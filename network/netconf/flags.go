@@ -7,7 +7,6 @@ import (
 	"github.com/spf13/pflag"
 	"github.com/spf13/viper"
 
-	"github.com/onflow/flow-go/network/channels"
 	p2pconfig "github.com/onflow/flow-go/network/p2p/config"
 )
 
@@ -203,8 +202,7 @@ func AllFlagNames() []string {
 		BuildFlagName(gossipsubKey, p2pconfig.ScoreParamsKey, p2pconfig.ScoringRegistryKey, p2pconfig.MisbehaviourPenaltiesKey, p2pconfig.ClusterPrefixedReductionFactorKey),
 
 		BuildFlagName(gossipsubKey, p2pconfig.PeerGaterKey, p2pconfig.EnabledKey),
-		BuildFlagName(gossipsubKey, p2pconfig.PeerGaterKey, p2pconfig.TopicDeliveryWeightsKey, channels.ConsensusCommittee.String()),
-		BuildFlagName(gossipsubKey, p2pconfig.PeerGaterKey, p2pconfig.TopicDeliveryWeightsKey, channels.SyncCommittee.String()),
+		BuildFlagName(gossipsubKey, p2pconfig.PeerGaterKey, p2pconfig.TopicDeliveryWeightsKey),
 	}
 
 	for _, scope := range []string{systemScope, transientScope, protocolScope, peerScope, peerProtocolScope} {
@@ -603,15 +601,11 @@ func InitializeNetworkFlags(flags *pflag.FlagSet, config *Config) {
 		"the factor used to reduce the penalty for control message misbehaviours on cluster prefixed topics")
 
 	flags.Bool(BuildFlagName(gossipsubKey, p2pconfig.PeerGaterKey, p2pconfig.EnabledKey),
-		config.GossipSub.PeerGaterParameters.Enabled,
+		config.GossipSub.PeerScoringEnabled,
 		"enable the libp2p peer gater")
-	flags.Float64(BuildFlagName(gossipsubKey, p2pconfig.PeerGaterKey, p2pconfig.TopicDeliveryWeightsKey, channels.ConsensusCommittee.String()),
-		config.GossipSub.PeerGaterParameters.TopicDeliveryWeightsOverride.ConsensusCommittee,
-		"topic delivery weights override for the consensus-committee topic")
-	flags.Float64(BuildFlagName(gossipsubKey, p2pconfig.PeerGaterKey, p2pconfig.TopicDeliveryWeightsKey, channels.SyncCommittee.String()),
-		config.GossipSub.PeerGaterParameters.TopicDeliveryWeightsOverride.SyncCommittee,
-		"topic delivery weights override for the sync-committee topic")
-
+	flags.String(BuildFlagName(gossipsubKey, p2pconfig.PeerGaterKey, p2pconfig.TopicDeliveryWeightsKey),
+		config.GossipSub.PeerGaterTopicDeliveryWeightsOverride,
+		"topic delivery weights override")
 }
 
 // LoadLibP2PResourceManagerFlags loads all CLI flags for the libp2p resource manager configuration on the provided pflag set.

@@ -1,6 +1,8 @@
 package p2pconfig
 
 import (
+	"strconv"
+	"strings"
 	"time"
 )
 
@@ -79,8 +81,12 @@ type GossipSubParameters struct {
 	SubscriptionProvider SubscriptionProviderParameters `mapstructure:"subscription-provider"`
 	ScoringParameters    ScoringParameters              `mapstructure:"scoring-parameters"`
 
-	// PeerGaterParameters is the configuration for the libp2p peer gater.
-	PeerGaterParameters PeerGaterParameters `mapstructure:"peer-gater"`
+	// PeerGaterEnabled enables the peer gater.
+	PeerGaterEnabled bool `mapstructure:"peer-gater-enabled"`
+	// PeerGaterTopicDeliveryWeightsOverride topic delivery weights that will override the default value for the specified channel.
+	// This is a comma separated list "channel:weight, channel2:weight, channel3:weight".
+	// i.e: consensus-committee: 1.5, sync-committee: .75
+	PeerGaterTopicDeliveryWeightsOverride string `mapstructure:"peer-gater-topic-delivery-weights-override"`
 }
 
 const (
@@ -94,30 +100,20 @@ type ScoringParameters struct {
 	ScoringRegistryParameters ScoringRegistryParameters `validate:"required" mapstructure:"scoring-registry"`
 }
 
-// PeerGaterParameters are the parameters for the libp2p peer gater. This config provides operators the ability
-// to override topic delivery weights for the peer gater. The default weight is 1.0.
-// Parameters are "numerical values" that are used to compute or build components that compute the score of a peer in GossipSub system.
-type PeerGaterParameters struct {
-	// Enabled enables the peer gater.
-	Enabled bool `validate:"required" mapstructure:"enabled"`
-	// TopicDeliveryWeightsOverride topic delivery weights that will override the default value for the specified channel.
-	TopicDeliveryWeightsOverride TopicDeliveryWeightsOverride `validate:"required" mapstructure:"topic-delivery-weights-override"`
-}
-
-// TopicDeliveryWeightsOverride topic delivery weights used to override the default topic delivery weight 1.0 of the peer gater.
-// Parameters are "numerical values" that are used to compute or build components that compute the score of a peer in GossipSub system.
-type TopicDeliveryWeightsOverride struct {
-	ConsensusCommittee float64 `validate:"required" mapstructure:"consensus-committee"`
-	SyncCommittee      float64 `validate:"required" mapstructure:"sync-committee"`
-}
-
-// ToMap returns the topic delivery weights configured on this struct as a map[string]float64 .
+// PeerGaterTopicDeliveryWeights returns the topic delivery weights configured on this struct as a map[string]float64 .
 // Note: When new topic delivery weights are added to the struct this func should be updated.
-func (t *TopicDeliveryWeightsOverride) ToMap() map[string]float64 {
-	return map[string]float64{
-		"consensus-committee": t.ConsensusCommittee,
-		"sync-committee":      t.SyncCommittee,
+func (g *GossipSubParameters) PeerGaterTopicDeliveryWeights() (map[string]float64, error) {
+	m := make(map[string]float64)
+	for _, weightConfig := range strings.Split(g.PeerGaterTopicDeliveryWeightsOverride, ",") {
+		wc := strings.Split(weightConfig, ":")
+		f, err := strconv.ParseFloat(strings.TrimSpace(wc[1]), 64)
+		if err != nil {
+			return nil, err
+		}
+		m[strings.TrimSpace(wc[0])] = f
 	}
+
+	return m, nil
 }
 
 // SubscriptionProviderParameters keys.
