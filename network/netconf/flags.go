@@ -202,7 +202,7 @@ func AllFlagNames() []string {
 		BuildFlagName(gossipsubKey, p2pconfig.ScoreParamsKey, p2pconfig.ScoringRegistryKey, p2pconfig.MisbehaviourPenaltiesKey, p2pconfig.PublishKey),
 		BuildFlagName(gossipsubKey, p2pconfig.ScoreParamsKey, p2pconfig.ScoringRegistryKey, p2pconfig.MisbehaviourPenaltiesKey, p2pconfig.ClusterPrefixedReductionFactorKey),
 
-		BuildFlagName(gossipsubKey, p2pconfig.PeerGaterKey, p2pconfig.EnableKey),
+		BuildFlagName(gossipsubKey, p2pconfig.PeerGaterKey, p2pconfig.EnabledKey),
 		BuildFlagName(gossipsubKey, p2pconfig.PeerGaterKey, p2pconfig.TopicDeliveryWeightsKey, channels.ConsensusCommittee.String()),
 		BuildFlagName(gossipsubKey, p2pconfig.PeerGaterKey, p2pconfig.TopicDeliveryWeightsKey, channels.SyncCommittee.String()),
 	}
@@ -602,7 +602,7 @@ func InitializeNetworkFlags(flags *pflag.FlagSet, config *Config) {
 		config.GossipSub.ScoringParameters.ScoringRegistryParameters.MisbehaviourPenalties.ClusterPrefixedReductionFactor,
 		"the factor used to reduce the penalty for control message misbehaviours on cluster prefixed topics")
 
-	flags.Bool(BuildFlagName(gossipsubKey, p2pconfig.PeerGaterKey, p2pconfig.EnableKey),
+	flags.Bool(BuildFlagName(gossipsubKey, p2pconfig.PeerGaterKey, p2pconfig.EnabledKey),
 		config.GossipSub.PeerGaterParameters.Enabled,
 		"enable the libp2p peer gater")
 	flags.Float64(BuildFlagName(gossipsubKey, p2pconfig.PeerGaterKey, p2pconfig.TopicDeliveryWeightsKey, channels.ConsensusCommittee.String()),

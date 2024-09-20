@@ -99,7 +99,7 @@ type ScoringParameters struct {
 // Parameters are "numerical values" that are used to compute or build components that compute the score of a peer in GossipSub system.
 type PeerGaterParameters struct {
 	// Enabled enables the peer gater.
-	Enabled bool `validate:"required" mapstructure:"enable"`
+	Enabled bool `validate:"required" mapstructure:"enabled"`
 	// TopicDeliveryWeightsOverride topic delivery weights that will override the default value for the specified channel.
 	TopicDeliveryWeightsOverride TopicDeliveryWeightsOverride `validate:"required" mapstructure:"topic-delivery-weights-override"`
 }
