@@ -913,10 +913,6 @@ func (suite *Suite) TestGetTransactionResultByIndex() {
 	suite.state.On("Final").Return(suite.snapshot, nil).Maybe()
 	suite.snapshot.On("Identities", mock.Anything).Return(fixedENIDs, nil)
 
-	// create a mock connection factory
-	connFactory := connectionmock.NewConnectionFactory(suite.T())
-	connFactory.On("GetExecutionAPIClient", mock.Anything).Return(suite.execClient, &mockCloser{}, nil)
-
 	exeEventReq := &execproto.GetTransactionByIndexRequest{
 		BlockId: blockId[:],
 		Index:   index,
@@ -928,7 +924,7 @@ func (suite *Suite) TestGetTransactionResultByIndex() {
 
 	params := suite.defaultBackendParams()
 	// the connection factory should be used to get the execution node client
-	params.ConnFactory = connFactory
+	params.ConnFactory = suite.setupConnectionFactory()
 	params.FixedExecutionNodeIDs = (fixedENIDs.NodeIDs()).Strings()
 
 	backend, err := New(params)
@@ -983,10 +979,6 @@ func (suite *Suite) TestGetTransactionResultsByBlockID() {
 	suite.state.On("Final").Return(suite.snapshot, nil).Maybe()
 	suite.snapshot.On("Identities", mock.Anything).Return(fixedENIDs, nil)
 
-	// create a mock connection factory
-	connFactory := connectionmock.NewConnectionFactory(suite.T())
-	connFactory.On("GetExecutionAPIClient", mock.Anything).Return(suite.execClient, &mockCloser{}, nil)
-
 	exeEventReq := &execproto.GetTransactionsByBlockIDRequest{
 		BlockId: blockId[:],
 	}
@@ -996,7 +988,7 @@ func (suite *Suite) TestGetTransactionResultsByBlockID() {
 	}
 
 	// the connection factory should be used to get the execution node client
-	params.ConnFactory = connFactory
+	params.ConnFactory = suite.setupConnectionFactory()
 	params.FixedExecutionNodeIDs = (fixedENIDs.NodeIDs()).Strings()
 
 	backend, err := New(params)
@@ -1076,10 +1068,6 @@ func (suite *Suite) TestTransactionStatusTransition() {
 	suite.state.On("Final").Return(suite.snapshot, nil).Maybe()
 	suite.snapshot.On("Identities", mock.Anything).Return(fixedENIDs, nil)
 
-	// create a mock connection factory
-	connFactory := connectionmock.NewConnectionFactory(suite.T())
-	connFactory.On("GetExecutionAPIClient", mock.Anything).Return(suite.execClient, &mockCloser{}, nil)
-
 	exeEventReq := &execproto.GetTransactionResultRequest{
 		BlockId:       blockID[:],
 		TransactionId: txID[:],
@@ -1091,7 +1079,7 @@ func (suite *Suite) TestTransactionStatusTransition() {
 
 	params := suite.defaultBackendParams()
 	// the connection factory should be used to get the execution node client
-	params.ConnFactory = connFactory
+	params.ConnFactory = suite.setupConnectionFactory()
 	params.FixedExecutionNodeIDs = (fixedENIDs.NodeIDs()).Strings()
 
 	backend, err := New(params)
@@ -1970,13 +1958,9 @@ func (suite *Suite) TestGetTransactionResultEventEncodingVersion() {
 	suite.state.On("Final").Return(suite.snapshot, nil).Maybe()
 	suite.snapshot.On("Identities", mock.Anything).Return(fixedENIDs, nil)
 
-	// create a mock connection factory
-	connFactory := connectionmock.NewConnectionFactory(suite.T())
-	connFactory.On("GetExecutionAPIClient", mock.Anything).Return(suite.execClient, &mockCloser{}, nil)
-
 	params := suite.defaultBackendParams()
 	// the connection factory should be used to get the execution node client
-	params.ConnFactory = connFactory
+	params.ConnFactory = suite.setupConnectionFactory()
 	params.FixedExecutionNodeIDs = (fixedENIDs.NodeIDs()).Strings()
 
 	backend, err := New(params)
@@ -2036,13 +2020,9 @@ func (suite *Suite) TestGetTransactionResultByIndexAndBlockIdEventEncodingVersio
 	suite.state.On("Final").Return(suite.snapshot, nil).Maybe()
 	suite.snapshot.On("Identities", mock.Anything).Return(fixedENIDs, nil)
 
-	// create a mock connection factory
-	connFactory := connectionmock.NewConnectionFactory(suite.T())
-	connFactory.On("GetExecutionAPIClient", mock.Anything).Return(suite.execClient, &mockCloser{}, nil)
-
 	params := suite.defaultBackendParams()
 	// the connection factory should be used to get the execution node client
-	params.ConnFactory = connFactory
+	params.ConnFactory = suite.setupConnectionFactory()
 	params.FixedExecutionNodeIDs = (fixedENIDs.NodeIDs()).Strings()
 
 	backend, err := New(params)
@@ -2136,17 +2116,13 @@ func (suite *Suite) TestNodeCommunicator() {
 	suite.state.On("Final").Return(suite.snapshot, nil).Maybe()
 	suite.snapshot.On("Identities", mock.Anything).Return(fixedENIDs, nil)
 
-	// create a mock connection factory
-	connFactory := connectionmock.NewConnectionFactory(suite.T())
-	connFactory.On("GetExecutionAPIClient", mock.Anything).Return(suite.execClient, &mockCloser{}, nil)
-
 	exeEventReq := &execproto.GetTransactionsByBlockIDRequest{
 		BlockId: blockId[:],
 	}
 
 	params := suite.defaultBackendParams()
 	// the connection factory should be used to get the execution node client
-	params.ConnFactory = connFactory
+	params.ConnFactory = suite.setupConnectionFactory()
 	params.FixedExecutionNodeIDs = (fixedENIDs.NodeIDs()).Strings()
 	// Left only one preferred execution node
 	params.PreferredExecutionNodeIDs = []string{fixedENIDs[0].NodeID.String()}
