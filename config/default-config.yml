@@ -629,9 +629,9 @@ network-config:
       # Recommended size is 10x the number of peers in the network.
       cache-size: 10000
     # Enables or disables the libp2p peer gater.
-    peer-gater-enabled: false
+    peer-gater-enabled: true
     # The per IP decay for all counters tracked by the peer gater for a peer.
-    peer-gater-source-decay: 10m
+    peer-gater-source-decay: 1h
     # The priority topic delivery weights.
     peer-gater-topic-delivery-weights-override: |
       consensus-committee: 1.5, sync-committee: .75
