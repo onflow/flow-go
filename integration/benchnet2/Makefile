@@ -33,7 +33,7 @@ gen-bootstrap: clone-flow
 		--address-format "%s%d-${NETWORK_ID}.${NAMESPACE}:3569" \
 		--access 15 \
 		--collection 20 \
-		--consensus 10 \
+		--consensus 4 \
 		--execution 2 \
 		--verification 50 \
 		--weight 100 \
