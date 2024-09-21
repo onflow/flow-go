@@ -35,9 +35,10 @@ const (
 )
 
 var (
-	flagANAddress    string
-	flagANNetworkKey string
-	flagNetworkEnv   string
+	flagANAddress          string
+	flagANNetworkKey       string
+	flagNetworkEnv         string
+	flagIncludeAccessNodes bool
 )
 
 // populatePartnerInfos represents the `populate-partner-infos` command which will read the proposed node
@@ -55,6 +56,7 @@ func init() {
 	populatePartnerInfosCMD.Flags().StringVar(&flagANAddress, "access-address", "", "the address of the access node used for client connections")
 	populatePartnerInfosCMD.Flags().StringVar(&flagANNetworkKey, "access-network-key", "", "the network key of the access node used for client connections in hex string format")
 	populatePartnerInfosCMD.Flags().StringVar(&flagNetworkEnv, "network", "mainnet", "the network string, expecting one of ( mainnet | testnet | emulator )")
+	populatePartnerInfosCMD.Flags().BoolVar(&flagIncludeAccessNodes, "include-candidate-access-nodes", false, "whether to include the candidate access nodes")
 
 	cmd.MarkFlagRequired(populatePartnerInfosCMD, "access-address")
 }
@@ -76,13 +78,26 @@ func populatePartnerInfosRun(_ *cobra.Command, _ []string) {
 		flow.RoleAccess:       0,
 	}
 	totalNumOfPartnerNodes := 0
+	var allNodes []cadence.Value
 
 	nodeInfos, err := executeGetProposedNodesInfosScript(ctx, flowClient)
 	if err != nil {
 		log.Fatal().Err(err).Msg("could not get node info for nodes in the proposed table")
 	}
+	allNodes = nodeInfos.(cadence.Array).Values[:]
 
-	for _, info := range nodeInfos.(cadence.Array).Values {
+	log.Info().Int("total_proposed_nodes", len(allNodes)).Msg("total nodes in proposed table")
+
+	if flagIncludeAccessNodes {
+		candidateNodeInfos, err := executeGetCandidateAccessNodesInfosScript(ctx, flowClient)
+		if err != nil {
+			log.Fatal().Err(err).Msg("could not get node info for nodes in the proposed table")
+		}
+		log.Info().Int("total_candidate_access_nodes", len(candidateNodeInfos.(cadence.Array).Values)).Msg("total access nodes in candidate table")
+		allNodes = append(allNodes, candidateNodeInfos.(cadence.Array).Values[:]...)
+	}
+
+	for _, info := range allNodes {
 		nodePubInfo, err := parseNodeInfo(info)
 		if err != nil {
 			log.Fatal().Err(err).Msg("could not parse node info from cadence script")
@@ -134,6 +149,21 @@ func getFlowClient() *client.Client {
 // executeGetProposedNodesInfosScript executes the get node info for each ID in the proposed table
 func executeGetProposedNodesInfosScript(ctx context.Context, client *client.Client) (cadence.Value, error) {
 	script, err := common.GetNodeInfoForProposedNodesScript(flagNetworkEnv)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get cadence script: %w", err)
+	}
+
+	infos, err := client.ExecuteScriptAtLatestBlock(ctx, script, []cadence.Value{})
+	if err != nil {
+		return nil, fmt.Errorf("failed to execute the get node info script: %w", err)
+	}
+
+	return infos, nil
+}
+
+// GetNodeInfoForCandidateNodesScript executes the get node info for each Access node ID in the candidate table
+func executeGetCandidateAccessNodesInfosScript(ctx context.Context, client *client.Client) (cadence.Value, error) {
+	script, err := common.GetNodeInfoForCandidateNodesScript(flagNetworkEnv)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get cadence script: %w", err)
 	}
