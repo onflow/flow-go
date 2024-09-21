@@ -91,7 +91,7 @@ func populatePartnerInfosRun(_ *cobra.Command, _ []string) {
 	if flagIncludeAccessNodes {
 		candidateNodeInfos, err := executeGetCandidateAccessNodesInfosScript(ctx, flowClient)
 		if err != nil {
-			log.Fatal().Err(err).Msg("could not get node info for nodes in the proposed table")
+			log.Fatal().Err(err).Msg("could not get node info for nodes in the candidate table")
 		}
 		log.Info().Int("total_candidate_access_nodes", len(candidateNodeInfos.(cadence.Array).Values)).Msg("total access nodes in candidate table")
 		allNodes = append(allNodes, candidateNodeInfos.(cadence.Array).Values[:]...)
