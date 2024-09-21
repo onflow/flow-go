@@ -56,10 +56,10 @@ consensus:
   defaults:{{template "defaults"}}
     resources:
       requests:
-        cpu: "1"
+        cpu: "200m"
         memory: "128Mi"
       limits:
-        cpu: "2"
+        cpu: "800m"
         memory: "10Gi"
     storage: 1G
   nodes:
