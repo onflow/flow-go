@@ -602,6 +602,7 @@ docker-native-build-ghost-debug:
 PHONY: docker-build-bootstrap
 docker-build-bootstrap:
 	docker build -f cmd/Dockerfile  --build-arg TARGET=./cmd/bootstrap --build-arg GOARCH=$(GOARCH) --build-arg VERSION=$(IMAGE_TAG) --build-arg CGO_FLAG=$(CRYPTO_FLAG) --target production \
+		--secret id=cadence_deploy_key,env=CADENCE_DEPLOY_KEY --build-arg GOPRIVATE=$(GOPRIVATE) \
 		--label "git_commit=${COMMIT}" --label "git_tag=${IMAGE_TAG}" \
 		-t "$(CONTAINER_REGISTRY)/bootstrap:latest" \
 		-t "$(CONTAINER_REGISTRY)/bootstrap:$(IMAGE_TAG)" .
@@ -613,6 +614,7 @@ tool-bootstrap: docker-build-bootstrap
 .PHONY: docker-build-bootstrap-transit
 docker-build-bootstrap-transit:
 	docker build -f cmd/Dockerfile  --build-arg TARGET=./cmd/bootstrap/transit --build-arg COMMIT=$(COMMIT)  --build-arg VERSION=$(VERSION) --build-arg GOARCH=$(GOARCH) --build-arg CGO_FLAG=$(CRYPTO_FLAG) --no-cache \
+		--secret id=cadence_deploy_key,env=CADENCE_DEPLOY_KEY --build-arg GOPRIVATE=$(GOPRIVATE) \
 	    --target production  \
 		-t "$(CONTAINER_REGISTRY)/bootstrap-transit:latest" \
 		-t "$(CONTAINER_REGISTRY)/bootstrap-transit:$(IMAGE_TAG)" .
@@ -858,6 +860,7 @@ docker-all-tools: tool-util tool-remove-execution-fork
 PHONY: docker-build-util
 docker-build-util:
 	docker build -f cmd/Dockerfile --build-arg TARGET=./cmd/util --build-arg GOARCH=$(GOARCH) --build-arg VERSION=$(IMAGE_TAG) --build-arg CGO_FLAG=$(CRYPTO_FLAG) --target production \
+		--secret id=cadence_deploy_key,env=CADENCE_DEPLOY_KEY --build-arg GOPRIVATE=$(GOPRIVATE) \
 		-t "$(CONTAINER_REGISTRY)/util:latest"  \
 		-t "$(CONTAINER_REGISTRY)/util:$(IMAGE_TAG)" .
 
@@ -868,6 +871,7 @@ tool-util: docker-build-util
 PHONY: docker-build-remove-execution-fork
 docker-build-remove-execution-fork:
 	docker build -f cmd/Dockerfile --ssh default --build-arg TARGET=./cmd/util/cmd/remove-execution-fork --build-arg GOARCH=$(GOARCH) --build-arg VERSION=$(IMAGE_TAG) --build-arg CGO_FLAG=$(CRYPTO_FLAG) --target production \
+		--secret id=cadence_deploy_key,env=CADENCE_DEPLOY_KEY --build-arg GOPRIVATE=$(GOPRIVATE) \
 		-t "$(CONTAINER_REGISTRY)/remove-execution-fork:latest" \
 		-t "$(CONTAINER_REGISTRY)/remove-execution-fork:$(IMAGE_TAG)" .
 
