@@ -78,11 +78,30 @@ func (l *NoopLimiter) IsRateLimited(address flow.Address) bool {
 	return false
 }
 
+// PayerBalanceMode represents the mode for checking the payer's balance
+// when validating transactions. It controls whether and how the balance
+// check is performed during transaction validation.
+//
+// There are few modes available:
+//
+//   - `Disabled` - Balance checking is completely disabled. No checks are
+//     performed to verify if the payer has sufficient balance to cover the
+//     transaction fees.
+//   - `WarnCheck` - Balance is checked, and a warning is logged if the payer
+//     does not have enough balance. The transaction is still accepted and
+//     processed regardless of the check result.
+//   - `EnforceCheck` - Balance is checked, and the transaction is rejected if
+//     the payer does not have sufficient balance to cover the transaction fees.
 type PayerBalanceMode int
 
 const (
+	// Disabled indicates that payer balance checking is turned off.
 	Disabled PayerBalanceMode = iota
+
+	// WarnCheck logs a warning if the payer's balance is insufficient, but does not prevent the transaction from being accepted.
 	WarnCheck
+
+	// EnforceCheck prevents the transaction from being accepted if the payer's balance is insufficient to cover transaction fees.
 	EnforceCheck
 )
 
