@@ -1046,20 +1046,20 @@ func (b *backendTransactions) LookupErrorMessageByTransactionID(
 			}
 
 			if txResult.Failed {
-				txErrorMessage := flow.TransactionResultErrorMessage{
-					TransactionID: txResult.TransactionID,
-					ErrorMessage:  FailedErrorMessage,
-					ExecutorID:    flow.ZeroID,
-					Index:         uint32(i),
-				}
 				if b.txResultErrorMessages != nil {
-					err = b.txResultErrorMessages.Store(blockID, []flow.TransactionResultErrorMessage{txErrorMessage})
+					err = b.txResultErrorMessages.Store(blockID, []flow.TransactionResultErrorMessage{
+						{
+							TransactionID: txResult.TransactionID,
+							ErrorMessage:  FailedErrorMessage,
+							ExecutorID:    flow.ZeroID,
+							Index:         uint32(i),
+						},
+					})
 					if err != nil {
 						return "", fmt.Errorf("failed to store transaction error messages: %w", err)
 					}
 				}
-
-				return txErrorMessage.ErrorMessage, nil
+				return FailedErrorMessage, nil
 			}
 		}
 
@@ -1119,21 +1119,21 @@ func (b *backendTransactions) LookupErrorMessageByIndex(
 		}
 
 		if txResult.Failed {
-			txErrorMessage := flow.TransactionResultErrorMessage{
-				TransactionID: txResult.TransactionID,
-				ErrorMessage:  FailedErrorMessage,
-				ExecutorID:    flow.ZeroID,
-				Index:         index,
-			}
-
 			if b.txResultErrorMessages != nil {
-				err = b.txResultErrorMessages.Store(blockID, []flow.TransactionResultErrorMessage{txErrorMessage})
+				err = b.txResultErrorMessages.Store(blockID, []flow.TransactionResultErrorMessage{
+					{
+						TransactionID: txResult.TransactionID,
+						ErrorMessage:  FailedErrorMessage,
+						ExecutorID:    flow.ZeroID,
+						Index:         index,
+					},
+				})
 				if err != nil {
 					return "", fmt.Errorf("failed to store transaction error messages: %w", err)
 				}
 			}
 
-			return txErrorMessage.ErrorMessage, nil
+			return FailedErrorMessage, nil
 		}
 
 		// in case tx result is not failed
