@@ -3,7 +3,6 @@ package cohort3
 import (
 	"context"
 	"fmt"
-	"path/filepath"
 	"testing"
 	"time"
 
@@ -70,7 +69,7 @@ func (s *RegisterDBPruningSuite) SetupTest() {
 		testnet.WithAdditionalFlagf("--execution-data-dir=%s", testnet.DefaultExecutionDataServiceDir),
 		testnet.WithAdditionalFlag("--execution-data-retry-delay=1s"),
 		testnet.WithAdditionalFlag("--execution-data-indexing-enabled=true"),
-		testnet.WithAdditionalFlagf("--execution-state-dir=%s", s.getPebbleDBPath(s.accessNodeName)),
+		testnet.WithAdditionalFlagf("--execution-state-dir=%s", testnet.DefaultExecutionStateDir),
 		testnet.WithAdditionalFlagf("--public-network-execution-data-sync-enabled=true"),
 		testnet.WithAdditionalFlagf("--event-query-mode=local-only"),
 		testnet.WithAdditionalFlag("--registerdb-pruning-enabled=true"),
@@ -105,7 +104,7 @@ func (s *RegisterDBPruningSuite) SetupTest() {
 		LogLevel:      zerolog.InfoLevel,
 		AdditionalFlags: []string{
 			fmt.Sprintf("--execution-data-dir=%s", testnet.DefaultExecutionDataServiceDir),
-			fmt.Sprintf("--execution-state-dir=%s", s.getPebbleDBPath(s.observerNodeName)),
+			fmt.Sprintf("--execution-state-dir=%s", testnet.DefaultExecutionStateDir),
 			"--execution-data-sync-enabled=true",
 			"--execution-data-indexing-enabled=true",
 			"--execution-data-retry-delay=1s",
@@ -128,30 +127,26 @@ func (s *RegisterDBPruningSuite) SetupTest() {
 }
 
 func (s *RegisterDBPruningSuite) TestHappyPath() {
-	//accessNode := s.net.ContainerByName(s.accessNodeName)
+	accessNode := s.net.ContainerByName(s.accessNodeName)
 	observerNode := s.net.ContainerByName(s.observerNodeName)
 
 	waitingBlockHeight := uint64(200)
 	s.waitUntilExecutionDataForBlockIndexed(observerNode, waitingBlockHeight)
 	s.net.StopContainers()
 
-	pebbleAN := s.getPebbleDB(s.accessNodeName)
+	pebbleAN := s.getPebbleDB(accessNode.PebbleDBPath())
 	registerAN := s.nodeRegisterStorage(pebbleAN)
 
-	pebbleON := s.getPebbleDB(s.observerNodeName)
+	pebbleON := s.getPebbleDB(observerNode.PebbleDBPath())
 	registerON := s.nodeRegisterStorage(pebbleON)
 
 	assert.Equal(s.T(), registerAN.LatestHeight(), registerON.LatestHeight())
 }
 
-func (s *RegisterDBPruningSuite) getPebbleDBPath(containerName string) string {
-	return filepath.Join(testnet.DefaultExecutionStateDir, containerName)
-}
-
-func (s *RegisterDBPruningSuite) getPebbleDB(containerName string) *pebble.DB {
+func (s *RegisterDBPruningSuite) getPebbleDB(path string) *pebble.DB {
 	if s.pebbleDb == nil {
 		var err error
-		s.pebbleDb, err = pstorage.OpenRegisterPebbleDB(s.getPebbleDBPath(containerName))
+		s.pebbleDb, err = pstorage.OpenRegisterPebbleDB(path)
 		require.NoError(s.T(), err, "could not open db")
 	}
 	return s.pebbleDb
