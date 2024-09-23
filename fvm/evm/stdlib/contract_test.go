@@ -994,37 +994,10 @@ func TestEVMEncodeDecodeABIRoundtripForUintIntTypes(t *testing.T) {
 	t.Parallel()
 
 	handler := &testContractHandler{}
-
 	contractsAddress := flow.BytesToAddress([]byte{0x1})
-
 	transactionEnvironment := newEVMTransactionEnvironment(handler, contractsAddress)
 	scriptEnvironment := newEVMScriptEnvironment(handler, contractsAddress)
-
 	rt := runtime.NewInterpreterRuntime(runtime.Config{})
-
-	script := []byte(`
-      import EVM from 0x1
-
-      access(all)
-      fun main(): Bool {
-        // Check UInt*/Int* encode/decode
-        let amount: UInt256 = 18446744073709551615
-        let minBalance: Int256 = -18446744073709551615
-        let data = EVM.encodeABIWithSignature(
-          "withdraw(uint,int)",
-          [UInt(amount), Int(minBalance)]
-        )
-        let values = EVM.decodeABIWithSignature(
-          "withdraw(uint,int)",
-          types: [Type<UInt>(), Type<Int>()],
-          data: data
-        )
-        assert((values[0] as! UInt) == UInt(amount))
-        assert((values[1] as! Int) == Int(minBalance))
-
-        return true
-      }
-	`)
 
 	accountCodes := map[common.Location][]byte{}
 	var events []cadence.Event
@@ -1073,25 +1046,207 @@ func TestEVMEncodeDecodeABIRoundtripForUintIntTypes(t *testing.T) {
 		nextTransactionLocation,
 	)
 
-	// Run script
+	t.Run("with values between the boundaries", func(t *testing.T) {
 
-	result, err := rt.ExecuteScript(
-		runtime.Script{
-			Source:    script,
-			Arguments: [][]byte{},
-		},
-		runtime.Context{
-			Interface:   runtimeInterface,
-			Environment: scriptEnvironment,
-			Location:    nextScriptLocation(),
-		},
-	)
-	require.NoError(t, err)
+		script := []byte(`
+        import EVM from 0x1
 
-	assert.Equal(t,
-		cadence.Bool(true),
-		result,
-	)
+        access(all)
+        fun main(): Bool {
+          // Check UInt/Int encode/decode
+          let amount: UInt256 = 18446744073709551615
+          let minBalance: Int256 = -18446744073709551615
+          let data = EVM.encodeABIWithSignature(
+            "withdraw(uint,int)",
+            [UInt(amount), Int(minBalance)]
+          )
+          let values = EVM.decodeABIWithSignature(
+            "withdraw(uint,int)",
+            types: [Type<UInt>(), Type<Int>()],
+            data: data
+          )
+          assert((values[0] as! UInt) == UInt(amount))
+          assert((values[1] as! Int) == Int(minBalance))
+
+          return true
+        }
+		`)
+
+		// Run script
+
+		result, err := rt.ExecuteScript(
+			runtime.Script{
+				Source:    script,
+				Arguments: [][]byte{},
+			},
+			runtime.Context{
+				Interface:   runtimeInterface,
+				Environment: scriptEnvironment,
+				Location:    nextScriptLocation(),
+			},
+		)
+		require.NoError(t, err)
+
+		assert.Equal(t, cadence.Bool(true), result)
+	})
+
+	t.Run("with values at the boundaries", func(t *testing.T) {
+
+		script := []byte(`
+        import EVM from 0x1
+
+        access(all)
+        fun main(): Bool {
+          // Check UInt*/Int* encode/decode
+          let data = EVM.encodeABIWithSignature(
+            "withdraw(uint,int,uint,int)",
+            [UInt(UInt256.max), Int(Int256.max),UInt(UInt256.min), Int(Int256.min)]
+          )
+          let values = EVM.decodeABIWithSignature(
+            "withdraw(uint,int,uint,int)",
+            types: [Type<UInt>(), Type<Int>(),Type<UInt>(), Type<Int>()],
+            data: data
+          )
+          assert((values[0] as! UInt) == UInt(UInt256.max))
+          assert((values[1] as! Int) == Int(Int256.max))
+          assert((values[2] as! UInt) == UInt(UInt256.min))
+          assert((values[3] as! Int) == Int(Int256.min))
+
+          return true
+        }
+		`)
+
+		// Run script
+
+		result, err := rt.ExecuteScript(
+			runtime.Script{
+				Source:    script,
+				Arguments: [][]byte{},
+			},
+			runtime.Context{
+				Interface:   runtimeInterface,
+				Environment: scriptEnvironment,
+				Location:    nextScriptLocation(),
+			},
+		)
+		require.NoError(t, err)
+
+		assert.Equal(t, cadence.Bool(true), result)
+	})
+
+	t.Run("with UInt values outside the boundaries", func(t *testing.T) {
+
+		script := []byte(`
+        import EVM from 0x1
+
+        access(all)
+        fun main(): Bool {
+          let data = EVM.encodeABIWithSignature(
+            "withdraw(uint)",
+            [UInt(UInt256.max)+10]
+          )
+
+          return true
+        }
+		`)
+
+		// Run script
+
+		_, err := rt.ExecuteScript(
+			runtime.Script{
+				Source:    script,
+				Arguments: [][]byte{},
+			},
+			runtime.Context{
+				Interface:   runtimeInterface,
+				Environment: scriptEnvironment,
+				Location:    nextScriptLocation(),
+			},
+		)
+		require.Error(t, err)
+
+		assert.ErrorContains(
+			t,
+			err,
+			"failed to ABI encode value of type UInt: value outside the boundaries of uint256",
+		)
+	})
+
+	t.Run("with Int values outside the max boundary", func(t *testing.T) {
+
+		script := []byte(`
+        import EVM from 0x1
+
+        access(all)
+        fun main(): Bool {
+          let data = EVM.encodeABIWithSignature(
+            "withdraw(int)",
+            [Int(Int256.max)+10]
+          )
+
+          return true
+        }
+		`)
+
+		// Run script
+
+		_, err := rt.ExecuteScript(
+			runtime.Script{
+				Source:    script,
+				Arguments: [][]byte{},
+			},
+			runtime.Context{
+				Interface:   runtimeInterface,
+				Environment: scriptEnvironment,
+				Location:    nextScriptLocation(),
+			},
+		)
+		require.Error(t, err)
+
+		assert.ErrorContains(
+			t,
+			err,
+			"failed to ABI encode value of type Int: value outside the boundaries of int256",
+		)
+	})
+
+	t.Run("with Int values outside the min boundary", func(t *testing.T) {
+
+		script := []byte(`
+        import EVM from 0x1
+
+        access(all)
+        fun main(): Bool {
+          let data = EVM.encodeABIWithSignature(
+            "withdraw(int)",
+            [Int(Int256.min)-10]
+          )
+
+          return true
+        }
+		`)
+
+		// Run script
+
+		_, err := rt.ExecuteScript(
+			runtime.Script{
+				Source:    script,
+				Arguments: [][]byte{},
+			},
+			runtime.Context{
+				Interface:   runtimeInterface,
+				Environment: scriptEnvironment,
+				Location:    nextScriptLocation(),
+			},
+		)
+		require.Error(t, err)
+
+		assert.ErrorContains(
+			t,
+			err,
+			"failed to ABI encode value of type Int: value outside the boundaries of int256",
+		)
+	})
 }
 
 func TestEVMEncodeDecodeABIRoundtrip(t *testing.T) {
