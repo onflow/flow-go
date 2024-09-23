@@ -52,3 +52,7 @@ func (m *MockLocal) SignFunc(data []byte, hasher hash.Hasher, f func(crypto.Priv
 	error)) (crypto.Signature, error) {
 	return f(m.sk, data, hasher)
 }
+
+func (m *MockLocal) Role() flow.Role {
+	return 0
+}

@@ -45,3 +45,7 @@ func (l *LocalNoKey) SignFunc(data []byte, hasher hash.Hasher, f func(crypto.Pri
 	error)) (crypto.Signature, error) {
 	return nil, fmt.Errorf("no private key to use for signing")
 }
+
+func (l *LocalNoKey) Role() flow.Role {
+	return 0
+}

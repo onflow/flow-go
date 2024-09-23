@@ -74,6 +74,24 @@ func (_m *Local) NotMeFilter() flow.IdentityFilter[flow.Identity] {
 	return r0
 }
 
+// Role provides a mock function with given fields:
+func (_m *Local) Role() flow.Role {
+	ret := _m.Called()
+
+	if len(ret) == 0 {
+		panic("no return value specified for Role")
+	}
+
+	var r0 flow.Role
+	if rf, ok := ret.Get(0).(func() flow.Role); ok {
+		r0 = rf()
+	} else {
+		r0 = ret.Get(0).(flow.Role)
+	}
+
+	return r0
+}
+
 // Sign provides a mock function with given fields: _a0, _a1
 func (_m *Local) Sign(_a0 []byte, _a1 hash.Hasher) (crypto.Signature, error) {
 	ret := _m.Called(_a0, _a1)

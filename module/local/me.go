@@ -52,3 +52,7 @@ func (l *Local) SignFunc(data []byte, hasher hash.Hasher, f func(crypto.PrivateK
 	error)) (crypto.Signature, error) {
 	return f(l.sk, data, hasher)
 }
+
+func (l *Local) Role() flow.Role {
+	return l.me.Role
+}

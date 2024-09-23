@@ -30,4 +30,6 @@ type Local interface {
 	// is to not expose the private key to the caller.
 	SignFunc([]byte, hash.Hasher, func(crypto.PrivateKey, []byte, hash.Hasher) (crypto.Signature,
 		error)) (crypto.Signature, error)
+
+	Role() flow.Role
 }

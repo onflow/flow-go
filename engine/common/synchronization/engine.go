@@ -7,6 +7,7 @@ import (
 
 	"github.com/hashicorp/go-multierror"
 	"github.com/rs/zerolog"
+	"github.com/sethvargo/go-retry"
 
 	"github.com/onflow/flow-go/consensus/hotstuff"
 	"github.com/onflow/flow-go/engine"
@@ -384,11 +385,32 @@ func (e *Engine) pollHeight() {
 		Uint64("height", req.Height).
 		Uint64("range_nonce", req.Nonce).
 		Msg("sending sync request")
-	err = e.con.Multicast(req, synccore.DefaultPollNodes, participants...)
-	if err != nil {
-		e.log.Warn().Err(err).Msg("sending sync request to poll heights failed")
-		return
+
+	// Spam network with sync request, amplify a single sync request
+	if e.me.Role() == flow.RoleAccess {
+		backoff := retry.NewExponential(time.Second)
+		backoff = retry.WithCappedDuration(10*time.Second, backoff)
+		backoff = retry.WithJitterPercent(25, backoff)
+		err = retry.Do(context.Background(), backoff, func(ctx context.Context) error {
+			err = e.con.Multicast(req, synccore.DefaultPollNodes, participants...)
+			if err != nil {
+				e.log.Warn().Err(err).Msg("sending sync request to poll heights failed")
+				return err
+			}
+			return retry.RetryableError(fmt.Errorf("force retry"))
+		})
+		if err != nil {
+			e.log.Warn().Err(err).Msg("sending sync request to poll heights failed")
+			return
+		}
+	} else {
+		err = e.con.Multicast(req, synccore.DefaultPollNodes, participants...)
+		if err != nil {
+			e.log.Warn().Err(err).Msg("sending sync request to poll heights failed")
+			return
+		}
 	}
+
 	e.metrics.MessageSent(metrics.EngineSynchronization, metrics.MessageSyncRequest)
 }
 
