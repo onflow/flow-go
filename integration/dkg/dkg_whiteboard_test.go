@@ -1,11 +1,12 @@
 package dkg
 
 import (
-	"golang.org/x/exp/slices"
 	"math/rand"
 	"os"
 	"testing"
 	"time"
+
+	"golang.org/x/exp/slices"
 
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"

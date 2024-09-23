@@ -1,8 +1,9 @@
 package dkg
 
 import (
-	"github.com/onflow/flow-go/module"
 	"sync"
+
+	"github.com/onflow/flow-go/module"
 
 	"github.com/onflow/crypto"
 

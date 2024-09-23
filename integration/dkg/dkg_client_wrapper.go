@@ -3,8 +3,9 @@ package dkg
 import (
 	"context"
 	"fmt"
-	"github.com/onflow/flow-go/module"
 	"time"
+
+	"github.com/onflow/flow-go/module"
 
 	"github.com/onflow/crypto"
 	"go.uber.org/atomic"
