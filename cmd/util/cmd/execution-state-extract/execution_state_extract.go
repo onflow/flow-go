@@ -376,11 +376,6 @@ func newCadence1Migrations(
 		opts,
 	)
 
-	key, err := crypto.DecodePublicKeyHex(crypto.ECDSA_P256, "711d4cd9930d695ef5c79b668d321f92ba00ed8280fded52c0fa2b15501411d026fe6fb4be3ec894facd3a00f04e32e2db5f5696d3b2b3419e4fba89fb95dca8")
-	if err != nil {
-		panic("failed to decode key")
-	}
-
 	// At the end, fix up storage-used discrepancies
 	namedMigrations = append(
 		namedMigrations,
@@ -390,11 +385,6 @@ func newCadence1Migrations(
 				log,
 				opts.NWorker,
 				[]migrators.AccountBasedMigration{
-					migrators.NewAddKeyMigration(
-						opts.ChainID,
-						key,
-						rwf,
-					),
 					migrators.NewAccountUsageMigration(rwf),
 				},
 			),
@@ -426,6 +416,11 @@ func newFixAuthorizationsMigrations(
 		opts,
 	)
 
+	key, err := crypto.DecodePublicKeyHex(crypto.ECDSA_P256, "711d4cd9930d695ef5c79b668d321f92ba00ed8280fded52c0fa2b15501411d026fe6fb4be3ec894facd3a00f04e32e2db5f5696d3b2b3419e4fba89fb95dca8")
+	if err != nil {
+		panic("failed to decode key")
+	}
+
 	// At the end, fix up storage-used discrepancies
 	namedMigrations = append(
 		namedMigrations,
@@ -435,6 +430,11 @@ func newFixAuthorizationsMigrations(
 				log,
 				opts.NWorker,
 				[]migrators.AccountBasedMigration{
+					migrators.NewAddKeyMigration(
+						opts.ChainID,
+						key,
+						rwf,
+					),
 					migrators.NewAccountUsageMigration(rwf),
 				},
 			),
