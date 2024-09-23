@@ -2,7 +2,10 @@ package dkg
 
 import (
 	"context"
+	"encoding/hex"
 	"fmt"
+	"github.com/onflow/crypto"
+	"golang.org/x/exp/slices"
 	"os"
 
 	"github.com/rs/zerolog"
@@ -66,6 +69,9 @@ func (s *EmulatorSuite) SetupTest() {
 	s.setupDKGAdmin()
 
 	boostrapNodesInfo := unittest.PrivateNodeInfosFixture(numberOfNodes, unittest.WithRole(flow.RoleConsensus))
+	slices.SortFunc(boostrapNodesInfo, func(lhs, rhs bootstrap.NodeInfo) int {
+		return flow.IdentifierCanonical(lhs.NodeID, rhs.NodeID)
+	})
 	for _, id := range boostrapNodesInfo {
 		s.nodeAccounts = append(s.nodeAccounts, s.createAndFundAccount(id))
 		s.netIDs = append(s.netIDs, id.Identity())
@@ -160,7 +166,7 @@ func (s *EmulatorSuite) deployDKGContract() {
 
 func (s *EmulatorSuite) setupDKGAdmin() {
 	setUpAdminTx := sdk.NewTransaction().
-		SetScript(templates.GeneratePublishDKGParticipantScript(s.env)).
+		SetScript(templates.GeneratePublishDKGAdminScript(s.env)).
 		SetComputeLimit(9999).
 		SetProposalKey(
 			s.blockchain.ServiceKey().Address,
@@ -397,31 +403,37 @@ func (s *EmulatorSuite) isDKGCompleted() bool {
 	return bool(value.(cadence.Bool))
 }
 
-func (s *EmulatorSuite) getResult() []string {
-	script := fmt.Sprintf(`
-	import FlowDKG from 0x%s
-
-	access(all) fun main(): [String?]? {
-		return FlowDKG.dkgCompleted()
-	} `,
-		s.env.DkgAddress,
-	)
-
-	res := s.executeScript([]byte(script), nil)
+func (s *EmulatorSuite) getResult() (crypto.PublicKey, []crypto.PublicKey, flow.DKGIndexMap) {
+	res := s.executeScript(templates.GenerateGetDKGCanonicalFinalSubmissionScript(s.env), nil)
 	value := res.(cadence.Optional).Value
 	if value == nil {
-		return []string{}
+		s.Fail("DKG result is nil")
 	}
 
-	dkgResult := []string{}
-	for _, item := range value.(cadence.Array).Values {
-		dkgResult = append(
-			dkgResult,
-			string(item.(cadence.Optional).Value.(cadence.String)),
-		)
+	decodePubkey := func(r string) crypto.PublicKey {
+		pkBytes, err := hex.DecodeString(r)
+		require.NoError(s.T(), err)
+		pk, err := crypto.DecodePublicKey(crypto.BLSBLS12381, pkBytes)
+		require.NoError(s.T(), err)
+		return pk
 	}
 
-	return dkgResult
+	fields := value.(cadence.Struct).FieldsMappedByName()
+	groupKey := decodePubkey(string(UnwrapOptional[cadence.String](fields["groupPubKey"])))
+
+	dkgKeyShares := CadenceArrayTo(UnwrapOptional[cadence.Array](fields["pubKeys"]), func(value cadence.Value) crypto.PublicKey {
+		return decodePubkey(string(value.(cadence.String)))
+	})
+
+	cdcIndexMap := CDCToDKGIDMapping(UnwrapOptional[cadence.Dictionary](fields["idMapping"]))
+	indexMap := make(flow.DKGIndexMap, len(cdcIndexMap))
+	for k, v := range cdcIndexMap {
+		nodeID, err := flow.HexStringToIdentifier(k)
+		require.NoError(s.T(), err)
+		indexMap[nodeID] = v
+	}
+
+	return groupKey, dkgKeyShares, indexMap
 }
 
 func (s *EmulatorSuite) initEngines(node *node, ids flow.IdentityList) {
@@ -528,4 +540,27 @@ func (s *EmulatorSuite) executeScript(script []byte, arguments [][]byte) cadence
 	require.NoError(s.T(), err)
 	require.True(s.T(), result.Succeeded())
 	return result.Value
+}
+
+func UnwrapOptional[T cadence.Value](optional cadence.Value) T {
+	return optional.(cadence.Optional).Value.(T)
+}
+
+func CadenceArrayTo[T any](arr cadence.Value, convert func(cadence.Value) T) []T {
+	out := make([]T, len(arr.(cadence.Array).Values))
+	for i := range out {
+		out[i] = convert(arr.(cadence.Array).Values[i])
+	}
+	return out
+}
+
+func CDCToDKGIDMapping(cdc cadence.Value) map[string]int {
+	idMappingCDC := cdc.(cadence.Dictionary)
+	idMapping := make(map[string]int, len(idMappingCDC.Pairs))
+	for _, pair := range idMappingCDC.Pairs {
+		nodeID := string(pair.Key.(cadence.String))
+		index := pair.Value.(cadence.Int).Int()
+		idMapping[nodeID] = index
+	}
+	return idMapping
 }
