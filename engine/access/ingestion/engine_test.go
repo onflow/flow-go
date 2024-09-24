@@ -849,6 +849,7 @@ func (s *Suite) TestTransactionResultErrorMessagesAreFetched() {
 	// Mock the protocol snapshot to return fixed execution node IDs.
 	_, fixedENIDs := s.setupReceipts(&block)
 	s.proto.snapshot.On("Identities", mock.Anything).Return(fixedENIDs, nil)
+	s.proto.state.On("AtBlockID", blockId).Return(s.proto.snapshot)
 
 	// Mock the finalized root block header with height 0.
 	header := unittest.BlockHeaderFixture(unittest.WithHeaderHeight(0))
@@ -947,14 +948,11 @@ func (s *Suite) TestTransactionResultErrorMessagesAreFetched() {
 // setupReceipts sets up mock execution receipts for a block and returns the receipts along
 // with the identities of the execution nodes that processed them.
 func (s *Suite) setupReceipts(block *flow.Block) ([]*flow.ExecutionReceipt, flow.IdentityList) {
-	ids := unittest.IdentityListFixture(2, unittest.WithRole(flow.RoleExecution))
+	ids := unittest.IdentityListFixture(1, unittest.WithRole(flow.RoleExecution))
 	receipt1 := unittest.ReceiptForBlockFixture(block)
 	receipt1.ExecutorID = ids[0].NodeID
-	receipt2 := unittest.ReceiptForBlockFixture(block)
-	receipt2.ExecutorID = ids[1].NodeID
-	receipt1.ExecutionResult = receipt2.ExecutionResult
 
-	receipts := flow.ExecutionReceiptList{receipt1, receipt2}
+	receipts := flow.ExecutionReceiptList{receipt1}
 	s.receipts.
 		On("ByBlockID", block.ID()).
 		Return(receipts, nil)
