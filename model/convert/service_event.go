@@ -226,7 +226,7 @@ func convertServiceEventEpochCommit(event flow.Event) (*flow.ServiceEvent, error
 
 	fields := cadence.FieldsMappedByName(cdcEvent)
 
-	const expectedFieldCount = 3
+	const expectedFieldCount = 5
 	if len(fields) < expectedFieldCount {
 		return nil, fmt.Errorf(
 			"insufficient fields in EpochCommit event (%d < %d)",
@@ -285,6 +285,7 @@ func convertServiceEventEpochCommit(event flow.Event) (*flow.ServiceEvent, error
 	}
 	commit.DKGGroupKey = groupKey[0]
 
+	commit.DKGIndexMap = make(flow.DKGIndexMap, len(cdcDKGIndexMap.Pairs))
 	for _, pair := range cdcDKGIndexMap.Pairs {
 		nodeID, err := flow.HexStringToIdentifier(string(pair.Key.(cadence.String)))
 		if err != nil {
