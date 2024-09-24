@@ -9,6 +9,7 @@ import (
 	"github.com/onflow/cadence/runtime/common"
 	"github.com/onflow/cadence/runtime/errors"
 	"github.com/onflow/cadence/runtime/interpreter"
+	"github.com/onflow/cadence/runtime/sema"
 	gethABI "github.com/onflow/go-ethereum/accounts/abi"
 	gethCommon "github.com/onflow/go-ethereum/common"
 
@@ -21,7 +22,8 @@ const abiEncodingByteSize = 32
 
 // abiEncodingError
 type abiEncodingError struct {
-	Type interpreter.StaticType
+	Type    interpreter.StaticType
+	Message string
 }
 
 var _ errors.UserError = abiEncodingError{}
@@ -36,6 +38,12 @@ func (e abiEncodingError) Error() string {
 	if ty != nil {
 		b.WriteString(" of type ")
 		b.WriteString(ty.String())
+	}
+
+	message := e.Message
+	if message != "" {
+		b.WriteString(": ")
+		b.WriteString(message)
 	}
 
 	return b.String()
@@ -95,12 +103,14 @@ func reportABIEncodingComputation(
 				reportComputation(computation)
 
 			case interpreter.BoolValue,
+				interpreter.UIntValue,
 				interpreter.UInt8Value,
 				interpreter.UInt16Value,
 				interpreter.UInt32Value,
 				interpreter.UInt64Value,
 				interpreter.UInt128Value,
 				interpreter.UInt256Value,
+				interpreter.IntValue,
 				interpreter.Int8Value,
 				interpreter.Int16Value,
 				interpreter.Int32Value,
@@ -227,6 +237,8 @@ var gethTypeString = gethABI.Type{T: gethABI.StringTy}
 
 var gethTypeBool = gethABI.Type{T: gethABI.BoolTy}
 
+var gethTypeUint = gethABI.Type{T: gethABI.UintTy, Size: 256}
+
 var gethTypeUint8 = gethABI.Type{T: gethABI.UintTy, Size: 8}
 
 var gethTypeUint16 = gethABI.Type{T: gethABI.UintTy, Size: 16}
@@ -238,6 +250,8 @@ var gethTypeUint64 = gethABI.Type{T: gethABI.UintTy, Size: 64}
 var gethTypeUint128 = gethABI.Type{T: gethABI.UintTy, Size: 128}
 
 var gethTypeUint256 = gethABI.Type{T: gethABI.UintTy, Size: 256}
+
+var gethTypeInt = gethABI.Type{T: gethABI.IntTy, Size: 256}
 
 var gethTypeInt8 = gethABI.Type{T: gethABI.IntTy, Size: 8}
 
@@ -259,6 +273,8 @@ func gethABIType(staticType interpreter.StaticType, evmAddressTypeID common.Type
 		return gethTypeString, true
 	case interpreter.PrimitiveStaticTypeBool:
 		return gethTypeBool, true
+	case interpreter.PrimitiveStaticTypeUInt:
+		return gethTypeUint, true
 	case interpreter.PrimitiveStaticTypeUInt8:
 		return gethTypeUint8, true
 	case interpreter.PrimitiveStaticTypeUInt16:
@@ -271,6 +287,8 @@ func gethABIType(staticType interpreter.StaticType, evmAddressTypeID common.Type
 		return gethTypeUint128, true
 	case interpreter.PrimitiveStaticTypeUInt256:
 		return gethTypeUint256, true
+	case interpreter.PrimitiveStaticTypeInt:
+		return gethTypeInt, true
 	case interpreter.PrimitiveStaticTypeInt8:
 		return gethTypeInt8, true
 	case interpreter.PrimitiveStaticTypeInt16:
@@ -338,6 +356,8 @@ func goType(
 		return reflect.TypeOf(""), true
 	case interpreter.PrimitiveStaticTypeBool:
 		return reflect.TypeOf(true), true
+	case interpreter.PrimitiveStaticTypeUInt:
+		return reflect.TypeOf((*big.Int)(nil)), true
 	case interpreter.PrimitiveStaticTypeUInt8:
 		return reflect.TypeOf(uint8(0)), true
 	case interpreter.PrimitiveStaticTypeUInt16:
@@ -349,6 +369,8 @@ func goType(
 	case interpreter.PrimitiveStaticTypeUInt128:
 		return reflect.TypeOf((*big.Int)(nil)), true
 	case interpreter.PrimitiveStaticTypeUInt256:
+		return reflect.TypeOf((*big.Int)(nil)), true
+	case interpreter.PrimitiveStaticTypeInt:
 		return reflect.TypeOf((*big.Int)(nil)), true
 	case interpreter.PrimitiveStaticTypeInt8:
 		return reflect.TypeOf(int8(0)), true
@@ -414,6 +436,17 @@ func encodeABI(
 			return bool(value), gethTypeBool, nil
 		}
 
+	case interpreter.UIntValue:
+		if staticType == interpreter.PrimitiveStaticTypeUInt {
+			if value.BigInt.Cmp(sema.UInt256TypeMaxIntBig) > 0 || value.BigInt.Cmp(sema.UInt256TypeMinIntBig) < 0 {
+				return nil, gethABI.Type{}, abiEncodingError{
+					Type:    value.StaticType(inter),
+					Message: "value outside the boundaries of uint256",
+				}
+			}
+			return value.BigInt, gethTypeUint, nil
+		}
+
 	case interpreter.UInt8Value:
 		if staticType == interpreter.PrimitiveStaticTypeUInt8 {
 			return uint8(value), gethTypeUint8, nil
@@ -442,6 +475,17 @@ func encodeABI(
 	case interpreter.UInt256Value:
 		if staticType == interpreter.PrimitiveStaticTypeUInt256 {
 			return value.BigInt, gethTypeUint256, nil
+		}
+
+	case interpreter.IntValue:
+		if staticType == interpreter.PrimitiveStaticTypeInt {
+			if value.BigInt.Cmp(sema.Int256TypeMaxIntBig) > 0 || value.BigInt.Cmp(sema.Int256TypeMinIntBig) < 0 {
+				return nil, gethABI.Type{}, abiEncodingError{
+					Type:    value.StaticType(inter),
+					Message: "value outside the boundaries of int256",
+				}
+			}
+			return value.BigInt, gethTypeInt, nil
 		}
 
 	case interpreter.Int8Value:
@@ -712,6 +756,16 @@ func decodeABI(
 		}
 		return interpreter.BoolValue(value), nil
 
+	case interpreter.PrimitiveStaticTypeUInt:
+		value, ok := value.(*big.Int)
+		if !ok {
+			break
+		}
+		memoryUsage := common.NewBigIntMemoryUsage(
+			common.BigIntByteLength(value),
+		)
+		return interpreter.NewUIntValueFromBigInt(inter, memoryUsage, func() *big.Int { return value }), nil
+
 	case interpreter.PrimitiveStaticTypeUInt8:
 		value, ok := value.(uint8)
 		if !ok {
@@ -753,6 +807,16 @@ func decodeABI(
 			break
 		}
 		return interpreter.NewUInt256ValueFromBigInt(inter, func() *big.Int { return value }), nil
+
+	case interpreter.PrimitiveStaticTypeInt:
+		value, ok := value.(*big.Int)
+		if !ok {
+			break
+		}
+		memoryUsage := common.NewBigIntMemoryUsage(
+			common.BigIntByteLength(value),
+		)
+		return interpreter.NewIntValueFromBigInt(inter, memoryUsage, func() *big.Int { return value }), nil
 
 	case interpreter.PrimitiveStaticTypeInt8:
 		value, ok := value.(int8)

@@ -200,6 +200,10 @@ func AllFlagNames() []string {
 		BuildFlagName(gossipsubKey, p2pconfig.ScoreParamsKey, p2pconfig.ScoringRegistryKey, p2pconfig.MisbehaviourPenaltiesKey, p2pconfig.IWantKey),
 		BuildFlagName(gossipsubKey, p2pconfig.ScoreParamsKey, p2pconfig.ScoringRegistryKey, p2pconfig.MisbehaviourPenaltiesKey, p2pconfig.PublishKey),
 		BuildFlagName(gossipsubKey, p2pconfig.ScoreParamsKey, p2pconfig.ScoringRegistryKey, p2pconfig.MisbehaviourPenaltiesKey, p2pconfig.ClusterPrefixedReductionFactorKey),
+
+		BuildFlagName(gossipsubKey, p2pconfig.PeerGaterKey, p2pconfig.EnabledKey),
+		BuildFlagName(gossipsubKey, p2pconfig.PeerGaterKey, p2pconfig.SourceDecayKey),
+		BuildFlagName(gossipsubKey, p2pconfig.PeerGaterKey, p2pconfig.TopicDeliveryWeightsKey),
 	}
 
 	for _, scope := range []string{systemScope, transientScope, protocolScope, peerScope, peerProtocolScope} {
@@ -597,6 +601,15 @@ func InitializeNetworkFlags(flags *pflag.FlagSet, config *Config) {
 		config.GossipSub.ScoringParameters.ScoringRegistryParameters.MisbehaviourPenalties.ClusterPrefixedReductionFactor,
 		"the factor used to reduce the penalty for control message misbehaviours on cluster prefixed topics")
 
+	flags.Bool(BuildFlagName(gossipsubKey, p2pconfig.PeerGaterKey, p2pconfig.EnabledKey),
+		config.GossipSub.PeerGaterEnabled,
+		"enable the libp2p peer gater")
+	flags.Duration(BuildFlagName(gossipsubKey, p2pconfig.PeerGaterKey, p2pconfig.SourceDecayKey),
+		config.GossipSub.PeerGaterSourceDecay,
+		"the per IP decay for all counters tracked by the peer gater for a peer")
+	flags.String(BuildFlagName(gossipsubKey, p2pconfig.PeerGaterKey, p2pconfig.TopicDeliveryWeightsKey),
+		config.GossipSub.PeerGaterTopicDeliveryWeightsOverride,
+		"topic delivery weights override, this is a comma separated with the format topic_1:2.2,topic_2:3.2,topic_3:1.7 these will be used to override the default topic weight of 1.0 for the specified topic.")
 }
 
 // LoadLibP2PResourceManagerFlags loads all CLI flags for the libp2p resource manager configuration on the provided pflag set.
@@ -666,6 +679,7 @@ func SetAliases(conf *viper.Viper) error {
 		// mapping should be from network-p2pconfig.key1.key2.key3... to network-config-key1-key2-key3...
 		m[strings.Join(s[1:], "-")] = key
 	}
+
 	// each flag name should correspond to exactly one key in our config store after it is loaded with the default config
 	for _, flagName := range AllFlagNames() {
 		fullKey, ok := m[flagName]
