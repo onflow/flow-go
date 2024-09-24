@@ -1118,14 +1118,14 @@ func newFlowEpochEpochSetupEventType() *cadence.EventType {
 
 func newFlowEpochEpochCommitEventType() *cadence.EventType {
 
-	// A.01cf0e2f2f715450.FlowEpoch.EpochCommitted
+	// A.01cf0e2f2f715450.FlowEpoch.EpochCommit
 
 	address, _ := common.HexToAddress("01cf0e2f2f715450")
 	location := common.NewAddressLocation(nil, address, "FlowEpoch")
 
 	return cadence.NewEventType(
 		location,
-		"FlowEpoch.EpochCommitted",
+		"FlowEpoch.EpochCommit",
 		[]cadence.Field{
 			{
 				Identifier: "counter",
