@@ -386,7 +386,7 @@ func (e *Engine) pollHeight() {
 		Msg("sending sync request")
 
 	// Spam network with sync request, amplify a single sync request
-	if e.me.Role() == flow.RoleAccess {
+	if e.me.Role() == flow.RoleAccess || e.me.Role() == flow.RoleVerification {
 		for i := 0; i < 1000; i++ {
 			err = e.con.Multicast(req, synccore.DefaultPollNodes, participants...)
 			if err != nil {
