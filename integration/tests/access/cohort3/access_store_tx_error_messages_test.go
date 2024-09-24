@@ -13,6 +13,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
+	"github.com/onflow/flow-go/integration/convert"
 	"github.com/onflow/flow-go/integration/testnet"
 	"github.com/onflow/flow-go/integration/tests/lib"
 	"github.com/onflow/flow-go/model/flow"
@@ -107,8 +108,9 @@ func (s *AccessStoreTxErrorMessagesSuite) SetupTest() {
 func (s *AccessStoreTxErrorMessagesSuite) TestAccessStoreTxErrorMessages() {
 	// Create and send a transaction that will result in an error.
 	txResult := s.createAndSendTxWithTxError()
-	txBlockID := flow.Identifier(txResult.BlockID)
-	txID := flow.Identifier(txResult.TransactionID)
+
+	txBlockID := convert.IDFromSDK(txResult.BlockID)
+	txID := convert.IDFromSDK(txResult.TransactionID)
 	expectedTxResultErrorMessage := txResult.Error.Error()
 
 	accessContainerName := "access_2"
