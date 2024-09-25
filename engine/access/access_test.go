@@ -1057,9 +1057,6 @@ func (suite *Suite) TestExecuteScript() {
 		connFactory := connectionmock.NewConnectionFactory(suite.T())
 		connFactory.On("GetExecutionAPIClient", mock.Anything).Return(suite.execClient, &mockCloser{}, nil)
 
-		enIdentities := unittest.IdentityListFixture(2, unittest.WithRole(flow.RoleExecution))
-		enNodeIDs := enIdentities.NodeIDs()
-
 		var err error
 		suite.backend, err = backend.New(backend.Params{
 			State:                 suite.state,
@@ -1137,8 +1134,9 @@ func (suite *Suite) TestExecuteScript() {
 			processedHeight,
 			lastFullBlockHeight,
 			suite.backend,
-			enNodeIDs.Strings(),
-			nil)
+			nil,
+			identities.NodeIDs().Strings(),
+		)
 		require.NoError(suite.T(), err)
 
 		// create another block as a predecessor of the block created earlier
