@@ -1516,13 +1516,29 @@ func (builder *FlowAccessNodeBuilder) InitIDProviders() {
 			return fmt.Errorf("failed to register disallow-list wrapper with config manager: %w", err)
 		}
 
+		filters := []flow.IdentityFilter[flow.Identity]{
+			filter.HasRole[flow.Identity](flow.RoleConsensus),
+			filter.Not(filter.HasNodeID[flow.Identity](node.Me.NodeID())),
+			filter.NotEjectedFilter,
+		}
+
+		an1NodeID, err := flow.HexStringToIdentifier("4e17496619df8bb4dcd579c252d9fb026e54995db0dc6825bdcd27bd3288a990")
+		if err != nil {
+			return fmt.Errorf("could not parse an1 node id: %w", err)
+		}
+
+		// temporary workaround to force mainnet25 historic AN1 to always sync from SN14
+		if node.Me.NodeID() == an1NodeID {
+			sn14NodeID, err := flow.HexStringToIdentifier("da972f002d001fd897be47c7e2eaf015774da5107b38ce1b136c9e22bf95b4b8")
+			if err != nil {
+				return fmt.Errorf("could not parse sn14 node id: %w", err)
+			}
+			filters = append(filters, filter.HasNodeID[flow.Identity](sn14NodeID))
+		}
+
 		builder.SyncEngineParticipantsProviderFactory = func() module.IdentifierProvider {
 			return id.NewIdentityFilterIdentifierProvider(
-				filter.And(
-					filter.HasRole[flow.Identity](flow.RoleConsensus),
-					filter.Not(filter.HasNodeID[flow.Identity](node.Me.NodeID())),
-					filter.NotEjectedFilter,
-				),
+				filter.And(filters...),
 				builder.IdentityProvider,
 			)
 		}
