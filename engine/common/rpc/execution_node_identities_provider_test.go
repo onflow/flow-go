@@ -173,7 +173,7 @@ func (suite *Suite) TestExecutionNodesForBlockID() {
 			expectedENs = flow.IdentityList{}
 		}
 
-		execProvider := commonrpc.NewExecutionNodeIdentitiesProvider(
+		execNodeIdentitiesProvider := commonrpc.NewExecutionNodeIdentitiesProvider(
 			suite.log,
 			suite.state,
 			suite.receipts,
@@ -181,7 +181,7 @@ func (suite *Suite) TestExecutionNodesForBlockID() {
 			fixedENIdentifiers,
 		)
 
-		allExecNodes, err := execProvider.ExecutionNodesForBlockID(context.Background(), block.ID())
+		allExecNodes, err := execNodeIdentitiesProvider.ExecutionNodesForBlockID(context.Background(), block.ID())
 		require.NoError(suite.T(), err)
 
 		execNodeSelectorFactory := backend.NewNodeSelectorFactory(false)
@@ -212,7 +212,7 @@ func (suite *Suite) TestExecutionNodesForBlockID() {
 		attempt3Receipts = flow.ExecutionReceiptList{}
 		suite.state.On("AtBlockID", mock.Anything).Return(suite.snapshot)
 
-		execProvider := commonrpc.NewExecutionNodeIdentitiesProvider(
+		execNodeIdentitiesProvider := commonrpc.NewExecutionNodeIdentitiesProvider(
 			suite.log,
 			suite.state,
 			suite.receipts,
@@ -220,7 +220,7 @@ func (suite *Suite) TestExecutionNodesForBlockID() {
 			flow.IdentifierList{},
 		)
 
-		allExecNodes, err := execProvider.ExecutionNodesForBlockID(context.Background(), block.ID())
+		allExecNodes, err := execNodeIdentitiesProvider.ExecutionNodesForBlockID(context.Background(), block.ID())
 		require.NoError(suite.T(), err)
 
 		execNodeSelectorFactory := backend.NewNodeSelectorFactory(false)
@@ -309,7 +309,7 @@ func (suite *Suite) TestExecutionNodesForBlockID() {
 			additionalNode[0],
 		}
 
-		execProvider := commonrpc.NewExecutionNodeIdentitiesProvider(
+		execNodeIdentitiesProvider := commonrpc.NewExecutionNodeIdentitiesProvider(
 			suite.log,
 			suite.state,
 			suite.receipts,
@@ -317,7 +317,7 @@ func (suite *Suite) TestExecutionNodesForBlockID() {
 			flow.IdentifierList{},
 		)
 
-		chosenIDs := execProvider.ChooseFromPreferredENIDs(allExecutionNodes, executorIDs)
+		chosenIDs := execNodeIdentitiesProvider.ChooseFromPreferredENIDs(allExecutionNodes, executorIDs)
 
 		require.ElementsMatch(suite.T(), chosenIDs, expectedOrder)
 		require.Equal(suite.T(), len(chosenIDs), commonrpc.MaxNodesCnt)

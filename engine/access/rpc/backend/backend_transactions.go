@@ -48,9 +48,9 @@ type backendTransactions struct {
 	txResultCache       *lru.Cache[flow.Identifier, *access.TransactionResult]
 	txResultQueryMode   IndexQueryMode
 
-	systemTxID   flow.Identifier
-	systemTx     *flow.TransactionBody
-	execProvider *commonrpc.ExecutionNodeIdentitiesProvider
+	systemTxID                 flow.Identifier
+	systemTx                   *flow.TransactionBody
+	execNodeIdentitiesProvider *commonrpc.ExecutionNodeIdentitiesProvider
 }
 
 var _ TransactionErrorMessage = (*backendTransactions)(nil)
@@ -411,7 +411,7 @@ func (b *backendTransactions) getTransactionResultsByBlockIDFromExecutionNode(
 		BlockId: blockID[:],
 	}
 
-	execNodes, err := b.execProvider.ExecutionNodesForBlockID(
+	execNodes, err := b.execNodeIdentitiesProvider.ExecutionNodesForBlockID(
 		ctx,
 		blockID,
 	)
@@ -568,7 +568,7 @@ func (b *backendTransactions) getTransactionResultByIndexFromExecutionNode(
 		Index:   index,
 	}
 
-	execNodes, err := b.execProvider.ExecutionNodesForBlockID(
+	execNodes, err := b.execNodeIdentitiesProvider.ExecutionNodesForBlockID(
 		ctx,
 		blockID,
 	)
@@ -755,7 +755,7 @@ func (b *backendTransactions) getTransactionResultFromExecutionNode(
 		TransactionId: transactionID[:],
 	}
 
-	execNodes, err := b.execProvider.ExecutionNodesForBlockID(
+	execNodes, err := b.execNodeIdentitiesProvider.ExecutionNodesForBlockID(
 		ctx,
 		blockID,
 	)
@@ -995,7 +995,7 @@ func (b *backendTransactions) LookupErrorMessageByTransactionID(
 		}
 	}
 
-	execNodes, err := b.execProvider.ExecutionNodesForBlockID(
+	execNodes, err := b.execNodeIdentitiesProvider.ExecutionNodesForBlockID(
 		ctx,
 		blockID,
 	)
@@ -1069,7 +1069,7 @@ func (b *backendTransactions) LookupErrorMessageByIndex(
 		}
 	}
 
-	execNodes, err := b.execProvider.ExecutionNodesForBlockID(
+	execNodes, err := b.execNodeIdentitiesProvider.ExecutionNodesForBlockID(
 		ctx,
 		blockID,
 	)
@@ -1141,7 +1141,7 @@ func (b *backendTransactions) LookupErrorMessagesByBlockID(
 		}
 	}
 
-	execNodes, err := b.execProvider.ExecutionNodesForBlockID(
+	execNodes, err := b.execNodeIdentitiesProvider.ExecutionNodesForBlockID(
 		ctx,
 		blockID,
 	)

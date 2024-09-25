@@ -28,16 +28,16 @@ import (
 const uniqueScriptLoggingTimeWindow = 10 * time.Minute
 
 type backendScripts struct {
-	log              zerolog.Logger
-	headers          storage.Headers
-	state            protocol.State
-	connFactory      connection.ConnectionFactory
-	metrics          module.BackendScriptsMetrics
-	loggedScripts    *lru.Cache[[md5.Size]byte, time.Time]
-	nodeCommunicator Communicator
-	scriptExecutor   execution.ScriptExecutor
-	scriptExecMode   IndexQueryMode
-	execProvider     *commonrpc.ExecutionNodeIdentitiesProvider
+	log                        zerolog.Logger
+	headers                    storage.Headers
+	state                      protocol.State
+	connFactory                connection.ConnectionFactory
+	metrics                    module.BackendScriptsMetrics
+	loggedScripts              *lru.Cache[[md5.Size]byte, time.Time]
+	nodeCommunicator           Communicator
+	scriptExecutor             execution.ScriptExecutor
+	scriptExecMode             IndexQueryMode
+	execNodeIdentitiesProvider *commonrpc.ExecutionNodeIdentitiesProvider
 }
 
 // scriptExecutionRequest encapsulates the data needed to execute a script to make it easier
@@ -225,7 +225,7 @@ func (b *backendScripts) executeScriptOnAvailableExecutionNodes(
 	r *scriptExecutionRequest,
 ) ([]byte, time.Duration, error) {
 	// find few execution nodes which have executed the block earlier and provided an execution receipt for it
-	executors, err := b.execProvider.ExecutionNodesForBlockID(ctx, r.blockID)
+	executors, err := b.execNodeIdentitiesProvider.ExecutionNodesForBlockID(ctx, r.blockID)
 	if err != nil {
 		return nil, 0, status.Errorf(codes.Internal, "failed to find script executors at blockId %v: %v", r.blockID.String(), err)
 	}

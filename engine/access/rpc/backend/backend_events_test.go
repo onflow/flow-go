@@ -185,7 +185,7 @@ func (s *BackendEventsSuite) defaultBackend() *backendEvents {
 		maxHeightRange:   DefaultMaxHeightRange,
 		queryMode:        IndexQueryModeExecutionNodesOnly,
 		eventsIndex:      s.eventsIndex,
-		execProvider: commonrpc.NewExecutionNodeIdentitiesProvider(
+		execNodeIdentitiesProvider: commonrpc.NewExecutionNodeIdentitiesProvider(
 			s.log,
 			s.state,
 			s.receipts,

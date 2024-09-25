@@ -28,16 +28,16 @@ import (
 )
 
 type backendEvents struct {
-	headers          storage.Headers
-	state            protocol.State
-	chain            flow.Chain
-	connFactory      connection.ConnectionFactory
-	log              zerolog.Logger
-	maxHeightRange   uint
-	nodeCommunicator Communicator
-	queryMode        IndexQueryMode
-	eventsIndex      *index.EventsIndex
-	execProvider     *rpc.ExecutionNodeIdentitiesProvider
+	headers                    storage.Headers
+	state                      protocol.State
+	chain                      flow.Chain
+	connFactory                connection.ConnectionFactory
+	log                        zerolog.Logger
+	maxHeightRange             uint
+	nodeCommunicator           Communicator
+	queryMode                  IndexQueryMode
+	eventsIndex                *index.EventsIndex
+	execNodeIdentitiesProvider *rpc.ExecutionNodeIdentitiesProvider
 }
 
 // blockMetadata is used to capture information about requested blocks to avoid repeated blockID
@@ -303,7 +303,7 @@ func (b *backendEvents) getBlockEventsFromExecutionNode(
 	// choose the last block ID to find the list of execution nodes
 	lastBlockID := blockIDs[len(blockIDs)-1]
 
-	execNodes, err := b.execProvider.ExecutionNodesForBlockID(
+	execNodes, err := b.execNodeIdentitiesProvider.ExecutionNodesForBlockID(
 		ctx,
 		lastBlockID,
 	)

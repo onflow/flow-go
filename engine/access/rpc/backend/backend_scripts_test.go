@@ -104,7 +104,7 @@ func (s *BackendScriptsSuite) defaultBackend() *backendScripts {
 		loggedScripts:    loggedScripts,
 		connFactory:      s.connectionFactory,
 		nodeCommunicator: NewNodeCommunicator(false),
-		execProvider: commonrpc.NewExecutionNodeIdentitiesProvider(
+		execNodeIdentitiesProvider: commonrpc.NewExecutionNodeIdentitiesProvider(
 			s.log,
 			s.state,
 			s.receipts,

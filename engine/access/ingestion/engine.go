@@ -108,8 +108,8 @@ type Engine struct {
 	// metrics
 	collectionExecutedMetric module.CollectionExecutedMetric
 
-	execProvider *commonrpc.ExecutionNodeIdentitiesProvider
-	backend      *backend.Backend
+	execNodeIdentitiesProvider *commonrpc.ExecutionNodeIdentitiesProvider
+	backend                    *backend.Backend
 }
 
 var _ network.MessageProcessor = (*Engine)(nil)
@@ -134,7 +134,7 @@ func New(
 	processedHeight storage.ConsumerProgress,
 	lastFullBlockHeight *counters.PersistentStrictMonotonicCounter,
 	backend *backend.Backend,
-	execProvider *commonrpc.ExecutionNodeIdentitiesProvider,
+	execNodeIdentitiesProvider *commonrpc.ExecutionNodeIdentitiesProvider,
 ) (*Engine, error) {
 	executionReceiptsRawQueue, err := fifoqueue.NewFifoQueue(defaultQueueCapacity)
 	if err != nil {
@@ -176,12 +176,12 @@ func New(
 		lastFullBlockHeight:            lastFullBlockHeight,
 
 		// queue / notifier for execution receipts
-		executionReceiptsNotifier: engine.NewNotifier(),
-		txResultErrorMessagesChan: make(chan flow.Identifier, 1),
-		executionReceiptsQueue:    executionReceiptsQueue,
-		messageHandler:            messageHandler,
-		backend:                   backend,
-		execProvider:              execProvider,
+		executionReceiptsNotifier:  engine.NewNotifier(),
+		txResultErrorMessagesChan:  make(chan flow.Identifier, 1),
+		executionReceiptsQueue:     executionReceiptsQueue,
+		messageHandler:             messageHandler,
+		backend:                    backend,
+		execNodeIdentitiesProvider: execNodeIdentitiesProvider,
 	}
 
 	// jobqueue Jobs object that tracks finalized blocks by height. This is used by the finalizedBlockConsumer
@@ -407,7 +407,7 @@ func (e *Engine) handleTransactionResultErrorMessages(ctx context.Context, block
 
 		// retrieves error messages from the backend if they do not already exist in storage
 		if !exists {
-			execNodes, err := e.execProvider.ExecutionNodesForBlockID(
+			execNodes, err := e.execNodeIdentitiesProvider.ExecutionNodesForBlockID(
 				ctx,
 				blockID,
 			)

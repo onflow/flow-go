@@ -25,14 +25,14 @@ import (
 )
 
 type backendAccounts struct {
-	log              zerolog.Logger
-	state            protocol.State
-	headers          storage.Headers
-	connFactory      connection.ConnectionFactory
-	nodeCommunicator Communicator
-	scriptExecutor   execution.ScriptExecutor
-	scriptExecMode   IndexQueryMode
-	execProvider     *commonrpc.ExecutionNodeIdentitiesProvider
+	log                        zerolog.Logger
+	state                      protocol.State
+	headers                    storage.Headers
+	connFactory                connection.ConnectionFactory
+	nodeCommunicator           Communicator
+	scriptExecutor             execution.ScriptExecutor
+	scriptExecMode             IndexQueryMode
+	execNodeIdentitiesProvider *commonrpc.ExecutionNodeIdentitiesProvider
 }
 
 // GetAccount returns the account details at the latest sealed block.
@@ -420,7 +420,7 @@ func (b *backendAccounts) getAccountFromAnyExeNode(
 		BlockId: blockID[:],
 	}
 
-	execNodes, err := b.execProvider.ExecutionNodesForBlockID(
+	execNodes, err := b.execNodeIdentitiesProvider.ExecutionNodesForBlockID(
 		ctx,
 		blockID,
 	)

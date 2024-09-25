@@ -83,7 +83,7 @@ func (s *BackendAccountsSuite) defaultBackend() *backendAccounts {
 		headers:          s.headers,
 		connFactory:      s.connectionFactory,
 		nodeCommunicator: NewNodeCommunicator(false),
-		execProvider: commonrpc.NewExecutionNodeIdentitiesProvider(
+		execNodeIdentitiesProvider: commonrpc.NewExecutionNodeIdentitiesProvider(
 			s.log,
 			s.state,
 			s.receipts,
