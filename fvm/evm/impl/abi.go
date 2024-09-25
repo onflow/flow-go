@@ -9,6 +9,7 @@ import (
 	"github.com/onflow/cadence/runtime/common"
 	"github.com/onflow/cadence/runtime/errors"
 	"github.com/onflow/cadence/runtime/interpreter"
+	"github.com/onflow/cadence/runtime/sema"
 	gethABI "github.com/onflow/go-ethereum/accounts/abi"
 	gethCommon "github.com/onflow/go-ethereum/common"
 
@@ -21,7 +22,8 @@ const abiEncodingByteSize = 32
 
 // abiEncodingError
 type abiEncodingError struct {
-	Type interpreter.StaticType
+	Type    interpreter.StaticType
+	Message string
 }
 
 var _ errors.UserError = abiEncodingError{}
@@ -36,6 +38,12 @@ func (e abiEncodingError) Error() string {
 	if ty != nil {
 		b.WriteString(" of type ")
 		b.WriteString(ty.String())
+	}
+
+	message := e.Message
+	if message != "" {
+		b.WriteString(": ")
+		b.WriteString(message)
 	}
 
 	return b.String()
@@ -430,6 +438,12 @@ func encodeABI(
 
 	case interpreter.UIntValue:
 		if staticType == interpreter.PrimitiveStaticTypeUInt {
+			if value.BigInt.Cmp(sema.UInt256TypeMaxIntBig) > 0 || value.BigInt.Cmp(sema.UInt256TypeMinIntBig) < 0 {
+				return nil, gethABI.Type{}, abiEncodingError{
+					Type:    value.StaticType(inter),
+					Message: "value outside the boundaries of uint256",
+				}
+			}
 			return value.BigInt, gethTypeUint, nil
 		}
 
@@ -465,6 +479,12 @@ func encodeABI(
 
 	case interpreter.IntValue:
 		if staticType == interpreter.PrimitiveStaticTypeInt {
+			if value.BigInt.Cmp(sema.Int256TypeMaxIntBig) > 0 || value.BigInt.Cmp(sema.Int256TypeMinIntBig) < 0 {
+				return nil, gethABI.Type{}, abiEncodingError{
+					Type:    value.StaticType(inter),
+					Message: "value outside the boundaries of int256",
+				}
+			}
 			return value.BigInt, gethTypeInt, nil
 		}
 
