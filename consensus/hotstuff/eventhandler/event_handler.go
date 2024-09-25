@@ -11,6 +11,7 @@ import (
 	"github.com/onflow/flow-go/consensus/hotstuff"
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/utils/logging"
 )
 
 // EventHandler is the main handler for individual events that trigger state transition.
@@ -44,6 +45,35 @@ type EventHandler struct {
 	committee     hotstuff.Replicas
 	safetyRules   hotstuff.SafetyRules
 	notifier      hotstuff.Consumer
+
+	// myLastProposedView is the latest view that this node has created a proposal for
+	// CAUTION: in-memory only; information will be lost once the node reboots. This is fine for the following reason:
+	//  1. At the moment, the block construction logic persists its blocks in the database, _before_ returning the
+	//     reference to the EventHandler, which subsequently publishes the block (via the `OnOwnProposal` notification).
+	//     Therefore, for each view that this consensus participant published a block for, this block is also in the database.
+	//  2. Before constructing a proposal for view v, the node confirms that there is no block for view v already stored in
+	//     its local Forks, and skips the block production otherwise. When the node boots up, it populates Forks with all
+	//     unfinalized blocks. Hence, we conclude:
+	//     Let v be a view for which this node constructed a proposal _before_ rebooting. Then, after rebooting it will never
+	//     construct another proposal for view v.
+	//  3. What remains is to show that this node will not propose for views which it has previously proposed for without any
+	//     reboots. Conceptually, this is guaranteed by the SafetyRules, but only if voting and signing proposals is _both_
+	//     done by safety rules. Unfortunately, the current implementation signs its own proposals _independently_ of safety rules.
+	//     Hence, we add the following logic:
+	//      - `myLastProposedView` is zero in case this node has not generated any proposal since its last reboot. Then, argument
+	//         2. guarantees that the node will not double-propose.
+	//      - Whenever this node constructed a proposal for view v, it will set `myLastProposedView` to value `v`, _before_
+	//        publishing the proposal (via the `OnOwnProposal` notification).
+	//      - Only if `v < myLastProposedView`, this node will engage its block production logic for view `v`. Therefore, it is
+	//        guaranteed that this node has not generated any proposal for view v since its last reboot.
+	// In summary, argument 2. and 3. guarantee that this node will not double-propose (independently of whether the node
+	// restarted or not). Note that this holds, _without_ the node needing to store newly generated proposals right away in `Forks`.
+	// On the happy path (no restarts), updating `myLastProposedView` will suffice to prevent creating two proposals for the same view.
+	// The node's own proposal will be added to Forks _after_ the broadcast the same way as proposals from other nodes.
+	// On the unhappy path, the node's own proposals will be added to Forks along with unfinalized proposals from other nodes.
+	// TODO: use safety rules also for block signing, which produces the same guarantees of not double-proposing without this extra logic
+	//       For further details, see issue https://github.com/onflow/flow-go/issues/6389
+	myLastProposedView uint64
 }
 
 var _ hotstuff.EventHandler = (*EventHandler)(nil)
@@ -313,6 +343,10 @@ func (e *EventHandler) broadcastTimeoutObjectIfAuthorized() error {
 //   - after receiving a proposal (but not changing view), if that proposal is referenced by our highest known QC,
 //     and the proposal was previously unknown, then we can propose a block in the current view
 //
+// Enforced INVARIANTS:
+//   - There will at most be `OnOwnProposal` notification emitted for views where this node is the leader, and none
+//     if another node is the leader. This holds irrespective of restarts. Formally, this prevents proposal equivocation.
+//
 // It reads the current view, and generates a proposal if we are the leader.
 // No errors are expected during normal operation.
 func (e *EventHandler) proposeForNewViewIfPrimary() error {
@@ -330,10 +364,24 @@ func (e *EventHandler) proposeForNewViewIfPrimary() error {
 
 	e.notifier.OnCurrentViewDetails(curView, finalizedView, currentLeader)
 
-	// check that I am the primary for this view and that I haven't already proposed; otherwise there is nothing to do
+	// check that I am the primary for this view
 	if e.committee.Self() != currentLeader {
 		return nil
 	}
+
+	// CASE A: Preventing proposal equivocation on the happy path
+	// We will never produce two proposals for the same view, _since_ the last reboot. This is because without a reboot,
+	// we can only proceed once beyond the following lines.
+	if curView <= e.myLastProposedView {
+		log.Debug().Msg("already proposed for current view")
+		return nil
+	}
+	e.myLastProposedView = curView
+
+	// CASE B: Preventing proposal equivocation on the unhappy path
+	// We will never produce a proposal for view v, if we already constructed a proposal for the same view _before_ the
+	// most recent reboot. This is because during proposal construction (further below), (i) the block is saved in the database
+	// _before_ a reference is returned to the EventHandler and (ii) all unfinalized proposals are added to Forks during the reboot.
 	for _, b := range e.forks.GetBlocksForView(curView) { // on the happy path, this slice is empty
 		if b.ProposerID == e.committee.Self() {
 			log.Debug().Msg("already proposed for current view")
@@ -381,39 +429,60 @@ func (e *EventHandler) proposeForNewViewIfPrimary() error {
 		lastViewTC = nil
 	}
 
+	// Construct Own Proposal
+	// CAUTION, design constraints:
+	//    (i) We cannot process our own proposal within the `EventHandler` right away.
+	//   (ii) We cannot add our own proposal to Forks here right away.
+	//  (iii) Metrics for the PaceMaker/CruiseControl assume that the EventHandler is the only caller of
+	//	     `TargetPublicationTime`. Technically, `TargetPublicationTime` records the publication delay
+	//	      relative to its _latest_ call.
+	//
+	// To satisfy all constraints, we construct the proposal here and query (once!) its `TargetPublicationTime`. Though,
+	// we do _not_ process our own blocks right away and instead ingest them into the EventHandler the same way as
+	// proposals from other consensus participants. Specifically, on the path through the HotStuff state machine leading
+	// to block construction, the node's own proposal is largely ephemeral. The proposal is handed to the `MessageHub` (via
+	// the `OnOwnProposal` notification including the `TargetPublicationTime`). The `MessageHub` waits until
+	// `TargetPublicationTime` and only then broadcast the proposal and puts it into the EventLoop's queue
+	// for inbound blocks. This is exactly the same way as proposals from other nodes are ingested by the `EventHandler`,
+	// except that we are skipping the ComplianceEngine (assuming that our own proposals are protocol-compliant).
+	//
+	// Context:
+	//  • On constraint (i): We want to support consensus committees only consisting of a *single* node. If the EvenHandler
+	//    internally processed the block right away via a direct message call, the call-stack would be ever-growing and
+	//    the node would crash eventually (we experienced this with a very early HotStuff implementation). Specifically,
+	//    if we wanted to process the block directly without taking a detour through the EventLoop's inbound queue,
+	//    we would call `OnReceiveProposal` here. The function `OnReceiveProposal` would then end up calling
+	//    then end up calling `proposeForNewViewIfPrimary` (this function) to generate the next proposal, which again
+	//    would result in calling `OnReceiveProposal` and so on so forth until the call stack or memory limit is reached
+	//    and the node crashes. This is only a problem for consensus committees of size 1.
+	//  • On constraint (ii): When adding a proposal to Forks, Forks emits a `BlockIncorporatedEvent` notification, which
+	//    is observed by Cruse Control and would change its state. However, note that Cruse Control is trying to estimate
+	//    the point in time when _other_ nodes are observing the proposal. The time when we broadcast the proposal (i.e.
+	//    `TargetPublicationTime`) is a reasonably good estimator, but *not* the time the proposer constructed the block
+	//    (because there is potentially still a significant wait until `TargetPublicationTime`).
+	//
+	// The current approach is for a node to process its own proposals at the same time and through the same code path as
+	// proposals from other nodes. This satisfies constraints (i) and (ii) and generates very strong consistency, from a
+	// software design perspective.
+	//    Just hypothetically, if we changed Cruise Control to be notified about own block proposals _only_ when they are
+	// broadcast (satisfying constraint (ii) without relying on the EventHandler), then we could add a proposal to Forks
+	// here right away. Nevertheless, the restriction remains that we cannot process that proposal right away within the
+	// EventHandler and instead need to put it into the EventLoop's inbound queue to support consensus committees of size 1.
 	flowProposal, err := e.blockProducer.MakeBlockProposal(curView, newestQC, lastViewTC)
 	if err != nil {
 		return fmt.Errorf("can not make block proposal for curView %v: %w", curView, err)
 	}
-	proposedBlock := model.BlockFromFlow(flowProposal) // turn the signed flow header into a proposal
-
-	// determine target publication time
-	// CAUTION:
-	//  • we must call `TargetPublicationTime` _before_ `AddValidatedBlock`, because `AddValidatedBlock`
-	//    may emit a BlockIncorporatedEvent, which changes CruiseControl's state.
-	//  • metrics for the PaceMaker/CruiseControl assume that the event handler is the only caller of
-	//   `TargetPublicationTime`. Technically, `TargetPublicationTime` records the publication delay
-	//    relative to its _latest_ call.
-	targetPublicationTime := e.paceMaker.TargetPublicationTime(flowProposal.View, start, flowProposal.ParentID)
-
-	// we want to store created proposal in forks to make sure that we don't create more proposals for
-	// current view. Due to asynchronous nature of our design it's possible that after creating proposal
-	// we will be asked to propose again for same view.
-	err = e.forks.AddValidatedBlock(proposedBlock)
-	if err != nil {
-		return fmt.Errorf("could not add newly created proposal (%v): %w", proposedBlock.BlockID, err)
-	}
-
+	targetPublicationTime := e.paceMaker.TargetPublicationTime(flowProposal.View, start, flowProposal.ParentID) // determine target publication time
 	log.Debug().
-		Uint64("block_view", proposedBlock.View).
+		Uint64("block_view", flowProposal.View).
 		Time("target_publication", targetPublicationTime).
-		Hex("block_id", proposedBlock.BlockID[:]).
+		Hex("block_id", logging.ID(flowProposal.ID())).
 		Uint64("parent_view", newestQC.View).
 		Hex("parent_id", newestQC.BlockID[:]).
-		Hex("signer", proposedBlock.ProposerID[:]).
+		Hex("signer", flowProposal.ProposerID[:]).
 		Msg("forwarding proposal to communicator for broadcasting")
 
-	// raise a notification with proposal (also triggers broadcast)
+	// emit notification with own proposal (also triggers broadcast)
 	e.notifier.OnOwnProposal(flowProposal, targetPublicationTime)
 	return nil
 }
