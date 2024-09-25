@@ -566,12 +566,6 @@ func getType(key ledger.Key) string {
 }
 
 func serviceAccountAddressForChain(chainID flow.ChainID) flow.Address {
-	switch chainID {
-	case flow.Mainnet:
-		return serviceAccountAddressOnMainnet
-	case flow.Testnet:
-		return serviceAccountAddressOnTestnet
-	default:
-		return flow.Address{}
-	}
+	 sc := systemcontracts.SystemContractsForChain(chainID)
+	 return sc.FlowServiceAccount.Address
 }
