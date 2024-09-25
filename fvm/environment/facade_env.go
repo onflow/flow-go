@@ -336,9 +336,8 @@ func (*facadeEnvironment) GetInterpreterSharedState() *interpreter.SharedState {
 	return nil
 }
 
-func (env *facadeEnvironment) RecoverProgram(program *ast.Program, location common.Location) (*ast.Program, error) {
+func (env *facadeEnvironment) RecoverProgram(program *ast.Program, location common.Location) ([]byte, error) {
 	return RecoverProgram(
-		env,
 		env.chain.ChainID(),
 		program,
 		location,

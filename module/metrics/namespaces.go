@@ -44,6 +44,7 @@ const (
 const (
 	subsystemTransactionTiming     = "transaction_timing"
 	subsystemTransactionSubmission = "transaction_submission"
+	subsystemTransactionValidation = "transaction_validation"
 	subsystemConnectionPool        = "connection_pool"
 	subsystemHTTP                  = "http"
 )

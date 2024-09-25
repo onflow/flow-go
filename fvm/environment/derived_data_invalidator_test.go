@@ -283,6 +283,12 @@ func TestMeterParamOverridesUpdated(t *testing.T) {
 
 	ctx.TxBody = &flow.TransactionBody{}
 
+	meterStateRead := &snapshot.ExecutionSnapshot{
+		ReadSet: map[flow.RegisterID]struct{}{
+			flow.NewRegisterID(ctx.Chain.ServiceAddress(), "meter"): {},
+		},
+	}
+
 	checkForUpdates := func(id flow.RegisterID, expected bool) {
 		snapshot := &snapshot.ExecutionSnapshot{
 			WriteSet: map[flow.RegisterID]flow.RegisterValue{
@@ -292,8 +298,8 @@ func TestMeterParamOverridesUpdated(t *testing.T) {
 
 		invalidator := environment.NewDerivedDataInvalidator(
 			environment.ContractUpdates{},
-			ctx.Chain.ServiceAddress(),
-			snapshot)
+			snapshot,
+			meterStateRead)
 		require.Equal(t, expected, invalidator.MeterParamOverridesUpdated)
 	}
 
@@ -304,17 +310,14 @@ func TestMeterParamOverridesUpdated(t *testing.T) {
 	otherOwner := unittest.RandomAddressFixtureForChain(ctx.Chain.ChainID())
 
 	for _, registerId := range executionSnapshot.AllRegisterIDs() {
-		checkForUpdates(registerId, true)
+		checkForUpdates(registerId, false)
 		checkForUpdates(
 			flow.NewRegisterID(otherOwner, registerId.Key),
 			false)
 	}
 
-	stabIndexKey := flow.NewRegisterID(owner, "$12345678")
-	require.True(t, stabIndexKey.IsSlabIndex())
-
-	checkForUpdates(stabIndexKey, true)
-	checkForUpdates(flow.NewRegisterID(owner, "other keys"), false)
-	checkForUpdates(flow.NewRegisterID(otherOwner, stabIndexKey.Key), false)
-	checkForUpdates(flow.NewRegisterID(otherOwner, "other key"), false)
+	checkForUpdates(flow.NewRegisterID(owner, "meter2"), false)
+	checkForUpdates(flow.NewRegisterID(owner, "meter"), true)
+	checkForUpdates(flow.NewRegisterID(otherOwner, "meter2"), false)
+	checkForUpdates(flow.NewRegisterID(otherOwner, "meter"), false)
 }

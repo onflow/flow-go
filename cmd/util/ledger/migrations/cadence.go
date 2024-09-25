@@ -392,25 +392,15 @@ func (m *IssueStorageCapConMigration) MigrateAccount(
 		return fmt.Errorf("failed to commit changes: %w", err)
 	}
 
-	// finalize the transaction
-	result, err := migrationRuntime.TransactionState.FinalizeMainTransaction()
-	if err != nil {
-		return fmt.Errorf("failed to finalize main transaction: %w", err)
-	}
+	// Commit/finalize the transaction
 
-	// Merge the changes into the registers
 	expectedAddresses := map[flow.Address]struct{}{
 		flow.Address(address): {},
 	}
 
-	err = registers.ApplyChanges(
-		accountRegisters,
-		result.WriteSet,
-		expectedAddresses,
-		m.log,
-	)
+	err = migrationRuntime.Commit(expectedAddresses, m.log)
 	if err != nil {
-		return fmt.Errorf("failed to apply changes: %w", err)
+		return fmt.Errorf("failed to commit: %w", err)
 	}
 
 	return nil
@@ -844,6 +834,21 @@ func NewCadence1Migrations(
 				Migrate: NewEVMSetupMigration(opts.ChainID, log),
 			},
 		)
+		if opts.ChainID == flow.Emulator {
+
+			// In the Emulator the EVM storage account needs to be created
+
+			systemContracts := systemcontracts.SystemContractsForChain(opts.ChainID)
+			evmStorageAddress := systemContracts.EVMStorage.Address
+
+			migs = append(
+				migs,
+				NamedMigration{
+					Name:    "evm-storage-account-creation-migration",
+					Migrate: NewAccountCreationMigration(evmStorageAddress, log),
+				},
+			)
+		}
 	}
 
 	return migs

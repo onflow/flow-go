@@ -122,25 +122,15 @@ func (m *FixSlabsWithBrokenReferencesMigration) MigrateAccount(
 		return fmt.Errorf("failed to commit storage: %w", err)
 	}
 
-	// Finalize the transaction
-	result, err := migrationRuntime.TransactionState.FinalizeMainTransaction()
-	if err != nil {
-		return fmt.Errorf("failed to finalize main transaction: %w", err)
-	}
+	// Commit/finalize the transaction
 
-	// Merge the changes to the original payloads.
 	expectedAddresses := map[flow.Address]struct{}{
 		flow.Address(address): {},
 	}
 
-	err = registers.ApplyChanges(
-		accountRegisters,
-		result.WriteSet,
-		expectedAddresses,
-		m.log,
-	)
+	err = migrationRuntime.Commit(expectedAddresses, m.log)
 	if err != nil {
-		return fmt.Errorf("failed to apply changes to account registers: %w", err)
+		return fmt.Errorf("failed to commit: %w", err)
 	}
 
 	// Log fixed payloads

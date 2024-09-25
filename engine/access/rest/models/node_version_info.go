@@ -12,4 +12,11 @@ func (t *NodeVersionInfo) Build(params *access.NodeVersionInfo) {
 	t.ProtocolVersion = util.FromUint(params.ProtocolVersion)
 	t.SporkRootBlockHeight = util.FromUint(params.SporkRootBlockHeight)
 	t.NodeRootBlockHeight = util.FromUint(params.NodeRootBlockHeight)
+
+	if params.CompatibleRange != nil {
+		t.CompatibleRange = &CompatibleRange{
+			StartHeight: util.FromUint(params.CompatibleRange.StartHeight),
+			EndHeight:   util.FromUint(params.CompatibleRange.EndHeight),
+		}
+	}
 }

@@ -1407,23 +1407,23 @@ func (_m *Environment) RecordTrace(operation string, location common.Location, d
 }
 
 // RecoverProgram provides a mock function with given fields: program, location
-func (_m *Environment) RecoverProgram(program *ast.Program, location common.Location) (*ast.Program, error) {
+func (_m *Environment) RecoverProgram(program *ast.Program, location common.Location) ([]byte, error) {
 	ret := _m.Called(program, location)
 
 	if len(ret) == 0 {
 		panic("no return value specified for RecoverProgram")
 	}
 
-	var r0 *ast.Program
+	var r0 []byte
 	var r1 error
-	if rf, ok := ret.Get(0).(func(*ast.Program, common.Location) (*ast.Program, error)); ok {
+	if rf, ok := ret.Get(0).(func(*ast.Program, common.Location) ([]byte, error)); ok {
 		return rf(program, location)
 	}
-	if rf, ok := ret.Get(0).(func(*ast.Program, common.Location) *ast.Program); ok {
+	if rf, ok := ret.Get(0).(func(*ast.Program, common.Location) []byte); ok {
 		r0 = rf(program, location)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*ast.Program)
+			r0 = ret.Get(0).([]byte)
 		}
 	}
 
