@@ -32,7 +32,6 @@ type backendTransactions struct {
 	*TransactionsLocalDataProvider
 	staticCollectionRPC accessproto.AccessAPIClient // rpc client tied to a fixed collection node
 	transactions        storage.Transactions
-	executionReceipts   storage.ExecutionReceipts
 	// NOTE: The transaction error message is currently only used by the access node and not by the observer node.
 	//       To avoid introducing unnecessary command line arguments in the observer, one case could be that the error
 	//       message cache is nil for the observer node.
@@ -49,8 +48,9 @@ type backendTransactions struct {
 	txResultCache       *lru.Cache[flow.Identifier, *access.TransactionResult]
 	txResultQueryMode   IndexQueryMode
 
-	systemTxID flow.Identifier
-	systemTx   *flow.TransactionBody
+	systemTxID   flow.Identifier
+	systemTx     *flow.TransactionBody
+	execProvider *commonrpc.ExecutionNodeIdentitiesProvider
 }
 
 var _ TransactionErrorMessage = (*backendTransactions)(nil)
@@ -411,14 +411,9 @@ func (b *backendTransactions) getTransactionResultsByBlockIDFromExecutionNode(
 		BlockId: blockID[:],
 	}
 
-	execNodes, err := commonrpc.ExecutionNodesForBlockID(
+	execNodes, err := b.execProvider.ExecutionNodesForBlockID(
 		ctx,
 		blockID,
-		b.executionReceipts,
-		b.state,
-		b.log,
-		preferredENIdentifiers,
-		fixedENIdentifiers,
 	)
 	if err != nil {
 		if IsInsufficientExecutionReceipts(err) {
@@ -573,14 +568,9 @@ func (b *backendTransactions) getTransactionResultByIndexFromExecutionNode(
 		Index:   index,
 	}
 
-	execNodes, err := commonrpc.ExecutionNodesForBlockID(
+	execNodes, err := b.execProvider.ExecutionNodesForBlockID(
 		ctx,
 		blockID,
-		b.executionReceipts,
-		b.state,
-		b.log,
-		preferredENIdentifiers,
-		fixedENIdentifiers,
 	)
 	if err != nil {
 		if IsInsufficientExecutionReceipts(err) {
@@ -765,14 +755,9 @@ func (b *backendTransactions) getTransactionResultFromExecutionNode(
 		TransactionId: transactionID[:],
 	}
 
-	execNodes, err := commonrpc.ExecutionNodesForBlockID(
+	execNodes, err := b.execProvider.ExecutionNodesForBlockID(
 		ctx,
 		blockID,
-		b.executionReceipts,
-		b.state,
-		b.log,
-		preferredENIdentifiers,
-		fixedENIdentifiers,
 	)
 	if err != nil {
 		// if no execution receipt were found, return a NotFound GRPC error
@@ -1010,14 +995,9 @@ func (b *backendTransactions) LookupErrorMessageByTransactionID(
 		}
 	}
 
-	execNodes, err := commonrpc.ExecutionNodesForBlockID(
+	execNodes, err := b.execProvider.ExecutionNodesForBlockID(
 		ctx,
 		blockID,
-		b.executionReceipts,
-		b.state,
-		b.log,
-		preferredENIdentifiers,
-		fixedENIdentifiers,
 	)
 	if err != nil {
 		if IsInsufficientExecutionReceipts(err) {
@@ -1089,14 +1069,9 @@ func (b *backendTransactions) LookupErrorMessageByIndex(
 		}
 	}
 
-	execNodes, err := commonrpc.ExecutionNodesForBlockID(
+	execNodes, err := b.execProvider.ExecutionNodesForBlockID(
 		ctx,
 		blockID,
-		b.executionReceipts,
-		b.state,
-		b.log,
-		preferredENIdentifiers,
-		fixedENIdentifiers,
 	)
 	if err != nil {
 		if IsInsufficientExecutionReceipts(err) {
@@ -1166,13 +1141,9 @@ func (b *backendTransactions) LookupErrorMessagesByBlockID(
 		}
 	}
 
-	execNodes, err := commonrpc.ExecutionNodesForBlockID(ctx,
+	execNodes, err := b.execProvider.ExecutionNodesForBlockID(
+		ctx,
 		blockID,
-		b.executionReceipts,
-		b.state,
-		b.log,
-		preferredENIdentifiers,
-		fixedENIdentifiers,
 	)
 	if err != nil {
 		if IsInsufficientExecutionReceipts(err) {

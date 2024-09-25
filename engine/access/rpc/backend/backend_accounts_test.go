@@ -13,6 +13,7 @@ import (
 
 	access "github.com/onflow/flow-go/engine/access/mock"
 	connectionmock "github.com/onflow/flow-go/engine/access/rpc/connection/mock"
+	commonrpc "github.com/onflow/flow-go/engine/common/rpc"
 	"github.com/onflow/flow-go/engine/common/rpc/convert"
 	"github.com/onflow/flow-go/model/flow"
 	execmock "github.com/onflow/flow-go/module/execution/mock"
@@ -77,12 +78,18 @@ func (s *BackendAccountsSuite) SetupTest() {
 
 func (s *BackendAccountsSuite) defaultBackend() *backendAccounts {
 	return &backendAccounts{
-		log:               s.log,
-		state:             s.state,
-		headers:           s.headers,
-		executionReceipts: s.receipts,
-		connFactory:       s.connectionFactory,
-		nodeCommunicator:  NewNodeCommunicator(false),
+		log:              s.log,
+		state:            s.state,
+		headers:          s.headers,
+		connFactory:      s.connectionFactory,
+		nodeCommunicator: NewNodeCommunicator(false),
+		execProvider: commonrpc.NewExecutionNodeIdentitiesProvider(
+			s.log,
+			s.state,
+			s.receipts,
+			flow.IdentifierList{},
+			flow.IdentifierList{},
+		),
 	}
 }
 

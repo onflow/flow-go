@@ -108,10 +108,8 @@ type Engine struct {
 	// metrics
 	collectionExecutedMetric module.CollectionExecutedMetric
 
-	preferredENIdentifiers flow.IdentifierList
-	fixedENIdentifiers     flow.IdentifierList
-
-	backend *backend.Backend
+	execProvider *commonrpc.ExecutionNodeIdentitiesProvider
+	backend      *backend.Backend
 }
 
 var _ network.MessageProcessor = (*Engine)(nil)
@@ -194,8 +192,7 @@ func New(
 		executionReceiptsQueue:    executionReceiptsQueue,
 		messageHandler:            messageHandler,
 		backend:                   backend,
-		preferredENIdentifiers:    preferredENIdentifiers,
-		fixedENIdentifiers:        fixedENIdentifiers,
+		execProvider:              commonrpc.NewExecutionNodeIdentitiesProvider(log, state, executionReceipts, preferredENIdentifiers, fixedENIdentifiers),
 	}
 
 	// jobqueue Jobs object that tracks finalized blocks by height. This is used by the finalizedBlockConsumer
@@ -421,14 +418,9 @@ func (e *Engine) handleTransactionResultErrorMessages(ctx context.Context, block
 
 		// retrieves error messages from the backend if they do not already exist in storage
 		if !exists {
-			execNodes, err := commonrpc.ExecutionNodesForBlockID(
+			execNodes, err := e.execProvider.ExecutionNodesForBlockID(
 				ctx,
 				blockID,
-				e.executionReceipts,
-				e.state,
-				e.log,
-				e.preferredENIdentifiers,
-				e.preferredENIdentifiers,
 			)
 			if err != nil {
 				// in case querying nodes by existing execution receipts failed,

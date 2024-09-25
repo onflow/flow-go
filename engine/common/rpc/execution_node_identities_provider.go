@@ -34,17 +34,54 @@ func IdentifierList(ids []string) (flow.IdentifierList, error) {
 	return idList, nil
 }
 
+// ExecutionNodeIdentitiesProvider is a container for elements required to retrieve
+// execution node identities for a given block ID.
+type ExecutionNodeIdentitiesProvider struct {
+	log zerolog.Logger
+
+	executionReceipts storage.ExecutionReceipts
+	state             protocol.State
+
+	preferredENIdentifiers flow.IdentifierList
+	fixedENIdentifiers     flow.IdentifierList
+}
+
+// NewExecutionNodeIdentitiesProvider creates and returns a new instance of
+// ExecutionNodeIdentitiesProvider.
+//
+// Parameters:
+//   - log: The logger to use for logging.
+//   - state: The protocol state used for retrieving block information.
+//   - executionReceipts: A storage.ExecutionReceipts object that contains the execution receipts
+//     for blocks.
+//   - preferredENIdentifiers: A flow.IdentifierList of preferred execution node identifiers that
+//     are prioritized during selection.
+//   - fixedENIdentifiers: A flow.IdentifierList of fixed execution node identifiers that are
+//     always considered if available.
+//
+// No error returns are expected during normal operations.
+func NewExecutionNodeIdentitiesProvider(
+	log zerolog.Logger,
+	state protocol.State,
+	executionReceipts storage.ExecutionReceipts,
+	preferredENIdentifiers flow.IdentifierList,
+	fixedENIdentifiers flow.IdentifierList,
+) *ExecutionNodeIdentitiesProvider {
+	return &ExecutionNodeIdentitiesProvider{
+		log:                    log,
+		executionReceipts:      executionReceipts,
+		state:                  state,
+		preferredENIdentifiers: preferredENIdentifiers,
+		fixedENIdentifiers:     fixedENIdentifiers,
+	}
+}
+
 // ExecutionNodesForBlockID returns upto maxNodesCnt number of randomly chosen execution node identities
 // which have executed the given block ID.
 // If no such execution node is found, an InsufficientExecutionReceipts error is returned.
-func ExecutionNodesForBlockID(
+func (e *ExecutionNodeIdentitiesProvider) ExecutionNodesForBlockID(
 	ctx context.Context,
 	blockID flow.Identifier,
-	executionReceipts storage.ExecutionReceipts,
-	state protocol.State,
-	log zerolog.Logger,
-	preferredENIdentifiers flow.IdentifierList,
-	fixedENIdentifiers flow.IdentifierList,
 ) (flow.IdentitySkeletonList, error) {
 	var (
 		executorIDs flow.IdentifierList
@@ -53,10 +90,10 @@ func ExecutionNodesForBlockID(
 
 	// check if the block ID is of the root block. If it is then don't look for execution receipts since they
 	// will not be present for the root block.
-	rootBlock := state.Params().FinalizedRoot()
+	rootBlock := e.state.Params().FinalizedRoot()
 
 	if rootBlock.ID() == blockID {
-		executorIdentities, err := state.Final().Identities(filter.HasRole[flow.Identity](flow.RoleExecution))
+		executorIdentities, err := e.state.Final().Identities(filter.HasRole[flow.Identity](flow.RoleExecution))
 		if err != nil {
 			return nil, fmt.Errorf("failed to retreive execution IDs for block ID %v: %w", blockID, err)
 		}
@@ -64,7 +101,7 @@ func ExecutionNodesForBlockID(
 	} else {
 		// try to find at least minExecutionNodesCnt execution node ids from the execution receipts for the given blockID
 		for attempt := 0; attempt < maxAttemptsForExecutionReceipt; attempt++ {
-			executorIDs, err = findAllExecutionNodes(blockID, executionReceipts, log)
+			executorIDs, err = e.findAllExecutionNodes(blockID)
 			if err != nil {
 				return nil, err
 			}
@@ -74,7 +111,7 @@ func ExecutionNodesForBlockID(
 			}
 
 			// log the attempt
-			log.Debug().Int("attempt", attempt).Int("max_attempt", maxAttemptsForExecutionReceipt).
+			e.log.Debug().Int("attempt", attempt).Int("max_attempt", maxAttemptsForExecutionReceipt).
 				Int("execution_receipts_found", len(executorIDs)).
 				Str("block_id", blockID.String()).
 				Msg("insufficient execution receipts")
@@ -93,7 +130,7 @@ func ExecutionNodesForBlockID(
 		receiptCnt := len(executorIDs)
 		// if less than minExecutionNodesCnt execution receipts have been received so far, then return random ENs
 		if receiptCnt < minExecutionNodesCnt {
-			newExecutorIDs, err := state.AtBlockID(blockID).Identities(filter.HasRole[flow.Identity](flow.RoleExecution))
+			newExecutorIDs, err := e.state.AtBlockID(blockID).Identities(filter.HasRole[flow.Identity](flow.RoleExecution))
 			if err != nil {
 				return nil, fmt.Errorf("failed to retreive execution IDs for block ID %v: %w", blockID, err)
 			}
@@ -102,7 +139,7 @@ func ExecutionNodesForBlockID(
 	}
 
 	// choose from the preferred or fixed execution nodes
-	subsetENs, err := chooseExecutionNodes(state, executorIDs, preferredENIdentifiers, fixedENIdentifiers)
+	subsetENs, err := e.chooseExecutionNodes(executorIDs)
 	if err != nil {
 		return nil, fmt.Errorf("failed to retreive execution IDs for block ID %v: %w", blockID, err)
 	}
@@ -116,13 +153,11 @@ func ExecutionNodesForBlockID(
 
 // findAllExecutionNodes find all the execution nodes ids from the execution receipts that have been received for the
 // given blockID
-func findAllExecutionNodes(
+func (e *ExecutionNodeIdentitiesProvider) findAllExecutionNodes(
 	blockID flow.Identifier,
-	executionReceipts storage.ExecutionReceipts,
-	log zerolog.Logger,
 ) (flow.IdentifierList, error) {
 	// lookup the receipt's storage with the block ID
-	allReceipts, err := executionReceipts.ByBlockID(blockID)
+	allReceipts, err := e.executionReceipts.ByBlockID(blockID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to retreive execution receipts for block ID %v: %w", blockID, err)
 	}
@@ -150,7 +185,7 @@ func findAllExecutionNodes(
 	// if there are more than one execution result for the same block ID, log as error
 	if executionResultGroupedMetaList.NumberGroups() > 1 {
 		identicalReceiptsStr := fmt.Sprintf("%v", flow.GetIDs(allReceipts))
-		log.Error().
+		e.log.Error().
 			Str("block_id", blockID.String()).
 			Str("execution_receipts", identicalReceiptsStr).
 			Msg("execution receipt mismatch")
@@ -176,35 +211,32 @@ func findAllExecutionNodes(
 // If neither preferred nor fixed nodes are defined, then all execution node matching the executor IDs are returned.
 // e.g. If execution nodes in identity table are {1,2,3,4}, preferred ENs are defined as {2,3,4}
 // and the executor IDs is {1,2,3}, then {2, 3} is returned as the chosen subset of ENs
-func chooseExecutionNodes(
-	state protocol.State,
+func (e *ExecutionNodeIdentitiesProvider) chooseExecutionNodes(
 	executorIDs flow.IdentifierList,
-	preferredENIdentifiers flow.IdentifierList,
-	fixedENIdentifiers flow.IdentifierList,
 ) (flow.IdentitySkeletonList, error) {
-	allENs, err := state.Final().Identities(filter.HasRole[flow.Identity](flow.RoleExecution))
+	allENs, err := e.state.Final().Identities(filter.HasRole[flow.Identity](flow.RoleExecution))
 	if err != nil {
 		return nil, fmt.Errorf("failed to retrieve all execution IDs: %w", err)
 	}
 
 	// choose from preferred EN IDs
-	if len(preferredENIdentifiers) > 0 {
-		chosenIDs := ChooseFromPreferredENIDs(allENs, executorIDs, preferredENIdentifiers)
+	if len(e.preferredENIdentifiers) > 0 {
+		chosenIDs := e.ChooseFromPreferredENIDs(allENs, executorIDs)
 		return chosenIDs.ToSkeleton(), nil
 	}
 
 	// if no preferred EN ID is found, then choose from the fixed EN IDs
-	if len(fixedENIdentifiers) > 0 {
+	if len(e.fixedENIdentifiers) > 0 {
 		// choose fixed ENs which have executed the transaction
 		chosenIDs := allENs.Filter(filter.And(
-			filter.HasNodeID[flow.Identity](fixedENIdentifiers...),
+			filter.HasNodeID[flow.Identity](e.fixedENIdentifiers...),
 			filter.HasNodeID[flow.Identity](executorIDs...),
 		))
 		if len(chosenIDs) > 0 {
 			return chosenIDs.ToSkeleton(), nil
 		}
 		// if no such ENs are found, then just choose all fixed ENs
-		chosenIDs = allENs.Filter(filter.HasNodeID[flow.Identity](fixedENIdentifiers...))
+		chosenIDs = allENs.Filter(filter.HasNodeID[flow.Identity](e.fixedENIdentifiers...))
 		return chosenIDs.ToSkeleton(), nil
 	}
 
@@ -218,15 +250,15 @@ func chooseExecutionNodes(
 // 1. Use any EN with a receipt.
 // 2. Use any preferred node not already selected.
 // 3. Use any EN not already selected.
-func ChooseFromPreferredENIDs(allENs flow.IdentityList,
+func (e *ExecutionNodeIdentitiesProvider) ChooseFromPreferredENIDs(
+	allENs flow.IdentityList,
 	executorIDs flow.IdentifierList,
-	preferredENIdentifiers flow.IdentifierList,
 ) flow.IdentityList {
 	var chosenIDs flow.IdentityList
 
 	// filter for both preferred and executor IDs
 	chosenIDs = allENs.Filter(filter.And(
-		filter.HasNodeID[flow.Identity](preferredENIdentifiers...),
+		filter.HasNodeID[flow.Identity](e.preferredENIdentifiers...),
 		filter.HasNodeID[flow.Identity](executorIDs...),
 	))
 
@@ -255,7 +287,7 @@ func ChooseFromPreferredENIDs(allENs flow.IdentityList,
 	}
 
 	// add any preferred node not already selected
-	preferredENs := allENs.Filter(filter.HasNodeID[flow.Identity](preferredENIdentifiers...))
+	preferredENs := allENs.Filter(filter.HasNodeID[flow.Identity](e.preferredENIdentifiers...))
 	addIfNotExists(preferredENs)
 	if len(chosenIDs) >= MaxNodesCnt {
 		return chosenIDs

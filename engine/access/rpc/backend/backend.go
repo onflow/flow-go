@@ -41,11 +41,6 @@ const DefaultLoggedScriptsCacheSize = 1_000_000
 // DefaultConnectionPoolSize is the default size for the connection pool to collection and execution nodes
 const DefaultConnectionPoolSize = 250
 
-var (
-	preferredENIdentifiers flow.IdentifierList
-	fixedENIdentifiers     flow.IdentifierList
-)
-
 // Backend implements the Access API.
 //
 // It is composed of several sub-backends that implement part of the Access API.
@@ -146,6 +141,18 @@ func New(params Params) (*Backend, error) {
 	}
 	systemTxID := systemTx.ID()
 
+	preferredENIdentifiers, err := commonrpc.IdentifierList(params.PreferredExecutionNodeIDs)
+	if err != nil {
+		return nil, fmt.Errorf("failed to convert node id string to Flow Identifier for preferred EN map: %w", err)
+	}
+
+	fixedENIdentifiers, err := commonrpc.IdentifierList(params.FixedExecutionNodeIDs)
+	if err != nil {
+		return nil, fmt.Errorf("failed to convert node id string to Flow Identifier for fixed EN map: %w", err)
+	}
+
+	execProvider := commonrpc.NewExecutionNodeIdentitiesProvider(params.Log, params.State, params.ExecutionReceipts, preferredENIdentifiers, fixedENIdentifiers)
+
 	transactionsLocalDataProvider := &TransactionsLocalDataProvider{
 		state:               params.State,
 		collections:         params.Collections,
@@ -161,28 +168,28 @@ func New(params Params) (*Backend, error) {
 		BlockTracker: params.BlockTracker,
 		// create the sub-backends
 		backendScripts: backendScripts{
-			log:               params.Log,
-			headers:           params.Headers,
-			executionReceipts: params.ExecutionReceipts,
-			connFactory:       params.ConnFactory,
-			state:             params.State,
-			metrics:           params.AccessMetrics,
-			loggedScripts:     loggedScripts,
-			nodeCommunicator:  params.Communicator,
-			scriptExecutor:    params.ScriptExecutor,
-			scriptExecMode:    params.ScriptExecutionMode,
+			log:              params.Log,
+			headers:          params.Headers,
+			connFactory:      params.ConnFactory,
+			state:            params.State,
+			metrics:          params.AccessMetrics,
+			loggedScripts:    loggedScripts,
+			nodeCommunicator: params.Communicator,
+			scriptExecutor:   params.ScriptExecutor,
+			scriptExecMode:   params.ScriptExecutionMode,
+			execProvider:     execProvider,
 		},
 		backendEvents: backendEvents{
-			log:               params.Log,
-			chain:             params.ChainID.Chain(),
-			state:             params.State,
-			headers:           params.Headers,
-			executionReceipts: params.ExecutionReceipts,
-			connFactory:       params.ConnFactory,
-			maxHeightRange:    params.MaxHeightRange,
-			nodeCommunicator:  params.Communicator,
-			queryMode:         params.EventQueryMode,
-			eventsIndex:       params.EventsIndex,
+			log:              params.Log,
+			chain:            params.ChainID.Chain(),
+			state:            params.State,
+			headers:          params.Headers,
+			connFactory:      params.ConnFactory,
+			maxHeightRange:   params.MaxHeightRange,
+			nodeCommunicator: params.Communicator,
+			queryMode:        params.EventQueryMode,
+			eventsIndex:      params.EventsIndex,
+			execProvider:     execProvider,
 		},
 		backendBlockHeaders: backendBlockHeaders{
 			headers: params.Headers,
@@ -193,14 +200,14 @@ func New(params Params) (*Backend, error) {
 			state:  params.State,
 		},
 		backendAccounts: backendAccounts{
-			log:               params.Log,
-			state:             params.State,
-			headers:           params.Headers,
-			executionReceipts: params.ExecutionReceipts,
-			connFactory:       params.ConnFactory,
-			nodeCommunicator:  params.Communicator,
-			scriptExecutor:    params.ScriptExecutor,
-			scriptExecMode:    params.ScriptExecutionMode,
+			log:              params.Log,
+			state:            params.State,
+			headers:          params.Headers,
+			connFactory:      params.ConnFactory,
+			nodeCommunicator: params.Communicator,
+			scriptExecutor:   params.ScriptExecutor,
+			scriptExecMode:   params.ScriptExecutionMode,
+			execProvider:     execProvider,
 		},
 		backendExecutionResults: backendExecutionResults{
 			executionResults: params.ExecutionResults,
@@ -239,7 +246,6 @@ func New(params Params) (*Backend, error) {
 		staticCollectionRPC:           params.CollectionRPC,
 		chainID:                       params.ChainID,
 		transactions:                  params.Transactions,
-		executionReceipts:             params.ExecutionReceipts,
 		txResultErrorMessages:         params.TxResultErrorMessages,
 		transactionValidator:          txValidator,
 		transactionMetrics:            params.AccessMetrics,
@@ -251,6 +257,7 @@ func New(params Params) (*Backend, error) {
 		txResultQueryMode:             params.TxResultQueryMode,
 		systemTx:                      systemTx,
 		systemTxID:                    systemTxID,
+		execProvider:                  execProvider,
 	}
 
 	// TODO: The TransactionErrorMessage interface should be reorganized in future, as it is implemented in backendTransactions but used in TransactionsLocalDataProvider, and its initialization is somewhat quirky.
@@ -266,16 +273,6 @@ func New(params Params) (*Backend, error) {
 	}
 
 	retry.SetBackend(b)
-
-	preferredENIdentifiers, err = commonrpc.IdentifierList(params.PreferredExecutionNodeIDs)
-	if err != nil {
-		return nil, fmt.Errorf("failed to convert node id string to Flow Identifier for preferred EN map: %w", err)
-	}
-
-	fixedENIdentifiers, err = commonrpc.IdentifierList(params.FixedExecutionNodeIDs)
-	if err != nil {
-		return nil, fmt.Errorf("failed to convert node id string to Flow Identifier for fixed EN map: %w", err)
-	}
 
 	return b, nil
 }
