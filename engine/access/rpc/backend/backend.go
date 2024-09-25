@@ -77,39 +77,38 @@ type Backend struct {
 }
 
 type Params struct {
-	State                     protocol.State
-	CollectionRPC             accessproto.AccessAPIClient
-	HistoricalAccessNodes     []accessproto.AccessAPIClient
-	Blocks                    storage.Blocks
-	Headers                   storage.Headers
-	Collections               storage.Collections
-	Transactions              storage.Transactions
-	ExecutionReceipts         storage.ExecutionReceipts
-	ExecutionResults          storage.ExecutionResults
-	TxResultErrorMessages     storage.TransactionResultErrorMessages
-	ChainID                   flow.ChainID
-	AccessMetrics             module.AccessMetrics
-	ConnFactory               connection.ConnectionFactory
-	RetryEnabled              bool
-	MaxHeightRange            uint
-	PreferredExecutionNodeIDs []string
-	FixedExecutionNodeIDs     []string
-	Log                       zerolog.Logger
-	SnapshotHistoryLimit      int
-	Communicator              Communicator
-	TxResultCacheSize         uint
-	ScriptExecutor            execution.ScriptExecutor
-	ScriptExecutionMode       IndexQueryMode
-	CheckPayerBalance         bool
-	EventQueryMode            IndexQueryMode
-	BlockTracker              subscription.BlockTracker
-	SubscriptionHandler       *subscription.SubscriptionHandler
+	State                 protocol.State
+	CollectionRPC         accessproto.AccessAPIClient
+	HistoricalAccessNodes []accessproto.AccessAPIClient
+	Blocks                storage.Blocks
+	Headers               storage.Headers
+	Collections           storage.Collections
+	Transactions          storage.Transactions
+	ExecutionReceipts     storage.ExecutionReceipts
+	ExecutionResults      storage.ExecutionResults
+	TxResultErrorMessages storage.TransactionResultErrorMessages
+	ChainID               flow.ChainID
+	AccessMetrics         module.AccessMetrics
+	ConnFactory           connection.ConnectionFactory
+	RetryEnabled          bool
+	MaxHeightRange        uint
+	Log                   zerolog.Logger
+	SnapshotHistoryLimit  int
+	Communicator          Communicator
+	TxResultCacheSize     uint
+	ScriptExecutor        execution.ScriptExecutor
+	ScriptExecutionMode   IndexQueryMode
+	CheckPayerBalance     bool
+	EventQueryMode        IndexQueryMode
+	BlockTracker          subscription.BlockTracker
+	SubscriptionHandler   *subscription.SubscriptionHandler
 
-	EventsIndex         *index.EventsIndex
-	TxResultQueryMode   IndexQueryMode
-	TxResultsIndex      *index.TransactionResultsIndex
-	LastFullBlockHeight *counters.PersistentStrictMonotonicCounter
-	VersionControl      *version.VersionControl
+	EventsIndex                *index.EventsIndex
+	TxResultQueryMode          IndexQueryMode
+	TxResultsIndex             *index.TransactionResultsIndex
+	LastFullBlockHeight        *counters.PersistentStrictMonotonicCounter
+	VersionControl             *version.VersionControl
+	ExecNodeIdentitiesProvider *commonrpc.ExecutionNodeIdentitiesProvider
 }
 
 var _ TransactionErrorMessage = (*Backend)(nil)
@@ -141,18 +140,6 @@ func New(params Params) (*Backend, error) {
 	}
 	systemTxID := systemTx.ID()
 
-	preferredENIdentifiers, err := commonrpc.IdentifierList(params.PreferredExecutionNodeIDs)
-	if err != nil {
-		return nil, fmt.Errorf("failed to convert node id string to Flow Identifier for preferred EN map: %w", err)
-	}
-
-	fixedENIdentifiers, err := commonrpc.IdentifierList(params.FixedExecutionNodeIDs)
-	if err != nil {
-		return nil, fmt.Errorf("failed to convert node id string to Flow Identifier for fixed EN map: %w", err)
-	}
-
-	execProvider := commonrpc.NewExecutionNodeIdentitiesProvider(params.Log, params.State, params.ExecutionReceipts, preferredENIdentifiers, fixedENIdentifiers)
-
 	transactionsLocalDataProvider := &TransactionsLocalDataProvider{
 		state:               params.State,
 		collections:         params.Collections,
@@ -177,7 +164,7 @@ func New(params Params) (*Backend, error) {
 			nodeCommunicator: params.Communicator,
 			scriptExecutor:   params.ScriptExecutor,
 			scriptExecMode:   params.ScriptExecutionMode,
-			execProvider:     execProvider,
+			execProvider:     params.ExecNodeIdentitiesProvider,
 		},
 		backendEvents: backendEvents{
 			log:              params.Log,
@@ -189,7 +176,7 @@ func New(params Params) (*Backend, error) {
 			nodeCommunicator: params.Communicator,
 			queryMode:        params.EventQueryMode,
 			eventsIndex:      params.EventsIndex,
-			execProvider:     execProvider,
+			execProvider:     params.ExecNodeIdentitiesProvider,
 		},
 		backendBlockHeaders: backendBlockHeaders{
 			headers: params.Headers,
@@ -207,7 +194,7 @@ func New(params Params) (*Backend, error) {
 			nodeCommunicator: params.Communicator,
 			scriptExecutor:   params.ScriptExecutor,
 			scriptExecMode:   params.ScriptExecutionMode,
-			execProvider:     execProvider,
+			execProvider:     params.ExecNodeIdentitiesProvider,
 		},
 		backendExecutionResults: backendExecutionResults{
 			executionResults: params.ExecutionResults,
@@ -257,7 +244,7 @@ func New(params Params) (*Backend, error) {
 		txResultQueryMode:             params.TxResultQueryMode,
 		systemTx:                      systemTx,
 		systemTxID:                    systemTxID,
-		execProvider:                  execProvider,
+		execProvider:                  params.ExecNodeIdentitiesProvider,
 	}
 
 	// TODO: The TransactionErrorMessage interface should be reorganized in future, as it is implemented in backendTransactions but used in TransactionsLocalDataProvider, and its initialization is somewhat quirky.

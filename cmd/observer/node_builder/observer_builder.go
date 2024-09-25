@@ -54,6 +54,7 @@ import (
 	statestreambackend "github.com/onflow/flow-go/engine/access/state_stream/backend"
 	"github.com/onflow/flow-go/engine/access/subscription"
 	"github.com/onflow/flow-go/engine/common/follower"
+	commonrpc "github.com/onflow/flow-go/engine/common/rpc"
 	"github.com/onflow/flow-go/engine/common/stop"
 	synceng "github.com/onflow/flow-go/engine/common/synchronization"
 	"github.com/onflow/flow-go/engine/common/version"
@@ -1937,25 +1938,41 @@ func (builder *ObserverServiceBuilder) enqueueRPCServer() {
 			return nil, fmt.Errorf("failed to initialize block tracker: %w", err)
 		}
 
+		preferredENIdentifiers, err := commonrpc.IdentifierList(backendConfig.PreferredExecutionNodeIDs)
+		if err != nil {
+			return nil, fmt.Errorf("failed to convert node id string to Flow Identifier for preferred EN map: %w", err)
+		}
+
+		fixedENIdentifiers, err := commonrpc.IdentifierList(backendConfig.FixedExecutionNodeIDs)
+		if err != nil {
+			return nil, fmt.Errorf("failed to convert node id string to Flow Identifier for fixed EN map: %w", err)
+		}
+
+		execNodeIdentitiesProvider := commonrpc.NewExecutionNodeIdentitiesProvider(
+			node.Logger,
+			node.State,
+			node.Storage.Receipts,
+			preferredENIdentifiers,
+			fixedENIdentifiers,
+		)
+
 		backendParams := backend.Params{
-			State:                     node.State,
-			Blocks:                    node.Storage.Blocks,
-			Headers:                   node.Storage.Headers,
-			Collections:               node.Storage.Collections,
-			Transactions:              node.Storage.Transactions,
-			ExecutionReceipts:         node.Storage.Receipts,
-			ExecutionResults:          node.Storage.Results,
-			ChainID:                   node.RootChainID,
-			AccessMetrics:             accessMetrics,
-			ConnFactory:               connFactory,
-			RetryEnabled:              false,
-			MaxHeightRange:            backendConfig.MaxHeightRange,
-			PreferredExecutionNodeIDs: backendConfig.PreferredExecutionNodeIDs,
-			FixedExecutionNodeIDs:     backendConfig.FixedExecutionNodeIDs,
-			Log:                       node.Logger,
-			SnapshotHistoryLimit:      backend.DefaultSnapshotHistoryLimit,
-			Communicator:              backend.NewNodeCommunicator(backendConfig.CircuitBreakerConfig.Enabled),
-			BlockTracker:              blockTracker,
+			State:                node.State,
+			Blocks:               node.Storage.Blocks,
+			Headers:              node.Storage.Headers,
+			Collections:          node.Storage.Collections,
+			Transactions:         node.Storage.Transactions,
+			ExecutionReceipts:    node.Storage.Receipts,
+			ExecutionResults:     node.Storage.Results,
+			ChainID:              node.RootChainID,
+			AccessMetrics:        accessMetrics,
+			ConnFactory:          connFactory,
+			RetryEnabled:         false,
+			MaxHeightRange:       backendConfig.MaxHeightRange,
+			Log:                  node.Logger,
+			SnapshotHistoryLimit: backend.DefaultSnapshotHistoryLimit,
+			Communicator:         backend.NewNodeCommunicator(backendConfig.CircuitBreakerConfig.Enabled),
+			BlockTracker:         blockTracker,
 			SubscriptionHandler: subscription.NewSubscriptionHandler(
 				builder.Logger,
 				broadcaster,
@@ -1963,7 +1980,8 @@ func (builder *ObserverServiceBuilder) enqueueRPCServer() {
 				builder.stateStreamConf.ResponseLimit,
 				builder.stateStreamConf.ClientSendBufferSize,
 			),
-			VersionControl: builder.VersionControl,
+			VersionControl:             builder.VersionControl,
+			ExecNodeIdentitiesProvider: execNodeIdentitiesProvider,
 		}
 
 		if builder.localServiceAPIEnabled {

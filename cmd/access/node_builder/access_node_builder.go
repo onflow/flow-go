@@ -55,6 +55,7 @@ import (
 	"github.com/onflow/flow-go/engine/access/subscription"
 	followereng "github.com/onflow/flow-go/engine/common/follower"
 	"github.com/onflow/flow-go/engine/common/requester"
+	commonrpc "github.com/onflow/flow-go/engine/common/rpc"
 	"github.com/onflow/flow-go/engine/common/stop"
 	synceng "github.com/onflow/flow-go/engine/common/synchronization"
 	"github.com/onflow/flow-go/engine/common/version"
@@ -349,6 +350,8 @@ type FlowAccessNodeBuilder struct {
 
 	stateStreamBackend *statestreambackend.StateStreamBackend
 	nodeBackend        *backend.Backend
+
+	ExecNodeIdentitiesProvider *commonrpc.ExecutionNodeIdentitiesProvider
 }
 
 func (builder *FlowAccessNodeBuilder) buildFollowerState() *FlowAccessNodeBuilder {
@@ -1926,33 +1929,49 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 				return nil, fmt.Errorf("transaction result query mode 'compare' is not supported")
 			}
 
+			preferredENIdentifiers, err := commonrpc.IdentifierList(backendConfig.PreferredExecutionNodeIDs)
+			if err != nil {
+				return nil, fmt.Errorf("failed to convert node id string to Flow Identifier for preferred EN map: %w", err)
+			}
+
+			fixedENIdentifiers, err := commonrpc.IdentifierList(backendConfig.FixedExecutionNodeIDs)
+			if err != nil {
+				return nil, fmt.Errorf("failed to convert node id string to Flow Identifier for fixed EN map: %w", err)
+			}
+
+			builder.ExecNodeIdentitiesProvider = commonrpc.NewExecutionNodeIdentitiesProvider(
+				node.Logger,
+				node.State,
+				node.Storage.Receipts,
+				preferredENIdentifiers,
+				fixedENIdentifiers,
+			)
+
 			builder.nodeBackend, err = backend.New(backend.Params{
-				State:                     node.State,
-				CollectionRPC:             builder.CollectionRPC,
-				HistoricalAccessNodes:     builder.HistoricalAccessRPCs,
-				Blocks:                    node.Storage.Blocks,
-				Headers:                   node.Storage.Headers,
-				Collections:               node.Storage.Collections,
-				Transactions:              node.Storage.Transactions,
-				ExecutionReceipts:         node.Storage.Receipts,
-				ExecutionResults:          node.Storage.Results,
-				TxResultErrorMessages:     node.Storage.TransactionResultErrorMessages,
-				ChainID:                   node.RootChainID,
-				AccessMetrics:             builder.AccessMetrics,
-				ConnFactory:               connFactory,
-				RetryEnabled:              builder.retryEnabled,
-				MaxHeightRange:            backendConfig.MaxHeightRange,
-				PreferredExecutionNodeIDs: backendConfig.PreferredExecutionNodeIDs,
-				FixedExecutionNodeIDs:     backendConfig.FixedExecutionNodeIDs,
-				Log:                       node.Logger,
-				SnapshotHistoryLimit:      backend.DefaultSnapshotHistoryLimit,
-				Communicator:              backend.NewNodeCommunicator(backendConfig.CircuitBreakerConfig.Enabled),
-				TxResultCacheSize:         builder.TxResultCacheSize,
-				ScriptExecutor:            builder.ScriptExecutor,
-				ScriptExecutionMode:       scriptExecMode,
-				CheckPayerBalance:         builder.checkPayerBalance,
-				EventQueryMode:            eventQueryMode,
-				BlockTracker:              blockTracker,
+				State:                 node.State,
+				CollectionRPC:         builder.CollectionRPC,
+				HistoricalAccessNodes: builder.HistoricalAccessRPCs,
+				Blocks:                node.Storage.Blocks,
+				Headers:               node.Storage.Headers,
+				Collections:           node.Storage.Collections,
+				Transactions:          node.Storage.Transactions,
+				ExecutionReceipts:     node.Storage.Receipts,
+				ExecutionResults:      node.Storage.Results,
+				TxResultErrorMessages: node.Storage.TransactionResultErrorMessages,
+				ChainID:               node.RootChainID,
+				AccessMetrics:         builder.AccessMetrics,
+				ConnFactory:           connFactory,
+				RetryEnabled:          builder.retryEnabled,
+				MaxHeightRange:        backendConfig.MaxHeightRange,
+				Log:                   node.Logger,
+				SnapshotHistoryLimit:  backend.DefaultSnapshotHistoryLimit,
+				Communicator:          backend.NewNodeCommunicator(backendConfig.CircuitBreakerConfig.Enabled),
+				TxResultCacheSize:     builder.TxResultCacheSize,
+				ScriptExecutor:        builder.ScriptExecutor,
+				ScriptExecutionMode:   scriptExecMode,
+				CheckPayerBalance:     builder.checkPayerBalance,
+				EventQueryMode:        eventQueryMode,
+				BlockTracker:          blockTracker,
 				SubscriptionHandler: subscription.NewSubscriptionHandler(
 					builder.Logger,
 					broadcaster,
@@ -1960,11 +1979,12 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 					builder.stateStreamConf.ResponseLimit,
 					builder.stateStreamConf.ClientSendBufferSize,
 				),
-				EventsIndex:         builder.EventsIndex,
-				TxResultQueryMode:   txResultQueryMode,
-				TxResultsIndex:      builder.TxResultsIndex,
-				LastFullBlockHeight: lastFullBlockHeight,
-				VersionControl:      builder.VersionControl,
+				EventsIndex:                builder.EventsIndex,
+				TxResultQueryMode:          txResultQueryMode,
+				TxResultsIndex:             builder.TxResultsIndex,
+				LastFullBlockHeight:        lastFullBlockHeight,
+				VersionControl:             builder.VersionControl,
+				ExecNodeIdentitiesProvider: builder.ExecNodeIdentitiesProvider,
 			})
 			if err != nil {
 				return nil, fmt.Errorf("could not initialize backend: %w", err)
@@ -2041,8 +2061,7 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 				processedBlockHeight,
 				lastFullBlockHeight,
 				builder.nodeBackend,
-				builder.rpcConf.BackendConfig.PreferredExecutionNodeIDs,
-				builder.rpcConf.BackendConfig.FixedExecutionNodeIDs,
+				builder.ExecNodeIdentitiesProvider,
 			)
 			if err != nil {
 				return nil, err

@@ -30,6 +30,7 @@ import (
 	backendmock "github.com/onflow/flow-go/engine/access/rpc/backend/mock"
 	"github.com/onflow/flow-go/engine/access/rpc/connection"
 	connectionmock "github.com/onflow/flow-go/engine/access/rpc/connection/mock"
+	commonrpc "github.com/onflow/flow-go/engine/common/rpc"
 	"github.com/onflow/flow-go/engine/common/rpc/convert"
 	"github.com/onflow/flow-go/engine/common/version"
 	"github.com/onflow/flow-go/fvm/blueprints"
@@ -89,6 +90,9 @@ type Suite struct {
 
 	chainID  flow.ChainID
 	systemTx *flow.TransactionBody
+
+	fixedExecutionNodeIDs     flow.IdentifierList
+	preferredExecutionNodeIDs flow.IdentifierList
 }
 
 func TestHandler(t *testing.T) {
@@ -921,10 +925,11 @@ func (suite *Suite) TestGetTransactionResultByIndex() {
 		Events: nil,
 	}
 
+	suite.fixedExecutionNodeIDs = fixedENIDs.NodeIDs()
+
 	params := suite.defaultBackendParams()
 	// the connection factory should be used to get the execution node client
 	params.ConnFactory = suite.setupConnectionFactory()
-	params.FixedExecutionNodeIDs = (fixedENIDs.NodeIDs()).Strings()
 
 	backend, err := New(params)
 	suite.Require().NoError(err)
@@ -962,7 +967,6 @@ func (suite *Suite) TestGetTransactionResultsByBlockID() {
 	suite.state.On("Sealed").Return(suite.snapshot, nil).Maybe()
 
 	ctx := context.Background()
-	params := suite.defaultBackendParams()
 
 	block := unittest.BlockFixture()
 	sporkRootBlockHeight := suite.state.Params().SporkRootBlockHeight()
@@ -986,9 +990,11 @@ func (suite *Suite) TestGetTransactionResultsByBlockID() {
 		TransactionResults: []*execproto.GetTransactionResultResponse{{}},
 	}
 
+	suite.fixedExecutionNodeIDs = fixedENIDs.NodeIDs()
+
+	params := suite.defaultBackendParams()
 	// the connection factory should be used to get the execution node client
 	params.ConnFactory = suite.setupConnectionFactory()
-	params.FixedExecutionNodeIDs = (fixedENIDs.NodeIDs()).Strings()
 
 	backend, err := New(params)
 	suite.Require().NoError(err)
@@ -1076,10 +1082,11 @@ func (suite *Suite) TestTransactionStatusTransition() {
 		Events: nil,
 	}
 
+	suite.fixedExecutionNodeIDs = fixedENIDs.NodeIDs()
+
 	params := suite.defaultBackendParams()
 	// the connection factory should be used to get the execution node client
 	params.ConnFactory = suite.setupConnectionFactory()
-	params.FixedExecutionNodeIDs = (fixedENIDs.NodeIDs()).Strings()
 
 	backend, err := New(params)
 	suite.Require().NoError(err)
@@ -1332,7 +1339,7 @@ func (suite *Suite) TestTransactionPendingToFinalizedStatusTransition() {
 	params := suite.defaultBackendParams()
 	params.ConnFactory = connFactory
 	params.MaxHeightRange = TEST_MAX_HEIGHT
-	params.PreferredExecutionNodeIDs = []string{receipts[0].ExecutorID.String()}
+	suite.preferredExecutionNodeIDs = flow.IdentifierList{receipts[0].ExecutorID}
 
 	backend, err := New(params)
 	suite.Require().NoError(err)
@@ -1471,10 +1478,11 @@ func (suite *Suite) TestGetExecutionResultByID() {
 		Return(executionResult, nil)
 
 	suite.Run("nonexisting execution result for id", func() {
+		suite.fixedExecutionNodeIDs = validENIDs
+
 		params := suite.defaultBackendParams()
 		params.ExecutionResults = results
 		params.ConnFactory = connFactory
-		params.FixedExecutionNodeIDs = validENIDs.Strings()
 
 		backend, err := New(params)
 		suite.Require().NoError(err)
@@ -1486,10 +1494,11 @@ func (suite *Suite) TestGetExecutionResultByID() {
 	})
 
 	suite.Run("existing execution result id", func() {
+		suite.fixedExecutionNodeIDs = validENIDs
+
 		params := suite.defaultBackendParams()
 		params.ExecutionResults = results
 		params.ConnFactory = connFactory
-		params.FixedExecutionNodeIDs = validENIDs.Strings()
 
 		backend, err := New(params)
 		suite.Require().NoError(err)
@@ -1533,10 +1542,11 @@ func (suite *Suite) TestGetExecutionResultByBlockID() {
 		Return(executionResult, nil)
 
 	suite.Run("nonexisting execution results", func() {
+		suite.fixedExecutionNodeIDs = validENIDs
+
 		params := suite.defaultBackendParams()
 		params.ExecutionResults = results
 		params.ConnFactory = connFactory
-		params.FixedExecutionNodeIDs = validENIDs.Strings()
 
 		backend, err := New(params)
 		suite.Require().NoError(err)
@@ -1548,10 +1558,11 @@ func (suite *Suite) TestGetExecutionResultByBlockID() {
 	})
 
 	suite.Run("existing execution results", func() {
+		suite.fixedExecutionNodeIDs = validENIDs
+
 		params := suite.defaultBackendParams()
 		params.ExecutionResults = results
 		params.ConnFactory = connFactory
-		params.FixedExecutionNodeIDs = validENIDs.Strings()
 
 		backend, err := New(params)
 		suite.Require().NoError(err)
@@ -1762,10 +1773,11 @@ func (suite *Suite) TestGetTransactionResultEventEncodingVersion() {
 	suite.state.On("Final").Return(suite.snapshot, nil).Maybe()
 	suite.snapshot.On("Identities", mock.Anything).Return(fixedENIDs, nil)
 
+	suite.fixedExecutionNodeIDs = fixedENIDs.NodeIDs()
+
 	params := suite.defaultBackendParams()
 	// the connection factory should be used to get the execution node client
 	params.ConnFactory = suite.setupConnectionFactory()
-	params.FixedExecutionNodeIDs = (fixedENIDs.NodeIDs()).Strings()
 
 	backend, err := New(params)
 	suite.Require().NoError(err)
@@ -1824,10 +1836,11 @@ func (suite *Suite) TestGetTransactionResultByIndexAndBlockIdEventEncodingVersio
 	suite.state.On("Final").Return(suite.snapshot, nil).Maybe()
 	suite.snapshot.On("Identities", mock.Anything).Return(fixedENIDs, nil)
 
+	suite.fixedExecutionNodeIDs = fixedENIDs.NodeIDs()
+
 	params := suite.defaultBackendParams()
 	// the connection factory should be used to get the execution node client
 	params.ConnFactory = suite.setupConnectionFactory()
-	params.FixedExecutionNodeIDs = (fixedENIDs.NodeIDs()).Strings()
 
 	backend, err := New(params)
 	suite.Require().NoError(err)
@@ -1924,12 +1937,13 @@ func (suite *Suite) TestNodeCommunicator() {
 		BlockId: blockId[:],
 	}
 
+	// Left only one preferred execution node
+	suite.fixedExecutionNodeIDs = fixedENIDs.NodeIDs()
+	suite.preferredExecutionNodeIDs = flow.IdentifierList{fixedENIDs[0].NodeID}
+
 	params := suite.defaultBackendParams()
 	// the connection factory should be used to get the execution node client
 	params.ConnFactory = suite.setupConnectionFactory()
-	params.FixedExecutionNodeIDs = (fixedENIDs.NodeIDs()).Strings()
-	// Left only one preferred execution node
-	params.PreferredExecutionNodeIDs = []string{fixedENIDs[0].NodeID.String()}
 
 	backend, err := New(params)
 	suite.Require().NoError(err)
@@ -2022,5 +2036,12 @@ func (suite *Suite) defaultBackendParams() Params {
 		TxResultQueryMode:    IndexQueryModeExecutionNodesOnly,
 		LastFullBlockHeight:  suite.lastFullBlockHeight,
 		VersionControl:       suite.versionControl,
+		ExecNodeIdentitiesProvider: commonrpc.NewExecutionNodeIdentitiesProvider(
+			suite.log,
+			suite.state,
+			suite.receipts,
+			suite.preferredExecutionNodeIDs,
+			suite.fixedExecutionNodeIDs,
+		),
 	}
 }

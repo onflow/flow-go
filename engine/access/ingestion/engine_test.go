@@ -20,6 +20,7 @@ import (
 	accessmock "github.com/onflow/flow-go/engine/access/mock"
 	"github.com/onflow/flow-go/engine/access/rpc/backend"
 	connectionmock "github.com/onflow/flow-go/engine/access/rpc/connection/mock"
+	commonrpc "github.com/onflow/flow-go/engine/common/rpc"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/module"
@@ -86,6 +87,8 @@ type Suite struct {
 	db                  *badger.DB
 	dbDir               string
 	lastFullBlockHeight *counters.PersistentStrictMonotonicCounter
+
+	execNodeIdentitiesProvider *commonrpc.ExecutionNodeIdentitiesProvider
 }
 
 func TestIngestEngine(t *testing.T) {
@@ -188,6 +191,14 @@ func (s *Suite) SetupTest() {
 		s.blocks,
 	)
 	require.NoError(s.T(), err)
+
+	s.execNodeIdentitiesProvider = commonrpc.NewExecutionNodeIdentitiesProvider(
+		s.log,
+		s.proto.state,
+		s.receipts,
+		nil,
+		s.enNodeIDs,
+	)
 }
 
 // initIngestionEngine create new instance of ingestion engine and waits when it starts
@@ -218,8 +229,7 @@ func (s *Suite) initIngestionEngine(ctx irrecoverable.SignalerContext) *Engine {
 		processedHeight,
 		s.lastFullBlockHeight,
 		s.backend,
-		s.enNodeIDs.Strings(),
-		nil,
+		s.execNodeIdentitiesProvider,
 	)
 
 	require.NoError(s.T(), err)
@@ -858,21 +868,21 @@ func (s *Suite) TestTransactionResultErrorMessagesAreFetched() {
 	// Initialize the backend with the mocked state, blocks, headers, transactions, etc.
 	var err error
 	s.backend, err = backend.New(backend.Params{
-		State:                 s.proto.state,
-		Blocks:                s.blocks,
-		Headers:               s.headers,
-		Transactions:          s.transactions,
-		ExecutionReceipts:     s.receipts,
-		ExecutionResults:      s.results,
-		ConnFactory:           connFactory,
-		MaxHeightRange:        backend.DefaultMaxHeightRange,
-		FixedExecutionNodeIDs: s.enNodeIDs.Strings(),
-		Log:                   s.log,
-		SnapshotHistoryLimit:  backend.DefaultSnapshotHistoryLimit,
-		Communicator:          backend.NewNodeCommunicator(false),
-		ScriptExecutionMode:   backend.IndexQueryModeExecutionNodesOnly,
-		TxResultQueryMode:     backend.IndexQueryModeExecutionNodesOnly,
-		ChainID:               flow.Testnet,
+		State:                      s.proto.state,
+		Blocks:                     s.blocks,
+		Headers:                    s.headers,
+		Transactions:               s.transactions,
+		ExecutionReceipts:          s.receipts,
+		ExecutionResults:           s.results,
+		ConnFactory:                connFactory,
+		MaxHeightRange:             backend.DefaultMaxHeightRange,
+		Log:                        s.log,
+		SnapshotHistoryLimit:       backend.DefaultSnapshotHistoryLimit,
+		Communicator:               backend.NewNodeCommunicator(false),
+		ScriptExecutionMode:        backend.IndexQueryModeExecutionNodesOnly,
+		TxResultQueryMode:          backend.IndexQueryModeExecutionNodesOnly,
+		ChainID:                    flow.Testnet,
+		ExecNodeIdentitiesProvider: s.execNodeIdentitiesProvider,
 	})
 	require.NoError(s.T(), err)
 

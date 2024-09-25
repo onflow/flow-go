@@ -26,6 +26,7 @@ import (
 	"github.com/onflow/flow-go/engine/access/rpc/backend"
 	connectionmock "github.com/onflow/flow-go/engine/access/rpc/connection/mock"
 	"github.com/onflow/flow-go/engine/access/subscription"
+	commonrpc "github.com/onflow/flow-go/engine/common/rpc"
 	"github.com/onflow/flow-go/engine/common/rpc/convert"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/factory"
@@ -642,23 +643,32 @@ func (suite *Suite) TestGetSealedTransaction() {
 		blocksToMarkExecuted, err := stdmap.NewTimes(100)
 		require.NoError(suite.T(), err)
 
-		bnd, err := backend.New(backend.Params{State: suite.state,
-			CollectionRPC:             suite.collClient,
-			Blocks:                    all.Blocks,
-			Headers:                   all.Headers,
-			Collections:               collections,
-			Transactions:              transactions,
-			ExecutionReceipts:         receipts,
-			ExecutionResults:          results,
-			ChainID:                   suite.chainID,
-			AccessMetrics:             suite.metrics,
-			ConnFactory:               connFactory,
-			MaxHeightRange:            backend.DefaultMaxHeightRange,
-			PreferredExecutionNodeIDs: enNodeIDs.Strings(),
-			Log:                       suite.log,
-			SnapshotHistoryLimit:      backend.DefaultSnapshotHistoryLimit,
-			Communicator:              backend.NewNodeCommunicator(false),
-			TxResultQueryMode:         backend.IndexQueryModeExecutionNodesOnly,
+		execNodeIdentitiesProvider := commonrpc.NewExecutionNodeIdentitiesProvider(
+			suite.log,
+			suite.state,
+			receipts,
+			enNodeIDs,
+			nil,
+		)
+
+		bnd, err := backend.New(backend.Params{
+			State:                      suite.state,
+			CollectionRPC:              suite.collClient,
+			Blocks:                     all.Blocks,
+			Headers:                    all.Headers,
+			Collections:                collections,
+			Transactions:               transactions,
+			ExecutionReceipts:          receipts,
+			ExecutionResults:           results,
+			ChainID:                    suite.chainID,
+			AccessMetrics:              suite.metrics,
+			ConnFactory:                connFactory,
+			MaxHeightRange:             backend.DefaultMaxHeightRange,
+			Log:                        suite.log,
+			SnapshotHistoryLimit:       backend.DefaultSnapshotHistoryLimit,
+			Communicator:               backend.NewNodeCommunicator(false),
+			TxResultQueryMode:          backend.IndexQueryModeExecutionNodesOnly,
+			ExecNodeIdentitiesProvider: execNodeIdentitiesProvider,
 		})
 		require.NoError(suite.T(), err)
 
@@ -701,8 +711,7 @@ func (suite *Suite) TestGetSealedTransaction() {
 			processedHeight,
 			lastFullBlockHeight,
 			bnd,
-			enNodeIDs.Strings(),
-			nil,
+			execNodeIdentitiesProvider,
 		)
 		require.NoError(suite.T(), err)
 
@@ -821,23 +830,31 @@ func (suite *Suite) TestGetTransactionResult() {
 		blocksToMarkExecuted, err := stdmap.NewTimes(100)
 		require.NoError(suite.T(), err)
 
+		execNodeIdentitiesProvider := commonrpc.NewExecutionNodeIdentitiesProvider(
+			suite.log,
+			suite.state,
+			receipts,
+			enNodeIDs,
+			nil,
+		)
+
 		bnd, err := backend.New(backend.Params{State: suite.state,
-			CollectionRPC:             suite.collClient,
-			Blocks:                    all.Blocks,
-			Headers:                   all.Headers,
-			Collections:               collections,
-			Transactions:              transactions,
-			ExecutionReceipts:         receipts,
-			ExecutionResults:          results,
-			ChainID:                   suite.chainID,
-			AccessMetrics:             suite.metrics,
-			ConnFactory:               connFactory,
-			MaxHeightRange:            backend.DefaultMaxHeightRange,
-			PreferredExecutionNodeIDs: enNodeIDs.Strings(),
-			Log:                       suite.log,
-			SnapshotHistoryLimit:      backend.DefaultSnapshotHistoryLimit,
-			Communicator:              backend.NewNodeCommunicator(false),
-			TxResultQueryMode:         backend.IndexQueryModeExecutionNodesOnly,
+			CollectionRPC:              suite.collClient,
+			Blocks:                     all.Blocks,
+			Headers:                    all.Headers,
+			Collections:                collections,
+			Transactions:               transactions,
+			ExecutionReceipts:          receipts,
+			ExecutionResults:           results,
+			ChainID:                    suite.chainID,
+			AccessMetrics:              suite.metrics,
+			ConnFactory:                connFactory,
+			MaxHeightRange:             backend.DefaultMaxHeightRange,
+			Log:                        suite.log,
+			SnapshotHistoryLimit:       backend.DefaultSnapshotHistoryLimit,
+			Communicator:               backend.NewNodeCommunicator(false),
+			TxResultQueryMode:          backend.IndexQueryModeExecutionNodesOnly,
+			ExecNodeIdentitiesProvider: execNodeIdentitiesProvider,
 		})
 		require.NoError(suite.T(), err)
 
@@ -879,8 +896,7 @@ func (suite *Suite) TestGetTransactionResult() {
 			processedHeight,
 			lastFullBlockHeight,
 			bnd,
-			enNodeIDs.Strings(),
-			nil,
+			execNodeIdentitiesProvider,
 		)
 		require.NoError(suite.T(), err)
 
@@ -1054,26 +1070,34 @@ func (suite *Suite) TestExecuteScript() {
 		enIdentities := unittest.IdentityListFixture(2, unittest.WithRole(flow.RoleExecution))
 		enNodeIDs := enIdentities.NodeIDs()
 
+		execNodeIdentitiesProvider := commonrpc.NewExecutionNodeIdentitiesProvider(
+			suite.log,
+			suite.state,
+			receipts,
+			nil,
+			enNodeIDs,
+		)
+
 		var err error
 		suite.backend, err = backend.New(backend.Params{
-			State:                 suite.state,
-			CollectionRPC:         suite.collClient,
-			Blocks:                all.Blocks,
-			Headers:               all.Headers,
-			Collections:           collections,
-			Transactions:          transactions,
-			ExecutionReceipts:     receipts,
-			ExecutionResults:      results,
-			ChainID:               suite.chainID,
-			AccessMetrics:         suite.metrics,
-			ConnFactory:           connFactory,
-			MaxHeightRange:        backend.DefaultMaxHeightRange,
-			FixedExecutionNodeIDs: (identities.NodeIDs()).Strings(),
-			Log:                   suite.log,
-			SnapshotHistoryLimit:  backend.DefaultSnapshotHistoryLimit,
-			Communicator:          backend.NewNodeCommunicator(false),
-			ScriptExecutionMode:   backend.IndexQueryModeExecutionNodesOnly,
-			TxResultQueryMode:     backend.IndexQueryModeExecutionNodesOnly,
+			State:                      suite.state,
+			CollectionRPC:              suite.collClient,
+			Blocks:                     all.Blocks,
+			Headers:                    all.Headers,
+			Collections:                collections,
+			Transactions:               transactions,
+			ExecutionReceipts:          receipts,
+			ExecutionResults:           results,
+			ChainID:                    suite.chainID,
+			AccessMetrics:              suite.metrics,
+			ConnFactory:                connFactory,
+			MaxHeightRange:             backend.DefaultMaxHeightRange,
+			Log:                        suite.log,
+			SnapshotHistoryLimit:       backend.DefaultSnapshotHistoryLimit,
+			Communicator:               backend.NewNodeCommunicator(false),
+			ScriptExecutionMode:        backend.IndexQueryModeExecutionNodesOnly,
+			TxResultQueryMode:          backend.IndexQueryModeExecutionNodesOnly,
+			ExecNodeIdentitiesProvider: execNodeIdentitiesProvider,
 		})
 		require.NoError(suite.T(), err)
 
@@ -1128,8 +1152,7 @@ func (suite *Suite) TestExecuteScript() {
 			processedHeight,
 			lastFullBlockHeight,
 			suite.backend,
-			enNodeIDs.Strings(),
-			nil,
+			execNodeIdentitiesProvider,
 		)
 		require.NoError(suite.T(), err)
 

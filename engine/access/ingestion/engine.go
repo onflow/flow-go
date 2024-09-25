@@ -134,8 +134,7 @@ func New(
 	processedHeight storage.ConsumerProgress,
 	lastFullBlockHeight *counters.PersistentStrictMonotonicCounter,
 	backend *backend.Backend,
-	preferredExecutionNodeIDs []string,
-	fixedExecutionNodeIDs []string,
+	execProvider *commonrpc.ExecutionNodeIdentitiesProvider,
 ) (*Engine, error) {
 	executionReceiptsRawQueue, err := fifoqueue.NewFifoQueue(defaultQueueCapacity)
 	if err != nil {
@@ -157,16 +156,6 @@ func New(
 	)
 
 	collectionExecutedMetric.UpdateLastFullBlockHeight(lastFullBlockHeight.Value())
-
-	preferredENIdentifiers, err := commonrpc.IdentifierList(preferredExecutionNodeIDs)
-	if err != nil {
-		return nil, fmt.Errorf("failed to convert node id string to Flow Identifier for preferred EN map: %w", err)
-	}
-
-	fixedENIdentifiers, err := commonrpc.IdentifierList(fixedExecutionNodeIDs)
-	if err != nil {
-		return nil, fmt.Errorf("failed to convert node id string to Flow Identifier for fixed EN map: %w", err)
-	}
 
 	// initialize the propagation engine with its dependencies
 	e := &Engine{
@@ -192,7 +181,7 @@ func New(
 		executionReceiptsQueue:    executionReceiptsQueue,
 		messageHandler:            messageHandler,
 		backend:                   backend,
-		execProvider:              commonrpc.NewExecutionNodeIdentitiesProvider(log, state, executionReceipts, preferredENIdentifiers, fixedENIdentifiers),
+		execProvider:              execProvider,
 	}
 
 	// jobqueue Jobs object that tracks finalized blocks by height. This is used by the finalizedBlockConsumer
