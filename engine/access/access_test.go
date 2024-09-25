@@ -1067,15 +1067,12 @@ func (suite *Suite) TestExecuteScript() {
 		connFactory := connectionmock.NewConnectionFactory(suite.T())
 		connFactory.On("GetExecutionAPIClient", mock.Anything).Return(suite.execClient, &mockCloser{}, nil)
 
-		enIdentities := unittest.IdentityListFixture(2, unittest.WithRole(flow.RoleExecution))
-		enNodeIDs := enIdentities.NodeIDs()
-
 		execNodeIdentitiesProvider := commonrpc.NewExecutionNodeIdentitiesProvider(
 			suite.log,
 			suite.state,
 			receipts,
 			nil,
-			enNodeIDs,
+			identities.NodeIDs(),
 		)
 
 		var err error

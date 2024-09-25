@@ -283,6 +283,11 @@ func (bl *BlockView) DryRunTransaction(
 	// we need to skip nonce check for dry run
 	msg.SkipAccountChecks = true
 
+	// call tracer
+	if proc.evm.Config.Tracer != nil && proc.evm.Config.Tracer.OnTxStart != nil {
+		proc.evm.Config.Tracer.OnTxStart(proc.evm.GetVMContext(), tx, msg.From)
+	}
+
 	// return without committing the state
 	txResult, err = proc.run(msg, tx.Hash(), tx.Type())
 	if txResult.Successful() {
@@ -304,6 +309,13 @@ func (bl *BlockView) DryRunTransaction(
 		// Take into account any gas refunds, which are calculated only after
 		// transaction execution.
 		txResult.GasConsumed += txResult.GasRefund
+	}
+
+	// call tracer on tx end
+	if proc.evm.Config.Tracer != nil &&
+		proc.evm.Config.Tracer.OnTxEnd != nil &&
+		txResult != nil {
+		proc.evm.Config.Tracer.OnTxEnd(txResult.Receipt(), txResult.ValidationError)
 	}
 
 	return txResult, err
