@@ -857,6 +857,13 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 
 				return nil
 			}).
+			AdminCommand("backfill-tx-error-messages", func(config *cmd.NodeConfig) commands.AdminCommand {
+				return storageCommands.NewBackfillTxErrorMessagesCommand(
+					builder.State,
+					builder.Storage.TransactionResults,
+					builder.Storage.TransactionResultErrorMessages,
+				)
+			}).
 			DependableComponent("execution data indexer", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 				// Note: using a DependableComponent here to ensure that the indexer does not block
 				// other components from starting while bootstrapping the register db since it may
