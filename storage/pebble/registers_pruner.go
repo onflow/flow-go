@@ -15,7 +15,8 @@ import (
 )
 
 const (
-	DefaultPruneThreshold      = uint64(100_000)
+	// DefaultPruneThreshold TODO: The value is temporary due to PruneThreshold PR not merged yet
+	DefaultPruneThreshold      = uint64(5)
 	DefaultPruneThrottleDelay  = 10 * time.Millisecond
 	DefaultPruneTickerInterval = 10 * time.Minute
 )
@@ -263,7 +264,9 @@ func (p *RegisterPruner) pruneUpToHeight(ctx context.Context, pruneHeight uint64
 		return err
 	}
 
-	p.metrics.Pruned(pruneHeight, time.Since(start))
+	if p.metrics != nil {
+		p.metrics.Pruned(pruneHeight, time.Since(start))
+	}
 
 	return nil
 }

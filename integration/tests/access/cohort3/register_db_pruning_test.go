@@ -111,8 +111,7 @@ func (s *RegisterDBPruningSuite) SetupTest() {
 			"--event-query-mode=local-only",
 			"--local-service-api-enabled=true",
 			"--registerdb-pruning-enabled=true",
-			"--registerdb-prune-throttle-delay=1s",
-			"--registerdb-prune-ticker-interval=10s",
+			"--registerdb-prune-ticker-interval=5s",
 		},
 	}}
 
@@ -134,22 +133,33 @@ func (s *RegisterDBPruningSuite) TestHappyPath() {
 	s.waitUntilExecutionDataForBlockIndexed(observerNode, waitingBlockHeight)
 	s.net.StopContainers()
 
+	//1. Get AN register height boundaries
 	pebbleAN := s.getPebbleDB(accessNode.PebbleDBPath())
-	registerAN := s.nodeRegisterStorage(pebbleAN)
+	firstHeightAN, latestHeightAN, err := pstorage.ReadHeightsFromBootstrappedDB(pebbleAN)
+	require.NoError(s.T(), err, "could not read from AN db")
 
+	//2. Get AN register height boundaries
 	pebbleON := s.getPebbleDB(observerNode.PebbleDBPath())
-	registerON := s.nodeRegisterStorage(pebbleON)
+	firstHeightON, latestHeightON, err := pstorage.ReadHeightsFromBootstrappedDB(pebbleON)
+	require.NoError(s.T(), err, "could not read from ON db")
 
-	assert.Equal(s.T(), registerAN.LatestHeight(), registerON.LatestHeight())
+	//4. Check heights for equality on both AN and ON nodes
+	assert.Equal(s.T(), firstHeightAN, firstHeightON)
+	assert.Equal(s.T(), latestHeightAN, latestHeightON)
+
+	//5. Check if first height is less or equal predicted first height
+	predictedPruneThreshold := uint64(5)
+	registerAN := s.nodeRegisterStorage(pebbleAN)
+	assert.LessOrEqual(s.T(), registerAN.LatestHeight()-predictedPruneThreshold, firstHeightAN)
+	registerON := s.nodeRegisterStorage(pebbleON)
+	assert.LessOrEqual(s.T(), registerON.LatestHeight()-predictedPruneThreshold, firstHeightON)
 }
 
 func (s *RegisterDBPruningSuite) getPebbleDB(path string) *pebble.DB {
-	if s.pebbleDb == nil {
-		var err error
-		s.pebbleDb, err = pstorage.OpenRegisterPebbleDB(path)
-		require.NoError(s.T(), err, "could not open db")
-	}
-	return s.pebbleDb
+	pebbleDb, err := pstorage.OpenRegisterPebbleDB(path)
+	require.NoError(s.T(), err, "could not open db")
+
+	return pebbleDb
 }
 
 func (s *RegisterDBPruningSuite) nodeRegisterStorage(db *pebble.DB) *pstorage.Registers {

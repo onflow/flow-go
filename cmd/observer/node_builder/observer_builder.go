@@ -319,9 +319,10 @@ type ObserverServiceBuilder struct {
 	// Public network
 	peerID peer.ID
 
-	TransactionMetrics *metrics.TransactionCollector
-	RestMetrics        *metrics.RestCollector
-	AccessMetrics      module.AccessMetrics
+	TransactionMetrics      *metrics.TransactionCollector
+	RestMetrics             *metrics.RestCollector
+	AccessMetrics           module.AccessMetrics
+	RegisterDBPrunerMetrics *metrics.RegisterDBPrunerCollector
 
 	// grpc servers
 	secureGrpcServer      *grpcserver.GrpcServer
@@ -1578,6 +1579,7 @@ func (builder *ObserverServiceBuilder) BuildExecutionSyncComponents() *ObserverS
 				registerDBPruner, err := pstorage.NewRegisterPruner(
 					node.Logger,
 					builder.RegisterDB,
+					pstorage.WithPrunerMetrics(builder.RegisterDBPrunerMetrics),
 					//pstorage.WithPruneThreshold(builder.registerDBPruneThreshold),
 					pstorage.WithPruneThrottleDelay(builder.registerDBPruneThrottleDelay),
 					pstorage.WithPruneTickerInterval(builder.registerDBPruneTickerInterval),
@@ -1813,11 +1815,16 @@ func (builder *ObserverServiceBuilder) enqueueRPCServer() {
 		builder.RestMetrics = m
 		return nil
 	})
+	builder.Module("register db metrics", func(node *cmd.NodeConfig) error {
+		builder.RegisterDBPrunerMetrics = metrics.NewRegisterDBPrunerCollector()
+		return nil
+	})
 	builder.Module("access metrics", func(node *cmd.NodeConfig) error {
 		builder.AccessMetrics = metrics.NewAccessCollector(
 			metrics.WithTransactionMetrics(builder.TransactionMetrics),
 			metrics.WithBackendScriptsMetrics(builder.TransactionMetrics),
 			metrics.WithRestMetrics(builder.RestMetrics),
+			metrics.WithRegisterDBPrunerMetrics(builder.RegisterDBPrunerMetrics),
 		)
 		return nil
 	})
