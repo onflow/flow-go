@@ -256,12 +256,7 @@ type EpochCommit struct {
 	// CAUTION: This list may include keys for nodes which do not exist in the consensus committee
 	//          and may NOT include keys for all nodes in the consensus committee.
 	DKGParticipantKeys []crypto.PublicKey
-	// DKGIndexMap is always nil and is not used. This field exists to avoid data-model changes in a future version.
-	// Deprecated: This field is always nil and should not be used (it isn't really deprecated -- "pre-un-deprecated", maybe --
-	// but marking it as such makes Go tooling flag it in a way that is useful for this circumstance)
-	//
-	// TODO(EFM, #6214): Parse this field from service event and make use of it.
-	//                   Here is what the godoc should look like once we do that:
+
 	// DKGIndexMap is a mapping from node identifier to Random Beacon index.
 	// It has the following invariants:
 	//   - len(DKGParticipantKeys) == len(DKGIndexMap)
