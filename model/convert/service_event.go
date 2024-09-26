@@ -272,19 +272,20 @@ func convertServiceEventEpochCommit(event flow.Event) (*flow.ServiceEvent, error
 		return nil, fmt.Errorf("could not convert cluster qc votes: %w", err)
 	}
 
-	// parse DKG group key and participants
-	// Note: this is read in the same order as `DKGClient.SubmitResult` ie. with the group public key first followed by individual keys
-	// https://github.com/onflow/flow-go/blob/feature/dkg/module/dkg/client.go#L182-L183
+	// parse DKG group participants
 	commit.DKGParticipantKeys, err = convertDKGKeys(cdcDKGKeys.Values...)
 	if err != nil {
 		return nil, fmt.Errorf("could not convert DKG keys: %w", err)
 	}
+
+	// parse DKG group key
 	groupKey, err := convertDKGKeys(cdcDKGGroupKey)
 	if err != nil {
 		return nil, fmt.Errorf("could not convert DKG group key: %w", err)
 	}
 	commit.DKGGroupKey = groupKey[0]
 
+	// parse DKG Index Map
 	commit.DKGIndexMap = make(flow.DKGIndexMap, len(cdcDKGIndexMap.Pairs))
 	for _, pair := range cdcDKGIndexMap.Pairs {
 		nodeID, err := flow.HexStringToIdentifier(string(pair.Key.(cadence.String)))
@@ -328,7 +329,7 @@ func convertServiceEventEpochRecover(event flow.Event) (*flow.ServiceEvent, erro
 
 	fields := cadence.FieldsMappedByName(cdcEvent)
 
-	const expectedFieldCount = 13
+	const expectedFieldCount = 15
 	if len(fields) < expectedFieldCount {
 		return nil, fmt.Errorf(
 			"insufficient fields in EpochRecover event (%d < %d)",
@@ -401,7 +402,17 @@ func convertServiceEventEpochRecover(event flow.Event) (*flow.ServiceEvent, erro
 
 	cdcDKGKeys, err := getField[cadence.Array](fields, "dkgPubKeys")
 	if err != nil {
-		return nil, fmt.Errorf("failed to decode EpochRecover event: %w", err)
+		return nil, fmt.Errorf("failed to decode EpochCommit event: %w", err)
+	}
+
+	cdcDKGGroupKey, err := getField[cadence.String](fields, "dkgGroupKey")
+	if err != nil {
+		return nil, fmt.Errorf("failed to decode EpochCommit event: %w", err)
+	}
+
+	cdcDKGIndexMap, err := getField[cadence.Dictionary](fields, "dkgIdMapping")
+	if err != nil {
+		return nil, fmt.Errorf("failed to decode EpochCommit event: %w", err)
 	}
 
 	setup := flow.EpochSetup{
@@ -456,19 +467,29 @@ func convertServiceEventEpochRecover(event flow.Event) (*flow.ServiceEvent, erro
 		return nil, fmt.Errorf("could not convert cluster qc vote data: %w", err)
 	}
 
-	// parse DKG group key and participants
-	// Note: this is read in the same order as `DKGClient.SubmitResult` ie. with the group public key first followed by individual keys
-	// https://github.com/onflow/flow-go/blob/feature/dkg/module/dkg/client.go#L182-L183
-	parsedKeys, err := convertDKGKeys(cdcDKGKeys.Values...)
+	// parse DKG participants
+	commit.DKGParticipantKeys, err = convertDKGKeys(cdcDKGKeys.Values...)
 	if err != nil {
 		return nil, fmt.Errorf("could not convert DKG keys: %w", err)
 	}
 
-	// TODO(EFM, #6214): sync changes for EFM recovery for smart contracts to update EpochRecover event to have the
-	//  same structure as EpochCommit. Add parsing of IndexMap when available.
-	commit.DKGGroupKey = parsedKeys[0]
-	commit.DKGParticipantKeys = parsedKeys[1:]
-	commit.DKGIndexMap = nil
+	// parse DKG group key
+	groupKey, err := convertDKGKeys(cdcDKGGroupKey)
+	if err != nil {
+		return nil, fmt.Errorf("could not convert DKG group key: %w", err)
+	}
+	commit.DKGGroupKey = groupKey[0]
+
+	// parse DKG Index Map
+	commit.DKGIndexMap = make(flow.DKGIndexMap, len(cdcDKGIndexMap.Pairs))
+	for _, pair := range cdcDKGIndexMap.Pairs {
+		nodeID, err := flow.HexStringToIdentifier(string(pair.Key.(cadence.String)))
+		if err != nil {
+			return nil, fmt.Errorf("could not convert hex string to flow.Identifer: %w", err)
+		}
+		index := pair.Value.(cadence.Int).Int()
+		commit.DKGIndexMap[nodeID] = index
+	}
 
 	// create the service event
 	serviceEvent := &flow.ServiceEvent{
