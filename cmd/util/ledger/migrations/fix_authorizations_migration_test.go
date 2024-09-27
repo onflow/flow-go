@@ -9,7 +9,6 @@ import (
 	jsoncdc "github.com/onflow/cadence/encoding/json"
 	"github.com/onflow/cadence/runtime/common"
 	"github.com/onflow/cadence/runtime/interpreter"
-	"github.com/onflow/cadence/runtime/sema"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/require"
 
@@ -17,22 +16,13 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
-func newEntitlementSetAuthorizationFromTypeIDs(
-	typeIDs []common.TypeID,
-	setKind sema.EntitlementSetKind,
-) interpreter.EntitlementSetAuthorization {
-	return interpreter.NewEntitlementSetAuthorization(
-		nil,
-		func() []common.TypeID {
-			return typeIDs
-		},
-		len(typeIDs),
-		setKind,
-	)
-}
-
 func TestFixAuthorizationsMigration(t *testing.T) {
 	t.Parallel()
+
+	// This test no longer works because publishing authorized capabilities is no longer allowed.
+	// The migration and test are kept for historical reasons.
+
+	t.Skip()
 
 	const chainID = flow.Emulator
 	chain := chainID.Chain()
