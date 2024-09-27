@@ -78,10 +78,14 @@ func ReadTrie(dir string, targetHash flow.StateCommitment) ([]*ledger.Payload, e
 
 	trie, err := led.Trie(ledger.RootHash(state))
 	if err != nil {
-		s, _ := led.MostRecentTouchedState()
-		log.Info().
-			Str("hash", s.String()).
-			Msgf("Most recently touched state")
+		s, mostRecentErr := led.MostRecentTouchedState()
+		if mostRecentErr != nil {
+			log.Error().Err(mostRecentErr).Msg("cannot get most recently touched state")
+		} else {
+			log.Info().
+				Str("hash", s.String()).
+				Msgf("Most recently touched state")
+		}
 		return nil, fmt.Errorf("cannot get trie at the given state commitment: %w", err)
 	}
 

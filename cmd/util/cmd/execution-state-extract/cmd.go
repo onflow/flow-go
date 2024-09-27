@@ -1,8 +1,10 @@
 package extract
 
 import (
+	"compress/gzip"
 	"encoding/hex"
 	"fmt"
+	"io"
 	"os"
 	"path"
 	"runtime/pprof"
@@ -31,6 +33,8 @@ var (
 	flagChain                              string
 	flagNWorker                            int
 	flagNoMigration                        bool
+	flagMigration                          string
+	flagAuthorizationFixes                 string
 	flagNoReport                           bool
 	flagValidateMigration                  bool
 	flagAllowPartialStateFromPayloads      bool
@@ -85,6 +89,12 @@ func init() {
 
 	Cmd.Flags().BoolVar(&flagNoMigration, "no-migration", false,
 		"don't migrate the state")
+
+	Cmd.Flags().StringVar(&flagMigration, "migration", "cadence-1.0",
+		"migration name. 'cadence-1.0' (default) or 'fix-authorizations'")
+
+	Cmd.Flags().StringVar(&flagAuthorizationFixes, "authorization-fixes", "",
+		"authorization fixes to apply. requires '--migration=fix-authorizations'")
 
 	Cmd.Flags().BoolVar(&flagNoReport, "no-report", false,
 		"don't report the state")
@@ -194,7 +204,10 @@ func run(*cobra.Command, []string) {
 		defer pprof.StopCPUProfile()
 	}
 
-	var stateCommitment flow.StateCommitment
+	err := os.MkdirAll(flagOutputDir, 0755)
+	if err != nil {
+		log.Fatal().Err(err).Msgf("cannot create output directory %s", flagOutputDir)
+	}
 
 	if len(flagBlockHash) > 0 && len(flagStateCommitment) > 0 {
 		log.Fatal().Msg("cannot run the command with both block hash and state commitment as inputs, only one of them should be provided")
@@ -217,6 +230,21 @@ func run(*cobra.Command, []string) {
 	if flagValidateMigration && flagDiffMigration {
 		log.Fatal().Msg("Both --validate and --diff are enabled, please specify only one (or none) of these")
 	}
+
+	switch flagMigration {
+	case "cadence-1.0":
+		// valid, no-op
+
+	case "fix-authorizations":
+		if flagAuthorizationFixes == "" {
+			log.Fatal().Msg("--migration=fix-authorizations requires --authorization-fixes")
+		}
+
+	default:
+		log.Fatal().Msg("Invalid --migration: got %s, expected 'cadence-1.0' or 'fix-authorizations'")
+	}
+
+	var stateCommitment flow.StateCommitment
 
 	if len(flagBlockHash) > 0 {
 		blockID, err := flow.HexStringToIdentifier(flagBlockHash)
@@ -427,9 +455,29 @@ func run(*cobra.Command, []string) {
 	// Migrate payloads.
 
 	if !flagNoMigration {
-		migrations := newMigrations(log.Logger, flagOutputDir, opts)
+		var migs []migrations.NamedMigration
 
-		migration := newMigration(log.Logger, migrations, flagNWorker)
+		switch flagMigration {
+		case "cadence-1.0":
+			migs = newCadence1Migrations(
+				log.Logger,
+				flagOutputDir,
+				opts,
+			)
+
+		case "fix-authorizations":
+			migs = newFixAuthorizationsMigrations(
+				log.Logger,
+				flagAuthorizationFixes,
+				flagOutputDir,
+				opts,
+			)
+
+		default:
+			log.Fatal().Msgf("unknown migration: %s", flagMigration)
+		}
+
+		migration := newMigration(log.Logger, migs, flagNWorker)
 
 		payloads, err = migration(payloads)
 		if err != nil {
@@ -507,3 +555,35 @@ func run(*cobra.Command, []string) {
 //
 // 	return fmt.Errorf("no checkpoint file was found, no root checkpoint file was found")
 // }
+
+func readAuthorizationFixes(path string) migrations.AuthorizationFixes {
+
+	file, err := os.Open(path)
+	if err != nil {
+		log.Fatal().Err(err).Msgf("can't open authorization fixes: %s", path)
+	}
+	defer file.Close()
+
+	var reader io.Reader = file
+	if isGzip(file) {
+		reader, err = gzip.NewReader(file)
+		if err != nil {
+			log.Fatal().Err(err).Msgf("failed to create gzip reader for %s", path)
+		}
+	}
+
+	log.Info().Msgf("Reading authorization fixes from %s ...", path)
+
+	fixes, err := migrations.ReadAuthorizationFixes(reader, nil)
+	if err != nil {
+		log.Fatal().Err(err).Msgf("failed to read authorization fixes %s", path)
+	}
+
+	log.Info().Msgf("Read %d authorization fixes", len(fixes))
+
+	return fixes
+}
+
+func isGzip(file *os.File) bool {
+	return strings.HasSuffix(file.Name(), ".gz")
+}
