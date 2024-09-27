@@ -668,16 +668,12 @@ func TestHandler_COA(t *testing.T) {
 				require.Len(t, pc.RequiredGasCalls, 1)
 				require.Equal(t,
 					pc.RequiredGasCalls[0],
-					types.RequiredGasCall{
-						Input:  precompiles.FlowBlockHeightFuncSig[:],
-						Output: precompiles.FlowBlockHeightFixedGas,
-					},
+					precompiles.FlowBlockHeightFixedGas,
 				)
 				require.Len(t, pc.RunCalls, 1)
 				require.Equal(t,
 					pc.RunCalls[0],
 					types.RunCall{
-						Input:    precompiles.FlowBlockHeightFuncSig[:],
 						Output:   ret.ReturnedData,
 						ErrorMsg: "",
 					},
