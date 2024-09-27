@@ -34,6 +34,11 @@ func newEntitlementSetAuthorizationFromTypeIDs(
 func TestFixAuthorizationsMigration(t *testing.T) {
 	t.Parallel()
 
+	// This test no longer works because publishing authorized capabilities is no longer allowed.
+	// The migration and test are kept for historical reasons.
+
+	t.Skip()
+
 	const chainID = flow.Emulator
 	chain := chainID.Chain()
 
