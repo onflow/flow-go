@@ -59,11 +59,6 @@ const (
 	blockHashListBucketKeyPrefix = "BlockHashListBucket"
 )
 
-var (
-	serviceAccountAddressOnMainnet = flow.HexToAddress("e467b9dd11fa00df")
-	serviceAccountAddressOnTestnet = flow.HexToAddress("8c5303eaa26202d6")
-)
-
 var Cmd = &cobra.Command{
 	Use:   "checkpoint-collect-stats",
 	Short: "collects stats on tries stored in a checkpoint, or payloads from a payloads file",
@@ -566,6 +561,6 @@ func getType(key ledger.Key) string {
 }
 
 func serviceAccountAddressForChain(chainID flow.ChainID) flow.Address {
-	 sc := systemcontracts.SystemContractsForChain(chainID)
-	 return sc.FlowServiceAccount.Address
+	sc := systemcontracts.SystemContractsForChain(chainID)
+	return sc.FlowServiceAccount.Address
 }
