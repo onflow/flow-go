@@ -10,7 +10,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
-// safetyRulesConcurrencyWrapper wraps `hotstuff.SafetyRules` to allow its use in concurrent environment.
+// safetyRulesConcurrencyWrapper wraps `hotstuff.SafetyRules` to allow its usage in concurrent environments.
 // Correctness requirements:
 //
 //	 (i) The wrapper's Sign function is called exactly once (wrapper errors on repeated Sign calls)
@@ -22,15 +22,15 @@ import (
 // Concurrency safety:
 //
 //	(a) There is one dedicated thread executing the Event Loop, including the EventHandler, that also runs the logic of
-//	    `BlockProducer.MakeBlockProposal`. Hence, while the "Event Loop Thread" is in `MakeBlockProposal`, we are guaranteed
+//	    `BlockProducer.MakeBlockProposal`. Hence, while the 'Event Loop Thread' is in `MakeBlockProposal`, we are guaranteed
 //	    the only interactions with `SafetyRules` are in `module.Builder.BuildOn`
 //	(b) The Event Loop Thread instantiates the variable `signingStatus`. Furthermore, the `signer` call first reads `signingStatus`.
 //	    Therefore, all operations in the EventHandler prior to calling `Builder.BuildOn(..)` happen before the call to `signer`.
-//	    Hence, it is guaranteed that the `signer` uses the most recent state of `SafetyRules`, even if signer is executed by a
+//	    Hence, it is guaranteed that the `signer` uses the most recent state of `SafetyRules`, even if `Sign` is executed by a
 //	    different thread.
 //	(c) Just before the `signer` call returns, it writes `signingStatus`. Furthermore, the Event Loop Thread reads `signingStatus`
 //	    right after the `Builder.BuildOn(..)` call returns. Thereby, Event Loop Thread sees the most recent state of `SafetyRules`
-//	    after completing the signing operation
+//	    after completing the signing operation.
 //
 // With the transitivity of the 'Happens Before' relationship (-> go Memory Model https://go.dev/ref/mem#atomic), we have proven
 // that concurrent access of the wrapped `safetyRules` is safe for the state transition:
@@ -38,7 +38,6 @@ import (
 //	instantiate signingStatus to 0  ─►  update signingStatus from 0 to 1 → signer → update signingStatus from 1 to 2  ─►  confirm signingStatus has value 2
 //
 // ╰──────────────┬───────────────╯    ╰──────────────────────────────────────┬─────────────────────────────────────╯    ╰────────────────┬────────────────╯
-//
 //	Event Loop Thread                                 within the scope of Builder.BuildOn                                  Event Loop Thread
 //
 // All state transitions _other_ than the one above yield exceptions without modifying `SafetyRules`.
@@ -48,7 +47,6 @@ type safetyRulesConcurrencyWrapper struct {
 	//  - value 0: signing is not yet started
 	//  - value 1: one thread has already entered the signing process, which is currently ongoing
 	//  - value 2: the thread that set `signingStatus` to value 1 has completed the signing
-	//  - value 3: proposal has been produced and signed and Event Loop thread has continued executing the `BlockProducer` logic
 	signingStatus atomic.Uint32
 	safetyRules   hotstuff.SafetyRules
 }
@@ -81,7 +79,7 @@ func (w *safetyRulesConcurrencyWrapper) Sign(unsignedHeader *flow.Header) error 
 	return nil
 }
 
-// IsSigningComplete atomically checks whether the Sign logic has concluded, and returns true exaclty in this case.
+// IsSigningComplete atomically checks whether the Sign logic has concluded, and returns true only in this case.
 // By reading the atomic `signingStatus` and confirming it has the expected value, it is guaranteed that any state
 // changes of `safetyRules` that happened within `Sign` are visible to the Event Loop Thread.
 // No errors expected during normal operations
