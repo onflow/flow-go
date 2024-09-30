@@ -30,19 +30,19 @@ func TestCombinedSignWithBeaconKey(t *testing.T) {
 	// prepare data
 	beaconKey := unittest.RandomBeaconPriv()
 	pk := beaconKey.PublicKey()
-	view := uint64(20)
+	proposerView := uint64(20)
 
 	proposerIdentity := identities[0]
 	fblock := unittest.BlockFixture()
 	fblock.Header.ProposerID = proposerIdentity.NodeID
-	fblock.Header.View = view
-	fblock.Header.ParentView = view - 1
+	fblock.Header.View = proposerView
+	fblock.Header.ParentView = proposerView - 1
 	fblock.Header.LastViewTC = nil
 	proposal := model.ProposalFromFlow(fblock.Header)
 	signerID := fblock.Header.ProposerID
 
 	beaconKeyStore := modulemock.NewRandomBeaconKeyStore(t)
-	beaconKeyStore.On("ByView", view).Return(beaconKey, nil)
+	beaconKeyStore.On("ByView", proposerView).Return(beaconKey, nil)
 
 	ourIdentity := unittest.IdentityFixture()
 	stakingPriv := unittest.StakingPrivKeyFixture()
@@ -109,7 +109,7 @@ func TestCombinedSignWithBeaconKey(t *testing.T) {
 	err = verifier.VerifyVote(&ourIdentity.IdentitySkeleton, vote.SigData, blockWrongID.View, blockWrongID.BlockID)
 	require.ErrorIs(t, err, model.ErrInvalidSignature)
 
-	// vote with a wrong view should be invalid
+	// vote with a wrong proposerView should be invalid
 	blockWrongView := *block
 	blockWrongView.View++
 	err = verifier.VerifyVote(&ourIdentity.IdentitySkeleton, vote.SigData, blockWrongID.View, blockWrongID.BlockID)
@@ -142,17 +142,17 @@ func TestCombinedSignWithNoBeaconKey(t *testing.T) {
 	// prepare data
 	beaconKey := unittest.RandomBeaconPriv()
 	pk := beaconKey.PublicKey()
-	view := uint64(20)
+	proposerView := uint64(20)
 
 	fblock := unittest.BlockFixture()
-	fblock.Header.View = view
-	fblock.Header.ParentView = view - 1
+	fblock.Header.View = proposerView
+	fblock.Header.ParentView = proposerView - 1
 	fblock.Header.LastViewTC = nil
 	proposal := model.ProposalFromFlow(fblock.Header)
 	signerID := fblock.Header.ProposerID
 
 	beaconKeyStore := modulemock.NewRandomBeaconKeyStore(t)
-	beaconKeyStore.On("ByView", view).Return(nil, module.ErrNoBeaconKeyForEpoch)
+	beaconKeyStore.On("ByView", proposerView).Return(nil, module.ErrNoBeaconKeyForEpoch)
 
 	ourIdentity := unittest.IdentityFixture()
 	stakingPriv := unittest.StakingPrivKeyFixture()

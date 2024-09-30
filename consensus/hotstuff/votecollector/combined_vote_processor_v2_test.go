@@ -782,8 +782,8 @@ func TestCombinedVoteProcessorV2_PropertyCreatingQCLiveness(testifyT *testing.T)
 func TestCombinedVoteProcessorV2_BuildVerifyQC(t *testing.T) {
 	epochCounter := uint64(3)
 	epochLookup := &modulemock.EpochLookup{}
-	view := uint64(20)
-	epochLookup.On("EpochForView", view).Return(epochCounter, nil)
+	proposerView := uint64(20)
+	epochLookup.On("EpochForView", proposerView).Return(epochCounter, nil)
 
 	// all committee members run DKG
 	dkgData, err := bootstrapDKG.RandomBeaconKG(11, unittest.RandomBytes(32))
@@ -846,11 +846,11 @@ func TestCombinedVoteProcessorV2_BuildVerifyQC(t *testing.T) {
 	}
 
 	leader := stakingSigners[0]
-	parentBlock := helper.MakeBlock(helper.WithBlockView(view - 1))
+	parentBlock := helper.MakeBlock(helper.WithBlockView(proposerView - 1))
 	proposal := helper.MakeProposal(
 		helper.WithBlock(
 			helper.MakeBlock(
-				helper.WithBlockView(view),
+				helper.WithBlockView(proposerView),
 				helper.WithParentBlock(parentBlock),
 				helper.WithBlockProposer(leader.NodeID))))
 	block := proposal.Block
