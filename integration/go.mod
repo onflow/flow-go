@@ -24,7 +24,7 @@ require (
 	github.com/onflow/crypto v0.25.2
 	github.com/onflow/flow-core-contracts/lib/go/contracts v1.3.1
 	github.com/onflow/flow-core-contracts/lib/go/templates v1.3.1
-	github.com/onflow/flow-emulator v1.0.1-0.20240927131812-9780997d6290
+	github.com/onflow/flow-emulator v1.0.1-0.20240930092334-2f46b2112195
 	github.com/onflow/flow-go v0.38.0-preview.0
 	github.com/onflow/flow-go-sdk v1.0.0
 	github.com/onflow/flow-go/insecure v0.0.0-00010101000000-000000000000
@@ -359,5 +359,3 @@ require (
 replace github.com/onflow/flow-go => ../
 
 replace github.com/onflow/flow-go/insecure => ../insecure
-
-replace github.com/onflow/flow-emulator v1.0.0-preview.41.0.20240829134601-0be55d6970b5 => github.com/The-K-R-O-K/flow-emulator v1.0.0-preview.12.0.20240903103527-a68bcda903d1
