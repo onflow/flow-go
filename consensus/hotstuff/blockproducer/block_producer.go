@@ -8,7 +8,18 @@ import (
 	"github.com/onflow/flow-go/module"
 )
 
-// BlockProducer is responsible for producing new block proposals
+// BlockProducer is responsible for producing new block proposals. It is a service component to HotStuff's
+// main state machine (implemented in the EventHandler). The BlockProducer's central purpose is to mediate
+// concurrent signing requests to its embedded `hotstuff.SafetyRules` during block production. The actual
+// work of producing a block proposal is delegated to the embedded `module.Builder`.
+//
+// Context: BlockProducer is part of the `hostuff` package and can therefore be expected to comply with
+// hotstuff-internal design patterns, such as there being a single dedicated thread executing the EventLoop,
+// including EventHandler, SafetyRules, and BlockProducer. However, `module.Builder` lives in a different
+// package! Therefore, we should make the least restrictive assumptions, and support concurrent signing requests
+// within `module.Builder`. To minimize implementation dependencies and reduce the chance of safety-critical
+// consensus bugs, BlockProducer wraps `SafetyRules` and mediates concurrent access. Furthermore, by supporting
+// concurrent singing requests, we enable various optimizations of optimistic and/or upfront block production.
 type BlockProducer struct {
 	safetyRules hotstuff.SafetyRules
 	committee   hotstuff.Replicas
@@ -17,8 +28,8 @@ type BlockProducer struct {
 
 var _ hotstuff.BlockProducer = (*BlockProducer)(nil)
 
-// New creates a new BlockProducer which wraps the chain compliance layer block builder
-// to provide hotstuff with block proposals.
+// New creates a new BlockProducer, which mediates concurrent signing requests to the embedded
+// `hotstuff.SafetyRules` during block production, delegated to `module.Builder`.
 // No errors are expected during normal operation.
 func New(safetyRules hotstuff.SafetyRules, committee hotstuff.Replicas, builder module.Builder) (*BlockProducer, error) {
 	bp := &BlockProducer{
