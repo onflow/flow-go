@@ -277,9 +277,9 @@ func (s *SafetyRulesTestSuite) TestProduceVote_InvalidProposerIdentity() {
 func (s *SafetyRulesTestSuite) TestProduceVote_NodeEjected() {
 	*s.committee = mocks.DynamicCommittee{}
 	s.committee.On("Self").Return(s.ourIdentity.NodeID)
-	s.committee.On("IdentityByBlock", s.proposal.Block.BlockID, s.ourIdentity.NodeID).Return(nil, model.NewInvalidSignerErrorf("node-ejected")).Once()
-	s.committee.On("IdentityByBlock", s.proposal.Block.BlockID, s.proposal.Block.ProposerID).Return(s.proposerIdentity, nil).Maybe()
 	s.committee.On("LeaderForView", s.proposal.Block.View).Return(s.proposerIdentity.NodeID, nil).Once()
+	s.committee.On("IdentityByBlock", s.proposal.Block.BlockID, s.proposal.Block.ProposerID).Return(s.proposerIdentity, nil).Maybe()
+	s.committee.On("IdentityByBlock", s.proposal.Block.BlockID, s.ourIdentity.NodeID).Return(nil, model.NewInvalidSignerErrorf("node-ejected")).Once()
 
 	vote, err := s.safety.ProduceVote(s.proposal, s.proposal.Block.View)
 	require.Nil(s.T(), vote)
@@ -294,9 +294,9 @@ func (s *SafetyRulesTestSuite) TestProduceVote_InvalidVoterIdentity() {
 	*s.committee = mocks.DynamicCommittee{}
 	s.committee.On("Self").Return(s.ourIdentity.NodeID)
 	exception := errors.New("invalid-signer-identity")
+	s.committee.On("LeaderForView", s.proposal.Block.View).Return(s.proposerIdentity.NodeID, nil).Once()
 	s.committee.On("IdentityByBlock", s.proposal.Block.BlockID, s.proposal.Block.ProposerID).Return(s.proposerIdentity, nil).Maybe()
 	s.committee.On("IdentityByBlock", s.proposal.Block.BlockID, s.ourIdentity.NodeID).Return(nil, exception).Once()
-	s.committee.On("LeaderForView", s.proposal.Block.View).Return(s.proposerIdentity.NodeID, nil).Once()
 
 	vote, err := s.safety.ProduceVote(s.proposal, s.proposal.Block.View)
 	require.Nil(s.T(), vote)
@@ -744,7 +744,8 @@ func (s *SafetyRulesTestSuite) TestSignOwnProposal() {
 	require.Equal(s.T(), vote, expectedVote)
 }
 
-// TestSignOwnProposal_ProposalNotSelf tests that we cannot sign a proposal that is not ours.
+// TestSignOwnProposal_ProposalNotSelf tests that we cannot sign a proposal that is not ours. We
+// verify that SafetyRules returns and exception and does not the benign sentinel error NoVoteError.
 func (s *SafetyRulesTestSuite) TestSignOwnProposal_ProposalNotSelf() {
 	vote, err := s.safety.SignOwnProposal(s.proposal)
 	require.Error(s.T(), err)
