@@ -4,24 +4,15 @@ import (
 	"context"
 	"testing"
 
-	"github.com/dgraph-io/badger/v2"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
-	accessmock "github.com/onflow/flow-go/engine/access/mock"
 	"github.com/onflow/flow-go/engine/access/rpc/backend"
-	backendmock "github.com/onflow/flow-go/engine/access/rpc/backend/mock"
-	connectionmock "github.com/onflow/flow-go/engine/access/rpc/connection/mock"
 	commonrpc "github.com/onflow/flow-go/engine/common/rpc"
-	"github.com/onflow/flow-go/engine/common/version"
-	"github.com/onflow/flow-go/fvm/blueprints"
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/module"
-	"github.com/onflow/flow-go/module/counters"
 	protocol "github.com/onflow/flow-go/state/protocol/mock"
-	bstorage "github.com/onflow/flow-go/storage/badger"
 	storagemock "github.com/onflow/flow-go/storage/mock"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -33,30 +24,7 @@ type Suite struct {
 	snapshot *protocol.Snapshot
 	log      zerolog.Logger
 
-	blocks             *storagemock.Blocks
-	headers            *storagemock.Headers
-	collections        *storagemock.Collections
-	transactions       *storagemock.Transactions
-	receipts           *storagemock.ExecutionReceipts
-	results            *storagemock.ExecutionResults
-	transactionResults *storagemock.LightTransactionResults
-	events             *storagemock.Events
-	txErrorMessages    *storagemock.TransactionResultErrorMessages
-
-	db                  *badger.DB
-	dbDir               string
-	lastFullBlockHeight *counters.PersistentStrictMonotonicCounter
-	versionControl      *version.VersionControl
-
-	colClient              *accessmock.AccessAPIClient
-	execClient             *accessmock.ExecutionAPIClient
-	historicalAccessClient *accessmock.AccessAPIClient
-
-	connectionFactory *connectionmock.ConnectionFactory
-	communicator      *backendmock.Communicator
-
-	chainID  flow.ChainID
-	systemTx *flow.TransactionBody
+	receipts *storagemock.ExecutionReceipts
 }
 
 func TestHandler(t *testing.T) {
@@ -67,47 +35,17 @@ func (suite *Suite) SetupTest() {
 	suite.log = zerolog.New(zerolog.NewConsoleWriter())
 	suite.state = new(protocol.State)
 	suite.snapshot = new(protocol.Snapshot)
+	suite.receipts = new(storagemock.ExecutionReceipts)
+
 	header := unittest.BlockHeaderFixture()
 	params := new(protocol.Params)
 	params.On("FinalizedRoot").Return(header, nil)
-	params.On("SporkID").Return(unittest.IdentifierFixture(), nil)
-	params.On("ProtocolVersion").Return(uint(unittest.Uint64InRange(10, 30)), nil)
-	params.On("SporkRootBlockHeight").Return(header.Height, nil)
-	params.On("SealedRoot").Return(header, nil)
 	suite.state.On("Params").Return(params)
-
-	suite.blocks = new(storagemock.Blocks)
-	suite.headers = new(storagemock.Headers)
-	suite.transactions = new(storagemock.Transactions)
-	suite.collections = new(storagemock.Collections)
-	suite.receipts = new(storagemock.ExecutionReceipts)
-	suite.results = new(storagemock.ExecutionResults)
-	suite.colClient = new(accessmock.AccessAPIClient)
-	suite.execClient = new(accessmock.ExecutionAPIClient)
-	suite.transactionResults = storagemock.NewLightTransactionResults(suite.T())
-	suite.events = storagemock.NewEvents(suite.T())
-	suite.chainID = flow.Testnet
-	suite.historicalAccessClient = new(accessmock.AccessAPIClient)
-	suite.connectionFactory = connectionmock.NewConnectionFactory(suite.T())
-
-	suite.communicator = new(backendmock.Communicator)
-
-	var err error
-	suite.systemTx, err = blueprints.SystemChunkTransaction(flow.Testnet.Chain())
-	suite.Require().NoError(err)
-
-	suite.db, suite.dbDir = unittest.TempBadgerDB(suite.T())
-	suite.lastFullBlockHeight, err = counters.NewPersistentStrictMonotonicCounter(
-		bstorage.NewConsumerProgress(suite.db, module.ConsumeProgressLastFullBlockHeight),
-		0,
-	)
-	suite.Require().NoError(err)
 }
 
 // TestExecutionNodesForBlockID tests the ExecutionNodesForBlockID used for serving all API calls
 // that need to talk to an execution node.
 func (suite *Suite) TestExecutionNodesForBlockID() {
-
 	totalReceipts := 5
 
 	block := unittest.BlockFixture()
