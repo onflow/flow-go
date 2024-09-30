@@ -227,7 +227,8 @@ func (s *SafetyRulesTestSuite) TestProduceVote_InvalidCurrentView() {
 }
 
 // TestProduceVote_ProposerNotActive tests that no vote is created when a proposal was submitted by an identity which is not part
-// of the committee. On practice this should never happen but a safety check is added to avoid any potential issues.
+// of the committee. Honest network participants should not vote, unless they are authorized to actively contribute to consensus. 
+// However, for a BFT implementation, honest nodes myst reject those votes.
 func (s *SafetyRulesTestSuite) TestProduceVote_ProposerNotActive() {
 	*s.committee = mocks.DynamicCommittee{}
 	exception := errors.New("invalid-leader-identity")
