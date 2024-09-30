@@ -243,9 +243,9 @@ func (s *SafetyRulesTestSuite) TestProduceVote_ProposerNotActive() {
 // TestProduceVote_NodeEjected tests that no vote is created if block proposer is ejected
 func (s *SafetyRulesTestSuite) TestProduceVote_ProposerEjected() {
 	*s.committee = mocks.DynamicCommittee{}
+	s.committee.On("Self").Return(s.ourIdentity.NodeID).Maybe()
 	s.committee.On("IdentityByBlock", s.proposal.Block.BlockID, s.proposal.Block.ProposerID).Return(nil, model.NewInvalidSignerErrorf("node-ejected")).Once()
 	s.committee.On("LeaderForView", s.proposal.Block.View).Return(s.proposerIdentity.NodeID, nil).Once()
-	s.committee.On("Self").Return(s.ourIdentity.NodeID).Maybe()
 
 	vote, err := s.safety.ProduceVote(s.proposal, s.proposal.Block.View)
 	require.Nil(s.T(), vote)
