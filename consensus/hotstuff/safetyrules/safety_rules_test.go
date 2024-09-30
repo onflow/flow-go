@@ -749,10 +749,12 @@ func (s *SafetyRulesTestSuite) TestSignOwnProposal() {
 func (s *SafetyRulesTestSuite) TestSignOwnProposal_ProposalNotSelf() {
 	vote, err := s.safety.SignOwnProposal(s.proposal)
 	require.Error(s.T(), err)
+	require.False(s.T(), model.IsNoVoteError(err))	
 	require.Nil(s.T(), vote)
 }
 
 // TestSignOwnProposal_SelfInvalidLeader tests that we cannot sign a proposal if we are not the leader for the view.
+// We verify that SafetyRules returns and exception and does not the benign sentinel error NoVoteError.
 func (s *SafetyRulesTestSuite) TestSignOwnProposal_SelfInvalidLeader() {
 	s.proposal.Block.ProposerID = s.ourIdentity.NodeID
 	exception := errors.New("invalid-signer-identity")
@@ -760,15 +762,17 @@ func (s *SafetyRulesTestSuite) TestSignOwnProposal_SelfInvalidLeader() {
 	s.committee.On("LeaderForView", s.proposal.Block.View).Return(flow.Identifier{}, exception).Once()
 	vote, err := s.safety.SignOwnProposal(s.proposal)
 	require.ErrorIs(s.T(), err, exception)
+	require.False(s.T(), model.IsNoVoteError(err))
 	require.Nil(s.T(), vote)
 }
 
-// TestProduceVote_VoteEquivocation tests scenario when we try to sign multiple proposals in the same view. We require that leader
-// follows next rules:
+// TestProduceVote_VoteEquivocation verifies that SafetyRules will refuse to sign multiple proposals for the same view. 
+// TestProduceVote_VoteEquivocation verifies that SafetyRules will refuse to sign multiple proposals for the same view.
+// We require that leader complies with the following next rules:
 //   - leader proposes once per view
 //   - leader's proposals follow safety rules
 //
-// Proposing twice per round on equivocating proposals is considered a byzantine behavior.
+// Signing repeatedly for one view (either proposals or voting) can lead to equivocating (byzantine behavior).
 // Expect a `model.NoVoteError` sentinel in such scenario.
 func (s *SafetyRulesTestSuite) TestSignOwnProposal_ProposalEquivocation() {
 	s.proposal.Block.ProposerID = s.ourIdentity.NodeID
