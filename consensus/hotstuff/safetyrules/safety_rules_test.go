@@ -227,7 +227,7 @@ func (s *SafetyRulesTestSuite) TestProduceVote_InvalidCurrentView() {
 }
 
 // TestProduceVote_ProposerNotActive tests that no vote is created when a proposal was submitted by an identity which is not part
-// of the committee. Honest network participants should not vote, unless they are authorized to actively contribute to consensus. 
+// of the committee. Honest network participants should not vote, unless they are authorized to actively contribute to consensus.
 // However, for a BFT implementation, honest nodes myst reject those votes.
 func (s *SafetyRulesTestSuite) TestProduceVote_ProposerNotActive() {
 	*s.committee = mocks.DynamicCommittee{}
@@ -749,7 +749,7 @@ func (s *SafetyRulesTestSuite) TestSignOwnProposal() {
 func (s *SafetyRulesTestSuite) TestSignOwnProposal_ProposalNotSelf() {
 	vote, err := s.safety.SignOwnProposal(s.proposal)
 	require.Error(s.T(), err)
-	require.False(s.T(), model.IsNoVoteError(err))	
+	require.False(s.T(), model.IsNoVoteError(err))
 	require.Nil(s.T(), vote)
 }
 
@@ -766,7 +766,7 @@ func (s *SafetyRulesTestSuite) TestSignOwnProposal_SelfInvalidLeader() {
 	require.Nil(s.T(), vote)
 }
 
-// TestProduceVote_VoteEquivocation verifies that SafetyRules will refuse to sign multiple proposals for the same view. 
+// TestProduceVote_VoteEquivocation verifies that SafetyRules will refuse to sign multiple proposals for the same view.
 // TestProduceVote_VoteEquivocation verifies that SafetyRules will refuse to sign multiple proposals for the same view.
 // We require that leader complies with the following next rules:
 //   - leader proposes once per view
