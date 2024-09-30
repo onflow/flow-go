@@ -79,13 +79,11 @@ func TestCombinedSignWithBeaconKey(t *testing.T) {
 	vote, err := safetyRules.SignOwnProposal(proposal)
 	require.NoError(t, err)
 	proposal.SigData = vote.SigData
-
 	err = verifier.VerifyVote(&ourIdentity.IdentitySkeleton, vote.SigData, proposal.Block.View, proposal.Block.BlockID)
 	require.NoError(t, err)
 
-	block := proposal.Block
-
 	// check that a created proposal's signature is a combined staking sig and random beacon sig
+	block := proposal.Block
 	msg := MakeVoteMessage(block.View, block.BlockID)
 	stakingSig, err := stakingPriv.Sign(msg, msig.NewBLSHasher(msig.ConsensusVoteTag))
 	require.NoError(t, err)
@@ -173,7 +171,7 @@ func TestCombinedSignWithNoBeaconKey(t *testing.T) {
 	// this failed node.
 	committee.On("DKG", mock.Anything).Return(dkg, nil)
 	committee.On("Self").Return(me.NodeID())
-	committee.On("IdentityByBlock", fblock.Header.ID(), mock.Anything).Return(ourIdentity, nil)
+	committee.On("IdentityByBlock", fblock.Header.ID(), signerID).Return(ourIdentity, nil)
 	committee.On("LeaderForView", mock.Anything).Return(signerID, nil).Maybe()
 
 	packer := signature.NewConsensusSigDataPacker(committee)
