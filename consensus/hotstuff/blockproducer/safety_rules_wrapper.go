@@ -38,6 +38,7 @@ import (
 //	instantiate signingStatus to 0  ─►  update signingStatus from 0 to 1 → signer → update signingStatus from 1 to 2  ─►  confirm signingStatus has value 2
 //
 // ╰──────────────┬───────────────╯    ╰──────────────────────────────────────┬─────────────────────────────────────╯    ╰────────────────┬────────────────╯
+//
 //	Event Loop Thread                                 within the scope of Builder.BuildOn                                  Event Loop Thread
 //
 // All state transitions _other_ than the one above yield exceptions without modifying `SafetyRules`.
