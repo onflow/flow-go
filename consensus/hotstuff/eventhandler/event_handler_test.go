@@ -766,6 +766,8 @@ func (es *EventHandlerSuite) Test100Timeout() {
 
 // TestLeaderBuild100Blocks tests scenario where leader builds 100 proposals one after another
 func (es *EventHandlerSuite) TestLeaderBuild100Blocks() {
+	require.Equal(es.T(), 1, len(es.forks.proposals), "expect Forks to contain only root block")
+
 	// I'm the leader for the first view
 	es.committee.leaders[es.initView] = struct{}{}
 
@@ -805,7 +807,8 @@ func (es *EventHandlerSuite) TestLeaderBuild100Blocks() {
 	}
 
 	require.Equal(es.T(), es.endView, es.paceMaker.CurView(), "incorrect view change")
-	require.Equal(es.T(), totalView, (len(es.forks.proposals)-1)/2)
+	require.Equal(es.T(), totalView+1, len(es.forks.proposals), "expect Forks to contain root block + 100 proposed blocks")
+	es.notifier.AssertExpectations(es.T())
 }
 
 // TestFollowerFollows100Blocks tests scenario where follower receives 100 proposals one after another
