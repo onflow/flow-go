@@ -17,7 +17,7 @@ import (
 // given a pebble instance with root block and root height populated
 type Registers struct {
 	db             *pebble.DB
-	firstHeight    *atomic.Uint64
+	firstHeight    uint64
 	latestHeight   *atomic.Uint64
 	pruneThreshold uint64
 }
@@ -46,7 +46,7 @@ func NewRegisters(db *pebble.DB, pruneThreshold uint64) (*Registers, error) {
 	// All registers between firstHeight and lastHeight have been indexed
 	return &Registers{
 		db:             db,
-		firstHeight:    atomic.NewUint64(firstHeight),
+		firstHeight:    firstHeight,
 		latestHeight:   atomic.NewUint64(latestHeight),
 		pruneThreshold: pruneThreshold,
 	}, nil
@@ -145,7 +145,8 @@ func (s *Registers) Store(
 		return fmt.Errorf("failed to commit batch: %w", err)
 	}
 
-	s.updateBounds(height)
+	s.latestHeight.Store(height)
+
 	return nil
 }
 
@@ -156,7 +157,19 @@ func (s *Registers) LatestHeight() uint64 {
 
 // FirstHeight first indexed height found in the store, typically root block for the spork
 func (s *Registers) FirstHeight() uint64 {
-	return s.firstHeight.Load()
+	latestHeight := s.LatestHeight()
+	// Skip pruning if disabled or if this is a new network with insufficient blocks.
+	if latestHeight < s.pruneThreshold {
+		return s.firstHeight
+	}
+
+	// Calculate the new prune height and update the first height if necessary.
+	pruneHeight := latestHeight - s.pruneThreshold
+	if pruneHeight < s.firstHeight {
+		return s.firstHeight
+	}
+
+	return pruneHeight
 }
 
 func firstStoredHeight(db *pebble.DB) (uint64, error) {
@@ -182,23 +195,4 @@ func convertNotFoundError(err error) error {
 		return storage.ErrNotFound
 	}
 	return err
-}
-
-// updateBounds updates the stored height bounds based on the latest block height.
-// This method also handles marks older data as pruned if the prune threshold is exceeded.
-func (s *Registers) updateBounds(latestHeight uint64) {
-	s.latestHeight.Store(latestHeight)
-
-	// Skip pruning if disabled or if this is a new network with insufficient blocks.
-	if latestHeight < s.pruneThreshold {
-		return
-	}
-
-	// Calculate the new prune height and update the first height if necessary.
-	pruneHeight := latestHeight - s.pruneThreshold
-	if pruneHeight < s.firstHeight.Load() {
-		return
-	}
-
-	s.firstHeight.Store(pruneHeight)
 }
