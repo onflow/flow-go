@@ -1088,13 +1088,9 @@ func TestCallingExtraPrecompiles(t *testing.T) {
 				output := []byte{3, 4}
 				addr := testutils.RandomAddress(t)
 				capturedCall := &types.PrecompiledCalls{
-					Address: addr,
-					RequiredGasCalls: []types.RequiredGasCall{{
-						Input:  input,
-						Output: uint64(10),
-					}},
+					Address:          addr,
+					RequiredGasCalls: []uint64{10},
 					RunCalls: []types.RunCall{{
-						Input:    input,
 						Output:   output,
 						ErrorMsg: "",
 					}},

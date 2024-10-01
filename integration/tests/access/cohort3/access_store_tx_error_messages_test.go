@@ -60,11 +60,6 @@ func (s *AccessStoreTxErrorMessagesSuite) SetupTest() {
 	storeTxAccess := testnet.NewNodeConfig(
 		flow.RoleAccess,
 		testnet.WithLogLevel(zerolog.InfoLevel),
-		testnet.WithAdditionalFlag("--execution-data-sync-enabled=true"),
-		testnet.WithAdditionalFlagf("--execution-data-dir=%s", testnet.DefaultExecutionDataServiceDir),
-		testnet.WithAdditionalFlag("--execution-data-retry-delay=1s"),
-		testnet.WithAdditionalFlag("--execution-data-indexing-enabled=true"),
-		testnet.WithAdditionalFlagf("--execution-state-dir=%s", testnet.DefaultExecutionStateDir),
 		testnet.WithAdditionalFlagf("--store-tx-result-error-messages=true"),
 		testnet.WithMetricsServer(),
 	)
