@@ -201,6 +201,10 @@ func RecoveredNonFungibleTokenCode(nonFungibleTokenAddress common.Address, contr
                       %[2]s.recoveryPanic("Collection.deposit")
                   }
 
+				  access(all) view fun getIDs(): [UInt64] {
+					  return self.ownedNFTs.keys
+                  }
+
                   access(all)
                   view fun getSupportedNFTTypes(): {Type: Bool} {
                       %[2]s.recoveryPanic("Collection.getSupportedNFTTypes")
