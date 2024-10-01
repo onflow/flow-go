@@ -27,6 +27,11 @@ type CollectionExecutedMetricImpl struct {
 	blocks      storage.Blocks
 }
 
+type TransactionsToBlock struct {
+	blockId      flow.Identifier
+	transactions []flow.Identifier
+}
+
 func NewCollectionExecutedMetricImpl(
 	log zerolog.Logger,
 	accessMetrics module.AccessMetrics,
@@ -72,6 +77,7 @@ func (c *CollectionExecutedMetricImpl) BlockFinalized(block *flow.Block) {
 	// TODO: lookup actual finalization time by looking at the block finalizing `b`
 	now := time.Now().UTC()
 	blockID := block.ID()
+	txToBlock := TransactionsToBlock{blockId: blockID}
 
 	// mark all transactions as finalized
 	// TODO: sample to reduce performance overhead
@@ -87,7 +93,22 @@ func (c *CollectionExecutedMetricImpl) BlockFinalized(block *flow.Block) {
 		}
 
 		for _, t := range l.Transactions {
+			txToBlock.transactions = append(txToBlock.transactions, t)
 			c.accessMetrics.TransactionFinalized(t, now)
+		}
+	}
+
+	for _, s := range block.Payload.Seals {
+		block, err := c.blocks.ByID(s.BlockID)
+		if err != nil {
+			c.log.Warn().Err(err).Msg("could not find block")
+			continue
+		}
+
+		if block.ID() == txToBlock.blockId && len(txToBlock.transactions) != 0 {
+			for _, t := range txToBlock.transactions {
+				c.accessMetrics.TransactionSealed(t, now)
+			}
 		}
 	}
 
