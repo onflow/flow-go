@@ -6,6 +6,8 @@ import (
 	"testing"
 	"time"
 
+	"golang.org/x/exp/slices"
+
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -194,6 +196,9 @@ func TestWithWhiteboard(t *testing.T) {
 	// we run the DKG protocol with N consensus nodes
 	N := 10
 	bootstrapNodesInfo := unittest.PrivateNodeInfosFixture(N, unittest.WithRole(flow.RoleConsensus))
+	slices.SortFunc(bootstrapNodesInfo, func(lhs, rhs bootstrap.NodeInfo) int {
+		return flow.IdentifierCanonical(lhs.NodeID, rhs.NodeID)
+	})
 	conIdentities := make(flow.IdentitySkeletonList, 0, len(bootstrapNodesInfo))
 	for _, identity := range bootstrapNodesInfo {
 		conIdentities = append(conIdentities, &identity.Identity().IdentitySkeleton)

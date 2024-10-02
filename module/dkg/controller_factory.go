@@ -42,17 +42,24 @@ func NewControllerFactory(
 
 // Create creates a new epoch-specific Controller equipped with a broker which
 // is capable of communicating with other nodes.
+// Participants list must be sorted in canonical order.
+// No errors are expected during normal operations.
 func (f *ControllerFactory) Create(
 	dkgInstanceID string,
 	participants flow.IdentitySkeletonList,
 	seed []byte) (module.DKGController, error) {
+
+	// ensure participants are sorted in canonical order
+	if !participants.Sorted(flow.Canonical[flow.IdentitySkeleton]) {
+		return nil, fmt.Errorf("participants are not sorted in canonical order")
+	}
 
 	myIndex, ok := participants.GetIndex(f.me.NodeID())
 	if !ok {
 		return nil, fmt.Errorf("failed to create controller factory, node %s is not part of DKG committee", f.me.NodeID().String())
 	}
 
-	broker := NewBroker(
+	broker, err := NewBroker(
 		f.log,
 		dkgInstanceID,
 		participants,
@@ -61,6 +68,9 @@ func (f *ControllerFactory) Create(
 		f.dkgContractClients,
 		f.tunnel,
 	)
+	if err != nil {
+		return nil, fmt.Errorf("could not create DKG broker: %w", err)
+	}
 
 	n := len(participants)
 	threshold := signature.RandomBeaconThreshold(n)

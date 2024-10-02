@@ -28,11 +28,12 @@ var (
 )
 
 func initCommittee(n int) (identities flow.IdentitySkeletonList, locals []module.Local) {
-	privateStakingKeys := unittest.StakingKeys(n)
-	for i, key := range privateStakingKeys {
-		id := unittest.IdentityFixture(unittest.WithStakingPubKey(key.PublicKey()))
-		identities = append(identities, &id.IdentitySkeleton)
-		local, _ := local.New(id.IdentitySkeleton, privateStakingKeys[i])
+	for _, identity := range unittest.IdentityListFixture(n).ToSkeleton().Sort(flow.Canonical[flow.IdentitySkeleton]) {
+		stakingPriv := unittest.StakingPrivKeyFixture()
+		identity.StakingPubKey = stakingPriv.PublicKey()
+
+		identities = append(identities, identity)
+		local, _ := local.New(*identity, stakingPriv)
 		locals = append(locals, local)
 	}
 	return identities, locals
@@ -62,6 +63,23 @@ func TestDefaultConfig(t *testing.T) {
 	})
 }
 
+// TestNewBroker_OrderNotCanonical checks that broker creation fails if the identities aren't sorted in canonical order.
+func TestNewBroker_OrderNotCanonical(t *testing.T) {
+	identities, locals := initCommittee(2)
+	identities[0], identities[1] = identities[1], identities[0] // break canonical order
+
+	_, err := NewBroker(
+		zerolog.Logger{},
+		dkgInstanceID,
+		identities,
+		locals[orig],
+		orig,
+		[]module.DKGContractClient{&mock.DKGContractClient{}},
+		NewBrokerTunnel(),
+	)
+	require.Error(t, err)
+}
+
 // TestPrivateSend_Valid checks that the broker correctly converts the message
 // destination parameter (index in committee list) to the corresponding
 // public Identifier, and successfully sends a DKG message to the intended
@@ -70,7 +88,7 @@ func TestPrivateSend_Valid(t *testing.T) {
 	committee, locals := initCommittee(2)
 
 	// sender broker
-	sender := NewBroker(
+	sender, err := NewBroker(
 		zerolog.Logger{},
 		dkgInstanceID,
 		committee,
@@ -79,6 +97,7 @@ func TestPrivateSend_Valid(t *testing.T) {
 		[]module.DKGContractClient{&mock.DKGContractClient{}},
 		NewBrokerTunnel(),
 	)
+	require.NoError(t, err)
 
 	// expected DKGMessageOut
 	expectedMsg := msg.PrivDKGMessageOut{
@@ -111,7 +130,7 @@ func TestPrivateSend_IndexOutOfRange(t *testing.T) {
 	committee, locals := initCommittee(2)
 
 	// sender broker
-	sender := NewBroker(
+	sender, err := NewBroker(
 		zerolog.Logger{},
 		dkgInstanceID,
 		committee,
@@ -120,6 +139,7 @@ func TestPrivateSend_IndexOutOfRange(t *testing.T) {
 		[]module.DKGContractClient{&mock.DKGContractClient{}},
 		NewBrokerTunnel(),
 	)
+	require.NoError(t, err)
 
 	// Launch a background routine to capture messages sent through the tunnel.
 	// No messages should be received because we are only sending invalid ones.
@@ -145,7 +165,7 @@ func TestReceivePrivateMessage_Valid(t *testing.T) {
 	committee, locals := initCommittee(2)
 
 	// receiving broker
-	receiver := NewBroker(
+	receiver, err := NewBroker(
 		zerolog.Logger{},
 		dkgInstanceID,
 		committee,
@@ -154,6 +174,7 @@ func TestReceivePrivateMessage_Valid(t *testing.T) {
 		[]module.DKGContractClient{&mock.DKGContractClient{}},
 		NewBrokerTunnel(),
 	)
+	require.NoError(t, err)
 
 	dkgMessage := msg.NewDKGMessage(msgb, dkgInstanceID)
 	expectedMsg := msg.PrivDKGMessageIn{
@@ -192,7 +213,7 @@ func TestBroadcastMessage(t *testing.T) {
 	committee, locals := initCommittee(2)
 
 	// sender
-	sender := NewBroker(
+	sender, err := NewBroker(
 		unittest.Logger(),
 		dkgInstanceID,
 		committee,
@@ -202,6 +223,7 @@ func TestBroadcastMessage(t *testing.T) {
 		NewBrokerTunnel(),
 		func(config *BrokerConfig) { config.RetryInitialWait = 1 }, // disable waiting between retries for tests
 	)
+	require.NoError(t, err)
 
 	expectedMsg, err := sender.prepareBroadcastMessage(msgb)
 	require.NoError(t, err)
@@ -236,7 +258,7 @@ func TestBroadcastMessage(t *testing.T) {
 func TestPoll(t *testing.T) {
 	committee, locals := initCommittee(2)
 
-	sender := NewBroker(
+	sender, err := NewBroker(
 		zerolog.Logger{},
 		dkgInstanceID,
 		committee,
@@ -245,8 +267,9 @@ func TestPoll(t *testing.T) {
 		[]module.DKGContractClient{&mock.DKGContractClient{}},
 		NewBrokerTunnel(),
 	)
+	require.NoError(t, err)
 
-	recipient := NewBroker(
+	recipient, err := NewBroker(
 		zerolog.Logger{},
 		dkgInstanceID,
 		committee,
@@ -255,6 +278,7 @@ func TestPoll(t *testing.T) {
 		[]module.DKGContractClient{&mock.DKGContractClient{}},
 		NewBrokerTunnel(),
 	)
+	require.NoError(t, err)
 
 	blockID := unittest.IdentifierFixture()
 	bcastMsgs := []msg.BroadcastDKGMessage{}
@@ -286,7 +310,7 @@ func TestPoll(t *testing.T) {
 		}
 	}()
 
-	err := sender.Poll(blockID)
+	err = sender.Poll(blockID)
 	require.NoError(t, err)
 
 	// check that the contract has been correctly called
@@ -315,7 +339,7 @@ func TestLogHook(t *testing.T) {
 	logger := zerolog.New(os.Stdout).Level(zerolog.WarnLevel).Hook(hook)
 
 	// sender
-	sender := NewBroker(
+	sender, err := NewBroker(
 		logger,
 		dkgInstanceID,
 		committee,
@@ -324,6 +348,7 @@ func TestLogHook(t *testing.T) {
 		[]module.DKGContractClient{&mock.DKGContractClient{}},
 		NewBrokerTunnel(),
 	)
+	require.NoError(t, err)
 
 	sender.Disqualify(1, "testing")
 	sender.FlagMisbehavior(1, "test")
@@ -336,7 +361,7 @@ func TestProcessPrivateMessage_InvalidOrigin(t *testing.T) {
 	committee, locals := initCommittee(2)
 
 	// receiving broker
-	receiver := NewBroker(
+	receiver, err := NewBroker(
 		zerolog.Logger{},
 		dkgInstanceID,
 		committee,
@@ -345,6 +370,7 @@ func TestProcessPrivateMessage_InvalidOrigin(t *testing.T) {
 		[]module.DKGContractClient{&mock.DKGContractClient{}},
 		NewBrokerTunnel(),
 	)
+	require.NoError(t, err)
 
 	// Launch a background routine to capture messages forwared to the private
 	// message channel. No messages should be received because we are only
