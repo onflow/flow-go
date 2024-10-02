@@ -294,7 +294,7 @@ func NewInstance(t *testing.T, options ...Option) *Instance {
 			}
 
 			// convert into proposal immediately
-			proposal := model.ProposalFromFlow(header)
+			proposal := model.SignedProposalFromFlow(header)
 
 			// store locally and loop back to engine for processing
 			in.ProcessBlock(proposal)
@@ -637,7 +637,7 @@ func (in *Instance) ProcessBlock(proposal *model.SignedProposal) {
 	if parentExists {
 		next := proposal
 		for next != nil {
-			in.headers[next.Block.BlockID] = model.ProposalToFlow(next)
+			in.headers[next.Block.BlockID] = model.SignedProposalToFlow(next)
 
 			in.queue <- next
 			// keep processing the pending blocks

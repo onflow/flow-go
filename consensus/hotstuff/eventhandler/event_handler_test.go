@@ -228,7 +228,7 @@ type BlockProducer struct {
 }
 
 func (b *BlockProducer) MakeBlockProposal(view uint64, qc *flow.QuorumCertificate, lastViewTC *flow.TimeoutCertificate) (*flow.Header, error) {
-	return model.ProposalToFlow(&model.SignedProposal{
+	return model.SignedProposalToFlow(&model.SignedProposal{
 		Block: helper.MakeBlock(
 			helper.WithBlockView(view),
 			helper.WithBlockQC(qc),
@@ -670,7 +670,7 @@ func (es *EventHandlerSuite) TestOnReceiveTc_NextLeaderProposes() {
 
 		// proposed block should contain valid newest QC and lastViewTC
 		expectedNewestQC := es.paceMaker.NewestQC()
-		proposal := model.ProposalFromFlow(header)
+		proposal := model.SignedProposalFromFlow(header)
 		require.Equal(es.T(), expectedNewestQC, proposal.Block.QC)
 		require.Equal(es.T(), es.paceMaker.LastViewTC(), proposal.LastViewTC)
 	}).Once()

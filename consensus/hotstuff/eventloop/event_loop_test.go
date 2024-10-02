@@ -271,7 +271,7 @@ func TestReadyDoneWithStartTime(t *testing.T) {
 
 	parentBlock := unittest.BlockHeaderFixture()
 	block := unittest.BlockHeaderWithParentFixture(parentBlock)
-	eventLoop.SubmitProposal(model.ProposalFromFlow(block))
+	eventLoop.SubmitProposal(model.SignedProposalFromFlow(block))
 
 	unittest.RequireCloseBefore(t, done, startTimeDuration+100*time.Millisecond, "proposal wasn't received")
 	cancel()

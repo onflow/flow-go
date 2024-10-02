@@ -27,7 +27,7 @@ func Recover(log zerolog.Logger, pending []*flow.Header, scanners ...BlockScanne
 
 	// add all pending blocks to forks
 	for _, header := range pending {
-		proposal := model.ProposalFromFlow(header) // convert the header into a proposal
+		proposal := model.SignedProposalFromFlow(header) // convert the header into a proposal
 		for _, s := range scanners {
 			err := s(proposal)
 			if err != nil {

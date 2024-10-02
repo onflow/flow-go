@@ -39,8 +39,8 @@ func (p *SignedProposal) ProposerVote() *Vote {
 	return &vote
 }
 
-// ProposalFromFlow turns a flow header into a hotstuff block type.
-func ProposalFromFlow(header *flow.Header) *SignedProposal {
+// SignedProposalFromFlow turns a flow header into a hotstuff block type.
+func SignedProposalFromFlow(header *flow.Header) *SignedProposal {
 	proposal := SignedProposal{
 		Proposal: Proposal{
 			Block:      BlockFromFlow(header),
@@ -51,8 +51,8 @@ func ProposalFromFlow(header *flow.Header) *SignedProposal {
 	return &proposal
 }
 
-// ProposalToFlow turns a block proposal into a flow header.
-func ProposalToFlow(proposal *SignedProposal) *flow.Header {
+// SignedProposalToFlow turns a block proposal into a flow header.
+func SignedProposalToFlow(proposal *SignedProposal) *flow.Header {
 
 	block := proposal.Block
 	header := &flow.Header{

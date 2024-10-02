@@ -38,7 +38,7 @@ func TestCombinedSignWithBeaconKey(t *testing.T) {
 	fblock.Header.View = proposerView
 	fblock.Header.ParentView = proposerView - 1
 	fblock.Header.LastViewTC = nil
-	proposal := model.ProposalFromFlow(fblock.Header)
+	proposal := model.SignedProposalFromFlow(fblock.Header)
 	signerID := fblock.Header.ProposerID
 
 	beaconKeyStore := modulemock.NewRandomBeaconKeyStore(t)
@@ -146,7 +146,7 @@ func TestCombinedSignWithNoBeaconKey(t *testing.T) {
 	fblock.Header.View = proposerView
 	fblock.Header.ParentView = proposerView - 1
 	fblock.Header.LastViewTC = nil
-	proposal := model.ProposalFromFlow(fblock.Header)
+	proposal := model.SignedProposalFromFlow(fblock.Header)
 	signerID := fblock.Header.ProposerID
 
 	beaconKeyStore := modulemock.NewRandomBeaconKeyStore(t)

@@ -206,7 +206,7 @@ func (cs *CoreSuite) TestOnBlockProposalValidParent() {
 	// store the data for retrieval
 	cs.headerDB[block.Header.ParentID] = cs.head
 
-	hotstuffProposal := model.ProposalFromFlow(block.Header)
+	hotstuffProposal := model.SignedProposalFromFlow(block.Header)
 	cs.validator.On("ValidateProposal", hotstuffProposal).Return(nil)
 	cs.voteAggregator.On("AddBlock", hotstuffProposal).Once()
 	cs.hotstuff.On("SubmitProposal", hotstuffProposal)
@@ -232,7 +232,7 @@ func (cs *CoreSuite) TestOnBlockProposalValidAncestor() {
 	cs.headerDB[parent.ID()] = &parent
 	cs.headerDB[ancestor.ID()] = &ancestor
 
-	hotstuffProposal := model.ProposalFromFlow(block.Header)
+	hotstuffProposal := model.SignedProposalFromFlow(block.Header)
 	cs.validator.On("ValidateProposal", hotstuffProposal).Return(nil)
 	cs.voteAggregator.On("AddBlock", hotstuffProposal).Once()
 	cs.hotstuff.On("SubmitProposal", hotstuffProposal).Once()
@@ -280,7 +280,7 @@ func (cs *CoreSuite) TestOnBlockProposal_FailsHotStuffValidation() {
 	parent := unittest.ClusterBlockWithParent(&ancestor)
 	block := unittest.ClusterBlockWithParent(&parent)
 	proposal := messages.NewClusterBlockProposal(&block)
-	hotstuffProposal := model.ProposalFromFlow(block.Header)
+	hotstuffProposal := model.SignedProposalFromFlow(block.Header)
 
 	// store the data for retrieval
 	cs.headerDB[parent.ID()] = &parent
@@ -363,7 +363,7 @@ func (cs *CoreSuite) TestOnBlockProposal_FailsProtocolStateValidation() {
 	parent := unittest.ClusterBlockWithParent(&ancestor)
 	block := unittest.ClusterBlockWithParent(&parent)
 	proposal := messages.NewClusterBlockProposal(&block)
-	hotstuffProposal := model.ProposalFromFlow(block.Header)
+	hotstuffProposal := model.SignedProposalFromFlow(block.Header)
 
 	// store the data for retrieval
 	cs.headerDB[parent.ID()] = &parent
@@ -476,7 +476,7 @@ func (cs *CoreSuite) TestProcessBlockAndDescendants() {
 	cs.childrenDB[parentID] = append(cs.childrenDB[parentID], pending3)
 
 	for _, block := range []cluster.Block{parent, block1, block2, block3} {
-		hotstuffProposal := model.ProposalFromFlow(block.Header)
+		hotstuffProposal := model.SignedProposalFromFlow(block.Header)
 		cs.validator.On("ValidateProposal", hotstuffProposal).Return(nil)
 		cs.voteAggregator.On("AddBlock", hotstuffProposal).Once()
 		cs.hotstuff.On("SubmitProposal", hotstuffProposal).Once()

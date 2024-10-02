@@ -30,7 +30,7 @@ func TestRecover(t *testing.T) {
 	// should forward blocks in exact order, just converting flow.Header to pending block
 	require.Len(t, recovered, len(pending))
 	for i, r := range recovered {
-		require.Equal(t, model.ProposalFromFlow(pending[i]), r)
+		require.Equal(t, model.SignedProposalFromFlow(pending[i]), r)
 	}
 }
 
