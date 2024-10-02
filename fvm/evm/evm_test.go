@@ -100,6 +100,7 @@ func TestEVMRun(t *testing.T) {
 						AddArgument(json.MustEncode(coinbase)),
 					0)
 
+				preSnapshot := snapshot
 				state, output, err := vm.Run(
 					ctx,
 					tx,
@@ -110,9 +111,11 @@ func TestEVMRun(t *testing.T) {
 				snapshot = snapshot.Append(state)
 
 				// assert event fields are correct
+				txPayloads := make([]events.TransactionEventPayload, 0)
 				require.Len(t, output.Events, 2)
 				txEvent := output.Events[0]
 				txEventPayload := testutils.TxEventToPayload(t, txEvent, sc.EVMContract.Address)
+				txPayloads = append(txPayloads, *txEventPayload)
 				require.NoError(t, err)
 
 				// fee transfer event
@@ -122,6 +125,7 @@ func TestEVMRun(t *testing.T) {
 				require.Equal(t, uint16(types.ErrCodeNoError), feeTranferEventPayload.ErrorCode)
 				require.Equal(t, uint16(1), feeTranferEventPayload.Index)
 				require.Equal(t, uint64(21000), feeTranferEventPayload.GasConsumed)
+				txPayloads = append(txPayloads, *feeTranferEventPayload)
 
 				// commit block
 				blockEventPayload, snapshot := callEVMHeartBeat(t,
@@ -146,6 +150,9 @@ func TestEVMRun(t *testing.T) {
 				require.Equal(t, blockEventPayload.Height, txEventPayload.BlockHeight)
 				require.Equal(t, blockEventPayload.TotalGasUsed-feeTranferEventPayload.GasConsumed, txEventPayload.GasConsumed)
 				require.Empty(t, txEventPayload.ContractAddress)
+
+				// check replayability before appending state
+				testutils.ValidateEventsReplayability(t, chain.ChainID(), preSnapshot, txPayloads, *blockEventPayload)
 
 				// append the state
 				snapshot = snapshot.Append(state)
@@ -207,7 +214,7 @@ func TestEVMRun(t *testing.T) {
 	})
 
 	t.Run("testing EVM.run (failed)", func(t *testing.T) {
-		t.Parallel()
+		// t.Parallel()
 		RunWithNewEnvironment(t,
 			chain, func(
 				ctx fvm.Context,
