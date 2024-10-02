@@ -19,8 +19,8 @@ func TestRecover(t *testing.T) {
 	}
 
 	// Recover with `pending` blocks and record what blocks are forwarded to `onProposal`
-	recovered := make([]*model.Proposal, 0)
-	scanner := func(block *model.Proposal) error {
+	recovered := make([]*model.SignedProposal, 0)
+	scanner := func(block *model.SignedProposal) error {
 		recovered = append(recovered, block)
 		return nil
 	}
@@ -35,7 +35,7 @@ func TestRecover(t *testing.T) {
 }
 
 func TestRecoverEmptyInput(t *testing.T) {
-	scanner := func(block *model.Proposal) error {
+	scanner := func(block *model.SignedProposal) error {
 		require.Fail(t, "no proposal expected")
 		return nil
 	}

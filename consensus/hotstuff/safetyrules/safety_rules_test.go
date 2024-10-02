@@ -31,7 +31,7 @@ type SafetyRulesTestSuite struct {
 	suite.Suite
 
 	bootstrapBlock   *model.Block
-	proposal         *model.Proposal
+	proposal         *model.SignedProposal
 	proposerIdentity *flow.Identity
 	ourIdentity      *flow.Identity
 	signer           *mocks.Signer

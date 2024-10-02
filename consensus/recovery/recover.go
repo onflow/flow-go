@@ -12,7 +12,7 @@ import (
 
 // BlockScanner describes a function for ingesting pending blocks.
 // Any returned errors are considered fatal.
-type BlockScanner func(proposal *model.Proposal) error
+type BlockScanner func(proposal *model.SignedProposal) error
 
 // Recover is a utility method for recovering the HotStuff state after a restart.
 // It receives the list `pending` containing _all_ blocks that
@@ -48,7 +48,7 @@ func Recover(log zerolog.Logger, pending []*flow.Header, scanners ...BlockScanne
 // finalized block. Caution, input blocks must be valid and in parent-first order
 // (unless parent is the latest finalized block).
 func ForksState(forks hotstuff.Forks) BlockScanner {
-	return func(proposal *model.Proposal) error {
+	return func(proposal *model.SignedProposal) error {
 		err := forks.AddValidatedBlock(proposal.Block)
 		if err != nil {
 			return fmt.Errorf("could not add block %v to forks: %w", proposal.Block.BlockID, err)
@@ -63,7 +63,7 @@ func ForksState(forks hotstuff.Forks) BlockScanner {
 //
 // Caution: input blocks must be valid.
 func VoteAggregatorState(voteAggregator hotstuff.VoteAggregator) BlockScanner {
-	return func(proposal *model.Proposal) error {
+	return func(proposal *model.SignedProposal) error {
 		voteAggregator.AddBlock(proposal)
 		return nil
 	}
@@ -72,7 +72,7 @@ func VoteAggregatorState(voteAggregator hotstuff.VoteAggregator) BlockScanner {
 // CollectParentQCs collects all parent QCs included in the blocks descending from the
 // latest finalized block. Caution, input blocks must be valid.
 func CollectParentQCs(collector Collector[*flow.QuorumCertificate]) BlockScanner {
-	return func(proposal *model.Proposal) error {
+	return func(proposal *model.SignedProposal) error {
 		qc := proposal.Block.QC
 		if qc != nil {
 			collector.Append(qc)
@@ -84,7 +84,7 @@ func CollectParentQCs(collector Collector[*flow.QuorumCertificate]) BlockScanner
 // CollectTCs collect all TCs included in the blocks descending from the
 // latest finalized block. Caution, input blocks must be valid.
 func CollectTCs(collector Collector[*flow.TimeoutCertificate]) BlockScanner {
-	return func(proposal *model.Proposal) error {
+	return func(proposal *model.SignedProposal) error {
 		tc := proposal.LastViewTC
 		if tc != nil {
 			collector.Append(tc)

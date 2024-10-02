@@ -618,7 +618,7 @@ func (cs *CoreSuite) TestProposalBufferingOrder() {
 	}
 	cs.hotstuff.On("SubmitProposal", mock.Anything).Times(4).Run(
 		func(args mock.Arguments) {
-			proposal := args.Get(0).(*model.Proposal)
+			proposal := args.Get(0).(*model.SignedProposal)
 			header := proposal.Block
 			if calls == 0 {
 				// first header processed must be the common parent

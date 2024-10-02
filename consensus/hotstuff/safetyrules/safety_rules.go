@@ -73,14 +73,33 @@ func New(
 //     This is a sentinel error and _expected_ during normal operation.
 //
 // All other errors are unexpected and potential symptoms of uncovered edge cases or corrupted internal state (fatal).
-func (r *SafetyRules) ProduceVote(proposal *model.Proposal, curView uint64) (*model.Vote, error) {
+func (r *SafetyRules) ProduceVote(signedProposal *model.SignedProposal, curView uint64) (*model.Vote, error) {
+	return r.produceVote(&signedProposal.Proposal, curView)
+}
+
+// produceVote implements the core Safety Rules to validate whether it is safe to vote.
+// This method is to be used for voting for other leaders' blocks as well as this node's own proposals
+// under construction. We explicitly codify the important aspect that a proposer's signature for their
+// own block is conceptually also just a vote (we explicitly use that property when aggregating votes and
+// including the proposer's own vote into a QC). In order to express this conceptual equivalence in code, the
+// voting logic in Safety Rules must also operate on an unsigned Proposal.
+//
+// The curView is taken as input to ensure SafetyRules will only vote for proposals at current view and prevent double voting.
+// Returns:
+//   - (vote, nil): On the _first_ block for the current view that is safe to vote for.
+//     Subsequently, voter does _not_ vote for any other block with the same (or lower) view.
+//   - (nil, model.NoVoteError): If the voter decides that it does not want to vote for the given block.
+//     This is a sentinel error and _expected_ during normal operation.
+//
+// All other errors are unexpected and potential symptoms of uncovered edge cases or corrupted internal state (fatal).
+func (r *SafetyRules) produceVote(proposal *model.Proposal, curView uint64) (*model.Vote, error) {
 	block := proposal.Block
 	// sanity checks:
 	if curView != block.View {
 		return nil, fmt.Errorf("expecting block for current view %d, but block's view is %d", curView, block.View)
 	}
 
-	err := r.IsSafeToVote(proposal)
+	err := r.isSafeToVote(proposal)
 	if err != nil {
 		return nil, fmt.Errorf("not safe to vote for proposal %x: %w", proposal.Block.BlockID, err)
 	}
@@ -144,6 +163,7 @@ func (r *SafetyRules) ProduceVote(proposal *model.Proposal, curView uint64) (*mo
 	}
 
 	return vote, nil
+
 }
 
 // ProduceTimeout takes current view, highest locally known QC and TC (optional, must be nil if and
@@ -221,13 +241,13 @@ func (r *SafetyRules) SignOwnProposal(unsignedProposal *model.Proposal) (*model.
 		return nil, fmt.Errorf("can't sign proposal for someone else's block")
 	}
 
-	return r.ProduceVote(unsignedProposal, unsignedProposal.Block.View)
+	return r.produceVote(unsignedProposal, unsignedProposal.Block.View)
 }
 
-// IsSafeToVote checks if this proposal is valid in terms of voting rules, if voting for this proposal won't break safety rules.
+// isSafeToVote checks if this proposal is valid in terms of voting rules, if voting for this proposal won't break safety rules.
 // Expected errors during normal operations:
 //   - NoVoteError if replica already acted during this view (either voted or generated timeout)
-func (r *SafetyRules) IsSafeToVote(proposal *model.Proposal) error {
+func (r *SafetyRules) isSafeToVote(proposal *model.Proposal) error {
 	blockView := proposal.Block.View
 
 	err := r.validateEvidenceForEnteringView(blockView, proposal.Block.QC, proposal.LastViewTC)

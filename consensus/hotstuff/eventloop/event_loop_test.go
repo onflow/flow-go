@@ -258,7 +258,7 @@ func TestReadyDoneWithStartTime(t *testing.T) {
 	require.NoError(t, err)
 
 	done := make(chan struct{})
-	eh.On("OnReceiveProposal", mock.AnythingOfType("*model.Proposal")).Run(func(args mock.Arguments) {
+	eh.On("OnReceiveProposal", mock.AnythingOfType("*model.SignedProposal")).Run(func(args mock.Arguments) {
 		require.True(t, time.Now().After(startTime))
 		close(done)
 	}).Return(nil).Once()

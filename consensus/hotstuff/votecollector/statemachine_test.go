@@ -51,7 +51,7 @@ func (s *StateMachineTestSuite) SetupTest() {
 	s.mockedProcessors = make(map[flow.Identifier]*mocks.VerifyingVoteProcessor)
 	s.notifier = mocks.NewVoteAggregationConsumer(s.T())
 
-	s.factoryMethod = func(log zerolog.Logger, block *model.Proposal) (hotstuff.VerifyingVoteProcessor, error) {
+	s.factoryMethod = func(log zerolog.Logger, block *model.SignedProposal) (hotstuff.VerifyingVoteProcessor, error) {
 		if processor, found := s.mockedProcessors[block.Block.BlockID]; found {
 			return processor, nil
 		}
@@ -64,7 +64,7 @@ func (s *StateMachineTestSuite) SetupTest() {
 
 // prepareMockedProcessor prepares a mocked processor and stores it in map, later it will be used
 // to mock behavior of verifying vote processor.
-func (s *StateMachineTestSuite) prepareMockedProcessor(proposal *model.Proposal) *mocks.VerifyingVoteProcessor {
+func (s *StateMachineTestSuite) prepareMockedProcessor(proposal *model.SignedProposal) *mocks.VerifyingVoteProcessor {
 	processor := &mocks.VerifyingVoteProcessor{}
 	processor.On("Block").Return(func() *model.Block {
 		return proposal.Block
@@ -101,7 +101,7 @@ func (s *StateMachineTestSuite) TestStatus_StateTransitions() {
 // factory are handed through (potentially wrapped), but are not replaced.
 func (s *StateMachineTestSuite) Test_FactoryErrorPropagation() {
 	factoryError := errors.New("factory error")
-	factory := func(log zerolog.Logger, block *model.Proposal) (hotstuff.VerifyingVoteProcessor, error) {
+	factory := func(log zerolog.Logger, block *model.SignedProposal) (hotstuff.VerifyingVoteProcessor, error) {
 		return nil, factoryError
 	}
 	s.collector.createVerifyingProcessor = factory

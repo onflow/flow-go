@@ -46,7 +46,7 @@ func (_m *SafetyRules) ProduceTimeout(curView uint64, newestQC *flow.QuorumCerti
 }
 
 // ProduceVote provides a mock function with given fields: proposal, curView
-func (_m *SafetyRules) ProduceVote(proposal *model.Proposal, curView uint64) (*model.Vote, error) {
+func (_m *SafetyRules) ProduceVote(proposal *model.SignedProposal, curView uint64) (*model.Vote, error) {
 	ret := _m.Called(proposal, curView)
 
 	if len(ret) == 0 {
@@ -55,10 +55,10 @@ func (_m *SafetyRules) ProduceVote(proposal *model.Proposal, curView uint64) (*m
 
 	var r0 *model.Vote
 	var r1 error
-	if rf, ok := ret.Get(0).(func(*model.Proposal, uint64) (*model.Vote, error)); ok {
+	if rf, ok := ret.Get(0).(func(*model.SignedProposal, uint64) (*model.Vote, error)); ok {
 		return rf(proposal, curView)
 	}
-	if rf, ok := ret.Get(0).(func(*model.Proposal, uint64) *model.Vote); ok {
+	if rf, ok := ret.Get(0).(func(*model.SignedProposal, uint64) *model.Vote); ok {
 		r0 = rf(proposal, curView)
 	} else {
 		if ret.Get(0) != nil {
@@ -66,7 +66,7 @@ func (_m *SafetyRules) ProduceVote(proposal *model.Proposal, curView uint64) (*m
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(*model.Proposal, uint64) error); ok {
+	if rf, ok := ret.Get(1).(func(*model.SignedProposal, uint64) error); ok {
 		r1 = rf(proposal, curView)
 	} else {
 		r1 = ret.Error(1)
@@ -76,7 +76,7 @@ func (_m *SafetyRules) ProduceVote(proposal *model.Proposal, curView uint64) (*m
 }
 
 // SignOwnProposal provides a mock function with given fields: unsignedProposal
-func (_m *SafetyRules) SignOwnProposal(unsignedProposal *model.Proposal) (*model.Vote, error) {
+func (_m *SafetyRules) SignOwnProposal(unsignedProposal *model.SignedProposal) (*model.Vote, error) {
 	ret := _m.Called(unsignedProposal)
 
 	if len(ret) == 0 {
@@ -85,10 +85,10 @@ func (_m *SafetyRules) SignOwnProposal(unsignedProposal *model.Proposal) (*model
 
 	var r0 *model.Vote
 	var r1 error
-	if rf, ok := ret.Get(0).(func(*model.Proposal) (*model.Vote, error)); ok {
+	if rf, ok := ret.Get(0).(func(*model.SignedProposal) (*model.Vote, error)); ok {
 		return rf(unsignedProposal)
 	}
-	if rf, ok := ret.Get(0).(func(*model.Proposal) *model.Vote); ok {
+	if rf, ok := ret.Get(0).(func(*model.SignedProposal) *model.Vote); ok {
 		r0 = rf(unsignedProposal)
 	} else {
 		if ret.Get(0) != nil {
@@ -96,7 +96,7 @@ func (_m *SafetyRules) SignOwnProposal(unsignedProposal *model.Proposal) (*model
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(*model.Proposal) error); ok {
+	if rf, ok := ret.Get(1).(func(*model.SignedProposal) error); ok {
 		r1 = rf(unsignedProposal)
 	} else {
 		r1 = ret.Error(1)

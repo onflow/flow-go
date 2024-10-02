@@ -22,7 +22,7 @@ type VoteProcessorTestSuiteBase struct {
 
 	stakingAggregator *mockhotstuff.WeightedSignatureAggregator
 	minRequiredWeight uint64
-	proposal          *model.Proposal
+	proposal          *model.SignedProposal
 }
 
 func (s *VoteProcessorTestSuiteBase) SetupTest() {

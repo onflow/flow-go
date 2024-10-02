@@ -35,7 +35,7 @@ type ProposalSuite struct {
 	parent       *model.Block
 	block        *model.Block
 	voters       flow.IdentitySkeletonList
-	proposal     *model.Proposal
+	proposal     *model.SignedProposal
 	vote         *model.Vote
 	voter        *flow.IdentitySkeleton
 	committee    *mocks.Replicas
@@ -70,7 +70,7 @@ func (ps *ProposalSuite) SetupTest() {
 	require.NoError(ps.T(), err)
 
 	ps.voters = ps.participants.Filter(filter.HasNodeID[flow.Identity](voterIDs...)).ToSkeleton()
-	ps.proposal = &model.Proposal{Block: ps.block}
+	ps.proposal = &model.SignedProposal{Block: ps.block}
 	ps.vote = ps.proposal.ProposerVote()
 	ps.voter = ps.leader
 

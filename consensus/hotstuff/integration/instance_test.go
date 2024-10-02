@@ -59,7 +59,7 @@ type Instance struct {
 	queue          chan interface{}
 	updatingBlocks sync.RWMutex
 	headers        map[flow.Identifier]*flow.Header
-	pendings       map[flow.Identifier]*model.Proposal // indexed by parent ID
+	pendings       map[flow.Identifier]*model.SignedProposal // indexed by parent ID
 
 	// mocked dependencies
 	committee *mocks.DynamicCommittee
@@ -151,7 +151,7 @@ func NewInstance(t *testing.T, options ...Option) *Instance {
 		stop:                  cfg.StopCondition,
 
 		// instance data
-		pendings: make(map[flow.Identifier]*model.Proposal),
+		pendings: make(map[flow.Identifier]*model.SignedProposal),
 		headers:  make(map[flow.Identifier]*flow.Header),
 		queue:    make(chan interface{}, 1024),
 
@@ -403,7 +403,7 @@ func NewInstance(t *testing.T, options ...Option) *Instance {
 	minRequiredWeight := committees.WeightThresholdToBuildQC(uint64(len(in.participants)) * weight)
 	voteProcessorFactory := mocks.NewVoteProcessorFactory(t)
 	voteProcessorFactory.On("Create", mock.Anything, mock.Anything).Return(
-		func(log zerolog.Logger, proposal *model.Proposal) hotstuff.VerifyingVoteProcessor {
+		func(log zerolog.Logger, proposal *model.SignedProposal) hotstuff.VerifyingVoteProcessor {
 			stakingSigAggtor := helper.MakeWeightedSignatureAggregator(weight)
 			stakingSigAggtor.On("Verify", mock.Anything, mock.Anything).Return(nil).Maybe()
 
@@ -597,7 +597,7 @@ func (in *Instance) Run() error {
 			}
 		case msg := <-in.queue:
 			switch m := msg.(type) {
-			case *model.Proposal:
+			case *model.SignedProposal:
 				// add block to aggregator
 				in.voteAggregator.AddBlock(m)
 				// then pass to event handler
@@ -629,7 +629,7 @@ func (in *Instance) Run() error {
 	}
 }
 
-func (in *Instance) ProcessBlock(proposal *model.Proposal) {
+func (in *Instance) ProcessBlock(proposal *model.SignedProposal) {
 	in.updatingBlocks.Lock()
 	defer in.updatingBlocks.Unlock()
 	_, parentExists := in.headers[proposal.Block.QC.BlockID]

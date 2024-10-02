@@ -120,7 +120,7 @@ func (p *ActivePaceMaker) ProcessQC(qc *flow.QuorumCertificate) (*model.NewViewE
 
 // ProcessTC notifies the Pacemaker of a new timeout certificate, which may allow
 // Pacemaker to fast-forward its current view.
-// A nil TC is an expected valid input, so that callers may pass in e.g. `Proposal.LastViewTC`,
+// A nil TC is an expected valid input, so that callers may pass in e.g. `SignedProposal.LastViewTC`,
 // which may or may not have a value.
 // No errors are expected, any error should be treated as exception
 func (p *ActivePaceMaker) ProcessTC(tc *flow.TimeoutCertificate) (*model.NewViewEvent, error) {

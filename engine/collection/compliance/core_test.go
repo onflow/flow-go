@@ -552,7 +552,7 @@ func (cs *CoreSuite) TestProposalBufferingOrder() {
 	}
 	cs.hotstuff.On("SubmitProposal", mock.Anything).Times(4).Run(
 		func(args mock.Arguments) {
-			header := args.Get(0).(*model.Proposal).Block
+			header := args.Get(0).(*model.SignedProposal).Block
 			assert.Equal(cs.T(), order[index], header.BlockID, "should submit correct header to hotstuff")
 			index++
 			cs.headerDB[header.BlockID] = proposalsLookup[header.BlockID]
