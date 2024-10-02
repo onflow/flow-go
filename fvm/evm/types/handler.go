@@ -76,13 +76,18 @@ type AddressAllocator interface {
 	AllocatePrecompileAddress(index uint64) Address
 }
 
-// BlockStore stores the chain of blocks
-type BlockStore interface {
-	// LatestBlock returns the latest appended block
-	LatestBlock() (*Block, error)
-
+// BlockHashProvider provides access to block hashes by height
+type BlockHashProvider interface {
 	// BlockHash returns the hash of the block at the given height
 	BlockHash(height uint64) (gethCommon.Hash, error)
+}
+
+// BlockStore stores the chain of blocks
+type BlockStore interface {
+	BlockHashProvider
+
+	// LatestBlock returns the latest appended block
+	LatestBlock() (*Block, error)
 
 	// BlockProposal returns the active block proposal
 	BlockProposal() (*BlockProposal, error)

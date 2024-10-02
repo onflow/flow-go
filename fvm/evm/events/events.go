@@ -6,7 +6,6 @@ import (
 	"github.com/onflow/cadence"
 	"github.com/onflow/cadence/encoding/ccf"
 	gethCommon "github.com/onflow/go-ethereum/common"
-	"github.com/onflow/go-ethereum/rlp"
 
 	"github.com/onflow/flow-go/fvm/evm/stdlib"
 	"github.com/onflow/flow-go/fvm/evm/types"
@@ -56,51 +55,27 @@ func NewTransactionEvent(
 }
 
 func (p *transactionEvent) ToCadence(chainID flow.ChainID) (cadence.Event, error) {
-	var encodedLogs []byte
-	var err error
-	if len(p.Result.Logs) > 0 {
-		encodedLogs, err = rlp.EncodeToBytes(p.Result.Logs)
-		if err != nil {
-			return cadence.Event{}, err
-		}
-	}
-
-	deployedAddress := cadence.String("")
-	if p.Result.DeployedContractAddress != nil {
-		deployedAddress = cadence.String(p.Result.DeployedContractAddress.String())
-	}
-
-	errorMsg := ""
-	if p.Result.VMError != nil {
-		errorMsg = p.Result.VMError.Error()
-	}
-	// both error would never happen at the same time
-	// but in case the priority is by validation error
-	if p.Result.ValidationError != nil {
-		errorMsg = p.Result.ValidationError.Error()
+	encodedLogs, err := p.Result.RLPEncodedLogs()
+	if err != nil {
+		return cadence.Event{}, err
 	}
 
 	eventType := stdlib.CadenceTypesForChain(chainID).TransactionExecuted
 
-	// the first 4 bytes of StateChangeCommitment is used as checksum
-	var checksum [ChecksumLength]byte
-	if len(p.Result.StateChangeCommitment) >= ChecksumLength {
-		copy(checksum[:ChecksumLength], p.Result.StateChangeCommitment[:ChecksumLength])
-	}
 	return cadence.NewEvent([]cadence.Value{
 		hashToCadenceArrayValue(p.Result.TxHash),
 		cadence.NewUInt16(p.Result.Index),
 		cadence.NewUInt8(p.Result.TxType),
 		bytesToCadenceUInt8ArrayValue(p.Payload),
 		cadence.NewUInt16(uint16(p.Result.ResultSummary().ErrorCode)),
-		cadence.String(errorMsg),
+		cadence.String(p.Result.ErrorMsg()),
 		cadence.NewUInt64(p.Result.GasConsumed),
-		deployedAddress,
+		cadence.String(p.Result.DeployedContractAddressString()),
 		bytesToCadenceUInt8ArrayValue(encodedLogs),
 		cadence.NewUInt64(p.BlockHeight),
 		bytesToCadenceUInt8ArrayValue(p.Result.ReturnedData),
 		bytesToCadenceUInt8ArrayValue(p.Result.PrecompiledCalls),
-		checksumToCadenceArrayValue(checksum),
+		checksumToCadenceArrayValue(p.Result.StateChangeChecksum()),
 	}).WithType(eventType), nil
 }
 
@@ -194,19 +169,19 @@ func DecodeBlockEventPayload(event cadence.Event) (*BlockEventPayload, error) {
 }
 
 type TransactionEventPayload struct {
-	Hash                gethCommon.Hash      `cadence:"hash"`
-	Index               uint16               `cadence:"index"`
-	TransactionType     uint8                `cadence:"type"`
-	Payload             []byte               `cadence:"payload"`
-	ErrorCode           uint16               `cadence:"errorCode"`
-	GasConsumed         uint64               `cadence:"gasConsumed"`
-	ContractAddress     string               `cadence:"contractAddress"`
-	Logs                []byte               `cadence:"logs"`
-	BlockHeight         uint64               `cadence:"blockHeight"`
-	ErrorMessage        string               `cadence:"errorMessage"`
-	ReturnedData        []byte               `cadence:"returnedData"`
-	PrecompiledCalls    []byte               `cadence:"precompiledCalls"`
-	StateUpdateChecksum [ChecksumLength]byte `cadence:"stateUpdateChecksum"`
+	Hash                gethCommon.Hash            `cadence:"hash"`
+	Index               uint16                     `cadence:"index"`
+	TransactionType     uint8                      `cadence:"type"`
+	Payload             []byte                     `cadence:"payload"`
+	ErrorCode           uint16                     `cadence:"errorCode"`
+	GasConsumed         uint64                     `cadence:"gasConsumed"`
+	ContractAddress     string                     `cadence:"contractAddress"`
+	Logs                []byte                     `cadence:"logs"`
+	BlockHeight         uint64                     `cadence:"blockHeight"`
+	ErrorMessage        string                     `cadence:"errorMessage"`
+	ReturnedData        []byte                     `cadence:"returnedData"`
+	PrecompiledCalls    []byte                     `cadence:"precompiledCalls"`
+	StateUpdateChecksum [types.ChecksumLength]byte `cadence:"stateUpdateChecksum"`
 }
 
 // transactionEventPayloadV0 legacy format of the transaction event without stateUpdateChecksum field
