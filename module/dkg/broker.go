@@ -237,7 +237,7 @@ func (b *Broker) SubmitResult(groupKey crypto.PublicKey, pubKeys []crypto.Public
 			return client.SubmitResult(groupKey, pubKeys, indexMap)
 		}
 	} else {
-		b.log.Warn().Msgf("submitting empty dkg result because I completed the DKG unsuccessfully").
+		b.log.Warn().Msgf("submitting empty dkg result because I completed the DKG unsuccessfully")
 		submitResult = func(client module.DKGContractClient) error {
 			return client.SubmitEmptyResult()
 		}
