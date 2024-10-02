@@ -89,6 +89,15 @@ func (r *SafetyRules) ProduceVote(proposal *model.Proposal, curView uint64) (*mo
 	if err != nil {
 		return nil, fmt.Errorf("expect to have a valid leader for view %d: %w", curView, err)
 	}
+	// This sanity check confirms that the proposal is from the correct leader of this view. In case this sanity check
+	// fails, we return an exception, because the compliance layer should have verified this already. However, proposals
+	// from this node might not go through the compliance engine, and must be signed before anyway. Therefore,
+	// we still include this sanity check, but return an exception because signing a proposal should be only for views
+	// where this node is actually the leader.
+	if block.ProposerID != currentLeader {
+		return nil, fmt.Errorf("incorrect proposal, as proposer %x is different from the leader %x for view %d", block.ProposerID, currentLeader, curView)
+	}
+
 	// In case this node is the leader, we can skip the following checks.
 	// • If this node is ejected (check (ii) would fail), voting for any blocks or singing own proposals is of no harm.
 	//   This is because all other honest nodes should have terminated their connection to us, so we are not risking
