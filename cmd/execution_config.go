@@ -133,7 +133,7 @@ func (exeConf *ExecutionConfig) SetupFlags(flags *pflag.FlagSet) {
 	flags.BoolVar(&exeConf.enableChecker, "enable-checker", true, "enable checker to check the correctness of the execution result, default is true")
 	// deprecated. Retain it to prevent nodes that previously had this configuration from crashing.
 	var deprecatedEnableNewIngestionEngine bool
-	flags.BoolVar(&deprecatedEnableNewIngestionEngine, "enable-new-ingestion-engine", true, "enable new ingestion engine, default is true")
+	flags.BoolVar(&deprecatedEnableNewIngestionEngine, "enable-new-ingestion-engine", true, "DEPRECATED. will be removed in a future version. enable new ingestion engine, default is true")
 	flags.StringVar(&exeConf.publicAccessID, "public-access-id", "", "public access ID for the node")
 
 }
