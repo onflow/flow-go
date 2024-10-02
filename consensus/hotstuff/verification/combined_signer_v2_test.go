@@ -38,7 +38,7 @@ func TestCombinedSignWithBeaconKey(t *testing.T) {
 	fblock.Header.View = proposerView
 	fblock.Header.ParentView = proposerView - 1
 	fblock.Header.LastViewTC = nil
-	proposal := model.SignedProposalFromFlow(fblock.Header)
+	proposal := model.ProposalFromFlow(fblock.Header)
 	signerID := fblock.Header.ProposerID
 
 	beaconKeyStore := modulemock.NewRandomBeaconKeyStore(t)
@@ -78,7 +78,7 @@ func TestCombinedSignWithBeaconKey(t *testing.T) {
 	// check that a created proposal can be verified by a verifier
 	vote, err := safetyRules.SignOwnProposal(proposal)
 	require.NoError(t, err)
-	proposal.SigData = vote.SigData
+
 	err = verifier.VerifyVote(&ourIdentity.IdentitySkeleton, vote.SigData, proposal.Block.View, proposal.Block.BlockID)
 	require.NoError(t, err)
 
@@ -92,7 +92,7 @@ func TestCombinedSignWithBeaconKey(t *testing.T) {
 	require.NoError(t, err)
 
 	expectedSig := msig.EncodeDoubleSig(stakingSig, beaconSig)
-	require.Equal(t, expectedSig, proposal.SigData)
+	require.Equal(t, expectedSig, vote.SigData)
 
 	// vote should be valid
 	vote, err = signer.CreateVote(block)
@@ -146,7 +146,7 @@ func TestCombinedSignWithNoBeaconKey(t *testing.T) {
 	fblock.Header.View = proposerView
 	fblock.Header.ParentView = proposerView - 1
 	fblock.Header.LastViewTC = nil
-	proposal := model.SignedProposalFromFlow(fblock.Header)
+	proposal := model.ProposalFromFlow(fblock.Header)
 	signerID := fblock.Header.ProposerID
 
 	beaconKeyStore := modulemock.NewRandomBeaconKeyStore(t)
@@ -190,7 +190,6 @@ func TestCombinedSignWithNoBeaconKey(t *testing.T) {
 	// check that a created proposal can be verified by a verifier
 	vote, err := safetyRules.SignOwnProposal(proposal)
 	require.NoError(t, err)
-	proposal.SigData = vote.SigData
 
 	err = verifier.VerifyVote(&ourIdentity.IdentitySkeleton, vote.SigData, proposal.Block.View, proposal.Block.BlockID)
 	require.NoError(t, err)
@@ -202,7 +201,7 @@ func TestCombinedSignWithNoBeaconKey(t *testing.T) {
 		msig.NewBLSHasher(msig.ConsensusVoteTag),
 	)
 	require.NoError(t, err)
-	require.Equal(t, expectedStakingSig, crypto.Signature(proposal.SigData))
+	require.Equal(t, expectedStakingSig, crypto.Signature(vote.SigData))
 }
 
 // Test_VerifyQC_EmptySigners checks that Verifier returns an `model.InsufficientSignaturesError`

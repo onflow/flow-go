@@ -67,7 +67,7 @@ func (w *safetyRulesConcurrencyWrapper) Sign(unsignedHeader *flow.Header) error 
 	} // signer is now in state 1, and this thread is the only one every going to execute the following logic
 
 	// signature for own block is structurally a vote
-	vote, err := w.safetyRules.SignOwnProposal(model.SignedProposalFromFlow(unsignedHeader))
+	vote, err := w.safetyRules.SignOwnProposal(model.ProposalFromFlow(unsignedHeader))
 	if err != nil {
 		return fmt.Errorf("could not sign block proposal: %w", err)
 	}

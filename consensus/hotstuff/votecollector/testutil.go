@@ -27,7 +27,7 @@ type VoteProcessorTestSuiteBase struct {
 
 func (s *VoteProcessorTestSuiteBase) SetupTest() {
 	s.stakingAggregator = &mockhotstuff.WeightedSignatureAggregator{}
-	s.proposal = helper.MakeProposal()
+	s.proposal = helper.MakeSignedProposal()
 
 	// let's assume we have 19 nodes each with weight 100
 	s.sigWeight = 100

@@ -228,14 +228,12 @@ type BlockProducer struct {
 }
 
 func (b *BlockProducer) MakeBlockProposal(view uint64, qc *flow.QuorumCertificate, lastViewTC *flow.TimeoutCertificate) (*flow.Header, error) {
-	return model.SignedProposalToFlow(&model.SignedProposal{
-		Block: helper.MakeBlock(
+	return model.SignedProposalToFlow(helper.MakeSignedProposal(helper.WithProposal(
+		helper.MakeProposal(helper.WithBlock(helper.MakeBlock(
 			helper.WithBlockView(view),
 			helper.WithBlockQC(qc),
-			helper.WithBlockProposer(b.proposerID),
-		),
-		LastViewTC: lastViewTC,
-	}), nil
+			helper.WithBlockProposer(b.proposerID))),
+			helper.WithLastViewTC(lastViewTC))))), nil
 }
 
 func TestEventHandler(t *testing.T) {
@@ -1035,8 +1033,5 @@ func createVote(block *model.Block) *model.Vote {
 
 func createProposal(view uint64, qcview uint64) *model.SignedProposal {
 	block := createBlockWithQC(view, qcview)
-	return &model.SignedProposal{
-		Block:   block,
-		SigData: nil,
-	}
+	return helper.MakeSignedProposal(helper.WithProposal(helper.MakeProposal(helper.WithBlock(block))))
 }

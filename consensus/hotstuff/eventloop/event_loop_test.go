@@ -75,7 +75,7 @@ func (s *EventLoopTestSuite) TestReadyDone() {
 
 // Test_SubmitQC tests that submitted proposal is eventually sent to event handler for processing
 func (s *EventLoopTestSuite) Test_SubmitProposal() {
-	proposal := helper.MakeProposal()
+	proposal := helper.MakeSignedProposal()
 	processed := atomic.NewBool(false)
 	s.eh.On("OnReceiveProposal", proposal).Run(func(args mock.Arguments) {
 		processed.Store(true)
@@ -229,7 +229,7 @@ func TestEventLoop_Timeout(t *testing.T) {
 	go func() {
 		defer wg.Done()
 		for !processed.Load() {
-			eventLoop.SubmitProposal(helper.MakeProposal())
+			eventLoop.SubmitProposal(helper.MakeSignedProposal())
 		}
 	}()
 

@@ -51,6 +51,15 @@ func SignedProposalFromFlow(header *flow.Header) *SignedProposal {
 	return &proposal
 }
 
+// ProposalFromFlow turns an unsigned flow header into a unsigned hotstuff block type.
+func ProposalFromFlow(header *flow.Header) *Proposal {
+	proposal := Proposal{
+		Block:      BlockFromFlow(header),
+		LastViewTC: header.LastViewTC,
+	}
+	return &proposal
+}
+
 // SignedProposalToFlow turns a block proposal into a flow header.
 func SignedProposalToFlow(proposal *SignedProposal) *flow.Header {
 

@@ -58,11 +58,10 @@ func TestCombinedSignWithBeaconKeyV3(t *testing.T) {
 	verifier := NewCombinedVerifierV3(committee, packer)
 
 	// check that a created proposal can be verified by a verifier
-	proposal, err := signer.CreateProposal(block)
+	vote, err := signer.CreateVote(block)
 	require.NoError(t, err)
 
-	vote := proposal.ProposerVote()
-	err = verifier.VerifyVote(nodeID, vote.SigData, proposal.Block.View, proposal.Block.BlockID)
+	err = verifier.VerifyVote(nodeID, vote.SigData, block.View, block.BlockID)
 	require.NoError(t, err)
 
 	// check that a created proposal's signature is a combined staking sig and random beacon sig
@@ -72,14 +71,14 @@ func TestCombinedSignWithBeaconKeyV3(t *testing.T) {
 	require.NoError(t, err)
 
 	expectedSig := msig.EncodeSingleSig(encoding.SigTypeRandomBeacon, beaconSig)
-	require.Equal(t, expectedSig, proposal.SigData)
+	require.Equal(t, expectedSig, vote.SigData)
 
 	// Vote from a node that is _not_ part of the Random Beacon committee should be rejected.
 	// Specifically, we expect that the verifier recognizes the `protocol.IdentityNotFoundError`
 	// as a sign of an invalid vote and wraps it into a `model.InvalidSignerError`.
 	*dkg = mocks.DKG{} // overwrite DKG mock with a new one
 	dkg.On("KeyShare", signerID).Return(nil, protocol.IdentityNotFoundError{NodeID: signerID})
-	err = verifier.VerifyVote(nodeID, vote.SigData, proposal.Block.View, proposal.Block.BlockID)
+	err = verifier.VerifyVote(nodeID, vote.SigData, block.View, block.BlockID)
 	require.True(t, model.IsInvalidSignerError(err))
 }
 
@@ -121,11 +120,10 @@ func TestCombinedSignWithNoBeaconKeyV3(t *testing.T) {
 	packer := signature.NewConsensusSigDataPacker(committee)
 	verifier := NewCombinedVerifierV3(committee, packer)
 
-	proposal, err := signer.CreateProposal(block)
+	vote, err := signer.CreateVote(block)
 	require.NoError(t, err)
 
-	vote := proposal.ProposerVote()
-	err = verifier.VerifyVote(nodeID, vote.SigData, proposal.Block.View, proposal.Block.BlockID)
+	err = verifier.VerifyVote(nodeID, vote.SigData, block.View, block.BlockID)
 	require.NoError(t, err)
 
 	// check that a created proposal's signature is a combined staking sig and random beacon sig
@@ -136,7 +134,7 @@ func TestCombinedSignWithNoBeaconKeyV3(t *testing.T) {
 	expectedSig := msig.EncodeSingleSig(encoding.SigTypeStaking, stakingSig)
 
 	// check the signature only has staking sig
-	require.Equal(t, expectedSig, proposal.SigData)
+	require.Equal(t, expectedSig, vote.SigData)
 }
 
 // Test_VerifyQC checks that a QC where either signer list is empty is rejected as invalid

@@ -77,8 +77,8 @@ func (bb *BlockBuilder) AddVersioned(qcView uint64, blockView uint64, qcVersion 
 
 // Proposals returns a list of all proposals added to the BlockBuilder.
 // Returns an error if the blocks do not form a connected tree rooted at genesis.
-func (bb *BlockBuilder) Proposals() ([]*model.SignedProposal, error) {
-	blocks := make([]*model.SignedProposal, 0, len(bb.blockViews))
+func (bb *BlockBuilder) Proposals() ([]*model.Proposal, error) {
+	blocks := make([]*model.Proposal, 0, len(bb.blockViews))
 
 	genesisBlock := makeGenesis()
 	genesisBV := &BlockView{
@@ -99,14 +99,13 @@ func (bb *BlockBuilder) Proposals() ([]*model.SignedProposal, error) {
 		if qc.View+1 != bv.View {
 			lastViewTC = helper.MakeTC(helper.WithTCView(bv.View - 1))
 		}
-		proposal := &model.SignedProposal{
+		proposal := &model.Proposal{
 			Block: &model.Block{
 				View:        bv.View,
 				QC:          qc,
 				PayloadHash: payloadHash,
 			},
 			LastViewTC: lastViewTC,
-			SigData:    nil,
 		}
 		proposal.Block.BlockID = makeBlockID(proposal.Block)
 
@@ -177,7 +176,7 @@ func makeGenesis() *model.CertifiedBlock {
 }
 
 // toBlocks converts the given proposals to slice of blocks
-func toBlocks(proposals []*model.SignedProposal) []*model.Block {
+func toBlocks(proposals []*model.Proposal) []*model.Block {
 	blocks := make([]*model.Block, 0, len(proposals))
 	for _, b := range proposals {
 		blocks = append(blocks, b.Block)
