@@ -1924,9 +1924,16 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 				return nil, fmt.Errorf("transaction result query mode 'compare' is not supported")
 			}
 
+			// If execution data syncing and indexing is disabled, pass nil indexReporter
+			var indexReporter state_synchronization.IndexReporter
+			if builder.executionDataSyncEnabled && builder.executionDataIndexingEnabled {
+				indexReporter = builder.Reporter
+			}
+
 			checkPayerBalanceMode, err := accessNode.ParsePayerBalanceMode(builder.checkPayerBalanceMode)
 			if err != nil {
 				return nil, fmt.Errorf("could not parse payer balance mode: %w", err)
+
 			}
 
 			nodeBackend, err := backend.New(backend.Params{
@@ -1967,16 +1974,11 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 				TxResultQueryMode:   txResultQueryMode,
 				TxResultsIndex:      builder.TxResultsIndex,
 				LastFullBlockHeight: lastFullBlockHeight,
+				IndexReporter:       indexReporter,
 				VersionControl:      builder.VersionControl,
 			})
 			if err != nil {
 				return nil, fmt.Errorf("could not initialize backend: %w", err)
-			}
-
-			// If execution data syncing and indexing is disabled, pass nil indexReporter
-			var indexReporter state_synchronization.IndexReporter
-			if builder.executionDataSyncEnabled && builder.executionDataIndexingEnabled {
-				indexReporter = builder.Reporter
 			}
 
 			engineBuilder, err := rpc.NewBuilder(

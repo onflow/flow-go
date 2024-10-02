@@ -23,6 +23,7 @@ import (
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/counters"
 	"github.com/onflow/flow-go/module/execution"
+	"github.com/onflow/flow-go/module/state_synchronization"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/storage"
 )
@@ -120,6 +121,7 @@ type Params struct {
 	TxResultQueryMode   IndexQueryMode
 	TxResultsIndex      *index.TransactionResultsIndex
 	LastFullBlockHeight *counters.PersistentStrictMonotonicCounter
+	IndexReporter       state_synchronization.IndexReporter
 	VersionControl      *version.VersionControl
 }
 
@@ -246,13 +248,7 @@ func New(params Params) (*Backend, error) {
 		versionControl:    params.VersionControl,
 	}
 
-	txValidator, err := configureTransactionValidator(
-		params.State,
-		params.ChainID,
-		params.AccessMetrics,
-		params.ScriptExecutor,
-		params.CheckPayerBalanceMode,
-	)
+	txValidator, err := configureTransactionValidator(params.State, params.ChainID, params.IndexReporter, params.AccessMetrics, params.ScriptExecutor, params.CheckPayerBalanceMode)
 	if err != nil {
 		return nil, fmt.Errorf("could not create transaction validator: %w", err)
 	}
@@ -319,12 +315,13 @@ func identifierList(ids []string) (flow.IdentifierList, error) {
 func configureTransactionValidator(
 	state protocol.State,
 	chainID flow.ChainID,
+	indexReporter state_synchronization.IndexReporter,
 	transactionMetrics module.TransactionValidationMetrics,
 	executor execution.ScriptExecutor,
 	checkPayerBalanceMode access.PayerBalanceMode,
 ) (*access.TransactionValidator, error) {
 	return access.NewTransactionValidator(
-		access.NewProtocolStateBlocks(state),
+		access.NewProtocolStateBlocks(state, indexReporter),
 		chainID.Chain(),
 		transactionMetrics,
 		access.TransactionValidationOptions{
