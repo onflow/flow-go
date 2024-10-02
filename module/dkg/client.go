@@ -306,7 +306,7 @@ func (c *Client) SubmitEmptyResult() error {
 		return fmt.Errorf("could not sign transaction: %w", err)
 	}
 
-	c.Log.Info().Str("tx_id", tx.ID().Hex()).Msg("sending SubmitResult transaction")
+	c.Log.Info().Str("tx_id", tx.ID().Hex()).Msg("sending SubmitEmptyResult transaction")
 	txID, err := c.SendTransaction(ctx, tx)
 	if err != nil {
 		return fmt.Errorf("failed to submit transaction: %w", err)

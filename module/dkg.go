@@ -35,12 +35,12 @@ type DKGContractClient interface {
 	// SubmitResult submits the final public result of the DKG protocol. This
 	// represents the group public key and the node's local computation of the
 	// public keys for each DKG participant.
-	// SubmitResult must be called strictly after the final phase has ended on happy path.
+	// SubmitResult must be called strictly after the final DKG phase has ended on happy path.
 	SubmitResult(crypto.PublicKey, []crypto.PublicKey, flow.DKGIndexMap) error
 
-	// SubmitEmptyResult submits an empty result of the DKG protocol. This
-	// represents an empty result when the DKG has locally failed.
-	// SubmitEmptyResult must be called strictly after the final phase has ended if DKG has failed.
+	// SubmitEmptyResult submits an empty result of the DKG protocol.
+	// This represents an empty result when the DKG has locally failed.
+	// SubmitEmptyResult must be called strictly after the final phase has ended if DKG has locally failed.
 	SubmitEmptyResult() error
 }
 
