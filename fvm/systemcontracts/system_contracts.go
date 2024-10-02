@@ -331,6 +331,15 @@ func init() {
 		}
 	}
 
+	burnerAddressFunc := func(chain flow.ChainID) flow.Address {
+		switch chain {
+		case flow.Mainnet, flow.Testnet:
+			return nthAddressFunc(FungibleTokenAccountIndex)(chain)
+		default:
+			return serviceAddressFunc(chain)
+		}
+	}
+
 	contractAddressFunc = map[string]func(id flow.ChainID) flow.Address{
 		ContractNameIDTableStaking: epochAddressFunc,
 		ContractNameEpoch:          epochAddressFunc,
@@ -355,7 +364,7 @@ func init() {
 		ContractNameEVM:       serviceAddressFunc,
 		AccountNameEVMStorage: evmStorageEVMFunc,
 
-		ContractNameBurner: serviceAddressFunc,
+		ContractNameBurner: burnerAddressFunc,
 	}
 
 	getSystemContractsForChain := func(chainID flow.ChainID) *SystemContracts {
