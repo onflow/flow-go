@@ -245,6 +245,18 @@ func (s *SafetyRulesTestSuite) TestProduceVote_CommitteeLeaderException() {
 	}
 }
 
+// TestProduceVote_DifferentProposerFromLeader tests that no vote is created if the proposer is different from the leader for
+// current view. This is a byzantine behavior and should be handled by the compliance layer but nevertheless we want to
+// have a sanity check for other code paths like voting on an own proposal created by the current leader.
+func (s *SafetyRulesTestSuite) TestProduceVote_DifferentProposerFromLeader() {
+	s.proposal.Block.ProposerID = unittest.IdentifierFixture() // different proposer
+	vote, err := s.safety.ProduceVote(s.proposal, s.proposal.Block.View)
+	require.Error(s.T(), err)
+	require.False(s.T(), model.IsNoVoteError(err))
+	require.Nil(s.T(), vote)
+	s.persister.AssertNotCalled(s.T(), "PutSafetyData")
+}
+
 // TestProduceVote_NodeEjected tests that no vote is created if block proposer is ejected
 func (s *SafetyRulesTestSuite) TestProduceVote_ProposerEjected() {
 	*s.committee = mocks.DynamicCommittee{}
@@ -773,8 +785,7 @@ func (s *SafetyRulesTestSuite) TestSignOwnProposal_SelfInvalidLeader() {
 	require.Nil(s.T(), vote)
 }
 
-// TestProduceVote_VoteEquivocation verifies that SafetyRules will refuse to sign multiple proposals for the same view.
-// TestProduceVote_VoteEquivocation verifies that SafetyRules will refuse to sign multiple proposals for the same view.
+// TestSignOwnProposal_ProposalEquivocation verifies that SafetyRules will refuse to sign multiple proposals for the same view.
 // We require that leader complies with the following next rules:
 //   - leader proposes once per view
 //   - leader's proposals follow safety rules
