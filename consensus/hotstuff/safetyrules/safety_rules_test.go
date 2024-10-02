@@ -472,8 +472,15 @@ func (s *SafetyRulesTestSuite) TestProduceVote_VoteEquivocation() {
 				helper.WithBlockProposer(s.proposerIdentity.NodeID)),
 		))
 
-	// voting at same view(event different proposal) should result in NoVoteError
+	// voting at same view(even different proposal) should result in NoVoteError
 	vote, err = s.safety.ProduceVote(equivocatingProposal, s.proposal.Block.View)
+	require.True(s.T(), model.IsNoVoteError(err))
+	require.Nil(s.T(), vote)
+
+	s.proposal.Block.ProposerID = s.ourIdentity.NodeID
+
+	// proposing at the same view should result in NoVoteError since we have already voted
+	vote, err = s.safety.SignOwnProposal(s.proposal)
 	require.True(s.T(), model.IsNoVoteError(err))
 	require.Nil(s.T(), vote)
 }
@@ -810,6 +817,12 @@ func (s *SafetyRulesTestSuite) TestSignOwnProposal_ProposalEquivocation() {
 
 	// signing same proposal again should return an error since we have already created a proposal for this view
 	vote, err = s.safety.SignOwnProposal(s.proposal)
+	require.Error(s.T(), err)
+	require.True(s.T(), model.IsNoVoteError(err))
+	require.Nil(s.T(), vote)
+
+	// voting for same view should also return an error since we have already proposed
+	vote, err = s.safety.ProduceVote(s.proposal, s.proposal.Block.View)
 	require.Error(s.T(), err)
 	require.True(s.T(), model.IsNoVoteError(err))
 	require.Nil(s.T(), vote)
