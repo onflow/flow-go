@@ -100,6 +100,59 @@ func (l *NoopLimiter) IsRateLimited(address flow.Address) bool {
 	return false
 }
 
+// PayerBalanceMode represents the mode for checking the payer's balance
+// when validating transactions. It controls whether and how the balance
+// check is performed during transaction validation.
+//
+// There are few modes available:
+//
+//   - `Disabled` - Balance checking is completely disabled. No checks are
+//     performed to verify if the payer has sufficient balance to cover the
+//     transaction fees.
+//   - `WarnCheck` - Balance is checked, and a warning is logged if the payer
+//     does not have enough balance. The transaction is still accepted and
+//     processed regardless of the check result.
+//   - `EnforceCheck` - Balance is checked, and the transaction is rejected if
+//     the payer does not have sufficient balance to cover the transaction fees.
+type PayerBalanceMode int
+
+const (
+	// Disabled indicates that payer balance checking is turned off.
+	Disabled PayerBalanceMode = iota
+
+	// WarnCheck logs a warning if the payer's balance is insufficient, but does not prevent the transaction from being accepted.
+	WarnCheck
+
+	// EnforceCheck prevents the transaction from being accepted if the payer's balance is insufficient to cover transaction fees.
+	EnforceCheck
+)
+
+func ParsePayerBalanceMode(s string) (PayerBalanceMode, error) {
+	switch s {
+	case Disabled.String():
+		return Disabled, nil
+	case WarnCheck.String():
+		return WarnCheck, nil
+	case EnforceCheck.String():
+		return EnforceCheck, nil
+	default:
+		return 0, errors.New("invalid payer balance mode")
+	}
+}
+
+func (m PayerBalanceMode) String() string {
+	switch m {
+	case Disabled:
+		return "disabled"
+	case WarnCheck:
+		return "warn"
+	case EnforceCheck:
+		return "enforce"
+	default:
+		return ""
+	}
+}
+
 type TransactionValidationOptions struct {
 	Expiry                       uint
 	ExpiryBuffer                 uint
@@ -109,7 +162,7 @@ type TransactionValidationOptions struct {
 	CheckScriptsParse            bool
 	MaxTransactionByteSize       uint64
 	MaxCollectionByteSize        uint64
-	CheckPayerBalance            bool
+	CheckPayerBalanceMode        PayerBalanceMode
 }
 
 type ValidationStep struct {
@@ -137,7 +190,7 @@ func NewTransactionValidator(
 	options TransactionValidationOptions,
 	executor execution.ScriptExecutor,
 ) (*TransactionValidator, error) {
-	if options.CheckPayerBalance && executor == nil {
+	if options.CheckPayerBalanceMode != Disabled && executor == nil {
 		return nil, errors.New("transaction validator cannot use checkPayerBalance with nil executor")
 	}
 
@@ -215,7 +268,11 @@ func (v *TransactionValidator) Validate(ctx context.Context, tx *flow.Transactio
 		// prevent the transaction from proceeding.
 		if IsInsufficientBalanceError(err) {
 			v.transactionValidationMetrics.TransactionValidationFailed(metrics.InsufficientBalance)
-			return err
+
+			if v.options.CheckPayerBalanceMode == EnforceCheck {
+				log.Warn().Err(err).Str("transactionID", tx.ID().String()).Str("payerAddress", tx.Payer.String()).Msg("enforce check error")
+				return err
+			}
 		}
 
 		// log and ignore all other errors
@@ -420,7 +477,7 @@ func (v *TransactionValidator) checkSignatureFormat(tx *flow.TransactionBody) er
 }
 
 func (v *TransactionValidator) checkSufficientBalanceToPayForTransaction(ctx context.Context, tx *flow.TransactionBody) error {
-	if !v.options.CheckPayerBalance {
+	if v.options.CheckPayerBalanceMode == Disabled {
 		return nil
 	}
 
