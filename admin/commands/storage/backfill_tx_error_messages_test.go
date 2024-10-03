@@ -158,7 +158,13 @@ func (suite *BackfillTxErrorMessagesSuite) SetupTest() {
 	)
 }
 
+// TestValidateInvalidFormat validates that invalid input formats trigger appropriate error responses.
+// It tests several invalid cases such as:
+// - Invalid "start-height" and "end-height" fields where values are in an incorrect format or out of valid ranges.
+// - Invalid combinations of "start-height" and "end-height" where logical constraints are violated.
+// - Invalid types for "execution-node-ids" which must be a list of strings, and invalid node IDs.
 func (suite *BackfillTxErrorMessagesSuite) TestValidateInvalidFormat() {
+	// invalid start-height
 	suite.Run("invalid start-height field", func() {
 		err := suite.command.Validator(&admin.CommandRequest{
 			Data: map[string]interface{}{
@@ -171,6 +177,7 @@ func (suite *BackfillTxErrorMessagesSuite) TestValidateInvalidFormat() {
 			fmt.Errorf("invalid value for \"n\": %v", 0)))
 	})
 
+	// invalid end-height
 	suite.Run("invalid end-height field", func() {
 		err := suite.command.Validator(&admin.CommandRequest{
 			Data: map[string]interface{}{
@@ -234,6 +241,12 @@ func (suite *BackfillTxErrorMessagesSuite) TestValidateInvalidFormat() {
 	})
 }
 
+// TestValidateValidFormat verifies that valid input parameters result in no validation errors
+// in the command validator.
+// It tests various valid cases, such as:
+// - Default parameters (start-height, end-height, execution-node-ids) are used.
+// - Provided "start-height" and "end-height" values are within expected ranges.
+// - Proper "execution-node-ids" are supplied.
 func (suite *BackfillTxErrorMessagesSuite) TestValidateValidFormat() {
 	// start-height and end-height are not provided, the root block and the latest sealed block
 	// will be used as the start and end heights respectively.
@@ -288,6 +301,8 @@ func (suite *BackfillTxErrorMessagesSuite) TestValidateValidFormat() {
 	})
 }
 
+// TestHandleBackfillTxErrorMessages handles the transaction error backfill logic for different scenarios.
+// It validates behavior when transaction error messages exist or do not exist in the database, handling both default and custom parameters.
 func (suite *BackfillTxErrorMessagesSuite) TestHandleBackfillTxErrorMessages() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -390,6 +405,9 @@ func (suite *BackfillTxErrorMessagesSuite) TestHandleBackfillTxErrorMessages() {
 	})
 }
 
+// TestHandleBackfillTxErrorMessagesErrors tests error scenarios.
+// It validates error handling in cases where transaction results are not indexed, ensuring that
+// appropriate errors are returned when blocks are not indexed.
 func (suite *BackfillTxErrorMessagesSuite) TestHandleBackfillTxErrorMessagesErrors() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -420,6 +438,8 @@ func (suite *BackfillTxErrorMessagesSuite) TestHandleBackfillTxErrorMessagesErro
 	})
 }
 
+// generateResultsForBlock generates mock transaction results for a block.
+// It creates a mix of failed and non-failed transaction results to simulate different transaction outcomes.
 func (suite *BackfillTxErrorMessagesSuite) generateResultsForBlock() []flow.LightTransactionResult {
 	results := make([]flow.LightTransactionResult, 0)
 
@@ -434,6 +454,8 @@ func (suite *BackfillTxErrorMessagesSuite) generateResultsForBlock() []flow.Ligh
 	return results
 }
 
+// mockTransactionErrorMessagesResponseByBlockID mocks the response of transaction error messages
+// by block ID for failed transactions. It simulates API calls that retrieve error messages from execution nodes.
 func (suite *BackfillTxErrorMessagesSuite) mockTransactionErrorMessagesResponseByBlockID(
 	blockID flow.Identifier,
 	results []flow.LightTransactionResult,
@@ -460,6 +482,8 @@ func (suite *BackfillTxErrorMessagesSuite) mockTransactionErrorMessagesResponseB
 		Once()
 }
 
+// mockStoreTxErrorMessages mocks the process of storing transaction error messages in the database
+// after retrieving the results of failed transactions .
 func (suite *BackfillTxErrorMessagesSuite) mockStoreTxErrorMessages(
 	blockID flow.Identifier,
 	results []flow.LightTransactionResult,
@@ -485,6 +509,8 @@ func (suite *BackfillTxErrorMessagesSuite) mockStoreTxErrorMessages(
 	suite.txErrorMessages.On("Store", blockID, txErrorMessages).Return(nil).Once()
 }
 
+// assertAllExpectations asserts that all the expectations set on various mocks are met,
+// ensuring the test results are valid.
 func (suite *BackfillTxErrorMessagesSuite) assertAllExpectations() {
 	suite.snapshot.AssertExpectations(suite.T())
 	suite.state.AssertExpectations(suite.T())
