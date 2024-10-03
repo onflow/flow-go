@@ -50,6 +50,7 @@ import (
 	storagemock "github.com/onflow/flow-go/storage/mock"
 	"github.com/onflow/flow-go/utils/unittest"
 	"github.com/onflow/flow-go/utils/unittest/generator"
+	"github.com/onflow/flow-go/utils/unittest/mocks"
 )
 
 const TEST_MAX_HEIGHT = 100
@@ -1448,10 +1449,6 @@ func (suite *Suite) TestGetLatestFinalizedBlock() {
 	})
 }
 
-type mockCloser struct{}
-
-func (mc *mockCloser) Close() error { return nil }
-
 func (suite *Suite) TestGetExecutionResultByID() {
 	suite.state.On("Sealed").Return(suite.snapshot, nil).Maybe()
 
@@ -1993,7 +1990,7 @@ func (suite *Suite) setupReceipts(block *flow.Block) ([]*flow.ExecutionReceipt, 
 func (suite *Suite) setupConnectionFactory() connection.ConnectionFactory {
 	// create a mock connection factory
 	connFactory := connectionmock.NewConnectionFactory(suite.T())
-	connFactory.On("GetExecutionAPIClient", mock.Anything).Return(suite.execClient, &mockCloser{}, nil)
+	connFactory.On("GetExecutionAPIClient", mock.Anything).Return(suite.execClient, &mocks.MockCloser{}, nil)
 	return connFactory
 }
 

@@ -833,10 +833,6 @@ func (s *Suite) TestProcessBackgroundCalls() {
 	})
 }
 
-type mockCloser struct{}
-
-func (mc *mockCloser) Close() error { return nil }
-
 // TestTransactionResultErrorMessagesAreFetched checks that transaction result error messages
 // are properly fetched from the execution nodes, processed, and stored in the protocol database.
 func (s *Suite) TestTransactionResultErrorMessagesAreFetched() {
@@ -854,7 +850,7 @@ func (s *Suite) TestTransactionResultErrorMessagesAreFetched() {
 
 	// create a mock connection factory
 	connFactory := connectionmock.NewConnectionFactory(s.T())
-	connFactory.On("GetExecutionAPIClient", mock.Anything).Return(execClient, &mockCloser{}, nil)
+	connFactory.On("GetExecutionAPIClient", mock.Anything).Return(execClient, &mocks.MockCloser{}, nil)
 
 	// Mock the protocol snapshot to return fixed execution node IDs.
 	_, fixedENIDs := s.setupReceipts(&block)
