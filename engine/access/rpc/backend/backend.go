@@ -23,6 +23,7 @@ import (
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/counters"
 	"github.com/onflow/flow-go/module/execution"
+	"github.com/onflow/flow-go/module/state_synchronization"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/storage"
 )
@@ -98,7 +99,7 @@ type Params struct {
 	TxResultCacheSize     uint
 	ScriptExecutor        execution.ScriptExecutor
 	ScriptExecutionMode   IndexQueryMode
-	CheckPayerBalance     bool
+	CheckPayerBalanceMode access.PayerBalanceMode
 	EventQueryMode        IndexQueryMode
 	BlockTracker          subscription.BlockTracker
 	SubscriptionHandler   *subscription.SubscriptionHandler
@@ -107,6 +108,7 @@ type Params struct {
 	TxResultQueryMode          IndexQueryMode
 	TxResultsIndex             *index.TransactionResultsIndex
 	LastFullBlockHeight        *counters.PersistentStrictMonotonicCounter
+	IndexReporter              state_synchronization.IndexReporter
 	VersionControl             *version.VersionControl
 	ExecNodeIdentitiesProvider *commonrpc.ExecutionNodeIdentitiesProvider
 }
@@ -222,7 +224,7 @@ func New(params Params) (*Backend, error) {
 		versionControl:    params.VersionControl,
 	}
 
-	txValidator, err := configureTransactionValidator(params.State, params.ChainID, params.AccessMetrics, params.ScriptExecutor, params.CheckPayerBalance)
+	txValidator, err := configureTransactionValidator(params.State, params.ChainID, params.IndexReporter, params.AccessMetrics, params.ScriptExecutor, params.CheckPayerBalanceMode)
 	if err != nil {
 		return nil, fmt.Errorf("could not create transaction validator: %w", err)
 	}
@@ -267,12 +269,13 @@ func New(params Params) (*Backend, error) {
 func configureTransactionValidator(
 	state protocol.State,
 	chainID flow.ChainID,
+	indexReporter state_synchronization.IndexReporter,
 	transactionMetrics module.TransactionValidationMetrics,
 	executor execution.ScriptExecutor,
-	checkPayerBalance bool,
+	checkPayerBalanceMode access.PayerBalanceMode,
 ) (*access.TransactionValidator, error) {
 	return access.NewTransactionValidator(
-		access.NewProtocolStateBlocks(state),
+		access.NewProtocolStateBlocks(state, indexReporter),
 		chainID.Chain(),
 		transactionMetrics,
 		access.TransactionValidationOptions{
@@ -284,7 +287,7 @@ func configureTransactionValidator(
 			MaxGasLimit:                  flow.DefaultMaxTransactionGasLimit,
 			MaxTransactionByteSize:       flow.DefaultMaxTransactionByteSize,
 			MaxCollectionByteSize:        flow.DefaultMaxCollectionByteSize,
-			CheckPayerBalance:            checkPayerBalance,
+			CheckPayerBalanceMode:        checkPayerBalanceMode,
 		},
 		executor,
 	)

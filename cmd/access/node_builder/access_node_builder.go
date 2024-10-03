@@ -27,6 +27,7 @@ import (
 	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/credentials/insecure"
 
+	accessNode "github.com/onflow/flow-go/access"
 	"github.com/onflow/flow-go/admin/commands"
 	stateSyncCommands "github.com/onflow/flow-go/admin/commands/state_synchronization"
 	storageCommands "github.com/onflow/flow-go/admin/commands/storage"
@@ -172,7 +173,7 @@ type AccessNodeConfig struct {
 	registerCacheType                    string
 	registerCacheSize                    uint
 	programCacheSize                     uint
-	checkPayerBalance                    bool
+	checkPayerBalanceMode                string
 	versionControlEnabled                bool
 	storeTxResultErrorMessages           bool
 	stopControlEnabled                   bool
@@ -276,7 +277,7 @@ func DefaultAccessNodeConfig() *AccessNodeConfig {
 		registerCacheType:                    pstorage.CacheTypeTwoQueue.String(),
 		registerCacheSize:                    0,
 		programCacheSize:                     0,
-		checkPayerBalance:                    false,
+		checkPayerBalanceMode:                accessNode.Disabled.String(),
 		versionControlEnabled:                true,
 		storeTxResultErrorMessages:           false,
 		stopControlEnabled:                   false,
@@ -1418,10 +1419,12 @@ func (builder *FlowAccessNodeBuilder) extraFlags() {
 			"program-cache-size",
 			defaultConfig.programCacheSize,
 			"[experimental] number of blocks to cache for cadence programs. use 0 to disable cache. default: 0. Note: this is an experimental feature and may cause nodes to become unstable under certain workloads. Use with caution.")
-		flags.BoolVar(&builder.checkPayerBalance,
-			"check-payer-balance",
-			defaultConfig.checkPayerBalance,
-			"checks that a transaction payer has sufficient balance to pay fees before submitting it to collection nodes")
+
+		// Payer Balance
+		flags.StringVar(&builder.checkPayerBalanceMode,
+			"check-payer-balance-mode",
+			defaultConfig.checkPayerBalanceMode,
+			"flag for payer balance validation that specifies whether or not to enforce the balance check. one of [disabled(default), warn, enforce]")
 	}).ValidateFlags(func() error {
 		if builder.supportsObserver && (builder.PublicNetworkConfig.BindAddress == cmd.NotSet || builder.PublicNetworkConfig.BindAddress == "") {
 			return errors.New("public-network-address must be set if supports-observer is true")
@@ -1482,7 +1485,7 @@ func (builder *FlowAccessNodeBuilder) extraFlags() {
 			}
 		}
 
-		if builder.checkPayerBalance && !builder.executionDataIndexingEnabled {
+		if builder.checkPayerBalanceMode != accessNode.Disabled.String() && !builder.executionDataIndexingEnabled {
 			return errors.New("execution-data-indexing-enabled must be set if check-payer-balance is enabled")
 		}
 
@@ -1814,6 +1817,13 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 
 			return nil
 		}).
+		Module("transaction result error messages storage", func(node *cmd.NodeConfig) error {
+			if builder.storeTxResultErrorMessages {
+				builder.Storage.TransactionResultErrorMessages = bstorage.NewTransactionResultErrorMessages(node.Metrics.Cache, node.DB, bstorage.DefaultCacheSize)
+			}
+
+			return nil
+		}).
 		Component("version control", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 			if !builder.versionControlEnabled {
 				noop := &module.NoopReadyDoneAware{}
@@ -1929,6 +1939,18 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 				return nil, fmt.Errorf("transaction result query mode 'compare' is not supported")
 			}
 
+			// If execution data syncing and indexing is disabled, pass nil indexReporter
+			var indexReporter state_synchronization.IndexReporter
+			if builder.executionDataSyncEnabled && builder.executionDataIndexingEnabled {
+				indexReporter = builder.Reporter
+			}
+
+			checkPayerBalanceMode, err := accessNode.ParsePayerBalanceMode(builder.checkPayerBalanceMode)
+			if err != nil {
+				return nil, fmt.Errorf("could not parse payer balance mode: %w", err)
+
+			}
+
 			preferredENIdentifiers, err := commonrpc.IdentifierList(backendConfig.PreferredExecutionNodeIDs)
 			if err != nil {
 				return nil, fmt.Errorf("failed to convert node id string to Flow Identifier for preferred EN map: %w", err)
@@ -1969,7 +1991,7 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 				TxResultCacheSize:     builder.TxResultCacheSize,
 				ScriptExecutor:        builder.ScriptExecutor,
 				ScriptExecutionMode:   scriptExecMode,
-				CheckPayerBalance:     builder.checkPayerBalance,
+				CheckPayerBalanceMode: checkPayerBalanceMode,
 				EventQueryMode:        eventQueryMode,
 				BlockTracker:          blockTracker,
 				SubscriptionHandler: subscription.NewSubscriptionHandler(
@@ -1983,17 +2005,12 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 				TxResultQueryMode:          txResultQueryMode,
 				TxResultsIndex:             builder.TxResultsIndex,
 				LastFullBlockHeight:        lastFullBlockHeight,
+				IndexReporter:              indexReporter,
 				VersionControl:             builder.VersionControl,
 				ExecNodeIdentitiesProvider: builder.ExecNodeIdentitiesProvider,
 			})
 			if err != nil {
 				return nil, fmt.Errorf("could not initialize backend: %w", err)
-			}
-
-			// If execution data syncing and indexing is disabled, pass nil indexReporter
-			var indexReporter state_synchronization.IndexReporter
-			if builder.executionDataSyncEnabled && builder.executionDataIndexingEnabled {
-				indexReporter = builder.Reporter
 			}
 
 			engineBuilder, err := rpc.NewBuilder(
