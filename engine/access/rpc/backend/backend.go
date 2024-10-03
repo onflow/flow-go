@@ -98,7 +98,7 @@ type Params struct {
 	TxResultCacheSize     uint
 	ScriptExecutor        execution.ScriptExecutor
 	ScriptExecutionMode   IndexQueryMode
-	CheckPayerBalance     bool
+	CheckPayerBalanceMode access.PayerBalanceMode
 	EventQueryMode        IndexQueryMode
 	BlockTracker          subscription.BlockTracker
 	SubscriptionHandler   *subscription.SubscriptionHandler
@@ -222,7 +222,13 @@ func New(params Params) (*Backend, error) {
 		versionControl:    params.VersionControl,
 	}
 
-	txValidator, err := configureTransactionValidator(params.State, params.ChainID, params.AccessMetrics, params.ScriptExecutor, params.CheckPayerBalance)
+	txValidator, err := configureTransactionValidator(
+		params.State,
+		params.ChainID,
+		params.AccessMetrics,
+		params.ScriptExecutor,
+		params.CheckPayerBalanceMode,
+	)
 	if err != nil {
 		return nil, fmt.Errorf("could not create transaction validator: %w", err)
 	}
@@ -269,7 +275,7 @@ func configureTransactionValidator(
 	chainID flow.ChainID,
 	transactionMetrics module.TransactionValidationMetrics,
 	executor execution.ScriptExecutor,
-	checkPayerBalance bool,
+	checkPayerBalanceMode access.PayerBalanceMode,
 ) (*access.TransactionValidator, error) {
 	return access.NewTransactionValidator(
 		access.NewProtocolStateBlocks(state),
@@ -284,7 +290,7 @@ func configureTransactionValidator(
 			MaxGasLimit:                  flow.DefaultMaxTransactionGasLimit,
 			MaxTransactionByteSize:       flow.DefaultMaxTransactionByteSize,
 			MaxCollectionByteSize:        flow.DefaultMaxCollectionByteSize,
-			CheckPayerBalance:            checkPayerBalance,
+			CheckPayerBalanceMode:        checkPayerBalanceMode,
 		},
 		executor,
 	)
