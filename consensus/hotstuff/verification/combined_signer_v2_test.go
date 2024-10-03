@@ -8,8 +8,10 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
+	"github.com/onflow/flow-go/consensus/hotstuff"
 	"github.com/onflow/flow-go/consensus/hotstuff/mocks"
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
+	"github.com/onflow/flow-go/consensus/hotstuff/safetyrules"
 	"github.com/onflow/flow-go/consensus/hotstuff/signature"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
@@ -28,23 +30,26 @@ func TestCombinedSignWithBeaconKey(t *testing.T) {
 	// prepare data
 	beaconKey := unittest.RandomBeaconPriv()
 	pk := beaconKey.PublicKey()
-	view := uint64(20)
+	proposerView := uint64(20)
 
+	proposerIdentity := identities[0]
 	fblock := unittest.BlockFixture()
-	fblock.Header.ProposerID = identities[0].NodeID
-	fblock.Header.View = view
-	block := model.BlockFromFlow(fblock.Header)
+	fblock.Header.ProposerID = proposerIdentity.NodeID
+	fblock.Header.View = proposerView
+	fblock.Header.ParentView = proposerView - 1
+	fblock.Header.LastViewTC = nil
+	proposal := model.ProposalFromFlow(fblock.Header)
 	signerID := fblock.Header.ProposerID
 
 	beaconKeyStore := modulemock.NewRandomBeaconKeyStore(t)
-	beaconKeyStore.On("ByView", view).Return(beaconKey, nil)
+	beaconKeyStore.On("ByView", proposerView).Return(beaconKey, nil)
 
+	ourIdentity := unittest.IdentityFixture()
 	stakingPriv := unittest.StakingPrivKeyFixture()
-	nodeID := &unittest.IdentityFixture().IdentitySkeleton
-	nodeID.NodeID = signerID
-	nodeID.StakingPubKey = stakingPriv.PublicKey()
+	ourIdentity.NodeID = signerID
+	ourIdentity.StakingPubKey = stakingPriv.PublicKey()
 
-	me, err := local.New(*nodeID, stakingPriv)
+	me, err := local.New(ourIdentity.IdentitySkeleton, stakingPriv)
 	require.NoError(t, err)
 	signer := NewCombinedSigner(me, beaconKeyStore)
 
@@ -53,19 +58,32 @@ func TestCombinedSignWithBeaconKey(t *testing.T) {
 
 	committee := &mocks.DynamicCommittee{}
 	committee.On("DKG", mock.Anything).Return(dkg, nil)
+	committee.On("Self").Return(me.NodeID())
+	committee.On("IdentityByBlock", fblock.Header.ID(), fblock.Header.ProposerID).Return(proposerIdentity, nil)
+	committee.On("LeaderForView", proposerView).Return(signerID, nil).Maybe()
 
 	packer := signature.NewConsensusSigDataPacker(committee)
 	verifier := NewCombinedVerifier(committee, packer)
 
-	// check that a created proposal can be verified by a verifier
-	proposal, err := signer.CreateProposal(block)
+	persist := mocks.NewPersister(t)
+	safetyData := &hotstuff.SafetyData{
+		LockedOneChainView:      fblock.Header.ParentView,
+		HighestAcknowledgedView: fblock.Header.ParentView,
+	}
+	persist.On("GetSafetyData", mock.Anything).Return(safetyData, nil).Once()
+	persist.On("PutSafetyData", mock.Anything).Return(nil)
+	safetyRules, err := safetyrules.New(signer, persist, committee)
 	require.NoError(t, err)
 
-	vote := proposal.ProposerVote()
-	err = verifier.VerifyVote(nodeID, vote.SigData, proposal.Block.View, proposal.Block.BlockID)
+	// check that a created proposal can be verified by a verifier
+	vote, err := safetyRules.SignOwnProposal(proposal)
+	require.NoError(t, err)
+	proposal.SigData = vote.SigData
+	err = verifier.VerifyVote(&ourIdentity.IdentitySkeleton, vote.SigData, proposal.Block.View, proposal.Block.BlockID)
 	require.NoError(t, err)
 
 	// check that a created proposal's signature is a combined staking sig and random beacon sig
+	block := proposal.Block
 	msg := MakeVoteMessage(block.View, block.BlockID)
 	stakingSig, err := stakingPriv.Sign(msg, msig.NewBLSHasher(msig.ConsensusVoteTag))
 	require.NoError(t, err)
@@ -80,19 +98,19 @@ func TestCombinedSignWithBeaconKey(t *testing.T) {
 	vote, err = signer.CreateVote(block)
 	require.NoError(t, err)
 
-	err = verifier.VerifyVote(nodeID, vote.SigData, proposal.Block.View, proposal.Block.BlockID)
+	err = verifier.VerifyVote(&ourIdentity.IdentitySkeleton, vote.SigData, proposal.Block.View, proposal.Block.BlockID)
 	require.NoError(t, err)
 
 	// vote on different block should be invalid
 	blockWrongID := *block
 	blockWrongID.BlockID[0]++
-	err = verifier.VerifyVote(nodeID, vote.SigData, blockWrongID.View, blockWrongID.BlockID)
+	err = verifier.VerifyVote(&ourIdentity.IdentitySkeleton, vote.SigData, blockWrongID.View, blockWrongID.BlockID)
 	require.ErrorIs(t, err, model.ErrInvalidSignature)
 
-	// vote with a wrong view should be invalid
+	// vote with a wrong proposerView should be invalid
 	blockWrongView := *block
 	blockWrongView.View++
-	err = verifier.VerifyVote(nodeID, vote.SigData, blockWrongID.View, blockWrongID.BlockID)
+	err = verifier.VerifyVote(&ourIdentity.IdentitySkeleton, vote.SigData, blockWrongID.View, blockWrongID.BlockID)
 	require.ErrorIs(t, err, model.ErrInvalidSignature)
 
 	// vote by different signer should be invalid
@@ -104,7 +122,7 @@ func TestCombinedSignWithBeaconKey(t *testing.T) {
 	// vote with changed signature should be invalid
 	brokenSig := append([]byte{}, vote.SigData...) // copy
 	brokenSig[4]++
-	err = verifier.VerifyVote(nodeID, brokenSig, block.View, block.BlockID)
+	err = verifier.VerifyVote(&ourIdentity.IdentitySkeleton, brokenSig, block.View, block.BlockID)
 	require.ErrorIs(t, err, model.ErrInvalidSignature)
 
 	// Vote from a node that is _not_ part of the Random Beacon committee should be rejected.
@@ -112,7 +130,7 @@ func TestCombinedSignWithBeaconKey(t *testing.T) {
 	// as a sign of an invalid vote and wraps it into a `model.InvalidSignerError`.
 	*dkg = mocks.DKG{} // overwrite DKG mock with a new one
 	dkg.On("KeyShare", signerID).Return(nil, protocol.IdentityNotFoundError{NodeID: signerID})
-	err = verifier.VerifyVote(nodeID, vote.SigData, proposal.Block.View, proposal.Block.BlockID)
+	err = verifier.VerifyVote(&ourIdentity.IdentitySkeleton, vote.SigData, proposal.Block.View, proposal.Block.BlockID)
 	require.True(t, model.IsInvalidSignerError(err))
 }
 
@@ -122,22 +140,24 @@ func TestCombinedSignWithNoBeaconKey(t *testing.T) {
 	// prepare data
 	beaconKey := unittest.RandomBeaconPriv()
 	pk := beaconKey.PublicKey()
-	view := uint64(20)
+	proposerView := uint64(20)
 
 	fblock := unittest.BlockFixture()
-	fblock.Header.View = view
-	block := model.BlockFromFlow(fblock.Header)
+	fblock.Header.View = proposerView
+	fblock.Header.ParentView = proposerView - 1
+	fblock.Header.LastViewTC = nil
+	proposal := model.ProposalFromFlow(fblock.Header)
 	signerID := fblock.Header.ProposerID
 
 	beaconKeyStore := modulemock.NewRandomBeaconKeyStore(t)
-	beaconKeyStore.On("ByView", view).Return(nil, module.ErrNoBeaconKeyForEpoch)
+	beaconKeyStore.On("ByView", proposerView).Return(nil, module.ErrNoBeaconKeyForEpoch)
 
+	ourIdentity := unittest.IdentityFixture()
 	stakingPriv := unittest.StakingPrivKeyFixture()
-	nodeID := &unittest.IdentityFixture().IdentitySkeleton
-	nodeID.NodeID = signerID
-	nodeID.StakingPubKey = stakingPriv.PublicKey()
+	ourIdentity.NodeID = signerID
+	ourIdentity.StakingPubKey = stakingPriv.PublicKey()
 
-	me, err := local.New(*nodeID, stakingPriv)
+	me, err := local.New(ourIdentity.IdentitySkeleton, stakingPriv)
 	require.NoError(t, err)
 	signer := NewCombinedSigner(me, beaconKeyStore)
 
@@ -150,21 +170,35 @@ func TestCombinedSignWithNoBeaconKey(t *testing.T) {
 	// for this failed node, which can be used to verify signature from
 	// this failed node.
 	committee.On("DKG", mock.Anything).Return(dkg, nil)
+	committee.On("Self").Return(me.NodeID())
+	committee.On("IdentityByBlock", fblock.Header.ID(), signerID).Return(ourIdentity, nil)
+	committee.On("LeaderForView", mock.Anything).Return(signerID, nil).Maybe()
 
 	packer := signature.NewConsensusSigDataPacker(committee)
 	verifier := NewCombinedVerifier(committee, packer)
 
-	proposal, err := signer.CreateProposal(block)
+	persist := mocks.NewPersister(t)
+	safetyData := &hotstuff.SafetyData{
+		LockedOneChainView:      fblock.Header.ParentView,
+		HighestAcknowledgedView: fblock.Header.ParentView,
+	}
+	persist.On("GetSafetyData", mock.Anything).Return(safetyData, nil).Once()
+	persist.On("PutSafetyData", mock.Anything).Return(nil)
+	safetyRules, err := safetyrules.New(signer, persist, committee)
 	require.NoError(t, err)
 
-	vote := proposal.ProposerVote()
-	err = verifier.VerifyVote(nodeID, vote.SigData, proposal.Block.View, proposal.Block.BlockID)
+	// check that a created proposal can be verified by a verifier
+	vote, err := safetyRules.SignOwnProposal(proposal)
+	require.NoError(t, err)
+	proposal.SigData = vote.SigData
+
+	err = verifier.VerifyVote(&ourIdentity.IdentitySkeleton, vote.SigData, proposal.Block.View, proposal.Block.BlockID)
 	require.NoError(t, err)
 
 	// As the proposer does not have a Random Beacon Key, it should sign solely with its staking key.
 	// In this case, the SigData should be identical to the staking sig.
 	expectedStakingSig, err := stakingPriv.Sign(
-		MakeVoteMessage(block.View, block.BlockID),
+		MakeVoteMessage(proposal.Block.View, proposal.Block.BlockID),
 		msig.NewBLSHasher(msig.ConsensusVoteTag),
 	)
 	require.NoError(t, err)
