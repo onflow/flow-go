@@ -850,20 +850,6 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 				builder.Storage.LightTransactionResults = bstorage.NewLightTransactionResults(node.Metrics.Cache, node.DB, bstorage.DefaultCacheSize)
 				return nil
 			}).
-			Module("transaction result error messages storage", func(node *cmd.NodeConfig) error {
-				if builder.storeTxResultErrorMessages {
-					builder.Storage.TransactionResultErrorMessages = bstorage.NewTransactionResultErrorMessages(node.Metrics.Cache, node.DB, bstorage.DefaultCacheSize)
-				}
-
-				return nil
-			}).
-			AdminCommand("backfill-tx-error-messages", func(config *cmd.NodeConfig) commands.AdminCommand {
-				return storageCommands.NewBackfillTxErrorMessagesCommand(
-					builder.State,
-					builder.Storage.TransactionResults,
-					builder.Storage.TransactionResultErrorMessages,
-				)
-			}).
 			DependableComponent("execution data indexer", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 				// Note: using a DependableComponent here to ensure that the indexer does not block
 				// other components from starting while bootstrapping the register db since it may
@@ -1791,6 +1777,13 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 			builder.Storage.Events = bstorage.NewEvents(node.Metrics.Cache, node.DB)
 			return nil
 		}).
+		Module("transaction result error messages storage", func(node *cmd.NodeConfig) error {
+			if builder.storeTxResultErrorMessages {
+				builder.Storage.TransactionResultErrorMessages = bstorage.NewTransactionResultErrorMessages(node.Metrics.Cache, node.DB, bstorage.DefaultCacheSize)
+			}
+
+			return nil
+		}).
 		Module("reporter", func(node *cmd.NodeConfig) error {
 			builder.Reporter = index.NewReporter()
 			return nil
@@ -2033,6 +2026,14 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 			builder.FollowerDistributor.AddOnBlockFinalizedConsumer(builder.RpcEng.OnFinalizedBlock)
 
 			return builder.RpcEng, nil
+		}).
+		AdminCommand("backfill-tx-error-messages", func(config *cmd.NodeConfig) commands.AdminCommand {
+			return storageCommands.NewBackfillTxErrorMessagesCommand(
+				builder.State,
+				builder.TxResultsIndex,
+				builder.Storage.TransactionResultErrorMessages,
+				builder.nodeBackend,
+			)
 		}).
 		Component("ingestion engine", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 			var err error
