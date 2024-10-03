@@ -1945,6 +1945,12 @@ func (builder *ObserverServiceBuilder) enqueueRPCServer() {
 			return nil, fmt.Errorf("failed to initialize block tracker: %w", err)
 		}
 
+		// If execution data syncing and indexing is disabled, pass nil indexReporter
+		var indexReporter state_synchronization.IndexReporter
+		if builder.executionDataSyncEnabled && builder.executionDataIndexingEnabled {
+			indexReporter = builder.Reporter
+		}
+
 		backendParams := backend.Params{
 			State:                     node.State,
 			Blocks:                    node.Storage.Blocks,
@@ -1971,6 +1977,7 @@ func (builder *ObserverServiceBuilder) enqueueRPCServer() {
 				builder.stateStreamConf.ResponseLimit,
 				builder.stateStreamConf.ClientSendBufferSize,
 			),
+			IndexReporter:  indexReporter,
 			VersionControl: builder.VersionControl,
 		}
 
@@ -1997,12 +2004,6 @@ func (builder *ObserverServiceBuilder) enqueueRPCServer() {
 			node.RootChainID.Chain())
 		if err != nil {
 			return nil, err
-		}
-
-		// If execution data syncing and indexing is disabled, pass nil indexReporter
-		var indexReporter state_synchronization.IndexReporter
-		if builder.executionDataSyncEnabled && builder.executionDataIndexingEnabled {
-			indexReporter = builder.Reporter
 		}
 
 		engineBuilder, err := rpc.NewBuilder(
