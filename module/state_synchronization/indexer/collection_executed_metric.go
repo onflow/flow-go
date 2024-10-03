@@ -27,8 +27,8 @@ type CollectionExecutedMetricImpl struct {
 	blocks      storage.Blocks
 }
 
-type TransactionsToBlock struct {
-	blockId      flow.Identifier
+type BlockTransactions struct {
+	blockID      flow.Identifier
 	transactions []flow.Identifier
 }
 
@@ -77,7 +77,7 @@ func (c *CollectionExecutedMetricImpl) BlockFinalized(block *flow.Block) {
 	// TODO: lookup actual finalization time by looking at the block finalizing `b`
 	now := time.Now().UTC()
 	blockID := block.ID()
-	txToBlock := TransactionsToBlock{blockId: blockID}
+	txToBlock := BlockTransactions{blockID: blockID}
 
 	// mark all transactions as finalized
 	// TODO: sample to reduce performance overhead
@@ -105,7 +105,7 @@ func (c *CollectionExecutedMetricImpl) BlockFinalized(block *flow.Block) {
 			continue
 		}
 
-		if block.ID() == txToBlock.blockId && len(txToBlock.transactions) != 0 {
+		if block.ID() == txToBlock.blockID && len(txToBlock.transactions) != 0 {
 			for _, t := range txToBlock.transactions {
 				c.accessMetrics.TransactionSealed(t, now)
 			}
