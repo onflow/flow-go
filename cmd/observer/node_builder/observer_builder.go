@@ -1938,6 +1938,12 @@ func (builder *ObserverServiceBuilder) enqueueRPCServer() {
 			return nil, fmt.Errorf("failed to initialize block tracker: %w", err)
 		}
 
+		// If execution data syncing and indexing is disabled, pass nil indexReporter
+		var indexReporter state_synchronization.IndexReporter
+		if builder.executionDataSyncEnabled && builder.executionDataIndexingEnabled {
+			indexReporter = builder.Reporter
+		}
+
 		preferredENIdentifiers, err := commonrpc.IdentifierList(backendConfig.PreferredExecutionNodeIDs)
 		if err != nil {
 			return nil, fmt.Errorf("failed to convert node id string to Flow Identifier for preferred EN map: %w", err)
@@ -1980,6 +1986,7 @@ func (builder *ObserverServiceBuilder) enqueueRPCServer() {
 				builder.stateStreamConf.ResponseLimit,
 				builder.stateStreamConf.ClientSendBufferSize,
 			),
+			IndexReporter:              indexReporter,
 			VersionControl:             builder.VersionControl,
 			ExecNodeIdentitiesProvider: execNodeIdentitiesProvider,
 		}
@@ -2007,12 +2014,6 @@ func (builder *ObserverServiceBuilder) enqueueRPCServer() {
 			node.RootChainID.Chain())
 		if err != nil {
 			return nil, err
-		}
-
-		// If execution data syncing and indexing is disabled, pass nil indexReporter
-		var indexReporter state_synchronization.IndexReporter
-		if builder.executionDataSyncEnabled && builder.executionDataIndexingEnabled {
-			indexReporter = builder.Reporter
 		}
 
 		engineBuilder, err := rpc.NewBuilder(
