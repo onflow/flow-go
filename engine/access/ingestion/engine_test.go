@@ -277,7 +277,7 @@ func (s *Suite) TestOnFinalizedBlockSingle() {
 		}).Once()
 	}
 
-	s.blocks.On("ByID", mock.Anything).Return(block, nil)
+	s.blocks.On("ByID", mock.Anything).Return(&block, nil)
 
 	// process the block through the finalized callback
 	eng.OnFinalizedBlock(&hotstuffBlock)
