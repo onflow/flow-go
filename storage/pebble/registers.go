@@ -65,7 +65,7 @@ func (s *Registers) Get(
 	height uint64,
 ) (flow.RegisterValue, error) {
 	latestHeight := s.LatestHeight()
-	firstHeight := s.FirstHeight()
+	firstHeight := s.calculateFirstHeight(latestHeight)
 	if height > latestHeight || height < firstHeight {
 		return nil, errors.Wrap(
 			storage.ErrHeightNotIndexed,
@@ -157,13 +157,24 @@ func (s *Registers) LatestHeight() uint64 {
 
 // FirstHeight first indexed height found in the store, typically root block for the spork
 func (s *Registers) FirstHeight() uint64 {
-	latestHeight := s.LatestHeight()
-	// Skip pruning if disabled or if this is a new network with insufficient blocks.
+	return s.calculateFirstHeight(s.LatestHeight())
+}
+
+// calculateFirstHeight calculates the first indexed height that is stored in the register index, based on the
+// latest height and the configured pruning threshold. If the latest height is below the pruning threshold, the
+// first indexed height will be the same as the initial height when the store was initialized. If the pruning
+// threshold has been exceeded, the first indexed height is adjusted accordingly.
+//
+// Parameters:
+// - latestHeight: the most recent height of complete registers available.
+//
+// Returns:
+// - The first indexed height, either as the initialized height or adjusted for pruning.
+func (s *Registers) calculateFirstHeight(latestHeight uint64) uint64 {
 	if latestHeight < s.pruneThreshold {
 		return s.firstHeight
 	}
 
-	// Calculate the new prune height and update the first height if necessary.
 	pruneHeight := latestHeight - s.pruneThreshold
 	if pruneHeight < s.firstHeight {
 		return s.firstHeight
