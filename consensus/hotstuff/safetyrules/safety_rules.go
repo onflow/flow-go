@@ -99,7 +99,7 @@ func (r *SafetyRules) ProduceVote(proposal *model.Proposal, curView uint64) (*mo
 	}
 
 	// In case this node is the leader, we can skip the following checks.
-	// • If this node is ejected (check (ii) would fail), voting for any blocks or singing own proposals is of no harm.
+	// • If this node is ejected (check (ii) would fail), voting for any blocks or signing own proposals is of no harm.
 	//   This is because all other honest nodes should have terminated their connection to us, so we are not risking
 	//   to use up the networking bandwidth of honest nodes. This is relevant in case of self-ejection: a node
 	//   operator suspecting their node's keys to be compromised can request for their node to be ejected to prevent

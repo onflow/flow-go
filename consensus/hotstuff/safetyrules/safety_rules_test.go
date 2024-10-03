@@ -770,7 +770,7 @@ func (s *SafetyRulesTestSuite) TestSignOwnProposal() {
 }
 
 // TestSignOwnProposal_ProposalNotSelf tests that we cannot sign a proposal that is not ours. We
-// verify that SafetyRules returns and exception and does not the benign sentinel error NoVoteError.
+// verify that SafetyRules returns an exception and not the benign sentinel error NoVoteError.
 func (s *SafetyRulesTestSuite) TestSignOwnProposal_ProposalNotSelf() {
 	vote, err := s.safety.SignOwnProposal(s.proposal)
 	require.Error(s.T(), err)

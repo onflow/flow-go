@@ -63,7 +63,7 @@ func newSafetyRulesConcurrencyWrapper(safetyRules hotstuff.SafetyRules) *safetyR
 // No errors expected during normal operations
 func (w *safetyRulesConcurrencyWrapper) Sign(unsignedHeader *flow.Header) error {
 	if !w.signingStatus.CompareAndSwap(0, 1) { // value of `signingStatus` is something else than 0
-		return fmt.Errorf("signer has already commenced signing; possebly repeated signer call")
+		return fmt.Errorf("signer has already commenced signing; possibly repeated signer call")
 	} // signer is now in state 1, and this thread is the only one every going to execute the following logic
 
 	// signature for own block is structurally a vote
