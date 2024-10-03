@@ -345,10 +345,6 @@ func (suite *BackfillTxErrorMessagesSuite) TestHandleBackfillTxErrorMessages() {
 		startHeight := 1
 		endHeight := 4
 
-		//suite.allENIDs = unittest.IdentityListFixture(3, unittest.WithRole(flow.RoleExecution))
-		//suite.snapshot.On("Identities", mock.Anything).Return(suite.allENIDs, nil)
-		//suite.state.On("Final").Return(suite.snapshot)
-
 		suite.T().Logf(fmt.Sprintf("%v", suite.allENIDs.NodeIDs()))
 
 		executorID := suite.allENIDs[0].ID()
