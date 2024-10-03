@@ -226,16 +226,33 @@ func (s *SafetyRulesTestSuite) TestProduceVote_InvalidCurrentView() {
 	s.persister.AssertNotCalled(s.T(), "PutSafetyData")
 }
 
-// TestProduceVote_ProposerNotActive tests that no vote is created when a proposal was submitted by an identity which is not part
-// of the committee. Honest network participants should not vote, unless they are authorized to actively contribute to consensus.
-// However, for a BFT implementation, honest nodes myst reject those votes.
-func (s *SafetyRulesTestSuite) TestProduceVote_ProposerNotActive() {
+// TestProduceVote_CommitteeLeaderException verifies that SafetyRules handles unexpected error returns from
+// the DynamicCommittee correctly. Specifically, generic exceptions and `model.ErrViewForUnknownEpoch`
+// returned by the committee when requesting the leader for the block's view is propagated up the call stack.
+// SafetyRules should *not* wrap unexpected exceptions into an expected NoVoteError.
+func (s *SafetyRulesTestSuite) TestProduceVote_CommitteeLeaderException() {
 	*s.committee = mocks.DynamicCommittee{}
-	exception := errors.New("invalid-leader-identity")
-	s.committee.On("LeaderForView", s.proposal.Block.View).Return(nil, exception).Once()
+	for _, exception := range []error{
+		errors.New("invalid-leader-identity"),
+		model.ErrViewForUnknownEpoch,
+	} {
+		s.committee.On("LeaderForView", s.proposal.Block.View).Return(nil, exception).Once()
+		vote, err := s.safety.ProduceVote(s.proposal, s.proposal.Block.View)
+		require.Nil(s.T(), vote)
+		require.ErrorIs(s.T(), err, exception)
+		require.False(s.T(), model.IsNoVoteError(err))
+		s.persister.AssertNotCalled(s.T(), "PutSafetyData")
+	}
+}
 
+// TestProduceVote_DifferentProposerFromLeader tests that no vote is created if the proposer is different from the leader for
+// current view. This is a byzantine behavior and should be handled by the compliance layer but nevertheless we want to
+// have a sanity check for other code paths like voting on an own proposal created by the current leader.
+func (s *SafetyRulesTestSuite) TestProduceVote_DifferentProposerFromLeader() {
+	s.proposal.Block.ProposerID = unittest.IdentifierFixture() // different proposer
 	vote, err := s.safety.ProduceVote(s.proposal, s.proposal.Block.View)
-	require.ErrorIs(s.T(), err, exception)
+	require.Error(s.T(), err)
+	require.False(s.T(), model.IsNoVoteError(err))
 	require.Nil(s.T(), vote)
 	s.persister.AssertNotCalled(s.T(), "PutSafetyData")
 }
@@ -455,8 +472,15 @@ func (s *SafetyRulesTestSuite) TestProduceVote_VoteEquivocation() {
 				helper.WithBlockProposer(s.proposerIdentity.NodeID)),
 		))))
 
-	// voting at same view(event different proposal) should result in NoVoteError
+	// voting at same view(even different proposal) should result in NoVoteError
 	vote, err = s.safety.ProduceVote(equivocatingProposal, s.proposal.Block.View)
+	require.True(s.T(), model.IsNoVoteError(err))
+	require.Nil(s.T(), vote)
+
+	s.proposal.Block.ProposerID = s.ourIdentity.NodeID
+
+	// proposing at the same view should result in NoVoteError since we have already voted
+	vote, err = s.safety.SignOwnProposal(&s.proposal.Proposal)
 	require.True(s.T(), model.IsNoVoteError(err))
 	require.Nil(s.T(), vote)
 }
@@ -736,6 +760,7 @@ func (s *SafetyRulesTestSuite) TestSignOwnProposal() {
 		HighestAcknowledgedView: s.proposal.Block.View,
 	}
 	expectedVote := makeVote(s.proposal.Block)
+	s.committee.On("LeaderForView").Unset()
 	s.committee.On("LeaderForView", s.proposal.Block.View).Return(s.ourIdentity.NodeID, nil).Once()
 	s.signer.On("CreateVote", s.proposal.Block).Return(expectedVote, nil).Once()
 	s.persister.On("PutSafetyData", expectedSafetyData).Return(nil).Once()
@@ -745,7 +770,7 @@ func (s *SafetyRulesTestSuite) TestSignOwnProposal() {
 }
 
 // TestSignOwnProposal_ProposalNotSelf tests that we cannot sign a proposal that is not ours. We
-// verify that SafetyRules returns and exception and does not the benign sentinel error NoVoteError.
+// verify that SafetyRules returns an exception and not the benign sentinel error NoVoteError.
 func (s *SafetyRulesTestSuite) TestSignOwnProposal_ProposalNotSelf() {
 	vote, err := s.safety.SignOwnProposal(&s.proposal.Proposal)
 	require.Error(s.T(), err)
@@ -757,17 +782,17 @@ func (s *SafetyRulesTestSuite) TestSignOwnProposal_ProposalNotSelf() {
 // We verify that SafetyRules returns and exception and does not the benign sentinel error NoVoteError.
 func (s *SafetyRulesTestSuite) TestSignOwnProposal_SelfInvalidLeader() {
 	s.proposal.Block.ProposerID = s.ourIdentity.NodeID
-	exception := errors.New("invalid-signer-identity")
+	otherID := unittest.IdentifierFixture()
+	require.NotEqual(s.T(), otherID, s.ourIdentity.NodeID)
 	s.committee.On("LeaderForView").Unset()
-	s.committee.On("LeaderForView", s.proposal.Block.View).Return(flow.Identifier{}, exception).Once()
+	s.committee.On("LeaderForView", s.proposal.Block.View).Return(otherID, nil).Once()
 	vote, err := s.safety.SignOwnProposal(&s.proposal.Proposal)
-	require.ErrorIs(s.T(), err, exception)
+	require.Error(s.T(), err)
 	require.False(s.T(), model.IsNoVoteError(err))
 	require.Nil(s.T(), vote)
 }
 
-// TestProduceVote_VoteEquivocation verifies that SafetyRules will refuse to sign multiple proposals for the same view.
-// TestProduceVote_VoteEquivocation verifies that SafetyRules will refuse to sign multiple proposals for the same view.
+// TestSignOwnProposal_ProposalEquivocation verifies that SafetyRules will refuse to sign multiple proposals for the same view.
 // We require that leader complies with the following next rules:
 //   - leader proposes once per view
 //   - leader's proposals follow safety rules
@@ -781,6 +806,7 @@ func (s *SafetyRulesTestSuite) TestSignOwnProposal_ProposalEquivocation() {
 		HighestAcknowledgedView: s.proposal.Block.View,
 	}
 	expectedVote := makeVote(s.proposal.Block)
+	s.committee.On("LeaderForView").Unset()
 	s.committee.On("LeaderForView", s.proposal.Block.View).Return(s.ourIdentity.NodeID, nil).Once()
 	s.signer.On("CreateVote", s.proposal.Block).Return(expectedVote, nil).Once()
 	s.persister.On("PutSafetyData", expectedSafetyData).Return(nil).Once()
@@ -791,6 +817,12 @@ func (s *SafetyRulesTestSuite) TestSignOwnProposal_ProposalEquivocation() {
 
 	// signing same proposal again should return an error since we have already created a proposal for this view
 	vote, err = s.safety.SignOwnProposal(&s.proposal.Proposal)
+	require.Error(s.T(), err)
+	require.True(s.T(), model.IsNoVoteError(err))
+	require.Nil(s.T(), vote)
+
+	// voting for same view should also return an error since we have already proposed
+	vote, err = s.safety.ProduceVote(s.proposal, s.proposal.Block.View)
 	require.Error(s.T(), err)
 	require.True(s.T(), model.IsNoVoteError(err))
 	require.Nil(s.T(), vote)
