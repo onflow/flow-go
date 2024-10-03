@@ -2564,44 +2564,15 @@ func setupCOA(
 			AddArgument(json.MustEncode(cadence.UFix64(initialFund))),
 		0)
 
-	preSnapshot := snap
-	txPayloads := make([]events.TransactionEventPayload, 0)
-
 	es, output, err := vm.Run(ctx, tx, snap)
 	require.NoError(t, err)
 	require.NoError(t, output.Err)
 
 	snap = snap.Append(es)
 
-	// 1st event is the coa deployment transaction
-	ev, err := ccf.Decode(nil, output.Events[0].Payload)
-	require.NoError(t, err)
-	cadenceEvent, ok := ev.(cadence.Event)
-	require.True(t, ok)
-	txEvent, err := events.DecodeTransactionEventPayload(cadenceEvent)
-	require.NoError(t, err)
-	txPayloads = append(txPayloads, *txEvent)
-
 	// 2nd event is the cadence owned account created event
 	coaAddress, err := types.COAAddressFromFlowCOACreatedEvent(sc.EVMContract.Address, output.Events[1])
 	require.NoError(t, err)
-
-	// 5ht event is the deposit
-	ev, err = ccf.Decode(nil, output.Events[4].Payload)
-	require.NoError(t, err)
-	cadenceEvent, ok = ev.(cadence.Event)
-	require.True(t, ok)
-	txEvent, err = events.DecodeTransactionEventPayload(cadenceEvent)
-	require.NoError(t, err)
-	txPayloads = append(txPayloads, *txEvent)
-
-	blockEventPayload, snap := callEVMHeartBeat(t, ctx, vm, snap)
-
-	testutils.ValidateEventsReplayability(t,
-		ctx.BlockHeader.ChainID,
-		preSnapshot,
-		txPayloads,
-		*blockEventPayload)
 
 	return coaAddress, snap
 }

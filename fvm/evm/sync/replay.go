@@ -21,33 +21,33 @@ import (
 // OnTransactionReplayed is called when a transaction is replayed
 type OnTransactionReplayed func(gethCommon.Hash)
 
+var emptyChecksum = [types.ChecksumLength]byte{0, 0, 0, 0}
+
 // ReplayBlockExecution re-executes transactions of a block using the
 // events emitted when transactions where executed.
 // it updates the state of the given ledger and uses the trace
 func ReplayBlockExecution(
 	chainID flow.ChainID,
 	storage types.BackendStorage,
-
+	blocks *Blocks,
 	tracer *gethTracer.Tracer,
 	transactionEvents []events.TransactionEventPayload,
 	blockEvent events.BlockEventPayload,
 	validateResults bool,
 	onTransactionReplayed OnTransactionReplayed,
 ) error {
-	// create blocks
-	blocks, err := newBlocks(chainID, storage)
+
+	// create a base block context for all transactions
+	// tx related context values will be replaced during execution
+	ctx, err := CreateBlockContext(chainID, blocks, tracer)
 	if err != nil {
 		return err
 	}
 
-	// create a base block context for all transactions
-	// tx related context values will be replaced during execution
-	ctx := createBlockContext(chainID, blocks, tracer, blockEvent)
-
 	gasConsumedSoFar := uint64(0)
 	txHashes := make(types.TransactionHashes, len(transactionEvents))
 	for idx, tx := range transactionEvents {
-		err = replayTransactionExecution(
+		err := replayTransactionExecution(
 			chainID,
 			ctx,
 			uint(idx),
@@ -77,6 +77,7 @@ func ReplayBlockExecution(
 	}
 	// no need to check the receipt root hash given we have checked the logs and other
 	// values during tx execution.
+
 	return nil
 }
 
@@ -137,7 +138,7 @@ func replayTransactionExecution(
 
 	// validate results
 	if validate {
-		if err := validateResult(res, txEvent); err != nil {
+		if err := ValidateResult(res, txEvent); err != nil {
 			return fmt.Errorf("transaction replay failed (txHash %x): %w", txEvent.Hash, err)
 		}
 	}
@@ -145,7 +146,7 @@ func replayTransactionExecution(
 	return nil
 }
 
-func validateResult(
+func ValidateResult(
 	res *types.Result,
 	txEvent *events.TransactionEventPayload,
 ) error {
@@ -181,23 +182,28 @@ func validateResult(
 	}
 
 	// check the state change checksum
-	if checksum := res.StateChangeChecksum(); checksum != txEvent.StateUpdateChecksum {
+	// if empty checksum skip (supporting blocks before checksum integration)
+	if checksum := res.StateChangeChecksum(); txEvent.StateUpdateChecksum != emptyChecksum &&
+		checksum != txEvent.StateUpdateChecksum {
 		return fmt.Errorf("state change checksum mismatch %x != %x", checksum, txEvent.StateUpdateChecksum)
 	}
 
 	return nil
 }
 
-func createBlockContext(
+func CreateBlockContext(
 	chainID flow.ChainID,
-	blocks types.BlockHashProvider,
+	blocks *Blocks,
 	tracer *gethTracer.Tracer,
-	blkEvent events.BlockEventPayload,
-) types.BlockContext {
+) (types.BlockContext, error) {
+	bm, err := blocks.LatestBlock()
+	if err != nil {
+		return types.BlockContext{}, err
+	}
 	return types.BlockContext{
 		ChainID:                types.EVMChainIDFromFlowChainID(chainID),
-		BlockNumber:            blkEvent.Height,
-		BlockTimestamp:         blkEvent.Timestamp,
+		BlockNumber:            bm.Height,
+		BlockTimestamp:         bm.Timestamp,
 		DirectCallBaseGasUsage: types.DefaultDirectCallBaseGasUsage,
 		DirectCallGasPrice:     types.DefaultDirectCallGasPrice,
 		GasFeeCollector:        types.CoinbaseAddress,
@@ -208,7 +214,7 @@ func createBlockContext(
 			}
 			return hash
 		},
-		Random: blkEvent.PrevRandao,
+		Random: bm.Random,
 		Tracer: tracer,
-	}
+	}, nil
 }

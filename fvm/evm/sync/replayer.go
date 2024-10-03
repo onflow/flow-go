@@ -5,16 +5,8 @@ import (
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/fvm/evm/events"
-	"github.com/onflow/flow-go/fvm/evm/types"
 	"github.com/onflow/flow-go/model/flow"
 )
-
-// StorageProvider provides access to storage at
-// specific time point in history of the EVM chain
-type StorageProvider interface {
-	GetStorageAt(height uint64, txIndex uint64) types.BackendStorage
-	GetStorageByHeight(height uint64) types.BackendStorage
-}
 
 // ChainReplayer consumes EVM transaction and block
 // events, re-execute EVM transaction and follows EVM chain.
@@ -50,13 +42,44 @@ func (cr *ChainReplayer) OnBlockReceived(
 	blockEvent events.BlockEventPayload,
 	onTransactionReplayed OnTransactionReplayed,
 ) error {
-	return ReplayBlockExecution(
+	// prepare storage
+	st, err := cr.storageProvider.GetStorageByHeight(blockEvent.Height)
+	if err != nil {
+		return err
+	}
+	storage := NewEphemeralStorage(st)
+
+	// create blocks
+	blocks, err := NewBlocks(cr.chainID, storage)
+	if err != nil {
+		return err
+	}
+
+	// push the new block
+	err = blocks.PushBlock(
+		blockEvent.Height,
+		blockEvent.Timestamp,
+		blockEvent.PrevRandao,
+		blockEvent.Hash,
+	)
+	if err != nil {
+		return err
+	}
+
+	// replay transactions
+	err = ReplayBlockExecution(
 		cr.chainID,
-		cr.storageProvider.GetStorageByHeight(blockEvent.Height),
+		storage,
+		blocks,
 		cr.tracer,
 		transactionEvents,
 		blockEvent,
 		cr.validateResults,
 		onTransactionReplayed,
 	)
+	if err != nil {
+		return err
+	}
+	// if everything successful commit changes
+	return storage.Commit()
 }
