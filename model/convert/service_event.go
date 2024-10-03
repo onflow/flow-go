@@ -273,8 +273,6 @@ func convertServiceEventEpochCommit(event flow.Event) (*flow.ServiceEvent, error
 	}
 
 	// parse DKG group key and participants
-	// Note: this is read in the same order as `DKGClient.SubmitResult` ie. with the group public key first followed by individual keys
-	// https://github.com/onflow/flow-go/blob/feature/dkg/module/dkg/client.go#L182-L183
 	commit.DKGParticipantKeys, err = convertDKGKeys(cdcDKGKeys.Values...)
 	if err != nil {
 		return nil, fmt.Errorf("could not convert DKG keys: %w", err)
