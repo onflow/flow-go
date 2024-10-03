@@ -27,6 +27,7 @@ import (
 	"github.com/onflow/flow-go/storage"
 	storagemock "github.com/onflow/flow-go/storage/mock"
 	"github.com/onflow/flow-go/utils/unittest"
+	unittestMocks "github.com/onflow/flow-go/utils/unittest/mocks"
 )
 
 const expectedErrorMsg = "expected test error"
@@ -64,10 +65,6 @@ func TestBackfillTxErrorMessages(t *testing.T) {
 	t.Parallel()
 	suite.Run(t, new(BackfillTxErrorMessagesSuite))
 }
-
-type mockCloser struct{}
-
-func (mc *mockCloser) Close() error { return nil }
 
 func (suite *BackfillTxErrorMessagesSuite) SetupTest() {
 	suite.log = zerolog.New(os.Stderr)
@@ -318,7 +315,7 @@ func (suite *BackfillTxErrorMessagesSuite) TestHandleBackfillTxErrorMessages() {
 		suite.reporter.On("HighestIndexedHeight").Return(suite.blockHeadersMap[uint64(suite.blockCount)].Height, nil)
 
 		// Create a mock execution client to simulate communication with execution nodes.
-		suite.connFactory.On("GetExecutionAPIClient", mock.Anything).Return(suite.execClient, &mockCloser{}, nil)
+		suite.connFactory.On("GetExecutionAPIClient", mock.Anything).Return(suite.execClient, &unittestMocks.MockCloser{}, nil)
 
 		for i := suite.nodeRootBlock.Header.Height; i <= suite.blockHeadersMap[uint64(suite.blockCount)].Height; i++ {
 			blockId := suite.blockHeadersMap[i].ID()
@@ -378,7 +375,7 @@ func (suite *BackfillTxErrorMessagesSuite) TestHandleBackfillTxErrorMessages() {
 		suite.reporter.On("HighestIndexedHeight").Return(suite.blockHeadersMap[uint64(endHeight)].Height, nil)
 
 		// Create a mock execution client to simulate communication with execution nodes.
-		suite.connFactory.On("GetExecutionAPIClient", mock.Anything).Return(suite.execClient, &mockCloser{}, nil)
+		suite.connFactory.On("GetExecutionAPIClient", mock.Anything).Return(suite.execClient, &unittestMocks.MockCloser{}, nil)
 
 		for i := startHeight; i <= endHeight; i++ {
 			blockId := suite.blockHeadersMap[uint64(i)].ID()
