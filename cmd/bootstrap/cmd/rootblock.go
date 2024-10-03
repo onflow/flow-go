@@ -146,7 +146,7 @@ func rootBlock(cmd *cobra.Command, args []string) {
 	}
 
 	log.Info().Msg("collecting partner network and staking keys")
-	partnerNodes, err := common.ReadFullPartnerNodeInfos(log, flagPartnerWeights, flagPartnerNodeInfoDir)
+	rawPartnerNodes, err := common.ReadFullPartnerNodeInfos(log, flagPartnerWeights, flagPartnerNodeInfoDir)
 	if err != nil {
 		log.Fatal().Err(err).Msg("failed to read full partner node infos")
 	}
@@ -160,12 +160,19 @@ func rootBlock(cmd *cobra.Command, args []string) {
 
 	log.Info().Msg("")
 
+	log.Info().Msg("remove internal partner nodes")
+	partnerNodes := common.FilterInternalPartners(rawPartnerNodes, internalNodes)
+	log.Info().Msgf("removed %d internal partner nodes", len(rawPartnerNodes)-len(partnerNodes))
+
 	log.Info().Msg("checking constraints on consensus nodes")
 	checkConstraints(partnerNodes, internalNodes)
 	log.Info().Msg("")
 
 	log.Info().Msg("assembling network and staking keys")
-	stakingNodes := mergeNodeInfos(internalNodes, partnerNodes)
+	stakingNodes, err := mergeNodeInfos(internalNodes, partnerNodes)
+	if err != nil {
+		log.Fatal().Err(err).Msgf("failed to merge node infos")
+	}
 	err = common.WriteJSON(model.PathNodeInfosPub, flagOutdir, model.ToPublicNodeInfoList(stakingNodes))
 	if err != nil {
 		log.Fatal().Err(err).Msg("failed to write json")
