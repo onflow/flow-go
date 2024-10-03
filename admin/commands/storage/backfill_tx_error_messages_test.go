@@ -114,8 +114,10 @@ func (suite *BackfillTxErrorMessagesSuite) SetupTest() {
 
 	// Mock the protocol snapshot to return fixed execution node IDs.
 	suite.allENIDs = unittest.IdentityListFixture(1, unittest.WithRole(flow.RoleExecution))
-	suite.snapshot.On("Identities", mock.Anything).Return(suite.allENIDs, nil)
-	suite.T().Logf(fmt.Sprintf("%v", suite.allENIDs.NodeIDs()))
+	suite.snapshot.On("Identities", mock.Anything).Return(
+		func(flow.IdentityFilter[flow.Identity]) (flow.IdentityList, error) {
+			return suite.allENIDs, nil
+		}, nil)
 
 	// create a mock connection factory
 	suite.connFactory = connectionmock.NewConnectionFactory(suite.T())
@@ -345,9 +347,9 @@ func (suite *BackfillTxErrorMessagesSuite) TestHandleBackfillTxErrorMessages() {
 		startHeight := 1
 		endHeight := 4
 
-		suite.T().Logf(fmt.Sprintf("%v", suite.allENIDs.NodeIDs()))
+		suite.allENIDs = unittest.IdentityListFixture(3, unittest.WithRole(flow.RoleExecution))
 
-		executorID := suite.allENIDs[0].ID()
+		executorID := suite.allENIDs[1].ID()
 		req = &admin.CommandRequest{
 			Data: map[string]interface{}{
 				"start-height":       float64(startHeight), // raw json parses to float64
