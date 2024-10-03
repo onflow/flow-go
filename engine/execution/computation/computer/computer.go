@@ -217,8 +217,14 @@ func (e *blockComputer) queueTransactionRequests(
 ) {
 	txnIndex := uint32(0)
 
+	tracer, err := e.vmCtx.EVMTracerCommon.NewEVMTracer(blockHeader.ID())
+	if err != nil {
+		panic(err)
+	}
+
 	collectionCtx := fvm.NewContextFromParent(
 		e.vmCtx,
+		fvm.WithEVMTracer(tracer),
 		fvm.WithBlockHeader(blockHeader),
 		// `protocol.Snapshot` implements `EntropyProvider` interface
 		// Note that `Snapshot` possible errors for RandomSource() are:

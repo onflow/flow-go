@@ -24,12 +24,35 @@ const (
 )
 
 type EVMTracer interface {
-	WithBlockID(identifier flow.Identifier)
 	TxTracer() *tracers.Tracer
 	Collect(txID gethCommon.Hash)
 }
 
+type EVMTracerCommon interface {
+	NewEVMTracer(blockID flow.Identifier) (EVMTracer, error)
+}
+
 var _ EVMTracer = &CallTracer{}
+
+type EVMCallTracerCommon struct {
+	logger       zerolog.Logger
+	tracer       *tracers.Tracer
+	tracerConfig []byte
+	uploader     Uploader
+}
+
+func NewEVMCallTracerCommon(
+	uploader Uploader,
+	logger zerolog.Logger,
+) *EVMCallTracerCommon {
+	tracerConfig := json.RawMessage(tracerConfig)
+
+	return &EVMCallTracerCommon{
+		logger:       logger.With().Str("module", "evm-tracer").Logger(),
+		tracerConfig: tracerConfig,
+		uploader:     uploader,
+	}
+}
 
 type CallTracer struct {
 	logger        zerolog.Logger
@@ -40,7 +63,9 @@ type CallTracer struct {
 	blockID       flow.Identifier
 }
 
-func NewEVMCallTracer(uploader Uploader, logger zerolog.Logger) (*CallTracer, error) {
+func (tc *EVMCallTracerCommon) NewEVMTracer(
+	blockID flow.Identifier,
+) (EVMTracer, error) {
 	tracerConfig := json.RawMessage(tracerConfig)
 
 	tracer, err := tracers.DefaultDirectory.New(tracerName, &tracers.Context{}, tracerConfig)
@@ -49,11 +74,11 @@ func NewEVMCallTracer(uploader Uploader, logger zerolog.Logger) (*CallTracer, er
 	}
 
 	return &CallTracer{
-		logger:        logger.With().Str("module", "evm-tracer").Logger(),
+		logger:        tc.logger.With().Str("block", blockID.String()).Logger(),
 		tracer:        tracer,
 		resultsByTxID: make(map[gethCommon.Hash]json.RawMessage),
 		tracerConfig:  tracerConfig,
-		uploader:      uploader,
+		uploader:      tc.uploader,
 	}, nil
 }
 
