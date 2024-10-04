@@ -60,6 +60,17 @@ func (v *EphemeralView) GetCodeHash(addr gethCommon.Address) (gethCommon.Hash, e
 	return bv.GetCodeHash(addr)
 }
 
+func (v *EphemeralView) GetSlab(addr gethCommon.Address, key gethCommon.Hash) (gethCommon.Hash, error) {
+	bv, err := state.NewBaseView(v.storage, v.rootAddr)
+	if err != nil {
+		return gethCommon.Hash{}, err
+	}
+	return bv.GetState(types.SlotAddress{
+		Address: addr,
+		Key:     key,
+	})
+}
+
 func (v *EphemeralView) DryCall(
 	from gethCommon.Address,
 	to gethCommon.Address,

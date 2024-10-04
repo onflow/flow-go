@@ -26,7 +26,8 @@ func TestInMemoryStorageProvider(t *testing.T) {
 	owner := []byte("owner")
 	key := []byte("key")
 	deltaKey := flow.RegisterID{
-		string(owner), string(key),
+		Owner: string(owner),
+		Key:   string(key),
 	}
 	// block additions
 	for i := 1; i < 11; i++ {
