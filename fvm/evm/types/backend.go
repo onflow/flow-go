@@ -4,7 +4,7 @@ import (
 	"github.com/onflow/flow-go/fvm/environment"
 )
 
-// Storage provides an interface for storage of registers
+// BackendStorage provides an interface for storage of registers
 type BackendStorage interface {
 	environment.ValueStore
 }

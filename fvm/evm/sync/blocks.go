@@ -44,10 +44,18 @@ func NewBlocks(
 	// if empty insert genesis block hash
 	if blocks.bhl.IsEmpty() {
 		genesis := types.GenesisBlock(chainID)
-		err = blocks.PushBlock(
+		err = blocks.PushBlockMeta(
+			NewBlockMeta(
+				genesis.Height,
+				genesis.Timestamp,
+				genesis.PrevRandao,
+			))
+		if err != nil {
+			return nil, err
+		}
+		// push block hash
+		err = blocks.PushBlockHash(
 			genesis.Height,
-			genesis.Timestamp,
-			genesis.PrevRandao,
 			types.GenesisBlockHash(chainID))
 		if err != nil {
 			return nil, err
@@ -56,30 +64,28 @@ func NewBlocks(
 	return blocks, nil
 }
 
-func (b *Blocks) PushBlock(
-	height uint64,
-	timestamp uint64,
-	prevRandao gethCommon.Hash,
-	hash gethCommon.Hash,
+// PushBlock pushes a new block into the storage
+func (b *Blocks) PushBlockMeta(
+	meta *BlockMeta,
 ) error {
 	// check height order
-	if height > 0 {
+	if meta.Height > 0 {
 		bm, err := b.LatestBlock()
 		if err != nil {
 			return err
 		}
-		if height != bm.Height+1 {
-			return fmt.Errorf("out of order block push got: %d, expected %d ", height, bm.Height+1)
+		if meta.Height != bm.Height+1 {
+			return fmt.Errorf("out of order block meta push! got: %d, expected %d ", meta.Height, bm.Height+1)
 		}
 	}
-	err := b.storeBlockMetaData(&BlockMeta{
-		Height:    height,
-		Timestamp: timestamp,
-		Random:    prevRandao,
-	})
-	if err != nil {
-		return err
-	}
+	return b.storeBlockMetaData(meta)
+}
+
+// PushBlockHash pushes a new block block hash into the storage
+func (b *Blocks) PushBlockHash(
+	height uint64,
+	hash gethCommon.Hash,
+) error {
 	return b.bhl.Push(height, hash)
 }
 

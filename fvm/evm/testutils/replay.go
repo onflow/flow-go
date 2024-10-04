@@ -4,7 +4,6 @@ import (
 	"testing"
 
 	"github.com/onflow/atree"
-	gethCommon "github.com/onflow/go-ethereum/common"
 	"github.com/stretchr/testify/require"
 
 	evmEvents "github.com/onflow/flow-go/fvm/evm/events"
@@ -21,21 +20,13 @@ func ValidateEventsReplayability(
 	transactionEvents []evmEvents.TransactionEventPayload,
 	blockEvent evmEvents.BlockEventPayload,
 ) {
-	storage := sync.NewEphemeralStorage(newSnapShotWrapper(preSnapshot))
-
-	// create blocks
-	blocks, err := sync.NewBlocks(chainID, storage)
-	require.NoError(t, err)
-
-	err = sync.ReplayBlockExecution(
+	_, err := sync.ReplayBlockExecution(
 		chainID,
-		storage,
-		blocks,
+		newSnapShotWrapper(preSnapshot),
 		nil,
 		transactionEvents,
 		blockEvent,
 		true,
-		func(h gethCommon.Hash) {},
 	)
 	require.NoError(t, err)
 }

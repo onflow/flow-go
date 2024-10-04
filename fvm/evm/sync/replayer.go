@@ -40,46 +40,20 @@ func NewChainReplayer(
 func (cr *ChainReplayer) OnBlockReceived(
 	transactionEvents []events.TransactionEventPayload,
 	blockEvent events.BlockEventPayload,
-	onTransactionReplayed OnTransactionReplayed,
-) error {
+) (ReplayResults, error) {
 	// prepare storage
-	st, err := cr.storageProvider.GetStorageByHeight(blockEvent.Height)
+	st, err := cr.storageProvider.GetSnapshotAt(blockEvent.Height)
 	if err != nil {
-		return err
-	}
-	storage := NewEphemeralStorage(st)
-
-	// create blocks
-	blocks, err := NewBlocks(cr.chainID, storage)
-	if err != nil {
-		return err
-	}
-
-	// push the new block
-	err = blocks.PushBlock(
-		blockEvent.Height,
-		blockEvent.Timestamp,
-		blockEvent.PrevRandao,
-		blockEvent.Hash,
-	)
-	if err != nil {
-		return err
+		return nil, err
 	}
 
 	// replay transactions
-	err = ReplayBlockExecution(
+	return ReplayBlockExecution(
 		cr.chainID,
-		storage,
-		blocks,
+		st,
 		cr.tracer,
 		transactionEvents,
 		blockEvent,
 		cr.validateResults,
-		onTransactionReplayed,
 	)
-	if err != nil {
-		return err
-	}
-	// if everything successful commit changes
-	return storage.Commit()
 }

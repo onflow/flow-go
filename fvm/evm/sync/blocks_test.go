@@ -36,7 +36,10 @@ func TestBlocks(t *testing.T) {
 	timestamp := uint64(2)
 	random := testutils.RandomCommonHash(t)
 	hash := testutils.RandomCommonHash(t)
-	err = blocks.PushBlock(height, timestamp, random, hash)
+
+	err = blocks.PushBlockMeta(sync.NewBlockMeta(height, timestamp, random))
+	require.NoError(t, err)
+	err = blocks.PushBlockHash(height, hash)
 	require.NoError(t, err)
 
 	// check values

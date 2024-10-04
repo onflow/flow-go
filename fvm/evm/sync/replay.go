@@ -18,36 +18,54 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
-// OnTransactionReplayed is called when a transaction is replayed
-type OnTransactionReplayed func(gethCommon.Hash)
-
 var emptyChecksum = [types.ChecksumLength]byte{0, 0, 0, 0}
+
+type ReplayResults interface {
+	StorageRegisterUpdates() map[flow.RegisterID]flow.RegisterValue
+}
 
 // ReplayBlockExecution re-executes transactions of a block using the
 // events emitted when transactions where executed.
 // it updates the state of the given ledger and uses the trace
 func ReplayBlockExecution(
 	chainID flow.ChainID,
-	storage types.BackendStorage,
-	blocks *Blocks,
+	snapshot BackendStorageSnapshot,
 	tracer *gethTracer.Tracer,
 	transactionEvents []events.TransactionEventPayload,
 	blockEvent events.BlockEventPayload,
 	validateResults bool,
-	onTransactionReplayed OnTransactionReplayed,
-) error {
+) (ReplayResults, error) {
+
+	storage := NewEphemeralStorage(NewReadOnlyStorage(snapshot))
+	// create blocks
+	blocks, err := NewBlocks(chainID, storage)
+	if err != nil {
+		return nil, err
+	}
+
+	// push the new block meta
+	err = blocks.PushBlockMeta(
+		NewBlockMeta(
+			blockEvent.Height,
+			blockEvent.Timestamp,
+			blockEvent.PrevRandao,
+		),
+	)
+	if err != nil {
+		return nil, err
+	}
 
 	// create a base block context for all transactions
 	// tx related context values will be replaced during execution
 	ctx, err := CreateBlockContext(chainID, blocks, tracer)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	gasConsumedSoFar := uint64(0)
 	txHashes := make(types.TransactionHashes, len(transactionEvents))
 	for idx, tx := range transactionEvents {
-		err := replayTransactionExecution(
+		err = replayTransactionExecution(
 			chainID,
 			ctx,
 			uint(idx),
@@ -57,28 +75,38 @@ func ReplayBlockExecution(
 			validateResults,
 		)
 		if err != nil {
-			return err
+			return nil, err
 		}
 		gasConsumedSoFar += tx.GasConsumed
 		txHashes[idx] = tx.Hash
-		onTransactionReplayed(tx.Hash)
 	}
 
 	// check transaction inclusion
 	txHashRoot := gethTypes.DeriveSha(txHashes, gethTrie.NewStackTrie(nil))
 	if txHashRoot != blockEvent.TransactionHashRoot {
-		return fmt.Errorf("transaction root hash doesn't match [%x] != [%x]", txHashRoot, blockEvent.TransactionHashRoot)
+		return nil, fmt.Errorf("transaction root hash doesn't match [%x] != [%x]", txHashRoot, blockEvent.TransactionHashRoot)
 	}
 
 	// check total gas used
 	if blockEvent.TotalGasUsed != gasConsumedSoFar {
-		return fmt.Errorf("total gas used doesn't match [%x] != [%x]", txHashRoot, blockEvent.TransactionHashRoot)
+		return nil, fmt.Errorf("total gas used doesn't match [%x] != [%x]", txHashRoot, blockEvent.TransactionHashRoot)
 
 	}
 	// no need to check the receipt root hash given we have checked the logs and other
 	// values during tx execution.
 
-	return nil
+	// push block hash
+	// we push the block hash after execution, so the behaviour of the blockhash is
+	// identical to the evm.handler.
+	err = blocks.PushBlockHash(
+		blockEvent.Height,
+		blockEvent.Hash,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	return storage, nil
 }
 
 func replayTransactionExecution(
