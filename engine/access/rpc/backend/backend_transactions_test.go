@@ -383,7 +383,7 @@ func (suite *Suite) TestLookupTransactionErrorMessageByTransactionID_HappyPath()
 		suite.execClient.On("GetTransactionErrorMessage", mock.Anything, exeEventReq).Return(exeEventResp, nil).Once()
 
 		// Perform the lookup and assert that the error message is retrieved correctly.
-		errMsg, err := backend.LookupErrorMessageByTransactionID(context.Background(), blockId, failedTxId, block.Header.Height)
+		errMsg, err := backend.LookupErrorMessageByTransactionID(context.Background(), blockId, block.Header.Height, failedTxId)
 		suite.Require().NoError(err)
 		suite.Require().Equal(expectedErrorMsg, errMsg)
 		suite.assertAllExpectations()
@@ -404,7 +404,7 @@ func (suite *Suite) TestLookupTransactionErrorMessageByTransactionID_HappyPath()
 			}, nil).Once()
 
 		// Perform the lookup and assert that the error message is retrieved correctly from storage.
-		errMsg, err := backend.LookupErrorMessageByTransactionID(context.Background(), blockId, failedTxId, block.Header.Height)
+		errMsg, err := backend.LookupErrorMessageByTransactionID(context.Background(), blockId, block.Header.Height, failedTxId)
 		suite.Require().NoError(err)
 		suite.Require().Equal(expectedErrorMsg, errMsg)
 		suite.assertAllExpectations()
@@ -461,7 +461,7 @@ func (suite *Suite) TestLookupTransactionErrorMessageByTransactionID_FailedToFet
 			Return(nil, storage.ErrNotFound).Once()
 
 		// Perform the lookup and expect a "NotFound" error with an empty error message.
-		errMsg, err := backend.LookupErrorMessageByTransactionID(context.Background(), blockId, failedTxId, block.Header.Height)
+		errMsg, err := backend.LookupErrorMessageByTransactionID(context.Background(), blockId, block.Header.Height, failedTxId)
 		suite.Require().Error(err)
 		suite.Require().Equal(codes.NotFound, status.Code(err))
 		suite.Require().Empty(errMsg)
@@ -489,7 +489,7 @@ func (suite *Suite) TestLookupTransactionErrorMessageByTransactionID_FailedToFet
 			}, nil).Once()
 
 		// Perform the lookup and expect no error and an empty error message.
-		errMsg, err := backend.LookupErrorMessageByTransactionID(context.Background(), blockId, failedTxId, block.Header.Height)
+		errMsg, err := backend.LookupErrorMessageByTransactionID(context.Background(), blockId, block.Header.Height, failedTxId)
 		suite.Require().NoError(err)
 		suite.Require().Empty(errMsg)
 		suite.assertAllExpectations()
@@ -526,7 +526,7 @@ func (suite *Suite) TestLookupTransactionErrorMessageByTransactionID_FailedToFet
 		}).Return(nil).Once()
 
 		// Perform the lookup and expect the failed error message to be returned.
-		errMsg, err := backend.LookupErrorMessageByTransactionID(context.Background(), blockId, failedTxId, block.Header.Height)
+		errMsg, err := backend.LookupErrorMessageByTransactionID(context.Background(), blockId, block.Header.Height, failedTxId)
 		suite.Require().NoError(err)
 		suite.Require().Equal(errMsg, FailedErrorMessage)
 		suite.assertAllExpectations()

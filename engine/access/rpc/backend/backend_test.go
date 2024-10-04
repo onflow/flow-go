@@ -110,9 +110,9 @@ func (suite *Suite) SetupTest() {
 	suite.collections = new(storagemock.Collections)
 	suite.receipts = new(storagemock.ExecutionReceipts)
 	suite.results = new(storagemock.ExecutionResults)
+	suite.txErrorMessages = storagemock.NewTransactionResultErrorMessages(suite.T())
 	suite.colClient = new(access.AccessAPIClient)
 	suite.execClient = new(access.ExecutionAPIClient)
-	suite.txErrorMessages = new(storagemock.TransactionResultErrorMessages)
 	suite.transactionResults = storagemock.NewLightTransactionResults(suite.T())
 	suite.events = storagemock.NewEvents(suite.T())
 	suite.chainID = flow.Testnet

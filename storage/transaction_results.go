@@ -42,7 +42,7 @@ type TransactionResultErrorMessages interface {
 	// No errors are expected during normal operation.
 	Store(blockID flow.Identifier, transactionResultErrorMessages []flow.TransactionResultErrorMessage) error
 
-	// Exists returns true if transaction result error messages the given ID has been stored.
+	// Exists returns true if transaction result error messages for the given ID have been stored.
 	//
 	// No errors are expected during normal operation.
 	Exists(blockID flow.Identifier) (bool, error)
