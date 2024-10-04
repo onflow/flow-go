@@ -85,7 +85,7 @@ type Engine struct {
 	// Notifier for queue consumer
 	finalizedBlockNotifier engine.Notifier
 
-	// txResultErrorMessagesChan uses to fetch and store transaction result error messages for block
+	// txResultErrorMessagesChan is used to fetch and store transaction result error messages for blocks
 	txResultErrorMessagesChan chan flow.Identifier
 
 	log     zerolog.Logger   // used to log relevant actions with context
@@ -413,45 +413,51 @@ func (e *Engine) processTransactionResultErrorMessages(ctx irrecoverable.Signale
 //
 // No errors are expected during normal operation.
 func (e *Engine) handleTransactionResultErrorMessages(ctx context.Context, blockID flow.Identifier) error {
-	if e.transactionResultErrorMessages != nil {
-		exists, err := e.transactionResultErrorMessages.Exists(blockID)
+	if e.transactionResultErrorMessages == nil {
+		return nil
+	}
+
+	exists, err := e.transactionResultErrorMessages.Exists(blockID)
+	if err != nil {
+		return fmt.Errorf("could not check existance of transaction result error messages: %w", err)
+	}
+
+	if exists {
+		return nil
+	}
+
+	// retrieves error messages from the backend if they do not already exist in storage
+	execNodes, err := commonrpc.ExecutionNodesForBlockID(
+		ctx,
+		blockID,
+		e.executionReceipts,
+		e.state,
+		e.log,
+		e.preferredENIdentifiers,
+		e.preferredENIdentifiers,
+	)
+	if err != nil {
+		// in case querying nodes by existing execution receipts failed,
+		// will continue with the next execution node from next the execution receipt for that block
+		e.log.Error().Err(err).Msg("failed to retrieve error messages from the backend")
+		return nil
+	}
+
+	req := &execproto.GetTransactionErrorMessagesByBlockIDRequest{
+		BlockId: convert.IdentifierToMessage(blockID),
+	}
+
+	resp, execNode, err := e.backend.GetTransactionErrorMessagesFromAnyEN(ctx, execNodes, req)
+	if err != nil {
+		// continue, we will add functionality to backfill these later
+		e.log.Error().Err(err).Msg("failed to get transaction error messages from execution nodes")
+		return nil
+	}
+
+	if len(resp) > 0 {
+		err = e.storeTransactionResultErrorMessages(blockID, resp, execNode)
 		if err != nil {
-			return fmt.Errorf("could not check existance of transaction result error messages: %w", err)
-		}
-
-		// retrieves error messages from the backend if they do not already exist in storage
-		if !exists {
-			execNodes, err := commonrpc.ExecutionNodesForBlockID(
-				ctx,
-				blockID,
-				e.executionReceipts,
-				e.state,
-				e.log,
-				e.preferredENIdentifiers,
-				e.preferredENIdentifiers,
-			)
-			if err != nil {
-				// in case querying nodes by existing execution receipts failed,
-				// will continue with the next execution node from next the execution receipt for that block
-				return nil
-			}
-
-			req := &execproto.GetTransactionErrorMessagesByBlockIDRequest{
-				BlockId: convert.IdentifierToMessage(blockID),
-			}
-
-			resp, execNode, err := e.backend.GetTransactionErrorMessagesFromAnyEN(ctx, execNodes, req)
-			if err != nil {
-				// continue, we will add functionality to backfill these later
-				return nil
-			}
-
-			if len(resp) > 0 {
-				err = e.storeTransactionResultErrorMessages(blockID, resp, execNode)
-				if err != nil {
-					return fmt.Errorf("could not store error messages: %w", err)
-				}
-			}
+			return fmt.Errorf("could not store error messages: %w", err)
 		}
 	}
 

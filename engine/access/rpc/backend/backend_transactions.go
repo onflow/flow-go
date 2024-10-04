@@ -1000,8 +1000,8 @@ func (b *backendTransactions) tryGetTransactionResultByIndex(
 func (b *backendTransactions) LookupErrorMessageByTransactionID(
 	ctx context.Context,
 	blockID flow.Identifier,
-	transactionID flow.Identifier,
 	height uint64,
+	transactionID flow.Identifier,
 ) (string, error) {
 	if b.txResultErrorMessages != nil {
 		res, err := b.txResultErrorMessages.ByBlockIDTransactionID(blockID, transactionID)

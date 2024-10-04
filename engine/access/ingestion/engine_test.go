@@ -138,7 +138,7 @@ func (s *Suite) SetupTest() {
 	s.receipts = new(storage.ExecutionReceipts)
 	s.transactions = new(storage.Transactions)
 	s.results = new(storage.ExecutionResults)
-	s.txErrorMessages = new(storage.TransactionResultErrorMessages)
+	s.txErrorMessages = storage.NewTransactionResultErrorMessages(s.T())
 	collectionsToMarkFinalized, err := stdmap.NewTimes(100)
 	require.NoError(s.T(), err)
 	collectionsToMarkExecuted, err := stdmap.NewTimes(100)
