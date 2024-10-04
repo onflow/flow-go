@@ -358,13 +358,13 @@ func createTrieFromPayloads(logger zerolog.Logger, payloads []*ledger.Payload) (
 	return newTrie, nil
 }
 
-func newMigrations(
+func newCadence1Migrations(
 	log zerolog.Logger,
 	outputDir string,
 	opts migrators.Options,
 ) []migrators.NamedMigration {
 
-	log.Info().Msg("initializing migrations")
+	log.Info().Msg("initializing Cadence 1.0 migrations ...")
 
 	rwf := reporters.NewReportFileWriterFactory(outputDir, log)
 
@@ -372,6 +372,46 @@ func newMigrations(
 		log,
 		outputDir,
 		rwf,
+		opts,
+	)
+
+	// At the end, fix up storage-used discrepancies
+	namedMigrations = append(
+		namedMigrations,
+		migrators.NamedMigration{
+			Name: "account-usage-migration",
+			Migrate: migrators.NewAccountBasedMigration(
+				log,
+				opts.NWorker,
+				[]migrators.AccountBasedMigration{
+					migrators.NewAccountUsageMigration(rwf),
+				},
+			),
+		},
+	)
+
+	log.Info().Msg("initialized migrations")
+
+	return namedMigrations
+}
+
+func newFixAuthorizationsMigrations(
+	log zerolog.Logger,
+	authorizationFixesPath string,
+	outputDir string,
+	opts migrators.Options,
+) []migrators.NamedMigration {
+
+	log.Info().Msg("initializing authorization fix migrations ...")
+
+	rwf := reporters.NewReportFileWriterFactory(outputDir, log)
+
+	authorizationFixes := readAuthorizationFixes(authorizationFixesPath)
+
+	namedMigrations := migrators.NewFixAuthorizationsMigrations(
+		log,
+		rwf,
+		authorizationFixes,
 		opts,
 	)
 

@@ -8,17 +8,27 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
+// CAUTION Tech Debt: The current implementation does not use SafetyRules, when a leader signs their own proposal.
+// This strongly complicates the safety argument, where enforcing the safety-critical property of only ever voting
+// once per view is distributed across different layers in the software stack.
+// For further details, see issue https://github.com/onflow/flow-go/issues/6389
+
 // SafetyRules is a dedicated module that enforces consensus safety. This component has the sole authority to generate
 // votes and timeouts. It follows voting and timeout rules for creating votes and timeouts respectively.
 // Caller can be sure that created vote or timeout doesn't break safety and can be used in consensus process.
 // SafetyRules relies on hotstuff.Persister to store latest state of hotstuff.SafetyData.
 //
 // The voting rules implemented by SafetyRules are:
-//  1. Replicas vote strictly in increasing rounds
-//  2. Each block has to include a TC or a QC from the previous round.
-//     a. [Happy path] If the previous round resulted in a QC then new QC should extend it.
+//  1. Replicas vote in strictly increasing views. At most one vote can be signed per view.
+//     Caution: The leader's block signature is formally a vote for their own proposal.
+//  2. Each block has to include a TC or a QC from the previous view.
+//     a. [Happy path] If the previous view resulted in a QC then the proposer should include it in their block.
 //     b. [Recovery path] If the previous round did *not* result in a QC, the leader of the
-//     subsequent round *must* include a valid TC for the previous round in its block.
+//     subsequent round *must* include a valid TC for the previous view in its block.
+//
+// Condition 1 guarantees a foundational security theorem for HotStuff (incl. the DiemBFT / Jolteon variant):
+//
+//	THEOREM: For each view, there can be at most 1 certified block.
 //
 // NOT safe for concurrent use.
 type SafetyRules struct {
@@ -75,27 +85,55 @@ func (r *SafetyRules) ProduceVote(proposal *model.Proposal, curView uint64) (*mo
 		return nil, fmt.Errorf("not safe to vote for proposal %x: %w", proposal.Block.BlockID, err)
 	}
 
-	// we expect that only valid proposals are submitted for voting
-	// we need to make sure that proposer is not ejected to decide to vote or not
-	_, err = r.committee.IdentityByBlock(block.BlockID, block.ProposerID)
-	if model.IsInvalidSignerError(err) {
-		// the proposer must be ejected since the proposal has already been validated,
-		// which ensures that the proposer was a valid committee member at the start of the epoch
-		return nil, model.NewNoVoteErrorf("proposer ejected: %w", err)
-	}
+	currentLeader, err := r.committee.LeaderForView(block.View)
 	if err != nil {
-		return nil, fmt.Errorf("internal error retrieving Identity of proposer %x at block %x: %w", block.ProposerID, block.BlockID, err)
+		return nil, fmt.Errorf("expect to have a valid leader for view %d: %w", curView, err)
+	}
+	// This sanity check confirms that the proposal is from the correct leader of this view. In case this sanity check
+	// fails, we return an exception, because the compliance layer should have verified this already. However, proposals
+	// from this node might not go through the compliance engine, and must be signed before anyway. Therefore,
+	// we still include this sanity check, but return an exception because signing a proposal should be only for views
+	// where this node is actually the leader.
+	if block.ProposerID != currentLeader {
+		return nil, fmt.Errorf("incorrect proposal, as proposer %x is different from the leader %x for view %d", block.ProposerID, currentLeader, curView)
 	}
 
-	// Do not produce a vote for blocks where we are not a valid committee member.
-	// HotStuff will ask for a vote for the first block of the next epoch, even if we
-	// have zero weight in the next epoch. Such vote can't be used to produce valid QCs.
-	_, err = r.committee.IdentityByBlock(block.BlockID, r.committee.Self())
-	if model.IsInvalidSignerError(err) {
-		return nil, model.NewNoVoteErrorf("I am not authorized to vote for block %x: %w", block.BlockID, err)
-	}
-	if err != nil {
-		return nil, fmt.Errorf("could not get self identity: %w", err)
+	// In case this node is the leader, we can skip the following checks.
+	// • If this node is ejected (check (ii) would fail), voting for any blocks or signing own proposals is of no harm.
+	//   This is because all other honest nodes should have terminated their connection to us, so we are not risking
+	//   to use up the networking bandwidth of honest nodes. This is relevant in case of self-ejection: a node
+	//   operator suspecting their node's keys to be compromised can request for their node to be ejected to prevent
+	//   malicious actors impersonating their node, launching an attack on the network, and the stake being slashed.
+	//   The self-ejection mechanism corresponds to key-revocation and reduces attack surface for the network and
+	//   the node operator's stake. In case of self-ejection, a node is no longer part of the network, hence it cannot
+	//   harm the network and is no longer subject to slashing for actions during the respective views. Therefore,
+	//   voting or continuing to signing block proposals is of no concern.
+	// • In case this node is the leader, `block.ProposerID` and `r.committee.Self()` are identical. In other words,
+	//   check (i) also verifies that this node itself is not ejected -- the same as check (ii). Hence, also check
+	//   (i) can be skipped with the same reasoning.
+	if currentLeader != r.committee.Self() {
+		// (i): we need to make sure that proposer is not ejected to vote
+		_, err = r.committee.IdentityByBlock(block.BlockID, block.ProposerID)
+		if model.IsInvalidSignerError(err) {
+			// the proposer must be ejected since the proposal has already been validated,
+			// which ensures that the proposer was a valid committee member at the start of the epoch
+			return nil, model.NewNoVoteErrorf("proposer ejected: %w", err)
+		}
+		if err != nil {
+			return nil, fmt.Errorf("internal error retrieving Identity of proposer %x at block %x: %w", block.ProposerID, block.BlockID, err)
+		}
+
+		// (ii) Do not produce a vote for blocks where we are not an active committee member. The HotStuff
+		// state machine may request to vote during grace periods outside the epochs, where the node is
+		// authorized to actively participate. If we voted during those grace periods, we would needlessly
+		// waste network bandwidth, as such votes can't be used to produce valid QCs.
+		_, err = r.committee.IdentityByBlock(block.BlockID, r.committee.Self())
+		if model.IsInvalidSignerError(err) {
+			return nil, model.NewNoVoteErrorf("I am not authorized to vote for block %x: %w", block.BlockID, err)
+		}
+		if err != nil {
+			return nil, fmt.Errorf("could not get self identity: %w", err)
+		}
 	}
 
 	vote, err := r.signer.CreateVote(block)
@@ -172,6 +210,29 @@ func (r *SafetyRules) ProduceTimeout(curView uint64, newestQC *flow.QuorumCertif
 	return timeout, nil
 }
 
+// SignOwnProposal takes an unsigned block proposal and produces a vote for it. Vote is a cryptographic commitment
+// to the proposal. By adding the vote to an unsigned proposal, the caller constructs a signed block proposal. This
+// method has to be used only by the leader, which must be the proposer of the block (or an exception is returned).
+// Implementors must guarantee that:
+// - vote on the proposal satisfies safety rules
+// - maximum one proposal is signed per view
+// Returns:
+//   - (vote, nil): the passed unsigned proposal is a valid one, and it's safe to make a proposal.
+//     Subsequently, leader does _not_ produce any _other_ proposal with the same (or lower) view.
+//   - (nil, model.NoVoteError): according to HotStuff's Safety Rules, it is not safe to sign the given proposal.
+//     This could happen because we have already proposed or timed out for the given view.
+//     This is a sentinel error and _expected_ during normal operation.
+//
+// All other errors are unexpected and potential symptoms of uncovered edge cases or corrupted internal state (fatal).
+func (r *SafetyRules) SignOwnProposal(unsignedProposal *model.Proposal) (*model.Vote, error) {
+	// check that the block is created by us
+	if unsignedProposal.Block.ProposerID != r.committee.Self() {
+		return nil, fmt.Errorf("can't sign proposal for someone else's block")
+	}
+
+	return r.ProduceVote(unsignedProposal, unsignedProposal.Block.View)
+}
+
 // IsSafeToVote checks if this proposal is valid in terms of voting rules, if voting for this proposal won't break safety rules.
 // Expected errors during normal operations:
 //   - NoVoteError if replica already acted during this view (either voted or generated timeout)
@@ -181,7 +242,7 @@ func (r *SafetyRules) IsSafeToVote(proposal *model.Proposal) error {
 	err := r.validateEvidenceForEnteringView(blockView, proposal.Block.QC, proposal.LastViewTC)
 	if err != nil {
 		// As we are expecting the blocks to be pre-validated, any failure here is a symptom of an internal bug.
-		return fmt.Errorf("proposal failed consensus validity check")
+		return fmt.Errorf("proposal failed consensus validity check: %w", err)
 	}
 
 	// This check satisfies voting rule 1

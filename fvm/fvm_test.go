@@ -1,6 +1,7 @@
 package fvm_test
 
 import (
+	"context"
 	"crypto/rand"
 	"encoding/hex"
 	"fmt"
@@ -19,6 +20,8 @@ import (
 	"github.com/onflow/cadence/runtime"
 	"github.com/onflow/cadence/runtime/common"
 	cadenceErrors "github.com/onflow/cadence/runtime/errors"
+	"github.com/onflow/cadence/runtime/interpreter"
+	"github.com/onflow/cadence/runtime/sema"
 	"github.com/onflow/cadence/runtime/tests/utils"
 	"github.com/onflow/crypto"
 	"github.com/stretchr/testify/assert"
@@ -39,6 +42,7 @@ import (
 	"github.com/onflow/flow-go/fvm/storage/snapshot/mock"
 	"github.com/onflow/flow-go/fvm/storage/testutils"
 	"github.com/onflow/flow-go/fvm/systemcontracts"
+	"github.com/onflow/flow-go/fvm/tracing"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -3083,6 +3087,145 @@ func TestEVM(t *testing.T) {
 				},
 				eventTypeIDs,
 			)
+		}),
+	)
+}
+
+func TestAccountCapabilitiesGetEntitledRejection(t *testing.T) {
+
+	// Note: This cannot be tested anymore using a transaction,
+	// because publish method also aborts when trying to publish an entitled capability.
+	// Therefore, test the functionality of the `ValidateAccountCapabilitiesGet` function.
+
+	t.Run("entitled capability", func(t *testing.T) {
+
+		env := environment.NewScriptEnv(
+			context.TODO(),
+			tracing.NewMockTracerSpan(),
+			environment.DefaultEnvironmentParams(),
+			nil,
+		)
+
+		valid, err := env.ValidateAccountCapabilitiesGet(
+			nil,
+			interpreter.EmptyLocationRange,
+			interpreter.AddressValue(common.ZeroAddress),
+			interpreter.NewUnmeteredPathValue(common.PathDomainPublic, "dummy_value"),
+			sema.NewReferenceType(
+				nil,
+				sema.NewEntitlementSetAccess(
+					[]*sema.EntitlementType{
+						sema.MutateType,
+					},
+					sema.Conjunction,
+				),
+				sema.IntType,
+			),
+			nil,
+		)
+		assert.NoError(t, err)
+		assert.False(t, valid)
+	})
+
+	t.Run("non-entitled capability", func(t *testing.T) {
+
+		env := environment.NewScriptEnv(
+			context.TODO(),
+			tracing.NewMockTracerSpan(),
+			environment.DefaultEnvironmentParams(),
+			nil,
+		)
+
+		valid, err := env.ValidateAccountCapabilitiesGet(
+			nil,
+			interpreter.EmptyLocationRange,
+			interpreter.AddressValue(common.ZeroAddress),
+			interpreter.NewUnmeteredPathValue(common.PathDomainPublic, "dummy_value"),
+			sema.NewReferenceType(
+				nil,
+				sema.UnauthorizedAccess,
+				sema.IntType,
+			),
+			nil,
+		)
+		assert.NoError(t, err)
+		assert.True(t, valid)
+	})
+}
+
+func TestAccountCapabilitiesPublishEntitledRejection(t *testing.T) {
+
+	t.Run("entitled capability", newVMTest().
+		run(func(
+			t *testing.T,
+			vm fvm.VM,
+			chain flow.Chain,
+			ctx fvm.Context,
+			snapshotTree snapshot.SnapshotTree,
+		) {
+
+			serviceAddress := chain.ServiceAddress()
+			txBody := flow.NewTransactionBody().
+				SetScript([]byte(`
+					transaction {
+                        prepare(signer: auth(Capabilities, Storage) &Account) {
+                            signer.storage.save(42, to: /storage/number)
+                            let cap = signer.capabilities.storage.issue<auth(Insert) &Int>(/storage/number)
+                            signer.capabilities.publish(cap, at: /public/number)
+                        }
+					}
+				`)).
+				AddAuthorizer(serviceAddress).
+				SetProposalKey(serviceAddress, 0, 0).
+				SetPayer(serviceAddress)
+
+			err := testutil.SignTransactionAsServiceAccount(txBody, 0, chain)
+			require.NoError(t, err)
+
+			_, output, err := vm.Run(
+				ctx,
+				fvm.Transaction(txBody, 0),
+				snapshotTree)
+
+			require.NoError(t, err)
+			require.ErrorAs(t, output.Err, &interpreter.EntitledCapabilityPublishingError{})
+		}),
+	)
+
+	t.Run("non entitled capability", newVMTest().
+		run(func(
+			t *testing.T,
+			vm fvm.VM,
+			chain flow.Chain,
+			ctx fvm.Context,
+			snapshotTree snapshot.SnapshotTree,
+		) {
+
+			serviceAddress := chain.ServiceAddress()
+			txBody := flow.NewTransactionBody().
+				SetScript([]byte(`
+					transaction {
+                        prepare(signer: auth(Capabilities, Storage) &Account) {
+                            signer.storage.save(42, to: /storage/number)
+                            let cap = signer.capabilities.storage.issue<&Int>(/storage/number)
+                            signer.capabilities.publish(cap, at: /public/number)
+                        }
+					}
+				`)).
+				AddAuthorizer(serviceAddress).
+				SetProposalKey(serviceAddress, 0, 0).
+				SetPayer(serviceAddress)
+
+			err := testutil.SignTransactionAsServiceAccount(txBody, 0, chain)
+			require.NoError(t, err)
+
+			_, output, err := vm.Run(
+				ctx,
+				fvm.Transaction(txBody, 0),
+				snapshotTree)
+
+			require.NoError(t, err)
+			require.NoError(t, output.Err)
 		}),
 	)
 }
