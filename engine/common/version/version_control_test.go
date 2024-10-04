@@ -208,6 +208,18 @@ func TestVersionControlInitialization(t *testing.T) {
 			expectedEnd:   latestBlockHeight,
 		},
 		{
+			name:        "start and end version set, middle envent ignored due to override",
+			nodeVersion: "0.0.2",
+			versionEvents: []*flow.SealedVersionBeacon{
+				VersionBeaconEvent(sealedRootBlockHeight+10, flow.VersionBoundary{BlockHeight: sealedRootBlockHeight + 12, Version: "0.0.1"}),
+				VersionBeaconEvent(latestBlockHeight-3, flow.VersionBoundary{BlockHeight: latestBlockHeight - 1, Version: "0.0.3"}),
+				VersionBeaconEvent(latestBlockHeight-10, flow.VersionBoundary{BlockHeight: latestBlockHeight - 8, Version: "0.0.4"}),
+			},
+			overrides:     map[string]struct{}{"0.0.3": {}},
+			expectedStart: sealedRootBlockHeight + 12,
+			expectedEnd:   latestBlockHeight - 9,
+		},
+		{
 			name:        "pre-release version matches overrides",
 			nodeVersion: "0.0.2",
 			versionEvents: []*flow.SealedVersionBeacon{
