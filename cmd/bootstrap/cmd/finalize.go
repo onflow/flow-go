@@ -132,7 +132,10 @@ func finalize(cmd *cobra.Command, args []string) {
 	log.Info().Msg("")
 
 	log.Info().Msg("assembling network and staking keys")
-	stakingNodes := mergeNodeInfos(internalNodes, partnerNodes)
+	stakingNodes, err := mergeNodeInfos(internalNodes, partnerNodes)
+	if err != nil {
+		log.Fatal().Err(err).Msgf("failed to merge internal and partner nodes: %v", err)
+	}
 	log.Info().Msg("")
 
 	// create flow.IdentityList representation of participant set
@@ -312,29 +315,31 @@ func readRootBlockVotes() []*hotstuff.Vote {
 //
 // IMPORTANT: node infos are returned in the canonical ordering, meaning this
 // is safe to use as the input to the DKG and protocol state.
-func mergeNodeInfos(internalNodes, partnerNodes []model.NodeInfo) []model.NodeInfo {
+func mergeNodeInfos(internalNodes, partnerNodes []model.NodeInfo) ([]model.NodeInfo, error) {
 	nodes := append(internalNodes, partnerNodes...)
 
 	// test for duplicate Addresses
 	addressLookup := make(map[string]struct{})
 	for _, node := range nodes {
 		if _, ok := addressLookup[node.Address]; ok {
-			log.Fatal().Str("address", node.Address).Msg("duplicate node address")
+			return nil, fmt.Errorf("duplicate node address: %v", node.Address)
 		}
+		addressLookup[node.Address] = struct{}{}
 	}
 
 	// test for duplicate node IDs
 	idLookup := make(map[flow.Identifier]struct{})
 	for _, node := range nodes {
 		if _, ok := idLookup[node.NodeID]; ok {
-			log.Fatal().Str("NodeID", node.NodeID.String()).Msg("duplicate node ID")
+			return nil, fmt.Errorf("duplicate node ID: %v", node.NodeID.String())
 		}
+		idLookup[node.NodeID] = struct{}{}
 	}
 
 	// sort nodes using the canonical ordering
 	nodes = model.Sort(nodes, flow.Canonical[flow.Identity])
 
-	return nodes
+	return nodes, nil
 }
 
 // readRootBlock reads root block data from disc, this file needs to be prepared with

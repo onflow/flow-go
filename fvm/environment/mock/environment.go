@@ -1756,6 +1756,10 @@ func (_m *Environment) ValidateAccountCapabilitiesGet(inter *interpreter.Interpr
 func (_m *Environment) ValidateAccountCapabilitiesPublish(inter *interpreter.Interpreter, locationRange interpreter.LocationRange, address interpreter.AddressValue, path interpreter.PathValue, capabilityBorrowType *interpreter.ReferenceStaticType) (bool, error) {
 	ret := _m.Called(inter, locationRange, address, path, capabilityBorrowType)
 
+	if len(ret) == 0 {
+		panic("no return value specified for ValidateAccountCapabilitiesPublish")
+	}
+
 	var r0 bool
 	var r1 error
 	if rf, ok := ret.Get(0).(func(*interpreter.Interpreter, interpreter.LocationRange, interpreter.AddressValue, interpreter.PathValue, *interpreter.ReferenceStaticType) (bool, error)); ok {
