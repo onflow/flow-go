@@ -5,19 +5,20 @@ import (
 
 	"github.com/onflow/flow-go/fvm/evm"
 	"github.com/onflow/flow-go/fvm/evm/offchain/storage"
+	"github.com/onflow/flow-go/fvm/evm/types"
 	"github.com/onflow/flow-go/model/flow"
 )
 
 type EphemeralViewProvider struct {
 	chainID         flow.ChainID
 	logger          zerolog.Logger
-	storageProvider storage.StorageProvider
+	storageProvider types.StorageProvider
 }
 
 // NewEphemeralViewProvider constructs a new EphemeralViewProvider
 func NewEphemeralViewProvider(
 	chainID flow.ChainID,
-	sp storage.StorageProvider,
+	sp types.StorageProvider,
 	logger zerolog.Logger,
 ) *EphemeralViewProvider {
 	return &EphemeralViewProvider{

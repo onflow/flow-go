@@ -1,19 +1,14 @@
 package storage
 
 import (
-	"errors"
 	"fmt"
 
 	"github.com/onflow/atree"
+
 	"github.com/onflow/flow-go/fvm/environment"
 	"github.com/onflow/flow-go/fvm/evm/types"
 	"github.com/onflow/flow-go/model/flow"
 )
-
-// BackendStorageSnapshot provides a read only view of registers
-type BackendStorageSnapshot interface {
-	GetValue(owner []byte, key []byte) ([]byte, error)
-}
 
 // EphemeralStorage holds on to register changes instead of applying them directly to
 // the provided backend storage. It can be used for dry running transaction/calls
@@ -103,52 +98,4 @@ func (s *EphemeralStorage) Commit() error {
 	// reset delta
 	s.deltas = make(map[flow.RegisterID]flow.RegisterValue)
 	return nil
-}
-
-// RegisterID creates a RegisterID from owner and key
-func RegisterID(owner []byte, key []byte) flow.RegisterID {
-	return flow.NewRegisterID(flow.BytesToAddress(owner), string(key))
-}
-
-type emptySnapshot struct{}
-
-var _ BackendStorageSnapshot = &emptySnapshot{}
-
-func (s *emptySnapshot) GetValue(owner, key []byte) ([]byte, error) {
-	return nil, nil
-}
-
-var EmptySnapshot = &emptySnapshot{}
-
-type ReadOnlyStorage struct {
-	snapshot BackendStorageSnapshot
-}
-
-var _ types.BackendStorage = &ReadOnlyStorage{}
-
-func NewReadOnlyStorage(snapshot BackendStorageSnapshot) *ReadOnlyStorage {
-	return &ReadOnlyStorage{
-		snapshot,
-	}
-}
-
-// GetValue reads a register value
-func (s *ReadOnlyStorage) GetValue(owner []byte, key []byte) ([]byte, error) {
-	return s.snapshot.GetValue(owner, key)
-}
-
-// SetValue is a noop
-func (s *ReadOnlyStorage) SetValue(owner, key, value []byte) error {
-	return nil
-}
-
-// ValueExists checks if a register exists
-func (s *ReadOnlyStorage) ValueExists(owner []byte, key []byte) (bool, error) {
-	val, err := s.snapshot.GetValue(owner, key)
-	return len(val) > 0, err
-}
-
-// AllocateSlabIndex returns error if called
-func (s *ReadOnlyStorage) AllocateSlabIndex(owner []byte) (atree.SlabIndex, error) {
-	return atree.SlabIndex{}, errors.New("unexpected call received")
 }

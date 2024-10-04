@@ -31,7 +31,7 @@ type ReplayResults interface {
 // it updates the state of the given ledger and uses the trace
 func ReplayBlockExecution(
 	chainID flow.ChainID,
-	snapshot storage.BackendStorageSnapshot,
+	snapshot types.BackendStorageSnapshot,
 	tracer *gethTracer.Tracer,
 	transactionEvents []events.TransactionEventPayload,
 	blockEvent *events.BlockEventPayload,

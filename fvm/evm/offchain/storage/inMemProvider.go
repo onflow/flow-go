@@ -3,25 +3,20 @@ package storage
 import (
 	"fmt"
 
+	"github.com/onflow/flow-go/fvm/evm/types"
 	"github.com/onflow/flow-go/model/flow"
 )
 
-// StorageProvider provides access to storage at
-// specific time point in history of the EVM chain
-type StorageProvider interface {
-	// GetSnapshotAt returns a readonly snapshot of storage
-	// at specific block (start state of the block before executing transactions)
-	GetSnapshotAt(height uint64) (BackendStorageSnapshot, error)
-}
-
-// InMemoryStorageProvider holds on block changes into memory
-// mostly provided for testing
+// InMemoryStorageProvider uses in memory views
+// to track deltas of each block.
+// Mostly used for testing purposes
 type InMemoryStorageProvider struct {
 	views []EphemeralStorage
 }
 
-var _ StorageProvider = &InMemoryStorageProvider{}
+var _ types.StorageProvider = &InMemoryStorageProvider{}
 
+// NewInMemoryStorageProvider constructs a new InMemoryStorageProvider
 func NewInMemoryStorageProvider() *InMemoryStorageProvider {
 	views := make([]EphemeralStorage, 2)
 	views[0] = *NewEphemeralStorage(NewReadOnlyStorage(EmptySnapshot))
@@ -31,13 +26,15 @@ func NewInMemoryStorageProvider() *InMemoryStorageProvider {
 	}
 }
 
-func (sp *InMemoryStorageProvider) GetSnapshotAt(height uint64) (BackendStorageSnapshot, error) {
+// GetSnapshotAt returns the snapshot at specific block height
+func (sp *InMemoryStorageProvider) GetSnapshotAt(height uint64) (types.BackendStorageSnapshot, error) {
 	if int(height) >= len(sp.views) {
 		return nil, fmt.Errorf("storage for the given height (%d) is not available", height)
 	}
 	return &sp.views[height], nil
 }
 
+// OnBlockExecuted accepts delta when a block is executed
 func (sp *InMemoryStorageProvider) OnBlockExecuted(
 	delta map[flow.RegisterID]flow.RegisterValue,
 ) error {
