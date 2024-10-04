@@ -32,18 +32,21 @@ func ReplayBlockExecution(
 	snapshot BackendStorageSnapshot,
 	tracer *gethTracer.Tracer,
 	transactionEvents []events.TransactionEventPayload,
-	blockEvent events.BlockEventPayload,
+	blockEvent *events.BlockEventPayload,
 	validateResults bool,
 ) (ReplayResults, error) {
 
+	// create storage
 	storage := NewEphemeralStorage(NewReadOnlyStorage(snapshot))
-	// create blocks
+
+	// prepare blocks
 	blocks, err := NewBlocks(chainID, storage)
 	if err != nil {
 		return nil, err
 	}
-
 	// push the new block meta
+	// it should be done before execution so block context creation
+	// can be done properly
 	err = blocks.PushBlockMeta(
 		NewBlockMeta(
 			blockEvent.Height,
@@ -81,20 +84,20 @@ func ReplayBlockExecution(
 		txHashes[idx] = tx.Hash
 	}
 
-	// check transaction inclusion
-	txHashRoot := gethTypes.DeriveSha(txHashes, gethTrie.NewStackTrie(nil))
-	if txHashRoot != blockEvent.TransactionHashRoot {
-		return nil, fmt.Errorf("transaction root hash doesn't match [%x] != [%x]", txHashRoot, blockEvent.TransactionHashRoot)
+	if validateResults {
+		// check transaction inclusion
+		txHashRoot := gethTypes.DeriveSha(txHashes, gethTrie.NewStackTrie(nil))
+		if txHashRoot != blockEvent.TransactionHashRoot {
+			return nil, fmt.Errorf("transaction root hash doesn't match [%x] != [%x]", txHashRoot, blockEvent.TransactionHashRoot)
+		}
+
+		// check total gas used
+		if blockEvent.TotalGasUsed != gasConsumedSoFar {
+			return nil, fmt.Errorf("total gas used doesn't match [%x] != [%x]", txHashRoot, blockEvent.TransactionHashRoot)
+		}
+		// no need to check the receipt root hash given we have checked the logs and other
+		// values during tx execution.
 	}
-
-	// check total gas used
-	if blockEvent.TotalGasUsed != gasConsumedSoFar {
-		return nil, fmt.Errorf("total gas used doesn't match [%x] != [%x]", txHashRoot, blockEvent.TransactionHashRoot)
-
-	}
-	// no need to check the receipt root hash given we have checked the logs and other
-	// values during tx execution.
-
 	// push block hash
 	// we push the block hash after execution, so the behaviour of the blockhash is
 	// identical to the evm.handler.

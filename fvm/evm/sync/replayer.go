@@ -39,7 +39,7 @@ func NewChainReplayer(
 // (including all the related transaction executed events)
 func (cr *ChainReplayer) OnBlockReceived(
 	transactionEvents []events.TransactionEventPayload,
-	blockEvent events.BlockEventPayload,
+	blockEvent *events.BlockEventPayload,
 ) (ReplayResults, error) {
 	// prepare storage
 	st, err := cr.storageProvider.GetSnapshotAt(blockEvent.Height)

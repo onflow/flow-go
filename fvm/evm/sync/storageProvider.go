@@ -14,15 +14,17 @@ type StorageProvider interface {
 	GetSnapshotAt(height uint64) (BackendStorageSnapshot, error)
 }
 
+// InMemoryStorageProvider holds on block changes into memory
+// mostly provided for testing
 type InMemoryStorageProvider struct {
 	views []EphemeralStorage
 }
 
 var _ StorageProvider = &InMemoryStorageProvider{}
 
-func NewInMemoryStorageProvider(initSnapshot BackendStorageSnapshot) *InMemoryStorageProvider {
+func NewInMemoryStorageProvider() *InMemoryStorageProvider {
 	views := make([]EphemeralStorage, 2)
-	views[0] = *NewEphemeralStorage(NewReadOnlyStorage(initSnapshot))
+	views[0] = *NewEphemeralStorage(NewReadOnlyStorage(EmptySnapshot))
 	views[1] = *NewEphemeralStorage(&views[0])
 	return &InMemoryStorageProvider{
 		views: views,

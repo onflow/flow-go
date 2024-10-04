@@ -18,7 +18,7 @@ func ValidateEventsReplayability(
 	chainID flow.ChainID,
 	preSnapshot snapshot.StorageSnapshot,
 	transactionEvents []evmEvents.TransactionEventPayload,
-	blockEvent evmEvents.BlockEventPayload,
+	blockEvent *evmEvents.BlockEventPayload,
 ) {
 	_, err := sync.ReplayBlockExecution(
 		chainID,

@@ -13,7 +13,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
-func flowToCadenceEvent(t testing.TB, event flow.Event) cadence.Event {
+func FlowToCadenceEvent(t testing.TB, event flow.Event) cadence.Event {
 	ev, err := ccf.Decode(nil, event.Payload)
 	require.NoError(t, err)
 	cadenceEvent, ok := ev.(cadence.Event)
@@ -31,7 +31,7 @@ func TxEventToPayload(t testing.TB, event flow.Event, evmContract flow.Address) 
 		).ID(),
 		string(event.Type),
 	)
-	cadenceEvent := flowToCadenceEvent(t, event)
+	cadenceEvent := FlowToCadenceEvent(t, event)
 	txEventPayload, err := events.DecodeTransactionEventPayload(cadenceEvent)
 	require.NoError(t, err)
 	return txEventPayload
@@ -48,7 +48,7 @@ func BlockEventToPayload(t testing.TB, event flow.Event, evmContract flow.Addres
 		string(event.Type),
 	)
 
-	cadenceEvent := flowToCadenceEvent(t, event)
+	cadenceEvent := FlowToCadenceEvent(t, event)
 	blockEventPayload, err := events.DecodeBlockEventPayload(cadenceEvent)
 	require.NoError(t, err)
 	return blockEventPayload

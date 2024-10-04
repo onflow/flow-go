@@ -152,7 +152,7 @@ func TestEVMRun(t *testing.T) {
 				require.Empty(t, txEventPayload.ContractAddress)
 
 				// check replayability before appending state
-				testutils.ValidateEventsReplayability(t, chain.ChainID(), preSnapshot, txPayloads, *blockEventPayload)
+				testutils.ValidateEventsReplayability(t, chain.ChainID(), preSnapshot, txPayloads, blockEventPayload)
 
 				// append the state
 				snapshot = snapshot.Append(state)
@@ -550,7 +550,7 @@ func TestEVMBatchRun(t *testing.T) {
 				)
 
 				// check replayability before appending state
-				testutils.ValidateEventsReplayability(t, chain.ChainID(), preSnapshot, txPayloads, *blockEventPayload)
+				testutils.ValidateEventsReplayability(t, chain.ChainID(), preSnapshot, txPayloads, blockEventPayload)
 
 				// retrieve the values
 				retrieveCode := []byte(fmt.Sprintf(
@@ -1045,7 +1045,7 @@ func TestEVMAddressDeposit(t *testing.T) {
 			)
 
 			// check replayability before appending state
-			testutils.ValidateEventsReplayability(t, chain.ChainID(), preSnapshot, txPayloads, *blockEventPayload)
+			testutils.ValidateEventsReplayability(t, chain.ChainID(), preSnapshot, txPayloads, blockEventPayload)
 
 		})
 }

@@ -10,7 +10,7 @@ import (
 )
 
 func TestInMemoryStorageProvider(t *testing.T) {
-	sp := sync.NewInMemoryStorageProvider(sync.EmptySnapshot)
+	sp := sync.NewInMemoryStorageProvider()
 
 	// at start
 	_, err := sp.GetSnapshotAt(0)
