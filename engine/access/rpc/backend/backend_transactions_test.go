@@ -416,13 +416,12 @@ func (suite *Suite) TestLookupTransactionErrorMessageByTransactionID_HappyPath()
 // It tests three cases:
 // 1. The transaction is not found in the transaction results, leading to a "NotFound" error.
 // 2. The transaction result is not failed, and the error message is empty.
-// 3. The transaction result is failed, and the error message is stored and returned.
+// 3. The transaction result is failed, and the error message "failed" are returned.
 func (suite *Suite) TestLookupTransactionErrorMessageByTransactionID_FailedToFetch() {
 	block := unittest.BlockFixture()
 	blockId := block.ID()
 	failedTx := unittest.TransactionFixture()
 	failedTxId := failedTx.ID()
-	failedTxIndex := uint32(0)
 
 	// Setup mock receipts and execution node identities.
 	_, fixedENIDs := suite.setupReceipts(&block)
@@ -457,7 +456,7 @@ func (suite *Suite) TestLookupTransactionErrorMessageByTransactionID_FailedToFet
 		// Setup mock that the transaction and tx error message is not found in the storage.
 		suite.txErrorMessages.On("ByBlockIDTransactionID", blockId, failedTxId).
 			Return(nil, storage.ErrNotFound).Once()
-		suite.transactionResults.On("ByBlockID", blockId).
+		suite.transactionResults.On("ByBlockIDTransactionID", blockId, failedTxId).
 			Return(nil, storage.ErrNotFound).Once()
 
 		// Perform the lookup and expect a "NotFound" error with an empty error message.
@@ -479,13 +478,11 @@ func (suite *Suite) TestLookupTransactionErrorMessageByTransactionID_FailedToFet
 			Return(nil, storage.ErrNotFound).Once()
 
 		// Setup mock that the transaction result exists and is not failed.
-		suite.transactionResults.On("ByBlockID", blockId).
-			Return([]flow.LightTransactionResult{
-				{
-					TransactionID:   failedTxId,
-					Failed:          false,
-					ComputationUsed: 0,
-				},
+		suite.transactionResults.On("ByBlockIDTransactionID", blockId, failedTxId).
+			Return(&flow.LightTransactionResult{
+				TransactionID:   failedTxId,
+				Failed:          false,
+				ComputationUsed: 0,
 			}, nil).Once()
 
 		// Perform the lookup and expect no error and an empty error message.
@@ -506,24 +503,12 @@ func (suite *Suite) TestLookupTransactionErrorMessageByTransactionID_FailedToFet
 			Return(nil, storage.ErrNotFound).Once()
 
 		// Setup mock that the transaction result exists and is failed.
-		suite.transactionResults.On("ByBlockID", blockId).
-			Return([]flow.LightTransactionResult{
-				{
-					TransactionID:   failedTxId,
-					Failed:          true,
-					ComputationUsed: 0,
-				},
+		suite.transactionResults.On("ByBlockIDTransactionID", blockId, failedTxId).
+			Return(&flow.LightTransactionResult{
+				TransactionID:   failedTxId,
+				Failed:          true,
+				ComputationUsed: 0,
 			}, nil).Once()
-
-		// Setup mock storing the transaction error message after retrieving the failed result.
-		suite.txErrorMessages.On("Store", blockId, []flow.TransactionResultErrorMessage{
-			{
-				TransactionID: failedTxId,
-				ExecutorID:    flow.ZeroID,
-				ErrorMessage:  FailedErrorMessage,
-				Index:         failedTxIndex,
-			},
-		}).Return(nil).Once()
 
 		// Perform the lookup and expect the failed error message to be returned.
 		errMsg, err := backend.LookupErrorMessageByTransactionID(context.Background(), blockId, block.Header.Height, failedTxId)
@@ -611,7 +596,7 @@ func (suite *Suite) TestLookupTransactionErrorMessageByIndex_HappyPath() {
 // It tests three cases:
 // 1. The transaction is not found in the transaction results, leading to a "NotFound" error.
 // 2. The transaction result is not failed, and the error message is empty.
-// 3. The transaction result is failed, and the error message is stored and returned.
+// 3. The transaction result is failed, and the error message "failed" are returned.
 func (suite *Suite) TestLookupTransactionErrorMessageByIndex_FailedToFetch() {
 	block := unittest.BlockFixture()
 	blockId := block.ID()
@@ -709,17 +694,6 @@ func (suite *Suite) TestLookupTransactionErrorMessageByIndex_FailedToFetch() {
 				Failed:          true,
 				ComputationUsed: 0,
 			}, nil).Once()
-
-		// Setup mock storing the transaction error message after retrieving the failed result.
-		suite.txErrorMessages.On("Store", blockId, []flow.TransactionResultErrorMessage{
-			{
-				TransactionID: failedTxId,
-				ExecutorID:    flow.ZeroID,
-				ErrorMessage:  FailedErrorMessage,
-				Index:         failedTxIndex,
-			},
-		}).
-			Return(nil).Once()
 
 		// Perform the lookup and expect the failed error message to be returned.
 		errMsg, err := backend.LookupErrorMessageByIndex(context.Background(), blockId, block.Header.Height, failedTxIndex)
@@ -838,7 +812,7 @@ func (suite *Suite) TestLookupTransactionErrorMessagesByBlockID_HappyPath() {
 // It tests three cases:
 // 1. The transaction is not found in the transaction results, leading to a "NotFound" error.
 // 2. The transaction result is not failed, and the error message is empty.
-// 3. The transaction result is failed, and the error message is stored and returned.
+// 3. The transaction result is failed, and the error message "failed" are returned.
 func (suite *Suite) TestLookupTransactionErrorMessagesByBlockID_FailedToFetch() {
 	block := unittest.BlockFixture()
 	blockId := block.ID()
@@ -946,30 +920,22 @@ func (suite *Suite) TestLookupTransactionErrorMessagesByBlockID_FailedToFetch() 
 		suite.transactionResults.On("ByBlockID", blockId).
 			Return(failedResultsByBlockID, nil).Once()
 
-		// Setup mock storing the transaction error messages after retrieving the failed result.
-		var expectedStoreTxErrorMessages []flow.TransactionResultErrorMessage
-		for i, result := range failedResultsByBlockID {
+		// Setup mock expected the transaction error messages after retrieving the failed result.
+		expectedTxErrorMessages := make(map[flow.Identifier]string)
+		for _, result := range failedResultsByBlockID {
 			if result.Failed {
-				expectedStoreTxErrorMessages = append(expectedStoreTxErrorMessages,
-					flow.TransactionResultErrorMessage{
-						TransactionID: result.TransactionID,
-						ErrorMessage:  FailedErrorMessage,
-						Index:         uint32(i),
-						ExecutorID:    flow.ZeroID,
-					})
+				expectedTxErrorMessages[result.TransactionID] = FailedErrorMessage
 			}
 		}
-		suite.txErrorMessages.On("Store", blockId, expectedStoreTxErrorMessages).
-			Return(nil).Once()
 
 		// Perform the lookup and expect the failed error messages to be returned.
 		errMsg, err := backend.LookupErrorMessagesByBlockID(context.Background(), blockId, block.Header.Height)
 		suite.Require().NoError(err)
-		suite.Require().Len(errMsg, len(expectedStoreTxErrorMessages))
-		for _, expected := range expectedStoreTxErrorMessages {
-			errMsg, ok := errMsg[expected.TransactionID]
+		suite.Require().Len(errMsg, len(expectedTxErrorMessages))
+		for txID, expectedMessage := range expectedTxErrorMessages {
+			actualMessage, ok := errMsg[txID]
 			suite.Require().True(ok)
-			suite.Assert().Equal(expected.ErrorMessage, errMsg)
+			suite.Assert().Equal(expectedMessage, actualMessage)
 		}
 		suite.assertAllExpectations()
 	})
