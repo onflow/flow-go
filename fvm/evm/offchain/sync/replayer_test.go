@@ -10,7 +10,8 @@ import (
 	"github.com/onflow/flow-go/fvm/evm/emulator"
 	"github.com/onflow/flow-go/fvm/evm/events"
 	"github.com/onflow/flow-go/fvm/evm/handler"
-	"github.com/onflow/flow-go/fvm/evm/sync"
+	"github.com/onflow/flow-go/fvm/evm/offchain/storage"
+	"github.com/onflow/flow-go/fvm/evm/offchain/sync"
 	"github.com/onflow/flow-go/fvm/evm/testutils"
 	"github.com/onflow/flow-go/fvm/evm/types"
 	"github.com/onflow/flow-go/fvm/systemcontracts"
@@ -69,7 +70,7 @@ func TestChainReplay(t *testing.T) {
 	}
 	// How do you expose the init estate
 
-	sp := sync.NewInMemoryStorageProvider()
+	sp := storage.NewInMemoryStorageProvider()
 	cr := sync.NewChainReplayer(chainID, sp, zerolog.Logger{}, nil, true)
 
 	_, err := cr.OnBlockReceived(txEventPayloads, blockEventPayload)

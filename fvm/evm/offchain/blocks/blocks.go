@@ -1,4 +1,4 @@
-package sync
+package blocks
 
 import (
 	"fmt"
@@ -45,7 +45,7 @@ func NewBlocks(
 	if blocks.bhl.IsEmpty() {
 		genesis := types.GenesisBlock(chainID)
 		err = blocks.PushBlockMeta(
-			NewBlockMeta(
+			NewMeta(
 				genesis.Height,
 				genesis.Timestamp,
 				genesis.PrevRandao,
@@ -66,7 +66,7 @@ func NewBlocks(
 
 // PushBlock pushes a new block into the storage
 func (b *Blocks) PushBlockMeta(
-	meta *BlockMeta,
+	meta *Meta,
 ) error {
 	// check height order
 	if meta.Height > 0 {
@@ -89,7 +89,7 @@ func (b *Blocks) PushBlockHash(
 	return b.bhl.Push(height, hash)
 }
 
-func (b *Blocks) LatestBlock() (*BlockMeta, error) {
+func (b *Blocks) LatestBlock() (*Meta, error) {
 	return b.loadBlockMetaData()
 }
 
@@ -100,7 +100,7 @@ func (b *Blocks) BlockHash(height uint64) (gethCommon.Hash, error) {
 }
 
 // storeBlockMetaData stores the block meta data into storage
-func (b *Blocks) storeBlockMetaData(bm *BlockMeta) error {
+func (b *Blocks) storeBlockMetaData(bm *Meta) error {
 	// store the encoded data into backend
 	return b.storage.SetValue(
 		b.rootAddress[:],
@@ -110,7 +110,7 @@ func (b *Blocks) storeBlockMetaData(bm *BlockMeta) error {
 }
 
 // loadBlockMetaData loads the block meta data from the storage
-func (b *Blocks) loadBlockMetaData() (*BlockMeta, error) {
+func (b *Blocks) loadBlockMetaData() (*Meta, error) {
 	data, err := b.storage.GetValue(
 		b.rootAddress[:],
 		[]byte(BlockStoreLatestBlockMetaKey),
@@ -118,5 +118,5 @@ func (b *Blocks) loadBlockMetaData() (*BlockMeta, error) {
 	if err != nil {
 		return nil, err
 	}
-	return BlockMetaFromEncoded(data)
+	return MetaFromEncoded(data)
 }

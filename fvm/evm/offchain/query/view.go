@@ -1,4 +1,4 @@
-package sync
+package query
 
 import (
 	"math/big"
@@ -12,6 +12,9 @@ import (
 	"github.com/onflow/flow-go/fvm/evm"
 	"github.com/onflow/flow-go/fvm/evm/emulator"
 	"github.com/onflow/flow-go/fvm/evm/emulator/state"
+	"github.com/onflow/flow-go/fvm/evm/offchain/blocks"
+	"github.com/onflow/flow-go/fvm/evm/offchain/storage"
+	"github.com/onflow/flow-go/fvm/evm/offchain/sync"
 	"github.com/onflow/flow-go/fvm/evm/types"
 	"github.com/onflow/flow-go/model/flow"
 )
@@ -19,7 +22,7 @@ import (
 type EphemeralView struct {
 	chainID  flow.ChainID
 	rootAddr flow.Address
-	storage  *EphemeralStorage
+	storage  *storage.EphemeralStorage
 	tracer   *gethTracers.Tracer
 	extraPCs []types.PrecompiledContract
 }
@@ -88,13 +91,13 @@ func (v *EphemeralView) DryCall(
 		}
 	}
 
-	blocks, err := NewBlocks(v.chainID, v.storage)
+	blks, err := blocks.NewBlocks(v.chainID, v.storage)
 	if err != nil {
 		return nil, err
 	}
 
 	// create context
-	ctx, err := CreateBlockContext(v.chainID, blocks, v.tracer)
+	ctx, err := sync.CreateBlockContext(v.chainID, blks, v.tracer)
 	if err != nil {
 		return nil, err
 	}

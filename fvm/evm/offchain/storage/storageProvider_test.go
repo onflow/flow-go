@@ -1,11 +1,11 @@
-package sync_test
+package storage_test
 
 import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/onflow/flow-go/fvm/evm/sync"
+	sync "github.com/onflow/flow-go/fvm/evm/offchain/storage"
 	"github.com/onflow/flow-go/model/flow"
 )
 

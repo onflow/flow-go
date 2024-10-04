@@ -1,22 +1,23 @@
-package sync
+package query
 
 import (
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/fvm/evm"
+	"github.com/onflow/flow-go/fvm/evm/offchain/storage"
 	"github.com/onflow/flow-go/model/flow"
 )
 
 type EphemeralViewProvider struct {
 	chainID         flow.ChainID
 	logger          zerolog.Logger
-	storageProvider StorageProvider
+	storageProvider storage.StorageProvider
 }
 
 // NewEphemeralViewProvider constructs a new EphemeralViewProvider
 func NewEphemeralViewProvider(
 	chainID flow.ChainID,
-	sp StorageProvider,
+	sp storage.StorageProvider,
 	logger zerolog.Logger,
 ) *EphemeralViewProvider {
 	return &EphemeralViewProvider{
@@ -34,6 +35,8 @@ func (evp *EphemeralViewProvider) GetBlockView(height uint64) (*EphemeralView, e
 	return &EphemeralView{
 		chainID:  evp.chainID,
 		rootAddr: evm.StorageAccountAddress(evp.chainID),
-		storage:  NewEphemeralStorage(NewReadOnlyStorage(readOnly)),
+		storage: storage.NewEphemeralStorage(
+			storage.NewReadOnlyStorage(readOnly),
+		),
 	}, nil
 }

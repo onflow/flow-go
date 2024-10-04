@@ -13,6 +13,8 @@ import (
 	"github.com/onflow/flow-go/fvm/evm"
 	"github.com/onflow/flow-go/fvm/evm/emulator"
 	"github.com/onflow/flow-go/fvm/evm/events"
+	"github.com/onflow/flow-go/fvm/evm/offchain/blocks"
+	"github.com/onflow/flow-go/fvm/evm/offchain/storage"
 	"github.com/onflow/flow-go/fvm/evm/precompiles"
 	"github.com/onflow/flow-go/fvm/evm/types"
 	"github.com/onflow/flow-go/model/flow"
@@ -29,7 +31,7 @@ type ReplayResults interface {
 // it updates the state of the given ledger and uses the trace
 func ReplayBlockExecution(
 	chainID flow.ChainID,
-	snapshot BackendStorageSnapshot,
+	snapshot storage.BackendStorageSnapshot,
 	tracer *gethTracer.Tracer,
 	transactionEvents []events.TransactionEventPayload,
 	blockEvent *events.BlockEventPayload,
@@ -37,18 +39,18 @@ func ReplayBlockExecution(
 ) (ReplayResults, error) {
 
 	// create storage
-	storage := NewEphemeralStorage(NewReadOnlyStorage(snapshot))
+	storage := storage.NewEphemeralStorage(storage.NewReadOnlyStorage(snapshot))
 
 	// prepare blocks
-	blocks, err := NewBlocks(chainID, storage)
+	blks, err := blocks.NewBlocks(chainID, storage)
 	if err != nil {
 		return nil, err
 	}
 	// push the new block meta
 	// it should be done before execution so block context creation
 	// can be done properly
-	err = blocks.PushBlockMeta(
-		NewBlockMeta(
+	err = blks.PushBlockMeta(
+		blocks.NewMeta(
 			blockEvent.Height,
 			blockEvent.Timestamp,
 			blockEvent.PrevRandao,
@@ -60,7 +62,7 @@ func ReplayBlockExecution(
 
 	// create a base block context for all transactions
 	// tx related context values will be replaced during execution
-	ctx, err := CreateBlockContext(chainID, blocks, tracer)
+	ctx, err := CreateBlockContext(chainID, blks, tracer)
 	if err != nil {
 		return nil, err
 	}
@@ -101,7 +103,7 @@ func ReplayBlockExecution(
 	// push block hash
 	// we push the block hash after execution, so the behaviour of the blockhash is
 	// identical to the evm.handler.
-	err = blocks.PushBlockHash(
+	err = blks.PushBlockHash(
 		blockEvent.Height,
 		blockEvent.Hash,
 	)
@@ -224,7 +226,7 @@ func ValidateResult(
 
 func CreateBlockContext(
 	chainID flow.ChainID,
-	blocks *Blocks,
+	blocks *blocks.Blocks,
 	tracer *gethTracer.Tracer,
 ) (types.BlockContext, error) {
 	bm, err := blocks.LatestBlock()

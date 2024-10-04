@@ -7,7 +7,8 @@ import (
 	"github.com/stretchr/testify/require"
 
 	evmEvents "github.com/onflow/flow-go/fvm/evm/events"
-	"github.com/onflow/flow-go/fvm/evm/sync"
+	"github.com/onflow/flow-go/fvm/evm/offchain/storage"
+	"github.com/onflow/flow-go/fvm/evm/offchain/sync"
 	"github.com/onflow/flow-go/fvm/evm/types"
 	"github.com/onflow/flow-go/fvm/storage/snapshot"
 	"github.com/onflow/flow-go/model/flow"
@@ -43,7 +44,7 @@ func newSnapShotWrapper(preSnapshot snapshot.StorageSnapshot) *snapShotWrapper {
 var _ types.BackendStorage = &snapShotWrapper{}
 
 func (s *snapShotWrapper) GetValue(owner []byte, key []byte) ([]byte, error) {
-	regID := sync.RegisterID(owner, key)
+	regID := storage.RegisterID(owner, key)
 	return s.preSnapshot.Get(regID)
 }
 

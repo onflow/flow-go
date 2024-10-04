@@ -5,6 +5,7 @@ import (
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/fvm/evm/events"
+	"github.com/onflow/flow-go/fvm/evm/offchain/storage"
 	"github.com/onflow/flow-go/model/flow"
 )
 
@@ -14,7 +15,7 @@ import (
 type ChainReplayer struct {
 	chainID         flow.ChainID
 	logger          zerolog.Logger
-	storageProvider StorageProvider
+	storageProvider storage.StorageProvider
 	tracer          *gethTracers.Tracer
 	validateResults bool
 }
@@ -22,7 +23,7 @@ type ChainReplayer struct {
 // NewChainReplayer constructs a new ChainReplayer
 func NewChainReplayer(
 	chainID flow.ChainID,
-	sp StorageProvider,
+	sp storage.StorageProvider,
 	logger zerolog.Logger,
 	tracer *gethTracers.Tracer,
 	validateResults bool,
