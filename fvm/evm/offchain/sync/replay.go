@@ -10,7 +10,6 @@ import (
 	gethTracer "github.com/onflow/go-ethereum/eth/tracers"
 	gethTrie "github.com/onflow/go-ethereum/trie"
 
-	"github.com/onflow/flow-go/fvm/evm"
 	"github.com/onflow/flow-go/fvm/evm/emulator"
 	"github.com/onflow/flow-go/fvm/evm/events"
 	"github.com/onflow/flow-go/fvm/evm/offchain/blocks"
@@ -31,6 +30,7 @@ type ReplayResults interface {
 // it updates the state of the given ledger and uses the trace
 func ReplayBlockExecution(
 	chainID flow.ChainID,
+	rootAddr flow.Address,
 	snapshot types.BackendStorageSnapshot,
 	tracer *gethTracer.Tracer,
 	transactionEvents []events.TransactionEventPayload,
@@ -42,7 +42,7 @@ func ReplayBlockExecution(
 	storage := storage.NewEphemeralStorage(storage.NewReadOnlyStorage(snapshot))
 
 	// prepare blocks
-	blks, err := blocks.NewBlocks(chainID, storage)
+	blks, err := blocks.NewBlocks(chainID, rootAddr, storage)
 	if err != nil {
 		return nil, err
 	}
@@ -71,7 +71,7 @@ func ReplayBlockExecution(
 	txHashes := make(types.TransactionHashes, len(transactionEvents))
 	for idx, tx := range transactionEvents {
 		err = replayTransactionExecution(
-			chainID,
+			rootAddr,
 			ctx,
 			uint(idx),
 			gasConsumedSoFar,
@@ -115,7 +115,7 @@ func ReplayBlockExecution(
 }
 
 func replayTransactionExecution(
-	chainID flow.ChainID,
+	rootAddr flow.Address,
 	ctx types.BlockContext,
 	txIndex uint,
 	gasUsedSoFar uint64,
@@ -125,7 +125,7 @@ func replayTransactionExecution(
 ) error {
 
 	// create emulator
-	em := emulator.NewEmulator(ledger, evm.StorageAccountAddress(chainID))
+	em := emulator.NewEmulator(ledger, rootAddr)
 
 	// update block context with tx level info
 	ctx.TotalGasUsedSoFar = gasUsedSoFar

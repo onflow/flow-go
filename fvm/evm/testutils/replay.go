@@ -17,12 +17,14 @@ import (
 func ValidateEventsReplayability(
 	t *testing.T,
 	chainID flow.ChainID,
+	rootAddr flow.Address,
 	preSnapshot snapshot.StorageSnapshot,
 	transactionEvents []evmEvents.TransactionEventPayload,
 	blockEvent *evmEvents.BlockEventPayload,
 ) {
 	_, err := sync.ReplayBlockExecution(
 		chainID,
+		rootAddr,
 		newSnapShotWrapper(preSnapshot),
 		nil,
 		transactionEvents,

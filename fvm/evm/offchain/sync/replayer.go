@@ -14,6 +14,7 @@ import (
 // this allows using different tracers and storage solutions.
 type ChainReplayer struct {
 	chainID         flow.ChainID
+	rootAddr        flow.Address
 	logger          zerolog.Logger
 	storageProvider types.StorageProvider
 	tracer          *gethTracers.Tracer
@@ -23,6 +24,7 @@ type ChainReplayer struct {
 // NewChainReplayer constructs a new ChainReplayer
 func NewChainReplayer(
 	chainID flow.ChainID,
+	rootAddr flow.Address,
 	sp types.StorageProvider,
 	logger zerolog.Logger,
 	tracer *gethTracers.Tracer,
@@ -30,6 +32,7 @@ func NewChainReplayer(
 ) *ChainReplayer {
 	return &ChainReplayer{
 		chainID:         chainID,
+		rootAddr:        rootAddr,
 		storageProvider: sp,
 		logger:          logger,
 		tracer:          tracer,
@@ -51,6 +54,7 @@ func (cr *ChainReplayer) OnBlockReceived(
 	// replay transactions
 	return ReplayBlockExecution(
 		cr.chainID,
+		cr.rootAddr,
 		st,
 		cr.tracer,
 		transactionEvents,

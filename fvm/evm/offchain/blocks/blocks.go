@@ -3,7 +3,6 @@ package blocks
 import (
 	"fmt"
 
-	"github.com/onflow/flow-go/fvm/evm"
 	"github.com/onflow/flow-go/fvm/evm/handler"
 	"github.com/onflow/flow-go/fvm/evm/types"
 	"github.com/onflow/flow-go/model/flow"
@@ -24,10 +23,10 @@ type Blocks struct {
 // NewBlocks constructs a new blocks type
 func NewBlocks(
 	chainID flow.ChainID,
+	rootAddress flow.Address,
 	storage types.BackendStorage,
 ) (*Blocks, error) {
 	var err error
-	rootAddress := evm.StorageAccountAddress(chainID)
 	blocks := &Blocks{
 		chainID:     chainID,
 		storage:     storage,

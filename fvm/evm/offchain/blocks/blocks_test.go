@@ -14,7 +14,8 @@ import (
 func TestBlocks(t *testing.T) {
 	storage := testutils.GetSimpleValueStore()
 	chainID := flow.Emulator.Chain().ChainID()
-	blks, err := blocks.NewBlocks(chainID, storage)
+	rootAddr := flow.Address{1, 2, 3, 4}
+	blks, err := blocks.NewBlocks(chainID, rootAddr, storage)
 	require.NoError(t, err)
 
 	// no insertion - genesis block

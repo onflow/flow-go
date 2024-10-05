@@ -9,7 +9,6 @@ import (
 	gethCrypto "github.com/onflow/go-ethereum/crypto"
 	gethTracers "github.com/onflow/go-ethereum/eth/tracers"
 
-	"github.com/onflow/flow-go/fvm/evm"
 	"github.com/onflow/flow-go/fvm/evm/emulator"
 	"github.com/onflow/flow-go/fvm/evm/emulator/state"
 	"github.com/onflow/flow-go/fvm/evm/offchain/blocks"
@@ -91,7 +90,7 @@ func (v *EphemeralView) DryCall(
 		}
 	}
 
-	blks, err := blocks.NewBlocks(v.chainID, v.storage)
+	blks, err := blocks.NewBlocks(v.chainID, v.rootAddr, v.storage)
 	if err != nil {
 		return nil, err
 	}
@@ -134,7 +133,7 @@ func NewDryRunStorageOverrideBalance(
 	balance *uint256.Int,
 ) DryRunOption {
 	return func(v *EphemeralView) error {
-		baseView, err := state.NewBaseView(v.storage, evm.StorageAccountAddress(v.chainID))
+		baseView, err := state.NewBaseView(v.storage, v.rootAddr)
 		if err != nil {
 			return err
 		}
@@ -163,7 +162,7 @@ func NewDryRunStorageOverrideNonce(
 	nonce uint64,
 ) DryRunOption {
 	return func(v *EphemeralView) error {
-		baseView, err := state.NewBaseView(v.storage, evm.StorageAccountAddress(v.chainID))
+		baseView, err := state.NewBaseView(v.storage, v.rootAddr)
 		if err != nil {
 			return err
 		}
@@ -192,7 +191,7 @@ func NewDryRunStorageOverrideCode(
 	code []byte,
 ) DryRunOption {
 	return func(v *EphemeralView) error {
-		baseView, err := state.NewBaseView(v.storage, evm.StorageAccountAddress(v.chainID))
+		baseView, err := state.NewBaseView(v.storage, v.rootAddr)
 		if err != nil {
 			return err
 		}
@@ -221,7 +220,7 @@ func NewDryRunStorageOverrideState(
 	slots map[gethCommon.Hash]gethCommon.Hash,
 ) DryRunOption {
 	return func(v *EphemeralView) error {
-		baseView, err := state.NewBaseView(v.storage, evm.StorageAccountAddress(v.chainID))
+		baseView, err := state.NewBaseView(v.storage, v.rootAddr)
 		if err != nil {
 			return err
 		}
@@ -249,7 +248,7 @@ func NewDryRunStorageOverrideStateDiff(
 	slots map[gethCommon.Hash]gethCommon.Hash,
 ) DryRunOption {
 	return func(v *EphemeralView) error {
-		baseView, err := state.NewBaseView(v.storage, evm.StorageAccountAddress(v.chainID))
+		baseView, err := state.NewBaseView(v.storage, v.rootAddr)
 		if err != nil {
 			return err
 		}

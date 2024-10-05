@@ -17,9 +17,9 @@ type InMemoryStorageProvider struct {
 var _ types.StorageProvider = &InMemoryStorageProvider{}
 
 // NewInMemoryStorageProvider constructs a new InMemoryStorageProvider
-func NewInMemoryStorageProvider() *InMemoryStorageProvider {
+func NewInMemoryStorageProvider(initSnapshot types.BackendStorageSnapshot) *InMemoryStorageProvider {
 	views := make([]EphemeralStorage, 2)
-	views[0] = *NewEphemeralStorage(NewReadOnlyStorage(EmptySnapshot))
+	views[0] = *NewEphemeralStorage(NewReadOnlyStorage(initSnapshot))
 	views[1] = *NewEphemeralStorage(&views[0])
 	return &InMemoryStorageProvider{
 		views: views,

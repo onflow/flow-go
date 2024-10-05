@@ -24,9 +24,8 @@ import (
 
 func TestChainReplay(t *testing.T) {
 
-	// setup transactions
-	var allEvents flow.EventsList
 	const chainID = flow.Emulator
+	var snapshot *testutils.TestValueStore
 	evmContract := evm.ContractAccountAddress(chainID)
 	testutils.RunWithTestBackend(t, func(backend *testutils.TestBackend) {
 		testutils.RunWithTestFlowEVMRootAddress(t, backend, func(rootAddr flow.Address) {
@@ -34,7 +33,10 @@ func TestChainReplay(t *testing.T) {
 				testutils.GetStorageTestContract(t),
 				backend, rootAddr, func(testContract *testutils.TestContract) {
 					testutils.RunWithEOATestAccount(t, backend, rootAddr, func(testAccount *testutils.EOATestAccount) {
-						handler := setupHandler(t, chainID, backend, rootAddr)
+						handler := setupHandler(chainID, backend, rootAddr)
+
+						// clone state before apply transactions
+						snapshot = backend.Clone()
 						gasFeeCollector := testutils.RandomAddress(t)
 						for i := 0; i < 10; i++ {
 							tx := testAccount.PrepareSignAndEncodeTx(t,
@@ -52,36 +54,35 @@ func TestChainReplay(t *testing.T) {
 						// TODO: here
 
 						handler.CommitBlockProposal()
-						allEvents = backend.Events()
+						allEvents := backend.Events()
+
+						var blockEventPayload *events.BlockEventPayload
+						txEventPayloads := make([]events.TransactionEventPayload, len(allEvents)-1)
+						for i, event := range allEvents {
+							// last event is block event
+							if i == len(allEvents)-1 {
+								blockEventPayload = testutils.BlockEventToPayload(t, event, evmContract)
+								continue
+							}
+							txEventPayloads[i] = *testutils.TxEventToPayload(t, event, evmContract)
+						}
+						// How do you expose the init estate
+
+						sp := storage.NewInMemoryStorageProvider(snapshot)
+						cr := sync.NewChainReplayer(chainID, rootAddr, sp, zerolog.Logger{}, nil, true)
+
+						_, err := cr.OnBlockReceived(txEventPayloads, blockEventPayload)
+						require.NoError(t, err)
 					})
 				})
 		})
 	})
 
-	var blockEventPayload *events.BlockEventPayload
-	txEventPayloads := make([]events.TransactionEventPayload, len(allEvents)-1)
-	for i, event := range allEvents {
-		// last event is block event
-		if i == len(allEvents)-1 {
-			blockEventPayload = testutils.BlockEventToPayload(t, event, evmContract)
-			continue
-		}
-		txEventPayloads[i] = *testutils.TxEventToPayload(t, event, evmContract)
-	}
-	// How do you expose the init estate
-
-	sp := storage.NewInMemoryStorageProvider()
-	cr := sync.NewChainReplayer(chainID, sp, zerolog.Logger{}, nil, true)
-
-	_, err := cr.OnBlockReceived(txEventPayloads, blockEventPayload)
-	require.NoError(t, err)
-	t.Fatal("XX")
-
 	// transactions that checks the value of the previous call and increment it
 
 }
 
-func setupHandler(t testing.TB,
+func setupHandler(
 	chainID flow.ChainID,
 	backend types.Backend,
 	rootAddr flow.Address,
