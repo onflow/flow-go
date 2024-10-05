@@ -26,7 +26,6 @@ func TestChainReplay(t *testing.T) {
 
 	const chainID = flow.Emulator
 	var snapshot *testutils.TestValueStore
-	evmContract := evm.ContractAccountAddress(chainID)
 	testutils.RunWithTestBackend(t, func(backend *testutils.TestBackend) {
 		testutils.RunWithTestFlowEVMRootAddress(t, backend, func(rootAddr flow.Address) {
 			testutils.RunWithDeployedContract(t,
@@ -41,7 +40,7 @@ func TestChainReplay(t *testing.T) {
 						for i := 0; i < 10; i++ {
 							tx := testAccount.PrepareSignAndEncodeTx(t,
 								testContract.DeployedAt.ToCommon(),
-								testContract.MakeCallData(t, "store", big.NewInt(int64(i))),
+								testContract.MakeCallData(t, "checkThenStore", big.NewInt(int64(i)), big.NewInt(int64(i+1))),
 								big.NewInt(0),
 								uint64(100_000),
 								big.NewInt(1),
@@ -50,23 +49,23 @@ func TestChainReplay(t *testing.T) {
 							require.Equal(t, types.ErrorCode(0), rs.ErrorCode)
 						}
 
+						// check block number
+						tx := testAccount.PrepareSignAndEncodeTx(t,
+							testContract.DeployedAt.ToCommon(),
+							testContract.MakeCallData(t, "checkBlockNumber", big.NewInt(1)),
+							big.NewInt(0),
+							uint64(100_000),
+							big.NewInt(1),
+						)
+						rs := handler.Run(tx, gasFeeCollector)
+						require.Equal(t, types.ErrorCode(0), rs.ErrorCode)
+
 						// call to block number - assert block number
-						// TODO: here
+						// TODO: add more cases
 
 						handler.CommitBlockProposal()
-						allEvents := backend.Events()
 
-						var blockEventPayload *events.BlockEventPayload
-						txEventPayloads := make([]events.TransactionEventPayload, len(allEvents)-1)
-						for i, event := range allEvents {
-							// last event is block event
-							if i == len(allEvents)-1 {
-								blockEventPayload = testutils.BlockEventToPayload(t, event, evmContract)
-								continue
-							}
-							txEventPayloads[i] = *testutils.TxEventToPayload(t, event, evmContract)
-						}
-						// How do you expose the init estate
+						txEventPayloads, blockEventPayload := prepareEvents(t, chainID, backend.Events())
 
 						sp := storage.NewInMemoryStorageProvider(snapshot)
 						cr := sync.NewChainReplayer(chainID, rootAddr, sp, zerolog.Logger{}, nil, true)
@@ -80,6 +79,27 @@ func TestChainReplay(t *testing.T) {
 
 	// transactions that checks the value of the previous call and increment it
 
+}
+
+func prepareEvents(
+	t *testing.T,
+	chainID flow.ChainID,
+	allEvents flow.EventsList) (
+	[]events.TransactionEventPayload,
+	*events.BlockEventPayload,
+) {
+	evmContract := evm.ContractAccountAddress(chainID)
+	var blockEventPayload *events.BlockEventPayload
+	txEventPayloads := make([]events.TransactionEventPayload, len(allEvents)-1)
+	for i, event := range allEvents {
+		// last event is block event
+		if i == len(allEvents)-1 {
+			blockEventPayload = testutils.BlockEventToPayload(t, event, evmContract)
+			continue
+		}
+		txEventPayloads[i] = *testutils.TxEventToPayload(t, event, evmContract)
+	}
+	return txEventPayloads, blockEventPayload
 }
 
 func setupHandler(

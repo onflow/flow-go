@@ -18,6 +18,11 @@ contract Storage {
         number = num;
     }
 
+    function checkThenStore(uint256 prev, uint256 num)public {
+        require(number == prev, "stored value check failed");
+        number = num;
+    }
+
     function storeWithLog(uint256 num) public {
         emit NewStore(msg.sender, num);
         number = num;
@@ -36,12 +41,20 @@ contract Storage {
         return block.number;
     }
 
+    function checkBlockNumber(uint expected) public view {
+        require(expected == block.number, "block number check failed");
+    }
+
     function blockTime() public view returns (uint) {
         return block.timestamp;
     }
 
     function blockHash(uint num)  public view returns (bytes32) {
         return blockhash(num);
+    }
+
+    function checkBlockHash(uint num, bytes32 expected) public view {
+        require(expected == blockhash(num), "hash check failed");
     }
 
     function random() public view returns (uint256) {
