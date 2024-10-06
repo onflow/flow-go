@@ -16,11 +16,10 @@ import (
 	"github.com/onflow/flow-go/fvm/evm/types"
 	"github.com/onflow/flow-go/fvm/systemcontracts"
 	"github.com/onflow/flow-go/model/flow"
+	gethCommon "github.com/onflow/go-ethereum/common"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/require"
 )
-
-// TODO: add all sorts of transactions (height query, precompiled, ...)
 
 func TestChainReplay(t *testing.T) {
 
@@ -37,7 +36,11 @@ func TestChainReplay(t *testing.T) {
 						// clone state before apply transactions
 						snapshot = backend.Clone()
 						gasFeeCollector := testutils.RandomAddress(t)
-						for i := 0; i < 10; i++ {
+
+						totalTxCount := 0
+
+						// case 0: check sequential updates to a slot
+						for i := 0; i < 5; i++ {
 							tx := testAccount.PrepareSignAndEncodeTx(t,
 								testContract.DeployedAt.ToCommon(),
 								testContract.MakeCallData(t, "checkThenStore", big.NewInt(int64(i)), big.NewInt(int64(i+1))),
@@ -47,9 +50,12 @@ func TestChainReplay(t *testing.T) {
 							)
 							rs := handler.Run(tx, gasFeeCollector)
 							require.Equal(t, types.ErrorCode(0), rs.ErrorCode)
+							totalTxCount += 2 // one for tx, one for gas refund
 						}
 
-						// check block number
+						// TODO: add batch run BatchRun
+
+						// case 1: fetching evm block number
 						tx := testAccount.PrepareSignAndEncodeTx(t,
 							testContract.DeployedAt.ToCommon(),
 							testContract.MakeCallData(t, "checkBlockNumber", big.NewInt(1)),
@@ -59,26 +65,91 @@ func TestChainReplay(t *testing.T) {
 						)
 						rs := handler.Run(tx, gasFeeCollector)
 						require.Equal(t, types.ErrorCode(0), rs.ErrorCode)
+						totalTxCount += 2 // one for tx, one for gas refund
 
-						// call to block number - assert block number
-						// TODO: add more cases
+						// case 2: making a call to the cadence arch
+						expectedFlowHeight := uint64(3)
+						tx = testAccount.PrepareSignAndEncodeTx(t,
+							testContract.DeployedAt.ToCommon(),
+							testContract.MakeCallData(t, "verifyArchCallToFlowBlockHeight", expectedFlowHeight),
+							big.NewInt(0),
+							uint64(2_000_000),
+							big.NewInt(1),
+						)
+						rs = handler.Run(tx, gasFeeCollector)
+						require.Equal(t, types.ErrorCode(0), rs.ErrorCode)
+						totalTxCount += 2 // one for tx, one for gas refund
 
+						// case 3: fetch evm block hash - last block
+						expected := types.GenesisBlockHash(chainID)
+						tx = testAccount.PrepareSignAndEncodeTx(t,
+							testContract.DeployedAt.ToCommon(),
+							testContract.MakeCallData(t, "checkBlockHash", big.NewInt(0), expected),
+							big.NewInt(0),
+							uint64(100_000),
+							big.NewInt(1),
+						)
+						rs = handler.Run(tx, gasFeeCollector)
+						require.Equal(t, types.ErrorCode(0), rs.ErrorCode)
+						totalTxCount += 2 // one for tx, one for gas refund
+
+						// case 4: fetch evm block hash - current block
+						expected = gethCommon.Hash{}
+						tx = testAccount.PrepareSignAndEncodeTx(t,
+							testContract.DeployedAt.ToCommon(),
+							testContract.MakeCallData(t, "checkBlockHash", big.NewInt(1), expected),
+							big.NewInt(0),
+							uint64(100_000),
+							big.NewInt(1),
+						)
+						rs = handler.Run(tx, gasFeeCollector)
+						require.Equal(t, types.ErrorCode(0), rs.ErrorCode)
+						totalTxCount += 2 // one for tx, one for gas refund
+
+						// case 5: coa operations
+						addr := handler.DeployCOA(100)
+						totalTxCount += 1
+
+						coa := handler.AccountByAddress(addr, true)
+						coa.Deposit(types.NewFlowTokenVault(types.MakeABalanceInFlow(10)))
+						totalTxCount += 1
+						coa.Withdraw(types.NewBalance(types.MakeABalanceInFlow(4)))
+						totalTxCount += 1
+
+						expectedBalance := (*big.Int)(types.MakeABalanceInFlow(6))
+						rs = coa.Call(
+							testContract.DeployedAt,
+							testContract.MakeCallData(t, "checkBalance", addr.ToCommon(), expectedBalance),
+							100_000,
+							types.EmptyBalance,
+						)
+						require.Equal(t, types.ErrorCode(0), rs.ErrorCode)
+						totalTxCount += 1
+
+						// TODO: add deploy
+						// coa.Deploy()
+
+						// commit block
 						handler.CommitBlockProposal()
 
+						// prepare events
 						txEventPayloads, blockEventPayload := prepareEvents(t, chainID, backend.Events())
 
+						// because we are doing direct calls, there is no extra
+						// events (e.g. COA created) events emitted.
+						require.Len(t, txEventPayloads, totalTxCount)
+
+						// check replay
 						sp := storage.NewInMemoryStorageProvider(snapshot)
 						cr := sync.NewChainReplayer(chainID, rootAddr, sp, zerolog.Logger{}, nil, true)
 
+						// TODO: check delta against the current block provider
 						_, err := cr.OnBlockReceived(txEventPayloads, blockEventPayload)
 						require.NoError(t, err)
 					})
 				})
 		})
 	})
-
-	// transactions that checks the value of the previous call and increment it
-
 }
 
 func prepareEvents(

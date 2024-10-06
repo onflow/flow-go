@@ -57,6 +57,10 @@ contract Storage {
         require(expected == blockhash(num), "hash check failed");
     }
 
+    function checkBalance(address addr, uint expected) public view{
+        require(expected == addr.balance, "balance check failed");
+    }
+    
     function random() public view returns (uint256) {
         return block.prevrandao;
     }

@@ -120,6 +120,24 @@
 	{
 		"inputs": [
 			{
+				"internalType": "address",
+				"name": "addr",
+				"type": "address"
+			},
+			{
+				"internalType": "uint256",
+				"name": "expected",
+				"type": "uint256"
+			}
+		],
+		"name": "checkBalance",
+		"outputs": [],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
 				"internalType": "uint256",
 				"name": "num",
 				"type": "uint256"
