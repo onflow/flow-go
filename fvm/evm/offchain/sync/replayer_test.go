@@ -1,6 +1,8 @@
 package sync_test
 
 import (
+	"fmt"
+	"math"
 	"math/big"
 	"testing"
 
@@ -39,7 +41,7 @@ func TestChainReplay(t *testing.T) {
 
 						totalTxCount := 0
 
-						// case 0: check sequential updates to a slot
+						// case: check sequential updates to a slot
 						for i := 0; i < 5; i++ {
 							tx := testAccount.PrepareSignAndEncodeTx(t,
 								testContract.DeployedAt.ToCommon(),
@@ -53,9 +55,25 @@ func TestChainReplay(t *testing.T) {
 							totalTxCount += 2 // one for tx, one for gas refund
 						}
 
-						// TODO: add batch run BatchRun
+						// case: add batch run BatchRun
+						batchSize := 4
+						txBatch := make([][]byte, batchSize)
+						for i := 0; i < batchSize; i++ {
+							txBatch[i] = testAccount.PrepareSignAndEncodeTx(t,
+								testContract.DeployedAt.ToCommon(),
+								testContract.MakeCallData(t, "store", big.NewInt(int64(i))),
+								big.NewInt(0),
+								uint64(100_000),
+								big.NewInt(1),
+							)
+						}
+						rss := handler.BatchRun(txBatch, gasFeeCollector)
+						for _, rs := range rss {
+							require.Equal(t, types.ErrorCode(0), rs.ErrorCode)
+						}
+						totalTxCount += batchSize + 1 // plus one for gas refund
 
-						// case 1: fetching evm block number
+						// case: fetching evm block number
 						tx := testAccount.PrepareSignAndEncodeTx(t,
 							testContract.DeployedAt.ToCommon(),
 							testContract.MakeCallData(t, "checkBlockNumber", big.NewInt(1)),
@@ -67,7 +85,7 @@ func TestChainReplay(t *testing.T) {
 						require.Equal(t, types.ErrorCode(0), rs.ErrorCode)
 						totalTxCount += 2 // one for tx, one for gas refund
 
-						// case 2: making a call to the cadence arch
+						// case: making a call to the cadence arch
 						expectedFlowHeight := uint64(3)
 						tx = testAccount.PrepareSignAndEncodeTx(t,
 							testContract.DeployedAt.ToCommon(),
@@ -80,7 +98,7 @@ func TestChainReplay(t *testing.T) {
 						require.Equal(t, types.ErrorCode(0), rs.ErrorCode)
 						totalTxCount += 2 // one for tx, one for gas refund
 
-						// case 3: fetch evm block hash - last block
+						// case: fetch evm block hash - last block
 						expected := types.GenesisBlockHash(chainID)
 						tx = testAccount.PrepareSignAndEncodeTx(t,
 							testContract.DeployedAt.ToCommon(),
@@ -93,7 +111,7 @@ func TestChainReplay(t *testing.T) {
 						require.Equal(t, types.ErrorCode(0), rs.ErrorCode)
 						totalTxCount += 2 // one for tx, one for gas refund
 
-						// case 4: fetch evm block hash - current block
+						// case: fetch evm block hash - current block
 						expected = gethCommon.Hash{}
 						tx = testAccount.PrepareSignAndEncodeTx(t,
 							testContract.DeployedAt.ToCommon(),
@@ -106,7 +124,7 @@ func TestChainReplay(t *testing.T) {
 						require.Equal(t, types.ErrorCode(0), rs.ErrorCode)
 						totalTxCount += 2 // one for tx, one for gas refund
 
-						// case 5: coa operations
+						// case: coa operations
 						addr := handler.DeployCOA(100)
 						totalTxCount += 1
 
@@ -126,8 +144,9 @@ func TestChainReplay(t *testing.T) {
 						require.Equal(t, types.ErrorCode(0), rs.ErrorCode)
 						totalTxCount += 1
 
-						// TODO: add deploy
-						// coa.Deploy()
+						rs = coa.Deploy(testContract.ByteCode, math.MaxUint64, types.EmptyBalance)
+						require.Equal(t, types.ErrorCode(0), rs.ErrorCode)
+						totalTxCount += 1
 
 						// commit block
 						handler.CommitBlockProposal()
@@ -142,10 +161,16 @@ func TestChainReplay(t *testing.T) {
 						// check replay
 						sp := storage.NewInMemoryStorageProvider(snapshot)
 						cr := sync.NewChainReplayer(chainID, rootAddr, sp, zerolog.Logger{}, nil, true)
-
-						// TODO: check delta against the current block provider
-						_, err := cr.OnBlockReceived(txEventPayloads, blockEventPayload)
+						result, err := cr.OnBlockReceived(txEventPayloads, blockEventPayload)
 						require.NoError(t, err)
+
+						// verify the state delta
+						for k, v := range result.StorageRegisterUpdates() {
+							ret, err := backend.GetValue([]byte(k.Owner), []byte(k.Key))
+							fmt.Println(">>>>", k.String(), v, ret)
+							require.NoError(t, err)
+							require.Equal(t, ret[:], v[:])
+						}
 					})
 				})
 		})
