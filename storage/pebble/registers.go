@@ -65,12 +65,13 @@ func (s *Registers) Get(
 	height uint64,
 ) (flow.RegisterValue, error) {
 	latestHeight := s.LatestHeight()
+	if height > latestHeight {
+		return nil, fmt.Errorf("height %d not indexed, latestHeight: %d, %w", height, latestHeight, storage.ErrHeightNotIndexed)
+	}
+
 	firstHeight := s.calculateFirstHeight(latestHeight)
-	if height > latestHeight || height < firstHeight {
-		return nil, errors.Wrap(
-			storage.ErrHeightNotIndexed,
-			fmt.Sprintf("height %d not indexed, indexed range is [%d-%d]", height, firstHeight, latestHeight),
-		)
+	if height < firstHeight {
+		return nil, fmt.Errorf("height %d not indexed, indexed range: [%d-%d], %w", height, firstHeight, latestHeight, storage.ErrHeightNotIndexed)
 	}
 	key := newLookupKey(height, reg)
 	return s.lookupRegister(key.Bytes())
