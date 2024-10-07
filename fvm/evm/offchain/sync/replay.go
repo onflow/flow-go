@@ -21,7 +21,10 @@ import (
 
 var emptyChecksum = [types.ChecksumLength]byte{0, 0, 0, 0}
 
+// ReplayResults is the result of replaying transactions
 type ReplayResults interface {
+	// StorageRegisterUpdates returns the set of register changes
+	// (only the EVM-related registers)
 	StorageRegisterUpdates() map[flow.RegisterID]flow.RegisterValue
 }
 
@@ -100,6 +103,7 @@ func ReplayBlockExecution(
 		// no need to check the receipt root hash given we have checked the logs and other
 		// values during tx execution.
 	}
+
 	// push block hash
 	// we push the block hash after execution, so the behaviour of the blockhash is
 	// identical to the evm.handler.
@@ -153,7 +157,6 @@ func replayTransactionExecution(
 		if err != nil {
 			return fmt.Errorf("failed to RLP-decode direct call [%x]: %w", txEvent.Payload, err)
 		}
-
 		res, err = bv.DirectCall(call)
 		if err != nil {
 			return fmt.Errorf("failed to execute direct call [%x]: %w", txEvent.Hash, err)
@@ -224,6 +227,7 @@ func ValidateResult(
 	return nil
 }
 
+// CreateBlockContext creates a block context using the passed blocks
 func CreateBlockContext(
 	chainID flow.ChainID,
 	blocks *blocks.Blocks,

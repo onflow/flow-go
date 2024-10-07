@@ -7,6 +7,10 @@ import (
 	"testing"
 
 	"github.com/onflow/cadence/runtime/common"
+	gethCommon "github.com/onflow/go-ethereum/common"
+	"github.com/rs/zerolog"
+	"github.com/stretchr/testify/require"
+
 	"github.com/onflow/flow-go/fvm/evm"
 	"github.com/onflow/flow-go/fvm/evm/debug"
 	"github.com/onflow/flow-go/fvm/evm/emulator"
@@ -14,30 +18,26 @@ import (
 	"github.com/onflow/flow-go/fvm/evm/handler"
 	"github.com/onflow/flow-go/fvm/evm/offchain/storage"
 	"github.com/onflow/flow-go/fvm/evm/offchain/sync"
-	"github.com/onflow/flow-go/fvm/evm/testutils"
+	. "github.com/onflow/flow-go/fvm/evm/testutils"
 	"github.com/onflow/flow-go/fvm/evm/types"
 	"github.com/onflow/flow-go/fvm/systemcontracts"
 	"github.com/onflow/flow-go/model/flow"
-	gethCommon "github.com/onflow/go-ethereum/common"
-	"github.com/rs/zerolog"
-	"github.com/stretchr/testify/require"
 )
 
 func TestChainReplay(t *testing.T) {
 
 	const chainID = flow.Emulator
-	var snapshot *testutils.TestValueStore
-	testutils.RunWithTestBackend(t, func(backend *testutils.TestBackend) {
-		testutils.RunWithTestFlowEVMRootAddress(t, backend, func(rootAddr flow.Address) {
-			testutils.RunWithDeployedContract(t,
-				testutils.GetStorageTestContract(t),
-				backend, rootAddr, func(testContract *testutils.TestContract) {
-					testutils.RunWithEOATestAccount(t, backend, rootAddr, func(testAccount *testutils.EOATestAccount) {
+	var snapshot *TestValueStore
+	RunWithTestBackend(t, func(backend *TestBackend) {
+		RunWithTestFlowEVMRootAddress(t, backend, func(rootAddr flow.Address) {
+			RunWithDeployedContract(t,
+				GetStorageTestContract(t), backend, rootAddr, func(testContract *TestContract) {
+					RunWithEOATestAccount(t, backend, rootAddr, func(testAccount *EOATestAccount) {
 						handler := setupHandler(chainID, backend, rootAddr)
 
 						// clone state before apply transactions
 						snapshot = backend.Clone()
-						gasFeeCollector := testutils.RandomAddress(t)
+						gasFeeCollector := RandomAddress(t)
 
 						totalTxCount := 0
 
@@ -189,10 +189,10 @@ func prepareEvents(
 	for i, event := range allEvents {
 		// last event is block event
 		if i == len(allEvents)-1 {
-			blockEventPayload = testutils.BlockEventToPayload(t, event, evmContract)
+			blockEventPayload = BlockEventToPayload(t, event, evmContract)
 			continue
 		}
-		txEventPayloads[i] = *testutils.TxEventToPayload(t, event, evmContract)
+		txEventPayloads[i] = *TxEventToPayload(t, event, evmContract)
 	}
 	return txEventPayloads, blockEventPayload
 }
