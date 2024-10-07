@@ -29,15 +29,15 @@ func TestCombinedSignWithBeaconKeyV3(t *testing.T) {
 	// prepare data
 	beaconKey := unittest.RandomBeaconPriv()
 	pk := beaconKey.PublicKey()
-	view := uint64(20)
+	proposerView := uint64(20)
 
 	fblock := unittest.BlockFixture()
-	fblock.Header.View = view
+	fblock.Header.View = proposerView
 	block := model.BlockFromFlow(fblock.Header)
 	signerID := fblock.Header.ProposerID
 
 	beaconKeyStore := modulemock.NewRandomBeaconKeyStore(t)
-	beaconKeyStore.On("ByView", view).Return(beaconKey, nil)
+	beaconKeyStore.On("ByView", proposerView).Return(beaconKey, nil)
 
 	stakingPriv := unittest.StakingPrivKeyFixture()
 	nodeID := &unittest.IdentityFixture().IdentitySkeleton
@@ -89,15 +89,15 @@ func TestCombinedSignWithNoBeaconKeyV3(t *testing.T) {
 	// prepare data
 	beaconKey := unittest.RandomBeaconPriv()
 	pk := beaconKey.PublicKey()
-	view := uint64(20)
+	proposerView := uint64(20)
 
 	fblock := unittest.BlockFixture()
-	fblock.Header.View = view
+	fblock.Header.View = proposerView
 	block := model.BlockFromFlow(fblock.Header)
 	signerID := fblock.Header.ProposerID
 
 	beaconKeyStore := modulemock.NewRandomBeaconKeyStore(t)
-	beaconKeyStore.On("ByView", view).Return(nil, module.ErrNoBeaconKeyForEpoch)
+	beaconKeyStore.On("ByView", proposerView).Return(nil, module.ErrNoBeaconKeyForEpoch)
 
 	stakingPriv := unittest.StakingPrivKeyFixture()
 	nodeID := &unittest.IdentityFixture().IdentitySkeleton
