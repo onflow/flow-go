@@ -1,7 +1,6 @@
 package sync_test
 
 import (
-	"fmt"
 	"math"
 	"math/big"
 	"testing"
@@ -164,15 +163,17 @@ func TestChainReplay(t *testing.T) {
 						result, err := cr.OnBlockReceived(txEventPayloads, blockEventPayload)
 						require.NoError(t, err)
 
+						// fmt.Println(">>>>>>>>>>>>>>>>>>>>>>>")
 						// verify the state delta
 						for k, v := range result.StorageRegisterUpdates() {
 							ret, err := backend.GetValue([]byte(k.Owner), []byte(k.Key))
-							fmt.Println(">>>>", k.String(), v, ret)
+							// fmt.Println("Set", hex.EncodeToString([]byte(k.Key)), hex.EncodeToString(v))
 							require.NoError(t, err)
 							require.Equal(t, ret[:], v[:])
 						}
 					})
 				})
+			// t.Fatal("XXX")
 		})
 	})
 }

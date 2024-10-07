@@ -2,7 +2,7 @@ package testutils
 
 import (
 	"crypto/rand"
-	"encoding/binary"
+	"encoding/hex"
 	"fmt"
 	"testing"
 
@@ -66,13 +66,11 @@ func fullKey(owner, key []byte) string {
 func GetSimpleValueStore() *TestValueStore {
 	return GetSimpleValueStorePopulated(
 		make(map[string][]byte),
-		make(map[string]uint64),
 	)
 }
 
 func GetSimpleValueStorePopulated(
 	data map[string][]byte,
-	allocator map[string]uint64,
 ) *TestValueStore {
 	bytesRead := 0
 	bytesWritten := 0
@@ -84,6 +82,7 @@ func GetSimpleValueStorePopulated(
 			return value, nil
 		},
 		SetValueFunc: func(owner, key, value []byte) error {
+			fmt.Println("Set", hex.EncodeToString(key), hex.EncodeToString(value))
 			fk := fullKey(owner, key)
 			data[fk] = value
 			bytesWritten += len(fk) + len(value)
@@ -96,25 +95,34 @@ func GetSimpleValueStorePopulated(
 			return len(value) > 0, nil
 		},
 		AllocateSlabIndexFunc: func(owner []byte) (atree.SlabIndex, error) {
-			index := allocator[string(owner)]
-			// TODO: figure out why it result in a collision
-			if index == 0 {
-				index = 10
+			fk := fullKey(owner, []byte(flow.AccountStatusKey))
+			statusBytes := data[fk]
+			bytesRead += len(fk) + len(statusBytes)
+			if len(statusBytes) == 0 {
+				return atree.SlabIndex{}, fmt.Errorf("state for account not found")
 			}
-			var data [8]byte
-			allocator[string(owner)] = index + 1
-			binary.BigEndian.PutUint64(data[:], index)
-			bytesRead += len(owner) + 8
-			bytesWritten += len(owner) + 8
-			return atree.SlabIndex(data), nil
+
+			status, err := environment.AccountStatusFromBytes(statusBytes)
+			if err != nil {
+				return atree.SlabIndex{}, err
+			}
+
+			// get and increment the index
+			index := status.SlabIndex()
+			newIndexBytes := index.Next()
+
+			// update the storageIndex bytes
+			status.SetStorageIndex(newIndexBytes)
+			val := status.ToBytes()
+			data[fk] = val
+			bytesWritten += len(fk) + len(val)
+
+			return index, nil
 		},
 		TotalStorageSizeFunc: func() int {
 			size := 0
 			for key, item := range data {
 				size += len(item) + len([]byte(key))
-			}
-			for key := range allocator {
-				size += len(key) + 8
 			}
 			return size
 		},
@@ -125,7 +133,7 @@ func GetSimpleValueStorePopulated(
 			return bytesWritten
 		},
 		TotalStorageItemsFunc: func() int {
-			return len(maps.Keys(data)) + len(maps.Keys(allocator))
+			return len(maps.Keys(data))
 		},
 		ResetStatsFunc: func() {
 			bytesRead = 0
@@ -138,12 +146,7 @@ func GetSimpleValueStorePopulated(
 			for k, v := range data {
 				newData[k] = v
 			}
-			newAllocator := make(map[string]uint64)
-			for k, v := range allocator {
-				newAllocator[k] = v
-			}
-			// clone allocator
-			return GetSimpleValueStorePopulated(newData, newAllocator)
+			return GetSimpleValueStorePopulated(newData)
 		},
 	}
 }

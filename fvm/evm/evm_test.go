@@ -1,8 +1,10 @@
 package evm_test
 
 import (
+	"bytes"
 	"encoding/binary"
 	"fmt"
+	"io"
 	"math"
 	"math/big"
 	"testing"
@@ -43,7 +45,7 @@ func TestEVMRun(t *testing.T) {
 
 	t.Run("testing EVM.run (happy case)", func(t *testing.T) {
 
-		t.Parallel()
+		// t.Parallel()
 		RunWithNewEnvironment(t,
 			chain, func(
 				ctx fvm.Context,
@@ -152,7 +154,8 @@ func TestEVMRun(t *testing.T) {
 				require.Empty(t, txEventPayload.ContractAddress)
 
 				// check replayability before appending state
-				testutils.ValidateEventsReplayability(t, chain.ChainID(), preSnapshot, txPayloads, blockEventPayload)
+				rootAddr := evm.StorageAccountAddress(chain.ChainID())
+				testutils.ValidateEventsReplayability(t, chain.ChainID(), rootAddr, preSnapshot, txPayloads, blockEventPayload)
 
 				// append the state
 				snapshot = snapshot.Append(state)
@@ -550,7 +553,8 @@ func TestEVMBatchRun(t *testing.T) {
 				)
 
 				// check replayability before appending state
-				testutils.ValidateEventsReplayability(t, chain.ChainID(), preSnapshot, txPayloads, blockEventPayload)
+				rootAddr := evm.StorageAccountAddress(chain.ChainID())
+				testutils.ValidateEventsReplayability(t, chain.ChainID(), rootAddr, preSnapshot, txPayloads, blockEventPayload)
 
 				// retrieve the values
 				retrieveCode := []byte(fmt.Sprintf(
@@ -1045,7 +1049,8 @@ func TestEVMAddressDeposit(t *testing.T) {
 			)
 
 			// check replayability before appending state
-			testutils.ValidateEventsReplayability(t, chain.ChainID(), preSnapshot, txPayloads, blockEventPayload)
+			rootAddr := evm.StorageAccountAddress(chain.ChainID())
+			testutils.ValidateEventsReplayability(t, chain.ChainID(), rootAddr, preSnapshot, txPayloads, blockEventPayload)
 
 		})
 }
@@ -2732,54 +2737,214 @@ func RunWithNewEnvironment(
 		*EOATestAccount,
 	),
 ) {
-	rootAddr := evm.StorageAccountAddress(chain.ChainID())
 
 	RunWithTestBackend(t, func(backend *TestBackend) {
-		RunWithDeployedContract(t, GetStorageTestContract(t), backend, rootAddr, func(testContract *TestContract) {
-			RunWithEOATestAccount(t, backend, rootAddr, func(testAccount *EOATestAccount) {
 
-				blocks := new(envMock.Blocks)
-				block1 := unittest.BlockFixture()
-				blocks.On("ByHeightFrom",
-					block1.Header.Height,
-					block1.Header,
-				).Return(block1.Header, nil)
+		blocks := new(envMock.Blocks)
+		block1 := unittest.BlockFixture()
+		blocks.On("ByHeightFrom",
+			block1.Header.Height,
+			block1.Header,
+		).Return(block1.Header, nil)
 
-				opts := []fvm.Option{
-					fvm.WithChain(chain),
-					fvm.WithBlockHeader(block1.Header),
-					fvm.WithAuthorizationChecksEnabled(false),
-					fvm.WithSequenceNumberCheckAndIncrementEnabled(false),
-					fvm.WithEntropyProvider(testutil.EntropyProviderFixture(nil)),
-					fvm.WithRandomSourceHistoryCallAllowed(true),
-					fvm.WithBlocks(blocks),
-					fvm.WithCadenceLogging(true),
-				}
-				ctx := fvm.NewContext(opts...)
+		opts := []fvm.Option{
+			fvm.WithChain(chain),
+			fvm.WithBlockHeader(block1.Header),
+			fvm.WithAuthorizationChecksEnabled(false),
+			fvm.WithSequenceNumberCheckAndIncrementEnabled(false),
+			fvm.WithEntropyProvider(testutil.EntropyProviderFixture(nil)),
+			fvm.WithRandomSourceHistoryCallAllowed(true),
+			fvm.WithBlocks(blocks),
+			fvm.WithCadenceLogging(true),
+		}
+		ctx := fvm.NewContext(opts...)
 
-				vm := fvm.NewVirtualMachine()
-				snapshotTree := snapshot.NewSnapshotTree(backend)
+		vm := fvm.NewVirtualMachine()
+		snapshotTree := snapshot.NewSnapshotTree(backend)
 
-				baseBootstrapOpts := []fvm.BootstrapProcedureOption{
-					fvm.WithInitialTokenSupply(unittest.GenesisTokenSupply),
-				}
+		baseBootstrapOpts := []fvm.BootstrapProcedureOption{
+			fvm.WithInitialTokenSupply(unittest.GenesisTokenSupply),
+		}
 
-				executionSnapshot, _, err := vm.Run(
-					ctx,
-					fvm.Bootstrap(unittest.ServiceAccountPublicKey, baseBootstrapOpts...),
-					snapshotTree)
-				require.NoError(t, err)
+		executionSnapshot, _, err := vm.Run(
+			ctx,
+			fvm.Bootstrap(unittest.ServiceAccountPublicKey, baseBootstrapOpts...),
+			snapshotTree)
+		require.NoError(t, err)
 
-				snapshotTree = snapshotTree.Append(executionSnapshot)
+		snapshotTree = snapshotTree.Append(executionSnapshot)
 
-				f(
-					fvm.NewContextFromParent(ctx, fvm.WithEVMEnabled(true)),
-					vm,
-					snapshotTree,
-					testContract,
-					testAccount,
-				)
-			})
-		})
+		ctx = fvm.NewContextFromParent(ctx, fvm.WithEVMEnabled(true))
+
+		var testAccount *EOATestAccount
+		testAccount, snapshotTree = setupTestEOAAccount(t, chain, ctx, vm, snapshotTree)
+
+		var testContract *TestContract
+		testContract, snapshotTree = setupTestContract(t, chain, testAccount, ctx, vm, snapshotTree)
+
+		f(
+			ctx,
+			vm,
+			snapshotTree,
+			testContract,
+			testAccount,
+		)
+		// })
 	})
+}
+
+func setupTestContract(
+	t *testing.T,
+	chain flow.Chain,
+	testAccount *EOATestAccount,
+	ctx fvm.Context,
+	vm fvm.VM,
+	snap snapshot.SnapshotTree,
+) (*TestContract, snapshot.SnapshotTree) {
+
+	// deploy the test contract
+	testContract := GetStorageTestContract(t)
+	evmAddr := evm.ContractAccountAddress(chain.ChainID())
+
+	innerTx := testAccount.SignTx(t,
+		gethTypes.NewContractCreation(
+			testAccount.Nonce(),
+			big.NewInt(0),
+			10_000_000,
+			big.NewInt(0),
+			testContract.ByteCode,
+		),
+	)
+	testAccount.SetNonce(testAccount.Nonce() + 1)
+
+	var b bytes.Buffer
+	writer := io.Writer(&b)
+	err := innerTx.EncodeRLP(writer)
+	require.NoError(t, err)
+
+	innerTxBytes := b.Bytes()
+
+	code := []byte(fmt.Sprintf(
+		`
+		import EVM from %s
+
+		transaction(tx: [UInt8], coinbaseBytes: [UInt8; 20]){
+			prepare(account: &Account) {
+				let coinbase = EVM.EVMAddress(bytes: coinbaseBytes)
+				let res = EVM.run(tx: tx, coinbase: coinbase)
+
+				assert(res.status == EVM.Status.successful, message: "unexpected status")
+				assert(res.errorCode == 0, message: "unexpected error code")
+				assert(res.gasUsed > 0, message: "zero gas consumed")
+				// assert(res.deployedContract == nil, message: "unexpected deployed contract")
+			}
+		}
+	`,
+		evmAddr.HexWithPrefix(),
+	))
+
+	coinbaseAddr := types.Address{1, 2, 3}
+	coinbaseBalance := getEVMAccountBalance(t, ctx, vm, snap, coinbaseAddr)
+	require.Zero(t, types.BalanceToBigInt(coinbaseBalance).Uint64())
+
+	innerTxEncoded := cadence.NewArray(
+		ConvertToCadence(innerTxBytes),
+	).WithType(stdlib.EVMTransactionBytesCadenceType)
+
+	coinbase := cadence.NewArray(
+		ConvertToCadence(coinbaseAddr.Bytes()),
+	).WithType(stdlib.EVMAddressBytesCadenceType)
+
+	tx := fvm.Transaction(
+		flow.NewTransactionBody().
+			SetScript(code).
+			AddAuthorizer(chain.ServiceAddress()).
+			AddArgument(json.MustEncode(innerTxEncoded)).
+			AddArgument(json.MustEncode(coinbase)),
+		0)
+
+	state, output, err := vm.Run(
+		ctx,
+		tx,
+		snap)
+	require.NoError(t, err)
+	require.NoError(t, output.Err)
+
+	snap = snap.Append(state)
+
+	// collect address from the event
+	require.Len(t, output.Events, 1)
+	txEvent := output.Events[0]
+	txEventPayload := testutils.TxEventToPayload(t, txEvent, evmAddr)
+	testContract.SetDeployedAt(
+		types.NewAddressFromString(txEventPayload.ContractAddress))
+
+	// commit block
+	_, snap = callEVMHeartBeat(t,
+		ctx,
+		vm,
+		snap)
+
+	return testContract, snap
+}
+
+func setupTestEOAAccount(
+	t *testing.T,
+	chain flow.Chain,
+	ctx fvm.Context,
+	vm fvm.VM,
+	snap snapshot.SnapshotTree,
+) (*EOATestAccount, snapshot.SnapshotTree) {
+	testAccount := GetTestEOAAccount(t, EOATestAccount1KeyHex)
+
+	code := []byte(fmt.Sprintf(
+		`
+		import EVM from %s
+		import FlowToken from %s
+
+		transaction(addr: [UInt8; 20]) {
+			prepare(account: auth(BorrowValue) &Account) {
+				let admin = account.storage
+					.borrow<&FlowToken.Administrator>(from: /storage/flowTokenAdmin)!
+
+				let minter <- admin.createNewMinter(allowedAmount: 1.0)
+				let vault <- minter.mintTokens(amount: 1.0)
+				destroy minter
+
+				let address = EVM.EVMAddress(bytes: addr)
+				address.deposit(from: <-vault)
+			}
+		}
+	`,
+		systemcontracts.SystemContractsForChain(chain.ChainID()).EVMContract.Address.HexWithPrefix(),
+		systemcontracts.SystemContractsForChain(chain.ChainID()).FlowToken.Address.HexWithPrefix(),
+	))
+
+	addr := RandomAddress(t)
+
+	tx := fvm.Transaction(
+		flow.NewTransactionBody().
+			SetScript(code).
+			AddAuthorizer(chain.ServiceAddress()).
+			AddArgument(json.MustEncode(cadence.NewArray(
+				ConvertToCadence(addr.Bytes()),
+			).WithType(stdlib.EVMAddressBytesCadenceType))),
+		0)
+
+	execSnap, output, err := vm.Run(
+		ctx,
+		tx,
+		snap)
+	require.NoError(t, err)
+	require.NoError(t, output.Err)
+
+	snap = snap.Append(execSnap)
+
+	// commit block
+	_, snap = callEVMHeartBeat(t,
+		ctx,
+		vm,
+		snap)
+
+	return testAccount, snap
 }
