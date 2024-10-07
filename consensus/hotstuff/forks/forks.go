@@ -401,7 +401,7 @@ func (f *Forks) checkForAdvancingFinalization(certifiedBlock *model.CertifiedBlo
 	parentBlock := parentVertex.(*BlockContainer).Block()
 
 	// Note: we assume that all stored blocks pass Forks.EnsureBlockIsValidExtension(block);
-	//       specifically, that SignedProposal's ViewNumber is strictly monotonically
+	//       specifically, that block's ViewNumber is strictly monotonically
 	//       increasing which is enforced by LevelledForest.VerifyVertex(...)
 	// We denote:
 	//  * a DIRECT 1-chain as '<-'
