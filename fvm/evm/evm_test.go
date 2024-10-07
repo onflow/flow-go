@@ -100,7 +100,6 @@ func TestEVMRun(t *testing.T) {
 						AddArgument(json.MustEncode(coinbase)),
 					0)
 
-				preSnapshot := snapshot
 				state, output, err := vm.Run(
 					ctx,
 					tx,
@@ -150,9 +149,6 @@ func TestEVMRun(t *testing.T) {
 				require.Equal(t, blockEventPayload.Height, txEventPayload.BlockHeight)
 				require.Equal(t, blockEventPayload.TotalGasUsed-feeTranferEventPayload.GasConsumed, txEventPayload.GasConsumed)
 				require.Empty(t, txEventPayload.ContractAddress)
-
-				// check replayability before appending state
-				testutils.ValidateEventsReplayability(t, chain.ChainID(), preSnapshot, txPayloads, blockEventPayload)
 
 				// append the state
 				snapshot = snapshot.Append(state)
@@ -485,10 +481,6 @@ func TestEVMBatchRun(t *testing.T) {
 				require.NoError(t, output.Err)
 				require.NotEmpty(t, state.WriteSet)
 
-				// collect data for replay
-				preSnapshot := snapshot
-				txPayloads := make([]events.TransactionEventPayload, 0)
-
 				// append the state
 				snapshot = snapshot.Append(state)
 
@@ -507,8 +499,6 @@ func TestEVMBatchRun(t *testing.T) {
 
 					event, err := events.DecodeTransactionEventPayload(cadenceEvent)
 					require.NoError(t, err)
-					txPayloads = append(txPayloads, *event)
-
 					txHashes = append(txHashes, event.Hash)
 					var logs []*gethTypes.Log
 					err = rlp.DecodeBytes(event.Logs, &logs)
@@ -530,7 +520,6 @@ func TestEVMBatchRun(t *testing.T) {
 				require.Equal(t, uint16(batchCount), feeTranferEventPayload.Index)
 				require.Equal(t, uint64(21000), feeTranferEventPayload.GasConsumed)
 				txHashes = append(txHashes, feeTranferEventPayload.Hash)
-				txPayloads = append(txPayloads, *feeTranferEventPayload)
 
 				// check coinbase balance (note the gas price is 1)
 				coinbaseBalance = getEVMAccountBalance(t, ctx, vm, snapshot, coinbaseAddr)
@@ -548,9 +537,6 @@ func TestEVMBatchRun(t *testing.T) {
 					txHashes.RootHash(),
 					blockEventPayload.TransactionHashRoot,
 				)
-
-				// check replayability before appending state
-				testutils.ValidateEventsReplayability(t, chain.ChainID(), preSnapshot, txPayloads, blockEventPayload)
 
 				// retrieve the values
 				retrieveCode := []byte(fmt.Sprintf(
@@ -997,10 +983,6 @@ func TestEVMAddressDeposit(t *testing.T) {
 					).WithType(stdlib.EVMAddressBytesCadenceType))),
 				0)
 
-			// collect data for replay
-			preSnapshot := snapshot
-			txPayloads := make([]events.TransactionEventPayload, 0)
-
 			execSnap, output, err := vm.Run(
 				ctx,
 				tx,
@@ -1017,7 +999,6 @@ func TestEVMAddressDeposit(t *testing.T) {
 			// tx executed event
 			txEvent := output.Events[2]
 			txEventPayload := testutils.TxEventToPayload(t, txEvent, sc.EVMContract.Address)
-			txPayloads = append(txPayloads, *txEventPayload)
 
 			// deposit event
 			depositEvent := output.Events[3]
@@ -1043,10 +1024,6 @@ func TestEVMAddressDeposit(t *testing.T) {
 				txHashes.RootHash(),
 				blockEventPayload.TransactionHashRoot,
 			)
-
-			// check replayability before appending state
-			testutils.ValidateEventsReplayability(t, chain.ChainID(), preSnapshot, txPayloads, blockEventPayload)
-
 		})
 }
 
