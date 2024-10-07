@@ -23,6 +23,17 @@ func TestStoringTransactionResultErrorMessages(t *testing.T) {
 		store := bstorage.NewTransactionResultErrorMessages(metrics, db, 1000)
 
 		blockID := unittest.IdentifierFixture()
+
+		// test db Exists by block id
+		exists, err := store.Exists(blockID)
+		require.NoError(t, err)
+		require.False(t, exists)
+
+		// check retrieving by ByBlockID
+		messages, err := store.ByBlockID(blockID)
+		require.NoError(t, err)
+		require.Nil(t, messages)
+
 		txErrorMessages := make([]flow.TransactionResultErrorMessage, 0)
 		for i := 0; i < 10; i++ {
 			expected := flow.TransactionResultErrorMessage{
@@ -33,8 +44,13 @@ func TestStoringTransactionResultErrorMessages(t *testing.T) {
 			}
 			txErrorMessages = append(txErrorMessages, expected)
 		}
-		err := store.Store(blockID, txErrorMessages)
+		err = store.Store(blockID, txErrorMessages)
 		require.NoError(t, err)
+
+		// test db Exists by block id
+		exists, err = store.Exists(blockID)
+		require.NoError(t, err)
+		require.True(t, exists)
 
 		// check retrieving by ByBlockIDTransactionID
 		for _, txErrorMessage := range txErrorMessages {
