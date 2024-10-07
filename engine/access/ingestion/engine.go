@@ -274,7 +274,7 @@ func (e *Engine) processFinalizedBlockJob(ctx irrecoverable.SignalerContext, job
 		ctx.Throw(fmt.Errorf("failed to convert job to block: %w", err))
 	}
 
-	err = e.processFinalizedBlock(block)
+	err = e.processFinalizedBlock(ctx, block)
 	if err == nil {
 		done()
 		return
@@ -437,10 +437,9 @@ func (e *Engine) handleTransactionResultErrorMessages(ctx context.Context, block
 		e.preferredENIdentifiers,
 	)
 	if err != nil {
-		// in case querying nodes by existing execution receipts failed,
-		// will continue with the next execution node from next the execution receipt for that block
-		e.log.Error().Err(err).Msg("failed to retrieve error messages from the backend")
-		return nil
+		e.log.Error().Err(err).Msg(fmt.Sprintf("failed to found execution nodes for block id: %s", blockID))
+
+		return fmt.Errorf("could not found execution nodes for block: %w", err)
 	}
 
 	req := &execproto.GetTransactionErrorMessagesByBlockIDRequest{
@@ -536,7 +535,7 @@ func (e *Engine) OnFinalizedBlock(*model.Block) {
 //   - storage.ErrAlreadyExists - if the collection within block or an execution result ID already exists in the database.
 //   - generic error in case of unexpected failure from the database layer, or failure
 //     to decode an existing database value.
-func (e *Engine) processFinalizedBlock(block *flow.Block) error {
+func (e *Engine) processFinalizedBlock(ctx context.Context, block *flow.Block) error {
 	// FIX: we can't index guarantees here, as we might have more than one block
 	// with the same collection as long as it is not finalized
 
@@ -553,6 +552,11 @@ func (e *Engine) processFinalizedBlock(block *flow.Block) error {
 		err := e.executionResults.Index(seal.BlockID, seal.ResultID)
 		if err != nil {
 			return fmt.Errorf("could not index block for execution result: %w", err)
+		}
+
+		err = e.handleTransactionResultErrorMessages(ctx, seal.BlockID)
+		if err != nil {
+			return err
 		}
 	}
 
