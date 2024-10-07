@@ -49,16 +49,19 @@ type TransactionResultErrorMessages interface {
 
 	// ByBlockIDTransactionID returns the transaction result error message for the given block ID and transaction ID.
 	//
-	// No errors are expected during normal operation.
+	// Expected errors during normal operation:
+	//   - `storage.ErrNotFound` if no transaction error message is known at given block and transaction id.
 	ByBlockIDTransactionID(blockID flow.Identifier, transactionID flow.Identifier) (*flow.TransactionResultErrorMessage, error)
 
 	// ByBlockIDTransactionIndex returns the transaction result error message for the given blockID and transaction index.
 	//
-	// No errors are expected during normal operation.
+	// Expected errors during normal operation:
+	//   - `storage.ErrNotFound` if no transaction error message is known at given block and transaction index.
 	ByBlockIDTransactionIndex(blockID flow.Identifier, txIndex uint32) (*flow.TransactionResultErrorMessage, error)
 
 	// ByBlockID gets all transaction result error messages for a block, ordered by transaction index.
 	//
-	// No errors are expected during normal operation.
+	// Expected errors during normal operation:
+	//   - `storage.ErrNotFound` if no transaction error messages is known at given block.
 	ByBlockID(id flow.Identifier) ([]flow.TransactionResultErrorMessage, error)
 }
