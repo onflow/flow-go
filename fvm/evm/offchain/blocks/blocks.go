@@ -3,10 +3,11 @@ package blocks
 import (
 	"fmt"
 
+	gethCommon "github.com/onflow/go-ethereum/common"
+
 	"github.com/onflow/flow-go/fvm/evm/handler"
 	"github.com/onflow/flow-go/fvm/evm/types"
 	"github.com/onflow/flow-go/model/flow"
-	gethCommon "github.com/onflow/go-ethereum/common"
 )
 
 const BlockStoreLatestBlockMetaKey = "LatestBlockMeta"
