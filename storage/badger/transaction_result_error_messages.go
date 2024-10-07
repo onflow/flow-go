@@ -163,6 +163,9 @@ func (t *TransactionResultErrorMessages) batchStore(blockID flow.Identifier, tra
 }
 
 // ByBlockIDTransactionID returns the transaction result error message for the given block ID and transaction ID
+//
+// Expected errors during normal operation:
+//   - `storage.ErrNotFound` if no transaction error message is known at given block and transaction id.
 func (t *TransactionResultErrorMessages) ByBlockIDTransactionID(blockID flow.Identifier, transactionID flow.Identifier) (*flow.TransactionResultErrorMessage, error) {
 	tx := t.db.NewTransaction(false)
 	defer tx.Discard()
@@ -175,6 +178,9 @@ func (t *TransactionResultErrorMessages) ByBlockIDTransactionID(blockID flow.Ide
 }
 
 // ByBlockIDTransactionIndex returns the transaction result error message for the given blockID and transaction index
+//
+// Expected errors during normal operation:
+//   - `storage.ErrNotFound` if no transaction error message is known at given block and transaction index.
 func (t *TransactionResultErrorMessages) ByBlockIDTransactionIndex(blockID flow.Identifier, txIndex uint32) (*flow.TransactionResultErrorMessage, error) {
 	tx := t.db.NewTransaction(false)
 	defer tx.Discard()
@@ -186,7 +192,10 @@ func (t *TransactionResultErrorMessages) ByBlockIDTransactionIndex(blockID flow.
 	return &transactionResultErrorMessage, nil
 }
 
-// ByBlockID gets all transaction result error messages for a block, ordered by transaction index
+// ByBlockID gets all transaction result error messages for a block, ordered by transaction index.
+//
+// Expected errors during normal operation:
+//   - `storage.ErrNotFound` if no transaction error messages is known at given block.
 func (t *TransactionResultErrorMessages) ByBlockID(blockID flow.Identifier) ([]flow.TransactionResultErrorMessage, error) {
 	tx := t.db.NewTransaction(false)
 	defer tx.Discard()
