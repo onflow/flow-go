@@ -8,12 +8,14 @@ import (
 	"github.com/onflow/flow-go/fvm/evm/types"
 )
 
+// ReadOnlyStorage wraps an snapshot and only provides read functionality.
 type ReadOnlyStorage struct {
 	snapshot types.BackendStorageSnapshot
 }
 
 var _ types.BackendStorage = &ReadOnlyStorage{}
 
+// NewReadOnlyStorage constructs a new ReadOnlyStorage using the given snapshot
 func NewReadOnlyStorage(snapshot types.BackendStorageSnapshot) *ReadOnlyStorage {
 	return &ReadOnlyStorage{
 		snapshot,

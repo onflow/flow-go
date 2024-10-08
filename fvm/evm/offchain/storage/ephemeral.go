@@ -83,24 +83,10 @@ func (s *EphemeralStorage) StorageRegisterUpdates() map[flow.RegisterID]flow.Reg
 	return s.deltas
 }
 
-// Commit commits changes from the delta to the underlying backend storage
-//
-// Warning! commit method doesn't sort the updates before sending the the backend
-// so it's not intended to be used for on-chain operations
-func (s *EphemeralStorage) Commit() error {
-	var err error
-	for k, v := range s.deltas {
-		err = s.parent.SetValue([]byte(k.Owner), []byte(k.Key), v)
-		if err != nil {
-			return err
-		}
-	}
-	// reset delta
-	s.deltas = make(map[flow.RegisterID]flow.RegisterValue)
-	return nil
-}
-
 // RegisterID creates a RegisterID from owner and key
 func RegisterID(owner []byte, key []byte) flow.RegisterID {
-	return flow.NewRegisterID(flow.BytesToAddress(owner), string(key))
+	return flow.RegisterID{
+		Owner: string(owner),
+		Key:   string(key),
+	}
 }
