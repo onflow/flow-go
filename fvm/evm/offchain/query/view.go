@@ -18,7 +18,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
-type EphemeralView struct {
+type View struct {
 	chainID  flow.ChainID
 	rootAddr flow.Address
 	storage  *storage.EphemeralStorage
@@ -26,7 +26,19 @@ type EphemeralView struct {
 	extraPCs []types.PrecompiledContract
 }
 
-func (v *EphemeralView) GetBalance(addr gethCommon.Address) (*big.Int, error) {
+func NewView(
+	chainID flow.ChainID,
+	rootAddr flow.Address,
+	storage *storage.EphemeralStorage,
+) *View {
+	return &View{
+		chainID:  chainID,
+		rootAddr: rootAddr,
+		storage:  storage,
+	}
+}
+
+func (v *View) GetBalance(addr gethCommon.Address) (*big.Int, error) {
 	bv, err := state.NewBaseView(v.storage, v.rootAddr)
 	if err != nil {
 		return nil, err
@@ -38,7 +50,7 @@ func (v *EphemeralView) GetBalance(addr gethCommon.Address) (*big.Int, error) {
 	return bal.ToBig(), nil
 }
 
-func (v *EphemeralView) GetNonce(addr gethCommon.Address) (uint64, error) {
+func (v *View) GetNonce(addr gethCommon.Address) (uint64, error) {
 	bv, err := state.NewBaseView(v.storage, v.rootAddr)
 	if err != nil {
 		return 0, err
@@ -46,7 +58,7 @@ func (v *EphemeralView) GetNonce(addr gethCommon.Address) (uint64, error) {
 	return bv.GetNonce(addr)
 }
 
-func (v *EphemeralView) GetCode(addr gethCommon.Address) ([]byte, error) {
+func (v *View) GetCode(addr gethCommon.Address) ([]byte, error) {
 	bv, err := state.NewBaseView(v.storage, v.rootAddr)
 	if err != nil {
 		return nil, err
@@ -54,7 +66,7 @@ func (v *EphemeralView) GetCode(addr gethCommon.Address) ([]byte, error) {
 	return bv.GetCode(addr)
 }
 
-func (v *EphemeralView) GetCodeHash(addr gethCommon.Address) (gethCommon.Hash, error) {
+func (v *View) GetCodeHash(addr gethCommon.Address) (gethCommon.Hash, error) {
 	bv, err := state.NewBaseView(v.storage, v.rootAddr)
 	if err != nil {
 		return gethCommon.Hash{}, err
@@ -62,7 +74,7 @@ func (v *EphemeralView) GetCodeHash(addr gethCommon.Address) (gethCommon.Hash, e
 	return bv.GetCodeHash(addr)
 }
 
-func (v *EphemeralView) GetSlab(addr gethCommon.Address, key gethCommon.Hash) (gethCommon.Hash, error) {
+func (v *View) GetSlab(addr gethCommon.Address, key gethCommon.Hash) (gethCommon.Hash, error) {
 	bv, err := state.NewBaseView(v.storage, v.rootAddr)
 	if err != nil {
 		return gethCommon.Hash{}, err
@@ -73,7 +85,7 @@ func (v *EphemeralView) GetSlab(addr gethCommon.Address, key gethCommon.Hash) (g
 	})
 }
 
-func (v *EphemeralView) DryCall(
+func (v *View) DryCall(
 	from gethCommon.Address,
 	to gethCommon.Address,
 	gasLimit uint64,
@@ -126,13 +138,13 @@ func (v *EphemeralView) DryCall(
 	return res, nil
 }
 
-type DryRunOption func(v *EphemeralView) error
+type DryRunOption func(v *View) error
 
 func NewDryRunStorageOverrideBalance(
 	addr gethCommon.Address,
 	balance *uint256.Int,
 ) DryRunOption {
-	return func(v *EphemeralView) error {
+	return func(v *View) error {
 		baseView, err := state.NewBaseView(v.storage, v.rootAddr)
 		if err != nil {
 			return err
@@ -161,7 +173,7 @@ func NewDryRunStorageOverrideNonce(
 	addr gethCommon.Address,
 	nonce uint64,
 ) DryRunOption {
-	return func(v *EphemeralView) error {
+	return func(v *View) error {
 		baseView, err := state.NewBaseView(v.storage, v.rootAddr)
 		if err != nil {
 			return err
@@ -190,7 +202,7 @@ func NewDryRunStorageOverrideCode(
 	addr gethCommon.Address,
 	code []byte,
 ) DryRunOption {
-	return func(v *EphemeralView) error {
+	return func(v *View) error {
 		baseView, err := state.NewBaseView(v.storage, v.rootAddr)
 		if err != nil {
 			return err
@@ -219,7 +231,7 @@ func NewDryRunStorageOverrideState(
 	addr gethCommon.Address,
 	slots map[gethCommon.Hash]gethCommon.Hash,
 ) DryRunOption {
-	return func(v *EphemeralView) error {
+	return func(v *View) error {
 		baseView, err := state.NewBaseView(v.storage, v.rootAddr)
 		if err != nil {
 			return err
@@ -247,7 +259,7 @@ func NewDryRunStorageOverrideStateDiff(
 	addr gethCommon.Address,
 	slots map[gethCommon.Hash]gethCommon.Hash,
 ) DryRunOption {
-	return func(v *EphemeralView) error {
+	return func(v *View) error {
 		baseView, err := state.NewBaseView(v.storage, v.rootAddr)
 		if err != nil {
 			return err
@@ -269,7 +281,7 @@ func NewDryRunStorageOverrideStateDiff(
 func NewDryRunTracerUpdate(
 	tracer *gethTracers.Tracer,
 ) DryRunOption {
-	return func(v *EphemeralView) error {
+	return func(v *View) error {
 		v.tracer = tracer
 		return nil
 	}
@@ -277,7 +289,7 @@ func NewDryRunTracerUpdate(
 
 // this method can be used with remote PC caller for cadence arch calls
 func NewDryRunWithExtraPrecompiledContracts(pcs []types.PrecompiledContract) DryRunOption {
-	return func(v *EphemeralView) error {
+	return func(v *View) error {
 		v.extraPCs = pcs
 		return nil
 	}

@@ -8,21 +8,21 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
-type EphemeralViewProvider struct {
+type ViewProvider struct {
 	chainID         flow.ChainID
 	rootAddr        flow.Address
 	logger          zerolog.Logger
 	storageProvider types.StorageProvider
 }
 
-// NewEphemeralViewProvider constructs a new EphemeralViewProvider
-func NewEphemeralViewProvider(
+// NewViewProvider constructs a new ViewProvider
+func NewViewProvider(
 	chainID flow.ChainID,
 	rootAddr flow.Address,
 	sp types.StorageProvider,
 	logger zerolog.Logger,
-) *EphemeralViewProvider {
-	return &EphemeralViewProvider{
+) *ViewProvider {
+	return &ViewProvider{
 		chainID:         chainID,
 		storageProvider: sp,
 		rootAddr:        rootAddr,
@@ -30,12 +30,12 @@ func NewEphemeralViewProvider(
 	}
 }
 
-func (evp *EphemeralViewProvider) GetBlockView(height uint64) (*EphemeralView, error) {
+func (evp *ViewProvider) GetBlockView(height uint64) (*View, error) {
 	readOnly, err := evp.storageProvider.GetSnapshotAt(height)
 	if err != nil {
 		return nil, err
 	}
-	return &EphemeralView{
+	return &View{
 		chainID:  evp.chainID,
 		rootAddr: evp.rootAddr,
 		storage: storage.NewEphemeralStorage(
