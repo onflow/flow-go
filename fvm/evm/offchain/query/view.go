@@ -320,5 +320,16 @@ func NewDryRunWithExtraPrecompiledContracts(pcs []types.PrecompiledContract) Dry
 		v.extraPCs = pcs
 		return nil
 	}
+}
 
+// this method can be used to replace the block meta
+func NewDryRunWithStorageOverrideBlocksMeta(meta *blocks.Meta) DryRunOption {
+	return func(v *View) error {
+		blks, err := blocks.NewBlocks(v.chainID, v.rootAddr, v.storage)
+		if err != nil {
+			return err
+		}
+		blks.PushBlockMeta(meta)
+		return nil
+	}
 }
