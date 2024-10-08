@@ -32,7 +32,7 @@ const (
 // smaller fixed size buckets to minimize the
 // number of bytes read and written during set/get operations.
 type BlockHashList struct {
-	backend     types.Backend
+	backend     types.BackendStorage
 	rootAddress flow.Address
 
 	// cached meta data
@@ -46,7 +46,7 @@ type BlockHashList struct {
 // It tries to load the metadata from the backend
 // and if not exist it creates one
 func NewBlockHashList(
-	backend types.Backend,
+	backend types.BackendStorage,
 	rootAddress flow.Address,
 	capacity int,
 ) (*BlockHashList, error) {

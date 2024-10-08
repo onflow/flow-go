@@ -1257,7 +1257,7 @@ func TestTransactionTracing(t *testing.T) {
 					testAccount.Address(),
 					types.Address{0x01, 0x02},
 					testContract.ByteCode,
-					1_000_000,
+					2_000_000,
 					big.NewInt(0),
 					testAccount.Nonce(),
 				),

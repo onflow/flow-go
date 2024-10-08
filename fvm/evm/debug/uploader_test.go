@@ -1,4 +1,4 @@
-package debug
+package debug_test
 
 import (
 	"context"
@@ -16,6 +16,7 @@ import (
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/require"
 
+	"github.com/onflow/flow-go/fvm/evm/debug"
 	"github.com/onflow/flow-go/model/flow"
 	testutils "github.com/onflow/flow-go/utils/unittest"
 )
@@ -27,7 +28,7 @@ func Test_Uploader(t *testing.T) {
 	testutils.SkipUnless(t, testutils.TEST_REQUIRES_GCP_ACCESS, "requires GCP Bucket setup")
 
 	t.Run("successfuly upload traces", func(t *testing.T) {
-		uploader, err := NewGCPUploader(bucket)
+		uploader, err := debug.NewGCPUploader(bucket)
 		require.NoError(t, err)
 
 		const testID = "test_p"
@@ -56,10 +57,10 @@ func Test_TracerUploaderIntegration(t *testing.T) {
 	testutils.SkipUnless(t, testutils.TEST_REQUIRES_GCP_ACCESS, "requires GCP Bucket setup")
 
 	t.Run("successfuly uploads traces", func(t *testing.T) {
-		uploader, err := NewGCPUploader(bucket)
+		uploader, err := debug.NewGCPUploader(bucket)
 		require.NoError(t, err)
 
-		tracer, err := NewEVMCallTracer(uploader, zerolog.Nop())
+		tracer, err := debug.NewEVMCallTracer(uploader, zerolog.Nop())
 		require.NoError(t, err)
 
 		tr := tracer.TxTracer()
