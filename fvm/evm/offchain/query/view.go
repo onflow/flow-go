@@ -20,6 +20,8 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
+// View provides query capabilities over
+// an specific state of the EVM chain.
 type View struct {
 	chainID         flow.ChainID
 	rootAddr        flow.Address
@@ -29,6 +31,7 @@ type View struct {
 	maxCallGasLimit uint64
 }
 
+// NewView constructs a new view.
 func NewView(
 	chainID flow.ChainID,
 	rootAddr flow.Address,
@@ -108,7 +111,7 @@ func (v *View) GetSlab(addr gethCommon.Address, key gethCommon.Hash) (gethCommon
 	})
 }
 
-// DryCall runs a call offchain and returns the results
+// DryCall runs a call off-chain and returns the results
 // accepts override storage and precompiled call options
 // as well as custom tracer.
 func (v *View) DryCall(
@@ -172,11 +175,13 @@ func (v *View) DryCall(
 	return res, nil
 }
 
-// DryRunOption captures a optional change
-// when running dry run
+// DryRunOption captures a options
+// to be applied before the execution of a dry call.
 type DryCallOption func(v *View) error
 
-func WithStorageOverrideBalance(
+// WithStateOverrideBalance constructs a dry call option
+// that replaces the balance of an address before the execution a dry call.
+func WithStateOverrideBalance(
 	addr gethCommon.Address,
 	balance *big.Int,
 ) DryCallOption {
@@ -211,7 +216,9 @@ func WithStorageOverrideBalance(
 	}
 }
 
-func WithStorageOverrideNonce(
+// WithStateOverrideNonce constructs a dry call option
+// that replaces the nonce of an address before the execution a dry call.
+func WithStateOverrideNonce(
 	addr gethCommon.Address,
 	nonce uint64,
 ) DryCallOption {
@@ -240,7 +247,9 @@ func WithStorageOverrideNonce(
 	}
 }
 
-func WithStorageOverrideCode(
+// WithStateOverrideCode constructs a dry call option
+// that replaces the code of an address before the dry call.
+func WithStateOverrideCode(
 	addr gethCommon.Address,
 	code []byte,
 ) DryCallOption {
@@ -269,7 +278,9 @@ func WithStorageOverrideCode(
 	}
 }
 
-func WithStorageOverrideState(
+// WithStateOverrideState constructs a dry call option
+// that overrides all slots in the account storage before executing the call.
+func WithStateOverrideState(
 	addr gethCommon.Address,
 	slots map[gethCommon.Hash]gethCommon.Hash,
 ) DryCallOption {
@@ -297,7 +308,9 @@ func WithStorageOverrideState(
 	}
 }
 
-func WithStorageOverrideStateDiff(
+// WithStateOverrideStateDiff constructs a dry call option
+// that overrides slots of an account before executing the call.
+func WithStateOverrideStateDiff(
 	addr gethCommon.Address,
 	slots map[gethCommon.Hash]gethCommon.Hash,
 ) DryCallOption {
@@ -320,6 +333,22 @@ func WithStorageOverrideStateDiff(
 	}
 }
 
+// WithStorageOverrideBlocksMeta constructs a dry call option
+// that overrides the value related to block meta
+func WithStateOverrideBlocksMeta(meta *blocks.Meta) DryCallOption {
+	return func(v *View) error {
+		blks, err := blocks.NewBlocks(v.chainID, v.rootAddr, v.storage)
+		if err != nil {
+			return err
+		}
+		blks.PushBlockMeta(meta)
+		return nil
+	}
+}
+
+// WithTracer constructs a dry call option
+// that allows running the dry call with the
+// custom tracer.
 func WithTracer(
 	tracer *gethTracers.Tracer,
 ) DryCallOption {
@@ -329,22 +358,14 @@ func WithTracer(
 	}
 }
 
+// WithTracer constructs a dry call option
+// that allows adding the precompiled contracts
+// while executing the dry-call.
+//
 // this method can be used with remote PC caller for cadence arch calls
 func WithExtraPrecompiledContracts(pcs []types.PrecompiledContract) DryCallOption {
 	return func(v *View) error {
 		v.extraPCs = pcs
-		return nil
-	}
-}
-
-// this method can be used to replace the block meta
-func WithStorageOverrideBlocksMeta(meta *blocks.Meta) DryCallOption {
-	return func(v *View) error {
-		blks, err := blocks.NewBlocks(v.chainID, v.rootAddr, v.storage)
-		if err != nil {
-			return err
-		}
-		blks.PushBlockMeta(meta)
 		return nil
 	}
 }

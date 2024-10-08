@@ -104,7 +104,7 @@ func TestView(t *testing.T) {
 							big.NewInt(0),
 							uint64(1_000_000),
 							big.NewInt(0),
-							query.WithStorageOverrideBalance(
+							query.WithStateOverrideBalance(
 								testAccount.Address().ToCommon(),
 								newBalance,
 							),
