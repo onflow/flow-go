@@ -9,10 +9,10 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
-// ChainReplayer consumes EVM transaction and block
+// Replayer consumes EVM transaction and block
 // events, re-execute EVM transaction and follows EVM chain.
 // this allows using different tracers and storage solutions.
-type ChainReplayer struct {
+type Replayer struct {
 	chainID         flow.ChainID
 	rootAddr        flow.Address
 	logger          zerolog.Logger
@@ -21,30 +21,31 @@ type ChainReplayer struct {
 	validateResults bool
 }
 
-// NewChainReplayer constructs a new ChainReplayer
-func NewChainReplayer(
+// NewReplayer constructs a new Replayer
+func NewReplayer(
 	chainID flow.ChainID,
 	rootAddr flow.Address,
 	sp types.StorageProvider,
 	logger zerolog.Logger,
 	tracer *gethTracers.Tracer,
 	validateResults bool,
-) *ChainReplayer {
-	return &ChainReplayer{
+) *Replayer {
+	return &Replayer{
 		chainID:         chainID,
 		rootAddr:        rootAddr,
 		storageProvider: sp,
 		logger:          logger,
 		tracer:          tracer,
+		validateResults: validateResults,
 	}
 }
 
 // OnBlockReceived is called when a new block is received
 // (including all the related transaction executed events)
-func (cr *ChainReplayer) OnBlockReceived(
+func (cr *Replayer) OnBlockReceived(
 	transactionEvents []events.TransactionEventPayload,
 	blockEvent *events.BlockEventPayload,
-) (ReplayResults, error) {
+) (types.ReplayResults, error) {
 	// prepare storage
 	st, err := cr.storageProvider.GetSnapshotAt(blockEvent.Height)
 	if err != nil {

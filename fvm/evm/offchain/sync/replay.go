@@ -21,10 +21,6 @@ import (
 
 var emptyChecksum = [types.ChecksumLength]byte{0, 0, 0, 0}
 
-type ReplayResults interface {
-	StorageRegisterUpdates() map[flow.RegisterID]flow.RegisterValue
-}
-
 // ReplayBlockExecution re-executes transactions of a block using the
 // events emitted when transactions where executed.
 // it updates the state of the given ledger and uses the trace
@@ -36,7 +32,7 @@ func ReplayBlockExecution(
 	transactionEvents []events.TransactionEventPayload,
 	blockEvent *events.BlockEventPayload,
 	validateResults bool,
-) (ReplayResults, error) {
+) (types.ReplayResults, error) {
 
 	// create storage
 	storage := storage.NewEphemeralStorage(storage.NewReadOnlyStorage(snapshot))
@@ -100,6 +96,7 @@ func ReplayBlockExecution(
 		// no need to check the receipt root hash given we have checked the logs and other
 		// values during tx execution.
 	}
+
 	// push block hash
 	// we push the block hash after execution, so the behaviour of the blockhash is
 	// identical to the evm.handler.
@@ -153,7 +150,6 @@ func replayTransactionExecution(
 		if err != nil {
 			return fmt.Errorf("failed to RLP-decode direct call [%x]: %w", txEvent.Payload, err)
 		}
-
 		res, err = bv.DirectCall(call)
 		if err != nil {
 			return fmt.Errorf("failed to execute direct call [%x]: %w", txEvent.Hash, err)
@@ -224,6 +220,7 @@ func ValidateResult(
 	return nil
 }
 
+// CreateBlockContext creates a block context using the passed blocks
 func CreateBlockContext(
 	chainID flow.ChainID,
 	blocks *blocks.Blocks,
