@@ -88,10 +88,10 @@ func (v *View) GetSlab(addr gethCommon.Address, key gethCommon.Hash) (gethCommon
 func (v *View) DryCall(
 	from gethCommon.Address,
 	to gethCommon.Address,
+	data []byte,
+	value *big.Int,
 	gasLimit uint64,
 	gasPrice *big.Int,
-	value *big.Int,
-	data []byte,
 	opts ...DryRunOption,
 ) (*types.Result, error) {
 	// apply all the options
@@ -123,14 +123,15 @@ func (v *View) DryCall(
 		return nil, err
 	}
 
-	tx := gethTypes.NewTransaction(
-		0, // TODO: is nonce of zero okey?
-		to,
-		value,
-		gasLimit,
-		gasPrice,
-		data)
-	res, err := bv.DryRunTransaction(tx, from)
+	res, err := bv.DirectCall(
+		&types.DirectCall{
+			From:     types.NewAddress(from),
+			To:       types.NewAddress(to),
+			Data:     data,
+			Value:    value,
+			GasLimit: gasLimit,
+		},
+	)
 	if err != nil {
 		return nil, err
 	}

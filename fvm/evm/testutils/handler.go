@@ -28,3 +28,35 @@ func SetupHandler(
 		debug.NopTracer,
 	)
 }
+
+type TestPrecompiledContract struct {
+	RequiredGasFunc func(input []byte) uint64
+	RunFunc         func(input []byte) ([]byte, error)
+	AddressFunc     func() types.Address
+}
+
+var _ types.PrecompiledContract = &TestPrecompiledContract{}
+
+// RequiredGas returns the contract gas use
+func (pc *TestPrecompiledContract) RequiredGas(input []byte) uint64 {
+	if pc.RequiredGasFunc == nil {
+		panic("RequiredGasFunc is not set for the test precompiled contract")
+	}
+	return pc.RequiredGasFunc(input)
+}
+
+// Run runs the precompiled contract
+func (pc *TestPrecompiledContract) Run(input []byte) ([]byte, error) {
+	if pc.RunFunc == nil {
+		panic("RunFunc is not set for the test precompiled contract")
+	}
+	return pc.RunFunc(input)
+}
+
+// Address returns the address that this contract is deployed to
+func (pc *TestPrecompiledContract) Address() types.Address {
+	if pc.AddressFunc == nil {
+		panic("AddressFunc is not set for the test precompiled contract")
+	}
+	return pc.AddressFunc()
+}
