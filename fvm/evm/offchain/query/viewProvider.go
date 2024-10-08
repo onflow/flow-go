@@ -6,6 +6,8 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
+// ViewProvider constructs views
+// based on the requirements
 type ViewProvider struct {
 	chainID         flow.ChainID
 	rootAddr        flow.Address
@@ -28,6 +30,7 @@ func NewViewProvider(
 	}
 }
 
+// GetBlockView returns the block view for the given height
 func (evp *ViewProvider) GetBlockView(height uint64) (*View, error) {
 	readOnly, err := evp.storageProvider.GetSnapshotAt(height)
 	if err != nil {
