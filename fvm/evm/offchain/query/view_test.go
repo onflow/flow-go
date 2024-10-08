@@ -27,12 +27,14 @@ func TestView(t *testing.T) {
 
 						h := SetupHandler(chainID, backend, rootAddr)
 
+						maxCallGasLimit := uint64(5_000_000)
 						view := query.NewView(
 							chainID,
 							rootAddr,
 							storage.NewEphemeralStorage(
 								backend,
 							),
+							maxCallGasLimit,
 						)
 
 						// test make balance query
@@ -110,6 +112,19 @@ func TestView(t *testing.T) {
 						require.NoError(t, err)
 						require.NoError(t, res.ValidationError)
 						require.NoError(t, res.VMError)
+
+						// test max gas limit
+						_, err = view.DryCall(
+							testAccount.Address().ToCommon(),
+							testContract.DeployedAt.ToCommon(),
+							testContract.MakeCallData(t,
+								"store",
+								uint64(2)),
+							big.NewInt(0),
+							maxCallGasLimit+1,
+							big.NewInt(0),
+						)
+						require.Error(t, err)
 
 					})
 				})

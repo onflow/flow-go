@@ -2,6 +2,7 @@ package query
 
 import (
 	"errors"
+	"fmt"
 	"math/big"
 
 	"github.com/holiman/uint256"
@@ -20,23 +21,33 @@ import (
 )
 
 type View struct {
-	chainID  flow.ChainID
-	rootAddr flow.Address
-	storage  *storage.EphemeralStorage
-	tracer   *gethTracers.Tracer
-	extraPCs []types.PrecompiledContract
+	chainID         flow.ChainID
+	rootAddr        flow.Address
+	storage         *storage.EphemeralStorage
+	tracer          *gethTracers.Tracer
+	extraPCs        []types.PrecompiledContract
+	maxCallGasLimit uint64
 }
 
 func NewView(
 	chainID flow.ChainID,
 	rootAddr flow.Address,
 	storage *storage.EphemeralStorage,
+	maxCallGasLimit uint64,
 ) *View {
 	return &View{
 		chainID:  chainID,
 		rootAddr: rootAddr,
 		storage:  storage,
 	}
+}
+
+func (v *View) GetBlockMeta(addr gethCommon.Address) (*blocks.Meta, error) {
+	blks, err := blocks.NewBlocks(v.chainID, v.rootAddr, v.storage)
+	if err != nil {
+		return nil, err
+	}
+	return blks.LatestBlock()
 }
 
 func (v *View) GetBalance(addr gethCommon.Address) (*big.Int, error) {
@@ -122,6 +133,13 @@ func (v *View) DryCall(
 	bv, err := em.NewBlockView(ctx)
 	if err != nil {
 		return nil, err
+	}
+
+	if gasLimit > v.maxCallGasLimit {
+		return nil, fmt.Errorf(
+			"gas limit is bigger than max gas limit allowed %d > %d",
+			gasLimit, v.maxCallGasLimit,
+		)
 	}
 
 	res, err := bv.DirectCall(
