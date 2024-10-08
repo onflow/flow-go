@@ -6,21 +6,16 @@ import (
 	"math/big"
 	"testing"
 
-	"github.com/onflow/cadence/runtime/common"
 	gethCommon "github.com/onflow/go-ethereum/common"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/fvm/evm"
-	"github.com/onflow/flow-go/fvm/evm/debug"
-	"github.com/onflow/flow-go/fvm/evm/emulator"
 	"github.com/onflow/flow-go/fvm/evm/events"
-	"github.com/onflow/flow-go/fvm/evm/handler"
 	"github.com/onflow/flow-go/fvm/evm/offchain/storage"
 	"github.com/onflow/flow-go/fvm/evm/offchain/sync"
 	. "github.com/onflow/flow-go/fvm/evm/testutils"
 	"github.com/onflow/flow-go/fvm/evm/types"
-	"github.com/onflow/flow-go/fvm/systemcontracts"
 	"github.com/onflow/flow-go/model/flow"
 )
 
@@ -33,7 +28,7 @@ func TestChainReplay(t *testing.T) {
 			RunWithDeployedContract(t,
 				GetStorageTestContract(t), backend, rootAddr, func(testContract *TestContract) {
 					RunWithEOATestAccount(t, backend, rootAddr, func(testAccount *EOATestAccount) {
-						handler := setupHandler(chainID, backend, rootAddr)
+						handler := SetupHandler(chainID, backend, rootAddr)
 
 						// clone state before apply transactions
 						snapshot = backend.Clone()
@@ -198,24 +193,6 @@ func prepareEvents(
 		txEventPayloads[i] = *TxEventToPayload(t, event, evmContract)
 	}
 	return txEventPayloads, blockEventPayload
-}
-
-func setupHandler(
-	chainID flow.ChainID,
-	backend types.Backend,
-	rootAddr flow.Address,
-) *handler.ContractHandler {
-	return handler.NewContractHandler(
-		chainID,
-		rootAddr,
-		common.MustBytesToAddress(systemcontracts.SystemContractsForChain(chainID).FlowToken.Address.Bytes()),
-		rootAddr,
-		handler.NewBlockStore(chainID, backend, rootAddr),
-		handler.NewAddressAllocator(),
-		backend,
-		emulator.NewEmulator(backend, rootAddr),
-		debug.NopTracer,
-	)
 }
 
 // TestStorageProvider constructs a new
