@@ -21,13 +21,6 @@ import (
 
 var emptyChecksum = [types.ChecksumLength]byte{0, 0, 0, 0}
 
-// ReplayResults is the result of replaying transactions
-type ReplayResults interface {
-	// StorageRegisterUpdates returns the set of register changes
-	// (only the EVM-related registers)
-	StorageRegisterUpdates() map[flow.RegisterID]flow.RegisterValue
-}
-
 // ReplayBlockExecution re-executes transactions of a block using the
 // events emitted when transactions where executed.
 // it updates the state of the given ledger and uses the trace
@@ -39,7 +32,7 @@ func ReplayBlockExecution(
 	transactionEvents []events.TransactionEventPayload,
 	blockEvent *events.BlockEventPayload,
 	validateResults bool,
-) (ReplayResults, error) {
+) (types.ReplayResults, error) {
 
 	// create storage
 	storage := storage.NewEphemeralStorage(storage.NewReadOnlyStorage(snapshot))
