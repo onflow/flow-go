@@ -751,8 +751,8 @@ func prepareTestExecutionService(dockerServices Services, flowNodeContainerConfi
 	observerService := prepareExecutionService(containerConfig, 1, 1)
 	observerService.Command = append(observerService.Command,
 		"--observer-mode=true",
-		fmt.Sprintf("--observer-mode-bootstrap-node-addresses=%s:%s", testnet.PrimaryAN, testnet.PublicNetworkPort),
-		fmt.Sprintf("--observer-mode-bootstrap-node-public-keys=%s", agPublicKey),
+		fmt.Sprintf("--bootstrap-node-addresses=%s:%s", testnet.PrimaryAN, testnet.PublicNetworkPort),
+		fmt.Sprintf("--bootstrap-node-public-keys=%s", agPublicKey),
 		fmt.Sprintf("--public-access-id=%s", publicAccessID),
 	)
 
