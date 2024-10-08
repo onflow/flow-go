@@ -20,12 +20,16 @@ import (
 
 var _ commands.AdminCommand = (*BackfillTxErrorMessagesCommand)(nil)
 
+// backfillTxErrorMessagesRequest represents the input parameters for
+// backfilling transaction error messages.
 type backfillTxErrorMessagesRequest struct {
-	startHeight      uint64
-	endHeight        uint64
-	executionNodeIds flow.IdentityList
+	startHeight      uint64            // Start height from which to begin backfilling.
+	endHeight        uint64            // End height up to which backfilling is performed.
+	executionNodeIds flow.IdentityList // List of execution node IDs to be used for backfilling.
 }
 
+// BackfillTxErrorMessagesCommand executes a command to backfill
+// transaction error messages by fetching them from execution nodes.
 type BackfillTxErrorMessagesCommand struct {
 	state           protocol.State
 	txResultsIndex  *index.TransactionResultsIndex
@@ -33,6 +37,7 @@ type BackfillTxErrorMessagesCommand struct {
 	backend         *backend.Backend
 }
 
+// NewBackfillTxErrorMessagesCommand creates a new instance of BackfillTxErrorMessagesCommand
 func NewBackfillTxErrorMessagesCommand(
 	state protocol.State,
 	txResultsIndex *index.TransactionResultsIndex,
@@ -47,8 +52,12 @@ func NewBackfillTxErrorMessagesCommand(
 	}
 }
 
-// Validator validates the request.
-// Returns admin.InvalidAdminReqError for invalid/malformed requests.
+// Validator validates the input for the backfill command. The input is validated
+// for field types, boundaries, and coherence of start and end heights.
+//
+// Expected errors during normal operation:
+//   - admin.InvalidAdminReqError - if start-height is greater than end-height or
+//     if the input format is invalid, if an invalid execution node ID is provided.
 func (b *BackfillTxErrorMessagesCommand) Validator(request *admin.CommandRequest) error {
 	input, ok := request.Data.(map[string]interface{})
 	if !ok {
@@ -107,6 +116,11 @@ func (b *BackfillTxErrorMessagesCommand) Validator(request *admin.CommandRequest
 	return nil
 }
 
+// Handler performs the backfilling operation by fetching missing transaction
+// error messages for blocks within the specified height range. Uses execution nodes
+// from data.executionNodeIds if available, otherwise defaults to valid execution nodes.
+//
+// No errors are expected during normal operation.
 func (b *BackfillTxErrorMessagesCommand) Handler(ctx context.Context, request *admin.CommandRequest) (interface{}, error) {
 	if b.txErrorMessages == nil {
 		return nil, fmt.Errorf("failed to backfill, could not get transaction error messages storage")
@@ -165,6 +179,11 @@ func (b *BackfillTxErrorMessagesCommand) Handler(ctx context.Context, request *a
 	return nil, nil
 }
 
+// parseExecutionNodeIds converts a list of node IDs from input to flow.IdentityList.
+// Returns an error if the IDs are invalid or empty.
+//
+// Expected errors during normal operation:
+// - admin.InvalidAdminReqParameterError - if execution-node-ids is empty or has an invalid format.
 func (b *BackfillTxErrorMessagesCommand) parseExecutionNodeIds(executionNodeIdsIn interface{}, allIdentities flow.IdentityList) (flow.IdentityList, error) {
 	var ids flow.IdentityList
 
@@ -192,12 +211,17 @@ func (b *BackfillTxErrorMessagesCommand) parseExecutionNodeIds(executionNodeIdsI
 	return ids, nil
 }
 
+// storeTransactionResultErrorMessages saves retrieved error messages for a given block ID.
+// It only stores messages if they exist, associating them with the specified block ID
+// and execution node identity.
+//
+// No errors are expected during normal operation.
 func (b *BackfillTxErrorMessagesCommand) storeTransactionResultErrorMessages(
 	blockID flow.Identifier,
 	errorMessagesResponses []*execproto.GetTransactionErrorMessagesResponse_Result,
 	execNode *flow.IdentitySkeleton,
 ) error {
-	errorMessages := make([]flow.TransactionResultErrorMessage, 0)
+	errorMessages := make([]flow.TransactionResultErrorMessage, 0, len(errorMessagesResponses))
 	for _, value := range errorMessagesResponses {
 		errorMessage := flow.TransactionResultErrorMessage{
 			ErrorMessage:  value.ErrorMessage,
@@ -208,11 +232,9 @@ func (b *BackfillTxErrorMessagesCommand) storeTransactionResultErrorMessages(
 		errorMessages = append(errorMessages, errorMessage)
 	}
 
-	if len(errorMessages) > 0 {
-		err := b.txErrorMessages.Store(blockID, errorMessages)
-		if err != nil {
-			return fmt.Errorf("failed to store transaction error messages: %w", err)
-		}
+	err := b.txErrorMessages.Store(blockID, errorMessages)
+	if err != nil {
+		return fmt.Errorf("failed to store transaction error messages: %w", err)
 	}
 
 	return nil
