@@ -160,11 +160,14 @@ func TestChainReplay(t *testing.T) {
 
 						// check replay
 						sp := newTestStorageProvider(snapshot, 1)
-						cr := sync.NewChainReplayer(chainID, rootAddr, sp, zerolog.Logger{}, nil, true)
+						cr := sync.NewReplayer(chainID, rootAddr, sp, zerolog.Logger{}, nil, true)
 						_, err := cr.OnBlockReceived(txEventPayloads, blockEventPayload)
 						require.NoError(t, err)
 
 						// TODO: verify the state delta
+						// currently the backend storage doesn't work well with this
+						// changes needed to make this work, which is left for future PRs
+						//
 						// for k, v := range result.StorageRegisterUpdates() {
 						// 	ret, err := backend.GetValue([]byte(k.Owner), []byte(k.Key))
 						// 	require.NoError(t, err)
