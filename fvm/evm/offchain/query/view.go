@@ -1,6 +1,7 @@
 package query
 
 import (
+	"errors"
 	"math/big"
 
 	"github.com/holiman/uint256"
@@ -143,7 +144,7 @@ type DryRunOption func(v *View) error
 
 func NewDryRunStorageOverrideBalance(
 	addr gethCommon.Address,
-	balance *uint256.Int,
+	balance *big.Int,
 ) DryRunOption {
 	return func(v *View) error {
 		baseView, err := state.NewBaseView(v.storage, v.rootAddr)
@@ -162,7 +163,13 @@ func NewDryRunStorageOverrideBalance(
 		if err != nil {
 			return err
 		}
-		err = baseView.UpdateAccount(addr, balance, nonce, code, codeHash)
+
+		convertedBalance, overflow := uint256.FromBig(balance)
+		if overflow {
+			return errors.New("balance too large")
+		}
+
+		err = baseView.UpdateAccount(addr, convertedBalance, nonce, code, codeHash)
 		if err != nil {
 			return err
 		}

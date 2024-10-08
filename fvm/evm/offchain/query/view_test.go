@@ -81,10 +81,31 @@ func TestView(t *testing.T) {
 							testContract.DeployedAt.ToCommon(),
 							testContract.MakeCallData(t, "verifyArchCallToFlowBlockHeight", expectedFlowHeight),
 							big.NewInt(0),
-							uint64(10_000_000),
+							uint64(1_000_000),
 							big.NewInt(0),
 							query.NewDryRunWithExtraPrecompiledContracts(
 								[]types.PrecompiledContract{pc}),
+						)
+						require.NoError(t, err)
+						require.NoError(t, res.ValidationError)
+						require.NoError(t, res.VMError)
+
+						// test dry call with overrides
+						newBalance := big.NewInt(3000)
+						res, err = view.DryCall(
+							testAccount.Address().ToCommon(),
+							testContract.DeployedAt.ToCommon(),
+							testContract.MakeCallData(t,
+								"checkBalance",
+								testAccount.Address().ToCommon(),
+								newBalance),
+							big.NewInt(0),
+							uint64(1_000_000),
+							big.NewInt(0),
+							query.NewDryRunStorageOverrideBalance(
+								testAccount.Address().ToCommon(),
+								newBalance,
+							),
 						)
 						require.NoError(t, err)
 						require.NoError(t, res.ValidationError)
