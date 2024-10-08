@@ -29,6 +29,11 @@ func TestStoringTransactionResultErrorMessages(t *testing.T) {
 		require.NoError(t, err)
 		require.False(t, exists)
 
+		// check retrieving by ByBlockID
+		messages, err := store.ByBlockID(blockID)
+		require.NoError(t, err)
+		require.Nil(t, messages)
+
 		txErrorMessages := make([]flow.TransactionResultErrorMessage, 0)
 		for i := 0; i < 10; i++ {
 			expected := flow.TransactionResultErrorMessage{
