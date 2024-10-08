@@ -19,6 +19,7 @@ import (
 	"github.com/onflow/flow-go/consensus/hotstuff/helper"
 	mockhotstuff "github.com/onflow/flow-go/consensus/hotstuff/mocks"
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
+	"github.com/onflow/flow-go/consensus/hotstuff/safetyrules"
 	"github.com/onflow/flow-go/consensus/hotstuff/signature"
 	hsig "github.com/onflow/flow-go/consensus/hotstuff/signature"
 	hotstuffvalidator "github.com/onflow/flow-go/consensus/hotstuff/validator"
@@ -781,8 +782,8 @@ func TestCombinedVoteProcessorV2_PropertyCreatingQCLiveness(testifyT *testing.T)
 func TestCombinedVoteProcessorV2_BuildVerifyQC(t *testing.T) {
 	epochCounter := uint64(3)
 	epochLookup := &modulemock.EpochLookup{}
-	view := uint64(20)
-	epochLookup.On("EpochForView", view).Return(epochCounter, nil)
+	proposerView := uint64(20)
+	epochLookup.On("EpochForView", proposerView).Return(epochCounter, nil)
 
 	// all committee members run DKG
 	dkgData, err := bootstrapDKG.RandomBeaconKG(11, unittest.RandomBytes(32))
@@ -845,9 +846,14 @@ func TestCombinedVoteProcessorV2_BuildVerifyQC(t *testing.T) {
 	}
 
 	leader := stakingSigners[0]
-
-	block := helper.MakeBlock(helper.WithBlockView(view),
-		helper.WithBlockProposer(leader.NodeID))
+	parentBlock := helper.MakeBlock(helper.WithBlockView(proposerView - 1))
+	proposal := helper.MakeProposal(
+		helper.WithBlock(
+			helper.MakeBlock(
+				helper.WithBlockView(proposerView),
+				helper.WithParentBlock(parentBlock),
+				helper.WithBlockProposer(leader.NodeID))))
+	block := proposal.Block
 
 	inmemDKG, err := inmem.DKGFromEncodable(inmem.EncodableDKG{
 		GroupKey: encodable.RandomBeaconPubKey{
@@ -858,10 +864,13 @@ func TestCombinedVoteProcessorV2_BuildVerifyQC(t *testing.T) {
 	require.NoError(t, err)
 
 	committee := &mockhotstuff.DynamicCommittee{}
+	committee.On("LeaderForView", block.View).Return(leader.NodeID, nil).Maybe()
 	committee.On("QuorumThresholdForView", mock.Anything).Return(committees.WeightThresholdToBuildQC(allIdentities.ToSkeleton().TotalWeight()), nil)
 	committee.On("IdentitiesByEpoch", block.View).Return(allIdentities.ToSkeleton(), nil)
 	committee.On("IdentitiesByBlock", block.BlockID).Return(allIdentities, nil)
+	committee.On("IdentityByBlock", block.BlockID, leader.NodeID).Return(leader, nil)
 	committee.On("DKG", block.View).Return(inmemDKG, nil)
+	committee.On("Self").Return(leader.NodeID)
 
 	votes := make([]*model.Vote, 0, len(allIdentities))
 
@@ -874,8 +883,18 @@ func TestCombinedVoteProcessorV2_BuildVerifyQC(t *testing.T) {
 	}
 
 	// create and sign proposal
-	proposal, err := signers[leader.NodeID].CreateProposal(block)
+	persist := mockhotstuff.NewPersister(t)
+	safetyData := &hotstuff.SafetyData{
+		LockedOneChainView:      parentBlock.View,
+		HighestAcknowledgedView: parentBlock.View,
+	}
+	persist.On("GetSafetyData", mock.Anything).Return(safetyData, nil).Once()
+	persist.On("PutSafetyData", mock.Anything).Return(nil)
+	safetyRules, err := safetyrules.New(signers[leader.NodeID], persist, committee)
 	require.NoError(t, err)
+	vote, err := safetyRules.SignOwnProposal(proposal)
+	require.NoError(t, err)
+	proposal.SigData = vote.SigData
 
 	qcCreated := false
 	onQCCreated := func(qc *flow.QuorumCertificate) {
