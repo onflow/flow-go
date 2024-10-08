@@ -434,11 +434,9 @@ func (e *Engine) handleTransactionResultErrorMessages(ctx context.Context, block
 		return nil
 	}
 
-	if len(resp) > 0 {
-		err = e.storeTransactionResultErrorMessages(blockID, resp, execNode)
-		if err != nil {
-			return fmt.Errorf("could not store error messages: %w", err)
-		}
+	err = e.storeTransactionResultErrorMessages(blockID, resp, execNode)
+	if err != nil {
+		return fmt.Errorf("could not store error messages: %w", err)
 	}
 
 	return nil
