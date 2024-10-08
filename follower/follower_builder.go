@@ -84,19 +84,14 @@ import (
 // For a node running as a standalone process, the config fields will be populated from the command line params,
 // while for a node running as a library, the config fields are expected to be initialized by the caller.
 type FollowerServiceConfig struct {
-	bootstrapNodeAddresses  []string
-	bootstrapNodePublicKeys []string
-	bootstrapIdentities     flow.IdentitySkeletonList // the identity list of bootstrap peers the node uses to discover other nodes
-	NetworkKey              crypto.PrivateKey         // the networking key passed in by the caller when being used as a library
-	baseOptions             []cmd.Option
+	bootstrapIdentities flow.IdentitySkeletonList // the identity list of bootstrap peers the node uses to discover other nodes
+	NetworkKey          crypto.PrivateKey         // the networking key passed in by the caller when being used as a library
+	baseOptions         []cmd.Option
 }
 
 // DefaultFollowerServiceConfig defines all the default values for the FollowerServiceConfig
 func DefaultFollowerServiceConfig() *FollowerServiceConfig {
-	return &FollowerServiceConfig{
-		bootstrapNodeAddresses:  []string{},
-		bootstrapNodePublicKeys: []string{},
-	}
+	return &FollowerServiceConfig{}
 }
 
 // FollowerServiceBuilder provides the common functionality needed to bootstrap a Flow staked and observer
@@ -136,7 +131,7 @@ func (builder *FollowerServiceBuilder) deriveBootstrapPeerIdentities() error {
 		return nil
 	}
 
-	ids, err := BootstrapIdentities(builder.bootstrapNodeAddresses, builder.bootstrapNodePublicKeys)
+	ids, err := builder.DeriveBootstrapPeerIdentities()
 	if err != nil {
 		return fmt.Errorf("failed to derive bootstrap peer identities: %w", err)
 	}
@@ -535,10 +530,10 @@ func (builder *FollowerServiceBuilder) validateParams() error {
 	if len(builder.bootstrapIdentities) > 0 {
 		return nil
 	}
-	if len(builder.bootstrapNodeAddresses) == 0 {
+	if len(builder.BootstrapNodeAddresses) == 0 {
 		return errors.New("no bootstrap node address provided")
 	}
-	if len(builder.bootstrapNodeAddresses) != len(builder.bootstrapNodePublicKeys) {
+	if len(builder.BootstrapNodeAddresses) != len(builder.BootstrapNodePublicKeys) {
 		return errors.New("number of bootstrap node addresses and public keys should match")
 	}
 	return nil
