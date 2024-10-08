@@ -43,7 +43,8 @@ func NewView(
 	}
 }
 
-func (v *View) GetBlockMeta(addr gethCommon.Address) (*blocks.Meta, error) {
+// GetBlockMeta return block meta data
+func (v *View) GetBlockMeta() (*blocks.Meta, error) {
 	blks, err := blocks.NewBlocks(v.chainID, v.rootAddr, v.storage)
 	if err != nil {
 		return nil, err
@@ -51,6 +52,8 @@ func (v *View) GetBlockMeta(addr gethCommon.Address) (*blocks.Meta, error) {
 	return blks.LatestBlock()
 }
 
+// GetBalance returns the balance for the given address
+// can be used for the `eth_getBalance` endpoint
 func (v *View) GetBalance(addr gethCommon.Address) (*big.Int, error) {
 	bv, err := state.NewBaseView(v.storage, v.rootAddr)
 	if err != nil {
@@ -63,6 +66,8 @@ func (v *View) GetBalance(addr gethCommon.Address) (*big.Int, error) {
 	return bal.ToBig(), nil
 }
 
+// GetNonce returns the nonce for the given address
+// can be used for the `eth_getTransactionCount` endpoint
 func (v *View) GetNonce(addr gethCommon.Address) (uint64, error) {
 	bv, err := state.NewBaseView(v.storage, v.rootAddr)
 	if err != nil {
@@ -71,6 +76,8 @@ func (v *View) GetNonce(addr gethCommon.Address) (uint64, error) {
 	return bv.GetNonce(addr)
 }
 
+// GetCode returns the code for the given address
+// can be used for the `eth_getCode` endpoint
 func (v *View) GetCode(addr gethCommon.Address) ([]byte, error) {
 	bv, err := state.NewBaseView(v.storage, v.rootAddr)
 	if err != nil {
@@ -79,6 +86,7 @@ func (v *View) GetCode(addr gethCommon.Address) ([]byte, error) {
 	return bv.GetCode(addr)
 }
 
+// GetCodeHash returns the codehash for the given address
 func (v *View) GetCodeHash(addr gethCommon.Address) (gethCommon.Hash, error) {
 	bv, err := state.NewBaseView(v.storage, v.rootAddr)
 	if err != nil {
@@ -87,6 +95,8 @@ func (v *View) GetCodeHash(addr gethCommon.Address) (gethCommon.Hash, error) {
 	return bv.GetCodeHash(addr)
 }
 
+// GetSlab returns the slab for the given address and key
+// can be used for the `eth_getStorageAt` endpoint
 func (v *View) GetSlab(addr gethCommon.Address, key gethCommon.Hash) (gethCommon.Hash, error) {
 	bv, err := state.NewBaseView(v.storage, v.rootAddr)
 	if err != nil {
@@ -98,6 +108,9 @@ func (v *View) GetSlab(addr gethCommon.Address, key gethCommon.Hash) (gethCommon
 	})
 }
 
+// DryCall runs a call offchain and returns the results
+// accepts override storage and precompiled call options
+// as well as custom tracer.
 func (v *View) DryCall(
 	from gethCommon.Address,
 	to gethCommon.Address,
@@ -105,7 +118,7 @@ func (v *View) DryCall(
 	value *big.Int,
 	gasLimit uint64,
 	gasPrice *big.Int,
-	opts ...DryRunOption,
+	opts ...DryCallOption,
 ) (*types.Result, error) {
 	// apply all the options
 	for _, op := range opts {
@@ -159,12 +172,14 @@ func (v *View) DryCall(
 	return res, nil
 }
 
-type DryRunOption func(v *View) error
+// DryRunOption captures a optional change
+// when running dry run
+type DryCallOption func(v *View) error
 
-func NewDryRunStorageOverrideBalance(
+func WithStorageOverrideBalance(
 	addr gethCommon.Address,
 	balance *big.Int,
-) DryRunOption {
+) DryCallOption {
 	return func(v *View) error {
 		baseView, err := state.NewBaseView(v.storage, v.rootAddr)
 		if err != nil {
@@ -196,10 +211,10 @@ func NewDryRunStorageOverrideBalance(
 	}
 }
 
-func NewDryRunStorageOverrideNonce(
+func WithStorageOverrideNonce(
 	addr gethCommon.Address,
 	nonce uint64,
-) DryRunOption {
+) DryCallOption {
 	return func(v *View) error {
 		baseView, err := state.NewBaseView(v.storage, v.rootAddr)
 		if err != nil {
@@ -225,10 +240,10 @@ func NewDryRunStorageOverrideNonce(
 	}
 }
 
-func NewDryRunStorageOverrideCode(
+func WithStorageOverrideCode(
 	addr gethCommon.Address,
 	code []byte,
-) DryRunOption {
+) DryCallOption {
 	return func(v *View) error {
 		baseView, err := state.NewBaseView(v.storage, v.rootAddr)
 		if err != nil {
@@ -254,10 +269,10 @@ func NewDryRunStorageOverrideCode(
 	}
 }
 
-func NewDryRunStorageOverrideState(
+func WithStorageOverrideState(
 	addr gethCommon.Address,
 	slots map[gethCommon.Hash]gethCommon.Hash,
-) DryRunOption {
+) DryCallOption {
 	return func(v *View) error {
 		baseView, err := state.NewBaseView(v.storage, v.rootAddr)
 		if err != nil {
@@ -282,10 +297,10 @@ func NewDryRunStorageOverrideState(
 	}
 }
 
-func NewDryRunStorageOverrideStateDiff(
+func WithStorageOverrideStateDiff(
 	addr gethCommon.Address,
 	slots map[gethCommon.Hash]gethCommon.Hash,
-) DryRunOption {
+) DryCallOption {
 	return func(v *View) error {
 		baseView, err := state.NewBaseView(v.storage, v.rootAddr)
 		if err != nil {
@@ -305,9 +320,9 @@ func NewDryRunStorageOverrideStateDiff(
 	}
 }
 
-func NewDryRunTracerUpdate(
+func WithTracer(
 	tracer *gethTracers.Tracer,
-) DryRunOption {
+) DryCallOption {
 	return func(v *View) error {
 		v.tracer = tracer
 		return nil
@@ -315,7 +330,7 @@ func NewDryRunTracerUpdate(
 }
 
 // this method can be used with remote PC caller for cadence arch calls
-func NewDryRunWithExtraPrecompiledContracts(pcs []types.PrecompiledContract) DryRunOption {
+func WithExtraPrecompiledContracts(pcs []types.PrecompiledContract) DryCallOption {
 	return func(v *View) error {
 		v.extraPCs = pcs
 		return nil
@@ -323,7 +338,7 @@ func NewDryRunWithExtraPrecompiledContracts(pcs []types.PrecompiledContract) Dry
 }
 
 // this method can be used to replace the block meta
-func NewDryRunWithStorageOverrideBlocksMeta(meta *blocks.Meta) DryRunOption {
+func WithStorageOverrideBlocksMeta(meta *blocks.Meta) DryCallOption {
 	return func(v *View) error {
 		blks, err := blocks.NewBlocks(v.chainID, v.rootAddr, v.storage)
 		if err != nil {

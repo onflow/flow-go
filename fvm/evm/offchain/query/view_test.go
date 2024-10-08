@@ -85,7 +85,7 @@ func TestView(t *testing.T) {
 							big.NewInt(0),
 							uint64(1_000_000),
 							big.NewInt(0),
-							query.NewDryRunWithExtraPrecompiledContracts(
+							query.WithExtraPrecompiledContracts(
 								[]types.PrecompiledContract{pc}),
 						)
 						require.NoError(t, err)
@@ -104,7 +104,7 @@ func TestView(t *testing.T) {
 							big.NewInt(0),
 							uint64(1_000_000),
 							big.NewInt(0),
-							query.NewDryRunStorageOverrideBalance(
+							query.WithStorageOverrideBalance(
 								testAccount.Address().ToCommon(),
 								newBalance,
 							),
