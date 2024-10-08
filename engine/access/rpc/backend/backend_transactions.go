@@ -985,8 +985,8 @@ func (b *backendTransactions) tryGetTransactionResultByIndex(
 func (b *backendTransactions) LookupErrorMessageByTransactionID(
 	ctx context.Context,
 	blockID flow.Identifier,
-	transactionID flow.Identifier,
 	height uint64,
+	transactionID flow.Identifier,
 ) (string, error) {
 	if b.txResultErrorMessages != nil {
 		res, err := b.txResultErrorMessages.ByBlockIDTransactionID(blockID, transactionID)
@@ -1013,34 +1013,14 @@ func (b *backendTransactions) LookupErrorMessageByTransactionID(
 	resp, err := b.getTransactionErrorMessageFromAnyEN(ctx, execNodes, req)
 	if err != nil {
 		// If no execution nodes return a valid response,
-		// store a static message "failed", with flow.ZeroID as the executor.
-		// TODO: find a better way to get transaction index here
-		txResults, err := b.txResultsIndex.ByBlockID(blockID, height)
+		// return a static message "failed".
+		txResult, err := b.txResultsIndex.ByBlockIDTransactionID(blockID, height, transactionID)
 		if err != nil {
 			return "", rpc.ConvertStorageError(err)
 		}
 
-		for i, txResult := range txResults {
-			if txResult.TransactionID != transactionID {
-				continue
-			}
-
-			if txResult.Failed {
-				if b.txResultErrorMessages != nil {
-					err = b.txResultErrorMessages.Store(blockID, []flow.TransactionResultErrorMessage{
-						{
-							TransactionID: txResult.TransactionID,
-							ErrorMessage:  FailedErrorMessage,
-							ExecutorID:    flow.ZeroID,
-							Index:         uint32(i),
-						},
-					})
-					if err != nil {
-						return "", fmt.Errorf("failed to store transaction error messages: %w", err)
-					}
-				}
-				return FailedErrorMessage, nil
-			}
+		if txResult.Failed {
+			return FailedErrorMessage, nil
 		}
 
 		// in case tx result is not failed
@@ -1087,27 +1067,13 @@ func (b *backendTransactions) LookupErrorMessageByIndex(
 	resp, err := b.getTransactionErrorMessageByIndexFromAnyEN(ctx, execNodes, req)
 	if err != nil {
 		// If no execution nodes return a valid response,
-		// store a static message "failed", with flow.ZeroID as the executor.
+		// return a static message "failed"
 		txResult, err := b.txResultsIndex.ByBlockIDTransactionIndex(blockID, height, index)
 		if err != nil {
 			return "", rpc.ConvertStorageError(err)
 		}
 
 		if txResult.Failed {
-			if b.txResultErrorMessages != nil {
-				err = b.txResultErrorMessages.Store(blockID, []flow.TransactionResultErrorMessage{
-					{
-						TransactionID: txResult.TransactionID,
-						ErrorMessage:  FailedErrorMessage,
-						ExecutorID:    flow.ZeroID,
-						Index:         index,
-					},
-				})
-				if err != nil {
-					return "", fmt.Errorf("failed to store transaction error messages: %w", err)
-				}
-			}
-
 			return FailedErrorMessage, nil
 		}
 
@@ -1158,40 +1124,19 @@ func (b *backendTransactions) LookupErrorMessagesByBlockID(
 	resp, _, err := b.GetTransactionErrorMessagesFromAnyEN(ctx, execNodes, req)
 	if err != nil {
 		// If no execution nodes return a valid response,
-		// store a static message "failed", with flow.ZeroID as the executor.
+		// return a static message "failed"
 		txResults, err := b.txResultsIndex.ByBlockID(blockID, height)
 		if err != nil {
 			return nil, rpc.ConvertStorageError(err)
 		}
 
-		var txErrorMessages []flow.TransactionResultErrorMessage
-
-		for i, txResult := range txResults {
+		for _, txResult := range txResults {
 			if txResult.Failed {
-				txErrorMessage := flow.TransactionResultErrorMessage{
-					TransactionID: txResult.TransactionID,
-					ErrorMessage:  FailedErrorMessage,
-					ExecutorID:    flow.ZeroID,
-					Index:         uint32(i),
-				}
-				txErrorMessages = append(txErrorMessages, txErrorMessage)
-				result[txErrorMessage.TransactionID] = txErrorMessage.ErrorMessage
+				result[txResult.TransactionID] = FailedErrorMessage
 			}
 		}
 
-		if len(txErrorMessages) > 0 {
-			if b.txResultErrorMessages != nil {
-				err = b.txResultErrorMessages.Store(blockID, txErrorMessages)
-				if err != nil {
-					return nil, fmt.Errorf("failed to store transaction error messages: %w", err)
-				}
-			}
-
-			return result, nil
-		}
-
-		// in case tx result is not failed
-		return nil, nil
+		return result, nil
 	}
 
 	for _, value := range resp {

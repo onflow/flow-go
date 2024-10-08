@@ -85,7 +85,7 @@ type Engine struct {
 	// Notifier for queue consumer
 	finalizedBlockNotifier engine.Notifier
 
-	// txResultErrorMessagesChan uses to fetch and store transaction result error messages for block
+	// txResultErrorMessagesChan is used to fetch and store transaction result error messages for blocks
 	txResultErrorMessagesChan chan flow.Identifier
 
 	log     zerolog.Logger   // used to log relevant actions with context
@@ -260,7 +260,7 @@ func (e *Engine) processFinalizedBlockJob(ctx irrecoverable.SignalerContext, job
 		ctx.Throw(fmt.Errorf("failed to convert job to block: %w", err))
 	}
 
-	err = e.processFinalizedBlock(block)
+	err = e.processFinalizedBlock(ctx, block)
 	if err == nil {
 		done()
 		return
@@ -399,40 +399,45 @@ func (e *Engine) processTransactionResultErrorMessages(ctx irrecoverable.Signale
 //
 // No errors are expected during normal operation.
 func (e *Engine) handleTransactionResultErrorMessages(ctx context.Context, blockID flow.Identifier) error {
-	if e.transactionResultErrorMessages != nil {
-		exists, err := e.transactionResultErrorMessages.Exists(blockID)
+	if e.transactionResultErrorMessages == nil {
+		return nil
+	}
+
+	exists, err := e.transactionResultErrorMessages.Exists(blockID)
+	if err != nil {
+		return fmt.Errorf("could not check existance of transaction result error messages: %w", err)
+	}
+
+	if exists {
+		return nil
+	}
+
+	// retrieves error messages from the backend if they do not already exist in storage
+	execNodes, err := e.execNodeIdentitiesProvider.ExecutionNodesForBlockID(
+		ctx,
+		blockID,
+	)
+	if err != nil {
+		e.log.Error().Err(err).Msg(fmt.Sprintf("failed to found execution nodes for block id: %s", blockID))
+
+		return fmt.Errorf("could not found execution nodes for block: %w", err)
+	}
+
+	req := &execproto.GetTransactionErrorMessagesByBlockIDRequest{
+		BlockId: convert.IdentifierToMessage(blockID),
+	}
+
+	resp, execNode, err := e.backend.GetTransactionErrorMessagesFromAnyEN(ctx, execNodes, req)
+	if err != nil {
+		// continue, we will add functionality to backfill these later
+		e.log.Error().Err(err).Msg("failed to get transaction error messages from execution nodes")
+		return nil
+	}
+
+	if len(resp) > 0 {
+		err = e.storeTransactionResultErrorMessages(blockID, resp, execNode)
 		if err != nil {
-			return fmt.Errorf("could not check existance of transaction result error messages: %w", err)
-		}
-
-		// retrieves error messages from the backend if they do not already exist in storage
-		if !exists {
-			execNodes, err := e.execNodeIdentitiesProvider.ExecutionNodesForBlockID(
-				ctx,
-				blockID,
-			)
-			if err != nil {
-				// in case querying nodes by existing execution receipts failed,
-				// will continue with the next execution node from next the execution receipt for that block
-				return nil
-			}
-
-			req := &execproto.GetTransactionErrorMessagesByBlockIDRequest{
-				BlockId: convert.IdentifierToMessage(blockID),
-			}
-
-			resp, execNode, err := e.backend.GetTransactionErrorMessagesFromAnyEN(ctx, execNodes, req)
-			if err != nil {
-				// continue, we will add functionality to backfill these later
-				return nil
-			}
-
-			if len(resp) > 0 {
-				err = e.storeTransactionResultErrorMessages(blockID, resp, execNode)
-				if err != nil {
-					return fmt.Errorf("could not store error messages: %w", err)
-				}
-			}
+			return fmt.Errorf("could not store error messages: %w", err)
 		}
 	}
 
@@ -452,7 +457,7 @@ func (e *Engine) storeTransactionResultErrorMessages(
 	errorMessagesResponses []*execproto.GetTransactionErrorMessagesResponse_Result,
 	execNode *flow.IdentitySkeleton,
 ) error {
-	errorMessages := make([]flow.TransactionResultErrorMessage, 0)
+	errorMessages := make([]flow.TransactionResultErrorMessage, 0, len(errorMessagesResponses))
 	for _, value := range errorMessagesResponses {
 		errorMessage := flow.TransactionResultErrorMessage{
 			ErrorMessage:  value.ErrorMessage,
@@ -511,7 +516,7 @@ func (e *Engine) OnFinalizedBlock(*model.Block) {
 //   - storage.ErrAlreadyExists - if the collection within block or an execution result ID already exists in the database.
 //   - generic error in case of unexpected failure from the database layer, or failure
 //     to decode an existing database value.
-func (e *Engine) processFinalizedBlock(block *flow.Block) error {
+func (e *Engine) processFinalizedBlock(ctx context.Context, block *flow.Block) error {
 	// FIX: we can't index guarantees here, as we might have more than one block
 	// with the same collection as long as it is not finalized
 
@@ -528,6 +533,11 @@ func (e *Engine) processFinalizedBlock(block *flow.Block) error {
 		err := e.executionResults.Index(seal.BlockID, seal.ResultID)
 		if err != nil {
 			return fmt.Errorf("could not index block for execution result: %w", err)
+		}
+
+		err = e.handleTransactionResultErrorMessages(ctx, seal.BlockID)
+		if err != nil {
+			return err
 		}
 	}
 
