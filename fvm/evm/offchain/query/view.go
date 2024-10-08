@@ -36,9 +36,10 @@ func NewView(
 	maxCallGasLimit uint64,
 ) *View {
 	return &View{
-		chainID:  chainID,
-		rootAddr: rootAddr,
-		storage:  storage,
+		chainID:         chainID,
+		rootAddr:        rootAddr,
+		storage:         storage,
+		maxCallGasLimit: maxCallGasLimit,
 	}
 }
 

@@ -119,7 +119,7 @@ func TestView(t *testing.T) {
 							testContract.DeployedAt.ToCommon(),
 							testContract.MakeCallData(t,
 								"store",
-								uint64(2)),
+								big.NewInt(2)),
 							big.NewInt(0),
 							maxCallGasLimit+1,
 							big.NewInt(0),
