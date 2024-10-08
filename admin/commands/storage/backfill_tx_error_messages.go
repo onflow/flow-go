@@ -212,8 +212,6 @@ func (b *BackfillTxErrorMessagesCommand) parseExecutionNodeIds(executionNodeIdsI
 }
 
 // storeTransactionResultErrorMessages saves retrieved error messages for a given block ID.
-// It only stores messages if they exist, associating them with the specified block ID
-// and execution node identity.
 //
 // No errors are expected during normal operation.
 func (b *BackfillTxErrorMessagesCommand) storeTransactionResultErrorMessages(
