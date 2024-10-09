@@ -910,12 +910,27 @@ type AccessMetrics interface {
 	TransactionMetrics
 	TransactionValidationMetrics
 	BackendScriptsMetrics
+	RegisterDBPrunerMetrics
 
 	// UpdateExecutionReceiptMaxHeight is called whenever we store an execution receipt from a block from a newer height
 	UpdateExecutionReceiptMaxHeight(height uint64)
 
 	// UpdateLastFullBlockHeight tracks the height of the last block for which all collections were received
 	UpdateLastFullBlockHeight(height uint64)
+}
+
+type RegisterDBPrunerMetrics interface {
+	// Pruned tracks the last pruned height and the pruning operation duration
+	Pruned(height uint64, duration time.Duration)
+
+	// NumberOfBlocksPruned tracks the number of blocks that were pruned during the operation.
+	NumberOfBlocksPruned(blocks uint64)
+
+	// NumberOfRowsPruned tracks the number of rows that were pruned during the operation.
+	NumberOfRowsPruned(rows uint64)
+
+	// ElementVisited records the element that were visited during the pruning operation.
+	ElementVisited()
 }
 
 type ExecutionResultStats struct {

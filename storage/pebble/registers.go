@@ -1,16 +1,15 @@
 package pebble
 
 import (
-	"encoding/binary"
 	"fmt"
 	"math"
 
 	"github.com/cockroachdb/pebble"
-	"github.com/pkg/errors"
 	"go.uber.org/atomic"
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/storage"
+	"github.com/onflow/flow-go/storage/pebble/operation"
 )
 
 // Registers library that implements pebble storage for registers
@@ -185,26 +184,9 @@ func (s *Registers) calculateFirstHeight(latestHeight uint64) uint64 {
 }
 
 func firstStoredHeight(db *pebble.DB) (uint64, error) {
-	return heightLookup(db, firstHeightKey)
+	return operation.RetrieveRegisterHeight(db, firstHeightKey)
 }
 
 func latestStoredHeight(db *pebble.DB) (uint64, error) {
-	return heightLookup(db, latestHeightKey)
-}
-
-func heightLookup(db *pebble.DB, key []byte) (uint64, error) {
-	res, closer, err := db.Get(key)
-	if err != nil {
-		return 0, convertNotFoundError(err)
-	}
-	defer closer.Close()
-	return binary.BigEndian.Uint64(res), nil
-}
-
-// convert pebble NotFound error to storage NotFound error
-func convertNotFoundError(err error) error {
-	if errors.Is(err, pebble.ErrNotFound) {
-		return storage.ErrNotFound
-	}
-	return err
+	return operation.RetrieveRegisterHeight(db, latestHeightKey)
 }

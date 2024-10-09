@@ -53,9 +53,24 @@ func (_m *AccessMetrics) ConnectionFromPoolUpdated() {
 	_m.Called()
 }
 
+// ElementVisited provides a mock function with given fields:
+func (_m *AccessMetrics) ElementVisited() {
+	_m.Called()
+}
+
 // NewConnectionEstablished provides a mock function with given fields:
 func (_m *AccessMetrics) NewConnectionEstablished() {
 	_m.Called()
+}
+
+// NumberOfBlocksPruned provides a mock function with given fields: blocks
+func (_m *AccessMetrics) NumberOfBlocksPruned(blocks uint64) {
+	_m.Called(blocks)
+}
+
+// NumberOfRowsPruned provides a mock function with given fields: rows
+func (_m *AccessMetrics) NumberOfRowsPruned(rows uint64) {
+	_m.Called(rows)
 }
 
 // ObserveHTTPRequestDuration provides a mock function with given fields: ctx, props, duration
@@ -66,6 +81,11 @@ func (_m *AccessMetrics) ObserveHTTPRequestDuration(ctx context.Context, props m
 // ObserveHTTPResponseSize provides a mock function with given fields: ctx, props, sizeBytes
 func (_m *AccessMetrics) ObserveHTTPResponseSize(ctx context.Context, props metrics.HTTPReqProperties, sizeBytes int64) {
 	_m.Called(ctx, props, sizeBytes)
+}
+
+// Pruned provides a mock function with given fields: height, duration
+func (_m *AccessMetrics) Pruned(height uint64, duration time.Duration) {
+	_m.Called(height, duration)
 }
 
 // ScriptExecuted provides a mock function with given fields: dur, size

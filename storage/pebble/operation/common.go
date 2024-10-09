@@ -42,6 +42,7 @@ func retrieve(key []byte, sc interface{}) func(r pebble.Reader) error {
 	}
 }
 
+// convertNotFoundError converts pebble NotFound error to storage NotFound error
 func convertNotFoundError(err error) error {
 	if errors.Is(err, pebble.ErrNotFound) {
 		return storage.ErrNotFound
