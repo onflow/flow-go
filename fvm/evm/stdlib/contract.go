@@ -78,6 +78,8 @@ var (
 
 	EVMBytes4ValueStaticType = interpreter.ConvertSemaArrayTypeToStaticArrayType(nil, sema.NewConstantSizedType(nil, sema.UInt8Type, 4))
 
+	EVMBytes32ValueStaticType = interpreter.ConvertSemaArrayTypeToStaticArrayType(nil, sema.NewConstantSizedType(nil, sema.UInt8Type, 32))
+
 	EVMAddressBytesCadenceType = cadence.NewConstantSizedArrayType(EVMAddressLength, cadence.UInt8Type)
 )
 

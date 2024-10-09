@@ -223,6 +223,16 @@ contract EVM {
         }
     }
 
+    access(all)
+    struct EVMBytes32 {
+        access(all)
+        let value: [UInt8; 32]
+
+        view init(value: [UInt8; 32]) {
+            self.value = value
+        }
+    }
+
     /// Converts a hex string to an EVM address if the string is a valid hex string
     /// Future implementations should pass data to InternalEVM for native deserialization
     access(all)
