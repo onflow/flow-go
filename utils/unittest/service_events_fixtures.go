@@ -273,9 +273,9 @@ func EpochRecoverFixtureByChainID(chain flow.ChainID) (flow.Event, *flow.EpochRe
 			DKGParticipantKeys: []crypto.PublicKey{
 				MustDecodePublicKeyHex(crypto.BLSBLS12381, "87a339e4e5c74f089da20a33f515d8c8f4464ab53ede5a74aa2432cd1ae66d522da0c122249ee176cd747ddc83ca81090498389384201614caf51eac392c1c0a916dfdcfbbdf7363f9552b6468434add3d3f6dc91a92bbe3ee368b59b7828488"),
 			},
-			//DKGIndexMap: flow.DKGIndexMap{
-			//	flow.MustHexStringToIdentifier("0000000000000000000000000000000000000000000000000000000000000011"): 0,
-			//},
+			DKGIndexMap: flow.DKGIndexMap{
+				flow.MustHexStringToIdentifier("0000000000000000000000000000000000000000000000000000000000000011"): 0,
+			},
 		},
 	}
 
@@ -892,11 +892,21 @@ func createEpochRecoverEvent(randomSourceHex string) cadence.Event {
 			cluster2,
 		}).WithType(cadence.NewVariableSizedArrayType(clusterQCVoteDataType)),
 
+		// dkgGroupKey
+		cadence.String("8c588266db5f5cda629e83f8aa04ae9413593fac19e4865d06d291c9d14fbdd9bdb86a7a12f9ef8590c79cb635e3163315d193087e9336092987150d0cd2b14ac6365f7dc93eec573752108b8c12368abb65f0652d9f644e5aed611c37926950"),
+
 		// dkgPubKeys
 		cadence.NewArray([]cadence.Value{
-			cadence.String("8c588266db5f5cda629e83f8aa04ae9413593fac19e4865d06d291c9d14fbdd9bdb86a7a12f9ef8590c79cb635e3163315d193087e9336092987150d0cd2b14ac6365f7dc93eec573752108b8c12368abb65f0652d9f644e5aed611c37926950"),
 			cadence.String("87a339e4e5c74f089da20a33f515d8c8f4464ab53ede5a74aa2432cd1ae66d522da0c122249ee176cd747ddc83ca81090498389384201614caf51eac392c1c0a916dfdcfbbdf7363f9552b6468434add3d3f6dc91a92bbe3ee368b59b7828488"),
 		}).WithType(cadence.NewVariableSizedArrayType(cadence.StringType)),
+
+		// dkgIdMapping
+		cadence.NewDictionary([]cadence.KeyValuePair{
+			{
+				Key:   cadence.String("0000000000000000000000000000000000000000000000000000000000000011"),
+				Value: cadence.NewInt(0),
+			},
+		}).WithType(cadence.NewDictionaryType(cadence.StringType, cadence.IntType)),
 	}).WithType(newFlowEpochEpochRecoverEventType())
 }
 
@@ -1212,8 +1222,16 @@ func newFlowEpochEpochRecoverEventType() *cadence.EventType {
 				Type:       cadence.NewVariableSizedArrayType(newFlowClusterQCClusterQCVoteDataStructType()),
 			},
 			{
+				Identifier: "dkgGroupKey",
+				Type:       cadence.StringType,
+			},
+			{
 				Identifier: "dkgPubKeys",
 				Type:       cadence.NewVariableSizedArrayType(cadence.StringType),
+			},
+			{
+				Identifier: "dkgIdMapping",
+				Type:       cadence.NewDictionaryType(cadence.StringType, cadence.IntType),
 			},
 		},
 		nil,
