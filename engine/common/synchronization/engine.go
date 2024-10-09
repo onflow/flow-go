@@ -423,6 +423,8 @@ func (e *Engine) sendRequests(participants flow.IdentifierList, ranges []chainsy
 			Msg("range requested")
 		e.core.RangeRequested(ran)
 		e.metrics.MessageSent(metrics.EngineSynchronization, metrics.MessageRangeRequest)
+
+		break
 	}
 
 	for _, batch := range batches {
@@ -450,6 +452,8 @@ func (e *Engine) sendRequests(participants flow.IdentifierList, ranges []chainsy
 			Msg("batch requested")
 		e.core.BatchRequested(batch)
 		e.metrics.MessageSent(metrics.EngineSynchronization, metrics.MessageBatchRequest)
+
+		break
 	}
 
 	if err := errs.ErrorOrNil(); err != nil {
