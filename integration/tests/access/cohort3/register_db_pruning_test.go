@@ -24,6 +24,8 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
+const TestRegisterDBPruningThreshold uint64 = 5
+
 type RegisterDBPruningSuite struct {
 	suite.Suite
 
@@ -75,6 +77,7 @@ func (s *RegisterDBPruningSuite) SetupTest() {
 		testnet.WithAdditionalFlag("--registerdb-pruning-enabled=true"),
 		testnet.WithAdditionalFlag("--registerdb-prune-throttle-delay=1s"),
 		testnet.WithAdditionalFlag("--registerdb-prune-ticker-interval=10s"),
+		testnet.WithAdditionalFlagf("--registerdb-pruning-threshold=%d", TestRegisterDBPruningThreshold),
 	)
 
 	consensusConfigs := []func(config *testnet.NodeConfig){
@@ -112,6 +115,7 @@ func (s *RegisterDBPruningSuite) SetupTest() {
 			"--local-service-api-enabled=true",
 			"--registerdb-pruning-enabled=true",
 			"--registerdb-prune-ticker-interval=5s",
+			fmt.Sprintf("--registerdb-pruning-threshold=%d", TestRegisterDBPruningThreshold),
 		},
 	}}
 
@@ -163,7 +167,7 @@ func (s *RegisterDBPruningSuite) getPebbleDB(path string) *pebble.DB {
 }
 
 func (s *RegisterDBPruningSuite) nodeRegisterStorage(db *pebble.DB) *pstorage.Registers {
-	registers, err := pstorage.NewRegisters(db)
+	registers, err := pstorage.NewRegisters(db, TestRegisterDBPruningThreshold)
 	s.Require().NoError(err)
 	return registers
 }

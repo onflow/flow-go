@@ -15,8 +15,7 @@ import (
 )
 
 const (
-	// DefaultPruneThreshold TODO: The value is temporary due to PruneThreshold PR not merged yet
-	DefaultPruneThreshold      = uint64(5)
+	DefaultPruneThreshold      = uint64(100_000)
 	DefaultPruneThrottleDelay  = 10 * time.Millisecond
 	DefaultPruneTickerInterval = 10 * time.Minute
 )

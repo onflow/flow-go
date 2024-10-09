@@ -62,13 +62,16 @@ func finalList(cmd *cobra.Command, args []string) {
 	registeredNodes := readStakingContractDetails()
 
 	// merge internal and partner node infos (from local files)
-	localNodes := mergeNodeInfos(internalNodes, partnerNodes)
+	localNodes, err := mergeNodeInfos(internalNodes, partnerNodes)
+	if err != nil {
+		log.Fatal().Err(err).Msg("failed to merge node infos")
+	}
 
 	// reconcile nodes from staking contract nodes
 	validateNodes(localNodes, registeredNodes)
 
 	// write node-config.json with the new list of nodes to be used for the `finalize` command
-	err := common.WriteJSON(model.PathFinallist, flagOutdir, model.ToPublicNodeInfoList(localNodes))
+	err = common.WriteJSON(model.PathFinallist, flagOutdir, model.ToPublicNodeInfoList(localNodes))
 	if err != nil {
 		log.Fatal().Err(err).Msg("failed to write json")
 	}

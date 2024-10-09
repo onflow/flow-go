@@ -24,23 +24,15 @@ func TestReplayer(t *testing.T) {
 
 	pc := &types.PrecompiledCalls{
 		Address: address,
-		RequiredGasCalls: []types.RequiredGasCall{
-			{
-				Input:  input1,
-				Output: gas1,
-			},
-			{
-				Input:  input2,
-				Output: gas2,
-			},
+		RequiredGasCalls: []uint64{
+			gas1,
+			gas2,
 		},
 		RunCalls: []types.RunCall{
 			{
-				Input:  input1,
 				Output: output1,
 			},
 			{
-				Input:    input2,
 				Output:   output2,
 				ErrorMsg: errMsg2,
 			},

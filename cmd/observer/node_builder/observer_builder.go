@@ -177,6 +177,7 @@ type ObserverServiceConfig struct {
 	registerDBPruningEnabled             bool
 	registerDBPruneTickerInterval        time.Duration
 	registerDBPruneThrottleDelay         time.Duration
+	registerDBPruneThreshold             uint64
 }
 
 // DefaultObserverServiceConfig defines all the default values for the ObserverServiceConfig
@@ -263,6 +264,7 @@ func DefaultObserverServiceConfig() *ObserverServiceConfig {
 		registerDBPruningEnabled:      false,
 		registerDBPruneTickerInterval: pstorage.DefaultPruneTickerInterval,
 		registerDBPruneThrottleDelay:  pstorage.DefaultPruneThrottleDelay,
+		registerDBPruneThreshold:      pstorage.DefaultPruneThreshold,
 	}
 }
 
@@ -835,6 +837,12 @@ func (builder *ObserverServiceBuilder) extraFlags() {
 			"program-cache-size",
 			defaultConfig.programCacheSize,
 			"[experimental] number of blocks to cache for cadence programs. use 0 to disable cache. default: 0. Note: this is an experimental feature and may cause nodes to become unstable under certain workloads. Use with caution.")
+
+		// Register DB Pruning
+		flags.Uint64Var(&builder.registerDBPruneThreshold,
+			"registerdb-pruning-threshold",
+			defaultConfig.registerDBPruneThreshold,
+			fmt.Sprintf("specifies the number of blocks below the latest stored block height to keep in register db. default: %d", defaultConfig.registerDBPruneThreshold))
 	}).ValidateFlags(func() error {
 		if builder.executionDataSyncEnabled {
 			if builder.executionDataConfig.FetchTimeout <= 0 {
@@ -1466,7 +1474,7 @@ func (builder *ObserverServiceBuilder) BuildExecutionSyncComponents() *ObserverS
 				}
 			}
 
-			registers, err := pstorage.NewRegisters(builder.RegisterDB)
+			registers, err := pstorage.NewRegisters(builder.RegisterDB, builder.registerDBPruneThreshold)
 			if err != nil {
 				return nil, fmt.Errorf("could not create registers storage: %w", err)
 			}
@@ -1995,6 +2003,12 @@ func (builder *ObserverServiceBuilder) enqueueRPCServer() {
 			return nil, fmt.Errorf("failed to initialize block tracker: %w", err)
 		}
 
+		// If execution data syncing and indexing is disabled, pass nil indexReporter
+		var indexReporter state_synchronization.IndexReporter
+		if builder.executionDataSyncEnabled && builder.executionDataIndexingEnabled {
+			indexReporter = builder.Reporter
+		}
+
 		backendParams := backend.Params{
 			State:                     node.State,
 			Blocks:                    node.Storage.Blocks,
@@ -2021,6 +2035,7 @@ func (builder *ObserverServiceBuilder) enqueueRPCServer() {
 				builder.stateStreamConf.ResponseLimit,
 				builder.stateStreamConf.ClientSendBufferSize,
 			),
+			IndexReporter:  indexReporter,
 			VersionControl: builder.VersionControl,
 		}
 
@@ -2047,12 +2062,6 @@ func (builder *ObserverServiceBuilder) enqueueRPCServer() {
 			node.RootChainID.Chain())
 		if err != nil {
 			return nil, err
-		}
-
-		// If execution data syncing and indexing is disabled, pass nil indexReporter
-		var indexReporter state_synchronization.IndexReporter
-		if builder.executionDataSyncEnabled && builder.executionDataIndexingEnabled {
-			indexReporter = builder.Reporter
 		}
 
 		engineBuilder, err := rpc.NewBuilder(
