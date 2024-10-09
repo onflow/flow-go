@@ -637,7 +637,6 @@ contract EVM {
         signatures: [[UInt8]],
         evmAddress: [UInt8; 20]
     ): ValidationResult {
-
         // make signature set first
         // check number of signatures matches number of key indices
         if keyIndices.length != signatures.length {
@@ -647,39 +646,58 @@ contract EVM {
             )
         }
 
-        var signatureSet: [Crypto.KeyListSignature] = []
-        for signatureIndex, signature in signatures{
-            signatureSet.append(Crypto.KeyListSignature(
-                keyIndex: Int(keyIndices[signatureIndex]),
-                signature: signature
-            ))
-        }
-
         // fetch account
         let acc = getAccount(address)
 
-        // constructing key list
+        var signatureSet: [Crypto.KeyListSignature] = []
         let keyList = Crypto.KeyList()
-        for signature in signatureSet {
-            let keyRef = acc.keys.get(keyIndex: signature.keyIndex)
-            if keyRef == nil {
-                return ValidationResult(
-                    isValid: false,
-                    problem: "invalid key index"
-                )
+        var keyListLength = 0
+        let seenKeys: {Int: Int} = {}
+        for signatureIndex, signature in signatures{
+            // index of the key on the account
+            let accountKeyIndex = Int(keyIndices[signatureIndex]!)
+            // index of the key in the key list
+            var keyListIndex = 0
+
+
+            if let seen = seenKeys[accountKeyIndex] {
+                // if we have already seen this accountKeyIndex, use the keyListIndex
+                // that was previously assigned to it
+                // `Crypto.KeyList.verify()` knows how to handle duplicate keys
+                keyListIndex = seen
+            } else {
+                // fetch account key with accountKeyIndex
+                let keyRef = acc.keys.get(keyIndex: accountKeyIndex)
+                if keyRef == nil {
+                    return ValidationResult(
+                        isValid: false,
+                        problem: "invalid key index"
+                    )
+                }
+
+                let key = keyRef!
+                if key.isRevoked {
+                    return ValidationResult(
+                        isValid: false,
+                        problem: "account key is revoked"
+                    )
+                }
+
+                keyList.add(
+                  key.publicKey,
+                  hashAlgorithm: key.hashAlgorithm,
+                  weight: key.weight,
+               )
+
+               keyListIndex = keyListLength
+               keyListLength = keyListLength + 1
+               seenKeys[accountKeyIndex] = keyListIndex
             }
-            let key = keyRef!
-            if key.isRevoked {
-                return ValidationResult(
-                    isValid: false,
-                    problem: "account key is revoked"
-                )
-            }
-            keyList.add(
-              key.publicKey,
-              hashAlgorithm: key.hashAlgorithm,
-              weight: key.weight,
-           )
+
+            signatureSet.append(Crypto.KeyListSignature(
+                keyIndex: keyListIndex,
+                signature: signature
+            ))
         }
 
         let isValid = keyList.verify(
