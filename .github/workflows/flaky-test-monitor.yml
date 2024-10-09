@@ -8,9 +8,12 @@ on:
   push:
     paths:
       - '.github/workflows/flaky-test-monitor.yml'
+permissions:
+  id-token: write
+  contents: read
 
 env:
-  BIGQUERY_DATASET: production_src_flow_test_metrics
+  BIGQUERY_DATASET: dev_src_flow_test_metrics
   BIGQUERY_TABLE: skipped_tests
   BIGQUERY_TABLE2: test_results
   GO_VERSION: "1.22"
@@ -73,7 +76,8 @@ jobs:
           TEST_CATEGORY: unit
         uses: ./.github/workflows/actions/test-monitor-process-results
         with:
-          gcp_sa_key: ${{ secrets.GCP_SA_KEY }}
+          service_account: ${{ secrets.FLAKY_TEST_SERVICE_ACCOUNT }} 
+          workload_identity_provider: ${{ secrets.FLAKY_TEST_WORKLOAD_IDENTITY_PROVIDER }}
 
   unit-test-modules:
     name: Unit Tests (Modules)
@@ -115,7 +119,8 @@ jobs:
           TEST_CATEGORY: ${{ matrix.test_category }}
         uses: ./.github/workflows/actions/test-monitor-process-results
         with:
-          gcp_sa_key: ${{ secrets.GCP_SA_KEY }}
+          service_account: ${{ secrets.FLAKY_TEST_SERVICE_ACCOUNT }} 
+          workload_identity_provider: ${{ secrets.FLAKY_TEST_WORKLOAD_IDENTITY_PROVIDER }}
 
   integration-test:
     name: Integration Tests
@@ -175,4 +180,6 @@ jobs:
           TEST_CATEGORY: ${{ matrix.test_category }}
         uses: ./.github/workflows/actions/test-monitor-process-results
         with:
-          gcp_sa_key: ${{ secrets.GCP_SA_KEY }}
+          service_account: ${{ secrets.FLAKY_TEST_SERVICE_ACCOUNT }} 
+          workload_identity_provider: ${{ secrets.FLAKY_TEST_WORKLOAD_IDENTITY_PROVIDER }}
+

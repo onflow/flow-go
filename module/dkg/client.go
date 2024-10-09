@@ -30,6 +30,8 @@ type Client struct {
 	env templates.Environment
 }
 
+var _ module.DKGContractClient = (*Client)(nil)
+
 // NewClient initializes a new client to the Flow DKG contract
 func NewClient(
 	log zerolog.Logger,
@@ -38,7 +40,7 @@ func NewClient(
 	signer sdkcrypto.Signer,
 	dkgContractAddress,
 	accountAddress string,
-	accountKeyIndex uint,
+	accountKeyIndex uint32,
 ) *Client {
 
 	log = log.With().
@@ -137,7 +139,7 @@ func (c *Client) Broadcast(msg model.BroadcastDKGMessage) error {
 		SetScript(templates.GenerateSendDKGWhiteboardMessageScript(c.env)).
 		SetComputeLimit(9999).
 		SetReferenceBlockID(latestBlock.ID).
-		SetProposalKey(account.Address, int(c.AccountKeyIndex), account.Keys[int(c.AccountKeyIndex)].SequenceNumber).
+		SetProposalKey(account.Address, c.AccountKeyIndex, account.Keys[int(c.AccountKeyIndex)].SequenceNumber).
 		SetPayer(account.Address).
 		AddAuthorizer(account.Address)
 
@@ -158,7 +160,7 @@ func (c *Client) Broadcast(msg model.BroadcastDKGMessage) error {
 	}
 
 	// sign envelope using account signer
-	err = tx.SignEnvelope(account.Address, int(c.AccountKeyIndex), c.Signer)
+	err = tx.SignEnvelope(account.Address, c.AccountKeyIndex, c.Signer)
 	if err != nil {
 		return fmt.Errorf("could not sign transaction: %w", err)
 	}
@@ -181,7 +183,7 @@ func (c *Client) Broadcast(msg model.BroadcastDKGMessage) error {
 // SubmitResult submits the final public result of the DKG protocol. This
 // represents the group public key and the node's local computation of the
 // public keys for each DKG participant. Serialized pub keys are encoded as hex.
-func (c *Client) SubmitResult(groupPublicKey crypto.PublicKey, publicKeys []crypto.PublicKey) error {
+func (c *Client) SubmitResult(groupPublicKey crypto.PublicKey, publicKeys []crypto.PublicKey, indexMap flow.DKGIndexMap) error {
 
 	started := time.Now()
 	ctx, cancel := context.WithTimeout(context.Background(), epochs.TransactionSubmissionTimeout)
@@ -203,48 +205,103 @@ func (c *Client) SubmitResult(groupPublicKey crypto.PublicKey, publicKeys []cryp
 		SetScript(templates.GenerateSendDKGFinalSubmissionScript(c.env)).
 		SetComputeLimit(9999).
 		SetReferenceBlockID(latestBlock.ID).
-		SetProposalKey(account.Address, int(c.AccountKeyIndex), account.Keys[int(c.AccountKeyIndex)].SequenceNumber).
+		SetProposalKey(account.Address, c.AccountKeyIndex, account.Keys[int(c.AccountKeyIndex)].SequenceNumber).
 		SetPayer(account.Address).
 		AddAuthorizer(account.Address)
 
-	// Note: We need to make sure that we pull the keys out in the same order that
-	// we have done here. Group Public key first followed by the individual public keys
-	finalSubmission := make([]cadence.Value, 0, len(publicKeys))
-
-	// first append group public key
-	if groupPublicKey != nil {
-		trimmedGroupHexString := trim0x(groupPublicKey.String())
-		cdcGroupString, err := cadence.NewString(trimmedGroupHexString)
-		if err != nil {
-			return fmt.Errorf("could not convert group key to cadence: %w", err)
-		}
-		finalSubmission = append(finalSubmission, cadence.NewOptional(cdcGroupString))
-	} else {
-		finalSubmission = append(finalSubmission, cadence.NewOptional(nil))
+	trimmedGroupHexString := trim0x(groupPublicKey.String())
+	cdcGroupString, err := cadence.NewString(trimmedGroupHexString)
+	if err != nil {
+		return fmt.Errorf("could not convert group key to cadence: %w", err)
 	}
 
+	// setup first arg - group key
+	err = tx.AddArgument(cdcGroupString)
+	if err != nil {
+		return fmt.Errorf("could not add argument to transaction: %w", err)
+	}
+
+	cdcPublicKeys := make([]cadence.Value, 0, len(publicKeys))
 	for _, publicKey := range publicKeys {
-
 		// append individual public keys
-		if publicKey != nil {
-			trimmedHexString := trim0x(publicKey.String())
-			cdcPubKey, err := cadence.NewString(trimmedHexString)
-			if err != nil {
-				return fmt.Errorf("could not convert pub keyshare to cadence: %w", err)
-			}
-			finalSubmission = append(finalSubmission, cadence.NewOptional(cdcPubKey))
-		} else {
-			finalSubmission = append(finalSubmission, cadence.NewOptional(nil))
+		trimmedHexString := trim0x(publicKey.String())
+		cdcPubKey, err := cadence.NewString(trimmedHexString)
+		if err != nil {
+			return fmt.Errorf("could not convert pub keyshare to cadence: %w", err)
 		}
+		cdcPublicKeys = append(cdcPublicKeys, cdcPubKey)
 	}
 
-	err = tx.AddArgument(cadence.NewArray(finalSubmission))
+	// setup second arg - array of public keys
+	err = tx.AddArgument(cadence.NewArray(cdcPublicKeys))
+	if err != nil {
+		return fmt.Errorf("could not add argument to transaction: %w", err)
+	}
+
+	cdcIndexMap := make([]cadence.KeyValuePair, 0, len(indexMap))
+	for nodeID, dkgIndex := range indexMap {
+		cdcIndexMap = append(cdcIndexMap, cadence.KeyValuePair{
+			Key:   cadence.String(nodeID.String()),
+			Value: cadence.NewInt(dkgIndex),
+		})
+	}
+
+	// setup third arg - IndexMap
+	err = tx.AddArgument(cadence.NewDictionary(cdcIndexMap))
 	if err != nil {
 		return fmt.Errorf("could not add argument to transaction: %w", err)
 	}
 
 	// sign envelope using account signer
-	err = tx.SignEnvelope(account.Address, int(c.AccountKeyIndex), c.Signer)
+	err = tx.SignEnvelope(account.Address, c.AccountKeyIndex, c.Signer)
+	if err != nil {
+		return fmt.Errorf("could not sign transaction: %w", err)
+	}
+
+	c.Log.Info().Str("tx_id", tx.ID().Hex()).Msg("sending SubmitResult transaction")
+	txID, err := c.SendTransaction(ctx, tx)
+	if err != nil {
+		return fmt.Errorf("failed to submit transaction: %w", err)
+	}
+
+	err = c.WaitForSealed(ctx, txID, started)
+	if err != nil {
+		return fmt.Errorf("failed to wait for transaction seal: %w", err)
+	}
+
+	return nil
+}
+
+// SubmitEmptyResult submits an empty result of the DKG protocol. This
+// represents an empty result when the DKG has locally failed.
+// SubmitEmptyResult must be called strictly after the final phase has ended if DKG has failed.
+func (c *Client) SubmitEmptyResult() error {
+	started := time.Now()
+	ctx, cancel := context.WithTimeout(context.Background(), epochs.TransactionSubmissionTimeout)
+	defer cancel()
+
+	// get account for given address
+	account, err := c.GetAccount(ctx)
+	if err != nil {
+		return fmt.Errorf("could not get account details: %w", err)
+	}
+
+	// get latest finalized block to execute transaction
+	latestBlock, err := c.FlowClient.GetLatestBlock(ctx, false)
+	if err != nil {
+		return fmt.Errorf("could not get latest block from node: %w", err)
+	}
+
+	tx := sdk.NewTransaction().
+		SetScript(templates.GenerateSendEmptyDKGFinalSubmissionScript(c.env)).
+		SetComputeLimit(9999).
+		SetReferenceBlockID(latestBlock.ID).
+		SetProposalKey(account.Address, c.AccountKeyIndex, account.Keys[int(c.AccountKeyIndex)].SequenceNumber).
+		SetPayer(account.Address).
+		AddAuthorizer(account.Address)
+
+	// sign envelope using account signer
+	err = tx.SignEnvelope(account.Address, c.AccountKeyIndex, c.Signer)
 	if err != nil {
 		return fmt.Errorf("could not sign transaction: %w", err)
 	}

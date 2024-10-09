@@ -41,6 +41,14 @@ type API interface {
 	GetAccountAtLatestBlock(ctx context.Context, address flow.Address) (*flow.Account, error)
 	GetAccountAtBlockHeight(ctx context.Context, address flow.Address, height uint64) (*flow.Account, error)
 
+	GetAccountBalanceAtLatestBlock(ctx context.Context, address flow.Address) (uint64, error)
+	GetAccountBalanceAtBlockHeight(ctx context.Context, address flow.Address, height uint64) (uint64, error)
+
+	GetAccountKeyAtLatestBlock(ctx context.Context, address flow.Address, keyIndex uint32) (*flow.AccountPublicKey, error)
+	GetAccountKeyAtBlockHeight(ctx context.Context, address flow.Address, keyIndex uint32, height uint64) (*flow.AccountPublicKey, error)
+	GetAccountKeysAtLatestBlock(ctx context.Context, address flow.Address) ([]flow.AccountPublicKey, error)
+	GetAccountKeysAtBlockHeight(ctx context.Context, address flow.Address, height uint64) ([]flow.AccountPublicKey, error)
+
 	ExecuteScriptAtLatestBlock(ctx context.Context, script []byte, arguments [][]byte) ([]byte, error)
 	ExecuteScriptAtBlockHeight(ctx context.Context, blockHeight uint64, script []byte, arguments [][]byte) ([]byte, error)
 	ExecuteScriptAtBlockID(ctx context.Context, blockID flow.Identifier, script []byte, arguments [][]byte) ([]byte, error)
@@ -256,6 +264,14 @@ type NetworkParameters struct {
 	ChainID flow.ChainID
 }
 
+// CompatibleRange contains the first and the last height that the version supports.
+type CompatibleRange struct {
+	// The first block that the version supports.
+	StartHeight uint64
+	// The last block that the version supports.
+	EndHeight uint64
+}
+
 // NodeVersionInfo contains information about node, such as semver, commit, sporkID, protocolVersion, etc
 type NodeVersionInfo struct {
 	Semver               string
@@ -264,4 +280,17 @@ type NodeVersionInfo struct {
 	ProtocolVersion      uint64
 	SporkRootBlockHeight uint64
 	NodeRootBlockHeight  uint64
+	CompatibleRange      *CompatibleRange
+}
+
+// CompatibleRangeToMessage converts a flow.CompatibleRange to a protobuf message
+func CompatibleRangeToMessage(c *CompatibleRange) *entities.CompatibleRange {
+	if c != nil {
+		return &entities.CompatibleRange{
+			StartHeight: c.StartHeight,
+			EndHeight:   c.EndHeight,
+		}
+	}
+
+	return nil
 }

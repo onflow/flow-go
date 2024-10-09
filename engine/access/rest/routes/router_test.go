@@ -70,9 +70,19 @@ func TestParseURL(t *testing.T) {
 			expected: "getAccount",
 		},
 		{
+			name:     "/v1/accounts/{address}/balance",
+			url:      "/v1/accounts/6a587be304c1224c/balance",
+			expected: "getAccountBalance",
+		},
+		{
 			name:     "/v1/accounts/{address}/keys/{index}",
 			url:      "/v1/accounts/6a587be304c1224c/keys/0",
 			expected: "getAccountKeyByIndex",
+		},
+		{
+			name:     "/v1/accounts/{address}/keys",
+			url:      "/v1/accounts/6a587be304c1224c/keys",
+			expected: "getAccountKeys",
 		},
 		{
 			name:     "/v1/events",
@@ -167,9 +177,19 @@ func TestBenchmarkParseURL(t *testing.T) {
 			expected: "getAccount",
 		},
 		{
+			name:     "/v1/accounts/{address}/balance",
+			url:      "/v1/accounts/6a587be304c1224c/balance",
+			expected: "getAccountBalance",
+		},
+		{
 			name:     "/v1/accounts/{address}/keys/{index}",
 			url:      "/v1/accounts/6a587be304c1224c/keys/0",
 			expected: "getAccountKeyByIndex",
+		},
+		{
+			name:     "/v1/accounts/{address}/keys",
+			url:      "/v1/accounts/6a587be304c1224c/keys",
+			expected: "getAccountKeys",
 		},
 		{
 			name:     "/v1/events",

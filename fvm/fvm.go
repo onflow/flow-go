@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/onflow/cadence"
+	"github.com/onflow/cadence/runtime/common"
 
 	"github.com/onflow/flow-go/fvm/environment"
 	"github.com/onflow/flow-go/fvm/errors"
@@ -83,7 +84,7 @@ func Run(executor ProcedureExecutor) error {
 	return executor.Execute()
 }
 
-// An Procedure is an operation (or set of operations) that reads or writes ledger state.
+// A Procedure is an operation (or set of operations) that reads or writes ledger state.
 type Procedure interface {
 	NewExecutor(
 		ctx Context,
@@ -118,8 +119,6 @@ type VM interface {
 		ProcedureOutput,
 		error,
 	)
-
-	GetAccount(Context, flow.Address, snapshot.StorageSnapshot) (*flow.Account, error)
 }
 
 var _ VM = (*VirtualMachine)(nil)
@@ -203,7 +202,7 @@ func (vm *VirtualMachine) Run(
 }
 
 // GetAccount returns an account by address or an error if none exists.
-func (vm *VirtualMachine) GetAccount(
+func GetAccount(
 	ctx Context,
 	address flow.Address,
 	storageSnapshot snapshot.StorageSnapshot,
@@ -211,6 +210,103 @@ func (vm *VirtualMachine) GetAccount(
 	*flow.Account,
 	error,
 ) {
+	env, _ := getScriptEnvironment(ctx, storageSnapshot)
+
+	account, err := env.GetAccount(address)
+	if err != nil {
+		if errors.IsLedgerFailure(err) {
+			return nil, fmt.Errorf(
+				"cannot get account, this error usually happens if the "+
+					"reference block for this query is not set to a recent "+
+					"block: %w",
+				err)
+		}
+		return nil, fmt.Errorf("cannot get account: %w", err)
+	}
+	return account, nil
+}
+
+// GetAccountBalance returns an account balance by address or an error if none exists.
+func GetAccountBalance(
+	ctx Context,
+	address flow.Address,
+	storageSnapshot snapshot.StorageSnapshot,
+) (
+	uint64,
+	error,
+) {
+	env, _ := getScriptEnvironment(ctx, storageSnapshot)
+
+	accountBalance, err := env.GetAccountBalance(common.MustBytesToAddress(address.Bytes()))
+
+	if err != nil {
+		return 0, fmt.Errorf("cannot get account balance: %w", err)
+	}
+	return accountBalance, nil
+}
+
+// GetAccountAvailableBalance returns an account available balance by address or an error if none exists.
+func GetAccountAvailableBalance(
+	ctx Context,
+	address flow.Address,
+	storageSnapshot snapshot.StorageSnapshot,
+) (
+	uint64,
+	error,
+) {
+	env, _ := getScriptEnvironment(ctx, storageSnapshot)
+
+	accountBalance, err := env.GetAccountAvailableBalance(common.MustBytesToAddress(address.Bytes()))
+
+	if err != nil {
+		return 0, fmt.Errorf("cannot get account balance: %w", err)
+	}
+	return accountBalance, nil
+}
+
+// GetAccountKeys returns an account keys by address or an error if none exists.
+func GetAccountKeys(
+	ctx Context,
+	address flow.Address,
+	storageSnapshot snapshot.StorageSnapshot,
+) (
+	[]flow.AccountPublicKey,
+	error,
+) {
+	_, accountInfo := getScriptEnvironment(ctx, storageSnapshot)
+	accountKeys, err := accountInfo.GetAccountKeys(address)
+
+	if err != nil {
+		return nil, fmt.Errorf("cannot get account keys: %w", err)
+	}
+	return accountKeys, nil
+}
+
+// GetAccountKey returns an account key by address and index or an error if none exists.
+func GetAccountKey(
+	ctx Context,
+	address flow.Address,
+	keyIndex uint32,
+	storageSnapshot snapshot.StorageSnapshot,
+) (
+	*flow.AccountPublicKey,
+	error,
+) {
+	_, accountInfo := getScriptEnvironment(ctx, storageSnapshot)
+	accountKey, err := accountInfo.GetAccountKeyByIndex(address, keyIndex)
+
+	if err != nil {
+		return nil, fmt.Errorf("cannot get account keys: %w", err)
+	}
+
+	return accountKey, nil
+}
+
+// Helper function to initialize common components.
+func getScriptEnvironment(
+	ctx Context,
+	storageSnapshot snapshot.StorageSnapshot,
+) (environment.Environment, environment.AccountInfo) {
 	blockDatabase := storage.NewBlockDatabase(
 		storageSnapshot,
 		0,
@@ -229,16 +325,6 @@ func (vm *VirtualMachine) GetAccount(
 		ctx.TracerSpan,
 		ctx.EnvironmentParams,
 		storageTxn)
-	account, err := env.GetAccount(address)
-	if err != nil {
-		if errors.IsLedgerFailure(err) {
-			return nil, fmt.Errorf(
-				"cannot get account, this error usually happens if the "+
-					"reference block for this query is not set to a recent "+
-					"block: %w",
-				err)
-		}
-		return nil, fmt.Errorf("cannot get account: %w", err)
-	}
-	return account, nil
+
+	return env, env.AccountInfo
 }

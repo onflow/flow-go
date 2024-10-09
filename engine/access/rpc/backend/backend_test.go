@@ -5,8 +5,11 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"sort"
 	"testing"
+	"time"
 
+	"github.com/coreos/go-semver/semver"
 	"github.com/dgraph-io/badger/v2"
 	accessproto "github.com/onflow/flow/protobuf/go/flow/access"
 	"github.com/onflow/flow/protobuf/go/flow/entities"
@@ -21,13 +24,14 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
-	accessflow "github.com/onflow/flow-go/access"
+	"github.com/onflow/flow-go/access"
 	"github.com/onflow/flow-go/cmd/build"
-	access "github.com/onflow/flow-go/engine/access/mock"
+	accessmock "github.com/onflow/flow-go/engine/access/mock"
 	backendmock "github.com/onflow/flow-go/engine/access/rpc/backend/mock"
 	"github.com/onflow/flow-go/engine/access/rpc/connection"
 	connectionmock "github.com/onflow/flow-go/engine/access/rpc/connection/mock"
 	"github.com/onflow/flow-go/engine/common/rpc/convert"
+	"github.com/onflow/flow-go/engine/common/version"
 	"github.com/onflow/flow-go/fvm/blueprints"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
@@ -73,10 +77,11 @@ type Suite struct {
 	db                  *badger.DB
 	dbDir               string
 	lastFullBlockHeight *counters.PersistentStrictMonotonicCounter
+	versionControl      *version.VersionControl
 
-	colClient              *access.AccessAPIClient
-	execClient             *access.ExecutionAPIClient
-	historicalAccessClient *access.AccessAPIClient
+	colClient              *accessmock.AccessAPIClient
+	execClient             *accessmock.ExecutionAPIClient
+	historicalAccessClient *accessmock.AccessAPIClient
 
 	connectionFactory *connectionmock.ConnectionFactory
 	communicator      *backendmock.Communicator
@@ -108,12 +113,12 @@ func (suite *Suite) SetupTest() {
 	suite.collections = new(storagemock.Collections)
 	suite.receipts = new(storagemock.ExecutionReceipts)
 	suite.results = new(storagemock.ExecutionResults)
-	suite.colClient = new(access.AccessAPIClient)
-	suite.execClient = new(access.ExecutionAPIClient)
+	suite.colClient = new(accessmock.AccessAPIClient)
+	suite.execClient = new(accessmock.ExecutionAPIClient)
 	suite.transactionResults = storagemock.NewLightTransactionResults(suite.T())
 	suite.events = storagemock.NewEvents(suite.T())
 	suite.chainID = flow.Testnet
-	suite.historicalAccessClient = new(access.AccessAPIClient)
+	suite.historicalAccessClient = new(accessmock.AccessAPIClient)
 	suite.connectionFactory = connectionmock.NewConnectionFactory(suite.T())
 
 	suite.communicator = new(backendmock.Communicator)
@@ -1589,13 +1594,14 @@ func (suite *Suite) TestGetNodeVersionInfo() {
 		state := protocol.NewState(suite.T())
 		state.On("Params").Return(stateParams, nil).Maybe()
 
-		expected := &accessflow.NodeVersionInfo{
+		expected := &access.NodeVersionInfo{
 			Semver:               build.Version(),
 			Commit:               build.Commit(),
 			SporkId:              sporkID,
 			ProtocolVersion:      uint64(protocolVersion),
 			SporkRootBlockHeight: sporkRootBlock.Height,
 			NodeRootBlockHeight:  nodeRootBlock.Height,
+			CompatibleRange:      nil,
 		}
 
 		params := suite.defaultBackendParams()
@@ -1605,6 +1611,104 @@ func (suite *Suite) TestGetNodeVersionInfo() {
 		suite.Require().NoError(err)
 
 		actual, err := backend.GetNodeVersionInfo(context.Background())
+		suite.Require().NoError(err)
+
+		suite.Require().Equal(expected, actual)
+	})
+
+	suite.Run("start and end version set", func() {
+		latestBlockHeight := nodeRootBlock.Height + 100
+		versionBeacons := storagemock.NewVersionBeacons(suite.T())
+
+		events := []*flow.SealedVersionBeacon{
+			{
+				VersionBeacon: unittest.VersionBeaconFixture(
+					unittest.WithBoundaries(flow.VersionBoundary{BlockHeight: nodeRootBlock.Height + 4, Version: "0.0.1"}),
+				),
+				SealHeight: nodeRootBlock.Height + 2,
+			},
+			{
+				VersionBeacon: unittest.VersionBeaconFixture(
+					unittest.WithBoundaries(flow.VersionBoundary{BlockHeight: nodeRootBlock.Height + 12, Version: "0.0.2"}),
+				),
+				SealHeight: nodeRootBlock.Height + 10,
+			},
+			{
+				VersionBeacon: unittest.VersionBeaconFixture(
+					unittest.WithBoundaries(flow.VersionBoundary{BlockHeight: latestBlockHeight - 8, Version: "0.0.3"}),
+				),
+				SealHeight: latestBlockHeight - 10,
+			},
+		}
+
+		eventMap := make(map[uint64]*flow.SealedVersionBeacon, len(events))
+		for _, event := range events {
+			eventMap[event.SealHeight] = event
+		}
+
+		// make sure events are sorted descending by seal height
+		sort.Slice(events, func(i, j int) bool {
+			return events[i].SealHeight > events[j].SealHeight
+		})
+
+		versionBeacons.
+			On("Highest", mock.AnythingOfType("uint64")).
+			Return(func(height uint64) (*flow.SealedVersionBeacon, error) {
+				// iterating through events sorted descending by seal height
+				// return the first event that was sealed in a height less than or equal to height
+				for _, event := range events {
+					if event.SealHeight <= height {
+						return event, nil
+					}
+				}
+				return nil, storage.ErrNotFound
+			})
+
+		var err error
+		suite.versionControl, err = version.NewVersionControl(
+			unittest.Logger(),
+			versionBeacons,
+			semver.New("0.0.2"),
+			nodeRootBlock.Height,
+			latestBlockHeight,
+		)
+		require.NoError(suite.T(), err)
+
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+		// Start the VersionControl component.
+		suite.versionControl.Start(irrecoverable.NewMockSignalerContext(suite.T(), ctx))
+		unittest.RequireComponentsReadyBefore(suite.T(), 2*time.Second, suite.versionControl)
+
+		stateParams := protocol.NewParams(suite.T())
+		stateParams.On("SporkID").Return(sporkID, nil)
+		stateParams.On("ProtocolVersion").Return(protocolVersion, nil)
+		stateParams.On("SporkRootBlockHeight").Return(sporkRootBlock.Height, nil)
+		stateParams.On("SealedRoot").Return(nodeRootBlock, nil)
+
+		state := protocol.NewState(suite.T())
+		state.On("Params").Return(stateParams, nil).Maybe()
+
+		expected := &access.NodeVersionInfo{
+			Semver:               build.Version(),
+			Commit:               build.Commit(),
+			SporkId:              sporkID,
+			ProtocolVersion:      uint64(protocolVersion),
+			SporkRootBlockHeight: sporkRootBlock.Height,
+			NodeRootBlockHeight:  nodeRootBlock.Height,
+			CompatibleRange: &access.CompatibleRange{
+				StartHeight: nodeRootBlock.Height + 12,
+				EndHeight:   latestBlockHeight - 9,
+			},
+		}
+
+		params := suite.defaultBackendParams()
+		params.State = state
+
+		backend, err := New(params)
+		suite.Require().NoError(err)
+
+		actual, err := backend.GetNodeVersionInfo(ctx)
 		suite.Require().NoError(err)
 
 		suite.Require().Equal(expected, actual)
@@ -2134,5 +2238,6 @@ func (suite *Suite) defaultBackendParams() Params {
 		BlockTracker:             nil,
 		TxResultQueryMode:        IndexQueryModeExecutionNodesOnly,
 		LastFullBlockHeight:      suite.lastFullBlockHeight,
+		VersionControl:           suite.versionControl,
 	}
 }

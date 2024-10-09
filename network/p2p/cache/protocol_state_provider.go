@@ -70,7 +70,6 @@ func NewProtocolStateIDCache(
 // and virtually latency free. However, we run data base queries and acquire locks here,
 // which is undesired.
 func (p *ProtocolStateIDCache) EpochTransition(newEpochCounter uint64, header *flow.Header) {
-	p.logger.Info().Uint64("newEpochCounter", newEpochCounter).Msg("epoch transition")
 	p.update(header.ID())
 }
 
@@ -82,7 +81,6 @@ func (p *ProtocolStateIDCache) EpochTransition(newEpochCounter uint64, header *f
 // and virtually latency free. However, we run data base queries and acquire locks here,
 // which is undesired.
 func (p *ProtocolStateIDCache) EpochSetupPhaseStarted(currentEpochCounter uint64, header *flow.Header) {
-	p.logger.Info().Uint64("currentEpochCounter", currentEpochCounter).Msg("epoch setup phase started")
 	p.update(header.ID())
 }
 
@@ -94,7 +92,6 @@ func (p *ProtocolStateIDCache) EpochSetupPhaseStarted(currentEpochCounter uint64
 // and virtually latency free. However, we run data base queries and acquire locks here,
 // which is undesired.
 func (p *ProtocolStateIDCache) EpochCommittedPhaseStarted(currentEpochCounter uint64, header *flow.Header) {
-	p.logger.Info().Uint64("currentEpochCounter", currentEpochCounter).Msg("epoch committed phase started")
 	p.update(header.ID())
 }
 

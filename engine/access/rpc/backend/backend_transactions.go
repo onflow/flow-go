@@ -56,7 +56,7 @@ func (b *backendTransactions) SendTransaction(
 ) error {
 	now := time.Now().UTC()
 
-	err := b.transactionValidator.Validate(tx)
+	err := b.transactionValidator.Validate(ctx, tx)
 	if err != nil {
 		return status.Errorf(codes.InvalidArgument, "invalid transaction: %s", err.Error())
 	}

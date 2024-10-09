@@ -189,8 +189,7 @@ func (s *Suite) initIngestionEngine(ctx irrecoverable.SignalerContext) *Engine {
 	)
 	require.NoError(s.T(), err)
 
-	eng, err := New(s.log, s.net, s.proto.state, s.me, s.request, s.blocks, s.headers, s.collections,
-		s.transactions, s.results, s.receipts, s.collectionExecutedMetric, processedHeight, s.lastFullBlockHeight)
+	eng, err := New(s.log, s.net, s.proto.state, s.me, s.request, s.blocks, s.headers, s.collections, s.transactions, s.results, s.receipts, s.collectionExecutedMetric, processedHeight, s.lastFullBlockHeight)
 	require.NoError(s.T(), err)
 
 	eng.ComponentManager.Start(ctx)

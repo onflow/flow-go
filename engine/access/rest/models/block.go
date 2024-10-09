@@ -84,7 +84,7 @@ func (b *BlockPayload) Build(payload *flow.Payload) error {
 func (b *BlockHeader) Build(header *flow.Header) {
 	b.Id = header.ID().String()
 	b.ParentId = header.ParentID.String()
-	b.Height = util.FromUint64(header.Height)
+	b.Height = util.FromUint(header.Height)
 	b.Timestamp = header.Timestamp
 	b.ParentVoterSignature = util.ToBase64(header.ParentVoterSigData)
 }

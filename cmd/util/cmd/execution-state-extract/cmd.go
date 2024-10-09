@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path"
+	"runtime/pprof"
 	"strings"
 
 	"github.com/rs/zerolog/log"
@@ -13,7 +14,9 @@ import (
 	"github.com/onflow/flow-go/cmd/util/cmd/common"
 	common2 "github.com/onflow/flow-go/cmd/util/common"
 	"github.com/onflow/flow-go/cmd/util/ledger/migrations"
+	"github.com/onflow/flow-go/cmd/util/ledger/reporters"
 	"github.com/onflow/flow-go/cmd/util/ledger/util"
+	"github.com/onflow/flow-go/ledger/complete/wal"
 	"github.com/onflow/flow-go/model/bootstrap"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/metrics"
@@ -178,6 +181,20 @@ func init() {
 }
 
 func run(*cobra.Command, []string) {
+	if flagCPUProfile != "" {
+		f, err := os.Create(flagCPUProfile)
+		if err != nil {
+			log.Fatal().Err(err).Msg("could not create CPU profile")
+		}
+
+		err = pprof.StartCPUProfile(f)
+		if err != nil {
+			log.Fatal().Err(err).Msg("could not start CPU profile")
+		}
+
+		defer pprof.StopCPUProfile()
+	}
+
 	var stateCommitment flow.StateCommitment
 
 	if len(flagBlockHash) > 0 && len(flagStateCommitment) > 0 {
@@ -281,11 +298,6 @@ func run(*cobra.Command, []string) {
 		}
 	}
 
-	// err := ensureCheckpointFileExist(flagExecutionStateDir)
-	// if err != nil {
-	// 	log.Fatal().Err(err).Msgf("cannot ensure checkpoint file exist in folder %v", flagExecutionStateDir)
-	// }
-
 	chain := flow.ChainID(flagChain).Chain()
 
 	if flagNoReport {
@@ -330,6 +342,12 @@ func run(*cobra.Command, []string) {
 			hex.EncodeToString(stateCommitment[:]),
 			flagExecutionStateDir,
 		)
+
+		err := ensureCheckpointFileExist(flagExecutionStateDir)
+		if err != nil {
+			log.Error().Err(err).Msgf("cannot ensure checkpoint file exist in folder %v", flagExecutionStateDir)
+		}
+
 	}
 
 	var outputMsg string
@@ -362,10 +380,10 @@ func run(*cobra.Command, []string) {
 	switch chainID {
 	case flow.Emulator:
 		burnerContractChange = migrations.BurnerContractChangeDeploy
-		evmContractChange = migrations.EVMContractChangeDeploy
+		evmContractChange = migrations.EVMContractChangeDeployMinimalAndUpdateFull
 	case flow.Testnet, flow.Mainnet:
 		burnerContractChange = migrations.BurnerContractChangeUpdate
-		evmContractChange = migrations.EVMContractChangeUpdate
+		evmContractChange = migrations.EVMContractChangeUpdateFull
 	}
 
 	stagedContracts, err := migrations.StagedContractsFromCSV(flagStagedContractsFile)
@@ -392,59 +410,102 @@ func run(*cobra.Command, []string) {
 		CacheEntitlementsMigrationResults: flagCacheEntitlementsMigrationResults,
 	}
 
+	var extractor extractor
 	if len(flagInputPayloadFileName) > 0 {
-		err = extractExecutionStateFromPayloads(
+		extractor = newPayloadFileExtractor(log.Logger, flagInputPayloadFileName)
+	} else {
+		extractor = newExecutionStateExtractor(log.Logger, flagExecutionStateDir, stateCommitment)
+	}
+
+	// Extract payloads.
+
+	payloadsFromPartialState, payloads, err := extractor.extract()
+	if err != nil {
+		log.Fatal().Err(err).Msgf("error extracting payloads: %s", err.Error())
+	}
+
+	log.Info().Msgf("extracted %d payloads", len(payloads))
+
+	// Migrate payloads.
+
+	if !flagNoMigration {
+		migrations := newMigrations(log.Logger, flagOutputDir, opts)
+
+		migration := newMigration(log.Logger, migrations, flagNWorker)
+
+		payloads, err = migration(payloads)
+		if err != nil {
+			log.Fatal().Err(err).Msgf("error migrating payloads: %s", err.Error())
+		}
+
+		log.Info().Msgf("migrated %d payloads", len(payloads))
+	}
+
+	// Export migrated payloads.
+
+	var exporter exporter
+	if len(flagOutputPayloadFileName) > 0 {
+		exporter = newPayloadFileExporter(
 			log.Logger,
-			flagExecutionStateDir,
-			flagOutputDir,
 			flagNWorker,
-			!flagNoMigration,
-			flagInputPayloadFileName,
 			flagOutputPayloadFileName,
 			exportPayloadsForOwners,
 			flagSortPayloads,
-			opts,
 		)
 	} else {
-		err = extractExecutionState(
+		exporter = newCheckpointFileExporter(
 			log.Logger,
-			flagExecutionStateDir,
-			stateCommitment,
 			flagOutputDir,
-			flagNWorker,
-			!flagNoMigration,
-			flagOutputPayloadFileName,
-			exportPayloadsForOwners,
-			flagSortPayloads,
-			opts,
 		)
 	}
 
+	log.Info().Msgf("exporting %d payloads", len(payloads))
+
+	exportedState, err := exporter.export(payloadsFromPartialState, payloads)
 	if err != nil {
-		log.Fatal().Err(err).Msgf("error extracting the execution state: %s", err.Error())
+		log.Fatal().Err(err).Msgf("error exporting migrated payloads: %s", err.Error())
 	}
+
+	log.Info().Msgf("exported %d payloads", len(payloads))
+
+	// Create export reporter.
+	reporter := reporters.NewExportReporter(
+		log.Logger,
+		func() flow.StateCommitment { return stateCommitment },
+	)
+
+	err = reporter.Report(nil, exportedState)
+	if err != nil {
+		log.Error().Err(err).Msgf("can not generate report for migrated state: %v", exportedState)
+	}
+
+	log.Info().Msgf(
+		"New state commitment for the exported state is: %s (base64: %s)",
+		exportedState.String(),
+		exportedState.Base64(),
+	)
 }
 
-// func ensureCheckpointFileExist(dir string) error {
-// 	checkpoints, err := wal.Checkpoints(dir)
-// 	if err != nil {
-// 		return fmt.Errorf("could not find checkpoint files: %v", err)
-// 	}
-//
-// 	if len(checkpoints) != 0 {
-// 		log.Info().Msgf("found checkpoint %v files: %v", len(checkpoints), checkpoints)
-// 		return nil
-// 	}
-//
-// 	has, err := wal.HasRootCheckpoint(dir)
-// 	if err != nil {
-// 		return fmt.Errorf("could not check has root checkpoint: %w", err)
-// 	}
-//
-// 	if has {
-// 		log.Info().Msg("found root checkpoint file")
-// 		return nil
-// 	}
-//
-// 	return fmt.Errorf("no checkpoint file was found, no root checkpoint file was found")
-// }
+func ensureCheckpointFileExist(dir string) error {
+	checkpoints, err := wal.Checkpoints(dir)
+	if err != nil {
+		return fmt.Errorf("could not find checkpoint files: %v", err)
+	}
+
+	if len(checkpoints) != 0 {
+		log.Info().Msgf("found checkpoint %v files: %v", len(checkpoints), checkpoints)
+		return nil
+	}
+
+	has, err := wal.HasRootCheckpoint(dir)
+	if err != nil {
+		return fmt.Errorf("could not check has root checkpoint: %w", err)
+	}
+
+	if has {
+		log.Info().Msg("found root checkpoint file")
+		return nil
+	}
+
+	return fmt.Errorf("no checkpoint file was found, no root checkpoint file was found in %v, check the --execution-state-dir flag", dir)
+}

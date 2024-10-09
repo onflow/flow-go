@@ -11,6 +11,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 	"go.uber.org/atomic"
+	"golang.org/x/exp/slices"
 	"pgregory.net/rapid"
 
 	bootstrapDKG "github.com/onflow/flow-go/cmd/bootstrap/dkg"
@@ -28,7 +29,6 @@ import (
 	"github.com/onflow/flow-go/module/local"
 	modulemock "github.com/onflow/flow-go/module/mock"
 	msig "github.com/onflow/flow-go/module/signature"
-	"github.com/onflow/flow-go/state/protocol/inmem"
 	storagemock "github.com/onflow/flow-go/storage/mock"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -796,6 +796,7 @@ func TestCombinedVoteProcessorV2_BuildVerifyQC(t *testing.T) {
 	stakingSigners := unittest.IdentityListFixture(3)
 	beaconSigners := unittest.IdentityListFixture(8)
 	allIdentities := append(stakingSigners, beaconSigners...)
+	slices.SortFunc(allIdentities, flow.Canonical[flow.Identity]) // sort in place to avoid taking a copy.
 	require.Equal(t, len(dkgData.PubKeyShares), len(allIdentities))
 	dkgParticipants := make(map[flow.Identifier]flow.DKGParticipant)
 	// fill dkg participants data
@@ -827,7 +828,6 @@ func TestCombinedVoteProcessorV2_BuildVerifyQC(t *testing.T) {
 		identity.StakingPubKey = stakingPriv.PublicKey()
 
 		participantData := dkgParticipants[identity.NodeID]
-
 		dkgKey := encodable.RandomBeaconPrivKey{
 			PrivateKey: dkgData.PrivKeyShares[participantData.Index],
 		}
@@ -844,24 +844,13 @@ func TestCombinedVoteProcessorV2_BuildVerifyQC(t *testing.T) {
 		signers[identity.NodeID] = verification.NewCombinedSigner(me, beaconSignerStore)
 	}
 
-	leader := stakingSigners[0]
+	leader := allIdentities[0]
 
 	block := helper.MakeBlock(helper.WithBlockView(view),
 		helper.WithBlockProposer(leader.NodeID))
 
-	inmemDKG, err := inmem.DKGFromEncodable(inmem.EncodableDKG{
-		GroupKey: encodable.RandomBeaconPubKey{
-			PublicKey: dkgData.PubGroupKey,
-		},
-		Participants: dkgParticipants,
-	})
+	committee, err := committees.NewStaticCommittee(allIdentities, flow.ZeroID, dkgParticipants, dkgData.PubGroupKey)
 	require.NoError(t, err)
-
-	committee := &mockhotstuff.DynamicCommittee{}
-	committee.On("QuorumThresholdForView", mock.Anything).Return(committees.WeightThresholdToBuildQC(allIdentities.ToSkeleton().TotalWeight()), nil)
-	committee.On("IdentitiesByEpoch", block.View).Return(allIdentities.ToSkeleton(), nil)
-	committee.On("IdentitiesByBlock", block.BlockID).Return(allIdentities, nil)
-	committee.On("DKG", block.View).Return(inmemDKG, nil)
 
 	votes := make([]*model.Vote, 0, len(allIdentities))
 

@@ -23,9 +23,6 @@ func LoggingMiddleware(logger zerolog.Logger) mux.MiddlewareFunc {
 			// continue to the next handler
 			inner.ServeHTTP(respWriter, req)
 			log := logger.Info()
-			if respWriter.statusCode != http.StatusOK {
-				log = logger.Error()
-			}
 			log.Str("method", req.Method).
 				Str("uri", req.RequestURI).
 				Str("client_ip", req.RemoteAddr).

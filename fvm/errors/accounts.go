@@ -32,7 +32,7 @@ func NewAccountAlreadyExistsError(address flow.Address) CodedError {
 // when a public key not found for the given address and key index.
 func NewAccountPublicKeyNotFoundError(
 	address flow.Address,
-	keyIndex uint64,
+	keyIndex uint32,
 ) CodedError {
 	return NewCodedError(
 		ErrCodeAccountPublicKeyNotFoundError,
@@ -50,8 +50,8 @@ func IsAccountPublicKeyNotFoundError(err error) bool {
 // when an account tries to add public keys over the limit.
 func NewAccountPublicKeyLimitError(
 	address flow.Address,
-	counts uint64,
-	limit uint64,
+	counts uint32,
+	limit uint32,
 ) CodedError {
 	return NewCodedError(
 		ErrCodeAccountPublicKeyLimitError,

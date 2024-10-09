@@ -189,7 +189,7 @@ func finalize(cmd *cobra.Command, args []string) {
 		intermediaryData.ProtocolVersion,
 		func(epochStateID flow.Identifier) (protocol_state.KVStoreAPI, error) {
 			return kvstore.NewDefaultKVStore(
-				intermediaryData.EpochCommitSafetyThreshold,
+				intermediaryData.FinalizationSafetyThreshold,
 				intermediaryData.EpochExtensionViewCount,
 				epochStateID)
 		},

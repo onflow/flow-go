@@ -25,10 +25,10 @@ func SelectFilter(object interface{}, selectKeys []string) (interface{}, error) 
 	}
 
 	filter := sliceToMap(selectKeys)
-
 	switch itemAsType := (*outputMap).(type) {
 	case []interface{}:
-		filterSlice(itemAsType, "", filter)
+		filteredSlice, _ := filterSlice(itemAsType, "", filter)
+		*outputMap = filteredSlice
 	case map[string]interface{}:
 		filterObject(itemAsType, "", filter)
 	}
@@ -40,6 +40,10 @@ func SelectFilter(object interface{}, selectKeys []string) (interface{}, error) 
 func filterObject(jsonStruct map[string]interface{}, prefix string, filterMap map[string]bool) {
 	for key, item := range jsonStruct {
 		newPrefix := jsonPath(prefix, key)
+		// if the leaf object is the key, go to others
+		if filterMap[newPrefix] {
+			continue
+		}
 		switch itemAsType := item.(type) {
 		case []interface{}:
 			// if the value of a key is a list, call filterSlice
@@ -87,7 +91,7 @@ func filterSlice(jsonSlice []interface{}, prefix string, filterMap map[string]bo
 			if len(itemAsType) == 0 {
 				// since all elements of the slice are the same, if one sub-slice has been filtered out, we can safely
 				// remove all sub-slices and return (instead of iterating all slice elements)
-				return nil, sliceType
+				return make([]interface{}, 0), sliceType
 			}
 		case map[string]interface{}:
 			// if the slice has structs as elements, call filterObject
@@ -96,7 +100,7 @@ func filterSlice(jsonSlice []interface{}, prefix string, filterMap map[string]bo
 			if len(itemAsType) == 0 {
 				// since all elements of the slice are the same, if one struct element has been filtered out, we can safely
 				// remove all struct elements and return (instead of iterating all slice elements)
-				return nil, false
+				return make([]interface{}, 0), false
 			}
 		default:
 			// if the elements are neither a slice nor a struct, then return the slice and true to indicate the slice has

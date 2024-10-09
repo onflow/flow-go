@@ -149,19 +149,9 @@ func (s *ClientSuite) TestNilDKGSubmission() {
 	// prepare DKG
 	clients := s.prepareDKG(participants)
 
-	// generate list of public keys
-	numberOfNodes := len(participants)
-	publicKeys := make([]crypto.PublicKey, 0, numberOfNodes+1)
-	for i := 0; i < numberOfNodes; i++ {
-		publicKeys = append(publicKeys, nil)
-	}
-
-	// create a nil group public key
-	var groupPublicKey crypto.PublicKey
-
 	// submit empty nil keys for each participant
 	for _, client := range clients {
-		err := client.SubmitResult(groupPublicKey, publicKeys)
+		err := client.SubmitEmptyResult()
 		require.NoError(s.T(), err)
 	}
 }
@@ -178,14 +168,16 @@ func (s *ClientSuite) TestSubmitResult() {
 	// generate list of public keys
 	numberOfNodes := len(participants)
 	publicKeys := make([]crypto.PublicKey, 0, numberOfNodes)
+	indexMap := make(flow.DKGIndexMap, numberOfNodes)
 	for i := 0; i < numberOfNodes; i++ {
 		privateKey := unittest.KeyFixture(crypto.BLSBLS12381)
 		publicKeys = append(publicKeys, privateKey.PublicKey())
+		indexMap[participants[i]] = i
 	}
 	// create a group public key
 	groupPublicKey := unittest.KeyFixture(crypto.BLSBLS12381).PublicKey()
 
-	err := clients[0].SubmitResult(groupPublicKey, publicKeys)
+	err := clients[0].SubmitResult(groupPublicKey, publicKeys, indexMap)
 	require.NoError(s.T(), err)
 }
 
@@ -232,7 +224,7 @@ func (s *ClientSuite) setUpAdmin() {
 
 	// set up admin resource
 	setUpAdminTx := sdk.NewTransaction().
-		SetScript(templates.GeneratePublishDKGParticipantScript(s.env)).
+		SetScript(templates.GeneratePublishDKGAdminScript(s.env)).
 		SetComputeLimit(9999).
 		SetProposalKey(s.blockchain.ServiceKey().Address, s.blockchain.ServiceKey().Index,
 			s.blockchain.ServiceKey().SequenceNumber).

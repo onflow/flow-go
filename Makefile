@@ -199,6 +199,7 @@ generate-mocks: install-mock-generators
 	mockery --name '.*' --dir="./consensus/hotstuff" --case=underscore --output="./consensus/hotstuff/mocks" --outpkg="mocks"
 	mockery --name '.*' --dir="./engine/access/wrapper" --case=underscore --output="./engine/access/mock" --outpkg="mock"
 	mockery --name 'API' --dir="./access" --case=underscore --output="./access/mock" --outpkg="mock"
+	mockery --name 'Blocks' --dir="./access" --case=underscore --output="./access/mock" --outpkg="mock"
 	mockery --name 'API' --dir="./engine/protocol" --case=underscore --output="./engine/protocol/mock" --outpkg="mock"
 	mockery --name '.*' --dir="./engine/access/state_stream" --case=underscore --output="./engine/access/state_stream/mock" --outpkg="mock"
 	mockery --name 'BlockTracker' --dir="./engine/access/subscription" --case=underscore --output="./engine/access/subscription/mock"  --outpkg="mock"
@@ -538,6 +539,14 @@ docker-native-build-access-corrupt:
 		-t "$(CONTAINER_REGISTRY)/access-corrupted:latest" \
 		-t "$(CONTAINER_REGISTRY)/access-corrupted:$(IMAGE_TAG)" .
 	./insecure/cmd/mods_restore.sh
+
+# build a binary to run on bare metal without using docker.
+# binary is written to file ./bin/app
+.PHONY: docker-native-build-access-binary
+docker-native-build-access-binary: docker-native-build-access
+	docker create --name extract "$(CONTAINER_REGISTRY)/access:latest"
+	docker cp extract:/bin/app ./flow_access_node
+	docker rm extract
 
 .PHONY: docker-native-build-observer
 docker-native-build-observer:

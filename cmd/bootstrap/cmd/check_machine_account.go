@@ -63,7 +63,7 @@ func checkMachineAccountRun(_ *cobra.Command, _ []string) {
 	log.Debug().
 		Str("machine_account_address", machineAccountInfo.Address).
 		Str("machine_account_pub_key", fmt.Sprintf("%x", encodedRuntimeAccountPubKey(machineAccountPrivKey))).
-		Uint("key_index", machineAccountInfo.KeyIndex).
+		Uint32("key_index", machineAccountInfo.KeyIndex).
 		Str("signing_algo", machineAccountInfo.SigningAlgorithm.String()).
 		Str("hash_algo", machineAccountInfo.HashAlgorithm.String()).
 		Msg("read machine account info from disk")

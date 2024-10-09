@@ -9,9 +9,11 @@ import (
 
 	"github.com/onflow/flow-go/integration/tests/epochs"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/utils/unittest"
 )
 
 func TestEpochStaticTransition(t *testing.T) {
+	unittest.SkipUnless(t, unittest.TEST_TODO, "requires changes to the DKG so we can produce a valid DKG IndexMap")
 	suite.Run(t, new(StaticEpochTransitionSuite))
 }
 
@@ -27,7 +29,7 @@ func (s *StaticEpochTransitionSuite) SetupTest() {
 	s.StakingAuctionLen = 10
 	s.DKGPhaseLen = 50
 	s.EpochLen = 300
-	s.EpochCommitSafetyThreshold = 50
+	s.FinalizationSafetyThreshold = 50
 
 	// run the generic setup, which starts up the network
 	s.BaseSuite.SetupTest()

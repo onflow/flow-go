@@ -86,12 +86,6 @@ func (snap EncodableSnapshot) LatestSealedResult() (*flow.ExecutionResult, error
 	return nil, fmt.Errorf("LatestSealedResult: unreachable for correctly formatted sealing segments")
 }
 
-// EncodableDKG is the encoding format for protocol.DKG
-type EncodableDKG struct {
-	GroupKey     encodable.RandomBeaconPubKey
-	Participants map[flow.Identifier]flow.DKGParticipant
-}
-
 type EncodableFullDKG struct {
 	GroupKey      encodable.RandomBeaconPubKey
 	PrivKeyShares []encodable.RandomBeaconPrivKey

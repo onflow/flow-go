@@ -537,7 +537,7 @@ func bootstrapEpochForProtocolStateEntry(
 
 			if commit != nil {
 				if err := protocol.IsValidEpochCommit(commit, setup); err != nil {
-					return fmt.Errorf("invalid EpochCommit for next epoch")
+					return fmt.Errorf("invalid EpochCommit for next epoch: %w", err)
 				}
 				commits = append(commits, commit)
 			}

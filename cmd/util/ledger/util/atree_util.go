@@ -3,6 +3,12 @@ package util
 import (
 	"fmt"
 
+	"github.com/onflow/atree"
+
+	"github.com/onflow/cadence/runtime"
+	"github.com/onflow/cadence/runtime/common"
+
+	"github.com/onflow/flow-go/cmd/util/ledger/util/registers"
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/ledger/common/convert"
 	"github.com/onflow/flow-go/model/flow"
@@ -56,4 +62,63 @@ func newHeadFromData(data []byte) (head, error) {
 
 func (h *head) version() byte {
 	return (h[0] & maskVersion) >> 4
+}
+
+func getSlabIDsFromRegisters(registers registers.Registers) ([]atree.SlabID, error) {
+	storageIDs := make([]atree.SlabID, 0, registers.Count())
+
+	err := registers.ForEach(func(owner string, key string, _ []byte) error {
+
+		if !flow.IsSlabIndexKey(key) {
+			return nil
+		}
+
+		slabID := atree.NewSlabID(
+			atree.Address([]byte(owner)),
+			atree.SlabIndex([]byte(key[1:])),
+		)
+
+		storageIDs = append(storageIDs, slabID)
+
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	return storageIDs, nil
+}
+
+func LoadAtreeSlabsInStorage(
+	storage *runtime.Storage,
+	registers registers.Registers,
+	nWorkers int,
+) error {
+
+	storageIDs, err := getSlabIDsFromRegisters(registers)
+	if err != nil {
+		return err
+	}
+
+	return storage.PersistentSlabStorage.BatchPreload(storageIDs, nWorkers)
+}
+
+func CheckStorageHealth(
+	address common.Address,
+	storage *runtime.Storage,
+	registers registers.Registers,
+	domains []string,
+	nWorkers int,
+) error {
+
+	err := LoadAtreeSlabsInStorage(storage, registers, nWorkers)
+	if err != nil {
+		return err
+	}
+
+	for _, domain := range domains {
+		_ = storage.GetStorageMap(address, domain, false)
+	}
+
+	return storage.CheckHealth()
 }

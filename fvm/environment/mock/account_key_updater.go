@@ -48,7 +48,7 @@ func (_m *AccountKeyUpdater) AddAccountKey(runtimeAddress common.Address, public
 }
 
 // RevokeAccountKey provides a mock function with given fields: runtimeAddress, keyIndex
-func (_m *AccountKeyUpdater) RevokeAccountKey(runtimeAddress common.Address, keyIndex int) (*stdlib.AccountKey, error) {
+func (_m *AccountKeyUpdater) RevokeAccountKey(runtimeAddress common.Address, keyIndex uint32) (*stdlib.AccountKey, error) {
 	ret := _m.Called(runtimeAddress, keyIndex)
 
 	if len(ret) == 0 {
@@ -57,10 +57,10 @@ func (_m *AccountKeyUpdater) RevokeAccountKey(runtimeAddress common.Address, key
 
 	var r0 *stdlib.AccountKey
 	var r1 error
-	if rf, ok := ret.Get(0).(func(common.Address, int) (*stdlib.AccountKey, error)); ok {
+	if rf, ok := ret.Get(0).(func(common.Address, uint32) (*stdlib.AccountKey, error)); ok {
 		return rf(runtimeAddress, keyIndex)
 	}
-	if rf, ok := ret.Get(0).(func(common.Address, int) *stdlib.AccountKey); ok {
+	if rf, ok := ret.Get(0).(func(common.Address, uint32) *stdlib.AccountKey); ok {
 		r0 = rf(runtimeAddress, keyIndex)
 	} else {
 		if ret.Get(0) != nil {
@@ -68,7 +68,7 @@ func (_m *AccountKeyUpdater) RevokeAccountKey(runtimeAddress common.Address, key
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(common.Address, int) error); ok {
+	if rf, ok := ret.Get(1).(func(common.Address, uint32) error); ok {
 		r1 = rf(runtimeAddress, keyIndex)
 	} else {
 		r1 = ret.Error(1)

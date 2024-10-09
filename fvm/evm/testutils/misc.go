@@ -6,6 +6,7 @@ import (
 	"math/rand"
 	"testing"
 
+	"github.com/holiman/uint256"
 	gethCommon "github.com/onflow/go-ethereum/common"
 	gethTypes "github.com/onflow/go-ethereum/core/types"
 	"github.com/stretchr/testify/require"
@@ -18,6 +19,10 @@ func RandomCommonHash(t testing.TB) gethCommon.Hash {
 	_, err := cryptoRand.Read(ret[:gethCommon.HashLength])
 	require.NoError(t, err)
 	return ret
+}
+
+func RandomUint256Int(limit int64) *uint256.Int {
+	return uint256.NewInt(uint64(rand.Int63n(limit) + 1))
 }
 
 func RandomBigInt(limit int64) *big.Int {
@@ -77,5 +82,44 @@ func COAOwnershipProofInContextFixture(t testing.TB) *types.COAOwnershipProofInC
 		COAOwnershipProof: *COAOwnershipProofFixture(t),
 		SignedData:        types.SignedData(signedMsg[:]),
 		EVMAddress:        RandomAddress(t),
+	}
+}
+
+func RandomResultFixture(t testing.TB) *types.Result {
+	contractAddress := RandomAddress(t)
+	return &types.Result{
+		Index:                   1,
+		TxType:                  1,
+		TxHash:                  RandomCommonHash(t),
+		ReturnedData:            RandomData(t),
+		GasConsumed:             RandomGas(1000),
+		DeployedContractAddress: &contractAddress,
+		Logs: []*gethTypes.Log{
+			GetRandomLogFixture(t),
+			GetRandomLogFixture(t),
+		},
+	}
+}
+
+func AggregatedPrecompiledCallsFixture(t testing.TB) types.AggregatedPrecompiledCalls {
+	return types.AggregatedPrecompiledCalls{
+		types.PrecompiledCalls{
+			Address: RandomAddress(t),
+			RequiredGasCalls: []types.RequiredGasCall{{
+				Input:  RandomData(t),
+				Output: 2,
+			}},
+			RunCalls: []types.RunCall{
+				{
+					Input:  RandomData(t),
+					Output: RandomData(t),
+				},
+				{
+					Input:    RandomData(t),
+					Output:   []byte{},
+					ErrorMsg: "Some error msg",
+				},
+			},
+		},
 	}
 }

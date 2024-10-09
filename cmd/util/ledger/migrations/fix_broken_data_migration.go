@@ -79,7 +79,7 @@ func (m *FixSlabsWithBrokenReferencesMigration) MigrateAccount(
 	storage := migrationRuntime.Storage
 
 	// Load all atree registers in storage
-	err := loadAtreeSlabsInStorage(storage, accountRegisters, m.nWorkers)
+	err := util.LoadAtreeSlabsInStorage(storage, accountRegisters, m.nWorkers)
 	if err != nil {
 		return err
 	}
@@ -122,25 +122,15 @@ func (m *FixSlabsWithBrokenReferencesMigration) MigrateAccount(
 		return fmt.Errorf("failed to commit storage: %w", err)
 	}
 
-	// Finalize the transaction
-	result, err := migrationRuntime.TransactionState.FinalizeMainTransaction()
-	if err != nil {
-		return fmt.Errorf("failed to finalize main transaction: %w", err)
-	}
+	// Commit/finalize the transaction
 
-	// Merge the changes to the original payloads.
 	expectedAddresses := map[flow.Address]struct{}{
 		flow.Address(address): {},
 	}
 
-	err = registers.ApplyChanges(
-		accountRegisters,
-		result.WriteSet,
-		expectedAddresses,
-		m.log,
-	)
+	err = migrationRuntime.Commit(expectedAddresses, m.log)
 	if err != nil {
-		return fmt.Errorf("failed to apply changes to account registers: %w", err)
+		return fmt.Errorf("failed to commit: %w", err)
 	}
 
 	// Log fixed payloads
@@ -209,7 +199,7 @@ func (m *FixSlabsWithBrokenReferencesMigration) writeBrokenPayloads() error {
 
 func getAtreePayloadsByID(
 	registers *registers.AccountRegisters,
-	ids map[atree.StorageID][]atree.StorageID,
+	ids map[atree.SlabID][]atree.SlabID,
 ) (
 	[]*ledger.Payload,
 	error,
@@ -225,12 +215,12 @@ func getAtreePayloadsByID(
 			return nil
 		}
 
-		storageID := atree.NewStorageID(
+		slabID := atree.NewSlabID(
 			atree.Address([]byte(owner)),
-			atree.StorageIndex([]byte(key[1:])),
+			atree.SlabIndex([]byte(key[1:])),
 		)
 
-		_, ok := ids[storageID]
+		_, ok := ids[slabID]
 		if !ok {
 			return nil
 		}

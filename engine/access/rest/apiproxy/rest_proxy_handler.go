@@ -203,6 +203,87 @@ func (r *RestProxyHandler) GetAccountAtBlockHeight(ctx context.Context, address 
 	return convert.MessageToAccount(accountResponse.Account)
 }
 
+// GetAccountBalanceAtBlockHeight returns account balance by account address and block height.
+func (r *RestProxyHandler) GetAccountBalanceAtBlockHeight(ctx context.Context, address flow.Address, height uint64) (uint64, error) {
+	upstream, closer, err := r.FaultTolerantClient()
+	if err != nil {
+		return 0, err
+	}
+	defer closer.Close()
+
+	getAccountBalanceAtBlockHeightRequest := &accessproto.GetAccountBalanceAtBlockHeightRequest{
+		Address:     address.Bytes(),
+		BlockHeight: height,
+	}
+
+	accountBalanceResponse, err := upstream.GetAccountBalanceAtBlockHeight(ctx, getAccountBalanceAtBlockHeightRequest)
+	r.log("upstream", "GetAccountBalanceAtBlockHeight", err)
+
+	if err != nil {
+		return 0, err
+	}
+
+	return accountBalanceResponse.GetBalance(), nil
+
+}
+
+// GetAccountKeys returns account keys by account address and block height.
+func (r *RestProxyHandler) GetAccountKeys(ctx context.Context, address flow.Address, height uint64) ([]flow.AccountPublicKey, error) {
+	upstream, closer, err := r.FaultTolerantClient()
+	if err != nil {
+		return nil, err
+	}
+	defer closer.Close()
+
+	getAccountKeysAtBlockHeightRequest := &accessproto.GetAccountKeysAtBlockHeightRequest{
+		Address:     address.Bytes(),
+		BlockHeight: height,
+	}
+
+	accountKeyResponse, err := upstream.GetAccountKeysAtBlockHeight(ctx, getAccountKeysAtBlockHeightRequest)
+	r.log("upstream", "GetAccountKeysAtBlockHeight", err)
+
+	if err != nil {
+		return nil, err
+	}
+
+	accountKeys := make([]flow.AccountPublicKey, len(accountKeyResponse.GetAccountKeys()))
+	for i, key := range accountKeyResponse.GetAccountKeys() {
+		accountKey, err := convert.MessageToAccountKey(key)
+		if err != nil {
+			return nil, err
+		}
+
+		accountKeys[i] = *accountKey
+	}
+
+	return accountKeys, nil
+}
+
+// GetAccountKeyByIndex returns account key by account address, key index and block height.
+func (r *RestProxyHandler) GetAccountKeyByIndex(ctx context.Context, address flow.Address, keyIndex uint32, height uint64) (*flow.AccountPublicKey, error) {
+	upstream, closer, err := r.FaultTolerantClient()
+	if err != nil {
+		return nil, err
+	}
+	defer closer.Close()
+
+	getAccountKeyAtBlockHeightRequest := &accessproto.GetAccountKeyAtBlockHeightRequest{
+		Address:     address.Bytes(),
+		Index:       keyIndex,
+		BlockHeight: height,
+	}
+
+	accountKeyResponse, err := upstream.GetAccountKeyAtBlockHeight(ctx, getAccountKeyAtBlockHeightRequest)
+	r.log("upstream", "GetAccountKeyAtBlockHeight", err)
+
+	if err != nil {
+		return nil, err
+	}
+
+	return convert.MessageToAccountKey(accountKeyResponse.AccountKey)
+}
+
 // ExecuteScriptAtLatestBlock executes script at latest block.
 func (r *RestProxyHandler) ExecuteScriptAtLatestBlock(ctx context.Context, script []byte, arguments [][]byte) ([]byte, error) {
 	upstream, closer, err := r.FaultTolerantClient()

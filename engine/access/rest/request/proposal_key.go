@@ -16,7 +16,7 @@ func (p *ProposalKey) Parse(raw models.ProposalKey, chain flow.Chain) error {
 		return err
 	}
 
-	keyIndex, err := util.ToUint64(raw.KeyIndex)
+	keyIndex, err := util.ToUint32(raw.KeyIndex)
 	if err != nil {
 		return fmt.Errorf("invalid key index: %w", err)
 	}

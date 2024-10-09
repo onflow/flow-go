@@ -55,10 +55,10 @@ func (g *Events) New() flow.Event {
 	identifier := fmt.Sprintf("TestContract.FooEvent%d", g.count)
 	typeID := location.TypeID(nil, identifier)
 
-	testEventType := &cadence.EventType{
-		Location:            location,
-		QualifiedIdentifier: identifier,
-		Fields: []cadence.Field{
+	testEventType := cadence.NewEventType(
+		location,
+		identifier,
+		[]cadence.Field{
 			{
 				Identifier: "a",
 				Type:       cadence.IntType,
@@ -68,7 +68,8 @@ func (g *Events) New() flow.Event {
 				Type:       cadence.StringType,
 			},
 		},
-	}
+		nil,
+	)
 
 	fooString, err := cadence.NewString("foo")
 	if err != nil {
@@ -123,16 +124,18 @@ func GenerateAccountCreateEvent(t *testing.T, address flow.Address) flow.Event {
 	cadenceEvent := cadence.NewEvent(
 		[]cadence.Value{
 			cadence.NewAddress(address),
-		}).WithType(&cadence.EventType{
-		Location:            stdlib.FlowLocation{},
-		QualifiedIdentifier: "AccountCreated",
-		Fields: []cadence.Field{
-			{
-				Identifier: "address",
-				Type:       cadence.AddressType,
+		}).
+		WithType(cadence.NewEventType(
+			stdlib.FlowLocation{},
+			"AccountCreated",
+			[]cadence.Field{
+				{
+					Identifier: "address",
+					Type:       cadence.AddressType,
+				},
 			},
-		},
-	})
+			nil,
+		))
 
 	payload, err := ccf.Encode(cadenceEvent)
 	require.NoError(t, err)
@@ -162,24 +165,26 @@ func GenerateAccountContractEvent(t *testing.T, qualifiedIdentifier string, addr
 				testutils.ConvertToCadence([]byte{111, 43, 164, 202, 220, 174, 148, 17, 253, 161, 9, 124, 237, 83, 227, 75, 115, 149, 141, 83, 129, 145, 252, 68, 122, 137, 80, 155, 89, 233, 136, 213}),
 			).WithType(cadence.NewConstantSizedArrayType(32, cadence.UInt8Type)),
 			contractName,
-		}).WithType(&cadence.EventType{
-		Location:            stdlib.FlowLocation{},
-		QualifiedIdentifier: qualifiedIdentifier,
-		Fields: []cadence.Field{
-			{
-				Identifier: "address",
-				Type:       cadence.AddressType,
+		}).
+		WithType(cadence.NewEventType(
+			stdlib.FlowLocation{},
+			qualifiedIdentifier,
+			[]cadence.Field{
+				{
+					Identifier: "address",
+					Type:       cadence.AddressType,
+				},
+				{
+					Identifier: "codeHash",
+					Type:       cadence.NewConstantSizedArrayType(32, cadence.UInt8Type),
+				},
+				{
+					Identifier: "contract",
+					Type:       cadence.StringType,
+				},
 			},
-			{
-				Identifier: "codeHash",
-				Type:       cadence.NewConstantSizedArrayType(32, cadence.UInt8Type),
-			},
-			{
-				Identifier: "contract",
-				Type:       cadence.StringType,
-			},
-		},
-	})
+			nil,
+		))
 
 	payload, err := ccf.Encode(cadenceEvent)
 	require.NoError(t, err)

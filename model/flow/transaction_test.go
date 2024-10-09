@@ -14,16 +14,16 @@ func TestTransaction_SignatureOrdering(t *testing.T) {
 	tx := flow.NewTransactionBody()
 
 	proposerAddress := unittest.RandomAddressFixture()
-	proposerKeyIndex := uint64(1)
+	proposerKeyIndex := uint32(1)
 	proposerSequenceNumber := uint64(42)
 	proposerSignature := []byte{1, 2, 3}
 
 	authorizerAddress := unittest.RandomAddressFixture()
-	authorizerKeyIndex := uint64(0)
+	authorizerKeyIndex := uint32(0)
 	authorizerSignature := []byte{4, 5, 6}
 
 	payerAddress := unittest.RandomAddressFixture()
-	payerKeyIndex := uint64(0)
+	payerKeyIndex := uint32(0)
 	payerSignature := []byte{7, 8, 9}
 
 	tx.SetProposalKey(proposerAddress, proposerKeyIndex, proposerSequenceNumber)

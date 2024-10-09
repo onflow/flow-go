@@ -51,6 +51,10 @@ func EncodeDelete(rootHash ledger.RootHash) []byte {
 	return buf
 }
 
+// Decode decodes the given data into a WAL operation, root hash and trie update.
+// It returns (WALDelete, rootHash, nil, nil) if the operation is WALDelete.
+// It returns (WALUpdate, hash.DummyHash, update, nil) if the operation is WALUpdate.
+// To read the root hash of the trie update, use update.RootHash.
 func Decode(data []byte) (operation WALOperation, rootHash ledger.RootHash, update *ledger.TrieUpdate, err error) {
 	if len(data) < 4 { // 1 byte op + 2 size + actual data = 4 minimum
 		err = fmt.Errorf("data corrupted, too short to represent operation - hexencoded data: %x", data)

@@ -307,7 +307,7 @@ func CheckMachineAccountInfo(
 			info.SigningAlgorithm.String(),
 			accountKey.SigAlgo.String())
 	}
-	if accountKey.Index != int(info.KeyIndex) {
+	if accountKey.Index != info.KeyIndex {
 		return fmt.Errorf("machine account key index mismatch between local (%d) and on-chain (%d)",
 			info.KeyIndex,
 			accountKey.Index)

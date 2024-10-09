@@ -195,6 +195,186 @@ func (_m *AccessAPIServer) GetAccountAtLatestBlock(_a0 context.Context, _a1 *acc
 	return r0, r1
 }
 
+// GetAccountBalanceAtBlockHeight provides a mock function with given fields: _a0, _a1
+func (_m *AccessAPIServer) GetAccountBalanceAtBlockHeight(_a0 context.Context, _a1 *access.GetAccountBalanceAtBlockHeightRequest) (*access.AccountBalanceResponse, error) {
+	ret := _m.Called(_a0, _a1)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetAccountBalanceAtBlockHeight")
+	}
+
+	var r0 *access.AccountBalanceResponse
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, *access.GetAccountBalanceAtBlockHeightRequest) (*access.AccountBalanceResponse, error)); ok {
+		return rf(_a0, _a1)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, *access.GetAccountBalanceAtBlockHeightRequest) *access.AccountBalanceResponse); ok {
+		r0 = rf(_a0, _a1)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*access.AccountBalanceResponse)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, *access.GetAccountBalanceAtBlockHeightRequest) error); ok {
+		r1 = rf(_a0, _a1)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// GetAccountBalanceAtLatestBlock provides a mock function with given fields: _a0, _a1
+func (_m *AccessAPIServer) GetAccountBalanceAtLatestBlock(_a0 context.Context, _a1 *access.GetAccountBalanceAtLatestBlockRequest) (*access.AccountBalanceResponse, error) {
+	ret := _m.Called(_a0, _a1)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetAccountBalanceAtLatestBlock")
+	}
+
+	var r0 *access.AccountBalanceResponse
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, *access.GetAccountBalanceAtLatestBlockRequest) (*access.AccountBalanceResponse, error)); ok {
+		return rf(_a0, _a1)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, *access.GetAccountBalanceAtLatestBlockRequest) *access.AccountBalanceResponse); ok {
+		r0 = rf(_a0, _a1)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*access.AccountBalanceResponse)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, *access.GetAccountBalanceAtLatestBlockRequest) error); ok {
+		r1 = rf(_a0, _a1)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// GetAccountKeyAtBlockHeight provides a mock function with given fields: _a0, _a1
+func (_m *AccessAPIServer) GetAccountKeyAtBlockHeight(_a0 context.Context, _a1 *access.GetAccountKeyAtBlockHeightRequest) (*access.AccountKeyResponse, error) {
+	ret := _m.Called(_a0, _a1)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetAccountKeyAtBlockHeight")
+	}
+
+	var r0 *access.AccountKeyResponse
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, *access.GetAccountKeyAtBlockHeightRequest) (*access.AccountKeyResponse, error)); ok {
+		return rf(_a0, _a1)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, *access.GetAccountKeyAtBlockHeightRequest) *access.AccountKeyResponse); ok {
+		r0 = rf(_a0, _a1)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*access.AccountKeyResponse)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, *access.GetAccountKeyAtBlockHeightRequest) error); ok {
+		r1 = rf(_a0, _a1)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// GetAccountKeyAtLatestBlock provides a mock function with given fields: _a0, _a1
+func (_m *AccessAPIServer) GetAccountKeyAtLatestBlock(_a0 context.Context, _a1 *access.GetAccountKeyAtLatestBlockRequest) (*access.AccountKeyResponse, error) {
+	ret := _m.Called(_a0, _a1)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetAccountKeyAtLatestBlock")
+	}
+
+	var r0 *access.AccountKeyResponse
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, *access.GetAccountKeyAtLatestBlockRequest) (*access.AccountKeyResponse, error)); ok {
+		return rf(_a0, _a1)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, *access.GetAccountKeyAtLatestBlockRequest) *access.AccountKeyResponse); ok {
+		r0 = rf(_a0, _a1)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*access.AccountKeyResponse)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, *access.GetAccountKeyAtLatestBlockRequest) error); ok {
+		r1 = rf(_a0, _a1)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// GetAccountKeysAtBlockHeight provides a mock function with given fields: _a0, _a1
+func (_m *AccessAPIServer) GetAccountKeysAtBlockHeight(_a0 context.Context, _a1 *access.GetAccountKeysAtBlockHeightRequest) (*access.AccountKeysResponse, error) {
+	ret := _m.Called(_a0, _a1)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetAccountKeysAtBlockHeight")
+	}
+
+	var r0 *access.AccountKeysResponse
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, *access.GetAccountKeysAtBlockHeightRequest) (*access.AccountKeysResponse, error)); ok {
+		return rf(_a0, _a1)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, *access.GetAccountKeysAtBlockHeightRequest) *access.AccountKeysResponse); ok {
+		r0 = rf(_a0, _a1)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*access.AccountKeysResponse)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, *access.GetAccountKeysAtBlockHeightRequest) error); ok {
+		r1 = rf(_a0, _a1)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// GetAccountKeysAtLatestBlock provides a mock function with given fields: _a0, _a1
+func (_m *AccessAPIServer) GetAccountKeysAtLatestBlock(_a0 context.Context, _a1 *access.GetAccountKeysAtLatestBlockRequest) (*access.AccountKeysResponse, error) {
+	ret := _m.Called(_a0, _a1)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetAccountKeysAtLatestBlock")
+	}
+
+	var r0 *access.AccountKeysResponse
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, *access.GetAccountKeysAtLatestBlockRequest) (*access.AccountKeysResponse, error)); ok {
+		return rf(_a0, _a1)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, *access.GetAccountKeysAtLatestBlockRequest) *access.AccountKeysResponse); ok {
+		r0 = rf(_a0, _a1)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*access.AccountKeysResponse)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, *access.GetAccountKeysAtLatestBlockRequest) error); ok {
+		r1 = rf(_a0, _a1)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
 // GetBlockByHeight provides a mock function with given fields: _a0, _a1
 func (_m *AccessAPIServer) GetBlockByHeight(_a0 context.Context, _a1 *access.GetBlockByHeightRequest) (*access.BlockResponse, error) {
 	ret := _m.Called(_a0, _a1)

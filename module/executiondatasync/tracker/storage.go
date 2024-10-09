@@ -52,13 +52,13 @@ const blobRecordKeyLength = 1 + 8 + blobs.CidLength
 func makeBlobRecordKey(blockHeight uint64, c cid.Cid) []byte {
 	blobRecordKey := make([]byte, blobRecordKeyLength)
 	blobRecordKey[0] = prefixBlobRecord
-	binary.LittleEndian.PutUint64(blobRecordKey[1:], blockHeight)
+	binary.BigEndian.PutUint64(blobRecordKey[1:], blockHeight)
 	copy(blobRecordKey[1+8:], c.Bytes())
 	return blobRecordKey
 }
 
 func parseBlobRecordKey(key []byte) (uint64, cid.Cid, error) {
-	blockHeight := binary.LittleEndian.Uint64(key[1:])
+	blockHeight := binary.BigEndian.Uint64(key[1:])
 	c, err := cid.Cast(key[1+8:])
 	return blockHeight, c, err
 }
@@ -74,7 +74,7 @@ func makeLatestHeightKey(c cid.Cid) []byte {
 
 func makeUint64Value(v uint64) []byte {
 	value := make([]byte, 8)
-	binary.LittleEndian.PutUint64(value, v)
+	binary.BigEndian.PutUint64(value, v)
 	return value
 }
 
@@ -84,7 +84,7 @@ func getUint64Value(item *badger.Item) (uint64, error) {
 		return 0, err
 	}
 
-	return binary.LittleEndian.Uint64(value), nil
+	return binary.BigEndian.Uint64(value), nil
 }
 
 // getBatchItemCountLimit returns the maximum number of items that can be included in a single batch

@@ -1,6 +1,8 @@
 package execution
 
 import (
+	"fmt"
+
 	"github.com/onflow/flow-go/fvm/storage/snapshot"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
@@ -31,7 +33,7 @@ func (er *BlockExecutionResult) Size() int {
 }
 
 func (er *BlockExecutionResult) CollectionExecutionResultAt(colIndex int) *CollectionExecutionResult {
-	if colIndex < 0 && colIndex > len(er.collectionExecutionResults) {
+	if colIndex < 0 || colIndex > len(er.collectionExecutionResults) {
 		return nil
 	}
 	return &er.collectionExecutionResults[colIndex]
@@ -184,6 +186,12 @@ func (ar *BlockAttestationResult) ChunkAt(index int) *flow.Chunk {
 
 	execRes := ar.collectionExecutionResults[index]
 	attestRes := ar.collectionAttestationResults[index]
+
+	if execRes.executionSnapshot == nil {
+		// This should never happen
+		// In case it does, attach additional information to the error message
+		panic(fmt.Sprintf("execution snapshot is nil. Block ID: %s, EndState: %s", ar.Block.ID(), attestRes.endStateCommit))
+	}
 
 	return flow.NewChunk(
 		ar.Block.ID(),

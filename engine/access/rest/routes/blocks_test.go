@@ -44,6 +44,10 @@ func prepareTestVectors(t *testing.T,
 	singleBlockCondensedResponse := expectedBlockResponsesExpanded(blocks[:1], executionResults[:1], false, flow.BlockStatusUnknown)
 	multipleBlockCondensedResponse := expectedBlockResponsesExpanded(blocks, executionResults, false, flow.BlockStatusUnknown)
 
+	multipleBlockHeaderWithHeaderSelectedResponse := expectedBlockResponsesSelected(blocks, executionResults, flow.BlockStatusUnknown, []string{"header"})
+	multipleBlockHeaderWithHeaderAndStatusSelectedResponse := expectedBlockResponsesSelected(blocks, executionResults, flow.BlockStatusUnknown, []string{"header", "block_status"})
+	multipleBlockHeaderWithUnknownSelectedResponse := expectedBlockResponsesSelected(blocks, executionResults, flow.BlockStatusUnknown, []string{"unknown"})
+
 	invalidID := unittest.IdentifierFixture().String()
 	invalidHeight := fmt.Sprintf("%d", blkCnt+1)
 
@@ -112,7 +116,7 @@ func prepareTestVectors(t *testing.T,
 		},
 		{
 			description:      "Get block by both heights and start and end height",
-			request:          requestURL(t, nil, heights[len(heights)-1], heights[0], true, heights...),
+			request:          requestURL(t, nil, heights[len(heights)-1], heights[0], true, []string{}, heights...),
 			expectedStatus:   http.StatusBadRequest,
 			expectedResponse: `{"code":400, "message": "can only provide either heights or start and end height range"}`,
 		},
@@ -134,6 +138,24 @@ func prepareTestVectors(t *testing.T,
 			expectedStatus:   http.StatusBadRequest,
 			expectedResponse: fmt.Sprintf(`{"code":400, "message": "at most %d IDs can be requested at a time"}`, request.MaxBlockRequestHeightRange),
 		},
+		{
+			description:      "Get multiple blocks by IDs with header selected",
+			request:          getByIDsCondensedWithSelectURL(t, blockIDs, []string{"header"}),
+			expectedStatus:   http.StatusOK,
+			expectedResponse: multipleBlockHeaderWithHeaderSelectedResponse,
+		},
+		{
+			description:      "Get multiple blocks by IDs with header and block_status selected",
+			request:          getByIDsCondensedWithSelectURL(t, blockIDs, []string{"header", "block_status"}),
+			expectedStatus:   http.StatusOK,
+			expectedResponse: multipleBlockHeaderWithHeaderAndStatusSelectedResponse,
+		},
+		{
+			description:      "Get multiple blocks by IDs with unknown select object",
+			request:          getByIDsCondensedWithSelectURL(t, blockIDs, []string{"unknown"}),
+			expectedStatus:   http.StatusOK,
+			expectedResponse: multipleBlockHeaderWithUnknownSelectedResponse,
+		},
 	}
 	return testVectors
 }
@@ -154,7 +176,7 @@ func TestAccessGetBlocks(t *testing.T) {
 	}
 }
 
-func requestURL(t *testing.T, ids []string, start string, end string, expandResponse bool, heights ...string) *http.Request {
+func requestURL(t *testing.T, ids []string, start string, end string, expandResponse bool, selectedFields []string, heights ...string) *http.Request {
 	u, _ := url.Parse("/v1/blocks")
 	q := u.Query()
 
@@ -170,6 +192,11 @@ func requestURL(t *testing.T, ids []string, start string, end string, expandResp
 	if len(heights) > 0 {
 		heightsStr := strings.Join(heights, ",")
 		q.Add(heightQueryParam, heightsStr)
+	}
+
+	if len(selectedFields) > 0 {
+		selectedStr := strings.Join(selectedFields, ",")
+		q.Add(middleware.SelectQueryParam, selectedStr)
 	}
 
 	if expandResponse {
@@ -188,19 +215,23 @@ func requestURL(t *testing.T, ids []string, start string, end string, expandResp
 }
 
 func getByIDsExpandedURL(t *testing.T, ids []string) *http.Request {
-	return requestURL(t, ids, "", "", true)
+	return requestURL(t, ids, "", "", true, []string{})
 }
 
 func getByHeightsExpandedURL(t *testing.T, heights ...string) *http.Request {
-	return requestURL(t, nil, "", "", true, heights...)
+	return requestURL(t, nil, "", "", true, []string{}, heights...)
 }
 
 func getByStartEndHeightExpandedURL(t *testing.T, start, end string) *http.Request {
-	return requestURL(t, nil, start, end, true)
+	return requestURL(t, nil, start, end, true, []string{})
 }
 
 func getByIDsCondensedURL(t *testing.T, ids []string) *http.Request {
-	return requestURL(t, ids, "", "", false)
+	return requestURL(t, ids, "", "", false, []string{})
+}
+
+func getByIDsCondensedWithSelectURL(t *testing.T, ids []string, selectedFields []string) *http.Request {
+	return requestURL(t, ids, "", "", false, selectedFields)
 }
 
 func generateMocks(backend *mock.API, count int) ([]string, []string, []*flow.Block, []*flow.ExecutionResult) {
@@ -232,65 +263,106 @@ func generateMocks(backend *mock.API, count int) ([]string, []string, []*flow.Bl
 	return blockIDs, heights, blocks, executionResults
 }
 
-func expectedBlockResponsesExpanded(blocks []*flow.Block, execResult []*flow.ExecutionResult, expanded bool, status flow.BlockStatus) string {
-	blockResponses := make([]string, len(blocks))
+func expectedBlockResponsesExpanded(
+	blocks []*flow.Block,
+	execResult []*flow.ExecutionResult,
+	expanded bool,
+	status flow.BlockStatus,
+	selectedFields ...string,
+) string {
+	blockResponses := make([]string, 0)
 	for i, b := range blocks {
-		blockResponses[i] = expectedBlockResponse(b, execResult[i], expanded, status)
+		response := expectedBlockResponse(b, execResult[i], expanded, status, selectedFields...)
+		if response != "" {
+			blockResponses = append(blockResponses, response)
+		}
 	}
 	return fmt.Sprintf("[%s]", strings.Join(blockResponses, ","))
 }
 
-func expectedBlockResponse(block *flow.Block, execResult *flow.ExecutionResult, expanded bool, status flow.BlockStatus) string {
+func expectedBlockResponsesSelected(
+	blocks []*flow.Block,
+	execResult []*flow.ExecutionResult,
+	status flow.BlockStatus,
+	selectedFields []string,
+) string {
+	return expectedBlockResponsesExpanded(blocks, execResult, false, status, selectedFields...)
+}
+
+func expectedBlockResponse(
+	block *flow.Block,
+	execResult *flow.ExecutionResult,
+	expanded bool,
+	status flow.BlockStatus,
+	selectedFields ...string,
+) string {
 	id := block.ID().String()
 	execResultID := execResult.ID().String()
-	execLink := fmt.Sprintf("/v1/execution_results/%s", execResultID)
 	blockLink := fmt.Sprintf("/v1/blocks/%s", id)
 	payloadLink := fmt.Sprintf("/v1/blocks/%s/payload", id)
-	blockStatus := status.String()
-
+	execLink := fmt.Sprintf("/v1/execution_results/%s", execResultID)
 	timestamp := block.Header.Timestamp.Format(time.RFC3339Nano)
 
+	header := fmt.Sprintf(`"header": {
+		"id": "%s",
+		"parent_id": "%s",
+		"height": "%d",
+		"timestamp": "%s",
+		"parent_voter_signature": "%s"
+	}`, id, block.Header.ParentID.String(), block.Header.Height, timestamp, util.ToBase64(block.Header.ParentVoterSigData))
+
+	links := fmt.Sprintf(`"_links": {
+		"_self": "%s"
+	}`, blockLink)
+
+	expandable := fmt.Sprintf(`"_expandable": {
+		"payload": "%s",
+		"execution_result": "%s"
+	}`, payloadLink, execLink)
+
+	blockStatus := fmt.Sprintf(`"block_status": "%s"`, status.String())
+	payload := `"payload": {"collection_guarantees": [],"block_seals": []}`
+	executionResult := fmt.Sprintf(`"execution_result": %s`, executionResultExpectedStr(execResult))
+
+	partsSet := make(map[string]string)
+
 	if expanded {
-		return fmt.Sprintf(`
-	{
-		"header": {
-			"id": "%s",
-			"parent_id": "%s",
-			"height": "%d",
-			"timestamp": "%s",
-			"parent_voter_signature": "%s"
-		},
-		"payload": {
-			"collection_guarantees": [],
-			"block_seals": []
-		},
-		"execution_result": %s,
-		"_expandable": {},
-		"_links": {
-			"_self": "%s"
-		},
-		"block_status": "%s"
-	}`, id, block.Header.ParentID.String(), block.Header.Height, timestamp,
-			util.ToBase64(block.Header.ParentVoterSigData), executionResultExpectedStr(execResult), blockLink, blockStatus)
+		partsSet["header"] = header
+		partsSet["payload"] = payload
+		partsSet["executionResult"] = executionResult
+		partsSet["_expandable"] = `"_expandable": {}`
+		partsSet["_links"] = links
+		partsSet["block_status"] = blockStatus
+	} else {
+		partsSet["header"] = header
+		partsSet["_expandable"] = expandable
+		partsSet["_links"] = links
+		partsSet["block_status"] = blockStatus
 	}
 
-	return fmt.Sprintf(`
-	{
-		"header": {
-			"id": "%s",
-			"parent_id": "%s",
-			"height": "%d",
-			"timestamp": "%s",
-			"parent_voter_signature": "%s"
-		},
-		"_expandable": {
-            "payload": "%s",
-            "execution_result": "%s"
-        },
-		"_links": {
-			"_self": "%s"
-		},
-		"block_status": "%s"
-	}`, id, block.Header.ParentID.String(), block.Header.Height, timestamp,
-		util.ToBase64(block.Header.ParentVoterSigData), payloadLink, execLink, blockLink, blockStatus)
+	if len(selectedFields) > 0 {
+		// filter a json struct
+		// elements whose keys are not found in the filter map will be removed
+		selectedFieldSet := make(map[string]struct{}, len(selectedFields))
+		for _, field := range selectedFields {
+			selectedFieldSet[field] = struct{}{}
+		}
+
+		for key := range partsSet {
+			if _, found := selectedFieldSet[key]; !found {
+				delete(partsSet, key)
+			}
+		}
+	}
+
+	// Iterate over the map and append the values to the slice
+	var values []string
+	for _, value := range partsSet {
+		values = append(values, value)
+	}
+	if len(values) == 0 {
+		return ""
+	}
+
+	return fmt.Sprintf("{%s}", strings.Join(values, ","))
 }

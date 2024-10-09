@@ -10,10 +10,10 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
-func BenchmarkStorage(b *testing.B) { benchmarkStorageGrowth(b, 100, 100) }
+func BenchmarkStorage(b *testing.B) { benchmarkStorageGrowth(b, 100, 100, 100) }
 
 // benchmark
-func benchmarkStorageGrowth(b *testing.B, accountCount, setupKittyCount int) {
+func benchmarkStorageGrowth(b *testing.B, accountCount, setupKittyCount, txPerBlock int) {
 	testutils.RunWithTestBackend(b, func(backend *testutils.TestBackend) {
 		testutils.RunWithTestFlowEVMRootAddress(b, backend, func(rootAddr flow.Address) {
 			testutils.RunWithDeployedContract(b,
@@ -48,12 +48,17 @@ func benchmarkStorageGrowth(b *testing.B, accountCount, setupKittyCount int) {
 								generation,
 								genes,
 							),
-							300_000_000,
+							50_000,
 							types.NewBalanceFromUFix64(0),
 						)
-						require.Equal(b, 2, len(backend.Events()))
+						require.Equal(b, 1, len(backend.Events()))
 						backend.DropEvents() // this would make things lighter
 						backend.ResetStats() // reset stats
+
+						if i%txPerBlock == 0 {
+							handler.CommitBlockProposal()
+							backend.DropEvents()
+						}
 					}
 
 					accounts[0].Call(
@@ -65,7 +70,7 @@ func benchmarkStorageGrowth(b *testing.B, accountCount, setupKittyCount int) {
 							testutils.RandomBigInt(1000),
 							testutils.RandomBigInt(1000),
 						),
-						300_000_000,
+						50_000,
 						types.NewBalanceFromUFix64(0),
 					)
 

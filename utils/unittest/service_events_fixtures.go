@@ -153,7 +153,9 @@ func EpochCommitFixtureByChainID(chain flow.ChainID) (flow.Event, *flow.EpochCom
 		DKGParticipantKeys: []crypto.PublicKey{
 			MustDecodePublicKeyHex(crypto.BLSBLS12381, "87a339e4e5c74f089da20a33f515d8c8f4464ab53ede5a74aa2432cd1ae66d522da0c122249ee176cd747ddc83ca81090498389384201614caf51eac392c1c0a916dfdcfbbdf7363f9552b6468434add3d3f6dc91a92bbe3ee368b59b7828488"),
 		},
-		DKGIndexMap: nil,
+		DKGIndexMap: flow.DKGIndexMap{
+			flow.MustHexStringToIdentifier("0000000000000000000000000000000000000000000000000000000000000011"): 0,
+		},
 	}
 
 	return event, expected
@@ -270,6 +272,9 @@ func EpochRecoverFixtureByChainID(chain flow.ChainID) (flow.Event, *flow.EpochRe
 			DKGGroupKey: MustDecodePublicKeyHex(crypto.BLSBLS12381, "8c588266db5f5cda629e83f8aa04ae9413593fac19e4865d06d291c9d14fbdd9bdb86a7a12f9ef8590c79cb635e3163315d193087e9336092987150d0cd2b14ac6365f7dc93eec573752108b8c12368abb65f0652d9f644e5aed611c37926950"),
 			DKGParticipantKeys: []crypto.PublicKey{
 				MustDecodePublicKeyHex(crypto.BLSBLS12381, "87a339e4e5c74f089da20a33f515d8c8f4464ab53ede5a74aa2432cd1ae66d522da0c122249ee176cd747ddc83ca81090498389384201614caf51eac392c1c0a916dfdcfbbdf7363f9552b6468434add3d3f6dc91a92bbe3ee368b59b7828488"),
+			},
+			DKGIndexMap: flow.DKGIndexMap{
+				flow.MustHexStringToIdentifier("0000000000000000000000000000000000000000000000000000000000000011"): 0,
 			},
 		},
 	}
@@ -792,11 +797,21 @@ func createEpochCommitEvent() cadence.Event {
 			cluster2,
 		}).WithType(cadence.NewVariableSizedArrayType(clusterQCType)),
 
+		// dkgGroupKey
+		cadence.String("8c588266db5f5cda629e83f8aa04ae9413593fac19e4865d06d291c9d14fbdd9bdb86a7a12f9ef8590c79cb635e3163315d193087e9336092987150d0cd2b14ac6365f7dc93eec573752108b8c12368abb65f0652d9f644e5aed611c37926950"),
+
 		// dkgPubKeys
 		cadence.NewArray([]cadence.Value{
-			cadence.String("8c588266db5f5cda629e83f8aa04ae9413593fac19e4865d06d291c9d14fbdd9bdb86a7a12f9ef8590c79cb635e3163315d193087e9336092987150d0cd2b14ac6365f7dc93eec573752108b8c12368abb65f0652d9f644e5aed611c37926950"),
 			cadence.String("87a339e4e5c74f089da20a33f515d8c8f4464ab53ede5a74aa2432cd1ae66d522da0c122249ee176cd747ddc83ca81090498389384201614caf51eac392c1c0a916dfdcfbbdf7363f9552b6468434add3d3f6dc91a92bbe3ee368b59b7828488"),
 		}).WithType(cadence.NewVariableSizedArrayType(cadence.StringType)),
+
+		// dkgIdMapping
+		cadence.NewDictionary([]cadence.KeyValuePair{
+			{
+				Key:   cadence.String("0000000000000000000000000000000000000000000000000000000000000011"),
+				Value: cadence.NewInt(0),
+			},
+		}).WithType(cadence.NewDictionaryType(cadence.StringType, cadence.IntType)),
 	}).WithType(newFlowEpochEpochCommitEventType())
 }
 
@@ -877,11 +892,21 @@ func createEpochRecoverEvent(randomSourceHex string) cadence.Event {
 			cluster2,
 		}).WithType(cadence.NewVariableSizedArrayType(clusterQCVoteDataType)),
 
+		// dkgGroupKey
+		cadence.String("8c588266db5f5cda629e83f8aa04ae9413593fac19e4865d06d291c9d14fbdd9bdb86a7a12f9ef8590c79cb635e3163315d193087e9336092987150d0cd2b14ac6365f7dc93eec573752108b8c12368abb65f0652d9f644e5aed611c37926950"),
+
 		// dkgPubKeys
 		cadence.NewArray([]cadence.Value{
-			cadence.String("8c588266db5f5cda629e83f8aa04ae9413593fac19e4865d06d291c9d14fbdd9bdb86a7a12f9ef8590c79cb635e3163315d193087e9336092987150d0cd2b14ac6365f7dc93eec573752108b8c12368abb65f0652d9f644e5aed611c37926950"),
 			cadence.String("87a339e4e5c74f089da20a33f515d8c8f4464ab53ede5a74aa2432cd1ae66d522da0c122249ee176cd747ddc83ca81090498389384201614caf51eac392c1c0a916dfdcfbbdf7363f9552b6468434add3d3f6dc91a92bbe3ee368b59b7828488"),
 		}).WithType(cadence.NewVariableSizedArrayType(cadence.StringType)),
+
+		// dkgIdMapping
+		cadence.NewDictionary([]cadence.KeyValuePair{
+			{
+				Key:   cadence.String("0000000000000000000000000000000000000000000000000000000000000011"),
+				Value: cadence.NewInt(0),
+			},
+		}).WithType(cadence.NewDictionaryType(cadence.StringType, cadence.IntType)),
 	}).WithType(newFlowEpochEpochRecoverEventType())
 }
 
@@ -940,10 +965,10 @@ func newFlowClusterQCVoteStructType() cadence.Type {
 	address, _ := common.HexToAddress("01cf0e2f2f715450")
 	location := common.NewAddressLocation(nil, address, "FlowClusterQC")
 
-	return &cadence.StructType{
-		Location:            location,
-		QualifiedIdentifier: "FlowClusterQC.Vote",
-		Fields: []cadence.Field{
+	return cadence.NewStructType(
+		location,
+		"FlowClusterQC.Vote",
+		[]cadence.Field{
 			{
 				Identifier: "nodeID",
 				Type:       cadence.StringType,
@@ -965,7 +990,8 @@ func newFlowClusterQCVoteStructType() cadence.Type {
 				Type:       cadence.UInt64Type,
 			},
 		},
-	}
+		nil,
+	)
 }
 
 func newFlowIDTableStakingNodeInfoStructType() *cadence.StructType {
@@ -975,10 +1001,10 @@ func newFlowIDTableStakingNodeInfoStructType() *cadence.StructType {
 	address, _ := common.HexToAddress("01cf0e2f2f715450")
 	location := common.NewAddressLocation(nil, address, "FlowIDTableStaking")
 
-	return &cadence.StructType{
-		Location:            location,
-		QualifiedIdentifier: "FlowIDTableStaking.NodeInfo",
-		Fields: []cadence.Field{
+	return cadence.NewStructType(
+		location,
+		"FlowIDTableStaking.NodeInfo",
+		[]cadence.Field{
 			{
 				Identifier: "id",
 				Type:       cadence.StringType,
@@ -1036,7 +1062,8 @@ func newFlowIDTableStakingNodeInfoStructType() *cadence.StructType {
 				Type:       cadence.UInt64Type,
 			},
 		},
-	}
+		nil,
+	)
 }
 
 func newFlowEpochEpochSetupEventType() *cadence.EventType {
@@ -1046,10 +1073,10 @@ func newFlowEpochEpochSetupEventType() *cadence.EventType {
 	address, _ := common.HexToAddress("01cf0e2f2f715450")
 	location := common.NewAddressLocation(nil, address, "FlowEpoch")
 
-	return &cadence.EventType{
-		Location:            location,
-		QualifiedIdentifier: "FlowEpoch.EpochSetup",
-		Fields: []cadence.Field{
+	return cadence.NewEventType(
+		location,
+		"FlowEpoch.EpochSetup",
+		[]cadence.Field{
 			{
 				Identifier: "counter",
 				Type:       cadence.UInt64Type,
@@ -1095,20 +1122,21 @@ func newFlowEpochEpochSetupEventType() *cadence.EventType {
 				Type:       cadence.UInt64Type,
 			},
 		},
-	}
+		nil,
+	)
 }
 
 func newFlowEpochEpochCommitEventType() *cadence.EventType {
 
-	// A.01cf0e2f2f715450.FlowEpoch.EpochCommitted
+	// A.01cf0e2f2f715450.FlowEpoch.EpochCommit
 
 	address, _ := common.HexToAddress("01cf0e2f2f715450")
 	location := common.NewAddressLocation(nil, address, "FlowEpoch")
 
-	return &cadence.EventType{
-		Location:            location,
-		QualifiedIdentifier: "FlowEpoch.EpochCommitted",
-		Fields: []cadence.Field{
+	return cadence.NewEventType(
+		location,
+		"FlowEpoch.EpochCommit",
+		[]cadence.Field{
 			{
 				Identifier: "counter",
 				Type:       cadence.UInt64Type,
@@ -1118,11 +1146,20 @@ func newFlowEpochEpochCommitEventType() *cadence.EventType {
 				Type:       cadence.NewVariableSizedArrayType(newFlowClusterQCClusterQCStructType()),
 			},
 			{
+				Identifier: "dkgGroupKey",
+				Type:       cadence.StringType,
+			},
+			{
 				Identifier: "dkgPubKeys",
 				Type:       cadence.NewVariableSizedArrayType(cadence.StringType),
 			},
+			{
+				Identifier: "dkgIdMapping",
+				Type:       cadence.NewDictionaryType(cadence.StringType, cadence.IntType),
+			},
 		},
-	}
+		nil,
+	)
 }
 
 func newFlowEpochEpochRecoverEventType() *cadence.EventType {
@@ -1132,10 +1169,10 @@ func newFlowEpochEpochRecoverEventType() *cadence.EventType {
 	address, _ := common.HexToAddress("01cf0e2f2f715450")
 	location := common.NewAddressLocation(nil, address, "FlowEpoch")
 
-	return &cadence.EventType{
-		Location:            location,
-		QualifiedIdentifier: "FlowEpoch.EpochRecover",
-		Fields: []cadence.Field{
+	return cadence.NewEventType(
+		location,
+		"FlowEpoch.EpochRecover",
+		[]cadence.Field{
 			{
 				Identifier: "counter",
 				Type:       cadence.UInt64Type,
@@ -1185,11 +1222,20 @@ func newFlowEpochEpochRecoverEventType() *cadence.EventType {
 				Type:       cadence.NewVariableSizedArrayType(newFlowClusterQCClusterQCVoteDataStructType()),
 			},
 			{
+				Identifier: "dkgGroupKey",
+				Type:       cadence.StringType,
+			},
+			{
 				Identifier: "dkgPubKeys",
 				Type:       cadence.NewVariableSizedArrayType(cadence.StringType),
 			},
+			{
+				Identifier: "dkgIdMapping",
+				Type:       cadence.NewDictionaryType(cadence.StringType, cadence.IntType),
+			},
 		},
-	}
+		nil,
+	)
 }
 
 func newFlowClusterQCClusterQCStructType() *cadence.StructType {
@@ -1199,10 +1245,10 @@ func newFlowClusterQCClusterQCStructType() *cadence.StructType {
 	address, _ := common.HexToAddress("01cf0e2f2f715450")
 	location := common.NewAddressLocation(nil, address, "FlowClusterQC")
 
-	return &cadence.StructType{
-		Location:            location,
-		QualifiedIdentifier: "FlowClusterQC.ClusterQC",
-		Fields: []cadence.Field{
+	return cadence.NewStructType(
+		location,
+		"FlowClusterQC.ClusterQC",
+		[]cadence.Field{
 			{
 				Identifier: "index",
 				Type:       cadence.UInt16Type,
@@ -1220,7 +1266,8 @@ func newFlowClusterQCClusterQCStructType() *cadence.StructType {
 				Type:       cadence.NewVariableSizedArrayType(cadence.StringType),
 			},
 		},
-	}
+		nil,
+	)
 }
 
 func newFlowClusterQCClusterQCVoteDataStructType() *cadence.StructType {
@@ -1230,10 +1277,10 @@ func newFlowClusterQCClusterQCVoteDataStructType() *cadence.StructType {
 	address, _ := common.HexToAddress("01cf0e2f2f715450")
 	location := common.NewAddressLocation(nil, address, "ClusterQCVoteData")
 
-	return &cadence.StructType{
-		Location:            location,
-		QualifiedIdentifier: "FlowClusterQC.ClusterQCVoteData",
-		Fields: []cadence.Field{
+	return cadence.NewStructType(
+		location,
+		"FlowClusterQC.ClusterQCVoteData",
+		[]cadence.Field{
 			{
 				Identifier: "aggregatedSignature",
 				Type:       cadence.StringType,
@@ -1243,7 +1290,8 @@ func newFlowClusterQCClusterQCVoteDataStructType() *cadence.StructType {
 				Type:       cadence.NewVariableSizedArrayType(cadence.StringType),
 			},
 		},
-	}
+		nil,
+	)
 }
 
 func NewNodeVersionBeaconVersionBeaconEventType() *cadence.EventType {
@@ -1253,10 +1301,10 @@ func NewNodeVersionBeaconVersionBeaconEventType() *cadence.EventType {
 	address, _ := common.HexToAddress("01cf0e2f2f715450")
 	location := common.NewAddressLocation(nil, address, "NodeVersionBeacon")
 
-	return &cadence.EventType{
-		Location:            location,
-		QualifiedIdentifier: "NodeVersionBeacon.VersionBeacon",
-		Fields: []cadence.Field{
+	return cadence.NewEventType(
+		location,
+		"NodeVersionBeacon.VersionBeacon",
+		[]cadence.Field{
 			{
 				Identifier: "versionBoundaries",
 				Type:       cadence.NewVariableSizedArrayType(NewNodeVersionBeaconVersionBoundaryStructType()),
@@ -1266,7 +1314,8 @@ func NewNodeVersionBeaconVersionBeaconEventType() *cadence.EventType {
 				Type:       cadence.UInt64Type,
 			},
 		},
-	}
+		nil,
+	)
 }
 
 func NewNodeVersionBeaconVersionBoundaryStructType() *cadence.StructType {
@@ -1276,10 +1325,10 @@ func NewNodeVersionBeaconVersionBoundaryStructType() *cadence.StructType {
 	address, _ := common.HexToAddress("01cf0e2f2f715450")
 	location := common.NewAddressLocation(nil, address, "NodeVersionBeacon")
 
-	return &cadence.StructType{
-		Location:            location,
-		QualifiedIdentifier: "NodeVersionBeacon.VersionBoundary",
-		Fields: []cadence.Field{
+	return cadence.NewStructType(
+		location,
+		"NodeVersionBeacon.VersionBoundary",
+		[]cadence.Field{
 			{
 				Identifier: "blockHeight",
 				Type:       cadence.UInt64Type,
@@ -1289,7 +1338,8 @@ func NewNodeVersionBeaconVersionBoundaryStructType() *cadence.StructType {
 				Type:       NewNodeVersionBeaconSemverStructType(),
 			},
 		},
-	}
+		nil,
+	)
 }
 
 func NewNodeVersionBeaconSemverStructType() *cadence.StructType {
@@ -1299,10 +1349,10 @@ func NewNodeVersionBeaconSemverStructType() *cadence.StructType {
 	address, _ := common.HexToAddress("01cf0e2f2f715450")
 	location := common.NewAddressLocation(nil, address, "NodeVersionBeacon")
 
-	return &cadence.StructType{
-		Location:            location,
-		QualifiedIdentifier: "NodeVersionBeacon.Semver",
-		Fields: []cadence.Field{
+	return cadence.NewStructType(
+		location,
+		"NodeVersionBeacon.Semver",
+		[]cadence.Field{
 			{
 				Identifier: "major",
 				Type:       cadence.UInt8Type,
@@ -1320,7 +1370,8 @@ func NewNodeVersionBeaconSemverStructType() *cadence.StructType {
 				Type:       cadence.NewOptionalType(cadence.StringType),
 			},
 		},
-	}
+		nil,
+	)
 }
 
 func NewProtocolStateVersionUpgradeEventType() *cadence.EventType {
@@ -1330,10 +1381,10 @@ func NewProtocolStateVersionUpgradeEventType() *cadence.EventType {
 	address, _ := common.HexToAddress("01cf0e2f2f715450")
 	location := common.NewAddressLocation(nil, address, "ProtocolStateVersionUpgrade")
 
-	return &cadence.EventType{
-		Location:            location,
-		QualifiedIdentifier: "NodeVersionBeacon.ProtocolStateVersionUpgrade",
-		Fields: []cadence.Field{
+	return cadence.NewEventType(
+		location,
+		"NodeVersionBeacon.ProtocolStateVersionUpgrade",
+		[]cadence.Field{
 			{
 				Identifier: "newProtocolVersion",
 				Type:       cadence.UInt64Type,
@@ -1343,7 +1394,8 @@ func NewProtocolStateVersionUpgradeEventType() *cadence.EventType {
 				Type:       cadence.UInt64Type,
 			},
 		},
-	}
+		nil,
+	)
 }
 
 func ufix64FromString(s string) cadence.UFix64 {
@@ -1478,10 +1530,10 @@ func NewFlowClusterQCClusterStructType() *cadence.StructType {
 	address, _ := common.HexToAddress("01cf0e2f2f715450")
 	location := common.NewAddressLocation(nil, address, "FlowClusterQC")
 
-	return &cadence.StructType{
-		Location:            location,
-		QualifiedIdentifier: "FlowClusterQC.Cluster",
-		Fields: []cadence.Field{
+	return cadence.NewStructType(
+		location,
+		"FlowClusterQC.Cluster",
+		[]cadence.Field{
 			{
 				Identifier: "index",
 				Type:       cadence.UInt16Type,
@@ -1503,5 +1555,6 @@ func NewFlowClusterQCClusterStructType() *cadence.StructType {
 				Type:       cadence.NewDictionaryType(cadence.StringType, cadence.UInt64Type),
 			},
 		},
-	}
+		nil,
+	)
 }

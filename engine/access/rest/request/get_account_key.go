@@ -11,7 +11,7 @@ const indexVar = "index"
 
 type GetAccountKey struct {
 	Address flow.Address
-	Index   uint64
+	Index   uint32
 	Height  uint64
 }
 
@@ -35,7 +35,7 @@ func (g *GetAccountKey) Parse(
 		return err
 	}
 
-	index, err := util.ToUint64(rawIndex)
+	index, err := util.ToUint32(rawIndex)
 	if err != nil {
 		return fmt.Errorf("invalid key index: %w", err)
 	}

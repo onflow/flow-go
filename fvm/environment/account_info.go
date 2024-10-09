@@ -15,12 +15,14 @@ import (
 // AccountInfo exposes various account balance and storage statistics.
 type AccountInfo interface {
 	// Cadence's runtime APIs.
-	GetStorageUsed(runtimeaddress common.Address) (uint64, error)
+	GetStorageUsed(runtimeAddress common.Address) (uint64, error)
 	GetStorageCapacity(runtimeAddress common.Address) (uint64, error)
 	GetAccountBalance(runtimeAddress common.Address) (uint64, error)
 	GetAccountAvailableBalance(runtimeAddress common.Address) (uint64, error)
 
 	GetAccount(address flow.Address) (*flow.Account, error)
+	GetAccountKeys(address flow.Address) ([]flow.AccountPublicKey, error)
+	GetAccountKeyByIndex(address flow.Address, index uint32) (*flow.AccountPublicKey, error)
 }
 
 type ParseRestrictedAccountInfo struct {
@@ -103,6 +105,35 @@ func (info ParseRestrictedAccountInfo) GetAccount(
 		address)
 }
 
+func (info ParseRestrictedAccountInfo) GetAccountKeys(
+	address flow.Address,
+) (
+	[]flow.AccountPublicKey,
+	error,
+) {
+	return parseRestrict1Arg1Ret(
+		info.txnState,
+		trace.FVMEnvGetAccountKeys,
+		info.impl.GetAccountKeys,
+		address)
+}
+
+func (info ParseRestrictedAccountInfo) GetAccountKeyByIndex(
+	address flow.Address,
+	index uint32,
+) (
+	*flow.AccountPublicKey,
+	error,
+) {
+	return parseRestrict2Arg1Ret(
+		info.txnState,
+		trace.FVMEnvGetAccountKey,
+		info.impl.GetAccountKeyByIndex,
+		address,
+		index,
+	)
+}
+
 type accountInfo struct {
 	tracer tracing.TracerSpan
 	meter  Meter
@@ -152,7 +183,7 @@ func (info *accountInfo) GetStorageUsed(
 }
 
 // StorageMBUFixToBytesUInt converts the return type of storage capacity which
-// is a UFix64 with the unit of megabytes to UInt with the unit of bytes
+// is a UFix64 with the unit of megabytes to UInt with the unit of bytes.
 func StorageMBUFixToBytesUInt(result cadence.Value) uint64 {
 	// Divide the unsigned int by (1e8 (the scale of Fix64) / 1e6 (for mega))
 	// to get bytes (rounded down)
@@ -253,4 +284,39 @@ func (info *accountInfo) GetAccount(
 	}
 
 	return account, nil
+}
+
+func (info *accountInfo) GetAccountKeys(
+	address flow.Address,
+) (
+	[]flow.AccountPublicKey,
+	error,
+) {
+	defer info.tracer.StartChildSpan(trace.FVMEnvGetAccountKeys).End()
+
+	accountKeys, err := info.accounts.GetPublicKeys(address)
+
+	if err != nil {
+		return nil, err
+	}
+
+	return accountKeys, nil
+}
+
+func (info *accountInfo) GetAccountKeyByIndex(
+	address flow.Address,
+	index uint32,
+) (
+	*flow.AccountPublicKey,
+	error,
+) {
+	defer info.tracer.StartChildSpan(trace.FVMEnvGetAccountKey).End()
+
+	accountKey, err := info.accounts.GetPublicKey(address, index)
+
+	if err != nil {
+		return nil, err
+	}
+
+	return &accountKey, nil
 }

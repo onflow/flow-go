@@ -207,6 +207,7 @@ func TestPrograms_TestBlockForks(t *testing.T) {
 	chain := flow.Emulator.Chain()
 	vm := fvm.NewVirtualMachine()
 	execCtx := fvm.NewContext(
+		fvm.WithEVMEnabled(true),
 		fvm.WithBlockHeader(block.Header),
 		fvm.WithBlocks(blockProvider{map[uint64]*flow.Block{0: &block}}),
 		fvm.WithChain(chain))

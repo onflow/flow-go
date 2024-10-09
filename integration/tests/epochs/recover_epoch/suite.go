@@ -12,7 +12,6 @@ import (
 
 	"github.com/onflow/flow-go/cmd/bootstrap/run"
 	"github.com/onflow/flow-go/integration/tests/epochs"
-	"github.com/onflow/flow-go/integration/utils"
 	"github.com/onflow/flow-go/model/bootstrap"
 	"github.com/onflow/flow-go/model/flow"
 )
@@ -28,7 +27,7 @@ func (s *Suite) SetupTest() {
 	// to manually trigger EFM we assign very short dkg phase len ensuring the dkg will fail
 	s.DKGPhaseLen = 10
 	s.EpochLen = 80
-	s.EpochCommitSafetyThreshold = 20
+	s.FinalizationSafetyThreshold = 20
 	s.NumOfCollectionClusters = 1
 
 	// run the generic setup, which starts up the network
@@ -85,24 +84,25 @@ func (s *Suite) executeEFMRecoverTXArgsCMD(
 
 // recoverEpoch submits the recover epoch transaction to the network.
 func (s *Suite) recoverEpoch(env templates.Environment, args []cadence.Value) *sdk.TransactionResult {
-	latestBlockID, err := s.Client.GetLatestBlockID(s.Ctx)
-	require.NoError(s.T(), err)
+	//latestBlockID, err := s.Client.GetLatestBlockID(s.Ctx)
+	//require.NoError(s.T(), err)
 
-	tx, err := utils.MakeRecoverEpochTx(
-		env,
-		s.Client.Account(),
-		0,
-		sdk.Identifier(latestBlockID),
-		args,
-	)
-	require.NoError(s.T(), err)
+	panic("implement me")
+	//tx, err := utils.MakeRecoverEpochTx(
+	//	env,
+	//	s.Client.Account(),
+	//	0,
+	//	sdk.Identifier(latestBlockID),
+	//	args,
+	//)
+	//require.NoError(s.T(), err)
 
-	err = s.Client.SignAndSendTransaction(s.Ctx, tx)
-	require.NoError(s.T(), err)
-	result, err := s.Client.WaitForSealed(s.Ctx, tx.ID())
-	require.NoError(s.T(), err)
-	s.Client.Account().Keys[0].SequenceNumber++
-	require.NoError(s.T(), result.Error)
+	//err = s.Client.SignAndSendTransaction(s.Ctx, tx)
+	//require.NoError(s.T(), err)
+	//result, err := s.Client.WaitForSealed(s.Ctx, tx.ID())
+	//require.NoError(s.T(), err)
+	//s.Client.Account().Keys[0].SequenceNumber++
+	//require.NoError(s.T(), result.Error)
 
-	return result
+	//return result
 }

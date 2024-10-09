@@ -21,6 +21,7 @@ import (
 	"github.com/onflow/flow-go/model/verification"
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
 	"github.com/onflow/flow-go/module/executiondatasync/provider"
+	"github.com/onflow/flow-go/module/metrics"
 )
 
 // ChunkVerifier is a verifier based on the current definitions of the flow network
@@ -36,7 +37,7 @@ func NewChunkVerifier(vm fvm.VM, vmCtx fvm.Context, logger zerolog.Logger) *Chun
 	return &ChunkVerifier{
 		vm:             vm,
 		vmCtx:          vmCtx,
-		systemChunkCtx: computer.SystemChunkContext(vmCtx),
+		systemChunkCtx: computer.SystemChunkContext(vmCtx, metrics.NewNoopCollector()),
 		logger:         logger.With().Str("component", "chunk_verifier").Logger(),
 	}
 }

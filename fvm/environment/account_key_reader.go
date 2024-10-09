@@ -23,12 +23,12 @@ type AccountKeyReader interface {
 	// exist, the provided index is not valid, or if the key retrieval fails.
 	GetAccountKey(
 		runtimeAddress common.Address,
-		keyIndex int,
+		keyIndex uint32,
 	) (
 		*runtime.AccountKey,
 		error,
 	)
-	AccountKeysCount(runtimeAddress common.Address) (uint64, error)
+	AccountKeysCount(runtimeAddress common.Address) (uint32, error)
 }
 
 type ParseRestrictedAccountKeyReader struct {
@@ -48,7 +48,7 @@ func NewParseRestrictedAccountKeyReader(
 
 func (reader ParseRestrictedAccountKeyReader) GetAccountKey(
 	runtimeAddress common.Address,
-	keyIndex int,
+	keyIndex uint32,
 ) (
 	*runtime.AccountKey,
 	error,
@@ -64,7 +64,7 @@ func (reader ParseRestrictedAccountKeyReader) GetAccountKey(
 func (reader ParseRestrictedAccountKeyReader) AccountKeysCount(
 	runtimeAddress common.Address,
 ) (
-	uint64,
+	uint32,
 	error,
 ) {
 	return parseRestrict1Arg1Ret(
@@ -96,7 +96,7 @@ func NewAccountKeyReader(
 
 func (reader *accountKeyReader) GetAccountKey(
 	runtimeAddress common.Address,
-	keyIndex int,
+	keyIndex uint32,
 ) (
 	*runtime.AccountKey,
 	error,
@@ -112,17 +112,12 @@ func (reader *accountKeyReader) GetAccountKey(
 		return formatErr(err)
 	}
 
-	// Don't return an error for invalid key indices
-	if keyIndex < 0 {
-		return nil, nil
-	}
-
 	address := flow.ConvertAddress(runtimeAddress)
 
 	// address verification is also done in this step
 	accountPublicKey, err := reader.accounts.GetPublicKey(
 		address,
-		uint64(keyIndex))
+		keyIndex)
 	if err != nil {
 		// If a key is not found at a given index, then return a nil key with
 		// no errors.  This is to be inline with the Cadence runtime. Otherwise,
@@ -147,12 +142,12 @@ func (reader *accountKeyReader) GetAccountKey(
 func (reader *accountKeyReader) AccountKeysCount(
 	runtimeAddress common.Address,
 ) (
-	uint64,
+	uint32,
 	error,
 ) {
 	defer reader.tracer.StartChildSpan(trace.FVMEnvAccountKeysCount).End()
 
-	formatErr := func(err error) (uint64, error) {
+	formatErr := func(err error) (uint32, error) {
 		return 0, fmt.Errorf("fetching account key count failed: %w", err)
 	}
 
@@ -162,8 +157,10 @@ func (reader *accountKeyReader) AccountKeysCount(
 	}
 
 	// address verification is also done in this step
-	return reader.accounts.GetPublicKeyCount(
+	keyCount, err := reader.accounts.GetPublicKeyCount(
 		flow.ConvertAddress(runtimeAddress))
+
+	return keyCount, err
 }
 
 func FlowToRuntimeAccountKey(

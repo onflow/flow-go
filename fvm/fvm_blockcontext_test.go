@@ -1661,7 +1661,7 @@ func TestBlockContext_GetAccount(t *testing.T) {
 	// happy path - get each of the created account and check if it is the right one
 	t.Run("get accounts", func(t *testing.T) {
 		for address, expectedKey := range accounts {
-			account, err := vm.GetAccount(ctx, address, snapshotTree)
+			account, err := fvm.GetAccount(ctx, address, snapshotTree)
 			require.NoError(t, err)
 
 			require.Len(t, account.Keys, 1)
@@ -1675,7 +1675,7 @@ func TestBlockContext_GetAccount(t *testing.T) {
 		address, err := addressGen.NextAddress()
 		require.NoError(t, err)
 
-		account, err := vm.GetAccount(ctx, address, snapshotTree)
+		account, err := fvm.GetAccount(ctx, address, snapshotTree)
 		require.True(t, errors.IsAccountNotFoundError(err))
 		require.Nil(t, account)
 	})

@@ -131,10 +131,29 @@ func createMultipleRandomTries(t *testing.T) []*trie.MTrie {
 	require.NoError(t, err, "update registers")
 	tries = append(tries, activeTrie)
 
+	// trie must be deep enough to test the subtrie
+	if !isTrieDeepEnough(activeTrie) {
+		// if not deep enough, keep re-trying
+		return createMultipleRandomTries(t)
+	}
+
 	return tries
 }
 
-func createMultipleRandomTriesMini(t *testing.T) []*trie.MTrie {
+func isTrieDeepEnough(trie *trie.MTrie) bool {
+	nodes := getNodesAtLevel(trie.RootNode(), subtrieLevel)
+	for _, n := range nodes {
+		if n == nil || n.IsLeaf() {
+			return false
+		}
+	}
+
+	return true
+}
+
+// createMultipleRandomTriesMini creates a set of tries with some shared paths,
+// the second returned trie is the last trie in the set, and it is guaranteed to be deep enough
+func createMultipleRandomTriesMini(t *testing.T) ([]*trie.MTrie, *trie.MTrie) {
 	tries := make([]*trie.MTrie, 0)
 	activeTrie := trie.NewEmptyMTrie()
 
@@ -158,7 +177,13 @@ func createMultipleRandomTriesMini(t *testing.T) []*trie.MTrie {
 	require.NoError(t, err, "update registers")
 	tries = append(tries, activeTrie)
 
-	return tries
+	// trie must be deep enough to test the subtrie
+	if !isTrieDeepEnough(activeTrie) {
+		// if not deep enough, keep re-trying
+		return createMultipleRandomTriesMini(t)
+	}
+
+	return tries, activeTrie
 }
 
 func TestEncodeSubTrie(t *testing.T) {
@@ -359,7 +384,7 @@ func TestWriteAndReadCheckpointV6LeafSimpleTrie(t *testing.T) {
 func TestWriteAndReadCheckpointV6LeafMultipleTriesFail(t *testing.T) {
 	unittest.RunWithTempDir(t, func(dir string) {
 		fileName := "checkpoint-multi-leaf-file"
-		tries := createMultipleRandomTriesMini(t)
+		tries, _ := createMultipleRandomTriesMini(t)
 		logger := unittest.Logger()
 		require.NoErrorf(t, StoreCheckpointV6Concurrently(tries, dir, fileName, logger), "fail to store checkpoint")
 		bufSize := 5
@@ -373,9 +398,9 @@ func TestWriteAndReadCheckpointV6LeafMultipleTriesFail(t *testing.T) {
 func TestWriteAndReadCheckpointV6LeafMultipleTriesOK(t *testing.T) {
 	unittest.RunWithTempDir(t, func(dir string) {
 		fileName := "checkpoint-multi-leaf-file"
-		multi := createMultipleRandomTriesMini(t)
+		_, last := createMultipleRandomTriesMini(t)
 
-		tries := multi[1:2]
+		tries := []*trie.MTrie{last}
 
 		logger := unittest.Logger()
 		require.NoErrorf(t, StoreCheckpointV6Concurrently(tries, dir, fileName, logger), "fail to store checkpoint")

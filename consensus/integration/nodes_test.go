@@ -95,7 +95,7 @@ func NewConsensusParticipants(data *run.ParticipantData) *ConsensusParticipants 
 			beaconInfoByEpoch: map[uint64]RandomBeaconNodeInfo{
 				1: {
 					RandomBeaconPrivKey: participant.RandomBeaconPrivKey,
-					DKGParticipant:      data.Lookup[participant.NodeID],
+					DKGParticipant:      data.DKGCommittee[participant.NodeID],
 				},
 			},
 		}
@@ -118,7 +118,7 @@ func (p *ConsensusParticipants) Lookup(nodeID flow.Identifier) *ConsensusPartici
 // If this node was part of previous epoch it will get updated, if not created.
 func (p *ConsensusParticipants) Update(epochCounter uint64, data *run.ParticipantData) {
 	for _, participant := range data.Participants {
-		dkgParticipant := data.Lookup[participant.NodeID]
+		dkgParticipant := data.DKGCommittee[participant.NodeID]
 		entry, ok := p.lookup[participant.NodeID]
 		if !ok {
 			entry = ConsensusParticipant{
@@ -257,12 +257,13 @@ func createRootBlockData(t *testing.T, participantData *run.ParticipantData) (*f
 	consensusParticipants := participantData.Identities()
 
 	// add other roles to create a complete identity list
-	participants := unittest.CompleteIdentitySet(consensusParticipants...)
-	participants.Sort(flow.Canonical[flow.Identity])
-
+	participants := unittest.CompleteIdentitySet(consensusParticipants...).Sort(flow.Canonical[flow.Identity])
+	dkgParticipants := participants.ToSkeleton().Filter(filter.IsValidDKGParticipant)
 	dkgParticipantsKeys := make([]crypto.PublicKey, 0, len(consensusParticipants))
-	for _, participant := range participants.Filter(filter.HasRole[flow.Identity](flow.RoleConsensus)) {
-		dkgParticipantsKeys = append(dkgParticipantsKeys, participantData.Lookup[participant.NodeID].KeyShare)
+	dkgIndexMap := make(flow.DKGIndexMap)
+	for index, participant := range dkgParticipants {
+		dkgParticipantsKeys = append(dkgParticipantsKeys, participantData.DKGCommittee[participant.NodeID].KeyShare)
+		dkgIndexMap[participant.NodeID] = index
 	}
 
 	counter := uint64(1)
@@ -276,8 +277,9 @@ func createRootBlockData(t *testing.T, participantData *run.ParticipantData) (*f
 		unittest.CommitWithCounter(counter),
 		unittest.WithClusterQCsFromAssignments(setup.Assignments),
 		func(commit *flow.EpochCommit) {
-			commit.DKGGroupKey = participantData.GroupKey
+			commit.DKGGroupKey = participantData.DKGGroupKey
 			commit.DKGParticipantKeys = dkgParticipantsKeys
+			commit.DKGIndexMap = dkgIndexMap
 		},
 	)
 
@@ -327,8 +329,8 @@ func completeConsensusIdentities(t *testing.T, nodeInfos []bootstrap.NodeInfo) *
 
 	participantData := &run.ParticipantData{
 		Participants: make([]run.Participant, 0, len(nodeInfos)),
-		Lookup:       make(map[flow.Identifier]flow.DKGParticipant),
-		GroupKey:     dkgData.PubGroupKey,
+		DKGCommittee: make(map[flow.Identifier]flow.DKGParticipant),
+		DKGGroupKey:  dkgData.PubGroupKey,
 	}
 	for index, node := range nodeInfos {
 		participant := run.Participant{
@@ -336,7 +338,7 @@ func completeConsensusIdentities(t *testing.T, nodeInfos []bootstrap.NodeInfo) *
 			RandomBeaconPrivKey: dkgData.PrivKeyShares[index],
 		}
 		participantData.Participants = append(participantData.Participants, participant)
-		participantData.Lookup[node.NodeID] = flow.DKGParticipant{
+		participantData.DKGCommittee[node.NodeID] = flow.DKGParticipant{
 			Index:    uint(index),
 			KeyShare: dkgData.PubKeyShares[index],
 		}

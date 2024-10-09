@@ -30,7 +30,7 @@ func MessageToTransaction(m *entitiesproto.Transaction, chain flow.Chain) (flow.
 		if err != nil {
 			return *t, err
 		}
-		t.SetProposalKey(proposalAddress, uint64(proposalKey.GetKeyId()), proposalKey.GetSequenceNumber())
+		t.SetProposalKey(proposalAddress, proposalKey.GetKeyId(), proposalKey.GetSequenceNumber())
 	}
 
 	payer := m.GetPayer()
@@ -55,7 +55,7 @@ func MessageToTransaction(m *entitiesproto.Transaction, chain flow.Chain) (flow.
 		if err != nil {
 			return *t, err
 		}
-		t.AddPayloadSignature(addr, uint64(sig.GetKeyId()), sig.GetSignature())
+		t.AddPayloadSignature(addr, sig.GetKeyId(), sig.GetSignature())
 	}
 
 	for _, sig := range m.GetEnvelopeSignatures() {
@@ -63,7 +63,7 @@ func MessageToTransaction(m *entitiesproto.Transaction, chain flow.Chain) (flow.
 		if err != nil {
 			return *t, err
 		}
-		t.AddEnvelopeSignature(addr, uint64(sig.GetKeyId()), sig.GetSignature())
+		t.AddEnvelopeSignature(addr, sig.GetKeyId(), sig.GetSignature())
 	}
 
 	t.SetScript(m.GetScript())

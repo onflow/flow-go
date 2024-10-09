@@ -223,11 +223,7 @@ func (es *committedEpoch) ClusterByChainID(chainID flow.ChainID) (protocol.Clust
 }
 
 func (es *committedEpoch) DKG() (protocol.DKG, error) {
-	encodable, err := EncodableDKGFromEvents(es.setupEvent, es.commitEvent)
-	if err != nil {
-		return nil, fmt.Errorf("could not build encodable DKG from epoch events")
-	}
-	return DKGFromEncodable(encodable)
+	return NewDKG(es.commitEvent), nil
 }
 
 // heightBoundedEpoch represents an epoch (with counter N) for which we know either

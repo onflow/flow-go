@@ -54,6 +54,18 @@ func (rd *Request) GetAccountRequest() (GetAccount, error) {
 	return req, err
 }
 
+func (rd *Request) GetAccountBalanceRequest() (GetAccountBalance, error) {
+	var req GetAccountBalance
+	err := req.Build(rd)
+	return req, err
+}
+
+func (rd *Request) GetAccountKeysRequest() (GetAccountKeys, error) {
+	var req GetAccountKeys
+	err := req.Build(rd)
+	return req, err
+}
+
 func (rd *Request) GetAccountKeyRequest() (GetAccountKey, error) {
 	var req GetAccountKey
 	err := req.Build(rd)

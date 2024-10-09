@@ -2,21 +2,30 @@ package pruner
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"math"
 	"time"
 
 	"github.com/rs/zerolog"
+	"go.uber.org/atomic"
 
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/component"
+	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
 	"github.com/onflow/flow-go/module/executiondatasync/tracker"
 	"github.com/onflow/flow-go/module/irrecoverable"
-	"github.com/onflow/flow-go/module/util"
 )
 
+// ErrNoRegisteredHeightRecorders represents an error indicating that pruner did not register any execution data height recorders.
+// This error occurs when the pruner attempts to perform operations that require
+// at least one registered height recorder, but none are found.
+var ErrNoRegisteredHeightRecorders = errors.New("no registered height recorders")
+
 const (
-	defaultHeightRangeTarget = uint64(400_000)
-	defaultThreshold         = uint64(100_000)
+	DefaultHeightRangeTarget = uint64(2_000_000)
+	DefaultThreshold         = uint64(100_000)
+	DefaultPruningInterval   = 10 * time.Minute
 )
 
 // Pruner is a component responsible for pruning data from
@@ -39,29 +48,29 @@ type Pruner struct {
 	storage       tracker.Storage
 	pruneCallback func(ctx context.Context) error
 
-	// channels used to send new fulfilled heights and config changes to the worker thread
-	fulfilledHeights      chan uint64
-	thresholdChan         chan uint64
-	heightRangeTargetChan chan uint64
-
 	lastFulfilledHeight uint64
 	lastPrunedHeight    uint64
 
 	// the height range is the range of heights between the last pruned and last fulfilled
 	// heightRangeTarget is the target minimum value for this range, so that after pruning
 	// the height range is equal to the target.
-	heightRangeTarget uint64
+	heightRangeTarget *atomic.Uint64
 
 	// threshold defines the maximum height range and how frequently pruning is performed.
 	// once the height range reaches `heightRangeTarget+threshold`, `threshold` many blocks
 	// are pruned
-	threshold uint64
+	threshold *atomic.Uint64
+
+	// pruningInterval how frequently pruning can be performed
+	pruningInterval time.Duration
 
 	logger  zerolog.Logger
 	metrics module.ExecutionDataPrunerMetrics
 
 	component.Component
 	cm *component.ComponentManager
+
+	registeredHeightRecorders []execution_data.ProcessedHeightRecorder
 }
 
 type PrunerOption func(*Pruner)
@@ -70,20 +79,28 @@ type PrunerOption func(*Pruner)
 // height range target.
 func WithHeightRangeTarget(heightRangeTarget uint64) PrunerOption {
 	return func(p *Pruner) {
-		p.heightRangeTarget = heightRangeTarget
+		p.heightRangeTarget.Store(heightRangeTarget)
 	}
 }
 
 // WithThreshold is used to configure the pruner with a custom threshold.
 func WithThreshold(threshold uint64) PrunerOption {
 	return func(p *Pruner) {
-		p.threshold = threshold
+		p.threshold.Store(threshold)
 	}
 }
 
+// WithPruneCallback sets a custom callback function to be called after pruning.
 func WithPruneCallback(callback func(context.Context) error) PrunerOption {
 	return func(p *Pruner) {
 		p.pruneCallback = callback
+	}
+}
+
+// WithPruningInterval is used to configure the pruner with a custom pruning interval.
+func WithPruningInterval(interval time.Duration) PrunerOption {
+	return func(p *Pruner) {
+		p.pruningInterval = interval
 	}
 }
 
@@ -99,21 +116,16 @@ func NewPruner(logger zerolog.Logger, metrics module.ExecutionDataPrunerMetrics,
 		return nil, fmt.Errorf("failed to get fulfilled height: %w", err)
 	}
 
-	fulfilledHeights := make(chan uint64, 32)
-	fulfilledHeights <- fulfilledHeight
-
 	p := &Pruner{
-		logger:                logger.With().Str("component", "execution_data_pruner").Logger(),
-		storage:               storage,
-		pruneCallback:         func(ctx context.Context) error { return nil },
-		fulfilledHeights:      fulfilledHeights,
-		thresholdChan:         make(chan uint64),
-		heightRangeTargetChan: make(chan uint64),
-		lastFulfilledHeight:   fulfilledHeight,
-		lastPrunedHeight:      lastPrunedHeight,
-		heightRangeTarget:     defaultHeightRangeTarget,
-		threshold:             defaultThreshold,
-		metrics:               metrics,
+		logger:              logger.With().Str("component", "execution_data_pruner").Logger(),
+		storage:             storage,
+		pruneCallback:       func(ctx context.Context) error { return nil },
+		lastFulfilledHeight: fulfilledHeight,
+		lastPrunedHeight:    lastPrunedHeight,
+		heightRangeTarget:   atomic.NewUint64(DefaultHeightRangeTarget),
+		threshold:           atomic.NewUint64(DefaultThreshold),
+		metrics:             metrics,
+		pruningInterval:     DefaultPruningInterval,
 	}
 	p.cm = component.NewComponentManagerBuilder().
 		AddWorker(p.loop).
@@ -127,66 +139,98 @@ func NewPruner(logger zerolog.Logger, metrics module.ExecutionDataPrunerMetrics,
 	return p, nil
 }
 
-// NotifyFulfilledHeight notifies the Pruner of the latest fulfilled height.
-func (p *Pruner) NotifyFulfilledHeight(height uint64) {
-	if util.CheckClosed(p.cm.ShutdownSignal()) {
-		return
-	}
-
-	select {
-	case p.fulfilledHeights <- height:
-	default:
-	}
-
+// RegisterHeightRecorder registers an execution data height recorder with the Pruner.
+//
+// Parameters:
+//   - recorder: The execution data height recorder to register.
+func (p *Pruner) RegisterHeightRecorder(recorder execution_data.ProcessedHeightRecorder) {
+	p.registeredHeightRecorders = append(p.registeredHeightRecorders, recorder)
 }
 
 // SetHeightRangeTarget updates the Pruner's height range target.
-// This may block for the duration of a pruning operation.
-func (p *Pruner) SetHeightRangeTarget(heightRangeTarget uint64) error {
-	select {
-	case p.heightRangeTargetChan <- heightRangeTarget:
-		return nil
-	case <-p.cm.ShutdownSignal():
-		return component.ErrComponentShutdown
-	}
+func (p *Pruner) SetHeightRangeTarget(heightRangeTarget uint64) {
+	p.heightRangeTarget.Store(heightRangeTarget)
 }
 
 // SetThreshold update's the Pruner's threshold.
-// This may block for the duration of a pruning operation.
-func (p *Pruner) SetThreshold(threshold uint64) error {
-	select {
-	case p.thresholdChan <- threshold:
-		return nil
-	case <-p.cm.ShutdownSignal():
-		return component.ErrComponentShutdown
-	}
+func (p *Pruner) SetThreshold(threshold uint64) {
+	p.threshold.Store(threshold)
 }
 
+// loop is the main worker for the Pruner, responsible for triggering
+// pruning operations at regular intervals. It monitors the heights
+// of registered height recorders and checks if pruning is necessary.
 func (p *Pruner) loop(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
 	ready()
+	ticker := time.NewTicker(p.pruningInterval)
+	defer ticker.Stop()
 
 	for {
 		select {
 		case <-ctx.Done():
 			return
-		case height := <-p.fulfilledHeights:
-			if height > p.lastFulfilledHeight {
-				p.lastFulfilledHeight = height
+		case <-ticker.C:
+			lowestHeight, err := p.lowestRecordersHeight()
+			if err == nil || !errors.Is(err, ErrNoRegisteredHeightRecorders) {
+				err := p.updateFulfilledHeight(lowestHeight)
+				if err != nil {
+					ctx.Throw(fmt.Errorf("failed to update lowest fulfilled height: %w", err))
+				}
 			}
-			p.checkPrune(ctx)
-		case heightRangeTarget := <-p.heightRangeTargetChan:
-			p.heightRangeTarget = heightRangeTarget
-			p.checkPrune(ctx)
-		case threshold := <-p.thresholdChan:
-			p.threshold = threshold
 			p.checkPrune(ctx)
 		}
 	}
 }
 
+// lowestRecordersHeight returns the lowest height among all registered
+// height recorders.
+//
+// This function iterates over all registered height recorders to determine
+// the smallest of complete height recorded. If no height recorders are registered, it
+// returns an error.
+//
+// Expected errors during normal operation:
+// - ErrNoRegisteredHeightRecorders: if no height recorders are registered.
+func (p *Pruner) lowestRecordersHeight() (uint64, error) {
+	if len(p.registeredHeightRecorders) == 0 {
+		return 0, ErrNoRegisteredHeightRecorders
+	}
+
+	lowestHeight := uint64(math.MaxUint64)
+	for _, recorder := range p.registeredHeightRecorders {
+		height := recorder.HighestCompleteHeight()
+		if height < lowestHeight {
+			lowestHeight = height
+		}
+	}
+	return lowestHeight, nil
+}
+
+// updateFulfilledHeight updates the last fulfilled height and stores it in the storage.
+//
+// Parameters:
+//   - height: The new fulfilled height.
+//
+// No errors are expected during normal operations.
+func (p *Pruner) updateFulfilledHeight(height uint64) error {
+	if height > p.lastFulfilledHeight {
+		p.lastFulfilledHeight = height
+		return p.storage.SetFulfilledHeight(height)
+	}
+	return nil
+}
+
+// checkPrune checks if pruning should be performed based on the height range
+// and triggers the pruning operation if necessary.
+//
+// Parameters:
+//   - ctx: The context for managing the pruning operation.
 func (p *Pruner) checkPrune(ctx irrecoverable.SignalerContext) {
-	if p.lastFulfilledHeight > p.heightRangeTarget+p.threshold+p.lastPrunedHeight {
-		pruneHeight := p.lastFulfilledHeight - p.heightRangeTarget
+	threshold := p.threshold.Load()
+	heightRangeTarget := p.heightRangeTarget.Load()
+
+	if p.lastFulfilledHeight > heightRangeTarget+threshold+p.lastPrunedHeight {
+		pruneHeight := p.lastFulfilledHeight - heightRangeTarget
 
 		p.logger.Info().Uint64("prune_height", pruneHeight).Msg("pruning storage")
 		start := time.Now()

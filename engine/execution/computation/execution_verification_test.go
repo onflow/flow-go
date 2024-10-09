@@ -222,7 +222,7 @@ func Test_ExecutionMatchesVerification(t *testing.T) {
 		assert.Len(t, txResults, 1)
 		assert.Equal(t, "", txResults[0].ErrorMessage)
 		// ensure events from the first transaction is emitted
-		require.Len(t, colResult.Events(), 14)
+		require.Len(t, colResult.Events(), 18)
 
 		colResult = cr.CollectionExecutionResultAt(1)
 		txResults = colResult.TransactionResults()
@@ -302,7 +302,7 @@ func Test_ExecutionMatchesVerification(t *testing.T) {
 				transactionEvents += 1
 			}
 		}
-		require.Equal(t, 14, transactionEvents)
+		require.Equal(t, 18, transactionEvents)
 
 		assert.Contains(t, txResults[1].ErrorMessage, errors.ErrCodeStorageCapacityExceeded.String())
 

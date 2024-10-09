@@ -3,8 +3,11 @@ name: Test Monitor - Process Results
 description: Custom action that's used in multiple Flaky Test Monitor jobs to process test results and upload them to BigQuery
 
 inputs:
-  gcp_sa_key:
-    description: 'The GCP service account key for uploading to BigQuery'
+  service_account:
+    description: 'The GCP Service Account'
+    required: true
+  workload_identity_provider:
+    description: 'The GCP Workload Identity Provider'
     required: true
 
 runs:
@@ -14,20 +17,30 @@ runs:
       id: commit_date
       run: echo "::set-output name=date::$(git show --no-patch --no-notes --pretty='%cI' $COMMIT_SHA)"
       shell: bash
+
     - name: Get job run date
       id: job_run_date
       run: echo "::set-output name=date::$(TZ=":UTC" date -Iseconds)"
       shell: bash
+
     - name: Process test results
       run: cat test-output | go run tools/test_monitor/level1/process_summary1_results.go
       env:
         JOB_STARTED: ${{ steps.job_run_date.outputs.date }}
         COMMIT_DATE: ${{ steps.commit_date.outputs.date }}
       shell: bash
-    - name: Set up Cloud SDK
-      uses: google-github-actions/setup-gcloud@v0
+
+    - name: Google auth
+      id: auth
+      uses: google-github-actions/auth@v2
       with:
-        service_account_key: ${{ inputs.gcp_sa_key }}
+        service_account: ${{ inputs.service_account }}
+        token_format: 'access_token'
+        workload_identity_provider: ${{ inputs.workload_identity_provider }}
+
+    - name: 'Set up Cloud SDK'
+      uses: 'google-github-actions/setup-gcloud@v2'
+
     - name: Upload results to BigQuery (skipped tests)
       uses: nick-fields/retry@v2
       with:

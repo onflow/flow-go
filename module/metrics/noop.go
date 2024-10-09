@@ -37,6 +37,7 @@ func (nc *NoopCollector) BlockProposalDuration(duration time.Duration)          
 // interface check
 var _ module.BackendScriptsMetrics = (*NoopCollector)(nil)
 var _ module.TransactionMetrics = (*NoopCollector)(nil)
+var _ module.TransactionValidationMetrics = (*NoopCollector)(nil)
 var _ module.HotstuffMetrics = (*NoopCollector)(nil)
 var _ module.EngineMetrics = (*NoopCollector)(nil)
 var _ module.HeroCacheMetrics = (*NoopCollector)(nil)
@@ -170,7 +171,7 @@ func (nc *NoopCollector) ExecutionCollectionExecuted(_ time.Duration, _ module.C
 }
 func (nc *NoopCollector) ExecutionBlockExecutionEffortVectorComponent(_ string, _ uint) {}
 func (nc *NoopCollector) ExecutionBlockCachedPrograms(programs int)                     {}
-func (nc *NoopCollector) ExecutionTransactionExecuted(_ time.Duration, stats module.TransactionExecutionResultStats) {
+func (nc *NoopCollector) ExecutionTransactionExecuted(_ time.Duration, _ module.TransactionExecutionResultStats, _ module.TransactionExecutionResultInfo) {
 }
 func (nc *NoopCollector) ExecutionChunkDataPackGenerated(_, _ int)                              {}
 func (nc *NoopCollector) ExecutionScriptExecuted(dur time.Duration, compUsed, _, _ uint64)      {}
@@ -199,6 +200,9 @@ func (nc *NoopCollector) RuntimeTransactionInterpreted(dur time.Duration)       
 func (nc *NoopCollector) RuntimeSetNumberOfAccounts(count uint64)                               {}
 func (nc *NoopCollector) RuntimeTransactionProgramsCacheMiss()                                  {}
 func (nc *NoopCollector) RuntimeTransactionProgramsCacheHit()                                   {}
+func (nc *NoopCollector) SetNumberOfDeployedCOAs(_ uint64)                                      {}
+func (nc *NoopCollector) EVMTransactionExecuted(_ uint64, _ bool, _ bool)                       {}
+func (nc *NoopCollector) EVMBlockExecuted(_ int, _ uint64, _ float64)                           {}
 func (nc *NoopCollector) ScriptExecuted(dur time.Duration, size int)                            {}
 func (nc *NoopCollector) ScriptExecutionErrorLocal()                                            {}
 func (nc *NoopCollector) ScriptExecutionErrorOnExecutionNode()                                  {}
@@ -212,6 +216,9 @@ func (nc *NoopCollector) TransactionReceived(txID flow.Identifier, when time.Tim
 func (nc *NoopCollector) TransactionFinalized(txID flow.Identifier, when time.Time)             {}
 func (nc *NoopCollector) TransactionExecuted(txID flow.Identifier, when time.Time)              {}
 func (nc *NoopCollector) TransactionExpired(txID flow.Identifier)                               {}
+func (nc *NoopCollector) TransactionValidated()                                                 {}
+func (nc *NoopCollector) TransactionValidationFailed(reason string)                             {}
+func (nc *NoopCollector) TransactionValidationSkipped()                                         {}
 func (nc *NoopCollector) TransactionSubmissionFailed()                                          {}
 func (nc *NoopCollector) UpdateExecutionReceiptMaxHeight(height uint64)                         {}
 func (nc *NoopCollector) UpdateLastFullBlockHeight(height uint64)                               {}

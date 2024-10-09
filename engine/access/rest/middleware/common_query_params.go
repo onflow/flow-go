@@ -8,7 +8,7 @@ import (
 )
 
 const ExpandQueryParam = "expand"
-const selectQueryParam = "select"
+const SelectQueryParam = "select"
 
 // commonQueryParamMiddleware generates a Middleware function that extracts the given query parameter from the request
 // and adds it to the request context as a key value pair with the key as the query param name.
@@ -37,7 +37,7 @@ func QueryExpandable() mux.MiddlewareFunc {
 
 // QuerySelect middleware extracts out the 'select' query param field if present in the request
 func QuerySelect() mux.MiddlewareFunc {
-	return commonQueryParamMiddleware(selectQueryParam)
+	return commonQueryParamMiddleware(SelectQueryParam)
 }
 
 func getField(req *http.Request, key string) ([]string, bool) {
@@ -54,5 +54,5 @@ func GetFieldsToExpand(req *http.Request) ([]string, bool) {
 }
 
 func GetFieldsToSelect(req *http.Request) ([]string, bool) {
-	return getField(req, selectQueryParam)
+	return getField(req, SelectQueryParam)
 }

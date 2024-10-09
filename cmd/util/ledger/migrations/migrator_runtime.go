@@ -8,6 +8,7 @@ import (
 	"github.com/onflow/cadence/runtime/interpreter"
 	"github.com/onflow/cadence/runtime/stdlib"
 	"github.com/onflow/crypto/hash"
+	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/cmd/util/ledger/util"
 	"github.com/onflow/flow-go/cmd/util/ledger/util/registers"
@@ -19,10 +20,30 @@ import (
 )
 
 type BasicMigrationRuntime struct {
+	Registers        registers.Registers
 	TransactionState state.NestedTransactionPreparer
 	Storage          *runtime.Storage
 	AccountsLedger   *util.AccountsAtreeLedger
 	Accounts         environment.Accounts
+}
+
+func (r *BasicMigrationRuntime) Commit(expectedAddresses map[flow.Address]struct{}, log zerolog.Logger) error {
+
+	result, err := r.TransactionState.FinalizeMainTransaction()
+	if err != nil {
+		return fmt.Errorf("failed to finalize main transaction: %w", err)
+	}
+
+	err = registers.ApplyChanges(
+		r.Registers,
+		result.WriteSet,
+		expectedAddresses,
+		log,
+	)
+	if err != nil {
+		return fmt.Errorf("failed to apply changes: %w", err)
+	}
+	return nil
 }
 
 type InterpreterMigrationRuntime struct {
@@ -45,6 +66,7 @@ type InterpreterMigrationRuntimeConfig struct {
 }
 
 func (c InterpreterMigrationRuntimeConfig) NewRuntimeInterface(
+	chainID flow.ChainID,
 	transactionState state.NestedTransactionPreparer,
 	accounts environment.Accounts,
 ) (
@@ -90,6 +112,7 @@ func (c InterpreterMigrationRuntimeConfig) NewRuntimeInterface(
 	}
 
 	return util.NewMigrationRuntimeInterface(
+		chainID,
 		getCodeFunc,
 		getContractNames,
 		getOrLoadProgram,
@@ -118,6 +141,7 @@ func NewBasicMigrationRuntime(regs registers.Registers) *BasicMigrationRuntime {
 	runtimeStorage := runtime.NewStorage(accountsAtreeLedger, nil)
 
 	return &BasicMigrationRuntime{
+		Registers:        regs,
 		TransactionState: transactionState,
 		Storage:          runtimeStorage,
 		AccountsLedger:   accountsAtreeLedger,
@@ -141,6 +165,7 @@ func NewInterpreterMigrationRuntime(
 	})
 
 	runtimeInterface, err := config.NewRuntimeInterface(
+		chainID,
 		basicMigrationRuntime.TransactionState,
 		basicMigrationRuntime.Accounts,
 	)

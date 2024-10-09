@@ -65,6 +65,11 @@ type transactionExecutor struct {
 	startedTransactionBodyExecution bool
 	nestedTxnId                     state.NestedTransactionId
 
+	// the state reads needed to compute the metering parameters
+	// this is used to invalidate the metering parameters if a transaction
+	// writes to any of those registers
+	meterStateRead *snapshot.ExecutionSnapshot
+
 	cadenceRuntime  *reusableRuntime.ReusableCadenceRuntime
 	txnBodyExecutor runtime.Executor
 
@@ -195,13 +200,23 @@ func (executor *transactionExecutor) preprocessTransactionBody() error {
 		}
 	}
 
-	meterParams, err := getBodyMeterParameters(
+	// get meter parameters
+	meterParams, meterStateRead, err := getBodyMeterParameters(
 		executor.ctx,
 		executor.proc,
 		executor.txnState)
 	if err != nil {
-		return fmt.Errorf("error gettng meter parameters: %w", err)
+		return fmt.Errorf("error getting meter parameters: %w", err)
 	}
+
+	if len(meterStateRead.WriteSet) != 0 {
+		// this should never happen
+		// and indicates an implementation error
+		panic("getting metering parameters should not write to registers")
+	}
+
+	// we need to save the meter state read for invalidation purposes
+	executor.meterStateRead = meterStateRead
 
 	txnId, err := executor.txnState.BeginNestedTransactionWithMeterParams(
 		meterParams)
@@ -387,8 +402,8 @@ func (executor *transactionExecutor) normalExecution() (
 
 	invalidator = environment.NewDerivedDataInvalidator(
 		contractUpdates,
-		executor.ctx.Chain.ServiceAddress(),
-		bodySnapshot)
+		bodySnapshot,
+		executor.meterStateRead)
 
 	// Check if all account storage limits are ok
 	//

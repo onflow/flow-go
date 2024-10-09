@@ -70,7 +70,6 @@ func TestParseEvent_Invalid(t *testing.T) {
 		"flow",                             // incorrect number of parts for protocol event
 		"flow.invalid.event",               // incorrect number of parts for protocol event
 		"A.0000000000000001.invalid",       // incorrect number of parts for account event
-		"A.0000000000000001.invalid.a.b",   // incorrect number of parts for account event
 
 	}
 
@@ -111,6 +110,18 @@ func TestValidateEvent(t *testing.T) {
 				Name:         "EventA",
 			},
 		},
+		{
+			name:      "resource destroyed event",
+			eventType: "A.0000000000000001.Contract1.ResourceA.ResourceB.ResourceC.ResourceDestroyed",
+			expected: events.ParsedEvent{
+				Type:         events.AccountEventType,
+				EventType:    "A.0000000000000001.Contract1.ResourceA.ResourceB.ResourceC.ResourceDestroyed",
+				Address:      "0000000000000001",
+				Contract:     "A.0000000000000001.Contract1",
+				ContractName: "Contract1",
+				Name:         "ResourceDestroyed",
+			},
+		},
 	}
 
 	for _, test := range tests {
@@ -138,7 +149,6 @@ func TestValidateEvent_Invalid(t *testing.T) {
 		"flow",                             // incorrect number of parts for protocol event
 		"flow.invalid.event",               // incorrect number of parts for protocol event
 		"A.0000000000000001.invalid",       // incorrect number of parts for account event
-		"A.0000000000000001.invalid.a.b",   // incorrect number of parts for account event
 		flow.EventType(fmt.Sprintf("A.%s.Contract1.EventA", unittest.RandomAddressFixture())), // address from wrong chain
 	}
 

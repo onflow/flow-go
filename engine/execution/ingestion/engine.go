@@ -19,6 +19,7 @@ import (
 	"github.com/onflow/flow-go/engine/execution/state"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
 	"github.com/onflow/flow-go/module/executiondatasync/pruner"
 	"github.com/onflow/flow-go/module/mempool/entity"
 	"github.com/onflow/flow-go/module/mempool/queue"
@@ -30,9 +31,12 @@ import (
 	"github.com/onflow/flow-go/utils/logging"
 )
 
+var _ execution_data.ProcessedHeightRecorder = (*Engine)(nil)
+
 // An Engine receives and saves incoming blocks.
 type Engine struct {
 	psEvents.Noop // satisfy protocol events consumer interface
+	execution_data.ProcessedHeightRecorder
 
 	unit                *engine.Unit
 	log                 zerolog.Logger
@@ -77,23 +81,24 @@ func New(
 	mempool := newMempool()
 
 	eng := Engine{
-		unit:                unit,
-		log:                 log,
-		collectionFetcher:   collectionFetcher,
-		headers:             headers,
-		blocks:              blocks,
-		collections:         collections,
-		computationManager:  executionEngine,
-		providerEngine:      providerEngine,
-		mempool:             mempool,
-		execState:           execState,
-		metrics:             metrics,
-		tracer:              tracer,
-		extensiveLogging:    extLog,
-		executionDataPruner: pruner,
-		uploader:            uploader,
-		stopControl:         stopControl,
-		loader:              loader,
+		unit:                    unit,
+		log:                     log,
+		collectionFetcher:       collectionFetcher,
+		headers:                 headers,
+		blocks:                  blocks,
+		collections:             collections,
+		computationManager:      executionEngine,
+		providerEngine:          providerEngine,
+		mempool:                 mempool,
+		execState:               execState,
+		metrics:                 metrics,
+		tracer:                  tracer,
+		extensiveLogging:        extLog,
+		executionDataPruner:     pruner,
+		uploader:                uploader,
+		stopControl:             stopControl,
+		loader:                  loader,
+		ProcessedHeightRecorder: execution_data.NewProcessedHeightRecorderManager(0),
 	}
 
 	return &eng, nil
@@ -460,7 +465,7 @@ func (e *Engine) executeBlock(
 	}
 
 	if e.executionDataPruner != nil {
-		e.executionDataPruner.NotifyFulfilledHeight(executableBlock.Height())
+		e.OnBlockProcessed(executableBlock.Height())
 	}
 
 	e.unit.Ctx()

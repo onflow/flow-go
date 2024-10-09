@@ -15,4 +15,7 @@ type Backend interface {
 	environment.RandomGenerator
 	environment.ContractFunctionInvoker
 	environment.UUIDGenerator
+	environment.Tracer
+	environment.EVMMetricsReporter
+	environment.LoggerProvider
 }

@@ -796,7 +796,7 @@ func (suite *BuilderSuite) TestBuildOn_RateLimitNonPayer() {
 		tx.Payer = unittest.RandomAddressFixture()
 		tx.ProposalKey = flow.ProposalKey{
 			Address:        proposer,
-			KeyIndex:       rand.Uint64(),
+			KeyIndex:       rand.Uint32(),
 			SequenceNumber: rand.Uint64(),
 		}
 		return &tx

@@ -8,8 +8,8 @@ import (
 func (e *Event) Build(event flow.Event) {
 	e.Type_ = string(event.Type)
 	e.TransactionId = event.TransactionID.String()
-	e.TransactionIndex = util.FromUint64(uint64(event.TransactionIndex))
-	e.EventIndex = util.FromUint64(uint64(event.EventIndex))
+	e.TransactionIndex = util.FromUint(uint64(event.TransactionIndex))
+	e.EventIndex = util.FromUint(uint64(event.EventIndex))
 	e.Payload = util.ToBase64(event.Payload)
 }
 
@@ -27,7 +27,7 @@ func (e *Events) Build(events []flow.Event) {
 }
 
 func (b *BlockEvents) Build(blockEvents flow.BlockEvents) {
-	b.BlockHeight = util.FromUint64(blockEvents.BlockHeight)
+	b.BlockHeight = util.FromUint(blockEvents.BlockHeight)
 	b.BlockId = blockEvents.BlockID.String()
 	b.BlockTimestamp = blockEvents.BlockTimestamp
 

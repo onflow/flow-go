@@ -18,10 +18,10 @@ const (
 	codeLivenessData = 11 // liveness data for hotstuff state
 
 	// codes for fields associated with the root state
-	codeSporkID                    = 13
-	codeProtocolVersion            = 14
-	codeEpochCommitSafetyThreshold = 15
-	codeSporkRootBlockHeight       = 16
+	codeSporkID              = 13
+	codeProtocolVersion      = 14
+	_                        = 15 // DEPRECATED: 15 was used to save the finalization safety threshold
+	codeSporkRootBlockHeight = 16
 
 	// code for heights with special meaning
 	codeFinalizedHeight         = 20 // latest finalized block height

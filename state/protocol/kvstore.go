@@ -52,53 +52,45 @@ type KVStoreReader interface {
 	// different extensions can have different view counts.
 	GetEpochExtensionViewCount() uint64
 
-	// GetEpochCommitSafetyThreshold [t] defines a deadline for sealing the EpochCommit
-	// service event near the end of each epoch - the "epoch commitment deadline".
-	// Given a safety threshold t, the deadline for an epoch with final view f is:
+	// GetFinalizationSafetyThreshold returns the FinalizationSafetyThreshold's current value `t`.
+	// The FinalizationSafetyThreshold is maintained by the protocol state, with correctness and
+	// consistency of updates across all nodes guaranteed by BFT consensus.
+	//
+	// In a nutshell, the FinalizationSafetyThreshold is a protocol axiom:
+	// It specifies the number of views `t`, such that when an honest node enters or surpasses
+	// view `v+t` the latest finalized view must be larger or equal to `v`. The value `t` is an
+	// empirical threshold, which must be chosen large enough that the probability of finalization
+	// halting for `t` or more views vanishes in practise. In the unlikely scenario that this
+	// threshold is exceeded, the protocol should halt.
+	// Formally, HotStuff (incl. its Jolteon derivative) provides no guarantees that finalization
+	// proceeds within `t` views, for _any_ value of `t`. Therefore, the FinalizationSafetyThreshold
+	// is an additional limitation on the *liveness* guarantees that HotStuff (Jolteon) provides.
+	// When entering view `v+t`, *safety-relevant* protocol logic should *confirm* that finalization
+	// has reached or exceeded view `v`.
+	//
+	// EXAMPLE:
+	// Given a threshold value `t`, the deadline for an epoch with final view `f` is:
 	//   Epoch Commitment Deadline: d=f-t
 	//
 	//                     Epoch Commitment Deadline
-	//   EPOCH N           ↓                 EPOCH N+1
-	//   ...---------------|---------------| |-----...
-	//   view:             d<·····t·······>f
+	//   EPOCH N           ↓                            EPOCH N+1
+	//   ...---------------|--------------------------| |-----...
+	//                     ↑                          ↑ ↑
+	//   view:             d············t············>⋮ f+1
 	//
-	// DEFINITION:
-	// This deadline is used to determine when to trigger epoch emergency fallback mode.
-	// Epoch Emergency Fallback mode is triggered when the EpochCommit service event
-	// fails to be sealed.
-	//
-	// Example: A service event is emitted in block A. The seal for A is included in C.
-	// A<-B(RA)<-C(SA)<-...<-R
-	//
-	// A service event S is considered sealed w.r.t. a reference block R if:
-	// * S was emitted during execution of some block A, s.t. A is an ancestor of R
-	// * The seal for block A was included in some block C, s.t C is an ancestor of R
-	//
-	// When we finalize the first block B with B.View >= d:
-	//  - HAPPY PATH: If an EpochCommit service event has been sealed w.r.t. B, no action is taken.
-	//  - FALLBACK PATH: If no EpochCommit service event has been sealed w.r.t. B,
-	//    Epoch Fallback Mode [EFM] is triggered.
-	//
-	// CONTEXT:
-	// The epoch commitment deadline exists to ensure that all nodes agree on
-	// whether Epoch Fallback Mode is triggered for a particular epoch, before
-	// the epoch actually ends. In particular, all nodes will agree about EFM
-	// being triggered (or not) if at least one block with view in [d, f] is
-	// finalized - in other words, we require at least one block being finalized
-	// after the epoch commitment deadline, and before the next epoch begins.
-	//
-	// It should be noted that we are employing a heuristic here, which succeeds with
-	// overwhelming probability of nearly 1. However, theoretically it is possible that
-	// no blocks are finalized within t views. In this edge case, the nodes would have not
-	// detected the epoch commit phase failing and the protocol would just halt at the end
-	// of the epoch. However, we emphasize that this is extremely unlikely, because the
-	// probability of randomly selecting t faulty leaders in sequence decays to zero
-	// exponentially with increasing t. Furthermore, failing to finalize blocks for a
-	// noticeable period entails halting block sealing, which would trigger human
-	// intervention on much smaller time scales than t views.
-	// Therefore, t should be chosen such that it takes more than 30mins to pass t views
-	// under happy path operation. Significant larger values are ok, but t views equalling
-	// 30 mins should be seen as a lower bound.
+	// This deadline is used to determine when to trigger Epoch Fallback Mode [EFM]:
+	// if no valid configuration for epoch N+1 has been determined by view `d`, the
+	// protocol enters EFM for the following reason:
+	//  * By the time a node surpasses the last view `f` of epoch N, it must know the leaders
+	//    for every view of epoch N+1.
+	//  * The leader selection for epoch N+1 is only unambiguously determined, if the configuration
+	//    for epoch N+1 has been finalized. (Otherwise, different forks could contain different
+	//    consensus committees for epoch N+1, which would lead to different leaders. Only finalization
+	//    resolves this ambiguity by finalizing one and orphaning epoch configurations possibly
+	//    contained in competing forks).
+	//  * The latest point where we could still finalize a configuration for Epoch N+1 is the last view
+	//    `f` of epoch N. As finalization is permitted to take up to `t` views, a valid configuration
+	//    for epoch N+1 must be available at latest by view d=f-t.
 	//
 	// When selecting a threshold value, ensure:
 	//  * The deadline is after the end of the DKG, with enough buffer between
@@ -107,8 +99,7 @@ type KVStoreReader interface {
 	//  * The buffer between the deadline and the final view of the epoch is large
 	//    enough that the network is overwhelming likely to finalize at least one
 	//    block with a view in this range
-	//
-	GetEpochCommitSafetyThreshold() uint64
+	GetFinalizationSafetyThreshold() uint64
 }
 
 // VersionedEncodable defines the interface for a versioned key-value store independent

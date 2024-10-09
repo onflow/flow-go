@@ -58,7 +58,7 @@ func AccountStatusRegisterID(address Address) RegisterID {
 	}
 }
 
-func PublicKeyRegisterID(address Address, index uint64) RegisterID {
+func PublicKeyRegisterID(address Address, index uint32) RegisterID {
 	return RegisterID{
 		Owner: addressToOwner(address),
 		Key:   fmt.Sprintf("public_key_%d", index),
