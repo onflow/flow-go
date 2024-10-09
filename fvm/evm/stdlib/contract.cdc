@@ -686,7 +686,7 @@ contract EVM {
                 keyList.add(
                   key.publicKey,
                   hashAlgorithm: key.hashAlgorithm,
-                  weight: key.weight,
+                  weight: key.weight / 1000.0,
                )
 
                keyListIndex = keyListLength
