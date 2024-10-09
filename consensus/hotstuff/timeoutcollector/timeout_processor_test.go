@@ -575,8 +575,9 @@ func createRealQC(
 	block *model.Block,
 ) *flow.QuorumCertificate {
 	leader := signers[0]
-	proposal, err := signerObjects[leader.NodeID].CreateProposal(block)
+	leaderVote, err := signerObjects[leader.NodeID].CreateVote(block)
 	require.NoError(t, err)
+	proposal := helper.MakeSignedProposal(helper.WithProposal(helper.MakeProposal(helper.WithBlock(block))), helper.WithSigData(leaderVote.SigData))
 
 	var createdQC *flow.QuorumCertificate
 	onQCCreated := func(qc *flow.QuorumCertificate) {

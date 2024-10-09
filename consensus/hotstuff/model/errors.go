@@ -113,7 +113,7 @@ type MissingBlockError struct {
 }
 
 func (e MissingBlockError) Error() string {
-	return fmt.Sprintf("missing Proposal at view %d with ID %v", e.View, e.BlockID)
+	return fmt.Sprintf("missing block at view %d with ID %v", e.View, e.BlockID)
 }
 
 // IsMissingBlockError returns whether an error is MissingBlockError
@@ -165,11 +165,11 @@ func (e InvalidTCError) Unwrap() error {
 
 // InvalidProposalError indicates that the proposal is invalid
 type InvalidProposalError struct {
-	InvalidProposal *Proposal
+	InvalidProposal *SignedProposal
 	Err             error
 }
 
-func NewInvalidProposalErrorf(proposal *Proposal, msg string, args ...interface{}) error {
+func NewInvalidProposalErrorf(proposal *SignedProposal, msg string, args ...interface{}) error {
 	return InvalidProposalError{
 		InvalidProposal: proposal,
 		Err:             fmt.Errorf(msg, args...),

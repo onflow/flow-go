@@ -164,7 +164,7 @@ func (e *EventHandler) OnReceiveTc(tc *flow.TimeoutCertificate) error {
 // consensus participant.
 // All inputs should be validated before feeding into this function. Assuming trusted data.
 // No errors are expected during normal operation.
-func (e *EventHandler) OnReceiveProposal(proposal *model.Proposal) error {
+func (e *EventHandler) OnReceiveProposal(proposal *model.SignedProposal) error {
 	block := proposal.Block
 	curView := e.paceMaker.CurView()
 	log := e.log.With().
@@ -429,7 +429,7 @@ func (e *EventHandler) proposeForNewViewIfPrimary() error {
 		lastViewTC = nil
 	}
 
-	// Construct Own Proposal
+	// Construct Own SignedProposal
 	// CAUTION, design constraints:
 	//    (i) We cannot process our own proposal within the `EventHandler` right away.
 	//   (ii) We cannot add our own proposal to Forks here right away.
@@ -491,7 +491,7 @@ func (e *EventHandler) proposeForNewViewIfPrimary() error {
 // It is called AFTER the block has been stored or found in Forks
 // It checks whether to vote for this block.
 // No errors are expected during normal operation.
-func (e *EventHandler) processBlockForCurrentView(proposal *model.Proposal) error {
+func (e *EventHandler) processBlockForCurrentView(proposal *model.SignedProposal) error {
 	// sanity check that block is really for the current view:
 	curView := e.paceMaker.CurView()
 	block := proposal.Block
@@ -526,7 +526,7 @@ func (e *EventHandler) processBlockForCurrentView(proposal *model.Proposal) erro
 // ownVote generates and forwards the own vote, if we decide to vote.
 // Any errors are potential symptoms of uncovered edge cases or corrupted internal state (fatal).
 // No errors are expected during normal operation.
-func (e *EventHandler) ownVote(proposal *model.Proposal, curView uint64, nextLeader flow.Identifier) error {
+func (e *EventHandler) ownVote(proposal *model.SignedProposal, curView uint64, nextLeader flow.Identifier) error {
 	block := proposal.Block
 	log := e.log.With().
 		Uint64("block_view", block.View).
