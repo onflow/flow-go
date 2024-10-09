@@ -884,6 +884,12 @@ func (m *FollowerState) epochMetricsAndEventsOnBlockFinalized(parentEpochState, 
 				m.metrics.CurrentDKGPhaseViews(childEpochSetup.DKGPhase1FinalView, childEpochSetup.DKGPhase2FinalView, childEpochSetup.DKGPhase3FinalView)
 			},
 		)
+		m.logger.Info().
+			Uint64("new_epoch_counter", childEpochSetup.Counter).
+			Uint64("new_epoch_height", finalized.Height).
+			Str("new_epoch_phase", childEpochPhase.String()).
+			Timestamp().
+			Msg("Epoch Transition")
 		return
 	}
 
