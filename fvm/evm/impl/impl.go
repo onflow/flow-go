@@ -194,6 +194,28 @@ func NewEVMBytes4(
 	)
 }
 
+func NewEVMBytes32(
+	inter *interpreter.Interpreter,
+	locationRange interpreter.LocationRange,
+	location common.AddressLocation,
+	bytes []byte,
+) *interpreter.CompositeValue {
+	return interpreter.NewCompositeValue(
+		inter,
+		locationRange,
+		location,
+		"EVM.EVMBytes32",
+		common.CompositeKindStructure,
+		[]interpreter.CompositeField{
+			{
+				Name:  "value",
+				Value: EVMBytes32ToBytesArrayValue(inter, bytes),
+			},
+		},
+		common.ZeroAddress,
+	)
+}
+
 func AddressBytesArrayValueToEVMAddress(
 	inter *interpreter.Interpreter,
 	locationRange interpreter.LocationRange,
@@ -285,6 +307,29 @@ func EVMBytes4ToBytesArrayValue(
 	return interpreter.NewArrayValueWithIterator(
 		inter,
 		stdlib.EVMBytes4ValueStaticType,
+		common.ZeroAddress,
+		uint64(len(bytes)),
+		func() interpreter.Value {
+			if index >= len(bytes) {
+				return nil
+			}
+			result := interpreter.NewUInt8Value(inter, func() uint8 {
+				return bytes[index]
+			})
+			index++
+			return result
+		},
+	)
+}
+
+func EVMBytes32ToBytesArrayValue(
+	inter *interpreter.Interpreter,
+	bytes []byte,
+) *interpreter.ArrayValue {
+	var index int
+	return interpreter.NewArrayValueWithIterator(
+		inter,
+		stdlib.EVMBytes32ValueStaticType,
 		common.ZeroAddress,
 		uint64(len(bytes)),
 		func() interpreter.Value {
