@@ -10,6 +10,7 @@ type TransactionTiming struct {
 	Received      time.Time
 	Finalized     time.Time
 	Executed      time.Time
+	Sealed        time.Time
 }
 
 func (t TransactionTiming) ID() Identifier {
