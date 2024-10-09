@@ -5,34 +5,47 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/rs/zerolog/log"
+
 	"github.com/onflow/cadence"
 	jsoncdc "github.com/onflow/cadence/encoding/json"
 	"github.com/onflow/cadence/runtime/parser"
 	"github.com/onflow/crypto"
 	"github.com/onflow/flow-core-contracts/lib/go/templates"
-	"github.com/rs/zerolog/log"
 
 	cadenceutils "github.com/onflow/flow-go/access/utils"
 	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/fvm/systemcontracts"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/execution"
+	"github.com/onflow/flow-go/module/metrics"
+	"github.com/onflow/flow-go/module/state_synchronization"
 	"github.com/onflow/flow-go/state"
 	"github.com/onflow/flow-go/state/protocol"
 )
+
+// DefaultSealedIndexedHeightThreshold is the default number of blocks between sealed and indexed height
+// this sets a limit on how far into the past the payer validator will allow for checking the payer's balance.
+const DefaultSealedIndexedHeightThreshold = 30
 
 type Blocks interface {
 	HeaderByID(id flow.Identifier) (*flow.Header, error)
 	FinalizedHeader() (*flow.Header, error)
 	SealedHeader() (*flow.Header, error)
+	IndexedHeight() (uint64, error)
 }
 
 type ProtocolStateBlocks struct {
-	state protocol.State
+	state         protocol.State
+	indexReporter state_synchronization.IndexReporter
 }
 
-func NewProtocolStateBlocks(state protocol.State) *ProtocolStateBlocks {
-	return &ProtocolStateBlocks{state: state}
+func NewProtocolStateBlocks(state protocol.State, indexReporter state_synchronization.IndexReporter) *ProtocolStateBlocks {
+	return &ProtocolStateBlocks{
+		state:         state,
+		indexReporter: indexReporter,
+	}
 }
 
 func (b *ProtocolStateBlocks) HeaderByID(id flow.Identifier) (*flow.Header, error) {
@@ -53,7 +66,19 @@ func (b *ProtocolStateBlocks) FinalizedHeader() (*flow.Header, error) {
 }
 
 func (b *ProtocolStateBlocks) SealedHeader() (*flow.Header, error) {
+
 	return b.state.Sealed().Head()
+
+}
+
+// IndexedHeight returns the highest indexed height by calling corresponding function of indexReporter.
+// Expected errors during normal operation:
+// - access.IndexReporterNotInitialized - indexed reporter was not initialized.
+func (b *ProtocolStateBlocks) IndexedHeight() (uint64, error) {
+	if b.indexReporter != nil {
+		return b.indexReporter.HighestIndexedHeight()
+	}
+	return 0, IndexReporterNotInitialized
 }
 
 // RateLimiter is an interface for checking if an address is rate limited.
@@ -75,6 +100,59 @@ func (l *NoopLimiter) IsRateLimited(address flow.Address) bool {
 	return false
 }
 
+// PayerBalanceMode represents the mode for checking the payer's balance
+// when validating transactions. It controls whether and how the balance
+// check is performed during transaction validation.
+//
+// There are few modes available:
+//
+//   - `Disabled` - Balance checking is completely disabled. No checks are
+//     performed to verify if the payer has sufficient balance to cover the
+//     transaction fees.
+//   - `WarnCheck` - Balance is checked, and a warning is logged if the payer
+//     does not have enough balance. The transaction is still accepted and
+//     processed regardless of the check result.
+//   - `EnforceCheck` - Balance is checked, and the transaction is rejected if
+//     the payer does not have sufficient balance to cover the transaction fees.
+type PayerBalanceMode int
+
+const (
+	// Disabled indicates that payer balance checking is turned off.
+	Disabled PayerBalanceMode = iota
+
+	// WarnCheck logs a warning if the payer's balance is insufficient, but does not prevent the transaction from being accepted.
+	WarnCheck
+
+	// EnforceCheck prevents the transaction from being accepted if the payer's balance is insufficient to cover transaction fees.
+	EnforceCheck
+)
+
+func ParsePayerBalanceMode(s string) (PayerBalanceMode, error) {
+	switch s {
+	case Disabled.String():
+		return Disabled, nil
+	case WarnCheck.String():
+		return WarnCheck, nil
+	case EnforceCheck.String():
+		return EnforceCheck, nil
+	default:
+		return 0, errors.New("invalid payer balance mode")
+	}
+}
+
+func (m PayerBalanceMode) String() string {
+	switch m {
+	case Disabled:
+		return "disabled"
+	case WarnCheck:
+		return "warn"
+	case EnforceCheck:
+		return "enforce"
+	default:
+		return ""
+	}
+}
+
 type TransactionValidationOptions struct {
 	Expiry                       uint
 	ExpiryBuffer                 uint
@@ -84,105 +162,102 @@ type TransactionValidationOptions struct {
 	CheckScriptsParse            bool
 	MaxTransactionByteSize       uint64
 	MaxCollectionByteSize        uint64
-	CheckPayerBalance            bool
+	CheckPayerBalanceMode        PayerBalanceMode
+}
+
+type ValidationStep struct {
+	check      func(*flow.TransactionBody) error
+	failReason string
 }
 
 type TransactionValidator struct {
-	blocks                   Blocks     // for looking up blocks to check transaction expiry
-	chain                    flow.Chain // for checking validity of addresses
-	options                  TransactionValidationOptions
-	serviceAccountAddress    flow.Address
-	limiter                  RateLimiter
-	scriptExecutor           execution.ScriptExecutor
-	verifyPayerBalanceScript []byte
+	blocks                       Blocks     // for looking up blocks to check transaction expiry
+	chain                        flow.Chain // for checking validity of addresses
+	options                      TransactionValidationOptions
+	serviceAccountAddress        flow.Address
+	limiter                      RateLimiter
+	scriptExecutor               execution.ScriptExecutor
+	verifyPayerBalanceScript     []byte
+	transactionValidationMetrics module.TransactionValidationMetrics
+
+	validationSteps []ValidationStep
 }
 
 func NewTransactionValidator(
 	blocks Blocks,
 	chain flow.Chain,
+	transactionValidationMetrics module.TransactionValidationMetrics,
 	options TransactionValidationOptions,
 	executor execution.ScriptExecutor,
 ) (*TransactionValidator, error) {
-	if options.CheckPayerBalance && executor == nil {
+	if options.CheckPayerBalanceMode != Disabled && executor == nil {
 		return nil, errors.New("transaction validator cannot use checkPayerBalance with nil executor")
 	}
 
 	env := systemcontracts.SystemContractsForChain(chain.ChainID()).AsTemplateEnv()
 
-	return &TransactionValidator{
-		blocks:                   blocks,
-		chain:                    chain,
-		options:                  options,
-		serviceAccountAddress:    chain.ServiceAddress(),
-		limiter:                  NewNoopLimiter(),
-		scriptExecutor:           executor,
-		verifyPayerBalanceScript: templates.GenerateVerifyPayerBalanceForTxExecution(env),
-	}, nil
+	txValidator := &TransactionValidator{
+		blocks:                       blocks,
+		chain:                        chain,
+		options:                      options,
+		serviceAccountAddress:        chain.ServiceAddress(),
+		limiter:                      NewNoopLimiter(),
+		scriptExecutor:               executor,
+		verifyPayerBalanceScript:     templates.GenerateVerifyPayerBalanceForTxExecution(env),
+		transactionValidationMetrics: transactionValidationMetrics,
+	}
+
+	txValidator.initValidationSteps()
+
+	return txValidator, nil
 }
 
 func NewTransactionValidatorWithLimiter(
 	blocks Blocks,
 	chain flow.Chain,
 	options TransactionValidationOptions,
+	transactionValidationMetrics module.TransactionValidationMetrics,
 	rateLimiter RateLimiter,
 ) *TransactionValidator {
-	return &TransactionValidator{
-		blocks:                blocks,
-		chain:                 chain,
-		options:               options,
-		serviceAccountAddress: chain.ServiceAddress(),
-		limiter:               rateLimiter,
+	txValidator := &TransactionValidator{
+		blocks:                       blocks,
+		chain:                        chain,
+		options:                      options,
+		serviceAccountAddress:        chain.ServiceAddress(),
+		limiter:                      rateLimiter,
+		transactionValidationMetrics: transactionValidationMetrics,
+	}
+
+	txValidator.initValidationSteps()
+
+	return txValidator
+}
+
+func (v *TransactionValidator) initValidationSteps() {
+	v.validationSteps = []ValidationStep{
+		// rate limit transactions for specific payers.
+		// a short term solution to prevent attacks that send too many failed transactions
+		// if a transaction is from a payer that should be rate limited, all the following
+		// checks will be skipped
+		{v.checkRateLimitPayer, metrics.InvalidTransactionRateLimit},
+		{v.checkTxSizeLimit, metrics.InvalidTransactionByteSize},
+		{v.checkMissingFields, metrics.IncompleteTransaction},
+		{v.checkGasLimit, metrics.InvalidGasLimit},
+		{v.checkExpiry, metrics.ExpiredTransaction},
+		{v.checkCanBeParsed, metrics.InvalidScript},
+		{v.checkAddresses, metrics.InvalidAddresses},
+		{v.checkSignatureFormat, metrics.InvalidSignature},
+		{v.checkSignatureDuplications, metrics.DuplicatedSignature},
 	}
 }
 
 func (v *TransactionValidator) Validate(ctx context.Context, tx *flow.TransactionBody) (err error) {
-	// rate limit transactions for specific payers.
-	// a short term solution to prevent attacks that send too many failed transactions
-	// if a transaction is from a payer that should be rate limited, all the following
-	// checks will be skipped
-	err = v.checkRateLimitPayer(tx)
-	if err != nil {
-		return err
-	}
 
-	err = v.checkTxSizeLimit(tx)
-	if err != nil {
-		return err
-	}
-
-	err = v.checkMissingFields(tx)
-	if err != nil {
-		return err
-	}
-
-	err = v.checkGasLimit(tx)
-	if err != nil {
-		return err
-	}
-
-	err = v.checkExpiry(tx)
-	if err != nil {
-		return err
-	}
-
-	err = v.checkCanBeParsed(tx)
-	if err != nil {
-		return err
-	}
-
-	err = v.checkAddresses(tx)
-	if err != nil {
-		return err
-	}
-
-	err = v.checkSignatureFormat(tx)
-	if err != nil {
-		return err
-	}
-
-	err = v.checkSignatureDuplications(tx)
-	if err != nil {
-		return err
+	for _, step := range v.validationSteps {
+		if err = step.check(tx); err != nil {
+			v.transactionValidationMetrics.TransactionValidationFailed(step.failReason)
+			return err
+		}
 	}
 
 	err = v.checkSufficientBalanceToPayForTransaction(ctx, tx)
@@ -192,14 +267,22 @@ func (v *TransactionValidator) Validate(ctx context.Context, tx *flow.Transactio
 		// are 'internal' and related to script execution process. they shouldn't
 		// prevent the transaction from proceeding.
 		if IsInsufficientBalanceError(err) {
-			return err
+			v.transactionValidationMetrics.TransactionValidationFailed(metrics.InsufficientBalance)
+
+			if v.options.CheckPayerBalanceMode == EnforceCheck {
+				log.Warn().Err(err).Str("transactionID", tx.ID().String()).Str("payerAddress", tx.Payer.String()).Msg("enforce check error")
+				return err
+			}
 		}
 
 		// log and ignore all other errors
+		v.transactionValidationMetrics.TransactionValidationSkipped()
 		log.Info().Err(err).Msg("check payer validation skipped due to error")
 	}
 
 	// TODO replace checkSignatureFormat by verifying the account/payer signatures
+
+	v.transactionValidationMetrics.TransactionValidated()
 
 	return nil
 }
@@ -337,7 +420,6 @@ func (v *TransactionValidator) checkCanBeParsed(tx *flow.TransactionBody) (err e
 }
 
 func (v *TransactionValidator) checkAddresses(tx *flow.TransactionBody) error {
-
 	for _, address := range append(tx.Authorizers, tx.Payer) {
 		// we check whether this is a valid output of the address generator
 		if !v.chain.IsValid(address) {
@@ -365,7 +447,6 @@ func (v *TransactionValidator) checkSignatureDuplications(tx *flow.TransactionBo
 }
 
 func (v *TransactionValidator) checkSignatureFormat(tx *flow.TransactionBody) error {
-
 	for _, signature := range append(tx.PayloadSignatures, tx.EnvelopeSignatures...) {
 		// check the format of the signature is valid.
 		// a valid signature is an ECDSA signature of either P-256 or secp256k1 curve.
@@ -396,13 +477,26 @@ func (v *TransactionValidator) checkSignatureFormat(tx *flow.TransactionBody) er
 }
 
 func (v *TransactionValidator) checkSufficientBalanceToPayForTransaction(ctx context.Context, tx *flow.TransactionBody) error {
-	if !v.options.CheckPayerBalance {
+	if v.options.CheckPayerBalanceMode == Disabled {
 		return nil
 	}
 
 	header, err := v.blocks.SealedHeader()
 	if err != nil {
 		return fmt.Errorf("could not fetch block header: %w", err)
+	}
+
+	indexedHeight, err := v.blocks.IndexedHeight()
+	if err != nil {
+		return fmt.Errorf("could not get indexed height: %w", err)
+	}
+
+	// we use latest indexed block to get the most up-to-date state data available for executing scripts.
+	// check here to make sure indexing is within an acceptable tolerance of sealing to avoid issues
+	// if indexing falls behind
+	sealedHeight := header.Height
+	if indexedHeight < sealedHeight-DefaultSealedIndexedHeightThreshold {
+		return IndexedHeightFarBehindError{SealedHeight: sealedHeight, IndexedHeight: indexedHeight}
 	}
 
 	payerAddress := cadence.NewAddress(tx.Payer)
@@ -414,7 +508,7 @@ func (v *TransactionValidator) checkSufficientBalanceToPayForTransaction(ctx con
 		return fmt.Errorf("failed to encode cadence args for script executor: %w", err)
 	}
 
-	result, err := v.scriptExecutor.ExecuteAtBlockHeight(ctx, v.verifyPayerBalanceScript, args, header.Height)
+	result, err := v.scriptExecutor.ExecuteAtBlockHeight(ctx, v.verifyPayerBalanceScript, args, indexedHeight)
 	if err != nil {
 		return fmt.Errorf("script finished with error: %w", err)
 	}
@@ -430,7 +524,7 @@ func (v *TransactionValidator) checkSufficientBalanceToPayForTransaction(ctx con
 	}
 
 	// return no error if payer has sufficient balance
-	if bool(canExecuteTransaction) {
+	if canExecuteTransaction {
 		return nil
 	}
 
