@@ -138,6 +138,14 @@ func reportABIEncodingComputation(
 					chunks := math.Ceil(float64(bytesLength) / float64(abiEncodingByteSize))
 					computation += uint(chunks * abiEncodingByteSize)
 					reportComputation(computation)
+				} else if value.TypeID() == evmLocation.TypeID(inter, "EVM.EVMBytes4") {
+					computation := uint(2 * abiEncodingByteSize)
+					bytesArrayValue := value.GetMember(inter, locationRange, "value")
+					arrValue := bytesArrayValue.(*interpreter.ArrayValue)
+					bytesLength := arrValue.Count()
+					chunks := math.Ceil(float64(bytesLength) / float64(abiEncodingByteSize))
+					computation += uint(chunks * abiEncodingByteSize)
+					reportComputation(computation)
 				} else {
 					panic(abiEncodingError{
 						Type: value.StaticType(inter),
@@ -280,7 +288,7 @@ var gethTypeAddress = gethABI.Type{T: gethABI.AddressTy, Size: 20}
 
 var gethTypeBytes = gethABI.Type{T: gethABI.BytesTy}
 
-// var gethTypeBytes4 = gethABI.Type{T: gethABI.BytesTy, Size: 4}
+var gethTypeBytes4 = gethABI.Type{T: gethABI.BytesTy, Size: 4}
 
 // var gethTypeBytes32 = gethABI.Type{T: gethABI.BytesTy, Size: 32}
 
@@ -333,6 +341,10 @@ func gethABIType(
 
 		if staticType.TypeID == "A.0000000000000001.EVM.EVMBytes" {
 			return gethTypeBytes, true
+		}
+
+		if staticType.TypeID == "A.0000000000000001.EVM.EVMBytes4" {
+			return gethTypeBytes4, true
 		}
 
 	case *interpreter.ConstantSizedStaticType:
@@ -567,6 +579,20 @@ func encodeABI(
 			}
 
 			return bytes, gethTypeBytes, nil
+		}
+
+		if value.TypeID() == "A.0000000000000001.EVM.EVMBytes4" {
+			bytesArrayValue := value.GetMember(inter, locationRange, "value")
+			bytes, err := interpreter.ByteArrayValueToByteSlice(
+				inter,
+				bytesArrayValue,
+				locationRange,
+			)
+			if err != nil {
+				panic(err)
+			}
+
+			return bytes, gethTypeBytes4, nil
 		}
 
 	case *interpreter.ArrayValue:
@@ -964,6 +990,20 @@ func decodeABI(
 				location,
 				bytes,
 			), nil
+		}
+
+		if staticType.TypeID == "A.0000000000000001.EVM.EVMBytes4" {
+			bytes, ok := value.([]uint8)
+			if !ok {
+				break
+			}
+			compValue := NewEVMBytes4(
+				inter,
+				locationRange,
+				location,
+				bytes,
+			)
+			return compValue, nil
 		}
 	}
 
