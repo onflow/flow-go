@@ -440,6 +440,18 @@ func goType(
 		return reflect.TypeOf(gethCommon.Address{}), true
 	}
 
+	if staticType.ID() == "A.0000000000000001.EVM.EVMBytes" {
+		return reflect.SliceOf(reflect.TypeOf(byte(0))), true
+	}
+
+	if staticType.ID() == "A.0000000000000001.EVM.EVMBytes4" {
+		return reflect.SliceOf(reflect.TypeOf(byte(0))), true
+	}
+
+	if staticType.ID() == "A.0000000000000001.EVM.EVMBytes32" {
+		return reflect.SliceOf(reflect.TypeOf(byte(0))), true
+	}
+
 	return nil, false
 }
 
