@@ -961,6 +961,49 @@ func TestEVMEncodeABIBytesRoundtrip(t *testing.T) {
 		computation = uint(0)
 	})
 
+	t.Run("ABI encode/decode into `bytes[]` Solidity type", func(t *testing.T) {
+		script := []byte(`
+          import EVM from 0x1
+
+          access(all)
+          fun main(): Bool {
+            let bytes: EVM.EVMBytes = EVM.EVMBytes(value: [5, 10, 15, 20, 25])
+            let bytesArray: [EVM.EVMBytes] = [bytes]
+            let encodedData = EVM.encodeABI([bytesArray])
+            let types = [Type<[EVM.EVMBytes]>()]
+            let values = EVM.decodeABI(types: types, data: encodedData)
+
+            assert(values.length == 1)
+            let evmBytes = values[0] as! [EVM.EVMBytes]
+            assert(evmBytes[0].value == [5, 10, 15, 20, 25])
+
+            return true
+          }
+		`)
+
+		// Run script
+		result, err := rt.ExecuteScript(
+			runtime.Script{
+				Source:    script,
+				Arguments: [][]byte{},
+			},
+			runtime.Context{
+				Interface:   runtimeInterface,
+				Environment: scriptEnvironment,
+				Location:    nextScriptLocation(),
+			},
+		)
+		require.NoError(t, err)
+
+		assert.Equal(t,
+			cadence.Bool(true),
+			result,
+		)
+
+		// Reset computation
+		computation = uint(0)
+	})
+
 	t.Run("ABI encode/decode into `bytes4` Solidity type", func(t *testing.T) {
 		script := []byte(`
           import EVM from 0x1
@@ -975,6 +1018,49 @@ func TestEVMEncodeABIBytesRoundtrip(t *testing.T) {
             assert(values.length == 1)
             let evmBytes = values[0] as! EVM.EVMBytes4
             assert(evmBytes.value == [5, 10, 15, 20])
+
+            return true
+          }
+		`)
+
+		// Run script
+		result, err := rt.ExecuteScript(
+			runtime.Script{
+				Source:    script,
+				Arguments: [][]byte{},
+			},
+			runtime.Context{
+				Interface:   runtimeInterface,
+				Environment: scriptEnvironment,
+				Location:    nextScriptLocation(),
+			},
+		)
+		require.NoError(t, err)
+
+		assert.Equal(t,
+			cadence.Bool(true),
+			result,
+		)
+
+		// Reset computation
+		computation = uint(0)
+	})
+
+	t.Run("ABI encode/decode into `bytes4[]` Solidity type", func(t *testing.T) {
+		script := []byte(`
+          import EVM from 0x1
+
+          access(all)
+          fun main(): Bool {
+            let bytes: EVM.EVMBytes4 = EVM.EVMBytes4(value: [5, 10, 15, 20])
+            let bytesArray: [EVM.EVMBytes4] = [bytes]
+            let encodedData = EVM.encodeABI([bytesArray])
+            let types = [Type<[EVM.EVMBytes4]>()]
+            let values = EVM.decodeABI(types: types, data: encodedData)
+
+            assert(values.length == 1)
+            let evmBytes = values[0] as! [EVM.EVMBytes4]
+            assert(evmBytes[0].value == [5, 10, 15, 20])
 
             return true
           }
@@ -1023,6 +1109,59 @@ func TestEVMEncodeABIBytesRoundtrip(t *testing.T) {
             assert(values.length == 1)
             let evmBytes = values[0] as! EVM.EVMBytes32
             assert(evmBytes.value == [
+              1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16,
+              17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30,
+              31, 32
+            ])
+
+            return true
+          }
+		`)
+
+		// Run script
+		result, err := rt.ExecuteScript(
+			runtime.Script{
+				Source:    script,
+				Arguments: [][]byte{},
+			},
+			runtime.Context{
+				Interface:   runtimeInterface,
+				Environment: scriptEnvironment,
+				Location:    nextScriptLocation(),
+			},
+		)
+		require.NoError(t, err)
+
+		assert.Equal(t,
+			cadence.Bool(true),
+			result,
+		)
+
+		// Reset computation
+		computation = uint(0)
+	})
+
+	t.Run("ABI encode/decode into `bytes32[]` Solidity type", func(t *testing.T) {
+		script := []byte(`
+          import EVM from 0x1
+
+          access(all)
+          fun main(): Bool {
+            let bytes: EVM.EVMBytes32 = EVM.EVMBytes32(
+              value: [
+                1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16,
+                17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30,
+                31, 32
+              ]
+            )
+            let bytesArray: [EVM.EVMBytes32] = [bytes]
+            let encodedData = EVM.encodeABI([bytesArray])
+            let types = [Type<[EVM.EVMBytes32]>()]
+            let values = EVM.decodeABI(types: types, data: encodedData)
+
+            assert(values.length == 1)
+            let evmBytes = values[0] as! [EVM.EVMBytes32]
+            assert(evmBytes[0].value == [
               1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16,
               17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30,
               31, 32
