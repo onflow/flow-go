@@ -203,8 +203,12 @@ contract EVM {
         }
     }
 
+    /// EVMBytes is a type wrapper used for ABI encoding/decoding into
+    /// Solidity `bytes` type
     access(all)
     struct EVMBytes {
+
+        /// Byte array representing the `bytes` value
         access(all)
         let value: [UInt8]
 
@@ -213,8 +217,12 @@ contract EVM {
         }
     }
 
+    /// EVMBytes4 is a type wrapper used for ABI encoding/decoding into
+    /// Solidity `bytes4` type
     access(all)
     struct EVMBytes4 {
+
+        /// Byte array representing the `bytes4` value
         access(all)
         let value: [UInt8; 4]
 
@@ -223,8 +231,12 @@ contract EVM {
         }
     }
 
+    /// EVMBytes32 is a type wrapper used for ABI encoding/decoding into
+    /// Solidity `bytes32` type
     access(all)
     struct EVMBytes32 {
+
+        /// Byte array representing the `bytes32` value
         access(all)
         let value: [UInt8; 32]
 
