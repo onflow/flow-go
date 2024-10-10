@@ -46,9 +46,17 @@ const (
 
 	EVMAddressTypeBytesFieldName = "bytes"
 
+	EVMBytesTypeValueFieldName = "value"
+
 	EVMAddressTypeQualifiedIdentifier = "EVM.EVMAddress"
 
 	EVMBalanceTypeQualifiedIdentifier = "EVM.Balance"
+
+	EVMBytesTypeQualifiedIdentifier = "EVM.EVMBytes"
+
+	EVMBytes4TypeQualifiedIdentifier = "EVM.EVMBytes4"
+
+	EVMBytes32TypeQualifiedIdentifier = "EVM.EVMBytes32"
 
 	EVMResultTypeQualifiedIdentifier       = "EVM.Result"
 	EVMResultTypeStatusFieldName           = "status"

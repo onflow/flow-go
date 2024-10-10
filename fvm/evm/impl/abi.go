@@ -86,7 +86,9 @@ func reportABIEncodingComputation(
 	reportComputation func(intensity uint),
 ) {
 	evmAddressTypeID := evmLocation.TypeID(inter, stdlib.EVMAddressTypeQualifiedIdentifier)
-	evmBytesTypeID := evmLocation.TypeID(inter, "EVM.EVMBytes")
+	evmBytesTypeID := evmLocation.TypeID(inter, stdlib.EVMBytesTypeQualifiedIdentifier)
+	evmBytes4TypeID := evmLocation.TypeID(inter, stdlib.EVMBytes4TypeQualifiedIdentifier)
+	evmBytes32TypeID := evmLocation.TypeID(inter, stdlib.EVMBytes32TypeQualifiedIdentifier)
 
 	values.Iterate(
 		inter,
@@ -126,23 +128,30 @@ func reportABIEncodingComputation(
 				reportComputation(abiEncodingByteSize)
 
 			case *interpreter.CompositeValue:
-				if value.TypeID() == evmAddressTypeID {
+				switch value.TypeID() {
+				case evmAddressTypeID:
 					// EVM addresses are static variables with a fixed
 					// size of 32 bytes.
 					reportComputation(abiEncodingByteSize)
-				} else if value.TypeID() == evmBytesTypeID || value.TypeID() == evmLocation.TypeID(inter, "EVM.EVMBytes4") || value.TypeID() == evmLocation.TypeID(inter, "EVM.EVMBytes32") {
+
+				case evmBytesTypeID,
+					evmBytes4TypeID,
+					evmBytes32TypeID:
+
 					computation := uint(2 * abiEncodingByteSize)
-					bytesArrayValue := value.GetMember(inter, locationRange, "value")
+					bytesArrayValue := value.GetMember(inter, locationRange, stdlib.EVMBytesTypeValueFieldName)
 					arrValue := bytesArrayValue.(*interpreter.ArrayValue)
 					bytesLength := arrValue.Count()
 					chunks := math.Ceil(float64(bytesLength) / float64(abiEncodingByteSize))
 					computation += uint(chunks * abiEncodingByteSize)
 					reportComputation(computation)
-				} else {
+
+				default:
 					panic(abiEncodingError{
 						Type: value.StaticType(inter),
 					})
 				}
+
 			case *interpreter.ArrayValue:
 				// Dynamic variables, such as arrays & slices, are encoded
 				// in 2+ chunks of 32 bytes. The first chunk contains
