@@ -104,7 +104,7 @@ func (b *backendScripts) ExecuteScriptAtBlockHeight(
 ) ([]byte, error) {
 	header, err := b.headers.ByHeight(blockHeight)
 	if err != nil {
-		return nil, rpc.ConvertStorageError(err)
+		return nil, rpc.ConvertStorageError(handleErrorMessage(b.state.Params(), blockHeight, err))
 	}
 
 	return b.executeScript(ctx, newScriptExecutionRequest(header.ID(), blockHeight, script, arguments))

@@ -3,6 +3,7 @@ package backend
 import (
 	"context"
 	"crypto/md5" //nolint:gosec
+	"errors"
 	"fmt"
 	"time"
 
@@ -640,4 +641,48 @@ func chooseFromPreferredENIDs(allENs flow.IdentityList, executorIDs flow.Identif
 	addIfNotExists(allENs)
 
 	return chosenIDs
+}
+
+// handleErrorMessage processes errors returned during height-based queries.
+// If the error is due to a block not being found, this function determines whether the queried
+// height falls outside the node's accessible range and provides context-sensitive error messages
+// based on spork and node root block heights.
+//
+// Parameters:
+// - stateParams: Protocol parameters that contain spork root and node root block heights.
+// - height: The queried block height.
+// - genericErr: The initial error returned when the block is not found.
+//
+// Expected errors during normal operation:
+// - storage.ErrNotFound - Indicates that the queried block does not exist in the local database.
+func handleErrorMessage(
+	stateParams protocol.Params,
+	height uint64,
+	genericErr error,
+) error {
+	if !errors.Is(genericErr, storage.ErrNotFound) {
+		return genericErr
+	}
+
+	sporkRootBlockHeight := stateParams.SporkRootBlockHeight()
+	nodeRootBlockHeader := stateParams.SealedRoot().Height
+
+	var err error
+	if height < sporkRootBlockHeight {
+		err = fmt.Errorf("block height %d is less than the spork root block height %d. Try to use a historic node: %w",
+			height,
+			sporkRootBlockHeight,
+			genericErr,
+		)
+	} else if height < nodeRootBlockHeader && nodeRootBlockHeader >= sporkRootBlockHeight {
+		err = fmt.Errorf("block height %d is less than the node`s root block height %d. Try to use a different Access node: %w",
+			height,
+			nodeRootBlockHeader,
+			genericErr,
+		)
+	} else {
+		err = genericErr
+	}
+
+	return err
 }
