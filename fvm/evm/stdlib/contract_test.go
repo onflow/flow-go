@@ -502,7 +502,6 @@ func TestEVMEncodeABIByteTypes(t *testing.T) {
 	nextScriptLocation := NewScriptLocationGenerator()
 
 	// Deploy contracts
-
 	deployContracts(
 		t,
 		rt,
@@ -683,31 +682,10 @@ func TestEVMEncodeABIBytesRoundtrip(t *testing.T) {
 	t.Parallel()
 
 	handler := &testContractHandler{}
-
 	contractsAddress := flow.BytesToAddress([]byte{0x1})
-
 	transactionEnvironment := newEVMTransactionEnvironment(handler, contractsAddress)
 	scriptEnvironment := newEVMScriptEnvironment(handler, contractsAddress)
-
 	rt := runtime.NewInterpreterRuntime(runtime.Config{})
-
-	script := []byte(`
-      import EVM from 0x1
-
-      access(all)
-      fun main(): Bool {
-        let bytes: EVM.EVMBytes = EVM.EVMBytes(value: [5, 10, 15, 20, 25])
-        let encodedData = EVM.encodeABI([bytes])
-        let types = [Type<EVM.EVMBytes>()]
-        let values = EVM.decodeABI(types: types, data: encodedData)
-
-        assert(values.length == 1)
-        let evmBytes = values[0] as! EVM.EVMBytes
-        assert(evmBytes.value == [5, 10, 15, 20, 25])
-
-        return true
-      }
-	`)
 
 	accountCodes := map[common.Location][]byte{}
 	var events []cadence.Event
@@ -735,7 +713,7 @@ func TestEVMEncodeABIBytesRoundtrip(t *testing.T) {
 			return json.Decode(nil, b)
 		},
 		OnMeterComputation: func(compKind common.ComputationKind, intensity uint) error {
-			if compKind == environment.ComputationKindEVMEncodeABI {
+			if compKind == environment.ComputationKindEVMDecodeABI {
 				computation += intensity
 			}
 			return nil
@@ -746,7 +724,6 @@ func TestEVMEncodeABIBytesRoundtrip(t *testing.T) {
 	nextScriptLocation := NewScriptLocationGenerator()
 
 	// Deploy contracts
-
 	deployContracts(
 		t,
 		rt,
@@ -756,234 +733,141 @@ func TestEVMEncodeABIBytesRoundtrip(t *testing.T) {
 		nextTransactionLocation,
 	)
 
-	// Run script
+	t.Run("ABI encode/decode into `bytes` Solidity type", func(t *testing.T) {
+		script := []byte(`
+          import EVM from 0x1
 
-	result, err := rt.ExecuteScript(
-		runtime.Script{
-			Source:    script,
-			Arguments: [][]byte{},
-		},
-		runtime.Context{
-			Interface:   runtimeInterface,
-			Environment: scriptEnvironment,
-			Location:    nextScriptLocation(),
-		},
-	)
-	require.NoError(t, err)
+          access(all)
+          fun main(): Bool {
+            let bytes: EVM.EVMBytes = EVM.EVMBytes(value: [5, 10, 15, 20, 25])
+            let encodedData = EVM.encodeABI([bytes])
+            let types = [Type<EVM.EVMBytes>()]
+            let values = EVM.decodeABI(types: types, data: encodedData)
 
-	assert.Equal(t,
-		cadence.Bool(true),
-		result,
-	)
-}
+            assert(values.length == 1)
+            let evmBytes = values[0] as! EVM.EVMBytes
+            assert(evmBytes.value == [5, 10, 15, 20, 25])
 
-func TestEVMEncodeABIBytes4Roundtrip(t *testing.T) {
+            return true
+          }
+		`)
 
-	t.Parallel()
-
-	handler := &testContractHandler{}
-
-	contractsAddress := flow.BytesToAddress([]byte{0x1})
-
-	transactionEnvironment := newEVMTransactionEnvironment(handler, contractsAddress)
-	scriptEnvironment := newEVMScriptEnvironment(handler, contractsAddress)
-
-	rt := runtime.NewInterpreterRuntime(runtime.Config{})
-
-	script := []byte(`
-      import EVM from 0x1
-
-      access(all)
-      fun main(): Bool {
-        let bytes: EVM.EVMBytes4 = EVM.EVMBytes4(value: [5, 10, 15, 20])
-        let encodedData = EVM.encodeABI([bytes])
-        let types = [Type<EVM.EVMBytes4>()]
-        let values = EVM.decodeABI(types: types, data: encodedData)
-
-        assert(values.length == 1)
-        let evmBytes = values[0] as! EVM.EVMBytes4
-        assert(evmBytes.value == [5, 10, 15, 20])
-
-        return true
-      }
-	`)
-
-	accountCodes := map[common.Location][]byte{}
-	var events []cadence.Event
-
-	computation := uint(0)
-	runtimeInterface := &TestRuntimeInterface{
-		Storage: NewTestLedger(nil, nil),
-		OnGetSigningAccounts: func() ([]runtime.Address, error) {
-			return []runtime.Address{runtime.Address(contractsAddress)}, nil
-		},
-		OnResolveLocation: LocationResolver,
-		OnUpdateAccountContractCode: func(location common.AddressLocation, code []byte) error {
-			accountCodes[location] = code
-			return nil
-		},
-		OnGetAccountContractCode: func(location common.AddressLocation) (code []byte, err error) {
-			code = accountCodes[location]
-			return code, nil
-		},
-		OnEmitEvent: func(event cadence.Event) error {
-			events = append(events, event)
-			return nil
-		},
-		OnDecodeArgument: func(b []byte, t cadence.Type) (cadence.Value, error) {
-			return json.Decode(nil, b)
-		},
-		OnMeterComputation: func(compKind common.ComputationKind, intensity uint) error {
-			if compKind == environment.ComputationKindEVMEncodeABI {
-				computation += intensity
-			}
-			return nil
-		},
-	}
-
-	nextTransactionLocation := NewTransactionLocationGenerator()
-	nextScriptLocation := NewScriptLocationGenerator()
-
-	// Deploy contracts
-
-	deployContracts(
-		t,
-		rt,
-		contractsAddress,
-		runtimeInterface,
-		transactionEnvironment,
-		nextTransactionLocation,
-	)
-
-	// Run script
-
-	result, err := rt.ExecuteScript(
-		runtime.Script{
-			Source:    script,
-			Arguments: [][]byte{},
-		},
-		runtime.Context{
-			Interface:   runtimeInterface,
-			Environment: scriptEnvironment,
-			Location:    nextScriptLocation(),
-		},
-	)
-	require.NoError(t, err)
-
-	assert.Equal(t,
-		cadence.Bool(true),
-		result,
-	)
-}
-
-func TestEVMEncodeABIBytes32Roundtrip(t *testing.T) {
-
-	t.Parallel()
-
-	handler := &testContractHandler{}
-
-	contractsAddress := flow.BytesToAddress([]byte{0x1})
-
-	transactionEnvironment := newEVMTransactionEnvironment(handler, contractsAddress)
-	scriptEnvironment := newEVMScriptEnvironment(handler, contractsAddress)
-
-	rt := runtime.NewInterpreterRuntime(runtime.Config{})
-
-	script := []byte(`
-      import EVM from 0x1
-
-      access(all)
-      fun main(): Bool {
-        let bytes: EVM.EVMBytes32 = EVM.EVMBytes32(
-		  value: [
-		    1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16,
-			17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30,
-			31, 32
-		  ]
+		// Run script
+		result, err := rt.ExecuteScript(
+			runtime.Script{
+				Source:    script,
+				Arguments: [][]byte{},
+			},
+			runtime.Context{
+				Interface:   runtimeInterface,
+				Environment: scriptEnvironment,
+				Location:    nextScriptLocation(),
+			},
 		)
-        let encodedData = EVM.encodeABI([bytes])
-        let types = [Type<EVM.EVMBytes32>()]
-        let values = EVM.decodeABI(types: types, data: encodedData)
+		require.NoError(t, err)
 
-        assert(values.length == 1)
-        let evmBytes = values[0] as! EVM.EVMBytes32
-        assert(evmBytes.value == [
-		    1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16,
-			17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30,
-			31, 32
-		  ]
+		assert.Equal(t,
+			cadence.Bool(true),
+			result,
 		)
 
-        return true
-      }
-	`)
+		// Reset computation
+		computation = uint(0)
+	})
 
-	accountCodes := map[common.Location][]byte{}
-	var events []cadence.Event
+	t.Run("ABI encode/decode into `bytes4` Solidity type", func(t *testing.T) {
+		script := []byte(`
+          import EVM from 0x1
 
-	computation := uint(0)
-	runtimeInterface := &TestRuntimeInterface{
-		Storage: NewTestLedger(nil, nil),
-		OnGetSigningAccounts: func() ([]runtime.Address, error) {
-			return []runtime.Address{runtime.Address(contractsAddress)}, nil
-		},
-		OnResolveLocation: LocationResolver,
-		OnUpdateAccountContractCode: func(location common.AddressLocation, code []byte) error {
-			accountCodes[location] = code
-			return nil
-		},
-		OnGetAccountContractCode: func(location common.AddressLocation) (code []byte, err error) {
-			code = accountCodes[location]
-			return code, nil
-		},
-		OnEmitEvent: func(event cadence.Event) error {
-			events = append(events, event)
-			return nil
-		},
-		OnDecodeArgument: func(b []byte, t cadence.Type) (cadence.Value, error) {
-			return json.Decode(nil, b)
-		},
-		OnMeterComputation: func(compKind common.ComputationKind, intensity uint) error {
-			if compKind == environment.ComputationKindEVMEncodeABI {
-				computation += intensity
-			}
-			return nil
-		},
-	}
+          access(all)
+          fun main(): Bool {
+            let bytes: EVM.EVMBytes4 = EVM.EVMBytes4(value: [5, 10, 15, 20])
+            let encodedData = EVM.encodeABI([bytes])
+            let types = [Type<EVM.EVMBytes4>()]
+            let values = EVM.decodeABI(types: types, data: encodedData)
 
-	nextTransactionLocation := NewTransactionLocationGenerator()
-	nextScriptLocation := NewScriptLocationGenerator()
+            assert(values.length == 1)
+            let evmBytes = values[0] as! EVM.EVMBytes4
+            assert(evmBytes.value == [5, 10, 15, 20])
 
-	// Deploy contracts
+            return true
+          }
+		`)
 
-	deployContracts(
-		t,
-		rt,
-		contractsAddress,
-		runtimeInterface,
-		transactionEnvironment,
-		nextTransactionLocation,
-	)
+		// Run script
+		result, err := rt.ExecuteScript(
+			runtime.Script{
+				Source:    script,
+				Arguments: [][]byte{},
+			},
+			runtime.Context{
+				Interface:   runtimeInterface,
+				Environment: scriptEnvironment,
+				Location:    nextScriptLocation(),
+			},
+		)
+		require.NoError(t, err)
 
-	// Run script
+		assert.Equal(t,
+			cadence.Bool(true),
+			result,
+		)
 
-	result, err := rt.ExecuteScript(
-		runtime.Script{
-			Source:    script,
-			Arguments: [][]byte{},
-		},
-		runtime.Context{
-			Interface:   runtimeInterface,
-			Environment: scriptEnvironment,
-			Location:    nextScriptLocation(),
-		},
-	)
-	require.NoError(t, err)
+		// Reset computation
+		computation = uint(0)
+	})
 
-	assert.Equal(t,
-		cadence.Bool(true),
-		result,
-	)
+	t.Run("ABI encode/decode into `bytes32` Solidity type", func(t *testing.T) {
+		script := []byte(`
+          import EVM from 0x1
+
+          access(all)
+          fun main(): Bool {
+            let bytes: EVM.EVMBytes32 = EVM.EVMBytes32(
+              value: [
+                1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16,
+                17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30,
+                31, 32
+              ]
+            )
+            let encodedData = EVM.encodeABI([bytes])
+            let types = [Type<EVM.EVMBytes32>()]
+            let values = EVM.decodeABI(types: types, data: encodedData)
+
+            assert(values.length == 1)
+            let evmBytes = values[0] as! EVM.EVMBytes32
+            assert(evmBytes.value == [
+              1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16,
+              17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30,
+              31, 32
+            ])
+
+            return true
+          }
+		`)
+
+		// Run script
+		result, err := rt.ExecuteScript(
+			runtime.Script{
+				Source:    script,
+				Arguments: [][]byte{},
+			},
+			runtime.Context{
+				Interface:   runtimeInterface,
+				Environment: scriptEnvironment,
+				Location:    nextScriptLocation(),
+			},
+		)
+		require.NoError(t, err)
+
+		assert.Equal(t,
+			cadence.Bool(true),
+			result,
+		)
+
+		// Reset computation
+		computation = uint(0)
+	})
 }
 
 func TestEVMEncodeABIComputation(t *testing.T) {
