@@ -46,9 +46,17 @@ const (
 
 	EVMAddressTypeBytesFieldName = "bytes"
 
+	EVMBytesTypeValueFieldName = "value"
+
 	EVMAddressTypeQualifiedIdentifier = "EVM.EVMAddress"
 
 	EVMBalanceTypeQualifiedIdentifier = "EVM.Balance"
+
+	EVMBytesTypeQualifiedIdentifier = "EVM.EVMBytes"
+
+	EVMBytes4TypeQualifiedIdentifier = "EVM.EVMBytes4"
+
+	EVMBytes32TypeQualifiedIdentifier = "EVM.EVMBytes32"
 
 	EVMResultTypeQualifiedIdentifier       = "EVM.Result"
 	EVMResultTypeStatusFieldName           = "status"
@@ -63,7 +71,11 @@ const (
 	EVMBlockTypeQualifiedIdentifier = "EVM.EVMBlock"
 )
 
-const EVMAddressLength = 20
+const (
+	EVMAddressLength = 20
+	EVMBytes4Length  = 4
+	EVMBytes32Length = 32
+)
 
 var (
 	EVMTransactionBytesCadenceType = cadence.NewVariableSizedArrayType(cadence.UInt8Type)
@@ -73,6 +85,18 @@ var (
 	EVMAddressBytesType           = sema.NewConstantSizedType(nil, sema.UInt8Type, EVMAddressLength)
 
 	EVMAddressBytesStaticType = interpreter.ConvertSemaArrayTypeToStaticArrayType(nil, EVMAddressBytesType)
+
+	EVMBytesValueStaticType = interpreter.ConvertSemaArrayTypeToStaticArrayType(nil, EVMTransactionBytesType)
+
+	EVMBytes4ValueStaticType = interpreter.ConvertSemaArrayTypeToStaticArrayType(
+		nil,
+		sema.NewConstantSizedType(nil, sema.UInt8Type, EVMBytes4Length),
+	)
+
+	EVMBytes32ValueStaticType = interpreter.ConvertSemaArrayTypeToStaticArrayType(
+		nil,
+		sema.NewConstantSizedType(nil, sema.UInt8Type, EVMBytes32Length),
+	)
 
 	EVMAddressBytesCadenceType = cadence.NewConstantSizedArrayType(EVMAddressLength, cadence.UInt8Type)
 )
