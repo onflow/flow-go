@@ -652,20 +652,15 @@ contract EVM {
         var signatureSet: [Crypto.KeyListSignature] = []
         let keyList = Crypto.KeyList()
         var keyListLength = 0
-        let seenKeys: {Int: Int} = {}
+        let seenAccountKeyIndices: {Int: Int} = {}
         for signatureIndex, signature in signatures{
             // index of the key on the account
             let accountKeyIndex = Int(keyIndices[signatureIndex]!)
             // index of the key in the key list
             var keyListIndex = 0
 
+            if !seenAccountKeyIndices.containsKey(accountKeyIndex) {
 
-            if let seen = seenKeys[accountKeyIndex] {
-                // if we have already seen this accountKeyIndex, use the keyListIndex
-                // that was previously assigned to it
-                // `Crypto.KeyList.verify()` knows how to handle duplicate keys
-                keyListIndex = seen
-            } else {
                 // fetch account key with accountKeyIndex
                 let keyRef = acc.keys.get(keyIndex: accountKeyIndex)
                 if keyRef == nil {
@@ -686,17 +681,26 @@ contract EVM {
                 keyList.add(
                   key.publicKey,
                   hashAlgorithm: key.hashAlgorithm,
+                  // normalization factor. We need to divide by 1000 because the
+                  // `Crypto.KeyList.verify()` function expects the weight to be
+                  // in the range [0, 1]. 1000 is the key weight threshold.
                   weight: key.weight / 1000.0,
                )
 
                keyListIndex = keyListLength
                keyListLength = keyListLength + 1
-               seenKeys[accountKeyIndex] = keyListIndex
+               seenAccountKeyIndices[accountKeyIndex] = keyListIndex
+
+            } else {
+               // if we have already seen this accountKeyIndex, use the keyListIndex
+               // that was previously assigned to it
+               // `Crypto.KeyList.verify()` knows how to handle duplicate keys
+               keyListIndex = seenAccountKeyIndices[accountKeyIndex]!
             }
 
             signatureSet.append(Crypto.KeyListSignature(
-                keyIndex: keyListIndex,
-                signature: signature
+               keyIndex: keyListIndex,
+               signature: signature
             ))
         }
 
