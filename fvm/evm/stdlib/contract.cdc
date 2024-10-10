@@ -660,37 +660,33 @@ contract EVM {
             var keyListIndex = 0
 
             if !seenAccountKeyIndices.containsKey(accountKeyIndex) {
-
                 // fetch account key with accountKeyIndex
-                let keyRef = acc.keys.get(keyIndex: accountKeyIndex)
-                if keyRef == nil {
+                if let key = acc.keys.get(keyIndex: accountKeyIndex) {
+                    if key.isRevoked {
+                        return ValidationResult(
+                            isValid: false,
+                            problem: "account key is revoked"
+                        )
+                    }
+
+                    keyList.add(
+                      key.publicKey,
+                      hashAlgorithm: key.hashAlgorithm,
+                      // normalization factor. We need to divide by 1000 because the
+                      // `Crypto.KeyList.verify()` function expects the weight to be
+                      // in the range [0, 1]. 1000 is the key weight threshold.
+                      weight: key.weight / 1000.0,
+                   )
+
+                   keyListIndex = keyListLength
+                   keyListLength = keyListLength + 1
+                   seenAccountKeyIndices[accountKeyIndex] = keyListIndex
+                } else {
                     return ValidationResult(
                         isValid: false,
                         problem: "invalid key index"
                     )
                 }
-
-                let key = keyRef!
-                if key.isRevoked {
-                    return ValidationResult(
-                        isValid: false,
-                        problem: "account key is revoked"
-                    )
-                }
-
-                keyList.add(
-                  key.publicKey,
-                  hashAlgorithm: key.hashAlgorithm,
-                  // normalization factor. We need to divide by 1000 because the
-                  // `Crypto.KeyList.verify()` function expects the weight to be
-                  // in the range [0, 1]. 1000 is the key weight threshold.
-                  weight: key.weight / 1000.0,
-               )
-
-               keyListIndex = keyListLength
-               keyListLength = keyListLength + 1
-               seenAccountKeyIndices[accountKeyIndex] = keyListIndex
-
             } else {
                // if we have already seen this accountKeyIndex, use the keyListIndex
                // that was previously assigned to it

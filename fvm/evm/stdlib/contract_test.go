@@ -4820,7 +4820,6 @@ func TestEVMValidateCOAOwnershipProof(t *testing.T) {
 				signatureAlgorithm runtime.SignatureAlgorithm,
 				hashAlgorithm runtime.HashAlgorithm,
 			) (bool, error) {
-				// require.Equal(t, []byte(signedData.ToGoValue()), st)
 				return true, nil
 			},
 		)
