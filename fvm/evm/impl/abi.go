@@ -149,10 +149,7 @@ func reportABIEncodingComputation(
 					// size of 32 bytes.
 					reportComputation(abiEncodingByteSize)
 
-				case evmTypeIDs.BytesTypeID,
-					evmTypeIDs.Bytes4TypeID,
-					evmTypeIDs.Bytes32TypeID:
-
+				case evmTypeIDs.BytesTypeID:
 					computation := uint(2 * abiEncodingByteSize)
 					valueMember := value.GetMember(inter, locationRange, stdlib.EVMBytesTypeValueFieldName)
 					bytesArray, ok := valueMember.(*interpreter.ArrayValue)
@@ -166,6 +163,12 @@ func reportABIEncodingComputation(
 					chunks := math.Ceil(float64(bytesLength) / float64(abiEncodingByteSize))
 					computation += uint(chunks * abiEncodingByteSize)
 					reportComputation(computation)
+
+				case evmTypeIDs.Bytes4TypeID:
+					reportComputation(abiEncodingByteSize)
+
+				case evmTypeIDs.Bytes32TypeID:
+					reportComputation(abiEncodingByteSize)
 
 				default:
 					panic(abiEncodingError{
@@ -266,7 +269,11 @@ func newInternalEVMTypeEncodeABIFunction(
 
 			encodedValues, err := arguments.Pack(values...)
 			if err != nil {
-				panic(abiEncodingError{})
+				panic(
+					abiEncodingError{
+						Message: err.Error(),
+					},
+				)
 			}
 
 			return interpreter.ByteSliceToByteArrayValue(inter, encodedValues)
@@ -310,9 +317,9 @@ var gethTypeAddress = gethABI.Type{T: gethABI.AddressTy, Size: 20}
 
 var gethTypeBytes = gethABI.Type{T: gethABI.BytesTy}
 
-var gethTypeBytes4 = gethABI.Type{T: gethABI.BytesTy, Size: 4}
+var gethTypeBytes4 = gethABI.Type{T: gethABI.FixedBytesTy, Size: 4}
 
-var gethTypeBytes32 = gethABI.Type{T: gethABI.BytesTy, Size: 32}
+var gethTypeBytes32 = gethABI.Type{T: gethABI.FixedBytesTy, Size: 32}
 
 func gethABIType(
 	staticType interpreter.StaticType,
@@ -475,11 +482,11 @@ func goType(
 	}
 
 	if staticType.ID() == evmTypeIDs.Bytes4TypeID {
-		return reflect.SliceOf(reflect.TypeOf(byte(0))), true
+		return reflect.ArrayOf(stdlib.EVMBytes4Length, reflect.TypeOf(byte(0))), true
 	}
 
 	if staticType.ID() == evmTypeIDs.Bytes32TypeID {
-		return reflect.SliceOf(reflect.TypeOf(byte(0))), true
+		return reflect.ArrayOf(stdlib.EVMBytes32Length, reflect.TypeOf(byte(0))), true
 	}
 
 	return nil, false
@@ -632,7 +639,7 @@ func encodeABI(
 				panic(err)
 			}
 
-			return bytes, gethTypeBytes4, nil
+			return [stdlib.EVMBytes4Length]byte(bytes), gethTypeBytes4, nil
 		}
 
 		if typeID == evmTypeIDs.Bytes32TypeID {
@@ -646,7 +653,7 @@ func encodeABI(
 				panic(err)
 			}
 
-			return bytes, gethTypeBytes32, nil
+			return [stdlib.EVMBytes32Length]byte(bytes), gethTypeBytes32, nil
 		}
 
 	case *interpreter.ArrayValue:
@@ -1047,7 +1054,7 @@ func decodeABI(
 		}
 
 		if staticType.TypeID == evmTypeIDs.Bytes4TypeID {
-			bytes, ok := value.([]byte)
+			bytes, ok := value.([stdlib.EVMBytes4Length]byte)
 			if !ok {
 				break
 			}
@@ -1060,7 +1067,7 @@ func decodeABI(
 		}
 
 		if staticType.TypeID == evmTypeIDs.Bytes32TypeID {
-			bytes, ok := value.([]byte)
+			bytes, ok := value.([stdlib.EVMBytes32Length]byte)
 			if !ok {
 				break
 			}
