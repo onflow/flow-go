@@ -176,7 +176,7 @@ func NewEVMBytes4(
 	inter *interpreter.Interpreter,
 	locationRange interpreter.LocationRange,
 	location common.AddressLocation,
-	bytes []byte,
+	bytes [4]byte,
 ) *interpreter.CompositeValue {
 	return interpreter.NewCompositeValue(
 		inter,
@@ -198,7 +198,7 @@ func NewEVMBytes32(
 	inter *interpreter.Interpreter,
 	locationRange interpreter.LocationRange,
 	location common.AddressLocation,
-	bytes []byte,
+	bytes [32]byte,
 ) *interpreter.CompositeValue {
 	return interpreter.NewCompositeValue(
 		inter,
@@ -301,7 +301,7 @@ func EVMBytesToBytesArrayValue(
 
 func EVMBytes4ToBytesArrayValue(
 	inter *interpreter.Interpreter,
-	bytes []byte,
+	bytes [4]byte,
 ) *interpreter.ArrayValue {
 	var index int
 	return interpreter.NewArrayValueWithIterator(
@@ -324,7 +324,7 @@ func EVMBytes4ToBytesArrayValue(
 
 func EVMBytes32ToBytesArrayValue(
 	inter *interpreter.Interpreter,
-	bytes []byte,
+	bytes [32]byte,
 ) *interpreter.ArrayValue {
 	var index int
 	return interpreter.NewArrayValueWithIterator(
