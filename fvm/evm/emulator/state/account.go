@@ -42,8 +42,14 @@ func NewAccount(
 	}
 }
 
+// HasCode returns true if account has code
 func (a *Account) HasCode() bool {
 	return a.CodeHash != gethTypes.EmptyCodeHash
+}
+
+// HasStoredValues returns true if account has stored values
+func (a *Account) HasStoredValues() bool {
+	return len(a.CollectionID) != 0
 }
 
 // Encode encodes the account

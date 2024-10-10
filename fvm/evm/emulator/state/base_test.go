@@ -302,6 +302,150 @@ func TestBaseView(t *testing.T) {
 		require.Equal(t, uint64(1), view.NumberOfAccounts())
 	})
 
+	t.Run("test account iterator", func(t *testing.T) {
+		ledger := testutils.GetSimpleValueStore()
+		rootAddr := flow.Address{1, 2, 3, 4, 5, 6, 7, 8}
+		view, err := state.NewBaseView(ledger, rootAddr)
+		require.NoError(t, err)
+
+		accountCounts := 10
+		nonces := make(map[gethCommon.Address]uint64)
+		balances := make(map[gethCommon.Address]*uint256.Int)
+		codeHashes := make(map[gethCommon.Address]gethCommon.Hash)
+		for i := 0; i < accountCounts; i++ {
+			addr := testutils.RandomCommonAddress(t)
+			balance := testutils.RandomUint256Int(1000)
+			nonce := testutils.RandomBigInt(1000).Uint64()
+			code := testutils.RandomData(t)
+			codeHash := testutils.RandomCommonHash(t)
+
+			err = view.CreateAccount(addr, balance, nonce, code, codeHash)
+			require.NoError(t, err)
+
+			nonces[addr] = nonce
+			balances[addr] = balance
+			codeHashes[addr] = codeHash
+		}
+		err = view.Commit()
+		require.NoError(t, err)
+
+		ai, err := view.AccountIterator()
+		require.NoError(t, err)
+
+		counter := 0
+		for {
+			acc, err := ai.Next()
+			require.NoError(t, err)
+			if acc == nil {
+				break
+			}
+			require.Equal(t, nonces[acc.Address], acc.Nonce)
+			require.Equal(t, balances[acc.Address].Uint64(), acc.Balance.Uint64())
+			require.Equal(t, codeHashes[acc.Address], acc.CodeHash)
+			counter += 1
+		}
+
+		require.Equal(t, accountCounts, counter)
+	})
+
+	t.Run("test code iterator", func(t *testing.T) {
+		ledger := testutils.GetSimpleValueStore()
+		rootAddr := flow.Address{1, 2, 3, 4, 5, 6, 7, 8}
+		view, err := state.NewBaseView(ledger, rootAddr)
+		require.NoError(t, err)
+
+		codeCounts := 10
+		codeByCodeHash := make(map[gethCommon.Hash][]byte)
+		refCountByCodeHash := make(map[gethCommon.Hash]uint64)
+		for i := 0; i < codeCounts; i++ {
+
+			code := testutils.RandomData(t)
+			codeHash := testutils.RandomCommonHash(t)
+			refCount := 0
+			// we add each code couple of times through different accounts
+			for j := 1; j <= i+1; j++ {
+				addr := testutils.RandomCommonAddress(t)
+				balance := testutils.RandomUint256Int(1000)
+				nonce := testutils.RandomBigInt(1000).Uint64()
+				err = view.CreateAccount(addr, balance, nonce, code, codeHash)
+				require.NoError(t, err)
+				refCount += 1
+			}
+			codeByCodeHash[codeHash] = code
+			refCountByCodeHash[codeHash] = uint64(refCount)
+		}
+		err = view.Commit()
+		require.NoError(t, err)
+
+		ci, err := view.CodeIterator()
+		require.NoError(t, err)
+
+		counter := 0
+		emptyCodeHash := gethCommon.Hash{}
+		for {
+			ch, code, count, err := ci.Next()
+			require.NoError(t, err)
+			if ch == emptyCodeHash {
+				break
+			}
+			require.Equal(t, codeByCodeHash[ch], code)
+			require.Equal(t, refCountByCodeHash[ch], count)
+			counter += 1
+		}
+
+		require.Equal(t, codeCounts, counter)
+	})
+
+	t.Run("test account storage iterator", func(t *testing.T) {
+		ledger := testutils.GetSimpleValueStore()
+		rootAddr := flow.Address{1, 2, 3, 4, 5, 6, 7, 8}
+		view, err := state.NewBaseView(ledger, rootAddr)
+		require.NoError(t, err)
+
+		addr := testutils.RandomCommonAddress(t)
+		code := []byte("code")
+		balance := testutils.RandomUint256Int(1000)
+		nonce := testutils.RandomBigInt(1000).Uint64()
+		codeHash := gethCrypto.Keccak256Hash(code)
+		err = view.CreateAccount(addr, balance, nonce, code, codeHash)
+		require.NoError(t, err)
+
+		slotCounts := 10
+		values := make(map[gethCommon.Hash]gethCommon.Hash)
+
+		for i := 0; i < slotCounts; i++ {
+			key := testutils.RandomCommonHash(t)
+			value := testutils.RandomCommonHash(t)
+
+			err = view.UpdateSlot(
+				types.SlotAddress{
+					Address: addr,
+					Key:     key,
+				}, value)
+			require.NoError(t, err)
+			values[key] = value
+		}
+		err = view.Commit()
+		require.NoError(t, err)
+
+		asi, err := view.AccountStorageIterator(addr)
+		require.NoError(t, err)
+
+		counter := 0
+		emptyKey := gethCommon.Hash{}
+		for {
+			key, value, err := asi.Next()
+			require.NoError(t, err)
+			if key == emptyKey {
+				break
+			}
+			require.Equal(t, values[key], value)
+			counter += 1
+		}
+
+		require.Equal(t, slotCounts, counter)
+	})
+
 }
 
 func checkAccount(t *testing.T,
