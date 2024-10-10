@@ -154,9 +154,15 @@ func reportABIEncodingComputation(
 					evmTypeIDs.Bytes32TypeID:
 
 					computation := uint(2 * abiEncodingByteSize)
-					bytesArrayValue := value.GetMember(inter, locationRange, stdlib.EVMBytesTypeValueFieldName)
-					arrValue := bytesArrayValue.(*interpreter.ArrayValue)
-					bytesLength := arrValue.Count()
+					valueMember := value.GetMember(inter, locationRange, stdlib.EVMBytesTypeValueFieldName)
+					bytesArray, ok := valueMember.(*interpreter.ArrayValue)
+					if !ok {
+						panic(abiEncodingError{
+							Type:    value.StaticType(inter),
+							Message: "could not convert value field to array",
+						})
+					}
+					bytesLength := bytesArray.Count()
 					chunks := math.Ceil(float64(bytesLength) / float64(abiEncodingByteSize))
 					computation += uint(chunks * abiEncodingByteSize)
 					reportComputation(computation)
@@ -602,10 +608,10 @@ func encodeABI(
 		}
 
 		if typeID == evmTypeIDs.BytesTypeID {
-			bytesArrayValue := value.GetMember(inter, locationRange, "value")
+			bytesValue := value.GetMember(inter, locationRange, stdlib.EVMBytesTypeValueFieldName)
 			bytes, err := interpreter.ByteArrayValueToByteSlice(
 				inter,
-				bytesArrayValue,
+				bytesValue,
 				locationRange,
 			)
 			if err != nil {
@@ -616,10 +622,10 @@ func encodeABI(
 		}
 
 		if typeID == evmTypeIDs.Bytes4TypeID {
-			bytesArrayValue := value.GetMember(inter, locationRange, "value")
+			bytesValue := value.GetMember(inter, locationRange, stdlib.EVMBytesTypeValueFieldName)
 			bytes, err := interpreter.ByteArrayValueToByteSlice(
 				inter,
-				bytesArrayValue,
+				bytesValue,
 				locationRange,
 			)
 			if err != nil {
@@ -630,10 +636,10 @@ func encodeABI(
 		}
 
 		if typeID == evmTypeIDs.Bytes32TypeID {
-			bytesArrayValue := value.GetMember(inter, locationRange, "value")
+			bytesValue := value.GetMember(inter, locationRange, stdlib.EVMBytesTypeValueFieldName)
 			bytes, err := interpreter.ByteArrayValueToByteSlice(
 				inter,
-				bytesArrayValue,
+				bytesValue,
 				locationRange,
 			)
 			if err != nil {
@@ -1028,7 +1034,7 @@ func decodeABI(
 		}
 
 		if staticType.TypeID == evmTypeIDs.BytesTypeID {
-			bytes, ok := value.([]uint8)
+			bytes, ok := value.([]byte)
 			if !ok {
 				break
 			}
@@ -1041,7 +1047,7 @@ func decodeABI(
 		}
 
 		if staticType.TypeID == evmTypeIDs.Bytes4TypeID {
-			bytes, ok := value.([]uint8)
+			bytes, ok := value.([]byte)
 			if !ok {
 				break
 			}
@@ -1054,7 +1060,7 @@ func decodeABI(
 		}
 
 		if staticType.TypeID == evmTypeIDs.Bytes32TypeID {
-			bytes, ok := value.([]uint8)
+			bytes, ok := value.([]byte)
 			if !ok {
 				break
 			}

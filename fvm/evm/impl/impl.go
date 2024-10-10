@@ -160,11 +160,11 @@ func NewEVMBytes(
 		inter,
 		locationRange,
 		location,
-		"EVM.EVMBytes",
+		stdlib.EVMBytesTypeQualifiedIdentifier,
 		common.CompositeKindStructure,
 		[]interpreter.CompositeField{
 			{
-				Name:  "value",
+				Name:  stdlib.EVMBytesTypeValueFieldName,
 				Value: EVMBytesToBytesArrayValue(inter, bytes),
 			},
 		},
@@ -182,11 +182,11 @@ func NewEVMBytes4(
 		inter,
 		locationRange,
 		location,
-		"EVM.EVMBytes4",
+		stdlib.EVMBytes4TypeQualifiedIdentifier,
 		common.CompositeKindStructure,
 		[]interpreter.CompositeField{
 			{
-				Name:  "value",
+				Name:  stdlib.EVMBytesTypeValueFieldName,
 				Value: EVMBytes4ToBytesArrayValue(inter, bytes),
 			},
 		},
@@ -204,11 +204,11 @@ func NewEVMBytes32(
 		inter,
 		locationRange,
 		location,
-		"EVM.EVMBytes32",
+		stdlib.EVMBytes32TypeQualifiedIdentifier,
 		common.CompositeKindStructure,
 		[]interpreter.CompositeField{
 			{
-				Name:  "value",
+				Name:  stdlib.EVMBytesTypeValueFieldName,
 				Value: EVMBytes32ToBytesArrayValue(inter, bytes),
 			},
 		},
@@ -308,9 +308,9 @@ func EVMBytes4ToBytesArrayValue(
 		inter,
 		stdlib.EVMBytes4ValueStaticType,
 		common.ZeroAddress,
-		uint64(len(bytes)),
+		stdlib.EVMBytes4Length,
 		func() interpreter.Value {
-			if index >= len(bytes) {
+			if index >= stdlib.EVMBytes4Length {
 				return nil
 			}
 			result := interpreter.NewUInt8Value(inter, func() uint8 {
@@ -331,9 +331,9 @@ func EVMBytes32ToBytesArrayValue(
 		inter,
 		stdlib.EVMBytes32ValueStaticType,
 		common.ZeroAddress,
-		uint64(len(bytes)),
+		stdlib.EVMBytes32Length,
 		func() interpreter.Value {
-			if index >= len(bytes) {
+			if index >= stdlib.EVMBytes32Length {
 				return nil
 			}
 			result := interpreter.NewUInt8Value(inter, func() uint8 {
