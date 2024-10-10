@@ -1023,13 +1023,12 @@ func decodeABI(
 			if !ok {
 				break
 			}
-			compValue := NewEVMBytes4(
+			return NewEVMBytes4(
 				inter,
 				locationRange,
 				location,
 				bytes,
-			)
-			return compValue, nil
+			), nil
 		}
 
 		if staticType.TypeID == "A.0000000000000001.EVM.EVMBytes32" {
@@ -1037,13 +1036,12 @@ func decodeABI(
 			if !ok {
 				break
 			}
-			compValue := NewEVMBytes32(
+			return NewEVMBytes32(
 				inter,
 				locationRange,
 				location,
 				bytes,
-			)
-			return compValue, nil
+			), nil
 		}
 	}
 
