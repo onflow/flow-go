@@ -255,11 +255,11 @@ func (fnb *FlowNodeBuilder) BaseFlags() {
 	// observer mode allows a unstaked execution node to fetch blocks from a public staked access node, and being able to execute blocks
 	fnb.flags.BoolVar(&fnb.BaseConfig.ObserverMode, "observer-mode", defaultConfig.ObserverMode, "whether the node is running in observer mode")
 	fnb.flags.StringSliceVar(&fnb.BootstrapNodePublicKeys,
-		"bootstrap-node-public-keys",
+		"observer-mode-bootstrap-node-public-keys",
 		[]string{},
 		"the networking public key of the bootstrap access node if this is an observer (in the same order as the bootstrap node addresses) e.g. \"d57a5e9c5.....\",\"44ded42d....\"")
 	fnb.flags.StringSliceVar(&fnb.BootstrapNodeAddresses,
-		"bootstrap-node-addresses",
+		"observer-mode-bootstrap-node-addresses",
 		[]string{},
 		"the network addresses of the bootstrap access node if this is an observer e.g. access-001.mainnet.flow.org:9653,access-002.mainnet.flow.org:9653")
 }
