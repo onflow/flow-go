@@ -200,8 +200,8 @@ func (setup *EpochSetup) EqualTo(other *EpochSetup) bool {
 // It contains data from EpochSetup, and EpochCommit events to so replicas can create a committed epoch from which they
 // can continue operating on the happy path.
 type EpochRecover struct {
-	EpochSetup
-	EpochCommit
+	EpochSetup  EpochSetup
+	EpochCommit EpochCommit
 }
 
 func (er *EpochRecover) ServiceEvent() ServiceEvent {

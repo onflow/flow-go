@@ -272,7 +272,7 @@ func convertServiceEventEpochCommit(event flow.Event) (*flow.ServiceEvent, error
 		return nil, fmt.Errorf("could not convert cluster qc votes: %w", err)
 	}
 
-	// parse DKG group participants
+	// parse DKG participants
 	commit.DKGParticipantKeys, err = convertDKGKeys(cdcDKGKeys.Values...)
 	if err != nil {
 		return nil, fmt.Errorf("could not convert DKG keys: %w", err)
