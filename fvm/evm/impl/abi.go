@@ -130,23 +130,7 @@ func reportABIEncodingComputation(
 					// EVM addresses are static variables with a fixed
 					// size of 32 bytes.
 					reportComputation(abiEncodingByteSize)
-				} else if value.TypeID() == evmBytesTypeID {
-					computation := uint(2 * abiEncodingByteSize)
-					bytesArrayValue := value.GetMember(inter, locationRange, "value")
-					arrValue := bytesArrayValue.(*interpreter.ArrayValue)
-					bytesLength := arrValue.Count()
-					chunks := math.Ceil(float64(bytesLength) / float64(abiEncodingByteSize))
-					computation += uint(chunks * abiEncodingByteSize)
-					reportComputation(computation)
-				} else if value.TypeID() == evmLocation.TypeID(inter, "EVM.EVMBytes4") {
-					computation := uint(2 * abiEncodingByteSize)
-					bytesArrayValue := value.GetMember(inter, locationRange, "value")
-					arrValue := bytesArrayValue.(*interpreter.ArrayValue)
-					bytesLength := arrValue.Count()
-					chunks := math.Ceil(float64(bytesLength) / float64(abiEncodingByteSize))
-					computation += uint(chunks * abiEncodingByteSize)
-					reportComputation(computation)
-				} else if value.TypeID() == evmLocation.TypeID(inter, "EVM.EVMBytes32") {
+				} else if value.TypeID() == evmBytesTypeID || value.TypeID() == evmLocation.TypeID(inter, "EVM.EVMBytes4") || value.TypeID() == evmLocation.TypeID(inter, "EVM.EVMBytes32") {
 					computation := uint(2 * abiEncodingByteSize)
 					bytesArrayValue := value.GetMember(inter, locationRange, "value")
 					arrValue := bytesArrayValue.(*interpreter.ArrayValue)
