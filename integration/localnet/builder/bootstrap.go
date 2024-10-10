@@ -454,8 +454,8 @@ func prepareObserverService(i int, observerName string, agPublicKey string) Serv
 
 	service := defaultService(observerName, DefaultObserverRole, dataDir, profilerDir, i)
 	service.Command = append(service.Command,
-		fmt.Sprintf("--bootstrap-node-addresses=%s:%s", testnet.PrimaryAN, testnet.PublicNetworkPort),
-		fmt.Sprintf("--bootstrap-node-public-keys=%s", agPublicKey),
+		fmt.Sprintf("--observer-mode-bootstrap-node-addresses=%s:%s", testnet.PrimaryAN, testnet.PublicNetworkPort),
+		fmt.Sprintf("--observer-mode-bootstrap-node-public-keys=%s", agPublicKey),
 		fmt.Sprintf("--upstream-node-addresses=%s:%s", testnet.PrimaryAN, testnet.GRPCSecurePort),
 		fmt.Sprintf("--upstream-node-public-keys=%s", agPublicKey),
 		fmt.Sprintf("--observer-networking-key-path=/bootstrap/private-root-information/%s_key", observerName),
