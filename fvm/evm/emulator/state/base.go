@@ -444,7 +444,10 @@ func (v *BaseView) AccountStorageIterator(
 	if err != nil {
 		return nil, err
 	}
-	return &AccountStorageIterator{colIterator: itr}, nil
+	return &AccountStorageIterator{
+		address:     addr,
+		colIterator: itr,
+	}, nil
 }
 
 func (v *BaseView) fetchOrCreateCollection(path string) (collection *Collection, created bool, error error) {
@@ -743,23 +746,28 @@ func (ci *CodeIterator) Next() (
 
 // AccountStorageIterator iterates over slots of an account
 type AccountStorageIterator struct {
+	address     gethCommon.Address
 	colIterator *CollectionIterator
 }
 
 // Next returns the next slot in the storage
-// if no more keys, it returns empty hash (gethCommon.Hash{}) (no error)
+// if no more keys, it returns nil (no error)
 func (asi *AccountStorageIterator) Next() (
-	key gethCommon.Hash,
-	value gethCommon.Hash,
-	err error,
+	*types.SlotEntry,
+	error,
 ) {
 	k, v, err := asi.colIterator.Next()
 	if err != nil {
-		return EmptyHash, EmptyHash, fmt.Errorf("account storage iteration failed: %w", err)
+		return nil, fmt.Errorf("account storage iteration failed: %w", err)
 	}
 	// no more keys
 	if k == nil {
-		return EmptyHash, EmptyHash, nil
+		return nil, nil
 	}
-	return gethCommon.BytesToHash(k), gethCommon.BytesToHash(v), nil
+	return &types.SlotEntry{
+		Address: asi.address,
+		Key:     gethCommon.BytesToHash(k),
+		Value:   gethCommon.BytesToHash(v),
+	}, nil
+
 }

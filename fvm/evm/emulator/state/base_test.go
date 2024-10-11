@@ -431,14 +431,13 @@ func TestBaseView(t *testing.T) {
 		require.NoError(t, err)
 
 		counter := 0
-		emptyKey := gethCommon.Hash{}
 		for {
-			key, value, err := asi.Next()
+			slot, err := asi.Next()
 			require.NoError(t, err)
-			if key == emptyKey {
+			if slot == nil {
 				break
 			}
-			require.Equal(t, values[key], value)
+			require.Equal(t, values[slot.Key], slot.Value)
 			counter += 1
 		}
 
