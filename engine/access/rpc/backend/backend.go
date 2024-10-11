@@ -667,22 +667,19 @@ func handleErrorMessage(
 	sporkRootBlockHeight := stateParams.SporkRootBlockHeight()
 	nodeRootBlockHeader := stateParams.SealedRoot().Height
 
-	var err error
 	if height < sporkRootBlockHeight {
-		err = fmt.Errorf("block height %d is less than the spork root block height %d. Try to use a historic node: %w",
+		return fmt.Errorf("block height %d is less than the spork root block height %d. Try to use a historic node: %w",
 			height,
 			sporkRootBlockHeight,
 			genericErr,
 		)
 	} else if height < nodeRootBlockHeader && nodeRootBlockHeader >= sporkRootBlockHeight {
-		err = fmt.Errorf("block height %d is less than the node`s root block height %d. Try to use a different Access node: %w",
+		return fmt.Errorf("block height %d is less than the node`s root block height %d. Try to use a different Access node: %w",
 			height,
 			nodeRootBlockHeader,
 			genericErr,
 		)
 	} else {
-		err = genericErr
+		return genericErr
 	}
-
-	return err
 }
