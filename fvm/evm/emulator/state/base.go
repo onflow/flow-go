@@ -711,39 +711,34 @@ type CodeIterator struct {
 }
 
 // Next returns the next code
-// if no more accounts next would return nil (no error)
+// if no more codes, it return nil (no error)
 func (ci *CodeIterator) Next() (
-	codeHash gethCommon.Hash,
-	code []byte,
-	refCounts uint64,
-	err error,
+	*CodeInContext,
+	error,
 ) {
 	ch, encodedCC, err := ci.colIterator.Next()
 	if err != nil {
-		return gethCommon.Hash{}, nil, 0, fmt.Errorf("code iteration failed: %w", err)
+		return nil, fmt.Errorf("code iteration failed: %w", err)
 	}
 	// no more keys
 	if ch == nil {
-		return gethCommon.Hash{}, nil, 0, nil
+		return nil, nil
 	}
 	if len(encodedCC) == 0 {
-		return gethCommon.Hash{},
-			nil, 0,
-			fmt.Errorf("encoded code container is empty (code hash: %x)", codeHash)
+		return nil,
+			fmt.Errorf("encoded code container is empty (code hash: %x)", ch)
 	}
 
 	codeCont, err := CodeContainerFromEncoded(encodedCC)
 	if err != nil {
-		return gethCommon.Hash{},
-			nil, 0,
-			fmt.Errorf("code container decoding failed (code hash: %x)", codeHash)
+		return nil, fmt.Errorf("code container decoding failed (code hash: %x)", ch)
 
 	}
-
-	return gethCommon.BytesToHash(ch),
-		codeCont.Code(),
-		codeCont.RefCount(),
-		nil
+	return &CodeInContext{
+		Hash:      gethCommon.BytesToHash(ch),
+		Code:      codeCont.Code(),
+		RefCounts: codeCont.RefCount(),
+	}, nil
 }
 
 // AccountStorageIterator iterates over slots of an account

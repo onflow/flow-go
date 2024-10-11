@@ -381,15 +381,14 @@ func TestBaseView(t *testing.T) {
 		require.NoError(t, err)
 
 		counter := 0
-		emptyCodeHash := gethCommon.Hash{}
 		for {
-			ch, code, count, err := ci.Next()
+			cic, err := ci.Next()
 			require.NoError(t, err)
-			if ch == emptyCodeHash {
+			if cic == nil {
 				break
 			}
-			require.Equal(t, codeByCodeHash[ch], code)
-			require.Equal(t, refCountByCodeHash[ch], count)
+			require.Equal(t, codeByCodeHash[cic.Hash], cic.Code)
+			require.Equal(t, refCountByCodeHash[cic.Hash], cic.RefCounts)
 			counter += 1
 		}
 
