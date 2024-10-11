@@ -36,6 +36,7 @@ func NewCore(
 
 // checkMyCommitWithSealedCommit is the main check of the checker engine
 func checkMyCommitWithSealedCommit(
+	logger zerolog.Logger,
 	executedBlock *flow.Header,
 	myCommit flow.StateCommitment,
 	sealedCommit flow.StateCommitment,
@@ -49,6 +50,11 @@ func checkMyCommitWithSealedCommit(
 			myCommit,
 		)
 	}
+
+	logger.Info().
+		Uint64("height", executedBlock.Height).
+		Str("block_id", executedBlock.ID().String()).
+		Msg("execution result matches the sealed result")
 
 	// match
 	return nil
@@ -65,7 +71,7 @@ func (c *Core) RunCheck() error {
 	mycommitAtLastSealed, err := c.execState.StateCommitmentByBlockID(lastSealedBlock.ID())
 	if err == nil {
 		// if last sealed block has been executed, then check if they match
-		return checkMyCommitWithSealedCommit(lastSealedBlock, mycommitAtLastSealed, seal.FinalState)
+		return checkMyCommitWithSealedCommit(c.log, lastSealedBlock, mycommitAtLastSealed, seal.FinalState)
 	}
 
 	// if last sealed block has not been executed, then check if recent executed block has
@@ -102,7 +108,7 @@ func (c *Core) RunCheck() error {
 		return fmt.Errorf("could not get my state commitment OnFinalizedBlock, blockID: %v", seal.BlockID)
 	}
 
-	return checkMyCommitWithSealedCommit(sealedExecuted, mycommit, sealedCommit)
+	return checkMyCommitWithSealedCommit(c.log, sealedExecuted, mycommit, sealedCommit)
 }
 
 // findLastSealedBlock finds the last sealed block
