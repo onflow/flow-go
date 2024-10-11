@@ -5,6 +5,7 @@ import (
 
 	"github.com/onflow/flow-go/fvm/storage/derived"
 	"github.com/onflow/flow-go/fvm/storage/snapshot"
+	"github.com/onflow/flow-go/model/flow"
 )
 
 type ContractUpdate struct {
@@ -26,6 +27,8 @@ type DerivedDataInvalidator struct {
 	ContractUpdates
 
 	MeterParamOverridesUpdated bool
+
+	CurrentVersionBoundaryUpdated bool
 }
 
 var _ derived.TransactionInvalidator = DerivedDataInvalidator{}
@@ -34,11 +37,15 @@ func NewDerivedDataInvalidator(
 	contractUpdates ContractUpdates,
 	executionSnapshot *snapshot.ExecutionSnapshot,
 	meterStateRead *snapshot.ExecutionSnapshot,
+	serviceAddress flow.Address,
 ) DerivedDataInvalidator {
 	return DerivedDataInvalidator{
 		ContractUpdates: contractUpdates,
 		MeterParamOverridesUpdated: meterParamOverridesUpdated(
 			executionSnapshot,
+			meterStateRead),
+		CurrentVersionBoundaryUpdated: currentVersionBoundaryUpdated(
+			serviceAddress,
 			meterStateRead),
 	}
 }
@@ -69,12 +76,36 @@ func meterParamOverridesUpdated(
 	return false
 }
 
+// currentVersionBoundaryUpdated returns true if the current version boundary
+// should be invalidated. Currently, this will trigger on any change to the
+// service account, which will trigger at least once per block. This is ok for now as
+// the meterParamOverrides also trigger on every block.
+func currentVersionBoundaryUpdated(
+	serviceAddress flow.Address,
+	executionSnapshot *snapshot.ExecutionSnapshot,
+) bool {
+	serviceAccount := string(serviceAddress.Bytes())
+
+	for registerId := range executionSnapshot.WriteSet {
+		// The meter param override values are stored in the service account.
+		if registerId.Owner == serviceAccount {
+			return true
+		}
+	}
+
+	return false
+}
+
 func (invalidator DerivedDataInvalidator) ProgramInvalidator() derived.ProgramInvalidator {
 	return ProgramInvalidator{invalidator}
 }
 
 func (invalidator DerivedDataInvalidator) MeterParamOverridesInvalidator() derived.MeterParamOverridesInvalidator {
 	return MeterParamOverridesInvalidator{invalidator}
+}
+
+func (invalidator DerivedDataInvalidator) CurrentVersionBoundaryInvalidator() derived.CurrentVersionBoundaryInvalidator {
+	return CurrentVersionBoundaryInvalidator{invalidator}
 }
 
 type ProgramInvalidator struct {
@@ -138,4 +169,22 @@ func (invalidator MeterParamOverridesInvalidator) ShouldInvalidateEntry(
 	_ *snapshot.ExecutionSnapshot,
 ) bool {
 	return invalidator.MeterParamOverridesUpdated
+}
+
+type CurrentVersionBoundaryInvalidator struct {
+	DerivedDataInvalidator
+}
+
+func (invalidator CurrentVersionBoundaryInvalidator) ShouldInvalidateEntries() bool {
+	return invalidator.CurrentVersionBoundaryUpdated
+}
+
+func (invalidator CurrentVersionBoundaryInvalidator) ShouldInvalidateEntry(
+	_ struct{},
+	_ flow.VersionBoundary,
+	_ *snapshot.ExecutionSnapshot,
+) bool {
+	// If the meter params are updated
+	// the current version boundary derived data table becomes invalid.
+	return invalidator.MeterParamOverridesUpdated || invalidator.CurrentVersionBoundaryUpdated
 }

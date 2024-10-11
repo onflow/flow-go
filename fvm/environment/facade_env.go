@@ -37,6 +37,7 @@ type facadeEnvironment struct {
 	ValueStore
 
 	*SystemContracts
+	CurrentVersionBoundary
 
 	UUIDGenerator
 	AccountLocalIDGenerator
@@ -103,6 +104,12 @@ func newFacadeEnvironment(
 		),
 
 		SystemContracts: systemContracts,
+		CurrentVersionBoundary: NewCurrentVersionBoundary(
+			tracer,
+			meter,
+			txnState,
+			params,
+		),
 
 		UUIDGenerator: NewUUIDGenerator(
 			tracer,
@@ -293,6 +300,9 @@ func (env *facadeEnvironment) addParseRestrictedChecks() {
 	env.RandomSourceHistoryProvider = NewParseRestrictedRandomSourceHistoryProvider(
 		env.txnState,
 		env.RandomSourceHistoryProvider)
+	env.CurrentVersionBoundary = NewParseRestrictedCurrentVersionBoundary(
+		env.txnState,
+		env.CurrentVersionBoundary)
 	env.UUIDGenerator = NewParseRestrictedUUIDGenerator(
 		env.txnState,
 		env.UUIDGenerator)

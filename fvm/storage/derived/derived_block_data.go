@@ -3,13 +3,13 @@ package derived
 import (
 	"fmt"
 
-	"github.com/onflow/flow-go/fvm/storage/snapshot"
-
 	"github.com/onflow/cadence/runtime/common"
 	"github.com/onflow/cadence/runtime/interpreter"
 
 	"github.com/onflow/flow-go/fvm/storage/logical"
+	"github.com/onflow/flow-go/fvm/storage/snapshot"
 	"github.com/onflow/flow-go/fvm/storage/state"
+	"github.com/onflow/flow-go/model/flow"
 )
 
 type DerivedTransactionPreparer interface {
@@ -32,6 +32,15 @@ type DerivedTransactionPreparer interface {
 		error,
 	)
 
+	GetCurrentVersionBoundary(
+		txnState state.NestedTransactionPreparer,
+		getCurrentVersionBoundaryComputer ValueComputer[struct{}, flow.VersionBoundary],
+	) (
+		flow.VersionBoundary,
+		*snapshot.ExecutionSnapshot,
+		error,
+	)
+
 	AddInvalidator(invalidator TransactionInvalidator)
 }
 
@@ -47,6 +56,8 @@ type DerivedBlockData struct {
 	programs *DerivedDataTable[common.AddressLocation, *Program]
 
 	meterParamOverrides *DerivedDataTable[struct{}, MeterParamOverrides]
+
+	currentVersionBoundary *DerivedDataTable[struct{}, flow.VersionBoundary]
 }
 
 // DerivedTransactionData is the derived data scratch space for a single
@@ -60,6 +71,11 @@ type DerivedTransactionData struct {
 	// There's only a single entry in this table.  For simplicity, we'll use
 	// struct{} as the entry's key.
 	meterParamOverrides *TableTransaction[struct{}, MeterParamOverrides]
+
+	// The currently effective version boundary
+	// There's only a single entry in this table.  For simplicity, we'll use
+	// struct{} as the entry's key.
+	currentVersionBoundary *TableTransaction[struct{}, flow.VersionBoundary]
 }
 
 func NewEmptyDerivedBlockData(
@@ -73,6 +89,10 @@ func NewEmptyDerivedBlockData(
 		meterParamOverrides: NewEmptyTable[
 			struct{},
 			MeterParamOverrides,
+		](initialSnapshotTime),
+		currentVersionBoundary: NewEmptyTable[
+			struct{},
+			flow.VersionBoundary,
 		](initialSnapshotTime),
 	}
 }
@@ -119,9 +139,17 @@ func (block *DerivedBlockData) NewDerivedTransactionData(
 		return nil, err
 	}
 
+	txnCurrentVersionBoundary, err := block.currentVersionBoundary.NewTableTransaction(
+		snapshotTime,
+		executionTime)
+	if err != nil {
+		return nil, err
+	}
+
 	return &DerivedTransactionData{
-		programs:            txnPrograms,
-		meterParamOverrides: txnMeterParamOverrides,
+		programs:               txnPrograms,
+		meterParamOverrides:    txnMeterParamOverrides,
+		currentVersionBoundary: txnCurrentVersionBoundary,
 	}, nil
 }
 
@@ -180,6 +208,8 @@ func (transaction *DerivedTransactionData) AddInvalidator(
 	transaction.programs.AddInvalidator(invalidator.ProgramInvalidator())
 	transaction.meterParamOverrides.AddInvalidator(
 		invalidator.MeterParamOverridesInvalidator())
+	transaction.currentVersionBoundary.AddInvalidator(
+		invalidator.CurrentVersionBoundaryInvalidator())
 }
 
 func (transaction *DerivedTransactionData) GetMeterParamOverrides(
@@ -194,6 +224,20 @@ func (transaction *DerivedTransactionData) GetMeterParamOverrides(
 		txnState,
 		struct{}{},
 		getMeterParamOverrides)
+}
+
+func (transaction *DerivedTransactionData) GetCurrentVersionBoundary(
+	txnState state.NestedTransactionPreparer,
+	getCurrentVersionBoundaryComputer ValueComputer[struct{}, flow.VersionBoundary],
+) (
+	flow.VersionBoundary,
+	*snapshot.ExecutionSnapshot,
+	error,
+) {
+	return transaction.currentVersionBoundary.GetWithStateOrCompute(
+		txnState,
+		struct{}{},
+		getCurrentVersionBoundaryComputer)
 }
 
 func (transaction *DerivedTransactionData) Validate() error {
