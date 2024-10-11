@@ -312,3 +312,17 @@ func (sys *SystemContracts) AccountsStorageCapacity(
 		},
 	)
 }
+
+var getCurrentVersionBoundarySpec = ContractFunctionSpec{
+	AddressFromChain: ServiceAddress,
+	LocationName:     systemcontracts.ContractNameNodeVersionBeacon,
+	FunctionName:     systemcontracts.ContractVersionBeacon_getCurrentVersionBoundary,
+	ArgumentTypes:    []sema.Type{},
+}
+
+func (sys *SystemContracts) GetCurrentVersionBoundary() (cadence.Value, error) {
+	return sys.Invoke(
+		getCurrentVersionBoundarySpec,
+		[]cadence.Value{},
+	)
+}
