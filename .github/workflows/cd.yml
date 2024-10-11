@@ -13,6 +13,7 @@ jobs:
   docker-push:
     name: Push to container registry
     runs-on: ubuntu-latest
+    environment: Production Docker Registry
     steps:
     - name: Setup Go
       uses: actions/setup-go@v4
