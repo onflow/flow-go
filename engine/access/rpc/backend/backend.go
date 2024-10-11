@@ -674,7 +674,7 @@ func handleErrorMessage(
 			genericErr,
 		)
 	} else if height < nodeRootBlockHeader && nodeRootBlockHeader >= sporkRootBlockHeight {
-		return fmt.Errorf("block height %d is less than the node`s root block height %d. Try to use a different Access node: %w",
+		return fmt.Errorf("block height %d is less than the node's root block height %d. Try to use a different Access node: %w",
 			height,
 			nodeRootBlockHeader,
 			genericErr,

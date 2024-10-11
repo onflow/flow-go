@@ -2241,3 +2241,81 @@ func (suite *Suite) defaultBackendParams() Params {
 		VersionControl:           suite.versionControl,
 	}
 }
+
+// TestHandleErrorMessage tests the handleErrorMessage function for various scenarios where the block height
+// is below the spork root height, below the node root height, above the node root height, or when a different
+// error is provided. It validates that handleErrorMessage returns an appropriate error message for each case.
+//
+// Test cases:
+// 1) If height is below the spork root height, it suggests using a historic node.
+// 2) If height is below the node root height, it suggests using a different Access node.
+// 3) If height is above the node root height, it returns the original error without modification.
+// 4) If a non-storage-related error is provided, it returns the error as is.
+func (suite *Suite) TestHandleErrorMessage() {
+	tests := []struct {
+		name              string
+		height            uint64
+		sporkRootHeight   uint64
+		nodeRootHeight    uint64
+		genericErr        error
+		expectedErrorMsg  string
+		expectOriginalErr bool
+	}{
+		{
+			name:              "Height below spork root height",
+			height:            uint64(50),
+			sporkRootHeight:   uint64(100),
+			nodeRootHeight:    uint64(200),
+			genericErr:        storage.ErrNotFound,
+			expectedErrorMsg:  "block height 50 is less than the spork root block height 100. Try to use a historic node: key not found",
+			expectOriginalErr: false,
+		},
+		{
+			name:              "Height below node root height",
+			height:            uint64(150),
+			sporkRootHeight:   uint64(100),
+			nodeRootHeight:    uint64(200),
+			genericErr:        storage.ErrNotFound,
+			expectedErrorMsg:  "block height 150 is less than the node's root block height 200. Try to use a different Access node: key not found",
+			expectOriginalErr: false,
+		},
+		{
+			name:              "Height above node root height",
+			height:            uint64(205),
+			sporkRootHeight:   uint64(100),
+			nodeRootHeight:    uint64(200),
+			genericErr:        storage.ErrNotFound,
+			expectedErrorMsg:  "not found",
+			expectOriginalErr: true,
+		},
+		{
+			name:              "Non-storage related error",
+			height:            uint64(150),
+			sporkRootHeight:   uint64(100),
+			nodeRootHeight:    uint64(200),
+			genericErr:        fmt.Errorf("some other error"),
+			expectedErrorMsg:  "some other error",
+			expectOriginalErr: true,
+		},
+	}
+
+	for _, test := range tests {
+		suite.T().Run(test.name, func(t *testing.T) {
+			stateParams := protocol.NewParams(suite.T())
+
+			if errors.Is(test.genericErr, storage.ErrNotFound) {
+				stateParams.On("SporkRootBlockHeight").Return(test.sporkRootHeight)
+				sealedRootHeader := unittest.BlockHeaderWithHeight(test.nodeRootHeight)
+				stateParams.On("SealedRoot").Return(sealedRootHeader, nil)
+			}
+
+			err := handleErrorMessage(stateParams, test.height, test.genericErr)
+
+			if test.expectOriginalErr {
+				assert.True(t, errors.Is(err, test.genericErr))
+			} else {
+				assert.ErrorContains(t, err, test.expectedErrorMsg)
+			}
+		})
+	}
+}
