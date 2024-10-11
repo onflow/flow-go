@@ -21,7 +21,7 @@ const (
 	CodesStorageIDKey = "CodesStorageIDKey"
 )
 
-var emptyHash = gethCommon.Hash{}
+var EmptyHash = gethCommon.Hash{}
 
 // BaseView implements a types.BaseView
 // it acts as the base layer of state queries for the stateDB
@@ -395,7 +395,7 @@ func (v *BaseView) NumberOfAccounts() uint64 {
 //
 // Warning! this is an expensive operation and should only be used
 // for testing and exporting state operations, while no changes
-// are applied to accounts
+// are applied to accounts. Note that the iteration order is not guaranteed.
 func (v *BaseView) AccountIterator() (*AccountIterator, error) {
 	itr, err := v.accounts.ReadOnlyIterator()
 	if err != nil {
@@ -408,7 +408,7 @@ func (v *BaseView) AccountIterator() (*AccountIterator, error) {
 //
 // Warning! this is an expensive operation and should only be used
 // for testing and exporting state operations, while no changes
-// are applied to codes
+// are applied to codes. Note that the iteration order is not guaranteed.
 func (v *BaseView) CodeIterator() (*CodeIterator, error) {
 	itr, err := v.codes.ReadOnlyIterator()
 	if err != nil {
@@ -422,7 +422,7 @@ func (v *BaseView) CodeIterator() (*CodeIterator, error) {
 //
 // Warning! this is an expensive operation and should only be used
 // for testing and exporting state operations, while no changes
-// are applied to accounts
+// are applied to accounts. Note that the iteration order is not guaranteed.
 func (v *BaseView) AccountStorageIterator(
 	addr gethCommon.Address,
 ) (*AccountStorageIterator, error) {
@@ -430,7 +430,7 @@ func (v *BaseView) AccountStorageIterator(
 	if err != nil {
 		return nil, err
 	}
-	if !acc.HasStoredValues() {
+	if acc == nil || !acc.HasStoredValues() {
 		return nil, fmt.Errorf("account %s has no stored value", addr.String())
 	}
 	col, found := v.slots[addr]
@@ -650,7 +650,7 @@ func (v *BaseView) storeSlot(sk types.SlotAddress, data gethCommon.Hash) error {
 		return err
 	}
 
-	if data == emptyHash {
+	if data == EmptyHash {
 		delete(v.cachedSlots, sk)
 		return col.Remove(sk.Key.Bytes())
 	}
@@ -760,11 +760,11 @@ func (asi *AccountStorageIterator) Next() (
 ) {
 	k, v, err := asi.colIterator.Next()
 	if err != nil {
-		return emptyHash, emptyHash, fmt.Errorf("account storage iteration failed: %w", err)
+		return EmptyHash, EmptyHash, fmt.Errorf("account storage iteration failed: %w", err)
 	}
 	// no more keys
 	if k == nil {
-		return emptyHash, emptyHash, nil
+		return EmptyHash, EmptyHash, nil
 	}
 	return gethCommon.BytesToHash(k), gethCommon.BytesToHash(v), nil
 }

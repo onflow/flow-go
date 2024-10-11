@@ -444,6 +444,21 @@ func TestBaseView(t *testing.T) {
 		}
 
 		require.Equal(t, slotCounts, counter)
+
+		// test non existing address
+		addr2 := testutils.RandomCommonAddress(t)
+		_, err = view.AccountStorageIterator(addr2)
+		require.Error(t, err)
+
+		// test address without storage
+		err = view.CreateAccount(addr2, balance, nonce, code, codeHash)
+		require.NoError(t, err)
+
+		err = view.Commit()
+		require.NoError(t, err)
+
+		_, err = view.AccountStorageIterator(addr2)
+		require.Error(t, err)
 	})
 
 }
