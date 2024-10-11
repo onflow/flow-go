@@ -437,6 +437,7 @@ func TestBaseView(t *testing.T) {
 			if slot == nil {
 				break
 			}
+			require.Equal(t, addr, slot.Address)
 			require.Equal(t, values[slot.Key], slot.Value)
 			counter += 1
 		}
