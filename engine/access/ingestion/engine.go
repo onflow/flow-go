@@ -80,7 +80,8 @@ type Engine struct {
 	executionReceiptsNotifier engine.Notifier
 	executionReceiptsQueue    engine.MessageStore
 	// Job queue
-	finalizedBlockConsumer *jobqueue.ComponentConsumer
+	finalizedBlockConsumer  *jobqueue.ComponentConsumer
+	txErrorMessagesConsumer *jobqueue.ComponentConsumer
 
 	// Notifier for queue consumer
 	finalizedBlockNotifier engine.Notifier
@@ -133,7 +134,8 @@ func New(
 	executionReceipts storage.ExecutionReceipts,
 	transactionResultErrorMessages storage.TransactionResultErrorMessages,
 	collectionExecutedMetric module.CollectionExecutedMetric,
-	processedHeight storage.ConsumerProgress,
+	finalizedProcessedHeight storage.ConsumerProgress,
+	txErrorMessagesProcessedHeight storage.ConsumerProgress,
 	lastFullBlockHeight *counters.PersistentStrictMonotonicCounter,
 	backend *backend.Backend,
 	preferredExecutionNodeIDs []string,
@@ -212,7 +214,7 @@ func New(
 	e.finalizedBlockConsumer, err = jobqueue.NewComponentConsumer(
 		e.log.With().Str("module", "ingestion_block_consumer").Logger(),
 		e.finalizedBlockNotifier.Channel(),
-		processedHeight,
+		finalizedProcessedHeight,
 		finalizedBlockReader,
 		defaultIndex,
 		e.processFinalizedBlockJob,
@@ -223,12 +225,29 @@ func New(
 		return nil, fmt.Errorf("error creating finalizedBlock jobqueue: %w", err)
 	}
 
+	// create a job queue that will process error messages for new blocks. The `txErrorMessagesConsumer` is used to
+	// signal new work, which is being triggered on the `processTxResultErrorMessagesJob` handler.
+	e.txErrorMessagesConsumer, err = jobqueue.NewComponentConsumer(
+		e.log.With().Str("module", "ingestion_tx_error_messages_consumer").Logger(),
+		e.finalizedBlockNotifier.Channel(),
+		txErrorMessagesProcessedHeight,
+		finalizedBlockReader,
+		defaultIndex,
+		e.processTxResultErrorMessagesJob,
+		workersCount,
+		searchAhead,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("error creating transaction result error messages jobqueue: %w", err)
+	}
+
 	// Add workers
 	e.ComponentManager = component.NewComponentManagerBuilder().
 		AddWorker(e.processBackground).
 		AddWorker(e.processExecutionReceipts).
 		AddWorker(e.runFinalizedBlockConsumer).
-		AddWorker(e.processTransactionResultErrorMessages).
+		AddWorker(e.processTransactionResultErrorMessagesByReceipts).
+		AddWorker(e.runTxResultErrorMessagesConsumer).
 		Build()
 
 	// register engine with the execution receipt provider
@@ -283,6 +302,23 @@ func (e *Engine) processFinalizedBlockJob(ctx irrecoverable.SignalerContext, job
 	e.log.Error().Err(err).Str("job_id", string(job.ID())).Msg("error during finalized block processing job")
 }
 
+// processTxResultErrorMessagesJob is a handler function for processing error messages jobs.
+// It converts the job to a block, processes error messages, and logs any errors encountered during processing.
+func (e *Engine) processTxResultErrorMessagesJob(ctx irrecoverable.SignalerContext, job module.Job, done func()) {
+	block, err := jobqueue.JobToBlock(job)
+	if err != nil {
+		ctx.Throw(fmt.Errorf("failed to convert job to block: %w", err))
+	}
+
+	err = e.processErrorMessagesForBlock(ctx, block)
+	if err == nil {
+		done()
+		return
+	}
+
+	e.log.Error().Err(err).Str("job_id", string(job.ID())).Msg("error during error messages job")
+}
+
 // processBackground is a background routine responsible for executing periodic tasks related to block processing and collection retrieval.
 // It performs tasks such as updating indexes of processed blocks and requesting missing collections from the network.
 // This function runs indefinitely until the context is canceled.
@@ -326,6 +362,18 @@ func (e *Engine) processBackground(ctx irrecoverable.SignalerContext, ready comp
 			}
 		}
 	}
+}
+
+// runTxResultErrorMessagesConsumer runs the txErrorMessagesConsumer component
+func (e *Engine) runTxResultErrorMessagesConsumer(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
+	e.txErrorMessagesConsumer.Start(ctx)
+
+	err := util.WaitClosed(ctx, e.txErrorMessagesConsumer.Ready())
+	if err == nil {
+		ready()
+	}
+
+	<-e.txErrorMessagesConsumer.Done()
 }
 
 // processExecutionReceipts is responsible for processing the execution receipts.
@@ -376,14 +424,14 @@ func (e *Engine) processAvailableExecutionReceipts(ctx context.Context) error {
 	}
 }
 
-// processTransactionResultErrorMessages handles error messages related to transaction
+// processTransactionResultErrorMessagesByReceipts handles error messages related to transaction
 // results by reading from the error messages channel and processing them accordingly.
 //
 // This function listens for messages on the txResultErrorMessagesChan channel and
 // processes each transaction result error message as it arrives.
 //
 // No errors are expected during normal operation.
-func (e *Engine) processTransactionResultErrorMessages(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
+func (e *Engine) processTransactionResultErrorMessagesByReceipts(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
 	ready()
 
 	for {
@@ -438,7 +486,6 @@ func (e *Engine) handleTransactionResultErrorMessages(ctx context.Context, block
 	)
 	if err != nil {
 		e.log.Error().Err(err).Msg(fmt.Sprintf("failed to found execution nodes for block id: %s", blockID))
-
 		return fmt.Errorf("could not found execution nodes for block: %w", err)
 	}
 
@@ -553,11 +600,6 @@ func (e *Engine) processFinalizedBlock(ctx context.Context, block *flow.Block) e
 		if err != nil {
 			return fmt.Errorf("could not index block for execution result: %w", err)
 		}
-
-		err = e.handleTransactionResultErrorMessages(ctx, seal.BlockID)
-		if err != nil {
-			return err
-		}
 	}
 
 	// skip requesting collections, if this block is below the last full block height
@@ -573,6 +615,21 @@ func (e *Engine) processFinalizedBlock(ctx context.Context, block *flow.Block) e
 	e.requestCollectionsInFinalizedBlock(block.Payload.Guarantees)
 
 	e.collectionExecutedMetric.BlockFinalized(block)
+
+	return nil
+}
+
+// processErrorMessagesForBlock processes transaction result error messages for each seal
+// in the provided block.
+//
+// No errors are expected during normal operation.
+func (e *Engine) processErrorMessagesForBlock(ctx context.Context, block *flow.Block) error {
+	for _, seal := range block.Payload.Seals {
+		err := e.handleTransactionResultErrorMessages(ctx, seal.BlockID)
+		if err != nil {
+			return err
+		}
+	}
 
 	return nil
 }
