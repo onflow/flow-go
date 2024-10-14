@@ -59,6 +59,9 @@ const (
 
 	// ensure blocks are processed sequentially by jobqueue
 	searchAhead = 1
+
+	// maxAttemptsForErrorMessagesCount is the maximum number of attempts to process transaction result messages for a given block ID
+	maxAttemptsForErrorMessagesCount = 3
 )
 
 var (
@@ -302,21 +305,28 @@ func (e *Engine) processFinalizedBlockJob(ctx irrecoverable.SignalerContext, job
 	e.log.Error().Err(err).Str("job_id", string(job.ID())).Msg("error during finalized block processing job")
 }
 
-// processTxResultErrorMessagesJob is a handler function for processing error messages jobs.
-// It converts the job to a block, processes error messages, and logs any errors encountered during processing.
+// processTxResultErrorMessagesJob processes a job for transaction error messages by
+// converting the job to a block and processing error messages with retries. If processing
+// fails for all attempts, it logs the error.
 func (e *Engine) processTxResultErrorMessagesJob(ctx irrecoverable.SignalerContext, job module.Job, done func()) {
 	block, err := jobqueue.JobToBlock(job)
 	if err != nil {
 		ctx.Throw(fmt.Errorf("failed to convert job to block: %w", err))
 	}
 
-	err = e.processErrorMessagesForBlock(ctx, block)
-	if err == nil {
-		done()
-		return
+	for attempt := 0; attempt < maxAttemptsForErrorMessagesCount; attempt++ {
+		err = e.processErrorMessagesForBlock(ctx, block)
+		if err == nil {
+			done()
+			return
+		}
 	}
 
-	e.log.Error().Err(err).Str("job_id", string(job.ID())).Msg("error during error messages job")
+	e.log.Error().
+		Err(err).
+		Str("job_id", string(job.ID())).
+		Int("attempts", maxAttemptsForErrorMessagesCount).
+		Msg("error during error messages job after max retries")
 }
 
 // processBackground is a background routine responsible for executing periodic tasks related to block processing and collection retrieval.
