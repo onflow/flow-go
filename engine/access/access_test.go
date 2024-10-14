@@ -683,6 +683,7 @@ func (suite *Suite) TestGetSealedTransaction() {
 
 		// create the ingest engine
 		processedHeight := bstorage.NewConsumerProgress(db, module.ConsumeProgressIngestionEngineBlockHeight)
+		processedTxErrorMessagesBlockHeight := bstorage.NewConsumerProgress(db, module.ConsumeProgressIngestionEngineTxErrorMessagesBlockHeight)
 
 		ingestEng, err := ingestion.New(
 			suite.log,
@@ -699,6 +700,7 @@ func (suite *Suite) TestGetSealedTransaction() {
 			nil,
 			collectionExecutedMetric,
 			processedHeight,
+			processedTxErrorMessagesBlockHeight,
 			lastFullBlockHeight,
 			bnd,
 			enNodeIDs.Strings(),
@@ -855,6 +857,8 @@ func (suite *Suite) TestGetTransactionResult() {
 		require.NoError(suite.T(), err)
 
 		processedHeight := bstorage.NewConsumerProgress(db, module.ConsumeProgressIngestionEngineBlockHeight)
+		processedTxErrorMessagesBlockHeight := bstorage.NewConsumerProgress(db, module.ConsumeProgressIngestionEngineTxErrorMessagesBlockHeight)
+
 		lastFullBlockHeight, err := counters.NewPersistentStrictMonotonicCounter(
 			bstorage.NewConsumerProgress(db, module.ConsumeProgressLastFullBlockHeight),
 			suite.rootBlock.Height,
@@ -877,6 +881,7 @@ func (suite *Suite) TestGetTransactionResult() {
 			nil,
 			collectionExecutedMetric,
 			processedHeight,
+			processedTxErrorMessagesBlockHeight,
 			lastFullBlockHeight,
 			bnd,
 			enNodeIDs.Strings(),
@@ -1101,6 +1106,8 @@ func (suite *Suite) TestExecuteScript() {
 			Once()
 
 		processedHeight := bstorage.NewConsumerProgress(db, module.ConsumeProgressIngestionEngineBlockHeight)
+		processedTxErrorMessagesBlockHeight := bstorage.NewConsumerProgress(db, module.ConsumeProgressIngestionEngineTxErrorMessagesBlockHeight)
+
 		lastFullBlockHeight, err := counters.NewPersistentStrictMonotonicCounter(
 			bstorage.NewConsumerProgress(db, module.ConsumeProgressLastFullBlockHeight),
 			suite.rootBlock.Height,
@@ -1123,6 +1130,7 @@ func (suite *Suite) TestExecuteScript() {
 			nil,
 			collectionExecutedMetric,
 			processedHeight,
+			processedTxErrorMessagesBlockHeight,
 			lastFullBlockHeight,
 			suite.backend,
 			nil,

@@ -1601,7 +1601,8 @@ func (builder *FlowAccessNodeBuilder) enqueueRelayNetwork() {
 }
 
 func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
-	var processedBlockHeight storage.ConsumerProgress
+	var processedFinalizedBlockHeight storage.ConsumerProgress
+	var processedTxErrorMessagesBlockHeight storage.ConsumerProgress
 
 	if builder.executionDataSyncEnabled {
 		builder.BuildExecutionSyncComponents()
@@ -1797,8 +1798,15 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 			builder.TxResultsIndex = index.NewTransactionResultsIndex(builder.Reporter, builder.Storage.LightTransactionResults)
 			return nil
 		}).
-		Module("processed block height consumer progress", func(node *cmd.NodeConfig) error {
-			processedBlockHeight = bstorage.NewConsumerProgress(builder.DB, module.ConsumeProgressIngestionEngineBlockHeight)
+		Module("processed finalized block height consumer progress", func(node *cmd.NodeConfig) error {
+			processedFinalizedBlockHeight = bstorage.NewConsumerProgress(builder.DB, module.ConsumeProgressIngestionEngineBlockHeight)
+			return nil
+		}).
+		Module("processed error messages block height consumer progress", func(node *cmd.NodeConfig) error {
+			processedTxErrorMessagesBlockHeight = bstorage.NewConsumerProgress(
+				builder.DB,
+				module.ConsumeProgressIngestionEngineTxErrorMessagesBlockHeight,
+			)
 			return nil
 		}).
 		Module("processed last full block height monotonic consumer progress", func(node *cmd.NodeConfig) error {
@@ -2056,7 +2064,8 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 				node.Storage.Receipts,
 				node.Storage.TransactionResultErrorMessages,
 				builder.collectionExecutedMetric,
-				processedBlockHeight,
+				processedFinalizedBlockHeight,
+				processedTxErrorMessagesBlockHeight,
 				lastFullBlockHeight,
 				builder.nodeBackend,
 				builder.rpcConf.BackendConfig.PreferredExecutionNodeIDs,

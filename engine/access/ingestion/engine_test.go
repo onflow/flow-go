@@ -193,6 +193,10 @@ func (s *Suite) SetupTest() {
 // initIngestionEngine create new instance of ingestion engine and waits when it starts
 func (s *Suite) initIngestionEngine(ctx irrecoverable.SignalerContext) *Engine {
 	processedHeight := bstorage.NewConsumerProgress(s.db, module.ConsumeProgressIngestionEngineBlockHeight)
+	processedTxErrorMessagesBlockHeight := bstorage.NewConsumerProgress(
+		s.db,
+		module.ConsumeProgressIngestionEngineTxErrorMessagesBlockHeight,
+	)
 
 	var err error
 	s.lastFullBlockHeight, err = counters.NewPersistentStrictMonotonicCounter(
@@ -216,6 +220,7 @@ func (s *Suite) initIngestionEngine(ctx irrecoverable.SignalerContext) *Engine {
 		s.txErrorMessages,
 		s.collectionExecutedMetric,
 		processedHeight,
+		processedTxErrorMessagesBlockHeight,
 		s.lastFullBlockHeight,
 		s.backend,
 		s.enNodeIDs.Strings(),
@@ -296,10 +301,6 @@ func (s *Suite) TestOnFinalizedBlockSingle() {
 	s.blocks.On("IndexBlockForCollections", block.ID(), []flow.Identifier(flow.GetIDs(block.Payload.Guarantees))).Return(nil).Once()
 	for _, seal := range block.Payload.Seals {
 		s.results.On("Index", seal.BlockID, seal.ResultID).Return(nil).Once()
-
-		// Mock the txErrorMessages storage to confirm that error messages exist.
-		s.txErrorMessages.On("Exists", seal.BlockID).
-			Return(true, nil).Once()
 	}
 
 	missingCollectionCount := 4
@@ -380,9 +381,6 @@ func (s *Suite) TestOnFinalizedBlockSeveralBlocksAhead() {
 		}
 		for _, seal := range block.Payload.Seals {
 			s.results.On("Index", seal.BlockID, seal.ResultID).Return(nil).Once()
-			// Mock the txErrorMessages storage to confirm that error messages exist.
-			s.txErrorMessages.On("Exists", seal.BlockID).
-				Return(true, nil).Once()
 		}
 	}
 
