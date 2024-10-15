@@ -112,9 +112,16 @@ func (v *View) DryCall(
 	data []byte,
 	value *big.Int,
 	gasLimit uint64,
-	gasPrice *big.Int,
 	opts ...DryCallOption,
 ) (*types.Result, error) {
+
+	if gasLimit > v.maxCallGasLimit {
+		return nil, fmt.Errorf(
+			"gas limit is bigger than max gas limit allowed %d > %d",
+			gasLimit, v.maxCallGasLimit,
+		)
+	}
+
 	// apply all the options
 	for _, op := range opts {
 		err := op(v)
@@ -138,13 +145,6 @@ func (v *View) DryCall(
 	bv, err := em.NewBlockView(ctx)
 	if err != nil {
 		return nil, err
-	}
-
-	if gasLimit > v.maxCallGasLimit {
-		return nil, fmt.Errorf(
-			"gas limit is bigger than max gas limit allowed %d > %d",
-			gasLimit, v.maxCallGasLimit,
-		)
 	}
 
 	res, err := bv.DirectCall(
@@ -333,7 +333,7 @@ func WithTracer(
 	}
 }
 
-// WithTracer constructs a dry call option
+// WithExtraPrecompiledContracts constructs a dry call option
 // that allows adding the precompiled contracts
 // while executing the dry-call.
 //

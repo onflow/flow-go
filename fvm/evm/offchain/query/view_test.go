@@ -89,7 +89,6 @@ func TestView(t *testing.T) {
 							testContract.MakeCallData(t, "verifyArchCallToFlowBlockHeight", expectedFlowHeight),
 							big.NewInt(0),
 							uint64(1_000_000),
-							big.NewInt(0),
 							query.WithExtraPrecompiledContracts(
 								[]types.PrecompiledContract{pc}),
 						)
@@ -108,7 +107,6 @@ func TestView(t *testing.T) {
 								newBalance),
 							big.NewInt(0),
 							uint64(1_000_000),
-							big.NewInt(0),
 							query.WithStateOverrideBalance(
 								testAccount.Address().ToCommon(),
 								newBalance,
@@ -127,7 +125,6 @@ func TestView(t *testing.T) {
 								big.NewInt(2)),
 							big.NewInt(0),
 							maxCallGasLimit+1,
-							big.NewInt(0),
 						)
 						require.Error(t, err)
 
