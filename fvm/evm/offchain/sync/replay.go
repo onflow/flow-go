@@ -33,6 +33,10 @@ func ReplayBlockExecution(
 	blockEvent *events.BlockEventPayload,
 	validateResults bool,
 ) (types.ReplayResults, error) {
+	// check the passed block event
+	if blockEvent == nil {
+		return nil, fmt.Errorf("nil block event has been passed")
+	}
 
 	// create storage
 	storage := storage.NewEphemeralStorage(storage.NewReadOnlyStorage(snapshot))
