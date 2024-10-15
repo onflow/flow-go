@@ -277,8 +277,6 @@ func (s *Suite) TestOnFinalizedBlockSingle() {
 		}).Once()
 	}
 
-	s.blocks.On("ByID", mock.Anything).Return(&block, nil)
-
 	// process the block through the finalized callback
 	eng.OnFinalizedBlock(&hotstuffBlock)
 
@@ -337,7 +335,6 @@ func (s *Suite) TestOnFinalizedBlockSeveralBlocksAhead() {
 	// expected all new blocks after last block processed
 	for _, block := range blocks {
 		s.blocks.On("IndexBlockForCollections", block.ID(), []flow.Identifier(flow.GetIDs(block.Payload.Guarantees))).Return(nil).Once()
-		s.blocks.On("ByID", mock.Anything).Return(&block, nil)
 
 		for _, cg := range block.Payload.Guarantees {
 			s.request.On("EntityByID", cg.CollectionID, mock.Anything).Return().Run(func(args mock.Arguments) {

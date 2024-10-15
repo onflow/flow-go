@@ -46,6 +46,7 @@ func NewCollectionExecutedMetricImpl(
 		blocksToMarkExecuted:       blocksToMarkExecuted,
 		collections:                collections,
 		blocks:                     blocks,
+		blockTransactions:          make(map[flow.Identifier][]flow.Identifier),
 	}, nil
 }
 
