@@ -170,10 +170,15 @@ func (res *Result) DeployedContractAddressString() string {
 // StateChangeChecksum constructs a checksum
 // based on the state change commitment on the result
 func (res *Result) StateChangeChecksum() [ChecksumLength]byte {
+	return BytesToChecksum(res.StateChangeCommitment)
+}
+
+// BytesToChecksum cuts the first 4 bytes of the input and convert it into checksum
+func BytesToChecksum(input []byte) [ChecksumLength]byte {
 	// the first 4 bytes of StateChangeCommitment is used as checksum
 	var checksum [ChecksumLength]byte
-	if len(res.StateChangeCommitment) >= ChecksumLength {
-		copy(checksum[:ChecksumLength], res.StateChangeCommitment[:ChecksumLength])
+	if len(input) >= ChecksumLength {
+		copy(checksum[:ChecksumLength], input[:ChecksumLength])
 	}
 	return checksum
 }
