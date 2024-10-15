@@ -8,6 +8,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/fvm/evm/handler"
+	"github.com/onflow/flow-go/fvm/evm/offchain/blocks"
 	"github.com/onflow/flow-go/fvm/evm/offchain/query"
 	"github.com/onflow/flow-go/fvm/evm/offchain/storage"
 	"github.com/onflow/flow-go/fvm/evm/precompiles"
@@ -27,6 +28,9 @@ func TestView(t *testing.T) {
 
 						h := SetupHandler(chainID, backend, rootAddr)
 
+						blks, err := blocks.NewBlocks(chainID, rootAddr, backend)
+						require.NoError(t, err)
+
 						maxCallGasLimit := uint64(5_000_000)
 						view := query.NewView(
 							chainID,
@@ -34,6 +38,7 @@ func TestView(t *testing.T) {
 							storage.NewEphemeralStorage(
 								backend,
 							),
+							blks,
 							maxCallGasLimit,
 						)
 

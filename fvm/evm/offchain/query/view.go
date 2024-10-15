@@ -13,9 +13,7 @@ import (
 
 	"github.com/onflow/flow-go/fvm/evm/emulator"
 	"github.com/onflow/flow-go/fvm/evm/emulator/state"
-	"github.com/onflow/flow-go/fvm/evm/offchain/blocks"
 	"github.com/onflow/flow-go/fvm/evm/offchain/storage"
-	"github.com/onflow/flow-go/fvm/evm/offchain/sync"
 	"github.com/onflow/flow-go/fvm/evm/types"
 	"github.com/onflow/flow-go/model/flow"
 )
@@ -26,6 +24,7 @@ type View struct {
 	chainID         flow.ChainID
 	rootAddr        flow.Address
 	storage         *storage.EphemeralStorage
+	blockSnapshot   types.BlockSnapshot
 	tracer          *gethTracers.Tracer
 	extraPCs        []types.PrecompiledContract
 	maxCallGasLimit uint64
@@ -36,23 +35,16 @@ func NewView(
 	chainID flow.ChainID,
 	rootAddr flow.Address,
 	storage *storage.EphemeralStorage,
+	blockSnapshot types.BlockSnapshot,
 	maxCallGasLimit uint64,
 ) *View {
 	return &View{
 		chainID:         chainID,
 		rootAddr:        rootAddr,
 		storage:         storage,
+		blockSnapshot:   blockSnapshot,
 		maxCallGasLimit: maxCallGasLimit,
 	}
-}
-
-// GetBlockMeta return block meta data
-func (v *View) GetBlockMeta() (*blocks.Meta, error) {
-	blks, err := blocks.NewBlocks(v.chainID, v.rootAddr, v.storage)
-	if err != nil {
-		return nil, err
-	}
-	return blks.LatestBlock()
 }
 
 // GetBalance returns the balance for the given address
@@ -131,16 +123,12 @@ func (v *View) DryCall(
 		}
 	}
 
-	blks, err := blocks.NewBlocks(v.chainID, v.rootAddr, v.storage)
-	if err != nil {
-		return nil, err
-	}
-
 	// create context
-	ctx, err := sync.CreateBlockContext(v.chainID, blks, v.tracer)
+	ctx, err := v.blockSnapshot.BlockContext()
 	if err != nil {
 		return nil, err
 	}
+	ctx.Tracer = v.tracer
 	ctx.ExtraPrecompiledContracts = v.extraPCs
 
 	// create emulator
@@ -330,19 +318,6 @@ func WithStateOverrideStateDiff(
 			}
 		}
 		return baseView.Commit()
-	}
-}
-
-// WithStorageOverrideBlocksMeta constructs a dry call option
-// that overrides the value related to block meta
-func WithStateOverrideBlocksMeta(meta *blocks.Meta) DryCallOption {
-	return func(v *View) error {
-		blks, err := blocks.NewBlocks(v.chainID, v.rootAddr, v.storage)
-		if err != nil {
-			return err
-		}
-		blks.PushBlockMeta(meta)
-		return nil
 	}
 }
 
