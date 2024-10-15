@@ -120,8 +120,23 @@ func GenesisBlock(chainID flow.ChainID) *Block {
 	}
 }
 
+// when testnet was launched the block structure
+// didn't have the preRandao filed so the hash of the event
+// was different from hashing the genesis block struct.
+var TestNetGenesisHash = gethCommon.Hash{
+	60, 220, 118, 103, 27, 85, 73, 205,
+	46, 2, 83, 105, 179, 240, 255, 14,
+	55, 21, 42, 211, 55, 87, 177, 115,
+	118, 144, 125, 37, 146, 116, 168, 229,
+}
+
 // GenesisBlockHash returns the genesis block hash in the EVM environment
 func GenesisBlockHash(chainID flow.ChainID) gethCommon.Hash {
+	// for the case of testnet, the block didn't initially
+	// had the preRandao and it was not part of the hash calculation.
+	if chainID == flow.Testnet {
+		return TestNetGenesisHash
+	}
 	h, err := GenesisBlock(chainID).Hash()
 	if err != nil { // this never happens
 		panic(err)
