@@ -126,6 +126,10 @@ func (ch *ChunkDataPacks) BatchRemove(chunkID flow.Identifier, batch storage.Bat
 	return fmt.Errorf("not implemented")
 }
 
+func (ch *ChunkDataPacks) PebbleBatchRemove(chunkID flow.Identifier, batch pebble.Writer) error {
+	return operation.RemoveChunkDataPack(chunkID)(batch)
+}
+
 func (ch *ChunkDataPacks) batchRemove(chunkID flow.Identifier, batch pebble.Writer) error {
 	return operation.RemoveChunkDataPack(chunkID)(batch)
 }
