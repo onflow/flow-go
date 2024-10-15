@@ -47,7 +47,7 @@ func NewReplayer(
 // OnBlockReceived is called when a new block is received
 // (including all the related transaction executed events)
 // this method can be called concurrently if underlying storage
-// and block snapshot provider support it.
+// tracer and block snapshot provider support concurrency.
 func (cr *Replayer) OnBlockReceived(
 	transactionEvents []events.TransactionEventPayload,
 	blockEvent *events.BlockEventPayload,
