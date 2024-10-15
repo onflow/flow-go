@@ -49,7 +49,7 @@ func TestFirst(t *testing.T) {
 	})
 }
 
-func TestIterateKeysInPrefixRange(t *testing.T) {
+func TestIterateKeysByPrefixRange(t *testing.T) {
 	dbtest.RunWithStorages(t, func(t *testing.T, r storage.Reader, withWriter dbtest.WithWriter) {
 		// Define the prefix range
 		prefixStart := []byte{0x10}
@@ -98,15 +98,89 @@ func TestIterateKeysInPrefixRange(t *testing.T) {
 	})
 }
 
-// TestIterateInvalidRange tests that error should return if startPrefix > endPrefix
-func TestIterateInvalidRange(t *testing.T) {
+// Verify that when keys are prefixed by two prefixes,we can iterate with either first prefix or second prefix.
+func TestIterateHierachicalPrefixes(t *testing.T) {
 	dbtest.RunWithStorages(t, func(t *testing.T, r storage.Reader, withWriter dbtest.WithWriter) {
+		keys := [][]byte{
+			{0x09, 0x00, 0x00},
+			{0x09, 0x00, 0xff},
+			{0x09, 0x19, 0xff},
+			{0x09, 0xff, 0x00},
+			{0x09, 0xff, 0xff},
+			{0x10, 0x00, 0x00},
+			{0x10, 0x00, 0xff},
+			{0x10, 0x19, 0x00},
+			{0x10, 0x19, 0xff},
+			{0x10, 0x20, 0x00},
+			{0x10, 0x20, 0xff},
+			{0x10, 0x21, 0x00},
+			{0x10, 0x21, 0xff},
+			{0x10, 0x22, 0x00},
+			{0x10, 0x22, 0xff},
+			{0x10, 0xff, 0x00},
+			{0x10, 0xff, 0xff},
+			{0x11, 0x00, 0x00},
+			{0x11, 0x00, 0xff},
+			{0x11, 0xff, 0x00},
+			{0x11, 0xff, 0xff},
+			{0x12, 0x00, 0x00},
+			{0x12, 0x00, 0xff},
+			{0x12, 0xff, 0x00},
+			{0x12, 0xff, 0xff},
+		}
 
-		var found [][]byte
-		require.Error(t, operation.Iterate([]byte{0x02}, []byte{0x01}, func(key []byte) error {
-			found = append(found, key)
+		// Insert the keys and values into storage
+		require.NoError(t, withWriter(func(writer storage.Writer) error {
+			for _, key := range keys {
+				err := operation.Upsert(key, []byte{1})(writer)
+				if err != nil {
+					return err
+				}
+			}
 			return nil
-		})(r))
+		}))
+
+		// Test iteration with range of first prefixes (0x10 to 0x11)
+		firstPrefixRangeExpected := [][]byte{
+			{0x10, 0x00, 0x00},
+			{0x10, 0x00, 0xff},
+			{0x10, 0x19, 0x00},
+			{0x10, 0x19, 0xff},
+			{0x10, 0x20, 0x00},
+			{0x10, 0x20, 0xff},
+			{0x10, 0x21, 0x00},
+			{0x10, 0x21, 0xff},
+			{0x10, 0x22, 0x00},
+			{0x10, 0x22, 0xff},
+			{0x10, 0xff, 0x00},
+			{0x10, 0xff, 0xff},
+			{0x11, 0x00, 0x00},
+			{0x11, 0x00, 0xff},
+			{0x11, 0xff, 0x00},
+			{0x11, 0xff, 0xff},
+		}
+		firstPrefixRangeActual := make([][]byte, 0)
+		err := operation.Iterate([]byte{0x10}, []byte{0x11}, func(key []byte) error {
+			firstPrefixRangeActual = append(firstPrefixRangeActual, key)
+			return nil
+		})(r)
+		require.NoError(t, err, "iterate with range of first prefixes should not return an error")
+		require.Equal(t, firstPrefixRangeExpected, firstPrefixRangeActual, "iterated values for range of first prefixes should match expected values")
+
+		// Test iteration with range of second prefixes (0x1020 to 0x1021)
+		secondPrefixRangeActual := make([][]byte, 0)
+		secondPrefixRangeExpected := [][]byte{
+			{0x10, 0x20, 0x00},
+			{0x10, 0x20, 0xff},
+			{0x10, 0x21, 0x00},
+			{0x10, 0x21, 0xff},
+		}
+		err = operation.Iterate([]byte{0x10, 0x20}, []byte{0x10, 0x21}, func(key []byte) error {
+			secondPrefixRangeActual = append(secondPrefixRangeActual, key)
+			return nil
+		})(r)
+		require.NoError(t, err, "iterate with range of second prefixes should not return an error")
+		require.Equal(t, secondPrefixRangeExpected, secondPrefixRangeActual, "iterated values for range of second prefixes should match expected values")
 	})
 }
 
@@ -215,6 +289,7 @@ func TestTraverse(t *testing.T) {
 	})
 }
 
+// Verify traversing a subset of keys with only keys traversal
 func TestTraverseKeyOnly(t *testing.T) {
 	dbtest.RunWithStorages(t, func(t *testing.T, r storage.Reader, withWriter dbtest.WithWriter) {
 		keys := [][]byte{
