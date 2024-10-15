@@ -6,7 +6,10 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
-// BasicProvider implements a ledger based block provider
+// BasicProvider implements a ledger-backed basic block snapshot provider
+// it assumes sequential progress on blocks and expects a
+// a OnBlockReceived call before block execution and
+// a follow up OnBlockExecuted call after block execution.
 type BasicProvider struct {
 	blks *Blocks
 }
@@ -25,6 +28,7 @@ func NewBasicProvider(
 	return &BasicProvider{blks: blks}, nil
 }
 
+// GetSnapshotAt returns a block snapshot at the given height
 func (p *BasicProvider) GetSnapshotAt(height uint64) (
 	types.BlockSnapshot,
 	error,
@@ -32,10 +36,8 @@ func (p *BasicProvider) GetSnapshotAt(height uint64) (
 	return p.blks, nil
 }
 
-// OnBlockReceived should be called before
-// executing blocks.
+// OnBlockReceived should be called before executing blocks.
 func (p *BasicProvider) OnBlockReceived(blockEvent *events.BlockEventPayload) error {
-	// prepare blocks
 	// push the new block meta
 	// it should be done before execution so block context creation
 	// can be done properly
@@ -48,8 +50,8 @@ func (p *BasicProvider) OnBlockReceived(blockEvent *events.BlockEventPayload) er
 	)
 }
 
+// OnBlockExecuted should be called after executing blocks.
 func (p *BasicProvider) OnBlockExecuted(blockEvent *events.BlockEventPayload) error {
-	// push block hash
 	// we push the block hash after execution, so the behaviour of the blockhash is
 	// identical to the evm.handler.
 	return p.blks.PushBlockHash(
