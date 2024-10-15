@@ -12,6 +12,7 @@ import (
 
 	"github.com/onflow/flow-go/fvm/evm"
 	"github.com/onflow/flow-go/fvm/evm/events"
+	"github.com/onflow/flow-go/fvm/evm/offchain/blocks"
 	"github.com/onflow/flow-go/fvm/evm/offchain/storage"
 	"github.com/onflow/flow-go/fvm/evm/offchain/sync"
 	. "github.com/onflow/flow-go/fvm/evm/testutils"
@@ -154,9 +155,19 @@ func TestChainReplay(t *testing.T) {
 						require.Len(t, txEventPayloads, totalTxCount)
 
 						// check replay
+
+						bp, err := blocks.NewBasicProvider(chainID, snapshot, rootAddr)
+						require.NoError(t, err)
+
+						err = bp.OnBlockReceived(blockEventPayload)
+						require.NoError(t, err)
+
 						sp := newTestStorageProvider(snapshot, 1)
-						cr := sync.NewReplayer(chainID, rootAddr, sp, zerolog.Logger{}, nil, true)
-						_, err := cr.OnBlockReceived(txEventPayloads, blockEventPayload)
+						cr := sync.NewReplayer(chainID, rootAddr, sp, bp, zerolog.Logger{}, nil, true)
+						_, err = cr.OnBlockReceived(txEventPayloads, blockEventPayload)
+						require.NoError(t, err)
+
+						err = bp.OnBlockExecuted(blockEventPayload)
 						require.NoError(t, err)
 
 						// TODO: verify the state delta
