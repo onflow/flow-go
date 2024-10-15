@@ -243,6 +243,30 @@ func TestRemoveRange(t *testing.T) {
 			require.Equal(t, !deleted, exists,
 				"expected key %x to be %s", key, map[bool]string{true: "deleted", false: "not deleted"})
 		}
+
+		// Verify that after the removal, Traverse the removed prefix would return nothing
+		removedKeys := make([]string, 0)
+		err := operation.Traverse(prefix, operation.KeyOnlyIterateFunc(func(key []byte) error {
+			removedKeys = append(removedKeys, fmt.Sprintf("%x", key))
+			return nil
+		}), storage.DefaultIteratorOptions())(r)
+		require.NoError(t, err)
+		require.Len(t, removedKeys, 0, "expected no entries to be found when traversing the removed prefix")
+
+		// Verify that after the removal, Iterate over all keys should only return keys outside the prefix range
+		expected := [][]byte{
+			{0x09, 0xff},
+			{0x11, 0x00},
+			{0x1A, 0xff},
+		}
+
+		actual := make([][]byte, 0)
+		err = operation.Iterate([]byte{keys[0][0]}, operation.PrefixUpperBound(keys[len(keys)-1]), operation.KeyOnlyIterateFunc(func(key []byte) error {
+			actual = append(actual, key)
+			return nil
+		}), storage.DefaultIteratorOptions())(r)
+		require.NoError(t, err)
+		require.Equal(t, expected, actual, "expected keys to match expected values")
 	})
 }
 

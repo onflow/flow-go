@@ -112,6 +112,49 @@ func TestTraverse(t *testing.T) {
 	})
 }
 
+func TestTraverseKeyOnly(t *testing.T) {
+	dbtest.RunWithStorages(t, func(t *testing.T, r storage.Reader, withWriter dbtest.WithWriter) {
+		keys := [][]byte{
+			// before start -> not included in range
+			{0x04, 0x33},
+			{0x09, 0xff},
+			// within the start prefix -> included in range
+			{0x10, 0x00},
+			{0x10, 0xff},
+			// between start and end -> included in range
+			{0x11, 0x00},
+			{0x1A, 0xff},
+		}
+		expected := [][]byte{
+			{0x10, 0x00},
+			{0x10, 0xff},
+		}
+
+		// Insert the keys and values into storage
+		require.NoError(t, withWriter(func(writer storage.Writer) error {
+			for _, key := range keys {
+				err := operation.Upsert(key, []byte{1})(writer)
+				if err != nil {
+					return err
+				}
+			}
+			return nil
+		}))
+
+		actual := make([][]byte, 0)
+
+		// Traverse the keys starting with prefix {0x11}
+		err := operation.Traverse([]byte{0x10}, operation.KeyOnlyIterateFunc(func(key []byte) error {
+			actual = append(actual, key)
+			return nil
+		}), storage.DefaultIteratorOptions())(r)
+		require.NoError(t, err, "traverse should not return an error")
+
+		// Assert that the actual values match the expected values
+		require.Equal(t, expected, actual, "traversed values should match expected values")
+	})
+}
+
 func TestFindHighestAtOrBelow(t *testing.T) {
 	// Helper function to insert an entity into the storage
 	insertEntity := func(writer storage.Writer, prefix []byte, height uint64, entity Entity) error {

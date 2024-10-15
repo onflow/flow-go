@@ -15,6 +15,8 @@ import (
 // return (true, nil) to read the value and pass it to the CreateFunc and HandleFunc for decoding
 // return (false, nil) to skip reading the value
 // return (false, err) if running into any exception, the iteration should be stopped.
+// Note: the returned bool is to decide whether to read the value or not, rather than whether to stop
+// the iteration or not.
 type CheckFunc func(key []byte) (bool, error)
 
 // createFunc returns a pointer to an initialized entity that we can potentially
@@ -112,7 +114,26 @@ func Iterate(startPrefix []byte, endPrefix []byte, iterFunc IterationFunc, opt s
 
 // Traverse will iterate over all keys with the given prefix
 func Traverse(prefix []byte, iterFunc IterationFunc, opt storage.IteratorOption) func(storage.Reader) error {
-	return Iterate(prefix, PrefixUpperBound(prefix), iterFunc, opt)
+	return Iterate(prefix, prefix, iterFunc, opt)
+}
+
+// KeyOnlyIterateFunc returns an IterationFunc that only iterates over keys
+func KeyOnlyIterateFunc(fn func(key []byte) error) IterationFunc {
+	return func() (CheckFunc, CreateFunc, HandleFunc) {
+		checker := func(key []byte) (bool, error) {
+			return false, fn(key)
+		}
+
+		create := func() interface{} {
+			return nil
+		}
+
+		handle := func() error {
+			return nil
+		}
+
+		return checker, create, handle
+	}
 }
 
 // PrefixUpperBound returns a key K such that all possible keys beginning with the input prefix
