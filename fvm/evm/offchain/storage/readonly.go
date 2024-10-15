@@ -27,9 +27,9 @@ func (s *ReadOnlyStorage) GetValue(owner []byte, key []byte) ([]byte, error) {
 	return s.snapshot.GetValue(owner, key)
 }
 
-// SetValue is a noop
+// SetValue returns an error if called
 func (s *ReadOnlyStorage) SetValue(owner, key, value []byte) error {
-	return nil
+	return errors.New("unexpected call received")
 }
 
 // ValueExists checks if a register exists
@@ -38,7 +38,7 @@ func (s *ReadOnlyStorage) ValueExists(owner []byte, key []byte) (bool, error) {
 	return len(val) > 0, err
 }
 
-// AllocateSlabIndex returns error if called
+// AllocateSlabIndex returns an error if called
 func (s *ReadOnlyStorage) AllocateSlabIndex(owner []byte) (atree.SlabIndex, error) {
 	return atree.SlabIndex{}, errors.New("unexpected call received")
 }

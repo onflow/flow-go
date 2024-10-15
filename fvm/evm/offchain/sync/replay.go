@@ -5,15 +5,12 @@ import (
 	"fmt"
 
 	"github.com/onflow/atree"
-	gethCommon "github.com/onflow/go-ethereum/common"
 	gethTypes "github.com/onflow/go-ethereum/core/types"
 	gethTracer "github.com/onflow/go-ethereum/eth/tracers"
 	gethTrie "github.com/onflow/go-ethereum/trie"
 
 	"github.com/onflow/flow-go/fvm/evm/emulator"
 	"github.com/onflow/flow-go/fvm/evm/events"
-	"github.com/onflow/flow-go/fvm/evm/offchain/blocks"
-	"github.com/onflow/flow-go/fvm/evm/offchain/storage"
 	"github.com/onflow/flow-go/fvm/evm/precompiles"
 	"github.com/onflow/flow-go/fvm/evm/types"
 	"github.com/onflow/flow-go/model/flow"
@@ -27,41 +24,26 @@ var emptyChecksum = [types.ChecksumLength]byte{0, 0, 0, 0}
 func ReplayBlockExecution(
 	chainID flow.ChainID,
 	rootAddr flow.Address,
-	snapshot types.BackendStorageSnapshot,
+	storage types.BackendStorage,
+	blockSnapshot types.BlockSnapshot,
 	tracer *gethTracer.Tracer,
 	transactionEvents []events.TransactionEventPayload,
 	blockEvent *events.BlockEventPayload,
 	validateResults bool,
-) (types.ReplayResults, error) {
-
-	// create storage
-	storage := storage.NewEphemeralStorage(storage.NewReadOnlyStorage(snapshot))
-
-	// prepare blocks
-	blks, err := blocks.NewBlocks(chainID, rootAddr, storage)
-	if err != nil {
-		return nil, err
-	}
-	// push the new block meta
-	// it should be done before execution so block context creation
-	// can be done properly
-	err = blks.PushBlockMeta(
-		blocks.NewMeta(
-			blockEvent.Height,
-			blockEvent.Timestamp,
-			blockEvent.PrevRandao,
-		),
-	)
-	if err != nil {
-		return nil, err
+) error {
+	// check the passed block event
+	if blockEvent == nil {
+		return fmt.Errorf("nil block event has been passed")
 	}
 
 	// create a base block context for all transactions
 	// tx related context values will be replaced during execution
-	ctx, err := CreateBlockContext(chainID, blks, tracer)
+	ctx, err := blockSnapshot.BlockContext()
 	if err != nil {
-		return nil, err
+		return err
 	}
+	// update the tracer
+	ctx.Tracer = tracer
 
 	gasConsumedSoFar := uint64(0)
 	txHashes := make(types.TransactionHashes, len(transactionEvents))
@@ -76,7 +58,7 @@ func ReplayBlockExecution(
 			validateResults,
 		)
 		if err != nil {
-			return nil, err
+			return fmt.Errorf("transaction execution failed, txIndex: %d, err: %w", idx, err)
 		}
 		gasConsumedSoFar += tx.GasConsumed
 		txHashes[idx] = tx.Hash
@@ -86,29 +68,18 @@ func ReplayBlockExecution(
 		// check transaction inclusion
 		txHashRoot := gethTypes.DeriveSha(txHashes, gethTrie.NewStackTrie(nil))
 		if txHashRoot != blockEvent.TransactionHashRoot {
-			return nil, fmt.Errorf("transaction root hash doesn't match [%x] != [%x]", txHashRoot, blockEvent.TransactionHashRoot)
+			return fmt.Errorf("transaction root hash doesn't match [%x] != [%x]", txHashRoot, blockEvent.TransactionHashRoot)
 		}
 
 		// check total gas used
 		if blockEvent.TotalGasUsed != gasConsumedSoFar {
-			return nil, fmt.Errorf("total gas used doesn't match [%x] != [%x]", txHashRoot, blockEvent.TransactionHashRoot)
+			return fmt.Errorf("total gas used doesn't match [%x] != [%x]", txHashRoot, blockEvent.TransactionHashRoot)
 		}
 		// no need to check the receipt root hash given we have checked the logs and other
 		// values during tx execution.
 	}
 
-	// push block hash
-	// we push the block hash after execution, so the behaviour of the blockhash is
-	// identical to the evm.handler.
-	err = blks.PushBlockHash(
-		blockEvent.Height,
-		blockEvent.Hash,
-	)
-	if err != nil {
-		return nil, err
-	}
-
-	return storage, nil
+	return nil
 }
 
 func replayTransactionExecution(
@@ -218,33 +189,4 @@ func ValidateResult(
 	}
 
 	return nil
-}
-
-// CreateBlockContext creates a block context using the passed blocks
-func CreateBlockContext(
-	chainID flow.ChainID,
-	blocks *blocks.Blocks,
-	tracer *gethTracer.Tracer,
-) (types.BlockContext, error) {
-	bm, err := blocks.LatestBlock()
-	if err != nil {
-		return types.BlockContext{}, err
-	}
-	return types.BlockContext{
-		ChainID:                types.EVMChainIDFromFlowChainID(chainID),
-		BlockNumber:            bm.Height,
-		BlockTimestamp:         bm.Timestamp,
-		DirectCallBaseGasUsage: types.DefaultDirectCallBaseGasUsage,
-		DirectCallGasPrice:     types.DefaultDirectCallGasPrice,
-		GasFeeCollector:        types.CoinbaseAddress,
-		GetHashFunc: func(n uint64) gethCommon.Hash {
-			hash, err := blocks.BlockHash(n)
-			if err != nil {
-				panic(err)
-			}
-			return hash
-		},
-		Random: bm.Random,
-		Tracer: tracer,
-	}, nil
 }
