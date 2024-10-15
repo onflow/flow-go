@@ -25,11 +25,8 @@ type CollectionExecutedMetricImpl struct {
 
 	collections storage.Collections
 	blocks      storage.Blocks
-}
 
-type BlockTransactions struct {
-	blockID      flow.Identifier
-	transactions []flow.Identifier
+	blockTransactions map[flow.Identifier][]flow.Identifier // Map to track transactions for each block for sealed metrics
 }
 
 func NewCollectionExecutedMetricImpl(
@@ -77,7 +74,11 @@ func (c *CollectionExecutedMetricImpl) BlockFinalized(block *flow.Block) {
 	// TODO: lookup actual finalization time by looking at the block finalizing `b`
 	now := time.Now().UTC()
 	blockID := block.ID()
-	blockTransactions := BlockTransactions{blockID: blockID}
+
+	// Initialize the transactions slice for this block ID if it doesn't already exist
+	if _, exists := c.blockTransactions[blockID]; !exists {
+		c.blockTransactions[blockID] = []flow.Identifier{}
+	}
 
 	// mark all transactions as finalized
 	// TODO: sample to reduce performance overhead
@@ -93,21 +94,19 @@ func (c *CollectionExecutedMetricImpl) BlockFinalized(block *flow.Block) {
 		}
 
 		for _, t := range l.Transactions {
-			blockTransactions.transactions = append(blockTransactions.transactions, t)
+			c.blockTransactions[blockID] = append(c.blockTransactions[blockID], t)
 			c.accessMetrics.TransactionFinalized(t, now)
 		}
 	}
 
+	// Process block seals
 	for _, s := range block.Payload.Seals {
-		_, err := c.blocks.ByID(s.BlockID)
-		if err != nil {
-			c.log.Warn().Err(err).Msg("could not find block")
-			continue
-		}
-
-		if s.BlockID == blockTransactions.blockID && len(blockTransactions.transactions) != 0 {
-			for _, t := range blockTransactions.transactions {
+		if transactions, found := c.blockTransactions[s.BlockID]; found && len(transactions) != 0 {
+			for _, t := range transactions {
 				c.accessMetrics.TransactionSealed(t, now)
+
+				// Remove the transaction by transaction ID
+				c.blockTransactions[s.BlockID] = removeTransactionByID(c.blockTransactions[s.BlockID], t)
 			}
 		}
 	}
@@ -117,6 +116,17 @@ func (c *CollectionExecutedMetricImpl) BlockFinalized(block *flow.Block) {
 		c.accessMetrics.UpdateExecutionReceiptMaxHeight(block.Header.Height)
 		c.blocksToMarkExecuted.Remove(blockID)
 	}
+}
+
+// Helper function to remove a transaction from the slice by transaction ID
+func removeTransactionByID(transactions []flow.Identifier, txID flow.Identifier) []flow.Identifier {
+	for i, t := range transactions {
+		if t == txID {
+			// Remove the transaction by slicing around it
+			return append(transactions[:i], transactions[i+1:]...)
+		}
+	}
+	return transactions
 }
 
 // ExecutionReceiptReceived tracks execution receipt metrics

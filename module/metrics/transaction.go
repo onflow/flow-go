@@ -302,8 +302,8 @@ func (tc *TransactionCollector) TransactionSealed(txID flow.Identifier, when tim
 
 	tc.trackTTS(t, tc.logTimeToSealed)
 
-	// remove transaction timing from mempool if finalized and sealed
-	if !t.Finalized.IsZero() && !t.Sealed.IsZero() {
+	// remove transaction timing from mempool if sealed
+	if !t.Sealed.IsZero() {
 		tc.transactionTimings.Remove(txID)
 	}
 }
@@ -357,7 +357,7 @@ func (tc *TransactionCollector) trackTTFE(t *flow.TransactionTiming, log bool) {
 }
 
 func (tc *TransactionCollector) trackTTS(t *flow.TransactionTiming, log bool) {
-	if t.Received.IsZero() || t.Finalized.IsZero() || t.Sealed.IsZero() {
+	if t.Received.IsZero() || t.Sealed.IsZero() {
 		return
 	}
 	duration := t.Sealed.Sub(t.Received).Seconds()
