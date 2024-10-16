@@ -2,6 +2,7 @@ package indexer
 
 import (
 	"errors"
+	"sync"
 	"time"
 
 	"github.com/rs/zerolog"
@@ -27,6 +28,7 @@ type CollectionExecutedMetricImpl struct {
 	blocks      storage.Blocks
 
 	blockTransactions map[flow.Identifier][]flow.Identifier // Map to track transactions for each block for sealed metrics
+	mutex             sync.RWMutex
 }
 
 func NewCollectionExecutedMetricImpl(
@@ -76,11 +78,6 @@ func (c *CollectionExecutedMetricImpl) BlockFinalized(block *flow.Block) {
 	now := time.Now().UTC()
 	blockID := block.ID()
 
-	// Initialize the transactions slice for this block ID if it doesn't already exist
-	if _, exists := c.blockTransactions[blockID]; !exists {
-		c.blockTransactions[blockID] = []flow.Identifier{}
-	}
-
 	// mark all transactions as finalized
 	// TODO: sample to reduce performance overhead
 	for _, g := range block.Payload.Guarantees {
@@ -94,21 +91,32 @@ func (c *CollectionExecutedMetricImpl) BlockFinalized(block *flow.Block) {
 			continue
 		}
 
+		c.mutex.Lock()
 		for _, t := range l.Transactions {
 			c.blockTransactions[blockID] = append(c.blockTransactions[blockID], t)
 			c.accessMetrics.TransactionFinalized(t, now)
 		}
+		c.mutex.Unlock()
 	}
 
 	// Process block seals
 	for _, s := range block.Payload.Seals {
-		if transactions, found := c.blockTransactions[s.BlockID]; found && len(transactions) != 0 {
+		c.mutex.RLock()
+		transactions, found := c.blockTransactions[s.BlockID]
+		c.mutex.RUnlock() // release the read lock after reading
+
+		if found && len(transactions) != 0 {
+			// Lock for writing since we will modify the transactions list
+			c.mutex.Lock()
+			// Process all transactions
 			for _, t := range transactions {
 				c.accessMetrics.TransactionSealed(t, now)
-
-				// Remove the transaction by transaction ID
-				c.blockTransactions[s.BlockID] = removeTransactionByID(c.blockTransactions[s.BlockID], t)
 			}
+
+			// Remove the entire block of transactions once processed
+			delete(c.blockTransactions, s.BlockID)
+			// Unlock after modifications are done
+			c.mutex.Unlock()
 		}
 	}
 
@@ -117,17 +125,6 @@ func (c *CollectionExecutedMetricImpl) BlockFinalized(block *flow.Block) {
 		c.accessMetrics.UpdateExecutionReceiptMaxHeight(block.Header.Height)
 		c.blocksToMarkExecuted.Remove(blockID)
 	}
-}
-
-// Helper function to remove a transaction from the slice by transaction ID
-func removeTransactionByID(transactions []flow.Identifier, txID flow.Identifier) []flow.Identifier {
-	for i, t := range transactions {
-		if t == txID {
-			// Remove the transaction by slicing around it
-			return append(transactions[:i], transactions[i+1:]...)
-		}
-	}
-	return transactions
 }
 
 // ExecutionReceiptReceived tracks execution receipt metrics
