@@ -421,15 +421,6 @@ func (e *Engine) dispatchRequest() (bool, error) {
 	}
 	e.requests[req.Nonce] = req
 
-	if e.log.Debug().Enabled() {
-		e.log.Debug().
-			Hex("provider", logging.ID(providerID)).
-			Uint64("nonce", req.Nonce).
-			Strs("entities", logging.IDs(entityIDs)).
-			TimeDiff("duration", time.Now(), requestStart).
-			Msg("entity request sent")
-	}
-
 	// NOTE: we forget about requests after the expiry of the shortest retry time
 	// from the entities in the list; this means that we purge requests aggressively.
 	// However, most requests should be responded to on the first attempt and clearing
@@ -443,11 +434,15 @@ func (e *Engine) dispatchRequest() (bool, error) {
 		delete(e.requests, req.Nonce)
 	}()
 
+	if e.log.Debug().Enabled() {
+		e.log.Debug().
+			Hex("provider", logging.ID(providerID)).
+			Uint64("nonce", req.Nonce).
+			Strs("entities", logging.IDs(entityIDs)).
+			TimeDiff("duration", time.Now(), requestStart).
+			Msg("entity request sent")
+	}
 	e.metrics.MessageSent(e.channel.String(), metrics.MessageEntityRequest)
-	e.log.Debug().
-		Uint64("nonce", req.Nonce).
-		Strs("entity_ids", flow.IdentifierList(req.EntityIDs).Strings()).
-		Msg("entity request sent")
 
 	return true, nil
 }
