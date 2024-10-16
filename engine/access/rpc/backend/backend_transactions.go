@@ -26,7 +26,7 @@ import (
 	"github.com/onflow/flow-go/storage"
 )
 
-const FailedErrorMessage = "failed"
+const DefaultFailedErrorMessage = "failed"
 
 type backendTransactions struct {
 	*TransactionsLocalDataProvider
@@ -1040,7 +1040,7 @@ func (b *backendTransactions) LookupErrorMessageByTransactionID(
 		}
 
 		if txResult.Failed {
-			return FailedErrorMessage, nil
+			return DefaultFailedErrorMessage, nil
 		}
 
 		// in case tx result is not failed
@@ -1099,7 +1099,7 @@ func (b *backendTransactions) LookupErrorMessageByIndex(
 		}
 
 		if txResult.Failed {
-			return FailedErrorMessage, nil
+			return DefaultFailedErrorMessage, nil
 		}
 
 		// in case tx result is not failed
@@ -1161,7 +1161,7 @@ func (b *backendTransactions) LookupErrorMessagesByBlockID(
 
 		for _, txResult := range txResults {
 			if txResult.Failed {
-				result[txResult.TransactionID] = FailedErrorMessage
+				result[txResult.TransactionID] = DefaultFailedErrorMessage
 			}
 		}
 
