@@ -121,7 +121,7 @@ func (m *ComputationMeter) ComputationAvailable(
 	return potentialComputationUsage <= m.params.computationLimit
 }
 
-// ComputationRemaining returns the remaining computation left in the transaction for the given type
+// ComputationRemaining returns the remaining computation (intensity) left in the transaction for the given type
 func (m *ComputationMeter) ComputationRemaining(kind common.ComputationKind) uint {
 	w, ok := m.params.computationWeights[kind]
 	// if not found return has capacity
@@ -131,6 +131,10 @@ func (m *ComputationMeter) ComputationRemaining(kind common.ComputationKind) uin
 	}
 
 	remainingComputationUsage := m.params.computationLimit - m.computationUsed
+	if remainingComputationUsage <= 0 {
+		return 0
+	}
+
 	return uint(remainingComputationUsage / w)
 }
 
