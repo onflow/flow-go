@@ -62,6 +62,8 @@ type Environment interface {
 		error,
 	)
 
+	GetCurrentVersionBoundary() (cadence.Value, error)
+
 	// AccountInfo
 	GetAccount(address flow.Address) (*flow.Account, error)
 	GetAccountKeys(address flow.Address) ([]flow.AccountPublicKey, error)

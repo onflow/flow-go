@@ -2,6 +2,7 @@ package fvm
 
 import (
 	"fmt"
+	"github.com/onflow/flow-go/fvm/systemcontracts"
 	"strconv"
 
 	"github.com/onflow/cadence/runtime"
@@ -400,10 +401,13 @@ func (executor *transactionExecutor) normalExecution() (
 		return
 	}
 
+	sc := systemcontracts.SystemContractsForChain(executor.ctx.Chain.ChainID())
 	invalidator = environment.NewDerivedDataInvalidator(
 		contractUpdates,
 		bodySnapshot,
-		executor.meterStateRead)
+		executor.meterStateRead,
+		sc.FlowServiceAccount.Address,
+	)
 
 	// Check if all account storage limits are ok
 	//

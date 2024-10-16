@@ -1,6 +1,7 @@
 package environment_test
 
 import (
+	"github.com/onflow/flow-go/fvm/systemcontracts"
 	"testing"
 
 	"github.com/onflow/cadence/runtime/common"
@@ -296,10 +297,13 @@ func TestMeterParamOverridesUpdated(t *testing.T) {
 			},
 		}
 
+		sc := systemcontracts.SystemContractsForChain(flow.Testnet)
+
 		invalidator := environment.NewDerivedDataInvalidator(
 			environment.ContractUpdates{},
 			snapshot,
-			meterStateRead)
+			meterStateRead,
+			sc.FlowServiceAccount.Address)
 		require.Equal(t, expected, invalidator.MeterParamOverridesUpdated)
 	}
 

@@ -2,6 +2,7 @@ package derived
 
 import (
 	"github.com/onflow/cadence/runtime/common"
+	"github.com/onflow/flow-go/model/flow"
 
 	"github.com/onflow/flow-go/fvm/meter"
 )
@@ -22,7 +23,13 @@ type MeterParamOverridesInvalidator TableInvalidator[
 	MeterParamOverrides,
 ]
 
+type CurrentVersionBoundaryInvalidator TableInvalidator[
+	struct{},
+	flow.VersionBoundary,
+]
+
 type TransactionInvalidator interface {
 	ProgramInvalidator() ProgramInvalidator
 	MeterParamOverridesInvalidator() MeterParamOverridesInvalidator
+	CurrentVersionBoundaryInvalidator() CurrentVersionBoundaryInvalidator
 }
