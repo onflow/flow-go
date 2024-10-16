@@ -203,6 +203,48 @@ contract EVM {
         }
     }
 
+    /// EVMBytes is a type wrapper used for ABI encoding/decoding into
+    /// Solidity `bytes` type
+    access(all)
+    struct EVMBytes {
+
+        /// Byte array representing the `bytes` value
+        access(all)
+        let value: [UInt8]
+
+        view init(value: [UInt8]) {
+            self.value = value
+        }
+    }
+
+    /// EVMBytes4 is a type wrapper used for ABI encoding/decoding into
+    /// Solidity `bytes4` type
+    access(all)
+    struct EVMBytes4 {
+
+        /// Byte array representing the `bytes4` value
+        access(all)
+        let value: [UInt8; 4]
+
+        view init(value: [UInt8; 4]) {
+            self.value = value
+        }
+    }
+
+    /// EVMBytes32 is a type wrapper used for ABI encoding/decoding into
+    /// Solidity `bytes32` type
+    access(all)
+    struct EVMBytes32 {
+
+        /// Byte array representing the `bytes32` value
+        access(all)
+        let value: [UInt8; 32]
+
+        view init(value: [UInt8; 32]) {
+            self.value = value
+        }
+    }
+
     /// Converts a hex string to an EVM address if the string is a valid hex string
     /// Future implementations should pass data to InternalEVM for native deserialization
     access(all)
