@@ -3,9 +3,10 @@ package storage_test
 import (
 	"testing"
 
+	"github.com/stretchr/testify/require"
+
 	"github.com/onflow/flow-go/fvm/evm/offchain/storage"
 	"github.com/onflow/flow-go/fvm/evm/testutils"
-	"github.com/stretchr/testify/require"
 )
 
 func TestReadOnlyStorage(t *testing.T) {
