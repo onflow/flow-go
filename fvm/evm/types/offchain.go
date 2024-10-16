@@ -27,8 +27,8 @@ type BlockSnapshotProvider interface {
 	GetSnapshotAt(height uint64) (BlockSnapshot, error)
 }
 
-// ReplayResults is the result of replaying transactions
-type ReplayResults interface {
+// ReplayResultCollector collects results of replay a block
+type ReplayResultCollector interface {
 	// StorageRegisterUpdates returns the set of register changes
 	// (only the EVM-related registers)
 	StorageRegisterUpdates() map[flow.RegisterID]flow.RegisterValue
