@@ -364,19 +364,14 @@ func gethABIType(
 
 	switch staticType := staticType.(type) {
 	case *interpreter.CompositeStaticType:
-		if staticType.TypeID == evmTypeIDs.AddressTypeID {
+		switch staticType.TypeID {
+		case evmTypeIDs.AddressTypeID:
 			return gethTypeAddress, true
-		}
-
-		if staticType.TypeID == evmTypeIDs.BytesTypeID {
+		case evmTypeIDs.BytesTypeID:
 			return gethTypeBytes, true
-		}
-
-		if staticType.TypeID == evmTypeIDs.Bytes4TypeID {
+		case evmTypeIDs.Bytes4TypeID:
 			return gethTypeBytes4, true
-		}
-
-		if staticType.TypeID == evmTypeIDs.Bytes32TypeID {
+		case evmTypeIDs.Bytes32TypeID:
 			return gethTypeBytes32, true
 		}
 
@@ -473,19 +468,14 @@ func goType(
 		return reflect.SliceOf(elementType), true
 	}
 
-	if staticType.ID() == evmTypeIDs.AddressTypeID {
+	switch staticType.ID() {
+	case evmTypeIDs.AddressTypeID:
 		return reflect.TypeOf(gethCommon.Address{}), true
-	}
-
-	if staticType.ID() == evmTypeIDs.BytesTypeID {
+	case evmTypeIDs.BytesTypeID:
 		return reflect.SliceOf(reflect.TypeOf(byte(0))), true
-	}
-
-	if staticType.ID() == evmTypeIDs.Bytes4TypeID {
+	case evmTypeIDs.Bytes4TypeID:
 		return reflect.ArrayOf(stdlib.EVMBytes4Length, reflect.TypeOf(byte(0))), true
-	}
-
-	if staticType.ID() == evmTypeIDs.Bytes32TypeID {
+	case evmTypeIDs.Bytes32TypeID:
 		return reflect.ArrayOf(stdlib.EVMBytes32Length, reflect.TypeOf(byte(0))), true
 	}
 
@@ -598,9 +588,8 @@ func encodeABI(
 		}
 
 	case *interpreter.CompositeValue:
-		typeID := value.TypeID()
-
-		if typeID == evmTypeIDs.AddressTypeID {
+		switch value.TypeID() {
+		case evmTypeIDs.AddressTypeID:
 			addressBytesArrayValue := value.GetMember(inter, locationRange, stdlib.EVMAddressTypeBytesFieldName)
 			bytes, err := interpreter.ByteArrayValueToByteSlice(
 				inter,
@@ -610,11 +599,9 @@ func encodeABI(
 			if err != nil {
 				panic(err)
 			}
-
 			return gethCommon.Address(bytes), gethTypeAddress, nil
-		}
 
-		if typeID == evmTypeIDs.BytesTypeID {
+		case evmTypeIDs.BytesTypeID:
 			bytesValue := value.GetMember(inter, locationRange, stdlib.EVMBytesTypeValueFieldName)
 			bytes, err := interpreter.ByteArrayValueToByteSlice(
 				inter,
@@ -624,11 +611,9 @@ func encodeABI(
 			if err != nil {
 				panic(err)
 			}
-
 			return bytes, gethTypeBytes, nil
-		}
 
-		if typeID == evmTypeIDs.Bytes4TypeID {
+		case evmTypeIDs.Bytes4TypeID:
 			bytesValue := value.GetMember(inter, locationRange, stdlib.EVMBytesTypeValueFieldName)
 			bytes, err := interpreter.ByteArrayValueToByteSlice(
 				inter,
@@ -638,11 +623,9 @@ func encodeABI(
 			if err != nil {
 				panic(err)
 			}
-
 			return [stdlib.EVMBytes4Length]byte(bytes), gethTypeBytes4, nil
-		}
 
-		if typeID == evmTypeIDs.Bytes32TypeID {
+		case evmTypeIDs.Bytes32TypeID:
 			bytesValue := value.GetMember(inter, locationRange, stdlib.EVMBytesTypeValueFieldName)
 			bytes, err := interpreter.ByteArrayValueToByteSlice(
 				inter,
@@ -652,7 +635,6 @@ func encodeABI(
 			if err != nil {
 				panic(err)
 			}
-
 			return [stdlib.EVMBytes32Length]byte(bytes), gethTypeBytes32, nil
 		}
 
@@ -1024,7 +1006,8 @@ func decodeABI(
 		), nil
 
 	case *interpreter.CompositeStaticType:
-		if staticType.TypeID == evmTypeIDs.AddressTypeID {
+		switch staticType.TypeID {
+		case evmTypeIDs.AddressTypeID:
 			addr, ok := value.(gethCommon.Address)
 			if !ok {
 				break
@@ -1038,9 +1021,8 @@ func decodeABI(
 				location,
 				address,
 			), nil
-		}
 
-		if staticType.TypeID == evmTypeIDs.BytesTypeID {
+		case evmTypeIDs.BytesTypeID:
 			bytes, ok := value.([]byte)
 			if !ok {
 				break
@@ -1051,9 +1033,8 @@ func decodeABI(
 				location,
 				bytes,
 			), nil
-		}
 
-		if staticType.TypeID == evmTypeIDs.Bytes4TypeID {
+		case evmTypeIDs.Bytes4TypeID:
 			bytes, ok := value.([stdlib.EVMBytes4Length]byte)
 			if !ok {
 				break
@@ -1064,9 +1045,8 @@ func decodeABI(
 				location,
 				bytes,
 			), nil
-		}
 
-		if staticType.TypeID == evmTypeIDs.Bytes32TypeID {
+		case evmTypeIDs.Bytes32TypeID:
 			bytes, ok := value.([stdlib.EVMBytes32Length]byte)
 			if !ok {
 				break
