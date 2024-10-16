@@ -37,7 +37,7 @@ func Connect(t *testing.T, instances []*Instance) {
 				}
 
 				// convert into proposal immediately
-				proposal := model.ProposalFromFlow(header)
+				proposal := model.SignedProposalFromFlow(header)
 
 				// store locally and loop back to engine for processing
 				sender.ProcessBlock(proposal)
