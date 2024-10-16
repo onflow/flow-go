@@ -82,6 +82,7 @@ jobs:
   docker-push:
     name: ${{ matrix.role }} images
     runs-on: ubuntu-latest
+    environment: Production Docker Registry
     needs: matrix_builder
 
     # setup jobs for each role
