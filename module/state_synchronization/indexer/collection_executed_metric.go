@@ -2,6 +2,7 @@ package indexer
 
 import (
 	"errors"
+	"sync"
 	"time"
 
 	"github.com/rs/zerolog"
@@ -25,6 +26,9 @@ type CollectionExecutedMetricImpl struct {
 
 	collections storage.Collections
 	blocks      storage.Blocks
+
+	blockTransactions map[flow.Identifier][]flow.Identifier // Map to track transactions for each block for sealed metrics
+	mutex             sync.RWMutex
 }
 
 func NewCollectionExecutedMetricImpl(
@@ -44,6 +48,7 @@ func NewCollectionExecutedMetricImpl(
 		blocksToMarkExecuted:       blocksToMarkExecuted,
 		collections:                collections,
 		blocks:                     blocks,
+		blockTransactions:          make(map[flow.Identifier][]flow.Identifier),
 	}, nil
 }
 
@@ -86,8 +91,32 @@ func (c *CollectionExecutedMetricImpl) BlockFinalized(block *flow.Block) {
 			continue
 		}
 
+		c.mutex.Lock()
 		for _, t := range l.Transactions {
+			c.blockTransactions[blockID] = append(c.blockTransactions[blockID], t)
 			c.accessMetrics.TransactionFinalized(t, now)
+		}
+		c.mutex.Unlock()
+	}
+
+	// Process block seals
+	for _, s := range block.Payload.Seals {
+		c.mutex.RLock()
+		transactions, found := c.blockTransactions[s.BlockID]
+		c.mutex.RUnlock() // release the read lock after reading
+
+		if found && len(transactions) != 0 {
+			// Lock for writing since we will modify the transactions list
+			c.mutex.Lock()
+			// Process all transactions
+			for _, t := range transactions {
+				c.accessMetrics.TransactionSealed(t, now)
+			}
+
+			// Remove the entire block of transactions once processed
+			delete(c.blockTransactions, s.BlockID)
+			// Unlock after modifications are done
+			c.mutex.Unlock()
 		}
 	}
 
