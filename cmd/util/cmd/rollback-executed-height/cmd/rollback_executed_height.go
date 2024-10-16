@@ -82,6 +82,13 @@ func run(*cobra.Command, []string) {
 		}
 	}()
 
+	log.Info().Msgf("compacting database")
+	err = chunkDataPackDB.Compact([]byte{0}, []byte{255}, true)
+	if err != nil {
+		log.Fatal().Err(err).Msgf("could not compact chunk data pack db")
+	}
+	log.Info().Msgf("compaction done")
+
 	metrics := &metrics.NoopCollector{}
 	transactionResults := badger.NewTransactionResults(metrics, db, badger.DefaultCacheSize)
 	commits := badger.NewCommits(metrics, db)
