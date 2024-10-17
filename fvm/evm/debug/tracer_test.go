@@ -1,4 +1,4 @@
-package debug
+package debug_test
 
 import (
 	"encoding/json"
@@ -11,6 +11,7 @@ import (
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/require"
 
+	"github.com/onflow/flow-go/fvm/evm/debug"
 	"github.com/onflow/flow-go/fvm/evm/testutils"
 	"github.com/onflow/flow-go/model/flow"
 )
@@ -23,13 +24,13 @@ func Test_CallTracer(t *testing.T) {
 
 		mockUpload := &testutils.MockUploader{
 			UploadFunc: func(id string, message json.RawMessage) error {
-				require.Equal(t, TraceID(txID, blockID), id)
+				require.Equal(t, debug.TraceID(txID, blockID), id)
 				require.Equal(t, res, message)
 				return nil
 			},
 		}
 
-		tracer, err := NewEVMCallTracer(mockUpload, zerolog.Nop())
+		tracer, err := debug.NewEVMCallTracer(mockUpload, zerolog.Nop())
 		require.NoError(t, err)
 		tracer.WithBlockID(blockID)
 
@@ -61,13 +62,13 @@ func Test_CallTracer(t *testing.T) {
 
 		mockUpload := &testutils.MockUploader{
 			UploadFunc: func(id string, message json.RawMessage) error {
-				require.Equal(t, TraceID(txID, blockID), id)
+				require.Equal(t, debug.TraceID(txID, blockID), id)
 				require.Equal(t, res, message)
 				return nil
 			},
 		}
 
-		tracer, err := NewEVMCallTracer(mockUpload, zerolog.Nop())
+		tracer, err := debug.NewEVMCallTracer(mockUpload, zerolog.Nop())
 		require.NoError(t, err)
 		tracer.WithBlockID(blockID)
 
@@ -107,7 +108,7 @@ func Test_CallTracer(t *testing.T) {
 			},
 		}
 
-		tracer, err := NewEVMCallTracer(mockUpload, zerolog.Nop())
+		tracer, err := debug.NewEVMCallTracer(mockUpload, zerolog.Nop())
 		require.NoError(t, err)
 		tracer.WithBlockID(blockID)
 
@@ -117,7 +118,7 @@ func Test_CallTracer(t *testing.T) {
 	})
 
 	t.Run("nop tracer", func(t *testing.T) {
-		tracer := nopTracer{}
+		tracer := debug.NopTracer
 		require.Nil(t, tracer.TxTracer())
 	})
 }
