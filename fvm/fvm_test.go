@@ -10,6 +10,8 @@ import (
 	"testing"
 
 	stdlib2 "github.com/onflow/cadence/runtime/stdlib"
+	flow2 "github.com/onflow/flow-go-sdk"
+	"github.com/onflow/flow-go-sdk/test"
 
 	envMock "github.com/onflow/flow-go/fvm/environment/mock"
 	"github.com/onflow/flow-go/fvm/evm/events"
@@ -1528,17 +1530,17 @@ func TestSettingExecutionWeights(t *testing.T) {
 				SetScript([]byte(fmt.Sprintf(`
 					import FungibleToken from 0x%s
 					import FlowToken from 0x%s
-	
+
 					transaction() {
 						let sentVault: @{FungibleToken.Vault}
-	
+
 						prepare(signer: auth(BorrowValue) &Account) {
 							let vaultRef = signer.storage.borrow<auth(FungibleToken.Withdraw) &FlowToken.Vault>(from: /storage/flowTokenVault)
 								?? panic("Could not borrow reference to the owner's Vault!")
-	
+
 							self.sentVault <- vaultRef.withdraw(amount: 5.0)
 						}
-	
+
 						execute {
 							let recipient1 = getAccount(%s)
 							let recipient2 = getAccount(%s)
@@ -1556,7 +1558,7 @@ func TestSettingExecutionWeights(t *testing.T) {
 								?? panic("Could not borrow receiver reference to the recipient's Vault")
 							let receiverRef5 = recipient5.capabilities.borrow<&{FungibleToken.Receiver}>(/public/flowTokenReceiver)
 								?? panic("Could not borrow receiver reference to the recipient's Vault")
-	
+
 							receiverRef1.deposit(from: <-self.sentVault.withdraw(amount: 1.0))
 							receiverRef2.deposit(from: <-self.sentVault.withdraw(amount: 1.0))
 							receiverRef3.deposit(from: <-self.sentVault.withdraw(amount: 1.0))
@@ -2916,7 +2918,7 @@ func TestEVM(t *testing.T) {
 			sc := systemcontracts.SystemContractsForChain(chain.ChainID())
 			script := fvm.Script([]byte(fmt.Sprintf(`
 				import EVM from %s
-				
+
 				access(all) fun main() {
 					let bal = EVM.Balance(attoflow: 1000000000000000000)
 					let acc <- EVM.createCadenceOwnedAccount()
@@ -2979,7 +2981,7 @@ func TestEVM(t *testing.T) {
 
 				script := fvm.Script([]byte(fmt.Sprintf(`
 					import EVM from %s
-					
+
 					access(all)
                     fun main() {
 						destroy <- EVM.createCadenceOwnedAccount()
@@ -3011,7 +3013,7 @@ func TestEVM(t *testing.T) {
 			txBody := flow.NewTransactionBody().
 				SetScript([]byte(fmt.Sprintf(`
 					import FungibleToken from %s
-					import FlowToken from %s						
+					import FlowToken from %s
 					import EVM from %s
 
 					transaction() {
@@ -3029,7 +3031,7 @@ func TestEVM(t *testing.T) {
 							acc.deposit(from: <- amount)
 							destroy acc
 
-							// commit blocks 
+							// commit blocks
 							evmHeartbeat.heartbeat()
 						}
 					}`,
@@ -3227,5 +3229,172 @@ func TestAccountCapabilitiesPublishEntitledRejection(t *testing.T) {
 			require.NoError(t, err)
 			require.NoError(t, output.Err)
 		}),
+	)
+}
+
+func TestCrypto(t *testing.T) {
+	t.Parallel()
+
+	chain, vm := createChainAndVm(flow.Testnet)
+
+	ctx := fvm.NewContext(
+		fvm.WithChain(chain),
+		fvm.WithCadenceLogging(true),
+	)
+
+	//accountKeys := test.AccountKeyGenerator()
+	//
+	//// Create new keys for the Crypto account and deploy
+	//cryptoAccountKey, _ := accountKeys.NewWithSigner()
+	//cryptoCode := contracts.Crypto()
+	//
+	//cryptoAddress, err := adapter.CreateAccount(
+	//	context.Background(),
+	//	[]*flow.AccountKey{cryptoAccountKey},
+	//	[]sdktemplates.Contract{
+	//		{
+	//			Name:   "Crypto",
+	//			Source: string(cryptoCode),
+	//		},
+	//	},
+	//)
+	//assert.NoError(t, err)
+
+	script := []byte(`
+      import Crypto
+
+      access(all)
+      fun main(
+        rawPublicKeys: [String],
+        weights: [UFix64],
+        domainSeparationTag: String,
+        signatures: [String],
+        toAddress: Address,
+        fromAddress: Address,
+        amount: UFix64
+      ): Bool {
+        let keyList = Crypto.KeyList()
+
+        var i = 0
+        for rawPublicKey in rawPublicKeys {
+          keyList.add(
+            PublicKey(
+              publicKey: rawPublicKey.decodeHex(),
+              signatureAlgorithm: SignatureAlgorithm.ECDSA_P256
+            ),
+            hashAlgorithm: HashAlgorithm.SHA3_256,
+            weight: weights[i],
+          )
+          i = i + 1
+        }
+
+        let signatureSet: [Crypto.KeyListSignature] = []
+
+        var j = 0
+        for signature in signatures {
+          signatureSet.append(
+            Crypto.KeyListSignature(
+              keyIndex: j,
+              signature: signature.decodeHex()
+            )
+          )
+          j = j + 1
+        }
+
+        // assemble the same message in cadence
+        let message = toAddress.toBytes()
+          .concat(fromAddress.toBytes())
+          .concat(amount.toBigEndianBytes())
+
+        return keyList.verify(
+          signatureSet: signatureSet,
+          signedData: message,
+          domainSeparationTag: domainSeparationTag
+        )
+      }
+   `)
+
+	accountKeys := test.AccountKeyGenerator()
+
+	// create the keys
+	keyAlice, signerAlice := accountKeys.NewWithSigner()
+	keyBob, signerBob := accountKeys.NewWithSigner()
+
+	// create the message that will be signed
+	addresses := test.AddressGenerator()
+
+	toAddress := cadence.Address(addresses.New())
+	fromAddress := cadence.Address(addresses.New())
+
+	amount, err := cadence.NewUFix64("100.00")
+	require.NoError(t, err)
+
+	var message []byte
+	message = append(message, toAddress.Bytes()...)
+	message = append(message, fromAddress.Bytes()...)
+	message = append(message, amount.ToBigEndianBytes()...)
+
+	// sign the message with Alice and Bob
+	signatureAlice, err := flow2.SignUserMessage(signerAlice, message)
+	require.NoError(t, err)
+
+	signatureBob, err := flow2.SignUserMessage(signerBob, message)
+	require.NoError(t, err)
+
+	publicKeys := cadence.NewArray([]cadence.Value{
+		cadence.String(hex.EncodeToString(keyAlice.PublicKey.Encode())),
+		cadence.String(hex.EncodeToString(keyBob.PublicKey.Encode())),
+	})
+
+	// each signature has half weight
+	weightAlice, err := cadence.NewUFix64("0.5")
+	require.NoError(t, err)
+
+	weightBob, err := cadence.NewUFix64("0.5")
+	require.NoError(t, err)
+
+	weights := cadence.NewArray([]cadence.Value{
+		weightAlice,
+		weightBob,
+	})
+
+	signatures := cadence.NewArray([]cadence.Value{
+		cadence.String(hex.EncodeToString(signatureAlice)),
+		cadence.String(hex.EncodeToString(signatureBob)),
+	})
+
+	domainSeparationTag := cadence.String("FLOW-V0.0-user")
+
+	arguments := []cadence.Value{
+		publicKeys,
+		weights,
+		domainSeparationTag,
+		signatures,
+		toAddress,
+		fromAddress,
+		amount,
+	}
+
+	encodedArguments := make([][]byte, 0, len(arguments))
+	for _, argument := range arguments {
+		encodedArguments = append(encodedArguments, jsoncdc.MustEncode(argument))
+	}
+
+	snapshotTree := testutil.RootBootstrappedLedger(vm, ctx)
+
+	_, output, err := vm.Run(
+		ctx,
+		fvm.Script(script).
+			WithArguments(encodedArguments...),
+		snapshotTree)
+	require.NoError(t, err)
+
+	require.NoError(t, output.Err)
+
+	result := output.Value
+
+	assert.Equal(t,
+		cadence.NewBool(true),
+		result,
 	)
 }
