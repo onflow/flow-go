@@ -73,7 +73,7 @@ func ReplayBlockExecution(
 
 		// check total gas used
 		if blockEvent.TotalGasUsed != gasConsumedSoFar {
-			return fmt.Errorf("total gas used doesn't match [%x] != [%x]", txHashRoot, blockEvent.TransactionHashRoot)
+			return fmt.Errorf("total gas used doesn't match [%d] != [%d]", gasConsumedSoFar, blockEvent.TotalGasUsed)
 		}
 		// no need to check the receipt root hash given we have checked the logs and other
 		// values during tx execution.
@@ -173,7 +173,7 @@ func ValidateResult(
 		return fmt.Errorf("failed to RLP-encode logs: %w", err)
 	}
 	if !bytes.Equal(encodedLogs, txEvent.Logs) {
-		return fmt.Errorf("encoded logs mismatch %s != %s", encodedLogs, txEvent.ErrorMessage)
+		return fmt.Errorf("encoded logs mismatch %x != %x", encodedLogs, txEvent.Logs)
 	}
 
 	// check deployed address
