@@ -6,8 +6,10 @@ import (
 	"github.com/onflow/cadence/runtime"
 	"github.com/onflow/cadence/runtime/ast"
 	"github.com/onflow/cadence/runtime/common"
+	"github.com/onflow/cadence/runtime/stdlib"
 
 	"github.com/onflow/flow-go/fvm/errors"
+	"github.com/onflow/flow-go/fvm/systemcontracts"
 	"github.com/onflow/flow-go/fvm/tracing"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/trace"
@@ -15,21 +17,23 @@ import (
 
 // ContractReader provide read access to contracts.
 type ContractReader struct {
-	tracer tracing.TracerSpan
-	meter  Meter
-
-	accounts Accounts
+	tracer    tracing.TracerSpan
+	meter     Meter
+	accounts  Accounts
+	contracts *systemcontracts.SystemContracts
 }
 
 func NewContractReader(
 	tracer tracing.TracerSpan,
 	meter Meter,
 	accounts Accounts,
+	contracts *systemcontracts.SystemContracts,
 ) *ContractReader {
 	return &ContractReader{
-		tracer:   tracer,
-		meter:    meter,
-		accounts: accounts,
+		tracer:    tracer,
+		meter:     meter,
+		accounts:  accounts,
+		contracts: contracts,
 	}
 }
 
@@ -153,6 +157,10 @@ func (reader *ContractReader) GetCode(
 	[]byte,
 	error,
 ) {
+	if location == stdlib.CryptoContractLocation {
+		location = reader.contracts.Crypto.Location()
+	}
+
 	contractLocation, ok := location.(common.AddressLocation)
 	if !ok {
 		return nil, errors.NewInvalidLocationErrorf(

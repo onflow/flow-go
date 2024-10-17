@@ -11,6 +11,7 @@ import (
 	"github.com/onflow/flow-go/fvm/storage"
 	"github.com/onflow/flow-go/fvm/storage/snapshot"
 	"github.com/onflow/flow-go/fvm/storage/state"
+	"github.com/onflow/flow-go/fvm/systemcontracts"
 	"github.com/onflow/flow-go/fvm/tracing"
 )
 
@@ -63,8 +64,9 @@ func newFacadeEnvironment(
 	accounts := NewAccounts(txnState)
 	logger := NewProgramLogger(tracer, params.ProgramLoggerParams)
 	runtime := NewRuntime(params.RuntimeParams)
+	chain := params.Chain
 	systemContracts := NewSystemContracts(
-		params.Chain,
+		chain,
 		tracer,
 		logger,
 		runtime)
@@ -130,6 +132,7 @@ func newFacadeEnvironment(
 			tracer,
 			meter,
 			accounts,
+			systemcontracts.SystemContractsForChain(chain.ChainID()),
 		),
 		ContractUpdater: NoContractUpdater{},
 		Programs: NewPrograms(

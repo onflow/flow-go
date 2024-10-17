@@ -13,7 +13,7 @@ import (
 // It is not suitable for execution.
 type checkingInterface struct {
 	runtime.EmptyRuntimeInterface
-	SystemContractCodes map[common.AddressLocation][]byte
+	SystemContractCodes map[common.Location][]byte
 	Programs            map[runtime.Location]*interpreter.Program
 }
 
@@ -87,6 +87,10 @@ func (r *checkingInterface) GetOrLoadProgram(
 	r.Programs[location] = program
 
 	return
+}
+
+func (r *checkingInterface) GetCode(location common.Location) ([]byte, error) {
+	return r.SystemContractCodes[location], nil
 }
 
 func (r *checkingInterface) GetAccountContractCode(location common.AddressLocation) (code []byte, err error) {
