@@ -44,11 +44,12 @@ func NewReplayer(
 	}
 }
 
-// OnBlockReceived is called when a new block is received
-// (including all the related transaction executed events)
+// ReplayBlock replays the execution of the transactions of an EVM block
+// using the provided transactionEvents and blockEvents,
+// which include all the context data for re-executing the transactions, and returns the replay result.
 // this method can be called concurrently if underlying storage
 // tracer and block snapshot provider support concurrency.
-func (cr *Replayer) OnBlockReceived(
+func (cr *Replayer) ReplayBlock(
 	transactionEvents []events.TransactionEventPayload,
 	blockEvent *events.BlockEventPayload,
 ) (types.ReplayResultCollector, error) {

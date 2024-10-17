@@ -12,7 +12,7 @@ type BackendStorageSnapshot interface {
 type StorageProvider interface {
 	// GetSnapshotAt returns a readonly snapshot of storage
 	// at specific block (start state of the block before executing transactions)
-	GetSnapshotAt(height uint64) (BackendStorageSnapshot, error)
+	GetSnapshotAt(evmBlockHeight uint64) (BackendStorageSnapshot, error)
 }
 
 // BlockSnapshot provides access to the block information
@@ -23,8 +23,8 @@ type BlockSnapshot interface {
 }
 
 type BlockSnapshotProvider interface {
-	// GetSnapshotAt returns a readonly snapshot of block given height
-	GetSnapshotAt(height uint64) (BlockSnapshot, error)
+	// GetSnapshotAt returns a readonly snapshot of block given evm block height
+	GetSnapshotAt(evmBlockHeight uint64) (BlockSnapshot, error)
 }
 
 // ReplayResultCollector collects results of replay a block

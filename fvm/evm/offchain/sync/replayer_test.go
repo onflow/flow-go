@@ -164,7 +164,7 @@ func TestChainReplay(t *testing.T) {
 
 						sp := newTestStorageProvider(snapshot, 1)
 						cr := sync.NewReplayer(chainID, rootAddr, sp, bp, zerolog.Logger{}, nil, true)
-						_, err = cr.OnBlockReceived(txEventPayloads, blockEventPayload)
+						_, err = cr.ReplayBlock(txEventPayloads, blockEventPayload)
 						require.NoError(t, err)
 
 						err = bp.OnBlockExecuted(blockEventPayload)
