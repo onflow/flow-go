@@ -20,7 +20,7 @@ require (
 	github.com/ipfs/go-ds-badger2 v0.1.3
 	github.com/ipfs/go-ds-pebble v0.3.1-0.20240828032824-d745b9d3200b
 	github.com/libp2p/go-libp2p v0.32.2
-	github.com/onflow/cadence v1.0.1
+	github.com/onflow/cadence v1.0.1-0.20241017185848-2874423ff599
 	github.com/onflow/crypto v0.25.2
 	github.com/onflow/flow-core-contracts/lib/go/contracts v1.3.3-0.20241017220455-79fdc6c8ba53
 	github.com/onflow/flow-core-contracts/lib/go/templates v1.3.3-0.20241017220455-79fdc6c8ba53
@@ -244,7 +244,7 @@ require (
 	github.com/multiformats/go-multistream v0.5.0 // indirect
 	github.com/multiformats/go-varint v0.0.7 // indirect
 	github.com/olekukonko/tablewriter v0.0.5 // indirect
-	github.com/onflow/atree v0.8.0-rc.6 // indirect
+	github.com/onflow/atree v0.8.0 // indirect
 	github.com/onflow/flow-ft/lib/go/contracts v1.0.1 // indirect
 	github.com/onflow/flow-ft/lib/go/templates v1.0.1 // indirect
 	github.com/onflow/flow-nft/lib/go/contracts v1.2.2 // indirect
