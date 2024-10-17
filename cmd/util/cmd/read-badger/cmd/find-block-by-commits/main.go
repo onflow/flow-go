@@ -80,7 +80,7 @@ func FindBlockIDByCommits(
 
 func toStateCommitments(commitsStr string) ([]flow.StateCommitment, error) {
 	commitSlice := strings.Split(commitsStr, ",")
-	commits := make([]flow.StateCommitment, len(commitSlice))
+	commits := make([]flow.StateCommitment, 0, len(commitSlice))
 	for _, c := range commitSlice {
 		commit, err := toStateCommitment(c)
 		if err != nil {
