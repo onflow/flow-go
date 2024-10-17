@@ -8,6 +8,11 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
+type Contract struct {
+	Name string
+	Code []byte
+}
+
 func NewDeploymentMigration(
 	chainID flow.ChainID,
 	contract Contract,

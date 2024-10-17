@@ -10,6 +10,11 @@ import (
 
 type RegistersMigration func(registersByAccount *registers.ByAccount) error
 
+type NamedMigration struct {
+	Name    string
+	Migrate RegistersMigration
+}
+
 var AllStorageMapDomains = []string{
 	common.PathDomainStorage.Identifier(),
 	common.PathDomainPrivate.Identifier(),

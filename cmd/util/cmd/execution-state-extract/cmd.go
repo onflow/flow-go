@@ -1,10 +1,8 @@
 package extract
 
 import (
-	"compress/gzip"
 	"encoding/hex"
 	"fmt"
-	"io"
 	"os"
 	"path"
 	"runtime/pprof"
@@ -326,7 +324,8 @@ func run(*cobra.Command, []string) {
 		}
 	}
 
-	chain := flow.ChainID(flagChain).Chain()
+	// Validate chain ID
+	_ = flow.ChainID(flagChain).Chain()
 
 	if flagNoReport {
 		log.Warn().Msgf("--no-report flag is deprecated")
@@ -401,43 +400,6 @@ func run(*cobra.Command, []string) {
 
 	log.Info().Msgf("state extraction plan: %s, %s", inputMsg, outputMsg)
 
-	chainID := chain.ChainID()
-
-	burnerContractChange := migrations.BurnerContractChangeNone
-	evmContractChange := migrations.EVMContractChangeNone
-	switch chainID {
-	case flow.Emulator:
-		burnerContractChange = migrations.BurnerContractChangeDeploy
-		evmContractChange = migrations.EVMContractChangeDeployMinimalAndUpdateFull
-	case flow.Testnet, flow.Mainnet:
-		burnerContractChange = migrations.BurnerContractChangeUpdate
-		evmContractChange = migrations.EVMContractChangeUpdateFull
-	}
-
-	stagedContracts, err := migrations.StagedContractsFromCSV(flagStagedContractsFile)
-	if err != nil {
-		log.Fatal().Err(err).Msgf("error loading staged contracts: %s", err.Error())
-	}
-
-	opts := migrations.Options{
-		NWorker:                           flagNWorker,
-		DiffMigrations:                    flagDiffMigration,
-		LogVerboseDiff:                    flagLogVerboseDiff,
-		CheckStorageHealthBeforeMigration: flagCheckStorageHealthBeforeMigration,
-		ChainID:                           chainID,
-		EVMContractChange:                 evmContractChange,
-		BurnerContractChange:              burnerContractChange,
-		StagedContracts:                   stagedContracts,
-		Prune:                             flagPrune,
-		MaxAccountSize:                    flagMaxAccountSize,
-		VerboseErrorOutput:                flagVerboseErrorOutput,
-		FixSlabsWithBrokenReferences:      chainID == flow.Testnet && flagFixSlabsWithBrokenReferences,
-		FilterUnreferencedSlabs:           flagFilterUnreferencedSlabs,
-		ReportMetrics:                     flagReportMetrics,
-		CacheStaticTypeMigrationResults:   flagCacheStaticTypeMigrationResults,
-		CacheEntitlementsMigrationResults: flagCacheEntitlementsMigrationResults,
-	}
-
 	var extractor extractor
 	if len(flagInputPayloadFileName) > 0 {
 		extractor = newPayloadFileExtractor(log.Logger, flagInputPayloadFileName)
@@ -460,21 +422,6 @@ func run(*cobra.Command, []string) {
 		var migs []migrations.NamedMigration
 
 		switch flagMigration {
-		case "cadence-1.0":
-			migs = newCadence1Migrations(
-				log.Logger,
-				flagOutputDir,
-				opts,
-			)
-
-		case "fix-authorizations":
-			migs = newFixAuthorizationsMigrations(
-				log.Logger,
-				flagAuthorizationFixes,
-				flagOutputDir,
-				opts,
-			)
-
 		default:
 			log.Fatal().Msgf("unknown migration: %s", flagMigration)
 		}
@@ -556,36 +503,4 @@ func ensureCheckpointFileExist(dir string) error {
 	}
 
 	return fmt.Errorf("no checkpoint file was found, no root checkpoint file was found in %v, check the --execution-state-dir flag", dir)
-}
-
-func readAuthorizationFixes(path string) migrations.AuthorizationFixes {
-
-	file, err := os.Open(path)
-	if err != nil {
-		log.Fatal().Err(err).Msgf("can't open authorization fixes: %s", path)
-	}
-	defer file.Close()
-
-	var reader io.Reader = file
-	if isGzip(file) {
-		reader, err = gzip.NewReader(file)
-		if err != nil {
-			log.Fatal().Err(err).Msgf("failed to create gzip reader for %s", path)
-		}
-	}
-
-	log.Info().Msgf("Reading authorization fixes from %s ...", path)
-
-	fixes, err := migrations.ReadAuthorizationFixes(reader, nil)
-	if err != nil {
-		log.Fatal().Err(err).Msgf("failed to read authorization fixes %s", path)
-	}
-
-	log.Info().Msgf("Read %d authorization fixes", len(fixes))
-
-	return fixes
-}
-
-func isGzip(file *os.File) bool {
-	return strings.HasSuffix(file.Name(), ".gz")
 }
