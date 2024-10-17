@@ -992,10 +992,11 @@ func (b *backendTransactions) tryGetTransactionResultByIndex(
 }
 
 // LookupErrorMessageByTransactionID returns transaction error message for specified transaction.
-// If an error message for transaction can be found in the cache then it will be used to serve the request, otherwise
-// an RPC call will be made to the EN to fetch that error message, fetched value will be cached in the LRU cache.
+// If transaction error messages are stored locally, they will be checked first in local storage.
+// If error messages are not stored locally, an RPC call will be made to the EN to fetch message.
+//
 // Expected errors during normal operation:
-//   - InsufficientExecutionReceipts - found insufficient receipts for given block ID.
+//   - InsufficientExecutionReceipts - found insufficient receipts for the given block ID.
 //   - status.Error - remote GRPC call to EN has failed.
 func (b *backendTransactions) LookupErrorMessageByTransactionID(
 	ctx context.Context,
@@ -1050,11 +1051,12 @@ func (b *backendTransactions) LookupErrorMessageByTransactionID(
 	return resp.ErrorMessage, nil
 }
 
-// LookupErrorMessageByIndex returns transaction error message for specified transaction using its index.
-// If an error message for transaction can be found in cache then it will be used to serve the request, otherwise
-// an RPC call will be made to the EN to fetch that error message, fetched value will be cached in the LRU cache.
+// LookupErrorMessageByIndex returns the transaction error message for a specified transaction using its index.
+// If transaction error messages are stored locally, they will be checked first in local storage.
+// If error messages are not stored locally, an RPC call will be made to the EN to fetch message.
+//
 // Expected errors during normal operation:
-//   - InsufficientExecutionReceipts - found insufficient receipts for given block ID.
+//   - InsufficientExecutionReceipts - found insufficient receipts for the given block ID.
 //   - status.Error - remote GRPC call to EN has failed.
 func (b *backendTransactions) LookupErrorMessageByIndex(
 	ctx context.Context,
@@ -1110,9 +1112,11 @@ func (b *backendTransactions) LookupErrorMessageByIndex(
 }
 
 // LookupErrorMessagesByBlockID returns all error messages for failed transactions by blockID.
-// An RPC call will be made to the EN to fetch missing errors messages, fetched value will be cached in the LRU cache.
+// If transaction error messages are stored locally, they will be checked first in local storage.
+// If error messages are not stored locally, an RPC call will be made to the EN to fetch messages.
+//
 // Expected errors during normal operation:
-//   - InsufficientExecutionReceipts - found insufficient receipts for given block ID.
+//   - InsufficientExecutionReceipts - found insufficient receipts for the given block ID.
 //   - status.Error - remote GRPC call to EN has failed.
 func (b *backendTransactions) LookupErrorMessagesByBlockID(
 	ctx context.Context,
