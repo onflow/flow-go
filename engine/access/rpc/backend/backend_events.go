@@ -104,7 +104,7 @@ func (b *backendEvents) GetEventsForHeightRange(
 		// and avoids calculating header.ID() for each block.
 		blockID, err := b.headers.BlockIDByHeight(i)
 		if err != nil {
-			return nil, rpc.ConvertStorageError(fmt.Errorf("failed to get blockID for %d: %w", i, err))
+			return nil, rpc.ConvertStorageError(resolveHeightError(b.state.Params(), i, err))
 		}
 		header, err := b.headers.ByBlockID(blockID)
 		if err != nil {
