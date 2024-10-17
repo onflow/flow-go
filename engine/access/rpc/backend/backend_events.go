@@ -303,7 +303,13 @@ func (b *backendEvents) getBlockEventsFromExecutionNode(
 	// choose the last block ID to find the list of execution nodes
 	lastBlockID := blockIDs[len(blockIDs)-1]
 
-	execNodes, err := executionNodesForBlockID(ctx, lastBlockID, b.executionReceipts, b.state, b.log)
+	execNodes, err := rpc.ExecutionNodesForBlockID(ctx,
+		lastBlockID,
+		b.executionReceipts,
+		b.state,
+		b.log,
+		preferredENIdentifiers,
+		fixedENIdentifiers)
 	if err != nil {
 		return nil, rpc.ConvertError(err, "failed to retrieve events from execution node", codes.Internal)
 	}

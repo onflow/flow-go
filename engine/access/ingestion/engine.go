@@ -6,11 +6,16 @@ import (
 	"fmt"
 	"time"
 
+	execproto "github.com/onflow/flow/protobuf/go/flow/execution"
 	"github.com/rs/zerolog"
+	"github.com/sethvargo/go-retry"
 
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/engine"
+	"github.com/onflow/flow-go/engine/access/rpc/backend"
 	"github.com/onflow/flow-go/engine/common/fifoqueue"
+	commonrpc "github.com/onflow/flow-go/engine/common/rpc"
+	"github.com/onflow/flow-go/engine/common/rpc/convert"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/module"
@@ -50,11 +55,29 @@ const (
 	// default queue capacity
 	defaultQueueCapacity = 10_000
 
-	// how many workers will concurrently process the tasks in the jobqueue
-	workersCount = 1
+	// processFinalizedBlocksWorkersCount defines the number of workers that
+	// concurrently process finalized blocks in the job queue.
+	processFinalizedBlocksWorkersCount = 1
+
+	// processTxErrorMessagesWorkersCount defines the number of workers that
+	// concurrently process transaction error messages in the job queue.
+	processTxErrorMessagesWorkersCount = 3
 
 	// ensure blocks are processed sequentially by jobqueue
 	searchAhead = 1
+
+	// defaultRetryDelay specifies the initial delay for the exponential backoff
+	// when the process of fetching transaction error messages fails.
+	//
+	// This delay increases with each retry attempt, up to the maximum defined by
+	// defaultMaxRetryDelay.
+	defaultRetryDelay = 1 * time.Second
+
+	// defaultMaxRetryDelay specifies the maximum delay for the exponential backoff
+	// when the process of fetching transaction error messages fails.
+	//
+	// Once this delay is reached, the backoff will no longer increase with each retry.
+	defaultMaxRetryDelay = 5 * time.Minute
 )
 
 var (
@@ -76,10 +99,14 @@ type Engine struct {
 	executionReceiptsNotifier engine.Notifier
 	executionReceiptsQueue    engine.MessageStore
 	// Job queue
-	finalizedBlockConsumer *jobqueue.ComponentConsumer
+	finalizedBlockConsumer  *jobqueue.ComponentConsumer
+	txErrorMessagesConsumer *jobqueue.ComponentConsumer
 
 	// Notifier for queue consumer
 	finalizedBlockNotifier engine.Notifier
+
+	// txResultErrorMessagesChan is used to fetch and store transaction result error messages for blocks
+	txResultErrorMessagesChan chan flow.Identifier
 
 	log     zerolog.Logger   // used to log relevant actions with context
 	state   protocol.State   // used to access the  protocol state
@@ -88,17 +115,23 @@ type Engine struct {
 
 	// storage
 	// FIX: remove direct DB access by substituting indexer module
-	blocks            storage.Blocks
-	headers           storage.Headers
-	collections       storage.Collections
-	transactions      storage.Transactions
-	executionReceipts storage.ExecutionReceipts
-	maxReceiptHeight  uint64
-	executionResults  storage.ExecutionResults
+	blocks                         storage.Blocks
+	headers                        storage.Headers
+	collections                    storage.Collections
+	transactions                   storage.Transactions
+	executionReceipts              storage.ExecutionReceipts
+	maxReceiptHeight               uint64
+	executionResults               storage.ExecutionResults
+	transactionResultErrorMessages storage.TransactionResultErrorMessages
 
 	lastFullBlockHeight *counters.PersistentStrictMonotonicCounter
 	// metrics
 	collectionExecutedMetric module.CollectionExecutedMetric
+
+	preferredENIdentifiers flow.IdentifierList
+	fixedENIdentifiers     flow.IdentifierList
+
+	backend *backend.Backend
 }
 
 var _ network.MessageProcessor = (*Engine)(nil)
@@ -118,9 +151,14 @@ func New(
 	transactions storage.Transactions,
 	executionResults storage.ExecutionResults,
 	executionReceipts storage.ExecutionReceipts,
+	transactionResultErrorMessages storage.TransactionResultErrorMessages,
 	collectionExecutedMetric module.CollectionExecutedMetric,
-	processedHeight storage.ConsumerProgress,
+	finalizedProcessedHeight storage.ConsumerProgress,
+	txErrorMessagesProcessedHeight storage.ConsumerProgress,
 	lastFullBlockHeight *counters.PersistentStrictMonotonicCounter,
+	backend *backend.Backend,
+	preferredExecutionNodeIDs []string,
+	fixedExecutionNodeIDs []string,
 ) (*Engine, error) {
 	executionReceiptsRawQueue, err := fifoqueue.NewFifoQueue(defaultQueueCapacity)
 	if err != nil {
@@ -143,27 +181,42 @@ func New(
 
 	collectionExecutedMetric.UpdateLastFullBlockHeight(lastFullBlockHeight.Value())
 
+	preferredENIdentifiers, err := commonrpc.IdentifierList(preferredExecutionNodeIDs)
+	if err != nil {
+		return nil, fmt.Errorf("failed to convert node id string to Flow Identifier for preferred EN map: %w", err)
+	}
+
+	fixedENIdentifiers, err := commonrpc.IdentifierList(fixedExecutionNodeIDs)
+	if err != nil {
+		return nil, fmt.Errorf("failed to convert node id string to Flow Identifier for fixed EN map: %w", err)
+	}
+
 	// initialize the propagation engine with its dependencies
 	e := &Engine{
-		log:                      log.With().Str("engine", "ingestion").Logger(),
-		state:                    state,
-		me:                       me,
-		request:                  request,
-		blocks:                   blocks,
-		headers:                  headers,
-		collections:              collections,
-		transactions:             transactions,
-		executionResults:         executionResults,
-		executionReceipts:        executionReceipts,
-		maxReceiptHeight:         0,
-		collectionExecutedMetric: collectionExecutedMetric,
-		finalizedBlockNotifier:   engine.NewNotifier(),
-		lastFullBlockHeight:      lastFullBlockHeight,
+		log:                            log.With().Str("engine", "ingestion").Logger(),
+		state:                          state,
+		me:                             me,
+		request:                        request,
+		blocks:                         blocks,
+		headers:                        headers,
+		collections:                    collections,
+		transactions:                   transactions,
+		executionResults:               executionResults,
+		executionReceipts:              executionReceipts,
+		transactionResultErrorMessages: transactionResultErrorMessages,
+		maxReceiptHeight:               0,
+		collectionExecutedMetric:       collectionExecutedMetric,
+		finalizedBlockNotifier:         engine.NewNotifier(),
+		lastFullBlockHeight:            lastFullBlockHeight,
 
 		// queue / notifier for execution receipts
 		executionReceiptsNotifier: engine.NewNotifier(),
+		txResultErrorMessagesChan: make(chan flow.Identifier, 1),
 		executionReceiptsQueue:    executionReceiptsQueue,
 		messageHandler:            messageHandler,
+		backend:                   backend,
+		preferredENIdentifiers:    preferredENIdentifiers,
+		fixedENIdentifiers:        fixedENIdentifiers,
 	}
 
 	// jobqueue Jobs object that tracks finalized blocks by height. This is used by the finalizedBlockConsumer
@@ -172,7 +225,7 @@ func New(
 
 	defaultIndex, err := e.defaultProcessedIndex()
 	if err != nil {
-		return nil, fmt.Errorf("could not read default processed index: %w", err)
+		return nil, fmt.Errorf("could not read default finalized processed index: %w", err)
 	}
 
 	// create a jobqueue that will process new available finalized block. The `finalizedBlockNotifier` is used to
@@ -180,15 +233,42 @@ func New(
 	e.finalizedBlockConsumer, err = jobqueue.NewComponentConsumer(
 		e.log.With().Str("module", "ingestion_block_consumer").Logger(),
 		e.finalizedBlockNotifier.Channel(),
-		processedHeight,
+		finalizedProcessedHeight,
 		finalizedBlockReader,
 		defaultIndex,
 		e.processFinalizedBlockJob,
-		workersCount,
+		processFinalizedBlocksWorkersCount,
 		searchAhead,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("error creating finalizedBlock jobqueue: %w", err)
+	}
+
+	// jobqueue Jobs object that tracks sealed blocks by height. This is used by the txErrorMessagesConsumer
+	// to get a sequential list of sealed blocks.
+	sealedBlockReader := jobqueue.NewSealedBlockHeaderReader(state, headers)
+
+	// Create a job queue that will process error messages for new sealed blocks.
+	// It listens to block finalization events from `finalizedBlockNotifier`, then checks if there
+	// are new sealed blocks with `sealedBlockReader`. If there are, it starts workers to process
+	// them with `processTxResultErrorMessagesJob`, which fetches transaction error messages. At most
+	// `processTxErrorMessagesWorkersCount` workers will be created for concurrent processing.
+	// When a sealed block's error messages has been processed, it updates and persists the highest consecutive
+	// processed height with `txErrorMessagesProcessedHeight`. That way, if the node crashes,
+	// it reads the `txErrorMessagesProcessedHeight` and resume from `txErrorMessagesProcessedHeight + 1`.
+	// If the database is empty, rootHeight will be used to init the last processed height.
+	e.txErrorMessagesConsumer, err = jobqueue.NewComponentConsumer(
+		e.log.With().Str("module", "ingestion_tx_error_messages_consumer").Logger(),
+		e.finalizedBlockNotifier.Channel(),
+		txErrorMessagesProcessedHeight,
+		sealedBlockReader,
+		e.state.Params().SealedRoot().Height,
+		e.processTxResultErrorMessagesJob,
+		processTxErrorMessagesWorkersCount,
+		0,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("error creating transaction result error messages jobqueue: %w", err)
 	}
 
 	// Add workers
@@ -196,6 +276,8 @@ func New(
 		AddWorker(e.processBackground).
 		AddWorker(e.processExecutionReceipts).
 		AddWorker(e.runFinalizedBlockConsumer).
+		AddWorker(e.processTransactionResultErrorMessagesByReceipts).
+		AddWorker(e.runTxResultErrorMessagesConsumer).
 		Build()
 
 	// register engine with the execution receipt provider
@@ -209,7 +291,7 @@ func New(
 
 // defaultProcessedIndex returns the last finalized block height from the protocol state.
 //
-// The BlockConsumer utilizes this return height to fetch and consume block jobs from
+// The finalizedBlockConsumer utilizes this return height to fetch and consume block jobs from
 // jobs queue the first time it initializes.
 //
 // No errors are expected during normal operation.
@@ -248,6 +330,27 @@ func (e *Engine) processFinalizedBlockJob(ctx irrecoverable.SignalerContext, job
 	}
 
 	e.log.Error().Err(err).Str("job_id", string(job.ID())).Msg("error during finalized block processing job")
+}
+
+// processTxResultErrorMessagesJob processes a job for transaction error messages by
+// converting the job to a block and processing error messages. If processing
+// fails for all attempts, it logs the error.
+func (e *Engine) processTxResultErrorMessagesJob(ctx irrecoverable.SignalerContext, job module.Job, done func()) {
+	header, err := jobqueue.JobToBlockHeader(job)
+	if err != nil {
+		ctx.Throw(fmt.Errorf("failed to convert job to block: %w", err))
+	}
+
+	err = e.processErrorMessagesForBlock(ctx, header.ID())
+	if err == nil {
+		done()
+		return
+	}
+
+	e.log.Error().
+		Err(err).
+		Str("job_id", string(job.ID())).
+		Msg("error encountered while processing transaction result error messages job")
 }
 
 // processBackground is a background routine responsible for executing periodic tasks related to block processing and collection retrieval.
@@ -295,6 +398,18 @@ func (e *Engine) processBackground(ctx irrecoverable.SignalerContext, ready comp
 	}
 }
 
+// runTxResultErrorMessagesConsumer runs the txErrorMessagesConsumer component
+func (e *Engine) runTxResultErrorMessagesConsumer(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
+	e.txErrorMessagesConsumer.Start(ctx)
+
+	err := util.WaitClosed(ctx, e.txErrorMessagesConsumer.Ready())
+	if err == nil {
+		ready()
+	}
+
+	<-e.txErrorMessagesConsumer.Done()
+}
+
 // processExecutionReceipts is responsible for processing the execution receipts.
 // It listens for incoming execution receipts and processes them asynchronously.
 func (e *Engine) processExecutionReceipts(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
@@ -337,7 +452,128 @@ func (e *Engine) processAvailableExecutionReceipts(ctx context.Context) error {
 		if err := e.handleExecutionReceipt(msg.OriginID, receipt); err != nil {
 			return err
 		}
+
+		// notify, to fetch and store transaction result error messages for block
+		e.txResultErrorMessagesChan <- receipt.BlockID
 	}
+}
+
+// processTransactionResultErrorMessagesByReceipts handles error messages related to transaction
+// results by reading from the error messages channel and processing them accordingly.
+//
+// This function listens for messages on the txResultErrorMessagesChan channel and
+// processes each transaction result error message as it arrives.
+//
+// No errors are expected during normal operation.
+func (e *Engine) processTransactionResultErrorMessagesByReceipts(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
+	ready()
+
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case blockID := <-e.txResultErrorMessagesChan:
+			err := e.handleTransactionResultErrorMessages(ctx, blockID)
+			if err != nil {
+				// if an error reaches this point, it is unexpected
+				ctx.Throw(err)
+				return
+			}
+		}
+	}
+}
+
+// handleTransactionResultErrorMessages processes transaction result error messages for a given block ID.
+// It retrieves error messages from the backend if they do not already exist in storage.
+//
+// The function first checks if error messages for the given block ID are already present in storage.
+// If they are not, it fetches the messages from execution nodes and stores them.
+//
+// Parameters:
+// - ctx: The context for managing cancellation and deadlines during the operation.
+// - blockID: The identifier of the block for which transaction result error messages need to be processed.
+//
+// No errors are expected during normal operation.
+func (e *Engine) handleTransactionResultErrorMessages(ctx context.Context, blockID flow.Identifier) error {
+	if e.transactionResultErrorMessages == nil {
+		return nil
+	}
+
+	exists, err := e.transactionResultErrorMessages.Exists(blockID)
+	if err != nil {
+		return fmt.Errorf("could not check existance of transaction result error messages: %w", err)
+	}
+
+	if exists {
+		return nil
+	}
+
+	// retrieves error messages from the backend if they do not already exist in storage
+	execNodes, err := commonrpc.ExecutionNodesForBlockID(
+		ctx,
+		blockID,
+		e.executionReceipts,
+		e.state,
+		e.log,
+		e.preferredENIdentifiers,
+		e.preferredENIdentifiers,
+	)
+	if err != nil {
+		e.log.Error().Err(err).Msg(fmt.Sprintf("failed to found execution nodes for block id: %s", blockID))
+		return fmt.Errorf("could not found execution nodes for block: %w", err)
+	}
+
+	req := &execproto.GetTransactionErrorMessagesByBlockIDRequest{
+		BlockId: convert.IdentifierToMessage(blockID),
+	}
+
+	resp, execNode, err := e.backend.GetTransactionErrorMessagesFromAnyEN(ctx, execNodes, req)
+	if err != nil {
+		// continue, we will add functionality to backfill these later
+		e.log.Error().Err(err).Msg("failed to get transaction error messages from execution nodes")
+		return nil
+	}
+
+	if len(resp) > 0 {
+		err = e.storeTransactionResultErrorMessages(blockID, resp, execNode)
+		if err != nil {
+			return fmt.Errorf("could not store error messages: %w", err)
+		}
+	}
+
+	return nil
+}
+
+// storeTransactionResultErrorMessages stores the transaction result error messages for a given block ID.
+//
+// Parameters:
+// - blockID: The identifier of the block for which the error messages are to be stored.
+// - errorMessagesResponses: A slice of responses containing the error messages to be stored.
+// - execNode: The execution node associated with the error messages.
+//
+// No errors are expected during normal operation.
+func (e *Engine) storeTransactionResultErrorMessages(
+	blockID flow.Identifier,
+	errorMessagesResponses []*execproto.GetTransactionErrorMessagesResponse_Result,
+	execNode *flow.IdentitySkeleton,
+) error {
+	errorMessages := make([]flow.TransactionResultErrorMessage, 0, len(errorMessagesResponses))
+	for _, value := range errorMessagesResponses {
+		errorMessage := flow.TransactionResultErrorMessage{
+			ErrorMessage:  value.ErrorMessage,
+			TransactionID: convert.MessageToIdentifier(value.TransactionId),
+			Index:         value.Index,
+			ExecutorID:    execNode.NodeID,
+		}
+		errorMessages = append(errorMessages, errorMessage)
+	}
+
+	err := e.transactionResultErrorMessages.Store(blockID, errorMessages)
+	if err != nil {
+		return fmt.Errorf("failed to store transaction error messages: %w", err)
+	}
+
+	return nil
 }
 
 // process processes the given ingestion engine event. Events that are given
@@ -415,6 +651,31 @@ func (e *Engine) processFinalizedBlock(block *flow.Block) error {
 	e.collectionExecutedMetric.BlockFinalized(block)
 
 	return nil
+}
+
+// processErrorMessagesForBlock processes transaction result error messages for sealed block.
+// If the process fails, it will retry, using exponential backoff.
+//
+// No errors are expected during normal operation.
+func (e *Engine) processErrorMessagesForBlock(ctx context.Context, blockID flow.Identifier) error {
+	backoff := retry.NewExponential(defaultRetryDelay)
+	backoff = retry.WithCappedDuration(defaultMaxRetryDelay, backoff)
+	backoff = retry.WithJitterPercent(15, backoff)
+
+	attempt := 0
+	return retry.Do(ctx, backoff, func(context.Context) error {
+		if attempt > 0 {
+			e.log.Debug().
+				Str("block_id", blockID.String()).
+				Uint64("attempt", uint64(attempt)).
+				Msgf("retrying process transaction result error messages")
+
+		}
+		attempt++
+		err := e.handleTransactionResultErrorMessages(ctx, blockID)
+
+		return retry.RetryableError(err)
+	})
 }
 
 // handleExecutionReceipt persists the execution receipt locally.
