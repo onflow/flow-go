@@ -75,9 +75,10 @@ type Suite struct {
 	blockMap        map[uint64]*flow.Block
 	rootBlock       flow.Block
 
-	execClient  *accessmock.ExecutionAPIClient
-	connFactory *connectionmock.ConnectionFactory
-	enNodeIDs   flow.IdentifierList
+	execClient                  *accessmock.ExecutionAPIClient
+	connFactory                 *connectionmock.ConnectionFactory
+	enNodeIDs                   flow.IdentifierList
+	txResultErrorMessagesExists bool
 
 	collectionExecutedMetric *indexer.CollectionExecutedMetricImpl
 
@@ -114,7 +115,6 @@ func (s *Suite) SetupTest() {
 	s.proto.params = new(protocol.Params)
 	s.finalizedBlock = unittest.BlockHeaderFixture(unittest.WithHeaderHeight(0))
 	s.proto.state.On("Identity").Return(s.obsIdentity, nil)
-	s.proto.state.On("Final").Return(s.proto.snapshot, nil)
 	s.proto.state.On("Params").Return(s.proto.params)
 	s.proto.snapshot.On("Head").Return(
 		func() *flow.Header {
@@ -175,6 +175,13 @@ func (s *Suite) SetupTest() {
 		),
 	).Maybe()
 
+	s.headers.On("ByHeight", mock.AnythingOfType("uint64")).Return(
+		mocks.ConvertStorageOutput(
+			mocks.StorageMapGetter(s.blockMap),
+			func(block *flow.Block) *flow.Header { return block.Header },
+		),
+	).Maybe()
+
 	s.proto.snapshot.On("Head").Return(
 		func() *flow.Header {
 			return s.finalizedBlock
@@ -182,6 +189,12 @@ func (s *Suite) SetupTest() {
 		nil,
 	).Maybe()
 	s.proto.state.On("Final").Return(s.proto.snapshot, nil)
+	s.proto.state.On("Sealed").Return(s.proto.snapshot, nil)
+
+	// Mock the finalized root block header with height 0.
+	header := unittest.BlockHeaderFixture(unittest.WithHeaderHeight(0))
+	s.proto.params.On("FinalizedRoot").Return(header, nil)
+	s.proto.params.On("SealedRoot").Return(header, nil)
 
 	s.collectionExecutedMetric, err = indexer.NewCollectionExecutedMetricImpl(
 		s.log,
@@ -194,6 +207,13 @@ func (s *Suite) SetupTest() {
 		blockTransactions,
 	)
 	require.NoError(s.T(), err)
+
+	s.txResultErrorMessagesExists = true
+	// Mock the txErrorMessages storage to confirm that error messages exists.
+	s.txErrorMessages.On("Exists", mock.Anything).
+		Return(func(flow.Identifier) bool {
+			return s.txResultErrorMessagesExists
+		}, nil).Maybe()
 }
 
 // initIngestionEngine create new instance of ingestion engine and waits when it starts
@@ -339,10 +359,6 @@ func (s *Suite) TestOnFinalizedBlockSingle() {
 		}).Once()
 	}
 
-	// Mock the txErrorMessages storage to confirm that error messages exists.
-	s.txErrorMessages.On("Exists", mock.Anything).
-		Return(true, nil).Maybe()
-
 	// process the block through the finalized callback
 	eng.OnFinalizedBlock(&hotstuffBlock)
 
@@ -412,10 +428,6 @@ func (s *Suite) TestOnFinalizedBlockSeveralBlocksAhead() {
 			s.results.On("Index", seal.BlockID, seal.ResultID).Return(nil).Once()
 		}
 	}
-
-	// Mock the txErrorMessages storage to confirm that error messages exists.
-	s.txErrorMessages.On("Exists", mock.Anything).
-		Return(true, nil).Maybe()
 
 	eng.OnFinalizedBlock(&hotstuffBlock)
 
@@ -884,10 +896,6 @@ func (s *Suite) TestHandleTransactionResultErrorMessages() {
 	s.proto.snapshot.On("Identities", mock.Anything).Return(fixedENIDs, nil)
 	s.proto.state.On("AtBlockID", blockId).Return(s.proto.snapshot).Once()
 
-	// Mock the finalized root block header with height 0.
-	header := unittest.BlockHeaderFixture(unittest.WithHeaderHeight(0))
-	s.proto.params.On("FinalizedRoot").Return(header, nil)
-
 	// Initialize the ingestion engine with the irrecoverable context.
 	eng := s.initIngestionEngine(irrecoverableCtx)
 
@@ -904,8 +912,7 @@ func (s *Suite) TestHandleTransactionResultErrorMessages() {
 		Once()
 
 	// Mock the txErrorMessages storage to confirm that error messages do not exist yet.
-	s.txErrorMessages.On("Exists", blockId).
-		Return(false, nil).Once()
+	s.txResultErrorMessagesExists = false
 
 	// Prepare the expected transaction error messages that should be stored.
 	expectedStoreTxErrorMessages := s.createExpectedTxErrorMessages(resultsByBlockID, fixedENIDs.NodeIDs()[0])
@@ -922,8 +929,7 @@ func (s *Suite) TestHandleTransactionResultErrorMessages() {
 
 	// Now simulate the second try when the error messages already exist in storage.
 	// Mock the txErrorMessages storage to confirm that error messages exist.
-	s.txErrorMessages.On("Exists", blockId).
-		Return(true, nil).Once()
+	s.txResultErrorMessagesExists = true
 	err = eng.handleTransactionResultErrorMessages(irrecoverableCtx, blockId)
 	require.NoError(s.T(), err)
 

@@ -8,6 +8,7 @@ import (
 
 	execproto "github.com/onflow/flow/protobuf/go/flow/execution"
 	"github.com/rs/zerolog"
+	"github.com/sethvargo/go-retry"
 
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/engine"
@@ -54,14 +55,29 @@ const (
 	// default queue capacity
 	defaultQueueCapacity = 10_000
 
-	// how many workers will concurrently process the tasks in the jobqueue
-	workersCount = 1
+	// processFinalizedBlocksWorkersCount defines the number of workers that
+	// concurrently process finalized blocks in the job queue.
+	processFinalizedBlocksWorkersCount = 1
+
+	// processTxErrorMessagesWorkersCount defines the number of workers that
+	// concurrently process transaction error messages in the job queue.
+	processTxErrorMessagesWorkersCount = 3
 
 	// ensure blocks are processed sequentially by jobqueue
 	searchAhead = 1
 
-	// maxAttemptsForErrorMessagesCount is the maximum number of attempts to process transaction result messages for a given block ID
-	maxAttemptsForErrorMessagesCount = 3
+	// defaultRetryDelay specifies the initial delay for the exponential backoff
+	// when the process of fetching transaction error messages fails.
+	//
+	// This delay increases with each retry attempt, up to the maximum defined by
+	// defaultMaxRetryDelay.
+	defaultRetryDelay = 1 * time.Second
+
+	// defaultMaxRetryDelay specifies the maximum delay for the exponential backoff
+	// when the process of fetching transaction error messages fails.
+	//
+	// Once this delay is reached, the backoff will no longer increase with each retry.
+	defaultMaxRetryDelay = 5 * time.Minute
 )
 
 var (
@@ -209,7 +225,7 @@ func New(
 
 	defaultIndex, err := e.defaultProcessedIndex()
 	if err != nil {
-		return nil, fmt.Errorf("could not read default processed index: %w", err)
+		return nil, fmt.Errorf("could not read default finalized processed index: %w", err)
 	}
 
 	// create a jobqueue that will process new available finalized block. The `finalizedBlockNotifier` is used to
@@ -221,24 +237,35 @@ func New(
 		finalizedBlockReader,
 		defaultIndex,
 		e.processFinalizedBlockJob,
-		workersCount,
+		processFinalizedBlocksWorkersCount,
 		searchAhead,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("error creating finalizedBlock jobqueue: %w", err)
 	}
 
-	// create a job queue that will process error messages for new blocks. The `txErrorMessagesConsumer` is used to
-	// signal new work, which is being triggered on the `processTxResultErrorMessagesJob` handler.
+	// jobqueue Jobs object that tracks sealed blocks by height. This is used by the txErrorMessagesConsumer
+	// to get a sequential list of sealed blocks.
+	sealedBlockReader := jobqueue.NewSealedBlockHeaderReader(state, headers)
+
+	// Create a job queue that will process error messages for new sealed blocks.
+	// It listens to block finalization events from `finalizedBlockNotifier`, then checks if there
+	// are new sealed blocks with `sealedBlockReader`. If there are, it starts workers to process
+	// them with `processTxResultErrorMessagesJob`, which fetches transaction error messages. At most
+	// `processTxErrorMessagesWorkersCount` workers will be created for concurrent processing.
+	// When a sealed block's error messages has been processed, it updates and persists the highest consecutive
+	// processed height with `txErrorMessagesProcessedHeight`. That way, if the node crashes,
+	// it reads the `txErrorMessagesProcessedHeight` and resume from `txErrorMessagesProcessedHeight + 1`.
+	// If the database is empty, rootHeight will be used to init the last processed height.
 	e.txErrorMessagesConsumer, err = jobqueue.NewComponentConsumer(
 		e.log.With().Str("module", "ingestion_tx_error_messages_consumer").Logger(),
 		e.finalizedBlockNotifier.Channel(),
 		txErrorMessagesProcessedHeight,
-		finalizedBlockReader,
-		defaultIndex,
+		sealedBlockReader,
+		e.state.Params().SealedRoot().Height,
 		e.processTxResultErrorMessagesJob,
-		workersCount,
-		searchAhead,
+		processTxErrorMessagesWorkersCount,
+		0,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("error creating transaction result error messages jobqueue: %w", err)
@@ -264,7 +291,7 @@ func New(
 
 // defaultProcessedIndex returns the last finalized block height from the protocol state.
 //
-// The BlockConsumer utilizes this return height to fetch and consume block jobs from
+// The finalizedBlockConsumer utilizes this return height to fetch and consume block jobs from
 // jobs queue the first time it initializes.
 //
 // No errors are expected during normal operation.
@@ -306,27 +333,24 @@ func (e *Engine) processFinalizedBlockJob(ctx irrecoverable.SignalerContext, job
 }
 
 // processTxResultErrorMessagesJob processes a job for transaction error messages by
-// converting the job to a block and processing error messages with retries. If processing
+// converting the job to a block and processing error messages. If processing
 // fails for all attempts, it logs the error.
 func (e *Engine) processTxResultErrorMessagesJob(ctx irrecoverable.SignalerContext, job module.Job, done func()) {
-	block, err := jobqueue.JobToBlock(job)
+	header, err := jobqueue.JobToBlockHeader(job)
 	if err != nil {
 		ctx.Throw(fmt.Errorf("failed to convert job to block: %w", err))
 	}
 
-	for attempt := 0; attempt < maxAttemptsForErrorMessagesCount; attempt++ {
-		err = e.processErrorMessagesForBlock(ctx, block)
-		if err == nil {
-			done()
-			return
-		}
+	err = e.processErrorMessagesForBlock(ctx, header.ID())
+	if err == nil {
+		done()
+		return
 	}
 
 	e.log.Error().
 		Err(err).
 		Str("job_id", string(job.ID())).
-		Int("attempts", maxAttemptsForErrorMessagesCount).
-		Msg("error during error messages job after max retries")
+		Msg("error encountered while processing transaction result error messages job")
 }
 
 // processBackground is a background routine responsible for executing periodic tasks related to block processing and collection retrieval.
@@ -629,19 +653,29 @@ func (e *Engine) processFinalizedBlock(block *flow.Block) error {
 	return nil
 }
 
-// processErrorMessagesForBlock processes transaction result error messages for each seal
-// in the provided block.
+// processErrorMessagesForBlock processes transaction result error messages for sealed block.
+// If the process fails, it will retry, using exponential backoff.
 //
 // No errors are expected during normal operation.
-func (e *Engine) processErrorMessagesForBlock(ctx context.Context, block *flow.Block) error {
-	for _, seal := range block.Payload.Seals {
-		err := e.handleTransactionResultErrorMessages(ctx, seal.BlockID)
-		if err != nil {
-			return err
-		}
-	}
+func (e *Engine) processErrorMessagesForBlock(ctx context.Context, blockID flow.Identifier) error {
+	backoff := retry.NewExponential(defaultRetryDelay)
+	backoff = retry.WithCappedDuration(defaultMaxRetryDelay, backoff)
+	backoff = retry.WithJitterPercent(15, backoff)
 
-	return nil
+	attempt := 0
+	return retry.Do(ctx, backoff, func(context.Context) error {
+		if attempt > 0 {
+			e.log.Debug().
+				Str("block_id", blockID.String()).
+				Uint64("attempt", uint64(attempt)).
+				Msgf("retrying process transaction result error messages")
+
+		}
+		attempt++
+		err := e.handleTransactionResultErrorMessages(ctx, blockID)
+
+		return retry.RetryableError(err)
+	})
 }
 
 // handleExecutionReceipt persists the execution receipt locally.
