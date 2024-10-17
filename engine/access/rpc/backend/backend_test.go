@@ -2241,16 +2241,16 @@ func (suite *Suite) defaultBackendParams() Params {
 	}
 }
 
-// TestHandleErrorMessage tests the handleErrorMessage function for various scenarios where the block height
+// TestResolveHeightError tests the resolveHeightError function for various scenarios where the block height
 // is below the spork root height, below the node root height, above the node root height, or when a different
-// error is provided. It validates that handleErrorMessage returns an appropriate error message for each case.
+// error is provided. It validates that resolveHeightError returns an appropriate error message for each case.
 //
 // Test cases:
 // 1) If height is below the spork root height, it suggests using a historic node.
 // 2) If height is below the node root height, it suggests using a different Access node.
 // 3) If height is above the node root height, it returns the original error without modification.
 // 4) If a non-storage-related error is provided, it returns the error as is.
-func (suite *Suite) TestHandleErrorMessage() {
+func (suite *Suite) TestResolveHeightError() {
 	tests := []struct {
 		name              string
 		height            uint64
@@ -2306,7 +2306,7 @@ func (suite *Suite) TestHandleErrorMessage() {
 				stateParams.On("SealedRoot").Return(sealedRootHeader, nil).Once()
 			}
 
-			err := handleErrorMessage(stateParams, test.height, test.genericErr)
+			err := resolveHeightError(stateParams, test.height, test.genericErr)
 
 			if test.expectOriginalErr {
 				suite.Assert().True(errors.Is(err, test.genericErr))

@@ -643,7 +643,7 @@ func chooseFromPreferredENIDs(allENs flow.IdentityList, executorIDs flow.Identif
 	return chosenIDs
 }
 
-// handleErrorMessage processes errors returned during height-based queries.
+// resolveHeightError processes errors returned during height-based queries.
 // If the error is due to a block not being found, this function determines whether the queried
 // height falls outside the node's accessible range and provides context-sensitive error messages
 // based on spork and node root block heights.
@@ -655,7 +655,7 @@ func chooseFromPreferredENIDs(allENs flow.IdentityList, executorIDs flow.Identif
 //
 // Expected errors during normal operation:
 // - storage.ErrNotFound - Indicates that the queried block does not exist in the local database.
-func handleErrorMessage(
+func resolveHeightError(
 	stateParams protocol.Params,
 	height uint64,
 	genericErr error,
@@ -673,7 +673,7 @@ func handleErrorMessage(
 			sporkRootBlockHeight,
 			genericErr,
 		)
-	} else if height < nodeRootBlockHeader && nodeRootBlockHeader >= sporkRootBlockHeight {
+	} else if height < nodeRootBlockHeader {
 		return fmt.Errorf("block height %d is less than the node's root block height %d. Try to use a different Access node: %w",
 			height,
 			nodeRootBlockHeader,

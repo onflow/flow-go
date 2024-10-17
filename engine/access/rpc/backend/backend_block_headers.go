@@ -69,7 +69,7 @@ func (b *backendBlockHeaders) GetBlockHeaderByID(ctx context.Context, id flow.Id
 func (b *backendBlockHeaders) GetBlockHeaderByHeight(ctx context.Context, height uint64) (*flow.Header, flow.BlockStatus, error) {
 	header, err := b.headers.ByHeight(height)
 	if err != nil {
-		return nil, flow.BlockStatusUnknown, rpc.ConvertStorageError(handleErrorMessage(b.state.Params(), height, err))
+		return nil, flow.BlockStatusUnknown, rpc.ConvertStorageError(resolveHeightError(b.state.Params(), height, err))
 	}
 
 	stat, err := b.getBlockStatus(ctx, header)
