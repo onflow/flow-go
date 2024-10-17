@@ -19,6 +19,11 @@ type StorageProvider interface {
 // at specific block height
 type BlockSnapshot interface {
 	// BlockContext constructs and returns the block context for the block
+	//
+	// Warning! the block hash provider on this one has to return empty
+	// for the current block to stay compatible with how on-chain EVM
+	// behaves. so if we are on block 10, and we query for the block hash on block
+	// 10 it should return empty hash.
 	BlockContext() (BlockContext, error)
 }
 

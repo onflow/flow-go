@@ -29,6 +29,7 @@ func NewBasicProvider(
 }
 
 // GetSnapshotAt returns a block snapshot at the given height
+// Snapshot at a height is not available until `OnBlockReceived` is called for that height.
 func (p *BasicProvider) GetSnapshotAt(height uint64) (
 	types.BlockSnapshot,
 	error,
