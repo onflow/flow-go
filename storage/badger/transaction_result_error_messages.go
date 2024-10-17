@@ -131,7 +131,11 @@ func (t *TransactionResultErrorMessages) Exists(blockID flow.Identifier) (bool, 
 // BatchStore inserts a batch of transaction result error messages into a batch
 //
 // No errors are expected during normal operation.
-func (t *TransactionResultErrorMessages) batchStore(blockID flow.Identifier, transactionResultErrorMessages []flow.TransactionResultErrorMessage, batch storage.BatchStorage) error {
+func (t *TransactionResultErrorMessages) batchStore(
+	blockID flow.Identifier,
+	transactionResultErrorMessages []flow.TransactionResultErrorMessage,
+	batch storage.BatchStorage,
+) error {
 	writeBatch := batch.GetWriter()
 
 	for _, result := range transactionResultErrorMessages {
