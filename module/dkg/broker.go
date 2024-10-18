@@ -209,16 +209,24 @@ func (b *Broker) Broadcast(data []byte) {
 }
 
 // SubmitResult publishes the result of the DKG protocol to the smart contract.
+// This function should be passed the beacon keys (group key, participant keys) resulting from the DKG process.
+// If the DKG process failed, no beacon keys will exist. In that case, we pass in nil here for both arguments.
+//
+// If non-nil arguments are provided, we submit a non-empty ResultSubmission to the DKG smart contract,
+// indicating that we completed the DKG successfully and essentially "voting for" our result.
+// If nil arguments are provided, we submit an empty ResultSubmission to the DKG smart contract,
+// indicating that we completed the DKG unsuccessfully.
 func (b *Broker) SubmitResult(groupKey crypto.PublicKey, pubKeys []crypto.PublicKey) error {
 
-	// If the DKG failed locally, we will get a nil key vector here.
-	// There are two different endpoints in the DKG smart contract for submitting a happy-path and failure-path result.
+	// If the DKG failed locally, we will get a nil group key and nil participant key vector here.
+	// There are two different transaction templates for submitting either a happy-path and failure-path result.
+	// We use SubmitResult to submit a successful result and SubmitEmptyResult to communicate that we completed the DKG without a result.
 	//
 	// In general, if pubKeys does not have one key per participant, we cannot submit
 	// a valid result - therefore we submit a nil vector (indicating that we have
 	// completed the process, but we know that we don't have a valid result).
 	var submitResult func(client module.DKGContractClient) error
-	if len(pubKeys) == len(b.committee) {
+	if len(pubKeys) == len(b.committee) && groupKey != nil {
 		indexMap := make(flow.DKGIndexMap, len(pubKeys))
 		// build a map of node IDs to indices in the key vector,
 		// this logic expects that committee is sorted in canonical order!
@@ -226,11 +234,10 @@ func (b *Broker) SubmitResult(groupKey crypto.PublicKey, pubKeys []crypto.Public
 			indexMap[participant.NodeID] = i
 		}
 		submitResult = func(client module.DKGContractClient) error {
-			return client.SubmitResult(groupKey, pubKeys, indexMap)
+			return client.SubmitParametersAndResult(indexMap, groupKey, pubKeys)
 		}
 	} else {
-		b.log.Warn().Msgf("submitting empty dkg result because of incomplete key vector (len=%d, expected=%d)",
-			len(pubKeys), len(b.committee))
+		b.log.Warn().Msgf("submitting empty dkg result because I completed the DKG unsuccessfully")
 		submitResult = func(client module.DKGContractClient) error {
 			return client.SubmitEmptyResult()
 		}
