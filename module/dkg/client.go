@@ -192,7 +192,6 @@ func (c *Client) Broadcast(msg model.BroadcastDKGMessage) error {
 // Therefore, we need to explicitly specify the DKG committee 𝒟 on the fallback path. For uniformity of implementation, we do the
 // same also on the happy path.
 func (c *Client) SubmitParametersAndResult(indexMap flow.DKGIndexMap, groupPublicKey crypto.PublicKey, publicKeys []crypto.PublicKey) error {
-
 	started := time.Now()
 	ctx, cancel := context.WithTimeout(context.Background(), epochs.TransactionSubmissionTimeout)
 	defer cancel()
