@@ -968,11 +968,7 @@ func convertClusterQCVotes(cdcClusterQCs []cadence.Value) (
 // convertDKGKeys converts hex-encoded DKG public keys as received by the DKG
 // smart contract into crypto.PublicKey representations suitable for inclusion
 // in the protocol state.
-func convertDKGKeys(cdcDKGKeys ...cadence.Value) (
-	convertedKeys []crypto.PublicKey,
-	err error,
-) {
-
+func convertDKGKeys(cdcDKGKeys ...cadence.Value) ([]crypto.PublicKey, error) {
 	hexDKGKeys := make([]string, 0, len(cdcDKGKeys))
 	for _, value := range cdcDKGKeys {
 		keyHex, ok := value.(cadence.String)
@@ -985,13 +981,9 @@ func convertDKGKeys(cdcDKGKeys ...cadence.Value) (
 	// decode individual public keys
 	convertedKeys = make([]crypto.PublicKey, 0, len(hexDKGKeys))
 	for _, pubKeyString := range hexDKGKeys {
-
 		pubKeyBytes, err := hex.DecodeString(pubKeyString)
 		if err != nil {
-			return nil, fmt.Errorf(
-				"could not decode individual public key into bytes: %w",
-				err,
-			)
+			return nil, fmt.Errorf("could not decode individual public key into bytes: %w", err)
 		}
 		pubKey, err := crypto.DecodePublicKey(crypto.BLSBLS12381, pubKeyBytes)
 		if err != nil {
