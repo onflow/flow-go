@@ -127,7 +127,7 @@ func (s *EmulatorSuite) runTest(goodNodes int, emulatorProblems bool) {
 
 	// the result is an array of public keys where the first item is the group
 	// public key
-	groupPubKey, pubKeys, _ := s.getResult()
+	_, groupPubKey, pubKeys := s.getParametersAndResult()
 
 	tag := "some tag"
 	hasher := msig.NewBLSHasher(tag)
