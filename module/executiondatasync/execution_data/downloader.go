@@ -12,7 +12,6 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/blobs"
-	"github.com/onflow/flow-go/module/executiondatasync/tracker"
 	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/storage"
 )
@@ -32,7 +31,7 @@ type downloader struct {
 	blobService network.BlobService
 	maxBlobSize int
 	serializer  Serializer
-	storage     tracker.Storage
+	storage     storage.ExecutionDataTracker
 	headers     storage.Headers
 }
 
@@ -46,7 +45,7 @@ func WithSerializer(serializer Serializer) DownloaderOption {
 }
 
 // WithExecutionDataTracker configures the execution data tracker and the storage headers for the downloader
-func WithExecutionDataTracker(storage tracker.Storage, headers storage.Headers) DownloaderOption {
+func WithExecutionDataTracker(storage storage.ExecutionDataTracker, headers storage.Headers) DownloaderOption {
 	return func(d *downloader) {
 		d.storage = storage
 		d.headers = headers
@@ -233,7 +232,7 @@ func (d *downloader) trackBlobs(blockID flow.Identifier, cids []cid.Cid) error {
 		return nil
 	}
 
-	return d.storage.Update(func(trackBlobs tracker.TrackBlobsFn) error {
+	return d.storage.Update(func(trackBlobs storage.TrackBlobsFn) error {
 		header, err := d.headers.ByBlockID(blockID)
 		if err != nil {
 			return err
