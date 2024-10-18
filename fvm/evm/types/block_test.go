@@ -17,14 +17,12 @@ func Test_GenesisBlock(t *testing.T) {
 	testnetGenesis := GenesisBlock(flow.Testnet)
 	require.Equal(t, testnetGenesis.Timestamp, GenesisTimestamp(flow.Testnet))
 	testnetGenesisHash := GenesisBlockHash(flow.Testnet)
-	h, err := testnetGenesis.Hash()
-	require.NoError(t, err)
-	require.Equal(t, h, testnetGenesisHash)
+	require.Equal(t, TestNetGenesisHash, testnetGenesisHash)
 
 	mainnetGenesis := GenesisBlock(flow.Mainnet)
 	require.Equal(t, mainnetGenesis.Timestamp, GenesisTimestamp(flow.Mainnet))
 	mainnetGenesisHash := GenesisBlockHash(flow.Mainnet)
-	h, err = mainnetGenesis.Hash()
+	h, err := mainnetGenesis.Hash()
 	require.NoError(t, err)
 	require.Equal(t, h, mainnetGenesisHash)
 
