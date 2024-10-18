@@ -106,16 +106,12 @@ func (c *CollectionExecutedMetricImpl) BlockFinalized(block *flow.Block) {
 		c.mutex.RUnlock() // release the read lock after reading
 
 		if found && len(transactions) != 0 {
-			// Lock for writing since we will modify the transactions list
-			c.mutex.Lock()
-			// Process all transactions
 			for _, t := range transactions {
 				c.accessMetrics.TransactionSealed(t, now)
 			}
 
-			// Remove the entire block of transactions once processed
+			c.mutex.Lock()
 			delete(c.blockTransactions, s.BlockID)
-			// Unlock after modifications are done
 			c.mutex.Unlock()
 		}
 	}
