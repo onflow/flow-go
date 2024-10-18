@@ -11,8 +11,8 @@ import (
 
 	"github.com/onflow/go-ethereum/core/vm"
 
+	cdcCommon "github.com/onflow/cadence/common"
 	"github.com/onflow/cadence/encoding/ccf"
-	cdcCommon "github.com/onflow/cadence/runtime/common"
 	gethCommon "github.com/onflow/go-ethereum/common"
 	gethTypes "github.com/onflow/go-ethereum/core/types"
 	"github.com/onflow/go-ethereum/rlp"

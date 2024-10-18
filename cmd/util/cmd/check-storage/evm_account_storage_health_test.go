@@ -9,9 +9,9 @@ import (
 	"golang.org/x/exp/maps"
 
 	"github.com/onflow/atree"
+	"github.com/onflow/cadence/common"
+	"github.com/onflow/cadence/interpreter"
 	"github.com/onflow/cadence/runtime"
-	"github.com/onflow/cadence/runtime/common"
-	"github.com/onflow/cadence/runtime/interpreter"
 	gethCommon "github.com/onflow/go-ethereum/common"
 
 	"github.com/onflow/flow-go/cmd/util/ledger/util"
