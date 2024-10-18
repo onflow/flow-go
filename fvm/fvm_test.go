@@ -9,7 +9,7 @@ import (
 	"strings"
 	"testing"
 
-	stdlib2 "github.com/onflow/cadence/runtime/stdlib"
+	stdlib2 "github.com/onflow/cadence/stdlib"
 	flow2 "github.com/onflow/flow-go-sdk"
 	"github.com/onflow/flow-go-sdk/test"
 
@@ -17,14 +17,14 @@ import (
 	"github.com/onflow/flow-go/fvm/evm/events"
 
 	"github.com/onflow/cadence"
+	"github.com/onflow/cadence/common"
 	"github.com/onflow/cadence/encoding/ccf"
 	jsoncdc "github.com/onflow/cadence/encoding/json"
+	cadenceErrors "github.com/onflow/cadence/errors"
+	"github.com/onflow/cadence/interpreter"
 	"github.com/onflow/cadence/runtime"
-	"github.com/onflow/cadence/runtime/common"
-	cadenceErrors "github.com/onflow/cadence/runtime/errors"
-	"github.com/onflow/cadence/runtime/interpreter"
-	"github.com/onflow/cadence/runtime/sema"
-	"github.com/onflow/cadence/runtime/tests/utils"
+	"github.com/onflow/cadence/sema"
+	"github.com/onflow/cadence/tests/utils"
 	"github.com/onflow/crypto"
 	"github.com/stretchr/testify/assert"
 	mockery "github.com/stretchr/testify/mock"

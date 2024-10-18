@@ -16,7 +16,7 @@ package systemcontracts
 import (
 	"fmt"
 
-	"github.com/onflow/cadence/runtime/common"
+	"github.com/onflow/cadence/common"
 	"github.com/onflow/flow-core-contracts/lib/go/templates"
 
 	"github.com/onflow/flow-go/model/flow"
