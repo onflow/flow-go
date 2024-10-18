@@ -5,7 +5,7 @@ import (
 
 	"github.com/onflow/flow-go/engine"
 
-	cadenceCommon "github.com/onflow/cadence/runtime/common"
+	cadenceCommon "github.com/onflow/cadence/common"
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/engine/execution/state"
