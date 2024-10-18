@@ -1,7 +1,6 @@
 package dkg
 
 import (
-	"encoding/hex"
 	"fmt"
 	"math/rand"
 	"testing"
@@ -128,22 +127,7 @@ func (s *EmulatorSuite) runTest(goodNodes int, emulatorProblems bool) {
 
 	// the result is an array of public keys where the first item is the group
 	// public key
-	res := s.getResult()
-
-	assert.Equal(s.T(), len(s.nodes)+1, len(res))
-	pubKeys := make([]crypto.PublicKey, 0, len(res))
-	for _, r := range res {
-		pkBytes, err := hex.DecodeString(r)
-		assert.NoError(s.T(), err)
-		pk, err := crypto.DecodePublicKey(crypto.BLSBLS12381, pkBytes)
-		assert.NoError(s.T(), err)
-		pubKeys = append(pubKeys, pk)
-	}
-
-	groupPubKeyBytes, err := hex.DecodeString(res[0])
-	assert.NoError(s.T(), err)
-	groupPubKey, err := crypto.DecodePublicKey(crypto.BLSBLS12381, groupPubKeyBytes)
-	assert.NoError(s.T(), err)
+	_, groupPubKey, pubKeys := s.getParametersAndResult()
 
 	tag := "some tag"
 	hasher := msig.NewBLSHasher(tag)
@@ -162,9 +146,9 @@ func (s *EmulatorSuite) runTest(goodNodes int, emulatorProblems bool) {
 		signatures = append(signatures, signature)
 		indices = append(indices, i)
 
-		ok, err := pubKeys[i+1].Verify(signature, sigData, hasher)
+		ok, err := pubKeys[i].Verify(signature, sigData, hasher)
 		require.NoError(s.T(), err)
-		assert.True(s.T(), ok, fmt.Sprintf("signature %d share doesn't verify under the public key share", i+1))
+		assert.True(s.T(), ok, fmt.Sprintf("signature %d share doesn't verify under the public key share", i))
 	}
 
 	// shuffle the signatures and indices before constructing the group
