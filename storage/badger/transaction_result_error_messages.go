@@ -197,6 +197,7 @@ func (t *TransactionResultErrorMessages) ByBlockIDTransactionIndex(blockID flow.
 }
 
 // ByBlockID gets all transaction result error messages for a block, ordered by transaction index.
+// Note: This method will return an empty slice both if the block is not indexed yet and if the block does not have any errors.
 //
 // No errors are expected during normal operation.
 func (t *TransactionResultErrorMessages) ByBlockID(blockID flow.Identifier) ([]flow.TransactionResultErrorMessage, error) {
