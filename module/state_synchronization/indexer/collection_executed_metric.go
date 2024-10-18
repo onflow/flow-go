@@ -28,7 +28,7 @@ type CollectionExecutedMetricImpl struct {
 	blocks      storage.Blocks
 
 	blockTransactions map[flow.Identifier][]flow.Identifier // Map to track transactions for each block for sealed metrics
-	mutex             sync.RWMutex
+	mu                sync.RWMutex
 }
 
 func NewCollectionExecutedMetricImpl(
@@ -94,25 +94,25 @@ func (c *CollectionExecutedMetricImpl) BlockFinalized(block *flow.Block) {
 		for _, t := range l.Transactions {
 			c.accessMetrics.TransactionFinalized(t, now)
 		}
-		c.mutex.Lock()
+		c.mu.Lock()
 		c.blockTransactions[blockID] = l.Transactions
-		c.mutex.Unlock()
+		c.mu.Unlock()
 	}
 
 	// Process block seals
 	for _, s := range block.Payload.Seals {
-		c.mutex.RLock()
+		c.mu.RLock()
 		transactions, found := c.blockTransactions[s.BlockID]
-		c.mutex.RUnlock() // release the read lock after reading
+		c.mu.RUnlock()
 
 		if found {
 			for _, t := range transactions {
 				c.accessMetrics.TransactionSealed(t, now)
 			}
 
-			c.mutex.Lock()
+			c.mu.Lock()
 			delete(c.blockTransactions, s.BlockID)
-			c.mutex.Unlock()
+			c.mu.Unlock()
 		}
 	}
 
