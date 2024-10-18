@@ -91,11 +91,11 @@ func (c *CollectionExecutedMetricImpl) BlockFinalized(block *flow.Block) {
 			continue
 		}
 
-		c.mutex.Lock()
 		for _, t := range l.Transactions {
-			c.blockTransactions[blockID] = append(c.blockTransactions[blockID], t)
 			c.accessMetrics.TransactionFinalized(t, now)
 		}
+		c.mutex.Lock()
+		c.blockTransactions[blockID] = l.Transactions
 		c.mutex.Unlock()
 	}
 
