@@ -62,6 +62,18 @@ func (c *CollectionExecutedMetricImpl) CollectionFinalized(light flow.LightColle
 	if ti, found := c.collectionsToMarkFinalized.ByID(light.ID()); found {
 		for _, t := range light.Transactions {
 			c.accessMetrics.TransactionFinalized(t, ti)
+
+			block, err := c.blocks.ByCollectionID(light.ID())
+			if err != nil {
+				c.log.Warn().Err(err).Msg("could not find block by collection ID")
+				continue
+			}
+
+			err = c.blockTransactions.Append(block.ID(), t)
+			if err != nil {
+				c.log.Warn().Err(err).Msg("could not append finalized tx to track sealed transactions")
+				continue
+			}
 		}
 		c.collectionsToMarkFinalized.Remove(light.ID())
 	}
