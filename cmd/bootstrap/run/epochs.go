@@ -1,6 +1,7 @@
 package run
 
 import (
+	"encoding/hex"
 	"fmt"
 
 	"github.com/rs/zerolog"
@@ -69,11 +70,6 @@ func GenerateRecoverEpochTxArgs(log zerolog.Logger,
 		}
 	}
 
-	currentEpochDKG, err := epoch.DKG()
-	if err != nil {
-		return nil, fmt.Errorf("failed to get DKG for current epoch: %w", err)
-	}
-
 	log.Info().Msg("computing collection node clusters")
 
 	assignments, clusters, err := common.ConstructClusterAssignment(log, partnerCollectors, internalCollectors, collectionClusters)
@@ -90,23 +86,30 @@ func GenerateRecoverEpochTxArgs(log zerolog.Logger,
 	clusterQCs := ConstructRootQCsForClusters(log, clusters, internalNodes, clusterBlocks)
 	log.Info().Msg("")
 
-	dkgPubKeys := make([]cadence.Value, 0)
-	nodeIds := make([]cadence.Value, 0)
+	epochProtocolState, err := snapshot.EpochProtocolState()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get epoch protocol state from snapshot: %w", err)
+	}
+	currentEpochDKG, err := epochProtocolState.DKG()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get DKG for current epoch: %w", err)
+	}
 
 	// NOTE: The RecoveryEpoch will re-use the last successful DKG output. This means that the consensus
 	// committee in the RecoveryEpoch must be identical to the committee which participated in that DKG.
-	dkgGroupKeyCdc, cdcErr := cadence.NewString(currentEpochDKG.GroupKey().String())
+	dkgGroupKeyCdc, cdcErr := cadence.NewString(hex.EncodeToString(currentEpochDKG.GroupKey().Encode()))
 	if cdcErr != nil {
 		log.Fatal().Err(cdcErr).Msg("failed to get dkg group key cadence string")
 	}
-	dkgPubKeys = append(dkgPubKeys, dkgGroupKeyCdc)
+	dkgPubKeys := make([]cadence.Value, 0)
+	nodeIds := make([]cadence.Value, 0)
 	for _, id := range currentEpochIdentities {
 		if id.GetRole() == flow.RoleConsensus {
 			dkgPubKey, keyShareErr := currentEpochDKG.KeyShare(id.GetNodeID())
 			if keyShareErr != nil {
 				log.Fatal().Err(keyShareErr).Msg(fmt.Sprintf("failed to get dkg pub key share for node: %s", id.GetNodeID()))
 			}
-			dkgPubKeyCdc, cdcErr := cadence.NewString(dkgPubKey.String())
+			dkgPubKeyCdc, cdcErr := cadence.NewString(hex.EncodeToString(dkgPubKey.Encode()))
 			if cdcErr != nil {
 				log.Fatal().Err(cdcErr).Msg(fmt.Sprintf("failed to get dkg pub key cadence string for node: %s", id.GetNodeID()))
 			}
@@ -118,6 +121,15 @@ func GenerateRecoverEpochTxArgs(log zerolog.Logger,
 		}
 		nodeIds = append(nodeIds, nodeIdCdc)
 	}
+
+	dkgIndexMapPairs := make([]cadence.KeyValuePair, 0)
+	for nodeID, index := range epochProtocolState.EpochCommit().DKGIndexMap {
+		dkgIndexMapPairs = append(dkgIndexMapPairs, cadence.KeyValuePair{
+			Key:   cadence.String(nodeID.String()),
+			Value: cadence.NewInt(index),
+		})
+	}
+
 	clusterQCAddress := systemcontracts.SystemContractsForChain(rootChainID).ClusterQC.Address.String()
 	qcVoteData, err := common.ConvertClusterQcsCdc(clusterQCs, clusters, clusterQCAddress)
 	if err != nil {
@@ -153,6 +165,10 @@ func GenerateRecoverEpochTxArgs(log zerolog.Logger,
 		cadence.NewArray(qcVoteData),
 		// dkg pub keys
 		cadence.NewArray(dkgPubKeys),
+		// dkg group key,
+		dkgGroupKeyCdc,
+		// dkg index map
+		cadence.NewDictionary(dkgIndexMapPairs),
 		// node ids
 		cadence.NewArray(nodeIds),
 		// recover the network by initializing a new recover epoch which will increment the smart contract epoch counter

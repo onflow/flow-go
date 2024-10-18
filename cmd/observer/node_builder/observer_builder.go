@@ -408,6 +408,7 @@ func (builder *ObserverServiceBuilder) buildFollowerState() *ObserverServiceBuil
 			node.Storage.Index,
 			node.Storage.Payloads,
 			blocktimer.DefaultBlockTimer,
+			nil,
 		)
 		builder.FollowerState = followerState
 

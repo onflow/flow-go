@@ -1,7 +1,9 @@
 package epochs
 
 import (
+	"errors"
 	"fmt"
+	"github.com/onflow/flow-go/storage"
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/state/protocol"
@@ -15,7 +17,8 @@ import (
 // Whenever invalid epoch state transition has been observed only epochFallbackStateMachines must be created for subsequent views.
 type FallbackStateMachine struct {
 	baseStateMachine
-	parentState protocol.KVStoreReader
+	localDKGState storage.DKGState
+	parentState   protocol.KVStoreReader
 }
 
 var _ StateMachine = (*FallbackStateMachine)(nil)
@@ -26,6 +29,7 @@ var _ StateMachine = (*FallbackStateMachine)(nil)
 // No errors are expected during normal operations.
 func NewFallbackStateMachine(
 	parentState protocol.KVStoreReader,
+	localDKGState storage.DKGState,
 	telemetry protocol_state.StateMachineTelemetryConsumer,
 	view uint64,
 	parentEpochState *flow.RichEpochStateEntry,
@@ -53,6 +57,7 @@ func NewFallbackStateMachine(
 	sm := &FallbackStateMachine{
 		baseStateMachine: *base,
 		parentState:      parentState,
+		localDKGState:    localDKGState,
 	}
 
 	if !nextEpochCommitted && view+parentState.GetFinalizationSafetyThreshold() >= state.CurrentEpochFinalView() {
@@ -204,6 +209,20 @@ func (m *FallbackStateMachine) ProcessEpochRecover(epochRecover *flow.EpochRecov
 	// if we have processed a valid EpochRecover event, we should exit EFM.
 	m.state.NextEpoch = nextEpoch
 	m.state.EpochFallbackTriggered = false
+
+	if m.localDKGState != nil {
+		beaconPrivateKey, err := m.localDKGState.RetrieveMyBeaconPrivateKey(m.state.CurrentEpochSetup.Counter)
+		if err != nil {
+			return false, fmt.Errorf("could not retrieve beacon key for current epoch: %w", err)
+		}
+
+		// store my beacon key for the first epoch post-spork
+		err = m.localDKGState.InsertMyBeaconPrivateKey(epochRecover.EpochSetup.Counter, beaconPrivateKey)
+		if err != nil && !errors.Is(err, storage.ErrAlreadyExists) {
+			return false, fmt.Errorf("could not store beacon key for next epoch: %w", err)
+		}
+	}
+
 	m.telemetry.OnServiceEventProcessed(epochRecover.ServiceEvent())
 	return true, nil
 }

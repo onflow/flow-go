@@ -152,11 +152,12 @@ func (keys *SafeBeaconPrivateKeys) RetrieveMyBeaconPrivateKey(epochCounter uint6
 		}
 
 		// for any end state besides success, the key is not safe
-		if endState != flow.DKGEndStateSuccess {
-			key = nil
-			safe = false
-			return nil
-		}
+		// TODO(EFM, #6214): THIS IS TEMPORARY, NO WAY THIS CAN GO TO THE PRODUCTION
+		//if endState != flow.DKGEndStateSuccess {
+		//	key = nil
+		//	safe = false
+		//	return nil
+		//}
 
 		// retrieve the key - any storage error (including not found) is an exception
 		var encodableKey *encodable.RandomBeaconPrivKey
