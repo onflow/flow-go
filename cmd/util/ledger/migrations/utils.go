@@ -1,9 +1,9 @@
 package migrations
 
 import (
+	"github.com/onflow/cadence/common"
 	"github.com/onflow/cadence/runtime"
-	"github.com/onflow/cadence/runtime/common"
-	"github.com/onflow/cadence/runtime/stdlib"
+	"github.com/onflow/cadence/stdlib"
 
 	"github.com/onflow/flow-go/cmd/util/ledger/util/registers"
 )

@@ -15,7 +15,7 @@ import (
 	sdk "github.com/onflow/flow-go-sdk"
 	"github.com/onflow/flow-go-sdk/crypto"
 
-	cadenceCommon "github.com/onflow/cadence/runtime/common"
+	cadenceCommon "github.com/onflow/cadence/common"
 
 	"github.com/onflow/flow-go/engine/execution/computation"
 	"github.com/onflow/flow-go/engine/execution/testutil"

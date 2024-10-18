@@ -4,10 +4,10 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/onflow/cadence/ast"
+	"github.com/onflow/cadence/common"
+	"github.com/onflow/cadence/interpreter"
 	"github.com/onflow/cadence/runtime"
-	"github.com/onflow/cadence/runtime/ast"
-	"github.com/onflow/cadence/runtime/common"
-	"github.com/onflow/cadence/runtime/interpreter"
 
 	"github.com/onflow/flow-go/fvm/environment"
 	"github.com/onflow/flow-go/fvm/storage/derived"
