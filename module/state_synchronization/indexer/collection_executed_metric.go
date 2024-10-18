@@ -98,7 +98,12 @@ func (c *CollectionExecutedMetricImpl) BlockFinalized(block *flow.Block) {
 
 		for _, t := range l.Transactions {
 			c.accessMetrics.TransactionFinalized(t, now)
-			c.blockTransactions.Append(blockID, t)
+			err = c.blockTransactions.Append(blockID, t)
+
+			if err != nil {
+				c.log.Warn().Err(err).Msg("could not append finalized tx to track sealed transactions")
+				continue
+			}
 		}
 	}
 
