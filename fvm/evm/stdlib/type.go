@@ -7,7 +7,6 @@ import (
 	"github.com/onflow/cadence/common"
 	"github.com/onflow/cadence/runtime"
 	"github.com/onflow/cadence/sema"
-	"github.com/onflow/cadence/stdlib"
 	coreContracts "github.com/onflow/flow-core-contracts/lib/go/contracts"
 
 	"github.com/onflow/flow-go/fvm/systemcontracts"
@@ -33,7 +32,10 @@ func newContractType(chainID flow.ChainID) *sema.CompositeType {
 
 	templatesEnv := contracts.AsTemplateEnv()
 
+	cryptoContractLocation := contracts.Crypto.Location()
+
 	runtimeInterface := &checkingInterface{
+		cryptoContractAddress: cryptoContractLocation.Address,
 		SystemContractCodes: map[common.Location][]byte{
 			contracts.ViewResolver.Location():               coreContracts.ViewResolver(),
 			contracts.Burner.Location():                     coreContracts.Burner(),
@@ -42,7 +44,7 @@ func newContractType(chainID flow.ChainID) *sema.CompositeType {
 			contracts.MetadataViews.Location():              coreContracts.MetadataViews(templatesEnv),
 			contracts.FlowToken.Location():                  coreContracts.FlowToken(templatesEnv),
 			contracts.FungibleTokenMetadataViews.Location(): coreContracts.FungibleTokenMetadataViews(templatesEnv),
-			stdlib.CryptoContractLocation:                   coreContracts.Crypto(),
+			cryptoContractLocation:                          coreContracts.Crypto(),
 		},
 	}
 

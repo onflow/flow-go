@@ -71,6 +71,8 @@ func newFacadeEnvironment(
 		logger,
 		runtime)
 
+	sc := systemcontracts.SystemContractsForChain(chain.ChainID())
+
 	env := &facadeEnvironment{
 		Runtime: runtime,
 
@@ -132,7 +134,7 @@ func newFacadeEnvironment(
 			tracer,
 			meter,
 			accounts,
-			systemcontracts.SystemContractsForChain(chain.ChainID()),
+			common.Address(sc.Crypto.Address),
 		),
 		ContractUpdater: NoContractUpdater{},
 		Programs: NewPrograms(

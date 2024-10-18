@@ -3242,24 +3242,6 @@ func TestCrypto(t *testing.T) {
 		fvm.WithCadenceLogging(true),
 	)
 
-	//accountKeys := test.AccountKeyGenerator()
-	//
-	//// Create new keys for the Crypto account and deploy
-	//cryptoAccountKey, _ := accountKeys.NewWithSigner()
-	//cryptoCode := contracts.Crypto()
-	//
-	//cryptoAddress, err := adapter.CreateAccount(
-	//	context.Background(),
-	//	[]*flow.AccountKey{cryptoAccountKey},
-	//	[]sdktemplates.Contract{
-	//		{
-	//			Name:   "Crypto",
-	//			Source: string(cryptoCode),
-	//		},
-	//	},
-	//)
-	//assert.NoError(t, err)
-
 	script := []byte(`
       import Crypto
 
