@@ -34,11 +34,18 @@ func WithRestMetrics(m module.RestMetrics) AccessCollectorOpts {
 	}
 }
 
+func WithRegisterDBPrunerMetrics(m module.RegisterDBPrunerMetrics) AccessCollectorOpts {
+	return func(ac *AccessCollector) {
+		ac.RegisterDBPrunerMetrics = m
+	}
+}
+
 type AccessCollector struct {
 	module.RestMetrics
 	module.TransactionMetrics
 	module.TransactionValidationMetrics
 	module.BackendScriptsMetrics
+	module.RegisterDBPrunerMetrics
 
 	connectionReused      prometheus.Counter
 	connectionsInPool     *prometheus.GaugeVec

@@ -42,6 +42,7 @@ var _ module.HotstuffMetrics = (*NoopCollector)(nil)
 var _ module.EngineMetrics = (*NoopCollector)(nil)
 var _ module.HeroCacheMetrics = (*NoopCollector)(nil)
 var _ module.NetworkMetrics = (*NoopCollector)(nil)
+var _ module.RegisterDBPrunerMetrics = (*NoopCollector)(nil)
 
 func (nc *NoopCollector) Peers(prefix string, n int)                                             {}
 func (nc *NoopCollector) Wantlist(prefix string, n int)                                          {}
@@ -238,6 +239,9 @@ func (nc *NoopCollector) RequestFailed(duration time.Duration, retryable bool)  
 func (nc *NoopCollector) RequestCanceled()                                                      {}
 func (nc *NoopCollector) ResponseDropped()                                                      {}
 func (nc *NoopCollector) Pruned(height uint64, duration time.Duration)                          {}
+func (nc *NoopCollector) NumberOfRowsPruned(rows uint64)                                        {}
+func (nc *NoopCollector) ElementVisited()                                                       {}
+func (nc *NoopCollector) NumberOfBlocksPruned(blocks uint64)                                    {}
 func (nc *NoopCollector) UpdateCollectionMaxHeight(height uint64)                               {}
 func (nc *NoopCollector) BucketAvailableSlots(uint64, uint64)                                   {}
 func (nc *NoopCollector) OnKeyPutSuccess(uint32)                                                {}
