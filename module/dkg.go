@@ -38,9 +38,14 @@ type DKGContractClient interface {
 	// SubmitResult must be called strictly after the final DKG phase has ended on happy path.
 	SubmitResult(crypto.PublicKey, []crypto.PublicKey, flow.DKGIndexMap) error
 
-	// SubmitEmptyResult submits an empty result of the DKG protocol.
-	// This represents an empty result when the DKG has locally failed.
-	// SubmitEmptyResult must be called strictly after the final phase has ended if DKG has locally failed.
+	// SubmitEmptyResult submits an empty result of the DKG protocol. The empty result is obtained by a node when
+	// it realizes locally that its DKG participation was unsuccessful (either because the DKG failed as a whole,
+	// or because the node received too many byzantine inputs). However, a node obtaining an empty result can
+	// happen in both cases of the DKG succeeding or failing. For further details, please see:
+	// https://flowfoundation.notion.site/Random-Beacon-2d61f3b3ad6e40ee9f29a1a38a93c99c
+	// Honest nodes would call `SubmitEmptyResult` strictly after the final phase has ended if DKG has ended.
+	// Though, `SubmitEmptyResult` also supports implementing byzantine participants for testing that submit an
+	// empty result too early (intentional protocol violation), *before* the final DKG phase concluded.
 	SubmitEmptyResult() error
 }
 
