@@ -82,17 +82,17 @@ func (_m *DKGContractClient) SubmitEmptyResult() error {
 	return r0
 }
 
-// SubmitResult provides a mock function with given fields: _a0, _a1, _a2
-func (_m *DKGContractClient) SubmitResult(_a0 crypto.PublicKey, _a1 []crypto.PublicKey, _a2 flow.DKGIndexMap) error {
-	ret := _m.Called(_a0, _a1, _a2)
+// SubmitParametersAndResult provides a mock function with given fields: indexMap, groupPublicKey, publicKeys
+func (_m *DKGContractClient) SubmitParametersAndResult(indexMap flow.DKGIndexMap, groupPublicKey crypto.PublicKey, publicKeys []crypto.PublicKey) error {
+	ret := _m.Called(indexMap, groupPublicKey, publicKeys)
 
 	if len(ret) == 0 {
-		panic("no return value specified for SubmitResult")
+		panic("no return value specified for SubmitParametersAndResult")
 	}
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(crypto.PublicKey, []crypto.PublicKey, flow.DKGIndexMap) error); ok {
-		r0 = rf(_a0, _a1, _a2)
+	if rf, ok := ret.Get(0).(func(flow.DKGIndexMap, crypto.PublicKey, []crypto.PublicKey) error); ok {
+		r0 = rf(indexMap, groupPublicKey, publicKeys)
 	} else {
 		r0 = ret.Error(0)
 	}
