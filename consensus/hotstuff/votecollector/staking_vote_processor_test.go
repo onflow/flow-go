@@ -285,8 +285,10 @@ func TestStakingVoteProcessorV2_BuildVerifyQC(t *testing.T) {
 	}
 
 	// create and sign proposal
-	proposal, err := signers[leader.NodeID].CreateProposal(block)
+	leaderVote, err := signers[leader.NodeID].CreateVote(block)
 	require.NoError(t, err)
+	proposal := helper.MakeSignedProposal(helper.WithProposal(
+		helper.MakeProposal(helper.WithBlock(block))), helper.WithSigData(leaderVote.SigData))
 
 	qcCreated := false
 	onQCCreated := func(qc *flow.QuorumCertificate) {

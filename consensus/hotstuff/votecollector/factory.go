@@ -16,7 +16,7 @@ import (
 // CAUTION: the baseFactory creates the VerifyingVoteProcessor for the given block. It
 // does _not_ check the proposer's vote for its own block. The API reflects this by
 // expecting a `model.Block` as input (which does _not_ contain the proposer vote) as
-// opposed to `model.Proposal` (combines block with proposer's vote).
+// opposed to `model.SignedProposal` (combines block with proposer's vote).
 // Therefore, baseFactory does _not_ implement `hotstuff.VoteProcessorFactory` by itself.
 // The VoteProcessorFactory adds the missing logic to verify the proposer's vote, by
 // wrapping the baseFactory (decorator pattern).
@@ -40,7 +40,7 @@ var _ hotstuff.VoteProcessorFactory = (*VoteProcessorFactory)(nil)
 // A VerifyingVoteProcessor are only created for proposals with valid proposer votes.
 // Expected error returns during normal operations:
 // * model.InvalidProposalError - proposal has invalid proposer vote
-func (f *VoteProcessorFactory) Create(log zerolog.Logger, proposal *model.Proposal) (hotstuff.VerifyingVoteProcessor, error) {
+func (f *VoteProcessorFactory) Create(log zerolog.Logger, proposal *model.SignedProposal) (hotstuff.VerifyingVoteProcessor, error) {
 	processor, err := f.baseFactory(log, proposal.Block)
 	if err != nil {
 		return nil, fmt.Errorf("instantiating vote processor for block %v failed: %w", proposal.Block.BlockID, err)

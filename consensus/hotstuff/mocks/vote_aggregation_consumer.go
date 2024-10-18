@@ -31,7 +31,7 @@ func (_m *VoteAggregationConsumer) OnQcConstructedFromVotes(_a0 *flow.QuorumCert
 }
 
 // OnVoteForInvalidBlockDetected provides a mock function with given fields: vote, invalidProposal
-func (_m *VoteAggregationConsumer) OnVoteForInvalidBlockDetected(vote *model.Vote, invalidProposal *model.Proposal) {
+func (_m *VoteAggregationConsumer) OnVoteForInvalidBlockDetected(vote *model.Vote, invalidProposal *model.SignedProposal) {
 	_m.Called(vote, invalidProposal)
 }
 

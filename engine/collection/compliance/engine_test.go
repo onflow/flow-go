@@ -165,7 +165,7 @@ func (cs *EngineSuite) TestSubmittingMultipleEntries() {
 		for i := 0; i < blockCount; i++ {
 			block := unittest.ClusterBlockWithParent(cs.head)
 			proposal := messages.NewClusterBlockProposal(&block)
-			hotstuffProposal := model.ProposalFromFlow(block.Header)
+			hotstuffProposal := model.SignedProposalFromFlow(block.Header)
 			cs.hotstuff.On("SubmitProposal", hotstuffProposal).Return().Once()
 			cs.voteAggregator.On("AddBlock", hotstuffProposal).Once()
 			cs.validator.On("ValidateProposal", hotstuffProposal).Return(nil).Once()
@@ -183,7 +183,7 @@ func (cs *EngineSuite) TestSubmittingMultipleEntries() {
 		block := unittest.ClusterBlockWithParent(cs.head)
 		proposal := messages.NewClusterBlockProposal(&block)
 
-		hotstuffProposal := model.ProposalFromFlow(block.Header)
+		hotstuffProposal := model.SignedProposalFromFlow(block.Header)
 		cs.hotstuff.On("SubmitProposal", hotstuffProposal).Once()
 		cs.voteAggregator.On("AddBlock", hotstuffProposal).Once()
 		cs.validator.On("ValidateProposal", hotstuffProposal).Return(nil).Once()

@@ -201,7 +201,7 @@ func (v *Validator) ValidateQC(qc *flow.QuorumCertificate) error {
 //   - model.ErrViewForUnknownEpoch if the proposal refers unknown epoch
 //
 // Any other error should be treated as exception
-func (v *Validator) ValidateProposal(proposal *model.Proposal) error {
+func (v *Validator) ValidateProposal(proposal *model.SignedProposal) error {
 	qc := proposal.Block.QC
 	block := proposal.Block
 

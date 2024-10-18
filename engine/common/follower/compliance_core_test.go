@@ -97,7 +97,7 @@ func (s *CoreSuite) TestProcessingSingleBlock() {
 	block := unittest.BlockWithParentFixture(s.finalizedBlock)
 
 	// incoming block has to be validated
-	s.validator.On("ValidateProposal", model.ProposalFromFlow(block.Header)).Return(nil).Once()
+	s.validator.On("ValidateProposal", model.SignedProposalFromFlow(block.Header)).Return(nil).Once()
 
 	err := s.core.OnBlockRange(s.originID, []*flow.Block{block})
 	require.NoError(s.T(), err)
@@ -114,7 +114,7 @@ func (s *CoreSuite) TestAddFinalizedBlock() {
 	block.Header.View = s.finalizedBlock.View - 1 // block is below finalized view
 
 	// incoming block has to be validated
-	s.validator.On("ValidateProposal", model.ProposalFromFlow(block.Header)).Return(nil).Once()
+	s.validator.On("ValidateProposal", model.SignedProposalFromFlow(block.Header)).Return(nil).Once()
 
 	err := s.core.OnBlockRange(s.originID, []*flow.Block{&block})
 	require.NoError(s.T(), err)
@@ -140,7 +140,7 @@ func (s *CoreSuite) TestProcessingRangeHappyPath() {
 			wg.Done()
 		}).Return().Once()
 	}
-	s.validator.On("ValidateProposal", model.ProposalFromFlow(blocks[len(blocks)-1].Header)).Return(nil).Once()
+	s.validator.On("ValidateProposal", model.SignedProposalFromFlow(blocks[len(blocks)-1].Header)).Return(nil).Once()
 
 	err := s.core.OnBlockRange(s.originID, blocks)
 	require.NoError(s.T(), err)
@@ -154,7 +154,7 @@ func (s *CoreSuite) TestProcessingNotOrderedBatch() {
 	blocks := unittest.ChainFixtureFrom(10, s.finalizedBlock)
 	blocks[2], blocks[3] = blocks[3], blocks[2]
 
-	s.validator.On("ValidateProposal", model.ProposalFromFlow(blocks[len(blocks)-1].Header)).Return(nil).Once()
+	s.validator.On("ValidateProposal", model.SignedProposalFromFlow(blocks[len(blocks)-1].Header)).Return(nil).Once()
 
 	err := s.core.OnBlockRange(s.originID, blocks)
 	require.ErrorIs(s.T(), err, cache.ErrDisconnectedBatch)
@@ -164,7 +164,7 @@ func (s *CoreSuite) TestProcessingNotOrderedBatch() {
 func (s *CoreSuite) TestProcessingInvalidBlock() {
 	blocks := unittest.ChainFixtureFrom(10, s.finalizedBlock)
 
-	invalidProposal := model.ProposalFromFlow(blocks[len(blocks)-1].Header)
+	invalidProposal := model.SignedProposalFromFlow(blocks[len(blocks)-1].Header)
 	sentinelError := model.NewInvalidProposalErrorf(invalidProposal, "")
 	s.validator.On("ValidateProposal", invalidProposal).Return(sentinelError).Once()
 	s.followerConsumer.On("OnInvalidBlockDetected", flow.Slashable[model.InvalidProposalError]{
@@ -189,7 +189,7 @@ func (s *CoreSuite) TestProcessingBlocksAfterShutdown() {
 	// to the protocol state
 
 	blocks := unittest.ChainFixtureFrom(10, s.finalizedBlock)
-	s.validator.On("ValidateProposal", model.ProposalFromFlow(blocks[len(blocks)-1].Header)).Return(nil).Once()
+	s.validator.On("ValidateProposal", model.SignedProposalFromFlow(blocks[len(blocks)-1].Header)).Return(nil).Once()
 
 	err := s.core.OnBlockRange(s.originID, blocks)
 	require.NoError(s.T(), err)

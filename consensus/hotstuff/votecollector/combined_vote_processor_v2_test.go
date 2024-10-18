@@ -57,7 +57,7 @@ func (s *CombinedVoteProcessorV2TestSuite) SetupTest() {
 
 	s.reconstructor = &mockhotstuff.RandomBeaconReconstructor{}
 	s.packer = &mockhotstuff.Packer{}
-	s.proposal = helper.MakeProposal()
+	s.proposal = helper.MakeSignedProposal()
 
 	s.minRequiredShares = 9 // we require 9 RB shares to reconstruct signature
 	s.rbSharesTotal = 0
@@ -894,7 +894,7 @@ func TestCombinedVoteProcessorV2_BuildVerifyQC(t *testing.T) {
 	require.NoError(t, err)
 	vote, err := safetyRules.SignOwnProposal(proposal)
 	require.NoError(t, err)
-	proposal.SigData = vote.SigData
+	signedProposal := helper.MakeSignedProposal(helper.WithProposal(proposal), helper.WithSigData(vote.SigData))
 
 	qcCreated := false
 	onQCCreated := func(qc *flow.QuorumCertificate) {
@@ -912,7 +912,7 @@ func TestCombinedVoteProcessorV2_BuildVerifyQC(t *testing.T) {
 	}
 
 	voteProcessorFactory := NewCombinedVoteProcessorFactory(committee, onQCCreated)
-	voteProcessor, err := voteProcessorFactory.Create(unittest.Logger(), proposal)
+	voteProcessor, err := voteProcessorFactory.Create(unittest.Logger(), signedProposal)
 	require.NoError(t, err)
 
 	// process votes by new leader, this will result in producing new QC
