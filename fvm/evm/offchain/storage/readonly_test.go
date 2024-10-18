@@ -28,7 +28,7 @@ func TestReadOnlyStorage(t *testing.T) {
 	require.True(t, found)
 
 	err = rs.SetValue(owner, key1, value1)
-	require.NoError(t, err)
+	require.Error(t, err)
 
 	_, err = rs.AllocateSlabIndex(owner)
 	require.Error(t, err)
