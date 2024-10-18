@@ -80,12 +80,12 @@ func (c *DKGClientWrapper) ReadBroadcast(fromIndex uint, referenceBlock flow.Ide
 	return c.client.ReadBroadcast(fromIndex, referenceBlock)
 }
 
-// SubmitResult implements the DKGContractClient interface
-func (c *DKGClientWrapper) SubmitResult(groupPubKey crypto.PublicKey, pubKeys []crypto.PublicKey, indexMap flow.DKGIndexMap) error {
+// SubmitParametersAndResult implements the DKGContractClient interface
+func (c *DKGClientWrapper) SubmitParametersAndResult(indexMap flow.DKGIndexMap, groupPubKey crypto.PublicKey, pubKeys []crypto.PublicKey) error {
 	if !c.enabled.Load() {
 		return fmt.Errorf("failed to submit DKG result: %w", errClientDisabled)
 	}
-	return c.client.SubmitResult(groupPubKey, pubKeys, indexMap)
+	return c.client.SubmitParametersAndResult(indexMap, groupPubKey, pubKeys)
 }
 
 // SubmitEmptyResult implements the DKGContractClient interface

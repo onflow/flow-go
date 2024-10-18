@@ -48,9 +48,9 @@ func (wc *WhiteboardClient) ReadBroadcast(fromIndex uint, referenceBlock flow.Id
 	return msgs, nil
 }
 
-// SubmitResult implements the DKGContractClient interface. It publishes the
+// SubmitParametersAndResult implements the DKGContractClient interface. It publishes the
 // DKG results under the node's ID.
-func (wc *WhiteboardClient) SubmitResult(groupKey crypto.PublicKey, pubKeys []crypto.PublicKey, indexMap flow.DKGIndexMap) error {
+func (wc *WhiteboardClient) SubmitParametersAndResult(indexMap flow.DKGIndexMap, groupKey crypto.PublicKey, pubKeys []crypto.PublicKey) error {
 	wc.whiteboard.submit(wc.nodeID, groupKey, pubKeys, indexMap)
 	return nil
 }
