@@ -519,8 +519,8 @@ func (e *Engine) handleTransactionResultErrorMessages(ctx context.Context, block
 		e.preferredENIdentifiers,
 	)
 	if err != nil {
-		e.log.Error().Err(err).Msg(fmt.Sprintf("failed to found execution nodes for block id: %s", blockID))
-		return fmt.Errorf("could not found execution nodes for block: %w", err)
+		e.log.Error().Err(err).Msg(fmt.Sprintf("failed to find execution nodes for block id: %s", blockID))
+		return fmt.Errorf("could not find execution nodes for block: %w", err)
 	}
 
 	req := &execproto.GetTransactionErrorMessagesByBlockIDRequest{
@@ -537,7 +537,7 @@ func (e *Engine) handleTransactionResultErrorMessages(ctx context.Context, block
 	if len(resp) > 0 {
 		err = e.storeTransactionResultErrorMessages(blockID, resp, execNode)
 		if err != nil {
-			return fmt.Errorf("could not store error messages: %w", err)
+			return fmt.Errorf("could not store error messages (block: %s): %w", blockID, err)
 		}
 	}
 
