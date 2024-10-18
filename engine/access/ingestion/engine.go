@@ -475,9 +475,12 @@ func (e *Engine) processTransactionResultErrorMessagesByReceipts(ctx irrecoverab
 		case blockID := <-e.txResultErrorMessagesChan:
 			err := e.handleTransactionResultErrorMessages(ctx, blockID)
 			if err != nil {
-				// if an error reaches this point, it is unexpected
-				ctx.Throw(err)
-				return
+				// TODO: we should revisit error handling here.
+				// Errors that come from querying the EN and possibly ExecutionNodesForBlockID should be logged and
+				// retried later, while others should cause an exception.
+				e.log.Error().
+					Err(err).
+					Msg("error encountered while processing transaction result error messages by receipts")
 			}
 		}
 	}
@@ -527,11 +530,13 @@ func (e *Engine) handleTransactionResultErrorMessages(ctx context.Context, block
 		BlockId: convert.IdentifierToMessage(blockID),
 	}
 
+	e.log.Debug().
+		Msgf("transaction error messages for block %s are being downloaded", blockID)
+
 	resp, execNode, err := e.backend.GetTransactionErrorMessagesFromAnyEN(ctx, execNodes, req)
 	if err != nil {
-		// continue, we will add functionality to backfill these later
 		e.log.Error().Err(err).Msg("failed to get transaction error messages from execution nodes")
-		return nil
+		return err
 	}
 
 	if len(resp) > 0 {
