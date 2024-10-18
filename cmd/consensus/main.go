@@ -287,6 +287,7 @@ func main() {
 				blockTimer,
 				receiptValidator,
 				sealValidator,
+				dkgState,
 			)
 			return err
 		}).
@@ -725,6 +726,7 @@ func main() {
 				node.Storage.Results,
 				node.Storage.Setups,
 				node.Storage.EpochCommits,
+				dkgState,
 			)
 			// initialize the block builder
 			var build module.Builder

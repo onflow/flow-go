@@ -2,6 +2,8 @@ package environment
 
 import (
 	"fmt"
+	"github.com/onflow/flow-go/utils/logging"
+	"github.com/rs/zerolog"
 
 	"github.com/onflow/cadence"
 
@@ -114,6 +116,7 @@ func (NoEventEmitter) Reset() {
 }
 
 type eventEmitter struct {
+	log    zerolog.Logger
 	tracer tracing.TracerSpan
 	meter  Meter
 
@@ -128,6 +131,7 @@ type eventEmitter struct {
 
 // NewEventEmitter constructs a new eventEmitter
 func NewEventEmitter(
+	log zerolog.Logger,
 	tracer tracing.TracerSpan,
 	meter Meter,
 	chain flow.Chain,
@@ -135,6 +139,7 @@ func NewEventEmitter(
 	params EventEmitterParams,
 ) EventEmitter {
 	emitter := &eventEmitter{
+		log:                log,
 		tracer:             tracer,
 		meter:              meter,
 		chain:              chain,
@@ -201,8 +206,12 @@ func (emitter *eventEmitter) EmitEvent(event cadence.Event) error {
 
 		// skip limit if payer is service account
 		// TODO skip only limit-related errors
-		if !isServiceAccount && eventEmitError != nil {
-			return eventEmitError
+		if eventEmitError != nil {
+			if isServiceAccount {
+				emitter.log.Error().Err(eventEmitError).Str(logging.KeySuspicious, "true").Msg("could not process service event")
+			} else {
+				return eventEmitError
+			}
 		}
 	}
 
