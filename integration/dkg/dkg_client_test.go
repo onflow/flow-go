@@ -177,7 +177,7 @@ func (s *ClientSuite) TestSubmitResult() {
 	// create a group public key
 	groupPublicKey := unittest.KeyFixture(crypto.BLSBLS12381).PublicKey()
 
-	err := clients[0].SubmitResult(groupPublicKey, publicKeys, indexMap)
+	err := clients[0].SubmitParametersAndResult(indexMap, groupPublicKey, publicKeys)
 	require.NoError(s.T(), err)
 }
 
