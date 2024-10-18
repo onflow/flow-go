@@ -38,6 +38,7 @@ type GerOrLoadProgramListenerFunc func(
 type MigrationRuntimeInterface struct {
 	runtime.EmptyRuntimeInterface
 	chainID                      flow.ChainID
+	CryptoContractAddress        common.Address
 	GetContractCodeFunc          GetContractCodeFunc
 	GetContractNamesFunc         GetContractNamesFunc
 	GetOrLoadProgramFunc         GetOrLoadProgramFunc
@@ -48,6 +49,7 @@ var _ runtime.Interface = &MigrationRuntimeInterface{}
 
 func NewMigrationRuntimeInterface(
 	chainID flow.ChainID,
+	cryptoContractAddress common.Address,
 	getCodeFunc GetContractCodeFunc,
 	getContractNamesFunc GetContractNamesFunc,
 	getOrLoadProgramFunc GetOrLoadProgramFunc,
@@ -55,6 +57,7 @@ func NewMigrationRuntimeInterface(
 ) *MigrationRuntimeInterface {
 	return &MigrationRuntimeInterface{
 		chainID:                      chainID,
+		CryptoContractAddress:        cryptoContractAddress,
 		GetContractCodeFunc:          getCodeFunc,
 		GetContractNamesFunc:         getContractNamesFunc,
 		GetOrLoadProgramFunc:         getOrLoadProgramFunc,
@@ -67,65 +70,12 @@ func (m *MigrationRuntimeInterface) ResolveLocation(
 	location runtime.Location,
 ) ([]runtime.ResolvedLocation, error) {
 
-	addressLocation, isAddress := location.(common.AddressLocation)
-
-	// if the location is not an address location, e.g. an identifier location (`import Crypto`),
-	// then return a single resolved location which declares all identifiers.
-	if !isAddress {
-		return []runtime.ResolvedLocation{
-			{
-				Location:    location,
-				Identifiers: identifiers,
-			},
-		}, nil
-	}
-
-	// if the location is an address,
-	// and no specific identifiers where requested in the import statement,
-	// then fetch all identifiers at this address
-	if len(identifiers) == 0 {
-		address := flow.Address(addressLocation.Address)
-
-		getContractNames := m.GetContractNamesFunc
-		if getContractNames == nil {
-			return nil, errors.New("GetContractNamesFunc missing")
-		}
-
-		contractNames, err := getContractNames(address)
-		if err != nil {
-			return nil, fmt.Errorf("ResolveLocation failed: %w", err)
-		}
-
-		// if there are no contractNames deployed,
-		// then return no resolved locations
-		if len(contractNames) == 0 {
-			return nil, nil
-		}
-
-		identifiers = make([]runtime.Identifier, len(contractNames))
-
-		for i := range identifiers {
-			identifiers[i] = runtime.Identifier{
-				Identifier: contractNames[i],
-			}
-		}
-	}
-
-	// return one resolved location per identifier.
-	// each resolved location is an address contract location
-	resolvedLocations := make([]runtime.ResolvedLocation, len(identifiers))
-	for i := range resolvedLocations {
-		identifier := identifiers[i]
-		resolvedLocations[i] = runtime.ResolvedLocation{
-			Location: common.AddressLocation{
-				Address: addressLocation.Address,
-				Name:    identifier.Identifier,
-			},
-			Identifiers: []runtime.Identifier{identifier},
-		}
-	}
-
-	return resolvedLocations, nil
+	return environment.ResolveLocation(
+		identifiers,
+		location,
+		m.GetContractNamesFunc,
+		m.CryptoContractAddress,
+	)
 }
 
 func (m *MigrationRuntimeInterface) GetCode(location runtime.Location) ([]byte, error) {

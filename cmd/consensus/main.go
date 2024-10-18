@@ -12,6 +12,7 @@ import (
 
 	client "github.com/onflow/flow-go-sdk/access/grpc"
 	"github.com/onflow/flow-go-sdk/crypto"
+
 	"github.com/onflow/flow-go/cmd"
 	"github.com/onflow/flow-go/cmd/util/cmd/common"
 	"github.com/onflow/flow-go/consensus"

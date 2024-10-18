@@ -2,7 +2,6 @@ package badger_test
 
 import (
 	"errors"
-
 	"testing"
 
 	"github.com/dgraph-io/badger/v2"

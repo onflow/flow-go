@@ -1,6 +1,7 @@
 package verification
 
 import (
+	"encoding/binary"
 	"fmt"
 
 	"github.com/onflow/crypto"
@@ -8,8 +9,6 @@ import (
 
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/model/flow"
-
-	"encoding/binary"
 )
 
 // MakeVoteMessage generates the message we have to sign in order to be able

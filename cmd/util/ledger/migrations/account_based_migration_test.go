@@ -3,7 +3,6 @@ package migrations
 import (
 	"context"
 	"fmt"
-
 	"testing"
 
 	"github.com/onflow/cadence/common"
