@@ -2,7 +2,6 @@ package indexer
 
 import (
 	"errors"
-	"sync"
 	"time"
 
 	"github.com/rs/zerolog"
@@ -27,8 +26,7 @@ type CollectionExecutedMetricImpl struct {
 	collections storage.Collections
 	blocks      storage.Blocks
 
-	blockTransactions map[flow.Identifier][]flow.Identifier // Map to track transactions for each block for sealed metrics
-	mu                sync.RWMutex
+	blockTransactions *stdmap.IdentifierMap // Map to track transactions for each block for sealed metrics
 }
 
 func NewCollectionExecutedMetricImpl(
@@ -40,7 +38,7 @@ func NewCollectionExecutedMetricImpl(
 	collections storage.Collections,
 	blocks storage.Blocks,
 ) (*CollectionExecutedMetricImpl, error) {
-	return &CollectionExecutedMetricImpl{
+	collectionExecutedMetricImpl := &CollectionExecutedMetricImpl{
 		log:                        log,
 		accessMetrics:              accessMetrics,
 		collectionsToMarkFinalized: collectionsToMarkFinalized,
@@ -48,8 +46,15 @@ func NewCollectionExecutedMetricImpl(
 		blocksToMarkExecuted:       blocksToMarkExecuted,
 		collections:                collections,
 		blocks:                     blocks,
-		blockTransactions:          make(map[flow.Identifier][]flow.Identifier),
-	}, nil
+	}
+
+	var err error
+	collectionExecutedMetricImpl.blockTransactions, err = stdmap.NewIdentifierMap(100)
+	if err != nil {
+		return nil, err
+	}
+
+	return collectionExecutedMetricImpl, nil
 }
 
 // CollectionFinalized tracks collections to mark finalized
@@ -93,26 +98,19 @@ func (c *CollectionExecutedMetricImpl) BlockFinalized(block *flow.Block) {
 
 		for _, t := range l.Transactions {
 			c.accessMetrics.TransactionFinalized(t, now)
+			c.blockTransactions.Append(blockID, t)
 		}
-		c.mu.Lock()
-		c.blockTransactions[blockID] = l.Transactions
-		c.mu.Unlock()
 	}
 
 	// Process block seals
 	for _, s := range block.Payload.Seals {
-		c.mu.RLock()
-		transactions, found := c.blockTransactions[s.BlockID]
-		c.mu.RUnlock()
+		transactions, found := c.blockTransactions.Get(s.BlockID)
 
 		if found {
 			for _, t := range transactions {
 				c.accessMetrics.TransactionSealed(t, now)
 			}
-
-			c.mu.Lock()
-			delete(c.blockTransactions, s.BlockID)
-			c.mu.Unlock()
+			c.blockTransactions.Remove(s.BlockID)
 		}
 	}
 
