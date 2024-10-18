@@ -52,3 +52,14 @@ type LightTransactionResult struct {
 	// ComputationUsed is amount of computation used while executing the transaction.
 	ComputationUsed uint64
 }
+
+type TransactionResultErrorMessage struct {
+	// TransactionID is the ID of the transaction this result error was emitted from.
+	TransactionID Identifier
+	// Index is the index of the transaction this result error was emitted from.
+	Index uint32
+	// ErrorMessage contains the error message of any error that may have occurred when the transaction was executed.
+	ErrorMessage string
+	// Executor node ID of the execution node that the message was received from.
+	ExecutorID Identifier
+}
