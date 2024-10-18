@@ -9,11 +9,13 @@ import (
 	"net/url"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
 	mocks "github.com/stretchr/testify/mock"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
 	"github.com/onflow/flow-go/access/mock"
+	"github.com/onflow/flow-go/engine/access/rest/models"
 	"github.com/onflow/flow-go/engine/access/rest/util"
 	"github.com/onflow/flow-go/model/flow"
 )
@@ -47,14 +49,21 @@ func TestScripts(t *testing.T) {
 
 	t.Run("get by Latest height", func(t *testing.T) {
 		backend := &mock.API{}
+		value := []byte("hello world")
 		backend.Mock.
 			On("ExecuteScriptAtLatestBlock", mocks.Anything, validCode, [][]byte{validArgs}).
 			Return([]byte("hello world"), nil)
 
+		expectedResponse := models.InlineResponse200{
+			Value: base64.StdEncoding.EncodeToString(value),
+		}
+		jsonExpectedResponse, err := json.MarshalIndent(expectedResponse, "", "\t")
+		assert.NoError(t, err)
+
 		req := scriptReq("", sealedHeightQueryParam, validBody)
 		assertOKResponse(t, req, fmt.Sprintf(
-			"\"%s\"",
-			base64.StdEncoding.EncodeToString([]byte(`hello world`)),
+			"%s",
+			jsonExpectedResponse,
 		), backend)
 	})
 
@@ -62,14 +71,21 @@ func TestScripts(t *testing.T) {
 		backend := &mock.API{}
 		height := uint64(1337)
 
+		value := []byte("hello world")
 		backend.Mock.
 			On("ExecuteScriptAtBlockHeight", mocks.Anything, height, validCode, [][]byte{validArgs}).
-			Return([]byte("hello world"), nil)
+			Return(value, nil)
+
+		expectedResponse := models.InlineResponse200{
+			Value: base64.StdEncoding.EncodeToString(value),
+		}
+		jsonExpectedResponse, err := json.MarshalIndent(expectedResponse, "", "\t")
+		assert.NoError(t, err)
 
 		req := scriptReq("", fmt.Sprintf("%d", height), validBody)
 		assertOKResponse(t, req, fmt.Sprintf(
-			"\"%s\"",
-			base64.StdEncoding.EncodeToString([]byte(`hello world`)),
+			"%s",
+			jsonExpectedResponse,
 		), backend)
 	})
 
@@ -77,14 +93,21 @@ func TestScripts(t *testing.T) {
 		backend := &mock.API{}
 		id, _ := flow.HexStringToIdentifier("222dc5dd51b9e4910f687e475f892f495f3352362ba318b53e318b4d78131312")
 
+		value := []byte("hello world")
 		backend.Mock.
 			On("ExecuteScriptAtBlockID", mocks.Anything, id, validCode, [][]byte{validArgs}).
-			Return([]byte("hello world"), nil)
+			Return(value, nil)
+
+		expectedResponse := models.InlineResponse200{
+			Value: base64.StdEncoding.EncodeToString(value),
+		}
+		jsonExpectedResponse, err := json.MarshalIndent(expectedResponse, "", "\t")
+		assert.NoError(t, err)
 
 		req := scriptReq(id.String(), "", validBody)
 		assertOKResponse(t, req, fmt.Sprintf(
-			"\"%s\"",
-			base64.StdEncoding.EncodeToString([]byte(`hello world`)),
+			"%s",
+			jsonExpectedResponse,
 		), backend)
 	})
 
