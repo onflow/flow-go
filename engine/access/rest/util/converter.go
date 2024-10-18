@@ -2,6 +2,7 @@ package util
 
 import (
 	"encoding/base64"
+	"errors"
 	"fmt"
 	"strconv"
 )
@@ -15,6 +16,9 @@ func FromUint[U uint | uint64 | uint32](number U) string {
 func ToUint64(uint64Str string) (uint64, error) {
 	val, err := strconv.ParseUint(uint64Str, 10, 64)
 	if err != nil {
+		if errors.Is(err, strconv.ErrRange) {
+			return 0, fmt.Errorf("value overflows uint64 range")
+		}
 		return 0, fmt.Errorf("value must be an unsigned 64 bit integer") // hide error from user
 	}
 	return val, nil
@@ -24,6 +28,9 @@ func ToUint64(uint64Str string) (uint64, error) {
 func ToUint32(uint32Str string) (uint32, error) {
 	val, err := strconv.ParseUint(uint32Str, 10, 32)
 	if err != nil {
+		if errors.Is(err, strconv.ErrRange) {
+			return 0, fmt.Errorf("value overflows uint32 range")
+		}
 		return 0, fmt.Errorf("value must be an unsigned 32 bit integer") // hide error from user
 	}
 	return uint32(val), nil
