@@ -105,7 +105,7 @@ func (c *CollectionExecutedMetricImpl) BlockFinalized(block *flow.Block) {
 		transactions, found := c.blockTransactions[s.BlockID]
 		c.mutex.RUnlock() // release the read lock after reading
 
-		if found && len(transactions) != 0 {
+		if found {
 			for _, t := range transactions {
 				c.accessMetrics.TransactionSealed(t, now)
 			}
