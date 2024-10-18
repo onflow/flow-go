@@ -25,6 +25,8 @@ type CollectionExecutedMetricImpl struct {
 
 	collections storage.Collections
 	blocks      storage.Blocks
+
+	blockTransactions *stdmap.IdentifierMap // Map to track transactions for each block for sealed metrics
 }
 
 func NewCollectionExecutedMetricImpl(
@@ -36,7 +38,7 @@ func NewCollectionExecutedMetricImpl(
 	collections storage.Collections,
 	blocks storage.Blocks,
 ) (*CollectionExecutedMetricImpl, error) {
-	return &CollectionExecutedMetricImpl{
+	collectionExecutedMetricImpl := &CollectionExecutedMetricImpl{
 		log:                        log,
 		accessMetrics:              accessMetrics,
 		collectionsToMarkFinalized: collectionsToMarkFinalized,
@@ -44,7 +46,15 @@ func NewCollectionExecutedMetricImpl(
 		blocksToMarkExecuted:       blocksToMarkExecuted,
 		collections:                collections,
 		blocks:                     blocks,
-	}, nil
+	}
+
+	var err error
+	collectionExecutedMetricImpl.blockTransactions, err = stdmap.NewIdentifierMap(100)
+	if err != nil {
+		return nil, err
+	}
+
+	return collectionExecutedMetricImpl, nil
 }
 
 // CollectionFinalized tracks collections to mark finalized
@@ -52,6 +62,18 @@ func (c *CollectionExecutedMetricImpl) CollectionFinalized(light flow.LightColle
 	if ti, found := c.collectionsToMarkFinalized.ByID(light.ID()); found {
 		for _, t := range light.Transactions {
 			c.accessMetrics.TransactionFinalized(t, ti)
+
+			block, err := c.blocks.ByCollectionID(light.ID())
+			if err != nil {
+				c.log.Warn().Err(err).Msg("could not find block by collection ID")
+				continue
+			}
+
+			err = c.blockTransactions.Append(block.ID(), t)
+			if err != nil {
+				c.log.Warn().Err(err).Msg("could not append finalized tx to track sealed transactions")
+				continue
+			}
 		}
 		c.collectionsToMarkFinalized.Remove(light.ID())
 	}
@@ -88,6 +110,24 @@ func (c *CollectionExecutedMetricImpl) BlockFinalized(block *flow.Block) {
 
 		for _, t := range l.Transactions {
 			c.accessMetrics.TransactionFinalized(t, now)
+			err = c.blockTransactions.Append(blockID, t)
+
+			if err != nil {
+				c.log.Warn().Err(err).Msg("could not append finalized tx to track sealed transactions")
+				continue
+			}
+		}
+	}
+
+	// Process block seals
+	for _, s := range block.Payload.Seals {
+		transactions, found := c.blockTransactions.Get(s.BlockID)
+
+		if found {
+			for _, t := range transactions {
+				c.accessMetrics.TransactionSealed(t, now)
+			}
+			c.blockTransactions.Remove(s.BlockID)
 		}
 	}
 
