@@ -26,7 +26,6 @@ import (
 	"errors"
 	"fmt"
 	"github.com/onflow/flow-go/integration/emulator"
-	"github.com/onflow/flow-go/integration/emulator/adapters"
 	"io"
 	"strings"
 	"testing"
@@ -49,13 +48,13 @@ import (
 
 func setupTransactionTests(t *testing.T, opts ...emulator.Option) (
 	*emulator.Blockchain,
-	*adapters.SDKAdapter,
+	*emulator.SDKAdapter,
 ) {
 	b, err := emulator.New(opts...)
 	require.NoError(t, err)
 
 	logger := zerolog.Nop()
-	return b, adapters.NewSDKAdapter(&logger, b)
+	return b, emulator.NewSDKAdapter(&logger, b)
 }
 
 func TestSubmitTransaction(t *testing.T) {
@@ -1965,7 +1964,7 @@ type MeteredMemoryIntensities map[common.MemoryKind]uint
 func IncrementHelper(
 	t *testing.T,
 	b emulator.Emulator,
-	adapter *adapters.SDKAdapter,
+	adapter *emulator.SDKAdapter,
 	counterAddress flowsdk.Address,
 	addTwoScript string,
 	expected int,

@@ -7,7 +7,6 @@ import (
 	"github.com/onflow/cadence"
 	jsoncdc "github.com/onflow/cadence/encoding/json"
 	emulator "github.com/onflow/flow-go/integration/emulator"
-	"github.com/onflow/flow-go/integration/emulator/adapters"
 	"github.com/rs/zerolog"
 
 	sdk "github.com/onflow/flow-go-sdk"
@@ -18,13 +17,13 @@ import (
 // EmulatorClient is a wrapper around the emulator to implement the same interface
 // used by the SDK client. Used for testing against the emulator.
 type EmulatorClient struct {
-	adapter *adapters.SDKAdapter
+	adapter *emulator.SDKAdapter
 }
 
 func NewEmulatorClient(blockchain emulator.Emulator) *EmulatorClient {
 	logger := zerolog.Nop()
 
-	adapter := adapters.NewSDKAdapter(&logger, blockchain)
+	adapter := emulator.NewSDKAdapter(&logger, blockchain)
 	client := &EmulatorClient{
 		adapter: adapter,
 	}

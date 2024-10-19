@@ -1,4 +1,4 @@
-package adapters
+package emulator
 
 import (
 	"context"
@@ -14,15 +14,13 @@ import (
 	"github.com/rs/zerolog"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
-
-	"github.com/onflow/flow-go/integration/emulator"
 )
 
 // SDKAdapter wraps an emulated emulator and implements the RPC handlers
 // required by the Access API.
 type SDKAdapter struct {
 	logger   *zerolog.Logger
-	emulator emulator.Emulator
+	emulator Emulator
 }
 
 func (b *SDKAdapter) EnableAutoMine() {
@@ -32,12 +30,12 @@ func (b *SDKAdapter) DisableAutoMine() {
 	b.emulator.DisableAutoMine()
 }
 
-func (b *SDKAdapter) Emulator() emulator.Emulator {
+func (b *SDKAdapter) Emulator() Emulator {
 	return b.emulator
 }
 
 // NewSDKAdapter returns a new SDKAdapter.
-func NewSDKAdapter(logger *zerolog.Logger, emulator emulator.Emulator) *SDKAdapter {
+func NewSDKAdapter(logger *zerolog.Logger, emulator Emulator) *SDKAdapter {
 	return &SDKAdapter{
 		logger:   logger,
 		emulator: emulator,
@@ -105,7 +103,7 @@ func (b *SDKAdapter) GetBlockHeaderByID(
 	sdk.BlockStatus,
 	error,
 ) {
-	block, err := b.emulator.GetBlockByID(emulator.SDKIdentifierToFlow(id))
+	block, err := b.emulator.GetBlockByID(SDKIdentifierToFlow(id))
 	if err != nil {
 		return nil, sdk.BlockStatusUnknown, err
 	}
@@ -177,7 +175,7 @@ func (b *SDKAdapter) GetBlockByID(
 	sdk.BlockStatus,
 	error,
 ) {
-	flowBlock, err := b.emulator.GetBlockByID(emulator.SDKIdentifierToFlow(id))
+	flowBlock, err := b.emulator.GetBlockByID(SDKIdentifierToFlow(id))
 	if err != nil {
 		return nil, sdk.BlockStatusUnknown, status.Error(codes.Internal, err.Error())
 	}
@@ -228,16 +226,16 @@ func (b *SDKAdapter) GetCollectionByID(
 	_ context.Context,
 	id sdk.Identifier,
 ) (*sdk.Collection, error) {
-	flowCollection, err := b.emulator.GetCollectionByID(emulator.SDKIdentifierToFlow(id))
+	flowCollection, err := b.emulator.GetCollectionByID(SDKIdentifierToFlow(id))
 	if err != nil {
 		return nil, err
 	}
-	collection := emulator.FlowLightCollectionToSDK(*flowCollection)
+	collection := FlowLightCollectionToSDK(*flowCollection)
 	return &collection, nil
 }
 
 func (b *SDKAdapter) SendTransaction(ctx context.Context, tx sdk.Transaction) error {
-	flowTx := emulator.SDKTransactionToFlow(tx)
+	flowTx := SDKTransactionToFlow(tx)
 	return b.emulator.SendTransaction(flowTx)
 }
 
@@ -246,11 +244,11 @@ func (b *SDKAdapter) GetTransaction(
 	ctx context.Context,
 	id sdk.Identifier,
 ) (*sdk.Transaction, error) {
-	tx, err := b.emulator.GetTransaction(emulator.SDKIdentifierToFlow(id))
+	tx, err := b.emulator.GetTransaction(SDKIdentifierToFlow(id))
 	if err != nil {
 		return nil, err
 	}
-	sdkTx := emulator.FlowTransactionToSDK(*tx)
+	sdkTx := FlowTransactionToSDK(*tx)
 	return &sdkTx, nil
 }
 
@@ -259,11 +257,11 @@ func (b *SDKAdapter) GetTransactionResult(
 	ctx context.Context,
 	id sdk.Identifier,
 ) (*sdk.TransactionResult, error) {
-	flowResult, err := b.emulator.GetTransactionResult(emulator.SDKIdentifierToFlow(id))
+	flowResult, err := b.emulator.GetTransactionResult(SDKIdentifierToFlow(id))
 	if err != nil {
 		return nil, err
 	}
-	return emulator.FlowTransactionResultToSDK(flowResult)
+	return FlowTransactionResultToSDK(flowResult)
 }
 
 // GetAccount returns an account by address at the latest sealed block.
@@ -291,11 +289,11 @@ func (b *SDKAdapter) GetAccountAtLatestBlock(
 }
 
 func (b *SDKAdapter) getAccount(address sdk.Address) (*sdk.Account, error) {
-	account, err := b.emulator.GetAccount(emulator.SDKAddressToFlow(address))
+	account, err := b.emulator.GetAccount(SDKAddressToFlow(address))
 	if err != nil {
 		return nil, err
 	}
-	return emulator.FlowAccountToSDK(*account)
+	return FlowAccountToSDK(*account)
 }
 
 func (b *SDKAdapter) GetAccountAtBlockHeight(
@@ -303,11 +301,11 @@ func (b *SDKAdapter) GetAccountAtBlockHeight(
 	address sdk.Address,
 	height uint64,
 ) (*sdk.Account, error) {
-	account, err := b.emulator.GetAccountAtBlockHeight(emulator.SDKAddressToFlow(address), height)
+	account, err := b.emulator.GetAccountAtBlockHeight(SDKAddressToFlow(address), height)
 	if err != nil {
 		return nil, err
 	}
-	return emulator.FlowAccountToSDK(*account)
+	return FlowAccountToSDK(*account)
 }
 
 // ExecuteScriptAtLatestBlock executes a script at a the latest block
@@ -340,7 +338,7 @@ func (b *SDKAdapter) ExecuteScriptAtBlockID(
 	script []byte,
 	arguments [][]byte,
 ) ([]byte, error) {
-	block, err := b.emulator.GetBlockByID(emulator.SDKIdentifierToFlow(blockID))
+	block, err := b.emulator.GetBlockByID(SDKIdentifierToFlow(blockID))
 	if err != nil {
 		return nil, err
 	}
@@ -389,12 +387,12 @@ func (b *SDKAdapter) GetSystemTransactionResult(_ context.Context, _ flowgo.Iden
 
 func (b *SDKAdapter) GetTransactionsByBlockID(ctx context.Context, id sdk.Identifier) ([]*sdk.Transaction, error) {
 	result := []*sdk.Transaction{}
-	transactions, err := b.emulator.GetTransactionsByBlockID(emulator.SDKIdentifierToFlow(id))
+	transactions, err := b.emulator.GetTransactionsByBlockID(SDKIdentifierToFlow(id))
 	if err != nil {
 		return nil, err
 	}
 	for _, transaction := range transactions {
-		sdkTransaction := emulator.FlowTransactionToSDK(*transaction)
+		sdkTransaction := FlowTransactionToSDK(*transaction)
 		result = append(result, &sdkTransaction)
 
 	}
@@ -403,12 +401,12 @@ func (b *SDKAdapter) GetTransactionsByBlockID(ctx context.Context, id sdk.Identi
 
 func (b *SDKAdapter) GetTransactionResultsByBlockID(ctx context.Context, id sdk.Identifier) ([]*sdk.TransactionResult, error) {
 	result := []*sdk.TransactionResult{}
-	transactionResults, err := b.emulator.GetTransactionResultsByBlockID(emulator.SDKIdentifierToFlow(id))
+	transactionResults, err := b.emulator.GetTransactionResultsByBlockID(SDKIdentifierToFlow(id))
 	if err != nil {
 		return nil, err
 	}
 	for _, transactionResult := range transactionResults {
-		sdkResult, err := emulator.FlowTransactionResultToSDK(transactionResult)
+		sdkResult, err := FlowTransactionResultToSDK(transactionResult)
 		if err != nil {
 			return nil, err
 		}
@@ -419,13 +417,13 @@ func (b *SDKAdapter) GetTransactionResultsByBlockID(ctx context.Context, id sdk.
 
 func (b *SDKAdapter) GetEventsForBlockIDs(ctx context.Context, eventType string, blockIDs []sdk.Identifier) ([]*sdk.BlockEvents, error) {
 	result := []*sdk.BlockEvents{}
-	flowBlockEvents, err := b.emulator.GetEventsForBlockIDs(eventType, emulator.SDKIdentifiersToFlow(blockIDs))
+	flowBlockEvents, err := b.emulator.GetEventsForBlockIDs(eventType, SDKIdentifiersToFlow(blockIDs))
 	if err != nil {
 		return nil, err
 	}
 
 	for _, flowBlockEvent := range flowBlockEvents {
-		sdkEvents, err := emulator.FlowEventsToSDK(flowBlockEvent.Events)
+		sdkEvents, err := FlowEventsToSDK(flowBlockEvent.Events)
 		if err != nil {
 			return nil, err
 		}
@@ -453,7 +451,7 @@ func (b *SDKAdapter) GetEventsForHeightRange(ctx context.Context, eventType stri
 	}
 
 	for _, flowBlockEvent := range flowBlockEvents {
-		sdkEvents, err := emulator.FlowEventsToSDK(flowBlockEvent.Events)
+		sdkEvents, err := FlowEventsToSDK(flowBlockEvent.Events)
 
 		if err != nil {
 			return nil, err
@@ -479,7 +477,7 @@ func (b *SDKAdapter) CreateAccount(ctx context.Context, publicKeys []*sdk.Accoun
 
 	serviceKey := b.emulator.ServiceKey()
 	latestBlock, err := b.emulator.GetLatestBlock()
-	serviceAddress := emulator.FlowAddressToSDK(serviceKey.Address)
+	serviceAddress := FlowAddressToSDK(serviceKey.Address)
 
 	if err != nil {
 		return sdk.Address{}, err

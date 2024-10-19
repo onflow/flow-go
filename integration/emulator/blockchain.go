@@ -113,17 +113,15 @@ func (b *Blockchain) Broadcaster() *engine.Broadcaster {
 
 func (b *Blockchain) ReloadBlockchain() (*Blockchain, error) {
 
-	cadenceLogger := b.conf.Logger.Hook(CadenceHook{MainLogger: &b.conf.ServerLogger}).Level(zerolog.DebugLevel)
-
 	b.vm = fvm.NewVirtualMachine()
 	b.vmCtx = fvm.NewContext(
-		fvm.WithLogger(cadenceLogger),
+		fvm.WithLogger(b.conf.Logger),
+		fvm.WithCadenceLogging(true),
 		fvm.WithChain(b.conf.GetChainID().Chain()),
 		fvm.WithBlocks(b.storage),
 		fvm.WithContractDeploymentRestricted(false),
 		fvm.WithContractRemovalRestricted(!b.conf.ContractRemovalEnabled),
 		fvm.WithComputationLimit(b.conf.ScriptGasLimit),
-		fvm.WithCadenceLogging(true),
 		fvm.WithAccountStorageLimit(b.conf.StorageLimitEnabled),
 		fvm.WithTransactionFeesEnabled(b.conf.TransactionFeesEnabled),
 		fvm.WithReusableCadenceRuntimePool(
@@ -771,10 +769,6 @@ func (b *Blockchain) executeAndCommitBlock() (*flowgo.Block, []*TransactionResul
 		return nil, results, err
 	}
 
-	for _, result := range results {
-		PrintTransactionResult(&b.conf.ServerLogger, result)
-	}
-
 	blockID := block.ID()
 	b.conf.ServerLogger.Debug().Fields(map[string]any{
 		"blockHeight": block.Header.Height,
@@ -985,6 +979,7 @@ func (b *Blockchain) GetLogs(identifier flowgo.Identifier) ([]string, error) {
 // SetClock sets the given clock on blockchain's pending block.
 func (b *Blockchain) SetClock(clock func() time.Time) {
 	b.clockOverride = clock
+	b.pendingBlock.SetTimestamp(clock())
 }
 
 // NewScriptEnvironment returns an environment.Environment by

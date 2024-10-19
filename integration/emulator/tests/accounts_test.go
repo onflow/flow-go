@@ -21,7 +21,6 @@ package tests
 import (
 	"context"
 	"fmt"
-	"github.com/onflow/flow-go/integration/emulator/adapters"
 	"testing"
 
 	flowsdk "github.com/onflow/flow-go-sdk"
@@ -41,7 +40,7 @@ const testContract = "access(all) contract Test {}"
 
 func setupAccountTests(t *testing.T, opts ...emulator.Option) (
 	*emulator.Blockchain,
-	*adapters.SDKAdapter,
+	*emulator.SDKAdapter,
 ) {
 	b, err := emulator.New(
 		opts...,
@@ -49,7 +48,7 @@ func setupAccountTests(t *testing.T, opts ...emulator.Option) (
 	require.NoError(t, err)
 
 	logger := zerolog.Nop()
-	return b, adapters.NewSDKAdapter(&logger, b)
+	return b, emulator.NewSDKAdapter(&logger, b)
 }
 
 func TestGetAccount(t *testing.T) {

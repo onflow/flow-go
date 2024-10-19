@@ -21,7 +21,6 @@ import (
 	"context"
 	"fmt"
 	"github.com/onflow/flow-go/integration/emulator"
-	"github.com/onflow/flow-go/integration/emulator/adapters"
 	"testing"
 	"time"
 
@@ -35,7 +34,7 @@ import (
 
 func setupPendingBlockTests(t *testing.T) (
 	*emulator.Blockchain,
-	*adapters.SDKAdapter,
+	*emulator.SDKAdapter,
 	*flowsdk.Transaction,
 	*flowsdk.Transaction,
 	*flowsdk.Transaction,
@@ -45,7 +44,7 @@ func setupPendingBlockTests(t *testing.T) (
 	)
 	require.NoError(t, err)
 	logger := zerolog.Nop()
-	adapter := adapters.NewSDKAdapter(&logger, b)
+	adapter := emulator.NewSDKAdapter(&logger, b)
 	serviceAccountAddress := flowsdk.Address(b.ServiceKey().Address)
 
 	addTwoScript, _ := DeployAndGenerateAddTwoScript(t, adapter)
@@ -336,7 +335,7 @@ func TestPendingBlockCommit(t *testing.T) {
 	serviceAccountAddress := flowsdk.Address(b.ServiceKey().Address)
 
 	logger := zerolog.Nop()
-	adapter := adapters.NewSDKAdapter(&logger, b)
+	adapter := emulator.NewSDKAdapter(&logger, b)
 
 	addTwoScript, _ := DeployAndGenerateAddTwoScript(t, adapter)
 

@@ -21,7 +21,6 @@ package tests
 import (
 	"context"
 	"fmt"
-	"github.com/onflow/flow-go/integration/emulator/adapters"
 	"testing"
 
 	"github.com/rs/zerolog"
@@ -44,7 +43,7 @@ func TestBlockInfo(t *testing.T) {
 	serviceAccountAddress := flowsdk.Address(b.ServiceKey().Address)
 
 	logger := zerolog.Nop()
-	adapter := adapters.NewSDKAdapter(&logger, b)
+	adapter := emulator.NewSDKAdapter(&logger, b)
 
 	block1, err := b.CommitBlock()
 	require.NoError(t, err)

@@ -22,7 +22,6 @@ import (
 	"context"
 	"fmt"
 	"github.com/onflow/flow-go/integration/emulator"
-	"github.com/onflow/flow-go/integration/emulator/adapters"
 	"testing"
 
 	"github.com/onflow/cadence"
@@ -47,7 +46,7 @@ func TestExecuteScript(t *testing.T) {
 	serviceAccountAddress := flowsdk.Address(b.ServiceKey().Address)
 
 	logger := zerolog.Nop()
-	adapter := adapters.NewSDKAdapter(&logger, b)
+	adapter := emulator.NewSDKAdapter(&logger, b)
 
 	addTwoScript, counterAddress := DeployAndGenerateAddTwoScript(t, adapter)
 

@@ -21,7 +21,6 @@ package tests
 import (
 	"context"
 	"fmt"
-	"github.com/onflow/flow-go/integration/emulator/adapters"
 	"testing"
 
 	"github.com/onflow/flow-go/integration/emulator"
@@ -44,7 +43,7 @@ func TestCommitBlock(t *testing.T) {
 	require.NoError(t, err)
 
 	logger := zerolog.Nop()
-	adapter := adapters.NewSDKAdapter(&logger, b)
+	adapter := emulator.NewSDKAdapter(&logger, b)
 	serviceAccountAddress := flowsdk.Address(b.ServiceKey().Address)
 
 	addTwoScript, _ := DeployAndGenerateAddTwoScript(t, adapter)
@@ -127,7 +126,7 @@ func TestBlockView(t *testing.T) {
 	require.NoError(t, err)
 
 	logger := zerolog.Nop()
-	adapter := adapters.NewSDKAdapter(&logger, b)
+	adapter := emulator.NewSDKAdapter(&logger, b)
 	serviceAccountAddress := flowsdk.Address(b.ServiceKey().Address)
 
 	t.Run("genesis should have 0 view", func(t *testing.T) {

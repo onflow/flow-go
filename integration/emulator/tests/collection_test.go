@@ -20,7 +20,6 @@ package tests
 import (
 	"context"
 	"github.com/onflow/flow-go/integration/emulator"
-	"github.com/onflow/flow-go/integration/emulator/adapters"
 	"testing"
 
 	"github.com/rs/zerolog"
@@ -61,7 +60,7 @@ func TestCollections(t *testing.T) {
 		require.NoError(t, err)
 
 		logger := zerolog.Nop()
-		adapter := adapters.NewSDKAdapter(&logger, b)
+		adapter := emulator.NewSDKAdapter(&logger, b)
 
 		addTwoScript, _ := DeployAndGenerateAddTwoScript(t, adapter)
 

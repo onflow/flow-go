@@ -21,7 +21,6 @@ package tests
 import (
 	"context"
 	"fmt"
-	"github.com/onflow/flow-go/integration/emulator/adapters"
 	"testing"
 
 	"github.com/onflow/cadence/stdlib"
@@ -87,7 +86,7 @@ func GenerateAddTwoToCounterScript(counterAddress flowsdk.Address) string {
 	)
 }
 
-func DeployAndGenerateAddTwoScript(t *testing.T, adapter *adapters.SDKAdapter) (string, flowsdk.Address) {
+func DeployAndGenerateAddTwoScript(t *testing.T, adapter *emulator.SDKAdapter) (string, flowsdk.Address) {
 
 	contracts := []templates.Contract{
 		{
@@ -128,7 +127,7 @@ func AssertTransactionSucceeded(t *testing.T, result *emulator.TransactionResult
 
 func LastCreatedAccount(b *emulator.Blockchain, result *emulator.TransactionResult) (*flowsdk.Account, error) {
 	logger := zerolog.Nop()
-	adapter := adapters.NewSDKAdapter(&logger, b)
+	adapter := emulator.NewSDKAdapter(&logger, b)
 
 	address, err := LastCreatedAccountAddress(result)
 	if err != nil {

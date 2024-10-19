@@ -22,7 +22,6 @@ import (
 	"context"
 	"fmt"
 	"github.com/onflow/flow-go/integration/emulator"
-	"github.com/onflow/flow-go/integration/emulator/adapters"
 	"testing"
 
 	"github.com/rs/zerolog"
@@ -75,7 +74,7 @@ func TestEventEmitted(t *testing.T) {
 		serviceAccountAddress := flowsdk.Address(b.ServiceKey().Address)
 
 		logger := zerolog.Nop()
-		adapter := adapters.NewSDKAdapter(&logger, b)
+		adapter := emulator.NewSDKAdapter(&logger, b)
 
 		accountContracts := []templates.Contract{
 			{
