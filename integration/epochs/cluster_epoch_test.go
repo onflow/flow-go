@@ -13,7 +13,7 @@ import (
 	"github.com/onflow/flow-core-contracts/lib/go/contracts"
 	"github.com/onflow/flow-core-contracts/lib/go/templates"
 
-	emulator "github.com/onflow/flow-emulator/emulator"
+	emulator "github.com/onflow/flow-go/integration/emulator"
 
 	sdk "github.com/onflow/flow-go-sdk"
 	sdkcrypto "github.com/onflow/flow-go-sdk/crypto"
@@ -31,10 +31,10 @@ import (
 type Suite struct {
 	suite.Suite
 
-	env            templates.Environment
-	blockchain     *emulator.Blockchain
-	emulatorClient *utils.EmulatorClient
-
+	env                   templates.Environment
+	blockchain            *emulator.Blockchain
+	emulatorClient        *utils.EmulatorClient
+	serviceAccountAddress sdk.Address
 	// Quorum Certificate deployed account and address
 	qcAddress    sdk.Address
 	qcAccountKey *sdk.AccountKey
@@ -51,7 +51,7 @@ func (s *Suite) SetupTest() {
 	)
 	s.Require().NoError(err)
 	s.emulatorClient = utils.NewEmulatorClient(s.blockchain)
-
+	s.serviceAccountAddress = sdk.Address(s.blockchain.ServiceKey().Address)
 	// deploy epoch qc contract
 	s.deployEpochQCContract()
 }
@@ -104,16 +104,16 @@ func (s *Suite) PublishVoter() {
 	publishVoterTx := sdk.NewTransaction().
 		SetScript(templates.GeneratePublishVoterScript(s.env)).
 		SetComputeLimit(9999).
-		SetProposalKey(s.blockchain.ServiceKey().Address,
+		SetProposalKey(s.serviceAccountAddress,
 			s.blockchain.ServiceKey().Index, s.blockchain.ServiceKey().SequenceNumber).
-		SetPayer(s.blockchain.ServiceKey().Address).
+		SetPayer(s.serviceAccountAddress).
 		AddAuthorizer(s.qcAddress)
 
 	signer, err := s.blockchain.ServiceKey().Signer()
 	require.NoError(s.T(), err)
 
 	s.SignAndSubmit(publishVoterTx,
-		[]sdk.Address{s.blockchain.ServiceKey().Address, s.qcAddress},
+		[]sdk.Address{s.serviceAccountAddress, s.qcAddress},
 		[]sdkcrypto.Signer{signer, s.qcSigner})
 }
 
@@ -124,9 +124,9 @@ func (s *Suite) StartVoting(clustering flow.ClusterList, clusterCount, nodesPerC
 	startVotingTx := sdk.NewTransaction().
 		SetScript(templates.GenerateStartVotingScript(s.env)).
 		SetComputeLimit(9999).
-		SetProposalKey(s.blockchain.ServiceKey().Address,
+		SetProposalKey(s.serviceAccountAddress,
 			s.blockchain.ServiceKey().Index, s.blockchain.ServiceKey().SequenceNumber).
-		SetPayer(s.blockchain.ServiceKey().Address).
+		SetPayer(s.serviceAccountAddress).
 		AddAuthorizer(s.qcAddress)
 
 	clusterIndices := make([]cadence.Value, 0, clusterCount)
@@ -170,7 +170,7 @@ func (s *Suite) StartVoting(clustering flow.ClusterList, clusterCount, nodesPerC
 	require.NoError(s.T(), err)
 
 	s.SignAndSubmit(startVotingTx,
-		[]sdk.Address{s.blockchain.ServiceKey().Address, s.qcAddress},
+		[]sdk.Address{s.serviceAccountAddress, s.qcAddress},
 		[]sdkcrypto.Signer{signer, s.qcSigner})
 }
 
@@ -180,9 +180,9 @@ func (s *Suite) CreateVoterResource(address sdk.Address, nodeID flow.Identifier,
 	registerVoterTx := sdk.NewTransaction().
 		SetScript(templates.GenerateCreateVoterScript(s.env)).
 		SetComputeLimit(9999).
-		SetProposalKey(s.blockchain.ServiceKey().Address,
+		SetProposalKey(s.serviceAccountAddress,
 			s.blockchain.ServiceKey().Index, s.blockchain.ServiceKey().SequenceNumber).
-		SetPayer(s.blockchain.ServiceKey().Address).
+		SetPayer(s.serviceAccountAddress).
 		AddAuthorizer(address)
 
 	err := registerVoterTx.AddArgument(cadence.NewAddress(s.qcAddress))
@@ -202,7 +202,7 @@ func (s *Suite) CreateVoterResource(address sdk.Address, nodeID flow.Identifier,
 	require.NoError(s.T(), err)
 
 	s.SignAndSubmit(registerVoterTx,
-		[]sdk.Address{s.blockchain.ServiceKey().Address, address},
+		[]sdk.Address{s.serviceAccountAddress, address},
 		[]sdkcrypto.Signer{signer, nodeSigner})
 }
 
@@ -210,16 +210,16 @@ func (s *Suite) StopVoting() {
 	tx := sdk.NewTransaction().
 		SetScript(templates.GenerateStopVotingScript(s.env)).
 		SetComputeLimit(9999).
-		SetProposalKey(s.blockchain.ServiceKey().Address,
+		SetProposalKey(s.serviceAccountAddress,
 			s.blockchain.ServiceKey().Index, s.blockchain.ServiceKey().SequenceNumber).
-		SetPayer(s.blockchain.ServiceKey().Address).
+		SetPayer(s.serviceAccountAddress).
 		AddAuthorizer(s.qcAddress)
 
 	signer, err := s.blockchain.ServiceKey().Signer()
 	require.NoError(s.T(), err)
 
 	s.SignAndSubmit(tx,
-		[]sdk.Address{s.blockchain.ServiceKey().Address, s.qcAddress},
+		[]sdk.Address{s.serviceAccountAddress, s.qcAddress},
 		[]sdkcrypto.Signer{signer, s.qcSigner})
 }
 

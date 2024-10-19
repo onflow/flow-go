@@ -8,7 +8,7 @@ import (
 
 	"github.com/onflow/cadence"
 	"github.com/onflow/cadence/encoding/ccf"
-	convert2 "github.com/onflow/flow-emulator/convert"
+	convert2 "github.com/onflow/flow-go/integration/convert"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/require"
 

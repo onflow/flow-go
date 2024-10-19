@@ -6,8 +6,8 @@ import (
 
 	"github.com/onflow/cadence"
 	jsoncdc "github.com/onflow/cadence/encoding/json"
-	"github.com/onflow/flow-emulator/adapters"
-	emulator "github.com/onflow/flow-emulator/emulator"
+	emulator "github.com/onflow/flow-go/integration/emulator"
+	"github.com/onflow/flow-go/integration/emulator/adapters"
 	"github.com/rs/zerolog"
 
 	sdk "github.com/onflow/flow-go-sdk"
