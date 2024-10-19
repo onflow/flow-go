@@ -26,7 +26,33 @@ import (
 // uniqueScriptLoggingTimeWindow is the duration for checking the uniqueness of scripts sent for execution
 const uniqueScriptLoggingTimeWindow = 10 * time.Minute
 
-type backendScripts struct {
+func NewBackendScripts(
+	log zerolog.Logger,
+	headers storage.Headers,
+	executionReceipts storage.ExecutionReceipts,
+	state protocol.State,
+	connFactory connection.ConnectionFactory,
+	metrics module.BackendScriptsMetrics,
+	loggedScripts *lru.Cache[[md5.Size]byte, time.Time],
+	nodeCommunicator Communicator,
+	scriptExecutor execution.ScriptExecutor,
+	scriptExecMode IndexQueryMode,
+) *BackendScripts {
+	return &BackendScripts{
+		log:               log,
+		headers:           headers,
+		executionReceipts: executionReceipts,
+		state:             state,
+		connFactory:       connFactory,
+		metrics:           metrics,
+		loggedScripts:     loggedScripts,
+		nodeCommunicator:  nodeCommunicator,
+		scriptExecutor:    scriptExecutor,
+		scriptExecMode:    scriptExecMode,
+	}
+}
+
+type BackendScripts struct {
 	log               zerolog.Logger
 	headers           storage.Headers
 	executionReceipts storage.ExecutionReceipts
@@ -39,9 +65,9 @@ type backendScripts struct {
 	scriptExecMode    IndexQueryMode
 }
 
-// scriptExecutionRequest encapsulates the data needed to execute a script to make it easier
+// ScriptExecutionRequest encapsulates the data needed to execute a script to make it easier
 // to pass around between the various methods involved in script execution
-type scriptExecutionRequest struct {
+type ScriptExecutionRequest struct {
 	blockID            flow.Identifier
 	height             uint64
 	script             []byte
@@ -49,8 +75,8 @@ type scriptExecutionRequest struct {
 	insecureScriptHash [md5.Size]byte
 }
 
-func newScriptExecutionRequest(blockID flow.Identifier, height uint64, script []byte, arguments [][]byte) *scriptExecutionRequest {
-	return &scriptExecutionRequest{
+func NewScriptExecutionRequest(blockID flow.Identifier, height uint64, script []byte, arguments [][]byte) *ScriptExecutionRequest {
+	return &ScriptExecutionRequest{
 		blockID:   blockID,
 		height:    height,
 		script:    script,
@@ -64,7 +90,7 @@ func newScriptExecutionRequest(blockID flow.Identifier, height uint64, script []
 }
 
 // ExecuteScriptAtLatestBlock executes provided script at the latest sealed block.
-func (b *backendScripts) ExecuteScriptAtLatestBlock(
+func (b *BackendScripts) ExecuteScriptAtLatestBlock(
 	ctx context.Context,
 	script []byte,
 	arguments [][]byte,
@@ -77,11 +103,11 @@ func (b *backendScripts) ExecuteScriptAtLatestBlock(
 		return nil, err
 	}
 
-	return b.executeScript(ctx, newScriptExecutionRequest(latestHeader.ID(), latestHeader.Height, script, arguments))
+	return b.ExecuteScript(ctx, NewScriptExecutionRequest(latestHeader.ID(), latestHeader.Height, script, arguments))
 }
 
 // ExecuteScriptAtBlockID executes provided script at the provided block ID.
-func (b *backendScripts) ExecuteScriptAtBlockID(
+func (b *BackendScripts) ExecuteScriptAtBlockID(
 	ctx context.Context,
 	blockID flow.Identifier,
 	script []byte,
@@ -92,11 +118,11 @@ func (b *backendScripts) ExecuteScriptAtBlockID(
 		return nil, rpc.ConvertStorageError(err)
 	}
 
-	return b.executeScript(ctx, newScriptExecutionRequest(blockID, header.Height, script, arguments))
+	return b.ExecuteScript(ctx, NewScriptExecutionRequest(blockID, header.Height, script, arguments))
 }
 
 // ExecuteScriptAtBlockHeight executes provided script at the provided block height.
-func (b *backendScripts) ExecuteScriptAtBlockHeight(
+func (b *BackendScripts) ExecuteScriptAtBlockHeight(
 	ctx context.Context,
 	blockHeight uint64,
 	script []byte,
@@ -107,14 +133,14 @@ func (b *backendScripts) ExecuteScriptAtBlockHeight(
 		return nil, rpc.ConvertStorageError(err)
 	}
 
-	return b.executeScript(ctx, newScriptExecutionRequest(header.ID(), blockHeight, script, arguments))
+	return b.ExecuteScript(ctx, NewScriptExecutionRequest(header.ID(), blockHeight, script, arguments))
 }
 
-// executeScript executes the provided script using either the local execution state or the execution
+// ExecuteScript executes the provided script using either the local execution state or the execution
 // nodes depending on the node's configuration and the availability of the data.
-func (b *backendScripts) executeScript(
+func (b *BackendScripts) ExecuteScript(
 	ctx context.Context,
-	scriptRequest *scriptExecutionRequest,
+	scriptRequest *ScriptExecutionRequest,
 ) ([]byte, error) {
 	switch b.scriptExecMode {
 	case IndexQueryModeExecutionNodesOnly:
@@ -167,9 +193,9 @@ func (b *backendScripts) executeScript(
 }
 
 // executeScriptLocally executes the provided script using the local execution state.
-func (b *backendScripts) executeScriptLocally(
+func (b *BackendScripts) executeScriptLocally(
 	ctx context.Context,
-	r *scriptExecutionRequest,
+	r *ScriptExecutionRequest,
 ) ([]byte, time.Duration, error) {
 	execStartTime := time.Now()
 
@@ -219,9 +245,9 @@ func (b *backendScripts) executeScriptLocally(
 }
 
 // executeScriptOnAvailableExecutionNodes executes the provided script using available execution nodes.
-func (b *backendScripts) executeScriptOnAvailableExecutionNodes(
+func (b *BackendScripts) executeScriptOnAvailableExecutionNodes(
 	ctx context.Context,
-	r *scriptExecutionRequest,
+	r *ScriptExecutionRequest,
 ) ([]byte, time.Duration, error) {
 	// find few execution nodes which have executed the block earlier and provided an execution receipt for it
 	executors, err := executionNodesForBlockID(ctx, r.blockID, b.executionReceipts, b.state, b.log)
@@ -290,10 +316,10 @@ func (b *backendScripts) executeScriptOnAvailableExecutionNodes(
 }
 
 // tryExecuteScriptOnExecutionNode attempts to execute the script on the given execution node.
-func (b *backendScripts) tryExecuteScriptOnExecutionNode(
+func (b *BackendScripts) tryExecuteScriptOnExecutionNode(
 	ctx context.Context,
 	executorAddress string,
-	r *scriptExecutionRequest,
+	r *ScriptExecutionRequest,
 ) ([]byte, error) {
 	execRPCClient, closer, err := b.connFactory.GetExecutionAPIClient(executorAddress)
 	if err != nil {
@@ -319,7 +345,7 @@ func isInvalidArgumentError(scriptExecutionErr error) bool {
 }
 
 // shouldLogScript checks if the script hash is unique in the time window
-func (b *backendScripts) shouldLogScript(execTime time.Time, scriptHash [md5.Size]byte) bool {
+func (b *BackendScripts) shouldLogScript(execTime time.Time, scriptHash [md5.Size]byte) bool {
 	if b.log.GetLevel() > zerolog.DebugLevel {
 		return false
 	}

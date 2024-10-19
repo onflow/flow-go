@@ -57,7 +57,7 @@ var (
 //
 // It is composed of several sub-backends that implement part of the Access API.
 //
-// Script related calls are handled by backendScripts.
+// Script related calls are handled by BackendScripts.
 // Transaction related calls are handled by backendTransactions.
 // Block Header related calls are handled by backendBlockHeaders.
 // Block details related calls are handled by backendBlockDetails.
@@ -66,7 +66,7 @@ var (
 //
 // All remaining calls are handled by the base Backend in this file.
 type Backend struct {
-	backendScripts
+	BackendScripts
 	backendTransactions
 	backendEvents
 	backendBlockHeaders
@@ -180,7 +180,7 @@ func New(params Params) (*Backend, error) {
 		state:        params.State,
 		BlockTracker: params.BlockTracker,
 		// create the sub-backends
-		backendScripts: backendScripts{
+		BackendScripts: BackendScripts{
 			log:               params.Log,
 			headers:           params.Headers,
 			executionReceipts: params.ExecutionReceipts,

@@ -79,7 +79,7 @@ func TestCompare(t *testing.T) {
 		},
 	}
 
-	request := newScriptExecutionRequest(unittest.IdentifierFixture(), 1, []byte("script"), [][]byte{})
+	request := NewScriptExecutionRequest(unittest.IdentifierFixture(), 1, []byte("script"), [][]byte{})
 	shouldLogScript := func(time.Time, [16]byte) bool { return true }
 	comparer := newScriptResultComparison(logger, m, shouldLogScript, request)
 

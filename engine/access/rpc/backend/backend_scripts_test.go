@@ -91,11 +91,11 @@ func (s *BackendScriptsSuite) SetupTest() {
 	s.failingScript = []byte("access(all) fun main() { panic(\"!!\") }")
 }
 
-func (s *BackendScriptsSuite) defaultBackend() *backendScripts {
+func (s *BackendScriptsSuite) defaultBackend() *BackendScripts {
 	loggedScripts, err := lru.New[[md5.Size]byte, time.Time](DefaultLoggedScriptsCacheSize)
 	s.Require().NoError(err)
 
-	return &backendScripts{
+	return &BackendScripts{
 		log:               s.log,
 		metrics:           metrics.NewNoopCollector(),
 		state:             s.state,
@@ -430,7 +430,7 @@ func (s *BackendScriptsSuite) TestExecuteScriptAtLatestBlockFromStorage_Inconsis
 	})
 }
 
-func (s *BackendScriptsSuite) testExecuteScriptAtLatestBlock(ctx context.Context, backend *backendScripts, statusCode codes.Code) {
+func (s *BackendScriptsSuite) testExecuteScriptAtLatestBlock(ctx context.Context, backend *BackendScripts, statusCode codes.Code) {
 	s.state.On("Sealed").Return(s.snapshot, nil).Once()
 	s.snapshot.On("Head").Return(s.block.Header, nil).Once()
 
@@ -446,7 +446,7 @@ func (s *BackendScriptsSuite) testExecuteScriptAtLatestBlock(ctx context.Context
 	}
 }
 
-func (s *BackendScriptsSuite) testExecuteScriptAtBlockID(ctx context.Context, backend *backendScripts, statusCode codes.Code) {
+func (s *BackendScriptsSuite) testExecuteScriptAtBlockID(ctx context.Context, backend *BackendScripts, statusCode codes.Code) {
 	blockID := s.block.ID()
 	s.headers.On("ByBlockID", blockID).Return(s.block.Header, nil).Once()
 
@@ -462,7 +462,7 @@ func (s *BackendScriptsSuite) testExecuteScriptAtBlockID(ctx context.Context, ba
 	}
 }
 
-func (s *BackendScriptsSuite) testExecuteScriptAtBlockHeight(ctx context.Context, backend *backendScripts, statusCode codes.Code) {
+func (s *BackendScriptsSuite) testExecuteScriptAtBlockHeight(ctx context.Context, backend *BackendScripts, statusCode codes.Code) {
 	height := s.block.Header.Height
 	s.headers.On("ByHeight", height).Return(s.block.Header, nil).Once()
 
