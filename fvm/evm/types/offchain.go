@@ -1,6 +1,8 @@
 package types
 
-import "github.com/onflow/flow-go/model/flow"
+import (
+	"github.com/onflow/flow-go/model/flow"
+)
 
 // BackendStorageSnapshot provides a read only view of registers
 type BackendStorageSnapshot interface {

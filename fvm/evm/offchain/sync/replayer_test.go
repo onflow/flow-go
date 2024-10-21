@@ -164,10 +164,10 @@ func TestChainReplay(t *testing.T) {
 
 						sp := newTestStorageProvider(snapshot, 1)
 						cr := sync.NewReplayer(chainID, rootAddr, sp, bp, zerolog.Logger{}, nil, true)
-						_, err = cr.ReplayBlock(txEventPayloads, blockEventPayload)
+						res, err := cr.ReplayBlock(txEventPayloads, blockEventPayload)
 						require.NoError(t, err)
 
-						err = bp.OnBlockExecuted(blockEventPayload)
+						err = bp.OnBlockExecuted(blockEventPayload.Height, res)
 						require.NoError(t, err)
 
 						// TODO: verify the state delta

@@ -1,6 +1,8 @@
 package blocks
 
 import (
+	"fmt"
+
 	"github.com/onflow/flow-go/fvm/evm/events"
 	"github.com/onflow/flow-go/fvm/evm/types"
 	"github.com/onflow/flow-go/model/flow"
@@ -11,7 +13,8 @@ import (
 // a OnBlockReceived call before block execution and
 // a follow up OnBlockExecuted call after block execution.
 type BasicProvider struct {
-	blks *Blocks
+	blks               *Blocks
+	latestBlockPayload *events.BlockEventPayload
 }
 
 var _ types.BlockSnapshotProvider = (*BasicProvider)(nil)
@@ -34,11 +37,15 @@ func (p *BasicProvider) GetSnapshotAt(height uint64) (
 	types.BlockSnapshot,
 	error,
 ) {
+	if p.latestBlockPayload.Height != height {
+		return nil, fmt.Errorf("active block height doesn't match expected: %d, got: %d", p.latestBlockPayload.Height, height)
+	}
 	return p.blks, nil
 }
 
 // OnBlockReceived should be called before executing blocks.
 func (p *BasicProvider) OnBlockReceived(blockEvent *events.BlockEventPayload) error {
+	p.latestBlockPayload = blockEvent
 	// push the new block meta
 	// it should be done before execution so block context creation
 	// can be done properly
@@ -52,11 +59,16 @@ func (p *BasicProvider) OnBlockReceived(blockEvent *events.BlockEventPayload) er
 }
 
 // OnBlockExecuted should be called after executing blocks.
-func (p *BasicProvider) OnBlockExecuted(blockEvent *events.BlockEventPayload) error {
+func (p *BasicProvider) OnBlockExecuted(
+	height uint64,
+	resCol types.ReplayResultCollector) error {
 	// we push the block hash after execution, so the behaviour of the blockhash is
 	// identical to the evm.handler.
+	if p.latestBlockPayload.Height != height {
+		return fmt.Errorf("active block height doesn't match expected: %d, got: %d", p.latestBlockPayload.Height, height)
+	}
 	return p.blks.PushBlockHash(
-		blockEvent.Height,
-		blockEvent.Hash,
+		p.latestBlockPayload.Height,
+		p.latestBlockPayload.Hash,
 	)
 }
