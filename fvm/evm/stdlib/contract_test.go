@@ -499,7 +499,7 @@ func TestEVMEncodeABIByteTypes(t *testing.T) {
 		OnGetSigningAccounts: func() ([]runtime.Address, error) {
 			return []runtime.Address{runtime.Address(contractsAddress)}, nil
 		},
-		OnResolveLocation: LocationResolver,
+		OnResolveLocation: newLocationResolver(contractsAddress),
 		OnUpdateAccountContractCode: func(location common.AddressLocation, code []byte) error {
 			accountCodes[location] = code
 			return nil
@@ -946,7 +946,7 @@ func TestEVMEncodeABIBytesRoundtrip(t *testing.T) {
 		OnGetSigningAccounts: func() ([]runtime.Address, error) {
 			return []runtime.Address{runtime.Address(contractsAddress)}, nil
 		},
-		OnResolveLocation: LocationResolver,
+		OnResolveLocation: newLocationResolver(contractsAddress),
 		OnUpdateAccountContractCode: func(location common.AddressLocation, code []byte) error {
 			accountCodes[location] = code
 			return nil
