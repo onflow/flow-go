@@ -1,14 +1,20 @@
 package blocks
 
 import (
+	"fmt"
+
 	"github.com/onflow/flow-go/fvm/evm/events"
 	"github.com/onflow/flow-go/fvm/evm/types"
 	"github.com/onflow/flow-go/model/flow"
 )
 
-// BasicProvider implements a ledger based block provider
+// BasicProvider implements a ledger-backed basic block snapshot provider
+// it assumes sequential progress on blocks and expects a
+// a OnBlockReceived call before block execution and
+// a follow up OnBlockExecuted call after block execution.
 type BasicProvider struct {
-	blks *Blocks
+	blks               *Blocks
+	latestBlockPayload *events.BlockEventPayload
 }
 
 var _ types.BlockSnapshotProvider = (*BasicProvider)(nil)
@@ -25,17 +31,21 @@ func NewBasicProvider(
 	return &BasicProvider{blks: blks}, nil
 }
 
+// GetSnapshotAt returns a block snapshot at the given height
+// Snapshot at a height is not available until `OnBlockReceived` is called for that height.
 func (p *BasicProvider) GetSnapshotAt(height uint64) (
 	types.BlockSnapshot,
 	error,
 ) {
+	if p.latestBlockPayload.Height != height {
+		return nil, fmt.Errorf("active block height doesn't match expected: %d, got: %d", p.latestBlockPayload.Height, height)
+	}
 	return p.blks, nil
 }
 
-// OnBlockReceived should be called before
-// executing blocks.
+// OnBlockReceived should be called before executing blocks.
 func (p *BasicProvider) OnBlockReceived(blockEvent *events.BlockEventPayload) error {
-	// prepare blocks
+	p.latestBlockPayload = blockEvent
 	// push the new block meta
 	// it should be done before execution so block context creation
 	// can be done properly
@@ -48,12 +58,17 @@ func (p *BasicProvider) OnBlockReceived(blockEvent *events.BlockEventPayload) er
 	)
 }
 
-func (p *BasicProvider) OnBlockExecuted(blockEvent *events.BlockEventPayload) error {
-	// push block hash
+// OnBlockExecuted should be called after executing blocks.
+func (p *BasicProvider) OnBlockExecuted(
+	height uint64,
+	resCol types.ReplayResultCollector) error {
 	// we push the block hash after execution, so the behaviour of the blockhash is
 	// identical to the evm.handler.
+	if p.latestBlockPayload.Height != height {
+		return fmt.Errorf("active block height doesn't match expected: %d, got: %d", p.latestBlockPayload.Height, height)
+	}
 	return p.blks.PushBlockHash(
-		blockEvent.Height,
-		blockEvent.Hash,
+		p.latestBlockPayload.Height,
+		p.latestBlockPayload.Hash,
 	)
 }

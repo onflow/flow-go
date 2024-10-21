@@ -4,11 +4,12 @@ import (
 	"testing"
 
 	"github.com/onflow/atree"
+	"github.com/stretchr/testify/require"
+
 	"github.com/onflow/flow-go/fvm/environment"
 	"github.com/onflow/flow-go/fvm/evm/offchain/storage"
 	"github.com/onflow/flow-go/fvm/evm/testutils"
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/stretchr/testify/require"
 )
 
 func TestEphemeralStorage(t *testing.T) {

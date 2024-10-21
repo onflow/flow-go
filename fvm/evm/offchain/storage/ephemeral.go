@@ -28,7 +28,7 @@ func NewEphemeralStorage(parent types.BackendStorage) *EphemeralStorage {
 
 var _ types.BackendStorage = (*EphemeralStorage)(nil)
 
-var _ types.ReplayResults = (*EphemeralStorage)(nil)
+var _ types.ReplayResultCollector = (*EphemeralStorage)(nil)
 
 // GetValue reads a register value
 func (s *EphemeralStorage) GetValue(owner []byte, key []byte) ([]byte, error) {
