@@ -200,6 +200,7 @@ func NewTransactionEnvironment(
 		params.Chain.ServiceAddress(),
 	)
 	env.EventEmitter = NewEventEmitter(
+		env.Logger(),
 		tracer,
 		env.Meter,
 		params.Chain,

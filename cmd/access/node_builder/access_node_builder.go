@@ -367,6 +367,7 @@ func (builder *FlowAccessNodeBuilder) buildFollowerState() *FlowAccessNodeBuilde
 			node.Storage.Index,
 			node.Storage.Payloads,
 			blocktimer.DefaultBlockTimer,
+			nil,
 		)
 		builder.FollowerState = followerState
 
