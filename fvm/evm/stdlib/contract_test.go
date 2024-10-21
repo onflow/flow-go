@@ -9,13 +9,13 @@ import (
 	"testing"
 
 	"github.com/onflow/cadence"
+	"github.com/onflow/cadence/common"
 	"github.com/onflow/cadence/encoding/json"
 	"github.com/onflow/cadence/runtime"
-	"github.com/onflow/cadence/runtime/common"
-	"github.com/onflow/cadence/runtime/sema"
-	cadenceStdlib "github.com/onflow/cadence/runtime/stdlib"
-	. "github.com/onflow/cadence/runtime/tests/runtime_utils"
-	"github.com/onflow/cadence/runtime/tests/utils"
+	"github.com/onflow/cadence/sema"
+	cadenceStdlib "github.com/onflow/cadence/stdlib"
+	. "github.com/onflow/cadence/tests/runtime_utils"
+	"github.com/onflow/cadence/tests/utils"
 	coreContracts "github.com/onflow/flow-core-contracts/lib/go/contracts"
 	coreContractstemplates "github.com/onflow/flow-core-contracts/lib/go/templates"
 	"github.com/onflow/go-ethereum/crypto"
@@ -454,6 +454,785 @@ func TestEVMEncodeABI(t *testing.T) {
 		result,
 	)
 	assert.Equal(t, computation, uint(len(cdcBytes)))
+}
+
+func TestEVMEncodeABIByteTypes(t *testing.T) {
+
+	t.Parallel()
+
+	handler := &testContractHandler{}
+	contractsAddress := flow.BytesToAddress([]byte{0x1})
+	transactionEnvironment := newEVMTransactionEnvironment(handler, contractsAddress)
+	scriptEnvironment := newEVMScriptEnvironment(handler, contractsAddress)
+	rt := runtime.NewInterpreterRuntime(runtime.Config{})
+
+	accountCodes := map[common.Location][]byte{}
+	var events []cadence.Event
+
+	computation := uint(0)
+	runtimeInterface := &TestRuntimeInterface{
+		Storage: NewTestLedger(nil, nil),
+		OnGetSigningAccounts: func() ([]runtime.Address, error) {
+			return []runtime.Address{runtime.Address(contractsAddress)}, nil
+		},
+		OnResolveLocation: LocationResolver,
+		OnUpdateAccountContractCode: func(location common.AddressLocation, code []byte) error {
+			accountCodes[location] = code
+			return nil
+		},
+		OnGetAccountContractCode: func(location common.AddressLocation) (code []byte, err error) {
+			code = accountCodes[location]
+			return code, nil
+		},
+		OnEmitEvent: func(event cadence.Event) error {
+			events = append(events, event)
+			return nil
+		},
+		OnDecodeArgument: func(b []byte, t cadence.Type) (cadence.Value, error) {
+			return json.Decode(nil, b)
+		},
+		OnMeterComputation: func(compKind common.ComputationKind, intensity uint) error {
+			if compKind == environment.ComputationKindEVMEncodeABI {
+				computation += intensity
+			}
+			return nil
+		},
+	}
+
+	nextTransactionLocation := NewTransactionLocationGenerator()
+	nextScriptLocation := NewScriptLocationGenerator()
+
+	// Deploy contracts
+	deployContracts(
+		t,
+		rt,
+		contractsAddress,
+		runtimeInterface,
+		transactionEnvironment,
+		nextTransactionLocation,
+	)
+
+	t.Run("ABI encode into `bytes` Solidity type", func(t *testing.T) {
+		script := []byte(`
+          import EVM from 0x1
+
+          access(all)
+          fun main(): [UInt8] {
+            let bytes: EVM.EVMBytes = EVM.EVMBytes(value: [5, 10, 15, 20, 25])
+            return EVM.encodeABI([bytes])
+          }
+		`)
+
+		// Run script
+		result, err := rt.ExecuteScript(
+			runtime.Script{
+				Source:    script,
+				Arguments: [][]byte{},
+			},
+			runtime.Context{
+				Interface:   runtimeInterface,
+				Environment: scriptEnvironment,
+				Location:    nextScriptLocation(),
+			},
+		)
+		require.NoError(t, err)
+
+		abiBytes := []byte{
+			0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0,
+			0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0,
+			0x0, 0x0, 0x0, 0x0, 0x0, 0x20, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0,
+			0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0,
+			0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x5, 0x5,
+			0xa, 0xf, 0x14, 0x19, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0,
+			0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0,
+			0x0, 0x0, 0x0, 0x0, 0x0,
+		}
+		expected := "00000000000000000000000000000000000000000000000000000000000000200000000000000000000000000000000000000000000000000000000000000005050a0f1419000000000000000000000000000000000000000000000000000000"
+		assert.Equal(
+			t,
+			expected,
+			hex.EncodeToString(abiBytes),
+		)
+		cdcBytes := make([]cadence.Value, 0)
+		for _, bt := range abiBytes {
+			cdcBytes = append(cdcBytes, cadence.UInt8(bt))
+		}
+		encodedABI := cadence.NewArray(
+			cdcBytes,
+		).WithType(cadence.NewVariableSizedArrayType(cadence.UInt8Type))
+
+		assert.Equal(t,
+			encodedABI,
+			result,
+		)
+		assert.Equal(t, computation, uint(len(cdcBytes)))
+
+		// Reset computation
+		computation = uint(0)
+	})
+
+	t.Run("ABI encode into `bytes[]` Solidity type", func(t *testing.T) {
+		script := []byte(`
+          import EVM from 0x1
+
+          access(all)
+          fun main(): [UInt8] {
+            let bytesArray: [EVM.EVMBytes] = [
+              EVM.EVMBytes(value: [5]),
+              EVM.EVMBytes(value: [10])
+            ]
+            return EVM.encodeABI([bytesArray])
+          }
+		`)
+
+		// Run script
+		result, err := rt.ExecuteScript(
+			runtime.Script{
+				Source:    script,
+				Arguments: [][]byte{},
+			},
+			runtime.Context{
+				Interface:   runtimeInterface,
+				Environment: scriptEnvironment,
+				Location:    nextScriptLocation(),
+			},
+		)
+		require.NoError(t, err)
+
+		abiBytes := []byte{
+			0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0,
+			0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0,
+			0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x20, 0x0, 0x0, 0x0, 0x0,
+			0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0,
+			0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0,
+			0x0, 0x0, 0x0, 0x2, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0,
+			0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0,
+			0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x40,
+			0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0,
+			0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0,
+			0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x80, 0x0, 0x0, 0x0, 0x0,
+			0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0,
+			0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0,
+			0x0, 0x0, 0x0, 0x1, 0x5, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0,
+			0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0,
+			0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0,
+			0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0,
+			0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0,
+			0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x1, 0xa, 0x0, 0x0, 0x0,
+			0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0,
+			0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0,
+			0x0, 0x0, 0x0, 0x0,
+		}
+		expected := "00000000000000000000000000000000000000000000000000000000000000200000000000000000000000000000000000000000000000000000000000000002000000000000000000000000000000000000000000000000000000000000004000000000000000000000000000000000000000000000000000000000000000800000000000000000000000000000000000000000000000000000000000000001050000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000010a00000000000000000000000000000000000000000000000000000000000000"
+		assert.Equal(
+			t,
+			expected,
+			hex.EncodeToString(abiBytes),
+		)
+		cdcBytes := make([]cadence.Value, 0)
+		for _, bt := range abiBytes {
+			cdcBytes = append(cdcBytes, cadence.UInt8(bt))
+		}
+		encodedABI := cadence.NewArray(
+			cdcBytes,
+		).WithType(cadence.NewVariableSizedArrayType(cadence.UInt8Type))
+
+		assert.Equal(t,
+			encodedABI,
+			result,
+		)
+		assert.Equal(t, computation, uint(len(cdcBytes)))
+
+		// Reset computation
+		computation = uint(0)
+	})
+
+	t.Run("ABI encode into `bytes4` Solidity type", func(t *testing.T) {
+		script := []byte(`
+          import EVM from 0x1
+
+          access(all)
+          fun main(): [UInt8] {
+            let bytes: EVM.EVMBytes4 = EVM.EVMBytes4(value: [5, 10, 15, 20])
+            return EVM.encodeABI([bytes])
+          }
+		`)
+
+		// Run script
+		result, err := rt.ExecuteScript(
+			runtime.Script{
+				Source:    script,
+				Arguments: [][]byte{},
+			},
+			runtime.Context{
+				Interface:   runtimeInterface,
+				Environment: scriptEnvironment,
+				Location:    nextScriptLocation(),
+			},
+		)
+		require.NoError(t, err)
+
+		abiBytes := []byte{
+			0x5, 0xa, 0xf, 0x14, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0,
+			0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0,
+			0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0,
+		}
+		expected := "050a0f1400000000000000000000000000000000000000000000000000000000"
+		assert.Equal(
+			t,
+			expected,
+			hex.EncodeToString(abiBytes),
+		)
+		cdcBytes := make([]cadence.Value, 0)
+		for _, bt := range abiBytes {
+			cdcBytes = append(cdcBytes, cadence.UInt8(bt))
+		}
+		encodedABI := cadence.NewArray(
+			cdcBytes,
+		).WithType(cadence.NewVariableSizedArrayType(cadence.UInt8Type))
+
+		assert.Equal(t,
+			encodedABI,
+			result,
+		)
+		assert.Equal(t, computation, uint(len(cdcBytes)))
+
+		// Reset computation
+		computation = uint(0)
+	})
+
+	t.Run("ABI encode into `bytes4[]` Solidity type", func(t *testing.T) {
+		script := []byte(`
+          import EVM from 0x1
+
+          access(all)
+          fun main(): [UInt8] {
+            let bytesArray: [EVM.EVMBytes4] = [
+              EVM.EVMBytes4(value: [5, 10, 15, 20]),
+              EVM.EVMBytes4(value: [25, 30, 35, 40])
+            ]
+            return EVM.encodeABI([bytesArray])
+          }
+		`)
+
+		// Run script
+		result, err := rt.ExecuteScript(
+			runtime.Script{
+				Source:    script,
+				Arguments: [][]byte{},
+			},
+			runtime.Context{
+				Interface:   runtimeInterface,
+				Environment: scriptEnvironment,
+				Location:    nextScriptLocation(),
+			},
+		)
+		require.NoError(t, err)
+
+		abiBytes := []byte{
+			0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0,
+			0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0,
+			0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x20, 0x0, 0x0, 0x0, 0x0,
+			0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0,
+			0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0,
+			0x0, 0x0, 0x0, 0x2, 0x5, 0xa, 0xf, 0x14, 0x0, 0x0, 0x0, 0x0,
+			0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0,
+			0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0,
+			0x19, 0x1e, 0x23, 0x28, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0,
+			0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0,
+			0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0,
+		}
+		expected := "00000000000000000000000000000000000000000000000000000000000000200000000000000000000000000000000000000000000000000000000000000002050a0f1400000000000000000000000000000000000000000000000000000000191e232800000000000000000000000000000000000000000000000000000000"
+		assert.Equal(
+			t,
+			expected,
+			hex.EncodeToString(abiBytes),
+		)
+		cdcBytes := make([]cadence.Value, 0)
+		for _, bt := range abiBytes {
+			cdcBytes = append(cdcBytes, cadence.UInt8(bt))
+		}
+		encodedABI := cadence.NewArray(
+			cdcBytes,
+		).WithType(cadence.NewVariableSizedArrayType(cadence.UInt8Type))
+
+		assert.Equal(t,
+			encodedABI,
+			result,
+		)
+		assert.Equal(t, computation, uint(len(cdcBytes)))
+
+		// Reset computation
+		computation = uint(0)
+	})
+
+	t.Run("ABI encode into `bytes32` Solidity type", func(t *testing.T) {
+		script := []byte(`
+          import EVM from 0x1
+
+          access(all)
+          fun main(): [UInt8] {
+            let bytes: EVM.EVMBytes32 = EVM.EVMBytes32(
+              value: [
+                1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16,
+                17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30,
+                31, 32
+              ]
+            )
+            return EVM.encodeABI([bytes])
+          }
+		`)
+
+		// Run script
+		result, err := rt.ExecuteScript(
+			runtime.Script{
+				Source:    script,
+				Arguments: [][]byte{},
+			},
+			runtime.Context{
+				Interface:   runtimeInterface,
+				Environment: scriptEnvironment,
+				Location:    nextScriptLocation(),
+			},
+		)
+		require.NoError(t, err)
+
+		abiBytes := []byte{
+			0x1, 0x2, 0x3, 0x4, 0x5, 0x6, 0x7, 0x8, 0x9, 0xa, 0xb, 0xc,
+			0xd, 0xe, 0xf, 0x10, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17,
+			0x18, 0x19, 0x1a, 0x1b, 0x1c, 0x1d, 0x1e, 0x1f, 0x20,
+		}
+		expected := "0102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f20"
+		assert.Equal(
+			t,
+			expected,
+			hex.EncodeToString(abiBytes),
+		)
+		cdcBytes := make([]cadence.Value, 0)
+		for _, bt := range abiBytes {
+			cdcBytes = append(cdcBytes, cadence.UInt8(bt))
+		}
+		encodedABI := cadence.NewArray(
+			cdcBytes,
+		).WithType(cadence.NewVariableSizedArrayType(cadence.UInt8Type))
+
+		assert.Equal(t,
+			encodedABI,
+			result,
+		)
+		assert.Equal(t, computation, uint(len(cdcBytes)))
+
+		// Reset computation
+		computation = uint(0)
+	})
+
+	t.Run("ABI encode into `bytes32[]` Solidity type", func(t *testing.T) {
+		script := []byte(`
+          import EVM from 0x1
+
+          access(all)
+          fun main(): [UInt8] {
+            let bytesA: EVM.EVMBytes32 = EVM.EVMBytes32(
+              value: [
+                1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16,
+                17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30,
+                31, 32
+              ]
+            )
+            let bytesB: EVM.EVMBytes32 = EVM.EVMBytes32(
+              value: [
+                32, 31, 30, 29, 28, 27, 26, 25, 24, 23, 22, 21, 20, 19,
+                18, 17, 16, 15, 14, 13, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3,
+                2, 1
+              ]
+            )
+            let bytesArray: [EVM.EVMBytes32] = [bytesA, bytesB]
+            return EVM.encodeABI([bytesArray])
+          }
+		`)
+
+		// Run script
+		result, err := rt.ExecuteScript(
+			runtime.Script{
+				Source:    script,
+				Arguments: [][]byte{},
+			},
+			runtime.Context{
+				Interface:   runtimeInterface,
+				Environment: scriptEnvironment,
+				Location:    nextScriptLocation(),
+			},
+		)
+		require.NoError(t, err)
+
+		abiBytes := []byte{
+			0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0,
+			0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0,
+			0x0, 0x0, 0x0, 0x0, 0x0, 0x20, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0,
+			0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0,
+			0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x2, 0x1,
+			0x2, 0x3, 0x4, 0x5, 0x6, 0x7, 0x8, 0x9, 0xa, 0xb, 0xc, 0xd, 0xe,
+			0xf, 0x10, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17, 0x18, 0x19,
+			0x1a, 0x1b, 0x1c, 0x1d, 0x1e, 0x1f, 0x20, 0x20, 0x1f, 0x1e, 0x1d,
+			0x1c, 0x1b, 0x1a, 0x19, 0x18, 0x17, 0x16, 0x15, 0x14, 0x13, 0x12,
+			0x11, 0x10, 0xf, 0xe, 0xd, 0xc, 0xb, 0xa, 0x9, 0x8, 0x7, 0x6, 0x5,
+			0x4, 0x3, 0x2, 0x1,
+		}
+		expected := "000000000000000000000000000000000000000000000000000000000000002000000000000000000000000000000000000000000000000000000000000000020102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f20201f1e1d1c1b1a191817161514131211100f0e0d0c0b0a090807060504030201"
+		assert.Equal(
+			t,
+			expected,
+			hex.EncodeToString(abiBytes),
+		)
+		cdcBytes := make([]cadence.Value, 0)
+		for _, bt := range abiBytes {
+			cdcBytes = append(cdcBytes, cadence.UInt8(bt))
+		}
+		encodedABI := cadence.NewArray(
+			cdcBytes,
+		).WithType(cadence.NewVariableSizedArrayType(cadence.UInt8Type))
+
+		assert.Equal(t,
+			encodedABI,
+			result,
+		)
+		assert.Equal(t, computation, uint(len(cdcBytes)))
+
+		// Reset computation
+		computation = uint(0)
+	})
+}
+
+func TestEVMEncodeABIBytesRoundtrip(t *testing.T) {
+
+	t.Parallel()
+
+	handler := &testContractHandler{}
+	contractsAddress := flow.BytesToAddress([]byte{0x1})
+	transactionEnvironment := newEVMTransactionEnvironment(handler, contractsAddress)
+	scriptEnvironment := newEVMScriptEnvironment(handler, contractsAddress)
+	rt := runtime.NewInterpreterRuntime(runtime.Config{})
+
+	accountCodes := map[common.Location][]byte{}
+	var events []cadence.Event
+
+	computation := uint(0)
+	runtimeInterface := &TestRuntimeInterface{
+		Storage: NewTestLedger(nil, nil),
+		OnGetSigningAccounts: func() ([]runtime.Address, error) {
+			return []runtime.Address{runtime.Address(contractsAddress)}, nil
+		},
+		OnResolveLocation: LocationResolver,
+		OnUpdateAccountContractCode: func(location common.AddressLocation, code []byte) error {
+			accountCodes[location] = code
+			return nil
+		},
+		OnGetAccountContractCode: func(location common.AddressLocation) (code []byte, err error) {
+			code = accountCodes[location]
+			return code, nil
+		},
+		OnEmitEvent: func(event cadence.Event) error {
+			events = append(events, event)
+			return nil
+		},
+		OnDecodeArgument: func(b []byte, t cadence.Type) (cadence.Value, error) {
+			return json.Decode(nil, b)
+		},
+		OnMeterComputation: func(compKind common.ComputationKind, intensity uint) error {
+			if compKind == environment.ComputationKindEVMDecodeABI {
+				computation += intensity
+			}
+			return nil
+		},
+	}
+
+	nextTransactionLocation := NewTransactionLocationGenerator()
+	nextScriptLocation := NewScriptLocationGenerator()
+
+	// Deploy contracts
+	deployContracts(
+		t,
+		rt,
+		contractsAddress,
+		runtimeInterface,
+		transactionEnvironment,
+		nextTransactionLocation,
+	)
+
+	t.Run("ABI encode/decode into `bytes` Solidity type", func(t *testing.T) {
+		script := []byte(`
+          import EVM from 0x1
+
+          access(all)
+          fun main(): Bool {
+            let bytes: EVM.EVMBytes = EVM.EVMBytes(value: [5, 10, 15, 20, 25])
+            let encodedData = EVM.encodeABI([bytes])
+            let types = [Type<EVM.EVMBytes>()]
+            let values = EVM.decodeABI(types: types, data: encodedData)
+
+            assert(values.length == 1)
+            let evmBytes = values[0] as! EVM.EVMBytes
+            assert(evmBytes.value == [5, 10, 15, 20, 25])
+
+            return true
+          }
+		`)
+
+		// Run script
+		result, err := rt.ExecuteScript(
+			runtime.Script{
+				Source:    script,
+				Arguments: [][]byte{},
+			},
+			runtime.Context{
+				Interface:   runtimeInterface,
+				Environment: scriptEnvironment,
+				Location:    nextScriptLocation(),
+			},
+		)
+		require.NoError(t, err)
+
+		assert.Equal(t,
+			cadence.Bool(true),
+			result,
+		)
+
+		// Reset computation
+		computation = uint(0)
+	})
+
+	t.Run("ABI encode/decode into `bytes[]` Solidity type", func(t *testing.T) {
+		script := []byte(`
+          import EVM from 0x1
+
+          access(all)
+          fun main(): Bool {
+            let bytes: EVM.EVMBytes = EVM.EVMBytes(value: [5, 10, 15, 20, 25])
+            let bytesArray: [EVM.EVMBytes] = [bytes]
+            let encodedData = EVM.encodeABI([bytesArray])
+            let types = [Type<[EVM.EVMBytes]>()]
+            let values = EVM.decodeABI(types: types, data: encodedData)
+
+            assert(values.length == 1)
+            let evmBytes = values[0] as! [EVM.EVMBytes]
+            assert(evmBytes[0].value == [5, 10, 15, 20, 25])
+
+            return true
+          }
+		`)
+
+		// Run script
+		result, err := rt.ExecuteScript(
+			runtime.Script{
+				Source:    script,
+				Arguments: [][]byte{},
+			},
+			runtime.Context{
+				Interface:   runtimeInterface,
+				Environment: scriptEnvironment,
+				Location:    nextScriptLocation(),
+			},
+		)
+		require.NoError(t, err)
+
+		assert.Equal(t,
+			cadence.Bool(true),
+			result,
+		)
+
+		// Reset computation
+		computation = uint(0)
+	})
+
+	t.Run("ABI encode/decode into `bytes4` Solidity type", func(t *testing.T) {
+		script := []byte(`
+          import EVM from 0x1
+
+          access(all)
+          fun main(): Bool {
+            let bytes: EVM.EVMBytes4 = EVM.EVMBytes4(value: [5, 10, 15, 20])
+            let encodedData = EVM.encodeABI([bytes])
+            let types = [Type<EVM.EVMBytes4>()]
+            let values = EVM.decodeABI(types: types, data: encodedData)
+
+            assert(values.length == 1)
+            let evmBytes = values[0] as! EVM.EVMBytes4
+            assert(evmBytes.value == [5, 10, 15, 20])
+
+            return true
+          }
+		`)
+
+		// Run script
+		result, err := rt.ExecuteScript(
+			runtime.Script{
+				Source:    script,
+				Arguments: [][]byte{},
+			},
+			runtime.Context{
+				Interface:   runtimeInterface,
+				Environment: scriptEnvironment,
+				Location:    nextScriptLocation(),
+			},
+		)
+		require.NoError(t, err)
+
+		assert.Equal(t,
+			cadence.Bool(true),
+			result,
+		)
+
+		// Reset computation
+		computation = uint(0)
+	})
+
+	t.Run("ABI encode/decode into `bytes4[]` Solidity type", func(t *testing.T) {
+		script := []byte(`
+          import EVM from 0x1
+
+          access(all)
+          fun main(): Bool {
+            let bytes: EVM.EVMBytes4 = EVM.EVMBytes4(value: [5, 10, 15, 20])
+            let bytesArray: [EVM.EVMBytes4] = [bytes]
+            let encodedData = EVM.encodeABI([bytesArray])
+            let types = [Type<[EVM.EVMBytes4]>()]
+            let values = EVM.decodeABI(types: types, data: encodedData)
+
+            assert(values.length == 1)
+            let evmBytes = values[0] as! [EVM.EVMBytes4]
+            assert(evmBytes[0].value == [5, 10, 15, 20])
+
+            return true
+          }
+		`)
+
+		// Run script
+		result, err := rt.ExecuteScript(
+			runtime.Script{
+				Source:    script,
+				Arguments: [][]byte{},
+			},
+			runtime.Context{
+				Interface:   runtimeInterface,
+				Environment: scriptEnvironment,
+				Location:    nextScriptLocation(),
+			},
+		)
+		require.NoError(t, err)
+
+		assert.Equal(t,
+			cadence.Bool(true),
+			result,
+		)
+
+		// Reset computation
+		computation = uint(0)
+	})
+
+	t.Run("ABI encode/decode into `bytes32` Solidity type", func(t *testing.T) {
+		script := []byte(`
+          import EVM from 0x1
+
+          access(all)
+          fun main(): Bool {
+            let bytes: EVM.EVMBytes32 = EVM.EVMBytes32(
+              value: [
+                1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16,
+                17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30,
+                31, 32
+              ]
+            )
+            let encodedData = EVM.encodeABI([bytes])
+            let types = [Type<EVM.EVMBytes32>()]
+            let values = EVM.decodeABI(types: types, data: encodedData)
+
+            assert(values.length == 1)
+            let evmBytes = values[0] as! EVM.EVMBytes32
+            assert(evmBytes.value == [
+              1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16,
+              17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30,
+              31, 32
+            ])
+
+            return true
+          }
+		`)
+
+		// Run script
+		result, err := rt.ExecuteScript(
+			runtime.Script{
+				Source:    script,
+				Arguments: [][]byte{},
+			},
+			runtime.Context{
+				Interface:   runtimeInterface,
+				Environment: scriptEnvironment,
+				Location:    nextScriptLocation(),
+			},
+		)
+		require.NoError(t, err)
+
+		assert.Equal(t,
+			cadence.Bool(true),
+			result,
+		)
+
+		// Reset computation
+		computation = uint(0)
+	})
+
+	t.Run("ABI encode/decode into `bytes32[]` Solidity type", func(t *testing.T) {
+		script := []byte(`
+          import EVM from 0x1
+
+          access(all)
+          fun main(): Bool {
+            let bytes: EVM.EVMBytes32 = EVM.EVMBytes32(
+              value: [
+                1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16,
+                17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30,
+                31, 32
+              ]
+            )
+            let bytesArray: [EVM.EVMBytes32] = [bytes]
+            let encodedData = EVM.encodeABI([bytesArray])
+            let types = [Type<[EVM.EVMBytes32]>()]
+            let values = EVM.decodeABI(types: types, data: encodedData)
+
+            assert(values.length == 1)
+            let evmBytes = values[0] as! [EVM.EVMBytes32]
+            assert(evmBytes[0].value == [
+              1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16,
+              17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30,
+              31, 32
+            ])
+
+            return true
+          }
+		`)
+
+		// Run script
+		result, err := rt.ExecuteScript(
+			runtime.Script{
+				Source:    script,
+				Arguments: [][]byte{},
+			},
+			runtime.Context{
+				Interface:   runtimeInterface,
+				Environment: scriptEnvironment,
+				Location:    nextScriptLocation(),
+			},
+		)
+		require.NoError(t, err)
+
+		assert.Equal(t,
+			cadence.Bool(true),
+			result,
+		)
+
+		// Reset computation
+		computation = uint(0)
+	})
 }
 
 func TestEVMEncodeABIComputation(t *testing.T) {

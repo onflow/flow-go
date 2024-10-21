@@ -10,7 +10,7 @@ import (
 	"slices"
 
 	"github.com/dustin/go-humanize/english"
-	"github.com/onflow/cadence/runtime/common"
+	"github.com/onflow/cadence/common"
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
 	"golang.org/x/sync/errgroup"

@@ -6,15 +6,15 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/onflow/cadence/runtime/stdlib"
+	"github.com/onflow/cadence/stdlib"
 	"github.com/rs/zerolog"
 	otelTrace "go.opentelemetry.io/otel/trace"
 
 	"github.com/onflow/atree"
 	"github.com/onflow/cadence"
+	"github.com/onflow/cadence/common"
 	"github.com/onflow/cadence/encoding/ccf"
 	"github.com/onflow/cadence/runtime"
-	"github.com/onflow/cadence/runtime/common"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/exp/maps"
 
