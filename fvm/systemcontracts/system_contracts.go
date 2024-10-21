@@ -231,6 +231,7 @@ func (c SystemContracts) All() []SystemContract {
 		// EVMStorage is not included here, since it is not a contract
 
 		c.Burner,
+		c.Crypto,
 	}
 }
 
