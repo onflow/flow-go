@@ -430,7 +430,7 @@ func convertServiceEventEpochRecover(event flow.Event) (*flow.ServiceEvent, erro
 	setup.RandomSource, err = hex.DecodeString(string(randomSrcHex))
 	if err != nil {
 		return nil, fmt.Errorf(
-			"could not decode random source hex (%v): %w",
+			"failed to decode random source hex (%v) from EpochRecover event: %w",
 			randomSrcHex,
 			err,
 		)
@@ -438,7 +438,7 @@ func convertServiceEventEpochRecover(event flow.Event) (*flow.ServiceEvent, erro
 
 	if len(setup.RandomSource) != flow.EpochSetupRandomSourceLength {
 		return nil, fmt.Errorf(
-			"random source in epoch recover event must be of (%d) bytes, got (%d)",
+			"random source in EpochRecover event must be of (%d) bytes, got (%d)",
 			flow.EpochSetupRandomSourceLength,
 			len(setup.RandomSource),
 		)
@@ -447,13 +447,13 @@ func convertServiceEventEpochRecover(event flow.Event) (*flow.ServiceEvent, erro
 	// parse cluster assignments; returned assignments are in canonical order
 	setup.Assignments, err = convertEpochRecoverCollectorClusterAssignments(cdcClusters.Values)
 	if err != nil {
-		return nil, fmt.Errorf("could not convert cluster assignments: %w", err)
+		return nil, fmt.Errorf("failed to convert cluster assignments from EpochRecover event: %w", err)
 	}
 
 	// parse epoch participants; returned node identities are in canonical order
 	setup.Participants, err = convertParticipants(cdcParticipants.Values)
 	if err != nil {
-		return nil, fmt.Errorf("could not convert participants: %w", err)
+		return nil, fmt.Errorf("failed to convert participants from EpochRecover event: %w", err)
 	}
 
 	commit := flow.EpochCommit{
