@@ -163,7 +163,6 @@ type AccessNodeConfig struct {
 	executionDataConfig                  edrequester.ExecutionDataConfig
 	PublicNetworkConfig                  PublicNetworkConfig
 	TxResultCacheSize                    uint
-	TxErrorMessagesCacheSize             uint
 	executionDataIndexingEnabled         bool
 	registersDBPath                      string
 	checkpointFile                       string
@@ -175,6 +174,7 @@ type AccessNodeConfig struct {
 	programCacheSize                     uint
 	checkPayerBalanceMode                string
 	versionControlEnabled                bool
+	storeTxResultErrorMessages           bool
 	stopControlEnabled                   bool
 	registerDBPruneThreshold             uint64
 }
@@ -248,7 +248,6 @@ func DefaultAccessNodeConfig() *AccessNodeConfig {
 		apiRatelimits:                nil,
 		apiBurstlimits:               nil,
 		TxResultCacheSize:            0,
-		TxErrorMessagesCacheSize:     1000,
 		PublicNetworkConfig: PublicNetworkConfig{
 			BindAddress: cmd.NotSet,
 			Metrics:     metrics.NewNoopCollector(),
@@ -280,6 +279,7 @@ func DefaultAccessNodeConfig() *AccessNodeConfig {
 		programCacheSize:                     0,
 		checkPayerBalanceMode:                accessNode.Disabled.String(),
 		versionControlEnabled:                true,
+		storeTxResultErrorMessages:           false,
 		stopControlEnabled:                   false,
 		registerDBPruneThreshold:             pruner.DefaultThreshold,
 	}
@@ -351,6 +351,7 @@ type FlowAccessNodeBuilder struct {
 	stateStreamGrpcServer *grpcserver.GrpcServer
 
 	stateStreamBackend *statestreambackend.StateStreamBackend
+	nodeBackend        *backend.Backend
 }
 
 func (builder *FlowAccessNodeBuilder) buildFollowerState() *FlowAccessNodeBuilder {
@@ -1241,7 +1242,6 @@ func (builder *FlowAccessNodeBuilder) extraFlags() {
 		flags.BoolVar(&builder.retryEnabled, "retry-enabled", defaultConfig.retryEnabled, "whether to enable the retry mechanism at the access node level")
 		flags.BoolVar(&builder.rpcMetricsEnabled, "rpc-metrics-enabled", defaultConfig.rpcMetricsEnabled, "whether to enable the rpc metrics")
 		flags.UintVar(&builder.TxResultCacheSize, "transaction-result-cache-size", defaultConfig.TxResultCacheSize, "transaction result cache size.(Disabled by default i.e 0)")
-		flags.UintVar(&builder.TxErrorMessagesCacheSize, "transaction-error-messages-cache-size", defaultConfig.TxErrorMessagesCacheSize, "transaction error messages cache size.(By default 1000)")
 		flags.StringVarP(&builder.nodeInfoFile,
 			"node-info-file",
 			"",
@@ -1375,7 +1375,10 @@ func (builder *FlowAccessNodeBuilder) extraFlags() {
 			"tx-result-query-mode",
 			defaultConfig.rpcConf.BackendConfig.TxResultQueryMode,
 			"mode to use when querying transaction results. one of [local-only, execution-nodes-only(default), failover]")
-
+		flags.BoolVar(&builder.storeTxResultErrorMessages,
+			"store-tx-result-error-messages",
+			defaultConfig.storeTxResultErrorMessages,
+			"whether to enable storing transaction error messages into the db")
 		// Script Execution
 		flags.StringVar(&builder.rpcConf.BackendConfig.ScriptExecutionMode,
 			"script-execution-mode",
@@ -1487,9 +1490,6 @@ func (builder *FlowAccessNodeBuilder) extraFlags() {
 			if builder.rpcConf.BackendConfig.CircuitBreakerConfig.RestoreTimeout <= 0 {
 				return errors.New("circuit-breaker-restore-timeout must be greater than 0")
 			}
-		}
-		if builder.TxErrorMessagesCacheSize == 0 {
-			return errors.New("transaction-error-messages-cache-size must be greater than 0")
 		}
 
 		if builder.checkPayerBalanceMode != accessNode.Disabled.String() && !builder.executionDataIndexingEnabled {
@@ -1603,7 +1603,8 @@ func (builder *FlowAccessNodeBuilder) enqueueRelayNetwork() {
 }
 
 func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
-	var processedBlockHeight storage.ConsumerProgress
+	var processedFinalizedBlockHeight storage.ConsumerProgress
+	var processedTxErrorMessagesBlockHeight storage.ConsumerProgress
 
 	if builder.executionDataSyncEnabled {
 		builder.BuildExecutionSyncComponents()
@@ -1799,8 +1800,15 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 			builder.TxResultsIndex = index.NewTransactionResultsIndex(builder.Reporter, builder.Storage.LightTransactionResults)
 			return nil
 		}).
-		Module("processed block height consumer progress", func(node *cmd.NodeConfig) error {
-			processedBlockHeight = bstorage.NewConsumerProgress(builder.DB, module.ConsumeProgressIngestionEngineBlockHeight)
+		Module("processed finalized block height consumer progress", func(node *cmd.NodeConfig) error {
+			processedFinalizedBlockHeight = bstorage.NewConsumerProgress(builder.DB, module.ConsumeProgressIngestionEngineBlockHeight)
+			return nil
+		}).
+		Module("processed error messages block height consumer progress", func(node *cmd.NodeConfig) error {
+			processedTxErrorMessagesBlockHeight = bstorage.NewConsumerProgress(
+				builder.DB,
+				module.ConsumeProgressIngestionEngineTxErrorMessagesBlockHeight,
+			)
 			return nil
 		}).
 		Module("processed last full block height monotonic consumer progress", func(node *cmd.NodeConfig) error {
@@ -1813,6 +1821,13 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 			)
 			if err != nil {
 				return fmt.Errorf("failed to initialize monotonic consumer progress: %w", err)
+			}
+
+			return nil
+		}).
+		Module("transaction result error messages storage", func(node *cmd.NodeConfig) error {
+			if builder.storeTxResultErrorMessages {
+				builder.Storage.TransactionResultErrorMessages = bstorage.NewTransactionResultErrorMessages(node.Metrics.Cache, node.DB, bstorage.DefaultCacheSize)
 			}
 
 			return nil
@@ -1944,7 +1959,7 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 
 			}
 
-			nodeBackend, err := backend.New(backend.Params{
+			builder.nodeBackend, err = backend.New(backend.Params{
 				State:                     node.State,
 				CollectionRPC:             builder.CollectionRPC,
 				HistoricalAccessNodes:     builder.HistoricalAccessRPCs,
@@ -1954,6 +1969,7 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 				Transactions:              node.Storage.Transactions,
 				ExecutionReceipts:         node.Storage.Receipts,
 				ExecutionResults:          node.Storage.Results,
+				TxResultErrorMessages:     node.Storage.TransactionResultErrorMessages,
 				ChainID:                   node.RootChainID,
 				AccessMetrics:             builder.AccessMetrics,
 				ConnFactory:               connFactory,
@@ -1965,7 +1981,6 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 				SnapshotHistoryLimit:      backend.DefaultSnapshotHistoryLimit,
 				Communicator:              backend.NewNodeCommunicator(backendConfig.CircuitBreakerConfig.Enabled),
 				TxResultCacheSize:         builder.TxResultCacheSize,
-				TxErrorMessagesCacheSize:  builder.TxErrorMessagesCacheSize,
 				ScriptExecutor:            builder.ScriptExecutor,
 				ScriptExecutionMode:       scriptExecMode,
 				CheckPayerBalanceMode:     checkPayerBalanceMode,
@@ -1997,8 +2012,8 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 				builder.AccessMetrics,
 				builder.rpcMetricsEnabled,
 				builder.Me,
-				nodeBackend,
-				nodeBackend,
+				builder.nodeBackend,
+				builder.nodeBackend,
 				builder.secureGrpcServer,
 				builder.unsecureGrpcServer,
 				builder.stateStreamBackend,
@@ -2049,9 +2064,14 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 				node.Storage.Transactions,
 				node.Storage.Results,
 				node.Storage.Receipts,
+				node.Storage.TransactionResultErrorMessages,
 				builder.collectionExecutedMetric,
-				processedBlockHeight,
+				processedFinalizedBlockHeight,
+				processedTxErrorMessagesBlockHeight,
 				lastFullBlockHeight,
+				builder.nodeBackend,
+				builder.rpcConf.BackendConfig.PreferredExecutionNodeIDs,
+				builder.rpcConf.BackendConfig.FixedExecutionNodeIDs,
 			)
 			if err != nil {
 				return nil, err
