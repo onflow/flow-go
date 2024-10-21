@@ -27,7 +27,6 @@ import (
 	"github.com/onflow/flow-go/fvm/evm/events"
 	"github.com/onflow/flow-go/fvm/evm/impl"
 	"github.com/onflow/flow-go/fvm/evm/stdlib"
-	"github.com/onflow/flow-go/fvm/evm/testutils"
 	. "github.com/onflow/flow-go/fvm/evm/testutils"
 	"github.com/onflow/flow-go/fvm/evm/types"
 	"github.com/onflow/flow-go/fvm/storage/snapshot"
@@ -112,12 +111,12 @@ func TestEVMRun(t *testing.T) {
 				// assert event fields are correct
 				require.Len(t, output.Events, 2)
 				txEvent := output.Events[0]
-				txEventPayload := testutils.TxEventToPayload(t, txEvent, sc.EVMContract.Address)
+				txEventPayload := TxEventToPayload(t, txEvent, sc.EVMContract.Address)
 				require.NoError(t, err)
 
 				// fee transfer event
 				feeTransferEvent := output.Events[1]
-				feeTranferEventPayload := testutils.TxEventToPayload(t, feeTransferEvent, sc.EVMContract.Address)
+				feeTranferEventPayload := TxEventToPayload(t, feeTransferEvent, sc.EVMContract.Address)
 				require.NoError(t, err)
 				require.Equal(t, uint16(types.ErrCodeNoError), feeTranferEventPayload.ErrorCode)
 				require.Equal(t, uint16(1), feeTranferEventPayload.Index)
@@ -379,7 +378,7 @@ func TestEVMRun(t *testing.T) {
 				require.NotEmpty(t, state.WriteSet)
 
 				txEvent := output.Events[0]
-				txEventPayload := testutils.TxEventToPayload(t, txEvent, sc.EVMContract.Address)
+				txEventPayload := TxEventToPayload(t, txEvent, sc.EVMContract.Address)
 
 				require.NotEmpty(t, txEventPayload.Hash)
 
@@ -512,7 +511,7 @@ func TestEVMBatchRun(t *testing.T) {
 
 				// last event is fee transfer event
 				feeTransferEvent := output.Events[batchCount]
-				feeTranferEventPayload := testutils.TxEventToPayload(t, feeTransferEvent, sc.EVMContract.Address)
+				feeTranferEventPayload := TxEventToPayload(t, feeTransferEvent, sc.EVMContract.Address)
 				require.NoError(t, err)
 				require.Equal(t, uint16(types.ErrCodeNoError), feeTranferEventPayload.ErrorCode)
 				require.Equal(t, uint16(batchCount), feeTranferEventPayload.Index)
@@ -996,7 +995,7 @@ func TestEVMAddressDeposit(t *testing.T) {
 
 			// tx executed event
 			txEvent := output.Events[2]
-			txEventPayload := testutils.TxEventToPayload(t, txEvent, sc.EVMContract.Address)
+			txEventPayload := TxEventToPayload(t, txEvent, sc.EVMContract.Address)
 
 			// deposit event
 			depositEvent := output.Events[3]
@@ -1250,7 +1249,7 @@ func TestCadenceOwnedAccountFunctionalities(t *testing.T) {
 				))
 
 				addr := cadence.NewArray(
-					ConvertToCadence(testutils.RandomAddress(t).Bytes()),
+					ConvertToCadence(RandomAddress(t).Bytes()),
 				).WithType(stdlib.EVMAddressBytesCadenceType)
 
 				script := fvm.Script(code).WithArguments(
