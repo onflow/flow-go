@@ -401,17 +401,17 @@ func convertServiceEventEpochRecover(event flow.Event) (*flow.ServiceEvent, erro
 
 	cdcDKGKeys, err := getField[cadence.Array](fields, "dkgPubKeys")
 	if err != nil {
-		return nil, fmt.Errorf("failed to decode EpochCommit event: %w", err)
+		return nil, fmt.Errorf("failed to decode EpochRecover event: %w", err)
 	}
 
 	cdcDKGGroupKey, err := getField[cadence.String](fields, "dkgGroupKey")
 	if err != nil {
-		return nil, fmt.Errorf("failed to decode EpochCommit event: %w", err)
+		return nil, fmt.Errorf("failed to decode EpochRecover event: %w", err)
 	}
 
 	cdcDKGIndexMap, err := getField[cadence.Dictionary](fields, "dkgIdMapping")
 	if err != nil {
-		return nil, fmt.Errorf("failed to decode EpochCommit event: %w", err)
+		return nil, fmt.Errorf("failed to decode EpochRecover event: %w", err)
 	}
 
 	setup := flow.EpochSetup{
@@ -463,19 +463,19 @@ func convertServiceEventEpochRecover(event flow.Event) (*flow.ServiceEvent, erro
 	// parse cluster qc votes
 	commit.ClusterQCs, err = convertClusterQCVoteData(cdcClusterQCVoteData.Values)
 	if err != nil {
-		return nil, fmt.Errorf("could not convert cluster qc vote data: %w", err)
+		return nil, fmt.Errorf("failed to decode clusterQCVoteData from EpochRecover event: %w", err)
 	}
 
 	// parse DKG participants
 	commit.DKGParticipantKeys, err = convertDKGKeys(cdcDKGKeys.Values)
 	if err != nil {
-		return nil, fmt.Errorf("could not convert DKG keys: %w", err)
+		return nil, fmt.Errorf("failed to decode DKG key shares from EpochRecover event: %w", err)
 	}
 
 	// parse DKG group key
 	commit.DKGGroupKey, err = convertDKGKey(cdcDKGGroupKey)
 	if err != nil {
-		return nil, fmt.Errorf("could not convert DKG group key: %w", err)
+		return nil, fmt.Errorf("failed to decode DKG group key from EpochRecover event: %w", err)
 	}
 
 	// parse DKG Index Map
@@ -483,7 +483,7 @@ func convertServiceEventEpochRecover(event flow.Event) (*flow.ServiceEvent, erro
 	for _, pair := range cdcDKGIndexMap.Pairs {
 		nodeID, err := flow.HexStringToIdentifier(string(pair.Key.(cadence.String)))
 		if err != nil {
-			return nil, fmt.Errorf("could not convert hex string to flow.Identifer: %w", err)
+			return nil, fmt.Errorf("failed to decode flow.Identifer in DKGIndexMap entry from EpochRecover event: %w", err)
 		}
 		index := pair.Value.(cadence.Int).Int()
 		commit.DKGIndexMap[nodeID] = index
