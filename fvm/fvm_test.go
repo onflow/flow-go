@@ -9,8 +9,8 @@ import (
 	"strings"
 	"testing"
 
-	stdlib2 "github.com/onflow/cadence/stdlib"
-	flow2 "github.com/onflow/flow-go-sdk"
+	cadenceStdlib "github.com/onflow/cadence/stdlib"
+	flowsdk "github.com/onflow/flow-go-sdk"
 	"github.com/onflow/flow-go-sdk/test"
 
 	envMock "github.com/onflow/flow-go/fvm/environment/mock"
@@ -973,7 +973,7 @@ func TestTransactionFeeDeduction(t *testing.T) {
 			address := flow.ConvertAddress(
 				cadence.SearchFieldByName(
 					data.(cadence.Event),
-					stdlib2.AccountEventAddressParameter.Identifier,
+					cadenceStdlib.AccountEventAddressParameter.Identifier,
 				).(cadence.Address),
 			)
 
@@ -2334,7 +2334,7 @@ func TestInteractionLimit(t *testing.T) {
 			address = flow.ConvertAddress(
 				cadence.SearchFieldByName(
 					data.(cadence.Event),
-					stdlib2.AccountEventAddressParameter.Identifier,
+					cadenceStdlib.AccountEventAddressParameter.Identifier,
 				).(cadence.Address),
 			)
 
@@ -3317,10 +3317,10 @@ func TestCrypto(t *testing.T) {
 	message = append(message, amount.ToBigEndianBytes()...)
 
 	// sign the message with Alice and Bob
-	signatureAlice, err := flow2.SignUserMessage(signerAlice, message)
+	signatureAlice, err := flowsdk.SignUserMessage(signerAlice, message)
 	require.NoError(t, err)
 
-	signatureBob, err := flow2.SignUserMessage(signerBob, message)
+	signatureBob, err := flowsdk.SignUserMessage(signerBob, message)
 	require.NoError(t, err)
 
 	publicKeys := cadence.NewArray([]cadence.Value{
