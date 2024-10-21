@@ -37,8 +37,9 @@ func NewCollectionExecutedMetricImpl(
 	blocksToMarkExecuted *stdmap.Times,
 	collections storage.Collections,
 	blocks storage.Blocks,
+	blockTransactions *stdmap.IdentifierMap,
 ) (*CollectionExecutedMetricImpl, error) {
-	collectionExecutedMetricImpl := &CollectionExecutedMetricImpl{
+	return &CollectionExecutedMetricImpl{
 		log:                        log,
 		accessMetrics:              accessMetrics,
 		collectionsToMarkFinalized: collectionsToMarkFinalized,
@@ -46,36 +47,32 @@ func NewCollectionExecutedMetricImpl(
 		blocksToMarkExecuted:       blocksToMarkExecuted,
 		collections:                collections,
 		blocks:                     blocks,
-	}
-
-	var err error
-	collectionExecutedMetricImpl.blockTransactions, err = stdmap.NewIdentifierMap(100)
-	if err != nil {
-		return nil, err
-	}
-
-	return collectionExecutedMetricImpl, nil
+		blockTransactions:          blockTransactions,
+	}, nil
 }
 
 // CollectionFinalized tracks collections to mark finalized
 func (c *CollectionExecutedMetricImpl) CollectionFinalized(light flow.LightCollection) {
-	if ti, found := c.collectionsToMarkFinalized.ByID(light.ID()); found {
+	lightID := light.ID()
+	if ti, found := c.collectionsToMarkFinalized.ByID(lightID); found {
+
+		block, err := c.blocks.ByCollectionID(lightID)
+		if err != nil {
+			c.log.Warn().Err(err).Msg("could not find block by collection ID")
+			return
+		}
+		blockID := block.ID()
+
 		for _, t := range light.Transactions {
 			c.accessMetrics.TransactionFinalized(t, ti)
 
-			block, err := c.blocks.ByCollectionID(light.ID())
-			if err != nil {
-				c.log.Warn().Err(err).Msg("could not find block by collection ID")
-				continue
-			}
-
-			err = c.blockTransactions.Append(block.ID(), t)
+			err = c.blockTransactions.Append(blockID, t)
 			if err != nil {
 				c.log.Warn().Err(err).Msg("could not append finalized tx to track sealed transactions")
 				continue
 			}
 		}
-		c.collectionsToMarkFinalized.Remove(light.ID())
+		c.collectionsToMarkFinalized.Remove(lightID)
 	}
 }
 
