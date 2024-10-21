@@ -32,10 +32,15 @@ type VersionControlConsumer func(height uint64, version *semver.Version)
 // NoHeight represents the maximum possible height for blocks.
 var NoHeight = uint64(0)
 
+// defaultCompatibilityOverrides stores the list of version compatibility overrides.
+// version beacon events who's Major.Minor.Patch version match an entry in this map will be ignored.
+//
+// IMPORTANT: only add versions to this list if you are certain that the cadence and fvm changes
+// deployed during the HCU are backwards compatible for scripts.
+var defaultCompatibilityOverrides = map[string]struct{}{}
+
 // VersionControl manages the version control system for the node.
 // It consumes BlockFinalized events and updates the node's version control based on the latest version beacon.
-//
-// VersionControl implements the protocol.Consumer and component.Component interfaces.
 type VersionControl struct {
 	// Noop implements the protocol.Consumer interface with no operations.
 	psEvents.Noop
@@ -67,6 +72,10 @@ type VersionControl struct {
 	// startHeight and endHeight define the height boundaries for version compatibility.
 	startHeight *atomic.Uint64
 	endHeight   *atomic.Uint64
+
+	// compatibilityOverrides stores the list of version compatibility overrides.
+	// version beacon events who's Major.Minor.Patch version match an entry in this map will be ignored.
+	compatibilityOverrides map[string]struct{}
 }
 
 var _ protocol.Consumer = (*VersionControl)(nil)
@@ -97,6 +106,7 @@ func NewVersionControl(
 		finalizedHeightNotifier: engine.NewNotifier(),
 		startHeight:             atomic.NewUint64(NoHeight),
 		endHeight:               atomic.NewUint64(NoHeight),
+		compatibilityOverrides:  defaultCompatibilityOverrides,
 	}
 
 	if vc.nodeVersion == nil {
@@ -146,10 +156,7 @@ func (v *VersionControl) initBoundaries(
 	for {
 		vb, err := v.versionBeacons.Highest(processedHeight)
 		if err != nil && !errors.Is(err, storage.ErrNotFound) {
-			ctx.Throw(
-				fmt.Errorf(
-					"failed to get highest version beacon for version control: %w",
-					err))
+			ctx.Throw(fmt.Errorf("failed to get highest version beacon for version control: %w", err))
 			return err
 		}
 
@@ -175,17 +182,16 @@ func (v *VersionControl) initBoundaries(
 				if err == nil {
 					err = fmt.Errorf("boundary semantic version is nil")
 				}
-				ctx.Throw(
-					fmt.Errorf(
-						"failed to parse semver during version control setup: %w",
-						err))
+				ctx.Throw(fmt.Errorf("failed to parse semver during version control setup: %w", err))
 				return err
 			}
-
-			compResult := ver.Compare(*v.nodeVersion)
 			processedHeight = vb.SealHeight - 1
 
-			if compResult <= 0 {
+			if v.isOverridden(ver) {
+				continue
+			}
+
+			if ver.Compare(*v.nodeVersion) <= 0 {
 				v.startHeight.Store(boundary.BlockHeight)
 				v.log.Info().
 					Uint64("startHeight", boundary.BlockHeight).
@@ -295,10 +301,7 @@ func (v *VersionControl) blockFinalized(
 				Uint64("height", height).
 				Msg("Failed to get highest version beacon")
 
-			ctx.Throw(
-				fmt.Errorf(
-					"failed to get highest version beacon for version control: %w",
-					err))
+			ctx.Throw(fmt.Errorf("failed to get highest version beacon for version control: %w", err))
 			return
 		}
 
@@ -330,11 +333,12 @@ func (v *VersionControl) blockFinalized(
 				}
 				// this should never happen as we already validated the version beacon
 				// when indexing it
-				ctx.Throw(
-					fmt.Errorf(
-						"failed to parse semver: %w",
-						err))
+				ctx.Throw(fmt.Errorf("failed to parse semver: %w", err))
 				return
+			}
+
+			if v.isOverridden(ver) {
+				continue
 			}
 
 			if ver.Compare(*v.nodeVersion) > 0 {
@@ -384,4 +388,25 @@ func (v *VersionControl) EndHeight() uint64 {
 	}
 
 	return endHeight
+}
+
+// isOverridden checks if the version is overridden by the compatibility overrides and can be ignored.
+func (v *VersionControl) isOverridden(ver *semver.Version) bool {
+	normalizedVersion := &semver.Version{
+		Major: ver.Major,
+		Minor: ver.Minor,
+		Patch: ver.Patch,
+	}
+
+	_, ok := v.compatibilityOverrides[normalizedVersion.String()]
+	if !ok {
+		return false
+	}
+
+	v.log.Info().
+		Str("event_version", ver.String()).
+		Str("override_version", normalizedVersion.String()).
+		Msg("ignoring version beacon event matching compatibility override")
+
+	return true
 }
