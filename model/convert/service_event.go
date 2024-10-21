@@ -273,17 +273,16 @@ func convertServiceEventEpochCommit(event flow.Event) (*flow.ServiceEvent, error
 	}
 
 	// parse DKG participants
-	commit.DKGParticipantKeys, err = convertDKGKeys(cdcDKGKeys.Values...)
+	commit.DKGParticipantKeys, err = convertDKGKeys(cdcDKGKeys.Values)
 	if err != nil {
 		return nil, fmt.Errorf("could not convert DKG keys: %w", err)
 	}
 
 	// parse DKG group key
-	groupKey, err := convertDKGKeys(cdcDKGGroupKey)
+	commit.DKGGroupKey, err = convertDKGKey(cdcDKGGroupKey)
 	if err != nil {
 		return nil, fmt.Errorf("could not convert DKG group key: %w", err)
 	}
-	commit.DKGGroupKey = groupKey[0]
 
 	// parse DKG Index Map
 	commit.DKGIndexMap = make(flow.DKGIndexMap, len(cdcDKGIndexMap.Pairs))
@@ -402,17 +401,17 @@ func convertServiceEventEpochRecover(event flow.Event) (*flow.ServiceEvent, erro
 
 	cdcDKGKeys, err := getField[cadence.Array](fields, "dkgPubKeys")
 	if err != nil {
-		return nil, fmt.Errorf("failed to decode EpochCommit event: %w", err)
+		return nil, fmt.Errorf("failed to decode EpochRecover event: %w", err)
 	}
 
 	cdcDKGGroupKey, err := getField[cadence.String](fields, "dkgGroupKey")
 	if err != nil {
-		return nil, fmt.Errorf("failed to decode EpochCommit event: %w", err)
+		return nil, fmt.Errorf("failed to decode EpochRecover event: %w", err)
 	}
 
 	cdcDKGIndexMap, err := getField[cadence.Dictionary](fields, "dkgIdMapping")
 	if err != nil {
-		return nil, fmt.Errorf("failed to decode EpochCommit event: %w", err)
+		return nil, fmt.Errorf("failed to decode EpochRecover event: %w", err)
 	}
 
 	setup := flow.EpochSetup{
@@ -431,7 +430,7 @@ func convertServiceEventEpochRecover(event flow.Event) (*flow.ServiceEvent, erro
 	setup.RandomSource, err = hex.DecodeString(string(randomSrcHex))
 	if err != nil {
 		return nil, fmt.Errorf(
-			"could not decode random source hex (%v): %w",
+			"failed to decode random source hex (%v) from EpochRecover event: %w",
 			randomSrcHex,
 			err,
 		)
@@ -439,7 +438,7 @@ func convertServiceEventEpochRecover(event flow.Event) (*flow.ServiceEvent, erro
 
 	if len(setup.RandomSource) != flow.EpochSetupRandomSourceLength {
 		return nil, fmt.Errorf(
-			"random source in epoch recover event must be of (%d) bytes, got (%d)",
+			"random source in EpochRecover event must be of (%d) bytes, got (%d)",
 			flow.EpochSetupRandomSourceLength,
 			len(setup.RandomSource),
 		)
@@ -448,13 +447,13 @@ func convertServiceEventEpochRecover(event flow.Event) (*flow.ServiceEvent, erro
 	// parse cluster assignments; returned assignments are in canonical order
 	setup.Assignments, err = convertEpochRecoverCollectorClusterAssignments(cdcClusters.Values)
 	if err != nil {
-		return nil, fmt.Errorf("could not convert cluster assignments: %w", err)
+		return nil, fmt.Errorf("failed to convert cluster assignments from EpochRecover event: %w", err)
 	}
 
 	// parse epoch participants; returned node identities are in canonical order
 	setup.Participants, err = convertParticipants(cdcParticipants.Values)
 	if err != nil {
-		return nil, fmt.Errorf("could not convert participants: %w", err)
+		return nil, fmt.Errorf("failed to convert participants from EpochRecover event: %w", err)
 	}
 
 	commit := flow.EpochCommit{
@@ -464,28 +463,27 @@ func convertServiceEventEpochRecover(event flow.Event) (*flow.ServiceEvent, erro
 	// parse cluster qc votes
 	commit.ClusterQCs, err = convertClusterQCVoteData(cdcClusterQCVoteData.Values)
 	if err != nil {
-		return nil, fmt.Errorf("could not convert cluster qc vote data: %w", err)
+		return nil, fmt.Errorf("failed to decode clusterQCVoteData from EpochRecover event: %w", err)
 	}
 
 	// parse DKG participants
-	commit.DKGParticipantKeys, err = convertDKGKeys(cdcDKGKeys.Values...)
+	commit.DKGParticipantKeys, err = convertDKGKeys(cdcDKGKeys.Values)
 	if err != nil {
-		return nil, fmt.Errorf("could not convert DKG keys: %w", err)
+		return nil, fmt.Errorf("failed to decode DKG key shares from EpochRecover event: %w", err)
 	}
 
 	// parse DKG group key
-	groupKey, err := convertDKGKeys(cdcDKGGroupKey)
+	commit.DKGGroupKey, err = convertDKGKey(cdcDKGGroupKey)
 	if err != nil {
-		return nil, fmt.Errorf("could not convert DKG group key: %w", err)
+		return nil, fmt.Errorf("failed to decode DKG group key from EpochRecover event: %w", err)
 	}
-	commit.DKGGroupKey = groupKey[0]
 
 	// parse DKG Index Map
 	commit.DKGIndexMap = make(flow.DKGIndexMap, len(cdcDKGIndexMap.Pairs))
 	for _, pair := range cdcDKGIndexMap.Pairs {
 		nodeID, err := flow.HexStringToIdentifier(string(pair.Key.(cadence.String)))
 		if err != nil {
-			return nil, fmt.Errorf("could not convert hex string to flow.Identifer: %w", err)
+			return nil, fmt.Errorf("failed to decode flow.Identifer in DKGIndexMap entry from EpochRecover event: %w", err)
 		}
 		index := pair.Value.(cadence.Int).Int()
 		commit.DKGIndexMap[nodeID] = index
@@ -991,39 +989,38 @@ func convertClusterQCVotes(cdcClusterQCs []cadence.Value) (
 // convertDKGKeys converts hex-encoded DKG public keys as received by the DKG
 // smart contract into crypto.PublicKey representations suitable for inclusion
 // in the protocol state.
-func convertDKGKeys(cdcDKGKeys ...cadence.Value) (
-	convertedKeys []crypto.PublicKey,
-	err error,
-) {
-
-	hexDKGKeys := make([]string, 0, len(cdcDKGKeys))
+func convertDKGKeys(cdcDKGKeys []cadence.Value) ([]crypto.PublicKey, error) {
+	convertedKeys := make([]crypto.PublicKey, 0, len(cdcDKGKeys))
 	for _, value := range cdcDKGKeys {
-		keyHex, ok := value.(cadence.String)
-		if !ok {
-			return nil, invalidCadenceTypeError("dkgKey", value, cadence.String(""))
-		}
-		hexDKGKeys = append(hexDKGKeys, string(keyHex))
-	}
-
-	// decode individual public keys
-	convertedKeys = make([]crypto.PublicKey, 0, len(hexDKGKeys))
-	for _, pubKeyString := range hexDKGKeys {
-
-		pubKeyBytes, err := hex.DecodeString(pubKeyString)
-		if err != nil {
-			return nil, fmt.Errorf(
-				"could not decode individual public key into bytes: %w",
-				err,
-			)
-		}
-		pubKey, err := crypto.DecodePublicKey(crypto.BLSBLS12381, pubKeyBytes)
+		pubKey, err := convertDKGKey(value)
 		if err != nil {
 			return nil, fmt.Errorf("could not decode dkg public key: %w", err)
 		}
 		convertedKeys = append(convertedKeys, pubKey)
 	}
-
 	return convertedKeys, nil
+}
+
+// convertDKGKey converts a single hex-encoded DKG public key as received by the DKG
+// smart contract into crypto.PublicKey representations suitable for inclusion
+// in the protocol state.
+func convertDKGKey(cdcDKGKeys cadence.Value) (crypto.PublicKey, error) {
+	// extract string representation from Cadence Value
+	keyHex, ok := cdcDKGKeys.(cadence.String)
+	if !ok {
+		return nil, invalidCadenceTypeError("dkgKey", cdcDKGKeys, cadence.String(""))
+	}
+
+	// decode individual public keys
+	pubKeyBytes, err := hex.DecodeString(string(keyHex))
+	if err != nil {
+		return nil, fmt.Errorf("could not decode individual public key into bytes: %w", err)
+	}
+	pubKey, err := crypto.DecodePublicKey(crypto.BLSBLS12381, pubKeyBytes)
+	if err != nil {
+		return nil, fmt.Errorf("could not decode dkg public key: %w", err)
+	}
+	return pubKey, nil
 }
 
 func invalidCadenceTypeError(

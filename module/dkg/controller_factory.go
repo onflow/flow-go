@@ -47,8 +47,8 @@ func NewControllerFactory(
 func (f *ControllerFactory) Create(
 	dkgInstanceID string,
 	participants flow.IdentitySkeletonList,
-	seed []byte) (module.DKGController, error) {
-
+	seed []byte,
+) (module.DKGController, error) {
 	// ensure participants are sorted in canonical order
 	if !participants.Sorted(flow.Canonical[flow.IdentitySkeleton]) {
 		return nil, fmt.Errorf("participants are not sorted in canonical order")
