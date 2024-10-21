@@ -403,6 +403,7 @@ func TestCreateTransaction(t *testing.T) {
 			{"reference_block_id", "-1", `{"code":400, "message":"invalid reference block ID: invalid ID format"}`},
 			{"reference_block_id", "", `{"code":400, "message":"reference block not provided"}`},
 			{"gas_limit", "-1", `{"code":400, "message":"invalid gas limit: value must be an unsigned 64 bit integer"}`},
+			{"gas_limit", "18446744073709551616", `{"code":400, "message":"invalid gas limit: value overflows uint64 range"}`},
 			{"payer", "yo", `{"code":400, "message":"invalid payer: invalid address"}`},
 			{"proposal_key", "yo", `{"code":400, "message":"request body contains an invalid value for the \"proposal_key\" field (at position 461)"}`},
 			{"authorizers", "", `{"code":400, "message":"request body contains an invalid value for the \"authorizers\" field (at position 32)"}`},
