@@ -1,7 +1,7 @@
 package testutils
 
 import (
-	"github.com/onflow/cadence/runtime/common"
+	"github.com/onflow/cadence/common"
 
 	"github.com/onflow/flow-go/fvm/evm/debug"
 	"github.com/onflow/flow-go/fvm/evm/emulator"

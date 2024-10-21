@@ -1,7 +1,6 @@
 package sync_test
 
 import (
-	"fmt"
 	"math"
 	"math/big"
 	"testing"
@@ -13,7 +12,6 @@ import (
 	"github.com/onflow/flow-go/fvm/evm"
 	"github.com/onflow/flow-go/fvm/evm/events"
 	"github.com/onflow/flow-go/fvm/evm/offchain/blocks"
-	"github.com/onflow/flow-go/fvm/evm/offchain/storage"
 	"github.com/onflow/flow-go/fvm/evm/offchain/sync"
 	. "github.com/onflow/flow-go/fvm/evm/testutils"
 	"github.com/onflow/flow-go/fvm/evm/types"
@@ -162,7 +160,7 @@ func TestChainReplay(t *testing.T) {
 						err = bp.OnBlockReceived(blockEventPayload)
 						require.NoError(t, err)
 
-						sp := newTestStorageProvider(snapshot, 1)
+						sp := NewTestStorageProvider(snapshot, 1)
 						cr := sync.NewReplayer(chainID, rootAddr, sp, bp, zerolog.Logger{}, nil, true)
 						res, err := cr.ReplayBlock(txEventPayloads, blockEventPayload)
 						require.NoError(t, err)
@@ -204,33 +202,4 @@ func prepareEvents(
 		txEventPayloads[i] = *TxEventToPayload(t, event, evmContract)
 	}
 	return txEventPayloads, blockEventPayload
-}
-
-// TestStorageProvider constructs a new
-// storage provider that only provides
-// storage for an specific height
-type testStorageProvider struct {
-	storage types.BackendStorage
-	height  uint64
-}
-
-var _ types.StorageProvider = &testStorageProvider{}
-
-// NewTestStorageProvider constructs a new TestStorageProvider
-func newTestStorageProvider(
-	initSnapshot types.BackendStorageSnapshot,
-	height uint64,
-) *testStorageProvider {
-	return &testStorageProvider{
-		storage: storage.NewEphemeralStorage(storage.NewReadOnlyStorage(initSnapshot)),
-		height:  height,
-	}
-}
-
-// GetSnapshotAt returns the snapshot at specific block height
-func (sp *testStorageProvider) GetSnapshotAt(height uint64) (types.BackendStorageSnapshot, error) {
-	if height != sp.height {
-		return nil, fmt.Errorf("storage for the given height (%d) is not available", height)
-	}
-	return sp.storage, nil
 }
