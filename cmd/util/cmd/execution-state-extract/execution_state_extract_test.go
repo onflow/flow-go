@@ -12,7 +12,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"go.uber.org/atomic"
 
-	runtimeCommon "github.com/onflow/cadence/runtime/common"
+	runtimeCommon "github.com/onflow/cadence/common"
 
 	"github.com/onflow/flow-go/cmd/util/cmd/common"
 	"github.com/onflow/flow-go/cmd/util/ledger/util"
