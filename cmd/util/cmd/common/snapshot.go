@@ -6,9 +6,10 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/onflow/flow-go-sdk/access/grpc"
 	"github.com/rs/zerolog"
 	"github.com/sethvargo/go-retry"
+
+	"github.com/onflow/flow-go-sdk/access/grpc"
 
 	"github.com/onflow/flow-go/utils/logging"
 
