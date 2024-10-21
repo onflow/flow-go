@@ -133,6 +133,8 @@ func (s *Suite) SetupTest() {
 	require.NoError(s.T(), err)
 	blocksToMarkExecuted, err := stdmap.NewTimes(100)
 	require.NoError(s.T(), err)
+	blockTransactions, err := stdmap.NewIdentifierMap(100)
+	require.NoError(s.T(), err)
 
 	s.proto.state.On("Identity").Return(s.obsIdentity, nil)
 	s.proto.state.On("Params").Return(s.proto.params)
@@ -174,6 +176,7 @@ func (s *Suite) SetupTest() {
 		blocksToMarkExecuted,
 		s.collections,
 		s.blocks,
+		blockTransactions,
 	)
 	require.NoError(s.T(), err)
 }

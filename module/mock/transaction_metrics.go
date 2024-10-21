@@ -39,6 +39,11 @@ func (_m *TransactionMetrics) TransactionResultFetched(dur time.Duration, size i
 	_m.Called(dur, size)
 }
 
+// TransactionSealed provides a mock function with given fields: txID, when
+func (_m *TransactionMetrics) TransactionSealed(txID flow.Identifier, when time.Time) {
+	_m.Called(txID, when)
+}
+
 // TransactionSubmissionFailed provides a mock function with given fields:
 func (_m *TransactionMetrics) TransactionSubmissionFailed() {
 	_m.Called()

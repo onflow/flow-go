@@ -150,6 +150,7 @@ type AccessNodeConfig struct {
 	logTxTimeToFinalized                 bool
 	logTxTimeToExecuted                  bool
 	logTxTimeToFinalizedExecuted         bool
+	logTxTimeToSealed                    bool
 	retryEnabled                         bool
 	rpcMetricsEnabled                    bool
 	executionDataSyncEnabled             bool
@@ -241,6 +242,7 @@ func DefaultAccessNodeConfig() *AccessNodeConfig {
 		logTxTimeToFinalized:         false,
 		logTxTimeToExecuted:          false,
 		logTxTimeToFinalizedExecuted: false,
+		logTxTimeToSealed:            false,
 		pingEnabled:                  false,
 		retryEnabled:                 false,
 		rpcMetricsEnabled:            false,
@@ -302,6 +304,7 @@ type FlowAccessNodeBuilder struct {
 	CollectionsToMarkFinalized   *stdmap.Times
 	CollectionsToMarkExecuted    *stdmap.Times
 	BlocksToMarkExecuted         *stdmap.Times
+	BlockTransactions            *stdmap.IdentifierMap
 	TransactionMetrics           *metrics.TransactionCollector
 	TransactionValidationMetrics *metrics.TransactionValidationCollector
 	RestMetrics                  *metrics.RestCollector
@@ -1234,6 +1237,10 @@ func (builder *FlowAccessNodeBuilder) extraFlags() {
 			"log-tx-time-to-finalized-executed",
 			defaultConfig.logTxTimeToFinalizedExecuted,
 			"log transaction time to finalized and executed")
+		flags.BoolVar(&builder.logTxTimeToSealed,
+			"log-tx-time-to-sealed",
+			defaultConfig.logTxTimeToSealed,
+			"log transaction time to sealed")
 		flags.BoolVar(&builder.pingEnabled,
 			"ping-enabled",
 			defaultConfig.pingEnabled,
@@ -1677,6 +1684,11 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 				return err
 			}
 
+			builder.BlockTransactions, err = stdmap.NewIdentifierMap(100)
+			if err != nil {
+				return err
+			}
+
 			builder.BlocksToMarkExecuted, err = stdmap.NewTimes(1 * 300) // assume 1 block per second * 300 seconds
 
 			return err
@@ -1688,6 +1700,7 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 				builder.logTxTimeToFinalized,
 				builder.logTxTimeToExecuted,
 				builder.logTxTimeToFinalizedExecuted,
+				builder.logTxTimeToSealed,
 			)
 			return nil
 		}).
@@ -1722,6 +1735,7 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 				builder.BlocksToMarkExecuted,
 				builder.Storage.Collections,
 				builder.Storage.Blocks,
+				builder.BlockTransactions,
 			)
 			if err != nil {
 				return err
