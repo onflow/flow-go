@@ -31,6 +31,7 @@ import (
 	"github.com/onflow/cadence"
 
 	"github.com/onflow/flow-go-sdk/crypto"
+
 	"github.com/onflow/flow-go/cmd/bootstrap/dkg"
 	"github.com/onflow/flow-go/cmd/bootstrap/run"
 	"github.com/onflow/flow-go/cmd/bootstrap/utils"

@@ -5,6 +5,7 @@ import (
 	"github.com/rs/zerolog"
 
 	flowsdk "github.com/onflow/flow-go-sdk"
+
 	"github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/fvm/systemcontracts"
 	"github.com/onflow/flow-go/integration/benchmark/account"

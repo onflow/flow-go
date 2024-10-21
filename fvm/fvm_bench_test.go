@@ -23,7 +23,7 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
-	flow2 "github.com/onflow/flow-go-sdk"
+	flowsdk "github.com/onflow/flow-go-sdk"
 	"github.com/onflow/flow-go-sdk/templates"
 
 	"github.com/onflow/flow-go/engine/execution"
@@ -315,13 +315,13 @@ func (b *BasicBlockExecutor) SetupAccounts(tb testing.TB, privateKeys []flow.Acc
 	serviceAddress := b.Chain(tb).ServiceAddress()
 
 	for _, privateKey := range privateKeys {
-		accountKey := flow2.NewAccountKey().
+		accountKey := flowsdk.NewAccountKey().
 			FromPrivateKey(privateKey.PrivateKey).
 			SetWeight(fvm.AccountKeyWeightThreshold).
 			SetHashAlgo(privateKey.HashAlgo).
 			SetSigAlgo(privateKey.SignAlgo)
 
-		sdkTX, err := templates.CreateAccount([]*flow2.AccountKey{accountKey}, []templates.Contract{}, flow2.BytesToAddress(serviceAddress.Bytes()))
+		sdkTX, err := templates.CreateAccount([]*flowsdk.AccountKey{accountKey}, []templates.Contract{}, flowsdk.BytesToAddress(serviceAddress.Bytes()))
 		require.NoError(tb, err)
 
 		txBody := flow.NewTransactionBody().

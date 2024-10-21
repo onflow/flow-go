@@ -19,6 +19,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	sdk "github.com/onflow/flow-go-sdk"
+
 	hotstuff "github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/engine/access/rest/util"

@@ -5,9 +5,8 @@ import (
 	"math/big"
 	"math/bits"
 	"math/rand"
-	"time"
-
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"

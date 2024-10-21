@@ -8,6 +8,7 @@ import (
 	"github.com/stretchr/testify/suite"
 
 	client "github.com/onflow/flow-go-sdk/access/grpc"
+
 	"github.com/onflow/flow-go/integration/convert"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/utils/unittest"
