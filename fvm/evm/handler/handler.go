@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"math/big"
 
-	"github.com/onflow/cadence/runtime/common"
+	"github.com/onflow/cadence/common"
 	gethCommon "github.com/onflow/go-ethereum/common"
 	gethTypes "github.com/onflow/go-ethereum/core/types"
 	"go.opentelemetry.io/otel/attribute"

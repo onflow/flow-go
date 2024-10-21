@@ -1,7 +1,7 @@
 package derived
 
 import (
-	"github.com/onflow/cadence/runtime/common"
+	"github.com/onflow/cadence/common"
 )
 
 // ProgramDependencies are the locations of programs that a program depends on.

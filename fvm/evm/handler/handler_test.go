@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/onflow/cadence/runtime/common"
+	"github.com/onflow/cadence/common"
 	gethCommon "github.com/onflow/go-ethereum/common"
 	gethCore "github.com/onflow/go-ethereum/core"
 	gethTypes "github.com/onflow/go-ethereum/core/types"

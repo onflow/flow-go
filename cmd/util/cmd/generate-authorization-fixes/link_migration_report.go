@@ -6,7 +6,7 @@ import (
 	"io"
 	"strings"
 
-	"github.com/onflow/cadence/runtime/common"
+	"github.com/onflow/cadence/common"
 )
 
 // AccountCapabilityID is a capability ID in an account.
