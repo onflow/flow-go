@@ -98,7 +98,7 @@ func (_m *EventLoop) Start(_a0 irrecoverable.SignalerContext) {
 }
 
 // SubmitProposal provides a mock function with given fields: proposal
-func (_m *EventLoop) SubmitProposal(proposal *model.Proposal) {
+func (_m *EventLoop) SubmitProposal(proposal *model.SignedProposal) {
 	_m.Called(proposal)
 }
 

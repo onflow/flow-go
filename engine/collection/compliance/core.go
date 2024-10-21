@@ -260,7 +260,7 @@ func (c *Core) processBlockAndDescendants(proposal flow.Slashable[*cluster.Block
 			})
 
 			// notify VoteAggregator about the invalid block
-			err = c.voteAggregator.InvalidBlock(model.ProposalFromFlow(header))
+			err = c.voteAggregator.InvalidBlock(model.SignedProposalFromFlow(header))
 			if err != nil {
 				if mempool.IsBelowPrunedThresholdError(err) {
 					log.Warn().Msg("received invalid block, but is below pruned threshold")
@@ -317,7 +317,7 @@ func (c *Core) processBlockProposal(proposal *cluster.Block) error {
 		Logger()
 	log.Info().Msg("processing block proposal")
 
-	hotstuffProposal := model.ProposalFromFlow(header)
+	hotstuffProposal := model.SignedProposalFromFlow(header)
 	err := c.validator.ValidateProposal(hotstuffProposal)
 	if err != nil {
 		if model.IsInvalidProposalError(err) {

@@ -106,7 +106,6 @@ func (bb *BlockBuilder) Proposals() ([]*model.Proposal, error) {
 				PayloadHash: payloadHash,
 			},
 			LastViewTC: lastViewTC,
-			SigData:    nil,
 		}
 		proposal.Block.BlockID = makeBlockID(proposal.Block)
 

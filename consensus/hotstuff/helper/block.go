@@ -56,15 +56,32 @@ func WithBlockQC(qc *flow.QuorumCertificate) func(*model.Block) {
 	}
 }
 
-func MakeProposal(options ...func(*model.Proposal)) *model.Proposal {
-	proposal := &model.Proposal{
-		Block:   MakeBlock(),
-		SigData: unittest.SignatureFixture(),
+func MakeSignedProposal(options ...func(*model.SignedProposal)) *model.SignedProposal {
+	proposal := &model.SignedProposal{
+		Proposal: *MakeProposal(),
+		SigData:  unittest.SignatureFixture(),
 	}
 	for _, option := range options {
 		option(proposal)
 	}
 	return proposal
+}
+
+func MakeProposal(options ...func(*model.Proposal)) *model.Proposal {
+	proposal := &model.Proposal{
+		Block:      MakeBlock(),
+		LastViewTC: nil,
+	}
+	for _, option := range options {
+		option(proposal)
+	}
+	return proposal
+}
+
+func WithProposal(proposal *model.Proposal) func(*model.SignedProposal) {
+	return func(signedProposal *model.SignedProposal) {
+		signedProposal.Proposal = *proposal
+	}
 }
 
 func WithBlock(block *model.Block) func(*model.Proposal) {
@@ -73,8 +90,8 @@ func WithBlock(block *model.Block) func(*model.Proposal) {
 	}
 }
 
-func WithSigData(sigData []byte) func(*model.Proposal) {
-	return func(proposal *model.Proposal) {
+func WithSigData(sigData []byte) func(*model.SignedProposal) {
+	return func(proposal *model.SignedProposal) {
 		proposal.SigData = sigData
 	}
 }

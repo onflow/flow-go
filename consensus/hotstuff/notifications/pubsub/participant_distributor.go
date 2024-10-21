@@ -46,7 +46,7 @@ func (d *ParticipantDistributor) OnStart(currentView uint64) {
 	}
 }
 
-func (d *ParticipantDistributor) OnReceiveProposal(currentView uint64, proposal *model.Proposal) {
+func (d *ParticipantDistributor) OnReceiveProposal(currentView uint64, proposal *model.SignedProposal) {
 	d.lock.RLock()
 	defer d.lock.RUnlock()
 	for _, subscriber := range d.consumers {
