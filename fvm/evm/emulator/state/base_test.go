@@ -340,8 +340,11 @@ func TestBaseView(t *testing.T) {
 				break
 			}
 			require.Equal(t, nonces[acc.Address], acc.Nonce)
+			delete(nonces, acc.Address)
 			require.Equal(t, balances[acc.Address].Uint64(), acc.Balance.Uint64())
+			delete(balances, acc.Address)
 			require.Equal(t, codeHashes[acc.Address], acc.CodeHash)
+			delete(codeHashes, acc.Address)
 			counter += 1
 		}
 
@@ -388,7 +391,9 @@ func TestBaseView(t *testing.T) {
 				break
 			}
 			require.Equal(t, codeByCodeHash[cic.Hash], cic.Code)
+			delete(codeByCodeHash, cic.Hash)
 			require.Equal(t, refCountByCodeHash[cic.Hash], cic.RefCounts)
+			delete(refCountByCodeHash, cic.Hash)
 			counter += 1
 		}
 
@@ -439,6 +444,7 @@ func TestBaseView(t *testing.T) {
 			}
 			require.Equal(t, addr, slot.Address)
 			require.Equal(t, values[slot.Key], slot.Value)
+			delete(values, slot.Key)
 			counter += 1
 		}
 
