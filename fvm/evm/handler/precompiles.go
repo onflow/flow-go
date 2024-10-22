@@ -5,7 +5,7 @@ import (
 	"fmt"
 
 	"github.com/onflow/cadence"
-	"github.com/onflow/cadence/runtime/sema"
+	"github.com/onflow/cadence/sema"
 
 	"github.com/onflow/flow-go/fvm/environment"
 	"github.com/onflow/flow-go/fvm/evm/precompiles"

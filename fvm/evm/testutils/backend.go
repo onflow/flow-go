@@ -6,15 +6,15 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/onflow/cadence/runtime/stdlib"
+	"github.com/onflow/cadence/stdlib"
 	"github.com/rs/zerolog"
 	otelTrace "go.opentelemetry.io/otel/trace"
 
 	"github.com/onflow/atree"
 	"github.com/onflow/cadence"
+	"github.com/onflow/cadence/common"
 	"github.com/onflow/cadence/encoding/ccf"
 	"github.com/onflow/cadence/runtime"
-	"github.com/onflow/cadence/runtime/common"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/exp/maps"
 
@@ -64,8 +64,16 @@ func fullKey(owner, key []byte) string {
 }
 
 func GetSimpleValueStore() *TestValueStore {
-	data := make(map[string][]byte)
-	allocator := make(map[string]uint64)
+	return GetSimpleValueStorePopulated(
+		make(map[string][]byte),
+		make(map[string]uint64),
+	)
+}
+
+func GetSimpleValueStorePopulated(
+	data map[string][]byte,
+	allocator map[string]uint64,
+) *TestValueStore {
 	bytesRead := 0
 	bytesWritten := 0
 	return &TestValueStore{
@@ -122,6 +130,20 @@ func GetSimpleValueStore() *TestValueStore {
 		ResetStatsFunc: func() {
 			bytesRead = 0
 			bytesWritten = 0
+		},
+
+		CloneFunc: func() *TestValueStore {
+			// clone data
+			newData := make(map[string][]byte)
+			for k, v := range data {
+				newData[k] = v
+			}
+			newAllocator := make(map[string]uint64)
+			for k, v := range allocator {
+				newAllocator[k] = v
+			}
+			// clone allocator
+			return GetSimpleValueStorePopulated(newData, newAllocator)
 		},
 	}
 }
@@ -230,6 +252,7 @@ type TestValueStore struct {
 	TotalBytesWrittenFunc func() int
 	TotalStorageItemsFunc func() int
 	ResetStatsFunc        func()
+	CloneFunc             func() *TestValueStore
 }
 
 var _ environment.ValueStore = &TestValueStore{}
@@ -295,6 +318,13 @@ func (vs *TestValueStore) ResetStats() {
 		panic("method not set")
 	}
 	vs.ResetStatsFunc()
+}
+
+func (vs *TestValueStore) Clone() *TestValueStore {
+	if vs.CloneFunc == nil {
+		panic("method not set")
+	}
+	return vs.CloneFunc()
 }
 
 type testMeter struct {

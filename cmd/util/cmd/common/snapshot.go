@@ -9,9 +9,10 @@ import (
 	"github.com/rs/zerolog"
 	"github.com/sethvargo/go-retry"
 
+	"github.com/onflow/flow-go-sdk/access/grpc"
+
 	"github.com/onflow/flow-go/utils/logging"
 
-	"github.com/onflow/flow-go-sdk/access/grpc"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/state/protocol/inmem"
