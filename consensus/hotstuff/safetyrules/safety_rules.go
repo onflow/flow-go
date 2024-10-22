@@ -78,7 +78,7 @@ func (r *SafetyRules) ProduceVote(signedProposal *model.SignedProposal, curView 
 }
 
 // produceVote implements the core Safety Rules to validate whether it is safe to vote.
-// This method is to be used for voting for other leaders' blocks as well as this node's own proposals
+// This method is to be used to vote for other leaders' blocks as well as this node's own proposals
 // under construction. We explicitly codify the important aspect that a proposer's signature for their
 // own block is conceptually also just a vote (we explicitly use that property when aggregating votes and
 // including the proposer's own vote into a QC). In order to express this conceptual equivalence in code, the
@@ -172,7 +172,6 @@ func (r *SafetyRules) produceVote(proposal *model.Proposal, curView uint64) (*mo
 	}
 
 	return vote, nil
-
 }
 
 // ProduceTimeout takes current view, highest locally known QC and TC (optional, must be nil if and

@@ -34,7 +34,7 @@ func BlockVotesBy(voterID flow.Identifier) VoteFilter {
 }
 
 // ProposalFilter is a filter function for dropping Proposals.
-// Return value `true` implies that the the given SignedProposal should be
+// Return value `true` implies that the given SignedProposal should be
 // dropped, while `false` indicates that the SignedProposal should be received.
 type ProposalFilter func(*model.SignedProposal) bool
 

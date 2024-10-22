@@ -179,7 +179,7 @@ func NewForks(t *testing.T, finalized uint64) *Forks {
 	}
 
 	f.On("AddValidatedBlock", mock.Anything).Return(func(proposal *model.Block) error {
-		log.Info().Msgf("forks.AddValidatedBlock received SignedProposal for view: %v, QC: %v\n", proposal.View, proposal.QC.View)
+		log.Info().Msgf("forks.AddValidatedBlock received Block proposal for view: %v, QC: %v\n", proposal.View, proposal.QC.View)
 		return f.addProposal(proposal)
 	}).Maybe()
 
