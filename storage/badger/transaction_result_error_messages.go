@@ -131,7 +131,11 @@ func (t *TransactionResultErrorMessages) Exists(blockID flow.Identifier) (bool, 
 // BatchStore inserts a batch of transaction result error messages into a batch
 //
 // No errors are expected during normal operation.
-func (t *TransactionResultErrorMessages) batchStore(blockID flow.Identifier, transactionResultErrorMessages []flow.TransactionResultErrorMessage, batch storage.BatchStorage) error {
+func (t *TransactionResultErrorMessages) batchStore(
+	blockID flow.Identifier,
+	transactionResultErrorMessages []flow.TransactionResultErrorMessage,
+	batch storage.BatchStorage,
+) error {
 	writeBatch := batch.GetWriter()
 
 	for _, result := range transactionResultErrorMessages {
@@ -193,9 +197,9 @@ func (t *TransactionResultErrorMessages) ByBlockIDTransactionIndex(blockID flow.
 }
 
 // ByBlockID gets all transaction result error messages for a block, ordered by transaction index.
+// Note: This method will return an empty slice both if the block is not indexed yet and if the block does not have any errors.
 //
-// Expected errors during normal operation:
-//   - `storage.ErrNotFound` if no transaction error messages is known at given block.
+// No errors are expected during normal operation.
 func (t *TransactionResultErrorMessages) ByBlockID(blockID flow.Identifier) ([]flow.TransactionResultErrorMessage, error) {
 	tx := t.db.NewTransaction(false)
 	defer tx.Discard()

@@ -60,8 +60,8 @@ type TransactionResultErrorMessages interface {
 	ByBlockIDTransactionIndex(blockID flow.Identifier, txIndex uint32) (*flow.TransactionResultErrorMessage, error)
 
 	// ByBlockID gets all transaction result error messages for a block, ordered by transaction index.
+	// Note: This method will return an empty slice both if the block is not indexed yet and if the block does not have any errors.
 	//
-	// Expected errors during normal operation:
-	//   - `storage.ErrNotFound` if no transaction error messages is known at given block.
+	// No errors are expected during normal operation.
 	ByBlockID(id flow.Identifier) ([]flow.TransactionResultErrorMessage, error)
 }

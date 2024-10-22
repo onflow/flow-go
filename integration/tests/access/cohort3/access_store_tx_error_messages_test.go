@@ -28,8 +28,7 @@ func TestAccessStoreTxErrorMessages(t *testing.T) {
 	suite.Run(t, new(AccessStoreTxErrorMessagesSuite))
 }
 
-// ObserverIndexerEnabledSuite tests the observer with the indexer enabled.
-// It uses ObserverSuite as a base to reuse the test cases that need to be run for any observer variation.
+// AccessStoreTxErrorMessagesSuite tests the access for storing transaction error messages.
 type AccessStoreTxErrorMessagesSuite struct {
 	suite.Suite
 
@@ -49,7 +48,7 @@ func (s *AccessStoreTxErrorMessagesSuite) TearDownTest() {
 	s.log.Info().Msg("================> Finish TearDownTest")
 }
 
-// SetupTest sets up the test suite by starting the network and preparing create, send and waiting for sealed transaction.
+// SetupTest sets up the test suite by starting the network.
 // The access are started with correct parameters and store transaction error messages.
 func (s *AccessStoreTxErrorMessagesSuite) SetupTest() {
 	defaultAccess := testnet.NewNodeConfig(

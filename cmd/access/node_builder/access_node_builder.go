@@ -45,6 +45,7 @@ import (
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/engine/access/index"
 	"github.com/onflow/flow-go/engine/access/ingestion"
+	"github.com/onflow/flow-go/engine/access/ingestion/tx_error_messages"
 	pingeng "github.com/onflow/flow-go/engine/access/ping"
 	"github.com/onflow/flow-go/engine/access/rest"
 	"github.com/onflow/flow-go/engine/access/rest/routes"
@@ -355,6 +356,7 @@ type FlowAccessNodeBuilder struct {
 	nodeBackend        *backend.Backend
 
 	ExecNodeIdentitiesProvider *commonrpc.ExecutionNodeIdentitiesProvider
+	TxResultErrorMessagesCore  *tx_error_messages.TxErrorMessagesCore
 }
 
 func (builder *FlowAccessNodeBuilder) buildFollowerState() *FlowAccessNodeBuilder {
@@ -1378,8 +1380,10 @@ func (builder *FlowAccessNodeBuilder) extraFlags() {
 			"tx-result-query-mode",
 			defaultConfig.rpcConf.BackendConfig.TxResultQueryMode,
 			"mode to use when querying transaction results. one of [local-only, execution-nodes-only(default), failover]")
-		flags.BoolVar(&builder.storeTxResultErrorMessages, "store-tx-result-error-messages", defaultConfig.storeTxResultErrorMessages, "whether enable storing the transaction error messages into the db")
-
+		flags.BoolVar(&builder.storeTxResultErrorMessages,
+			"store-tx-result-error-messages",
+			defaultConfig.storeTxResultErrorMessages,
+			"whether to enable storing transaction error messages into the db")
 		// Script Execution
 		flags.StringVar(&builder.rpcConf.BackendConfig.ScriptExecutionMode,
 			"script-execution-mode",
@@ -1604,7 +1608,8 @@ func (builder *FlowAccessNodeBuilder) enqueueRelayNetwork() {
 }
 
 func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
-	var processedBlockHeight storage.ConsumerProgress
+	var processedFinalizedBlockHeight storage.ConsumerProgress
+	var processedTxErrorMessagesBlockHeight storage.ConsumerProgress
 
 	if builder.executionDataSyncEnabled {
 		builder.BuildExecutionSyncComponents()
@@ -1807,8 +1812,8 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 			builder.TxResultsIndex = index.NewTransactionResultsIndex(builder.Reporter, builder.Storage.LightTransactionResults)
 			return nil
 		}).
-		Module("processed block height consumer progress", func(node *cmd.NodeConfig) error {
-			processedBlockHeight = bstorage.NewConsumerProgress(builder.DB, module.ConsumeProgressIngestionEngineBlockHeight)
+		Module("processed finalized block height consumer progress", func(node *cmd.NodeConfig) error {
+			processedFinalizedBlockHeight = bstorage.NewConsumerProgress(builder.DB, module.ConsumeProgressIngestionEngineBlockHeight)
 			return nil
 		}).
 		Module("processed last full block height monotonic consumer progress", func(node *cmd.NodeConfig) error {
@@ -2077,6 +2082,15 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 				return nil, fmt.Errorf("could not create requester engine: %w", err)
 			}
 
+			if builder.storeTxResultErrorMessages {
+				builder.TxResultErrorMessagesCore = tx_error_messages.NewTxErrorMessagesCore(
+					node.Logger,
+					builder.nodeBackend,
+					node.Storage.TransactionResultErrorMessages,
+					builder.ExecNodeIdentitiesProvider,
+				)
+			}
+
 			builder.IngestEng, err = ingestion.New(
 				node.Logger,
 				node.EngineRegistry,
@@ -2089,12 +2103,10 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 				node.Storage.Transactions,
 				node.Storage.Results,
 				node.Storage.Receipts,
-				node.Storage.TransactionResultErrorMessages,
 				builder.collectionExecutedMetric,
-				processedBlockHeight,
+				processedFinalizedBlockHeight,
 				lastFullBlockHeight,
-				builder.nodeBackend,
-				builder.ExecNodeIdentitiesProvider,
+				builder.TxResultErrorMessagesCore,
 			)
 			if err != nil {
 				return nil, err
@@ -2111,6 +2123,31 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 			// be handled by the scaffold.
 			return builder.RequestEng, nil
 		})
+
+	if builder.storeTxResultErrorMessages {
+		builder.Module("processed error messages block height consumer progress", func(node *cmd.NodeConfig) error {
+			processedTxErrorMessagesBlockHeight = bstorage.NewConsumerProgress(
+				builder.DB,
+				module.ConsumeProgressEngineTxErrorMessagesBlockHeight,
+			)
+			return nil
+		})
+		builder.Component("transaction result error messages engine", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
+			engine, err := tx_error_messages.New(
+				node.Logger,
+				node.State,
+				node.Storage.Headers,
+				processedTxErrorMessagesBlockHeight,
+				builder.TxResultErrorMessagesCore,
+			)
+			if err != nil {
+				return nil, err
+			}
+			builder.FollowerDistributor.AddOnBlockFinalizedConsumer(engine.OnFinalizedBlock)
+
+			return engine, nil
+		})
+	}
 
 	if builder.supportsObserver {
 		builder.Component("public sync request handler", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {

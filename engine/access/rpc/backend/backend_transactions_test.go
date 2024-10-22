@@ -516,7 +516,7 @@ func (suite *Suite) TestLookupTransactionErrorMessageByTransactionID_FailedToFet
 		// Perform the lookup and expect the failed error message to be returned.
 		errMsg, err := backend.LookupErrorMessageByTransactionID(context.Background(), blockId, block.Header.Height, failedTxId)
 		suite.Require().NoError(err)
-		suite.Require().Equal(errMsg, FailedErrorMessage)
+		suite.Require().Equal(errMsg, DefaultFailedErrorMessage)
 		suite.assertAllExpectations()
 	})
 }
@@ -703,7 +703,7 @@ func (suite *Suite) TestLookupTransactionErrorMessageByIndex_FailedToFetch() {
 		// Perform the lookup and expect the failed error message to be returned.
 		errMsg, err := backend.LookupErrorMessageByIndex(context.Background(), blockId, block.Header.Height, failedTxIndex)
 		suite.Require().NoError(err)
-		suite.Require().Equal(errMsg, FailedErrorMessage)
+		suite.Require().Equal(errMsg, DefaultFailedErrorMessage)
 		suite.assertAllExpectations()
 	})
 }
@@ -931,7 +931,7 @@ func (suite *Suite) TestLookupTransactionErrorMessagesByBlockID_FailedToFetch() 
 		expectedTxErrorMessages := make(map[flow.Identifier]string)
 		for _, result := range failedResultsByBlockID {
 			if result.Failed {
-				expectedTxErrorMessages[result.TransactionID] = FailedErrorMessage
+				expectedTxErrorMessages[result.TransactionID] = DefaultFailedErrorMessage
 			}
 		}
 
