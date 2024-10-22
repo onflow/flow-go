@@ -13,7 +13,7 @@ import (
 	"github.com/onflow/cadence/encoding/ccf"
 	jsoncdc "github.com/onflow/cadence/encoding/json"
 	"github.com/onflow/cadence/runtime"
-	"github.com/onflow/cadence/runtime/stdlib"
+	"github.com/onflow/cadence/stdlib"
 	"github.com/onflow/crypto"
 	"github.com/onflow/crypto/hash"
 	"github.com/stretchr/testify/mock"
