@@ -4,7 +4,7 @@ import (
 	"testing"
 	"testing/quick"
 
-	"github.com/onflow/cadence/runtime/common"
+	"github.com/onflow/cadence/common"
 	testMock "github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 

@@ -4,9 +4,9 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/onflow/cadence/common"
+	"github.com/onflow/cadence/interpreter"
 	"github.com/onflow/cadence/runtime"
-	"github.com/onflow/cadence/runtime/common"
-	"github.com/onflow/cadence/runtime/interpreter"
 	"github.com/rs/zerolog/log"
 	"golang.org/x/sync/errgroup"
 

@@ -8,7 +8,7 @@ import (
 	"github.com/fxamacker/cbor/v2"
 	"github.com/onflow/atree"
 	"github.com/onflow/cadence/runtime"
-	"github.com/onflow/cadence/runtime/sema"
+	"github.com/onflow/cadence/sema"
 	"github.com/onflow/crypto"
 	"github.com/onflow/crypto/hash"
 	"github.com/stretchr/testify/assert"
