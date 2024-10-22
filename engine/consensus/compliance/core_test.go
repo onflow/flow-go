@@ -9,6 +9,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
+	"github.com/onflow/flow-go/consensus/hotstuff/helper"
 	hotstuff "github.com/onflow/flow-go/consensus/hotstuff/mocks"
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	consensus "github.com/onflow/flow-go/engine/consensus/mock"
@@ -626,7 +627,7 @@ func (cs *CoreSuite) TestProposalBufferingOrder() {
 			}
 			// mark the proposal as processed
 			delete(unprocessed, header.BlockID)
-			cs.headerDB[header.BlockID] = model.SignedProposalToFlow(proposal)
+			cs.headerDB[header.BlockID] = helper.SignedProposalToFlow(proposal)
 			calls++
 		},
 	)

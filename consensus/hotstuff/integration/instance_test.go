@@ -637,7 +637,7 @@ func (in *Instance) ProcessBlock(proposal *model.SignedProposal) {
 	if parentExists {
 		next := proposal
 		for next != nil {
-			in.headers[next.Block.BlockID] = model.SignedProposalToFlow(next)
+			in.headers[next.Block.BlockID] = helper.SignedProposalToFlow(next)
 
 			in.queue <- next
 			// keep processing the pending blocks
