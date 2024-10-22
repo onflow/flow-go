@@ -3,7 +3,7 @@ package environment_test
 import (
 	"testing"
 
-	"github.com/onflow/cadence/runtime/common"
+	"github.com/onflow/cadence/common"
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/fvm"
