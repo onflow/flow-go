@@ -706,12 +706,10 @@ func (suite *Suite) TestGetSealedTransaction() {
 			transactions,
 			results,
 			receipts,
-			nil,
 			collectionExecutedMetric,
 			processedHeight,
 			lastFullBlockHeight,
-			bnd,
-			execNodeIdentitiesProvider,
+			nil,
 		)
 		require.NoError(suite.T(), err)
 
@@ -803,6 +801,9 @@ func (suite *Suite) TestGetTransactionResult() {
 		allIdentities := append(colIdentities, enIdentities...)
 		finalSnapshot.On("Identities", mock.Anything).Return(allIdentities, nil)
 
+		suite.state.On("AtBlockID", blockNegativeId).Return(suite.sealedSnapshot)
+		suite.sealedSnapshot.On("Identities", mock.Anything).Return(allIdentities, nil)
+
 		// assume execution node returns an empty list of events
 		suite.execClient.On("GetTransactionResult", mock.Anything, mock.Anything).Return(&execproto.GetTransactionResultResponse{
 			Events: nil,
@@ -872,6 +873,7 @@ func (suite *Suite) TestGetTransactionResult() {
 		require.NoError(suite.T(), err)
 
 		processedHeight := bstorage.NewConsumerProgress(db, module.ConsumeProgressIngestionEngineBlockHeight)
+
 		lastFullBlockHeight, err := counters.NewPersistentStrictMonotonicCounter(
 			bstorage.NewConsumerProgress(db, module.ConsumeProgressLastFullBlockHeight),
 			suite.rootBlock.Height,
@@ -891,12 +893,10 @@ func (suite *Suite) TestGetTransactionResult() {
 			transactions,
 			results,
 			receipts,
-			nil,
 			collectionExecutedMetric,
 			processedHeight,
 			lastFullBlockHeight,
-			bnd,
-			execNodeIdentitiesProvider,
+			nil,
 		)
 		require.NoError(suite.T(), err)
 
@@ -993,6 +993,7 @@ func (suite *Suite) TestGetTransactionResult() {
 			}
 			resp, err := handler.GetTransactionResult(context.Background(), getReq)
 			require.Error(suite.T(), err)
+			require.Contains(suite.T(), err.Error(), "failed to find: transaction not in block")
 			require.Nil(suite.T(), resp)
 		})
 
@@ -1125,6 +1126,7 @@ func (suite *Suite) TestExecuteScript() {
 			Once()
 
 		processedHeight := bstorage.NewConsumerProgress(db, module.ConsumeProgressIngestionEngineBlockHeight)
+
 		lastFullBlockHeight, err := counters.NewPersistentStrictMonotonicCounter(
 			bstorage.NewConsumerProgress(db, module.ConsumeProgressLastFullBlockHeight),
 			suite.rootBlock.Height,
@@ -1144,12 +1146,10 @@ func (suite *Suite) TestExecuteScript() {
 			transactions,
 			results,
 			receipts,
-			nil,
 			collectionExecutedMetric,
 			processedHeight,
 			lastFullBlockHeight,
-			suite.backend,
-			execNodeIdentitiesProvider,
+			nil,
 		)
 		require.NoError(suite.T(), err)
 

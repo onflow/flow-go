@@ -53,6 +53,9 @@ type LightTransactionResult struct {
 	ComputationUsed uint64
 }
 
+// TransactionResultErrorMessage represents an error message resulting from a transaction's execution.
+// This struct holds the transaction's ID, its index, any error message generated during execution,
+// and the identifier of the execution node that provided the error message.
 type TransactionResultErrorMessage struct {
 	// TransactionID is the ID of the transaction this result error was emitted from.
 	TransactionID Identifier
