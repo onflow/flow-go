@@ -148,9 +148,9 @@ type currentVersionBoundaryInvalidator struct {
 }
 
 func (inv *currentVersionBoundaryInvalidator) ShouldInvalidateEntries() bool {
-	return inv.invalidate
+	return inv.invalidate || inv.invalidateAll
 }
 
 func (inv *currentVersionBoundaryInvalidator) ShouldInvalidateEntry(_ struct{}, _ flow.VersionBoundary, _ *snapshot.ExecutionSnapshot) bool {
-	return inv.invalidate
+	return inv.invalidate || inv.invalidateAll
 }
