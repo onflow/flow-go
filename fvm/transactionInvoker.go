@@ -2,8 +2,9 @@ package fvm
 
 import (
 	"fmt"
-	"github.com/onflow/flow-go/fvm/systemcontracts"
 	"strconv"
+
+	"github.com/onflow/flow-go/fvm/systemcontracts"
 
 	"github.com/onflow/cadence/runtime"
 	"github.com/onflow/cadence/runtime/common"

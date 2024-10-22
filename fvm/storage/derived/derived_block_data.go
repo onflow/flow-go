@@ -37,7 +37,6 @@ type DerivedTransactionPreparer interface {
 		getCurrentVersionBoundaryComputer ValueComputer[struct{}, flow.VersionBoundary],
 	) (
 		flow.VersionBoundary,
-		*snapshot.ExecutionSnapshot,
 		error,
 	)
 
@@ -231,13 +230,14 @@ func (transaction *DerivedTransactionData) GetCurrentVersionBoundary(
 	getCurrentVersionBoundaryComputer ValueComputer[struct{}, flow.VersionBoundary],
 ) (
 	flow.VersionBoundary,
-	*snapshot.ExecutionSnapshot,
 	error,
 ) {
-	return transaction.currentVersionBoundary.GetWithStateOrCompute(
+	vb, _, err := transaction.currentVersionBoundary.GetWithStateOrCompute(
 		txnState,
 		struct{}{},
 		getCurrentVersionBoundaryComputer)
+
+	return vb, err
 }
 
 func (transaction *DerivedTransactionData) Validate() error {

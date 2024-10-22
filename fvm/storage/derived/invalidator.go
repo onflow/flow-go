@@ -2,6 +2,7 @@ package derived
 
 import (
 	"github.com/onflow/cadence/runtime/common"
+
 	"github.com/onflow/flow-go/model/flow"
 
 	"github.com/onflow/flow-go/fvm/meter"
