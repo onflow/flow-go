@@ -48,36 +48,50 @@ func (c *Config) ChainRules() gethParams.Rules {
 		c.BlockContext.Time)
 }
 
-// DefaultChainConfig is the default chain config used by the emulator
-// considers majority of EVM upgrades (e.g. Cancun update) are already applied
+// PreviewNetChainConfig is the chain config used by the previewnet
+var PreviewNetChainConfig = MakeChainConfig(types.FlowEVMPreviewNetChainID)
+
+// PreviewNetChainConfig is the chain config used by the testnet
+var TestNetChainConfig = MakeChainConfig(types.FlowEVMTestNetChainID)
+
+// MainNetChainConfig is the chain config used by the mainnet
+var MainNetChainConfig = MakeChainConfig(types.FlowEVMMainNetChainID)
+
+// DefaultChainConfig is the chain config used by the emulator
+var DefaultChainConfig = PreviewNetChainConfig
+
+// MakeChainConfig constructs a chain config
+// it considers majority of EVM upgrades (e.g. Cancun update) are already applied
 // This has been done through setting the height of these changes
 // to zero nad setting the time for some other changes to zero
 // For the future changes of EVM, we need to update the EVM go mod version
 // and set a proper height for the specific release based on the Flow EVM heights
 // so it could gets activated at a desired time.
-var DefaultChainConfig = &gethParams.ChainConfig{
-	ChainID: types.FlowEVMPreviewNetChainID,
+func MakeChainConfig(chainID *big.Int) *gethParams.ChainConfig {
+	return &gethParams.ChainConfig{
+		ChainID: chainID,
 
-	// Fork scheduling based on block heights
-	HomesteadBlock:      bigZero,
-	DAOForkBlock:        bigZero,
-	DAOForkSupport:      false,
-	EIP150Block:         bigZero,
-	EIP155Block:         bigZero,
-	EIP158Block:         bigZero,
-	ByzantiumBlock:      bigZero, // already on Byzantium
-	ConstantinopleBlock: bigZero, // already on Constantinople
-	PetersburgBlock:     bigZero, // already on Petersburg
-	IstanbulBlock:       bigZero, // already on Istanbul
-	BerlinBlock:         bigZero, // already on Berlin
-	LondonBlock:         bigZero, // already on London
-	MuirGlacierBlock:    bigZero, // already on MuirGlacier
+		// Fork scheduling based on block heights
+		HomesteadBlock:      bigZero,
+		DAOForkBlock:        bigZero,
+		DAOForkSupport:      false,
+		EIP150Block:         bigZero,
+		EIP155Block:         bigZero,
+		EIP158Block:         bigZero,
+		ByzantiumBlock:      bigZero, // already on Byzantium
+		ConstantinopleBlock: bigZero, // already on Constantinople
+		PetersburgBlock:     bigZero, // already on Petersburg
+		IstanbulBlock:       bigZero, // already on Istanbul
+		BerlinBlock:         bigZero, // already on Berlin
+		LondonBlock:         bigZero, // already on London
+		MuirGlacierBlock:    bigZero, // already on MuirGlacier
 
-	// Fork scheduling based on timestamps
-	ShanghaiTime: &zero, // already on Shanghai
-	CancunTime:   &zero, // already on Cancun
-	PragueTime:   nil,   // not on Prague
-	VerkleTime:   nil,   // not on Verkle
+		// Fork scheduling based on timestamps
+		ShanghaiTime: &zero, // already on Shanghai
+		CancunTime:   &zero, // already on Cancun
+		PragueTime:   nil,   // not on Prague
+		VerkleTime:   nil,   // not on Verkle
+	}
 }
 
 // Default config supports the dynamic fee structure (EIP-1559)
@@ -123,7 +137,14 @@ type Option func(*Config) *Config
 // WithChainID sets the evm chain ID
 func WithChainID(chainID *big.Int) Option {
 	return func(c *Config) *Config {
-		c.ChainConfig.ChainID = chainID
+		switch chainID.Uint64() {
+		case types.FlowEVMPreviewNetChainIDInUInt64:
+			c.ChainConfig = PreviewNetChainConfig
+		case types.FlowEVMTestNetChainIDInUInt64:
+			c.ChainConfig = TestNetChainConfig
+		case types.FlowEVMMainNetChainIDInUInt64:
+			c.ChainConfig = MainNetChainConfig
+		}
 		return c
 	}
 }

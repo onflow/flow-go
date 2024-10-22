@@ -3,7 +3,7 @@
 package mock
 
 import (
-	common "github.com/onflow/cadence/runtime/common"
+	common "github.com/onflow/cadence/common"
 
 	flow "github.com/onflow/flow-go/model/flow"
 
