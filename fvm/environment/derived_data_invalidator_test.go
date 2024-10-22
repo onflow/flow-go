@@ -1,8 +1,9 @@
 package environment_test
 
 import (
-	"github.com/onflow/flow-go/fvm/systemcontracts"
 	"testing"
+
+	"github.com/onflow/flow-go/fvm/systemcontracts"
 
 	"github.com/onflow/cadence/runtime/common"
 	"github.com/stretchr/testify/require"
