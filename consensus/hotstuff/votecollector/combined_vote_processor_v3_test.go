@@ -981,7 +981,6 @@ func TestCombinedVoteProcessorV3_BuildVerifyQC(t *testing.T) {
 	}
 
 	leader := stakingSigners[0]
-
 	block := helper.MakeBlock(helper.WithBlockView(proposerView), helper.WithBlockProposer(leader.NodeID))
 
 	inmemDKG, err := inmem.DKGFromEncodable(inmem.EncodableDKG{
