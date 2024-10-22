@@ -6,6 +6,7 @@ import (
 	gethCommon "github.com/onflow/go-ethereum/common"
 	gethTypes "github.com/onflow/go-ethereum/core/types"
 	gethVM "github.com/onflow/go-ethereum/core/vm"
+	"github.com/onflow/go-ethereum/rlp"
 )
 
 // StateDB acts as the main interface to the EVM runtime
@@ -167,4 +168,25 @@ type BaseView interface {
 type SlotAddress struct {
 	Address gethCommon.Address
 	Key     gethCommon.Hash
+}
+
+// SlotEntry captures an address to a storage slot and the value stored in it
+type SlotEntry struct {
+	Address gethCommon.Address
+	Key     gethCommon.Hash
+	Value   gethCommon.Hash
+}
+
+// Encoded returns the encoded content of the slot entry
+func (se *SlotEntry) Encode() ([]byte, error) {
+	return rlp.EncodeToBytes(se)
+}
+
+// SlotEntryFromEncoded constructs an slot entry from the encoded data
+func SlotEntryFromEncoded(encoded []byte) (*SlotEntry, error) {
+	if len(encoded) == 0 {
+		return nil, nil
+	}
+	se := &SlotEntry{}
+	return se, rlp.DecodeBytes(encoded, se)
 }

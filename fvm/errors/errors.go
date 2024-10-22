@@ -5,8 +5,8 @@ import (
 	"fmt"
 
 	"github.com/hashicorp/go-multierror"
+	"github.com/onflow/cadence/errors"
 	"github.com/onflow/cadence/runtime"
-	"github.com/onflow/cadence/runtime/errors"
 )
 
 type Unwrappable interface {

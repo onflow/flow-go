@@ -4,19 +4,19 @@ package mock
 
 import (
 	atree "github.com/onflow/atree"
-	ast "github.com/onflow/cadence/runtime/ast"
+	ast "github.com/onflow/cadence/ast"
 
 	attribute "go.opentelemetry.io/otel/attribute"
 
 	cadence "github.com/onflow/cadence"
 
-	common "github.com/onflow/cadence/runtime/common"
+	common "github.com/onflow/cadence/common"
 
 	environment "github.com/onflow/flow-go/fvm/environment"
 
 	flow "github.com/onflow/flow-go/model/flow"
 
-	interpreter "github.com/onflow/cadence/runtime/interpreter"
+	interpreter "github.com/onflow/cadence/interpreter"
 
 	meter "github.com/onflow/flow-go/fvm/meter"
 
@@ -26,9 +26,9 @@ import (
 
 	runtime "github.com/onflow/flow-go/fvm/runtime"
 
-	sema "github.com/onflow/cadence/runtime/sema"
+	sema "github.com/onflow/cadence/sema"
 
-	stdlib "github.com/onflow/cadence/runtime/stdlib"
+	stdlib "github.com/onflow/cadence/stdlib"
 
 	time "time"
 
