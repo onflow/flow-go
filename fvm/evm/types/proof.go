@@ -4,9 +4,9 @@ import (
 	"fmt"
 
 	"github.com/onflow/cadence"
-	"github.com/onflow/cadence/runtime/common"
-	"github.com/onflow/cadence/runtime/sema"
-	cadenceRLP "github.com/onflow/cadence/runtime/stdlib/rlp"
+	"github.com/onflow/cadence/common"
+	"github.com/onflow/cadence/sema"
+	cadenceRLP "github.com/onflow/cadence/stdlib/rlp"
 	"github.com/onflow/go-ethereum/rlp"
 
 	"github.com/onflow/flow-go/model/flow"

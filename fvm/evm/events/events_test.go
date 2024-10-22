@@ -11,8 +11,8 @@ import (
 
 	"github.com/onflow/go-ethereum/core/vm"
 
+	cdcCommon "github.com/onflow/cadence/common"
 	"github.com/onflow/cadence/encoding/ccf"
-	cdcCommon "github.com/onflow/cadence/runtime/common"
 	gethCommon "github.com/onflow/go-ethereum/common"
 	gethTypes "github.com/onflow/go-ethereum/core/types"
 	"github.com/onflow/go-ethereum/rlp"
@@ -131,7 +131,7 @@ func TestEVMTransactionExecutedEventCCFEncodingDecoding(t *testing.T) {
 		assert.Equal(t, tep.GasConsumed, txResult.GasConsumed)
 		assert.Equal(t, tep.ErrorMessage, txResult.VMError.Error())
 		assert.Equal(t, tep.ReturnedData, txResult.ReturnedData)
-		assert.Equal(t, tep.StateUpdateChecksum[:], stateUpdateCommit[:events.ChecksumLength])
+		assert.Equal(t, tep.StateUpdateChecksum[:], stateUpdateCommit[:types.ChecksumLength])
 		assert.Equal(
 			t,
 			tep.ContractAddress,
