@@ -80,7 +80,7 @@ func (b *backendBlockDetails) GetBlockByID(ctx context.Context, id flow.Identifi
 func (b *backendBlockDetails) GetBlockByHeight(ctx context.Context, height uint64) (*flow.Block, flow.BlockStatus, error) {
 	block, err := b.blocks.ByHeight(height)
 	if err != nil {
-		return nil, flow.BlockStatusUnknown, rpc.ConvertStorageError(err)
+		return nil, flow.BlockStatusUnknown, rpc.ConvertStorageError(resolveHeightError(b.state.Params(), height, err))
 	}
 
 	stat, err := b.getBlockStatus(ctx, block)
