@@ -45,6 +45,7 @@ import (
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/engine/access/index"
 	"github.com/onflow/flow-go/engine/access/ingestion"
+	"github.com/onflow/flow-go/engine/access/ingestion/tx_error_messages"
 	pingeng "github.com/onflow/flow-go/engine/access/ping"
 	"github.com/onflow/flow-go/engine/access/rest"
 	"github.com/onflow/flow-go/engine/access/rest/routes"
@@ -56,6 +57,7 @@ import (
 	"github.com/onflow/flow-go/engine/access/subscription"
 	followereng "github.com/onflow/flow-go/engine/common/follower"
 	"github.com/onflow/flow-go/engine/common/requester"
+	commonrpc "github.com/onflow/flow-go/engine/common/rpc"
 	"github.com/onflow/flow-go/engine/common/stop"
 	synceng "github.com/onflow/flow-go/engine/common/synchronization"
 	"github.com/onflow/flow-go/engine/common/version"
@@ -352,6 +354,8 @@ type FlowAccessNodeBuilder struct {
 
 	stateStreamBackend *statestreambackend.StateStreamBackend
 	nodeBackend        *backend.Backend
+
+	TxResultErrorMessagesCore *tx_error_messages.TxErrorMessagesCore
 }
 
 func (builder *FlowAccessNodeBuilder) buildFollowerState() *FlowAccessNodeBuilder {
@@ -1804,13 +1808,6 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 			processedFinalizedBlockHeight = bstorage.NewConsumerProgress(builder.DB, module.ConsumeProgressIngestionEngineBlockHeight)
 			return nil
 		}).
-		Module("processed error messages block height consumer progress", func(node *cmd.NodeConfig) error {
-			processedTxErrorMessagesBlockHeight = bstorage.NewConsumerProgress(
-				builder.DB,
-				module.ConsumeProgressIngestionEngineTxErrorMessagesBlockHeight,
-			)
-			return nil
-		}).
 		Module("processed last full block height monotonic consumer progress", func(node *cmd.NodeConfig) error {
 			rootBlockHeight := node.State.Params().FinalizedRoot().Height
 
@@ -2052,6 +2049,28 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 				return nil, fmt.Errorf("could not create requester engine: %w", err)
 			}
 
+			preferredENIdentifiers, err := commonrpc.IdentifierList(builder.rpcConf.BackendConfig.PreferredExecutionNodeIDs)
+			if err != nil {
+				return nil, fmt.Errorf("failed to convert node id string to Flow Identifier for preferred EN map: %w", err)
+			}
+
+			fixedENIdentifiers, err := commonrpc.IdentifierList(builder.rpcConf.BackendConfig.FixedExecutionNodeIDs)
+			if err != nil {
+				return nil, fmt.Errorf("failed to convert node id string to Flow Identifier for fixed EN map: %w", err)
+			}
+
+			if builder.storeTxResultErrorMessages {
+				builder.TxResultErrorMessagesCore = tx_error_messages.NewTxErrorMessagesCore(
+					node.Logger,
+					node.State,
+					builder.nodeBackend,
+					node.Storage.Receipts,
+					node.Storage.TransactionResultErrorMessages,
+					preferredENIdentifiers,
+					fixedENIdentifiers,
+				)
+			}
+
 			builder.IngestEng, err = ingestion.New(
 				node.Logger,
 				node.EngineRegistry,
@@ -2064,14 +2083,10 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 				node.Storage.Transactions,
 				node.Storage.Results,
 				node.Storage.Receipts,
-				node.Storage.TransactionResultErrorMessages,
 				builder.collectionExecutedMetric,
 				processedFinalizedBlockHeight,
-				processedTxErrorMessagesBlockHeight,
 				lastFullBlockHeight,
-				builder.nodeBackend,
-				builder.rpcConf.BackendConfig.PreferredExecutionNodeIDs,
-				builder.rpcConf.BackendConfig.FixedExecutionNodeIDs,
+				builder.TxResultErrorMessagesCore,
 			)
 			if err != nil {
 				return nil, err
@@ -2088,6 +2103,31 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 			// be handled by the scaffold.
 			return builder.RequestEng, nil
 		})
+
+	if builder.storeTxResultErrorMessages {
+		builder.Module("processed error messages block height consumer progress", func(node *cmd.NodeConfig) error {
+			processedTxErrorMessagesBlockHeight = bstorage.NewConsumerProgress(
+				builder.DB,
+				module.ConsumeProgressEngineTxErrorMessagesBlockHeight,
+			)
+			return nil
+		})
+		builder.Component("transaction result error messages engine", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
+			engine, err := tx_error_messages.New(
+				node.Logger,
+				node.State,
+				node.Storage.Headers,
+				processedTxErrorMessagesBlockHeight,
+				builder.TxResultErrorMessagesCore,
+			)
+			if err != nil {
+				return nil, err
+			}
+			builder.FollowerDistributor.AddOnBlockFinalizedConsumer(engine.OnFinalizedBlock)
+
+			return engine, nil
+		})
+	}
 
 	if builder.supportsObserver {
 		builder.Component("public sync request handler", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {

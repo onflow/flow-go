@@ -2,7 +2,6 @@ package ingestion
 
 import (
 	"context"
-	"fmt"
 	"math/rand"
 	"os"
 	"sync"
@@ -10,16 +9,12 @@ import (
 	"time"
 
 	"github.com/dgraph-io/badger/v2"
-	execproto "github.com/onflow/flow/protobuf/go/flow/execution"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
 	hotmodel "github.com/onflow/flow-go/consensus/hotstuff/model"
-	accessmock "github.com/onflow/flow-go/engine/access/mock"
-	"github.com/onflow/flow-go/engine/access/rpc/backend"
-	connectionmock "github.com/onflow/flow-go/engine/access/rpc/connection/mock"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/module"
@@ -42,8 +37,6 @@ import (
 	"github.com/onflow/flow-go/utils/unittest/mocks"
 )
 
-const expectedErrorMsg = "expected test error"
-
 type Suite struct {
 	suite.Suite
 
@@ -54,31 +47,26 @@ type Suite struct {
 		params   *protocol.Params
 	}
 
-	me              *modulemock.Local
-	net             *mocknetwork.Network
-	request         *modulemock.Requester
-	obsIdentity     *flow.Identity
-	provider        *mocknetwork.Engine
-	blocks          *storage.Blocks
-	headers         *storage.Headers
-	collections     *storage.Collections
-	transactions    *storage.Transactions
-	receipts        *storage.ExecutionReceipts
-	results         *storage.ExecutionResults
-	seals           *storage.Seals
-	txErrorMessages *storage.TransactionResultErrorMessages
-	conduit         *mocknetwork.Conduit
-	downloader      *downloadermock.Downloader
-	sealedBlock     *flow.Header
-	finalizedBlock  *flow.Header
-	log             zerolog.Logger
-	blockMap        map[uint64]*flow.Block
-	rootBlock       flow.Block
+	me           *modulemock.Local
+	net          *mocknetwork.Network
+	request      *modulemock.Requester
+	obsIdentity  *flow.Identity
+	provider     *mocknetwork.Engine
+	blocks       *storage.Blocks
+	headers      *storage.Headers
+	collections  *storage.Collections
+	transactions *storage.Transactions
+	receipts     *storage.ExecutionReceipts
+	results      *storage.ExecutionResults
+	seals        *storage.Seals
 
-	execClient                  *accessmock.ExecutionAPIClient
-	connFactory                 *connectionmock.ConnectionFactory
-	enNodeIDs                   flow.IdentifierList
-	txResultErrorMessagesExists bool
+	conduit        *mocknetwork.Conduit
+	downloader     *downloadermock.Downloader
+	sealedBlock    *flow.Header
+	finalizedBlock *flow.Header
+	log            zerolog.Logger
+	blockMap       map[uint64]*flow.Block
+	rootBlock      flow.Block
 
 	collectionExecutedMetric *indexer.CollectionExecutedMetricImpl
 
@@ -131,9 +119,6 @@ func (s *Suite) SetupTest() {
 		Return(conduit, nil).
 		Once()
 	s.request = modulemock.NewRequester(s.T())
-	// Create a mock execution client to simulate communication with execution nodes.
-	s.execClient = accessmock.NewExecutionAPIClient(s.T())
-	s.connFactory = connectionmock.NewConnectionFactory(s.T())
 	s.provider = mocknetwork.NewEngine(s.T())
 	s.blocks = storage.NewBlocks(s.T())
 	s.headers = storage.NewHeaders(s.T())
@@ -141,7 +126,6 @@ func (s *Suite) SetupTest() {
 	s.receipts = new(storage.ExecutionReceipts)
 	s.transactions = new(storage.Transactions)
 	s.results = new(storage.ExecutionResults)
-	s.txErrorMessages = storage.NewTransactionResultErrorMessages(s.T())
 	collectionsToMarkFinalized, err := stdmap.NewTimes(100)
 	require.NoError(s.T(), err)
 	collectionsToMarkExecuted, err := stdmap.NewTimes(100)
@@ -173,13 +157,6 @@ func (s *Suite) SetupTest() {
 		),
 	).Maybe()
 
-	s.headers.On("ByHeight", mock.AnythingOfType("uint64")).Return(
-		mocks.ConvertStorageOutput(
-			mocks.StorageMapGetter(s.blockMap),
-			func(block *flow.Block) *flow.Header { return block.Header },
-		),
-	).Maybe()
-
 	s.proto.snapshot.On("Head").Return(
 		func() *flow.Header {
 			return s.finalizedBlock
@@ -187,12 +164,10 @@ func (s *Suite) SetupTest() {
 		nil,
 	).Maybe()
 	s.proto.state.On("Final").Return(s.proto.snapshot, nil)
-	s.proto.state.On("Sealed").Return(s.proto.snapshot, nil)
 
 	// Mock the finalized root block header with height 0.
 	header := unittest.BlockHeaderFixture(unittest.WithHeaderHeight(0))
 	s.proto.params.On("FinalizedRoot").Return(header, nil)
-	s.proto.params.On("SealedRoot").Return(header, nil)
 
 	s.collectionExecutedMetric, err = indexer.NewCollectionExecutedMetricImpl(
 		s.log,
@@ -204,48 +179,17 @@ func (s *Suite) SetupTest() {
 		s.blocks,
 	)
 	require.NoError(s.T(), err)
-
-	s.txResultErrorMessagesExists = true
-	// Mock the txErrorMessages storage to confirm that error messages exists.
-	s.txErrorMessages.On("Exists", mock.Anything).
-		Return(func(flow.Identifier) bool {
-			return s.txResultErrorMessagesExists
-		}, nil).Maybe()
 }
 
 // initIngestionEngine create new instance of ingestion engine and waits when it starts
 func (s *Suite) initIngestionEngine(ctx irrecoverable.SignalerContext) *Engine {
 	processedHeight := bstorage.NewConsumerProgress(s.db, module.ConsumeProgressIngestionEngineBlockHeight)
-	processedTxErrorMessagesBlockHeight := bstorage.NewConsumerProgress(
-		s.db,
-		module.ConsumeProgressIngestionEngineTxErrorMessagesBlockHeight,
-	)
 
 	var err error
 	s.lastFullBlockHeight, err = counters.NewPersistentStrictMonotonicCounter(
 		bstorage.NewConsumerProgress(s.db, module.ConsumeProgressLastFullBlockHeight),
 		s.finalizedBlock.Height,
 	)
-	require.NoError(s.T(), err)
-
-	// Initialize the backend with the mocked state, blocks, headers, transactions, etc.
-	backend, err := backend.New(backend.Params{
-		State:                 s.proto.state,
-		Blocks:                s.blocks,
-		Headers:               s.headers,
-		Transactions:          s.transactions,
-		ExecutionReceipts:     s.receipts,
-		ExecutionResults:      s.results,
-		ConnFactory:           s.connFactory,
-		MaxHeightRange:        backend.DefaultMaxHeightRange,
-		FixedExecutionNodeIDs: s.enNodeIDs.Strings(),
-		Log:                   s.log,
-		SnapshotHistoryLimit:  backend.DefaultSnapshotHistoryLimit,
-		Communicator:          backend.NewNodeCommunicator(false),
-		ScriptExecutionMode:   backend.IndexQueryModeExecutionNodesOnly,
-		TxResultQueryMode:     backend.IndexQueryModeExecutionNodesOnly,
-		ChainID:               flow.Testnet,
-	})
 	require.NoError(s.T(), err)
 
 	eng, err := New(
@@ -260,13 +204,9 @@ func (s *Suite) initIngestionEngine(ctx irrecoverable.SignalerContext) *Engine {
 		s.transactions,
 		s.results,
 		s.receipts,
-		s.txErrorMessages,
 		s.collectionExecutedMetric,
 		processedHeight,
-		processedTxErrorMessagesBlockHeight,
 		s.lastFullBlockHeight,
-		backend,
-		s.enNodeIDs.Strings(),
 		nil,
 	)
 
@@ -360,7 +300,7 @@ func (s *Suite) TestOnFinalizedBlockSingle() {
 	// process the block through the finalized callback
 	eng.OnFinalizedBlock(&hotstuffBlock)
 
-	unittest.RequireReturnsBefore(s.T(), wg.Wait, time.Second, "expect to process new block before timeout")
+	unittest.RequireReturnsBefore(s.T(), wg.Wait, 100*time.Millisecond, "expect to process new block before timeout")
 
 	// assert that the block was retrieved and all collections were requested
 	s.headers.AssertExpectations(s.T())
@@ -429,7 +369,7 @@ func (s *Suite) TestOnFinalizedBlockSeveralBlocksAhead() {
 
 	eng.OnFinalizedBlock(&hotstuffBlock)
 
-	unittest.RequireReturnsBefore(s.T(), wg.Wait, time.Second, "expect to process all blocks before timeout")
+	unittest.RequireReturnsBefore(s.T(), wg.Wait, 100*time.Millisecond, "expect to process all blocks before timeout")
 
 	expectedEntityByIDCalls := 0
 	expectedIndexCalls := 0
@@ -869,143 +809,6 @@ func (s *Suite) TestProcessBackgroundCalls() {
 		s.Require().Equal(finalizedHeight, s.lastFullBlockHeight.Value())
 		s.blocks.AssertExpectations(s.T())
 	})
-}
-
-type mockCloser struct{}
-
-func (mc *mockCloser) Close() error { return nil }
-
-// TestHandleTransactionResultErrorMessages checks that transaction result error messages
-// are properly fetched from the execution nodes, processed, and stored in the protocol database.
-func (s *Suite) TestHandleTransactionResultErrorMessages() {
-	irrecoverableCtx := irrecoverable.NewMockSignalerContext(s.T(), s.ctx)
-
-	block := unittest.BlockFixture()
-	blockId := block.ID()
-
-	// Create identities for 1 execution nodes.
-	enIdentities := unittest.IdentityListFixture(1, unittest.WithRole(flow.RoleExecution))
-	s.enNodeIDs = enIdentities.NodeIDs()
-
-	s.connFactory.On("GetExecutionAPIClient", mock.Anything).Return(s.execClient, &mockCloser{}, nil)
-
-	// Mock the protocol snapshot to return fixed execution node IDs.
-	_, fixedENIDs := s.setupReceipts(&block)
-	s.proto.snapshot.On("Identities", mock.Anything).Return(fixedENIDs, nil)
-	s.proto.state.On("AtBlockID", blockId).Return(s.proto.snapshot).Once()
-
-	// Initialize the ingestion engine with the irrecoverable context.
-	eng := s.initIngestionEngine(irrecoverableCtx)
-
-	// Create mock transaction results with a mix of failed and non-failed transactions.
-	resultsByBlockID := s.mockTransactionResultsByBlock(5)
-
-	// Prepare a request to fetch transaction error messages by block ID from execution nodes.
-	exeEventReq := &execproto.GetTransactionErrorMessagesByBlockIDRequest{
-		BlockId: blockId[:],
-	}
-
-	s.execClient.On("GetTransactionErrorMessagesByBlockID", mock.Anything, exeEventReq).
-		Return(s.createTransactionErrorMessagesResponse(resultsByBlockID), nil).
-		Once()
-
-	// Mock the txErrorMessages storage to confirm that error messages do not exist yet.
-	s.txResultErrorMessagesExists = false
-
-	// Prepare the expected transaction error messages that should be stored.
-	expectedStoreTxErrorMessages := s.createExpectedTxErrorMessages(resultsByBlockID, fixedENIDs.NodeIDs()[0])
-
-	// Mock the storage of the fetched error messages into the protocol database.
-	s.txErrorMessages.On("Store", blockId, expectedStoreTxErrorMessages).
-		Return(nil).Once()
-
-	err := eng.handleTransactionResultErrorMessages(irrecoverableCtx, blockId)
-	require.NoError(s.T(), err)
-
-	// Verify that the mock expectations for storing the error messages were met.
-	s.txErrorMessages.AssertExpectations(s.T())
-
-	// Now simulate the second try when the error messages already exist in storage.
-	// Mock the txErrorMessages storage to confirm that error messages exist.
-	s.txResultErrorMessagesExists = true
-	err = eng.handleTransactionResultErrorMessages(irrecoverableCtx, blockId)
-	require.NoError(s.T(), err)
-
-	// Verify that the mock expectations for storing the error messages were not met.
-	s.txErrorMessages.AssertExpectations(s.T())
-	s.execClient.AssertExpectations(s.T())
-}
-
-// createTransactionErrorMessagesResponse create TransactionErrorMessagesResponse from execution node based on results.
-func (s *Suite) createTransactionErrorMessagesResponse(resultsByBlockID []flow.LightTransactionResult) *execproto.GetTransactionErrorMessagesResponse {
-	exeErrMessagesResp := &execproto.GetTransactionErrorMessagesResponse{}
-
-	for i, result := range resultsByBlockID {
-		if result.Failed {
-			errMsg := fmt.Sprintf("%s.%s", expectedErrorMsg, result.TransactionID)
-			exeErrMessagesResp.Results = append(exeErrMessagesResp.Results, &execproto.GetTransactionErrorMessagesResponse_Result{
-				TransactionId: result.TransactionID[:],
-				ErrorMessage:  errMsg,
-				Index:         uint32(i),
-			})
-		}
-	}
-
-	return exeErrMessagesResp
-}
-
-// createExpectedTxErrorMessages creates a list of expected transaction error messages based on transaction results
-func (s *Suite) createExpectedTxErrorMessages(resultsByBlockID []flow.LightTransactionResult, executionNode flow.Identifier) []flow.TransactionResultErrorMessage {
-	// Prepare the expected transaction error messages that should be stored.
-	var expectedStoreTxErrorMessages []flow.TransactionResultErrorMessage
-
-	for i, result := range resultsByBlockID {
-		if result.Failed {
-			errMsg := fmt.Sprintf("%s.%s", expectedErrorMsg, result.TransactionID)
-
-			expectedStoreTxErrorMessages = append(expectedStoreTxErrorMessages,
-				flow.TransactionResultErrorMessage{
-					TransactionID: result.TransactionID,
-					ErrorMessage:  errMsg,
-					Index:         uint32(i),
-					ExecutorID:    executionNode,
-				})
-		}
-	}
-
-	return expectedStoreTxErrorMessages
-}
-
-// mockTransactionResultsByBlock create mock transaction results with a mix of failed and non-failed transactions.
-func (s *Suite) mockTransactionResultsByBlock(count int) []flow.LightTransactionResult {
-	// Create mock transaction results with a mix of failed and non-failed transactions.
-	resultsByBlockID := make([]flow.LightTransactionResult, 0)
-	for i := 0; i < count; i++ {
-		resultsByBlockID = append(resultsByBlockID, flow.LightTransactionResult{
-			TransactionID:   unittest.IdentifierFixture(),
-			Failed:          i%2 == 0, // create a mix of failed and non-failed transactions
-			ComputationUsed: 0,
-		})
-	}
-
-	return resultsByBlockID
-}
-
-// setupReceipts sets up mock execution receipts for a block and returns the receipts along
-// with the identities of the execution nodes that processed them.
-func (s *Suite) setupReceipts(block *flow.Block) ([]*flow.ExecutionReceipt, flow.IdentityList) {
-	ids := unittest.IdentityListFixture(1, unittest.WithRole(flow.RoleExecution))
-	receipt1 := unittest.ReceiptForBlockFixture(block)
-	receipt1.ExecutorID = ids[0].NodeID
-
-	receipts := flow.ExecutionReceiptList{receipt1}
-	s.receipts.
-		On("ByBlockID", mock.Anything).
-		Return(func(flow.Identifier) flow.ExecutionReceiptList {
-			return receipts
-		}, nil)
-
-	return receipts, ids
 }
 
 func (s *Suite) TestComponentShutdown() {
