@@ -8,7 +8,7 @@ import (
 )
 
 // VoteFilter is a filter function for dropping Votes.
-// Return value `true` implies that the the given Vote should be
+// Return value `true` implies that the given Vote should be
 // dropped, while `false` indicates that the Vote should be received.
 type VoteFilter func(*model.Vote) bool
 
@@ -61,7 +61,7 @@ func BlockProposalsBy(proposerID flow.Identifier) ProposalFilter {
 }
 
 // TimeoutObjectFilter is a filter function for dropping TimeoutObjects.
-// Return value `true` implies that the the given TimeoutObject should be
+// Return value `true` implies that the given TimeoutObject should be
 // dropped, while `false` indicates that the TimeoutObject should be received.
 type TimeoutObjectFilter func(*model.TimeoutObject) bool
 
