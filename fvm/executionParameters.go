@@ -8,7 +8,7 @@ import (
 	"github.com/onflow/flow-go/fvm/storage/snapshot"
 
 	"github.com/onflow/cadence"
-	"github.com/onflow/cadence/runtime/common"
+	"github.com/onflow/cadence/common"
 
 	"github.com/onflow/flow-go/fvm/blueprints"
 	"github.com/onflow/flow-go/fvm/environment"

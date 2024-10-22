@@ -3,7 +3,7 @@
 package mock
 
 import (
-	stdlib "github.com/onflow/cadence/runtime/stdlib"
+	stdlib "github.com/onflow/cadence/stdlib"
 	mock "github.com/stretchr/testify/mock"
 )
 
