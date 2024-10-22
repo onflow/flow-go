@@ -167,7 +167,7 @@ func (b *BackfillTxErrorMessagesCommand) Handler(ctx context.Context, request *a
 
 		resp, execNode, err := b.backend.GetTransactionErrorMessagesFromAnyEN(ctx, data.executionNodeIds.ToSkeleton(), req)
 		if err != nil {
-			return nil, fmt.Errorf("failed to retrieve transaction error messages for block id %#v: %w", blockID, err)
+			return nil, fmt.Errorf("failed to retrieve transaction error messages for block id %v: %w", blockID, err)
 		}
 
 		err = b.storeTransactionResultErrorMessages(blockID, resp, execNode)
