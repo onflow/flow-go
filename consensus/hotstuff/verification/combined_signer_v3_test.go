@@ -57,7 +57,7 @@ func TestCombinedSignWithBeaconKeyV3(t *testing.T) {
 	packer := signature.NewConsensusSigDataPacker(committee)
 	verifier := NewCombinedVerifierV3(committee, packer)
 
-	// check that a created proposal can be verified by a verifier
+	// check that the proposer's vote for their own block (i.e. the proposer signature in the header) passes verification
 	vote, err := signer.CreateVote(block)
 	require.NoError(t, err)
 
@@ -120,6 +120,7 @@ func TestCombinedSignWithNoBeaconKeyV3(t *testing.T) {
 	packer := signature.NewConsensusSigDataPacker(committee)
 	verifier := NewCombinedVerifierV3(committee, packer)
 
+	// check that the proposer's vote for their own block (i.e. the proposer signature in the header) passes verification
 	vote, err := signer.CreateVote(block)
 	require.NoError(t, err)
 

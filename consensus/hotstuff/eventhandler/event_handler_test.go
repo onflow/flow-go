@@ -228,7 +228,7 @@ type BlockProducer struct {
 }
 
 func (b *BlockProducer) MakeBlockProposal(view uint64, qc *flow.QuorumCertificate, lastViewTC *flow.TimeoutCertificate) (*flow.Header, error) {
-	return model.SignedProposalToFlow(helper.MakeSignedProposal(helper.WithProposal(
+	return helper.SignedProposalToFlow(helper.MakeSignedProposal(helper.WithProposal(
 		helper.MakeProposal(helper.WithBlock(helper.MakeBlock(
 			helper.WithBlockView(view),
 			helper.WithBlockQC(qc),

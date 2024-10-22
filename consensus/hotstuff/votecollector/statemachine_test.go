@@ -90,9 +90,7 @@ func (s *StateMachineTestSuite) TestStatus_StateTransitions() {
 	require.Equal(s.T(), hotstuff.VoteCollectorStatusVerifying, s.collector.Status())
 
 	// after submitting double proposal we should transfer into invalid state
-	err = s.collector.ProcessBlock(helper.MakeSignedProposal(helper.WithProposal(
-		helper.MakeProposal(helper.WithBlock(
-			helper.MakeBlock(helper.WithBlockView(s.view)))))))
+	err = s.collector.ProcessBlock(makeSignedProposalWithView(s.view))
 	require.NoError(s.T(), err)
 	require.Equal(s.T(), hotstuff.VoteCollectorStatusInvalid, s.collector.Status())
 }

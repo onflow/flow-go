@@ -75,7 +75,7 @@ func TestCombinedSignWithBeaconKey(t *testing.T) {
 	safetyRules, err := safetyrules.New(signer, persist, committee)
 	require.NoError(t, err)
 
-	// check that a created proposal can be verified by a verifier
+	// check that the proposer's vote for their own block (i.e. the proposer signature in the header) passes verification
 	vote, err := safetyRules.SignOwnProposal(proposal)
 	require.NoError(t, err)
 
@@ -187,7 +187,7 @@ func TestCombinedSignWithNoBeaconKey(t *testing.T) {
 	safetyRules, err := safetyrules.New(signer, persist, committee)
 	require.NoError(t, err)
 
-	// check that a created proposal can be verified by a verifier
+	// check that the proposer's vote for their own block (i.e. the proposer signature in the header) passes verification
 	vote, err := safetyRules.SignOwnProposal(proposal)
 	require.NoError(t, err)
 

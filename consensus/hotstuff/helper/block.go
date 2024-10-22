@@ -101,3 +101,29 @@ func WithLastViewTC(lastViewTC *flow.TimeoutCertificate) func(*model.Proposal) {
 		proposal.LastViewTC = lastViewTC
 	}
 }
+
+// SignedProposalToFlow turns a block proposal into a flow header.
+//
+// CAUTION: This function is only suitable for TESTING purposes ONLY.
+// In the conversion from `flow.Header` to HoStuff's `model.Block` we loose information
+// (e.g. `ChainID` and `Height` are not included in `model.Block`) and hence the conversion
+// is *not reversible*. This is on purpose, because we wanted to only expose data to
+// HotStuff that HotStuff really needs.
+func SignedProposalToFlow(proposal *model.SignedProposal) *flow.Header {
+
+	block := proposal.Block
+	header := &flow.Header{
+		ParentID:           block.QC.BlockID,
+		PayloadHash:        block.PayloadHash,
+		Timestamp:          block.Timestamp,
+		View:               block.View,
+		ParentView:         block.QC.View,
+		ParentVoterIndices: block.QC.SignerIndices,
+		ParentVoterSigData: block.QC.SigData,
+		ProposerID:         block.ProposerID,
+		ProposerSigData:    proposal.SigData,
+		LastViewTC:         proposal.LastViewTC,
+	}
+
+	return header
+}
