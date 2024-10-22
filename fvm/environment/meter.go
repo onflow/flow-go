@@ -55,6 +55,7 @@ const (
 	_
 	ComputationKindEVMEncodeABI
 	ComputationKindEVMDecodeABI
+	ComputationKindMinimumRequiredVersion
 )
 
 // MainnetExecutionEffortWeights are the execution effort weights as they are
