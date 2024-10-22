@@ -23,6 +23,12 @@ type Proposal struct {
 
 // SignedProposal represent a new proposed block within HotStuff (and thus
 // a header in the bigger picture), signed by the proposer.
+//
+// CAUTION: the signature only covers the pair (Block.View, Block.BlockID). Therefore, only
+// the data that is hashed into the BlockID is cryptographically secured by the proposer's
+// signature.
+// Specifically, the proposer's signature cannot be covered by the Block.BlockID, as the
+// proposer _signs_ the Block.BlockID (otherwise we have a cyclic dependency).
 type SignedProposal struct {
 	Proposal
 	SigData []byte
