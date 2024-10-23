@@ -236,7 +236,7 @@ func GenerateQCParticipantData(allNodes, internalNodes []bootstrap.NodeInfo, dkg
 
 		dkgParticipant, ok := participantLookup[node.NodeID]
 		if !ok {
-			return nil, fmt.Errorf("non existent node id (%x) in participant lookup", node.NodeID)
+			return nil, fmt.Errorf("nonexistent node id (%x) in participant lookup", node.NodeID)
 		}
 		dkgIndex := dkgParticipant.Index
 

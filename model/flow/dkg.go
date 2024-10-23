@@ -53,8 +53,8 @@ func (state DKGEndState) String() string {
 //   - The values in DKGIndexMap must form the set {0, 1, …, n-1}, as required by the low level cryptography
 //     module.
 //
-// CAUTION: It is important to cleanly differentiate between the consensus committee 𝒞, the random beacon
-// committee ℛ and the DKG committee 𝒟:
+// CAUTION: It is important to cleanly differentiate between the consensus committee 𝒞, the DKG committee 𝒟
+// and the the committee ℛ:
 //   - For an epoch, the consensus committee 𝒞 contains all nodes that are authorized to vote for blocks. Authority
 //     to vote (i.e. membership in the consensus committee) is irrevocably granted for an epoch (though, honest nodes
 //     will reject votes and proposals from ejected nodes; nevertheless, ejected nodes formally remain members of
@@ -62,7 +62,7 @@ func (state DKGEndState) String() string {
 //   - The DKG committee 𝒟 is the set of parties that were authorized to
 //     participate in the DKG. Mathematically, the DKGIndexMap is an bijective function
 //     DKGIndexMap: 𝒟 ↦ {0,1,…,n-1}.
-//   - Only consensus nodes are allowed to contribute to the random beacon. We define the random beacon committee ℛ
+//   - Only consensus nodes are allowed to contribute to the random beacon. We define the committee ℛ
 //     as the subset of the consensus committee (ℛ ⊆ 𝒞), which _successfully_ completed the DKG,
 //     i.e which completed participation in DKG (ℛ ⊆ 𝒟) with a private key that matches the public key assigned to them by
 //     the DKG committee (or a trusted dealer). Nodes in ℛ are therefore able to submit valid random beacon votes.
@@ -78,8 +78,7 @@ func (state DKGEndState) String() string {
 // Broadly, this makes the protocol more robust against temporary disruptions and sudden, large fluctuations in node
 // participation.
 //
-// Nevertheless, there is an important liveness constraint: the intersection, the random beacon committee ℛ should
-// be a large number of nodes.
+// Nevertheless, there is an important liveness constraint: the committee ℛ should be a large number of nodes.
 // Specifically, an honest supermajority of consensus nodes must contain enough successful DKG participants
 // (about n/2 + 1) to produce a valid group signature for the random beacon at each block [1, 3].
 // Therefore, we have the approximate lower bound |ℛ| >= n/2 + 1 = |𝒟|/2 + 1 = len(DKGIndexMap)/2 + 1.

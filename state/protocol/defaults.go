@@ -34,7 +34,7 @@ func DefaultEpochSafetyParams(chain flow.ChainID) (SafetyParams, error) {
 // RandomBeaconSafetyThreshold defines a production network safety threshold for random beacon protocol based on the size
 // of the random beacon committee ℛ and the DKG committee 𝒟.
 //
-// We recall that the random beacon committee ℛ is defined as the subset of the consensus committee (ℛ ⊆ 𝒞),
+// We recall that the committee ℛ is defined as the subset of the consensus committee (ℛ ⊆ 𝒞),
 // and the DKG committee (ℛ ⊆ 𝒟) which _successfully_ completed the DKG and is able to contribute with a random beacon share.
 //
 // An honest supermajority of consensus nodes must contain enough successful DKG participants
