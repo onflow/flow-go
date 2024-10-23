@@ -183,7 +183,6 @@ const (
 	FVMEnvGetBlockAtHeight            SpanName = "fvm.env.getBlockAtHeight"
 	FVMEnvRandom                      SpanName = "fvm.env.unsafeRandom"
 	FVMEnvRandomSourceHistoryProvider SpanName = "fvm.env.randomSourceHistoryProvider"
-	FVMEnvMinimumRequiredVersion      SpanName = "fvm.env.minimumRequiredVersion"
 	FVMEnvCreateAccount               SpanName = "fvm.env.createAccount"
 	FVMEnvAddAccountKey               SpanName = "fvm.env.addAccountKey"
 	FVMEnvAccountKeysCount            SpanName = "fvm.env.accountKeysCount"

@@ -43,6 +43,11 @@ type StateParameters struct {
 	maxValueSizeAllowed uint64
 }
 
+type ExecutionParameters struct {
+	meter.MeterParameters
+	ExecutionVersion semver.Version
+}
+
 func DefaultParameters() StateParameters {
 	return StateParameters{
 		MeterParameters:     meter.DefaultParameters(),
@@ -132,7 +137,7 @@ func NewExecutionStateWithSpockStateHasher(
 // NewChildWithMeterParams generates a new child state using the provide meter
 // parameters.
 func (state *ExecutionState) NewChildWithMeterParams(
-	params meter.ExecutionParameters,
+	params ExecutionParameters,
 ) *ExecutionState {
 	return &ExecutionState{
 		finalized:        false,
@@ -341,8 +346,8 @@ func (state *ExecutionState) checkSize(
 	return nil
 }
 
-func (state *ExecutionState) ExecutionParameters() meter.ExecutionParameters {
-	return meter.ExecutionParameters{
+func (state *ExecutionState) ExecutionParameters() ExecutionParameters {
+	return ExecutionParameters{
 		MeterParameters:  state.meter.MeterParameters,
 		ExecutionVersion: state.executionVersion,
 	}

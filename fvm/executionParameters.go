@@ -65,14 +65,14 @@ func getExecutionParameters(
 	ctx Context,
 	proc Procedure,
 	txnState storage.TransactionPreparer,
-) (meter.ExecutionParameters, *snapshot.ExecutionSnapshot, error) {
+) (state.ExecutionParameters, *snapshot.ExecutionSnapshot, error) {
 	meterParams := getBasicMeterParameters(ctx, proc)
 
 	executionParams, executionParamsStateRead, err := txnState.GetStateExecutionParameters(
 		txnState,
 		NewExecutionParametersComputer(log, ctx, txnState))
 	if err != nil {
-		return meter.ExecutionParameters{
+		return state.ExecutionParameters{
 			MeterParameters:  meterParams,
 			ExecutionVersion: semver.Version{},
 		}, nil, err
@@ -98,7 +98,7 @@ func getExecutionParameters(
 			WithStorageInteractionLimit(math.MaxUint64)
 	}
 
-	return meter.ExecutionParameters{
+	return state.ExecutionParameters{
 		MeterParameters:  meterParams,
 		ExecutionVersion: executionParams.ExecutionVersion,
 	}, executionParamsStateRead, nil
