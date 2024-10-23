@@ -54,7 +54,7 @@ func (state DKGEndState) String() string {
 //     module.
 //
 // CAUTION: It is important to cleanly differentiate between the consensus committee 𝒞, the DKG committee 𝒟
-// and the the committee ℛ:
+// and the committee ℛ:
 //   - For an epoch, the consensus committee 𝒞 contains all nodes that are authorized to vote for blocks. Authority
 //     to vote (i.e. membership in the consensus committee) is irrevocably granted for an epoch (though, honest nodes
 //     will reject votes and proposals from ejected nodes; nevertheless, ejected nodes formally remain members of
