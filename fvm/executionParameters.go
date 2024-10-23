@@ -214,7 +214,7 @@ func (computer ExecutionParametersComputer) getExecutionParameters() (
 		return overrides, err
 	}
 
-	executionVersion, err := GetMinimumExecutionVersion(computer.log, env)
+	executionVersion, err := GetMinimumExecutionVersion(computer.log, computer.ctx, env)
 	err = setIfOk(
 		"execution version",
 		err,
@@ -358,8 +358,12 @@ func GetExecutionMemoryLimit(
 
 func GetMinimumExecutionVersion(
 	log zerolog.Logger,
+	ctx Context,
 	env environment.Environment,
 ) (semver.Version, error) {
+	if !ctx.ReadVersionFromNodeVersionBeacon {
+		return semver.Version{}, nil
+	}
 
 	value, err := env.GetCurrentVersionBoundary()
 

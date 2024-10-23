@@ -290,13 +290,8 @@ func (c *IndexerCore) updateProgramCache(header *flow.Header, events []flow.Even
 			invalidated:   updatedContracts,
 			invalidateAll: hasAuthorizedTransaction(collections, c.serviceAddress),
 		},
-		meterParamOverrides: &meterParamOverridesInvalidator{
+		executionParameters: &executionParametersInvalidator{
 			invalidateAll: hasAuthorizedTransaction(collections, c.serviceAddress),
-		},
-		currentVersionBoundary: &currentVersionBoundaryInvalidator{
-			invalidateAll: hasAuthorizedTransaction(collections, c.serviceAddress),
-			// this will eventually be different from invalidateAll
-			invalidate: hasAuthorizedTransaction(collections, c.serviceAddress),
 		},
 	})
 
