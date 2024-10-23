@@ -972,7 +972,7 @@ func convertDKGKeys(cdcDKGKeys []cadence.Value) ([]crypto.PublicKey, error) {
 	for _, value := range cdcDKGKeys {
 		pubKey, err := convertDKGKey(value)
 		if err != nil {
-			return nil, fmt.Errorf("could not decode dkg public key: %w", err)
+			return nil, fmt.Errorf("could not decode public key share: %w", err)
 		}
 		convertedKeys = append(convertedKeys, pubKey)
 	}
@@ -992,11 +992,11 @@ func convertDKGKey(cdcDKGKeys cadence.Value) (crypto.PublicKey, error) {
 	// decode individual public keys
 	pubKeyBytes, err := hex.DecodeString(string(keyHex))
 	if err != nil {
-		return nil, fmt.Errorf("could not decode individual public key into bytes: %w", err)
+		return nil, fmt.Errorf("could not decode hex into bytes: %w", err)
 	}
 	pubKey, err := crypto.DecodePublicKey(crypto.BLSBLS12381, pubKeyBytes)
 	if err != nil {
-		return nil, fmt.Errorf("could not decode dkg public key: %w", err)
+		return nil, fmt.Errorf("could not decode bytes into a public key: %w", err)
 	}
 	return pubKey, nil
 }

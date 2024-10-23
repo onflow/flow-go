@@ -24,7 +24,7 @@ type Participant struct {
 	RandomBeaconPrivKey crypto.PrivateKey
 }
 
-// ParticipantData represents a subset of all consensus participants that contributing to some signing process (at the moment, we only use
+// ParticipantData represents a subset of all consensus participants that contribute to some signing process (at the moment, we only use
 // it for the contributors for the root QC). For mainnet, this a *strict subset* of all consensus participants:
 //   - In an early step during the bootstrapping process, every node operator locally generates votes for the root block from the nodes they
 //     operate. During the vote-generation step, (see function `constructRootVotes`), `Participants` represents only the operator's own
@@ -236,7 +236,7 @@ func GenerateQCParticipantData(allNodes, internalNodes []bootstrap.NodeInfo, dkg
 
 		dkgParticipant, ok := participantLookup[node.NodeID]
 		if !ok {
-			return nil, fmt.Errorf("nonexistannt node id (%x) in participant lookup", node.NodeID)
+			return nil, fmt.Errorf("non existent node id (%x) in participant lookup", node.NodeID)
 		}
 		dkgIndex := dkgParticipant.Index
 
