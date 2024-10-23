@@ -97,7 +97,7 @@ func NewMutableProtocolState(
 	results storage.ExecutionResults,
 	setups storage.EpochSetups,
 	commits storage.EpochCommits,
-	localDKGState storage.DKGState,
+	localDKGState storage.EpochRecoveryDKGState,
 ) *MutableProtocolState {
 	log = log.With().Str("module", "dynamic_protocol_state").Logger()
 	// TODO [future generalization]: ideally, the telemetry consumers would be injected into the constructor

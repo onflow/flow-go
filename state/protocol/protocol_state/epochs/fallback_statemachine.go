@@ -17,7 +17,7 @@ import (
 // Whenever invalid epoch state transition has been observed only epochFallbackStateMachines must be created for subsequent views.
 type FallbackStateMachine struct {
 	baseStateMachine
-	localDKGState storage.DKGState
+	localDKGState storage.EpochRecoveryDKGState
 	parentState   protocol.KVStoreReader
 }
 
@@ -29,7 +29,7 @@ var _ StateMachine = (*FallbackStateMachine)(nil)
 // No errors are expected during normal operations.
 func NewFallbackStateMachine(
 	parentState protocol.KVStoreReader,
-	localDKGState storage.DKGState,
+	localDKGState storage.EpochRecoveryDKGState,
 	telemetry protocol_state.StateMachineTelemetryConsumer,
 	view uint64,
 	parentEpochState *flow.RichEpochStateEntry,
@@ -217,7 +217,7 @@ func (m *FallbackStateMachine) ProcessEpochRecover(epochRecover *flow.EpochRecov
 		}
 
 		// store my beacon key for the first epoch post-spork
-		err = m.localDKGState.InsertMyBeaconPrivateKey(epochRecover.EpochSetup.Counter, beaconPrivateKey)
+		err = m.localDKGState.OverwriteMyBeaconPrivateKey(epochRecover.EpochSetup.Counter, beaconPrivateKey)
 		if err != nil && !errors.Is(err, storage.ErrAlreadyExists) {
 			return false, fmt.Errorf("could not store beacon key for next epoch: %w", err)
 		}

@@ -13,7 +13,7 @@ type EpochStateMachineFactory struct {
 	setups                    storage.EpochSetups
 	commits                   storage.EpochCommits
 	epochProtocolStateDB      storage.EpochProtocolStateEntries
-	localDKGState             storage.DKGState
+	localDKGState             storage.EpochRecoveryDKGState
 	happyPathTelemetryFactory protocol_state.StateMachineEventsTelemetryFactory
 	fallbackTelemetryFactory  protocol_state.StateMachineEventsTelemetryFactory
 }
@@ -24,7 +24,7 @@ func NewEpochStateMachineFactory(
 	setups storage.EpochSetups,
 	commits storage.EpochCommits,
 	epochProtocolStateDB storage.EpochProtocolStateEntries,
-	localDKGState storage.DKGState,
+	localDKGState storage.EpochRecoveryDKGState,
 	happyPathTelemetryFactory, fallbackTelemetryFactory protocol_state.StateMachineEventsTelemetryFactory,
 ) *EpochStateMachineFactory {
 	return &EpochStateMachineFactory{

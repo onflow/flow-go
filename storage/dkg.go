@@ -58,3 +58,26 @@ type SafeBeaconKeys interface {
 	//   - (nil, false, error) for any unexpected exception
 	RetrieveMyBeaconPrivateKey(epochCounter uint64) (key crypto.PrivateKey, safe bool, err error)
 }
+
+// EpochRecoveryDKGState is a specific interface that allows to overwrite the beacon private key for given epoch.
+// This interface is used *ONLY* in the epoch recovery process and only by the consensus participants.
+// Each consensus participant takes part in the DKG, after finishing the DKG protocol each replica obtains a random beacon
+// private key which is stored in the database along with DKG end state which will be equal to flow.DKGEndStateSuccess.
+// If for any reason DKG fails, then the private key will be nil and DKG end state will be equal to flow.DKGEndStateDKGFailure.
+// It's not a problem by itself, but when the epoch recovery takes place, we need to query last valid beacon private key for
+// the current replica and set it for recovered epoch, otherwise replicas won't be able to vote for blocks in the recovered epoch.
+type EpochRecoveryDKGState interface {
+	// RetrieveMyBeaconPrivateKey retrieves the random beacon private key for an epoch.
+	//
+	// CAUTION: these keys are stored before they are validated against the
+	// canonical key vector and may not be valid for use in signing. Use SafeBeaconKeys
+	// to guarantee only keys safe for signing are returned
+	// Error returns: storage.ErrNotFound
+	RetrieveMyBeaconPrivateKey(epochCounter uint64) (crypto.PrivateKey, error)
+
+	// OverwriteMyBeaconPrivateKey overwrites the random beacon private key for the epoch that recovers the protocol from
+	// epoch fallback mode. Effectively, this function overwrites whatever might be available in the database with
+	// given private key for current consensus participant.
+	// No errors are expected during normal operations.
+	OverwriteMyBeaconPrivateKey(epochCounter uint64, key crypto.PrivateKey) error
+}

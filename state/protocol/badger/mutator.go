@@ -67,7 +67,7 @@ func NewFollowerState(
 	index storage.Index,
 	payloads storage.Payloads,
 	blockTimer protocol.BlockTimer,
-	dkgState storage.DKGState,
+	dkgState storage.EpochRecoveryDKGState,
 ) (*FollowerState, error) {
 	followerState := &FollowerState{
 		State:      state,
@@ -106,7 +106,7 @@ func NewFullConsensusState(
 	blockTimer protocol.BlockTimer,
 	receiptValidator module.ReceiptValidator,
 	sealValidator module.SealValidator,
-	dkgState storage.DKGState,
+	dkgState storage.EpochRecoveryDKGState,
 ) (*ParticipantState, error) {
 	followerState, err := NewFollowerState(
 		logger,
