@@ -1,17 +1,10 @@
 package meter
 
-import "github.com/coreos/go-semver/semver"
-
 type MeterParameters struct {
 	ComputationMeterParameters
 	MemoryMeterParameters
 	EventMeterParameters
 	InteractionMeterParameters
-}
-
-type ExecutionParameters struct {
-	MeterParameters
-	ExecutionVersion semver.Version
 }
 
 func DefaultParameters() MeterParameters {

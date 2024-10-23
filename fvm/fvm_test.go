@@ -3262,7 +3262,7 @@ func Test_MinimumRequiredVersion(t *testing.T) {
 		// this will set the parameters to the txnState.
 		// this is done at the beginning of a transaction/script
 		txnId, err := txnState.BeginNestedTransactionWithMeterParams(
-			meter.ExecutionParameters{
+			state.ExecutionParameters{
 				ExecutionVersion: executionParams.ExecutionVersion,
 			})
 		require.NoError(t, err)
