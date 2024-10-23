@@ -74,7 +74,7 @@ contract EVM {
         /// This data helps to replay the transactions without the need to
         /// have access to the full cadence state data.
         precompiledCalls: [UInt8],
-        /// stateUpdateChecksum provides a mean to validate 
+        /// stateUpdateChecksum provides a mean to validate
         /// the updates to the storage when re-executing a transaction off-chain.
         stateUpdateChecksum: [UInt8; 4]
     )
@@ -200,6 +200,48 @@ contract EVM {
         access(all)
         view fun equals(_ other: EVMAddress): Bool {
             return self.bytes == other.bytes
+        }
+    }
+
+    /// EVMBytes is a type wrapper used for ABI encoding/decoding into
+    /// Solidity `bytes` type
+    access(all)
+    struct EVMBytes {
+
+        /// Byte array representing the `bytes` value
+        access(all)
+        let value: [UInt8]
+
+        view init(value: [UInt8]) {
+            self.value = value
+        }
+    }
+
+    /// EVMBytes4 is a type wrapper used for ABI encoding/decoding into
+    /// Solidity `bytes4` type
+    access(all)
+    struct EVMBytes4 {
+
+        /// Byte array representing the `bytes4` value
+        access(all)
+        let value: [UInt8; 4]
+
+        view init(value: [UInt8; 4]) {
+            self.value = value
+        }
+    }
+
+    /// EVMBytes32 is a type wrapper used for ABI encoding/decoding into
+    /// Solidity `bytes32` type
+    access(all)
+    struct EVMBytes32 {
+
+        /// Byte array representing the `bytes32` value
+        access(all)
+        let value: [UInt8; 32]
+
+        view init(value: [UInt8; 32]) {
+            self.value = value
         }
     }
 
