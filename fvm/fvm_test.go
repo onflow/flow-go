@@ -5,11 +5,12 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"fmt"
-	"github.com/rs/zerolog"
 	"math"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/rs/zerolog"
 
 	"github.com/coreos/go-semver/semver"
 	"github.com/onflow/flow-core-contracts/lib/go/templates"
@@ -3256,6 +3257,7 @@ func Test_MinimumRequiredVersion(t *testing.T) {
 		executionParams, _, err := txnState.GetStateExecutionParameters(
 			txnState,
 			fvm.NewExecutionParametersComputer(log, ctx, txnState))
+		require.NoError(t, err)
 
 		// this will set the parameters to the txnState.
 		// this is done at the beginning of a transaction/script
@@ -3263,6 +3265,7 @@ func Test_MinimumRequiredVersion(t *testing.T) {
 			meter.ExecutionParameters{
 				ExecutionVersion: executionParams.ExecutionVersion,
 			})
+		require.NoError(t, err)
 
 		mrv := environment.NewMinimumRequiredVersion(txnState)
 
