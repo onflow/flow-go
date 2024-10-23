@@ -19,10 +19,12 @@
 package unittest
 
 import (
+	"github.com/onflow/flow/protobuf/go/flow/entities"
+
 	"github.com/onflow/flow-go-sdk/test"
+
 	"github.com/onflow/flow-go/integration/emulator"
 	flowgo "github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow/protobuf/go/flow/entities"
 )
 
 func TransactionFixture() flowgo.TransactionBody {

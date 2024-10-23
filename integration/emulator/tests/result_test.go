@@ -20,14 +20,16 @@ package tests
 
 import (
 	"errors"
-	"github.com/onflow/flow-go/integration/emulator"
-	"github.com/onflow/flow-go/model/flow"
 	"testing"
 
 	"github.com/onflow/cadence"
+	"github.com/stretchr/testify/assert"
+
 	flowsdk "github.com/onflow/flow-go-sdk"
 	"github.com/onflow/flow-go-sdk/test"
-	"github.com/stretchr/testify/assert"
+
+	"github.com/onflow/flow-go/integration/emulator"
+	"github.com/onflow/flow-go/model/flow"
 )
 
 func TestResult(t *testing.T) {

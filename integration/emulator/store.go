@@ -22,11 +22,13 @@ package emulator
 
 import (
 	"context"
+
+	"github.com/psiemens/graceland"
+
 	"github.com/onflow/flow-go/access"
 	"github.com/onflow/flow-go/fvm/environment"
 	"github.com/onflow/flow-go/fvm/storage/snapshot"
 	flowgo "github.com/onflow/flow-go/model/flow"
-	"github.com/psiemens/graceland"
 )
 
 // EmulatorStorage defines the storage layer for persistent chain state.

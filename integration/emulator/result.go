@@ -20,7 +20,9 @@ package emulator
 
 import (
 	"fmt"
+
 	"github.com/onflow/cadence"
+
 	flowsdk "github.com/onflow/flow-go-sdk"
 	flowgo "github.com/onflow/flow-go/model/flow"
 )

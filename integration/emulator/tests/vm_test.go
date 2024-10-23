@@ -19,14 +19,15 @@
 package tests_test
 
 import (
-	"github.com/onflow/flow-go/integration/emulator"
 	"testing"
 
-	"github.com/onflow/flow-go-sdk/test"
-	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow/protobuf/go/flow/entities"
 	"github.com/stretchr/testify/assert"
 
+	"github.com/onflow/flow-go-sdk/test"
+
+	"github.com/onflow/flow-go/fvm"
+	"github.com/onflow/flow-go/integration/emulator"
 	flowgo "github.com/onflow/flow-go/model/flow"
 )
 

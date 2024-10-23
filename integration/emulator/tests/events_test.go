@@ -21,19 +21,20 @@ package tests
 import (
 	"context"
 	"fmt"
-	"github.com/onflow/flow-go/integration/emulator"
 	"testing"
 
 	"github.com/rs/zerolog"
-
-	"github.com/onflow/cadence/common"
-	"github.com/onflow/flow-go-sdk/templates"
-	flowgo "github.com/onflow/flow-go/model/flow"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/cadence"
+	"github.com/onflow/cadence/common"
+
 	flowsdk "github.com/onflow/flow-go-sdk"
+	"github.com/onflow/flow-go-sdk/templates"
+
+	"github.com/onflow/flow-go/integration/emulator"
+	flowgo "github.com/onflow/flow-go/model/flow"
 )
 
 func TestEventEmitted(t *testing.T) {

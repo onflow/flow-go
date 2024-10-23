@@ -19,10 +19,11 @@
 package tests
 
 import (
-	"github.com/onflow/flow-go/integration/emulator"
 	"testing"
 
 	"github.com/stretchr/testify/require"
+
+	"github.com/onflow/flow-go/integration/emulator"
 )
 
 func TestAttachments(t *testing.T) {

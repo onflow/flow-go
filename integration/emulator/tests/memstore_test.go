@@ -20,15 +20,16 @@ package tests
 
 import (
 	"context"
-	"github.com/onflow/flow-go/integration/emulator"
 	"sync"
 	"testing"
 
-	"github.com/onflow/flow-go/fvm/storage/snapshot"
-	"github.com/onflow/flow-go/model/flow"
-	flowgo "github.com/onflow/flow-go/model/flow"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/onflow/flow-go/fvm/storage/snapshot"
+	"github.com/onflow/flow-go/integration/emulator"
+	"github.com/onflow/flow-go/model/flow"
+	flowgo "github.com/onflow/flow-go/model/flow"
 )
 
 func TestMemstore(t *testing.T) {

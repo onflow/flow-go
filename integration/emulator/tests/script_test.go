@@ -21,18 +21,20 @@ package tests
 import (
 	"context"
 	"fmt"
-	"github.com/onflow/flow-go/integration/emulator"
 	"testing"
 
 	"github.com/onflow/cadence"
 	jsoncdc "github.com/onflow/cadence/encoding/json"
-	flowsdk "github.com/onflow/flow-go-sdk"
-	fvmerrors "github.com/onflow/flow-go/fvm/errors"
-	"github.com/onflow/flow-go/fvm/evm/stdlib"
-	flowgo "github.com/onflow/flow-go/model/flow"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	flowsdk "github.com/onflow/flow-go-sdk"
+
+	fvmerrors "github.com/onflow/flow-go/fvm/errors"
+	"github.com/onflow/flow-go/fvm/evm/stdlib"
+	"github.com/onflow/flow-go/integration/emulator"
+	flowgo "github.com/onflow/flow-go/model/flow"
 )
 
 func TestExecuteScript(t *testing.T) {

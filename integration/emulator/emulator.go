@@ -20,6 +20,7 @@ package emulator
 
 import (
 	"fmt"
+
 	sdkcrypto "github.com/onflow/flow-go-sdk/crypto"
 
 	"github.com/onflow/crypto"

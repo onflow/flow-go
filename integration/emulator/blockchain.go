@@ -38,10 +38,13 @@ import (
 	"sync"
 	"time"
 
+	"github.com/rs/zerolog"
+
 	"github.com/onflow/cadence"
 	"github.com/onflow/cadence/runtime"
 
 	"github.com/onflow/flow-core-contracts/lib/go/templates"
+
 	"github.com/onflow/flow-go/access"
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/fvm"
@@ -50,7 +53,6 @@ import (
 	reusableRuntime "github.com/onflow/flow-go/fvm/runtime"
 	flowgo "github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/metrics"
-	"github.com/rs/zerolog"
 )
 
 // systemChunkTransactionTemplate looks for the RandomBeaconHistory

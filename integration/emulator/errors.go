@@ -22,10 +22,10 @@ import (
 	"errors"
 	"fmt"
 
-	fvmerrors "github.com/onflow/flow-go/fvm/errors"
-
 	"github.com/onflow/flow-go-sdk/crypto"
+
 	"github.com/onflow/flow-go/access"
+	fvmerrors "github.com/onflow/flow-go/fvm/errors"
 	flowgo "github.com/onflow/flow-go/model/flow"
 )
 

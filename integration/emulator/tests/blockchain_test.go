@@ -23,16 +23,17 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/onflow/cadence/stdlib"
 	"github.com/rs/zerolog"
-
-	"github.com/onflow/flow-go/integration/emulator"
-
-	"github.com/onflow/cadence"
-	flowsdk "github.com/onflow/flow-go-sdk"
-	"github.com/onflow/flow-go-sdk/templates"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/onflow/cadence"
+	"github.com/onflow/cadence/stdlib"
+
+	flowsdk "github.com/onflow/flow-go-sdk"
+	"github.com/onflow/flow-go-sdk/templates"
+
+	"github.com/onflow/flow-go/integration/emulator"
 )
 
 const counterScript = `

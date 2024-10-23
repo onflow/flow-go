@@ -4,13 +4,15 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"math"
+
 	"github.com/onflow/cadence"
+
 	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/fvm/environment"
 	"github.com/onflow/flow-go/fvm/meter"
 	"github.com/onflow/flow-go/fvm/storage/snapshot"
 	flowgo "github.com/onflow/flow-go/model/flow"
-	"math"
 )
 
 func configureLedger(

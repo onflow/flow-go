@@ -3,17 +3,21 @@ package emulator
 import (
 	"context"
 	"fmt"
-	"github.com/onflow/cadence"
-	jsoncdc "github.com/onflow/cadence/encoding/json"
-	"github.com/onflow/cadence/stdlib"
-	sdk "github.com/onflow/flow-go-sdk"
-	"github.com/onflow/flow-go-sdk/templates"
-	"github.com/onflow/flow-go/access"
-	flowgo "github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow/protobuf/go/flow/entities"
+
 	"github.com/rs/zerolog"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+
+	"github.com/onflow/cadence"
+	jsoncdc "github.com/onflow/cadence/encoding/json"
+	"github.com/onflow/cadence/stdlib"
+	"github.com/onflow/flow/protobuf/go/flow/entities"
+
+	sdk "github.com/onflow/flow-go-sdk"
+	"github.com/onflow/flow-go-sdk/templates"
+
+	"github.com/onflow/flow-go/access"
+	flowgo "github.com/onflow/flow-go/model/flow"
 )
 
 // SDKAdapter wraps an emulated emulator and implements the RPC handlers

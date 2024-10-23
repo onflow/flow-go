@@ -21,17 +21,19 @@ package tests_test
 import (
 	"context"
 	"fmt"
-	"github.com/onflow/flow-go/integration/emulator"
-	"github.com/onflow/flow-go/integration/emulator/utils/unittest"
 	"testing"
 
-	"github.com/onflow/flow-go-sdk/test"
-	"github.com/onflow/flow-go/fvm/storage/snapshot"
-	"github.com/onflow/flow-go/model/flow"
-	flowgo "github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow/protobuf/go/flow/entities"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/onflow/flow-go-sdk/test"
+
+	"github.com/onflow/flow-go/fvm/storage/snapshot"
+	"github.com/onflow/flow-go/integration/emulator"
+	"github.com/onflow/flow-go/integration/emulator/utils/unittest"
+	"github.com/onflow/flow-go/model/flow"
+	flowgo "github.com/onflow/flow-go/model/flow"
 )
 
 func TestBlocks(t *testing.T) {

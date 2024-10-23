@@ -22,10 +22,10 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/onflow/flow-go/access"
-	"github.com/onflow/flow-go/fvm/environment"
 	"sync"
 
+	"github.com/onflow/flow-go/access"
+	"github.com/onflow/flow-go/fvm/environment"
 	"github.com/onflow/flow-go/fvm/storage/snapshot"
 	flowgo "github.com/onflow/flow-go/model/flow"
 )

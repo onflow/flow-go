@@ -24,13 +24,13 @@ import (
 	"testing"
 
 	"github.com/rs/zerolog"
-
-	"github.com/onflow/flow-go/integration/emulator"
-
-	flowsdk "github.com/onflow/flow-go-sdk"
-	flowgo "github.com/onflow/flow-go/model/flow"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	flowsdk "github.com/onflow/flow-go-sdk"
+
+	"github.com/onflow/flow-go/integration/emulator"
+	flowgo "github.com/onflow/flow-go/model/flow"
 )
 
 func TestBlockInfo(t *testing.T) {
