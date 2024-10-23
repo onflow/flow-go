@@ -79,7 +79,7 @@ type Engine struct {
 	executionReceiptsQueue    engine.MessageStore
 	// Job queue
 	finalizedBlockConsumer *jobqueue.ComponentConsumer
-	// Notifiers for queue consumer
+	// Notifier for queue consumer
 	finalizedBlockNotifier engine.Notifier
 
 	// txResultErrorMessagesChan is used to fetch and store transaction result error messages for blocks
@@ -201,12 +201,20 @@ func New(
 	}
 
 	// Add workers
-	e.ComponentManager = component.NewComponentManagerBuilder().
+	builder := component.NewComponentManagerBuilder().
 		AddWorker(e.processBackground).
 		AddWorker(e.processExecutionReceipts).
-		AddWorker(e.runFinalizedBlockConsumer).
-		AddWorker(e.processTransactionResultErrorMessagesByReceipts).
-		Build()
+		AddWorker(e.runFinalizedBlockConsumer)
+
+	// If txErrorMessagesCore is provided, add a worker responsible for processing
+	// transaction result error messages by receipts. This worker listens for blocks
+	// containing execution receipts and processes any associated transaction result
+	// error messages. The worker is added only when error message processing is enabled.
+	if txErrorMessagesCore != nil {
+		builder.AddWorker(e.processTransactionResultErrorMessagesByReceipts)
+	}
+
+	e.ComponentManager = builder.Build()
 
 	// register engine with the execution receipt provider
 	_, err = net.Register(channels.ReceiveReceipts, e)
@@ -348,8 +356,13 @@ func (e *Engine) processAvailableExecutionReceipts(ctx context.Context) error {
 			return err
 		}
 
-		// notify, to fetch and store transaction result error messages for block
-		e.txResultErrorMessagesChan <- receipt.BlockID
+		// Notify to fetch and store transaction result error messages for the block.
+		// If txErrorMessagesCore is enabled, the receipt's BlockID is sent to trigger
+		// transaction error message processing. This step is skipped if error message
+		// storage is not enabled.
+		if e.txErrorMessagesCore != nil {
+			e.txResultErrorMessagesChan <- receipt.BlockID
+		}
 	}
 }
 
@@ -368,10 +381,6 @@ func (e *Engine) processTransactionResultErrorMessagesByReceipts(ctx irrecoverab
 		case <-ctx.Done():
 			return
 		case blockID := <-e.txResultErrorMessagesChan:
-			if e.txErrorMessagesCore == nil {
-				return
-			}
-
 			err := e.txErrorMessagesCore.HandleTransactionResultErrorMessages(ctx, blockID)
 			if err != nil {
 				// TODO: we should revisit error handling here.
