@@ -12,13 +12,17 @@ import (
 
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/engine"
+	"github.com/onflow/flow-go/engine/access/ingestion/tx_error_messages"
 	"github.com/onflow/flow-go/engine/common/fifoqueue"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/component"
+	"github.com/onflow/flow-go/module/counters"
 	"github.com/onflow/flow-go/module/irrecoverable"
+	"github.com/onflow/flow-go/module/jobqueue"
 	"github.com/onflow/flow-go/module/state_synchronization/indexer"
+	"github.com/onflow/flow-go/module/util"
 	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/state/protocol"
@@ -48,6 +52,13 @@ const (
 
 	// default queue capacity
 	defaultQueueCapacity = 10_000
+
+	// processFinalizedBlocksWorkersCount defines the number of workers that
+	// concurrently process finalized blocks in the job queue.
+	processFinalizedBlocksWorkersCount = 1
+
+	// ensure blocks are processed sequentially by jobqueue
+	searchAhead = 1
 )
 
 var (
@@ -68,6 +79,11 @@ type Engine struct {
 	executionReceiptsQueue    engine.MessageStore
 	finalizedBlockNotifier    engine.Notifier
 	finalizedBlockQueue       engine.MessageStore
+	// Job queue
+	finalizedBlockConsumer *jobqueue.ComponentConsumer
+
+	// txResultErrorMessagesChan is used to fetch and store transaction result error messages for blocks
+	txResultErrorMessagesChan chan flow.Identifier
 
 	log     zerolog.Logger   // used to log relevant actions with context
 	state   protocol.State   // used to access the  protocol state
@@ -84,8 +100,11 @@ type Engine struct {
 	maxReceiptHeight  uint64
 	executionResults  storage.ExecutionResults
 
+	lastFullBlockHeight *counters.PersistentStrictMonotonicCounter
 	// metrics
 	collectionExecutedMetric module.CollectionExecutedMetric
+
+	txErrorMessagesCore *tx_error_messages.TxErrorMessagesCore
 }
 
 // New creates a new access ingestion engine
@@ -102,6 +121,9 @@ func New(
 	executionResults storage.ExecutionResults,
 	executionReceipts storage.ExecutionReceipts,
 	collectionExecutedMetric module.CollectionExecutedMetric,
+	finalizedProcessedHeight storage.ConsumerProgress,
+	lastFullBlockHeight *counters.PersistentStrictMonotonicCounter,
+	txErrorMessagesCore *tx_error_messages.TxErrorMessagesCore,
 ) (*Engine, error) {
 	executionReceiptsRawQueue, err := fifoqueue.NewFifoQueue(defaultQueueCapacity)
 	if err != nil {
@@ -153,21 +175,59 @@ func New(
 
 		// queue / notifier for execution receipts
 		executionReceiptsNotifier: engine.NewNotifier(),
+		txResultErrorMessagesChan: make(chan flow.Identifier, 1),
 		executionReceiptsQueue:    executionReceiptsQueue,
 
 		// queue / notifier for finalized blocks
 		finalizedBlockNotifier: engine.NewNotifier(),
 		finalizedBlockQueue:    finalizedBlocksQueue,
 
-		messageHandler: messageHandler,
+		lastFullBlockHeight: lastFullBlockHeight,
+		messageHandler:      messageHandler,
+		txErrorMessagesCore: txErrorMessagesCore,
+	}
+
+	// jobqueue Jobs object that tracks finalized blocks by height. This is used by the finalizedBlockConsumer
+	// to get a sequential list of finalized blocks.
+	finalizedBlockReader := jobqueue.NewFinalizedBlockReader(state, blocks)
+
+	defaultIndex, err := e.defaultProcessedIndex()
+	if err != nil {
+		return nil, fmt.Errorf("could not read default finalized processed index: %w", err)
+	}
+
+	// create a jobqueue that will process new available finalized block. The `finalizedBlockNotifier` is used to
+	// signal new work, which is being triggered on the `processFinalizedBlockJob` handler.
+	e.finalizedBlockConsumer, err = jobqueue.NewComponentConsumer(
+		e.log.With().Str("module", "ingestion_block_consumer").Logger(),
+		e.finalizedBlockNotifier.Channel(),
+		finalizedProcessedHeight,
+		finalizedBlockReader,
+		defaultIndex,
+		e.processFinalizedBlockJob,
+		processFinalizedBlocksWorkersCount,
+		searchAhead,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("error creating finalizedBlock jobqueue: %w", err)
 	}
 
 	// Add workers
-	e.ComponentManager = component.NewComponentManagerBuilder().
+	builder := component.NewComponentManagerBuilder().
 		AddWorker(e.processBackground).
 		AddWorker(e.processExecutionReceipts).
 		AddWorker(e.processFinalizedBlocks).
-		Build()
+		AddWorker(e.runFinalizedBlockConsumer)
+
+	// If txErrorMessagesCore is provided, add a worker responsible for processing
+	// transaction result error messages by receipts. This worker listens for blocks
+	// containing execution receipts and processes any associated transaction result
+	// error messages. The worker is added only when error message processing is enabled.
+	if txErrorMessagesCore != nil {
+		builder.AddWorker(e.processTransactionResultErrorMessagesByReceipts)
+	}
+
+	e.ComponentManager = builder.Build()
 
 	// register engine with the execution receipt provider
 	_, err = net.Register(channels.ReceiveReceipts, e)
@@ -213,6 +273,23 @@ func (e *Engine) initLastFullBlockHeightIndex() error {
 	e.collectionExecutedMetric.UpdateLastFullBlockHeight(lastFullHeight)
 
 	return nil
+}
+
+// processFinalizedBlockJob is a handler function for processing finalized block jobs.
+// It converts the job to a block, processes the block, and logs any errors encountered during processing.
+func (e *Engine) processFinalizedBlockJob(ctx irrecoverable.SignalerContext, job module.Job, done func()) {
+	block, err := jobqueue.JobToBlock(job)
+	if err != nil {
+		ctx.Throw(fmt.Errorf("failed to convert job to block: %w", err))
+	}
+
+	err = e.processFinalizedBlock(block.ID())
+	if err == nil {
+		done()
+		return
+	}
+
+	e.log.Error().Err(err).Str("job_id", string(job.ID())).Msg("error during finalized block processing job")
 }
 
 func (e *Engine) processBackground(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
@@ -291,8 +368,71 @@ func (e *Engine) processAvailableExecutionReceipts(ctx context.Context) error {
 		if err := e.handleExecutionReceipt(msg.OriginID, receipt); err != nil {
 			return err
 		}
+
+		// Notify to fetch and store transaction result error messages for the block.
+		// If txErrorMessagesCore is enabled, the receipt's BlockID is sent to trigger
+		// transaction error message processing. This step is skipped if error message
+		// storage is not enabled.
+		if e.txErrorMessagesCore != nil {
+			e.txResultErrorMessagesChan <- receipt.BlockID
+		}
+	}
+}
+
+// processTransactionResultErrorMessagesByReceipts handles error messages related to transaction
+// results by reading from the error messages channel and processing them accordingly.
+//
+// This function listens for messages on the txResultErrorMessagesChan channel and
+// processes each transaction result error message as it arrives.
+//
+// No errors are expected during normal operation.
+func (e *Engine) processTransactionResultErrorMessagesByReceipts(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
+	ready()
+
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case blockID := <-e.txResultErrorMessagesChan:
+			err := e.txErrorMessagesCore.HandleTransactionResultErrorMessages(ctx, blockID)
+			if err != nil {
+				// TODO: we should revisit error handling here.
+				// Errors that come from querying the EN and possibly ExecutionNodesForBlockID should be logged and
+				// retried later, while others should cause an exception.
+				e.log.Error().
+					Err(err).
+					Msg("error encountered while processing transaction result error messages by receipts")
+			}
+		}
 	}
 
+}
+
+// defaultProcessedIndex returns the last finalized block height from the protocol state.
+//
+// The finalizedBlockConsumer utilizes this return height to fetch and consume block jobs from
+// jobs queue the first time it initializes.
+//
+// No errors are expected during normal operation.
+func (e *Engine) defaultProcessedIndex() (uint64, error) {
+	final, err := e.state.Final().Head()
+	if err != nil {
+		return 0, fmt.Errorf("could not get finalized height: %w", err)
+	}
+	return final.Height, nil
+}
+
+// TODO(illia): this has `access memory violation` error
+// runFinalizedBlockConsumer runs the finalizedBlockConsumer component
+func (e *Engine) runFinalizedBlockConsumer(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
+	e.finalizedBlockConsumer.Start(ctx)
+
+	err := util.WaitClosed(ctx, e.finalizedBlockConsumer.Ready())
+	if err == nil {
+		ready()
+	}
+
+	<-e.finalizedBlockConsumer.Done()
 }
 
 func (e *Engine) processFinalizedBlocks(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {

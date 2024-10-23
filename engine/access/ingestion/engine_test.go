@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/dgraph-io/badger/v2"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -17,20 +18,24 @@ import (
 	hotmodel "github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
+	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/component"
+	"github.com/onflow/flow-go/module/counters"
 	downloadermock "github.com/onflow/flow-go/module/executiondatasync/execution_data/mock"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/mempool/stdmap"
 	"github.com/onflow/flow-go/module/metrics"
-	module "github.com/onflow/flow-go/module/mock"
+	modulemock "github.com/onflow/flow-go/module/mock"
 	"github.com/onflow/flow-go/module/signature"
 	"github.com/onflow/flow-go/module/state_synchronization/indexer"
 	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/network/mocknetwork"
 	protocol "github.com/onflow/flow-go/state/protocol/mock"
 	storerr "github.com/onflow/flow-go/storage"
+	bstorage "github.com/onflow/flow-go/storage/badger"
 	storage "github.com/onflow/flow-go/storage/mock"
 	"github.com/onflow/flow-go/utils/unittest"
+	"github.com/onflow/flow-go/utils/unittest/mocks"
 )
 
 type Suite struct {
@@ -43,10 +48,11 @@ type Suite struct {
 		params   *protocol.Params
 	}
 
-	me             *module.Local
-	request        *module.Requester
+	me             *modulemock.Local
+	request        *modulemock.Requester
 	provider       *mocknetwork.Engine
 	blocks         *storage.Blocks
+	blockMap       map[uint64]*flow.Block
 	headers        *storage.Headers
 	collections    *storage.Collections
 	transactions   *storage.Transactions
@@ -60,8 +66,11 @@ type Suite struct {
 
 	collectionExecutedMetric *indexer.CollectionExecutedMetricImpl
 
-	eng    *Engine
-	cancel context.CancelFunc
+	eng                 *Engine
+	cancel              context.CancelFunc
+	lastFullBlockHeight *counters.PersistentStrictMonotonicCounter
+	db                  *badger.DB
+	dbDir               string
 }
 
 func TestIngestEngine(t *testing.T) {
@@ -70,6 +79,8 @@ func TestIngestEngine(t *testing.T) {
 
 func (s *Suite) TearDownTest() {
 	s.cancel()
+	err := os.RemoveAll(s.dbDir)
+	s.Require().NoError(err)
 }
 
 func (s *Suite) SetupTest() {
@@ -85,7 +96,7 @@ func (s *Suite) SetupTest() {
 	s.proto.params = new(protocol.Params)
 	s.finalizedBlock = unittest.BlockHeaderFixture(unittest.WithHeaderHeight(0))
 	s.proto.state.On("Identity").Return(obsIdentity, nil)
-	s.proto.state.On("Final").Return(s.proto.snapshot, nil)
+	s.proto.state.On("Final").Return(s.proto.snapshot, nil) //TODO(illia): perhaps this should be removed
 	s.proto.state.On("Params").Return(s.proto.params)
 	s.proto.snapshot.On("Head").Return(
 		func() *flow.Header {
@@ -94,7 +105,7 @@ func (s *Suite) SetupTest() {
 		nil,
 	).Maybe()
 
-	s.me = new(module.Local)
+	s.me = new(modulemock.Local)
 	s.me.On("NodeID").Return(obsIdentity.NodeID)
 
 	net := new(mocknetwork.Network)
@@ -102,11 +113,13 @@ func (s *Suite) SetupTest() {
 	net.On("Register", channels.ReceiveReceipts, mock.Anything).
 		Return(conduit, nil).
 		Once()
-	s.request = new(module.Requester)
+	s.request = modulemock.NewRequester(s.T())
 
-	s.provider = new(mocknetwork.Engine)
-	s.blocks = new(storage.Blocks)
-	s.headers = new(storage.Headers)
+	s.provider = mocknetwork.NewEngine(s.T())
+	s.blocks = storage.NewBlocks(s.T())
+	blockCount := 5
+	s.blockMap = make(map[uint64]*flow.Block, blockCount)
+	s.headers = storage.NewHeaders(s.T())
 	s.collections = new(storage.Collections)
 	s.transactions = new(storage.Transactions)
 	s.receipts = new(storage.ExecutionReceipts)
@@ -117,6 +130,12 @@ func (s *Suite) SetupTest() {
 	require.NoError(s.T(), err)
 	blocksToMarkExecuted, err := stdmap.NewTimes(100)
 	require.NoError(s.T(), err)
+
+	s.db, s.dbDir = unittest.TempBadgerDB(s.T())
+
+	// Mock the finalized root block header with height 0.
+	header := unittest.BlockHeaderFixture(unittest.WithHeaderHeight(0))
+	s.proto.params.On("FinalizedRoot").Return(header, nil)
 
 	s.collectionExecutedMetric, err = indexer.NewCollectionExecutedMetricImpl(
 		s.log,
@@ -129,11 +148,41 @@ func (s *Suite) SetupTest() {
 	)
 	require.NoError(s.T(), err)
 
-	eng, err := New(s.log, net, s.proto.state, s.me, s.request, s.blocks, s.headers, s.collections,
-		s.transactions, s.results, s.receipts, s.collectionExecutedMetric)
+	processedHeight := bstorage.NewConsumerProgress(s.db, module.ConsumeProgressIngestionEngineBlockHeight)
+
+	s.lastFullBlockHeight, err = counters.NewPersistentStrictMonotonicCounter(
+		bstorage.NewConsumerProgress(s.db, module.ConsumeProgressLastFullBlockHeight),
+		s.finalizedBlock.Height,
+	)
+	require.NoError(s.T(), err)
+
+	eng, err := New(
+		s.log,
+		net,
+		s.proto.state,
+		s.me,
+		s.request,
+		s.blocks,
+		s.headers,
+		s.collections,
+		s.transactions,
+		s.results,
+		s.receipts,
+		s.collectionExecutedMetric,
+		processedHeight,
+		s.lastFullBlockHeight,
+		nil,
+	)
 	require.NoError(s.T(), err)
 
 	s.blocks.On("GetLastFullBlockHeight").Once().Return(uint64(0), errors.New("do nothing"))
+
+	s.blocks.On("ByHeight", mock.AnythingOfType("uint64")).Return(
+		mocks.ConvertStorageOutput(
+			mocks.StorageMapGetter(s.blockMap),
+			func(block *flow.Block) *flow.Block { return block },
+		),
+	).Maybe()
 
 	irrecoverableCtx, _ := irrecoverable.WithSignaler(ctx)
 	eng.ComponentManager.Start(irrecoverableCtx)
@@ -169,7 +218,7 @@ func (s *Suite) TestOnFinalizedBlock() {
 	}
 
 	// we should query the block once and index the guarantee payload once
-	s.blocks.On("ByID", block.ID()).Return(&block, nil).Twice()
+	s.blocks.On("ByID", block.ID()).Return(&block, nil).Once()
 	for _, g := range block.Payload.Guarantees {
 		collection := unittest.CollectionFixture(1)
 		light := collection.Light()
@@ -351,6 +400,7 @@ func (s *Suite) TestRequestMissingCollections() {
 		// some blocks may not be present hence add a gap
 		height := startHeight + uint64(i)
 		block.Header.Height = height
+		s.blockMap[height] = &block
 		blocks[i] = block
 		heightMap[height] = &block
 		for _, c := range block.Payload.Guarantees {
@@ -506,6 +556,7 @@ func (s *Suite) TestProcessBackgroundCalls() {
 		// set the height
 		height := startHeight + uint64(i)
 		block.Header.Height = height
+		s.blockMap[block.Header.Height] = &block
 		blocks[i] = block
 		heightMap[height] = &block
 	}

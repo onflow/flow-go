@@ -26,6 +26,7 @@ import (
 	backendmock "github.com/onflow/flow-go/engine/access/rpc/backend/mock"
 	"github.com/onflow/flow-go/engine/access/rpc/connection"
 	connectionmock "github.com/onflow/flow-go/engine/access/rpc/connection/mock"
+	commonrpc "github.com/onflow/flow-go/engine/common/rpc"
 	"github.com/onflow/flow-go/engine/common/rpc/convert"
 	"github.com/onflow/flow-go/fvm/blueprints"
 	"github.com/onflow/flow-go/model/flow"
@@ -65,6 +66,7 @@ type Suite struct {
 	results            *storagemock.ExecutionResults
 	transactionResults *storagemock.LightTransactionResults
 	events             *storagemock.Events
+	txErrorMessages    *storagemock.TransactionResultErrorMessages
 
 	colClient              *access.AccessAPIClient
 	execClient             *access.ExecutionAPIClient
@@ -100,6 +102,7 @@ func (suite *Suite) SetupTest() {
 	suite.collections = new(storagemock.Collections)
 	suite.receipts = new(storagemock.ExecutionReceipts)
 	suite.results = new(storagemock.ExecutionResults)
+	suite.txErrorMessages = storagemock.NewTransactionResultErrorMessages(suite.T())
 	suite.colClient = new(access.AccessAPIClient)
 	suite.execClient = new(access.ExecutionAPIClient)
 	suite.transactionResults = storagemock.NewLightTransactionResults(suite.T())
@@ -931,10 +934,6 @@ func (suite *Suite) TestGetTransactionResultByIndex() {
 	suite.state.On("Final").Return(suite.snapshot, nil).Maybe()
 	suite.snapshot.On("Identities", mock.Anything).Return(fixedENIDs, nil)
 
-	// create a mock connection factory
-	connFactory := connectionmock.NewConnectionFactory(suite.T())
-	connFactory.On("GetExecutionAPIClient", mock.Anything).Return(suite.execClient, &mockCloser{}, nil)
-
 	exeEventReq := &execproto.GetTransactionByIndexRequest{
 		BlockId: blockId[:],
 		Index:   index,
@@ -946,7 +945,7 @@ func (suite *Suite) TestGetTransactionResultByIndex() {
 
 	params := suite.defaultBackendParams()
 	// the connection factory should be used to get the execution node client
-	params.ConnFactory = connFactory
+	params.ConnFactory = suite.setupConnectionFactory()
 	params.FixedExecutionNodeIDs = (fixedENIDs.NodeIDs()).Strings()
 
 	backend, err := New(params)
@@ -1002,10 +1001,6 @@ func (suite *Suite) TestGetTransactionResultsByBlockID() {
 	suite.state.On("Final").Return(suite.snapshot, nil).Maybe()
 	suite.snapshot.On("Identities", mock.Anything).Return(fixedENIDs, nil)
 
-	// create a mock connection factory
-	connFactory := connectionmock.NewConnectionFactory(suite.T())
-	connFactory.On("GetExecutionAPIClient", mock.Anything).Return(suite.execClient, &mockCloser{}, nil)
-
 	exeEventReq := &execproto.GetTransactionsByBlockIDRequest{
 		BlockId: blockId[:],
 	}
@@ -1015,7 +1010,7 @@ func (suite *Suite) TestGetTransactionResultsByBlockID() {
 	}
 
 	// the connection factory should be used to get the execution node client
-	params.ConnFactory = connFactory
+	params.ConnFactory = suite.setupConnectionFactory()
 	params.FixedExecutionNodeIDs = (fixedENIDs.NodeIDs()).Strings()
 
 	backend, err := New(params)
@@ -1095,10 +1090,6 @@ func (suite *Suite) TestTransactionStatusTransition() {
 	suite.state.On("Final").Return(suite.snapshot, nil).Maybe()
 	suite.snapshot.On("Identities", mock.Anything).Return(fixedENIDs, nil)
 
-	// create a mock connection factory
-	connFactory := connectionmock.NewConnectionFactory(suite.T())
-	connFactory.On("GetExecutionAPIClient", mock.Anything).Return(suite.execClient, &mockCloser{}, nil)
-
 	exeEventReq := &execproto.GetTransactionResultRequest{
 		BlockId:       blockID[:],
 		TransactionId: txID[:],
@@ -1110,7 +1101,7 @@ func (suite *Suite) TestTransactionStatusTransition() {
 
 	params := suite.defaultBackendParams()
 	// the connection factory should be used to get the execution node client
-	params.ConnFactory = connFactory
+	params.ConnFactory = suite.setupConnectionFactory()
 	params.FixedExecutionNodeIDs = (fixedENIDs.NodeIDs()).Strings()
 
 	backend, err := New(params)
@@ -1723,7 +1714,7 @@ func (suite *Suite) TestGetNetworkParameters() {
 	suite.Require().Equal(expectedChainID, actual.ChainID)
 }
 
-// TestExecutionNodesForBlockID tests the common method backend.executionNodesForBlockID used for serving all API calls
+// TestExecutionNodesForBlockID tests the common method backend.ExecutionNodesForBlockID used for serving all API calls
 // that need to talk to an execution node.
 func (suite *Suite) TestExecutionNodesForBlockID() {
 
@@ -1789,7 +1780,7 @@ func (suite *Suite) TestExecutionNodesForBlockID() {
 			expectedENs = flow.IdentityList{}
 		}
 
-		allExecNodes, err := executionNodesForBlockID(context.Background(), block.ID(), suite.receipts, suite.state, suite.log)
+		allExecNodes, err := commonrpc.ExecutionNodesForBlockID(context.Background(), block.ID(), suite.receipts, suite.state, suite.log, preferredENIdentifiers, fixedENIdentifiers)
 		require.NoError(suite.T(), err)
 
 		execNodeSelectorFactory := NodeSelectorFactory{circuitBreakerEnabled: false}
@@ -1801,7 +1792,7 @@ func (suite *Suite) TestExecutionNodesForBlockID() {
 			actualList = append(actualList, actual)
 		}
 
-		if len(expectedENs) > maxNodesCnt {
+		if len(expectedENs) > commonrpc.MaxNodesCnt {
 			for _, actual := range actualList {
 				require.Contains(suite.T(), expectedENs, actual)
 			}
@@ -1809,7 +1800,7 @@ func (suite *Suite) TestExecutionNodesForBlockID() {
 			require.ElementsMatch(suite.T(), actualList, expectedENs)
 		}
 	}
-	// if we don't find sufficient receipts, executionNodesForBlockID should return a list of random ENs
+	// if we don't find sufficient receipts, ExecutionNodesForBlockID should return a list of random ENs
 	suite.Run("insufficient receipts return random ENs in State", func() {
 		// return no receipts at all attempts
 		attempt1Receipts = flow.ExecutionReceiptList{}
@@ -1817,7 +1808,8 @@ func (suite *Suite) TestExecutionNodesForBlockID() {
 		attempt3Receipts = flow.ExecutionReceiptList{}
 		suite.state.On("AtBlockID", mock.Anything).Return(suite.snapshot)
 
-		allExecNodes, err := executionNodesForBlockID(context.Background(), block.ID(), suite.receipts, suite.state, suite.log)
+		allExecNodes, err := commonrpc.ExecutionNodesForBlockID(context.Background(), block.ID(), suite.receipts, suite.state, suite.log, preferredENIdentifiers,
+			fixedENIdentifiers)
 		require.NoError(suite.T(), err)
 
 		execNodeSelectorFactory := NodeSelectorFactory{circuitBreakerEnabled: false}
@@ -1829,7 +1821,7 @@ func (suite *Suite) TestExecutionNodesForBlockID() {
 			actualList = append(actualList, actual)
 		}
 
-		require.Equal(suite.T(), len(actualList), maxNodesCnt)
+		require.Equal(suite.T(), len(actualList), commonrpc.MaxNodesCnt)
 	})
 
 	// if no preferred or fixed ENs are specified, the ExecutionNodesForBlockID function should
@@ -1850,7 +1842,7 @@ func (suite *Suite) TestExecutionNodesForBlockID() {
 	suite.Run("two preferred ENs with zero fixed EN", func() {
 		// mark the first two ENs as preferred
 		preferredENs := allExecutionNodes[0:2]
-		expectedList := allExecutionNodes[0:maxNodesCnt]
+		expectedList := allExecutionNodes[0:commonrpc.MaxNodesCnt]
 		testExecutionNodesForBlockID(preferredENs, nil, expectedList)
 	})
 	// if both are specified, the ExecutionNodesForBlockID function should
@@ -1860,7 +1852,7 @@ func (suite *Suite) TestExecutionNodesForBlockID() {
 		fixedENs := allExecutionNodes[0:5]
 		// mark the first two of the fixed ENs as preferred ENs
 		preferredENs := fixedENs[0:2]
-		expectedList := fixedENs[0:maxNodesCnt]
+		expectedList := fixedENs[0:commonrpc.MaxNodesCnt]
 		testExecutionNodesForBlockID(preferredENs, fixedENs, expectedList)
 	})
 	// if both are specified, but the preferred ENs don't match the ExecutorIDs in the ER,
@@ -1885,7 +1877,7 @@ func (suite *Suite) TestExecutionNodesForBlockID() {
 		currentAttempt = 0
 		// mark the first two ENs as preferred
 		preferredENs := allExecutionNodes[0:2]
-		expectedList := allExecutionNodes[0:maxNodesCnt]
+		expectedList := allExecutionNodes[0:commonrpc.MaxNodesCnt]
 		testExecutionNodesForBlockID(preferredENs, nil, expectedList)
 	})
 	// if preferredENIdentifiers was set and there are less than maxNodesCnt nodes selected than check the order
@@ -1906,10 +1898,10 @@ func (suite *Suite) TestExecutionNodesForBlockID() {
 			additionalNode[0],
 		}
 
-		chosenIDs := chooseFromPreferredENIDs(allExecutionNodes, executorIDs)
+		chosenIDs := commonrpc.ChooseFromPreferredENIDs(allExecutionNodes, executorIDs, preferredENIdentifiers)
 
 		require.ElementsMatch(suite.T(), chosenIDs, expectedOrder)
-		require.Equal(suite.T(), len(chosenIDs), maxNodesCnt)
+		require.Equal(suite.T(), len(chosenIDs), commonrpc.MaxNodesCnt)
 	})
 }
 
@@ -1955,13 +1947,9 @@ func (suite *Suite) TestGetTransactionResultEventEncodingVersion() {
 	suite.state.On("Final").Return(suite.snapshot, nil).Maybe()
 	suite.snapshot.On("Identities", mock.Anything).Return(fixedENIDs, nil)
 
-	// create a mock connection factory
-	connFactory := connectionmock.NewConnectionFactory(suite.T())
-	connFactory.On("GetExecutionAPIClient", mock.Anything).Return(suite.execClient, &mockCloser{}, nil)
-
 	params := suite.defaultBackendParams()
 	// the connection factory should be used to get the execution node client
-	params.ConnFactory = connFactory
+	params.ConnFactory = suite.setupConnectionFactory()
 	params.FixedExecutionNodeIDs = (fixedENIDs.NodeIDs()).Strings()
 
 	backend, err := New(params)
@@ -2021,13 +2009,9 @@ func (suite *Suite) TestGetTransactionResultByIndexAndBlockIdEventEncodingVersio
 	suite.state.On("Final").Return(suite.snapshot, nil).Maybe()
 	suite.snapshot.On("Identities", mock.Anything).Return(fixedENIDs, nil)
 
-	// create a mock connection factory
-	connFactory := connectionmock.NewConnectionFactory(suite.T())
-	connFactory.On("GetExecutionAPIClient", mock.Anything).Return(suite.execClient, &mockCloser{}, nil)
-
 	params := suite.defaultBackendParams()
 	// the connection factory should be used to get the execution node client
-	params.ConnFactory = connFactory
+	params.ConnFactory = suite.setupConnectionFactory()
 	params.FixedExecutionNodeIDs = (fixedENIDs.NodeIDs()).Strings()
 
 	backend, err := New(params)
@@ -2121,17 +2105,13 @@ func (suite *Suite) TestNodeCommunicator() {
 	suite.state.On("Final").Return(suite.snapshot, nil).Maybe()
 	suite.snapshot.On("Identities", mock.Anything).Return(fixedENIDs, nil)
 
-	// create a mock connection factory
-	connFactory := connectionmock.NewConnectionFactory(suite.T())
-	connFactory.On("GetExecutionAPIClient", mock.Anything).Return(suite.execClient, &mockCloser{}, nil)
-
 	exeEventReq := &execproto.GetTransactionsByBlockIDRequest{
 		BlockId: blockId[:],
 	}
 
 	params := suite.defaultBackendParams()
 	// the connection factory should be used to get the execution node client
-	params.ConnFactory = connFactory
+	params.ConnFactory = suite.setupConnectionFactory()
 	params.FixedExecutionNodeIDs = (fixedENIDs.NodeIDs()).Strings()
 	// Left only one preferred execution node
 	params.PreferredExecutionNodeIDs = []string{fixedENIDs[0].NodeID.String()}
@@ -2209,21 +2189,20 @@ func generateEncodedEvents(t *testing.T, n int) ([]flow.Event, []flow.Event) {
 
 func (suite *Suite) defaultBackendParams() Params {
 	return Params{
-		State:                    suite.state,
-		Blocks:                   suite.blocks,
-		Headers:                  suite.headers,
-		Collections:              suite.collections,
-		Transactions:             suite.transactions,
-		ExecutionReceipts:        suite.receipts,
-		ExecutionResults:         suite.results,
-		ChainID:                  suite.chainID,
-		CollectionRPC:            suite.colClient,
-		MaxHeightRange:           DefaultMaxHeightRange,
-		SnapshotHistoryLimit:     DefaultSnapshotHistoryLimit,
-		Communicator:             NewNodeCommunicator(false),
-		AccessMetrics:            metrics.NewNoopCollector(),
-		Log:                      suite.log,
-		TxErrorMessagesCacheSize: 1000,
-		TxResultQueryMode:        IndexQueryModeExecutionNodesOnly,
+		State:                suite.state,
+		Blocks:               suite.blocks,
+		Headers:              suite.headers,
+		Collections:          suite.collections,
+		Transactions:         suite.transactions,
+		ExecutionReceipts:    suite.receipts,
+		ExecutionResults:     suite.results,
+		ChainID:              suite.chainID,
+		CollectionRPC:        suite.colClient,
+		MaxHeightRange:       DefaultMaxHeightRange,
+		SnapshotHistoryLimit: DefaultSnapshotHistoryLimit,
+		Communicator:         NewNodeCommunicator(false),
+		AccessMetrics:        metrics.NewNoopCollector(),
+		Log:                  suite.log,
+		TxResultQueryMode:    IndexQueryModeExecutionNodesOnly,
 	}
 }

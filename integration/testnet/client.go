@@ -71,7 +71,8 @@ func NewClientWithKey(accessAddr string, accountAddr sdk.Address, key sdkcrypto.
 // address, with a test service account key for signing transactions.
 func NewClient(addr string, chain flow.Chain) (*Client, error) {
 	key := unittest.ServiceAccountPrivateKey
-	privateKey, err := sdkcrypto.DecodePrivateKey(sdkcrypto.SignatureAlgorithm(key.SignAlgo), key.PrivateKey.Encode())
+	//TODO(illia): did i mess up with a merge? there's no Encode() method for this type `key.PrivateKey.Encode()`
+	privateKey, err := sdkcrypto.DecodePrivateKey(sdkcrypto.SignatureAlgorithm(key.SignAlgo), key.PrivateKey)
 	if err != nil {
 		return nil, fmt.Errorf("could not decode private key: %w", err)
 	}
@@ -99,6 +100,12 @@ func (c *Client) AccountKeyPriv() sdkcrypto.PrivateKey {
 }
 
 func (c *Client) GetSeqNumber() uint64 {
+	n := c.accountKey.SequenceNumber
+	c.accountKey.SequenceNumber++
+	return n
+}
+
+func (c *Client) GetAndIncrementSeqNumber() uint64 {
 	n := c.accountKey.SequenceNumber
 	c.accountKey.SequenceNumber++
 	return n
