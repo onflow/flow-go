@@ -195,6 +195,17 @@ func IsValidEpochCommit(commit *flow.EpochCommit, setup *flow.EpochSetup) error 
 	// enforce invariant: RandomBeaconSafetyThreshold ≤ |𝒞 ∩ 𝒟| where:
 	// - 𝒞 is the set of all consensus committee members
 	// - 𝒟 is the set of all DKG participants
+	//
+	// Note that this is only a sanity check that makes sure the cardinality of ℛ ⊆ 𝒟 ∩ 𝒞 does not go below the
+	// critical liveness threshold of 0.62 * |𝒟| (details in [2]).
+	// If RandomBeaconSafetyThreshold > |𝒞 ∩ 𝒟|, we are certain that RandomBeaconSafetyThreshold > |ℛ|. However,
+	// making sure that RandomBeaconSafetyThreshold <= |𝒞 ∩ 𝒟| does not prove that |ℛ| is above the critical threshold.
+	//
+	// This is different than the check implemented by the DKG contract where the value of |ℛ| is known and compared
+	// to the threshold. Unlike the DKG contract, the protocol state does not have access to the value of |ℛ| from a past
+	// key generation (decentralized or not).
+	//
+	// [2] https://www.notion.so/flowfoundation/DKG-contract-success-threshold-86c6bf2b92034855b3c185d7616eb6f1?pvs=4
 	if RandomBeaconSafetyThreshold(uint(n)) > numberOfRandomBeaconParticipants {
 		return NewInvalidServiceEventErrorf("not enough random beacon participants required %d, got %d",
 			signature.RandomBeaconThreshold(n), numberOfRandomBeaconParticipants)
