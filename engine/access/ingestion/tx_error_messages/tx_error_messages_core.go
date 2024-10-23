@@ -42,7 +42,7 @@ func NewTxErrorMessagesCore(
 	fixedExecutionNodeIDs flow.IdentifierList,
 ) *TxErrorMessagesCore {
 	return &TxErrorMessagesCore{
-		log:                            log.With().Str("engine", "tx_error_messages_core").Logger(),
+		log:                            log.With().Str("module", "tx_error_messages_core").Logger(),
 		state:                          state,
 		backend:                        backend,
 		executionReceipts:              executionReceipts,
