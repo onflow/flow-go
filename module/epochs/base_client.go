@@ -12,6 +12,7 @@ import (
 
 	sdk "github.com/onflow/flow-go-sdk"
 	sdkcrypto "github.com/onflow/flow-go-sdk/crypto"
+
 	"github.com/onflow/flow-go/network"
 
 	"github.com/onflow/flow-go/module"
