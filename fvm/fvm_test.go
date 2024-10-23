@@ -5,6 +5,7 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"fmt"
+	"github.com/rs/zerolog"
 	"math"
 	"strings"
 	"testing"
@@ -13,7 +14,6 @@ import (
 	"github.com/coreos/go-semver/semver"
 	"github.com/onflow/flow-core-contracts/lib/go/templates"
 
-	"github.com/onflow/flow-go/cmd/util/ledger/util"
 	"github.com/onflow/flow-go/fvm/storage"
 	"github.com/onflow/flow-go/fvm/storage/state"
 
@@ -3242,9 +3242,9 @@ func Test_MinimumRequiredVersion(t *testing.T) {
 
 	chain := flow.Emulator.Chain()
 	sc := systemcontracts.SystemContractsForChain(chain.ChainID())
-	tracer := tracing.NewTracerSpan()
+	log := zerolog.New(zerolog.NewTestWriter(t))
 
-	getVersion := func(snapshotTree snapshot.SnapshotTree) string {
+	getVersion := func(ctx fvm.Context, snapshotTree snapshot.SnapshotTree) string {
 		blockDatabase := storage.NewBlockDatabase(
 			snapshotTree,
 			0,
@@ -3253,14 +3253,25 @@ func Test_MinimumRequiredVersion(t *testing.T) {
 		txnState, err := blockDatabase.NewTransaction(0, state.DefaultParameters())
 		require.NoError(t, err)
 
-		envParams := environment.DefaultEnvironmentParams()
-		envParams.Chain = chain
+		executionParams, _, err := txnState.GetStateExecutionParameters(
+			txnState,
+			fvm.NewExecutionParametersComputer(log, ctx, txnState))
 
-		mrv := environment.NewMinimumRequiredVersion(tracer, util.NopMeter{}, txnState, envParams)
+		// this will set the parameters to the txnState.
+		// this is done at the beginning of a transaction/script
+		txnId, err := txnState.BeginNestedTransactionWithMeterParams(
+			meter.ExecutionParameters{
+				ExecutionVersion: executionParams.ExecutionVersion,
+			})
+
+		mrv := environment.NewMinimumRequiredVersion(txnState)
 
 		v, err := mrv.MinimumRequiredVersion()
 
 		require.NoError(t, err)
+		_, err = txnState.CommitNestedTransaction(txnId)
+		require.NoError(t, err)
+
 		return v
 	}
 
@@ -3360,7 +3371,7 @@ func Test_MinimumRequiredVersion(t *testing.T) {
 			snapshotTree snapshot.SnapshotTree,
 		) {
 			// default version is empty
-			require.Equal(t, semver.Version{}.String(), getVersion(snapshotTree))
+			require.Equal(t, semver.Version{}.String(), getVersion(ctx, snapshotTree))
 
 			// define mapping for flow go version to cadence version
 			flowVersion1 := semver.Version{
@@ -3410,28 +3421,28 @@ func Test_MinimumRequiredVersion(t *testing.T) {
 			txIndex += 1
 
 			// so far no change:
-			require.Equal(t, semver.Version{}.String(), getVersion(snapshotTree))
+			require.Equal(t, semver.Version{}.String(), getVersion(ctx, snapshotTree))
 
 			// system transaction needs to run to update the flowVersion on chain
 			snapshotTree = runSystemTxToUpdateNodeVersionBeaconContract(hv1-1, ctx, snapshotTree, vm, txIndex)
 			txIndex += 1
 
 			// no change:
-			require.Equal(t, semver.Version{}.String(), getVersion(snapshotTree))
+			require.Equal(t, semver.Version{}.String(), getVersion(ctx, snapshotTree))
 
 			// system transaction needs to run to update the flowVersion on chain
 			snapshotTree = runSystemTxToUpdateNodeVersionBeaconContract(hv1, ctx, snapshotTree, vm, txIndex)
 			txIndex += 1
 
 			// switch to cadence version 1
-			require.Equal(t, cadenceVersion1.String(), getVersion(snapshotTree))
+			require.Equal(t, cadenceVersion1.String(), getVersion(ctx, snapshotTree))
 
 			// system transaction needs to run to update the flowVersion on chain
 			snapshotTree = runSystemTxToUpdateNodeVersionBeaconContract(hv1+1, ctx, snapshotTree, vm, txIndex)
 			txIndex += 1
 
 			// still cadence version 1
-			require.Equal(t, cadenceVersion1.String(), getVersion(snapshotTree))
+			require.Equal(t, cadenceVersion1.String(), getVersion(ctx, snapshotTree))
 
 			// insert version boundary 2
 			snapshotTree = insertVersionBoundary(flowVersion2, hv1+1, hv2, ctx, snapshotTree, vm, txIndex)
@@ -3441,6 +3452,6 @@ func Test_MinimumRequiredVersion(t *testing.T) {
 			snapshotTree = runSystemTxToUpdateNodeVersionBeaconContract(hv2, ctx, snapshotTree, vm, txIndex)
 
 			// switch cadence version 2
-			require.Equal(t, cadenceVersion2.String(), getVersion(snapshotTree))
+			require.Equal(t, cadenceVersion2.String(), getVersion(ctx, snapshotTree))
 		}))
 }

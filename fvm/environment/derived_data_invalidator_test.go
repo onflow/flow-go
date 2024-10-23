@@ -84,7 +84,7 @@ func TestDerivedDataProgramInvalidator(t *testing.T) {
 	})
 	t.Run("meter parameters invalidator invalidates all entries", func(t *testing.T) {
 		invalidator := environment.DerivedDataInvalidator{
-			MeterParamOverridesUpdated: true,
+			ExecutionParametersUpdated: true,
 		}.ProgramInvalidator()
 
 		require.True(t, invalidator.ShouldInvalidateEntries())
@@ -209,7 +209,7 @@ func TestDerivedDataProgramInvalidator(t *testing.T) {
 
 func TestMeterParamOverridesInvalidator(t *testing.T) {
 	invalidator := environment.DerivedDataInvalidator{}.
-		MeterParamOverridesInvalidator()
+		ExecutionParametersInvalidator()
 
 	require.False(t, invalidator.ShouldInvalidateEntries())
 	require.False(t, invalidator.ShouldInvalidateEntry(
@@ -219,8 +219,8 @@ func TestMeterParamOverridesInvalidator(t *testing.T) {
 
 	invalidator = environment.DerivedDataInvalidator{
 		ContractUpdates:            environment.ContractUpdates{},
-		MeterParamOverridesUpdated: true,
-	}.MeterParamOverridesInvalidator()
+		ExecutionParametersUpdated: true,
+	}.ExecutionParametersInvalidator()
 
 	require.True(t, invalidator.ShouldInvalidateEntries())
 	require.True(t, invalidator.ShouldInvalidateEntry(
@@ -267,7 +267,7 @@ func TestMeterParamOverridesUpdated(t *testing.T) {
 	txnState, err := blockDatabase.NewTransaction(0, state.DefaultParameters())
 	require.NoError(t, err)
 
-	computer := fvm.NewMeterParamOverridesComputer(ctx, txnState)
+	computer := fvm.NewExecutionParametersComputer(
 
 	overrides, err := computer.Compute(txnState, struct{}{})
 	require.NoError(t, err)
@@ -298,14 +298,11 @@ func TestMeterParamOverridesUpdated(t *testing.T) {
 			},
 		}
 
-		sc := systemcontracts.SystemContractsForChain(flow.Testnet)
-
 		invalidator := environment.NewDerivedDataInvalidator(
 			environment.ContractUpdates{},
 			snapshot,
-			meterStateRead,
-			sc.FlowServiceAccount.Address)
-		require.Equal(t, expected, invalidator.MeterParamOverridesUpdated)
+			meterStateRead)
+		require.Equal(t, expected, invalidator.ExecutionParametersUpdated)
 	}
 
 	executionSnapshot, err = txnState.FinalizeMainTransaction()

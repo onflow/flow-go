@@ -3,9 +3,7 @@ package fvm
 import (
 	"fmt"
 	"strconv"
-
-	"github.com/onflow/flow-go/fvm/systemcontracts"
-
+	
 	"github.com/onflow/cadence/runtime"
 	"github.com/onflow/cadence/runtime/common"
 	"github.com/rs/zerolog"
@@ -70,7 +68,7 @@ type transactionExecutor struct {
 	// the state reads needed to compute the metering parameters
 	// this is used to invalidate the metering parameters if a transaction
 	// writes to any of those registers
-	meterStateRead *snapshot.ExecutionSnapshot
+	executionStateRead *snapshot.ExecutionSnapshot
 
 	cadenceRuntime  *reusableRuntime.ReusableCadenceRuntime
 	txnBodyExecutor runtime.Executor
@@ -201,27 +199,27 @@ func (executor *transactionExecutor) preprocessTransactionBody() error {
 			return err
 		}
 	}
-
 	// get meter parameters
-	meterParams, meterStateRead, err := getBodyMeterParameters(
+	executionParameters, executionStateRead, err := getExecutionParameters(
+		executor.env.Logger(),
 		executor.ctx,
 		executor.proc,
 		executor.txnState)
 	if err != nil {
-		return fmt.Errorf("error getting meter parameters: %w", err)
+		return fmt.Errorf("error getting execution parameters: %w", err)
 	}
 
-	if len(meterStateRead.WriteSet) != 0 {
+	if len(executionStateRead.WriteSet) != 0 {
 		// this should never happen
 		// and indicates an implementation error
-		panic("getting metering parameters should not write to registers")
+		panic("getting execution parameters should not write to registers")
 	}
 
-	// we need to save the meter state read for invalidation purposes
-	executor.meterStateRead = meterStateRead
+	// we need to save the execution state read for invalidation purposes
+	executor.executionStateRead = executionStateRead
 
 	txnId, err := executor.txnState.BeginNestedTransactionWithMeterParams(
-		meterParams)
+		executionParameters)
 	if err != nil {
 		return err
 	}
@@ -402,12 +400,10 @@ func (executor *transactionExecutor) normalExecution() (
 		return
 	}
 
-	sc := systemcontracts.SystemContractsForChain(executor.ctx.Chain.ChainID())
 	invalidator = environment.NewDerivedDataInvalidator(
 		contractUpdates,
 		bodySnapshot,
-		executor.meterStateRead,
-		sc.FlowServiceAccount.Address,
+		executor.executionStateRead,
 	)
 
 	// Check if all account storage limits are ok

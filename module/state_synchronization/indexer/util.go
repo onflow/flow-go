@@ -100,7 +100,7 @@ func (inv *accessInvalidator) ProgramInvalidator() derived.ProgramInvalidator {
 	return inv.programs
 }
 
-func (inv *accessInvalidator) MeterParamOverridesInvalidator() derived.MeterParamOverridesInvalidator {
+func (inv *accessInvalidator) ExecutionParametersInvalidator() derived.ExecutionParametersInvalidator {
 	return inv.meterParamOverrides
 }
 
@@ -126,9 +126,9 @@ func (inv *programInvalidator) ShouldInvalidateEntry(location common.AddressLoca
 	return inv.invalidateAll || ok
 }
 
-var _ derived.MeterParamOverridesInvalidator = (*meterParamOverridesInvalidator)(nil)
+var _ derived.ExecutionParametersInvalidator = (*meterParamOverridesInvalidator)(nil)
 
-// meterParamOverridesInvalidator is a derived.MeterParamOverridesInvalidator that invalidates meter param overrides.
+// meterParamOverridesInvalidator is a derived.ExecutionParametersInvalidator that invalidates meter param overrides.
 type meterParamOverridesInvalidator struct {
 	invalidateAll bool
 }

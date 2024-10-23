@@ -3,6 +3,9 @@ package fvm
 import (
 	"context"
 	"fmt"
+	"github.com/coreos/go-semver/semver"
+	"github.com/onflow/flow-go/model/convert"
+	"github.com/rs/zerolog"
 	"math"
 
 	"github.com/onflow/flow-go/fvm/storage/snapshot"
@@ -52,75 +55,82 @@ func getBasicMeterParameters(
 	return params
 }
 
-// getBodyMeterParameters returns the set of meter parameters used for
-// transaction/script body execution.
-func getBodyMeterParameters(
+// getExecutionParameters returns the set of meter parameters used for
+// transaction/script body execution and the minimum required version as defined by the
+// NodeVersionBeacon contract.
+func getExecutionParameters(
+	log zerolog.Logger,
 	ctx Context,
 	proc Procedure,
 	txnState storage.TransactionPreparer,
-) (
-	meter.MeterParameters,
-	*snapshot.ExecutionSnapshot,
-	error,
-) {
-	procParams := getBasicMeterParameters(ctx, proc)
+) (meter.ExecutionParameters, *snapshot.ExecutionSnapshot, error) {
+	meterParams := getBasicMeterParameters(ctx, proc)
 
-	overrides, meterStateRead, err := txnState.GetMeterParamOverrides(
+	executionParams, executionParamsStateRead, err := txnState.GetStateExecutionParameters(
 		txnState,
-		NewMeterParamOverridesComputer(ctx, txnState))
+		NewExecutionParametersComputer(log, ctx, txnState))
 	if err != nil {
-		return procParams, nil, err
+		return meter.ExecutionParameters{
+			MeterParameters:  meterParams,
+			ExecutionVersion: semver.Version{},
+		}, nil, err
 	}
 
-	if overrides.ComputationWeights != nil {
-		procParams = procParams.WithComputationWeights(
-			overrides.ComputationWeights)
+	if executionParams.ComputationWeights != nil {
+		meterParams = meterParams.WithComputationWeights(
+			executionParams.ComputationWeights)
 	}
 
-	if overrides.MemoryWeights != nil {
-		procParams = procParams.WithMemoryWeights(overrides.MemoryWeights)
+	if executionParams.MemoryWeights != nil {
+		meterParams = meterParams.WithMemoryWeights(executionParams.MemoryWeights)
 	}
 
-	if overrides.MemoryLimit != nil {
-		procParams = procParams.WithMemoryLimit(*overrides.MemoryLimit)
+	if executionParams.MemoryLimit != nil {
+		meterParams = meterParams.WithMemoryLimit(*executionParams.MemoryLimit)
 	}
 
 	// NOTE: The memory limit (and interaction limit) may be overridden by the
 	// environment.  We need to ignore the override in that case.
 	if proc.ShouldDisableMemoryAndInteractionLimits(ctx) {
-		procParams = procParams.WithMemoryLimit(math.MaxUint64).
+		meterParams = meterParams.WithMemoryLimit(math.MaxUint64).
 			WithStorageInteractionLimit(math.MaxUint64)
 	}
 
-	return procParams, meterStateRead, nil
+	return meter.ExecutionParameters{
+		MeterParameters:  meterParams,
+		ExecutionVersion: executionParams.ExecutionVersion,
+	}, executionParamsStateRead, nil
 }
 
-type MeterParamOverridesComputer struct {
+type ExecutionParametersComputer struct {
+	log      zerolog.Logger
 	ctx      Context
 	txnState storage.TransactionPreparer
 }
 
-func NewMeterParamOverridesComputer(
+func NewExecutionParametersComputer(
+	log zerolog.Logger,
 	ctx Context,
 	txnState storage.TransactionPreparer,
-) MeterParamOverridesComputer {
-	return MeterParamOverridesComputer{
+) ExecutionParametersComputer {
+	return ExecutionParametersComputer{
+		log:      log,
 		ctx:      ctx,
 		txnState: txnState,
 	}
 }
 
-func (computer MeterParamOverridesComputer) Compute(
+func (computer ExecutionParametersComputer) Compute(
 	_ state.NestedTransactionPreparer,
 	_ struct{},
 ) (
-	derived.MeterParamOverrides,
+	derived.StateExecutionParameters,
 	error,
 ) {
-	var overrides derived.MeterParamOverrides
+	var overrides derived.StateExecutionParameters
 	var err error
 	computer.txnState.RunWithAllLimitsDisabled(func() {
-		overrides, err = computer.getMeterParamOverrides()
+		overrides, err = computer.getExecutionParameters()
 	})
 
 	if err != nil {
@@ -132,8 +142,8 @@ func (computer MeterParamOverridesComputer) Compute(
 	return overrides, nil
 }
 
-func (computer MeterParamOverridesComputer) getMeterParamOverrides() (
-	derived.MeterParamOverrides,
+func (computer ExecutionParametersComputer) getExecutionParameters() (
+	derived.StateExecutionParameters,
 	error,
 ) {
 	// Check that the service account exists because all the settings are
@@ -147,7 +157,7 @@ func (computer MeterParamOverridesComputer) getMeterParamOverrides() (
 		computer.ctx.EnvironmentParams,
 		computer.txnState)
 
-	overrides := derived.MeterParamOverrides{}
+	overrides := derived.StateExecutionParameters{}
 
 	// set the property if no error, but if the error is a fatal error then
 	// return it
@@ -200,6 +210,15 @@ func (computer MeterParamOverridesComputer) getMeterParamOverrides() (
 		"execution memory limit",
 		err,
 		func() { overrides.MemoryLimit = &memoryLimit })
+	if err != nil {
+		return overrides, err
+	}
+
+	executionVersion, err := GetMinimumExecutionVersion(computer.log, env)
+	err = setIfOk(
+		"execution version",
+		err,
+		func() { overrides.ExecutionVersion = executionVersion })
 	if err != nil {
 		return overrides, err
 	}
@@ -335,4 +354,36 @@ func GetExecutionMemoryLimit(
 	}
 
 	return uint64(memoryLimitRaw), nil
+}
+
+func GetMinimumExecutionVersion(
+	log zerolog.Logger,
+	env environment.Environment,
+) (semver.Version, error) {
+
+	value, err := env.GetCurrentVersionBoundary()
+
+	if err != nil {
+		return semver.Version{}, fmt.Errorf("could not get current version boundary: %w", err)
+	}
+
+	boundary, err := convert.VersionBoundary(value)
+
+	if err != nil {
+		return semver.Version{}, fmt.Errorf("could not parse current version boundary: %w", err)
+	}
+
+	semVer, err := semver.NewVersion(boundary.Version)
+	if err != nil {
+		// This could be problematic, if the version is not a valid semver version. The NodeVersionBeacon should prevent
+		// this, but it could have bugs.
+		// Erroring here gives us no way to recover as no transactions would work anymore,
+		// instead return the version as 0.0.0 and log the error, allowing us to recover.
+		// this would mean that any if-statements that were relying on a higher version would fail,
+		// but that is preferable to all transactions halting.
+		log.Error().Err(err).Msg("could not parse version boundary. Version boundary as defined in the NodeVersionBeacon contract is not a valid semver version!")
+		return semver.Version{}, nil
+	}
+
+	return *semVer, nil
 }
