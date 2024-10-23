@@ -2,13 +2,16 @@ package emulator
 
 import (
 	"fmt"
+
+	"github.com/rs/zerolog"
+
 	"github.com/onflow/cadence"
 	"github.com/onflow/crypto"
 	"github.com/onflow/crypto/hash"
+
 	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/fvm/meter"
 	flowgo "github.com/onflow/flow-go/model/flow"
-	"github.com/rs/zerolog"
 )
 
 // config is a set of configuration options for an emulated emulator.

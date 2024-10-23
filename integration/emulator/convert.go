@@ -20,9 +20,12 @@ package emulator
 
 import (
 	"fmt"
+
 	"github.com/onflow/cadence"
 	"github.com/onflow/cadence/encoding/ccf"
+
 	sdk "github.com/onflow/flow-go-sdk"
+
 	"github.com/onflow/flow-go/access"
 	"github.com/onflow/flow-go/fvm"
 	fvmerrors "github.com/onflow/flow-go/fvm/errors"
