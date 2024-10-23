@@ -2,6 +2,7 @@ package derived
 
 import (
 	"fmt"
+
 	"github.com/onflow/cadence/common"
 	"github.com/onflow/cadence/interpreter"
 

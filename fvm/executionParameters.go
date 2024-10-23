@@ -3,10 +3,12 @@ package fvm
 import (
 	"context"
 	"fmt"
-	"github.com/coreos/go-semver/semver"
-	"github.com/onflow/flow-go/model/convert"
-	"github.com/rs/zerolog"
 	"math"
+
+	"github.com/coreos/go-semver/semver"
+	"github.com/rs/zerolog"
+
+	"github.com/onflow/flow-go/model/convert"
 
 	"github.com/onflow/flow-go/fvm/storage/snapshot"
 
