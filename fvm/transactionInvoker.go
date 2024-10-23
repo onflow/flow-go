@@ -34,6 +34,8 @@ type TransactionExecutorParams struct {
 
 	// Note: This is disabled only by tests
 	TransactionBodyExecutionEnabled bool
+
+	ReadVersionFromNodeVersionBeacon bool
 }
 
 func DefaultTransactionExecutorParams() TransactionExecutorParams {
@@ -42,6 +44,7 @@ func DefaultTransactionExecutorParams() TransactionExecutorParams {
 		SequenceNumberCheckAndIncrementEnabled: true,
 		AccountKeyWeightThreshold:              AccountKeyWeightThreshold,
 		TransactionBodyExecutionEnabled:        true,
+		ReadVersionFromNodeVersionBeacon:       true,
 	}
 }
 

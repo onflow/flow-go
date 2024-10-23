@@ -3,8 +3,6 @@ package environment_test
 import (
 	"testing"
 
-	"github.com/onflow/flow-go/fvm/systemcontracts"
-
 	"github.com/onflow/cadence/runtime/common"
 	"github.com/stretchr/testify/require"
 
@@ -214,7 +212,7 @@ func TestMeterParamOverridesInvalidator(t *testing.T) {
 	require.False(t, invalidator.ShouldInvalidateEntries())
 	require.False(t, invalidator.ShouldInvalidateEntry(
 		struct{}{},
-		derived.MeterParamOverrides{},
+		derived.StateExecutionParameters{},
 		nil))
 
 	invalidator = environment.DerivedDataInvalidator{
@@ -225,7 +223,7 @@ func TestMeterParamOverridesInvalidator(t *testing.T) {
 	require.True(t, invalidator.ShouldInvalidateEntries())
 	require.True(t, invalidator.ShouldInvalidateEntry(
 		struct{}{},
-		derived.MeterParamOverrides{},
+		derived.StateExecutionParameters{},
 		nil))
 }
 
@@ -268,6 +266,10 @@ func TestMeterParamOverridesUpdated(t *testing.T) {
 	require.NoError(t, err)
 
 	computer := fvm.NewExecutionParametersComputer(
+		ctx.Logger,
+		ctx,
+		txnState,
+	)
 
 	overrides, err := computer.Compute(txnState, struct{}{})
 	require.NoError(t, err)

@@ -91,9 +91,8 @@ var _ derived.TransactionInvalidator = (*accessInvalidator)(nil)
 
 // accessInvalidator is a derived.TransactionInvalidator that invalidates programs and meter param overrides.
 type accessInvalidator struct {
-	programs               *programInvalidator
-	meterParamOverrides    *meterParamOverridesInvalidator
-	currentVersionBoundary *currentVersionBoundaryInvalidator
+	programs            *programInvalidator
+	executionParameters *executionParametersInvalidator
 }
 
 func (inv *accessInvalidator) ProgramInvalidator() derived.ProgramInvalidator {
@@ -101,11 +100,7 @@ func (inv *accessInvalidator) ProgramInvalidator() derived.ProgramInvalidator {
 }
 
 func (inv *accessInvalidator) ExecutionParametersInvalidator() derived.ExecutionParametersInvalidator {
-	return inv.meterParamOverrides
-}
-
-func (inv *accessInvalidator) CurrentVersionBoundaryInvalidator() derived.CurrentVersionBoundaryInvalidator {
-	return inv.currentVersionBoundary
+	return inv.executionParameters
 }
 
 var _ derived.ProgramInvalidator = (*programInvalidator)(nil)
@@ -126,31 +121,17 @@ func (inv *programInvalidator) ShouldInvalidateEntry(location common.AddressLoca
 	return inv.invalidateAll || ok
 }
 
-var _ derived.ExecutionParametersInvalidator = (*meterParamOverridesInvalidator)(nil)
+var _ derived.ExecutionParametersInvalidator = (*executionParametersInvalidator)(nil)
 
-// meterParamOverridesInvalidator is a derived.ExecutionParametersInvalidator that invalidates meter param overrides.
-type meterParamOverridesInvalidator struct {
+// executionParametersInvalidator is a derived.ExecutionParametersInvalidator that invalidates meter param overrides and execution version.
+type executionParametersInvalidator struct {
 	invalidateAll bool
 }
 
-func (inv *meterParamOverridesInvalidator) ShouldInvalidateEntries() bool {
+func (inv *executionParametersInvalidator) ShouldInvalidateEntries() bool {
 	return inv.invalidateAll
 }
 
-func (inv *meterParamOverridesInvalidator) ShouldInvalidateEntry(_ struct{}, _ derived.MeterParamOverrides, _ *snapshot.ExecutionSnapshot) bool {
+func (inv *executionParametersInvalidator) ShouldInvalidateEntry(_ struct{}, _ derived.StateExecutionParameters, _ *snapshot.ExecutionSnapshot) bool {
 	return inv.invalidateAll
-}
-
-// currentVersionBoundaryInvalidator is a derived.CurrentVersionBoundaryInvalidator that invalidates current version boundary.
-type currentVersionBoundaryInvalidator struct {
-	invalidateAll bool
-	invalidate    bool
-}
-
-func (inv *currentVersionBoundaryInvalidator) ShouldInvalidateEntries() bool {
-	return inv.invalidate || inv.invalidateAll
-}
-
-func (inv *currentVersionBoundaryInvalidator) ShouldInvalidateEntry(_ struct{}, _ flow.VersionBoundary, _ *snapshot.ExecutionSnapshot) bool {
-	return inv.invalidate || inv.invalidateAll
 }

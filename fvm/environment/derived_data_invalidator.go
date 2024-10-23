@@ -26,8 +26,6 @@ type DerivedDataInvalidator struct {
 	ContractUpdates
 
 	ExecutionParametersUpdated bool
-
-	CurrentVersionBoundaryUpdated bool
 }
 
 var _ derived.TransactionInvalidator = DerivedDataInvalidator{}

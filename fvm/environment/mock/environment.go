@@ -912,7 +912,7 @@ func (_m *Environment) GetCurrentVersionBoundary() (cadence.Value, error) {
 	ret := _m.Called()
 
 	if len(ret) == 0 {
-		panic("no return value specified for getMinimuRequiredVersion")
+		panic("no return value specified for GetCurrentVersionBoundary")
 	}
 
 	var r0 cadence.Value
