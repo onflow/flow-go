@@ -21,14 +21,17 @@ type SubscriptionHandler interface {
 }
 
 type SubscriptionHandlerFactory struct {
+	eventFilterConfig state_stream.EventFilterConfig
+
 	stateStreamApi state_stream.API
 	accessApi      access.API
 }
 
-func NewSubscriptionHandlerFactory(stateStreamApi state_stream.API, accessApi access.API) *SubscriptionHandlerFactory {
+func NewSubscriptionHandlerFactory(eventFilterConfig state_stream.EventFilterConfig, stateStreamApi state_stream.API, accessApi access.API) *SubscriptionHandlerFactory {
 	return &SubscriptionHandlerFactory{
-		stateStreamApi: stateStreamApi,
-		accessApi:      accessApi,
+		eventFilterConfig: eventFilterConfig,
+		stateStreamApi:    stateStreamApi,
+		accessApi:         accessApi,
 	}
 }
 
