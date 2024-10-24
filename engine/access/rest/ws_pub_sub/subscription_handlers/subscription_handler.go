@@ -2,6 +2,9 @@ package subscription_handlers
 
 import (
 	"fmt"
+
+	"github.com/onflow/flow-go/access"
+	"github.com/onflow/flow-go/engine/access/state_stream"
 )
 
 const (
@@ -17,7 +20,19 @@ type SubscriptionHandler interface {
 	Close() error
 }
 
-func CreateSubscriptionHandler(topic string, arguments map[string]interface{}, broadcastMessage func([]byte) error) (SubscriptionHandler, error) {
+type SubscriptionHandlerFactory struct {
+	stateStreamApi state_stream.API
+	accessApi      access.API
+}
+
+func NewSubscriptionHandlerFactory(stateStreamApi state_stream.API, accessApi access.API) *SubscriptionHandlerFactory {
+	return &SubscriptionHandlerFactory{
+		stateStreamApi: stateStreamApi,
+		accessApi:      accessApi,
+	}
+}
+
+func (s *SubscriptionHandlerFactory) CreateSubscriptionHandler(topic string, arguments map[string]interface{}, broadcastMessage func([]byte) error) (SubscriptionHandler, error) {
 	switch topic {
 	// TODO: Implemented handlers for each topic should be added in respective case
 	case EventsTopic,
