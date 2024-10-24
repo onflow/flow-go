@@ -9,7 +9,7 @@ import (
 
 	"github.com/onflow/flow-go/access"
 	"github.com/onflow/flow-go/engine/access/rest/routes"
-	"github.com/onflow/flow-go/engine/access/rest/ws_pub_sub/subscription_handlers"
+	"github.com/onflow/flow-go/engine/access/rest/routes/subscription_handlers"
 	"github.com/onflow/flow-go/engine/access/state_stream"
 	"github.com/onflow/flow-go/engine/access/state_stream/backend"
 	"github.com/onflow/flow-go/model/flow"
