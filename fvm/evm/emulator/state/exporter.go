@@ -132,7 +132,6 @@ func (e *Exporter) exportCodes(writer io.Writer) error {
 	return nil
 }
 
-
 // exportSlots exports slots (key value pairs stored under accounts)
 func (e *Exporter) exportSlots(addresses []gethCommon.Address, writer io.Writer) error {
 	for _, addr := range addresses {
