@@ -358,7 +358,8 @@ type FlowAccessNodeBuilder struct {
 	stateStreamBackend *statestreambackend.StateStreamBackend
 	nodeBackend        *backend.Backend
 
-	TxResultErrorMessagesCore *tx_error_messages.TxErrorMessagesCore
+	ExecNodeIdentitiesProvider *commonrpc.ExecutionNodeIdentitiesProvider
+	TxResultErrorMessagesCore  *tx_error_messages.TxErrorMessagesCore
 }
 
 func (builder *FlowAccessNodeBuilder) buildFollowerState() *FlowAccessNodeBuilder {
@@ -1970,33 +1971,49 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 
 			}
 
+			preferredENIdentifiers, err := commonrpc.IdentifierList(backendConfig.PreferredExecutionNodeIDs)
+			if err != nil {
+				return nil, fmt.Errorf("failed to convert node id string to Flow Identifier for preferred EN map: %w", err)
+			}
+
+			fixedENIdentifiers, err := commonrpc.IdentifierList(backendConfig.FixedExecutionNodeIDs)
+			if err != nil {
+				return nil, fmt.Errorf("failed to convert node id string to Flow Identifier for fixed EN map: %w", err)
+			}
+
+			builder.ExecNodeIdentitiesProvider = commonrpc.NewExecutionNodeIdentitiesProvider(
+				node.Logger,
+				node.State,
+				node.Storage.Receipts,
+				preferredENIdentifiers,
+				fixedENIdentifiers,
+			)
+
 			builder.nodeBackend, err = backend.New(backend.Params{
-				State:                     node.State,
-				CollectionRPC:             builder.CollectionRPC,
-				HistoricalAccessNodes:     builder.HistoricalAccessRPCs,
-				Blocks:                    node.Storage.Blocks,
-				Headers:                   node.Storage.Headers,
-				Collections:               node.Storage.Collections,
-				Transactions:              node.Storage.Transactions,
-				ExecutionReceipts:         node.Storage.Receipts,
-				ExecutionResults:          node.Storage.Results,
-				TxResultErrorMessages:     node.Storage.TransactionResultErrorMessages,
-				ChainID:                   node.RootChainID,
-				AccessMetrics:             builder.AccessMetrics,
-				ConnFactory:               connFactory,
-				RetryEnabled:              builder.retryEnabled,
-				MaxHeightRange:            backendConfig.MaxHeightRange,
-				PreferredExecutionNodeIDs: backendConfig.PreferredExecutionNodeIDs,
-				FixedExecutionNodeIDs:     backendConfig.FixedExecutionNodeIDs,
-				Log:                       node.Logger,
-				SnapshotHistoryLimit:      backend.DefaultSnapshotHistoryLimit,
-				Communicator:              backend.NewNodeCommunicator(backendConfig.CircuitBreakerConfig.Enabled),
-				TxResultCacheSize:         builder.TxResultCacheSize,
-				ScriptExecutor:            builder.ScriptExecutor,
-				ScriptExecutionMode:       scriptExecMode,
-				CheckPayerBalanceMode:     checkPayerBalanceMode,
-				EventQueryMode:            eventQueryMode,
-				BlockTracker:              blockTracker,
+				State:                 node.State,
+				CollectionRPC:         builder.CollectionRPC,
+				HistoricalAccessNodes: builder.HistoricalAccessRPCs,
+				Blocks:                node.Storage.Blocks,
+				Headers:               node.Storage.Headers,
+				Collections:           node.Storage.Collections,
+				Transactions:          node.Storage.Transactions,
+				ExecutionReceipts:     node.Storage.Receipts,
+				ExecutionResults:      node.Storage.Results,
+				TxResultErrorMessages: node.Storage.TransactionResultErrorMessages,
+				ChainID:               node.RootChainID,
+				AccessMetrics:         builder.AccessMetrics,
+				ConnFactory:           connFactory,
+				RetryEnabled:          builder.retryEnabled,
+				MaxHeightRange:        backendConfig.MaxHeightRange,
+				Log:                   node.Logger,
+				SnapshotHistoryLimit:  backend.DefaultSnapshotHistoryLimit,
+				Communicator:          backend.NewNodeCommunicator(backendConfig.CircuitBreakerConfig.Enabled),
+				TxResultCacheSize:     builder.TxResultCacheSize,
+				ScriptExecutor:        builder.ScriptExecutor,
+				ScriptExecutionMode:   scriptExecMode,
+				CheckPayerBalanceMode: checkPayerBalanceMode,
+				EventQueryMode:        eventQueryMode,
+				BlockTracker:          blockTracker,
 				SubscriptionHandler: subscription.NewSubscriptionHandler(
 					builder.Logger,
 					broadcaster,
@@ -2004,12 +2021,13 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 					builder.stateStreamConf.ResponseLimit,
 					builder.stateStreamConf.ClientSendBufferSize,
 				),
-				EventsIndex:         builder.EventsIndex,
-				TxResultQueryMode:   txResultQueryMode,
-				TxResultsIndex:      builder.TxResultsIndex,
-				LastFullBlockHeight: lastFullBlockHeight,
-				IndexReporter:       indexReporter,
-				VersionControl:      builder.VersionControl,
+				EventsIndex:                builder.EventsIndex,
+				TxResultQueryMode:          txResultQueryMode,
+				TxResultsIndex:             builder.TxResultsIndex,
+				LastFullBlockHeight:        lastFullBlockHeight,
+				IndexReporter:              indexReporter,
+				VersionControl:             builder.VersionControl,
+				ExecNodeIdentitiesProvider: builder.ExecNodeIdentitiesProvider,
 			})
 			if err != nil {
 				return nil, fmt.Errorf("could not initialize backend: %w", err)
@@ -2063,25 +2081,12 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 				return nil, fmt.Errorf("could not create requester engine: %w", err)
 			}
 
-			preferredENIdentifiers, err := commonrpc.IdentifierList(builder.rpcConf.BackendConfig.PreferredExecutionNodeIDs)
-			if err != nil {
-				return nil, fmt.Errorf("failed to convert node id string to Flow Identifier for preferred EN map: %w", err)
-			}
-
-			fixedENIdentifiers, err := commonrpc.IdentifierList(builder.rpcConf.BackendConfig.FixedExecutionNodeIDs)
-			if err != nil {
-				return nil, fmt.Errorf("failed to convert node id string to Flow Identifier for fixed EN map: %w", err)
-			}
-
 			if builder.storeTxResultErrorMessages {
 				builder.TxResultErrorMessagesCore = tx_error_messages.NewTxErrorMessagesCore(
 					node.Logger,
-					node.State,
 					builder.nodeBackend,
-					node.Storage.Receipts,
 					node.Storage.TransactionResultErrorMessages,
-					preferredENIdentifiers,
-					fixedENIdentifiers,
+					builder.ExecNodeIdentitiesProvider,
 				)
 			}
 
