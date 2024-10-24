@@ -25,6 +25,7 @@ import (
 
 	"github.com/onflow/crypto"
 	"github.com/onflow/crypto/hash"
+
 	"github.com/onflow/flow-go/access"
 	flowgo "github.com/onflow/flow-go/model/flow"
 )
