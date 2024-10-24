@@ -8,7 +8,6 @@ import (
 
 	"github.com/onflow/cadence"
 	"github.com/onflow/cadence/encoding/ccf"
-	convert2 "github.com/onflow/flow-emulator/convert"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/require"
 
@@ -28,6 +27,7 @@ import (
 	"github.com/onflow/flow-go/integration/benchmark/common"
 	"github.com/onflow/flow-go/integration/benchmark/load"
 	"github.com/onflow/flow-go/integration/convert"
+	"github.com/onflow/flow-go/integration/internal/emulator"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -254,7 +254,7 @@ func (t *testTransactionSender) Send(tx *sdk.Transaction) (sdk.TransactionResult
 		Error:         result.Err,
 		BlockID:       sdk.EmptyID,
 		BlockHeight:   0,
-		TransactionID: convert2.FlowIdentifierToSDK(txBody.ID()),
+		TransactionID: emulator.FlowIdentifierToSDK(txBody.ID()),
 		CollectionID:  sdk.EmptyID,
 	}
 

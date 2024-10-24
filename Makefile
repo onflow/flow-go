@@ -101,7 +101,7 @@ go-math-rand-check:
 	#   - "onflow/crypto/random" for deterministic randomness
 	grep --include=\*.go \
 	--exclude=*test* --exclude=*helper* --exclude=*example* --exclude=*fixture* --exclude=*benchmark* --exclude=*profiler* \
-    --exclude-dir=*test* --exclude-dir=*helper* --exclude-dir=*example* --exclude-dir=*fixture* --exclude-dir=*benchmark* --exclude-dir=*profiler* -rnw '"math/rand"'; \
+    --exclude-dir=*test* --exclude-dir=*helper* --exclude-dir=*example* --exclude-dir=*fixture* --exclude-dir=*benchmark* --exclude-dir=*profiler* --exclude-dir=*emulator* -rnw '"math/rand"'; \
     if [ $$? -ne 1 ]; then \
        echo "[Error] Go production code should not use math/rand package"; exit 1; \
     fi
