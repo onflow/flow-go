@@ -1684,7 +1684,7 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 				return err
 			}
 
-			builder.BlockTransactions, err = stdmap.NewIdentifierMap(100)
+			builder.BlockTransactions, err = stdmap.NewIdentifierMap(10000)
 			if err != nil {
 				return err
 			}
