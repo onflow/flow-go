@@ -216,7 +216,7 @@ func (computer ExecutionParametersComputer) getExecutionParameters() (
 		return overrides, err
 	}
 
-	executionVersion, err := GetMinimumExecutionVersion(computer.log, computer.ctx, env)
+	executionVersion, err := GetMinimumRequiredExecutionVersion(computer.log, computer.ctx, env)
 	err = setIfOk(
 		"execution version",
 		err,
@@ -358,7 +358,7 @@ func GetExecutionMemoryLimit(
 	return uint64(memoryLimitRaw), nil
 }
 
-func GetMinimumExecutionVersion(
+func GetMinimumRequiredExecutionVersion(
 	log zerolog.Logger,
 	ctx Context,
 	env environment.Environment,
@@ -367,6 +367,7 @@ func GetMinimumExecutionVersion(
 		return semver.Version{}, nil
 	}
 
+	// the current version boundary defines a block height and a minimum required version that is required past that block height.
 	value, err := env.GetCurrentVersionBoundary()
 
 	if err != nil {

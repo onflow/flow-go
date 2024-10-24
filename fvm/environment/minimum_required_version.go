@@ -27,12 +27,12 @@ func NewMinimumRequiredVersion(
 func (c minimumRequiredVersion) MinimumRequiredVersion() (string, error) {
 	executionParameters := c.txnPreparer.ExecutionParameters()
 
-	cadenceVersion := mapToCadenceVersion(executionParameters.ExecutionVersion)
+	cadenceVersion := mapToCadenceVersion(executionParameters.ExecutionVersion, fvmToCadenceVersionMapping)
 
 	return cadenceVersion.String(), nil
 }
 
-func mapToCadenceVersion(version semver.Version) semver.Version {
+func mapToCadenceVersion(flowGoVersion semver.Version, versionMapping []VersionMapEntry) semver.Version {
 	// return 0.0.0 if there is no mapping for the version
 	var cadenceVersion = semver.Version{}
 
@@ -40,8 +40,8 @@ func mapToCadenceVersion(version semver.Version) semver.Version {
 		return version.Compare(versionToCompare) >= 0
 	}
 
-	for _, entry := range fvmToCadenceVersionMapping {
-		if greaterThanOrEqualTo(version, entry.FlowGoVersion) {
+	for _, entry := range versionMapping {
+		if greaterThanOrEqualTo(flowGoVersion, entry.FlowGoVersion) {
 			cadenceVersion = entry.CadenceVersion
 		} else {
 			break
@@ -59,8 +59,7 @@ type VersionMapEntry struct {
 // FVMToCadenceVersionMapping is a hardcoded mapping between FVM versions and Cadence versions.
 // Entries are only needed for cadence versions where cadence intends to switch behaviour
 // based on the version.
-// This should be ordered.
-
+// This should be ordered in ascending order by FlowGoVersion.
 var fvmToCadenceVersionMapping = []VersionMapEntry{
 	// Leaving this example in, so it's easier to understand
 	//{

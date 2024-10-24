@@ -1183,6 +1183,7 @@ func convertVersionBoundaries(array cadence.Array) (
 	return boundaries, nil
 }
 
+// VersionBoundary decodes a single version boundary from the given Cadence value.
 func VersionBoundary(value cadence.Value) (
 	flow.VersionBoundary,
 	error,
