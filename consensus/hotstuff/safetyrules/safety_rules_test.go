@@ -31,7 +31,7 @@ type SafetyRulesTestSuite struct {
 	suite.Suite
 
 	bootstrapBlock   *model.Block
-	proposal         *model.Proposal
+	proposal         *model.SignedProposal
 	proposerIdentity *flow.Identity
 	ourIdentity      *flow.Identity
 	signer           *mocks.Signer
@@ -50,13 +50,13 @@ func (s *SafetyRulesTestSuite) SetupTest() {
 
 	// bootstrap at random bootstrapBlock
 	s.bootstrapBlock = helper.MakeBlock(helper.WithBlockView(100))
-	s.proposal = helper.MakeProposal(
+	s.proposal = helper.MakeSignedProposal(helper.WithProposal(helper.MakeProposal(
 		helper.WithBlock(
 			helper.MakeBlock(
 				helper.WithParentBlock(s.bootstrapBlock),
 				helper.WithBlockView(s.bootstrapBlock.View+1),
 				helper.WithBlockProposer(s.proposerIdentity.NodeID)),
-		))
+		))))
 
 	s.committee.On("Self").Return(s.ourIdentity.NodeID).Maybe()
 	s.committee.On("LeaderForView", mock.Anything).Return(s.proposerIdentity.NodeID, nil).Maybe()
@@ -104,13 +104,13 @@ func (s *SafetyRulesTestSuite) TestProduceVote_ShouldVote() {
 		helper.WithTCNewestQC(s.proposal.Block.QC))
 
 	// voting on proposal where last view ended with TC
-	proposalWithTC := helper.MakeProposal(
+	proposalWithTC := helper.MakeSignedProposal(helper.WithProposal(helper.MakeProposal(
 		helper.WithBlock(
 			helper.MakeBlock(
 				helper.WithParentBlock(s.bootstrapBlock),
 				helper.WithBlockView(s.proposal.Block.View+2),
 				helper.WithBlockProposer(s.proposerIdentity.NodeID))),
-		helper.WithLastViewTC(lastViewTC))
+		helper.WithLastViewTC(lastViewTC))))
 
 	expectedSafetyData = &hotstuff.SafetyData{
 		LockedOneChainView:      s.proposal.Block.QC.View,
@@ -139,13 +139,13 @@ func (s *SafetyRulesTestSuite) TestProduceVote_IncludedQCHigherThanTCsQC() {
 		helper.WithTCNewestQC(s.proposal.Block.QC))
 
 	// voting on proposal where last view ended with TC
-	proposalWithTC := helper.MakeProposal(
+	proposalWithTC := helper.MakeSignedProposal(helper.WithProposal(helper.MakeProposal(
 		helper.WithBlock(
 			helper.MakeBlock(
 				helper.WithParentBlock(s.proposal.Block),
 				helper.WithBlockView(s.proposal.Block.View+2),
 				helper.WithBlockProposer(s.proposerIdentity.NodeID))),
-		helper.WithLastViewTC(lastViewTC))
+		helper.WithLastViewTC(lastViewTC))))
 
 	expectedSafetyData := &hotstuff.SafetyData{
 		LockedOneChainView:      proposalWithTC.Block.QC.View,
@@ -210,13 +210,13 @@ func (s *SafetyRulesTestSuite) TestProduceVote_InvalidCurrentView() {
 	})
 	s.Run("view-not-monotonously-increasing", func() {
 		// create block with view < HighestAcknowledgedView
-		proposal := helper.MakeProposal(
+		proposal := helper.MakeSignedProposal(helper.WithProposal(helper.MakeProposal(
 			helper.WithBlock(
 				helper.MakeBlock(
 					func(block *model.Block) {
 						block.QC = helper.MakeQC(helper.WithQCView(s.safetyData.HighestAcknowledgedView - 2))
 					},
-					helper.WithBlockView(s.safetyData.HighestAcknowledgedView-1))))
+					helper.WithBlockView(s.safetyData.HighestAcknowledgedView-1))))))
 		vote, err := s.safety.ProduceVote(proposal, proposal.Block.View)
 		require.Nil(s.T(), vote)
 		require.Error(s.T(), err)
@@ -362,12 +362,12 @@ func (s *SafetyRulesTestSuite) TestProduceVote_VotingOnInvalidProposals() {
 
 	// a proposal which includes a QC for the previous round should not contain a TC
 	s.Run("proposal-includes-last-view-qc-and-tc", func() {
-		proposal := helper.MakeProposal(
+		proposal := helper.MakeSignedProposal(helper.WithProposal(helper.MakeProposal(
 			helper.WithBlock(
 				helper.MakeBlock(
 					helper.WithParentBlock(s.bootstrapBlock),
 					helper.WithBlockView(s.bootstrapBlock.View+1))),
-			helper.WithLastViewTC(helper.MakeTC()))
+			helper.WithLastViewTC(helper.MakeTC()))))
 		s.committee.On("IdentityByBlock", proposal.Block.BlockID, proposal.Block.ProposerID).Return(s.proposerIdentity, nil).Maybe()
 		vote, err := s.safety.ProduceVote(proposal, proposal.Block.View)
 		require.Error(s.T(), err)
@@ -376,11 +376,11 @@ func (s *SafetyRulesTestSuite) TestProduceVote_VotingOnInvalidProposals() {
 	})
 	s.Run("no-last-view-tc", func() {
 		// create block where Block.View != Block.QC.View+1 and LastViewTC = nil
-		proposal := helper.MakeProposal(
+		proposal := helper.MakeSignedProposal(helper.WithProposal(helper.MakeProposal(
 			helper.WithBlock(
 				helper.MakeBlock(
 					helper.WithParentBlock(s.bootstrapBlock),
-					helper.WithBlockView(s.bootstrapBlock.View+2))))
+					helper.WithBlockView(s.bootstrapBlock.View+2))))))
 		vote, err := s.safety.ProduceVote(proposal, proposal.Block.View)
 		require.Error(s.T(), err)
 		require.False(s.T(), model.IsNoVoteError(err))
@@ -389,14 +389,14 @@ func (s *SafetyRulesTestSuite) TestProduceVote_VotingOnInvalidProposals() {
 	s.Run("last-view-tc-invalid-view", func() {
 		// create block where Block.View != Block.QC.View+1 and
 		// Block.View != LastViewTC.View+1
-		proposal := helper.MakeProposal(
+		proposal := helper.MakeSignedProposal(helper.WithProposal(helper.MakeProposal(
 			helper.WithBlock(
 				helper.MakeBlock(
 					helper.WithParentBlock(s.bootstrapBlock),
 					helper.WithBlockView(s.bootstrapBlock.View+2))),
 			helper.WithLastViewTC(
 				helper.MakeTC(
-					helper.WithTCView(s.bootstrapBlock.View))))
+					helper.WithTCView(s.bootstrapBlock.View))))))
 		vote, err := s.safety.ProduceVote(proposal, proposal.Block.View)
 		require.Error(s.T(), err)
 		require.False(s.T(), model.IsNoVoteError(err))
@@ -406,7 +406,7 @@ func (s *SafetyRulesTestSuite) TestProduceVote_VotingOnInvalidProposals() {
 		// create block where Block.View != Block.QC.View+1 and
 		// Block.View == LastViewTC.View+1 and Block.QC.View >= Block.View
 		// in this case block is not safe to extend since proposal includes QC which is newer than the proposal itself.
-		proposal := helper.MakeProposal(
+		proposal := helper.MakeSignedProposal(helper.WithProposal(helper.MakeProposal(
 			helper.WithBlock(
 				helper.MakeBlock(
 					helper.WithParentBlock(s.bootstrapBlock),
@@ -416,7 +416,7 @@ func (s *SafetyRulesTestSuite) TestProduceVote_VotingOnInvalidProposals() {
 					})),
 			helper.WithLastViewTC(
 				helper.MakeTC(
-					helper.WithTCView(s.bootstrapBlock.View+1))))
+					helper.WithTCView(s.bootstrapBlock.View+1))))))
 		vote, err := s.safety.ProduceVote(proposal, proposal.Block.View)
 		require.Error(s.T(), err)
 		require.False(s.T(), model.IsNoVoteError(err))
@@ -428,7 +428,7 @@ func (s *SafetyRulesTestSuite) TestProduceVote_VotingOnInvalidProposals() {
 		// in this case block is not safe to extend since proposal is built on top of QC, which is lower
 		// than QC presented in LastViewTC.
 		TONewestQC := helper.MakeQC(helper.WithQCView(s.bootstrapBlock.View + 1))
-		proposal := helper.MakeProposal(
+		proposal := helper.MakeSignedProposal(helper.WithProposal(helper.MakeProposal(
 			helper.WithBlock(
 				helper.MakeBlock(
 					helper.WithParentBlock(s.bootstrapBlock),
@@ -436,7 +436,7 @@ func (s *SafetyRulesTestSuite) TestProduceVote_VotingOnInvalidProposals() {
 			helper.WithLastViewTC(
 				helper.MakeTC(
 					helper.WithTCView(s.bootstrapBlock.View+1),
-					helper.WithTCNewestQC(TONewestQC))))
+					helper.WithTCNewestQC(TONewestQC))))))
 		vote, err := s.safety.ProduceVote(proposal, proposal.Block.View)
 		require.Error(s.T(), err)
 		require.False(s.T(), model.IsNoVoteError(err))
@@ -464,13 +464,13 @@ func (s *SafetyRulesTestSuite) TestProduceVote_VoteEquivocation() {
 	require.NotNil(s.T(), vote)
 	require.Equal(s.T(), expectedVote, vote)
 
-	equivocatingProposal := helper.MakeProposal(
+	equivocatingProposal := helper.MakeSignedProposal(helper.WithProposal(helper.MakeProposal(
 		helper.WithBlock(
 			helper.MakeBlock(
 				helper.WithParentBlock(s.bootstrapBlock),
 				helper.WithBlockView(s.bootstrapBlock.View+1),
 				helper.WithBlockProposer(s.proposerIdentity.NodeID)),
-		))
+		))))
 
 	// voting at same view(even different proposal) should result in NoVoteError
 	vote, err = s.safety.ProduceVote(equivocatingProposal, s.proposal.Block.View)
@@ -480,7 +480,7 @@ func (s *SafetyRulesTestSuite) TestProduceVote_VoteEquivocation() {
 	s.proposal.Block.ProposerID = s.ourIdentity.NodeID
 
 	// proposing at the same view should result in NoVoteError since we have already voted
-	vote, err = s.safety.SignOwnProposal(s.proposal)
+	vote, err = s.safety.SignOwnProposal(&s.proposal.Proposal)
 	require.True(s.T(), model.IsNoVoteError(err))
 	require.Nil(s.T(), vote)
 }
@@ -764,7 +764,7 @@ func (s *SafetyRulesTestSuite) TestSignOwnProposal() {
 	s.committee.On("LeaderForView", s.proposal.Block.View).Return(s.ourIdentity.NodeID, nil).Once()
 	s.signer.On("CreateVote", s.proposal.Block).Return(expectedVote, nil).Once()
 	s.persister.On("PutSafetyData", expectedSafetyData).Return(nil).Once()
-	vote, err := s.safety.SignOwnProposal(s.proposal)
+	vote, err := s.safety.SignOwnProposal(&s.proposal.Proposal)
 	require.NoError(s.T(), err)
 	require.Equal(s.T(), vote, expectedVote)
 }
@@ -772,7 +772,7 @@ func (s *SafetyRulesTestSuite) TestSignOwnProposal() {
 // TestSignOwnProposal_ProposalNotSelf tests that we cannot sign a proposal that is not ours. We
 // verify that SafetyRules returns an exception and not the benign sentinel error NoVoteError.
 func (s *SafetyRulesTestSuite) TestSignOwnProposal_ProposalNotSelf() {
-	vote, err := s.safety.SignOwnProposal(s.proposal)
+	vote, err := s.safety.SignOwnProposal(&s.proposal.Proposal)
 	require.Error(s.T(), err)
 	require.False(s.T(), model.IsNoVoteError(err))
 	require.Nil(s.T(), vote)
@@ -786,7 +786,7 @@ func (s *SafetyRulesTestSuite) TestSignOwnProposal_SelfInvalidLeader() {
 	require.NotEqual(s.T(), otherID, s.ourIdentity.NodeID)
 	s.committee.On("LeaderForView").Unset()
 	s.committee.On("LeaderForView", s.proposal.Block.View).Return(otherID, nil).Once()
-	vote, err := s.safety.SignOwnProposal(s.proposal)
+	vote, err := s.safety.SignOwnProposal(&s.proposal.Proposal)
 	require.Error(s.T(), err)
 	require.False(s.T(), model.IsNoVoteError(err))
 	require.Nil(s.T(), vote)
@@ -811,12 +811,12 @@ func (s *SafetyRulesTestSuite) TestSignOwnProposal_ProposalEquivocation() {
 	s.signer.On("CreateVote", s.proposal.Block).Return(expectedVote, nil).Once()
 	s.persister.On("PutSafetyData", expectedSafetyData).Return(nil).Once()
 
-	vote, err := s.safety.SignOwnProposal(s.proposal)
+	vote, err := s.safety.SignOwnProposal(&s.proposal.Proposal)
 	require.NoError(s.T(), err)
 	require.Equal(s.T(), expectedVote, vote)
 
 	// signing same proposal again should return an error since we have already created a proposal for this view
-	vote, err = s.safety.SignOwnProposal(s.proposal)
+	vote, err = s.safety.SignOwnProposal(&s.proposal.Proposal)
 	require.Error(s.T(), err)
 	require.True(s.T(), model.IsNoVoteError(err))
 	require.Nil(s.T(), vote)

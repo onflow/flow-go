@@ -1047,7 +1047,7 @@ func CopyCheckpointFile(filename string, from string, to string) (
 	[]string,
 	error,
 ) {
-	// It's possible that the trie dir does not yet exist. If not this will create the the required path
+	// It's possible that the trie dir does not yet exist. If not this will create the required path
 	err := os.MkdirAll(to, 0700)
 	if err != nil {
 		return nil, err
@@ -1091,7 +1091,7 @@ func CopyCheckpointFile(filename string, from string, to string) (
 // the `to` directory
 func SoftlinkCheckpointFile(filename string, from string, to string) ([]string, error) {
 
-	// It's possible that the trie dir does not yet exist. If not this will create the the required path
+	// It's possible that the trie dir does not yet exist. If not this will create the required path
 	err := os.MkdirAll(to, 0700)
 	if err != nil {
 		return nil, err

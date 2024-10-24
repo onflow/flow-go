@@ -84,13 +84,13 @@ func (s *VoteAggregatorTestSuite) TestOnFinalizedBlock() {
 // an input to AddBlock (only expects _valid_ blocks per API contract).
 // The exception should be propagated to the VoteAggregator's internal `ComponentManager`.
 func (s *VoteAggregatorTestSuite) TestProcessInvalidBlock() {
-	block := helper.MakeProposal(
+	block := helper.MakeSignedProposal(helper.WithProposal(helper.MakeProposal(
 		helper.WithBlock(
 			helper.MakeBlock(
 				helper.WithBlockView(100),
 			),
 		),
-	)
+	)))
 	processed := make(chan struct{})
 	collector := mocks.NewVoteCollector(s.T())
 	collector.On("ProcessBlock", block).Run(func(_ mock.Arguments) {

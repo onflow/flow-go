@@ -77,7 +77,7 @@ The jobqueue architecture is optimized for "pull" style processes, where the job
 Some use cases might require "push" style jobs where there is a job producer that create new jobs, and a consumer that processes work from the producer. This is possible with the jobqueue, but requires the producer persist the jobs to a database, then implement the `Head` and `AtIndex` methods that allow accessing jobs by sequential `uint64` indexes.
 
 ### TODOs
-1. Jobs at different index are processed in parallel, it's possible that there is a job takes a long time to work on, and causing too many completed jobs cached in memory before being used to update the the last processed job index.
+1. Jobs at different index are processed in parallel, it's possible that there is a job takes a long time to work on, and causing too many completed jobs cached in memory before being used to update the last processed job index.
   `maxSearchAhead` will allow the job consumer to stop consume more blocks if too many jobs are completed, but the job at index lastProcesssed + 1 has not been unprocessed yet.
   The difference between `maxSearchAhead` and `maxProcessing` is that: `maxProcessing` allows at most `maxProcessing` number of works to process jobs. However, even if there is worker available, it might not be assigned to a job, because the job at index lastProcesssed +1 has not been done, it won't work on an job with index higher than `lastProcesssed + maxSearchAhead`.
 2. accept callback to get notified when the consecutive job index is finished.

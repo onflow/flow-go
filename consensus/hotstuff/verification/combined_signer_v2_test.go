@@ -75,10 +75,10 @@ func TestCombinedSignWithBeaconKey(t *testing.T) {
 	safetyRules, err := safetyrules.New(signer, persist, committee)
 	require.NoError(t, err)
 
-	// check that a created proposal can be verified by a verifier
+	// check that the proposer's vote for their own block (i.e. the proposer signature in the header) passes verification
 	vote, err := safetyRules.SignOwnProposal(proposal)
 	require.NoError(t, err)
-	proposal.SigData = vote.SigData
+
 	err = verifier.VerifyVote(&ourIdentity.IdentitySkeleton, vote.SigData, proposal.Block.View, proposal.Block.BlockID)
 	require.NoError(t, err)
 
@@ -92,7 +92,7 @@ func TestCombinedSignWithBeaconKey(t *testing.T) {
 	require.NoError(t, err)
 
 	expectedSig := msig.EncodeDoubleSig(stakingSig, beaconSig)
-	require.Equal(t, expectedSig, proposal.SigData)
+	require.Equal(t, expectedSig, vote.SigData)
 
 	// vote should be valid
 	vote, err = signer.CreateVote(block)
@@ -187,10 +187,9 @@ func TestCombinedSignWithNoBeaconKey(t *testing.T) {
 	safetyRules, err := safetyrules.New(signer, persist, committee)
 	require.NoError(t, err)
 
-	// check that a created proposal can be verified by a verifier
+	// check that the proposer's vote for their own block (i.e. the proposer signature in the header) passes verification
 	vote, err := safetyRules.SignOwnProposal(proposal)
 	require.NoError(t, err)
-	proposal.SigData = vote.SigData
 
 	err = verifier.VerifyVote(&ourIdentity.IdentitySkeleton, vote.SigData, proposal.Block.View, proposal.Block.BlockID)
 	require.NoError(t, err)
@@ -202,7 +201,7 @@ func TestCombinedSignWithNoBeaconKey(t *testing.T) {
 		msig.NewBLSHasher(msig.ConsensusVoteTag),
 	)
 	require.NoError(t, err)
-	require.Equal(t, expectedStakingSig, crypto.Signature(proposal.SigData))
+	require.Equal(t, expectedStakingSig, crypto.Signature(vote.SigData))
 }
 
 // Test_VerifyQC_EmptySigners checks that Verifier returns an `model.InsufficientSignaturesError`
