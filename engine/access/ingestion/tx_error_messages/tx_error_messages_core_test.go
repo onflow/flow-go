@@ -259,13 +259,7 @@ func (s *TxErrorMessagesCoreSuite) initCore() *TxErrorMessagesCore {
 		s.log,
 		backend,
 		s.txErrorMessages,
-		commonrpc.NewExecutionNodeIdentitiesProvider(
-			s.log,
-			s.proto.state,
-			s.receipts,
-			flow.IdentifierList{},
-			flow.IdentifierList{},
-		),
+		execNodeIdentitiesProvider,
 	)
 	return core
 }

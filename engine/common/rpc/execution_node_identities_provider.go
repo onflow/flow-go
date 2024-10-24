@@ -58,8 +58,6 @@ type ExecutionNodeIdentitiesProvider struct {
 //     are prioritized during selection.
 //   - fixedENIdentifiers: A flow.IdentifierList of fixed execution node identifiers that are
 //     always considered if available.
-//
-// No error returns are expected during normal operations.
 func NewExecutionNodeIdentitiesProvider(
 	log zerolog.Logger,
 	state protocol.State,
