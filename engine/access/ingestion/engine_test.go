@@ -47,18 +47,19 @@ type Suite struct {
 		params   *protocol.Params
 	}
 
-	me             *modulemock.Local
-	net            *mocknetwork.Network
-	request        *modulemock.Requester
-	obsIdentity    *flow.Identity
-	provider       *mocknetwork.Engine
-	blocks         *storage.Blocks
-	headers        *storage.Headers
-	collections    *storage.Collections
-	transactions   *storage.Transactions
-	receipts       *storage.ExecutionReceipts
-	results        *storage.ExecutionResults
-	seals          *storage.Seals
+	me           *modulemock.Local
+	net          *mocknetwork.Network
+	request      *modulemock.Requester
+	obsIdentity  *flow.Identity
+	provider     *mocknetwork.Engine
+	blocks       *storage.Blocks
+	headers      *storage.Headers
+	collections  *storage.Collections
+	transactions *storage.Transactions
+	receipts     *storage.ExecutionReceipts
+	results      *storage.ExecutionResults
+	seals        *storage.Seals
+
 	conduit        *mocknetwork.Conduit
 	downloader     *downloadermock.Downloader
 	sealedBlock    *flow.Header
@@ -102,7 +103,6 @@ func (s *Suite) SetupTest() {
 	s.proto.params = new(protocol.Params)
 	s.finalizedBlock = unittest.BlockHeaderFixture(unittest.WithHeaderHeight(0))
 	s.proto.state.On("Identity").Return(s.obsIdentity, nil)
-	s.proto.state.On("Final").Return(s.proto.snapshot, nil)
 	s.proto.state.On("Params").Return(s.proto.params)
 	s.proto.snapshot.On("Head").Return(
 		func() *flow.Header {
@@ -119,7 +119,6 @@ func (s *Suite) SetupTest() {
 		Return(conduit, nil).
 		Once()
 	s.request = modulemock.NewRequester(s.T())
-
 	s.provider = mocknetwork.NewEngine(s.T())
 	s.blocks = storage.NewBlocks(s.T())
 	s.headers = storage.NewHeaders(s.T())
@@ -168,6 +167,10 @@ func (s *Suite) SetupTest() {
 	).Maybe()
 	s.proto.state.On("Final").Return(s.proto.snapshot, nil)
 
+	// Mock the finalized root block header with height 0.
+	header := unittest.BlockHeaderFixture(unittest.WithHeaderHeight(0))
+	s.proto.params.On("FinalizedRoot").Return(header, nil)
+
 	s.collectionExecutedMetric, err = indexer.NewCollectionExecutedMetricImpl(
 		s.log,
 		metrics.NewNoopCollector(),
@@ -192,7 +195,24 @@ func (s *Suite) initIngestionEngine(ctx irrecoverable.SignalerContext) *Engine {
 	)
 	require.NoError(s.T(), err)
 
-	eng, err := New(s.log, s.net, s.proto.state, s.me, s.request, s.blocks, s.headers, s.collections, s.transactions, s.results, s.receipts, s.collectionExecutedMetric, processedHeight, s.lastFullBlockHeight)
+	eng, err := New(
+		s.log,
+		s.net,
+		s.proto.state,
+		s.me,
+		s.request,
+		s.blocks,
+		s.headers,
+		s.collections,
+		s.transactions,
+		s.results,
+		s.receipts,
+		s.collectionExecutedMetric,
+		processedHeight,
+		s.lastFullBlockHeight,
+		nil,
+	)
+
 	require.NoError(s.T(), err)
 
 	eng.ComponentManager.Start(ctx)
