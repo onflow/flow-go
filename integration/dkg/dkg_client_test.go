@@ -10,10 +10,7 @@ import (
 	"github.com/stretchr/testify/suite"
 
 	"github.com/onflow/cadence"
-
 	jsoncdc "github.com/onflow/cadence/encoding/json"
-	emulator "github.com/onflow/flow-go/integration/emulator"
-
 	"github.com/onflow/crypto"
 	"github.com/onflow/flow-core-contracts/lib/go/contracts"
 	"github.com/onflow/flow-core-contracts/lib/go/templates"
@@ -23,6 +20,7 @@ import (
 	sdktemplates "github.com/onflow/flow-go-sdk/templates"
 	"github.com/onflow/flow-go-sdk/test"
 
+	emulator "github.com/onflow/flow-go/integration/emulator"
 	"github.com/onflow/flow-go/integration/utils"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/dkg"
