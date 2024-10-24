@@ -17,7 +17,8 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
-type Suite struct {
+// ENIdentitiesProviderSuite is a test suite for testing the ExecutionNodeIdentitiesProvider.
+type ENIdentitiesProviderSuite struct {
 	suite.Suite
 
 	state    *protocol.State
@@ -28,10 +29,11 @@ type Suite struct {
 }
 
 func TestHandler(t *testing.T) {
-	suite.Run(t, new(Suite))
+	suite.Run(t, new(ENIdentitiesProviderSuite))
 }
 
-func (suite *Suite) SetupTest() {
+// SetupTest initializes the test suite with mock state and receipts storage.
+func (suite *ENIdentitiesProviderSuite) SetupTest() {
 	suite.log = zerolog.New(zerolog.NewConsoleWriter())
 	suite.state = new(protocol.State)
 	suite.snapshot = new(protocol.Snapshot)
@@ -43,9 +45,10 @@ func (suite *Suite) SetupTest() {
 	suite.state.On("Params").Return(params)
 }
 
-// TestExecutionNodesForBlockID tests the ExecutionNodesForBlockID used for serving all API calls
-// that need to talk to an execution node.
-func (suite *Suite) TestExecutionNodesForBlockID() {
+// TestExecutionNodesForBlockID tests the ExecutionNodesForBlockID function.
+// This function is responsible for retrieving execution nodes used to serve
+// all API calls that interact with execution nodes.
+func (suite *ENIdentitiesProviderSuite) TestExecutionNodesForBlockID() {
 	totalReceipts := 5
 
 	block := unittest.BlockFixture()

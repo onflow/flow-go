@@ -95,7 +95,7 @@ func New(
 	// it reads the `txErrorMessagesProcessedHeight` and resume from `txErrorMessagesProcessedHeight + 1`.
 	// If the database is empty, rootHeight will be used to init the last processed height.
 	e.txErrorMessagesConsumer, err = jobqueue.NewComponentConsumer(
-		e.log.With().Str("module", "ingestion_tx_error_messages_consumer").Logger(),
+		e.log.With().Str("engine", "tx_error_messages").Logger(),
 		e.txErrorMessagesNotifier.Channel(),
 		txErrorMessagesProcessedHeight,
 		sealedBlockReader,

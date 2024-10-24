@@ -246,6 +246,8 @@ func (s *BackendAccountsSuite) TestGetAccountFromStorage_Fails() {
 		scriptExecutor.On("GetAccountAtBlockHeight", mock.Anything, s.failingAddress, s.block.Header.Height).
 			Return(nil, tt.err).Times(3)
 
+		s.state.On("Params").Return(s.params).Times(3)
+
 		s.Run(fmt.Sprintf("GetAccount - fails with %v", tt.err), func() {
 			s.testGetAccount(ctx, backend, tt.statusCode)
 		})
@@ -255,6 +257,9 @@ func (s *BackendAccountsSuite) TestGetAccountFromStorage_Fails() {
 		})
 
 		s.Run(fmt.Sprintf("GetAccountAtBlockHeight - fails with %v", tt.err), func() {
+			s.params.On("SporkRootBlockHeight").Return(s.block.Header.Height-10, nil)
+			s.params.On("SealedRoot").Return(s.block.Header, nil)
+
 			s.testGetAccountAtBlockHeight(ctx, backend, tt.statusCode)
 		})
 	}
@@ -287,6 +292,9 @@ func (s *BackendAccountsSuite) TestGetAccountFromFailover_HappyPath() {
 		})
 
 		s.Run(fmt.Sprintf("GetAccountAtBlockHeight - happy path - recovers %v", errToReturn), func() {
+			s.params.On("SporkRootBlockHeight").Return(s.block.Header.Height-10, nil)
+			s.params.On("SealedRoot").Return(s.block.Header, nil)
+
 			s.testGetAccountAtBlockHeight(ctx, backend, codes.OK)
 		})
 	}

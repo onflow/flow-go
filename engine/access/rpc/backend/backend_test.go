@@ -17,7 +17,6 @@ import (
 	execproto "github.com/onflow/flow/protobuf/go/flow/execution"
 	"github.com/rs/zerolog"
 	"github.com/sony/gobreaker"
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
@@ -1487,7 +1486,7 @@ func (suite *Suite) TestGetExecutionResultByID() {
 		// execute request
 		_, err = backend.GetExecutionResultByID(ctx, nonexistingID)
 
-		assert.Error(suite.T(), err)
+		suite.Assert().Error(err)
 	})
 
 	suite.Run("existing execution result id", func() {
@@ -1551,7 +1550,7 @@ func (suite *Suite) TestGetExecutionResultByBlockID() {
 		// execute request
 		_, err = backend.GetExecutionResultForBlockID(ctx, nonexistingBlockID)
 
-		assert.Error(suite.T(), err)
+		suite.Assert().Error(err)
 	})
 
 	suite.Run("existing execution results", func() {
@@ -2040,5 +2039,82 @@ func (suite *Suite) defaultBackendParams() Params {
 			suite.preferredExecutionNodeIDs,
 			suite.fixedExecutionNodeIDs,
 		),
+	}
+}
+
+// TestResolveHeightError tests the resolveHeightError function for various scenarios where the block height
+// is below the spork root height, below the node root height, above the node root height, or when a different
+// error is provided. It validates that resolveHeightError returns an appropriate error message for each case.
+//
+// Test cases:
+// 1) If height is below the spork root height, it suggests using a historic node.
+// 2) If height is below the node root height, it suggests using a different Access node.
+// 3) If height is above the node root height, it returns the original error without modification.
+// 4) If a non-storage-related error is provided, it returns the error as is.
+func (suite *Suite) TestResolveHeightError() {
+	tests := []struct {
+		name              string
+		height            uint64
+		sporkRootHeight   uint64
+		nodeRootHeight    uint64
+		genericErr        error
+		expectedErrorMsg  string
+		expectOriginalErr bool
+	}{
+		{
+			name:             "height below spork root height",
+			height:           uint64(50),
+			sporkRootHeight:  uint64(100),
+			nodeRootHeight:   uint64(200),
+			genericErr:       storage.ErrNotFound,
+			expectedErrorMsg: "block height %d is less than the spork root block height 100. Try to use a historic node: %v"},
+		{
+			name:              "height below node root height",
+			height:            uint64(150),
+			sporkRootHeight:   uint64(100),
+			nodeRootHeight:    uint64(200),
+			genericErr:        storage.ErrNotFound,
+			expectedErrorMsg:  "block height %d is less than the node's root block height 200. Try to use a different Access node: %v",
+			expectOriginalErr: false,
+		},
+		{
+			name:              "height above node root height",
+			height:            uint64(205),
+			sporkRootHeight:   uint64(100),
+			nodeRootHeight:    uint64(200),
+			genericErr:        storage.ErrNotFound,
+			expectedErrorMsg:  "%v",
+			expectOriginalErr: true,
+		},
+		{
+			name:              "non-storage related error",
+			height:            uint64(150),
+			sporkRootHeight:   uint64(100),
+			nodeRootHeight:    uint64(200),
+			genericErr:        fmt.Errorf("some other error"),
+			expectedErrorMsg:  "%v",
+			expectOriginalErr: true,
+		},
+	}
+
+	for _, test := range tests {
+		suite.T().Run(test.name, func(t *testing.T) {
+			stateParams := protocol.NewParams(suite.T())
+
+			if errors.Is(test.genericErr, storage.ErrNotFound) {
+				stateParams.On("SporkRootBlockHeight").Return(test.sporkRootHeight).Once()
+				sealedRootHeader := unittest.BlockHeaderWithHeight(test.nodeRootHeight)
+				stateParams.On("SealedRoot").Return(sealedRootHeader, nil).Once()
+			}
+
+			err := resolveHeightError(stateParams, test.height, test.genericErr)
+
+			if test.expectOriginalErr {
+				suite.Assert().True(errors.Is(err, test.genericErr))
+			} else {
+				expectedError := fmt.Sprintf(test.expectedErrorMsg, test.height, test.genericErr)
+				suite.Assert().Equal(err.Error(), expectedError)
+			}
+		})
 	}
 }
