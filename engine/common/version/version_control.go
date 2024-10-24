@@ -39,6 +39,7 @@ var NoHeight = uint64(0)
 // deployed during the HCU are backwards compatible for scripts.
 var defaultCompatibilityOverrides = map[string]struct{}{
 	"0.37.17": {},
+	"0.37.18": {},
 }
 
 // VersionControl manages the version control system for the node.
