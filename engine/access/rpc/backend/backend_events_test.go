@@ -438,6 +438,39 @@ func (s *BackendEventsSuite) TestGetEventsForHeightRange_HandlesErrors() {
 		s.Assert().Equal(codes.OutOfRange, status.Code(err))
 		s.Assert().Nil(response)
 	})
+
+	s.state.On("Params").Return(s.params)
+
+	s.Run("returns error for startHeight < spork root height", func() {
+		backend := s.defaultBackend()
+
+		sporkRootHeight := s.blocks[0].Header.Height - 10
+		startHeight := sporkRootHeight - 1
+
+		s.params.On("SporkRootBlockHeight").Return(sporkRootHeight).Once()
+		s.params.On("SealedRoot").Return(s.rootHeader, nil).Once()
+
+		response, err := backend.GetEventsForHeightRange(ctx, targetEvent, startHeight, endHeight, encoding)
+		s.Assert().Equal(codes.NotFound, status.Code(err))
+		s.Assert().ErrorContains(err, "Try to use a historic node")
+		s.Assert().Nil(response)
+	})
+
+	s.Run("returns error for startHeight < node root height", func() {
+		backend := s.defaultBackend()
+
+		sporkRootHeight := s.blocks[0].Header.Height - 10
+		nodeRootHeader := unittest.BlockHeaderWithHeight(s.blocks[0].Header.Height)
+		startHeight := nodeRootHeader.Height - 5
+
+		s.params.On("SporkRootBlockHeight").Return(sporkRootHeight).Once()
+		s.params.On("SealedRoot").Return(nodeRootHeader, nil).Once()
+
+		response, err := backend.GetEventsForHeightRange(ctx, targetEvent, startHeight, endHeight, encoding)
+		s.Assert().Equal(codes.NotFound, status.Code(err))
+		s.Assert().ErrorContains(err, "Try to use a different Access node")
+		s.Assert().Nil(response)
+	})
 }
 
 func (s *BackendEventsSuite) TestGetEventsForBlockIDs_HandlesErrors() {

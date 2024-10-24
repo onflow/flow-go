@@ -34,7 +34,7 @@ func NewTxErrorMessagesCore(
 	execNodeIdentitiesProvider *commonrpc.ExecutionNodeIdentitiesProvider,
 ) *TxErrorMessagesCore {
 	return &TxErrorMessagesCore{
-		log:                            log.With().Str("engine", "tx_error_messages_core").Logger(),
+		log:                            log.With().Str("module", "tx_error_messages_core").Logger(),
 		backend:                        backend,
 		transactionResultErrorMessages: transactionResultErrorMessages,
 		execNodeIdentitiesProvider:     execNodeIdentitiesProvider,

@@ -138,8 +138,8 @@ type FlowNodeBuilder struct {
 	adminCommandBootstrapper *admin.CommandRunnerBootstrapper
 	adminCommands            map[string]func(config *NodeConfig) commands.AdminCommand
 	componentBuilder         component.ComponentManagerBuilder
-	bootstrapNodeAddresses   []string
-	bootstrapNodePublicKeys  []string
+	BootstrapNodeAddresses   []string
+	BootstrapNodePublicKeys  []string
 }
 
 var _ NodeBuilder = (*FlowNodeBuilder)(nil)
@@ -254,13 +254,13 @@ func (fnb *FlowNodeBuilder) BaseFlags() {
 
 	// observer mode allows a unstaked execution node to fetch blocks from a public staked access node, and being able to execute blocks
 	fnb.flags.BoolVar(&fnb.BaseConfig.ObserverMode, "observer-mode", defaultConfig.ObserverMode, "whether the node is running in observer mode")
-	fnb.flags.StringSliceVar(&fnb.bootstrapNodePublicKeys,
+	fnb.flags.StringSliceVar(&fnb.BootstrapNodePublicKeys,
 		"observer-mode-bootstrap-node-public-keys",
-		nil,
+		[]string{},
 		"the networking public key of the bootstrap access node if this is an observer (in the same order as the bootstrap node addresses) e.g. \"d57a5e9c5.....\",\"44ded42d....\"")
-	fnb.flags.StringSliceVar(&fnb.bootstrapNodeAddresses,
+	fnb.flags.StringSliceVar(&fnb.BootstrapNodeAddresses,
 		"observer-mode-bootstrap-node-addresses",
-		nil,
+		[]string{},
 		"the network addresses of the bootstrap access node if this is an observer e.g. access-001.mainnet.flow.org:9653,access-002.mainnet.flow.org:9653")
 }
 
@@ -413,8 +413,13 @@ func (fnb *FlowNodeBuilder) EnqueueNetworkInit() {
 		}
 
 		if fnb.ObserverMode {
-			// observer mode only init pulbic libp2p node
-			publicLibp2pNode, err := fnb.BuildPublicLibp2pNode(myAddr)
+			// observer mode only init public libp2p node
+			ids, err := fnb.DeriveBootstrapPeerIdentities()
+			if err != nil {
+				return nil, fmt.Errorf("failed to derive bootstrap peer identities: %w", err)
+			}
+
+			publicLibp2pNode, err := fnb.BuildPublicLibp2pNode(myAddr, ids)
 			if err != nil {
 				return nil, fmt.Errorf("could not build public libp2p node: %w", err)
 			}
@@ -500,7 +505,18 @@ func (fnb *FlowNodeBuilder) HeroCacheMetricsFactory() metrics.HeroCacheMetricsFa
 	return metrics.NewNoopHeroCacheMetricsFactory()
 }
 
-// initPublicLibp2pNode creates a libp2p node for the observer service in the public (unstaked) network.
+// DeriveBootstrapPeerIdentities derives the Flow Identity of the bootstrap peers from the parameters.
+// These are the identities of the observers also acting as the DHT bootstrap server
+func (fnb *FlowNodeBuilder) DeriveBootstrapPeerIdentities() (flow.IdentitySkeletonList, error) {
+	ids, err := BootstrapIdentities(fnb.BootstrapNodeAddresses, fnb.BootstrapNodePublicKeys)
+	if err != nil {
+		return nil, fmt.Errorf("failed to derive bootstrap peer identities: %w", err)
+	}
+
+	return ids, nil
+}
+
+// BuildPublicLibp2pNode creates a libp2p node for the observer service in the public (unstaked) network.
 // The factory function is later passed into the initMiddleware function to eventually instantiate the p2p.LibP2PNode instance
 // The LibP2P host is created with the following options:
 // * DHT as client and seeded with the given bootstrap peers
@@ -515,24 +531,10 @@ func (fnb *FlowNodeBuilder) HeroCacheMetricsFactory() metrics.HeroCacheMetricsFa
 // Returns:
 // - p2p.LibP2PNode: the libp2p node
 // - error: if any error occurs. Any error returned is considered irrecoverable.
-func (fnb *FlowNodeBuilder) BuildPublicLibp2pNode(address string) (p2p.LibP2PNode, error) {
+func (fnb *FlowNodeBuilder) BuildPublicLibp2pNode(address string, bootstrapIdentities flow.IdentitySkeletonList) (p2p.LibP2PNode, error) {
 	var pis []peer.AddrInfo
 
-	ids, err := BootstrapIdentities(fnb.bootstrapNodeAddresses, fnb.bootstrapNodePublicKeys)
-	if err != nil {
-		return nil, fmt.Errorf("could not create bootstrap identities: %w", err)
-	}
-
-	for _, b := range ids {
-		pi, err := utils.PeerAddressInfo(*b)
-		if err != nil {
-			return nil, fmt.Errorf("could not extract peer address info from bootstrap identity %v: %w", b, err)
-		}
-
-		pis = append(pis, pi)
-	}
-
-	for _, b := range ids {
+	for _, b := range bootstrapIdentities {
 		pi, err := utils.PeerAddressInfo(*b)
 		if err != nil {
 			return nil, fmt.Errorf("could not extract peer address info from bootstrap identity %v: %w", b, err)

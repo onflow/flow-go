@@ -74,7 +74,7 @@ contract EVM {
         /// This data helps to replay the transactions without the need to
         /// have access to the full cadence state data.
         precompiledCalls: [UInt8],
-        /// stateUpdateChecksum provides a mean to validate 
+        /// stateUpdateChecksum provides a mean to validate
         /// the updates to the storage when re-executing a transaction off-chain.
         stateUpdateChecksum: [UInt8; 4]
     )
