@@ -12,6 +12,7 @@ import (
 	"github.com/onflow/flow-go/access"
 	"github.com/onflow/flow-go/engine/access/rest/middleware"
 	"github.com/onflow/flow-go/engine/access/rest/models"
+	"github.com/onflow/flow-go/engine/access/rest/ws_pub_sub/subscription_handlers"
 	"github.com/onflow/flow-go/engine/access/state_stream"
 	"github.com/onflow/flow-go/engine/access/state_stream/backend"
 	"github.com/onflow/flow-go/model/flow"
@@ -74,6 +75,20 @@ func (b *RouterBuilder) AddWsRoutes(
 			Name(r.Name).
 			Handler(h)
 	}
+
+	return b
+}
+
+// AddPubSubRoute adds WebSocket route for the pub/sub mechanism to the router.
+func (b *RouterBuilder) AddPubSubRoute(
+	chain flow.Chain,
+	subHandlerFactory *subscription_handlers.SubscriptionHandlerFactory,
+) *RouterBuilder {
+	b.v1SubRouter.
+		Methods(http.MethodGet).
+		Path("/ws").
+		Name("ws").
+		Handler(NewWSBrokerHandler(b.logger, chain, subHandlerFactory))
 
 	return b
 }

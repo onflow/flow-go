@@ -47,6 +47,9 @@ func NewServer(serverAPI access.API,
 		builder.AddWsRoutes(stateStreamApi, chain, stateStreamConfig)
 	}
 
+	//TODO: add SubscriptionHandlerFactory
+	builder.AddPubSubRoute(chain, nil)
+
 	c := cors.New(cors.Options{
 		AllowedOrigins: []string{"*"},
 		AllowedHeaders: []string{"*"},
