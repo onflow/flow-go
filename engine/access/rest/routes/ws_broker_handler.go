@@ -7,7 +7,7 @@ import (
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/engine/access/rest/models"
-	"github.com/onflow/flow-go/engine/access/rest/ws_pub_sub/subscription_handlers"
+	"github.com/onflow/flow-go/engine/access/rest/routes/subscription_handlers"
 	"github.com/onflow/flow-go/model/flow"
 )
 
