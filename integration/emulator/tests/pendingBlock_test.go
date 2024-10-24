@@ -444,7 +444,7 @@ func TestPendingBlockSetTimestamp(t *testing.T) {
 	b.SetClock(clock.Now)
 	_, _ = b.CommitBlock()
 
-	scriptResult, err = adapter.ExecuteScriptAtLatestBlock(
+	_, err = adapter.ExecuteScriptAtLatestBlock(
 		context.Background(),
 		script,
 		[][]byte{},
