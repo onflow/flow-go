@@ -9,6 +9,7 @@ import (
 
 	"github.com/onflow/flow-go/access"
 	"github.com/onflow/flow-go/engine/access/rest/routes"
+	"github.com/onflow/flow-go/engine/access/rest/routes/subscription_handlers"
 	"github.com/onflow/flow-go/engine/access/state_stream"
 	"github.com/onflow/flow-go/engine/access/state_stream/backend"
 	"github.com/onflow/flow-go/model/flow"
@@ -43,6 +44,7 @@ func NewServer(serverAPI access.API,
 	stateStreamConfig backend.Config,
 ) (*http.Server, error) {
 	builder := routes.NewRouterBuilder(logger, restCollector).AddRestRoutes(serverAPI, chain)
+	_ = subscription_handlers.NewSubscriptionHandlerFactory(stateStreamConfig.EventFilterConfig, stateStreamApi, serverAPI)
 	if stateStreamApi != nil {
 		builder.AddWsRoutes(stateStreamApi, chain, stateStreamConfig)
 	}
