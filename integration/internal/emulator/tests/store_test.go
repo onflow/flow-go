@@ -30,8 +30,8 @@ import (
 	"github.com/onflow/flow-go-sdk/test"
 
 	"github.com/onflow/flow-go/fvm/storage/snapshot"
-	"github.com/onflow/flow-go/integration/emulator"
-	"github.com/onflow/flow-go/integration/emulator/utils/unittest"
+	emulator "github.com/onflow/flow-go/integration/internal/emulator"
+	"github.com/onflow/flow-go/integration/internal/emulator/utils/unittest"
 	"github.com/onflow/flow-go/model/flow"
 	flowgo "github.com/onflow/flow-go/model/flow"
 )

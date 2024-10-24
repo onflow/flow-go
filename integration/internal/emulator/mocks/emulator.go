@@ -12,10 +12,11 @@ package mocks
 import (
 	reflect "reflect"
 
-	emulator "github.com/onflow/flow-go/integration/emulator"
-	access "github.com/onflow/flow-go/access"
-	flow "github.com/onflow/flow-go/model/flow"
 	gomock "go.uber.org/mock/gomock"
+
+	access "github.com/onflow/flow-go/access"
+	emulator "github.com/onflow/flow-go/integration/internal/emulator"
+	flow "github.com/onflow/flow-go/model/flow"
 )
 
 // MockEmulator is a mock of Emulator interface.

@@ -13,13 +13,12 @@ import (
 	"github.com/onflow/flow-core-contracts/lib/go/contracts"
 	"github.com/onflow/flow-core-contracts/lib/go/templates"
 
-	emulator "github.com/onflow/flow-go/integration/emulator"
-
 	sdk "github.com/onflow/flow-go-sdk"
 	sdkcrypto "github.com/onflow/flow-go-sdk/crypto"
 	sdktemplates "github.com/onflow/flow-go-sdk/templates"
 	"github.com/onflow/flow-go-sdk/test"
 
+	emulator "github.com/onflow/flow-go/integration/internal/emulator"
 	"github.com/onflow/flow-go/integration/utils"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/factory"

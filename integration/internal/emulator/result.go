@@ -24,6 +24,7 @@ import (
 	"github.com/onflow/cadence"
 
 	flowsdk "github.com/onflow/flow-go-sdk"
+
 	flowgo "github.com/onflow/flow-go/model/flow"
 )
 

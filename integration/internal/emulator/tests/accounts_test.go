@@ -33,7 +33,7 @@ import (
 	"github.com/onflow/flow-go-sdk/test"
 
 	fvmerrors "github.com/onflow/flow-go/fvm/errors"
-	"github.com/onflow/flow-go/integration/emulator"
+	emulator "github.com/onflow/flow-go/integration/internal/emulator"
 	flowgo "github.com/onflow/flow-go/model/flow"
 )
 

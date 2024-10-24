@@ -13,10 +13,11 @@ import (
 	context "context"
 	reflect "reflect"
 
-	emulator "github.com/onflow/flow-go/integration/emulator"
-	snapshot "github.com/onflow/flow-go/fvm/storage/snapshot"
-	flow "github.com/onflow/flow-go/model/flow"
 	gomock "go.uber.org/mock/gomock"
+
+	snapshot "github.com/onflow/flow-go/fvm/storage/snapshot"
+	"github.com/onflow/flow-go/integration/internal/emulator"
+	flow "github.com/onflow/flow-go/model/flow"
 )
 
 // MockEmulatorStorage is a mock of EmulatorStorage interface.

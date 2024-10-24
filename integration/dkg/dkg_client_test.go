@@ -20,7 +20,7 @@ import (
 	sdktemplates "github.com/onflow/flow-go-sdk/templates"
 	"github.com/onflow/flow-go-sdk/test"
 
-	emulator "github.com/onflow/flow-go/integration/emulator"
+	emulator "github.com/onflow/flow-go/integration/internal/emulator"
 	"github.com/onflow/flow-go/integration/utils"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/dkg"

@@ -27,7 +27,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/fvm/storage/snapshot"
-	"github.com/onflow/flow-go/integration/emulator"
+	"github.com/onflow/flow-go/integration/internal/emulator"
 	"github.com/onflow/flow-go/model/flow"
 	flowgo "github.com/onflow/flow-go/model/flow"
 )

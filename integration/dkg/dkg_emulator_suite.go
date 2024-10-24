@@ -23,7 +23,7 @@ import (
 	dkgeng "github.com/onflow/flow-go/engine/consensus/dkg"
 	"github.com/onflow/flow-go/engine/testutil"
 	"github.com/onflow/flow-go/fvm/systemcontracts"
-	"github.com/onflow/flow-go/integration/emulator"
+	emulator "github.com/onflow/flow-go/integration/internal/emulator"
 	"github.com/onflow/flow-go/integration/tests/lib"
 	"github.com/onflow/flow-go/integration/utils"
 	"github.com/onflow/flow-go/model/bootstrap"

@@ -27,7 +27,7 @@ import (
 	"github.com/onflow/flow-go/integration/benchmark/common"
 	"github.com/onflow/flow-go/integration/benchmark/load"
 	"github.com/onflow/flow-go/integration/convert"
-	"github.com/onflow/flow-go/integration/emulator"
+	"github.com/onflow/flow-go/integration/internal/emulator"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/utils/unittest"
 )

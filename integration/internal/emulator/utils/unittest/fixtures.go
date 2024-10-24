@@ -23,7 +23,7 @@ import (
 
 	"github.com/onflow/flow-go-sdk/test"
 
-	"github.com/onflow/flow-go/integration/emulator"
+	emulator "github.com/onflow/flow-go/integration/internal/emulator"
 	flowgo "github.com/onflow/flow-go/model/flow"
 )
 

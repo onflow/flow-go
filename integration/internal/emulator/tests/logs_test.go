@@ -21,30 +21,26 @@ package tests
 import (
 	"testing"
 
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/onflow/flow-go/integration/emulator"
+	"github.com/onflow/flow-go/integration/internal/emulator"
 )
 
-func TestAttachments(t *testing.T) {
+func TestRuntimeLogs(t *testing.T) {
 
 	t.Parallel()
 
 	b, err := emulator.New()
 	require.NoError(t, err)
 
-	script := `
-		access(all) resource R {}
-
-		access(all) attachment A for R {}
-
+	script := []byte(`
 		access(all) fun main() {
-			let r <- create R()
-			r[A]
-			destroy r
+			log("elephant ears")
 		}
-	`
+	`)
 
-	_, err = b.ExecuteScript([]byte(script), nil)
-	require.NoError(t, err)
+	result, err := b.ExecuteScript(script, nil)
+	assert.NoError(t, err)
+	assert.Equal(t, []string{`"elephant ears"`}, result.Logs)
 }
