@@ -44,13 +44,16 @@ func NewServer(serverAPI access.API,
 	stateStreamConfig backend.Config,
 ) (*http.Server, error) {
 	builder := routes.NewRouterBuilder(logger, restCollector).AddRestRoutes(serverAPI, chain)
-	_ = subscription_handlers.NewSubscriptionHandlerFactory(stateStreamConfig.EventFilterConfig, stateStreamApi, serverAPI)
 	if stateStreamApi != nil {
 		builder.AddWsRoutes(stateStreamApi, chain, stateStreamConfig)
 	}
 
-	//TODO: add SubscriptionHandlerFactory
-	builder.AddPubSubRoute(chain, nil)
+	subscriptionHandlerFactory := subscription_handlers.NewSubscriptionHandlerFactory(
+		stateStreamConfig.EventFilterConfig,
+		stateStreamApi,
+		serverAPI,
+	)
+	builder.AddPubSubRoute(chain, subscriptionHandlerFactory)
 
 	c := cors.New(cors.Options{
 		AllowedOrigins: []string{"*"},
