@@ -13,6 +13,7 @@ import (
 
 	access "github.com/onflow/flow-go/engine/access/mock"
 	connectionmock "github.com/onflow/flow-go/engine/access/rpc/connection/mock"
+	commonrpc "github.com/onflow/flow-go/engine/common/rpc"
 	"github.com/onflow/flow-go/engine/common/rpc/convert"
 	"github.com/onflow/flow-go/model/flow"
 	execmock "github.com/onflow/flow-go/module/execution/mock"
@@ -21,6 +22,7 @@ import (
 	"github.com/onflow/flow-go/storage"
 	storagemock "github.com/onflow/flow-go/storage/mock"
 	"github.com/onflow/flow-go/utils/unittest"
+	"github.com/onflow/flow-go/utils/unittest/mocks"
 
 	execproto "github.com/onflow/flow/protobuf/go/flow/execution"
 )
@@ -77,12 +79,18 @@ func (s *BackendAccountsSuite) SetupTest() {
 
 func (s *BackendAccountsSuite) defaultBackend() *backendAccounts {
 	return &backendAccounts{
-		log:               s.log,
-		state:             s.state,
-		headers:           s.headers,
-		executionReceipts: s.receipts,
-		connFactory:       s.connectionFactory,
-		nodeCommunicator:  NewNodeCommunicator(false),
+		log:              s.log,
+		state:            s.state,
+		headers:          s.headers,
+		connFactory:      s.connectionFactory,
+		nodeCommunicator: NewNodeCommunicator(false),
+		execNodeIdentitiesProvider: commonrpc.NewExecutionNodeIdentitiesProvider(
+			s.log,
+			s.state,
+			s.receipts,
+			flow.IdentifierList{},
+			flow.IdentifierList{},
+		),
 	}
 }
 
@@ -100,7 +108,7 @@ func (s *BackendAccountsSuite) setupExecutionNodes(block *flow.Block) {
 	s.receipts.On("ByBlockID", block.ID()).Return(receipts, nil)
 
 	s.connectionFactory.On("GetExecutionAPIClient", mock.Anything).
-		Return(s.execClient, &mockCloser{}, nil)
+		Return(s.execClient, &mocks.MockCloser{}, nil)
 }
 
 // setupENSuccessResponse configures the execution node client to return a successful response

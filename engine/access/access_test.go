@@ -26,6 +26,7 @@ import (
 	"github.com/onflow/flow-go/engine/access/rpc/backend"
 	connectionmock "github.com/onflow/flow-go/engine/access/rpc/connection/mock"
 	"github.com/onflow/flow-go/engine/access/subscription"
+	commonrpc "github.com/onflow/flow-go/engine/common/rpc"
 	"github.com/onflow/flow-go/engine/common/rpc/convert"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/factory"
@@ -267,10 +268,6 @@ func (suite *Suite) TestSendExpiredTransaction() {
 	})
 }
 
-type mockCloser struct{}
-
-func (mc *mockCloser) Close() error { return nil }
-
 // TestSendTransactionToRandomCollectionNode tests that collection nodes are chosen from the appropriate cluster when
 // forwarding transactions by sending two transactions bound for two different collection clusters.
 func (suite *Suite) TestSendTransactionToRandomCollectionNode() {
@@ -325,8 +322,8 @@ func (suite *Suite) TestSendTransactionToRandomCollectionNode() {
 
 		// create a mock connection factory
 		connFactory := connectionmock.NewConnectionFactory(suite.T())
-		connFactory.On("GetAccessAPIClient", collNode1.Address, nil).Return(col1ApiClient, &mockCloser{}, nil)
-		connFactory.On("GetAccessAPIClient", collNode2.Address, nil).Return(col2ApiClient, &mockCloser{}, nil)
+		connFactory.On("GetAccessAPIClient", collNode1.Address, nil).Return(col1ApiClient, &mocks.MockCloser{}, nil)
+		connFactory.On("GetAccessAPIClient", collNode2.Address, nil).Return(col2ApiClient, &mocks.MockCloser{}, nil)
 
 		bnd, err := backend.New(backend.Params{State: suite.state,
 			Collections:          collections,
@@ -629,7 +626,7 @@ func (suite *Suite) TestGetSealedTransaction() {
 
 		// create a mock connection factory
 		connFactory := connectionmock.NewConnectionFactory(suite.T())
-		connFactory.On("GetExecutionAPIClient", mock.Anything).Return(suite.execClient, &mockCloser{}, nil)
+		connFactory.On("GetExecutionAPIClient", mock.Anything).Return(suite.execClient, &mocks.MockCloser{}, nil)
 
 		// initialize storage
 		metrics := metrics.NewNoopCollector()
@@ -644,23 +641,32 @@ func (suite *Suite) TestGetSealedTransaction() {
 		blockTransactions, err := stdmap.NewIdentifierMap(100)
 		require.NoError(suite.T(), err)
 
-		bnd, err := backend.New(backend.Params{State: suite.state,
-			CollectionRPC:             suite.collClient,
-			Blocks:                    all.Blocks,
-			Headers:                   all.Headers,
-			Collections:               collections,
-			Transactions:              transactions,
-			ExecutionReceipts:         receipts,
-			ExecutionResults:          results,
-			ChainID:                   suite.chainID,
-			AccessMetrics:             suite.metrics,
-			ConnFactory:               connFactory,
-			MaxHeightRange:            backend.DefaultMaxHeightRange,
-			PreferredExecutionNodeIDs: enNodeIDs.Strings(),
-			Log:                       suite.log,
-			SnapshotHistoryLimit:      backend.DefaultSnapshotHistoryLimit,
-			Communicator:              backend.NewNodeCommunicator(false),
-			TxResultQueryMode:         backend.IndexQueryModeExecutionNodesOnly,
+		execNodeIdentitiesProvider := commonrpc.NewExecutionNodeIdentitiesProvider(
+			suite.log,
+			suite.state,
+			receipts,
+			enNodeIDs,
+			nil,
+		)
+
+		bnd, err := backend.New(backend.Params{
+			State:                      suite.state,
+			CollectionRPC:              suite.collClient,
+			Blocks:                     all.Blocks,
+			Headers:                    all.Headers,
+			Collections:                collections,
+			Transactions:               transactions,
+			ExecutionReceipts:          receipts,
+			ExecutionResults:           results,
+			ChainID:                    suite.chainID,
+			AccessMetrics:              suite.metrics,
+			ConnFactory:                connFactory,
+			MaxHeightRange:             backend.DefaultMaxHeightRange,
+			Log:                        suite.log,
+			SnapshotHistoryLimit:       backend.DefaultSnapshotHistoryLimit,
+			Communicator:               backend.NewNodeCommunicator(false),
+			TxResultQueryMode:          backend.IndexQueryModeExecutionNodesOnly,
+			ExecNodeIdentitiesProvider: execNodeIdentitiesProvider,
 		})
 		require.NoError(suite.T(), err)
 
@@ -809,7 +815,7 @@ func (suite *Suite) TestGetTransactionResult() {
 
 		// create a mock connection factory
 		connFactory := connectionmock.NewConnectionFactory(suite.T())
-		connFactory.On("GetExecutionAPIClient", mock.Anything).Return(suite.execClient, &mockCloser{}, nil)
+		connFactory.On("GetExecutionAPIClient", mock.Anything).Return(suite.execClient, &mocks.MockCloser{}, nil)
 
 		// initialize storage
 		metrics := metrics.NewNoopCollector()
@@ -826,23 +832,31 @@ func (suite *Suite) TestGetTransactionResult() {
 		blockTransactions, err := stdmap.NewIdentifierMap(100)
 		require.NoError(suite.T(), err)
 
+		execNodeIdentitiesProvider := commonrpc.NewExecutionNodeIdentitiesProvider(
+			suite.log,
+			suite.state,
+			receipts,
+			enNodeIDs,
+			nil,
+		)
+
 		bnd, err := backend.New(backend.Params{State: suite.state,
-			CollectionRPC:             suite.collClient,
-			Blocks:                    all.Blocks,
-			Headers:                   all.Headers,
-			Collections:               collections,
-			Transactions:              transactions,
-			ExecutionReceipts:         receipts,
-			ExecutionResults:          results,
-			ChainID:                   suite.chainID,
-			AccessMetrics:             suite.metrics,
-			ConnFactory:               connFactory,
-			MaxHeightRange:            backend.DefaultMaxHeightRange,
-			PreferredExecutionNodeIDs: enNodeIDs.Strings(),
-			Log:                       suite.log,
-			SnapshotHistoryLimit:      backend.DefaultSnapshotHistoryLimit,
-			Communicator:              backend.NewNodeCommunicator(false),
-			TxResultQueryMode:         backend.IndexQueryModeExecutionNodesOnly,
+			CollectionRPC:              suite.collClient,
+			Blocks:                     all.Blocks,
+			Headers:                    all.Headers,
+			Collections:                collections,
+			Transactions:               transactions,
+			ExecutionReceipts:          receipts,
+			ExecutionResults:           results,
+			ChainID:                    suite.chainID,
+			AccessMetrics:              suite.metrics,
+			ConnFactory:                connFactory,
+			MaxHeightRange:             backend.DefaultMaxHeightRange,
+			Log:                        suite.log,
+			SnapshotHistoryLimit:       backend.DefaultSnapshotHistoryLimit,
+			Communicator:               backend.NewNodeCommunicator(false),
+			TxResultQueryMode:          backend.IndexQueryModeExecutionNodesOnly,
+			ExecNodeIdentitiesProvider: execNodeIdentitiesProvider,
 		})
 		require.NoError(suite.T(), err)
 
@@ -1054,28 +1068,36 @@ func (suite *Suite) TestExecuteScript() {
 
 		// create a mock connection factory
 		connFactory := connectionmock.NewConnectionFactory(suite.T())
-		connFactory.On("GetExecutionAPIClient", mock.Anything).Return(suite.execClient, &mockCloser{}, nil)
+		connFactory.On("GetExecutionAPIClient", mock.Anything).Return(suite.execClient, &mocks.MockCloser{}, nil)
+
+		execNodeIdentitiesProvider := commonrpc.NewExecutionNodeIdentitiesProvider(
+			suite.log,
+			suite.state,
+			receipts,
+			nil,
+			identities.NodeIDs(),
+		)
 
 		var err error
 		suite.backend, err = backend.New(backend.Params{
-			State:                 suite.state,
-			CollectionRPC:         suite.collClient,
-			Blocks:                all.Blocks,
-			Headers:               all.Headers,
-			Collections:           collections,
-			Transactions:          transactions,
-			ExecutionReceipts:     receipts,
-			ExecutionResults:      results,
-			ChainID:               suite.chainID,
-			AccessMetrics:         suite.metrics,
-			ConnFactory:           connFactory,
-			MaxHeightRange:        backend.DefaultMaxHeightRange,
-			FixedExecutionNodeIDs: (identities.NodeIDs()).Strings(),
-			Log:                   suite.log,
-			SnapshotHistoryLimit:  backend.DefaultSnapshotHistoryLimit,
-			Communicator:          backend.NewNodeCommunicator(false),
-			ScriptExecutionMode:   backend.IndexQueryModeExecutionNodesOnly,
-			TxResultQueryMode:     backend.IndexQueryModeExecutionNodesOnly,
+			State:                      suite.state,
+			CollectionRPC:              suite.collClient,
+			Blocks:                     all.Blocks,
+			Headers:                    all.Headers,
+			Collections:                collections,
+			Transactions:               transactions,
+			ExecutionReceipts:          receipts,
+			ExecutionResults:           results,
+			ChainID:                    suite.chainID,
+			AccessMetrics:              suite.metrics,
+			ConnFactory:                connFactory,
+			MaxHeightRange:             backend.DefaultMaxHeightRange,
+			Log:                        suite.log,
+			SnapshotHistoryLimit:       backend.DefaultSnapshotHistoryLimit,
+			Communicator:               backend.NewNodeCommunicator(false),
+			ScriptExecutionMode:        backend.IndexQueryModeExecutionNodesOnly,
+			TxResultQueryMode:          backend.IndexQueryModeExecutionNodesOnly,
+			ExecNodeIdentitiesProvider: execNodeIdentitiesProvider,
 		})
 		require.NoError(suite.T(), err)
 
