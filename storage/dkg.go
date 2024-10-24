@@ -67,13 +67,7 @@ type SafeBeaconKeys interface {
 // It's not a problem by itself, but when the epoch recovery takes place, we need to query last valid beacon private key for
 // the current replica and set it for recovered epoch, otherwise replicas won't be able to vote for blocks in the recovered epoch.
 type EpochRecoveryDKGState interface {
-	// RetrieveMyBeaconPrivateKey retrieves the random beacon private key for an epoch.
-	//
-	// CAUTION: these keys are stored before they are validated against the
-	// canonical key vector and may not be valid for use in signing. Use SafeBeaconKeys
-	// to guarantee only keys safe for signing are returned
-	// Error returns: storage.ErrNotFound
-	RetrieveMyBeaconPrivateKey(epochCounter uint64) (crypto.PrivateKey, error)
+	SafeBeaconKeys
 
 	// OverwriteMyBeaconPrivateKey overwrites the random beacon private key for the epoch that recovers the protocol from
 	// epoch fallback mode. Effectively, this function overwrites whatever might be available in the database with
