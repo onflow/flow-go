@@ -3389,33 +3389,14 @@ func Test_MinimumRequiredVersion(t *testing.T) {
 				Patch:      3,
 				PreRelease: "rc.2",
 			}
-			flowVersion2 := semver.Version{
-				Major:      2,
-				Minor:      2,
-				Patch:      3,
-				PreRelease: "rc.1",
-			}
-			cadenceVersion2 := semver.Version{
-				Major:      12,
-				Minor:      0,
-				Patch:      0,
-				PreRelease: "",
-			}
 			environment.SetFVMToCadenceVersionMappingForTestingOnly(
-				[]environment.VersionMapEntry{
-					{
-						FlowGoVersion:  flowVersion1,
-						CadenceVersion: cadenceVersion1,
-					},
-					{
-						FlowGoVersion:  flowVersion2,
-						CadenceVersion: cadenceVersion2,
-					},
+				environment.FlowGoToCadenceVersionMapping{
+					FlowGoVersion:  flowVersion1,
+					CadenceVersion: cadenceVersion1,
 				})
 
 			h0 := uint64(100)   // starting height
 			hv1 := uint64(2000) // version boundary height
-			hv2 := uint64(4000) // version boundary height
 
 			txIndex := uint32(0)
 
@@ -3442,19 +3423,8 @@ func Test_MinimumRequiredVersion(t *testing.T) {
 
 			// system transaction needs to run to update the flowVersion on chain
 			snapshotTree = runSystemTxToUpdateNodeVersionBeaconContract(hv1+1, ctx, snapshotTree, vm, txIndex)
-			txIndex += 1
 
 			// still cadence version 1
 			require.Equal(t, cadenceVersion1.String(), getVersion(ctx, snapshotTree))
-
-			// insert version boundary 2
-			snapshotTree = insertVersionBoundary(flowVersion2, hv1+1, hv2, ctx, snapshotTree, vm, txIndex)
-			txIndex += 1
-
-			// system transaction needs to run to update the flowVersion on chain
-			snapshotTree = runSystemTxToUpdateNodeVersionBeaconContract(hv2, ctx, snapshotTree, vm, txIndex)
-
-			// switch cadence version 2
-			require.Equal(t, cadenceVersion2.String(), getVersion(ctx, snapshotTree))
 		}))
 }
