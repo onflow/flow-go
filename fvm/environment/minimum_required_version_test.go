@@ -8,31 +8,27 @@ import (
 )
 
 func Test_MapToCadenceVersion(t *testing.T) {
-	v0 := semver.Version{}
+	flowV0 := semver.Version{}
+	cadenceV0 := semver.Version{}
 	flowV1 := semver.Version{
-		Major:      1,
-		Minor:      2,
-		Patch:      3,
-		PreRelease: "rc.1",
+		Major: 0,
+		Minor: 37,
+		Patch: 0,
 	}
 	flowV2 := semver.Version{
-		Major:      2,
-		Minor:      2,
-		Patch:      3,
-		PreRelease: "rc.1",
+		Major: 0,
+		Minor: 37,
+		Patch: 30,
 	}
-
 	cadenceV1 := semver.Version{
-		Major:      2,
-		Minor:      1,
-		Patch:      3,
-		PreRelease: "rc.2",
+		Major: 1,
+		Minor: 0,
+		Patch: 0,
 	}
 	cadenceV2 := semver.Version{
-		Major:      12,
-		Minor:      0,
-		Patch:      0,
-		PreRelease: "",
+		Major: 1,
+		Minor: 1,
+		Patch: 0,
 	}
 
 	mapping := []VersionMapEntry{
@@ -58,13 +54,13 @@ func Test_MapToCadenceVersion(t *testing.T) {
 	}
 
 	t.Run("no mapping, v0", func(t *testing.T) {
-		version := mapToCadenceVersion(v0, nil)
+		version := mapToCadenceVersion(flowV0, nil)
 
-		require.Equal(t, v0, version)
+		require.Equal(t, cadenceV0, version)
 	})
 
 	t.Run("v0", func(t *testing.T) {
-		version := mapToCadenceVersion(v0, mappingWith2Versions)
+		version := mapToCadenceVersion(flowV0, mappingWith2Versions)
 
 		require.Equal(t, semver.Version{}, version)
 	})
@@ -75,7 +71,7 @@ func Test_MapToCadenceVersion(t *testing.T) {
 
 		version := mapToCadenceVersion(v, mappingWith2Versions)
 
-		require.Equal(t, v0, version)
+		require.Equal(t, cadenceV0, version)
 	})
 	t.Run("v1", func(t *testing.T) {
 		version := mapToCadenceVersion(flowV1, mappingWith2Versions)
@@ -122,7 +118,7 @@ func Test_MapToCadenceVersion(t *testing.T) {
 
 		version := mapToCadenceVersion(v, mapping)
 
-		require.Equal(t, v0, version)
+		require.Equal(t, cadenceV0, version)
 	})
 	t.Run("v1, single version in mapping", func(t *testing.T) {
 		version := mapToCadenceVersion(flowV1, mapping)
