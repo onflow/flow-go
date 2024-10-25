@@ -31,36 +31,19 @@ func Test_MapToCadenceVersion(t *testing.T) {
 		Patch: 0,
 	}
 
-	mapping := []VersionMapEntry{
-		{
-			FlowGoVersion:  flowV1,
-			CadenceVersion: cadenceV1,
-		},
-		{
-			FlowGoVersion:  flowV2,
-			CadenceVersion: cadenceV2,
-		},
-	}
-
-	mappingWith2Versions := []VersionMapEntry{
-		{
-			FlowGoVersion:  flowV1,
-			CadenceVersion: cadenceV1,
-		},
-		{
-			FlowGoVersion:  flowV2,
-			CadenceVersion: cadenceV2,
-		},
+	mapping := FlowGoToCadenceVersionMapping{
+		FlowGoVersion:  flowV1,
+		CadenceVersion: cadenceV1,
 	}
 
 	t.Run("no mapping, v0", func(t *testing.T) {
-		version := mapToCadenceVersion(flowV0, nil)
+		version := mapToCadenceVersion(flowV0, FlowGoToCadenceVersionMapping{})
 
 		require.Equal(t, cadenceV0, version)
 	})
 
 	t.Run("v0", func(t *testing.T) {
-		version := mapToCadenceVersion(flowV0, mappingWith2Versions)
+		version := mapToCadenceVersion(flowV0, mapping)
 
 		require.Equal(t, semver.Version{}, version)
 	})
@@ -69,12 +52,12 @@ func Test_MapToCadenceVersion(t *testing.T) {
 		v := flowV1
 		v.Patch -= 1
 
-		version := mapToCadenceVersion(v, mappingWith2Versions)
+		version := mapToCadenceVersion(v, mapping)
 
 		require.Equal(t, cadenceV0, version)
 	})
 	t.Run("v1", func(t *testing.T) {
-		version := mapToCadenceVersion(flowV1, mappingWith2Versions)
+		version := mapToCadenceVersion(flowV1, mapping)
 
 		require.Equal(t, cadenceV1, version)
 	})
@@ -83,7 +66,7 @@ func Test_MapToCadenceVersion(t *testing.T) {
 		v := flowV1
 		v.BumpPatch()
 
-		version := mapToCadenceVersion(v, mappingWith2Versions)
+		version := mapToCadenceVersion(v, mapping)
 
 		require.Equal(t, cadenceV1, version)
 	})
@@ -92,12 +75,12 @@ func Test_MapToCadenceVersion(t *testing.T) {
 		v := flowV2
 		v.Patch -= 1
 
-		version := mapToCadenceVersion(v, mappingWith2Versions)
+		version := mapToCadenceVersion(v, mapping)
 
 		require.Equal(t, cadenceV1, version)
 	})
 	t.Run("v2", func(t *testing.T) {
-		version := mapToCadenceVersion(flowV2, mappingWith2Versions)
+		version := mapToCadenceVersion(flowV2, mapping)
 
 		require.Equal(t, cadenceV2, version)
 	})
@@ -106,32 +89,8 @@ func Test_MapToCadenceVersion(t *testing.T) {
 		v := flowV2
 		v.BumpPatch()
 
-		version := mapToCadenceVersion(v, mappingWith2Versions)
+		version := mapToCadenceVersion(v, mapping)
 
 		require.Equal(t, cadenceV2, version)
-	})
-
-	t.Run("v1 - delta, single version in mapping", func(t *testing.T) {
-
-		v := flowV1
-		v.Patch -= 1
-
-		version := mapToCadenceVersion(v, mapping)
-
-		require.Equal(t, cadenceV0, version)
-	})
-	t.Run("v1, single version in mapping", func(t *testing.T) {
-		version := mapToCadenceVersion(flowV1, mapping)
-
-		require.Equal(t, cadenceV1, version)
-	})
-	t.Run("v1 + delta, single version in mapping", func(t *testing.T) {
-
-		v := flowV1
-		v.BumpPatch()
-
-		version := mapToCadenceVersion(v, mapping)
-
-		require.Equal(t, cadenceV1, version)
 	})
 }
