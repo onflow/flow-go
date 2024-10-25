@@ -9,8 +9,8 @@ import (
 	"github.com/schollz/progressbar/v3"
 
 	"github.com/onflow/cadence"
+	"github.com/onflow/cadence/common"
 	jsoncdc "github.com/onflow/cadence/encoding/json"
-	"github.com/onflow/cadence/runtime/common"
 
 	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/fvm/environment"

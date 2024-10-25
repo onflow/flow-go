@@ -8,7 +8,7 @@ import (
 	syncAtomic "sync/atomic"
 	"time"
 
-	"github.com/onflow/cadence/runtime/common"
+	"github.com/onflow/cadence/common"
 	"github.com/rs/zerolog"
 	"golang.org/x/sync/errgroup"
 
