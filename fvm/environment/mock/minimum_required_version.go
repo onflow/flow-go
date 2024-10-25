@@ -14,7 +14,7 @@ func (_m *MinimumRequiredVersion) MinimumRequiredVersion() (string, error) {
 	ret := _m.Called()
 
 	if len(ret) == 0 {
-		panic("no return value specified for MinimumRequiredVersion")
+		panic("no return value specified for MinimumCadenceRequiredVersion")
 	}
 
 	var r0 string

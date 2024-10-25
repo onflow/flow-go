@@ -3442,7 +3442,7 @@ func Test_MinimumRequiredVersion(t *testing.T) {
 			})
 		require.NoError(t, err)
 
-		mrv := environment.NewMinimumRequiredVersion(txnState)
+		mrv := environment.NewMinimumCadenceRequiredVersion(txnState)
 
 		v, err := mrv.MinimumRequiredVersion()
 
