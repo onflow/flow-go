@@ -104,7 +104,7 @@ func (b *backendEvents) GetEventsForHeightRange(
 		// and avoids calculating header.ID() for each block.
 		blockID, err := b.headers.BlockIDByHeight(i)
 		if err != nil {
-			return nil, rpc.ConvertStorageError(fmt.Errorf("failed to get blockID for %d: %w", i, err))
+			return nil, rpc.ConvertStorageError(resolveHeightError(b.state.Params(), i, err))
 		}
 		header, err := b.headers.ByBlockID(blockID)
 		if err != nil {
@@ -303,7 +303,13 @@ func (b *backendEvents) getBlockEventsFromExecutionNode(
 	// choose the last block ID to find the list of execution nodes
 	lastBlockID := blockIDs[len(blockIDs)-1]
 
-	execNodes, err := executionNodesForBlockID(ctx, lastBlockID, b.executionReceipts, b.state, b.log)
+	execNodes, err := rpc.ExecutionNodesForBlockID(ctx,
+		lastBlockID,
+		b.executionReceipts,
+		b.state,
+		b.log,
+		preferredENIdentifiers,
+		fixedENIdentifiers)
 	if err != nil {
 		return nil, rpc.ConvertError(err, "failed to retrieve events from execution node", codes.Internal)
 	}

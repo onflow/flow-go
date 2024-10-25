@@ -16,6 +16,7 @@ import (
 	"github.com/onflow/flow-go/fvm/evm"
 	evmStdlib "github.com/onflow/flow-go/fvm/evm/stdlib"
 	"github.com/onflow/flow-go/fvm/storage/state"
+	"github.com/onflow/flow-go/fvm/systemcontracts"
 	"github.com/onflow/flow-go/model/flow"
 )
 
@@ -111,8 +112,11 @@ func (c InterpreterMigrationRuntimeConfig) NewRuntimeInterface(
 		}
 	}
 
+	sc := systemcontracts.SystemContractsForChain(chainID)
+
 	return util.NewMigrationRuntimeInterface(
 		chainID,
+		common.Address(sc.Crypto.Address),
 		getCodeFunc,
 		getContractNames,
 		getOrLoadProgram,
