@@ -261,7 +261,7 @@ func NewWSHandler(
 		maxStreams:               int32(stateStreamConfig.MaxGlobalStreams),
 		defaultHeartbeatInterval: stateStreamConfig.HeartbeatInterval,
 		activeStreamCount:        atomic.NewInt32(0),
-		HttpHandler:              NewHttpHandler(logger, chain),
+		HttpHandler:              NewHttpHandler(logger, chain, DefaultMaxRequestSize),
 	}
 
 	return handler

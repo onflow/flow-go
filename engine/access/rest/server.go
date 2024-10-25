@@ -24,13 +24,17 @@ const (
 
 	// DefaultIdleTimeout is the default idle timeout for the HTTP server
 	DefaultIdleTimeout = time.Second * 60
+
+	// DefaultMaxRequestSize is the default message size limit
+	//DefaultMaxRequestSize = 2 << 20 // 2MB
 )
 
 type Config struct {
-	ListenAddress string
-	WriteTimeout  time.Duration
-	ReadTimeout   time.Duration
-	IdleTimeout   time.Duration
+	ListenAddress  string
+	WriteTimeout   time.Duration
+	ReadTimeout    time.Duration
+	IdleTimeout    time.Duration
+	MaxRequestSize int64
 }
 
 // NewServer returns an HTTP server initialized with the REST API handler
@@ -42,7 +46,7 @@ func NewServer(serverAPI access.API,
 	stateStreamApi state_stream.API,
 	stateStreamConfig backend.Config,
 ) (*http.Server, error) {
-	builder := routes.NewRouterBuilder(logger, restCollector).AddRestRoutes(serverAPI, chain)
+	builder := routes.NewRouterBuilder(logger, restCollector).AddRestRoutes(serverAPI, chain, config.MaxRequestSize)
 	if stateStreamApi != nil {
 		builder.AddWsRoutes(stateStreamApi, chain, stateStreamConfig)
 	}

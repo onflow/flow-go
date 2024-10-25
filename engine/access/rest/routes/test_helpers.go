@@ -126,6 +126,7 @@ func executeRequest(req *http.Request, backend access.API) *httptest.ResponseRec
 	).AddRestRoutes(
 		backend,
 		flow.Testnet.Chain(),
+		DefaultMaxRequestSize,
 	).Build()
 
 	rr := httptest.NewRecorder()

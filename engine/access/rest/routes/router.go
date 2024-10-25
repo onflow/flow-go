@@ -46,10 +46,14 @@ func NewRouterBuilder(
 }
 
 // AddRestRoutes adds rest routes to the router.
-func (b *RouterBuilder) AddRestRoutes(backend access.API, chain flow.Chain) *RouterBuilder {
+func (b *RouterBuilder) AddRestRoutes(
+	backend access.API,
+	chain flow.Chain,
+	maxRequestSize int64,
+) *RouterBuilder {
 	linkGenerator := models.NewLinkGeneratorImpl(b.v1SubRouter)
 	for _, r := range Routes {
-		h := NewHandler(b.logger, backend, r.Handler, linkGenerator, chain)
+		h := NewHandler(b.logger, backend, r.Handler, linkGenerator, chain, maxRequestSize)
 		b.v1SubRouter.
 			Methods(r.Method).
 			Path(r.Pattern).
