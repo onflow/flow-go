@@ -16,14 +16,14 @@ type BeaconKeyRecovery struct {
 	events.Noop
 	local         module.Local
 	state         protocol.State
-	localDKGState storage.EpochRecoveryDKGState
+	localDKGState storage.EpochRecoveryMyBeaconKey
 }
 
 var _ protocol.Consumer = &BeaconKeyRecovery{}
 
 func NewBeaconKeyRecovery(local module.Local,
 	state protocol.State,
-	localDKGState storage.EpochRecoveryDKGState,
+	localDKGState storage.EpochRecoveryMyBeaconKey,
 ) (*BeaconKeyRecovery, error) {
 	recovery := &BeaconKeyRecovery{
 		Noop:          events.Noop{},

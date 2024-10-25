@@ -127,7 +127,6 @@ func (v *VerificationNodeBuilder) LoadComponentsAndModules() {
 				node.Storage.Index,
 				node.Storage.Payloads,
 				blocktimer.DefaultBlockTimer,
-				nil,
 			)
 			return err
 		}).

@@ -13,7 +13,6 @@ type EpochStateMachineFactory struct {
 	setups                    storage.EpochSetups
 	commits                   storage.EpochCommits
 	epochProtocolStateDB      storage.EpochProtocolStateEntries
-	localDKGState             storage.EpochRecoveryDKGState
 	happyPathTelemetryFactory protocol_state.StateMachineEventsTelemetryFactory
 	fallbackTelemetryFactory  protocol_state.StateMachineEventsTelemetryFactory
 }
@@ -24,14 +23,12 @@ func NewEpochStateMachineFactory(
 	setups storage.EpochSetups,
 	commits storage.EpochCommits,
 	epochProtocolStateDB storage.EpochProtocolStateEntries,
-	localDKGState storage.EpochRecoveryDKGState,
 	happyPathTelemetryFactory, fallbackTelemetryFactory protocol_state.StateMachineEventsTelemetryFactory,
 ) *EpochStateMachineFactory {
 	return &EpochStateMachineFactory{
 		setups:                    setups,
 		commits:                   commits,
 		epochProtocolStateDB:      epochProtocolStateDB,
-		localDKGState:             localDKGState,
 		happyPathTelemetryFactory: happyPathTelemetryFactory,
 		fallbackTelemetryFactory:  fallbackTelemetryFactory,
 	}
@@ -52,7 +49,7 @@ func (f *EpochStateMachineFactory) Create(candidateView uint64, parentBlockID fl
 			return NewHappyPathStateMachine(f.happyPathTelemetryFactory(candidateView), candidateView, parentState)
 		},
 		func(candidateView uint64, parentEpochState *flow.RichEpochStateEntry) (StateMachine, error) {
-			return NewFallbackStateMachine(parentState, f.localDKGState, f.fallbackTelemetryFactory(candidateView), candidateView, parentEpochState)
+			return NewFallbackStateMachine(parentState, f.fallbackTelemetryFactory(candidateView), candidateView, parentEpochState)
 		},
 	)
 }

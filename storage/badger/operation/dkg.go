@@ -20,6 +20,16 @@ func InsertMyBeaconPrivateKey(epochCounter uint64, info *encodable.RandomBeaconP
 	return insert(makePrefix(codeBeaconPrivateKey, epochCounter), info)
 }
 
+// UpsertMyBeaconPrivateKey stores the random beacon private key for the given epoch even if it already exists.
+//
+// CAUTION: This method stores confidential information and should only be
+// used in the context of the secrets database. This is enforced in the above
+// layer (see storage.EpochRecoveryMyBeaconKey).
+// This method has to be used only in very specific cases, like epoch recovery, for normal usage use InsertMyBeaconPrivateKey.
+func UpsertMyBeaconPrivateKey(epochCounter uint64, info *encodable.RandomBeaconPrivKey) func(*badger.Txn) error {
+	return upsert(makePrefix(codeBeaconPrivateKey, epochCounter), info)
+}
+
 // RetrieveMyBeaconPrivateKey retrieves the random beacon private key for the given epoch.
 //
 // CAUTION: This method stores confidential information and should only be
@@ -60,6 +70,12 @@ func RetrieveDKGStartedForEpoch(epochCounter uint64, started *bool) func(*badger
 // Error returns: storage.ErrAlreadyExists
 func InsertDKGEndStateForEpoch(epochCounter uint64, endState flow.DKGEndState) func(*badger.Txn) error {
 	return insert(makePrefix(codeDKGEnded, epochCounter), endState)
+}
+
+// UpsertDKGEndStateForEpoch stores the DKG end state for the epoch even if it already exists.
+// CAUTION: this method has to be used only in very specific cases, like epoch recovery, for normal usage use InsertDKGEndStateForEpoch.
+func UpsertDKGEndStateForEpoch(epochCounter uint64, endState flow.DKGEndState) func(*badger.Txn) error {
+	return upsert(makePrefix(codeDKGEnded, epochCounter), endState)
 }
 
 // RetrieveDKGEndStateForEpoch retrieves the DKG end state for the epoch.

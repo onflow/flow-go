@@ -557,7 +557,6 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity bootstrap.NodeInfo, ide
 		node.Index,
 		node.Payloads,
 		blocktimer.DefaultBlockTimer,
-		nil,
 	)
 	require.NoError(t, err)
 

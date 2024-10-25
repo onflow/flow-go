@@ -2,6 +2,7 @@ package badger
 
 import (
 	"fmt"
+	"github.com/onflow/flow-go/storage"
 
 	"github.com/dgraph-io/badger/v2"
 	"github.com/onflow/crypto"
@@ -125,6 +126,8 @@ type SafeBeaconPrivateKeys struct {
 	state *DKGState
 }
 
+var _ storage.SafeBeaconKeys = (*SafeBeaconPrivateKeys)(nil)
+
 // NewSafeBeaconPrivateKeys returns a safe beacon key storage backed by Badger DB.
 func NewSafeBeaconPrivateKeys(state *DKGState) *SafeBeaconPrivateKeys {
 	return &SafeBeaconPrivateKeys{state: state}
@@ -152,12 +155,11 @@ func (keys *SafeBeaconPrivateKeys) RetrieveMyBeaconPrivateKey(epochCounter uint6
 		}
 
 		// for any end state besides success, the key is not safe
-		// TODO(EFM, #6214): THIS IS TEMPORARY, NO WAY THIS CAN GO TO THE PRODUCTION
-		//if endState != flow.DKGEndStateSuccess {
-		//	key = nil
-		//	safe = false
-		//	return nil
-		//}
+		if endState != flow.DKGEndStateSuccess {
+			key = nil
+			safe = false
+			return nil
+		}
 
 		// retrieve the key - any storage error (including not found) is an exception
 		var encodableKey *encodable.RandomBeaconPrivKey
@@ -174,4 +176,27 @@ func (keys *SafeBeaconPrivateKeys) RetrieveMyBeaconPrivateKey(epochCounter uint6
 		return nil
 	})
 	return
+}
+
+type EpochRecoveryMyBeaconKey struct {
+	*SafeBeaconPrivateKeys
+}
+
+var _ storage.EpochRecoveryMyBeaconKey = (*EpochRecoveryMyBeaconKey)(nil)
+
+func NewEpochRecoveryMyBeaconKey(keys *SafeBeaconPrivateKeys) *EpochRecoveryMyBeaconKey {
+	return &EpochRecoveryMyBeaconKey{SafeBeaconPrivateKeys: keys}
+}
+
+func (keys *EpochRecoveryMyBeaconKey) OverwriteMyBeaconPrivateKey(epochCounter uint64, key crypto.PrivateKey) error {
+	if key == nil {
+		return fmt.Errorf("will not store nil beacon key")
+	}
+	encodableKey := &encodable.RandomBeaconPrivKey{PrivateKey: key}
+	err := keys.state.db.Update(operation.UpsertMyBeaconPrivateKey(epochCounter, encodableKey))
+	if err != nil {
+		return fmt.Errorf("could not overwrite beacon key for epoch %d: %w", epochCounter, err)
+	}
+	keys.state.keyCache.Insert(epochCounter, encodableKey)
+	return nil
 }

@@ -97,7 +97,6 @@ func NewMutableProtocolState(
 	results storage.ExecutionResults,
 	setups storage.EpochSetups,
 	commits storage.EpochCommits,
-	localDKGState storage.EpochRecoveryDKGState,
 ) *MutableProtocolState {
 	log = log.With().Str("module", "dynamic_protocol_state").Logger()
 	// TODO [future generalization]: ideally, the telemetry consumers would be injected into the constructor
@@ -131,7 +130,7 @@ func NewMutableProtocolState(
 	// all factories are expected to be called in order defined here.
 	kvStateMachineFactories := []protocol_state.KeyValueStoreStateMachineFactory{
 		kvstore.NewPSVersionUpgradeStateMachineFactory(psVersionUpgradeStateMachineTelemetry),
-		epochs.NewEpochStateMachineFactory(setups, commits, epochProtocolStateDB, localDKGState, epochHappyPathTelemetryFactory, epochFallbackTelemetryFactory),
+		epochs.NewEpochStateMachineFactory(setups, commits, epochProtocolStateDB, epochHappyPathTelemetryFactory, epochFallbackTelemetryFactory),
 		kvstore.NewSetValueStateMachineFactory(setKVStoreValueTelemetry),
 	}
 	return newMutableProtocolState(epochProtocolStateDB, kvstore.NewProtocolKVStore(kvStoreSnapshots), globalParams, headers, results, kvStateMachineFactories)

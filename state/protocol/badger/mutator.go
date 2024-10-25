@@ -67,7 +67,6 @@ func NewFollowerState(
 	index storage.Index,
 	payloads storage.Payloads,
 	blockTimer protocol.BlockTimer,
-	dkgState storage.EpochRecoveryDKGState,
 ) (*FollowerState, error) {
 	followerState := &FollowerState{
 		State:      state,
@@ -86,7 +85,6 @@ func NewFollowerState(
 			state.results,
 			state.epoch.setups,
 			state.epoch.commits,
-			dkgState,
 		),
 	}
 	return followerState, nil
@@ -106,7 +104,6 @@ func NewFullConsensusState(
 	blockTimer protocol.BlockTimer,
 	receiptValidator module.ReceiptValidator,
 	sealValidator module.SealValidator,
-	dkgState storage.EpochRecoveryDKGState,
 ) (*ParticipantState, error) {
 	followerState, err := NewFollowerState(
 		logger,
@@ -116,7 +113,6 @@ func NewFullConsensusState(
 		index,
 		payloads,
 		blockTimer,
-		dkgState,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("initialization of Mutable Follower State failed: %w", err)

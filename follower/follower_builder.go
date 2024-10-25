@@ -163,7 +163,6 @@ func (builder *FollowerServiceBuilder) buildFollowerState() *FollowerServiceBuil
 			node.Storage.Index,
 			node.Storage.Payloads,
 			blocktimer.DefaultBlockTimer,
-			nil,
 		)
 		builder.FollowerState = followerState
 
