@@ -193,7 +193,13 @@ func (keys *EpochRecoveryMyBeaconKey) OverwriteMyBeaconPrivateKey(epochCounter u
 		return fmt.Errorf("will not store nil beacon key")
 	}
 	encodableKey := &encodable.RandomBeaconPrivKey{PrivateKey: key}
-	err := keys.state.db.Update(operation.UpsertMyBeaconPrivateKey(epochCounter, encodableKey))
+	err := keys.state.db.Update(func(txn *badger.Txn) error {
+		err := operation.UpsertMyBeaconPrivateKey(epochCounter, encodableKey)(txn)
+		if err != nil {
+			return err
+		}
+		return operation.UpsertDKGEndStateForEpoch(epochCounter, flow.DKGEndStateSuccess)(txn)
+	})
 	if err != nil {
 		return fmt.Errorf("could not overwrite beacon key for epoch %d: %w", epochCounter, err)
 	}

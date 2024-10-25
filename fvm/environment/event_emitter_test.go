@@ -1,6 +1,7 @@
 package environment_test
 
 import (
+	"github.com/onflow/flow-go/utils/unittest"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -164,6 +165,7 @@ func createTestEventEmitterWithLimit(chain flow.ChainID, address flow.Address, e
 		))
 
 	return environment.NewEventEmitter(
+		unittest.Logger(),
 		tracing.NewTracerSpan(),
 		environment.NewMeter(txnState),
 		chain.Chain(),

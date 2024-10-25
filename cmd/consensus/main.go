@@ -357,6 +357,18 @@ func main() {
 
 			return nil
 		}).
+		Module("my beacon key epoch recovery", func(node *cmd.NodeConfig) error {
+			recoverMyBeaconKeyStorage := bstorage.NewEpochRecoveryMyBeaconKey(safeBeaconKeys)
+			myBeaconKeyRecovery, err := dkgmodule.NewBeaconKeyRecovery(node.Logger, node.Me, node.State, recoverMyBeaconKeyStorage)
+			if err != nil {
+				return fmt.Errorf("could not initialize my beacon key epoch recovery: %w", err)
+			}
+
+			// reactorEngine consumes the EpochSetupPhaseStarted event
+			node.ProtocolEvents.AddConsumer(myBeaconKeyRecovery)
+
+			return nil
+		}).
 		Module("collection guarantees mempool", func(node *cmd.NodeConfig) error {
 			guarantees, err = stdmap.NewGuarantees(guaranteeLimit)
 			return err
