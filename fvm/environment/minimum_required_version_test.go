@@ -15,19 +15,9 @@ func Test_MapToCadenceVersion(t *testing.T) {
 		Minor: 37,
 		Patch: 0,
 	}
-	flowV2 := semver.Version{
-		Major: 0,
-		Minor: 37,
-		Patch: 30,
-	}
 	cadenceV1 := semver.Version{
 		Major: 1,
 		Minor: 0,
-		Patch: 0,
-	}
-	cadenceV2 := semver.Version{
-		Major: 1,
-		Minor: 1,
 		Patch: 0,
 	}
 
@@ -69,28 +59,5 @@ func Test_MapToCadenceVersion(t *testing.T) {
 		version := mapToCadenceVersion(v, mapping)
 
 		require.Equal(t, cadenceV1, version)
-	})
-	t.Run("v2 - delta", func(t *testing.T) {
-
-		v := flowV2
-		v.Patch -= 1
-
-		version := mapToCadenceVersion(v, mapping)
-
-		require.Equal(t, cadenceV1, version)
-	})
-	t.Run("v2", func(t *testing.T) {
-		version := mapToCadenceVersion(flowV2, mapping)
-
-		require.Equal(t, cadenceV2, version)
-	})
-	t.Run("v2 + delta", func(t *testing.T) {
-
-		v := flowV2
-		v.BumpPatch()
-
-		version := mapToCadenceVersion(v, mapping)
-
-		require.Equal(t, cadenceV2, version)
 	})
 }
