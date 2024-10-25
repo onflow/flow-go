@@ -31,7 +31,7 @@ type SafetyData struct {
 // Implementations are generally *not* concurrency safe.
 type SafetyRules interface {
 	// ProduceVote takes a block proposal and current view, and decides whether to vote for the block.
-	// Voting is deterministic meaning voting for same proposal will always result in the same vote.
+	// Voting is deterministic, i.e. voting for same proposal will always result in the same vote.
 	// Returns:
 	//  * (vote, nil): On the _first_ block for the current view that is safe to vote for.
 	//    Subsequently, voter does _not_ vote for any _other_ block with the same (or lower) view.
