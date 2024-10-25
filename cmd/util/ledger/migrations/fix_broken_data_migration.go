@@ -8,12 +8,12 @@ import (
 	"sync"
 	"time"
 
-	"github.com/onflow/cadence/migrations"
+	"github.com/onflow/cadence/interpreter"
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/atree"
 
-	"github.com/onflow/cadence/runtime/common"
+	"github.com/onflow/cadence/common"
 
 	"github.com/onflow/flow-go/cmd/util/ledger/reporters"
 	"github.com/onflow/flow-go/cmd/util/ledger/util"
@@ -22,6 +22,28 @@ import (
 	"github.com/onflow/flow-go/ledger/common/convert"
 	"github.com/onflow/flow-go/model/flow"
 )
+
+// ShouldFixBrokenCompositeKeyedDictionary returns true if the given value is a dictionary with a composite key type.
+//
+// It is useful for use with atree's PersistentSlabStorage.FixLoadedBrokenReferences.
+//
+// NOTE: The intended use case is to enable migration programs in onflow/flow-go to fix broken references.
+// As of April 2024, only 10 registers in testnet (not mainnet) were found to have broken references,
+// and they seem to have resulted from a bug that was fixed 2 years ago by https://github.com/onflow/cadence/pull/1565.
+func ShouldFixBrokenCompositeKeyedDictionary(atreeValue atree.Value) bool {
+	orderedMap, ok := atreeValue.(*atree.OrderedMap)
+	if !ok {
+		return false
+	}
+
+	dictionaryStaticType, ok := orderedMap.Type().(*interpreter.DictionaryStaticType)
+	if !ok {
+		return false
+	}
+
+	_, ok = dictionaryStaticType.KeyType.(*interpreter.CompositeStaticType)
+	return ok
+}
 
 type FixSlabsWithBrokenReferencesMigration struct {
 	log            zerolog.Logger
@@ -86,7 +108,7 @@ func (m *FixSlabsWithBrokenReferencesMigration) MigrateAccount(
 
 	// Fix broken references
 	fixedStorageIDs, skippedStorageIDs, err :=
-		storage.FixLoadedBrokenReferences(migrations.ShouldFixBrokenCompositeKeyedDictionary)
+		storage.FixLoadedBrokenReferences(ShouldFixBrokenCompositeKeyedDictionary)
 	if err != nil {
 		return err
 	}
