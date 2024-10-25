@@ -24,9 +24,6 @@ const (
 
 	// DefaultIdleTimeout is the default idle timeout for the HTTP server
 	DefaultIdleTimeout = time.Second * 60
-
-	// DefaultMaxRequestSize is the default message size limit
-	//DefaultMaxRequestSize = 2 << 20 // 2MB
 )
 
 type Config struct {
