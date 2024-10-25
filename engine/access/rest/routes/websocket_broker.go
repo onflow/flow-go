@@ -39,6 +39,25 @@ func NewWebSocketBroker(logger zerolog.Logger, conn *websocket.Conn, limitsConfi
 	}
 }
 
+// TODO: I would name this SetConnectionConfig
+func (w *WebSocketBroker) SetWebsocketConf() error {
+	return nil
+}
+
+/*
+readMessages:
+This method runs while the connection is active. It retrieves, validates, and processes client messages. Actions handled include subscribe, unsubscribe, and list_subscriptions. Additional actions can be added as needed.
+
+writeMessages:
+This method runs while the connection is active, listening on the broadcast channel. It retrieves responses and sends them to the client.
+
+broadcastMessage:
+This method is called by each SubscriptionHandler, receiving formatted subscription messages and writing them to the broadcast channel.
+
+pingPongHandler:
+This method periodically checks the connection's availability using ping/pong messages and terminates the connection if the client becomes unresponsive.
+*/
+
 // Triggered by the readMessages method when the action is subscribe. It extracts the topic from the message’s topic
 // field, creates the appropriate SubscriptionHandler for the topic using the factory function CreateSubscription,
 // and adds an instance of the new handler to the subs map. The client receives a notification confirming the successful subscription along with the specific ID.
