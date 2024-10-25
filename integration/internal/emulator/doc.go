@@ -5,7 +5,7 @@
 //   - we want the test to include execution of smart contract code in a realistic environment
 //
 // Before using this package, flow-go's integration tests used the Flow Emulator directly.
-// This created a repository-wise circular dependency and complicated version upgrades (see https://github.com/onflow/flow-emulator).
+// This created a repository-wise circular dependency and complicated version upgrades (see https://github.com/onflow/flow-go/issues/2863).
 // The main purpose for this package is to replace that dependency with minimal ongoing
 // maintenance overhead.
 package emulator
