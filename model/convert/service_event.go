@@ -1170,74 +1170,86 @@ func convertVersionBoundaries(array cadence.Array) (
 	boundaries := make([]flow.VersionBoundary, len(array.Values))
 
 	for i, cadenceVal := range array.Values {
-		boundary, err := DecodeCadenceValue(
-			fmt.Sprintf(".Values[%d]", i),
-			cadenceVal,
-			func(structVal cadence.Struct) (
-				flow.VersionBoundary,
-				error,
-			) {
-				if structVal.Type() == nil {
-					return flow.VersionBoundary{}, fmt.Errorf("VersionBoundary struct doesn't have type")
-				}
-
-				fields := cadence.FieldsMappedByName(structVal)
-
-				const expectedFieldCount = 2
-				if len(fields) < expectedFieldCount {
-					return flow.VersionBoundary{}, fmt.Errorf(
-						"incorrect number of fields (%d != %d)",
-						len(fields),
-						expectedFieldCount,
-					)
-				}
-
-				blockHeightValue, err := getField[cadence.Value](fields, "blockHeight")
-				if err != nil {
-					return flow.VersionBoundary{}, fmt.Errorf("failed to decode VersionBoundary struct: %w", err)
-				}
-
-				versionValue, err := getField[cadence.Value](fields, "version")
-				if err != nil {
-					return flow.VersionBoundary{}, fmt.Errorf("failed to decode VersionBoundary struct: %w", err)
-				}
-
-				height, err := DecodeCadenceValue(
-					".blockHeight",
-					blockHeightValue,
-					func(cadenceVal cadence.UInt64) (
-						uint64,
-						error,
-					) {
-						return uint64(cadenceVal), nil
-					},
-				)
-				if err != nil {
-					return flow.VersionBoundary{}, err
-				}
-
-				version, err := DecodeCadenceValue(
-					".version",
-					versionValue,
-					convertSemverVersion,
-				)
-				if err != nil {
-					return flow.VersionBoundary{}, err
-				}
-
-				return flow.VersionBoundary{
-					BlockHeight: height,
-					Version:     version,
-				}, nil
-			},
-		)
+		boundary, err := VersionBoundary(cadenceVal)
 		if err != nil {
-			return nil, err
+			return nil, decodeError{
+				location: fmt.Sprintf(".Values[%d]", i),
+				err:      err,
+			}
 		}
 		boundaries[i] = boundary
 	}
 
 	return boundaries, nil
+}
+
+// VersionBoundary decodes a single version boundary from the given Cadence value.
+func VersionBoundary(value cadence.Value) (
+	flow.VersionBoundary,
+	error,
+) {
+	boundary, err := DecodeCadenceValue(
+		"VersionBoundary",
+		value,
+		func(structVal cadence.Struct) (
+			flow.VersionBoundary,
+			error,
+		) {
+			if structVal.Type() == nil {
+				return flow.VersionBoundary{}, fmt.Errorf("VersionBoundary struct doesn't have type")
+			}
+
+			fields := cadence.FieldsMappedByName(structVal)
+
+			const expectedFieldCount = 2
+			if len(fields) < expectedFieldCount {
+				return flow.VersionBoundary{}, fmt.Errorf(
+					"incorrect number of fields (%d != %d)",
+					len(fields),
+					expectedFieldCount,
+				)
+			}
+
+			blockHeightValue, err := getField[cadence.Value](fields, "blockHeight")
+			if err != nil {
+				return flow.VersionBoundary{}, fmt.Errorf("failed to decode VersionBoundary struct: %w", err)
+			}
+
+			versionValue, err := getField[cadence.Value](fields, "version")
+			if err != nil {
+				return flow.VersionBoundary{}, fmt.Errorf("failed to decode VersionBoundary struct: %w", err)
+			}
+
+			height, err := DecodeCadenceValue(
+				".blockHeight",
+				blockHeightValue,
+				func(cadenceVal cadence.UInt64) (
+					uint64,
+					error,
+				) {
+					return uint64(cadenceVal), nil
+				},
+			)
+			if err != nil {
+				return flow.VersionBoundary{}, err
+			}
+
+			version, err := DecodeCadenceValue(
+				".version",
+				versionValue,
+				convertSemverVersion,
+			)
+			if err != nil {
+				return flow.VersionBoundary{}, err
+			}
+
+			return flow.VersionBoundary{
+				BlockHeight: height,
+				Version:     version,
+			}, nil
+		},
+	)
+	return boundary, err
 }
 
 func convertSemverVersion(structVal cadence.Struct) (

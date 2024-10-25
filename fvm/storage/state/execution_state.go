@@ -3,6 +3,8 @@ package state
 import (
 	"fmt"
 
+	"github.com/coreos/go-semver/semver"
+
 	"github.com/onflow/cadence/runtime/common"
 	"github.com/onflow/crypto/hash"
 
@@ -27,7 +29,8 @@ type ExecutionState struct {
 	finalized bool
 
 	*spockState
-	meter *meter.Meter
+	meter            *meter.Meter
+	executionVersion semver.Version
 
 	// NOTE: parent and child state shares the same limits controller
 	*limitsController
@@ -38,6 +41,11 @@ type StateParameters struct {
 
 	maxKeySizeAllowed   uint64
 	maxValueSizeAllowed uint64
+}
+
+type ExecutionParameters struct {
+	meter.MeterParameters
+	ExecutionVersion semver.Version
 }
 
 func DefaultParameters() StateParameters {
@@ -129,19 +137,20 @@ func NewExecutionStateWithSpockStateHasher(
 // NewChildWithMeterParams generates a new child state using the provide meter
 // parameters.
 func (state *ExecutionState) NewChildWithMeterParams(
-	params meter.MeterParameters,
+	params ExecutionParameters,
 ) *ExecutionState {
 	return &ExecutionState{
 		finalized:        false,
 		spockState:       state.spockState.NewChild(),
-		meter:            meter.NewMeter(params),
+		meter:            meter.NewMeter(params.MeterParameters),
+		executionVersion: params.ExecutionVersion,
 		limitsController: state.limitsController,
 	}
 }
 
 // NewChild generates a new child state using the parent's meter parameters.
 func (state *ExecutionState) NewChild() *ExecutionState {
-	return state.NewChildWithMeterParams(state.meter.MeterParameters)
+	return state.NewChildWithMeterParams(state.ExecutionParameters())
 }
 
 // InteractionUsed returns the amount of ledger interaction (total ledger byte read + total ledger byte written)
@@ -335,6 +344,13 @@ func (state *ExecutionState) checkSize(
 			state.maxValueSizeAllowed)
 	}
 	return nil
+}
+
+func (state *ExecutionState) ExecutionParameters() ExecutionParameters {
+	return ExecutionParameters{
+		MeterParameters:  state.meter.MeterParameters,
+		ExecutionVersion: state.executionVersion,
+	}
 }
 
 func (state *ExecutionState) readSetSize() int {

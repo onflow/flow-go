@@ -37,6 +37,7 @@ type facadeEnvironment struct {
 	ValueStore
 
 	*SystemContracts
+	MinimumCadenceRequiredVersion
 
 	UUIDGenerator
 	AccountLocalIDGenerator
@@ -103,6 +104,9 @@ func newFacadeEnvironment(
 		),
 
 		SystemContracts: systemContracts,
+		MinimumCadenceRequiredVersion: NewMinimumCadenceRequiredVersion(
+			txnState,
+		),
 
 		UUIDGenerator: NewUUIDGenerator(
 			tracer,
