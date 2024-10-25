@@ -154,25 +154,25 @@ func (keys *SafeBeaconPrivateKeys) RetrieveMyBeaconPrivateKey(epochCounter uint6
 			return err // storage.ErrNotFound or exception
 		}
 
-		// for any end state besides success, the key is not safe
-		if endState != flow.DKGEndStateSuccess {
+		// for any end state besides success and recovery, the key is not safe
+		if endState == flow.DKGEndStateSuccess || endState == flow.DKGEndStateRecovered {
+			// retrieve the key - any storage error (including not found) is an exception
+			var encodableKey *encodable.RandomBeaconPrivKey
+			encodableKey, err = keys.state.retrieveKeyTx(epochCounter)(txn)
+			if err != nil {
+				key = nil
+				safe = false
+				return fmt.Errorf("[unexpected] could not retrieve beacon key for epoch %d with successful DKG: %v", epochCounter, err)
+			}
+
+			// return the key only for successful end state
+			safe = true
+			key = encodableKey.PrivateKey
+		} else {
 			key = nil
 			safe = false
-			return nil
 		}
 
-		// retrieve the key - any storage error (including not found) is an exception
-		var encodableKey *encodable.RandomBeaconPrivKey
-		encodableKey, err = keys.state.retrieveKeyTx(epochCounter)(txn)
-		if err != nil {
-			key = nil
-			safe = false
-			return fmt.Errorf("[unexpected] could not retrieve beacon key for epoch %d with successful DKG: %v", epochCounter, err)
-		}
-
-		// return the key only for successful end state
-		safe = true
-		key = encodableKey.PrivateKey
 		return nil
 	})
 	return
@@ -198,7 +198,7 @@ func (keys *EpochRecoveryMyBeaconKey) OverwriteMyBeaconPrivateKey(epochCounter u
 		if err != nil {
 			return err
 		}
-		return operation.UpsertDKGEndStateForEpoch(epochCounter, flow.DKGEndStateSuccess)(txn)
+		return operation.UpsertDKGEndStateForEpoch(epochCounter, flow.DKGEndStateRecovered)(txn)
 	})
 	if err != nil {
 		return fmt.Errorf("could not overwrite beacon key for epoch %d: %w", epochCounter, err)

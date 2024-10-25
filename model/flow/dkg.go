@@ -14,6 +14,8 @@ const (
 	DKGEndStateNoKey
 	// DKGEndStateDKGFailure - the underlying DKG library reported an error.
 	DKGEndStateDKGFailure
+	// DKGEndStateRecovered - this node has recovered its beacon key from a previous epoch.
+	DKGEndStateRecovered
 )
 
 func (state DKGEndState) String() string {
@@ -26,6 +28,8 @@ func (state DKGEndState) String() string {
 		return "DKGEndStateNoKey"
 	case DKGEndStateDKGFailure:
 		return "DKGEndStateDKGFailure"
+	case DKGEndStateRecovered:
+		return "DKGEndStateRecovered"
 	default:
 		return "DKGEndStateUnknown"
 	}
