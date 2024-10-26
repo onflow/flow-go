@@ -182,7 +182,7 @@ func (c *Client) Broadcast(msg model.BroadcastDKGMessage) error {
 
 // SubmitParametersAndResult posts the DKG setup parameters (`flow.DKGIndexMap`) and the node's locally-computed DKG result to
 // the DKG white-board smart contract. The DKG results are the node's local computation of the group public key and the public
-// keys shares. Serialized public keys are encoded as hex.
+// key shares. Serialized public keys are encoded as lower-case hex strings.
 // Conceptually the flow.DKGIndexMap is not an output of the DKG protocol. Rather, it is part of the configuration/initialization
 // information of the DKG. Before an epoch transition on the happy path (using the data in the EpochSetup event), each consensus
 // participant locally fixes the DKG committee 𝒟 including the respective nodes order to be identical to the consensus

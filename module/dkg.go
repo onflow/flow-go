@@ -34,7 +34,7 @@ type DKGContractClient interface {
 
 	// SubmitParametersAndResult posts the DKG setup parameters (`flow.DKGIndexMap`) and the node's locally-computed DKG result to
 	// the DKG white-board smart contract. The DKG results are the node's local computation of the group public key and the public
-	// keys shares. Serialized public keys are encoded as hex.
+	// key shares. Serialized public keys are encoded as lower-case hex strings.
 	// Conceptually the flow.DKGIndexMap is not an output of the DKG protocol. Rather, it is part of the configuration/initialization
 	// information of the DKG. Before an epoch transition on the happy path (using the data in the EpochSetup event), each consensus
 	// participant locally fixes the DKG committee 𝒟 including the respective nodes order to be identical to the consensus
@@ -49,7 +49,8 @@ type DKGContractClient interface {
 	// The empty result is obtained by a node when it realizes locally that its DKG participation
 	// was unsuccessful (for various reasons: because the node received too many byzantine inputs,
 	// because the node has networking issues, because a locally computed key is invalid..).
-	// However, a node obtaining an empty result can happen in both cases of the DKG succeeding or failing.
+	// However, a node obtaining an empty result can happen in both cases of the DKG succeeding or failing
+	// globally.
 	// For further details, please see:
 	// https://flowfoundation.notion.site/Random-Beacon-2d61f3b3ad6e40ee9f29a1a38a93c99c
 	// Honest nodes would call `SubmitEmptyResult` strictly after the final phase has ended if DKG has ended.

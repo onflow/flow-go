@@ -972,7 +972,7 @@ func convertDKGKeys(cdcDKGKeys []cadence.Value) ([]crypto.PublicKey, error) {
 	for _, value := range cdcDKGKeys {
 		pubKey, err := convertDKGKey(value)
 		if err != nil {
-			return nil, fmt.Errorf("could not decode public key share: %w", err)
+			return nil, fmt.Errorf("could not decode public beacon key share: %w", err)
 		}
 		convertedKeys = append(convertedKeys, pubKey)
 	}
