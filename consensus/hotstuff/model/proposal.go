@@ -22,10 +22,10 @@ import (
 // voting logic in Safety Rules must also operate on an unsigned Proposal.
 //
 // TODO: atm, the flow.Header embeds the LastViewTC. However, for HotStuff we have `model.Block`
-//       and `model.Proposal`, where the latter was introduced when we added the PaceMaker to
-//       vanilla HotStuff. It would be more consistent, if we added `LastViewTC` to `model.Block`,
-//       or even better, introduce an interface for HotStuff's notion of a block (exposing
-//       the fields in `model.Block` plus LastViewTC)
+// and `model.Proposal`, where the latter was introduced when we added the PaceMaker to
+// vanilla HotStuff. It would be more consistent, if we added `LastViewTC` to `model.Block`,
+// or even better, introduce an interface for HotStuff's notion of a block (exposing
+// the fields in `model.Block` plus LastViewTC)
 type Proposal struct {
 	Block      *Block
 	LastViewTC *flow.TimeoutCertificate
