@@ -849,7 +849,6 @@ func (ec *ExecutionCollector) ExecutionTransactionExecuted(
 	if stats.Failed {
 		ec.totalFailedTransactionsCounter.Inc()
 	}
-
 }
 
 // ExecutionChunkDataPackGenerated reports stats on chunk data pack generation
@@ -980,10 +979,6 @@ func (ec *ExecutionCollector) ReadDurationPerItem(duration time.Duration) {
 
 func (ec *ExecutionCollector) ExecutionCollectionRequestSent() {
 	ec.collectionRequestSent.Inc()
-}
-
-func (ec *ExecutionCollector) ExecutionCollectionRequestRetried() {
-	ec.collectionRequestRetried.Inc()
 }
 
 func (ec *ExecutionCollector) ExecutionBlockDataUploadStarted() {
