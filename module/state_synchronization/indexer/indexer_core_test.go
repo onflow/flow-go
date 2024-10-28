@@ -197,6 +197,8 @@ func (i *indexCoreTest) initIndexer() *indexCoreTest {
 	require.NoError(i.t, err)
 	blocksToMarkExecuted, err := stdmap.NewTimes(100)
 	require.NoError(i.t, err)
+	blockTransactions, err := stdmap.NewIdentifierMap(100)
+	require.NoError(i.t, err)
 
 	log := zerolog.New(os.Stdout)
 	blocks := storagemock.NewBlocks(i.t)
@@ -209,6 +211,7 @@ func (i *indexCoreTest) initIndexer() *indexCoreTest {
 		blocksToMarkExecuted,
 		i.collections,
 		blocks,
+		blockTransactions,
 	)
 	require.NoError(i.t, err)
 

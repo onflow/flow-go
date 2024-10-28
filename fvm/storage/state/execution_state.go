@@ -2,8 +2,9 @@ package state
 
 import (
 	"fmt"
+	"math"
 
-	"github.com/onflow/cadence/runtime/common"
+	"github.com/onflow/cadence/common"
 	"github.com/onflow/crypto/hash"
 
 	"github.com/onflow/flow-go/fvm/errors"
@@ -233,6 +234,20 @@ func (state *ExecutionState) ComputationAvailable(kind common.ComputationKind, i
 		return state.meter.ComputationAvailable(kind, intensity)
 	}
 	return true
+}
+
+// ComputationRemaining returns the available computation capacity without metering
+func (state *ExecutionState) ComputationRemaining(kind common.ComputationKind) uint {
+	if state.finalized {
+		// if state is finalized return 0
+		return 0
+	}
+
+	if state.enforceLimits {
+		return state.meter.ComputationRemaining(kind)
+	}
+
+	return math.MaxUint
 }
 
 // TotalComputationUsed returns total computation used

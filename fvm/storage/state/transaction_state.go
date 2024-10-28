@@ -3,7 +3,7 @@ package state
 import (
 	"fmt"
 
-	"github.com/onflow/cadence/runtime/common"
+	"github.com/onflow/cadence/common"
 
 	"github.com/onflow/flow-go/fvm/meter"
 	"github.com/onflow/flow-go/fvm/storage/snapshot"
@@ -22,6 +22,7 @@ func (id NestedTransactionId) StateForTestingOnly() *ExecutionState {
 type Meter interface {
 	MeterComputation(kind common.ComputationKind, intensity uint) error
 	ComputationAvailable(kind common.ComputationKind, intensity uint) bool
+	ComputationRemaining(kind common.ComputationKind) uint
 	ComputationIntensities() meter.MeteredComputationIntensities
 	TotalComputationLimit() uint
 	TotalComputationUsed() uint64
@@ -449,6 +450,10 @@ func (txnState *transactionState) ComputationAvailable(
 	intensity uint,
 ) bool {
 	return txnState.current().ComputationAvailable(kind, intensity)
+}
+
+func (txnState *transactionState) ComputationRemaining(kind common.ComputationKind) uint {
+	return txnState.current().ComputationRemaining(kind)
 }
 
 func (txnState *transactionState) MeterMemory(

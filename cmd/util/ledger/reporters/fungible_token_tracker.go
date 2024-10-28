@@ -9,9 +9,9 @@ import (
 	"github.com/rs/zerolog"
 	"github.com/schollz/progressbar/v3"
 
+	"github.com/onflow/cadence/common"
+	"github.com/onflow/cadence/interpreter"
 	cadenceRuntime "github.com/onflow/cadence/runtime"
-	"github.com/onflow/cadence/runtime/common"
-	"github.com/onflow/cadence/runtime/interpreter"
 
 	"github.com/onflow/flow-go/cmd/util/ledger/util"
 	"github.com/onflow/flow-go/fvm/environment"

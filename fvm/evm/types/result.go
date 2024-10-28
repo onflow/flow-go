@@ -151,7 +151,7 @@ func (res *Result) RLPEncodedLogs() ([]byte, error) {
 	if len(res.Logs) > 0 {
 		encodedLogs, err = rlp.EncodeToBytes(res.Logs)
 		if err != nil {
-			return nil, err
+			return encodedLogs, err
 		}
 	}
 	return encodedLogs, nil
@@ -170,11 +170,11 @@ func (res *Result) DeployedContractAddressString() string {
 // StateChangeChecksum constructs a checksum
 // based on the state change commitment on the result
 func (res *Result) StateChangeChecksum() [ChecksumLength]byte {
-	return BytesToChecksum(res.StateChangeCommitment)
+	return SliceToChecksumLength(res.StateChangeCommitment)
 }
 
-// BytesToChecksum cuts the first 4 bytes of the input and convert it into checksum
-func BytesToChecksum(input []byte) [ChecksumLength]byte {
+// SliceToChecksumLength cuts the first 4 bytes of the input and convert it into checksum
+func SliceToChecksumLength(input []byte) [ChecksumLength]byte {
 	// the first 4 bytes of StateChangeCommitment is used as checksum
 	var checksum [ChecksumLength]byte
 	if len(input) >= ChecksumLength {
