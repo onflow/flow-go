@@ -423,7 +423,7 @@ func (e *ReactorEngine) end(nextEpochCounter uint64) func() error {
 		if crypto.IsDKGFailureError(err) {
 			e.log.Warn().Err(err).Msgf("node %s with index %d failed DKG locally", e.me.NodeID(), e.controller.GetIndex())
 			err := e.dkgState.SetDKGEndState(nextEpochCounter, flow.DKGEndStateDKGFailure)
-			if err != nil {
+			if err != nil && !errors.Is(err, storage.ErrAlreadyExists) {
 				return fmt.Errorf("failed to set dkg end state following dkg end error: %w", err)
 			}
 		} else if err != nil {
