@@ -37,7 +37,7 @@ func NewSubscriptionHandlerFactory(eventFilterConfig state_stream.EventFilterCon
 	}
 }
 
-func (s *SubscriptionHandlerFactory) CreateSubscriptionHandler(topic string, arguments map[string]interface{}, broadcastMessage func([]byte) error) (SubscriptionHandler, error) {
+func (s *SubscriptionHandlerFactory) CreateSubscriptionHandler(topic string, arguments map[string]interface{}, broadcastMessage func(interface{})) (SubscriptionHandler, error) {
 	switch topic {
 	// TODO: Implemented handlers for each topic should be added in respective case
 	case EventsTopic,

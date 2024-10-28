@@ -337,10 +337,7 @@ func (w *WebSocketBroker) pingPongHandler() {
 //	  "id": "sub_id_1"
 //	}
 func (w *WebSocketBroker) subscribe(msg *SubscribeMessage) {
-	subHandler, err := w.subHandlerFactory.CreateSubscriptionHandler(msg.Topic, msg.Arguments, func(bytes []byte) error {
-		w.logger.Info().Msg(fmt.Sprintf("message: %s", string(bytes)))
-		return nil
-	})
+	subHandler, err := w.subHandlerFactory.CreateSubscriptionHandler(msg.Topic, msg.Arguments, w.broadcastMessage)
 	if err != nil {
 		// TODO: Handle as client error response
 		w.logger.Err(err).Msg("Subscription handler creation failed")
