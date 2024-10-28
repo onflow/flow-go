@@ -392,3 +392,12 @@ func WithEVMTracer(tracer debug.EVMTracer) Option {
 		return ctx
 	}
 }
+
+// WithReadVersionFromNodeVersionBeacon sets whether the version from the node version beacon should be read
+// this should only be disabled for testing
+func WithReadVersionFromNodeVersionBeacon(enabled bool) Option {
+	return func(ctx Context) Context {
+		ctx.ReadVersionFromNodeVersionBeacon = enabled
+		return ctx
+	}
+}

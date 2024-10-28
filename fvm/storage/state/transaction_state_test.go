@@ -104,7 +104,9 @@ func TestUnrestrictedNestedTransactionDifferentMeterParams(t *testing.T) {
 	require.Equal(t, uint(math.MaxUint), mainState.TotalMemoryLimit())
 
 	id1, err := txn.BeginNestedTransactionWithMeterParams(
-		meter.DefaultParameters().WithMemoryLimit(1))
+		state.ExecutionParameters{
+			MeterParameters: meter.DefaultParameters().WithMemoryLimit(1),
+		})
 	require.NoError(t, err)
 
 	nestedState1 := id1.StateForTestingOnly()
@@ -112,7 +114,9 @@ func TestUnrestrictedNestedTransactionDifferentMeterParams(t *testing.T) {
 	require.Equal(t, uint(1), nestedState1.TotalMemoryLimit())
 
 	id2, err := txn.BeginNestedTransactionWithMeterParams(
-		meter.DefaultParameters().WithMemoryLimit(2))
+		state.ExecutionParameters{
+			MeterParameters: meter.DefaultParameters().WithMemoryLimit(2),
+		})
 	require.NoError(t, err)
 
 	nestedState2 := id2.StateForTestingOnly()

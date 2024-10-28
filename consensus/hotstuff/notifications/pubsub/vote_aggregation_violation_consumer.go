@@ -43,7 +43,7 @@ func (d *VoteAggregationViolationDistributor) OnInvalidVoteDetected(err model.In
 	}
 }
 
-func (d *VoteAggregationViolationDistributor) OnVoteForInvalidBlockDetected(vote *model.Vote, invalidProposal *model.Proposal) {
+func (d *VoteAggregationViolationDistributor) OnVoteForInvalidBlockDetected(vote *model.Vote, invalidProposal *model.SignedProposal) {
 	d.lock.RLock()
 	defer d.lock.RUnlock()
 	for _, subscriber := range d.consumers {

@@ -18,9 +18,11 @@ type TransactionCollector struct {
 	logTimeToFinalized             bool
 	logTimeToExecuted              bool
 	logTimeToFinalizedExecuted     bool
+	logTimeToSealed                bool
 	timeToFinalized                prometheus.Summary
 	timeToExecuted                 prometheus.Summary
 	timeToFinalizedExecuted        prometheus.Summary
+	timeToSealed                   prometheus.Summary
 	transactionSubmission          *prometheus.CounterVec
 	transactionSize                prometheus.Histogram
 	scriptExecutedDuration         *prometheus.HistogramVec
@@ -40,6 +42,7 @@ func NewTransactionCollector(
 	logTimeToFinalized bool,
 	logTimeToExecuted bool,
 	logTimeToFinalizedExecuted bool,
+	logTimeToSealed bool,
 ) *TransactionCollector {
 
 	tc := &TransactionCollector{
@@ -48,6 +51,7 @@ func NewTransactionCollector(
 		logTimeToFinalized:         logTimeToFinalized,
 		logTimeToExecuted:          logTimeToExecuted,
 		logTimeToFinalizedExecuted: logTimeToFinalizedExecuted,
+		logTimeToSealed:            logTimeToSealed,
 		timeToFinalized: promauto.NewSummary(prometheus.SummaryOpts{
 			Name:      "time_to_finalized_seconds",
 			Namespace: namespaceAccess,
@@ -82,6 +86,20 @@ func NewTransactionCollector(
 			Subsystem: subsystemTransactionTiming,
 			Help: "the duration of how long it took between the transaction was received until it was both " +
 				"finalized and executed",
+			Objectives: map[float64]float64{
+				0.01: 0.001,
+				0.5:  0.05,
+				0.99: 0.001,
+			},
+			MaxAge:     10 * time.Minute,
+			AgeBuckets: 5,
+			BufCap:     500,
+		}),
+		timeToSealed: promauto.NewSummary(prometheus.SummaryOpts{
+			Name:      "time_to_seal_seconds",
+			Namespace: namespaceAccess,
+			Subsystem: subsystemTransactionTiming,
+			Help:      "the duration of how long it took between the transaction was received until it was sealed",
 			Objectives: map[float64]float64{
 				0.01: 0.001,
 				0.5:  0.05,
@@ -269,6 +287,27 @@ func (tc *TransactionCollector) TransactionExecuted(txID flow.Identifier, when t
 	}
 }
 
+func (tc *TransactionCollector) TransactionSealed(txID flow.Identifier, when time.Time) {
+	t, updated := tc.transactionTimings.Adjust(txID, func(t *flow.TransactionTiming) *flow.TransactionTiming {
+		t.Sealed = when
+		return t
+	})
+
+	if !updated {
+		tc.log.Debug().
+			Str("transaction_id", txID.String()).
+			Msg("failed to update TransactionSealed metric")
+		return
+	}
+
+	tc.trackTTS(t, tc.logTimeToSealed)
+
+	// remove transaction timing from mempool if sealed
+	if !t.Sealed.IsZero() {
+		tc.transactionTimings.Remove(txID)
+	}
+}
+
 func (tc *TransactionCollector) trackTTF(t *flow.TransactionTiming, log bool) {
 	if t.Received.IsZero() || t.Finalized.IsZero() {
 		return
@@ -314,6 +353,20 @@ func (tc *TransactionCollector) trackTTFE(t *flow.TransactionTiming, log bool) {
 	if log {
 		tc.log.Info().Str("transaction_id", t.TransactionID.String()).Float64("duration", duration).
 			Msg("transaction time to finalized and executed")
+	}
+}
+
+func (tc *TransactionCollector) trackTTS(t *flow.TransactionTiming, log bool) {
+	if t.Received.IsZero() || t.Sealed.IsZero() {
+		return
+	}
+	duration := t.Sealed.Sub(t.Received).Seconds()
+
+	tc.timeToSealed.Observe(duration)
+
+	if log {
+		tc.log.Info().Str("transaction_id", t.TransactionID.String()).Float64("duration", duration).
+			Msg("transaction time to sealed")
 	}
 }
 

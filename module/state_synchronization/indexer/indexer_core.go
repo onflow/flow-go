@@ -287,9 +287,10 @@ func (c *IndexerCore) updateProgramCache(header *flow.Header, events []flow.Even
 
 	tx.AddInvalidator(&accessInvalidator{
 		programs: &programInvalidator{
-			invalidated: updatedContracts,
+			invalidated:   updatedContracts,
+			invalidateAll: hasAuthorizedTransaction(collections, c.serviceAddress),
 		},
-		meterParamOverrides: &meterParamOverridesInvalidator{
+		executionParameters: &executionParametersInvalidator{
 			invalidateAll: hasAuthorizedTransaction(collections, c.serviceAddress),
 		},
 	})
@@ -325,7 +326,7 @@ func (c *IndexerCore) indexRegisters(registers map[ledger.Path]*ledger.Payload, 
 	return c.registers.Store(regEntries, height)
 }
 
-// HandleCollection handles the response of the a collection request made earlier when a block was received.
+// HandleCollection handles the response of the collection request made earlier when a block was received.
 // No errors expected during normal operations.
 func HandleCollection(
 	collection *flow.Collection,
