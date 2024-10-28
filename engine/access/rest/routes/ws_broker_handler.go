@@ -24,7 +24,7 @@ type WSBrokerHandler struct {
 var _ http.Handler = (*WSBrokerHandler)(nil)
 
 // NewWSBrokerHandler creates a new instance of WSBrokerHandler.
-// It initializes the handler with the provided logger, blockchain chain, and a factory for subscription handlers.
+// It initializes the handler with the provided logger, blockchain chain, and a subHandlerFactory for subscription handlers.
 //
 // Parameters:
 // - logger: Logger for recording internal events.
@@ -77,7 +77,7 @@ func (h *WSBrokerHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	defer conn.Close()
 
 	//TODO: fill LimitsConfiguration
-	wsBroker := NewWebSocketBroker(logger, conn, LimitsConfiguration{})
+	wsBroker := NewWebSocketBroker(logger, conn, LimitsConfiguration{}, h.subHandlerFactory)
 	err = wsBroker.SetConnectionConfig()
 	//TODO :
 	if err != nil {

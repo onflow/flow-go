@@ -15,6 +15,13 @@ import (
 	"github.com/onflow/flow-go/engine/access/rest/routes/subscription_handlers"
 )
 
+// Constants representing action types.
+const (
+	SubscribeAction         = "subscribe"          // Action for subscription message
+	UnsubscribeAction       = "unsubscribe"        // Action for unsubscription message
+	ListSubscriptionsAction = "list_subscriptions" // Action to list active subscriptions
+)
+
 // Define a base struct to determine the action
 type BaseMessage struct {
 	Action string `json:"action"`
@@ -26,7 +33,23 @@ type SubscribeMessage struct {
 	Arguments map[string]interface{} `json:"arguments"`
 }
 
+// SubscribeMessageResponse represents the response to a subscription message.
+// It includes the topic and a unique subscription ID.
+type SubscribeMessageResponse struct {
+	BaseMessage
+	Topic string `json:"topic"`
+	ID    string `json:"id"`
+}
+
 type UnsubscribeMessage struct {
+	BaseMessage
+	Topic string `json:"topic"`
+	ID    string `json:"id"`
+}
+
+// UnsubscribeMessageResponse represents the response to an unsubscription message.
+// It includes the topic and subscription ID for confirmation.
+type UnsubscribeMessageResponse struct {
 	BaseMessage
 	Topic string `json:"topic"`
 	ID    string `json:"id"`
@@ -34,6 +57,19 @@ type UnsubscribeMessage struct {
 
 type ListSubscriptionsMessage struct {
 	BaseMessage
+}
+
+// SubscriptionEntry represents an active subscription entry with a specific topic and unique identifier.
+type SubscriptionEntry struct {
+	Topic string `json:"topic"`
+	ID    string `json:"id"`
+}
+
+// ListSubscriptionsMessageResponse is the structure used to respond to list_subscriptions requests.
+// It contains a list of active subscriptions for the current WebSocket connection.
+type ListSubscriptionsMessageResponse struct {
+	BaseMessage
+	Subscriptions []SubscriptionEntry `json:"subscriptions"`
 }
 
 type LimitsConfiguration struct {
@@ -47,11 +83,11 @@ type LimitsConfiguration struct {
 }
 
 type WebSocketBroker struct {
-	logger zerolog.Logger
+	logger            zerolog.Logger
+	subHandlerFactory *subscription_handlers.SubscriptionHandlerFactory
+	conn              *websocket.Conn // WebSocket connection for communication with the client
 
-	conn *websocket.Conn // WebSocket connection for communication with the client
-
-	subs map[string]map[string]subscription_handlers.SubscriptionHandler // First key is the topic, second key is the subscription ID
+	subs map[string]subscription_handlers.SubscriptionHandler // First key is the subscription ID, second key is the topic
 
 	limitsConfiguration LimitsConfiguration // Limits on the maximum number of subscriptions per connection, responses per second, and send message timeout.
 
@@ -59,11 +95,18 @@ type WebSocketBroker struct {
 	broadcastChannel chan interface{} // Channel to read messages from node subscriptions
 }
 
-func NewWebSocketBroker(logger zerolog.Logger, conn *websocket.Conn, limitsConfiguration LimitsConfiguration) *WebSocketBroker {
+func NewWebSocketBroker(
+	logger zerolog.Logger,
+	conn *websocket.Conn,
+	limitsConfiguration LimitsConfiguration,
+	subHandlerFactory *subscription_handlers.SubscriptionHandlerFactory,
+) *WebSocketBroker {
 	websocketBroker := &WebSocketBroker{
-		logger:              logger,
+		logger:              logger.With().Str("component", "websocket-broker").Logger(),
 		conn:                conn,
 		limitsConfiguration: limitsConfiguration,
+		subHandlerFactory:   subHandlerFactory,
+		subs:                make(map[string]subscription_handlers.SubscriptionHandler),
 	}
 	websocketBroker.startResponseLimiter()
 
@@ -139,7 +182,7 @@ func (w *WebSocketBroker) readMessages() {
 
 		// Process based on the action type
 		switch baseMsg.Action {
-		case "subscribe":
+		case SubscribeAction:
 			var subscribeMsg SubscribeMessage
 			if err := json.Unmarshal(message, &subscribeMsg); err != nil {
 				err := fmt.Errorf("error parsing 'subscribe' message: %w", err)
@@ -157,8 +200,8 @@ func (w *WebSocketBroker) readMessages() {
 			}
 			w.limitsConfiguration.activeSubscriptions.Add(1)
 
-			w.subscribe(subscribeMsg.Topic, subscribeMsg.Arguments)
-		case "unsubscribe":
+			w.subscribe(&subscribeMsg)
+		case UnsubscribeAction:
 			var unsubscribeMsg UnsubscribeMessage
 			if err := json.Unmarshal(message, &unsubscribeMsg); err != nil {
 				err := fmt.Errorf("error parsing 'unsubscribe' message: %w", err)
@@ -169,9 +212,9 @@ func (w *WebSocketBroker) readMessages() {
 
 			w.limitsConfiguration.activeSubscriptions.Add(-1)
 
-			w.unsubscribe(unsubscribeMsg.ID)
+			w.unsubscribe(&unsubscribeMsg)
 
-		case "list_subscriptions":
+		case ListSubscriptionsAction:
 			var listSubscriptionsMsg ListSubscriptionsMessage
 			if err := json.Unmarshal(message, &listSubscriptionsMsg); err != nil {
 				err := fmt.Errorf("error parsing 'unsubsclist_subscriptionsribe' message: %w", err)
@@ -280,21 +323,122 @@ func (w *WebSocketBroker) pingPongHandler() {
 	}
 }
 
-// Triggered by the readMessages method when the action is subscribe. It extracts the topic from the message’s topic
-// field, creates the appropriate SubscriptionHandler for the topic using the factory function CreateSubscription,
-// and adds an instance of the new handler to the subs map. The client receives a notification confirming the successful subscription along with the specific ID.
-func (w *WebSocketBroker) subscribe(topic string, arguments map[string]interface{}) {
+// subscribe processes a request to subscribe to a specific topic. It uses the topic field in
+// the message to create a SubscriptionHandler, which is then added to the `subs` map to track
+// active subscriptions. A confirmation response is sent back to the client with the subscription ID.
+//
+// This method is triggered by the readMessages method when the action is "subscribe".
+//
+// Example response sent to client:
+//
+//	{
+//	  "action": "subscribe",
+//	  "topic": "example_topic",
+//	  "id": "sub_id_1"
+//	}
+func (w *WebSocketBroker) subscribe(msg *SubscribeMessage) {
+	subHandler, err := w.subHandlerFactory.CreateSubscriptionHandler(msg.Topic, msg.Arguments, func(bytes []byte) error {
+		w.logger.Info().Msg(fmt.Sprintf("message: %s", string(bytes)))
+		return nil
+	})
+	if err != nil {
+		// TODO: Handle as client error response
+		w.logger.Err(err).Msg("Subscription handler creation failed")
+		return
+	}
 
+	w.subs[subHandler.ID()] = subHandler
+
+	w.broadcastMessage(SubscribeMessageResponse{
+		BaseMessage: BaseMessage{
+			Action: SubscribeAction,
+		},
+		Topic: subHandler.Topic(),
+		ID:    subHandler.ID(),
+	})
 }
 
-// It is triggered by the readMessages method when the action is unsubscribe. It removes the relevant handler from
-// the subs map by calling SubscriptionHandler::CloseSubscription and notifying the client of successful unsubscription.
-func (w *WebSocketBroker) unsubscribe(subscriptionID string) {
+// unsubscribe processes a request to cancel an active subscription, identified by its ID.
+// It removes the relevant SubscriptionHandler from the `subs` map, closes the handler,
+// and sends a confirmation response to the client.
+//
+// This method is triggered by the readMessages method when the action is "unsubscribe".
+//
+// Example response sent to client:
+//
+//	{
+//	  "action": "unsubscribe",
+//	  "topic": "example_topic",
+//	  "id": "sub_id_1"
+//	}
+func (w *WebSocketBroker) unsubscribe(msg *UnsubscribeMessage) {
+	sub, found := w.subs[msg.ID]
+	if !found {
+		// TODO: Handle as client error response
+		w.logger.Info().Msg(fmt.Sprintf("No subscription found for ID %s", msg.ID))
+		return
+	}
 
+	response := UnsubscribeMessageResponse{
+		BaseMessage: BaseMessage{
+			Action: UnsubscribeAction,
+		},
+		Topic: sub.Topic(),
+		ID:    sub.ID(),
+	}
+
+	if err := sub.Close(); err != nil {
+		// TODO: Handle as client error response
+		w.logger.Err(err).Msgf("Failed to close subscription with ID %s", msg.ID)
+		return
+	}
+
+	delete(w.subs, msg.ID)
+
+	w.broadcastMessage(response)
 }
 
-// It is triggered by the readMessages method when the action is list_subscriptions. It gathers all active subscriptions
-// for the current connection, formats the response, and sends it back to the client.
+// listOfSubscriptions gathers all active subscriptions for the current WebSocket connection,
+// formats them into a ListSubscriptionsMessageResponse, and sends the response to the client.
+//
+// This method is triggered by the readMessages handler when the action "list_subscriptions" is received.
+//
+// Example message structure sent to the client:
+//
+//	{
+//	  "action": "list_subscriptions",
+//	  "subscriptions": [
+//	    {"topic": "example_topic_1", "id": "sub_id_1"},
+//	    {"topic": "example_topic_2", "id": "sub_id_2"}
+//	  ]
+//	}
 func (w *WebSocketBroker) listOfSubscriptions() {
+	response := ListSubscriptionsMessageResponse{
+		BaseMessage: BaseMessage{
+			Action: ListSubscriptionsAction,
+		},
+		Subscriptions: make([]SubscriptionEntry, 0, len(w.subs)),
+	}
 
+	for id, sub := range w.subs {
+		response.Subscriptions = append(response.Subscriptions, SubscriptionEntry{
+			Topic: sub.Topic(),
+			ID:    id,
+		})
+	}
+
+	w.broadcastMessage(response)
+}
+
+// clearSubscriptions closes each SubscriptionHandler in the subs map and
+// removes all entries from the map.
+func (w *WebSocketBroker) clearSubscriptions() {
+	for id, sub := range w.subs {
+		// Attempt to close the subscription
+		if err := sub.Close(); err != nil {
+			w.logger.Err(err).Msgf("Failed to close subscription with ID %s", id)
+		}
+		// Remove the subscription from the map
+		delete(w.subs, id)
+	}
 }

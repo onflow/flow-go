@@ -17,6 +17,8 @@ const (
 )
 
 type SubscriptionHandler interface {
+	ID() string
+	Topic() string
 	Close() error
 }
 
