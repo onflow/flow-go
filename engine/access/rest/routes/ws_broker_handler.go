@@ -78,11 +78,14 @@ func (h *WSBrokerHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	//TODO: fill LimitsConfiguration
 	wsBroker := NewWebSocketBroker(logger, conn, LimitsConfiguration{})
-	err = wsBroker.SetWebsocketConf()
+	err = wsBroker.SetConnectionConfig()
+	//TODO :
 	if err != nil {
 		// TODO: handle error
 		return
 	}
 
-	//TODO: add readMessages and writeMessages using WebSocketBroker
+	go wsBroker.readMessages()
+	go wsBroker.pingPongHandler()
+	wsBroker.writeMessages()
 }
