@@ -27,6 +27,11 @@ type BaseMessage struct {
 	Action string `json:"action"`
 }
 
+type BaseMessageResponse struct {
+	Action  string `json:"action"`
+	Success bool   `json:"success"`
+}
+
 type SubscribeMessage struct {
 	BaseMessage
 	Topic     string                 `json:"topic"`
@@ -36,7 +41,7 @@ type SubscribeMessage struct {
 // SubscribeMessageResponse represents the response to a subscription message.
 // It includes the topic and a unique subscription ID.
 type SubscribeMessageResponse struct {
-	BaseMessage
+	BaseMessageResponse
 	Topic string `json:"topic"`
 	ID    string `json:"id"`
 }
@@ -50,7 +55,7 @@ type UnsubscribeMessage struct {
 // UnsubscribeMessageResponse represents the response to an unsubscription message.
 // It includes the topic and subscription ID for confirmation.
 type UnsubscribeMessageResponse struct {
-	BaseMessage
+	BaseMessageResponse
 	Topic string `json:"topic"`
 	ID    string `json:"id"`
 }
@@ -68,7 +73,7 @@ type SubscriptionEntry struct {
 // ListSubscriptionsMessageResponse is the structure used to respond to list_subscriptions requests.
 // It contains a list of active subscriptions for the current WebSocket connection.
 type ListSubscriptionsMessageResponse struct {
-	BaseMessage
+	BaseMessageResponse
 	Subscriptions []SubscriptionEntry `json:"subscriptions"`
 }
 
@@ -347,8 +352,9 @@ func (w *WebSocketBroker) subscribe(msg *SubscribeMessage) {
 	w.subs[subHandler.ID()] = subHandler
 
 	w.broadcastMessage(SubscribeMessageResponse{
-		BaseMessage: BaseMessage{
-			Action: SubscribeAction,
+		BaseMessageResponse: BaseMessageResponse{
+			Action:  SubscribeAction,
+			Success: true,
 		},
 		Topic: subHandler.Topic(),
 		ID:    subHandler.ID(),
@@ -377,8 +383,9 @@ func (w *WebSocketBroker) unsubscribe(msg *UnsubscribeMessage) {
 	}
 
 	response := UnsubscribeMessageResponse{
-		BaseMessage: BaseMessage{
-			Action: UnsubscribeAction,
+		BaseMessageResponse: BaseMessageResponse{
+			Action:  UnsubscribeAction,
+			Success: true,
 		},
 		Topic: sub.Topic(),
 		ID:    sub.ID(),
@@ -386,6 +393,7 @@ func (w *WebSocketBroker) unsubscribe(msg *UnsubscribeMessage) {
 
 	if err := sub.Close(); err != nil {
 		// TODO: Handle as client error response
+		response.Success = false
 		w.logger.Err(err).Msgf("Failed to close subscription with ID %s", msg.ID)
 		return
 	}
@@ -411,8 +419,9 @@ func (w *WebSocketBroker) unsubscribe(msg *UnsubscribeMessage) {
 //	}
 func (w *WebSocketBroker) listOfSubscriptions() {
 	response := ListSubscriptionsMessageResponse{
-		BaseMessage: BaseMessage{
-			Action: ListSubscriptionsAction,
+		BaseMessageResponse: BaseMessageResponse{
+			Action:  ListSubscriptionsAction,
+			Success: true,
 		},
 		Subscriptions: make([]SubscriptionEntry, 0, len(w.subs)),
 	}
