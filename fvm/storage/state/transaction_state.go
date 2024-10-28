@@ -45,6 +45,9 @@ type Meter interface {
 type NestedTransactionPreparer interface {
 	Meter
 
+	// ExecutionParameters returns the execution parameters
+	ExecutionParameters() ExecutionParameters
+
 	// NumNestedTransactions returns the number of uncommitted nested
 	// transactions.  Note that the main transaction is not considered a
 	// nested transaction.
@@ -84,7 +87,7 @@ type NestedTransactionPreparer interface {
 	// the provided meter parameters. This returns error if the current nested
 	// transaction is program restricted.
 	BeginNestedTransactionWithMeterParams(
-		params meter.MeterParameters,
+		params ExecutionParameters,
 	) (
 		NestedTransactionId,
 		error,
@@ -200,6 +203,10 @@ func (txnState *transactionState) current() nestedTransactionStackFrame {
 	return txnState.nestedTransactions[txnState.NumNestedTransactions()]
 }
 
+func (txnState *transactionState) ExecutionParameters() ExecutionParameters {
+	return txnState.current().ExecutionParameters()
+}
+
 func (txnState *transactionState) NumNestedTransactions() int {
 	return len(txnState.nestedTransactions) - 1
 }
@@ -267,7 +274,7 @@ func (txnState *transactionState) BeginNestedTransaction() (
 }
 
 func (txnState *transactionState) BeginNestedTransactionWithMeterParams(
-	params meter.MeterParameters,
+	params ExecutionParameters,
 ) (
 	NestedTransactionId,
 	error,
