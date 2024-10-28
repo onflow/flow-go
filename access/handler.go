@@ -1435,14 +1435,18 @@ func (h *Handler) SendAndSubscribeTransactionStatuses(
 	messageIndex := counters.NewMonotonousCounter(0)
 	return subscription.HandleSubscription(sub, func(txResults []*TransactionResult) error {
 		for i := range txResults {
-			value := messageIndex.Increment()
+			index := messageIndex.Value()
 
 			err = stream.Send(&access.SendAndSubscribeTransactionStatusesResponse{
 				TransactionResults: TransactionResultToMessage(txResults[i]),
-				MessageIndex:       value,
+				MessageIndex:       index,
 			})
 			if err != nil {
 				return rpc.ConvertError(err, "could not send response", codes.Internal)
+			}
+
+			if ok := messageIndex.Set(index + 1); !ok {
+				return status.Errorf(codes.Internal, "message index already incremented to %d", messageIndex.Value())
 			}
 		}
 

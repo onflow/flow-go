@@ -381,7 +381,7 @@ func (h *Handler) handleEventsResponse(send sendSubscribeEventsResponseFunc, hea
 			return status.Errorf(codes.Internal, "could not convert events to entity: %v", err)
 		}
 
-		index := messageIndex.Increment()
+		index := messageIndex.Value()
 
 		err = send(&executiondata.SubscribeEventsResponse{
 			BlockHeight:    resp.Height,
@@ -392,6 +392,10 @@ func (h *Handler) handleEventsResponse(send sendSubscribeEventsResponseFunc, hea
 		})
 		if err != nil {
 			return rpc.ConvertError(err, "could not send response", codes.Internal)
+		}
+
+		if ok := messageIndex.Set(index + 1); !ok {
+			return status.Errorf(codes.Internal, "message index already incremented to %d", messageIndex.Value())
 		}
 
 		return nil
@@ -495,7 +499,7 @@ func (h *Handler) handleAccountStatusesResponse(
 			return err
 		}
 
-		index := messageIndex.Increment()
+		index := messageIndex.Value()
 
 		err = send(&executiondata.SubscribeAccountStatusesResponse{
 			BlockId:      convert.IdentifierToMessage(resp.BlockID),
@@ -505,6 +509,10 @@ func (h *Handler) handleAccountStatusesResponse(
 		})
 		if err != nil {
 			return rpc.ConvertError(err, "could not send response", codes.Internal)
+		}
+
+		if ok := messageIndex.Set(index + 1); !ok {
+			return status.Errorf(codes.Internal, "message index already incremented to %d", messageIndex.Value())
 		}
 
 		return nil
