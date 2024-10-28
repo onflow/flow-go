@@ -31,7 +31,7 @@ type SafetyData struct {
 // Implementations are generally *not* concurrency safe.
 type SafetyRules interface {
 	// ProduceVote takes a block proposal and current view, and decides whether to vote for the block.
-	// Voting is deterministic meaning voting for same proposal will always result in the same vote.
+	// Voting is deterministic, i.e. voting for same proposal will always result in the same vote.
 	// Returns:
 	//  * (vote, nil): On the _first_ block for the current view that is safe to vote for.
 	//    Subsequently, voter does _not_ vote for any _other_ block with the same (or lower) view.
@@ -40,7 +40,8 @@ type SafetyRules interface {
 	//  * (nil, model.NoVoteError): If the safety module decides that it is not safe to vote for the given block.
 	//    This is a sentinel error and _expected_ during normal operation.
 	// All other errors are unexpected and potential symptoms of uncovered edge cases or corrupted internal state (fatal).
-	ProduceVote(proposal *model.Proposal, curView uint64) (*model.Vote, error)
+	ProduceVote(proposal *model.SignedProposal, curView uint64) (*model.Vote, error)
+
 	// ProduceTimeout takes current view, highest locally known QC and TC (optional, must be nil if and
 	// only if QC is for previous view) and decides whether to produce timeout for current view.
 	// Returns:
