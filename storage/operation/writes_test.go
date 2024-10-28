@@ -4,11 +4,15 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
+	"os"
+	"path/filepath"
 	"sync"
 	"testing"
 
+	"github.com/cockroachdb/pebble"
 	"github.com/stretchr/testify/require"
 
+	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/storage/operation"
 	"github.com/onflow/flow-go/storage/operation/dbtest"
@@ -134,6 +138,74 @@ func TestRemove(t *testing.T) {
 		var item Entity
 		err := operation.Retrieve(e.Key(), &item)(r)
 		require.True(t, errors.Is(err, storage.ErrNotFound), "expected not found error after delete")
+	})
+}
+
+func TestRemoveDiskUsage(t *testing.T) {
+	count := 10000
+	wg := sync.WaitGroup{}
+	// 10000 chunk data packs will produce 4 log files
+	// Wait for the 4 log file to be deleted
+	wg.Add(4)
+
+	// Create an event listener to monitor compaction events
+	listener := pebble.EventListener{
+		// Capture when compaction ends
+		WALDeleted: func(info pebble.WALDeleteInfo) {
+			wg.Done()
+		},
+	}
+
+	// Configure Pebble DB with the event listener
+	opts := &pebble.Options{
+		MemTableSize:  64 << 20, // required for rotating WAL
+		EventListener: &listener,
+	}
+
+	dbtest.RunWithPebbleDB(t, opts, func(t *testing.T, r storage.Reader, withWriter dbtest.WithWriter, dir string, db *pebble.DB) {
+		items := make([]*flow.ChunkDataPack, count)
+
+		// prefix is needed for defining the key range for compaction
+		prefix := []byte{1}
+		getKey := func(c *flow.ChunkDataPack) []byte {
+			return append(prefix, c.ChunkID[:]...)
+		}
+
+		for i := 0; i < count; i++ {
+			chunkID := unittest.IdentifierFixture()
+			chunkDataPack := unittest.ChunkDataPackFixture(chunkID)
+			items[i] = chunkDataPack
+		}
+
+		// Insert 100 entities
+		require.NoError(t, withWriter(func(writer storage.Writer) error {
+			for i := 0; i < count; i++ {
+				if err := operation.Upsert(getKey(items[i]), items[i])(writer); err != nil {
+					return err
+				}
+			}
+			return nil
+		}))
+		sizeBefore := getFolderSize(t, dir)
+
+		// Remove all entities
+		require.NoError(t, withWriter(func(writer storage.Writer) error {
+			for i := 0; i < count; i++ {
+				if err := operation.Remove(getKey(items[i]))(writer); err != nil {
+					return err
+				}
+			}
+			return nil
+		}))
+
+		// Trigger compaction
+		require.NoError(t, db.Compact(prefix, []byte{2}, true))
+		wg.Wait()
+
+		// Verify the disk usage is reduced
+		sizeAfter := getFolderSize(t, dir)
+		require.Greater(t, sizeBefore, sizeAfter,
+			fmt.Sprintf("expected disk usage to be reduced after compaction, before: %d, after: %d", sizeBefore, sizeAfter))
 	})
 }
 
@@ -270,6 +342,58 @@ func TestRemoveRange(t *testing.T) {
 	})
 }
 
+// verify if iterating each key and writing new keys concurrently, the iterator will visit all keys once
+func TestIterateAndWriteConcurrently(t *testing.T) {
+	dbtest.RunWithStorages(t, func(t *testing.T, r storage.Reader, withWriter dbtest.WithWriter) {
+		prefix := []byte{0x10}
+
+		storeKey := func(e Entity) []byte {
+			return append(prefix, e.Key()...)
+		}
+
+		// adding some data to database
+		count := 100
+		for i := 0; i < count; i++ {
+			e := Entity{ID: uint64(i)}
+			require.NoError(t, withWriter(operation.Upsert(storeKey(e), e)))
+		}
+
+		// iterate over all keys and write new keys concurrently
+		var wg sync.WaitGroup
+		visitedKeys := make(map[string]struct{})
+		newKeysCount := 50
+
+		// Goroutine for iteration
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			err := operation.Iterate(prefix, operation.PrefixUpperBound(prefix), operation.KeyOnlyIterateFunc(func(key []byte) error {
+				_, visited := visitedKeys[string(key)]
+				require.False(t, visited)
+				visitedKeys[string(key)] = struct{}{}
+				return nil
+			}), storage.DefaultIteratorOptions())(r)
+			require.NoError(t, err)
+		}()
+
+		// Goroutine for writing new keys
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for i := 0; i < newKeysCount; i++ {
+				e := Entity{ID: uint64(count + i)}
+				require.NoError(t, withWriter(operation.Upsert(storeKey(e), e)))
+			}
+		}()
+
+		wg.Wait()
+
+		// Verify that all keys (including new ones) were visited
+		require.True(t, len(visitedKeys) >= count, "expected all keys to be visited")
+	})
+
+}
+
 type Entity struct {
 	ID uint64
 }
@@ -299,4 +423,26 @@ func (a UnencodeableEntity) MarshalMsgpack() ([]byte, error) {
 
 func (a UnencodeableEntity) UnmarshalMsgpack(b []byte) error {
 	return errCantDecode
+}
+
+func getFolderSize(t testing.TB, dir string) int64 {
+	var size int64
+	require.NoError(t, filepath.WalkDir(dir, func(path string, d os.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if !d.IsDir() {
+			info, err := d.Info()
+			if err != nil {
+				fmt.Printf("warning: could not get file info for %s: %v\n", path, err)
+				return nil
+			}
+
+			// Add the file size to total
+			size += info.Size()
+		}
+		return nil
+	}))
+
+	return size
 }
