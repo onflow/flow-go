@@ -364,7 +364,7 @@ func main() {
 				return fmt.Errorf("could not initialize my beacon key epoch recovery: %w", err)
 			}
 
-			// reactorEngine consumes the EpochSetupPhaseStarted event
+			// subscribe for protocol events to handle exiting EFM
 			node.ProtocolEvents.AddConsumer(myBeaconKeyRecovery)
 
 			return nil
