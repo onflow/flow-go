@@ -156,6 +156,9 @@ func (w *WebSocketBroker) resolveWebSocketError(err error) (int, string) {
 	if errors.As(err, &statusErr) {
 		wsMsg := statusErr.UserMessage()
 
+		if statusErr.Status() == http.StatusBadRequest {
+			return websocket.CloseUnsupportedData, wsMsg
+		}
 		if statusErr.Status() == http.StatusServiceUnavailable {
 			return websocket.CloseTryAgainLater, wsMsg
 		}
@@ -225,7 +228,7 @@ func (w *WebSocketBroker) readMessages() {
 func (w *WebSocketBroker) processMessage(message []byte) error {
 	var baseMsg BaseMessageRequest
 	if err := json.Unmarshal(message, &baseMsg); err != nil {
-		return models.NewRestError(http.StatusBadRequest, "invalid message structure", err)
+		return models.NewRestError(http.StatusBadRequest, "invalid message structure: 'action' is required", err)
 	}
 	switch baseMsg.Action {
 	case SubscribeAction:
