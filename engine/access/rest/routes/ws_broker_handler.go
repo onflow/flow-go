@@ -5,7 +5,6 @@ import (
 
 	"github.com/gorilla/websocket"
 	"github.com/rs/zerolog"
-	"go.uber.org/atomic"
 
 	"github.com/onflow/flow-go/engine/access/rest/models"
 	"github.com/onflow/flow-go/engine/access/rest/routes/subscription_handlers"
@@ -19,6 +18,7 @@ type WSBrokerHandler struct {
 	*HttpHandler
 
 	logger            zerolog.Logger
+	config            WebsocketConfig
 	subHandlerFactory *subscription_handlers.SubscriptionHandlerFactory
 }
 
@@ -33,11 +33,13 @@ var _ http.Handler = (*WSBrokerHandler)(nil)
 // - subHandlerFactory: Factory for creating handlers that manage specific pub-sub subscriptions.
 func NewWSBrokerHandler(
 	logger zerolog.Logger,
+	config WebsocketConfig,
 	chain flow.Chain,
 	subHandlerFactory *subscription_handlers.SubscriptionHandlerFactory,
 ) *WSBrokerHandler {
 	return &WSBrokerHandler{
 		logger:            logger,
+		config:            config,
 		subHandlerFactory: subHandlerFactory,
 		HttpHandler:       NewHttpHandler(logger, chain),
 	}
@@ -79,12 +81,8 @@ func (h *WSBrokerHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	wsBroker := NewWebSocketBroker(
 		logger,
+		h.config,
 		conn,
-		//TODO: fill all limits
-		LimitsConfiguration{
-			activeResponsesPerSecond: atomic.NewUint64(0),
-			activeSubscriptions:      atomic.NewUint64(0),
-		},
 		h.subHandlerFactory,
 	)
 	err = wsBroker.configureConnection()

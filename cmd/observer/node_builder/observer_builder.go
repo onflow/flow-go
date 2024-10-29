@@ -139,6 +139,7 @@ type ObserverServiceConfig struct {
 	checkpointFile                       string
 	apiTimeout                           time.Duration
 	stateStreamConf                      statestreambackend.Config
+	wsConfig                             routes.WebsocketConfig
 	stateStreamFilterConf                map[string]int
 	upstreamNodeAddresses                []string
 	upstreamNodePublicKeys               []string
@@ -208,7 +209,12 @@ func DefaultObserverServiceConfig() *ObserverServiceConfig {
 			HeartbeatInterval:       subscription.DefaultHeartbeatInterval,
 			RegisterIDsRequestLimit: state_stream.DefaultRegisterIDsRequestLimit,
 		},
-		stateStreamFilterConf:                nil,
+		stateStreamFilterConf: nil,
+		wsConfig: routes.WebsocketConfig{
+			MaxSubscriptionsPerConnection: routes.DefaultMaxSubscriptionsPerConnection,
+			MaxResponsesPerSecond:         routes.DefaultMaxResponsesPerSecond,
+			SendMessageTimeout:            routes.DefaultSendMessageTimeout,
+		},
 		rpcMetricsEnabled:                    false,
 		apiRatelimits:                        nil,
 		apiBurstlimits:                       nil,
@@ -798,6 +804,23 @@ func (builder *ObserverServiceBuilder) extraFlags() {
 			"registerdb-pruning-threshold",
 			defaultConfig.registerDBPruneThreshold,
 			fmt.Sprintf("specifies the number of blocks below the latest stored block height to keep in register db. default: %d", defaultConfig.registerDBPruneThreshold))
+
+		// Websocket subscriptions
+		flags.Uint64Var(&builder.wsConfig.MaxSubscriptionsPerConnection,
+			"websocket-max-subscriptions-per-connection",
+			defaultConfig.wsConfig.MaxSubscriptionsPerConnection,
+			fmt.Sprintf("maximum number of subscriptions per connection for websocket subscriptions. Default: %d", builder.wsConfig.MaxSubscriptionsPerConnection))
+
+		flags.Uint64Var(&builder.wsConfig.MaxResponsesPerSecond,
+			"websocket-max-responses-per-second",
+			defaultConfig.wsConfig.MaxResponsesPerSecond,
+			fmt.Sprintf("maximum number of responses per second for websocket subscriptions. Default: %d", builder.wsConfig.MaxResponsesPerSecond))
+
+		flags.DurationVar(&builder.wsConfig.SendMessageTimeout,
+			"websocket-send-message-timeout",
+			defaultConfig.wsConfig.SendMessageTimeout,
+			fmt.Sprintf("timeout value for send messages for websocket subscriptions. Default: %v", defaultConfig.wsConfig.SendMessageTimeout))
+
 	}).ValidateFlags(func() error {
 		if builder.executionDataSyncEnabled {
 			if builder.executionDataConfig.FetchTimeout <= 0 {
@@ -1931,6 +1954,7 @@ func (builder *ObserverServiceBuilder) enqueueRPCServer() {
 			builder.unsecureGrpcServer,
 			builder.stateStreamBackend,
 			builder.stateStreamConf,
+			builder.wsConfig,
 			indexReporter,
 		)
 		if err != nil {

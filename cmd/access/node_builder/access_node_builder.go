@@ -146,6 +146,7 @@ type AccessNodeConfig struct {
 	apiBurstlimits                       map[string]int
 	rpcConf                              rpc.Config
 	stateStreamConf                      statestreambackend.Config
+	wsConfig                             routes.WebsocketConfig
 	stateStreamFilterConf                map[string]int
 	ExecutionNodeAddress                 string // deprecated
 	HistoricalAccessRPCs                 []access.AccessAPIClient
@@ -238,7 +239,12 @@ func DefaultAccessNodeConfig() *AccessNodeConfig {
 			ResponseLimit:           subscription.DefaultResponseLimit,
 			HeartbeatInterval:       subscription.DefaultHeartbeatInterval,
 		},
-		stateStreamFilterConf:        nil,
+		stateStreamFilterConf: nil,
+		wsConfig: routes.WebsocketConfig{
+			MaxSubscriptionsPerConnection: routes.DefaultMaxSubscriptionsPerConnection,
+			MaxResponsesPerSecond:         routes.DefaultMaxResponsesPerSecond,
+			SendMessageTimeout:            routes.DefaultSendMessageTimeout,
+		},
 		ExecutionNodeAddress:         "localhost:9000",
 		logTxTimeToFinalized:         false,
 		logTxTimeToExecuted:          false,
@@ -1436,6 +1442,23 @@ func (builder *FlowAccessNodeBuilder) extraFlags() {
 			"registerdb-pruning-threshold",
 			defaultConfig.registerDBPruneThreshold,
 			fmt.Sprintf("specifies the number of blocks below the latest stored block height to keep in register db. default: %d", defaultConfig.registerDBPruneThreshold))
+
+		// Websocket subscriptions
+		flags.Uint64Var(&builder.wsConfig.MaxSubscriptionsPerConnection,
+			"websocket-max-subscriptions-per-connection",
+			defaultConfig.wsConfig.MaxSubscriptionsPerConnection,
+			fmt.Sprintf("maximum number of subscriptions per connection for websocket subscriptions. Default: %d", builder.wsConfig.MaxSubscriptionsPerConnection))
+
+		flags.Uint64Var(&builder.wsConfig.MaxResponsesPerSecond,
+			"websocket-max-responses-per-second",
+			defaultConfig.wsConfig.MaxResponsesPerSecond,
+			fmt.Sprintf("maximum number of responses per second for websocket subscriptions. Default: %d", builder.wsConfig.MaxResponsesPerSecond))
+
+		flags.DurationVar(&builder.wsConfig.SendMessageTimeout,
+			"websocket-send-message-timeout",
+			defaultConfig.wsConfig.SendMessageTimeout,
+			fmt.Sprintf("timeout value for send messages for websocket subscriptions. Default: %v", defaultConfig.wsConfig.SendMessageTimeout))
+
 	}).ValidateFlags(func() error {
 		if builder.supportsObserver && (builder.PublicNetworkConfig.BindAddress == cmd.NotSet || builder.PublicNetworkConfig.BindAddress == "") {
 			return errors.New("public-network-address must be set if supports-observer is true")
@@ -2015,6 +2038,7 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 				builder.unsecureGrpcServer,
 				builder.stateStreamBackend,
 				builder.stateStreamConf,
+				builder.wsConfig,
 				indexReporter,
 			)
 			if err != nil {

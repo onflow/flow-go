@@ -82,13 +82,14 @@ func (b *RouterBuilder) AddWsRoutes(
 // AddPubSubRoute adds WebSocket route for the pub/sub mechanism to the router.
 func (b *RouterBuilder) AddPubSubRoute(
 	chain flow.Chain,
+	wsConfig WebsocketConfig,
 	subHandlerFactory *subscription_handlers.SubscriptionHandlerFactory,
 ) *RouterBuilder {
 	b.v1SubRouter.
 		Methods(http.MethodGet).
 		Path("/ws").
 		Name("ws").
-		Handler(NewWSBrokerHandler(b.logger, chain, subHandlerFactory))
+		Handler(NewWSBrokerHandler(b.logger, wsConfig, chain, subHandlerFactory))
 
 	return b
 }

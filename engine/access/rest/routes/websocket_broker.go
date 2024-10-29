@@ -22,6 +22,15 @@ const (
 	ListSubscriptionsAction = "list_subscriptions" // Action to list active subscriptions
 )
 
+const (
+	// DefaultMaxSubscriptionsPerConnection defines the default max number of subscriptions that can be open at the same time.
+	DefaultMaxSubscriptionsPerConnection = 1000
+
+	DefaultMaxResponsesPerSecond = 100
+
+	DefaultSendMessageTimeout = 10 * time.Second
+)
+
 // Define a base struct to determine the action
 type BaseMessageRequest struct {
 	Action string `json:"action"`
@@ -78,14 +87,11 @@ type ListSubscriptionsMessageResponse struct {
 	Subscriptions []*SubscriptionEntry `json:"subscriptions,omitempty"`
 }
 
-type LimitsConfiguration struct {
-	maxSubscriptions    uint64
-	activeSubscriptions *atomic.Uint64
+type WebsocketConfig struct {
+	MaxSubscriptionsPerConnection uint64
+	MaxResponsesPerSecond         uint64
 
-	maxResponsesPerSecond    uint64
-	activeResponsesPerSecond *atomic.Uint64
-
-	sendMessageTimeout time.Duration
+	SendMessageTimeout time.Duration
 }
 
 type WebSocketBroker struct {
@@ -95,24 +101,29 @@ type WebSocketBroker struct {
 
 	subs map[string]subscription_handlers.SubscriptionHandler // First key is the subscription ID, second key is the topic
 
-	limitsConfiguration LimitsConfiguration // Limits on the maximum number of subscriptions per connection, responses per second, and send message timeout.
+	config WebsocketConfig // Limits on the maximum number of subscriptions per connection, responses per second, and send message timeout.
 
 	errChannel       chan error       // Channel to read messages from the client
 	broadcastChannel chan interface{} // Channel to read messages from node subscriptions
+
+	activeSubscriptions      *atomic.Uint64
+	activeResponsesPerSecond *atomic.Uint64
 }
 
 func NewWebSocketBroker(
 	logger zerolog.Logger,
+	config WebsocketConfig,
 	conn *websocket.Conn,
-	limitsConfiguration LimitsConfiguration,
 	subHandlerFactory *subscription_handlers.SubscriptionHandlerFactory,
 ) *WebSocketBroker {
 	websocketBroker := &WebSocketBroker{
-		logger:              logger.With().Str("component", "websocket-broker").Logger(),
-		conn:                conn,
-		limitsConfiguration: limitsConfiguration,
-		subHandlerFactory:   subHandlerFactory,
-		subs:                make(map[string]subscription_handlers.SubscriptionHandler),
+		logger:                   logger.With().Str("component", "websocket-broker").Logger(),
+		conn:                     conn,
+		config:                   config,
+		subHandlerFactory:        subHandlerFactory,
+		subs:                     make(map[string]subscription_handlers.SubscriptionHandler),
+		activeResponsesPerSecond: atomic.NewUint64(0),
+		activeSubscriptions:      atomic.NewUint64(0),
 	}
 	go websocketBroker.resetResponseLimit()
 
@@ -125,7 +136,7 @@ func (w *WebSocketBroker) resetResponseLimit() {
 	defer ticker.Stop()
 
 	for range ticker.C {
-		w.limitsConfiguration.activeResponsesPerSecond.Store(0) // Reset the response count every second
+		w.activeResponsesPerSecond.Store(0) // Reset the response count every second
 	}
 }
 
@@ -235,13 +246,12 @@ func (w *WebSocketBroker) handleSubscribeRequest(message []byte) error {
 		return fmt.Errorf("failed to parse 'subscribe' message: %w", err)
 	}
 
-	if w.limitsConfiguration.activeSubscriptions.Load() >= w.limitsConfiguration.maxSubscriptions {
-		return fmt.Errorf("max subscriptions reached, max subscriptions count: %d", w.limitsConfiguration.maxSubscriptions)
+	if w.activeSubscriptions.Load() >= w.config.MaxSubscriptionsPerConnection {
+		return fmt.Errorf("max subscriptions reached, max subscriptions per connection count: %d", w.config.MaxSubscriptionsPerConnection)
 	}
-	w.limitsConfiguration.activeSubscriptions.Add(1)
-	w.subscribe(&subscribeMsg)
+	w.activeSubscriptions.Add(1)
 
-	return nil
+	return w.subscribe(&subscribeMsg)
 }
 
 func (w *WebSocketBroker) handleUnsubscribeRequest(message []byte) error {
@@ -250,10 +260,8 @@ func (w *WebSocketBroker) handleUnsubscribeRequest(message []byte) error {
 		return fmt.Errorf("failed to parse 'unsubscribe' message: %w", err)
 	}
 
-	w.limitsConfiguration.activeSubscriptions.Add(-1)
-	w.unsubscribe(&unsubscribeMsg)
-
-	return nil
+	w.activeSubscriptions.Sub(1)
+	return w.unsubscribe(&unsubscribeMsg)
 }
 
 func (w *WebSocketBroker) handleListSubscriptionsRequest(message []byte) error {
@@ -285,10 +293,14 @@ func (w *WebSocketBroker) writeMessages() {
 			}
 
 			// 2) as error receiver for any errors that occur during the reading process
-			w.sendData(BaseMessageResponse{
+			err = w.sendResponse(BaseMessageResponse{
 				Success:      false,
 				ErrorMessage: err.Error(),
+				//TODO: add action
 			})
+			if err != nil {
+				return
+			}
 		case data, ok := <-w.broadcastChannel:
 			if !ok {
 				err := fmt.Errorf("broadcast channel closed, no error occurred")
@@ -296,7 +308,8 @@ func (w *WebSocketBroker) writeMessages() {
 				return
 			}
 
-			if err := w.sendData(data); err != nil {
+			if err := w.sendResponse(data); err != nil {
+				w.handleWSError(err)
 				return
 			}
 		case <-pingTicker.C:
@@ -307,20 +320,15 @@ func (w *WebSocketBroker) writeMessages() {
 	}
 }
 
-// sendData sends a JSON message to the WebSocket client, setting the write deadline.
+// sendResponse sends a JSON message to the WebSocket client, setting the write deadline.
 // Returns an error if the write fails, causing the connection to close.
-func (w *WebSocketBroker) sendData(data interface{}) error {
+func (w *WebSocketBroker) sendResponse(data interface{}) error {
 	if err := w.conn.SetWriteDeadline(time.Now().Add(writeWait)); err != nil {
 		w.handleWSError(models.NewRestError(http.StatusInternalServerError, "failed to set write deadline", err))
 		return err
 	}
 
-	if err := w.conn.WriteJSON(data); err != nil {
-		w.handleWSError(err)
-		return err
-	}
-
-	return nil
+	return w.conn.WriteJSON(data)
 }
 
 // sendPing sends a periodic ping message to the WebSocket client to keep the connection alive.
@@ -341,14 +349,14 @@ func (w *WebSocketBroker) sendPing() error {
 // broadcastMessage is called by each SubscriptionHandler,
 // receiving formatted subscription messages and writing them to the broadcast channel.
 func (w *WebSocketBroker) broadcastMessage(data interface{}) {
-	if w.limitsConfiguration.activeResponsesPerSecond.Load() >= w.limitsConfiguration.maxResponsesPerSecond {
+	if w.activeResponsesPerSecond.Load() >= w.config.MaxResponsesPerSecond {
 		// TODO: recheck edge cases
-		time.Sleep(w.limitsConfiguration.sendMessageTimeout) // Adjust the sleep duration as needed
+		time.Sleep(w.config.SendMessageTimeout) // Adjust the sleep duration as needed
 	}
 
 	// Send the message to the broadcast channel
 	w.broadcastChannel <- data
-	w.limitsConfiguration.activeResponsesPerSecond.Add(1)
+	w.activeResponsesPerSecond.Add(1)
 }
 
 // subscribe processes a request to subscribe to a specific topic. It uses the topic field in
@@ -364,18 +372,11 @@ func (w *WebSocketBroker) broadcastMessage(data interface{}) {
 //	  "topic": "example_topic",
 //	  "id": "sub_id_1"
 //	}
-func (w *WebSocketBroker) subscribe(msg *SubscribeMessageRequest) {
+func (w *WebSocketBroker) subscribe(msg *SubscribeMessageRequest) error {
 	subHandler, err := w.subHandlerFactory.CreateSubscriptionHandler(msg.Topic, msg.Arguments, w.broadcastMessage)
 	if err != nil {
 		w.logger.Err(err).Msg("Subscription handler creation failed")
-
-		err = fmt.Errorf("subscription handler creation failed: %w", err)
-		w.sendData(BaseMessageResponse{
-			Action:       SubscribeAction,
-			Success:      false,
-			ErrorMessage: err.Error(),
-		})
-		return
+		return fmt.Errorf("subscription handler creation failed: %w", err)
 	}
 
 	w.subs[subHandler.ID()] = subHandler
@@ -388,6 +389,8 @@ func (w *WebSocketBroker) subscribe(msg *SubscribeMessageRequest) {
 		Topic: subHandler.Topic(),
 		ID:    subHandler.ID(),
 	})
+
+	return nil
 }
 
 // unsubscribe processes a request to cancel an active subscription, identified by its ID.
@@ -403,42 +406,30 @@ func (w *WebSocketBroker) subscribe(msg *SubscribeMessageRequest) {
 //	  "topic": "example_topic",
 //	  "id": "sub_id_1"
 //	}
-func (w *WebSocketBroker) unsubscribe(msg *UnsubscribeMessageRequest) {
+func (w *WebSocketBroker) unsubscribe(msg *UnsubscribeMessageRequest) error {
 	sub, found := w.subs[msg.ID]
 	if !found {
-		errMsg := fmt.Sprintf("No subscription found for ID %s", msg.ID)
+		errMsg := fmt.Sprintf("no subscription found for ID %s", msg.ID)
 		w.logger.Info().Msg(errMsg)
-		w.sendData(BaseMessageResponse{
-			Action:       UnsubscribeAction,
-			Success:      false,
-			ErrorMessage: errMsg,
-		})
-		return
+		return fmt.Errorf(errMsg)
 	}
 
-	response := UnsubscribeMessageResponse{
+	if err := sub.Close(); err != nil {
+		w.logger.Err(err).Msgf("Failed to close subscription with ID %s", msg.ID)
+		return fmt.Errorf("failed to close subscription with ID %s: %w", msg.ID, err)
+	}
+
+	delete(w.subs, msg.ID)
+	w.broadcastMessage(UnsubscribeMessageResponse{
 		BaseMessageResponse: BaseMessageResponse{
 			Action:  UnsubscribeAction,
 			Success: true,
 		},
 		Topic: sub.Topic(),
 		ID:    sub.ID(),
-	}
+	})
 
-	if err := sub.Close(); err != nil {
-		w.logger.Err(err).Msgf("Failed to close subscription with ID %s", msg.ID)
-		err := fmt.Errorf("failed to close subscription with ID %s: %w", msg.ID, err)
-		w.sendData(BaseMessageResponse{
-			Action:       UnsubscribeAction,
-			Success:      false,
-			ErrorMessage: err.Error(),
-		})
-		return
-	}
-
-	delete(w.subs, msg.ID)
-
-	w.broadcastMessage(response)
+	return nil
 }
 
 // listOfSubscriptions gathers all active subscriptions for the current WebSocket connection,

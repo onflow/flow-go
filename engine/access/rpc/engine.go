@@ -14,6 +14,7 @@ import (
 	"github.com/onflow/flow-go/access"
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/engine/access/rest"
+	"github.com/onflow/flow-go/engine/access/rest/routes"
 	"github.com/onflow/flow-go/engine/access/rpc/backend"
 	"github.com/onflow/flow-go/engine/access/state_stream"
 	statestreambackend "github.com/onflow/flow-go/engine/access/state_stream/backend"
@@ -71,6 +72,7 @@ type Engine struct {
 
 	stateStreamBackend state_stream.API
 	stateStreamConfig  statestreambackend.Config
+	wsConfig           routes.WebsocketConfig
 }
 type Option func(*RPCEngineBuilder)
 
@@ -88,6 +90,7 @@ func NewBuilder(log zerolog.Logger,
 	unsecureGrpcServer *grpcserver.GrpcServer,
 	stateStreamBackend state_stream.API,
 	stateStreamConfig statestreambackend.Config,
+	wsConfig routes.WebsocketConfig,
 	indexReporter state_synchronization.IndexReporter,
 ) (*RPCEngineBuilder, error) {
 	log = log.With().Str("engine", "rpc").Logger()
@@ -114,6 +117,7 @@ func NewBuilder(log zerolog.Logger,
 		restHandler:               restHandler,
 		stateStreamBackend:        stateStreamBackend,
 		stateStreamConfig:         stateStreamConfig,
+		wsConfig:                  wsConfig,
 	}
 	backendNotifierActor, backendNotifierWorker := events.NewFinalizationActor(eng.processOnFinalizedBlock)
 	eng.backendNotifierActor = backendNotifierActor
@@ -240,8 +244,16 @@ func (e *Engine) serveREST(ctx irrecoverable.SignalerContext, ready component.Re
 
 	e.log.Info().Str("rest_api_address", e.config.RestConfig.ListenAddress).Msg("starting REST server on address")
 
-	r, err := rest.NewServer(e.restHandler, e.config.RestConfig, e.log, e.chain, e.restCollector, e.stateStreamBackend,
-		e.stateStreamConfig)
+	r, err := rest.NewServer(
+		e.restHandler,
+		e.config.RestConfig,
+		e.log,
+		e.chain,
+		e.restCollector,
+		e.stateStreamBackend,
+		e.stateStreamConfig,
+		e.wsConfig,
+	)
 	if err != nil {
 		e.log.Err(err).Msg("failed to initialize the REST server")
 		ctx.Throw(err)

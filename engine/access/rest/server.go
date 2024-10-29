@@ -42,6 +42,7 @@ func NewServer(serverAPI access.API,
 	restCollector module.RestMetrics,
 	stateStreamApi state_stream.API,
 	stateStreamConfig backend.Config,
+	wsConfig routes.WebsocketConfig,
 ) (*http.Server, error) {
 	builder := routes.NewRouterBuilder(logger, restCollector).AddRestRoutes(serverAPI, chain)
 	if stateStreamApi != nil {
@@ -53,7 +54,7 @@ func NewServer(serverAPI access.API,
 		stateStreamApi,
 		serverAPI,
 	)
-	builder.AddPubSubRoute(chain, subscriptionHandlerFactory)
+	builder.AddPubSubRoute(chain, wsConfig, subscriptionHandlerFactory)
 
 	c := cors.New(cors.Options{
 		AllowedOrigins: []string{"*"},
