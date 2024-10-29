@@ -204,7 +204,6 @@ func (m *FallbackStateMachine) ProcessEpochRecover(epochRecover *flow.EpochRecov
 	// if we have processed a valid EpochRecover event, we should exit EFM.
 	m.state.NextEpoch = nextEpoch
 	m.state.EpochFallbackTriggered = false
-
 	m.telemetry.OnServiceEventProcessed(epochRecover.ServiceEvent())
 	return true, nil
 }
