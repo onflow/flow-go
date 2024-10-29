@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"bytes"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"testing"
@@ -42,14 +43,14 @@ func TestRecoverEpochHappyPath(t *testing.T) {
 		currentEpochDKG, err := rootSnapshot.Epochs().Current().DKG()
 		require.NoError(t, err)
 		expectedDKGPubKeys := make(map[cadence.String]struct{})
-		expectedDKGGroupKey := cadence.String(currentEpochDKG.GroupKey().String())
+		expectedDKGGroupKey := cadence.String(hex.EncodeToString(currentEpochDKG.GroupKey().Encode()))
 		for _, id := range allNodeIds {
 			if id.GetRole() == flow.RoleConsensus {
 				dkgPubKey, keyShareErr := currentEpochDKG.KeyShare(id.GetNodeID())
 				if keyShareErr != nil {
 					log.Fatal().Err(keyShareErr).Msg(fmt.Sprintf("failed to get dkg pub key share for node: %s", id.GetNodeID()))
 				}
-				expectedDKGPubKeys[cadence.String(dkgPubKey.String())] = struct{}{}
+				expectedDKGPubKeys[cadence.String(hex.EncodeToString(dkgPubKey.Encode()))] = struct{}{}
 			}
 		}
 
@@ -78,21 +79,23 @@ func TestRecoverEpochHappyPath(t *testing.T) {
 		finalView, err := currEpoch.FinalView()
 		require.NoError(t, err)
 
+		// epoch counter
+		require.Equal(t, decodedValues[0], cadence.NewUInt64(flagEpochCounter))
 		// epoch start view
-		require.Equal(t, decodedValues[0], cadence.NewUInt64(finalView+1))
+		require.Equal(t, decodedValues[1], cadence.NewUInt64(finalView+1))
 		// staking phase end view
-		require.Equal(t, decodedValues[1], cadence.NewUInt64(finalView+flagNumViewsInStakingAuction))
+		require.Equal(t, decodedValues[2], cadence.NewUInt64(finalView+flagNumViewsInStakingAuction))
 		// epoch end view
-		require.Equal(t, decodedValues[2], cadence.NewUInt64(finalView+flagNumViewsInEpoch))
+		require.Equal(t, decodedValues[3], cadence.NewUInt64(finalView+flagNumViewsInEpoch))
 		// target duration
-		require.Equal(t, decodedValues[3], cadence.NewUInt64(flagTargetDuration))
+		require.Equal(t, decodedValues[4], cadence.NewUInt64(flagTargetDuration))
 		// target end time
 		expectedTargetEndTime, err := rootSnapshot.Epochs().Current().TargetEndTime()
 		require.NoError(t, err)
-		require.Equal(t, decodedValues[4], cadence.NewUInt64(expectedTargetEndTime))
+		require.Equal(t, decodedValues[5], cadence.NewUInt64(expectedTargetEndTime))
 		// clusters: we cannot guarantee order of the cluster when we generate the test fixtures
 		// so, we ensure each cluster member is part of the full set of node ids
-		for _, cluster := range decodedValues[5].(cadence.Array).Values {
+		for _, cluster := range decodedValues[6].(cadence.Array).Values {
 			for _, nodeId := range cluster.(cadence.Array).Values {
 				_, ok := allNodeIdsCdc[nodeId.(cadence.String)]
 				require.True(t, ok)
@@ -100,7 +103,7 @@ func TestRecoverEpochHappyPath(t *testing.T) {
 		}
 		// qcVoteData: we cannot guarantee order of the cluster when we generate the test fixtures
 		// so, we ensure each voter id that participated in a qc vote exists and is a collection node
-		for _, voteData := range decodedValues[6].(cadence.Array).Values {
+		for _, voteData := range decodedValues[7].(cadence.Array).Values {
 			fields := cadence.FieldsMappedByName(voteData.(cadence.Struct))
 			for _, voterId := range fields["voterIDs"].(cadence.Array).Values {
 				id, ok := allNodeIdsCdc[voterId.(cadence.String)]
@@ -109,17 +112,23 @@ func TestRecoverEpochHappyPath(t *testing.T) {
 			}
 		}
 		// dkg pub keys
-		require.Equal(t, expectedDKGGroupKey, decodedValues[7].(cadence.Array).Values[0])
-		for _, dkgPubKey := range decodedValues[7].(cadence.Array).Values[1:] {
+		for _, dkgPubKey := range decodedValues[8].(cadence.Array).Values {
 			_, ok := expectedDKGPubKeys[dkgPubKey.(cadence.String)]
 			require.True(t, ok)
 		}
+		// dkg group key
+		require.Equal(t, expectedDKGGroupKey, decodedValues[9].(cadence.String))
+		// dkg index map
+		for _, pair := range decodedValues[10].(cadence.Dictionary).Pairs {
+			_, ok := allNodeIdsCdc[pair.Key.(cadence.String)]
+			require.True(t, ok)
+		}
 		// node ids
-		for _, nodeId := range decodedValues[8].(cadence.Array).Values {
+		for _, nodeId := range decodedValues[11].(cadence.Array).Values {
 			_, ok := allNodeIdsCdc[nodeId.(cadence.String)]
 			require.True(t, ok)
 		}
 		// unsafeAllowOverWrite
-		require.Equal(t, decodedValues[9], cadence.NewBool(false))
+		require.Equal(t, decodedValues[12], cadence.NewBool(false))
 	})
 }
