@@ -2,21 +2,21 @@ package cohort2
 
 import (
 	"fmt"
-	"github.com/onflow/flow-core-contracts/lib/go/templates"
-	"github.com/onflow/flow-go/cmd/bootstrap/run"
-	"github.com/onflow/flow-go/integration/tests/epochs"
-	"github.com/onflow/flow-go/model/bootstrap"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/onflow/cadence"
+	"github.com/onflow/flow-core-contracts/lib/go/templates"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
 	sdk "github.com/onflow/flow-go-sdk"
 
+	"github.com/onflow/flow-go/cmd/bootstrap/run"
+	"github.com/onflow/flow-go/integration/tests/epochs"
 	"github.com/onflow/flow-go/integration/utils"
+	"github.com/onflow/flow-go/model/bootstrap"
 	"github.com/onflow/flow-go/model/flow"
 )
 
