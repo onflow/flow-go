@@ -5,6 +5,7 @@ import (
 
 	"github.com/gorilla/websocket"
 	"github.com/rs/zerolog"
+	"go.uber.org/atomic"
 
 	"github.com/onflow/flow-go/engine/access/rest/models"
 	"github.com/onflow/flow-go/engine/access/rest/routes/subscription_handlers"
@@ -76,12 +77,19 @@ func (h *WSBrokerHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 	defer conn.Close()
 
-	//TODO: fill LimitsConfiguration
-	wsBroker := NewWebSocketBroker(logger, conn, LimitsConfiguration{}, h.subHandlerFactory)
-	err = wsBroker.SetConnectionConfig()
-	//TODO :
+	wsBroker := NewWebSocketBroker(
+		logger,
+		conn,
+		//TODO: fill all limits
+		LimitsConfiguration{
+			activeResponsesPerSecond: atomic.NewUint64(0),
+			activeSubscriptions:      atomic.NewUint64(0),
+		},
+		h.subHandlerFactory,
+	)
+	err = wsBroker.configureConnection()
 	if err != nil {
-		// TODO: handle error
+		wsBroker.handleWSError(err)
 		return
 	}
 
