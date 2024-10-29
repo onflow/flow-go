@@ -29,7 +29,7 @@
 /fvm/** @janezpodhostnik
 
 # Networking Stream
-/network/** @yhassanzadeh13
+/network/** @Kay-Zee
 
 # Cryptography Stream
 /crypto/** @tarakby
@@ -38,13 +38,13 @@
 /cmd/bootstrap/** @zhangchiqing
 
 # Dev Tools Stream
-.github/workflows/** @gomisha
-/insecure/** @gomisha @yhassanzadeh13
-/integration/benchnet2/** @gomisha
-/tools/test_monitor/** @gomisha
+.github/workflows/** @Kay-Zee
+/insecure/** @Kay-Zee
+/integration/benchnet2/** @Kay-Zee
+/tools/test_monitor/** @Kay-Zee
 
 # Performance Stream
-/integration/benchmark/** @gomisha
+/integration/benchmark/** @Kay-Zee
 
 # Execution Sync
 /module/executiondatasync/** @peterargue
