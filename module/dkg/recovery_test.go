@@ -323,5 +323,42 @@ func (s *BeaconKeyRecoverySuite) TestNewBeaconKeyRecovery_RecoverKey() {
 		dkgState.On("RetrieveMyBeaconPrivateKey", s.nextEpochCounter).Return(nil, false, nil).Once()
 		performTest(dkgState)
 	})
+}
 
+// TestEpochFallbackModeExited tests a scenario:
+// - node starts in epoch fallback phase
+// - when creating NewBeaconKeyRecovery we shouldn't attempt to recover the key since the epoch phase is not committed.
+// - node leaves EFM and transitions to the epoch committed phase
+// - node doesn't have a safe beacon key for the next epoch
+// - node has a safe beacon key for the current epoch
+// - node is part of the DKG for the next epoch
+// In case like this we need try recovering the key from the current epoch.
+func (s *BeaconKeyRecoverySuite) TestEpochFallbackModeExited() {
+	// start in epoch fallback phase
+	s.currentEpochPhase = flow.EpochPhaseFallback
+
+	// this shouldn't perform any recovery
+	recovery, err := NewBeaconKeyRecovery(unittest.Logger(), s.local, s.state, s.dkgState)
+	require.NoError(s.T(), err)
+	require.NotNil(s.T(), recovery)
+	s.dkgState.AssertNumberOfCalls(s.T(), "OverwriteMyBeaconPrivateKey", 0)
+
+	// transition to epoch committed phase
+	s.currentEpochPhase = flow.EpochPhaseCommitted
+
+	// don't have a key for the next epoch
+	s.dkgState.On("RetrieveMyBeaconPrivateKey", s.nextEpochCounter).Return(nil, false, nil).Once()
+
+	// have a safe key for the current epoch
+	myBeaconKey := unittest.PrivateKeyFixture(crypto.ECDSAP256, unittest.DefaultSeedFixtureLength)
+	s.dkgState.On("RetrieveMyBeaconPrivateKey", s.currentEpochCounter).Return(myBeaconKey, true, nil).Once()
+	// node is part of the DKG for the next epoch
+	dkg := mockprotocol.NewDKG(s.T())
+	dkg.On("KeyShare", s.local.NodeID()).Return(myBeaconKey.PublicKey(), nil).Once()
+	s.nextEpoch.On("DKG").Return(dkg, nil).Once()
+
+	s.dkgState.On("OverwriteMyBeaconPrivateKey", s.nextEpochCounter, myBeaconKey).Return(nil).Once()
+
+	recovery.EpochFallbackModeExited(s.currentEpochCounter, s.head)
+	s.dkgState.AssertNumberOfCalls(s.T(), "OverwriteMyBeaconPrivateKey", 1)
 }
