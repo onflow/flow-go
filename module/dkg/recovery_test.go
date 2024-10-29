@@ -1,6 +1,7 @@
 package dkg
 
 import (
+	"errors"
 	"github.com/onflow/crypto"
 	"github.com/onflow/flow-go/model/flow"
 	mockmodule "github.com/onflow/flow-go/module/mock"
@@ -45,18 +46,75 @@ func (s *BeaconKeyRecoverySuite) SetupTest() {
 	s.nextEpochCounter = uint64(1)
 
 	s.local.On("NodeID").Return(unittest.IdentifierFixture()).Maybe()
-	s.epochProtocolState.On("Epoch").Return(s.currentEpochCounter)
-	s.epochProtocolState.On("EpochPhase").Return(func() flow.EpochPhase { return s.currentEpochPhase })
-	s.nextEpoch.On("Counter").Return(s.nextEpochCounter, nil)
+	s.epochProtocolState.On("Epoch").Return(s.currentEpochCounter).Maybe()
+	s.epochProtocolState.On("EpochPhase").Return(func() flow.EpochPhase { return s.currentEpochPhase }).Maybe()
+	s.nextEpoch.On("Counter").Return(s.nextEpochCounter, nil).Maybe()
 
 	epochs := mockprotocol.NewEpochQuery(s.T())
-	epochs.On("Next").Return(s.nextEpoch, nil)
+	epochs.On("Next").Return(s.nextEpoch, nil).Maybe()
 
 	s.finalSnapshot.On("Head").Return(s.head, nil)
-	s.finalSnapshot.On("EpochProtocolState").Return(s.epochProtocolState, nil)
-	s.finalSnapshot.On("Epochs").Return(epochs)
+	s.finalSnapshot.On("EpochProtocolState").Return(s.epochProtocolState, nil).Maybe()
+	s.finalSnapshot.On("Epochs").Return(epochs).Maybe()
 
 	s.state.On("Final").Return(s.finalSnapshot)
+}
+
+// TestNewBeaconKeyRecovery_EpochIsNotCommitted tests a scenario:
+// - node is not in epoch committed phase
+// In a case like this there is no need to proceed since we don't have the next epoch available.
+func (s *BeaconKeyRecoverySuite) TestNewBeaconKeyRecovery_EpochIsNotCommitted() {
+	for _, phase := range []flow.EpochPhase{
+		flow.EpochPhaseFallback,
+		flow.EpochPhaseStaking,
+		flow.EpochPhaseSetup,
+	} {
+		s.currentEpochPhase = phase
+		recovery, err := NewBeaconKeyRecovery(unittest.Logger(), s.local, s.state, s.dkgState)
+		require.NoError(s.T(), err)
+		require.NotNil(s.T(), recovery)
+	}
+	s.dkgState.AssertNumberOfCalls(s.T(), "OverwriteMyBeaconPrivateKey", 0)
+}
+
+// TestNewBeaconKeyRecovery_HeadException tests a scenario:
+// - exception is thrown when trying to get the head of the final snapshot
+// This is an unexpected error and should be propagated to the caller.
+func (s *BeaconKeyRecoverySuite) TestNewBeaconKeyRecovery_HeadException() {
+	exception := errors.New("exception")
+	s.finalSnapshot.On("Head").Unset()
+	s.finalSnapshot.On("Head").Return(nil, exception).Once()
+
+	recovery, err := NewBeaconKeyRecovery(unittest.Logger(), s.local, s.state, s.dkgState)
+	require.ErrorIs(s.T(), err, exception)
+	require.Nil(s.T(), recovery)
+}
+
+// TestNewBeaconKeyRecovery_EpochProtocolStateException tests a scenario:
+// - exception is thrown when trying to get the epoch protocol state of the final snapshot
+// This is an unexpected error and should be propagated to the caller.
+func (s *BeaconKeyRecoverySuite) TestNewBeaconKeyRecovery_EpochProtocolStateException() {
+	exception := errors.New("exception")
+	s.finalSnapshot.On("EpochProtocolState").Unset()
+	s.finalSnapshot.On("EpochProtocolState").Return(nil, exception).Once()
+
+	recovery, err := NewBeaconKeyRecovery(unittest.Logger(), s.local, s.state, s.dkgState)
+	require.ErrorIs(s.T(), err, exception)
+	require.Nil(s.T(), recovery)
+}
+
+// TestNewBeaconKeyRecovery_NextEpochCounterException tests a scenario:
+// - node is in epoch committed phase
+// - exception is thrown when trying to get counter of the next epoch
+// This is an unexpected error and should be propagated to the caller.
+func (s *BeaconKeyRecoverySuite) TestNewBeaconKeyRecovery_NextEpochCounterException() {
+	exception := errors.New("exception")
+	s.nextEpoch.On("Counter").Unset()
+	s.nextEpoch.On("Counter").Return(uint64(0), exception).Once()
+
+	recovery, err := NewBeaconKeyRecovery(unittest.Logger(), s.local, s.state, s.dkgState)
+	require.ErrorIs(s.T(), err, exception)
+	require.Nil(s.T(), recovery)
 }
 
 // TestNewBeaconKeyRecovery_KeyAlreadyRecovered tests a scenario:
@@ -74,17 +132,19 @@ func (s *BeaconKeyRecoverySuite) TestNewBeaconKeyRecovery_KeyAlreadyRecovered() 
 	s.dkgState.AssertNumberOfCalls(s.T(), "OverwriteMyBeaconPrivateKey", 0)
 }
 
-// TestNewBeaconKeyRecovery_KeyAlreadyRecovered tests a scenario:
+// TestNewBeaconKeyRecovery_RecoverKey tests a scenario:
 // - node is in epoch committed phase
 // - node doesn't have a safe beacon key for the next epoch
 // - node has a safe beacon key for the current epoch
 // - node is part of the DKG for the next epoch
 // In case like this we need try recovering the key from the current epoch.
 func (s *BeaconKeyRecoverySuite) TestNewBeaconKeyRecovery_RecoverKey() {
+	// no key for the next epoch
 	s.dkgState.On("RetrieveMyBeaconPrivateKey", s.nextEpochCounter).Return(nil, false, nil).Once()
+	// have a safe key for the current epoch
 	myBeaconKey := unittest.PrivateKeyFixture(crypto.ECDSAP256, unittest.DefaultSeedFixtureLength)
 	s.dkgState.On("RetrieveMyBeaconPrivateKey", s.currentEpochCounter).Return(myBeaconKey, true, nil).Once()
-
+	// node is part of the DKG for the next epoch
 	dkg := mockprotocol.NewDKG(s.T())
 	dkg.On("KeyShare", s.local.NodeID()).Return(myBeaconKey.PublicKey(), nil).Once()
 	s.nextEpoch.On("DKG").Return(dkg, nil).Once()
