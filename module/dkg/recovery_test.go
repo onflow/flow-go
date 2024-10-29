@@ -26,7 +26,9 @@ type BeaconKeyRecoverySuite struct {
 	finalSnapshot      *mockprotocol.Snapshot
 	nextEpoch          *mockprotocol.Epoch
 
-	currentEpochPhase flow.EpochPhase
+	currentEpochCounter uint64
+	nextEpochCounter    uint64
+	currentEpochPhase   flow.EpochPhase
 }
 
 func (s *BeaconKeyRecoverySuite) SetupTest() {
@@ -39,10 +41,13 @@ func (s *BeaconKeyRecoverySuite) SetupTest() {
 
 	s.head = unittest.BlockHeaderFixture()
 	s.currentEpochPhase = flow.EpochPhaseCommitted
+	s.currentEpochCounter = uint64(0)
+	s.nextEpochCounter = uint64(1)
 
-	s.epochProtocolState.On("Epoch").Return(uint64(0))
+	s.local.On("NodeID").Return(unittest.IdentifierFixture()).Maybe()
+	s.epochProtocolState.On("Epoch").Return(s.currentEpochCounter)
 	s.epochProtocolState.On("EpochPhase").Return(func() flow.EpochPhase { return s.currentEpochPhase })
-	s.nextEpoch.On("Counter").Return(uint64(1), nil)
+	s.nextEpoch.On("Counter").Return(s.nextEpochCounter, nil)
 
 	epochs := mockprotocol.NewEpochQuery(s.T())
 	epochs.On("Next").Return(s.nextEpoch, nil)
@@ -59,12 +64,36 @@ func (s *BeaconKeyRecoverySuite) SetupTest() {
 // - node has a safe beacon key for the next epoch
 // In case like this there is no need for recovery and we should exit early.
 func (s *BeaconKeyRecoverySuite) TestNewBeaconKeyRecovery_KeyAlreadyRecovered() {
-	s.dkgState.On("RetrieveMyBeaconPrivateKey", uint64(1)).Return(
-		unittest.PrivateKeyFixture(crypto.ECDSAP256, unittest.DefaultSeedFixtureLength), true, nil)
+	s.dkgState.On("RetrieveMyBeaconPrivateKey", s.nextEpochCounter).Return(
+		unittest.PrivateKeyFixture(crypto.ECDSAP256, unittest.DefaultSeedFixtureLength), true, nil).Once()
 
 	recovery, err := NewBeaconKeyRecovery(unittest.Logger(), s.local, s.state, s.dkgState)
 	require.NoError(s.T(), err)
 	require.NotNil(s.T(), recovery)
 
 	s.dkgState.AssertNumberOfCalls(s.T(), "OverwriteMyBeaconPrivateKey", 0)
+}
+
+// TestNewBeaconKeyRecovery_KeyAlreadyRecovered tests a scenario:
+// - node is in epoch committed phase
+// - node doesn't have a safe beacon key for the next epoch
+// - node has a safe beacon key for the current epoch
+// - node is part of the DKG for the next epoch
+// In case like this we need try recovering the key from the current epoch.
+func (s *BeaconKeyRecoverySuite) TestNewBeaconKeyRecovery_RecoverKey() {
+	s.dkgState.On("RetrieveMyBeaconPrivateKey", s.nextEpochCounter).Return(nil, false, nil).Once()
+	myBeaconKey := unittest.PrivateKeyFixture(crypto.ECDSAP256, unittest.DefaultSeedFixtureLength)
+	s.dkgState.On("RetrieveMyBeaconPrivateKey", s.currentEpochCounter).Return(myBeaconKey, true, nil).Once()
+
+	dkg := mockprotocol.NewDKG(s.T())
+	dkg.On("KeyShare", s.local.NodeID()).Return(myBeaconKey.PublicKey(), nil).Once()
+	s.nextEpoch.On("DKG").Return(dkg, nil).Once()
+
+	s.dkgState.On("OverwriteMyBeaconPrivateKey", s.nextEpochCounter, myBeaconKey).Return(nil).Once()
+
+	recovery, err := NewBeaconKeyRecovery(unittest.Logger(), s.local, s.state, s.dkgState)
+	require.NoError(s.T(), err)
+	require.NotNil(s.T(), recovery)
+
+	s.dkgState.AssertNumberOfCalls(s.T(), "OverwriteMyBeaconPrivateKey", 1)
 }
