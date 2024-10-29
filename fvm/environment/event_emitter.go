@@ -2,7 +2,7 @@ package environment
 
 import (
 	"fmt"
-	"github.com/onflow/flow-go/utils/logging"
+
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/cadence"
@@ -14,6 +14,7 @@ import (
 	"github.com/onflow/flow-go/model/convert"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/trace"
+	"github.com/onflow/flow-go/utils/logging"
 )
 
 const (

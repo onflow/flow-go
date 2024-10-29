@@ -2,7 +2,13 @@ package dkg
 
 import (
 	"errors"
+	"testing"
+
+	"github.com/stretchr/testify/require"
+	"github.com/stretchr/testify/suite"
+
 	"github.com/onflow/crypto"
+
 	"github.com/onflow/flow-go/model/flow"
 	mockmodule "github.com/onflow/flow-go/module/mock"
 	"github.com/onflow/flow-go/state/protocol"
@@ -10,9 +16,6 @@ import (
 	"github.com/onflow/flow-go/storage"
 	mockstorage "github.com/onflow/flow-go/storage/mock"
 	"github.com/onflow/flow-go/utils/unittest"
-	"github.com/stretchr/testify/require"
-	"github.com/stretchr/testify/suite"
-	"testing"
 )
 
 func TestBeaconKeyRecovery(t *testing.T) {

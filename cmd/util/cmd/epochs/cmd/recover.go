@@ -49,7 +49,6 @@ This recovery process has some constraints:
 	flagNumViewsInStakingAuction uint64
 	flagEpochCounter             uint64
 	flagTargetDuration           uint64
-	flagRecoveryEpochCounter     uint64
 	flagUnsafeAllowOverWrite     bool
 	flagRootChainID              string
 )
