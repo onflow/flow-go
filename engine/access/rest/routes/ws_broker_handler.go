@@ -94,6 +94,5 @@ func (h *WSBrokerHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	go wsBroker.readMessages()
-	go wsBroker.pingPongHandler()
 	wsBroker.writeMessages()
 }
