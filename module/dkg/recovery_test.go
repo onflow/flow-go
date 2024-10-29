@@ -6,6 +6,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	mockmodule "github.com/onflow/flow-go/module/mock"
 	mockprotocol "github.com/onflow/flow-go/state/protocol/mock"
+	"github.com/onflow/flow-go/storage"
 	mockstorage "github.com/onflow/flow-go/storage/mock"
 	"github.com/onflow/flow-go/utils/unittest"
 	"github.com/stretchr/testify/require"
@@ -117,6 +118,19 @@ func (s *BeaconKeyRecoverySuite) TestNewBeaconKeyRecovery_NextEpochCounterExcept
 	require.Nil(s.T(), recovery)
 }
 
+// TestNewBeaconKeyRecovery_NextEpochRetrieveMyBeaconPrivateKeyException tests a scenario:
+// - node is in epoch committed phase
+// - exception is thrown when trying to check if there is a safe beacon key for the next epoch
+// This is an unexpected error and should be propagated to the caller.
+func (s *BeaconKeyRecoverySuite) TestNewBeaconKeyRecovery_NextEpochRetrieveMyBeaconPrivateKeyException() {
+	exception := errors.New("exception")
+	s.dkgState.On("RetrieveMyBeaconPrivateKey", s.nextEpochCounter).Return(nil, false, exception).Once()
+
+	recovery, err := NewBeaconKeyRecovery(unittest.Logger(), s.local, s.state, s.dkgState)
+	require.ErrorIs(s.T(), err, exception)
+	require.Nil(s.T(), recovery)
+}
+
 // TestNewBeaconKeyRecovery_KeyAlreadyRecovered tests a scenario:
 // - node is in epoch committed phase
 // - node has a safe beacon key for the next epoch
@@ -132,6 +146,54 @@ func (s *BeaconKeyRecoverySuite) TestNewBeaconKeyRecovery_KeyAlreadyRecovered() 
 	s.dkgState.AssertNumberOfCalls(s.T(), "OverwriteMyBeaconPrivateKey", 0)
 }
 
+// TestNewBeaconKeyRecovery_NoSafeMyBeaconPrivateKey tests a scenario:
+// - node is in epoch committed phase
+// - node doesn't have a safe beacon key for the next epoch
+// - node doesn't have a safe beacon key for the current epoch
+// We can't do much in this case since there is no key to recover.
+func (s *BeaconKeyRecoverySuite) TestNewBeaconKeyRecovery_NoSafeMyBeaconPrivateKey() {
+	s.Run("no-safe-key", func() {
+		dkgState := mockstorage.NewEpochRecoveryMyBeaconKey(s.T())
+		dkgState.On("RetrieveMyBeaconPrivateKey", s.nextEpochCounter).Return(
+			nil, false, nil).Once()
+		dkgState.On("RetrieveMyBeaconPrivateKey", s.currentEpochCounter).Return(
+			nil, false, nil).Once()
+
+		recovery, err := NewBeaconKeyRecovery(unittest.Logger(), s.local, s.state, dkgState)
+		require.NoError(s.T(), err)
+		require.NotNil(s.T(), recovery)
+
+		dkgState.AssertNumberOfCalls(s.T(), "OverwriteMyBeaconPrivateKey", 0)
+	})
+	s.Run("err-not-found", func() {
+		dkgState := mockstorage.NewEpochRecoveryMyBeaconKey(s.T())
+		dkgState.On("RetrieveMyBeaconPrivateKey", s.nextEpochCounter).Return(
+			nil, false, nil).Once()
+		dkgState.On("RetrieveMyBeaconPrivateKey", s.currentEpochCounter).Return(
+			nil, false, storage.ErrNotFound).Once()
+
+		recovery, err := NewBeaconKeyRecovery(unittest.Logger(), s.local, s.state, dkgState)
+		require.NoError(s.T(), err)
+		require.NotNil(s.T(), recovery)
+
+		dkgState.AssertNumberOfCalls(s.T(), "OverwriteMyBeaconPrivateKey", 0)
+	})
+	s.Run("exception", func() {
+		exception := errors.New("exception")
+		dkgState := mockstorage.NewEpochRecoveryMyBeaconKey(s.T())
+		dkgState.On("RetrieveMyBeaconPrivateKey", s.nextEpochCounter).Return(
+			nil, false, nil).Once()
+		dkgState.On("RetrieveMyBeaconPrivateKey", s.currentEpochCounter).Return(
+			nil, false, exception).Once()
+
+		recovery, err := NewBeaconKeyRecovery(unittest.Logger(), s.local, s.state, dkgState)
+		require.ErrorIs(s.T(), err, exception)
+		require.Nil(s.T(), recovery)
+
+		dkgState.AssertNumberOfCalls(s.T(), "OverwriteMyBeaconPrivateKey", 0)
+	})
+}
+
 // TestNewBeaconKeyRecovery_RecoverKey tests a scenario:
 // - node is in epoch committed phase
 // - node doesn't have a safe beacon key for the next epoch
@@ -139,21 +201,33 @@ func (s *BeaconKeyRecoverySuite) TestNewBeaconKeyRecovery_KeyAlreadyRecovered() 
 // - node is part of the DKG for the next epoch
 // In case like this we need try recovering the key from the current epoch.
 func (s *BeaconKeyRecoverySuite) TestNewBeaconKeyRecovery_RecoverKey() {
-	// no key for the next epoch
-	s.dkgState.On("RetrieveMyBeaconPrivateKey", s.nextEpochCounter).Return(nil, false, nil).Once()
-	// have a safe key for the current epoch
-	myBeaconKey := unittest.PrivateKeyFixture(crypto.ECDSAP256, unittest.DefaultSeedFixtureLength)
-	s.dkgState.On("RetrieveMyBeaconPrivateKey", s.currentEpochCounter).Return(myBeaconKey, true, nil).Once()
-	// node is part of the DKG for the next epoch
-	dkg := mockprotocol.NewDKG(s.T())
-	dkg.On("KeyShare", s.local.NodeID()).Return(myBeaconKey.PublicKey(), nil).Once()
-	s.nextEpoch.On("DKG").Return(dkg, nil).Once()
+	performTest := func(dkgState *mockstorage.EpochRecoveryMyBeaconKey) {
+		// have a safe key for the current epoch
+		myBeaconKey := unittest.PrivateKeyFixture(crypto.ECDSAP256, unittest.DefaultSeedFixtureLength)
+		dkgState.On("RetrieveMyBeaconPrivateKey", s.currentEpochCounter).Return(myBeaconKey, true, nil).Once()
+		// node is part of the DKG for the next epoch
+		dkg := mockprotocol.NewDKG(s.T())
+		dkg.On("KeyShare", s.local.NodeID()).Return(myBeaconKey.PublicKey(), nil).Once()
+		s.nextEpoch.On("DKG").Return(dkg, nil).Once()
 
-	s.dkgState.On("OverwriteMyBeaconPrivateKey", s.nextEpochCounter, myBeaconKey).Return(nil).Once()
+		dkgState.On("OverwriteMyBeaconPrivateKey", s.nextEpochCounter, myBeaconKey).Return(nil).Once()
 
-	recovery, err := NewBeaconKeyRecovery(unittest.Logger(), s.local, s.state, s.dkgState)
-	require.NoError(s.T(), err)
-	require.NotNil(s.T(), recovery)
+		recovery, err := NewBeaconKeyRecovery(unittest.Logger(), s.local, s.state, dkgState)
+		require.NoError(s.T(), err)
+		require.NotNil(s.T(), recovery)
 
-	s.dkgState.AssertNumberOfCalls(s.T(), "OverwriteMyBeaconPrivateKey", 1)
+		dkgState.AssertNumberOfCalls(s.T(), "OverwriteMyBeaconPrivateKey", 1)
+	}
+
+	s.Run("err-not-found-for-key-next-epoch", func() {
+		dkgState := mockstorage.NewEpochRecoveryMyBeaconKey(s.T())
+		dkgState.On("RetrieveMyBeaconPrivateKey", s.nextEpochCounter).Return(nil, false, storage.ErrNotFound).Once()
+		performTest(dkgState)
+	})
+	s.Run("key-for-next-epoch-is-not-safe", func() {
+		dkgState := mockstorage.NewEpochRecoveryMyBeaconKey(s.T())
+		dkgState.On("RetrieveMyBeaconPrivateKey", s.nextEpochCounter).Return(nil, false, nil).Once()
+		performTest(dkgState)
+	})
+
 }
