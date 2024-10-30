@@ -2416,16 +2416,6 @@ func TestAttachments(t *testing.T) {
 
 	newVMTest().
 		withBootstrapProcedureOptions().
-		withContextOptions(
-			fvm.WithReusableCadenceRuntimePool(
-				reusableRuntime.NewReusableCadenceRuntimePool(
-					1,
-					runtime.Config{
-						AttachmentsEnabled: true,
-					},
-				),
-			),
-		).
 		run(
 			func(
 				t *testing.T,
