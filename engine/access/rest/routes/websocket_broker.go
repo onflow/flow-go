@@ -215,7 +215,7 @@ func (w *WebSocketBroker) readMessages() {
 
 		// Process the incoming message
 		if err := w.processMessage(message); err != nil {
-			// Send structured error response on failure
+			// Log error for sending structured error response on failure
 			w.logger.Err(err).Msg("failed to send error message response")
 		}
 	}
