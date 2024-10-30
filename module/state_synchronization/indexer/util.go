@@ -92,15 +92,15 @@ var _ derived.TransactionInvalidator = (*accessInvalidator)(nil)
 // accessInvalidator is a derived.TransactionInvalidator that invalidates programs and meter param overrides.
 type accessInvalidator struct {
 	programs            *programInvalidator
-	meterParamOverrides *meterParamOverridesInvalidator
+	executionParameters *executionParametersInvalidator
 }
 
 func (inv *accessInvalidator) ProgramInvalidator() derived.ProgramInvalidator {
 	return inv.programs
 }
 
-func (inv *accessInvalidator) MeterParamOverridesInvalidator() derived.MeterParamOverridesInvalidator {
-	return inv.meterParamOverrides
+func (inv *accessInvalidator) ExecutionParametersInvalidator() derived.ExecutionParametersInvalidator {
+	return inv.executionParameters
 }
 
 var _ derived.ProgramInvalidator = (*programInvalidator)(nil)
@@ -121,17 +121,17 @@ func (inv *programInvalidator) ShouldInvalidateEntry(location common.AddressLoca
 	return inv.invalidateAll || ok
 }
 
-var _ derived.MeterParamOverridesInvalidator = (*meterParamOverridesInvalidator)(nil)
+var _ derived.ExecutionParametersInvalidator = (*executionParametersInvalidator)(nil)
 
-// meterParamOverridesInvalidator is a derived.MeterParamOverridesInvalidator that invalidates meter param overrides.
-type meterParamOverridesInvalidator struct {
+// executionParametersInvalidator is a derived.ExecutionParametersInvalidator that invalidates meter param overrides and execution version.
+type executionParametersInvalidator struct {
 	invalidateAll bool
 }
 
-func (inv *meterParamOverridesInvalidator) ShouldInvalidateEntries() bool {
+func (inv *executionParametersInvalidator) ShouldInvalidateEntries() bool {
 	return inv.invalidateAll
 }
 
-func (inv *meterParamOverridesInvalidator) ShouldInvalidateEntry(_ struct{}, _ derived.MeterParamOverrides, _ *snapshot.ExecutionSnapshot) bool {
+func (inv *executionParametersInvalidator) ShouldInvalidateEntry(_ struct{}, _ derived.StateExecutionParameters, _ *snapshot.ExecutionSnapshot) bool {
 	return inv.invalidateAll
 }
