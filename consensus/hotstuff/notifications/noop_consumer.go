@@ -32,7 +32,7 @@ func (*NoopParticipantConsumer) OnEventProcessed() {}
 
 func (*NoopParticipantConsumer) OnStart(uint64) {}
 
-func (*NoopParticipantConsumer) OnReceiveProposal(uint64, *model.Proposal) {}
+func (*NoopParticipantConsumer) OnReceiveProposal(uint64, *model.SignedProposal) {}
 
 func (*NoopParticipantConsumer) OnReceiveQc(uint64, *flow.QuorumCertificate) {}
 
@@ -116,7 +116,8 @@ func (*NoopProposalViolationConsumer) OnDoubleVotingDetected(*model.Vote, *model
 
 func (*NoopProposalViolationConsumer) OnInvalidVoteDetected(model.InvalidVoteError) {}
 
-func (*NoopProposalViolationConsumer) OnVoteForInvalidBlockDetected(*model.Vote, *model.Proposal) {}
+func (*NoopProposalViolationConsumer) OnVoteForInvalidBlockDetected(*model.Vote, *model.SignedProposal) {
+}
 
 func (*NoopProposalViolationConsumer) OnDoubleTimeoutDetected(*model.TimeoutObject, *model.TimeoutObject) {
 }

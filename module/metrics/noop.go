@@ -194,7 +194,6 @@ func (nc *NoopCollector) ReadValuesSize(byte uint64)                            
 func (nc *NoopCollector) ReadDuration(duration time.Duration)                                   {}
 func (nc *NoopCollector) ReadDurationPerItem(duration time.Duration)                            {}
 func (nc *NoopCollector) ExecutionCollectionRequestSent()                                       {}
-func (nc *NoopCollector) ExecutionCollectionRequestRetried()                                    {}
 func (nc *NoopCollector) RuntimeTransactionParsed(dur time.Duration)                            {}
 func (nc *NoopCollector) RuntimeTransactionChecked(dur time.Duration)                           {}
 func (nc *NoopCollector) RuntimeTransactionInterpreted(dur time.Duration)                       {}
@@ -215,6 +214,7 @@ func (nc *NoopCollector) ScriptExecutionNotIndexed()                            
 func (nc *NoopCollector) TransactionResultFetched(dur time.Duration, size int)                  {}
 func (nc *NoopCollector) TransactionReceived(txID flow.Identifier, when time.Time)              {}
 func (nc *NoopCollector) TransactionFinalized(txID flow.Identifier, when time.Time)             {}
+func (nc *NoopCollector) TransactionSealed(txID flow.Identifier, when time.Time)                {}
 func (nc *NoopCollector) TransactionExecuted(txID flow.Identifier, when time.Time)              {}
 func (nc *NoopCollector) TransactionExpired(txID flow.Identifier)                               {}
 func (nc *NoopCollector) TransactionValidated()                                                 {}

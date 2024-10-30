@@ -10,6 +10,10 @@ var (
 	FlowEVMPreviewNetChainID = big.NewInt(646)
 	FlowEVMTestNetChainID    = big.NewInt(545)
 	FlowEVMMainNetChainID    = big.NewInt(747)
+
+	FlowEVMPreviewNetChainIDInUInt64 = FlowEVMPreviewNetChainID.Uint64()
+	FlowEVMTestNetChainIDInUInt64    = FlowEVMTestNetChainID.Uint64()
+	FlowEVMMainNetChainIDInUInt64    = FlowEVMMainNetChainID.Uint64()
 )
 
 func EVMChainIDFromFlowChainID(flowChainID flow.ChainID) *big.Int {

@@ -8,12 +8,12 @@ import (
 	"testing"
 
 	"github.com/onflow/cadence"
+	"github.com/onflow/cadence/common"
 	"github.com/onflow/cadence/encoding/ccf"
+	"github.com/onflow/cadence/interpreter"
 	"github.com/onflow/cadence/runtime"
-	"github.com/onflow/cadence/runtime/common"
-	"github.com/onflow/cadence/runtime/interpreter"
-	"github.com/onflow/cadence/runtime/sema"
-	"github.com/onflow/cadence/runtime/stdlib"
+	"github.com/onflow/cadence/sema"
+	"github.com/onflow/cadence/stdlib"
 
 	"github.com/ipfs/boxo/blockstore"
 	"github.com/ipfs/go-datastore"
@@ -705,6 +705,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 						},
 					),
 				),
+				fvm.WithReadVersionFromNodeVersionBeacon(false),
 			)
 
 			vm := fvm.NewVirtualMachine()
@@ -816,7 +817,9 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 					runtime.Config{},
 					func(_ runtime.Config) runtime.Runtime {
 						return rt
-					})))
+					})),
+			fvm.WithReadVersionFromNodeVersionBeacon(false),
+		)
 
 		vm := fvm.NewVirtualMachine()
 
@@ -929,7 +932,9 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 					runtime.Config{},
 					func(_ runtime.Config) runtime.Runtime {
 						return rt
-					})))
+					})),
+			fvm.WithReadVersionFromNodeVersionBeacon(false),
+		)
 
 		vm := fvm.NewVirtualMachine()
 

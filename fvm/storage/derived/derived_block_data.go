@@ -3,12 +3,11 @@ package derived
 import (
 	"fmt"
 
-	"github.com/onflow/flow-go/fvm/storage/snapshot"
-
-	"github.com/onflow/cadence/runtime/common"
-	"github.com/onflow/cadence/runtime/interpreter"
+	"github.com/onflow/cadence/common"
+	"github.com/onflow/cadence/interpreter"
 
 	"github.com/onflow/flow-go/fvm/storage/logical"
+	"github.com/onflow/flow-go/fvm/storage/snapshot"
 	"github.com/onflow/flow-go/fvm/storage/state"
 )
 
@@ -23,11 +22,12 @@ type DerivedTransactionPreparer interface {
 	)
 	GetProgram(location common.AddressLocation) (*Program, bool)
 
-	GetMeterParamOverrides(
+	// GetStateExecutionParameters returns parameters needed for execution from the state.
+	GetStateExecutionParameters(
 		txnState state.NestedTransactionPreparer,
-		getMeterParamOverrides ValueComputer[struct{}, MeterParamOverrides],
+		getMeterParamOverrides ValueComputer[struct{}, StateExecutionParameters],
 	) (
-		MeterParamOverrides,
+		StateExecutionParameters,
 		*snapshot.ExecutionSnapshot,
 		error,
 	)
@@ -46,7 +46,7 @@ type Program struct {
 type DerivedBlockData struct {
 	programs *DerivedDataTable[common.AddressLocation, *Program]
 
-	meterParamOverrides *DerivedDataTable[struct{}, MeterParamOverrides]
+	meterParamOverrides *DerivedDataTable[struct{}, StateExecutionParameters]
 }
 
 // DerivedTransactionData is the derived data scratch space for a single
@@ -59,7 +59,7 @@ type DerivedTransactionData struct {
 
 	// There's only a single entry in this table.  For simplicity, we'll use
 	// struct{} as the entry's key.
-	meterParamOverrides *TableTransaction[struct{}, MeterParamOverrides]
+	executionParameters *TableTransaction[struct{}, StateExecutionParameters]
 }
 
 func NewEmptyDerivedBlockData(
@@ -72,7 +72,7 @@ func NewEmptyDerivedBlockData(
 		](initialSnapshotTime),
 		meterParamOverrides: NewEmptyTable[
 			struct{},
-			MeterParamOverrides,
+			StateExecutionParameters,
 		](initialSnapshotTime),
 	}
 }
@@ -87,14 +87,14 @@ func (block *DerivedBlockData) NewChildDerivedBlockData() *DerivedBlockData {
 func (block *DerivedBlockData) NewSnapshotReadDerivedTransactionData() *DerivedTransactionData {
 	return &DerivedTransactionData{
 		programs:            block.programs.NewSnapshotReadTableTransaction(),
-		meterParamOverrides: block.meterParamOverrides.NewSnapshotReadTableTransaction(),
+		executionParameters: block.meterParamOverrides.NewSnapshotReadTableTransaction(),
 	}
 }
 
 func (block *DerivedBlockData) NewCachingSnapshotReadDerivedTransactionData() *DerivedTransactionData {
 	return &DerivedTransactionData{
 		programs:            block.programs.NewCachingSnapshotReadTableTransaction(),
-		meterParamOverrides: block.meterParamOverrides.NewCachingSnapshotReadTableTransaction(),
+		executionParameters: block.meterParamOverrides.NewCachingSnapshotReadTableTransaction(),
 	}
 }
 
@@ -121,7 +121,7 @@ func (block *DerivedBlockData) NewDerivedTransactionData(
 
 	return &DerivedTransactionData{
 		programs:            txnPrograms,
-		meterParamOverrides: txnMeterParamOverrides,
+		executionParameters: txnMeterParamOverrides,
 	}, nil
 }
 
@@ -178,19 +178,19 @@ func (transaction *DerivedTransactionData) AddInvalidator(
 	}
 
 	transaction.programs.AddInvalidator(invalidator.ProgramInvalidator())
-	transaction.meterParamOverrides.AddInvalidator(
-		invalidator.MeterParamOverridesInvalidator())
+	transaction.executionParameters.AddInvalidator(
+		invalidator.ExecutionParametersInvalidator())
 }
 
-func (transaction *DerivedTransactionData) GetMeterParamOverrides(
+func (transaction *DerivedTransactionData) GetStateExecutionParameters(
 	txnState state.NestedTransactionPreparer,
-	getMeterParamOverrides ValueComputer[struct{}, MeterParamOverrides],
+	getMeterParamOverrides ValueComputer[struct{}, StateExecutionParameters],
 ) (
-	MeterParamOverrides,
+	StateExecutionParameters,
 	*snapshot.ExecutionSnapshot,
 	error,
 ) {
-	return transaction.meterParamOverrides.GetWithStateOrCompute(
+	return transaction.executionParameters.GetWithStateOrCompute(
 		txnState,
 		struct{}{},
 		getMeterParamOverrides)
@@ -202,7 +202,7 @@ func (transaction *DerivedTransactionData) Validate() error {
 		return fmt.Errorf("programs validate failed: %w", err)
 	}
 
-	err = transaction.meterParamOverrides.Validate()
+	err = transaction.executionParameters.Validate()
 	if err != nil {
 		return fmt.Errorf("meter param overrides validate failed: %w", err)
 	}
@@ -216,7 +216,7 @@ func (transaction *DerivedTransactionData) Commit() error {
 		return fmt.Errorf("programs commit failed: %w", err)
 	}
 
-	err = transaction.meterParamOverrides.Commit()
+	err = transaction.executionParameters.Commit()
 	if err != nil {
 		return fmt.Errorf("meter param overrides commit failed: %w", err)
 	}

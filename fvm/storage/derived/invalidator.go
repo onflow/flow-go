@@ -1,7 +1,8 @@
 package derived
 
 import (
-	"github.com/onflow/cadence/runtime/common"
+	"github.com/coreos/go-semver/semver"
+	"github.com/onflow/cadence/common"
 
 	"github.com/onflow/flow-go/fvm/meter"
 )
@@ -12,17 +13,23 @@ type MeterParamOverrides struct {
 	MemoryLimit        *uint64                      // nil indicates no override
 }
 
+// StateExecutionParameters are parameters needed for execution defined in the execution state.
+type StateExecutionParameters struct {
+	MeterParamOverrides
+	ExecutionVersion semver.Version
+}
+
 type ProgramInvalidator TableInvalidator[
 	common.AddressLocation,
 	*Program,
 ]
 
-type MeterParamOverridesInvalidator TableInvalidator[
+type ExecutionParametersInvalidator TableInvalidator[
 	struct{},
-	MeterParamOverrides,
+	StateExecutionParameters,
 ]
 
 type TransactionInvalidator interface {
 	ProgramInvalidator() ProgramInvalidator
-	MeterParamOverridesInvalidator() MeterParamOverridesInvalidator
+	ExecutionParametersInvalidator() ExecutionParametersInvalidator
 }

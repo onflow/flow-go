@@ -4,19 +4,19 @@ package mock
 
 import (
 	atree "github.com/onflow/atree"
-	ast "github.com/onflow/cadence/runtime/ast"
+	ast "github.com/onflow/cadence/ast"
 
 	attribute "go.opentelemetry.io/otel/attribute"
 
 	cadence "github.com/onflow/cadence"
 
-	common "github.com/onflow/cadence/runtime/common"
+	common "github.com/onflow/cadence/common"
 
 	environment "github.com/onflow/flow-go/fvm/environment"
 
 	flow "github.com/onflow/flow-go/model/flow"
 
-	interpreter "github.com/onflow/cadence/runtime/interpreter"
+	interpreter "github.com/onflow/cadence/interpreter"
 
 	meter "github.com/onflow/flow-go/fvm/meter"
 
@@ -26,9 +26,9 @@ import (
 
 	runtime "github.com/onflow/flow-go/fvm/runtime"
 
-	sema "github.com/onflow/cadence/runtime/sema"
+	sema "github.com/onflow/cadence/sema"
 
-	stdlib "github.com/onflow/cadence/runtime/stdlib"
+	stdlib "github.com/onflow/cadence/stdlib"
 
 	time "time"
 
@@ -896,6 +896,36 @@ func (_m *Environment) GetCurrentBlockHeight() (uint64, error) {
 		r0 = rf()
 	} else {
 		r0 = ret.Get(0).(uint64)
+	}
+
+	if rf, ok := ret.Get(1).(func() error); ok {
+		r1 = rf()
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// GetCurrentVersionBoundary provides a mock function with given fields:
+func (_m *Environment) GetCurrentVersionBoundary() (cadence.Value, error) {
+	ret := _m.Called()
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetCurrentVersionBoundary")
+	}
+
+	var r0 cadence.Value
+	var r1 error
+	if rf, ok := ret.Get(0).(func() (cadence.Value, error)); ok {
+		return rf()
+	}
+	if rf, ok := ret.Get(0).(func() cadence.Value); ok {
+		r0 = rf()
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(cadence.Value)
+		}
 	}
 
 	if rf, ok := ret.Get(1).(func() error); ok {
