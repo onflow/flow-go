@@ -17,67 +17,68 @@ import (
 
 // Constants representing action types.
 const (
+	UnknownAction           = "unknown"
 	SubscribeAction         = "subscribe"          // Action for subscription message
 	UnsubscribeAction       = "unsubscribe"        // Action for unsubscription message
 	ListSubscriptionsAction = "list_subscriptions" // Action to list active subscriptions
 )
 
 const (
-	// DefaultMaxSubscriptionsPerConnection defines the default max number of subscriptions that can be open at the same time.
-	DefaultMaxSubscriptionsPerConnection = 1000
-
-	DefaultMaxResponsesPerSecond = 100
-
-	DefaultSendMessageTimeout = 10 * time.Second
+	DefaultMaxSubscriptionsPerConnection = 1000             // Default maximum subscriptions per connection
+	DefaultMaxResponsesPerSecond         = 100              // Default maximum responses per second
+	DefaultSendMessageTimeout            = 10 * time.Second // Default timeout for sending messages
 )
 
-// Define a base struct to determine the action
+// BaseMessageRequest represents a base structure for incoming messages.
 type BaseMessageRequest struct {
-	Action string `json:"action"`
+	Action string `json:"action"` // Action type of the request
 }
 
+// BaseMessageResponse represents a base structure for outgoing messages.
 type BaseMessageResponse struct {
-	Action       string `json:"action,omitempty"`
-	Success      bool   `json:"success"`
-	ErrorMessage string `json:"error_message,omitempty"`
+	Action       string `json:"action,omitempty"`        // Action type of the response
+	Success      bool   `json:"success"`                 // Indicates success or failure
+	ErrorMessage string `json:"error_message,omitempty"` // Error message, if any
+
 }
 
+// SubscribeMessageRequest represents a request to subscribe to a topic.
 type SubscribeMessageRequest struct {
 	BaseMessageRequest
-	Topic     string                 `json:"topic"`
-	Arguments map[string]interface{} `json:"arguments"`
+	Topic     string                 `json:"topic"`     // Topic to subscribe to
+	Arguments map[string]interface{} `json:"arguments"` // Additional arguments for subscription
 }
 
-// SubscribeMessageResponse represents the response to a subscription message.
-// It includes the topic and a unique subscription ID.
+// SubscribeMessageResponse represents the response to a subscription request.
 type SubscribeMessageResponse struct {
 	BaseMessageResponse
-	Topic string `json:"topic"`
-	ID    string `json:"id"`
+	Topic string `json:"topic"` // Topic of the subscription
+	ID    string `json:"id"`    // Unique subscription ID
 }
 
+// UnsubscribeMessageRequest represents a request to unsubscribe from a topic.
 type UnsubscribeMessageRequest struct {
 	BaseMessageRequest
-	Topic string `json:"topic"`
-	ID    string `json:"id"`
+	Topic string `json:"topic"` // Topic to unsubscribe from
+	ID    string `json:"id"`    // Unique subscription ID
 }
 
-// UnsubscribeMessageResponse represents the response to an unsubscription message.
-// It includes the topic and subscription ID for confirmation.
+// UnsubscribeMessageResponse represents the response to an unsubscription request.
 type UnsubscribeMessageResponse struct {
 	BaseMessageResponse
-	Topic string `json:"topic"`
-	ID    string `json:"id"`
+	Topic string `json:"topic"` // Topic of the unsubscription
+	ID    string `json:"id"`    // Unique subscription ID
 }
 
+// ListSubscriptionsMessageRequest represents a request to list active subscriptions.
 type ListSubscriptionsMessageRequest struct {
 	BaseMessageRequest
 }
 
-// SubscriptionEntry represents an active subscription entry with a specific topic and unique identifier.
+// SubscriptionEntry represents an active subscription entry.
 type SubscriptionEntry struct {
-	Topic string `json:"topic,omitempty"`
-	ID    string `json:"id,omitempty"`
+	Topic string `json:"topic,omitempty"` // Topic of the subscription
+	ID    string `json:"id,omitempty"`    // Unique subscription ID
 }
 
 // ListSubscriptionsMessageResponse is the structure used to respond to list_subscriptions requests.
@@ -87,6 +88,7 @@ type ListSubscriptionsMessageResponse struct {
 	Subscriptions []*SubscriptionEntry `json:"subscriptions,omitempty"`
 }
 
+// WebsocketConfig holds configuration for the WebSocketBroker connection.
 type WebsocketConfig struct {
 	MaxSubscriptionsPerConnection uint64
 	MaxResponsesPerSecond         uint64
@@ -101,15 +103,16 @@ type WebSocketBroker struct {
 
 	subs map[string]subscription_handlers.SubscriptionHandler // First key is the subscription ID, second key is the topic
 
-	config WebsocketConfig // Limits on the maximum number of subscriptions per connection, responses per second, and send message timeout.
+	config WebsocketConfig // Configuration for the WebSocket broker
 
-	errChannel       chan error       // Channel to read messages from the client
-	broadcastChannel chan interface{} // Channel to read messages from node subscriptions
+	errChannel       chan error       // Channel for error messages
+	broadcastChannel chan interface{} // Channel for broadcast messages
 
-	activeSubscriptions      *atomic.Uint64
-	activeResponsesPerSecond *atomic.Uint64
+	activeSubscriptions      *atomic.Uint64 // Count of active subscriptions
+	activeResponsesPerSecond *atomic.Uint64 // Count of responses per second
 }
 
+// NewWebSocketBroker initializes a new WebSocketBroker instance.
 func NewWebSocketBroker(
 	logger zerolog.Logger,
 	config WebsocketConfig,
@@ -183,8 +186,7 @@ func (w *WebSocketBroker) handleWSError(err error) {
 	wsCode, wsMsg := w.resolveWebSocketError(err)
 
 	// Send the close message to the client
-	closeMessage := websocket.FormatCloseMessage(wsCode, wsMsg)
-	err = w.conn.WriteControl(websocket.CloseMessage, closeMessage, time.Now().Add(time.Second))
+	err = w.conn.WriteControl(websocket.CloseMessage, websocket.FormatCloseMessage(wsCode, wsMsg), time.Now().Add(time.Second))
 	if err != nil {
 		w.logger.Error().Err(err).Msgf("error sending WebSocket CloseMessage error: %v", err)
 	}
@@ -201,43 +203,47 @@ func (w *WebSocketBroker) handleWSError(err error) {
 // to handle incoming messages asynchronously.
 func (w *WebSocketBroker) readMessages() {
 	for {
-		// reads messages from the WebSocket connection when
-		// 1) the connection is closed by client
-		// 2) unexpected message is received from the client
-
 		_, message, err := w.conn.ReadMessage()
 		if err != nil {
-			w.errChannel <- err
-
-			//it means that client connection has been terminated, and we need to stop this goroutine
 			if websocket.IsCloseError(err) {
-				return
+				w.logger.Info().Msg("connection closed by client")
 			}
-			continue
+			// Send the error to the error channel for handling in writeMessages
+			w.errChannel <- err
+			return
 		}
 
+		// Process the incoming message
 		if err := w.processMessage(message); err != nil {
-			w.errChannel <- err
+			// Send structured error response on failure
+			w.logger.Err(err).Msg("failed to send error message response")
 		}
 	}
 }
 
-// Process message based on action type
+// processMessage processes incoming WebSocket messages based on their action type.
 func (w *WebSocketBroker) processMessage(message []byte) error {
 	var baseMsg BaseMessageRequest
 	if err := json.Unmarshal(message, &baseMsg); err != nil {
-		return fmt.Errorf("invalid message structure: 'action' is required: %w", err)
+		return w.sendErrorResponse(UnknownAction, fmt.Sprintf("invalid message structure: 'action' is required: %v", err))
 	}
+
+	var err error
 	switch baseMsg.Action {
 	case SubscribeAction:
-		return w.handleSubscribeRequest(message)
+		err = w.handleSubscribeRequest(message)
 	case UnsubscribeAction:
-		return w.handleUnsubscribeRequest(message)
+		err = w.handleUnsubscribeRequest(message)
 	case ListSubscriptionsAction:
-		return w.handleListSubscriptionsRequest(message)
+		err = w.handleListSubscriptionsRequest(message)
 	default:
-		return fmt.Errorf("unknown action type: %s", baseMsg.Action)
+		err = fmt.Errorf("unsupported action type: %s", baseMsg.Action)
 	}
+	if err != nil {
+		return w.sendErrorResponse(baseMsg.Action, err.Error())
+	}
+
+	return nil
 }
 
 func (w *WebSocketBroker) handleSubscribeRequest(message []byte) error {
@@ -284,23 +290,10 @@ func (w *WebSocketBroker) writeMessages() {
 	for {
 		select {
 		case err := <-w.errChannel:
-			// we use errChannel
-			// 1) as indicator of client's status, when errChannel closes it means that client
+			// we use errChannel as indicator of client's status, when errChannel closes it means that client
 			// connection has been terminated, and we need to stop this goroutine to avoid memory leak.
-			if websocket.IsCloseError(err) {
-				w.handleWSError(err)
-				return
-			}
-
-			// 2) as error receiver for any errors that occur during the reading process
-			err = w.sendResponse(BaseMessageResponse{
-				Success:      false,
-				ErrorMessage: err.Error(),
-				//TODO: add action
-			})
-			if err != nil {
-				return
-			}
+			w.handleWSError(err)
+			return
 		case data, ok := <-w.broadcastChannel:
 			if !ok {
 				err := fmt.Errorf("broadcast channel closed, no error occurred")
@@ -329,6 +322,15 @@ func (w *WebSocketBroker) sendResponse(data interface{}) error {
 	}
 
 	return w.conn.WriteJSON(data)
+}
+
+// Helper to send structured error responses
+func (w *WebSocketBroker) sendErrorResponse(action, errMsg string) error {
+	return w.sendResponse(BaseMessageResponse{
+		Action:       action,
+		Success:      false,
+		ErrorMessage: errMsg,
+	})
 }
 
 // sendPing sends a periodic ping message to the WebSocket client to keep the connection alive.
