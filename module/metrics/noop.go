@@ -213,6 +213,7 @@ func (nc *NoopCollector) ScriptExecutionNotIndexed()                            
 func (nc *NoopCollector) TransactionResultFetched(dur time.Duration, size int)                  {}
 func (nc *NoopCollector) TransactionReceived(txID flow.Identifier, when time.Time)              {}
 func (nc *NoopCollector) TransactionFinalized(txID flow.Identifier, when time.Time)             {}
+func (nc *NoopCollector) TransactionSealed(txID flow.Identifier, when time.Time)                {}
 func (nc *NoopCollector) TransactionExecuted(txID flow.Identifier, when time.Time)              {}
 func (nc *NoopCollector) TransactionExpired(txID flow.Identifier)                               {}
 func (nc *NoopCollector) TransactionSubmissionFailed()                                          {}
