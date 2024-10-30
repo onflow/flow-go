@@ -10,22 +10,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/rs/zerolog"
-
 	"github.com/coreos/go-semver/semver"
-	"github.com/onflow/flow-core-contracts/lib/go/templates"
-
-	"github.com/onflow/flow-go/fvm/storage"
-	"github.com/onflow/flow-go/fvm/storage/state"
-
-	cadenceStdlib "github.com/onflow/cadence/stdlib"
-
-	flowsdk "github.com/onflow/flow-go-sdk"
-	"github.com/onflow/flow-go-sdk/test"
-
-	envMock "github.com/onflow/flow-go/fvm/environment/mock"
-	"github.com/onflow/flow-go/fvm/evm/events"
-
 	"github.com/onflow/cadence"
 	"github.com/onflow/cadence/common"
 	"github.com/onflow/cadence/encoding/ccf"
@@ -34,8 +19,13 @@ import (
 	"github.com/onflow/cadence/interpreter"
 	"github.com/onflow/cadence/runtime"
 	"github.com/onflow/cadence/sema"
-	"github.com/onflow/cadence/tests/utils"
+	cadenceStdlib "github.com/onflow/cadence/stdlib"
+	"github.com/onflow/cadence/test_utils/runtime_utils"
 	"github.com/onflow/crypto"
+	"github.com/onflow/flow-core-contracts/lib/go/templates"
+	flowsdk "github.com/onflow/flow-go-sdk"
+	"github.com/onflow/flow-go-sdk/test"
+	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	mockery "github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -45,13 +35,17 @@ import (
 	"github.com/onflow/flow-go/fvm"
 	fvmCrypto "github.com/onflow/flow-go/fvm/crypto"
 	"github.com/onflow/flow-go/fvm/environment"
+	envMock "github.com/onflow/flow-go/fvm/environment/mock"
 	"github.com/onflow/flow-go/fvm/errors"
+	"github.com/onflow/flow-go/fvm/evm/events"
 	"github.com/onflow/flow-go/fvm/evm/stdlib"
 	"github.com/onflow/flow-go/fvm/evm/types"
 	"github.com/onflow/flow-go/fvm/meter"
 	reusableRuntime "github.com/onflow/flow-go/fvm/runtime"
+	"github.com/onflow/flow-go/fvm/storage"
 	"github.com/onflow/flow-go/fvm/storage/snapshot"
 	"github.com/onflow/flow-go/fvm/storage/snapshot/mock"
+	"github.com/onflow/flow-go/fvm/storage/state"
 	"github.com/onflow/flow-go/fvm/storage/testutils"
 	"github.com/onflow/flow-go/fvm/systemcontracts"
 	"github.com/onflow/flow-go/fvm/tracing"
@@ -2612,25 +2606,25 @@ func TestStorageIterationWithBrokenValues(t *testing.T) {
 				}
 
 				// Deploy `A`
-				runTransaction(utils.DeploymentTransaction(
+				runTransaction(runtime_utils.DeploymentTransaction(
 					"A",
 					[]byte(contractA),
 				))
 
 				// Deploy `B`
-				runTransaction(utils.DeploymentTransaction(
+				runTransaction(runtime_utils.DeploymentTransaction(
 					"B",
 					[]byte(contractB),
 				))
 
 				// Deploy `C`
-				runTransaction(utils.DeploymentTransaction(
+				runTransaction(runtime_utils.DeploymentTransaction(
 					"C",
 					[]byte(contractC),
 				))
 
 				// Deploy `D`
-				runTransaction(utils.DeploymentTransaction(
+				runTransaction(runtime_utils.DeploymentTransaction(
 					"D",
 					[]byte(contractD),
 				))
@@ -2672,7 +2666,7 @@ func TestStorageIterationWithBrokenValues(t *testing.T) {
 				)))
 
 				// Update `A`, such that `B`, `C` and `D` are now broken.
-				runTransaction(utils.UpdateTransaction(
+				runTransaction(runtime_utils.UpdateTransaction(
 					"A",
 					[]byte(updatedContractA),
 				))
