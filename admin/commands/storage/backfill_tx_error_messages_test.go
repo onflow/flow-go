@@ -95,7 +95,7 @@ func (suite *BackfillTxErrorMessagesSuite) SetupTest() {
 	suite.params.On("SealedRoot").Return(suite.nodeRootBlock.Header, nil)
 	suite.state.On("Params").Return(suite.params, nil).Maybe()
 
-	suite.snapshot = createSnapshot(parent)
+	suite.snapshot = createSnapshot(suite.T(), parent)
 	suite.state.On("Sealed").Return(suite.snapshot)
 	suite.state.On("Final").Return(suite.snapshot)
 
@@ -103,7 +103,7 @@ func (suite *BackfillTxErrorMessagesSuite) SetupTest() {
 		func(height uint64) protocol.Snapshot {
 			if int(height) < len(suite.blockHeadersMap) {
 				header := suite.blockHeadersMap[height]
-				return createSnapshot(header)
+				return createSnapshot(suite.T(), header)
 			}
 			return invalid.NewSnapshot(fmt.Errorf("invalid height: %v", height))
 		},
@@ -169,7 +169,7 @@ func (suite *BackfillTxErrorMessagesSuite) TestValidateInvalidFormat() {
 			},
 		})
 		suite.Error(err)
-		suite.Equal(err, admin.NewInvalidAdminReqErrorf(
+		suite.ErrorIs(err, admin.NewInvalidAdminReqErrorf(
 			"invalid 'start-height' field: %w",
 			fmt.Errorf("invalid value for \"n\": %v", 0)))
 	})
@@ -182,7 +182,7 @@ func (suite *BackfillTxErrorMessagesSuite) TestValidateInvalidFormat() {
 			},
 		})
 		suite.Error(err)
-		suite.Equal(err, admin.NewInvalidAdminReqErrorf(
+		suite.ErrorIs(err, admin.NewInvalidAdminReqErrorf(
 			"invalid 'end-height' field: %w",
 			fmt.Errorf("invalid value for \"n\": %v", 0)))
 	})
@@ -197,7 +197,7 @@ func (suite *BackfillTxErrorMessagesSuite) TestValidateInvalidFormat() {
 			},
 		})
 		suite.Error(err)
-		suite.Equal(err, admin.NewInvalidAdminReqErrorf(
+		suite.ErrorIs(err, admin.NewInvalidAdminReqErrorf(
 			"start-height %v should not be smaller than end-height %v", startHeight, endHeight))
 	})
 
@@ -210,7 +210,7 @@ func (suite *BackfillTxErrorMessagesSuite) TestValidateInvalidFormat() {
 			},
 		})
 		suite.Error(err)
-		suite.Equal(err, admin.NewInvalidAdminReqParameterError(
+		suite.ErrorIs(err, admin.NewInvalidAdminReqParameterError(
 			"execution-node-ids", "must be a list of string", []int{1, 2, 3}))
 
 		// invalid type
@@ -220,7 +220,7 @@ func (suite *BackfillTxErrorMessagesSuite) TestValidateInvalidFormat() {
 			},
 		})
 		suite.Error(err)
-		suite.Equal(err, admin.NewInvalidAdminReqParameterError(
+		suite.ErrorIs(err, admin.NewInvalidAdminReqParameterError(
 			"execution-node-ids", "must be a list of string", "123"))
 
 		// invalid execution node id
@@ -233,7 +233,7 @@ func (suite *BackfillTxErrorMessagesSuite) TestValidateInvalidFormat() {
 			},
 		})
 		suite.Error(err)
-		suite.Equal(err, admin.NewInvalidAdminReqParameterError(
+		suite.ErrorIs(err, admin.NewInvalidAdminReqParameterError(
 			"execution-node-ids", "could not found execution nodes by provided ids", []string{invalidENID.String()}))
 	})
 }
@@ -430,7 +430,7 @@ func (suite *BackfillTxErrorMessagesSuite) TestHandleBackfillTxErrorMessagesErro
 
 		_, err := suite.command.Handler(ctx, req)
 		suite.Require().Error(err)
-		suite.Equal(err, fmt.Errorf("failed to get result by block ID: %w", expectedErr))
+		suite.ErrorIs(err, fmt.Errorf("failed to get result by block ID: %w", expectedErr))
 		suite.assertAllExpectations()
 	})
 }

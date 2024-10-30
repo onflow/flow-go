@@ -1807,13 +1807,6 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 			builder.Storage.Events = bstorage.NewEvents(node.Metrics.Cache, node.DB)
 			return nil
 		}).
-		Module("transaction result error messages storage", func(node *cmd.NodeConfig) error {
-			if builder.storeTxResultErrorMessages {
-				builder.Storage.TransactionResultErrorMessages = bstorage.NewTransactionResultErrorMessages(node.Metrics.Cache, node.DB, bstorage.DefaultCacheSize)
-			}
-
-			return nil
-		}).
 		Module("reporter", func(node *cmd.NodeConfig) error {
 			builder.Reporter = index.NewReporter()
 			return nil

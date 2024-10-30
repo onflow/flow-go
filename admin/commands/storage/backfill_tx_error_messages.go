@@ -154,6 +154,7 @@ func (b *BackfillTxErrorMessagesCommand) Handler(ctx context.Context, request *a
 		for _, txResult := range results {
 			if txResult.Failed {
 				fetchTxErrorMessages = true
+				break // Exit the loop as soon as a failed result is found
 			}
 		}
 
