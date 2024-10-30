@@ -638,6 +638,8 @@ func (suite *Suite) TestGetSealedTransaction() {
 		require.NoError(suite.T(), err)
 		blocksToMarkExecuted, err := stdmap.NewTimes(100)
 		require.NoError(suite.T(), err)
+		blockTransactions, err := stdmap.NewIdentifierMap(100)
+		require.NoError(suite.T(), err)
 
 		execNodeIdentitiesProvider := commonrpc.NewExecutionNodeIdentitiesProvider(
 			suite.log,
@@ -678,6 +680,7 @@ func (suite *Suite) TestGetSealedTransaction() {
 			blocksToMarkExecuted,
 			collections,
 			all.Blocks,
+			blockTransactions,
 		)
 		require.NoError(suite.T(), err)
 
@@ -826,6 +829,8 @@ func (suite *Suite) TestGetTransactionResult() {
 		require.NoError(suite.T(), err)
 		blocksToMarkExecuted, err := stdmap.NewTimes(100)
 		require.NoError(suite.T(), err)
+		blockTransactions, err := stdmap.NewIdentifierMap(100)
+		require.NoError(suite.T(), err)
 
 		execNodeIdentitiesProvider := commonrpc.NewExecutionNodeIdentitiesProvider(
 			suite.log,
@@ -865,6 +870,7 @@ func (suite *Suite) TestGetTransactionResult() {
 			blocksToMarkExecuted,
 			collections,
 			all.Blocks,
+			blockTransactions,
 		)
 		require.NoError(suite.T(), err)
 
@@ -1105,6 +1111,8 @@ func (suite *Suite) TestExecuteScript() {
 		require.NoError(suite.T(), err)
 		blocksToMarkExecuted, err := stdmap.NewTimes(100)
 		require.NoError(suite.T(), err)
+		blockTransactions, err := stdmap.NewIdentifierMap(100)
+		require.NoError(suite.T(), err)
 
 		collectionExecutedMetric, err := indexer.NewCollectionExecutedMetricImpl(
 			suite.log,
@@ -1114,6 +1122,7 @@ func (suite *Suite) TestExecuteScript() {
 			blocksToMarkExecuted,
 			collections,
 			all.Blocks,
+			blockTransactions,
 		)
 		require.NoError(suite.T(), err)
 

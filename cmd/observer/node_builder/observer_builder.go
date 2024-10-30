@@ -148,6 +148,7 @@ type ObserverServiceConfig struct {
 	logTxTimeToFinalized                 bool
 	logTxTimeToExecuted                  bool
 	logTxTimeToFinalizedExecuted         bool
+	logTxTimeToSealed                    bool
 	executionDataSyncEnabled             bool
 	executionDataIndexingEnabled         bool
 	executionDataDBMode                  string
@@ -223,6 +224,7 @@ func DefaultObserverServiceConfig() *ObserverServiceConfig {
 		logTxTimeToFinalized:                 false,
 		logTxTimeToExecuted:                  false,
 		logTxTimeToFinalizedExecuted:         false,
+		logTxTimeToSealed:                    false,
 		executionDataSyncEnabled:             false,
 		executionDataIndexingEnabled:         false,
 		executionDataDBMode:                  execution_data.ExecutionDataDBModeBadger.String(),
@@ -659,6 +661,10 @@ func (builder *ObserverServiceBuilder) extraFlags() {
 			"log-tx-time-to-finalized-executed",
 			defaultConfig.logTxTimeToFinalizedExecuted,
 			"log transaction time to finalized and executed")
+		flags.BoolVar(&builder.logTxTimeToSealed,
+			"log-tx-time-to-sealed",
+			defaultConfig.logTxTimeToSealed,
+			"log transaction time to sealed")
 		flags.BoolVar(&builder.rpcMetricsEnabled, "rpc-metrics-enabled", defaultConfig.rpcMetricsEnabled, "whether to enable the rpc metrics")
 		flags.BoolVar(&builder.executionDataIndexingEnabled,
 			"execution-data-indexing-enabled",
@@ -1671,6 +1677,7 @@ func (builder *ObserverServiceBuilder) enqueueRPCServer() {
 			builder.logTxTimeToFinalized,
 			builder.logTxTimeToExecuted,
 			builder.logTxTimeToFinalizedExecuted,
+			builder.logTxTimeToSealed,
 		)
 		return nil
 	})

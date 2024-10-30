@@ -15,7 +15,7 @@ type VoteAggregator struct {
 }
 
 // AddBlock provides a mock function with given fields: block
-func (_m *VoteAggregator) AddBlock(block *model.Proposal) {
+func (_m *VoteAggregator) AddBlock(block *model.SignedProposal) {
 	_m.Called(block)
 }
 
@@ -45,7 +45,7 @@ func (_m *VoteAggregator) Done() <-chan struct{} {
 }
 
 // InvalidBlock provides a mock function with given fields: block
-func (_m *VoteAggregator) InvalidBlock(block *model.Proposal) error {
+func (_m *VoteAggregator) InvalidBlock(block *model.SignedProposal) error {
 	ret := _m.Called(block)
 
 	if len(ret) == 0 {
@@ -53,7 +53,7 @@ func (_m *VoteAggregator) InvalidBlock(block *model.Proposal) error {
 	}
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(*model.Proposal) error); ok {
+	if rf, ok := ret.Get(0).(func(*model.SignedProposal) error); ok {
 		r0 = rf(block)
 	} else {
 		r0 = ret.Error(0)

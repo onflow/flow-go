@@ -46,7 +46,7 @@ func (_m *SafetyRules) ProduceTimeout(curView uint64, newestQC *flow.QuorumCerti
 }
 
 // ProduceVote provides a mock function with given fields: proposal, curView
-func (_m *SafetyRules) ProduceVote(proposal *model.Proposal, curView uint64) (*model.Vote, error) {
+func (_m *SafetyRules) ProduceVote(proposal *model.SignedProposal, curView uint64) (*model.Vote, error) {
 	ret := _m.Called(proposal, curView)
 
 	if len(ret) == 0 {
@@ -55,10 +55,10 @@ func (_m *SafetyRules) ProduceVote(proposal *model.Proposal, curView uint64) (*m
 
 	var r0 *model.Vote
 	var r1 error
-	if rf, ok := ret.Get(0).(func(*model.Proposal, uint64) (*model.Vote, error)); ok {
+	if rf, ok := ret.Get(0).(func(*model.SignedProposal, uint64) (*model.Vote, error)); ok {
 		return rf(proposal, curView)
 	}
-	if rf, ok := ret.Get(0).(func(*model.Proposal, uint64) *model.Vote); ok {
+	if rf, ok := ret.Get(0).(func(*model.SignedProposal, uint64) *model.Vote); ok {
 		r0 = rf(proposal, curView)
 	} else {
 		if ret.Get(0) != nil {
@@ -66,7 +66,7 @@ func (_m *SafetyRules) ProduceVote(proposal *model.Proposal, curView uint64) (*m
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(*model.Proposal, uint64) error); ok {
+	if rf, ok := ret.Get(1).(func(*model.SignedProposal, uint64) error); ok {
 		r1 = rf(proposal, curView)
 	} else {
 		r1 = ret.Error(1)

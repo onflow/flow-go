@@ -261,7 +261,7 @@ func TestFinalize_Multiple2Chains(t *testing.T) {
 }
 
 // TestFinalize_OrphanedFork tests that we can finalize a block which causes a conflicting fork to be orphaned.
-// We ingest the the following block tree:
+// We ingest the following block tree:
 //
 //	[◄(1) 2] [◄(2) 3]
 //	         [◄(2) 4] [◄(4) 5] [◄(5) 6]
@@ -389,7 +389,7 @@ func TestIgnoreBlocksBelowFinalizedView(t *testing.T) {
 }
 
 // TestDoubleProposal tests that the DoubleProposal notification is emitted when two different
-// blocks for the same view are added. We ingest the the following block tree:
+// blocks for the same view are added. We ingest the following block tree:
 //
 //	               / [◄(1) 2]
 //			[1]
@@ -460,7 +460,7 @@ func TestConflictingQCs(t *testing.T) {
 }
 
 // TestConflictingFinalizedForks checks that finalizing 2 conflicting forks should return model.ByzantineThresholdExceededError
-// We ingest the the following block tree:
+// We ingest the following block tree:
 //
 //	[◄(1) 2] [◄(2) 3] [◄(3) 4] [◄(4) 5]
 //	         [◄(2) 6] [◄(6) 7] [◄(7) 8]
