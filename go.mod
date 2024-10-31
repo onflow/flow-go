@@ -106,6 +106,7 @@ require (
 	github.com/huandu/go-clone/generic v1.7.2
 	github.com/ipfs/boxo v0.17.1-0.20240131173518-89bceff34bf1
 	github.com/mitchellh/mapstructure v1.5.0
+	github.com/onflow/bridged-usdc/lib/go/contracts v0.0.0-20241031171244-21575ddc23e0
 	github.com/onflow/go-ethereum v1.14.7
 	github.com/onflow/wal v1.0.2
 	github.com/slok/go-http-metrics v0.10.0
@@ -257,6 +258,7 @@ require (
 	github.com/onflow/flow-ft/lib/go/templates v1.0.1 // indirect
 	github.com/onflow/flow-nft/lib/go/contracts v1.2.2 // indirect
 	github.com/onflow/flow-nft/lib/go/templates v1.2.1 // indirect
+	github.com/onflow/nft-storefront/lib/go/contracts v1.0.0 // indirect
 	github.com/onflow/sdks v0.6.0-preview.1 // indirect
 	github.com/onsi/ginkgo v1.16.5 // indirect
 	github.com/onsi/ginkgo/v2 v2.13.2 // indirect
