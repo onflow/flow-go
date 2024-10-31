@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"encoding/hex"
 	"encoding/json"
-	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -47,9 +46,7 @@ func TestRecoverEpochHappyPath(t *testing.T) {
 		for _, id := range allNodeIds {
 			if id.GetRole() == flow.RoleConsensus {
 				dkgPubKey, keyShareErr := currentEpochDKG.KeyShare(id.GetNodeID())
-				if keyShareErr != nil {
-					log.Fatal().Err(keyShareErr).Msg(fmt.Sprintf("failed to get dkg pub key share for node: %s", id.GetNodeID()))
-				}
+				require.NoError(t, keyShareErr)
 				expectedDKGPubKeys[cadence.String(hex.EncodeToString(dkgPubKey.Encode()))] = struct{}{}
 			}
 		}
@@ -80,19 +77,19 @@ func TestRecoverEpochHappyPath(t *testing.T) {
 		require.NoError(t, err)
 
 		// epoch counter
-		require.Equal(t, decodedValues[0], cadence.NewUInt64(flagEpochCounter))
+		require.Equal(t, cadence.NewUInt64(flagEpochCounter), decodedValues[0])
 		// epoch start view
-		require.Equal(t, decodedValues[1], cadence.NewUInt64(finalView+1))
+		require.Equal(t, cadence.NewUInt64(finalView+1), decodedValues[1])
 		// staking phase end view
-		require.Equal(t, decodedValues[2], cadence.NewUInt64(finalView+flagNumViewsInStakingAuction))
+		require.Equal(t, cadence.NewUInt64(finalView+flagNumViewsInStakingAuction), decodedValues[2])
 		// epoch end view
-		require.Equal(t, decodedValues[3], cadence.NewUInt64(finalView+flagNumViewsInEpoch))
+		require.Equal(t, cadence.NewUInt64(finalView+flagNumViewsInEpoch), decodedValues[3])
 		// target duration
-		require.Equal(t, decodedValues[4], cadence.NewUInt64(flagTargetDuration))
+		require.Equal(t, cadence.NewUInt64(flagTargetDuration), decodedValues[4])
 		// target end time
 		expectedTargetEndTime, err := rootSnapshot.Epochs().Current().TargetEndTime()
 		require.NoError(t, err)
-		require.Equal(t, decodedValues[5], cadence.NewUInt64(expectedTargetEndTime))
+		require.Equal(t, cadence.NewUInt64(expectedTargetEndTime), decodedValues[5])
 		// clusters: we cannot guarantee order of the cluster when we generate the test fixtures
 		// so, we ensure each cluster member is part of the full set of node ids
 		for _, cluster := range decodedValues[6].(cadence.Array).Values {
@@ -129,6 +126,6 @@ func TestRecoverEpochHappyPath(t *testing.T) {
 			require.True(t, ok)
 		}
 		// unsafeAllowOverWrite
-		require.Equal(t, decodedValues[12], cadence.NewBool(false))
+		require.Equal(t, cadence.NewBool(false), decodedValues[12])
 	})
 }
