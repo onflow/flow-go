@@ -48,12 +48,12 @@ require (
 	github.com/multiformats/go-multiaddr-dns v0.3.1
 	github.com/multiformats/go-multihash v0.2.3
 	github.com/onflow/atree v0.8.0
-	github.com/onflow/cadence v1.2.1
+	github.com/onflow/cadence v1.2.2
 	github.com/onflow/crypto v0.25.2
 	github.com/onflow/flow v0.3.4
 	github.com/onflow/flow-core-contracts/lib/go/contracts v1.4.0
 	github.com/onflow/flow-core-contracts/lib/go/templates v1.4.0
-	github.com/onflow/flow-go-sdk v1.2.2
+	github.com/onflow/flow-go-sdk v1.2.3
 	github.com/onflow/flow/protobuf/go/flow v0.4.7
 	github.com/pbnjay/memory v0.0.0-20210728143218-7b4eea64cf58
 	github.com/pierrec/lz4 v2.6.1+incompatible
@@ -77,11 +77,11 @@ require (
 	go.opentelemetry.io/otel/trace v1.24.0
 	go.uber.org/atomic v1.11.0
 	go.uber.org/multierr v1.11.0
-	golang.org/x/crypto v0.26.0
+	golang.org/x/crypto v0.28.0
 	golang.org/x/exp v0.0.0-20240119083558-1b970713d09a
 	golang.org/x/sync v0.8.0
-	golang.org/x/sys v0.23.0
-	golang.org/x/text v0.17.0
+	golang.org/x/sys v0.26.0
+	golang.org/x/text v0.19.0
 	golang.org/x/time v0.5.0
 	golang.org/x/tools v0.21.1-0.20240508182429-e35e4ccd0d2d
 	google.golang.org/api v0.162.0
@@ -311,7 +311,7 @@ require (
 	golang.org/x/mod v0.17.0 // indirect
 	golang.org/x/net v0.25.0 // indirect
 	golang.org/x/oauth2 v0.17.0 // indirect
-	golang.org/x/term v0.23.0 // indirect
+	golang.org/x/term v0.25.0 // indirect
 	gonum.org/v1/gonum v0.14.0 // indirect
 	google.golang.org/appengine v1.6.8 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20240227224415-6ceb2ff114de // indirect
