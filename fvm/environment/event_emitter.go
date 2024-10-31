@@ -209,7 +209,7 @@ func (emitter *eventEmitter) EmitEvent(event cadence.Event) error {
 		// TODO skip only limit-related errors
 		if eventEmitError != nil {
 			if isServiceAccount {
-				emitter.log.Error().Err(eventEmitError).Str(logging.KeySuspicious, "true").Msg("could not process service event")
+				emitter.log.Error().Err(eventEmitError).Str(logging.KeySuspicious, "true").Msg("could not emit service event")
 			} else {
 				return eventEmitError
 			}
