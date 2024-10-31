@@ -1074,6 +1074,10 @@ type TransactionMetrics interface {
 	// works if the transaction was earlier added as received.
 	TransactionFinalized(txID flow.Identifier, when time.Time)
 
+	// TransactionSealed reports the time spent between the transaction being received and sealed. Reporting only
+	// works if the transaction was earlier added as received.
+	TransactionSealed(txID flow.Identifier, when time.Time)
+
 	// TransactionExecuted reports the time spent between the transaction being received and executed. Reporting only
 	// works if the transaction was earlier added as received.
 	TransactionExecuted(txID flow.Identifier, when time.Time)
