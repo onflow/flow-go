@@ -27,9 +27,6 @@ var removeNodeTxScript string
 //go:embed templates/set-protocol-state-version.cdc
 var setProtocolStateVersionScript string
 
-//go:embed templates/recover-epoch.cdc
-var recoverEpochTxScript string
-
 func LocalnetEnv() templates.Environment {
 	return templates.Environment{
 		EpochAddress:             "f8d6e0586b0a20c7",
@@ -250,7 +247,7 @@ func MakeRecoverEpochTx(
 ) (*sdk.Transaction, error) {
 	accountKey := adminAccount.Keys[adminAccountKeyID]
 	tx := sdk.NewTransaction().
-		SetScript([]byte(templates.ReplaceAddresses(recoverEpochTxScript, env))).
+		SetScript(templates.GenerateRecoverEpochScript(env)).
 		SetComputeLimit(9999).
 		SetReferenceBlockID(latestBlockID).
 		SetProposalKey(adminAccount.Address, adminAccountKeyID, accountKey.SequenceNumber).
