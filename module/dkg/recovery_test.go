@@ -346,6 +346,8 @@ func (s *BeaconKeyRecoverySuite) TestEpochFallbackModeExited() {
 	require.NotNil(s.T(), recovery)
 	s.dkgState.AssertNumberOfCalls(s.T(), "UpsertMyBeaconPrivateKey", 0)
 
+	s.state.On("AtHeight", s.head.Height).Return(s.finalSnapshot, nil).Once()
+
 	// transition to epoch committed phase
 	s.currentEpochPhase = flow.EpochPhaseCommitted
 
