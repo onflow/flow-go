@@ -12,24 +12,6 @@ type EpochRecoveryMyBeaconKey struct {
 	mock.Mock
 }
 
-// UpsertMyBeaconPrivateKey provides a mock function with given fields: epochCounter, key
-func (_m *EpochRecoveryMyBeaconKey) UpsertMyBeaconPrivateKey(epochCounter uint64, key crypto.PrivateKey) error {
-	ret := _m.Called(epochCounter, key)
-
-	if len(ret) == 0 {
-		panic("no return value specified for UpsertMyBeaconPrivateKey")
-	}
-
-	var r0 error
-	if rf, ok := ret.Get(0).(func(uint64, crypto.PrivateKey) error); ok {
-		r0 = rf(epochCounter, key)
-	} else {
-		r0 = ret.Error(0)
-	}
-
-	return r0
-}
-
 // RetrieveMyBeaconPrivateKey provides a mock function with given fields: epochCounter
 func (_m *EpochRecoveryMyBeaconKey) RetrieveMyBeaconPrivateKey(epochCounter uint64) (crypto.PrivateKey, bool, error) {
 	ret := _m.Called(epochCounter)
@@ -65,6 +47,24 @@ func (_m *EpochRecoveryMyBeaconKey) RetrieveMyBeaconPrivateKey(epochCounter uint
 	}
 
 	return r0, r1, r2
+}
+
+// UpsertMyBeaconPrivateKey provides a mock function with given fields: epochCounter, key
+func (_m *EpochRecoveryMyBeaconKey) UpsertMyBeaconPrivateKey(epochCounter uint64, key crypto.PrivateKey) error {
+	ret := _m.Called(epochCounter, key)
+
+	if len(ret) == 0 {
+		panic("no return value specified for UpsertMyBeaconPrivateKey")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(uint64, crypto.PrivateKey) error); ok {
+		r0 = rf(epochCounter, key)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
 }
 
 // NewEpochRecoveryMyBeaconKey creates a new instance of EpochRecoveryMyBeaconKey. It also registers a testing interface on the mock and a cleanup function to assert the mocks expectations.
