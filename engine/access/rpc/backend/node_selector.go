@@ -24,6 +24,19 @@ type NodeSelectorFactory struct {
 	circuitBreakerEnabled bool
 }
 
+// NewNodeSelectorFactory creates a new instance of NodeSelectorFactory with the provided circuit breaker configuration.
+//
+// When `circuitBreakerEnabled` is set to true, nodes will be selected using a pseudo-random sampling mechanism and picked in-order.
+// When set to false, nodes will be selected in the order they are proposed, without any changes.
+//
+// Parameters:
+// - circuitBreakerEnabled: A boolean that controls whether the circuit breaker is enabled for node selection.
+func NewNodeSelectorFactory(circuitBreakerEnabled bool) *NodeSelectorFactory {
+	return &NodeSelectorFactory{
+		circuitBreakerEnabled: circuitBreakerEnabled,
+	}
+}
+
 // SelectNodes selects the configured number of node identities from the provided list of nodes
 // and returns the node selector to iterate through them.
 func (n *NodeSelectorFactory) SelectNodes(nodes flow.IdentityList) (NodeSelector, error) {

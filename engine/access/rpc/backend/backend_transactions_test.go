@@ -354,6 +354,8 @@ func (suite *Suite) TestLookupTransactionErrorMessageByTransactionID_HappyPath()
 	suite.state.On("Final").Return(suite.snapshot, nil).Maybe()
 	suite.snapshot.On("Identities", mock.Anything).Return(fixedENIDs, nil)
 
+	suite.fixedExecutionNodeIDs = fixedENIDs.NodeIDs()
+
 	params := suite.defaultBackendParams()
 	params.TxResultErrorMessages = suite.txErrorMessages
 
@@ -361,7 +363,6 @@ func (suite *Suite) TestLookupTransactionErrorMessageByTransactionID_HappyPath()
 	suite.Run("happy path from EN", func() {
 		// the connection factory should be used to get the execution node client
 		params.ConnFactory = suite.setupConnectionFactory()
-		params.FixedExecutionNodeIDs = fixedENIDs.NodeIDs().Strings()
 
 		// Mock the cache lookup for the transaction error message, returning "not found".
 		suite.txErrorMessages.On("ByBlockIDTransactionID", blockId, failedTxId).
@@ -432,11 +433,12 @@ func (suite *Suite) TestLookupTransactionErrorMessageByTransactionID_FailedToFet
 	reporter.On("LowestIndexedHeight").Return(block.Header.Height, nil)
 	reporter.On("HighestIndexedHeight").Return(block.Header.Height+10, nil)
 
+	suite.fixedExecutionNodeIDs = fixedENIDs.NodeIDs()
+
 	params := suite.defaultBackendParams()
 	// The connection factory should be used to get the execution node client
 	params.ConnFactory = suite.setupConnectionFactory()
 	// Initialize the transaction results index with the mock reporter.
-	params.FixedExecutionNodeIDs = fixedENIDs.NodeIDs().Strings()
 	params.TxResultsIndex = NewTransactionResultsIndex(suite.transactionResults)
 	err := params.TxResultsIndex.Initialize(reporter)
 	suite.Require().NoError(err)
@@ -534,6 +536,8 @@ func (suite *Suite) TestLookupTransactionErrorMessageByIndex_HappyPath() {
 	suite.state.On("Final").Return(suite.snapshot, nil).Maybe()
 	suite.snapshot.On("Identities", mock.Anything).Return(fixedENIDs, nil)
 
+	suite.fixedExecutionNodeIDs = fixedENIDs.NodeIDs()
+
 	params := suite.defaultBackendParams()
 	params.TxResultErrorMessages = suite.txErrorMessages
 
@@ -541,7 +545,6 @@ func (suite *Suite) TestLookupTransactionErrorMessageByIndex_HappyPath() {
 	suite.Run("happy path from EN", func() {
 		// the connection factory should be used to get the execution node client
 		params.ConnFactory = suite.setupConnectionFactory()
-		params.FixedExecutionNodeIDs = fixedENIDs.NodeIDs().Strings()
 
 		// Mock the cache lookup for the transaction error message, returning "not found".
 		suite.txErrorMessages.On("ByBlockIDTransactionIndex", blockId, failedTxIndex).
@@ -617,10 +620,11 @@ func (suite *Suite) TestLookupTransactionErrorMessageByIndex_FailedToFetch() {
 	reporter.On("LowestIndexedHeight").Return(block.Header.Height, nil)
 	reporter.On("HighestIndexedHeight").Return(block.Header.Height+10, nil)
 
+	suite.fixedExecutionNodeIDs = fixedENIDs.NodeIDs()
+
 	params := suite.defaultBackendParams()
 	// the connection factory should be used to get the execution node client
 	params.ConnFactory = connFactory
-	params.FixedExecutionNodeIDs = fixedENIDs.NodeIDs().Strings()
 	// Initialize the transaction results index with the mock reporter.
 	params.TxResultsIndex = NewTransactionResultsIndex(suite.transactionResults)
 	err := params.TxResultsIndex.Initialize(reporter)
@@ -723,6 +727,8 @@ func (suite *Suite) TestLookupTransactionErrorMessagesByBlockID_HappyPath() {
 	suite.state.On("Final").Return(suite.snapshot, nil).Maybe()
 	suite.snapshot.On("Identities", mock.Anything).Return(fixedENIDs, nil)
 
+	suite.fixedExecutionNodeIDs = fixedENIDs.NodeIDs()
+
 	params := suite.defaultBackendParams()
 	params.TxResultErrorMessages = suite.txErrorMessages
 
@@ -730,7 +736,6 @@ func (suite *Suite) TestLookupTransactionErrorMessagesByBlockID_HappyPath() {
 	suite.Run("happy path from EN", func() {
 		// the connection factory should be used to get the execution node client
 		params.ConnFactory = suite.setupConnectionFactory()
-		params.FixedExecutionNodeIDs = fixedENIDs.NodeIDs().Strings()
 
 		// Mock the cache lookup for the transaction error messages, returning "not found".
 		suite.txErrorMessages.On("ByBlockID", blockId).
@@ -826,10 +831,11 @@ func (suite *Suite) TestLookupTransactionErrorMessagesByBlockID_FailedToFetch() 
 	reporter.On("LowestIndexedHeight").Return(block.Header.Height, nil)
 	reporter.On("HighestIndexedHeight").Return(block.Header.Height+10, nil)
 
+	suite.fixedExecutionNodeIDs = fixedENIDs.NodeIDs()
+
 	params := suite.defaultBackendParams()
 	// the connection factory should be used to get the execution node client
 	params.ConnFactory = suite.setupConnectionFactory()
-	params.FixedExecutionNodeIDs = fixedENIDs.NodeIDs().Strings()
 	// Initialize the transaction results index with the mock reporter.
 	params.TxResultsIndex = NewTransactionResultsIndex(suite.transactionResults)
 	err := params.TxResultsIndex.Initialize(reporter)
@@ -1239,11 +1245,12 @@ func (suite *Suite) TestTransactionResultFromStorage() {
 	reporter.On("LowestIndexedHeight").Return(block.Header.Height, nil)
 	reporter.On("HighestIndexedHeight").Return(block.Header.Height+10, nil)
 
+	suite.fixedExecutionNodeIDs = fixedENIDs.NodeIDs()
+
 	// Set up the backend parameters and the backend instance
 	params := suite.defaultBackendParams()
 	// the connection factory should be used to get the execution node client
 	params.ConnFactory = suite.setupConnectionFactory()
-	params.FixedExecutionNodeIDs = fixedENIDs.NodeIDs().Strings()
 	params.TxResultQueryMode = IndexQueryModeLocalOnly
 
 	params.EventsIndex = NewEventsIndex(suite.events)
@@ -1327,11 +1334,12 @@ func (suite *Suite) TestTransactionByIndexFromStorage() {
 	reporter.On("LowestIndexedHeight").Return(block.Header.Height, nil)
 	reporter.On("HighestIndexedHeight").Return(block.Header.Height+10, nil)
 
+	suite.fixedExecutionNodeIDs = fixedENIDs.NodeIDs()
+
 	// Set up the backend parameters and the backend instance
 	params := suite.defaultBackendParams()
 	// the connection factory should be used to get the execution node client
 	params.ConnFactory = suite.setupConnectionFactory()
-	params.FixedExecutionNodeIDs = fixedENIDs.NodeIDs().Strings()
 	params.TxResultQueryMode = IndexQueryModeLocalOnly
 
 	params.EventsIndex = NewEventsIndex(suite.events)
@@ -1425,7 +1433,6 @@ func (suite *Suite) TestTransactionResultsByBlockIDFromStorage() {
 	params := suite.defaultBackendParams()
 	// the connection factory should be used to get the execution node client
 	params.ConnFactory = suite.setupConnectionFactory()
-	params.FixedExecutionNodeIDs = fixedENIDs.NodeIDs().Strings()
 
 	params.EventsIndex = NewEventsIndex(suite.events)
 	err := params.EventsIndex.Initialize(reporter)

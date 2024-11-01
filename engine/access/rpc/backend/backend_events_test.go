@@ -20,6 +20,7 @@ import (
 
 	access "github.com/onflow/flow-go/engine/access/mock"
 	connectionmock "github.com/onflow/flow-go/engine/access/rpc/connection/mock"
+	commonrpc "github.com/onflow/flow-go/engine/common/rpc"
 	"github.com/onflow/flow-go/engine/common/rpc/convert"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/irrecoverable"
@@ -174,16 +175,22 @@ func (s *BackendEventsSuite) SetupTest() {
 
 func (s *BackendEventsSuite) defaultBackend() *backendEvents {
 	return &backendEvents{
-		log:               s.log,
-		chain:             s.chainID.Chain(),
-		state:             s.state,
-		headers:           s.headers,
-		executionReceipts: s.receipts,
-		connFactory:       s.connectionFactory,
-		nodeCommunicator:  NewNodeCommunicator(false),
-		maxHeightRange:    DefaultMaxHeightRange,
-		queryMode:         IndexQueryModeExecutionNodesOnly,
-		eventsIndex:       s.eventsIndex,
+		log:              s.log,
+		chain:            s.chainID.Chain(),
+		state:            s.state,
+		headers:          s.headers,
+		connFactory:      s.connectionFactory,
+		nodeCommunicator: NewNodeCommunicator(false),
+		maxHeightRange:   DefaultMaxHeightRange,
+		queryMode:        IndexQueryModeExecutionNodesOnly,
+		eventsIndex:      s.eventsIndex,
+		execNodeIdentitiesProvider: commonrpc.NewExecutionNodeIdentitiesProvider(
+			s.log,
+			s.state,
+			s.receipts,
+			flow.IdentifierList{},
+			flow.IdentifierList{},
+		),
 	}
 }
 

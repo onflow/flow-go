@@ -25,9 +25,12 @@ import (
 
 	"github.com/onflow/flow/protobuf/go/flow/access"
 
+	"github.com/onflow/flow-go/crypto"
+
 	"github.com/onflow/flow-go/admin/commands"
 	stateSyncCommands "github.com/onflow/flow-go/admin/commands/state_synchronization"
 	"github.com/onflow/flow-go/cmd"
+	"github.com/onflow/flow-go/cmd/access/index"
 	"github.com/onflow/flow-go/consensus"
 	"github.com/onflow/flow-go/consensus/hotstuff"
 	"github.com/onflow/flow-go/consensus/hotstuff/committees"
@@ -37,7 +40,6 @@ import (
 	hotstuffvalidator "github.com/onflow/flow-go/consensus/hotstuff/validator"
 	"github.com/onflow/flow-go/consensus/hotstuff/verification"
 	recovery "github.com/onflow/flow-go/consensus/recovery/protocol"
-	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/engine/access/apiproxy"
 	"github.com/onflow/flow-go/engine/access/rest"
@@ -49,6 +51,7 @@ import (
 	"github.com/onflow/flow-go/engine/access/state_stream"
 	statestreambackend "github.com/onflow/flow-go/engine/access/state_stream/backend"
 	"github.com/onflow/flow-go/engine/common/follower"
+	commonrpc "github.com/onflow/flow-go/engine/common/rpc"
 	synceng "github.com/onflow/flow-go/engine/common/synchronization"
 	"github.com/onflow/flow-go/engine/execution/computation/query"
 	"github.com/onflow/flow-go/engine/protocol"
@@ -242,6 +245,7 @@ type ObserverServiceBuilder struct {
 	ExecutionDataStore      execution_data.ExecutionDataStore
 
 	RegistersAsyncStore *execution.RegistersAsyncStore
+	Reporter            *index.Reporter
 	EventsIndex         *backend.EventsIndex
 
 	// available until after the network has started. Hence, a factory function that needs to be called just before
@@ -1560,24 +1564,48 @@ func (builder *ObserverServiceBuilder) enqueueRPCServer() {
 			),
 		}
 
+		// If execution data syncing and indexing is disabled, pass nil indexReporter
+		var indexReporter state_synchronization.IndexReporter
+		if builder.executionDataSyncEnabled && builder.executionDataIndexingEnabled {
+			indexReporter = builder.Reporter
+		}
+
+		preferredENIdentifiers, err := commonrpc.IdentifierList(backendConfig.PreferredExecutionNodeIDs)
+		if err != nil {
+			return nil, fmt.Errorf("failed to convert node id string to Flow Identifier for preferred EN map: %w", err)
+		}
+
+		fixedENIdentifiers, err := commonrpc.IdentifierList(backendConfig.FixedExecutionNodeIDs)
+		if err != nil {
+			return nil, fmt.Errorf("failed to convert node id string to Flow Identifier for fixed EN map: %w", err)
+		}
+
+		execNodeIdentitiesProvider := commonrpc.NewExecutionNodeIdentitiesProvider(
+			node.Logger,
+			node.State,
+			node.Storage.Receipts,
+			preferredENIdentifiers,
+			fixedENIdentifiers,
+		)
+
 		accessBackend, err := backend.New(backend.Params{
-			State:                     node.State,
-			Blocks:                    node.Storage.Blocks,
-			Headers:                   node.Storage.Headers,
-			Collections:               node.Storage.Collections,
-			Transactions:              node.Storage.Transactions,
-			ExecutionReceipts:         node.Storage.Receipts,
-			ExecutionResults:          node.Storage.Results,
-			ChainID:                   node.RootChainID,
-			AccessMetrics:             accessMetrics,
-			ConnFactory:               connFactory,
-			RetryEnabled:              false,
-			MaxHeightRange:            backendConfig.MaxHeightRange,
-			PreferredExecutionNodeIDs: backendConfig.PreferredExecutionNodeIDs,
-			FixedExecutionNodeIDs:     backendConfig.FixedExecutionNodeIDs,
-			Log:                       node.Logger,
-			SnapshotHistoryLimit:      backend.DefaultSnapshotHistoryLimit,
-			Communicator:              backend.NewNodeCommunicator(backendConfig.CircuitBreakerConfig.Enabled),
+			State:                      node.State,
+			Blocks:                     node.Storage.Blocks,
+			Headers:                    node.Storage.Headers,
+			Collections:                node.Storage.Collections,
+			Transactions:               node.Storage.Transactions,
+			ExecutionReceipts:          node.Storage.Receipts,
+			ExecutionResults:           node.Storage.Results,
+			ChainID:                    node.RootChainID,
+			AccessMetrics:              accessMetrics,
+			ConnFactory:                connFactory,
+			RetryEnabled:               false,
+			MaxHeightRange:             backendConfig.MaxHeightRange,
+			Log:                        node.Logger,
+			SnapshotHistoryLimit:       backend.DefaultSnapshotHistoryLimit,
+			Communicator:               backend.NewNodeCommunicator(backendConfig.CircuitBreakerConfig.Enabled),
+			IndexReporter:              indexReporter,
+			ExecNodeIdentitiesProvider: execNodeIdentitiesProvider,
 		})
 		if err != nil {
 			return nil, fmt.Errorf("could not initialize backend: %w", err)
