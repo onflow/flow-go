@@ -12,12 +12,12 @@ type EpochRecoveryMyBeaconKey struct {
 	mock.Mock
 }
 
-// OverwriteMyBeaconPrivateKey provides a mock function with given fields: epochCounter, key
-func (_m *EpochRecoveryMyBeaconKey) OverwriteMyBeaconPrivateKey(epochCounter uint64, key crypto.PrivateKey) error {
+// UpsertMyBeaconPrivateKey provides a mock function with given fields: epochCounter, key
+func (_m *EpochRecoveryMyBeaconKey) UpsertMyBeaconPrivateKey(epochCounter uint64, key crypto.PrivateKey) error {
 	ret := _m.Called(epochCounter, key)
 
 	if len(ret) == 0 {
-		panic("no return value specified for OverwriteMyBeaconPrivateKey")
+		panic("no return value specified for UpsertMyBeaconPrivateKey")
 	}
 
 	var r0 error

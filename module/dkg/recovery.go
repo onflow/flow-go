@@ -137,7 +137,7 @@ func (b *BeaconKeyRecovery) tryRecoverMyBeaconPrivateKey(final protocol.Snapshot
 		return fmt.Errorf("could not get beacon key share for my node(%x): %w", b.local.NodeID(), err)
 	}
 	if beaconPubKey.Equals(myBeaconPrivateKey.PublicKey()) {
-		err := b.localDKGState.OverwriteMyBeaconPrivateKey(nextEpochCounter, myBeaconPrivateKey)
+		err := b.localDKGState.UpsertMyBeaconPrivateKey(nextEpochCounter, myBeaconPrivateKey)
 		if err != nil {
 			return fmt.Errorf("could not overwrite my beacon private key for the next epoch: %w", err)
 		}

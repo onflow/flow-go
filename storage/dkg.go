@@ -69,9 +69,9 @@ type SafeBeaconKeys interface {
 type EpochRecoveryMyBeaconKey interface {
 	SafeBeaconKeys
 
-	// OverwriteMyBeaconPrivateKey overwrites the random beacon private key for the epoch that recovers the protocol from
+	// UpsertMyBeaconPrivateKey overwrites the random beacon private key for the epoch that recovers the protocol from
 	// epoch fallback mode. Effectively, this function overwrites whatever might be available in the database with
 	// given private key for current consensus participant.
 	// No errors are expected during normal operations.
-	OverwriteMyBeaconPrivateKey(epochCounter uint64, key crypto.PrivateKey) error
+	UpsertMyBeaconPrivateKey(epochCounter uint64, key crypto.PrivateKey) error
 }

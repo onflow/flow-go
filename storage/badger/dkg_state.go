@@ -178,6 +178,13 @@ func (keys *SafeBeaconPrivateKeys) RetrieveMyBeaconPrivateKey(epochCounter uint6
 	return
 }
 
+// EpochRecoveryMyBeaconKey is a specific module that allows to overwrite the beacon private key for given epoch.
+// This module is used *ONLY* in the epoch recovery process and only by the consensus participants.
+// Each consensus participant takes part in the DKG, after finishing the DKG protocol each replica obtains a random beacon
+// private key which is stored in the database along with DKG end state which will be equal to flow.DKGEndStateSuccess.
+// If for any reason DKG fails, then the private key will be nil and DKG end state will be equal to flow.DKGEndStateDKGFailure.
+// It's not a problem by itself, but when the epoch recovery takes place, we need to query last valid beacon private key for
+// the current replica and set it for recovered epoch, otherwise replicas won't be able to vote for blocks in the recovered epoch.
 type EpochRecoveryMyBeaconKey struct {
 	*SafeBeaconPrivateKeys
 }
@@ -188,7 +195,11 @@ func NewEpochRecoveryMyBeaconKey(keys *SafeBeaconPrivateKeys) *EpochRecoveryMyBe
 	return &EpochRecoveryMyBeaconKey{SafeBeaconPrivateKeys: keys}
 }
 
-func (keys *EpochRecoveryMyBeaconKey) OverwriteMyBeaconPrivateKey(epochCounter uint64, key crypto.PrivateKey) error {
+// UpsertMyBeaconPrivateKey overwrites the random beacon private key for the epoch that recovers the protocol from
+// epoch fallback mode. Effectively, this function overwrites whatever might be available in the database with
+// given private key for current consensus participant.
+// No errors are expected during normal operations.
+func (keys *EpochRecoveryMyBeaconKey) UpsertMyBeaconPrivateKey(epochCounter uint64, key crypto.PrivateKey) error {
 	if key == nil {
 		return fmt.Errorf("will not store nil beacon key")
 	}

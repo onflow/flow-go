@@ -83,7 +83,7 @@ func (s *BeaconKeyRecoverySuite) TestNewBeaconKeyRecovery_EpochIsNotCommitted() 
 		require.NoError(s.T(), err)
 		require.NotNil(s.T(), recovery)
 	}
-	s.dkgState.AssertNumberOfCalls(s.T(), "OverwriteMyBeaconPrivateKey", 0)
+	s.dkgState.AssertNumberOfCalls(s.T(), "UpsertMyBeaconPrivateKey", 0)
 }
 
 // TestNewBeaconKeyRecovery_HeadException tests a scenario:
@@ -151,7 +151,7 @@ func (s *BeaconKeyRecoverySuite) TestNewBeaconKeyRecovery_KeyAlreadyRecovered() 
 	require.NoError(s.T(), err)
 	require.NotNil(s.T(), recovery)
 
-	s.dkgState.AssertNumberOfCalls(s.T(), "OverwriteMyBeaconPrivateKey", 0)
+	s.dkgState.AssertNumberOfCalls(s.T(), "UpsertMyBeaconPrivateKey", 0)
 }
 
 // TestNewBeaconKeyRecovery_NoSafeMyBeaconPrivateKey tests a scenario:
@@ -171,7 +171,7 @@ func (s *BeaconKeyRecoverySuite) TestNewBeaconKeyRecovery_NoSafeMyBeaconPrivateK
 		require.NoError(s.T(), err)
 		require.NotNil(s.T(), recovery)
 
-		dkgState.AssertNumberOfCalls(s.T(), "OverwriteMyBeaconPrivateKey", 0)
+		dkgState.AssertNumberOfCalls(s.T(), "UpsertMyBeaconPrivateKey", 0)
 	})
 	s.Run("err-not-found", func() {
 		dkgState := mockstorage.NewEpochRecoveryMyBeaconKey(s.T())
@@ -184,7 +184,7 @@ func (s *BeaconKeyRecoverySuite) TestNewBeaconKeyRecovery_NoSafeMyBeaconPrivateK
 		require.NoError(s.T(), err)
 		require.NotNil(s.T(), recovery)
 
-		dkgState.AssertNumberOfCalls(s.T(), "OverwriteMyBeaconPrivateKey", 0)
+		dkgState.AssertNumberOfCalls(s.T(), "UpsertMyBeaconPrivateKey", 0)
 	})
 	s.Run("exception", func() {
 		exception := errors.New("exception")
@@ -198,7 +198,7 @@ func (s *BeaconKeyRecoverySuite) TestNewBeaconKeyRecovery_NoSafeMyBeaconPrivateK
 		require.ErrorIs(s.T(), err, exception)
 		require.Nil(s.T(), recovery)
 
-		dkgState.AssertNumberOfCalls(s.T(), "OverwriteMyBeaconPrivateKey", 0)
+		dkgState.AssertNumberOfCalls(s.T(), "UpsertMyBeaconPrivateKey", 0)
 	})
 }
 
@@ -268,7 +268,7 @@ func (s *BeaconKeyRecoverySuite) TestNewBeaconKeyRecovery_NodeIsNotPartOfNextEpo
 		require.NoError(s.T(), err)
 		require.NotNil(s.T(), recovery)
 
-		dkgState.AssertNumberOfCalls(s.T(), "OverwriteMyBeaconPrivateKey", 0)
+		dkgState.AssertNumberOfCalls(s.T(), "UpsertMyBeaconPrivateKey", 0)
 	})
 	s.Run("pub-key-mismatch", func() {
 		dkgState := mockstorage.NewEpochRecoveryMyBeaconKey(s.T())
@@ -287,7 +287,7 @@ func (s *BeaconKeyRecoverySuite) TestNewBeaconKeyRecovery_NodeIsNotPartOfNextEpo
 		require.NoError(s.T(), err)
 		require.NotNil(s.T(), recovery)
 
-		dkgState.AssertNumberOfCalls(s.T(), "OverwriteMyBeaconPrivateKey", 0)
+		dkgState.AssertNumberOfCalls(s.T(), "UpsertMyBeaconPrivateKey", 0)
 	})
 }
 
@@ -307,13 +307,13 @@ func (s *BeaconKeyRecoverySuite) TestNewBeaconKeyRecovery_RecoverKey() {
 		dkg.On("KeyShare", s.local.NodeID()).Return(myBeaconKey.PublicKey(), nil).Once()
 		s.nextEpoch.On("DKG").Return(dkg, nil).Once()
 
-		dkgState.On("OverwriteMyBeaconPrivateKey", s.nextEpochCounter, myBeaconKey).Return(nil).Once()
+		dkgState.On("UpsertMyBeaconPrivateKey", s.nextEpochCounter, myBeaconKey).Return(nil).Once()
 
 		recovery, err := NewBeaconKeyRecovery(unittest.Logger(), s.local, s.state, dkgState)
 		require.NoError(s.T(), err)
 		require.NotNil(s.T(), recovery)
 
-		dkgState.AssertNumberOfCalls(s.T(), "OverwriteMyBeaconPrivateKey", 1)
+		dkgState.AssertNumberOfCalls(s.T(), "UpsertMyBeaconPrivateKey", 1)
 	}
 
 	s.Run("err-not-found-for-key-next-epoch", func() {
@@ -344,7 +344,7 @@ func (s *BeaconKeyRecoverySuite) TestEpochFallbackModeExited() {
 	recovery, err := NewBeaconKeyRecovery(unittest.Logger(), s.local, s.state, s.dkgState)
 	require.NoError(s.T(), err)
 	require.NotNil(s.T(), recovery)
-	s.dkgState.AssertNumberOfCalls(s.T(), "OverwriteMyBeaconPrivateKey", 0)
+	s.dkgState.AssertNumberOfCalls(s.T(), "UpsertMyBeaconPrivateKey", 0)
 
 	// transition to epoch committed phase
 	s.currentEpochPhase = flow.EpochPhaseCommitted
@@ -360,8 +360,8 @@ func (s *BeaconKeyRecoverySuite) TestEpochFallbackModeExited() {
 	dkg.On("KeyShare", s.local.NodeID()).Return(myBeaconKey.PublicKey(), nil).Once()
 	s.nextEpoch.On("DKG").Return(dkg, nil).Once()
 
-	s.dkgState.On("OverwriteMyBeaconPrivateKey", s.nextEpochCounter, myBeaconKey).Return(nil).Once()
+	s.dkgState.On("UpsertMyBeaconPrivateKey", s.nextEpochCounter, myBeaconKey).Return(nil).Once()
 
 	recovery.EpochFallbackModeExited(s.currentEpochCounter, s.head)
-	s.dkgState.AssertNumberOfCalls(s.T(), "OverwriteMyBeaconPrivateKey", 1)
+	s.dkgState.AssertNumberOfCalls(s.T(), "UpsertMyBeaconPrivateKey", 1)
 }
