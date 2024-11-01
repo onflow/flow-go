@@ -4,18 +4,13 @@ import (
 	"context"
 	"fmt"
 
-	execproto "github.com/onflow/flow/protobuf/go/flow/execution"
-
 	"github.com/onflow/flow-go/admin"
 	"github.com/onflow/flow-go/admin/commands"
-	"github.com/onflow/flow-go/engine/access/index"
-	"github.com/onflow/flow-go/engine/access/rpc/backend"
+	"github.com/onflow/flow-go/engine/access/ingestion/tx_error_messages"
 	commonrpc "github.com/onflow/flow-go/engine/common/rpc"
-	"github.com/onflow/flow-go/engine/common/rpc/convert"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/state/protocol"
-	"github.com/onflow/flow-go/storage"
 )
 
 var _ commands.AdminCommand = (*BackfillTxErrorMessagesCommand)(nil)
@@ -31,24 +26,18 @@ type backfillTxErrorMessagesRequest struct {
 // BackfillTxErrorMessagesCommand executes a command to backfill
 // transaction error messages by fetching them from execution nodes.
 type BackfillTxErrorMessagesCommand struct {
-	state           protocol.State
-	txResultsIndex  *index.TransactionResultsIndex
-	txErrorMessages storage.TransactionResultErrorMessages
-	backend         *backend.Backend
+	state               protocol.State
+	txErrorMessagesCore *tx_error_messages.TxErrorMessagesCore
 }
 
 // NewBackfillTxErrorMessagesCommand creates a new instance of BackfillTxErrorMessagesCommand
 func NewBackfillTxErrorMessagesCommand(
 	state protocol.State,
-	txResultsIndex *index.TransactionResultsIndex,
-	txErrorMessages storage.TransactionResultErrorMessages,
-	backend *backend.Backend,
+	txErrorMessagesCore *tx_error_messages.TxErrorMessagesCore,
 ) commands.AdminCommand {
 	return &BackfillTxErrorMessagesCommand{
-		state:           state,
-		txResultsIndex:  txResultsIndex,
-		txErrorMessages: txErrorMessages,
-		backend:         backend,
+		state:               state,
+		txErrorMessagesCore: txErrorMessagesCore,
 	}
 }
 
@@ -69,30 +58,41 @@ func (b *BackfillTxErrorMessagesCommand) Validator(request *admin.CommandRequest
 	rootHeight := b.state.Params().SealedRoot().Height
 	data.startHeight = rootHeight // Default value
 
+	sealed, err := b.state.Sealed().Head()
+	if err != nil {
+		return fmt.Errorf("failed to lookup sealed header: %w", err)
+	}
+
+	lastSealedHeight := sealed.Height
 	if startHeightIn, ok := input["start-height"]; ok {
 		if startHeight, err := parseN(startHeightIn); err != nil {
 			return admin.NewInvalidAdminReqErrorf("invalid 'start-height' field: %w", err)
+		} else if startHeight > lastSealedHeight {
+			return admin.NewInvalidAdminReqErrorf(
+				"'start-height' %d can not be grater than latest sealed block %d",
+				startHeight,
+				lastSealedHeight,
+			)
 		} else if startHeight > rootHeight {
 			data.startHeight = startHeight
 		}
 	}
 
-	sealed, err := b.state.Sealed().Head()
-	if err != nil {
-		return fmt.Errorf("failed to lookup sealed header: %w", err)
-	}
-	data.endHeight = sealed.Height // Default value
-
+	data.endHeight = lastSealedHeight // Default value
 	if endHeightIn, ok := input["end-height"]; ok {
 		if endHeight, err := parseN(endHeightIn); err != nil {
 			return admin.NewInvalidAdminReqErrorf("invalid 'end-height' field: %w", err)
-		} else if endHeight < sealed.Height {
+		} else if endHeight < lastSealedHeight {
 			data.endHeight = endHeight
 		}
 	}
 
 	if data.endHeight < data.startHeight {
-		return admin.NewInvalidAdminReqErrorf("start-height %d should not be smaller than end-height %d", data.startHeight, data.endHeight)
+		return admin.NewInvalidAdminReqErrorf(
+			"'start-height' %d should not be smaller than 'end-height' %d",
+			data.startHeight,
+			data.endHeight,
+		)
 	}
 
 	identities, err := b.state.Final().Identities(filter.HasRole[flow.Identity](flow.RoleExecution))
@@ -122,7 +122,7 @@ func (b *BackfillTxErrorMessagesCommand) Validator(request *admin.CommandRequest
 //
 // No errors are expected during normal operation.
 func (b *BackfillTxErrorMessagesCommand) Handler(ctx context.Context, request *admin.CommandRequest) (interface{}, error) {
-	if b.txErrorMessages == nil {
+	if b.txErrorMessagesCore == nil {
 		return nil, fmt.Errorf("failed to backfill, could not get transaction error messages storage")
 	}
 
@@ -135,45 +135,9 @@ func (b *BackfillTxErrorMessagesCommand) Handler(ctx context.Context, request *a
 		}
 
 		blockID := header.ID()
-
-		exists, err := b.txErrorMessages.Exists(blockID)
+		err = b.txErrorMessagesCore.HandleTransactionResultErrorMessagesByENs(ctx, blockID, data.executionNodeIds.ToSkeleton())
 		if err != nil {
-			return nil, fmt.Errorf("could not check existance of transaction result error messages: %w", err)
-		}
-
-		if exists {
-			continue
-		}
-
-		results, err := b.txResultsIndex.ByBlockID(blockID, height)
-		if err != nil {
-			return nil, fmt.Errorf("failed to get result by block ID: %w", err)
-		}
-
-		fetchTxErrorMessages := false
-		for _, txResult := range results {
-			if txResult.Failed {
-				fetchTxErrorMessages = true
-				break // Exit the loop as soon as a failed result is found
-			}
-		}
-
-		if !fetchTxErrorMessages {
-			continue
-		}
-
-		req := &execproto.GetTransactionErrorMessagesByBlockIDRequest{
-			BlockId: convert.IdentifierToMessage(blockID),
-		}
-
-		resp, execNode, err := b.backend.GetTransactionErrorMessagesFromAnyEN(ctx, data.executionNodeIds.ToSkeleton(), req)
-		if err != nil {
-			return nil, fmt.Errorf("failed to retrieve transaction error messages for block id %v: %w", blockID, err)
-		}
-
-		err = b.storeTransactionResultErrorMessages(blockID, resp, execNode)
-		if err != nil {
-			return nil, fmt.Errorf("could not store error messages: %w", err)
+			return nil, fmt.Errorf("error encountered while processing transaction result error message for block: %d, %w", height, err)
 		}
 	}
 
@@ -210,31 +174,4 @@ func (b *BackfillTxErrorMessagesCommand) parseExecutionNodeIds(executionNodeIdsI
 	}
 
 	return ids, nil
-}
-
-// storeTransactionResultErrorMessages saves retrieved error messages for a given block ID.
-//
-// No errors are expected during normal operation.
-func (b *BackfillTxErrorMessagesCommand) storeTransactionResultErrorMessages(
-	blockID flow.Identifier,
-	errorMessagesResponses []*execproto.GetTransactionErrorMessagesResponse_Result,
-	execNode *flow.IdentitySkeleton,
-) error {
-	errorMessages := make([]flow.TransactionResultErrorMessage, 0, len(errorMessagesResponses))
-	for _, value := range errorMessagesResponses {
-		errorMessage := flow.TransactionResultErrorMessage{
-			ErrorMessage:  value.ErrorMessage,
-			TransactionID: convert.MessageToIdentifier(value.TransactionId),
-			Index:         value.Index,
-			ExecutorID:    execNode.NodeID,
-		}
-		errorMessages = append(errorMessages, errorMessage)
-	}
-
-	err := b.txErrorMessages.Store(blockID, errorMessages)
-	if err != nil {
-		return fmt.Errorf("failed to store transaction error messages: %w", err)
-	}
-
-	return nil
 }
