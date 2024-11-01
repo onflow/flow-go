@@ -136,8 +136,8 @@ func (s *RecoverEpochSuite) TestRecoverEpoch() {
 	epoch1FinalView, err := s.Net.BootstrapSnapshot.Epochs().Current().FinalView()
 	require.NoError(s.T(), err)
 
-	// wait for at least the first block of the next epoch to be sealed so that we can
-	// ensure that we are still in the same epoch after the final view of that epoch indicating we are in EFM
+	// Wait for at least the first view past the current epoch's original FinalView to be finalized.
+	// At this point we can observe that an extension has been added to the current epoch, indicating EFM.
 	s.TimedLogf("waiting for epoch transition (finalized view %d)", epoch1FinalView+1)
 	s.AwaitFinalizedView(s.Ctx, epoch1FinalView+1, 2*time.Minute, 500*time.Millisecond)
 	s.TimedLogf("observed finalized view %d", epoch1FinalView+1)
