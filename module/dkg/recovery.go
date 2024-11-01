@@ -16,14 +16,19 @@ import (
 	"github.com/onflow/flow-go/utils/logging"
 )
 
-// BeaconKeyRecovery is a specific module that performs automatic recovery of the random beacon private key
-// when exiting the epoch fallback mode.
-// When following the happy path of the protocol, each node that takes part in the DKG eventually obtains a random beacon
-// private key which is stored in storage.DKGState. When the network enters EFM, then eventually the network will be recovered
-// by submitting the recovery epoch which will effectively exit the EFM. When recovering the next epoch,
-// the operator will use a result of last successful DKG. However, each node needs to track this event and correctly fill
-// the storage.DKGState using the last obtained 'my beacon key' for recovered(next) epoch.
-// This module checks if there is a valid 'my beacon key' for the next epoch, and if not, it tries to recover it from the previous epoch.
+// BeaconKeyRecovery is a specific module that attempts automatic recovery of the random beacon private key
+// when exiting Epoch Fallback Mode [EFM].
+// In the happy path of the protocol, each node that takes part in the DKG obtains a random beacon
+// private key which is stored in storage.DKGState. If the network enters EFM, the network can be recovered
+// via the flow.EpochRecover service event, which exits EFM by specifying the subsequent epoch ("recovery epoch").
+// This recovery epoch must have a Random Beacon committee with valid keys, but no successful DKG occurred.
+// To solve this, by convention, we require the recovery epoch to re-use the Random Beacon public keys from
+// the most recent successful DKG.
+// Upon observing that EFM was exited, this component:
+//   - looks up its Random Beacon private key from the last DKG
+//   - looks up the Random Beacon public keys specified for the recovery epoch
+//   - validates that its private key is compatible (matches the public key specified)
+//   - if valid, persists that private key as the safe beacon key for the recovery epoch
 type BeaconKeyRecovery struct {
 	events.Noop
 	log           zerolog.Logger
