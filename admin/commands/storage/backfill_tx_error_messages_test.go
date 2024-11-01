@@ -3,6 +3,7 @@ package storage
 import (
 	"context"
 	"fmt"
+	commonrpc "github.com/onflow/flow-go/engine/common/rpc"
 	"os"
 	"testing"
 
@@ -136,13 +137,13 @@ func (suite *BackfillTxErrorMessagesSuite) SetupTest() {
 		ScriptExecutionMode:  backend.IndexQueryModeExecutionNodesOnly,
 		TxResultQueryMode:    backend.IndexQueryModeExecutionNodesOnly,
 		ChainID:              flow.Testnet,
-		//ExecNodeIdentitiesProvider: commonrpc.NewExecutionNodeIdentitiesProvider(
-		//	suite.log,
-		//	suite.state,
-		//	suite.receipts,
-		//	nil,
-		//	nil,
-		//),
+		ExecNodeIdentitiesProvider: commonrpc.NewExecutionNodeIdentitiesProvider(
+			suite.log,
+			suite.state,
+			suite.receipts,
+			nil,
+			nil,
+		),
 	})
 	require.NoError(suite.T(), err)
 

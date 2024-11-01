@@ -15,6 +15,7 @@ import (
 	accessmock "github.com/onflow/flow-go/engine/access/mock"
 	"github.com/onflow/flow-go/engine/access/rpc/backend"
 	connectionmock "github.com/onflow/flow-go/engine/access/rpc/connection/mock"
+	commonrpc "github.com/onflow/flow-go/engine/common/rpc"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	protocol "github.com/onflow/flow-go/state/protocol/mock"
@@ -234,30 +235,35 @@ func (s *TxErrorMessagesCoreSuite) TestHandleTransactionResultErrorMessages_Erro
 
 // initCore create new instance of transaction error messages core.
 func (s *TxErrorMessagesCoreSuite) initCore() *TxErrorMessagesCore {
+	execNodeIdentitiesProvider := commonrpc.NewExecutionNodeIdentitiesProvider(
+		s.log,
+		s.proto.state,
+		s.receipts,
+		flow.IdentifierList{},
+		s.enNodeIDs.NodeIDs(),
+	)
+
 	// Initialize the backend
 	backend, err := backend.New(backend.Params{
-		State:                 s.proto.state,
-		ExecutionReceipts:     s.receipts,
-		ConnFactory:           s.connFactory,
-		MaxHeightRange:        backend.DefaultMaxHeightRange,
-		FixedExecutionNodeIDs: s.enNodeIDs.NodeIDs().Strings(),
-		Log:                   s.log,
-		SnapshotHistoryLimit:  backend.DefaultSnapshotHistoryLimit,
-		Communicator:          backend.NewNodeCommunicator(false),
-		ScriptExecutionMode:   backend.IndexQueryModeExecutionNodesOnly,
-		TxResultQueryMode:     backend.IndexQueryModeExecutionNodesOnly,
-		ChainID:               flow.Testnet,
+		State:                      s.proto.state,
+		ExecutionReceipts:          s.receipts,
+		ConnFactory:                s.connFactory,
+		MaxHeightRange:             backend.DefaultMaxHeightRange,
+		Log:                        s.log,
+		SnapshotHistoryLimit:       backend.DefaultSnapshotHistoryLimit,
+		Communicator:               backend.NewNodeCommunicator(false),
+		ScriptExecutionMode:        backend.IndexQueryModeExecutionNodesOnly,
+		TxResultQueryMode:          backend.IndexQueryModeExecutionNodesOnly,
+		ChainID:                    flow.Testnet,
+		ExecNodeIdentitiesProvider: execNodeIdentitiesProvider,
 	})
 	require.NoError(s.T(), err)
 
 	core := NewTxErrorMessagesCore(
 		s.log,
-		s.proto.state,
 		backend,
-		s.receipts,
 		s.txErrorMessages,
-		s.enNodeIDs.NodeIDs(),
-		nil,
+		execNodeIdentitiesProvider,
 	)
 	return core
 }
