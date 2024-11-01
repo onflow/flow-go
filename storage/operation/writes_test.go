@@ -12,7 +12,6 @@ import (
 	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/storage/operation"
 	"github.com/onflow/flow-go/storage/operation/dbtest"
-	"github.com/onflow/flow-go/utils/unittest"
 )
 
 func TestReadWrite(t *testing.T) {
@@ -230,16 +229,15 @@ func TestRemoveRange(t *testing.T) {
 		// Remove the keys in the prefix range
 		require.NoError(t, withWriter(operation.RemoveByPrefix(r, prefix)))
 
-		lg := unittest.Logger().With().Logger()
 		// Verify that the keys in the prefix range have been removed
 		for i, key := range keys {
 			var exists bool
 			require.NoError(t, operation.Exists(key, &exists)(r))
-			lg.Info().Msgf("key %x exists: %t", key, exists)
+			t.Logf("key %x exists: %t", key, exists)
 
 			deleted := includeStart <= i && i <= includeEnd
 
-			// deleted item should not exist
+			// An item that was not deleted must exist
 			require.Equal(t, !deleted, exists,
 				"expected key %x to be %s", key, map[bool]string{true: "deleted", false: "not deleted"})
 		}

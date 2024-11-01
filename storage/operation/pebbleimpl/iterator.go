@@ -32,7 +32,7 @@ func newPebbleIterator(reader pebble.Reader, startPrefix, endPrefix []byte, ops 
 	}, nil
 }
 
-func (i *pebbleIterator) SeekGE() {
+func (i *pebbleIterator) First() {
 	i.iter.First()
 }
 

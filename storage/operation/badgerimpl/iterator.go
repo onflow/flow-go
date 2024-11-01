@@ -34,7 +34,7 @@ func newBadgerIterator(db *badger.DB, startPrefix, endPrefix []byte, ops storage
 	}
 }
 
-func (i *badgerIterator) SeekGE() {
+func (i *badgerIterator) First() {
 	i.iter.Seek(i.lowerBound)
 }
 
@@ -44,7 +44,7 @@ func (i *badgerIterator) Valid() bool {
 		return false
 	}
 	key := i.iter.Item().Key()
-	// "< 0" means the upperBound is exclusive
+	// "< 0" means "key < upperBound"
 	valid := bytes.Compare(key, i.upperBound) < 0
 	return valid
 }

@@ -6,8 +6,8 @@ import (
 
 // Iterator is an interface for iterating over key-value pairs in a storage backend.
 type Iterator interface {
-	// SeekGE seeks to the smallest key greater than or equal to the given key.
-	SeekGE()
+	// First seeks to the smallest key greater than or equal to the given key.
+	First()
 
 	// Valid returns whether the iterator is positioned at a valid key-value pair.
 	Valid() bool
@@ -15,10 +15,11 @@ type Iterator interface {
 	// Next advances the iterator to the next key-value pair.
 	Next()
 
-	// Key returns the key of the current key-value pair, or nil if done.
+	// IterItem returns the current key-value pair, or nil if done.
 	IterItem() IterItem
 
 	// Close closes the iterator. Iterator must be closed, otherwise it causes memory leak.
+	// No errors expected during normal operation
 	Close() error
 }
 
@@ -28,6 +29,7 @@ type IterItem interface {
 
 	// Value returns the value of the current key-value pair
 	// The reason it takes a function is to follow badgerDB's API pattern
+	// No errors expected during normal operation
 	Value(func(val []byte) error) error
 }
 
@@ -44,6 +46,7 @@ func DefaultIteratorOptions() IteratorOption {
 type Reader interface {
 	// Get gets the value for the given key. It returns ErrNotFound if the DB
 	// does not contain the key.
+	// other errors are exceptions
 	//
 	// The caller should not modify the contents of the returned slice, but it is
 	// safe to modify the contents of the argument after Get returns. The
@@ -51,7 +54,11 @@ type Reader interface {
 	// success, the caller MUST call closer.Close() or a memory leak will occur.
 	Get(key []byte) (value []byte, closer io.Closer, err error)
 
-	// NewIter returns a new Iterator for the given key range [startPrefix, endPrefix], both inclusive.
+	// NewIter returns a new Iterator for the given key prefix range [startPrefix, endPrefix], both inclusive.
+	// Specifically, all keys that meet ANY of the following conditions are included in the iteration:
+	//   - have a prefix equal to startPrefix OR
+	//   - have a prefix equal to the endPrefix OR
+	//   - have a prefix that is lexicographically between startPrefix and endPrefix
 	NewIter(startPrefix, endPrefix []byte, ops IteratorOption) (Iterator, error)
 }
 
@@ -61,20 +68,26 @@ type Writer interface {
 	// for that key; a DB is not a multi-map.
 	//
 	// It is safe to modify the contents of the arguments after Set returns.
+	// No errors expected during normal operation
 	Set(k, v []byte) error
 
 	// Delete deletes the value for the given key. Deletes are blind all will
 	// succeed even if the given key does not exist.
 	//
 	// It is safe to modify the contents of the arguments after Delete returns.
+	// No errors expected during normal operation
 	Delete(key []byte) error
 
 	// DeleteByRange removes all keys with a prefix that falls within the
 	// range [start, end], both inclusive.
+	// No errors expected during normal operation
 	DeleteByRange(globalReader Reader, startPrefix, endPrefix []byte) error
 }
 
 // ReaderBatchWriter is an interface for reading and writing to a storage backend.
+// It is useful for performing a related sequence of reads and writes, after which you would like
+// to modify some non-database state if the sequence completed successfully (via AddCallback).
+// If you are not using AddCallback, avoid using ReaderBatchWriter: use Reader and Writer directly.
 type ReaderBatchWriter interface {
 	// GlobalReader returns a database-backed reader which reads the latest committed global database state ("read-committed isolation").
 	// This reader will not read writes written to ReaderBatchWriter.Writer until the write batch is committed.
@@ -104,21 +117,21 @@ func OnCommitSucceed(b ReaderBatchWriter, onSuccessFn func()) {
 }
 
 func StartEndPrefixToLowerUpperBound(startPrefix, endPrefix []byte) (lowerBound, upperBound []byte) {
-	// LowerBound specifies the smallest key to iterate and it's inclusive.
-	// UpperBound specifies the largest key to iterate and it's exclusive (not inclusive)
-	// in order to match all keys prefixed with the `end` bytes, we increment the bytes of end by 1,
+	// Return value lowerBound specifies the smallest key to iterate and it's inclusive.
+	// Return value upperBound specifies the largest key to iterate and it's exclusive (not inclusive)
+	// in order to match all keys prefixed with `endPrefix`, we increment the bytes of `endPrefix` by 1,
 	// for instance, to iterate keys between "hello" and "world",
 	// we use "hello" as LowerBound, "worle" as UpperBound, so that "world", "world1", "worldffff...ffff"
 	// will all be included.
-	return startPrefix, prefixUpperBound(endPrefix)
+	return startPrefix, PrefixUpperBound(endPrefix)
 }
 
-// prefixUpperBound returns a key K such that all possible keys beginning with the input prefix
+// PrefixUpperBound returns a key K such that all possible keys beginning with the input prefix
 // sort lower than K according to the byte-wise lexicographic key ordering used by Pebble.
 // This is used to define an upper bound for iteration, when we want to iterate over
 // all keys beginning with a given prefix.
 // referred to https://pkg.go.dev/github.com/cockroachdb/pebble#example-Iterator-PrefixIteration
-func prefixUpperBound(prefix []byte) []byte {
+func PrefixUpperBound(prefix []byte) []byte {
 	end := make([]byte, len(prefix))
 	copy(end, prefix)
 	for i := len(end) - 1; i >= 0; i-- {

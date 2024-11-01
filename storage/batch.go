@@ -4,16 +4,16 @@ import (
 	"github.com/dgraph-io/badger/v2"
 )
 
-// deprecated
-// use Writer instead
+// Deprecated: Transaction is being deprecated as part of the transition from Badger to Pebble.
+// Use Writer instead of Transaction for all new code.
 type Transaction interface {
 	Set(key, val []byte) error
 }
 
-// deprecated
-// use ReaderBatchWriter instead
 // BatchStorage serves as an abstraction over batch storage, adding ability to add ability to add extra
 // callbacks which fire after the batch is successfully flushed.
+// Deprecated: BatchStorage is being deprecated as part of the transition from Badger to Pebble.
+// Use ReaderBatchWriter instead of BatchStorage for all new code.
 type BatchStorage interface {
 	GetWriter() *badger.WriteBatch
 

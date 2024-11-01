@@ -32,11 +32,7 @@ func (b dbReader) Get(key []byte) ([]byte, io.Closer, error) {
 		return nil, nil, irrecoverable.NewExceptionf("could not load data: %w", err)
 	}
 
-	var value []byte
-	err = item.Value(func(val []byte) error {
-		value = append([]byte{}, val...)
-		return nil
-	})
+	value, err := item.ValueCopy(nil)
 	if err != nil {
 		return nil, nil, irrecoverable.NewExceptionf("could not load value: %w", err)
 	}

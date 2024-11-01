@@ -28,7 +28,7 @@ type CreateFunc func() interface{}
 type HandleFunc func() error
 type IterationFunc func() (CheckFunc, CreateFunc, HandleFunc)
 
-// IterateKeysInPrefixRange will iterate over all keys in the given range [startPrefix, endPrefix] (both inclusive)
+// IterateKeysInPrefixRange will iterate over all keys with prefixes in the range [startPrefix, endPrefix] (both inclusive)
 func IterateKeysInPrefixRange(startPrefix []byte, endPrefix []byte, check func(key []byte) error) func(storage.Reader) error {
 	return Iterate(startPrefix, endPrefix, func() (CheckFunc, CreateFunc, HandleFunc) {
 		return func(key []byte) (bool, error) {
@@ -41,7 +41,7 @@ func IterateKeysInPrefixRange(startPrefix []byte, endPrefix []byte, check func(k
 	}, storage.IteratorOption{IterateKeyOnly: true})
 }
 
-// Iterate will iterate over all keys in the given range [startPrefix, endPrefix] (both inclusive)
+// Iterate will iterate over all keys with prefixes in the given range [startPrefix, endPrefix] (both inclusive)
 func Iterate(startPrefix []byte, endPrefix []byte, iterFunc IterationFunc, opt storage.IteratorOption) func(storage.Reader) error {
 	return func(r storage.Reader) error {
 
@@ -64,7 +64,7 @@ func Iterate(startPrefix []byte, endPrefix []byte, iterFunc IterationFunc, opt s
 		}
 		defer it.Close()
 
-		for it.SeekGE(); it.Valid(); it.Next() {
+		for it.First(); it.Valid(); it.Next() {
 			item := it.IterItem()
 			key := item.Key()
 
@@ -72,6 +72,9 @@ func Iterate(startPrefix []byte, endPrefix []byte, iterFunc IterationFunc, opt s
 			check, create, handle := iterFunc()
 
 			keyCopy := make([]byte, len(key))
+
+			// The underlying database may re-use and modify the backing memory of the returned key.
+			// Tor safety we proactively make a copy before passing the key to the upper layer.
 			copy(keyCopy, key)
 
 			// check if we should process the item at all
@@ -112,25 +115,7 @@ func Iterate(startPrefix []byte, endPrefix []byte, iterFunc IterationFunc, opt s
 
 // Traverse will iterate over all keys with the given prefix
 func Traverse(prefix []byte, iterFunc IterationFunc, opt storage.IteratorOption) func(storage.Reader) error {
-	return Iterate(prefix, PrefixUpperBound(prefix), iterFunc, opt)
-}
-
-// PrefixUpperBound returns a key K such that all possible keys beginning with the input prefix
-// sort lower than K according to the byte-wise lexicographic key ordering used by Pebble.
-// This is used to define an upper bound for iteration, when we want to iterate over
-// all keys beginning with a given prefix.
-// referred to https://pkg.go.dev/github.com/cockroachdb/pebble#example-Iterator-PrefixIteration
-func PrefixUpperBound(prefix []byte) []byte {
-	end := make([]byte, len(prefix))
-	copy(end, prefix)
-	for i := len(end) - 1; i >= 0; i-- {
-		// increment the bytes by 1
-		end[i] = end[i] + 1
-		if end[i] != 0 {
-			return end[:i+1]
-		}
-	}
-	return nil // no upper-bound
+	return Iterate(prefix, prefix, iterFunc, opt)
 }
 
 // Exists returns true if a key exists in the database.
@@ -155,7 +140,7 @@ func Exists(key []byte, keyExists *bool) func(storage.Reader) error {
 	}
 }
 
-// retrieve will retrieve the binary data under the given key from the badger DB
+// Retrieve will retrieve the binary data under the given key from the database
 // and decode it into the given entity. The provided entity needs to be a
 // pointer to an initialized entity of the correct type.
 // Error returns:
@@ -196,7 +181,7 @@ func FindHighestAtOrBelow(prefix []byte, height uint64, entity interface{}) func
 
 		var highestKey []byte
 		// find highest value below the given height
-		for it.SeekGE(); it.Valid(); it.Next() {
+		for it.First(); it.Valid(); it.Next() {
 			highestKey = it.IterItem().Key()
 		}
 

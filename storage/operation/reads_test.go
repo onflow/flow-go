@@ -35,9 +35,9 @@ func TestIterateKeysInPrefixRange(t *testing.T) {
 			{0x21, 0x00},
 		}
 
-		// Keys expected to be in the prefix range
-		lastNToExclude := 1
-		keysInRange := keys[1 : len(keys)-lastNToExclude] // these keys are between the start and end
+		// The first and last keys are outside the prefix range, so we omit them
+		// from keysInRange, which is the set of keys we expect in the iteration
+		keysInRange := keys[1 : len(keys)-1]
 
 		// Insert the keys into the storage
 		require.NoError(t, withWriter(func(writer storage.Writer) error {
@@ -63,20 +63,21 @@ func TestIterateKeysInPrefixRange(t *testing.T) {
 
 func TestTraverse(t *testing.T) {
 	dbtest.RunWithStorages(t, func(t *testing.T, r storage.Reader, withWriter dbtest.WithWriter) {
-		keys := [][]byte{
-			{0x42, 0x00},
-			{0xff},
-			{0x42, 0x56},
-			{0x00},
-			{0x42, 0xff},
+		keyVals := map[[2]byte]uint64{
+			{0x41, 0xff}: 3,
+			{0x42, 0x00}: 11,
+			{0xff}:       13,
+			{0x42, 0x56}: 17,
+			{0x00}:       19,
+			{0x42, 0xff}: 23,
+			{0x43, 0x00}: 33,
 		}
-		vals := []uint64{11, 13, 17, 19, 23}
 		expected := []uint64{11, 23}
 
 		// Insert the keys and values into storage
 		require.NoError(t, withWriter(func(writer storage.Writer) error {
-			for i, key := range keys {
-				err := operation.Upsert(key, vals[i])(writer)
+			for key, val := range keyVals {
+				err := operation.Upsert(key[:], val)(writer)
 				if err != nil {
 					return err
 				}
@@ -84,7 +85,7 @@ func TestTraverse(t *testing.T) {
 			return nil
 		}))
 
-		actual := make([]uint64, 0, len(keys))
+		actual := make([]uint64, 0, len(keyVals))
 
 		// Define the iteration logic
 		iterationFunc := func() (operation.CheckFunc, operation.CreateFunc, operation.HandleFunc) {
