@@ -148,7 +148,7 @@ func (b *BeaconKeyRecovery) tryRecoverMyBeaconPrivateKey(final protocol.Snapshot
 		}
 		log.Info().Msgf("succesfully recovered my beacon private key for the next epoch")
 	} else {
-		log.Warn().Str(logging.KeySuspicious, "true").Msgf("available my beacon key is not part of the next epoch DKG")
+		log.Debug().Msgf("my beacon key is not part of the next epoch DKG")
 	}
 
 	return nil
