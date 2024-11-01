@@ -49,8 +49,7 @@ type WebSocketBroker struct {
 	errChannel       chan error       // Channel for error messages
 	broadcastChannel chan interface{} // Channel for broadcast messages
 
-	activeSubscriptions      *atomic.Uint64 // Count of active subscriptions
-	activeResponsesPerSecond *atomic.Uint64 // Count of responses per second
+	activeSubscriptions *atomic.Uint64 // Count of active subscriptions
 }
 
 // NewWebSocketBroker initializes a new WebSocketBroker instance.
@@ -61,27 +60,15 @@ func NewWebSocketBroker(
 	subHandlerFactory *subscription_handlers.SubscriptionHandlerFactory,
 ) *WebSocketBroker {
 	websocketBroker := &WebSocketBroker{
-		logger:                   logger.With().Str("component", "websocket-broker").Logger(),
-		conn:                     conn,
-		config:                   config,
-		subHandlerFactory:        subHandlerFactory,
-		subs:                     make(map[string]subscription_handlers.SubscriptionHandler),
-		activeResponsesPerSecond: atomic.NewUint64(0),
-		activeSubscriptions:      atomic.NewUint64(0),
+		logger:              logger.With().Str("component", "websocket-broker").Logger(),
+		conn:                conn,
+		config:              config,
+		subHandlerFactory:   subHandlerFactory,
+		subs:                make(map[string]subscription_handlers.SubscriptionHandler),
+		activeSubscriptions: atomic.NewUint64(0),
 	}
-	go websocketBroker.resetResponseLimit()
 
 	return websocketBroker
-}
-
-// resetResponseLimit resets the response limit every second.
-func (w *WebSocketBroker) resetResponseLimit() {
-	ticker := time.NewTicker(time.Second)
-	defer ticker.Stop()
-
-	for range ticker.C {
-		w.activeResponsesPerSecond.Store(0) // Reset the response count every second
-	}
 }
 
 func (w *WebSocketBroker) configureConnection() error {
@@ -292,14 +279,10 @@ func (w *WebSocketBroker) sendPing() error {
 // broadcastMessage is called by each SubscriptionHandler,
 // receiving formatted subscription messages and writing them to the broadcast channel.
 func (w *WebSocketBroker) broadcastMessage(data interface{}) {
-	if w.activeResponsesPerSecond.Load() >= w.config.MaxResponsesPerSecond {
-		// TODO: recheck edge cases
-		time.Sleep(w.config.SendMessageTimeout) // Adjust the sleep duration as needed
-	}
+	// TODO: add limitation for responses per second
 
 	// Send the message to the broadcast channel
 	w.broadcastChannel <- data
-	w.activeResponsesPerSecond.Add(1)
 }
 
 // subscribe processes a request to subscribe to a specific topic. It uses the topic field in
