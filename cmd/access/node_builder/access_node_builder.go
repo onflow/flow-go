@@ -1042,7 +1042,7 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 					node.Logger,
 					builder.RegisterDB,
 					pstorage.WithPrunerMetrics(builder.RegisterDBPrunerMetrics),
-					//pstorage.WithPruneThreshold(builder.registerDBPruneThreshold),
+					pstorage.WithPruneThreshold(builder.registerDBPruneThreshold),
 					pstorage.WithPruneThrottleDelay(builder.registerDBPruneThrottleDelay),
 					pstorage.WithPruneTickerInterval(builder.registerDBPruneTickerInterval),
 				)
