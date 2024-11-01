@@ -9,8 +9,7 @@ import (
 )
 
 type pebbleIterator struct {
-	iter       *pebble.Iterator
-	lowerBound []byte
+	iter *pebble.Iterator
 }
 
 var _ storage.Iterator = (*pebbleIterator)(nil)
@@ -29,13 +28,12 @@ func newPebbleIterator(reader pebble.Reader, startPrefix, endPrefix []byte, ops 
 	}
 
 	return &pebbleIterator{
-		iter:       iter,
-		lowerBound: lowerBound,
+		iter: iter,
 	}, nil
 }
 
 func (i *pebbleIterator) SeekGE() {
-	i.iter.SeekGE(i.lowerBound)
+	i.iter.First()
 }
 
 func (i *pebbleIterator) Valid() bool {
