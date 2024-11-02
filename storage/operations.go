@@ -63,6 +63,7 @@ type Reader interface {
 }
 
 // Writer is an interface for batch writing to a storage backend.
+// It cannot be used concurrently for writing.
 type Writer interface {
 	// Set sets the value for the given key. It overwrites any previous value
 	// for that key; a DB is not a multi-map.

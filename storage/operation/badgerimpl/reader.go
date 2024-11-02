@@ -20,6 +20,14 @@ var _ io.Closer = (*noopCloser)(nil)
 
 func (noopCloser) Close() error { return nil }
 
+// Get gets the value for the given key. It returns ErrNotFound if the DB
+// does not contain the key.
+// other errors are exceptions
+//
+// The caller should not modify the contents of the returned slice, but it is
+// safe to modify the contents of the argument after Get returns. The
+// returned slice will remain valid until the returned Closer is closed. On
+// success, the caller MUST call closer.Close() or a memory leak will occur.
 func (b dbReader) Get(key []byte) ([]byte, io.Closer, error) {
 	tx := b.db.NewTransaction(false)
 	defer tx.Discard()
@@ -40,6 +48,11 @@ func (b dbReader) Get(key []byte) ([]byte, io.Closer, error) {
 	return value, noopCloser{}, nil
 }
 
+// NewIter returns a new Iterator for the given key prefix range [startPrefix, endPrefix], both inclusive.
+// Specifically, all keys that meet ANY of the following conditions are included in the iteration:
+//   - have a prefix equal to startPrefix OR
+//   - have a prefix equal to the endPrefix OR
+//   - have a prefix that is lexicographically between startPrefix and endPrefix
 func (b dbReader) NewIter(startPrefix, endPrefix []byte, ops storage.IteratorOption) (storage.Iterator, error) {
 	return newBadgerIterator(b.db, startPrefix, endPrefix, ops), nil
 }
