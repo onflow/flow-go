@@ -42,14 +42,15 @@ func RunWithRegistersStorageWithInitialData(
 		r, err := NewRegisters(db, 5)
 		require.NoError(tb, err)
 
-		keys := make([]uint64, 0, len(data))
-		for k := range data {
-			keys = append(keys, k)
+		heights := make([]uint64, 0, len(data))
+		for h := range data {
+			heights = append(heights, h)
 		}
-		sort.Slice(keys, func(i, j int) bool { return keys[i] < keys[j] })
+		// Should sort heights before store them through register, as they are not stored in order in test data
+		sort.Slice(heights, func(i, j int) bool { return heights[i] < heights[j] })
 
-		// Iterate over the map in ascending order by key
-		for _, height := range keys {
+		// Iterate over the heights in ascending order
+		for _, height := range heights {
 			err = r.Store(data[height], height)
 			require.NoError(tb, err)
 		}
