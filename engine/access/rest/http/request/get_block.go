@@ -21,6 +21,12 @@ type GetBlock struct {
 	SealedHeight bool
 }
 
+func GetBlockRequest(r *common.Request) (GetBlock, error) {
+	var req GetBlock
+	err := req.Build(r)
+	return req, err
+}
+
 func (g *GetBlock) Build(r *common.Request) error {
 	return g.Parse(
 		r.GetQueryParams(heightQuery),
@@ -95,6 +101,12 @@ type GetBlockByIDs struct {
 	IDs []flow.Identifier
 }
 
+func GetBlockByIDsRequest(r *common.Request) (GetBlockByIDs, error) {
+	var req GetBlockByIDs
+	err := req.Build(r)
+	return req, err
+}
+
 func (g *GetBlockByIDs) Build(r *common.Request) error {
 	return g.Parse(
 		r.GetVars(idParam),
@@ -114,4 +126,10 @@ func (g *GetBlockByIDs) Parse(rawIds []string) error {
 
 type GetBlockPayload struct {
 	GetByIDRequest
+}
+
+func GetBlockPayloadRequest(r *common.Request) (GetBlockPayload, error) {
+	var req GetBlockPayload
+	err := req.Build(r)
+	return req, err
 }

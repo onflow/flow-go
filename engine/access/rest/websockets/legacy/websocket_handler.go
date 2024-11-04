@@ -35,12 +35,12 @@ const (
 type WebsocketController struct {
 	logger            zerolog.Logger
 	conn              *websocket.Conn                // the WebSocket connection for communication with the client
-	api               state_stream.API               // the state_stream.API instance for managing event subscriptions
-	eventFilterConfig state_stream.EventFilterConfig // the configuration for filtering events
+	Api               state_stream.API               // the state_stream.API instance for managing event subscriptions
+	EventFilterConfig state_stream.EventFilterConfig // the configuration for filtering events
 	maxStreams        int32                          // the maximum number of streams allowed
 	activeStreamCount *atomic.Int32                  // the current number of active streams
 	readChannel       chan error                     // channel which notify closing connection by the client and provide errors to the client
-	heartbeatInterval uint64                         // the interval to deliver heartbeat messages to client[IN BLOCKS]
+	HeartbeatInterval uint64                         // the interval to deliver heartbeat messages to client[IN BLOCKS]
 }
 
 // SetWebsocketConf used to set read and write deadlines for WebSocket connections and establishes a Pong handler to
@@ -153,7 +153,7 @@ func (wsController *WebsocketController) writeEvents(sub subscription.Subscripti
 			// message will be emitted.
 			if len(resp.Events) == 0 {
 				blocksSinceLastMessage++
-				if blocksSinceLastMessage < wsController.heartbeatInterval {
+				if blocksSinceLastMessage < wsController.HeartbeatInterval {
 					continue
 				}
 				blocksSinceLastMessage = 0
@@ -234,7 +234,7 @@ type SubscribeHandlerFunc func(
 // WSHandler is websocket handler implementing custom websocket handler function and allows easier handling of errors and
 // responses as it wraps functionality for handling error and responses outside of endpoint handling.
 type WSHandler struct {
-	*common.HttpHandler
+	*common.BaseHttpHandler
 	subscribeFunc SubscribeHandlerFunc
 
 	api                      state_stream.API
@@ -260,7 +260,7 @@ func NewWSHandler(
 		maxStreams:               int32(stateStreamConfig.MaxGlobalStreams),
 		defaultHeartbeatInterval: stateStreamConfig.HeartbeatInterval,
 		activeStreamCount:        atomic.NewInt32(0),
-		HttpHandler:              common.NewHttpHandler(logger, chain),
+		BaseHttpHandler:          common.NewHttpHandler(logger, chain),
 	}
 
 	return handler
@@ -270,9 +270,9 @@ func NewWSHandler(
 // such as logging, error handling, request decorators
 func (h *WSHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	// create a logger
-	logger := h.Logger.With().Str("subscribe_url", r.URL.String()).Logger()
+	logger := h.BaseHttpHandler.Logger.With().Str("subscribe_url", r.URL.String()).Logger()
 
-	err := h.VerifyRequest(w, r)
+	err := h.BaseHttpHandler.VerifyRequest(w, r)
 	if err != nil {
 		// VerifyRequest sets the response error before returning
 		return
@@ -287,7 +287,7 @@ func (h *WSHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 	conn, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {
-		h.ErrorHandler(w, common.NewRestError(http.StatusInternalServerError, "webSocket upgrade error: ", err), logger)
+		h.BaseHttpHandler.ErrorHandler(w, common.NewRestError(http.StatusInternalServerError, "webSocket upgrade error: ", err), logger)
 		return
 	}
 	defer conn.Close()
@@ -295,12 +295,12 @@ func (h *WSHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	wsController := &WebsocketController{
 		logger:            logger,
 		conn:              conn,
-		api:               h.api,
-		eventFilterConfig: h.eventFilterConfig,
+		Api:               h.api,
+		EventFilterConfig: h.eventFilterConfig,
 		maxStreams:        h.maxStreams,
 		activeStreamCount: h.activeStreamCount,
 		readChannel:       make(chan error),
-		heartbeatInterval: h.defaultHeartbeatInterval, // set default heartbeat interval from state stream config
+		HeartbeatInterval: h.defaultHeartbeatInterval, // set default heartbeat interval from state stream config
 	}
 
 	err = wsController.SetWebsocketConf()
@@ -322,7 +322,7 @@ func (h *WSHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	sub, err := h.subscribeFunc(ctx, common.Decorate(r, h.HttpHandler.Chain), wsController)
+	sub, err := h.subscribeFunc(ctx, common.Decorate(r, h.BaseHttpHandler.Chain), wsController)
 	if err != nil {
 		wsController.wsErrorHandler(err)
 		return

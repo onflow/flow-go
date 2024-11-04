@@ -5,13 +5,14 @@ import (
 
 	"github.com/onflow/flow-go/access"
 	"github.com/onflow/flow-go/engine/access/rest/common"
+	"github.com/onflow/flow-go/engine/access/rest/http/request"
 
 	"github.com/onflow/flow-go/engine/access/rest/http/models"
 )
 
 // GetExecutionResultsByBlockIDs gets Execution Result payload by block IDs.
 func GetExecutionResultsByBlockIDs(r *common.Request, backend access.API, link models.LinkGenerator) (interface{}, error) {
-	req, err := r.GetExecutionResultByBlockIDsRequest()
+	req, err := request.GetExecutionResultByBlockIDsRequest(r)
 	if err != nil {
 		return nil, common.NewBadRequestError(err)
 	}
@@ -37,7 +38,7 @@ func GetExecutionResultsByBlockIDs(r *common.Request, backend access.API, link m
 
 // GetExecutionResultByID gets execution result by the ID.
 func GetExecutionResultByID(r *common.Request, backend access.API, link models.LinkGenerator) (interface{}, error) {
-	req, err := r.GetExecutionResultRequest()
+	req, err := request.GetExecutionResultRequest(r)
 	if err != nil {
 		return nil, common.NewBadRequestError(err)
 	}

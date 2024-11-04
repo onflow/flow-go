@@ -10,6 +10,12 @@ type GetAccountBalance struct {
 	Height  uint64
 }
 
+func GetAccountBalanceRequest(r *common.Request) (GetAccountBalance, error) {
+	var req GetAccountBalance
+	err := req.Build(r)
+	return req, err
+}
+
 func (g *GetAccountBalance) Build(r *common.Request) error {
 	return g.Parse(
 		r.GetVar(addressVar),

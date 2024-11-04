@@ -12,7 +12,7 @@ import (
 
 // GetAccountKeyByIndex handler retrieves an account key by address and index and returns the response
 func GetAccountKeyByIndex(r *common.Request, backend access.API, _ models.LinkGenerator) (interface{}, error) {
-	req, err := r.GetAccountKeyRequest()
+	req, err := request.GetAccountKeyRequest(r)
 	if err != nil {
 		return nil, common.NewBadRequestError(err)
 	}
@@ -42,7 +42,7 @@ func GetAccountKeyByIndex(r *common.Request, backend access.API, _ models.LinkGe
 
 // GetAccountKeys handler retrieves an account keys by address and returns the response
 func GetAccountKeys(r *common.Request, backend access.API, _ models.LinkGenerator) (interface{}, error) {
-	req, err := r.GetAccountKeysRequest()
+	req, err := request.GetAccountKeysRequest(r)
 	if err != nil {
 		return nil, common.NewBadRequestError(err)
 	}

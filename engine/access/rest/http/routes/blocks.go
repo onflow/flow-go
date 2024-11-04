@@ -17,7 +17,7 @@ import (
 
 // GetBlocksByIDs gets blocks by provided ID or list of IDs.
 func GetBlocksByIDs(r *common.Request, backend access.API, link models.LinkGenerator) (interface{}, error) {
-	req, err := r.GetBlockByIDsRequest()
+	req, err := request.GetBlockByIDsRequest(r)
 	if err != nil {
 		return nil, common.NewBadRequestError(err)
 	}
@@ -37,7 +37,7 @@ func GetBlocksByIDs(r *common.Request, backend access.API, link models.LinkGener
 
 // GetBlocksByHeight gets blocks by height.
 func GetBlocksByHeight(r *common.Request, backend access.API, link models.LinkGenerator) (interface{}, error) {
-	req, err := r.GetBlockRequest()
+	req, err := request.GetBlockRequest(r)
 	if err != nil {
 		return nil, common.NewBadRequestError(err)
 	}
@@ -94,7 +94,7 @@ func GetBlocksByHeight(r *common.Request, backend access.API, link models.LinkGe
 
 // GetBlockPayloadByID gets block payload by ID
 func GetBlockPayloadByID(r *common.Request, backend access.API, _ models.LinkGenerator) (interface{}, error) {
-	req, err := r.GetBlockPayloadRequest()
+	req, err := request.GetBlockPayloadRequest(r)
 	if err != nil {
 		return nil, common.NewBadRequestError(err)
 	}

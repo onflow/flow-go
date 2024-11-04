@@ -1,4 +1,4 @@
-package common
+package router
 
 import (
 	"bufio"
@@ -16,7 +16,6 @@ import (
 
 	"github.com/onflow/flow-go/access"
 	"github.com/onflow/flow-go/access/mock"
-	"github.com/onflow/flow-go/engine/access/rest/router"
 	"github.com/onflow/flow-go/engine/access/state_stream"
 	"github.com/onflow/flow-go/engine/access/state_stream/backend"
 	"github.com/onflow/flow-go/engine/access/subscription"
@@ -28,16 +27,16 @@ import (
 const (
 	ExpandableFieldPayload      = "payload"
 	ExpandableExecutionResult   = "execution_result"
-	sealedHeightQueryParam      = "sealed"
-	finalHeightQueryParam       = "final"
-	startHeightQueryParam       = "start_height"
-	endHeightQueryParam         = "end_height"
-	heightQueryParam            = "height"
-	startBlockIdQueryParam      = "start_block_id"
-	eventTypesQueryParams       = "event_types"
-	addressesQueryParams        = "addresses"
-	contractsQueryParams        = "contracts"
-	heartbeatIntervalQueryParam = "heartbeat_interval"
+	SealedHeightQueryParam      = "sealed"
+	FinalHeightQueryParam       = "final"
+	StartHeightQueryParam       = "start_height"
+	EndHeightQueryParam         = "end_height"
+	HeightQueryParam            = "height"
+	StartBlockIdQueryParam      = "start_block_id"
+	EventTypesQueryParams       = "event_types"
+	AddressesQueryParams        = "addresses"
+	ContractsQueryParams        = "contracts"
+	HeartbeatIntervalQueryParam = "heartbeat_interval"
 )
 
 // fakeNetConn implements a mocked ws connection that can be injected in testing logic.
@@ -48,7 +47,7 @@ type fakeNetConn struct {
 
 var _ net.Conn = (*fakeNetConn)(nil)
 
-// Close closes the fakeNetConn and signals its closure by closing the "closed" channel.
+// Close closes the fakeNetConn and signals its closure by closing the "Closed" channel.
 func (c fakeNetConn) Close() error {
 	select {
 	case <-c.closed:
@@ -65,7 +64,7 @@ func (c fakeNetConn) SetReadDeadline(t time.Time) error  { return nil }
 func (c fakeNetConn) SetWriteDeadline(t time.Time) error { return nil }
 func (c fakeNetConn) Read(p []byte) (n int, err error) {
 	<-c.closed
-	return 0, fmt.Errorf("closed")
+	return 0, fmt.Errorf("Closed")
 }
 
 type fakeAddr int
@@ -83,45 +82,45 @@ func (a fakeAddr) String() string {
 	return "str"
 }
 
-// testHijackResponseRecorder is a custom ResponseRecorder that implements the http.Hijacker interface
+// TestHijackResponseRecorder is a custom ResponseRecorder that implements the http.Hijacker interface
 // for testing WebSocket connections and hijacking.
-type testHijackResponseRecorder struct {
+type TestHijackResponseRecorder struct {
 	*httptest.ResponseRecorder
-	closed       chan struct{}
-	responseBuff *bytes.Buffer
+	Closed       chan struct{}
+	ResponseBuff *bytes.Buffer
 }
 
-var _ http.Hijacker = (*testHijackResponseRecorder)(nil)
+var _ http.Hijacker = (*TestHijackResponseRecorder)(nil)
 
 // Hijack implements the http.Hijacker interface by returning a fakeNetConn and a bufio.ReadWriter
 // that simulate a hijacked connection.
-func (w *testHijackResponseRecorder) Hijack() (net.Conn, *bufio.ReadWriter, error) {
+func (w *TestHijackResponseRecorder) Hijack() (net.Conn, *bufio.ReadWriter, error) {
 	br := bufio.NewReaderSize(strings.NewReader(""), subscription.DefaultSendBufferSize)
 	bw := bufio.NewWriterSize(&bytes.Buffer{}, subscription.DefaultSendBufferSize)
-	w.responseBuff = bytes.NewBuffer(make([]byte, 0))
-	w.closed = make(chan struct{}, 1)
+	w.ResponseBuff = bytes.NewBuffer(make([]byte, 0))
+	w.Closed = make(chan struct{}, 1)
 
-	return fakeNetConn{w.responseBuff, w.closed}, bufio.NewReadWriter(br, bw), nil
+	return fakeNetConn{w.ResponseBuff, w.Closed}, bufio.NewReadWriter(br, bw), nil
 }
 
-func (w *testHijackResponseRecorder) Close() error {
+func (w *TestHijackResponseRecorder) Close() error {
 	select {
-	case <-w.closed:
+	case <-w.Closed:
 	default:
-		close(w.closed)
+		close(w.Closed)
 	}
 	return nil
 }
 
-// newTestHijackResponseRecorder creates a new instance of testHijackResponseRecorder.
-func newTestHijackResponseRecorder() *testHijackResponseRecorder {
-	return &testHijackResponseRecorder{
+// NewTestHijackResponseRecorder creates a new instance of TestHijackResponseRecorder.
+func NewTestHijackResponseRecorder() *TestHijackResponseRecorder {
+	return &TestHijackResponseRecorder{
 		ResponseRecorder: httptest.NewRecorder(),
 	}
 }
 
-func executeRequest(req *http.Request, backend access.API) *httptest.ResponseRecorder {
-	router := router.NewRouterBuilder(
+func ExecuteRequest(req *http.Request, backend access.API) *httptest.ResponseRecorder {
+	router := NewRouterBuilder(
 		unittest.Logger(),
 		metrics.NewNoopCollector(),
 	).AddRestRoutes(
@@ -134,7 +133,7 @@ func executeRequest(req *http.Request, backend access.API) *httptest.ResponseRec
 	return rr
 }
 
-func executeWsRequest(req *http.Request, stateStreamApi state_stream.API, responseRecorder *testHijackResponseRecorder, chain flow.Chain) {
+func ExecuteWsRequest(req *http.Request, stateStreamApi state_stream.API, responseRecorder *TestHijackResponseRecorder, chain flow.Chain) {
 	restCollector := metrics.NewNoopCollector()
 
 	config := backend.Config{
@@ -143,18 +142,22 @@ func executeWsRequest(req *http.Request, stateStreamApi state_stream.API, respon
 		HeartbeatInterval: subscription.DefaultHeartbeatInterval,
 	}
 
-	router := router.NewRouterBuilder(unittest.Logger(), restCollector).AddWsRoutes(
+	router := NewRouterBuilder(
+		unittest.Logger(),
+		restCollector,
+	).AddWsRoutes(
 		stateStreamApi,
-		chain, config).Build()
+		chain, config,
+	).Build()
 	router.ServeHTTP(responseRecorder, req)
 }
 
-func assertOKResponse(t *testing.T, req *http.Request, expectedRespBody string, backend *mock.API) {
-	assertResponse(t, req, http.StatusOK, expectedRespBody, backend)
+func AssertOKResponse(t *testing.T, req *http.Request, expectedRespBody string, backend *mock.API) {
+	AssertResponse(t, req, http.StatusOK, expectedRespBody, backend)
 }
 
-func assertResponse(t *testing.T, req *http.Request, status int, expectedRespBody string, backend *mock.API) {
-	rr := executeRequest(req, backend)
+func AssertResponse(t *testing.T, req *http.Request, status int, expectedRespBody string, backend *mock.API) {
+	rr := ExecuteRequest(req, backend)
 	actualResponseBody := rr.Body.String()
 	require.JSONEq(t,
 		expectedRespBody,

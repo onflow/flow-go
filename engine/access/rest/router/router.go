@@ -2,7 +2,6 @@ package router
 
 import (
 	"fmt"
-	"net/http"
 	"regexp"
 	"strings"
 
@@ -10,10 +9,10 @@ import (
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/access"
-	"github.com/onflow/flow-go/engine/access/rest/http/middleware"
+	"github.com/onflow/flow-go/engine/access/rest/common/middleware"
+	httphandler "github.com/onflow/flow-go/engine/access/rest/http"
 	"github.com/onflow/flow-go/engine/access/rest/http/models"
-	"github.com/onflow/flow-go/engine/access/rest/http/routes"
-	"github.com/onflow/flow-go/engine/access/rest/websockets/legacy"
+	legacy_ws "github.com/onflow/flow-go/engine/access/rest/websockets/legacy"
 	"github.com/onflow/flow-go/engine/access/state_stream"
 	"github.com/onflow/flow-go/engine/access/state_stream/backend"
 	"github.com/onflow/flow-go/model/flow"
@@ -51,7 +50,7 @@ func NewRouterBuilder(
 func (b *RouterBuilder) AddRestRoutes(backend access.API, chain flow.Chain) *RouterBuilder {
 	linkGenerator := models.NewLinkGeneratorImpl(b.v1SubRouter)
 	for _, r := range Routes {
-		h := routes.NewHandler(b.logger, backend, r.Handler, linkGenerator, chain)
+		h := httphandler.NewHandler(b.logger, backend, r.Handler, linkGenerator, chain)
 		b.v1SubRouter.
 			Methods(r.Method).
 			Path(r.Pattern).
@@ -69,7 +68,7 @@ func (b *RouterBuilder) AddWsRoutes(
 ) *RouterBuilder {
 
 	for _, r := range WSRoutes {
-		h := legacy.NewWSHandler(b.logger, stateStreamApi, r.Handler, chain, stateStreamConfig)
+		h := legacy_ws.NewWSHandler(b.logger, stateStreamApi, r.Handler, chain, stateStreamConfig)
 		b.v1SubRouter.
 			Methods(r.Method).
 			Path(r.Pattern).
@@ -83,114 +82,6 @@ func (b *RouterBuilder) AddWsRoutes(
 func (b *RouterBuilder) Build() *mux.Router {
 	return b.router
 }
-
-type route struct {
-	Name    string
-	Method  string
-	Pattern string
-	Handler routes.ApiHandlerFunc
-}
-
-type wsroute struct {
-	Name    string
-	Method  string
-	Pattern string
-	Handler legacy.SubscribeHandlerFunc
-}
-
-var Routes = []route{{
-	Method:  http.MethodGet,
-	Pattern: "/transactions/{id}",
-	Name:    "getTransactionByID",
-	Handler: routes.GetTransactionByID,
-}, {
-	Method:  http.MethodPost,
-	Pattern: "/transactions",
-	Name:    "createTransaction",
-	Handler: routes.CreateTransaction,
-}, {
-	Method:  http.MethodGet,
-	Pattern: "/transaction_results/{id}",
-	Name:    "getTransactionResultByID",
-	Handler: routes.GetTransactionResultByID,
-}, {
-	Method:  http.MethodGet,
-	Pattern: "/blocks/{id}",
-	Name:    "getBlocksByIDs",
-	Handler: routes.GetBlocksByIDs,
-}, {
-	Method:  http.MethodGet,
-	Pattern: "/blocks",
-	Name:    "getBlocksByHeight",
-	Handler: routes.GetBlocksByHeight,
-}, {
-	Method:  http.MethodGet,
-	Pattern: "/blocks/{id}/payload",
-	Name:    "getBlockPayloadByID",
-	Handler: routes.GetBlockPayloadByID,
-}, {
-	Method:  http.MethodGet,
-	Pattern: "/execution_results/{id}",
-	Name:    "getExecutionResultByID",
-	Handler: routes.GetExecutionResultByID,
-}, {
-	Method:  http.MethodGet,
-	Pattern: "/execution_results",
-	Name:    "getExecutionResultByBlockID",
-	Handler: routes.GetExecutionResultsByBlockIDs,
-}, {
-	Method:  http.MethodGet,
-	Pattern: "/collections/{id}",
-	Name:    "getCollectionByID",
-	Handler: routes.GetCollectionByID,
-}, {
-	Method:  http.MethodPost,
-	Pattern: "/scripts",
-	Name:    "executeScript",
-	Handler: routes.ExecuteScript,
-}, {
-	Method:  http.MethodGet,
-	Pattern: "/accounts/{address}",
-	Name:    "getAccount",
-	Handler: routes.GetAccount,
-}, {
-	Method:  http.MethodGet,
-	Pattern: "/accounts/{address}/balance",
-	Name:    "getAccountBalance",
-	Handler: routes.GetAccountBalance,
-}, {
-	Method:  http.MethodGet,
-	Pattern: "/accounts/{address}/keys/{index}",
-	Name:    "getAccountKeyByIndex",
-	Handler: routes.GetAccountKeyByIndex,
-}, {
-	Method:  http.MethodGet,
-	Pattern: "/accounts/{address}/keys",
-	Name:    "getAccountKeys",
-	Handler: routes.GetAccountKeys,
-}, {
-	Method:  http.MethodGet,
-	Pattern: "/events",
-	Name:    "getEvents",
-	Handler: routes.GetEvents,
-}, {
-	Method:  http.MethodGet,
-	Pattern: "/network/parameters",
-	Name:    "getNetworkParameters",
-	Handler: routes.GetNetworkParameters,
-}, {
-	Method:  http.MethodGet,
-	Pattern: "/node_version_info",
-	Name:    "getNodeVersionInfo",
-	Handler: routes.GetNodeVersionInfo,
-}}
-
-var WSRoutes = []wsroute{{
-	Method:  http.MethodGet,
-	Pattern: "/subscribe_events",
-	Name:    "subscribeEvents",
-	Handler: legacy.SubscribeEvents,
-}}
 
 var routeUrlMap = map[string]string{}
 var routeRE = regexp.MustCompile(`(?i)/v1/(\w+)(/(\w+))?(/(\w+))?(/(\w+))?`)

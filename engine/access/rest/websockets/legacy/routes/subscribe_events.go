@@ -1,9 +1,11 @@
-package legacy
+package routes
 
 import (
 	"context"
 
 	"github.com/onflow/flow-go/engine/access/rest/common"
+	"github.com/onflow/flow-go/engine/access/rest/websockets/legacy"
+	"github.com/onflow/flow-go/engine/access/rest/websockets/legacy/request"
 	"github.com/onflow/flow-go/engine/access/state_stream"
 	"github.com/onflow/flow-go/engine/access/subscription"
 )
@@ -11,17 +13,17 @@ import (
 // SubscribeEvents create websocket connection and write to it requested events.
 func SubscribeEvents(
 	ctx context.Context,
-	request *common.Request,
-	wsController *WebsocketController,
+	r *common.Request,
+	wsController *legacy.WebsocketController,
 ) (subscription.Subscription, error) {
-	req, err := request.SubscribeEventsRequest()
+	req, err := request.SubscribeEventsRequest(r)
 	if err != nil {
 		return nil, common.NewBadRequestError(err)
 	}
 	// Retrieve the filter parameters from the request, if provided
 	filter, err := state_stream.NewEventFilter(
-		wsController.eventFilterConfig,
-		request.Chain,
+		wsController.EventFilterConfig,
+		r.Chain,
 		req.EventTypes,
 		req.Addresses,
 		req.Contracts,
@@ -32,8 +34,8 @@ func SubscribeEvents(
 
 	// Check if heartbeat interval was passed via request
 	if req.HeartbeatInterval > 0 {
-		wsController.heartbeatInterval = req.HeartbeatInterval
+		wsController.HeartbeatInterval = req.HeartbeatInterval
 	}
 
-	return wsController.api.SubscribeEvents(ctx, req.StartBlockID, req.StartHeight, filter), nil
+	return wsController.Api.SubscribeEvents(ctx, req.StartBlockID, req.StartHeight, filter), nil
 }

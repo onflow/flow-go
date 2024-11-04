@@ -18,6 +18,12 @@ type GetEvents struct {
 	BlockIDs    []flow.Identifier
 }
 
+func GetEventsRequest(r *common.Request) (GetEvents, error) {
+	var req GetEvents
+	err := req.Build(r)
+	return req, err
+}
+
 func (g *GetEvents) Build(r *common.Request) error {
 	return g.Parse(
 		r.GetQueryParam(eventTypeQuery),

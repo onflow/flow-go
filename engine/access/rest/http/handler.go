@@ -1,4 +1,4 @@
-package routes
+package http
 
 import (
 	"net/http"
@@ -24,7 +24,7 @@ type ApiHandlerFunc func(
 // Handler function allows easier handling of errors and responses as it
 // wraps functionality for handling error and responses outside of endpoint handling.
 type Handler struct {
-	*common.HttpHandler
+	*common.BaseHttpHandler
 	backend        access.API
 	linkGenerator  models.LinkGenerator
 	apiHandlerFunc ApiHandlerFunc
@@ -38,10 +38,10 @@ func NewHandler(
 	chain flow.Chain,
 ) *Handler {
 	handler := &Handler{
-		backend:        backend,
-		apiHandlerFunc: handlerFunc,
-		linkGenerator:  generator,
-		HttpHandler:    common.NewHttpHandler(logger, chain),
+		backend:         backend,
+		apiHandlerFunc:  handlerFunc,
+		linkGenerator:   generator,
+		BaseHttpHandler: common.NewHttpHandler(logger, chain),
 	}
 
 	return handler

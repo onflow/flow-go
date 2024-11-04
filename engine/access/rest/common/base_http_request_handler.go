@@ -18,10 +18,10 @@ import (
 
 const MaxRequestSize = 2 << 20 // 2MB
 
-// HttpHandler is custom http handler implementing custom handler function.
-// HttpHandler function allows easier handling of errors and responses as it
+// BaseHttpHandler is custom http handler implementing custom handler function.
+// BaseHttpHandler function allows easier handling of errors and responses as it
 // wraps functionality for handling error and responses outside of endpoint handling.
-type HttpHandler struct {
+type BaseHttpHandler struct {
 	Logger zerolog.Logger
 	Chain  flow.Chain
 }
@@ -29,8 +29,8 @@ type HttpHandler struct {
 func NewHttpHandler(
 	logger zerolog.Logger,
 	chain flow.Chain,
-) *HttpHandler {
-	return &HttpHandler{
+) *BaseHttpHandler {
+	return &BaseHttpHandler{
 		Logger: logger,
 		Chain:  chain,
 	}
@@ -38,7 +38,7 @@ func NewHttpHandler(
 
 // VerifyRequest function acts as a wrapper to each request providing common handling functionality
 // such as logging, error handling
-func (h *HttpHandler) VerifyRequest(w http.ResponseWriter, r *http.Request) error {
+func (h *BaseHttpHandler) VerifyRequest(w http.ResponseWriter, r *http.Request) error {
 	// create a logger
 	errLog := h.Logger.With().Str("request_url", r.URL.String()).Logger()
 
@@ -52,7 +52,7 @@ func (h *HttpHandler) VerifyRequest(w http.ResponseWriter, r *http.Request) erro
 	return nil
 }
 
-func (h *HttpHandler) ErrorHandler(w http.ResponseWriter, err error, errorLogger zerolog.Logger) {
+func (h *BaseHttpHandler) ErrorHandler(w http.ResponseWriter, err error, errorLogger zerolog.Logger) {
 	// rest status type error should be returned with status and user message provided
 	var statusErr StatusError
 	if errors.As(err, &statusErr) {
@@ -99,7 +99,7 @@ func (h *HttpHandler) ErrorHandler(w http.ResponseWriter, err error, errorLogger
 }
 
 // JsonResponse builds a JSON response and send it to the client
-func (h *HttpHandler) JsonResponse(w http.ResponseWriter, code int, response interface{}, errLogger zerolog.Logger) {
+func (h *BaseHttpHandler) JsonResponse(w http.ResponseWriter, code int, response interface{}, errLogger zerolog.Logger) {
 	w.Header().Set("Content-Type", "application/json; charset=UTF-8")
 
 	// serialize response to JSON and handler errors
@@ -120,7 +120,7 @@ func (h *HttpHandler) JsonResponse(w http.ResponseWriter, code int, response int
 
 // errorResponse sends an HTTP error response to the client with the given return code
 // and a model error with the given response message in the response body
-func (h *HttpHandler) errorResponse(
+func (h *BaseHttpHandler) errorResponse(
 	w http.ResponseWriter,
 	returnCode int,
 	responseMessage string,

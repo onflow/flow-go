@@ -13,6 +13,12 @@ type GetExecutionResultByBlockIDs struct {
 	BlockIDs []flow.Identifier
 }
 
+func GetExecutionResultByBlockIDsRequest(r *common.Request) (GetExecutionResultByBlockIDs, error) {
+	var req GetExecutionResultByBlockIDs
+	err := req.Build(r)
+	return req, err
+}
+
 func (g *GetExecutionResultByBlockIDs) Build(r *common.Request) error {
 	return g.Parse(
 		r.GetQueryParams(blockIDQuery),
@@ -36,4 +42,10 @@ func (g *GetExecutionResultByBlockIDs) Parse(rawIDs []string) error {
 
 type GetExecutionResult struct {
 	GetByIDRequest
+}
+
+func GetExecutionResultRequest(r *common.Request) (GetExecutionResult, error) {
+	var req GetExecutionResult
+	err := req.Build(r)
+	return req, err
 }

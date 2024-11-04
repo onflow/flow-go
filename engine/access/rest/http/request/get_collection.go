@@ -11,6 +11,12 @@ type GetCollection struct {
 	ExpandsTransactions bool
 }
 
+func GetCollectionRequest(r *common.Request) (GetCollection, error) {
+	var req GetCollection
+	err := req.Build(r)
+	return req, err
+}
+
 func (g *GetCollection) Build(r *common.Request) error {
 	err := g.GetByIDRequest.Build(r)
 	g.ExpandsTransactions = r.Expands(ExpandsTransactions)

@@ -38,6 +38,18 @@ type GetTransaction struct {
 	ExpandsResult bool
 }
 
+func GetTransactionRequest(r *common.Request) (GetTransaction, error) {
+	var req GetTransaction
+	err := req.Build(r)
+	return req, err
+}
+
+func CreateTransactionRequest(r *common.Request) (CreateTransaction, error) {
+	var req CreateTransaction
+	err := req.Build(r)
+	return req, err
+}
+
 func (g *GetTransaction) Build(r *common.Request) error {
 	err := g.TransactionOptionals.Parse(r)
 	if err != nil {
@@ -53,6 +65,12 @@ func (g *GetTransaction) Build(r *common.Request) error {
 type GetTransactionResult struct {
 	GetByIDRequest
 	TransactionOptionals
+}
+
+func GetTransactionResultRequest(r *common.Request) (GetTransactionResult, error) {
+	var req GetTransactionResult
+	err := req.Build(r)
+	return req, err
 }
 
 func (g *GetTransactionResult) Build(r *common.Request) error {

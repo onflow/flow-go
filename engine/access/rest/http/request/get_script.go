@@ -16,6 +16,12 @@ type GetScript struct {
 	Script      Script
 }
 
+func GetScriptRequest(r *common.Request) (GetScript, error) {
+	var req GetScript
+	err := req.Build(r)
+	return req, err
+}
+
 func (g *GetScript) Build(r *common.Request) error {
 	return g.Parse(
 		r.GetQueryParam(blockHeightQuery),

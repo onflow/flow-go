@@ -6,8 +6,7 @@ import (
 
 	"github.com/gorilla/mux"
 
-	"github.com/onflow/flow-go/engine/access/rest/http/middleware"
-	"github.com/onflow/flow-go/engine/access/rest/http/request"
+	"github.com/onflow/flow-go/engine/access/rest/common/middleware"
 	"github.com/onflow/flow-go/model/flow"
 )
 
@@ -17,102 +16,6 @@ type Request struct {
 	ExpandFields map[string]bool
 	selectFields []string
 	Chain        flow.Chain
-}
-
-func (rd *Request) GetScriptRequest() (request.GetScript, error) {
-	var req request.GetScript
-	err := req.Build(rd)
-	return req, err
-}
-
-func (rd *Request) GetBlockRequest() (request.GetBlock, error) {
-	var req request.GetBlock
-	err := req.Build(rd)
-	return req, err
-}
-
-func (rd *Request) GetBlockByIDsRequest() (request.GetBlockByIDs, error) {
-	var req request.GetBlockByIDs
-	err := req.Build(rd)
-	return req, err
-}
-
-func (rd *Request) GetBlockPayloadRequest() (request.GetBlockPayload, error) {
-	var req request.GetBlockPayload
-	err := req.Build(rd)
-	return req, err
-}
-
-func (rd *Request) GetCollectionRequest() (request.GetCollection, error) {
-	var req request.GetCollection
-	err := req.Build(rd)
-	return req, err
-}
-
-func (rd *Request) GetAccountRequest() (request.GetAccount, error) {
-	var req request.GetAccount
-	err := req.Build(rd)
-	return req, err
-}
-
-func (rd *Request) GetAccountBalanceRequest() (request.GetAccountBalance, error) {
-	var req request.GetAccountBalance
-	err := req.Build(rd)
-	return req, err
-}
-
-func (rd *Request) GetAccountKeysRequest() (request.GetAccountKeys, error) {
-	var req request.GetAccountKeys
-	err := req.Build(rd)
-	return req, err
-}
-
-func (rd *Request) GetAccountKeyRequest() (request.GetAccountKey, error) {
-	var req request.GetAccountKey
-	err := req.Build(rd)
-	return req, err
-}
-
-func (rd *Request) GetExecutionResultByBlockIDsRequest() (request.GetExecutionResultByBlockIDs, error) {
-	var req request.GetExecutionResultByBlockIDs
-	err := req.Build(rd)
-	return req, err
-}
-
-func (rd *Request) GetExecutionResultRequest() (request.GetExecutionResult, error) {
-	var req request.GetExecutionResult
-	err := req.Build(rd)
-	return req, err
-}
-
-func (rd *Request) GetTransactionRequest() (request.GetTransaction, error) {
-	var req request.GetTransaction
-	err := req.Build(rd)
-	return req, err
-}
-
-func (rd *Request) GetTransactionResultRequest() (request.GetTransactionResult, error) {
-	var req request.GetTransactionResult
-	err := req.Build(rd)
-	return req, err
-}
-
-func (rd *Request) GetEventsRequest() (request.GetEvents, error) {
-	var req request.GetEvents
-	err := req.Build(rd)
-	return req, err
-}
-
-func (rd *Request) CreateTransactionRequest() (request.CreateTransaction, error) {
-	var req request.CreateTransaction
-	err := req.Build(rd)
-	return req, err
-}
-
-func (rd *Request) SubscribeEventsRequest() (request.SubscribeEvents, error) {
-	var req request.SubscribeEvents
-	err := req.Build(rd)
-	return req, err
 }
 
 func (rd *Request) Expands(field string) bool {

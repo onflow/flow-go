@@ -23,7 +23,6 @@ import (
 	"github.com/onflow/flow-go/engine/access/rest"
 	"github.com/onflow/flow-go/engine/access/rest/common"
 	"github.com/onflow/flow-go/engine/access/rest/http/request"
-	"github.com/onflow/flow-go/engine/access/rest/http/routes"
 	"github.com/onflow/flow-go/engine/access/rpc"
 	"github.com/onflow/flow-go/engine/access/rpc/backend"
 	statestreambackend "github.com/onflow/flow-go/engine/access/state_stream/backend"
@@ -452,13 +451,13 @@ func assertError(t *testing.T, resp *http.Response, err error, expectedCode int,
 
 func optionsForBlockByID() *restclient.BlocksApiBlocksIdGetOpts {
 	return &restclient.BlocksApiBlocksIdGetOpts{
-		Expand:  optional.NewInterface([]string{routes.ExpandableFieldPayload}),
+		Expand:  optional.NewInterface([]string{"payload"}),
 		Select_: optional.NewInterface([]string{"header.id"}),
 	}
 }
 func optionsForBlockByStartEndHeight(startHeight, endHeight uint64) *restclient.BlocksApiBlocksGetOpts {
 	return &restclient.BlocksApiBlocksGetOpts{
-		Expand:      optional.NewInterface([]string{routes.ExpandableFieldPayload}),
+		Expand:      optional.NewInterface([]string{"payload"}),
 		Select_:     optional.NewInterface([]string{"header.id", "header.height"}),
 		StartHeight: optional.NewInterface(startHeight),
 		EndHeight:   optional.NewInterface(endHeight),
@@ -467,7 +466,7 @@ func optionsForBlockByStartEndHeight(startHeight, endHeight uint64) *restclient.
 
 func optionsForBlockByHeights(heights []uint64) *restclient.BlocksApiBlocksGetOpts {
 	return &restclient.BlocksApiBlocksGetOpts{
-		Expand:  optional.NewInterface([]string{routes.ExpandableFieldPayload}),
+		Expand:  optional.NewInterface([]string{"payload"}),
 		Select_: optional.NewInterface([]string{"header.id", "header.height"}),
 		Height:  optional.NewInterface(heights),
 	}
@@ -475,7 +474,7 @@ func optionsForBlockByHeights(heights []uint64) *restclient.BlocksApiBlocksGetOp
 
 func optionsForFinalizedBlock(finalOrSealed string) *restclient.BlocksApiBlocksGetOpts {
 	return &restclient.BlocksApiBlocksGetOpts{
-		Expand:  optional.NewInterface([]string{routes.ExpandableFieldPayload}),
+		Expand:  optional.NewInterface([]string{"payload"}),
 		Select_: optional.NewInterface([]string{"header.id", "header.height"}),
 		Height:  optional.NewInterface(finalOrSealed),
 	}

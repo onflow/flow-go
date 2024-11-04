@@ -17,7 +17,7 @@ const EventTypeQuery = "type"
 
 // GetEvents for the provided block range or list of block IDs filtered by type.
 func GetEvents(r *common.Request, backend access.API, _ models.LinkGenerator) (interface{}, error) {
-	req, err := r.GetEventsRequest()
+	req, err := request.GetEventsRequest(r)
 	if err != nil {
 		return nil, common.NewBadRequestError(err)
 	}

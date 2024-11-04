@@ -16,6 +16,12 @@ type GetAccountKey struct {
 	Height  uint64
 }
 
+func GetAccountKeyRequest(r *common.Request) (GetAccountKey, error) {
+	var req GetAccountKey
+	err := req.Build(r)
+	return req, err
+}
+
 func (g *GetAccountKey) Build(r *common.Request) error {
 	return g.Parse(
 		r.GetVar(addressVar),
