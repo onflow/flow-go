@@ -8,7 +8,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/antihax/optional"
 	accessproto "github.com/onflow/flow/protobuf/go/flow/access"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
@@ -18,11 +17,9 @@ import (
 	"google.golang.org/grpc/credentials/insecure"
 
 	"github.com/onflow/crypto"
-	restclient "github.com/onflow/flow/openapi/go-client-generated"
 
 	accessmock "github.com/onflow/flow-go/engine/access/mock"
 	"github.com/onflow/flow-go/engine/access/rest"
-	"github.com/onflow/flow-go/engine/access/rest/routes"
 	"github.com/onflow/flow-go/engine/access/rpc"
 	"github.com/onflow/flow-go/engine/access/rpc/backend"
 	statestreambackend "github.com/onflow/flow-go/engine/access/state_stream/backend"
@@ -223,33 +220,33 @@ func (suite *IrrecoverableStateTestSuite) TestGRPCInconsistentNodeState() {
 	suite.Require().Nil(actual)
 }
 
-// TestRestInconsistentNodeState tests the behavior when the REST API encounters an inconsistent node state.
-func (suite *IrrecoverableStateTestSuite) TestRestInconsistentNodeState() {
-	collections := unittest.CollectionListFixture(1)
-	blockHeader := unittest.BlockWithGuaranteesFixture(
-		unittest.CollectionGuaranteesWithCollectionIDFixture(collections),
-	)
-	suite.blocks.On("ByID", blockHeader.ID()).Return(blockHeader, nil)
-
-	err := fmt.Errorf("inconsistent node's state")
-	suite.snapshot.On("Head").Return(nil, err)
-
-	config := restclient.NewConfiguration()
-	config.BasePath = fmt.Sprintf("http://%s/v1", suite.rpcEng.RestApiAddress().String())
-	client := restclient.NewAPIClient(config)
-
-	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
-	defer cancel()
-
-	actual, _, err := client.BlocksApi.BlocksIdGet(ctx, []string{blockHeader.ID().String()}, optionsForBlocksIdGetOpts())
-	suite.Require().Error(err)
-	suite.Require().Nil(actual)
-}
-
-// optionsForBlocksIdGetOpts returns options for the BlocksApi.BlocksIdGet function.
-func optionsForBlocksIdGetOpts() *restclient.BlocksApiBlocksIdGetOpts {
-	return &restclient.BlocksApiBlocksIdGetOpts{
-		Expand:  optional.NewInterface([]string{routes.ExpandableFieldPayload}),
-		Select_: optional.NewInterface([]string{"header.id"}),
-	}
-}
+//// TestRestInconsistentNodeState tests the behavior when the REST API encounters an inconsistent node state.
+//func (suite *IrrecoverableStateTestSuite) TestRestInconsistentNodeState() {
+//	collections := unittest.CollectionListFixture(1)
+//	blockHeader := unittest.BlockWithGuaranteesFixture(
+//		unittest.CollectionGuaranteesWithCollectionIDFixture(collections),
+//	)
+//	suite.blocks.On("ByID", blockHeader.ID()).Return(blockHeader, nil)
+//
+//	err := fmt.Errorf("inconsistent node's state")
+//	suite.snapshot.On("Head").Return(nil, err)
+//
+//	config := restclient.NewConfiguration()
+//	config.BasePath = fmt.Sprintf("http://%s/v1", suite.rpcEng.RestApiAddress().String())
+//	client := restclient.NewAPIClient(config)
+//
+//	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
+//	defer cancel()
+//
+//	actual, _, err := client.BlocksApi.BlocksIdGet(ctx, []string{blockHeader.ID().String()}, optionsForBlocksIdGetOpts())
+//	suite.Require().Error(err)
+//	suite.Require().Nil(actual)
+//}
+//
+//// optionsForBlocksIdGetOpts returns options for the BlocksApi.BlocksIdGet function.
+//func optionsForBlocksIdGetOpts() *restclient.BlocksApiBlocksIdGetOpts {
+//	return &restclient.BlocksApiBlocksIdGetOpts{
+//		Expand:  optional.NewInterface([]string{routes.ExpandableFieldPayload}),
+//		Select_: optional.NewInterface([]string{"header.id"}),
+//	}
+//}

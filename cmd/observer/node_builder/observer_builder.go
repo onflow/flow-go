@@ -43,7 +43,7 @@ import (
 	"github.com/onflow/flow-go/engine/access/index"
 	"github.com/onflow/flow-go/engine/access/rest"
 	restapiproxy "github.com/onflow/flow-go/engine/access/rest/apiproxy"
-	"github.com/onflow/flow-go/engine/access/rest/routes"
+	"github.com/onflow/flow-go/engine/access/rest/router"
 	"github.com/onflow/flow-go/engine/access/rpc"
 	"github.com/onflow/flow-go/engine/access/rpc/backend"
 	rpcConnection "github.com/onflow/flow-go/engine/access/rpc/connection"
@@ -1681,7 +1681,7 @@ func (builder *ObserverServiceBuilder) enqueueRPCServer() {
 		return nil
 	})
 	builder.Module("rest metrics", func(node *cmd.NodeConfig) error {
-		m, err := metrics.NewRestCollector(routes.URLToRoute, node.MetricsRegisterer)
+		m, err := metrics.NewRestCollector(router.URLToRoute, node.MetricsRegisterer)
 		if err != nil {
 			return err
 		}

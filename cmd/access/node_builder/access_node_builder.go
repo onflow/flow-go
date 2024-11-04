@@ -48,7 +48,7 @@ import (
 	"github.com/onflow/flow-go/engine/access/ingestion/tx_error_messages"
 	pingeng "github.com/onflow/flow-go/engine/access/ping"
 	"github.com/onflow/flow-go/engine/access/rest"
-	"github.com/onflow/flow-go/engine/access/rest/routes"
+	"github.com/onflow/flow-go/engine/access/rest/router"
 	"github.com/onflow/flow-go/engine/access/rpc"
 	"github.com/onflow/flow-go/engine/access/rpc/backend"
 	rpcConnection "github.com/onflow/flow-go/engine/access/rpc/connection"
@@ -1714,7 +1714,7 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 			return nil
 		}).
 		Module("rest metrics", func(node *cmd.NodeConfig) error {
-			m, err := metrics.NewRestCollector(routes.URLToRoute, node.MetricsRegisterer)
+			m, err := metrics.NewRestCollector(router.URLToRoute, node.MetricsRegisterer)
 			if err != nil {
 				return err
 			}

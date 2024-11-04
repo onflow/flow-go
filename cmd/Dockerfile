@@ -6,7 +6,7 @@
 FROM golang:1.22-bullseye AS build-setup
 
 RUN apt-get update
-RUN apt-get -y install zip apt-utils gcc-aarch64-linux-gnu
+RUN apt-get -y install zip apt-common gcc-aarch64-linux-gnu
 
 ## (2) Setup crypto dependencies
 FROM build-setup AS build-env
