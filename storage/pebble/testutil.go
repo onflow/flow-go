@@ -39,19 +39,19 @@ func RunWithRegistersStorageWithInitialData(
 	f func(db *pebble.DB)) {
 	unittest.RunWithTempDir(tb, func(dir string) {
 		db := NewBootstrappedRegistersWithPathForTest(tb, dir, uint64(0), uint64(0))
-		r, err := NewRegisters(db, 5)
+		registers, err := NewRegisters(db, 5)
 		require.NoError(tb, err)
 
 		heights := make([]uint64, 0, len(data))
 		for h := range data {
 			heights = append(heights, h)
 		}
-		// Should sort heights before store them through register, as they are not stored in order in test data
+		// Should sort heights before store them through register, as they are not stored in the test data map
 		sort.Slice(heights, func(i, j int) bool { return heights[i] < heights[j] })
 
-		// Iterate over the heights in ascending order
+		// Iterate over the heights in ascending order and store keys in DB through registers
 		for _, height := range heights {
-			err = r.Store(data[height], height)
+			err = registers.Store(data[height], height)
 			require.NoError(tb, err)
 		}
 

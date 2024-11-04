@@ -21,6 +21,8 @@ type DBPruner struct {
 	dbBatch        *pebble.Batch
 	lastRegisterID flow.RegisterID
 	keepKeyFound   bool
+
+	totalKeysPruned int
 }
 
 var _ io.Closer = (*DBPruner)(nil)
@@ -31,6 +33,7 @@ func NewDBPruner(db *pebble.DB, logger zerolog.Logger, pruneThrottleDelay time.D
 		pruneThrottleDelay: pruneThrottleDelay,
 		pruneHeight:        pruneHeight,
 		dbBatch:            db.NewBatch(),
+		totalKeysPruned:    0,
 	}
 }
 
@@ -56,6 +59,8 @@ func (p *DBPruner) BatchDelete(ctx context.Context, lookupKeys [][]byte) error {
 	if err := p.dbBatch.Commit(pebble.Sync); err != nil {
 		return fmt.Errorf("failed to commit batch: %w", err)
 	}
+
+	p.totalKeysPruned += len(lookupKeys)
 
 	// Throttle to prevent excessive system load
 	select {
@@ -89,6 +94,10 @@ func (p *DBPruner) CanPruneKey(key []byte) (bool, error) {
 	}
 
 	return true, nil
+}
+
+func (p *DBPruner) TotalKeysPruned() int {
+	return p.totalKeysPruned
 }
 
 func (p *DBPruner) Close() error {

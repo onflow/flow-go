@@ -171,6 +171,8 @@ func (p *RegisterPruner) checkPrune(ctx context.Context) error {
 //
 // No errors are expected during normal operations.
 func (p *RegisterPruner) pruneUpToHeight(ctx context.Context, r pebble.Reader, pruneHeight uint64) error {
+	start := time.Now()
+
 	// first, update firstHeight in the db
 	// this ensures that if the node crashes during pruning, there will still be a consistent
 	// view when the node starts up. Subsequent prunes will remove any leftover data.
@@ -232,6 +234,12 @@ func (p *RegisterPruner) pruneUpToHeight(ctx context.Context, r pebble.Reader, p
 			return err
 		}
 	}
+
+	p.logger.Info().Msgf(
+		"Pruned %d keys in %s",
+		dbPruner.TotalKeysPruned(),
+		time.Since(start).String(),
+	)
 
 	return nil
 }
