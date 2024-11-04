@@ -204,12 +204,14 @@ func (db *StateDB) SetCode(addr gethCommon.Address, code []byte) {
 
 // AddRefund adds the amount to the total (gas) refund
 func (db *StateDB) AddRefund(amount uint64) {
+	fmt.Println("AddRefund", amount)
 	err := db.latestView().AddRefund(amount)
 	db.handleError(err)
 }
 
 // SubRefund subtracts the amount from the total (gas) refund
 func (db *StateDB) SubRefund(amount uint64) {
+	fmt.Println("SetRefund", amount)
 	err := db.latestView().SubRefund(amount)
 	db.handleError(err)
 }

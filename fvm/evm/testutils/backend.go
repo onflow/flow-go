@@ -145,6 +145,19 @@ func GetSimpleValueStorePopulated(
 			// clone allocator
 			return GetSimpleValueStorePopulated(newData, newAllocator)
 		},
+
+		DumpFunc: func() (map[string][]byte, map[string]uint64) {
+			// clone data
+			newData := make(map[string][]byte)
+			for k, v := range data {
+				newData[k] = v
+			}
+			newAllocator := make(map[string]uint64)
+			for k, v := range allocator {
+				newAllocator[k] = v
+			}
+			return newData, newAllocator
+		},
 	}
 }
 
@@ -253,6 +266,7 @@ type TestValueStore struct {
 	TotalStorageItemsFunc func() int
 	ResetStatsFunc        func()
 	CloneFunc             func() *TestValueStore
+	DumpFunc              func() (map[string][]byte, map[string]uint64)
 }
 
 var _ environment.ValueStore = &TestValueStore{}
@@ -325,6 +339,13 @@ func (vs *TestValueStore) Clone() *TestValueStore {
 		panic("method not set")
 	}
 	return vs.CloneFunc()
+}
+
+func (vs *TestValueStore) Dump() (map[string][]byte, map[string]uint64) {
+	if vs.DumpFunc == nil {
+		panic("method not set")
+	}
+	return vs.DumpFunc()
 }
 
 type testMeter struct {
