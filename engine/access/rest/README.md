@@ -5,7 +5,9 @@ the [Flow OpenAPI definition](https://github.com/onflow/flow/blob/master/openapi
 available on our [docs site](https://docs.onflow.org/http-api/).
 
 ## Packages
-
+<!---
+TODO: update README.md after the reviews
+-->
 - `rest`: The HTTP handlers for the server generator and the select filter, implementation of handling local requests.
 - `middleware`: The common [middlewares](https://github.com/gorilla/mux#middleware) that all request pass through.
 - `models`: The generated models using openapi generators and implementation of model builders.

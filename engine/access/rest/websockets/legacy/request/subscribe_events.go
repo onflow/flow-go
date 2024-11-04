@@ -27,6 +27,10 @@ type SubscribeEvents struct {
 	HeartbeatInterval uint64
 }
 
+// SubscribeEventsRequest extracts necessary variables from the provided request,
+// builds a SubscribeEvents instance, and validates it.
+//
+// No errors are expected during normal operation.
 func SubscribeEventsRequest(r *common.Request) (SubscribeEvents, error) {
 	var req SubscribeEvents
 	err := req.Build(r)
