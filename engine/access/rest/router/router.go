@@ -10,9 +10,9 @@ import (
 
 	"github.com/onflow/flow-go/access"
 	"github.com/onflow/flow-go/engine/access/rest/common/middleware"
-	httphandler "github.com/onflow/flow-go/engine/access/rest/http"
+	"github.com/onflow/flow-go/engine/access/rest/http"
 	"github.com/onflow/flow-go/engine/access/rest/http/models"
-	legacy_ws "github.com/onflow/flow-go/engine/access/rest/websockets/legacy"
+	legacyws "github.com/onflow/flow-go/engine/access/rest/websockets/legacy"
 	"github.com/onflow/flow-go/engine/access/state_stream"
 	"github.com/onflow/flow-go/engine/access/state_stream/backend"
 	"github.com/onflow/flow-go/model/flow"
@@ -50,7 +50,7 @@ func NewRouterBuilder(
 func (b *RouterBuilder) AddRestRoutes(backend access.API, chain flow.Chain) *RouterBuilder {
 	linkGenerator := models.NewLinkGeneratorImpl(b.v1SubRouter)
 	for _, r := range Routes {
-		h := httphandler.NewHandler(b.logger, backend, r.Handler, linkGenerator, chain)
+		h := http.NewHandler(b.logger, backend, r.Handler, linkGenerator, chain)
 		b.v1SubRouter.
 			Methods(r.Method).
 			Path(r.Pattern).
@@ -68,7 +68,7 @@ func (b *RouterBuilder) AddWsRoutes(
 ) *RouterBuilder {
 
 	for _, r := range WSRoutes {
-		h := legacy_ws.NewWSHandler(b.logger, stateStreamApi, r.Handler, chain, stateStreamConfig)
+		h := legacyws.NewWSHandler(b.logger, stateStreamApi, r.Handler, chain, stateStreamConfig)
 		b.v1SubRouter.
 			Methods(r.Method).
 			Path(r.Pattern).

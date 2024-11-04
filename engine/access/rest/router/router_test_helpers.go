@@ -64,7 +64,7 @@ func (c fakeNetConn) SetReadDeadline(t time.Time) error  { return nil }
 func (c fakeNetConn) SetWriteDeadline(t time.Time) error { return nil }
 func (c fakeNetConn) Read(p []byte) (n int, err error) {
 	<-c.closed
-	return 0, fmt.Errorf("Closed")
+	return 0, fmt.Errorf("closed")
 }
 
 type fakeAddr int
