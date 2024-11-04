@@ -13,6 +13,10 @@ type GetExecutionResultByBlockIDs struct {
 	BlockIDs []flow.Identifier
 }
 
+// GetExecutionResultByBlockIDsRequest extracts necessary variables from the provided request,
+// builds a GetExecutionResultByBlockIDs instance, and validates it.
+//
+// No errors are expected during normal operation.
 func GetExecutionResultByBlockIDsRequest(r *common.Request) (GetExecutionResultByBlockIDs, error) {
 	var req GetExecutionResultByBlockIDs
 	err := req.Build(r)
@@ -44,6 +48,10 @@ type GetExecutionResult struct {
 	GetByIDRequest
 }
 
+// GetExecutionResultRequest extracts necessary variables from the provided request,
+// builds a GetExecutionResult instance, and validates it.
+//
+// No errors are expected during normal operation.
 func GetExecutionResultRequest(r *common.Request) (GetExecutionResult, error) {
 	var req GetExecutionResult
 	err := req.Build(r)

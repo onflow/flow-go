@@ -38,6 +38,10 @@ type GetTransaction struct {
 	ExpandsResult bool
 }
 
+// GetTransactionRequest extracts necessary variables from the provided request,
+// builds a GetTransaction instance, and validates it.
+//
+// No errors are expected during normal operation.
 func GetTransactionRequest(r *common.Request) (GetTransaction, error) {
 	var req GetTransaction
 	err := req.Build(r)
@@ -61,6 +65,10 @@ type GetTransactionResult struct {
 	TransactionOptionals
 }
 
+// GetTransactionResultRequest extracts necessary variables from the provided request,
+// builds a GetTransactionResult instance, and validates it.
+//
+// No errors are expected during normal operation.
 func GetTransactionResultRequest(r *common.Request) (GetTransactionResult, error) {
 	var req GetTransactionResult
 	err := req.Build(r)

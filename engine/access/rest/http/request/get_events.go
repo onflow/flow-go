@@ -18,6 +18,10 @@ type GetEvents struct {
 	BlockIDs    []flow.Identifier
 }
 
+// GetEventsRequest extracts necessary variables from the provided request,
+// builds a GetEvents instance, and validates it.
+//
+// No errors are expected during normal operation.
 func GetEventsRequest(r *common.Request) (GetEvents, error) {
 	var req GetEvents
 	err := req.Build(r)

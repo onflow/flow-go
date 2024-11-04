@@ -21,6 +21,10 @@ type GetBlock struct {
 	SealedHeight bool
 }
 
+// GetBlockRequest extracts necessary query parameters from the provided request,
+// builds a GetBlock instance, and validates it.
+//
+// No errors are expected during normal operation.
 func GetBlockRequest(r *common.Request) (GetBlock, error) {
 	var req GetBlock
 	err := req.Build(r)
@@ -101,6 +105,10 @@ type GetBlockByIDs struct {
 	IDs []flow.Identifier
 }
 
+// GetBlockByIDsRequest extracts necessary variables from the provided request,
+// builds a GetBlockByIDs instance, and validates it.
+//
+// No errors are expected during normal operation.
 func GetBlockByIDsRequest(r *common.Request) (GetBlockByIDs, error) {
 	var req GetBlockByIDs
 	err := req.Build(r)
@@ -128,6 +136,10 @@ type GetBlockPayload struct {
 	GetByIDRequest
 }
 
+// GetBlockPayloadRequest extracts necessary variables from the provided request,
+// builds a GetBlockPayload instance, and validates it.
+//
+// No errors are expected during normal operation.
 func GetBlockPayloadRequest(r *common.Request) (GetBlockPayload, error) {
 	var req GetBlockPayload
 	err := req.Build(r)

@@ -13,6 +13,10 @@ type GetAccount struct {
 	Height  uint64
 }
 
+// GetAccountRequest extracts necessary variables and query parameters from the provided request,
+// builds a GetAccount instance, and validates it.
+//
+// No errors are expected during normal operation.
 func GetAccountRequest(r *common.Request) (GetAccount, error) {
 	var req GetAccount
 	err := req.Build(r)

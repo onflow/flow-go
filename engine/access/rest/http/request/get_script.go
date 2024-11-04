@@ -16,6 +16,10 @@ type GetScript struct {
 	Script      Script
 }
 
+// GetScriptRequest extracts necessary variables from the provided request,
+// builds a GetScript instance, and validates it.
+//
+// No errors are expected during normal operation.
 func GetScriptRequest(r *common.Request) (GetScript, error) {
 	var req GetScript
 	err := req.Build(r)

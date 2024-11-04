@@ -10,6 +10,10 @@ type GetAccountBalance struct {
 	Height  uint64
 }
 
+// GetAccountBalanceRequest extracts necessary variables and query parameters from the provided request,
+// builds a GetAccountBalance instance, and validates it.
+//
+// No errors are expected during normal operation.
 func GetAccountBalanceRequest(r *common.Request) (GetAccountBalance, error) {
 	var req GetAccountBalance
 	err := req.Build(r)

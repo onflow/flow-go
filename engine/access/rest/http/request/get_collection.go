@@ -11,6 +11,10 @@ type GetCollection struct {
 	ExpandsTransactions bool
 }
 
+// GetCollectionRequest extracts necessary variables from the provided request,
+// builds a GetCollection instance, and validates it.
+//
+// No errors are expected during normal operation.
 func GetCollectionRequest(r *common.Request) (GetCollection, error) {
 	var req GetCollection
 	err := req.Build(r)
