@@ -1019,9 +1019,6 @@ type ExecutionMetrics interface {
 	// ExecutionCollectionRequestSent reports when a request for a collection is sent to a collection node
 	ExecutionCollectionRequestSent()
 
-	// Unused
-	ExecutionCollectionRequestRetried()
-
 	// ExecutionSync reports when the state syncing is triggered or stopped.
 	ExecutionSync(syncing bool)
 

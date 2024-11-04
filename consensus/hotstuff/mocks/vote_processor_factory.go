@@ -17,7 +17,7 @@ type VoteProcessorFactory struct {
 }
 
 // Create provides a mock function with given fields: log, proposal
-func (_m *VoteProcessorFactory) Create(log zerolog.Logger, proposal *model.Proposal) (hotstuff.VerifyingVoteProcessor, error) {
+func (_m *VoteProcessorFactory) Create(log zerolog.Logger, proposal *model.SignedProposal) (hotstuff.VerifyingVoteProcessor, error) {
 	ret := _m.Called(log, proposal)
 
 	if len(ret) == 0 {
@@ -26,10 +26,10 @@ func (_m *VoteProcessorFactory) Create(log zerolog.Logger, proposal *model.Propo
 
 	var r0 hotstuff.VerifyingVoteProcessor
 	var r1 error
-	if rf, ok := ret.Get(0).(func(zerolog.Logger, *model.Proposal) (hotstuff.VerifyingVoteProcessor, error)); ok {
+	if rf, ok := ret.Get(0).(func(zerolog.Logger, *model.SignedProposal) (hotstuff.VerifyingVoteProcessor, error)); ok {
 		return rf(log, proposal)
 	}
-	if rf, ok := ret.Get(0).(func(zerolog.Logger, *model.Proposal) hotstuff.VerifyingVoteProcessor); ok {
+	if rf, ok := ret.Get(0).(func(zerolog.Logger, *model.SignedProposal) hotstuff.VerifyingVoteProcessor); ok {
 		r0 = rf(log, proposal)
 	} else {
 		if ret.Get(0) != nil {
@@ -37,7 +37,7 @@ func (_m *VoteProcessorFactory) Create(log zerolog.Logger, proposal *model.Propo
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(zerolog.Logger, *model.Proposal) error); ok {
+	if rf, ok := ret.Get(1).(func(zerolog.Logger, *model.SignedProposal) error); ok {
 		r1 = rf(log, proposal)
 	} else {
 		r1 = ret.Error(1)

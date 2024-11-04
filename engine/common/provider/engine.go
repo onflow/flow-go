@@ -266,7 +266,7 @@ func (e *Engine) onEntityRequest(request *internal.EntityRequest) error {
 	e.log.Info().
 		Str("origin_id", request.OriginId.String()).
 		Strs("entity_ids", flow.IdentifierList(entityIDs).Strings()).
-		Uint64("nonce", request.Nonce). // to match with the the entity request received log
+		Uint64("nonce", request.Nonce). // to match with the entity request received log
 		Msg("entity response sent")
 
 	return nil

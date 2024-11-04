@@ -436,7 +436,7 @@ func (h *MessageHub) OnOwnProposal(proposal *flow.Header, targetPublicationTime 
 			return
 		}
 
-		hotstuffProposal := model.ProposalFromFlow(proposal)
+		hotstuffProposal := model.SignedProposalFromFlow(proposal)
 		// notify vote aggregator that new block proposal is available, in case we are next leader
 		h.voteAggregator.AddBlock(hotstuffProposal) // non-blocking
 

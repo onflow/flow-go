@@ -24,6 +24,7 @@ import (
 	export "github.com/onflow/flow-go/cmd/util/cmd/exec-data-json-export"
 	edbs "github.com/onflow/flow-go/cmd/util/cmd/execution-data-blobstore/cmd"
 	extract "github.com/onflow/flow-go/cmd/util/cmd/execution-state-extract"
+	evm_state_exporter "github.com/onflow/flow-go/cmd/util/cmd/export-evm-state"
 	ledger_json_exporter "github.com/onflow/flow-go/cmd/util/cmd/export-json-execution-state"
 	export_json_transactions "github.com/onflow/flow-go/cmd/util/cmd/export-json-transactions"
 	extractpayloads "github.com/onflow/flow-go/cmd/util/cmd/extract-payloads-by-address"
@@ -124,6 +125,7 @@ func addCommands() {
 	rootCmd.AddCommand(debug_tx.Cmd)
 	rootCmd.AddCommand(debug_script.Cmd)
 	rootCmd.AddCommand(generate_authorization_fixes.Cmd)
+	rootCmd.AddCommand(evm_state_exporter.Cmd)
 }
 
 func initConfig() {

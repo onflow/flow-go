@@ -14,8 +14,8 @@ import (
 	"github.com/onflow/cadence/runtime"
 	"github.com/onflow/cadence/sema"
 	cadenceStdlib "github.com/onflow/cadence/stdlib"
-	. "github.com/onflow/cadence/tests/runtime_utils"
-	"github.com/onflow/cadence/tests/utils"
+	. "github.com/onflow/cadence/test_utils/common_utils"
+	. "github.com/onflow/cadence/test_utils/runtime_utils"
 	coreContracts "github.com/onflow/flow-core-contracts/lib/go/contracts"
 	coreContractstemplates "github.com/onflow/flow-core-contracts/lib/go/templates"
 	"github.com/onflow/go-ethereum/crypto"
@@ -2413,7 +2413,7 @@ func TestEVMEncodeDecodeABIErrors(t *testing.T) {
 				Location:    nextScriptLocation(),
 			},
 		)
-		utils.RequireError(t, err)
+		RequireError(t, err)
 		assert.ErrorContains(
 			t,
 			err,
@@ -2498,7 +2498,7 @@ func TestEVMEncodeDecodeABIErrors(t *testing.T) {
 				Location:    nextScriptLocation(),
 			},
 		)
-		utils.RequireError(t, err)
+		RequireError(t, err)
 		assert.ErrorContains(
 			t,
 			err,
@@ -2584,7 +2584,7 @@ func TestEVMEncodeDecodeABIErrors(t *testing.T) {
 				Location:    nextScriptLocation(),
 			},
 		)
-		utils.RequireError(t, err)
+		RequireError(t, err)
 		assert.ErrorContains(
 			t,
 			err,
@@ -2670,7 +2670,7 @@ func TestEVMEncodeDecodeABIErrors(t *testing.T) {
 				Location:    nextScriptLocation(),
 			},
 		)
-		utils.RequireError(t, err)
+		RequireError(t, err)
 		assert.ErrorContains(
 			t,
 			err,
@@ -2766,7 +2766,7 @@ func TestEVMEncodeDecodeABIErrors(t *testing.T) {
 				Location:    nextScriptLocation(),
 			},
 		)
-		utils.RequireError(t, err)
+		RequireError(t, err)
 		assert.ErrorContains(
 			t,
 			err,
@@ -2852,7 +2852,7 @@ func TestEVMEncodeDecodeABIErrors(t *testing.T) {
 				Location:    nextScriptLocation(),
 			},
 		)
-		utils.RequireError(t, err)
+		RequireError(t, err)
 		assert.ErrorContains(
 			t,
 			err,
@@ -2938,7 +2938,7 @@ func TestEVMEncodeDecodeABIErrors(t *testing.T) {
 				Location:    nextScriptLocation(),
 			},
 		)
-		utils.RequireError(t, err)
+		RequireError(t, err)
 		assert.ErrorContains(
 			t,
 			err,
@@ -3024,7 +3024,7 @@ func TestEVMEncodeDecodeABIErrors(t *testing.T) {
 				Location:    nextScriptLocation(),
 			},
 		)
-		utils.RequireError(t, err)
+		RequireError(t, err)
 		assert.ErrorContains(
 			t,
 			err,
@@ -3110,7 +3110,7 @@ func TestEVMEncodeDecodeABIErrors(t *testing.T) {
 				Location:    nextScriptLocation(),
 			},
 		)
-		utils.RequireError(t, err)
+		RequireError(t, err)
 		assert.ErrorContains(
 			t,
 			err,
@@ -3196,7 +3196,7 @@ func TestEVMEncodeDecodeABIErrors(t *testing.T) {
 				Location:    nextScriptLocation(),
 			},
 		)
-		utils.RequireError(t, err)
+		RequireError(t, err)
 		assert.ErrorContains(
 			t,
 			err,
@@ -3292,7 +3292,7 @@ func TestEVMEncodeDecodeABIErrors(t *testing.T) {
 				Location:    nextScriptLocation(),
 			},
 		)
-		utils.RequireError(t, err)
+		RequireError(t, err)
 		assert.ErrorContains(
 			t,
 			err,

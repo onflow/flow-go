@@ -132,14 +132,14 @@ func NewSafetyRules(t *testing.T) *SafetyRules {
 
 	// SafetyRules will not vote for any block, unless the blockID exists in votable map
 	safetyRules.On("ProduceVote", mock.Anything, mock.Anything).Return(
-		func(block *model.Proposal, _ uint64) *model.Vote {
+		func(block *model.SignedProposal, _ uint64) *model.Vote {
 			_, ok := safetyRules.votable[block.Block.BlockID]
 			if !ok {
 				return nil
 			}
 			return createVote(block.Block)
 		},
-		func(block *model.Proposal, _ uint64) error {
+		func(block *model.SignedProposal, _ uint64) error {
 			_, ok := safetyRules.votable[block.Block.BlockID]
 			if !ok {
 				return model.NewNoVoteErrorf("block not found")
@@ -179,7 +179,7 @@ func NewForks(t *testing.T, finalized uint64) *Forks {
 	}
 
 	f.On("AddValidatedBlock", mock.Anything).Return(func(proposal *model.Block) error {
-		log.Info().Msgf("forks.AddValidatedBlock received Proposal for view: %v, QC: %v\n", proposal.View, proposal.QC.View)
+		log.Info().Msgf("forks.AddValidatedBlock received Block proposal for view: %v, QC: %v\n", proposal.View, proposal.QC.View)
 		return f.addProposal(proposal)
 	}).Maybe()
 
@@ -228,14 +228,12 @@ type BlockProducer struct {
 }
 
 func (b *BlockProducer) MakeBlockProposal(view uint64, qc *flow.QuorumCertificate, lastViewTC *flow.TimeoutCertificate) (*flow.Header, error) {
-	return model.ProposalToFlow(&model.Proposal{
-		Block: helper.MakeBlock(
+	return helper.SignedProposalToFlow(helper.MakeSignedProposal(helper.WithProposal(
+		helper.MakeProposal(helper.WithBlock(helper.MakeBlock(
 			helper.WithBlockView(view),
 			helper.WithBlockQC(qc),
-			helper.WithBlockProposer(b.proposerID),
-		),
-		LastViewTC: lastViewTC,
-	}), nil
+			helper.WithBlockProposer(b.proposerID))),
+			helper.WithLastViewTC(lastViewTC))))), nil
 }
 
 func TestEventHandler(t *testing.T) {
@@ -258,8 +256,8 @@ type EventHandlerSuite struct {
 
 	initView       uint64 // the current view at the beginning of the test case
 	endView        uint64 // the expected current view at the end of the test case
-	parentProposal *model.Proposal
-	votingProposal *model.Proposal
+	parentProposal *model.SignedProposal
+	votingProposal *model.SignedProposal
 	qc             *flow.QuorumCertificate
 	tc             *flow.TimeoutCertificate
 	newview        *model.NewViewEvent
@@ -670,7 +668,7 @@ func (es *EventHandlerSuite) TestOnReceiveTc_NextLeaderProposes() {
 
 		// proposed block should contain valid newest QC and lastViewTC
 		expectedNewestQC := es.paceMaker.NewestQC()
-		proposal := model.ProposalFromFlow(header)
+		proposal := model.SignedProposalFromFlow(header)
 		require.Equal(es.T(), expectedNewestQC, proposal.Block.QC)
 		require.Equal(es.T(), es.paceMaker.LastViewTC(), proposal.LastViewTC)
 	}).Once()
@@ -1033,10 +1031,7 @@ func createVote(block *model.Block) *model.Vote {
 	}
 }
 
-func createProposal(view uint64, qcview uint64) *model.Proposal {
+func createProposal(view uint64, qcview uint64) *model.SignedProposal {
 	block := createBlockWithQC(view, qcview)
-	return &model.Proposal{
-		Block:   block,
-		SigData: nil,
-	}
+	return helper.MakeSignedProposal(helper.WithProposal(helper.MakeProposal(helper.WithBlock(block))))
 }

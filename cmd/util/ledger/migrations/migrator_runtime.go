@@ -164,9 +164,7 @@ func NewInterpreterMigrationRuntime(
 ) {
 	basicMigrationRuntime := NewBasicMigrationRuntime(regs)
 
-	env := runtime.NewBaseInterpreterEnvironment(runtime.Config{
-		AttachmentsEnabled: true,
-	})
+	env := runtime.NewBaseInterpreterEnvironment(runtime.Config{})
 
 	runtimeInterface, err := config.NewRuntimeInterface(
 		chainID,
