@@ -44,12 +44,6 @@ func GetTransactionRequest(r *common.Request) (GetTransaction, error) {
 	return req, err
 }
 
-func CreateTransactionRequest(r *common.Request) (CreateTransaction, error) {
-	var req CreateTransaction
-	err := req.Build(r)
-	return req, err
-}
-
 func (g *GetTransaction) Build(r *common.Request) error {
 	err := g.TransactionOptionals.Parse(r)
 	if err != nil {

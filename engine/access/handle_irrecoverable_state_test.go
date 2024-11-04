@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"github.com/antihax/optional"
-	restclient "github.com/onflow/flow/openapi/go-client-generated"
 	accessproto "github.com/onflow/flow/protobuf/go/flow/access"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
@@ -19,6 +18,7 @@ import (
 	"google.golang.org/grpc/credentials/insecure"
 
 	"github.com/onflow/crypto"
+	restclient "github.com/onflow/flow/openapi/go-client-generated"
 
 	accessmock "github.com/onflow/flow-go/engine/access/mock"
 	"github.com/onflow/flow-go/engine/access/rest"

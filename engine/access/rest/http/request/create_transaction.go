@@ -11,6 +11,12 @@ type CreateTransaction struct {
 	Transaction flow.TransactionBody
 }
 
+func CreateTransactionRequest(r *common.Request) (CreateTransaction, error) {
+	var req CreateTransaction
+	err := req.Build(r)
+	return req, err
+}
+
 func (c *CreateTransaction) Build(r *common.Request) error {
 	return c.Parse(r.Body, r.Chain)
 }
