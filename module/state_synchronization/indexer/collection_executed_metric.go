@@ -25,6 +25,8 @@ type CollectionExecutedMetricImpl struct {
 
 	collections storage.Collections
 	blocks      storage.Blocks
+
+	blockTransactions *stdmap.IdentifierMap // Map to track transactions for each block for sealed metrics
 }
 
 func NewCollectionExecutedMetricImpl(
@@ -35,6 +37,7 @@ func NewCollectionExecutedMetricImpl(
 	blocksToMarkExecuted *stdmap.Times,
 	collections storage.Collections,
 	blocks storage.Blocks,
+	blockTransactions *stdmap.IdentifierMap,
 ) (*CollectionExecutedMetricImpl, error) {
 	return &CollectionExecutedMetricImpl{
 		log:                        log,
@@ -44,16 +47,32 @@ func NewCollectionExecutedMetricImpl(
 		blocksToMarkExecuted:       blocksToMarkExecuted,
 		collections:                collections,
 		blocks:                     blocks,
+		blockTransactions:          blockTransactions,
 	}, nil
 }
 
 // CollectionFinalized tracks collections to mark finalized
 func (c *CollectionExecutedMetricImpl) CollectionFinalized(light flow.LightCollection) {
-	if ti, found := c.collectionsToMarkFinalized.ByID(light.ID()); found {
+	lightID := light.ID()
+	if ti, found := c.collectionsToMarkFinalized.ByID(lightID); found {
+
+		block, err := c.blocks.ByCollectionID(lightID)
+		if err != nil {
+			c.log.Warn().Err(err).Msg("could not find block by collection ID")
+			return
+		}
+		blockID := block.ID()
+
 		for _, t := range light.Transactions {
 			c.accessMetrics.TransactionFinalized(t, ti)
+
+			err = c.blockTransactions.Append(blockID, t)
+			if err != nil {
+				c.log.Warn().Err(err).Msg("could not append finalized tx to track sealed transactions")
+				continue
+			}
 		}
-		c.collectionsToMarkFinalized.Remove(light.ID())
+		c.collectionsToMarkFinalized.Remove(lightID)
 	}
 }
 
@@ -72,7 +91,6 @@ func (c *CollectionExecutedMetricImpl) BlockFinalized(block *flow.Block) {
 	// TODO: lookup actual finalization time by looking at the block finalizing `b`
 	now := time.Now().UTC()
 	blockID := block.ID()
-
 	// mark all transactions as finalized
 	// TODO: sample to reduce performance overhead
 	for _, g := range block.Payload.Guarantees {
@@ -88,6 +106,24 @@ func (c *CollectionExecutedMetricImpl) BlockFinalized(block *flow.Block) {
 
 		for _, t := range l.Transactions {
 			c.accessMetrics.TransactionFinalized(t, now)
+			err = c.blockTransactions.Append(blockID, t)
+
+			if err != nil {
+				c.log.Warn().Err(err).Msg("could not append finalized tx to track sealed transactions")
+				continue
+			}
+		}
+	}
+
+	// Process block seals
+	for _, s := range block.Payload.Seals {
+		transactions, found := c.blockTransactions.Get(s.BlockID)
+
+		if found {
+			for _, t := range transactions {
+				c.accessMetrics.TransactionSealed(t, now)
+			}
+			c.blockTransactions.Remove(s.BlockID)
 		}
 	}
 

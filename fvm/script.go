@@ -173,7 +173,8 @@ func (executor *scriptExecutor) Execute() error {
 }
 
 func (executor *scriptExecutor) execute() error {
-	meterParams, _, err := getBodyMeterParameters(
+	executionParams, _, err := getExecutionParameters(
+		executor.env.Logger(),
 		executor.ctx,
 		executor.proc,
 		executor.txnState)
@@ -182,7 +183,7 @@ func (executor *scriptExecutor) execute() error {
 	}
 
 	txnId, err := executor.txnState.BeginNestedTransactionWithMeterParams(
-		meterParams)
+		executionParams)
 	if err != nil {
 		return err
 	}
