@@ -253,6 +253,7 @@ func NewWSHandler(
 	subscribeFunc SubscribeHandlerFunc,
 	chain flow.Chain,
 	stateStreamConfig backend.Config,
+	maxRequestSize int64,
 ) *WSHandler {
 	handler := &WSHandler{
 		subscribeFunc:            subscribeFunc,
@@ -261,7 +262,7 @@ func NewWSHandler(
 		maxStreams:               int32(stateStreamConfig.MaxGlobalStreams),
 		defaultHeartbeatInterval: stateStreamConfig.HeartbeatInterval,
 		activeStreamCount:        atomic.NewInt32(0),
-		HttpHandler:              NewHttpHandler(logger, chain, DefaultMaxRequestSize),
+		HttpHandler:              NewHttpHandler(logger, chain, maxRequestSize),
 	}
 
 	return handler

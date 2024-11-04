@@ -68,10 +68,11 @@ func (b *RouterBuilder) AddWsRoutes(
 	stateStreamApi state_stream.API,
 	chain flow.Chain,
 	stateStreamConfig backend.Config,
+	maxRequestSize int64,
 ) *RouterBuilder {
 
 	for _, r := range WSRoutes {
-		h := NewWSHandler(b.logger, stateStreamApi, r.Handler, chain, stateStreamConfig)
+		h := NewWSHandler(b.logger, stateStreamApi, r.Handler, chain, stateStreamConfig, maxRequestSize)
 		b.v1SubRouter.
 			Methods(r.Method).
 			Path(r.Pattern).
