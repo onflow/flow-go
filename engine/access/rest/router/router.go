@@ -67,7 +67,7 @@ func (b *RouterBuilder) AddWsRoutes(
 	stateStreamConfig backend.Config,
 ) *RouterBuilder {
 
-	for _, r := range WSRoutes {
+	for _, r := range WSLegacyRoutes {
 		h := legacyws.NewWSHandler(b.logger, stateStreamApi, r.Handler, chain, stateStreamConfig)
 		b.v1SubRouter.
 			Methods(r.Method).
@@ -90,7 +90,7 @@ func init() {
 	for _, r := range Routes {
 		routeUrlMap[r.Pattern] = r.Name
 	}
-	for _, r := range WSRoutes {
+	for _, r := range WSLegacyRoutes {
 		routeUrlMap[r.Pattern] = r.Name
 	}
 }
