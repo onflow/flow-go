@@ -13,6 +13,7 @@ import (
 	badgerds "github.com/ipfs/go-ds-badger2"
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
+	"go.uber.org/atomic"
 
 	"github.com/onflow/flow-go/cmd"
 	"github.com/onflow/flow-go/cmd/util/cmd/common"
@@ -26,6 +27,7 @@ import (
 	"github.com/onflow/flow-go/fvm/storage/derived"
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/ledger/common/pathfinder"
+	"github.com/onflow/flow-go/ledger/complete"
 	ledgercomplete "github.com/onflow/flow-go/ledger/complete"
 	"github.com/onflow/flow-go/ledger/complete/wal"
 	"github.com/onflow/flow-go/model/flow"
@@ -128,6 +130,21 @@ func runWithFlags(
 	if err != nil {
 		return fmt.Errorf("failed to initialize ledger: %w", err)
 	}
+
+	compactor, err := complete.NewCompactor(
+		ledgerStorage, diskWAL,
+		log.With().Str("subcomponent", "checkpointer").Logger(),
+		500,
+		100,
+		5,
+		atomic.NewBool(false),
+		metrics.NewNoopCollector(),
+	)
+	if err != nil {
+		return fmt.Errorf("failed to initialize compactor: %w", err)
+	}
+	<-compactor.Ready()
+	<-ledgerStorage.Ready()
 
 	execState, err := createExecutionState(chunkDataPackDir, ledgerStorage, storages, db)
 	if err != nil {
@@ -269,6 +286,8 @@ func executeBlock(
 		executableBlock.Block.Header.ParentID,
 		executableBlock.Block.Header.Height-1,
 	)
+
+	log.Info().Msgf("computing block %v", executableBlock.Block.Header.ID())
 
 	computationResult, err := computationManager.ComputeBlock(
 		ctx,

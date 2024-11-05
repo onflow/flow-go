@@ -150,6 +150,7 @@ func (collector *resultCollector) commitCollection(
 		collectionExecutionSnapshot,
 		collector.currentCollectionStorageSnapshot,
 	)
+
 	if err != nil {
 		return fmt.Errorf("commit view failed: %w", err)
 	}
