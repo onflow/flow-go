@@ -265,7 +265,7 @@ func (suite *BackfillTxErrorMessagesSuite) TestValidateInvalidFormat() {
 		})
 		suite.Error(err)
 		suite.Equal(err, admin.NewInvalidAdminReqParameterError(
-			"execution-node-ids", "must be a list of string", []int{1, 2, 3}))
+			"execution-node-ids", "must be a list of strings", []int{1, 2, 3}))
 
 		// invalid type
 		err = suite.command.Validator(&admin.CommandRequest{
@@ -275,7 +275,7 @@ func (suite *BackfillTxErrorMessagesSuite) TestValidateInvalidFormat() {
 		})
 		suite.Error(err)
 		suite.Equal(err, admin.NewInvalidAdminReqParameterError(
-			"execution-node-ids", "must be a list of string", "123"))
+			"execution-node-ids", "must be a list of strings", "123"))
 
 		// invalid execution node id
 		invalidENID := unittest.IdentifierFixture()

@@ -175,7 +175,7 @@ func (b *BackfillTxErrorMessagesCommand) parseExecutionNodeIds(executionNodeIdsI
 	switch executionNodeIds := executionNodeIdsIn.(type) {
 	case []string:
 		if len(executionNodeIds) == 0 {
-			return nil, admin.NewInvalidAdminReqParameterError("execution-node-ids", "must be a non empty list of string", executionNodeIdsIn)
+			return nil, admin.NewInvalidAdminReqParameterError("execution-node-ids", "must be a non empty list of strings", executionNodeIdsIn)
 		}
 		requestedENIdentifiers, err := commonrpc.IdentifierList(executionNodeIds)
 		if err != nil {
@@ -190,7 +190,7 @@ func (b *BackfillTxErrorMessagesCommand) parseExecutionNodeIds(executionNodeIdsI
 			ids = append(ids, id)
 		}
 	default:
-		return nil, admin.NewInvalidAdminReqParameterError("execution-node-ids", "must be a list of string", executionNodeIdsIn)
+		return nil, admin.NewInvalidAdminReqParameterError("execution-node-ids", "must be a list of strings", executionNodeIdsIn)
 	}
 
 	return ids.ToSkeleton(), nil
