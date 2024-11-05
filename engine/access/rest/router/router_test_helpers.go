@@ -145,7 +145,7 @@ func ExecuteWsRequest(req *http.Request, stateStreamApi state_stream.API, respon
 	router := NewRouterBuilder(
 		unittest.Logger(),
 		restCollector,
-	).AddWsRoutes(
+	).AddWsLegacyRoutes(
 		stateStreamApi,
 		chain, config,
 	).Build()

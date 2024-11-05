@@ -60,8 +60,8 @@ func (b *RouterBuilder) AddRestRoutes(backend access.API, chain flow.Chain) *Rou
 	return b
 }
 
-// AddWsRoutes adds WebSocket routes to the router.
-func (b *RouterBuilder) AddWsRoutes(
+// AddWsLegacyRoutes adds WebSocket routes to the router.
+func (b *RouterBuilder) AddWsLegacyRoutes(
 	stateStreamApi state_stream.API,
 	chain flow.Chain,
 	stateStreamConfig backend.Config,

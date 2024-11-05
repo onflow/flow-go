@@ -44,7 +44,7 @@ func NewServer(serverAPI access.API,
 ) (*http.Server, error) {
 	builder := router.NewRouterBuilder(logger, restCollector).AddRestRoutes(serverAPI, chain)
 	if stateStreamApi != nil {
-		builder.AddWsRoutes(stateStreamApi, chain, stateStreamConfig)
+		builder.AddWsLegacyRoutes(stateStreamApi, chain, stateStreamConfig)
 	}
 
 	c := cors.New(cors.Options{
