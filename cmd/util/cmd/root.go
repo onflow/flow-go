@@ -31,6 +31,7 @@ import (
 	find_inconsistent_result "github.com/onflow/flow-go/cmd/util/cmd/find-inconsistent-result"
 	find_trie_root "github.com/onflow/flow-go/cmd/util/cmd/find-trie-root"
 	generate_authorization_fixes "github.com/onflow/flow-go/cmd/util/cmd/generate-authorization-fixes"
+	re_execute_block "github.com/onflow/flow-go/cmd/util/cmd/re-execute-block"
 	read_badger "github.com/onflow/flow-go/cmd/util/cmd/read-badger/cmd"
 	read_execution_state "github.com/onflow/flow-go/cmd/util/cmd/read-execution-state"
 	read_hotstuff "github.com/onflow/flow-go/cmd/util/cmd/read-hotstuff/cmd"
@@ -126,6 +127,7 @@ func addCommands() {
 	rootCmd.AddCommand(debug_script.Cmd)
 	rootCmd.AddCommand(generate_authorization_fixes.Cmd)
 	rootCmd.AddCommand(evm_state_exporter.Cmd)
+	rootCmd.AddCommand(re_execute_block.Cmd)
 }
 
 func initConfig() {
