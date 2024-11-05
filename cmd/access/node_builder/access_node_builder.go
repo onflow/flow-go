@@ -1514,7 +1514,7 @@ func (builder *FlowAccessNodeBuilder) extraFlags() {
 		}
 
 		if builder.rpcConf.RestConfig.MaxRequestSize <= 0 {
-			return errors.New("rest-max-request-size must be greater than or equal to 0")
+			return errors.New("rest-max-request-size must be greater than 0")
 		}
 
 		return nil
