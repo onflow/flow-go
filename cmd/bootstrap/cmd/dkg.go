@@ -10,10 +10,11 @@ import (
 	model "github.com/onflow/flow-go/model/bootstrap"
 	"github.com/onflow/flow-go/model/dkg"
 	"github.com/onflow/flow-go/model/encodable"
+	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/state/protocol/inmem"
 )
 
-func runBeaconKG(nodes []model.NodeInfo) dkg.DKGData {
+func runBeaconKG(nodes []model.NodeInfo) (dkg.DKGData, flow.DKGIndexMap) {
 	n := len(nodes)
 
 	log.Info().Msgf("read %v node infos for DKG", n)
@@ -46,6 +47,11 @@ func runBeaconKG(nodes []model.NodeInfo) dkg.DKGData {
 		log.Info().Msgf("wrote file %s/%s", flagOutdir, fmt.Sprintf(model.PathRandomBeaconPriv, nodeID))
 	}
 
+	indexMap := make(flow.DKGIndexMap, len(pubKeyShares))
+	for i, node := range nodes {
+		indexMap[node.NodeID] = i
+	}
+
 	// write full DKG info that will be used to construct QC
 	err = common.WriteJSON(model.PathRootDKGData, flagOutdir, inmem.EncodableFullDKG{
 		GroupKey: encodable.RandomBeaconPubKey{
@@ -59,5 +65,5 @@ func runBeaconKG(nodes []model.NodeInfo) dkg.DKGData {
 	}
 	log.Info().Msgf("wrote file %s/%s", flagOutdir, model.PathRootDKGData)
 
-	return dkgData
+	return dkgData, indexMap
 }
