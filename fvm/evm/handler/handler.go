@@ -7,6 +7,7 @@ import (
 	"github.com/onflow/cadence/common"
 	gethCommon "github.com/onflow/go-ethereum/common"
 	gethTypes "github.com/onflow/go-ethereum/core/types"
+	"github.com/rs/zerolog/log"
 	"go.opentelemetry.io/otel/attribute"
 
 	"github.com/onflow/flow-go/fvm/environment"
@@ -398,6 +399,13 @@ func (h *ContractHandler) run(rlpEncodedTx []byte) (*types.Result, error) {
 	if res == nil { // safety check for result
 		return nil, types.ErrUnexpectedEmptyResult
 	}
+
+	log.Info().
+		Str("tx_hash", res.TxHash.String()).
+		Uint64("gas_consumed", res.GasConsumed).
+		Uint64("cumulative_gas_used", res.CumulativeGasUsed).
+		Uint64("gas_refund", res.GasRefund).
+		Msg("executed transaction")
 
 	// step 6 - meter gas anyway (even for invalid or failed states)
 	err = h.meterGasUsage(res)

@@ -82,10 +82,11 @@ func init() {
 	_ = Cmd.MarkPersistentFlagRequired("nodeid")
 
 	Cmd.Flags().IntVar(&flagFrom, "from", 0, "from segment")
+	_ = Cmd.MarkPersistentFlagRequired("from")
 }
 
 func run(*cobra.Command, []string) {
-	err := runWithFlags(flagDatadir, flagExecutionStateDir, flagChunkDataPackDir, flagBootstrapDir, flagExecutionDataDir, flagNodeID, uint64(flagFrom))
+	err := runWithFlags(flagDatadir, flagChunkDataPackDir, flagExecutionStateDir, flagBootstrapDir, flagExecutionDataDir, flagNodeID, uint64(flagFrom))
 	if err != nil {
 		log.Fatal().Err(err).Msg("could not run with flags")
 	}
@@ -100,6 +101,15 @@ func runWithFlags(
 	nodeID string,
 	height uint64,
 ) error {
+	log.Info().
+		Str("datadir", datadir).
+		Str("chunkDataPackDir", chunkDataPackDir).
+		Str("trieDir", trieDir).
+		Str("bootstrapDir", bootstrapDir).
+		Str("executionDataDir", executionDataDir).
+		Str("nodeID", nodeID).
+		Uint64("height", height).
+		Msg("re-execute block")
 
 	db := common.InitStorage(flagDatadir)
 	defer db.Close()
@@ -231,10 +241,15 @@ func ExecuteBlock(
 		return err
 	}
 
-	_, err = executeBlock(execState, computationManager, context.Background(), block)
+	log.Info().Msgf("executing block %v", block.Block.Header.ID())
+
+	result, err := executeBlock(execState, computationManager, context.Background(), block)
 	if err != nil {
 		return err
 	}
+
+	log.Info().Msgf("block %v executed, result ID: %v", block.Block.Header.ID(), result.ID())
+
 	return nil
 }
 
