@@ -180,8 +180,8 @@ func (suite *BackfillTxErrorMessagesSuite) TestValidateInvalidFormat() {
 			fmt.Errorf("invalid value for \"n\": %v", 0)))
 	})
 
-	// invalid start-height, start-height is grater than latest sealed block
-	suite.Run("start-height is grater than latest sealed block", func() {
+	// invalid start-height, start-height is greater than latest sealed block
+	suite.Run("start-height is greater than latest sealed block", func() {
 		startHeight := 100
 		err := suite.command.Validator(&admin.CommandRequest{
 			Data: map[string]interface{}{
@@ -190,11 +190,11 @@ func (suite *BackfillTxErrorMessagesSuite) TestValidateInvalidFormat() {
 		})
 		suite.Error(err)
 		suite.Equal(err, admin.NewInvalidAdminReqErrorf(
-			"'start-height' %d must not be grater than latest sealed block %d", startHeight, suite.sealedBlock.Header.Height))
+			"'start-height' %d must not be greater than latest sealed block %d", startHeight, suite.sealedBlock.Header.Height))
 	})
 
-	// invalid start-height, start-height is smaller than root block
-	suite.Run("start-height is smaller than root block", func() {
+	// invalid start-height, start-height is less than root block
+	suite.Run("start-height is less than root block", func() {
 		suite.nodeRootBlock.Header = suite.blockHeadersMap[2] // mock sealed root block to height 2
 
 		startHeight := 1
@@ -205,7 +205,7 @@ func (suite *BackfillTxErrorMessagesSuite) TestValidateInvalidFormat() {
 		})
 		suite.Error(err)
 		suite.Equal(err, admin.NewInvalidAdminReqErrorf(
-			"'start-height' %d must not be smaller than root block %d", startHeight, suite.nodeRootBlock.Header.Height))
+			"'start-height' %d must not be less than root block %d", startHeight, suite.nodeRootBlock.Header.Height))
 
 		suite.nodeRootBlock.Header = suite.blockHeadersMap[0] // mock sealed root block back to height 0
 	})
@@ -223,8 +223,8 @@ func (suite *BackfillTxErrorMessagesSuite) TestValidateInvalidFormat() {
 			fmt.Errorf("invalid value for \"n\": %v", 0)))
 	})
 
-	// end-height is bigger than latest sealed block
-	suite.Run("invalid end-height is grater than latest sealed block", func() {
+	// end-height is greater than latest sealed block
+	suite.Run("invalid end-height is greater than latest sealed block", func() {
 		endHeight := 100
 		err := suite.command.Validator(&admin.CommandRequest{
 			Data: map[string]interface{}{
@@ -235,7 +235,7 @@ func (suite *BackfillTxErrorMessagesSuite) TestValidateInvalidFormat() {
 		})
 		suite.Error(err)
 		suite.Equal(err, admin.NewInvalidAdminReqErrorf(
-			"'end-height' %d must not be grater than latest sealed block %d",
+			"'end-height' %d must not be greater than latest sealed block %d",
 			endHeight,
 			suite.sealedBlock.Header.Height,
 		))
@@ -252,7 +252,7 @@ func (suite *BackfillTxErrorMessagesSuite) TestValidateInvalidFormat() {
 		})
 		suite.Error(err)
 		suite.Equal(err, admin.NewInvalidAdminReqErrorf(
-			"'start-height' %d must not be smaller than 'end-height' %d", startHeight, endHeight))
+			"'start-height' %d must not be less than 'end-height' %d", startHeight, endHeight))
 	})
 
 	// invalid execution-node-ids param
@@ -288,7 +288,7 @@ func (suite *BackfillTxErrorMessagesSuite) TestValidateInvalidFormat() {
 		})
 		suite.Error(err)
 		suite.Equal(err, admin.NewInvalidAdminReqParameterError(
-			"execution-node-ids", "could not found execution node by provided id", invalidENID.String()))
+			"execution-node-ids", "could not find execution node by provided id", invalidENID.String()))
 	})
 }
 

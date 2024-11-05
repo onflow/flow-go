@@ -72,7 +72,7 @@ func (b *BackfillTxErrorMessagesCommand) Validator(request *admin.CommandRequest
 
 		if startHeight > lastSealedHeight {
 			return admin.NewInvalidAdminReqErrorf(
-				"'start-height' %d must not be grater than latest sealed block %d",
+				"'start-height' %d must not be greater than latest sealed block %d",
 				startHeight,
 				lastSealedHeight,
 			)
@@ -80,7 +80,7 @@ func (b *BackfillTxErrorMessagesCommand) Validator(request *admin.CommandRequest
 
 		if startHeight < rootHeight {
 			return admin.NewInvalidAdminReqErrorf(
-				"'start-height' %d must not be smaller than root block %d",
+				"'start-height' %d must not be less than root block %d",
 				startHeight,
 				rootHeight,
 			)
@@ -98,7 +98,7 @@ func (b *BackfillTxErrorMessagesCommand) Validator(request *admin.CommandRequest
 
 		if endHeight > lastSealedHeight {
 			return admin.NewInvalidAdminReqErrorf(
-				"'end-height' %d must not be grater than latest sealed block %d",
+				"'end-height' %d must not be greater than latest sealed block %d",
 				endHeight,
 				lastSealedHeight,
 			)
@@ -109,7 +109,7 @@ func (b *BackfillTxErrorMessagesCommand) Validator(request *admin.CommandRequest
 
 	if data.endHeight < data.startHeight {
 		return admin.NewInvalidAdminReqErrorf(
-			"'start-height' %d must not be smaller than 'end-height' %d",
+			"'start-height' %d must not be less than 'end-height' %d",
 			data.startHeight,
 			data.endHeight,
 		)
@@ -185,7 +185,7 @@ func (b *BackfillTxErrorMessagesCommand) parseExecutionNodeIds(executionNodeIdsI
 		for _, enId := range requestedENIdentifiers {
 			id, exists := allIdentities.ByNodeID(enId)
 			if !exists {
-				return nil, admin.NewInvalidAdminReqParameterError("execution-node-ids", "could not found execution node by provided id", enId)
+				return nil, admin.NewInvalidAdminReqParameterError("execution-node-ids", "could not find execution node by provided id", enId)
 			}
 			ids = append(ids, id)
 		}
