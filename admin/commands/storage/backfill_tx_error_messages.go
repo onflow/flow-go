@@ -18,9 +18,9 @@ var _ commands.AdminCommand = (*BackfillTxErrorMessagesCommand)(nil)
 // backfillTxErrorMessagesRequest represents the input parameters for
 // backfilling transaction error messages.
 type backfillTxErrorMessagesRequest struct {
-	startHeight      uint64            // Start height from which to begin backfilling.
-	endHeight        uint64            // End height up to which backfilling is performed.
-	executionNodeIds flow.IdentityList // List of execution node IDs to be used for backfilling.
+	startHeight      uint64                    // Start height from which to begin backfilling.
+	endHeight        uint64                    // End height up to which backfilling is performed.
+	executionNodeIds flow.IdentitySkeletonList // List of execution node IDs to be used for backfilling.
 }
 
 // BackfillTxErrorMessagesCommand executes a command to backfill
@@ -65,31 +65,51 @@ func (b *BackfillTxErrorMessagesCommand) Validator(request *admin.CommandRequest
 
 	lastSealedHeight := sealed.Height
 	if startHeightIn, ok := input["start-height"]; ok {
-		if startHeight, err := parseN(startHeightIn); err != nil {
+		startHeight, err := parseN(startHeightIn)
+		if err != nil {
 			return admin.NewInvalidAdminReqErrorf("invalid 'start-height' field: %w", err)
-		} else if startHeight > lastSealedHeight {
+		}
+
+		if startHeight > lastSealedHeight {
 			return admin.NewInvalidAdminReqErrorf(
-				"'start-height' %d can not be grater than latest sealed block %d",
+				"'start-height' %d must not be grater than latest sealed block %d",
 				startHeight,
 				lastSealedHeight,
 			)
-		} else if startHeight > rootHeight {
-			data.startHeight = startHeight
 		}
+
+		if startHeight < rootHeight {
+			return admin.NewInvalidAdminReqErrorf(
+				"'start-height' %d must not be smaller than root block %d",
+				startHeight,
+				rootHeight,
+			)
+		}
+
+		data.startHeight = startHeight
 	}
 
 	data.endHeight = lastSealedHeight // Default value
 	if endHeightIn, ok := input["end-height"]; ok {
-		if endHeight, err := parseN(endHeightIn); err != nil {
+		endHeight, err := parseN(endHeightIn)
+		if err != nil {
 			return admin.NewInvalidAdminReqErrorf("invalid 'end-height' field: %w", err)
-		} else if endHeight < lastSealedHeight {
-			data.endHeight = endHeight
 		}
+
+		if endHeight > lastSealedHeight {
+			return admin.NewInvalidAdminReqErrorf(
+				"'end-height' %d must not be grater than latest sealed block %d",
+				endHeight,
+				lastSealedHeight,
+			)
+		}
+
+		data.endHeight = endHeight
 	}
 
 	if data.endHeight < data.startHeight {
 		return admin.NewInvalidAdminReqErrorf(
-			"'start-height' %d should not be smaller than 'end-height' %d",
+			"'start-height' %d must not be smaller than 'end-height' %d",
 			data.startHeight,
 			data.endHeight,
 		)
@@ -108,7 +128,7 @@ func (b *BackfillTxErrorMessagesCommand) Validator(request *admin.CommandRequest
 		data.executionNodeIds = executionNodeIds
 	} else {
 		// in case no execution node ids provided, the command will use any valid execution node
-		data.executionNodeIds = identities
+		data.executionNodeIds = identities.ToSkeleton()
 	}
 
 	request.ValidatorData = data
@@ -135,7 +155,7 @@ func (b *BackfillTxErrorMessagesCommand) Handler(ctx context.Context, request *a
 		}
 
 		blockID := header.ID()
-		err = b.txErrorMessagesCore.HandleTransactionResultErrorMessagesByENs(ctx, blockID, data.executionNodeIds.ToSkeleton())
+		err = b.txErrorMessagesCore.HandleTransactionResultErrorMessagesByENs(ctx, blockID, data.executionNodeIds)
 		if err != nil {
 			return nil, fmt.Errorf("error encountered while processing transaction result error message for block: %d, %w", height, err)
 		}
@@ -144,12 +164,12 @@ func (b *BackfillTxErrorMessagesCommand) Handler(ctx context.Context, request *a
 	return nil, nil
 }
 
-// parseExecutionNodeIds converts a list of node IDs from input to flow.IdentityList.
+// parseExecutionNodeIds converts a list of node IDs from input to flow.IdentitySkeletonList.
 // Returns an error if the IDs are invalid or empty.
 //
 // Expected errors during normal operation:
 // - admin.InvalidAdminReqParameterError - if execution-node-ids is empty or has an invalid format.
-func (b *BackfillTxErrorMessagesCommand) parseExecutionNodeIds(executionNodeIdsIn interface{}, allIdentities flow.IdentityList) (flow.IdentityList, error) {
+func (b *BackfillTxErrorMessagesCommand) parseExecutionNodeIds(executionNodeIdsIn interface{}, allIdentities flow.IdentityList) (flow.IdentitySkeletonList, error) {
 	var ids flow.IdentityList
 
 	switch executionNodeIds := executionNodeIdsIn.(type) {
@@ -162,10 +182,10 @@ func (b *BackfillTxErrorMessagesCommand) parseExecutionNodeIds(executionNodeIdsI
 			return nil, admin.NewInvalidAdminReqParameterError("execution-node-ids", err.Error(), executionNodeIdsIn)
 		}
 
-		for _, en := range requestedENIdentifiers {
-			id, exists := allIdentities.ByNodeID(en)
+		for _, enId := range requestedENIdentifiers {
+			id, exists := allIdentities.ByNodeID(enId)
 			if !exists {
-				return nil, admin.NewInvalidAdminReqParameterError("execution-node-ids", "could not found execution nodes by provided ids", executionNodeIdsIn)
+				return nil, admin.NewInvalidAdminReqParameterError("execution-node-ids", "could not found execution node by provided id", enId)
 			}
 			ids = append(ids, id)
 		}
@@ -173,5 +193,5 @@ func (b *BackfillTxErrorMessagesCommand) parseExecutionNodeIds(executionNodeIdsI
 		return nil, admin.NewInvalidAdminReqParameterError("execution-node-ids", "must be a list of string", executionNodeIdsIn)
 	}
 
-	return ids, nil
+	return ids.ToSkeleton(), nil
 }

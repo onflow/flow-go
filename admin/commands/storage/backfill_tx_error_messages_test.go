@@ -58,6 +58,7 @@ type BackfillTxErrorMessagesSuite struct {
 	blockHeadersMap map[uint64]*flow.Header
 
 	nodeRootBlock flow.Block
+	sealedBlock   *flow.Block
 	blockCount    int
 }
 
@@ -89,13 +90,17 @@ func (suite *BackfillTxErrorMessagesSuite) SetupTest() {
 		// update for next iteration
 		parent = block.Header
 		suite.blockHeadersMap[block.Header.Height] = block.Header
+		suite.sealedBlock = block
 	}
 
 	suite.params = protocolmock.NewParams(suite.T())
-	suite.params.On("SealedRoot").Return(suite.nodeRootBlock.Header, nil)
+	suite.params.On("SealedRoot").Return(
+		func() *flow.Header {
+			return suite.nodeRootBlock.Header
+		}, nil)
 	suite.state.On("Params").Return(suite.params, nil).Maybe()
 
-	suite.snapshot = createSnapshot(suite.T(), parent)
+	suite.snapshot = createSnapshot(suite.T(), suite.sealedBlock.Header)
 	suite.state.On("Sealed").Return(suite.snapshot)
 	suite.state.On("Final").Return(suite.snapshot)
 
@@ -114,7 +119,7 @@ func (suite *BackfillTxErrorMessagesSuite) SetupTest() {
 	suite.snapshot.On("Identities", mock.Anything).Return(
 		func(flow.IdentityFilter[flow.Identity]) (flow.IdentityList, error) {
 			return suite.allENIDs, nil
-		}, nil)
+		}, nil).Maybe()
 
 	// create a mock connection factory
 	suite.connFactory = connectionmock.NewConnectionFactory(suite.T())
@@ -176,7 +181,7 @@ func (suite *BackfillTxErrorMessagesSuite) TestValidateInvalidFormat() {
 	})
 
 	// invalid start-height, start-height is grater than latest sealed block
-	suite.Run("invalid end-height field", func() {
+	suite.Run("start-height is grater than latest sealed block", func() {
 		startHeight := 100
 		err := suite.command.Validator(&admin.CommandRequest{
 			Data: map[string]interface{}{
@@ -185,7 +190,24 @@ func (suite *BackfillTxErrorMessagesSuite) TestValidateInvalidFormat() {
 		})
 		suite.Error(err)
 		suite.Equal(err, admin.NewInvalidAdminReqErrorf(
-			"'start-height' %d can not be grater than latest sealed block %d", startHeight, suite.blockCount))
+			"'start-height' %d must not be grater than latest sealed block %d", startHeight, suite.sealedBlock.Header.Height))
+	})
+
+	// invalid start-height, start-height is smaller than root block
+	suite.Run("start-height is smaller than root block", func() {
+		suite.nodeRootBlock.Header = suite.blockHeadersMap[2] // mock sealed root block to height 2
+
+		startHeight := 1
+		err := suite.command.Validator(&admin.CommandRequest{
+			Data: map[string]interface{}{
+				"start-height": float64(startHeight),
+			},
+		})
+		suite.Error(err)
+		suite.Equal(err, admin.NewInvalidAdminReqErrorf(
+			"'start-height' %d must not be smaller than root block %d", startHeight, suite.nodeRootBlock.Header.Height))
+
+		suite.nodeRootBlock.Header = suite.blockHeadersMap[0] // mock sealed root block back to height 0
 	})
 
 	// invalid end-height
@@ -201,6 +223,24 @@ func (suite *BackfillTxErrorMessagesSuite) TestValidateInvalidFormat() {
 			fmt.Errorf("invalid value for \"n\": %v", 0)))
 	})
 
+	// end-height is bigger than latest sealed block
+	suite.Run("invalid end-height is grater than latest sealed block", func() {
+		endHeight := 100
+		err := suite.command.Validator(&admin.CommandRequest{
+			Data: map[string]interface{}{
+				"start-height":       float64(1),         // raw json parses to float64
+				"end-height":         float64(endHeight), // raw json parses to float64
+				"execution-node-ids": []string{suite.allENIDs[0].ID().String()},
+			},
+		})
+		suite.Error(err)
+		suite.Equal(err, admin.NewInvalidAdminReqErrorf(
+			"'end-height' %d must not be grater than latest sealed block %d",
+			endHeight,
+			suite.sealedBlock.Header.Height,
+		))
+	})
+
 	suite.Run("invalid combination of start-height and end-height fields", func() {
 		startHeight := 3
 		endHeight := 1
@@ -212,7 +252,7 @@ func (suite *BackfillTxErrorMessagesSuite) TestValidateInvalidFormat() {
 		})
 		suite.Error(err)
 		suite.Equal(err, admin.NewInvalidAdminReqErrorf(
-			"'start-height' %d should not be smaller than 'end-height' %d", startHeight, endHeight))
+			"'start-height' %d must not be smaller than 'end-height' %d", startHeight, endHeight))
 	})
 
 	// invalid execution-node-ids param
@@ -241,14 +281,14 @@ func (suite *BackfillTxErrorMessagesSuite) TestValidateInvalidFormat() {
 		invalidENID := unittest.IdentifierFixture()
 		err = suite.command.Validator(&admin.CommandRequest{
 			Data: map[string]interface{}{
-				"start-height":       float64(1),  // raw json parses to float64
-				"end-height":         float64(10), // raw json parses to float64
+				"start-height":       float64(1), // raw json parses to float64
+				"end-height":         float64(4), // raw json parses to float64
 				"execution-node-ids": []string{invalidENID.String()},
 			},
 		})
 		suite.Error(err)
 		suite.Equal(err, admin.NewInvalidAdminReqParameterError(
-			"execution-node-ids", "could not found execution nodes by provided ids", []string{invalidENID.String()}))
+			"execution-node-ids", "could not found execution node by provided id", invalidENID.String()))
 	})
 }
 
@@ -256,8 +296,7 @@ func (suite *BackfillTxErrorMessagesSuite) TestValidateInvalidFormat() {
 // in the command validator.
 // It tests various valid cases, such as:
 // - Default parameters (start-height, end-height, execution-node-ids) are used.
-// - Provided "start-height" and "end-height" values are within expected ranges.
-// - Proper "execution-node-ids" are supplied.
+// - Provided parameters (start-height, end-height, execution-node-ids) values are within expected ranges.
 func (suite *BackfillTxErrorMessagesSuite) TestValidateValidFormat() {
 	// start-height and end-height are not provided, the root block and the latest sealed block
 	// will be used as the start and end heights respectively.
@@ -265,36 +304,6 @@ func (suite *BackfillTxErrorMessagesSuite) TestValidateValidFormat() {
 	suite.Run("happy case, all default parameters", func() {
 		err := suite.command.Validator(&admin.CommandRequest{
 			Data: map[string]interface{}{},
-		})
-		suite.NoError(err)
-	})
-
-	// all parameters are provided
-	// start-height is less than root block, the root  block
-	// will be used as the start-height.
-	suite.Run("happy case, start-height is less than root block", func() {
-		suite.params.On("SealedRoot").Return(suite.blockHeadersMap[1].Height, nil)
-		suite.state.On("Params").Return(suite.params, nil).Maybe()
-		err := suite.command.Validator(&admin.CommandRequest{
-			Data: map[string]interface{}{
-				"start-height":       float64(2), // raw json parses to float64
-				"end-height":         float64(5), // raw json parses to float64
-				"execution-node-ids": []string{suite.allENIDs[0].ID().String()},
-			},
-		})
-		suite.NoError(err)
-	})
-
-	// all parameters are provided
-	// end-height is bigger than latest sealed block, the latest sealed block
-	// will be used as the end-height.
-	suite.Run("happy case, end-height is bigger than latest sealed block", func() {
-		err := suite.command.Validator(&admin.CommandRequest{
-			Data: map[string]interface{}{
-				"start-height":       float64(1),   // raw json parses to float64
-				"end-height":         float64(100), // raw json parses to float64
-				"execution-node-ids": []string{suite.allENIDs[0].ID().String()},
-			},
 		})
 		suite.NoError(err)
 	})
