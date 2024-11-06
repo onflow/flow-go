@@ -20,6 +20,7 @@ import (
 func TestEncodeDecode(t *testing.T) {
 	setup := unittest.EpochSetupFixture()
 	commit := unittest.EpochCommitFixture()
+	epochRecover := unittest.EpochRecoverFixture()
 	versionBeacon := unittest.VersionBeaconFixture()
 	protocolVersionUpgrade := unittest.ProtocolStateVersionUpgradeFixture()
 	setEpochExtensionViewCount := &flow.SetEpochExtensionViewCount{Value: uint64(rand.Uint32())}
@@ -42,6 +43,9 @@ func TestEncodeDecode(t *testing.T) {
 			// EpochCommit
 			assertJsonConvert(t, commit, comparePubKey)
 
+			// EpochRecover
+			assertJsonConvert(t, epochRecover, comparePubKey)
+
 			// VersionBeacon
 			assertJsonConvert(t, versionBeacon)
 
@@ -61,6 +65,9 @@ func TestEncodeDecode(t *testing.T) {
 
 			// EpochCommit
 			assertJsonGenericConvert(t, commit, comparePubKey)
+
+			// EpochRecover
+			assertJsonGenericConvert(t, epochRecover, comparePubKey)
 
 			// VersionBeacon
 			assertJsonGenericConvert(t, versionBeacon)
@@ -84,6 +91,9 @@ func TestEncodeDecode(t *testing.T) {
 			// EpochCommit
 			assertMsgPackConvert(t, commit, comparePubKey)
 
+			// EpochRecover
+			assertMsgPackConvert(t, epochRecover, comparePubKey)
+
 			// VersionBeacon
 			assertMsgPackConvert(t, versionBeacon)
 
@@ -103,6 +113,9 @@ func TestEncodeDecode(t *testing.T) {
 
 			// EpochCommit
 			assertMsgPackGenericConvert(t, commit, comparePubKey)
+
+			// EpochRecover
+			assertMsgPackGenericConvert(t, epochRecover, comparePubKey)
 
 			// VersionBeacon
 			assertMsgPackGenericConvert(t, versionBeacon, comparePubKey)
@@ -126,6 +139,9 @@ func TestEncodeDecode(t *testing.T) {
 			// EpochCommit
 			assertCborConvert(t, commit, comparePubKey)
 
+			// EpochRecover
+			assertCborConvert(t, epochRecover, comparePubKey)
+
 			// VersionBeacon
 			assertCborConvert(t, versionBeacon)
 
@@ -145,6 +161,9 @@ func TestEncodeDecode(t *testing.T) {
 
 			// EpochCommit
 			assertCborGenericConvert(t, commit, comparePubKey)
+
+			// EpochRecover
+			assertCborGenericConvert(t, epochRecover, comparePubKey)
 
 			// VersionBeacon
 			assertCborGenericConvert(t, versionBeacon)
