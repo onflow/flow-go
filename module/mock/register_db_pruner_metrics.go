@@ -9,8 +9,8 @@ type RegisterDBPrunerMetrics struct {
 	mock.Mock
 }
 
-// LatestPrunedHeightWithProgressPercentage provides a mock function with given fields: lastPrunedHeight
-func (_m *RegisterDBPrunerMetrics) LatestPrunedHeightWithProgressPercentage(lastPrunedHeight uint64) {
+// LatestPrunedHeight provides a mock function with given fields: lastPrunedHeight
+func (_m *RegisterDBPrunerMetrics) LatestPrunedHeight(lastPrunedHeight uint64) {
 	_m.Called(lastPrunedHeight)
 }
 

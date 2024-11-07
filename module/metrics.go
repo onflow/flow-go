@@ -920,8 +920,8 @@ type AccessMetrics interface {
 }
 
 type RegisterDBPrunerMetrics interface {
-	// LatestPrunedHeightWithProgressPercentage tracks the percentage progress of pruning.
-	LatestPrunedHeightWithProgressPercentage(lastPrunedHeight uint64)
+	// LatestPrunedHeight tracks the latest pruned height of pruning.
+	LatestPrunedHeight(lastPrunedHeight uint64)
 }
 
 type ExecutionResultStats struct {

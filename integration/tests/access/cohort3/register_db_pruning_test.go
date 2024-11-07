@@ -152,7 +152,7 @@ func (s *RegisterDBPruningSuite) TestHappyPath() {
 	assert.Equal(s.T(), latestHeightAN, latestHeightON)
 
 	//5. Check if first height is less or equal predicted first height
-	predictedPruneThreshold := uint64(5)
+	predictedPruneThreshold := pstorage.PruneInterval(TestRegisterDBPruningThreshold)
 	registerAN := s.nodeRegisterStorage(pebbleAN)
 	assert.LessOrEqual(s.T(), registerAN.LatestHeight()-predictedPruneThreshold, firstHeightAN)
 	registerON := s.nodeRegisterStorage(pebbleON)

@@ -16,18 +16,18 @@ type RegisterDBPrunerCollector struct {
 var _ module.RegisterDBPrunerMetrics = (*RegisterDBPrunerCollector)(nil)
 
 // NewRegisterDBPrunerCollector creates and returns a new RegisterDBPrunerCollector instance
-// with pre-configured Prometheus metrics for monitoring the pruning process.
+// with metrics for monitoring the last pruning height.
 func NewRegisterDBPrunerCollector() *RegisterDBPrunerCollector {
 	return &RegisterDBPrunerCollector{
 		lastPrunedHeight: promauto.NewGauge(prometheus.GaugeOpts{
 			Name:      "last_pruned_height",
 			Namespace: namespaceAccess,
 			Subsystem: subsystemRegisterDBPruner,
-			Help:      "The last block height that has been pruned.",
+			Help:      "The last block height up to which data has been pruned.",
 		}),
 	}
 }
 
-func (c *RegisterDBPrunerCollector) LatestPrunedHeightWithProgressPercentage(lastPrunedHeight uint64) {
+func (c *RegisterDBPrunerCollector) LatestPrunedHeight(lastPrunedHeight uint64) {
 	c.lastPrunedHeight.Set(float64(lastPrunedHeight))
 }

@@ -17,7 +17,7 @@ import (
 
 const (
 	// DefaultPruneThreshold defines the default number of blocks to retain below the latest block height. Blocks below
-	// this threshold will be considered for pruning if they exceed the pruneInterval.
+	// this threshold will be considered for pruning if they exceed the PruneInterval.
 	DefaultPruneThreshold = uint64(100_000)
 
 	// DefaultPruneThrottleDelay is the default delay between each batch of keys inspected and pruned. This helps
@@ -31,7 +31,7 @@ const (
 
 // TODO: This configuration should be changed after testing it with real network data for better performance.
 const (
-	// pruneIntervalRatio represents an additional percentage of pruneThreshold which is used to calculate pruneInterval
+	// pruneIntervalRatio represents an additional percentage of pruneThreshold which is used to calculate PruneInterval
 	// Pruning will start if there are more than `(1 + pruneIntervalRatio) * pruneThreshold` unpruned blocks
 	pruneIntervalRatio = 0.1 // 10%
 	// deleteItemsPerBatch defines the number of database keys to delete in each batch operation.
@@ -39,9 +39,9 @@ const (
 	deleteItemsPerBatch = 256
 )
 
-// pruneInterval calculates the interval at which pruning is triggered based on the given pruneThreshold and
+// PruneInterval calculates the interval at which pruning is triggered based on the given pruneThreshold and
 // the pruneIntervalRatio.
-func pruneInterval(threshold uint64) uint64 {
+func PruneInterval(threshold uint64) uint64 {
 	return threshold + uint64(float64(threshold)*pruneIntervalRatio)
 }
 
@@ -73,7 +73,7 @@ type PrunerOption func(*RegisterPruner)
 func WithPruneThreshold(threshold uint64) PrunerOption {
 	return func(p *RegisterPruner) {
 		p.pruneThreshold = threshold
-		p.pruneInterval = pruneInterval(threshold)
+		p.pruneInterval = PruneInterval(threshold)
 	}
 }
 
@@ -111,7 +111,7 @@ func NewRegisterPruner(
 	pruner := &RegisterPruner{
 		logger:              logger.With().Str("component", "registerdb_pruner").Logger(),
 		db:                  db,
-		pruneInterval:       pruneInterval(DefaultPruneThreshold),
+		pruneInterval:       PruneInterval(DefaultPruneThreshold),
 		pruneThreshold:      DefaultPruneThreshold,
 		pruneThrottleDelay:  DefaultPruneThrottleDelay,
 		pruneTickerInterval: DefaultPruneTickerInterval,
@@ -161,7 +161,7 @@ func (p *RegisterPruner) checkPrune(ctx context.Context) error {
 		return fmt.Errorf("failed to get latest height from register storage: %w", err)
 	}
 
-	if firstHeight >= latestHeight {
+	if firstHeight > latestHeight {
 		return errors.New("the latest height must be greater than the first height")
 	}
 
@@ -266,7 +266,7 @@ func (p *RegisterPruner) pruneUpToHeight(ctx context.Context, r pebble.Reader, p
 		Dur("duration_ms", time.Since(start)).
 		Msg("pruning complete")
 
-	p.metrics.LatestPrunedHeightWithProgressPercentage(pruneHeight)
+	p.metrics.LatestPrunedHeight(pruneHeight)
 
 	return nil
 }
