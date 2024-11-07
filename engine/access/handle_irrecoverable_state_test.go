@@ -22,6 +22,7 @@ import (
 
 	accessmock "github.com/onflow/flow-go/engine/access/mock"
 	"github.com/onflow/flow-go/engine/access/rest"
+	"github.com/onflow/flow-go/engine/access/rest/router"
 	"github.com/onflow/flow-go/engine/access/rpc"
 	"github.com/onflow/flow-go/engine/access/rpc/backend"
 	statestreambackend "github.com/onflow/flow-go/engine/access/state_stream/backend"
@@ -248,7 +249,7 @@ func (suite *IrrecoverableStateTestSuite) TestRestInconsistentNodeState() {
 // optionsForBlocksIdGetOpts returns options for the BlocksApi.BlocksIdGet function.
 func optionsForBlocksIdGetOpts() *restclient.BlocksApiBlocksIdGetOpts {
 	return &restclient.BlocksApiBlocksIdGetOpts{
-		Expand:  optional.NewInterface([]string{"payload"}),
+		Expand:  optional.NewInterface([]string{router.ExpandableFieldPayload}),
 		Select_: optional.NewInterface([]string{"header.id"}),
 	}
 }
