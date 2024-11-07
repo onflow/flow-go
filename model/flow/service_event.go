@@ -38,6 +38,7 @@ const (
 type ServiceEvent struct {
 	Type  ServiceEventType
 	Event interface{}
+	//ChunkIndex int
 }
 
 // ServiceEventList is a handy container to enable comparisons

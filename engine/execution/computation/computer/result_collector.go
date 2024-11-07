@@ -407,6 +407,7 @@ func (collector *resultCollector) Finalize(
 		collector.result.ExecutableBlock.ID(),
 		collector.result.AllChunks(),
 		collector.result.AllConvertedServiceEvents(),
+		collector.result.ServiceEventChunkIndices(),
 		executionDataID)
 
 	executionReceipt, err := GenerateExecutionReceipt(

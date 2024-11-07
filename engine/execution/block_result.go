@@ -89,11 +89,22 @@ func (er *BlockExecutionResult) AllExecutionSnapshots() []*snapshot.ExecutionSna
 func (er *BlockExecutionResult) AllConvertedServiceEvents() flow.ServiceEventList {
 	res := make(flow.ServiceEventList, 0)
 	for _, ce := range er.collectionExecutionResults {
+		// NOTE: at this point we have the chunk->service event mapping
 		if len(ce.convertedServiceEvents) > 0 {
 			res = append(res, ce.convertedServiceEvents...)
 		}
 	}
 	return res
+}
+
+func (er *BlockExecutionResult) ServiceEventChunkIndices() []int {
+	indices := make([]int, 0)
+	for chunkIndex, ce := range er.collectionExecutionResults {
+		if len(ce.convertedServiceEvents) > 0 {
+			indices = append(indices, chunkIndex)
+		}
+	}
+	return indices
 }
 
 // AllUpdatedRegisters returns all updated unique register entries

@@ -84,6 +84,7 @@ func ComputationResultForBlockFixture(
 		completeBlock.ID(),
 		computationResult.AllChunks(),
 		convertedServiceEvents,
+		[]int{0, 0, 0, 0},
 		executionDataID)
 
 	computationResult.ExecutionReceipt = &flow.ExecutionReceipt{
