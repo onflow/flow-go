@@ -27,6 +27,7 @@ import (
 	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/credentials/insecure"
 
+	accessNode "github.com/onflow/flow-go/access"
 	"github.com/onflow/flow-go/admin/commands"
 	stateSyncCommands "github.com/onflow/flow-go/admin/commands/state_synchronization"
 	storageCommands "github.com/onflow/flow-go/admin/commands/storage"
@@ -55,6 +56,7 @@ import (
 	"github.com/onflow/flow-go/engine/access/subscription"
 	followereng "github.com/onflow/flow-go/engine/common/follower"
 	"github.com/onflow/flow-go/engine/common/requester"
+	"github.com/onflow/flow-go/engine/common/stop"
 	synceng "github.com/onflow/flow-go/engine/common/synchronization"
 	"github.com/onflow/flow-go/engine/common/version"
 	"github.com/onflow/flow-go/engine/execution/computation/query"
@@ -172,8 +174,9 @@ type AccessNodeConfig struct {
 	registerCacheType                    string
 	registerCacheSize                    uint
 	programCacheSize                     uint
-	checkPayerBalance                    bool
+	checkPayerBalanceMode                string
 	versionControlEnabled                bool
+	stopControlEnabled                   bool
 }
 
 type PublicNetworkConfig struct {
@@ -276,8 +279,9 @@ func DefaultAccessNodeConfig() *AccessNodeConfig {
 		registerCacheType:                    pstorage.CacheTypeTwoQueue.String(),
 		registerCacheSize:                    0,
 		programCacheSize:                     0,
-		checkPayerBalance:                    false,
+		checkPayerBalanceMode:                accessNode.Disabled.String(),
 		versionControlEnabled:                true,
+		stopControlEnabled:                   false,
 	}
 }
 
@@ -289,44 +293,46 @@ type FlowAccessNodeBuilder struct {
 	*AccessNodeConfig
 
 	// components
-	FollowerState              protocol.FollowerState
-	SyncCore                   *chainsync.Core
-	RpcEng                     *rpc.Engine
-	FollowerDistributor        *consensuspubsub.FollowerDistributor
-	CollectionRPC              access.AccessAPIClient
-	TransactionTimings         *stdmap.TransactionTimings
-	CollectionsToMarkFinalized *stdmap.Times
-	CollectionsToMarkExecuted  *stdmap.Times
-	BlocksToMarkExecuted       *stdmap.Times
-	BlockTransactions          *stdmap.IdentifierMap
-	TransactionMetrics         *metrics.TransactionCollector
-	RestMetrics                *metrics.RestCollector
-	AccessMetrics              module.AccessMetrics
-	PingMetrics                module.PingMetrics
-	Committee                  hotstuff.DynamicCommittee
-	Finalized                  *flow.Header // latest finalized block that the node knows of at startup time
-	Pending                    []*flow.Header
-	FollowerCore               module.HotStuffFollower
-	Validator                  hotstuff.Validator
-	ExecutionDataDownloader    execution_data.Downloader
-	PublicBlobService          network.BlobService
-	ExecutionDataRequester     state_synchronization.ExecutionDataRequester
-	ExecutionDataStore         execution_data.ExecutionDataStore
-	ExecutionDataBlobstore     blobs.Blobstore
-	ExecutionDataCache         *execdatacache.ExecutionDataCache
-	ExecutionIndexer           *indexer.Indexer
-	ExecutionIndexerCore       *indexer.IndexerCore
-	ScriptExecutor             *backend.ScriptExecutor
-	RegistersAsyncStore        *execution.RegistersAsyncStore
-	Reporter                   *index.Reporter
-	EventsIndex                *index.EventsIndex
-	TxResultsIndex             *index.TransactionResultsIndex
-	IndexerDependencies        *cmd.DependencyList
-	collectionExecutedMetric   module.CollectionExecutedMetric
-	ExecutionDataPruner        *pruner.Pruner
-	ExecutionDatastoreManager  edstorage.DatastoreManager
-	ExecutionDataTracker       tracker.Storage
-	versionControl             *version.VersionControl
+	FollowerState                protocol.FollowerState
+	SyncCore                     *chainsync.Core
+	RpcEng                       *rpc.Engine
+	FollowerDistributor          *consensuspubsub.FollowerDistributor
+	CollectionRPC                access.AccessAPIClient
+	TransactionTimings           *stdmap.TransactionTimings
+	CollectionsToMarkFinalized   *stdmap.Times
+	CollectionsToMarkExecuted    *stdmap.Times
+	BlocksToMarkExecuted         *stdmap.Times
+	BlockTransactions            *stdmap.IdentifierMap
+	TransactionMetrics           *metrics.TransactionCollector
+	TransactionValidationMetrics *metrics.TransactionValidationCollector
+	RestMetrics                  *metrics.RestCollector
+	AccessMetrics                module.AccessMetrics
+	PingMetrics                  module.PingMetrics
+	Committee                    hotstuff.DynamicCommittee
+	Finalized                    *flow.Header // latest finalized block that the node knows of at startup time
+	Pending                      []*flow.Header
+	FollowerCore                 module.HotStuffFollower
+	Validator                    hotstuff.Validator
+	ExecutionDataDownloader      execution_data.Downloader
+	PublicBlobService            network.BlobService
+	ExecutionDataRequester       state_synchronization.ExecutionDataRequester
+	ExecutionDataStore           execution_data.ExecutionDataStore
+	ExecutionDataBlobstore       blobs.Blobstore
+	ExecutionDataCache           *execdatacache.ExecutionDataCache
+	ExecutionIndexer             *indexer.Indexer
+	ExecutionIndexerCore         *indexer.IndexerCore
+	ScriptExecutor               *backend.ScriptExecutor
+	RegistersAsyncStore          *execution.RegistersAsyncStore
+	Reporter                     *index.Reporter
+	EventsIndex                  *index.EventsIndex
+	TxResultsIndex               *index.TransactionResultsIndex
+	IndexerDependencies          *cmd.DependencyList
+	collectionExecutedMetric     module.CollectionExecutedMetric
+	ExecutionDataPruner          *pruner.Pruner
+	ExecutionDatastoreManager    edstorage.DatastoreManager
+	ExecutionDataTracker         tracker.Storage
+	VersionControl               *version.VersionControl
+	StopControl                  *stop.StopControl
 
 	// The sync engine participants provider is the libp2p peer store for the access node
 	// which is not available until after the network has started.
@@ -981,7 +987,7 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 					builder.programCacheSize > 0,
 				)
 
-				err = builder.ScriptExecutor.Initialize(builder.ExecutionIndexer, scripts, builder.versionControl)
+				err = builder.ScriptExecutor.Initialize(builder.ExecutionIndexer, scripts, builder.VersionControl)
 				if err != nil {
 					return nil, err
 				}
@@ -994,6 +1000,10 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 				err = builder.RegistersAsyncStore.Initialize(registers)
 				if err != nil {
 					return nil, err
+				}
+
+				if builder.stopControlEnabled {
+					builder.StopControl.RegisterHeightRecorder(builder.ExecutionIndexer)
 				}
 
 				return builder.ExecutionIndexer, nil
@@ -1266,6 +1276,10 @@ func (builder *FlowAccessNodeBuilder) extraFlags() {
 			"version-control-enabled",
 			defaultConfig.versionControlEnabled,
 			"whether to enable the version control feature. Default value is true")
+		flags.BoolVar(&builder.stopControlEnabled,
+			"stop-control-enabled",
+			defaultConfig.stopControlEnabled,
+			"whether to enable the stop control feature. Default value is false")
 		// ExecutionDataRequester config
 		flags.BoolVar(&builder.executionDataSyncEnabled,
 			"execution-data-sync-enabled",
@@ -1408,10 +1422,12 @@ func (builder *FlowAccessNodeBuilder) extraFlags() {
 			"program-cache-size",
 			defaultConfig.programCacheSize,
 			"[experimental] number of blocks to cache for cadence programs. use 0 to disable cache. default: 0. Note: this is an experimental feature and may cause nodes to become unstable under certain workloads. Use with caution.")
-		flags.BoolVar(&builder.checkPayerBalance,
-			"check-payer-balance",
-			defaultConfig.checkPayerBalance,
-			"checks that a transaction payer has sufficient balance to pay fees before submitting it to collection nodes")
+
+		// Payer Balance
+		flags.StringVar(&builder.checkPayerBalanceMode,
+			"check-payer-balance-mode",
+			defaultConfig.checkPayerBalanceMode,
+			"flag for payer balance validation that specifies whether or not to enforce the balance check. one of [disabled(default), warn, enforce]")
 	}).ValidateFlags(func() error {
 		if builder.supportsObserver && (builder.PublicNetworkConfig.BindAddress == cmd.NotSet || builder.PublicNetworkConfig.BindAddress == "") {
 			return errors.New("public-network-address must be set if supports-observer is true")
@@ -1475,7 +1491,7 @@ func (builder *FlowAccessNodeBuilder) extraFlags() {
 			return errors.New("transaction-error-messages-cache-size must be greater than 0")
 		}
 
-		if builder.checkPayerBalance && !builder.executionDataIndexingEnabled {
+		if builder.checkPayerBalanceMode != accessNode.Disabled.String() && !builder.executionDataIndexingEnabled {
 			return errors.New("execution-data-indexing-enabled must be set if check-payer-balance is enabled")
 		}
 
@@ -1596,6 +1612,8 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 	builder.IndexerDependencies.Add(ingestionDependable)
 	versionControlDependable := module.NewProxiedReadyDoneAware()
 	builder.IndexerDependencies.Add(versionControlDependable)
+	stopControlDependable := module.NewProxiedReadyDoneAware()
+	builder.IndexerDependencies.Add(stopControlDependable)
 	var lastFullBlockHeight *counters.PersistentStrictMonotonicCounter
 
 	builder.
@@ -1678,6 +1696,10 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 			)
 			return nil
 		}).
+		Module("transaction validation metrics", func(node *cmd.NodeConfig) error {
+			builder.TransactionValidationMetrics = metrics.NewTransactionValidationCollector()
+			return nil
+		}).
 		Module("rest metrics", func(node *cmd.NodeConfig) error {
 			m, err := metrics.NewRestCollector(routes.URLToRoute, node.MetricsRegisterer)
 			if err != nil {
@@ -1689,6 +1711,7 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 		Module("access metrics", func(node *cmd.NodeConfig) error {
 			builder.AccessMetrics = metrics.NewAccessCollector(
 				metrics.WithTransactionMetrics(builder.TransactionMetrics),
+				metrics.WithTransactionValidationMetrics(builder.TransactionValidationMetrics),
 				metrics.WithBackendScriptsMetrics(builder.TransactionMetrics),
 				metrics.WithRestMetrics(builder.RestMetrics),
 			)
@@ -1827,10 +1850,28 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 			// VersionControl needs to consume BlockFinalized events.
 			node.ProtocolEvents.AddConsumer(versionControl)
 
-			builder.versionControl = versionControl
-			versionControlDependable.Init(builder.versionControl)
+			builder.VersionControl = versionControl
+			versionControlDependable.Init(builder.VersionControl)
 
 			return versionControl, nil
+		}).
+		Component("stop control", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
+			if !builder.stopControlEnabled {
+				noop := &module.NoopReadyDoneAware{}
+				stopControlDependable.Init(noop)
+				return noop, nil
+			}
+
+			stopControl := stop.NewStopControl(
+				builder.Logger,
+			)
+
+			builder.VersionControl.AddVersionUpdatesConsumer(stopControl.OnVersionUpdate)
+
+			builder.StopControl = stopControl
+			stopControlDependable.Init(builder.StopControl)
+
+			return stopControl, nil
 		}).
 		Component("RPC engine", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 			config := builder.rpcConf
@@ -1897,6 +1938,18 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 				return nil, fmt.Errorf("transaction result query mode 'compare' is not supported")
 			}
 
+			// If execution data syncing and indexing is disabled, pass nil indexReporter
+			var indexReporter state_synchronization.IndexReporter
+			if builder.executionDataSyncEnabled && builder.executionDataIndexingEnabled {
+				indexReporter = builder.Reporter
+			}
+
+			checkPayerBalanceMode, err := accessNode.ParsePayerBalanceMode(builder.checkPayerBalanceMode)
+			if err != nil {
+				return nil, fmt.Errorf("could not parse payer balance mode: %w", err)
+
+			}
+
 			nodeBackend, err := backend.New(backend.Params{
 				State:                     node.State,
 				CollectionRPC:             builder.CollectionRPC,
@@ -1921,7 +1974,7 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 				TxErrorMessagesCacheSize:  builder.TxErrorMessagesCacheSize,
 				ScriptExecutor:            builder.ScriptExecutor,
 				ScriptExecutionMode:       scriptExecMode,
-				CheckPayerBalance:         builder.checkPayerBalance,
+				CheckPayerBalanceMode:     checkPayerBalanceMode,
 				EventQueryMode:            eventQueryMode,
 				BlockTracker:              blockTracker,
 				SubscriptionHandler: subscription.NewSubscriptionHandler(
@@ -1935,15 +1988,11 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 				TxResultQueryMode:   txResultQueryMode,
 				TxResultsIndex:      builder.TxResultsIndex,
 				LastFullBlockHeight: lastFullBlockHeight,
+				IndexReporter:       indexReporter,
+				VersionControl:      builder.VersionControl,
 			})
 			if err != nil {
 				return nil, fmt.Errorf("could not initialize backend: %w", err)
-			}
-
-			// If execution data syncing and indexing is disabled, pass nil indexReporter
-			var indexReporter state_synchronization.IndexReporter
-			if builder.executionDataSyncEnabled && builder.executionDataIndexingEnabled {
-				indexReporter = builder.Reporter
 			}
 
 			engineBuilder, err := rpc.NewBuilder(

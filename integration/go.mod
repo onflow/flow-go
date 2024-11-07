@@ -24,11 +24,11 @@ require (
 	github.com/onflow/crypto v0.25.2
 	github.com/onflow/flow-core-contracts/lib/go/contracts v1.3.1
 	github.com/onflow/flow-core-contracts/lib/go/templates v1.3.1
-	github.com/onflow/flow-emulator v1.0.0-preview.36.0.20240729195722-d4eb1c30eb9f
-	github.com/onflow/flow-go v0.36.8-0.20240729193633-433a32eeb0cd
-	github.com/onflow/flow-go-sdk v1.0.0-preview.54
+	github.com/onflow/flow-emulator v1.0.1-0.20241002100151-fa253c380189
+	github.com/onflow/flow-go v0.38.0-preview.0.0.20241001140429-ec4ad1cf1c8a
+	github.com/onflow/flow-go-sdk v1.0.0
 	github.com/onflow/flow-go/insecure v0.0.0-00010101000000-000000000000
-	github.com/onflow/flow/protobuf/go/flow v0.4.5
+	github.com/onflow/flow/protobuf/go/flow v0.4.7
 	github.com/onflow/go-ethereum v1.14.7
 	github.com/prometheus/client_golang v1.18.0
 	github.com/prometheus/client_model v0.5.0

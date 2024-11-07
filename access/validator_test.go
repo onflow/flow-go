@@ -17,7 +17,9 @@ import (
 	accessmock "github.com/onflow/flow-go/access/mock"
 	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module"
 	execmock "github.com/onflow/flow-go/module/execution/mock"
+	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -31,9 +33,11 @@ type TransactionValidatorSuite struct {
 	header           *flow.Header
 	chain            flow.Chain
 	validatorOptions access.TransactionValidationOptions
+	metrics          module.TransactionValidationMetrics
 }
 
 func (s *TransactionValidatorSuite) SetupTest() {
+	s.metrics = metrics.NewNoopCollector()
 	s.blocks = accessmock.NewBlocks(s.T())
 	assert.NotNil(s.T(), s.blocks)
 
@@ -54,7 +58,7 @@ func (s *TransactionValidatorSuite) SetupTest() {
 
 	s.chain = flow.Testnet.Chain()
 	s.validatorOptions = access.TransactionValidationOptions{
-		CheckPayerBalance:      true,
+		CheckPayerBalanceMode:  access.EnforceCheck,
 		MaxTransactionByteSize: flow.DefaultMaxTransactionByteSize,
 		MaxCollectionByteSize:  flow.DefaultMaxCollectionByteSize,
 	}
@@ -84,12 +88,16 @@ func (s *TransactionValidatorSuite) TestTransactionValidator_ScriptExecutorInter
 	scriptExecutor := execmock.NewScriptExecutor(s.T())
 	assert.NotNil(s.T(), scriptExecutor)
 
+	s.blocks.
+		On("IndexedHeight").
+		Return(s.header.Height, nil)
+
 	scriptExecutor.
 		On("ExecuteAtBlockHeight", mock.Anything, mock.Anything, mock.Anything, mock.Anything).
 		Return(nil, errors.New("script executor internal error")).
 		Once()
 
-	validator, err := access.NewTransactionValidator(s.blocks, s.chain, s.validatorOptions, scriptExecutor)
+	validator, err := access.NewTransactionValidator(s.blocks, s.chain, s.metrics, s.validatorOptions, scriptExecutor)
 	assert.NoError(s.T(), err)
 	assert.NotNil(s.T(), validator)
 
@@ -111,12 +119,16 @@ func (s *TransactionValidatorSuite) TestTransactionValidator_SufficientBalance()
 	actualResponse, err := jsoncdc.Encode(actualResponseValue)
 	assert.NoError(s.T(), err)
 
+	s.blocks.
+		On("IndexedHeight").
+		Return(s.header.Height, nil)
+
 	scriptExecutor.
 		On("ExecuteAtBlockHeight", mock.Anything, mock.Anything, mock.Anything, mock.Anything).
 		Return(actualResponse, nil).
 		Once()
 
-	validator, err := access.NewTransactionValidator(s.blocks, s.chain, s.validatorOptions, scriptExecutor)
+	validator, err := access.NewTransactionValidator(s.blocks, s.chain, s.metrics, s.validatorOptions, scriptExecutor)
 	assert.NoError(s.T(), err)
 	assert.NotNil(s.T(), validator)
 
@@ -138,27 +150,61 @@ func (s *TransactionValidatorSuite) TestTransactionValidator_InsufficientBalance
 	actualResponse, err := jsoncdc.Encode(actualResponseValue)
 	assert.NoError(s.T(), err)
 
+	s.blocks.
+		On("IndexedHeight").
+		Return(s.header.Height, nil)
+
 	scriptExecutor.
 		On("ExecuteAtBlockHeight", mock.Anything, mock.Anything, mock.Anything, mock.Anything).
-		Return(actualResponse, nil).
-		Once()
+		Return(actualResponse, nil).Twice()
 
 	actualAccountResponse, err := unittest.AccountFixture()
 	assert.NoError(s.T(), err)
 	assert.NotNil(s.T(), actualAccountResponse)
 
-	validator, err := access.NewTransactionValidator(s.blocks, s.chain, s.validatorOptions, scriptExecutor)
+	validateTx := func() error {
+		txBody := unittest.TransactionBodyFixture()
+		validator, err := access.NewTransactionValidator(s.blocks, s.chain, s.metrics, s.validatorOptions, scriptExecutor)
+		assert.NoError(s.T(), err)
+		assert.NotNil(s.T(), validator)
+
+		return validator.Validate(context.Background(), &txBody)
+	}
+
+	s.Run("with enforce check", func() {
+		err := validateTx()
+
+		expectedError := access.InsufficientBalanceError{
+			Payer:           unittest.AddressFixture(),
+			RequiredBalance: requiredBalance,
+		}
+		assert.ErrorIs(s.T(), err, expectedError)
+	})
+
+	s.Run("with warn check", func() {
+		s.validatorOptions.CheckPayerBalanceMode = access.WarnCheck
+		err := validateTx()
+		assert.NoError(s.T(), err)
+	})
+}
+
+func (s *TransactionValidatorSuite) TestTransactionValidator_SealedIndexedHeightThresholdLimit() {
+	scriptExecutor := execmock.NewScriptExecutor(s.T())
+
+	// setting indexed height to be behind of sealed by bigger number than allowed(DefaultSealedIndexedHeightThreshold)
+	indexedHeight := s.header.Height - 40
+
+	s.blocks.
+		On("IndexedHeight").
+		Return(indexedHeight, nil)
+
+	validator, err := access.NewTransactionValidator(s.blocks, s.chain, s.metrics, s.validatorOptions, scriptExecutor)
 	assert.NoError(s.T(), err)
 	assert.NotNil(s.T(), validator)
 
 	txBody := unittest.TransactionBodyFixture()
 
-	expectedError := access.InsufficientBalanceError{
-		Payer:           unittest.AddressFixture(),
-		RequiredBalance: requiredBalance,
-	}
+	err = validator.Validate(context.Background(), &txBody)
+	assert.NoError(s.T(), err)
 
-	actualErr := validator.Validate(context.Background(), &txBody)
-
-	assert.ErrorIs(s.T(), actualErr, expectedError)
 }

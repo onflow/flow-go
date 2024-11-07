@@ -10,6 +10,12 @@ import (
 
 type AccessCollectorOpts func(*AccessCollector)
 
+func WithTransactionValidationMetrics(m module.TransactionValidationMetrics) AccessCollectorOpts {
+	return func(ac *AccessCollector) {
+		ac.TransactionValidationMetrics = m
+	}
+}
+
 func WithTransactionMetrics(m module.TransactionMetrics) AccessCollectorOpts {
 	return func(ac *AccessCollector) {
 		ac.TransactionMetrics = m
@@ -31,6 +37,7 @@ func WithRestMetrics(m module.RestMetrics) AccessCollectorOpts {
 type AccessCollector struct {
 	module.RestMetrics
 	module.TransactionMetrics
+	module.TransactionValidationMetrics
 	module.BackendScriptsMetrics
 
 	connectionReused      prometheus.Counter

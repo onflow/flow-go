@@ -1,9 +1,8 @@
 package pebble
 
 import (
-	"fmt"
-
 	"errors"
+	"fmt"
 
 	"github.com/cockroachdb/pebble"
 	"github.com/hashicorp/go-multierror"

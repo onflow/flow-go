@@ -54,6 +54,7 @@ import (
 	statestreambackend "github.com/onflow/flow-go/engine/access/state_stream/backend"
 	"github.com/onflow/flow-go/engine/access/subscription"
 	"github.com/onflow/flow-go/engine/common/follower"
+	"github.com/onflow/flow-go/engine/common/stop"
 	synceng "github.com/onflow/flow-go/engine/common/synchronization"
 	"github.com/onflow/flow-go/engine/common/version"
 	"github.com/onflow/flow-go/engine/execution/computation/query"
@@ -165,6 +166,7 @@ type ObserverServiceConfig struct {
 	executionDataPruningInterval         time.Duration
 	localServiceAPIEnabled               bool
 	versionControlEnabled                bool
+	stopControlEnabled                   bool
 	executionDataDir                     string
 	executionDataStartHeight             uint64
 	executionDataConfig                  edrequester.ExecutionDataConfig
@@ -241,6 +243,7 @@ func DefaultObserverServiceConfig() *ObserverServiceConfig {
 		executionDataPruningInterval:         pruner.DefaultPruningInterval,
 		localServiceAPIEnabled:               false,
 		versionControlEnabled:                true,
+		stopControlEnabled:                   false,
 		executionDataDir:                     filepath.Join(homedir, ".flow", "execution_data"),
 		executionDataStartHeight:             0,
 		executionDataConfig: edrequester.ExecutionDataConfig{
@@ -281,7 +284,8 @@ type ObserverServiceBuilder struct {
 	ExecutionIndexerCore *indexer.IndexerCore
 	TxResultsIndex       *index.TransactionResultsIndex
 	IndexerDependencies  *cmd.DependencyList
-	versionControl       *version.VersionControl
+	VersionControl       *version.VersionControl
+	StopControl          *stop.StopControl
 
 	ExecutionDataDownloader   execution_data.Downloader
 	ExecutionDataRequester    state_synchronization.ExecutionDataRequester
@@ -687,6 +691,10 @@ func (builder *ObserverServiceBuilder) extraFlags() {
 			"version-control-enabled",
 			defaultConfig.versionControlEnabled,
 			"whether to enable the version control feature. Default value is true")
+		flags.BoolVar(&builder.stopControlEnabled,
+			"stop-control-enabled",
+			defaultConfig.stopControlEnabled,
+			"whether to enable the stop control feature. Default value is false")
 		flags.BoolVar(&builder.localServiceAPIEnabled, "local-service-api-enabled", defaultConfig.localServiceAPIEnabled, "whether to use local indexed data for api queries")
 		flags.StringVar(&builder.registersDBPath, "execution-state-dir", defaultConfig.registersDBPath, "directory to use for execution-state database")
 		flags.StringVar(&builder.checkpointFile, "execution-state-checkpoint", defaultConfig.checkpointFile, "execution-state checkpoint file")
@@ -1519,7 +1527,7 @@ func (builder *ObserverServiceBuilder) BuildExecutionSyncComponents() *ObserverS
 				builder.programCacheSize > 0,
 			)
 
-			err = builder.ScriptExecutor.Initialize(builder.ExecutionIndexer, scripts, builder.versionControl)
+			err = builder.ScriptExecutor.Initialize(builder.ExecutionIndexer, scripts, builder.VersionControl)
 			if err != nil {
 				return nil, err
 			}
@@ -1527,6 +1535,10 @@ func (builder *ObserverServiceBuilder) BuildExecutionSyncComponents() *ObserverS
 			err = builder.RegistersAsyncStore.Initialize(registers)
 			if err != nil {
 				return nil, err
+			}
+
+			if builder.stopControlEnabled {
+				builder.StopControl.RegisterHeightRecorder(builder.ExecutionIndexer)
 			}
 
 			return builder.ExecutionIndexer, nil
@@ -1833,6 +1845,8 @@ func (builder *ObserverServiceBuilder) enqueueRPCServer() {
 
 	versionControlDependable := module.NewProxiedReadyDoneAware()
 	builder.IndexerDependencies.Add(versionControlDependable)
+	stopControlDependable := module.NewProxiedReadyDoneAware()
+	builder.IndexerDependencies.Add(stopControlDependable)
 
 	builder.Component("version control", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 		if !builder.versionControlEnabled {
@@ -1861,11 +1875,30 @@ func (builder *ObserverServiceBuilder) enqueueRPCServer() {
 		// VersionControl needs to consume BlockFinalized events.
 		node.ProtocolEvents.AddConsumer(versionControl)
 
-		builder.versionControl = versionControl
-		versionControlDependable.Init(builder.versionControl)
+		builder.VersionControl = versionControl
+		versionControlDependable.Init(builder.VersionControl)
 
 		return versionControl, nil
 	})
+	builder.Component("stop control", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
+		if !builder.stopControlEnabled {
+			noop := &module.NoopReadyDoneAware{}
+			stopControlDependable.Init(noop)
+			return noop, nil
+		}
+
+		stopControl := stop.NewStopControl(
+			builder.Logger,
+		)
+
+		builder.VersionControl.AddVersionUpdatesConsumer(stopControl.OnVersionUpdate)
+
+		builder.StopControl = stopControl
+		stopControlDependable.Init(builder.StopControl)
+
+		return stopControl, nil
+	})
+
 	builder.Component("RPC engine", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 		accessMetrics := builder.AccessMetrics
 		config := builder.rpcConf
@@ -1911,6 +1944,12 @@ func (builder *ObserverServiceBuilder) enqueueRPCServer() {
 			return nil, fmt.Errorf("failed to initialize block tracker: %w", err)
 		}
 
+		// If execution data syncing and indexing is disabled, pass nil indexReporter
+		var indexReporter state_synchronization.IndexReporter
+		if builder.executionDataSyncEnabled && builder.executionDataIndexingEnabled {
+			indexReporter = builder.Reporter
+		}
+
 		backendParams := backend.Params{
 			State:                     node.State,
 			Blocks:                    node.Storage.Blocks,
@@ -1937,6 +1976,8 @@ func (builder *ObserverServiceBuilder) enqueueRPCServer() {
 				builder.stateStreamConf.ResponseLimit,
 				builder.stateStreamConf.ClientSendBufferSize,
 			),
+			IndexReporter:  indexReporter,
+			VersionControl: builder.VersionControl,
 		}
 
 		if builder.localServiceAPIEnabled {
@@ -1962,12 +2003,6 @@ func (builder *ObserverServiceBuilder) enqueueRPCServer() {
 			node.RootChainID.Chain())
 		if err != nil {
 			return nil, err
-		}
-
-		// If execution data syncing and indexing is disabled, pass nil indexReporter
-		var indexReporter state_synchronization.IndexReporter
-		if builder.executionDataSyncEnabled && builder.executionDataIndexingEnabled {
-			indexReporter = builder.Reporter
 		}
 
 		engineBuilder, err := rpc.NewBuilder(

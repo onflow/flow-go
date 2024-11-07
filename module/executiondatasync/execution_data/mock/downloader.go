@@ -109,6 +109,11 @@ func (_m *Downloader) Ready() <-chan struct{} {
 	return r0
 }
 
+// SetHeightUpdatesConsumer provides a mock function with given fields: _a0
+func (_m *Downloader) SetHeightUpdatesConsumer(_a0 execution_data.HeightUpdatesConsumer) {
+	_m.Called(_a0)
+}
+
 // NewDownloader creates a new instance of Downloader. It also registers a testing interface on the mock and a cleanup function to assert the mocks expectations.
 // The first argument is typically a *testing.T value.
 func NewDownloader(t interface {
