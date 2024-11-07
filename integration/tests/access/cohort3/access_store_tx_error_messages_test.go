@@ -14,6 +14,7 @@ import (
 	sdkcrypto "github.com/onflow/flow-go-sdk/crypto"
 	"github.com/onflow/flow-go-sdk/templates"
 
+	"github.com/onflow/flow-go/integration/client"
 	"github.com/onflow/flow-go/integration/convert"
 	"github.com/onflow/flow-go/integration/testnet"
 	"github.com/onflow/flow-go/integration/tests/lib"
@@ -39,6 +40,8 @@ type AccessStoreTxErrorMessagesSuite struct {
 	cancel context.CancelFunc
 
 	net *testnet.FlowNetwork
+
+	accessContainerName string
 }
 
 func (s *AccessStoreTxErrorMessagesSuite) TearDownTest() {
@@ -56,6 +59,7 @@ func (s *AccessStoreTxErrorMessagesSuite) SetupTest() {
 		testnet.WithLogLevel(zerolog.FatalLevel),
 	)
 
+	s.accessContainerName = "access_2"
 	storeTxAccess := testnet.NewNodeConfig(
 		flow.RoleAccess,
 		testnet.WithLogLevel(zerolog.InfoLevel),
@@ -104,37 +108,46 @@ func (s *AccessStoreTxErrorMessagesSuite) TestAccessStoreTxErrorMessages() {
 	// Create and send a transaction that will result in an error.
 	txResult := s.createAndSendTxWithTxError()
 
-	txBlockID := convert.IDFromSDK(txResult.BlockID)
-	txID := convert.IDFromSDK(txResult.TransactionID)
-	expectedTxResultErrorMessage := txResult.Error.Error()
-
-	accessContainerName := "access_2"
-
 	// Wait until execution receipts are handled, transaction error messages are stored.
 	s.Eventually(func() bool {
-		value, err := s.getMaxReceiptHeight(accessContainerName)
+		value, err := s.getMaxReceiptHeight(s.accessContainerName)
 		return err == nil && value > txResult.BlockHeight
 	}, 60*time.Second, 1*time.Second)
 
 	// Stop the network containers before checking the results.
 	s.net.StopContainers()
 
-	// Get the access node and open the protocol DB.
-	accessNode := s.net.ContainerByName(accessContainerName)
-	// setup storage objects needed to get the execution data id
-	anDB, err := accessNode.DB()
-	require.NoError(s.T(), err, "could not open db")
+	txResults := []*sdk.TransactionResult{txResult}
+	txErrorMessages := s.fetchTxErrorMessages(txResults, s.accessContainerName)
+	s.verifyTxErrorMessage(txResults, txErrorMessages)
+}
 
-	metrics := metrics.NewNoopCollector()
-	anTxErrorMessages := badger.NewTransactionResultErrorMessages(metrics, anDB, badger.DefaultCacheSize)
+// TestBackfillTxErrorMessages verifies that transaction error messages are backfilled correctly
+// by creating a transaction that results in an error, running the backfill command, and checking
+// if the error message is stored and retrieved from the database.
+func (s *AccessStoreTxErrorMessagesSuite) TestBackfillTxErrorMessages() {
+	// Create and send a transactions that will result in an error.
+	transactionCount := 5
+	txResults := make([]*sdk.TransactionResult, transactionCount)
+	for i := 0; i < transactionCount; i++ {
+		txResults[i] = s.createAndSendTxWithTxError()
+	}
 
-	// Fetch the stored error message by block ID and transaction ID.
-	errMsgResult, err := anTxErrorMessages.ByBlockIDTransactionID(txBlockID, txID)
-	s.Require().NoError(err)
+	serverAddr := fmt.Sprintf("localhost:%s", s.net.ContainerByName(s.accessContainerName).Port(testnet.AdminPort))
+	adminClient := client.NewAdminClient(serverAddr)
 
-	// Verify that the error message retrieved matches the expected values.
-	s.Require().Equal(txID, errMsgResult.TransactionID)
-	s.Require().Equal(expectedTxResultErrorMessage, errMsgResult.ErrorMessage)
+	startHeight := 1
+	endHeight := txResults[len(txResults)-1].BlockHeight // last tx result block height
+	data := map[string]interface{}{"start-height": startHeight, "endHeight": endHeight}
+	// executes the backfill command for transaction error messages
+	_, err := adminClient.RunCommand(context.Background(), "backfill-tx-error-messages", data)
+	require.NoError(s.T(), err)
+
+	// Stop the network containers before checking the results.
+	s.net.StopContainers()
+
+	txErrorMessages := s.fetchTxErrorMessages(txResults, s.accessContainerName)
+	s.verifyTxErrorMessage(txResults, txErrorMessages)
 }
 
 // createAndSendTxWithTxError creates and sends a transaction that will result in an error.
@@ -196,4 +209,41 @@ func (s *AccessStoreTxErrorMessagesSuite) getMaxReceiptHeight(containerName stri
 
 	// Return the first value found as the max receipt height.
 	return uint64(values[0].GetGauge().GetValue()), nil
+}
+
+// fetchTxErrorMessage retrieves the stored transaction error message for a given transaction result.
+func (s *AccessStoreTxErrorMessagesSuite) fetchTxErrorMessages(txResults []*sdk.TransactionResult, containerName string) []*flow.TransactionResultErrorMessage {
+	accessNode := s.net.ContainerByName(containerName)
+	anDB, err := accessNode.DB()
+	require.NoError(s.T(), err, "could not open db")
+
+	metrics := metrics.NewNoopCollector()
+	anTxErrorMessages := badger.NewTransactionResultErrorMessages(metrics, anDB, badger.DefaultCacheSize)
+
+	txResultErrorMessages := make([]*flow.TransactionResultErrorMessage, len(txResults))
+	for i, txResult := range txResults {
+		txBlockID := convert.IDFromSDK(txResult.BlockID)
+		txID := convert.IDFromSDK(txResult.TransactionID)
+
+		errMsgResult, err := anTxErrorMessages.ByBlockIDTransactionID(txBlockID, txID)
+		s.Require().NoError(err)
+
+		txResultErrorMessages[i] = errMsgResult
+	}
+
+	return txResultErrorMessages
+}
+
+// verifyTxErrorMessage compares the expected and retrieved error messages to verify accuracy.
+func (s *AccessStoreTxErrorMessagesSuite) verifyTxErrorMessage(txResults []*sdk.TransactionResult, errMsgResults []*flow.TransactionResultErrorMessage) {
+	s.Require().Equal(len(txResults), len(errMsgResults))
+
+	for i, txResult := range txResults {
+		expectedTxResultErrorMessage := txResult.Error.Error()
+		expectedTxID := convert.IDFromSDK(txResult.TransactionID)
+
+		s.Require().Equal(expectedTxID, errMsgResults[i].TransactionID)
+		s.Require().Equal(expectedTxResultErrorMessage, errMsgResults[i].ErrorMessage)
+	}
+
 }

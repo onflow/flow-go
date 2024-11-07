@@ -145,8 +145,9 @@ func (s *TxErrorMessagesCoreSuite) TestHandleTransactionResultErrorMessages() {
 
 	// Verify that the mock expectations for storing the error messages were met.
 	s.txErrorMessages.AssertExpectations(s.T())
+	s.proto.state.AssertExpectations(s.T())
 
-	// Now simulate the second try when the error messages already exist in storage.
+	// 2. Now simulate the second try when the error messages already exist in storage.
 	// Mock the txErrorMessages storage to confirm that error messages exist.
 	s.txErrorMessages.On("Exists", blockId).
 		Return(true, nil).Once()
@@ -156,6 +157,7 @@ func (s *TxErrorMessagesCoreSuite) TestHandleTransactionResultErrorMessages() {
 	// Verify that the mock expectations for storing the error messages were not met.
 	s.txErrorMessages.AssertExpectations(s.T())
 	s.execClient.AssertExpectations(s.T())
+	s.proto.state.AssertExpectations(s.T())
 }
 
 // TestHandleTransactionResultErrorMessages_ErrorCases tests the error handling of

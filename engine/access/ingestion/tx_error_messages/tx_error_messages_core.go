@@ -111,6 +111,40 @@ func (c *TxErrorMessagesCore) HandleTransactionResultErrorMessages(ctx context.C
 	return nil
 }
 
+func (c *TxErrorMessagesCore) HandleTransactionResultErrorMessagesByENs(
+	ctx context.Context,
+	blockID flow.Identifier,
+	execNodes flow.IdentityList,
+) error {
+	exists, err := c.transactionResultErrorMessages.Exists(blockID)
+	if err != nil {
+		return fmt.Errorf("could not check existance of transaction result error messages: %w", err)
+	}
+	if exists {
+		return nil
+	}
+
+	req := &execproto.GetTransactionErrorMessagesByBlockIDRequest{
+		BlockId: convert.IdentifierToMessage(blockID),
+	}
+	c.log.Debug().Msgf("transaction error messages for block %s are being downloaded", blockID)
+
+	resp, execNode, err := c.backend.GetTransactionErrorMessagesFromAnyEN(ctx, execNodes, req)
+	if err != nil {
+		c.log.Error().Err(err).Msg("failed to get transaction error messages from execution nodes")
+		return err
+	}
+
+	if len(resp) > 0 {
+		err = c.storeTransactionResultErrorMessages(blockID, resp, execNode)
+		if err != nil {
+			return fmt.Errorf("could not store error messages (block: %s): %w", blockID, err)
+		}
+	}
+
+	return nil
+}
+
 // storeTransactionResultErrorMessages stores the transaction result error messages for a given block ID.
 //
 // Parameters:
