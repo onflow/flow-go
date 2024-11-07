@@ -123,7 +123,7 @@ func (s *TxErrorMessagesCoreSuite) TestHandleTransactionResultErrorMessages() {
 		Return(createTransactionErrorMessagesResponse(resultsByBlockID), nil).
 		Once()
 
-	// Mock the txErrorMessages storage to confirm that error messages do not exist yet.
+	// 1. Mock the txErrorMessages storage to confirm that error messages do not exist yet.
 	s.txErrorMessages.On("Exists", blockId).
 		Return(false, nil).Once()
 
@@ -140,17 +140,20 @@ func (s *TxErrorMessagesCoreSuite) TestHandleTransactionResultErrorMessages() {
 
 	// Verify that the mock expectations for storing the error messages were met.
 	s.txErrorMessages.AssertExpectations(s.T())
+	s.proto.state.AssertExpectations(s.T())
 
-	// Now simulate the second try when the error messages already exist in storage.
+	// 2. Now simulate the second try when the error messages already exist in storage.
 	// Mock the txErrorMessages storage to confirm that error messages exist.
 	s.txErrorMessages.On("Exists", blockId).
 		Return(true, nil).Once()
+	s.proto.state.On("AtBlockID", blockId).Return(s.proto.snapshot).Once()
 	err = core.HandleTransactionResultErrorMessages(irrecoverableCtx, blockId)
 	require.NoError(s.T(), err)
 
 	// Verify that the mock expectations for storing the error messages were not met.
 	s.txErrorMessages.AssertExpectations(s.T())
 	s.execClient.AssertExpectations(s.T())
+	s.proto.state.AssertExpectations(s.T())
 }
 
 // TestHandleTransactionResultErrorMessages_ErrorCases tests the error handling of
