@@ -48,6 +48,7 @@ import (
 	"github.com/onflow/flow-go/engine/access/ingestion/tx_error_messages"
 	pingeng "github.com/onflow/flow-go/engine/access/ping"
 	"github.com/onflow/flow-go/engine/access/rest"
+	commonrest "github.com/onflow/flow-go/engine/access/rest/common"
 	"github.com/onflow/flow-go/engine/access/rest/router"
 	"github.com/onflow/flow-go/engine/access/rpc"
 	"github.com/onflow/flow-go/engine/access/rpc/backend"
@@ -220,10 +221,11 @@ func DefaultAccessNodeConfig() *AccessNodeConfig {
 				TxResultQueryMode:   backend.IndexQueryModeExecutionNodesOnly.String(), // default to ENs only for now
 			},
 			RestConfig: rest.Config{
-				ListenAddress: "",
-				WriteTimeout:  rest.DefaultWriteTimeout,
-				ReadTimeout:   rest.DefaultReadTimeout,
-				IdleTimeout:   rest.DefaultIdleTimeout,
+				ListenAddress:  "",
+				WriteTimeout:   rest.DefaultWriteTimeout,
+				ReadTimeout:    rest.DefaultReadTimeout,
+				IdleTimeout:    rest.DefaultIdleTimeout,
+				MaxRequestSize: commonrest.DefaultMaxRequestSize,
 			},
 			MaxMsgSize:     grpcutils.DefaultMaxMsgSize,
 			CompressorName: grpcutils.NoCompressor,
@@ -1190,6 +1192,10 @@ func (builder *FlowAccessNodeBuilder) extraFlags() {
 			defaultConfig.rpcConf.RestConfig.ReadTimeout,
 			"timeout to use when reading REST request headers")
 		flags.DurationVar(&builder.rpcConf.RestConfig.IdleTimeout, "rest-idle-timeout", defaultConfig.rpcConf.RestConfig.IdleTimeout, "idle timeout for REST connections")
+		flags.Int64Var(&builder.rpcConf.RestConfig.MaxRequestSize,
+			"rest-max-request-size",
+			defaultConfig.rpcConf.RestConfig.MaxRequestSize,
+			"the maximum request size in bytes for payload sent over REST server")
 		flags.StringVarP(&builder.rpcConf.CollectionAddr,
 			"static-collection-ingress-addr",
 			"",
@@ -1506,6 +1512,10 @@ func (builder *FlowAccessNodeBuilder) extraFlags() {
 
 		if builder.checkPayerBalanceMode != accessNode.Disabled.String() && !builder.executionDataIndexingEnabled {
 			return errors.New("execution-data-indexing-enabled must be set if check-payer-balance is enabled")
+		}
+
+		if builder.rpcConf.RestConfig.MaxRequestSize <= 0 {
+			return errors.New("rest-max-request-size must be greater than 0")
 		}
 
 		return nil

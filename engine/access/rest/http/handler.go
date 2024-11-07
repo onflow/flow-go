@@ -36,12 +36,13 @@ func NewHandler(
 	handlerFunc ApiHandlerFunc,
 	generator models.LinkGenerator,
 	chain flow.Chain,
+	maxRequestSize int64,
 ) *Handler {
 	handler := &Handler{
 		backend:        backend,
 		apiHandlerFunc: handlerFunc,
 		linkGenerator:  generator,
-		HttpHandler:    common.NewHttpHandler(logger, chain),
+		HttpHandler:    common.NewHttpHandler(logger, chain, maxRequestSize),
 	}
 
 	return handler

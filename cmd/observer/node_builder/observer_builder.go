@@ -43,6 +43,7 @@ import (
 	"github.com/onflow/flow-go/engine/access/index"
 	"github.com/onflow/flow-go/engine/access/rest"
 	restapiproxy "github.com/onflow/flow-go/engine/access/rest/apiproxy"
+	commonrest "github.com/onflow/flow-go/engine/access/rest/common"
 	"github.com/onflow/flow-go/engine/access/rest/router"
 	"github.com/onflow/flow-go/engine/access/rpc"
 	"github.com/onflow/flow-go/engine/access/rpc/backend"
@@ -191,10 +192,11 @@ func DefaultObserverServiceConfig() *ObserverServiceConfig {
 				TxResultQueryMode:         backend.IndexQueryModeExecutionNodesOnly.String(), // default to ENs only for now
 			},
 			RestConfig: rest.Config{
-				ListenAddress: "",
-				WriteTimeout:  rest.DefaultWriteTimeout,
-				ReadTimeout:   rest.DefaultReadTimeout,
-				IdleTimeout:   rest.DefaultIdleTimeout,
+				ListenAddress:  "",
+				WriteTimeout:   rest.DefaultWriteTimeout,
+				ReadTimeout:    rest.DefaultReadTimeout,
+				IdleTimeout:    rest.DefaultIdleTimeout,
+				MaxRequestSize: commonrest.DefaultMaxRequestSize,
 			},
 			MaxMsgSize:     grpcutils.DefaultMaxMsgSize,
 			CompressorName: grpcutils.NoCompressor,
@@ -621,6 +623,10 @@ func (builder *ObserverServiceBuilder) extraFlags() {
 			defaultConfig.rpcConf.RestConfig.ReadTimeout,
 			"timeout to use when reading REST request headers")
 		flags.DurationVar(&builder.rpcConf.RestConfig.IdleTimeout, "rest-idle-timeout", defaultConfig.rpcConf.RestConfig.IdleTimeout, "idle timeout for REST connections")
+		flags.Int64Var(&builder.rpcConf.RestConfig.MaxRequestSize,
+			"rest-max-request-size",
+			defaultConfig.rpcConf.RestConfig.MaxRequestSize,
+			"the maximum request size in bytes for payload sent over REST server")
 		flags.UintVar(&builder.rpcConf.MaxMsgSize,
 			"rpc-max-message-size",
 			defaultConfig.rpcConf.MaxMsgSize,
@@ -849,6 +855,10 @@ func (builder *ObserverServiceBuilder) extraFlags() {
 			if builder.stateStreamConf.RegisterIDsRequestLimit <= 0 {
 				return errors.New("state-stream-max-register-values must be greater than 0")
 			}
+		}
+
+		if builder.rpcConf.RestConfig.MaxRequestSize <= 0 {
+			return errors.New("rest-max-request-size must be greater than 0")
 		}
 
 		return nil

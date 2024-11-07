@@ -16,6 +16,7 @@ import (
 
 	"github.com/onflow/flow-go/access"
 	"github.com/onflow/flow-go/access/mock"
+	"github.com/onflow/flow-go/engine/access/rest/common"
 	"github.com/onflow/flow-go/engine/access/state_stream"
 	"github.com/onflow/flow-go/engine/access/state_stream/backend"
 	"github.com/onflow/flow-go/engine/access/subscription"
@@ -126,6 +127,7 @@ func ExecuteRequest(req *http.Request, backend access.API) *httptest.ResponseRec
 	).AddRestRoutes(
 		backend,
 		flow.Testnet.Chain(),
+		common.DefaultMaxRequestSize,
 	).Build()
 
 	rr := httptest.NewRecorder()
@@ -147,7 +149,7 @@ func ExecuteWsRequest(req *http.Request, stateStreamApi state_stream.API, respon
 		restCollector,
 	).AddWsLegacyRoutes(
 		stateStreamApi,
-		chain, config,
+		chain, config, common.DefaultMaxRequestSize,
 	).Build()
 	router.ServeHTTP(responseRecorder, req)
 }
