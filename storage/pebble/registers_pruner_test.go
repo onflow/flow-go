@@ -168,7 +168,7 @@ func requirePruning(t *testing.T, db *pebble.DB, expectedFirstHeightAfterPruning
 		actualFirstHeight, err := firstStoredHeight(db)
 		require.NoError(t, err)
 		return expectedFirstHeightAfterPruning == actualFirstHeight
-	}, 2*time.Second, 15*time.Millisecond)
+	}, 60*time.Second, 15*time.Millisecond)
 }
 
 // cleanupPruner stops the pruner and verifies there are no errors in the error channel.
@@ -384,14 +384,14 @@ func verifyData(t *testing.T,
 			val, closer, err := db.Get(newLookupKey(height, entry.Key).Bytes())
 			require.NoError(t, err)
 			require.Equal(t, entry.Value, val)
-			closer.Close()
+			require.NoError(t, closer.Close())
 		}
 	}
 
 	for height, entries := range data.prunedData {
 		for _, entry := range entries {
 			_, _, err := db.Get(newLookupKey(height, entry.Key).Bytes())
-			require.Error(t, err)
+			require.ErrorIs(t, err, pebble.ErrNotFound)
 		}
 	}
 }

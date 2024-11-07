@@ -3,7 +3,6 @@ package pebble
 import (
 	"context"
 	"fmt"
-	"io"
 	"time"
 
 	"github.com/cockroachdb/pebble"
@@ -20,21 +19,19 @@ type DBPruner struct {
 	pruneThrottleDelay time.Duration
 	pruneHeight        uint64
 
-	dbBatch              *pebble.Batch
+	db                   *pebble.DB
 	lastRegisterID       flow.RegisterID
 	keepFirstRelevantKey bool
 
 	totalKeysPruned int
 }
 
-var _ io.Closer = (*DBPruner)(nil)
-
-func NewDBPruner(db *pebble.DB, logger zerolog.Logger, pruneThrottleDelay time.Duration, pruneHeight uint64) *DBPruner {
+func RegisterPrunerRun(db *pebble.DB, logger zerolog.Logger, pruneThrottleDelay time.Duration, pruneHeight uint64) *DBPruner {
 	return &DBPruner{
 		logger:             logger,
 		pruneThrottleDelay: pruneThrottleDelay,
 		pruneHeight:        pruneHeight,
-		dbBatch:            db.NewBatch(),
+		db:                 db,
 		totalKeysPruned:    0,
 	}
 }
@@ -49,26 +46,25 @@ func NewDBPruner(db *pebble.DB, logger zerolog.Logger, pruneThrottleDelay time.D
 //
 // No errors are expected during normal operations.
 func (p *DBPruner) BatchDelete(ctx context.Context, lookupKeys [][]byte) error {
-	defer p.dbBatch.Reset()
+	dbBatch := p.db.NewBatch()
+	defer func() {
+		if cerr := dbBatch.Close(); cerr != nil {
+			p.logger.Err(cerr).Msg("error while closing the db batch")
+		}
+	}()
 
 	for _, key := range lookupKeys {
-		if err := p.dbBatch.Delete(key, nil); err != nil {
+		if err := dbBatch.Delete(key, nil); err != nil {
 			keyHeight, registerID, _ := lookupKeyToRegisterID(key)
-			return fmt.Errorf("failed to delete lookupKey: %w %d %v", err, keyHeight, registerID)
+			return fmt.Errorf("failed to delete lookupKey (height: %d, registerID: %v): %w", keyHeight, registerID, err)
 		}
 	}
 
-	if err := p.dbBatch.Commit(pebble.Sync); err != nil {
+	if err := dbBatch.Commit(pebble.Sync); err != nil {
 		return fmt.Errorf("failed to commit batch: %w", err)
 	}
 
 	p.totalKeysPruned += len(lookupKeys)
-
-	// Throttle to prevent excessive system load
-	select {
-	case <-ctx.Done():
-	case <-time.After(p.pruneThrottleDelay):
-	}
 
 	return nil
 }
@@ -121,9 +117,4 @@ func (p *DBPruner) CanPruneKey(key []byte) (bool, error) {
 // TotalKeysPruned returns the total number of keys that have been pruned by the DBPruner.
 func (p *DBPruner) TotalKeysPruned() int {
 	return p.totalKeysPruned
-}
-
-// Close closes the batch associated with the DBPruner.
-func (p *DBPruner) Close() error {
-	return p.dbBatch.Close()
 }

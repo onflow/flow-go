@@ -3,6 +3,7 @@ package pebble
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
@@ -15,25 +16,37 @@ import (
 )
 
 const (
-	DefaultPruneThreshold      = uint64(100_000)
-	DefaultPruneThrottleDelay  = 10 * time.Millisecond
+	// DefaultPruneThreshold defines the default number of blocks to retain below the latest block height. Blocks below
+	// this threshold will be considered for pruning if they exceed the pruneInterval.
+	DefaultPruneThreshold = uint64(100_000)
+
+	// DefaultPruneThrottleDelay is the default delay between each batch of keys inspected and pruned. This helps
+	// to reduce the load on the database during pruning.
+	DefaultPruneThrottleDelay = 10 * time.Millisecond
+
+	// DefaultPruneTickerInterval is the default interval between consecutive pruning checks. Pruning will be triggered
+	// at this interval if conditions are met.
 	DefaultPruneTickerInterval = 10 * time.Minute
 )
 
 // TODO: This configuration should be changed after testing it with real network data for better performance.
 const (
 	// pruneIntervalRatio represents an additional percentage of pruneThreshold which is used to calculate pruneInterval
+	// Pruning will start if there are more than `(1 + pruneIntervalRatio) * pruneThreshold` unpruned blocks
 	pruneIntervalRatio = 0.1 // 10%
 	// deleteItemsPerBatch defines the number of database keys to delete in each batch operation.
 	// This value is used to control the size of deletion operations during pruning.
 	deleteItemsPerBatch = 256
 )
 
-// pruneInterval is a helper function which calculates interval for pruner
+// pruneInterval calculates the interval at which pruning is triggered based on the given pruneThreshold and
+// the pruneIntervalRatio.
 func pruneInterval(threshold uint64) uint64 {
 	return threshold + uint64(float64(threshold)*pruneIntervalRatio)
 }
 
+// RegisterPruner manages the pruning process for register storage, handling
+// threshold-based deletion of old data from the Pebble DB to optimize storage use.
 type RegisterPruner struct {
 	component.Component
 
@@ -52,9 +65,11 @@ type RegisterPruner struct {
 	pruneTickerInterval time.Duration
 }
 
+// PrunerOption is a functional option used to configure a RegisterPruner instance.
 type PrunerOption func(*RegisterPruner)
 
-// WithPruneThreshold is used to configure the pruner with a custom threshold.
+// WithPruneThreshold configures the RegisterPruner with a custom threshold. The pruneThreshold sets the number of
+// blocks below the latest height to keep.
 func WithPruneThreshold(threshold uint64) PrunerOption {
 	return func(p *RegisterPruner) {
 		p.pruneThreshold = threshold
@@ -62,29 +77,32 @@ func WithPruneThreshold(threshold uint64) PrunerOption {
 	}
 }
 
-// WithPruneThrottleDelay is used to configure the pruner with a custom
-// throttle delay.
+// WithPruneThrottleDelay configures the RegisterPruner with a custom delay between batches of keys inspected and pruned,
+// reducing load on the database.
 func WithPruneThrottleDelay(throttleDelay time.Duration) PrunerOption {
 	return func(p *RegisterPruner) {
 		p.pruneThrottleDelay = throttleDelay
 	}
 }
 
-// WithPruneTickerInterval is used to configure the pruner with a custom
-// ticker interval.
+// WithPruneTickerInterval configures the RegisterPruner with a custom interval between consecutive pruning checks.
 func WithPruneTickerInterval(interval time.Duration) PrunerOption {
 	return func(p *RegisterPruner) {
 		p.pruneTickerInterval = interval
 	}
 }
 
-// WithPrunerMetrics is used to sets the metrics for a RegisterPruner instance.
+// WithPrunerMetrics sets the metrics interface for a RegisterPruner instance, allowing tracking of pruning performance
+// and key metrics.
 func WithPrunerMetrics(metrics module.RegisterDBPrunerMetrics) PrunerOption {
 	return func(p *RegisterPruner) {
 		p.metrics = metrics
 	}
 }
 
+// NewRegisterPruner creates and initializes a new RegisterPruner instance with the specified logger, database connection,
+// and optional configurations provided via PrunerOptions. This sets up the pruning component and returns an error if
+// any issues occur.
 func NewRegisterPruner(
 	logger zerolog.Logger,
 	db *pebble.DB,
@@ -143,7 +161,11 @@ func (p *RegisterPruner) checkPrune(ctx context.Context) error {
 		return fmt.Errorf("failed to get latest height from register storage: %w", err)
 	}
 
-	if latestHeight-firstHeight <= p.pruneInterval+p.pruneThreshold {
+	if firstHeight >= latestHeight {
+		return errors.New("the latest height must be greater than the first height")
+	}
+
+	if latestHeight-firstHeight <= p.pruneInterval {
 		return nil
 	}
 
@@ -180,12 +202,12 @@ func (p *RegisterPruner) pruneUpToHeight(ctx context.Context, r pebble.Reader, p
 		return fmt.Errorf("failed to update first height for register storage: %w", err)
 	}
 
-	dbPruner := NewDBPruner(p.db, p.logger, p.pruneThrottleDelay, pruneHeight)
+	dbPruner := RegisterPrunerRun(p.db, p.logger, p.pruneThrottleDelay, pruneHeight)
 
 	prefix := []byte{codeRegister}
 	it, err := r.NewIter(&pebble.IterOptions{
 		LowerBound: prefix,
-		UpperBound: []byte{codeFirstBlockHeight},
+		UpperBound: []byte{codeRegister + 1},
 	})
 	if err != nil {
 		return fmt.Errorf("cannot create iterator: %w", err)
@@ -194,10 +216,6 @@ func (p *RegisterPruner) pruneUpToHeight(ctx context.Context, r pebble.Reader, p
 	defer func() {
 		if cerr := it.Close(); cerr != nil {
 			p.logger.Err(cerr).Msg("error while closing the iterator")
-		}
-
-		if cerr := dbPruner.Close(); cerr != nil {
-			p.logger.Err(cerr).Msg("error while closing the db pruner")
 		}
 	}()
 
@@ -218,11 +236,18 @@ func (p *RegisterPruner) pruneUpToHeight(ctx context.Context, r pebble.Reader, p
 		// Create a copy of the key to avoid memory issues
 		batchKeysToRemove = append(batchKeysToRemove, bytes.Clone(key))
 
-		if len(batchKeysToRemove) == deleteItemsPerBatch {
+		if len(batchKeysToRemove) >= deleteItemsPerBatch {
 			// Perform batch delete
 			if err := dbPruner.BatchDelete(ctx, batchKeysToRemove); err != nil {
 				return err
 			}
+
+			// Throttle to prevent excessive system load
+			select {
+			case <-ctx.Done():
+			case <-time.After(p.pruneThrottleDelay):
+			}
+
 			// Reset batchKeysToRemove to empty slice while retaining capacity
 			batchKeysToRemove = batchKeysToRemove[:0]
 		}
@@ -235,11 +260,13 @@ func (p *RegisterPruner) pruneUpToHeight(ctx context.Context, r pebble.Reader, p
 		}
 	}
 
-	p.logger.Info().Msgf(
-		"Pruned %d keys in %s",
-		dbPruner.TotalKeysPruned(),
-		time.Since(start).String(),
-	)
+	p.logger.Info().
+		Uint64("height", pruneHeight).
+		Int("keys_pruned", dbPruner.TotalKeysPruned()).
+		Dur("duration_ms", time.Since(start)).
+		Msg("pruning complete")
+
+	p.metrics.LatestPrunedHeightWithProgressPercentage(pruneHeight)
 
 	return nil
 }

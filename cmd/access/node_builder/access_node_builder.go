@@ -878,7 +878,6 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 				// take hours to complete.
 				var err error
 				builder.RegisterDB, err = pstorage.OpenRegisterPebbleDB(builder.registersDBPath)
-				builder.Logger.Warn().Msg(fmt.Sprintf("!!!!!!!!!! builder.registersDBPath: %s", builder.registersDBPath))
 				if err != nil {
 					return nil, fmt.Errorf("could not open registers db: %w", err)
 				}
@@ -1387,15 +1386,15 @@ func (builder *FlowAccessNodeBuilder) extraFlags() {
 		flags.BoolVar(&builder.registerDBPruningEnabled,
 			"registerdb-pruning-enabled",
 			defaultConfig.registerDBPruningEnabled,
-			"whether to enable the pruning for register db")
+			"whether to enable pruning for the register db")
 		flags.DurationVar(&builder.registerDBPruneThrottleDelay,
 			"registerdb-prune-throttle-delay",
 			defaultConfig.registerDBPruneThrottleDelay,
-			"delay for controlling a pause between batches of registers inspected and pruned")
+			"delay between batches of registers during register db pruning")
 		flags.DurationVar(&builder.registerDBPruneTickerInterval,
 			"registerdb-prune-ticker-interval",
 			defaultConfig.registerDBPruneTickerInterval,
-			"duration after which the pruner tries to prune data. The default value is 10 minutes")
+			"interval between register db pruning cycles. The default value is 10 minutes")
 
 		// Execution State Streaming API
 		flags.Uint32Var(&builder.stateStreamConf.ExecutionDataCacheSize, "execution-data-cache-size", defaultConfig.stateStreamConf.ExecutionDataCacheSize, "block execution data cache size")
