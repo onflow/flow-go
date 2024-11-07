@@ -2130,6 +2130,12 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 			// order for it to properly start and shut down, we should still return it as its own engine here, so it can
 			// be handled by the scaffold.
 			return builder.RequestEng, nil
+		}).
+		AdminCommand("backfill-tx-error-messages", func(config *cmd.NodeConfig) commands.AdminCommand {
+			return storageCommands.NewBackfillTxErrorMessagesCommand(
+				builder.State,
+				builder.TxResultErrorMessagesCore,
+			)
 		})
 
 	if builder.storeTxResultErrorMessages {
