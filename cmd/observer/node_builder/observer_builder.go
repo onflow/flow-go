@@ -938,7 +938,7 @@ func (builder *ObserverServiceBuilder) InitIDProviders() {
 
 					if flowID, err := builder.IDTranslator.GetFlowID(pid); err != nil {
 						// TODO: this is an instance of "log error and continue with best effort" anti-pattern
-						builder.Logger.Err(err).Str("peer", p2plogging.PeerId(pid)).Msg("failed to translate to Flow ID")
+						builder.Logger.Debug().Str("peer", p2plogging.PeerId(pid)).Msg("failed to translate to Flow ID")
 					} else {
 						result = append(result, flowID)
 					}
