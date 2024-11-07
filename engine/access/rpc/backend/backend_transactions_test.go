@@ -29,6 +29,7 @@ import (
 	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/utils/unittest"
 	"github.com/onflow/flow-go/utils/unittest/generator"
+	"github.com/onflow/flow-go/utils/unittest/mocks"
 )
 
 const expectedErrorMsg = "expected test error"
@@ -611,7 +612,7 @@ func (suite *Suite) TestLookupTransactionErrorMessageByIndex_FailedToFetch() {
 
 	// Create a mock connection factory
 	connFactory := connectionmock.NewConnectionFactory(suite.T())
-	connFactory.On("GetExecutionAPIClient", mock.Anything).Return(suite.execClient, &mockCloser{}, nil)
+	connFactory.On("GetExecutionAPIClient", mock.Anything).Return(suite.execClient, &mocks.MockCloser{}, nil)
 
 	// Create a mock index reporter
 	reporter := syncmock.NewIndexReporter(suite.T())
