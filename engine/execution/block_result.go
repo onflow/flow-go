@@ -97,11 +97,11 @@ func (er *BlockExecutionResult) AllConvertedServiceEvents() flow.ServiceEventLis
 	return res
 }
 
-func (er *BlockExecutionResult) ServiceEventChunkIndices() []int {
-	indices := make([]int, 0)
+func (er *BlockExecutionResult) ServiceEventChunkIndices() []uint64 {
+	indices := make([]uint64, 0)
 	for chunkIndex, ce := range er.collectionExecutionResults {
 		if len(ce.convertedServiceEvents) > 0 {
-			indices = append(indices, chunkIndex)
+			indices = append(indices, uint64(chunkIndex))
 		}
 	}
 	return indices

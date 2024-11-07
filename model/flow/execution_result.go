@@ -18,7 +18,7 @@ type ExecutionResult struct {
 	// Requirements:
 	//   - len(ServiceEventChunkIndices) == len(ServiceEvents)
 	//   - values are monotonically increasing, and in the range [0, len(Chunks)]
-	ServiceEventChunkIndices []int
+	ServiceEventChunkIndices []uint64
 	ExecutionDataID          Identifier // hash commitment to flow.BlockExecutionDataRoot
 }
 
@@ -27,7 +27,7 @@ func NewExecutionResult(
 	blockID Identifier,
 	chunks ChunkList,
 	serviceEvents ServiceEventList,
-	serviceEventChunkIndices []int,
+	serviceEventChunkIndices []uint64,
 	executionDataID Identifier,
 ) *ExecutionResult {
 	return &ExecutionResult{
@@ -40,7 +40,7 @@ func NewExecutionResult(
 	}
 }
 
-func (er ExecutionResult) ServiceEventsByChunk(chunk int) ServiceEventList {
+func (er ExecutionResult) ServiceEventsByChunk(chunk uint64) ServiceEventList {
 	events := make(ServiceEventList, 0)
 	for eventIndex, chunkIndex := range er.ServiceEventChunkIndices {
 		if chunkIndex == chunk {
