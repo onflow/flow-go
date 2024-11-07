@@ -258,11 +258,6 @@ func (tc *TransactionCollector) TransactionFinalized(txID flow.Identifier, when 
 
 	tc.trackTTF(t, tc.logTimeToFinalized)
 	tc.trackTTFE(t, tc.logTimeToFinalizedExecuted)
-
-	// remove transaction timing from mempool if finalized and executed
-	if !t.Finalized.IsZero() && !t.Executed.IsZero() {
-		tc.transactionTimings.Remove(txID)
-	}
 }
 
 func (tc *TransactionCollector) TransactionExecuted(txID flow.Identifier, when time.Time) {
@@ -280,11 +275,6 @@ func (tc *TransactionCollector) TransactionExecuted(txID flow.Identifier, when t
 
 	tc.trackTTE(t, tc.logTimeToExecuted)
 	tc.trackTTFE(t, tc.logTimeToFinalizedExecuted)
-
-	// remove transaction timing from mempool if finalized and executed
-	if !t.Finalized.IsZero() && !t.Executed.IsZero() {
-		tc.transactionTimings.Remove(txID)
-	}
 }
 
 func (tc *TransactionCollector) TransactionSealed(txID flow.Identifier, when time.Time) {
