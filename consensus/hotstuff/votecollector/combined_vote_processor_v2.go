@@ -55,15 +55,20 @@ func (f *combinedVoteProcessorFactoryBaseV2) Create(log zerolog.Logger, block *m
 		return nil, fmt.Errorf("could not create aggregator for staking signatures at block %v: %w", block.BlockID, err)
 	}
 
-	publicKeyShares := make([]crypto.PublicKey, 0, len(allParticipants))
 	dkg, err := f.committee.DKG(block.View)
 	if err != nil {
 		return nil, fmt.Errorf("could not get DKG info at block %v: %w", block.BlockID, err)
 	}
-	for _, participant := range allParticipants {
-		pk, err := dkg.KeyShare(participant.NodeID)
+
+	publicKeyShares := make([]crypto.PublicKey, 0, dkg.Size())
+	for i := uint(0); i < dkg.Size(); i++ {
+		nodeID, err := dkg.NodeID(i)
 		if err != nil {
-			return nil, fmt.Errorf("could not get random beacon key share for %x at block %v: %w", participant.NodeID, block.BlockID, err)
+			return nil, fmt.Errorf("could not get nodeID for index %d at block %v: %w", i, block.BlockID, err)
+		}
+		pk, err := dkg.KeyShare(nodeID)
+		if err != nil {
+			return nil, fmt.Errorf("could not get random beacon key share for %x at block %v: %w", nodeID, block.BlockID, err)
 		}
 		publicKeyShares = append(publicKeyShares, pk)
 	}

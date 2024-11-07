@@ -47,10 +47,19 @@ func (f *combinedVoteProcessorFactoryBaseV3) Create(log zerolog.Logger, block *m
 	// message that has to be verified against aggregated signature
 	msg := verification.MakeVoteMessage(block.View, block.BlockID)
 
+	dkg, err := f.committee.DKG(block.View)
+	if err != nil {
+		return nil, fmt.Errorf("could not get DKG info at block %v: %w", block.BlockID, err)
+	}
+
 	// prepare the staking public keys of participants
 	stakingKeys := make([]crypto.PublicKey, 0, len(allParticipants))
+	stakingBeaconKeys := make([]crypto.PublicKey, 0, len(allParticipants))
 	for _, participant := range allParticipants {
 		stakingKeys = append(stakingKeys, participant.StakingPubKey)
+		if pk, err := dkg.KeyShare(participant.NodeID); err == nil {
+			stakingBeaconKeys = append(stakingBeaconKeys, pk)
+		}
 	}
 
 	stakingSigAggtor, err := signature.NewWeightedSignatureAggregator(allParticipants, stakingKeys, msg, msig.ConsensusVoteTag)
@@ -58,24 +67,23 @@ func (f *combinedVoteProcessorFactoryBaseV3) Create(log zerolog.Logger, block *m
 		return nil, fmt.Errorf("could not create aggregator for staking signatures: %w", err)
 	}
 
-	dkg, err := f.committee.DKG(block.View)
-	if err != nil {
-		return nil, fmt.Errorf("could not get DKG info at block %v: %w", block.BlockID, err)
-	}
-
-	// prepare the random beacon public keys of participants
-	beaconKeys := make([]crypto.PublicKey, 0, len(allParticipants))
-	for _, participant := range allParticipants {
-		pk, err := dkg.KeyShare(participant.NodeID)
-		if err != nil {
-			return nil, fmt.Errorf("could not get random beacon key share for %x: %w", participant.NodeID, err)
-		}
-		beaconKeys = append(beaconKeys, pk)
-	}
-
-	rbSigAggtor, err := signature.NewWeightedSignatureAggregator(allParticipants, beaconKeys, msg, msig.RandomBeaconTag)
+	rbSigAggtor, err := signature.NewWeightedSignatureAggregator(allParticipants, stakingBeaconKeys, msg, msig.RandomBeaconTag)
 	if err != nil {
 		return nil, fmt.Errorf("could not create aggregator for thershold signatures: %w", err)
+	}
+
+	beaconKeys := make([]crypto.PublicKey, 0, dkg.Size())
+	for i := uint(0); i < dkg.Size(); i++ {
+		nodeID, err := dkg.NodeID(i)
+		if err != nil {
+			return nil, fmt.Errorf("could not get nodeID for index %d at block %v: %w", i, block.BlockID, err)
+		}
+
+		pk, err := dkg.KeyShare(nodeID)
+		if err != nil {
+			return nil, fmt.Errorf("could not get random beacon key share for %x at block %v: %w", nodeID, block.BlockID, err)
+		}
+		beaconKeys = append(beaconKeys, pk)
 	}
 
 	threshold := msig.RandomBeaconThreshold(int(dkg.Size()))
