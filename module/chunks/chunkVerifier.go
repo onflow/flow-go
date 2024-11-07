@@ -291,13 +291,15 @@ func (fcv *ChunkVerifier) verifyTransactionsInContext(
 		return nil, chmodels.NewCFInvalidEventsCollection(chunk.EventCollection, eventsHash, chIndex, execResID, events)
 	}
 
-	serviceEventsInChunk := result.ServiceEventsByChunk(chunk.Index)
-	equal, err := serviceEventsInChunk.EqualTo(serviceEvents)
-	if err != nil {
-		return nil, fmt.Errorf("error while comparing service events: %w", err)
-	}
-	if !equal {
-		return nil, chmodels.CFInvalidServiceSystemEventsEmitted(result.ServiceEvents, serviceEvents, chIndex, execResID)
+	if len(result.ServiceEvents) > 0 {
+		serviceEventsInChunk := result.ServiceEventsByChunk(chunk.Index)
+		equal, err := serviceEventsInChunk.EqualTo(serviceEvents)
+		if err != nil {
+			return nil, fmt.Errorf("error while comparing service events: %w", err)
+		}
+		if !equal {
+			return nil, chmodels.CFInvalidServiceSystemEventsEmitted(result.ServiceEvents, serviceEvents, chIndex, execResID)
+		}
 	}
 
 	// Applying chunk updates to the partial trie.	This returns the expected
