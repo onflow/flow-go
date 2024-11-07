@@ -179,6 +179,14 @@ func (h *handler) Ping(
 	return &execution.PingResponse{}, nil
 }
 
+func (h *handler) GetTransactionExecutionMetricsAfter(
+	ctx context.Context,
+	request *execution.GetTransactionExecutionMetricsAfterRequest,
+) (*execution.GetTransactionExecutionMetricsAfterResponse, error) {
+	// Implementation should be backported
+	return nil, nil
+}
+
 func (h *handler) ExecuteScriptAtBlockID(
 	ctx context.Context,
 	req *execution.ExecuteScriptAtBlockIDRequest,
