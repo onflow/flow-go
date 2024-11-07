@@ -21,6 +21,8 @@ type Blocks struct {
 	bhl         *handler.BlockHashList
 }
 
+var _ types.BlockSnapshot = (*Blocks)(nil)
+
 // NewBlocks constructs a new blocks type
 func NewBlocks(
 	chainID flow.ChainID,
@@ -97,6 +99,31 @@ func (b *Blocks) LatestBlock() (*Meta, error) {
 func (b *Blocks) BlockHash(height uint64) (gethCommon.Hash, error) {
 	_, hash, err := b.bhl.BlockHashByHeight(height)
 	return hash, err
+}
+
+// BlockContext constructs a block context for the latest block
+func (b *Blocks) BlockContext() (types.BlockContext, error) {
+	bm, err := b.LatestBlock()
+	if err != nil {
+		return types.BlockContext{}, err
+	}
+
+	return types.BlockContext{
+		ChainID:                types.EVMChainIDFromFlowChainID(b.chainID),
+		BlockNumber:            bm.Height,
+		BlockTimestamp:         bm.Timestamp,
+		DirectCallBaseGasUsage: types.DefaultDirectCallBaseGasUsage,
+		DirectCallGasPrice:     types.DefaultDirectCallGasPrice,
+		GasFeeCollector:        types.CoinbaseAddress,
+		GetHashFunc: func(n uint64) gethCommon.Hash {
+			hash, err := b.BlockHash(n)
+			if err != nil {
+				panic(err)
+			}
+			return hash
+		},
+		Random: bm.Random,
+	}, nil
 }
 
 // storeBlockMetaData stores the block meta data into storage

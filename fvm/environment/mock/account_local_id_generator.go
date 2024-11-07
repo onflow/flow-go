@@ -3,7 +3,7 @@
 package mock
 
 import (
-	common "github.com/onflow/cadence/runtime/common"
+	common "github.com/onflow/cadence/common"
 
 	mock "github.com/stretchr/testify/mock"
 )

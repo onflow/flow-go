@@ -8,22 +8,24 @@ import (
 	"math"
 	"strings"
 	"testing"
+	"time"
 
-	stdlib2 "github.com/onflow/cadence/runtime/stdlib"
-
-	envMock "github.com/onflow/flow-go/fvm/environment/mock"
-	"github.com/onflow/flow-go/fvm/evm/events"
-
+	"github.com/coreos/go-semver/semver"
 	"github.com/onflow/cadence"
+	"github.com/onflow/cadence/common"
 	"github.com/onflow/cadence/encoding/ccf"
 	jsoncdc "github.com/onflow/cadence/encoding/json"
+	cadenceErrors "github.com/onflow/cadence/errors"
+	"github.com/onflow/cadence/interpreter"
 	"github.com/onflow/cadence/runtime"
-	"github.com/onflow/cadence/runtime/common"
-	cadenceErrors "github.com/onflow/cadence/runtime/errors"
-	"github.com/onflow/cadence/runtime/interpreter"
-	"github.com/onflow/cadence/runtime/sema"
-	"github.com/onflow/cadence/runtime/tests/utils"
+	"github.com/onflow/cadence/sema"
+	cadenceStdlib "github.com/onflow/cadence/stdlib"
+	"github.com/onflow/cadence/test_utils/runtime_utils"
 	"github.com/onflow/crypto"
+	"github.com/onflow/flow-core-contracts/lib/go/templates"
+	flowsdk "github.com/onflow/flow-go-sdk"
+	"github.com/onflow/flow-go-sdk/test"
+	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	mockery "github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -33,13 +35,17 @@ import (
 	"github.com/onflow/flow-go/fvm"
 	fvmCrypto "github.com/onflow/flow-go/fvm/crypto"
 	"github.com/onflow/flow-go/fvm/environment"
+	envMock "github.com/onflow/flow-go/fvm/environment/mock"
 	"github.com/onflow/flow-go/fvm/errors"
+	"github.com/onflow/flow-go/fvm/evm/events"
 	"github.com/onflow/flow-go/fvm/evm/stdlib"
 	"github.com/onflow/flow-go/fvm/evm/types"
 	"github.com/onflow/flow-go/fvm/meter"
 	reusableRuntime "github.com/onflow/flow-go/fvm/runtime"
+	"github.com/onflow/flow-go/fvm/storage"
 	"github.com/onflow/flow-go/fvm/storage/snapshot"
 	"github.com/onflow/flow-go/fvm/storage/snapshot/mock"
+	"github.com/onflow/flow-go/fvm/storage/state"
 	"github.com/onflow/flow-go/fvm/storage/testutils"
 	"github.com/onflow/flow-go/fvm/systemcontracts"
 	"github.com/onflow/flow-go/fvm/tracing"
@@ -971,7 +977,7 @@ func TestTransactionFeeDeduction(t *testing.T) {
 			address := flow.ConvertAddress(
 				cadence.SearchFieldByName(
 					data.(cadence.Event),
-					stdlib2.AccountEventAddressParameter.Identifier,
+					cadenceStdlib.AccountEventAddressParameter.Identifier,
 				).(cadence.Address),
 			)
 
@@ -1528,17 +1534,17 @@ func TestSettingExecutionWeights(t *testing.T) {
 				SetScript([]byte(fmt.Sprintf(`
 					import FungibleToken from 0x%s
 					import FlowToken from 0x%s
-	
+
 					transaction() {
 						let sentVault: @{FungibleToken.Vault}
-	
+
 						prepare(signer: auth(BorrowValue) &Account) {
 							let vaultRef = signer.storage.borrow<auth(FungibleToken.Withdraw) &FlowToken.Vault>(from: /storage/flowTokenVault)
 								?? panic("Could not borrow reference to the owner's Vault!")
-	
+
 							self.sentVault <- vaultRef.withdraw(amount: 5.0)
 						}
-	
+
 						execute {
 							let recipient1 = getAccount(%s)
 							let recipient2 = getAccount(%s)
@@ -1556,7 +1562,7 @@ func TestSettingExecutionWeights(t *testing.T) {
 								?? panic("Could not borrow receiver reference to the recipient's Vault")
 							let receiverRef5 = recipient5.capabilities.borrow<&{FungibleToken.Receiver}>(/public/flowTokenReceiver)
 								?? panic("Could not borrow receiver reference to the recipient's Vault")
-	
+
 							receiverRef1.deposit(from: <-self.sentVault.withdraw(amount: 1.0))
 							receiverRef2.deposit(from: <-self.sentVault.withdraw(amount: 1.0))
 							receiverRef3.deposit(from: <-self.sentVault.withdraw(amount: 1.0))
@@ -2332,7 +2338,7 @@ func TestInteractionLimit(t *testing.T) {
 			address = flow.ConvertAddress(
 				cadence.SearchFieldByName(
 					data.(cadence.Event),
-					stdlib2.AccountEventAddressParameter.Identifier,
+					cadenceStdlib.AccountEventAddressParameter.Identifier,
 				).(cadence.Address),
 			)
 
@@ -2404,16 +2410,6 @@ func TestAttachments(t *testing.T) {
 
 	newVMTest().
 		withBootstrapProcedureOptions().
-		withContextOptions(
-			fvm.WithReusableCadenceRuntimePool(
-				reusableRuntime.NewReusableCadenceRuntimePool(
-					1,
-					runtime.Config{
-						AttachmentsEnabled: true,
-					},
-				),
-			),
-		).
 		run(
 			func(
 				t *testing.T,
@@ -2610,25 +2606,25 @@ func TestStorageIterationWithBrokenValues(t *testing.T) {
 				}
 
 				// Deploy `A`
-				runTransaction(utils.DeploymentTransaction(
+				runTransaction(runtime_utils.DeploymentTransaction(
 					"A",
 					[]byte(contractA),
 				))
 
 				// Deploy `B`
-				runTransaction(utils.DeploymentTransaction(
+				runTransaction(runtime_utils.DeploymentTransaction(
 					"B",
 					[]byte(contractB),
 				))
 
 				// Deploy `C`
-				runTransaction(utils.DeploymentTransaction(
+				runTransaction(runtime_utils.DeploymentTransaction(
 					"C",
 					[]byte(contractC),
 				))
 
 				// Deploy `D`
-				runTransaction(utils.DeploymentTransaction(
+				runTransaction(runtime_utils.DeploymentTransaction(
 					"D",
 					[]byte(contractD),
 				))
@@ -2670,7 +2666,7 @@ func TestStorageIterationWithBrokenValues(t *testing.T) {
 				)))
 
 				// Update `A`, such that `B`, `C` and `D` are now broken.
-				runTransaction(utils.UpdateTransaction(
+				runTransaction(runtime_utils.UpdateTransaction(
 					"A",
 					[]byte(updatedContractA),
 				))
@@ -2916,7 +2912,7 @@ func TestEVM(t *testing.T) {
 			sc := systemcontracts.SystemContractsForChain(chain.ChainID())
 			script := fvm.Script([]byte(fmt.Sprintf(`
 				import EVM from %s
-				
+
 				access(all) fun main() {
 					let bal = EVM.Balance(attoflow: 1000000000000000000)
 					let acc <- EVM.createCadenceOwnedAccount()
@@ -2979,7 +2975,7 @@ func TestEVM(t *testing.T) {
 
 				script := fvm.Script([]byte(fmt.Sprintf(`
 					import EVM from %s
-					
+
 					access(all)
                     fun main() {
 						destroy <- EVM.createCadenceOwnedAccount()
@@ -3011,7 +3007,7 @@ func TestEVM(t *testing.T) {
 			txBody := flow.NewTransactionBody().
 				SetScript([]byte(fmt.Sprintf(`
 					import FungibleToken from %s
-					import FlowToken from %s						
+					import FlowToken from %s
 					import EVM from %s
 
 					transaction() {
@@ -3029,7 +3025,7 @@ func TestEVM(t *testing.T) {
 							acc.deposit(from: <- amount)
 							destroy acc
 
-							// commit blocks 
+							// commit blocks
 							evmHeartbeat.heartbeat()
 						}
 					}`,
@@ -3228,4 +3224,366 @@ func TestAccountCapabilitiesPublishEntitledRejection(t *testing.T) {
 			require.NoError(t, output.Err)
 		}),
 	)
+}
+
+func TestCrypto(t *testing.T) {
+	t.Parallel()
+
+	const chainID = flow.Testnet
+
+	test := func(t *testing.T, importDecl string) {
+
+		chain, vm := createChainAndVm(chainID)
+
+		ctx := fvm.NewContext(
+			fvm.WithChain(chain),
+			fvm.WithCadenceLogging(true),
+		)
+
+		script := []byte(fmt.Sprintf(
+			`
+              %s
+
+              access(all)
+              fun main(
+                rawPublicKeys: [String],
+                weights: [UFix64],
+                domainSeparationTag: String,
+                signatures: [String],
+                toAddress: Address,
+                fromAddress: Address,
+                amount: UFix64
+              ): Bool {
+                let keyList = Crypto.KeyList()
+
+                var i = 0
+                for rawPublicKey in rawPublicKeys {
+                  keyList.add(
+                    PublicKey(
+                      publicKey: rawPublicKey.decodeHex(),
+                      signatureAlgorithm: SignatureAlgorithm.ECDSA_P256
+                    ),
+                    hashAlgorithm: HashAlgorithm.SHA3_256,
+                    weight: weights[i],
+                  )
+                  i = i + 1
+                }
+
+                let signatureSet: [Crypto.KeyListSignature] = []
+
+                var j = 0
+                for signature in signatures {
+                  signatureSet.append(
+                    Crypto.KeyListSignature(
+                      keyIndex: j,
+                      signature: signature.decodeHex()
+                    )
+                  )
+                  j = j + 1
+                }
+
+                // assemble the same message in cadence
+                let message = toAddress.toBytes()
+                  .concat(fromAddress.toBytes())
+                  .concat(amount.toBigEndianBytes())
+
+                return keyList.verify(
+                  signatureSet: signatureSet,
+                  signedData: message,
+                  domainSeparationTag: domainSeparationTag
+                )
+              }
+            `,
+			importDecl,
+		))
+
+		accountKeys := test.AccountKeyGenerator()
+
+		// create the keys
+		keyAlice, signerAlice := accountKeys.NewWithSigner()
+		keyBob, signerBob := accountKeys.NewWithSigner()
+
+		// create the message that will be signed
+		addresses := test.AddressGenerator()
+
+		toAddress := cadence.Address(addresses.New())
+		fromAddress := cadence.Address(addresses.New())
+
+		amount, err := cadence.NewUFix64("100.00")
+		require.NoError(t, err)
+
+		var message []byte
+		message = append(message, toAddress.Bytes()...)
+		message = append(message, fromAddress.Bytes()...)
+		message = append(message, amount.ToBigEndianBytes()...)
+
+		// sign the message with Alice and Bob
+		signatureAlice, err := flowsdk.SignUserMessage(signerAlice, message)
+		require.NoError(t, err)
+
+		signatureBob, err := flowsdk.SignUserMessage(signerBob, message)
+		require.NoError(t, err)
+
+		publicKeys := cadence.NewArray([]cadence.Value{
+			cadence.String(hex.EncodeToString(keyAlice.PublicKey.Encode())),
+			cadence.String(hex.EncodeToString(keyBob.PublicKey.Encode())),
+		})
+
+		// each signature has half weight
+		weightAlice, err := cadence.NewUFix64("0.5")
+		require.NoError(t, err)
+
+		weightBob, err := cadence.NewUFix64("0.5")
+		require.NoError(t, err)
+
+		weights := cadence.NewArray([]cadence.Value{
+			weightAlice,
+			weightBob,
+		})
+
+		signatures := cadence.NewArray([]cadence.Value{
+			cadence.String(hex.EncodeToString(signatureAlice)),
+			cadence.String(hex.EncodeToString(signatureBob)),
+		})
+
+		domainSeparationTag := cadence.String("FLOW-V0.0-user")
+
+		arguments := []cadence.Value{
+			publicKeys,
+			weights,
+			domainSeparationTag,
+			signatures,
+			toAddress,
+			fromAddress,
+			amount,
+		}
+
+		encodedArguments := make([][]byte, 0, len(arguments))
+		for _, argument := range arguments {
+			encodedArguments = append(encodedArguments, jsoncdc.MustEncode(argument))
+		}
+
+		snapshotTree := testutil.RootBootstrappedLedger(vm, ctx)
+
+		_, output, err := vm.Run(
+			ctx,
+			fvm.Script(script).
+				WithArguments(encodedArguments...),
+			snapshotTree)
+		require.NoError(t, err)
+
+		require.NoError(t, output.Err)
+
+		result := output.Value
+
+		assert.Equal(t,
+			cadence.NewBool(true),
+			result,
+		)
+	}
+
+	t.Run("identifier location", func(t *testing.T) {
+		t.Parallel()
+
+		test(t, "import Crypto")
+	})
+
+	t.Run("address location", func(t *testing.T) {
+		t.Parallel()
+
+		sc := systemcontracts.SystemContractsForChain(chainID)
+		cryptoContractAddress := sc.Crypto.Address.HexWithPrefix()
+
+		test(t, fmt.Sprintf("import Crypto from %s", cryptoContractAddress))
+	})
+}
+
+func Test_MinimumRequiredVersion(t *testing.T) {
+
+	chain := flow.Emulator.Chain()
+	sc := systemcontracts.SystemContractsForChain(chain.ChainID())
+	log := zerolog.New(zerolog.NewTestWriter(t))
+
+	getVersion := func(ctx fvm.Context, snapshotTree snapshot.SnapshotTree) string {
+		blockDatabase := storage.NewBlockDatabase(
+			snapshotTree,
+			0,
+			nil)
+
+		txnState, err := blockDatabase.NewTransaction(0, state.DefaultParameters())
+		require.NoError(t, err)
+
+		executionParams, _, err := txnState.GetStateExecutionParameters(
+			txnState,
+			fvm.NewExecutionParametersComputer(log, ctx, txnState))
+		require.NoError(t, err)
+
+		// this will set the parameters to the txnState.
+		// this is done at the beginning of a transaction/script
+		txnId, err := txnState.BeginNestedTransactionWithMeterParams(
+			state.ExecutionParameters{
+				ExecutionVersion: executionParams.ExecutionVersion,
+			})
+		require.NoError(t, err)
+
+		mrv := environment.NewMinimumCadenceRequiredVersion(txnState)
+
+		v, err := mrv.MinimumRequiredVersion()
+
+		require.NoError(t, err)
+		_, err = txnState.CommitNestedTransaction(txnId)
+		require.NoError(t, err)
+
+		return v
+	}
+
+	insertVersionBoundary := func(newVersion semver.Version, currentHeight, insertHeight uint64, ctx fvm.Context, snapshotTree snapshot.SnapshotTree, vm fvm.VM, txIndex uint32) snapshot.SnapshotTree {
+		setVersionBoundaryScript := templates.GenerateSetVersionBoundaryScript(sc.AsTemplateEnv())
+		tx := flow.NewTransactionBody().
+			SetScript(setVersionBoundaryScript).
+			SetProposalKey(sc.FlowServiceAccount.Address, 0, 0).
+			AddAuthorizer(sc.FlowServiceAccount.Address).
+			SetPayer(sc.FlowServiceAccount.Address)
+
+		tx.
+			AddArgument(jsoncdc.MustEncode(cadence.UInt8(newVersion.Major))).
+			AddArgument(jsoncdc.MustEncode(cadence.UInt8(newVersion.Minor))).
+			AddArgument(jsoncdc.MustEncode(cadence.UInt8(newVersion.Patch))).
+			AddArgument(jsoncdc.MustEncode(cadence.String(newVersion.PreRelease)))
+
+		tx.AddArgument(jsoncdc.MustEncode(cadence.UInt64(insertHeight)))
+
+		startHeader := flow.Header{
+			Height:    currentHeight,
+			ChainID:   chain.ChainID(),
+			Timestamp: time.Now().UTC(),
+		}
+
+		blocks := new(envMock.Blocks)
+		ctxWithBlock := fvm.NewContextFromParent(
+			ctx,
+			fvm.WithBlockHeader(&startHeader),
+			fvm.WithBlocks(blocks),
+		)
+
+		executionSnapshot, output, err := vm.Run(
+			ctxWithBlock,
+			fvm.Transaction(tx, txIndex),
+			snapshotTree)
+
+		require.NoError(t, err)
+		require.NoError(t, output.Err)
+		return snapshotTree.Append(executionSnapshot)
+	}
+
+	runSystemTxToUpdateNodeVersionBeaconContract := func(atHeight uint64, ctx fvm.Context, snapshotTree snapshot.SnapshotTree, vm fvm.VM, txIndex uint32) snapshot.SnapshotTree {
+		txBody := flow.NewTransactionBody().
+			SetScript([]byte(fmt.Sprintf(`
+					import NodeVersionBeacon from %s
+					
+					transaction {
+						prepare(serviceAccount: auth(BorrowValue) &Account) {
+
+							let versionBeaconHeartbeat = serviceAccount.storage
+								.borrow<&NodeVersionBeacon.Heartbeat>(from: NodeVersionBeacon.HeartbeatStoragePath)
+								?? panic("Couldn't borrow NodeVersionBeacon.Heartbeat Resource")
+							versionBeaconHeartbeat.heartbeat()
+						}
+					}
+					`,
+				sc.NodeVersionBeacon.Address.HexWithPrefix()))).
+			SetProposalKey(sc.FlowServiceAccount.Address, 0, 0).
+			AddAuthorizer(sc.FlowServiceAccount.Address).
+			SetPayer(sc.FlowServiceAccount.Address)
+
+		endHeader := flow.Header{
+			Height:    atHeight,
+			ChainID:   chain.ChainID(),
+			Timestamp: time.Now().UTC(),
+		}
+
+		blocks := new(envMock.Blocks)
+		ctxWithBlock := fvm.NewContextFromParent(ctx,
+			fvm.WithBlockHeader(&endHeader),
+			fvm.WithBlocks(blocks),
+		)
+
+		executionSnapshot, output, err := vm.Run(
+			ctxWithBlock,
+			fvm.Transaction(txBody, txIndex),
+			snapshotTree)
+
+		require.NoError(t, err)
+		require.NoError(t, output.Err)
+
+		return snapshotTree.Append(executionSnapshot)
+	}
+
+	t.Run("minimum required version", newVMTest().
+		withContextOptions(
+			fvm.WithChain(chain),
+			fvm.WithAuthorizationChecksEnabled(false),
+			fvm.WithSequenceNumberCheckAndIncrementEnabled(false),
+		).
+		run(func(
+			t *testing.T,
+			vm fvm.VM,
+			chain flow.Chain,
+			ctx fvm.Context,
+			snapshotTree snapshot.SnapshotTree,
+		) {
+			// default version is empty
+			require.Equal(t, semver.Version{}.String(), getVersion(ctx, snapshotTree))
+
+			// define mapping for flow go version to cadence version
+			flowVersion1 := semver.Version{
+				Major:      1,
+				Minor:      2,
+				Patch:      3,
+				PreRelease: "rc.1",
+			}
+			cadenceVersion1 := semver.Version{
+				Major:      2,
+				Minor:      1,
+				Patch:      3,
+				PreRelease: "rc.2",
+			}
+			environment.SetFVMToCadenceVersionMappingForTestingOnly(
+				environment.FlowGoToCadenceVersionMapping{
+					FlowGoVersion:  flowVersion1,
+					CadenceVersion: cadenceVersion1,
+				})
+
+			h0 := uint64(100)   // starting height
+			hv1 := uint64(2000) // version boundary height
+
+			txIndex := uint32(0)
+
+			// insert version boundary 1
+			snapshotTree = insertVersionBoundary(flowVersion1, h0, hv1, ctx, snapshotTree, vm, txIndex)
+			txIndex += 1
+
+			// so far no change:
+			require.Equal(t, semver.Version{}.String(), getVersion(ctx, snapshotTree))
+
+			// system transaction needs to run to update the flowVersion on chain
+			snapshotTree = runSystemTxToUpdateNodeVersionBeaconContract(hv1-1, ctx, snapshotTree, vm, txIndex)
+			txIndex += 1
+
+			// no change:
+			require.Equal(t, semver.Version{}.String(), getVersion(ctx, snapshotTree))
+
+			// system transaction needs to run to update the flowVersion on chain
+			snapshotTree = runSystemTxToUpdateNodeVersionBeaconContract(hv1, ctx, snapshotTree, vm, txIndex)
+			txIndex += 1
+
+			// switch to cadence version 1
+			require.Equal(t, cadenceVersion1.String(), getVersion(ctx, snapshotTree))
+
+			// system transaction needs to run to update the flowVersion on chain
+			snapshotTree = runSystemTxToUpdateNodeVersionBeaconContract(hv1+1, ctx, snapshotTree, vm, txIndex)
+
+			// still cadence version 1
+			require.Equal(t, cadenceVersion1.String(), getVersion(ctx, snapshotTree))
+		}))
 }

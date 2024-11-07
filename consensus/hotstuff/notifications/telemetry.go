@@ -60,7 +60,7 @@ func (t *TelemetryConsumer) OnStart(currentView uint64) {
 	t.pathHandler.NextStep().Msg("OnStart")
 }
 
-func (t *TelemetryConsumer) OnReceiveProposal(currentView uint64, proposal *model.Proposal) {
+func (t *TelemetryConsumer) OnReceiveProposal(currentView uint64, proposal *model.SignedProposal) {
 	block := proposal.Block
 	t.pathHandler.StartNextPath(currentView)
 	step := t.pathHandler.NextStep().

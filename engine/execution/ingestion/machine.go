@@ -54,7 +54,7 @@ func NewMachine(
 	broadcaster provider.ProviderEngine,
 	uploader *uploader.Manager,
 	stopControl *stop.StopControl,
-) (*Machine, module.ReadyDoneAware, error) {
+) (*Machine, *Core, error) {
 
 	e := &Machine{
 		log:                logger.With().Str("engine", "ingestion_machine").Logger(),

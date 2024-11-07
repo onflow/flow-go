@@ -52,7 +52,6 @@ import (
 	txmetrics "github.com/onflow/flow-go/engine/execution/computation/metrics"
 	"github.com/onflow/flow-go/engine/execution/ingestion"
 	"github.com/onflow/flow-go/engine/execution/ingestion/fetcher"
-	"github.com/onflow/flow-go/engine/execution/ingestion/loader"
 	"github.com/onflow/flow-go/engine/execution/ingestion/stop"
 	"github.com/onflow/flow-go/engine/execution/ingestion/uploader"
 	exeprovider "github.com/onflow/flow-go/engine/execution/provider"
@@ -1081,61 +1080,24 @@ func (exeNode *ExecutionNode) LoadIngestionEngine(
 		exeNode.collectionRequester = reqEng
 	}
 
-	if exeNode.exeConf.enableNewIngestionEngine {
-		_, core, err := ingestion.NewMachine(
-			node.Logger,
-			node.ProtocolEvents,
-			exeNode.collectionRequester,
-			colFetcher,
-			node.Storage.Headers,
-			node.Storage.Blocks,
-			node.Storage.Collections,
-			exeNode.executionState,
-			node.State,
-			exeNode.collector,
-			exeNode.computationManager,
-			exeNode.providerEngine,
-			exeNode.blockDataUploader,
-			exeNode.stopControl,
-		)
-
-		return core, err
-	}
-
-	var blockLoader ingestion.BlockLoader
-	if exeNode.exeConf.enableStorehouse {
-		blockLoader = loader.NewUnfinalizedLoader(node.Logger, node.State, node.Storage.Headers, exeNode.executionState)
-	} else {
-		blockLoader = loader.NewUnexecutedLoader(node.Logger, node.State, node.Storage.Headers, exeNode.executionState)
-	}
-
-	ingestionEng, err := ingestion.New(
-		exeNode.ingestionUnit,
+	_, core, err := ingestion.NewMachine(
 		node.Logger,
-		node.EngineRegistry,
+		node.ProtocolEvents,
+		exeNode.collectionRequester,
 		colFetcher,
 		node.Storage.Headers,
 		node.Storage.Blocks,
 		node.Storage.Collections,
+		exeNode.executionState,
+		node.State,
+		exeNode.collector,
 		exeNode.computationManager,
 		exeNode.providerEngine,
-		exeNode.executionState,
-		exeNode.collector,
-		node.Tracer,
-		exeNode.exeConf.extensiveLog,
-		exeNode.executionDataPruner,
 		exeNode.blockDataUploader,
 		exeNode.stopControl,
-		blockLoader,
 	)
 
-	// TODO: we should solve these mutual dependencies better
-	// => https://github.com/dapperlabs/flow-go/issues/4360
-	exeNode.collectionRequester.WithHandle(ingestionEng.OnCollection)
-
-	node.ProtocolEvents.AddConsumer(ingestionEng)
-
-	return ingestionEng, err
+	return core, err
 }
 
 // create scripts engine for handling script execution

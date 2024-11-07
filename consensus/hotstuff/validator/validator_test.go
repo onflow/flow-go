@@ -35,7 +35,7 @@ type ProposalSuite struct {
 	parent       *model.Block
 	block        *model.Block
 	voters       flow.IdentitySkeletonList
-	proposal     *model.Proposal
+	proposal     *model.SignedProposal
 	vote         *model.Vote
 	voter        *flow.IdentitySkeleton
 	committee    *mocks.Replicas
@@ -70,7 +70,7 @@ func (ps *ProposalSuite) SetupTest() {
 	require.NoError(ps.T(), err)
 
 	ps.voters = ps.participants.Filter(filter.HasNodeID[flow.Identity](voterIDs...)).ToSkeleton()
-	ps.proposal = &model.Proposal{Block: ps.block}
+	ps.proposal = helper.MakeSignedProposal(helper.WithProposal(helper.MakeProposal(helper.WithBlock(ps.block))))
 	ps.vote = ps.proposal.ProposerVote()
 	ps.voter = ps.leader
 
@@ -256,7 +256,7 @@ func (ps *ProposalSuite) TestProposalWithLastViewTC() {
 	ps.committee.On("LeaderForView", mock.Anything).Return(ps.leader.NodeID, nil)
 
 	ps.Run("happy-path", func() {
-		proposal := helper.MakeProposal(
+		proposal := helper.MakeSignedProposal(helper.WithProposal(helper.MakeProposal(
 			helper.WithBlock(helper.MakeBlock(
 				helper.WithBlockView(ps.block.View+2),
 				helper.WithBlockProposer(ps.leader.NodeID),
@@ -267,14 +267,14 @@ func (ps *ProposalSuite) TestProposalWithLastViewTC() {
 				helper.WithTCSigners(ps.indices),
 				helper.WithTCView(ps.block.View+1),
 				helper.WithTCNewestQC(ps.block.QC))),
-		)
+		)))
 		ps.verifier.On("VerifyTC", ps.voters, []byte(proposal.LastViewTC.SigData),
 			proposal.LastViewTC.View, proposal.LastViewTC.NewestQCViews).Return(nil).Once()
 		err := ps.validator.ValidateProposal(proposal)
 		require.NoError(ps.T(), err)
 	})
 	ps.Run("no-tc", func() {
-		proposal := helper.MakeProposal(
+		proposal := helper.MakeSignedProposal(helper.WithProposal(helper.MakeProposal(
 			helper.WithBlock(helper.MakeBlock(
 				helper.WithBlockView(ps.block.View+2),
 				helper.WithBlockProposer(ps.leader.NodeID),
@@ -282,14 +282,14 @@ func (ps *ProposalSuite) TestProposalWithLastViewTC() {
 				helper.WithBlockQC(ps.block.QC)),
 			),
 			// in this case proposal without LastViewTC is considered invalid
-		)
+		)))
 		err := ps.validator.ValidateProposal(proposal)
 		require.True(ps.T(), model.IsInvalidProposalError(err))
 		ps.verifier.AssertNotCalled(ps.T(), "VerifyQC")
 		ps.verifier.AssertNotCalled(ps.T(), "VerifyTC")
 	})
 	ps.Run("tc-for-wrong-view", func() {
-		proposal := helper.MakeProposal(
+		proposal := helper.MakeSignedProposal(helper.WithProposal(helper.MakeProposal(
 			helper.WithBlock(helper.MakeBlock(
 				helper.WithBlockView(ps.block.View+2),
 				helper.WithBlockProposer(ps.leader.NodeID),
@@ -300,14 +300,14 @@ func (ps *ProposalSuite) TestProposalWithLastViewTC() {
 				helper.WithTCSigners(ps.indices),
 				helper.WithTCView(ps.block.View+10), // LastViewTC.View must be equal to Block.View-1
 				helper.WithTCNewestQC(ps.block.QC))),
-		)
+		)))
 		err := ps.validator.ValidateProposal(proposal)
 		require.True(ps.T(), model.IsInvalidProposalError(err))
 		ps.verifier.AssertNotCalled(ps.T(), "VerifyQC")
 		ps.verifier.AssertNotCalled(ps.T(), "VerifyTC")
 	})
 	ps.Run("proposal-not-safe-to-extend", func() {
-		proposal := helper.MakeProposal(
+		proposal := helper.MakeSignedProposal(helper.WithProposal(helper.MakeProposal(
 			helper.WithBlock(helper.MakeBlock(
 				helper.WithBlockView(ps.block.View+2),
 				helper.WithBlockProposer(ps.leader.NodeID),
@@ -319,14 +319,14 @@ func (ps *ProposalSuite) TestProposalWithLastViewTC() {
 				helper.WithTCView(ps.block.View+1),
 				// proposal is not safe to extend because included QC.View is higher that Block.QC.View
 				helper.WithTCNewestQC(helper.MakeQC(helper.WithQCView(ps.block.View+1))))),
-		)
+		)))
 		err := ps.validator.ValidateProposal(proposal)
 		require.True(ps.T(), model.IsInvalidProposalError(err))
 		ps.verifier.AssertNotCalled(ps.T(), "VerifyQC")
 		ps.verifier.AssertNotCalled(ps.T(), "VerifyTC")
 	})
 	ps.Run("included-tc-highest-qc-not-highest", func() {
-		proposal := helper.MakeProposal(
+		proposal := helper.MakeSignedProposal(helper.WithProposal(helper.MakeProposal(
 			helper.WithBlock(helper.MakeBlock(
 				helper.WithBlockView(ps.block.View+2),
 				helper.WithBlockProposer(ps.leader.NodeID),
@@ -338,7 +338,7 @@ func (ps *ProposalSuite) TestProposalWithLastViewTC() {
 				helper.WithTCView(ps.block.View+1),
 				helper.WithTCNewestQC(ps.block.QC),
 			)),
-		)
+		)))
 		ps.verifier.On("VerifyTC", ps.voters, []byte(proposal.LastViewTC.SigData),
 			proposal.LastViewTC.View, mock.Anything).Return(nil).Once()
 
@@ -352,7 +352,7 @@ func (ps *ProposalSuite) TestProposalWithLastViewTC() {
 		// TC is signed by only one signer - insufficient to reach weight threshold
 		insufficientSignerIndices, err := signature.EncodeSignersToIndices(ps.participants.NodeIDs(), ps.participants.NodeIDs()[:1])
 		require.NoError(ps.T(), err)
-		proposal := helper.MakeProposal(
+		proposal := helper.MakeSignedProposal(helper.WithProposal(helper.MakeProposal(
 			helper.WithBlock(helper.MakeBlock(
 				helper.WithBlockView(ps.block.View+2),
 				helper.WithBlockProposer(ps.leader.NodeID),
@@ -364,7 +364,7 @@ func (ps *ProposalSuite) TestProposalWithLastViewTC() {
 				helper.WithTCView(ps.block.View+1),
 				helper.WithTCNewestQC(ps.block.QC),
 			)),
-		)
+		)))
 		err = ps.validator.ValidateProposal(proposal)
 		require.True(ps.T(), model.IsInvalidProposalError(err) && model.IsInvalidTCError(err))
 		ps.verifier.AssertNotCalled(ps.T(), "VerifyTC")
@@ -375,7 +375,7 @@ func (ps *ProposalSuite) TestProposalWithLastViewTC() {
 			helper.WithQCView(ps.block.QC.View-1),
 			helper.WithQCSigners(ps.indices))
 
-		proposal := helper.MakeProposal(
+		proposal := helper.MakeSignedProposal(helper.WithProposal(helper.MakeProposal(
 			helper.WithBlock(helper.MakeBlock(
 				helper.WithBlockView(ps.block.View+2),
 				helper.WithBlockProposer(ps.leader.NodeID),
@@ -386,7 +386,7 @@ func (ps *ProposalSuite) TestProposalWithLastViewTC() {
 				helper.WithTCSigners(ps.indices),
 				helper.WithTCView(ps.block.View+1),
 				helper.WithTCNewestQC(qc))),
-		)
+		)))
 		ps.verifier.On("VerifyTC", ps.voters, []byte(proposal.LastViewTC.SigData),
 			proposal.LastViewTC.View, proposal.LastViewTC.NewestQCViews).Return(nil).Once()
 		ps.verifier.On("VerifyQC", ps.voters, qc.SigData,
@@ -399,7 +399,7 @@ func (ps *ProposalSuite) TestProposalWithLastViewTC() {
 			helper.WithQCView(ps.block.QC.View-2),
 			helper.WithQCSigners(ps.indices))
 
-		proposal := helper.MakeProposal(
+		proposal := helper.MakeSignedProposal(helper.WithProposal(helper.MakeProposal(
 			helper.WithBlock(helper.MakeBlock(
 				helper.WithBlockView(ps.block.View+2),
 				helper.WithBlockProposer(ps.leader.NodeID),
@@ -410,7 +410,7 @@ func (ps *ProposalSuite) TestProposalWithLastViewTC() {
 				helper.WithTCSigners(ps.indices),
 				helper.WithTCView(ps.block.View+1),
 				helper.WithTCNewestQC(newestQC))),
-		)
+		)))
 		ps.verifier.On("VerifyTC", ps.voters, []byte(proposal.LastViewTC.SigData),
 			proposal.LastViewTC.View, proposal.LastViewTC.NewestQCViews).Return(nil).Once()
 		// Validating QC included in TC returns ErrViewForUnknownEpoch
@@ -423,7 +423,7 @@ func (ps *ProposalSuite) TestProposalWithLastViewTC() {
 		require.NotErrorIs(ps.T(), err, model.ErrViewForUnknownEpoch)
 	})
 	ps.Run("included-tc-invalid-sig", func() {
-		proposal := helper.MakeProposal(
+		proposal := helper.MakeSignedProposal(helper.WithProposal(helper.MakeProposal(
 			helper.WithBlock(helper.MakeBlock(
 				helper.WithBlockView(ps.block.View+2),
 				helper.WithBlockProposer(ps.leader.NodeID),
@@ -434,7 +434,7 @@ func (ps *ProposalSuite) TestProposalWithLastViewTC() {
 				helper.WithTCSigners(ps.indices),
 				helper.WithTCView(ps.block.View+1),
 				helper.WithTCNewestQC(ps.block.QC))),
-		)
+		)))
 		ps.verifier.On("VerifyTC", ps.voters, []byte(proposal.LastViewTC.SigData),
 			proposal.LastViewTC.View, proposal.LastViewTC.NewestQCViews).Return(model.ErrInvalidSignature).Once()
 		err := ps.validator.ValidateProposal(proposal)
@@ -443,7 +443,7 @@ func (ps *ProposalSuite) TestProposalWithLastViewTC() {
 			proposal.LastViewTC.View, proposal.LastViewTC.NewestQCViews)
 	})
 	ps.Run("last-view-successful-but-includes-tc", func() {
-		proposal := helper.MakeProposal(
+		proposal := helper.MakeSignedProposal(helper.WithProposal(helper.MakeProposal(
 			helper.WithBlock(helper.MakeBlock(
 				helper.WithBlockView(ps.finalized+1),
 				helper.WithBlockProposer(ps.leader.NodeID),
@@ -451,7 +451,7 @@ func (ps *ProposalSuite) TestProposalWithLastViewTC() {
 				helper.WithParentBlock(ps.parent)),
 			),
 			helper.WithLastViewTC(helper.MakeTC()),
-		)
+		)))
 		err := ps.validator.ValidateProposal(proposal)
 		require.True(ps.T(), model.IsInvalidProposalError(err))
 		ps.verifier.AssertNotCalled(ps.T(), "VerifyTC")

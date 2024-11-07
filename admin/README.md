@@ -115,3 +115,8 @@ curl localhost:9002/admin/run_command -H 'Content-Type: application/json' -d '{"
 curl localhost:9002/admin/run_command -H 'Content-Type: application/json' -d '{"commandName": "protocol-snapshot"}'
 curl localhost:9002/admin/run_command -H 'Content-Type: application/json' -d '{"commandName": "protocol-snapshot", "data": { "blocks-to-skip": 10 }}'
 ```
+
+### To backfill transaction error messages
+```
+curl localhost:9002/admin/run_command -H 'Content-Type: application/json' -d '{"commandName": "backfill-tx-error-messages", "data": { "start-height": 340, "end-height": 343, "execution-node-ids":["ec7b934df29248d574ae1cc33ae77f22f0fcf96a79e009224c46374d1837824e", "8cbdc8d24a28899a33140cb68d4146cd6f2f6c18c57f54c299f26351d126919e"] }}'
+```
