@@ -4,11 +4,15 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
+	"os"
+	"path/filepath"
 	"sync"
 	"testing"
 
+	"github.com/cockroachdb/pebble"
 	"github.com/stretchr/testify/require"
 
+	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/storage/operation"
 	"github.com/onflow/flow-go/storage/operation/dbtest"
@@ -136,6 +140,74 @@ func TestRemove(t *testing.T) {
 	})
 }
 
+func TestRemoveDiskUsage(t *testing.T) {
+	count := 10000
+	wg := sync.WaitGroup{}
+	// 10000 chunk data packs will produce 4 log files
+	// Wait for the 4 log file to be deleted
+	wg.Add(4)
+
+	// Create an event listener to monitor compaction events
+	listener := pebble.EventListener{
+		// Capture when compaction ends
+		WALDeleted: func(info pebble.WALDeleteInfo) {
+			wg.Done()
+		},
+	}
+
+	// Configure Pebble DB with the event listener
+	opts := &pebble.Options{
+		MemTableSize:  64 << 20, // required for rotating WAL
+		EventListener: &listener,
+	}
+
+	dbtest.RunWithPebbleDB(t, opts, func(t *testing.T, r storage.Reader, withWriter dbtest.WithWriter, dir string, db *pebble.DB) {
+		items := make([]*flow.ChunkDataPack, count)
+
+		// prefix is needed for defining the key range for compaction
+		prefix := []byte{1}
+		getKey := func(c *flow.ChunkDataPack) []byte {
+			return append(prefix, c.ChunkID[:]...)
+		}
+
+		for i := 0; i < count; i++ {
+			chunkID := unittest.IdentifierFixture()
+			chunkDataPack := unittest.ChunkDataPackFixture(chunkID)
+			items[i] = chunkDataPack
+		}
+
+		// Insert 100 entities
+		require.NoError(t, withWriter(func(writer storage.Writer) error {
+			for i := 0; i < count; i++ {
+				if err := operation.Upsert(getKey(items[i]), items[i])(writer); err != nil {
+					return err
+				}
+			}
+			return nil
+		}))
+		sizeBefore := getFolderSize(t, dir)
+
+		// Remove all entities
+		require.NoError(t, withWriter(func(writer storage.Writer) error {
+			for i := 0; i < count; i++ {
+				if err := operation.Remove(getKey(items[i]))(writer); err != nil {
+					return err
+				}
+			}
+			return nil
+		}))
+
+		// Trigger compaction
+		require.NoError(t, db.Compact(prefix, []byte{2}, true))
+		wg.Wait()
+
+		// Verify the disk usage is reduced
+		sizeAfter := getFolderSize(t, dir)
+		require.Greater(t, sizeBefore, sizeAfter,
+			fmt.Sprintf("expected disk usage to be reduced after compaction, before: %d, after: %d", sizeBefore, sizeAfter))
+	})
+}
+
 func TestConcurrentWrite(t *testing.T) {
 	dbtest.RunWithStorages(t, func(t *testing.T, r storage.Reader, withWriter dbtest.WithWriter) {
 		var wg sync.WaitGroup
@@ -241,6 +313,30 @@ func TestRemoveRange(t *testing.T) {
 			require.Equal(t, !deleted, exists,
 				"expected key %x to be %s", key, map[bool]string{true: "deleted", false: "not deleted"})
 		}
+
+		// Verify that after the removal, Traverse the removed prefix would return nothing
+		removedKeys := make([]string, 0)
+		err := operation.Traverse(prefix, operation.KeyOnlyIterateFunc(func(key []byte) error {
+			removedKeys = append(removedKeys, fmt.Sprintf("%x", key))
+			return nil
+		}), storage.DefaultIteratorOptions())(r)
+		require.NoError(t, err)
+		require.Len(t, removedKeys, 0, "expected no entries to be found when traversing the removed prefix")
+
+		// Verify that after the removal, Iterate over all keys should only return keys outside the prefix range
+		expected := [][]byte{
+			{0x09, 0xff},
+			{0x11, 0x00},
+			{0x1A, 0xff},
+		}
+
+		actual := make([][]byte, 0)
+		err = operation.Iterate([]byte{keys[0][0]}, operation.PrefixUpperBound(keys[len(keys)-1]), operation.KeyOnlyIterateFunc(func(key []byte) error {
+			actual = append(actual, key)
+			return nil
+		}), storage.DefaultIteratorOptions())(r)
+		require.NoError(t, err)
+		require.Equal(t, expected, actual, "expected keys to match expected values")
 	})
 }
 
@@ -273,4 +369,26 @@ func (a UnencodeableEntity) MarshalMsgpack() ([]byte, error) {
 
 func (a UnencodeableEntity) UnmarshalMsgpack(b []byte) error {
 	return errCantDecode
+}
+
+func getFolderSize(t testing.TB, dir string) int64 {
+	var size int64
+	require.NoError(t, filepath.WalkDir(dir, func(path string, d os.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if !d.IsDir() {
+			info, err := d.Info()
+			if err != nil {
+				fmt.Printf("warning: could not get file info for %s: %v\n", path, err)
+				return nil
+			}
+
+			// Add the file size to total
+			size += info.Size()
+		}
+		return nil
+	}))
+
+	return size
 }

@@ -61,6 +61,92 @@ func TestIterateKeysInPrefixRange(t *testing.T) {
 	})
 }
 
+// Verify that when keys are prefixed by two prefixes,we can iterate with either first prefix or second prefix.
+func TestIterateHierachicalPrefixes(t *testing.T) {
+	dbtest.RunWithStorages(t, func(t *testing.T, r storage.Reader, withWriter dbtest.WithWriter) {
+		keys := [][]byte{
+			{0x09, 0x00, 0x00},
+			{0x09, 0x00, 0xff},
+			{0x09, 0x19, 0xff},
+			{0x09, 0xff, 0x00},
+			{0x09, 0xff, 0xff},
+			{0x10, 0x00, 0x00},
+			{0x10, 0x00, 0xff},
+			{0x10, 0x19, 0x00},
+			{0x10, 0x19, 0xff},
+			{0x10, 0x20, 0x00},
+			{0x10, 0x20, 0xff},
+			{0x10, 0x21, 0x00},
+			{0x10, 0x21, 0xff},
+			{0x10, 0x22, 0x00},
+			{0x10, 0x22, 0xff},
+			{0x10, 0xff, 0x00},
+			{0x10, 0xff, 0xff},
+			{0x11, 0x00, 0x00},
+			{0x11, 0x00, 0xff},
+			{0x11, 0xff, 0x00},
+			{0x11, 0xff, 0xff},
+			{0x12, 0x00, 0x00},
+			{0x12, 0x00, 0xff},
+			{0x12, 0xff, 0x00},
+			{0x12, 0xff, 0xff},
+		}
+
+		// Insert the keys and values into storage
+		require.NoError(t, withWriter(func(writer storage.Writer) error {
+			for _, key := range keys {
+				err := operation.Upsert(key, []byte{1})(writer)
+				if err != nil {
+					return err
+				}
+			}
+			return nil
+		}))
+
+		// Test iteration with range of first prefixes (0x10 to 0x11)
+		firstPrefixRangeExpected := [][]byte{
+			{0x10, 0x00, 0x00},
+			{0x10, 0x00, 0xff},
+			{0x10, 0x19, 0x00},
+			{0x10, 0x19, 0xff},
+			{0x10, 0x20, 0x00},
+			{0x10, 0x20, 0xff},
+			{0x10, 0x21, 0x00},
+			{0x10, 0x21, 0xff},
+			{0x10, 0x22, 0x00},
+			{0x10, 0x22, 0xff},
+			{0x10, 0xff, 0x00},
+			{0x10, 0xff, 0xff},
+			{0x11, 0x00, 0x00},
+			{0x11, 0x00, 0xff},
+			{0x11, 0xff, 0x00},
+			{0x11, 0xff, 0xff},
+		}
+		firstPrefixRangeActual := make([][]byte, 0)
+		err := operation.IterateKeysInPrefixRange([]byte{0x10}, []byte{0x11}, func(key []byte) error {
+			firstPrefixRangeActual = append(firstPrefixRangeActual, key)
+			return nil
+		})(r)
+		require.NoError(t, err, "iterate with range of first prefixes should not return an error")
+		require.Equal(t, firstPrefixRangeExpected, firstPrefixRangeActual, "iterated values for range of first prefixes should match expected values")
+
+		// Test iteration with range of second prefixes (0x1020 to 0x1021)
+		secondPrefixRangeActual := make([][]byte, 0)
+		secondPrefixRangeExpected := [][]byte{
+			{0x10, 0x20, 0x00},
+			{0x10, 0x20, 0xff},
+			{0x10, 0x21, 0x00},
+			{0x10, 0x21, 0xff},
+		}
+		err = operation.IterateKeysInPrefixRange([]byte{0x10, 0x20}, []byte{0x10, 0x21}, func(key []byte) error {
+			secondPrefixRangeActual = append(secondPrefixRangeActual, key)
+			return nil
+		})(r)
+		require.NoError(t, err, "iterate with range of second prefixes should not return an error")
+		require.Equal(t, secondPrefixRangeExpected, secondPrefixRangeActual, "iterated values for range of second prefixes should match expected values")
+	})
+}
+
 func TestTraverse(t *testing.T) {
 	dbtest.RunWithStorages(t, func(t *testing.T, r storage.Reader, withWriter dbtest.WithWriter) {
 		keyVals := map[[2]byte]uint64{
@@ -106,6 +192,50 @@ func TestTraverse(t *testing.T) {
 
 		// Traverse the keys starting with prefix {0x42}
 		err := operation.Traverse([]byte{0x42}, iterationFunc, storage.DefaultIteratorOptions())(r)
+		require.NoError(t, err, "traverse should not return an error")
+
+		// Assert that the actual values match the expected values
+		require.Equal(t, expected, actual, "traversed values should match expected values")
+	})
+}
+
+// Verify traversing a subset of keys with only keys traversal
+func TestTraverseKeyOnly(t *testing.T) {
+	dbtest.RunWithStorages(t, func(t *testing.T, r storage.Reader, withWriter dbtest.WithWriter) {
+		keys := [][]byte{
+			// before start -> not included in range
+			{0x04, 0x33},
+			{0x09, 0xff},
+			// within the start prefix -> included in range
+			{0x10, 0x00},
+			{0x10, 0xff},
+			// between start and end -> included in range
+			{0x11, 0x00},
+			{0x1A, 0xff},
+		}
+		expected := [][]byte{
+			{0x10, 0x00},
+			{0x10, 0xff},
+		}
+
+		// Insert the keys and values into storage
+		require.NoError(t, withWriter(func(writer storage.Writer) error {
+			for _, key := range keys {
+				err := operation.Upsert(key, []byte{1})(writer)
+				if err != nil {
+					return err
+				}
+			}
+			return nil
+		}))
+
+		actual := make([][]byte, 0)
+
+		// Traverse the keys starting with prefix {0x11}
+		err := operation.Traverse([]byte{0x10}, operation.KeyOnlyIterateFunc(func(key []byte) error {
+			actual = append(actual, key)
+			return nil
+		}), storage.DefaultIteratorOptions())(r)
 		require.NoError(t, err, "traverse should not return an error")
 
 		// Assert that the actual values match the expected values
