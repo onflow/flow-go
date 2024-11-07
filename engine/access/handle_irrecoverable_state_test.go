@@ -171,6 +171,7 @@ func (suite *IrrecoverableStateTestSuite) SetupTest() {
 		suite.unsecureGrpcServer,
 		nil,
 		stateStreamConfig,
+		routes.WebsocketConfig{},
 		nil,
 	)
 	assert.NoError(suite.T(), err)

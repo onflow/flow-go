@@ -193,6 +193,7 @@ func (suite *RestAPITestSuite) SetupTest() {
 		suite.unsecureGrpcServer,
 		nil,
 		stateStreamConfig,
+		routes.WebsocketConfig{},
 		nil,
 	)
 	assert.NoError(suite.T(), err)

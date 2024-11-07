@@ -21,6 +21,7 @@ import (
 	"google.golang.org/grpc/status"
 
 	accessmock "github.com/onflow/flow-go/engine/access/mock"
+	"github.com/onflow/flow-go/engine/access/rest/routes"
 	"github.com/onflow/flow-go/engine/access/rpc/backend"
 	statestreambackend "github.com/onflow/flow-go/engine/access/state_stream/backend"
 	"github.com/onflow/flow-go/model/flow"
@@ -187,6 +188,7 @@ func (suite *RateLimitTestSuite) SetupTest() {
 		suite.unsecureGrpcServer,
 		nil,
 		stateStreamConfig,
+		routes.WebsocketConfig{},
 		nil,
 	)
 	require.NoError(suite.T(), err)
