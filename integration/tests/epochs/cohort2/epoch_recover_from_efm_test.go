@@ -33,10 +33,11 @@ func (s *RecoverEpochSuite) SetupTest() {
 	// use a shorter staking auction because we don't have staking operations in this case
 	s.StakingAuctionLen = 2
 	// to manually trigger EFM we assign very short dkg phase len ensuring the dkg will fail
-	s.DKGPhaseLen = 10
-	s.EpochLen = 80
+	s.DKGPhaseLen = 30
+	s.EpochLen = 150
 	s.FinalizationSafetyThreshold = 20
 	s.NumOfCollectionClusters = 1
+	s.NumOfConsensusNodes = 3
 
 	// run the generic setup, which starts up the network
 	s.BaseSuite.SetupTest()
@@ -115,11 +116,15 @@ func (s *RecoverEpochSuite) recoverEpoch(env templates.Environment, args []caden
 }
 
 // TestRecoverEpoch ensures that the recover epoch governance transaction flow works as expected and a network that
-// enters Epoch Fallback Mode can successfully recover. This test will do the following:
+// enters Epoch Fallback Mode can successfully recover.
+// For this specific scenario, we are testing a scenario where the consensus committee is equal to the DKG committee, i.e.
+// no changes to the identity table between epoch start and submitting the recover epoch transaction were made.
+// This test will do the following:
 // 1. Triggers EFM by turning off the sole collection node before the end of the DKG forcing the DKG to fail.
 // 2. Generates epoch recover transaction args using the epoch efm-recover-tx-args.
 // 3. Submit recover epoch transaction.
 // 4. Ensure expected EpochRecover event is emitted.
+// 5. Ensure the network transitions into the recovery epoch and finalizes the first view of the recovery epoch.
 func (s *RecoverEpochSuite) TestRecoverEpoch() {
 	// 1. Manually trigger EFM
 	// wait until the epoch setup phase to force network into EFM
@@ -171,7 +176,7 @@ func (s *RecoverEpochSuite) TestRecoverEpoch() {
 	require.NoError(s.T(), result.Error)
 	require.Equal(s.T(), result.Status, sdk.TransactionStatusSealed)
 
-	// 3. Ensure EpochRecover event was emitted.
+	// 4. Ensure expected EpochRecover event is emitted.
 	eventType := ""
 	for _, evt := range result.Events {
 		if strings.Contains(evt.Type, "FlowEpoch.EpochRecover") {
@@ -184,12 +189,11 @@ func (s *RecoverEpochSuite) TestRecoverEpoch() {
 	require.NoError(s.T(), err)
 	require.Equal(s.T(), events[0].Events[0].Type, eventType)
 
+	// 5. Ensure the network transitions into the recovery epoch and finalizes the first view of the recovery epoch.
 	startViewOfNextEpoch := uint64(txArgs[1].(cadence.UInt64))
-	// wait for first view of recovery epoch
 	s.TimedLogf("waiting to transition into recovery epoch (finalized view %d)", startViewOfNextEpoch)
 	s.AwaitFinalizedView(s.Ctx, startViewOfNextEpoch, 2*time.Minute, 500*time.Millisecond)
 	s.TimedLogf("observed finalized first view of recovery epoch %d", startViewOfNextEpoch)
 
-	// ensure we transition into recovery epoch
 	s.AssertInEpoch(s.Ctx, 1)
 }
