@@ -50,10 +50,10 @@ gen-bootstrap: clone-flow
 		--root-height 0 \
 		--root-parent 0000000000000000000000000000000000000000000000000000000000000000 \
 		--epoch-counter 0 \
-		--epoch-length 5000 \
-		--epoch-staking-phase-length 500 \
-		--epoch-dkg-phase-length 1000 \
-		--epoch-extension-view-count=600 \
+		--epoch-length 2000 \
+		--epoch-staking-phase-length 100 \
+		--epoch-dkg-phase-length 500 \
+		--epoch-extension-view-count=500 \
 		--collection-clusters 1 \
 		--protocol-version=0 \
 		--finalization-safety-threshold=100 \
