@@ -53,7 +53,7 @@ gen-bootstrap: clone-flow
 		--epoch-length 2000 \
 		--epoch-staking-phase-length 100 \
 		--epoch-dkg-phase-length 500 \
-		--epoch-extension-view-count=500 \
+		--epoch-extension-view-count=600 \
 		--collection-clusters 1 \
 		--protocol-version=0 \
 		--finalization-safety-threshold=100 \
