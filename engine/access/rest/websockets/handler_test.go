@@ -26,16 +26,19 @@ var (
 type WsHandlerSuite struct {
 	suite.Suite
 
-	logger  zerolog.Logger
-	handler *websockets.Handler
+	logger       zerolog.Logger
+	handler      *websockets.Handler
+	wsConfig     *websockets.Config
+	streamApi    *streammock.API
+	streamConfig *backend.Config
 }
 
 func (s *WsHandlerSuite) SetupTest() {
 	s.logger = unittest.Logger()
-	wsConfig := websockets.NewDefaultWebsocketConfig()
-	streamApi := streammock.NewAPI(s.T())
-	streamConfig := backend.Config{}
-	s.handler = websockets.NewWebSocketHandler(s.logger, wsConfig, chainID.Chain(), streamApi, streamConfig, 1024)
+	s.wsConfig = websockets.NewDefaultWebsocketConfig()
+	s.streamApi = streammock.NewAPI(s.T())
+	s.streamConfig = &backend.Config{}
+	s.handler = websockets.NewWebSocketHandler(s.logger, s.wsConfig, chainID.Chain(), s.streamApi, *s.streamConfig, 1024)
 }
 
 func TestWsHandlerSuite(t *testing.T) {

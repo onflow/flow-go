@@ -53,3 +53,18 @@ func (s *ThreadSafeMap[K, V]) Len() int {
 	defer s.mu.RUnlock()
 	return len(s.m)
 }
+
+// ForEach applies a function to each key-value pair in the map.
+func (s *ThreadSafeMap[K, V]) ForEach(f func(K, V)) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	for k, v := range s.m {
+		f(k, v)
+	}
+}
+
+func (s *ThreadSafeMap[K, V]) Clear() {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.m = make(map[K]V)
+}

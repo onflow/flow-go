@@ -59,14 +59,17 @@ func (c *Controller) writeMessagesToClient(ctx context.Context) {
 			return
 		case msg := <-c.communicationChannel:
 			// TODO: handle 'response per second' limits
-			c.conn.WriteJSON(msg)
+
+			err := c.conn.WriteJSON(msg)
+			if err != nil {
+				c.logger.Error().Err(err).Msg("error writing to connection")
+			}
 		}
 	}
 }
 
 func (c *Controller) readMessagesFromClient(ctx context.Context) {
-	defer close(c.communicationChannel)
-	defer c.conn.Close()
+	defer c.shutdownConnection()
 
 	for {
 		select {
@@ -164,3 +167,14 @@ func (c *Controller) handleUnsubscribe(msg UnsubscribeMessageRequest) {
 }
 
 func (c *Controller) handleListSubscriptions(msg ListSubscriptionsMessageRequest) {}
+
+func (c *Controller) shutdownConnection() {
+	defer c.conn.Close()
+	defer close(c.communicationChannel)
+
+	c.dataProviders.ForEach(func(_ uuid.UUID, dp dp.DataProvider) {
+		dp.Close()
+	})
+
+	c.dataProviders.Clear()
+}
