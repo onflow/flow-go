@@ -28,10 +28,11 @@ const (
 )
 
 type Config struct {
-	ListenAddress string
-	WriteTimeout  time.Duration
-	ReadTimeout   time.Duration
-	IdleTimeout   time.Duration
+	ListenAddress  string
+	WriteTimeout   time.Duration
+	ReadTimeout    time.Duration
+	IdleTimeout    time.Duration
+	MaxRequestSize int64
 }
 
 // NewServer returns an HTTP server initialized with the REST API handler
@@ -44,9 +45,9 @@ func NewServer(serverAPI access.API,
 	stateStreamConfig backend.Config,
 	wsConfig websockets.Config,
 ) (*http.Server, error) {
-	builder := router.NewRouterBuilder(logger, restCollector).AddRestRoutes(serverAPI, chain)
+	builder := router.NewRouterBuilder(logger, restCollector).AddRestRoutes(serverAPI, chain, config.MaxRequestSize)
 	if stateStreamApi != nil {
-		builder.AddLegacyWebsocketsRoutes(stateStreamApi, chain, stateStreamConfig)
+		builder.AddLegacyWebsocketsRoutes(stateStreamApi, chain, stateStreamConfig, config.MaxRequestSize)
 	}
 
 	builder.AddWebsocketsRoute(chain, &wsConfig, stateStreamApi, stateStreamConfig)

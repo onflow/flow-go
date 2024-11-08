@@ -234,7 +234,7 @@ type SubscribeHandlerFunc func(
 // WSHandler is websocket handler implementing custom websocket handler function and allows easier handling of errors and
 // responses as it wraps functionality for handling error and responses outside of endpoint handling.
 type WSHandler struct {
-	*common.BaseHttpHandler
+	*common.HttpHandler
 	subscribeFunc SubscribeHandlerFunc
 
 	api                      state_stream.API
@@ -252,6 +252,7 @@ func NewWSHandler(
 	subscribeFunc SubscribeHandlerFunc,
 	chain flow.Chain,
 	stateStreamConfig backend.Config,
+	maxRequestSize int64,
 ) *WSHandler {
 	handler := &WSHandler{
 		subscribeFunc:            subscribeFunc,
@@ -260,7 +261,7 @@ func NewWSHandler(
 		maxStreams:               int32(stateStreamConfig.MaxGlobalStreams),
 		defaultHeartbeatInterval: stateStreamConfig.HeartbeatInterval,
 		activeStreamCount:        atomic.NewInt32(0),
-		BaseHttpHandler:          common.NewHttpHandler(logger, chain),
+		HttpHandler:              common.NewHttpHandler(logger, chain, maxRequestSize),
 	}
 
 	return handler
@@ -270,9 +271,9 @@ func NewWSHandler(
 // such as logging, error handling, request decorators
 func (h *WSHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	// create a logger
-	logger := h.BaseHttpHandler.Logger.With().Str("subscribe_url", r.URL.String()).Logger()
+	logger := h.HttpHandler.Logger.With().Str("subscribe_url", r.URL.String()).Logger()
 
-	err := h.BaseHttpHandler.VerifyRequest(w, r)
+	err := h.HttpHandler.VerifyRequest(w, r)
 	if err != nil {
 		// VerifyRequest sets the response error before returning
 		return
@@ -287,7 +288,7 @@ func (h *WSHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 	conn, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {
-		h.BaseHttpHandler.ErrorHandler(w, common.NewRestError(http.StatusInternalServerError, "webSocket upgrade error: ", err), logger)
+		h.HttpHandler.ErrorHandler(w, common.NewRestError(http.StatusInternalServerError, "webSocket upgrade error: ", err), logger)
 		return
 	}
 	defer conn.Close()
@@ -322,7 +323,7 @@ func (h *WSHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	sub, err := h.subscribeFunc(ctx, common.Decorate(r, h.BaseHttpHandler.Chain), wsController)
+	sub, err := h.subscribeFunc(ctx, common.Decorate(r, h.HttpHandler.Chain), wsController)
 	if err != nil {
 		wsController.wsErrorHandler(err)
 		return

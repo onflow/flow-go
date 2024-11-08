@@ -16,34 +16,38 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
-const MaxRequestSize = 2 << 20 // 2MB
+const DefaultMaxRequestSize = 2 << 20 // 2MB
 
-// BaseHttpHandler is custom http handler implementing custom handler function.
-// BaseHttpHandler function allows easier handling of errors and responses as it
+// HttpHandler is custom http handler implementing custom handler function.
+// HttpHandler function allows easier handling of errors and responses as it
 // wraps functionality for handling error and responses outside of endpoint handling.
-type BaseHttpHandler struct {
+type HttpHandler struct {
 	Logger zerolog.Logger
 	Chain  flow.Chain
+
+	MaxRequestSize int64
 }
 
 func NewHttpHandler(
 	logger zerolog.Logger,
 	chain flow.Chain,
-) *BaseHttpHandler {
-	return &BaseHttpHandler{
-		Logger: logger,
-		Chain:  chain,
+	maxRequestSize int64,
+) *HttpHandler {
+	return &HttpHandler{
+		Logger:         logger,
+		Chain:          chain,
+		MaxRequestSize: maxRequestSize,
 	}
 }
 
 // VerifyRequest function acts as a wrapper to each request providing common handling functionality
 // such as logging, error handling
-func (h *BaseHttpHandler) VerifyRequest(w http.ResponseWriter, r *http.Request) error {
+func (h *HttpHandler) VerifyRequest(w http.ResponseWriter, r *http.Request) error {
 	// create a logger
 	errLog := h.Logger.With().Str("request_url", r.URL.String()).Logger()
 
 	// limit requested body size
-	r.Body = http.MaxBytesReader(w, r.Body, MaxRequestSize)
+	r.Body = http.MaxBytesReader(w, r.Body, h.MaxRequestSize)
 	err := r.ParseForm()
 	if err != nil {
 		h.ErrorHandler(w, err, errLog)
@@ -52,7 +56,7 @@ func (h *BaseHttpHandler) VerifyRequest(w http.ResponseWriter, r *http.Request) 
 	return nil
 }
 
-func (h *BaseHttpHandler) ErrorHandler(w http.ResponseWriter, err error, errorLogger zerolog.Logger) {
+func (h *HttpHandler) ErrorHandler(w http.ResponseWriter, err error, errorLogger zerolog.Logger) {
 	// rest status type error should be returned with status and user message provided
 	var statusErr StatusError
 	if errors.As(err, &statusErr) {
@@ -99,7 +103,7 @@ func (h *BaseHttpHandler) ErrorHandler(w http.ResponseWriter, err error, errorLo
 }
 
 // JsonResponse builds a JSON response and send it to the client
-func (h *BaseHttpHandler) JsonResponse(w http.ResponseWriter, code int, response interface{}, errLogger zerolog.Logger) {
+func (h *HttpHandler) JsonResponse(w http.ResponseWriter, code int, response interface{}, errLogger zerolog.Logger) {
 	w.Header().Set("Content-Type", "application/json; charset=UTF-8")
 
 	// serialize response to JSON and handler errors
@@ -120,7 +124,7 @@ func (h *BaseHttpHandler) JsonResponse(w http.ResponseWriter, code int, response
 
 // errorResponse sends an HTTP error response to the client with the given return code
 // and a model error with the given response message in the response body
-func (h *BaseHttpHandler) errorResponse(
+func (h *HttpHandler) errorResponse(
 	w http.ResponseWriter,
 	returnCode int,
 	responseMessage string,

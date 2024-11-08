@@ -28,6 +28,7 @@ import (
 	"github.com/onflow/flow-go/storage"
 	storagemock "github.com/onflow/flow-go/storage/mock"
 	"github.com/onflow/flow-go/utils/unittest"
+	"github.com/onflow/flow-go/utils/unittest/mocks"
 )
 
 var (
@@ -128,7 +129,7 @@ func (s *BackendScriptsSuite) setupExecutionNodes(block *flow.Block) {
 	s.receipts.On("ByBlockID", block.ID()).Return(receipts, nil)
 
 	s.connectionFactory.On("GetExecutionAPIClient", mock.Anything).
-		Return(s.execClient, &mockCloser{}, nil)
+		Return(s.execClient, &mocks.MockCloser{}, nil)
 }
 
 // setupENSuccessResponse configures the execution client mock to return a successful response

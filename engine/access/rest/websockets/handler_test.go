@@ -36,7 +36,7 @@ func (s *WsHandlerSuite) SetupTest() {
 	wsConfig := websockets.NewDefaultWebsocketConfig()
 	streamApi := streammock.NewAPI(s.T())
 	streamConfig := backend.Config{}
-	s.handler = websockets.NewWebSocketHandler(s.logger, wsConfig, chainID.Chain(), streamApi, streamConfig)
+	s.handler = websockets.NewWebSocketHandler(s.logger, wsConfig, chainID.Chain(), streamApi, streamConfig, 1024)
 }
 
 func TestWsHandlerSuite(t *testing.T) {
@@ -54,6 +54,7 @@ func (s *WsHandlerSuite) TestSubscribeRequest() {
 		defer server.Close()
 
 		conn, _, err := ClientConnection(server.URL)
+		defer conn.Close()
 		require.NoError(s.T(), err)
 
 		args := map[string]interface{}{

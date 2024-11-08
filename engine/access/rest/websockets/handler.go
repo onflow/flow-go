@@ -14,7 +14,7 @@ import (
 )
 
 type Handler struct {
-	*common.BaseHttpHandler
+	*common.HttpHandler
 
 	logger          zerolog.Logger
 	websocketConfig *Config
@@ -24,9 +24,16 @@ type Handler struct {
 
 var _ http.Handler = (*Handler)(nil)
 
-func NewWebSocketHandler(logger zerolog.Logger, config *Config, chain flow.Chain, streamApi state_stream.API, streamConfig backend.Config) *Handler {
+func NewWebSocketHandler(
+	logger zerolog.Logger,
+	config *Config,
+	chain flow.Chain,
+	streamApi state_stream.API,
+	streamConfig backend.Config,
+	maxRequestSize int64,
+) *Handler {
 	return &Handler{
-		BaseHttpHandler: common.NewHttpHandler(logger, chain),
+		HttpHandler:     common.NewHttpHandler(logger, chain, maxRequestSize),
 		websocketConfig: config,
 		logger:          logger,
 		streamApi:       streamApi,
@@ -35,9 +42,9 @@ func NewWebSocketHandler(logger zerolog.Logger, config *Config, chain flow.Chain
 }
 func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	//TODO: change to accept topic instead of URL
-	logger := h.BaseHttpHandler.Logger.With().Str("websocket_subscribe_url", r.URL.String()).Logger()
+	logger := h.HttpHandler.Logger.With().Str("websocket_subscribe_url", r.URL.String()).Logger()
 
-	err := h.BaseHttpHandler.VerifyRequest(w, r)
+	err := h.HttpHandler.VerifyRequest(w, r)
 	if err != nil {
 		// VerifyRequest sets the response error before returning
 		logger.Warn().Err(err).Msg("error validating websocket request")
@@ -53,7 +60,7 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	conn, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {
-		h.BaseHttpHandler.ErrorHandler(w, common.NewRestError(http.StatusInternalServerError, "webSocket upgrade error: ", err), logger)
+		h.HttpHandler.ErrorHandler(w, common.NewRestError(http.StatusInternalServerError, "webSocket upgrade error: ", err), logger)
 		return
 	}
 

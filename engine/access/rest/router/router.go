@@ -49,10 +49,14 @@ func NewRouterBuilder(
 }
 
 // AddRestRoutes adds rest routes to the router.
-func (b *RouterBuilder) AddRestRoutes(backend access.API, chain flow.Chain) *RouterBuilder {
+func (b *RouterBuilder) AddRestRoutes(
+	backend access.API,
+	chain flow.Chain,
+	maxRequestSize int64,
+) *RouterBuilder {
 	linkGenerator := models.NewLinkGeneratorImpl(b.v1SubRouter)
 	for _, r := range Routes {
-		h := flowhttp.NewHandler(b.logger, backend, r.Handler, linkGenerator, chain)
+		h := flowhttp.NewHandler(b.logger, backend, r.Handler, linkGenerator, chain, maxRequestSize)
 		b.v1SubRouter.
 			Methods(r.Method).
 			Path(r.Pattern).
@@ -67,10 +71,11 @@ func (b *RouterBuilder) AddLegacyWebsocketsRoutes(
 	stateStreamApi state_stream.API,
 	chain flow.Chain,
 	stateStreamConfig backend.Config,
+	maxRequestSize int64,
 ) *RouterBuilder {
 
-	for _, r := range WSRoutes {
-		h := legacyws.NewWSHandler(b.logger, stateStreamApi, r.Handler, chain, stateStreamConfig)
+	for _, r := range WSLegacyRoutes {
+		h := legacyws.NewWSHandler(b.logger, stateStreamApi, r.Handler, chain, stateStreamConfig, maxRequestSize)
 		b.v1SubRouter.
 			Methods(r.Method).
 			Path(r.Pattern).
@@ -86,8 +91,9 @@ func (b *RouterBuilder) AddWebsocketsRoute(
 	config *websockets.Config,
 	streamApi state_stream.API,
 	streamConfig backend.Config,
+	maxRequestSize int64,
 ) *RouterBuilder {
-	handler := websockets.NewWebSocketHandler(b.logger, config, chain, streamApi, streamConfig)
+	handler := websockets.NewWebSocketHandler(b.logger, config, chain, streamApi, streamConfig, maxRequestSize)
 	b.v1SubRouter.
 		Methods(http.MethodGet).
 		Path("/ws").
@@ -108,7 +114,7 @@ func init() {
 	for _, r := range Routes {
 		routeUrlMap[r.Pattern] = r.Name
 	}
-	for _, r := range WSRoutes {
+	for _, r := range WSLegacyRoutes {
 		routeUrlMap[r.Pattern] = r.Name
 	}
 }
