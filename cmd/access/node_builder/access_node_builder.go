@@ -48,7 +48,8 @@ import (
 	"github.com/onflow/flow-go/engine/access/ingestion/tx_error_messages"
 	pingeng "github.com/onflow/flow-go/engine/access/ping"
 	"github.com/onflow/flow-go/engine/access/rest"
-	"github.com/onflow/flow-go/engine/access/rest/routes"
+	commonrest "github.com/onflow/flow-go/engine/access/rest/common"
+	"github.com/onflow/flow-go/engine/access/rest/router"
 	"github.com/onflow/flow-go/engine/access/rpc"
 	"github.com/onflow/flow-go/engine/access/rpc/backend"
 	rpcConnection "github.com/onflow/flow-go/engine/access/rpc/connection"
@@ -227,7 +228,7 @@ func DefaultAccessNodeConfig() *AccessNodeConfig {
 				WriteTimeout:   rest.DefaultWriteTimeout,
 				ReadTimeout:    rest.DefaultReadTimeout,
 				IdleTimeout:    rest.DefaultIdleTimeout,
-				MaxRequestSize: routes.DefaultMaxRequestSize,
+				MaxRequestSize: commonrest.DefaultMaxRequestSize,
 			},
 			MaxMsgSize:     grpcutils.DefaultMaxMsgSize,
 			CompressorName: grpcutils.NoCompressor,
@@ -1777,7 +1778,7 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 			return nil
 		}).
 		Module("rest metrics", func(node *cmd.NodeConfig) error {
-			m, err := metrics.NewRestCollector(routes.URLToRoute, node.MetricsRegisterer)
+			m, err := metrics.NewRestCollector(router.URLToRoute, node.MetricsRegisterer)
 			if err != nil {
 				return err
 			}
@@ -2188,6 +2189,12 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 			// order for it to properly start and shut down, we should still return it as its own engine here, so it can
 			// be handled by the scaffold.
 			return builder.RequestEng, nil
+		}).
+		AdminCommand("backfill-tx-error-messages", func(config *cmd.NodeConfig) commands.AdminCommand {
+			return storageCommands.NewBackfillTxErrorMessagesCommand(
+				builder.State,
+				builder.TxResultErrorMessagesCore,
+			)
 		})
 
 	if builder.storeTxResultErrorMessages {

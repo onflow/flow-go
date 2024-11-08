@@ -43,7 +43,8 @@ import (
 	"github.com/onflow/flow-go/engine/access/index"
 	"github.com/onflow/flow-go/engine/access/rest"
 	restapiproxy "github.com/onflow/flow-go/engine/access/rest/apiproxy"
-	"github.com/onflow/flow-go/engine/access/rest/routes"
+	commonrest "github.com/onflow/flow-go/engine/access/rest/common"
+	"github.com/onflow/flow-go/engine/access/rest/router"
 	"github.com/onflow/flow-go/engine/access/rpc"
 	"github.com/onflow/flow-go/engine/access/rpc/backend"
 	rpcConnection "github.com/onflow/flow-go/engine/access/rpc/connection"
@@ -198,7 +199,7 @@ func DefaultObserverServiceConfig() *ObserverServiceConfig {
 				WriteTimeout:   rest.DefaultWriteTimeout,
 				ReadTimeout:    rest.DefaultReadTimeout,
 				IdleTimeout:    rest.DefaultIdleTimeout,
-				MaxRequestSize: routes.DefaultMaxRequestSize,
+				MaxRequestSize: commonrest.DefaultMaxRequestSize,
 			},
 			MaxMsgSize:     grpcutils.DefaultMaxMsgSize,
 			CompressorName: grpcutils.NoCompressor,
@@ -963,7 +964,7 @@ func (builder *ObserverServiceBuilder) InitIDProviders() {
 
 					if flowID, err := builder.IDTranslator.GetFlowID(pid); err != nil {
 						// TODO: this is an instance of "log error and continue with best effort" anti-pattern
-						builder.Logger.Err(err).Str("peer", p2plogging.PeerId(pid)).Msg("failed to translate to Flow ID")
+						builder.Logger.Debug().Str("peer", p2plogging.PeerId(pid)).Msg("failed to translate to Flow ID")
 					} else {
 						result = append(result, flowID)
 					}
@@ -1743,7 +1744,7 @@ func (builder *ObserverServiceBuilder) enqueueRPCServer() {
 		return nil
 	})
 	builder.Module("rest metrics", func(node *cmd.NodeConfig) error {
-		m, err := metrics.NewRestCollector(routes.URLToRoute, node.MetricsRegisterer)
+		m, err := metrics.NewRestCollector(router.URLToRoute, node.MetricsRegisterer)
 		if err != nil {
 			return err
 		}
