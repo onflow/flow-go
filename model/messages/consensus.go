@@ -11,21 +11,23 @@ import (
 // Deprecated: Please update flow.ExecutionResult to use []flow.Chunk, then
 // replace instances of this type with flow.ExecutionResult
 type UntrustedExecutionResult struct {
-	PreviousResultID flow.Identifier
-	BlockID          flow.Identifier
-	Chunks           []flow.Chunk
-	ServiceEvents    flow.ServiceEventList
-	ExecutionDataID  flow.Identifier
+	PreviousResultID         flow.Identifier
+	BlockID                  flow.Identifier
+	Chunks                   []flow.Chunk
+	ServiceEvents            flow.ServiceEventList
+	ServiceEventChunkIndices []uint64
+	ExecutionDataID          flow.Identifier
 }
 
 // ToInternal returns the internal representation of the type.
 func (ur *UntrustedExecutionResult) ToInternal() *flow.ExecutionResult {
 	result := flow.ExecutionResult{
-		PreviousResultID: ur.PreviousResultID,
-		BlockID:          ur.BlockID,
-		Chunks:           make(flow.ChunkList, 0, len(ur.Chunks)),
-		ServiceEvents:    ur.ServiceEvents,
-		ExecutionDataID:  ur.ExecutionDataID,
+		PreviousResultID:         ur.PreviousResultID,
+		BlockID:                  ur.BlockID,
+		Chunks:                   make(flow.ChunkList, 0, len(ur.Chunks)),
+		ServiceEvents:            ur.ServiceEvents,
+		ServiceEventChunkIndices: ur.ServiceEventChunkIndices,
+		ExecutionDataID:          ur.ExecutionDataID,
 	}
 	for _, chunk := range ur.Chunks {
 		chunk := chunk
@@ -38,10 +40,11 @@ func (ur *UntrustedExecutionResult) ToInternal() *flow.ExecutionResult {
 // to the representation used in untrusted messages.
 func UntrustedExecutionResultFromInternal(internal *flow.ExecutionResult) UntrustedExecutionResult {
 	result := UntrustedExecutionResult{
-		PreviousResultID: internal.PreviousResultID,
-		BlockID:          internal.BlockID,
-		ServiceEvents:    internal.ServiceEvents,
-		ExecutionDataID:  internal.ExecutionDataID,
+		PreviousResultID:         internal.PreviousResultID,
+		BlockID:                  internal.BlockID,
+		ServiceEvents:            internal.ServiceEvents,
+		ServiceEventChunkIndices: internal.ServiceEventChunkIndices,
+		ExecutionDataID:          internal.ExecutionDataID,
 	}
 	for _, chunk := range internal.Chunks {
 		result.Chunks = append(result.Chunks, *chunk)

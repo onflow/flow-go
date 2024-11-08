@@ -291,8 +291,9 @@ func (fcv *ChunkVerifier) verifyTransactionsInContext(
 		return nil, chmodels.NewCFInvalidEventsCollection(chunk.EventCollection, eventsHash, chIndex, execResID, events)
 	}
 
-	if systemChunk {
-		equal, err := result.ServiceEvents.EqualTo(serviceEvents)
+	if len(result.ServiceEvents) > 0 {
+		serviceEventsInChunk := result.ServiceEventsByChunk(chunk.Index)
+		equal, err := serviceEventsInChunk.EqualTo(serviceEvents)
 		if err != nil {
 			return nil, fmt.Errorf("error while comparing service events: %w", err)
 		}

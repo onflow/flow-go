@@ -234,6 +234,7 @@ func makeComputationResult(
 		completeBlock.ID(),
 		computationResult.AllChunks(),
 		flow.ServiceEventList{},
+		nil,
 		executionDataID)
 
 	computationResult.BlockAttestationResult.BlockExecutionResult.ExecutionDataRoot = &flow.BlockExecutionDataRoot{

@@ -606,6 +606,10 @@ type testMetadata struct {
 	ledger *completeLedger.Ledger
 }
 
+func (m *testMetadata) ServiceEventChunkIndices() []uint64 {
+	return make([]uint64, len(m.ServiceEvents)) // all 0 - all in system chunk
+}
+
 func (m *testMetadata) RefreshChunkData(t *testing.T) *verification.VerifiableChunkData {
 	cedCollection := m.Collection
 
@@ -653,10 +657,11 @@ func (m *testMetadata) RefreshChunkData(t *testing.T) *verification.VerifiableCh
 
 	// ExecutionResult setup
 	result := &flow.ExecutionResult{
-		BlockID:         m.Header.ID(),
-		Chunks:          flow.ChunkList{chunk},
-		ServiceEvents:   m.ServiceEvents,
-		ExecutionDataID: executionDataID,
+		BlockID:                  m.Header.ID(),
+		Chunks:                   flow.ChunkList{chunk},
+		ServiceEvents:            m.ServiceEvents,
+		ServiceEventChunkIndices: m.ServiceEventChunkIndices(),
+		ExecutionDataID:          executionDataID,
 	}
 
 	return &verification.VerifiableChunkData{

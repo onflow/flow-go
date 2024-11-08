@@ -14,7 +14,12 @@ type ExecutionResult struct {
 	BlockID          Identifier // commit of the current block
 	Chunks           ChunkList
 	ServiceEvents    ServiceEventList
-	ExecutionDataID  Identifier // hash commitment to flow.BlockExecutionDataRoot
+	// maps index in ServiceEvents to index in ChunkList
+	// Requirements:
+	//   - len(ServiceEventChunkIndices) == len(ServiceEvents)
+	//   - values are monotonically increasing, and in the range [0, len(Chunks)]
+	ServiceEventChunkIndices []uint64
+	ExecutionDataID          Identifier // hash commitment to flow.BlockExecutionDataRoot
 }
 
 func NewExecutionResult(
@@ -22,15 +27,27 @@ func NewExecutionResult(
 	blockID Identifier,
 	chunks ChunkList,
 	serviceEvents ServiceEventList,
+	serviceEventChunkIndices []uint64,
 	executionDataID Identifier,
 ) *ExecutionResult {
 	return &ExecutionResult{
-		PreviousResultID: previousResultID,
-		BlockID:          blockID,
-		Chunks:           chunks,
-		ServiceEvents:    serviceEvents,
-		ExecutionDataID:  executionDataID,
+		PreviousResultID:         previousResultID,
+		BlockID:                  blockID,
+		Chunks:                   chunks,
+		ServiceEvents:            serviceEvents,
+		ServiceEventChunkIndices: serviceEventChunkIndices,
+		ExecutionDataID:          executionDataID,
 	}
+}
+
+func (er ExecutionResult) ServiceEventsByChunk(chunk uint64) ServiceEventList {
+	events := make(ServiceEventList, 0)
+	for eventIndex, chunkIndex := range er.ServiceEventChunkIndices {
+		if chunkIndex == chunk {
+			events = append(events, er.ServiceEvents[eventIndex])
+		}
+	}
+	return events
 }
 
 // ID returns the hash of the execution result body
