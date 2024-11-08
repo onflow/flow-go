@@ -7,7 +7,6 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/gorilla/websocket"
-
 	"github.com/rs/zerolog"
 
 	dp "github.com/onflow/flow-go/engine/access/rest/websockets/data_provider"
@@ -169,12 +168,15 @@ func (c *Controller) handleUnsubscribe(msg UnsubscribeMessageRequest) {
 func (c *Controller) handleListSubscriptions(msg ListSubscriptionsMessageRequest) {}
 
 func (c *Controller) shutdownConnection() {
-	defer c.conn.Close()
 	defer close(c.communicationChannel)
+	defer func(conn *websocket.Conn) {
+		if err := c.conn.Close(); err != nil {
+			c.logger.Error().Err(err).Msg("error closing connection")
+		}
+	}(c.conn)
 
 	c.dataProviders.ForEach(func(_ uuid.UUID, dp dp.DataProvider) {
 		dp.Close()
 	})
-
 	c.dataProviders.Clear()
 }

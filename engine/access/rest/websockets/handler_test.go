@@ -56,7 +56,10 @@ func (s *WsHandlerSuite) TestSubscribeRequest() {
 		defer server.Close()
 
 		conn, _, err := ClientConnection(server.URL)
-		defer conn.Close()
+		defer func(conn *websocket.Conn) {
+			err := conn.Close()
+			require.NoError(s.T(), err)
+		}(conn)
 		require.NoError(s.T(), err)
 
 		args := map[string]interface{}{
