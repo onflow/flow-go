@@ -39,6 +39,8 @@ func (s *RecoverEpochSuite) SetupTest() {
 	s.EpochLen = 150
 	s.FinalizationSafetyThreshold = 20
 	s.NumOfCollectionClusters = 1
+	// we need to use 3 consensus nodes to be able to eject a single node from the consensus committee
+	// and still have a DKG committee which meets the protocol.RandomBeaconSafetyThreshold
 	s.NumOfConsensusNodes = 3
 
 	// run the generic setup, which starts up the network
