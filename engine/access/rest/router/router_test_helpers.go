@@ -133,7 +133,7 @@ func ExecuteRequest(req *http.Request, backend access.API) *httptest.ResponseRec
 	return rr
 }
 
-func ExecuteWsRequest(req *http.Request, stateStreamApi state_stream.API, responseRecorder *TestHijackResponseRecorder, chain flow.Chain) {
+func ExecuteLegacyWsRequest(req *http.Request, stateStreamApi state_stream.API, responseRecorder *TestHijackResponseRecorder, chain flow.Chain) {
 	restCollector := metrics.NewNoopCollector()
 
 	config := backend.Config{
@@ -145,7 +145,7 @@ func ExecuteWsRequest(req *http.Request, stateStreamApi state_stream.API, respon
 	router := NewRouterBuilder(
 		unittest.Logger(),
 		restCollector,
-	).AddWsRoutes(
+	).AddLegacyWebsocketsRoutes(
 		stateStreamApi,
 		chain, config,
 	).Build()

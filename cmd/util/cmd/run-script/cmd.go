@@ -16,6 +16,7 @@ import (
 	"github.com/onflow/flow-go/cmd/util/ledger/util"
 	"github.com/onflow/flow-go/cmd/util/ledger/util/registers"
 	"github.com/onflow/flow-go/engine/access/rest"
+	"github.com/onflow/flow-go/engine/access/rest/websockets"
 	"github.com/onflow/flow-go/engine/access/state_stream/backend"
 	"github.com/onflow/flow-go/engine/access/subscription"
 	"github.com/onflow/flow-go/engine/execution/computation"
@@ -169,6 +170,7 @@ func run(*cobra.Command, []string) {
 			metrics.NewNoopCollector(),
 			nil,
 			backend.Config{},
+			*websockets.NewDefaultWebsocketConfig(),
 		)
 		if err != nil {
 			log.Fatal().Err(err).Msg("failed to create server")

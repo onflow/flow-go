@@ -2,6 +2,7 @@ package router
 
 import (
 	"fmt"
+	"net/http"
 	"regexp"
 	"strings"
 
@@ -10,8 +11,9 @@ import (
 
 	"github.com/onflow/flow-go/access"
 	"github.com/onflow/flow-go/engine/access/rest/common/middleware"
-	"github.com/onflow/flow-go/engine/access/rest/http"
+	flowhttp "github.com/onflow/flow-go/engine/access/rest/http"
 	"github.com/onflow/flow-go/engine/access/rest/http/models"
+	"github.com/onflow/flow-go/engine/access/rest/websockets"
 	legacyws "github.com/onflow/flow-go/engine/access/rest/websockets/legacy"
 	"github.com/onflow/flow-go/engine/access/state_stream"
 	"github.com/onflow/flow-go/engine/access/state_stream/backend"
@@ -50,7 +52,7 @@ func NewRouterBuilder(
 func (b *RouterBuilder) AddRestRoutes(backend access.API, chain flow.Chain) *RouterBuilder {
 	linkGenerator := models.NewLinkGeneratorImpl(b.v1SubRouter)
 	for _, r := range Routes {
-		h := http.NewHandler(b.logger, backend, r.Handler, linkGenerator, chain)
+		h := flowhttp.NewHandler(b.logger, backend, r.Handler, linkGenerator, chain)
 		b.v1SubRouter.
 			Methods(r.Method).
 			Path(r.Pattern).
@@ -60,8 +62,8 @@ func (b *RouterBuilder) AddRestRoutes(backend access.API, chain flow.Chain) *Rou
 	return b
 }
 
-// AddWsRoutes adds WebSocket routes to the router.
-func (b *RouterBuilder) AddWsRoutes(
+// AddLegacyWebsocketsRoutes adds WebSocket routes to the router.
+func (b *RouterBuilder) AddLegacyWebsocketsRoutes(
 	stateStreamApi state_stream.API,
 	chain flow.Chain,
 	stateStreamConfig backend.Config,
@@ -75,6 +77,22 @@ func (b *RouterBuilder) AddWsRoutes(
 			Name(r.Name).
 			Handler(h)
 	}
+
+	return b
+}
+
+func (b *RouterBuilder) AddWebsocketsRoute(
+	chain flow.Chain,
+	config *websockets.Config,
+	streamApi state_stream.API,
+	streamConfig backend.Config,
+) *RouterBuilder {
+	handler := websockets.NewWebSocketHandler(b.logger, config, chain, streamApi, streamConfig)
+	b.v1SubRouter.
+		Methods(http.MethodGet).
+		Path("/ws").
+		Name("ws").
+		Handler(handler)
 
 	return b
 }
