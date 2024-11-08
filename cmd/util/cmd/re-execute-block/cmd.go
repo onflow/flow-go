@@ -55,6 +55,7 @@ var (
 	flagExecutionDataDir  string
 	flagNodeID            string
 	flagFrom              int
+	flagSaveResult        bool
 )
 
 var Cmd = &cobra.Command{
@@ -83,12 +84,15 @@ func init() {
 	Cmd.PersistentFlags().StringVarP(&flagNodeID, "nodeid", "", "", "node id")
 	_ = Cmd.MarkPersistentFlagRequired("nodeid")
 
-	Cmd.Flags().IntVar(&flagFrom, "from", 0, "from segment")
+	Cmd.Flags().IntVar(&flagFrom, "from", 0, "block height to execute from")
 	_ = Cmd.MarkPersistentFlagRequired("from")
+
+	Cmd.Flags().BoolVar(&flagSaveResult, "save-result", false, "save the result of the execution")
+	_ = Cmd.MarkPersistentFlagRequired("save-result")
 }
 
 func run(*cobra.Command, []string) {
-	err := runWithFlags(flagDatadir, flagChunkDataPackDir, flagExecutionStateDir, flagBootstrapDir, flagExecutionDataDir, flagNodeID, uint64(flagFrom))
+	err := runWithFlags(flagDatadir, flagChunkDataPackDir, flagExecutionStateDir, flagBootstrapDir, flagExecutionDataDir, flagNodeID, uint64(flagFrom), flagSaveResult)
 	if err != nil {
 		log.Fatal().Err(err).Msg("could not run with flags")
 	}
@@ -102,6 +106,7 @@ func runWithFlags(
 	executionDataDir string,
 	nodeID string,
 	height uint64,
+	saveResult bool,
 ) error {
 	log.Info().
 		Str("datadir", datadir).
@@ -235,10 +240,19 @@ func runWithFlags(
 		return err
 	}
 
-	err = ExecuteBlock(execState, computationManager, storages.Headers, storages.Blocks, storages.Commits, storages.Collections,
+	result, err := ExecuteBlock(execState, computationManager, storages.Headers, storages.Blocks, storages.Commits, storages.Collections,
 		height)
 	if err != nil {
-		log.Fatal().Err(err).Msg("could not execute block")
+		return fmt.Errorf("failed to execute block: %w", err)
+	}
+
+	if saveResult {
+		err = execState.SaveExecutionResults(context.Background(), result)
+		if err != nil {
+			return fmt.Errorf("failed to save execution result: %w", err)
+		}
+
+		log.Info().Msgf("result saved: %v", result.ID())
 	}
 
 	return nil
@@ -252,22 +266,22 @@ func ExecuteBlock(
 	commits storage.Commits,
 	collections storage.Collections,
 	height uint64,
-) error {
+) (*execution.ComputationResult, error) {
 	block, err := readBlock(headers, blocks, commits, collections, height)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	log.Info().Msgf("executing block %v", block.Block.Header.ID())
 
 	result, err := executeBlock(execState, computationManager, context.Background(), block)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	log.Info().Msgf("block %v executed, result ID: %v", block.Block.Header.ID(), result.ID())
 
-	return nil
+	return result, nil
 }
 
 func executeBlock(
