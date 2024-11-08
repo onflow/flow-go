@@ -15,7 +15,6 @@ import (
 	"github.com/onflow/flow-go/engine/access/rest/websockets"
 	"github.com/onflow/flow-go/engine/access/state_stream/backend"
 	streammock "github.com/onflow/flow-go/engine/access/state_stream/mock"
-
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/utils/unittest"
 )
