@@ -8,6 +8,7 @@ import (
 
 	"github.com/onflow/crypto"
 	"github.com/onflow/crypto/hash"
+	"github.com/rs/zerolog/log"
 	otelTrace "go.opentelemetry.io/otel/trace"
 
 	"github.com/onflow/flow-go/engine/execution"
@@ -228,12 +229,13 @@ func (collector *resultCollector) processTransactionResult(
 	timeSpent time.Duration,
 	numConflictRetries int,
 ) error {
-	logger := txn.ctx.Logger.With().
-		Uint64("computation_used", output.ComputationUsed).
-		Uint64("memory_used", output.MemoryEstimate).
-		Int64("time_spent_in_ms", timeSpent.Milliseconds()).
-		Float64("normalized_time_per_computation", flow.NormalizedExecutionTimePerComputationUnit(timeSpent, output.ComputationUsed)).
-		Logger()
+	logger := log.Logger
+	// logger := zerolog.Logger().With().
+	// 	Uint64("computation_used", output.ComputationUsed).
+	// 	Uint64("memory_used", output.MemoryEstimate).
+	// 	Int64("time_spent_in_ms", timeSpent.Milliseconds()).
+	// 	Float64("normalized_time_per_computation", flow.NormalizedExecutionTimePerComputationUnit(timeSpent, output.ComputationUsed)).
+	// 	Logger()
 
 	if output.Err != nil {
 		logger = logger.With().

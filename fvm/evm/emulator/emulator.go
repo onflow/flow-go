@@ -174,6 +174,7 @@ func (bl *BlockView) RunTransaction(
 		proc.evm.Config.Tracer.OnTxStart(proc.evm.GetVMContext(), tx, msg.From)
 	}
 
+	log.Info().Msgf("executing EVM transaction %v", tx.Hash().Hex())
 	// run msg
 	res, err := proc.run(msg, tx.Hash(), tx.Type())
 	if err != nil {
@@ -329,9 +330,12 @@ func (bl *BlockView) newProcedure() (*procedure, error) {
 		return nil, err
 	}
 	cfg := bl.config
+
+	fmt.Println("=====================>>>>>>>>>")
 	log.Info().
 		Str("chain_config", fmt.Sprintf("%+v", cfg.ChainConfig)).
 		Msg("new EVM with configs")
+
 	return &procedure{
 		config: cfg,
 		evm: gethVM.NewEVM(
@@ -652,6 +656,7 @@ func (proc *procedure) run(
 	// if the block gas limit is set to anything than max
 	// we need to update this code.
 	gasPool := (*gethCore.GasPool)(&proc.config.BlockContext.GasLimit)
+
 	log.Info().
 		Str("tx_hash", txHash.Hex()).
 		Msg("Running EVM transaction")
