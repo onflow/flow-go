@@ -9,6 +9,7 @@ import (
 
 	"github.com/onflow/flow-go/access"
 	"github.com/onflow/flow-go/engine/access/rest/router"
+	"github.com/onflow/flow-go/engine/access/rest/websockets/data_providers"
 	"github.com/onflow/flow-go/engine/access/state_stream"
 	"github.com/onflow/flow-go/engine/access/state_stream/backend"
 	"github.com/onflow/flow-go/model/flow"
@@ -47,6 +48,9 @@ func NewServer(serverAPI access.API,
 	if stateStreamApi != nil {
 		builder.AddWsLegacyRoutes(stateStreamApi, chain, stateStreamConfig, config.MaxRequestSize)
 	}
+
+	// TODO: add new websocket routes
+	_ = data_providers.NewDataProviderFactory(logger, stateStreamConfig.EventFilterConfig, stateStreamApi, serverAPI)
 
 	c := cors.New(cors.Options{
 		AllowedOrigins: []string{"*"},

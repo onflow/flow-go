@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/onflow/flow-go/engine/access/rest/common"
+	"github.com/onflow/flow-go/engine/access/rest/common/convert"
 	"github.com/onflow/flow-go/model/flow"
 )
 
@@ -60,7 +61,7 @@ func (g *GetByIDRequest) Build(r *common.Request) error {
 }
 
 func (g *GetByIDRequest) Parse(rawID string) error {
-	var id ID
+	var id convert.ID
 	err := id.Parse(rawID)
 	if err != nil {
 		return err

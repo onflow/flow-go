@@ -22,7 +22,7 @@ import (
 	accessmock "github.com/onflow/flow-go/engine/access/mock"
 	"github.com/onflow/flow-go/engine/access/rest"
 	"github.com/onflow/flow-go/engine/access/rest/common"
-	"github.com/onflow/flow-go/engine/access/rest/http/request"
+	"github.com/onflow/flow-go/engine/access/rest/common/convert"
 	"github.com/onflow/flow-go/engine/access/rest/router"
 	"github.com/onflow/flow-go/engine/access/rpc"
 	"github.com/onflow/flow-go/engine/access/rpc/backend"
@@ -230,8 +230,8 @@ func TestRestAPI(t *testing.T) {
 
 func (suite *RestAPITestSuite) TestGetBlock() {
 
-	testBlockIDs := make([]string, request.MaxIDsLength)
-	testBlocks := make([]*flow.Block, request.MaxIDsLength)
+	testBlockIDs := make([]string, convert.MaxIDsLength)
+	testBlocks := make([]*flow.Block, convert.MaxIDsLength)
 	for i := range testBlockIDs {
 		collections := unittest.CollectionListFixture(1)
 		block := unittest.BlockWithGuaranteesFixture(
@@ -281,7 +281,7 @@ func (suite *RestAPITestSuite) TestGetBlock() {
 		actualBlocks, resp, err := client.BlocksApi.BlocksIdGet(ctx, blockIDSlice, optionsForBlockByID())
 		require.NoError(suite.T(), err)
 		assert.Equal(suite.T(), http.StatusOK, resp.StatusCode)
-		assert.Len(suite.T(), actualBlocks, request.MaxIDsLength)
+		assert.Len(suite.T(), actualBlocks, convert.MaxIDsLength)
 		for i, b := range testBlocks {
 			assert.Equal(suite.T(), b.ID().String(), actualBlocks[i].Header.Id)
 		}
@@ -379,13 +379,13 @@ func (suite *RestAPITestSuite) TestGetBlock() {
 		ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
 		defer cancel()
 
-		blockIDs := make([]string, request.MaxIDsLength+1)
+		blockIDs := make([]string, convert.MaxIDsLength+1)
 		copy(blockIDs, testBlockIDs)
-		blockIDs[request.MaxIDsLength] = unittest.IdentifierFixture().String()
+		blockIDs[convert.MaxIDsLength] = unittest.IdentifierFixture().String()
 
 		blockIDSlice := []string{strings.Join(blockIDs, ",")}
 		_, resp, err := client.BlocksApi.BlocksIdGet(ctx, blockIDSlice, optionsForBlockByID())
-		assertError(suite.T(), resp, err, http.StatusBadRequest, fmt.Sprintf("at most %d IDs can be requested at a time", request.MaxIDsLength))
+		assertError(suite.T(), resp, err, http.StatusBadRequest, fmt.Sprintf("at most %d IDs can be requested at a time", convert.MaxIDsLength))
 	})
 
 	suite.Run("GetBlockByID with one non-existing block ID", func() {
