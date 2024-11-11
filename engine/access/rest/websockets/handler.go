@@ -40,6 +40,7 @@ func NewWebSocketHandler(
 		streamConfig:    streamConfig,
 	}
 }
+
 func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	//TODO: change to accept topic instead of URL
 	logger := h.HttpHandler.Logger.With().Str("websocket_subscribe_url", r.URL.String()).Logger()
