@@ -254,7 +254,7 @@ func DefaultObserverServiceConfig() *ObserverServiceConfig {
 		registerCacheSize:        0,
 		programCacheSize:         0,
 		registerDBPruneThreshold: pruner.DefaultThreshold,
-		websocketConfig:          *websockets.NewDefaultWebsocketConfig(),
+		websocketConfig:          websockets.NewDefaultWebsocketConfig(),
 	}
 }
 

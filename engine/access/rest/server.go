@@ -50,7 +50,7 @@ func NewServer(serverAPI access.API,
 		builder.AddLegacyWebsocketsRoutes(stateStreamApi, chain, stateStreamConfig, config.MaxRequestSize)
 	}
 
-	builder.AddWebsocketsRoute(chain, &wsConfig, stateStreamApi, stateStreamConfig, config.MaxRequestSize)
+	builder.AddWebsocketsRoute(chain, wsConfig, stateStreamApi, stateStreamConfig, config.MaxRequestSize)
 
 	c := cors.New(cors.Options{
 		AllowedOrigins: []string{"*"},

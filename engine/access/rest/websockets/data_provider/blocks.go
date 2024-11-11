@@ -38,13 +38,12 @@ func NewMockBlockProvider(
 	}
 }
 
-func (p *MockBlockProvider) Run() {
+func (p *MockBlockProvider) Run(_ context.Context) {
 	select {
 	case <-p.ctx.Done():
 		return
 	default:
-		p.ch <- "hello"
-		p.ch <- "world"
+		p.ch <- "hello world"
 	}
 }
 

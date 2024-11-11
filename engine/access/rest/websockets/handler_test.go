@@ -13,6 +13,7 @@ import (
 	"github.com/stretchr/testify/suite"
 
 	"github.com/onflow/flow-go/engine/access/rest/websockets"
+	"github.com/onflow/flow-go/engine/access/rest/websockets/models"
 	"github.com/onflow/flow-go/engine/access/state_stream/backend"
 	streammock "github.com/onflow/flow-go/engine/access/state_stream/mock"
 	"github.com/onflow/flow-go/model/flow"
@@ -28,17 +29,17 @@ type WsHandlerSuite struct {
 
 	logger       zerolog.Logger
 	handler      *websockets.Handler
-	wsConfig     *websockets.Config
+	wsConfig     websockets.Config
 	streamApi    *streammock.API
-	streamConfig *backend.Config
+	streamConfig backend.Config
 }
 
 func (s *WsHandlerSuite) SetupTest() {
 	s.logger = unittest.Logger()
 	s.wsConfig = websockets.NewDefaultWebsocketConfig()
 	s.streamApi = streammock.NewAPI(s.T())
-	s.streamConfig = &backend.Config{}
-	s.handler = websockets.NewWebSocketHandler(s.logger, s.wsConfig, chainID.Chain(), s.streamApi, *s.streamConfig, 1024)
+	s.streamConfig = backend.Config{}
+	s.handler = websockets.NewWebSocketHandler(s.logger, s.wsConfig, chainID.Chain(), s.streamApi, s.streamConfig, 1024)
 }
 
 func TestWsHandlerSuite(t *testing.T) {
@@ -65,8 +66,8 @@ func (s *WsHandlerSuite) TestSubscribeRequest() {
 		args := map[string]interface{}{
 			"start_block_height": 10,
 		}
-		body := websockets.SubscribeMessageRequest{
-			BaseMessageRequest: websockets.BaseMessageRequest{Action: "subscribe"},
+		body := models.SubscribeMessageRequest{
+			BaseMessageRequest: models.BaseMessageRequest{Action: "subscribe"},
 			Topic:              "blocks",
 			Arguments:          args,
 		}
@@ -80,12 +81,6 @@ func (s *WsHandlerSuite) TestSubscribeRequest() {
 		require.NoError(s.T(), err)
 
 		actualMsg := strings.Trim(string(msg), "\n\"\\ ")
-		require.Equal(s.T(), "hello", actualMsg)
-
-		_, msg, err = conn.ReadMessage()
-		require.NoError(s.T(), err)
-
-		actualMsg = strings.Trim(string(msg), "\n\"\\ ")
-		require.Equal(s.T(), "world", actualMsg)
+		require.Equal(s.T(), "hello world", actualMsg)
 	})
 }

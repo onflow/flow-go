@@ -88,7 +88,7 @@ func (b *RouterBuilder) AddLegacyWebsocketsRoutes(
 
 func (b *RouterBuilder) AddWebsocketsRoute(
 	chain flow.Chain,
-	config *websockets.Config,
+	config websockets.Config,
 	streamApi state_stream.API,
 	streamConfig backend.Config,
 	maxRequestSize int64,

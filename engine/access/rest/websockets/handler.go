@@ -17,7 +17,7 @@ type Handler struct {
 	*common.HttpHandler
 
 	logger          zerolog.Logger
-	websocketConfig *Config
+	websocketConfig Config
 	streamApi       state_stream.API
 	streamConfig    backend.Config
 }
@@ -26,7 +26,7 @@ var _ http.Handler = (*Handler)(nil)
 
 func NewWebSocketHandler(
 	logger zerolog.Logger,
-	config *Config,
+	config Config,
 	chain flow.Chain,
 	streamApi state_stream.API,
 	streamConfig backend.Config,
@@ -64,7 +64,6 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	ctx := context.Background()
-	controller := NewWebSocketController(ctx, logger, h.websocketConfig, h.streamApi, h.streamConfig, conn)
-	controller.HandleConnection()
+	controller := NewWebSocketController(logger, h.websocketConfig, h.streamApi, h.streamConfig, conn)
+	controller.HandleConnection(context.TODO())
 }

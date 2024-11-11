@@ -111,7 +111,7 @@ func (suite *SecureGRPCTestSuite) SetupTest() {
 		UnsecureGRPCListenAddr: unittest.DefaultAddress,
 		SecureGRPCListenAddr:   unittest.DefaultAddress,
 		HTTPListenAddr:         unittest.DefaultAddress,
-		WebSocketConfig:        *websockets.NewDefaultWebsocketConfig(),
+		WebSocketConfig:        websockets.NewDefaultWebsocketConfig(),
 	}
 
 	// generate a server certificate that will be served by the GRPC server

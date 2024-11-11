@@ -14,6 +14,7 @@ import (
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/mempool/queue"
 	"github.com/onflow/flow-go/module/metrics"
+	"github.com/onflow/flow-go/utils/concurrentmap"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -115,7 +116,7 @@ func TestWorkerPool_TwoWorkers_ConcurrentEvents(t *testing.T) {
 	}
 
 	q := queue.NewHeroStore(uint32(size), unittest.Logger(), metrics.NewNoopCollector())
-	distributedEvents := unittest.NewProtectedMap[string, struct{}]()
+	distributedEvents := concurrentmap.NewConcurrentMap[string, struct{}]()
 	allEventsDistributed := sync.WaitGroup{}
 	allEventsDistributed.Add(size)
 

@@ -10,45 +10,44 @@ import (
 	"github.com/rs/zerolog"
 
 	dp "github.com/onflow/flow-go/engine/access/rest/websockets/data_provider"
+	"github.com/onflow/flow-go/engine/access/rest/websockets/models"
 	"github.com/onflow/flow-go/engine/access/state_stream"
 	"github.com/onflow/flow-go/engine/access/state_stream/backend"
+	"github.com/onflow/flow-go/utils/concurrentmap"
 )
 
 type Controller struct {
-	ctx                  context.Context
 	logger               zerolog.Logger
-	config               *Config
+	config               Config
 	conn                 *websocket.Conn
 	communicationChannel chan interface{}
-	dataProviders        *ThreadSafeMap[uuid.UUID, dp.DataProvider]
+	dataProviders        *concurrentmap.ConcurrentMap[uuid.UUID, dp.DataProvider]
 	dataProvidersFactory *dp.Factory
 }
 
 func NewWebSocketController(
-	ctx context.Context,
 	logger zerolog.Logger,
-	config *Config,
+	config Config,
 	streamApi state_stream.API,
 	streamConfig backend.Config,
 	conn *websocket.Conn,
 ) *Controller {
 	return &Controller{
-		ctx:                  ctx,
 		logger:               logger.With().Str("component", "websocket-controller").Logger(),
 		config:               config,
 		conn:                 conn,
 		communicationChannel: make(chan interface{}), //TODO: should it be buffered chan?
-		dataProviders:        NewThreadSafeMap[uuid.UUID, dp.DataProvider](),
+		dataProviders:        concurrentmap.NewConcurrentMap[uuid.UUID, dp.DataProvider](),
 		dataProvidersFactory: dp.NewDataProviderFactory(logger, streamApi, streamConfig),
 	}
 }
 
 // HandleConnection manages the WebSocket connection, adding context and error handling.
-func (c *Controller) HandleConnection() {
+func (c *Controller) HandleConnection(ctx context.Context) {
 	//TODO: configure the connection with ping-pong and deadlines
-
-	go c.readMessagesFromClient(c.ctx)
-	go c.writeMessagesToClient(c.ctx)
+	//TODO: spin up a response limit tracker routine
+	go c.readMessagesFromClient(ctx)
+	go c.writeMessagesToClient(ctx)
 }
 
 func (c *Controller) writeMessagesToClient(ctx context.Context) {
@@ -85,13 +84,13 @@ func (c *Controller) readMessagesFromClient(ctx context.Context) {
 				return
 			}
 
-			baseMsg, err := c.parseMessage(msg)
+			baseMsg, validatedMsg, err := c.parseAndValidateMessage(msg)
 			if err != nil {
-				c.logger.Warn().Err(err).Msg("error parsing base message")
+				c.logger.Debug().Err(err).Msg("error parsing and validating client message")
 				return
 			}
 
-			if err := c.dispatchAction(baseMsg.Action, msg); err != nil {
+			if err := c.handleAction(ctx, baseMsg.Action, validatedMsg); err != nil {
 				c.logger.Warn().Err(err).Str("action", baseMsg.Action).Msg("error handling action")
 			}
 		}
@@ -106,55 +105,68 @@ func (c *Controller) readMessage() (json.RawMessage, error) {
 	return message, nil
 }
 
-func (c *Controller) parseMessage(message json.RawMessage) (BaseMessageRequest, error) {
-	var baseMsg BaseMessageRequest
+func (c *Controller) parseAndValidateMessage(message json.RawMessage) (models.BaseMessageRequest, interface{}, error) {
+	var baseMsg models.BaseMessageRequest
 	if err := json.Unmarshal(message, &baseMsg); err != nil {
-		return BaseMessageRequest{}, fmt.Errorf("error unmarshalling base message: %w", err)
+		return models.BaseMessageRequest{}, nil, fmt.Errorf("error unmarshalling base message: %w", err)
 	}
-	return baseMsg, nil
-}
 
-// dispatchAction routes the action to the appropriate handler based on the action type.
-func (c *Controller) dispatchAction(action string, message json.RawMessage) error {
-	switch action {
+	var validatedMsg interface{}
+	switch baseMsg.Action {
 	case "subscribe":
-		var subscribeMsg SubscribeMessageRequest
+		var subscribeMsg models.SubscribeMessageRequest
 		if err := json.Unmarshal(message, &subscribeMsg); err != nil {
-			return fmt.Errorf("error unmarshalling subscribe message: %w", err)
+			return baseMsg, nil, fmt.Errorf("error unmarshalling subscribe message: %w", err)
 		}
-		c.handleSubscribe(subscribeMsg)
+		//TODO: add validation logic for `topic` field
+		validatedMsg = subscribeMsg
 
 	case "unsubscribe":
-		var unsubscribeMsg UnsubscribeMessageRequest
+		var unsubscribeMsg models.UnsubscribeMessageRequest
 		if err := json.Unmarshal(message, &unsubscribeMsg); err != nil {
-			return fmt.Errorf("error unmarshalling unsubscribe message: %w", err)
+			return baseMsg, nil, fmt.Errorf("error unmarshalling unsubscribe message: %w", err)
 		}
-		c.handleUnsubscribe(unsubscribeMsg)
+		validatedMsg = unsubscribeMsg
 
 	case "list_subscriptions":
-		var listMsg ListSubscriptionsMessageRequest
+		var listMsg models.ListSubscriptionsMessageRequest
 		if err := json.Unmarshal(message, &listMsg); err != nil {
-			return fmt.Errorf("error unmarshalling list subscriptions message: %w", err)
+			return baseMsg, nil, fmt.Errorf("error unmarshalling list subscriptions message: %w", err)
 		}
-		c.handleListSubscriptions(listMsg)
+		validatedMsg = listMsg
 
 	default:
-		c.logger.Warn().Str("action", action).Msg("unknown action type")
+		c.logger.Debug().Str("action", baseMsg.Action).Msg("unknown action type")
+		return baseMsg, nil, fmt.Errorf("unknown action type: %s", baseMsg.Action)
+	}
+
+	return baseMsg, validatedMsg, nil
+}
+
+func (c *Controller) handleAction(ctx context.Context, action string, message interface{}) error {
+	switch action {
+	case "subscribe":
+		c.handleSubscribe(ctx, message.(models.SubscribeMessageRequest))
+	case "unsubscribe":
+		c.handleUnsubscribe(ctx, message.(models.UnsubscribeMessageRequest))
+	case "list_subscriptions":
+		c.handleListSubscriptions(ctx, message.(models.ListSubscriptionsMessageRequest))
+	default:
 		return fmt.Errorf("unknown action type: %s", action)
 	}
 	return nil
 }
 
-func (c *Controller) handleSubscribe(msg SubscribeMessageRequest) {
-	dp := c.dataProvidersFactory.NewDataProvider(c.ctx, c.communicationChannel, msg.Topic)
-	c.dataProviders.Insert(dp.ID(), dp)
-	dp.Run()
+func (c *Controller) handleSubscribe(ctx context.Context, msg models.SubscribeMessageRequest) {
+	dp := c.dataProvidersFactory.NewDataProvider(ctx, c.communicationChannel, msg.Topic)
+	c.dataProviders.Add(dp.ID(), dp)
+	dp.Run(ctx)
 }
 
-func (c *Controller) handleUnsubscribe(msg UnsubscribeMessageRequest) {
+func (c *Controller) handleUnsubscribe(ctx context.Context, msg models.UnsubscribeMessageRequest) {
 	id, err := uuid.Parse(msg.ID)
 	if err != nil {
-		c.logger.Warn().Err(err).Str("topic", msg.Topic).Msg("error parsing message ID")
+		c.logger.Debug().Err(err).Msg("error parsing message ID")
 		return
 	}
 
@@ -165,7 +177,8 @@ func (c *Controller) handleUnsubscribe(msg UnsubscribeMessageRequest) {
 	}
 }
 
-func (c *Controller) handleListSubscriptions(msg ListSubscriptionsMessageRequest) {}
+func (c *Controller) handleListSubscriptions(ctx context.Context, msg models.ListSubscriptionsMessageRequest) {
+}
 
 func (c *Controller) shutdownConnection() {
 	defer close(c.communicationChannel)
@@ -175,8 +188,13 @@ func (c *Controller) shutdownConnection() {
 		}
 	}(c.conn)
 
-	c.dataProviders.ForEach(func(_ uuid.UUID, dp dp.DataProvider) {
+	err := c.dataProviders.ForEach(func(_ uuid.UUID, dp dp.DataProvider) error {
 		dp.Close()
+		return nil
 	})
+	if err != nil {
+		c.logger.Error().Err(err).Msg("error closing data provider")
+	}
+
 	c.dataProviders.Clear()
 }

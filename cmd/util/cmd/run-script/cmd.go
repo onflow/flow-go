@@ -170,7 +170,7 @@ func run(*cobra.Command, []string) {
 			metrics.NewNoopCollector(),
 			nil,
 			backend.Config{},
-			*websockets.NewDefaultWebsocketConfig(),
+			websockets.NewDefaultWebsocketConfig(),
 		)
 		if err != nil {
 			log.Fatal().Err(err).Msg("failed to create server")
