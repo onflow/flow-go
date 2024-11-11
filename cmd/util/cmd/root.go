@@ -27,6 +27,7 @@ import (
 	extractpayloads "github.com/onflow/flow-go/cmd/util/cmd/extract-payloads-by-address"
 	find_inconsistent_result "github.com/onflow/flow-go/cmd/util/cmd/find-inconsistent-result"
 	find_trie_root "github.com/onflow/flow-go/cmd/util/cmd/find-trie-root"
+	re_execute_block "github.com/onflow/flow-go/cmd/util/cmd/re-execute-block"
 	read_badger "github.com/onflow/flow-go/cmd/util/cmd/read-badger/cmd"
 	read_execution_state "github.com/onflow/flow-go/cmd/util/cmd/read-execution-state"
 	read_hotstuff "github.com/onflow/flow-go/cmd/util/cmd/read-hotstuff/cmd"
@@ -118,6 +119,7 @@ func addCommands() {
 	rootCmd.AddCommand(run_script.Cmd)
 	rootCmd.AddCommand(system_addresses.Cmd)
 	rootCmd.AddCommand(check_storage.Cmd)
+	rootCmd.AddCommand(re_execute_block.Cmd)
 }
 
 func initConfig() {
