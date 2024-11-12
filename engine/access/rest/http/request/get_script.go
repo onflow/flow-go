@@ -5,7 +5,7 @@ import (
 	"io"
 
 	"github.com/onflow/flow-go/engine/access/rest/common"
-	"github.com/onflow/flow-go/engine/access/rest/common/convert"
+	"github.com/onflow/flow-go/engine/access/rest/common/parser"
 	"github.com/onflow/flow-go/model/flow"
 )
 
@@ -43,7 +43,7 @@ func (g *GetScript) Parse(rawHeight string, rawID string, rawScript io.Reader) e
 	}
 	g.BlockHeight = height.Flow()
 
-	var id convert.ID
+	var id parser.ID
 	err = id.Parse(rawID)
 	if err != nil {
 		return err

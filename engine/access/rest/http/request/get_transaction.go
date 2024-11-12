@@ -2,7 +2,7 @@ package request
 
 import (
 	"github.com/onflow/flow-go/engine/access/rest/common"
-	"github.com/onflow/flow-go/engine/access/rest/common/convert"
+	"github.com/onflow/flow-go/engine/access/rest/common/parser"
 	"github.com/onflow/flow-go/model/flow"
 )
 
@@ -16,14 +16,14 @@ type TransactionOptionals struct {
 }
 
 func (t *TransactionOptionals) Parse(r *common.Request) error {
-	var blockId convert.ID
+	var blockId parser.ID
 	err := blockId.Parse(r.GetQueryParam(blockIDQueryParam))
 	if err != nil {
 		return err
 	}
 	t.BlockID = blockId.Flow()
 
-	var collectionId convert.ID
+	var collectionId parser.ID
 	err = collectionId.Parse(r.GetQueryParam(collectionIDQueryParam))
 	if err != nil {
 		return err

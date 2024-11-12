@@ -4,7 +4,7 @@ import (
 	"fmt"
 
 	"github.com/onflow/flow-go/engine/access/rest/common"
-	"github.com/onflow/flow-go/engine/access/rest/common/convert"
+	"github.com/onflow/flow-go/engine/access/rest/common/parser"
 	"github.com/onflow/flow-go/model/flow"
 )
 
@@ -51,7 +51,7 @@ func (g *GetEvents) Parse(rawType string, rawStart string, rawEnd string, rawBlo
 	}
 	g.EndHeight = height.Flow()
 
-	var blockIDs convert.IDs
+	var blockIDs parser.IDs
 	err = blockIDs.Parse(rawBlockIDs)
 	if err != nil {
 		return err

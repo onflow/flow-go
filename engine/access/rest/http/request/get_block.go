@@ -4,7 +4,7 @@ import (
 	"fmt"
 
 	"github.com/onflow/flow-go/engine/access/rest/common"
-	"github.com/onflow/flow-go/engine/access/rest/common/convert"
+	"github.com/onflow/flow-go/engine/access/rest/common/parser"
 	"github.com/onflow/flow-go/model/flow"
 )
 
@@ -123,7 +123,7 @@ func (g *GetBlockByIDs) Build(r *common.Request) error {
 }
 
 func (g *GetBlockByIDs) Parse(rawIds []string) error {
-	var ids convert.IDs
+	var ids parser.IDs
 	err := ids.Parse(rawIds)
 	if err != nil {
 		return err

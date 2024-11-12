@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"io"
 
-	convert2 "github.com/onflow/flow-go/engine/access/rest/common/convert"
+	convert2 "github.com/onflow/flow-go/engine/access/rest/common/parser"
 	"github.com/onflow/flow-go/engine/access/rest/http/models"
 	"github.com/onflow/flow-go/engine/access/rest/util"
 	"github.com/onflow/flow-go/engine/common/rpc/convert"
