@@ -57,15 +57,20 @@ func (s *DataProviderFactorySuite) TestSupportedTopics() {
 		name               string
 		topic              string
 		arguments          map[string]string
-		mockSubscription   func()
+		mockSubscription   func() string // return subscription id
 		assertExpectations func()
 	}{
 		{
 			name:      "block topic",
 			topic:     BlocksTopic,
 			arguments: map[string]string{"block_status": parser.Finalized},
-			mockSubscription: func() {
-				s.accessApi.On("SubscribeBlocksFromLatest", mock.Anything, flow.BlockStatusFinalized).Return(nil).Once()
+			mockSubscription: func() string {
+				subscription := statestreammock.NewSubscription(s.T())
+				subscriptionID := unittest.IdentifierFixture().String()
+				subscription.On("ID").Return(subscriptionID).Once()
+
+				s.accessApi.On("SubscribeBlocksFromLatest", mock.Anything, flow.BlockStatusFinalized).Return(subscription).Once()
+				return subscriptionID
 			},
 			assertExpectations: func() {
 				s.accessApi.AssertExpectations(s.T())
@@ -75,11 +80,14 @@ func (s *DataProviderFactorySuite) TestSupportedTopics() {
 
 	for _, test := range testCases {
 		s.Run(test.name, func() {
-			test.mockSubscription()
+			subscriptionID := test.mockSubscription()
 
 			provider, err := s.factory.NewDataProvider(s.ctx, test.topic, test.arguments, s.ch)
 			s.Require().NotNil(provider, "Expected provider for topic %s", test.topic)
 			s.Require().NoError(err, "Expected no error for topic %s", test.topic)
+
+			s.Require().Equal(test.topic, provider.Topic())
+			s.Require().Equal(subscriptionID, provider.ID())
 
 			test.assertExpectations()
 		})

@@ -1,6 +1,6 @@
 package data_providers
 
-// The DataProvider is the interface abstracts of the actual subscriptions used by the WebSocketCollector.
+// The DataProvider is the interface abstracts of the actual data provider used by the WebSocketCollector.
 type DataProvider interface {
 	BaseDataProvider
 

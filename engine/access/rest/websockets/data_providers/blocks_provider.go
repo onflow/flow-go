@@ -42,8 +42,6 @@ func NewBlocksDataProvider(
 	arguments map[string]string,
 	send chan<- interface{},
 ) (*BlocksDataProvider, error) {
-	ctx, cancel := context.WithCancel(ctx)
-
 	p := &BlocksDataProvider{
 		logger: logger.With().Str("component", "block-data-provider").Logger(),
 		api:    api,
@@ -55,10 +53,12 @@ func NewBlocksDataProvider(
 		return nil, fmt.Errorf("invalid arguments: %w", err)
 	}
 
+	context, cancel := context.WithCancel(ctx)
+
 	// Set up a subscription to blocks based on the provided start block ID and block status.
 	subscription := p.createSubscription(ctx)
 	p.BaseDataProviderImpl = NewBaseDataProviderImpl(
-		ctx,
+		context,
 		cancel,
 		topic,
 		send,

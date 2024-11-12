@@ -105,3 +105,5 @@ func (s *BlocksProviderSuite) TestBlocksDataProvider_InvalidArguments() {
 		})
 	}
 }
+
+// TODO: add tests for responses after the WebsocketController is ready
