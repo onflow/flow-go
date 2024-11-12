@@ -154,7 +154,7 @@ func TestBootstrapInvalidEpochCommit(t *testing.T) {
 		setup := result.ServiceEvents[0].Event.(*flow.EpochSetup)
 		commit := result.ServiceEvents[1].Event.(*flow.EpochCommit)
 		// replace entity in the index map so the size matches but with negative index.
-		nodeID := setup.Participants.Filter(filter.IsValidDKGParticipant)[0].NodeID
+		nodeID := setup.Participants.Filter(filter.IsConsensusCommitteeMember)[0].NodeID
 		commit.DKGIndexMap[nodeID] = -1
 
 		err := protocol.IsValidEpochCommit(commit, setup)
@@ -165,7 +165,7 @@ func TestBootstrapInvalidEpochCommit(t *testing.T) {
 		_, result, _ := unittest.BootstrapFixture(participants)
 		setup := result.ServiceEvents[0].Event.(*flow.EpochSetup)
 		commit := result.ServiceEvents[1].Event.(*flow.EpochCommit)
-		nodeID := setup.Participants.Filter(filter.IsValidDKGParticipant)[0].NodeID
+		nodeID := setup.Participants.Filter(filter.IsConsensusCommitteeMember)[0].NodeID
 		commit.DKGIndexMap[nodeID] = len(commit.DKGParticipantKeys) // change index so it's out of bound and not consecutive
 
 		err := protocol.IsValidEpochCommit(commit, setup)
@@ -177,8 +177,8 @@ func TestBootstrapInvalidEpochCommit(t *testing.T) {
 		setup := result.ServiceEvents[0].Event.(*flow.EpochSetup)
 		commit := result.ServiceEvents[1].Event.(*flow.EpochCommit)
 		// replace entity in the index map so the size matches but with negative index.
-		nodeID := setup.Participants.Filter(filter.IsValidDKGParticipant)[0].NodeID
-		otherNodeID := setup.Participants.Filter(filter.IsValidDKGParticipant)[1].NodeID
+		nodeID := setup.Participants.Filter(filter.IsConsensusCommitteeMember)[0].NodeID
+		otherNodeID := setup.Participants.Filter(filter.IsConsensusCommitteeMember)[1].NodeID
 		commit.DKGIndexMap[nodeID] = commit.DKGIndexMap[otherNodeID] // change index so it's out of bound and not consecutive
 
 		err := protocol.IsValidEpochCommit(commit, setup)

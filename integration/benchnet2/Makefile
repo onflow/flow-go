@@ -56,7 +56,7 @@ gen-bootstrap: clone-flow
 		--epoch-extension-view-count=600 \
 		--collection-clusters 1 \
 		--protocol-version=0 \
-		--epoch-commit-safety-threshold=100 \
+		--finalization-safety-threshold=100 \
 		--use-default-epoch-timing \
 		--config ../../../bootstrap/conf/node-config.json \
 		-o ../../../bootstrap/ \
