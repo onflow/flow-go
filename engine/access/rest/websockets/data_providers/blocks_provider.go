@@ -56,7 +56,7 @@ func NewBlocksDataProvider(
 	context, cancel := context.WithCancel(ctx)
 
 	// Set up a subscription to blocks based on the provided start block ID and block status.
-	subscription := p.createSubscription(ctx)
+	subscription := p.createSubscription(context)
 	p.BaseDataProviderImpl = NewBaseDataProviderImpl(
 		context,
 		cancel,
