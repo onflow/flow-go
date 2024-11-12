@@ -5,11 +5,14 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/suite"
 
 	accessmock "github.com/onflow/flow-go/access/mock"
+	"github.com/onflow/flow-go/engine/access/rest/common/parser"
 	"github.com/onflow/flow-go/engine/access/state_stream"
 	statestreammock "github.com/onflow/flow-go/engine/access/state_stream/mock"
+	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -19,6 +22,9 @@ type DataProviderFactorySuite struct {
 
 	ctx context.Context
 	ch  chan interface{}
+
+	accessApi      *accessmock.API
+	stateStreamApi *statestreammock.API
 
 	factory *DataProviderFactory
 }
@@ -32,20 +38,52 @@ func TestDataProviderFactorySuite(t *testing.T) {
 func (s *DataProviderFactorySuite) SetupTest() {
 	log := unittest.Logger()
 	eventFilterConfig := state_stream.EventFilterConfig{}
-	stateStreamApi := statestreammock.NewAPI(s.T())
-	accessApi := accessmock.NewAPI(s.T())
+	s.stateStreamApi = statestreammock.NewAPI(s.T())
+	s.accessApi = accessmock.NewAPI(s.T())
 
 	s.ctx = context.Background()
 	s.ch = make(chan interface{})
 
-	s.factory = NewDataProviderFactory(log, eventFilterConfig, stateStreamApi, accessApi)
+	s.factory = NewDataProviderFactory(log, eventFilterConfig, s.stateStreamApi, s.accessApi)
 	s.Require().NotNil(s.factory)
 }
 
+// TODO: add others topic to check when they will be implemented
 // TestSupportedTopics verifies that supported topics return a valid provider and no errors.
 // Each test case includes a topic and arguments for which a data provider should be created.
 func (s *DataProviderFactorySuite) TestSupportedTopics() {
+	// Define supported topics and check if each returns the correct provider without errors
+	testCases := []struct {
+		name               string
+		topic              string
+		arguments          map[string]string
+		mockSubscription   func()
+		assertExpectations func()
+	}{
+		{
+			name:      "block topic",
+			topic:     BlocksTopic,
+			arguments: map[string]string{"block_status": parser.Finalized},
+			mockSubscription: func() {
+				s.accessApi.On("SubscribeBlocksFromLatest", mock.Anything, flow.BlockStatusFinalized).Return(nil).Once()
+			},
+			assertExpectations: func() {
+				s.accessApi.AssertExpectations(s.T())
+			},
+		},
+	}
 
+	for _, test := range testCases {
+		s.Run(test.name, func() {
+			test.mockSubscription()
+
+			provider, err := s.factory.NewDataProvider(s.ctx, test.topic, test.arguments, s.ch)
+			s.Require().NotNil(provider, "Expected provider for topic %s", test.topic)
+			s.Require().NoError(err, "Expected no error for topic %s", test.topic)
+
+			test.assertExpectations()
+		})
+	}
 }
 
 // TestUnsupportedTopics verifies that unsupported topics do not return a provider
