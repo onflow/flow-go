@@ -76,14 +76,13 @@ func addGenerateRecoverEpochTxArgsCmdFlags() error {
 		"containing the output from the `keygen` command for internal nodes")
 	generateRecoverEpochTxArgsCmd.Flags().Uint64Var(&flagNumViewsInEpoch, "epoch-length", 0, "length of each epoch measured in views")
 	generateRecoverEpochTxArgsCmd.Flags().Uint64Var(&flagNumViewsInStakingAuction, "epoch-staking-phase-length", 0, "length of the epoch staking phase measured in views")
-	generateRecoverEpochTxArgsCmd.Flags().Uint64Var(&flagEpochCounter, "epoch-counter", 0, "the epoch counter used to generate the root cluster block")
 	generateRecoverEpochTxArgsCmd.Flags().Uint64Var(&flagTargetDuration, "epoch-timing-duration", 0, "the target duration of the epoch, in seconds")
 	// The following option allows the RecoveryEpoch specified by this command to overwrite an epoch which already exists in the smart contract.
 	// This is needed only if a previous recoverEpoch transaction was submitted and a race condition occurred such that:
 	//   - the RecoveryEpoch in the admin transaction was accepted by the smart contract
 	//   - the RecoveryEpoch service event (after sealing latency) was rejected by the Protocol State
 	generateRecoverEpochTxArgsCmd.Flags().BoolVar(&flagUnsafeAllowOverWrite, "unsafe-overwrite-epoch-data", false, "set to true if the resulting transaction is allowed to overwrite an already specified epoch in the smart contract.")
-	generateRecoverEpochTxArgsCmd.Flags().Uint64Var(&flagEpochCounter, "recovery-epoch-counter", 0, "the recovery epoch counter")
+	generateRecoverEpochTxArgsCmd.Flags().Uint64Var(&flagEpochCounter, "recovery-epoch-counter", 0, "the epoch counter for the recovery epoch")
 
 	err := generateRecoverEpochTxArgsCmd.MarkFlagRequired("access-address")
 	if err != nil {
@@ -96,10 +95,6 @@ func addGenerateRecoverEpochTxArgsCmdFlags() error {
 	err = generateRecoverEpochTxArgsCmd.MarkFlagRequired("epoch-staking-phase-length")
 	if err != nil {
 		return fmt.Errorf("failed to mark epoch-staking-phase-length flag as required")
-	}
-	err = generateRecoverEpochTxArgsCmd.MarkFlagRequired("epoch-counter")
-	if err != nil {
-		return fmt.Errorf("failed to mark epoch-counter flag as required")
 	}
 	err = generateRecoverEpochTxArgsCmd.MarkFlagRequired("collection-clusters")
 	if err != nil {

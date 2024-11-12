@@ -42,7 +42,10 @@ func constructRootEpochEvents(
 	participants flow.IdentityList,
 	assignments flow.AssignmentList,
 	clusterQCs []*flow.QuorumCertificate,
-	dkgData dkg.DKGData) (*flow.EpochSetup, *flow.EpochCommit) {
+	dkgData dkg.DKGData,
+	dkgIndexMap flow.DKGIndexMap,
+) (*flow.EpochSetup, *flow.EpochCommit) {
+
 	epochSetup := &flow.EpochSetup{
 		Counter:            flagEpochCounter,
 		FirstView:          firstView,
@@ -77,6 +80,7 @@ func constructRootEpochEvents(
 		ClusterQCs:         flow.ClusterQCVoteDatasFromQCs(qcsWithSignerIDs),
 		DKGGroupKey:        dkgData.PubGroupKey,
 		DKGParticipantKeys: dkgData.PubKeyShares,
+		DKGIndexMap:        dkgIndexMap,
 	}
 	return epochSetup, epochCommit
 }
