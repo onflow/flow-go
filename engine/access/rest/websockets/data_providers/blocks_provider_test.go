@@ -57,7 +57,13 @@ func (s *BlocksProviderSuite) SetupTest() {
 	s.finalizedBlock = parent
 }
 
-// TestBlocksDataProvider_InvalidArguments verifies that
+// TestBlocksDataProvider_InvalidArguments tests the behavior of the block data provider
+// when invalid arguments are provided. It verifies that appropriate errors are returned
+// for missing or conflicting arguments.
+// This test covers the test cases:
+// 1. Missing 'block_status' argument.
+// 2. Invalid 'block_status' argument.
+// 3. Providing both 'start_block_id' and 'start_block_height' simultaneously.
 func (s *BlocksProviderSuite) TestBlocksDataProvider_InvalidArguments() {
 	ctx := context.Background()
 	send := make(chan interface{})
