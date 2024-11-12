@@ -72,7 +72,7 @@ func NewBlocksDataProvider(
 //
 // No errors are expected during normal operations.
 func (p *BlocksDataProvider) Run() error {
-	return HandleSubscription(p.ctx, p.subscription, handleResponse(p.send, p.args.BlockStatus))
+	return subscription.HandleSubscription(p.ctx, p.subscription, handleResponse(p.send, p.args.BlockStatus))
 }
 
 // validateArguments checks and validates the arguments passed to the provider.
