@@ -53,7 +53,7 @@ func HandleSubscription[T any](ctx context.Context, sub Subscription, handleResp
 // Expected errors during normal operation:
 //   - codes.Internal: If the subscription encounters an error or gets an unexpected response.
 func HandleRPCSubscription[T any](sub Subscription, handleResponse func(resp T) error) error {
-	err := HandleSubscription(nil, sub, handleResponse)
+	err := HandleSubscription(context.TODO(), sub, handleResponse)
 	if err != nil {
 		return rpc.ConvertError(err, "handle subscription error", codes.Internal)
 	}
