@@ -202,7 +202,7 @@ func (p *RegisterPruner) pruneUpToHeight(ctx context.Context, r pebble.Reader, p
 		return fmt.Errorf("failed to update first height for register storage: %w", err)
 	}
 
-	dbPruner := RegisterPrunerRun(p.db, p.logger, p.pruneThrottleDelay, pruneHeight)
+	dbPruner := NewRegisterPrunerRun(p.db, p.logger, pruneHeight)
 
 	prefix := []byte{codeRegister}
 	it, err := r.NewIter(&pebble.IterOptions{
@@ -238,24 +238,24 @@ func (p *RegisterPruner) pruneUpToHeight(ctx context.Context, r pebble.Reader, p
 
 		if len(batchKeysToRemove) >= deleteItemsPerBatch {
 			// Perform batch delete
-			if err := dbPruner.BatchDelete(ctx, batchKeysToRemove); err != nil {
+			if err := dbPruner.BatchDelete(batchKeysToRemove); err != nil {
 				return err
 			}
+
+			// Reset batchKeysToRemove to empty slice while retaining capacity
+			batchKeysToRemove = batchKeysToRemove[:0]
 
 			// Throttle to prevent excessive system load
 			select {
 			case <-ctx.Done():
 			case <-time.After(p.pruneThrottleDelay):
 			}
-
-			// Reset batchKeysToRemove to empty slice while retaining capacity
-			batchKeysToRemove = batchKeysToRemove[:0]
 		}
 	}
 
 	if len(batchKeysToRemove) > 0 {
 		// Perform the final batch delete if there are any remaining keys
-		if err := dbPruner.BatchDelete(ctx, batchKeysToRemove); err != nil {
+		if err := dbPruner.BatchDelete(batchKeysToRemove); err != nil {
 			return err
 		}
 	}
