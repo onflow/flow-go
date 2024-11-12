@@ -17,9 +17,9 @@ import (
 
 // BlocksArguments contains the arguments required for subscribing to blocks
 type BlocksArguments struct {
-	StartBlockID     flow.Identifier
-	StartBlockHeight uint64
-	BlockStatus      flow.BlockStatus
+	StartBlockID     flow.Identifier  // ID of the block to start subscription from
+	StartBlockHeight uint64           // Height of the block to start subscription from
+	BlockStatus      flow.BlockStatus // Status of blocks to subscribe to
 }
 
 // BlocksDataProvider is responsible for providing blocks
@@ -55,7 +55,7 @@ func NewBlocksDataProvider(
 		return nil, fmt.Errorf("invalid arguments: %w", err)
 	}
 
-	// Subscribe to blocks from the start block ID with the specified block status.
+	// Set up a subscription to blocks based on the provided start block ID and block status.
 	subscription := p.createSubscription(ctx)
 	p.BaseDataProviderImpl = NewBaseDataProviderImpl(
 		ctx,
@@ -79,7 +79,7 @@ func (p *BlocksDataProvider) Run() error {
 //
 // No errors are expected during normal operations.
 func (p *BlocksDataProvider) validateArguments(arguments map[string]string) error {
-	// Check for block_status argument and validate
+	// Parse 'block_status'
 	if blockStatusIn, ok := arguments["block_status"]; ok {
 		blockStatus, err := parser.ParseBlockStatus(blockStatusIn)
 		if err != nil {
@@ -90,6 +90,7 @@ func (p *BlocksDataProvider) validateArguments(arguments map[string]string) erro
 		return fmt.Errorf("'block_status' must be provided")
 	}
 
+	// Parse 'start_block_id' if provided
 	if startBlockIDIn, ok := arguments["start_block_id"]; ok {
 		var startBlockID parser.ID
 		err := startBlockID.Parse(startBlockIDIn)
@@ -99,6 +100,7 @@ func (p *BlocksDataProvider) validateArguments(arguments map[string]string) erro
 		p.args.StartBlockID = startBlockID.Flow()
 	}
 
+	// Parse 'start_block_height' if provided
 	if startBlockHeightIn, ok := arguments["start_block_height"]; ok {
 		var err error
 		p.args.StartBlockHeight, err = util.ToUint64(startBlockHeightIn)
@@ -117,13 +119,13 @@ func (p *BlocksDataProvider) validateArguments(arguments map[string]string) erro
 	return nil
 }
 
-// createSubscription
+// createSubscription creates a new subscription based on the specified start block ID or height.
 func (p *BlocksDataProvider) createSubscription(ctx context.Context) subscription.Subscription {
 	if p.args.StartBlockID != flow.ZeroID {
 		return p.api.SubscribeBlocksFromStartBlockID(ctx, p.args.StartBlockID, p.args.BlockStatus)
 	}
 
-	if p.args.StartBlockHeight > 0 {
+	if p.args.StartBlockHeight != request.EmptyHeight {
 		return p.api.SubscribeBlocksFromStartHeight(ctx, p.args.StartBlockHeight, p.args.BlockStatus)
 	}
 

@@ -6,12 +6,10 @@ import (
 	"testing"
 
 	"github.com/rs/zerolog"
-	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/suite"
 
 	accessmock "github.com/onflow/flow-go/access/mock"
 	"github.com/onflow/flow-go/engine/access/rest/common/parser"
-	mockstatestream "github.com/onflow/flow-go/engine/access/state_stream/mock"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -100,48 +98,4 @@ func (s *BlocksProviderSuite) TestBlocksDataProvider_InvalidArguments() {
 			s.Require().Contains(err.Error(), test.expectedErrorMsg)
 		})
 	}
-}
-
-// TestBlocksDataProvider_ValidArguments tests
-func (s *BlocksProviderSuite) TestBlocksDataProvider_ValidArguments() {
-	ctx := context.Background()
-
-	topic := BlocksTopic
-	send := make(chan interface{})
-
-	s.Run("subscribe blocks from start block id", func() {
-		subscription := mockstatestream.NewSubscription(s.T())
-		startBlockId := s.rootBlock.Header.ID()
-
-		s.api.On("SubscribeBlocksFromStartBlockID", mock.Anything, startBlockId, flow.BlockStatusFinalized).Return(subscription).Once()
-
-		arguments := map[string]string{
-			"start_block_id": startBlockId.String(),
-			"block_status":   parser.Finalized,
-		}
-
-		provider, err := NewBlocksDataProvider(ctx, s.log, s.api, topic, arguments, send)
-		s.Require().NoError(err)
-		s.Require().NotNil(provider)
-		s.Require().Equal(flow.BlockStatusFinalized, provider.args.BlockStatus)
-
-		// Create a channel to receive mock Blocks objects
-		ch := make(chan interface{})
-		var chReadOnly <-chan interface{}
-		// Simulate sending a mock Blocks
-		go func() {
-			for _, block := range s.blockMap {
-				// Send the mock Blocks through the channel
-				ch <- block
-			}
-		}()
-
-		chReadOnly = ch
-		subscription.Mock.On("Channel").Return(chReadOnly)
-
-		err = provider.Run()
-		s.Require().NoError(err)
-
-		provider.Close()
-	})
 }

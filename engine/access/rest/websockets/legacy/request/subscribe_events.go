@@ -5,7 +5,7 @@ import (
 	"strconv"
 
 	"github.com/onflow/flow-go/engine/access/rest/common"
-	"github.com/onflow/flow-go/engine/access/rest/common/convert"
+	"github.com/onflow/flow-go/engine/access/rest/common/parser"
 	"github.com/onflow/flow-go/engine/access/rest/http/request"
 	"github.com/onflow/flow-go/model/flow"
 )
@@ -57,7 +57,7 @@ func (g *SubscribeEvents) Parse(
 	rawContracts []string,
 	rawHeartbeatInterval string,
 ) error {
-	var startBlockID convert.ID
+	var startBlockID parser.ID
 	err := startBlockID.Parse(rawStartBlockID)
 	if err != nil {
 		return err

@@ -19,9 +19,7 @@ const (
 	BlockDigestsTopic        = "block_digests"
 	TransactionStatusesTopic = "transaction_statuses"
 
-	BlocksFromStartBlockIDTopic     = "blocks_from_start_block_id"
-	BlocksFromStartBlockHeightTopic = "blocks_from_start_block_height"
-	BlocksFromLatestTopic           = "blocks_from_latest"
+	BlocksTopic = "blocks"
 )
 
 // DataProviderFactory is responsible for creating data providers based on the
@@ -73,12 +71,8 @@ func (s *DataProviderFactory) NewDataProvider(
 	ch chan<- interface{},
 ) (DataProvider, error) {
 	switch topic {
-	case BlocksFromStartBlockIDTopic:
-		return NewBlocksFromStartBlockIDProvider(ctx, s.logger, s.accessApi, topic, arguments, ch)
-	case BlocksFromStartBlockHeightTopic:
-		return NewBlocksFromStartBlockHeightProvider(ctx, s.logger, s.accessApi, topic, arguments, ch)
-	case BlocksFromLatestTopic:
-		return NewBlocksFromLatestProvider(ctx, s.logger, s.accessApi, topic, arguments, ch)
+	case BlocksTopic:
+		return NewBlocksDataProvider(ctx, s.logger, s.accessApi, topic, arguments, ch)
 	// TODO: Implemented handlers for each topic should be added in respective case
 	case EventsTopic,
 		AccountStatusesTopic,

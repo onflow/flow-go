@@ -2,9 +2,7 @@ package data_providers
 
 import (
 	"context"
-	"fmt"
 
-	"github.com/onflow/flow-go/access"
 	"github.com/onflow/flow-go/engine/access/subscription"
 )
 
@@ -29,7 +27,6 @@ type BaseDataProviderImpl struct {
 	cancel context.CancelFunc
 	ctx    context.Context
 
-	api          access.API
 	send         chan<- interface{}
 	subscription subscription.Subscription
 }
@@ -38,7 +35,6 @@ type BaseDataProviderImpl struct {
 func NewBaseDataProviderImpl(
 	ctx context.Context,
 	cancel context.CancelFunc,
-	api access.API,
 	topic string,
 	send chan<- interface{},
 	subscription subscription.Subscription,
@@ -49,7 +45,6 @@ func NewBaseDataProviderImpl(
 		ctx:    ctx,
 		cancel: cancel,
 
-		api:          api,
 		send:         send,
 		subscription: subscription,
 	}
@@ -68,32 +63,4 @@ func (b *BaseDataProviderImpl) Topic() string {
 // Close terminates the data provider.
 func (b *BaseDataProviderImpl) Close() {
 	b.cancel()
-}
-
-// TODO: refactor rpc version of HandleSubscription and use it
-func HandleSubscription[T any](ctx context.Context, sub subscription.Subscription, handleResponse func(resp T) error) error {
-	for {
-		select {
-		case v, ok := <-sub.Channel():
-			if !ok {
-				if sub.Err() != nil {
-					return fmt.Errorf("stream encountered an error: %w", sub.Err())
-				}
-				return nil
-			}
-
-			resp, ok := v.(T)
-			if !ok {
-				return fmt.Errorf("unexpected subscription response type: %T", v)
-			}
-
-			err := handleResponse(resp)
-			if err != nil {
-				return err
-			}
-		case <-ctx.Done():
-			// context closed, subscription closed
-			return nil
-		}
-	}
 }
