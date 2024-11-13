@@ -69,7 +69,7 @@ func (f *combinedVoteProcessorFactoryBaseV3) Create(log zerolog.Logger, block *m
 
 	rbSigAggtor, err := signature.NewWeightedSignatureAggregator(allParticipants, stakingBeaconKeys, msg, msig.RandomBeaconTag)
 	if err != nil {
-		return nil, fmt.Errorf("could not create aggregator for thershold signatures: %w", err)
+		return nil, fmt.Errorf("could not create aggregator for threshold signatures: %w", err)
 	}
 
 	threshold := msig.RandomBeaconThreshold(int(dkg.Size()))
