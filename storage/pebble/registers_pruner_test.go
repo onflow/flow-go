@@ -115,9 +115,9 @@ func TestPruneErrors(t *testing.T) {
 			pruner, err := NewRegisterPruner(
 				zerolog.Nop(),
 				db,
+				metrics.NewNoopCollector(),
 				WithPruneThreshold(5),
 				WithPruneTickerInterval(10*time.Millisecond),
-				WithPrunerMetrics(metrics.NewNoopCollector()),
 			)
 			require.NoError(t, err)
 
@@ -144,9 +144,9 @@ func TestPruneErrors(t *testing.T) {
 			pruner, err := NewRegisterPruner(
 				zerolog.Nop(),
 				db,
+				metrics.NewNoopCollector(),
 				WithPruneThreshold(5),
 				WithPruneTickerInterval(10*time.Millisecond),
-				WithPrunerMetrics(metrics.NewNoopCollector()),
 			)
 			require.NoError(t, err)
 
