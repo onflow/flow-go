@@ -15,11 +15,10 @@ import (
 const (
 	EventsTopic              = "events"
 	AccountStatusesTopic     = "account_statuses"
+	BlocksTopic              = "blocks"
 	BlockHeadersTopic        = "block_headers"
 	BlockDigestsTopic        = "block_digests"
 	TransactionStatusesTopic = "transaction_statuses"
-
-	BlocksTopic = "blocks"
 )
 
 // DataProviderFactory is responsible for creating data providers based on the
