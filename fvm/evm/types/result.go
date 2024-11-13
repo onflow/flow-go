@@ -4,6 +4,7 @@ import (
 	"github.com/onflow/go-ethereum/common"
 	gethCommon "github.com/onflow/go-ethereum/common"
 	gethTypes "github.com/onflow/go-ethereum/core/types"
+	"github.com/onflow/go-ethereum/rlp"
 )
 
 // InvalidTransactionGasCost is a gas cost we charge when
@@ -16,6 +17,9 @@ import (
 // are doing on chain validation we can/should charge the
 // user for the validation fee.
 const InvalidTransactionGasCost = 1_000
+
+// ChecksumLength captures number of bytes a checksum uses
+const ChecksumLength = 4
 
 // Status captures the status of an interaction to the emulator
 type Status uint8
@@ -123,6 +127,59 @@ func (res *Result) VMErrorString() string {
 		return res.VMError.Error()
 	}
 	return ""
+}
+
+// ErrorMsg returns the error message, if any VM or Validation error
+// both error would never happen at the same time
+// but if it happens the priority is by validation error
+func (res *Result) ErrorMsg() string {
+	errorMsg := ""
+	if res.VMError != nil {
+		errorMsg = res.VMError.Error()
+	}
+	if res.ValidationError != nil {
+		errorMsg = res.ValidationError.Error()
+	}
+	return errorMsg
+}
+
+// RLPEncodedLogs returns the rlp encoding of the logs
+func (res *Result) RLPEncodedLogs() ([]byte, error) {
+	var encodedLogs []byte
+	var err error
+	if len(res.Logs) > 0 {
+		encodedLogs, err = rlp.EncodeToBytes(res.Logs)
+		if err != nil {
+			return encodedLogs, err
+		}
+	}
+	return encodedLogs, nil
+}
+
+// DeployedContractAddressString returns an string of the deployed address
+// it returns an empty string if the deployed address is nil
+func (res *Result) DeployedContractAddressString() string {
+	deployedAddress := ""
+	if res.DeployedContractAddress != nil {
+		deployedAddress = res.DeployedContractAddress.String()
+	}
+	return deployedAddress
+}
+
+// StateChangeChecksum constructs a checksum
+// based on the state change commitment on the result
+func (res *Result) StateChangeChecksum() [ChecksumLength]byte {
+	panic("not implemented")
+}
+
+// SliceToChecksumLength cuts the first 4 bytes of the input and convert it into checksum
+func SliceToChecksumLength(input []byte) [ChecksumLength]byte {
+	// the first 4 bytes of StateChangeCommitment is used as checksum
+	var checksum [ChecksumLength]byte
+	if len(input) >= ChecksumLength {
+		copy(checksum[:ChecksumLength], input[:ChecksumLength])
+	}
+	return checksum
 }
 
 // Receipt constructs an EVM-style receipt
