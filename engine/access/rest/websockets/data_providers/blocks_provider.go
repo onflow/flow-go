@@ -47,15 +47,15 @@ func NewBlocksDataProvider(
 		api:    api,
 	}
 
-	// Validate arguments passed to the provider.
-	err := p.validateArguments(arguments)
+	// Initialize arguments passed to the provider.
+	err := p.initArguments(arguments)
 	if err != nil {
 		return nil, fmt.Errorf("invalid arguments: %w", err)
 	}
 
 	context, cancel := context.WithCancel(ctx)
 
-	// Set up a subscription to blocks based on the provided start block ID and block status.
+	// Set up a subscription to blocks based on arguments.
 	subscription := p.createSubscription(context)
 	p.BaseDataProviderImpl = NewBaseDataProviderImpl(
 		cancel,
@@ -74,10 +74,10 @@ func (p *BlocksDataProvider) Run() error {
 	return subscription.HandleSubscription(p.subscription, handleResponse(p.send, p.args.BlockStatus))
 }
 
-// validateArguments checks and validates the arguments passed to the provider.
+// initArguments checks and validates the arguments passed to the provider.
 //
 // No errors are expected during normal operations.
-func (p *BlocksDataProvider) validateArguments(arguments map[string]string) error {
+func (p *BlocksDataProvider) initArguments(arguments map[string]string) error {
 	// Parse 'block_status'
 	if blockStatusIn, ok := arguments["block_status"]; ok {
 		blockStatus, err := parser.ParseBlockStatus(blockStatusIn)
@@ -118,7 +118,7 @@ func (p *BlocksDataProvider) validateArguments(arguments map[string]string) erro
 	return nil
 }
 
-// createSubscription creates a new subscription based on the specified start block ID or height.
+// createSubscription creates a new subscription using the specified input arguments.
 func (p *BlocksDataProvider) createSubscription(ctx context.Context) subscription.Subscription {
 	if p.args.StartBlockID != flow.ZeroID {
 		return p.api.SubscribeBlocksFromStartBlockID(ctx, p.args.StartBlockID, p.args.BlockStatus)
