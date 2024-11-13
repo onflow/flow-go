@@ -3,6 +3,7 @@ package run
 import (
 	"encoding/hex"
 	"fmt"
+	"github.com/onflow/crypto"
 
 	"github.com/rs/zerolog"
 
@@ -109,6 +110,139 @@ func GenerateRecoverEpochTxArgs(log zerolog.Logger,
 	// copy DKG public keys from the current epoch
 	dkgPubKeys := make([]cadence.Value, 0)
 	for _, dkgPubKey := range currentEpochCommit.DKGParticipantKeys {
+		dkgPubKeyCdc, cdcErr := cadence.NewString(hex.EncodeToString(dkgPubKey.Encode()))
+		if cdcErr != nil {
+			return nil, fmt.Errorf("failed to get dkg pub key cadence string for node: %w", cdcErr)
+		}
+		dkgPubKeys = append(dkgPubKeys, dkgPubKeyCdc)
+	}
+	// fill node IDs
+	nodeIds := make([]cadence.Value, 0)
+	for _, id := range currentEpochIdentities {
+		nodeIdCdc, err := cadence.NewString(id.GetNodeID().String())
+		if err != nil {
+			return nil, fmt.Errorf("failed to convert node ID to cadence string %s: %w", id.GetNodeID(), err)
+		}
+		nodeIds = append(nodeIds, nodeIdCdc)
+	}
+
+	clusterQCAddress := systemcontracts.SystemContractsForChain(rootChainID).ClusterQC.Address.String()
+	qcVoteData, err := common.ConvertClusterQcsCdc(clusterQCs, clusters, clusterQCAddress)
+	if err != nil {
+		return nil, fmt.Errorf("failed to convert cluster qcs to cadence type")
+	}
+	currEpochFinalView, err := epoch.FinalView()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get final view of current epoch")
+	}
+	currEpochTargetEndTime, err := epoch.TargetEndTime()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get target end time of current epoch")
+	}
+
+	args := []cadence.Value{
+		// recovery epoch counter
+		cadence.NewUInt64(recoveryEpochCounter),
+		// epoch start view
+		cadence.NewUInt64(currEpochFinalView + 1),
+		// staking phase end view
+		cadence.NewUInt64(currEpochFinalView + numViewsInStakingAuction),
+		// epoch end view
+		cadence.NewUInt64(currEpochFinalView + numViewsInEpoch),
+		// target duration
+		cadence.NewUInt64(targetDuration),
+		// target end time
+		cadence.NewUInt64(currEpochTargetEndTime),
+		// clusters,
+		common.ConvertClusterAssignmentsCdc(assignments),
+		// qcVoteData
+		cadence.NewArray(qcVoteData),
+		// dkg pub keys
+		cadence.NewArray(dkgPubKeys),
+		// dkg group key,
+		dkgGroupKeyCdc,
+		// dkg index map
+		cadence.NewDictionary(dkgIndexMapPairs),
+		// node ids
+		cadence.NewArray(nodeIds),
+		// recover the network by initializing a new recover epoch which will increment the smart contract epoch counter
+		// or overwrite the epoch metadata for the current epoch
+		cadence.NewBool(unsafeAllowOverWrite),
+	}
+
+	return args, nil
+}
+
+func GenerateRecoverTxArgsWithDKG(log zerolog.Logger,
+	internalNodes []bootstrap.NodeInfo,
+	collectionClusters int,
+	recoveryEpochCounter uint64,
+	rootChainID flow.ChainID,
+	numViewsInStakingAuction uint64,
+	numViewsInEpoch uint64,
+	targetDuration uint64,
+	unsafeAllowOverWrite bool,
+	dkgIndexMap flow.DKGIndexMap,
+	dkgParticipantKeys []crypto.PublicKey,
+	dkgGroupKey crypto.PublicKey,
+	snapshot *inmem.Snapshot,
+) ([]cadence.Value, error) {
+	epoch := snapshot.Epochs().Current()
+
+	currentEpochIdentities, err := snapshot.Identities(filter.IsValidProtocolParticipant)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get  valid protocol participants from snapshot: %w", err)
+	}
+	// We need canonical ordering here; sanity check to enforce this:
+	if !currentEpochIdentities.Sorted(flow.Canonical[flow.Identity]) {
+		return nil, fmt.Errorf("identies from snapshot not in canonical order")
+	}
+
+	// separate collector nodes by internal and partner nodes
+	collectors := currentEpochIdentities.Filter(filter.HasRole[flow.Identity](flow.RoleCollection))
+	internalCollectors := make(flow.IdentityList, 0)
+	partnerCollectors := make(flow.IdentityList, 0)
+
+	internalNodesMap := make(map[flow.Identifier]struct{})
+	for _, node := range internalNodes {
+		internalNodesMap[node.NodeID] = struct{}{}
+	}
+
+	for _, collector := range collectors {
+		if _, ok := internalNodesMap[collector.NodeID]; ok {
+			internalCollectors = append(internalCollectors, collector)
+		} else {
+			partnerCollectors = append(partnerCollectors, collector)
+		}
+	}
+
+	assignments, clusters, err := common.ConstructClusterAssignment(log, partnerCollectors, internalCollectors, collectionClusters)
+	if err != nil {
+		return nil, fmt.Errorf("unable to generate cluster assignment: %w", err)
+	}
+
+	clusterBlocks := GenerateRootClusterBlocks(recoveryEpochCounter, clusters)
+	clusterQCs := ConstructRootQCsForClusters(log, clusters, internalNodes, clusterBlocks)
+
+	// NOTE: The RecoveryEpoch will re-use the last successful DKG output. This means that the random beacon committee can be
+	// different from the consensus committee. This could happen if the node was ejected from the consensus committee, but it still has to be
+	// included in the DKG committee since the threshold signature scheme operates on pre-defined number of participants and cannot be changed.
+	dkgGroupKeyCdc, cdcErr := cadence.NewString(hex.EncodeToString(dkgGroupKey.Encode()))
+	if cdcErr != nil {
+		return nil, fmt.Errorf("failed to get dkg group key cadence string: %w", cdcErr)
+	}
+
+	// copy DKG index map from the current epoch
+	dkgIndexMapPairs := make([]cadence.KeyValuePair, 0)
+	for nodeID, index := range dkgIndexMap {
+		dkgIndexMapPairs = append(dkgIndexMapPairs, cadence.KeyValuePair{
+			Key:   cadence.String(nodeID.String()),
+			Value: cadence.NewInt(index),
+		})
+	}
+	// copy DKG public keys from the current epoch
+	dkgPubKeys := make([]cadence.Value, 0)
+	for _, dkgPubKey := range dkgParticipantKeys {
 		dkgPubKeyCdc, cdcErr := cadence.NewString(hex.EncodeToString(dkgPubKey.Encode()))
 		if cdcErr != nil {
 			return nil, fmt.Errorf("failed to get dkg pub key cadence string for node: %w", cdcErr)
