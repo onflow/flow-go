@@ -147,7 +147,6 @@ func (s *RecoverEpochSuite) TestRecoverEpoch() {
 	require.NoError(s.T(), err)
 
 	// Wait for at least the first view past the current epoch's original FinalView to be finalized.
-	// At this point we can observe that an extension has been added to the current epoch, indicating EFM.
 	s.TimedLogf("waiting for epoch transition (finalized view %d)", epoch1FinalView+1)
 	s.AwaitFinalizedView(s.Ctx, epoch1FinalView+1, 2*time.Minute, 500*time.Millisecond)
 	s.TimedLogf("observed finalized view %d", epoch1FinalView+1)
@@ -200,6 +199,13 @@ func (s *RecoverEpochSuite) TestRecoverEpoch() {
 	s.TimedLogf("observed finalized first view of recovery epoch %d", startViewOfNextEpoch)
 
 	s.AssertInEpoch(s.Ctx, 1)
+
+	endViewOfNextEpoch := uint64(txArgs[3].(cadence.UInt64))
+	s.TimedLogf("waiting to transition into after recovery epoch (finalized view %d)", endViewOfNextEpoch+1)
+	s.AwaitFinalizedView(s.Ctx, endViewOfNextEpoch+1, 2*time.Minute, 500*time.Millisecond)
+	s.TimedLogf("observed finalized first view of after recovery epoch %d", endViewOfNextEpoch+1)
+
+	s.AssertInEpoch(s.Ctx, 2)
 }
 
 // TestRecoverEpochNodeEjected ensures that the recover epoch governance transaction flow works as expected, and a network that
@@ -230,7 +236,6 @@ func (s *RecoverEpochSuite) TestRecoverEpochNodeEjected() {
 	require.NoError(s.T(), err)
 
 	// Wait for at least the first view past the current epoch's original FinalView to be finalized.
-	// At this point we can observe that an extension has been added to the current epoch, indicating EFM.
 	s.TimedLogf("waiting for epoch transition (finalized view %d)", epoch1FinalView+1)
 	s.AwaitFinalizedView(s.Ctx, epoch1FinalView+1, 2*time.Minute, 500*time.Millisecond)
 	s.TimedLogf("observed finalized view %d", epoch1FinalView+1)
@@ -291,4 +296,11 @@ func (s *RecoverEpochSuite) TestRecoverEpochNodeEjected() {
 	s.TimedLogf("observed finalized first view of recovery epoch %d", startViewOfNextEpoch)
 
 	s.AssertInEpoch(s.Ctx, 1)
+
+	endViewOfNextEpoch := uint64(txArgs[3].(cadence.UInt64))
+	s.TimedLogf("waiting to transition into after recovery epoch (finalized view %d)", endViewOfNextEpoch+1)
+	s.AwaitFinalizedView(s.Ctx, endViewOfNextEpoch+1, 2*time.Minute, 500*time.Millisecond)
+	s.TimedLogf("observed finalized first view of after recovery epoch %d", endViewOfNextEpoch+1)
+
+	s.AssertInEpoch(s.Ctx, 2)
 }
