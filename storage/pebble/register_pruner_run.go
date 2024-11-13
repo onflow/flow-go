@@ -81,6 +81,12 @@ func (p *RegisterPrunerRun) BatchDelete(lookupKeys [][]byte) error {
 // register ID. This function ensures that only the earliest relevant key for
 // each register ID is retained, which helps to preserve the latest state.
 //
+// Function Behavior:
+//  1. Identifies the height and register ID of the key.
+//  2. Checks if the key’s height is greater than the prune threshold (in which case it cannot be pruned).
+//  3. Ensures that for each unique register ID, only the first key below or equal to the prune threshold
+//     is retained as the latest necessary state, while all others are marked for pruning.
+//
 // Parameters:
 //   - key: The key to evaluate for pruning eligibility.
 //
@@ -91,30 +97,33 @@ func (p *RegisterPrunerRun) CanPruneKey(key []byte) (bool, error) {
 		return false, fmt.Errorf("malformed lookup key %v: %w", key, err)
 	}
 
-	// Reset the state if this is a new register ID.
+	// If the register ID changes, reset the state, allowing for a fresh assessment of this new register's keys.
+	// For example if key changed from 0x01/key/owner1 to 0x01/key/owner2 there is another bucket, and the state should
+	// be reset to check keys in a scope of this bucket.
 	if p.lastRegisterID != registerID {
 		p.keepFirstRelevantKey = false
 		p.lastRegisterID = registerID
 	}
 
-	// If the height of the key is above the prune height, it should not be pruned.
+	// If the height of the key is above the prune height, it should not be pruned. For example, if the prune height is 99989,
+	// entries with a height greater than 99989 should definitely be kept.
 	if keyHeight > p.pruneHeight {
 		return false, nil
 	}
-
-	// For each register ID, find the first key whose height is less than or equal to the prune height.
-	// This is the earliest entry to keep. For example, if pruneHeight is 99989:
-	// [0x01/key/owner1/99990] [keep, > 99989]
-	// [0x01/key/owner1/99988] [first key to keep < 99989]
-	// [0x01/key/owner1/85000] [remove]
+	// For each unique register ID, keep only the first key below or equal to the prune threshold.
+	// This first key is considered the minimum viable state to retain, and any further keys for the same
+	// register ID can be safely pruned. For example, if pruneHeight is 99989:
+	// [0x01/key/owner1/99990] [> 99989]
+	// [0x01/key/owner1/99988] [first key to keep, < 99989]
+	// [0x01/key/owner1/85000] [pruned]
 	// ...
-	// [0x01/key/owner2/99989] [first key to keep == 99989]
-	// [0x01/key/owner2/99988] [remove]
+	// [0x01/key/owner2/99989] [first key to keep, == 99989]
+	// [0x01/key/owner2/99988] [pruned]
 	// ...
-	// [0x01/key/owner3/99988] [first key to keep < 99989]
-	// [0x01/key/owner3/98001] [remove]
+	// [0x01/key/owner3/99988] [first key to keep, < 99989]
+	// [0x01/key/owner3/98001] [pruned]
 	// ...
-	// [0x02/key/owner0/99900] [first key to keep < 99989]
+	// [0x02/key/owner0/99900] [first key to keep, < 99989]
 	if !p.keepFirstRelevantKey {
 		p.keepFirstRelevantKey = true
 		return false, nil

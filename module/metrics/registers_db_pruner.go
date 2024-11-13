@@ -7,8 +7,7 @@ import (
 	"github.com/onflow/flow-go/module"
 )
 
-// RegisterDBPrunerCollector collects metrics for the database pruning process, the latest height that has been pruned,
-// and the pruning progress.
+// RegisterDBPrunerCollector collects metrics for the database pruning process, the latest height that has been pruned
 type RegisterDBPrunerCollector struct {
 	lastPrunedHeight prometheus.Gauge // The last pruned block height.
 }

@@ -92,20 +92,13 @@ func WithPruneTickerInterval(interval time.Duration) PrunerOption {
 	}
 }
 
-// WithPrunerMetrics sets the metrics interface for a RegisterPruner instance, allowing tracking of pruning performance
-// and key metrics.
-func WithPrunerMetrics(metrics module.RegisterDBPrunerMetrics) PrunerOption {
-	return func(p *RegisterPruner) {
-		p.metrics = metrics
-	}
-}
-
 // NewRegisterPruner creates and initializes a new RegisterPruner instance with the specified logger, database connection,
 // and optional configurations provided via PrunerOptions. This sets up the pruning component and returns an error if
 // any issues occur.
 func NewRegisterPruner(
 	logger zerolog.Logger,
 	db *pebble.DB,
+	metrics module.RegisterDBPrunerMetrics,
 	opts ...PrunerOption,
 ) (*RegisterPruner, error) {
 	pruner := &RegisterPruner{
@@ -115,6 +108,7 @@ func NewRegisterPruner(
 		pruneThreshold:      DefaultPruneThreshold,
 		pruneThrottleDelay:  DefaultPruneThrottleDelay,
 		pruneTickerInterval: DefaultPruneTickerInterval,
+		metrics:             metrics,
 	}
 
 	pruner.Component = component.NewComponentManagerBuilder().
@@ -246,10 +240,7 @@ func (p *RegisterPruner) pruneUpToHeight(ctx context.Context, r pebble.Reader, p
 			batchKeysToRemove = batchKeysToRemove[:0]
 
 			// Throttle to prevent excessive system load
-			select {
-			case <-ctx.Done():
-			case <-time.After(p.pruneThrottleDelay):
-			}
+			<-time.After(p.pruneThrottleDelay)
 		}
 	}
 

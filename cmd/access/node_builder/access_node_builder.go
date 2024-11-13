@@ -1043,7 +1043,7 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 				registerDBPruner, err := pstorage.NewRegisterPruner(
 					node.Logger,
 					builder.RegisterDB,
-					pstorage.WithPrunerMetrics(builder.RegisterDBPrunerMetrics),
+					builder.RegisterDBPrunerMetrics,
 					pstorage.WithPruneThreshold(builder.registerDBPruneThreshold),
 					pstorage.WithPruneThrottleDelay(builder.registerDBPruneThrottleDelay),
 					pstorage.WithPruneTickerInterval(builder.registerDBPruneTickerInterval),
