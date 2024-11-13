@@ -5,8 +5,8 @@ import (
 	"fmt"
 
 	"github.com/hashicorp/go-multierror"
+	"github.com/onflow/cadence/common"
 	"github.com/onflow/cadence/runtime"
-	"github.com/onflow/cadence/runtime/common"
 
 	"github.com/onflow/flow-go/fvm/environment"
 	"github.com/onflow/flow-go/fvm/errors"
@@ -173,7 +173,8 @@ func (executor *scriptExecutor) Execute() error {
 }
 
 func (executor *scriptExecutor) execute() error {
-	meterParams, err := getBodyMeterParameters(
+	executionParams, _, err := getExecutionParameters(
+		executor.env.Logger(),
 		executor.ctx,
 		executor.proc,
 		executor.txnState)
@@ -182,7 +183,7 @@ func (executor *scriptExecutor) execute() error {
 	}
 
 	txnId, err := executor.txnState.BeginNestedTransactionWithMeterParams(
-		meterParams)
+		executionParams)
 	if err != nil {
 		return err
 	}

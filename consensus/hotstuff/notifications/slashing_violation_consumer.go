@@ -78,7 +78,7 @@ func (c *SlashingViolationsConsumer) OnInvalidTimeoutDetected(err model.InvalidT
 		Msg("OnInvalidTimeoutDetected")
 }
 
-func (c *SlashingViolationsConsumer) OnVoteForInvalidBlockDetected(vote *model.Vote, proposal *model.Proposal) {
+func (c *SlashingViolationsConsumer) OnVoteForInvalidBlockDetected(vote *model.Vote, proposal *model.SignedProposal) {
 	c.log.Warn().
 		Uint64("vote_view", vote.View).
 		Hex("voted_block_id", vote.BlockID[:]).

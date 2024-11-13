@@ -3,10 +3,9 @@ package migrations
 import (
 	"context"
 	"fmt"
-
 	"testing"
 
-	"github.com/onflow/cadence/runtime/common"
+	"github.com/onflow/cadence/common"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/require"
 

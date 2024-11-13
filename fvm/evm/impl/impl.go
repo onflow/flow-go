@@ -5,10 +5,10 @@ import (
 	"math/big"
 
 	"github.com/onflow/cadence"
-	"github.com/onflow/cadence/runtime/common"
-	"github.com/onflow/cadence/runtime/errors"
-	"github.com/onflow/cadence/runtime/interpreter"
-	"github.com/onflow/cadence/runtime/sema"
+	"github.com/onflow/cadence/common"
+	"github.com/onflow/cadence/errors"
+	"github.com/onflow/cadence/interpreter"
+	"github.com/onflow/cadence/sema"
 
 	"github.com/onflow/flow-go/fvm/evm/stdlib"
 	"github.com/onflow/flow-go/fvm/evm/types"
@@ -150,6 +150,72 @@ func NewEVMAddress(
 	)
 }
 
+func NewEVMBytes(
+	inter *interpreter.Interpreter,
+	locationRange interpreter.LocationRange,
+	location common.AddressLocation,
+	bytes []byte,
+) *interpreter.CompositeValue {
+	return interpreter.NewCompositeValue(
+		inter,
+		locationRange,
+		location,
+		stdlib.EVMBytesTypeQualifiedIdentifier,
+		common.CompositeKindStructure,
+		[]interpreter.CompositeField{
+			{
+				Name:  stdlib.EVMBytesTypeValueFieldName,
+				Value: EVMBytesToBytesArrayValue(inter, bytes),
+			},
+		},
+		common.ZeroAddress,
+	)
+}
+
+func NewEVMBytes4(
+	inter *interpreter.Interpreter,
+	locationRange interpreter.LocationRange,
+	location common.AddressLocation,
+	bytes [4]byte,
+) *interpreter.CompositeValue {
+	return interpreter.NewCompositeValue(
+		inter,
+		locationRange,
+		location,
+		stdlib.EVMBytes4TypeQualifiedIdentifier,
+		common.CompositeKindStructure,
+		[]interpreter.CompositeField{
+			{
+				Name:  stdlib.EVMBytesTypeValueFieldName,
+				Value: EVMBytes4ToBytesArrayValue(inter, bytes),
+			},
+		},
+		common.ZeroAddress,
+	)
+}
+
+func NewEVMBytes32(
+	inter *interpreter.Interpreter,
+	locationRange interpreter.LocationRange,
+	location common.AddressLocation,
+	bytes [32]byte,
+) *interpreter.CompositeValue {
+	return interpreter.NewCompositeValue(
+		inter,
+		locationRange,
+		location,
+		stdlib.EVMBytes32TypeQualifiedIdentifier,
+		common.CompositeKindStructure,
+		[]interpreter.CompositeField{
+			{
+				Name:  stdlib.EVMBytesTypeValueFieldName,
+				Value: EVMBytes32ToBytesArrayValue(inter, bytes),
+			},
+		},
+		common.ZeroAddress,
+	)
+}
+
 func AddressBytesArrayValueToEVMAddress(
 	inter *interpreter.Interpreter,
 	locationRange interpreter.LocationRange,
@@ -203,6 +269,75 @@ func EVMAddressToAddressBytesArrayValue(
 			}
 			result := interpreter.NewUInt8Value(inter, func() uint8 {
 				return address[index]
+			})
+			index++
+			return result
+		},
+	)
+}
+
+func EVMBytesToBytesArrayValue(
+	inter *interpreter.Interpreter,
+	bytes []byte,
+) *interpreter.ArrayValue {
+	var index int
+	return interpreter.NewArrayValueWithIterator(
+		inter,
+		stdlib.EVMBytesValueStaticType,
+		common.ZeroAddress,
+		uint64(len(bytes)),
+		func() interpreter.Value {
+			if index >= len(bytes) {
+				return nil
+			}
+			result := interpreter.NewUInt8Value(inter, func() uint8 {
+				return bytes[index]
+			})
+			index++
+			return result
+		},
+	)
+}
+
+func EVMBytes4ToBytesArrayValue(
+	inter *interpreter.Interpreter,
+	bytes [4]byte,
+) *interpreter.ArrayValue {
+	var index int
+	return interpreter.NewArrayValueWithIterator(
+		inter,
+		stdlib.EVMBytes4ValueStaticType,
+		common.ZeroAddress,
+		stdlib.EVMBytes4Length,
+		func() interpreter.Value {
+			if index >= stdlib.EVMBytes4Length {
+				return nil
+			}
+			result := interpreter.NewUInt8Value(inter, func() uint8 {
+				return bytes[index]
+			})
+			index++
+			return result
+		},
+	)
+}
+
+func EVMBytes32ToBytesArrayValue(
+	inter *interpreter.Interpreter,
+	bytes [32]byte,
+) *interpreter.ArrayValue {
+	var index int
+	return interpreter.NewArrayValueWithIterator(
+		inter,
+		stdlib.EVMBytes32ValueStaticType,
+		common.ZeroAddress,
+		stdlib.EVMBytes32Length,
+		func() interpreter.Value {
+			if index >= stdlib.EVMBytes32Length {
+				return nil
+			}
+			result := interpreter.NewUInt8Value(inter, func() uint8 {
+				return bytes[index]
 			})
 			index++
 			return result

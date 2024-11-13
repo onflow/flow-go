@@ -23,7 +23,7 @@ func (_m *VoteAggregationViolationConsumer) OnInvalidVoteDetected(err model.Inva
 }
 
 // OnVoteForInvalidBlockDetected provides a mock function with given fields: vote, invalidProposal
-func (_m *VoteAggregationViolationConsumer) OnVoteForInvalidBlockDetected(vote *model.Vote, invalidProposal *model.Proposal) {
+func (_m *VoteAggregationViolationConsumer) OnVoteForInvalidBlockDetected(vote *model.Vote, invalidProposal *model.SignedProposal) {
 	_m.Called(vote, invalidProposal)
 }
 

@@ -269,6 +269,14 @@ func (g *Builder) Build(ctx irrecoverable.SignalerContext) (p2p.PubSubAdapter, e
 	})
 	gossipSubConfigs.WithMessageIdFunction(utils.MessageID)
 
+	if g.gossipSubCfg.PeerGaterEnabled {
+		topicDeliveryWeights, err := g.gossipSubCfg.PeerGaterTopicDeliveryWeights()
+		if err != nil {
+			return nil, fmt.Errorf("failed to add peer gater option: %w", err)
+		}
+		gossipSubConfigs.WithPeerGater(topicDeliveryWeights, g.gossipSubCfg.PeerGaterSourceDecay)
+	}
+
 	if g.routingSystem != nil {
 		gossipSubConfigs.WithRoutingDiscovery(g.routingSystem)
 	}

@@ -101,7 +101,7 @@ go-math-rand-check:
 	#   - "onflow/crypto/random" for deterministic randomness
 	grep --include=\*.go \
 	--exclude=*test* --exclude=*helper* --exclude=*example* --exclude=*fixture* --exclude=*benchmark* --exclude=*profiler* \
-    --exclude-dir=*test* --exclude-dir=*helper* --exclude-dir=*example* --exclude-dir=*fixture* --exclude-dir=*benchmark* --exclude-dir=*profiler* -rnw '"math/rand"'; \
+    --exclude-dir=*test* --exclude-dir=*helper* --exclude-dir=*example* --exclude-dir=*fixture* --exclude-dir=*benchmark* --exclude-dir=*profiler* --exclude-dir=*emulator* -rnw '"math/rand"'; \
     if [ $$? -ne 1 ]; then \
        echo "[Error] Go production code should not use math/rand package"; exit 1; \
     fi
@@ -138,8 +138,8 @@ endif
 
 .PHONY: generate-openapi
 generate-openapi:
-	swagger-codegen generate -l go -i https://raw.githubusercontent.com/onflow/flow/master/openapi/access.yaml -D packageName=models,modelDocs=false,models -o engine/access/rest/models;
-	go fmt ./engine/access/rest/models
+	swagger-codegen generate -l go -i https://raw.githubusercontent.com/onflow/flow/master/openapi/access.yaml -D packageName=models,modelDocs=false,models -o engine/access/rest/http/models;
+	go fmt ./engine/access/rest/http/models
 
 .PHONY: generate
 generate: generate-proto generate-mocks generate-fvm-env-wrappers
@@ -857,7 +857,7 @@ docker-all-tools: tool-util tool-remove-execution-fork
 
 PHONY: docker-build-util
 docker-build-util:
-	docker build -f cmd/Dockerfile --build-arg TARGET=./cmd/util --build-arg GOARCH=$(GOARCH) --build-arg VERSION=$(IMAGE_TAG) --build-arg CGO_FLAG=$(CRYPTO_FLAG) --target production \
+	docker build -f cmd/Dockerfile --build-arg TARGET=./cmd/util --build-arg GOARCH=$(GOARCH) --build-arg VERSION=$(IMAGE_TAG) --build-arg CGO_FLAG=$(DISABLE_ADX) --target production \
 		-t "$(CONTAINER_REGISTRY)/util:latest"  \
 		-t "$(CONTAINER_REGISTRY)/util:$(IMAGE_TAG)" .
 

@@ -88,8 +88,9 @@ func TestStateDB(t *testing.T) {
 		ret = db.GetCommittedState(addr1, key1)
 		require.Equal(t, gethCommon.Hash{}, ret)
 
-		err = db.Commit(true)
+		commit, err := db.Commit(true)
 		require.NoError(t, err)
+		require.NotEmpty(t, commit)
 
 		ret = db.GetCommittedState(addr1, key1)
 		require.Equal(t, value1, ret)
@@ -272,10 +273,10 @@ func TestStateDB(t *testing.T) {
 		require.NoError(t, err)
 
 		db.CreateAccount(testutils.RandomCommonAddress(t))
-
-		err = db.Commit(true)
+		commit, err := db.Commit(true)
 		// ret := db.Error()
 		require.Error(t, err)
+		require.Empty(t, commit)
 		// check wrapping
 		require.True(t, types.IsAStateError(err))
 	})
@@ -297,9 +298,10 @@ func TestStateDB(t *testing.T) {
 
 		db.CreateAccount(testutils.RandomCommonAddress(t))
 
-		err = db.Commit(true)
+		commit, err := db.Commit(true)
 		// ret := db.Error()
 		require.Error(t, err)
+		require.Empty(t, commit)
 		// check wrapping
 		require.True(t, types.IsAFatalError(err))
 	})
@@ -321,8 +323,9 @@ func TestStateDB(t *testing.T) {
 		// accounts without slots
 		db.CreateAccount(addr1)
 		require.NoError(t, db.Error())
-		err = db.Commit(true)
+		commit, err := db.Commit(true)
 		require.NoError(t, err)
+		require.NotEmpty(t, commit)
 
 		root = db.GetStorageRoot(addr1)
 		require.NoError(t, db.Error())
@@ -330,8 +333,9 @@ func TestStateDB(t *testing.T) {
 
 		db.AddBalance(addr1, uint256.NewInt(100), tracing.BalanceChangeTouchAccount)
 		require.NoError(t, db.Error())
-		err = db.Commit(true)
+		commit, err = db.Commit(true)
 		require.NoError(t, err)
+		require.NotEmpty(t, commit)
 
 		root = db.GetStorageRoot(addr1)
 		require.NoError(t, db.Error())
@@ -344,8 +348,9 @@ func TestStateDB(t *testing.T) {
 		require.NoError(t, db.Error())
 		db.SetState(addr1, key, value)
 		require.NoError(t, db.Error())
-		err = db.Commit(true)
+		commit, err = db.Commit(true)
 		require.NoError(t, err)
+		require.NotEmpty(t, commit)
 
 		root = db.GetStorageRoot(addr1)
 		require.NoError(t, db.Error())
@@ -367,8 +372,9 @@ func TestStateDB(t *testing.T) {
 		db.SetCode(addr1, code1)
 		db.AddBalance(addr1, balance1, tracing.BalanceChangeTransfer)
 		require.NoError(t, db.Error())
-		err = db.Commit(true)
+		commit, err := db.Commit(true)
 		require.NoError(t, err)
+		require.NotEmpty(t, commit)
 		// renew db
 		db, err = state.NewStateDB(ledger, rootAddr)
 		require.NoError(t, err)
@@ -388,8 +394,9 @@ func TestStateDB(t *testing.T) {
 		db.AddBalance(addr2, balance2, tracing.BalanceChangeTransfer)
 		require.NoError(t, db.Error())
 		// commit and renew db
-		err = db.Commit(true)
+		commit, err = db.Commit(true)
 		require.NoError(t, err)
+		require.NotEmpty(t, commit)
 		db, err = state.NewStateDB(ledger, rootAddr)
 		require.NoError(t, err)
 		// call self destruct should not work
@@ -400,8 +407,9 @@ func TestStateDB(t *testing.T) {
 		require.Empty(t, db.GetCode(addr2))
 		require.NoError(t, db.Error())
 		// commit and renew db
-		err = db.Commit(true)
+		commit, err = db.Commit(true)
 		require.NoError(t, err)
+		require.NotEmpty(t, commit)
 		db, err = state.NewStateDB(ledger, rootAddr)
 		require.NoError(t, err)
 		// set code and call contract creation
@@ -411,8 +419,9 @@ func TestStateDB(t *testing.T) {
 		// now calling selfdestruct should do the job
 		db.Selfdestruct6780(addr2)
 		require.NoError(t, db.Error())
-		err = db.Commit(true)
+		commit, err = db.Commit(true)
 		require.NoError(t, err)
+		require.NotEmpty(t, commit)
 		db, err = state.NewStateDB(ledger, rootAddr)
 		require.NoError(t, err)
 		// now query
@@ -438,8 +447,9 @@ func TestStateDB(t *testing.T) {
 		db.Selfdestruct6780(addr3)
 		require.NoError(t, db.Error())
 		// commit changes
-		err = db.Commit(true)
+		commit, err = db.Commit(true)
 		require.NoError(t, err)
+		require.NotEmpty(t, commit)
 		// renew db
 		db, err = state.NewStateDB(ledger, rootAddr)
 		require.NoError(t, err)

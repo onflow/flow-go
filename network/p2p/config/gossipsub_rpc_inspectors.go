@@ -48,6 +48,7 @@ const (
 	InspectionKey       = "inspection"
 	TruncationKey       = "truncation"
 	EnableKey           = "enable"
+	EnabledKey          = "enabled"
 	DisabledKey         = "disabled"
 	MessageIDKey        = "message-id"
 	RejectUnstakedPeers = "reject-unstaked-peers"

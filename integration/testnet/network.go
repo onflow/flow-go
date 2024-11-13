@@ -31,6 +31,7 @@ import (
 	"github.com/onflow/cadence"
 
 	"github.com/onflow/flow-go-sdk/crypto"
+
 	"github.com/onflow/flow-go/cmd/bootstrap/dkg"
 	"github.com/onflow/flow-go/cmd/bootstrap/run"
 	"github.com/onflow/flow-go/cmd/bootstrap/utils"
@@ -765,8 +766,8 @@ func (net *FlowNetwork) AddObserver(t *testing.T, conf ObserverConfig) *Containe
 				fmt.Sprintf("--secretsdir=%s", DefaultFlowSecretsDBDir),
 				fmt.Sprintf("--profiler-dir=%s", DefaultProfilerDir),
 				fmt.Sprintf("--loglevel=%s", conf.LogLevel.String()),
-				fmt.Sprintf("--bootstrap-node-addresses=%s", accessNode.ContainerAddr(PublicNetworkPort)),
-				fmt.Sprintf("--bootstrap-node-public-keys=%s", accessPublicKey),
+				fmt.Sprintf("--observer-mode-bootstrap-node-addresses=%s", accessNode.ContainerAddr(PublicNetworkPort)),
+				fmt.Sprintf("--observer-mode-bootstrap-node-public-keys=%s", accessPublicKey),
 				fmt.Sprintf("--upstream-node-addresses=%s", accessNode.ContainerAddr(GRPCSecurePort)),
 				fmt.Sprintf("--upstream-node-public-keys=%s", accessPublicKey),
 				fmt.Sprintf("--observer-networking-key-path=%s/private-root-information/%s_key", DefaultBootstrapDir, conf.ContainerName),

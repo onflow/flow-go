@@ -395,14 +395,11 @@ func prepareExecutionService(container testnet.ContainerConfig, i int, n int) Se
 		panic(err)
 	}
 
-	enableNewIngestionEngine := true
-
 	service.Command = append(service.Command,
 		"--triedir=/trie",
 		fmt.Sprintf("--rpc-addr=%s:%s", container.ContainerName, testnet.GRPCPort),
 		fmt.Sprintf("--cadence-tracing=%t", cadenceTracing),
 		fmt.Sprintf("--extensive-tracing=%t", extesiveTracing),
-		fmt.Sprintf("--enable-new-ingestion-engine=%v", enableNewIngestionEngine),
 		"--execution-data-dir=/data/execution-data",
 		"--chunk-data-pack-dir=/data/chunk-data-pack",
 	)
@@ -459,8 +456,8 @@ func prepareObserverService(i int, observerName string, agPublicKey string) Serv
 
 	service := defaultService(observerName, DefaultObserverRole, dataDir, profilerDir, i)
 	service.Command = append(service.Command,
-		fmt.Sprintf("--bootstrap-node-addresses=%s:%s", testnet.PrimaryAN, testnet.PublicNetworkPort),
-		fmt.Sprintf("--bootstrap-node-public-keys=%s", agPublicKey),
+		fmt.Sprintf("--observer-mode-bootstrap-node-addresses=%s:%s", testnet.PrimaryAN, testnet.PublicNetworkPort),
+		fmt.Sprintf("--observer-mode-bootstrap-node-public-keys=%s", agPublicKey),
 		fmt.Sprintf("--upstream-node-addresses=%s:%s", testnet.PrimaryAN, testnet.GRPCSecurePort),
 		fmt.Sprintf("--upstream-node-public-keys=%s", agPublicKey),
 		fmt.Sprintf("--observer-networking-key-path=/bootstrap/private-root-information/%s_key", observerName),

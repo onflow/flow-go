@@ -26,6 +26,7 @@ import (
 	"github.com/onflow/flow-go/engine/access/rpc/backend"
 	connectionmock "github.com/onflow/flow-go/engine/access/rpc/connection/mock"
 	"github.com/onflow/flow-go/engine/access/subscription"
+	commonrpc "github.com/onflow/flow-go/engine/common/rpc"
 	"github.com/onflow/flow-go/engine/common/rpc/convert"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/factory"
@@ -267,10 +268,6 @@ func (suite *Suite) TestSendExpiredTransaction() {
 	})
 }
 
-type mockCloser struct{}
-
-func (mc *mockCloser) Close() error { return nil }
-
 // TestSendTransactionToRandomCollectionNode tests that collection nodes are chosen from the appropriate cluster when
 // forwarding transactions by sending two transactions bound for two different collection clusters.
 func (suite *Suite) TestSendTransactionToRandomCollectionNode() {
@@ -325,20 +322,19 @@ func (suite *Suite) TestSendTransactionToRandomCollectionNode() {
 
 		// create a mock connection factory
 		connFactory := connectionmock.NewConnectionFactory(suite.T())
-		connFactory.On("GetAccessAPIClient", collNode1.Address, nil).Return(col1ApiClient, &mockCloser{}, nil)
-		connFactory.On("GetAccessAPIClient", collNode2.Address, nil).Return(col2ApiClient, &mockCloser{}, nil)
+		connFactory.On("GetAccessAPIClient", collNode1.Address, nil).Return(col1ApiClient, &mocks.MockCloser{}, nil)
+		connFactory.On("GetAccessAPIClient", collNode2.Address, nil).Return(col2ApiClient, &mocks.MockCloser{}, nil)
 
 		bnd, err := backend.New(backend.Params{State: suite.state,
-			Collections:              collections,
-			Transactions:             transactions,
-			ChainID:                  suite.chainID,
-			AccessMetrics:            metrics,
-			ConnFactory:              connFactory,
-			MaxHeightRange:           backend.DefaultMaxHeightRange,
-			Log:                      suite.log,
-			SnapshotHistoryLimit:     backend.DefaultSnapshotHistoryLimit,
-			Communicator:             backend.NewNodeCommunicator(false),
-			TxErrorMessagesCacheSize: 1000,
+			Collections:          collections,
+			Transactions:         transactions,
+			ChainID:              suite.chainID,
+			AccessMetrics:        metrics,
+			ConnFactory:          connFactory,
+			MaxHeightRange:       backend.DefaultMaxHeightRange,
+			Log:                  suite.log,
+			SnapshotHistoryLimit: backend.DefaultSnapshotHistoryLimit,
+			Communicator:         backend.NewNodeCommunicator(false),
 		})
 		require.NoError(suite.T(), err)
 
@@ -630,7 +626,7 @@ func (suite *Suite) TestGetSealedTransaction() {
 
 		// create a mock connection factory
 		connFactory := connectionmock.NewConnectionFactory(suite.T())
-		connFactory.On("GetExecutionAPIClient", mock.Anything).Return(suite.execClient, &mockCloser{}, nil)
+		connFactory.On("GetExecutionAPIClient", mock.Anything).Return(suite.execClient, &mocks.MockCloser{}, nil)
 
 		// initialize storage
 		metrics := metrics.NewNoopCollector()
@@ -642,25 +638,35 @@ func (suite *Suite) TestGetSealedTransaction() {
 		require.NoError(suite.T(), err)
 		blocksToMarkExecuted, err := stdmap.NewTimes(100)
 		require.NoError(suite.T(), err)
+		blockTransactions, err := stdmap.NewIdentifierMap(100)
+		require.NoError(suite.T(), err)
 
-		bnd, err := backend.New(backend.Params{State: suite.state,
-			CollectionRPC:             suite.collClient,
-			Blocks:                    all.Blocks,
-			Headers:                   all.Headers,
-			Collections:               collections,
-			Transactions:              transactions,
-			ExecutionReceipts:         receipts,
-			ExecutionResults:          results,
-			ChainID:                   suite.chainID,
-			AccessMetrics:             suite.metrics,
-			ConnFactory:               connFactory,
-			MaxHeightRange:            backend.DefaultMaxHeightRange,
-			PreferredExecutionNodeIDs: enNodeIDs.Strings(),
-			Log:                       suite.log,
-			SnapshotHistoryLimit:      backend.DefaultSnapshotHistoryLimit,
-			Communicator:              backend.NewNodeCommunicator(false),
-			TxErrorMessagesCacheSize:  1000,
-			TxResultQueryMode:         backend.IndexQueryModeExecutionNodesOnly,
+		execNodeIdentitiesProvider := commonrpc.NewExecutionNodeIdentitiesProvider(
+			suite.log,
+			suite.state,
+			receipts,
+			enNodeIDs,
+			nil,
+		)
+
+		bnd, err := backend.New(backend.Params{
+			State:                      suite.state,
+			CollectionRPC:              suite.collClient,
+			Blocks:                     all.Blocks,
+			Headers:                    all.Headers,
+			Collections:                collections,
+			Transactions:               transactions,
+			ExecutionReceipts:          receipts,
+			ExecutionResults:           results,
+			ChainID:                    suite.chainID,
+			AccessMetrics:              suite.metrics,
+			ConnFactory:                connFactory,
+			MaxHeightRange:             backend.DefaultMaxHeightRange,
+			Log:                        suite.log,
+			SnapshotHistoryLimit:       backend.DefaultSnapshotHistoryLimit,
+			Communicator:               backend.NewNodeCommunicator(false),
+			TxResultQueryMode:          backend.IndexQueryModeExecutionNodesOnly,
+			ExecNodeIdentitiesProvider: execNodeIdentitiesProvider,
 		})
 		require.NoError(suite.T(), err)
 
@@ -674,6 +680,7 @@ func (suite *Suite) TestGetSealedTransaction() {
 			blocksToMarkExecuted,
 			collections,
 			all.Blocks,
+			blockTransactions,
 		)
 		require.NoError(suite.T(), err)
 
@@ -686,8 +693,23 @@ func (suite *Suite) TestGetSealedTransaction() {
 		// create the ingest engine
 		processedHeight := bstorage.NewConsumerProgress(db, module.ConsumeProgressIngestionEngineBlockHeight)
 
-		ingestEng, err := ingestion.New(suite.log, suite.net, suite.state, suite.me, suite.request, all.Blocks, all.Headers, collections,
-			transactions, results, receipts, collectionExecutedMetric, processedHeight, lastFullBlockHeight)
+		ingestEng, err := ingestion.New(
+			suite.log,
+			suite.net,
+			suite.state,
+			suite.me,
+			suite.request,
+			all.Blocks,
+			all.Headers,
+			collections,
+			transactions,
+			results,
+			receipts,
+			collectionExecutedMetric,
+			processedHeight,
+			lastFullBlockHeight,
+			nil,
+		)
 		require.NoError(suite.T(), err)
 
 		// 1. Assume that follower engine updated the block storage and the protocol state. The block is reported as sealed
@@ -744,7 +766,6 @@ func (suite *Suite) TestGetTransactionResult() {
 		all := util.StorageLayer(suite.T(), db)
 		results := bstorage.NewExecutionResults(suite.metrics, db)
 		receipts := bstorage.NewExecutionReceipts(suite.metrics, db, results, bstorage.DefaultCacheSize)
-
 		originID := unittest.IdentifierFixture()
 
 		*suite.state = protocol.State{}
@@ -779,6 +800,9 @@ func (suite *Suite) TestGetTransactionResult() {
 		allIdentities := append(colIdentities, enIdentities...)
 		finalSnapshot.On("Identities", mock.Anything).Return(allIdentities, nil)
 
+		suite.state.On("AtBlockID", blockNegativeId).Return(suite.sealedSnapshot)
+		suite.sealedSnapshot.On("Identities", mock.Anything).Return(allIdentities, nil)
+
 		// assume execution node returns an empty list of events
 		suite.execClient.On("GetTransactionResult", mock.Anything, mock.Anything).Return(&execproto.GetTransactionResultResponse{
 			Events: nil,
@@ -791,7 +815,7 @@ func (suite *Suite) TestGetTransactionResult() {
 
 		// create a mock connection factory
 		connFactory := connectionmock.NewConnectionFactory(suite.T())
-		connFactory.On("GetExecutionAPIClient", mock.Anything).Return(suite.execClient, &mockCloser{}, nil)
+		connFactory.On("GetExecutionAPIClient", mock.Anything).Return(suite.execClient, &mocks.MockCloser{}, nil)
 
 		// initialize storage
 		metrics := metrics.NewNoopCollector()
@@ -805,25 +829,34 @@ func (suite *Suite) TestGetTransactionResult() {
 		require.NoError(suite.T(), err)
 		blocksToMarkExecuted, err := stdmap.NewTimes(100)
 		require.NoError(suite.T(), err)
+		blockTransactions, err := stdmap.NewIdentifierMap(100)
+		require.NoError(suite.T(), err)
+
+		execNodeIdentitiesProvider := commonrpc.NewExecutionNodeIdentitiesProvider(
+			suite.log,
+			suite.state,
+			receipts,
+			enNodeIDs,
+			nil,
+		)
 
 		bnd, err := backend.New(backend.Params{State: suite.state,
-			CollectionRPC:             suite.collClient,
-			Blocks:                    all.Blocks,
-			Headers:                   all.Headers,
-			Collections:               collections,
-			Transactions:              transactions,
-			ExecutionReceipts:         receipts,
-			ExecutionResults:          results,
-			ChainID:                   suite.chainID,
-			AccessMetrics:             suite.metrics,
-			ConnFactory:               connFactory,
-			MaxHeightRange:            backend.DefaultMaxHeightRange,
-			PreferredExecutionNodeIDs: enNodeIDs.Strings(),
-			Log:                       suite.log,
-			SnapshotHistoryLimit:      backend.DefaultSnapshotHistoryLimit,
-			Communicator:              backend.NewNodeCommunicator(false),
-			TxErrorMessagesCacheSize:  1000,
-			TxResultQueryMode:         backend.IndexQueryModeExecutionNodesOnly,
+			CollectionRPC:              suite.collClient,
+			Blocks:                     all.Blocks,
+			Headers:                    all.Headers,
+			Collections:                collections,
+			Transactions:               transactions,
+			ExecutionReceipts:          receipts,
+			ExecutionResults:           results,
+			ChainID:                    suite.chainID,
+			AccessMetrics:              suite.metrics,
+			ConnFactory:                connFactory,
+			MaxHeightRange:             backend.DefaultMaxHeightRange,
+			Log:                        suite.log,
+			SnapshotHistoryLimit:       backend.DefaultSnapshotHistoryLimit,
+			Communicator:               backend.NewNodeCommunicator(false),
+			TxResultQueryMode:          backend.IndexQueryModeExecutionNodesOnly,
+			ExecNodeIdentitiesProvider: execNodeIdentitiesProvider,
 		})
 		require.NoError(suite.T(), err)
 
@@ -837,10 +870,12 @@ func (suite *Suite) TestGetTransactionResult() {
 			blocksToMarkExecuted,
 			collections,
 			all.Blocks,
+			blockTransactions,
 		)
 		require.NoError(suite.T(), err)
 
 		processedHeight := bstorage.NewConsumerProgress(db, module.ConsumeProgressIngestionEngineBlockHeight)
+
 		lastFullBlockHeight, err := counters.NewPersistentStrictMonotonicCounter(
 			bstorage.NewConsumerProgress(db, module.ConsumeProgressLastFullBlockHeight),
 			suite.rootBlock.Height,
@@ -848,8 +883,23 @@ func (suite *Suite) TestGetTransactionResult() {
 		require.NoError(suite.T(), err)
 
 		// create the ingest engine
-		ingestEng, err := ingestion.New(suite.log, suite.net, suite.state, suite.me, suite.request, all.Blocks, all.Headers, collections,
-			transactions, results, receipts, collectionExecutedMetric, processedHeight, lastFullBlockHeight)
+		ingestEng, err := ingestion.New(
+			suite.log,
+			suite.net,
+			suite.state,
+			suite.me,
+			suite.request,
+			all.Blocks,
+			all.Headers,
+			collections,
+			transactions,
+			results,
+			receipts,
+			collectionExecutedMetric,
+			processedHeight,
+			lastFullBlockHeight,
+			nil,
+		)
 		require.NoError(suite.T(), err)
 
 		background, cancel := context.WithCancel(context.Background())
@@ -945,6 +995,7 @@ func (suite *Suite) TestGetTransactionResult() {
 			}
 			resp, err := handler.GetTransactionResult(context.Background(), getReq)
 			require.Error(suite.T(), err)
+			require.Contains(suite.T(), err.Error(), "failed to find: transaction not in block")
 			require.Nil(suite.T(), resp)
 		})
 
@@ -1011,36 +1062,42 @@ func (suite *Suite) TestExecuteScript() {
 		collections := bstorage.NewCollections(db, transactions)
 		results := bstorage.NewExecutionResults(suite.metrics, db)
 		receipts := bstorage.NewExecutionReceipts(suite.metrics, db, results, bstorage.DefaultCacheSize)
-
 		identities := unittest.IdentityListFixture(2, unittest.WithRole(flow.RoleExecution))
 		suite.sealedSnapshot.On("Identities", mock.Anything).Return(identities, nil)
 		suite.finalSnapshot.On("Identities", mock.Anything).Return(identities, nil)
 
 		// create a mock connection factory
 		connFactory := connectionmock.NewConnectionFactory(suite.T())
-		connFactory.On("GetExecutionAPIClient", mock.Anything).Return(suite.execClient, &mockCloser{}, nil)
+		connFactory.On("GetExecutionAPIClient", mock.Anything).Return(suite.execClient, &mocks.MockCloser{}, nil)
+
+		execNodeIdentitiesProvider := commonrpc.NewExecutionNodeIdentitiesProvider(
+			suite.log,
+			suite.state,
+			receipts,
+			nil,
+			identities.NodeIDs(),
+		)
 
 		var err error
 		suite.backend, err = backend.New(backend.Params{
-			State:                    suite.state,
-			CollectionRPC:            suite.collClient,
-			Blocks:                   all.Blocks,
-			Headers:                  all.Headers,
-			Collections:              collections,
-			Transactions:             transactions,
-			ExecutionReceipts:        receipts,
-			ExecutionResults:         results,
-			ChainID:                  suite.chainID,
-			AccessMetrics:            suite.metrics,
-			ConnFactory:              connFactory,
-			MaxHeightRange:           backend.DefaultMaxHeightRange,
-			FixedExecutionNodeIDs:    (identities.NodeIDs()).Strings(),
-			Log:                      suite.log,
-			SnapshotHistoryLimit:     backend.DefaultSnapshotHistoryLimit,
-			Communicator:             backend.NewNodeCommunicator(false),
-			ScriptExecutionMode:      backend.IndexQueryModeExecutionNodesOnly,
-			TxErrorMessagesCacheSize: 1000,
-			TxResultQueryMode:        backend.IndexQueryModeExecutionNodesOnly,
+			State:                      suite.state,
+			CollectionRPC:              suite.collClient,
+			Blocks:                     all.Blocks,
+			Headers:                    all.Headers,
+			Collections:                collections,
+			Transactions:               transactions,
+			ExecutionReceipts:          receipts,
+			ExecutionResults:           results,
+			ChainID:                    suite.chainID,
+			AccessMetrics:              suite.metrics,
+			ConnFactory:                connFactory,
+			MaxHeightRange:             backend.DefaultMaxHeightRange,
+			Log:                        suite.log,
+			SnapshotHistoryLimit:       backend.DefaultSnapshotHistoryLimit,
+			Communicator:               backend.NewNodeCommunicator(false),
+			ScriptExecutionMode:        backend.IndexQueryModeExecutionNodesOnly,
+			TxResultQueryMode:          backend.IndexQueryModeExecutionNodesOnly,
+			ExecNodeIdentitiesProvider: execNodeIdentitiesProvider,
 		})
 		require.NoError(suite.T(), err)
 
@@ -1054,6 +1111,8 @@ func (suite *Suite) TestExecuteScript() {
 		require.NoError(suite.T(), err)
 		blocksToMarkExecuted, err := stdmap.NewTimes(100)
 		require.NoError(suite.T(), err)
+		blockTransactions, err := stdmap.NewIdentifierMap(100)
+		require.NoError(suite.T(), err)
 
 		collectionExecutedMetric, err := indexer.NewCollectionExecutedMetricImpl(
 			suite.log,
@@ -1063,6 +1122,7 @@ func (suite *Suite) TestExecuteScript() {
 			blocksToMarkExecuted,
 			collections,
 			all.Blocks,
+			blockTransactions,
 		)
 		require.NoError(suite.T(), err)
 
@@ -1071,6 +1131,7 @@ func (suite *Suite) TestExecuteScript() {
 			Once()
 
 		processedHeight := bstorage.NewConsumerProgress(db, module.ConsumeProgressIngestionEngineBlockHeight)
+
 		lastFullBlockHeight, err := counters.NewPersistentStrictMonotonicCounter(
 			bstorage.NewConsumerProgress(db, module.ConsumeProgressLastFullBlockHeight),
 			suite.rootBlock.Height,
@@ -1078,8 +1139,23 @@ func (suite *Suite) TestExecuteScript() {
 		require.NoError(suite.T(), err)
 
 		// create the ingest engine
-		ingestEng, err := ingestion.New(suite.log, suite.net, suite.state, suite.me, suite.request, all.Blocks, all.Headers, collections,
-			transactions, results, receipts, collectionExecutedMetric, processedHeight, lastFullBlockHeight)
+		ingestEng, err := ingestion.New(
+			suite.log,
+			suite.net,
+			suite.state,
+			suite.me,
+			suite.request,
+			all.Blocks,
+			all.Headers,
+			collections,
+			transactions,
+			results,
+			receipts,
+			collectionExecutedMetric,
+			processedHeight,
+			lastFullBlockHeight,
+			nil,
+		)
 		require.NoError(suite.T(), err)
 
 		// create another block as a predecessor of the block created earlier

@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"strconv"
 
+	"github.com/onflow/cadence/common"
 	"github.com/onflow/cadence/runtime"
-	"github.com/onflow/cadence/runtime/common"
 	"github.com/rs/zerolog"
 	"go.opentelemetry.io/otel/attribute"
 	otelTrace "go.opentelemetry.io/otel/trace"
@@ -34,6 +34,8 @@ type TransactionExecutorParams struct {
 
 	// Note: This is disabled only by tests
 	TransactionBodyExecutionEnabled bool
+
+	ReadVersionFromNodeVersionBeacon bool
 }
 
 func DefaultTransactionExecutorParams() TransactionExecutorParams {
@@ -42,6 +44,7 @@ func DefaultTransactionExecutorParams() TransactionExecutorParams {
 		SequenceNumberCheckAndIncrementEnabled: true,
 		AccountKeyWeightThreshold:              AccountKeyWeightThreshold,
 		TransactionBodyExecutionEnabled:        true,
+		ReadVersionFromNodeVersionBeacon:       true,
 	}
 }
 
@@ -64,6 +67,11 @@ type transactionExecutor struct {
 
 	startedTransactionBodyExecution bool
 	nestedTxnId                     state.NestedTransactionId
+
+	// the state reads needed to compute the metering parameters
+	// this is used to invalidate the metering parameters if a transaction
+	// writes to any of those registers
+	executionStateRead *snapshot.ExecutionSnapshot
 
 	cadenceRuntime  *reusableRuntime.ReusableCadenceRuntime
 	txnBodyExecutor runtime.Executor
@@ -194,17 +202,27 @@ func (executor *transactionExecutor) preprocessTransactionBody() error {
 			return err
 		}
 	}
-
-	meterParams, err := getBodyMeterParameters(
+	// get meter parameters
+	executionParameters, executionStateRead, err := getExecutionParameters(
+		executor.env.Logger(),
 		executor.ctx,
 		executor.proc,
 		executor.txnState)
 	if err != nil {
-		return fmt.Errorf("error gettng meter parameters: %w", err)
+		return fmt.Errorf("error getting execution parameters: %w", err)
 	}
 
+	if len(executionStateRead.WriteSet) != 0 {
+		// this should never happen
+		// and indicates an implementation error
+		panic("getting execution parameters should not write to registers")
+	}
+
+	// we need to save the execution state read for invalidation purposes
+	executor.executionStateRead = executionStateRead
+
 	txnId, err := executor.txnState.BeginNestedTransactionWithMeterParams(
-		meterParams)
+		executionParameters)
 	if err != nil {
 		return err
 	}
@@ -387,8 +405,9 @@ func (executor *transactionExecutor) normalExecution() (
 
 	invalidator = environment.NewDerivedDataInvalidator(
 		contractUpdates,
-		executor.ctx.Chain.ServiceAddress(),
-		bodySnapshot)
+		bodySnapshot,
+		executor.executionStateRead,
+	)
 
 	// Check if all account storage limits are ok
 	//

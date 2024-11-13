@@ -24,11 +24,13 @@ import (
 	export "github.com/onflow/flow-go/cmd/util/cmd/exec-data-json-export"
 	edbs "github.com/onflow/flow-go/cmd/util/cmd/execution-data-blobstore/cmd"
 	extract "github.com/onflow/flow-go/cmd/util/cmd/execution-state-extract"
+	evm_state_exporter "github.com/onflow/flow-go/cmd/util/cmd/export-evm-state"
 	ledger_json_exporter "github.com/onflow/flow-go/cmd/util/cmd/export-json-execution-state"
 	export_json_transactions "github.com/onflow/flow-go/cmd/util/cmd/export-json-transactions"
 	extractpayloads "github.com/onflow/flow-go/cmd/util/cmd/extract-payloads-by-address"
 	find_inconsistent_result "github.com/onflow/flow-go/cmd/util/cmd/find-inconsistent-result"
 	find_trie_root "github.com/onflow/flow-go/cmd/util/cmd/find-trie-root"
+	generate_authorization_fixes "github.com/onflow/flow-go/cmd/util/cmd/generate-authorization-fixes"
 	read_badger "github.com/onflow/flow-go/cmd/util/cmd/read-badger/cmd"
 	read_execution_state "github.com/onflow/flow-go/cmd/util/cmd/read-execution-state"
 	read_hotstuff "github.com/onflow/flow-go/cmd/util/cmd/read-hotstuff/cmd"
@@ -122,6 +124,8 @@ func addCommands() {
 	rootCmd.AddCommand(check_storage.Cmd)
 	rootCmd.AddCommand(debug_tx.Cmd)
 	rootCmd.AddCommand(debug_script.Cmd)
+	rootCmd.AddCommand(generate_authorization_fixes.Cmd)
+	rootCmd.AddCommand(evm_state_exporter.Cmd)
 }
 
 func initConfig() {

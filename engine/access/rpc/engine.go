@@ -8,8 +8,6 @@ import (
 	"net/http"
 	"sync"
 
-	"github.com/onflow/flow-go/module/state_synchronization"
-
 	"github.com/rs/zerolog"
 	"google.golang.org/grpc/credentials"
 
@@ -25,6 +23,7 @@ import (
 	"github.com/onflow/flow-go/module/events"
 	"github.com/onflow/flow-go/module/grpcserver"
 	"github.com/onflow/flow-go/module/irrecoverable"
+	"github.com/onflow/flow-go/module/state_synchronization"
 	"github.com/onflow/flow-go/state/protocol"
 )
 

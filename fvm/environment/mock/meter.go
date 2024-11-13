@@ -3,7 +3,7 @@
 package mock
 
 import (
-	common "github.com/onflow/cadence/runtime/common"
+	common "github.com/onflow/cadence/common"
 
 	meter "github.com/onflow/flow-go/fvm/meter"
 
@@ -137,9 +137,9 @@ func (_m *Meter) MemoryUsed() (uint64, error) {
 	return r0, r1
 }
 
-// MeterComputation provides a mock function with given fields: _a0, _a1
-func (_m *Meter) MeterComputation(_a0 common.ComputationKind, _a1 uint) error {
-	ret := _m.Called(_a0, _a1)
+// MeterComputation provides a mock function with given fields: operationType, intensity
+func (_m *Meter) MeterComputation(operationType common.ComputationKind, intensity uint) error {
+	ret := _m.Called(operationType, intensity)
 
 	if len(ret) == 0 {
 		panic("no return value specified for MeterComputation")
@@ -147,7 +147,7 @@ func (_m *Meter) MeterComputation(_a0 common.ComputationKind, _a1 uint) error {
 
 	var r0 error
 	if rf, ok := ret.Get(0).(func(common.ComputationKind, uint) error); ok {
-		r0 = rf(_a0, _a1)
+		r0 = rf(operationType, intensity)
 	} else {
 		r0 = ret.Error(0)
 	}

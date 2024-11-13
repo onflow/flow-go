@@ -981,10 +981,6 @@ func (ec *ExecutionCollector) ExecutionCollectionRequestSent() {
 	ec.collectionRequestSent.Inc()
 }
 
-func (ec *ExecutionCollector) ExecutionCollectionRequestRetried() {
-	ec.collectionRequestRetried.Inc()
-}
-
 func (ec *ExecutionCollector) ExecutionBlockDataUploadStarted() {
 	ec.blockDataUploadsInProgress.Inc()
 }
@@ -1080,4 +1076,35 @@ func (ec *ExecutionCollector) ExecutionComputationResultUploaded() {
 
 func (ec *ExecutionCollector) ExecutionComputationResultUploadRetried() {
 	ec.computationResultUploadRetriedCount.Inc()
+}
+
+type ExecutionCollectorWithTransactionCallback struct {
+	*ExecutionCollector
+	TransactionCallback func(
+		dur time.Duration,
+		stats module.TransactionExecutionResultStats,
+		info module.TransactionExecutionResultInfo,
+	)
+}
+
+func (ec *ExecutionCollector) WithTransactionCallback(
+	callback func(
+		time.Duration,
+		module.TransactionExecutionResultStats,
+		module.TransactionExecutionResultInfo,
+	),
+) *ExecutionCollectorWithTransactionCallback {
+	return &ExecutionCollectorWithTransactionCallback{
+		ExecutionCollector:  ec,
+		TransactionCallback: callback,
+	}
+}
+
+func (ec *ExecutionCollectorWithTransactionCallback) ExecutionTransactionExecuted(
+	dur time.Duration,
+	stats module.TransactionExecutionResultStats,
+	info module.TransactionExecutionResultInfo,
+) {
+	ec.ExecutionCollector.ExecutionTransactionExecuted(dur, stats, info)
+	ec.TransactionCallback(dur, stats, info)
 }

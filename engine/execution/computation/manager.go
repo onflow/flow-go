@@ -231,8 +231,7 @@ func DefaultFVMOptions(chainID flow.ChainID, cadenceTracing bool, extensiveTraci
 			reusableRuntime.NewReusableCadenceRuntimePool(
 				ReusableCadenceRuntimePoolSize,
 				runtime.Config{
-					TracingEnabled:     cadenceTracing,
-					AttachmentsEnabled: true,
+					TracingEnabled: cadenceTracing,
 				},
 			)),
 		fvm.WithEVMEnabled(true),

@@ -3,7 +3,7 @@ package environment_test
 import (
 	"testing"
 
-	"github.com/onflow/cadence/runtime/common"
+	"github.com/onflow/cadence/common"
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/fvm"
@@ -82,7 +82,7 @@ func TestDerivedDataProgramInvalidator(t *testing.T) {
 	})
 	t.Run("meter parameters invalidator invalidates all entries", func(t *testing.T) {
 		invalidator := environment.DerivedDataInvalidator{
-			MeterParamOverridesUpdated: true,
+			ExecutionParametersUpdated: true,
 		}.ProgramInvalidator()
 
 		require.True(t, invalidator.ShouldInvalidateEntries())
@@ -207,23 +207,23 @@ func TestDerivedDataProgramInvalidator(t *testing.T) {
 
 func TestMeterParamOverridesInvalidator(t *testing.T) {
 	invalidator := environment.DerivedDataInvalidator{}.
-		MeterParamOverridesInvalidator()
+		ExecutionParametersInvalidator()
 
 	require.False(t, invalidator.ShouldInvalidateEntries())
 	require.False(t, invalidator.ShouldInvalidateEntry(
 		struct{}{},
-		derived.MeterParamOverrides{},
+		derived.StateExecutionParameters{},
 		nil))
 
 	invalidator = environment.DerivedDataInvalidator{
 		ContractUpdates:            environment.ContractUpdates{},
-		MeterParamOverridesUpdated: true,
-	}.MeterParamOverridesInvalidator()
+		ExecutionParametersUpdated: true,
+	}.ExecutionParametersInvalidator()
 
 	require.True(t, invalidator.ShouldInvalidateEntries())
 	require.True(t, invalidator.ShouldInvalidateEntry(
 		struct{}{},
-		derived.MeterParamOverrides{},
+		derived.StateExecutionParameters{},
 		nil))
 }
 
@@ -265,7 +265,11 @@ func TestMeterParamOverridesUpdated(t *testing.T) {
 	txnState, err := blockDatabase.NewTransaction(0, state.DefaultParameters())
 	require.NoError(t, err)
 
-	computer := fvm.NewMeterParamOverridesComputer(ctx, txnState)
+	computer := fvm.NewExecutionParametersComputer(
+		ctx.Logger,
+		ctx,
+		txnState,
+	)
 
 	overrides, err := computer.Compute(txnState, struct{}{})
 	require.NoError(t, err)
@@ -283,6 +287,12 @@ func TestMeterParamOverridesUpdated(t *testing.T) {
 
 	ctx.TxBody = &flow.TransactionBody{}
 
+	meterStateRead := &snapshot.ExecutionSnapshot{
+		ReadSet: map[flow.RegisterID]struct{}{
+			flow.NewRegisterID(ctx.Chain.ServiceAddress(), "meter"): {},
+		},
+	}
+
 	checkForUpdates := func(id flow.RegisterID, expected bool) {
 		snapshot := &snapshot.ExecutionSnapshot{
 			WriteSet: map[flow.RegisterID]flow.RegisterValue{
@@ -292,9 +302,9 @@ func TestMeterParamOverridesUpdated(t *testing.T) {
 
 		invalidator := environment.NewDerivedDataInvalidator(
 			environment.ContractUpdates{},
-			ctx.Chain.ServiceAddress(),
-			snapshot)
-		require.Equal(t, expected, invalidator.MeterParamOverridesUpdated)
+			snapshot,
+			meterStateRead)
+		require.Equal(t, expected, invalidator.ExecutionParametersUpdated)
 	}
 
 	executionSnapshot, err = txnState.FinalizeMainTransaction()
@@ -304,17 +314,14 @@ func TestMeterParamOverridesUpdated(t *testing.T) {
 	otherOwner := unittest.RandomAddressFixtureForChain(ctx.Chain.ChainID())
 
 	for _, registerId := range executionSnapshot.AllRegisterIDs() {
-		checkForUpdates(registerId, true)
+		checkForUpdates(registerId, false)
 		checkForUpdates(
 			flow.NewRegisterID(otherOwner, registerId.Key),
 			false)
 	}
 
-	stabIndexKey := flow.NewRegisterID(owner, "$12345678")
-	require.True(t, stabIndexKey.IsSlabIndex())
-
-	checkForUpdates(stabIndexKey, true)
-	checkForUpdates(flow.NewRegisterID(owner, "other keys"), false)
-	checkForUpdates(flow.NewRegisterID(otherOwner, stabIndexKey.Key), false)
-	checkForUpdates(flow.NewRegisterID(otherOwner, "other key"), false)
+	checkForUpdates(flow.NewRegisterID(owner, "meter2"), false)
+	checkForUpdates(flow.NewRegisterID(owner, "meter"), true)
+	checkForUpdates(flow.NewRegisterID(otherOwner, "meter2"), false)
+	checkForUpdates(flow.NewRegisterID(otherOwner, "meter"), false)
 }

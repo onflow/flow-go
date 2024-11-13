@@ -59,7 +59,7 @@ type Instance struct {
 	queue          chan interface{}
 	updatingBlocks sync.RWMutex
 	headers        map[flow.Identifier]*flow.Header
-	pendings       map[flow.Identifier]*model.Proposal // indexed by parent ID
+	pendings       map[flow.Identifier]*model.SignedProposal // indexed by parent ID
 
 	// mocked dependencies
 	committee *mocks.DynamicCommittee
@@ -151,7 +151,7 @@ func NewInstance(t *testing.T, options ...Option) *Instance {
 		stop:                  cfg.StopCondition,
 
 		// instance data
-		pendings: make(map[flow.Identifier]*model.Proposal),
+		pendings: make(map[flow.Identifier]*model.SignedProposal),
 		headers:  make(map[flow.Identifier]*flow.Header),
 		queue:    make(chan interface{}, 1024),
 
@@ -227,16 +227,6 @@ func NewInstance(t *testing.T, options ...Option) *Instance {
 	in.persist.On("PutLivenessData", mock.Anything).Return(nil)
 
 	// program the hotstuff signer behaviour
-	in.signer.On("CreateProposal", mock.Anything).Return(
-		func(block *model.Block) *model.Proposal {
-			proposal := &model.Proposal{
-				Block:   block,
-				SigData: nil,
-			}
-			return proposal
-		},
-		nil,
-	)
 	in.signer.On("CreateVote", mock.Anything).Return(
 		func(block *model.Block) *model.Vote {
 			vote := &model.Vote{
@@ -304,7 +294,7 @@ func NewInstance(t *testing.T, options ...Option) *Instance {
 			}
 
 			// convert into proposal immediately
-			proposal := model.ProposalFromFlow(header)
+			proposal := model.SignedProposalFromFlow(header)
 
 			// store locally and loop back to engine for processing
 			in.ProcessBlock(proposal)
@@ -365,10 +355,6 @@ func NewInstance(t *testing.T, options ...Option) *Instance {
 	notifier.AddConsumer(logConsumer)
 	notifier.AddConsumer(in.notifier)
 
-	// initialize the block producer
-	in.producer, err = blockproducer.New(in.signer, in.committee, in.builder)
-	require.NoError(t, err)
-
 	// initialize the finalizer
 	rootBlock := model.BlockFromFlow(cfg.Root)
 
@@ -417,20 +403,26 @@ func NewInstance(t *testing.T, options ...Option) *Instance {
 	minRequiredWeight := committees.WeightThresholdToBuildQC(uint64(len(in.participants)) * weight)
 	voteProcessorFactory := mocks.NewVoteProcessorFactory(t)
 	voteProcessorFactory.On("Create", mock.Anything, mock.Anything).Return(
-		func(log zerolog.Logger, proposal *model.Proposal) hotstuff.VerifyingVoteProcessor {
+		func(log zerolog.Logger, proposal *model.SignedProposal) hotstuff.VerifyingVoteProcessor {
 			stakingSigAggtor := helper.MakeWeightedSignatureAggregator(weight)
 			stakingSigAggtor.On("Verify", mock.Anything, mock.Anything).Return(nil).Maybe()
 
 			rbRector := helper.MakeRandomBeaconReconstructor(msig.RandomBeaconThreshold(len(in.participants)))
 			rbRector.On("Verify", mock.Anything, mock.Anything).Return(nil).Maybe()
 
-			return votecollector.NewCombinedVoteProcessor(
+			processor := votecollector.NewCombinedVoteProcessor(
 				log, proposal.Block,
 				stakingSigAggtor, rbRector,
 				onQCCreated,
 				packer,
 				minRequiredWeight,
 			)
+
+			err := processor.Process(proposal.ProposerVote())
+			if err != nil {
+				t.Fatalf("invalid vote for own proposal: %v", err)
+			}
+			return processor
 		}, nil).Maybe()
 
 	voteAggregationDistributor := pubsub.NewVoteAggregationDistributor()
@@ -531,6 +523,10 @@ func NewInstance(t *testing.T, options ...Option) *Instance {
 	in.safetyRules, err = safetyrules.New(in.signer, in.persist, in.committee)
 	require.NoError(t, err)
 
+	// initialize the block producer
+	in.producer, err = blockproducer.New(in.safetyRules, in.committee, in.builder)
+	require.NoError(t, err)
+
 	// initialize the event handler
 	in.handler, err = eventhandler.NewEventHandler(
 		log,
@@ -601,7 +597,7 @@ func (in *Instance) Run() error {
 			}
 		case msg := <-in.queue:
 			switch m := msg.(type) {
-			case *model.Proposal:
+			case *model.SignedProposal:
 				// add block to aggregator
 				in.voteAggregator.AddBlock(m)
 				// then pass to event handler
@@ -633,7 +629,7 @@ func (in *Instance) Run() error {
 	}
 }
 
-func (in *Instance) ProcessBlock(proposal *model.Proposal) {
+func (in *Instance) ProcessBlock(proposal *model.SignedProposal) {
 	in.updatingBlocks.Lock()
 	defer in.updatingBlocks.Unlock()
 	_, parentExists := in.headers[proposal.Block.QC.BlockID]
@@ -641,7 +637,7 @@ func (in *Instance) ProcessBlock(proposal *model.Proposal) {
 	if parentExists {
 		next := proposal
 		for next != nil {
-			in.headers[next.Block.BlockID] = model.ProposalToFlow(next)
+			in.headers[next.Block.BlockID] = helper.SignedProposalToFlow(next)
 
 			in.queue <- next
 			// keep processing the pending blocks

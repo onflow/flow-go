@@ -15,19 +15,31 @@ func TestTracker(t *testing.T) {
 	apc := testutils.AggregatedPrecompiledCallsFixture(t)
 	var runCallCounter int
 	var requiredGasCallCounter int
+
+	reqGasCallInputs := make([][]byte, len(apc[0].RequiredGasCalls))
+	runCallInputs := make([][]byte, len(apc[0].RunCalls))
+
+	for i := range apc[0].RequiredGasCalls {
+		reqGasCallInputs[i] = testutils.RandomData(t)
+	}
+
+	for i := range apc[0].RunCalls {
+		runCallInputs[i] = testutils.RandomData(t)
+	}
+
 	pc := &MockedPrecompiled{
 		AddressFunc: func() types.Address {
 			return apc[0].Address
 		},
 		RequiredGasFunc: func(input []byte) uint64 {
 			res := apc[0].RequiredGasCalls[requiredGasCallCounter]
-			require.Equal(t, res.Input, input)
+			require.Equal(t, reqGasCallInputs[requiredGasCallCounter], input)
 			requiredGasCallCounter += 1
-			return res.Output
+			return res
 		},
 		RunFunc: func(input []byte) ([]byte, error) {
 			res := apc[0].RunCalls[runCallCounter]
-			require.Equal(t, res.Input, input)
+			require.Equal(t, runCallInputs[runCallCounter], input)
 			runCallCounter += 1
 			var err error
 			if len(res.ErrorMsg) > 0 {
@@ -40,12 +52,13 @@ func TestTracker(t *testing.T) {
 	wpc := tracker.RegisterPrecompiledContract(pc)
 
 	require.Equal(t, apc[0].Address, wpc.Address())
+
 	for _, pc := range apc {
-		for _, call := range pc.RequiredGasCalls {
-			require.Equal(t, call.Output, wpc.RequiredGas(call.Input))
+		for i, call := range pc.RequiredGasCalls {
+			require.Equal(t, call, wpc.RequiredGas(reqGasCallInputs[i]))
 		}
-		for _, call := range pc.RunCalls {
-			ret, err := wpc.Run(call.Input)
+		for i, call := range pc.RunCalls {
+			ret, err := wpc.Run(runCallInputs[i])
 			require.Equal(t, call.Output, ret)
 			errMsg := ""
 			if err != nil {

@@ -1088,13 +1088,9 @@ func TestCallingExtraPrecompiles(t *testing.T) {
 				output := []byte{3, 4}
 				addr := testutils.RandomAddress(t)
 				capturedCall := &types.PrecompiledCalls{
-					Address: addr,
-					RequiredGasCalls: []types.RequiredGasCall{{
-						Input:  input,
-						Output: uint64(10),
-					}},
+					Address:          addr,
+					RequiredGasCalls: []uint64{10},
 					RunCalls: []types.RunCall{{
-						Input:    input,
 						Output:   output,
 						ErrorMsg: "",
 					}},
@@ -1103,7 +1099,8 @@ func TestCallingExtraPrecompiles(t *testing.T) {
 					AddressFunc: func() types.Address {
 						return addr
 					},
-					RequiredGasFunc: func(input []byte) uint64 {
+					RequiredGasFunc: func(inp []byte) uint64 {
+						require.Equal(t, input, inp)
 						return uint64(10)
 					},
 					RunFunc: func(inp []byte) ([]byte, error) {
@@ -1224,9 +1221,9 @@ func TestTransactionTracing(t *testing.T) {
 			require.NoError(t, res.ValidationError)
 			require.NoError(t, res.VMError)
 			txID = res.TxHash
-			tracer.Collect(txID)
 			trace = tracer.GetResultByTxHash(txID)
 			require.NotEmpty(t, trace)
+			tracer.Collect(txID)
 
 			testAccount.SetNonce(testAccount.Nonce() + 1)
 			require.Eventuallyf(t, func() bool {
@@ -1260,17 +1257,17 @@ func TestTransactionTracing(t *testing.T) {
 					testAccount.Address(),
 					types.Address{0x01, 0x02},
 					testContract.ByteCode,
-					1_000_000,
+					2_000_000,
 					big.NewInt(0),
 					testAccount.Nonce(),
 				),
 			)
 			requireSuccessfulExecution(t, err, res)
 			txID = res.TxHash
-			tracer.WithBlockID(blockID)
-			tracer.Collect(txID)
 			trace = tracer.GetResultByTxHash(txID)
 			require.NotEmpty(t, trace)
+			tracer.WithBlockID(blockID)
+			tracer.Collect(txID)
 
 			testAccount.SetNonce(testAccount.Nonce() + 1)
 			require.Eventuallyf(t, func() bool {
@@ -1311,10 +1308,10 @@ func TestTransactionTracing(t *testing.T) {
 			res, err := blk.RunTransaction(tx)
 			requireSuccessfulExecution(t, err, res)
 			txID = res.TxHash
-			tracer.WithBlockID(blockID)
-			tracer.Collect(txID)
 			trace = tracer.GetResultByTxHash(txID)
 			require.NotEmpty(t, trace)
+			tracer.WithBlockID(blockID)
+			tracer.Collect(txID)
 
 			testAccount.SetNonce(testAccount.Nonce() + 1)
 			require.Eventuallyf(t, func() bool {
@@ -1390,9 +1387,9 @@ func TestTransactionTracing(t *testing.T) {
 			requireSuccessfulExecution(t, err, res)
 			txID = res.TxHash
 			tracer.WithBlockID(blockID)
-			tracer.Collect(txID)
 			trace = tracer.GetResultByTxHash(txID)
 			require.NotEmpty(t, trace)
+			tracer.Collect(txID)
 
 			testAccount.SetNonce(testAccount.Nonce() + 1)
 			require.Eventuallyf(t, func() bool {
@@ -1482,9 +1479,9 @@ func TestTransactionTracing(t *testing.T) {
 			require.NoError(t, err)
 			require.Len(t, results, 1)
 			txID = results[0].TxHash
+			trace = tracer.GetResultByTxHash(txID)
 			tracer.WithBlockID(blockID)
 			tracer.Collect(txID)
-			trace = tracer.GetResultByTxHash(txID)
 
 			require.Eventuallyf(t, func() bool {
 				<-uploaded
