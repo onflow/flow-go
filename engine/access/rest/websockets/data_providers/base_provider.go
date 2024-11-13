@@ -22,29 +22,22 @@ var _ BaseDataProvider = (*BaseDataProviderImpl)(nil)
 // BaseDataProviderImpl is the concrete implementation of the BaseDataProvider interface.
 // It holds common objects for the provider.
 type BaseDataProviderImpl struct {
-	topic string
-
-	cancel context.CancelFunc
-	ctx    context.Context
-
+	topic        string
+	cancel       context.CancelFunc
 	send         chan<- interface{}
 	subscription subscription.Subscription
 }
 
 // NewBaseDataProviderImpl creates a new instance of BaseDataProviderImpl.
 func NewBaseDataProviderImpl(
-	ctx context.Context,
 	cancel context.CancelFunc,
 	topic string,
 	send chan<- interface{},
 	subscription subscription.Subscription,
 ) *BaseDataProviderImpl {
 	return &BaseDataProviderImpl{
-		topic: topic,
-
-		ctx:    ctx,
-		cancel: cancel,
-
+		topic:        topic,
+		cancel:       cancel,
 		send:         send,
 		subscription: subscription,
 	}

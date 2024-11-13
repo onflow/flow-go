@@ -5,6 +5,5 @@ import (
 )
 
 type BlockMessageResponse struct {
-	Block       *flow.Block      `json:"block"`
-	BlockStatus flow.BlockStatus `json:"block_status"`
+	Block *flow.Block `json:"block"`
 }

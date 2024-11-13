@@ -6,6 +6,8 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
+// Finalized and Sealed represents the status of a block.
+// It is used in rest arguments to provide block status.
 const (
 	Finalized = "finalized"
 	Sealed    = "sealed"

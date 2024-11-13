@@ -58,7 +58,6 @@ func NewBlocksDataProvider(
 	// Set up a subscription to blocks based on the provided start block ID and block status.
 	subscription := p.createSubscription(context)
 	p.BaseDataProviderImpl = NewBaseDataProviderImpl(
-		context,
 		cancel,
 		topic,
 		send,
@@ -72,7 +71,7 @@ func NewBlocksDataProvider(
 //
 // No errors are expected during normal operations.
 func (p *BlocksDataProvider) Run() error {
-	return subscription.HandleSubscription(p.ctx, p.subscription, handleResponse(p.send, p.args.BlockStatus))
+	return subscription.HandleSubscription(p.subscription, handleResponse(p.send, p.args.BlockStatus))
 }
 
 // validateArguments checks and validates the arguments passed to the provider.
@@ -138,8 +137,7 @@ func (p *BlocksDataProvider) createSubscription(ctx context.Context) subscriptio
 func handleResponse(send chan<- interface{}, blockStatus flow.BlockStatus) func(*flow.Block) error {
 	return func(block *flow.Block) error {
 		send <- &models.BlockMessageResponse{
-			Block:       block,
-			BlockStatus: blockStatus,
+			Block: block,
 		}
 
 		return nil
