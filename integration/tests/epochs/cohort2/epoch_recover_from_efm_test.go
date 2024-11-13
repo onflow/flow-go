@@ -225,7 +225,7 @@ func (s *RecoverEpochSuite) TestRecoverEpochNodeEjected() {
 	// start the paused collection node now that we are in EFM
 	require.NoError(s.T(), ln.Start())
 
-	// get final view form the latest snapshot
+	// get final view from the latest snapshot
 	epoch1FinalView, err := s.Net.BootstrapSnapshot.Epochs().Current().FinalView()
 	require.NoError(s.T(), err)
 
