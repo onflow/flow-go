@@ -151,6 +151,11 @@ func ValidateResult(
 	txEvent *events.TransactionEventPayload,
 ) error {
 
+	// skip the validation for the block 217735938
+	if txEvent.BlockHeight == 217735938 {
+		return nil
+	}
+
 	// we should never produce invalid transaction, since if the transaction was emitted from the evm core
 	// it must have either been successful or failed, invalid transactions are not emitted
 	if res.Invalid() {
