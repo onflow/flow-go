@@ -72,22 +72,8 @@ func (f *combinedVoteProcessorFactoryBaseV3) Create(log zerolog.Logger, block *m
 		return nil, fmt.Errorf("could not create aggregator for thershold signatures: %w", err)
 	}
 
-	beaconKeys := make([]crypto.PublicKey, 0, dkg.Size())
-	for i := uint(0); i < dkg.Size(); i++ {
-		nodeID, err := dkg.NodeID(i)
-		if err != nil {
-			return nil, fmt.Errorf("could not get nodeID for index %d at block %v: %w", i, block.BlockID, err)
-		}
-
-		pk, err := dkg.KeyShare(nodeID)
-		if err != nil {
-			return nil, fmt.Errorf("could not get random beacon key share for %x at block %v: %w", nodeID, block.BlockID, err)
-		}
-		beaconKeys = append(beaconKeys, pk)
-	}
-
 	threshold := msig.RandomBeaconThreshold(int(dkg.Size()))
-	randomBeaconInspector, err := signature.NewRandomBeaconInspector(dkg.GroupKey(), beaconKeys, threshold, msg)
+	randomBeaconInspector, err := signature.NewRandomBeaconInspector(dkg.GroupKey(), dkg.KeyShares(), threshold, msg)
 	if err != nil {
 		return nil, fmt.Errorf("could not create random beacon inspector: %w", err)
 	}

@@ -2,7 +2,6 @@ package committees
 
 import (
 	"fmt"
-
 	"github.com/onflow/crypto"
 
 	"github.com/onflow/flow-go/consensus/hotstuff"
@@ -146,6 +145,15 @@ func (s staticDKG) KeyShare(nodeID flow.Identifier) (crypto.PublicKey, error) {
 		return nil, protocol.IdentityNotFoundError{NodeID: nodeID}
 	}
 	return participant.KeyShare, nil
+}
+
+// KeyShares returns all public key shares that are result of the distributed key generation.
+func (s staticDKG) KeyShares() []crypto.PublicKey {
+	participants := make([]crypto.PublicKey, len(s.dkgParticipants))
+	for _, participant := range s.dkgParticipants {
+		participants[participant.Index] = participant.KeyShare
+	}
+	return participants
 }
 
 // NodeID returns the node identifier for the given index.
