@@ -56,6 +56,9 @@ func GenerateRecoverEpochTxArgs(log zerolog.Logger,
 
 	internalNodesMap := make(map[flow.Identifier]struct{})
 	for _, node := range internalNodes {
+		if !currentEpochIdentities.Exists(node.Identity()) {
+			log.Warn().Msgf("node ID found in internal node infos missing from protocol snapshot identities %s", node.NodeID)
+		}
 		internalNodesMap[node.NodeID] = struct{}{}
 	}
 	log.Info().Msg("")
