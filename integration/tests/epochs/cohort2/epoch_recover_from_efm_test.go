@@ -68,7 +68,7 @@ func (s *RecoverEpochSuite) executeEFMRecoverTXArgsCMD(
 	numViewsInEpoch,
 	numViewsInStakingAuction,
 	recoveryEpochCounter,
-	targetDuration uint64,
+	recoveryEpochTargetDuration uint64,
 	unsafeAllowOverWrite bool) []cadence.Value {
 	// read internal node info from one of the consensus nodes
 	internalNodePrivInfoDir, nodeConfigJson := s.getNodeInfoDirs(flow.RoleConsensus)
@@ -82,7 +82,7 @@ func (s *RecoverEpochSuite) executeEFMRecoverTXArgsCMD(
 		flow.Localnet,
 		numViewsInStakingAuction,
 		numViewsInEpoch,
-		targetDuration,
+		recoveryEpochTargetDuration,
 		unsafeAllowOverWrite,
 		snapshot,
 	)

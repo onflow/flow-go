@@ -75,6 +75,8 @@ func TestRecoverEpochHappyPath(t *testing.T) {
 		currEpoch := rootSnapshot.Epochs().Current()
 		finalView, err := currEpoch.FinalView()
 		require.NoError(t, err)
+		targetEndTime, err := currEpoch.TargetEndTime()
+		require.NoError(t, err)
 
 		// epoch counter
 		require.Equal(t, cadence.NewUInt64(flagEpochCounter), decodedValues[0])
@@ -85,7 +87,7 @@ func TestRecoverEpochHappyPath(t *testing.T) {
 		// epoch end view
 		require.Equal(t, cadence.NewUInt64(finalView+flagNumViewsInEpoch), decodedValues[3])
 		// target duration
-		require.Equal(t, cadence.NewUInt64(flagTargetDuration), decodedValues[4])
+		require.Equal(t, cadence.NewUInt64(targetEndTime+flagRecoveryEpochTargetDuration), decodedValues[4])
 		// target end time
 		expectedTargetEndTime, err := rootSnapshot.Epochs().Current().TargetEndTime()
 		require.NoError(t, err)

@@ -27,7 +27,7 @@ func GenerateRecoverEpochTxArgs(log zerolog.Logger,
 	rootChainID flow.ChainID,
 	numViewsInStakingAuction uint64,
 	numViewsInEpoch uint64,
-	targetDuration uint64,
+	recoveryEpochTargetDuration uint64,
 	unsafeAllowOverWrite bool,
 	snapshot *inmem.Snapshot,
 ) ([]cadence.Value, error) {
@@ -164,8 +164,8 @@ func GenerateRecoverEpochTxArgs(log zerolog.Logger,
 		cadence.NewUInt64(currEpochFinalView + numViewsInStakingAuction),
 		// epoch end view
 		cadence.NewUInt64(currEpochFinalView + numViewsInEpoch),
-		// target duration
-		cadence.NewUInt64(targetDuration),
+		// recovery epoch target duration
+		cadence.NewUInt64(currEpochTargetEndTime + recoveryEpochTargetDuration),
 		// target end time
 		cadence.NewUInt64(currEpochTargetEndTime),
 		// clusters,
