@@ -1,6 +1,7 @@
 package evm_exporter
 
 import (
+	"encoding/gob"
 	"fmt"
 	"os"
 
@@ -9,7 +10,6 @@ import (
 
 	"github.com/onflow/flow-go/cmd/util/ledger/util"
 	"github.com/onflow/flow-go/fvm/evm"
-	"github.com/onflow/flow-go/fvm/evm/emulator/state"
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/ledger/common/convert"
 	"github.com/onflow/flow-go/model/flow"
@@ -81,23 +81,44 @@ func ExportEVMState(
 		}
 	}
 
-	payloadsLedger := util.NewPayloadsLedger(filteredPayloads)
+	// write evm state to output dir
+	data := make(map[string][]byte)
+	for registerID, payload := range filteredPayloads {
+		owner := []byte(registerID.Owner)
+		key := []byte(registerID.Key)
+		value := payload.Value()
+		fk := fullKey(owner, key)
 
-	exporter, err := state.NewExporter(payloadsLedger, storageRoot)
+		data[fk] = value
+	}
+
+	err = serialize("./values.gob", data)
 	if err != nil {
-		return fmt.Errorf("failed to create exporter: %w", err)
+		return err
 	}
 
-	if _, err := os.Stat(outputPath); os.IsNotExist(err) {
-		err := os.Mkdir(outputPath, os.ModePerm)
-		if err != nil {
-			return fmt.Errorf("failed to create path: %w", err)
-		}
-	}
+	return nil
+}
 
-	err = exporter.Export(outputPath)
+func fullKey(owner, key []byte) string {
+	return string(owner) + "~" + string(key)
+}
+
+// Serialize function: saves map data to a file
+func serialize(filename string, data map[string][]byte) error {
+	// Create a file to save data
+	file, err := os.Create(filename)
 	if err != nil {
-		return fmt.Errorf("failed to export: %w", err)
+		return err
 	}
+	defer file.Close()
+
+	// Use gob to encode data
+	encoder := gob.NewEncoder(file)
+	err = encoder.Encode(data)
+	if err != nil {
+		return err
+	}
+
 	return nil
 }
