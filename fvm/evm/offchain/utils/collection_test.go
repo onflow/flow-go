@@ -15,6 +15,7 @@ import (
 
 	"github.com/onflow/cadence"
 	"github.com/onflow/cadence/encoding/ccf"
+	gethCommon "github.com/onflow/go-ethereum/common"
 
 	"github.com/onflow/flow-go/fvm/environment"
 	"github.com/onflow/flow-go/fvm/evm"
@@ -24,10 +25,42 @@ import (
 	"github.com/onflow/flow-go/fvm/evm/offchain/utils"
 	. "github.com/onflow/flow-go/fvm/evm/testutils"
 	"github.com/onflow/flow-go/model/flow"
-	gethCommon "github.com/onflow/go-ethereum/common"
 )
 
 const resume_height = 6559268
+
+func TestValues(t *testing.T) {
+	values, err := deserialize("./values.gob")
+	require.NoError(t, err)
+	fmt.Println(len(values))
+
+	rootAddr := evm.StorageAccountAddress(flow.Testnet)
+	for fk := range values {
+		owner, _, err := decodeFullKey(fk)
+		require.NoError(t, err)
+		require.Equal(t, owner, rootAddr[:])
+	}
+
+	allocators, err := deserializeAllocator("./allocators.gob")
+	require.NoError(t, err)
+	fmt.Println(len(allocators))
+	for k, v := range allocators {
+		fmt.Println(k, v)
+	}
+}
+
+func decodeFullKey(encoded string) ([]byte, []byte, error) {
+	// Split the encoded string at the first occurrence of "~"
+	parts := strings.SplitN(encoded, "~", 2)
+	if len(parts) != 2 {
+		return nil, nil, fmt.Errorf("invalid encoded key: no delimiter found")
+	}
+
+	// Convert the split parts back to byte slices
+	owner := []byte(parts[0])
+	key := []byte(parts[1])
+	return owner, key, nil
+}
 
 func TestTestnetFrom(t *testing.T) {
 	values, err := deserialize("./values.gob")
