@@ -121,13 +121,13 @@ func (b *BeaconKeyRecovery) recoverMyBeaconPrivateKey(final protocol.Snapshot) e
 	myBeaconPrivateKey, safe, err := b.localDKGState.RetrieveMyBeaconPrivateKey(currentEpochCounter)
 	if err != nil {
 		if errors.Is(err, storage.ErrNotFound) {
-			log.Warn().Str(logging.KeySuspicious, "true").Msgf("no my beacon key for the current epoch has been found")
+			log.Warn().Str(logging.KeyPotentialConfigurationProblem, "true").Msgf("no my beacon key for the current epoch has been found")
 			return nil
 		}
 		return fmt.Errorf("could not retrieve my beacon private key for the current epoch: %w", err)
 	}
 	if !safe {
-		log.Warn().Str(logging.KeySuspicious, "true").Msgf("my beacon key for the current epoch is not safe")
+		log.Warn().Str(logging.KeyPotentialConfigurationProblem, "true").Msgf("my beacon key for the current epoch is not safe")
 		return nil
 	}
 
@@ -138,7 +138,7 @@ func (b *BeaconKeyRecovery) recoverMyBeaconPrivateKey(final protocol.Snapshot) e
 	beaconPubKey, err := nextEpochDKG.KeyShare(b.local.NodeID())
 	if err != nil {
 		if protocol.IsIdentityNotFound(err) {
-			log.Warn().Str(logging.KeySuspicious, "true").Msgf("current node is not part of the next epoch DKG")
+			log.Warn().Str(logging.KeyPotentialConfigurationProblem, "true").Msgf("current node is not part of the next epoch DKG")
 			return nil
 		}
 		return fmt.Errorf("could not get beacon key share for my node(%x): %w", b.local.NodeID(), err)
