@@ -63,6 +63,7 @@ func NewBlocks(
 			return nil, err
 		}
 	}
+
 	return blocks, nil
 }
 
