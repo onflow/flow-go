@@ -165,12 +165,6 @@ func NewSafeTxTracer(ct *CallTracer) *tracers.Tracer {
 		if ct.tracer.OnTxStart != nil {
 			ct.tracer.OnTxStart(vm, tx, from)
 		}
-		// reset tracing to have fresh state
-		if err := ct.ResetTracer(); err != nil {
-			l.Error().Err(err).
-				Msg("failed to reset tracer")
-			return
-		}
 	}
 
 	wrapped.OnTxEnd = func(receipt *types.Receipt, err error) {
@@ -197,6 +191,13 @@ func NewSafeTxTracer(ct *CallTracer) *tracers.Tracer {
 			return
 		}
 		ct.resultsByTxID[receipt.TxHash] = res
+
+		// reset tracing to have fresh state
+		if err := ct.ResetTracer(); err != nil {
+			l.Error().Err(err).
+				Msg("failed to reset tracer")
+			return
+		}
 	}
 
 	wrapped.OnEnter = func(
