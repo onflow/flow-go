@@ -6,6 +6,8 @@ import (
 	"testing"
 	"time"
 
+	"golang.org/x/exp/rand"
+
 	"github.com/cockroachdb/pebble"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/require"
@@ -14,6 +16,12 @@ import (
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/utils/unittest"
+)
+
+const (
+	latestHeight   uint64 = 12
+	pruneHeight    uint64 = 7
+	pruneThreshold uint64 = 5
 )
 
 // testCase defines the structure for a single test case, including initial data setup,
@@ -72,7 +80,7 @@ func TestPrune(t *testing.T) {
 					zerolog.Nop(),
 					db,
 					metrics.NewNoopCollector(),
-					WithPruneThreshold(5),
+					WithPruneThreshold(pruneThreshold),
 					WithPruneTickerInterval(10*time.Millisecond),
 				)
 				require.NoError(t, err)
@@ -96,6 +104,91 @@ func TestPrune(t *testing.T) {
 	}
 }
 
+// TestRemainingValuesAfterPruning tests that pruning does not affect values above the pruned height.
+//
+// This test covers scenarios where:
+// - The value entries in the database remains the same after pruning process
+func TestRemainingValuesAfterPruning(t *testing.T) {
+	// Generate random initial data across a range of heights.
+	testData := generateRandomRegisterData()
+
+	RunWithRegistersStorageWithInitialData(t, testData.initialData, func(db *pebble.DB) {
+		pruner, err := NewRegisterPruner(
+			zerolog.Nop(),
+			db,
+			metrics.NewNoopCollector(),
+			WithPruneThreshold(pruneThreshold),
+			WithPruneTickerInterval(10*time.Millisecond),
+		)
+		require.NoError(t, err)
+
+		ctx, cancel := context.WithCancel(context.Background())
+		signalerCtx, errChan := irrecoverable.WithSignaler(ctx)
+
+		// Start the pruning process.
+		pruner.Start(signalerCtx)
+
+		// Wait until pruning completes and verify that values above prune height remain unchanged.
+		requirePruning(t, db, testData.expectedFirstHeight)
+
+		// Clean up pruner and check for any errors.
+		cleanupPruner(t, pruner, cancel, errChan)
+
+		// Check that all heights above the prune height have unchanged values.
+		for height := pruneHeight + 1; height <= latestHeight; height++ {
+			entries, exists := testData.expectedData[height]
+			if !exists {
+				continue
+			}
+
+			for _, entry := range entries {
+				val, closer, err := db.Get(newLookupKey(height, entry.Key).Bytes())
+				require.NoError(t, err)
+				require.Equal(t, entry.Value, val)
+				require.NoError(t, closer.Close())
+			}
+		}
+	})
+}
+
+// TestPruningInterruption tests that interrupted pruning does not affect any register values.
+//
+// This test covers scenarios where:
+// - The all values entries in the database remains the same when pruning was interrupted in the middle of the process
+func TestPruningInterruption(t *testing.T) {
+	// Generate random initial data across a range of heights.
+	testData := generateRandomRegisterData()
+
+	RunWithRegistersStorageWithInitialData(t, testData.initialData, func(db *pebble.DB) {
+		pruner, err := NewRegisterPruner(
+			zerolog.Nop(),
+			db,
+			metrics.NewNoopCollector(),
+			WithPruneThreshold(pruneThreshold),
+			WithPruneTickerInterval(10*time.Millisecond),
+		)
+		require.NoError(t, err)
+
+		ctx, cancel := context.WithCancel(context.Background())
+		signalerCtx, errChan := irrecoverable.WithSignaler(ctx)
+
+		// Start the pruning process but cancel it immediately to simulate interruption.
+		go pruner.Start(signalerCtx)
+
+		cleanupPruner(t, pruner, cancel, errChan)
+
+		// Verify that all values remain unchanged after the interrupted pruning attempt.
+		for height, entries := range testData.initialData {
+			for _, entry := range entries {
+				val, closer, err := db.Get(newLookupKey(height, entry.Key).Bytes())
+				require.NoError(t, err)
+				require.Equal(t, entry.Value, val)
+				require.NoError(t, closer.Close())
+			}
+		}
+	})
+}
+
 // TestPruneErrors checks the error handling behavior of the RegisterPruner when certain
 // conditions cause failures during the pruning process.
 //
@@ -116,7 +209,7 @@ func TestPruneErrors(t *testing.T) {
 				zerolog.Nop(),
 				db,
 				metrics.NewNoopCollector(),
-				WithPruneThreshold(5),
+				WithPruneThreshold(pruneThreshold),
 				WithPruneTickerInterval(10*time.Millisecond),
 			)
 			require.NoError(t, err)
@@ -145,7 +238,7 @@ func TestPruneErrors(t *testing.T) {
 				zerolog.Nop(),
 				db,
 				metrics.NewNoopCollector(),
-				WithPruneThreshold(5),
+				WithPruneThreshold(pruneThreshold),
 				WithPruneTickerInterval(10*time.Millisecond),
 			)
 			require.NoError(t, err)
@@ -185,7 +278,7 @@ func cleanupPruner(t *testing.T, pruner *RegisterPruner, cancel context.CancelFu
 
 // straightPruneTestCase initializes and returns a testCase with predefined data for straight pruning.
 func straightPruneTestCase() testCase {
-	initialData := emptyRegistersData(12)
+	initialData := emptyRegistersData(latestHeight)
 
 	key1 := flow.RegisterID{Owner: "owner1", Key: "key1"}
 	key2 := flow.RegisterID{Owner: "owner2", Key: "key2"}
@@ -265,7 +358,7 @@ func straightPruneTestCase() testCase {
 
 	return testCase{
 		initialData:         initialData,
-		expectedFirstHeight: 7,
+		expectedFirstHeight: pruneHeight,
 		expectedData:        expectedData,
 		prunedData:          prunedData,
 	}
@@ -273,7 +366,7 @@ func straightPruneTestCase() testCase {
 
 // testCaseWithDiffHeights initializes and returns a testCase with predefined data for different entries to keep
 func testCaseWithDiffHeights() testCase {
-	initialData := emptyRegistersData(12)
+	initialData := emptyRegistersData(latestHeight)
 
 	key1 := flow.RegisterID{Owner: "owner1", Key: "key1"}
 	key2 := flow.RegisterID{Owner: "owner2", Key: "key2"}
@@ -358,17 +451,62 @@ func testCaseWithDiffHeights() testCase {
 
 	return testCase{
 		initialData:         initialData,
-		expectedFirstHeight: 7,
+		expectedFirstHeight: pruneHeight,
 		expectedData:        expectedData,
 		prunedData:          prunedData,
 	}
 }
 
+// generateRandomRegisterData generates random register entries up to a given number of heights.
+func generateRandomRegisterData() testCase {
+	initialData := emptyRegistersData(latestHeight)
+
+	keys := []flow.RegisterID{
+		{Owner: "owner1", Key: "key1"},
+		{Owner: "owner2", Key: "key2"},
+		{Owner: "owner3", Key: "key3"},
+	}
+
+	values := [][]byte{
+		[]byte("value1"),
+		[]byte("value2"),
+		[]byte("value3"),
+	}
+
+	rand.Seed(uint64(time.Now().UnixNano()))
+	expectedData := make(map[uint64]flow.RegisterEntries)
+
+	for height := uint64(1); height <= latestHeight; height++ {
+		var entries flow.RegisterEntries
+
+		// Randomly assign register entries for each height.
+		for j, key := range keys {
+			if rand.Intn(2) == 0 {
+				entries = append(entries, flow.RegisterEntry{
+					Key:   key,
+					Value: values[j],
+				})
+			}
+		}
+
+		initialData[height] = entries
+		if height > pruneHeight {
+			expectedData[height] = entries
+		}
+	}
+
+	return testCase{
+		initialData:         initialData,
+		expectedFirstHeight: pruneHeight,
+		expectedData:        expectedData,
+	}
+}
+
 // emptyRegistersData initializes an empty map for storing register entries.
-func emptyRegistersData(count int) map[uint64]flow.RegisterEntries {
+func emptyRegistersData(count uint64) map[uint64]flow.RegisterEntries {
 	data := make(map[uint64]flow.RegisterEntries, count)
-	for i := 1; i <= count; i++ {
-		data[uint64(i)] = flow.RegisterEntries{}
+	for i := uint64(1); i <= count; i++ {
+		data[i] = flow.RegisterEntries{}
 	}
 
 	return data
