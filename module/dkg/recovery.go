@@ -19,7 +19,7 @@ import (
 // BeaconKeyRecovery is a specific module that attempts automatic recovery of the random beacon private key
 // when exiting Epoch Fallback Mode [EFM].
 // In the happy path of the protocol, each node that takes part in the DKG obtains a random beacon
-// private key which is stored in storage.DKGState. If the network enters EFM, the network can be recovered
+// private key, which is stored in storage.DKGState. If the network enters EFM, the network can be recovered
 // via the flow.EpochRecover service event, which exits EFM by specifying the subsequent epoch ("recovery epoch").
 // This recovery epoch must have a Random Beacon committee with valid keys, but no successful DKG occurred.
 // To solve this, by convention, we require the recovery epoch to re-use the Random Beacon public keys from
@@ -81,8 +81,10 @@ func (b *BeaconKeyRecovery) EpochFallbackModeExited(epochCounter uint64, refBloc
 // concluding the 'my beacon key' recovery.
 // If there is a safe 'my beacon key' for the next epoch, or we are not in committed phase (DKG for next epoch is not available)
 // then calling this method is no-op.
-// No errors are expected during normal operations.
-func (b *BeaconKeyRecovery) tryRecoverMyBeaconPrivateKey(final protocol.Snapshot) error {
+// Expected Errors under normal operations: 
+//  * `nextEpochNotYetCommitted` if the next epoch is not yet committed, hence we can't confirm whether we have an usable
+//     Random Beacon key.
+func (b *BeaconKeyRecovery) recoverMyBeaconPrivateKey(final protocol.Snapshot) error {
 	head, err := final.Head()
 	if err != nil {
 		return fmt.Errorf("could not get head of snapshot: %w", err)
@@ -131,7 +133,7 @@ func (b *BeaconKeyRecovery) tryRecoverMyBeaconPrivateKey(final protocol.Snapshot
 
 	nextEpochDKG, err := final.Epochs().Next().DKG()
 	if err != nil {
-		return fmt.Errorf("could not get DKG for next epoch : %w", err)
+		return fmt.Errorf("could not get DKG for next epoch %d: %w", nextEpochCounter, err)
 	}
 	beaconPubKey, err := nextEpochDKG.KeyShare(b.local.NodeID())
 	if err != nil {

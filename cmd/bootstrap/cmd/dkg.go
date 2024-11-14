@@ -16,7 +16,6 @@ import (
 
 func runBeaconKG(nodes []model.NodeInfo) (dkg.DKGData, flow.DKGIndexMap) {
 	n := len(nodes)
-
 	log.Info().Msgf("read %v node infos for DKG", n)
 
 	log.Debug().Msgf("will run DKG")
