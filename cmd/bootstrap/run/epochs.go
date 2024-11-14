@@ -95,8 +95,18 @@ func GenerateRecoverEpochTxArgs(log zerolog.Logger,
 		return nil, fmt.Errorf("failed to get DKG for current epoch: %w", err)
 	}
 
-	// NOTE: The RecoveryEpoch will re-use the last successful DKG output. This means that the consensus
-	// committee in the RecoveryEpoch must be identical to the committee which participated in that DKG.
+	// Context: recovering from Epoch Fallback Mode requires that a sufficiency large fraction of consensus participants
+	// has valid random beacon keys (threshold signature scheme). The specific origin of those threshold keys is largely
+	// irrelevant. Running a centralized key generation process, using keys from an off-chain DKG, or reusing the random
+	// beacon keys from a prior epoch are all conceptually possible - provided the intersection between the consensus
+	// committee and the random beacon committee is large enough (for liveness).
+	// Implemented here:
+	// In a nutshell, we are carrying the current consensus and collector nodes forward into the next epoch (the Recovery
+	// Epoch). Removing or adding a small number of nodes here would be possible, but is not implemented at the moment.
+	// In all cases, a core requirement for liveness is: the fraction of consensus participants in the recovery epoch with
+	// valid random beacon should ber significantly larger than the threshold of the threshold-cryptography scheme.
+	// The EFM Recovery State Machine will heuristically reject recovery attempts (specifically reject EpochRecover Service
+	// events) where when the intersection between consensus and random beacon committees is too small.
 	dkgGroupKeyCdc, cdcErr := cadence.NewString(hex.EncodeToString(currentEpochDKG.GroupKey().Encode()))
 	if cdcErr != nil {
 		log.Fatal().Err(cdcErr).Msg("failed to get dkg group key cadence string")
