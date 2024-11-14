@@ -57,7 +57,7 @@ func NewBeaconKeyRecovery(
 		localDKGState: localDKGState,
 	}
 
-	err := recovery.tryRecoverMyBeaconPrivateKey(state.Final())
+	err := recovery.recoverMyBeaconPrivateKey(state.Final())
 	if err != nil {
 		return nil, fmt.Errorf("could not recover my beacon private key when initializing: %w", err)
 	}
@@ -69,7 +69,7 @@ func NewBeaconKeyRecovery(
 // this node has exited the epoch fallback mode.
 func (b *BeaconKeyRecovery) EpochFallbackModeExited(epochCounter uint64, refBlock *flow.Header) {
 	b.log.Info().Msgf("epoch fallback mode exited for epoch %d", epochCounter)
-	err := b.tryRecoverMyBeaconPrivateKey(b.state.AtHeight(refBlock.Height)) // refBlock must be finalized
+	err := b.recoverMyBeaconPrivateKey(b.state.AtHeight(refBlock.Height)) // refBlock must be finalized
 	if err != nil {
 		irrecoverable.Throw(context.TODO(), fmt.Errorf("failed to get final epoch protocol state: %w", err))
 	}
@@ -81,8 +81,8 @@ func (b *BeaconKeyRecovery) EpochFallbackModeExited(epochCounter uint64, refBloc
 // concluding the 'my beacon key' recovery.
 // If there is a safe 'my beacon key' for the next epoch, or we are not in committed phase (DKG for next epoch is not available)
 // then calling this method is no-op.
-// Expected Errors under normal operations: 
-//  * `nextEpochNotYetCommitted` if the next epoch is not yet committed, hence we can't confirm whether we have an usable
+// Expected Errors under normal operations:
+//   - `nextEpochNotYetCommitted` if the next epoch is not yet committed, hence we can't confirm whether we have an usable
 //     Random Beacon key.
 func (b *BeaconKeyRecovery) recoverMyBeaconPrivateKey(final protocol.Snapshot) error {
 	head, err := final.Head()
