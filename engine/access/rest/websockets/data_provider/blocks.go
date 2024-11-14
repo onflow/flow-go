@@ -11,39 +11,40 @@ import (
 
 type MockBlockProvider struct {
 	id               uuid.UUID
-	ch               chan<- interface{}
+	topicChan        chan<- interface{} // provider is not the one who is responsible to close this channel
 	topic            string
 	logger           zerolog.Logger
-	ctx              context.Context
 	stopProviderFunc context.CancelFunc
 	streamApi        state_stream.API
 }
 
 func NewMockBlockProvider(
-	ctx context.Context,
 	ch chan<- interface{},
 	topic string,
 	logger zerolog.Logger,
 	streamApi state_stream.API,
 ) *MockBlockProvider {
-	ctx, cancel := context.WithCancel(ctx)
 	return &MockBlockProvider{
 		id:               uuid.New(),
-		ch:               ch,
+		topicChan:        ch,
 		topic:            topic,
 		logger:           logger.With().Str("component", "block-provider").Logger(),
-		ctx:              ctx,
-		stopProviderFunc: cancel,
+		stopProviderFunc: nil,
 		streamApi:        streamApi,
 	}
 }
 
-func (p *MockBlockProvider) Run(_ context.Context) {
-	select {
-	case <-p.ctx.Done():
-		return
-	default:
-		p.ch <- "hello world"
+func (p *MockBlockProvider) Run(ctx context.Context) {
+	ctx, cancel := context.WithCancel(ctx)
+	p.stopProviderFunc = cancel
+
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case p.topicChan <- "hello world":
+			return
+		}
 	}
 }
 
