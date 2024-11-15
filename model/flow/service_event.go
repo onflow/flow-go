@@ -7,6 +7,8 @@ import (
 	"github.com/fxamacker/cbor/v2"
 	"github.com/vmihailenco/msgpack/v4"
 
+	"github.com/onflow/flow-go-sdk"
+
 	cborcodec "github.com/onflow/flow-go/model/encoding/cbor"
 )
 
@@ -37,7 +39,41 @@ const (
 // encoding and decoding.
 type ServiceEvent struct {
 	Type  ServiceEventType
-	Event interface{}
+	Event typedServiceEvent // TODO replace with typedServiceEvent type?
+}
+
+type ChunkIndexed[T typedServiceEvent] struct {
+	ChunkIndex uint
+	Event      T
+}
+
+func (c ChunkIndexed[T]) ID() Identifier {
+	return c.Event.ID()
+}
+
+func (c ChunkIndexed[T]) isSpecificServiceEvent() {}
+
+func ToChunkIndexedServiceEventList(chunkIndex uint, events ServiceEventList) ServiceEventList {
+	for i := range events {
+		events[i] = ServiceEvent{
+			Type: events[i].Type,
+			Event: ChunkIndexed[typedServiceEvent]{
+				ChunkIndex: chunkIndex,
+				Event:      events[i].Event,
+			},
+		}
+	}
+	return events
+}
+
+type typedServiceEvent interface {
+	// isSpecificServiceEvent is used to signal that a type is a specific ServiceEvent.
+	isSpecificServiceEvent()
+	IDEntity // all service events must be hashable
+}
+
+func (se *ServiceEvent) ID() flow.Identifier {
+	panic("")
 }
 
 // ServiceEventList is a handy container to enable comparisons
