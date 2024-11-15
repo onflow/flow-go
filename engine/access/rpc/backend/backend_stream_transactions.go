@@ -247,28 +247,21 @@ func (b *backendSubscribeTransactions) searchForTransactionBlockInfo(
 	return nil, flow.ZeroID, 0, flow.ZeroID, nil
 }
 
-// searchForTransactionResult searches for the transaction result of a block. It retrieves the execution result for the specified block ID.
-// Expected errors:
-// - codes.Internal if an internal error occurs while retrieving execution result.
+// searchForTransactionResult searches for the transaction result of a block. It retrieves the transaction result from
+// storage and, in case of failure, attempts to fetch the transaction result directly from the execution node.
+// This is necessary to ensure data availability despite sync storage latency.
+//
+// No errors expected during normal operations.
 func (b *backendSubscribeTransactions) searchForTransactionResult(
 	ctx context.Context,
 	txInfo *TransactionSubscriptionMetadata,
 ) (*access.TransactionResult, error) {
-	_, err := b.executionResults.ByBlockID(txInfo.BlockID)
+	block, err := b.txLocalDataProvider.blocks.ByHeight(txInfo.BlockHeight)
+	txResult, err := b.backendTransactions.GetTransactionResultFromStorage(ctx, block, txInfo.TransactionID, txInfo.eventEncodingVersion)
 	if err != nil {
-		if errors.Is(err, storage.ErrNotFound) {
-			return nil, nil
-		}
-		return nil, fmt.Errorf("failed to get execution result for block %s: %w", txInfo.BlockID, err)
+		// If any error occurs with local storage - request transaction result from EN
+		txResult, err = b.backendTransactions.GetTransactionResultFromExecutionNode(ctx, block, txInfo.TransactionID, txInfo.eventEncodingVersion)
 	}
-
-	txResult, err := b.backendTransactions.GetTransactionResult(
-		ctx,
-		txInfo.TransactionID,
-		txInfo.BlockID,
-		txInfo.CollectionID,
-		txInfo.eventEncodingVersion,
-	)
 
 	if err != nil {
 		// if either the storage or execution node reported no results or there were not enough execution results

@@ -651,14 +651,14 @@ func (b *backendTransactions) lookupTransactionResult(
 	var err error
 	switch b.txResultQueryMode {
 	case IndexQueryModeExecutionNodesOnly:
-		txResult, err = b.getTransactionResultFromExecutionNode(ctx, block, txID, requiredEventEncodingVersion)
+		txResult, err = b.GetTransactionResultFromExecutionNode(ctx, block, txID, requiredEventEncodingVersion)
 	case IndexQueryModeLocalOnly:
 		txResult, err = b.GetTransactionResultFromStorage(ctx, block, txID, requiredEventEncodingVersion)
 	case IndexQueryModeFailover:
 		txResult, err = b.GetTransactionResultFromStorage(ctx, block, txID, requiredEventEncodingVersion)
 		if err != nil {
 			// If any error occurs with local storage - request transaction result from EN
-			txResult, err = b.getTransactionResultFromExecutionNode(ctx, block, txID, requiredEventEncodingVersion)
+			txResult, err = b.GetTransactionResultFromExecutionNode(ctx, block, txID, requiredEventEncodingVersion)
 		}
 	default:
 		return nil, status.Errorf(codes.Internal, "unknown transaction result query mode: %v", b.txResultQueryMode)
@@ -742,7 +742,7 @@ func (b *backendTransactions) registerTransactionForRetry(tx *flow.TransactionBo
 	b.retry.RegisterTransaction(referenceBlock.Height, tx)
 }
 
-func (b *backendTransactions) getTransactionResultFromExecutionNode(
+func (b *backendTransactions) GetTransactionResultFromExecutionNode(
 	ctx context.Context,
 	block *flow.Block,
 	transactionID flow.Identifier,
