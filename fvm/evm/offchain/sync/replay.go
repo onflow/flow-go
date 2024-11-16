@@ -5,11 +5,13 @@ import (
 	"fmt"
 
 	"github.com/onflow/atree"
+	gethCommon "github.com/onflow/go-ethereum/common"
 	gethTypes "github.com/onflow/go-ethereum/core/types"
 	gethTracer "github.com/onflow/go-ethereum/eth/tracers"
 	gethTrie "github.com/onflow/go-ethereum/trie"
 
 	"github.com/onflow/flow-go/fvm/evm/emulator"
+	"github.com/onflow/flow-go/fvm/evm/emulator/state"
 	"github.com/onflow/flow-go/fvm/evm/events"
 	"github.com/onflow/flow-go/fvm/evm/precompiles"
 	"github.com/onflow/flow-go/fvm/evm/types"
@@ -105,6 +107,13 @@ func replayTransactionExecution(
 			return fmt.Errorf("error decoding precompiled calls [%x]: %w", txEvent.Payload, err)
 		}
 		ctx.ExtraPrecompiledContracts = precompiles.AggregatedPrecompiledCallsToPrecompiledContracts(pcs)
+	}
+
+	if ctx.BlockNumber == 8008603 && ctx.ChainID == types.FlowEVMTestNetChainID {
+		//delete 0 address to fix gasUsage issue on testnet
+		base, _ := state.NewBaseView(ledger, rootAddr)
+		base.DeleteAccount(gethCommon.Address{})
+		base.Commit()
 	}
 
 	// create a new block view
