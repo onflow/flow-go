@@ -39,28 +39,36 @@ const (
 // encoding and decoding.
 type ServiceEvent struct {
 	Type  ServiceEventType
-	Event typedServiceEvent // TODO replace with typedServiceEvent type?
+	Event any // TODO replace with typedServiceEvent type?
 }
 
-type ChunkIndexed[T typedServiceEvent] struct {
-	ChunkIndex uint
-	Event      T
+type ChunkIndexed[T any] struct {
+	// always set to true - used to differentiate from other types
+	// needed only while we support both ServiceEvent and ChunkIndexed[ServiceEvent]
+	__isChunkIndexed__ bool
+	ChunkIndex         uint
+	Event              T
 }
 
-func (c ChunkIndexed[T]) ID() Identifier {
-	return c.Event.ID()
+func makeChunkIndexed[T any](event T, index uint) ChunkIndexed[T] {
+	return ChunkIndexed[T]{
+		__isChunkIndexed__: true,
+		ChunkIndex:         index,
+		Event:              event,
+	}
 }
 
-func (c ChunkIndexed[T]) isSpecificServiceEvent() {}
+//func (c ChunkIndexed[T]) ID() Identifier {
+//	return c.Event.ID()
+//}
+//
+//func (c ChunkIndexed[T]) isSpecificServiceEvent() {}
 
 func ToChunkIndexedServiceEventList(chunkIndex uint, events ServiceEventList) ServiceEventList {
 	for i := range events {
 		events[i] = ServiceEvent{
-			Type: events[i].Type,
-			Event: ChunkIndexed[typedServiceEvent]{
-				ChunkIndex: chunkIndex,
-				Event:      events[i].Event,
-			},
+			Type:  events[i].Type,
+			Event: makeChunkIndexed(events[i], chunkIndex),
 		}
 	}
 	return events
@@ -184,14 +192,25 @@ func (marshaller marshallerImpl) UnmarshalWrapped(b []byte) (ServiceEvent, error
 func unmarshalWrapped[E any](b []byte, marshaller marshallerImpl) (*E, error) {
 	wrapper := struct {
 		Type  ServiceEventType
-		Event E
+		Event ChunkIndexed[E]
 	}{}
 	err := marshaller.unmarshalFunc(b, &wrapper)
 	if err != nil {
 		return nil, err
 	}
+	if wrapper.Event.__isChunkIndexed__ {
+		return &wrapper.Event.Event, nil
+	}
 
-	return &wrapper.Event, nil
+	priorVersionWrapper := struct {
+		Type  ServiceEventType
+		Event E
+	}{}
+	err = marshaller.unmarshalFunc(b, &priorVersionWrapper)
+	if err != nil {
+		return nil, err
+	}
+	return &priorVersionWrapper.Event, nil
 }
 
 // UnmarshalWithType unmarshals the service event and returns it as a wrapped ServiceEvent type.

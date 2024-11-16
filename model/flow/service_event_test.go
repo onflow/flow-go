@@ -181,6 +181,7 @@ func TestEncodeDecode(t *testing.T) {
 }
 
 // ServiceEventCapable is an interface to convert a specific event type to a generic ServiceEvent type.
+// TODO
 type ServiceEventCapable interface {
 	ServiceEvent() flow.ServiceEvent
 }
