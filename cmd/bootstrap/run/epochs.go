@@ -33,8 +33,10 @@ func GenerateRecoverEpochTxArgs(log zerolog.Logger,
 ) ([]cadence.Value, error) {
 	epoch := snapshot.Epochs().Current()
 
-	// including only currently active protocol participants (excluding nodes that are ejected, joining or leaving)
-	currentEpochIdentities, err := snapshot.Identities(filter.And(filter.IsValidProtocolParticipant, filter.IsValidCurrentEpochParticipant))
+	// including only (conjunction):
+	//  * nodes authorized to actively participate in the current epoch (i.e. excluding ejected, joining or leaving nodes)
+	//  * and with _positive_ weight 
+	currentEpochIdentities, err := snapshot.Identities(filter.And(filter.IsValidCurrentEpochParticipant, filter.HasWeightGreaterThanZero))
 	if err != nil {
 		return nil, fmt.Errorf("failed to get  valid protocol participants from snapshot: %w", err)
 	}
