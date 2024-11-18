@@ -15,7 +15,6 @@ import (
 	gethTypes "github.com/onflow/go-ethereum/core/types"
 	gethParams "github.com/onflow/go-ethereum/params"
 	gethUtils "github.com/onflow/go-ethereum/trie/utils"
-	"github.com/rs/zerolog/log"
 
 	"github.com/onflow/flow-go/fvm/evm/types"
 	"github.com/onflow/flow-go/model/flow"
@@ -141,7 +140,7 @@ func (db *StateDB) SubBalance(
 	amount *uint256.Int,
 	reason gethTracing.BalanceChangeReason,
 ) {
-	log.Info().Msgf("SubBalance %s, %v, %s", addr.String(), amount, reason)
+	// log.Info().Msgf("SubBalance %s, %v, %s", addr.String(), amount, reason)
 	// negative amounts are not accepted.
 	if amount.Sign() < 0 {
 		db.handleError(types.ErrInvalidBalance)

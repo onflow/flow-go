@@ -2,7 +2,6 @@ package emulator
 
 import (
 	"errors"
-	"fmt"
 	"math/big"
 
 	"github.com/holiman/uint256"
@@ -15,7 +14,6 @@ import (
 	gethVM "github.com/onflow/go-ethereum/core/vm"
 	gethCrypto "github.com/onflow/go-ethereum/crypto"
 	gethParams "github.com/onflow/go-ethereum/params"
-	"github.com/rs/zerolog/log"
 
 	"github.com/onflow/flow-go/fvm/evm/emulator/state"
 	"github.com/onflow/flow-go/fvm/evm/types"
@@ -174,7 +172,6 @@ func (bl *BlockView) RunTransaction(
 		proc.evm.Config.Tracer.OnTxStart(proc.evm.GetVMContext(), tx, msg.From)
 	}
 
-	log.Info().Msgf("executing EVM transaction %v", tx.Hash().Hex())
 	// run msg
 	res, err := proc.run(msg, tx.Hash(), tx.Type())
 	if err != nil {
@@ -330,11 +327,6 @@ func (bl *BlockView) newProcedure() (*procedure, error) {
 		return nil, err
 	}
 	cfg := bl.config
-
-	fmt.Println("=====================>>>>>>>>>")
-	log.Info().
-		Str("chain_config", fmt.Sprintf("%+v", cfg.ChainConfig)).
-		Msg("new EVM with configs")
 
 	return &procedure{
 		config: cfg,
@@ -657,10 +649,6 @@ func (proc *procedure) run(
 	// we need to update this code.
 	gasPool := (*gethCore.GasPool)(&proc.config.BlockContext.GasLimit)
 
-	log.Info().
-		Str("tx_hash", txHash.Hex()).
-		Msg("Running EVM transaction")
-
 	// transit the state
 	execResult, err := gethCore.NewStateTransition(
 		proc.evm,
@@ -690,13 +678,6 @@ func (proc *procedure) run(
 		if err != nil {
 			return nil, err
 		}
-
-		log.Info().
-			Str("tx_hash", txHash.Hex()).
-			Uint64("gas_used", res.GasConsumed).
-			Uint64("cumulative_gas_used", res.CumulativeGasUsed).
-			Uint64("gas_refund", res.GasRefund).
-			Msg("EVM transaction executed")
 
 		// we need to capture the returned value no matter the status
 		// if the tx is reverted the error message is returned as returned value

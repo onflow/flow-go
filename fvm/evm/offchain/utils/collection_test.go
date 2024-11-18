@@ -2,29 +2,39 @@ package utils_test
 
 import (
 	"bufio"
+	"context"
 	"encoding/gob"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"io"
 	"os"
 	"strings"
 	"testing"
 
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/require"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
 
 	"github.com/onflow/cadence"
 	"github.com/onflow/cadence/encoding/ccf"
+	"github.com/onflow/flow/protobuf/go/flow/entities"
+	"github.com/onflow/flow/protobuf/go/flow/executiondata"
 	gethCommon "github.com/onflow/go-ethereum/common"
 
+	"github.com/onflow/flow-go/engine/common/rpc/convert"
 	"github.com/onflow/flow-go/fvm/environment"
 	"github.com/onflow/flow-go/fvm/evm"
 	"github.com/onflow/flow-go/fvm/evm/events"
 	"github.com/onflow/flow-go/fvm/evm/offchain/blocks"
+	"github.com/onflow/flow-go/fvm/evm/offchain/storage"
 	"github.com/onflow/flow-go/fvm/evm/offchain/sync"
 	"github.com/onflow/flow-go/fvm/evm/offchain/utils"
 	. "github.com/onflow/flow-go/fvm/evm/testutils"
+	ledgerConvert "github.com/onflow/flow-go/ledger/common/convert"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
 )
 
 const resume_height = 6559268
@@ -110,11 +120,18 @@ func ReplayingFromSratchFromHeight(
 				return nil
 			}
 
-			fmt.Println("height: ", blockEventPayload.Height)
+			// fmt.Println("height: ", blockEventPayload.Height)
 
 			idx := blockEventPayload.Height % 256
 
-			blockEventPayload.Hash = hashes[idx]
+			consistentHash := hashes[idx]
+
+			if consistentHash != hashes[idx] {
+				blockEventPayload.Hash = consistentHash
+				fmt.Println("block hash inconsistent", blockEventPayload.Height, idx, blockEventPayload.Hash.Hex(), consistentHash.Hex())
+			} else if blockEventPayload.Height > 256 {
+				panic("height")
+			}
 
 			err = bp.OnBlockReceived(blockEventPayload)
 			require.NoError(t, err)
@@ -152,9 +169,30 @@ func ReplayingFromSratchToHeight(
 	bp, err := blocks.NewBasicProvider(chainID, storage, rootAddr)
 	require.NoError(t, err)
 
+	hashes := fixedHashes()
+
+	lookup := make(map[gethCommon.Hash]struct{})
+	for _, hash := range hashes {
+		lookup[hash] = struct{}{}
+	}
+
 	ReplayingBlocksFromScratch(t, storage, filePath,
 		func(blockEventPayload *events.BlockEventPayload, txEvents []events.TransactionEventPayload) error {
-			fmt.Println("height: ", blockEventPayload.Height)
+
+			fmt.Println("blockEventPayload: ", blockEventPayload)
+			fmt.Println("txEvents: ", txEvents)
+
+			idx := blockEventPayload.Height % 256
+			consistentHash := hashes[idx]
+			if blockEventPayload.Hash == hashes[idx] {
+				fmt.Println("block hash consistent", blockEventPayload.Height, idx, blockEventPayload.Hash.Hex(), consistentHash.Hex())
+			}
+
+			_, ok := lookup[blockEventPayload.Hash]
+			if ok {
+				fmt.Println("found block hash", blockEventPayload.Height, blockEventPayload.Hash.Hex())
+			}
+
 			err = bp.OnBlockReceived(blockEventPayload)
 			require.NoError(t, err)
 
@@ -170,6 +208,10 @@ func ReplayingFromSratchToHeight(
 
 			err = bp.OnBlockExecuted(blockEventPayload.Height, res)
 			require.NoError(t, err)
+
+			if blockEventPayload.Height == uint64(813) {
+				panic("stop")
+			}
 
 			if blockEventPayload.Height == stopAfterExecuted {
 				values, allocators := storage.Dump()
@@ -227,6 +269,233 @@ func ReplayingFromSratch(
 
 			return nil
 		})
+}
+
+type Subscription[T any] struct {
+	ch  chan T
+	err error
+}
+
+func NewSubscription[T any]() *Subscription[T] {
+	return &Subscription[T]{
+		ch: make(chan T),
+	}
+}
+
+func (s *Subscription[T]) Channel() <-chan T {
+	return s.ch
+}
+
+func (s *Subscription[T]) Err() error {
+	return s.err
+}
+
+type ExecutionDataResponse struct {
+	BlockID       flow.Identifier
+	Height        uint64
+	ExecutionData *execution_data.BlockExecutionData
+}
+
+func SyncAndReplay(
+	t *testing.T,
+	chainID flow.ChainID,
+	fromHeight uint64,
+	handler func(*events.BlockEventPayload, []events.TransactionEventPayload, ExecutionDataResponse) error,
+) {
+
+	sub := NewSubscription[ExecutionDataResponse]()
+	SyncBlocksFromScratch(t, chainID, fromHeight, sub)
+	txEvents := make([]events.TransactionEventPayload, 0)
+
+	for resp := range sub.Channel() {
+		for _, chunk := range resp.ExecutionData.ChunkExecutionDatas {
+			for _, e := range chunk.Events {
+				evtType := string(e.Type)
+				if strings.Contains(evtType, "BlockExecuted") {
+					ev, err := ccf.Decode(nil, e.Payload)
+					require.NoError(t, err)
+					blockEventPayload, err := events.DecodeBlockEventPayload(ev.(cadence.Event))
+					require.NoError(t, err)
+
+					require.NoError(t,
+						handler(blockEventPayload, txEvents, resp),
+						fmt.Sprintf("fail to handle block at height %d",
+							blockEventPayload.Height))
+
+					txEvents = make([]events.TransactionEventPayload, 0)
+				} else if strings.Contains(evtType, "TransactionExecuted") {
+					fmt.Println("transaction executed")
+					ev, err := ccf.Decode(nil, e.Payload)
+					require.NoError(t, err)
+					txEv, err := events.DecodeTransactionEventPayload(ev.(cadence.Event))
+					require.NoError(t, err)
+					txEvents = append(txEvents, *txEv)
+				}
+			}
+		}
+	}
+}
+
+func TestReplayWithExecutionData(t *testing.T) {
+	chainID := flow.Testnet
+	store := GetSimpleValueStore()
+	rootAddr := evm.StorageAccountAddress(chainID)
+	fmt.Println("rootAddr", rootAddr)
+
+	// setup the rootAddress account
+	as := environment.NewAccountStatus()
+	err := store.SetValue(rootAddr[:], []byte(flow.AccountStatusKey), as.ToBytes())
+	require.NoError(t, err)
+
+	fromHeight := uint64(211176670) // root block of devnet51
+
+	SyncAndReplay(t, chainID, fromHeight,
+		func(blockEventPayload *events.BlockEventPayload, txEvents []events.TransactionEventPayload, resp ExecutionDataResponse) error {
+			fmt.Println("height", blockEventPayload.Height, blockEventPayload.Hash, resp.Height)
+
+			bpStorage := storage.NewEphemeralStorage(store)
+			bp, err := blocks.NewBasicProvider(chainID, bpStorage, rootAddr)
+			require.NoError(t, err)
+
+			err = bp.OnBlockReceived(blockEventPayload)
+			require.NoError(t, err)
+
+			sp := NewTestStorageProvider(store, blockEventPayload.Height)
+			cr := sync.NewReplayer(chainID, rootAddr, sp, bp, zerolog.Logger{}, nil, true)
+			res, err := cr.ReplayBlock(txEvents, blockEventPayload)
+			require.NoError(t, err)
+			// commit all changes
+			for k, v := range res.StorageRegisterUpdates() {
+				err = store.SetValue([]byte(k.Owner), []byte(k.Key), v)
+				require.NoError(t, err)
+			}
+
+			for k, v := range bpStorage.StorageRegisterUpdates() {
+				err = store.SetValue([]byte(k.Owner), []byte(k.Key), v)
+				require.NoError(t, err)
+			}
+
+			verifyTrieUpdates(
+				t,
+				rootAddr,
+				resp,
+				res.StorageRegisterUpdates(),
+				bpStorage.StorageRegisterUpdates())
+
+			err = bp.OnBlockExecuted(blockEventPayload.Height, res)
+			require.NoError(t, err)
+
+			return nil
+		})
+}
+
+func verifyTrieUpdates(
+	t *testing.T,
+	rootAddr flow.Address,
+	resp ExecutionDataResponse,
+	gwUpdates map[flow.RegisterID]flow.RegisterValue,
+	gwBlockUpdates map[flow.RegisterID]flow.RegisterValue,
+) {
+	enUpdates := make(map[flow.RegisterID]flow.RegisterValue)
+	rootAddrStr := string(rootAddr.Bytes())
+	for _, chunk := range resp.ExecutionData.ChunkExecutionDatas {
+		for _, p := range chunk.TrieUpdate.Payloads {
+			id, val, err := ledgerConvert.PayloadToRegister(p)
+			require.NoError(t, err)
+			if id.Owner == rootAddrStr {
+				enUpdates[id] = val
+				fmt.Println("enUpdates", id.Key, fmt.Sprintf("%x", val))
+			}
+		}
+	}
+
+	matchingKeys := make(map[string]flow.RegisterValue, len(enUpdates))
+	missingKeys := make(map[string]flow.RegisterValue, len(enUpdates))
+
+	fmt.Println("total GW updates", len(gwUpdates), len(gwBlockUpdates), "total EN updates", len(enUpdates))
+
+	for k, v := range gwUpdates {
+		fmt.Println("gw Updates", k.Key, fmt.Sprintf("%x", v))
+	}
+
+	for k, v := range gwBlockUpdates {
+		fmt.Println("gw Block Updates", k.Key, fmt.Sprintf("%x", v))
+	}
+
+	for k, v := range gwUpdates {
+		enV, ok := enUpdates[k]
+		if ok {
+			require.Equal(t, v, enV, fmt.Sprintf("mismatching value in gwUpdates for key: %v", k.Key))
+			matchingKeys[k.Key] = v
+			delete(enUpdates, k)
+		} else {
+			missingKeys[k.Key] = v
+		}
+	}
+
+	for k, v := range gwBlockUpdates {
+		enV, ok := enUpdates[k]
+		if ok {
+			require.Equal(t, fmt.Sprintf("%x", v), fmt.Sprintf("%x", enV), fmt.Sprintf("mismatching value in gwBLockUpdates for key: %v", k.Key))
+			matchingKeys[k.Key] = v
+			delete(enUpdates, k)
+		} else {
+			missingKeys[k.Key] = v
+		}
+	}
+
+	for k, v := range missingKeys {
+		fmt.Println("missing key", k, v)
+	}
+}
+
+func SyncBlocksFromScratch(
+	t *testing.T,
+	chainID flow.ChainID,
+	fromHeight uint64,
+	sub *Subscription[ExecutionDataResponse],
+) {
+
+	address := "access-001.devnet51.nodes.onflow.org:9000"
+	opts := make([]grpc.DialOption, 0)
+	opts = append(opts, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	conn, err := grpc.Dial(address, opts...)
+	require.NoError(t, err)
+	client := executiondata.NewExecutionDataAPIClient(conn)
+	req := executiondata.SubscribeExecutionDataRequest{
+		EventEncodingVersion: entities.EventEncodingVersion_CCF_V0,
+		StartBlockHeight:     fromHeight,
+	}
+
+	stream, err := client.SubscribeExecutionData(context.Background(), &req)
+	require.NoError(t, err)
+
+	go func() {
+		defer close(sub.ch)
+
+		for {
+			resp, err := stream.Recv()
+			if err == io.EOF {
+				return
+			}
+			if err != nil {
+				sub.err = fmt.Errorf("error receiving execution data: %w [%d]", err, fromHeight)
+				return
+			}
+
+			execData, err := convert.MessageToBlockExecutionData(resp.GetBlockExecutionData(), chainID.Chain())
+			if err != nil {
+				fmt.Printf("error converting execution data:\n%v", resp.GetBlockExecutionData())
+				sub.err = fmt.Errorf("error converting execution data: %w", err)
+				return
+			}
+
+			sub.ch <- ExecutionDataResponse{
+				Height:        resp.BlockHeight,
+				ExecutionData: execData,
+			}
+		}
+	}()
 }
 
 func ReplayingBlocksFromScratch(
