@@ -55,6 +55,7 @@ func (c *CollectionExecutionResult) ServiceEventList() flow.EventsList {
 	return c.serviceEvents
 }
 
+// TODO: we can
 func (c *CollectionExecutionResult) ConvertedServiceEvents() flow.ServiceEventList {
 	return c.convertedServiceEvents
 }

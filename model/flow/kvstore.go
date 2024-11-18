@@ -4,6 +4,7 @@ package flow
 // the `EpochExtensionViewCount` parameter in the protocol state's key-value store.
 // NOTE: A SetEpochExtensionViewCount event `E` is accepted while processing block `B`
 // which seals `E` if and only if E.Value > 2*FinalizationSafetyThreshold.
+// TODO needs ID method
 type SetEpochExtensionViewCount struct {
 	Value uint64
 }

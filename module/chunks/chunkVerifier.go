@@ -291,6 +291,7 @@ func (fcv *ChunkVerifier) verifyTransactionsInContext(
 		return nil, chmodels.NewCFInvalidEventsCollection(chunk.EventCollection, eventsHash, chIndex, execResID, events)
 	}
 
+	// TODO: retrieve sevents for this chunk, then compare (not only system chunk)
 	if systemChunk {
 		equal, err := result.ServiceEvents.EqualTo(serviceEvents)
 		if err != nil {

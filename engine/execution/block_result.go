@@ -51,6 +51,7 @@ func (er *BlockExecutionResult) AllEvents() flow.EventsList {
 
 func (er *BlockExecutionResult) AllServiceEvents() flow.EventsList {
 	res := make(flow.EventsList, 0)
+	// TODO: this is where we can inject the chunk index (iter index below)
 	for _, ce := range er.collectionExecutionResults {
 		if len(ce.serviceEvents) > 0 {
 			res = append(res, ce.serviceEvents...)

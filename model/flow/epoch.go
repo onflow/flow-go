@@ -458,6 +458,7 @@ func (commit *EpochCommit) EqualTo(other *EpochCommit) bool {
 // EjectNode is a service event emitted when a node has to be ejected from the network.
 // The Dynamic Protocol State observes these events and updates the identity table accordingly.
 // It contains a single field which is the identifier of the node being ejected.
+// TODO needs id method
 type EjectNode struct {
 	NodeID Identifier
 }

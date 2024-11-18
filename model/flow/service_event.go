@@ -43,8 +43,9 @@ type ServiceEvent struct {
 }
 
 type ChunkIndexed[T any] struct {
-	// always set to true - used to differentiate from other types
+	// always set to true - used to differentiate from other types during unmarshal
 	// needed only while we support both ServiceEvent and ChunkIndexed[ServiceEvent]
+	// TODO: set in Marshal?
 	__isChunkIndexed__ bool
 	ChunkIndex         uint
 	Event              T
@@ -57,12 +58,6 @@ func makeChunkIndexed[T any](event T, index uint) ChunkIndexed[T] {
 		Event:              event,
 	}
 }
-
-//func (c ChunkIndexed[T]) ID() Identifier {
-//	return c.Event.ID()
-//}
-//
-//func (c ChunkIndexed[T]) isSpecificServiceEvent() {}
 
 func ToChunkIndexedServiceEventList(chunkIndex uint, events ServiceEventList) ServiceEventList {
 	for i := range events {

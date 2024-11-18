@@ -273,6 +273,7 @@ func (collector *resultCollector) processTransactionResult(
 		txnResult.ErrorMessage = output.Err.Error()
 	}
 
+	// TODO: we should inject service event chunk index at this point
 	collector.result.
 		CollectionExecutionResultAt(txn.collectionIndex).
 		AppendTransactionResults(

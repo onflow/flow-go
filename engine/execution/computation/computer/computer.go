@@ -253,6 +253,9 @@ func (e *blockComputer) queueTransactionRequests(
 				collectionLogger,
 				txnIndex,
 				txnBody,
+				// TODO(jord): is there a system transaction in every chunk?
+				// My understanding is there is one system chunk containing one system transaction.
+				// This is setting isSystemTransaction=true for one transaction in every collection...
 				i == len(collection.Transactions)-1)
 			txnIndex += 1
 		}

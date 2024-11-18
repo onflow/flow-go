@@ -118,7 +118,6 @@ func (el EventsList) ByteSize() int {
 
 // EventsMerkleRootHash calculates the root hash of events inserted into a
 // merkle trie with the hash of event as the key and encoded event as value
-// TODO(jord): update to include service events
 func EventsMerkleRootHash(el EventsList) (Identifier, error) {
 	tree, err := merkle.NewTree(IdentifierLen)
 	if err != nil {

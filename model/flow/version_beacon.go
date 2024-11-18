@@ -35,6 +35,7 @@ func (v VersionBoundary) Semver() (*semver.Version, error) {
 // Sequence is the event sequence number, which can be used to verify that no event has been
 // skipped by the follower. Every time the smart contract emits a new event, it increments
 // the sequence number by one.
+// TODO needs id method
 type VersionBeacon struct {
 	VersionBoundaries []VersionBoundary
 	Sequence          uint64
@@ -179,6 +180,8 @@ func (v *VersionBeacon) String() string {
 // The Protocol State version must be incremented when:
 //   - a change is made to the Protocol State Machine
 //   - a new key is added or removed from the Protocol State Key-Value Store
+//
+// TODO needs id method
 type ProtocolStateVersionUpgrade struct {
 	NewProtocolStateVersion uint64
 	ActiveView              uint64

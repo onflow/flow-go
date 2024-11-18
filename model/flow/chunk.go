@@ -21,7 +21,7 @@ func init() {
 }
 
 type ChunkBody struct {
-	// TODO(jord): what about service event chunk?
+	// TODO(jord): what about service event chunk? - add note that it is last chunk
 	CollectionIndex uint
 
 	// execution info
