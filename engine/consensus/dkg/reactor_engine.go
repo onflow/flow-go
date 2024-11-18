@@ -421,11 +421,20 @@ func (e *ReactorEngine) end(nextEpochCounter uint64) func() error {
 
 		err := e.controller.End()
 		if crypto.IsDKGFailureError(err) {
+			// Failing to complete the DKG protocol is a rare but expected scenario, which we must handle.
+			// By convention, if we are leaving the happy path, we want to persist the _first_ failure symptom
+			// in the `dkgState`. If the write yields a `storage.ErrAlreadyExists`, we know the overall protocol
+			// has already abandoned the happy path, because on the happy path the ReactorEngine is the only writer.
+			// Then this function just stops and returns without error.
 			e.log.Warn().Err(err).Msgf("node %s with index %d failed DKG locally", e.me.NodeID(), e.controller.GetIndex())
 			err := e.dkgState.SetDKGEndState(nextEpochCounter, flow.DKGEndStateDKGFailure)
-			if err != nil && !errors.Is(err, storage.ErrAlreadyExists) {
+			if err != nil {
+				if errors.Is(err, storage.ErrAlreadyExists) {
+					return nil // DKGEndState already being set is expected in case of epoch recovery
+				}
 				return fmt.Errorf("failed to set dkg end state following dkg end error: %w", err)
 			}
+			return nil // local DKG protocol has failed (the expected scenario)
 		} else if err != nil {
 			return fmt.Errorf("unknown error ending the dkg: %w", err)
 		}
