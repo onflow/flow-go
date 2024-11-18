@@ -163,7 +163,7 @@ func IsValidEpochCommit(commit *flow.EpochCommit, setup *flow.EpochSetup) error 
 		return NewInvalidServiceEventErrorf("inconsistent epoch counter between commit (%d) and setup (%d) events in same epoch", commit.Counter, setup.Counter)
 	}
 
-	// make sure we have a valid DKG public key
+	// make sure we have a Random Beacon group key:
 	if commit.DKGGroupKey == nil {
 		return NewInvalidServiceEventErrorf("missing DKG public group key")
 	}
@@ -171,7 +171,7 @@ func IsValidEpochCommit(commit *flow.EpochCommit, setup *flow.EpochSetup) error 
 	// enforce invariant: len(DKGParticipantKeys) == len(DKGIndexMap)
 	n := len(commit.DKGIndexMap) // size of the DKG committee
 	if len(commit.DKGParticipantKeys) != n {
-		return NewInvalidServiceEventErrorf("dkg key list (len=%d) does not match index map (len=%d)", len(commit.DKGParticipantKeys), len(commit.DKGIndexMap))
+		return NewInvalidServiceEventErrorf("number of %d Random Beacon key shares is inconsistent with number of DKG participatns (len=%d)", len(commit.DKGParticipantKeys), len(commit.DKGIndexMap))
 	}
 
 	// enforce invariant: DKGIndexMap values form the set {0, 1, ..., n-1} where n=len(DKGParticipantKeys)
