@@ -84,6 +84,7 @@ func (bhl *BlockHashList) Push(height uint64, bh gethCommon.Hash) error {
 	if !bhl.IsEmpty() && height != bhl.height+1 {
 		return fmt.Errorf("out of the order block hash, expected: %d, got: %d", bhl.height+1, height)
 	}
+
 	// updates the block hash stored at index
 	err := bhl.updateBlockHashAt(bhl.tail, bh)
 	if err != nil {
@@ -147,19 +148,22 @@ func (bhl *BlockHashList) updateBlockHashAt(idx int, bh gethCommon.Hash) error {
 	// fetch the bucket
 	bucketNumber := idx / hashCountPerBucket
 	bucket, err := bhl.fetchBucket(bucketNumber)
+	cpy := make([]byte, len(bucket))
+	copy(cpy, bucket)
+
 	if err != nil {
 		return err
 	}
 	// update the block hash
 	start := (idx % hashCountPerBucket) * hashEncodingSize
 	end := start + hashEncodingSize
-	copy(bucket[start:end], bh.Bytes())
+	copy(cpy[start:end], bh.Bytes())
 
 	// store bucket
 	return bhl.backend.SetValue(
 		bhl.rootAddress[:],
 		[]byte(fmt.Sprintf(blockHashListBucketKeyFormat, bucketNumber)),
-		bucket,
+		cpy,
 	)
 }
 
