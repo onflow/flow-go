@@ -2,6 +2,7 @@ package badger
 
 import (
 	"fmt"
+	"github.com/onflow/flow-go/module/irrecoverable"
 
 	"github.com/dgraph-io/badger/v2"
 	"github.com/onflow/crypto"
@@ -155,7 +156,7 @@ func (keys *SafeBeaconPrivateKeys) RetrieveMyBeaconPrivateKey(epochCounter uint6
 		}
 
 		// for any end state besides success and recovery, the key is not safe
-		if endState == flow.DKGEndStateSuccess || endState == flow.DKGEndStateRecovered {
+		if endState == flow.DKGEndStateSuccess || endState == flow.RandomBeaconKeyRecovered {
 			// retrieve the key - any storage error (including `storage.ErrNotFound`) is an exception
 			var encodableKey *encodable.RandomBeaconPrivKey
 			encodableKey, err = keys.state.retrieveKeyTx(epochCounter)(txn)
@@ -209,7 +210,7 @@ func (keys *EpochRecoveryMyBeaconKey) UpsertMyBeaconPrivateKey(epochCounter uint
 		if err != nil {
 			return err
 		}
-		return operation.UpsertDKGEndStateForEpoch(epochCounter, flow.DKGEndStateRecovered)(txn)
+		return operation.UpsertDKGEndStateForEpoch(epochCounter, flow.RandomBeaconKeyRecovered)(txn)
 	})
 	if err != nil {
 		return fmt.Errorf("could not overwrite beacon key for epoch %d: %w", epochCounter, err)

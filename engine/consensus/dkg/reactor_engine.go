@@ -430,6 +430,10 @@ func (e *ReactorEngine) end(nextEpochCounter uint64) func() error {
 			return fmt.Errorf("unknown error ending the dkg: %w", err)
 		}
 
+		// The following only implements the happy path, which is an atomic step-by-step progression
+		// along a single path in the `dkgState` machine. If the write yields a `storage.ErrAlreadyExists`,
+		// we know the overall protocol has already abandoned the happy path, because on the happy path
+		// ReactorEngine is the only writer. Then this function just stops and returns without error.
 		privateShare, _, _ := e.controller.GetArtifacts()
 		if privateShare != nil {
 			// we only store our key if one was computed
