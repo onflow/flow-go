@@ -434,7 +434,10 @@ func (e *ReactorEngine) end(nextEpochCounter uint64) func() error {
 		if privateShare != nil {
 			// we only store our key if one was computed
 			err = e.dkgState.InsertMyBeaconPrivateKey(nextEpochCounter, privateShare)
-			if err != nil && !errors.Is(err, storage.ErrAlreadyExists) {
+			if err != nil {
+				if errors.Is(err, storage.ErrAlreadyExists) {
+					return nil // the beacon key already existing is expected in case of epoch recovery
+				}
 				return fmt.Errorf("could not save beacon private key in db: %w", err)
 			}
 		}

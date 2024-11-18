@@ -69,7 +69,8 @@ func (s *RecoverEpochSuite) executeEFMRecoverTXArgsCMD(
 	numViewsInStakingAuction,
 	recoveryEpochCounter,
 	recoveryEpochTargetDuration uint64,
-	unsafeAllowOverWrite bool) []cadence.Value {
+	unsafeAllowOverWrite bool,
+) []cadence.Value {
 	// read internal node info from one of the consensus nodes
 	internalNodePrivInfoDir, nodeConfigJson := s.getNodeInfoDirs(flow.RoleConsensus)
 	snapshot := s.GetLatestProtocolSnapshot(s.Ctx)
@@ -114,8 +115,8 @@ func (s *RecoverEpochSuite) recoverEpoch(env templates.Environment, args []caden
 	return result
 }
 
-// TestRecoverEpoch ensures that the recover epoch governance transaction flow works as expected and a network that
-// enters Epoch Fallback Mode can successfully recover. This test will do the following:
+// TestRecoverEpoch ensures that the recover epoch governance transaction flow works as expected, i.e.
+// a network that entered Epoch Fallback Mode successfully recovers. This test will do the following:
 // 1. Triggers EFM by turning off the sole collection node before the end of the DKG forcing the DKG to fail.
 // 2. Generates epoch recover transaction args using the epoch efm-recover-tx-args.
 // 3. Submit recover epoch transaction.

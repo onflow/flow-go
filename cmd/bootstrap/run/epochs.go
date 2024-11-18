@@ -106,9 +106,9 @@ func GenerateRecoverEpochTxArgs(log zerolog.Logger,
 	// In a nutshell, we are carrying the current consensus and collector nodes forward into the next epoch (the Recovery
 	// Epoch). Removing or adding a small number of nodes here would be possible, but is not implemented at the moment.
 	// In all cases, a core requirement for liveness is: the fraction of consensus participants in the recovery epoch with
-	// valid random beacon should ber significantly larger than the threshold of the threshold-cryptography scheme.
+	// valid random beacon key should be significantly larger than the threshold of the threshold-cryptography scheme.
 	// The EFM Recovery State Machine will heuristically reject recovery attempts (specifically reject EpochRecover Service
-	// events) where when the intersection between consensus and random beacon committees is too small.
+	// events, when the intersection between consensus and random beacon committees is too small.
 	dkgGroupKeyCdc, cdcErr := cadence.NewString(hex.EncodeToString(currentEpochDKG.GroupKey().Encode()))
 	if cdcErr != nil {
 		log.Fatal().Err(cdcErr).Msg("failed to get dkg group key cadence string")
