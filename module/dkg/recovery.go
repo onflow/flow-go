@@ -16,6 +16,11 @@ import (
 	"github.com/onflow/flow-go/utils/logging"
 )
 
+// the nextEpochNotYetCommitted is an entirely internal sentinel error, which indicates that no
+// private Random Beacon Key for the next epoch could be recovered, as the next epoch is not
+// yet committed.
+var nextEpochNotYetCommitted = errors.New("next Epoch not yet committed")
+
 // BeaconKeyRecovery is a specific module that attempts automatic recovery of the random beacon private key
 // when exiting Epoch Fallback Mode [EFM].
 // In the happy path of the protocol, each node that takes part in the DKG obtains a random beacon
@@ -58,7 +63,7 @@ func NewBeaconKeyRecovery(
 	}
 
 	err := recovery.recoverMyBeaconPrivateKey(state.Final())
-	if err != nil {
+	if err != nil && !errors.Is(err, nextEpochNotYetCommitted) {
 		return nil, fmt.Errorf("could not recover my beacon private key when initializing: %w", err)
 	}
 
@@ -71,18 +76,18 @@ func (b *BeaconKeyRecovery) EpochFallbackModeExited(epochCounter uint64, refBloc
 	b.log.Info().Msgf("epoch fallback mode exited for epoch %d", epochCounter)
 	err := b.recoverMyBeaconPrivateKey(b.state.AtHeight(refBlock.Height)) // refBlock must be finalized
 	if err != nil {
-		irrecoverable.Throw(context.TODO(), fmt.Errorf("failed to get final epoch protocol state: %w", err))
+		irrecoverable.Throw(context.TODO(), fmt.Errorf("failed to recovery my beacon private key: %w", err))
 	}
 }
 
-// tryRecoverMyBeaconPrivateKey performs the recovery of the random beacon private key for the next epoch by trying to use
+// recoverMyBeaconPrivateKey performs the recovery of the random beacon private key for the next epoch by trying to use
 // a safe 'my beacon key' from the current epoch (it is expected that this method will be called before entering the recovered epoch).
 // If a safe 'my beacon key' is found, it will be stored in the storage.EpochRecoveryMyBeaconKey for the next epoch
 // concluding the 'my beacon key' recovery.
 // If there is a safe 'my beacon key' for the next epoch, or we are not in committed phase (DKG for next epoch is not available)
 // then calling this method is no-op.
 // Expected Errors under normal operations:
-//   - `nextEpochNotYetCommitted` if the next epoch is not yet committed, hence we can't confirm whether we have an usable
+//   - `nextEpochNotYetCommitted` if the next epoch is not yet committed, hence we can't confirm whether we have a usable
 //     Random Beacon key.
 func (b *BeaconKeyRecovery) recoverMyBeaconPrivateKey(final protocol.Snapshot) error {
 	head, err := final.Head()
@@ -100,9 +105,22 @@ func (b *BeaconKeyRecovery) recoverMyBeaconPrivateKey(final protocol.Snapshot) e
 		Uint64("view", head.View).
 		Uint64("epochCounter", currentEpochCounter).
 		Logger()
+	// Only when the next epoch is committed, Random Beacon keys for that epoch's consensus participants are finally persisted
+	// in `localDKGState`. It is important to wait until this point, so each node can locally check whether their private key
+	// is consistent with its respective entry in the public key vector `EpochCommit.DKGParticipantKeys` (assuming the node
+	// concluded the DKG). This mechanic is identical to the happy path (`EpochCommit` event emitted by Epoch System Smart
+	// Contract) and the recovery epoch (`EpochCommit` event part of `EpochRecover` event, whose content is effectively
+	// provided by the human governance committee).
+	// The next epoch *not yet* being committed is only possible on the happy path, when the node boots up and checks
+	// that it hasn't lost a `FallbackModeExited` notification. However, when observing the `EpochFallbackModeExited`
+	// notification, the Epoch Phase *must* be `flow.EpochPhaseCommitted`, otherwise the state is corrupted.
+	// Diligently verifying this case is important to avoid a situation where the node runs into the next epoch and failes
+	// to access its Random Beacon key, just because this recovery here has failed before.
 	if epochProtocolState.EpochPhase() != flow.EpochPhaseCommitted {
-		log.Info().Msgf("epoch is in phase %s", epochProtocolState.EpochPhase())
-		return nil
+		log.Info().
+			Str("EpochPhase", epochProtocolState.EpochPhase().String()).
+			Msgf("Cannot (yet) determine dkg key for next epoch, as next epoch is not yet committed")
+		return nextEpochNotYetCommitted
 	}
 
 	nextEpoch := final.Epochs().Next() // guaranteed to be committed
