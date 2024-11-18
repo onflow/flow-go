@@ -329,7 +329,7 @@ func (s *BeaconKeyRecoverySuite) TestNewBeaconKeyRecovery_RecoverKey() {
 }
 
 // TestEpochFallbackModeExited confirms successful key recovery
-// when the recovery process is triggered by observing a `EpochFallbackModeExited` notification: 
+// when the recovery process is triggered by observing a `EpochFallbackModeExited` notification:
 // - node starts in epoch fallback phase
 // - when creating NewBeaconKeyRecovery we shouldn't attempt to recover the key since the epoch phase is not committed.
 // - node leaves EFM and transitions to the epoch committed phase
