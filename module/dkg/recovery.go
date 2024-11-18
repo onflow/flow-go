@@ -105,7 +105,8 @@ func (b *BeaconKeyRecovery) recoverMyBeaconPrivateKey(final protocol.Snapshot) e
 		return nil
 	}
 
-	nextEpochCounter, err := final.Epochs().Next().Counter()
+	nextEpoch := final.Epochs().Next() // guaranteed to be committed
+	nextEpochCounter, err := nextEpoch.Counter()
 	if err != nil {
 		return fmt.Errorf("could not get next epoch counter: %w", err)
 	}
@@ -131,7 +132,7 @@ func (b *BeaconKeyRecovery) recoverMyBeaconPrivateKey(final protocol.Snapshot) e
 		return nil
 	}
 
-	nextEpochDKG, err := final.Epochs().Next().DKG()
+	nextEpochDKG, err := nextEpoch.DKG()
 	if err != nil {
 		return fmt.Errorf("could not get DKG for next epoch %d: %w", nextEpochCounter, err)
 	}
