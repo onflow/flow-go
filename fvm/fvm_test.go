@@ -3460,6 +3460,8 @@ func Test_BlockHashListShouldWriteOnPush(t *testing.T) {
 		) {
 			capacity := 256
 
+			// for the setup we make sure all the block hash list buckets exist
+
 			ts := state.NewTransactionState(snapshotTree, state.DefaultParameters())
 			accounts := environment.NewAccounts(ts)
 			envMeter := environment.NewMeter(ts)
@@ -3504,6 +3506,7 @@ func Test_BlockHashListShouldWriteOnPush(t *testing.T) {
 			es, err = ts.FinalizeMainTransaction()
 			require.NoError(t, err)
 
+			// the write set should have both block metadata and block hash list bucket
 			require.Len(t, es.WriteSet, 2)
 			newBlockHashListBucket, ok := es.WriteSet[flow.NewRegisterID(sc.EVMStorage.Address, "BlockHashListBucket0")]
 			require.True(t, ok)
