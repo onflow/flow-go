@@ -89,7 +89,7 @@ func TestRecoverEpochHappyPath(t *testing.T) {
 		// target duration
 		require.Equal(t, cadence.NewUInt64(flagRecoveryEpochTargetDuration), decodedValues[4])
 		// target end time
-		require.Equal(t, cadence.NewUInt64(expectedTargetEndTime+flagRecoveryEpochTargetDuration), decodedValues[5])
+		require.Equal(t, cadence.NewUInt64(currEpochTargetEndTime+flagRecoveryEpochTargetDuration), decodedValues[5])
 		// clusters: we cannot guarantee order of the cluster when we generate the test fixtures
 		// so, we ensure each cluster member is part of the full set of node ids
 		for _, cluster := range decodedValues[6].(cadence.Array).Values {
