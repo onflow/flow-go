@@ -26,7 +26,7 @@ IMAGE_TAG_ARM := $(IMAGE_TAG)-arm
 # Name of the cover profile
 COVER_PROFILE := coverage.txt
 # Disable go sum database lookup for private repos
-GOPRIVATE=github.com/dapperlabs/*
+GOPRIVATE=github.com/onflow/*-internal
 # OS
 UNAME := $(shell uname)
 
