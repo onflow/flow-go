@@ -14,6 +14,9 @@ const (
 	DKGEndStateNoKey
 	// DKGEndStateDKGFailure - the underlying DKG library reported an error.
 	DKGEndStateDKGFailure
+	// RandomBeaconKeyRecovered - this node has recovered its beacon key from a previous epoch.
+	// This occurs only for epochs which are entered through the EFM Recovery process (`flow.EpochRecover` service event).
+	RandomBeaconKeyRecovered
 )
 
 func (state DKGEndState) String() string {
@@ -26,6 +29,8 @@ func (state DKGEndState) String() string {
 		return "DKGEndStateNoKey"
 	case DKGEndStateDKGFailure:
 		return "DKGEndStateDKGFailure"
+	case RandomBeaconKeyRecovered:
+		return "RandomBeaconKeyRecovered"
 	default:
 		return "DKGEndStateUnknown"
 	}

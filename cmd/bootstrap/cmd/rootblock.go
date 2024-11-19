@@ -174,7 +174,7 @@ func rootBlock(cmd *cobra.Command, args []string) {
 	log.Info().Msg("")
 
 	log.Info().Msg("running DKG for consensus nodes")
-	dkgData := runBeaconKG(model.FilterByRole(stakingNodes, flow.RoleConsensus))
+	dkgData, dkgIndexMap := runBeaconKG(model.FilterByRole(stakingNodes, flow.RoleConsensus))
 	log.Info().Msg("")
 
 	// create flow.IdentityList representation of the participant set
@@ -200,7 +200,7 @@ func rootBlock(cmd *cobra.Command, args []string) {
 	log.Info().Msg("")
 
 	log.Info().Msg("constructing intermediary bootstrapping data")
-	epochSetup, epochCommit := constructRootEpochEvents(header.View, participants, assignments, clusterQCs, dkgData)
+	epochSetup, epochCommit := constructRootEpochEvents(header.View, participants, assignments, clusterQCs, dkgData, dkgIndexMap)
 	epochConfig := generateExecutionStateEpochConfig(epochSetup, clusterQCs, dkgData)
 	intermediaryEpochData := IntermediaryEpochData{
 		RootEpochSetup:       epochSetup,
