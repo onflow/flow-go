@@ -60,7 +60,7 @@ func ConvertToCadence(data []byte) []cadence.Value {
 }
 
 func fullKey(owner, key []byte) string {
-	return string(owner) + "~" + string(key)
+	return fmt.Sprintf("%x~%s", owner, key)
 }
 
 func GetSimpleValueStore() *TestValueStore {

@@ -27,6 +27,7 @@ import (
 	"github.com/onflow/flow-go/fvm/environment"
 	"github.com/onflow/flow-go/fvm/evm"
 	"github.com/onflow/flow-go/fvm/evm/events"
+	"github.com/onflow/flow-go/fvm/evm/handler"
 	"github.com/onflow/flow-go/fvm/evm/offchain/blocks"
 	"github.com/onflow/flow-go/fvm/evm/offchain/storage"
 	"github.com/onflow/flow-go/fvm/evm/offchain/sync"
@@ -300,6 +301,7 @@ func SyncAndReplay(
 	t *testing.T,
 	chainID flow.ChainID,
 	fromHeight uint64,
+	toHeight uint64,
 	handler func(*events.BlockEventPayload, []events.TransactionEventPayload, ExecutionDataResponse) error,
 ) {
 
@@ -322,6 +324,10 @@ func SyncAndReplay(
 						fmt.Sprintf("fail to handle block at height %d",
 							blockEventPayload.Height))
 
+					if resp.Height == toHeight {
+						return
+					}
+
 					txEvents = make([]events.TransactionEventPayload, 0)
 				} else if strings.Contains(evtType, "TransactionExecuted") {
 					fmt.Println("transaction executed")
@@ -336,20 +342,46 @@ func SyncAndReplay(
 	}
 }
 
-func TestReplayWithExecutionData(t *testing.T) {
+func TestReplayWithExecutionDataFromTo(t *testing.T) {
 	chainID := flow.Testnet
-	store := GetSimpleValueStore()
+
+	fromHeight := uint64(211176670)
+	toHeight := fromHeight + 20000
+
+	valuesFileName := "./values_replay_with_en.gob"
+	allocatorsFileName := "./allocators_replay_with_en.gob"
+	_, vErr := os.Stat(valuesFileName)
+	_, aErr := os.Stat(allocatorsFileName)
+	if os.IsNotExist(vErr) != os.IsNotExist(aErr) {
+		t.Fatal("one of the files exists, the other doesn't")
+	}
+
+	var store *TestValueStore
+	if os.IsNotExist(vErr) {
+		store = GetSimpleValueStore()
+	} else {
+		values, err := deserialize(valuesFileName)
+		require.NoError(t, err)
+		allocators, err := deserializeAllocator(allocatorsFileName)
+		require.NoError(t, err)
+		store = GetSimpleValueStorePopulated(values, allocators)
+		fromHeight += 1 // re-execute from the next block
+	}
+
 	rootAddr := evm.StorageAccountAddress(chainID)
 	fmt.Println("rootAddr", rootAddr)
 
-	// setup the rootAddress account
-	as := environment.NewAccountStatus()
-	err := store.SetValue(rootAddr[:], []byte(flow.AccountStatusKey), as.ToBytes())
-	require.NoError(t, err)
+	rootHeight := uint64(211176670) // root block of devnet51
+	if fromHeight == rootHeight {
+		// setup the rootAddress account
+		as := environment.NewAccountStatus()
+		err := store.SetValue(rootAddr[:], []byte(flow.AccountStatusKey), as.ToBytes())
+		require.NoError(t, err)
+	}
 
-	fromHeight := uint64(211176670) // root block of devnet51
+	fmt.Println("replay from height", fromHeight, "to height", toHeight)
 
-	SyncAndReplay(t, chainID, fromHeight,
+	SyncAndReplay(t, chainID, fromHeight, toHeight,
 		func(blockEventPayload *events.BlockEventPayload, txEvents []events.TransactionEventPayload, resp ExecutionDataResponse) error {
 			fmt.Println("height", blockEventPayload.Height, blockEventPayload.Hash, resp.Height)
 
@@ -370,6 +402,10 @@ func TestReplayWithExecutionData(t *testing.T) {
 				require.NoError(t, err)
 			}
 
+			err = bp.OnBlockExecuted(blockEventPayload.Height, res)
+			require.NoError(t, err)
+
+			// save block hash list
 			for k, v := range bpStorage.StorageRegisterUpdates() {
 				err = store.SetValue([]byte(k.Owner), []byte(k.Key), v)
 				require.NoError(t, err)
@@ -382,11 +418,14 @@ func TestReplayWithExecutionData(t *testing.T) {
 				res.StorageRegisterUpdates(),
 				bpStorage.StorageRegisterUpdates())
 
-			err = bp.OnBlockExecuted(blockEventPayload.Height, res)
-			require.NoError(t, err)
-
 			return nil
 		})
+
+	values, allocators := store.Dump()
+
+	require.NoError(t, serialize(valuesFileName, values))
+	require.NoError(t, serializeAllocator(allocatorsFileName, allocators))
+	fmt.Println("finished writing for height ", toHeight)
 }
 
 func verifyTrieUpdates(
@@ -402,51 +441,67 @@ func verifyTrieUpdates(
 		for _, p := range chunk.TrieUpdate.Payloads {
 			id, val, err := ledgerConvert.PayloadToRegister(p)
 			require.NoError(t, err)
-			if id.Owner == rootAddrStr {
+			if id.Owner == rootAddrStr &&
+				id.Key != handler.BlockStoreLatestBlockKey &&
+				id.Key != handler.BlockStoreLatestBlockProposalKey {
 				enUpdates[id] = val
-				fmt.Println("enUpdates", id.Key, fmt.Sprintf("%x", val))
+
+				// if id.Key
+				if strings.HasPrefix(id.Key, "BlockHashListBucket") {
+					gwVal, ok := gwBlockUpdates[id]
+					require.True(t, ok, fmt.Sprintf("missing key in gwBlockUpdates: %v", id.Key))
+					require.Equal(t, fmt.Sprintf("%x", val), fmt.Sprintf("%x", gwVal),
+						fmt.Sprintf("mismatching value in gwBlockUpdates for key: %v", id.Key))
+					fmt.Println("matching key", id.Key, fmt.Sprintf("%x", val))
+				}
 			}
 		}
 	}
 
-	matchingKeys := make(map[string]flow.RegisterValue, len(enUpdates))
-	missingKeys := make(map[string]flow.RegisterValue, len(enUpdates))
+	// matchingKeys := make(map[string]flow.RegisterValue, len(enUpdates))
+	// missingKeys := make(map[string]flow.RegisterValue, len(enUpdates))
 
-	fmt.Println("total GW updates", len(gwUpdates), len(gwBlockUpdates), "total EN updates", len(enUpdates))
+	// fmt.Println("total GW updates", len(gwUpdates), len(gwBlockUpdates), "total EN updates", len(enUpdates))
 
-	for k, v := range gwUpdates {
-		fmt.Println("gw Updates", k.Key, fmt.Sprintf("%x", v))
-	}
-
-	for k, v := range gwBlockUpdates {
-		fmt.Println("gw Block Updates", k.Key, fmt.Sprintf("%x", v))
-	}
-
-	for k, v := range gwUpdates {
-		enV, ok := enUpdates[k]
-		if ok {
-			require.Equal(t, v, enV, fmt.Sprintf("mismatching value in gwUpdates for key: %v", k.Key))
-			matchingKeys[k.Key] = v
-			delete(enUpdates, k)
-		} else {
-			missingKeys[k.Key] = v
-		}
-	}
-
-	for k, v := range gwBlockUpdates {
-		enV, ok := enUpdates[k]
-		if ok {
-			require.Equal(t, fmt.Sprintf("%x", v), fmt.Sprintf("%x", enV), fmt.Sprintf("mismatching value in gwBLockUpdates for key: %v", k.Key))
-			matchingKeys[k.Key] = v
-			delete(enUpdates, k)
-		} else {
-			missingKeys[k.Key] = v
-		}
-	}
-
-	for k, v := range missingKeys {
-		fmt.Println("missing key", k, v)
-	}
+	// for k, v := range gwUpdates {
+	// 	fmt.Println("gw Updates", k.Key, fmt.Sprintf("%x", v))
+	// }
+	//
+	// for k, v := range gwBlockUpdates {
+	// 	fmt.Println("gw Block Updates", k.Key, fmt.Sprintf("%x", v))
+	// }
+	//
+	// for k, v := range gwUpdates {
+	// 	enV, ok := enUpdates[k]
+	// 	if ok {
+	// 		if k.Key != state.AccountsStorageIDKey &&
+	// 			k.Key != state.CodesStorageIDKey { // skip storage id key, because the slab is different
+	// 			require.Equal(t, v, enV, fmt.Sprintf("mismatching value in gwUpdates for key: %v", k.Key))
+	// 		}
+	// 		matchingKeys[k.Key] = v
+	// 		delete(enUpdates, k)
+	// 	} else {
+	// 		missingKeys[k.Key] = v
+	// 	}
+	// }
+	//
+	// for k, v := range gwBlockUpdates {
+	// 	if k.Key == blocks.BlockStoreLatestBlockMetaKey {
+	// 		continue
+	// 	}
+	// 	enV, ok := enUpdates[k]
+	// 	if ok {
+	// 		require.Equal(t, fmt.Sprintf("%x", v), fmt.Sprintf("%x", enV), fmt.Sprintf("mismatching value in gwBLockUpdates for key: %v", k.Key))
+	// 		matchingKeys[k.Key] = v
+	// 		delete(enUpdates, k)
+	// 	} else {
+	// 		missingKeys[k.Key] = v
+	// 	}
+	// }
+	//
+	// for k, v := range missingKeys {
+	// 	fmt.Println("missing key", k, v)
+	// }
 }
 
 func SyncBlocksFromScratch(

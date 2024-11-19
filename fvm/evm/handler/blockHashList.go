@@ -161,6 +161,27 @@ func (bhl *BlockHashList) updateBlockHashAt(idx int, bh gethCommon.Hash) error {
 		[]byte(fmt.Sprintf(blockHashListBucketKeyFormat, bucketNumber)),
 		bucket,
 	)
+	// fetch the bucket
+	// bucketNumber := idx / hashCountPerBucket
+	// bucket, err := bhl.fetchBucket(bucketNumber)
+	// if err != nil {
+	// 	return err
+	// }
+	//
+	// cpy := make([]byte, len(bucket))
+	// copy(cpy, bucket)
+	//
+	// // update the block hash
+	// start := (idx % hashCountPerBucket) * hashEncodingSize
+	// end := start + hashEncodingSize
+	// copy(cpy[start:end], bh.Bytes())
+	//
+	// // store bucket
+	// return bhl.backend.SetValue(
+	// 	bhl.rootAddress[:],
+	// 	[]byte(fmt.Sprintf(blockHashListBucketKeyFormat, bucketNumber)),
+	// 	cpy,
+	// )
 }
 
 // fetchBucket fetches the bucket
@@ -257,4 +278,8 @@ func (bhl *BlockHashList) storeMetaData() error {
 		[]byte(blockHashListMetaKey),
 		buffer,
 	)
+}
+
+func (bhl *BlockHashList) GetIntenal() (int, int, uint64) {
+	return bhl.tail, bhl.count, bhl.height
 }

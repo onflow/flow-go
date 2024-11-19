@@ -784,6 +784,7 @@ func (a *Account) codeHash() ([]byte, error) {
 // Deposit deposits the token from the given vault into the flow evm main vault
 // and update the account balance with the new amount
 func (a *Account) Deposit(v *types.FLOWTokenVault) {
+	fmt.Println("deploy deposit to", a.address, v.Balance())
 	defer a.fch.backend.StartChildSpan(trace.FVMEVMDeposit).End()
 
 	bridge := a.fch.addressAllocator.NativeTokenBridgeAddress()
@@ -805,6 +806,7 @@ func (a *Account) Deposit(v *types.FLOWTokenVault) {
 // Withdraw deducts the balance from the account and
 // withdraw and return flow token from the Flex main vault.
 func (a *Account) Withdraw(b types.Balance) *types.FLOWTokenVault {
+	fmt.Println("withdraw to", a.address, b)
 	defer a.fch.backend.StartChildSpan(trace.FVMEVMWithdraw).End()
 
 	res, err := a.executeAndHandleAuthorizedCall(
@@ -824,6 +826,7 @@ func (a *Account) Withdraw(b types.Balance) *types.FLOWTokenVault {
 
 // Transfer transfers tokens between accounts
 func (a *Account) Transfer(to types.Address, balance types.Balance) {
+	fmt.Println("transfer to", a.address, to, balance)
 	res, err := a.executeAndHandleAuthorizedCall(
 		types.NewTransferCall(
 			a.address,
@@ -842,6 +845,7 @@ func (a *Account) Transfer(to types.Address, balance types.Balance) {
 // contained in the result summary as data and
 // the contract data is not controlled by the caller accounts
 func (a *Account) Deploy(code types.Code, gaslimit types.GasLimit, balance types.Balance) *types.ResultSummary {
+	fmt.Println("deploy", a.address, code, gaslimit, balance)
 	// capture open tracing span
 	defer a.fch.backend.StartChildSpan(trace.FVMEVMDeploy).End()
 
@@ -866,6 +870,7 @@ func (a *Account) Deploy(code types.Code, gaslimit types.GasLimit, balance types
 // given it doesn't goes beyond what Flow transaction allows.
 // the balance would be deducted from the OFA account and would be transferred to the target address
 func (a *Account) Call(to types.Address, data types.Data, gaslimit types.GasLimit, balance types.Balance) *types.ResultSummary {
+	fmt.Println("call", a.address, to, data, gaslimit, balance)
 	// capture open tracing span
 	defer a.fch.backend.StartChildSpan(trace.FVMEVMCall).End()
 

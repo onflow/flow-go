@@ -1,6 +1,7 @@
 package handler_test
 
 import (
+	"fmt"
 	"testing"
 
 	gethCommon "github.com/onflow/go-ethereum/common"
@@ -28,6 +29,12 @@ func TestBlockHashList(t *testing.T) {
 			require.NoError(t, err)
 			require.Equal(t, gethCommon.Hash{}, h)
 
+			// fmt.Println(backend.Dump())
+			pair, _ := backend.Dump()
+			for k, v := range pair {
+				fmt.Println(k, v)
+			}
+
 			// first add blocks for the full range of capacity
 			for i := 0; i < capacity; i++ {
 				err := bhl.Push(uint64(i), gethCommon.Hash{byte(i)})
@@ -37,42 +44,41 @@ func TestBlockHashList(t *testing.T) {
 				h, err := bhl.LastAddedBlockHash()
 				require.NoError(t, err)
 				require.Equal(t, gethCommon.Hash{byte(i)}, h)
+
+				// check the value for all of them
+				for h := 0; h <= i; h++ {
+					found, bh, err := bhl.BlockHashByHeight(uint64(h))
+					require.NoError(t, err)
+					require.True(t, found)
+					require.Equal(t, gethCommon.Hash{byte(h)}, bh)
+				}
 			}
 
-			// check the value for all of them
-			for i := 0; i < capacity; i++ {
-				found, h, err := bhl.BlockHashByHeight(uint64(i))
-				require.NoError(t, err)
-				require.True(t, found)
-				require.Equal(t, gethCommon.Hash{byte(i)}, h)
-			}
-			h, err = bhl.LastAddedBlockHash()
-			require.NoError(t, err)
-			require.Equal(t, gethCommon.Hash{byte(capacity - 1)}, h)
+			additional := capacity * 2
 
 			// over the border additions
-			for i := capacity; i < capacity+3; i++ {
+			for i := capacity; i < capacity+additional; i++ {
 				err := bhl.Push(uint64(i), gethCommon.Hash{byte(i)})
 				require.NoError(t, err)
 				require.Equal(t, uint64(i-capacity+1), bhl.MinAvailableHeight())
 				require.Equal(t, uint64(i), bhl.MaxAvailableHeight())
+
+				// check that old block has been replaced
+				for h := 0; h < i; h++ {
+					expectedFound := h > i-capacity
+					found, bh, err := bhl.BlockHashByHeight(uint64(h))
+					require.NoError(t, err)
+					require.Equal(t, expectedFound, found, fmt.Sprintf("i %v, h: %v", i, h))
+
+					if expectedFound {
+						require.Equal(t, gethCommon.Hash{byte(h)}, bh)
+					}
+				}
 			}
-			// check that old block has been replaced
-			for i := 0; i < 3; i++ {
-				found, _, err := bhl.BlockHashByHeight(uint64(i))
-				require.NoError(t, err)
-				require.False(t, found)
-			}
-			// check the rest of blocks
-			for i := 3; i < capacity+3; i++ {
-				found, h, err := bhl.BlockHashByHeight(uint64(i))
-				require.NoError(t, err)
-				require.True(t, found)
-				require.Equal(t, gethCommon.Hash{byte(i)}, h)
-			}
+
 			h, err = bhl.LastAddedBlockHash()
 			require.NoError(t, err)
-			require.Equal(t, gethCommon.Hash{byte(capacity + 2)}, h)
+			require.Equal(t, gethCommon.Hash{byte(capacity + additional - 1)}, h)
 
 			// construct a new one and check
 			bhl, err = handler.NewBlockHashList(backend, root, capacity)
@@ -83,16 +89,50 @@ func TestBlockHashList(t *testing.T) {
 			require.NoError(t, err)
 			require.Equal(t, h, h2)
 
-			require.Equal(t, uint64(3), bhl.MinAvailableHeight())
-			require.Equal(t, uint64(capacity+2), bhl.MaxAvailableHeight())
+			require.Equal(t, uint64(additional), bhl.MinAvailableHeight())
+			require.Equal(t, uint64(capacity+additional-1), bhl.MaxAvailableHeight())
 
 			// check all the stored blocks
-			for i := 3; i < capacity+3; i++ {
+			for i := additional; i < capacity+additional; i++ {
 				found, h, err := bhl.BlockHashByHeight(uint64(i))
 				require.NoError(t, err)
 				require.True(t, found)
 				require.Equal(t, gethCommon.Hash{byte(i)}, h)
 			}
+		})
+	})
+}
+
+func TestList(t *testing.T) {
+	testutils.RunWithTestBackend(t, func(backend *testutils.TestBackend) {
+		testutils.RunWithTestFlowEVMRootAddress(t, backend, func(root flow.Address) {
+			capacity := 4
+			bhl, err := handler.NewBlockHashList(backend, root, capacity)
+			require.NoError(t, err)
+			require.True(t, bhl.IsEmpty())
+
+			h, err := bhl.LastAddedBlockHash()
+			require.NoError(t, err)
+			require.Equal(t, gethCommon.Hash{}, h)
+
+			for i := 0; i < 20; i++ {
+				err := bhl.Push(uint64(i), gethCommon.Hash{byte(i + 1)})
+				require.NoError(t, err)
+				// require.Equal(t, uint64(0), bhl.MinAvailableHeight())
+				// require.Equal(t, uint64(i), bhl.MaxAvailableHeight())
+				h, err := bhl.LastAddedBlockHash()
+				require.NoError(t, err)
+				require.Equal(t, gethCommon.Hash{byte(i + 1)}, h)
+
+				// data, _ := backend.Dump()
+				// for k, v := range data {
+				// 	fmt.Printf("%v: %x\n", k, v)
+				// }
+			}
+
+			found, h, err := bhl.BlockHashByHeight(19)
+			require.NoError(t, err)
+			require.True(t, found)
 		})
 	})
 }

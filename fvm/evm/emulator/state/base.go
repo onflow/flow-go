@@ -244,6 +244,7 @@ func (v *BaseView) CreateAccount(
 	code []byte,
 	codeHash gethCommon.Hash,
 ) error {
+	fmt.Println("BaseView.CreateAccount", addr, balance, nonce, codeHash)
 	var colID []byte
 	// if is an smart contract account
 	if len(code) > 0 {
@@ -268,6 +269,7 @@ func (v *BaseView) UpdateAccount(
 	code []byte,
 	codeHash gethCommon.Hash,
 ) error {
+	fmt.Println("BaseView.UpdateAccount", addr, balance, nonce, codeHash)
 	acc, err := v.getAccount(addr)
 	if err != nil {
 		return err
@@ -297,6 +299,7 @@ func (v *BaseView) UpdateAccount(
 // DeleteAccount deletes an account's meta data, code, and
 // storage slots associated with that address
 func (v *BaseView) DeleteAccount(addr gethCommon.Address) error {
+	fmt.Println("BaseView.DeleteAccount", addr)
 	// 1. check account exists
 	acc, err := v.getAccount(addr)
 	if err != nil {
@@ -352,6 +355,7 @@ func (v *BaseView) DeleteAccount(addr gethCommon.Address) error {
 
 // PurgeAllSlotsOfAnAccount purges all the slots related to an account
 func (v *BaseView) PurgeAllSlotsOfAnAccount(addr gethCommon.Address) error {
+	fmt.Println("BaseView.PurgeAllSlotsOfAnAccount", addr)
 	acc, err := v.getAccount(addr)
 	if err != nil {
 		return err
