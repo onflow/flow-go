@@ -4,7 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
-
+	"go.uber.org/atomic"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
@@ -39,6 +39,7 @@ type TransactionSubscriptionMetadata struct {
 	blockWithTx          *flow.Header
 	txExecuted           bool
 	eventEncodingVersion entities.EventEncodingVersion
+	triggerFirstPending  *atomic.Bool
 }
 
 // SubscribeTransactionStatuses subscribes to transaction status changes starting from the transaction reference block ID.
@@ -57,11 +58,12 @@ func (b *backendSubscribeTransactions) SubscribeTransactionStatuses(
 		TransactionResult: &access.TransactionResult{
 			TransactionID: tx.ID(),
 			BlockID:       flow.ZeroID,
-			Status:        flow.TransactionStatusUnknown,
+			Status:        flow.TransactionStatusPending,
 		},
 		txReferenceBlockID:   tx.ReferenceBlockID,
 		blockWithTx:          nil,
 		eventEncodingVersion: requiredEventEncodingVersion,
+		triggerFirstPending:  atomic.NewBool(true),
 	}
 
 	return b.subscriptionHandler.Subscribe(ctx, nextHeight, b.getTransactionStatusResponse(&txInfo))
@@ -74,6 +76,13 @@ func (b *backendSubscribeTransactions) getTransactionStatusResponse(txInfo *Tran
 		err := b.checkBlockReady(height)
 		if err != nil {
 			return nil, err
+		}
+
+		// The status of the first pending transaction should be returned immediately, as the transaction has already been sent.
+		// This should occur only once for each subscription.
+		if txInfo.triggerFirstPending.Load() {
+			txInfo.triggerFirstPending.Toggle()
+			return b.generateResultsWithMissingStatuses(txInfo, flow.TransactionStatusUnknown)
 		}
 
 		// If the transaction status already reported the final status, return with no data available
@@ -120,19 +129,8 @@ func (b *backendSubscribeTransactions) getTransactionStatusResponse(txInfo *Tran
 		}
 
 		// If block with transaction was not found, get transaction status to check if it different from last status
-		if txInfo.blockWithTx == nil {
-			txInfo.Status, err = b.txLocalDataProvider.DeriveUnknownTransactionStatus(txInfo.txReferenceBlockID)
-		} else if txInfo.Status == prevTxStatus {
-			// When a block with the transaction is available, it is possible to receive a new transaction status while
-			// searching for the transaction result. Otherwise, it remains unchanged. So, if the old and new transaction
-			// statuses are the same, the current transaction status should be retrieved.
-			txInfo.Status, err = b.txLocalDataProvider.DeriveTransactionStatus(txInfo.blockWithTx.Height, txInfo.txExecuted)
-		}
-		if err != nil {
-			if !errors.Is(err, state.ErrUnknownSnapshotReference) {
-				irrecoverable.Throw(ctx, err)
-			}
-			return nil, rpc.ConvertStorageError(err)
+		if txInfo.Status, err = b.getTransactionStatus(ctx, txInfo, prevTxStatus); err != nil {
+			return nil, err
 		}
 
 		// If the old and new transaction statuses are still the same, the status change should not be reported, so
@@ -143,6 +141,29 @@ func (b *backendSubscribeTransactions) getTransactionStatusResponse(txInfo *Tran
 
 		return b.generateResultsWithMissingStatuses(txInfo, prevTxStatus)
 	}
+}
+
+func (b *backendSubscribeTransactions) getTransactionStatus(ctx context.Context, txInfo *TransactionSubscriptionMetadata, prevTxStatus flow.TransactionStatus) (flow.TransactionStatus, error) {
+	txStatus := prevTxStatus
+	var err error
+
+	if txInfo.blockWithTx == nil {
+		txStatus, err = b.txLocalDataProvider.DeriveUnknownTransactionStatus(txInfo.txReferenceBlockID)
+	} else if txInfo.Status == prevTxStatus {
+		// When a block with the transaction is available, it is possible to receive a new transaction status while
+		// searching for the transaction result. Otherwise, it remains unchanged. So, if the old and new transaction
+		// statuses are the same, the current transaction status should be retrieved.
+		txStatus, err = b.txLocalDataProvider.DeriveTransactionStatus(txInfo.blockWithTx.Height, txInfo.txExecuted)
+	}
+
+	if err != nil {
+		if !errors.Is(err, state.ErrUnknownSnapshotReference) {
+			irrecoverable.Throw(ctx, err)
+		}
+		return flow.TransactionStatusUnknown, rpc.ConvertStorageError(err)
+	}
+
+	return txStatus, nil
 }
 
 // generateResultsWithMissingStatuses checks if the current result differs from the previous result by more than one step.
