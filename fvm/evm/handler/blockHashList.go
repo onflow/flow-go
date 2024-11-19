@@ -148,12 +148,13 @@ func (bhl *BlockHashList) updateBlockHashAt(idx int, bh gethCommon.Hash) error {
 	// fetch the bucket
 	bucketNumber := idx / hashCountPerBucket
 	bucket, err := bhl.fetchBucket(bucketNumber)
-	cpy := make([]byte, len(bucket))
-	copy(cpy, bucket)
-
 	if err != nil {
 		return err
 	}
+
+	cpy := make([]byte, len(bucket))
+	copy(cpy, bucket)
+
 	// update the block hash
 	start := (idx % hashCountPerBucket) * hashEncodingSize
 	end := start + hashEncodingSize
