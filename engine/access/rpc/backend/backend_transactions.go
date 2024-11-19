@@ -742,6 +742,12 @@ func (b *backendTransactions) registerTransactionForRetry(tx *flow.TransactionBo
 	b.retry.RegisterTransaction(referenceBlock.Height, tx)
 }
 
+// GetTransactionResultFromExecutionNode retrieves the result of a specified transaction
+// from the execution nodes for a given block.
+//
+// Error returns:
+//   - `codes.NotFound` if no execution receipt were found.
+//   - Returns internal errors if event conversion or status derivation fails.
 func (b *backendTransactions) GetTransactionResultFromExecutionNode(
 	ctx context.Context,
 	block *flow.Block,

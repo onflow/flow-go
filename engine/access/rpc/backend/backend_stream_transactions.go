@@ -259,7 +259,12 @@ func (b *backendSubscribeTransactions) searchForTransactionResult(
 	txResult, err := b.backendTransactions.GetTransactionResultFromStorage(ctx, txInfo.blockWithTx, txInfo.TransactionID, txInfo.eventEncodingVersion)
 	if err != nil {
 		// If any error occurs with local storage - request transaction result from EN
-		txResult, err = b.backendTransactions.GetTransactionResultFromExecutionNode(ctx, txInfo.blockWithTx, txInfo.TransactionID, txInfo.eventEncodingVersion)
+		txResult, err = b.backendTransactions.GetTransactionResultFromExecutionNode(
+			ctx,
+			txInfo.blockWithTx,
+			txInfo.TransactionID,
+			txInfo.eventEncodingVersion,
+		)
 	}
 
 	if err != nil {
