@@ -28,6 +28,7 @@ import (
 	"github.com/onflow/flow-go/cmd/util/cmd/snapshot"
 	truncate_database "github.com/onflow/flow-go/cmd/util/cmd/truncate-database"
 	update_commitment "github.com/onflow/flow-go/cmd/util/cmd/update-commitment"
+	verify_execution_result "github.com/onflow/flow-go/cmd/util/cmd/verify_execution_result"
 	"github.com/onflow/flow-go/cmd/util/cmd/version"
 )
 
@@ -84,6 +85,7 @@ func addCommands() {
 	rootCmd.AddCommand(find_inconsistent_result.Cmd)
 	rootCmd.AddCommand(find_trie_root.Cmd)
 	rootCmd.AddCommand(update_commitment.Cmd)
+	rootCmd.AddCommand(verify_execution_result.Cmd)
 }
 
 func initConfig() {
