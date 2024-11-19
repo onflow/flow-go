@@ -285,8 +285,6 @@ func (s *TransactionStatusSuite) TestSubscribeTransactionStatusHappyCase() {
 	guarantee := col.Guarantee()
 	light := col.Light()
 	txId := transaction.ID()
-	var txResult flow.LightTransactionResult
-	txResultError := storage.ErrNotFound
 	eventsForTx := unittest.EventsFixture(1, flow.EventAccountCreated)
 	eventMessages := make([]*entities.Event, 1)
 	for j, event := range eventsForTx {
@@ -299,13 +297,21 @@ func (s *TransactionStatusSuite) TestSubscribeTransactionStatusHappyCase() {
 		mock.AnythingOfType("flow.Identifier"),
 	).Return(eventsForTx, nil)
 
+	hasTransactionResultInStorage := false
 	s.transactionResults.On(
 		"ByBlockIDTransactionID",
 		mock.AnythingOfType("flow.Identifier"),
 		mock.AnythingOfType("flow.Identifier"),
 	).Return(func(blockID flow.Identifier, transactionID flow.Identifier) (*flow.LightTransactionResult, error) {
-		return &txResult, txResultError
-	}, txResultError)
+		if hasTransactionResultInStorage {
+			return &flow.LightTransactionResult{
+				TransactionID:   txId,
+				Failed:          false,
+				ComputationUsed: 0,
+			}, nil
+		}
+		return nil, storage.ErrNotFound
+	}).Twice()
 
 	// Create a special common function to read subscription messages from the channel and check converting it to transaction info
 	// and check results for correctness
@@ -323,7 +329,7 @@ func (s *TransactionStatusSuite) TestSubscribeTransactionStatusHappyCase() {
 			result := txResults[0]
 			assert.Equal(s.T(), txId, result.TransactionID)
 			assert.Equal(s.T(), expectedTxStatus, result.Status)
-		}, 350*time.Second, fmt.Sprintf("timed out waiting for transaction info:\n\t- txID: %x\n\t- blockID: %x", txId, s.finalizedBlock.ID()))
+		}, time.Second, fmt.Sprintf("timed out waiting for transaction info:\n\t- txID: %x\n\t- blockID: %x", txId, s.finalizedBlock.ID()))
 	}
 
 	// 1. Subscribe to transaction status and receive the first message with pending status
@@ -341,12 +347,8 @@ func (s *TransactionStatusSuite) TestSubscribeTransactionStatusHappyCase() {
 	// 3. Add one more finalized block on top of the transaction block and add execution results to storage
 	finalizedResult := unittest.ExecutionResultFixture(unittest.WithBlock(s.finalizedBlock))
 	s.resultsMap[s.finalizedBlock.ID()] = finalizedResult
-	txResult = flow.LightTransactionResult{
-		TransactionID:   txId,
-		Failed:          false,
-		ComputationUsed: 0,
-	}
-	txResultError = nil
+	// init transaction result for storage
+	hasTransactionResultInStorage = true
 	s.addNewFinalizedBlock(s.finalizedBlock.Header, true)
 	checkNewSubscriptionMessage(sub, flow.TransactionStatusExecuted)
 
