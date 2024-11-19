@@ -36,7 +36,7 @@ type backendSubscribeTransactions struct {
 type TransactionSubscriptionMetadata struct {
 	*access.TransactionResult
 	txReferenceBlockID   flow.Identifier
-	blockWithTx          *flow.Header
+	blockWithTx          *flow.Block
 	txExecuted           bool
 	eventEncodingVersion entities.EventEncodingVersion
 }
@@ -126,7 +126,7 @@ func (b *backendSubscribeTransactions) getTransactionStatusResponse(txInfo *Tran
 			// When a block with the transaction is available, it is possible to receive a new transaction status while
 			// searching for the transaction result. Otherwise, it remains unchanged. So, if the old and new transaction
 			// statuses are the same, the current transaction status should be retrieved.
-			txInfo.Status, err = b.txLocalDataProvider.DeriveTransactionStatus(txInfo.blockWithTx.Height, txInfo.txExecuted)
+			txInfo.Status, err = b.txLocalDataProvider.DeriveTransactionStatus(txInfo.BlockHeight, txInfo.txExecuted)
 		}
 		if err != nil {
 			if !errors.Is(err, state.ErrUnknownSnapshotReference) {
@@ -229,7 +229,7 @@ func (b *backendSubscribeTransactions) checkBlockReady(height uint64) error {
 func (b *backendSubscribeTransactions) searchForTransactionBlockInfo(
 	height uint64,
 	txInfo *TransactionSubscriptionMetadata,
-) (*flow.Header, flow.Identifier, uint64, flow.Identifier, error) {
+) (*flow.Block, flow.Identifier, uint64, flow.Identifier, error) {
 	block, err := b.txLocalDataProvider.blocks.ByHeight(height)
 	if err != nil {
 		return nil, flow.ZeroID, 0, flow.ZeroID, fmt.Errorf("error looking up block: %w", err)
@@ -241,7 +241,7 @@ func (b *backendSubscribeTransactions) searchForTransactionBlockInfo(
 	}
 
 	if collectionID != flow.ZeroID {
-		return block.Header, block.ID(), height, collectionID, nil
+		return block, block.ID(), height, collectionID, nil
 	}
 
 	return nil, flow.ZeroID, 0, flow.ZeroID, nil
@@ -256,11 +256,10 @@ func (b *backendSubscribeTransactions) searchForTransactionResult(
 	ctx context.Context,
 	txInfo *TransactionSubscriptionMetadata,
 ) (*access.TransactionResult, error) {
-	block, err := b.txLocalDataProvider.blocks.ByHeight(txInfo.BlockHeight)
-	txResult, err := b.backendTransactions.GetTransactionResultFromStorage(ctx, block, txInfo.TransactionID, txInfo.eventEncodingVersion)
+	txResult, err := b.backendTransactions.GetTransactionResultFromStorage(ctx, txInfo.blockWithTx, txInfo.TransactionID, txInfo.eventEncodingVersion)
 	if err != nil {
 		// If any error occurs with local storage - request transaction result from EN
-		txResult, err = b.backendTransactions.GetTransactionResultFromExecutionNode(ctx, block, txInfo.TransactionID, txInfo.eventEncodingVersion)
+		txResult, err = b.backendTransactions.GetTransactionResultFromExecutionNode(ctx, txInfo.blockWithTx, txInfo.TransactionID, txInfo.eventEncodingVersion)
 	}
 
 	if err != nil {
