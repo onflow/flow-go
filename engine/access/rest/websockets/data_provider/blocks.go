@@ -42,7 +42,7 @@ func (p *MockBlockProvider) Run(ctx context.Context) {
 		select {
 		case <-ctx.Done():
 			return
-		case p.topicChan <- "hello world":
+		case p.topicChan <- "block{height: 42}":
 			return
 		}
 	}

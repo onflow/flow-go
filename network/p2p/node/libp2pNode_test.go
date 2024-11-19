@@ -159,7 +159,7 @@ func TestConnGater(t *testing.T) {
 	sporkID := unittest.IdentifierFixture()
 	idProvider := mockmodule.NewIdentityProvider(t)
 
-	node1Peers := concurrentmap.NewConcurrentMap[peer.ID, struct{}]()
+	node1Peers := concurrentmap.New[peer.ID, struct{}]()
 	node1, identity1 := p2ptest.NodeFixture(t, sporkID, t.Name(), idProvider, p2ptest.WithConnectionGater(p2ptest.NewConnectionGater(idProvider, func(pid peer.ID) error {
 		if !node1Peers.Has(pid) {
 			return fmt.Errorf("peer id not found: %s", p2plogging.PeerId(pid))
@@ -174,7 +174,7 @@ func TestConnGater(t *testing.T) {
 	node1Info, err := utils.PeerAddressInfo(identity1.IdentitySkeleton)
 	assert.NoError(t, err)
 
-	node2Peers := concurrentmap.NewConcurrentMap[peer.ID, struct{}]()
+	node2Peers := concurrentmap.New[peer.ID, struct{}]()
 	node2, identity2 := p2ptest.NodeFixture(t, sporkID, t.Name(), idProvider, p2ptest.WithConnectionGater(p2ptest.NewConnectionGater(idProvider, func(pid peer.ID) error {
 		if !node2Peers.Has(pid) {
 			return fmt.Errorf("id not found: %s", p2plogging.PeerId(pid))

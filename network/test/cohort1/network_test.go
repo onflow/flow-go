@@ -618,7 +618,7 @@ func (suite *NetworkTestSuite) MultiPing(count int) {
 	senderNodeIndex := 0
 	targetNodeIndex := suite.size - 1
 
-	receivedPayloads := concurrentmap.NewConcurrentMap[string, struct{}]() // keep track of unique payloads received.
+	receivedPayloads := concurrentmap.New[string, struct{}]() // keep track of unique payloads received.
 
 	// regex to extract the payload from the message
 	regex := regexp.MustCompile(`^hello from: \d`)

@@ -116,7 +116,7 @@ func TestWorkerPool_TwoWorkers_ConcurrentEvents(t *testing.T) {
 	}
 
 	q := queue.NewHeroStore(uint32(size), unittest.Logger(), metrics.NewNoopCollector())
-	distributedEvents := concurrentmap.NewConcurrentMap[string, struct{}]()
+	distributedEvents := concurrentmap.New[string, struct{}]()
 	allEventsDistributed := sync.WaitGroup{}
 	allEventsDistributed.Add(size)
 

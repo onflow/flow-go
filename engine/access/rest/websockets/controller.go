@@ -21,7 +21,7 @@ type Controller struct {
 	config               Config
 	conn                 *websocket.Conn
 	communicationChannel chan interface{}
-	dataProviders        *concurrentmap.ConcurrentMap[uuid.UUID, dp.DataProvider]
+	dataProviders        *concurrentmap.Map[uuid.UUID, dp.DataProvider]
 	dataProvidersFactory *dp.Factory
 }
 
@@ -37,7 +37,7 @@ func NewWebSocketController(
 		config:               config,
 		conn:                 conn,
 		communicationChannel: make(chan interface{}), //TODO: should it be buffered chan?
-		dataProviders:        concurrentmap.NewConcurrentMap[uuid.UUID, dp.DataProvider](),
+		dataProviders:        concurrentmap.New[uuid.UUID, dp.DataProvider](),
 		dataProvidersFactory: dp.NewDataProviderFactory(logger, streamApi, streamConfig),
 	}
 }
@@ -47,10 +47,14 @@ func (c *Controller) HandleConnection(ctx context.Context) {
 	//TODO: configure the connection with ping-pong and deadlines
 	//TODO: spin up a response limit tracker routine
 	go c.readMessagesFromClient(ctx)
-	go c.writeMessagesToClient(ctx)
+	c.writeMessagesToClient(ctx)
 }
 
+// writeMessagesToClient reads a messages from communication channel and passes them on to a client WebSocket connection.
+// The communication channel is filled by data providers. Besides, the response limit tracker is involved in
+// write message regulation
 func (c *Controller) writeMessagesToClient(ctx context.Context) {
+	//TODO: can it run forever? maybe we should cancel the ctx in the reader routine
 	for {
 		select {
 		case <-ctx.Done():
@@ -66,6 +70,8 @@ func (c *Controller) writeMessagesToClient(ctx context.Context) {
 	}
 }
 
+// readMessagesFromClient continuously reads messages from a client WebSocket connection,
+// processes each message, and handles actions based on the message type.
 func (c *Controller) readMessagesFromClient(ctx context.Context) {
 	defer c.shutdownConnection()
 
@@ -90,7 +96,7 @@ func (c *Controller) readMessagesFromClient(ctx context.Context) {
 				return
 			}
 
-			if err := c.handleAction(ctx, baseMsg.Action, validatedMsg); err != nil {
+			if err := c.handleAction(ctx, validatedMsg); err != nil {
 				c.logger.Warn().Err(err).Str("action", baseMsg.Action).Msg("error handling action")
 			}
 		}
@@ -143,30 +149,35 @@ func (c *Controller) parseAndValidateMessage(message json.RawMessage) (models.Ba
 	return baseMsg, validatedMsg, nil
 }
 
-func (c *Controller) handleAction(ctx context.Context, action string, message interface{}) error {
-	switch action {
-	case "subscribe":
-		c.handleSubscribe(ctx, message.(models.SubscribeMessageRequest))
-	case "unsubscribe":
-		c.handleUnsubscribe(ctx, message.(models.UnsubscribeMessageRequest))
-	case "list_subscriptions":
-		c.handleListSubscriptions(ctx, message.(models.ListSubscriptionsMessageRequest))
+func (c *Controller) handleAction(ctx context.Context, message interface{}) error {
+	switch msg := message.(type) {
+	case models.SubscribeMessageRequest:
+		c.handleSubscribe(ctx, msg)
+	case models.UnsubscribeMessageRequest:
+		c.handleUnsubscribe(ctx, msg)
+	case models.ListSubscriptionsMessageRequest:
+		c.handleListSubscriptions(ctx, msg)
 	default:
-		return fmt.Errorf("unknown action type: %s", action)
+		return fmt.Errorf("unknown message type: %T", msg)
 	}
 	return nil
 }
 
 func (c *Controller) handleSubscribe(ctx context.Context, msg models.SubscribeMessageRequest) {
-	dp := c.dataProvidersFactory.NewDataProvider(ctx, c.communicationChannel, msg.Topic)
+	dp := c.dataProvidersFactory.NewDataProvider(c.communicationChannel, msg.Topic)
 	c.dataProviders.Add(dp.ID(), dp)
 	dp.Run(ctx)
+
+	//TODO: return OK response to client
+	c.communicationChannel <- msg
 }
 
-func (c *Controller) handleUnsubscribe(ctx context.Context, msg models.UnsubscribeMessageRequest) {
+func (c *Controller) handleUnsubscribe(_ context.Context, msg models.UnsubscribeMessageRequest) {
 	id, err := uuid.Parse(msg.ID)
 	if err != nil {
 		c.logger.Debug().Err(err).Msg("error parsing message ID")
+		//TODO: return an error response to client
+		c.communicationChannel <- err
 		return
 	}
 
@@ -178,6 +189,7 @@ func (c *Controller) handleUnsubscribe(ctx context.Context, msg models.Unsubscri
 }
 
 func (c *Controller) handleListSubscriptions(ctx context.Context, msg models.ListSubscriptionsMessageRequest) {
+	//TODO: return a response to client
 }
 
 func (c *Controller) shutdownConnection() {

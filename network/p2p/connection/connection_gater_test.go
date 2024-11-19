@@ -36,7 +36,7 @@ func TestConnectionGating(t *testing.T) {
 	sporkID := unittest.IdentifierFixture()
 	idProvider := mockmodule.NewIdentityProvider(t)
 	// create 2 nodes
-	node1Peers := concurrentmap.NewConcurrentMap[peer.ID, struct{}]()
+	node1Peers := concurrentmap.New[peer.ID, struct{}]()
 	node1, node1Id := p2ptest.NodeFixture(
 		t,
 		sporkID,
@@ -50,7 +50,7 @@ func TestConnectionGating(t *testing.T) {
 		})))
 	idProvider.On("ByPeerID", node1.ID()).Return(&node1Id, true).Maybe()
 
-	node2Peers := concurrentmap.NewConcurrentMap[peer.ID, struct{}]()
+	node2Peers := concurrentmap.New[peer.ID, struct{}]()
 	node2, node2Id := p2ptest.NodeFixture(
 		t,
 		sporkID,
@@ -247,7 +247,7 @@ func TestConnectionGater_InterceptUpgrade(t *testing.T) {
 	inbounds := make([]chan string, 0, count)
 	identities := make(flow.IdentityList, 0, count)
 
-	disallowedPeerIds := concurrentmap.NewConcurrentMap[peer.ID, struct{}]()
+	disallowedPeerIds := concurrentmap.New[peer.ID, struct{}]()
 	allPeerIds := make(peer.IDSlice, 0, count)
 	idProvider := mockmodule.NewIdentityProvider(t)
 	connectionGater := mockp2p.NewConnectionGater(t)
@@ -332,7 +332,7 @@ func TestConnectionGater_Disallow_Integration(t *testing.T) {
 	ids := flow.IdentityList{}
 	inbounds := make([]chan string, 0, 5)
 
-	disallowedList := concurrentmap.NewConcurrentMap[*flow.Identity, struct{}]()
+	disallowedList := concurrentmap.New[*flow.Identity, struct{}]()
 
 	for i := 0; i < count; i++ {
 		handler, inbound := p2ptest.StreamHandlerFixture(t)

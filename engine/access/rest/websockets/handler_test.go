@@ -81,6 +81,6 @@ func (s *WsHandlerSuite) TestSubscribeRequest() {
 		require.NoError(s.T(), err)
 
 		actualMsg := strings.Trim(string(msg), "\n\"\\ ")
-		require.Equal(s.T(), "hello world", actualMsg)
+		require.Equal(s.T(), "block{height: 42}", actualMsg)
 	})
 }
