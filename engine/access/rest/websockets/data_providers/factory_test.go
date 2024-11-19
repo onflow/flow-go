@@ -76,6 +76,38 @@ func (s *DataProviderFactorySuite) TestSupportedTopics() {
 				s.accessApi.AssertExpectations(s.T())
 			},
 		},
+		{
+			name:      "block headers topic",
+			topic:     BlockHeadersTopic,
+			arguments: map[string]string{"block_status": parser.Finalized},
+			mockSubscription: func() string {
+				subscription := statestreammock.NewSubscription(s.T())
+				subscriptionID := unittest.IdentifierFixture().String()
+				subscription.On("ID").Return(subscriptionID).Once()
+
+				s.accessApi.On("SubscribeBlockHeadersFromLatest", mock.Anything, flow.BlockStatusFinalized).Return(subscription).Once()
+				return subscriptionID
+			},
+			assertExpectations: func() {
+				s.accessApi.AssertExpectations(s.T())
+			},
+		},
+		{
+			name:      "block digests topic",
+			topic:     BlockDigestsTopic,
+			arguments: map[string]string{"block_status": parser.Finalized},
+			mockSubscription: func() string {
+				subscription := statestreammock.NewSubscription(s.T())
+				subscriptionID := unittest.IdentifierFixture().String()
+				subscription.On("ID").Return(subscriptionID).Once()
+
+				s.accessApi.On("SubscribeBlockDigestsFromLatest", mock.Anything, flow.BlockStatusFinalized).Return(subscription).Once()
+				return subscriptionID
+			},
+			assertExpectations: func() {
+				s.accessApi.AssertExpectations(s.T())
+			},
+		},
 	}
 
 	for _, test := range testCases {

@@ -17,3 +17,10 @@ type BlockHeaderMessageResponse struct {
 	// in the request.
 	Header *flow.Header `json:"header"`
 }
+
+// BlockDigestMessageResponse is the response message for 'block_digests' topic.
+type BlockDigestMessageResponse struct {
+	// The sealed or finalized block digest according to the block status
+	// in the request.
+	Block *flow.BlockDigest `json:"block_digest"`
+}
