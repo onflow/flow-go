@@ -310,7 +310,7 @@ func (s *TransactionStatusSuite) TestSubscribeTransactionStatusHappyCase() {
 			result := txResults[0]
 			assert.Equal(s.T(), txId, result.TransactionID)
 			assert.Equal(s.T(), expectedTxStatus, result.Status)
-		}, 1000*time.Second, fmt.Sprintf("timed out waiting for transaction info:\n\t- txID: %x\n\t- blockID: %x", txId, s.finalizedBlock.ID()))
+		}, time.Second, fmt.Sprintf("timed out waiting for transaction info:\n\t- txID: %x\n\t- blockID: %x", txId, s.finalizedBlock.ID()))
 	}
 
 	// 1. Subscribe to transaction status and receive the first message with pending status
