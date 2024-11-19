@@ -325,6 +325,7 @@ func SyncAndReplay(
 							blockEventPayload.Height))
 
 					if resp.Height == toHeight {
+						fmt.Println("reached the toHeight", toHeight)
 						return
 					}
 
@@ -348,8 +349,11 @@ func TestReplayWithExecutionDataFromTo(t *testing.T) {
 	fromHeight := uint64(211176670)
 	toHeight := fromHeight + 20000
 
-	valuesFileName := "./values_replay_with_en.gob"
-	allocatorsFileName := "./allocators_replay_with_en.gob"
+	// valuesFileName := "./values_replay_with_en.gob"
+	// allocatorsFileName := "./allocators_replay_with_en.gob"
+
+	valuesFileName := "./en_values_5100000.gob"
+	allocatorsFileName := "./en_allocators_5100000.gob"
 	_, vErr := os.Stat(valuesFileName)
 	_, aErr := os.Stat(allocatorsFileName)
 	if os.IsNotExist(vErr) != os.IsNotExist(aErr) {
@@ -383,7 +387,9 @@ func TestReplayWithExecutionDataFromTo(t *testing.T) {
 
 	SyncAndReplay(t, chainID, fromHeight, toHeight,
 		func(blockEventPayload *events.BlockEventPayload, txEvents []events.TransactionEventPayload, resp ExecutionDataResponse) error {
+			// if resp.Height%100 == 0 {
 			fmt.Println("height", blockEventPayload.Height, blockEventPayload.Hash, resp.Height)
+			// }
 
 			bpStorage := storage.NewEphemeralStorage(store)
 			bp, err := blocks.NewBasicProvider(chainID, bpStorage, rootAddr)
@@ -452,7 +458,7 @@ func verifyTrieUpdates(
 					require.True(t, ok, fmt.Sprintf("missing key in gwBlockUpdates: %v", id.Key))
 					require.Equal(t, fmt.Sprintf("%x", val), fmt.Sprintf("%x", gwVal),
 						fmt.Sprintf("mismatching value in gwBlockUpdates for key: %v", id.Key))
-					fmt.Println("matching key", id.Key, fmt.Sprintf("%x", val))
+					// fmt.Println("matching key", id.Key, fmt.Sprintf("%x", val))
 				}
 			}
 		}
