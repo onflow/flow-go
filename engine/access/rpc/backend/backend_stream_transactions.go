@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+
 	"go.uber.org/atomic"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -39,7 +40,7 @@ type TransactionSubscriptionMetadata struct {
 	blockWithTx          *flow.Header
 	txExecuted           bool
 	eventEncodingVersion entities.EventEncodingVersion
-	triggerFirstPending  *atomic.Bool
+	shouldTriggerPending *atomic.Bool
 }
 
 // SubscribeTransactionStatuses subscribes to transaction status changes starting from the transaction reference block ID.
@@ -63,7 +64,7 @@ func (b *backendSubscribeTransactions) SubscribeTransactionStatuses(
 		txReferenceBlockID:   tx.ReferenceBlockID,
 		blockWithTx:          nil,
 		eventEncodingVersion: requiredEventEncodingVersion,
-		triggerFirstPending:  atomic.NewBool(true),
+		shouldTriggerPending: atomic.NewBool(true),
 	}
 
 	return b.subscriptionHandler.Subscribe(ctx, nextHeight, b.getTransactionStatusResponse(&txInfo))
@@ -80,8 +81,8 @@ func (b *backendSubscribeTransactions) getTransactionStatusResponse(txInfo *Tran
 
 		// The status of the first pending transaction should be returned immediately, as the transaction has already been sent.
 		// This should occur only once for each subscription.
-		if txInfo.triggerFirstPending.Load() {
-			txInfo.triggerFirstPending.Toggle()
+		if txInfo.shouldTriggerPending.Load() {
+			txInfo.shouldTriggerPending.Toggle()
 			return b.generateResultsWithMissingStatuses(txInfo, flow.TransactionStatusUnknown)
 		}
 
@@ -143,6 +144,11 @@ func (b *backendSubscribeTransactions) getTransactionStatusResponse(txInfo *Tran
 	}
 }
 
+// getTransactionStatus determines the current status of a transaction based on its metadata
+// and previous status. It  derives the transaction status by analyzing the transaction's
+// execution block, if available, or its reference block.
+//
+// No errors expected during normal operations.
 func (b *backendSubscribeTransactions) getTransactionStatus(ctx context.Context, txInfo *TransactionSubscriptionMetadata, prevTxStatus flow.TransactionStatus) (flow.TransactionStatus, error) {
 	txStatus := txInfo.Status
 	var err error
