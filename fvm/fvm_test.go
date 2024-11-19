@@ -3,6 +3,7 @@ package fvm_test
 import (
 	"context"
 	"crypto/rand"
+	"encoding/binary"
 	"encoding/hex"
 	"fmt"
 	"math"
@@ -38,6 +39,7 @@ import (
 	envMock "github.com/onflow/flow-go/fvm/environment/mock"
 	"github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/fvm/evm/events"
+	"github.com/onflow/flow-go/fvm/evm/handler"
 	"github.com/onflow/flow-go/fvm/evm/stdlib"
 	"github.com/onflow/flow-go/fvm/evm/types"
 	"github.com/onflow/flow-go/fvm/meter"
@@ -3585,5 +3587,104 @@ func Test_MinimumRequiredVersion(t *testing.T) {
 
 			// still cadence version 1
 			require.Equal(t, cadenceVersion1.String(), getVersion(ctx, snapshotTree))
+		}))
+}
+
+func Test_BlockHashListShouldWriteOnPush(t *testing.T) {
+
+	chain := flow.Emulator.Chain()
+	sc := systemcontracts.SystemContractsForChain(chain.ChainID())
+
+	push := func(bhl *handler.BlockHashList, height uint64) {
+		buffer := make([]byte, 32)
+		pos := 0
+
+		// encode capacity
+		binary.BigEndian.PutUint64(buffer[pos:], height)
+		err := bhl.Push(height, [32]byte(buffer))
+		require.NoError(t, err)
+	}
+
+	t.Run("block hash list write on push", newVMTest().
+		withContextOptions(
+			fvm.WithChain(chain),
+			fvm.WithEVMEnabled(true),
+		).
+		run(func(
+			t *testing.T,
+			vm fvm.VM,
+			chain flow.Chain,
+			ctx fvm.Context,
+			snapshotTree snapshot.SnapshotTree,
+		) {
+			capacity := 256
+
+			ts := state.NewTransactionState(snapshotTree, state.DefaultParameters())
+			accounts := environment.NewAccounts(ts)
+			envMeter := environment.NewMeter(ts)
+
+			valueStore := environment.NewValueStore(
+				tracing.NewMockTracerSpan(),
+				envMeter,
+				accounts,
+			)
+
+			bhl, err := handler.NewBlockHashList(valueStore, sc.EVMStorage.Address, capacity)
+			require.NoError(t, err)
+
+			// fill the block hash list
+			height := uint64(0)
+			for ; height < uint64(capacity); height++ {
+				push(bhl, height)
+			}
+
+			es, err := ts.FinalizeMainTransaction()
+			require.NoError(t, err)
+			snapshotTree = snapshotTree.Append(es)
+
+			// end of test setup
+
+			ts = state.NewTransactionState(snapshotTree, state.DefaultParameters())
+			accounts = environment.NewAccounts(ts)
+			envMeter = environment.NewMeter(ts)
+
+			valueStore = environment.NewValueStore(
+				tracing.NewMockTracerSpan(),
+				envMeter,
+				accounts,
+			)
+
+			bhl, err = handler.NewBlockHashList(valueStore, sc.EVMStorage.Address, capacity)
+			require.NoError(t, err)
+
+			// after we push the changes should be applied and the first block hash in the bucket should be capacity+1 instead of 0
+			push(bhl, height)
+
+			es, err = ts.FinalizeMainTransaction()
+			require.NoError(t, err)
+
+			require.Len(t, es.WriteSet, 2)
+			newBlockHashListBucket, ok := es.WriteSet[flow.NewRegisterID(sc.EVMStorage.Address, "BlockHashListBucket0")]
+			require.True(t, ok)
+			// full expected block hash list bucket split by individual block hashes
+			// first block hash is the capacity+1 instead of 0 (00 00 00 00 00 00 01 00)
+			expectedBlockHashListBucket, err := hex.DecodeString(
+				"0000000000000100000000000000000000000000000000000000000000000000" +
+					"0000000000000001000000000000000000000000000000000000000000000000" +
+					"0000000000000002000000000000000000000000000000000000000000000000" +
+					"0000000000000003000000000000000000000000000000000000000000000000" +
+					"0000000000000004000000000000000000000000000000000000000000000000" +
+					"0000000000000005000000000000000000000000000000000000000000000000" +
+					"0000000000000006000000000000000000000000000000000000000000000000" +
+					"0000000000000007000000000000000000000000000000000000000000000000" +
+					"0000000000000008000000000000000000000000000000000000000000000000" +
+					"0000000000000009000000000000000000000000000000000000000000000000" +
+					"000000000000000a000000000000000000000000000000000000000000000000" +
+					"000000000000000b000000000000000000000000000000000000000000000000" +
+					"000000000000000c000000000000000000000000000000000000000000000000" +
+					"000000000000000d000000000000000000000000000000000000000000000000" +
+					"000000000000000e000000000000000000000000000000000000000000000000" +
+					"000000000000000f000000000000000000000000000000000000000000000000")
+			require.Equal(t, expectedBlockHashListBucket, newBlockHashListBucket)
 		}))
 }
