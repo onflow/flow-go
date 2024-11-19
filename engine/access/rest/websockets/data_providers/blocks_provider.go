@@ -43,12 +43,13 @@ func NewBlocksDataProvider(
 	send chan<- interface{},
 ) (*BlocksDataProvider, error) {
 	p := &BlocksDataProvider{
-		logger: logger.With().Str("component", "block-data-provider").Logger(),
+		logger: logger.With().Str("component", "blocks-data-provider").Logger(),
 		api:    api,
 	}
 
 	// Initialize arguments passed to the provider.
-	err := p.initArguments(arguments)
+	var err error
+	p.args, err = ParseBlocksArguments(arguments)
 	if err != nil {
 		return nil, fmt.Errorf("invalid arguments: %w", err)
 	}
@@ -71,51 +72,7 @@ func NewBlocksDataProvider(
 //
 // No errors are expected during normal operations.
 func (p *BlocksDataProvider) Run() error {
-	return subscription.HandleSubscription(p.subscription, handleResponse(p.send, p.args.BlockStatus))
-}
-
-// initArguments checks and validates the arguments passed to the provider.
-//
-// No errors are expected during normal operations.
-func (p *BlocksDataProvider) initArguments(arguments map[string]string) error {
-	// Parse 'block_status'
-	if blockStatusIn, ok := arguments["block_status"]; ok {
-		blockStatus, err := parser.ParseBlockStatus(blockStatusIn)
-		if err != nil {
-			return err
-		}
-		p.args.BlockStatus = blockStatus
-	} else {
-		return fmt.Errorf("'block_status' must be provided")
-	}
-
-	// Parse 'start_block_id' if provided
-	if startBlockIDIn, ok := arguments["start_block_id"]; ok {
-		var startBlockID parser.ID
-		err := startBlockID.Parse(startBlockIDIn)
-		if err != nil {
-			return err
-		}
-		p.args.StartBlockID = startBlockID.Flow()
-	}
-
-	// Parse 'start_block_height' if provided
-	if startBlockHeightIn, ok := arguments["start_block_height"]; ok {
-		var err error
-		p.args.StartBlockHeight, err = util.ToUint64(startBlockHeightIn)
-		if err != nil {
-			return fmt.Errorf("invalid 'start_block_height': %w", err)
-		}
-	} else {
-		p.args.StartBlockHeight = request.EmptyHeight
-	}
-
-	// if both start_block_id and start_height are provided
-	if p.args.StartBlockID != flow.ZeroID && p.args.StartBlockHeight != request.EmptyHeight {
-		return fmt.Errorf("can only provide either 'start_block_id' or 'start_block_height'")
-	}
-
-	return nil
+	return subscription.HandleSubscription(p.subscription, p.handleResponse(p.send))
 }
 
 // createSubscription creates a new subscription using the specified input arguments.
@@ -134,7 +91,7 @@ func (p *BlocksDataProvider) createSubscription(ctx context.Context) subscriptio
 // handleResponse processes a block and sends the formatted response.
 //
 // No errors are expected during normal operations.
-func handleResponse(send chan<- interface{}, blockStatus flow.BlockStatus) func(*flow.Block) error {
+func (p *BlocksDataProvider) handleResponse(send chan<- interface{}) func(*flow.Block) error {
 	return func(block *flow.Block) error {
 		send <- &models.BlockMessageResponse{
 			Block: block,
@@ -142,4 +99,48 @@ func handleResponse(send chan<- interface{}, blockStatus flow.BlockStatus) func(
 
 		return nil
 	}
+}
+
+// ParseBlocksArguments validates and initializes the blocks arguments.
+func ParseBlocksArguments(arguments map[string]string) (BlocksArguments, error) {
+	var args BlocksArguments
+
+	// Parse 'block_status'
+	if blockStatusIn, ok := arguments["block_status"]; ok {
+		blockStatus, err := parser.ParseBlockStatus(blockStatusIn)
+		if err != nil {
+			return args, err
+		}
+		args.BlockStatus = blockStatus
+	} else {
+		return args, fmt.Errorf("'block_status' must be provided")
+	}
+
+	// Parse 'start_block_id' if provided
+	if startBlockIDIn, ok := arguments["start_block_id"]; ok {
+		var startBlockID parser.ID
+		err := startBlockID.Parse(startBlockIDIn)
+		if err != nil {
+			return args, err
+		}
+		args.StartBlockID = startBlockID.Flow()
+	}
+
+	// Parse 'start_block_height' if provided
+	if startBlockHeightIn, ok := arguments["start_block_height"]; ok {
+		var err error
+		args.StartBlockHeight, err = util.ToUint64(startBlockHeightIn)
+		if err != nil {
+			return args, fmt.Errorf("invalid 'start_block_height': %w", err)
+		}
+	} else {
+		args.StartBlockHeight = request.EmptyHeight
+	}
+
+	// Ensure only one of start_block_id or start_block_height is provided
+	if args.StartBlockID != flow.ZeroID && args.StartBlockHeight != request.EmptyHeight {
+		return args, fmt.Errorf("can only provide either 'start_block_id' or 'start_block_height'")
+	}
+
+	return args, nil
 }

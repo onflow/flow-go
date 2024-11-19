@@ -57,18 +57,16 @@ func (s *BlocksProviderSuite) SetupTest() {
 	s.finalizedBlock = parent
 }
 
-// TestBlocksDataProvider_InvalidArguments tests the behavior of the block data provider
-// when invalid arguments are provided. It verifies that appropriate errors are returned
-// for missing or conflicting arguments.
-// This test covers the test cases:
-// 1. Missing 'block_status' argument.
-// 2. Invalid 'block_status' argument.
-// 3. Providing both 'start_block_id' and 'start_block_height' simultaneously.
-func (s *BlocksProviderSuite) TestBlocksDataProvider_InvalidArguments() {
-	ctx := context.Background()
-	send := make(chan interface{})
-
-	testCases := []testErrType{
+// invalidArgumentsTestCases returns a list of test cases with invalid argument combinations
+// for testing the behavior of block, block headers, block digests data providers. Each test case includes a name,
+// a set of input arguments, and the expected error message that should be returned.
+//
+// The test cases cover scenarios such as:
+// 1. Missing the required 'block_status' argument.
+// 2. Providing an unknown or invalid 'block_status' value.
+// 3. Supplying both 'start_block_id' and 'start_block_height' simultaneously, which is not allowed.
+func (s *BlocksProviderSuite) invalidArgumentsTestCases() []testErrType {
+	return []testErrType{
 		{
 			name: "missing 'block_status' argument",
 			arguments: map[string]string{
@@ -93,10 +91,22 @@ func (s *BlocksProviderSuite) TestBlocksDataProvider_InvalidArguments() {
 			expectedErrorMsg: "can only provide either 'start_block_id' or 'start_block_height'",
 		},
 	}
+}
+
+// TestBlocksDataProvider_InvalidArguments tests the behavior of the block data provider
+// when invalid arguments are provided. It verifies that appropriate errors are returned
+// for missing or conflicting arguments.
+// This test covers the test cases:
+// 1. Missing 'block_status' argument.
+// 2. Invalid 'block_status' argument.
+// 3. Providing both 'start_block_id' and 'start_block_height' simultaneously.
+func (s *BlocksProviderSuite) TestBlocksDataProvider_InvalidArguments() {
+	ctx := context.Background()
+	send := make(chan interface{})
 
 	topic := BlocksTopic
 
-	for _, test := range testCases {
+	for _, test := range s.invalidArgumentsTestCases() {
 		s.Run(test.name, func() {
 			provider, err := NewBlocksDataProvider(ctx, s.log, s.api, topic, test.arguments, send)
 			s.Require().Nil(provider)

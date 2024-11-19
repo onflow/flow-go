@@ -72,10 +72,11 @@ func (s *DataProviderFactory) NewDataProvider(
 	switch topic {
 	case BlocksTopic:
 		return NewBlocksDataProvider(ctx, s.logger, s.accessApi, topic, arguments, ch)
+	case BlockHeadersTopic:
+		return NewBlockHeadersDataProvider(ctx, s.logger, s.accessApi, topic, arguments, ch)
 	// TODO: Implemented handlers for each topic should be added in respective case
 	case EventsTopic,
 		AccountStatusesTopic,
-		BlockHeadersTopic,
 		BlockDigestsTopic,
 		TransactionStatusesTopic:
 		return nil, fmt.Errorf("topic \"%s\" not implemented yet", topic)
