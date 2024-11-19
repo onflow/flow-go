@@ -75,7 +75,7 @@ func TestRecoverEpochHappyPath(t *testing.T) {
 		currEpoch := rootSnapshot.Epochs().Current()
 		finalView, err := currEpoch.FinalView()
 		require.NoError(t, err)
-		expectedTargetEndTime, err := currEpoch.TargetEndTime()
+		currEpochTargetEndTime, err := currEpoch.TargetEndTime()
 		require.NoError(t, err)
 
 		// epoch counter
@@ -87,7 +87,7 @@ func TestRecoverEpochHappyPath(t *testing.T) {
 		// epoch end view
 		require.Equal(t, cadence.NewUInt64(finalView+flagNumViewsInEpoch), decodedValues[3])
 		// target duration
-		require.Equal(t, cadence.NewUInt64(expectedTargetEndTime), decodedValues[4])
+		require.Equal(t, cadence.NewUInt64(flagRecoveryEpochTargetDuration), decodedValues[4])
 		// target end time
 		require.Equal(t, cadence.NewUInt64(expectedTargetEndTime+flagRecoveryEpochTargetDuration), decodedValues[5])
 		// clusters: we cannot guarantee order of the cluster when we generate the test fixtures

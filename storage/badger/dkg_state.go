@@ -163,7 +163,7 @@ func (keys *SafeBeaconPrivateKeys) RetrieveMyBeaconPrivateKey(epochCounter uint6
 			if err != nil {
 				key = nil
 				safe = false
-				return irrecoverable.NewExceptionf("[unexpected] could not retrieve beacon key for epoch %d with successful DKG: %v", epochCounter, err)
+				return irrecoverable.NewExceptionf("could not retrieve beacon key for epoch %d with successful DKG: %v", epochCounter, err)
 			}
 
 			// return the key only for successful end state

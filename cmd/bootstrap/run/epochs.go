@@ -204,7 +204,7 @@ func GenerateRecoverEpochTxArgs(log zerolog.Logger,
 		// epoch end view
 		cadence.NewUInt64(currEpochFinalView + numViewsInEpoch),
 		// recovery epoch target duration
-		cadence.NewUInt64(currEpochTargetEndTime),
+		cadence.NewUInt64(recoveryEpochTargetDuration),
 		// target end time
 		cadence.NewUInt64(currEpochTargetEndTime + recoveryEpochTargetDuration),
 		// clusters,
