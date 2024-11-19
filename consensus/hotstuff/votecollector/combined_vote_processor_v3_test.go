@@ -519,7 +519,7 @@ func TestCombinedVoteProcessorV3_PropertyCreatingQCCorrectness(testifyT *testing
 			// in the following, we check validity for each field of `blockSigData` individually
 
 			// 1. CHECK: `StakingSigners` and `RandomBeaconSigners`
-			// Verify that input `hotstuff.BlockSignatureData` has the expected structure.
+			// Verify that input [hotstuff.BlockSignatureData] has the expected structure.
 			//  * When the Vote Processor notices that constructing a valid QC is possible, it does
 			//    so with the signatures collected at this time.
 			//  * However, due to concurrency, additional votes might have been added to the aggregators
@@ -687,7 +687,7 @@ func TestCombinedVoteProcessorV3_PropertyCreatingQCCorrectness(testifyT *testing
 // TestCombinedVoteProcessorV3_OnlyRandomBeaconSigners tests the most optimal happy path,
 // where all consensus replicas vote using their random beacon keys. In this case,
 // no staking signatures were collected and the CombinedVoteProcessor should be setting
-// `BlockSignatureData.StakingSigners` and `BlockSignatureData.AggregatedStakingSig` to nil or empty slices.
+// [BlockSignatureData.StakingSigners] and [BlockSignatureData.AggregatedStakingSig] to nil or empty slices.
 func TestCombinedVoteProcessorV3_OnlyRandomBeaconSigners(testifyT *testing.T) {
 	// setup CombinedVoteProcessorV3
 	block := helper.MakeBlock()
@@ -724,8 +724,8 @@ func TestCombinedVoteProcessorV3_OnlyRandomBeaconSigners(testifyT *testing.T) {
 	reconstructor.On("EnoughShares").Return(true).Once()
 	reconstructor.On("Reconstruct").Return(unittest.SignatureFixture(), nil).Once()
 
-	// Adding the vote should trigger QC generation. We expect `BlockSignatureData.StakingSigners`
-	// and `BlockSignatureData.AggregatedStakingSig` to be both empty, as there are no staking signatures.
+	// Adding the vote should trigger QC generation. We expect [BlockSignatureData.StakingSigners]
+	// and [BlockSignatureData.AggregatedStakingSig] to be both empty, as there are no staking signatures.
 	packer.On("Pack", block.View, mock.Anything).
 		Run(func(args mock.Arguments) {
 			blockSigData := args.Get(1).(*hotstuff.BlockSignatureData)

@@ -68,7 +68,7 @@ func (cache *epochRangeCache) extendLatestEpoch(epochCounter uint64, extension f
 		return nil
 	}
 
-	// sanity check: `extension.FinalView` should be greater than final view of latest epoch
+	// sanity check: [extension.FinalView] should be greater than final view of latest epoch
 	if latestEpoch.finalView > extension.FinalView {
 		return fmt.Errorf(invalidExtensionFinalView, latestEpoch.finalView, extension.FinalView)
 	}

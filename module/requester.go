@@ -8,7 +8,7 @@ type Requester interface {
 	// EntityByID will request an entity through the request engine backing
 	// the interface. The additional selector will be applied to the subset
 	// of valid providers for the entity and allows finer-grained control
-	// over which providers to request a given entity from. Use `filter.Any`
+	// over which providers to request a given entity from. Use [filter.Any]
 	// if no additional restrictions are required. Data integrity of response
 	// will be checked upon arrival. This function should be used for requesting
 	// entites by their IDs.

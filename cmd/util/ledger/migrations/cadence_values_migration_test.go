@@ -2733,7 +2733,7 @@ func TestTypeRequirementRemovalMigration(t *testing.T) {
 
 	contractName := "TiblesProducer"
 
-	// Store a value with the actual `TiblesProducer.Minter` type
+	// Store a value with the actual [TiblesProducer.Minter] type
 	storageMap.WriteValue(
 		migrationRuntime.Interpreter,
 		interpreter.StringStorageMapKey("a"),
@@ -2750,7 +2750,7 @@ func TestTypeRequirementRemovalMigration(t *testing.T) {
 		),
 	)
 
-	// Store a value with a random `TiblesProducer.Minter` type (different address)
+	// Store a value with a random [TiblesProducer.Minter] type (different address)
 	storageMap.WriteValue(
 		migrationRuntime.Interpreter,
 		interpreter.StringStorageMapKey("b"),

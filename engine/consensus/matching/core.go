@@ -219,7 +219,7 @@ func (c *Core) processReceipt(receipt *flow.ExecutionReceipt) (bool, error) {
 		if module.IsUnknownResultError(err) {
 			// Previous result is missing. Hence, we can't validate this receipt.
 			// We want to efficiently handle receipts arriving out of order. Therefore, we cache the
-			// receipt in `c.pendingReceipts`. On finalization of new blocks, we request receipts
+			// receipt in [c.pendingReceipts]. On finalization of new blocks, we request receipts
 			// for all unsealed but finalized blocks. For instance, given blocks
 			// A <- B <- C <- D <- E, if we receive their receipts in the order of [E,C,D,B,A], then:
 			//  - If we drop the missing previous receipts, then only A will be processed.

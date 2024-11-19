@@ -146,7 +146,7 @@ func (suite *ProtocolStateProviderTestSuite) TestIDTranslation() {
 
 // TestUnknownIDs verifies that `ProtocolStateIDCache` complies with `p2p.IDTranslator`
 // interface specification: we expect an `p2p.ErrUnknownId` when attempting to
-// translate an unknown `peer.ID` or `flow.Identifier`.
+// translate an unknown [peer.ID] or [flow.Identifier].
 func (suite *ProtocolStateProviderTestSuite) TestUnknownIDs() {
 	unknwonFlowID := unittest.IdentifierFixture()
 	_, err := suite.provider.GetPeerID(unknwonFlowID)

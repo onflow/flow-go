@@ -228,7 +228,7 @@ func TestTimeoutSignatureAggregator_Aggregate(t *testing.T) {
 		require.Nil(t, aggSig)
 
 		// Also, _after_ attempting to add a signature from unknown `signerID`:
-		// calling `Aggregate()` should error with `model.InsufficientSignaturesError`,
+		// calling `Aggregate()` should error with [model.InsufficientSignaturesError],
 		// as still zero signatures are stored.
 		_, err = aggregator.VerifyAndAdd(unittest.IdentifierFixture(), unittest.SignatureFixture(), 0)
 		require.True(t, model.IsInvalidSignerError(err))

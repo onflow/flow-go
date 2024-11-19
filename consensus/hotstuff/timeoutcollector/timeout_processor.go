@@ -221,7 +221,7 @@ func (p *TimeoutProcessor) validateTimeout(timeout *model.TimeoutObject) error {
 		}
 		if errors.Is(err, model.ErrViewForUnknownEpoch) {
 			// We require each replica to be bootstrapped with a QC pointing to a finalized block. Therefore, we should know the
-			// Epoch for any QC.View and TC.View we encounter. Receiving a `model.ErrViewForUnknownEpoch` is conceptually impossible,
+			// Epoch for any QC.View and TC.View we encounter. Receiving a [model.ErrViewForUnknownEpoch] is conceptually impossible,
 			// i.e. a symptom of an internal bug or invalid bootstrapping information.
 			return fmt.Errorf("no Epoch information availalbe for QC that was included in TO; symptom of internal bug or invalid bootstrapping information: %s", err.Error())
 		}
@@ -237,7 +237,7 @@ func (p *TimeoutProcessor) validateTimeout(timeout *model.TimeoutObject) error {
 			}
 			if errors.Is(err, model.ErrViewForUnknownEpoch) {
 				// We require each replica to be bootstrapped with a QC pointing to a finalized block. Therefore, we should know the
-				// Epoch for any QC.View and TC.View we encounter. Receiving a `model.ErrViewForUnknownEpoch` is conceptually impossible,
+				// Epoch for any QC.View and TC.View we encounter. Receiving a [model.ErrViewForUnknownEpoch] is conceptually impossible,
 				// i.e. a symptom of an internal bug or invalid bootstrapping information.
 				return fmt.Errorf("no Epoch information availalbe for TC that was included in TO; symptom of internal bug or invalid bootstrapping information: %s", err.Error())
 			}
@@ -258,7 +258,7 @@ func (p *TimeoutProcessor) buildTC() (*flow.TimeoutCertificate, error) {
 	}
 
 	// IMPORTANT: To properly verify an aggregated signature included in TC we need to provide list of signers with corresponding
-	// messages(`TimeoutCertificate.NewestQCViews`) for each signer. If the one-to-once correspondence of view and signer is not maintained,
+	// messages([TimeoutCertificate.NewestQCViews]) for each signer. If the one-to-once correspondence of view and signer is not maintained,
 	// it won't be possible to verify the aggregated signature.
 	// Aggregate returns an unordered set of signers together with additional data.
 	// Due to implementation specifics of signer indices, the decoding step results in canonically ordered signer ids, which means

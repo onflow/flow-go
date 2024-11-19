@@ -88,7 +88,7 @@ func (c *Cache[K, V]) IsCached(key K) bool {
 
 // Get will try to retrieve the resource from cache first, and then from the
 // injected. During normal operations, the following error returns are expected:
-//   - `storage.ErrNotFound` if key is unknown.
+//   - [storage.ErrNotFound] if key is unknown.
 func (c *Cache[K, V]) Get(key K) func(*badger.Txn) (V, error) {
 	return func(tx *badger.Txn) (V, error) {
 

@@ -32,7 +32,7 @@ type DKGContractClient interface {
 	// messages for that phase.
 	ReadBroadcast(fromIndex uint, referenceBlock flow.Identifier) ([]messages.BroadcastDKGMessage, error)
 
-	// SubmitParametersAndResult posts the DKG setup parameters (`flow.DKGIndexMap`) and the node's locally-computed DKG result to
+	// SubmitParametersAndResult posts the DKG setup parameters ([flow.DKGIndexMap]) and the node's locally-computed DKG result to
 	// the DKG white-board smart contract. The DKG result are the group public key and the node's local computation of the public
 	// keys for each DKG participant. Serialized public keys are encoded as hex.
 	// Conceptually the flow.DKGIndexMap is not and output of the DKG protocol. Rather, it is part of the configuration/initialization

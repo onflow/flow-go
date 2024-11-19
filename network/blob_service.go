@@ -28,7 +28,7 @@ type BlobGetter interface {
 
 // BlobService is a hybrid blob datastore. It stores data in a local
 // datastore and may retrieve data from a remote Exchange.
-// It uses an internal `datastore.Datastore` instance to store values.
+// It uses an internal [datastore.Datastore] instance to store values.
 type BlobService interface {
 	component.Component
 	BlobGetter

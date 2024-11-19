@@ -14,7 +14,7 @@ type IdentifierProvider interface {
 
 // IdentityProvider provides an interface to get a list of Identities representing
 // the set of participants in the Flow protocol. CAUTION: return values will include
-// ejected nodes, so callers must check the `Identity.Ejected` flag.
+// ejected nodes, so callers must check the [Identity.Ejected] flag.
 type IdentityProvider interface {
 	// Identities returns the full identities of _all_ nodes currently known to the
 	// protocol that pass the provided filter. Caution, this includes ejected nodes.

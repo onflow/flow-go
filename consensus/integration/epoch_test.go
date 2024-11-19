@@ -24,7 +24,7 @@ func TestUnweightedNode(t *testing.T) {
 	rootSnapshot := createRootSnapshot(t, participantsData)
 	consensusParticipants := NewConsensusParticipants(participantsData)
 
-	// add a consensus node to next epoch (it will have `flow.EpochParticipationStatusJoining` status in the current epoch)
+	// add a consensus node to next epoch (it will have [flow.EpochParticipationStatusJoining] status in the current epoch)
 	nextEpochParticipantsData := createConsensusIdentities(t, 1)
 	// epoch 2 identities includes:
 	// * same collection node from epoch 1, so cluster QCs are consistent

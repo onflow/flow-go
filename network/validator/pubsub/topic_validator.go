@@ -26,7 +26,7 @@ import (
 func messageSigningID(m *pubsub.Message) (peer.ID, error) {
 	var pubk crypto.PubKey
 
-	// m.From is the original sender of the message (versus `m.ReceivedFrom` which is the last hop which sent us this message)
+	// m.From is the original sender of the message (versus [m.ReceivedFrom] which is the last hop which sent us this message)
 	pid, err := peer.IDFromBytes(m.From)
 	if err != nil {
 		return "", err

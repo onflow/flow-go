@@ -339,7 +339,7 @@ func (c *Consensus) handleProtocolEvents(ctx irrecoverable.SignalerContext, read
 	}
 }
 
-// EpochCommittedPhaseStarted informs `committees.Consensus` that the first block in flow.EpochPhaseCommitted has been finalized.
+// EpochCommittedPhaseStarted informs [committees.Consensus] that the first block in flow.EpochPhaseCommitted has been finalized.
 // This event consumer function enqueues an event handler function for the single event handler thread to execute.
 func (c *Consensus) EpochCommittedPhaseStarted(_ uint64, first *flow.Header) {
 	c.epochEvents <- func() error {
@@ -347,7 +347,7 @@ func (c *Consensus) EpochCommittedPhaseStarted(_ uint64, first *flow.Header) {
 	}
 }
 
-// EpochExtended informs `committees.Consensus` that a block including a new epoch extension has been finalized.
+// EpochExtended informs [committees.Consensus] that a block including a new epoch extension has been finalized.
 // This event consumer function enqueues an event handler function for the single event handler thread to execute.
 func (c *Consensus) EpochExtended(epochCounter uint64, _ *flow.Header, extension flow.EpochExtension) {
 	c.epochEvents <- func() error {

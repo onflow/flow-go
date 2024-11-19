@@ -21,13 +21,13 @@ import (
 	"github.com/onflow/flow-go/storage"
 )
 
-// defaultBlockQueueCapacity maximum capacity of inbound queue for `messages.BlockProposal`s
+// defaultBlockQueueCapacity maximum capacity of inbound queue for [messages.BlockProposal]s
 const defaultBlockQueueCapacity = 10_000
 
-// Engine is a wrapper around `compliance.Core`. The Engine queues inbound messages, relevant
+// Engine is a wrapper around [compliance.Core]. The Engine queues inbound messages, relevant
 // node-internal notifications, and manages the worker routines processing the inbound events,
 // and forwards outbound messages to the networking layer.
-// `compliance.Core` implements the actual compliance logic.
+// [compliance.Core] implements the actual compliance logic.
 // Implements consensus.Compliance interface.
 type Engine struct {
 	component.Component
@@ -54,7 +54,7 @@ func NewEngine(
 	core *Core,
 ) (*Engine, error) {
 
-	// Inbound FIFO queue for `messages.BlockProposal`s
+	// Inbound FIFO queue for [messages.BlockProposal]s
 	blocksQueue, err := fifoqueue.NewFifoQueue(
 		defaultBlockQueueCapacity,
 		fifoqueue.WithLengthObserver(func(len int) { core.mempoolMetrics.MempoolEntries(metrics.ResourceBlockProposalQueue, uint(len)) }),

@@ -167,14 +167,14 @@ func (e *Engine) HandleReceipt(originID flow.Identifier, receipt flow.Entity) {
 	}
 }
 
-// OnFinalizedBlock implements the `OnFinalizedBlock` callback from the `hotstuff.FinalizationConsumer`
+// OnFinalizedBlock implements the `OnFinalizedBlock` callback from the [hotstuff.FinalizationConsumer]
 // CAUTION: the input to this callback is treated as trusted; precautions should be taken that messages
 // from external nodes cannot be considered as inputs to this function
 func (e *Engine) OnFinalizedBlock(*model.Block) {
 	e.finalizationEventsNotifier.Notify()
 }
 
-// OnBlockIncorporated implements the `OnBlockIncorporated` callback from the `hotstuff.FinalizationConsumer`
+// OnBlockIncorporated implements the `OnBlockIncorporated` callback from the [hotstuff.FinalizationConsumer]
 // CAUTION: the input to this callback is treated as trusted; precautions should be taken that messages
 // from external nodes cannot be considered as inputs to this function
 func (e *Engine) OnBlockIncorporated(incorporatedBlock *model.Block) {

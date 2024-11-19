@@ -16,7 +16,7 @@ type randomBeaconInspector struct {
 }
 
 // NewRandomBeaconInspector instantiates a new randomBeaconInspector.
-// The constructor errors with a `model.ConfigurationError` in any of the following cases
+// The constructor errors with a [model.ConfigurationError] in any of the following cases
 //   - n is not between `ThresholdSignMinSize` and `ThresholdSignMaxSize`,
 //     for n the number of participants `n := len(publicKeyShares)`
 //   - threshold value is not in interval [1, n-1]

@@ -21,7 +21,7 @@ import (
 	"github.com/onflow/flow-go/storage"
 )
 
-// defaultBlockQueueCapacity maximum capacity of inbound queue for `messages.ClusterBlockProposal`s
+// defaultBlockQueueCapacity maximum capacity of inbound queue for [messages.ClusterBlockProposal]s
 const defaultBlockQueueCapacity = 10_000
 
 // Engine is a wrapper struct for `Core` which implements cluster consensus algorithm.

@@ -29,7 +29,7 @@ func TestFollowerCore(t *testing.T) {
 }
 
 // CoreSuite maintains minimal state for testing ComplianceCore.
-// Performs startup & shutdown using `module.Startable` and `module.ReadyDoneAware` interfaces.
+// Performs startup & shutdown using [module.Startable] and [module.ReadyDoneAware] interfaces.
 type CoreSuite struct {
 	suite.Suite
 

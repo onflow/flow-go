@@ -404,7 +404,7 @@ func (s *EmulatorSuite) isDKGCompleted() bool {
 	return bool(value.(cadence.Bool))
 }
 
-// getParametersAndResult retrieves the DKG setup parameters (`flow.DKGIndexMap`) and the DKG result from the DKG white-board smart contract.
+// getParametersAndResult retrieves the DKG setup parameters ([flow.DKGIndexMap]) and the DKG result from the DKG white-board smart contract.
 func (s *EmulatorSuite) getParametersAndResult() (flow.DKGIndexMap, crypto.PublicKey, []crypto.PublicKey) {
 	res := s.executeScript(templates.GenerateGetDKGCanonicalFinalSubmissionScript(s.env), nil)
 	value := res.(cadence.Optional).Value

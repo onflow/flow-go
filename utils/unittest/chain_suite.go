@@ -183,7 +183,7 @@ func (bc *BaseChainSuite) SetupChain() {
 		return nil, false
 	}
 
-	// define the protocol state snapshot for any block in `bc.Blocks`
+	// define the protocol state snapshot for any block in [bc.Blocks]
 	bc.State.On("AtBlockID", mock.Anything).Return(
 		func(blockID flow.Identifier) realproto.Snapshot {
 			block, found := bc.Blocks[blockID]

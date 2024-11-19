@@ -9,17 +9,17 @@ import (
 )
 
 var (
-	// ErrInvalidId indicates that the given ID (either `peer.ID` or `flow.Identifier`) has an invalid format.
+	// ErrInvalidId indicates that the given ID (either [peer.ID] or [flow.Identifier]) has an invalid format.
 	ErrInvalidId = errors.New("empty peer ID")
 
-	// ErrUnknownId indicates that the given ID (either `peer.ID` or `flow.Identifier`) is unknown.
+	// ErrUnknownId indicates that the given ID (either [peer.ID] or [flow.Identifier]) is unknown.
 	ErrUnknownId = errors.New("unknown ID")
 )
 
 // IDTranslator provides an interface for converting from Flow ID's to LibP2P peer ID's
 // and vice versa.
 type IDTranslator interface {
-	// GetPeerID returns the peer ID for the given `flow.Identifier`.
+	// GetPeerID returns the peer ID for the given [flow.Identifier].
 	// During normal operations, the following error returns are expected
 	//  * ErrUnknownId if the given Identifier is unknown
 	//  * ErrInvalidId if the given Identifier has an invalid format.
@@ -31,7 +31,7 @@ type IDTranslator interface {
 	// TODO: implementations do not fully adhere to this convention on error returns
 	GetPeerID(flow.Identifier) (peer.ID, error)
 
-	// GetFlowID returns the `flow.Identifier` for the given `peer.ID`.
+	// GetFlowID returns the [flow.Identifier] for the given [peer.ID].
 	// During normal operations, the following error returns are expected
 	//  * ErrUnknownId if the given Identifier is unknown
 	//  * ErrInvalidId if the given Identifier has an invalid format.

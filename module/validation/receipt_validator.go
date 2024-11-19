@@ -85,7 +85,7 @@ func (v *receiptValidator) verifyChunksFormat(result *flow.ExecutionResult) erro
 	// For a block containing k collections, the Flow protocol prescribes that a valid execution result
 	// must contain k+1 chunks. Specifically, we have one chunk per collection plus the system chunk.
 	// The system chunk must exist, even if block payload itself is empty.
-	index, err := v.index.ByBlockID(result.BlockID) // returns `storage.ErrNotFound` for unknown BlockID
+	index, err := v.index.ByBlockID(result.BlockID) // returns [storage.ErrNotFound] for unknown BlockID
 	if err != nil {
 		if errors.Is(err, storage.ErrNotFound) {
 			return module.NewUnknownBlockError("could not find payload index for executed block %v: %w", result.BlockID, err)
@@ -107,7 +107,7 @@ func (v *receiptValidator) verifyChunksFormat(result *flow.ExecutionResult) erro
 //   - engine.InvalidInputError if result does not form a valid sub-graph
 //   - module.UnknownBlockError when the executed block is unknown
 func (v *receiptValidator) subgraphCheck(result *flow.ExecutionResult, prevResult *flow.ExecutionResult) error {
-	block, err := v.state.AtBlockID(result.BlockID).Head() // returns `storage.ErrNotFound` for unknown BlockID
+	block, err := v.state.AtBlockID(result.BlockID).Head() // returns [storage.ErrNotFound] for unknown BlockID
 	if err != nil {
 		if errors.Is(err, storage.ErrNotFound) {
 			return module.NewUnknownBlockError("executed block %v unknown: %w", result.BlockID, err)
@@ -154,7 +154,7 @@ func (v *receiptValidator) resultChainCheck(result *flow.ExecutionResult, prevRe
 //   - execution result has a valid parent and satisfies the subgraph check
 //
 // In order to validate a receipt, both the executed block and the parent result
-// referenced in `receipt.ExecutionResult` must be known. We return nil if all checks
+// referenced in [receipt.ExecutionResult] must be known. We return nil if all checks
 // pass successfully.
 //
 // Expected errors during normal operations:
@@ -165,7 +165,7 @@ func (v *receiptValidator) resultChainCheck(result *flow.ExecutionResult, prevRe
 // All other error are potential symptoms critical internal failures, such as bugs or state corruption.
 func (v *receiptValidator) Validate(receipt *flow.ExecutionReceipt) error {
 	parentResult, err := v.results.ByID(receipt.ExecutionResult.PreviousResultID)
-	if err != nil { // we expect `storage.ErrNotFound` in case parent result is unknown; any other error is unexpected, critical failure
+	if err != nil { // we expect [storage.ErrNotFound] in case parent result is unknown; any other error is unexpected, critical failure
 		if errors.Is(err, storage.ErrNotFound) {
 			return module.NewUnknownResultError("parent result %v unknown: %w", receipt.ExecutionResult.PreviousResultID, err)
 		}
@@ -322,7 +322,7 @@ func (v *receiptValidator) ValidatePayload(candidate *flow.Block) error {
 		if _, forBlockOnFork := forkBlocks[result.BlockID]; !forBlockOnFork {
 			return engine.NewInvalidInputErrorf("results %v at index %d is for block not on fork (%x)", resultID, i, result.BlockID)
 		}
-		// Reaching the following code implies that the executed block with ID `result.BlockID` is known to the protocol state, i.e. well formed.
+		// Reaching the following code implies that the executed block with ID [result.BlockID] is known to the protocol state, i.e. well formed.
 
 		// validate result
 		err = v.validateResult(result, prevResult)

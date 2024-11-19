@@ -91,11 +91,11 @@ func (v *Validator) ValidateTC(tc *flow.TimeoutCertificate) error {
 
 	// verifying that tc.NewestQC is the QC with the highest view.
 	// Note: A byzantine TC could include `nil` for tc.NewestQCViews, in which case `tc.NewestQCViews[0]`
-	// would panic. Though, per API specification `verifier.VerifyTC(…)` should return a `model.InvalidFormatError`
-	// if `signers` and `tc.NewestQCViews` have different length. Hence, the following code is safe only if it is executed
+	// would panic. Though, per API specification `verifier.VerifyTC(…)` should return a [model.InvalidFormatError]
+	// if `signers` and [tc.NewestQCViews] have different length. Hence, the following code is safe only if it is executed
 	//  1. _after_ checking the quorum threshold (thereby we guarantee that `signers` is not empty); and
-	//  2. _after_ `verifier.VerifyTC(…)`, which enforces that `signers` and `tc.NewestQCViews` have identical length.
-	// Only then we can be sure that `tc.NewestQCViews` cannot be nil.
+	//  2. _after_ `verifier.VerifyTC(…)`, which enforces that `signers` and [tc.NewestQCViews] have identical length.
+	// Only then we can be sure that [tc.NewestQCViews] cannot be nil.
 	newestQCView := tc.NewestQCViews[0]
 	for _, view := range tc.NewestQCViews {
 		if newestQCView < view {
@@ -117,7 +117,7 @@ func (v *Validator) ValidateTC(tc *flow.TimeoutCertificate) error {
 			// a QC at least as new as the root QC must be contained in any TC. This is because the TC must include signatures from a
 			// supermajority of replicas, including at least one honest replica, which attest to their locally highest known QC. Hence,
 			// any QC included in a TC must be the root QC or newer. Therefore, we should know the Epoch for any QC we encounter.
-			// receiving a `model.ErrViewForUnknownEpoch` is conceptually impossible, i.e. a symptom of an internal bug or invalid
+			// receiving a [model.ErrViewForUnknownEpoch] is conceptually impossible, i.e. a symptom of an internal bug or invalid
 			// bootstrapping information.
 			return fmt.Errorf("no Epoch information availalbe for QC that was included in TC; symptom of internal bug or invalid bootstrapping information: %s", err.Error())
 		}
@@ -170,7 +170,7 @@ func (v *Validator) ValidateQC(qc *flow.QuorumCertificate) error {
 		//    is also a member of the random beacon committee. Consequently, `InvalidSignerError` should
 		//    not occur atm.
 		//    TODO: if the random beacon committee is a strict subset of the HotStuff committee,
-		//          we expect `model.InvalidSignerError` here during normal operations.
+		//          we expect [model.InvalidSignerError] here during normal operations.
 		// * model.InsufficientSignaturesError: we previously checked the total weight of all signers
 		//   meets the supermajority threshold, which is a _positive_ number. Hence, there must be at
 		//   least one signer. Hence, receiving this error would be a symptom of a fatal internal bug.
@@ -181,7 +181,7 @@ func (v *Validator) ValidateQC(qc *flow.QuorumCertificate) error {
 			return newInvalidQCError(qc, fmt.Errorf("QC contains invalid signature(s): %w", err))
 		case errors.Is(err, model.ErrViewForUnknownEpoch):
 			// We have earlier queried the Identities for the QC's view, which must have returned proper values,
-			// otherwise, we wouldn't reach this code. Therefore, it should be impossible for `verifier.VerifyQC`
+			// otherwise, we wouldn't reach this code. Therefore, it should be impossible for [verifier.VerifyQC]
 			// to return ErrViewForUnknownEpoch. To avoid confusion with expected sentinel errors, we only preserve
 			// the error messages here, but not the error types.
 			return fmt.Errorf("internal error, as querying identities for view %d succeeded earlier but now the view supposedly belongs to an unknown epoch: %s", qc.View, err.Error())
@@ -260,7 +260,7 @@ func (v *Validator) ValidateProposal(proposal *model.Proposal) error {
 		}
 		if errors.Is(err, model.ErrViewForUnknownEpoch) {
 			// We require each replica to be bootstrapped with a QC pointing to a finalized block. Therefore, we should know the
-			// Epoch for any QC.View and TC.View we encounter. Receiving a `model.ErrViewForUnknownEpoch` is conceptually impossible,
+			// Epoch for any QC.View and TC.View we encounter. Receiving a [model.ErrViewForUnknownEpoch] is conceptually impossible,
 			// i.e. a symptom of an internal bug or invalid bootstrapping information.
 			return fmt.Errorf("no Epoch information availalbe for QC that was included in proposal; symptom of internal bug or invalid bootstrapping information: %s", err.Error())
 		}
@@ -276,7 +276,7 @@ func (v *Validator) ValidateProposal(proposal *model.Proposal) error {
 			}
 			if errors.Is(err, model.ErrViewForUnknownEpoch) {
 				// We require each replica to be bootstrapped with a QC pointing to a finalized block. Therefore, we should know the
-				// Epoch for any QC.View and TC.View we encounter. Receiving a `model.ErrViewForUnknownEpoch` is conceptually impossible,
+				// Epoch for any QC.View and TC.View we encounter. Receiving a [model.ErrViewForUnknownEpoch] is conceptually impossible,
 				// i.e. a symptom of an internal bug or invalid bootstrapping information.
 				return fmt.Errorf("no Epoch information availalbe for QC that was included in TC; symptom of internal bug or invalid bootstrapping information: %s", err.Error())
 			}
@@ -306,11 +306,11 @@ func (v *Validator) ValidateVote(vote *model.Vote) (*flow.IdentitySkeleton, erro
 	// check whether the signature data is valid for the vote in the hotstuff context
 	err = v.verifier.VerifyVote(voter, vote.SigData, vote.View, vote.BlockID)
 	if err != nil {
-		// Theoretically, `VerifyVote` could also return a `model.InvalidSignerError`. However,
+		// Theoretically, `VerifyVote` could also return a [model.InvalidSignerError]. However,
 		// for the time being, we assume that _every_ HotStuff participant is also a member of
 		// the random beacon committee. Consequently, `InvalidSignerError` should not occur atm.
 		// TODO: if the random beacon committee is a strict subset of the HotStuff committee,
-		//       we expect `model.InvalidSignerError` here during normal operations.
+		//       we expect [model.InvalidSignerError] here during normal operations.
 		if model.IsInvalidFormatError(err) || errors.Is(err, model.ErrInvalidSignature) {
 			return nil, newInvalidVoteError(vote, err)
 		}

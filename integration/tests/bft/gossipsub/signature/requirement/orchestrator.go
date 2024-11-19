@@ -33,7 +33,7 @@ const (
 	numOfUnauthorizedEvents = 5
 )
 
-// Orchestrator represents a simple `insecure.AttackOrchestrator` that tracks any unsigned messages received by victim nodes as well as the typically expected messages.
+// Orchestrator represents a simple [insecure.AttackOrchestrator] that tracks any unsigned messages received by victim nodes as well as the typically expected messages.
 type Orchestrator struct {
 	*bft.BaseOrchestrator
 	codec                      network.Codec

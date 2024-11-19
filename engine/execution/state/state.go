@@ -38,7 +38,7 @@ type ReadOnlyExecutionState interface {
 	GetHighestExecutedBlockID(context.Context) (uint64, flow.Identifier, error)
 }
 
-// ScriptExecutionState is a subset of the `state.ExecutionState` interface purposed to only access the state
+// ScriptExecutionState is a subset of the [state.ExecutionState] interface purposed to only access the state
 // used for script execution and not mutate the execution state of the blockchain.
 type ScriptExecutionState interface {
 	// NewStorageSnapshot creates a new ready-only view at the given block.

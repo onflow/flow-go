@@ -19,14 +19,14 @@ import (
 
 /* **************** Base-Factory for CombinedVoteProcessors ***************** */
 
-// combinedVoteProcessorFactoryBaseV3 is a `votecollector.baseFactory` for creating
+// combinedVoteProcessorFactoryBaseV3 is a [votecollector.baseFactory] for creating
 // CombinedVoteProcessors, holding all needed dependencies.
 // combinedVoteProcessorFactoryBaseV3 is intended to be used for the main consensus.
 // CAUTION:
 // this base factory only creates the VerifyingVoteProcessor for the given block.
 // It does _not_ check the proposer's vote for its own block, i.e. it does _not_
-// implement `hotstuff.VoteProcessorFactory`. This base factory should be wrapped
-// by `votecollector.VoteProcessorFactory` which adds the logic to verify
+// implement [hotstuff.VoteProcessorFactory]. This base factory should be wrapped
+// by [votecollector.VoteProcessorFactory] which adds the logic to verify
 // the proposer's vote (decorator pattern).
 // nolint:unused
 type combinedVoteProcessorFactoryBaseV3 struct {
@@ -275,7 +275,7 @@ func (p *CombinedVoteProcessorV3) buildQC() (*flow.QuorumCertificate, error) {
 	//   `stakingSigners` and `aggregatedStakingSig` both being zero-length
 	//   (here, we use `nil`).
 	// * If it has _not collected any_ signatures, `stakingSigAggtor.Aggregate()`
-	//   errors with a `model.InsufficientSignaturesError`. We shortcut this case,
+	//   errors with a [model.InsufficientSignaturesError]. We shortcut this case,
 	//   and only call `Aggregate`, if the `stakingSigAggtor` has collected signatures
 	//   with non-zero weight (i.e. at least one signature was collected).
 	var stakingSigners []flow.Identifier // nil (zero value) represents empty set of staking signers

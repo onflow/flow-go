@@ -62,7 +62,7 @@ func (v *StakingVerifier) VerifyVote(signer *flow.IdentitySkeleton, sigData []by
 //   - unexpected errors should be treated as symptoms of bugs or uncovered
 //     edge cases in the logic (i.e. as fatal)
 //
-// In the single verification case, `sigData` represents a single signature (`crypto.Signature`).
+// In the single verification case, `sigData` represents a single signature ([crypto.Signature]).
 func (v *StakingVerifier) VerifyQC(signers flow.IdentitySkeletonList, sigData []byte, view uint64, blockID flow.Identifier) error {
 	msg := MakeVoteMessage(view, blockID)
 

@@ -56,7 +56,7 @@ func NewHappyPathStateMachine(telemetry protocol_state.StateMachineTelemetryCons
 // Returned boolean indicates if event triggered a transition in the state machine or not.
 // Implementors must never return (true, error).
 // Expected errors indicating that we are leaving the happy-path of the epoch transitions
-//   - `protocol.InvalidServiceEventError` - if the service event is invalid or is not a valid state transition for the current protocol state.
+//   - [protocol.InvalidServiceEventError] - if the service event is invalid or is not a valid state transition for the current protocol state.
 //     CAUTION: the HappyPathStateMachine is left with a potentially dysfunctional state when this error occurs. Do NOT call the Build method
 //     after such error and discard the HappyPathStateMachine!
 func (u *HappyPathStateMachine) ProcessEpochSetup(epochSetup *flow.EpochSetup) (bool, error) {
@@ -72,18 +72,18 @@ func (u *HappyPathStateMachine) ProcessEpochSetup(epochSetup *flow.EpochSetup) (
 		return false, err
 	}
 
-	// When observing setup event for subsequent epoch, construct the EpochStateContainer for `MinEpochStateEntry.NextEpoch`.
+	// When observing setup event for subsequent epoch, construct the EpochStateContainer for [MinEpochStateEntry.NextEpoch].
 	// Context:
-	// Note that the `EpochStateContainer.ActiveIdentities` only contains the nodes that are *active* in the next epoch. Active means
+	// Note that the [EpochStateContainer.ActiveIdentities] only contains the nodes that are *active* in the next epoch. Active means
 	// that these nodes are authorized to contribute to extending the chain. Nodes are listed in `ActiveIdentities` if and only if
 	// they are part of the EpochSetup event for the respective epoch.
 	//
 	// sanity checking SAFETY-CRITICAL INVARIANT (I):
-	//   - Per convention, the `flow.EpochSetup` event should list the IdentitySkeletons in canonical order. This is useful
+	//   - Per convention, the [flow.EpochSetup] event should list the IdentitySkeletons in canonical order. This is useful
 	//     for most efficient construction of the full active Identities for an epoch. We enforce this here at the gateway
 	//     to the protocol state, when we incorporate new information from the EpochSetup event.
 	//   - Note that the system smart contracts manage the identity table as an unordered set! For the protocol state, we desire a fixed
-	//     ordering to simplify various implementation details, like the DKG. Therefore, we order identities in `flow.EpochSetup` during
+	//     ordering to simplify various implementation details, like the DKG. Therefore, we order identities in [flow.EpochSetup] during
 	//     conversion from cadence to Go in the function `convert.ServiceEvent(flow.ChainID, flow.Event)` in package `model/convert`
 	// sanity checking SAFETY-CRITICAL INVARIANT (II):
 	// While ejection status and dynamic weight are not part of the EpochSetup event, we can supplement this information as follows:
@@ -98,7 +98,7 @@ func (u *HappyPathStateMachine) ProcessEpochSetup(epochSetup *flow.EpochSetup) (
 	//          the system smart contracts later) is illegal.
 	//     (ii) When the EpochSetup event is emitted / processed, the weight of all active nodes equals their InitialWeight and
 
-	// For collector clusters, we rely on invariants (I) and (II) holding. See `committees.Cluster` for details, specifically function
+	// For collector clusters, we rely on invariants (I) and (II) holding. See [committees.Cluster] for details, specifically function
 	// `constructInitialClusterIdentities(..)`. While the system smart contract must satisfy this invariant, we run a sanity check below.
 	activeIdentitiesLookup := u.state.CurrentEpoch.ActiveIdentities.Lookup() // lookup NodeID → DynamicIdentityEntry for nodes _active_ in the current epoch
 	nextEpochActiveIdentities, err := buildNextEpochActiveParticipants(activeIdentitiesLookup, u.state.CurrentEpochSetup, epochSetup)
@@ -135,7 +135,7 @@ func (u *HappyPathStateMachine) ProcessEpochSetup(epochSetup *flow.EpochSetup) (
 // Returned boolean indicates if event triggered a transition in the state machine or not.
 // Implementors must never return (true, error).
 // Expected errors indicating that we are leaving the happy-path of the epoch transitions
-//   - `protocol.InvalidServiceEventError` - if the service event is invalid or is not a valid state transition for the current protocol state.
+//   - [protocol.InvalidServiceEventError] - if the service event is invalid or is not a valid state transition for the current protocol state.
 //     CAUTION: the HappyPathStateMachine is left with a potentially dysfunctional state when this error occurs. Do NOT call the Build method
 //     after such error and discard the HappyPathStateMachine!
 func (u *HappyPathStateMachine) ProcessEpochCommit(epochCommit *flow.EpochCommit) (bool, error) {
@@ -162,7 +162,7 @@ func (u *HappyPathStateMachine) ProcessEpochCommit(epochCommit *flow.EpochCommit
 	return true, nil
 }
 
-// ProcessEpochRecover returns the sentinel error `protocol.InvalidServiceEventError`, which
+// ProcessEpochRecover returns the sentinel error [protocol.InvalidServiceEventError], which
 // indicates that `EpochRecover` are not expected on the happy path of epoch lifecycle.
 func (u *HappyPathStateMachine) ProcessEpochRecover(epochRecover *flow.EpochRecover) (bool, error) {
 	u.telemetry.OnServiceEventReceived(epochRecover.ServiceEvent())
@@ -171,18 +171,18 @@ func (u *HappyPathStateMachine) ProcessEpochRecover(epochRecover *flow.EpochReco
 	return false, err
 }
 
-// When observing setup event for subsequent epoch, construct the EpochStateContainer for `ProtocolStateEntry.NextEpoch`.
+// When observing setup event for subsequent epoch, construct the EpochStateContainer for [ProtocolStateEntry.NextEpoch].
 // Context:
-// Note that the `EpochStateContainer.ActiveIdentities` only contains the nodes that are *active* in the next epoch. Active means
+// Note that the [EpochStateContainer.ActiveIdentities] only contains the nodes that are *active* in the next epoch. Active means
 // that these nodes are authorized to contribute to extending the chain. Nodes are listed in `ActiveIdentities` if and only if
 // they are part of the EpochSetup event for the respective epoch.
 //
 // sanity checking SAFETY-CRITICAL INVARIANT (I):
-//   - Per convention, the `flow.EpochSetup` event should list the IdentitySkeletons in canonical order. This is useful
+//   - Per convention, the [flow.EpochSetup] event should list the IdentitySkeletons in canonical order. This is useful
 //     for most efficient construction of the full active Identities for an epoch. We enforce this here at the gateway
 //     to the protocol state, when we incorporate new information from the EpochSetup event.
 //   - Note that the system smart contracts manage the identity table as an unordered set! For the protocol state, we desire a fixed
-//     ordering to simplify various implementation details, like the DKG. Therefore, we order identities in `flow.EpochSetup` during
+//     ordering to simplify various implementation details, like the DKG. Therefore, we order identities in [flow.EpochSetup] during
 //     conversion from cadence to Go in the function `convert.ServiceEvent(flow.ChainID, flow.Event)` in package `model/convert`
 // sanity checking SAFETY-CRITICAL INVARIANT (II):
 // While ejection status and dynamic weight are not part of the EpochSetup event, we can supplement this information as follows:
@@ -197,7 +197,7 @@ func (u *HappyPathStateMachine) ProcessEpochRecover(epochRecover *flow.EpochReco
 //          the system smart contracts later) is illegal.
 //     (ii) When the EpochSetup event is emitted / processed, the weight of all active nodes equals their InitialWeight and
 
-// For collector clusters, we rely on invariants (I) and (II) holding. See `committees.Cluster` for details, specifically function
+// For collector clusters, we rely on invariants (I) and (II) holding. See [committees.Cluster] for details, specifically function
 // `constructInitialClusterIdentities(..)`. While the system smart contract must satisfy this invariant, we run a sanity check below.
 // This is a side-effect-free function. This function only returns protocol.InvalidServiceEventError as errors.
 func buildNextEpochActiveParticipants(activeIdentitiesLookup map[flow.Identifier]*flow.DynamicIdentityEntry, currentEpochSetup, nextEpochSetup *flow.EpochSetup) (flow.DynamicIdentityEntryList, error) {

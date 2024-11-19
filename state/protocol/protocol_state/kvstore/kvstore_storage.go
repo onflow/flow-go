@@ -11,7 +11,7 @@ import (
 )
 
 // ProtocolKVStore persists different snapshots of key-value stores [KV-stores]. Here, we augment
-// the low-level primitives provided by `storage.ProtocolKVStore` with logic for encoding and
+// the low-level primitives provided by [storage.ProtocolKVStore] with logic for encoding and
 // decoding the state snapshots into abstract representation `protocol_state.KVStoreAPI`.
 //
 // TODO (optional): include a cache of the _decoded_ Protocol States, so we don't decode+encode on each consensus view (hot-path)
@@ -24,7 +24,7 @@ var _ protocol_state.ProtocolKVStore = (*ProtocolKVStore)(nil)
 // NewProtocolKVStore instantiates a ProtocolKVStore for querying & storing deserialized `protocol_state.KVStoreAPIs`.
 // At this abstraction level, we can only handle protocol state snapshots, whose data models are supported by the current
 // software version. There might be serialized snapshots with legacy versions in the database, that are not supported
-// anymore by this software version and can only be retrieved as versioned binary blobs via `storage.ProtocolKVStore`.
+// anymore by this software version and can only be retrieved as versioned binary blobs via [storage.ProtocolKVStore].
 func NewProtocolKVStore(protocolStateSnapshots storage.ProtocolKVStore) *ProtocolKVStore {
 	return &ProtocolKVStore{
 		ProtocolKVStore: protocolStateSnapshots,
@@ -32,7 +32,7 @@ func NewProtocolKVStore(protocolStateSnapshots storage.ProtocolKVStore) *Protoco
 }
 
 // StoreTx returns an anonymous function (intended to be executed as part of a badger transaction), which persists
-// the given KV-store snapshot as part of a DB tx. Per convention, all implementations of `protocol.KVStoreReader`
+// the given KV-store snapshot as part of a DB tx. Per convention, all implementations of [protocol.KVStoreReader]
 // must support encoding their state into a version and data blob.
 // Expected errors of the returned anonymous function:
 //   - storage.ErrAlreadyExists if a KV-store snapshot with the given id is already stored.

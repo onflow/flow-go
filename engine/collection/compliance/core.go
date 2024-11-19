@@ -373,9 +373,9 @@ func (c *Core) ProcessFinalizedBlock(finalized *flow.Header) {
 	c.mempoolMetrics.MempoolEntries(metrics.ResourceClusterProposal, c.pending.Size())
 }
 
-// checkForAndLogOutdatedInputError checks whether error is an `engine.OutdatedInputError`.
+// checkForAndLogOutdatedInputError checks whether error is an [engine.OutdatedInputError].
 // If this is the case, we emit a log message and return true.
-// For any error other than `engine.OutdatedInputError`, this function is a no-op
+// For any error other than [engine.OutdatedInputError], this function is a no-op
 // and returns false.
 func checkForAndLogOutdatedInputError(err error, log zerolog.Logger) bool {
 	if engine.IsOutdatedInputError(err) {
@@ -387,9 +387,9 @@ func checkForAndLogOutdatedInputError(err error, log zerolog.Logger) bool {
 	return false
 }
 
-// checkForAndLogUnverifiableInputError checks whether error is an `engine.UnverifiableInputError`.
+// checkForAndLogUnverifiableInputError checks whether error is an [engine.UnverifiableInputError].
 // If this is the case, we emit a log message and return true.
-// For any error other than `engine.UnverifiableInputError`, this function is a no-op
+// For any error other than [engine.UnverifiableInputError], this function is a no-op
 // and returns false.
 func checkForAndLogUnverifiableInputError(err error, log zerolog.Logger) bool {
 	if engine.IsUnverifiableInputError(err) {

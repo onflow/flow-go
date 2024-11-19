@@ -62,11 +62,11 @@ type EpochProtocolState interface {
 	// Let `\` denote the relative set complement (also called 'set difference').
 	// The set of authorized identities this function returns is different depending on epoch state:
 	// EpochStaking phase:
-	//   - nodes in C with status `flow.EpochParticipationStatusActive`
-	//   - nodes in P\C with status `flow.EpochParticipationStatusLeaving`
+	//   - nodes in C with status [flow.EpochParticipationStatusActive]
+	//   - nodes in P\C with status [flow.EpochParticipationStatusLeaving]
 	// EpochSetup/EpochCommitted phase:
-	//   - nodes in C with status `flow.EpochParticipationStatusActive`
-	//   - nodes in S\C with status `flow.EpochParticipationStatusJoining`
+	//   - nodes in C with status [flow.EpochParticipationStatusActive]
+	//   - nodes in S\C with status [flow.EpochParticipationStatusJoining]
 	Identities() flow.IdentityList
 
 	// GlobalParams returns global, static network params that are same for all nodes in the network.

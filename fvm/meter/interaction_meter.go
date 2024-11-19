@@ -92,8 +92,8 @@ func (m *InteractionMeter) MeterStorageWrite(
 
 // replaceWrite replaces the write size of a given key with the new size, because
 // only the last write of a given key is counted towards the total interaction limit.
-// These are the only write usages of `m.totalStorageBytesWritten` and `m.writes`,
-// which means that `m.totalStorageBytesWritten` can never become negative.
+// These are the only write usages of [m.totalStorageBytesWritten] and [m.writes],
+// which means that [m.totalStorageBytesWritten] can never become negative.
 // oldSize is always <= m.totalStorageBytesWritten.
 func (m *InteractionMeter) replaceWrite(
 	k flow.RegisterID,

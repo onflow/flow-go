@@ -211,7 +211,7 @@ func (suite *EpochLookupSuite) TestProtocolEvents_EpochExtended_SanityChecks() {
 		return ctx
 	}
 
-	suite.T().Run("sanity check: `extension.FinalView` should be greater than final view of latest epoch", func(t *testing.T) {
+	suite.T().Run("sanity check: [extension.FinalView] should be greater than final view of latest epoch", func(t *testing.T) {
 		// initially, only current epoch is committed
 		suite.CommitEpochs(suite.prevEpoch, suite.currEpoch)
 		ctx := initAndStartLookup()

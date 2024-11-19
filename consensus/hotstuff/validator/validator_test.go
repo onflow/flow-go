@@ -165,9 +165,9 @@ func (ps *ProposalSuite) TestProposalWrongLeader() {
 }
 
 // TestProposalQCInvalid checks that Validator handles the verifier's error returns correctly.
-// In case of `model.InvalidFormatError` and model.ErrInvalidSignature`, we expect the Validator
-// to recognize those as an invalid QC, i.e. returns an `model.InvalidProposalError`.
-// In contrast, unexpected exceptions and `model.InvalidSignerError` should _not_ be
+// In case of [model.InvalidFormatError] and model.ErrInvalidSignature`, we expect the Validator
+// to recognize those as an invalid QC, i.e. returns an [model.InvalidProposalError].
+// In contrast, unexpected exceptions and [model.InvalidSignerError] should _not_ be
 // interpreted as a sign of an invalid QC.
 func (ps *ProposalSuite) TestProposalQCInvalid() {
 	ps.Run("invalid-signature", func() {
@@ -191,11 +191,11 @@ func (ps *ProposalSuite) TestProposalQCInvalid() {
 		assert.True(ps.T(), model.IsInvalidProposalError(err), "if the block's QC has an invalid format, an ErrorInvalidBlock error should be raised")
 	})
 
-	// Theoretically, `VerifyQC` could also return a `model.InvalidSignerError`. However,
+	// Theoretically, `VerifyQC` could also return a [model.InvalidSignerError]. However,
 	// for the time being, we assume that _every_ HotStuff participant is also a member of
 	// the random beacon committee. Consequently, `InvalidSignerError` should not occur atm.
 	// TODO: if the random beacon committee is a strict subset of the HotStuff committee,
-	//       we expect `model.InvalidSignerError` here during normal operations.
+	//       we expect [model.InvalidSignerError] here during normal operations.
 	ps.Run("invalid-signer", func() {
 		*ps.verifier = mocks.Verifier{}
 		ps.verifier.On("VerifyQC", ps.voters, ps.block.QC.SigData, ps.parent.View, ps.parent.BlockID).Return(
@@ -534,14 +534,14 @@ func (vs *VoteSuite) TestVoteVerifyVote_ErrViewForUnknownEpoch() {
 
 // TestVoteInvalidSignerID checks that the Validator correctly handles a vote
 // with a SignerID that does not correspond to a valid consensus participant.
-// In this case, the `hotstuff.DynamicCommittee` returns a `model.InvalidSignerError`,
+// In this case, the [hotstuff.DynamicCommittee] returns a [model.InvalidSignerError],
 // which the Validator should recognize as a symptom for an invalid vote.
-// Hence, we expect the validator to return a `model.InvalidVoteError`.
+// Hence, we expect the validator to return a [model.InvalidVoteError].
 func (vs *VoteSuite) TestVoteInvalidSignerID() {
 	*vs.committee = mocks.Replicas{}
 	vs.committee.On("IdentityByEpoch", vs.block.View, vs.vote.SignerID).Return(nil, model.NewInvalidSignerErrorf(""))
 
-	// A `model.InvalidSignerError` from the committee should be interpreted as
+	// A [model.InvalidSignerError] from the committee should be interpreted as
 	// the Vote being invalid, i.e. we expect an InvalidVoteError to be returned
 	_, err := vs.validator.ValidateVote(vs.vote)
 	assert.Error(vs.T(), err, "a vote with unknown SignerID should be rejected")
@@ -549,15 +549,15 @@ func (vs *VoteSuite) TestVoteInvalidSignerID() {
 }
 
 // TestVoteSignatureInvalid checks that the Validator correctly handles votes
-// with cryptographically invalid signature. In this case, the `hotstuff.Verifier`
-// returns a `model.ErrInvalidSignature`, which the Validator should recognize as
+// with cryptographically invalid signature. In this case, the [hotstuff.Verifier]
+// returns a [model.ErrInvalidSignature], which the Validator should recognize as
 // a symptom for an invalid vote.
-// Hence, we expect the validator to return a `model.InvalidVoteError`.
+// Hence, we expect the validator to return a [model.InvalidVoteError].
 func (vs *VoteSuite) TestVoteSignatureInvalid() {
 	*vs.verifier = mocks.Verifier{}
 	vs.verifier.On("VerifyVote", vs.signer, vs.vote.SigData, vs.block.View, vs.block.BlockID).Return(fmt.Errorf("staking sig is invalid: %w", model.ErrInvalidSignature))
 
-	// A `model.ErrInvalidSignature` from the `hotstuff.Verifier` should be interpreted as
+	// A [model.ErrInvalidSignature] from the [hotstuff.Verifier] should be interpreted as
 	// the Vote being invalid, i.e. we expect an InvalidVoteError to be returned
 	_, err := vs.validator.ValidateVote(vs.vote)
 	assert.Error(vs.T(), err, "a vote with an invalid signature should be rejected")
@@ -668,7 +668,7 @@ func (qs *QCSuite) TestQCSignatureError() {
 }
 
 // TestQCSignatureInvalid verifies that the Validator correctly handles the model.ErrInvalidSignature.
-// This error return from `Verifier.VerifyQC` is an expected failure case in case of a byzantine input, where
+// This error return from [Verifier.VerifyQC] is an expected failure case in case of a byzantine input, where
 // one of the signatures in the QC is broken. Hence, the Validator should wrap it as InvalidProposalError.
 func (qs *QCSuite) TestQCSignatureInvalid() {
 	// change the verifier to fail the QC signature
@@ -692,7 +692,7 @@ func (qs *QCSuite) TestQCVerifyQC_ErrViewForUnknownEpoch() {
 }
 
 // TestQCSignatureInvalidFormat verifies that the Validator correctly handles the model.InvalidFormatError.
-// This error return from `Verifier.VerifyQC` is an expected failure case in case of a byzantine input, where
+// This error return from [Verifier.VerifyQC] is an expected failure case in case of a byzantine input, where
 // some binary vector (e.g. `sigData`) is broken. Hence, the Validator should wrap it as InvalidProposalError.
 func (qs *QCSuite) TestQCSignatureInvalidFormat() {
 	// change the verifier to fail the QC signature
@@ -706,7 +706,7 @@ func (qs *QCSuite) TestQCSignatureInvalidFormat() {
 
 // TestQCEmptySigners verifies that the Validator correctly handles the model.InsufficientSignaturesError:
 // In the validator, we previously checked the total weight of all signers meets the supermajority threshold,
-// which is a _positive_ number. Hence, there must be at least one signer. Hence, `Verifier.VerifyQC`
+// which is a _positive_ number. Hence, there must be at least one signer. Hence, [Verifier.VerifyQC]
 // returning this error would be a symptom of a fatal internal bug. The Validator should _not_ interpret
 // this error as an invalid QC / invalid block, i.e. it should _not_ return an `InvalidProposalError`.
 func (qs *QCSuite) TestQCEmptySigners() {

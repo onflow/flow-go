@@ -50,7 +50,7 @@ func newBaseStateMachine(telemetry protocol_state.StateMachineTelemetryConsumer,
 
 // Build returns updated protocol state entry, state ID and a flag indicating if there were any changes.
 // CAUTION:
-// Do NOT call Build, if the baseStateMachine instance has returned a `protocol.InvalidServiceEventError`
+// Do NOT call Build, if the baseStateMachine instance has returned a [protocol.InvalidServiceEventError]
 // at any time during its lifetime. After this error, the baseStateMachine is left with a potentially
 // dysfunctional state and should be discarded.
 func (u *baseStateMachine) Build() (updatedState *flow.EpochStateEntry, stateID flow.Identifier, hasChanges bool) {

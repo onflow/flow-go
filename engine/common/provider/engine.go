@@ -35,7 +35,7 @@ const (
 // RetrieveFunc is a function provided to the provider engine upon construction.
 // It is used by the engine when receiving requests in order to retrieve the
 // related entities. It is important that the retrieve function return a
-// `storage.ErrNotFound` error if the entity does not exist locally; otherwise,
+// [storage.ErrNotFound] error if the entity does not exist locally; otherwise,
 // the logic will error and not send responses when failing to retrieve entities.
 type RetrieveFunc func(flow.Identifier) (flow.Entity, error)
 

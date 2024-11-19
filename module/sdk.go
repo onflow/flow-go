@@ -8,7 +8,7 @@ import (
 	sdk "github.com/onflow/flow-go-sdk"
 )
 
-// SDKClientWrapper is a temporary solution to mocking the `sdk.Client` interface from `flow-go-sdk`
+// SDKClientWrapper is a temporary solution to mocking the [sdk.Client] interface from `flow-go-sdk`
 type SDKClientWrapper interface {
 	GetAccount(context.Context, sdk.Address) (*sdk.Account, error)
 	GetAccountAtLatestBlock(context.Context, sdk.Address) (*sdk.Account, error)

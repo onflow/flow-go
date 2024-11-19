@@ -1697,7 +1697,7 @@ func TestStagedContractsWithUpdateValidator(t *testing.T) {
 		require.Len(t, logWriter.logs, 1)
 		assert.Contains(t,
 			logWriter.logs[0],
-			"incompatible type annotations. expected `FungibleToken.Vault`, found `{FungibleToken.Vault}`",
+			"incompatible type annotations. expected [FungibleToken.Vault], found `{FungibleToken.Vault}`",
 		)
 
 		require.Equal(t, 1, accountRegistersA.Count())
@@ -1976,7 +1976,7 @@ func TestStagedContractConformanceChanges(t *testing.T) {
 
 	t.Run("MetadataViews.Resolver to ArbitraryContract.Resolver unsupported", func(t *testing.T) {
 
-		// `MetadataViews.Resolver` shouldn't be able to replace with any arbitrary `Resolver` interface!
+		// [MetadataViews.Resolver] shouldn't be able to replace with any arbitrary `Resolver` interface!
 
 		t.Parallel()
 

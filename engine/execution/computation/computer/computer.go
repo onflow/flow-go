@@ -220,7 +220,7 @@ func (e *blockComputer) queueTransactionRequests(
 	collectionCtx := fvm.NewContextFromParent(
 		e.vmCtx,
 		fvm.WithBlockHeader(blockHeader),
-		// `protocol.Snapshot` implements `EntropyProvider` interface
+		// [protocol.Snapshot] implements `EntropyProvider` interface
 		// Note that `Snapshot` possible errors for RandomSource() are:
 		// - storage.ErrNotFound if the QC is unknown.
 		// - state.ErrUnknownSnapshotReference if the snapshot reference block is unknown
@@ -261,7 +261,7 @@ func (e *blockComputer) queueTransactionRequests(
 	systemCtx := fvm.NewContextFromParent(
 		e.systemChunkCtx,
 		fvm.WithBlockHeader(blockHeader),
-		// `protocol.Snapshot` implements `EntropyProvider` interface
+		// [protocol.Snapshot] implements `EntropyProvider` interface
 		// Note that `Snapshot` possible errors for RandomSource() are:
 		// - storage.ErrNotFound if the QC is unknown.
 		// - state.ErrUnknownSnapshotReference if the snapshot reference block is unknown

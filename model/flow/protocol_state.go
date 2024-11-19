@@ -72,7 +72,7 @@ type EpochExtension struct {
 }
 
 // ID returns an identifier for this EpochStateContainer by hashing internal fields.
-// Per convention, the ID of a `nil` EpochStateContainer is `flow.ZeroID`.
+// Per convention, the ID of a `nil` EpochStateContainer is [flow.ZeroID].
 func (c *EpochStateContainer) ID() Identifier {
 	if c == nil {
 		return ZeroID
@@ -80,8 +80,8 @@ func (c *EpochStateContainer) ID() Identifier {
 	return MakeID(c)
 }
 
-// EventIDs returns the `flow.EventIDs` with the hashes of the EpochSetup and EpochCommit events.
-// Per convention, for a `nil` EpochStateContainer, we return `flow.ZeroID` for both events.
+// EventIDs returns the [flow.EventIDs] with the hashes of the EpochSetup and EpochCommit events.
+// Per convention, for a `nil` EpochStateContainer, we return [flow.ZeroID] for both events.
 func (c *EpochStateContainer) EventIDs() EventIDs {
 	if c == nil {
 		return EventIDs{ZeroID, ZeroID}
@@ -91,7 +91,7 @@ func (c *EpochStateContainer) EventIDs() EventIDs {
 
 // Copy returns a full copy of the entry.
 // Embedded Identities are deep-copied, _except_ for their keys, which are copied by reference.
-// Per convention, the ID of a `nil` EpochStateContainer is `flow.ZeroID`.
+// Per convention, the ID of a `nil` EpochStateContainer is [flow.ZeroID].
 func (c *EpochStateContainer) Copy() *EpochStateContainer {
 	if c == nil {
 		return nil
@@ -152,7 +152,7 @@ func NewEpochStateEntry(
 		NextEpochCommit:     nextEpochCommit,
 	}
 
-	// If previous epoch is specified: ensure respective epoch service events are not nil and consistent with commitments in `MinEpochStateEntry.PreviousEpoch`
+	// If previous epoch is specified: ensure respective epoch service events are not nil and consistent with commitments in [MinEpochStateEntry.PreviousEpoch]
 	if epochState.PreviousEpoch != nil {
 		if epochState.PreviousEpoch.SetupID != previousEpochSetup.ID() { // calling ID() will panic is EpochSetup event is nil
 			return nil, fmt.Errorf("supplied previous epoch's setup event (%x) does not match commitment (%x) in MinEpochStateEntry", previousEpochSetup.ID(), epochState.PreviousEpoch.SetupID)
@@ -169,7 +169,7 @@ func NewEpochStateEntry(
 		}
 	}
 
-	// For current epoch: ensure respective epoch service events are not nil and consistent with commitments in `MinEpochStateEntry.CurrentEpoch`
+	// For current epoch: ensure respective epoch service events are not nil and consistent with commitments in [MinEpochStateEntry.CurrentEpoch]
 	if epochState.CurrentEpoch.SetupID != currentEpochSetup.ID() { // calling ID() will panic is EpochSetup event is nil
 		return nil, fmt.Errorf("supplied current epoch's setup event (%x) does not match commitment (%x) in MinEpochStateEntry", currentEpochSetup.ID(), epochState.CurrentEpoch.SetupID)
 	}
@@ -183,7 +183,7 @@ func NewEpochStateEntry(
 	// Otherwise, we are in epoch setup or epoch commit phase (i.e. epochState.NextEpoch ≠ nil):
 	//  (2a) Full identity table contains active identities from current epoch + nodes joining in next epoch with `EpochParticipationStatusJoining` status.
 	//  (2b) Furthermore, we also build the full identity table for the next epoch's staking phase:
-	//       active identities from next epoch + nodes from current epoch that are leaving at the end of the current epoch with `flow.EpochParticipationStatusLeaving` status.
+	//       active identities from next epoch + nodes from current epoch that are leaving at the end of the current epoch with [flow.EpochParticipationStatusLeaving] status.
 	nextEpoch := epochState.NextEpoch
 	if nextEpoch == nil { // in staking phase: build full identity table for current epoch according to (1)
 		if nextEpochSetup != nil {
@@ -193,7 +193,7 @@ func NewEpochStateEntry(
 			return nil, fmt.Errorf("no next epoch but gotten non-nil EpochCommit event")
 		}
 	} else { // epochState.NextEpoch ≠ nil, i.e. we are in epoch setup or epoch commit phase
-		// ensure respective epoch service events are not nil and consistent with commitments in `MinEpochStateEntry.NextEpoch`
+		// ensure respective epoch service events are not nil and consistent with commitments in [MinEpochStateEntry.NextEpoch]
 		if nextEpoch.SetupID != nextEpochSetup.ID() {
 			return nil, fmt.Errorf("supplied next epoch's setup event (%x) does not match commitment (%x) in MinEpochStateEntry", nextEpoch.SetupID, nextEpochSetup.ID())
 		}
@@ -250,7 +250,7 @@ func NewRichEpochStateEntry(
 	// Otherwise, we are in epoch setup or epoch commit phase (i.e. epochState.NextEpoch ≠ nil):
 	//  (2a) Full identity table contains active identities from current epoch + nodes joining in next epoch with status `EpochParticipationStatusJoining`.
 	//  (2b) Furthermore, we also build the full identity table for the next epoch's staking phase:
-	//       active identities from next epoch + nodes from current epoch that are leaving at the end of the current epoch with `flow.EpochParticipationStatusLeaving` status.
+	//       active identities from next epoch + nodes from current epoch that are leaving at the end of the current epoch with [flow.EpochParticipationStatusLeaving] status.
 	var err error
 	nextEpoch := epochState.NextEpoch
 	if nextEpoch == nil { // in staking phase: build full identity table for current epoch according to (1)
@@ -375,7 +375,7 @@ func (e *EpochStateEntry) CurrentEpochFinalView() uint64 {
 // The receiver MinEpochStateEntry must be properly constructed.
 // See flow.EpochPhase for detailed documentation.
 func (e *MinEpochStateEntry) EpochPhase() EpochPhase {
-	// CAUTION: the logic below that deduces the EpochPhase must be consistent with `epochs.FallbackStateMachine`,
+	// CAUTION: the logic below that deduces the EpochPhase must be consistent with [epochs.FallbackStateMachine],
 	// which sets the fields we are using here. Specifically, we require that the FallbackStateMachine clears out
 	// any tentative values for a subsequent epoch _unless_ that epoch is already committed.
 	if e.EpochFallbackTriggered {
@@ -502,7 +502,7 @@ func BuildIdentityTable(
 		return nil, fmt.Errorf("could not reconstruct participants for adjacent epoch: %w", err)
 	}
 
-	// Combine the participants of the current and adjacent epoch. The method `GenericIdentityList.Union`
+	// Combine the participants of the current and adjacent epoch. The method [GenericIdentityList.Union]
 	// already implements the following required conventions:
 	//  1. Preference for IdentitySkeleton of the target epoch:
 	//     In case an IdentitySkeleton with the same NodeID exists in the target epoch as well as
@@ -527,7 +527,7 @@ func DynamicIdentityEntryListFromIdentities(identities IdentityList) DynamicIden
 // ComposeFullIdentities combines identity skeletons and dynamic identities to produce a flow.IdentityList.
 // It enforces that the input slices `skeletons` and `dynamics` list the same identities (compared by nodeID)
 // in the same order. Otherwise, an exception is returned. For each identity i, we set
-// `i.EpochParticipationStatus` to the `defaultEpochParticipationStatus` _unless_ i is ejected.
+// [i.EpochParticipationStatus] to the `defaultEpochParticipationStatus` _unless_ i is ejected.
 // No errors are expected during normal operations.
 func ComposeFullIdentities(
 	skeletons IdentitySkeletonList,

@@ -24,13 +24,13 @@ func (s IdentifierSet) Contains(id flow.Identifier) bool {
 	return found
 }
 
-// NodeDisallowListingWrapper is a wrapper for an `module.IdentityProvider` instance, where the
+// NodeDisallowListingWrapper is a wrapper for an [module.IdentityProvider] instance, where the
 // wrapper overrides the `Ejected` flag to true for all NodeIDs in a `disallowList`.
 // To avoid modifying the source of the identities, the wrapper creates shallow copies
 // of the identities (whenever necessary) and modifies the `Ejected` flag only in
 // the copy.
 // The `NodeDisallowListingWrapper` internally represents the `disallowList` as a map, to enable
-// performant lookup. However, the exported API works with `flow.IdentifierList` for
+// performant lookup. However, the exported API works with [flow.IdentifierList] for
 // disallowList, as this is a broadly supported data structure which lends itself better
 // to config or command-line inputs.
 // When a node is disallow-listed, the networking layer connection to that node is closed and no
@@ -134,7 +134,7 @@ func (w *NodeDisallowListingWrapper) Identities(filter flow.IdentityFilter[flow.
 		return identities
 	}
 
-	// Iterate over all returned identities and set the `EpochParticipationStatus` to `flow.EpochParticipationStatusEjected`.
+	// Iterate over all returned identities and set the `EpochParticipationStatus` to [flow.EpochParticipationStatusEjected].
 	// We copy both the return slice and identities of blocked nodes to avoid
 	// any possibility of accidentally modifying the wrapped IdentityProvider
 	idtx := make(flow.IdentityList, 0, len(identities))
@@ -182,7 +182,7 @@ func (w *NodeDisallowListingWrapper) setEjectedIfBlocked(identity *flow.Identity
 	}
 
 	// For blocked nodes, we want to return their `Identity` with the `EpochParticipationStatus`
-	// set to `flow.EpochParticipationStatusEjected`.
+	// set to [flow.EpochParticipationStatusEjected].
 	// Caution: we need to copy the `Identity` before we override `EpochParticipationStatus`, as we
 	// would otherwise potentially change the wrapped IdentityProvider.
 	var i = *identity // shallow copy is sufficient, because `EpochParticipationStatus` is a value type in DynamicIdentity which is also a value type.

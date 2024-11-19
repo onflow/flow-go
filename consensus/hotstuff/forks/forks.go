@@ -185,7 +185,7 @@ func (f *Forks) EnsureBlockIsValidExtension(block *model.Block) error {
 // Possible error returns:
 //   - model.MissingBlockError if the parent does not exist in the forest (but is above
 //     the pruned view). From the perspective of Forks, this error is benign (no-op).
-//   - model.InvalidBlockError if the block is invalid (see `Forks.EnsureBlockIsValidExtension`
+//   - model.InvalidBlockError if the block is invalid (see [Forks.EnsureBlockIsValidExtension]
 //     for details). From the perspective of Forks, this error is benign (no-op). However, we
 //     assume all blocks are fully verified, i.e. they should satisfy all consistency
 //     requirements. Hence, this error is likely an indicator of a bug in the compliance layer.
@@ -237,7 +237,7 @@ func (f *Forks) AddCertifiedBlock(certifiedBlock *model.CertifiedBlock) error {
 // Possible error returns:
 //   - model.MissingBlockError if the parent does not exist in the forest (but is above
 //     the pruned view). From the perspective of Forks, this error is benign (no-op).
-//   - model.InvalidBlockError if the block is invalid (see `Forks.EnsureBlockIsValidExtension`
+//   - model.InvalidBlockError if the block is invalid (see [Forks.EnsureBlockIsValidExtension]
 //     for details). From the perspective of Forks, this error is benign (no-op). However, we
 //     assume all blocks are fully verified, i.e. they should satisfy all consistency
 //     requirements. Hence, this error is likely an indicator of a bug in the compliance layer.
@@ -287,7 +287,7 @@ func (f *Forks) AddValidatedBlock(proposal *model.Block) error {
 // Possible error returns:
 //   - model.MissingBlockError if the parent does not exist in the forest (but is above
 //     the pruned view). From the perspective of Forks, this error is benign (no-op).
-//   - model.InvalidBlockError if the block is invalid (see `Forks.EnsureBlockIsValidExtension`
+//   - model.InvalidBlockError if the block is invalid (see [Forks.EnsureBlockIsValidExtension]
 //     for details). From the perspective of Forks, this error is benign (no-op). However, we
 //     assume all blocks are fully verified, i.e. they should satisfy all consistency
 //     requirements. Hence, this error is likely an indicator of a bug in the compliance layer.
@@ -360,7 +360,7 @@ func (f *Forks) checkForDoubleProposal(block *model.Block) {
 
 // checkForAdvancingFinalization checks whether observing certifiedBlock leads to progress of
 // finalization. This function should be called every time a new block is added to Forks. If the new
-// block is the head of a 2-chain satisfying the finalization rule, we update `Forks.finalityProof` to
+// block is the head of a 2-chain satisfying the finalization rule, we update [Forks.finalityProof] to
 // the new latest finalized block. Calling this method with previously-processed blocks leaves the
 // consensus state invariant.
 // UNVALIDATED: assumes that relevant block properties are consistent with previous blocks
@@ -411,7 +411,7 @@ func (f *Forks) checkForAdvancingFinalization(certifiedBlock *model.CertifiedBlo
 	//                   ╰─────────────────────╯
 	//                       certifiedBlock
 	// Hence, we can finalize `parentBlock` as head of a 2-chain,
-	// if and only if `Block.View` is exactly 1 higher than the view of `parentBlock`
+	// if and only if [Block.View] is exactly 1 higher than the view of `parentBlock`
 	if parentBlock.View+1 != certifiedBlock.View() {
 		return nil
 	}

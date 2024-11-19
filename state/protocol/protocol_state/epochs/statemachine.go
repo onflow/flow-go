@@ -83,7 +83,7 @@ import (
 type StateMachine interface {
 	// Build returns updated protocol state entry, state ID and a flag indicating if there were any changes.
 	// CAUTION:
-	// Do NOT call Build, if the StateMachine instance has returned a `protocol.InvalidServiceEventError`
+	// Do NOT call Build, if the StateMachine instance has returned a [protocol.InvalidServiceEventError]
 	// at any time during its lifetime. After this error, the StateMachine is left with a potentially
 	// dysfunctional state and should be discarded.
 	Build() (updatedState *flow.EpochStateEntry, stateID flow.Identifier, hasChanges bool)
@@ -96,7 +96,7 @@ type StateMachine interface {
 	// Returned boolean indicates if event triggered a transition in the state machine or not.
 	// Implementors must never return (true, error).
 	// Expected errors indicating that we are leaving the happy-path of the epoch transitions
-	//   - `protocol.InvalidServiceEventError` - if the service event is invalid or is not a valid state transition for the current protocol state.
+	//   - [protocol.InvalidServiceEventError] - if the service event is invalid or is not a valid state transition for the current protocol state.
 	//     CAUTION: the StateMachine is left with a potentially dysfunctional state when this error occurs. Do NOT call the Build method
 	//     after such error and discard the StateMachine!
 	ProcessEpochSetup(epochSetup *flow.EpochSetup) (bool, error)
@@ -107,7 +107,7 @@ type StateMachine interface {
 	// Returned boolean indicates if event triggered a transition in the state machine or not.
 	// Implementors must never return (true, error).
 	// Expected errors indicating that we are leaving the happy-path of the epoch transitions
-	//   - `protocol.InvalidServiceEventError` - if the service event is invalid or is not a valid state transition for the current protocol state.
+	//   - [protocol.InvalidServiceEventError] - if the service event is invalid or is not a valid state transition for the current protocol state.
 	//     CAUTION: the StateMachine is left with a potentially dysfunctional state when this error occurs. Do NOT call the Build method
 	//     after such error and discard the StateMachine!
 	ProcessEpochCommit(epochCommit *flow.EpochCommit) (bool, error)
@@ -123,7 +123,7 @@ type StateMachine interface {
 	// either the `EpochRecover` event is rejected (leading to `InvalidServiceEventError`) or there is an
 	// exception processing the event. Otherwise, an `EpochRecover` event must always lead to a state change.
 	// Expected errors during normal operations:
-	//   - `protocol.InvalidServiceEventError` - if the service event is invalid or is not a valid state transition for the current protocol state.
+	//   - [protocol.InvalidServiceEventError] - if the service event is invalid or is not a valid state transition for the current protocol state.
 	ProcessEpochRecover(epochRecover *flow.EpochRecover) (bool, error)
 
 	// EjectIdentity updates the identity table by changing the node's participation status to 'ejected'
@@ -307,7 +307,7 @@ func (e *EpochStateMachine) EvolveState(sealedServiceEvents []flow.ServiceEvent)
 // This function applies all evolving state operations to the active state machine. In case of successful evolution,
 // it returns the deferred DB updates to be applied to the storage.
 // Expected errors during normal operations:
-// - `protocol.InvalidServiceEventError` if any service event is invalid or is not a valid state transition for the current protocol state
+// - [protocol.InvalidServiceEventError] if any service event is invalid or is not a valid state transition for the current protocol state
 func (e *EpochStateMachine) evolveActiveStateMachine(sealedServiceEvents []flow.ServiceEvent) (*transaction.DeferredBlockPersist, error) {
 	parentProtocolState := e.activeStateMachine.ParentState()
 

@@ -11,7 +11,7 @@ import (
 )
 
 // WrappedCadenceRuntime wraps cadence runtime to handle errors.
-// Errors from cadence runtime should be handled with `errors.HandleRuntimeError` before the FVM can understand them.
+// Errors from cadence runtime should be handled with [errors.HandleRuntimeError] before the FVM can understand them.
 // Handling all possible locations, where the error could be coming from, here,
 // makes it impossible to forget to handle the error.
 type WrappedCadenceRuntime struct {

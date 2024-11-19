@@ -66,7 +66,7 @@ func (s *blockSignerDecoderSuite) Test_RootBlock() {
 
 // Test_CommitteeException verifies that `BlockSignerDecoder`
 // does _not_ erroneously interpret an unexpected exception from the committee as
-// a sign of an unknown block, i.e. the decoder should _not_ return an `model.ErrViewForUnknownEpoch` or `signature.InvalidSignerIndicesError`
+// a sign of an unknown block, i.e. the decoder should _not_ return an [model.ErrViewForUnknownEpoch] or [signature.InvalidSignerIndicesError]
 func (s *blockSignerDecoderSuite) Test_CommitteeException() {
 	s.Run("ByEpoch exception", func() {
 		exception := errors.New("unexpected exception")

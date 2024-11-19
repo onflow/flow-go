@@ -187,8 +187,8 @@ func (c *CombinedVerifierV3) VerifyQC(signers flow.IdentitySkeletonList, sigData
 
 	// STEP 3: validating the aggregated staking signatures
 	// Note: it is possible that all replicas signed with their random beacon keys, i.e.
-	// `blockSigData.StakingSigners` could be empty. In this case, the
-	// `blockSigData.AggregatedStakingSig` should also be empty.
+	// [blockSigData.StakingSigners] could be empty. In this case, the
+	// [blockSigData.AggregatedStakingSig] should also be empty.
 	numStakingSigners := len(blockSigData.StakingSigners)
 	if numStakingSigners == 0 {
 		if len(blockSigData.AggregatedStakingSig) > 0 {

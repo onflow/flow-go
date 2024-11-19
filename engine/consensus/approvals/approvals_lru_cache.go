@@ -8,8 +8,8 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
-// LruCache is a wrapper over `simplelru.LRUCache` that provides needed api for processing result approvals
-// Extends functionality of `simplelru.LRUCache` by introducing additional index for quicker access.
+// LruCache is a wrapper over [simplelru.LRUCache] that provides needed api for processing result approvals
+// Extends functionality of [simplelru.LRUCache] by introducing additional index for quicker access.
 type LruCache struct {
 	lru  simplelru.LRUCache[flow.Identifier, *flow.ResultApproval]
 	lock sync.RWMutex

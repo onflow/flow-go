@@ -76,7 +76,7 @@ func (vt *viewTracker) ProcessQC(qc *flow.QuorumCertificate) (uint64, error) {
 		return view, nil
 	}
 
-	// supermajority of replicas have already voted during round `qc.view`, hence it is safe to proceed to subsequent view
+	// supermajority of replicas have already voted during round [qc.view], hence it is safe to proceed to subsequent view
 	newView := qc.View + 1
 	err := vt.updateLivenessData(newView, qc, nil)
 	if err != nil {
@@ -86,7 +86,7 @@ func (vt *viewTracker) ProcessQC(qc *flow.QuorumCertificate) (uint64, error) {
 }
 
 // ProcessTC ingests a TC, which might advance the current view. A nil TC is accepted as
-// input, so that callers may pass in e.g. `Proposal.LastViewTC`, which may or may not have
+// input, so that callers may pass in e.g. [Proposal.LastViewTC], which may or may not have
 // a value. It returns the resulting view after processing the TC and embedded QC.
 // No errors are expected, any error should be treated as exception
 func (vt *viewTracker) ProcessTC(tc *flow.TimeoutCertificate) (uint64, error) {
@@ -108,7 +108,7 @@ func (vt *viewTracker) ProcessTC(tc *flow.TimeoutCertificate) (uint64, error) {
 		return view, nil
 	}
 
-	// supermajority of replicas have already reached their timeout for view `tc.View`, hence it is safe to proceed to subsequent view
+	// supermajority of replicas have already reached their timeout for view [tc.View], hence it is safe to proceed to subsequent view
 	newView := tc.View + 1
 	err := vt.updateLivenessData(newView, tc.NewestQC, tc)
 	if err != nil {

@@ -1546,9 +1546,9 @@ func TestDryRun(t *testing.T) {
 				require.NoError(t, err)
 				require.Equal(t, types.StatusSuccessful, res.Status)
 				require.Equal(t, types.ErrCodeNoError, res.ErrorCode)
-				// Make sure that gas consumed from `EVM.dryRun` is bigger
+				// Make sure that gas consumed from [EVM.dryRun] is bigger
 				// than the actual gas consumption of the equivalent
-				// `EVM.run`.
+				// [EVM.run].
 				totalGas := emulator.AddOne64th(res.GasConsumed) + gethParams.SstoreSentryGasEIP2200
 				require.Equal(
 					t,
@@ -1680,9 +1680,9 @@ func TestDryRun(t *testing.T) {
 				require.NoError(t, err)
 				require.Equal(t, types.StatusSuccessful, res.Status)
 				require.Equal(t, types.ErrCodeNoError, res.ErrorCode)
-				// Make sure that gas consumed from `EVM.dryRun` is bigger
+				// Make sure that gas consumed from [EVM.dryRun] is bigger
 				// than the actual gas consumption of the equivalent
-				// `EVM.run`.
+				// [EVM.run].
 				totalGas := emulator.AddOne64th(res.GasConsumed) + gethParams.SstoreSentryGasEIP2200
 				require.Equal(
 					t,
@@ -1812,9 +1812,9 @@ func TestDryRun(t *testing.T) {
 				require.NoError(t, err)
 				//require.Equal(t, types.StatusSuccessful, res.Status)
 				require.Equal(t, types.ErrCodeNoError, res.ErrorCode)
-				// Make sure that gas consumed from `EVM.dryRun` is bigger
+				// Make sure that gas consumed from [EVM.dryRun] is bigger
 				// than the actual gas consumption of the equivalent
-				// `EVM.run`.
+				// [EVM.run].
 				totalGas := emulator.AddOne64th(res.GasConsumed) + gethParams.SstoreSentryGasEIP2200 + gethParams.SstoreClearsScheduleRefundEIP3529
 				require.Equal(
 					t,

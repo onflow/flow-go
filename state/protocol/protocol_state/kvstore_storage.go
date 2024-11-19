@@ -7,7 +7,7 @@ import (
 )
 
 // ProtocolKVStore persists different snapshots of the Protocol State's Key-Calue stores [KV-stores].
-// Here, we augment the low-level primitives provided by `storage.ProtocolKVStore` with logic for
+// Here, we augment the low-level primitives provided by [storage.ProtocolKVStore] with logic for
 // encoding and decoding the state snapshots into abstract representation `protocol_state.KVStoreAPI`.
 //
 // At the abstraction level here, we can only handle protocol state snapshots, whose data models are
@@ -16,7 +16,7 @@ import (
 type ProtocolKVStore interface {
 	// StoreTx returns an anonymous function (intended to be executed as part of a database transaction),
 	// which persists the given KV-store snapshot as part of a DB tx. Per convention, all implementations
-	// of `protocol.KVStoreReader` should be able to successfully encode their state into a data blob.
+	// of [protocol.KVStoreReader] should be able to successfully encode their state into a data blob.
 	// If the encoding fails, the anonymous function returns an error upon call.
 	//
 	// Expected errors of the returned anonymous function:

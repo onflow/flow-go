@@ -144,7 +144,7 @@ func (suite *Suite) TestCancelVoting() {
 	go func() {
 		err := suite.voter.Vote(ctxWithCancel, suite.epoch)
 		suite.Assert().Error(err, "when canceling voting process, Vote method should return with an error")
-		suite.Assert().ErrorIs(err, context.Canceled, "`context.Canceled` should be in the error trace")
+		suite.Assert().ErrorIs(err, context.Canceled, "[context.Canceled] should be in the error trace")
 		suite.Assert().True(epochs.IsClusterQCNoVoteError(err), "got error of unexpected type")
 		close(voteReturned)
 	}()

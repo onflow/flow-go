@@ -197,7 +197,7 @@ func (c *ComplianceCore) OnBlockRange(originID flow.Identifier, batch []*flow.Bl
 
 // processCoreSeqEvents processes events that need to be dispatched on dedicated core's goroutine.
 // Here we process events that need to be sequentially ordered(processing certified blocks and new finalized blocks).
-// Implements `component.ComponentWorker` signature.
+// Implements [component.ComponentWorker] signature.
 // Is NOT concurrency safe: should be executed by _single dedicated_ goroutine.
 func (c *ComplianceCore) processCoreSeqEvents(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
 	ready()
@@ -224,7 +224,7 @@ func (c *ComplianceCore) processCoreSeqEvents(ctx irrecoverable.SignalerContext,
 // OnFinalizedBlock updates local state of pendingCache tree using received finalized block and queues finalized block
 // to be processed by internal goroutine.
 // This function is safe to use in concurrent environment.
-// CAUTION: this function blocks and hence is not compliant with the `FinalizationConsumer.OnFinalizedBlock` interface.
+// CAUTION: this function blocks and hence is not compliant with the [FinalizationConsumer.OnFinalizedBlock] interface.
 func (c *ComplianceCore) OnFinalizedBlock(final *flow.Header) {
 	c.pendingCache.PruneUpToView(final.View)
 
@@ -243,7 +243,7 @@ func (c *ComplianceCore) OnFinalizedBlock(final *flow.Header) {
 //     finalized block plus all of their connected descendants. The list `connectedBlocks` is in 'parent first'
 //     order, i.e. a block is listed before any of its descendants. The PendingTree guarantees that all
 //     ancestors are listed, _unless_ the ancestor is the finalized block or the ancestor has been returned
-//     by a previous call to `PendingTree.AddBlocks`.
+//     by a previous call to [PendingTree.AddBlocks].
 //  2. We extend the protocol state with the connected certified blocks from step 1.
 //  3. We submit the connected certified blocks from step 1 to the consensus follower.
 //

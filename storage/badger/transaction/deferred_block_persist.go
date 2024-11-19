@@ -5,7 +5,7 @@ import (
 )
 
 // DeferredBlockPersistOp is a shorthand notation for an anonymous function that takes the ID of
-// a fully constructed block and a `transaction.Tx` as inputs and runs some database operations
+// a fully constructed block and a [transaction.Tx] as inputs and runs some database operations
 // as part of that transaction. It is a "Promise Pattern", essentially saying:
 // once we have the completed the block's construction, we persist data structures that are
 // referenced by the block or populate database indices. This pattern is necessary, because
@@ -17,7 +17,7 @@ type DeferredBlockPersistOp func(blockID flow.Identifier, tx *Tx) error
 var noOpPersist DeferredBlockPersistOp = func(blockID flow.Identifier, tx *Tx) error { return nil }
 
 // WithBlock adds the still missing block ID information to a `DeferredBlockPersistOp`, thereby converting
-// it into a `transaction.DeferredDBUpdate`.
+// it into a [transaction.DeferredDBUpdate].
 func (d DeferredBlockPersistOp) WithBlock(blockID flow.Identifier) DeferredDBUpdate {
 	return func(tx *Tx) error {
 		return d(blockID, tx)
@@ -27,14 +27,14 @@ func (d DeferredBlockPersistOp) WithBlock(blockID flow.Identifier) DeferredDBUpd
 // DeferredBlockPersist is a utility for accumulating deferred database interactions that
 // are supposed to be executed in one atomic transaction. It supports:
 //   - Deferred database operations that work directly on Badger transactions.
-//   - Deferred database operations that work on `transaction.Tx`.
+//   - Deferred database operations that work on [transaction.Tx].
 //     Tx is a storage-layer abstraction, with support for callbacks that are executed
 //     after the underlying database transaction completed _successfully_.
 //   - Deferred database operations that depend on the ID of the block under construction
-//     and `transaction.Tx`. Especially useful for populating `ByBlockID` indices.
+//     and [transaction.Tx]. Especially useful for populating `ByBlockID` indices.
 //
 // ORDER OF EXECUTION
-// We extend the process in which `transaction.Tx` executes database operations, schedules
+// We extend the process in which [transaction.Tx] executes database operations, schedules
 // callbacks, and executed the callbacks. Specifically, DeferredDbOps proceeds as follows:
 //
 //  0. Record functors added via `AddBadgerOp`, `AddDbOp`, `OnSucceed` ...

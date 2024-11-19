@@ -157,7 +157,7 @@ func (keys *SafeBeaconPrivateKeys) RetrieveMyBeaconPrivateKey(epochCounter uint6
 
 		// for any end state besides success and recovery, the key is not safe
 		if endState == flow.DKGEndStateSuccess || endState == flow.RandomBeaconKeyRecovered {
-			// retrieve the key - any storage error (including `storage.ErrNotFound`) is an exception
+			// retrieve the key - any storage error (including [storage.ErrNotFound]) is an exception
 			var encodableKey *encodable.RandomBeaconPrivKey
 			encodableKey, err = keys.state.retrieveKeyTx(epochCounter)(txn)
 			if err != nil {
@@ -182,8 +182,8 @@ func (keys *SafeBeaconPrivateKeys) RetrieveMyBeaconPrivateKey(epochCounter uint6
 // EpochRecoveryMyBeaconKey is a specific module that allows to overwrite the beacon private key for a given epoch.
 // This module is used *ONLY* in the epoch recovery process and only by the consensus participants.
 // Each consensus participant takes part in the DKG, and after successfully finishing the DKG protocol it obtains a
-// random beacon private key, which is stored in the database along with DKG end state `flow.DKGEndStateSuccess`.
-// If for any reason the DKG fails, then the private key will be nil and DKG end state will be `flow.DKGEndStateDKGFailure`.
+// random beacon private key, which is stored in the database along with DKG end state [flow.DKGEndStateSuccess].
+// If for any reason the DKG fails, then the private key will be nil and DKG end state will be [flow.DKGEndStateDKGFailure].
 // When the epoch recovery takes place, we need to query the last valid beacon private key for the current replica and
 // also set it for use during the Recovery Epoch, otherwise replicas won't be able to vote for blocks during the Recovery Epoch.
 type EpochRecoveryMyBeaconKey struct {
@@ -198,7 +198,7 @@ func NewEpochRecoveryMyBeaconKey(keys *SafeBeaconPrivateKeys) *EpochRecoveryMyBe
 
 // UpsertMyBeaconPrivateKey overwrites the random beacon private key for the epoch that recovers the protocol from
 // Epoch Fallback Mode. Effectively, this function overwrites whatever might be available in the database with
-// the given private key and sets the DKGEndState to `flow.DKGEndStateRecovered`.
+// the given private key and sets the DKGEndState to [flow.DKGEndStateRecovered].
 // No errors are expected during normal operations.
 func (keys *EpochRecoveryMyBeaconKey) UpsertMyBeaconPrivateKey(epochCounter uint64, key crypto.PrivateKey) error {
 	if key == nil {

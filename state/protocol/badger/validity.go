@@ -204,7 +204,7 @@ func validateVersionBeacon(snap protocol.Snapshot) error {
 // ValidRootSnapshotContainsEntityExpiryRange performs a sanity check to make sure the
 // root snapshot has enough history to encompass at least one full entity expiry window.
 // Entities (in particular transactions and collections) may reference a block within
-// the past `flow.DefaultTransactionExpiry` blocks, so a new node must begin with at least
+// the past [flow.DefaultTransactionExpiry] blocks, so a new node must begin with at least
 // this many blocks worth of history leading up to the snapshot's root block.
 //
 // Currently, Access Nodes and Consensus Nodes require root snapshots passing this validator function.

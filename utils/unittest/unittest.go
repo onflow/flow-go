@@ -293,7 +293,7 @@ func RequireNotClosed(t *testing.T, ch <-chan struct{}, message string) {
 // account for the actual error being wrapped). Fails the test if either error
 // is nil.
 //
-// NOTE: This should only be used in cases where `errors.Is` cannot be, like
+// NOTE: This should only be used in cases where [errors.Is] cannot be, like
 // when errors are transmitted over the network without type information.
 func AssertErrSubstringMatch(t testing.TB, expected, actual error) {
 	require.NotNil(t, expected)

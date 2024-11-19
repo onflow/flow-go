@@ -250,7 +250,7 @@ func TestBlockContext_DeployContract(t *testing.T) {
 		require.NoError(t, output.Err)
 	})
 
-	t.Run("account with deployed contract has `contracts.names` filled", func(t *testing.T) {
+	t.Run("account with deployed contract has [contracts.names] filled", func(t *testing.T) {
 
 		// Create an account private key.
 		privateKeys, err := testutil.GenerateAccountPrivateKeys(1)
@@ -288,7 +288,7 @@ func TestBlockContext_DeployContract(t *testing.T) {
 
 		snapshotTree = snapshotTree.Append(executionSnapshot)
 
-		// transaction will panic if `contracts.names` is incorrect
+		// transaction will panic if [contracts.names] is incorrect
 		txBody = flow.NewTransactionBody().
 			SetScript([]byte(`
 				transaction {
