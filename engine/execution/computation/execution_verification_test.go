@@ -25,7 +25,6 @@ import (
 	"github.com/onflow/flow-go/engine/execution/testutil"
 	"github.com/onflow/flow-go/engine/execution/utils"
 	"github.com/onflow/flow-go/engine/testutil/mocklocal"
-	"github.com/onflow/flow-go/engine/verification/fetcher"
 	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/fvm/blueprints"
 	"github.com/onflow/flow-go/fvm/environment"
@@ -36,6 +35,7 @@ import (
 	"github.com/onflow/flow-go/ledger/complete/wal/fixtures"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/verification"
+	"github.com/onflow/flow-go/model/verification/convert"
 	"github.com/onflow/flow-go/module/chunks"
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
 	exedataprovider "github.com/onflow/flow-go/module/executiondatasync/provider"
@@ -69,7 +69,7 @@ func Test_ExecutionMatchesVerification(t *testing.T) {
 			`pub contract Foo {
 				pub event FooEvent(x: Int, y: Int)
 
-				pub fun event() { 
+				pub fun event() {
 					emit FooEvent(x: 2, y: 1)
 				}
 			}`), "Foo")
@@ -113,7 +113,7 @@ func Test_ExecutionMatchesVerification(t *testing.T) {
 			`pub contract Foo {
 				pub event FooEvent(x: Int, y: Int)
 
-				pub fun event() { 
+				pub fun event() {
 					emit FooEvent(x: 2, y: 1)
 				}
 			}`), "Foo")
@@ -585,35 +585,35 @@ func TestTransactionFeeDeduction(t *testing.T) {
 							//
 							// The withdraw amount and the account from getAccount
 							// would be the parameters to the transaction
-							
+
 							import FungibleToken from 0x%s
 							import FlowToken from 0x%s
-							
+
 							transaction(amount: UFix64, to: Address) {
-							
+
 								// The Vault resource that holds the tokens that are being transferred
 								let sentVault: @FungibleToken.Vault
-							
+
 								prepare(signer: AuthAccount) {
-							
+
 									// Get a reference to the signer's stored vault
 									let vaultRef = signer.borrow<&FlowToken.Vault>(from: /storage/flowTokenVault)
 										?? panic("Could not borrow reference to the owner's Vault!")
-							
+
 									// Withdraw tokens from the signer's stored vault
 									self.sentVault <- vaultRef.withdraw(amount: amount)
 								}
-							
+
 								execute {
-							
+
 									// Get the recipient's public account object
 									let recipient = getAccount(to)
-							
+
 									// Get a reference to the recipient's Receiver
 									let receiverRef = recipient.getCapability(/public/flowTokenReceiver)
 										.borrow<&{FungibleToken.Receiver}>()
 										?? panic("Could not borrow receiver reference to the recipient's Vault")
-							
+
 									// Deposit the withdrawn tokens in the recipient's receiver
 									receiverRef.deposit(from: <-self.sentVault)
 								}
@@ -841,7 +841,7 @@ func executeBlockAndVerifyWithParameters(t *testing.T,
 
 	for i, chunk := range er.Chunks {
 		isSystemChunk := i == er.Chunks.Len()-1
-		offsetForChunk, err := fetcher.TransactionOffsetForChunk(er.Chunks, chunk.Index)
+		offsetForChunk, err := convert.TransactionOffsetForChunk(er.Chunks, chunk.Index)
 		require.NoError(t, err)
 
 		vcds[i] = &verification.VerifiableChunkData{
