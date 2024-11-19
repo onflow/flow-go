@@ -144,12 +144,12 @@ func (b *backendSubscribeTransactions) getTransactionStatusResponse(txInfo *Tran
 }
 
 func (b *backendSubscribeTransactions) getTransactionStatus(ctx context.Context, txInfo *TransactionSubscriptionMetadata, prevTxStatus flow.TransactionStatus) (flow.TransactionStatus, error) {
-	txStatus := prevTxStatus
+	txStatus := txInfo.Status
 	var err error
 
 	if txInfo.blockWithTx == nil {
 		txStatus, err = b.txLocalDataProvider.DeriveUnknownTransactionStatus(txInfo.txReferenceBlockID)
-	} else if txInfo.Status == prevTxStatus {
+	} else if txStatus == prevTxStatus {
 		// When a block with the transaction is available, it is possible to receive a new transaction status while
 		// searching for the transaction result. Otherwise, it remains unchanged. So, if the old and new transaction
 		// statuses are the same, the current transaction status should be retrieved.

@@ -148,7 +148,7 @@ func (s *TransactionStatusSuite) SetupTest() {
 	require.NoError(s.T(), err)
 
 	s.blocks.On("ByHeight", mock.AnythingOfType("uint64")).Return(mocks.StorageMapGetter(s.blockMap))
-	s.state.On("Final").Return(s.finalSnapshot, nil)
+	s.state.On("Final").Return(s.finalSnapshot, nil).Maybe()
 	s.state.On("AtBlockID", mock.AnythingOfType("flow.Identifier")).Return(func(blockID flow.Identifier) protocolint.Snapshot {
 		s.tempSnapshot.On("Head").Unset()
 		s.tempSnapshot.On("Head").Return(func() *flow.Header {
@@ -162,12 +162,12 @@ func (s *TransactionStatusSuite) SetupTest() {
 		}, nil)
 
 		return s.tempSnapshot
-	}, nil)
+	}, nil).Maybe()
 
 	s.finalSnapshot.On("Head").Return(func() *flow.Header {
 		finalizedHeader := s.finalizedBlock.Header
 		return finalizedHeader
-	}, nil)
+	}, nil).Maybe()
 
 	s.blockTracker.On("GetStartHeightFromBlockID", mock.Anything).Return(func(_ flow.Identifier) (uint64, error) {
 		finalizedHeader := s.finalizedBlock.Header
