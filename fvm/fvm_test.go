@@ -3599,7 +3599,7 @@ func Test_BlockHashListShouldWriteOnPush(t *testing.T) {
 		buffer := make([]byte, 32)
 		pos := 0
 
-		// encode capacity
+		// encode height as block hash
 		binary.BigEndian.PutUint64(buffer[pos:], height)
 		err := bhl.Push(height, [32]byte(buffer))
 		require.NoError(t, err)
