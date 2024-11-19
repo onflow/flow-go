@@ -264,7 +264,7 @@ func (b *backendSubscribeTransactions) searchForTransactionResult(
 	}
 
 	if err != nil {
-		// if either the storage or execution node reported no results or there were not enough execution results
+		// if either the storage or execution node reported no results
 		if status.Code(err) == codes.NotFound {
 			// No result yet, indicate that it has not been executed
 			return nil, nil
