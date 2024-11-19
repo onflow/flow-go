@@ -15,7 +15,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
-// BlocksArguments contains the arguments required for subscribing to blocks
+// BlocksArguments contains the arguments required for subscribing to blocks / block headers / block digests
 type BlocksArguments struct {
 	StartBlockID     flow.Identifier  // ID of the block to start subscription from
 	StartBlockHeight uint64           // Height of the block to start subscription from

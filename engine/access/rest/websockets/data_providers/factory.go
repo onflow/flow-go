@@ -25,8 +25,7 @@ const (
 // requested topic. It manages access to logging, state stream configuration,
 // and relevant APIs needed to retrieve data.
 type DataProviderFactory struct {
-	logger            zerolog.Logger
-	eventFilterConfig state_stream.EventFilterConfig
+	logger zerolog.Logger
 
 	stateStreamApi state_stream.API
 	accessApi      access.API
@@ -41,15 +40,13 @@ type DataProviderFactory struct {
 // - accessApi: API for accessing data from the Flow Access API.
 func NewDataProviderFactory(
 	logger zerolog.Logger,
-	eventFilterConfig state_stream.EventFilterConfig,
 	stateStreamApi state_stream.API,
 	accessApi access.API,
 ) *DataProviderFactory {
 	return &DataProviderFactory{
-		logger:            logger,
-		eventFilterConfig: eventFilterConfig,
-		stateStreamApi:    stateStreamApi,
-		accessApi:         accessApi,
+		logger:         logger,
+		stateStreamApi: stateStreamApi,
+		accessApi:      accessApi,
 	}
 }
 

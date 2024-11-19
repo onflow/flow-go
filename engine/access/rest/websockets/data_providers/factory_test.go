@@ -10,7 +10,6 @@ import (
 
 	accessmock "github.com/onflow/flow-go/access/mock"
 	"github.com/onflow/flow-go/engine/access/rest/common/parser"
-	"github.com/onflow/flow-go/engine/access/state_stream"
 	statestreammock "github.com/onflow/flow-go/engine/access/state_stream/mock"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -37,15 +36,24 @@ func TestDataProviderFactorySuite(t *testing.T) {
 // It initializes the factory with mock instances and validates that it is created successfully.
 func (s *DataProviderFactorySuite) SetupTest() {
 	log := unittest.Logger()
-	eventFilterConfig := state_stream.EventFilterConfig{}
 	s.stateStreamApi = statestreammock.NewAPI(s.T())
 	s.accessApi = accessmock.NewAPI(s.T())
 
 	s.ctx = context.Background()
 	s.ch = make(chan interface{})
 
-	s.factory = NewDataProviderFactory(log, eventFilterConfig, s.stateStreamApi, s.accessApi)
+	s.factory = NewDataProviderFactory(log, s.stateStreamApi, s.accessApi)
 	s.Require().NotNil(s.factory)
+}
+
+// mockSubscription creates a mock subscription instance for testing purposes.
+// It sets up the mock subscription's ID method to return a predefined identifiers
+func (s *DataProviderFactorySuite) mockSubscription() *statestreammock.Subscription {
+	subscription := statestreammock.NewSubscription(s.T())
+	subscriptionID := unittest.IdentifierFixture().String()
+	subscription.On("ID").Return(subscriptionID).Twice()
+
+	return subscription
 }
 
 // TODO: add others topic to check when they will be implemented
@@ -65,12 +73,9 @@ func (s *DataProviderFactorySuite) TestSupportedTopics() {
 			topic:     BlocksTopic,
 			arguments: map[string]string{"block_status": parser.Finalized},
 			mockSubscription: func() string {
-				subscription := statestreammock.NewSubscription(s.T())
-				subscriptionID := unittest.IdentifierFixture().String()
-				subscription.On("ID").Return(subscriptionID).Once()
-
+				subscription := s.mockSubscription()
 				s.accessApi.On("SubscribeBlocksFromLatest", mock.Anything, flow.BlockStatusFinalized).Return(subscription).Once()
-				return subscriptionID
+				return subscription.ID()
 			},
 			assertExpectations: func() {
 				s.accessApi.AssertExpectations(s.T())
@@ -81,12 +86,10 @@ func (s *DataProviderFactorySuite) TestSupportedTopics() {
 			topic:     BlockHeadersTopic,
 			arguments: map[string]string{"block_status": parser.Finalized},
 			mockSubscription: func() string {
-				subscription := statestreammock.NewSubscription(s.T())
-				subscriptionID := unittest.IdentifierFixture().String()
-				subscription.On("ID").Return(subscriptionID).Once()
+				subscription := s.mockSubscription()
 
 				s.accessApi.On("SubscribeBlockHeadersFromLatest", mock.Anything, flow.BlockStatusFinalized).Return(subscription).Once()
-				return subscriptionID
+				return subscription.ID()
 			},
 			assertExpectations: func() {
 				s.accessApi.AssertExpectations(s.T())
@@ -97,12 +100,10 @@ func (s *DataProviderFactorySuite) TestSupportedTopics() {
 			topic:     BlockDigestsTopic,
 			arguments: map[string]string{"block_status": parser.Finalized},
 			mockSubscription: func() string {
-				subscription := statestreammock.NewSubscription(s.T())
-				subscriptionID := unittest.IdentifierFixture().String()
-				subscription.On("ID").Return(subscriptionID).Once()
+				subscription := s.mockSubscription()
 
 				s.accessApi.On("SubscribeBlockDigestsFromLatest", mock.Anything, flow.BlockStatusFinalized).Return(subscription).Once()
-				return subscriptionID
+				return subscription.ID()
 			},
 			assertExpectations: func() {
 				s.accessApi.AssertExpectations(s.T())

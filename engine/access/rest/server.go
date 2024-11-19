@@ -50,7 +50,7 @@ func NewServer(serverAPI access.API,
 	}
 
 	// TODO: add new websocket routes
-	_ = data_providers.NewDataProviderFactory(logger, stateStreamConfig.EventFilterConfig, stateStreamApi, serverAPI)
+	_ = data_providers.NewDataProviderFactory(logger, stateStreamApi, serverAPI)
 
 	c := cors.New(cors.Options{
 		AllowedOrigins: []string{"*"},
