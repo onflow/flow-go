@@ -3,8 +3,10 @@ package flow
 import (
 	"encoding/json"
 	"fmt"
+	"io"
 
 	"github.com/fxamacker/cbor/v2"
+	"github.com/onflow/go-ethereum/rlp"
 	"github.com/vmihailenco/msgpack/v4"
 
 	"github.com/onflow/flow-go-sdk"
@@ -38,24 +40,48 @@ const (
 // This type represents a generic service event and primarily exists to simplify
 // encoding and decoding.
 type ServiceEvent struct {
-	Type  ServiceEventType
-	Event any // TODO replace with typedServiceEvent type?
+	Type       ServiceEventType
+	ChunkIndex uint64
+	Event      any // TODO replace with typedServiceEvent type?
 }
 
 type ChunkIndexed[T any] struct {
+	ChunkIndex uint
+	Event      T
+}
+
+type chunkIndexedWithEncodingHint[T any] struct {
 	// always set to true - used to differentiate from other types during unmarshal
 	// needed only while we support both ServiceEvent and ChunkIndexed[ServiceEvent]
-	// TODO: set in Marshal?
 	__isChunkIndexed__ bool
-	ChunkIndex         uint
-	Event              T
+	ChunkIndexed[T]
+}
+
+func (ci ChunkIndexed[T]) MarshalJSON() ([]byte, error) {
+	return json.Marshal(chunkIndexedWithEncodingHint[T]{
+		__isChunkIndexed__: true,
+		ChunkIndexed:       ci,
+	})
+}
+
+func (ci ChunkIndexed[T]) EncodeRLP(w io.Writer) error {
+	return rlp.Encode(w, chunkIndexedWithEncodingHint[T]{
+		__isChunkIndexed__: true,
+		ChunkIndexed:       ci,
+	})
+}
+
+func (ci ChunkIndexed[T]) MarshalCBOR() ([]byte, error) {
+	return cbor.Marshal(chunkIndexedWithEncodingHint[T]{
+		__isChunkIndexed__: true,
+		ChunkIndexed:       ci,
+	})
 }
 
 func makeChunkIndexed[T any](event T, index uint) ChunkIndexed[T] {
 	return ChunkIndexed[T]{
-		__isChunkIndexed__: true,
-		ChunkIndex:         index,
-		Event:              event,
+		ChunkIndex: index,
+		Event:      event,
 	}
 }
 
@@ -193,7 +219,7 @@ func unmarshalWrapped[E any](b []byte, marshaller marshallerImpl) (*E, error) {
 	if err != nil {
 		return nil, err
 	}
-	if wrapper.Event.__isChunkIndexed__ {
+	if wrapper.Event.ChunkIndex > 0 { // TODO this is wrong, just to prevent error
 		return &wrapper.Event.Event, nil
 	}
 

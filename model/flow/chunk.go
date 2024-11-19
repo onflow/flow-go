@@ -31,7 +31,10 @@ type ChunkBody struct {
 	// any service events emitted relative to all service events emitted in the overall block.
 	// See [EventsMerkleRootHash] for details.
 	EventCollection Identifier
-	BlockID         Identifier // Block id of the execution result this chunk belongs to
+	// ServiceEventIndices is a list of indices of service events which were emitted...
+	// TODO doc
+	ServiceEventIndices []int
+	BlockID             Identifier // Block id of the execution result this chunk belongs to
 
 	// Computation consumption info
 	TotalComputationUsed uint64 // total amount of computation used by running all txs in this chunk

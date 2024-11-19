@@ -1,6 +1,7 @@
 package flow_test
 
 import (
+	"encoding/json"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -157,4 +158,29 @@ func TestChunkTotalComputationUsedIsSet(t *testing.T) {
 	)
 
 	assert.Equal(t, i, chunk.TotalComputationUsed)
+}
+
+func TestChunkEncodeDecode(t *testing.T) {
+	chunk := unittest.ChunkFixture(unittest.IdentifierFixture(), 0)
+
+	t.Run("", func(t *testing.T) {
+		chunk.ServiceEventIndices = nil
+		bz, err := json.Marshal(chunk)
+		require.NoError(t, err)
+		unmarshaled := new(flow.Chunk)
+		err = json.Unmarshal(bz, unmarshaled)
+		require.NoError(t, err)
+		assert.Equal(t, chunk, unmarshaled)
+		assert.Nil(t, unmarshaled.ServiceEventIndices)
+	})
+	t.Run("", func(t *testing.T) {
+		chunk.ServiceEventIndices = []int{}
+		bz, err := json.Marshal(chunk)
+		require.NoError(t, err)
+		unmarshaled := new(flow.Chunk)
+		err = json.Unmarshal(bz, unmarshaled)
+		require.NoError(t, err)
+		assert.Equal(t, chunk, unmarshaled)
+		assert.NotNil(t, unmarshaled.ServiceEventIndices)
+	})
 }
