@@ -55,13 +55,19 @@ jobs:
         # https://github.com/golangci/golangci-lint-action/issues/244
         skip-cache: true
 
-
   tidy:
     name: Tidy
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repo
         uses: actions/checkout@v3
+
+      - name: Setup private build environment
+        if: ${{ vars.PRIVATE_BUILDS_SUPPORTED == 'true' }} 
+        uses: ./actions/private-setup
+        with:
+          cadence_deploy_key: ${{ secrets.CADENCE_DEPLOY_KEY }}
+
       - name: Setup Go
         uses: actions/setup-go@v4
         timeout-minutes: 10 # fail fast. sometimes this step takes an extremely long time
@@ -139,6 +145,13 @@ jobs:
     steps:
     - name: Checkout repo
       uses: actions/checkout@v3
+
+    - name: Setup private build environment
+      if: ${{ vars.PRIVATE_BUILDS_SUPPORTED == 'true' }} 
+      uses: ./actions/private-setup
+      with:
+        cadence_deploy_key: ${{ secrets.CADENCE_DEPLOY_KEY }}
+
     - name: Setup Go
       uses: actions/setup-go@v4
       timeout-minutes: 10 # fail fast. sometimes this step takes an extremely long time
@@ -178,6 +191,13 @@ jobs:
     steps:
       - name: Checkout repo
         uses: actions/checkout@v3
+
+      - name: Setup private build environment
+        if: ${{ vars.PRIVATE_BUILDS_SUPPORTED == 'true' }} 
+        uses: ./actions/private-setup
+        with:
+          cadence_deploy_key: ${{ secrets.CADENCE_DEPLOY_KEY }}
+
       - name: Setup Go
         uses: actions/setup-go@v4
         timeout-minutes: 10 # fail fast. sometimes this step takes an extremely long time
@@ -216,6 +236,13 @@ jobs:
         with:
           # all tags are needed for integration tests
           fetch-depth: 0
+
+      - name: Setup private build environment
+        if: ${{ vars.PRIVATE_BUILDS_SUPPORTED == 'true' }} 
+        uses: ./actions/private-setup
+        with:
+          cadence_deploy_key: ${{ secrets.CADENCE_DEPLOY_KEY }}
+
       - name: Setup Go
         uses: actions/setup-go@v4
         timeout-minutes: 10 # fail fast. sometimes this step takes an extremely long time
@@ -255,9 +282,17 @@ jobs:
         targets: ${{ fromJSON(needs.create-integration-dynamic-test-matrix.outputs.dynamic-matrix)}}
     ## need to set image explicitly due to GitHub logging issue as described in https://github.com/onflow/flow-go/pull/3087#issuecomment-1234383202
     runs-on: ${{ matrix.targets.runner }}
+
     steps:
       - name: Checkout repo
         uses: actions/checkout@v3
+      
+      - name: Setup private build environment
+        if: ${{ vars.PRIVATE_BUILDS_SUPPORTED == 'true' }} 
+        uses: ./actions/private-setup
+        with:
+          cadence_deploy_key: ${{ secrets.CADENCE_DEPLOY_KEY }}
+
       - name: Setup Go
         uses: actions/setup-go@v4
         timeout-minutes: 10 # fail fast. sometimes this step takes an extremely long time
@@ -348,6 +383,13 @@ jobs:
       with:
           # all tags are needed for integration tests
           fetch-depth: 0
+
+    - name: Setup private build environment
+      if: ${{ vars.PRIVATE_BUILDS_SUPPORTED == 'true' }} 
+      uses: ./actions/private-setup
+      with:
+        cadence_deploy_key: ${{ secrets.CADENCE_DEPLOY_KEY }}
+
     - name: Setup Go
       uses: actions/setup-go@v4
       timeout-minutes: 10 # fail fast. sometimes this step takes an extremely long time
