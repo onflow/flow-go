@@ -87,9 +87,14 @@ func (snap EncodableSnapshot) LatestSealedResult() (*flow.ExecutionResult, error
 }
 
 type EncodableFullDKG struct {
-	GroupKey      encodable.RandomBeaconPubKey
-	PrivKeyShares []encodable.RandomBeaconPrivKey
-	PubKeyShares  []encodable.RandomBeaconPubKey
+	GroupKey     encodable.RandomBeaconPubKey
+	Participants []EncodableDKGParticipant
+}
+
+type EncodableDKGParticipant struct {
+	PrivKeyShare encodable.RandomBeaconPrivKey
+	PubKeyShare  encodable.RandomBeaconPubKey
+	NodeID       flow.Identifier
 }
 
 // EncodableCluster is the encoding format for protocol.Cluster

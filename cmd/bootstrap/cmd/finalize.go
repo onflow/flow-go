@@ -149,7 +149,7 @@ func finalize(cmd *cobra.Command, args []string) {
 	log.Info().Msgf("received votes total: %v", len(votes))
 
 	log.Info().Msg("reading dkg data")
-	dkgData := readDKGData()
+	dkgData, _ := readDKGData()
 	log.Info().Msg("")
 
 	log.Info().Msg("reading intermediary bootstrapping data")
@@ -349,7 +349,7 @@ func readRootBlock() *flow.Block {
 
 // readDKGData reads DKG data from disc, this file needs to be prepared with
 // rootblock command
-func readDKGData() dkg.DKGData {
+func readDKGData() (dkg.DKGData, flow.DKGIndexMap) {
 	encodableDKG, err := utils.ReadData[inmem.EncodableFullDKG](flagDKGDataPath)
 	if err != nil {
 		log.Fatal().Err(err).Msg("could not read DKG data")
@@ -361,15 +361,14 @@ func readDKGData() dkg.DKGData {
 		PubKeyShares:  nil,
 	}
 
-	for _, pubKey := range encodableDKG.PubKeyShares {
-		dkgData.PubKeyShares = append(dkgData.PubKeyShares, pubKey.PublicKey)
+	indexMap := make(flow.DKGIndexMap, len(encodableDKG.Participants))
+	for i, participant := range encodableDKG.Participants {
+		dkgData.PubKeyShares = append(dkgData.PubKeyShares, participant.PubKeyShare.PublicKey)
+		dkgData.PrivKeyShares = append(dkgData.PrivKeyShares, participant.PrivKeyShare.PrivateKey)
+		indexMap[participant.NodeID] = i
 	}
 
-	for _, privKey := range encodableDKG.PrivKeyShares {
-		dkgData.PrivKeyShares = append(dkgData.PrivKeyShares, privKey.PrivateKey)
-	}
-
-	return dkgData
+	return dkgData, indexMap
 }
 
 // Validation utility methods ------------------------------------------------

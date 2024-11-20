@@ -27,17 +27,16 @@ func runBeaconKG(nodes []model.NodeInfo) (dkg.DKGData, flow.DKGIndexMap) {
 	}
 	log.Info().Msgf("finished running DKG")
 
-	pubKeyShares := make([]encodable.RandomBeaconPubKey, 0, len(dkgData.PubKeyShares))
-	for _, pubKey := range dkgData.PubKeyShares {
-		pubKeyShares = append(pubKeyShares, encodable.RandomBeaconPubKey{PublicKey: pubKey})
-	}
-
-	privKeyShares := make([]encodable.RandomBeaconPrivKey, 0, len(dkgData.PrivKeyShares))
+	encodableParticipants := make([]inmem.EncodableDKGParticipant, 0, len(nodes))
 	for i, privKey := range dkgData.PrivKeyShares {
 		nodeID := nodes[i].NodeID
 
 		encKey := encodable.RandomBeaconPrivKey{PrivateKey: privKey}
-		privKeyShares = append(privKeyShares, encKey)
+		encodableParticipants = append(encodableParticipants, inmem.EncodableDKGParticipant{
+			PrivKeyShare: encKey,
+			PubKeyShare:  encodable.RandomBeaconPubKey{PublicKey: dkgData.PubKeyShares[i]},
+			NodeID:       nodeID,
+		})
 
 		err = common.WriteJSON(fmt.Sprintf(model.PathRandomBeaconPriv, nodeID), flagOutdir, encKey)
 		if err != nil {
@@ -46,7 +45,7 @@ func runBeaconKG(nodes []model.NodeInfo) (dkg.DKGData, flow.DKGIndexMap) {
 		log.Info().Msgf("wrote file %s/%s", flagOutdir, fmt.Sprintf(model.PathRandomBeaconPriv, nodeID))
 	}
 
-	indexMap := make(flow.DKGIndexMap, len(pubKeyShares))
+	indexMap := make(flow.DKGIndexMap, len(nodes))
 	for i, node := range nodes {
 		indexMap[node.NodeID] = i
 	}
@@ -56,8 +55,7 @@ func runBeaconKG(nodes []model.NodeInfo) (dkg.DKGData, flow.DKGIndexMap) {
 		GroupKey: encodable.RandomBeaconPubKey{
 			PublicKey: dkgData.PubGroupKey,
 		},
-		PubKeyShares:  pubKeyShares,
-		PrivKeyShares: privKeyShares,
+		Participants: encodableParticipants,
 	})
 	if err != nil {
 		log.Fatal().Err(err).Msg("failed to write json")
