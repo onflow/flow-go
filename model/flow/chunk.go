@@ -84,9 +84,13 @@ func NewChunk(
 	startState StateCommitment,
 	numberOfTransactions int,
 	eventCollection Identifier,
+	serviceEventIndices []uint32,
 	endState StateCommitment,
 	totalComputationUsed uint64,
 ) *Chunk {
+	if serviceEventIndices == nil {
+		serviceEventIndices = []uint32{}
+	}
 	return &Chunk{
 		ChunkBody: ChunkBody{
 			BlockID:              blockID,
@@ -94,6 +98,7 @@ func NewChunk(
 			StartState:           startState,
 			NumberOfTransactions: uint64(numberOfTransactions),
 			EventCollection:      eventCollection,
+			ServiceEventIndices:  serviceEventIndices,
 			TotalComputationUsed: totalComputationUsed,
 		},
 		Index:    uint64(collectionIndex),

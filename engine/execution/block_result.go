@@ -49,6 +49,23 @@ func (er *BlockExecutionResult) AllEvents() flow.EventsList {
 	return res
 }
 
+func (er *BlockExecutionResult) ServiceEventIndicesForChunk(chunkIndex int) []uint32 {
+	nServiceEventsForChunk := len(er.collectionExecutionResults[chunkIndex].serviceEvents)
+	if nServiceEventsForChunk == 0 {
+		return []uint32{}
+	}
+
+	firstIndex := 0
+	for i := 0; i < chunkIndex; i++ {
+		firstIndex += len(er.collectionExecutionResults[i].serviceEvents)
+	}
+	indices := make([]uint32, 0, nServiceEventsForChunk)
+	for i := firstIndex; i < len(er.collectionExecutionResults[chunkIndex].serviceEvents); i++ {
+		indices = append(indices, uint32(i))
+	}
+	return indices
+}
+
 func (er *BlockExecutionResult) AllServiceEvents() flow.EventsList {
 	res := make(flow.EventsList, 0)
 	for _, ce := range er.collectionExecutionResults {
@@ -199,6 +216,7 @@ func (ar *BlockAttestationResult) ChunkAt(index int) *flow.Chunk {
 		attestRes.startStateCommit,
 		len(execRes.TransactionResults()),
 		attestRes.eventCommit,
+		ar.ServiceEventIndicesForChunk(index),
 		attestRes.endStateCommit,
 		execRes.executionSnapshot.TotalComputationUsed(),
 	)
