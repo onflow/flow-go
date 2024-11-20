@@ -60,7 +60,7 @@ func TestDKGState_BeaconKeys(t *testing.T) {
 			assert.True(t, errors.Is(err, storage.ErrNotFound))
 		})
 
-		// attempt to store a nil key should fail  - use DKGState.SetEndState(flow.DKGEndStateNoKey)
+		// attempt to store a nil key should fail  - use RecoverablePrivateBeaconKeyState.SetEndState(flow.DKGEndStateNoKey)
 		t.Run("should fail to store a nil key instead)", func(t *testing.T) {
 			err = store.InsertMyBeaconPrivateKey(epochCounter, nil)
 			assert.Error(t, err)
@@ -221,7 +221,7 @@ func TestSafeBeaconPrivateKeys(t *testing.T) {
 	})
 }
 
-// TestSecretDBRequirement tests that the DKGState constructor will return an
+// TestSecretDBRequirement tests that the RecoverablePrivateBeaconKeyState constructor will return an
 // error if instantiated using a database not marked with the correct type.
 func TestSecretDBRequirement(t *testing.T) {
 	unittest.RunWithBadgerDB(t, func(db *badger.DB) {

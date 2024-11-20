@@ -127,7 +127,7 @@ func main() {
 		committee             *committees.Consensus
 		epochLookup           *epochs.EpochLookup
 		hotstuffModules       *consensus.HotstuffModules
-		dkgState              *bstorage.DKGState
+		dkgState              *bstorage.RecoverablePrivateBeaconKeyState
 		safeBeaconKeys        *bstorage.SafeBeaconPrivateKeys
 		getSealingConfigs     module.SealingConfigsGetter
 	)
