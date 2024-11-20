@@ -245,6 +245,7 @@ func (s *ChunkVerifierTestSuite) TestEventsMismatch() {
 
 // TestServiceEventsMismatch tests verification behavior in case
 // of emitted service events not matching chunks'
+// TODO: fix
 func (s *ChunkVerifierTestSuite) TestServiceEventsMismatch() {
 	meta := s.GetTestSetup(s.T(), "doesn't matter", true)
 	vch := meta.RefreshChunkData(s.T())
@@ -257,6 +258,7 @@ func (s *ChunkVerifierTestSuite) TestServiceEventsMismatch() {
 	s.snapshots[string(serviceTxBody.Script)] = &snapshot.ExecutionSnapshot{}
 	s.outputs[string(serviceTxBody.Script)] = fvm.ProcedureOutput{
 		ComputationUsed:        computationUsed,
+		ServiceEvents:          unittest.EventsFixture(1),
 		ConvertedServiceEvents: flow.ServiceEventList{*epochCommitServiceEvent},
 		Events:                 meta.ChunkEvents,
 	}
@@ -266,6 +268,8 @@ func (s *ChunkVerifierTestSuite) TestServiceEventsMismatch() {
 	assert.True(s.T(), chunksmodels.IsChunkFaultError(err))
 	assert.IsType(s.T(), &chunksmodels.CFInvalidServiceEventsEmitted{}, err)
 }
+
+// TODO: add test case for non-system chunk service event
 
 // TestServiceEventsAreChecked ensures that service events are in fact checked
 func (s *ChunkVerifierTestSuite) TestServiceEventsAreChecked() {
