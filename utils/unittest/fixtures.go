@@ -1329,7 +1329,6 @@ func ChunkFixture(
 			CollectionIndex:      collectionIndex,
 			StartState:           StateCommitmentFixture(),
 			EventCollection:      IdentifierFixture(),
-			ServiceEventIndices:  make([]uint32, 0),
 			TotalComputationUsed: 4200,
 			NumberOfTransactions: 42,
 			BlockID:              blockID,
