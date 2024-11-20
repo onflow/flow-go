@@ -86,11 +86,13 @@ func (snap EncodableSnapshot) LatestSealedResult() (*flow.ExecutionResult, error
 	return nil, fmt.Errorf("LatestSealedResult: unreachable for correctly formatted sealing segments")
 }
 
+// EncodableFullDKG encodes DKG data for all participants and the group key. Effectively encodes output of the DKG.
 type EncodableFullDKG struct {
 	GroupKey     encodable.RandomBeaconPubKey
 	Participants []EncodableDKGParticipant
 }
 
+// EncodableDKGParticipant encodes DKG data for single participant.
 type EncodableDKGParticipant struct {
 	PrivKeyShare encodable.RandomBeaconPrivKey
 	PubKeyShare  encodable.RandomBeaconPubKey
