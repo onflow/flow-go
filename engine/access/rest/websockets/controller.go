@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/gorilla/websocket"
@@ -14,6 +15,14 @@ import (
 	"github.com/onflow/flow-go/engine/access/state_stream"
 	"github.com/onflow/flow-go/engine/access/state_stream/backend"
 	"github.com/onflow/flow-go/utils/concurrentmap"
+)
+
+const (
+	// Time allowed to read the next pong message from the peer.
+	pongWait = 10 * time.Second
+
+	// Time allowed to write a message to the peer.
+	writeWait = 10 * time.Second
 )
 
 type Controller struct {
@@ -44,10 +53,39 @@ func NewWebSocketController(
 
 // HandleConnection manages the WebSocket connection, adding context and error handling.
 func (c *Controller) HandleConnection(ctx context.Context) {
-	//TODO: configure the connection with ping-pong and deadlines
+	// configuring the connection with appropriate read/write deadlines and handlers.
+	err := c.configureConnection()
+	if err != nil {
+		// TODO: add error handling here
+		c.logger.Error().Err(err).Msg("error configuring connection")
+		c.shutdownConnection()
+		return
+	}
+
 	//TODO: spin up a response limit tracker routine
 	go c.readMessagesFromClient(ctx)
 	c.writeMessagesToClient(ctx)
+}
+
+// configureConnection used to set read and write deadlines for WebSocket connections and establishes a Pong handler to
+// manage incoming Pong messages. These methods allow to specify a time limit for reading from or writing to a WebSocket
+// connection. If the operation (reading or writing) takes longer than the specified deadline, the connection will be closed.
+func (c *Controller) configureConnection() error {
+	// Set the initial write deadline for the first ping message
+	if err := c.conn.SetWriteDeadline(time.Now().Add(writeWait)); err != nil {
+		return fmt.Errorf("failed to set the initial write deadline: %w", err)
+	}
+	// Set the initial read deadline for the first pong message
+	if err := c.conn.SetReadDeadline(time.Now().Add(pongWait)); err != nil {
+		return fmt.Errorf("failed to set the initial read deadline: %w", err)
+	}
+
+	// Establish a Pong handler
+	c.conn.SetPongHandler(func(string) error {
+		return c.conn.SetReadDeadline(time.Now().Add(pongWait))
+	})
+
+	return nil
 }
 
 // writeMessagesToClient reads a messages from communication channel and passes them on to a client WebSocket connection.
