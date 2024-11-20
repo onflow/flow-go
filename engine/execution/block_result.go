@@ -60,7 +60,7 @@ func (er *BlockExecutionResult) ServiceEventIndicesForChunk(chunkIndex int) []ui
 		firstIndex += len(er.collectionExecutionResults[i].serviceEvents)
 	}
 	indices := make([]uint32, 0, nServiceEventsForChunk)
-	for i := firstIndex; i < len(er.collectionExecutionResults[chunkIndex].serviceEvents); i++ {
+	for i := firstIndex; i < firstIndex+nServiceEventsForChunk; i++ {
 		indices = append(indices, uint32(i))
 	}
 	return indices
