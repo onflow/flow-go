@@ -19,6 +19,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	sdk "github.com/onflow/flow-go-sdk"
+
 	hotstuff "github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/engine/access/rest/util"
@@ -1328,6 +1329,7 @@ func ChunkFixture(
 			CollectionIndex:      collectionIndex,
 			StartState:           StateCommitmentFixture(),
 			EventCollection:      IdentifierFixture(),
+			ServiceEventIndices:  make([]uint32, 0),
 			TotalComputationUsed: 4200,
 			NumberOfTransactions: 42,
 			BlockID:              blockID,

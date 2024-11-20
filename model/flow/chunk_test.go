@@ -1,4 +1,4 @@
-package flow
+package flow_test
 
 import (
 	"encoding/json"
@@ -8,6 +8,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/utils/rand"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -16,7 +17,7 @@ import (
 // out of range indices
 func TestChunkList_ByIndex(t *testing.T) {
 	// creates a chunk list with the size of 10
-	var chunkList ChunkList = make([]*Chunk, 10)
+	var chunkList flow.ChunkList = make([]*flow.Chunk, 10)
 
 	// an out of index chunk by index
 	_, ok := chunkList.ByIndex(11)
@@ -37,14 +38,14 @@ func TestDistinctChunkIDs_EmptyChunks(t *testing.T) {
 	require.NotEqual(t, blockIdA, blockIdB)
 
 	// generates a chunk associated with each block id
-	chunkA := &Chunk{
-		ChunkBody: ChunkBody{
+	chunkA := &flow.Chunk{
+		ChunkBody: flow.ChunkBody{
 			BlockID: blockIdA,
 		},
 	}
 
-	chunkB := &Chunk{
-		ChunkBody: ChunkBody{
+	chunkB := &flow.Chunk{
+		ChunkBody: flow.ChunkBody{
 			BlockID: blockIdB,
 		},
 	}
@@ -84,7 +85,7 @@ func TestChunkList_Indices(t *testing.T) {
 	cl := unittest.ChunkListFixture(5, unittest.IdentifierFixture())
 	t.Run("empty chunk subset indices", func(t *testing.T) {
 		// subset of chunk list that is empty should return an empty list
-		subset := ChunkList{}
+		subset := flow.ChunkList{}
 		indices := subset.Indices()
 		require.Len(t, indices, 0)
 	})
@@ -101,7 +102,7 @@ func TestChunkList_Indices(t *testing.T) {
 	t.Run("multiple chunk subset indices", func(t *testing.T) {
 		// subset that only contains even chunk indices, should return
 		// a uint64 slice that only contains even chunk indices
-		subset := ChunkList{cl[0], cl[2], cl[4]}
+		subset := flow.ChunkList{cl[0], cl[2], cl[4]}
 		indices := subset.Indices()
 		require.Len(t, indices, 3)
 		require.Contains(t, indices, uint64(0), uint64(2), uint64(4))
@@ -112,7 +113,7 @@ func TestChunkIndexIsSet(t *testing.T) {
 
 	i, err := rand.Uint()
 	require.NoError(t, err)
-	chunk := NewChunk(
+	chunk := flow.NewChunk(
 		unittest.IdentifierFixture(),
 		int(i),
 		unittest.StateCommitmentFixture(),
@@ -131,7 +132,7 @@ func TestChunkNumberOfTxsIsSet(t *testing.T) {
 
 	i, err := rand.Uint32()
 	require.NoError(t, err)
-	chunk := NewChunk(
+	chunk := flow.NewChunk(
 		unittest.IdentifierFixture(),
 		3,
 		unittest.StateCommitmentFixture(),
@@ -149,7 +150,7 @@ func TestChunkTotalComputationUsedIsSet(t *testing.T) {
 
 	i, err := rand.Uint64()
 	require.NoError(t, err)
-	chunk := NewChunk(
+	chunk := flow.NewChunk(
 		unittest.IdentifierFixture(),
 		3,
 		unittest.StateCommitmentFixture(),
@@ -172,7 +173,7 @@ func TestChunkEncodeDecode(t *testing.T) {
 		t.Run("json", func(t *testing.T) {
 			bz, err := json.Marshal(chunk)
 			require.NoError(t, err)
-			unmarshaled := new(Chunk)
+			unmarshaled := new(flow.Chunk)
 			err = json.Unmarshal(bz, unmarshaled)
 			require.NoError(t, err)
 			assert.Equal(t, chunk, unmarshaled)
@@ -181,7 +182,7 @@ func TestChunkEncodeDecode(t *testing.T) {
 		t.Run("cbor", func(t *testing.T) {
 			bz, err := cbor.Marshal(chunk)
 			require.NoError(t, err)
-			unmarshaled := new(Chunk)
+			unmarshaled := new(flow.Chunk)
 			err = cbor.Unmarshal(bz, unmarshaled)
 			require.NoError(t, err)
 			assert.Equal(t, chunk, unmarshaled)
@@ -193,7 +194,7 @@ func TestChunkEncodeDecode(t *testing.T) {
 		t.Run("json", func(t *testing.T) {
 			bz, err := json.Marshal(chunk)
 			require.NoError(t, err)
-			unmarshaled := new(Chunk)
+			unmarshaled := new(flow.Chunk)
 			err = json.Unmarshal(bz, unmarshaled)
 			require.NoError(t, err)
 			assert.Equal(t, chunk, unmarshaled)
@@ -202,7 +203,7 @@ func TestChunkEncodeDecode(t *testing.T) {
 		t.Run("cbor", func(t *testing.T) {
 			bz, err := cbor.Marshal(chunk)
 			require.NoError(t, err)
-			unmarshaled := new(Chunk)
+			unmarshaled := new(flow.Chunk)
 			err = cbor.Unmarshal(bz, unmarshaled)
 			require.NoError(t, err)
 			assert.Equal(t, chunk, unmarshaled)
@@ -217,14 +218,14 @@ func TestChunk_ModelVersions_EncodeDecode(t *testing.T) {
 	chunkFixture.ServiceEventIndices = []uint32{1} // non-nil extra field
 
 	t.Run("writing v0 and reading v1 should yield nil for new field", func(t *testing.T) {
-		var chunkv0 chunkBodyV0
-		unittest.CopyStructure(t, chunkFixture.ChunkBody, chunkv0)
+		var chunkv0 flow.ChunkBodyV0
+		unittest.CopyStructure(t, chunkFixture.ChunkBody, &chunkv0)
 
 		t.Run("json", func(t *testing.T) {
 			bz, err := json.Marshal(chunkv0)
 			require.NoError(t, err)
 
-			var unmarshaled ChunkBody
+			var unmarshaled flow.ChunkBody
 			err = json.Unmarshal(bz, &unmarshaled)
 			require.NoError(t, err)
 			assert.Equal(t, chunkv0.EventCollection, unmarshaled.EventCollection)
@@ -236,7 +237,7 @@ func TestChunk_ModelVersions_EncodeDecode(t *testing.T) {
 			bz, err := cbor.Marshal(chunkv0)
 			require.NoError(t, err)
 
-			var unmarshaled ChunkBody
+			var unmarshaled flow.ChunkBody
 			err = cbor.Unmarshal(bz, &unmarshaled)
 			require.NoError(t, err)
 			assert.Equal(t, chunkv0.EventCollection, unmarshaled.EventCollection)
@@ -252,7 +253,7 @@ func TestChunk_ModelVersions_EncodeDecode(t *testing.T) {
 			bz, err := json.Marshal(chunkv1)
 			require.NoError(t, err)
 
-			var unmarshaled chunkBodyV0
+			var unmarshaled flow.ChunkBodyV0
 			err = json.Unmarshal(bz, &unmarshaled)
 			require.NoError(t, err)
 			assert.Equal(t, chunkv1.EventCollection, unmarshaled.EventCollection)
@@ -262,7 +263,7 @@ func TestChunk_ModelVersions_EncodeDecode(t *testing.T) {
 			bz, err := cbor.Marshal(chunkv1)
 			require.NoError(t, err)
 
-			var unmarshaled chunkBodyV0
+			var unmarshaled flow.ChunkBodyV0
 			err = cbor.Unmarshal(bz, &unmarshaled)
 			require.NoError(t, err)
 			assert.Equal(t, chunkv1.EventCollection, unmarshaled.EventCollection)
@@ -275,7 +276,7 @@ func TestChunk_ModelVersions_EncodeDecode(t *testing.T) {
 func TestChunk_ModelVersions_IDConsistentAcrossVersions(t *testing.T) {
 	chunk := unittest.ChunkFixture(unittest.IdentifierFixture(), 1)
 	chunkBody := chunk.ChunkBody
-	var chunkv0 chunkBodyV0
+	var chunkv0 flow.ChunkBodyV0
 	unittest.CopyStructure(t, chunkBody, &chunkv0)
 
 	// A nil ServiceEventIndices fields indicates a prior model version.
@@ -283,7 +284,7 @@ func TestChunk_ModelVersions_IDConsistentAcrossVersions(t *testing.T) {
 	t.Run("nil ServiceEventIndices fields", func(t *testing.T) {
 		chunkBody.ServiceEventIndices = nil
 		assert.Equal(t, chunkBody.BlockID, chunkv0.BlockID)
-		assert.Equal(t, MakeID(chunkv0), MakeID(chunkBody))
+		assert.Equal(t, flow.MakeID(chunkv0), flow.MakeID(chunkBody))
 	})
 	// A non-nil ServiceEventIndices fields indicates an up-to-date model version.
 	// The ID calculation for the old and new model version should be different,
@@ -291,6 +292,6 @@ func TestChunk_ModelVersions_IDConsistentAcrossVersions(t *testing.T) {
 	t.Run("non-nil ServiceEventIndices fields", func(t *testing.T) {
 		chunkBody.ServiceEventIndices = []uint32{}
 		assert.Equal(t, chunkBody.BlockID, chunkv0.BlockID)
-		assert.NotEqual(t, MakeID(chunkv0), MakeID(chunkBody))
+		assert.NotEqual(t, flow.MakeID(chunkv0), flow.MakeID(chunkBody))
 	})
 }

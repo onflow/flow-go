@@ -23,7 +23,7 @@ func init() {
 }
 
 // TODO doc
-type chunkBodyV0 struct {
+type ChunkBodyV0 struct {
 	CollectionIndex      uint
 	StartState           StateCommitment
 	EventCollection      Identifier
@@ -52,13 +52,13 @@ type ChunkBody struct {
 
 // Fingerprint returns the unique binary representation for the receiver ChunkBody,
 // used to compute the ID (hash).
-// The fingerprint is backward-compatible with the prior data model for ChunkBody: chunkBodyV0.
+// The fingerprint is backward-compatible with the prior data model for ChunkBody: ChunkBodyV0.
 //   - All new ChunkBody instances must have non-nil ServiceEventIndices
 //   - A nil ServiceEventIndices field indicates a v0 version of ChunkBody
 //   - when computing the ID of such a ChunkBody, the ServiceEventIndices field is omitted from the fingerprint
 func (ch ChunkBody) Fingerprint() []byte {
 	if ch.ServiceEventIndices == nil {
-		return rlp.NewMarshaler().MustMarshal(chunkBodyV0{
+		return rlp.NewMarshaler().MustMarshal(ChunkBodyV0{
 			CollectionIndex:      ch.CollectionIndex,
 			StartState:           ch.StartState,
 			EventCollection:      ch.EventCollection,
