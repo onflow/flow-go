@@ -43,7 +43,7 @@ func (er ExecutionResult) Checksum() Identifier {
 	return MakeID(er)
 }
 
-// ValidateChunksLength checks whether the number of chuncks is zero.
+// ValidateChunksLength checks whether the number of chunks is zero.
 //
 // It returns false if the number of chunks is zero (invalid).
 // By protocol definition, each ExecutionReceipt must contain at least one
@@ -74,6 +74,33 @@ func (er ExecutionResult) InitialStateCommit() (StateCommitment, error) {
 		return DummyStateCommitment, ErrNoChunks
 	}
 	return er.Chunks[0].StartState, nil
+}
+
+// SystemChunk is a system-generated chunk added to every block.
+// It is always the final chunk in an execution result.
+func (er ExecutionResult) SystemChunk() *Chunk {
+	return er.Chunks[len(er.Chunks)-1]
+}
+
+// ServiceEventsByChunk returns the list of service events emitted during the given chunk.
+func (er ExecutionResult) ServiceEventsByChunk(chunkIndex uint64) ServiceEventList {
+	indices := er.Chunks[chunkIndex].ServiceEventIndices
+	// CASE 1: Service event indices are specified (non-nil)
+	if indices != nil {
+		serviceEventsForChunk := make(ServiceEventList, 0, len(indices))
+		for _, eventIndex := range indices {
+			serviceEventsForChunk = append(serviceEventsForChunk, er.ServiceEvents[eventIndex])
+		}
+		return serviceEventsForChunk
+	}
+	// CASE 2: Service event indices are omitted (nil)
+	// This indicates the chunk was generated in an older data model version.
+	// In this case, any service events associated with the result are assumed
+	// to have been emitted within the system chunk (last chunk)
+	if chunkIndex == er.SystemChunk().Index {
+		return er.ServiceEvents
+	}
+	return nil
 }
 
 func (er ExecutionResult) MarshalJSON() ([]byte, error) {
