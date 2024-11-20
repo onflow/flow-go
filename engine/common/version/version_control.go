@@ -40,6 +40,7 @@ var NoHeight = uint64(0)
 var defaultCompatibilityOverrides = map[string]struct{}{
 	"0.37.17": {},
 	"0.37.18": {},
+	"0.37.22": {},
 }
 
 // VersionControl manages the version control system for the node.
