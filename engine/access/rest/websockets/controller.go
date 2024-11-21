@@ -67,20 +67,18 @@ func (c *Controller) HandleConnection(ctx context.Context) {
 	c.writeMessagesToClient(ctx)
 }
 
-// configureConnection used to set read and write deadlines for WebSocket connections and establishes a Pong handler to
-// manage incoming Pong messages. These methods allow to specify a time limit for reading from or writing to a WebSocket
-// connection. If the operation (reading or writing) takes longer than the specified deadline, the connection will be closed.
+// configureConnection configures the WebSocket connection by setting up a Pong handler
+// to handle incoming Pong messages and update the read deadline accordingly.
+//
+// The Pong handler resets the read deadline whenever a Pong message is received from the peer.
+// This mechanism ensures the connection remains active as long as the peer responds to periodic pings.
+//
+// Note: The default value for the read deadline in Gorilla WebSockets is 0, which means
+// no deadline is set unless explicitly configured. Without a read deadline, the connection
+// will remain open indefinitely if the client keeps the connection open without sending any messages unless explicitly
+// closed by either the server or the client.
 func (c *Controller) configureConnection() error {
-	// Set the initial write deadline for the first ping message
-	if err := c.conn.SetWriteDeadline(time.Now().Add(writeWait)); err != nil {
-		return fmt.Errorf("failed to set the initial write deadline: %w", err)
-	}
-	// Set the initial read deadline for the first pong message
-	if err := c.conn.SetReadDeadline(time.Now().Add(pongWait)); err != nil {
-		return fmt.Errorf("failed to set the initial read deadline: %w", err)
-	}
-
-	// Establish a Pong handler
+	// Establish a Pong handler which sets the handler for pong messages received from the peer.
 	c.conn.SetPongHandler(func(string) error {
 		return c.conn.SetReadDeadline(time.Now().Add(pongWait))
 	})
