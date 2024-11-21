@@ -40,10 +40,21 @@ func Verify(from uint64, to uint64, chainID flow.ChainID, dataDir string, execut
 			return err
 		}
 	} else {
-		// TODO: recover from gob
+		prev := from - 1
+		valueFileName, allocatorFileName := evmStateGobFileNamesByEndHeight(evmStateGobDir, prev)
+		values, err := testutils.DeserializeState(valueFileName)
+		if err != nil {
+			return err
+		}
+
+		allocators, err := testutils.DeserializeAllocator(allocatorFileName)
+		if err != nil {
+			return err
+		}
+		store = testutils.GetSimpleValueStorePopulated(values, allocators)
 	}
 
-	return utils.OffchainReplayBackwardCompatibilityTest(
+	err = utils.OffchainReplayBackwardCompatibilityTest(
 		chainID,
 		from,
 		to,
@@ -52,6 +63,23 @@ func Verify(from uint64, to uint64, chainID flow.ChainID, dataDir string, execut
 		executionDataStore,
 		store,
 	)
+
+	if err != nil {
+		return err
+	}
+
+	valueFileName, allocatorFileName := evmStateGobFileNamesByEndHeight(evmStateGobDir, to)
+	values, allocators := store.Dump()
+	err = testutils.SerializeState(valueFileName, values)
+	if err != nil {
+		return err
+	}
+	err = testutils.SerializeAllocator(allocatorFileName, allocators)
+	if err != nil {
+		return err
+	}
+
+	return nil
 }
 
 func initStorages(chainID flow.ChainID, dataDir string, executionDataDir string) (
@@ -90,4 +118,10 @@ func isEVMRootHeight(chainID flow.ChainID, flowHeight uint64) bool {
 		return flowHeight == 85981136
 	}
 	return flowHeight == 1
+}
+
+func evmStateGobFileNamesByEndHeight(evmStateGobDir string, endHeight uint64) (string, string) {
+	valueFileName := filepath.Join(evmStateGobDir, fmt.Sprintf("values-%d.gob", endHeight))
+	allocatorFileName := filepath.Join(evmStateGobDir, fmt.Sprintf("allocators-%d.gob", endHeight))
+	return valueFileName, allocatorFileName
 }
