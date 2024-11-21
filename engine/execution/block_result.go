@@ -49,6 +49,8 @@ func (er *BlockExecutionResult) AllEvents() flow.EventsList {
 	return res
 }
 
+// ServiceEventIndicesForChunk returns the list of service event indices associated with the given chunk.
+// Outputs are index ranges with no gaps, and index into the flow.ExecutionResult.ServiceEvents field.
 func (er *BlockExecutionResult) ServiceEventIndicesForChunk(chunkIndex int) []uint32 {
 	nServiceEventsForChunk := len(er.collectionExecutionResults[chunkIndex].serviceEvents)
 	if nServiceEventsForChunk == 0 {
