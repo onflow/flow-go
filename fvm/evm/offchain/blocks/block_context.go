@@ -1,10 +1,11 @@
 package blocks
 
 import (
-	evmTypes "github.com/onflow/flow-go/fvm/evm/types"
-	"github.com/onflow/flow-go/model/flow"
 	gethCommon "github.com/onflow/go-ethereum/common"
 	"github.com/onflow/go-ethereum/eth/tracers"
+
+	"github.com/onflow/flow-go/fvm/evm/types"
+	"github.com/onflow/flow-go/model/flow"
 )
 
 // NewBlockContext creates a new block context for the given chain ID and height.
@@ -20,20 +21,20 @@ func NewBlockContext(
 	getHashByHeight func(uint64) gethCommon.Hash,
 	prevRandao gethCommon.Hash,
 	tracer *tracers.Tracer,
-) (evmTypes.BlockContext, error) {
+) (types.BlockContext, error) {
 
 	// coinbase address fix
-	miner := evmTypes.CoinbaseAddress
+	miner := types.CoinbaseAddress
 	if chainID == flow.Testnet && height < coinbaseAddressChangeEVMHeightTestnet {
-		miner = evmTypes.Address(gethCommon.HexToAddress("0000000000000000000000021169100eecb7c1a6"))
+		miner = oldCoinbaseAddressTestnet
 	}
 
-	return evmTypes.BlockContext{
-		ChainID:                evmTypes.EVMChainIDFromFlowChainID(chainID),
+	return types.BlockContext{
+		ChainID:                types.EVMChainIDFromFlowChainID(chainID),
 		BlockNumber:            height,
 		BlockTimestamp:         timestamp,
-		DirectCallBaseGasUsage: evmTypes.DefaultDirectCallBaseGasUsage,
-		DirectCallGasPrice:     evmTypes.DefaultDirectCallGasPrice,
+		DirectCallBaseGasUsage: types.DefaultDirectCallBaseGasUsage,
+		DirectCallGasPrice:     types.DefaultDirectCallGasPrice,
 		GasFeeCollector:        miner,
 		GetHashFunc: func(n uint64) gethCommon.Hash {
 			// For block heights greater than or equal to the current,
@@ -67,10 +68,13 @@ func NewBlockContext(
 const blockHashListFixHCUEVMHeightMainnet = 0
 
 // Testnet52 - Height Coordinated Upgrade 4, Nov 20, 2024
-const blockHashListFixHCUEVMHeightTestnet = 0
+// Flow Block: 228025500 7eb808b77f02c3e77c36d57dc893ed63adc5ff6113bb0f4b141bb39e44d634e6
+const blockHashListFixHCUEVMHeightTestnet = 16848829
 
 // TODO: HCU name and date
 const coinbaseAddressChangeEVMHeightTestnet = 1385490
+
+var oldCoinbaseAddressTestnet = types.Address(gethCommon.HexToAddress("0000000000000000000000021169100eecb7c1a6"))
 
 var fixedHashes map[flow.ChainID][256]gethCommon.Hash
 
