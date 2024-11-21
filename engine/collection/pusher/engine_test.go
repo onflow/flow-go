@@ -1,4 +1,4 @@
-package pusher_test
+package pusher
 
 import (
 	"context"
@@ -10,14 +10,12 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/suite"
 
-	"github.com/onflow/flow-go/engine/collection/pusher"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/model/messages"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/metrics"
 	module "github.com/onflow/flow-go/module/mock"
-	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/network/mocknetwork"
 	protocol "github.com/onflow/flow-go/state/protocol/mock"
 	storage "github.com/onflow/flow-go/storage/mock"
@@ -35,7 +33,7 @@ type Suite struct {
 	collections  *storage.Collections
 	transactions *storage.Transactions
 
-	engine *pusher.Engine
+	engine *Engine
 }
 
 func (suite *Suite) SetupTest() {
@@ -66,7 +64,7 @@ func (suite *Suite) SetupTest() {
 	suite.collections = new(storage.Collections)
 	suite.transactions = new(storage.Transactions)
 
-	suite.engine, err = pusher.New(
+	suite.engine, err = New(
 		zerolog.New(io.Discard),
 		net,
 		suite.state,
@@ -119,7 +117,7 @@ func (suite *Suite) TestSubmitCollectionGuaranteeNonLocal() {
 	msg := &messages.SubmitCollectionGuarantee{
 		Guarantee: *guarantee,
 	}
-	err := suite.engine.Process(channels.PushGuarantees, sender.NodeID, msg)
+	err := suite.engine.process(sender.NodeID, msg)
 	suite.Require().Error(err)
 
 	suite.conduit.AssertNumberOfCalls(suite.T(), "Multicast", 0)
