@@ -8,6 +8,7 @@ import (
 
 	"github.com/dgraph-io/badger/v2"
 	badgerds "github.com/ipfs/go-ds-badger2"
+	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/cmd/util/cmd/common"
 	"github.com/onflow/flow-go/fvm/environment"
@@ -20,7 +21,16 @@ import (
 	"github.com/onflow/flow-go/storage"
 )
 
-func Verify(from uint64, to uint64, chainID flow.ChainID, dataDir string, executionDataDir string, evmStateGobDir string) error {
+// Verify verifies the offchain replay of EVM blocks from the given height range
+// and updates the EVM state gob files with the latest state
+func Verify(log zerolog.Logger, from uint64, to uint64, chainID flow.ChainID, dataDir string, executionDataDir string, evmStateGobDir string) error {
+	log.Info().
+		Str("chain", chainID.String()).
+		Str("dataDir", dataDir).
+		Str("executionDataDir", executionDataDir).
+		Str("evmStateGobDir", evmStateGobDir).
+		Msgf("verifying range from %d to %d", from, to)
+
 	db, storages, executionDataStore, dsStore, err := initStorages(chainID, dataDir, executionDataDir)
 	if err != nil {
 		return fmt.Errorf("could not initialize storages: %w", err)
@@ -32,6 +42,8 @@ func Verify(from uint64, to uint64, chainID flow.ChainID, dataDir string, execut
 	var store *testutils.TestValueStore
 	isRoot := isEVMRootHeight(chainID, from)
 	if isRoot {
+		log.Info().Msgf("initializing EVM state for root height %d", from)
+
 		store = testutils.GetSimpleValueStore()
 		as := environment.NewAccountStatus()
 		rootAddr := evm.StorageAccountAddress(chainID)
@@ -41,20 +53,23 @@ func Verify(from uint64, to uint64, chainID flow.ChainID, dataDir string, execut
 		}
 	} else {
 		prev := from - 1
+		log.Info().Msgf("loading EVM state from previous height %d", prev)
+
 		valueFileName, allocatorFileName := evmStateGobFileNamesByEndHeight(evmStateGobDir, prev)
 		values, err := testutils.DeserializeState(valueFileName)
 		if err != nil {
-			return err
+			return fmt.Errorf("could not deserialize state %v: %w", valueFileName, err)
 		}
 
 		allocators, err := testutils.DeserializeAllocator(allocatorFileName)
 		if err != nil {
-			return err
+			return fmt.Errorf("could not deserialize allocator %v: %w", allocatorFileName, err)
 		}
 		store = testutils.GetSimpleValueStorePopulated(values, allocators)
 	}
 
 	err = utils.OffchainReplayBackwardCompatibilityTest(
+		log,
 		chainID,
 		from,
 		to,
@@ -78,6 +93,8 @@ func Verify(from uint64, to uint64, chainID flow.ChainID, dataDir string, execut
 	if err != nil {
 		return err
 	}
+
+	log.Info().Msgf("saved EVM state to %s and %s", valueFileName, allocatorFileName)
 
 	return nil
 }

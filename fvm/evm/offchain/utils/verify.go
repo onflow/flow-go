@@ -5,10 +5,9 @@ import (
 	"errors"
 	"strings"
 
-	"github.com/rs/zerolog/log"
-
 	"github.com/onflow/cadence"
 	"github.com/onflow/cadence/encoding/ccf"
+	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/fvm/environment"
 	"github.com/onflow/flow-go/fvm/evm"
@@ -25,6 +24,7 @@ import (
 )
 
 func OffchainReplayBackwardCompatibilityTest(
+	log zerolog.Logger,
 	chainID flow.ChainID,
 	flowStartHeight uint64,
 	flowEndHeight uint64,
@@ -97,7 +97,7 @@ func OffchainReplayBackwardCompatibilityTest(
 		}
 
 		sp := testutils.NewTestStorageProvider(store, evmBlockEvent.Height)
-		cr := sync.NewReplayer(chainID, rootAddr, sp, bp, log.Logger, nil, true)
+		cr := sync.NewReplayer(chainID, rootAddr, sp, bp, log, nil, true)
 		res, err := cr.ReplayBlock(evmTxEvents, evmBlockEvent)
 		if err != nil {
 			return err
@@ -125,6 +125,8 @@ func OffchainReplayBackwardCompatibilityTest(
 				return err
 			}
 		}
+
+		log.Info().Msgf("verified block %d", height)
 	}
 
 	return nil

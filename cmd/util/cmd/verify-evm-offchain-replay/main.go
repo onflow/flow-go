@@ -55,7 +55,7 @@ func run(*cobra.Command, []string) {
 	}
 
 	log.Info().Msgf("verifying range from %d to %d", from, to)
-	err = Verify(from, to, flow.Testnet, flagDatadir, flagExecutionDataDir, flagEVMStateGobDir)
+	err = Verify(log.Logger, from, to, flow.Testnet, flagDatadir, flagExecutionDataDir, flagEVMStateGobDir)
 	if err != nil {
 		log.Fatal().Err(err).Msg("could not verify last k height")
 	}
