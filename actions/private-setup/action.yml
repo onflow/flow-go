@@ -1,0 +1,29 @@
+name: "Private Build Setup"
+description: "Checks and configures the environment for building private dependencies"
+inputs:
+  cadence_deploy_key:
+    description: "Deploy Key for Private Cadence Repo"
+    required: true
+  go_private_value:
+    description: "The value for GOPRIVATE"
+    required: false
+    default: "github.com/onflow/*-internal"
+runs:
+  using: "composite"
+  steps:
+    - name: Load deploy key
+      uses: webfactory/ssh-agent@v0.5.3
+      with:
+        ssh-private-key: "${{ inputs.cadence_deploy_key }}"
+        known-hosts: "github.com"
+
+    - name: Configure git for SSH
+      shell: bash
+      run: |
+        git config --global url."git@github.com:".insteadOf "https://github.com/"
+
+    - name: Configure GOPRIVATE env  
+      shell: bash
+      run: |
+        echo "GOPRIVATE=${{ inputs.go_private_value }}" >> $GITHUB_ENV
+
