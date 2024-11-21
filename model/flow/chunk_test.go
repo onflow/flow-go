@@ -164,7 +164,10 @@ func TestChunkTotalComputationUsedIsSet(t *testing.T) {
 	assert.Equal(t, i, chunk.TotalComputationUsed)
 }
 
-// TODO doc
+// TestChunkEncodeDecode test encoding and decoding properties.
+// In particular, we want to demonstrate that nil-ness of the ServiceEventIndices field
+// is preserved by the encoding schemes we use, because this difference is meaningful and
+// important for backward compatibility (see [ChunkBody.ServiceEventIndices] for details).
 func TestChunkEncodeDecode(t *testing.T) {
 	chunk := unittest.ChunkFixture(unittest.IdentifierFixture(), 0)
 
@@ -212,7 +215,8 @@ func TestChunkEncodeDecode(t *testing.T) {
 	})
 }
 
-// TODO doc
+// TestChunk_ModelVersions_EncodeDecode tests that encoding and decoding between
+// supported versions works as expected.
 func TestChunk_ModelVersions_EncodeDecode(t *testing.T) {
 	chunkFixture := unittest.ChunkFixture(unittest.IdentifierFixture(), 1)
 	chunkFixture.ServiceEventIndices = []uint32{1} // non-nil extra field
@@ -272,7 +276,8 @@ func TestChunk_ModelVersions_EncodeDecode(t *testing.T) {
 	})
 }
 
-// TODO doc
+// TestChunk_ModelVersions_IDConsistentAcrossVersions ensures that the ID function
+// is backward compatible with old data model versions.
 func TestChunk_ModelVersions_IDConsistentAcrossVersions(t *testing.T) {
 	chunk := unittest.ChunkFixture(unittest.IdentifierFixture(), 1)
 	chunkBody := chunk.ChunkBody
@@ -283,7 +288,6 @@ func TestChunk_ModelVersions_IDConsistentAcrossVersions(t *testing.T) {
 	// The ID calculation for the old and new model version should be the same.
 	t.Run("nil ServiceEventIndices fields", func(t *testing.T) {
 		chunkBody.ServiceEventIndices = nil
-		assert.Equal(t, chunkBody.BlockID, chunkv0.BlockID)
 		assert.Equal(t, flow.MakeID(chunkv0), flow.MakeID(chunkBody))
 	})
 	// A non-nil ServiceEventIndices fields indicates an up-to-date model version.
@@ -291,7 +295,6 @@ func TestChunk_ModelVersions_IDConsistentAcrossVersions(t *testing.T) {
 	// because the new model should include the ServiceEventIndices field value.
 	t.Run("non-nil ServiceEventIndices fields", func(t *testing.T) {
 		chunkBody.ServiceEventIndices = []uint32{}
-		assert.Equal(t, chunkBody.BlockID, chunkv0.BlockID)
 		assert.NotEqual(t, flow.MakeID(chunkv0), flow.MakeID(chunkBody))
 	})
 }

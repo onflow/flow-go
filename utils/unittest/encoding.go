@@ -7,7 +7,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// TODO doc
+// CopyStructure copies public fields of compatible types from src to dst.
 func CopyStructure(t *testing.T, src, dst any) {
 	bz, err := cbor.Marshal(src)
 	require.NoError(t, err)
