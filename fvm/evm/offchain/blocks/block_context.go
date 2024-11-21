@@ -98,6 +98,7 @@ func generateFixedHashes() {
 		testnetFixedHashes[i] = gethCommon.HexToHash(testnetHashes[i])
 	}
 
+	fixedHashes = make(map[flow.ChainID][256]gethCommon.Hash)
 	fixedHashes[flow.Mainnet] = mainnetFixedHashes
 	fixedHashes[flow.Testnet] = testnetFixedHashes
 }
