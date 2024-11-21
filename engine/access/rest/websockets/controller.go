@@ -67,17 +67,24 @@ func (c *Controller) HandleConnection(ctx context.Context) {
 	c.writeMessagesToClient(ctx)
 }
 
-// configureConnection configures the WebSocket connection by setting up a Pong handler
-// to handle incoming Pong messages and update the read deadline accordingly.
+// configureConnection sets up the WebSocket connection with a read deadline
+// and a handler for receiving pong messages from the client.
 //
-// The Pong handler resets the read deadline whenever a Pong message is received from the peer.
-// This mechanism ensures the connection remains active as long as the peer responds to periodic pings.
-//
-// Note: The default value for the read deadline in Gorilla WebSockets is 0, which means
-// no deadline is set unless explicitly configured. Without a read deadline, the connection
-// will remain open indefinitely if the client keeps the connection open without sending any messages unless explicitly
-// closed by either the server or the client.
+// The function does the following:
+//  1. Sets an initial read deadline to ensure the server doesn't wait indefinitely
+//     for a pong message from the client. If no message is received within the
+//     specified `pongWait` duration, the connection will be closed.
+//  2. Establishes a Pong handler that resets the read deadline every time a pong
+//     message is received from the client, allowing the server to continue waiting
+//     for further pong messages within the new deadline.
 func (c *Controller) configureConnection() error {
+	// Set the initial read deadline for the first pong message
+	// The Pong handler itself only resets the read deadline after receiving a Pong.
+	// It doesn't set an initial deadline. The initial read deadline is crucial to prevent the server from waiting
+	// forever if the client doesn't send Pongs.
+	if err := c.conn.SetReadDeadline(time.Now().Add(pongWait)); err != nil {
+		return fmt.Errorf("failed to set the initial read deadline: %w", err)
+	}
 	// Establish a Pong handler which sets the handler for pong messages received from the peer.
 	c.conn.SetPongHandler(func(string) error {
 		return c.conn.SetReadDeadline(time.Now().Add(pongWait))
