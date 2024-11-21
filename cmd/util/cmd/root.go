@@ -41,6 +41,7 @@ import (
 	"github.com/onflow/flow-go/cmd/util/cmd/snapshot"
 	system_addresses "github.com/onflow/flow-go/cmd/util/cmd/system-addresses"
 	truncate_database "github.com/onflow/flow-go/cmd/util/cmd/truncate-database"
+	verify_evm_offchain_replay "github.com/onflow/flow-go/cmd/util/cmd/verify-evm-offchain-replay"
 	"github.com/onflow/flow-go/cmd/util/cmd/version"
 	"github.com/onflow/flow-go/module/profiler"
 )
@@ -126,6 +127,7 @@ func addCommands() {
 	rootCmd.AddCommand(debug_script.Cmd)
 	rootCmd.AddCommand(generate_authorization_fixes.Cmd)
 	rootCmd.AddCommand(evm_state_exporter.Cmd)
+	rootCmd.AddCommand(verify_evm_offchain_replay.Cmd)
 }
 
 func initConfig() {
