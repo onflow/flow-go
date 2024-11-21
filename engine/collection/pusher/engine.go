@@ -4,15 +4,20 @@
 package pusher
 
 import (
+	"context"
+	"errors"
 	"fmt"
 
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/engine"
+	"github.com/onflow/flow-go/engine/common/fifoqueue"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/model/messages"
 	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/module/component"
+	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/channels"
@@ -24,7 +29,6 @@ import (
 // Engine is the collection pusher engine, which provides access to resources
 // held by the collection node.
 type Engine struct {
-	unit         *engine.Unit
 	log          zerolog.Logger
 	engMetrics   module.EngineMetrics
 	colMetrics   module.CollectionMetrics
@@ -33,11 +37,33 @@ type Engine struct {
 	state        protocol.State
 	collections  storage.Collections
 	transactions storage.Transactions
+
+	messageHandler *engine.MessageHandler
+	notifier       engine.Notifier
+	inbound        *fifoqueue.FifoQueue
+
+	component.Component
+	cm *component.ComponentManager
 }
 
+// TODO convert to network.MessageProcessor
+var _ network.Engine = (*Engine)(nil)
+var _ component.Component = (*Engine)(nil)
+
 func New(log zerolog.Logger, net network.EngineRegistry, state protocol.State, engMetrics module.EngineMetrics, colMetrics module.CollectionMetrics, me module.Local, collections storage.Collections, transactions storage.Transactions) (*Engine, error) {
+	// TODO length observer metrics
+	inbound, err := fifoqueue.NewFifoQueue(1000)
+	if err != nil {
+		return nil, fmt.Errorf("could not create inbound fifoqueue: %w", err)
+	}
+
+	notifier := engine.NewNotifier()
+	messageHandler := engine.NewMessageHandler(log, notifier, engine.Pattern{
+		Match: engine.MatchType[*messages.SubmitCollectionGuarantee],
+		Store: &engine.FifoMessageStore{FifoQueue: inbound},
+	})
+
 	e := &Engine{
-		unit:         engine.NewUnit(),
 		log:          log.With().Str("engine", "pusher").Logger(),
 		engMetrics:   engMetrics,
 		colMetrics:   colMetrics,
@@ -45,6 +71,10 @@ func New(log zerolog.Logger, net network.EngineRegistry, state protocol.State, e
 		state:        state,
 		collections:  collections,
 		transactions: transactions,
+
+		messageHandler: messageHandler,
+		notifier:       notifier,
+		inbound:        inbound,
 	}
 
 	conduit, err := net.Register(channels.PushGuarantees, e)
@@ -53,55 +83,86 @@ func New(log zerolog.Logger, net network.EngineRegistry, state protocol.State, e
 	}
 	e.conduit = conduit
 
+	e.cm = component.NewComponentManagerBuilder().
+		AddWorker(e.inboundMessageWorker).
+		Build()
+	e.Component = e.cm
+
 	return e, nil
 }
 
-// Ready returns a ready channel that is closed once the engine has fully
-// started.
-func (e *Engine) Ready() <-chan struct{} {
-	return e.unit.Ready()
+func (e *Engine) inboundMessageWorker(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
+	ready()
+
+	done := ctx.Done()
+	wake := e.notifier.Channel()
+	for {
+		select {
+		case <-done:
+			return
+		case <-wake:
+			e.processInboundMessages(ctx)
+		}
+	}
 }
 
-// Done returns a done channel that is closed once the engine has fully stopped.
-func (e *Engine) Done() <-chan struct{} {
-	return e.unit.Done()
+func (e *Engine) processInboundMessages(ctx context.Context) {
+	for {
+		nextMessage, ok := e.inbound.Pop()
+		if !ok {
+			return
+		}
+
+		asEngineWrapper := nextMessage.(*engine.Message)
+		asSCGMsg := asEngineWrapper.Payload.(*messages.SubmitCollectionGuarantee)
+		originID := asEngineWrapper.OriginID
+
+		_ = e.process(originID, asSCGMsg)
+
+		select {
+		case <-ctx.Done():
+			return
+		default:
+		}
+	}
 }
 
 // SubmitLocal submits an event originating on the local node.
 func (e *Engine) SubmitLocal(event interface{}) {
-	e.unit.Launch(func() {
-		err := e.process(e.me.NodeID(), event)
-		if err != nil {
-			engine.LogError(e.log, err)
-		}
-	})
+	err := e.messageHandler.Process(e.me.NodeID(), event)
+	if err != nil {
+		engine.LogError(e.log, err)
+	}
 }
 
 // Submit submits the given event from the node with the given origin ID
 // for processing in a non-blocking manner. It returns instantly and logs
 // a potential processing error internally when done.
 func (e *Engine) Submit(channel channels.Channel, originID flow.Identifier, event interface{}) {
-	e.unit.Launch(func() {
-		err := e.process(originID, event)
-		if err != nil {
-			engine.LogError(e.log, err)
-		}
-	})
+	err := e.messageHandler.Process(originID, event)
+	if err != nil {
+		engine.LogError(e.log, err)
+	}
 }
 
 // ProcessLocal processes an event originating on the local node.
 func (e *Engine) ProcessLocal(event interface{}) error {
-	return e.unit.Do(func() error {
-		return e.process(e.me.NodeID(), event)
-	})
+	return e.messageHandler.Process(e.me.NodeID(), event)
 }
 
 // Process processes the given event from the node with the given origin ID in
 // a blocking manner. It returns the potential processing error when done.
-func (e *Engine) Process(channel channels.Channel, originID flow.Identifier, event interface{}) error {
-	return e.unit.Do(func() error {
-		return e.process(originID, event)
-	})
+func (e *Engine) Process(channel channels.Channel, originID flow.Identifier, message any) error {
+	err := e.messageHandler.Process(originID, message)
+	if err != nil {
+		if errors.Is(err, engine.IncompatibleInputTypeError) {
+			e.log.Warn().Bool(logging.KeySuspicious, true).Msgf("%v delivered unsupported message %T through %v", originID, message, channel)
+			return nil
+		}
+		// TODO add comment about Process errors...
+		return fmt.Errorf("unexpected failure to process inbound pusher message")
+	}
+	return nil
 }
 
 // process processes events for the pusher engine on the collection node.
