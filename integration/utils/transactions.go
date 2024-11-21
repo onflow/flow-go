@@ -24,6 +24,9 @@ var createAndSetupNodeTxScript string
 //go:embed templates/remove-node.cdc
 var removeNodeTxScript string
 
+//go:embed "templates/set-protocol-state-version.cdc"
+var setProtocolStateVersionScript string
+
 func LocalnetEnv() templates.Environment {
 	return templates.Environment{
 		EpochAddress:             "f8d6e0586b0a20c7",
@@ -194,7 +197,7 @@ func MakeSetProtocolStateVersionTx(
 	accountKey := adminAccount.Keys[adminAccountKeyID]
 
 	tx := sdk.NewTransaction().
-		SetScript(templates.GenerateSetProtocolStateVersionScript(env)).
+		SetScript([]byte(templates.ReplaceAddresses(setProtocolStateVersionScript, env))).
 		SetComputeLimit(9999).
 		SetReferenceBlockID(latestBlockID).
 		SetProposalKey(adminAccount.Address, adminAccountKeyID, accountKey.SequenceNumber).
