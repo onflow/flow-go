@@ -83,7 +83,6 @@ func (er ExecutionResult) SystemChunk() *Chunk {
 }
 
 // ServiceEventsByChunk returns the list of service events emitted during the given chunk.
-// TODO test
 func (er ExecutionResult) ServiceEventsByChunk(chunkIndex uint64) ServiceEventList {
 	indices := er.Chunks[chunkIndex].ServiceEventIndices
 	// CASE 1: Service event indices are specified (non-nil)
