@@ -98,6 +98,14 @@ func (c *Controller) writeMessagesToClient(ctx context.Context) {
 		case msg := <-c.communicationChannel:
 			// TODO: handle 'response per second' limits
 
+			// Specifies a timeout for the write operation. If the write
+			// isn't completed within this duration, it fails with a timeout error.
+			// SetWriteDeadline ensures the write operation does not block indefinitely
+			// if the client is slow or unresponsive. This prevents resource exhaustion
+			// and allows the server to gracefully handle timeouts for delayed writes.
+			if err := c.conn.SetWriteDeadline(time.Now().Add(writeWait)); err != nil {
+				c.logger.Error().Err(err).Msg("failed to set the write deadline")
+			}
 			err := c.conn.WriteJSON(msg)
 			if err != nil {
 				c.logger.Error().Err(err).Msg("error writing to connection")
