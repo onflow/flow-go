@@ -65,14 +65,19 @@ func NewBlockContext(
 }
 
 // TODO: HCU not done yet
+// PR: https://github.com/onflow/flow-go/pull/6734
 const blockHashListFixHCUEVMHeightMainnet = 0
 
 // Testnet52 - Height Coordinated Upgrade 4, Nov 20, 2024
 // Flow Block: 228025500 7eb808b77f02c3e77c36d57dc893ed63adc5ff6113bb0f4b141bb39e44d634e6
+// PR: https://github.com/onflow/flow-go/pull/6734
 const blockHashListFixHCUEVMHeightTestnet = 16848829
 
-// TODO: HCU name and date
-const coinbaseAddressChangeEVMHeightTestnet = 1385490
+// Testnet51 - Height Coordinated Upgrade 1
+// Flow Block: 212562161 1a520608c5457f228405c4c30fc39c8a0af7cf915fb2ede7ec5ccffc2a000f57
+// PR: https://github.com/onflow/flow-go/pull/6380
+// TODO: should this be 1385490?
+const coinbaseAddressChangeEVMHeightTestnet = 1385491
 
 var oldCoinbaseAddressTestnet = types.Address(gethCommon.HexToAddress("0000000000000000000000021169100eecb7c1a6"))
 
