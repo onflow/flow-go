@@ -2,7 +2,6 @@ package utils_test
 
 import (
 	"bufio"
-	"encoding/gob"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
@@ -114,9 +113,9 @@ func initStorageWithEVMStateGob(t *testing.T, chainID flow.ChainID, evmStateGob 
 	}
 
 	valueFileName, allocatorFileName := evmStateGobFileNamesByEndHeight(evmStateGob, evmStateEndHeight)
-	values, err := deserialize(valueFileName)
+	values, err := DeserializeState(valueFileName)
 	require.NoError(t, err)
-	allocators, err := deserializeAllocator(allocatorFileName)
+	allocators, err := DeserializeAllocator(allocatorFileName)
 	require.NoError(t, err)
 	store := GetSimpleValueStorePopulated(values, allocators)
 	return store, evmStateEndHeight
@@ -190,8 +189,8 @@ func dumpEVMStateToGobFiles(t *testing.T, store *TestValueStore, dir string, evm
 	valuesFileName, allocatorsFileName := evmStateGobFileNamesByEndHeight(dir, evmStateEndHeight)
 	values, allocators := store.Dump()
 
-	require.NoError(t, serialize(valuesFileName, values))
-	require.NoError(t, serializeAllocator(allocatorsFileName, allocators))
+	require.NoError(t, SerializeState(valuesFileName, values))
+	require.NoError(t, SerializeAllocator(allocatorsFileName, allocators))
 	return valuesFileName, allocatorsFileName
 }
 
@@ -243,86 +242,4 @@ func scanEventFilesAndRun(
 	if err := scanner.Err(); err != nil {
 		t.Fatal(err)
 	}
-}
-
-// Serialize function: saves map data to a file
-func serialize(filename string, data map[string][]byte) error {
-	// Create a file to save data
-	file, err := os.Create(filename)
-	if err != nil {
-		return err
-	}
-	defer file.Close()
-
-	// Use gob to encode data
-	encoder := gob.NewEncoder(file)
-	err = encoder.Encode(data)
-	if err != nil {
-		return err
-	}
-
-	return nil
-}
-
-// Deserialize function: reads map data from a file
-func deserialize(filename string) (map[string][]byte, error) {
-	// Open the file for reading
-	file, err := os.Open(filename)
-	if err != nil {
-		return nil, err
-	}
-	defer file.Close()
-
-	// Prepare the map to store decoded data
-	var data map[string][]byte
-
-	// Use gob to decode data
-	decoder := gob.NewDecoder(file)
-	err = decoder.Decode(&data)
-	if err != nil {
-		return nil, err
-	}
-
-	return data, nil
-}
-
-// Serialize function: saves map data to a file
-func serializeAllocator(filename string, data map[string]uint64) error {
-	// Create a file to save data
-	file, err := os.Create(filename)
-	if err != nil {
-		return err
-	}
-	defer file.Close()
-
-	// Use gob to encode data
-	encoder := gob.NewEncoder(file)
-	err = encoder.Encode(data)
-	if err != nil {
-		return err
-	}
-
-	return nil
-}
-
-// Deserialize function: reads map data from a file
-func deserializeAllocator(filename string) (map[string]uint64, error) {
-	// Open the file for reading
-	file, err := os.Open(filename)
-	if err != nil {
-		return nil, err
-	}
-	defer file.Close()
-
-	// Prepare the map to store decoded data
-	var data map[string]uint64
-
-	// Use gob to decode data
-	decoder := gob.NewDecoder(file)
-	err = decoder.Decode(&data)
-	if err != nil {
-		return nil, err
-	}
-
-	return data, nil
 }
