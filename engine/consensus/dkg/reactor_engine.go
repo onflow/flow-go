@@ -319,7 +319,7 @@ func (e *ReactorEngine) handleEpochCommittedPhaseStarted(currentEpochCounter uin
 			Str("computed_beacon_pub_key", localPubKey.String()).
 			Str("canonical_beacon_pub_key", nextDKGPubKey.String()).
 			Msg("checking beacon key consistency: locally computed beacon public key does not match beacon public key for next epoch")
-		err := e.dkgState.SetDKGState(nextEpochCounter, flow.DKGStateNoKey)
+		err := e.dkgState.SetDKGState(nextEpochCounter, flow.DKGStateInconsistentKey)
 		if err != nil {
 			// TODO use irrecoverable context
 			log.Fatal().Err(err).Msg("failed to set dkg end state")
