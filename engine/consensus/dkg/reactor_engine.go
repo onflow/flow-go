@@ -154,24 +154,27 @@ func (e *ReactorEngine) startDKGForEpoch(currentEpochCounter uint64, first *flow
 		Hex("first_block_id", firstID[:]).        // id of first block in EpochSetup phase
 		Logger()
 
-	// if we have started the dkg for this epoch already, exit
-	started, err := e.dkgState.GetDKGStarted(nextEpochCounter)
+	// if we have dkgState the dkg for this epoch already, exit
+	dkgState, err := e.dkgState.GetDKGEndState(nextEpochCounter)
 	if err != nil {
-		// unexpected storage-level error
-		// TODO use irrecoverable context
-		log.Fatal().Err(err).Msg("could not check whether DKG is started")
-	}
-	if started {
-		log.Warn().Msg("DKG started before, skipping starting the DKG for this epoch")
+		if !errors.Is(err, storage.ErrNotFound) {
+			// unexpected storage-level error
+			// TODO use irrecoverable context
+			log.Fatal().Err(err).Msg("could not check whether DKG is dkgState")
+		}
+
+		// there is no dkgState for this epoch, continue
+	} else {
+		log.Warn().Msgf("DKG started before, skipping starting the DKG for this epoch, current state: %s", dkgState)
 		return
 	}
 
 	// flag that we are starting the dkg for this epoch
-	err = e.dkgState.SetDKGStarted(nextEpochCounter)
+	err = e.dkgState.SetDKGEndState(nextEpochCounter, flow.DKGStateStarted)
 	if err != nil {
 		// unexpected storage-level error
 		// TODO use irrecoverable context
-		log.Fatal().Err(err).Msg("could not set dkg started")
+		log.Fatal().Err(err).Msg("could not set dkg dkgState")
 	}
 
 	curDKGInfo, err := e.getDKGInfo(firstID)
@@ -289,10 +292,10 @@ func (e *ReactorEngine) handleEpochCommittedPhaseStarted(currentEpochCounter uin
 		return
 	}
 
-	myBeaconPrivKey, err := e.dkgState.RetrieveMyBeaconPrivateKey(nextEpochCounter)
+	myBeaconPrivKey, err := e.dkgState.UnsafeRetrieveMyBeaconPrivateKey(nextEpochCounter)
 	if errors.Is(err, storage.ErrNotFound) {
 		log.Warn().Msg("checking beacon key consistency: no key found")
-		err := e.dkgState.SetDKGEndState(nextEpochCounter, flow.DKGEndStateNoKey)
+		err := e.dkgState.SetDKGEndState(nextEpochCounter, flow.DKGStateNoKey)
 		if err != nil {
 			// TODO use irrecoverable context
 			log.Fatal().Err(err).Msg("failed to set dkg end state")
@@ -319,7 +322,7 @@ func (e *ReactorEngine) handleEpochCommittedPhaseStarted(currentEpochCounter uin
 			Str("computed_beacon_pub_key", localPubKey.String()).
 			Str("canonical_beacon_pub_key", nextDKGPubKey.String()).
 			Msg("checking beacon key consistency: locally computed beacon public key does not match beacon public key for next epoch")
-		err := e.dkgState.SetDKGEndState(nextEpochCounter, flow.DKGEndStateInconsistentKey)
+		err := e.dkgState.SetDKGEndState(nextEpochCounter, flow.DKGStateNoKey)
 		if err != nil {
 			// TODO use irrecoverable context
 			log.Fatal().Err(err).Msg("failed to set dkg end state")
@@ -327,7 +330,7 @@ func (e *ReactorEngine) handleEpochCommittedPhaseStarted(currentEpochCounter uin
 		return
 	}
 
-	err = e.dkgState.SetDKGEndState(nextEpochCounter, flow.DKGEndStateSuccess)
+	err = e.dkgState.SetDKGEndState(nextEpochCounter, flow.DKGStateSuccess)
 	if err != nil {
 		// TODO use irrecoverable context
 		e.log.Fatal().Err(err).Msg("failed to set dkg end state")
@@ -427,10 +430,10 @@ func (e *ReactorEngine) end(nextEpochCounter uint64) func() error {
 			// has already abandoned the happy path, because on the happy path the ReactorEngine is the only writer.
 			// Then this function just stops and returns without error.
 			e.log.Warn().Err(err).Msgf("node %s with index %d failed DKG locally", e.me.NodeID(), e.controller.GetIndex())
-			err := e.dkgState.SetDKGEndState(nextEpochCounter, flow.DKGEndStateDKGFailure)
+			err := e.dkgState.SetDKGEndState(nextEpochCounter, flow.DKGStateDKGFailure)
 			if err != nil {
 				if errors.Is(err, storage.ErrAlreadyExists) {
-					return nil // DKGEndState already being set is expected in case of epoch recovery
+					return nil // DKGState already being set is expected in case of epoch recovery
 				}
 				return fmt.Errorf("failed to set dkg end state following dkg end error: %w", err)
 			}

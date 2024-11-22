@@ -266,7 +266,7 @@ type ReactorEngineSuite_CommittedPhase struct {
 	epochCounter         uint64            // current epoch counter
 	myLocalBeaconKey     crypto.PrivateKey // my locally computed beacon key
 	myGlobalBeaconPubKey crypto.PublicKey  // my public key, as dictated by global DKG
-	dkgEndState          flow.DKGEndState  // backend for DGKState.
+	dkgEndState          flow.DKGState     // backend for DGKState.
 	firstBlock           *flow.Header      // first block of EpochCommitted phase
 	warnsLogged          int               // count # of warn-level logs
 
@@ -313,12 +313,12 @@ func (suite *ReactorEngineSuite_CommittedPhase) SetupTest() {
 	suite.dkgState.On("SetDKGEndState", suite.NextEpochCounter(), mock.Anything).
 		Run(func(args mock.Arguments) {
 			assert.Equal(suite.T(), flow.DKGEndStateUnknown, suite.dkgEndState) // must be unset
-			endState := args[1].(flow.DKGEndState)
+			endState := args[1].(flow.DKGState)
 			suite.dkgEndState = endState
 		}).
 		Return(nil)
 	suite.dkgState.On("GetDKGEndState", suite.NextEpochCounter()).Return(
-		func(_ uint64) flow.DKGEndState { return suite.dkgEndState },
+		func(_ uint64) flow.DKGState { return suite.dkgEndState },
 		func(_ uint64) error {
 			if suite.dkgEndState == flow.DKGEndStateUnknown {
 				return storerr.ErrNotFound
