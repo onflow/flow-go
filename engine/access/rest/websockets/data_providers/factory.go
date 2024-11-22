@@ -3,12 +3,12 @@ package data_providers
 import (
 	"context"
 	"fmt"
-	"github.com/onflow/flow-go/model/flow"
 
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/access"
 	"github.com/onflow/flow-go/engine/access/state_stream"
+	"github.com/onflow/flow-go/model/flow"
 )
 
 // Constants defining various topic names used to specify different types of
@@ -59,12 +59,14 @@ func NewDataProviderFactory(
 	logger zerolog.Logger,
 	stateStreamApi state_stream.API,
 	accessApi access.API,
+	chain flow.Chain,
 	eventFilterConfig state_stream.EventFilterConfig,
 ) *DataProviderFactoryImpl {
 	return &DataProviderFactoryImpl{
 		logger:            logger,
 		stateStreamApi:    stateStreamApi,
 		accessApi:         accessApi,
+		chain:             chain,
 		eventFilterConfig: eventFilterConfig,
 	}
 }

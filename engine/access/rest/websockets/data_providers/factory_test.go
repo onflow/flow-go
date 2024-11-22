@@ -10,6 +10,7 @@ import (
 
 	accessmock "github.com/onflow/flow-go/access/mock"
 	"github.com/onflow/flow-go/engine/access/rest/common/parser"
+	"github.com/onflow/flow-go/engine/access/state_stream"
 	statestreammock "github.com/onflow/flow-go/engine/access/state_stream/mock"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -42,7 +43,9 @@ func (s *DataProviderFactorySuite) SetupTest() {
 	s.ctx = context.Background()
 	s.ch = make(chan interface{})
 
-	s.factory = NewDataProviderFactory(log, s.stateStreamApi, s.accessApi)
+	chain := flow.Testnet.Chain()
+
+	s.factory = NewDataProviderFactory(log, s.stateStreamApi, s.accessApi, chain, state_stream.DefaultEventFilterConfig)
 	s.Require().NotNil(s.factory)
 }
 
