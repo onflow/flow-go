@@ -1,6 +1,7 @@
 package badger
 
 import (
+	"errors"
 	"fmt"
 	"golang.org/x/exp/slices"
 
@@ -25,6 +26,7 @@ var allowedStateTransitions = map[flow.DKGState][]flow.DKGState{
 	flow.DKGStateDKGFailure:       {flow.RandomBeaconKeyRecovered},
 	flow.DKGStateInconsistentKey:  {flow.RandomBeaconKeyRecovered},
 	flow.DKGStateNoKey:            {flow.RandomBeaconKeyRecovered},
+	flow.DKGStateUnknown:          {flow.DKGStateStarted, flow.DKGStateNoKey, flow.DKGStateDKGFailure, flow.DKGStateInconsistentKey, flow.RandomBeaconKeyRecovered},
 }
 
 // RecoverablePrivateBeaconKeyState stores state information about in-progress and completed DKGs, including
@@ -141,7 +143,11 @@ func (ds *RecoverablePrivateBeaconKeyState) processStateTransition(epochCounter 
 		var currentState flow.DKGState
 		err := operation.RetrieveDKGEndStateForEpoch(epochCounter, &currentState)(tx.DBTxn)
 		if err != nil {
-			return fmt.Errorf("could not retrieve current state for epoch %d: %w", epochCounter, err)
+			if errors.Is(err, storage.ErrNotFound) {
+				currentState = flow.DKGStateUnknown
+			} else {
+				return fmt.Errorf("could not retrieve current state for epoch %d: %w", epochCounter, err)
+			}
 		}
 
 		allowedStates := allowedStateTransitions[currentState]
