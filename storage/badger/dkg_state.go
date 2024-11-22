@@ -120,13 +120,13 @@ func (ds *RecoverablePrivateBeaconKeyState) GetDKGStarted(epochCounter uint64) (
 }
 
 // SetDKGEndState stores that the DKG has ended, and its end state.
-func (ds *RecoverablePrivateBeaconKeyState) SetDKGEndState(epochCounter uint64, endState flow.DKGEndState) error {
+func (ds *RecoverablePrivateBeaconKeyState) SetDKGEndState(epochCounter uint64, endState flow.DKGState) error {
 	return ds.db.Update(operation.InsertDKGEndStateForEpoch(epochCounter, endState))
 }
 
 // GetDKGEndState retrieves the DKG end state for the epoch.
-func (ds *RecoverablePrivateBeaconKeyState) GetDKGEndState(epochCounter uint64) (flow.DKGEndState, error) {
-	var endState flow.DKGEndState
+func (ds *RecoverablePrivateBeaconKeyState) GetDKGEndState(epochCounter uint64) (flow.DKGState, error) {
+	var endState flow.DKGState
 	err := ds.db.Update(operation.RetrieveDKGEndStateForEpoch(epochCounter, &endState))
 	return endState, err
 }
@@ -144,7 +144,7 @@ func (ds *RecoverablePrivateBeaconKeyState) RetrieveMyBeaconPrivateKey(epochCoun
 	err = ds.db.View(func(txn *badger.Txn) error {
 
 		// retrieve the end state
-		var endState flow.DKGEndState
+		var endState flow.DKGState
 		err = operation.RetrieveDKGEndStateForEpoch(epochCounter, &endState)(txn)
 		if err != nil {
 			key = nil
@@ -178,7 +178,7 @@ func (ds *RecoverablePrivateBeaconKeyState) RetrieveMyBeaconPrivateKey(epochCoun
 
 // UpsertMyBeaconPrivateKey overwrites the random beacon private key for the epoch that recovers the protocol from
 // Epoch Fallback Mode. Effectively, this function overwrites whatever might be available in the database with
-// the given private key and sets the DKGEndState to `flow.DKGEndStateRecovered`.
+// the given private key and sets the DKGState to `flow.DKGEndStateRecovered`.
 // No errors are expected during normal operations.
 func (ds *RecoverablePrivateBeaconKeyState) UpsertMyBeaconPrivateKey(epochCounter uint64, key crypto.PrivateKey) error {
 	if key == nil {

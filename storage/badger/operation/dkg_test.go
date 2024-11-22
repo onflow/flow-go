@@ -88,7 +88,7 @@ func TestDKGEndStateForEpoch(t *testing.T) {
 		assert.NoError(t, err)
 
 		// should be able to read end state
-		var readEndState flow.DKGEndState
+		var readEndState flow.DKGState
 		err = db.View(RetrieveDKGEndStateForEpoch(epochCounter, &readEndState))
 		assert.NoError(t, err)
 		assert.Equal(t, endState, readEndState)

@@ -69,7 +69,7 @@ func RetrieveDKGStartedForEpoch(epochCounter uint64, started *bool) func(*badger
 
 // InsertDKGEndStateForEpoch stores the DKG end state for the epoch.
 // Error returns: storage.ErrAlreadyExists
-func InsertDKGEndStateForEpoch(epochCounter uint64, endState flow.DKGEndState) func(*badger.Txn) error {
+func InsertDKGEndStateForEpoch(epochCounter uint64, endState flow.DKGState) func(*badger.Txn) error {
 	return insert(makePrefix(codeDKGEnded, epochCounter), endState)
 }
 
@@ -77,12 +77,12 @@ func InsertDKGEndStateForEpoch(epochCounter uint64, endState flow.DKGEndState) f
 // the given epoch counter already exists in the database or not.
 // CAUTION: this method has to be used only in the very specific edge-cases of epoch recovery. For storing the
 // DKG results obtained on the happy-path, please use method `InsertDKGEndStateForEpoch`.
-func UpsertDKGEndStateForEpoch(epochCounter uint64, endState flow.DKGEndState) func(*badger.Txn) error {
+func UpsertDKGEndStateForEpoch(epochCounter uint64, endState flow.DKGState) func(*badger.Txn) error {
 	return upsert(makePrefix(codeDKGEnded, epochCounter), endState)
 }
 
 // RetrieveDKGEndStateForEpoch retrieves the DKG end state for the epoch.
 // Error returns: storage.ErrNotFound
-func RetrieveDKGEndStateForEpoch(epochCounter uint64, endState *flow.DKGEndState) func(*badger.Txn) error {
+func RetrieveDKGEndStateForEpoch(epochCounter uint64, endState *flow.DKGState) func(*badger.Txn) error {
 	return retrieve(makePrefix(codeDKGEnded, epochCounter), endState)
 }

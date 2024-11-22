@@ -25,13 +25,9 @@ type SafeBeaconKeys interface {
 type DKGStateReader interface {
 	SafeBeaconKeys
 
-	// GetDKGStarted checks whether the DKG has been started for the given epoch.
-	// No errors expected during normal operation.
-	GetDKGStarted(epochCounter uint64) (bool, error)
-
 	// GetDKGEndState retrieves the end state for the given DKG.
 	// Error returns: storage.ErrNotFound
-	GetDKGEndState(epochCounter uint64) (flow.DKGEndState, error)
+	GetDKGEndState(epochCounter uint64) (flow.DKGState, error)
 
 	// UnsafeRetrieveMyBeaconPrivateKey retrieves the random beacon private key for an epoch.
 	//
@@ -48,13 +44,9 @@ type DKGStateReader interface {
 type DKGState interface {
 	DKGStateReader
 
-	// SetDKGStarted sets the flag indicating the DKG has started for the given epoch.
-	// Error returns: storage.ErrAlreadyExists
-	SetDKGStarted(epochCounter uint64) error
-
 	// SetDKGEndState stores that the DKG has ended, and its end state.
 	// Error returns: storage.ErrAlreadyExists
-	SetDKGEndState(epochCounter uint64, endState flow.DKGEndState) error
+	SetDKGEndState(epochCounter uint64, endState flow.DKGState) error
 
 	// InsertMyBeaconPrivateKey stores the random beacon private key for an epoch.
 	//
