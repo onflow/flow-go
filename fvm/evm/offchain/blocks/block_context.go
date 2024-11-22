@@ -26,7 +26,7 @@ func NewBlockContext(
 	// coinbase address fix
 	miner := types.CoinbaseAddress
 	if chainID == flow.Testnet && height < coinbaseAddressChangeEVMHeightTestnet {
-		miner = oldCoinbaseAddressTestnet
+		miner = genesisCoinbaseAddressTestnet
 	}
 
 	return types.BlockContext{
@@ -36,27 +36,27 @@ func NewBlockContext(
 		DirectCallBaseGasUsage: types.DefaultDirectCallBaseGasUsage,
 		DirectCallGasPrice:     types.DefaultDirectCallGasPrice,
 		GasFeeCollector:        miner,
-		GetHashFunc: func(n uint64) gethCommon.Hash {
+		GetHashFunc: func(hashHeight uint64) gethCommon.Hash {
 			// For block heights greater than or equal to the current,
 			// return an empty block hash.
-			if n >= height {
+			if hashHeight >= height {
 				return gethCommon.Hash{}
 			}
 			// If the given block height, is more than 256 blocks
 			// in the past, return an empty block hash.
-			if height-n > 256 {
+			if height-hashHeight > 256 {
 				return gethCommon.Hash{}
 			}
 
 			// For testnet & mainnet, we fetch the block hash from the hard-coded
 			// array of hashes.
-			if chainID == flow.Mainnet && height < blockHashListFixHCUEVMHeightMainnet {
-				return fixedHashes[flow.Mainnet][height%256]
-			} else if chainID == flow.Testnet && height < blockHashListFixHCUEVMHeightTestnet {
-				return fixedHashes[flow.Testnet][height%256]
+			if chainID == flow.Mainnet && hashHeight < blockHashListFixHCUEVMHeightMainnet {
+				return fixedHashes[flow.Mainnet][hashHeight%256]
+			} else if chainID == flow.Testnet && blockHashListBugIntroducedHCUEVMHeightTestnet <= hashHeight && hashHeight < blockHashListFixHCUEVMHeightTestnet {
+				return fixedHashes[flow.Testnet][hashHeight%256]
 			}
 
-			return getHashByHeight(n)
+			return getHashByHeight(hashHeight)
 
 		},
 		Random: prevRandao,
@@ -74,13 +74,17 @@ const blockHashListFixHCUEVMHeightMainnet = 8357079
 // PR: https://github.com/onflow/flow-go/pull/6734
 const blockHashListFixHCUEVMHeightTestnet = 16848829
 
+// Testnet52 - Spork
+// Flow Block: 218215350 cc7188f0bdac4c442cc3ee072557d7f7c8ca4462537da945b148d5d0efa7a1ff
+// PR: https://github.com/onflow/flow-go/pull/6377
+const blockHashListBugIntroducedHCUEVMHeightTestnet = 7038679
+
 // Testnet51 - Height Coordinated Upgrade 1
 // Flow Block: 212562161 1a520608c5457f228405c4c30fc39c8a0af7cf915fb2ede7ec5ccffc2a000f57
 // PR: https://github.com/onflow/flow-go/pull/6380
-// TODO: should this be 1385490?
 const coinbaseAddressChangeEVMHeightTestnet = 1385491
 
-var oldCoinbaseAddressTestnet = types.Address(gethCommon.HexToAddress("0000000000000000000000021169100eecb7c1a6"))
+var genesisCoinbaseAddressTestnet = types.Address(gethCommon.HexToAddress("0000000000000000000000021169100eecb7c1a6"))
 
 var fixedHashes map[flow.ChainID][256]gethCommon.Hash
 
