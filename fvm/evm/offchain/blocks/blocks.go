@@ -117,7 +117,7 @@ func (b *Blocks) BlockContext() (types.BlockContext, error) {
 			if err != nil {
 				panic(err)
 			}
-			return hash
+			return UseFixedHashList(b.chainID, bm.Height, n, hash)
 		},
 		bm.Random,
 		nil,

@@ -13,6 +13,7 @@ import (
 // a OnBlockReceived call before block execution and
 // a follow up OnBlockExecuted call after block execution.
 type BasicProvider struct {
+	chainID            flow.ChainID
 	blks               *Blocks
 	latestBlockPayload *events.BlockEventPayload
 }
@@ -28,7 +29,7 @@ func NewBasicProvider(
 	if err != nil {
 		return nil, err
 	}
-	return &BasicProvider{blks: blks}, nil
+	return &BasicProvider{chainID: chainID, blks: blks}, nil
 }
 
 // GetSnapshotAt returns a block snapshot at the given height
@@ -67,8 +68,12 @@ func (p *BasicProvider) OnBlockExecuted(
 	if p.latestBlockPayload.Height != height {
 		return fmt.Errorf("active block height doesn't match expected: %d, got: %d", p.latestBlockPayload.Height, height)
 	}
+
+	correctHash := p.latestBlockPayload.Hash
+	storedBlockHash := UseFixedHashList(p.chainID, height, height, correctHash)
+
 	return p.blks.PushBlockHash(
 		p.latestBlockPayload.Height,
-		p.latestBlockPayload.Hash,
+		storedBlockHash,
 	)
 }
