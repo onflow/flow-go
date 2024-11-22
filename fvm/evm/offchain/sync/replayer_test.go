@@ -169,7 +169,7 @@ func TestChainReplay(t *testing.T) {
 
 						require.Len(t, results, totalTxCount)
 
-						proposal := blocks.ReconstructProposal(blockEventPayload, txEventPayloads, results)
+						proposal := blocks.ReconstructProposal(blockEventPayload, results)
 
 						err = bp.OnBlockExecuted(blockEventPayload.Height, res, proposal)
 						require.NoError(t, err)

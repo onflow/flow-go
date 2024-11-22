@@ -7,18 +7,14 @@ import (
 
 func ReconstructProposal(
 	blockEvent *events.BlockEventPayload,
-	txEvents []events.TransactionEventPayload,
 	results []*types.Result,
 ) *types.BlockProposal {
 	receipts := make([]types.LightReceipt, 0, len(results))
+	txHashes := make(types.TransactionHashes, 0, len(results))
 
 	for _, result := range results {
 		receipts = append(receipts, *result.LightReceipt())
-	}
-
-	txHashes := make(types.TransactionHashes, 0, len(txEvents))
-	for _, tx := range txEvents {
-		txHashes = append(txHashes, tx.Hash)
+		txHashes = append(txHashes, result.TxHash)
 	}
 
 	return &types.BlockProposal{
