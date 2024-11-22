@@ -25,6 +25,16 @@ import (
 	"github.com/onflow/flow-go/storage"
 )
 
+// EVM Root Height is the first block that has EVM Block Event where the EVM block height is 1
+func isEVMRootHeight(chainID flow.ChainID, flowHeight uint64) bool {
+	if chainID == flow.Testnet {
+		return flowHeight == 211176671
+	} else if chainID == flow.Mainnet {
+		return flowHeight == 85981136
+	}
+	return flowHeight == 1
+}
+
 func OffchainReplayBackwardCompatibilityTest(
 	log zerolog.Logger,
 	chainID flow.ChainID,
@@ -42,6 +52,14 @@ func OffchainReplayBackwardCompatibilityTest(
 	bp, err := blocks.NewBasicProvider(chainID, bpStorage, rootAddr)
 	if err != nil {
 		return err
+	}
+
+	// setup account status at EVM root block
+	if isEVMRootHeight(chainID, flowStartHeight) {
+		err = bpStorage.SetValue(rootAddr[:], []byte(flow.AccountStatusKey), environment.NewAccountStatus().ToBytes())
+		if err != nil {
+			return err
+		}
 	}
 
 	for height := flowStartHeight; height <= flowEndHeight; height++ {
@@ -87,7 +105,7 @@ func OffchainReplayBackwardCompatibilityTest(
 			}
 		}
 
-		// parse events
+		// parse EVM events
 		evmBlockEvent, evmTxEvents, err := parseEVMEvents(events)
 		if err != nil {
 			return err
@@ -107,7 +125,7 @@ func OffchainReplayBackwardCompatibilityTest(
 
 		actualUpdates := make(map[flow.RegisterID]flow.RegisterValue, len(expectedUpdates))
 
-		// commit all changes
+		// commit all register changes from the EVM state transition
 		for k, v := range res.StorageRegisterUpdates() {
 			err = store.SetValue([]byte(k.Owner), []byte(k.Key), v)
 			if err != nil {
@@ -117,14 +135,15 @@ func OffchainReplayBackwardCompatibilityTest(
 			actualUpdates[k] = v
 		}
 
-		blockProposal := blocks.ReconstructProposal(evmBlockEvent, evmTxEvents, results)
+		blockProposal := blocks.ReconstructProposal(evmBlockEvent, results)
 
 		err = bp.OnBlockExecuted(evmBlockEvent.Height, res, blockProposal)
 		if err != nil {
 			return err
 		}
 
-		// verify and commit all block hash list changes
+		// commit all register changes from non-EVM state transition, such
+		// as block hash list changes
 		for k, v := range bpStorage.StorageRegisterUpdates() {
 			// verify the block hash list changes are included in the trie update
 

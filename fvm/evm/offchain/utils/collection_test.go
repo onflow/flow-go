@@ -156,7 +156,7 @@ func replayEvents(
 				require.NoError(t, err)
 			}
 
-			proposal := blocks.ReconstructProposal(blockEventPayload, txEvents, results)
+			proposal := blocks.ReconstructProposal(blockEventPayload, results)
 
 			err = bp.OnBlockExecuted(blockEventPayload.Height, res, proposal)
 			require.NoError(t, err)
