@@ -45,13 +45,13 @@ func NewBlockHeadersDataProvider(
 		return nil, fmt.Errorf("invalid arguments: %w", err)
 	}
 
-	context, cancel := context.WithCancel(ctx)
+	ctx, cancel := context.WithCancel(ctx)
 
 	p.BaseDataProviderImpl = NewBaseDataProviderImpl(
 		topic,
 		cancel,
 		send,
-		p.createSubscription(context), // Set up a subscription to block headers based on arguments.
+		p.createSubscription(ctx), // Set up a subscription to block headers based on arguments.
 	)
 
 	return p, nil

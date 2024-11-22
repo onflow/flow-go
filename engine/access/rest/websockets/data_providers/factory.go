@@ -21,9 +21,9 @@ const (
 	TransactionStatusesTopic = "transaction_statuses"
 )
 
-// DataProviderFactory is responsible for creating data providers based on the
-// requested topic. It manages access to logging, state stream configuration,
-// and relevant APIs needed to retrieve data.
+// DataProviderFactory defines an interface for creating data providers
+// based on specified topics. The factory abstracts the creation process
+// and ensures consistent access to required APIs.
 type DataProviderFactory interface {
 	// NewDataProvider creates a new data provider based on the specified topic
 	// and configuration parameters.
@@ -34,9 +34,9 @@ type DataProviderFactory interface {
 
 var _ DataProviderFactory = (*DataProviderFactoryImpl)(nil)
 
-// DataProviderFactoryImpl is responsible for creating data providers based on the
-// requested topic. It manages access to logging, state stream configuration,
-// and relevant APIs needed to retrieve data.
+// DataProviderFactoryImpl is an implementation of the DataProviderFactory interface.
+// It is responsible for creating data providers based on the
+// requested topic. It manages access to logging and relevant APIs needed to retrieve data.
 type DataProviderFactoryImpl struct {
 	logger zerolog.Logger
 
