@@ -73,9 +73,10 @@ func (s *DataProviderFactory) NewDataProvider(
 		return NewBlockHeadersDataProvider(ctx, s.logger, s.accessApi, topic, arguments, ch)
 	case BlockDigestsTopic:
 		return NewBlockDigestsDataProvider(ctx, s.logger, s.accessApi, topic, arguments, ch)
-	// TODO: Implemented handlers for each topic should be added in respective case
-	case EventsTopic,
-		AccountStatusesTopic,
+	case EventsTopic:
+		return NewEventsDataProvider(ctx, s.logger, s.stateStreamApi, topic, arguments, ch)
+		// TODO: Implemented handlers for each topic should be added in respective case
+	case AccountStatusesTopic,
 		TransactionStatusesTopic:
 		return nil, fmt.Errorf("topic \"%s\" not implemented yet", topic)
 	default:
