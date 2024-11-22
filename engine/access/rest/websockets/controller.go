@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"sync"
 	"time"
 
 	"github.com/google/uuid"
@@ -18,6 +19,10 @@ import (
 )
 
 const (
+	// PingPeriod defines the interval at which ping messages are sent to the client.
+	// This value must be less than pongWait.
+	PingPeriod = (pongWait * 9) / 10
+
 	// Time allowed to read the next pong message from the peer.
 	pongWait = 10 * time.Second
 
@@ -30,8 +35,12 @@ type Controller struct {
 	config               Config
 	conn                 *websocket.Conn
 	communicationChannel chan interface{}
+	errorChannel         chan error
 	dataProviders        *concurrentmap.Map[uuid.UUID, dp.DataProvider]
 	dataProvidersFactory *dp.Factory
+
+	shutdownOnce sync.Once // Ensures shutdown is only called once
+	shutdown     bool
 }
 
 func NewWebSocketController(
@@ -46,13 +55,19 @@ func NewWebSocketController(
 		config:               config,
 		conn:                 conn,
 		communicationChannel: make(chan interface{}), //TODO: should it be buffered chan?
+		errorChannel:         make(chan error, 1),
 		dataProviders:        concurrentmap.New[uuid.UUID, dp.DataProvider](),
 		dataProvidersFactory: dp.NewDataProviderFactory(logger, streamApi, streamConfig),
 	}
 }
 
-// HandleConnection manages the WebSocket connection, adding context and error handling.
+// HandleConnection manages the lifecycle of a WebSocket connection,
+// including setup, message processing, and graceful shutdown.
+//
+// Parameters:
+// - ctx: The context for controlling cancellation and timeouts.
 func (c *Controller) HandleConnection(ctx context.Context) {
+	defer close(c.errorChannel)
 	// configuring the connection with appropriate read/write deadlines and handlers.
 	err := c.configureConnection()
 	if err != nil {
@@ -63,8 +78,54 @@ func (c *Controller) HandleConnection(ctx context.Context) {
 	}
 
 	//TODO: spin up a response limit tracker routine
-	go c.readMessagesFromClient(ctx)
-	c.writeMessagesToClient(ctx)
+
+	// for track all goroutines and error handling
+	var wg sync.WaitGroup
+
+	c.startProcess(&wg, ctx, c.readMessagesFromClient)
+	c.startProcess(&wg, ctx, c.keepalive)
+	c.startProcess(&wg, ctx, c.writeMessagesToClient)
+
+	select {
+	case err := <-c.errorChannel:
+		c.logger.Error().Err(err).Msg("error detected in one of the goroutines")
+		//TODO: add error handling here
+		c.shutdownConnection()
+	case <-ctx.Done():
+		// Context canceled, shut down gracefully
+		c.shutdownConnection()
+	}
+
+	// Wait for all goroutines
+	wg.Wait()
+}
+
+// startProcess is a helper function to start a goroutine for a given process
+// and ensure it is tracked via a sync.WaitGroup.
+//
+// Parameters:
+// - wg: The wait group to track goroutines.
+// - ctx: The context for cancellation.
+// - process: The function to run in a new goroutine.
+//
+// No errors are expected during normal operation.
+func (c *Controller) startProcess(wg *sync.WaitGroup, ctx context.Context, process func(context.Context) error) {
+	wg.Add(1)
+
+	go func() {
+		defer wg.Done()
+
+		err := process(ctx)
+		if err != nil {
+			// Check if shutdown has already been called, to avoid multiple shutdowns
+			if c.shutdown {
+				c.logger.Warn().Err(err).Msg("error detected after shutdown initiated, ignoring")
+				return
+			}
+
+			c.errorChannel <- err
+		}
+	}()
 }
 
 // configureConnection sets up the WebSocket connection with a read deadline
@@ -96,12 +157,14 @@ func (c *Controller) configureConnection() error {
 // writeMessagesToClient reads a messages from communication channel and passes them on to a client WebSocket connection.
 // The communication channel is filled by data providers. Besides, the response limit tracker is involved in
 // write message regulation
-func (c *Controller) writeMessagesToClient(ctx context.Context) {
+//
+// No errors are expected during normal operation.
+func (c *Controller) writeMessagesToClient(ctx context.Context) error {
 	//TODO: can it run forever? maybe we should cancel the ctx in the reader routine
 	for {
 		select {
 		case <-ctx.Done():
-			return
+			return nil
 		case msg := <-c.communicationChannel:
 			// TODO: handle 'response per second' limits
 
@@ -112,10 +175,12 @@ func (c *Controller) writeMessagesToClient(ctx context.Context) {
 			// and allows the server to gracefully handle timeouts for delayed writes.
 			if err := c.conn.SetWriteDeadline(time.Now().Add(writeWait)); err != nil {
 				c.logger.Error().Err(err).Msg("failed to set the write deadline")
+				return err
 			}
 			err := c.conn.WriteJSON(msg)
 			if err != nil {
 				c.logger.Error().Err(err).Msg("error writing to connection")
+				return err
 			}
 		}
 	}
@@ -123,32 +188,33 @@ func (c *Controller) writeMessagesToClient(ctx context.Context) {
 
 // readMessagesFromClient continuously reads messages from a client WebSocket connection,
 // processes each message, and handles actions based on the message type.
-func (c *Controller) readMessagesFromClient(ctx context.Context) {
-	defer c.shutdownConnection()
-
+//
+// No errors are expected during normal operation.
+func (c *Controller) readMessagesFromClient(ctx context.Context) error {
 	for {
 		select {
 		case <-ctx.Done():
 			c.logger.Info().Msg("context canceled, stopping read message loop")
-			return
+			return nil
 		default:
 			msg, err := c.readMessage()
 			if err != nil {
 				if websocket.IsCloseError(err, websocket.CloseNormalClosure, websocket.CloseAbnormalClosure) {
-					return
+					return nil
 				}
 				c.logger.Warn().Err(err).Msg("error reading message from client")
-				return
+				return err
 			}
 
 			baseMsg, validatedMsg, err := c.parseAndValidateMessage(msg)
 			if err != nil {
 				c.logger.Debug().Err(err).Msg("error parsing and validating client message")
-				return
+				return err
 			}
 
 			if err := c.handleAction(ctx, validatedMsg); err != nil {
 				c.logger.Warn().Err(err).Str("action", baseMsg.Action).Msg("error handling action")
+				return err
 			}
 		}
 	}
@@ -244,20 +310,60 @@ func (c *Controller) handleListSubscriptions(ctx context.Context, msg models.Lis
 }
 
 func (c *Controller) shutdownConnection() {
-	defer close(c.communicationChannel)
-	defer func(conn *websocket.Conn) {
-		if err := c.conn.Close(); err != nil {
-			c.logger.Error().Err(err).Msg("error closing connection")
-		}
-	}(c.conn)
+	c.shutdownOnce.Do(func() {
+		c.shutdown = true
 
-	err := c.dataProviders.ForEach(func(_ uuid.UUID, dp dp.DataProvider) error {
-		dp.Close()
-		return nil
+		defer close(c.communicationChannel)
+		defer func(conn *websocket.Conn) {
+			if err := c.conn.Close(); err != nil {
+				c.logger.Error().Err(err).Msg("error closing connection")
+			}
+		}(c.conn)
+
+		err := c.dataProviders.ForEach(func(_ uuid.UUID, dp dp.DataProvider) error {
+			dp.Close()
+			return nil
+		})
+		if err != nil {
+			c.logger.Error().Err(err).Msg("error closing data provider")
+		}
+
+		c.dataProviders.Clear()
 	})
-	if err != nil {
-		c.logger.Error().Err(err).Msg("error closing data provider")
+}
+
+// keepalive sends a ping message periodically to keep the WebSocket connection alive
+// and avoid timeouts.
+//
+// No errors are expected during normal operation.
+func (c *Controller) keepalive(ctx context.Context) error {
+	pingTicker := time.NewTicker(PingPeriod)
+	defer pingTicker.Stop()
+
+	for {
+		select {
+		case <-ctx.Done():
+			//	return ctx.Err()
+			return nil
+		case <-pingTicker.C:
+			if err := c.sendPing(); err != nil {
+				// Log error and exit the loop on failure
+				c.logger.Error().Err(err).Msg("failed to send ping")
+				return err
+			}
+		}
+	}
+}
+
+// sendPing sends a periodic ping message to the WebSocket client to keep the connection alive.
+func (c *Controller) sendPing() error {
+	if err := c.conn.SetWriteDeadline(time.Now().Add(writeWait)); err != nil {
+		return fmt.Errorf("failed to set the write deadline for ping: %w", err)
 	}
 
-	c.dataProviders.Clear()
+	if err := c.conn.WriteMessage(websocket.PingMessage, nil); err != nil {
+		return fmt.Errorf("failed to write ping message: %w", err)
+	}
+
+	return nil
 }

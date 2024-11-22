@@ -12,6 +12,7 @@ import (
 	"go.uber.org/atomic"
 
 	"github.com/onflow/flow-go/engine/access/rest/common"
+	"github.com/onflow/flow-go/engine/access/rest/websockets"
 	"github.com/onflow/flow-go/engine/access/state_stream"
 	"github.com/onflow/flow-go/engine/access/state_stream/backend"
 	"github.com/onflow/flow-go/engine/access/subscription"
@@ -22,9 +23,6 @@ import (
 const (
 	// Time allowed to read the next pong message from the peer.
 	pongWait = 10 * time.Second
-
-	// Send pings to peer with this period. Must be less than pongWait.
-	pingPeriod = (pongWait * 9) / 10
 
 	// Time allowed to write a message to the peer.
 	writeWait = 10 * time.Second
@@ -111,7 +109,7 @@ func (wsController *WebsocketController) wsErrorHandler(err error) {
 // If an error occurs or the subscription channel is closed, it handles the error or termination accordingly.
 // The function uses a ticker to periodically send ping messages to the client to maintain the connection.
 func (wsController *WebsocketController) writeEvents(sub subscription.Subscription) {
-	ticker := time.NewTicker(pingPeriod)
+	ticker := time.NewTicker(websockets.PingPeriod)
 	defer ticker.Stop()
 
 	blocksSinceLastMessage := uint64(0)
