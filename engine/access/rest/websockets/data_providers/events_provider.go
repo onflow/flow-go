@@ -3,6 +3,7 @@ package data_providers
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"github.com/rs/zerolog"
 
@@ -38,6 +39,8 @@ func NewEventsDataProvider(
 	ctx context.Context,
 	logger zerolog.Logger,
 	stateStreamApi state_stream.API,
+	chain flow.Chain,
+	eventFilterConfig state_stream.EventFilterConfig,
 	topic string,
 	arguments map[string]string,
 	send chan<- interface{},
@@ -49,7 +52,7 @@ func NewEventsDataProvider(
 
 	// Initialize arguments passed to the provider.
 	var err error
-	p.args, err = ParseEventsArguments(arguments)
+	p.args, err = ParseEventsArguments(arguments, chain, eventFilterConfig)
 	if err != nil {
 		return nil, fmt.Errorf("invalid arguments for events data provider: %w", err)
 	}
@@ -60,8 +63,8 @@ func NewEventsDataProvider(
 	sub := p.createSubscription(subCtx)
 
 	p.BaseDataProviderImpl = NewBaseDataProviderImpl(
-		cancel,
 		topic,
+		cancel,
 		send,
 		sub,
 	)
@@ -78,10 +81,6 @@ func (p *EventsDataProvider) Run() error {
 
 // createSubscription creates a new subscription using the specified input arguments.
 func (p *EventsDataProvider) createSubscription(ctx context.Context) subscription.Subscription {
-	if p.args.StartBlockID != flow.ZeroID && p.args.StartBlockHeight != request.EmptyHeight {
-		return p.stateStreamApi.SubscribeEvents(ctx, p.args.StartBlockID, p.args.StartBlockHeight, p.args.Filter)
-	}
-
 	if p.args.StartBlockID != flow.ZeroID {
 		return p.stateStreamApi.SubscribeEventsFromStartBlockID(ctx, p.args.StartBlockID, p.args.Filter)
 	}
@@ -107,24 +106,48 @@ func (p *EventsDataProvider) handleResponse(send chan<- interface{}) func(*flow.
 }
 
 // ParseEventsArguments validates and initializes the events arguments.
-func ParseEventsArguments(arguments map[string]string) (EventsArguments, error) {
+func ParseEventsArguments(
+	arguments map[string]string,
+	chain flow.Chain,
+	eventFilterConfig state_stream.EventFilterConfig,
+) (EventsArguments, error) {
 	var args EventsArguments
 
-	// Parse
-	if eventStatusIn, ok := arguments["event_filter"]; ok {
-		eventFilter := parser.ParseEventFilter(eventStatusIn)
-		if err != nil {
-			return args, err
+	// Parse 'event_types' as []string{}
+	var eventTypes []string
+	if eventTypesIn, ok := arguments["event_types"]; ok {
+		if eventTypesIn != "" {
+			eventTypes = strings.Split(eventTypesIn, ",")
 		}
-		args.Filter = eventFilter
-	} else {
-		return args, fmt.Errorf("'event_filter' must be provided")
 	}
+
+	// Parse 'addresses' as []string{}
+	var addresses []string
+	if addressesIn, ok := arguments["addresses"]; ok {
+		if addressesIn != "" {
+			addresses = strings.Split(addressesIn, ",")
+		}
+	}
+
+	// Parse 'contracts' as []string{}
+	var contracts []string
+	if contractsIn, ok := arguments["contracts"]; ok {
+		if contractsIn != "" {
+			contracts = strings.Split(contractsIn, ",")
+		}
+	}
+
+	// Initialize the event filter with the parsed arguments
+	filter, err := state_stream.NewEventFilter(eventFilterConfig, chain, eventTypes, addresses, contracts)
+	if err != nil {
+		return args, err
+	}
+	args.Filter = filter
 
 	// Parse 'start_block_id' if provided
 	if startBlockIDIn, ok := arguments["start_block_id"]; ok {
 		var startBlockID parser.ID
-		err := startBlockID.Parse(startBlockIDIn)
+		err = startBlockID.Parse(startBlockIDIn)
 		if err != nil {
 			return args, err
 		}
@@ -133,7 +156,6 @@ func ParseEventsArguments(arguments map[string]string) (EventsArguments, error) 
 
 	// Parse 'start_block_height' if provided
 	if startBlockHeightIn, ok := arguments["start_block_height"]; ok {
-		var err error
 		args.StartBlockHeight, err = util.ToUint64(startBlockHeightIn)
 		if err != nil {
 			return args, fmt.Errorf("invalid 'start_block_height': %w", err)

@@ -3,6 +3,7 @@ package data_providers
 import (
 	"context"
 	"fmt"
+	"github.com/onflow/flow-go/model/flow"
 
 	"github.com/rs/zerolog"
 
@@ -42,6 +43,9 @@ type DataProviderFactoryImpl struct {
 
 	stateStreamApi state_stream.API
 	accessApi      access.API
+
+	chain             flow.Chain
+	eventFilterConfig state_stream.EventFilterConfig
 }
 
 // NewDataProviderFactory creates a new DataProviderFactory
@@ -55,11 +59,13 @@ func NewDataProviderFactory(
 	logger zerolog.Logger,
 	stateStreamApi state_stream.API,
 	accessApi access.API,
+	eventFilterConfig state_stream.EventFilterConfig,
 ) *DataProviderFactoryImpl {
 	return &DataProviderFactoryImpl{
-		logger:         logger,
-		stateStreamApi: stateStreamApi,
-		accessApi:      accessApi,
+		logger:            logger,
+		stateStreamApi:    stateStreamApi,
+		accessApi:         accessApi,
+		eventFilterConfig: eventFilterConfig,
 	}
 }
 
@@ -87,7 +93,7 @@ func (s *DataProviderFactoryImpl) NewDataProvider(
 	case BlockDigestsTopic:
 		return NewBlockDigestsDataProvider(ctx, s.logger, s.accessApi, topic, arguments, ch)
 	case EventsTopic:
-		return NewEventsDataProvider(ctx, s.logger, s.stateStreamApi, topic, arguments, ch)
+		return NewEventsDataProvider(ctx, s.logger, s.stateStreamApi, s.chain, s.eventFilterConfig, topic, arguments, ch)
 		// TODO: Implemented handlers for each topic should be added in respective case
 	case AccountStatusesTopic,
 		TransactionStatusesTopic:
