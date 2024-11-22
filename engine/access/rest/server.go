@@ -9,7 +9,8 @@ import (
 
 	"github.com/onflow/flow-go/access"
 	"github.com/onflow/flow-go/engine/access/rest/router"
-	"github.com/onflow/flow-go/engine/access/rest/websockets/data_providers"
+	"github.com/onflow/flow-go/engine/access/rest/websockets"
+	dp "github.com/onflow/flow-go/engine/access/rest/websockets/data_providers"
 	"github.com/onflow/flow-go/engine/access/state_stream"
 	"github.com/onflow/flow-go/engine/access/state_stream/backend"
 	"github.com/onflow/flow-go/model/flow"
@@ -43,14 +44,15 @@ func NewServer(serverAPI access.API,
 	restCollector module.RestMetrics,
 	stateStreamApi state_stream.API,
 	stateStreamConfig backend.Config,
+	wsConfig websockets.Config,
 ) (*http.Server, error) {
 	builder := router.NewRouterBuilder(logger, restCollector).AddRestRoutes(serverAPI, chain, config.MaxRequestSize)
 	if stateStreamApi != nil {
-		builder.AddWsLegacyRoutes(stateStreamApi, chain, stateStreamConfig, config.MaxRequestSize)
+		builder.AddLegacyWebsocketsRoutes(stateStreamApi, chain, stateStreamConfig, config.MaxRequestSize)
 	}
 
-	// TODO: add new websocket routes
-	_ = data_providers.NewDataProviderFactory(logger, stateStreamApi, serverAPI)
+	dataProviderFactory := dp.NewDataProviderFactory(logger, stateStreamApi, serverAPI)
+	builder.AddWebsocketsRoute(chain, wsConfig, config.MaxRequestSize, dataProviderFactory)
 
 	c := cors.New(cors.Options{
 		AllowedOrigins: []string{"*"},

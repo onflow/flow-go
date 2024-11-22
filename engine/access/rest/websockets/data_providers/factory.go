@@ -24,7 +24,20 @@ const (
 // DataProviderFactory is responsible for creating data providers based on the
 // requested topic. It manages access to logging, state stream configuration,
 // and relevant APIs needed to retrieve data.
-type DataProviderFactory struct {
+type DataProviderFactory interface {
+	// NewDataProvider creates a new data provider based on the specified topic
+	// and configuration parameters.
+	//
+	// No errors are expected during normal operations.
+	NewDataProvider(context.Context, string, map[string]string, chan<- interface{}) (DataProvider, error)
+}
+
+var _ DataProviderFactory = (*DataProviderFactoryImpl)(nil)
+
+// DataProviderFactoryImpl is responsible for creating data providers based on the
+// requested topic. It manages access to logging, state stream configuration,
+// and relevant APIs needed to retrieve data.
+type DataProviderFactoryImpl struct {
 	logger zerolog.Logger
 
 	stateStreamApi state_stream.API
@@ -42,8 +55,8 @@ func NewDataProviderFactory(
 	logger zerolog.Logger,
 	stateStreamApi state_stream.API,
 	accessApi access.API,
-) *DataProviderFactory {
-	return &DataProviderFactory{
+) *DataProviderFactoryImpl {
+	return &DataProviderFactoryImpl{
 		logger:         logger,
 		stateStreamApi: stateStreamApi,
 		accessApi:      accessApi,
@@ -60,7 +73,7 @@ func NewDataProviderFactory(
 // - ch: Channel to which the data provider sends data.
 //
 // No errors are expected during normal operations.
-func (s *DataProviderFactory) NewDataProvider(
+func (s *DataProviderFactoryImpl) NewDataProvider(
 	ctx context.Context,
 	topic string,
 	arguments map[string]string,

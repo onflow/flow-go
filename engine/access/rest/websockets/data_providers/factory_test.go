@@ -25,7 +25,7 @@ type DataProviderFactorySuite struct {
 	accessApi      *accessmock.API
 	stateStreamApi *statestreammock.API
 
-	factory *DataProviderFactory
+	factory *DataProviderFactoryImpl
 }
 
 func TestDataProviderFactorySuite(t *testing.T) {
@@ -47,15 +47,10 @@ func (s *DataProviderFactorySuite) SetupTest() {
 }
 
 // setupSubscription creates a mock subscription instance for testing purposes.
-// It configures the mock subscription's `ID` method to return a predefined subscription identifier.
-// Additionally, it sets the return value of the specified API call to the mock subscription.
-func (s *DataProviderFactorySuite) setupSubscription(apiCall *mock.Call) string {
+// It configures the return value of the specified API call to the mock subscription.
+func (s *DataProviderFactorySuite) setupSubscription(apiCall *mock.Call) {
 	subscription := statestreammock.NewSubscription(s.T())
-	subscriptionID := unittest.IdentifierFixture().String()
-	subscription.On("ID").Return(subscriptionID).Once()
-
 	apiCall.Return(subscription).Once()
-	return subscriptionID
 }
 
 // TODO: add others topic to check when they will be implemented
@@ -67,15 +62,15 @@ func (s *DataProviderFactorySuite) TestSupportedTopics() {
 		name               string
 		topic              string
 		arguments          map[string]string
-		setupSubscription  func() string // return subscription id
+		setupSubscription  func()
 		assertExpectations func()
 	}{
 		{
 			name:      "block topic",
 			topic:     BlocksTopic,
 			arguments: map[string]string{"block_status": parser.Finalized},
-			setupSubscription: func() string {
-				return s.setupSubscription(s.accessApi.On("SubscribeBlocksFromLatest", mock.Anything, flow.BlockStatusFinalized))
+			setupSubscription: func() {
+				s.setupSubscription(s.accessApi.On("SubscribeBlocksFromLatest", mock.Anything, flow.BlockStatusFinalized))
 			},
 			assertExpectations: func() {
 				s.accessApi.AssertExpectations(s.T())
@@ -85,8 +80,8 @@ func (s *DataProviderFactorySuite) TestSupportedTopics() {
 			name:      "block headers topic",
 			topic:     BlockHeadersTopic,
 			arguments: map[string]string{"block_status": parser.Finalized},
-			setupSubscription: func() string {
-				return s.setupSubscription(s.accessApi.On("SubscribeBlockHeadersFromLatest", mock.Anything, flow.BlockStatusFinalized))
+			setupSubscription: func() {
+				s.setupSubscription(s.accessApi.On("SubscribeBlockHeadersFromLatest", mock.Anything, flow.BlockStatusFinalized))
 			},
 			assertExpectations: func() {
 				s.accessApi.AssertExpectations(s.T())
@@ -96,8 +91,8 @@ func (s *DataProviderFactorySuite) TestSupportedTopics() {
 			name:      "block digests topic",
 			topic:     BlockDigestsTopic,
 			arguments: map[string]string{"block_status": parser.Finalized},
-			setupSubscription: func() string {
-				return s.setupSubscription(s.accessApi.On("SubscribeBlockDigestsFromLatest", mock.Anything, flow.BlockStatusFinalized))
+			setupSubscription: func() {
+				s.setupSubscription(s.accessApi.On("SubscribeBlockDigestsFromLatest", mock.Anything, flow.BlockStatusFinalized))
 			},
 			assertExpectations: func() {
 				s.accessApi.AssertExpectations(s.T())
@@ -107,14 +102,12 @@ func (s *DataProviderFactorySuite) TestSupportedTopics() {
 
 	for _, test := range testCases {
 		s.Run(test.name, func() {
-			subscriptionID := test.setupSubscription()
+			test.setupSubscription()
 
 			provider, err := s.factory.NewDataProvider(s.ctx, test.topic, test.arguments, s.ch)
 			s.Require().NotNil(provider, "Expected provider for topic %s", test.topic)
 			s.Require().NoError(err, "Expected no error for topic %s", test.topic)
-
 			s.Require().Equal(test.topic, provider.Topic())
-			s.Require().Equal(subscriptionID, provider.ID())
 
 			test.assertExpectations()
 		})

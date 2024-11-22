@@ -47,13 +47,11 @@ func NewBlockDigestsDataProvider(
 
 	context, cancel := context.WithCancel(ctx)
 
-	// Set up a subscription to block digests based on arguments.
-	subscription := p.createSubscription(context)
 	p.BaseDataProviderImpl = NewBaseDataProviderImpl(
-		cancel,
 		topic,
+		cancel,
 		send,
-		subscription,
+		p.createSubscription(context), // Set up a subscription to block digests based on arguments.
 	)
 
 	return p, nil
