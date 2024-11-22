@@ -18,6 +18,7 @@ import (
 	evmStorage "github.com/onflow/flow-go/fvm/evm/offchain/storage"
 	"github.com/onflow/flow-go/fvm/evm/offchain/sync"
 	"github.com/onflow/flow-go/fvm/evm/testutils"
+	"github.com/onflow/flow-go/fvm/evm/types"
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/ledger/common/convert"
 	"github.com/onflow/flow-go/model/flow"
@@ -100,7 +101,7 @@ func OffchainReplayBackwardCompatibilityTest(
 
 		sp := testutils.NewTestStorageProvider(store, evmBlockEvent.Height)
 		cr := sync.NewReplayer(chainID, rootAddr, sp, bp, log, nil, true)
-		res, err := cr.ReplayBlock(evmTxEvents, evmBlockEvent)
+		res, results, err := cr.ReplayBlock(evmTxEvents, evmBlockEvent)
 		if err != nil {
 			return err
 		}
@@ -113,7 +114,9 @@ func OffchainReplayBackwardCompatibilityTest(
 			}
 		}
 
-		err = bp.OnBlockExecuted(evmBlockEvent.Height, res)
+		blockProposal := reconstructProposal(evmBlockEvent, evmTxEvents, results)
+
+		err = bp.OnBlockExecuted(evmBlockEvent.Height, res, blockProposal)
 		if err != nil {
 			return err
 		}
@@ -184,4 +187,36 @@ func parseEVMEvents(evts flow.EventsList) (*events.BlockEventPayload, []events.T
 	}
 
 	return blockEvent, txEvents, nil
+}
+
+func reconstructProposal(
+	blockEvent *events.BlockEventPayload,
+	txEvents []events.TransactionEventPayload,
+	results []*types.Result,
+) *types.BlockProposal {
+	receipts := make([]types.LightReceipt, 0, len(results))
+
+	for _, result := range results {
+		receipts = append(receipts, *result.LightReceipt())
+	}
+
+	txHashes := make(types.TransactionHashes, 0, len(txEvents))
+	for _, tx := range txEvents {
+		txHashes = append(txHashes, tx.Hash)
+	}
+
+	return &types.BlockProposal{
+		Block: types.Block{
+			ParentBlockHash:     blockEvent.ParentBlockHash,
+			Height:              blockEvent.Height,
+			Timestamp:           blockEvent.Timestamp,
+			TotalSupply:         blockEvent.TotalSupply.Big(),
+			ReceiptRoot:         blockEvent.ReceiptRoot,
+			TransactionHashRoot: blockEvent.TransactionHashRoot,
+			TotalGasUsed:        blockEvent.TotalGasUsed,
+			PrevRandao:          blockEvent.PrevRandao,
+		},
+		Receipts: receipts,
+		TxHashes: txHashes,
+	}
 }

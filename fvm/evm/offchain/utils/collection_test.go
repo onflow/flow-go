@@ -147,7 +147,7 @@ func replayEvents(
 
 			sp := NewTestStorageProvider(store, blockEventPayload.Height)
 			cr := sync.NewReplayer(chainID, rootAddr, sp, bp, zerolog.Logger{}, nil, true)
-			res, err := cr.ReplayBlock(txEvents, blockEventPayload)
+			res, _, err := cr.ReplayBlock(txEvents, blockEventPayload)
 			require.NoError(t, err)
 
 			// commit all changes
