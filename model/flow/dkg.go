@@ -1,38 +1,46 @@
 package flow
 
-// DKGEndState captures the final state of a completed DKG.
-type DKGEndState uint32
+// DKGState captures the final state of a completed DKG.
+type DKGState uint32
 
 const (
-	// DKGEndStateUnknown - zero value for this enum, indicates unset value
-	DKGEndStateUnknown DKGEndState = iota
-	// DKGEndStateSuccess - the DKG completed, this node has a valid beacon key.
-	DKGEndStateSuccess
-	// DKGEndStateInconsistentKey - the DKG completed, this node has an invalid beacon key.
-	DKGEndStateInconsistentKey
-	// DKGEndStateNoKey - this node did not store a key, typically caused by a crash mid-DKG.
-	DKGEndStateNoKey
-	// DKGEndStateDKGFailure - the underlying DKG library reported an error.
-	DKGEndStateDKGFailure
+	// DKGStateUnknown - zero value for this enum, indicates unset value
+	DKGStateUnknown DKGState = iota
+	// DKGStateSuccess - the DKG completed, this node has a valid beacon key.
+	DKGStateStarted
+	// DKGStateCompleted
+	DKGStateCompleted
+	// DKGStateSuccess
+	DKGStateSuccess
+	// DKGStateInconsistentKey - the DKG completed, this node has an invalid beacon key.
+	DKGStateInconsistentKey
+	// DKGStateNoKey - this node did not store a key, typically caused by a crash mid-DKG.
+	DKGStateNoKey
+	// DKGStateDKGFailure - the underlying DKG library reported an error.
+	DKGStateDKGFailure
 	// RandomBeaconKeyRecovered - this node has recovered its beacon key from a previous epoch.
 	// This occurs only for epochs which are entered through the EFM Recovery process (`flow.EpochRecover` service event).
 	RandomBeaconKeyRecovered
 )
 
-func (state DKGEndState) String() string {
+func (state DKGState) String() string {
 	switch state {
-	case DKGEndStateSuccess:
-		return "DKGEndStateSuccess"
-	case DKGEndStateInconsistentKey:
-		return "DKGEndStateInconsistentKey"
-	case DKGEndStateNoKey:
-		return "DKGEndStateNoKey"
-	case DKGEndStateDKGFailure:
-		return "DKGEndStateDKGFailure"
+	case DKGStateStarted:
+		return "DKGStateStarted"
+	case DKGStateCompleted:
+		return "DKGStateCompleted"
+	case DKGStateSuccess:
+		return "DKGStateSuccess"
+	case DKGStateInconsistentKey:
+		return "DKGStateInconsistentKey"
+	case DKGStateNoKey:
+		return "DKGStateNoKey"
+	case DKGStateDKGFailure:
+		return "DKGStateDKGFailure"
 	case RandomBeaconKeyRecovered:
 		return "RandomBeaconKeyRecovered"
 	default:
-		return "DKGEndStateUnknown"
+		return "DKGStateUnknown"
 	}
 }
 
