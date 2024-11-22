@@ -19,7 +19,7 @@ func (_m *DKGState) GetDKGEndState(epochCounter uint64) (flow.DKGState, error) {
 	ret := _m.Called(epochCounter)
 
 	if len(ret) == 0 {
-		panic("no return value specified for GetDKGEndState")
+		panic("no return value specified for GetDKGState")
 	}
 
 	var r0 flow.DKGState
@@ -123,7 +123,7 @@ func (_m *DKGState) SetDKGEndState(epochCounter uint64, endState flow.DKGState) 
 	ret := _m.Called(epochCounter, endState)
 
 	if len(ret) == 0 {
-		panic("no return value specified for SetDKGEndState")
+		panic("no return value specified for SetDKGState")
 	}
 
 	var r0 error

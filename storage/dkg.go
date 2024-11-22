@@ -27,7 +27,7 @@ type DKGStateReader interface {
 
 	// GetDKGEndState retrieves the end state for the given DKG.
 	// Error returns: storage.ErrNotFound
-	GetDKGEndState(epochCounter uint64) (flow.DKGState, error)
+	GetDKGState(epochCounter uint64) (flow.DKGState, error)
 
 	// UnsafeRetrieveMyBeaconPrivateKey retrieves the random beacon private key for an epoch.
 	//
@@ -46,7 +46,7 @@ type DKGState interface {
 
 	// SetDKGEndState stores that the DKG has ended, and its end state.
 	// Error returns: storage.ErrAlreadyExists
-	SetDKGEndState(epochCounter uint64, endState flow.DKGState) error
+	SetDKGState(epochCounter uint64, newState flow.DKGState) error
 
 	// GetDKGStarted checks whether the DKG has been started for the given epoch.
 	// No errors expected during normal operation.

@@ -350,7 +350,7 @@ func main() {
 				return err
 			}
 			// mark the root DKG as successful, so it is considered safe to use the key
-			err = dkgState.SetDKGEndState(epochCounter, flow.DKGEndStateSuccess)
+			err = dkgState.SetDKGState(epochCounter, flow.DKGEndStateSuccess)
 			if err != nil && !errors.Is(err, storage.ErrAlreadyExists) {
 				return err
 			}

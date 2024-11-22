@@ -310,14 +310,14 @@ func (suite *ReactorEngineSuite_CommittedPhase) SetupTest() {
 			return nil
 		},
 	)
-	suite.dkgState.On("SetDKGEndState", suite.NextEpochCounter(), mock.Anything).
+	suite.dkgState.On("SetDKGState", suite.NextEpochCounter(), mock.Anything).
 		Run(func(args mock.Arguments) {
 			assert.Equal(suite.T(), flow.DKGEndStateUnknown, suite.dkgEndState) // must be unset
 			endState := args[1].(flow.DKGState)
 			suite.dkgEndState = endState
 		}).
 		Return(nil)
-	suite.dkgState.On("GetDKGEndState", suite.NextEpochCounter()).Return(
+	suite.dkgState.On("GetDKGState", suite.NextEpochCounter()).Return(
 		func(_ uint64) flow.DKGState { return suite.dkgEndState },
 		func(_ uint64) error {
 			if suite.dkgEndState == flow.DKGEndStateUnknown {
@@ -438,7 +438,7 @@ func (suite *ReactorEngineSuite_CommittedPhase) TestStartupInCommittedPhase_DKGS
 	suite.snap.On("EpochPhase").Return(flow.EpochPhaseCommitted, nil).Once()
 	// the dkg for this epoch has been started but not ended
 	suite.dkgState.On("GetDKGStarted", suite.NextEpochCounter()).Return(true, nil).Once()
-	suite.dkgState.On("GetDKGEndState", suite.NextEpochCounter()).Return(flow.DKGEndStateUnknown, storerr.ErrNotFound).Once()
+	suite.dkgState.On("GetDKGState", suite.NextEpochCounter()).Return(flow.DKGEndStateUnknown, storerr.ErrNotFound).Once()
 
 	// start up the engine
 	unittest.AssertClosesBefore(suite.T(), suite.engine.Ready(), time.Second)
@@ -461,7 +461,7 @@ func (suite *ReactorEngineSuite_CommittedPhase) TestStartupInCommittedPhase_DKGE
 	suite.snap.On("EpochPhase").Return(flow.EpochPhaseCommitted, nil).Once()
 	// the dkg for this epoch has been started and ended
 	suite.dkgState.On("GetDKGStarted", suite.NextEpochCounter()).Return(true, nil).Once()
-	suite.dkgState.On("GetDKGEndState", suite.NextEpochCounter()).Return(flow.DKGEndStateNoKey, nil).Once()
+	suite.dkgState.On("GetDKGState", suite.NextEpochCounter()).Return(flow.DKGEndStateNoKey, nil).Once()
 
 	// start up the engine
 	unittest.AssertClosesBefore(suite.T(), suite.engine.Ready(), time.Second)
@@ -482,7 +482,7 @@ func (suite *ReactorEngineSuite_CommittedPhase) TestStartupInCommittedPhase_Inco
 	suite.snap.On("EpochPhase").Return(flow.EpochPhaseCommitted, nil).Once()
 	// the dkg for this epoch has been started but not ended
 	suite.dkgState.On("GetDKGStarted", suite.NextEpochCounter()).Return(true, nil).Once()
-	suite.dkgState.On("GetDKGEndState", suite.NextEpochCounter()).Return(flow.DKGEndStateUnknown, storerr.ErrNotFound).Once()
+	suite.dkgState.On("GetDKGState", suite.NextEpochCounter()).Return(flow.DKGEndStateUnknown, storerr.ErrNotFound).Once()
 
 	// set our global pub key to a random value
 	suite.myGlobalBeaconPubKey = unittest.RandomBeaconPriv().PublicKey()
@@ -508,7 +508,7 @@ func (suite *ReactorEngineSuite_CommittedPhase) TestStartupInCommittedPhase_Miss
 	suite.snap.On("EpochPhase").Return(flow.EpochPhaseCommitted, nil).Once()
 	// the dkg for this epoch has been started but not ended
 	suite.dkgState.On("GetDKGStarted", suite.NextEpochCounter()).Return(true, nil).Once()
-	suite.dkgState.On("GetDKGEndState", suite.NextEpochCounter()).Return(flow.DKGEndStateUnknown, storerr.ErrNotFound).Once()
+	suite.dkgState.On("GetDKGState", suite.NextEpochCounter()).Return(flow.DKGEndStateUnknown, storerr.ErrNotFound).Once()
 
 	// remove our key
 	suite.myLocalBeaconKey = nil

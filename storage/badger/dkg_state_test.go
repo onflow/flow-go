@@ -33,7 +33,7 @@ func TestDKGState_DKGStarted(t *testing.T) {
 
 		// store dkg-started flag for epoch
 		t.Run("should be able to set DKGStarted", func(t *testing.T) {
-			err = store.SetDKGEndState(epochCounter, flow.DKGStateStarted)
+			err = store.SetDKGState(epochCounter, flow.DKGStateStarted)
 			assert.NoError(t, err)
 		})
 
@@ -98,12 +98,12 @@ func TestDKGState_EndState(t *testing.T) {
 		endState := flow.DKGStateNoKey
 
 		t.Run("should be able to store an end state", func(t *testing.T) {
-			err = store.SetDKGEndState(epochCounter, endState)
+			err = store.SetDKGState(epochCounter, endState)
 			require.NoError(t, err)
 		})
 
 		t.Run("should be able to read an end state", func(t *testing.T) {
-			readEndState, err := store.GetDKGEndState(epochCounter)
+			readEndState, err := store.GetDKGState(epochCounter)
 			require.NoError(t, err)
 			assert.Equal(t, endState, readEndState)
 		})
@@ -146,7 +146,7 @@ func TestSafeBeaconPrivateKeys(t *testing.T) {
 			err := dkgState.InsertMyBeaconPrivateKey(epochCounter, expected)
 			assert.NoError(t, err)
 			// mark dkg unsuccessful
-			err = dkgState.SetDKGEndState(epochCounter, flow.DKGStateInconsistentKey)
+			err = dkgState.SetDKGState(epochCounter, flow.DKGStateInconsistentKey)
 			assert.NoError(t, err)
 
 			key, safe, err := dkgState.RetrieveMyBeaconPrivateKey(epochCounter)
@@ -163,7 +163,7 @@ func TestSafeBeaconPrivateKeys(t *testing.T) {
 			err := dkgState.InsertMyBeaconPrivateKey(epochCounter, expected)
 			assert.NoError(t, err)
 			// mark dkg result as inconsistent
-			err = dkgState.SetDKGEndState(epochCounter, flow.DKGStateInconsistentKey)
+			err = dkgState.SetDKGState(epochCounter, flow.DKGStateInconsistentKey)
 			assert.NoError(t, err)
 
 			key, safe, err := dkgState.RetrieveMyBeaconPrivateKey(epochCounter)
@@ -176,7 +176,7 @@ func TestSafeBeaconPrivateKeys(t *testing.T) {
 			epochCounter := rand.Uint64()
 
 			// mark dkg result as no key
-			err = dkgState.SetDKGEndState(epochCounter, flow.DKGStateNoKey)
+			err = dkgState.SetDKGState(epochCounter, flow.DKGStateNoKey)
 			assert.NoError(t, err)
 
 			key, safe, err := dkgState.RetrieveMyBeaconPrivateKey(epochCounter)
@@ -193,7 +193,7 @@ func TestSafeBeaconPrivateKeys(t *testing.T) {
 			err := dkgState.InsertMyBeaconPrivateKey(epochCounter, expected)
 			assert.NoError(t, err)
 			// mark dkg successful
-			err = dkgState.SetDKGEndState(epochCounter, flow.DKGStateSuccess)
+			err = dkgState.SetDKGState(epochCounter, flow.DKGStateSuccess)
 			assert.NoError(t, err)
 
 			key, safe, err := dkgState.RetrieveMyBeaconPrivateKey(epochCounter)
@@ -207,7 +207,7 @@ func TestSafeBeaconPrivateKeys(t *testing.T) {
 			epochCounter := rand.Uint64()
 
 			// mark dkg successful
-			err = dkgState.SetDKGEndState(epochCounter, flow.DKGStateSuccess)
+			err = dkgState.SetDKGState(epochCounter, flow.DKGStateSuccess)
 			assert.NoError(t, err)
 
 			key, safe, err := dkgState.RetrieveMyBeaconPrivateKey(epochCounter)
