@@ -89,7 +89,13 @@ func (ds *RecoverablePrivateBeaconKeyState) InsertMyBeaconPrivateKey(epochCounte
 		return fmt.Errorf("will not store nil beacon key")
 	}
 	encodableKey := &encodable.RandomBeaconPrivKey{PrivateKey: key}
-	return operation.RetryOnConflictTx(ds.db, transaction.Update, ds.storeKeyTx(epochCounter, encodableKey))
+	return operation.RetryOnConflictTx(ds.db, transaction.Update, func(tx *transaction.Tx) error {
+		err := ds.storeKeyTx(epochCounter, encodableKey)(tx)
+		if err != nil {
+			return err
+		}
+		return operation.InsertDKGEndStateForEpoch(epochCounter, flow.DKGStateCompleted)(tx.DBTxn)
+	})
 }
 
 // UnsafeRetrieveMyBeaconPrivateKey retrieves the random beacon private key for an epoch.
@@ -105,11 +111,6 @@ func (ds *RecoverablePrivateBeaconKeyState) UnsafeRetrieveMyBeaconPrivateKey(epo
 		return nil, err
 	}
 	return encodableKey.PrivateKey, nil
-}
-
-// SetDKGStarted sets the flag indicating the DKG has started for the given epoch.
-func (ds *RecoverablePrivateBeaconKeyState) SetDKGStarted(epochCounter uint64) error {
-	return ds.db.Update(operation.InsertDKGStartedForEpoch(epochCounter))
 }
 
 // GetDKGStarted checks whether the DKG has been started for the given epoch.
@@ -153,7 +154,7 @@ func (ds *RecoverablePrivateBeaconKeyState) RetrieveMyBeaconPrivateKey(epochCoun
 		}
 
 		// for any end state besides success and recovery, the key is not safe
-		if endState == flow.DKGEndStateSuccess || endState == flow.RandomBeaconKeyRecovered {
+		if endState == flow.DKGStateSuccess || endState == flow.RandomBeaconKeyRecovered {
 			// retrieve the key - any storage error (including `storage.ErrNotFound`) is an exception
 			var encodableKey *encodable.RandomBeaconPrivKey
 			encodableKey, err = ds.retrieveKeyTx(epochCounter)(txn)

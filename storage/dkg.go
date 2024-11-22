@@ -48,6 +48,10 @@ type DKGState interface {
 	// Error returns: storage.ErrAlreadyExists
 	SetDKGEndState(epochCounter uint64, endState flow.DKGState) error
 
+	// GetDKGStarted checks whether the DKG has been started for the given epoch.
+	// No errors expected during normal operation.
+	GetDKGStarted(epochCounter uint64) (bool, error)
+
 	// InsertMyBeaconPrivateKey stores the random beacon private key for an epoch.
 	//
 	// CAUTION: these keys are stored before they are validated against the

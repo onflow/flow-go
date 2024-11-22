@@ -155,17 +155,15 @@ func (e *ReactorEngine) startDKGForEpoch(currentEpochCounter uint64, first *flow
 		Logger()
 
 	// if we have dkgState the dkg for this epoch already, exit
-	dkgState, err := e.dkgState.GetDKGEndState(nextEpochCounter)
+	started, err := e.dkgState.GetDKGStarted(nextEpochCounter)
 	if err != nil {
-		if !errors.Is(err, storage.ErrNotFound) {
-			// unexpected storage-level error
-			// TODO use irrecoverable context
-			log.Fatal().Err(err).Msg("could not check whether DKG is dkgState")
-		}
+		// unexpected storage-level error
+		// TODO use irrecoverable context
+		log.Fatal().Err(err).Msg("could not check whether DKG is dkgState")
 
-		// there is no dkgState for this epoch, continue
-	} else {
-		log.Warn().Msgf("DKG started before, skipping starting the DKG for this epoch, current state: %s", dkgState)
+	}
+	if started {
+		log.Warn().Msg("DKG started before, skipping starting the DKG for this epoch")
 		return
 	}
 
