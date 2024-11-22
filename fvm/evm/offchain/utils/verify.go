@@ -209,21 +209,21 @@ func verifyRegisterUpdates(expectedUpdates map[flow.RegisterID]flow.RegisterValu
 	if len(missingUpdates) > 0 {
 		errorMessage.WriteString("Missing register updates:\n")
 		for id, value := range missingUpdates {
-			errorMessage.WriteString(fmt.Sprintf("  RegisterID: %v, ExpectedValue: %v\n", id, value))
+			errorMessage.WriteString(fmt.Sprintf("  RegisterKey: %v, ExpectedValue: %x\n", id.Key, value))
 		}
 	}
 
 	if len(additionalUpdates) > 0 {
 		errorMessage.WriteString("Additional register updates:\n")
 		for id, value := range additionalUpdates {
-			errorMessage.WriteString(fmt.Sprintf("  RegisterID: %v, ActualValue: %v\n", id, value))
+			errorMessage.WriteString(fmt.Sprintf("  RegisterKey: %v, ActualValue: %x\n", id.Key, value))
 		}
 	}
 
 	if len(mismatchingUpdates) > 0 {
 		errorMessage.WriteString("Mismatching register updates:\n")
 		for id, values := range mismatchingUpdates {
-			errorMessage.WriteString(fmt.Sprintf("  RegisterID: %v, ExpectedValue: %v, ActualValue: %v\n", id, values[0], values[1]))
+			errorMessage.WriteString(fmt.Sprintf("  RegisterKey: %v, ExpectedValue: %x, ActualValue: %x\n", id.Key, values[0], values[1]))
 		}
 	}
 
