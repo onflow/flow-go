@@ -12,6 +12,7 @@ import (
 	"github.com/onflow/flow-go/fvm/evm"
 	"github.com/onflow/flow-go/fvm/evm/events"
 	"github.com/onflow/flow-go/fvm/evm/offchain/blocks"
+	"github.com/onflow/flow-go/fvm/evm/offchain/storage"
 	"github.com/onflow/flow-go/fvm/evm/offchain/sync"
 	. "github.com/onflow/flow-go/fvm/evm/testutils"
 	"github.com/onflow/flow-go/fvm/evm/types"
@@ -154,7 +155,8 @@ func TestChainReplay(t *testing.T) {
 
 						// check replay
 
-						bp, err := blocks.NewBasicProvider(chainID, snapshot, rootAddr)
+						bpStorage := storage.NewEphemeralStorage(snapshot)
+						bp, err := blocks.NewBasicProvider(chainID, bpStorage, rootAddr)
 						require.NoError(t, err)
 
 						err = bp.OnBlockReceived(blockEventPayload)
@@ -167,14 +169,12 @@ func TestChainReplay(t *testing.T) {
 
 						require.Len(t, results, totalTxCount)
 
-						err = bp.OnBlockExecuted(blockEventPayload.Height, res)
+						proposal := blocks.ReconstructProposal(blockEventPayload, txEventPayloads, results)
+
+						err = bp.OnBlockExecuted(blockEventPayload.Height, res, proposal)
 						require.NoError(t, err)
 
-						// TODO: verify the state delta
-						// currently the backend storage doesn't work well with this
-						// changes needed to make this work, which is left for future PRs
-						//
-						// for k, v := range result.StorageRegisterUpdates() {
+						// for k, v := range bpStorage.StorageRegisterUpdates() {
 						// 	ret, err := backend.GetValue([]byte(k.Owner), []byte(k.Key))
 						// 	require.NoError(t, err)
 						// 	require.Equal(t, ret[:], v[:])
