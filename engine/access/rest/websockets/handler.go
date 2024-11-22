@@ -48,7 +48,7 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	err := h.HttpHandler.VerifyRequest(w, r)
 	if err != nil {
 		// VerifyRequest sets the response error before returning
-		logger.Warn().Err(err).Msg("error validating websocket request")
+		logger.Debug().Err(err).Msg("error validating websocket request")
 		return
 	}
 
