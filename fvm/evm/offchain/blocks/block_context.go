@@ -48,12 +48,9 @@ func NewBlockContext(
 				return gethCommon.Hash{}
 			}
 
-			// For testnet & mainnet, we fetch the block hash from the hard-coded
-			// array of hashes.
-			if chainID == flow.Mainnet && hashHeight < blockHashListFixHCUEVMHeightMainnet {
-				return fixedHashes[flow.Mainnet][hashHeight%256]
-			} else if chainID == flow.Testnet && blockHashListBugIntroducedHCUEVMHeightTestnet <= hashHeight && hashHeight < blockHashListFixHCUEVMHeightTestnet {
-				return fixedHashes[flow.Testnet][hashHeight%256]
+			hash, ok := UseBlockHashCorrection(chainID, height, hashHeight)
+			if ok {
+				return hash
 			}
 
 			return getHashByHeight(hashHeight)
@@ -62,6 +59,18 @@ func NewBlockContext(
 		Random: prevRandao,
 		Tracer: tracer,
 	}, nil
+}
+
+// UseBlockHashCorrection returns the block hash correction for the given chain ID, EVM height, and queried EVM height, and a boolean indicating whether the correction should be used.
+func UseBlockHashCorrection(chainID flow.ChainID, evmHeightOfCurrentBlock uint64, queriedEVMHeight uint64) (gethCommon.Hash, bool) {
+	// For testnet & mainnet, we fetch the block hash from the hard-coded
+	// array of hashes.
+	if chainID == flow.Mainnet && evmHeightOfCurrentBlock < blockHashListFixHCUEVMHeightMainnet {
+		return fixedHashes[flow.Mainnet][queriedEVMHeight%256], true
+	} else if chainID == flow.Testnet && blockHashListBugIntroducedHCUEVMHeightTestnet <= evmHeightOfCurrentBlock && evmHeightOfCurrentBlock < blockHashListFixHCUEVMHeightTestnet {
+		return fixedHashes[flow.Testnet][queriedEVMHeight%256], true
+	}
+	return gethCommon.Hash{}, false
 }
 
 // Testnet52 - Height Coordinated Upgrade 4, Nov 21, 2024
