@@ -2,6 +2,7 @@ package badger
 
 import (
 	"fmt"
+	"golang.org/x/exp/slices"
 
 	"github.com/dgraph-io/badger/v2"
 	"github.com/onflow/crypto"
@@ -15,6 +16,16 @@ import (
 	"github.com/onflow/flow-go/storage/badger/operation"
 	"github.com/onflow/flow-go/storage/badger/transaction"
 )
+
+var allowedStateTransitions = map[flow.DKGState][]flow.DKGState{
+	flow.DKGStateStarted:          {flow.DKGStateCompleted, flow.DKGStateNoKey, flow.DKGStateDKGFailure, flow.DKGStateInconsistentKey, flow.RandomBeaconKeyRecovered},
+	flow.DKGStateCompleted:        {flow.DKGStateSuccess, flow.DKGStateNoKey, flow.DKGStateDKGFailure, flow.DKGStateInconsistentKey, flow.RandomBeaconKeyRecovered},
+	flow.DKGStateSuccess:          {},
+	flow.RandomBeaconKeyRecovered: {},
+	flow.DKGStateDKGFailure:       {flow.RandomBeaconKeyRecovered},
+	flow.DKGStateInconsistentKey:  {flow.RandomBeaconKeyRecovered},
+	flow.DKGStateNoKey:            {flow.RandomBeaconKeyRecovered},
+}
 
 // RecoverablePrivateBeaconKeyState stores state information about in-progress and completed DKGs, including
 // computed keys. Must be instantiated using secrets database.
@@ -94,7 +105,7 @@ func (ds *RecoverablePrivateBeaconKeyState) InsertMyBeaconPrivateKey(epochCounte
 		if err != nil {
 			return err
 		}
-		return operation.InsertDKGEndStateForEpoch(epochCounter, flow.DKGStateCompleted)(tx.DBTxn)
+		return ds.processStateTransition(epochCounter, flow.DKGStateCompleted)(tx)
 	})
 }
 
@@ -122,7 +133,32 @@ func (ds *RecoverablePrivateBeaconKeyState) GetDKGStarted(epochCounter uint64) (
 
 // SetDKGEndState stores that the DKG has ended, and its end state.
 func (ds *RecoverablePrivateBeaconKeyState) SetDKGEndState(epochCounter uint64, endState flow.DKGState) error {
-	return ds.db.Update(operation.InsertDKGEndStateForEpoch(epochCounter, endState))
+	return operation.RetryOnConflictTx(ds.db, transaction.Update, ds.processStateTransition(epochCounter, endState))
+}
+
+func (ds *RecoverablePrivateBeaconKeyState) processStateTransition(epochCounter uint64, newState flow.DKGState) func(*transaction.Tx) error {
+	return func(tx *transaction.Tx) error {
+		var currentState flow.DKGState
+		err := operation.RetrieveDKGEndStateForEpoch(epochCounter, &currentState)(tx.DBTxn)
+		if err != nil {
+			return fmt.Errorf("could not retrieve current state for epoch %d: %w", epochCounter, err)
+		}
+
+		allowedStates := allowedStateTransitions[currentState]
+		if slices.Index(allowedStates, newState) < 0 {
+			return fmt.Errorf("invalid state transition from %s to %s", currentState, newState)
+		}
+
+		// ensure invariant holds and we still have a valid private key stored
+		if newState == flow.DKGStateSuccess {
+			_, err = ds.retrieveKeyTx(epochCounter)(tx.DBTxn)
+			if err != nil {
+				return fmt.Errorf("cannot transition to flow.DKGStateSuccess without a valid random beacon key: %w", err)
+			}
+		}
+
+		return operation.InsertDKGEndStateForEpoch(epochCounter, newState)(tx.DBTxn)
+	}
 }
 
 // GetDKGEndState retrieves the DKG end state for the epoch.

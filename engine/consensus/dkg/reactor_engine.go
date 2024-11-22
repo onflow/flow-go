@@ -160,7 +160,6 @@ func (e *ReactorEngine) startDKGForEpoch(currentEpochCounter uint64, first *flow
 		// unexpected storage-level error
 		// TODO use irrecoverable context
 		log.Fatal().Err(err).Msg("could not check whether DKG is dkgState")
-
 	}
 	if started {
 		log.Warn().Msg("DKG started before, skipping starting the DKG for this epoch")
