@@ -56,13 +56,11 @@ func NewBlocksDataProvider(
 
 	context, cancel := context.WithCancel(ctx)
 
-	// Set up a subscription to blocks based on arguments.
-	subscription := p.createSubscription(context)
 	p.BaseDataProviderImpl = NewBaseDataProviderImpl(
-		cancel,
 		topic,
+		cancel,
 		send,
-		subscription,
+		p.createSubscription(context), // Set up a subscription to blocks based on arguments.
 	)
 
 	return p, nil

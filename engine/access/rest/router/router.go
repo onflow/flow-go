@@ -2,6 +2,7 @@ package router
 
 import (
 	"fmt"
+	"net/http"
 	"regexp"
 	"strings"
 
@@ -10,8 +11,10 @@ import (
 
 	"github.com/onflow/flow-go/access"
 	"github.com/onflow/flow-go/engine/access/rest/common/middleware"
-	"github.com/onflow/flow-go/engine/access/rest/http"
+	flowhttp "github.com/onflow/flow-go/engine/access/rest/http"
 	"github.com/onflow/flow-go/engine/access/rest/http/models"
+	"github.com/onflow/flow-go/engine/access/rest/websockets"
+	dp "github.com/onflow/flow-go/engine/access/rest/websockets/data_providers"
 	legacyws "github.com/onflow/flow-go/engine/access/rest/websockets/legacy"
 	"github.com/onflow/flow-go/engine/access/state_stream"
 	"github.com/onflow/flow-go/engine/access/state_stream/backend"
@@ -54,7 +57,7 @@ func (b *RouterBuilder) AddRestRoutes(
 ) *RouterBuilder {
 	linkGenerator := models.NewLinkGeneratorImpl(b.v1SubRouter)
 	for _, r := range Routes {
-		h := http.NewHandler(b.logger, backend, r.Handler, linkGenerator, chain, maxRequestSize)
+		h := flowhttp.NewHandler(b.logger, backend, r.Handler, linkGenerator, chain, maxRequestSize)
 		b.v1SubRouter.
 			Methods(r.Method).
 			Path(r.Pattern).
@@ -64,8 +67,8 @@ func (b *RouterBuilder) AddRestRoutes(
 	return b
 }
 
-// AddWsLegacyRoutes adds WebSocket routes to the router.
-func (b *RouterBuilder) AddWsLegacyRoutes(
+// AddLegacyWebsocketsRoutes adds WebSocket routes to the router.
+func (b *RouterBuilder) AddLegacyWebsocketsRoutes(
 	stateStreamApi state_stream.API,
 	chain flow.Chain,
 	stateStreamConfig backend.Config,
@@ -80,6 +83,22 @@ func (b *RouterBuilder) AddWsLegacyRoutes(
 			Name(r.Name).
 			Handler(h)
 	}
+
+	return b
+}
+
+func (b *RouterBuilder) AddWebsocketsRoute(
+	chain flow.Chain,
+	config websockets.Config,
+	maxRequestSize int64,
+	dataProviderFactory dp.DataProviderFactory,
+) *RouterBuilder {
+	handler := websockets.NewWebSocketHandler(b.logger, config, chain, maxRequestSize, dataProviderFactory)
+	b.v1SubRouter.
+		Methods(http.MethodGet).
+		Path("/ws").
+		Name("ws").
+		Handler(handler)
 
 	return b
 }
