@@ -23,6 +23,7 @@ import (
 	accessmock "github.com/onflow/flow-go/engine/access/mock"
 	"github.com/onflow/flow-go/engine/access/rest"
 	"github.com/onflow/flow-go/engine/access/rest/router"
+	"github.com/onflow/flow-go/engine/access/rest/websockets"
 	"github.com/onflow/flow-go/engine/access/rpc"
 	"github.com/onflow/flow-go/engine/access/rpc/backend"
 	statestreambackend "github.com/onflow/flow-go/engine/access/state_stream/backend"
@@ -109,6 +110,7 @@ func (suite *IrrecoverableStateTestSuite) SetupTest() {
 		RestConfig: rest.Config{
 			ListenAddress: unittest.DefaultAddress,
 		},
+		WebSocketConfig: websockets.NewDefaultWebsocketConfig(),
 	}
 
 	// generate a server certificate that will be served by the GRPC server
