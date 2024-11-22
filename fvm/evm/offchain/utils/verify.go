@@ -68,7 +68,7 @@ func OffchainReplayBackwardCompatibilityTest(
 			payloads = append(payloads, chunkData.TrieUpdate.Payloads...)
 		}
 
-		updates := make(map[flow.RegisterID]flow.RegisterValue, len(payloads))
+		expectedUpdates := make(map[flow.RegisterID]flow.RegisterValue, len(payloads))
 		for i := len(payloads) - 1; i >= 0; i-- {
 			regID, regVal, err := convert.PayloadToRegister(payloads[i])
 			if err != nil {
@@ -82,8 +82,8 @@ func OffchainReplayBackwardCompatibilityTest(
 
 			// when iterating backwards, duplicated register updates are stale updates,
 			// so skipping them
-			if _, ok := updates[regID]; !ok {
-				updates[regID] = regVal
+			if _, ok := expectedUpdates[regID]; !ok {
+				expectedUpdates[regID] = regVal
 			}
 		}
 
@@ -105,12 +105,16 @@ func OffchainReplayBackwardCompatibilityTest(
 			return err
 		}
 
+		actualUpdates := make(map[flow.RegisterID]flow.RegisterValue, len(expectedUpdates))
+
 		// commit all changes
 		for k, v := range res.StorageRegisterUpdates() {
 			err = store.SetValue([]byte(k.Owner), []byte(k.Key), v)
 			if err != nil {
 				return err
 			}
+
+			actualUpdates[k] = v
 		}
 
 		blockProposal := blocks.ReconstructProposal(evmBlockEvent, evmTxEvents, results)
@@ -129,20 +133,12 @@ func OffchainReplayBackwardCompatibilityTest(
 				return err
 			}
 
-			expectedUpdate, ok := updates[k]
-			if !ok {
-				return fmt.Errorf("missing update for register %v, %v", k, expectedUpdate)
-			}
-
-			if !bytes.Equal(expectedUpdate, v) {
-				return fmt.Errorf("unexpected update for register %v, expected %v, got %v", k, expectedUpdate, v)
-			}
-
-			delete(updates, k)
+			actualUpdates[k] = v
 		}
 
-		if len(updates) > 0 {
-			return fmt.Errorf("missing updates for registers %v", updates)
+		err = verifyRegisterUpdates(expectedUpdates, actualUpdates)
+		if err != nil {
+			return err
 		}
 
 		log.Info().Msgf("verified block %d", height)
@@ -186,4 +182,54 @@ func parseEVMEvents(evts flow.EventsList) (*events.BlockEventPayload, []events.T
 	}
 
 	return blockEvent, txEvents, nil
+}
+
+func verifyRegisterUpdates(expectedUpdates map[flow.RegisterID]flow.RegisterValue, actualUpdates map[flow.RegisterID]flow.RegisterValue) error {
+	missingUpdates := make(map[flow.RegisterID]flow.RegisterValue)
+	additionalUpdates := make(map[flow.RegisterID]flow.RegisterValue)
+	mismatchingUpdates := make(map[flow.RegisterID][2]flow.RegisterValue)
+
+	for k, v := range expectedUpdates {
+		if actualVal, ok := actualUpdates[k]; !ok {
+			missingUpdates[k] = v
+		} else if !bytes.Equal(v, actualVal) {
+			mismatchingUpdates[k] = [2]flow.RegisterValue{v, actualVal}
+		}
+
+		delete(actualUpdates, k)
+	}
+
+	for k, v := range actualUpdates {
+		additionalUpdates[k] = v
+	}
+
+	// Build a combined error message
+	var errorMessage strings.Builder
+
+	if len(missingUpdates) > 0 {
+		errorMessage.WriteString("Missing register updates:\n")
+		for id, value := range missingUpdates {
+			errorMessage.WriteString(fmt.Sprintf("  RegisterID: %v, ExpectedValue: %v\n", id, value))
+		}
+	}
+
+	if len(additionalUpdates) > 0 {
+		errorMessage.WriteString("Additional register updates:\n")
+		for id, value := range additionalUpdates {
+			errorMessage.WriteString(fmt.Sprintf("  RegisterID: %v, ActualValue: %v\n", id, value))
+		}
+	}
+
+	if len(mismatchingUpdates) > 0 {
+		errorMessage.WriteString("Mismatching register updates:\n")
+		for id, values := range mismatchingUpdates {
+			errorMessage.WriteString(fmt.Sprintf("  RegisterID: %v, ExpectedValue: %v, ActualValue: %v\n", id, values[0], values[1]))
+		}
+	}
+
+	if errorMessage.Len() > 0 {
+		return errors.New(errorMessage.String())
+	}
+
+	return nil
 }
