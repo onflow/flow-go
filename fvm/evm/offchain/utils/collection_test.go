@@ -147,7 +147,7 @@ func replayEvents(
 
 			sp := NewTestStorageProvider(store, blockEventPayload.Height)
 			cr := sync.NewReplayer(chainID, rootAddr, sp, bp, zerolog.Logger{}, nil, true)
-			res, _, err := cr.ReplayBlock(txEvents, blockEventPayload)
+			res, results, err := cr.ReplayBlock(txEvents, blockEventPayload)
 			require.NoError(t, err)
 
 			// commit all changes
@@ -156,7 +156,9 @@ func replayEvents(
 				require.NoError(t, err)
 			}
 
-			err = bp.OnBlockExecuted(blockEventPayload.Height, res)
+			proposal := blocks.ReconstructProposal(blockEventPayload, txEvents, results)
+
+			err = bp.OnBlockExecuted(blockEventPayload.Height, res, proposal)
 			require.NoError(t, err)
 
 			// commit all block hash list changes
