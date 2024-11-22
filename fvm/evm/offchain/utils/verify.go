@@ -1,8 +1,10 @@
 package utils
 
 import (
+	"bytes"
 	"context"
 	"errors"
+	"fmt"
 	"strings"
 
 	"github.com/onflow/cadence"
@@ -124,6 +126,21 @@ func OffchainReplayBackwardCompatibilityTest(
 			if err != nil {
 				return err
 			}
+
+			expectedUpdate, ok := updates[k]
+			if !ok {
+				return fmt.Errorf("missing update for register %v, %v", k, expectedUpdate)
+			}
+
+			if !bytes.Equal(expectedUpdate, v) {
+				return fmt.Errorf("unexpected update for register %v, expected %v, got %v", k, expectedUpdate, v)
+			}
+
+			delete(updates, k)
+		}
+
+		if len(updates) > 0 {
+			return fmt.Errorf("missing updates for registers %v", updates)
 		}
 
 		log.Info().Msgf("verified block %d", height)
