@@ -91,7 +91,7 @@ const blockHashListBugIntroducedHCUEVMHeightTestnet = 7038679
 // Testnet51 - Height Coordinated Upgrade 1
 // Flow Block: 212562161 1a520608c5457f228405c4c30fc39c8a0af7cf915fb2ede7ec5ccffc2a000f57
 // PR: https://github.com/onflow/flow-go/pull/6380
-const coinbaseAddressChangeEVMHeightTestnet = 1385490
+const coinbaseAddressChangeEVMHeightTestnet = 1385491
 
 var genesisCoinbaseAddressTestnet = types.Address(gethCommon.HexToAddress("0000000000000000000000021169100eecb7c1a6"))
 
