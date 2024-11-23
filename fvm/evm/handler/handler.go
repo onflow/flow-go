@@ -356,7 +356,7 @@ func (h *ContractHandler) commitBlockProposal() error {
 	// log evm block commitment
 	logger := h.backend.Logger()
 	logger.Info().
-		Uint64("height", bp.Height).
+		Uint64("evm_height", bp.Height).
 		Int("tx_count", len(bp.TxHashes)).
 		Uint64("total_gas_used", bp.TotalGasUsed).
 		Uint64("total_supply", bp.TotalSupply.Uint64()).
