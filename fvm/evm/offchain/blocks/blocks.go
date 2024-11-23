@@ -113,11 +113,16 @@ func (b *Blocks) BlockContext() (types.BlockContext, error) {
 		bm.Height,
 		bm.Timestamp,
 		func(n uint64) gethCommon.Hash {
+			hash, ok := UseBlockHashCorrection(b.chainID, bm.Height, n)
+			if ok {
+				return hash
+			}
+
 			hash, err := b.BlockHash(n)
 			if err != nil {
 				panic(err)
 			}
-			return UseFixedHashList(b.chainID, bm.Height, n, hash)
+			return hash
 		},
 		bm.Random,
 		nil,

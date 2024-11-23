@@ -69,11 +69,15 @@ func (p *BasicProvider) OnBlockExecuted(
 		return fmt.Errorf("active block height doesn't match expected: %d, got: %d", p.latestBlockPayload.Height, height)
 	}
 
-	correctHash := p.latestBlockPayload.Hash
-	storedBlockHash := UseFixedHashList(p.chainID, height, height, correctHash)
+	hash := p.latestBlockPayload.Hash
+
+	fixedHash, ok := UseBlockHashCorrection(p.chainID, height, height)
+	if ok {
+		hash = fixedHash
+	}
 
 	return p.blks.PushBlockHash(
 		p.latestBlockPayload.Height,
-		storedBlockHash,
+		hash,
 	)
 }
