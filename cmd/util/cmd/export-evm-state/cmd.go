@@ -3,13 +3,17 @@ package evm_exporter
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
 
+	"github.com/onflow/atree"
+
 	"github.com/onflow/flow-go/cmd/util/ledger/util"
 	"github.com/onflow/flow-go/fvm/evm"
 	"github.com/onflow/flow-go/fvm/evm/emulator/state"
+	"github.com/onflow/flow-go/fvm/evm/testutils"
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/ledger/common/convert"
 	"github.com/onflow/flow-go/model/flow"
@@ -20,6 +24,8 @@ var (
 	flagExecutionStateDir string
 	flagOutputDir         string
 	flagStateCommitment   string
+	flagEVMStateGobDir    string
+	flagEVMStateGobHeight uint64
 )
 
 var Cmd = &cobra.Command{
@@ -34,7 +40,6 @@ func init() {
 
 	Cmd.Flags().StringVar(&flagExecutionStateDir, "execution-state-dir", "",
 		"Execution Node state dir (where WAL logs are written")
-	_ = Cmd.MarkFlagRequired("execution-state-dir")
 
 	Cmd.Flags().StringVar(&flagOutputDir, "output-dir", "",
 		"Directory to write new Execution State to")
@@ -42,13 +47,26 @@ func init() {
 
 	Cmd.Flags().StringVar(&flagStateCommitment, "state-commitment", "",
 		"State commitment (hex-encoded, 64 characters)")
+
+	Cmd.Flags().StringVar(&flagEVMStateGobDir, "evm_state_gob_dir", "/var/flow/data/evm_state_gob",
+		"directory that stores the evm state gob files as checkpoint")
+
+	Cmd.Flags().Uint64Var(&flagEVMStateGobHeight, "evm_state_gob_height", 0,
+		"the flow height of the evm state gob files")
 }
 
 func run(*cobra.Command, []string) {
 	log.Info().Msg("start exporting evm state")
-	err := ExportEVMState(flagChain, flagExecutionStateDir, flagStateCommitment, flagOutputDir)
-	if err != nil {
-		log.Fatal().Err(err).Msg("cannot get export evm state")
+	if flagExecutionStateDir != "" {
+		err := ExportEVMState(flagChain, flagExecutionStateDir, flagStateCommitment, flagOutputDir)
+		if err != nil {
+			log.Fatal().Err(err).Msg("cannot get export evm state")
+		}
+	} else if flagEVMStateGobDir != "" {
+		err := ExportEVMStateFromGob(flagChain, flagEVMStateGobDir, flagEVMStateGobHeight, flagOutputDir)
+		if err != nil {
+			log.Fatal().Err(err).Msg("cannot get export evm state from gob files")
+		}
 	}
 }
 
@@ -83,7 +101,40 @@ func ExportEVMState(
 
 	payloadsLedger := util.NewPayloadsLedger(filteredPayloads)
 
-	exporter, err := state.NewExporter(payloadsLedger, storageRoot)
+	return ExportEVMStateFromPayloads(payloadsLedger, storageRoot, outputPath)
+}
+
+func ExportEVMStateFromGob(
+	chainName string,
+	evmStateGobDir string,
+	flowHeight uint64,
+	outputPath string) error {
+
+	valueFileName, allocatorFileName := evmStateGobFileNamesByEndHeight(evmStateGobDir, flowHeight)
+	chainID := flow.ChainID(chainName)
+
+	storageRoot := evm.StorageAccountAddress(chainID)
+	valuesGob, err := testutils.DeserializeState(valueFileName)
+	if err != nil {
+		return err
+	}
+
+	allocatorGobs, err := testutils.DeserializeAllocator(allocatorFileName)
+	if err != nil {
+		return err
+	}
+
+	store := testutils.GetSimpleValueStorePopulated(valuesGob, allocatorGobs)
+
+	return ExportEVMStateFromPayloads(store, storageRoot, outputPath)
+}
+
+func ExportEVMStateFromPayloads(
+	ledger atree.Ledger,
+	storageRoot flow.Address,
+	outputPath string,
+) error {
+	exporter, err := state.NewExporter(ledger, storageRoot)
 	if err != nil {
 		return fmt.Errorf("failed to create exporter: %w", err)
 	}
@@ -106,4 +157,10 @@ func ExportEVMState(
 		return fmt.Errorf("failed to export: %w", err)
 	}
 	return nil
+}
+
+func evmStateGobFileNamesByEndHeight(evmStateGobDir string, endHeight uint64) (string, string) {
+	valueFileName := filepath.Join(evmStateGobDir, fmt.Sprintf("values-%d.gob", endHeight))
+	allocatorFileName := filepath.Join(evmStateGobDir, fmt.Sprintf("allocators-%d.gob", endHeight))
+	return valueFileName, allocatorFileName
 }
