@@ -37,7 +37,7 @@ func NewExporter(ledger atree.Ledger, root flow.Address) (*Exporter, error) {
 }
 
 func (e *Exporter) Export(path string) error {
-	af, err := os.OpenFile(filepath.Join(path, ExportedAccountsFileName), os.O_RDWR, 0644)
+	af, err := os.Create(filepath.Join(path, ExportedAccountsFileName))
 	if err != nil {
 		return err
 	}
@@ -48,7 +48,7 @@ func (e *Exporter) Export(path string) error {
 		return err
 	}
 
-	cf, err := os.OpenFile(filepath.Join(path, ExportedCodesFileName), os.O_RDWR, 0644)
+	cf, err := os.Create(filepath.Join(path, ExportedCodesFileName))
 	if err != nil {
 		return err
 	}
@@ -59,7 +59,7 @@ func (e *Exporter) Export(path string) error {
 		return err
 	}
 
-	sf, err := os.OpenFile(filepath.Join(path, ExportedSlotsFileName), os.O_RDWR, 0644)
+	sf, err := os.Create(filepath.Join(path, ExportedSlotsFileName))
 	if err != nil {
 		return err
 	}
