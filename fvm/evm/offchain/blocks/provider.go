@@ -99,7 +99,6 @@ func (p *BasicProvider) OnBlockExecuted(
 		return types.NewFatalError(err)
 	}
 
-	hash := p.latestBlockPayload.Hash
 	// update block proposal
 	err = p.storage.SetValue(
 		p.rootAddr[:],
@@ -110,9 +109,15 @@ func (p *BasicProvider) OnBlockExecuted(
 		return err
 	}
 
+	storedHash := p.latestBlockPayload.Hash
+	hash, ok := UseBlockHashCorrection(p.chainID, height, height)
+	if ok {
+		storedHash = hash
+	}
+
 	// update block hash list
 	return p.blks.PushBlockHash(
 		p.latestBlockPayload.Height,
-		hash,
+		storedHash,
 	)
 }

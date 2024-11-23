@@ -48,10 +48,10 @@ func NewBlockContext(
 				return gethCommon.Hash{}
 			}
 
-			// hash, ok := UseBlockHashCorrection(chainID, height, hashHeight)
-			// if ok {
-			// 	return hash
-			// }
+			hash, ok := UseBlockHashCorrection(chainID, height, hashHeight)
+			if ok {
+				return hash
+			}
 
 			return getHashByHeight(hashHeight)
 
