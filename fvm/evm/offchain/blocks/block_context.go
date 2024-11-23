@@ -1,8 +1,6 @@
 package blocks
 
 import (
-	"fmt"
-
 	gethCommon "github.com/onflow/go-ethereum/common"
 	"github.com/onflow/go-ethereum/eth/tracers"
 
@@ -117,4 +115,3 @@ func generateFixedHashes() {
 func init() {
 	generateFixedHashes()
 }
->>>>>>> master
