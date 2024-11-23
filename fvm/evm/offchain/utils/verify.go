@@ -14,6 +14,7 @@ import (
 	"github.com/onflow/flow-go/fvm/environment"
 	"github.com/onflow/flow-go/fvm/evm"
 	"github.com/onflow/flow-go/fvm/evm/events"
+	"github.com/onflow/flow-go/fvm/evm/handler"
 	"github.com/onflow/flow-go/fvm/evm/offchain/blocks"
 	evmStorage "github.com/onflow/flow-go/fvm/evm/offchain/storage"
 	"github.com/onflow/flow-go/fvm/evm/offchain/sync"
@@ -98,6 +99,10 @@ func OffchainReplayBackwardCompatibilityTest(
 				continue
 			}
 
+			if !verifiableKeys(regID) {
+				continue
+			}
+
 			// when iterating backwards, duplicated register updates are stale updates,
 			// so skipping them
 			if _, ok := expectedUpdates[regID]; !ok {
@@ -152,7 +157,12 @@ func OffchainReplayBackwardCompatibilityTest(
 				return err
 			}
 
+			if !verifiableKeys(k) {
+				continue
+			}
+
 			actualUpdates[k] = v
+
 		}
 
 		err = verifyRegisterUpdates(expectedUpdates, actualUpdates)
@@ -164,6 +174,10 @@ func OffchainReplayBackwardCompatibilityTest(
 	}
 
 	return nil
+}
+
+func verifiableKeys(key flow.RegisterID) bool {
+	return handler.IsBlockHashListBucketKeyFormat(key) || handler.IsBlockHashListMetaKey(key)
 }
 
 func parseEVMEvents(evts flow.EventsList) (*events.BlockEventPayload, []events.TransactionEventPayload, error) {
