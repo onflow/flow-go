@@ -48,21 +48,21 @@ func OffchainReplayBackwardCompatibilityTest(
 	rootAddr := evm.StorageAccountAddress(chainID)
 	rootAddrStr := string(rootAddr.Bytes())
 
-	bpStorage := evmStorage.NewEphemeralStorage(store)
-	bp, err := blocks.NewBasicProvider(chainID, bpStorage, rootAddr)
-	if err != nil {
-		return err
-	}
-
-	// setup account status at EVM root block
-	if isEVMRootHeight(chainID, flowStartHeight) {
-		err = bpStorage.SetValue(rootAddr[:], []byte(flow.AccountStatusKey), environment.NewAccountStatus().ToBytes())
+	for height := flowStartHeight; height <= flowEndHeight; height++ {
+		bpStorage := evmStorage.NewEphemeralStorage(store)
+		bp, err := blocks.NewBasicProvider(chainID, bpStorage, rootAddr)
 		if err != nil {
 			return err
 		}
-	}
 
-	for height := flowStartHeight; height <= flowEndHeight; height++ {
+		// setup account status at EVM root block
+		if isEVMRootHeight(chainID, flowStartHeight) {
+			err = bpStorage.SetValue(rootAddr[:], []byte(flow.AccountStatusKey), environment.NewAccountStatus().ToBytes())
+			if err != nil {
+				return err
+			}
+		}
+
 		blockID, err := headers.BlockIDByHeight(height)
 		if err != nil {
 			return err
