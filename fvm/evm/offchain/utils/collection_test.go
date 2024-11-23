@@ -53,20 +53,7 @@ func TestTestnetBackwardCompatibility(t *testing.T) {
 	)
 }
 
-// BackwardCompatibilityTestSinceEVMGenesisBlock verifies that the offchain package
-// is able to read EVM events from the given file paths and replay blocks since the
-// EVM genesis block and derive a consistant state as the latest onchain EVM state.
-// the eventsFilePaths is a list of file paths that contain ordered EVM events in JSONL format.
-// The EVM events file can be queried by flow cli query, for instance:
-//
-// flow events get A.8c5303eaa26202d6.EVM.TransactionExecuted A.8c5303eaa26202d6.EVM.BlockExecuted
-//   --start 211176670 --end 211176770 --network testnet --host access-001.devnet51.nodes.onflow.org:9000
-//
-// After replaying with each event json file, it will generate a values_<height>.gob and
-// allocators_<height>.gob files as checkpoint, such that when the checkpoint exists, it will loaded
-// and skil replaying the coresponding event json files.
-
-// backwardCompatibilityTestSinceEVMGenesisBlock ensures that the offchain package
+// BackwardCompatibilityTestSinceEVMGenesisBlock ensures that the offchain package
 // can read EVM events from the provided file paths, replay blocks starting from
 // the EVM genesis block, and derive a consistent state matching the latest on-chain EVM state.
 //
@@ -87,7 +74,7 @@ func BackwardCompatibleSinceEVMGenesisBlock(
 	checkpointDir string,
 	checkpointEndHeight uint64, // EVM height of an EVM state that a checkpoint was created for
 ) {
-	// ensure that checkpoints are not more than the event files
+	// ensure that event files is not an empty array
 	require.True(t, len(eventsFilePaths) > 0)
 
 	log.Info().Msgf("replaying EVM events from %v to %v, with checkpoints in %s, and checkpointEndHeight: %v",
@@ -206,40 +193,6 @@ func dumpCheckpoint(t *testing.T, store *TestValueStore, dir string, checkpointE
 	require.NoError(t, serialize(valuesFileName, values))
 	require.NoError(t, serializeAllocator(allocatorsFileName, allocators))
 	return valuesFileName, allocatorsFileName
-}
-
-const resume_height = 6559268
-
-func decodeFullKey(encoded string) ([]byte, []byte, error) {
-	// Split the encoded string at the first occurrence of "~"
-	parts := strings.SplitN(encoded, "~", 2)
-	if len(parts) != 2 {
-		return nil, nil, fmt.Errorf("invalid encoded key: no delimiter found")
-	}
-
-	// Convert the split parts back to byte slices
-	owner := []byte(parts[0])
-	key := []byte(parts[1])
-	return owner, key, nil
-}
-
-type Subscription[T any] struct {
-	ch  chan T
-	err error
-}
-
-func NewSubscription[T any]() *Subscription[T] {
-	return &Subscription[T]{
-		ch: make(chan T),
-	}
-}
-
-func (s *Subscription[T]) Channel() <-chan T {
-	return s.ch
-}
-
-func (s *Subscription[T]) Err() error {
-	return s.err
 }
 
 // scanEventFilesAndRun
