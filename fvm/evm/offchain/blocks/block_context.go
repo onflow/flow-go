@@ -55,13 +55,14 @@ func NewBlockContext(
 	}, nil
 }
 
-// UseBlockHashCorrection returns the block hash correction for the given chain ID, EVM height, and queried EVM height, and a boolean indicating whether the correction should be used.
+// UseBlockHashCorrection returns the block hash correction for the given chain ID, EVM height,
+// and queried EVM height, and a boolean indicating whether the correction should be used.
 func UseBlockHashCorrection(chainID flow.ChainID, evmHeightOfCurrentBlock uint64, queriedEVMHeight uint64) (gethCommon.Hash, bool) {
 	// For testnet & mainnet, we fetch the block hash from the hard-coded
 	// array of hashes.
 	if chainID == flow.Mainnet && evmHeightOfCurrentBlock < blockHashListFixHCUEVMHeightMainnet {
 		return fixedHashes[flow.Mainnet][queriedEVMHeight%256], true
-	} else if chainID == flow.Testnet && blockHashListBugIntroducedHCUEVMHeightTestnet <= evmHeightOfCurrentBlock && evmHeightOfCurrentBlock < blockHashListFixHCUEVMHeightTestnet {
+	} else if chainID == flow.Testnet && evmHeightOfCurrentBlock < blockHashListFixHCUEVMHeightTestnet {
 		return fixedHashes[flow.Testnet][queriedEVMHeight%256], true
 	}
 	return gethCommon.Hash{}, false
