@@ -1,6 +1,8 @@
 package blocks
 
 import (
+	"fmt"
+
 	gethCommon "github.com/onflow/go-ethereum/common"
 	"github.com/onflow/go-ethereum/eth/tracers"
 
@@ -28,6 +30,8 @@ func NewBlockContext(
 	if chainID == flow.Testnet && height < coinbaseAddressChangeEVMHeightTestnet {
 		miner = oldCoinbaseAddressTestnet
 	}
+
+	fmt.Printf("height: %v, miner: %v\n", height, miner)
 
 	return types.BlockContext{
 		ChainID:                types.EVMChainIDFromFlowChainID(chainID),
