@@ -137,6 +137,10 @@ func OffchainReplayBackwardCompatibilityTest(
 				return err
 			}
 
+			if !verifiableKeys(k) {
+				continue
+			}
+
 			actualUpdates[k] = v
 		}
 
