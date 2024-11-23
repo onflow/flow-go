@@ -146,12 +146,6 @@ func ExportEVMStateFromPayloads(
 		}
 	}
 
-	fi, err := os.Create(outputPath)
-	if err != nil {
-		return err
-	}
-	defer fi.Close()
-
 	err = exporter.Export(outputPath)
 	if err != nil {
 		return fmt.Errorf("failed to export: %w", err)
