@@ -67,7 +67,7 @@ func UseBlockHashCorrection(chainID flow.ChainID, evmHeightOfCurrentBlock uint64
 	// array of hashes.
 	if chainID == flow.Mainnet && evmHeightOfCurrentBlock < blockHashListFixHCUEVMHeightMainnet {
 		return fixedHashes[flow.Mainnet][queriedEVMHeight%256], true
-	} else if chainID == flow.Testnet && blockHashListBugIntroducedHCUEVMHeightTestnet <= evmHeightOfCurrentBlock && evmHeightOfCurrentBlock < blockHashListFixHCUEVMHeightTestnet {
+	} else if chainID == flow.Testnet && evmHeightOfCurrentBlock < blockHashListFixHCUEVMHeightTestnet {
 		return fixedHashes[flow.Testnet][queriedEVMHeight%256], true
 	}
 	return gethCommon.Hash{}, false
