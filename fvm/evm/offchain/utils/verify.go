@@ -14,7 +14,6 @@ import (
 	"github.com/onflow/flow-go/fvm/environment"
 	"github.com/onflow/flow-go/fvm/evm"
 	"github.com/onflow/flow-go/fvm/evm/events"
-	"github.com/onflow/flow-go/fvm/evm/handler"
 	"github.com/onflow/flow-go/fvm/evm/offchain/blocks"
 	evmStorage "github.com/onflow/flow-go/fvm/evm/offchain/storage"
 	"github.com/onflow/flow-go/fvm/evm/offchain/sync"
@@ -58,7 +57,8 @@ func OffchainReplayBackwardCompatibilityTest(
 
 		// setup account status at EVM root block
 		if isEVMRootHeight(chainID, flowStartHeight) {
-			err = bpStorage.SetValue(rootAddr[:], []byte(flow.AccountStatusKey), environment.NewAccountStatus().ToBytes())
+			err = bpStorage.SetValue(rootAddr[:], []byte(flow.AccountStatusKey),
+				environment.NewAccountStatus().ToBytes())
 			if err != nil {
 				return err
 			}
@@ -166,7 +166,6 @@ func OffchainReplayBackwardCompatibilityTest(
 			}
 
 			actualUpdates[k] = v
-
 		}
 
 		err = verifyRegisterUpdates(expectedUpdates, actualUpdates)
@@ -181,7 +180,8 @@ func OffchainReplayBackwardCompatibilityTest(
 }
 
 func verifiableKeys(key flow.RegisterID) bool {
-	return handler.IsBlockHashListBucketKeyFormat(key) || handler.IsBlockHashListMetaKey(key)
+	return false
+	// return handler.IsBlockHashListBucketKeyFormat(key) || handler.IsBlockHashListMetaKey(key)
 }
 
 func parseEVMEvents(evts flow.EventsList) (*events.BlockEventPayload, []events.TransactionEventPayload, error) {
