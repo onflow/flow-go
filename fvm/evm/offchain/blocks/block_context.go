@@ -67,7 +67,11 @@ func UseBlockHashCorrection(chainID flow.ChainID, evmHeightOfCurrentBlock uint64
 	// array of hashes.
 	if chainID == flow.Mainnet && evmHeightOfCurrentBlock < blockHashListFixHCUEVMHeightMainnet {
 		return fixedHashes[flow.Mainnet][queriedEVMHeight%256], true
-	} else if chainID == flow.Testnet && blockHashListBugIntroducedHCUEVMHeightTestnet <= evmHeightOfCurrentBlock && evmHeightOfCurrentBlock < blockHashListFixHCUEVMHeightTestnet {
+		// TODO: look into why adding this check blockHashListBugIntroducedHCUEVMHeightTestnet <= evmHeightOfCurrentBlock would cause
+		// the regression of https://github.com/onflow/flow-go/issues/6552#issuecomment-2436319989
+		// gas consumption mismatch 3772744 != 3792644 at cadence block 217735938: EVM height: 6559268
+		// } else if chainID == flow.Testnet && blockHashListBugIntroducedHCUEVMHeightTestnet <= evmHeightOfCurrentBlock && evmHeightOfCurrentBlock < blockHashListFixHCUEVMHeightTestnet {
+	} else if chainID == flow.Testnet && evmHeightOfCurrentBlock < blockHashListFixHCUEVMHeightTestnet {
 		return fixedHashes[flow.Testnet][queriedEVMHeight%256], true
 	}
 	return gethCommon.Hash{}, false
