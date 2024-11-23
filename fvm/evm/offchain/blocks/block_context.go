@@ -25,9 +25,9 @@ func NewBlockContext(
 
 	// coinbase address fix
 	miner := types.CoinbaseAddress
-	if chainID == flow.Testnet && height < coinbaseAddressChangeEVMHeightTestnet {
-		miner = genesisCoinbaseAddressTestnet
-	}
+	// if chainID == flow.Testnet && height < coinbaseAddressChangeEVMHeightTestnet {
+	// 	miner = genesisCoinbaseAddressTestnet
+	// }
 
 	return types.BlockContext{
 		ChainID:                types.EVMChainIDFromFlowChainID(chainID),
