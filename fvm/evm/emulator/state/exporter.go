@@ -43,7 +43,7 @@ func NewExporter(ledger atree.Ledger, root flow.Address) (*Exporter, error) {
 func (e *Exporter) ExportGob(path string) error {
 	fileName := filepath.Join(path, ExportedStateGobFileName)
 	// Open the file for reading
-	file, err := os.Open(fileName)
+	file, err := os.Create(fileName)
 	if err != nil {
 		return err
 	}
