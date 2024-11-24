@@ -1,6 +1,7 @@
 package state
 
 import (
+	"fmt"
 	"io"
 	"os"
 	"path/filepath"
@@ -8,6 +9,7 @@ import (
 	"github.com/onflow/atree"
 	gethCommon "github.com/onflow/go-ethereum/common"
 
+	"github.com/onflow/flow-go/fvm/evm/types"
 	"github.com/onflow/flow-go/model/flow"
 )
 
@@ -96,6 +98,12 @@ func (e *Exporter) exportAccounts(writer io.Writer) ([]gethCommon.Address, error
 		if err != nil {
 			return nil, err
 		}
+
+		_, err = DecodeAccount(encoded)
+		if err != nil {
+			return nil, fmt.Errorf("account can not be decoded: %w", err)
+		}
+
 		// write every account on a new line
 		_, err = writer.Write(append(encoded, byte('\n')))
 		if err != nil {
@@ -123,6 +131,12 @@ func (e *Exporter) exportCodes(writer io.Writer) error {
 		if err != nil {
 			return err
 		}
+
+		_, err = CodeInContextFromEncoded(encoded)
+		if err != nil {
+			return fmt.Errorf("error decoding code in context: %w", err)
+		}
+
 		// write every codes on a new line
 		_, err = writer.Write(append(encoded, byte('\n')))
 		if err != nil {
@@ -151,6 +165,12 @@ func (e *Exporter) exportSlots(addresses []gethCommon.Address, writer io.Writer)
 			if err != nil {
 				return err
 			}
+
+			_, err = types.SlotEntryFromEncoded(encoded)
+			if err != nil {
+				return fmt.Errorf("error decoding slot entry: %w", err)
+			}
+
 			// write every codes on a new line
 			_, err = writer.Write(append(encoded, byte('\n')))
 			if err != nil {
