@@ -26,7 +26,7 @@ import (
 )
 
 // EVM Root Height is the first block that has EVM Block Event where the EVM block height is 1
-func isEVMRootHeight(chainID flow.ChainID, flowHeight uint64) bool {
+func IsEVMRootHeight(chainID flow.ChainID, flowHeight uint64) bool {
 	if chainID == flow.Testnet {
 		return flowHeight == 211176671
 	} else if chainID == flow.Mainnet {
@@ -48,6 +48,17 @@ func OffchainReplayBackwardCompatibilityTest(
 ) error {
 	rootAddr := evm.StorageAccountAddress(chainID)
 	rootAddrStr := string(rootAddr.Bytes())
+
+	if IsEVMRootHeight(chainID, flowStartHeight) {
+		log.Info().Msgf("initializing EVM state for root height %d", flowStartHeight)
+
+		as := environment.NewAccountStatus()
+		rootAddr := evm.StorageAccountAddress(chainID)
+		err := store.SetValue(rootAddr[:], []byte(flow.AccountStatusKey), as.ToBytes())
+		if err != nil {
+			return err
+		}
+	}
 
 	for height := flowStartHeight; height <= flowEndHeight; height++ {
 		bpStorage := evmStorage.NewEphemeralStorage(store)

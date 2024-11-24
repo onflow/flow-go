@@ -12,8 +12,6 @@ import (
 	"github.com/rs/zerolog/log"
 
 	"github.com/onflow/flow-go/cmd/util/cmd/common"
-	"github.com/onflow/flow-go/fvm/environment"
-	"github.com/onflow/flow-go/fvm/evm"
 	"github.com/onflow/flow-go/fvm/evm/offchain/utils"
 	"github.com/onflow/flow-go/fvm/evm/testutils"
 	"github.com/onflow/flow-go/model/flow"
@@ -56,17 +54,9 @@ func Verify(
 	var store *testutils.TestValueStore
 
 	// root block require the account status registers to be saved
-	isRoot := isEVMRootHeight(chainID, from)
+	isRoot := utils.IsEVMRootHeight(chainID, from)
 	if isRoot {
-		log.Info().Msgf("initializing EVM state for root height %d", from)
-
 		store = testutils.GetSimpleValueStore()
-		as := environment.NewAccountStatus()
-		rootAddr := evm.StorageAccountAddress(chainID)
-		err = store.SetValue(rootAddr[:], []byte(flow.AccountStatusKey), as.ToBytes())
-		if err != nil {
-			return err
-		}
 	} else {
 		prev := from - 1
 		store, err = loadState(prev, evmStateGobDir)
@@ -174,16 +164,6 @@ func initStorages(chainID flow.ChainID, dataDir string, executionDataDir string)
 	executionDataStore := execution_data.NewExecutionDataStore(executionDataBlobstore, execution_data.DefaultSerializer)
 
 	return db, storages, executionDataStore, ds, nil
-}
-
-// EVM Root Height is the first block that has EVM Block Event where the EVM block height is 1
-func isEVMRootHeight(chainID flow.ChainID, flowHeight uint64) bool {
-	if chainID == flow.Testnet {
-		return flowHeight == 211176671
-	} else if chainID == flow.Mainnet {
-		return flowHeight == 85981136
-	}
-	return flowHeight == 1
 }
 
 func evmStateGobFileNamesByEndHeight(evmStateGobDir string, endHeight uint64) (string, string) {
