@@ -51,14 +51,14 @@ func init() {
 }
 
 func run(*cobra.Command, []string) {
-	_ = flow.ChainID(flagChain).Chain()
+	chainID := flow.ChainID(flagChain)
 
 	from, to, err := parseFromTo(flagFromTo)
 	if err != nil {
 		log.Fatal().Err(err).Msg("could not parse from_to")
 	}
 
-	err = Verify(log.Logger, from, to, flow.Testnet, flagDatadir, flagExecutionDataDir, flagEVMStateGobDir, flagSaveEveryNBlocks)
+	err = Verify(log.Logger, from, to, chainID, flagDatadir, flagExecutionDataDir, flagEVMStateGobDir, flagSaveEveryNBlocks)
 	if err != nil {
 		log.Fatal().Err(err).Msg("could not verify height")
 	}
