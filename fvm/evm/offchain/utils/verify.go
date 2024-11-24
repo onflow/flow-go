@@ -60,6 +60,7 @@ func OffchainReplayBackwardCompatibilityTest(
 		}
 	}
 
+	evmTxEventsWithNoBlock := make([]events.TransactionEventPayload, 0)
 	for height := flowStartHeight; height <= flowEndHeight; height++ {
 		bpStorage := evmStorage.NewEphemeralStorage(store)
 		bp, err := blocks.NewBasicProvider(chainID, bpStorage, rootAddr)
@@ -82,11 +83,11 @@ func OffchainReplayBackwardCompatibilityTest(
 			return err
 		}
 
-		events := flow.EventsList{}
+		evts := flow.EventsList{}
 		payloads := []*ledger.Payload{}
 
 		for _, chunkData := range executionData.ChunkExecutionDatas {
-			events = append(events, chunkData.Events...)
+			evts = append(evts, chunkData.Events...)
 			payloads = append(payloads, chunkData.TrieUpdate.Payloads...)
 		}
 
@@ -114,10 +115,22 @@ func OffchainReplayBackwardCompatibilityTest(
 		}
 
 		// parse EVM events
-		evmBlockEvent, evmTxEvents, err := parseEVMEvents(events)
+		evmBlockEvent, evmTxEvents, err := parseEVMEvents(evts)
 		if err != nil {
 			return err
 		}
+
+		if evmBlockEvent == nil {
+			evmTxEventsWithNoBlock = append(evmTxEventsWithNoBlock, evmTxEvents...)
+			log.Info().Msgf("block has no EVM block, height :%v", height)
+			err = onHeightReplayed(height)
+			if err != nil {
+				return err
+			}
+			continue
+		}
+
+		evmTxEventsWithNoBlock = make([]events.TransactionEventPayload, 0)
 
 		err = bp.OnBlockReceived(evmBlockEvent)
 		if err != nil {
@@ -126,7 +139,7 @@ func OffchainReplayBackwardCompatibilityTest(
 
 		sp := testutils.NewTestStorageProvider(store, evmBlockEvent.Height)
 		cr := sync.NewReplayer(chainID, rootAddr, sp, bp, log, nil, true)
-		res, results, err := cr.ReplayBlock(evmTxEvents, evmBlockEvent)
+		res, results, err := cr.ReplayBlock(evmTxEventsWithNoBlock, evmBlockEvent)
 		if err != nil {
 			return err
 		}
