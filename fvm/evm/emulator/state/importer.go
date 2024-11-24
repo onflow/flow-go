@@ -58,26 +58,6 @@ func ImportEVMState(path string) (*EVMState, error) {
 	var codes []*CodeInContext
 	var slots []*types.SlotEntry
 
-	// Import accounts
-	accountsFile, err := os.Open(filepath.Join(path, ExportedAccountsFileName))
-	if err != nil {
-		return nil, fmt.Errorf("error opening accounts file: %w", err)
-	}
-	defer accountsFile.Close()
-
-	scanner := bufio.NewScanner(accountsFile)
-	for scanner.Scan() {
-		acc, err := DecodeAccount(scanner.Bytes())
-		if err != nil {
-			return nil, fmt.Errorf("error decoding account: %w", err)
-		}
-		accounts[acc.Address] = acc
-	}
-
-	if err := scanner.Err(); err != nil {
-		return nil, fmt.Errorf("error reading accounts file: %w", err)
-	}
-
 	// Import codes
 	codesFile, err := os.Open(filepath.Join(path, ExportedCodesFileName))
 	if err != nil {
@@ -85,7 +65,7 @@ func ImportEVMState(path string) (*EVMState, error) {
 	}
 	defer codesFile.Close()
 
-	scanner = bufio.NewScanner(codesFile)
+	scanner := bufio.NewScanner(codesFile)
 	for scanner.Scan() {
 		code, err := CodeInContextFromEncoded(scanner.Bytes())
 		if err != nil {
@@ -111,6 +91,28 @@ func ImportEVMState(path string) (*EVMState, error) {
 			return nil, fmt.Errorf("error decoding slot entry: %w", err)
 		}
 		slots = append(slots, slot)
+	}
+
+	// Import accounts
+	accountsFile, err := os.Open(filepath.Join(path, ExportedAccountsFileName))
+	if err != nil {
+		return nil, fmt.Errorf("error opening accounts file: %w", err)
+	}
+	defer accountsFile.Close()
+
+	scanner = bufio.NewScanner(accountsFile)
+	for scanner.Scan() {
+		acc, err := DecodeAccount(scanner.Bytes())
+		if err != nil {
+			fmt.Println("error decoding account: ", err, scanner.Bytes())
+		} else {
+			fmt.Println("decoded account", acc.Address)
+		}
+		accounts[acc.Address] = acc
+	}
+
+	if err := scanner.Err(); err != nil {
+		return nil, fmt.Errorf("error reading accounts file: %w", err)
 	}
 
 	if err := scanner.Err(); err != nil {
