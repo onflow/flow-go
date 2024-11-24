@@ -44,6 +44,7 @@ func OffchainReplayBackwardCompatibilityTest(
 	results storage.ExecutionResults,
 	executionDataStore execution_data.ExecutionDataGetter,
 	store environment.ValueStore,
+	onHeightReplayed func(uint64) error,
 ) error {
 	rootAddr := evm.StorageAccountAddress(chainID)
 	rootAddrStr := string(rootAddr.Bytes())
@@ -173,7 +174,10 @@ func OffchainReplayBackwardCompatibilityTest(
 			return err
 		}
 
-		log.Info().Msgf("verified block %d", height)
+		err = onHeightReplayed(height)
+		if err != nil {
+			return err
+		}
 	}
 
 	return nil

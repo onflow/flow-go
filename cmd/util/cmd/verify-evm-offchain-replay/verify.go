@@ -9,6 +9,7 @@ import (
 	"github.com/dgraph-io/badger/v2"
 	badgerds "github.com/ipfs/go-ds-badger2"
 	"github.com/rs/zerolog"
+	"github.com/rs/zerolog/log"
 
 	"github.com/onflow/flow-go/cmd/util/cmd/common"
 	"github.com/onflow/flow-go/fvm/environment"
@@ -23,13 +24,26 @@ import (
 
 // Verify verifies the offchain replay of EVM blocks from the given height range
 // and updates the EVM state gob files with the latest state
-func Verify(log zerolog.Logger, from uint64, to uint64, chainID flow.ChainID, dataDir string, executionDataDir string, evmStateGobDir string) error {
-	log.Info().
+func Verify(
+	log zerolog.Logger,
+	from uint64,
+	to uint64,
+	chainID flow.ChainID,
+	dataDir string,
+	executionDataDir string,
+	evmStateGobDir string,
+	saveEveryNBlocks uint64,
+) error {
+	lg := log.With().
+		Uint64("from", from).Uint64("to", to).
 		Str("chain", chainID.String()).
 		Str("dataDir", dataDir).
 		Str("executionDataDir", executionDataDir).
 		Str("evmStateGobDir", evmStateGobDir).
-		Msgf("verifying range from %d to %d", from, to)
+		Uint64("saveEveryNBlocks", saveEveryNBlocks).
+		Logger()
+
+	lg.Info().Msgf("verifying range from %d to %d", from, to)
 
 	db, storages, executionDataStore, dsStore, err := initStorages(chainID, dataDir, executionDataDir)
 	if err != nil {
@@ -40,6 +54,8 @@ func Verify(log zerolog.Logger, from uint64, to uint64, chainID flow.ChainID, da
 	defer dsStore.Close()
 
 	var store *testutils.TestValueStore
+
+	// root block require the account status registers to be saved
 	isRoot := isEVMRootHeight(chainID, from)
 	if isRoot {
 		log.Info().Msgf("initializing EVM state for root height %d", from)
@@ -53,21 +69,25 @@ func Verify(log zerolog.Logger, from uint64, to uint64, chainID flow.ChainID, da
 		}
 	} else {
 		prev := from - 1
-		log.Info().Msgf("loading EVM state from previous height %d", prev)
-
-		valueFileName, allocatorFileName := evmStateGobFileNamesByEndHeight(evmStateGobDir, prev)
-		values, err := testutils.DeserializeState(valueFileName)
+		store, err = loadState(prev, evmStateGobDir)
 		if err != nil {
-			return fmt.Errorf("could not deserialize state %v: %w", valueFileName, err)
+			return fmt.Errorf("could not load EVM state from previous height %d: %w", prev, err)
 		}
-
-		allocators, err := testutils.DeserializeAllocator(allocatorFileName)
-		if err != nil {
-			return fmt.Errorf("could not deserialize allocator %v: %w", allocatorFileName, err)
-		}
-		store = testutils.GetSimpleValueStorePopulated(values, allocators)
 	}
 
+	// save state every N blocks
+	onHeightReplayed := func(height uint64) error {
+		log.Info().Msgf("replayed height %d", height)
+		if height%saveEveryNBlocks == 0 {
+			err := saveState(store, height, evmStateGobDir)
+			if err != nil {
+				return err
+			}
+		}
+		return nil
+	}
+
+	// replay blocks
 	err = utils.OffchainReplayBackwardCompatibilityTest(
 		log,
 		chainID,
@@ -77,15 +97,27 @@ func Verify(log zerolog.Logger, from uint64, to uint64, chainID flow.ChainID, da
 		storages.Results,
 		executionDataStore,
 		store,
+		onHeightReplayed,
 	)
 
 	if err != nil {
 		return err
 	}
 
-	valueFileName, allocatorFileName := evmStateGobFileNamesByEndHeight(evmStateGobDir, to)
+	err = saveState(store, to, evmStateGobDir)
+	if err != nil {
+		return err
+	}
+
+	lg.Info().Msgf("successfully verified range from %d to %d", from, to)
+
+	return nil
+}
+
+func saveState(store *testutils.TestValueStore, height uint64, gobDir string) error {
+	valueFileName, allocatorFileName := evmStateGobFileNamesByEndHeight(gobDir, height)
 	values, allocators := store.Dump()
-	err = testutils.SerializeState(valueFileName, values)
+	err := testutils.SerializeState(valueFileName, values)
 	if err != nil {
 		return err
 	}
@@ -97,6 +129,23 @@ func Verify(log zerolog.Logger, from uint64, to uint64, chainID flow.ChainID, da
 	log.Info().Msgf("saved EVM state to %s and %s", valueFileName, allocatorFileName)
 
 	return nil
+}
+
+func loadState(height uint64, gobDir string) (*testutils.TestValueStore, error) {
+	valueFileName, allocatorFileName := evmStateGobFileNamesByEndHeight(gobDir, height)
+	values, err := testutils.DeserializeState(valueFileName)
+	if err != nil {
+		return nil, fmt.Errorf("could not deserialize state %v: %w", valueFileName, err)
+	}
+
+	allocators, err := testutils.DeserializeAllocator(allocatorFileName)
+	if err != nil {
+		return nil, fmt.Errorf("could not deserialize allocator %v: %w", allocatorFileName, err)
+	}
+	store := testutils.GetSimpleValueStorePopulated(values, allocators)
+
+	log.Info().Msgf("loaded EVM state for height %d from gob file %v", height, valueFileName)
+	return store, nil
 }
 
 func initStorages(chainID flow.ChainID, dataDir string, executionDataDir string) (
