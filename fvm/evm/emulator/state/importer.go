@@ -1,10 +1,10 @@
 package state
 
 import (
-	"bufio"
 	"fmt"
-	"os"
+	"io/ioutil"
 	"path/filepath"
+	"strings"
 
 	gethCommon "github.com/onflow/go-ethereum/common"
 
@@ -57,36 +57,34 @@ func ImportEVMState(path string) (*EVMState, error) {
 	accounts := make(map[gethCommon.Address]*Account)
 	var codes []*CodeInContext
 	var slots []*types.SlotEntry
-
 	// Import codes
-	codesFile, err := os.Open(filepath.Join(path, ExportedCodesFileName))
+	codesData, err := ioutil.ReadFile(filepath.Join(path, ExportedCodesFileName))
 	if err != nil {
 		return nil, fmt.Errorf("error opening codes file: %w", err)
 	}
-	defer codesFile.Close()
-
-	scanner := bufio.NewScanner(codesFile)
-	for scanner.Scan() {
-		code, err := CodeInContextFromEncoded(scanner.Bytes())
+	codesLines := strings.Split(string(codesData), "\n")
+	for _, line := range codesLines {
+		if line == "" {
+			continue
+		}
+		code, err := CodeInContextFromEncoded([]byte(line))
 		if err != nil {
 			return nil, fmt.Errorf("error decoding code in context: %w", err)
 		}
 		codes = append(codes, code)
 	}
-	if err := scanner.Err(); err != nil {
-		return nil, fmt.Errorf("error reading codes file: %w", err)
-	}
 
 	// Import slots
-	slotsFile, err := os.Open(filepath.Join(path, ExportedSlotsFileName))
+	slotsData, err := ioutil.ReadFile(filepath.Join(path, ExportedSlotsFileName))
 	if err != nil {
 		return nil, fmt.Errorf("error opening slots file: %w", err)
 	}
-	defer slotsFile.Close()
-
-	scanner = bufio.NewScanner(slotsFile)
-	for scanner.Scan() {
-		slot, err := types.SlotEntryFromEncoded(scanner.Bytes())
+	slotsLines := strings.Split(string(slotsData), "\n")
+	for _, line := range slotsLines {
+		if line == "" {
+			continue
+		}
+		slot, err := types.SlotEntryFromEncoded([]byte(line))
 		if err != nil {
 			return nil, fmt.Errorf("error decoding slot entry: %w", err)
 		}
@@ -94,30 +92,22 @@ func ImportEVMState(path string) (*EVMState, error) {
 	}
 
 	// Import accounts
-	accountsFile, err := os.Open(filepath.Join(path, ExportedAccountsFileName))
+	accountsData, err := ioutil.ReadFile(filepath.Join(path, ExportedAccountsFileName))
 	if err != nil {
 		return nil, fmt.Errorf("error opening accounts file: %w", err)
 	}
-	defer accountsFile.Close()
-
-	scanner = bufio.NewScanner(accountsFile)
-	for scanner.Scan() {
-		acc, err := DecodeAccount(scanner.Bytes())
+	accountsLines := strings.Split(string(accountsData), "\n")
+	for _, line := range accountsLines {
+		if line == "" {
+			continue
+		}
+		acc, err := DecodeAccount([]byte(line))
 		if err != nil {
-			fmt.Println("error decoding account: ", err, scanner.Bytes())
+			fmt.Println("error decoding account: ", err, line)
 		} else {
 			fmt.Println("decoded account", acc.Address)
+			accounts[acc.Address] = acc
 		}
-		accounts[acc.Address] = acc
 	}
-
-	if err := scanner.Err(); err != nil {
-		return nil, fmt.Errorf("error reading accounts file: %w", err)
-	}
-
-	if err := scanner.Err(); err != nil {
-		return nil, fmt.Errorf("error reading slots file: %w", err)
-	}
-
 	return ToEVMState(accounts, codes, slots)
 }
