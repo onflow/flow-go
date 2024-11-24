@@ -125,6 +125,8 @@ func OffchainReplayBackwardCompatibilityTest(
 				return err
 			}
 		}
+
+		log.Info().Msgf("verified block %d (EVM height)", height, evmBlockEvent.Height)
 	}
 
 	return nil

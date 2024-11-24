@@ -39,8 +39,6 @@ func Verify(from uint64, to uint64, chainID flow.ChainID, dataDir string, execut
 		if err != nil {
 			return err
 		}
-	} else {
-		// TODO: recover from gob
 	}
 
 	return utils.OffchainReplayBackwardCompatibilityTest(
