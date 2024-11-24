@@ -31,7 +31,7 @@ func Diff(a *EVMState, b *EVMState) []error {
 	for addr, accA := range a.Accounts {
 		if accB, exists := b.Accounts[addr]; exists {
 			if !AccountEqual(accA, accB) {
-				differences = append(differences, fmt.Errorf("account %s differs", addr.Hex()))
+				differences = append(differences, fmt.Errorf("account %s differs, accA %v, accB %v", addr.Hex(), accA, accB))
 			}
 		} else {
 			differences = append(differences, fmt.Errorf("account %s exists in a but not in b", addr.Hex()))
