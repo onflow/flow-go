@@ -1,8 +1,10 @@
 package state
 
 import (
+	"encoding/gob"
 	"fmt"
 	"io/ioutil"
+	"os"
 	"path/filepath"
 	"strings"
 
@@ -51,6 +53,28 @@ func ToEVMState(
 	}
 
 	return state, nil
+}
+
+func ImportEVMStateFromGob(path string) (*EVMState, error) {
+	fileName := filepath.Join(path, ExportedStateGobFileName)
+	// Open the file for reading
+	file, err := os.Open(fileName)
+	if err != nil {
+		return nil, err
+	}
+	defer file.Close()
+
+	// Prepare the map to store decoded data
+	var data EVMState
+
+	// Use gob to decode data
+	decoder := gob.NewDecoder(file)
+	err = decoder.Decode(&data)
+	if err != nil {
+		return nil, err
+	}
+
+	return &data, nil
 }
 
 func ImportEVMState(path string) (*EVMState, error) {

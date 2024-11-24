@@ -1,6 +1,7 @@
 package state
 
 import (
+	"encoding/gob"
 	"fmt"
 	"io"
 	"os"
@@ -17,6 +18,7 @@ const (
 	ExportedAccountsFileName = "accounts.bin"
 	ExportedCodesFileName    = "codes.bin"
 	ExportedSlotsFileName    = "slots.bin"
+	ExportedStateGobFileName = "state.gob"
 )
 
 type Exporter struct {
@@ -36,6 +38,30 @@ func NewExporter(ledger atree.Ledger, root flow.Address) (*Exporter, error) {
 		root:     root,
 		baseView: bv,
 	}, nil
+}
+
+func (e *Exporter) ExportGob(path string) error {
+	fileName := filepath.Join(path, ExportedStateGobFileName)
+	// Open the file for reading
+	file, err := os.Open(fileName)
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+
+	state, err := Extract(e.ledger, e.root, e.baseView)
+	if err != nil {
+		return err
+	}
+
+	// Use gob to encode data
+	encoder := gob.NewEncoder(file)
+	err = encoder.Encode(state)
+	if err != nil {
+		return err
+	}
+
+	return nil
 }
 
 func (e *Exporter) Export(path string) error {
