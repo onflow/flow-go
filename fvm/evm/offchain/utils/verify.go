@@ -56,15 +56,6 @@ func OffchainReplayBackwardCompatibilityTest(
 			return err
 		}
 
-		// setup account status at EVM root block
-		if isEVMRootHeight(chainID, flowStartHeight) {
-			err = bpStorage.SetValue(rootAddr[:], []byte(flow.AccountStatusKey),
-				environment.NewAccountStatus().ToBytes())
-			if err != nil {
-				return err
-			}
-		}
-
 		blockID, err := headers.BlockIDByHeight(height)
 		if err != nil {
 			return err
