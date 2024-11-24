@@ -7,10 +7,10 @@ import (
 )
 
 func TestStateDiff(t *testing.T) {
-	offchainState, err := ImportEVMState("/var/flow2/evm-state-from-gobs-218215348/")
+	offchainState, err := ImportEVMStateFromGob("/var/flow2/evm-state-from-gobs-218215348/")
 	require.NoError(t, err)
 
-	enState, err := ImportEVMState("/var/flow2/evm-state-from-gobs-218215348/")
+	enState, err := ImportEVMStateFromGob("/var/flow2/evm-state-from-gobs-218215348/")
 	require.NoError(t, err)
 
 	differences := Diff(enState, offchainState)
