@@ -18,11 +18,16 @@ import (
 )
 
 const (
+
+	// PingPeriod defines the interval at which ping messages are sent to the client.
+	// This value must be less than pongWait.
+	PingPeriod = (PongWait * 9) / 10
+
 	// Time allowed to read the next pong message from the peer.
-	pongWait = 10 * time.Second
+	PongWait = 10 * time.Second
 
 	// Time allowed to write a message to the peer.
-	writeWait = 10 * time.Second
+	WriteWait = 10 * time.Second
 )
 
 type Controller struct {
@@ -82,12 +87,12 @@ func (c *Controller) configureConnection() error {
 	// The Pong handler itself only resets the read deadline after receiving a Pong.
 	// It doesn't set an initial deadline. The initial read deadline is crucial to prevent the server from waiting
 	// forever if the client doesn't send Pongs.
-	if err := c.conn.SetReadDeadline(time.Now().Add(pongWait)); err != nil {
+	if err := c.conn.SetReadDeadline(time.Now().Add(PongWait)); err != nil {
 		return fmt.Errorf("failed to set the initial read deadline: %w", err)
 	}
 	// Establish a Pong handler which sets the handler for pong messages received from the peer.
 	c.conn.SetPongHandler(func(string) error {
-		return c.conn.SetReadDeadline(time.Now().Add(pongWait))
+		return c.conn.SetReadDeadline(time.Now().Add(PongWait))
 	})
 
 	return nil
@@ -110,7 +115,7 @@ func (c *Controller) writeMessagesToClient(ctx context.Context) {
 			// SetWriteDeadline ensures the write operation does not block indefinitely
 			// if the client is slow or unresponsive. This prevents resource exhaustion
 			// and allows the server to gracefully handle timeouts for delayed writes.
-			if err := c.conn.SetWriteDeadline(time.Now().Add(writeWait)); err != nil {
+			if err := c.conn.SetWriteDeadline(time.Now().Add(WriteWait)); err != nil {
 				c.logger.Error().Err(err).Msg("failed to set the write deadline")
 			}
 			err := c.conn.WriteJSON(msg)
