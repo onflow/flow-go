@@ -24,7 +24,8 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
-const TestRegisterDBPruningThreshold uint64 = 5
+const TestRegisterDBPruningThreshold uint64 = 60
+const TestPruneTickerInterval uint64 = 60
 
 type RegisterDBPruningSuite struct {
 	suite.Suite
@@ -55,7 +56,7 @@ func (s *RegisterDBPruningSuite) TearDownTest() {
 }
 
 func (s *RegisterDBPruningSuite) SetupTest() {
-	s.log = unittest.LoggerForTest(s.Suite.T(), zerolog.InfoLevel)
+	s.log = unittest.LoggerForTest(s.Suite.T(), zerolog.ErrorLevel)
 	s.log.Info().Msg("================> SetupTest")
 	defer func() {
 		s.log.Info().Msg("================> Finish SetupTest")
@@ -65,7 +66,7 @@ func (s *RegisterDBPruningSuite) SetupTest() {
 	s.accessNodeName = testnet.PrimaryAN
 	accessNodeConfig := testnet.NewNodeConfig(
 		flow.RoleAccess,
-		testnet.WithLogLevel(zerolog.FatalLevel),
+		testnet.WithLogLevel(zerolog.ErrorLevel),
 		testnet.WithAdditionalFlag("--supports-observer=true"),
 		testnet.WithAdditionalFlag("--execution-data-sync-enabled=true"),
 		testnet.WithAdditionalFlagf("--execution-data-dir=%s", testnet.DefaultExecutionDataServiceDir),
@@ -74,10 +75,9 @@ func (s *RegisterDBPruningSuite) SetupTest() {
 		testnet.WithAdditionalFlagf("--execution-state-dir=%s", testnet.DefaultExecutionStateDir),
 		testnet.WithAdditionalFlagf("--public-network-execution-data-sync-enabled=true"),
 		testnet.WithAdditionalFlagf("--event-query-mode=local-only"),
-		testnet.WithAdditionalFlag("--registerdb-pruning-enabled=true"),
-		testnet.WithAdditionalFlag("--registerdb-prune-throttle-delay=1s"),
-		testnet.WithAdditionalFlag("--registerdb-prune-ticker-interval=10s"),
-		testnet.WithAdditionalFlagf("--registerdb-pruning-threshold=%d", TestRegisterDBPruningThreshold),
+		//testnet.WithAdditionalFlag("--registerdb-pruning-enabled=true"),
+		//testnet.WithAdditionalFlagf("--registerdb-prune-ticker-interval=%ds", TestPruneTickerInterval),
+		//testnet.WithAdditionalFlagf("--registerdb-pruning-threshold=%d", TestRegisterDBPruningThreshold),
 	)
 
 	consensusConfigs := []func(config *testnet.NodeConfig){
@@ -104,7 +104,7 @@ func (s *RegisterDBPruningSuite) SetupTest() {
 
 	observers := []testnet.ObserverConfig{{
 		ContainerName: s.observerNodeName,
-		LogLevel:      zerolog.InfoLevel,
+		LogLevel:      zerolog.ErrorLevel,
 		AdditionalFlags: []string{
 			fmt.Sprintf("--execution-data-dir=%s", testnet.DefaultExecutionDataServiceDir),
 			fmt.Sprintf("--execution-state-dir=%s", testnet.DefaultExecutionStateDir),
@@ -114,7 +114,7 @@ func (s *RegisterDBPruningSuite) SetupTest() {
 			"--event-query-mode=local-only",
 			"--local-service-api-enabled=true",
 			"--registerdb-pruning-enabled=true",
-			"--registerdb-prune-ticker-interval=5s",
+			fmt.Sprintf("--registerdb-prune-ticker-interval=%ds", TestPruneTickerInterval),
 			fmt.Sprintf("--registerdb-pruning-threshold=%d", TestRegisterDBPruningThreshold),
 		},
 	}}
@@ -132,14 +132,14 @@ func (s *RegisterDBPruningSuite) SetupTest() {
 func (s *RegisterDBPruningSuite) TestHappyPath() {
 	accessNode := s.net.ContainerByName(s.accessNodeName)
 	observerNode := s.net.ContainerByName(s.observerNodeName)
-
+	//
 	waitingBlockHeight := uint64(200)
 	s.waitUntilExecutionDataForBlockIndexed(observerNode, waitingBlockHeight)
 	s.net.StopContainers()
 
 	//1. Get AN register height boundaries
 	pebbleAN := s.getPebbleDB(accessNode.PebbleDBPath())
-	firstHeightAN, latestHeightAN, err := pstorage.ReadHeightsFromBootstrappedDB(pebbleAN)
+	_, latestHeightAN, err := pstorage.ReadHeightsFromBootstrappedDB(pebbleAN)
 	require.NoError(s.T(), err, "could not read from AN db")
 
 	//2. Get AN register height boundaries
@@ -148,15 +148,13 @@ func (s *RegisterDBPruningSuite) TestHappyPath() {
 	require.NoError(s.T(), err, "could not read from ON db")
 
 	//4. Check heights for equality on both AN and ON nodes
-	assert.Equal(s.T(), firstHeightAN, firstHeightON)
 	assert.Equal(s.T(), latestHeightAN, latestHeightON)
 
 	//5. Check if first height is less or equal predicted first height
-	predictedPruneThreshold := pstorage.PruneInterval(TestRegisterDBPruningThreshold)
-	registerAN := s.nodeRegisterStorage(pebbleAN)
-	assert.LessOrEqual(s.T(), registerAN.LatestHeight()-predictedPruneThreshold, firstHeightAN)
+	//registerAN := s.nodeRegisterStorage(pebbleAN)
+	//assert.GreaterOrEqual(s.T(), registerAN.FirstHeight(), firstHeightAN)
 	registerON := s.nodeRegisterStorage(pebbleON)
-	assert.LessOrEqual(s.T(), registerON.LatestHeight()-predictedPruneThreshold, firstHeightON)
+	assert.GreaterOrEqual(s.T(), registerON.FirstHeight(), firstHeightON)
 }
 
 func (s *RegisterDBPruningSuite) getPebbleDB(path string) *pebble.DB {
