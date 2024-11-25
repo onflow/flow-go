@@ -87,8 +87,8 @@ func NewCache(log zerolog.Logger, limit uint32, collector module.HeroCacheMetric
 }
 
 // handleEjectedEntity performs cleanup of secondary indexes to prevent memory leaks.
-// WARNING: Concurrency safety of this function is guaranteed by `c.lock`. This method is only called
-// by `herocache.Cache.Add` and we perform this call while `c.lock` is in locked state.
+// WARNING: Concurrency safety of this function is guaranteed by [c.lock]. This method is only called
+// by `herocache.Cache.Add` and we perform this call while [c.lock] is in locked state.
 func (c *Cache) handleEjectedEntity(entity flow.Entity) {
 	block := entity.(*flow.Block)
 	blockID := block.ID()
@@ -150,12 +150,12 @@ func (c *Cache) AddBlocks(batch []*flow.Block) (certifiedBatch []*flow.Block, ce
 
 	// Single atomic operation (main logic), with result returned as `batchContext`
 	//  * add the given batch of blocks to the cache
-	//  * check for equivocating blocks (result stored in `batchContext.equivocatingBlocks`)
+	//  * check for equivocating blocks (result stored in [batchContext.equivocatingBlocks])
 	//  * check whether first block in batch (index 0) has a parent already in the cache
-	//    (result stored in `batchContext.batchParent`)
+	//    (result stored in [batchContext.batchParent])
 	//  * check whether last block in batch has a child already in the cache
-	//    (result stored in `batchContext.batchChild`)
-	//  * check if input is redundant (indicated by `batchContext.redundant`), i.e. ALL blocks
+	//    (result stored in [batchContext.batchChild])
+	//  * check if input is redundant (indicated by [batchContext.redundant]), i.e. ALL blocks
 	//    are already known: then skip further processing
 	bc := c.unsafeAtomicAdd(blockIDs, batch)
 	if bc.redundant {

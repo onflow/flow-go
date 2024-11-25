@@ -59,7 +59,7 @@ type Forks interface {
 	// Possible error returns:
 	//   - model.MissingBlockError if the parent does not exist in the forest (but is above
 	//     the pruned view). From the perspective of Forks, this error is benign (no-op).
-	//   - model.InvalidBlockError if the block is invalid (see `Forks.EnsureBlockIsValidExtension`
+	//   - model.InvalidBlockError if the block is invalid (see [Forks.EnsureBlockIsValidExtension]
 	//     for details). From the perspective of Forks, this error is benign (no-op). However, we
 	//     assume all blocks are fully verified, i.e. they should satisfy all consistency
 	//     requirements. Hence, this error is likely an indicator of a bug in the compliance layer.
@@ -81,7 +81,7 @@ type Forks interface {
 	// Possible error returns:
 	//   - model.MissingBlockError if the parent does not exist in the forest (but is above
 	//     the pruned view). From the perspective of Forks, this error is benign (no-op).
-	//   - model.InvalidBlockError if the block is invalid (see `Forks.EnsureBlockIsValidExtension`
+	//   - model.InvalidBlockError if the block is invalid (see [Forks.EnsureBlockIsValidExtension]
 	//     for details). From the perspective of Forks, this error is benign (no-op). However, we
 	//     assume all blocks are fully verified, i.e. they should satisfy all consistency
 	//     requirements. Hence, this error is likely an indicator of a bug in the compliance layer.

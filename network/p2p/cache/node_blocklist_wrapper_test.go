@@ -46,7 +46,7 @@ func TestNodeDisallowListWrapperTestSuite(t *testing.T) {
 }
 
 // TestHonestNode verifies:
-// For nodes _not_ on the disallowList, the `cache.NodeDisallowListingWrapper` should forward
+// For nodes _not_ on the disallowList, the [cache.NodeDisallowListingWrapper] should forward
 // the identities from the wrapped `IdentityProvider` without modification.
 func (s *NodeDisallowListWrapperTestSuite) TestHonestNode() {
 	s.Run("ByNodeID", func() {
@@ -82,11 +82,11 @@ func (s *NodeDisallowListWrapperTestSuite) TestHonestNode() {
 
 // TestDisallowListNode tests proper handling of identities _on_ the disallowList:
 //   - For any identity `i` with `i.NodeID ∈ disallowList`, the returned identity
-//     should have `i.Ejected` set to `true` (irrespective of the `Ejected`
+//     should have [i.Ejected] set to `true` (irrespective of the `Ejected`
 //     flag's initial returned by the wrapped `IdentityProvider`).
 //   - The wrapper should _copy_ the identity and _not_ write into the wrapped
 //     IdentityProvider's memory.
-//   - For `IdentityProvider.ByNodeID` and `IdentityProvider.ByPeerID`:
+//   - For [IdentityProvider.ByNodeID] and [IdentityProvider.ByPeerID]:
 //     whether or not the wrapper modifies the `Ejected` flag should depend only
 //     in the NodeID of the returned identity, irrespective of the second return
 //     value (boolean).

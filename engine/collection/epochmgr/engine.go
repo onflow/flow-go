@@ -35,7 +35,7 @@ var ErrNotAuthorizedForEpoch = fmt.Errorf("we are not an authorized participant 
 // spinning up engines when a new epoch is about to start and spinning down
 // engines for an epoch that has ended.
 //
-// The `epochmgr.Engine` implements the `protocol.Consumer` interface. In particular, it
+// The [epochmgr.Engine] implements the [protocol.Consumer] interface. In particular, it
 // ingests the following notifications from the protocol state:
 //   - EpochSetupPhaseStarted
 //   - EpochTransition

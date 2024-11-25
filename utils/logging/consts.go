@@ -6,7 +6,7 @@ const (
 	// regarding misbehaving nodes.
 	// Axiomatically, each node considers its own operator as well as Flow's governance committee as trusted.
 	// Hence, potential problems with inputs (mostly configurations) from these sources are *not* considered
-	// byzantine. To flag inputs from these sources, please use `logging.KeyPotentialConfigurationProblem`.
+	// byzantine. To flag inputs from these sources, please use [logging.KeyPotentialConfigurationProblem].
 	KeySuspicious = "suspicious"
 
 	// KeyPotentialConfigurationProblem is a logging label. It flags that the log event informs about suspected

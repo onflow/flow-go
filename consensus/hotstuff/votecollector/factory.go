@@ -15,20 +15,20 @@ import (
 // be used.
 // CAUTION: the baseFactory creates the VerifyingVoteProcessor for the given block. It
 // does _not_ check the proposer's vote for its own block. The API reflects this by
-// expecting a `model.Block` as input (which does _not_ contain the proposer vote) as
-// opposed to `model.Proposal` (combines block with proposer's vote).
-// Therefore, baseFactory does _not_ implement `hotstuff.VoteProcessorFactory` by itself.
+// expecting a [model.Block] as input (which does _not_ contain the proposer vote) as
+// opposed to [model.Proposal] (combines block with proposer's vote).
+// Therefore, baseFactory does _not_ implement [hotstuff.VoteProcessorFactory] by itself.
 // The VoteProcessorFactory adds the missing logic to verify the proposer's vote, by
 // wrapping the baseFactory (decorator pattern).
 type baseFactory func(log zerolog.Logger, block *model.Block) (hotstuff.VerifyingVoteProcessor, error)
 
-// VoteProcessorFactory implements `hotstuff.VoteProcessorFactory`. Its main purpose
+// VoteProcessorFactory implements [hotstuff.VoteProcessorFactory]. Its main purpose
 // is to construct instances of VerifyingVoteProcessors for a given block proposal.
 // VoteProcessorFactory
 // * delegates the creation of the actual instances to baseFactory
 // * adds the logic to verify the proposer's vote for its own block
 // Thereby, VoteProcessorFactory guarantees that only proposals with valid proposer
-// vote are accepted (as per API specification). Otherwise, an `model.InvalidProposalError`
+// vote are accepted (as per API specification). Otherwise, an [model.InvalidProposalError]
 // is returned.
 type VoteProcessorFactory struct {
 	baseFactory baseFactory

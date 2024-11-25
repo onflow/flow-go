@@ -107,13 +107,13 @@ func (b *BeaconKeyRecovery) recoverMyBeaconPrivateKey(final protocol.Snapshot) e
 		Logger()
 	// Only when the next epoch is committed, Random Beacon keys for that epoch's consensus participants are finally persisted
 	// in `localDKGState`. It is important to wait until this point, so each node can locally check whether their private key
-	// is consistent with its respective entry in the public key vector `EpochCommit.DKGParticipantKeys` (assuming the node
+	// is consistent with its respective entry in the public key vector [EpochCommit.DKGParticipantKeys] (assuming the node
 	// concluded the DKG). This mechanic is identical to the happy path (`EpochCommit` event emitted by Epoch System Smart
 	// Contract) and the recovery epoch (`EpochCommit` event part of `EpochRecover` event, whose content is effectively
 	// provided by the human governance committee).
 	// The next epoch *not yet* being committed is only possible on the happy path, when the node boots up and checks
 	// that it hasn't lost a `FallbackModeExited` notification. However, when observing the `EpochFallbackModeExited`
-	// notification, the Epoch Phase *must* be `flow.EpochPhaseCommitted`, otherwise the state is corrupted.
+	// notification, the Epoch Phase *must* be [flow.EpochPhaseCommitted], otherwise the state is corrupted.
 	// Diligently verifying this case is important to avoid a situation where the node runs into the next epoch and failes
 	// to access its Random Beacon key, just because this recovery here has failed before.
 	if epochProtocolState.EpochPhase() != flow.EpochPhaseCommitted {

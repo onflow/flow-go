@@ -78,7 +78,7 @@ func (h *Headers) retrieveTx(blockID flow.Identifier) func(*badger.Txn) (*flow.H
 	}
 }
 
-// results in `storage.ErrNotFound` for unknown height
+// results in [storage.ErrNotFound] for unknown height
 func (h *Headers) retrieveIdByHeightTx(height uint64) func(*badger.Txn) (flow.Identifier, error) {
 	return func(tx *badger.Txn) (flow.Identifier, error) {
 		blockID, err := h.heightCache.Get(height)(tx)
@@ -128,7 +128,7 @@ func (h *Headers) Exists(blockID flow.Identifier) (bool, error) {
 
 // BlockIDByHeight returns the block ID that is finalized at the given height. It is an optimized
 // version of `ByHeight` that skips retrieving the block. Expected errors during normal operations:
-//   - `storage.ErrNotFound` if no finalized block is known at given height.
+//   - [storage.ErrNotFound] if no finalized block is known at given height.
 func (h *Headers) BlockIDByHeight(height uint64) (flow.Identifier, error) {
 	tx := h.db.NewTransaction(false)
 	defer tx.Discard()

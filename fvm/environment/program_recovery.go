@@ -416,7 +416,7 @@ func isNonFungibleTokenContract(program *ast.Program, nonFungibleTokenAddress co
 	return true
 }
 
-// isNonFungibleTokenNFTNominalType checks if the given type is a nominal type representing `NonFungibleToken.NFT`
+// isNonFungibleTokenNFTNominalType checks if the given type is a nominal type representing [NonFungibleToken.NFT]
 func isNonFungibleTokenNFTNominalType(ty ast.Type) bool {
 	nominalType, ok := ty.(*ast.NominalType)
 	return ok &&

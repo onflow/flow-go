@@ -423,7 +423,7 @@ func (e *ReactorEngine) end(nextEpochCounter uint64) func() error {
 		if crypto.IsDKGFailureError(err) {
 			// Failing to complete the DKG protocol is a rare but expected scenario, which we must handle.
 			// By convention, if we are leaving the happy path, we want to persist the _first_ failure symptom
-			// in the `dkgState`. If the write yields a `storage.ErrAlreadyExists`, we know the overall protocol
+			// in the `dkgState`. If the write yields a [storage.ErrAlreadyExists], we know the overall protocol
 			// has already abandoned the happy path, because on the happy path the ReactorEngine is the only writer.
 			// Then this function just stops and returns without error.
 			e.log.Warn().Err(err).Msgf("node %s with index %d failed DKG locally", e.me.NodeID(), e.controller.GetIndex())
@@ -440,7 +440,7 @@ func (e *ReactorEngine) end(nextEpochCounter uint64) func() error {
 		}
 
 		// The following only implements the happy path, which is an atomic step-by-step progression
-		// along a single path in the `dkgState` machine. If the write yields a `storage.ErrAlreadyExists`,
+		// along a single path in the `dkgState` machine. If the write yields a [storage.ErrAlreadyExists],
 		// we know the overall protocol has already abandoned the happy path, because on the happy path
 		// ReactorEngine is the only writer. Then this function just stops and returns without error.
 		privateShare, _, _ := e.controller.GetArtifacts()

@@ -185,7 +185,7 @@ func (s *SignatureAggregatorSameMessage) Aggregate() ([]int, crypto.Signature, e
 		return s.cachedSignerIndices, s.cachedSignature, nil
 	}
 
-	// compute aggregation result and cache it in `s.cachedSignerIndices`, `s.cachedSignature`
+	// compute aggregation result and cache it in [s.cachedSignerIndices], [s.cachedSignature]
 	sharesNum := len(s.indexToSignature)
 	indices := make([]int, 0, sharesNum)
 	signatures := make([]crypto.Signature, 0, sharesNum)
@@ -234,7 +234,7 @@ func (s *SignatureAggregatorSameMessage) Aggregate() ([]int, crypto.Signature, e
 //   - (true, agg_key, nil): signature is valid
 //   - (false, agg_key, nil): signature is cryptographically invalid. This also includes the case where
 //     `agg_key` is equal to the identity public key (because of equivocation). If the caller needs to
-//     differentiate this case, `crypto.IsIdentityPublicKey` can be used to test the returned `agg_key`
+//     differentiate this case, [crypto.IsIdentityPublicKey] can be used to test the returned `agg_key`
 //   - (false, nil, err) with error types:
 //     -- InsufficientSignaturesError if no signer indices are given (`signers` is empty)
 //     -- InvalidSignerIdxError if some signer indices are out of bound

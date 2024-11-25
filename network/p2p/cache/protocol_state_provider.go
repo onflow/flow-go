@@ -16,8 +16,8 @@ import (
 	"github.com/onflow/flow-go/state/protocol/events"
 )
 
-// ProtocolStateIDCache implements an `id.IdentityProvider` and `p2p.IDTranslator` for the set of
-// authorized Flow network participants as according to the given `protocol.State`.
+// ProtocolStateIDCache implements an [id.IdentityProvider] and `p2p.IDTranslator` for the set of
+// authorized Flow network participants as according to the given [protocol.State].
 // the implementation assumes that the node information changes rarely, while queries are frequent.
 // Hence, we follow an event-driven design, where the ProtocolStateIDCache subscribes to relevant
 // protocol notifications (mainly Epoch notifications) and updates its internally cached list of

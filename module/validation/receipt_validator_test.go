@@ -60,7 +60,7 @@ func (s *ReceiptValidationSuite) TestReceiptValid() {
 	s.publicKey.AssertExpectations(s.T())
 }
 
-// TestReceiptNoIdentity tests that we reject receipt with invalid `ExecutionResult.ExecutorID`
+// TestReceiptNoIdentity tests that we reject receipt with invalid [ExecutionResult.ExecutorID]
 // Note: for a receipt with a bad `ExecutorID`, we should never get to validating the signature,
 // because there is no valid identity, where we can retrieve a staking signature from.
 func (s *ReceiptValidationSuite) TestReceiptNoIdentity() {
@@ -280,8 +280,8 @@ func (s *ReceiptValidationSuite) TestReceiptInvalidCollectionIndex() {
 }
 
 // TestReceiptNoPreviousResult tests that `Validate` rejects a receipt, whose parent result is unknown:
-// - per API contract it should return a `module.UnknownResultError`
-// - should _not_ be misinterpreted as an invalid receipt, i.e. should not receive an `engine.InvalidInputError`
+// - per API contract it should return a [module.UnknownResultError]
+// - should _not_ be misinterpreted as an invalid receipt, i.e. should not receive an [engine.InvalidInputError]
 func (s *ReceiptValidationSuite) TestReceiptNoPreviousResult() {
 	valSubgrph := s.ValidSubgraphFixture()
 	// invalidate prev execution result, it will result in failing to lookup
@@ -938,8 +938,8 @@ func (s *ReceiptValidationSuite) TestValidateReceiptResultHasEnoughReceipts() {
 }
 
 // TestReceiptNoBlock tests that the validator rejects a receipt, whose executed block is unknown:
-//   - per API contract it should return a `module.UnknownBlockError`
-//   - should _not_ be misinterpreted as an invalid receipt, i.e. should not receive an `engine.InvalidInputError`
+//   - per API contract it should return a [module.UnknownBlockError]
+//   - should _not_ be misinterpreted as an invalid receipt, i.e. should not receive an [engine.InvalidInputError]
 func (s *ReceiptValidationSuite) TestReceiptNoBlock() {
 	s.publicKey.On("Verify", mock.Anything, mock.Anything, mock.Anything).Return(true, nil).Maybe()
 
@@ -954,13 +954,13 @@ func (s *ReceiptValidationSuite) TestReceiptNoBlock() {
 			unittest.WithPreviousResult(*s.LatestExecutionResult)), // known parent result
 		)) // but the ID of the executed block is randomly chosen, i.e. unknown
 
-	// attempting to validate receipt `r` should fail with an `module.UnknownBlockError`
+	// attempting to validate receipt `r` should fail with an [module.UnknownBlockError]
 	err := s.receiptValidator.Validate(r)
 	s.Require().Error(err, "should reject invalid receipt")
 	s.Assert().True(module.IsUnknownBlockError(err), err)
 	s.Assert().False(engine.IsInvalidInputError(err), err)
 
-	// attempting to validate a block, whose payload contains receipt `r` should fail with an `module.UnknownBlockError`
+	// attempting to validate a block, whose payload contains receipt `r` should fail with an [module.UnknownBlockError]
 	candidate := unittest.BlockWithParentFixture(unknownExecutedBlock.Header)
 	candidate.SetPayload(unittest.PayloadFixture(unittest.WithReceipts(r)))
 	err = s.receiptValidator.ValidatePayload(candidate)

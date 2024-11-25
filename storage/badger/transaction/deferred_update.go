@@ -5,7 +5,7 @@ import (
 )
 
 // DeferredDBUpdate is a shorthand notation for an anonymous function that takes
-// a `transaction.Tx` as input and runs some database operations as part of that transaction.
+// a [transaction.Tx] as input and runs some database operations as part of that transaction.
 type DeferredDBUpdate func(*Tx) error
 
 // DeferredBadgerUpdate is a shorthand notation for an anonymous function that takes
@@ -15,12 +15,12 @@ type DeferredBadgerUpdate = func(*badger.Txn) error
 // DeferredDbOps is a utility for accumulating deferred database interactions that
 // are supposed to be executed in one atomic transaction. It supports:
 //   - Deferred database operations that work directly on Badger transactions.
-//   - Deferred database operations that work on `transaction.Tx`.
+//   - Deferred database operations that work on [transaction.Tx].
 //     Tx is a storage-layer abstraction, with support for callbacks that are executed
 //     after the underlying database transaction completed _successfully_.
 //
 // ORDER OF EXECUTION
-// We extend the process in which `transaction.Tx` executes database operations, schedules
+// We extend the process in which [transaction.Tx] executes database operations, schedules
 // callbacks, and executed the callbacks. Specifically, DeferredDbOps proceeds as follows:
 //
 //  0. Record functors added via `AddBadgerOp`, `AddDbOp`, `OnSucceed` ...

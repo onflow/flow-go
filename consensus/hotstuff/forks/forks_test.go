@@ -493,9 +493,9 @@ func TestConflictingFinalizedForks(t *testing.T) {
 }
 
 // TestAddDisconnectedBlock checks that adding a block which does not connect to the
-// latest finalized block returns a `model.MissingBlockError`
+// latest finalized block returns a [model.MissingBlockError]
 //   - receives [◄(2) 3]
-//   - should return `model.MissingBlockError`, because the parent is above the pruning
+//   - should return [model.MissingBlockError], because the parent is above the pruning
 //     threshold, but Forks does not know its parent
 func TestAddDisconnectedBlock(t *testing.T) {
 	blocks, err := NewBlockBuilder().
@@ -936,7 +936,7 @@ func makeFinalityProof(t *testing.T, block *model.Block, directChild *model.Bloc
 // blockAwaitingFinalization is intended for tracking finalization events and their order for a specific block
 type blockAwaitingFinalization struct {
 	Block                   *model.Block
-	MakeFinalCalled         bool // indicates whether `Finalizer.MakeFinal` was called
+	MakeFinalCalled         bool // indicates whether [Finalizer.MakeFinal] was called
 	OnFinalizedBlockEmitted bool // indicates whether `OnFinalizedBlockCalled` notification was emitted
 }
 

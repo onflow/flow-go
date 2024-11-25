@@ -82,7 +82,7 @@ var _ ProposalTiming = (*happyPathBlockTime)(nil)
 //     In other words, when primary determines at what future time to broadcast the child, the child
 //     has _not_ been published and the `timedBlock` references the parent on the happy path (or another
 //     earlier block on the unhappy path)
-//   - `unconstrainedBlockTime` is the delay, relative to `timedBlock.TimeObserved` when the controller would
+//   - `unconstrainedBlockTime` is the delay, relative to [timedBlock.TimeObserved] when the controller would
 //     like the child block to be published. Caution, no limits of authority have been applied to this value yet!
 //   - `timingConfig` which defines the limits for authority for the controller.
 //

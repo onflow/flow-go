@@ -9,8 +9,8 @@ import (
 // function's interface.
 //
 // It wraps an error, which could be a sentinel error. IT does NOT IMPLEMENT an UNWRAP method,
-// so the enclosed error's type cannot be accessed. Therefore, methods such as `errors.As` and
-// `errors.Is` do not detect the exception as any known sentinel error.
+// so the enclosed error's type cannot be accessed. Therefore, methods such as [errors.As] and
+// [errors.Is] do not detect the exception as any known sentinel error.
 // NOTE: this type is private, because checking for an exception (as opposed to checking for the
 // set of expected error types) is considered an anti-pattern because it may miss unexpected
 // errors which are not implemented as an exception.

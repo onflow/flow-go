@@ -100,7 +100,7 @@ func (b *backendEvents) GetEventsForHeightRange(
 	blockHeaders := make([]blockMetadata, 0, endHeight-startHeight+1)
 
 	for i := startHeight; i <= endHeight; i++ {
-		// this looks inefficient, but is actually what's done under the covers by `headers.ByHeight`
+		// this looks inefficient, but is actually what's done under the covers by [headers.ByHeight]
 		// and avoids calculating header.ID() for each block.
 		blockID, err := b.headers.BlockIDByHeight(i)
 		if err != nil {

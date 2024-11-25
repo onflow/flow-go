@@ -84,7 +84,7 @@ func (s *EventLoopTestSuite) Test_SubmitProposal() {
 	require.Eventually(s.T(), processed.Load, time.Millisecond*100, time.Millisecond*10)
 }
 
-// Test_SubmitQC tests that submitted QC is eventually sent to `EventHandler.OnReceiveQc` for processing
+// Test_SubmitQC tests that submitted QC is eventually sent to [EventHandler.OnReceiveQc] for processing
 func (s *EventLoopTestSuite) Test_SubmitQC() {
 	// qcIngestionFunction is the archetype for EventLoop.OnQcConstructedFromVotes and EventLoop.OnNewQcDiscovered
 	type qcIngestionFunction func(*flow.QuorumCertificate)
@@ -108,7 +108,7 @@ func (s *EventLoopTestSuite) Test_SubmitQC() {
 	})
 }
 
-// Test_SubmitTC tests that submitted TC is eventually sent to `EventHandler.OnReceiveTc` for processing
+// Test_SubmitTC tests that submitted TC is eventually sent to [EventHandler.OnReceiveTc] for processing
 func (s *EventLoopTestSuite) Test_SubmitTC() {
 	// tcIngestionFunction is the archetype for EventLoop.OnTcConstructedFromTimeouts and EventLoop.OnNewTcDiscovered
 	type tcIngestionFunction func(*flow.TimeoutCertificate)
@@ -132,7 +132,7 @@ func (s *EventLoopTestSuite) Test_SubmitTC() {
 	})
 }
 
-// Test_SubmitTC_IngestNewestQC tests that included QC in TC is eventually sent to `EventHandler.OnReceiveQc` for processing
+// Test_SubmitTC_IngestNewestQC tests that included QC in TC is eventually sent to [EventHandler.OnReceiveQc] for processing
 func (s *EventLoopTestSuite) Test_SubmitTC_IngestNewestQC() {
 	// tcIngestionFunction is the archetype for EventLoop.OnTcConstructedFromTimeouts and EventLoop.OnNewTcDiscovered
 	type tcIngestionFunction func(*flow.TimeoutCertificate)

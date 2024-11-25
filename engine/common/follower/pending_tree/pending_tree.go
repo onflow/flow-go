@@ -194,10 +194,10 @@ func (t *PendingTree) FinalizeFork(finalized *flow.Header) ([]flow.CertifiedBloc
 	return connectedBlocks, nil
 }
 
-// updateAndCollectFork marks the subtree rooted at `vertex.Block` as connected to the finalized state
-// and returns all blocks in this subtree. No parents of `vertex.Block` are modified or included in the output.
+// updateAndCollectFork marks the subtree rooted at [vertex.Block] as connected to the finalized state
+// and returns all blocks in this subtree. No parents of [vertex.Block] are modified or included in the output.
 // The output list will be ordered so that parents appear before children.
-// The caller must ensure that `vertex.Block` is connected to the finalized state.
+// The caller must ensure that [vertex.Block] is connected to the finalized state.
 //
 //	A ← B ← C ←D
 //	      ↖ E

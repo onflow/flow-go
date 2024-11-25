@@ -21,7 +21,7 @@ func TestCustomizedError(t *testing.T) {
 
 	require.True(t, IsInvalidInputError(err))
 
-	// if an invalid error is wrapped with `fmt.Errorf`, it
+	// if an invalid error is wrapped with [fmt.Errorf], it
 	// is still an invalid error
 	err = fmt.Errorf("could not process, because: %w", err)
 	require.True(t, IsInvalidInputError(err))

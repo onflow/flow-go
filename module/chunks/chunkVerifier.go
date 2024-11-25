@@ -59,7 +59,7 @@ func (fcv *ChunkVerifier) Verify(
 		ctx = fvm.NewContextFromParent(
 			fcv.systemChunkCtx,
 			fvm.WithBlockHeader(vc.Header),
-			// `protocol.Snapshot` implements `EntropyProvider` interface
+			// [protocol.Snapshot] implements `EntropyProvider` interface
 			// Note that `Snapshot` possible errors for RandomSource() are:
 			// - storage.ErrNotFound if the QC is unknown.
 			// - state.ErrUnknownSnapshotReference if the snapshot reference block is unknown
@@ -80,7 +80,7 @@ func (fcv *ChunkVerifier) Verify(
 		ctx = fvm.NewContextFromParent(
 			fcv.vmCtx,
 			fvm.WithBlockHeader(vc.Header),
-			// `protocol.Snapshot` implements `EntropyProvider` interface
+			// [protocol.Snapshot] implements `EntropyProvider` interface
 			// Note that `Snapshot` possible errors for RandomSource() are:
 			// - storage.ErrNotFound if the QC is unknown.
 			// - state.ErrUnknownSnapshotReference if the snapshot reference block is unknown
@@ -170,7 +170,7 @@ func (fcv *ChunkVerifier) verifyTransactionsInContext(
 
 	// Consensus nodes already enforce some fundamental properties of ExecutionResults:
 	//   1. The result contains the correct number of chunks (compared to the block it pertains to).
-	//   2. The result contains chunks with strictly monotonically increasing `Chunk.Index` starting with index 0
+	//   2. The result contains chunks with strictly monotonically increasing [Chunk.Index] starting with index 0
 	//   3. for each chunk, the consistency requirement `Chunk.Index == Chunk.CollectionIndex` holds
 	// See `module/validation/receiptValidator` for implementation, which is used by the consensus nodes.
 	// And issue https://github.com/dapperlabs/flow-go/issues/6864 for implementing 3.

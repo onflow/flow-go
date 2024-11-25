@@ -15,7 +15,7 @@ const (
 	// DKGEndStateDKGFailure - the underlying DKG library reported an error.
 	DKGEndStateDKGFailure
 	// RandomBeaconKeyRecovered - this node has recovered its beacon key from a previous epoch.
-	// This occurs only for epochs which are entered through the EFM Recovery process (`flow.EpochRecover` service event).
+	// This occurs only for epochs which are entered through the EFM Recovery process ([flow.EpochRecover] service event).
 	RandomBeaconKeyRecovered
 )
 

@@ -65,7 +65,7 @@ func (e *ejector) Eject(nodeID flow.Identifier) bool {
 // It is not allowed to readmit nodes that were ejected. Whenever a new DynamicIdentityList is tracked,
 // we ensure that the ejection status of previously ejected nodes is not reverted.
 // If a node was previously ejected and the new DynamicIdentityList contains the node with an `Ejected`
-// status of `false`, a `protocol.InvalidServiceEventError` is returned and the ejector remains unchanged.
+// status of `false`, a [protocol.InvalidServiceEventError] is returned and the ejector remains unchanged.
 func (e *ejector) TrackDynamicIdentityList(list flow.DynamicIdentityEntryList) error {
 	tracker := trackedDynamicIdentityList{dynamicIdentities: list}
 	if len(e.ejected) > 0 {

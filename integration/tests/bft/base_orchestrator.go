@@ -13,7 +13,7 @@ import (
 type OnEgressEvent func(event *insecure.EgressEvent) error
 type OnIngressEvent func(event *insecure.IngressEvent) error
 
-// BaseOrchestrator represents a simple `insecure.AttackOrchestrator` that tracks messages. This attack orchestrator
+// BaseOrchestrator represents a simple [insecure.AttackOrchestrator] that tracks messages. This attack orchestrator
 // simply passes through messages without changes to the orchestrator network. This orchestrator reduces boilerplate
 // of BFT tests by implementing common logic. Boilerplate can further be reduced by using the OnEgressEvent and OnIngressEvent
 // fields to define callbacks that will be invoked on each event received, this removes the need to redefine the logger and send

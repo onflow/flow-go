@@ -24,13 +24,13 @@ func Test_ProtocolState(t *testing.T) {
 	globalParams := psmock.NewGlobalParams(t)
 	protocolState := NewProtocolState(epochProtocolStateDB, protocolKVStoreDB, globalParams)
 
-	t.Run("testing `EpochProtocolStateEntries.AtBlockID`", func(t *testing.T) {
+	t.Run("testing [EpochProtocolStateEntries.AtBlockID]", func(t *testing.T) {
 		test_AtBlockID(t, protocolState, epochProtocolStateDB)
 	})
-	t.Run("testing `EpochProtocolStateEntries.GlobalParams`", func(t *testing.T) {
+	t.Run("testing [EpochProtocolStateEntries.GlobalParams]", func(t *testing.T) {
 		test_GlobalParams(t, protocolState, globalParams)
 	})
-	t.Run("testing `EpochProtocolStateEntries.KVStoreAtBlockID`", func(t *testing.T) {
+	t.Run("testing [EpochProtocolStateEntries.KVStoreAtBlockID]", func(t *testing.T) {
 		test_KVStoreAtBlockID(t, protocolState, protocolKVStoreDB)
 	})
 }
@@ -56,13 +56,13 @@ func Test_MutableProtocolState(t *testing.T) {
 		setupsDB,
 		commitsDB)
 
-	t.Run("testing `MutableProtocolState.AtBlockID`", func(t *testing.T) {
+	t.Run("testing [MutableProtocolState.AtBlockID]", func(t *testing.T) {
 		test_AtBlockID(t, mutableProtocolState, epochProtocolStateDB)
 	})
-	t.Run("testing `MutableProtocolState.GlobalParams`", func(t *testing.T) {
+	t.Run("testing [MutableProtocolState.GlobalParams]", func(t *testing.T) {
 		test_GlobalParams(t, mutableProtocolState, globalParams)
 	})
-	t.Run("testing `MutableProtocolState.KVStoreAtBlockID`", func(t *testing.T) {
+	t.Run("testing [MutableProtocolState.KVStoreAtBlockID]", func(t *testing.T) {
 		test_KVStoreAtBlockID(t, mutableProtocolState, protocolKVStoreDB)
 	})
 }

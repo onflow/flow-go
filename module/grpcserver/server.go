@@ -18,7 +18,7 @@ import (
 	"github.com/onflow/flow-go/module/irrecoverable"
 )
 
-// GrpcServer wraps `grpc.Server` and allows to manage it using `component.Component` interface. It can be injected
+// GrpcServer wraps [grpc.Server] and allows to manage it using [component.Component] interface. It can be injected
 // into different engines making it possible to use single grpc server for multiple services which live in different modules.
 type GrpcServer struct {
 	component.Component

@@ -7,7 +7,7 @@ import (
 	"github.com/onflow/flow-go/state/protocol"
 )
 
-// Distributor implements the `protocol.Consumer` interface for ingesting notifications emitted
+// Distributor implements the [protocol.Consumer] interface for ingesting notifications emitted
 // by the protocol state. It distributes the notifications to all registered consumers.
 type Distributor struct {
 	subscribers []protocol.Consumer

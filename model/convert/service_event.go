@@ -61,8 +61,8 @@ func getField[T cadence.Value](fields map[string]cadence.Value, fieldName string
 // convertServiceEventEpochSetup converts a service event encoded as the generic
 // flow.Event type to a ServiceEvent type for an EpochSetup event
 // CONVENTION: in the returned `EpochSetup` event,
-//   - Node identities listed in `EpochSetup.Participants` are in CANONICAL ORDER
-//   - for each cluster assignment (i.e. element in `EpochSetup.Assignments`), the nodeIDs are listed in CANONICAL ORDER
+//   - Node identities listed in [EpochSetup.Participants] are in CANONICAL ORDER
+//   - for each cluster assignment (i.e. element in [EpochSetup.Assignments]), the nodeIDs are listed in CANONICAL ORDER
 //
 // CAUTION: This function must only be used for input events computed locally, by an
 // Execution or Verification Node; it is not resilient to malicious inputs.

@@ -7,7 +7,7 @@ import (
 )
 
 // Config contains the configuration parameters for a Truncated Exponential Backoff,
-// as implemented by the `timeout.Controller`
+// as implemented by the [timeout.Controller]
 //   - On timeout: increase timeout by multiplicative factor `TimeoutAdjustmentFactor`. This
 //     results in exponentially growing timeout duration on multiple subsequent timeouts.
 //   - On progress: decrease timeout by multiplicative factor `TimeoutAdjustmentFactor.
@@ -66,7 +66,7 @@ func NewDefaultConfig() Config {
 //   - blockRateDelay: a delay to delay the proposal broadcasting [Milliseconds]
 //     Consistency requirement: must be non-negative
 //
-// Returns `model.ConfigurationError` is any of the consistency requirements is violated.
+// Returns [model.ConfigurationError] is any of the consistency requirements is violated.
 func NewConfig(minReplicaTimeout time.Duration, maxReplicaTimeout time.Duration, timeoutAdjustmentFactor float64, happyPathMaxRoundFailures uint64, maxRebroadcastInterval time.Duration) (Config, error) {
 	if minReplicaTimeout <= 0 {
 		return Config{}, model.NewConfigurationErrorf("minReplicaTimeout must be a positive number[milliseconds]")

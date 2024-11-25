@@ -24,7 +24,7 @@ const overCapacityThreshold = 128
 //     keep the mempool size within the desired limit.
 //   - The ejector _might_ (for performance reasons) retain more elements in the
 //     mempool than the targeted capacity.
-//   - The ejector _must_ notify the `Backend.ejectionCallbacks` for _each_
+//   - The ejector _must_ notify the [Backend.ejectionCallbacks] for _each_
 //     element it removes from the mempool.
 //   - Implementations do _not_ need to be concurrency safe. The Backend handles
 //     concurrency (specifically, it locks the mempool during ejection).

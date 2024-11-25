@@ -5,7 +5,7 @@ import (
 )
 
 // WithInitialWeight returns an anonymous function that assigns the given weight value
-// to `Identity.InitialWeight`. This function is primarily intended for testing, as
+// to [Identity.InitialWeight]. This function is primarily intended for testing, as
 // Identity structs should be immutable by convention.
 func WithInitialWeight(weight uint64) flow.IdentityMapFunc[flow.Identity] {
 	return func(identity flow.Identity) flow.Identity {
@@ -15,7 +15,7 @@ func WithInitialWeight(weight uint64) flow.IdentityMapFunc[flow.Identity] {
 }
 
 // WithEpochParticipationStatus returns an anonymous function that assigns the given epoch participation status value
-// to `Identity.EpochParticipationStatus`. This function is primarily intended for testing, as
+// to [Identity.EpochParticipationStatus]. This function is primarily intended for testing, as
 // Identity structs should be immutable by convention.
 func WithEpochParticipationStatus(status flow.EpochParticipationStatus) flow.IdentityMapFunc[flow.Identity] {
 	return func(identity flow.Identity) flow.Identity {

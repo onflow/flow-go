@@ -163,7 +163,7 @@ func (sys *SystemContracts) DeductTransactionFees(
 	)
 }
 
-// uses `FlowServiceAccount.setupNewAccount` from https://github.com/onflow/flow-core-contracts/blob/master/contracts/FlowServiceAccount.cdc
+// uses [FlowServiceAccount.setupNewAccount] from https://github.com/onflow/flow-core-contracts/blob/master/contracts/FlowServiceAccount.cdc
 var setupNewAccountSpec = ContractFunctionSpec{
 	AddressFromChain: ServiceAddress,
 	LocationName:     systemcontracts.ContractNameServiceAccount,

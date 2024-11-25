@@ -169,7 +169,7 @@ func (v *VersionBeacon) String() string {
 // NOTE: A ProtocolStateVersionUpgrade event `E` is accepted while processing block `B`
 // which seals `E` if and only if E.ActiveView > B.View + SafetyThreshold.
 // SafetyThreshold is a protocol parameter set so that it is overwhelmingly likely that
-// block `B` is finalized (ergo the protocol version switch at the specified view `E.ActiveView`)
+// block `B` is finalized (ergo the protocol version switch at the specified view [E.ActiveView])
 // within any stretch of SafetyThreshold-many views.
 // TODO: This concept mirrors `FinalizationSafetyThreshold` and `versionBoundaryFreezePeriod`
 // These parameters should be consolidated.

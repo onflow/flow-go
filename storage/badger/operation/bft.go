@@ -34,7 +34,7 @@ func PersistBlocklist(blocklist map[flow.Identifier]struct{}) func(*badger.Txn) 
 }
 
 // RetrieveBlocklist reads the set of blocked node IDs from the data base.
-// Returns `storage.ErrNotFound` error in case no respective data base entry is present.
+// Returns [storage.ErrNotFound] error in case no respective data base entry is present.
 //
 // TODO: TEMPORARY manual override for adding node IDs to list of ejected nodes, applies to networking layer only
 func RetrieveBlocklist(blocklist *map[flow.Identifier]struct{}) func(*badger.Txn) error {

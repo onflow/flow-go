@@ -15,7 +15,7 @@ type ReceiptValidator interface {
 	//   - execution result has a valid parent and satisfies the subgraph check
 	//
 	// In order to validate a receipt, both the executed block and the parent result
-	// referenced in `receipt.ExecutionResult` must be known. We return nil if all checks
+	// referenced in [receipt.ExecutionResult] must be known. We return nil if all checks
 	// pass successfully.
 	//
 	// Expected errors during normal operations:

@@ -79,7 +79,7 @@ func (c *Client) ReadBroadcast(fromIndex uint, referenceBlock flow.Identifier) (
 	}
 	values := value.(cadence.Array).Values
 
-	// unpack return from contract to `model.DKGMessage`
+	// unpack return from contract to [model.DKGMessage]
 	messages := make([]model.BroadcastDKGMessage, 0, len(values))
 	for _, val := range values {
 		fields := cadence.FieldsMappedByName(val.(cadence.Struct))
@@ -180,7 +180,7 @@ func (c *Client) Broadcast(msg model.BroadcastDKGMessage) error {
 	return nil
 }
 
-// SubmitParametersAndResult posts the DKG setup parameters (`flow.DKGIndexMap`) and the node's locally-computed DKG result to
+// SubmitParametersAndResult posts the DKG setup parameters ([flow.DKGIndexMap]) and the node's locally-computed DKG result to
 // the DKG white-board smart contract. The DKG result are the group public key and the node's local computation of the public
 // keys for each DKG participant. Serialized public keys are encoded as hex.
 // Conceptually the flow.DKGIndexMap is not and output of the DKG protocol. Rather, it is part of the configuration/initialization

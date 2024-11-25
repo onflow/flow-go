@@ -10,7 +10,7 @@ import (
 //
 // There are two ways to interact with this environment:
 //
-// First, passing a signed transaction (EOA account) to the `EVM.run` Cadence function
+// First, passing a signed transaction (EOA account) to the [EVM.run] Cadence function
 // creates a new block, updates the internal merkle tree, and emits a new root hash.
 //
 // The Second way is through a new form of account called cadence-owned-accounts (COAs),

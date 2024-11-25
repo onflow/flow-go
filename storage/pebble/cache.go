@@ -126,7 +126,7 @@ func (c *ReadCache) IsCached(key string) bool {
 
 // Get will try to retrieve the resource from cache first, and then from the
 // injected. During normal operations, the following error returns are expected:
-//   - `storage.ErrNotFound` if key is unknown.
+//   - [storage.ErrNotFound] if key is unknown.
 func (c *ReadCache) Get(key string) (flow.RegisterValue, error) {
 	resource, cached := c.cache.Get(key)
 	if cached {

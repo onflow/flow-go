@@ -37,7 +37,7 @@ func MakeTimeoutMessage(view uint64, newestQCView uint64) []byte {
 // verifyAggregatedSignatureOneMessage encapsulates the logic of verifying an aggregated signature
 // under the same message.
 // Proofs of possession of all input keys are assumed to be valid (checked by the protocol).
-// This logic is commonly used across the different implementations of `hotstuff.Verifier`.
+// This logic is commonly used across the different implementations of [hotstuff.Verifier].
 // In this context, all signatures apply to blocks.
 // Return values:
 //   - nil if `aggregatedSig` is valid against the public keys and message.
@@ -82,7 +82,7 @@ func verifyAggregatedSignatureOneMessage(
 // verifyTCSignatureManyMessages checks cryptographic validity of the TC's signature w.r.t.
 // multiple messages and public keys.
 // Proofs of possession of all input keys are assumed to be valid (checked by the protocol).
-// This logic is commonly used across the different implementations of `hotstuff.Verifier`.
+// This logic is commonly used across the different implementations of [hotstuff.Verifier].
 // It is the responsibility of the calling code to ensure that all `pks` are authorized,
 // without duplicates. The caller must also make sure the `hasher` passed is non nil and has
 // 128-bytes outputs.

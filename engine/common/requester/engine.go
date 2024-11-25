@@ -27,7 +27,7 @@ import (
 // and errors should be handled internally within the function.
 type HandleFunc func(originID flow.Identifier, entity flow.Entity)
 
-// CreateFunc is a function that creates a `flow.Entity` with an underlying type
+// CreateFunc is a function that creates a [flow.Entity] with an underlying type
 // so that we can properly decode entities transmitted over the network.
 type CreateFunc func() flow.Entity
 
@@ -199,7 +199,7 @@ func (e *Engine) Process(channel channels.Channel, originID flow.Identifier, mes
 // list. The provided selector will be applied to the set of valid providers on top
 // of the global selector injected upon construction. It allows for finer-grained
 // control over which subset of providers to request a given entity from, such as
-// selection of a collection cluster. Use `filter.Any` if no additional selection
+// selection of a collection cluster. Use [filter.Any] if no additional selection
 // is required. Checks integrity of response to make sure that we got entity that we were requesting.
 func (e *Engine) EntityByID(entityID flow.Identifier, selector flow.IdentityFilter[flow.Identity]) {
 	e.addEntityRequest(entityID, selector, true)

@@ -50,9 +50,9 @@ type TimeoutObject struct {
 	// SigData is a BLS signature created by staking key signing View + NewestQC.View
 	// This signature is further aggregated in TimeoutCertificate.
 	SigData crypto.Signature
-	// TimeoutTick is the number of times the `timeout.Controller` has (re-)emitted the
+	// TimeoutTick is the number of times the [timeout.Controller] has (re-)emitted the
 	// timeout for this view. When the timer for the view's original duration expires, a `TimeoutObject`
-	// with `TimeoutTick = 0` is broadcast. Subsequently, `timeout.Controller` re-broadcasts the
+	// with `TimeoutTick = 0` is broadcast. Subsequently, [timeout.Controller] re-broadcasts the
 	// `TimeoutObject` periodically  based on some internal heuristic. Each time we attempt a re-broadcast,
 	// the `TimeoutTick` is incremented. Incrementing the field prevents de-duplicated within the network layer,
 	// which in turn guarantees quick delivery of the `TimeoutObject` after GST and facilitates recovery.
@@ -89,12 +89,12 @@ func (t *TimeoutObject) String() string {
 	)
 }
 
-// LogContext returns a `zerolog.Contex` including the most important properties of the TC:
+// LogContext returns a [zerolog.Contex] including the most important properties of the TC:
 //   - view number that this TC is for
 //   - view and ID of the block that the included QC points to
 //   - number of times a re-broadcast of this timeout was attempted
 //   - [optional] if the TC also includes a TC for the prior view, i.e. `LastViewTC` ≠ nil:
-//     the new of `LastViewTC` and the view that `LastViewTC.NewestQC` is for
+//     the new of `LastViewTC` and the view that [LastViewTC.NewestQC] is for
 func (t *TimeoutObject) LogContext(logger zerolog.Logger) zerolog.Context {
 	logContext := logger.With().
 		Uint64("timeout_newest_qc_view", t.NewestQC.View).

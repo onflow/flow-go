@@ -22,7 +22,7 @@ func (b *BlockContainer) Level() uint64             { return b.View }
 func (b *BlockContainer) Parent() (flow.Identifier, uint64) {
 	// Caution: not all blocks have a QC for the parent, such as the spork root blocks.
 	// Per API contract, we are obliged to return a value to prevent panics during logging.
-	// (see vertex `forest.VertexToString` method).
+	// (see vertex [forest.VertexToString] method).
 	if b.QC == nil {
 		return flow.ZeroID, 0
 	}

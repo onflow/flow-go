@@ -16,7 +16,7 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
-// TestProtocolKVStore_StoreTx verifies correct functioning of `ProtocolKVStore.StoreTx`. In a nutshell,
+// TestProtocolKVStore_StoreTx verifies correct functioning of [ProtocolKVStore.StoreTx]. In a nutshell,
 // `ProtocolKVStore` should encode the provided snapshot and call the lower-level storage abstraction
 // to persist the encoded result.
 func TestProtocolKVStore_StoreTx(t *testing.T) {
@@ -62,7 +62,7 @@ func TestProtocolKVStore_StoreTx(t *testing.T) {
 	})
 }
 
-// TestProtocolKVStore_IndexTx verifies that `ProtocolKVStore.IndexTx` delegate all calls directly to the
+// TestProtocolKVStore_IndexTx verifies that [ProtocolKVStore.IndexTx] delegate all calls directly to the
 // low-level storage abstraction.
 func TestProtocolKVStore_IndexTx(t *testing.T) {
 	blockID := unittest.IdentifierFixture()
@@ -100,7 +100,7 @@ func TestProtocolKVStore_IndexTx(t *testing.T) {
 	})
 }
 
-// TestProtocolKVStore_ByBlockID verifies correct functioning of `ProtocolKVStore.ByBlockID`. In a nutshell,
+// TestProtocolKVStore_ByBlockID verifies correct functioning of [ProtocolKVStore.ByBlockID]. In a nutshell,
 // `ProtocolKVStore` should attempt to retrieve the encoded snapshot from the lower-level storage abstraction
 // and return the decoded result.
 func TestProtocolKVStore_ByBlockID(t *testing.T) {
@@ -131,9 +131,9 @@ func TestProtocolKVStore_ByBlockID(t *testing.T) {
 		require.Equal(t, expectedState, decodedState)
 	})
 
-	// On the unhappy path, either `ProtocolKVStore.ByBlockID` could error, or the decoding could fail. In either case,
+	// On the unhappy path, either [ProtocolKVStore.ByBlockID] could error, or the decoding could fail. In either case,
 	// the error should be escalated to the caller.
-	t.Run("low-level `ProtocolKVStore.ByBlockID` errors", func(t *testing.T) {
+	t.Run("low-level [ProtocolKVStore.ByBlockID] errors", func(t *testing.T) {
 		someError := errors.New("some problem")
 		llStorage.On("ByBlockID", blockID).Return(nil, someError).Once()
 
@@ -152,7 +152,7 @@ func TestProtocolKVStore_ByBlockID(t *testing.T) {
 	})
 	t.Run("decoding yields exception", func(t *testing.T) {
 		versionedSnapshot := &flow.PSKeyValueStoreData{
-			Version: 1, // model version 1 is known, but data is random, which should yield an `irrecoverable.Exception`
+			Version: 1, // model version 1 is known, but data is random, which should yield an [irrecoverable.Exception]
 			Data:    unittest.RandomBytes(117),
 		}
 		llStorage.On("ByBlockID", blockID).Return(versionedSnapshot, nil).Once()
@@ -162,7 +162,7 @@ func TestProtocolKVStore_ByBlockID(t *testing.T) {
 	})
 }
 
-// TestProtocolKVStore_ByID verifies correct functioning of `ProtocolKVStore.ByID`. In a nutshell,
+// TestProtocolKVStore_ByID verifies correct functioning of [ProtocolKVStore.ByID]. In a nutshell,
 // `ProtocolKVStore` should attempt to retrieve the encoded snapshot from the lower-level storage
 // abstraction and return the decoded result.
 func TestProtocolKVStore_ByID(t *testing.T) {
@@ -193,9 +193,9 @@ func TestProtocolKVStore_ByID(t *testing.T) {
 		require.Equal(t, expectedState, decodedState)
 	})
 
-	// On the unhappy path, either `ProtocolKVStore.ByID` could error, or the decoding could fail. In either case,
+	// On the unhappy path, either [ProtocolKVStore.ByID] could error, or the decoding could fail. In either case,
 	// the error should be escalated to the caller.
-	t.Run("low-level `ProtocolKVStore.ByID` errors", func(t *testing.T) {
+	t.Run("low-level [ProtocolKVStore.ByID] errors", func(t *testing.T) {
 		someError := errors.New("some problem")
 		llStorage.On("ByID", protocolStateID).Return(nil, someError).Once()
 
@@ -214,7 +214,7 @@ func TestProtocolKVStore_ByID(t *testing.T) {
 	})
 	t.Run("decoding yields exception", func(t *testing.T) {
 		versionedSnapshot := &flow.PSKeyValueStoreData{
-			Version: 1, // model version 1 is known, but data is random, which should yield an `irrecoverable.Exception`
+			Version: 1, // model version 1 is known, but data is random, which should yield an [irrecoverable.Exception]
 			Data:    unittest.RandomBytes(117),
 		}
 		llStorage.On("ByID", protocolStateID).Return(versionedSnapshot, nil).Once()

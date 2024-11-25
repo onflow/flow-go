@@ -28,7 +28,7 @@ const (
 	numOfUnauthorizedEvents = 5
 )
 
-// Orchestrator represents a simple `insecure.AttackOrchestrator` that tracks messages received before and after the
+// Orchestrator represents a simple [insecure.AttackOrchestrator] that tracks messages received before and after the
 // senderVN is disallow-listed by the receiverEN via the admin disallow-list command.
 type Orchestrator struct {
 	*bft.BaseOrchestrator

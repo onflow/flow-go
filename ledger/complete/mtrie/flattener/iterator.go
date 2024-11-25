@@ -41,7 +41,7 @@ type NodeIterator struct {
 	//     - If `p` has only one child, this child must be `n`.
 	//       Therefore, by recalling `n`, we have recalled all ancestors of `p`.
 	//     - If `n` is the right child, we haven already searched through all of `p`
-	//       descendents (as the `p.LeftChild` must have been searched before)
+	//       descendents (as the [p.LeftChild] must have been searched before)
 	//       Therefore, by recalling `n`, we have recalled all ancestors of `p`
 	// Hence, it follows that the head of the stack always satisfies the
 	// Descendents-First-Relationship. As we search the trie in DFS manner, each

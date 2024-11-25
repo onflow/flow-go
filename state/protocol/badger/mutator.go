@@ -294,8 +294,8 @@ func (m *ParticipantState) Extend(ctx context.Context, candidate *flow.Block) er
 //	5b. store candidate block and index it as a child of its parent (needed for recovery to traverse unfinalized blocks)
 //	5c. if we are given a certifyingQC, store it and queue a `BlockProcessable` notification for the candidate block
 //
-// If `headerExtend` is called by `ParticipantState.Extend` (full consensus participant) then `certifyingQC` will be nil,
-// but the block payload will be validated. If `headerExtend` is called by `FollowerState.Extend` (consensus follower),
+// If `headerExtend` is called by [ParticipantState.Extend] (full consensus participant) then `certifyingQC` will be nil,
+// but the block payload will be validated. If `headerExtend` is called by [FollowerState.Extend] (consensus follower),
 // then `certifyingQC` must be not nil which proves payload validity.
 //
 // Expected errors during normal operations:
@@ -315,7 +315,7 @@ func (m *FollowerState) headerExtend(ctx context.Context, candidate *flow.Block,
 	// (ii) has the same chain ID as its parent and a height incremented by 1.
 	parent, err := m.headers.ByBlockID(header.ParentID) // (i) connects to the known block tree
 	if err != nil {
-		// The only sentinel error that can happen here is `storage.ErrNotFound`. However, by convention the
+		// The only sentinel error that can happen here is [storage.ErrNotFound]. However, by convention the
 		// protocol state must be extended in a parent-first order. This block's parent being unknown breaks
 		// with this API contract and results in an exception.
 		return irrecoverable.NewExceptionf("could not retrieve the candidate's parent block %v: %w", header.ParentID, err)

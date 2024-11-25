@@ -11,7 +11,7 @@ import (
 
 // IncorporatedResultSeals implements the incorporated result seals memory pool
 // of the consensus nodes.
-// ATTENTION: this is a temporary wrapper for `mempool.IncorporatedResultSeals`
+// ATTENTION: this is a temporary wrapper for [mempool.IncorporatedResultSeals]
 // to enforce that there are at least 2 receipts from _different_ ENs
 // committing to the same incorporated result.
 // This wrapper should only be used with `Core`.

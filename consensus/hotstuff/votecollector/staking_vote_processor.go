@@ -24,8 +24,8 @@ import (
 // CAUTION:
 // this base factory only creates the VerifyingVoteProcessor for the given block.
 // It does _not_ check the proposer's vote for its own block, i.e. it does _not_
-// implement `hotstuff.VoteProcessorFactory`. This base factory should be wrapped
-// by `votecollector.VoteProcessorFactory` which adds the logic to verify
+// implement [hotstuff.VoteProcessorFactory]. This base factory should be wrapped
+// by [votecollector.VoteProcessorFactory] which adds the logic to verify
 // the proposer's vote (decorator pattern).
 type stakingVoteProcessorFactoryBase struct {
 	committee   hotstuff.DynamicCommittee

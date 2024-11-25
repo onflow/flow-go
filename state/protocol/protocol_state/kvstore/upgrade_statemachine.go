@@ -71,7 +71,7 @@ func (m *PSVersionUpgradeStateMachine) EvolveState(orderedUpdates []flow.Service
 
 // processSingleEvent performs processing of a single protocol version upgrade event.
 // Expected errors indicating that we have observed and invalid service event from protocol's point of view.
-//   - `protocol.InvalidServiceEventError` - if the service event is invalid for the current protocol state.
+//   - [protocol.InvalidServiceEventError] - if the service event is invalid for the current protocol state.
 //
 // All other errors should be treated as exceptions.
 func (m *PSVersionUpgradeStateMachine) processSingleEvent(versionUpgrade *flow.ProtocolStateVersionUpgrade) error {
@@ -118,7 +118,7 @@ func (m *PSVersionUpgradeStateMachine) processSingleEvent(versionUpgrade *flow.P
 	}
 
 	// There can be multiple `versionUpgrade` Service Events sealed in one block. In case we have _not_
-	// encountered any, `m.EvolvingState` contains the latest `versionUpgrade` as of the parent block, because
+	// encountered any, [m.EvolvingState] contains the latest `versionUpgrade` as of the parent block, because
 	// we cloned it from the parent state. If we encountered some version upgrades, we already enforced that
 	// they are all upgrades to the same version. So we only need to check that the next `versionUpgrade`
 	// also has the same version.

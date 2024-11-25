@@ -108,8 +108,8 @@ func TestCombinedSignWithBeaconKey(t *testing.T) {
 	require.ErrorIs(t, err, model.ErrInvalidSignature)
 
 	// Vote from a node that is _not_ part of the Random Beacon committee should be rejected.
-	// Specifically, we expect that the verifier recognizes the `protocol.IdentityNotFoundError`
-	// as a sign of an invalid vote and wraps it into a `model.InvalidSignerError`.
+	// Specifically, we expect that the verifier recognizes the [protocol.IdentityNotFoundError]
+	// as a sign of an invalid vote and wraps it into a [model.InvalidSignerError].
 	*dkg = mocks.DKG{} // overwrite DKG mock with a new one
 	dkg.On("KeyShare", signerID).Return(nil, protocol.IdentityNotFoundError{NodeID: signerID})
 	err = verifier.VerifyVote(nodeID, vote.SigData, proposal.Block.View, proposal.Block.BlockID)
@@ -171,9 +171,9 @@ func TestCombinedSignWithNoBeaconKey(t *testing.T) {
 	require.Equal(t, expectedStakingSig, crypto.Signature(proposal.SigData))
 }
 
-// Test_VerifyQC_EmptySigners checks that Verifier returns an `model.InsufficientSignaturesError`
+// Test_VerifyQC_EmptySigners checks that Verifier returns an [model.InsufficientSignaturesError]
 // if `signers` input is empty or nil. This check should happen _before_ the Verifier calls into
-// any sub-components, because some (e.g. `crypto.AggregateBLSPublicKeys`) don't provide sufficient
+// any sub-components, because some (e.g. [crypto.AggregateBLSPublicKeys]) don't provide sufficient
 // sentinel errors to distinguish between internal problems and external byzantine inputs.
 func Test_VerifyQC_EmptySigners(t *testing.T) {
 	committee := &mocks.DynamicCommittee{}

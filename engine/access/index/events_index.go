@@ -7,7 +7,7 @@ import (
 	"github.com/onflow/flow-go/storage"
 )
 
-// EventsIndex implements a wrapper around `storage.Events` ensuring that needed data has been synced and is available to the client.
+// EventsIndex implements a wrapper around [storage.Events] ensuring that needed data has been synced and is available to the client.
 // Note: read detail how `Reporter` is working
 type EventsIndex struct {
 	*Reporter

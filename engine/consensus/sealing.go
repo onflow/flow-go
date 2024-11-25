@@ -3,7 +3,7 @@ package consensus
 import "github.com/onflow/flow-go/model/flow"
 
 // SealingCore processes incoming execution results and result approvals.
-// Accepts `flow.IncorporatedResult` to start processing approvals for particular result.
+// Accepts [flow.IncorporatedResult] to start processing approvals for particular result.
 // Whenever enough approvals are collected produces a candidate seal and adds it to the mempool.
 // Implementations of SealingCore are _concurrency safe_.
 type SealingCore interface {

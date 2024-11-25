@@ -338,7 +338,7 @@ func (va *VoteAggregator) PruneUpToView(lowestRetainedView uint64) {
 	}
 }
 
-// OnFinalizedBlock implements the `OnFinalizedBlock` callback from the `hotstuff.FinalizationConsumer`
+// OnFinalizedBlock implements the `OnFinalizedBlock` callback from the [hotstuff.FinalizationConsumer]
 // It informs sealing.Core about finalization of respective block.
 //
 // CAUTION: the input to this callback is treated as trusted; precautions should be taken that messages

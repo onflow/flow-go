@@ -48,7 +48,7 @@ type SignalerContext interface {
 	sealed()         // private, to constrain builder to using WithSignaler
 }
 
-// SignalerContextKey represents the key type for retrieving a SignalerContext from a value `context.Context`.
+// SignalerContextKey represents the key type for retrieving a SignalerContext from a value [context.Context].
 type SignalerContextKey struct{}
 
 // private, to force context derivation / WithSignaler
@@ -65,7 +65,7 @@ func WithSignaler(parent context.Context) (SignalerContext, <-chan error) {
 	return &signalerCtx{parent, sig}, errChan
 }
 
-// WithSignalerContext wraps `SignalerContext` using `context.WithValue` so it can later be used with `Throw`.
+// WithSignalerContext wraps `SignalerContext` using [context.WithValue] so it can later be used with `Throw`.
 func WithSignalerContext(parent context.Context, ctx SignalerContext) context.Context {
 	return context.WithValue(parent, SignalerContextKey{}, ctx)
 }

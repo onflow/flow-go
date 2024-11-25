@@ -35,7 +35,7 @@ func NewProtocolState(epochProtocolStateDB storage.EpochProtocolStateEntries, kv
 }
 
 // newProtocolState creates a new ProtocolState instance. The exported constructor `NewProtocolState` only requires the
-// lower-level `storage.ProtocolKVStore` as input. Though, internally we use the higher-level `protocol_state.ProtocolKVStore`,
+// lower-level [storage.ProtocolKVStore] as input. Though, internally we use the higher-level `protocol_state.ProtocolKVStore`,
 // which wraps the lower-level ProtocolKVStore.
 func newProtocolState(epochProtocolStateDB storage.EpochProtocolStateEntries, kvStoreSnapshots protocol_state.ProtocolKVStore, globalParams protocol.GlobalParams) *ProtocolState {
 	return &ProtocolState{

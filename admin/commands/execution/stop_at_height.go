@@ -63,7 +63,7 @@ func (s *StopAtHeightCommand) Handler(_ context.Context, req *admin.CommandReque
 //
 // Additionally, height must be a positive integer. If a float value is provided, only the integer part is used.
 // The following sentinel errors are expected during normal operations:
-// * `admin.InvalidAdminReqError` if any required field is missing or in a wrong format
+// * [admin.InvalidAdminReqError] if any required field is missing or in a wrong format
 func (s *StopAtHeightCommand) Validator(req *admin.CommandRequest) error {
 
 	input, ok := req.Data.(map[string]interface{})

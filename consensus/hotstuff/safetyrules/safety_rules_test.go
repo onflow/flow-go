@@ -415,7 +415,7 @@ func (s *SafetyRulesTestSuite) TestProduceVote_VotingOnInvalidProposals() {
 //   - replica votes in monotonously increasing views
 //
 // Voting twice per round on equivocating proposals is considered a byzantine behavior.
-// Expect a `model.NoVoteError` sentinel in such scenario.
+// Expect a [model.NoVoteError] sentinel in such scenario.
 func (s *SafetyRulesTestSuite) TestProduceVote_VoteEquivocation() {
 	expectedVote := makeVote(s.proposal.Block)
 	s.signer.On("CreateVote", s.proposal.Block).Return(expectedVote, nil).Once()

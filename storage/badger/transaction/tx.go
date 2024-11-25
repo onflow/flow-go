@@ -21,7 +21,7 @@ import (
 //     functions.
 //   - Whether a transaction is considered to have succeeded depends only on the return value
 //     of the outermost function. For example, consider a chain of 3 functions: f3( f2( f1(x)))
-//     Lets assume f1 fails with an `storage.ErrAlreadyExists` sentinel, which f2 expects and
+//     Lets assume f1 fails with an [storage.ErrAlreadyExists] sentinel, which f2 expects and
 //     therefore discards. f3 could then succeed, i.e. return nil.
 //     Consequently, the entire list of callbacks is executed, including f1's callback if it
 //     added one. Callback implementations therefore need to account for this edge case.
@@ -37,7 +37,7 @@ type Tx struct {
 // CAUTION:
 // Whether a transaction is considered to have succeeded depends only on the return value
 // of the outermost function. For example, consider a chain of 3 functions: f3( f2( f1(x)))
-// Lets assume f1 fails with an `storage.ErrAlreadyExists` sentinel, which f2 expects and
+// Lets assume f1 fails with an [storage.ErrAlreadyExists] sentinel, which f2 expects and
 // therefore discards. f3 could then succeed, i.e. return nil.
 // Consequently, the entire list of callbacks is executed, including f1's callback if it
 // added one. Callback implementations therefore need to account for this edge case.

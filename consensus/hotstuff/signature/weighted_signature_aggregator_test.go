@@ -229,7 +229,7 @@ func TestWeightedSignatureAggregator(t *testing.T) {
 		assert.Nil(t, signers)
 
 		// Also, _after_ attempting to add a signature from unknown `signerID`:
-		// calling `Aggregate()` should error with `model.InsufficientSignaturesError`,
+		// calling `Aggregate()` should error with [model.InsufficientSignaturesError],
 		// as still zero signatures are stored.
 		_, err = aggregator.TrustedAdd(unittest.IdentifierFixture(), unittest.SignatureFixture())
 		assert.True(t, model.IsInvalidSignerError(err))

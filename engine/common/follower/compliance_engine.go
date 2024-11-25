@@ -183,7 +183,7 @@ func (e *ComplianceEngine) OnBlockProposal(proposal flow.Slashable[*messages.Blo
 // order (less efficient), making it robust against byzantine nodes.
 func (e *ComplianceEngine) OnSyncedBlocks(blocks flow.Slashable[[]*messages.BlockProposal]) {
 	e.engMetrics.MessageReceived(metrics.EngineFollower, metrics.MessageSyncedBlocks)
-	// The synchronization engine feeds the follower with batches of blocks. The field `Slashable.OriginID`
+	// The synchronization engine feeds the follower with batches of blocks. The field [Slashable.OriginID]
 	// states which node forwarded the batch to us. Each block contains its proposer and signature.
 
 	if e.syncedBlocks.Push(blocks) {
@@ -195,7 +195,7 @@ func (e *ComplianceEngine) OnSyncedBlocks(blocks flow.Slashable[[]*messages.Bloc
 // and asynchronously executes the internal pruning logic. We accept inputs out of order, and only act
 // on inputs with strictly monotonously increasing views.
 //
-// Implements the `OnFinalizedBlock` callback from the `hotstuff.FinalizationConsumer`
+// Implements the `OnFinalizedBlock` callback from the [hotstuff.FinalizationConsumer]
 // CAUTION: the input to this callback is treated as trusted; precautions should be taken that messages
 // from external nodes cannot be considered as inputs to this function.
 func (e *ComplianceEngine) OnFinalizedBlock(block *model.Block) {
@@ -222,7 +222,7 @@ func (e *ComplianceEngine) Process(channel channels.Channel, originID flow.Ident
 }
 
 // processBlocksLoop processes available blocks as they are queued.
-// Implements `component.ComponentWorker` signature.
+// Implements [component.ComponentWorker] signature.
 func (e *ComplianceEngine) processBlocksLoop(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
 	ready()
 
@@ -252,7 +252,7 @@ func (e *ComplianceEngine) processBlocksLoop(ctx irrecoverable.SignalerContext, 
 //     synchronization produces for a node that is catching up. In other words, prioritizing
 //     the few new proposals first is probably not going to be much of a distraction.
 //     Proposals too far in the future are dropped (see parameter `SkipNewProposalsThreshold`
-//     in `compliance.Config`), to prevent memory overflow.
+//     in [compliance.Config]), to prevent memory overflow.
 //
 // No errors are expected during normal operation. All returned exceptions are potential
 // symptoms of internal state corruption and should be fatal.
@@ -374,7 +374,7 @@ func (e *ComplianceEngine) processConnectedBatch(ctx irrecoverable.SignalerConte
 }
 
 // finalizationProcessingLoop is a separate goroutine that performs processing of finalization events.
-// Implements `component.ComponentWorker` signature.
+// Implements [component.ComponentWorker] signature.
 func (e *ComplianceEngine) finalizationProcessingLoop(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
 	ready()
 

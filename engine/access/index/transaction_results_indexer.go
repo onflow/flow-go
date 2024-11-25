@@ -5,7 +5,7 @@ import (
 	"github.com/onflow/flow-go/storage"
 )
 
-// TransactionResultsIndex implements a wrapper around `storage.LightTransactionResult` ensuring that needed data has been synced and is available to the client.
+// TransactionResultsIndex implements a wrapper around [storage.LightTransactionResult] ensuring that needed data has been synced and is available to the client.
 // Note: read detail how `Reporter` is working
 type TransactionResultsIndex struct {
 	*Reporter

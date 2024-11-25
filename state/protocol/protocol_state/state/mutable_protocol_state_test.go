@@ -71,7 +71,7 @@ func (s *StateMutatorSuite) SetupTest() {
 	// CAUTION: ID of evolving state must be defined by the tests.
 	s.evolvingState = *protocol_statemock.NewKVStoreMutator(s.T())
 
-	// Factories for the state machines expect `s.parentState` as parent state and `s.replicatedState` as target state.
+	// Factories for the state machines expect [s.parentState] as parent state and [s.replicatedState] as target state.
 	// CAUTION: the behaviour of each state machine has to be defined by the tests.
 	s.kvStateMachines = make([]protocol_statemock.OrthogonalStoreStateMachine[protocol.KVStoreReader], 2)
 	s.kvStateMachineFactories = make([]protocol_statemock.KeyValueStoreStateMachineFactory, len(s.kvStateMachines))
@@ -98,7 +98,7 @@ func (s *StateMutatorSuite) SetupTest() {
 //
 // Note that the `MutableProtocolState` bundles all deferred database updates into a `DeferredBlockPersist`. Conceptually, it is possible that
 // the `MutableProtocolState` wraps the deferred database operations in faulty code, such that they are eventually not executed. Therefore,
-// we explicitly test here whether the storage functors *generated* by `ProtocolKVStore.IndexTx` and “ProtocolKVStore.StoreTx` are
+// we explicitly test here whether the storage functors *generated* by [ProtocolKVStore.IndexTx] and “ProtocolKVStore.StoreTx` are
 // actually called when executing the returned `DeferredBlockPersist`
 func (s *StateMutatorSuite) testEvolveState(seals []*flow.Seal, expectedResultingStateID flow.Identifier, stateChangeExpected bool) {
 	// on the happy path, we _always_ require a deferred db update, which indexes the protocol state by the candidate block's ID
@@ -133,7 +133,7 @@ func (s *StateMutatorSuite) testEvolveState(seals []*flow.Seal, expectedResultin
 	storeTxDeferredUpdate.AssertExpectations(s.T())
 }
 
-// Test_HappyPath_StateInvariant tests that `MutableProtocolState.EvolveState` returns all updates from sub-state state machines and
+// Test_HappyPath_StateInvariant tests that [MutableProtocolState.EvolveState] returns all updates from sub-state state machines and
 // prepares updates to the KV store, when building protocol state. Here, we focus on the path, where the *state remains invariant*.
 func (s *StateMutatorSuite) Test_HappyPath_StateInvariant() {
 	parentProtocolStateID := s.parentState.ID()
@@ -187,7 +187,7 @@ func (s *StateMutatorSuite) Test_HappyPath_StateInvariant() {
 	})
 }
 
-// Test_HappyPath_StateChange tests that `MutableProtocolState.EvolveState` returns all updates from sub-state state machines and
+// Test_HappyPath_StateChange tests that [MutableProtocolState.EvolveState] returns all updates from sub-state state machines and
 // prepares updates to the KV store, when building protocol state. Here, we focus on the path, where the *state is modified*.
 //
 // All mocked state machines return a single deferred db update that will be subsequently returned and executed.
@@ -349,7 +349,7 @@ func (s *StateMutatorSuite) Test_VersionUpgrade() {
 	})
 }
 
-// Test_SealsOrdered verifies that `MutableProtocolState.EvolveState` processes service events from seals ordered by *increasing* block
+// Test_SealsOrdered verifies that [MutableProtocolState.EvolveState] processes service events from seals ordered by *increasing* block
 // height, independently of the order the seals are provided with. Here, we explicitly provide seals in order of *decreasing* block height.
 func (s *StateMutatorSuite) Test_SealsOrdered() {
 	// generate seals in order of *increasing* block height and store the resulting list of _ordered_ service events for reference in `orderedServiceEvents`
@@ -395,7 +395,7 @@ func (s *StateMutatorSuite) Test_SealsOrdered() {
 
 }
 
-// Test_ParentNotFound checks the behaviour of `MutableProtocolState.EvolveState` when the specified parent block is not found.
+// Test_ParentNotFound checks the behaviour of [MutableProtocolState.EvolveState] when the specified parent block is not found.
 func (s *StateMutatorSuite) Test_InvalidParent() {
 	unknownParent := unittest.IdentifierFixture()
 	s.protocolKVStoreDB.On("ByBlockID", unknownParent).Return(nil, storage.ErrNotFound)
@@ -633,7 +633,7 @@ func (m *mockStateTransition) Mock() protocol_statemock.OrthogonalStoreStateMach
 	deferredUpdate.On("Execute", mock.Anything).Return(nil).Once()
 	deferredDBUpdates := transaction.NewDeferredBlockPersist().AddDbOp(deferredUpdate.Execute)
 	stateMachine.On("Build").Run(func(args mock.Arguments) {
-		require.True(m.T, evolveStateCalled, "Method `OrthogonalStoreStateMachine.Build` called before `EvolveState`!")
+		require.True(m.T, evolveStateCalled, "Method [OrthogonalStoreStateMachine.Build] called before `EvolveState`!")
 	}).Return(deferredDBUpdates, nil).Once()
 	return *stateMachine //nolint:govet
 }

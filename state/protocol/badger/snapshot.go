@@ -140,7 +140,7 @@ func (s *Snapshot) SealedResult() (*flow.ExecutionResult, *flow.Seal, error) {
 // SealingSegment will walk through the chain backward until we reach the block referenced
 // by the latest seal and build a SealingSegment. As we visit each block we check each execution
 // receipt in the block's payload to make sure we have a corresponding execution result, any
-// execution results missing from blocks are stored in the `SealingSegment.ExecutionResults` field.
+// execution results missing from blocks are stored in the [SealingSegment.ExecutionResults] field.
 // See `model/flow/sealing_segment.md` for detailed technical specification of the Sealing Segment
 //
 // Expected errors during normal operations:
@@ -155,8 +155,8 @@ func (s *Snapshot) SealingSegment() (*flow.SealingSegment, error) {
 	//  (ii) All blocks that are sealed by `head`. This is relevant if head` contains _multiple_ seals.
 	// (iii) The sealing segment should contain the history back to (including):
 	//       limitHeight := max(blockSealedAtHead.Height - flow.DefaultTransactionExpiry, SporkRootBlockHeight)
-	// Per convention, we include the blocks for (i) in the `SealingSegment.Blocks`, while the
-	// additional blocks for (ii) and optionally (iii) are contained in as `SealingSegment.ExtraBlocks`.
+	// Per convention, we include the blocks for (i) in the [SealingSegment.Blocks], while the
+	// additional blocks for (ii) and optionally (iii) are contained in as [SealingSegment.ExtraBlocks].
 	head, err := s.state.blocks.ByID(s.blockID)
 	if err != nil {
 		return nil, fmt.Errorf("could not get snapshot's reference block: %w", err)

@@ -1976,7 +1976,7 @@ func TestStagedContractConformanceChanges(t *testing.T) {
 
 	t.Run("MetadataViews.Resolver to ArbitraryContract.Resolver unsupported", func(t *testing.T) {
 
-		// `MetadataViews.Resolver` shouldn't be able to replace with any arbitrary `Resolver` interface!
+		// [MetadataViews.Resolver] shouldn't be able to replace with any arbitrary `Resolver` interface!
 
 		t.Parallel()
 

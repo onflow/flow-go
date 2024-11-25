@@ -223,8 +223,8 @@ func New(
 	// To know what's the height of the next un-processed consecutive height, it reads the latest
 	// consecutive height in `processedNotifications`. And it's persisted in storage to be crash-resistant.
 	// When a new consecutive height is available, it calls `processNotificationJob` to notify all the
-	// `e.consumers`.
-	// Note: the `e.consumers` will be guaranteed to receive at least one `OnExecutionDataFetched` event
+	// [e.consumers].
+	// Note: the [e.consumers] will be guaranteed to receive at least one `OnExecutionDataFetched` event
 	// for each sealed block in consecutive block height order.
 	e.notificationConsumer, err = jobqueue.NewComponentConsumer(
 		e.log.With().Str("module", "notification_consumer").Logger(),
