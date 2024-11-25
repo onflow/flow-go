@@ -60,6 +60,11 @@ func OffchainReplayBackwardCompatibilityTest(
 		}
 	}
 
+	// pendingEVMTxEvents are tx events that are executed block included in a flow block that
+	// didn't emit EVM block event, which is caused when the system tx to emit EVM block fails.
+	// we accumulate these pending txs, and replay them when we encounter a block with EVM block event.
+	pendingEVMTxEvents := make([]events.TransactionEventPayload, 0)
+
 	for height := flowStartHeight; height <= flowEndHeight; height++ {
 		bpStorage := evmStorage.NewEphemeralStorage(store)
 		bp, err := blocks.NewBasicProvider(chainID, bpStorage, rootAddr)
@@ -119,11 +124,10 @@ func OffchainReplayBackwardCompatibilityTest(
 			return err
 		}
 
+		pendingEVMTxEvents = append(pendingEVMTxEvents, evmTxEvents...)
+
 		if evmBlockEvent == nil {
-			log.Info().Msgf("block has no EVM block, height :%v", height)
-			if len(evmTxEvents) > 0 {
-				return fmt.Errorf("block has EVM transactions but no EVM Block, height: %v", height)
-			}
+			log.Info().Msgf("block has no EVM block, height :%v, txEvents: %v", height, len(evmTxEvents))
 
 			err = onHeightReplayed(height)
 			if err != nil {
@@ -132,6 +136,12 @@ func OffchainReplayBackwardCompatibilityTest(
 			continue
 		}
 
+		// when we encounter a block with EVM block event, we replay the pending txs accumulated
+		// from previous blocks that had no EVM block event.
+		evmTxEventsIncludedInBlock := pendingEVMTxEvents
+		// reset pendingEVMTxEvents
+		pendingEVMTxEvents = make([]events.TransactionEventPayload, 0)
+
 		err = bp.OnBlockReceived(evmBlockEvent)
 		if err != nil {
 			return err
@@ -139,7 +149,7 @@ func OffchainReplayBackwardCompatibilityTest(
 
 		sp := testutils.NewTestStorageProvider(store, evmBlockEvent.Height)
 		cr := sync.NewReplayer(chainID, rootAddr, sp, bp, log, nil, true)
-		res, results, err := cr.ReplayBlock(evmTxEvents, evmBlockEvent)
+		res, results, err := cr.ReplayBlock(evmTxEventsIncludedInBlock, evmBlockEvent)
 		if err != nil {
 			return err
 		}
