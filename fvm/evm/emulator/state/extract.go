@@ -1,7 +1,6 @@
 package state
 
 import (
-	"github.com/onflow/atree"
 	gethCommon "github.com/onflow/go-ethereum/common"
 
 	"github.com/onflow/flow-go/fvm/evm/types"
@@ -9,7 +8,6 @@ import (
 )
 
 func Extract(
-	ledger atree.Ledger,
 	root flow.Address,
 	baseView *BaseView,
 ) (*EVMState, error) {
