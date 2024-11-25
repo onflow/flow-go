@@ -45,6 +45,7 @@ import (
 	restapiproxy "github.com/onflow/flow-go/engine/access/rest/apiproxy"
 	commonrest "github.com/onflow/flow-go/engine/access/rest/common"
 	"github.com/onflow/flow-go/engine/access/rest/router"
+	"github.com/onflow/flow-go/engine/access/rest/websockets"
 	"github.com/onflow/flow-go/engine/access/rpc"
 	"github.com/onflow/flow-go/engine/access/rpc/backend"
 	rpcConnection "github.com/onflow/flow-go/engine/access/rpc/connection"
@@ -171,6 +172,7 @@ type ObserverServiceConfig struct {
 	registerDBPruneTickerInterval        time.Duration
 	registerDBPruneThrottleDelay         time.Duration
 	registerDBPruneThreshold             uint64
+	websocketConfig                      websockets.Config
 }
 
 // DefaultObserverServiceConfig defines all the default values for the ObserverServiceConfig
@@ -258,6 +260,7 @@ func DefaultObserverServiceConfig() *ObserverServiceConfig {
 		registerDBPruneTickerInterval: pstorage.DefaultPruneTickerInterval,
 		registerDBPruneThrottleDelay:  pstorage.DefaultPruneThrottleDelay,
 		registerDBPruneThreshold:      pstorage.DefaultPruneThreshold,
+		websocketConfig:               websockets.NewDefaultWebsocketConfig(),
 	}
 }
 
