@@ -31,16 +31,18 @@ const (
 )
 
 type Controller struct {
-	logger               zerolog.Logger
-	config               Config
-	conn                 *websocket.Conn
-	communicationChannel chan interface{}
-	errorChannel         chan error
+	logger zerolog.Logger
+	config Config
+	conn   *websocket.Conn
+
+	communicationChannel chan interface{} // Channel for sending messages to the client.
+	errorChannel         chan error       // Channel for reporting errors.
+
 	dataProviders        *concurrentmap.Map[uuid.UUID, dp.DataProvider]
 	dataProvidersFactory *dp.Factory
 
 	shutdownOnce sync.Once // Ensures shutdown is only called once
-	shutdown     bool
+	shutdown     bool      // Indicates if the controller is shutting down.
 }
 
 func NewWebSocketController(
@@ -55,7 +57,7 @@ func NewWebSocketController(
 		config:               config,
 		conn:                 conn,
 		communicationChannel: make(chan interface{}), //TODO: should it be buffered chan?
-		errorChannel:         make(chan error, 1),
+		errorChannel:         make(chan error, 1),    // Buffered error channel to hold one error.
 		dataProviders:        concurrentmap.New[uuid.UUID, dp.DataProvider](),
 		dataProvidersFactory: dp.NewDataProviderFactory(logger, streamApi, streamConfig),
 	}
@@ -86,6 +88,7 @@ func (c *Controller) HandleConnection(ctx context.Context) {
 	c.startProcess(&wg, ctx, c.keepalive)
 	c.startProcess(&wg, ctx, c.writeMessagesToClient)
 
+	// Wait for context cancellation or errors from goroutines.
 	select {
 	case err := <-c.errorChannel:
 		c.logger.Error().Err(err).Msg("error detected in one of the goroutines")
@@ -96,7 +99,7 @@ func (c *Controller) HandleConnection(ctx context.Context) {
 		c.shutdownConnection()
 	}
 
-	// Wait for all goroutines
+	// Ensure all goroutines finish execution.
 	wg.Wait()
 }
 
@@ -160,7 +163,6 @@ func (c *Controller) configureConnection() error {
 //
 // No errors are expected during normal operation.
 func (c *Controller) writeMessagesToClient(ctx context.Context) error {
-	//TODO: can it run forever? maybe we should cancel the ctx in the reader routine
 	for {
 		select {
 		case <-ctx.Done():
@@ -343,7 +345,6 @@ func (c *Controller) keepalive(ctx context.Context) error {
 	for {
 		select {
 		case <-ctx.Done():
-			//	return ctx.Err()
 			return nil
 		case <-pingTicker.C:
 			if err := c.sendPing(); err != nil {
@@ -356,6 +357,8 @@ func (c *Controller) keepalive(ctx context.Context) error {
 }
 
 // sendPing sends a periodic ping message to the WebSocket client to keep the connection alive.
+//
+// No errors are expected during normal operation.
 func (c *Controller) sendPing() error {
 	if err := c.conn.SetWriteDeadline(time.Now().Add(writeWait)); err != nil {
 		return fmt.Errorf("failed to set the write deadline for ping: %w", err)
