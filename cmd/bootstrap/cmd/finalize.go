@@ -352,7 +352,7 @@ func readRootBlock() *flow.Block {
 func readDKGData() (dkg.DKGData, flow.DKGIndexMap) {
 	encodableDKG, err := utils.ReadData[inmem.EncodableFullDKG](flagDKGDataPath)
 	if err != nil {
-		log.Fatal().Err(err).Msg("could not read DKG data")
+		log.Fatal().Err(err).Msg("loading threshold key data for Random Beacon failed")
 	}
 
 	dkgData := dkg.DKGData{
