@@ -49,7 +49,7 @@ func (e *Exporter) ExportGob(path string) error {
 	}
 	defer file.Close()
 
-	state, err := Extract(e.ledger, e.root, e.baseView)
+	state, err := Extract(e.root, e.baseView)
 	if err != nil {
 		return err
 	}
