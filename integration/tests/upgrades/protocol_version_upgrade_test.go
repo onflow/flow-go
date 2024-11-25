@@ -31,7 +31,7 @@ func (s *ProtocolVersionUpgradeSuite) SetupTest() {
 	// Begin the test with a v0 kvstore, rather than the default v1.
 	// This lets us test upgrading v0->v1
 	s.KVStoreFactory = func(epochStateID flow.Identifier) (protocol_state.KVStoreAPI, error) {
-		return kvstore.NewKVStoreV0(5, 100, epochStateID)
+		return kvstore.NewKVStoreV0(10, 50, epochStateID)
 	}
 	s.Suite.SetupTest()
 }
@@ -76,7 +76,6 @@ func (s *ProtocolVersionUpgradeSuite) TestProtocolStateVersionUpgradeServiceEven
 	// after an invalid protocol version upgrade event, we should still have a v0 kvstore
 	snapshot = s.AwaitSnapshotAtView(invalidUpgradeActiveView, time.Minute, 500*time.Millisecond)
 	actualProtocolVersion = snapshot.Encodable().SealingSegment.LatestProtocolStateEntry().KVStore.Version
-	// below line is failing, probably because we are starting with v0 now...
 	require.Equal(s.T(), INITIAL_PROTOCOL_VERSION, actualProtocolVersion, "should have v0 still after invalid upgrade")
 
 	// 2. Valid service event should cause a version upgrade
