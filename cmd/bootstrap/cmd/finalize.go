@@ -149,7 +149,7 @@ func finalize(cmd *cobra.Command, args []string) {
 	log.Info().Msgf("received votes total: %v", len(votes))
 
 	log.Info().Msg("reading dkg data")
-	dkgData, _ := readDKGData()
+	dkgData, _ := readRandomBeaconKeys()
 	log.Info().Msg("")
 
 	log.Info().Msg("reading intermediary bootstrapping data")
@@ -347,15 +347,15 @@ func readRootBlock() *flow.Block {
 	return rootBlock
 }
 
-// readDKGData reads DKG data from disc, this file needs to be prepared with
-// rootblock command
-func readDKGData() (dkg.DKGData, flow.DKGIndexMap) {
-	encodableDKG, err := utils.ReadData[inmem.EncodableFullDKG](flagDKGDataPath)
+// readRandomBeaconKeys reads the threshold key data from disc.
+// This file needs to be prepared with rootblock command
+func readRandomBeaconKeys() (dkg.ThresholdKeySet, flow.DKGIndexMap) {
+	encodableDKG, err := utils.ReadData[inmem.ThresholdKeySet](flagDKGDataPath)
 	if err != nil {
 		log.Fatal().Err(err).Msg("loading threshold key data for Random Beacon failed")
 	}
 
-	dkgData := dkg.DKGData{
+	dkgData := dkg.ThresholdKeySet{
 		PrivKeyShares: nil,
 		PubGroupKey:   encodableDKG.GroupKey.PublicKey,
 		PubKeyShares:  nil,

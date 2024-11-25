@@ -92,10 +92,10 @@ func (snap EncodableSnapshot) LatestSealedResult() (*flow.ExecutionResult, error
 // safety, the Flow protocol fixes threshold to t = floor((n-1)/2), for n the number of parties in the threshold
 // cryptography scheme, specifically n = len(Participants).
 // Without loss of generality, our threshold cryptography protocol with n parties identifies the individual
-// participants by the indices {0, 1, …, n-1}. The slice Participants is ordered accordingly. 
+// participants by the indices {0, 1, …, n-1}. The slice Participants is ordered accordingly.
 type ThresholdKeySet struct {
 	GroupKey     encodable.RandomBeaconPubKey
-	Participants []EncodableDKGParticipant
+	Participants []ThresholdParticipant
 }
 
 // ThresholdParticipant encodes the threshold key data for single participant.

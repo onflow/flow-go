@@ -190,7 +190,7 @@ func createValidator(committee hotstuff.DynamicCommittee) (hotstuff.Validator, e
 // LIMITATION: this function only supports the 'trusted dealer' model, where for the consensus committee (`allNodes`)
 // a trusted dealer generated the threshold-signature key (`dkgData` containing key shares and group key). Therefore,
 // `allNodes` must be in the same order that was used when running the DKG.
-func GenerateQCParticipantData(allNodes, internalNodes []bootstrap.NodeInfo, dkgData dkg.DKGData) (*ParticipantData, error) {
+func GenerateQCParticipantData(allNodes, internalNodes []bootstrap.NodeInfo, dkgData dkg.ThresholdKeySet) (*ParticipantData, error) {
 	// stakingNodes can include external validators, so it can be longer than internalNodes
 	if len(allNodes) < len(internalNodes) {
 		return nil, fmt.Errorf("need at least as many staking public keys as private keys (pub=%d, priv=%d)", len(allNodes), len(internalNodes))

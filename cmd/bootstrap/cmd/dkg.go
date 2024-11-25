@@ -14,27 +14,25 @@ import (
 	"github.com/onflow/flow-go/state/protocol/inmem"
 )
 
-func runBeaconKG(nodes []model.NodeInfo) (dkg.DKGData, flow.DKGIndexMap) {
+func runBeaconKG(nodes []model.NodeInfo) (dkg.ThresholdKeySet, flow.DKGIndexMap) {
 	n := len(nodes)
 	log.Info().Msgf("read %v node infos for DKG", n)
 
 	log.Debug().Msgf("will run DKG")
-	var dkgData dkg.DKGData
-	var err error
-	dkgData, err = bootstrapDKG.RandomBeaconKG(n, GenerateRandomSeed(crypto.KeyGenSeedMinLen))
+	randomBeaconData, err := bootstrapDKG.RandomBeaconKG(n, GenerateRandomSeed(crypto.KeyGenSeedMinLen))
 	if err != nil {
 		log.Fatal().Err(err).Msg("error running DKG")
 	}
 	log.Info().Msgf("finished running DKG")
 
-	encodableParticipants := make([]inmem.EncodableDKGParticipant, 0, len(nodes))
-	for i, privKey := range dkgData.PrivKeyShares {
+	encodableParticipants := make([]inmem.ThresholdParticipant, 0, len(nodes))
+	for i, privKey := range randomBeaconData.PrivKeyShares {
 		nodeID := nodes[i].NodeID
 
 		encKey := encodable.RandomBeaconPrivKey{PrivateKey: privKey}
-		encodableParticipants = append(encodableParticipants, inmem.EncodableDKGParticipant{
+		encodableParticipants = append(encodableParticipants, inmem.ThresholdParticipant{
 			PrivKeyShare: encKey,
-			PubKeyShare:  encodable.RandomBeaconPubKey{PublicKey: dkgData.PubKeyShares[i]},
+			PubKeyShare:  encodable.RandomBeaconPubKey{PublicKey: randomBeaconData.PubKeyShares[i]},
 			NodeID:       nodeID,
 		})
 
@@ -51,9 +49,9 @@ func runBeaconKG(nodes []model.NodeInfo) (dkg.DKGData, flow.DKGIndexMap) {
 	}
 
 	// write full DKG info that will be used to construct QC
-	err = common.WriteJSON(model.PathRootDKGData, flagOutdir, inmem.EncodableFullDKG{
+	err = common.WriteJSON(model.PathRootDKGData, flagOutdir, inmem.ThresholdKeySet{
 		GroupKey: encodable.RandomBeaconPubKey{
-			PublicKey: dkgData.PubGroupKey,
+			PublicKey: randomBeaconData.PubGroupKey,
 		},
 		Participants: encodableParticipants,
 	})
@@ -62,5 +60,5 @@ func runBeaconKG(nodes []model.NodeInfo) (dkg.DKGData, flow.DKGIndexMap) {
 	}
 	log.Info().Msgf("wrote file %s/%s", flagOutdir, model.PathRootDKGData)
 
-	return dkgData, indexMap
+	return randomBeaconData, indexMap
 }
