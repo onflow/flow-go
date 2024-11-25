@@ -2,12 +2,13 @@
 //
 // # Reactor Engine
 //
-// The [ReactorEngine] implements triggers to control the lifecycle of DKG runs. A new
-// DKG protocol is started when an EpochSetup event is sealed and finalized. The
-// subsequent phase transitions are triggered when specified views are encountered
-// (specifically when the first block of a given view is finalized). In between
-// phase transitions the engine regularly queries the DKG smart-contract to read
-// broadcast messages.
+// The [ReactorEngine] implements triggers to control the lifecycle of DKG instances.
+// A new DKG instance is started when an EpochSetup service event is sealed.
+// The subsequent phase transitions are triggered when specified views are encountered.
+// Specifically, phase transitions for a view V are triggered when the first block with view >=V is finalized.
+// Between phase transitions, we periodically query the DKG smart-contract ("whiteboard") to read broadcast messages.
+// Before transitioning the state machine to the next phase, we query the whiteboard w.r.t. the final view
+// of the phase - this ensures all participants eventually observe the same set of messages for each phase.
 //
 // # Messaging Engine
 //
@@ -16,12 +17,12 @@
 //
 // # Architecture
 //
-// For every new epoch, the [ReactorEngine] instantiates a new [module.DKGController] with a
-// new [module.DKGBroker] using the provided ControllerFactory. The ControllerFactory ties new
-// DKGControllers to the [MessagingEngine] via a BrokerTunnel which exposes channels
-// to relay incoming and outgoing messages (see package module/dkg).
+// In the happy path, one DKG instance runs every epoch. For each DKG instance, the [ReactorEngine]
+// instantiates a new, epoch-scoped [module.DKGController] and [module.DKGBroker] using the provided ControllerFactory.
+// The ControllerFactory ties new DKGControllers to the [MessagingEngine] via a BrokerTunnel,
+// which exposes channels to relay incoming and outgoing messages (see package module/dkg for details).
 //
-//	  EpochSetup/EpochCommit/OnView
+//	  EpochSetup/EpochCommit/OnView events
 //	            |
 //	            v
 //	     +---------------+
@@ -29,7 +30,7 @@
 //	     +---------------+
 //	            |
 //	            v
-//	 *~~~~~~~~~~~~~~~~~~~~~* <- Epoch-scoped
+//	 *~~~~~~~~~~~~~~~~~~~~~* <- Epoch-scoped components
 //	 |  +---------------+  |
 //	 |  | Controller    |  |
 //	 |  +---------------+  |
