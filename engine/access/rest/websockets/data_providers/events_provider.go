@@ -113,56 +113,61 @@ func ParseEventsArguments(
 ) (EventsArguments, error) {
 	var args EventsArguments
 
-	// Parse 'event_types' as []string{}
-	var eventTypes []string
-	if eventTypesIn, ok := arguments["event_types"]; ok {
-		if eventTypesIn != "" {
-			eventTypes = strings.Split(eventTypesIn, ",")
-		}
-	}
+	// Check for mutual exclusivity of start_block_id and start_block_height early
+	_, hasStartBlockID := arguments["start_block_id"]
+	_, hasStartBlockHeight := arguments["start_block_height"]
 
-	// Parse 'addresses' as []string{}
-	var addresses []string
-	if addressesIn, ok := arguments["addresses"]; ok {
-		if addressesIn != "" {
-			addresses = strings.Split(addressesIn, ",")
-		}
+	if hasStartBlockID && hasStartBlockHeight {
+		return args, fmt.Errorf("can only provide either 'start_block_id' or 'start_block_height'")
 	}
-
-	// Parse 'contracts' as []string{}
-	var contracts []string
-	if contractsIn, ok := arguments["contracts"]; ok {
-		if contractsIn != "" {
-			contracts = strings.Split(contractsIn, ",")
-		}
-	}
-
-	// Initialize the event filter with the parsed arguments
-	filter, err := state_stream.NewEventFilter(eventFilterConfig, chain, eventTypes, addresses, contracts)
-	if err != nil {
-		return args, err
-	}
-	args.Filter = filter
 
 	// Parse 'start_block_id' if provided
-	if startBlockIDIn, ok := arguments["start_block_id"]; ok {
+	if hasStartBlockID {
 		var startBlockID parser.ID
-		err = startBlockID.Parse(startBlockIDIn)
+		err := startBlockID.Parse(arguments["start_block_id"])
 		if err != nil {
-			return args, err
+			return args, fmt.Errorf("invalid 'start_block_id': %w", err)
 		}
 		args.StartBlockID = startBlockID.Flow()
+	} else {
+		args.StartBlockID = flow.ZeroID
 	}
 
 	// Parse 'start_block_height' if provided
-	if startBlockHeightIn, ok := arguments["start_block_height"]; ok {
-		args.StartBlockHeight, err = util.ToUint64(startBlockHeightIn)
+	if hasStartBlockHeight {
+		var err error
+		args.StartBlockHeight, err = util.ToUint64(arguments["start_block_height"])
 		if err != nil {
 			return args, fmt.Errorf("invalid 'start_block_height': %w", err)
 		}
 	} else {
 		args.StartBlockHeight = request.EmptyHeight
 	}
+
+	// Parse 'event_types' as []string{}
+	var eventTypes []string
+	if eventTypesIn, ok := arguments["event_types"]; ok && eventTypesIn != "" {
+		eventTypes = strings.Split(eventTypesIn, ",")
+	}
+
+	// Parse 'addresses' as []string{}
+	var addresses []string
+	if addressesIn, ok := arguments["addresses"]; ok && addressesIn != "" {
+		addresses = strings.Split(addressesIn, ",")
+	}
+
+	// Parse 'contracts' as []string{}
+	var contracts []string
+	if contractsIn, ok := arguments["contracts"]; ok && contractsIn != "" {
+		contracts = strings.Split(contractsIn, ",")
+	}
+
+	// Initialize the event filter with the parsed arguments
+	filter, err := state_stream.NewEventFilter(eventFilterConfig, chain, eventTypes, addresses, contracts)
+	if err != nil {
+		return args, fmt.Errorf("failed to create event filter: %w", err)
+	}
+	args.Filter = filter
 
 	return args, nil
 }
