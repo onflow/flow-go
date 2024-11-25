@@ -327,7 +327,7 @@ func (e *ReactorEngine) handleEpochCommittedPhaseStarted(currentEpochCounter uin
 		return
 	}
 
-	err = e.dkgState.SetDKGState(nextEpochCounter, flow.DKGStateSuccess)
+	err = e.dkgState.SetDKGState(nextEpochCounter, flow.RandomBeaconKeyCommitted)
 	if err != nil {
 		// TODO use irrecoverable context
 		e.log.Fatal().Err(err).Msg("failed to set dkg end state")
@@ -427,7 +427,7 @@ func (e *ReactorEngine) end(nextEpochCounter uint64) func() error {
 			// has already abandoned the happy path, because on the happy path the ReactorEngine is the only writer.
 			// Then this function just stops and returns without error.
 			e.log.Warn().Err(err).Msgf("node %s with index %d failed DKG locally", e.me.NodeID(), e.controller.GetIndex())
-			err := e.dkgState.SetDKGState(nextEpochCounter, flow.DKGStateDKGFailure)
+			err := e.dkgState.SetDKGState(nextEpochCounter, flow.DKGStateFailure)
 			if err != nil {
 				if errors.Is(err, storage.ErrAlreadyExists) {
 					return nil // DKGState already being set is expected in case of epoch recovery

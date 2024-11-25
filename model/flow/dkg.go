@@ -1,23 +1,25 @@
 package flow
 
-// DKGState captures the final state of a completed DKG.
+// DKGState captures all possible states of the Recoverable Random Beacon State Machine.
 type DKGState uint32
 
 const (
-	// DKGStateUnknown - zero value for this enum, indicates unset value
-	DKGStateUnknown DKGState = iota
-	// DKGStateSuccess - the DKG completed, this node has a valid beacon key.
+	// DKGStateUninitialized - zero value for this enum, indicates that there is no initialized state.
+	// Conceptually, this is the 'initial' state of a finite state machine before any transitions.
+	DKGStateUninitialized DKGState = iota
+	// DKGStateStarted - the DKG process has been started. This state is set when the node enters the [flow.EpochPhaseSetup]
+	// phase and starts the DKG process, which will on the happy path result in generating a random beacon key.
 	DKGStateStarted
-	// DKGStateCompleted
+	// DKGStateCompleted - the DKG process has been locally completed by this node. This state is set when the node successfully
+	// completes the DKG process and has generated a random beacon key.
+	// ATTENTION: This state does not imply that there is a safe random beacon key available for the next epoch. Only after
+	// the node enters [flow.EpochPhaseCommitted] and the [flow.EpochCommit] service event has been finalized, we can be sure
+	// that our beacon key share is part of the Random Beacon Committee for the next epoch.
 	DKGStateCompleted
-	// DKGStateSuccess
-	DKGStateSuccess
-	// DKGStateInconsistentKey - the DKG completed, this node has an invalid beacon key.
-	DKGStateInconsistentKey
-	// DKGStateNoKey - this node did not store a key, typically caused by a crash mid-DKG.
-	DKGStateNoKey
-	// DKGStateDKGFailure - the underlying DKG library reported an error.
-	DKGStateDKGFailure
+	// RandomBeaconKeyCommitted -
+	RandomBeaconKeyCommitted
+	// DKGStateFailure - the underlying DKG library reported an error.
+	DKGStateFailure
 	// RandomBeaconKeyRecovered - this node has recovered its beacon key from a previous epoch.
 	// This occurs only for epochs which are entered through the EFM Recovery process (`flow.EpochRecover` service event).
 	RandomBeaconKeyRecovered
@@ -29,18 +31,14 @@ func (state DKGState) String() string {
 		return "DKGStateStarted"
 	case DKGStateCompleted:
 		return "DKGStateCompleted"
-	case DKGStateSuccess:
-		return "DKGStateSuccess"
-	case DKGStateInconsistentKey:
-		return "DKGStateInconsistentKey"
-	case DKGStateNoKey:
-		return "DKGStateNoKey"
-	case DKGStateDKGFailure:
-		return "DKGStateDKGFailure"
+	case RandomBeaconKeyCommitted:
+		return "RandomBeaconKeyCommitted"
+	case DKGStateFailure:
+		return "DKGStateFailure"
 	case RandomBeaconKeyRecovered:
 		return "RandomBeaconKeyRecovered"
 	default:
-		return "DKGStateUnknown"
+		return "DKGStateUninitialized"
 	}
 }
 

@@ -19,14 +19,14 @@ import (
 )
 
 var allowedStateTransitions = map[flow.DKGState][]flow.DKGState{
-	flow.DKGStateStarted:          {flow.DKGStateCompleted, flow.DKGStateNoKey, flow.DKGStateDKGFailure, flow.DKGStateInconsistentKey, flow.RandomBeaconKeyRecovered},
-	flow.DKGStateCompleted:        {flow.DKGStateSuccess, flow.DKGStateNoKey, flow.DKGStateDKGFailure, flow.DKGStateInconsistentKey, flow.RandomBeaconKeyRecovered},
-	flow.DKGStateSuccess:          {},
+	flow.DKGStateStarted:          {flow.DKGStateCompleted, flow.DKGStateNoKey, flow.DKGStateFailure, flow.DKGStateInconsistentKey, flow.RandomBeaconKeyRecovered},
+	flow.DKGStateCompleted:        {flow.RandomBeaconKeyCommitted, flow.DKGStateNoKey, flow.DKGStateFailure, flow.DKGStateInconsistentKey, flow.RandomBeaconKeyRecovered},
+	flow.RandomBeaconKeyCommitted: {},
 	flow.RandomBeaconKeyRecovered: {},
-	flow.DKGStateDKGFailure:       {flow.RandomBeaconKeyRecovered},
+	flow.DKGStateFailure:          {flow.RandomBeaconKeyRecovered},
 	flow.DKGStateInconsistentKey:  {flow.RandomBeaconKeyRecovered},
 	flow.DKGStateNoKey:            {flow.RandomBeaconKeyRecovered},
-	flow.DKGStateUnknown:          {flow.DKGStateStarted, flow.DKGStateNoKey, flow.DKGStateDKGFailure, flow.DKGStateInconsistentKey, flow.RandomBeaconKeyRecovered},
+	flow.DKGStateUninitialized:    {flow.DKGStateStarted, flow.DKGStateNoKey, flow.DKGStateFailure, flow.DKGStateInconsistentKey, flow.RandomBeaconKeyRecovered},
 }
 
 // RecoverablePrivateBeaconKeyState stores state information about in-progress and completed DKGs, including
@@ -144,7 +144,7 @@ func (ds *RecoverablePrivateBeaconKeyState) processStateTransition(epochCounter 
 		err := operation.RetrieveDKGEndStateForEpoch(epochCounter, &currentState)(tx.DBTxn)
 		if err != nil {
 			if errors.Is(err, storage.ErrNotFound) {
-				currentState = flow.DKGStateUnknown
+				currentState = flow.DKGStateUninitialized
 			} else {
 				return fmt.Errorf("could not retrieve current state for epoch %d: %w", epochCounter, err)
 			}
@@ -156,10 +156,10 @@ func (ds *RecoverablePrivateBeaconKeyState) processStateTransition(epochCounter 
 		}
 
 		// ensure invariant holds and we still have a valid private key stored
-		if newState == flow.DKGStateSuccess {
+		if newState == flow.RandomBeaconKeyCommitted {
 			_, err = ds.retrieveKeyTx(epochCounter)(tx.DBTxn)
 			if err != nil {
-				return fmt.Errorf("cannot transition to flow.DKGStateSuccess without a valid random beacon key: %w", err)
+				return fmt.Errorf("cannot transition to flow.RandomBeaconKeyCommitted without a valid random beacon key: %w", err)
 			}
 		}
 
@@ -196,7 +196,7 @@ func (ds *RecoverablePrivateBeaconKeyState) RetrieveMyBeaconPrivateKey(epochCoun
 		}
 
 		// for any end state besides success and recovery, the key is not safe
-		if endState == flow.DKGStateSuccess || endState == flow.RandomBeaconKeyRecovered {
+		if endState == flow.RandomBeaconKeyCommitted || endState == flow.RandomBeaconKeyRecovered {
 			// retrieve the key - any storage error (including `storage.ErrNotFound`) is an exception
 			var encodableKey *encodable.RandomBeaconPrivKey
 			encodableKey, err = ds.retrieveKeyTx(epochCounter)(txn)
