@@ -86,7 +86,7 @@ const blockHashListFixHCUEVMHeightTestnet = 16848829
 // Testnet52 - Spork
 // Flow Block: 218215350 cc7188f0bdac4c442cc3ee072557d7f7c8ca4462537da945b148d5d0efa7a1ff
 // PR: https://github.com/onflow/flow-go/pull/6377
-const blockHashListBugIntroducedHCUEVMHeightTestnet = 7038679
+// const blockHashListBugIntroducedHCUEVMHeightTestnet = 7038679
 
 // Testnet51 - Height Coordinated Upgrade 1
 // Flow Block: 212562161 1a520608c5457f228405c4c30fc39c8a0af7cf915fb2ede7ec5ccffc2a000f57
