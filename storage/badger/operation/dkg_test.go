@@ -61,7 +61,7 @@ func TestDKGStartedForEpoch(t *testing.T) {
 			epochCounter := rand.Uint64()
 
 			// set the flag, ensure no error
-			err := db.Update(InsertDKGStartedForEpoch(epochCounter))
+			err := db.Update(InsertDKGStateForEpoch(epochCounter, flow.DKGStateStarted))
 			assert.NoError(t, err)
 
 			// read the flag, should be true now
@@ -83,18 +83,18 @@ func TestDKGEndStateForEpoch(t *testing.T) {
 		epochCounter := rand.Uint64()
 
 		// should be able to write end state
-		endState := flow.DKGEndStateSuccess
-		err := db.Update(InsertDKGEndStateForEpoch(epochCounter, endState))
+		endState := flow.DKGStateStarted
+		err := db.Update(InsertDKGStateForEpoch(epochCounter, endState))
 		assert.NoError(t, err)
 
 		// should be able to read end state
 		var readEndState flow.DKGState
-		err = db.View(RetrieveDKGEndStateForEpoch(epochCounter, &readEndState))
+		err = db.View(RetrieveDKGStateForEpoch(epochCounter, &readEndState))
 		assert.NoError(t, err)
 		assert.Equal(t, endState, readEndState)
 
 		// attempting to overwrite should error
-		err = db.Update(InsertDKGEndStateForEpoch(epochCounter, flow.DKGEndStateDKGFailure))
+		err = db.Update(InsertDKGStateForEpoch(epochCounter, flow.DKGStateFailure))
 		assert.ErrorIs(t, err, storage.ErrAlreadyExists)
 	})
 }

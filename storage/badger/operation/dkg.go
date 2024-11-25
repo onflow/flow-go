@@ -41,13 +41,13 @@ func RetrieveMyBeaconPrivateKey(epochCounter uint64, info *encodable.RandomBeaco
 	return retrieve(makePrefix(codeBeaconPrivateKey, epochCounter), info)
 }
 
-// RetrieveDKGStartedForEpoch retrieves the DKG started flag for the given epoch.
+// RetrieveDKGStartedForEpoch retrieves whether DKG has started for the given epoch.
 // If no flag is set, started is set to false and no error is returned.
 // No errors expected during normal operation.
 func RetrieveDKGStartedForEpoch(epochCounter uint64, started *bool) func(*badger.Txn) error {
 	return func(tx *badger.Txn) error {
 		var state flow.DKGState
-		err := RetrieveDKGEndStateForEpoch(epochCounter, &state)(tx)
+		err := RetrieveDKGStateForEpoch(epochCounter, &state)(tx)
 		if errors.Is(err, storage.ErrNotFound) {
 			// flag not set - therefore DKG not started
 			*started = false
@@ -63,22 +63,22 @@ func RetrieveDKGStartedForEpoch(epochCounter uint64, started *bool) func(*badger
 	}
 }
 
-// InsertDKGEndStateForEpoch stores the DKG end state for the epoch.
-// Error returns: storage.ErrAlreadyExists
-func InsertDKGEndStateForEpoch(epochCounter uint64, endState flow.DKGState) func(*badger.Txn) error {
-	return insert(makePrefix(codeDKGEnded, epochCounter), endState)
+// InsertDKGStateForEpoch stores the DKG current state of Random Beacon Recoverable State Machine for the epoch.
+// Error returns: [storage.ErrAlreadyExists]
+func InsertDKGStateForEpoch(epochCounter uint64, newState flow.DKGState) func(*badger.Txn) error {
+	return insert(makePrefix(codeDKGState, epochCounter), newState)
 }
 
-// UpsertDKGEndStateForEpoch stores the DKG end state for the epoch, irrespective of whether an entry for
+// UpsertDKGStateForEpoch stores the current state of Random Beacon Recoverable State Machine for the epoch, irrespective of whether an entry for
 // the given epoch counter already exists in the database or not.
 // CAUTION: this method has to be used only in the very specific edge-cases of epoch recovery. For storing the
-// DKG results obtained on the happy-path, please use method `InsertDKGEndStateForEpoch`.
-func UpsertDKGEndStateForEpoch(epochCounter uint64, endState flow.DKGState) func(*badger.Txn) error {
-	return upsert(makePrefix(codeDKGEnded, epochCounter), endState)
+// DKG results obtained on the happy-path, please use method [InsertDKGStateForEpoch].
+func UpsertDKGStateForEpoch(epochCounter uint64, newState flow.DKGState) func(*badger.Txn) error {
+	return upsert(makePrefix(codeDKGState, epochCounter), newState)
 }
 
-// RetrieveDKGEndStateForEpoch retrieves the DKG end state for the epoch.
-// Error returns: storage.ErrNotFound
-func RetrieveDKGEndStateForEpoch(epochCounter uint64, endState *flow.DKGState) func(*badger.Txn) error {
-	return retrieve(makePrefix(codeDKGEnded, epochCounter), endState)
+// RetrieveDKGStateForEpoch retrieves the DKG end state for the epoch.
+// Error returns: [storage.ErrNotFound]
+func RetrieveDKGStateForEpoch(epochCounter uint64, newState *flow.DKGState) func(*badger.Txn) error {
+	return retrieve(makePrefix(codeDKGState, epochCounter), newState)
 }

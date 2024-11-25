@@ -397,7 +397,7 @@ func (suite *ReactorEngineSuite_CommittedPhase) TestInconsistentKey() {
 
 	suite.engine.EpochCommittedPhaseStarted(suite.epochCounter, suite.firstBlock)
 	suite.Require().Equal(1, suite.warnsLogged)
-	suite.Assert().Equal(flow.DKGStateInconsistentKey, suite.DKGState)
+	suite.Assert().Equal(flow.DKGStateFailure, suite.DKGState)
 }
 
 // TestMissingKey tests the path where we are checking the global DKG results
@@ -412,7 +412,7 @@ func (suite *ReactorEngineSuite_CommittedPhase) TestMissingKey() {
 
 	suite.engine.EpochCommittedPhaseStarted(suite.epochCounter, suite.firstBlock)
 	suite.Require().Equal(1, suite.warnsLogged)
-	suite.Assert().Equal(flow.DKGStateNoKey, suite.DKGState)
+	suite.Assert().Equal(flow.DKGStateFailure, suite.DKGState)
 }
 
 // TestLocalDKGFailure tests the path where we are checking the global DKG
@@ -461,7 +461,7 @@ func (suite *ReactorEngineSuite_CommittedPhase) TestStartupInCommittedPhase_DKGS
 	suite.snap.On("EpochPhase").Return(flow.EpochPhaseCommitted, nil).Once()
 	// the dkg for this epoch has been started and ended
 	suite.dkgState.On("GetDKGStarted", suite.NextEpochCounter()).Return(true, nil).Once()
-	suite.dkgState.On("GetDKGState", suite.NextEpochCounter()).Return(flow.DKGStateNoKey, nil).Once()
+	suite.dkgState.On("GetDKGState", suite.NextEpochCounter()).Return(flow.DKGStateFailure, nil).Once()
 
 	// start up the engine
 	unittest.AssertClosesBefore(suite.T(), suite.engine.Ready(), time.Second)
@@ -497,7 +497,7 @@ func (suite *ReactorEngineSuite_CommittedPhase) TestStartupInCommittedPhase_Inco
 		mock.Anything,
 	)
 	// should set DKG end state
-	suite.Assert().Equal(flow.DKGStateInconsistentKey, suite.DKGState)
+	suite.Assert().Equal(flow.DKGStateFailure, suite.DKGState)
 }
 
 // TestStartupInCommittedPhase_MissingKey tests that the dkg end state is correctly
@@ -523,7 +523,7 @@ func (suite *ReactorEngineSuite_CommittedPhase) TestStartupInCommittedPhase_Miss
 		mock.Anything,
 	)
 	// should set DKG end state
-	suite.Assert().Equal(flow.DKGStateNoKey, suite.DKGState)
+	suite.Assert().Equal(flow.DKGStateFailure, suite.DKGState)
 }
 
 // utility function to track the number of warn-level calls to a logger

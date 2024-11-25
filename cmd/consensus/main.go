@@ -128,7 +128,6 @@ func main() {
 		epochLookup           *epochs.EpochLookup
 		hotstuffModules       *consensus.HotstuffModules
 		dkgState              *bstorage.RecoverablePrivateBeaconKeyState
-		safeBeaconKeys        *bstorage.SafeBeaconPrivateKeys
 		getSealingConfigs     module.SealingConfigsGetter
 	)
 	var deprecatedFlagBlockRateDelay time.Duration
@@ -216,10 +215,6 @@ func main() {
 		Module("dkg state", func(node *cmd.NodeConfig) error {
 			dkgState, err = bstorage.NewDKGState(node.Metrics.Cache, node.SecretsDB)
 			return err
-		}).
-		Module("beacon keys", func(node *cmd.NodeConfig) error {
-			safeBeaconKeys = bstorage.NewSafeBeaconPrivateKeys(dkgState)
-			return nil
 		}).
 		Module("updatable sealing config", func(node *cmd.NodeConfig) error {
 			setter, err := updatable_configs.NewSealingConfigs(
@@ -350,7 +345,7 @@ func main() {
 				return err
 			}
 			// mark the root DKG as successful, so it is considered safe to use the key
-			err = dkgState.SetDKGState(epochCounter, flow.DKGEndStateSuccess)
+			err = dkgState.SetDKGState(epochCounter, flow.RandomBeaconKeyCommitted)
 			if err != nil && !errors.Is(err, storage.ErrAlreadyExists) {
 				return err
 			}
@@ -358,8 +353,7 @@ func main() {
 			return nil
 		}).
 		Module("my beacon key epoch recovery", func(node *cmd.NodeConfig) error {
-			recoverMyBeaconKeyStorage := bstorage.NewEpochRecoveryMyBeaconKey(safeBeaconKeys)
-			myBeaconKeyRecovery, err := dkgmodule.NewBeaconKeyRecovery(node.Logger, node.Me, node.State, recoverMyBeaconKeyStorage)
+			myBeaconKeyRecovery, err := dkgmodule.NewBeaconKeyRecovery(node.Logger, node.Me, node.State, dkgState)
 			if err != nil {
 				return fmt.Errorf("could not initialize my beacon key epoch recovery: %w", err)
 			}
@@ -582,7 +576,7 @@ func main() {
 			// wrap Main consensus committee with metrics
 			wrappedCommittee := committees.NewMetricsWrapper(committee, mainMetrics) // wrapper for measuring time spent determining consensus committee relations
 
-			beaconKeyStore := hotsignature.NewEpochAwareRandomBeaconKeyStore(epochLookup, safeBeaconKeys)
+			beaconKeyStore := hotsignature.NewEpochAwareRandomBeaconKeyStore(epochLookup, dkgState)
 
 			// initialize the combined signer for hotstuff
 			var signer hotstuff.Signer

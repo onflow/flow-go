@@ -3,10 +3,10 @@ package badger
 import (
 	"errors"
 	"fmt"
-	"golang.org/x/exp/slices"
 
 	"github.com/dgraph-io/badger/v2"
 	"github.com/onflow/crypto"
+	"golang.org/x/exp/slices"
 
 	"github.com/onflow/flow-go/model/encodable"
 	"github.com/onflow/flow-go/model/flow"
@@ -19,14 +19,12 @@ import (
 )
 
 var allowedStateTransitions = map[flow.DKGState][]flow.DKGState{
-	flow.DKGStateStarted:          {flow.DKGStateCompleted, flow.DKGStateNoKey, flow.DKGStateFailure, flow.DKGStateInconsistentKey, flow.RandomBeaconKeyRecovered},
-	flow.DKGStateCompleted:        {flow.RandomBeaconKeyCommitted, flow.DKGStateNoKey, flow.DKGStateFailure, flow.DKGStateInconsistentKey, flow.RandomBeaconKeyRecovered},
+	flow.DKGStateStarted:          {flow.DKGStateCompleted, flow.DKGStateFailure, flow.RandomBeaconKeyRecovered},
+	flow.DKGStateCompleted:        {flow.RandomBeaconKeyCommitted, flow.DKGStateFailure, flow.RandomBeaconKeyRecovered},
 	flow.RandomBeaconKeyCommitted: {},
 	flow.RandomBeaconKeyRecovered: {},
 	flow.DKGStateFailure:          {flow.RandomBeaconKeyRecovered},
-	flow.DKGStateInconsistentKey:  {flow.RandomBeaconKeyRecovered},
-	flow.DKGStateNoKey:            {flow.RandomBeaconKeyRecovered},
-	flow.DKGStateUninitialized:    {flow.DKGStateStarted, flow.DKGStateNoKey, flow.DKGStateFailure, flow.DKGStateInconsistentKey, flow.RandomBeaconKeyRecovered},
+	flow.DKGStateUninitialized:    {flow.DKGStateStarted, flow.DKGStateFailure, flow.RandomBeaconKeyRecovered},
 }
 
 // RecoverablePrivateBeaconKeyState stores state information about in-progress and completed DKGs, including
@@ -141,7 +139,7 @@ func (ds *RecoverablePrivateBeaconKeyState) SetDKGState(epochCounter uint64, new
 func (ds *RecoverablePrivateBeaconKeyState) processStateTransition(epochCounter uint64, newState flow.DKGState) func(*transaction.Tx) error {
 	return func(tx *transaction.Tx) error {
 		var currentState flow.DKGState
-		err := operation.RetrieveDKGEndStateForEpoch(epochCounter, &currentState)(tx.DBTxn)
+		err := operation.RetrieveDKGStateForEpoch(epochCounter, &currentState)(tx.DBTxn)
 		if err != nil {
 			if errors.Is(err, storage.ErrNotFound) {
 				currentState = flow.DKGStateUninitialized
@@ -163,14 +161,14 @@ func (ds *RecoverablePrivateBeaconKeyState) processStateTransition(epochCounter 
 			}
 		}
 
-		return operation.InsertDKGEndStateForEpoch(epochCounter, newState)(tx.DBTxn)
+		return operation.InsertDKGStateForEpoch(epochCounter, newState)(tx.DBTxn)
 	}
 }
 
 // GetDKGEndState retrieves the DKG end state for the epoch.
 func (ds *RecoverablePrivateBeaconKeyState) GetDKGState(epochCounter uint64) (flow.DKGState, error) {
 	var endState flow.DKGState
-	err := ds.db.Update(operation.RetrieveDKGEndStateForEpoch(epochCounter, &endState))
+	err := ds.db.Update(operation.RetrieveDKGStateForEpoch(epochCounter, &endState))
 	return endState, err
 }
 
@@ -188,7 +186,7 @@ func (ds *RecoverablePrivateBeaconKeyState) RetrieveMyBeaconPrivateKey(epochCoun
 
 		// retrieve the end state
 		var endState flow.DKGState
-		err = operation.RetrieveDKGEndStateForEpoch(epochCounter, &endState)(txn)
+		err = operation.RetrieveDKGStateForEpoch(epochCounter, &endState)(txn)
 		if err != nil {
 			key = nil
 			safe = false
@@ -233,7 +231,7 @@ func (ds *RecoverablePrivateBeaconKeyState) UpsertMyBeaconPrivateKey(epochCounte
 		if err != nil {
 			return err
 		}
-		return operation.UpsertDKGEndStateForEpoch(epochCounter, flow.RandomBeaconKeyRecovered)(txn)
+		return operation.UpsertDKGStateForEpoch(epochCounter, flow.RandomBeaconKeyRecovered)(txn)
 	})
 	if err != nil {
 		return fmt.Errorf("could not overwrite beacon key for epoch %d: %w", epochCounter, err)
