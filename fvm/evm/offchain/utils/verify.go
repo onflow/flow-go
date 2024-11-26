@@ -84,7 +84,7 @@ func OffchainReplayBackwardCompatibilityTest(
 
 		executionData, err := executionDataStore.Get(context.Background(), result.ExecutionDataID)
 		if err != nil {
-			return err
+			return fmt.Errorf("could not get execution data %v for block %d: %w", result.ExecutionDataID, height, err)
 		}
 
 		evts := flow.EventsList{}
