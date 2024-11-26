@@ -3,9 +3,12 @@ package data_providers
 import (
 	"context"
 	"fmt"
+	"strconv"
 	"strings"
 
 	"github.com/rs/zerolog"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 
 	"github.com/onflow/flow-go/engine/access/rest/common/parser"
 	"github.com/onflow/flow-go/engine/access/rest/http/request"
@@ -14,6 +17,7 @@ import (
 	"github.com/onflow/flow-go/engine/access/state_stream"
 	"github.com/onflow/flow-go/engine/access/subscription"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module/counters"
 )
 
 // EventsArguments contains the arguments required for subscribing to events
@@ -96,9 +100,17 @@ func (p *EventsDataProvider) createSubscription(ctx context.Context) subscriptio
 //
 // No errors are expected during normal operations.
 func (p *EventsDataProvider) handleResponse(send chan<- interface{}) func(*flow.Event) error {
+	messageIndex := counters.NewMonotonousCounter(0)
+
 	return func(event *flow.Event) error {
+		if ok := messageIndex.Set(messageIndex.Value() + 1); !ok {
+			return status.Errorf(codes.Internal, "message index already incremented to %d", messageIndex.Value())
+		}
+		index := messageIndex.Value()
+
 		send <- &models.EventResponse{
-			Event: event,
+			Event:        event,
+			MessageIndex: strconv.FormatUint(index, 10),
 		}
 
 		return nil
