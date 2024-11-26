@@ -26,7 +26,7 @@ import (
 )
 
 // EVM Root Height is the first block that has EVM Block Event where the EVM block height is 1
-func isEVMRootHeight(chainID flow.ChainID, flowHeight uint64) bool {
+func IsEVMRootHeight(chainID flow.ChainID, flowHeight uint64) bool {
 	if chainID == flow.Testnet {
 		return flowHeight == 211176671
 	} else if chainID == flow.Mainnet {
@@ -44,24 +44,32 @@ func OffchainReplayBackwardCompatibilityTest(
 	results storage.ExecutionResults,
 	executionDataStore execution_data.ExecutionDataGetter,
 	store environment.ValueStore,
+	onHeightReplayed func(uint64) error,
 ) error {
 	rootAddr := evm.StorageAccountAddress(chainID)
 	rootAddrStr := string(rootAddr.Bytes())
+
+	if IsEVMRootHeight(chainID, flowStartHeight) {
+		log.Info().Msgf("initializing EVM state for root height %d", flowStartHeight)
+
+		as := environment.NewAccountStatus()
+		rootAddr := evm.StorageAccountAddress(chainID)
+		err := store.SetValue(rootAddr[:], []byte(flow.AccountStatusKey), as.ToBytes())
+		if err != nil {
+			return err
+		}
+	}
+
+	// pendingEVMTxEvents are tx events that are executed block included in a flow block that
+	// didn't emit EVM block event, which is caused when the system tx to emit EVM block fails.
+	// we accumulate these pending txs, and replay them when we encounter a block with EVM block event.
+	pendingEVMTxEvents := make([]events.TransactionEventPayload, 0)
 
 	for height := flowStartHeight; height <= flowEndHeight; height++ {
 		bpStorage := evmStorage.NewEphemeralStorage(store)
 		bp, err := blocks.NewBasicProvider(chainID, bpStorage, rootAddr)
 		if err != nil {
 			return err
-		}
-
-		// setup account status at EVM root block
-		if isEVMRootHeight(chainID, flowStartHeight) {
-			err = bpStorage.SetValue(rootAddr[:], []byte(flow.AccountStatusKey),
-				environment.NewAccountStatus().ToBytes())
-			if err != nil {
-				return err
-			}
 		}
 
 		blockID, err := headers.BlockIDByHeight(height)
@@ -76,14 +84,14 @@ func OffchainReplayBackwardCompatibilityTest(
 
 		executionData, err := executionDataStore.Get(context.Background(), result.ExecutionDataID)
 		if err != nil {
-			return err
+			return fmt.Errorf("could not get execution data %v for block %d: %w", result.ExecutionDataID, height, err)
 		}
 
-		events := flow.EventsList{}
+		evts := flow.EventsList{}
 		payloads := []*ledger.Payload{}
 
 		for _, chunkData := range executionData.ChunkExecutionDatas {
-			events = append(events, chunkData.Events...)
+			evts = append(evts, chunkData.Events...)
 			payloads = append(payloads, chunkData.TrieUpdate.Payloads...)
 		}
 
@@ -111,10 +119,28 @@ func OffchainReplayBackwardCompatibilityTest(
 		}
 
 		// parse EVM events
-		evmBlockEvent, evmTxEvents, err := parseEVMEvents(events)
+		evmBlockEvent, evmTxEvents, err := parseEVMEvents(evts)
 		if err != nil {
 			return err
 		}
+
+		pendingEVMTxEvents = append(pendingEVMTxEvents, evmTxEvents...)
+
+		if evmBlockEvent == nil {
+			log.Info().Msgf("block has no EVM block, height :%v, txEvents: %v", height, len(evmTxEvents))
+
+			err = onHeightReplayed(height)
+			if err != nil {
+				return err
+			}
+			continue
+		}
+
+		// when we encounter a block with EVM block event, we replay the pending txs accumulated
+		// from previous blocks that had no EVM block event.
+		evmTxEventsIncludedInBlock := pendingEVMTxEvents
+		// reset pendingEVMTxEvents
+		pendingEVMTxEvents = make([]events.TransactionEventPayload, 0)
 
 		err = bp.OnBlockReceived(evmBlockEvent)
 		if err != nil {
@@ -123,7 +149,7 @@ func OffchainReplayBackwardCompatibilityTest(
 
 		sp := testutils.NewTestStorageProvider(store, evmBlockEvent.Height)
 		cr := sync.NewReplayer(chainID, rootAddr, sp, bp, log, nil, true)
-		res, results, err := cr.ReplayBlock(evmTxEvents, evmBlockEvent)
+		res, results, err := cr.ReplayBlock(evmTxEventsIncludedInBlock, evmBlockEvent)
 		if err != nil {
 			return err
 		}
@@ -173,7 +199,10 @@ func OffchainReplayBackwardCompatibilityTest(
 			return err
 		}
 
-		log.Info().Msgf("verified block %d", height)
+		err = onHeightReplayed(height)
+		if err != nil {
+			return err
+		}
 	}
 
 	return nil
