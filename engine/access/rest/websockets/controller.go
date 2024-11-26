@@ -23,10 +23,10 @@ const (
 	// This value must be less than pongWait.
 	PingPeriod = (PongWait * 9) / 10
 
-	// Time allowed to read the next pong message from the peer.
+	// PongWait specifies the maximum time to wait for a pong message from the client.
 	PongWait = 10 * time.Second
 
-	// Time allowed to write a message to the peer.
+	// WriteWait specifies the maximum duration allowed to write a message to the client.
 	WriteWait = 10 * time.Second
 )
 
