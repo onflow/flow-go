@@ -164,11 +164,17 @@ func (c *Controller) handleSubscribe(ctx context.Context, msg models.SubscribeMe
 	dp, _ := c.dataProviderFactory.NewDataProvider(ctx, msg.Topic, msg.Arguments, c.communicationChannel)
 	// TODO: handle error here
 	c.dataProviders.Add(dp.ID(), dp)
-	_ = dp.Run()
-	// TODO: handle error here
 
 	//TODO: return OK response to client
 	c.communicationChannel <- msg
+
+	go func() {
+		err := dp.Run()
+		if err != nil {
+			// Log or handle the error from Run
+			c.logger.Error().Err(err).Msgf("error while running data provider for topic: %s", msg.Topic)
+		}
+	}()
 }
 
 func (c *Controller) handleUnsubscribe(_ context.Context, msg models.UnsubscribeMessageRequest) {
