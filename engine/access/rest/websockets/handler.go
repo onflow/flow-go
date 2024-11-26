@@ -65,6 +65,6 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	controller := NewWebSocketController(logger, h.websocketConfig, h.streamApi, h.streamConfig, conn)
+	controller := NewWebSocketController(logger, h.websocketConfig, h.streamApi, h.streamConfig, NewWebsocketConnection(conn))
 	controller.HandleConnection(context.TODO())
 }

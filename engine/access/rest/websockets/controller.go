@@ -33,7 +33,7 @@ const (
 type Controller struct {
 	logger zerolog.Logger
 	config Config
-	conn   *websocket.Conn
+	conn   WebsocketConnection
 
 	communicationChannel chan interface{} // Channel for sending messages to the client.
 	errorChannel         chan error       // Channel for reporting errors.
@@ -50,7 +50,7 @@ func NewWebSocketController(
 	config Config,
 	streamApi state_stream.API,
 	streamConfig backend.Config,
-	conn *websocket.Conn,
+	conn WebsocketConnection,
 ) *Controller {
 	return &Controller{
 		logger:               logger.With().Str("component", "websocket-controller").Logger(),
@@ -90,7 +90,12 @@ func (c *Controller) HandleConnection(ctx context.Context) {
 
 	// Wait for context cancellation or errors from goroutines.
 	select {
-	case err := <-c.errorChannel:
+	case err, ok := <-c.errorChannel:
+		if !ok {
+			c.logger.Error().Msg("error channel closed")
+			//TODO: add error handling here
+			return
+		}
 		c.logger.Error().Err(err).Msg("error detected in one of the goroutines")
 		//TODO: add error handling here
 		c.shutdownConnection()
@@ -166,7 +171,7 @@ func (c *Controller) writeMessagesToClient(ctx context.Context) error {
 	for {
 		select {
 		case <-ctx.Done():
-			return nil
+			return ctx.Err()
 		case msg := <-c.communicationChannel:
 			// TODO: handle 'response per second' limits
 
@@ -197,7 +202,7 @@ func (c *Controller) readMessagesFromClient(ctx context.Context) error {
 		select {
 		case <-ctx.Done():
 			c.logger.Info().Msg("context canceled, stopping read message loop")
-			return nil
+			return ctx.Err()
 		default:
 			msg, err := c.readMessage()
 			if err != nil {
@@ -315,12 +320,12 @@ func (c *Controller) shutdownConnection() {
 	c.shutdownOnce.Do(func() {
 		c.shutdown = true
 
-		defer close(c.communicationChannel)
-		defer func(conn *websocket.Conn) {
+		defer func(conn WebsocketConnection) {
 			if err := c.conn.Close(); err != nil {
 				c.logger.Error().Err(err).Msg("error closing connection")
 			}
 		}(c.conn)
+		close(c.communicationChannel)
 
 		err := c.dataProviders.ForEach(func(_ uuid.UUID, dp dp.DataProvider) error {
 			dp.Close()
@@ -345,7 +350,7 @@ func (c *Controller) keepalive(ctx context.Context) error {
 	for {
 		select {
 		case <-ctx.Done():
-			return nil
+			return ctx.Err()
 		case <-pingTicker.C:
 			if err := c.sendPing(); err != nil {
 				// Log error and exit the loop on failure
