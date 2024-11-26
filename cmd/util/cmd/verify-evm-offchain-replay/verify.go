@@ -31,7 +31,7 @@ func Verify(log zerolog.Logger, from uint64, to uint64, chainID flow.ChainID, da
 		Str("evmStateGobDir", evmStateGobDir).
 		Msgf("verifying range from %d to %d", from, to)
 
-	db, storages, executionDataStore, dsStore, err := initStorages(chainID, dataDir, executionDataDir)
+	db, storages, executionDataStore, dsStore, err := initStorages(dataDir, executionDataDir)
 	if err != nil {
 		return fmt.Errorf("could not initialize storages: %w", err)
 	}
@@ -100,7 +100,7 @@ func Verify(log zerolog.Logger, from uint64, to uint64, chainID flow.ChainID, da
 	return nil
 }
 
-func initStorages(chainID flow.ChainID, dataDir string, executionDataDir string) (
+func initStorages(dataDir string, executionDataDir string) (
 	*badger.DB,
 	*storage.All,
 	execution_data.ExecutionDataGetter,
