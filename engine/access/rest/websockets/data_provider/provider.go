@@ -10,5 +10,5 @@ type DataProvider interface {
 	Run(ctx context.Context)
 	ID() uuid.UUID
 	Topic() string
-	Close()
+	Close() error
 }

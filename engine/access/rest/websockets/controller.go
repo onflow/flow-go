@@ -3,7 +3,9 @@ package websockets
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"sync"
 
 	"github.com/google/uuid"
 	"github.com/gorilla/websocket"
@@ -11,34 +13,35 @@ import (
 
 	dp "github.com/onflow/flow-go/engine/access/rest/websockets/data_provider"
 	"github.com/onflow/flow-go/engine/access/rest/websockets/models"
-	"github.com/onflow/flow-go/engine/access/state_stream"
-	"github.com/onflow/flow-go/engine/access/state_stream/backend"
 	"github.com/onflow/flow-go/utils/concurrentmap"
 )
+
+var ErrEmptyMessage = errors.New("empty message")
 
 type Controller struct {
 	logger               zerolog.Logger
 	config               Config
-	conn                 *websocket.Conn
+	conn                 WebsocketConnection
 	communicationChannel chan interface{}
 	dataProviders        *concurrentmap.Map[uuid.UUID, dp.DataProvider]
-	dataProvidersFactory *dp.Factory
+	dataProvidersFactory dp.Factory
+	shutdownOnce         sync.Once
 }
 
 func NewWebSocketController(
 	logger zerolog.Logger,
 	config Config,
-	streamApi state_stream.API,
-	streamConfig backend.Config,
-	conn *websocket.Conn,
+	factory dp.Factory,
+	conn WebsocketConnection,
 ) *Controller {
 	return &Controller{
 		logger:               logger.With().Str("component", "websocket-controller").Logger(),
 		config:               config,
 		conn:                 conn,
-		communicationChannel: make(chan interface{}), //TODO: should it be buffered chan?
+		communicationChannel: make(chan interface{}, 10), //TODO: should it be buffered chan?
 		dataProviders:        concurrentmap.New[uuid.UUID, dp.DataProvider](),
-		dataProvidersFactory: dp.NewDataProviderFactory(logger, streamApi, streamConfig),
+		dataProvidersFactory: factory,
+		shutdownOnce:         sync.Once{},
 	}
 }
 
@@ -46,59 +49,73 @@ func NewWebSocketController(
 func (c *Controller) HandleConnection(ctx context.Context) {
 	//TODO: configure the connection with ping-pong and deadlines
 	//TODO: spin up a response limit tracker routine
-	go c.readMessagesFromClient(ctx)
-	c.writeMessagesToClient(ctx)
+	go c.readMessages(ctx)
+	c.writeMessages(ctx)
 }
 
-// writeMessagesToClient reads a messages from communication channel and passes them on to a client WebSocket connection.
+// writeMessages reads a messages from communication channel and passes them on to a client WebSocket connection.
 // The communication channel is filled by data providers. Besides, the response limit tracker is involved in
 // write message regulation
-func (c *Controller) writeMessagesToClient(ctx context.Context) {
-	//TODO: can it run forever? maybe we should cancel the ctx in the reader routine
-	for {
-		select {
-		case <-ctx.Done():
-			return
-		case msg := <-c.communicationChannel:
-			// TODO: handle 'response per second' limits
-
-			err := c.conn.WriteJSON(msg)
-			if err != nil {
-				c.logger.Error().Err(err).Msg("error writing to connection")
-			}
-		}
-	}
-}
-
-// readMessagesFromClient continuously reads messages from a client WebSocket connection,
-// processes each message, and handles actions based on the message type.
-func (c *Controller) readMessagesFromClient(ctx context.Context) {
+func (c *Controller) writeMessages(ctx context.Context) {
 	defer c.shutdownConnection()
 
 	for {
 		select {
 		case <-ctx.Done():
-			c.logger.Info().Msg("context canceled, stopping read message loop")
 			return
-		default:
-			msg, err := c.readMessage()
+		case msg, ok := <-c.communicationChannel:
+			if !ok {
+				return
+			}
+			c.logger.Debug().Msgf("read message from communication channel: %s", msg)
+
+			// TODO: handle 'response per second' limits
+			err := c.conn.WriteJSON(msg)
 			if err != nil {
-				if websocket.IsCloseError(err, websocket.CloseNormalClosure, websocket.CloseAbnormalClosure) {
+				if websocket.IsCloseError(err, websocket.CloseNormalClosure, websocket.CloseGoingAway) ||
+					websocket.IsUnexpectedCloseError(err, websocket.CloseNormalClosure, websocket.CloseGoingAway) {
 					return
 				}
-				c.logger.Warn().Err(err).Msg("error reading message from client")
+
+				c.logger.Error().Err(err).Msg("error writing to connection")
 				return
 			}
 
-			baseMsg, validatedMsg, err := c.parseAndValidateMessage(msg)
-			if err != nil {
-				c.logger.Debug().Err(err).Msg("error parsing and validating client message")
+			c.logger.Debug().Msg("written message to client")
+		}
+	}
+}
+
+// readMessages continuously reads messages from a client WebSocket connection,
+// processes each message, and handles actions based on the message type.
+func (c *Controller) readMessages(ctx context.Context) {
+	defer c.shutdownConnection()
+
+	for {
+		msg, err := c.readMessage()
+		if err != nil {
+			if websocket.IsCloseError(err, websocket.CloseNormalClosure, websocket.CloseAbnormalClosure) ||
+				websocket.IsUnexpectedCloseError(err, websocket.CloseNormalClosure, websocket.CloseGoingAway) {
 				return
+			} else if errors.Is(err, ErrEmptyMessage) {
+				continue
 			}
 
-			if err := c.handleAction(ctx, validatedMsg); err != nil {
-				c.logger.Warn().Err(err).Str("action", baseMsg.Action).Msg("error handling action")
-			}
+			c.logger.Debug().Err(err).Msg("error reading message from client")
+			continue
+		}
+
+		baseMsg, validatedMsg, err := c.parseAndValidateMessage(msg)
+		if err != nil {
+			c.logger.Debug().Err(err).Msg("error parsing and validating client message")
+			//TODO: write error to error channel
+			continue
+		}
+
+		if err := c.handleAction(ctx, validatedMsg); err != nil {
+			c.logger.Debug().Err(err).Str("action", baseMsg.Action).Msg("error handling action")
+			//TODO: write error to error channel
+			continue
 		}
 	}
 }
@@ -108,6 +125,11 @@ func (c *Controller) readMessage() (json.RawMessage, error) {
 	if err := c.conn.ReadJSON(&message); err != nil {
 		return nil, fmt.Errorf("error reading JSON from client: %w", err)
 	}
+
+	if message == nil {
+		return nil, ErrEmptyMessage
+	}
+
 	return message, nil
 }
 
@@ -166,10 +188,18 @@ func (c *Controller) handleAction(ctx context.Context, message interface{}) erro
 func (c *Controller) handleSubscribe(ctx context.Context, msg models.SubscribeMessageRequest) {
 	dp := c.dataProvidersFactory.NewDataProvider(c.communicationChannel, msg.Topic)
 	c.dataProviders.Add(dp.ID(), dp)
-	dp.Run(ctx)
 
-	//TODO: return OK response to client
-	c.communicationChannel <- msg
+	// firstly, we want to write OK response to client and only after that we can start providing actual data
+	response := models.SubscribeMessageResponse{
+		BaseMessageResponse: models.BaseMessageResponse{
+			Success: true,
+		},
+		Topic: dp.Topic(),
+		ID:    dp.ID().String(),
+	}
+	c.communicationChannel <- response
+
+	dp.Run(ctx)
 }
 
 func (c *Controller) handleUnsubscribe(_ context.Context, msg models.UnsubscribeMessageRequest) {
@@ -193,20 +223,24 @@ func (c *Controller) handleListSubscriptions(ctx context.Context, msg models.Lis
 }
 
 func (c *Controller) shutdownConnection() {
-	defer close(c.communicationChannel)
-	defer func(conn *websocket.Conn) {
-		if err := c.conn.Close(); err != nil {
-			c.logger.Error().Err(err).Msg("error closing connection")
+	c.shutdownOnce.Do(func() {
+		defer close(c.communicationChannel)
+		defer func(conn WebsocketConnection) {
+			if err := c.conn.Close(); err != nil {
+				c.logger.Warn().Err(err).Msg("error closing connection")
+			}
+		}(c.conn)
+
+		c.logger.Debug().Msg("shutting down connection")
+
+		err := c.dataProviders.ForEach(func(_ uuid.UUID, dp dp.DataProvider) error {
+			dp.Close()
+			return nil
+		})
+		if err != nil {
+			c.logger.Error().Err(err).Msg("error closing data provider")
 		}
-	}(c.conn)
 
-	err := c.dataProviders.ForEach(func(_ uuid.UUID, dp dp.DataProvider) error {
-		dp.Close()
-		return nil
+		c.dataProviders.Clear()
 	})
-	if err != nil {
-		c.logger.Error().Err(err).Msg("error closing data provider")
-	}
-
-	c.dataProviders.Clear()
 }

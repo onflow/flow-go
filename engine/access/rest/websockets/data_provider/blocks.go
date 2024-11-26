@@ -56,6 +56,7 @@ func (p *MockBlockProvider) Topic() string {
 	return p.topic
 }
 
-func (p *MockBlockProvider) Close() {
+func (p *MockBlockProvider) Close() error {
 	p.stopProviderFunc()
+	return nil
 }

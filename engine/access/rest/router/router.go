@@ -14,6 +14,7 @@ import (
 	flowhttp "github.com/onflow/flow-go/engine/access/rest/http"
 	"github.com/onflow/flow-go/engine/access/rest/http/models"
 	"github.com/onflow/flow-go/engine/access/rest/websockets"
+	"github.com/onflow/flow-go/engine/access/rest/websockets/data_provider"
 	legacyws "github.com/onflow/flow-go/engine/access/rest/websockets/legacy"
 	"github.com/onflow/flow-go/engine/access/state_stream"
 	"github.com/onflow/flow-go/engine/access/state_stream/backend"
@@ -93,7 +94,8 @@ func (b *RouterBuilder) AddWebsocketsRoute(
 	streamConfig backend.Config,
 	maxRequestSize int64,
 ) *RouterBuilder {
-	handler := websockets.NewWebSocketHandler(b.logger, config, chain, streamApi, streamConfig, maxRequestSize)
+	factory := data_provider.NewDataProviderFactory(b.logger, streamApi, streamConfig)
+	handler := websockets.NewWebSocketHandler(b.logger, config, chain, factory, maxRequestSize)
 	b.v1SubRouter.
 		Methods(http.MethodGet).
 		Path("/ws").
