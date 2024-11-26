@@ -47,8 +47,8 @@ require (
 	github.com/multiformats/go-multiaddr v0.12.2
 	github.com/multiformats/go-multiaddr-dns v0.3.1
 	github.com/multiformats/go-multihash v0.2.3
-	github.com/onflow/atree v0.8.0
-	github.com/onflow/cadence v1.2.2
+	github.com/onflow/atree v0.8.1-0.20241028213850-07c884e4abcf
+	github.com/onflow/cadence v1.2.3-0.20241125225033-c8a61764cba5
 	github.com/onflow/crypto v0.25.2
 	github.com/onflow/flow v0.3.4
 	github.com/onflow/flow-core-contracts/lib/go/contracts v1.4.0
@@ -297,7 +297,7 @@ require (
 	github.com/whyrusleeping/go-keyspace v0.0.0-20160322163242-5b898ac5add1 // indirect
 	github.com/x448/float16 v0.8.4 // indirect
 	github.com/yusufpapurcu/wmi v1.2.2 // indirect
-	github.com/zeebo/blake3 v0.2.3 // indirect
+	github.com/zeebo/blake3 v0.2.4 // indirect
 	go.opencensus.io v0.24.0 // indirect
 	go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc v0.47.0 // indirect
 	go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.47.0 // indirect
