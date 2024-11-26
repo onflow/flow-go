@@ -5,10 +5,12 @@ import (
 
 	"github.com/onflow/cadence/runtime"
 	"github.com/stretchr/testify/require"
+
+	"github.com/onflow/flow-go/model/flow"
 )
 
 func TestReusableCadenceRuntimePoolUnbuffered(t *testing.T) {
-	pool := NewReusableCadenceRuntimePool(0, runtime.Config{})
+	pool := NewReusableCadenceRuntimePool(0, runtime.Config{}, flow.Emulator)
 	require.Nil(t, pool.pool)
 
 	entry := pool.Borrow(nil)
@@ -23,7 +25,7 @@ func TestReusableCadenceRuntimePoolUnbuffered(t *testing.T) {
 }
 
 func TestReusableCadenceRuntimePoolBuffered(t *testing.T) {
-	pool := NewReusableCadenceRuntimePool(100, runtime.Config{})
+	pool := NewReusableCadenceRuntimePool(100, runtime.Config{}, flow.Emulator)
 	require.NotNil(t, pool.pool)
 
 	select {
@@ -50,7 +52,7 @@ func TestReusableCadenceRuntimePoolBuffered(t *testing.T) {
 }
 
 func TestReusableCadenceRuntimePoolSharing(t *testing.T) {
-	pool := NewReusableCadenceRuntimePool(100, runtime.Config{})
+	pool := NewReusableCadenceRuntimePool(100, runtime.Config{}, flow.Emulator)
 	require.NotNil(t, pool.pool)
 
 	select {
@@ -59,7 +61,7 @@ func TestReusableCadenceRuntimePoolSharing(t *testing.T) {
 	default:
 	}
 
-	var otherPool ReusableCadenceRuntimePool = pool
+	var otherPool = pool
 
 	entry := otherPool.Borrow(nil)
 	require.NotNil(t, entry)

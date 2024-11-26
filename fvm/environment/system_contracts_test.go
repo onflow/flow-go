@@ -54,10 +54,13 @@ func TestSystemContractsInvoke(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
+			const chainID = flow.Mainnet
+
 			tracer := tracing.NewTracerSpan()
 			runtimePool := reusableRuntime.NewCustomReusableCadenceRuntimePool(
 				0,
 				runtime.Config{},
+				chainID,
 				func(_ runtime.Config) runtime.Runtime {
 					return &testutil.TestInterpreterRuntime{
 						InvokeContractFunc: tc.contractFunction,
@@ -70,7 +73,7 @@ func TestSystemContractsInvoke(t *testing.T) {
 				},
 			)
 			invoker := environment.NewSystemContracts(
-				flow.Mainnet.Chain(),
+				chainID.Chain(),
 				tracer,
 				environment.NewProgramLogger(
 					tracer,

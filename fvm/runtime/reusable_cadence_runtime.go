@@ -3,12 +3,15 @@ package runtime
 import (
 	"github.com/onflow/cadence"
 	"github.com/onflow/cadence/common"
+	cadenceErrors "github.com/onflow/cadence/errors"
 	"github.com/onflow/cadence/interpreter"
 	"github.com/onflow/cadence/runtime"
 	"github.com/onflow/cadence/sema"
 	"github.com/onflow/cadence/stdlib"
 
 	"github.com/onflow/flow-go/fvm/errors"
+	"github.com/onflow/flow-go/fvm/systemcontracts"
+	"github.com/onflow/flow-go/model/flow"
 )
 
 // Note: this is a subset of environment.Environment, redeclared to handle
@@ -26,6 +29,18 @@ var randomSourceFunctionType = &sema.FunctionType{
 	ReturnTypeAnnotation: sema.NewTypeAnnotation(sema.ByteArrayType),
 }
 
+// scheduleAccountV2MigrationType is the type of the `scheduleAccountV2Migration` function.
+// This defies the signature as `func (address: Address): Bool`
+var scheduleAccountV2MigrationType = &sema.FunctionType{
+	Parameters: []sema.Parameter{
+		{
+			Identifier:     "address",
+			TypeAnnotation: sema.AddressTypeAnnotation,
+		},
+	},
+	ReturnTypeAnnotation: sema.NewTypeAnnotation(sema.BoolType),
+}
+
 type ReusableCadenceRuntime struct {
 	runtime.Runtime
 	TxRuntimeEnv     runtime.Environment
@@ -34,12 +49,24 @@ type ReusableCadenceRuntime struct {
 	fvmEnv Environment
 }
 
-func NewReusableCadenceRuntime(rt runtime.Runtime, config runtime.Config) *ReusableCadenceRuntime {
+func NewReusableCadenceRuntime(
+	rt runtime.Runtime,
+	config runtime.Config,
+	chainID flow.ChainID,
+) *ReusableCadenceRuntime {
 	reusable := &ReusableCadenceRuntime{
 		Runtime:          rt,
 		TxRuntimeEnv:     runtime.NewBaseInterpreterEnvironment(config),
 		ScriptRuntimeEnv: runtime.NewScriptInterpreterEnvironment(config),
 	}
+
+	reusable.declareRandomSourceHistory()
+	reusable.declareScheduleAccountV2Migration(chainID)
+
+	return reusable
+}
+
+func (reusable *ReusableCadenceRuntime) declareRandomSourceHistory() {
 
 	// Declare the `randomSourceHistory` function. This function is **only** used by the
 	// System transaction, to fill the `RandomBeaconHistory` contract via the heartbeat
@@ -63,8 +90,9 @@ func NewReusableCadenceRuntime(rt runtime.Runtime, config runtime.Config) *Reusa
 
 				var err error
 				var source []byte
-				if reusable.fvmEnv != nil {
-					source, err = reusable.fvmEnv.RandomSourceHistory()
+				fvmEnv := reusable.fvmEnv
+				if fvmEnv != nil {
+					source, err = fvmEnv.RandomSourceHistory()
 				} else {
 					err = errors.NewOperationNotSupportedError("randomSourceHistory")
 				}
@@ -81,8 +109,56 @@ func NewReusableCadenceRuntime(rt runtime.Runtime, config runtime.Config) *Reusa
 	}
 
 	reusable.TxRuntimeEnv.DeclareValue(blockRandomSource, nil)
+}
 
-	return reusable
+func (reusable *ReusableCadenceRuntime) declareScheduleAccountV2Migration(chainID flow.ChainID) {
+
+	serviceAccount := systemcontracts.SystemContractsForChain(chainID).FlowServiceAccount
+
+	blockRandomSource := stdlib.StandardLibraryValue{
+		Name: "scheduleAccountV2Migration",
+		Type: scheduleAccountV2MigrationType,
+		Kind: common.DeclarationKindFunction,
+		Value: interpreter.NewUnmeteredStaticHostFunctionValue(
+			scheduleAccountV2MigrationType,
+			func(invocation interpreter.Invocation) interpreter.Value {
+				if len(invocation.Arguments) != 1 {
+					panic(errors.NewInvalidArgumentErrorf(
+						"scheduleAccountV2Migration should be called with exactly one argument of type Address",
+					))
+				}
+
+				addressValue, ok := invocation.Arguments[0].(interpreter.AddressValue)
+				if !ok {
+					panic(errors.NewInvalidArgumentErrorf(
+						"scheduleAccountV2Migration should be called with exactly one argument of type Address",
+					))
+				}
+
+				storage := invocation.Interpreter.Storage()
+
+				runtimeStorage, ok := storage.(*runtime.Storage)
+				if !ok {
+					panic(cadenceErrors.NewUnexpectedError("interpreter storage is not a runtime.Storage"))
+				}
+
+				result := runtimeStorage.ScheduleV2Migration(common.Address(addressValue))
+
+				return interpreter.AsBoolValue(result)
+			},
+		),
+	}
+
+	accountV2MigrationLocation := common.NewAddressLocation(
+		nil,
+		common.Address(serviceAccount.Address),
+		"AccountV2Migration",
+	)
+
+	reusable.TxRuntimeEnv.DeclareValue(
+		blockRandomSource,
+		accountV2MigrationLocation,
+	)
 }
 
 func (reusable *ReusableCadenceRuntime) SetFvmEnvironment(fvmEnv Environment) {
@@ -165,6 +241,8 @@ type ReusableCadenceRuntimePool struct {
 
 	config runtime.Config
 
+	chainID flow.ChainID
+
 	// When newCustomRuntime is nil, the pool will create standard cadence
 	// interpreter runtimes via runtime.NewInterpreterRuntime.  Otherwise, the
 	// pool will create runtimes using this function.
@@ -176,6 +254,7 @@ type ReusableCadenceRuntimePool struct {
 func newReusableCadenceRuntimePool(
 	poolSize int,
 	config runtime.Config,
+	chainID flow.ChainID,
 	newCustomRuntime CadenceRuntimeConstructor,
 ) ReusableCadenceRuntimePool {
 	var pool chan *ReusableCadenceRuntime
@@ -186,6 +265,7 @@ func newReusableCadenceRuntimePool(
 	return ReusableCadenceRuntimePool{
 		pool:             pool,
 		config:           config,
+		chainID:          chainID,
 		newCustomRuntime: newCustomRuntime,
 	}
 }
@@ -193,10 +273,12 @@ func newReusableCadenceRuntimePool(
 func NewReusableCadenceRuntimePool(
 	poolSize int,
 	config runtime.Config,
+	chainID flow.ChainID,
 ) ReusableCadenceRuntimePool {
 	return newReusableCadenceRuntimePool(
 		poolSize,
 		config,
+		chainID,
 		nil,
 	)
 }
@@ -204,11 +286,13 @@ func NewReusableCadenceRuntimePool(
 func NewCustomReusableCadenceRuntimePool(
 	poolSize int,
 	config runtime.Config,
+	chainID flow.ChainID,
 	newCustomRuntime CadenceRuntimeConstructor,
 ) ReusableCadenceRuntimePool {
 	return newReusableCadenceRuntimePool(
 		poolSize,
 		config,
+		chainID,
 		newCustomRuntime,
 	)
 }
@@ -233,6 +317,7 @@ func (pool ReusableCadenceRuntimePool) Borrow(
 				pool.newRuntime(),
 			},
 			pool.config,
+			pool.chainID,
 		)
 	}
 
