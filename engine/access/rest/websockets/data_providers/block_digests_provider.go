@@ -30,7 +30,7 @@ func NewBlockDigestsDataProvider(
 	logger zerolog.Logger,
 	api access.API,
 	topic string,
-	arguments map[string]string,
+	arguments models.Arguments,
 	send chan<- interface{},
 ) (*BlockDigestsDataProvider, error) {
 	p := &BlockDigestsDataProvider{

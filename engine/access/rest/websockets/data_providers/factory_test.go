@@ -10,6 +10,7 @@ import (
 
 	accessmock "github.com/onflow/flow-go/access/mock"
 	"github.com/onflow/flow-go/engine/access/rest/common/parser"
+	"github.com/onflow/flow-go/engine/access/rest/websockets/models"
 	statestreammock "github.com/onflow/flow-go/engine/access/state_stream/mock"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -63,14 +64,14 @@ func (s *DataProviderFactorySuite) TestSupportedTopics() {
 	testCases := []struct {
 		name               string
 		topic              string
-		arguments          map[string]string
+		arguments          models.Arguments
 		setupSubscription  func()
 		assertExpectations func()
 	}{
 		{
 			name:      "block topic",
 			topic:     BlocksTopic,
-			arguments: map[string]string{"block_status": parser.Finalized},
+			arguments: models.Arguments{"block_status": parser.Finalized},
 			setupSubscription: func() {
 				s.setupSubscription(s.accessApi.On("SubscribeBlocksFromLatest", mock.Anything, flow.BlockStatusFinalized))
 			},
@@ -81,7 +82,7 @@ func (s *DataProviderFactorySuite) TestSupportedTopics() {
 		{
 			name:      "block headers topic",
 			topic:     BlockHeadersTopic,
-			arguments: map[string]string{"block_status": parser.Finalized},
+			arguments: models.Arguments{"block_status": parser.Finalized},
 			setupSubscription: func() {
 				s.setupSubscription(s.accessApi.On("SubscribeBlockHeadersFromLatest", mock.Anything, flow.BlockStatusFinalized))
 			},
@@ -92,7 +93,7 @@ func (s *DataProviderFactorySuite) TestSupportedTopics() {
 		{
 			name:      "block digests topic",
 			topic:     BlockDigestsTopic,
-			arguments: map[string]string{"block_status": parser.Finalized},
+			arguments: models.Arguments{"block_status": parser.Finalized},
 			setupSubscription: func() {
 				s.setupSubscription(s.accessApi.On("SubscribeBlockDigestsFromLatest", mock.Anything, flow.BlockStatusFinalized))
 			},

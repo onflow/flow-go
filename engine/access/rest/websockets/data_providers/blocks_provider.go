@@ -39,7 +39,7 @@ func NewBlocksDataProvider(
 	logger zerolog.Logger,
 	api access.API,
 	topic string,
-	arguments map[string]string,
+	arguments models.Arguments,
 	send chan<- interface{},
 ) (*BlocksDataProvider, error) {
 	p := &BlocksDataProvider{
@@ -100,7 +100,7 @@ func (p *BlocksDataProvider) handleResponse(send chan<- interface{}) func(*flow.
 }
 
 // ParseBlocksArguments validates and initializes the blocks arguments.
-func ParseBlocksArguments(arguments map[string]string) (BlocksArguments, error) {
+func ParseBlocksArguments(arguments models.Arguments) (BlocksArguments, error) {
 	var args BlocksArguments
 
 	// Parse 'block_status'

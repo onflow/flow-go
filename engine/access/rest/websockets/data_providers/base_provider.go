@@ -16,7 +16,7 @@ type BaseDataProvider interface {
 	// Topic returns the topic associated with the data provider.
 	Topic() string
 	// Close terminates the data provider.
-	Close()
+	Close() error
 }
 
 var _ BaseDataProvider = (*BaseDataProviderImpl)(nil)
@@ -58,6 +58,7 @@ func (b *BaseDataProviderImpl) Topic() string {
 }
 
 // Close terminates the data provider.
-func (b *BaseDataProviderImpl) Close() {
+func (b *BaseDataProviderImpl) Close() error {
 	b.cancel()
+	return nil
 }
