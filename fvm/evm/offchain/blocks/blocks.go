@@ -108,22 +108,20 @@ func (b *Blocks) BlockContext() (types.BlockContext, error) {
 		return types.BlockContext{}, err
 	}
 
-	return types.BlockContext{
-		ChainID:                types.EVMChainIDFromFlowChainID(b.chainID),
-		BlockNumber:            bm.Height,
-		BlockTimestamp:         bm.Timestamp,
-		DirectCallBaseGasUsage: types.DefaultDirectCallBaseGasUsage,
-		DirectCallGasPrice:     types.DefaultDirectCallGasPrice,
-		GasFeeCollector:        types.CoinbaseAddress,
-		GetHashFunc: func(n uint64) gethCommon.Hash {
+	return NewBlockContext(
+		b.chainID,
+		bm.Height,
+		bm.Timestamp,
+		func(n uint64) gethCommon.Hash {
 			hash, err := b.BlockHash(n)
 			if err != nil {
 				panic(err)
 			}
 			return hash
 		},
-		Random: bm.Random,
-	}, nil
+		bm.Random,
+		nil,
+	)
 }
 
 // storeBlockMetaData stores the block meta data into storage
