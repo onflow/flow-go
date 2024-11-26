@@ -10,7 +10,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 	"github.com/stretchr/testify/require"
 
@@ -20,9 +19,6 @@ import (
 	"github.com/onflow/flow-go/fvm/environment"
 	"github.com/onflow/flow-go/fvm/evm"
 	"github.com/onflow/flow-go/fvm/evm/events"
-	"github.com/onflow/flow-go/fvm/evm/offchain/blocks"
-	"github.com/onflow/flow-go/fvm/evm/offchain/storage"
-	"github.com/onflow/flow-go/fvm/evm/offchain/sync"
 	"github.com/onflow/flow-go/fvm/evm/offchain/utils"
 	. "github.com/onflow/flow-go/fvm/evm/testutils"
 	"github.com/onflow/flow-go/model/flow"
@@ -128,10 +124,6 @@ func replayEvents(
 
 	rootAddr := evm.StorageAccountAddress(chainID)
 
-	bpStorage := storage.NewEphemeralStorage(store)
-	bp, err := blocks.NewBasicProvider(chainID, bpStorage, rootAddr)
-	require.NoError(t, err)
-
 	nextHeight := initialNextHeight
 
 	scanEventFilesAndRun(t, eventsFilePath,
@@ -142,31 +134,17 @@ func replayEvents(
 					nextHeight, blockEventPayload.Height)
 			}
 
-			err = bp.OnBlockReceived(blockEventPayload)
-			require.NoError(t, err)
-
-			sp := NewTestStorageProvider(store, blockEventPayload.Height)
-			cr := sync.NewReplayer(chainID, rootAddr, sp, bp, zerolog.Logger{}, nil, true)
-			res, results, err := cr.ReplayBlock(txEvents, blockEventPayload)
-			require.NoError(t, err)
-
-			// commit all changes
-			for k, v := range res.StorageRegisterUpdates() {
-				err = store.SetValue([]byte(k.Owner), []byte(k.Key), v)
-				require.NoError(t, err)
+			_, _, err := utils.ReplayEVMEventsToStore(
+				log.Logger,
+				store,
+				chainID,
+				rootAddr,
+				blockEventPayload,
+				txEvents,
+			)
+			if err != nil {
+				return fmt.Errorf("fail to replay events: %w", err)
 			}
-
-			proposal := blocks.ReconstructProposal(blockEventPayload, results)
-
-			err = bp.OnBlockExecuted(blockEventPayload.Height, res, proposal)
-			require.NoError(t, err)
-
-			// commit all block hash list changes
-			for k, v := range bpStorage.StorageRegisterUpdates() {
-				err = store.SetValue([]byte(k.Owner), []byte(k.Key), v)
-				require.NoError(t, err)
-			}
-
 			// verify the block height is sequential without gap
 			nextHeight++
 
