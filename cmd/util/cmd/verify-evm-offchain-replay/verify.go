@@ -77,6 +77,7 @@ func Verify(log zerolog.Logger, from uint64, to uint64, chainID flow.ChainID, da
 		storages.Results,
 		executionDataStore,
 		store,
+		func(uint64) error { return nil },
 	)
 
 	if err != nil {
