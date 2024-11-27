@@ -3,14 +3,13 @@ package runtime
 import (
 	"github.com/onflow/cadence"
 	"github.com/onflow/cadence/common"
-	cadenceErrors "github.com/onflow/cadence/errors"
 	"github.com/onflow/cadence/interpreter"
 	"github.com/onflow/cadence/runtime"
 	"github.com/onflow/cadence/sema"
 	"github.com/onflow/cadence/stdlib"
 
+	"github.com/onflow/flow-go/fvm/accountV2Migration"
 	"github.com/onflow/flow-go/fvm/errors"
-	"github.com/onflow/flow-go/fvm/systemcontracts"
 	"github.com/onflow/flow-go/model/flow"
 )
 
@@ -23,22 +22,9 @@ type Environment interface {
 }
 
 // randomSourceFunctionType is the type of the `randomSource` function.
-// This defies the signature as `func (): [UInt8]`
+// This defines the signature as `func(): [UInt8]`
 var randomSourceFunctionType = &sema.FunctionType{
-	Parameters:           []sema.Parameter{},
 	ReturnTypeAnnotation: sema.NewTypeAnnotation(sema.ByteArrayType),
-}
-
-// scheduleAccountV2MigrationType is the type of the `scheduleAccountV2Migration` function.
-// This defies the signature as `func (address: Address): Bool`
-var scheduleAccountV2MigrationType = &sema.FunctionType{
-	Parameters: []sema.Parameter{
-		{
-			Identifier:     "address",
-			TypeAnnotation: sema.AddressTypeAnnotation,
-		},
-	},
-	ReturnTypeAnnotation: sema.NewTypeAnnotation(sema.BoolType),
 }
 
 type ReusableCadenceRuntime struct {
@@ -61,7 +47,7 @@ func NewReusableCadenceRuntime(
 	}
 
 	reusable.declareRandomSourceHistory()
-	reusable.declareScheduleAccountV2Migration(chainID)
+	accountV2Migration.DeclareScheduleAccountV2MigrationFunction(reusable.TxRuntimeEnv, chainID)
 
 	return reusable
 }
@@ -76,16 +62,25 @@ func (reusable *ReusableCadenceRuntime) declareRandomSourceHistory() {
 	// it is not part of the cadence standard library, and can just be injected from here.
 	// It also doesnt need user documentation, since it is not (and should not)
 	// be called by the user. If it is called by the user it will panic.
+	functionType := randomSourceFunctionType
+
 	blockRandomSource := stdlib.StandardLibraryValue{
 		Name: "randomSourceHistory",
-		Type: randomSourceFunctionType,
+		Type: functionType,
 		Kind: common.DeclarationKindFunction,
 		Value: interpreter.NewUnmeteredStaticHostFunctionValue(
-			randomSourceFunctionType,
+			functionType,
 			func(invocation interpreter.Invocation) interpreter.Value {
-				if len(invocation.Arguments) != 0 {
+
+				actualArgumentCount := len(invocation.Arguments)
+				expectedArgumentCount := len(functionType.Parameters)
+
+				if actualArgumentCount != expectedArgumentCount {
 					panic(errors.NewInvalidArgumentErrorf(
-						"randomSourceHistory should be called without arguments"))
+						"incorrect number of arguments: got %d, expected %d",
+						actualArgumentCount,
+						expectedArgumentCount,
+					))
 				}
 
 				var err error
@@ -109,56 +104,6 @@ func (reusable *ReusableCadenceRuntime) declareRandomSourceHistory() {
 	}
 
 	reusable.TxRuntimeEnv.DeclareValue(blockRandomSource, nil)
-}
-
-func (reusable *ReusableCadenceRuntime) declareScheduleAccountV2Migration(chainID flow.ChainID) {
-
-	serviceAccount := systemcontracts.SystemContractsForChain(chainID).FlowServiceAccount
-
-	blockRandomSource := stdlib.StandardLibraryValue{
-		Name: "scheduleAccountV2Migration",
-		Type: scheduleAccountV2MigrationType,
-		Kind: common.DeclarationKindFunction,
-		Value: interpreter.NewUnmeteredStaticHostFunctionValue(
-			scheduleAccountV2MigrationType,
-			func(invocation interpreter.Invocation) interpreter.Value {
-				if len(invocation.Arguments) != 1 {
-					panic(errors.NewInvalidArgumentErrorf(
-						"scheduleAccountV2Migration should be called with exactly one argument of type Address",
-					))
-				}
-
-				addressValue, ok := invocation.Arguments[0].(interpreter.AddressValue)
-				if !ok {
-					panic(errors.NewInvalidArgumentErrorf(
-						"scheduleAccountV2Migration should be called with exactly one argument of type Address",
-					))
-				}
-
-				storage := invocation.Interpreter.Storage()
-
-				runtimeStorage, ok := storage.(*runtime.Storage)
-				if !ok {
-					panic(cadenceErrors.NewUnexpectedError("interpreter storage is not a runtime.Storage"))
-				}
-
-				result := runtimeStorage.ScheduleV2Migration(common.Address(addressValue))
-
-				return interpreter.AsBoolValue(result)
-			},
-		),
-	}
-
-	accountV2MigrationLocation := common.NewAddressLocation(
-		nil,
-		common.Address(serviceAccount.Address),
-		"AccountV2Migration",
-	)
-
-	reusable.TxRuntimeEnv.DeclareValue(
-		blockRandomSource,
-		accountV2MigrationLocation,
-	)
 }
 
 func (reusable *ReusableCadenceRuntime) SetFvmEnvironment(fvmEnv Environment) {
