@@ -17,11 +17,12 @@ var (
 	flagEVMStateGobDir   string
 	flagChain            string
 	flagFromTo           string
+	flagSaveEveryNBlocks uint64
 )
 
 // usage example
 //
-//		./util verify-evm-offchain-replay --chain flow-testnet --from-to 211176671-211177000
+//		./util verify-evm-offchain-replay --chain flow-testnet --from_to 211176671-211177000
 //	     --datadir /var/flow/data/protocol --execution_data_dir /var/flow/data/execution_data
 var Cmd = &cobra.Command{
 	Use:   "verify-evm-offchain-replay",
@@ -44,23 +45,23 @@ func init() {
 
 	Cmd.Flags().StringVar(&flagEVMStateGobDir, "evm_state_gob_dir", "/var/flow/data/evm_state_gob",
 		"directory that stores the evm state gob files as checkpoint")
+
+	Cmd.Flags().Uint64Var(&flagSaveEveryNBlocks, "save_every", uint64(1_000_000),
+		"save the evm state gob files every N blocks")
 }
 
 func run(*cobra.Command, []string) {
-	_ = flow.ChainID(flagChain).Chain()
+	chainID := flow.ChainID(flagChain)
 
 	from, to, err := parseFromTo(flagFromTo)
 	if err != nil {
 		log.Fatal().Err(err).Msg("could not parse from_to")
 	}
 
-	log.Info().Msgf("verifying range from %d to %d", from, to)
-	err = Verify(log.Logger, from, to, flow.Testnet, flagDatadir, flagExecutionDataDir, flagEVMStateGobDir)
+	err = Verify(log.Logger, from, to, chainID, flagDatadir, flagExecutionDataDir, flagEVMStateGobDir, flagSaveEveryNBlocks)
 	if err != nil {
 		log.Fatal().Err(err).Msg("could not verify height")
 	}
-	log.Info().Msgf("successfully verified range from %d to %d", from, to)
-
 }
 
 func parseFromTo(fromTo string) (from, to uint64, err error) {
