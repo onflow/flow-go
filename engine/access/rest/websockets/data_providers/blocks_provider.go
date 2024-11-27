@@ -114,8 +114,16 @@ func ParseBlocksArguments(arguments models.Arguments) (BlocksArguments, error) {
 		return args, fmt.Errorf("'block_status' must be provided")
 	}
 
+	startBlockIDIn, hasStartBlockID := arguments["start_block_id"]
+	startBlockHeightIn, hasStartBlockHeight := arguments["start_block_height"]
+
+	// Ensure only one of start_block_id or start_block_height is provided
+	if hasStartBlockID && hasStartBlockHeight {
+		return args, fmt.Errorf("can only provide either 'start_block_id' or 'start_block_height'")
+	}
+
 	// Parse 'start_block_id' if provided
-	if startBlockIDIn, ok := arguments["start_block_id"]; ok {
+	if hasStartBlockID {
 		var startBlockID parser.ID
 		err := startBlockID.Parse(startBlockIDIn)
 		if err != nil {
@@ -125,7 +133,7 @@ func ParseBlocksArguments(arguments models.Arguments) (BlocksArguments, error) {
 	}
 
 	// Parse 'start_block_height' if provided
-	if startBlockHeightIn, ok := arguments["start_block_height"]; ok {
+	if hasStartBlockHeight {
 		var err error
 		args.StartBlockHeight, err = util.ToUint64(startBlockHeightIn)
 		if err != nil {
@@ -133,11 +141,6 @@ func ParseBlocksArguments(arguments models.Arguments) (BlocksArguments, error) {
 		}
 	} else {
 		args.StartBlockHeight = request.EmptyHeight
-	}
-
-	// Ensure only one of start_block_id or start_block_height is provided
-	if args.StartBlockID != flow.ZeroID && args.StartBlockHeight != request.EmptyHeight {
-		return args, fmt.Errorf("can only provide either 'start_block_id' or 'start_block_height'")
 	}
 
 	return args, nil
