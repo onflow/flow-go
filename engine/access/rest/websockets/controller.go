@@ -365,11 +365,7 @@ func (c *Controller) keepalive(ctx context.Context) error {
 //
 // No errors are expected during normal operation.
 func (c *Controller) sendPing() error {
-	if err := c.conn.SetWriteDeadline(time.Now().Add(WriteWait)); err != nil {
-		return fmt.Errorf("failed to set the write deadline for ping: %w", err)
-	}
-
-	if err := c.conn.WriteMessage(websocket.PingMessage, nil); err != nil {
+	if err := c.conn.WriteControl(websocket.PingMessage, time.Now().Add(WriteWait)); err != nil {
 		return fmt.Errorf("failed to write ping message: %w", err)
 	}
 

@@ -9,11 +9,11 @@ import (
 type WebsocketConnection interface {
 	ReadJSON(v interface{}) error
 	WriteJSON(v interface{}) error
-	WriteMessage(int, []byte) error
+	WriteControl(messageType int, deadline time.Time) error
 	Close() error
-	SetReadDeadline(time.Time) error
-	SetWriteDeadline(time.Time) error
-	SetPongHandler(func(string) error)
+	SetReadDeadline(deadline time.Time) error
+	SetWriteDeadline(deadline time.Time) error
+	SetPongHandler(h func(string) error)
 }
 
 type WebsocketConnectionImpl struct {
@@ -36,20 +36,20 @@ func (c *WebsocketConnectionImpl) WriteJSON(v interface{}) error {
 	return c.conn.WriteJSON(v)
 }
 
-func (c *WebsocketConnectionImpl) WriteMessage(messageType int, data []byte) error {
-	return c.conn.WriteMessage(messageType, data)
+func (c *WebsocketConnectionImpl) WriteControl(messageType int, deadline time.Time) error {
+	return c.conn.WriteControl(messageType, nil, deadline)
 }
 
 func (c *WebsocketConnectionImpl) Close() error {
 	return c.conn.Close()
 }
 
-func (c *WebsocketConnectionImpl) SetReadDeadline(t time.Time) error {
-	return c.conn.SetReadDeadline(t)
+func (c *WebsocketConnectionImpl) SetReadDeadline(deadline time.Time) error {
+	return c.conn.SetReadDeadline(deadline)
 }
 
-func (c *WebsocketConnectionImpl) SetWriteDeadline(t time.Time) error {
-	return c.conn.SetWriteDeadline(t)
+func (c *WebsocketConnectionImpl) SetWriteDeadline(deadline time.Time) error {
+	return c.conn.SetWriteDeadline(deadline)
 }
 
 func (c *WebsocketConnectionImpl) SetPongHandler(h func(string) error) {

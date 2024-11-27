@@ -58,8 +58,7 @@ func (s *ControllerSuite) startKeepalive(ctx context.Context, expectedError erro
 
 // Helper function to setup mock behavior for SetWriteDeadline and WriteMessage.
 func (s *ControllerSuite) setupMockConnection(writeMessageError error) {
-	s.connection.On("SetWriteDeadline", mock.Anything).Return(nil).Once()
-	s.connection.On("WriteMessage", websocket.PingMessage, mock.Anything).Return(writeMessageError).Once()
+	s.connection.On("WriteControl", websocket.PingMessage, mock.Anything).Return(writeMessageError).Once()
 }
 
 // Helper function to wait for expected mock calls.
@@ -82,7 +81,7 @@ func (s *ControllerSuite) TestKeepaliveError() {
 	s.startKeepalive(ctx, expectedError)
 
 	// Wait for the ping message or timeout
-	expectedCalls := 2
+	expectedCalls := 1
 	s.waitForMockCalls(expectedCalls, PongWait*3/2, 1*time.Second, "ping message was not sent")
 
 	// Assert expectations

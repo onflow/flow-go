@@ -49,14 +49,14 @@ func (_m *WebsocketConnection) ReadJSON(v interface{}) error {
 	return r0
 }
 
-// SetPongHandler provides a mock function with given fields: _a0
-func (_m *WebsocketConnection) SetPongHandler(_a0 func(string) error) {
-	_m.Called(_a0)
+// SetPongHandler provides a mock function with given fields: h
+func (_m *WebsocketConnection) SetPongHandler(h func(string) error) {
+	_m.Called(h)
 }
 
-// SetReadDeadline provides a mock function with given fields: _a0
-func (_m *WebsocketConnection) SetReadDeadline(_a0 time.Time) error {
-	ret := _m.Called(_a0)
+// SetReadDeadline provides a mock function with given fields: deadline
+func (_m *WebsocketConnection) SetReadDeadline(deadline time.Time) error {
+	ret := _m.Called(deadline)
 
 	if len(ret) == 0 {
 		panic("no return value specified for SetReadDeadline")
@@ -64,7 +64,7 @@ func (_m *WebsocketConnection) SetReadDeadline(_a0 time.Time) error {
 
 	var r0 error
 	if rf, ok := ret.Get(0).(func(time.Time) error); ok {
-		r0 = rf(_a0)
+		r0 = rf(deadline)
 	} else {
 		r0 = ret.Error(0)
 	}
@@ -72,9 +72,9 @@ func (_m *WebsocketConnection) SetReadDeadline(_a0 time.Time) error {
 	return r0
 }
 
-// SetWriteDeadline provides a mock function with given fields: _a0
-func (_m *WebsocketConnection) SetWriteDeadline(_a0 time.Time) error {
-	ret := _m.Called(_a0)
+// SetWriteDeadline provides a mock function with given fields: deadline
+func (_m *WebsocketConnection) SetWriteDeadline(deadline time.Time) error {
+	ret := _m.Called(deadline)
 
 	if len(ret) == 0 {
 		panic("no return value specified for SetWriteDeadline")
@@ -82,7 +82,25 @@ func (_m *WebsocketConnection) SetWriteDeadline(_a0 time.Time) error {
 
 	var r0 error
 	if rf, ok := ret.Get(0).(func(time.Time) error); ok {
-		r0 = rf(_a0)
+		r0 = rf(deadline)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// WriteControl provides a mock function with given fields: messageType, deadline
+func (_m *WebsocketConnection) WriteControl(messageType int, deadline time.Time) error {
+	ret := _m.Called(messageType, deadline)
+
+	if len(ret) == 0 {
+		panic("no return value specified for WriteControl")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(int, time.Time) error); ok {
+		r0 = rf(messageType, deadline)
 	} else {
 		r0 = ret.Error(0)
 	}
@@ -101,24 +119,6 @@ func (_m *WebsocketConnection) WriteJSON(v interface{}) error {
 	var r0 error
 	if rf, ok := ret.Get(0).(func(interface{}) error); ok {
 		r0 = rf(v)
-	} else {
-		r0 = ret.Error(0)
-	}
-
-	return r0
-}
-
-// WriteMessage provides a mock function with given fields: _a0, _a1
-func (_m *WebsocketConnection) WriteMessage(_a0 int, _a1 []byte) error {
-	ret := _m.Called(_a0, _a1)
-
-	if len(ret) == 0 {
-		panic("no return value specified for WriteMessage")
-	}
-
-	var r0 error
-	if rf, ok := ret.Get(0).(func(int, []byte) error); ok {
-		r0 = rf(_a0, _a1)
 	} else {
 		r0 = ret.Error(0)
 	}
