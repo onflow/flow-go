@@ -24,9 +24,9 @@ import (
 // EVM Root Height is the first block that has EVM Block Event where the EVM block height is 1
 func IsEVMRootHeight(chainID flow.ChainID, flowHeight uint64) bool {
 	if chainID == flow.Testnet {
-		return flowHeight == 211176671
+		return flowHeight == 211176670
 	} else if chainID == flow.Mainnet {
-		return flowHeight == 85981136
+		return flowHeight == 85981135
 	}
 	return flowHeight == 1
 }
