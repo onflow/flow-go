@@ -1344,7 +1344,7 @@ func setupKeys(networkConf NetworkConfig) ([]ContainerConfig, error) {
 // and returns all DKG data. This includes the group private key, node indices,
 // and per-node public and private key-shares.
 // Only consensus nodes participate in the DKG.
-func runBeaconKG(confs []ContainerConfig) (dkgmod.DKGData, flow.DKGIndexMap, error) {
+func runBeaconKG(confs []ContainerConfig) (dkgmod.ThresholdKeySet, flow.DKGIndexMap, error) {
 
 	// filter by consensus nodes
 	consensusNodes := bootstrap.Sort(bootstrap.FilterByRole(toNodeInfos(confs), flow.RoleConsensus), flow.Canonical[flow.Identity])
@@ -1352,12 +1352,12 @@ func runBeaconKG(confs []ContainerConfig) (dkgmod.DKGData, flow.DKGIndexMap, err
 
 	dkgSeed, err := getSeed()
 	if err != nil {
-		return dkgmod.DKGData{}, nil, err
+		return dkgmod.ThresholdKeySet{}, nil, err
 	}
 
-	dkg, err := dkg.RandomBeaconKG(nConsensusNodes, dkgSeed)
+	randomBeaconData, err := dkg.RandomBeaconKG(nConsensusNodes, dkgSeed)
 	if err != nil {
-		return dkgmod.DKGData{}, nil, err
+		return dkgmod.ThresholdKeySet{}, nil, err
 	}
 
 	indexMap := make(flow.DKGIndexMap, nConsensusNodes)
@@ -1365,7 +1365,7 @@ func runBeaconKG(confs []ContainerConfig) (dkgmod.DKGData, flow.DKGIndexMap, err
 		indexMap[node.NodeID] = i
 	}
 
-	return dkg, indexMap, nil
+	return randomBeaconData, indexMap, nil
 }
 
 // setupClusterGenesisBlockQCs generates bootstrapping resources necessary for each collector cluster:

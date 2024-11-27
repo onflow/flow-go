@@ -235,7 +235,7 @@ func (p *CombinedVoteProcessorV2) Process(vote *model.Vote) error {
 
 	// checking of conditions for building QC are satisfied
 	totalWeight := p.stakingSigAggtor.TotalWeight()
-	p.log.Debug().Msgf("processed vote, total weight=(%d), required=(%d)", totalWeight, p.minRequiredWeight)
+	p.log.Debug().Msgf("processed vote with sig len %d, total weight=(%d), required=(%d)", len(vote.SigData), totalWeight, p.minRequiredWeight)
 	if totalWeight < p.minRequiredWeight {
 		return nil
 	}
