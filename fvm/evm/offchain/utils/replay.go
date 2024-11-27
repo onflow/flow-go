@@ -96,6 +96,9 @@ func (a *EVMEventsAccumulator) HasBlockEvent(
 		return evmBlockEvent, a.pendingEVMTxEvents, false
 	}
 
+	pendingEVMTxEvents := a.pendingEVMTxEvents
+	// reset pending events
+	a.pendingEVMTxEvents = make([]events.TransactionEventPayload, 0)
 	// if there is an EVM block event, we return the EVM block and the accumulated tx events
-	return evmBlockEvent, a.pendingEVMTxEvents, true
+	return evmBlockEvent, pendingEVMTxEvents, true
 }
