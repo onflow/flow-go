@@ -22,7 +22,7 @@ var (
 
 // usage example
 //
-//		./util verify-evm-offchain-replay --chain flow-testnet --from_to 211176671-211177000
+//		./util verify-evm-offchain-replay --chain flow-testnet --from_to 211176670-211177000
 //	     --datadir /var/flow/data/protocol --execution_data_dir /var/flow/data/execution_data
 var Cmd = &cobra.Command{
 	Use:   "verify-evm-offchain-replay",
