@@ -26,13 +26,13 @@ func TestTestnetFromRootToLatest(t *testing.T) {
 func TestMainnetFromRootToLatest(t *testing.T) {
 	// verify Mainnet25
 	require.NoError(t, Verify(log.Logger, 85981135, 88226266,
-		flow.Testnet, "/var/flow/data/protocol", "/var/flow/data/execution_data",
+		flow.Mainnet, "/var/flow/data/protocol", "/var/flow/data/execution_data",
 		"/var/flow/nov26_mainnet_evm_state_gob", 100_000),
 	)
 
 	// verify Mainnet26
 	require.NoError(t, Verify(log.Logger, 88226267, 94800210,
-		flow.Testnet, "/var/flow52/data/protocol", "/var/flow52/data/execution_data",
+		flow.Mainnet, "/var/flow26/data/protocol", "/var/flow26/data/execution_data",
 		"/var/flow/nov26_mainnet_evm_state_gob", 100_000),
 	)
 }
