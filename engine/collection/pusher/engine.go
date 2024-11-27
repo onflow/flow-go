@@ -171,20 +171,13 @@ func (e *Engine) process(originID flow.Identifier, event interface{}) error {
 	case *messages.SubmitCollectionGuarantee:
 		e.engMetrics.MessageReceived(metrics.EngineCollectionProvider, metrics.MessageSubmitGuarantee)
 		defer e.engMetrics.MessageHandled(metrics.EngineCollectionProvider, metrics.MessageSubmitGuarantee)
-		return e.onSubmitCollectionGuarantee(originID, ev)
+		if originID != e.me.NodeID() {
+			return fmt.Errorf("invalid remote request to submit collection guarantee (from=%x)", originID)
+		}
+		return e.SubmitCollectionGuarantee(&ev.Guarantee)
 	default:
 		return fmt.Errorf("invalid event type (%T)", event)
 	}
-}
-
-// onSubmitCollectionGuarantee handles submitting the given collection guarantee
-// to consensus nodes.
-func (e *Engine) onSubmitCollectionGuarantee(originID flow.Identifier, req *messages.SubmitCollectionGuarantee) error {
-	if originID != e.me.NodeID() {
-		return fmt.Errorf("invalid remote request to submit collection guarantee (from=%x)", originID)
-	}
-
-	return e.SubmitCollectionGuarantee(&req.Guarantee)
 }
 
 // SubmitCollectionGuarantee submits the collection guarantee to all consensus nodes.
