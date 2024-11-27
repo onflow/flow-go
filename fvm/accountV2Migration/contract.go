@@ -11,7 +11,6 @@ import (
 	"github.com/onflow/cadence/stdlib"
 
 	"github.com/onflow/flow-go/fvm/errors"
-	"github.com/onflow/flow-go/fvm/systemcontracts"
 	"github.com/onflow/flow-go/model/flow"
 )
 
@@ -118,16 +117,18 @@ func DeclareScheduleAccountV2MigrationFunction(environment runtime.Environment, 
 		),
 	}
 
-	sc := systemcontracts.SystemContractsForChain(chainID)
-
-	accountV2MigrationLocation := common.NewAddressLocation(
-		nil,
-		common.Address(sc.AccountV2Migration.Address),
-		ContractName,
-	)
+	// TODO: restrict, but requires to be set during bootstrapping
+	//sc := systemcontracts.SystemContractsForChain(chainID)
+	//
+	//accountV2MigrationLocation := common.NewAddressLocation(
+	//	nil,
+	//	common.Address(sc.AccountV2Migration.Address),
+	//	ContractName,
+	//)
 
 	environment.DeclareValue(
 		functionValue,
-		accountV2MigrationLocation,
+		// TODO: accountV2MigrationLocation,
+		nil,
 	)
 }
