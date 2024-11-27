@@ -84,14 +84,15 @@ func New(log zerolog.Logger, net network.EngineRegistry, state protocol.State, e
 	e.conduit = conduit
 
 	e.cm = component.NewComponentManagerBuilder().
-		AddWorker(e.inboundMessageWorker).
+		AddWorker(e.outboundQueueWorker).
 		Build()
 	e.Component = e.cm
 
 	return e, nil
 }
 
-func (e *Engine) inboundMessageWorker(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
+// Worker to process SubmitCollectionGuarantee messages coming from the Finalizer.
+func (e *Engine) outboundQueueWorker(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
 	ready()
 
 	done := ctx.Done()
@@ -101,27 +102,35 @@ func (e *Engine) inboundMessageWorker(ctx irrecoverable.SignalerContext, ready c
 		case <-done:
 			return
 		case <-wake:
-			e.processInboundMessages(ctx)
+			err := e.processOutboundMessages(ctx)
+			if err != nil {
+				ctx.Throw(err)
+			}
 		}
 	}
 }
 
-func (e *Engine) processInboundMessages(ctx context.Context) {
+// processOutboundMessages processes any available messages from the queue.
+// Only returns when the queue is empty (or the engine is terminated).
+func (e *Engine) processOutboundMessages(ctx context.Context) error {
 	for {
 		nextMessage, ok := e.inbound.Pop()
 		if !ok {
-			return
+			return nil
 		}
 
 		asEngineWrapper := nextMessage.(*engine.Message)
 		asSCGMsg := asEngineWrapper.Payload.(*messages.SubmitCollectionGuarantee)
 		originID := asEngineWrapper.OriginID
 
-		_ = e.process(originID, asSCGMsg)
+		err := e.process(originID, asSCGMsg)
+		if err != nil {
+			return err
+		}
 
 		select {
 		case <-ctx.Done():
-			return
+			return nil
 		default:
 		}
 	}
