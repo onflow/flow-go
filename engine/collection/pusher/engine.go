@@ -175,21 +175,6 @@ func (e *Engine) SubmitCollectionGuarantee(msg *messages.SubmitCollectionGuarant
 	e.notifier.Notify()
 }
 
-// process processes events for the pusher engine on the collection node.
-func (e *Engine) process(originID flow.Identifier, event interface{}) error {
-	switch ev := event.(type) {
-	case *messages.SubmitCollectionGuarantee:
-		e.engMetrics.MessageReceived(metrics.EngineCollectionProvider, metrics.MessageSubmitGuarantee)
-		defer e.engMetrics.MessageHandled(metrics.EngineCollectionProvider, metrics.MessageSubmitGuarantee)
-		if originID != e.me.NodeID() {
-			return fmt.Errorf("invalid remote request to submit collection guarantee (from=%x)", originID)
-		}
-		return e.publishCollectionGuarantee(&ev.Guarantee)
-	default:
-		return fmt.Errorf("invalid event type (%T)", event)
-	}
-}
-
 // publishCollectionGuarantee publishes the collection guarantee to all consensus nodes.
 func (e *Engine) publishCollectionGuarantee(guarantee *flow.CollectionGuarantee) error {
 	consensusNodes, err := e.state.Final().Identities(filter.HasRole[flow.Identity](flow.RoleConsensus))
