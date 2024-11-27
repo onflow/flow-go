@@ -47,8 +47,8 @@ require (
 	github.com/multiformats/go-multiaddr v0.12.2
 	github.com/multiformats/go-multiaddr-dns v0.3.1
 	github.com/multiformats/go-multihash v0.2.3
-	github.com/onflow/atree v0.8.1-0.20241028213850-07c884e4abcf
-	github.com/onflow/cadence v1.2.3-0.20241125225033-c8a61764cba5
+	github.com/onflow/atree v0.8.1
+	github.com/onflow/cadence v1.2.3-0.20241127215308-d0026257ee4a
 	github.com/onflow/crypto v0.25.2
 	github.com/onflow/flow v0.3.4
 	github.com/onflow/flow-core-contracts/lib/go/contracts v1.4.0
@@ -68,7 +68,7 @@ require (
 	github.com/spf13/cobra v1.8.0
 	github.com/spf13/pflag v1.0.5
 	github.com/spf13/viper v1.15.0
-	github.com/stretchr/testify v1.9.0
+	github.com/stretchr/testify v1.10.0
 	github.com/vmihailenco/msgpack v4.0.4+incompatible
 	github.com/vmihailenco/msgpack/v4 v4.3.11
 	go.opentelemetry.io/otel v1.24.0

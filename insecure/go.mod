@@ -14,7 +14,7 @@ require (
 	github.com/onflow/flow-go v0.36.2-0.20240717162253-d5d2e606ef53
 	github.com/rs/zerolog v1.29.0
 	github.com/spf13/pflag v1.0.5
-	github.com/stretchr/testify v1.9.0
+	github.com/stretchr/testify v1.10.0
 	github.com/yhassanzadeh13/go-libp2p-pubsub v0.6.11-flow-expose-msg.0.20240220190333-03695dea34a3 // libp2p v0.32.0
 	go.uber.org/atomic v1.11.0
 	google.golang.org/grpc v1.63.2
@@ -202,8 +202,8 @@ require (
 	github.com/multiformats/go-varint v0.0.7 // indirect
 	github.com/nxadm/tail v1.4.8 // indirect
 	github.com/olekukonko/tablewriter v0.0.5 // indirect
-	github.com/onflow/atree v0.8.1-0.20241028213850-07c884e4abcf // indirect
-	github.com/onflow/cadence v1.2.3-0.20241125225033-c8a61764cba5 // indirect
+	github.com/onflow/atree v0.8.1 // indirect
+	github.com/onflow/cadence v1.2.3-0.20241127215308-d0026257ee4a // indirect
 	github.com/onflow/flow-core-contracts/lib/go/contracts v1.4.0 // indirect
 	github.com/onflow/flow-core-contracts/lib/go/templates v1.4.0 // indirect
 	github.com/onflow/flow-ft/lib/go/contracts v1.0.1 // indirect
