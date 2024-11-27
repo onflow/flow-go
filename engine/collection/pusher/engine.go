@@ -5,7 +5,6 @@ package pusher
 
 import (
 	"context"
-	"errors"
 	"fmt"
 
 	"github.com/rs/zerolog"
@@ -38,9 +37,8 @@ type Engine struct {
 	collections  storage.Collections
 	transactions storage.Transactions
 
-	messageHandler *engine.MessageHandler
-	notifier       engine.Notifier
-	inbound        *fifoqueue.FifoQueue
+	notifier engine.Notifier
+	inbound  *fifoqueue.FifoQueue
 
 	component.Component
 	cm *component.ComponentManager
@@ -58,10 +56,6 @@ func New(log zerolog.Logger, net network.EngineRegistry, state protocol.State, e
 	}
 
 	notifier := engine.NewNotifier()
-	messageHandler := engine.NewMessageHandler(log, notifier, engine.Pattern{
-		Match: engine.MatchType[*messages.SubmitCollectionGuarantee],
-		Store: &engine.FifoMessageStore{FifoQueue: inbound},
-	})
 
 	e := &Engine{
 		log:          log.With().Str("engine", "pusher").Logger(),
@@ -72,9 +66,8 @@ func New(log zerolog.Logger, net network.EngineRegistry, state protocol.State, e
 		collections:  collections,
 		transactions: transactions,
 
-		messageHandler: messageHandler,
-		notifier:       notifier,
-		inbound:        inbound,
+		notifier: notifier,
+		inbound:  inbound,
 	}
 
 	conduit, err := net.Register(channels.PushGuarantees, e)
@@ -119,11 +112,12 @@ func (e *Engine) processOutboundMessages(ctx context.Context) error {
 			return nil
 		}
 
-		asEngineWrapper := nextMessage.(*engine.Message)
-		asSCGMsg := asEngineWrapper.Payload.(*messages.SubmitCollectionGuarantee)
-		originID := asEngineWrapper.OriginID
+		asSCGMsg, ok := nextMessage.(*messages.SubmitCollectionGuarantee)
+		if !ok {
+			return fmt.Errorf("invalid message type in pusher engine queue")
+		}
 
-		err := e.process(originID, asSCGMsg)
+		err := e.publishCollectionGuarantee(&asSCGMsg.Guarantee)
 		if err != nil {
 			return err
 		}
@@ -138,9 +132,11 @@ func (e *Engine) processOutboundMessages(ctx context.Context) error {
 
 // SubmitLocal submits an event originating on the local node.
 func (e *Engine) SubmitLocal(event interface{}) {
-	err := e.messageHandler.Process(e.me.NodeID(), event)
-	if err != nil {
-		engine.LogError(e.log, err)
+	ev, ok := event.(*messages.SubmitCollectionGuarantee)
+	if ok {
+		e.SubmitCollectionGuarantee(ev)
+	} else {
+		engine.LogError(e.log, fmt.Errorf("invalid message argument to pusher engine"))
 	}
 }
 
@@ -153,13 +149,30 @@ func (e *Engine) Submit(channel channels.Channel, originID flow.Identifier, even
 
 // ProcessLocal processes an event originating on the local node.
 func (e *Engine) ProcessLocal(event interface{}) error {
-	return e.messageHandler.Process(e.me.NodeID(), event)
+	ev, ok := event.(*messages.SubmitCollectionGuarantee)
+	if ok {
+		e.SubmitCollectionGuarantee(ev)
+		return nil
+	} else {
+		return fmt.Errorf("invalid message argument to pusher engine")
+	}
 }
 
 // Process processes the given event from the node with the given origin ID in
 // a blocking manner. It returns the potential processing error when done.
 func (e *Engine) Process(channel channels.Channel, originID flow.Identifier, message any) error {
 	return fmt.Errorf("pusher engine should only receive local messages on the same node")
+}
+
+// SubmitCollectionGuarantee adds a collection guarantee to the engine's queue
+// to later be published to consensus nodes.
+func (e *Engine) SubmitCollectionGuarantee(msg *messages.SubmitCollectionGuarantee) {
+	ok := e.inbound.Push(msg)
+	if !ok {
+		e.log.Err(fmt.Errorf("failed to store collection guarantee in queue"))
+		return
+	}
+	e.notifier.Notify()
 }
 
 // process processes events for the pusher engine on the collection node.
@@ -171,14 +184,14 @@ func (e *Engine) process(originID flow.Identifier, event interface{}) error {
 		if originID != e.me.NodeID() {
 			return fmt.Errorf("invalid remote request to submit collection guarantee (from=%x)", originID)
 		}
-		return e.SubmitCollectionGuarantee(&ev.Guarantee)
+		return e.publishCollectionGuarantee(&ev.Guarantee)
 	default:
 		return fmt.Errorf("invalid event type (%T)", event)
 	}
 }
 
-// SubmitCollectionGuarantee submits the collection guarantee to all consensus nodes.
-func (e *Engine) SubmitCollectionGuarantee(guarantee *flow.CollectionGuarantee) error {
+// publishCollectionGuarantee publishes the collection guarantee to all consensus nodes.
+func (e *Engine) publishCollectionGuarantee(guarantee *flow.CollectionGuarantee) error {
 	consensusNodes, err := e.state.Final().Identities(filter.HasRole[flow.Identity](flow.RoleConsensus))
 	if err != nil {
 		return fmt.Errorf("could not get consensus nodes: %w", err)
