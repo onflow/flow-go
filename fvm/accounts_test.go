@@ -1758,3 +1758,35 @@ func TestGetStorageCapacity(t *testing.T) {
 			}),
 	)
 }
+
+func TestAccountV2Migration_getAccountStorageFormat(t *testing.T) {
+
+	t.Run(
+		"service account",
+		newVMTest().run(func(
+			t *testing.T,
+			vm fvm.VM,
+			chain flow.Chain,
+			ctx fvm.Context,
+			snapshotTree snapshot.SnapshotTree,
+		) {
+			serviceAddress := chain.ServiceAddress()
+
+			script := fvm.Script([]byte(fmt.Sprintf(
+				`
+                    import AccountV2Migration from %[1]s
+
+					access(all) fun main() {
+						let storageFormat = AccountV2Migration.getAccountStorageFormat(address: %[1]s)
+						assert(storageFormat == AccountV2Migration.StorageFormat.V1)
+					}
+				`,
+				serviceAddress.HexWithPrefix(),
+			)))
+
+			_, output, err := vm.Run(ctx, script, snapshotTree)
+			require.NoError(t, err)
+			require.NoError(t, output.Err)
+		}),
+	)
+}

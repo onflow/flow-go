@@ -47,7 +47,7 @@ func NewReusableCadenceRuntime(
 	}
 
 	reusable.declareRandomSourceHistory()
-	accountV2Migration.DeclareScheduleAccountV2MigrationFunction(reusable.TxRuntimeEnv, chainID)
+	accountV2Migration.DeclareFunctions(reusable.TxRuntimeEnv, chainID)
 
 	return reusable
 }

@@ -2,6 +2,18 @@ access(all)
 contract AccountV2Migration {
 
     access(all)
+    enum StorageFormat: UInt8 {
+        access(all)
+        case Unknown
+
+        access(all)
+        case V1
+
+        access(all)
+        case V2
+    }
+
+    access(all)
     event Migrated(
         addressStartIndex: UInt64,
         count: UInt64
@@ -80,5 +92,11 @@ contract AccountV2Migration {
             addressStartIndex: startIndex,
             count: batchSize
         )
+    }
+
+    access(all)
+    fun getAccountStorageFormat(address: Address): StorageFormat? {
+        let rawStorageFormat = getAccountStorageFormat(address: address)
+        return StorageFormat(rawValue: rawStorageFormat)
     }
 }

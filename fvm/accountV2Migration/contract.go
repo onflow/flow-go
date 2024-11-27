@@ -37,7 +37,12 @@ var scheduleAccountV2MigrationType = &sema.FunctionType{
 	ReturnTypeAnnotation: sema.NewTypeAnnotation(sema.BoolType),
 }
 
-func DeclareScheduleAccountV2MigrationFunction(environment runtime.Environment, chainID flow.ChainID) {
+func DeclareFunctions(environment runtime.Environment, chainID flow.ChainID) {
+	declareScheduleAccountV2MigrationFunction(environment, chainID)
+	declareGetAccountStorageFormatFunction(environment)
+}
+
+func declareScheduleAccountV2MigrationFunction(environment runtime.Environment, chainID flow.ChainID) {
 
 	functionType := scheduleAccountV2MigrationType
 
@@ -113,6 +118,91 @@ func DeclareScheduleAccountV2MigrationFunction(environment runtime.Environment, 
 				}
 
 				return interpreter.TrueValue
+			},
+		),
+	}
+
+	// TODO: restrict, but requires to be set during bootstrapping
+	//sc := systemcontracts.SystemContractsForChain(chainID)
+	//
+	//accountV2MigrationLocation := common.NewAddressLocation(
+	//	nil,
+	//	common.Address(sc.AccountV2Migration.Address),
+	//	ContractName,
+	//)
+
+	environment.DeclareValue(
+		functionValue,
+		// TODO: accountV2MigrationLocation,
+		nil,
+	)
+}
+
+const getAccountStorageFormatFunctionName = "getAccountStorageFormat"
+
+// getAccountStorageFormatType is the type of the `getAccountStorageFormat` function.
+// This defines the signature as `func(address: Address): UInt8`
+var getAccountStorageFormatType = &sema.FunctionType{
+	Parameters: []sema.Parameter{
+		{
+			Identifier:     "address",
+			TypeAnnotation: sema.AddressTypeAnnotation,
+		},
+	},
+	ReturnTypeAnnotation: sema.NewTypeAnnotation(sema.UInt8Type),
+}
+
+func declareGetAccountStorageFormatFunction(environment runtime.Environment) {
+
+	functionType := getAccountStorageFormatType
+
+	functionValue := stdlib.StandardLibraryValue{
+		Name: getAccountStorageFormatFunctionName,
+		Type: functionType,
+		Kind: common.DeclarationKindFunction,
+		Value: interpreter.NewUnmeteredStaticHostFunctionValue(
+			functionType,
+			func(invocation interpreter.Invocation) interpreter.Value {
+				inter := invocation.Interpreter
+
+				// Get interpreter storage
+
+				storage := inter.Storage()
+
+				runtimeStorage, ok := storage.(*runtime.Storage)
+				if !ok {
+					panic(cadenceErrors.NewUnexpectedError("interpreter storage is not a runtime.Storage"))
+				}
+
+				// Check the number of arguments
+
+				actualArgumentCount := len(invocation.Arguments)
+				expectedArgumentCount := len(functionType.Parameters)
+
+				if actualArgumentCount != expectedArgumentCount {
+					panic(errors.NewInvalidArgumentErrorf(
+						"incorrect number of arguments: got %d, expected %d",
+						actualArgumentCount,
+						expectedArgumentCount,
+					))
+				}
+
+				// Get addressStartIndex argument
+
+				firstArgument := invocation.Arguments[0]
+				addressValue, ok := firstArgument.(interpreter.AddressValue)
+				if !ok {
+					panic(errors.NewInvalidArgumentErrorf(
+						"incorrect type for argument 0: got `%s`, expected `%s`",
+						firstArgument.StaticType(inter),
+						sema.TheAddressType,
+					))
+				}
+				address := common.Address(addressValue)
+
+				// Get and return the storage format for the account
+
+				return interpreter.UInt8Value(runtimeStorage.AccountStorageFormat(address))
 			},
 		),
 	}
