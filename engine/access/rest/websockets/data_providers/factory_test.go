@@ -10,6 +10,7 @@ import (
 
 	accessmock "github.com/onflow/flow-go/access/mock"
 	"github.com/onflow/flow-go/engine/access/rest/common/parser"
+	"github.com/onflow/flow-go/engine/access/rest/websockets/models"
 	"github.com/onflow/flow-go/engine/access/state_stream"
 	statestreammock "github.com/onflow/flow-go/engine/access/state_stream/mock"
 	"github.com/onflow/flow-go/model/flow"
@@ -60,18 +61,20 @@ func (s *DataProviderFactorySuite) setupSubscription(apiCall *mock.Call) {
 // TestSupportedTopics verifies that supported topics return a valid provider and no errors.
 // Each test case includes a topic and arguments for which a data provider should be created.
 func (s *DataProviderFactorySuite) TestSupportedTopics() {
+	s.T().Parallel()
+
 	// Define supported topics and check if each returns the correct provider without errors
 	testCases := []struct {
 		name               string
 		topic              string
-		arguments          map[string]string
+		arguments          models.Arguments
 		setupSubscription  func()
 		assertExpectations func()
 	}{
 		{
 			name:      "block topic",
 			topic:     BlocksTopic,
-			arguments: map[string]string{"block_status": parser.Finalized},
+			arguments: models.Arguments{"block_status": parser.Finalized},
 			setupSubscription: func() {
 				s.setupSubscription(s.accessApi.On("SubscribeBlocksFromLatest", mock.Anything, flow.BlockStatusFinalized))
 			},
@@ -82,7 +85,7 @@ func (s *DataProviderFactorySuite) TestSupportedTopics() {
 		{
 			name:      "block headers topic",
 			topic:     BlockHeadersTopic,
-			arguments: map[string]string{"block_status": parser.Finalized},
+			arguments: models.Arguments{"block_status": parser.Finalized},
 			setupSubscription: func() {
 				s.setupSubscription(s.accessApi.On("SubscribeBlockHeadersFromLatest", mock.Anything, flow.BlockStatusFinalized))
 			},
@@ -93,7 +96,7 @@ func (s *DataProviderFactorySuite) TestSupportedTopics() {
 		{
 			name:      "block digests topic",
 			topic:     BlockDigestsTopic,
-			arguments: map[string]string{"block_status": parser.Finalized},
+			arguments: models.Arguments{"block_status": parser.Finalized},
 			setupSubscription: func() {
 				s.setupSubscription(s.accessApi.On("SubscribeBlockDigestsFromLatest", mock.Anything, flow.BlockStatusFinalized))
 			},
@@ -105,6 +108,7 @@ func (s *DataProviderFactorySuite) TestSupportedTopics() {
 
 	for _, test := range testCases {
 		s.Run(test.name, func() {
+			s.T().Parallel()
 			test.setupSubscription()
 
 			provider, err := s.factory.NewDataProvider(s.ctx, test.topic, test.arguments, s.ch)
@@ -120,6 +124,8 @@ func (s *DataProviderFactorySuite) TestSupportedTopics() {
 // TestUnsupportedTopics verifies that unsupported topics do not return a provider
 // and instead return an error indicating the topic is unsupported.
 func (s *DataProviderFactorySuite) TestUnsupportedTopics() {
+	s.T().Parallel()
+
 	// Define unsupported topics
 	unsupportedTopics := []string{
 		"unknown_topic",

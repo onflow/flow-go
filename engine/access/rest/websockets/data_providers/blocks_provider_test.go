@@ -10,6 +10,7 @@ import (
 
 	accessmock "github.com/onflow/flow-go/access/mock"
 	"github.com/onflow/flow-go/engine/access/rest/common/parser"
+	"github.com/onflow/flow-go/engine/access/rest/websockets/models"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -18,7 +19,7 @@ const unknownBlockStatus = "unknown_block_status"
 
 type testErrType struct {
 	name             string
-	arguments        map[string]string
+	arguments        models.Arguments
 	expectedErrorMsg string
 }
 
@@ -69,21 +70,21 @@ func (s *BlocksProviderSuite) invalidArgumentsTestCases() []testErrType {
 	return []testErrType{
 		{
 			name: "missing 'block_status' argument",
-			arguments: map[string]string{
+			arguments: models.Arguments{
 				"start_block_id": s.rootBlock.ID().String(),
 			},
 			expectedErrorMsg: "'block_status' must be provided",
 		},
 		{
 			name: "unknown 'block_status' argument",
-			arguments: map[string]string{
+			arguments: models.Arguments{
 				"block_status": unknownBlockStatus,
 			},
 			expectedErrorMsg: fmt.Sprintf("invalid 'block_status', must be '%s' or '%s'", parser.Finalized, parser.Sealed),
 		},
 		{
 			name: "provide both 'start_block_id' and 'start_block_height' arguments",
-			arguments: map[string]string{
+			arguments: models.Arguments{
 				"block_status":       parser.Finalized,
 				"start_block_id":     s.rootBlock.ID().String(),
 				"start_block_height": fmt.Sprintf("%d", s.rootBlock.Header.Height),

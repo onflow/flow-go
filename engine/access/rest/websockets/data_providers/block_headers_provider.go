@@ -30,7 +30,7 @@ func NewBlockHeadersDataProvider(
 	logger zerolog.Logger,
 	api access.API,
 	topic string,
-	arguments map[string]string,
+	arguments models.Arguments,
 	send chan<- interface{},
 ) (*BlockHeadersDataProvider, error) {
 	p := &BlockHeadersDataProvider{

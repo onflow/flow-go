@@ -7,6 +7,7 @@ import (
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/access"
+	"github.com/onflow/flow-go/engine/access/rest/websockets/models"
 	"github.com/onflow/flow-go/engine/access/state_stream"
 	"github.com/onflow/flow-go/model/flow"
 )
@@ -30,7 +31,7 @@ type DataProviderFactory interface {
 	// and configuration parameters.
 	//
 	// No errors are expected during normal operations.
-	NewDataProvider(context.Context, string, map[string]string, chan<- interface{}) (DataProvider, error)
+	NewDataProvider(ctx context.Context, topic string, arguments models.Arguments, ch chan<- interface{}) (DataProvider, error)
 }
 
 var _ DataProviderFactory = (*DataProviderFactoryImpl)(nil)
@@ -84,7 +85,7 @@ func NewDataProviderFactory(
 func (s *DataProviderFactoryImpl) NewDataProvider(
 	ctx context.Context,
 	topic string,
-	arguments map[string]string,
+	arguments models.Arguments,
 	ch chan<- interface{},
 ) (DataProvider, error) {
 	switch topic {
