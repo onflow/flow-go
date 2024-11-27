@@ -11,7 +11,7 @@ import (
 
 func TestTestnetFromRootToLatest(t *testing.T) {
 	// verify Testnet51
-	require.NoError(t, Verify(log.Logger, 211176671, 218215348,
+	require.NoError(t, Verify(log.Logger, 211176670, 218215348,
 		flow.Testnet, "/var/flow/data/protocol", "/var/flow/data/execution_data",
 		"/var/flow/nov26_testnet_evm_state_gob", 100_000),
 	)
