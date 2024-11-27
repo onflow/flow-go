@@ -79,6 +79,8 @@ func OffchainReplayBackwardCompatibilityTest(
 			if err != nil {
 				return err
 			}
+
+			continue
 		}
 
 		if IsSporkHeight(chainID, height) {
