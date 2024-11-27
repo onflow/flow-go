@@ -164,7 +164,7 @@ func TestChainReplay(t *testing.T) {
 
 						sp := NewTestStorageProvider(snapshot, 1)
 						cr := sync.NewReplayer(chainID, rootAddr, sp, bp, zerolog.Logger{}, nil, true)
-						res, results, err := cr.ReplayBlock(txEventPayloads, blockEventPayload)
+						res, results, err := cr.ReplayBlockEvents(txEventPayloads, blockEventPayload)
 						require.NoError(t, err)
 
 						require.Len(t, results, totalTxCount)
@@ -173,12 +173,6 @@ func TestChainReplay(t *testing.T) {
 
 						err = bp.OnBlockExecuted(blockEventPayload.Height, res, proposal)
 						require.NoError(t, err)
-
-						// for k, v := range bpStorage.StorageRegisterUpdates() {
-						// 	ret, err := backend.GetValue([]byte(k.Owner), []byte(k.Key))
-						// 	require.NoError(t, err)
-						// 	require.Equal(t, ret[:], v[:])
-						// }
 					})
 				})
 		})

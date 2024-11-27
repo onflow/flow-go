@@ -38,7 +38,7 @@ func ReplayEVMEventsToStore(
 
 	sp := testutils.NewTestStorageProvider(store, evmBlockEvent.Height)
 	cr := sync.NewReplayer(chainID, rootAddr, sp, bp, log, nil, true)
-	res, results, err := cr.ReplayBlock(evmTxEvents, evmBlockEvent)
+	res, results, err := cr.ReplayBlockEvents(evmTxEvents, evmBlockEvent)
 	if err != nil {
 		return nil, nil, err
 	}
