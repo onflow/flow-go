@@ -51,7 +51,7 @@ func (state DKGEndState) String() string {
 //   - DKGIndexMap completely describes the DKG committee. If n parties are authorized to participate
 //     in the DKG, DKGIndexMap must contain exactly n elements, i.e. n = len(DKGIndexMap)
 //   - The values in DKGIndexMap must form the set {0, 1, …, n-1}, as required by the low level cryptography
-//     module.
+//     module (convention simplifying the implementation).
 //
 // CAUTION: It is important to cleanly differentiate between the consensus committee 𝒞, the DKG committee 𝒟
 // and the committee ℛ:
@@ -59,14 +59,14 @@ func (state DKGEndState) String() string {
 //     to vote (i.e. membership in the consensus committee) is irrevocably granted for an epoch (though, honest nodes
 //     will reject votes and proposals from ejected nodes; nevertheless, ejected nodes formally remain members of
 //     the consensus committee).
-//   - The DKG committee 𝒟 is the set of parties that were authorized to
-//     participate in the DKG. Mathematically, the DKGIndexMap is an bijective function
-//     DKGIndexMap: 𝒟 ↦ {0,1,…,n-1}.
-//   - Only consensus nodes are allowed to contribute to the random beacon. We define the committee ℛ
-//     as the subset of the consensus committee (ℛ ⊆ 𝒞), which _successfully_ completed the DKG,
-//     i.e which completed participation in DKG (ℛ ⊆ 𝒟) with a private key that matches the public key assigned to them by
-//     the DKG committee (or a trusted dealer). Nodes in ℛ are therefore able to submit valid random beacon votes.
-//     Based on this definition we note that ℛ ⊆ (𝒟 ∩ 𝒞).
+//   - The DKG committee 𝒟 is the set of parties that were authorized to participate in the DKG (happy path; or
+//     eligible to receive a private key share from an alternative source on the fallback path). Mathematically,
+//     the DKGIndexMap is a bijective function DKGIndexMap: 𝒟 ↦ {0,1,…,n-1}.
+//   - Only consensus nodes are allowed to contribute to the random beacon. Informally, we define ℛ as the
+//     as the subset of the consensus committee (ℛ ⊆ 𝒞), which _successfully_ completed the DKG (hence ℛ ⊆ 𝒟).
+//     Specifically, r ∈ ℛ iff and only if r has a private Random Beacon key share matching the respective public
+//     key share in the `EpochCommit` event. In other words, consensus nodes are in ℛ iff and only if they are able
+//     to submit valid random beacon votes. Based on this definition we note that ℛ ⊆ (𝒟 ∩ 𝒞).
 //
 // The protocol explicitly ALLOWS additional parties outside the current epoch's consensus committee to participate.
 // In particular, there can be a key-value pair (d,i) ∈ DKGIndexMap, such that the nodeID d is *not* a consensus
@@ -80,16 +80,16 @@ func (state DKGEndState) String() string {
 //
 // Nevertheless, there is an important liveness constraint: the committee ℛ should be a large number of nodes.
 // Specifically, an honest supermajority of consensus nodes must contain enough successful DKG participants
-// (about n/2 + 1) to produce a valid group signature for the random beacon at each block [1, 3].
-// Therefore, we have the approximate lower bound |ℛ| >= n/2 + 1 = |𝒟|/2 + 1 = len(DKGIndexMap)/2 + 1.
+// (about |𝒟|/2 + 1) to produce a valid group signature for the random beacon at each block [1, 3].
+// Therefore, we have the approximate lower bound |ℛ| ≳ n/2 + 1 = |𝒟|/2 + 1 = len(DKGIndexMap)/2 + 1.
 // Operating close to this lower bound would require that every random beacon key-holder ϱ ∈ ℛ remaining in the consensus committee is honest
-// (incl. quickly responsive) *all the time*. This is a lower bound, unsuited for decentralized production networks.
+// (incl. quickly responsive) *all the time*. Such a reliability assumption is unsuited for decentralized production networks.
 // To reject configurations that are vulnerable to liveness failures, the protocol uses the threshold `t_safety`
 // (heuristic, see [2]), which is implemented on the smart contract level.
-// In a nutshell, |ℛ| and therefore |𝒟 ∩ 𝒞| (given that |ℛ| <= |𝒟 ∩ 𝒞|) should be well above 70% * |𝒟| = 0.7 * n,
-// values in the range 70%-62% of |𝒟|  should be considered for short-term recovery cases.
+// Ideally, |ℛ| and therefore |𝒟 ∩ 𝒞| (given that |ℛ| <= |𝒟 ∩ 𝒞|) should be well above 70% . |𝒟|.
+// Values in the range 70%-62% of |𝒟| should be considered for short-term recovery cases.
 // Values of 62% * |𝒟| or lower (i.e. |ℛ| ≤ 0.62·|𝒟|) are not recommended for any
-// production network, as single-node crashes are already enough to halt consensus.
+// production network, as single-node crashes may already be enough to halt consensus.
 //
 // For further details, see
 //   - [1] https://www.notion.so/flowfoundation/Threshold-Signatures-7e26c6dd46ae40f7a83689ba75a785e3?pvs=4

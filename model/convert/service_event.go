@@ -475,7 +475,7 @@ func convertServiceEventEpochRecover(event flow.Event) (*flow.ServiceEvent, erro
 	// parse DKG group key
 	commit.DKGGroupKey, err = convertDKGKey(cdcDKGGroupKey)
 	if err != nil {
-		return nil, fmt.Errorf("failed to decode DKG group key from EpochRecover event: %w", err)
+		return nil, fmt.Errorf("failed to decode Random Beacon group key from EpochRecover event: %w", err)
 	}
 
 	// parse DKG Index Map
@@ -1014,7 +1014,7 @@ func convertDKGKey(cdcDKGKeys cadence.Value) (crypto.PublicKey, error) {
 	// decode individual public keys
 	pubKeyBytes, err := hex.DecodeString(string(keyHex))
 	if err != nil {
-		return nil, fmt.Errorf("could not decode hex into bytes: %w", err)
+		return nil, fmt.Errorf("converting hex to bytes failed: %w", err)
 	}
 	pubKey, err := crypto.DecodePublicKey(crypto.BLSBLS12381, pubKeyBytes)
 	if err != nil {

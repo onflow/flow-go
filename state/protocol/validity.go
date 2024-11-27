@@ -192,16 +192,21 @@ func IsValidEpochCommit(commit *flow.EpochCommit, setup *flow.EpochSetup) error 
 			numberOfRandomBeaconParticipants++
 		}
 	}
-	// enforce invariant: RandomBeaconSafetyThreshold ≤ |𝒞 ∩ 𝒟| where:
+	// Important SANITY CHECK: reject configurations where too few consensus nodes have valid random beacon key shares to
+	// reliably reach the required threshold of signers. Specifically, we enforce RandomBeaconSafetyThreshold ≤ |𝒞 ∩ 𝒟|.
 	// - 𝒞 is the set of all consensus committee members
 	// - 𝒟 is the set of all DKG participants
+	// - ℛ is the subset of the consensus committee (ℛ ⊆ 𝒞): it contains consensus nodes (and only those) with a
+	//   private Random Beacon key share matching the respective public key share in the `EpochCommit` event.
 	//
-	// Note that this is only a sanity check that makes sure the cardinality of ℛ ⊆ 𝒟 ∩ 𝒞 does not go below the
-	// critical liveness threshold of 0.62 * |𝒟| (details in [2]).
-	// If RandomBeaconSafetyThreshold > |𝒞 ∩ 𝒟|, we are certain that RandomBeaconSafetyThreshold > |ℛ|. However,
-	// making sure that RandomBeaconSafetyThreshold <= |𝒞 ∩ 𝒟| does not prove that |ℛ| is above the critical threshold.
+	// This is only a sanity check: on the protocol level, we only know which nodes (set 𝒟) could participate in the DKG,
+	// but not which consensus nodes obtained a *valid* random beacon key share. In other words, we only have access to the
+	// superset 𝒟 ∩ 𝒞 ⊇ ℛ here. If 𝒟 ∩ 𝒞 is already too small, we are certain that too few consensus nodes have valid random
+	// beacon keys (RandomBeaconSafetyThreshold > |𝒞 ∩ 𝒟| entails RandomBeaconSafetyThreshold > |ℛ|) and we reject the
+	// Epoch configuration. However, enough nodes in the superset |𝒞 ∩ 𝒟| does not guarantee that |ℛ| is above the critical
+	// threshold (e.g. too many nodes |𝒞 ∩ 𝒟| could have failed the DKG and therefore not be in ℛ).
 	//
-	// This is different than the check implemented by the DKG contract where the value of |ℛ| is known and compared
+	// This is different than the check in the DKG smart contract, where the value of |ℛ| is known and compared
 	// to the threshold. Unlike the DKG contract, the protocol state does not have access to the value of |ℛ| from a past
 	// key generation (decentralized or not).
 	//
