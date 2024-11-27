@@ -160,6 +160,7 @@ func benchmarkComputeBlock(
 			reusableRuntime.NewReusableCadenceRuntimePool(
 				ReusableCadenceRuntimePoolSize,
 				runtime.Config{},
+				chainID,
 			)),
 	)
 	snapshotTree := testutil.RootBootstrappedLedger(
