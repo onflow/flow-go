@@ -485,7 +485,7 @@ func (v *BaseView) fetchOrCreateCollection(path string) (collection *Collection,
 	}
 	if len(collectionID) == 0 {
 		collection, err = v.collectionProvider.NewCollection()
-		return collection, true, err
+		return collection, true, fmt.Errorf("fail to create collection with key %v: %w", path, err)
 	}
 	collection, err = v.collectionProvider.CollectionByID(collectionID)
 	return collection, false, err

@@ -29,7 +29,7 @@ func (s *ReadOnlyStorage) GetValue(owner []byte, key []byte) ([]byte, error) {
 
 // SetValue returns an error if called
 func (s *ReadOnlyStorage) SetValue(owner, key, value []byte) error {
-	panic(fmt.Sprintf("unexpected call received for SetValue with owner: %x, key: %v, value: %x", owner, key, value))
+	return fmt.Errorf("unexpected call received for SetValue with owner: %x, key: %v, value: %x", owner, key, value)
 }
 
 // ValueExists checks if a register exists
@@ -40,5 +40,5 @@ func (s *ReadOnlyStorage) ValueExists(owner []byte, key []byte) (bool, error) {
 
 // AllocateSlabIndex returns an error if called
 func (s *ReadOnlyStorage) AllocateSlabIndex(owner []byte) (atree.SlabIndex, error) {
-	panic(fmt.Errorf("unexpected call received for AllocateSlabIndex with owner: %x", owner))
+	return atree.SlabIndex{}, fmt.Errorf("unexpected call received for AllocateSlabIndex with owner: %x", owner)
 }
