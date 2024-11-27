@@ -530,7 +530,7 @@ func createNode(
 	require.NoError(t, err)
 
 	keys := &storagemock.SafeBeaconKeys{}
-	// there is DKG key for this epoch
+	// there is Random Beacon key for this epoch
 	keys.On("RetrieveMyBeaconPrivateKey", mock.Anything).Return(
 		func(epochCounter uint64) crypto.PrivateKey {
 			dkgInfo, ok := participant.beaconInfoByEpoch[epochCounter]

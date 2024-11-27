@@ -20,7 +20,7 @@ import (
 // EFM can be exited only by a special service event, EpochRecover, which initially originates from a manual service account transaction.
 // The full epoch data must be generated manually and submitted with this transaction in order for an
 // EpochRecover event to be emitted. This command retrieves the current protocol state identities, computes the cluster assignment using those
-// identities, generates the cluster QCs and retrieves the DKG key vector of the last successful epoch.
+// identities, generates the cluster QCs and retrieves the Random Beacon key vector of the last successful epoch.
 // This recovery process has some constraints:
 //   - The RecoveryEpoch must have exactly the same consensus committee as participated in the most recent successful DKG.
 //   - The RecoveryEpoch must contain enough "internal" collection nodes so that all clusters contain a supermajority of "internal" collection nodes (same constraint as sporks)
