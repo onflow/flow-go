@@ -45,6 +45,15 @@ func NewReplayer(
 }
 
 // ReplayBlock replays the execution of the transactions of an EVM block
+func (cr *Replayer) ReplayBlock(
+	transactionEvents []events.TransactionEventPayload,
+	blockEvent *events.BlockEventPayload,
+) (types.ReplayResultCollector, error) {
+	res, _, err := cr.ReplayBlockEvents(transactionEvents, blockEvent)
+	return res, err
+}
+
+// ReplayBlockEvents replays the execution of the transactions of an EVM block
 // using the provided transactionEvents and blockEvents,
 // which include all the context data for re-executing the transactions, and returns
 // the replay result and the result of each transaction.
@@ -57,7 +66,7 @@ func NewReplayer(
 // Warning! the list of transaction events has to be sorted based on their
 // execution, sometimes the access node might return events out of order
 // it needs to be sorted by txIndex and eventIndex respectively.
-func (cr *Replayer) ReplayBlock(
+func (cr *Replayer) ReplayBlockEvents(
 	transactionEvents []events.TransactionEventPayload,
 	blockEvent *events.BlockEventPayload,
 ) (types.ReplayResultCollector, []*types.Result, error) {
