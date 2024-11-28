@@ -31,7 +31,6 @@ type WsControllerSuite struct {
 }
 
 func (s *WsControllerSuite) SetupTest() {
-	//s.logger = unittest.LoggerWithWriterAndLevel(os.Stdout, zerolog.DebugLevel)
 	s.logger = unittest.Logger()
 	s.wsConfig = NewDefaultWebsocketConfig()
 	s.streamApi = streammock.NewAPI(s.T())
@@ -42,6 +41,8 @@ func TestWsControllerSuite(t *testing.T) {
 	suite.Run(t, new(WsControllerSuite))
 }
 
+// TestSubscribeRequest tests the subscribe to topic flow.
+// We emulate a request message from a client, and a response message from a controller.
 func (s *WsControllerSuite) TestSubscribeRequest() {
 	s.T().Run("Happy path", func(t *testing.T) {
 		conn, dataProviderFactory, dataProvider := newControllerMocks(t)
@@ -58,6 +59,7 @@ func (s *WsControllerSuite) TestSubscribeRequest() {
 			Arguments:          nil,
 		}
 
+		// Simulate receiving the subscription request from the client
 		conn.
 			On("ReadJSON", mock.Anything).
 			Run(func(args mock.Arguments) {
@@ -70,17 +72,21 @@ func (s *WsControllerSuite) TestSubscribeRequest() {
 			Return(nil).
 			Once()
 
+		// Channel to signal the test flow completion
 		done := make(chan struct{}, 1)
+
+		// Simulate writing a successful subscription response back to the client
 		conn.
 			On("WriteJSON", mock.Anything).
 			Return(func(msg interface{}) error {
 				response, ok := msg.(models.SubscribeMessageResponse)
 				require.True(t, ok)
 				require.True(t, response.Success)
-				close(done)
+				close(done) // Signal that response has been sent
 				return websocket.ErrCloseSent
 			})
 
+		// Simulate client closing connection after receiving the response
 		conn.
 			On("ReadJSON", mock.Anything).
 			Return(func(interface{}) error {
@@ -95,12 +101,13 @@ func (s *WsControllerSuite) TestSubscribeRequest() {
 	})
 }
 
+// TestSubscribeBlocks tests the functionality for streaming blocks to a subscriber.
 func (s *WsControllerSuite) TestSubscribeBlocks() {
 	s.T().Run("Stream one block", func(t *testing.T) {
 		conn, dataProviderFactory, dataProvider := newControllerMocks(t)
 		controller := NewWebSocketController(s.logger, s.wsConfig, dataProviderFactory, conn)
 
-		// we want data provider to write some block to controller
+		// Simulate data provider write a block to the controller
 		expectedBlock := unittest.BlockFixture()
 		dataProvider.
 			On("Run", mock.Anything).
@@ -110,15 +117,17 @@ func (s *WsControllerSuite) TestSubscribeBlocks() {
 			Once()
 
 		done := make(chan struct{}, 1)
-		var actualBlock flow.Block
-
 		s.expectSubscriptionRequest(conn, done)
 		s.expectSubscriptionResponse(conn, true)
 
+		// Expect a valid block to be passed to WriteJSON.
+		// If we got to this point, the controller executed all its logic properly
+		var actualBlock flow.Block
 		conn.
 			On("WriteJSON", mock.Anything).
 			Return(func(msg interface{}) error {
-				block := msg.(flow.Block)
+				block, ok := msg.(flow.Block)
+				require.True(t, ok)
 				actualBlock = block
 
 				close(done)
@@ -133,7 +142,7 @@ func (s *WsControllerSuite) TestSubscribeBlocks() {
 		conn, dataProviderFactory, dataProvider := newControllerMocks(t)
 		controller := NewWebSocketController(s.logger, s.wsConfig, dataProviderFactory, conn)
 
-		// we want data provider to write some block to controller
+		// Simulate data provider writes some blocks to the controller
 		expectedBlocks := unittest.BlockFixtures(100)
 		dataProvider.
 			On("Run", mock.Anything).
@@ -145,16 +154,20 @@ func (s *WsControllerSuite) TestSubscribeBlocks() {
 			Once()
 
 		done := make(chan struct{}, 1)
-		actualBlocks := make([]*flow.Block, len(expectedBlocks))
-		i := 0
-
 		s.expectSubscriptionRequest(conn, done)
 		s.expectSubscriptionResponse(conn, true)
 
+		i := 0
+		actualBlocks := make([]*flow.Block, len(expectedBlocks))
+
+		// Expect valid blocks to be passed to WriteJSON.
+		// If we got to this point, the controller executed all its logic properly
 		conn.
 			On("WriteJSON", mock.Anything).
 			Return(func(msg interface{}) error {
-				block := msg.(flow.Block)
+				block, ok := msg.(flow.Block)
+				require.True(t, ok)
+
 				actualBlocks[i] = &block
 				i += 1
 
@@ -172,6 +185,8 @@ func (s *WsControllerSuite) TestSubscribeBlocks() {
 	})
 }
 
+// newControllerMocks initializes mock WebSocket connection, data provider, and data provider factory.
+// The mocked functions are expected to be called in a case when a test is expected to reach WriteJSON function.
 func newControllerMocks(t *testing.T) (*connmock.WebsocketConnection, *dpmock.Factory, *dpmock.DataProvider) {
 	conn := connmock.NewWebsocketConnection(t)
 	conn.On("Close").Return(nil).Once()
@@ -192,6 +207,7 @@ func newControllerMocks(t *testing.T) (*connmock.WebsocketConnection, *dpmock.Fa
 	return conn, factory, dataProvider
 }
 
+// expectSubscriptionRequest mocks the client's subscription request.
 func (s *WsControllerSuite) expectSubscriptionRequest(conn *connmock.WebsocketConnection, done <-chan struct{}) {
 	requestMessage := models.SubscribeMessageRequest{
 		BaseMessageRequest: models.BaseMessageRequest{Action: "subscribe"},
@@ -223,6 +239,7 @@ func (s *WsControllerSuite) expectSubscriptionRequest(conn *connmock.WebsocketCo
 		})
 }
 
+// expectSubscriptionResponse mocks the subscription response sent to the client.
 func (s *WsControllerSuite) expectSubscriptionResponse(conn *connmock.WebsocketConnection, success bool) {
 	conn.On("WriteJSON", mock.Anything).
 		Run(func(args mock.Arguments) {

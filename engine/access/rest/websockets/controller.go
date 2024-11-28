@@ -224,22 +224,21 @@ func (c *Controller) handleListSubscriptions(ctx context.Context, msg models.Lis
 
 func (c *Controller) shutdownConnection() {
 	c.shutdownOnce.Do(func() {
-		defer close(c.communicationChannel)
-		defer func(conn WebsocketConnection) {
+		defer func() {
+			close(c.communicationChannel)
+
 			if err := c.conn.Close(); err != nil {
 				c.logger.Warn().Err(err).Msg("error closing connection")
 			}
-		}(c.conn)
+		}()
 
 		c.logger.Debug().Msg("shutting down connection")
 
-		err := c.dataProviders.ForEach(func(_ uuid.UUID, dp dp.DataProvider) error {
-			dp.Close()
+		_ = c.dataProviders.ForEach(func(id uuid.UUID, dp dp.DataProvider) error {
+			err := dp.Close()
+			c.logger.Error().Err(err).Msgf("error closing data provider: %s", id.String())
 			return nil
 		})
-		if err != nil {
-			c.logger.Error().Err(err).Msg("error closing data provider")
-		}
 
 		c.dataProviders.Clear()
 	})
