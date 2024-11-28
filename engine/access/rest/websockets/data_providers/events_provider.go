@@ -141,8 +141,6 @@ func ParseEventsArguments(
 			return args, fmt.Errorf("invalid 'start_block_id': %w", err)
 		}
 		args.StartBlockID = startBlockID.Flow()
-	} else {
-		args.StartBlockID = flow.ZeroID
 	}
 
 	// Parse 'start_block_height' if provided
@@ -157,9 +155,12 @@ func ParseEventsArguments(
 	}
 
 	// Parse 'event_types' as []string{}
-	var eventTypes []string
+	var eventTypes parser.EventTypes
 	if eventTypesIn, ok := arguments["event_types"]; ok && eventTypesIn != "" {
-		eventTypes = strings.Split(eventTypesIn, ",")
+		err := eventTypes.Parse(strings.Split(eventTypesIn, ","))
+		if err != nil {
+			return args, fmt.Errorf("invalid 'event_types': %w", err)
+		}
 	}
 
 	// Parse 'addresses' as []string{}
@@ -175,7 +176,7 @@ func ParseEventsArguments(
 	}
 
 	// Initialize the event filter with the parsed arguments
-	filter, err := state_stream.NewEventFilter(eventFilterConfig, chain, eventTypes, addresses, contracts)
+	filter, err := state_stream.NewEventFilter(eventFilterConfig, chain, eventTypes.Flow(), addresses, contracts)
 	if err != nil {
 		return args, fmt.Errorf("failed to create event filter: %w", err)
 	}
