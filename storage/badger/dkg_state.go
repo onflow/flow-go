@@ -19,12 +19,11 @@ import (
 )
 
 var allowedStateTransitions = map[flow.DKGState][]flow.DKGState{
-	flow.DKGStateStarted:          {flow.DKGStateCompleted, flow.DKGStateFailure, flow.RandomBeaconKeyRecovered},
-	flow.DKGStateCompleted:        {flow.RandomBeaconKeyCommitted, flow.DKGStateFailure, flow.RandomBeaconKeyRecovered},
+	flow.DKGStateStarted:          {flow.DKGStateCompleted, flow.DKGStateFailure, flow.RandomBeaconKeyCommitted},
+	flow.DKGStateCompleted:        {flow.RandomBeaconKeyCommitted, flow.DKGStateFailure, flow.RandomBeaconKeyCommitted},
 	flow.RandomBeaconKeyCommitted: {},
-	flow.RandomBeaconKeyRecovered: {},
-	flow.DKGStateFailure:          {flow.RandomBeaconKeyRecovered},
-	flow.DKGStateUninitialized:    {flow.DKGStateStarted, flow.DKGStateFailure, flow.RandomBeaconKeyRecovered},
+	flow.DKGStateFailure:          {flow.RandomBeaconKeyCommitted},
+	flow.DKGStateUninitialized:    {flow.DKGStateStarted, flow.DKGStateFailure, flow.RandomBeaconKeyCommitted},
 }
 
 // RecoverablePrivateBeaconKeyState stores state information about in-progress and completed DKGs, including
@@ -32,8 +31,8 @@ var allowedStateTransitions = map[flow.DKGState][]flow.DKGState{
 // RecoverablePrivateBeaconKeyState is a specific module that allows to overwrite the beacon private key for a given epoch.
 // This module is used *ONLY* in the epoch recovery process and only by the consensus participants.
 // Each consensus participant takes part in the DKG, and after successfully finishing the DKG protocol it obtains a
-// random beacon private key, which is stored in the database along with DKG end state `flow.DKGEndStateSuccess`.
-// If for any reason the DKG fails, then the private key will be nil and DKG end state will be `flow.DKGEndStateDKGFailure`.
+// random beacon private key, which is stored in the database along with DKG current state [flow.DKGStateCompleted].
+// If for any reason the DKG fails, then the private key will be nil and DKG current state will be [flow.DKGStateFailure].
 // When the epoch recovery takes place, we need to query the last valid beacon private key for the current replica and
 // also set it for use during the Recovery Epoch, otherwise replicas won't be able to vote for blocks during the Recovery Epoch.
 type RecoverablePrivateBeaconKeyState struct {
@@ -167,9 +166,9 @@ func (ds *RecoverablePrivateBeaconKeyState) processStateTransition(epochCounter 
 
 // GetDKGEndState retrieves the DKG end state for the epoch.
 func (ds *RecoverablePrivateBeaconKeyState) GetDKGState(epochCounter uint64) (flow.DKGState, error) {
-	var endState flow.DKGState
-	err := ds.db.Update(operation.RetrieveDKGStateForEpoch(epochCounter, &endState))
-	return endState, err
+	var currentState flow.DKGState
+	err := ds.db.Update(operation.RetrieveDKGStateForEpoch(epochCounter, &currentState))
+	return currentState, err
 }
 
 // RetrieveMyBeaconPrivateKey retrieves my beacon private key for the given
@@ -185,16 +184,16 @@ func (ds *RecoverablePrivateBeaconKeyState) RetrieveMyBeaconPrivateKey(epochCoun
 	err = ds.db.View(func(txn *badger.Txn) error {
 
 		// retrieve the end state
-		var endState flow.DKGState
-		err = operation.RetrieveDKGStateForEpoch(epochCounter, &endState)(txn)
+		var currentState flow.DKGState
+		err = operation.RetrieveDKGStateForEpoch(epochCounter, &currentState)(txn)
 		if err != nil {
 			key = nil
 			safe = false
 			return err // storage.ErrNotFound or exception
 		}
 
-		// for any end state besides success and recovery, the key is not safe
-		if endState == flow.RandomBeaconKeyCommitted || endState == flow.RandomBeaconKeyRecovered {
+		// a key is safe iff it was previously committed
+		if currentState == flow.RandomBeaconKeyCommitted {
 			// retrieve the key - any storage error (including `storage.ErrNotFound`) is an exception
 			var encodableKey *encodable.RandomBeaconPrivKey
 			encodableKey, err = ds.retrieveKeyTx(epochCounter)(txn)
@@ -219,7 +218,7 @@ func (ds *RecoverablePrivateBeaconKeyState) RetrieveMyBeaconPrivateKey(epochCoun
 
 // UpsertMyBeaconPrivateKey overwrites the random beacon private key for the epoch that recovers the protocol from
 // Epoch Fallback Mode. Effectively, this function overwrites whatever might be available in the database with
-// the given private key and sets the DKGState to `flow.DKGEndStateRecovered`.
+// the given private key and sets the [flow.DKGState] to [flow.RandomBeaconKeyCommitted].
 // No errors are expected during normal operations.
 func (ds *RecoverablePrivateBeaconKeyState) UpsertMyBeaconPrivateKey(epochCounter uint64, key crypto.PrivateKey) error {
 	if key == nil {
@@ -231,7 +230,7 @@ func (ds *RecoverablePrivateBeaconKeyState) UpsertMyBeaconPrivateKey(epochCounte
 		if err != nil {
 			return err
 		}
-		return operation.UpsertDKGStateForEpoch(epochCounter, flow.RandomBeaconKeyRecovered)(txn)
+		return operation.UpsertDKGStateForEpoch(epochCounter, flow.RandomBeaconKeyCommitted)(txn)
 	})
 	if err != nil {
 		return fmt.Errorf("could not overwrite beacon key for epoch %d: %w", epochCounter, err)
