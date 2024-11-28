@@ -8,18 +8,16 @@ import (
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/engine/access/rest/common"
-	"github.com/onflow/flow-go/engine/access/state_stream"
-	"github.com/onflow/flow-go/engine/access/state_stream/backend"
+	"github.com/onflow/flow-go/engine/access/rest/websockets/data_provider"
 	"github.com/onflow/flow-go/model/flow"
 )
 
 type Handler struct {
 	*common.HttpHandler
 
-	logger          zerolog.Logger
-	websocketConfig Config
-	streamApi       state_stream.API
-	streamConfig    backend.Config
+	logger              zerolog.Logger
+	websocketConfig     Config
+	dataProviderFactory data_provider.DataProviderFactory
 }
 
 var _ http.Handler = (*Handler)(nil)
@@ -28,16 +26,14 @@ func NewWebSocketHandler(
 	logger zerolog.Logger,
 	config Config,
 	chain flow.Chain,
-	streamApi state_stream.API,
-	streamConfig backend.Config,
+	dataProviderFactory data_provider.DataProviderFactory,
 	maxRequestSize int64,
 ) *Handler {
 	return &Handler{
-		HttpHandler:     common.NewHttpHandler(logger, chain, maxRequestSize),
-		websocketConfig: config,
-		logger:          logger,
-		streamApi:       streamApi,
-		streamConfig:    streamConfig,
+		HttpHandler:         common.NewHttpHandler(logger, chain, maxRequestSize),
+		websocketConfig:     config,
+		logger:              logger,
+		dataProviderFactory: dataProviderFactory,
 	}
 }
 
@@ -65,6 +61,6 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	controller := NewWebSocketController(logger, h.websocketConfig, h.streamApi, h.streamConfig, NewWebsocketConnection(conn))
+	controller := NewWebSocketController(logger, h.websocketConfig, h.dataProviderFactory, NewWebsocketConnection(conn))
 	controller.HandleConnection(context.TODO())
 }

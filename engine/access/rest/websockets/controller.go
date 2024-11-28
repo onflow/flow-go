@@ -13,8 +13,6 @@ import (
 
 	dp "github.com/onflow/flow-go/engine/access/rest/websockets/data_provider"
 	"github.com/onflow/flow-go/engine/access/rest/websockets/models"
-	"github.com/onflow/flow-go/engine/access/state_stream"
-	"github.com/onflow/flow-go/engine/access/state_stream/backend"
 	"github.com/onflow/flow-go/utils/concurrentmap"
 )
 
@@ -39,7 +37,7 @@ type Controller struct {
 	errorChannel         chan error       // Channel for reporting errors.
 
 	dataProviders        *concurrentmap.Map[uuid.UUID, dp.DataProvider]
-	dataProvidersFactory *dp.Factory
+	dataProvidersFactory dp.DataProviderFactory
 
 	shutdownOnce sync.Once // Ensures shutdown is only called once
 	shutdown     bool      // Indicates if the controller is shutting down.
@@ -48,8 +46,7 @@ type Controller struct {
 func NewWebSocketController(
 	logger zerolog.Logger,
 	config Config,
-	streamApi state_stream.API,
-	streamConfig backend.Config,
+	dataProviderFactory dp.DataProviderFactory,
 	conn WebsocketConnection,
 ) *Controller {
 	return &Controller{
@@ -59,7 +56,7 @@ func NewWebSocketController(
 		communicationChannel: make(chan interface{}), //TODO: should it be buffered chan?
 		errorChannel:         make(chan error, 1),    // Buffered error channel to hold one error.
 		dataProviders:        concurrentmap.New[uuid.UUID, dp.DataProvider](),
-		dataProvidersFactory: dp.NewDataProviderFactory(logger, streamApi, streamConfig),
+		dataProvidersFactory: dataProviderFactory,
 	}
 }
 
@@ -172,7 +169,11 @@ func (c *Controller) writeMessagesToClient(ctx context.Context) error {
 		select {
 		case <-ctx.Done():
 			return ctx.Err()
-		case msg := <-c.communicationChannel:
+		case msg, ok := <-c.communicationChannel:
+			if !ok {
+				err := fmt.Errorf("communication channel closed, no error occurred")
+				return err
+			}
 			// TODO: handle 'response per second' limits
 
 			// Specifies a timeout for the write operation. If the write
@@ -290,10 +291,11 @@ func (c *Controller) handleAction(ctx context.Context, message interface{}) erro
 func (c *Controller) handleSubscribe(ctx context.Context, msg models.SubscribeMessageRequest) {
 	dp := c.dataProvidersFactory.NewDataProvider(c.communicationChannel, msg.Topic)
 	c.dataProviders.Add(dp.ID(), dp)
-	dp.Run(ctx)
 
 	//TODO: return OK response to client
 	c.communicationChannel <- msg
+
+	dp.Run(ctx)
 }
 
 func (c *Controller) handleUnsubscribe(_ context.Context, msg models.UnsubscribeMessageRequest) {
@@ -320,12 +322,12 @@ func (c *Controller) shutdownConnection() {
 	c.shutdownOnce.Do(func() {
 		c.shutdown = true
 
-		defer func(conn WebsocketConnection) {
+		defer func() {
 			if err := c.conn.Close(); err != nil {
 				c.logger.Error().Err(err).Msg("error closing connection")
 			}
-		}(c.conn)
-		close(c.communicationChannel)
+			close(c.communicationChannel)
+		}()
 
 		err := c.dataProviders.ForEach(func(_ uuid.UUID, dp dp.DataProvider) error {
 			dp.Close()
