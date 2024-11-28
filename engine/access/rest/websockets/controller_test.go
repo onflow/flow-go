@@ -195,11 +195,10 @@ func (s *ControllerSuite) TestControllerShutdown() {
 	})
 }
 
-// TestKeepalive tests the behavior of the keepalive function.
-func (s *ControllerSuite) TestKeepalive() {
+// TestKeepaliveHappyCase tests the behavior of the keepalive function.
+func (s *ControllerSuite) TestKeepaliveHappyCase() {
 	// Create a context for the test
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	ctx := context.Background()
 
 	controller := s.initializeController()
 	s.connection.On("WriteControl", websocket.PingMessage, mock.Anything).Return(nil)
@@ -215,6 +214,9 @@ func (s *ControllerSuite) TestKeepalive() {
 	s.Require().Eventually(func() bool {
 		return len(s.connection.Calls) == expectedCalls
 	}, 30*time.Second, 1*time.Second, "not all ping messages were sent")
+
+	s.connection.On("Close").Return(nil).Once()
+	controller.shutdownConnection()
 
 	// Assert that the ping was sent
 	s.connection.AssertExpectations(s.T())
