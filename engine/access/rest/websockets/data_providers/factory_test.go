@@ -104,6 +104,17 @@ func (s *DataProviderFactorySuite) TestSupportedTopics() {
 				s.accessApi.AssertExpectations(s.T())
 			},
 		},
+		{
+			name:      "events topic",
+			topic:     EventsTopic,
+			arguments: models.Arguments{},
+			setupSubscription: func() {
+				s.setupSubscription(s.stateStreamApi.On("SubscribeEventsFromLatest", mock.Anything, mock.Anything))
+			},
+			assertExpectations: func() {
+				s.stateStreamApi.AssertExpectations(s.T())
+			},
+		},
 	}
 
 	for _, test := range testCases {
