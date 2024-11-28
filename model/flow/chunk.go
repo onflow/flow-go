@@ -22,8 +22,8 @@ func init() {
 	}
 }
 
-// ChunkBodyV0 is the prior version of ChunkBody, used for backward compatibility and tests.
-// Compared to ChunkBody, ChunkBodyV0 does not have the ServiceEventIndices field.
+// ChunkBodyV0 is the prior version of ChunkBody, used for computing backward-compatible IDs and tests.
+// Compared to ChunkBody, ChunkBodyV0 does not have the ServiceEventCount field.
 type ChunkBodyV0 struct {
 	CollectionIndex      uint
 	StartState           StateCommitment
@@ -43,9 +43,9 @@ type ChunkBody struct {
 	// By reading this field in prior chunks in the same ExecutionResult, we can
 	// compute exactly what service events were emitted in this chunk.
 	//
-	// Let C be this chunk, Cr be the set of chunks in the ExecutionResult containing C.
+	// Let C be this chunk, K be the set of chunks in the ExecutionResult containing C.
 	// Then the service event indices for C are given by:
-	//    StartIndex = ∑Ci.ServiceEventCount : Ci ∈ Cr, Ci.Index < C.Index
+	//    StartIndex = ∑Ci.ServiceEventCount : Ci ∈ K, Ci.Index < C.Index
 	//    EndIndex = StartIndex + C.ServiceEventCount
 	// The service events for C are given by:
 	//    ExecutionResult.ServiceEvents[StartIndex:EndIndex]
@@ -68,9 +68,9 @@ type ChunkBody struct {
 // Fingerprint returns the unique binary representation for the receiver ChunkBody,
 // used to compute the ID (hash).
 // The fingerprint is backward-compatible with the prior data model for ChunkBody: ChunkBodyV0.
-//   - All new ChunkBody instances must have non-nil ServiceEventIndices
-//   - A nil ServiceEventIndices field indicates a v0 version of ChunkBody
-//   - when computing the ID of such a ChunkBody, the ServiceEventIndices field is omitted from the fingerprint
+//   - All new ChunkBody instances must have non-nil ServiceEventCount field
+//   - A nil ServiceEventCount field indicates a v0 version of ChunkBody
+//   - when computing the ID of such a ChunkBody, the ServiceEventCount field is omitted from the fingerprint
 func (ch ChunkBody) Fingerprint() []byte {
 	if ch.ServiceEventCount == nil {
 		return rlp.NewMarshaler().MustMarshal(ChunkBodyV0{
