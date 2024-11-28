@@ -20,6 +20,7 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
+// ControllerSuite is a test suite for the WebSocket Controller.
 type ControllerSuite struct {
 	suite.Suite
 
@@ -50,7 +51,7 @@ func (s *ControllerSuite) TestConfigureConnection() {
 	// Mock configureConnection to succeed
 	s.mockConnectionSetup()
 
-	// Call configureConnection
+	// Call configureConnection and check for errors
 	err := controller.configureConnection()
 	s.Require().NoError(err, "configureConnection should not return an error")
 
@@ -192,6 +193,31 @@ func (s *ControllerSuite) TestControllerShutdown() {
 		s.dataProviderFactory.AssertExpectations(s.T())
 		blocksDataProvider.AssertExpectations(s.T())
 	})
+}
+
+// TestKeepalive tests the behavior of the keepalive function.
+func (s *ControllerSuite) TestKeepalive() {
+	// Create a context for the test
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	controller := s.initializeController()
+	s.connection.On("WriteControl", websocket.PingMessage, mock.Anything).Return(nil)
+
+	// Start the keepalive process in a separate goroutine
+	go func() {
+		err := controller.keepalive(ctx)
+		s.Require().NoError(err)
+	}()
+
+	// Use Eventually to wait for some ping messages
+	expectedCalls := 3 // expected 3 ping messages for 30 seconds
+	s.Require().Eventually(func() bool {
+		return len(s.connection.Calls) == expectedCalls
+	}, 30*time.Second, 1*time.Second, "not all ping messages were sent")
+
+	// Assert that the ping was sent
+	s.connection.AssertExpectations(s.T())
 }
 
 // TestKeepaliveError tests the behavior of the keepalive function when there is an error in writing the ping.
