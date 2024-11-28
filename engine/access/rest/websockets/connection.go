@@ -4,6 +4,9 @@ import (
 	"github.com/gorilla/websocket"
 )
 
+// We wrap gorilla's websocket connection with interface
+// to be able to mock it in order to test the types dependent on it
+
 type WebsocketConnection interface {
 	ReadJSON(v interface{}) error
 	WriteJSON(v interface{}) error
