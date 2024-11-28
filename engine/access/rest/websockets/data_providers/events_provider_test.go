@@ -55,7 +55,7 @@ func (s *EventsProviderSuite) invalidArgumentsTestCases() []testErrType {
 	return []testErrType{
 		{
 			name: "provide both 'start_block_id' and 'start_block_height' arguments",
-			arguments: map[string]string{
+			arguments: models.Arguments{
 				"start_block_id":     s.rootBlock.ID().String(),
 				"start_block_height": fmt.Sprintf("%d", s.rootBlock.Header.Height),
 			},
@@ -109,6 +109,7 @@ func (s *EventsProviderSuite) TestEventsDataProvider_InvalidArguments() {
 	}
 }
 
+// TestMessageIndexEventProviderResponse_HappyPath tests that MessageIndex values in response are strictly increasing.
 func (s *EventsProviderSuite) TestMessageIndexEventProviderResponse_HappyPath() {
 	ctx := context.Background()
 	send := make(chan interface{}, 10)

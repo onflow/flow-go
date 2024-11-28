@@ -46,7 +46,7 @@ func NewEventsDataProvider(
 	chain flow.Chain,
 	eventFilterConfig state_stream.EventFilterConfig,
 	topic string,
-	arguments map[string]string,
+	arguments models.Arguments,
 	send chan<- interface{},
 ) (*EventsDataProvider, error) {
 	p := &EventsDataProvider{
@@ -119,7 +119,7 @@ func (p *EventsDataProvider) handleResponse(send chan<- interface{}) func(*flow.
 
 // ParseEventsArguments validates and initializes the events arguments.
 func ParseEventsArguments(
-	arguments map[string]string,
+	arguments models.Arguments,
 	chain flow.Chain,
 	eventFilterConfig state_stream.EventFilterConfig,
 ) (EventsArguments, error) {
