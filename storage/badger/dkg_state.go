@@ -130,7 +130,8 @@ func (ds *RecoverablePrivateBeaconKeyState) GetDKGStarted(epochCounter uint64) (
 	return started, err
 }
 
-// SetDKGEndState stores that the DKG has ended, and its end state.
+// SetDKGState stores that the current state for the Recoverable Random Beacon State Machine.
+// No errors are expected during normal operations.
 func (ds *RecoverablePrivateBeaconKeyState) SetDKGState(epochCounter uint64, newState flow.DKGState) error {
 	return operation.RetryOnConflictTx(ds.db, transaction.Update, ds.processStateTransition(epochCounter, newState))
 }
@@ -225,12 +226,12 @@ func (ds *RecoverablePrivateBeaconKeyState) UpsertMyBeaconPrivateKey(epochCounte
 		return fmt.Errorf("will not store nil beacon key")
 	}
 	encodableKey := &encodable.RandomBeaconPrivKey{PrivateKey: key}
-	err := ds.db.Update(func(txn *badger.Txn) error {
-		err := operation.UpsertMyBeaconPrivateKey(epochCounter, encodableKey)(txn)
+	err := operation.RetryOnConflictTx(ds.db, transaction.Update, func(tx *transaction.Tx) error {
+		err := operation.UpsertMyBeaconPrivateKey(epochCounter, encodableKey)(tx.DBTxn)
 		if err != nil {
 			return err
 		}
-		return operation.UpsertDKGStateForEpoch(epochCounter, flow.RandomBeaconKeyCommitted)(txn)
+		return ds.processStateTransition(epochCounter, flow.RandomBeaconKeyCommitted)(tx)
 	})
 	if err != nil {
 		return fmt.Errorf("could not overwrite beacon key for epoch %d: %w", epochCounter, err)
