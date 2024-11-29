@@ -480,6 +480,7 @@ func main() {
 				node.EngineRegistry,
 				node.State,
 				node.Metrics.Engine,
+				node.Metrics.Mempool,
 				colMetrics,
 				node.Me,
 				node.Storage.Collections,

@@ -72,6 +72,7 @@ func (suite *Suite) SetupTest() {
 		suite.state,
 		metrics,
 		metrics,
+		metrics,
 		suite.me,
 		suite.collections,
 		suite.transactions,

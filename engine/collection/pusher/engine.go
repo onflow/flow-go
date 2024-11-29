@@ -38,7 +38,7 @@ type Engine struct {
 	transactions storage.Transactions
 
 	notifier engine.Notifier
-	inbound  *fifoqueue.FifoQueue
+	queue    *fifoqueue.FifoQueue
 
 	component.Component
 	cm *component.ComponentManager
@@ -48,11 +48,26 @@ type Engine struct {
 var _ network.Engine = (*Engine)(nil)
 var _ component.Component = (*Engine)(nil)
 
-func New(log zerolog.Logger, net network.EngineRegistry, state protocol.State, engMetrics module.EngineMetrics, colMetrics module.CollectionMetrics, me module.Local, collections storage.Collections, transactions storage.Transactions) (*Engine, error) {
-	// TODO length observer metrics
-	inbound, err := fifoqueue.NewFifoQueue(1000)
+// New creates a new pusher engine.
+func New(
+	log zerolog.Logger,
+	net network.EngineRegistry,
+	state protocol.State,
+	engMetrics module.EngineMetrics,
+	mempoolMetrics module.MempoolMetrics,
+	colMetrics module.CollectionMetrics,
+	me module.Local,
+	collections storage.Collections,
+	transactions storage.Transactions,
+) (*Engine, error) {
+	queue, err := fifoqueue.NewFifoQueue(
+		1000,
+		fifoqueue.WithLengthObserver(func(len int) {
+			mempoolMetrics.MempoolEntries(metrics.ResourceSubmitCollectionGuaranteesQueue, uint(len))
+		}),
+	)
 	if err != nil {
-		return nil, fmt.Errorf("could not create inbound fifoqueue: %w", err)
+		return nil, fmt.Errorf("could not create fifoqueue: %w", err)
 	}
 
 	notifier := engine.NewNotifier()
@@ -67,7 +82,7 @@ func New(log zerolog.Logger, net network.EngineRegistry, state protocol.State, e
 		transactions: transactions,
 
 		notifier: notifier,
-		inbound:  inbound,
+		queue:    queue,
 	}
 
 	conduit, err := net.Register(channels.PushGuarantees, e)
@@ -107,7 +122,7 @@ func (e *Engine) outboundQueueWorker(ctx irrecoverable.SignalerContext, ready co
 // Only returns when the queue is empty (or the engine is terminated).
 func (e *Engine) processOutboundMessages(ctx context.Context) error {
 	for {
-		nextMessage, ok := e.inbound.Pop()
+		nextMessage, ok := e.queue.Pop()
 		if !ok {
 			return nil
 		}
@@ -167,9 +182,9 @@ func (e *Engine) Process(channel channels.Channel, originID flow.Identifier, mes
 // SubmitCollectionGuarantee adds a collection guarantee to the engine's queue
 // to later be published to consensus nodes.
 func (e *Engine) SubmitCollectionGuarantee(msg *messages.SubmitCollectionGuarantee) {
-	ok := e.inbound.Push(msg)
+	ok := e.queue.Push(msg)
 	if !ok {
-		e.log.Err(fmt.Errorf("failed to store collection guarantee in queue"))
+		engine.LogError(e.log, fmt.Errorf("failed to store collection guarantee in queue"))
 		return
 	}
 	e.notifier.Notify()
