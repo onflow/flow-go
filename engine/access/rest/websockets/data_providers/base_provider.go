@@ -8,22 +8,8 @@ import (
 	"github.com/onflow/flow-go/engine/access/subscription"
 )
 
-// BaseDataProvider defines the basic interface for a data provider. It provides methods
-// for retrieving the provider's unique ID, topic, and a method to close the provider.
-type BaseDataProvider interface {
-	// ID returns the unique identifier of the data provider.
-	ID() uuid.UUID
-	// Topic returns the topic associated with the data provider.
-	Topic() string
-	// Close terminates the data provider.
-	Close() error
-}
-
-var _ BaseDataProvider = (*BaseDataProviderImpl)(nil)
-
-// BaseDataProviderImpl is the concrete implementation of the BaseDataProvider interface.
-// It holds common objects for the provider.
-type BaseDataProviderImpl struct {
+// baseDataProvider holds common objects for the provider
+type baseDataProvider struct {
 	id           uuid.UUID
 	topic        string
 	cancel       context.CancelFunc
@@ -31,14 +17,14 @@ type BaseDataProviderImpl struct {
 	subscription subscription.Subscription
 }
 
-// NewBaseDataProviderImpl creates a new instance of BaseDataProviderImpl.
-func NewBaseDataProviderImpl(
+// newBaseDataProvider creates a new instance of baseDataProvider.
+func newBaseDataProvider(
 	topic string,
 	cancel context.CancelFunc,
 	send chan<- interface{},
 	subscription subscription.Subscription,
-) *BaseDataProviderImpl {
-	return &BaseDataProviderImpl{
+) *baseDataProvider {
+	return &baseDataProvider{
 		id:           uuid.New(),
 		topic:        topic,
 		cancel:       cancel,
@@ -48,17 +34,19 @@ func NewBaseDataProviderImpl(
 }
 
 // ID returns the unique identifier of the data provider.
-func (b *BaseDataProviderImpl) ID() uuid.UUID {
+func (b *baseDataProvider) ID() uuid.UUID {
 	return b.id
 }
 
 // Topic returns the topic associated with the data provider.
-func (b *BaseDataProviderImpl) Topic() string {
+func (b *baseDataProvider) Topic() string {
 	return b.topic
 }
 
 // Close terminates the data provider.
-func (b *BaseDataProviderImpl) Close() error {
+//
+// No errors are expected during normal operations.
+func (b *baseDataProvider) Close() error {
 	b.cancel()
 	return nil
 }

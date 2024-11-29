@@ -100,7 +100,7 @@ func (s *DataProviderFactoryImpl) NewDataProvider(
 		// TODO: Implemented handlers for each topic should be added in respective case
 	case AccountStatusesTopic,
 		TransactionStatusesTopic:
-		return nil, fmt.Errorf("topic \"%s\" not implemented yet", topic)
+		return nil, fmt.Errorf(`topic "%s" not implemented yet`, topic)
 	default:
 		return nil, fmt.Errorf("unsupported topic \"%s\"", topic)
 	}
