@@ -210,6 +210,7 @@ func (ds *RecoverablePrivateBeaconKeyState) RetrieveMyBeaconPrivateKey(epochCoun
 		} else {
 			key = nil
 			safe = false
+			return storage.ErrNotFound
 		}
 
 		return nil
