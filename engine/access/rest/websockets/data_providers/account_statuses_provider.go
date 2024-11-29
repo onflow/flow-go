@@ -28,10 +28,9 @@ type AccountStatusesArguments struct {
 }
 
 type AccountStatusesDataProvider struct {
-	*BaseDataProviderImpl
+	*baseDataProvider
 
 	logger         zerolog.Logger
-	args           AccountStatusesArguments
 	stateStreamApi state_stream.API
 }
 
@@ -53,22 +52,18 @@ func NewAccountStatusesDataProvider(
 		stateStreamApi: stateStreamApi,
 	}
 
-	var err error
-	p.args, err = ParseAccountStatusesArguments(arguments, chain, eventFilterConfig)
+	accountStatusesArgs, err := ParseAccountStatusesArguments(arguments, chain, eventFilterConfig)
 	if err != nil {
 		return nil, fmt.Errorf("invalid arguments for account statuses data provider: %w", err)
 	}
 
 	subCtx, cancel := context.WithCancel(ctx)
 
-	// Set up a subscription to events based on arguments.
-	sub := p.createSubscription(subCtx)
-
-	p.BaseDataProviderImpl = NewBaseDataProviderImpl(
+	p.baseDataProvider = newBaseDataProvider(
 		topic,
 		cancel,
 		send,
-		sub,
+		p.createSubscription(subCtx, accountStatusesArgs), // Set up a subscription to events based on arguments.
 	)
 
 	return p, nil
@@ -82,16 +77,16 @@ func (p *AccountStatusesDataProvider) Run() error {
 }
 
 // createSubscription creates a new subscription using the specified input arguments.
-func (p *AccountStatusesDataProvider) createSubscription(ctx context.Context) subscription.Subscription {
-	if p.args.StartBlockID != flow.ZeroID {
-		return p.stateStreamApi.SubscribeAccountStatusesFromStartBlockID(ctx, p.args.StartBlockID, p.args.Filter)
+func (p *AccountStatusesDataProvider) createSubscription(ctx context.Context, args AccountStatusesArguments) subscription.Subscription {
+	if args.StartBlockID != flow.ZeroID {
+		return p.stateStreamApi.SubscribeAccountStatusesFromStartBlockID(ctx, args.StartBlockID, args.Filter)
 	}
 
-	if p.args.StartBlockHeight != request.EmptyHeight {
-		return p.stateStreamApi.SubscribeAccountStatusesFromStartHeight(ctx, p.args.StartBlockHeight, p.args.Filter)
+	if args.StartBlockHeight != request.EmptyHeight {
+		return p.stateStreamApi.SubscribeAccountStatusesFromStartHeight(ctx, args.StartBlockHeight, args.Filter)
 	}
 
-	return p.stateStreamApi.SubscribeAccountStatusesFromLatestBlock(ctx, p.args.Filter)
+	return p.stateStreamApi.SubscribeAccountStatusesFromLatestBlock(ctx, args.Filter)
 }
 
 // handleResponse processes an account statuses and sends the formatted response.
