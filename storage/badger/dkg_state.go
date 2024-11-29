@@ -154,14 +154,14 @@ func (ds *RecoverablePrivateBeaconKeyState) processStateTransition(epochCounter 
 		}
 
 		// ensure invariant holds and we still have a valid private key stored
-		if newState == flow.RandomBeaconKeyCommitted {
+		if newState == flow.RandomBeaconKeyCommitted || newState == flow.DKGStateCompleted {
 			_, err = ds.retrieveKeyTx(epochCounter)(tx.DBTxn)
 			if err != nil {
-				return fmt.Errorf("cannot transition to flow.RandomBeaconKeyCommitted without a valid random beacon key: %w", err)
+				return fmt.Errorf("cannot transition to %s without a valid random beacon key: %w", newState, err)
 			}
 		}
 
-		return operation.InsertDKGStateForEpoch(epochCounter, newState)(tx.DBTxn)
+		return operation.UpsertDKGStateForEpoch(epochCounter, newState)(tx.DBTxn)
 	}
 }
 
