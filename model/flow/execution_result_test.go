@@ -7,7 +7,6 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/utils/slices"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -44,15 +43,17 @@ func TestExecutionResultGroupBy(t *testing.T) {
 	assert.Equal(t, 0, unknown.Size())
 }
 
+func TestExecutionResult_FingerprintBackwardCompatibility(t *testing.T) {}
+
 // Tests that [ExecutionResult.ServiceEventsByChunk] method works in a variety of circumstances.
 // It also tests the method against an ExecutionResult instance backed by both the
-// current and old data model version (with and with ServiceEventIndices field)
+// current and old data model version (with and with ServiceEventCount field)
 func TestExecutionResult_ServiceEventsByChunk(t *testing.T) {
 	t.Run("no service events", func(t *testing.T) {
-		t.Run("nil ServiceEventIndices field (old model)", func(t *testing.T) {
+		t.Run("nil ServiceEventCount field (old model)", func(t *testing.T) {
 			result := unittest.ExecutionResultFixture()
 			for _, chunk := range result.Chunks {
-				chunk.ServiceEventIndices = nil
+				chunk.ServiceEventCount = nil
 			}
 			// should return empty list for all chunks
 			for chunkIndex := 0; chunkIndex < result.Chunks.Len(); chunkIndex++ {
@@ -60,10 +61,10 @@ func TestExecutionResult_ServiceEventsByChunk(t *testing.T) {
 				assert.Len(t, serviceEvents, 0)
 			}
 		})
-		t.Run("populated ServiceEventIndices field", func(t *testing.T) {
+		t.Run("populated ServiceEventCount field", func(t *testing.T) {
 			result := unittest.ExecutionResultFixture()
 			for _, chunk := range result.Chunks {
-				chunk.ServiceEventIndices = make([]uint32, 0)
+				chunk.ServiceEventCount = unittest.PtrTo[uint16](0)
 			}
 			// should return empty list for all chunks
 			for chunkIndex := 0; chunkIndex < result.Chunks.Len(); chunkIndex++ {
@@ -74,10 +75,10 @@ func TestExecutionResult_ServiceEventsByChunk(t *testing.T) {
 	})
 
 	t.Run("service events only in system chunk", func(t *testing.T) {
-		t.Run("nil ServiceEventIndices field (old model)", func(t *testing.T) {
+		t.Run("nil ServiceEventCount field (old model)", func(t *testing.T) {
 			result := unittest.ExecutionResultFixture()
 			for _, chunk := range result.Chunks {
-				chunk.ServiceEventIndices = nil
+				chunk.ServiceEventCount = nil
 			}
 
 			// should return empty list for all chunks
@@ -86,13 +87,13 @@ func TestExecutionResult_ServiceEventsByChunk(t *testing.T) {
 				assert.Len(t, serviceEvents, 0)
 			}
 		})
-		t.Run("populated ServiceEventIndices field", func(t *testing.T) {
+		t.Run("populated ServiceEventCount field", func(t *testing.T) {
 			nServiceEvents := rand.Intn(10) + 1
 			result := unittest.ExecutionResultFixture(unittest.WithServiceEvents(nServiceEvents))
 			for _, chunk := range result.Chunks[:result.Chunks.Len()-1] {
-				chunk.ServiceEventIndices = make([]uint32, 0)
+				chunk.ServiceEventCount = unittest.PtrTo[uint16](0)
 			}
-			result.SystemChunk().ServiceEventIndices = slices.MakeRange(0, uint32(nServiceEvents))
+			result.SystemChunk().ServiceEventCount = unittest.PtrTo(uint16(nServiceEvents))
 
 			// should return empty list for all non-system chunks
 			for chunkIndex := 0; chunkIndex < result.Chunks.Len()-1; chunkIndex++ {
@@ -109,11 +110,11 @@ func TestExecutionResult_ServiceEventsByChunk(t *testing.T) {
 		result := unittest.ExecutionResultFixture()
 		unittest.WithServiceEvents(result.Chunks.Len() - 1)(result) // one service event per non-system chunk
 
-		for chunkIndex, chunk := range result.Chunks {
-			// 1 service event per chunk => service event indices match chunk indices
-			chunk.ServiceEventIndices = []uint32{uint32(chunkIndex)}
+		for _, chunk := range result.Chunks {
+			// 1 service event per chunk
+			chunk.ServiceEventCount = unittest.PtrTo(uint16(1))
 		}
-		result.SystemChunk().ServiceEventIndices = make([]uint32, 0) // none in system chunk
+		result.SystemChunk().ServiceEventCount = unittest.PtrTo(uint16(0))
 
 		// should return one service event per non-system chunk
 		for chunkIndex := 0; chunkIndex < result.Chunks.Len()-1; chunkIndex++ {
@@ -129,9 +130,9 @@ func TestExecutionResult_ServiceEventsByChunk(t *testing.T) {
 		result := unittest.ExecutionResultFixture()
 		unittest.WithServiceEvents(result.Chunks.Len())(result) // one service event per chunk
 
-		for chunkIndex, chunk := range result.Chunks {
-			// 1 service event per chunk => service event indices match chunk indices
-			chunk.ServiceEventIndices = []uint32{uint32(chunkIndex)}
+		for _, chunk := range result.Chunks {
+			// 1 service event per chunk
+			chunk.ServiceEventCount = unittest.PtrTo(uint16(1))
 		}
 
 		// should return one service event per chunk
