@@ -164,6 +164,7 @@ func (c *Controller) handleSubscribe(ctx context.Context, msg models.SubscribeMe
 	dp, err := c.dataProviderFactory.NewDataProvider(ctx, msg.Topic, msg.Arguments, c.communicationChannel)
 	if err != nil {
 		// TODO: handle error here
+		c.logger.Error().Err(err).Msgf("error while creating data provider for topic: %s", msg.Topic)
 	}
 
 	c.dataProviders.Add(dp.ID(), dp)

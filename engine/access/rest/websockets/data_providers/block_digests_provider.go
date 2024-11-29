@@ -18,7 +18,6 @@ type BlockDigestsDataProvider struct {
 	*BaseDataProviderImpl
 
 	logger zerolog.Logger
-	args   BlocksArguments
 	api    access.API
 }
 
@@ -38,20 +37,18 @@ func NewBlockDigestsDataProvider(
 		api:    api,
 	}
 
-	// Initialize arguments passed to the provider.
-	var err error
-	p.args, err = ParseBlocksArguments(arguments)
+	// Parse arguments passed to the provider.
+	blockArgs, err := ParseBlocksArguments(arguments)
 	if err != nil {
 		return nil, fmt.Errorf("invalid arguments: %w", err)
 	}
 
-	ctx, cancel := context.WithCancel(ctx)
-
+	subCtx, cancel := context.WithCancel(ctx)
 	p.BaseDataProviderImpl = NewBaseDataProviderImpl(
 		topic,
 		cancel,
 		send,
-		p.createSubscription(ctx), // Set up a subscription to block digests based on arguments.
+		p.createSubscription(subCtx, blockArgs), // Set up a subscription to block digests based on arguments.
 	)
 
 	return p, nil
@@ -65,16 +62,16 @@ func (p *BlockDigestsDataProvider) Run() error {
 }
 
 // createSubscription creates a new subscription using the specified input arguments.
-func (p *BlockDigestsDataProvider) createSubscription(ctx context.Context) subscription.Subscription {
-	if p.args.StartBlockID != flow.ZeroID {
-		return p.api.SubscribeBlockDigestsFromStartBlockID(ctx, p.args.StartBlockID, p.args.BlockStatus)
+func (p *BlockDigestsDataProvider) createSubscription(ctx context.Context, args BlocksArguments) subscription.Subscription {
+	if args.StartBlockID != flow.ZeroID {
+		return p.api.SubscribeBlockDigestsFromStartBlockID(ctx, args.StartBlockID, args.BlockStatus)
 	}
 
-	if p.args.StartBlockHeight != request.EmptyHeight {
-		return p.api.SubscribeBlockDigestsFromStartHeight(ctx, p.args.StartBlockHeight, p.args.BlockStatus)
+	if args.StartBlockHeight != request.EmptyHeight {
+		return p.api.SubscribeBlockDigestsFromStartHeight(ctx, args.StartBlockHeight, args.BlockStatus)
 	}
 
-	return p.api.SubscribeBlockDigestsFromLatest(ctx, p.args.BlockStatus)
+	return p.api.SubscribeBlockDigestsFromLatest(ctx, args.BlockStatus)
 }
 
 // handleResponse processes a block digest and sends the formatted response.

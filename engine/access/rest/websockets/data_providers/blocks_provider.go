@@ -27,7 +27,6 @@ type BlocksDataProvider struct {
 	*BaseDataProviderImpl
 
 	logger zerolog.Logger
-	args   BlocksArguments
 	api    access.API
 }
 
@@ -47,20 +46,18 @@ func NewBlocksDataProvider(
 		api:    api,
 	}
 
-	// Initialize arguments passed to the provider.
-	var err error
-	p.args, err = ParseBlocksArguments(arguments)
+	// Parse arguments passed to the provider.
+	blockArgs, err := ParseBlocksArguments(arguments)
 	if err != nil {
 		return nil, fmt.Errorf("invalid arguments: %w", err)
 	}
 
-	ctx, cancel := context.WithCancel(ctx)
-
+	subCtx, cancel := context.WithCancel(ctx)
 	p.BaseDataProviderImpl = NewBaseDataProviderImpl(
 		topic,
 		cancel,
 		send,
-		p.createSubscription(ctx), // Set up a subscription to blocks based on arguments.
+		p.createSubscription(subCtx, blockArgs), // Set up a subscription to blocks based on arguments.
 	)
 
 	return p, nil
@@ -74,16 +71,16 @@ func (p *BlocksDataProvider) Run() error {
 }
 
 // createSubscription creates a new subscription using the specified input arguments.
-func (p *BlocksDataProvider) createSubscription(ctx context.Context) subscription.Subscription {
-	if p.args.StartBlockID != flow.ZeroID {
-		return p.api.SubscribeBlocksFromStartBlockID(ctx, p.args.StartBlockID, p.args.BlockStatus)
+func (p *BlocksDataProvider) createSubscription(ctx context.Context, args BlocksArguments) subscription.Subscription {
+	if args.StartBlockID != flow.ZeroID {
+		return p.api.SubscribeBlocksFromStartBlockID(ctx, args.StartBlockID, args.BlockStatus)
 	}
 
-	if p.args.StartBlockHeight != request.EmptyHeight {
-		return p.api.SubscribeBlocksFromStartHeight(ctx, p.args.StartBlockHeight, p.args.BlockStatus)
+	if args.StartBlockHeight != request.EmptyHeight {
+		return p.api.SubscribeBlocksFromStartHeight(ctx, args.StartBlockHeight, args.BlockStatus)
 	}
 
-	return p.api.SubscribeBlocksFromLatest(ctx, p.args.BlockStatus)
+	return p.api.SubscribeBlocksFromLatest(ctx, args.BlockStatus)
 }
 
 // handleResponse processes a block and sends the formatted response.
