@@ -15,7 +15,7 @@ import (
 
 // BlockDigestsDataProvider is responsible for providing block digests
 type BlockDigestsDataProvider struct {
-	*BaseDataProviderImpl
+	*baseDataProvider
 
 	logger zerolog.Logger
 	api    access.API
@@ -44,7 +44,7 @@ func NewBlockDigestsDataProvider(
 	}
 
 	subCtx, cancel := context.WithCancel(ctx)
-	p.BaseDataProviderImpl = NewBaseDataProviderImpl(
+	p.baseDataProvider = newBaseDataProvider(
 		topic,
 		cancel,
 		send,
