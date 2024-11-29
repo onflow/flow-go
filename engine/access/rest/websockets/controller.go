@@ -161,8 +161,11 @@ func (c *Controller) handleAction(ctx context.Context, message interface{}) erro
 }
 
 func (c *Controller) handleSubscribe(ctx context.Context, msg models.SubscribeMessageRequest) {
-	dp, _ := c.dataProviderFactory.NewDataProvider(ctx, msg.Topic, msg.Arguments, c.communicationChannel)
-	// TODO: handle error here
+	dp, err := c.dataProviderFactory.NewDataProvider(ctx, msg.Topic, msg.Arguments, c.communicationChannel)
+	if err != nil {
+		// TODO: handle error here
+	}
+
 	c.dataProviders.Add(dp.ID(), dp)
 
 	//TODO: return OK response to client
@@ -171,7 +174,7 @@ func (c *Controller) handleSubscribe(ctx context.Context, msg models.SubscribeMe
 	go func() {
 		err := dp.Run()
 		if err != nil {
-			// Log or handle the error from Run
+			//TODO: Log or handle the error from Run
 			c.logger.Error().Err(err).Msgf("error while running data provider for topic: %s", msg.Topic)
 		}
 	}()

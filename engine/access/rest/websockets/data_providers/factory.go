@@ -91,7 +91,7 @@ func (s *DataProviderFactoryImpl) NewDataProvider(
 	case EventsTopic,
 		AccountStatusesTopic,
 		TransactionStatusesTopic:
-		return nil, fmt.Errorf("topic \"%s\" not implemented yet", topic)
+		return nil, fmt.Errorf(`topic "%s" not implemented yet`, topic)
 	default:
 		return nil, fmt.Errorf("unsupported topic \"%s\"", topic)
 	}
