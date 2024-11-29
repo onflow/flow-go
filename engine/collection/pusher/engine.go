@@ -25,8 +25,8 @@ import (
 	"github.com/onflow/flow-go/utils/logging"
 )
 
-// Engine is the collection pusher engine, which provides access to resources
-// held by the collection node.
+// Engine is part of the Collection Nodes. It broadcasts finalized collections
+// that the cluster generates to the broader network.
 type Engine struct {
 	log          zerolog.Logger
 	engMetrics   module.EngineMetrics
