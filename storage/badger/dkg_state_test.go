@@ -1,4 +1,4 @@
-package badger_test
+package badger
 
 import (
 	"errors"
@@ -12,44 +12,70 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/storage"
-	bstorage "github.com/onflow/flow-go/storage/badger"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
-func TestDKGState_DKGStarted(t *testing.T) {
-	unittest.RunWithTypedBadgerDB(t, bstorage.InitSecret, func(db *badger.DB) {
+// TestDKGState_UninitializedState checks that invariants are enforced for uninitialized DKG state.
+// This test is written in a way that we start with initial state of the Recoverable Random Beacon State Machine and
+// try to perform all possible actions and transitions in it.
+func TestDKGState_UninitializedState(t *testing.T) {
+	unittest.RunWithTypedBadgerDB(t, InitSecret, func(db *badger.DB) {
 		metrics := metrics.NewNoopCollector()
-		store, err := bstorage.NewDKGState(metrics, db)
+		store, err := NewDKGState(metrics, db)
 		require.NoError(t, err)
 
 		epochCounter := rand.Uint64()
 
-		// check dkg-started flag for non-existent epoch
-		t.Run("DKGStarted should default to false", func(t *testing.T) {
-			started, err := store.GetDKGStarted(rand.Uint64())
-			assert.NoError(t, err)
-			assert.False(t, started)
-		})
+		started, err := store.GetDKGStarted(epochCounter)
+		require.NoError(t, err)
+		require.False(t, started)
 
-		// store dkg-started flag for epoch
-		t.Run("should be able to set DKGStarted", func(t *testing.T) {
+		actualState, err := store.GetDKGState(epochCounter)
+		require.ErrorIs(t, err, storage.ErrNotFound)
+		require.Equal(t, flow.DKGStateUninitialized, actualState)
+
+		pk, err := store.UnsafeRetrieveMyBeaconPrivateKey(epochCounter)
+		require.ErrorIs(t, err, storage.ErrNotFound)
+		require.Nil(t, pk)
+
+		pk, safe, err := store.RetrieveMyBeaconPrivateKey(epochCounter)
+		require.ErrorIs(t, err, storage.ErrNotFound)
+		require.False(t, safe)
+		require.Nil(t, pk)
+
+		t.Run("-> flow.DKGStateStarted, should be allowed", func(t *testing.T) {
+			epochCounter++
 			err = store.SetDKGState(epochCounter, flow.DKGStateStarted)
-			assert.NoError(t, err)
+			require.NoError(t, err)
 		})
 
-		// retrieve flag for epoch
-		t.Run("should be able to read DKGStarted", func(t *testing.T) {
-			started, err := store.GetDKGStarted(epochCounter)
-			assert.NoError(t, err)
-			assert.True(t, started)
+		t.Run("-> flow.DKGStateFailure, should be allowed", func(t *testing.T) {
+			epochCounter++
+			err = store.SetDKGState(epochCounter, flow.DKGStateFailure)
+			require.NoError(t, err)
+		})
+
+		t.Run("-> flow.DKGStateCompleted, not allowed", func(t *testing.T) {
+			epochCounter++
+			err = store.InsertMyBeaconPrivateKey(epochCounter, unittest.RandomBeaconPriv())
+			require.Error(t, err, "should not be able to enter completed state without starting")
+			err = store.SetDKGState(epochCounter, flow.DKGStateCompleted)
+			require.Error(t, err, "should not be able to enter completed state without starting")
+		})
+
+		t.Run("-> flow.RandomBeaconKeyCommitted, should be allowed", func(t *testing.T) {
+			err = store.SetDKGState(epochCounter, flow.RandomBeaconKeyCommitted)
+			require.Error(t, err, "should not be able to set DKG state to recovered, only using dedicated interface")
+			err = store.UpsertMyBeaconPrivateKey(epochCounter, unittest.RandomBeaconPriv())
+			require.NoError(t, err)
 		})
 	})
 }
 
 func TestDKGState_BeaconKeys(t *testing.T) {
-	unittest.RunWithTypedBadgerDB(t, bstorage.InitSecret, func(db *badger.DB) {
+	unittest.RunWithTypedBadgerDB(t, InitSecret, func(db *badger.DB) {
 		metrics := metrics.NewNoopCollector()
-		store, err := bstorage.NewDKGState(metrics, db)
+		store, err := NewDKGState(metrics, db)
 		require.NoError(t, err)
 
 		epochCounter := rand.Uint64()
@@ -89,9 +115,9 @@ func TestDKGState_BeaconKeys(t *testing.T) {
 }
 
 func TestDKGState_EndState(t *testing.T) {
-	unittest.RunWithTypedBadgerDB(t, bstorage.InitSecret, func(db *badger.DB) {
+	unittest.RunWithTypedBadgerDB(t, InitSecret, func(db *badger.DB) {
 		metrics := metrics.NewNoopCollector()
-		store, err := bstorage.NewDKGState(metrics, db)
+		store, err := NewDKGState(metrics, db)
 		require.NoError(t, err)
 
 		epochCounter := rand.Uint64()
@@ -111,9 +137,9 @@ func TestDKGState_EndState(t *testing.T) {
 }
 
 func TestSafeBeaconPrivateKeys(t *testing.T) {
-	unittest.RunWithTypedBadgerDB(t, bstorage.InitSecret, func(db *badger.DB) {
+	unittest.RunWithTypedBadgerDB(t, InitSecret, func(db *badger.DB) {
 		metrics := metrics.NewNoopCollector()
-		dkgState, err := bstorage.NewDKGState(metrics, db)
+		dkgState, err := NewDKGState(metrics, db)
 		require.NoError(t, err)
 
 		t.Run("non-existent key -> should return ErrNotFound", func(t *testing.T) {
@@ -225,7 +251,7 @@ func TestSafeBeaconPrivateKeys(t *testing.T) {
 func TestSecretDBRequirement(t *testing.T) {
 	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
 		metrics := metrics.NewNoopCollector()
-		_, err := bstorage.NewDKGState(metrics, db)
+		_, err := NewDKGState(metrics, db)
 		require.Error(t, err)
 	})
 }
