@@ -3,7 +3,6 @@ package websockets
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"sync"
 
@@ -15,8 +14,6 @@ import (
 	"github.com/onflow/flow-go/engine/access/rest/websockets/models"
 	"github.com/onflow/flow-go/utils/concurrentmap"
 )
-
-var ErrEmptyMessage = errors.New("empty message")
 
 type Controller struct {
 	logger               zerolog.Logger
@@ -97,8 +94,6 @@ func (c *Controller) readMessages(ctx context.Context) {
 			if websocket.IsCloseError(err, websocket.CloseNormalClosure, websocket.CloseAbnormalClosure) ||
 				websocket.IsUnexpectedCloseError(err, websocket.CloseNormalClosure, websocket.CloseGoingAway) {
 				return
-			} else if errors.Is(err, ErrEmptyMessage) {
-				continue
 			}
 
 			c.logger.Debug().Err(err).Msg("error reading message from client")
@@ -124,10 +119,6 @@ func (c *Controller) readMessage() (json.RawMessage, error) {
 	var message json.RawMessage
 	if err := c.conn.ReadJSON(&message); err != nil {
 		return nil, fmt.Errorf("error reading JSON from client: %w", err)
-	}
-
-	if message == nil {
-		return nil, ErrEmptyMessage
 	}
 
 	return message, nil
