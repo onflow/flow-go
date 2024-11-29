@@ -29,10 +29,9 @@ type EventsArguments struct {
 
 // EventsDataProvider is responsible for providing events
 type EventsDataProvider struct {
-	*BaseDataProviderImpl
+	*baseDataProvider
 
 	logger         zerolog.Logger
-	args           EventsArguments
 	stateStreamApi state_stream.API
 }
 
@@ -55,22 +54,18 @@ func NewEventsDataProvider(
 	}
 
 	// Initialize arguments passed to the provider.
-	var err error
-	p.args, err = ParseEventsArguments(arguments, chain, eventFilterConfig)
+	eventArgs, err := ParseEventsArguments(arguments, chain, eventFilterConfig)
 	if err != nil {
 		return nil, fmt.Errorf("invalid arguments for events data provider: %w", err)
 	}
 
 	subCtx, cancel := context.WithCancel(ctx)
 
-	// Set up a subscription to events based on arguments.
-	sub := p.createSubscription(subCtx)
-
-	p.BaseDataProviderImpl = NewBaseDataProviderImpl(
+	p.baseDataProvider = newBaseDataProvider(
 		topic,
 		cancel,
 		send,
-		sub,
+		p.createSubscription(subCtx, eventArgs), // Set up a subscription to events based on arguments.
 	)
 
 	return p, nil
@@ -84,16 +79,16 @@ func (p *EventsDataProvider) Run() error {
 }
 
 // createSubscription creates a new subscription using the specified input arguments.
-func (p *EventsDataProvider) createSubscription(ctx context.Context) subscription.Subscription {
-	if p.args.StartBlockID != flow.ZeroID {
-		return p.stateStreamApi.SubscribeEventsFromStartBlockID(ctx, p.args.StartBlockID, p.args.Filter)
+func (p *EventsDataProvider) createSubscription(ctx context.Context, args EventsArguments) subscription.Subscription {
+	if args.StartBlockID != flow.ZeroID {
+		return p.stateStreamApi.SubscribeEventsFromStartBlockID(ctx, args.StartBlockID, args.Filter)
 	}
 
-	if p.args.StartBlockHeight != request.EmptyHeight {
-		return p.stateStreamApi.SubscribeEventsFromStartHeight(ctx, p.args.StartBlockHeight, p.args.Filter)
+	if args.StartBlockHeight != request.EmptyHeight {
+		return p.stateStreamApi.SubscribeEventsFromStartHeight(ctx, args.StartBlockHeight, args.Filter)
 	}
 
-	return p.stateStreamApi.SubscribeEventsFromLatest(ctx, p.args.Filter)
+	return p.stateStreamApi.SubscribeEventsFromLatest(ctx, args.Filter)
 }
 
 // handleResponse processes an event and sends the formatted response.
