@@ -15,10 +15,9 @@ import (
 
 // BlockHeadersDataProvider is responsible for providing block headers
 type BlockHeadersDataProvider struct {
-	*BaseDataProviderImpl
+	*baseDataProvider
 
 	logger zerolog.Logger
-	args   BlocksArguments
 	api    access.API
 }
 
@@ -38,20 +37,18 @@ func NewBlockHeadersDataProvider(
 		api:    api,
 	}
 
-	// Initialize arguments passed to the provider.
-	var err error
-	p.args, err = ParseBlocksArguments(arguments)
+	// Parse arguments passed to the provider.
+	blockArgs, err := ParseBlocksArguments(arguments)
 	if err != nil {
 		return nil, fmt.Errorf("invalid arguments: %w", err)
 	}
 
-	ctx, cancel := context.WithCancel(ctx)
-
-	p.BaseDataProviderImpl = NewBaseDataProviderImpl(
+	subCtx, cancel := context.WithCancel(ctx)
+	p.baseDataProvider = newBaseDataProvider(
 		topic,
 		cancel,
 		send,
-		p.createSubscription(ctx), // Set up a subscription to block headers based on arguments.
+		p.createSubscription(subCtx, blockArgs), // Set up a subscription to block headers based on arguments.
 	)
 
 	return p, nil
@@ -65,16 +62,16 @@ func (p *BlockHeadersDataProvider) Run() error {
 }
 
 // createSubscription creates a new subscription using the specified input arguments.
-func (p *BlockHeadersDataProvider) createSubscription(ctx context.Context) subscription.Subscription {
-	if p.args.StartBlockID != flow.ZeroID {
-		return p.api.SubscribeBlockHeadersFromStartBlockID(ctx, p.args.StartBlockID, p.args.BlockStatus)
+func (p *BlockHeadersDataProvider) createSubscription(ctx context.Context, args BlocksArguments) subscription.Subscription {
+	if args.StartBlockID != flow.ZeroID {
+		return p.api.SubscribeBlockHeadersFromStartBlockID(ctx, args.StartBlockID, args.BlockStatus)
 	}
 
-	if p.args.StartBlockHeight != request.EmptyHeight {
-		return p.api.SubscribeBlockHeadersFromStartHeight(ctx, p.args.StartBlockHeight, p.args.BlockStatus)
+	if args.StartBlockHeight != request.EmptyHeight {
+		return p.api.SubscribeBlockHeadersFromStartHeight(ctx, args.StartBlockHeight, args.BlockStatus)
 	}
 
-	return p.api.SubscribeBlockHeadersFromLatest(ctx, p.args.BlockStatus)
+	return p.api.SubscribeBlockHeadersFromLatest(ctx, args.BlockStatus)
 }
 
 // handleResponse processes a block header and sends the formatted response.
