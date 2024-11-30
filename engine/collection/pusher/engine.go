@@ -25,8 +25,9 @@ import (
 	"github.com/onflow/flow-go/utils/logging"
 )
 
-// Engine is part of the Collection Nodes. It broadcasts finalized collections
-// that the cluster generates to the broader network.
+// Engine is part of the Collection Node. It broadcasts finalized collections
+// ("collection guarantees") that the cluster generates to Consensus Nodes
+// for inclusion in blocks.
 type Engine struct {
 	log          zerolog.Logger
 	engMetrics   module.EngineMetrics
@@ -61,7 +62,7 @@ func New(
 	transactions storage.Transactions,
 ) (*Engine, error) {
 	queue, err := fifoqueue.NewFifoQueue(
-		1000,
+		200, // roughly 1 minute of collections, at 3BPS
 		fifoqueue.WithLengthObserver(func(len int) {
 			mempoolMetrics.MempoolEntries(metrics.ResourceSubmitCollectionGuaranteesQueue, uint(len))
 		}),
@@ -99,7 +100,8 @@ func New(
 	return e, nil
 }
 
-// Worker to process SubmitCollectionGuarantee messages coming from the Finalizer.
+// outboundQueueWorker implements a component worker which broadcasts collection guarantees, 
+// enqueued by the Finalizer upon finalization, to Consensus Nodes.
 func (e *Engine) outboundQueueWorker(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
 	ready()
 
