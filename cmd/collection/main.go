@@ -481,7 +481,6 @@ func main() {
 				node.State,
 				node.Metrics.Engine,
 				node.Metrics.Mempool,
-				colMetrics,
 				node.Me,
 				node.Storage.Collections,
 				node.Storage.Transactions,

@@ -31,7 +31,6 @@ import (
 type Engine struct {
 	log          zerolog.Logger
 	engMetrics   module.EngineMetrics
-	colMetrics   module.CollectionMetrics
 	conduit      network.Conduit
 	me           module.Local
 	state        protocol.State
@@ -56,7 +55,6 @@ func New(
 	state protocol.State,
 	engMetrics module.EngineMetrics,
 	mempoolMetrics module.MempoolMetrics,
-	colMetrics module.CollectionMetrics,
 	me module.Local,
 	collections storage.Collections,
 	transactions storage.Transactions,
@@ -76,7 +74,6 @@ func New(
 	e := &Engine{
 		log:          log.With().Str("engine", "pusher").Logger(),
 		engMetrics:   engMetrics,
-		colMetrics:   colMetrics,
 		me:           me,
 		state:        state,
 		collections:  collections,
@@ -100,7 +97,7 @@ func New(
 	return e, nil
 }
 
-// outboundQueueWorker implements a component worker which broadcasts collection guarantees, 
+// outboundQueueWorker implements a component worker which broadcasts collection guarantees,
 // enqueued by the Finalizer upon finalization, to Consensus Nodes.
 func (e *Engine) outboundQueueWorker(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
 	ready()
