@@ -1653,7 +1653,7 @@ func TestExtendEpochCommitInvalid(t *testing.T) {
 			unittest.InsertAndFinalize(t, state, block3)
 
 			_, receipt, seal := createCommit(block3, func(commit *flow.EpochCommit) {
-				// add an extra dkg key
+				// add an extra Random Beacon key
 				commit.DKGParticipantKeys = append(commit.DKGParticipantKeys, unittest.KeyFixture(crypto.BLSBLS12381).PublicKey())
 			})
 

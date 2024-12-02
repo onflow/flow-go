@@ -1072,8 +1072,8 @@ func BootstrapNetwork(networkConf NetworkConfig, bootstrapDir string, chainID fl
 
 	allNodeInfos := append(toNodeInfos(stakedConfs), followerInfos...)
 
-	// IMPORTANT: we must use this ordering when writing the DKG keys as
-	//            this ordering defines the DKG participant's indices
+	// IMPORTANT: we must use this ordering when writing the Random Beacon keys as
+	//            this ordering defines the DKG participants' indices
 	stakedNodeInfos := bootstrap.Sort(toNodeInfos(stakedConfs), flow.Canonical[flow.Identity])
 
 	dkg, dkgIndexMap, err := runBeaconKG(stakedConfs)
