@@ -28,7 +28,6 @@ import (
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
 	"github.com/onflow/flow-go/module/executiondatasync/provider"
 	"github.com/onflow/flow-go/module/metrics"
-	"github.com/onflow/flow-go/utils/slices"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -694,8 +693,8 @@ func (m *testMetadata) RefreshChunkData(t *testing.T) *verification.VerifiableCh
 			StartState:      flow.StateCommitment(m.StartState),
 			BlockID:         m.Header.ID(),
 			// in these test cases, all defined service events correspond to the current chunk
-			ServiceEventIndices: slices.MakeRange(0, uint32(len(m.ServiceEvents))),
-			EventCollection:     eventsMerkleRootHash,
+			ServiceEventCount: unittest.PtrTo(uint16(len(m.ServiceEvents))),
+			EventCollection:   eventsMerkleRootHash,
 		},
 		Index: 0,
 	}
