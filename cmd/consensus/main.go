@@ -127,7 +127,7 @@ func main() {
 		committee             *committees.Consensus
 		epochLookup           *epochs.EpochLookup
 		hotstuffModules       *consensus.HotstuffModules
-		dkgState              *bstorage.RecoverablePrivateBeaconKeyState
+		dkgState              *bstorage.RecoverablePrivateBeaconKeyStateMachine
 		getSealingConfigs     module.SealingConfigsGetter
 	)
 	var deprecatedFlagBlockRateDelay time.Duration
@@ -213,7 +213,7 @@ func main() {
 			return nil
 		}).
 		Module("dkg state", func(node *cmd.NodeConfig) error {
-			dkgState, err = bstorage.NewDKGState(node.Metrics.Cache, node.SecretsDB)
+			dkgState, err = bstorage.NewRecoverableRandomBeaconStateMachine(node.Metrics.Cache, node.SecretsDB)
 			return err
 		}).
 		Module("updatable sealing config", func(node *cmd.NodeConfig) error {

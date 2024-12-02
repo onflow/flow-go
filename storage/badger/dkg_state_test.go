@@ -19,7 +19,7 @@ import (
 func TestDKGState_UninitializedState(t *testing.T) {
 	unittest.RunWithTypedBadgerDB(t, InitSecret, func(db *badger.DB) {
 		metrics := metrics.NewNoopCollector()
-		store, err := NewDKGState(metrics, db)
+		store, err := NewRecoverableRandomBeaconStateMachine(metrics, db)
 		require.NoError(t, err)
 
 		epochCounter := rand.Uint64()
@@ -83,7 +83,7 @@ func TestDKGState_UninitializedState(t *testing.T) {
 func TestDKGState_StartedState(t *testing.T) {
 	unittest.RunWithTypedBadgerDB(t, InitSecret, func(db *badger.DB) {
 		metrics := metrics.NewNoopCollector()
-		store, err := NewDKGState(metrics, db)
+		store, err := NewRecoverableRandomBeaconStateMachine(metrics, db)
 		require.NoError(t, err)
 
 		setupState := func() uint64 {
@@ -150,7 +150,7 @@ func TestDKGState_StartedState(t *testing.T) {
 func TestDKGState_CompletedState(t *testing.T) {
 	unittest.RunWithTypedBadgerDB(t, InitSecret, func(db *badger.DB) {
 		metrics := metrics.NewNoopCollector()
-		store, err := NewDKGState(metrics, db)
+		store, err := NewRecoverableRandomBeaconStateMachine(metrics, db)
 		require.NoError(t, err)
 
 		setupState := func() uint64 {
@@ -223,7 +223,7 @@ func TestDKGState_CompletedState(t *testing.T) {
 func TestDKGState_FailureState(t *testing.T) {
 	unittest.RunWithTypedBadgerDB(t, InitSecret, func(db *badger.DB) {
 		metrics := metrics.NewNoopCollector()
-		store, err := NewDKGState(metrics, db)
+		store, err := NewRecoverableRandomBeaconStateMachine(metrics, db)
 		require.NoError(t, err)
 
 		setupState := func() uint64 {
@@ -295,7 +295,7 @@ func TestDKGState_FailureState(t *testing.T) {
 func TestDKGState_RandomBeaconKeyCommittedState(t *testing.T) {
 	unittest.RunWithTypedBadgerDB(t, InitSecret, func(db *badger.DB) {
 		metrics := metrics.NewNoopCollector()
-		store, err := NewDKGState(metrics, db)
+		store, err := NewRecoverableRandomBeaconStateMachine(metrics, db)
 		require.NoError(t, err)
 
 		setupState := func() uint64 {
@@ -356,12 +356,12 @@ func TestDKGState_RandomBeaconKeyCommittedState(t *testing.T) {
 	})
 }
 
-// TestSecretDBRequirement tests that the RecoverablePrivateBeaconKeyState constructor will return an
+// TestSecretDBRequirement tests that the RecoverablePrivateBeaconKeyStateMachine constructor will return an
 // error if instantiated using a database not marked with the correct type.
 func TestSecretDBRequirement(t *testing.T) {
 	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
 		metrics := metrics.NewNoopCollector()
-		_, err := NewDKGState(metrics, db)
+		_, err := NewRecoverableRandomBeaconStateMachine(metrics, db)
 		require.Error(t, err)
 	})
 }
