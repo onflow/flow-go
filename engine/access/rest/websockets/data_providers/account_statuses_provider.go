@@ -93,13 +93,13 @@ func (p *AccountStatusesDataProvider) createSubscription(ctx context.Context, ar
 //
 // No errors are expected during normal operations.
 func (p *AccountStatusesDataProvider) handleResponse(send chan<- interface{}) func(accountStatusesResponse *backend.AccountStatusesResponse) error {
-	messageIndex := counters.NewMonotonousCounter(0)
+	messageIndex := counters.NewMonotonousCounter(1)
 
 	return func(accountStatusesResponse *backend.AccountStatusesResponse) error {
+		index := messageIndex.Value()
 		if ok := messageIndex.Set(messageIndex.Value() + 1); !ok {
 			return status.Errorf(codes.Internal, "message index already incremented to %d", messageIndex.Value())
 		}
-		index := messageIndex.Value()
 
 		send <- &models.AccountStatusesResponse{
 			BlockID:       accountStatusesResponse.BlockID.String(),
