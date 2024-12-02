@@ -365,14 +365,3 @@ func (c *Controller) keepalive(ctx context.Context) error {
 		}
 	}
 }
-
-// sendPing sends a periodic ping message to the WebSocket client to keep the connection alive.
-//
-// No errors are expected during normal operation.
-func (c *Controller) sendPing() error {
-	if err := c.conn.WriteControl(websocket.PingMessage, time.Now().Add(WriteWait)); err != nil {
-		return fmt.Errorf("failed to write ping message: %w", err)
-	}
-
-	return nil
-}
