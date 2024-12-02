@@ -165,13 +165,10 @@ func createNode(
 	// reactorEngine consumes the EpochSetupPhaseStarted event
 	core.ProtocolEvents.AddConsumer(reactorEngine)
 
-	safeBeaconKeys := badger.NewSafeBeaconPrivateKeys(dkgState)
-
 	node := node{
 		t:               t,
 		GenericNode:     core,
 		dkgState:        dkgState,
-		safeBeaconKeys:  safeBeaconKeys,
 		messagingEngine: messagingEngine,
 		reactorEngine:   reactorEngine,
 	}
@@ -298,10 +295,9 @@ func TestWithWhiteboard(t *testing.T) {
 	signatures := []crypto.Signature{}
 	indices := []int{}
 	for i, n := range nodes {
-
-		// TODO: to replace with safeBeaconKeys
-		beaconKey, err := n.dkgState.RetrieveMyBeaconPrivateKey(nextEpochSetup.Counter)
+		beaconKey, safe, err := n.dkgState.RetrieveMyBeaconPrivateKey(nextEpochSetup.Counter)
 		require.NoError(t, err)
+		require.True(t, safe)
 
 		signature, err := beaconKey.Sign(sigData, hasher)
 		require.NoError(t, err)

@@ -502,7 +502,6 @@ func (s *EmulatorSuite) initEngines(node *node, ids flow.IdentityList) {
 	node.GenericNode = core
 	node.messagingEngine = messagingEngine
 	node.dkgState = dkgState
-	node.safeBeaconKeys = badger.NewSafeBeaconPrivateKeys(dkgState)
 	node.reactorEngine = reactorEngine
 }
 
