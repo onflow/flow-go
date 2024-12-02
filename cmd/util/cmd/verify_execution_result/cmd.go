@@ -44,7 +44,7 @@ func init() {
 		"last k sealed blocks to verify")
 
 	Cmd.Flags().StringVar(&flagFromTo, "from_to", "",
-		"the height range to verify blocks, i.e, 1-1000, 1000-2000, 2000-3000, etc.")
+		"the height range to verify blocks (inclusive), i.e, 1-1000, 1000-2000, 2000-3000, etc.")
 }
 
 func run(*cobra.Command, []string) {
