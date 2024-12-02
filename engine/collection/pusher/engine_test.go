@@ -13,7 +13,6 @@ import (
 	"github.com/onflow/flow-go/engine/collection/pusher"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
-	"github.com/onflow/flow-go/model/messages"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/metrics"
 	module "github.com/onflow/flow-go/module/mock"
@@ -97,11 +96,9 @@ func (suite *Suite) TestSubmitCollectionGuarantee() {
 	suite.conduit.On("Publish", guarantee, consensus[0].NodeID).
 		Run(func(_ mock.Arguments) { close(done) }).Return(nil).Once()
 
-	msg := &messages.SubmitCollectionGuarantee{
-		Guarantee: *guarantee,
-	}
-	err := suite.engine.ProcessLocal(msg)
-	suite.Require().Nil(err)
+	suite.engine.SubmitCollectionGuarantee(guarantee)
+	// TODO signature?
+	//suite.Require().Nil(err)
 
 	unittest.RequireCloseBefore(suite.T(), done, time.Second, "message not sent")
 
@@ -116,10 +113,7 @@ func (suite *Suite) TestSubmitCollectionGuaranteeNonLocal() {
 	// send from a non-allowed role
 	sender := suite.identities.Filter(filter.HasRole[flow.Identity](flow.RoleVerification))[0]
 
-	msg := &messages.SubmitCollectionGuarantee{
-		Guarantee: *guarantee,
-	}
-	err := suite.engine.Process(channels.PushGuarantees, sender.NodeID, msg)
+	err := suite.engine.Process(channels.PushGuarantees, sender.NodeID, guarantee)
 	suite.Require().Error(err)
 
 	suite.conduit.AssertNumberOfCalls(suite.T(), "Multicast", 0)

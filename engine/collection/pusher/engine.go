@@ -13,7 +13,6 @@ import (
 	"github.com/onflow/flow-go/engine/common/fifoqueue"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
-	"github.com/onflow/flow-go/model/messages"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/component"
 	"github.com/onflow/flow-go/module/irrecoverable"
@@ -44,8 +43,7 @@ type Engine struct {
 	cm *component.ComponentManager
 }
 
-// TODO convert to network.MessageProcessor
-var _ network.Engine = (*Engine)(nil)
+var _ network.MessageProcessor = (*Engine)(nil)
 var _ component.Component = (*Engine)(nil)
 
 // New creates a new pusher engine.
@@ -120,17 +118,17 @@ func (e *Engine) outboundQueueWorker(ctx irrecoverable.SignalerContext, ready co
 // No errors expected during normal operations.
 func (e *Engine) processOutboundMessages(ctx context.Context) error {
 	for {
-		nextMessage, ok := e.queue.Pop()
+		item, ok := e.queue.Pop()
 		if !ok {
 			return nil
 		}
 
-		asSCGMsg, ok := nextMessage.(*messages.SubmitCollectionGuarantee)
+		guarantee, ok := item.(*flow.CollectionGuarantee)
 		if !ok {
-			return fmt.Errorf("invalid message type in pusher engine queue")
+			return fmt.Errorf("invalid type in pusher engine queue")
 		}
 
-		err := e.publishCollectionGuarantee(&asSCGMsg.Guarantee)
+		err := e.publishCollectionGuarantee(guarantee)
 		if err != nil {
 			return err
 		}
@@ -143,44 +141,18 @@ func (e *Engine) processOutboundMessages(ctx context.Context) error {
 	}
 }
 
-// SubmitLocal submits an event originating on the local node.
-func (e *Engine) SubmitLocal(event interface{}) {
-	ev, ok := event.(*messages.SubmitCollectionGuarantee)
-	if ok {
-		e.SubmitCollectionGuarantee(ev)
-	} else {
-		engine.LogError(e.log, fmt.Errorf("invalid message argument to pusher engine"))
-	}
-}
-
-// Submit submits the given event from the node with the given origin ID
-// for processing in a non-blocking manner. It returns instantly and logs
-// a potential processing error internally when done.
-func (e *Engine) Submit(channel channels.Channel, originID flow.Identifier, event interface{}) {
-	engine.LogError(e.log, fmt.Errorf("pusher engine should only receive local messages on the same node"))
-}
-
-// ProcessLocal processes an event originating on the local node.
-func (e *Engine) ProcessLocal(event interface{}) error {
-	ev, ok := event.(*messages.SubmitCollectionGuarantee)
-	if ok {
-		e.SubmitCollectionGuarantee(ev)
-		return nil
-	} else {
-		return fmt.Errorf("invalid message argument to pusher engine")
-	}
-}
-
 // Process processes the given event from the node with the given origin ID in
-// a blocking manner. It returns the potential processing error when done.
+// a non-blocking manner. It returns the potential processing error when done.
+// Because the pusher engine does not accept inputs from the network,
+// always drop any messages and return an error.
 func (e *Engine) Process(channel channels.Channel, originID flow.Identifier, message any) error {
 	return fmt.Errorf("pusher engine should only receive local messages on the same node")
 }
 
 // SubmitCollectionGuarantee adds a collection guarantee to the engine's queue
 // to later be published to consensus nodes.
-func (e *Engine) SubmitCollectionGuarantee(msg *messages.SubmitCollectionGuarantee) {
-	if e.queue.Push(msg) {
+func (e *Engine) SubmitCollectionGuarantee(guarantee *flow.CollectionGuarantee) {
+	if e.queue.Push(guarantee) {
 		e.notifier.Notify()
 	} else {
 		e.engMetrics.OutboundMessageDropped(metrics.EngineCollectionProvider, metrics.MessageCollectionGuarantee)

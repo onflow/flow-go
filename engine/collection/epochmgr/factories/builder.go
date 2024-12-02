@@ -6,11 +6,11 @@ import (
 	"github.com/dgraph-io/badger/v2"
 	"github.com/rs/zerolog"
 
+	"github.com/onflow/flow-go/engine/collection"
 	"github.com/onflow/flow-go/module"
 	builder "github.com/onflow/flow-go/module/builder/collection"
 	finalizer "github.com/onflow/flow-go/module/finalizer/collection"
 	"github.com/onflow/flow-go/module/mempool"
-	"github.com/onflow/flow-go/network"
 	clusterstate "github.com/onflow/flow-go/state/cluster"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/storage"
@@ -23,7 +23,7 @@ type BuilderFactory struct {
 	trace            module.Tracer
 	opts             []builder.Opt
 	metrics          module.CollectionMetrics
-	pusher           network.Engine // engine for pushing finalized collection to consensus committee
+	pusher           collection.GuaranteedCollectionPublisher // engine for pushing finalized collection to consensus committee
 	log              zerolog.Logger
 }
 
@@ -33,7 +33,7 @@ func NewBuilderFactory(
 	mainChainHeaders storage.Headers,
 	trace module.Tracer,
 	metrics module.CollectionMetrics,
-	pusher network.Engine,
+	pusher collection.GuaranteedCollectionPublisher,
 	log zerolog.Logger,
 	opts ...builder.Opt,
 ) (*BuilderFactory, error) {

@@ -8,13 +8,12 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
+	collectionmock "github.com/onflow/flow-go/engine/collection/mock"
 	model "github.com/onflow/flow-go/model/cluster"
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/model/messages"
 	"github.com/onflow/flow-go/module/finalizer/collection"
 	"github.com/onflow/flow-go/module/mempool/herocache"
 	"github.com/onflow/flow-go/module/metrics"
-	"github.com/onflow/flow-go/network/mocknetwork"
 	cluster "github.com/onflow/flow-go/state/cluster/badger"
 	"github.com/onflow/flow-go/storage/badger/operation"
 	"github.com/onflow/flow-go/storage/badger/procedure"
@@ -65,8 +64,8 @@ func TestFinalizer(t *testing.T) {
 			bootstrap()
 			defer cleanup()
 
-			prov := new(mocknetwork.Engine)
-			prov.On("SubmitLocal", mock.Anything)
+			prov := new(collectionmock.GuaranteedCollectionPublisher)
+			prov.On("SubmitCollectionGuarantee", mock.Anything)
 			finalizer := collection.NewFinalizer(db, pool, prov, metrics)
 
 			fakeBlockID := unittest.IdentifierFixture()
@@ -78,8 +77,8 @@ func TestFinalizer(t *testing.T) {
 			bootstrap()
 			defer cleanup()
 
-			prov := new(mocknetwork.Engine)
-			prov.On("SubmitLocal", mock.Anything)
+			prov := new(collectionmock.GuaranteedCollectionPublisher)
+			prov.On("SubmitCollectionGuarantee", mock.Anything)
 			finalizer := collection.NewFinalizer(db, pool, prov, metrics)
 
 			// tx1 is included in the finalized block
@@ -104,8 +103,8 @@ func TestFinalizer(t *testing.T) {
 			bootstrap()
 			defer cleanup()
 
-			prov := new(mocknetwork.Engine)
-			prov.On("SubmitLocal", mock.Anything)
+			prov := new(collectionmock.GuaranteedCollectionPublisher)
+			prov.On("SubmitCollectionGuarantee", mock.Anything)
 			finalizer := collection.NewFinalizer(db, pool, prov, metrics)
 
 			// create a new block that isn't connected to a parent
@@ -123,7 +122,7 @@ func TestFinalizer(t *testing.T) {
 			bootstrap()
 			defer cleanup()
 
-			prov := new(mocknetwork.Engine)
+			prov := new(collectionmock.GuaranteedCollectionPublisher)
 			finalizer := collection.NewFinalizer(db, pool, prov, metrics)
 
 			// create a block with empty payload on genesis
@@ -141,15 +140,15 @@ func TestFinalizer(t *testing.T) {
 			assert.Equal(t, block.ID(), final.ID())
 
 			// collection should not have been propagated
-			prov.AssertNotCalled(t, "SubmitLocal", mock.Anything)
+			prov.AssertNotCalled(t, "SubmitCollectionGuarantee", mock.Anything)
 		})
 
 		t.Run("finalize single block", func(t *testing.T) {
 			bootstrap()
 			defer cleanup()
 
-			prov := new(mocknetwork.Engine)
-			prov.On("SubmitLocal", mock.Anything)
+			prov := new(collectionmock.GuaranteedCollectionPublisher)
+			prov.On("SubmitCollectionGuarantee", mock.Anything)
 			finalizer := collection.NewFinalizer(db, pool, prov, metrics)
 
 			// tx1 is included in the finalized block and mempool
@@ -180,15 +179,13 @@ func TestFinalizer(t *testing.T) {
 			assertClusterBlocksIndexedByReferenceHeight(t, db, refBlock.Height, final.ID())
 
 			// block should be passed to provider
-			prov.AssertNumberOfCalls(t, "SubmitLocal", 1)
-			prov.AssertCalled(t, "SubmitLocal", &messages.SubmitCollectionGuarantee{
-				Guarantee: flow.CollectionGuarantee{
-					CollectionID:     block.Payload.Collection.ID(),
-					ReferenceBlockID: refBlock.ID(),
-					ChainID:          block.Header.ChainID,
-					SignerIndices:    block.Header.ParentVoterIndices,
-					Signature:        nil,
-				},
+			prov.AssertNumberOfCalls(t, "SubmitCollectionGuarantee", 1)
+			prov.AssertCalled(t, "SubmitCollectionGuarantee", &flow.CollectionGuarantee{
+				CollectionID:     block.Payload.Collection.ID(),
+				ReferenceBlockID: refBlock.ID(),
+				ChainID:          block.Header.ChainID,
+				SignerIndices:    block.Header.ParentVoterIndices,
+				Signature:        nil,
 			})
 		})
 
@@ -197,8 +194,8 @@ func TestFinalizer(t *testing.T) {
 			bootstrap()
 			defer cleanup()
 
-			prov := new(mocknetwork.Engine)
-			prov.On("SubmitLocal", mock.Anything)
+			prov := new(collectionmock.GuaranteedCollectionPublisher)
+			prov.On("SubmitCollectionGuarantee", mock.Anything)
 			finalizer := collection.NewFinalizer(db, pool, prov, metrics)
 
 			// tx1 is included in the first finalized block and mempool
@@ -233,24 +230,20 @@ func TestFinalizer(t *testing.T) {
 			assertClusterBlocksIndexedByReferenceHeight(t, db, refBlock.Height, block1.ID(), block2.ID())
 
 			// both blocks should be passed to provider
-			prov.AssertNumberOfCalls(t, "SubmitLocal", 2)
-			prov.AssertCalled(t, "SubmitLocal", &messages.SubmitCollectionGuarantee{
-				Guarantee: flow.CollectionGuarantee{
-					CollectionID:     block1.Payload.Collection.ID(),
-					ReferenceBlockID: refBlock.ID(),
-					ChainID:          block1.Header.ChainID,
-					SignerIndices:    block1.Header.ParentVoterIndices,
-					Signature:        nil,
-				},
+			prov.AssertNumberOfCalls(t, "SubmitCollectionGuarantee", 2)
+			prov.AssertCalled(t, "SubmitCollectionGuarantee", &flow.CollectionGuarantee{
+				CollectionID:     block1.Payload.Collection.ID(),
+				ReferenceBlockID: refBlock.ID(),
+				ChainID:          block1.Header.ChainID,
+				SignerIndices:    block1.Header.ParentVoterIndices,
+				Signature:        nil,
 			})
-			prov.AssertCalled(t, "SubmitLocal", &messages.SubmitCollectionGuarantee{
-				Guarantee: flow.CollectionGuarantee{
-					CollectionID:     block2.Payload.Collection.ID(),
-					ReferenceBlockID: refBlock.ID(),
-					ChainID:          block2.Header.ChainID,
-					SignerIndices:    block2.Header.ParentVoterIndices,
-					Signature:        nil,
-				},
+			prov.AssertCalled(t, "SubmitCollectionGuarantee", &flow.CollectionGuarantee{
+				CollectionID:     block2.Payload.Collection.ID(),
+				ReferenceBlockID: refBlock.ID(),
+				ChainID:          block2.Header.ChainID,
+				SignerIndices:    block2.Header.ParentVoterIndices,
+				Signature:        nil,
 			})
 		})
 
@@ -258,8 +251,8 @@ func TestFinalizer(t *testing.T) {
 			bootstrap()
 			defer cleanup()
 
-			prov := new(mocknetwork.Engine)
-			prov.On("SubmitLocal", mock.Anything)
+			prov := new(collectionmock.GuaranteedCollectionPublisher)
+			prov.On("SubmitCollectionGuarantee", mock.Anything)
 			finalizer := collection.NewFinalizer(db, pool, prov, metrics)
 
 			// tx1 is included in the finalized parent block and mempool
@@ -295,15 +288,13 @@ func TestFinalizer(t *testing.T) {
 			assertClusterBlocksIndexedByReferenceHeight(t, db, refBlock.Height, block1.ID())
 
 			// block should be passed to provider
-			prov.AssertNumberOfCalls(t, "SubmitLocal", 1)
-			prov.AssertCalled(t, "SubmitLocal", &messages.SubmitCollectionGuarantee{
-				Guarantee: flow.CollectionGuarantee{
-					CollectionID:     block1.Payload.Collection.ID(),
-					ReferenceBlockID: refBlock.ID(),
-					ChainID:          block1.Header.ChainID,
-					SignerIndices:    block1.Header.ParentVoterIndices,
-					Signature:        nil,
-				},
+			prov.AssertNumberOfCalls(t, "SubmitCollectionGuarantee", 1)
+			prov.AssertCalled(t, "SubmitCollectionGuarantee", &flow.CollectionGuarantee{
+				CollectionID:     block1.Payload.Collection.ID(),
+				ReferenceBlockID: refBlock.ID(),
+				ChainID:          block1.Header.ChainID,
+				SignerIndices:    block1.Header.ParentVoterIndices,
+				Signature:        nil,
 			})
 		})
 
@@ -312,8 +303,8 @@ func TestFinalizer(t *testing.T) {
 			bootstrap()
 			defer cleanup()
 
-			prov := new(mocknetwork.Engine)
-			prov.On("SubmitLocal", mock.Anything)
+			prov := new(collectionmock.GuaranteedCollectionPublisher)
+			prov.On("SubmitCollectionGuarantee", mock.Anything)
 			finalizer := collection.NewFinalizer(db, pool, prov, metrics)
 
 			// tx1 is included in the finalized block and mempool
@@ -349,15 +340,13 @@ func TestFinalizer(t *testing.T) {
 			assertClusterBlocksIndexedByReferenceHeight(t, db, refBlock.Height, block1.ID())
 
 			// block should be passed to provider
-			prov.AssertNumberOfCalls(t, "SubmitLocal", 1)
-			prov.AssertCalled(t, "SubmitLocal", &messages.SubmitCollectionGuarantee{
-				Guarantee: flow.CollectionGuarantee{
-					CollectionID:     block1.Payload.Collection.ID(),
-					ReferenceBlockID: refBlock.ID(),
-					ChainID:          block1.Header.ChainID,
-					SignerIndices:    block1.Header.ParentVoterIndices,
-					Signature:        nil,
-				},
+			prov.AssertNumberOfCalls(t, "SubmitCollectionGuarantee", 1)
+			prov.AssertCalled(t, "SubmitCollectionGuarantee", &flow.CollectionGuarantee{
+				CollectionID:     block1.Payload.Collection.ID(),
+				ReferenceBlockID: refBlock.ID(),
+				ChainID:          block1.Header.ChainID,
+				SignerIndices:    block1.Header.ParentVoterIndices,
+				Signature:        nil,
 			})
 		})
 	})

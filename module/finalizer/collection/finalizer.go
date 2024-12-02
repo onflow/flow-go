@@ -5,12 +5,11 @@ import (
 
 	"github.com/dgraph-io/badger/v2"
 
+	"github.com/onflow/flow-go/engine/collection"
 	"github.com/onflow/flow-go/model/cluster"
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/model/messages"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/mempool"
-	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/storage/badger/operation"
 	"github.com/onflow/flow-go/storage/badger/procedure"
 )
@@ -22,7 +21,7 @@ import (
 type Finalizer struct {
 	db           *badger.DB
 	transactions mempool.Transactions
-	prov         network.Engine
+	prov         collection.GuaranteedCollectionPublisher
 	metrics      module.CollectionMetrics
 }
 
@@ -30,7 +29,7 @@ type Finalizer struct {
 func NewFinalizer(
 	db *badger.DB,
 	transactions mempool.Transactions,
-	prov network.Engine,
+	prov collection.GuaranteedCollectionPublisher,
 	metrics module.CollectionMetrics,
 ) *Finalizer {
 	f := &Finalizer{
@@ -160,14 +159,12 @@ func (f *Finalizer) MakeFinal(blockID flow.Identifier) error {
 			// collection.
 
 			// TODO add real signatures here (2711)
-			f.prov.SubmitLocal(&messages.SubmitCollectionGuarantee{
-				Guarantee: flow.CollectionGuarantee{
-					CollectionID:     payload.Collection.ID(),
-					ReferenceBlockID: payload.ReferenceBlockID,
-					ChainID:          header.ChainID,
-					SignerIndices:    step.ParentVoterIndices,
-					Signature:        nil, // TODO: to remove because it's not easily verifiable by consensus nodes
-				},
+			f.prov.SubmitCollectionGuarantee(&flow.CollectionGuarantee{
+				CollectionID:     payload.Collection.ID(),
+				ReferenceBlockID: payload.ReferenceBlockID,
+				ChainID:          header.ChainID,
+				SignerIndices:    step.ParentVoterIndices,
+				Signature:        nil, // TODO: to remove because it's not easily verifiable by consensus nodes
 			})
 		}
 
