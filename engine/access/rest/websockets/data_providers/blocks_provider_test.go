@@ -217,7 +217,7 @@ func (s *BlocksProviderSuite) requireBlock(v interface{}, expectedBlock *flow.Bl
 // Arguments:
 // - topic: The topic associated with the data provider.
 // - tests: A slice of test cases to run, each specifying setup and validation logic.
-// - sendData: A function to simulate emitting data into the data channel.
+// - sendData: A function to simulate emitting data into the subscription's data channel.
 // - requireFn: A function to validate the output received in the send channel.
 func (s *BlocksProviderSuite) testHappyPath(
 	topic string,

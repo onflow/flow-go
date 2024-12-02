@@ -58,7 +58,14 @@ func NewBlockDigestsDataProvider(
 //
 // No errors are expected during normal operations.
 func (p *BlockDigestsDataProvider) Run() error {
-	return subscription.HandleSubscription(p.subscription, p.handleResponse(p.send))
+	return subscription.HandleSubscription(
+		p.subscription,
+		subscription.HandleResponse(p.send, func(block *flow.BlockDigest) (interface{}, error) {
+			return &models.BlockDigestMessageResponse{
+				Block: block,
+			}, nil
+		}),
+	)
 }
 
 // createSubscription creates a new subscription using the specified input arguments.
@@ -72,17 +79,4 @@ func (p *BlockDigestsDataProvider) createSubscription(ctx context.Context, args 
 	}
 
 	return p.api.SubscribeBlockDigestsFromLatest(ctx, args.BlockStatus)
-}
-
-// handleResponse processes a block digest and sends the formatted response.
-//
-// No errors are expected during normal operations.
-func (p *BlockDigestsDataProvider) handleResponse(send chan<- interface{}) func(block *flow.BlockDigest) error {
-	return func(block *flow.BlockDigest) error {
-		send <- &models.BlockDigestMessageResponse{
-			Block: block,
-		}
-
-		return nil
-	}
 }
