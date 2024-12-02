@@ -49,23 +49,10 @@ func (er *BlockExecutionResult) AllEvents() flow.EventsList {
 	return res
 }
 
-// ServiceEventIndicesForChunk returns the list of service event indices associated with the given chunk.
-// Outputs are index ranges with no gaps, and index into the flow.ExecutionResult.ServiceEvents field.
-func (er *BlockExecutionResult) ServiceEventIndicesForChunk(chunkIndex int) []uint32 {
-	nServiceEventsForChunk := len(er.collectionExecutionResults[chunkIndex].serviceEvents)
-	if nServiceEventsForChunk == 0 {
-		return []uint32{}
-	}
-
-	firstIndex := 0
-	for i := 0; i < chunkIndex; i++ {
-		firstIndex += len(er.collectionExecutionResults[i].serviceEvents)
-	}
-	indices := make([]uint32, 0, nServiceEventsForChunk)
-	for i := firstIndex; i < firstIndex+nServiceEventsForChunk; i++ {
-		indices = append(indices, uint32(i))
-	}
-	return indices
+// ServiceEventCountForChunk returns the number of service events emitted in the given chunk.
+func (er *BlockExecutionResult) ServiceEventCountForChunk(chunkIndex int) uint16 {
+	serviceEventCount := len(er.collectionExecutionResults[chunkIndex].serviceEvents)
+	return uint16(serviceEventCount)
 }
 
 func (er *BlockExecutionResult) AllServiceEvents() flow.EventsList {
@@ -218,7 +205,7 @@ func (ar *BlockAttestationResult) ChunkAt(index int) *flow.Chunk {
 		attestRes.startStateCommit,
 		len(execRes.TransactionResults()),
 		attestRes.eventCommit,
-		ar.ServiceEventIndicesForChunk(index),
+		ar.ServiceEventCountForChunk(index),
 		attestRes.endStateCommit,
 		execRes.executionSnapshot.TotalComputationUsed(),
 	)

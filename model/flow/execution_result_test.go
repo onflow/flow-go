@@ -43,6 +43,7 @@ func TestExecutionResultGroupBy(t *testing.T) {
 	assert.Equal(t, 0, unknown.Size())
 }
 
+// TODO
 func TestExecutionResult_FingerprintBackwardCompatibility(t *testing.T) {}
 
 // Tests that [ExecutionResult.ServiceEventsByChunk] method works in a variety of circumstances.

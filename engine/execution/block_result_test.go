@@ -24,15 +24,15 @@ func makeBlockExecutionResultFixture(serviceEventsPerChunk []int) *BlockExecutio
 	return fixture
 }
 
-// Tests that ServiceEventIndicesForChunk method works as expected under various circumstances:
+// Tests that ServiceEventCountForChunk method works as expected under various circumstances:
 func TestBlockExecutionResult_ServiceEventIndicesForChunk(t *testing.T) {
 	t.Run("no service events", func(t *testing.T) {
 		nChunks := rand.Intn(10) + 1
 		blockResult := makeBlockExecutionResultFixture(make([]int, nChunks))
-		// all chunks should yield an empty list of service event indices
+		// all chunks should have 0 service event count
 		for chunkIndex := 0; chunkIndex < nChunks; chunkIndex++ {
-			indices := blockResult.ServiceEventIndicesForChunk(chunkIndex)
-			assert.Equal(t, make([]uint32, 0), indices)
+			count := blockResult.ServiceEventCountForChunk(chunkIndex)
+			assert.Equal(t, uint16(0), count)
 		}
 	})
 	t.Run("service events only in system chunk", func(t *testing.T) {
@@ -43,14 +43,13 @@ func TestBlockExecutionResult_ServiceEventIndicesForChunk(t *testing.T) {
 		serviceEventAllocation[nChunks-1] = nServiceEvents
 
 		blockResult := makeBlockExecutionResultFixture(serviceEventAllocation)
-		// all non-system chunks should yield an empty list of service event indices
+		// all non-system chunks should have zero service event count
 		for chunkIndex := 0; chunkIndex < nChunks-1; chunkIndex++ {
-			indices := blockResult.ServiceEventIndicesForChunk(chunkIndex)
-			assert.Equal(t, make([]uint32, 0), indices)
+			count := blockResult.ServiceEventCountForChunk(chunkIndex)
+			assert.Equal(t, uint16(0), count)
 		}
-		// the system chunk should contain indices for all events
-		expected := slices.MakeRange[uint32](0, uint32(nServiceEvents))
-		assert.Equal(t, expected, blockResult.ServiceEventIndicesForChunk(nChunks-1))
+		// the system chunk should contain all service events
+		assert.Equal(t, uint16(nServiceEvents), blockResult.ServiceEventCountForChunk(nChunks-1))
 	})
 	t.Run("service events only outside system chunk", func(t *testing.T) {
 		nChunks := rand.Intn(10) + 2 // at least 2 chunks
@@ -59,28 +58,24 @@ func TestBlockExecutionResult_ServiceEventIndicesForChunk(t *testing.T) {
 		serviceEventAllocation[nChunks-1] = 0
 
 		blockResult := makeBlockExecutionResultFixture(serviceEventAllocation)
-		// all non-system chunks should yield a length-1 list of service event indices
+		// all non-system chunks should have 1 service event
 		for chunkIndex := 0; chunkIndex < nChunks-1; chunkIndex++ {
-			indices := blockResult.ServiceEventIndicesForChunk(chunkIndex)
-			// 1 service event per chunk => service event indices match chunk indices
-			expected := slices.Fill(uint32(chunkIndex), 1)
-			assert.Equal(t, expected, indices)
+			count := blockResult.ServiceEventCountForChunk(chunkIndex)
+			assert.Equal(t, uint16(1), count)
 		}
-		// the system chunk should contain indices for all events
-		assert.Equal(t, make([]uint32, 0), blockResult.ServiceEventIndicesForChunk(nChunks-1))
+		// the system chunk service event count should include all service events
+		assert.Equal(t, uint16(0), blockResult.ServiceEventCountForChunk(nChunks-1))
 	})
 	t.Run("service events in both system chunk and other chunks", func(t *testing.T) {
 		nChunks := rand.Intn(10) + 2 // at least 2 chunks
-		// add 1 service event to all chunks (including system chunk
+		// add 1 service event to all chunks (including system chunk)
 		serviceEventAllocation := slices.Fill(1, nChunks)
 
 		blockResult := makeBlockExecutionResultFixture(serviceEventAllocation)
-		// all  chunks should yield a length-1 list of service event indices
+		// all chunks should have service event count of 1
 		for chunkIndex := 0; chunkIndex < nChunks; chunkIndex++ {
-			indices := blockResult.ServiceEventIndicesForChunk(chunkIndex)
-			// 1 service event per chunk => service event indices match chunk indices
-			expected := slices.Fill(uint32(chunkIndex), 1)
-			assert.Equal(t, expected, indices)
+			count := blockResult.ServiceEventCountForChunk(chunkIndex)
+			assert.Equal(t, uint16(1), count)
 		}
 	})
 }
