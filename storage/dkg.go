@@ -21,36 +21,42 @@ type SafeBeaconKeys interface {
 	RetrieveMyBeaconPrivateKey(epochCounter uint64) (key crypto.PrivateKey, safe bool, err error)
 }
 
-// DKGStateReader ...
+// DKGStateReader is a ready-only interface for reading state of the Random Beacon Recoverable State Machine.
 type DKGStateReader interface {
 	SafeBeaconKeys
 
-	// GetDKGEndState retrieves the end state for the given DKG.
-	// Error returns: storage.ErrNotFound
+	// GetDKGState retrieves the current state of the state machine for the given epoch.
+	// If an error is returned, the state is undefined meaning that state machine is in initial state
+	// Error returns: storage.ErrNotFound.
 	GetDKGState(epochCounter uint64) (flow.DKGState, error)
+
+	// GetDKGStarted checks whether the DKG has been started for the given epoch.
+	// No errors expected during normal operation.
+	GetDKGStarted(epochCounter uint64) (bool, error)
 
 	// UnsafeRetrieveMyBeaconPrivateKey retrieves the random beacon private key for an epoch.
 	//
 	// CAUTION: these keys are stored before they are validated against the
 	// canonical key vector and may not be valid for use in signing. Use SafeBeaconKeys
 	// to guarantee only keys safe for signing are returned
-	// Error returns: storage.ErrNotFound
+	// Error returns: storage.ErrNotFound.
 	UnsafeRetrieveMyBeaconPrivateKey(epochCounter uint64) (crypto.PrivateKey, error)
 }
 
 // DKGState is the storage interface for storing all artifacts and state
-// related to the DKG process, including the latest state of a running or
-// completed DKG, and computed beacon keys.
+// related to the DKG process, including the latest state of a running or completed DKG, and computed beacon keys.
+// It allows to initiate state transitions to the Random Beacon Recoverable State Machine by calling respective methods.
+// It supports all state transitions for the happy path. Recovery from the epoch fallback mode is supported by the EpochRecoveryMyBeaconKey interface.
 type DKGState interface {
 	DKGStateReader
 
-	// SetDKGEndState stores that the DKG has ended, and its end state.
-	// Error returns: storage.ErrAlreadyExists
+	// SetDKGState performs a state transition for the Random Beacon Recoverable State Machine.
+	// Some state transitions may not be possible using this method. For instance, we might not be able to enter [flow.DKGStateCompleted]
+	// state directly from [flow.DKGStateStarted], even if such transition is valid. The reason for this is that some states require additional
+	// data to be processed by the state machine before the transition can be made. For such cases there are dedicated methods that should be used, ex.
+	// InsertMyBeaconPrivateKey and UpsertMyBeaconPrivateKey, which allow to store the needed data and perform the transition in one atomic operation.
+	// No errors are expected during normal operations.
 	SetDKGState(epochCounter uint64, newState flow.DKGState) error
-
-	// GetDKGStarted checks whether the DKG has been started for the given epoch.
-	// No errors expected during normal operation.
-	GetDKGStarted(epochCounter uint64) (bool, error)
 
 	// InsertMyBeaconPrivateKey stores the random beacon private key for an epoch.
 	//
@@ -64,7 +70,7 @@ type DKGState interface {
 // EpochRecoveryMyBeaconKey is a specific interface that allows to overwrite the beacon private key for given epoch.
 // This interface is used *ONLY* in the epoch recovery process and only by the consensus participants.
 // Each consensus participant takes part in the DKG, after finishing the DKG protocol each replica obtains a random beacon
-// private key which is stored in the database along with DKG end state which will be equal to flow.DKGEndStateSuccess.
+// private key which is stored in the database along with DKG state which will be equal to [flow.RandomBeaconKeyCommitted].
 // If for any reason DKG fails, then the private key will be nil and DKG end state will be equal to flow.DKGEndStateDKGFailure.
 // It's not a problem by itself, but when the epoch recovery takes place, we need to query last valid beacon private key for
 // the current replica and set it for recovered epoch, otherwise replicas won't be able to vote for blocks in the recovered epoch.
