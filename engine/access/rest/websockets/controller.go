@@ -21,7 +21,8 @@ const (
 	// This value must be less than pongWait.
 	PingPeriod = (PongWait * 9) / 10
 
-	// PongWait specifies the maximum time to wait for a pong message from the peer.
+	// PongWait specifies the maximum time to wait for a pong response message from the peer
+	// after sending a ping
 	PongWait = 10 * time.Second
 
 	// WriteWait specifies the maximum duration allowed to write a message to the peer.
@@ -354,10 +355,12 @@ func (c *Controller) keepalive(ctx context.Context) error {
 		case <-ctx.Done():
 			return ctx.Err()
 		case <-pingTicker.C:
-			if err := c.sendPing(); err != nil {
+			err := c.conn.WriteControl(websocket.PingMessage, time.Now().Add(WriteWait))
+			if err != nil {
 				// Log error and exit the loop on failure
-				c.logger.Error().Err(err).Msg("failed to send ping")
-				return err
+				c.logger.Debug().Err(err).Msg("failed to send ping")
+
+				return fmt.Errorf("failed to write ping message: %w", err)
 			}
 		}
 	}
