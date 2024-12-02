@@ -54,3 +54,25 @@ func HandleRPCSubscription[T any](sub Subscription, handleResponse func(resp T) 
 
 	return nil
 }
+
+// HandleResponse processes a generic response of type and sends it to the provided channel.
+//
+// Parameters:
+// - send: The channel to which the processed response is sent.
+// - transform: A function to transform the response into the expected interface{} type.
+//
+// No errors are expected during normal operations.
+func HandleResponse[T any](send chan<- interface{}, transform func(resp T) (interface{}, error)) func(resp T) error {
+	return func(response T) error {
+		// Transform the response
+		resp, err := transform(response)
+		if err != nil {
+			return fmt.Errorf("failed to transform response: %w", err)
+		}
+
+		// send to the channel
+		send <- resp
+
+		return nil
+	}
+}

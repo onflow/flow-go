@@ -67,7 +67,14 @@ func NewBlocksDataProvider(
 //
 // No errors are expected during normal operations.
 func (p *BlocksDataProvider) Run() error {
-	return subscription.HandleSubscription(p.subscription, p.handleResponse(p.send))
+	return subscription.HandleSubscription(
+		p.subscription,
+		subscription.HandleResponse(p.send, func(block *flow.Block) (interface{}, error) {
+			return &models.BlockMessageResponse{
+				Block: block,
+			}, nil
+		}),
+	)
 }
 
 // createSubscription creates a new subscription using the specified input arguments.
@@ -81,19 +88,6 @@ func (p *BlocksDataProvider) createSubscription(ctx context.Context, args Blocks
 	}
 
 	return p.api.SubscribeBlocksFromLatest(ctx, args.BlockStatus)
-}
-
-// handleResponse processes a block and sends the formatted response.
-//
-// No errors are expected during normal operations.
-func (p *BlocksDataProvider) handleResponse(send chan<- interface{}) func(*flow.Block) error {
-	return func(block *flow.Block) error {
-		send <- &models.BlockMessageResponse{
-			Block: block,
-		}
-
-		return nil
-	}
 }
 
 // ParseBlocksArguments validates and initializes the blocks arguments.

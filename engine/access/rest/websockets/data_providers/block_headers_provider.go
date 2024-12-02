@@ -58,7 +58,14 @@ func NewBlockHeadersDataProvider(
 //
 // No errors are expected during normal operations.
 func (p *BlockHeadersDataProvider) Run() error {
-	return subscription.HandleSubscription(p.subscription, p.handleResponse(p.send))
+	return subscription.HandleSubscription(
+		p.subscription,
+		subscription.HandleResponse(p.send, func(header *flow.Header) (interface{}, error) {
+			return &models.BlockHeaderMessageResponse{
+				Header: header,
+			}, nil
+		}),
+	)
 }
 
 // createSubscription creates a new subscription using the specified input arguments.
@@ -72,17 +79,4 @@ func (p *BlockHeadersDataProvider) createSubscription(ctx context.Context, args 
 	}
 
 	return p.api.SubscribeBlockHeadersFromLatest(ctx, args.BlockStatus)
-}
-
-// handleResponse processes a block header and sends the formatted response.
-//
-// No errors are expected during normal operations.
-func (p *BlockHeadersDataProvider) handleResponse(send chan<- interface{}) func(header *flow.Header) error {
-	return func(header *flow.Header) error {
-		send <- &models.BlockHeaderMessageResponse{
-			Header: header,
-		}
-
-		return nil
-	}
 }
