@@ -170,6 +170,9 @@ func (s *EventsProviderSuite) TestMessageIndexEventProviderResponse_HappyPath() 
 		responses = append(responses, eventRes)
 	}
 
+	// Verifying that indices are starting from 1
+	s.Require().Equal("1", responses[0].MessageIndex, "Expected MessageIndex to start with 1")
+
 	// Verifying that indices are strictly increasing
 	for i := 1; i < len(responses); i++ {
 		prevIndex, _ := strconv.Atoi(responses[i-1].MessageIndex)
