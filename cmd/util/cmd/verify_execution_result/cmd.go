@@ -36,9 +36,11 @@ func init() {
 
 	Cmd.Flags().StringVar(&flagDatadir, "datadir", "/var/flow/data/protocol",
 		"directory that stores the protocol state")
+	_ = Cmd.MarkFlagRequired("datadir")
 
 	Cmd.Flags().StringVar(&flagChunkDataPackDir, "chunk_data_pack_dir", "/var/flow/data/chunk_data_pack",
 		"directory that stores the protocol state")
+	_ = Cmd.MarkFlagRequired("chunk_data_pack_dir")
 
 	Cmd.Flags().Uint64Var(&flagLastK, "lastk", 1,
 		"last k sealed blocks to verify")
