@@ -13,7 +13,7 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
-// TestDKGState_UninitializedState checks that invariants are enforced for uninitialized DKG state.
+// TestDKGState_UninitializedState checks that invariants are enforced for [flow.DKGStateUninitialized] state.
 // This test is written in a way that we start with initial state of the Recoverable Random Beacon State Machine and
 // try to perform all possible actions and transitions in it.
 func TestDKGState_UninitializedState(t *testing.T) {
@@ -77,8 +77,8 @@ func TestDKGState_UninitializedState(t *testing.T) {
 	})
 }
 
-// TestDKGState_UninitializedState checks that invariants are enforced for uninitialized DKG state.
-// This test is written in a way that we start with initial state of the Recoverable Random Beacon State Machine and
+// TestDKGState_StartedState checks that invariants are enforced for [flow.DKGStateStarted] state.
+// This test is written in a way that we start in [flow.DKGStateStarted] of the Recoverable Random Beacon State Machine and
 // try to perform all possible actions and transitions in it.
 func TestDKGState_StartedState(t *testing.T) {
 	unittest.RunWithTypedBadgerDB(t, InitSecret, func(db *badger.DB) {
@@ -144,9 +144,9 @@ func TestDKGState_StartedState(t *testing.T) {
 	})
 }
 
-// TestDKGState_UninitializedState checks that invariants are enforced for uninitialized DKG state.
-// This test is written in a way that we start with initial state of the Recoverable Random Beacon State Machine and
-// try to perform all possible actions and transitions in it.
+// TestDKGState_CompletedState checks that invariants are enforced for [flow.DKGStateCompleted] state.
+// This test is written in a way that we start in [flow.DKGStateCompleted] of the Recoverable Random Beacon State Machine and
+// try to perform all possible actions and transitions in it. We enter [flow.DKGStateCompleted] by inserting a mock private key.
 func TestDKGState_CompletedState(t *testing.T) {
 	unittest.RunWithTypedBadgerDB(t, InitSecret, func(db *badger.DB) {
 		metrics := metrics.NewNoopCollector()
@@ -217,8 +217,8 @@ func TestDKGState_CompletedState(t *testing.T) {
 	})
 }
 
-// TestDKGState_UninitializedState checks that invariants are enforced for uninitialized DKG state.
-// This test is written in a way that we start with initial state of the Recoverable Random Beacon State Machine and
+// TestDKGState_FailureState checks that invariants are enforced for [flow.DKGStateFailure] state.
+// This test is written in a way that we start with [flow.DKGStateFailure] of the Recoverable Random Beacon State Machine and
 // try to perform all possible actions and transitions in it.
 func TestDKGState_FailureState(t *testing.T) {
 	unittest.RunWithTypedBadgerDB(t, InitSecret, func(db *badger.DB) {
@@ -289,8 +289,8 @@ func TestDKGState_FailureState(t *testing.T) {
 	})
 }
 
-// TestDKGState_UninitializedState checks that invariants are enforced for uninitialized DKG state.
-// This test is written in a way that we start with initial state of the Recoverable Random Beacon State Machine and
+// TestDKGState_RandomBeaconKeyCommittedState checks that invariants are enforced for [flow.RandomBeaconKeyCommitted] state.
+// This test is written in a way that we start with [flow.RandomBeaconKeyCommitted] state of the Recoverable Random Beacon State Machine and
 // try to perform all possible actions and transitions in it.
 func TestDKGState_RandomBeaconKeyCommittedState(t *testing.T) {
 	unittest.RunWithTypedBadgerDB(t, InitSecret, func(db *badger.DB) {
