@@ -90,6 +90,12 @@ func VerifyRange(
 
 	log.Info().Msgf("verifying blocks from %d to %d", from, to)
 
+	root := state.Params().SealedRoot().Height
+
+	if from <= root {
+		return fmt.Errorf("cannot verify blocks before the root block, from: %d, root: %d", from, root)
+	}
+
 	for height := from; height <= to; height++ {
 		log.Info().Uint64("height", height).Msg("verifying height")
 		err := verifyHeight(height, storages.Headers, chunkDataPacks, storages.Results, state, verifier)
