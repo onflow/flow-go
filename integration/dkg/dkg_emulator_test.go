@@ -136,9 +136,8 @@ func (s *EmulatorSuite) runTest(goodNodes int, emulatorProblems bool) {
 	signatures := []crypto.Signature{}
 	indices := []int{}
 	for i, n := range nodes {
-		beaconKey, safe, err := n.dkgState.RetrieveMyBeaconPrivateKey(nextEpochSetup.Counter)
+		beaconKey, err := n.dkgState.UnsafeRetrieveMyBeaconPrivateKey(nextEpochSetup.Counter)
 		require.NoError(s.T(), err)
-		require.True(s.T(), safe)
 
 		signature, err := beaconKey.Sign(sigData, hasher)
 		require.NoError(s.T(), err)

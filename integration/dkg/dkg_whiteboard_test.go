@@ -295,9 +295,8 @@ func TestWithWhiteboard(t *testing.T) {
 	signatures := []crypto.Signature{}
 	indices := []int{}
 	for i, n := range nodes {
-		beaconKey, safe, err := n.dkgState.RetrieveMyBeaconPrivateKey(nextEpochSetup.Counter)
+		beaconKey, err := n.dkgState.UnsafeRetrieveMyBeaconPrivateKey(nextEpochSetup.Counter)
 		require.NoError(t, err)
-		require.True(t, safe)
 
 		signature, err := beaconKey.Sign(sigData, hasher)
 		require.NoError(t, err)
