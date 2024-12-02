@@ -23,15 +23,15 @@ import (
 // VerifyLastKHeight verifies the last k sealed blocks by verifying all chunks in the results.
 // It assumes the latest sealed block has been executed, and the chunk data packs have not been
 // pruned.
-func VerifyLastKHeight(k uint64, chainID flow.ChainID, protocolDataDir string, chunkDataPackDir string) error {
+func VerifyLastKHeight(k uint64, chainID flow.ChainID, protocolDataDir string, chunkDataPackDir string) (err error) {
 	closer, storages, chunkDataPacks, state, verifier, err := initStorages(chainID, protocolDataDir, chunkDataPackDir)
 	if err != nil {
 		return fmt.Errorf("could not init storages: %w", err)
 	}
 	defer func() {
-		err := closer()
-		if err != nil {
-			log.Error().Err(err).Msg("failed to close storages")
+		closerErr := closer()
+		if closerErr != nil {
+			err = errors.Join(err, closerErr)
 		}
 	}()
 
@@ -132,15 +132,16 @@ func initStorages(chainID flow.ChainID, dataDir string, chunkDataPackDir string)
 
 	verifier := makeVerifier(log.Logger, chainID, storages.Headers)
 	closer := func() error {
-		err := db.Close()
-		if err != nil {
-			return fmt.Errorf("failed to close protocol db: %w", err)
+	        var dbErr, chunkDataPackDBErr error
+		
+		if err := db.Close(); err != nil {
+			dbErr = fmt.Errorf("failed to close protocol db: %w", err)
 		}
-		err = chunkDataPackDB.Close()
-		if err != nil {
-			return fmt.Errorf("failed to close chunk data pack db: %w", err)
+		
+		if err := chunkDataPackDB.Close(); err != nil {
+			chunkDataPackDBErr = fmt.Errorf("failed to close chunk data pack db: %w", err)
 		}
-		return nil
+		return errors.Join(dbErr, chunkDataPackDBErr)
 	}
 	return closer, storages, chunkDataPacks, state, verifier, nil
 }
