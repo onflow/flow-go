@@ -75,7 +75,22 @@ func NewEventsDataProvider(
 //
 // No errors are expected during normal operations.
 func (p *EventsDataProvider) Run() error {
-	return subscription.HandleSubscription(p.subscription, p.handleResponse(p.send))
+	messageIndex := counters.NewMonotonousCounter(1)
+
+	return subscription.HandleSubscription(
+		p.subscription,
+		subscription.HandleResponse(p.send, func(event *flow.Event) (interface{}, error) {
+			index := messageIndex.Value()
+			if ok := messageIndex.Set(messageIndex.Value() + 1); !ok {
+				return nil, status.Errorf(codes.Internal, "message index already incremented to %d", messageIndex.Value())
+			}
+
+			return &models.EventResponse{
+				Event:        event,
+				MessageIndex: strconv.FormatUint(index, 10),
+			}, nil
+		}))
+
 }
 
 // createSubscription creates a new subscription using the specified input arguments.
@@ -89,27 +104,6 @@ func (p *EventsDataProvider) createSubscription(ctx context.Context, args Events
 	}
 
 	return p.stateStreamApi.SubscribeEventsFromLatest(ctx, args.Filter)
-}
-
-// handleResponse processes an event and sends the formatted response.
-//
-// No errors are expected during normal operations.
-func (p *EventsDataProvider) handleResponse(send chan<- interface{}) func(*flow.Event) error {
-	messageIndex := counters.NewMonotonousCounter(1)
-
-	return func(event *flow.Event) error {
-		index := messageIndex.Value()
-		if ok := messageIndex.Set(messageIndex.Value() + 1); !ok {
-			return status.Errorf(codes.Internal, "message index already incremented to %d", messageIndex.Value())
-		}
-
-		send <- &models.EventResponse{
-			Event:        event,
-			MessageIndex: strconv.FormatUint(index, 10),
-		}
-
-		return nil
-	}
 }
 
 // ParseEventsArguments validates and initializes the events arguments.
