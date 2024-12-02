@@ -26,6 +26,8 @@ import (
 	"google.golang.org/api/option"
 
 	"github.com/onflow/flow-go/crypto"
+	"github.com/onflow/flow-go/fvm"
+	"github.com/onflow/flow-go/fvm/environment"
 
 	"github.com/onflow/flow-go/admin"
 	"github.com/onflow/flow-go/admin/commands"
@@ -34,8 +36,6 @@ import (
 	"github.com/onflow/flow-go/cmd/build"
 	"github.com/onflow/flow-go/config"
 	"github.com/onflow/flow-go/consensus/hotstuff/persister"
-	"github.com/onflow/flow-go/fvm"
-	"github.com/onflow/flow-go/fvm/environment"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/module"
