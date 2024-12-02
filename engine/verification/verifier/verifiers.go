@@ -3,8 +3,6 @@ package verifier
 import (
 	"fmt"
 
-	"github.com/cockroachdb/pebble"
-	"github.com/dgraph-io/badger/v2"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 
@@ -26,18 +24,14 @@ import (
 // It assumes the latest sealed block has been executed, and the chunk data packs have not been
 // pruned.
 func VerifyLastKHeight(k uint64, chainID flow.ChainID, protocolDataDir string, chunkDataPackDir string) error {
-	db, storages, cdpDB, chunkDataPacks, state, verifier, err := initStorages(chainID, protocolDataDir, chunkDataPackDir)
+	closer, storages, chunkDataPacks, state, verifier, err := initStorages(chainID, protocolDataDir, chunkDataPackDir)
 	if err != nil {
 		return fmt.Errorf("could not init storages: %w", err)
 	}
 	defer func() {
-		err := db.Close()
+		err := closer()
 		if err != nil {
-			log.Error().Err(err).Msg("failed to close db")
-		}
-		err = cdpDB.Close()
-		if err != nil {
-			log.Error().Err(err).Msg("failed to close chunk data pack db")
+			log.Error().Err(err).Msg("failed to close storages")
 		}
 	}()
 
@@ -47,6 +41,12 @@ func VerifyLastKHeight(k uint64, chainID flow.ChainID, protocolDataDir string, c
 	}
 
 	root := state.Params().SealedRoot().Height
+
+	// preventing overflow
+	if k > lastSealed.Height+1 {
+		return fmt.Errorf("k is greater than the number of sealed blocks, k: %d, last sealed height: %d", k, lastSealed.Height)
+	}
+
 	from := lastSealed.Height - k + 1
 
 	// root block is not verifiable, because it's sealed already.
@@ -57,6 +57,8 @@ func VerifyLastKHeight(k uint64, chainID flow.ChainID, protocolDataDir string, c
 		from = firstVerifiable
 	}
 	to := lastSealed.Height
+
+	log.Info().Msgf("verifying blocks from %d to %d", from, to)
 
 	for height := from; height <= to; height++ {
 		log.Info().Uint64("height", height).Msg("verifying height")
@@ -75,11 +77,18 @@ func VerifyRange(
 	chainID flow.ChainID,
 	protocolDataDir string, chunkDataPackDir string,
 ) error {
-	db, storages, chunkDataPacks, state, verifier, err := initStorages(chainID, protocolDataDir, chunkDataPackDir)
+	closer, storages, chunkDataPacks, state, verifier, err := initStorages(chainID, protocolDataDir, chunkDataPackDir)
 	if err != nil {
 		return fmt.Errorf("could not init storages: %w", err)
 	}
-	defer db.Close()
+	defer func() {
+		err := closer()
+		if err != nil {
+			log.Error().Err(err).Msg("failed to close storages")
+		}
+	}()
+
+	log.Info().Msgf("verifying blocks from %d to %d", from, to)
 
 	for height := from; height <= to; height++ {
 		log.Info().Uint64("height", height).Msg("verifying height")
@@ -93,9 +102,8 @@ func VerifyRange(
 }
 
 func initStorages(chainID flow.ChainID, dataDir string, chunkDataPackDir string) (
-	*badger.DB,
+	func() error,
 	*storage.All,
-	*pebble.DB,
 	storage.ChunkDataPacks,
 	protocol.State,
 	module.ChunkVerifier,
@@ -106,18 +114,29 @@ func initStorages(chainID flow.ChainID, dataDir string, chunkDataPackDir string)
 	storages := common.InitStorages(db)
 	state, err := common.InitProtocolState(db, storages)
 	if err != nil {
-		return nil, nil, nil, nil, nil, nil, fmt.Errorf("could not init protocol state: %w", err)
+		return nil, nil, nil, nil, nil, fmt.Errorf("could not init protocol state: %w", err)
 	}
 
 	chunkDataPackDB, err := storagepebble.OpenDefaultPebbleDB(chunkDataPackDir)
 	if err != nil {
-		return nil, nil, nil, nil, nil, nil, fmt.Errorf("could not open chunk data pack DB: %w", err)
+		return nil, nil, nil, nil, nil, fmt.Errorf("could not open chunk data pack DB: %w", err)
 	}
 	chunkDataPacks := storagepebble.NewChunkDataPacks(metrics.NewNoopCollector(),
 		chunkDataPackDB, storages.Collections, 1000)
 
 	verifier := makeVerifier(log.Logger, chainID, storages.Headers)
-	return db, storages, chunkDataPackDB, chunkDataPacks, state, verifier, nil
+	closer := func() error {
+		err := db.Close()
+		if err != nil {
+			return fmt.Errorf("failed to close protocol db: %w", err)
+		}
+		err = chunkDataPackDB.Close()
+		if err != nil {
+			return fmt.Errorf("failed to close chunk data pack db: %w", err)
+		}
+		return nil
+	}
+	return closer, storages, chunkDataPacks, state, verifier, nil
 }
 
 func verifyHeight(
