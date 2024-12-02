@@ -119,6 +119,7 @@ func (e *Engine) outboundQueueWorker(ctx irrecoverable.SignalerContext, ready co
 
 // processOutboundMessages processes any available messages from the queue.
 // Only returns when the queue is empty (or the engine is terminated).
+// No errors expected during normal operations.
 func (e *Engine) processOutboundMessages(ctx context.Context) error {
 	for {
 		nextMessage, ok := e.queue.Pop()
@@ -190,6 +191,7 @@ func (e *Engine) SubmitCollectionGuarantee(msg *messages.SubmitCollectionGuarant
 }
 
 // publishCollectionGuarantee publishes the collection guarantee to all consensus nodes.
+// No errors expected during normal operation.
 func (e *Engine) publishCollectionGuarantee(guarantee *flow.CollectionGuarantee) error {
 	consensusNodes, err := e.state.Final().Identities(filter.HasRole[flow.Identity](flow.RoleConsensus))
 	if err != nil {
