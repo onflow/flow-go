@@ -14,6 +14,34 @@ type EpochRecoveryMyBeaconKey struct {
 	mock.Mock
 }
 
+// GetDKGStarted provides a mock function with given fields: epochCounter
+func (_m *EpochRecoveryMyBeaconKey) GetDKGStarted(epochCounter uint64) (bool, error) {
+	ret := _m.Called(epochCounter)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetDKGStarted")
+	}
+
+	var r0 bool
+	var r1 error
+	if rf, ok := ret.Get(0).(func(uint64) (bool, error)); ok {
+		return rf(epochCounter)
+	}
+	if rf, ok := ret.Get(0).(func(uint64) bool); ok {
+		r0 = rf(epochCounter)
+	} else {
+		r0 = ret.Get(0).(bool)
+	}
+
+	if rf, ok := ret.Get(1).(func(uint64) error); ok {
+		r1 = rf(epochCounter)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
 // GetDKGState provides a mock function with given fields: epochCounter
 func (_m *EpochRecoveryMyBeaconKey) GetDKGState(epochCounter uint64) (flow.DKGState, error) {
 	ret := _m.Called(epochCounter)
