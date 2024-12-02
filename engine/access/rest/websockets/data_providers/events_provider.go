@@ -95,13 +95,13 @@ func (p *EventsDataProvider) createSubscription(ctx context.Context, args Events
 //
 // No errors are expected during normal operations.
 func (p *EventsDataProvider) handleResponse(send chan<- interface{}) func(*flow.Event) error {
-	messageIndex := counters.NewMonotonousCounter(0)
+	messageIndex := counters.NewMonotonousCounter(1)
 
 	return func(event *flow.Event) error {
+		index := messageIndex.Value()
 		if ok := messageIndex.Set(messageIndex.Value() + 1); !ok {
 			return status.Errorf(codes.Internal, "message index already incremented to %d", messageIndex.Value())
 		}
-		index := messageIndex.Value()
 
 		send <- &models.EventResponse{
 			Event:        event,
