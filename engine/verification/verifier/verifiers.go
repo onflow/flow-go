@@ -1,6 +1,7 @@
 package verifier
 
 import (
+	"errors"
 	"fmt"
 
 	"github.com/rs/zerolog"
@@ -76,15 +77,15 @@ func VerifyRange(
 	from, to uint64,
 	chainID flow.ChainID,
 	protocolDataDir string, chunkDataPackDir string,
-) error {
+) (err error) {
 	closer, storages, chunkDataPacks, state, verifier, err := initStorages(chainID, protocolDataDir, chunkDataPackDir)
 	if err != nil {
 		return fmt.Errorf("could not init storages: %w", err)
 	}
 	defer func() {
-		err := closer()
-		if err != nil {
-			log.Error().Err(err).Msg("failed to close storages")
+		closerErr := closer()
+		if closerErr != nil {
+			err = errors.Join(err, closerErr)
 		}
 	}()
 
@@ -132,12 +133,12 @@ func initStorages(chainID flow.ChainID, dataDir string, chunkDataPackDir string)
 
 	verifier := makeVerifier(log.Logger, chainID, storages.Headers)
 	closer := func() error {
-	        var dbErr, chunkDataPackDBErr error
-		
+		var dbErr, chunkDataPackDBErr error
+
 		if err := db.Close(); err != nil {
 			dbErr = fmt.Errorf("failed to close protocol db: %w", err)
 		}
-		
+
 		if err := chunkDataPackDB.Close(); err != nil {
 			chunkDataPackDBErr = fmt.Errorf("failed to close chunk data pack db: %w", err)
 		}
