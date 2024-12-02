@@ -48,7 +48,7 @@ func init() {
 }
 
 func run(*cobra.Command, []string) {
-	_ = flow.ChainID(flagChain).Chain()
+	chainID := flow.ChainID(flagChain)
 
 	if flagFromTo != "" {
 		from, to, err := parseFromTo(flagFromTo)
@@ -57,15 +57,15 @@ func run(*cobra.Command, []string) {
 		}
 
 		log.Info().Msgf("verifying range from %d to %d", from, to)
-		err = verifier.VerifyRange(from, to, flow.Testnet, flagDatadir, flagChunkDataPackDir)
+		err = verifier.VerifyRange(from, to, chainID, flagDatadir, flagChunkDataPackDir)
 		if err != nil {
-			log.Fatal().Err(err).Msg("could not verify last k height")
+			log.Fatal().Err(err).Msg("could not verify range from %d to %d")
 		}
 		log.Info().Msgf("successfully verified range from %d to %d", from, to)
 
 	} else {
 		log.Info().Msgf("verifying last %d sealed blocks", flagLastK)
-		err := verifier.VerifyLastKHeight(flagLastK, flow.Testnet, flagDatadir, flagChunkDataPackDir)
+		err := verifier.VerifyLastKHeight(flagLastK, chainID, flagDatadir, flagChunkDataPackDir)
 		if err != nil {
 			log.Fatal().Err(err).Msg("could not verify last k height")
 		}
