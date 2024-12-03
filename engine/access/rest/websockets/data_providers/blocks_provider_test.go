@@ -233,7 +233,7 @@ func (s *BlocksProviderSuite) testHappyPath(
 			// Create a channel to simulate the subscription's data channel
 			dataChan := make(chan interface{})
 
-			//	// Create a mock subscription and mock the channel
+			// Create a mock subscription and mock the channel
 			sub := statestreamsmock.NewSubscription(s.T())
 			sub.On("Channel").Return((<-chan interface{})(dataChan))
 			sub.On("Err").Return(nil)
