@@ -5,7 +5,7 @@
 // The [ReactorEngine] implements triggers to control the lifecycle of DKG instances.
 // A new DKG instance is started when an EpochSetup service event is sealed.
 // The subsequent phase transitions are triggered when specified views are encountered.
-// Specifically, phase transitions for a view V are triggered when the first block with view >=V is finalized.
+// Specifically, phase transitions for a view V are triggered when the first block with view ≥V is finalized.
 // Between phase transitions, we periodically query the DKG smart-contract ("whiteboard") to read broadcast messages.
 // Before transitioning the state machine to the next phase, we query the whiteboard w.r.t. the final view
 // of the phase - this ensures all participants eventually observe the same set of messages for each phase.
@@ -22,29 +22,24 @@
 // The dkg.ControllerFactory ties new module.DKGController's to the [MessagingEngine] via a dkg.BrokerTunnel,
 // which exposes channels to relay incoming and outgoing messages (see package module/dkg for details).
 //
-//	  EpochSetup/EpochCommit/OnView events
-//	            |
-//	            v
-//	     +---------------+
-//	     | ReactorEngine |
-//	     +---------------+
-//	            |
-//	            v
-//	 *~~~~~~~~~~~~~~~~~~~~~* <- Epoch-scoped components
-//	 |  +---------------+  |
-//	 |  | Controller    |  |
-//	 |  +---------------+  |
-//	 |         |           |
-//	 |         v           |
-//	 |  +---------------+  |
-//	 |  | Broker        |  |
-//	 |  +---------------+  |
-//	 *~~~~~~~~|~~~~~~~~~\~~*
-//	          |          \
-//	    BrokerTunnel      DKGContractClient
-//	          |            \
-//	+--------------+   +------------------+
-//	| Messaging    |   | FlowDKG smart    |
-//	| Engine       |   | contract         |
-//	+--------------+   +------------------+
+//	EpochSetup/EpochCommit/OnView events
+//	              ↓
+//	      ┏━━━━━━━━━━━━━━━━━┓
+//	      ┃   ReactorEngine ┃
+//	      ┗━━━━━━━━━━━━━━━━━┛
+//	              ↓
+//	      ┏━━━━━━━━━━━━━━━━━┓    ╮
+//	      ┃   Controller    ┃    │
+//	      ┗━━━━━━━━━━━━━━━━━┛    │
+//	              ↓              ┝ Epoch-scoped components
+//	      ┏━━━━━━━━━━━━━━━━━┓    │
+//	      ┃       Broker    ┃    │
+//	      ┗━━━━━━━━━━━━━━━━━┛    ╯
+//	          │         │
+//	 BrokerTunnel      DKGContractClient
+//	          ↓         ↓
+//	┏━━━━━━━━━━━━━━┓   ┏━━━━━━━━━━━━━━━━━━┓
+//	┃ Messaging    ┃   ┃ FlowDKG smart    ┃
+//	┃ Engine       ┃   ┃ contract         ┃
+//	┗━━━━━━━━━━━━━━┛   ┗━━━━━━━━━━━━━━━━━━┛
 package dkg
