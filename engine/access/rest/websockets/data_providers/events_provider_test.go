@@ -3,13 +3,13 @@ package data_providers
 import (
 	"context"
 	"fmt"
-	"github.com/stretchr/testify/require"
 	"strconv"
 	"testing"
 	"time"
 
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
 	"github.com/onflow/flow-go/engine/access/rest/websockets/models"
