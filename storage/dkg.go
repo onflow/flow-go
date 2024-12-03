@@ -3,6 +3,7 @@ package storage
 import (
 	"errors"
 	"fmt"
+
 	"github.com/onflow/crypto"
 
 	"github.com/onflow/flow-go/model/flow"
@@ -98,7 +99,7 @@ type InvalidTransitionRandomBeaconStateMachineErr struct {
 }
 
 func (e InvalidTransitionRandomBeaconStateMachineErr) Error() string {
-	return fmt.Sprintf("invalid state transition from %s to %s: %w", e.From.String(), e.To.String(), e.err.Error())
+	return fmt.Sprintf("invalid state transition from %s to %s: %s", e.From.String(), e.To.String(), e.err.Error())
 }
 
 func IsInvalidTransitionRandomBeaconStateMachineErr(err error) bool {
