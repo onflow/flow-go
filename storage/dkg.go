@@ -60,7 +60,7 @@ type DKGState interface {
 	// data to be processed by the state machine before the transition can be made. For such cases there are dedicated methods that should be used, ex.
 	// InsertMyBeaconPrivateKey and UpsertMyBeaconPrivateKey, which allow to store the needed data and perform the transition in one atomic operation.
 	// Error returns:
-	//   - [storage.InvalidTransitionRandomBeaconStateMachineError] - if the requested state transition is invalid.
+	//   - [storage.InvalidTransitionRandomBeaconStateMachineErr] - if the requested state transition is invalid.
 	SetDKGState(epochCounter uint64, newState flow.DKGState) error
 
 	// InsertMyBeaconPrivateKey stores the random beacon private key for an epoch.
@@ -70,7 +70,7 @@ type DKGState interface {
 	// to guarantee only keys safe for signing are returned
 	// Error returns:
 	//   - [storage.ErrAlreadyExists] - if there is already a key stored for given epoch.
-	//   - [storage.InvalidTransitionRandomBeaconStateMachineError] - if the requested state transition is invalid.
+	//   - [storage.InvalidTransitionRandomBeaconStateMachineErr] - if the requested state transition is invalid.
 	InsertMyBeaconPrivateKey(epochCounter uint64, key crypto.PrivateKey) error
 }
 
@@ -90,25 +90,35 @@ type EpochRecoveryMyBeaconKey interface {
 	UpsertMyBeaconPrivateKey(epochCounter uint64, key crypto.PrivateKey) error
 }
 
-// InvalidTransitionRandomBeaconStateMachineError is a sentinel error that is returned in case an invalid state transition is attempted.
-type InvalidTransitionRandomBeaconStateMachineError struct {
+// InvalidTransitionRandomBeaconStateMachineErr is a sentinel error that is returned in case an invalid state transition is attempted.
+type InvalidTransitionRandomBeaconStateMachineErr struct {
+	err  error
 	From flow.DKGState
 	To   flow.DKGState
 }
 
-func (e InvalidTransitionRandomBeaconStateMachineError) Error() string {
-	return fmt.Sprintf("invalid state transition from %s to %s", e.From.String(), e.To.String())
+func (e InvalidTransitionRandomBeaconStateMachineErr) Error() string {
+	return fmt.Sprintf("invalid state transition from %s to %s: %w", e.From.String(), e.To.String(), e.err.Error())
 }
 
-func IsInvalidTransitionRandomBeaconStateMachineError(err error) bool {
-	var e InvalidTransitionRandomBeaconStateMachineError
+func IsInvalidTransitionRandomBeaconStateMachineErr(err error) bool {
+	var e InvalidTransitionRandomBeaconStateMachineErr
 	return errors.As(err, &e)
 }
 
-// NewInvalidTransitionRandomBeaconStateMachine constructs a new InvalidTransitionRandomBeaconStateMachineError error.
-func NewInvalidTransitionRandomBeaconStateMachine(from, to flow.DKGState) error {
-	return InvalidTransitionRandomBeaconStateMachineError{
+// NewInvalidTransitionRandomBeaconStateMachineErr constructs a new InvalidTransitionRandomBeaconStateMachineErr error.
+func NewInvalidTransitionRandomBeaconStateMachineErr(from, to flow.DKGState) error {
+	return InvalidTransitionRandomBeaconStateMachineErr{
 		From: from,
 		To:   to,
+	}
+}
+
+// NewInvalidTransitionRandomBeaconStateMachineErrf constructs a new InvalidTransitionRandomBeaconStateMachineErr error with a formatted message.
+func NewInvalidTransitionRandomBeaconStateMachineErrf(from, to flow.DKGState, msg string, args ...any) error {
+	return InvalidTransitionRandomBeaconStateMachineErr{
+		From: from,
+		To:   to,
+		err:  fmt.Errorf(msg, args...),
 	}
 }

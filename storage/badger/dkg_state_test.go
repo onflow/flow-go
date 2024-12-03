@@ -22,7 +22,10 @@ func TestDKGState_UninitializedState(t *testing.T) {
 		store, err := NewRecoverableRandomBeaconStateMachine(metrics, db)
 		require.NoError(t, err)
 
-		epochCounter := rand.Uint64()
+		setupState := func() uint64 {
+			return rand.Uint64()
+		}
+		epochCounter := setupState()
 
 		started, err := store.GetDKGStarted(epochCounter)
 		require.NoError(t, err)
@@ -42,35 +45,38 @@ func TestDKGState_UninitializedState(t *testing.T) {
 		require.Nil(t, pk)
 
 		t.Run("-> flow.DKGStateUninitialized, not allowed", func(t *testing.T) {
-			epochCounter++
-			err = store.SetDKGState(epochCounter, flow.DKGStateUninitialized)
+			err = store.SetDKGState(setupState(), flow.DKGStateUninitialized)
 			require.Error(t, err)
+			require.True(t, storage.IsInvalidTransitionRandomBeaconStateMachineErr(err))
 		})
 
 		t.Run("-> flow.DKGStateStarted, should be allowed", func(t *testing.T) {
 			epochCounter++
-			err = store.SetDKGState(epochCounter, flow.DKGStateStarted)
+			err = store.SetDKGState(setupState(), flow.DKGStateStarted)
 			require.NoError(t, err)
 		})
 
 		t.Run("-> flow.DKGStateFailure, should be allowed", func(t *testing.T) {
 			epochCounter++
-			err = store.SetDKGState(epochCounter, flow.DKGStateFailure)
+			err = store.SetDKGState(setupState(), flow.DKGStateFailure)
 			require.NoError(t, err)
 		})
 
 		t.Run("-> flow.DKGStateCompleted, not allowed", func(t *testing.T) {
-			epochCounter++
+			epochCounter := setupState()
 			err = store.InsertMyBeaconPrivateKey(epochCounter, unittest.RandomBeaconPriv())
 			require.Error(t, err, "should not be able to enter completed state without starting")
+			require.True(t, storage.IsInvalidTransitionRandomBeaconStateMachineErr(err))
 			err = store.SetDKGState(epochCounter, flow.DKGStateCompleted)
 			require.Error(t, err, "should not be able to enter completed state without starting")
+			require.True(t, storage.IsInvalidTransitionRandomBeaconStateMachineErr(err))
 		})
 
 		t.Run("-> flow.RandomBeaconKeyCommitted, should be allowed", func(t *testing.T) {
-			epochCounter++
+			epochCounter := setupState()
 			err = store.SetDKGState(epochCounter, flow.RandomBeaconKeyCommitted)
 			require.Error(t, err, "should not be able to set DKG state to recovered, only using dedicated interface")
+			require.True(t, storage.IsInvalidTransitionRandomBeaconStateMachineErr(err))
 			err = store.UpsertMyBeaconPrivateKey(epochCounter, unittest.RandomBeaconPriv())
 			require.NoError(t, err)
 		})
@@ -114,11 +120,13 @@ func TestDKGState_StartedState(t *testing.T) {
 		t.Run("-> flow.DKGStateUninitialized, not allowed", func(t *testing.T) {
 			err = store.SetDKGState(setupState(), flow.DKGStateUninitialized)
 			require.Error(t, err)
+			require.True(t, storage.IsInvalidTransitionRandomBeaconStateMachineErr(err))
 		})
 
 		t.Run("-> flow.DKGStateStarted, not allowed", func(t *testing.T) {
 			err = store.SetDKGState(setupState(), flow.DKGStateStarted)
 			require.Error(t, err)
+			require.True(t, storage.IsInvalidTransitionRandomBeaconStateMachineErr(err))
 		})
 
 		t.Run("-> flow.DKGStateFailure, should be allowed", func(t *testing.T) {
@@ -130,6 +138,7 @@ func TestDKGState_StartedState(t *testing.T) {
 			epochCounter := setupState()
 			err = store.SetDKGState(epochCounter, flow.DKGStateCompleted)
 			require.Error(t, err, "should not be able to enter completed state without providing a private key")
+			require.True(t, storage.IsInvalidTransitionRandomBeaconStateMachineErr(err))
 			err = store.InsertMyBeaconPrivateKey(epochCounter, unittest.RandomBeaconPriv())
 			require.NoError(t, err)
 		})
@@ -138,6 +147,7 @@ func TestDKGState_StartedState(t *testing.T) {
 			epochCounter := setupState()
 			err = store.SetDKGState(epochCounter, flow.RandomBeaconKeyCommitted)
 			require.Error(t, err, "should not be able to set DKG state to recovered, only using dedicated interface")
+			require.True(t, storage.IsInvalidTransitionRandomBeaconStateMachineErr(err))
 			err = store.UpsertMyBeaconPrivateKey(epochCounter, unittest.RandomBeaconPriv())
 			require.NoError(t, err)
 		})
@@ -183,11 +193,13 @@ func TestDKGState_CompletedState(t *testing.T) {
 		t.Run("-> flow.DKGStateUninitialized, not allowed", func(t *testing.T) {
 			err = store.SetDKGState(setupState(), flow.DKGStateUninitialized)
 			require.Error(t, err)
+			require.True(t, storage.IsInvalidTransitionRandomBeaconStateMachineErr(err))
 		})
 
 		t.Run("-> flow.DKGStateStarted, not allowed", func(t *testing.T) {
 			err = store.SetDKGState(setupState(), flow.DKGStateStarted)
 			require.Error(t, err)
+			require.True(t, storage.IsInvalidTransitionRandomBeaconStateMachineErr(err))
 		})
 
 		t.Run("-> flow.DKGStateFailure, should be allowed", func(t *testing.T) {
@@ -199,8 +211,10 @@ func TestDKGState_CompletedState(t *testing.T) {
 			epochCounter := setupState()
 			err = store.SetDKGState(epochCounter, flow.DKGStateCompleted)
 			require.Error(t, err, "already in this state")
+			require.True(t, storage.IsInvalidTransitionRandomBeaconStateMachineErr(err))
 			err = store.InsertMyBeaconPrivateKey(epochCounter, unittest.RandomBeaconPriv())
 			require.Error(t, err, "already inserted private key")
+			require.ErrorIs(t, err, storage.ErrAlreadyExists)
 		})
 
 		t.Run("-> flow.RandomBeaconKeyCommitted, should be allowed", func(t *testing.T) {
@@ -254,30 +268,36 @@ func TestDKGState_FailureState(t *testing.T) {
 		t.Run("-> flow.DKGStateUninitialized, not allowed", func(t *testing.T) {
 			err = store.SetDKGState(setupState(), flow.DKGStateUninitialized)
 			require.Error(t, err)
+			require.True(t, storage.IsInvalidTransitionRandomBeaconStateMachineErr(err))
 		})
 
 		t.Run("-> flow.DKGStateStarted, not allowed", func(t *testing.T) {
 			err = store.SetDKGState(setupState(), flow.DKGStateStarted)
 			require.Error(t, err)
+			require.True(t, storage.IsInvalidTransitionRandomBeaconStateMachineErr(err))
 		})
 
 		t.Run("-> flow.DKGStateFailure, not allowed", func(t *testing.T) {
 			err = store.SetDKGState(setupState(), flow.DKGStateFailure)
 			require.Error(t, err)
+			require.True(t, storage.IsInvalidTransitionRandomBeaconStateMachineErr(err))
 		})
 
 		t.Run("-> flow.DKGStateCompleted, not allowed", func(t *testing.T) {
 			epochCounter := setupState()
 			err = store.SetDKGState(epochCounter, flow.DKGStateCompleted)
 			require.Error(t, err)
+			require.True(t, storage.IsInvalidTransitionRandomBeaconStateMachineErr(err))
 			err = store.InsertMyBeaconPrivateKey(epochCounter, unittest.RandomBeaconPriv())
 			require.Error(t, err)
+			require.True(t, storage.IsInvalidTransitionRandomBeaconStateMachineErr(err))
 		})
 
 		t.Run("-> flow.RandomBeaconKeyCommitted, should be allowed", func(t *testing.T) {
 			epochCounter := setupState()
 			err = store.SetDKGState(epochCounter, flow.RandomBeaconKeyCommitted)
 			require.Error(t, err, "should not be able to set DKG state to recovered, only using dedicated interface")
+			require.True(t, storage.IsInvalidTransitionRandomBeaconStateMachineErr(err))
 			expectedKey := unittest.RandomBeaconPriv()
 			err = store.UpsertMyBeaconPrivateKey(epochCounter, expectedKey)
 			require.NoError(t, err)
@@ -326,24 +346,28 @@ func TestDKGState_RandomBeaconKeyCommittedState(t *testing.T) {
 		t.Run("-> flow.DKGStateUninitialized, not allowed", func(t *testing.T) {
 			err = store.SetDKGState(setupState(), flow.DKGStateUninitialized)
 			require.Error(t, err)
+			require.True(t, storage.IsInvalidTransitionRandomBeaconStateMachineErr(err))
 		})
 
 		t.Run("-> flow.DKGStateStarted, not allowed", func(t *testing.T) {
 			err = store.SetDKGState(setupState(), flow.DKGStateStarted)
 			require.Error(t, err)
+			require.True(t, storage.IsInvalidTransitionRandomBeaconStateMachineErr(err))
 		})
 
 		t.Run("-> flow.DKGStateFailure, not allowed", func(t *testing.T) {
 			err = store.SetDKGState(setupState(), flow.DKGStateFailure)
 			require.Error(t, err)
+			require.True(t, storage.IsInvalidTransitionRandomBeaconStateMachineErr(err))
 		})
 
 		t.Run("-> flow.DKGStateCompleted, not allowed", func(t *testing.T) {
 			epochCounter := setupState()
 			err = store.SetDKGState(epochCounter, flow.DKGStateCompleted)
 			require.Error(t, err)
+			require.True(t, storage.IsInvalidTransitionRandomBeaconStateMachineErr(err))
 			err = store.InsertMyBeaconPrivateKey(epochCounter, unittest.RandomBeaconPriv())
-			require.Error(t, err)
+			require.ErrorIs(t, err, storage.ErrAlreadyExists)
 		})
 
 		t.Run("-> flow.RandomBeaconKeyCommitted, allowed", func(t *testing.T) {
