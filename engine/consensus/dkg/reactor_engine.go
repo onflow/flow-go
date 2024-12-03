@@ -271,9 +271,13 @@ func (e *ReactorEngine) handleEpochCommittedPhaseStarted(currentEpochCounter uin
 	// This can happen if the DKG failed locally, if we failed to generate
 	// a local private beacon key, or if we crashed while performing this
 	// check previously.
-	endState, err := e.dkgState.GetDKGState(nextEpochCounter)
-	if err == nil {
-		log.Warn().Msgf("checking beacon key consistency: exiting because dkg end state was already set: %s", endState.String())
+	currentState, err := e.dkgState.GetDKGState(nextEpochCounter)
+	if err != nil {
+		log.Fatal().Err(err).Msg("failed to get dkg state, by this point it should have been set")
+		return
+	}
+	if currentState != flow.DKGStateCompleted {
+		log.Warn().Msgf("checking beacon key consistency: exiting because dkg didn't reach completed state: %s", currentState.String())
 		return
 	}
 
