@@ -49,6 +49,12 @@ func (er *BlockExecutionResult) AllEvents() flow.EventsList {
 	return res
 }
 
+// ServiceEventCountForChunk returns the number of service events emitted in the given chunk.
+func (er *BlockExecutionResult) ServiceEventCountForChunk(chunkIndex int) uint16 {
+	serviceEventCount := len(er.collectionExecutionResults[chunkIndex].serviceEvents)
+	return uint16(serviceEventCount)
+}
+
 func (er *BlockExecutionResult) AllServiceEvents() flow.EventsList {
 	res := make(flow.EventsList, 0)
 	for _, ce := range er.collectionExecutionResults {
@@ -199,6 +205,7 @@ func (ar *BlockAttestationResult) ChunkAt(index int) *flow.Chunk {
 		attestRes.startStateCommit,
 		len(execRes.TransactionResults()),
 		attestRes.eventCommit,
+		ar.ServiceEventCountForChunk(index),
 		attestRes.endStateCommit,
 		execRes.executionSnapshot.TotalComputationUsed(),
 	)
