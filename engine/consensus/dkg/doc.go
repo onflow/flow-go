@@ -18,8 +18,8 @@
 // # Architecture
 //
 // In the happy path, one DKG instance runs every epoch. For each DKG instance, the [ReactorEngine]
-// instantiates a new, epoch-scoped [module.DKGController] and [module.DKGBroker] using the provided ControllerFactory.
-// The ControllerFactory ties new DKGControllers to the [MessagingEngine] via a BrokerTunnel,
+// instantiates a new, epoch-scoped module.DKGController and module.DKGBroker using the provided dkg.ControllerFactory.
+// The dkg.ControllerFactory ties new module.DKGController's to the [MessagingEngine] via a dkg.BrokerTunnel,
 // which exposes channels to relay incoming and outgoing messages (see package module/dkg for details).
 //
 //	  EpochSetup/EpochCommit/OnView events
