@@ -65,7 +65,6 @@ import (
 	"github.com/onflow/flow-go/state/protocol/blocktimer"
 	"github.com/onflow/flow-go/state/protocol/events/gadgets"
 	protocol_state "github.com/onflow/flow-go/state/protocol/protocol_state/state"
-	"github.com/onflow/flow-go/storage"
 	bstorage "github.com/onflow/flow-go/storage/badger"
 	"github.com/onflow/flow-go/utils/io"
 )
@@ -104,31 +103,31 @@ func main() {
 		insecureAccessAPI  bool
 		accessNodeIDS      []string
 
-		err                   error
-		mutableState          protocol.ParticipantState
-		beaconPrivateKey      *encodable.RandomBeaconPrivKey
-		guarantees            mempool.Guarantees
-		receipts              mempool.ExecutionTree
-		seals                 mempool.IncorporatedResultSeals
-		pendingReceipts       mempool.PendingReceipts
-		receiptRequester      *requester.Engine
-		syncCore              *chainsync.Core
-		comp                  *compliance.Engine
-		hot                   module.HotStuff
-		conMetrics            module.ConsensusMetrics
-		machineAccountMetrics module.MachineAccountMetrics
-		mainMetrics           module.HotstuffMetrics
-		receiptValidator      module.ReceiptValidator
-		chunkAssigner         *chmodule.ChunkAssigner
-		followerDistributor   *pubsub.FollowerDistributor
-		dkgBrokerTunnel       *dkgmodule.BrokerTunnel
-		blockTimer            protocol.BlockTimer
-		proposalDurProvider   hotstuff.ProposalDurationProvider
-		committee             *committees.Consensus
-		epochLookup           *epochs.EpochLookup
-		hotstuffModules       *consensus.HotstuffModules
-		dkgState              *bstorage.RecoverablePrivateBeaconKeyStateMachine
-		getSealingConfigs     module.SealingConfigsGetter
+		err                     error
+		mutableState            protocol.ParticipantState
+		beaconPrivateKey        *encodable.RandomBeaconPrivKey
+		guarantees              mempool.Guarantees
+		receipts                mempool.ExecutionTree
+		seals                   mempool.IncorporatedResultSeals
+		pendingReceipts         mempool.PendingReceipts
+		receiptRequester        *requester.Engine
+		syncCore                *chainsync.Core
+		comp                    *compliance.Engine
+		hot                     module.HotStuff
+		conMetrics              module.ConsensusMetrics
+		machineAccountMetrics   module.MachineAccountMetrics
+		mainMetrics             module.HotstuffMetrics
+		receiptValidator        module.ReceiptValidator
+		chunkAssigner           *chmodule.ChunkAssigner
+		followerDistributor     *pubsub.FollowerDistributor
+		dkgBrokerTunnel         *dkgmodule.BrokerTunnel
+		blockTimer              protocol.BlockTimer
+		proposalDurProvider     hotstuff.ProposalDurationProvider
+		committee               *committees.Consensus
+		epochLookup             *epochs.EpochLookup
+		hotstuffModules         *consensus.HotstuffModules
+		myBeaconKeyStateMachine *bstorage.RecoverablePrivateBeaconKeyStateMachine
+		getSealingConfigs       module.SealingConfigsGetter
 	)
 	var deprecatedFlagBlockRateDelay time.Duration
 
@@ -213,7 +212,7 @@ func main() {
 			return nil
 		}).
 		Module("dkg state", func(node *cmd.NodeConfig) error {
-			dkgState, err = bstorage.NewRecoverableRandomBeaconStateMachine(node.Metrics.Cache, node.SecretsDB)
+			myBeaconKeyStateMachine, err = bstorage.NewRecoverableRandomBeaconStateMachine(node.Metrics.Cache, node.SecretsDB)
 			return err
 		}).
 		Module("updatable sealing config", func(node *cmd.NodeConfig) error {
@@ -339,21 +338,24 @@ func main() {
 					myBeaconPublicKeyShare)
 			}
 
-			// store my beacon key for the first epoch post-spork
-			err = dkgState.InsertMyBeaconPrivateKey(epochCounter, beaconPrivateKey.PrivateKey)
-			if err != nil && !errors.Is(err, storage.ErrAlreadyExists) {
-				return err
+			started, err := myBeaconKeyStateMachine.GetDKGStarted(epochCounter)
+			if err != nil {
+				return fmt.Errorf("could not get DKG started flag for root epoch %d: %w", epochCounter, err)
 			}
-			// mark the root DKG as successful, so it is considered safe to use the key
-			err = dkgState.SetDKGState(epochCounter, flow.RandomBeaconKeyCommitted)
-			if err != nil && !errors.Is(err, storage.ErrAlreadyExists) {
-				return err
+
+			// perform this only if state machine is in initial state
+			if !started {
+				// store my beacon key for the first epoch post-spork
+				err = myBeaconKeyStateMachine.UpsertMyBeaconPrivateKey(epochCounter, beaconPrivateKey.PrivateKey)
+				if err != nil {
+					return fmt.Errorf("could not upsert my beacon private key for root epoch %d: %w", epochCounter, err)
+				}
 			}
 
 			return nil
 		}).
 		Module("my beacon key epoch recovery", func(node *cmd.NodeConfig) error {
-			myBeaconKeyRecovery, err := dkgmodule.NewBeaconKeyRecovery(node.Logger, node.Me, node.State, dkgState)
+			myBeaconKeyRecovery, err := dkgmodule.NewBeaconKeyRecovery(node.Logger, node.Me, node.State, myBeaconKeyStateMachine)
 			if err != nil {
 				return fmt.Errorf("could not initialize my beacon key epoch recovery: %w", err)
 			}
@@ -576,7 +578,7 @@ func main() {
 			// wrap Main consensus committee with metrics
 			wrappedCommittee := committees.NewMetricsWrapper(committee, mainMetrics) // wrapper for measuring time spent determining consensus committee relations
 
-			beaconKeyStore := hotsignature.NewEpochAwareRandomBeaconKeyStore(epochLookup, dkgState)
+			beaconKeyStore := hotsignature.NewEpochAwareRandomBeaconKeyStore(epochLookup, myBeaconKeyStateMachine)
 
 			// initialize the combined signer for hotstuff
 			var signer hotstuff.Signer
@@ -916,7 +918,7 @@ func main() {
 				node.Logger,
 				node.Me,
 				node.State,
-				dkgState,
+				myBeaconKeyStateMachine,
 				dkgmodule.NewControllerFactory(
 					node.Logger,
 					node.Me,
