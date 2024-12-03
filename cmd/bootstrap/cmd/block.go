@@ -42,7 +42,7 @@ func constructRootEpochEvents(
 	participants flow.IdentityList,
 	assignments flow.AssignmentList,
 	clusterQCs []*flow.QuorumCertificate,
-	dkgData dkg.DKGData,
+	dkgData dkg.ThresholdKeySet,
 	dkgIndexMap flow.DKGIndexMap,
 ) (*flow.EpochSetup, *flow.EpochCommit) {
 
