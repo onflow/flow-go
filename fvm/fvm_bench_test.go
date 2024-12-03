@@ -48,11 +48,11 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
 	"github.com/onflow/flow-go/module/executiondatasync/provider"
-	mocktracker "github.com/onflow/flow-go/module/executiondatasync/tracker/mock"
 	"github.com/onflow/flow-go/module/metrics"
 	moduleMock "github.com/onflow/flow-go/module/mock"
 	requesterunit "github.com/onflow/flow-go/module/state_synchronization/requester/unittest"
 	"github.com/onflow/flow-go/module/trace"
+	mocktracker "github.com/onflow/flow-go/storage/mocks"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -208,7 +208,7 @@ func NewBasicBlockExecutor(tb testing.TB, chain flow.Chain, logger zerolog.Logge
 	require.NoError(tb, err)
 
 	bservice := requesterunit.MockBlobService(blockstore.NewBlockstore(dssync.MutexWrap(datastore.NewMapDatastore())))
-	trackerStorage := mocktracker.NewMockStorage()
+	trackerStorage := mocktracker.NewMockExecutionDataTracker()
 
 	prov := provider.NewProvider(
 		zerolog.Nop(),
