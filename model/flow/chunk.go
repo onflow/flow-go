@@ -2,12 +2,12 @@ package flow
 
 import (
 	"fmt"
+	"io"
 	"log"
 
 	"github.com/ipfs/go-cid"
+	"github.com/onflow/go-ethereum/rlp"
 	"github.com/vmihailenco/msgpack/v4"
-
-	"github.com/onflow/flow-go/model/encoding/rlp"
 )
 
 var EmptyEventCollectionID Identifier
@@ -65,15 +65,37 @@ type ChunkBody struct {
 	NumberOfTransactions uint64 // number of transactions inside the collection
 }
 
-// Fingerprint returns the unique binary representation for the receiver ChunkBody,
-// used to compute the ID (hash).
-// The fingerprint is backward-compatible with the prior data model for ChunkBody: ChunkBodyV0.
+// EncodeRLP defines custom encoding logic for the Chunk type.
+// This method exists only so that the embedded ChunkBody's EncodeRLP method is
+// not interpreted as the RLP encoding for the entire Chunk.
+func (ch Chunk) EncodeRLP(w io.Writer) error {
+	return rlp.Encode(w, struct {
+		ChunkBody ChunkBody
+		Index     uint64
+		EndState  StateCommitment
+	}{
+		ChunkBody: ch.ChunkBody,
+		Index:     ch.Index,
+		EndState:  ch.EndState,
+	})
+}
+
+// EncodeRLP defines custom encoding logic for the ChunkBody type.
+// The encoding is defined for backward compatibility with prior data model version (ChunkBodyV0):
 //   - All new ChunkBody instances must have non-nil ServiceEventCount field
 //   - A nil ServiceEventCount field indicates a v0 version of ChunkBody
 //   - when computing the ID of such a ChunkBody, the ServiceEventCount field is omitted from the fingerprint
-func (ch ChunkBody) Fingerprint() []byte {
+func (ch ChunkBody) EncodeRLP(w io.Writer) error {
+	var err error
 	if ch.ServiceEventCount == nil {
-		return rlp.NewMarshaler().MustMarshal(ChunkBodyV0{
+		err = rlp.Encode(w, struct {
+			CollectionIndex      uint
+			StartState           StateCommitment
+			EventCollection      Identifier
+			BlockID              Identifier
+			TotalComputationUsed uint64
+			NumberOfTransactions uint64
+		}{
 			CollectionIndex:      ch.CollectionIndex,
 			StartState:           ch.StartState,
 			EventCollection:      ch.EventCollection,
@@ -81,8 +103,29 @@ func (ch ChunkBody) Fingerprint() []byte {
 			TotalComputationUsed: ch.TotalComputationUsed,
 			NumberOfTransactions: ch.NumberOfTransactions,
 		})
+	} else {
+		err = rlp.Encode(w, struct {
+			CollectionIndex      uint
+			StartState           StateCommitment
+			EventCollection      Identifier
+			ServiceEventCount    *uint16
+			BlockID              Identifier
+			TotalComputationUsed uint64
+			NumberOfTransactions uint64
+		}{
+			CollectionIndex:      ch.CollectionIndex,
+			StartState:           ch.StartState,
+			EventCollection:      ch.EventCollection,
+			ServiceEventCount:    ch.ServiceEventCount,
+			BlockID:              ch.BlockID,
+			TotalComputationUsed: ch.TotalComputationUsed,
+			NumberOfTransactions: ch.NumberOfTransactions,
+		})
 	}
-	return rlp.NewMarshaler().MustMarshal(ch)
+	if err != nil {
+		return fmt.Errorf("failed to rlp encode ChunkBody: %w", err)
+	}
+	return nil
 }
 
 type Chunk struct {

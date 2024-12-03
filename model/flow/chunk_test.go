@@ -8,6 +8,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/onflow/flow-go/model/fingerprint"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/utils/rand"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -276,10 +277,15 @@ func TestChunk_ModelVersions_EncodeDecode(t *testing.T) {
 	})
 }
 
-// TestChunk_ModelVersions_IDConsistentAcrossVersions ensures that the ID function
-// is backward compatible with old data model versions.
-func TestChunk_ModelVersions_IDConsistentAcrossVersions(t *testing.T) {
+// FingerprintBackwardCompatibility ensures that the Fingerprint and ID functions
+// are backward compatible with old data model versions. Specifically, if the new
+// ServiceEventCount field is nil, then the new model should produce IDs consistent
+// with the old model.
+//
+// Backward compatibility is implemented by providing a custom EncodeRLP method.
+func TestChunk_FingerprintBackwardCompatibility(t *testing.T) {
 	chunk := unittest.ChunkFixture(unittest.IdentifierFixture(), 1)
+	chunk.ServiceEventCount = nil
 	chunkBody := chunk.ChunkBody
 	var chunkv0 flow.ChunkBodyV0
 	unittest.CopyStructure(t, chunkBody, &chunkv0)
@@ -289,6 +295,7 @@ func TestChunk_ModelVersions_IDConsistentAcrossVersions(t *testing.T) {
 	t.Run("nil ServiceEventCount fields", func(t *testing.T) {
 		chunkBody.ServiceEventCount = nil
 		assert.Equal(t, flow.MakeID(chunkv0), flow.MakeID(chunkBody))
+		assert.Equal(t, fingerprint.Fingerprint(chunkv0), fingerprint.Fingerprint(chunkBody))
 	})
 	// A non-nil ServiceEventCount fields indicates an up-to-date model version.
 	// The ID calculation for the old and new model version should be different,

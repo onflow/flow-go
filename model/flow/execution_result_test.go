@@ -6,6 +6,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
+	"github.com/onflow/flow-go/model/fingerprint"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -43,8 +44,41 @@ func TestExecutionResultGroupBy(t *testing.T) {
 	assert.Equal(t, 0, unknown.Size())
 }
 
-// TODO
-func TestExecutionResult_FingerprintBackwardCompatibility(t *testing.T) {}
+// FingerprintBackwardCompatibility ensures that the Fingerprint and ID functions
+// are backward compatible with old data model versions. Specifically, if the new
+// ServiceEventCount field is nil, then the new model should produce IDs consistent
+// with the old model.
+//
+// Backward compatibility is implemented by providing a custom EncodeRLP method.
+func TestExecutionResult_FingerprintBackwardCompatibility(t *testing.T) {
+	// Define a series of types which use flow.ChunkBodyV0
+	type ChunkV0 struct {
+		flow.ChunkBodyV0
+		Index    uint64
+		EndState flow.StateCommitment
+	}
+	type ChunkListV0 []*ChunkV0
+	type ExecutionResultV0 struct {
+		PreviousResultID flow.Identifier
+		BlockID          flow.Identifier
+		Chunks           ChunkListV0
+		ServiceEvents    flow.ServiceEventList
+		ExecutionDataID  flow.Identifier
+	}
+
+	// Construct an ExecutionResult with nil ServiceEventCount fields
+	result := unittest.ExecutionResultFixture()
+	for i := range result.Chunks {
+		result.Chunks[i].ServiceEventCount = nil
+	}
+
+	// Copy all fields to the prior-version model
+	var resultv0 ExecutionResultV0
+	unittest.CopyStructure(t, result, &resultv0)
+
+	assert.Equal(t, result.ID(), flow.MakeID(resultv0))
+	assert.Equal(t, fingerprint.Fingerprint(result), fingerprint.Fingerprint(resultv0))
+}
 
 // Tests that [ExecutionResult.ServiceEventsByChunk] method works in a variety of circumstances.
 // It also tests the method against an ExecutionResult instance backed by both the
