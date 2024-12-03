@@ -23,7 +23,6 @@ type Controller struct {
 	conn   WebsocketConnection
 
 	communicationChannel chan interface{} // Channel for sending messages to the client.
-	errorChannel         chan error       // Channel for reporting errors.
 
 	dataProviders        *concurrentmap.Map[uuid.UUID, dp.DataProvider]
 	dataProvidersFactory dp.DataProviderFactory
@@ -42,7 +41,6 @@ func NewWebSocketController(
 		config:               config,
 		conn:                 conn,
 		communicationChannel: make(chan interface{}), //TODO: should it be buffered chan?
-		errorChannel:         make(chan error, 1),    // Buffered error channel to hold one error.
 		dataProviders:        concurrentmap.New[uuid.UUID, dp.DataProvider](),
 		dataProvidersFactory: dataProviderFactory,
 		shutdown:             atomic.NewBool(false),
@@ -55,7 +53,7 @@ func NewWebSocketController(
 // Parameters:
 // - ctx: The context for controlling cancellation and timeouts.
 func (c *Controller) HandleConnection(ctx context.Context) {
-	defer close(c.errorChannel)
+
 	// configuring the connection with appropriate read/write deadlines and handlers.
 	err := c.configureConnection()
 	if err != nil {
