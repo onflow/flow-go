@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/onflow/flow-go/fvm/evm/events"
+	"github.com/onflow/flow-go/fvm/evm/handler"
 	"github.com/onflow/flow-go/fvm/evm/types"
 	"github.com/onflow/flow-go/model/flow"
 )
@@ -13,7 +14,10 @@ import (
 // a OnBlockReceived call before block execution and
 // a follow up OnBlockExecuted call after block execution.
 type BasicProvider struct {
+	chainID            flow.ChainID
 	blks               *Blocks
+	rootAddr           flow.Address
+	storage            types.BackendStorage
 	latestBlockPayload *events.BlockEventPayload
 }
 
@@ -28,7 +32,12 @@ func NewBasicProvider(
 	if err != nil {
 		return nil, err
 	}
-	return &BasicProvider{blks: blks}, nil
+	return &BasicProvider{
+		chainID:  chainID,
+		blks:     blks,
+		rootAddr: rootAddr,
+		storage:  storage,
+	}, nil
 }
 
 // GetSnapshotAt returns a block snapshot at the given height
@@ -61,14 +70,49 @@ func (p *BasicProvider) OnBlockReceived(blockEvent *events.BlockEventPayload) er
 // OnBlockExecuted should be called after executing blocks.
 func (p *BasicProvider) OnBlockExecuted(
 	height uint64,
-	resCol types.ReplayResultCollector) error {
+	resCol types.ReplayResultCollector,
+	blockProposal *types.BlockProposal,
+) error {
 	// we push the block hash after execution, so the behaviour of the blockhash is
 	// identical to the evm.handler.
 	if p.latestBlockPayload.Height != height {
 		return fmt.Errorf("active block height doesn't match expected: %d, got: %d", p.latestBlockPayload.Height, height)
 	}
+
+	blockBytes, err := blockProposal.Block.ToBytes()
+	if err != nil {
+		return types.NewFatalError(err)
+	}
+
+	// do the same as handler.CommitBlockProposal
+	err = p.storage.SetValue(
+		p.rootAddr[:],
+		[]byte(handler.BlockStoreLatestBlockKey),
+		blockBytes,
+	)
+	if err != nil {
+		return err
+	}
+
+	blockProposalBytes, err := blockProposal.ToBytes()
+	if err != nil {
+		return types.NewFatalError(err)
+	}
+
+	hash := p.latestBlockPayload.Hash
+	// update block proposal
+	err = p.storage.SetValue(
+		p.rootAddr[:],
+		[]byte(handler.BlockStoreLatestBlockProposalKey),
+		blockProposalBytes,
+	)
+	if err != nil {
+		return err
+	}
+
+	// update block hash list
 	return p.blks.PushBlockHash(
 		p.latestBlockPayload.Height,
-		p.latestBlockPayload.Hash,
+		hash,
 	)
 }

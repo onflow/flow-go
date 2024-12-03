@@ -2,7 +2,6 @@ package utils_test
 
 import (
 	"bufio"
-	"encoding/gob"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
@@ -11,7 +10,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 	"github.com/stretchr/testify/require"
 
@@ -21,9 +19,6 @@ import (
 	"github.com/onflow/flow-go/fvm/environment"
 	"github.com/onflow/flow-go/fvm/evm"
 	"github.com/onflow/flow-go/fvm/evm/events"
-	"github.com/onflow/flow-go/fvm/evm/offchain/blocks"
-	"github.com/onflow/flow-go/fvm/evm/offchain/storage"
-	"github.com/onflow/flow-go/fvm/evm/offchain/sync"
 	"github.com/onflow/flow-go/fvm/evm/offchain/utils"
 	. "github.com/onflow/flow-go/fvm/evm/testutils"
 	"github.com/onflow/flow-go/model/flow"
@@ -41,7 +36,7 @@ func TestTestnetBackwardCompatibility(t *testing.T) {
 	// > ~/Downloads/events_devnet51_1.jsonl
 	// ...
 	//
-	// 2) comment the above t.Skip, and update the events file paths and checkpoint dir
+	// 2) comment the above t.Skip, and update the events file paths and evmStateGob dir
 	// to run the tests
 	BackwardCompatibleSinceEVMGenesisBlock(
 		t, flow.Testnet, []string{
@@ -65,47 +60,47 @@ func TestTestnetBackwardCompatibility(t *testing.T) {
 //	--start 211176670 --end 211176770 --network testnet --host access-001.devnet51.nodes.onflow.org:9000
 //
 // During the replay process, it will generate `values_<height>.gob` and
-// `allocators_<height>.gob` checkpoint files for each height. If these checkpoint files exist,
+// `allocators_<height>.gob` checkpoint files for each height. If these checkpoint gob files exist,
 // the corresponding event JSON files will be skipped to optimize replay.
 func BackwardCompatibleSinceEVMGenesisBlock(
 	t *testing.T,
 	chainID flow.ChainID,
 	eventsFilePaths []string, // ordered EVM events in JSONL format
-	checkpointDir string,
-	checkpointEndHeight uint64, // EVM height of an EVM state that a checkpoint was created for
+	evmStateGob string,
+	evmStateEndHeight uint64, // EVM height of an EVM state that a evmStateGob file was created for
 ) {
 	// ensure that event files is not an empty array
 	require.True(t, len(eventsFilePaths) > 0)
 
-	log.Info().Msgf("replaying EVM events from %v to %v, with checkpoints in %s, and checkpointEndHeight: %v",
+	log.Info().Msgf("replaying EVM events from %v to %v, with evmStateGob file in %s, and evmStateEndHeight: %v",
 		eventsFilePaths[0], eventsFilePaths[len(eventsFilePaths)-1],
-		checkpointDir, checkpointEndHeight)
+		evmStateGob, evmStateEndHeight)
 
-	store, checkpointEndHeightOrZero := initStorageWithCheckpoints(t, chainID, checkpointDir, checkpointEndHeight)
+	store, evmStateEndHeightOrZero := initStorageWithEVMStateGob(t, chainID, evmStateGob, evmStateEndHeight)
 
 	// the events to replay
-	nextHeight := checkpointEndHeightOrZero + 1
+	nextHeight := evmStateEndHeightOrZero + 1
 
 	// replay each event files
 	for _, eventsFilePath := range eventsFilePaths {
 		log.Info().Msgf("replaying events from %v, nextHeight: %v", eventsFilePath, nextHeight)
 
-		checkpointEndHeight := replayEvents(t, chainID, store, eventsFilePath, checkpointDir, nextHeight)
-		nextHeight = checkpointEndHeight + 1
+		evmStateEndHeight := replayEvents(t, chainID, store, eventsFilePath, evmStateGob, nextHeight)
+		nextHeight = evmStateEndHeight + 1
 	}
 
 	log.Info().
 		Msgf("succhessfully replayed all events and state changes are consistent with onchain state change. nextHeight: %v", nextHeight)
 }
 
-func initStorageWithCheckpoints(t *testing.T, chainID flow.ChainID, checkpointDir string, checkpointEndHeight uint64) (
+func initStorageWithEVMStateGob(t *testing.T, chainID flow.ChainID, evmStateGob string, evmStateEndHeight uint64) (
 	*TestValueStore, uint64,
 ) {
 	rootAddr := evm.StorageAccountAddress(chainID)
 
-	// if there is no checkpoint, create a empty store and initialize the account status,
+	// if there is no evmStateGob file, create a empty store and initialize the account status,
 	// return 0 as the genesis height
-	if checkpointEndHeight == 0 {
+	if evmStateEndHeight == 0 {
 		store := GetSimpleValueStore()
 		as := environment.NewAccountStatus()
 		require.NoError(t, store.SetValue(rootAddr[:], []byte(flow.AccountStatusKey), as.ToBytes()))
@@ -113,25 +108,21 @@ func initStorageWithCheckpoints(t *testing.T, chainID flow.ChainID, checkpointDi
 		return store, 0
 	}
 
-	valueFileName, allocatorFileName := checkpointFileNamesByEndHeight(checkpointDir, checkpointEndHeight)
-	values, err := deserialize(valueFileName)
+	valueFileName, allocatorFileName := evmStateGobFileNamesByEndHeight(evmStateGob, evmStateEndHeight)
+	values, err := DeserializeState(valueFileName)
 	require.NoError(t, err)
-	allocators, err := deserializeAllocator(allocatorFileName)
+	allocators, err := DeserializeAllocator(allocatorFileName)
 	require.NoError(t, err)
 	store := GetSimpleValueStorePopulated(values, allocators)
-	return store, checkpointEndHeight
+	return store, evmStateEndHeight
 }
 
 func replayEvents(
 	t *testing.T,
 	chainID flow.ChainID,
-	store *TestValueStore, eventsFilePath string, checkpointDir string, initialNextHeight uint64) uint64 {
+	store *TestValueStore, eventsFilePath string, evmStateGob string, initialNextHeight uint64) uint64 {
 
 	rootAddr := evm.StorageAccountAddress(chainID)
-
-	bpStorage := storage.NewEphemeralStorage(store)
-	bp, err := blocks.NewBasicProvider(chainID, bpStorage, rootAddr)
-	require.NoError(t, err)
 
 	nextHeight := initialNextHeight
 
@@ -143,55 +134,43 @@ func replayEvents(
 					nextHeight, blockEventPayload.Height)
 			}
 
-			err = bp.OnBlockReceived(blockEventPayload)
-			require.NoError(t, err)
-
-			sp := NewTestStorageProvider(store, blockEventPayload.Height)
-			cr := sync.NewReplayer(chainID, rootAddr, sp, bp, zerolog.Logger{}, nil, true)
-			res, err := cr.ReplayBlock(txEvents, blockEventPayload)
-			require.NoError(t, err)
-
-			// commit all changes
-			for k, v := range res.StorageRegisterUpdates() {
-				err = store.SetValue([]byte(k.Owner), []byte(k.Key), v)
-				require.NoError(t, err)
+			_, _, err := utils.ReplayEVMEventsToStore(
+				log.Logger,
+				store,
+				chainID,
+				rootAddr,
+				blockEventPayload,
+				txEvents,
+			)
+			if err != nil {
+				return fmt.Errorf("fail to replay events: %w", err)
 			}
-
-			err = bp.OnBlockExecuted(blockEventPayload.Height, res)
-			require.NoError(t, err)
-
-			// commit all block hash list changes
-			for k, v := range bpStorage.StorageRegisterUpdates() {
-				err = store.SetValue([]byte(k.Owner), []byte(k.Key), v)
-				require.NoError(t, err)
-			}
-
 			// verify the block height is sequential without gap
 			nextHeight++
 
 			return nil
 		})
 
-	checkpointEndHeight := nextHeight - 1
+	evmStateEndHeight := nextHeight - 1
 
-	log.Info().Msgf("finished replaying events from %v to %v, creating checkpoint", initialNextHeight, checkpointEndHeight)
-	valuesFile, allocatorsFile := dumpCheckpoint(t, store, checkpointDir, checkpointEndHeight)
-	log.Info().Msgf("checkpoint created: %v, %v", valuesFile, allocatorsFile)
+	log.Info().Msgf("finished replaying events from %v to %v, creating evm state gobs", initialNextHeight, evmStateEndHeight)
+	valuesFile, allocatorsFile := dumpEVMStateToGobFiles(t, store, evmStateGob, evmStateEndHeight)
+	log.Info().Msgf("evm state gobs created: %v, %v", valuesFile, allocatorsFile)
 
-	return checkpointEndHeight
+	return evmStateEndHeight
 }
 
-func checkpointFileNamesByEndHeight(dir string, endHeight uint64) (string, string) {
+func evmStateGobFileNamesByEndHeight(dir string, endHeight uint64) (string, string) {
 	return filepath.Join(dir, fmt.Sprintf("values_%d.gob", endHeight)),
 		filepath.Join(dir, fmt.Sprintf("allocators_%d.gob", endHeight))
 }
 
-func dumpCheckpoint(t *testing.T, store *TestValueStore, dir string, checkpointEndHeight uint64) (string, string) {
-	valuesFileName, allocatorsFileName := checkpointFileNamesByEndHeight(dir, checkpointEndHeight)
+func dumpEVMStateToGobFiles(t *testing.T, store *TestValueStore, dir string, evmStateEndHeight uint64) (string, string) {
+	valuesFileName, allocatorsFileName := evmStateGobFileNamesByEndHeight(dir, evmStateEndHeight)
 	values, allocators := store.Dump()
 
-	require.NoError(t, serialize(valuesFileName, values))
-	require.NoError(t, serializeAllocator(allocatorsFileName, allocators))
+	require.NoError(t, SerializeState(valuesFileName, values))
+	require.NoError(t, SerializeAllocator(allocatorsFileName, allocators))
 	return valuesFileName, allocatorsFileName
 }
 
@@ -243,86 +222,4 @@ func scanEventFilesAndRun(
 	if err := scanner.Err(); err != nil {
 		t.Fatal(err)
 	}
-}
-
-// Serialize function: saves map data to a file
-func serialize(filename string, data map[string][]byte) error {
-	// Create a file to save data
-	file, err := os.Create(filename)
-	if err != nil {
-		return err
-	}
-	defer file.Close()
-
-	// Use gob to encode data
-	encoder := gob.NewEncoder(file)
-	err = encoder.Encode(data)
-	if err != nil {
-		return err
-	}
-
-	return nil
-}
-
-// Deserialize function: reads map data from a file
-func deserialize(filename string) (map[string][]byte, error) {
-	// Open the file for reading
-	file, err := os.Open(filename)
-	if err != nil {
-		return nil, err
-	}
-	defer file.Close()
-
-	// Prepare the map to store decoded data
-	var data map[string][]byte
-
-	// Use gob to decode data
-	decoder := gob.NewDecoder(file)
-	err = decoder.Decode(&data)
-	if err != nil {
-		return nil, err
-	}
-
-	return data, nil
-}
-
-// Serialize function: saves map data to a file
-func serializeAllocator(filename string, data map[string]uint64) error {
-	// Create a file to save data
-	file, err := os.Create(filename)
-	if err != nil {
-		return err
-	}
-	defer file.Close()
-
-	// Use gob to encode data
-	encoder := gob.NewEncoder(file)
-	err = encoder.Encode(data)
-	if err != nil {
-		return err
-	}
-
-	return nil
-}
-
-// Deserialize function: reads map data from a file
-func deserializeAllocator(filename string) (map[string]uint64, error) {
-	// Open the file for reading
-	file, err := os.Open(filename)
-	if err != nil {
-		return nil, err
-	}
-	defer file.Close()
-
-	// Prepare the map to store decoded data
-	var data map[string]uint64
-
-	// Use gob to decode data
-	decoder := gob.NewDecoder(file)
-	err = decoder.Decode(&data)
-	if err != nil {
-		return nil, err
-	}
-
-	return data, nil
 }
