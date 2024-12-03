@@ -182,12 +182,11 @@ func (e *Engine) Process(channel channels.Channel, originID flow.Identifier, mes
 // SubmitCollectionGuarantee adds a collection guarantee to the engine's queue
 // to later be published to consensus nodes.
 func (e *Engine) SubmitCollectionGuarantee(msg *messages.SubmitCollectionGuarantee) {
-	ok := e.queue.Push(msg)
-	if !ok {
-		engine.LogError(e.log, fmt.Errorf("failed to store collection guarantee in queue"))
-		return
+	if e.queue.Push(msg) {
+		e.notifier.Notify()
+	} else {
+		e.engMetrics.OutboundMessageDropped(metrics.EngineCollectionProvider, metrics.MessageCollectionGuarantee)
 	}
-	e.notifier.Notify()
 }
 
 // publishCollectionGuarantee publishes the collection guarantee to all consensus nodes.
