@@ -33,8 +33,7 @@ import (
 	"github.com/onflow/flow-go/cmd/build"
 	"github.com/onflow/flow-go/config"
 	"github.com/onflow/flow-go/consensus/hotstuff/persister"
-	"github.com/onflow/flow-go/fvm"
-	"github.com/onflow/flow-go/fvm/environment"
+	"github.com/onflow/flow-go/fvm/initialize"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/module"
@@ -1522,32 +1521,9 @@ func (fnb *FlowNodeBuilder) initLocal() error {
 }
 
 func (fnb *FlowNodeBuilder) initFvmOptions() {
-	blockFinder := environment.NewBlockFinder(fnb.Storage.Headers)
-	vmOpts := []fvm.Option{
-		fvm.WithChain(fnb.RootChainID.Chain()),
-		fvm.WithBlocks(blockFinder),
-		fvm.WithAccountStorageLimit(true),
-	}
-	switch fnb.RootChainID {
-	case flow.Testnet,
-		flow.Sandboxnet,
-		flow.Previewnet,
-		flow.Mainnet:
-		vmOpts = append(vmOpts,
-			fvm.WithTransactionFeesEnabled(true),
-		)
-	}
-	switch fnb.RootChainID {
-	case flow.Testnet,
-		flow.Sandboxnet,
-		flow.Previewnet,
-		flow.Localnet,
-		flow.Benchnet:
-		vmOpts = append(vmOpts,
-			fvm.WithContractDeploymentRestricted(false),
-		)
-	}
-	fnb.FvmOptions = vmOpts
+	fnb.FvmOptions = initialize.InitFvmOptions(
+		fnb.RootChainID, fnb.Storage.Headers,
+	)
 }
 
 // handleModules initializes the given module.
