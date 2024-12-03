@@ -19,7 +19,6 @@ import (
 	"github.com/onflow/flow-go/fvm/meter"
 	reusableRuntime "github.com/onflow/flow-go/fvm/runtime"
 	"github.com/onflow/flow-go/fvm/runtime/testutil"
-	"github.com/onflow/flow-go/model/flow"
 )
 
 func TestGetExecutionMemoryWeights(t *testing.T) {
@@ -37,7 +36,6 @@ func TestGetExecutionMemoryWeights(t *testing.T) {
 					ReadStoredFunc: readStored,
 				},
 				runtime.Config{},
-				flow.Emulator,
 			),
 		)
 		envMock.On("ReturnCadenceRuntime", mock.Anything).Return()
@@ -168,7 +166,6 @@ func TestGetExecutionEffortWeights(t *testing.T) {
 					ReadStoredFunc: readStored,
 				},
 				runtime.Config{},
-				flow.Emulator,
 			),
 		)
 		envMock.On("ReturnCadenceRuntime", mock.Anything).Return()

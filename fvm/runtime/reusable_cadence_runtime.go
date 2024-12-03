@@ -8,9 +8,7 @@ import (
 	"github.com/onflow/cadence/sema"
 	"github.com/onflow/cadence/stdlib"
 
-	"github.com/onflow/flow-go/fvm/accountV2Migration"
 	"github.com/onflow/flow-go/fvm/errors"
-	"github.com/onflow/flow-go/model/flow"
 )
 
 // Note: this is a subset of environment.Environment, redeclared to handle
@@ -38,7 +36,6 @@ type ReusableCadenceRuntime struct {
 func NewReusableCadenceRuntime(
 	rt runtime.Runtime,
 	config runtime.Config,
-	chainID flow.ChainID,
 ) *ReusableCadenceRuntime {
 	reusable := &ReusableCadenceRuntime{
 		Runtime:          rt,
@@ -47,7 +44,6 @@ func NewReusableCadenceRuntime(
 	}
 
 	reusable.declareRandomSourceHistory()
-	accountV2Migration.DeclareFunctions(reusable.TxRuntimeEnv, chainID)
 
 	return reusable
 }
@@ -186,8 +182,6 @@ type ReusableCadenceRuntimePool struct {
 
 	config runtime.Config
 
-	chainID flow.ChainID
-
 	// When newCustomRuntime is nil, the pool will create standard cadence
 	// interpreter runtimes via runtime.NewInterpreterRuntime.  Otherwise, the
 	// pool will create runtimes using this function.
@@ -199,7 +193,6 @@ type ReusableCadenceRuntimePool struct {
 func newReusableCadenceRuntimePool(
 	poolSize int,
 	config runtime.Config,
-	chainID flow.ChainID,
 	newCustomRuntime CadenceRuntimeConstructor,
 ) ReusableCadenceRuntimePool {
 	var pool chan *ReusableCadenceRuntime
@@ -210,7 +203,6 @@ func newReusableCadenceRuntimePool(
 	return ReusableCadenceRuntimePool{
 		pool:             pool,
 		config:           config,
-		chainID:          chainID,
 		newCustomRuntime: newCustomRuntime,
 	}
 }
@@ -218,12 +210,10 @@ func newReusableCadenceRuntimePool(
 func NewReusableCadenceRuntimePool(
 	poolSize int,
 	config runtime.Config,
-	chainID flow.ChainID,
 ) ReusableCadenceRuntimePool {
 	return newReusableCadenceRuntimePool(
 		poolSize,
 		config,
-		chainID,
 		nil,
 	)
 }
@@ -231,13 +221,11 @@ func NewReusableCadenceRuntimePool(
 func NewCustomReusableCadenceRuntimePool(
 	poolSize int,
 	config runtime.Config,
-	chainID flow.ChainID,
 	newCustomRuntime CadenceRuntimeConstructor,
 ) ReusableCadenceRuntimePool {
 	return newReusableCadenceRuntimePool(
 		poolSize,
 		config,
-		chainID,
 		newCustomRuntime,
 	)
 }
@@ -262,7 +250,6 @@ func (pool ReusableCadenceRuntimePool) Borrow(
 				pool.newRuntime(),
 			},
 			pool.config,
-			pool.chainID,
 		)
 	}
 

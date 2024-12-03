@@ -165,7 +165,6 @@ func NewBasicBlockExecutor(tb testing.TB, chain flow.Chain, logger zerolog.Logge
 			reusableRuntime.NewReusableCadenceRuntimePool(
 				computation.ReusableCadenceRuntimePoolSize,
 				runtime.Config{},
-				chain.ChainID(),
 			),
 		),
 		fvm.WithEVMEnabled(true),

@@ -11,6 +11,7 @@ import (
 	"github.com/onflow/cadence/stdlib"
 
 	"github.com/onflow/flow-go/fvm/errors"
+	"github.com/onflow/flow-go/fvm/systemcontracts"
 	"github.com/onflow/flow-go/model/flow"
 )
 
@@ -39,7 +40,7 @@ var scheduleAccountV2MigrationType = &sema.FunctionType{
 
 func DeclareFunctions(environment runtime.Environment, chainID flow.ChainID) {
 	declareScheduleAccountV2MigrationFunction(environment, chainID)
-	declareGetAccountStorageFormatFunction(environment)
+	declareGetAccountStorageFormatFunction(environment, chainID)
 }
 
 func declareScheduleAccountV2MigrationFunction(environment runtime.Environment, chainID flow.ChainID) {
@@ -122,19 +123,17 @@ func declareScheduleAccountV2MigrationFunction(environment runtime.Environment, 
 		),
 	}
 
-	// TODO: restrict, but requires to be set during bootstrapping
-	//sc := systemcontracts.SystemContractsForChain(chainID)
-	//
-	//accountV2MigrationLocation := common.NewAddressLocation(
-	//	nil,
-	//	common.Address(sc.AccountV2Migration.Address),
-	//	ContractName,
-	//)
+	sc := systemcontracts.SystemContractsForChain(chainID)
+
+	accountV2MigrationLocation := common.NewAddressLocation(
+		nil,
+		common.Address(sc.AccountV2Migration.Address),
+		ContractName,
+	)
 
 	environment.DeclareValue(
 		functionValue,
-		// TODO: accountV2MigrationLocation,
-		nil,
+		accountV2MigrationLocation,
 	)
 }
 
@@ -152,7 +151,7 @@ var getAccountStorageFormatType = &sema.FunctionType{
 	ReturnTypeAnnotation: sema.NewTypeAnnotation(sema.UInt8Type),
 }
 
-func declareGetAccountStorageFormatFunction(environment runtime.Environment) {
+func declareGetAccountStorageFormatFunction(environment runtime.Environment, chainID flow.ChainID) {
 
 	functionType := getAccountStorageFormatType
 
@@ -207,18 +206,16 @@ func declareGetAccountStorageFormatFunction(environment runtime.Environment) {
 		),
 	}
 
-	// TODO: restrict, but requires to be set during bootstrapping
-	//sc := systemcontracts.SystemContractsForChain(chainID)
-	//
-	//accountV2MigrationLocation := common.NewAddressLocation(
-	//	nil,
-	//	common.Address(sc.AccountV2Migration.Address),
-	//	ContractName,
-	//)
+	sc := systemcontracts.SystemContractsForChain(chainID)
+
+	accountV2MigrationLocation := common.NewAddressLocation(
+		nil,
+		common.Address(sc.AccountV2Migration.Address),
+		ContractName,
+	)
 
 	environment.DeclareValue(
 		functionValue,
-		// TODO: accountV2MigrationLocation,
-		nil,
+		accountV2MigrationLocation,
 	)
 }

@@ -233,7 +233,6 @@ func DefaultFVMOptions(chainID flow.ChainID, cadenceTracing bool, extensiveTraci
 				runtime.Config{
 					TracingEnabled: cadenceTracing,
 				},
-				chainID,
 			)),
 		fvm.WithEVMEnabled(true),
 	}

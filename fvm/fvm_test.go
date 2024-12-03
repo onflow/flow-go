@@ -2451,7 +2451,6 @@ func TestCapabilityControllers(t *testing.T) {
 					reusableRuntime.NewReusableCadenceRuntimePool(
 						1,
 						runtime.Config{},
-						flow.Emulator,
 					),
 				),
 			).
@@ -2506,7 +2505,6 @@ func TestStorageIterationWithBrokenValues(t *testing.T) {
 				reusableRuntime.NewReusableCadenceRuntimePool(
 					1,
 					runtime.Config{},
-					flow.Emulator,
 				),
 			),
 			fvm.WithContractDeploymentRestricted(false),

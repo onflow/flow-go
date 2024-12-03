@@ -701,7 +701,6 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 					reusableRuntime.NewCustomReusableCadenceRuntimePool(
 						0,
 						runtime.Config{},
-						chainID,
 						func(_ runtime.Config) runtime.Runtime {
 							return emittingRuntime
 						},
@@ -817,7 +816,6 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 				reusableRuntime.NewCustomReusableCadenceRuntimePool(
 					0,
 					runtime.Config{},
-					execCtx.Chain.ChainID(),
 					func(_ runtime.Config) runtime.Runtime {
 						return rt
 					})),
@@ -933,7 +931,6 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 				reusableRuntime.NewCustomReusableCadenceRuntimePool(
 					0,
 					runtime.Config{},
-					execCtx.Chain.ChainID(),
 					func(_ runtime.Config) runtime.Runtime {
 						return rt
 					})),
