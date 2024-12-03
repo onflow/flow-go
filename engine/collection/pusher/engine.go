@@ -69,8 +69,6 @@ func New(
 		return nil, fmt.Errorf("could not create fifoqueue: %w", err)
 	}
 
-	notifier := engine.NewNotifier()
-
 	e := &Engine{
 		log:          log.With().Str("engine", "pusher").Logger(),
 		engMetrics:   engMetrics,
@@ -79,7 +77,7 @@ func New(
 		collections:  collections,
 		transactions: transactions,
 
-		notifier: notifier,
+		notifier: engine.NewNotifier(),
 		queue:    queue,
 	}
 
@@ -194,11 +192,12 @@ func (e *Engine) SubmitCollectionGuarantee(msg *messages.SubmitCollectionGuarant
 func (e *Engine) publishCollectionGuarantee(guarantee *flow.CollectionGuarantee) error {
 	consensusNodes, err := e.state.Final().Identities(filter.HasRole[flow.Identity](flow.RoleConsensus))
 	if err != nil {
-		return fmt.Errorf("could not get consensus nodes: %w", err)
+		return fmt.Errorf("could not get consensus nodes' identities: %w", err)
 	}
 
-	// NOTE: Consensus nodes do not broadcast guarantees among themselves, so it needs that
-	// at least one collection node make a publish to all of them.
+	// NOTE: Consensus nodes do not broadcast guarantees among themselves. So for the collection to be included,
+	// at least one collector has to successfully broadcast the collection to consensus nodes. Otherwise, the
+	// collection is lost, which is acceptable as long as we only lose a small fraction of collections.
 	err = e.conduit.Publish(guarantee, consensusNodes.NodeIDs()...)
 	if err != nil {
 		return fmt.Errorf("could not submit collection guarantee: %w", err)
