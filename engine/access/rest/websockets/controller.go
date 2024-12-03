@@ -4,12 +4,13 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"sync"
 	"time"
 
 	"github.com/google/uuid"
 	"github.com/gorilla/websocket"
 	"github.com/rs/zerolog"
+	"go.uber.org/atomic"
+	"golang.org/x/sync/errgroup"
 
 	dp "github.com/onflow/flow-go/engine/access/rest/websockets/data_provider"
 	"github.com/onflow/flow-go/engine/access/rest/websockets/models"
@@ -54,8 +55,7 @@ type Controller struct {
 	dataProviders        *concurrentmap.Map[uuid.UUID, dp.DataProvider]
 	dataProvidersFactory dp.DataProviderFactory
 
-	shutdownOnce sync.Once // Ensures shutdown is only called once
-	shutdown     bool      // Indicates if the controller is shutting down.
+	shutdown *atomic.Bool // Indicates if the controller is shutting down.
 }
 
 func NewWebSocketController(
@@ -72,6 +72,7 @@ func NewWebSocketController(
 		errorChannel:         make(chan error, 1),    // Buffered error channel to hold one error.
 		dataProviders:        concurrentmap.New[uuid.UUID, dp.DataProvider](),
 		dataProvidersFactory: dataProviderFactory,
+		shutdown:             atomic.NewBool(false),
 	}
 }
 
@@ -94,53 +95,26 @@ func (c *Controller) HandleConnection(ctx context.Context) {
 	//TODO: spin up a response limit tracker routine
 
 	// for track all goroutines and error handling
-	var wg sync.WaitGroup
+	g, gCtx := errgroup.WithContext(ctx)
 
-	c.startProcess(&wg, ctx, c.readMessagesFromClient)
-	c.startProcess(&wg, ctx, c.keepalive)
-	c.startProcess(&wg, ctx, c.writeMessagesToClient)
+	g.Go(func() error {
+		return c.readMessagesFromClient(gCtx)
+	})
 
-	// Wait for context cancellation or errors from goroutines.
-	select {
-	case err := <-c.errorChannel:
-		c.logger.Error().Err(err).Msg("error detected in one of the goroutines")
+	g.Go(func() error {
+		return c.keepalive(gCtx)
+	})
+
+	g.Go(func() error {
+		return c.writeMessagesToClient(gCtx)
+	})
+
+	if err = g.Wait(); err != nil {
 		//TODO: add error handling here
-		c.shutdownConnection()
-	case <-ctx.Done():
-		// Context canceled, shut down gracefully
+		c.logger.Error().Err(err).Msg("error detected in one of the goroutines")
+
 		c.shutdownConnection()
 	}
-
-	// Ensure all goroutines finish execution.
-	wg.Wait()
-}
-
-// startProcess is a helper function to start a goroutine for a given process
-// and ensure it is tracked via a sync.WaitGroup.
-//
-// Parameters:
-// - wg: The wait group to track goroutines.
-// - ctx: The context for cancellation.
-// - process: The function to run in a new goroutine.
-//
-// No errors are expected during normal operation.
-func (c *Controller) startProcess(wg *sync.WaitGroup, ctx context.Context, process func(context.Context) error) {
-	wg.Add(1)
-
-	go func() {
-		defer wg.Done()
-
-		err := process(ctx)
-		if err != nil {
-			// Check if shutdown has already been called, to avoid multiple shutdowns
-			if c.shutdown {
-				c.logger.Warn().Err(err).Msg("error detected after shutdown initiated, ignoring")
-				return
-			}
-
-			c.errorChannel <- err
-		}
-	}()
 }
 
 // configureConnection sets up the WebSocket connection with a read deadline
@@ -329,26 +303,29 @@ func (c *Controller) handleListSubscriptions(ctx context.Context, msg models.Lis
 }
 
 func (c *Controller) shutdownConnection() {
-	c.shutdownOnce.Do(func() {
-		c.shutdown = true
+	if !c.shutdown.CompareAndSwap(false, true) {
+		return
+	}
 
-		defer func() {
-			if err := c.conn.Close(); err != nil {
-				c.logger.Error().Err(err).Msg("error closing connection")
-			}
-			close(c.communicationChannel)
-		}()
-
-		err := c.dataProviders.ForEach(func(_ uuid.UUID, dp dp.DataProvider) error {
-			dp.Close()
-			return nil
-		})
-		if err != nil {
-			c.logger.Error().Err(err).Msg("error closing data provider")
+	defer func() {
+		if err := c.conn.Close(); err != nil {
+			c.logger.Error().Err(err).Msg("error closing connection")
 		}
+		// it's not safe to close this here,
+		// because the data providers could continue to write out new messages
+		// TODO: will be included as a part of PR #6642
+		close(c.communicationChannel)
+	}()
 
-		c.dataProviders.Clear()
+	err := c.dataProviders.ForEach(func(_ uuid.UUID, dp dp.DataProvider) error {
+		dp.Close()
+		return nil
 	})
+	if err != nil {
+		c.logger.Error().Err(err).Msg("error closing data provider")
+	}
+
+	c.dataProviders.Clear()
 }
 
 // keepalive sends a ping message periodically to keep the WebSocket connection alive

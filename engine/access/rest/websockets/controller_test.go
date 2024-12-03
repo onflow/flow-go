@@ -91,7 +91,7 @@ func (s *ControllerSuite) TestControllerShutdown() {
 		defer cancel()
 		controller.HandleConnection(ctx)
 
-		s.Require().True(controller.shutdown)
+		s.Require().True(controller.shutdown.Load())
 		// Ensure all expectations are met
 		s.connection.AssertExpectations(s.T())
 	})
@@ -101,19 +101,9 @@ func (s *ControllerSuite) TestControllerShutdown() {
 		// Mock configureConnection to succeed
 		s.mockConnectionSetup()
 
-		// Mock keepalive to return an error
-		done := make(chan struct{}, 1)
-		s.connection.On("WriteControl", websocket.PingMessage, mock.Anything).Return(func(int, time.Time) error {
-			_, ok := <-done
-			if !ok {
-				return websocket.ErrCloseSent
-			}
-			return nil
-		}).Once()
 		s.connection.
 			On("ReadJSON", mock.Anything).
 			Return(func(_ interface{}) error {
-				close(done)
 				return assert.AnError
 			}).
 			Once()
@@ -124,7 +114,7 @@ func (s *ControllerSuite) TestControllerShutdown() {
 		defer cancel()
 		controller.HandleConnection(ctx)
 
-		s.Require().True(controller.shutdown)
+		s.Require().True(controller.shutdown.Load())
 		// Ensure all expectations are met
 		s.connection.AssertExpectations(s.T())
 	})
@@ -137,15 +127,6 @@ func (s *ControllerSuite) TestControllerShutdown() {
 		blocksDataProvider := s.mockBlockDataProviderSetup(uuid.New())
 
 		done := make(chan struct{}, 1)
-		// Mock keepalive to return a connection error
-		s.connection.On("WriteControl", websocket.PingMessage, mock.Anything).Return(func(int, time.Time) error {
-			_, ok := <-done
-			if !ok {
-				return websocket.ErrCloseSent
-			}
-			return nil
-		}).Once()
-
 		requestMessage := models.SubscribeMessageRequest{
 			BaseMessageRequest: models.BaseMessageRequest{Action: "subscribe"},
 			Topic:              "blocks",
@@ -187,11 +168,29 @@ func (s *ControllerSuite) TestControllerShutdown() {
 		defer cancel()
 		controller.HandleConnection(ctx)
 
-		s.Require().True(controller.shutdown)
+		s.Require().True(controller.shutdown.Load())
 		// Ensure all expectations are met
 		s.connection.AssertExpectations(s.T())
 		s.dataProviderFactory.AssertExpectations(s.T())
 		blocksDataProvider.AssertExpectations(s.T())
+	})
+
+	s.T().Run("context closed", func(*testing.T) {
+		controller := s.initializeController()
+
+		// Mock configureConnection to succeed
+		s.mockConnectionSetup()
+
+		s.connection.On("Close").Return(nil).Once()
+
+		ctx, cancel := context.WithCancel(context.Background())
+		cancel()
+
+		controller.HandleConnection(ctx)
+
+		s.Require().True(controller.shutdown.Load())
+		// Ensure all expectations are met
+		s.connection.AssertExpectations(s.T())
 	})
 }
 
