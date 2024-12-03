@@ -181,11 +181,11 @@ func (c *Client) Broadcast(msg model.BroadcastDKGMessage) error {
 }
 
 // SubmitParametersAndResult posts the DKG setup parameters (`flow.DKGIndexMap`) and the node's locally-computed DKG result to
-// the DKG white-board smart contract. The DKG result are the group public key and the node's local computation of the public
-// keys for each DKG participant. Serialized public keys are encoded as hex.
-// Conceptually the flow.DKGIndexMap is not and output of the DKG protocol. Rather, it is part of the configuration/initialization
+// the DKG white-board smart contract. The DKG results are the node's local computation of the group public key and the public
+// key shares. Serialized public keys are encoded as lower-case hex strings.
+// Conceptually the flow.DKGIndexMap is not an output of the DKG protocol. Rather, it is part of the configuration/initialization
 // information of the DKG. Before an epoch transition on the happy path (using the data in the EpochSetup event), each consensus
-// participant locally fixes the DKG committee 𝒟 including the order of the respective nodes order to be identical to the consensus
+// participant locally fixes the DKG committee 𝒟 including the respective nodes' order to be identical to the consensus
 // committee 𝒞. However, in case of a failed epoch transition, we desire the ability to manually provide the result of a successful
 // DKG for the immediately next epoch (so-called recovery epoch). The DKG committee 𝒟 must have a sufficiently large overlap with
 // the recovery epoch's consensus committee 𝒞 -- though for flexibility, we do *not* want to require that both committees are identical.

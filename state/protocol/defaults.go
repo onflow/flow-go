@@ -32,15 +32,23 @@ func DefaultEpochSafetyParams(chain flow.ChainID) (SafetyParams, error) {
 }
 
 // RandomBeaconSafetyThreshold defines a production network safety threshold for random beacon protocol based on the size
-// of the DKG committee 𝒟 which is a subset of consensus committee 𝒞.
+// of the random beacon committee ℛ and the DKG committee 𝒟.
+//
+// We recall that the committee ℛ is defined as the subset of the consensus committee (ℛ ⊆ 𝒞) and the DKG
+// committee (ℛ ⊆ 𝒟) that _successfully_ completed the DKG and is able to contribute with a random beacon share.
+//
 // An honest supermajority of consensus nodes must contain enough successful DKG participants
-// (about |𝒟|/2) to produce a valid group signature for the random beacon [1, 3]. Therefore, we have the approximate
-// lower bound |𝒟|/2. This is a lower bound, unsuited for decentralized production networks.
+// (about |𝒟|/2 + 1) to produce a valid group signature for the random beacon at each block [1, 3].
+// Therefore, we have the approximate lower bound |ℛ| ≳ n/2 + 1 = |𝒟|/2 + 1 = len(DKGIndexMap)/2 + 1.
+// Operating close to this lower bound would require that every random beacon key-holder ϱ ∈ ℛ remaining in the consensus committee is honest
+// (incl. quickly responsive) *all the time*. Such a reliability assumption is unsuited for decentralized production networks.
 // To reject configurations that are vulnerable to liveness failures, the protocol uses the threshold `t_safety`
-// (heuristic, see [2]), which is implemented on the smart contract level. In a nutshell, the cardinality of intersection 𝒟 ∩ 𝒞
-// (wrt both sets 𝒟 ∩ 𝒞) should be well above 70%, values in the range 70-62% should be considered for short-term
-// recovery cases. Values of 62% or lower are not recommended for any
-// production network, as single-node crashes are already enough to halt consensus.
+// (heuristic, see [2]), which is implemented on the smart contract level.
+// Ideally, |ℛ| and therefore |𝒟 ∩ 𝒞| (given that |ℛ| <= |𝒟 ∩ 𝒞|) should be well above 70% . |𝒟|.
+// Values in the range 70%-62% of |𝒟| should be considered for short-term recovery cases.
+// Values of 62% * |𝒟| or lower (i.e. |ℛ| ≤ 0.62·|𝒟|) are not recommended for any
+// production network, as single-node crashes may already be enough to halt consensus.
+//
 // For further details, see
 //   - godoc for [flow.DKGIndexMap]
 //   - [1] https://www.notion.so/flowfoundation/Threshold-Signatures-7e26c6dd46ae40f7a83689ba75a785e3?pvs=4
