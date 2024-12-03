@@ -44,6 +44,7 @@ type RecoverablePrivateBeaconKeyStateMachine struct {
 var _ storage.EpochRecoveryMyBeaconKey = (*RecoverablePrivateBeaconKeyStateMachine)(nil)
 
 // NewRecoverableRandomBeaconStateMachine returns the RecoverablePrivateBeaconKeyStateMachine implementation backed by Badger DB.
+// No errors are expected during normal operations.
 func NewRecoverableRandomBeaconStateMachine(collector module.CacheMetrics, db *badger.DB) (*RecoverablePrivateBeaconKeyStateMachine, error) {
 	err := operation.EnsureSecretDB(db)
 	if err != nil {
@@ -78,7 +79,10 @@ func NewRecoverableRandomBeaconStateMachine(collector module.CacheMetrics, db *b
 //
 // CAUTION: these keys are stored before they are validated against the
 // canonical key vector and may not be valid for use in signing. Use SafeBeaconKeys
-// to guarantee only keys safe for signing are returned
+// to guarantee only keys safe for signing are returned.
+// Error returns:
+//   - [storage.ErrAlreadyExists] - if there is already a key stored for given epoch.
+//   - [storage.InvalidTransitionRandomBeaconStateMachineError] - if the requested state transition is invalid.
 func (ds *RecoverablePrivateBeaconKeyStateMachine) InsertMyBeaconPrivateKey(epochCounter uint64, key crypto.PrivateKey) error {
 	if key == nil {
 		return fmt.Errorf("will not store nil beacon key")
@@ -98,7 +102,8 @@ func (ds *RecoverablePrivateBeaconKeyStateMachine) InsertMyBeaconPrivateKey(epoc
 // CAUTION: these keys are stored before they are validated against the
 // canonical key vector and may not be valid for use in signing. Use SafeBeaconKeys
 // to guarantee only keys safe for signing are returned
-// Error returns: storage.ErrNotFound
+// Error returns:
+//   - [storage.ErrNotFound] - if there is no key stored for given epoch.
 func (ds *RecoverablePrivateBeaconKeyStateMachine) UnsafeRetrieveMyBeaconPrivateKey(epochCounter uint64) (crypto.PrivateKey, error) {
 	tx := ds.db.NewTransaction(false)
 	defer tx.Discard()
@@ -122,11 +127,14 @@ func (ds *RecoverablePrivateBeaconKeyStateMachine) GetDKGStarted(epochCounter ui
 // state directly from [flow.DKGStateStarted], even if such transition is valid. The reason for this is that some states require additional
 // data to be processed by the state machine before the transition can be made. For such cases there are dedicated methods that should be used, ex.
 // InsertMyBeaconPrivateKey and UpsertMyBeaconPrivateKey, which allow to store the needed data and perform the transition in one atomic operation.
-// No errors are expected during normal operations.
+// Error returns:
+//   - [storage.InvalidTransitionRandomBeaconStateMachineError] - if the requested state transition is invalid.
 func (ds *RecoverablePrivateBeaconKeyStateMachine) SetDKGState(epochCounter uint64, newState flow.DKGState) error {
 	return operation.RetryOnConflictTx(ds.db, transaction.Update, ds.processStateTransition(epochCounter, newState))
 }
 
+// Error returns:
+//   - storage.InvalidTransitionRandomBeaconStateMachineError - if the requested state transition is invalid
 func (ds *RecoverablePrivateBeaconKeyStateMachine) processStateTransition(epochCounter uint64, newState flow.DKGState) func(*transaction.Tx) error {
 	return func(tx *transaction.Tx) error {
 		var currentState flow.DKGState
@@ -141,7 +149,7 @@ func (ds *RecoverablePrivateBeaconKeyStateMachine) processStateTransition(epochC
 
 		allowedStates := allowedStateTransitions[currentState]
 		if slices.Index(allowedStates, newState) < 0 {
-			return fmt.Errorf("invalid state transition from %s to %s", currentState, newState)
+			return storage.NewInvalidTransitionRandomBeaconStateMachine(currentState, newState)
 		}
 
 		// ensure invariant holds and we still have a valid private key stored
@@ -158,7 +166,8 @@ func (ds *RecoverablePrivateBeaconKeyStateMachine) processStateTransition(epochC
 
 // GetDKGState retrieves the current state of the state machine for the given epoch.
 // If an error is returned, the state is undefined meaning that state machine is in initial state
-// Error returns: storage.ErrNotFound.
+// Error returns:
+//   - [storage.ErrNotFound] - if there is no state stored for given epoch, meaning the state machine is in initial state.
 func (ds *RecoverablePrivateBeaconKeyStateMachine) GetDKGState(epochCounter uint64) (flow.DKGState, error) {
 	var currentState flow.DKGState
 	err := ds.db.Update(operation.RetrieveDKGStateForEpoch(epochCounter, &currentState))
@@ -172,7 +181,7 @@ func (ds *RecoverablePrivateBeaconKeyStateMachine) GetDKGState(epochCounter uint
 //   - (key, true, nil) if the key is present and confirmed valid
 //   - (nil, false, nil) if the key has been marked invalid or unavailable
 //     -> no beacon key will ever be available for the epoch in this case
-//   - (nil, false, storage.ErrNotFound) if the DKG has not ended
+//   - (nil, false, [storage.ErrNotFound]) if the DKG has not ended
 //   - (nil, false, error) for any unexpected exception
 func (ds *RecoverablePrivateBeaconKeyStateMachine) RetrieveMyBeaconPrivateKey(epochCounter uint64) (key crypto.PrivateKey, safe bool, err error) {
 	err = ds.db.View(func(txn *badger.Txn) error {
