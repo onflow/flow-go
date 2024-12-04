@@ -105,7 +105,7 @@ func LoadAtreeSlabsInStorage(
 }
 
 func CheckStorageHealth(
-	inter *interpreter.Interpreter,
+	interpreter *interpreter.Interpreter,
 	address common.Address,
 	storage *runtime.Storage,
 	registers registers.Registers,
@@ -119,7 +119,7 @@ func CheckStorageHealth(
 	}
 
 	for _, domain := range domains {
-		_ = storage.GetDomainStorageMap(inter, address, domain, false)
+		_ = storage.GetDomainStorageMap(interpreter, address, domain, false)
 	}
 
 	return storage.CheckHealth()
