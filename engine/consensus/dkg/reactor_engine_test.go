@@ -290,7 +290,7 @@ func (suite *ReactorEngineSuite_CommittedPhase) NextEpochCounter() uint64 {
 func (suite *ReactorEngineSuite_CommittedPhase) SetupTest() {
 
 	suite.epochCounter = rand.Uint64()
-	suite.DKGState = flow.DKGStateUninitialized
+	suite.DKGState = flow.DKGStateCompleted // we start with the completed state since we are going to test the transition to committed
 	suite.me = new(module.Local)
 
 	id := unittest.IdentifierFixture()
@@ -312,7 +312,7 @@ func (suite *ReactorEngineSuite_CommittedPhase) SetupTest() {
 	)
 	suite.dkgState.On("SetDKGState", suite.NextEpochCounter(), mock.Anything).
 		Run(func(args mock.Arguments) {
-			assert.Equal(suite.T(), flow.DKGStateUninitialized, suite.DKGState) // must be unset
+			assert.Equal(suite.T(), flow.DKGStateCompleted, suite.DKGState) // must be equal to the initial state of the test
 			endState := args[1].(flow.DKGState)
 			suite.DKGState = endState
 		}).
