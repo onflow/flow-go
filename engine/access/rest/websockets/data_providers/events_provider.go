@@ -42,11 +42,11 @@ func NewEventsDataProvider(
 	ctx context.Context,
 	logger zerolog.Logger,
 	stateStreamApi state_stream.API,
-	chain flow.Chain,
-	eventFilterConfig state_stream.EventFilterConfig,
 	topic string,
 	arguments models.Arguments,
 	send chan<- interface{},
+	chain flow.Chain,
+	eventFilterConfig state_stream.EventFilterConfig,
 ) (*EventsDataProvider, error) {
 	p := &EventsDataProvider{
 		logger:         logger.With().Str("component", "events-data-provider").Logger(),
