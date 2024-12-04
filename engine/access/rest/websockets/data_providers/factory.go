@@ -47,6 +47,7 @@ type DataProviderFactoryImpl struct {
 
 	chain             flow.Chain
 	eventFilterConfig state_stream.EventFilterConfig
+	heartbeatInterval uint64
 }
 
 // NewDataProviderFactory creates a new DataProviderFactory
@@ -62,6 +63,7 @@ func NewDataProviderFactory(
 	accessApi access.API,
 	chain flow.Chain,
 	eventFilterConfig state_stream.EventFilterConfig,
+	heartbeatInterval uint64,
 ) *DataProviderFactoryImpl {
 	return &DataProviderFactoryImpl{
 		logger:            logger,
@@ -69,6 +71,7 @@ func NewDataProviderFactory(
 		accessApi:         accessApi,
 		chain:             chain,
 		eventFilterConfig: eventFilterConfig,
+		heartbeatInterval: heartbeatInterval,
 	}
 }
 
@@ -96,7 +99,7 @@ func (s *DataProviderFactoryImpl) NewDataProvider(
 	case BlockDigestsTopic:
 		return NewBlockDigestsDataProvider(ctx, s.logger, s.accessApi, topic, arguments, ch)
 	case EventsTopic:
-		return NewEventsDataProvider(ctx, s.logger, s.stateStreamApi, topic, arguments, ch, s.chain, s.eventFilterConfig)
+		return NewEventsDataProvider(ctx, s.logger, s.stateStreamApi, topic, arguments, ch, s.chain, s.eventFilterConfig, s.heartbeatInterval)
 		// TODO: Implemented handlers for each topic should be added in respective case
 	case AccountStatusesTopic,
 		TransactionStatusesTopic:

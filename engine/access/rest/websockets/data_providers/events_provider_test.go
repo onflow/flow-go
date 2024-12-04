@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"strconv"
 	"testing"
-	"time"
 
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/mock"
@@ -14,7 +13,9 @@ import (
 
 	"github.com/onflow/flow-go/engine/access/rest/websockets/models"
 	"github.com/onflow/flow-go/engine/access/state_stream"
+	"github.com/onflow/flow-go/engine/access/state_stream/backend"
 	ssmock "github.com/onflow/flow-go/engine/access/state_stream/mock"
+	"github.com/onflow/flow-go/engine/access/subscription"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -46,7 +47,13 @@ func (s *EventsProviderSuite) SetupTest() {
 	s.rootBlock = unittest.BlockFixture()
 	s.rootBlock.Header.Height = 0
 
-	s.factory = NewDataProviderFactory(s.log, s.api, nil, flow.Testnet.Chain(), state_stream.DefaultEventFilterConfig)
+	s.factory = NewDataProviderFactory(
+		s.log,
+		s.api,
+		nil,
+		flow.Testnet.Chain(),
+		state_stream.DefaultEventFilterConfig,
+		subscription.DefaultHeartbeatInterval)
 	s.Require().NotNil(s.factory)
 }
 
@@ -119,13 +126,25 @@ func (s *EventsProviderSuite) TestEventsDataProvider_HappyPath() {
 func (s *EventsProviderSuite) testHappyPath(
 	topic string,
 	tests []testType,
-	requireFn func(interface{}, *flow.Event),
+	requireFn func(interface{}, *backend.EventsResponse),
 ) {
 	expectedEvents := []flow.Event{
 		unittest.EventFixture(flow.EventAccountCreated, 0, 0, unittest.IdentifierFixture(), 0),
 		unittest.EventFixture(flow.EventAccountUpdated, 0, 0, unittest.IdentifierFixture(), 0),
 		unittest.EventFixture(flow.EventAccountCreated, 0, 0, unittest.IdentifierFixture(), 0),
 		unittest.EventFixture(flow.EventAccountUpdated, 0, 0, unittest.IdentifierFixture(), 0),
+	}
+
+	var expectedEventsResponses []backend.EventsResponse
+
+	for i := 0; i < len(expectedEvents); i++ {
+		expectedEventsResponses = append(expectedEventsResponses, backend.EventsResponse{
+			Height:         s.rootBlock.Header.Height,
+			BlockID:        s.rootBlock.ID(),
+			Events:         expectedEvents,
+			BlockTimestamp: s.rootBlock.Header.Timestamp,
+		})
+
 	}
 
 	for _, test := range tests {
@@ -157,19 +176,17 @@ func (s *EventsProviderSuite) testHappyPath(
 			go func() {
 				defer close(eventChan)
 
-				for i := 0; i < len(expectedEvents); i++ {
-					eventChan <- &expectedEvents[i]
+				for i := 0; i < len(expectedEventsResponses); i++ {
+					eventChan <- &expectedEventsResponses[i]
 				}
 			}()
 
 			// Collect responses
-			for _, e := range expectedEvents {
-				unittest.RequireReturnsBefore(s.T(), func() {
-					v, ok := <-send
-					s.Require().True(ok, "channel closed while waiting for event %v: err: %v", e.ID(), sub.Err())
+			for _, e := range expectedEventsResponses {
+				v, ok := <-send
+				s.Require().True(ok, "channel closed while waiting for event %v: err: %v", e.BlockID, sub.Err())
 
-					requireFn(v, &e)
-				}, time.Second, fmt.Sprintf("timed out waiting for event %v ", e.ID()))
+				requireFn(v, &e)
 			}
 
 			// Ensure the provider is properly closed after the test
@@ -179,11 +196,11 @@ func (s *EventsProviderSuite) testHappyPath(
 }
 
 // requireEvents ensures that the received event information matches the expected data.
-func (s *EventsProviderSuite) requireEvents(v interface{}, expectedEvent *flow.Event) {
+func (s *EventsProviderSuite) requireEvents(v interface{}, expectedEventsResponse *backend.EventsResponse) {
 	actualResponse, ok := v.(*models.EventResponse)
 	require.True(s.T(), ok, "Expected *models.EventResponse, got %T", v)
 
-	s.Require().Equal(expectedEvent, actualResponse.Event)
+	s.Require().ElementsMatch(expectedEventsResponse.Events, actualResponse.Events)
 }
 
 // invalidArgumentsTestCases returns a list of test cases with invalid argument combinations
@@ -244,7 +261,8 @@ func (s *EventsProviderSuite) TestEventsDataProvider_InvalidArguments() {
 				test.arguments,
 				send,
 				s.chain,
-				state_stream.DefaultEventFilterConfig)
+				state_stream.DefaultEventFilterConfig,
+				subscription.DefaultHeartbeatInterval)
 			s.Require().Nil(provider)
 			s.Require().Error(err)
 			s.Require().Contains(err.Error(), test.expectedErrorMsg)
@@ -283,7 +301,8 @@ func (s *EventsProviderSuite) TestMessageIndexEventProviderResponse_HappyPath() 
 		arguments,
 		send,
 		s.chain,
-		state_stream.DefaultEventFilterConfig)
+		state_stream.DefaultEventFilterConfig,
+		subscription.DefaultHeartbeatInterval)
 	s.Require().NotNil(provider)
 	s.Require().NoError(err)
 
@@ -298,8 +317,8 @@ func (s *EventsProviderSuite) TestMessageIndexEventProviderResponse_HappyPath() 
 		defer close(eventChan) // Close the channel when done
 
 		for i := 0; i < eventsCount; i++ {
-			eventChan <- &flow.Event{
-				Type: "flow.AccountCreated",
+			eventChan <- &backend.EventsResponse{
+				Height: s.rootBlock.Header.Height,
 			}
 		}
 	}()

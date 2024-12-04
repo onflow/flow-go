@@ -13,6 +13,7 @@ import (
 	"github.com/onflow/flow-go/engine/access/rest/websockets/models"
 	"github.com/onflow/flow-go/engine/access/state_stream"
 	statestreammock "github.com/onflow/flow-go/engine/access/state_stream/mock"
+	"github.com/onflow/flow-go/engine/access/subscription"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -46,7 +47,13 @@ func (s *DataProviderFactorySuite) SetupTest() {
 
 	chain := flow.Testnet.Chain()
 
-	s.factory = NewDataProviderFactory(log, s.stateStreamApi, s.accessApi, chain, state_stream.DefaultEventFilterConfig)
+	s.factory = NewDataProviderFactory(
+		log,
+		s.stateStreamApi,
+		s.accessApi,
+		chain,
+		state_stream.DefaultEventFilterConfig,
+		subscription.DefaultHeartbeatInterval)
 	s.Require().NotNil(s.factory)
 }
 

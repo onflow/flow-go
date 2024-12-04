@@ -16,6 +16,7 @@ import (
 	"github.com/onflow/flow-go/engine/access/rest/util"
 	"github.com/onflow/flow-go/engine/access/rest/websockets/models"
 	"github.com/onflow/flow-go/engine/access/state_stream"
+	"github.com/onflow/flow-go/engine/access/state_stream/backend"
 	"github.com/onflow/flow-go/engine/access/subscription"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/counters"
@@ -34,6 +35,8 @@ type EventsDataProvider struct {
 
 	logger         zerolog.Logger
 	stateStreamApi state_stream.API
+
+	heartbeatInterval uint64
 }
 
 var _ DataProvider = (*EventsDataProvider)(nil)
@@ -48,10 +51,12 @@ func NewEventsDataProvider(
 	send chan<- interface{},
 	chain flow.Chain,
 	eventFilterConfig state_stream.EventFilterConfig,
+	heartbeatInterval uint64,
 ) (*EventsDataProvider, error) {
 	p := &EventsDataProvider{
-		logger:         logger.With().Str("component", "events-data-provider").Logger(),
-		stateStreamApi: stateStreamApi,
+		logger:            logger.With().Str("component", "events-data-provider").Logger(),
+		stateStreamApi:    stateStreamApi,
+		heartbeatInterval: heartbeatInterval,
 	}
 
 	// Initialize arguments passed to the provider.
@@ -76,22 +81,39 @@ func NewEventsDataProvider(
 //
 // No errors are expected during normal operations.
 func (p *EventsDataProvider) Run() error {
+	return subscription.HandleSubscription(p.subscription, p.handleResponse(p.send))
+}
+
+func (p *EventsDataProvider) handleResponse(send chan<- interface{}) func(eventsResponse *backend.EventsResponse) error {
+	blocksSinceLastMessage := uint64(0)
 	messageIndex := counters.NewMonotonousCounter(1)
 
-	return subscription.HandleSubscription(
-		p.subscription,
-		subscription.HandleResponse(p.send, func(event *flow.Event) (interface{}, error) {
-			index := messageIndex.Value()
-			if ok := messageIndex.Set(messageIndex.Value() + 1); !ok {
-				return nil, status.Errorf(codes.Internal, "message index already incremented to %d", messageIndex.Value())
+	return func(eventsResponse *backend.EventsResponse) error {
+		// check if there are any events in the response. if not, do not send a message unless the last
+		// response was more than HeartbeatInterval blocks ago
+		if len(eventsResponse.Events) == 0 {
+			blocksSinceLastMessage++
+			if blocksSinceLastMessage < p.heartbeatInterval {
+				return nil
 			}
+			blocksSinceLastMessage = 0
+		}
 
-			return &models.EventResponse{
-				Event:        event,
-				MessageIndex: strconv.FormatUint(index, 10),
-			}, nil
-		}))
+		index := messageIndex.Value()
+		if ok := messageIndex.Set(messageIndex.Value() + 1); !ok {
+			return status.Errorf(codes.Internal, "message index already incremented to %d", messageIndex.Value())
+		}
 
+		send <- &models.EventResponse{
+			BlockId:        eventsResponse.BlockID.String(),
+			BlockHeight:    strconv.FormatUint(eventsResponse.Height, 10),
+			BlockTimestamp: eventsResponse.BlockTimestamp,
+			Events:         eventsResponse.Events,
+			MessageIndex:   strconv.FormatUint(index, 10),
+		}
+
+		return nil
+	}
 }
 
 // createSubscription creates a new subscription using the specified input arguments.
