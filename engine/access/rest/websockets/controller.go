@@ -11,7 +11,7 @@ import (
 	"github.com/rs/zerolog"
 	"golang.org/x/sync/errgroup"
 
-	dp "github.com/onflow/flow-go/engine/access/rest/websockets/data_provider"
+	dp "github.com/onflow/flow-go/engine/access/rest/websockets/data_providers"
 	"github.com/onflow/flow-go/engine/access/rest/websockets/models"
 	"github.com/onflow/flow-go/utils/concurrentmap"
 )
@@ -23,15 +23,15 @@ type Controller struct {
 
 	communicationChannel chan interface{} // Channel for sending messages to the client.
 
-	dataProviders        *concurrentmap.Map[uuid.UUID, dp.DataProvider]
-	dataProvidersFactory dp.DataProviderFactory
+	dataProviders       *concurrentmap.Map[uuid.UUID, dp.DataProvider]
+	dataProviderFactory dp.DataProviderFactory
 }
 
 func NewWebSocketController(
 	logger zerolog.Logger,
 	config Config,
-	dataProviderFactory dp.DataProviderFactory,
 	conn WebsocketConnection,
+	dataProviderFactory dp.DataProviderFactory,
 ) *Controller {
 	return &Controller{
 		logger:               logger.With().Str("component", "websocket-controller").Logger(),
@@ -39,7 +39,7 @@ func NewWebSocketController(
 		conn:                 conn,
 		communicationChannel: make(chan interface{}), //TODO: should it be buffered chan?
 		dataProviders:        concurrentmap.New[uuid.UUID, dp.DataProvider](),
-		dataProvidersFactory: dataProviderFactory,
+		dataProviderFactory:  dataProviderFactory,
 	}
 }
 
@@ -79,7 +79,6 @@ func (c *Controller) HandleConnection(ctx context.Context) {
 	if err = g.Wait(); err != nil {
 		//TODO: add error handling here
 		c.logger.Error().Err(err).Msg("error detected in one of the goroutines")
-
 		c.shutdownConnection()
 	}
 }
@@ -123,7 +122,7 @@ func (c *Controller) writeMessagesToClient(ctx context.Context) error {
 	for {
 		select {
 		case <-ctx.Done():
-			return nil
+			return ctx.Err()
 		case msg, ok := <-c.communicationChannel:
 			if !ok {
 				err := fmt.Errorf("communication channel closed, no error occurred")
@@ -159,7 +158,7 @@ func (c *Controller) readMessagesFromClient(ctx context.Context) error {
 		select {
 		case <-ctx.Done():
 			c.logger.Info().Msg("context canceled, stopping read message loop")
-			return nil
+			return ctx.Err()
 		default:
 			msg, err := c.readMessage()
 			if err != nil {
@@ -245,13 +244,24 @@ func (c *Controller) handleAction(ctx context.Context, message interface{}) erro
 }
 
 func (c *Controller) handleSubscribe(ctx context.Context, msg models.SubscribeMessageRequest) {
-	dp := c.dataProvidersFactory.NewDataProvider(c.communicationChannel, msg.Topic)
+	dp, err := c.dataProviderFactory.NewDataProvider(ctx, msg.Topic, msg.Arguments, c.communicationChannel)
+	if err != nil {
+		// TODO: handle error here
+		c.logger.Error().Err(err).Msgf("error while creating data provider for topic: %s", msg.Topic)
+	}
+
 	c.dataProviders.Add(dp.ID(), dp)
 
 	//TODO: return OK response to client
 	c.communicationChannel <- msg
 
-	dp.Run(ctx)
+	go func() {
+		err := dp.Run()
+		if err != nil {
+			//TODO: Log or handle the error from Run
+			c.logger.Error().Err(err).Msgf("error while running data provider for topic: %s", msg.Topic)
+		}
+	}()
 }
 
 func (c *Controller) handleUnsubscribe(_ context.Context, msg models.UnsubscribeMessageRequest) {
@@ -305,7 +315,7 @@ func (c *Controller) keepalive(ctx context.Context) error {
 	for {
 		select {
 		case <-ctx.Done():
-			return nil
+			return ctx.Err()
 		case <-pingTicker.C:
 			err := c.conn.WriteControl(websocket.PingMessage, time.Now().Add(WriteWait))
 			if err != nil {

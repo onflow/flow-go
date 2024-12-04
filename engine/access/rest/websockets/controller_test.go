@@ -14,7 +14,8 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/suite"
 
-	dpmock "github.com/onflow/flow-go/engine/access/rest/websockets/data_provider/mock"
+	dp "github.com/onflow/flow-go/engine/access/rest/websockets/data_providers"
+	dpmock "github.com/onflow/flow-go/engine/access/rest/websockets/data_providers/mock"
 	connectionmock "github.com/onflow/flow-go/engine/access/rest/websockets/mock"
 	"github.com/onflow/flow-go/engine/access/rest/websockets/models"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -124,7 +125,7 @@ func (s *ControllerSuite) TestControllerShutdown() {
 		done := make(chan struct{}, 1)
 		requestMessage := models.SubscribeMessageRequest{
 			BaseMessageRequest: models.BaseMessageRequest{Action: "subscribe"},
-			Topic:              "blocks",
+			Topic:              dp.BlocksTopic,
 			Arguments:          nil,
 		}
 
@@ -250,7 +251,7 @@ func (s *ControllerSuite) TestKeepaliveContextCancel() {
 
 // initializeController initializes the WebSocket controller.
 func (s *ControllerSuite) initializeController() *Controller {
-	return NewWebSocketController(s.logger, s.config, s.dataProviderFactory, s.connection)
+	return NewWebSocketController(s.logger, s.config, s.connection, s.dataProviderFactory)
 }
 
 // mockDataProviderSetup is a helper which mocks a blocks data provider setup.
@@ -258,8 +259,9 @@ func (s *ControllerSuite) mockBlockDataProviderSetup(id uuid.UUID) *dpmock.DataP
 	dataProvider := dpmock.NewDataProvider(s.T())
 	dataProvider.On("ID").Return(id).Once()
 	dataProvider.On("Close").Return(nil).Once()
-	s.dataProviderFactory.On("NewDataProvider", mock.Anything, mock.Anything).Return(dataProvider).Once()
-	dataProvider.On("Run", mock.Anything).Return().Once()
+	s.dataProviderFactory.On("NewDataProvider", mock.Anything, dp.BlocksTopic, mock.Anything, mock.Anything).
+		Return(dataProvider, nil).Once()
+	dataProvider.On("Run").Return(nil).Once()
 
 	return dataProvider
 }
