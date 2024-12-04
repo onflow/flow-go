@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"testing"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/gorilla/websocket"
@@ -182,6 +183,61 @@ func (s *WsControllerSuite) TestSubscribeBlocks() {
 
 		controller.HandleConnection(context.Background())
 		require.Equal(t, expectedBlocks, actualBlocks)
+	})
+}
+
+func (s *WsControllerSuite) TestRateLimiter() {
+	s.T().Run("Enforces response rate limit", func(t *testing.T) {
+		//conn, _, _ := newControllerMocks(t)
+		conn := connmock.NewWebsocketConnection(t)
+		conn.On("Close").Return(nil).Once()
+
+		// Configure the controller with a specific rate limit
+		config := NewDefaultWebsocketConfig()
+		config.MaxResponsesPerSecond = 2 // 2 messages per second
+		controller := NewWebSocketController(
+			s.logger,
+			config,
+			nil,
+			conn,
+		)
+
+		expectedTime := uint64(time.Second.Milliseconds()) / config.MaxResponsesPerSecond
+
+		// Simulate pushing messages into the communication channel
+		totalMessages := 5
+		for i := 1; i <= totalMessages; i++ {
+			controller.communicationChannel <- map[string]interface{}{
+				"message": i,
+			}
+		}
+
+		// Capture timestamps to verify rate limiting
+		var timestamps []time.Time
+		conn.
+			On("WriteJSON", mock.Anything).
+			Run(func(args mock.Arguments) {
+				timestamps = append(timestamps, time.Now())
+			}).
+			Return(nil).
+			Times(totalMessages)
+
+		// Execute writeMessages with a context
+		ctx, cancel := context.WithTimeout(context.Background(), time.Second*3)
+		defer cancel()
+
+		controller.writeMessages(ctx)
+
+		// Assertions
+		require.Len(t, timestamps, totalMessages, "All messages should be processed")
+
+		const tolerance = 5 * time.Millisecond // Allow up to 5ms deviation
+
+		// Check that the time intervals between messages respect the rate limit
+		for i := 1; i < len(timestamps); i++ {
+			delay := timestamps[i].Sub(timestamps[i-1])
+			require.GreaterOrEqual(t, delay, time.Duration(expectedTime)-tolerance, "Messages should respect rate limit")
+		}
 	})
 }
 

@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"golang.org/x/time/rate"
 	"sync"
 
 	"github.com/google/uuid"
@@ -23,6 +24,8 @@ type Controller struct {
 	dataProviders        *concurrentmap.Map[uuid.UUID, dp.DataProvider]
 	dataProvidersFactory dp.Factory
 	shutdownOnce         sync.Once
+
+	limiter *rate.Limiter
 }
 
 func NewWebSocketController(
@@ -39,6 +42,7 @@ func NewWebSocketController(
 		dataProviders:        concurrentmap.New[uuid.UUID, dp.DataProvider](),
 		dataProvidersFactory: factory,
 		shutdownOnce:         sync.Once{},
+		limiter:              rate.NewLimiter(rate.Limit(config.MaxResponsesPerSecond), 1),
 	}
 }
 
@@ -66,7 +70,10 @@ func (c *Controller) writeMessages(ctx context.Context) {
 			}
 			c.logger.Debug().Msgf("read message from communication channel: %s", msg)
 
-			// TODO: handle 'response per second' limits
+			// blocking wait for the streamer's rate limit to have available capacity
+			if err := c.limiter.WaitN(ctx, 1); err != nil {
+				return
+			}
 			err := c.conn.WriteJSON(msg)
 			if err != nil {
 				if websocket.IsCloseError(err, websocket.CloseNormalClosure, websocket.CloseGoingAway) ||
