@@ -2,6 +2,7 @@ package data_providers
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"strconv"
 	"strings"
@@ -143,10 +144,15 @@ func ParseEventsArguments(
 		args.StartBlockHeight = request.EmptyHeight
 	}
 
-	// Parse 'event_types' as []string{}
 	var eventTypes parser.EventTypes
+	// Parse 'event_types' as []string{}
 	if eventTypesIn, ok := arguments["event_types"]; ok && eventTypesIn != "" {
-		err := eventTypes.Parse(strings.Split(eventTypesIn, ","))
+		err := json.Unmarshal([]byte(eventTypesIn), &eventTypes) // Expect a JSON array
+		if err != nil {
+			return args, fmt.Errorf("could not parse 'event_types': %w", err)
+		}
+
+		err = eventTypes.Parse(strings.Split(eventTypesIn, ","))
 		if err != nil {
 			return args, fmt.Errorf("invalid 'event_types': %w", err)
 		}
@@ -155,13 +161,19 @@ func ParseEventsArguments(
 	// Parse 'addresses' as []string{}
 	var addresses []string
 	if addressesIn, ok := arguments["addresses"]; ok && addressesIn != "" {
-		addresses = strings.Split(addressesIn, ",")
+		err := json.Unmarshal([]byte(addressesIn), &addresses) // Expect a JSON array
+		if err != nil {
+			return args, fmt.Errorf("could not parse 'addresses': %w", err)
+		}
 	}
 
 	// Parse 'contracts' as []string{}
 	var contracts []string
 	if contractsIn, ok := arguments["contracts"]; ok && contractsIn != "" {
-		contracts = strings.Split(contractsIn, ",")
+		err := json.Unmarshal([]byte(contractsIn), &contracts) // Expect a JSON array
+		if err != nil {
+			return args, fmt.Errorf("could not parse 'contracts': %w", err)
+		}
 	}
 
 	// Initialize the event filter with the parsed arguments
