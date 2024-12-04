@@ -53,7 +53,7 @@ func (s *WsControllerSuite) TestSubscribeRequest() {
 			Run(func(args mock.Arguments) {}).
 			Once()
 
-		requestMessage := models.SubscribeMessageRequest{
+		subscribeRequest := models.SubscribeMessageRequest{
 			BaseMessageRequest: models.BaseMessageRequest{Action: "subscribe"},
 			Topic:              "blocks",
 			Arguments:          nil,
@@ -63,11 +63,11 @@ func (s *WsControllerSuite) TestSubscribeRequest() {
 		conn.
 			On("ReadJSON", mock.Anything).
 			Run(func(args mock.Arguments) {
-				reqMsg, ok := args.Get(0).(*json.RawMessage)
+				requestMsg, ok := args.Get(0).(*json.RawMessage)
 				require.True(t, ok)
-				msg, err := json.Marshal(requestMessage)
+				subscribeRequestMessage, err := json.Marshal(subscribeRequest)
 				require.NoError(t, err)
-				*reqMsg = msg
+				*requestMsg = subscribeRequestMessage
 			}).
 			Return(nil).
 			Once()
@@ -90,11 +90,8 @@ func (s *WsControllerSuite) TestSubscribeRequest() {
 		conn.
 			On("ReadJSON", mock.Anything).
 			Return(func(interface{}) error {
-				_, ok := <-done
-				if !ok {
-					return websocket.ErrCloseSent
-				}
-				return nil
+				<-done
+				return websocket.ErrCloseSent
 			})
 
 		controller.HandleConnection(context.Background())
@@ -231,11 +228,8 @@ func (s *WsControllerSuite) expectSubscriptionRequest(conn *connmock.WebsocketCo
 	conn.
 		On("ReadJSON", mock.Anything).
 		Return(func(msg interface{}) error {
-			_, ok := <-done
-			if !ok {
-				return websocket.ErrCloseSent
-			}
-			return nil
+			<-done
+			return websocket.ErrCloseSent
 		})
 }
 

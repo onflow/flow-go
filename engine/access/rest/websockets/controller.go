@@ -35,7 +35,7 @@ func NewWebSocketController(
 		logger:               logger.With().Str("component", "websocket-controller").Logger(),
 		config:               config,
 		conn:                 conn,
-		communicationChannel: make(chan interface{}, 10), //TODO: should it be buffered chan?
+		communicationChannel: make(chan interface{}), //TODO: should it be buffered chan?
 		dataProviders:        concurrentmap.New[uuid.UUID, dp.DataProvider](),
 		dataProvidersFactory: factory,
 		shutdownOnce:         sync.Once{},
@@ -46,6 +46,7 @@ func NewWebSocketController(
 func (c *Controller) HandleConnection(ctx context.Context) {
 	//TODO: configure the connection with ping-pong and deadlines
 	//TODO: spin up a response limit tracker routine
+	defer c.shutdownConnection()
 	go c.readMessages(ctx)
 	c.writeMessages(ctx)
 }
@@ -54,8 +55,6 @@ func (c *Controller) HandleConnection(ctx context.Context) {
 // The communication channel is filled by data providers. Besides, the response limit tracker is involved in
 // write message regulation
 func (c *Controller) writeMessages(ctx context.Context) {
-	defer c.shutdownConnection()
-
 	for {
 		select {
 		case <-ctx.Done():
@@ -86,8 +85,6 @@ func (c *Controller) writeMessages(ctx context.Context) {
 // readMessages continuously reads messages from a client WebSocket connection,
 // processes each message, and handles actions based on the message type.
 func (c *Controller) readMessages(ctx context.Context) {
-	defer c.shutdownConnection()
-
 	for {
 		msg, err := c.readMessage()
 		if err != nil {
@@ -188,7 +185,12 @@ func (c *Controller) handleSubscribe(ctx context.Context, msg models.SubscribeMe
 		Topic: dp.Topic(),
 		ID:    dp.ID().String(),
 	}
-	c.communicationChannel <- response
+
+	select {
+	case <-ctx.Done():
+		return
+	case c.communicationChannel <- response:
+	}
 
 	dp.Run(ctx)
 }
@@ -216,8 +218,6 @@ func (c *Controller) handleListSubscriptions(ctx context.Context, msg models.Lis
 func (c *Controller) shutdownConnection() {
 	c.shutdownOnce.Do(func() {
 		defer func() {
-			close(c.communicationChannel)
-
 			if err := c.conn.Close(); err != nil {
 				c.logger.Warn().Err(err).Msg("error closing connection")
 			}
