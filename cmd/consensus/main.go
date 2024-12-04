@@ -363,10 +363,8 @@ func main() {
 			if err != nil {
 				return fmt.Errorf("could not initialize my beacon key epoch recovery: %w", err)
 			}
-
 			// subscribe for protocol events to handle exiting EFM
 			node.ProtocolEvents.AddConsumer(myBeaconKeyRecovery)
-
 			return nil
 		}).
 		Module("collection guarantees mempool", func(node *cmd.NodeConfig) error {

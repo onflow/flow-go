@@ -10,15 +10,15 @@ import (
 )
 
 // RandomBeaconKG is centralized BLS threshold signature key generation.
-func RandomBeaconKG(n int, seed []byte) (model.DKGData, error) {
+func RandomBeaconKG(n int, seed []byte) (model.ThresholdKeySet, error) {
 
 	if n == 1 {
 		sk, pk, pkGroup, err := thresholdSignKeyGenOneNode(seed)
 		if err != nil {
-			return model.DKGData{}, fmt.Errorf("Beacon KeyGen failed: %w", err)
+			return model.ThresholdKeySet{}, fmt.Errorf("Beacon KeyGen failed: %w", err)
 		}
 
-		dkgData := model.DKGData{
+		dkgData := model.ThresholdKeySet{
 			PrivKeyShares: sk,
 			PubGroupKey:   pkGroup,
 			PubKeyShares:  pk,
@@ -29,16 +29,16 @@ func RandomBeaconKG(n int, seed []byte) (model.DKGData, error) {
 	skShares, pkShares, pkGroup, err := crypto.BLSThresholdKeyGen(int(n),
 		signature.RandomBeaconThreshold(int(n)), seed)
 	if err != nil {
-		return model.DKGData{}, fmt.Errorf("Beacon KeyGen failed: %w", err)
+		return model.ThresholdKeySet{}, fmt.Errorf("Beacon KeyGen failed: %w", err)
 	}
 
-	dkgData := model.DKGData{
+	randomBeaconData := model.ThresholdKeySet{
 		PrivKeyShares: skShares,
 		PubGroupKey:   pkGroup,
 		PubKeyShares:  pkShares,
 	}
 
-	return dkgData, nil
+	return randomBeaconData, nil
 }
 
 // Beacon KG with one node

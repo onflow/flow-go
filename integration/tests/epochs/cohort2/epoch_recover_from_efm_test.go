@@ -41,7 +41,7 @@ func (s *RecoverEpochSuite) SetupTest() {
 	s.FinalizationSafetyThreshold = 20
 	s.NumOfCollectionClusters = 1
 	// we need to use 3 consensus nodes to be able to eject a single node from the consensus committee
-	// and still have a DKG committee which meets the protocol.RandomBeaconSafetyThreshold
+	// and still have a Random Beacon committee which meets the protocol.RandomBeaconSafetyThreshold
 	s.NumOfConsensusNodes = 3
 
 	// run the generic setup, which starts up the network
@@ -74,8 +74,9 @@ func (s *RecoverEpochSuite) executeEFMRecoverTXArgsCMD(
 	numViewsInEpoch,
 	numViewsInStakingAuction,
 	recoveryEpochCounter,
-	targetDuration uint64,
-	unsafeAllowOverWrite bool) []cadence.Value {
+	recoveryEpochTargetDuration uint64,
+	unsafeAllowOverWrite bool,
+) []cadence.Value {
 	// read internal node info from one of the consensus nodes
 	internalNodePrivInfoDir, nodeConfigJson := s.getNodeInfoDirs(flow.RoleConsensus)
 	snapshot := s.GetLatestProtocolSnapshot(s.Ctx)
@@ -88,7 +89,7 @@ func (s *RecoverEpochSuite) executeEFMRecoverTXArgsCMD(
 		flow.Localnet,
 		numViewsInStakingAuction,
 		numViewsInEpoch,
-		targetDuration,
+		recoveryEpochTargetDuration,
 		unsafeAllowOverWrite,
 		snapshot,
 	)
@@ -120,9 +121,9 @@ func (s *RecoverEpochSuite) recoverEpoch(env templates.Environment, args []caden
 	return result
 }
 
-// TestRecoverEpoch ensures that the recover epoch governance transaction flow works as expected, and a network that
-// enters Epoch Fallback Mode can successfully recover.
-// For this specific scenario, we are testing a scenario where the consensus committee is equal to the DKG committee, i.e.,
+// TestRecoverEpoch ensures that the recover epoch governance transaction flow works as expected, i.e.
+// a network that entered Epoch Fallback Mode successfully recovers.
+// For this specific scenario, we are testing a scenario where the consensus committee is equal to the Random Beacon committee, i.e.,
 // no changes to the identity table between epoch start and submitting the recover epoch transaction were made.
 // This test will do the following:
 // 1. Triggers EFM by turning off the sole collection node before the end of the DKG forcing the DKG to fail.
@@ -210,7 +211,7 @@ func (s *RecoverEpochSuite) TestRecoverEpoch() {
 
 // TestRecoverEpochNodeEjected ensures that the recover epoch governance transaction flow works as expected, and a network that
 // enters Epoch Fallback Mode can successfully recover.
-// For this specific scenario, we are testing a scenario where the consensus committee is a subset of the DKG committee, i.e.,
+// For this specific scenario, we are testing a scenario where the consensus committee is a subset of the Random Beacon committee, i.e.,
 // a node was ejected between epoch start and submitting the recover epoch transaction.
 // This test will do the following:
 // 1. Triggers EFM by turning off the sole collection node before the end of the DKG forcing the DKG to fail.

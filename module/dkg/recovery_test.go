@@ -296,7 +296,7 @@ func (s *BeaconKeyRecoverySuite) TestNewBeaconKeyRecovery_NodeIsNotPartOfNextEpo
 // - node doesn't have a safe beacon key for the next epoch
 // - node has a safe beacon key for the current epoch
 // - node is part of the DKG for the next epoch
-// In case like this we need try recovering the key from the current epoch.
+// In this case, the implementation should successfully recover the Random Beacon Private key from the current epoch.
 func (s *BeaconKeyRecoverySuite) TestNewBeaconKeyRecovery_RecoverKey() {
 	performTest := func(dkgState *mockstorage.EpochRecoveryMyBeaconKey) {
 		// have a safe key for the current epoch
@@ -328,14 +328,15 @@ func (s *BeaconKeyRecoverySuite) TestNewBeaconKeyRecovery_RecoverKey() {
 	})
 }
 
-// TestEpochFallbackModeExited tests a scenario:
+// TestEpochFallbackModeExited confirms successful key recovery
+// when the recovery process is triggered by observing a `EpochFallbackModeExited` notification:
 // - node starts in epoch fallback phase
 // - when creating NewBeaconKeyRecovery we shouldn't attempt to recover the key since the epoch phase is not committed.
 // - node leaves EFM and transitions to the epoch committed phase
 // - node doesn't have a safe beacon key for the next epoch
 // - node has a safe beacon key for the current epoch
 // - node is part of the DKG for the next epoch
-// In case like this we need try recovering the key from the current epoch.
+// In this case, the implementation should successfully recover the Random Beacon Private key from the current epoch.
 func (s *BeaconKeyRecoverySuite) TestEpochFallbackModeExited() {
 	// start in epoch fallback phase
 	s.currentEpochPhase = flow.EpochPhaseFallback
