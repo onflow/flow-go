@@ -4,15 +4,19 @@
 package pusher
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/engine"
+	"github.com/onflow/flow-go/engine/common/fifoqueue"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/model/messages"
 	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/module/component"
+	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/channels"
@@ -21,30 +25,60 @@ import (
 	"github.com/onflow/flow-go/utils/logging"
 )
 
-// Engine is the collection pusher engine, which provides access to resources
-// held by the collection node.
+// Engine is part of the Collection Node. It broadcasts finalized collections
+// ("collection guarantees") that the cluster generates to Consensus Nodes
+// for inclusion in blocks.
 type Engine struct {
-	unit         *engine.Unit
 	log          zerolog.Logger
 	engMetrics   module.EngineMetrics
-	colMetrics   module.CollectionMetrics
 	conduit      network.Conduit
 	me           module.Local
 	state        protocol.State
 	collections  storage.Collections
 	transactions storage.Transactions
+
+	notifier engine.Notifier
+	queue    *fifoqueue.FifoQueue
+
+	component.Component
+	cm *component.ComponentManager
 }
 
-func New(log zerolog.Logger, net network.EngineRegistry, state protocol.State, engMetrics module.EngineMetrics, colMetrics module.CollectionMetrics, me module.Local, collections storage.Collections, transactions storage.Transactions) (*Engine, error) {
+// TODO convert to network.MessageProcessor
+var _ network.Engine = (*Engine)(nil)
+var _ component.Component = (*Engine)(nil)
+
+// New creates a new pusher engine.
+func New(
+	log zerolog.Logger,
+	net network.EngineRegistry,
+	state protocol.State,
+	engMetrics module.EngineMetrics,
+	mempoolMetrics module.MempoolMetrics,
+	me module.Local,
+	collections storage.Collections,
+	transactions storage.Transactions,
+) (*Engine, error) {
+	queue, err := fifoqueue.NewFifoQueue(
+		200, // roughly 1 minute of collections, at 3BPS
+		fifoqueue.WithLengthObserver(func(len int) {
+			mempoolMetrics.MempoolEntries(metrics.ResourceSubmitCollectionGuaranteesQueue, uint(len))
+		}),
+	)
+	if err != nil {
+		return nil, fmt.Errorf("could not create fifoqueue: %w", err)
+	}
+
 	e := &Engine{
-		unit:         engine.NewUnit(),
 		log:          log.With().Str("engine", "pusher").Logger(),
 		engMetrics:   engMetrics,
-		colMetrics:   colMetrics,
 		me:           me,
 		state:        state,
 		collections:  collections,
 		transactions: transactions,
+
+		notifier: engine.NewNotifier(),
+		queue:    queue,
 	}
 
 	conduit, err := net.Register(channels.PushGuarantees, e)
@@ -53,88 +87,117 @@ func New(log zerolog.Logger, net network.EngineRegistry, state protocol.State, e
 	}
 	e.conduit = conduit
 
+	e.cm = component.NewComponentManagerBuilder().
+		AddWorker(e.outboundQueueWorker).
+		Build()
+	e.Component = e.cm
+
 	return e, nil
 }
 
-// Ready returns a ready channel that is closed once the engine has fully
-// started.
-func (e *Engine) Ready() <-chan struct{} {
-	return e.unit.Ready()
+// outboundQueueWorker implements a component worker which broadcasts collection guarantees,
+// enqueued by the Finalizer upon finalization, to Consensus Nodes.
+func (e *Engine) outboundQueueWorker(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
+	ready()
+
+	done := ctx.Done()
+	wake := e.notifier.Channel()
+	for {
+		select {
+		case <-done:
+			return
+		case <-wake:
+			err := e.processOutboundMessages(ctx)
+			if err != nil {
+				ctx.Throw(err)
+			}
+		}
+	}
 }
 
-// Done returns a done channel that is closed once the engine has fully stopped.
-func (e *Engine) Done() <-chan struct{} {
-	return e.unit.Done()
+// processOutboundMessages processes any available messages from the queue.
+// Only returns when the queue is empty (or the engine is terminated).
+// No errors expected during normal operations.
+func (e *Engine) processOutboundMessages(ctx context.Context) error {
+	for {
+		nextMessage, ok := e.queue.Pop()
+		if !ok {
+			return nil
+		}
+
+		asSCGMsg, ok := nextMessage.(*messages.SubmitCollectionGuarantee)
+		if !ok {
+			return fmt.Errorf("invalid message type in pusher engine queue")
+		}
+
+		err := e.publishCollectionGuarantee(&asSCGMsg.Guarantee)
+		if err != nil {
+			return err
+		}
+
+		select {
+		case <-ctx.Done():
+			return nil
+		default:
+		}
+	}
 }
 
 // SubmitLocal submits an event originating on the local node.
 func (e *Engine) SubmitLocal(event interface{}) {
-	e.unit.Launch(func() {
-		err := e.process(e.me.NodeID(), event)
-		if err != nil {
-			engine.LogError(e.log, err)
-		}
-	})
+	ev, ok := event.(*messages.SubmitCollectionGuarantee)
+	if ok {
+		e.SubmitCollectionGuarantee(ev)
+	} else {
+		engine.LogError(e.log, fmt.Errorf("invalid message argument to pusher engine"))
+	}
 }
 
 // Submit submits the given event from the node with the given origin ID
 // for processing in a non-blocking manner. It returns instantly and logs
 // a potential processing error internally when done.
 func (e *Engine) Submit(channel channels.Channel, originID flow.Identifier, event interface{}) {
-	e.unit.Launch(func() {
-		err := e.process(originID, event)
-		if err != nil {
-			engine.LogError(e.log, err)
-		}
-	})
+	engine.LogError(e.log, fmt.Errorf("pusher engine should only receive local messages on the same node"))
 }
 
 // ProcessLocal processes an event originating on the local node.
 func (e *Engine) ProcessLocal(event interface{}) error {
-	return e.unit.Do(func() error {
-		return e.process(e.me.NodeID(), event)
-	})
+	ev, ok := event.(*messages.SubmitCollectionGuarantee)
+	if ok {
+		e.SubmitCollectionGuarantee(ev)
+		return nil
+	} else {
+		return fmt.Errorf("invalid message argument to pusher engine")
+	}
 }
 
 // Process processes the given event from the node with the given origin ID in
 // a blocking manner. It returns the potential processing error when done.
-func (e *Engine) Process(channel channels.Channel, originID flow.Identifier, event interface{}) error {
-	return e.unit.Do(func() error {
-		return e.process(originID, event)
-	})
+func (e *Engine) Process(channel channels.Channel, originID flow.Identifier, message any) error {
+	return fmt.Errorf("pusher engine should only receive local messages on the same node")
 }
 
-// process processes events for the pusher engine on the collection node.
-func (e *Engine) process(originID flow.Identifier, event interface{}) error {
-	switch ev := event.(type) {
-	case *messages.SubmitCollectionGuarantee:
-		e.engMetrics.MessageReceived(metrics.EngineCollectionProvider, metrics.MessageSubmitGuarantee)
-		defer e.engMetrics.MessageHandled(metrics.EngineCollectionProvider, metrics.MessageSubmitGuarantee)
-		return e.onSubmitCollectionGuarantee(originID, ev)
-	default:
-		return fmt.Errorf("invalid event type (%T)", event)
+// SubmitCollectionGuarantee adds a collection guarantee to the engine's queue
+// to later be published to consensus nodes.
+func (e *Engine) SubmitCollectionGuarantee(msg *messages.SubmitCollectionGuarantee) {
+	if e.queue.Push(msg) {
+		e.notifier.Notify()
+	} else {
+		e.engMetrics.OutboundMessageDropped(metrics.EngineCollectionProvider, metrics.MessageCollectionGuarantee)
 	}
 }
 
-// onSubmitCollectionGuarantee handles submitting the given collection guarantee
-// to consensus nodes.
-func (e *Engine) onSubmitCollectionGuarantee(originID flow.Identifier, req *messages.SubmitCollectionGuarantee) error {
-	if originID != e.me.NodeID() {
-		return fmt.Errorf("invalid remote request to submit collection guarantee (from=%x)", originID)
-	}
-
-	return e.SubmitCollectionGuarantee(&req.Guarantee)
-}
-
-// SubmitCollectionGuarantee submits the collection guarantee to all consensus nodes.
-func (e *Engine) SubmitCollectionGuarantee(guarantee *flow.CollectionGuarantee) error {
+// publishCollectionGuarantee publishes the collection guarantee to all consensus nodes.
+// No errors expected during normal operation.
+func (e *Engine) publishCollectionGuarantee(guarantee *flow.CollectionGuarantee) error {
 	consensusNodes, err := e.state.Final().Identities(filter.HasRole[flow.Identity](flow.RoleConsensus))
 	if err != nil {
-		return fmt.Errorf("could not get consensus nodes: %w", err)
+		return fmt.Errorf("could not get consensus nodes' identities: %w", err)
 	}
 
-	// NOTE: Consensus nodes do not broadcast guarantees among themselves, so it needs that
-	// at least one collection node make a publish to all of them.
+	// NOTE: Consensus nodes do not broadcast guarantees among themselves. So for the collection to be included,
+	// at least one collector has to successfully broadcast the collection to consensus nodes. Otherwise, the
+	// collection is lost, which is acceptable as long as we only lose a small fraction of collections.
 	err = e.conduit.Publish(guarantee, consensusNodes.NodeIDs()...)
 	if err != nil {
 		return fmt.Errorf("could not submit collection guarantee: %w", err)

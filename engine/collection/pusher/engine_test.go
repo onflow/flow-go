@@ -1,8 +1,10 @@
 package pusher_test
 
 import (
+	"context"
 	"io"
 	"testing"
+	"time"
 
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/mock"
@@ -12,6 +14,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/model/messages"
+	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/metrics"
 	module "github.com/onflow/flow-go/module/mock"
 	"github.com/onflow/flow-go/network/channels"
@@ -82,18 +85,25 @@ func TestPusherEngine(t *testing.T) {
 
 // should be able to submit collection guarantees to consensus nodes
 func (suite *Suite) TestSubmitCollectionGuarantee() {
+	ctx, cancel := irrecoverable.NewMockSignalerContextWithCancel(suite.T(), context.Background())
+	suite.engine.Start(ctx)
+	defer cancel()
+	done := make(chan struct{})
 
 	guarantee := unittest.CollectionGuaranteeFixture()
 
 	// should submit the collection to consensus nodes
 	consensus := suite.identities.Filter(filter.HasRole[flow.Identity](flow.RoleConsensus))
-	suite.conduit.On("Publish", guarantee, consensus[0].NodeID).Return(nil)
+	suite.conduit.On("Publish", guarantee, consensus[0].NodeID).
+		Run(func(_ mock.Arguments) { close(done) }).Return(nil).Once()
 
 	msg := &messages.SubmitCollectionGuarantee{
 		Guarantee: *guarantee,
 	}
 	err := suite.engine.ProcessLocal(msg)
 	suite.Require().Nil(err)
+
+	unittest.RequireCloseBefore(suite.T(), done, time.Second, "message not sent")
 
 	suite.conduit.AssertExpectations(suite.T())
 }
