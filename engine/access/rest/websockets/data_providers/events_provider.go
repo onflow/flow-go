@@ -115,8 +115,8 @@ func ParseEventsArguments(
 	var args EventsArguments
 
 	// Check for mutual exclusivity of start_block_id and start_block_height early
-	_, hasStartBlockID := arguments["start_block_id"]
-	_, hasStartBlockHeight := arguments["start_block_height"]
+	startBlockIDIn, hasStartBlockID := arguments["start_block_id"]
+	startBlockHeightIn, hasStartBlockHeight := arguments["start_block_height"]
 
 	if hasStartBlockID && hasStartBlockHeight {
 		return args, fmt.Errorf("can only provide either 'start_block_id' or 'start_block_height'")
@@ -125,7 +125,7 @@ func ParseEventsArguments(
 	// Parse 'start_block_id' if provided
 	if hasStartBlockID {
 		var startBlockID parser.ID
-		err := startBlockID.Parse(arguments["start_block_id"])
+		err := startBlockID.Parse(startBlockIDIn)
 		if err != nil {
 			return args, fmt.Errorf("invalid 'start_block_id': %w", err)
 		}
@@ -135,7 +135,7 @@ func ParseEventsArguments(
 	// Parse 'start_block_height' if provided
 	if hasStartBlockHeight {
 		var err error
-		args.StartBlockHeight, err = util.ToUint64(arguments["start_block_height"])
+		args.StartBlockHeight, err = util.ToUint64(startBlockHeightIn)
 		if err != nil {
 			return args, fmt.Errorf("invalid 'start_block_height': %w", err)
 		}
