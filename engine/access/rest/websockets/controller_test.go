@@ -45,16 +45,16 @@ func (s *ControllerSuite) SetupTest() {
 	s.dataProviderFactory = dpmock.NewDataProviderFactory(s.T())
 }
 
-// TestConfigureConnection ensures that the WebSocket connection is configured correctly.
-func (s *ControllerSuite) TestConfigureConnection() {
+// TestConfigureKeepaliveConnection ensures that the WebSocket connection is configured correctly.
+func (s *ControllerSuite) TestConfigureKeepaliveConnection() {
 	controller := s.initializeController()
 
 	// Mock configureConnection to succeed
 	s.mockConnectionSetup()
 
-	// Call configureConnection and check for errors
-	err := controller.configureConnection()
-	s.Require().NoError(err, "configureConnection should not return an error")
+	// Call configureKeepalive and check for errors
+	err := controller.configureKeepalive()
+	s.Require().NoError(err, "configureKeepalive should not return an error")
 
 	// Assert expectations
 	s.connection.AssertExpectations(s.T())
@@ -243,7 +243,7 @@ func (s *ControllerSuite) TestKeepaliveContextCancel() {
 	// Start the keepalive process with the context canceled
 	err := controller.keepalive(ctx)
 	s.Require().Error(err)
-	s.Require().Equal(context.Canceled, err)
+	s.Require().ErrorIs(context.Canceled, err)
 
 	// Assert expectations
 	s.connection.AssertExpectations(s.T()) // Should not invoke WriteMessage after context cancellation

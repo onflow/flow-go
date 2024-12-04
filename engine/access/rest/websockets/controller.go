@@ -51,7 +51,7 @@ func NewWebSocketController(
 func (c *Controller) HandleConnection(ctx context.Context) {
 
 	// configuring the connection with appropriate read/write deadlines and handlers.
-	err := c.configureConnection()
+	err := c.configureKeepalive()
 	if err != nil {
 		// TODO: add error handling here
 		c.logger.Error().Err(err).Msg("error configuring connection")
@@ -83,7 +83,7 @@ func (c *Controller) HandleConnection(ctx context.Context) {
 	}
 }
 
-// configureConnection sets up the WebSocket connection with a read deadline
+// configureKeepalive sets up the WebSocket connection with a read deadline
 // and a handler for receiving pong messages from the client.
 //
 // The function does the following:
@@ -94,9 +94,8 @@ func (c *Controller) HandleConnection(ctx context.Context) {
 //     message is received from the client, allowing the server to continue waiting
 //     for further pong messages within the new deadline.
 //
-// Expected errors during normal operation:
-// - context.Canceled if the client disconnected
-func (c *Controller) configureConnection() error {
+// No errors are expected during normal operation.
+func (c *Controller) configureKeepalive() error {
 	// Set the initial read deadline for the first pong message
 	// The Pong handler itself only resets the read deadline after receiving a Pong.
 	// It doesn't set an initial deadline. The initial read deadline is crucial to prevent the server from waiting
