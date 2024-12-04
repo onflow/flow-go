@@ -45,22 +45,35 @@ func NewReplayer(
 }
 
 // ReplayBlock replays the execution of the transactions of an EVM block
+func (cr *Replayer) ReplayBlock(
+	transactionEvents []events.TransactionEventPayload,
+	blockEvent *events.BlockEventPayload,
+) (types.ReplayResultCollector, error) {
+	res, _, err := cr.ReplayBlockEvents(transactionEvents, blockEvent)
+	return res, err
+}
+
+// ReplayBlockEvents replays the execution of the transactions of an EVM block
 // using the provided transactionEvents and blockEvents,
-// which include all the context data for re-executing the transactions, and returns the replay result.
+// which include all the context data for re-executing the transactions, and returns
+// the replay result and the result of each transaction.
+// the replay result contains the register updates, and the result of each transaction
+// contains the execution result of each transaction, which is useful for recontstructing
+// the EVM block proposal.
 // this method can be called concurrently if underlying storage
 // tracer and block snapshot provider support concurrency.
 //
 // Warning! the list of transaction events has to be sorted based on their
 // execution, sometimes the access node might return events out of order
 // it needs to be sorted by txIndex and eventIndex respectively.
-func (cr *Replayer) ReplayBlock(
+func (cr *Replayer) ReplayBlockEvents(
 	transactionEvents []events.TransactionEventPayload,
 	blockEvent *events.BlockEventPayload,
-) (types.ReplayResultCollector, error) {
+) (types.ReplayResultCollector, []*types.Result, error) {
 	// prepare storage
 	st, err := cr.storageProvider.GetSnapshotAt(blockEvent.Height)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	// create storage
@@ -69,11 +82,11 @@ func (cr *Replayer) ReplayBlock(
 	// get block snapshot
 	bs, err := cr.blockProvider.GetSnapshotAt(blockEvent.Height)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	// replay transactions
-	err = ReplayBlockExecution(
+	results, err := ReplayBlockExecution(
 		cr.chainID,
 		cr.rootAddr,
 		state,
@@ -84,8 +97,8 @@ func (cr *Replayer) ReplayBlock(
 		cr.validateResults,
 	)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
-	return state, nil
+	return state, results, nil
 }

@@ -12,7 +12,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
-	dpmock "github.com/onflow/flow-go/engine/access/rest/websockets/data_provider/mock"
+	dpmock "github.com/onflow/flow-go/engine/access/rest/websockets/data_providers/mock"
 	connmock "github.com/onflow/flow-go/engine/access/rest/websockets/mock"
 	"github.com/onflow/flow-go/engine/access/rest/websockets/models"
 	"github.com/onflow/flow-go/engine/access/state_stream/backend"
@@ -49,8 +49,9 @@ func (s *WsControllerSuite) TestSubscribeRequest() {
 		controller := NewWebSocketController(s.logger, s.wsConfig, dataProviderFactory, conn)
 
 		dataProvider.
-			On("Run", mock.Anything).
+			On("Run").
 			Run(func(args mock.Arguments) {}).
+			Return(nil).
 			Once()
 
 		subscribeRequest := models.SubscribeMessageRequest{
@@ -111,6 +112,7 @@ func (s *WsControllerSuite) TestSubscribeBlocks() {
 			Run(func(args mock.Arguments) {
 				controller.communicationChannel <- expectedBlock
 			}).
+			Return(nil).
 			Once()
 
 		done := make(chan struct{}, 1)
@@ -148,6 +150,7 @@ func (s *WsControllerSuite) TestSubscribeBlocks() {
 					controller.communicationChannel <- *block
 				}
 			}).
+			Return(nil).
 			Once()
 
 		done := make(chan struct{}, 1)
@@ -184,7 +187,7 @@ func (s *WsControllerSuite) TestSubscribeBlocks() {
 
 // newControllerMocks initializes mock WebSocket connection, data provider, and data provider factory.
 // The mocked functions are expected to be called in a case when a test is expected to reach WriteJSON function.
-func newControllerMocks(t *testing.T) (*connmock.WebsocketConnection, *dpmock.Factory, *dpmock.DataProvider) {
+func newControllerMocks(t *testing.T) (*connmock.WebsocketConnection, *dpmock.DataProviderFactory, *dpmock.DataProvider) {
 	conn := connmock.NewWebsocketConnection(t)
 	conn.On("Close").Return(nil).Once()
 
@@ -195,10 +198,10 @@ func newControllerMocks(t *testing.T) (*connmock.WebsocketConnection, *dpmock.Fa
 	dataProvider.On("Close").Return(nil)
 	dataProvider.On("Topic").Return(topic)
 
-	factory := dpmock.NewFactory(t)
+	factory := dpmock.NewDataProviderFactory(t)
 	factory.
-		On("NewDataProvider", mock.Anything, mock.Anything).
-		Return(dataProvider).
+		On("NewDataProvider", mock.Anything, mock.Anything, mock.Anything, mock.Anything).
+		Return(dataProvider, nil).
 		Once()
 
 	return conn, factory, dataProvider
