@@ -92,7 +92,7 @@ func TestFilterUnreferencedSlabs(t *testing.T) {
 		return index, nil
 	}
 
-	storage := runtime.NewStorage(payloadsLedger, nil)
+	storage := runtime.NewStorage(payloadsLedger, nil, runtime.StorageConfig{})
 
 	// {Int: Int}
 	dict1StaticType := interpreter.NewDictionaryStaticType(
@@ -156,9 +156,10 @@ func TestFilterUnreferencedSlabs(t *testing.T) {
 		array,
 	)
 
-	storageMap := storage.GetStorageMap(
+	storageMap := storage.GetDomainStorageMap(
+		inter,
 		testAddress,
-		common.PathDomainStorage.Identifier(),
+		common.StorageDomainPathStorage,
 		true,
 	)
 
