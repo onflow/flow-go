@@ -28,7 +28,7 @@ func IndexCollectionPayload(blockID flow.Identifier, txIDs []flow.Identifier) fu
 	return insert(makePrefix(codeIndexCollection, blockID), txIDs)
 }
 
-// LookupCollection looks up the collection for a given cluster payload.
+// LookupCollectionPayload looks up the collection for a given cluster payload.
 func LookupCollectionPayload(blockID flow.Identifier, txIDs *[]flow.Identifier) func(*badger.Txn) error {
 	return retrieve(makePrefix(codeIndexCollection, blockID), txIDs)
 }
