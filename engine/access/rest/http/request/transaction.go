@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io"
 
+	"github.com/onflow/flow-go/engine/access/rest/common/parser"
 	"github.com/onflow/flow-go/engine/access/rest/http/models"
 	"github.com/onflow/flow-go/engine/access/rest/util"
 	"github.com/onflow/flow-go/engine/common/rpc/convert"
@@ -89,7 +90,7 @@ func (t *Transaction) Parse(raw io.Reader, chain flow.Chain) error {
 		return fmt.Errorf("invalid transaction script encoding")
 	}
 
-	var blockID ID
+	var blockID parser.ID
 	err = blockID.Parse(tx.ReferenceBlockId)
 	if err != nil {
 		return fmt.Errorf("invalid reference block ID: %w", err)

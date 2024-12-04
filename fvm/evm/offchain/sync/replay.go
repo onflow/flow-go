@@ -30,25 +30,26 @@ func ReplayBlockExecution(
 	transactionEvents []events.TransactionEventPayload,
 	blockEvent *events.BlockEventPayload,
 	validateResults bool,
-) error {
+) ([]*types.Result, error) {
 	// check the passed block event
 	if blockEvent == nil {
-		return fmt.Errorf("nil block event has been passed")
+		return nil, fmt.Errorf("nil block event has been passed")
 	}
 
 	// create a base block context for all transactions
 	// tx related context values will be replaced during execution
 	ctx, err := blockSnapshot.BlockContext()
 	if err != nil {
-		return err
+		return nil, err
 	}
 	// update the tracer
 	ctx.Tracer = tracer
 
 	gasConsumedSoFar := uint64(0)
 	txHashes := make(types.TransactionHashes, len(transactionEvents))
+	results := make([]*types.Result, 0, len(transactionEvents))
 	for idx, tx := range transactionEvents {
-		err = replayTransactionExecution(
+		result, err := replayTransactionExecution(
 			rootAddr,
 			ctx,
 			uint(idx),
@@ -58,28 +59,30 @@ func ReplayBlockExecution(
 			validateResults,
 		)
 		if err != nil {
-			return fmt.Errorf("transaction execution failed, txIndex: %d, err: %w", idx, err)
+			return nil, fmt.Errorf("transaction execution failed, txIndex: %d, err: %w", idx, err)
 		}
 		gasConsumedSoFar += tx.GasConsumed
 		txHashes[idx] = tx.Hash
+
+		results = append(results, result)
 	}
 
 	if validateResults {
 		// check transaction inclusion
 		txHashRoot := gethTypes.DeriveSha(txHashes, gethTrie.NewStackTrie(nil))
 		if txHashRoot != blockEvent.TransactionHashRoot {
-			return fmt.Errorf("transaction root hash doesn't match [%x] != [%x]", txHashRoot, blockEvent.TransactionHashRoot)
+			return nil, fmt.Errorf("transaction root hash doesn't match [%x] != [%x]", txHashRoot, blockEvent.TransactionHashRoot)
 		}
 
 		// check total gas used
 		if blockEvent.TotalGasUsed != gasConsumedSoFar {
-			return fmt.Errorf("total gas used doesn't match [%d] != [%d]", gasConsumedSoFar, blockEvent.TotalGasUsed)
+			return nil, fmt.Errorf("total gas used doesn't match [%d] != [%d]", gasConsumedSoFar, blockEvent.TotalGasUsed)
 		}
 		// no need to check the receipt root hash given we have checked the logs and other
 		// values during tx execution.
 	}
 
-	return nil
+	return results, nil
 }
 
 func replayTransactionExecution(
@@ -90,7 +93,7 @@ func replayTransactionExecution(
 	ledger atree.Ledger,
 	txEvent *events.TransactionEventPayload,
 	validate bool,
-) error {
+) (*types.Result, error) {
 
 	// create emulator
 	em := emulator.NewEmulator(ledger, rootAddr)
@@ -102,7 +105,7 @@ func replayTransactionExecution(
 	if len(txEvent.PrecompiledCalls) > 0 {
 		pcs, err := types.AggregatedPrecompileCallsFromEncoded(txEvent.PrecompiledCalls)
 		if err != nil {
-			return fmt.Errorf("error decoding precompiled calls [%x]: %w", txEvent.Payload, err)
+			return nil, fmt.Errorf("error decoding precompiled calls [%x]: %w", txEvent.Payload, err)
 		}
 		ctx.ExtraPrecompiledContracts = precompiles.AggregatedPrecompiledCallsToPrecompiledContracts(pcs)
 	}
@@ -110,7 +113,7 @@ func replayTransactionExecution(
 	// create a new block view
 	bv, err := em.NewBlockView(ctx)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	var res *types.Result
@@ -119,31 +122,31 @@ func replayTransactionExecution(
 	if txEvent.TransactionType == types.DirectCallTxType {
 		call, err := types.DirectCallFromEncoded(txEvent.Payload)
 		if err != nil {
-			return fmt.Errorf("failed to RLP-decode direct call [%x]: %w", txEvent.Payload, err)
+			return nil, fmt.Errorf("failed to RLP-decode direct call [%x]: %w", txEvent.Payload, err)
 		}
 		res, err = bv.DirectCall(call)
 		if err != nil {
-			return fmt.Errorf("failed to execute direct call [%x]: %w", txEvent.Hash, err)
+			return nil, fmt.Errorf("failed to execute direct call [%x]: %w", txEvent.Hash, err)
 		}
 	} else {
 		gethTx := &gethTypes.Transaction{}
 		if err := gethTx.UnmarshalBinary(txEvent.Payload); err != nil {
-			return fmt.Errorf("failed to RLP-decode transaction [%x]: %w", txEvent.Payload, err)
+			return nil, fmt.Errorf("failed to RLP-decode transaction [%x]: %w", txEvent.Payload, err)
 		}
 		res, err = bv.RunTransaction(gethTx)
 		if err != nil {
-			return fmt.Errorf("failed to run transaction [%x]: %w", txEvent.Hash, err)
+			return nil, fmt.Errorf("failed to run transaction [%x]: %w", txEvent.Hash, err)
 		}
 	}
 
 	// validate results
 	if validate {
 		if err := ValidateResult(res, txEvent); err != nil {
-			return fmt.Errorf("transaction replay failed (txHash %x): %w", txEvent.Hash, err)
+			return nil, fmt.Errorf("transaction replay failed (txHash %x): %w", txEvent.Hash, err)
 		}
 	}
 
-	return nil
+	return res, nil
 }
 
 func ValidateResult(

@@ -9,10 +9,8 @@ import (
 	"github.com/gorilla/websocket"
 	"github.com/rs/zerolog"
 
-	dp "github.com/onflow/flow-go/engine/access/rest/websockets/data_provider"
+	dp "github.com/onflow/flow-go/engine/access/rest/websockets/data_providers"
 	"github.com/onflow/flow-go/engine/access/rest/websockets/models"
-	"github.com/onflow/flow-go/engine/access/state_stream"
-	"github.com/onflow/flow-go/engine/access/state_stream/backend"
 	"github.com/onflow/flow-go/utils/concurrentmap"
 )
 
@@ -22,15 +20,14 @@ type Controller struct {
 	conn                 *websocket.Conn
 	communicationChannel chan interface{}
 	dataProviders        *concurrentmap.Map[uuid.UUID, dp.DataProvider]
-	dataProvidersFactory *dp.Factory
+	dataProviderFactory  dp.DataProviderFactory
 }
 
 func NewWebSocketController(
 	logger zerolog.Logger,
 	config Config,
-	streamApi state_stream.API,
-	streamConfig backend.Config,
 	conn *websocket.Conn,
+	dataProviderFactory dp.DataProviderFactory,
 ) *Controller {
 	return &Controller{
 		logger:               logger.With().Str("component", "websocket-controller").Logger(),
@@ -38,7 +35,7 @@ func NewWebSocketController(
 		conn:                 conn,
 		communicationChannel: make(chan interface{}), //TODO: should it be buffered chan?
 		dataProviders:        concurrentmap.New[uuid.UUID, dp.DataProvider](),
-		dataProvidersFactory: dp.NewDataProviderFactory(logger, streamApi, streamConfig),
+		dataProviderFactory:  dataProviderFactory,
 	}
 }
 
@@ -164,12 +161,24 @@ func (c *Controller) handleAction(ctx context.Context, message interface{}) erro
 }
 
 func (c *Controller) handleSubscribe(ctx context.Context, msg models.SubscribeMessageRequest) {
-	dp := c.dataProvidersFactory.NewDataProvider(c.communicationChannel, msg.Topic)
+	dp, err := c.dataProviderFactory.NewDataProvider(ctx, msg.Topic, msg.Arguments, c.communicationChannel)
+	if err != nil {
+		// TODO: handle error here
+		c.logger.Error().Err(err).Msgf("error while creating data provider for topic: %s", msg.Topic)
+	}
+
 	c.dataProviders.Add(dp.ID(), dp)
-	dp.Run(ctx)
 
 	//TODO: return OK response to client
 	c.communicationChannel <- msg
+
+	go func() {
+		err := dp.Run()
+		if err != nil {
+			//TODO: Log or handle the error from Run
+			c.logger.Error().Err(err).Msgf("error while running data provider for topic: %s", msg.Topic)
+		}
+	}()
 }
 
 func (c *Controller) handleUnsubscribe(_ context.Context, msg models.UnsubscribeMessageRequest) {
