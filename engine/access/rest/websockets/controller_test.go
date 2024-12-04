@@ -77,11 +77,8 @@ func (s *ControllerSuite) TestControllerShutdown() {
 		s.connection.
 			On("ReadJSON", mock.Anything).
 			Return(func(interface{}) error {
-				_, ok := <-done
-				if !ok {
-					return websocket.ErrCloseSent
-				}
-				return nil
+				<-done
+				return websocket.ErrCloseSent
 			}).
 			Once()
 
@@ -91,7 +88,6 @@ func (s *ControllerSuite) TestControllerShutdown() {
 		defer cancel()
 		controller.HandleConnection(ctx)
 
-		s.Require().True(controller.shutdown.Load())
 		// Ensure all expectations are met
 		s.connection.AssertExpectations(s.T())
 	})
@@ -114,7 +110,6 @@ func (s *ControllerSuite) TestControllerShutdown() {
 		defer cancel()
 		controller.HandleConnection(ctx)
 
-		s.Require().True(controller.shutdown.Load())
 		// Ensure all expectations are met
 		s.connection.AssertExpectations(s.T())
 	})
@@ -148,11 +143,8 @@ func (s *ControllerSuite) TestControllerShutdown() {
 		s.connection.
 			On("ReadJSON", mock.Anything).
 			Return(func(interface{}) error {
-				_, ok := <-done
-				if !ok {
-					return websocket.ErrCloseSent
-				}
-				return nil
+				<-done
+				return websocket.ErrCloseSent
 			})
 
 		s.connection.On("SetWriteDeadline", mock.Anything).Return(nil).Once()
@@ -168,7 +160,6 @@ func (s *ControllerSuite) TestControllerShutdown() {
 		defer cancel()
 		controller.HandleConnection(ctx)
 
-		s.Require().True(controller.shutdown.Load())
 		// Ensure all expectations are met
 		s.connection.AssertExpectations(s.T())
 		s.dataProviderFactory.AssertExpectations(s.T())
@@ -188,7 +179,6 @@ func (s *ControllerSuite) TestControllerShutdown() {
 
 		controller.HandleConnection(ctx)
 
-		s.Require().True(controller.shutdown.Load())
 		// Ensure all expectations are met
 		s.connection.AssertExpectations(s.T())
 	})

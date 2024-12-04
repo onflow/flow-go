@@ -9,7 +9,6 @@ import (
 	"github.com/google/uuid"
 	"github.com/gorilla/websocket"
 	"github.com/rs/zerolog"
-	"go.uber.org/atomic"
 	"golang.org/x/sync/errgroup"
 
 	dp "github.com/onflow/flow-go/engine/access/rest/websockets/data_provider"
@@ -26,8 +25,6 @@ type Controller struct {
 
 	dataProviders        *concurrentmap.Map[uuid.UUID, dp.DataProvider]
 	dataProvidersFactory dp.DataProviderFactory
-
-	shutdown *atomic.Bool // Indicates if the controller is shutting down.
 }
 
 func NewWebSocketController(
@@ -43,7 +40,6 @@ func NewWebSocketController(
 		communicationChannel: make(chan interface{}), //TODO: should it be buffered chan?
 		dataProviders:        concurrentmap.New[uuid.UUID, dp.DataProvider](),
 		dataProvidersFactory: dataProviderFactory,
-		shutdown:             atomic.NewBool(false),
 	}
 }
 
@@ -98,6 +94,9 @@ func (c *Controller) HandleConnection(ctx context.Context) {
 //  2. Establishes a Pong handler that resets the read deadline every time a pong
 //     message is received from the client, allowing the server to continue waiting
 //     for further pong messages within the new deadline.
+//
+// Expected errors during normal operation:
+// - context.Canceled if the client disconnected
 func (c *Controller) configureConnection() error {
 	// Set the initial read deadline for the first pong message
 	// The Pong handler itself only resets the read deadline after receiving a Pong.
@@ -118,12 +117,13 @@ func (c *Controller) configureConnection() error {
 // The communication channel is filled by data providers. Besides, the response limit tracker is involved in
 // write message regulation
 //
-// No errors are expected during normal operation.
+// Expected errors during normal operation:
+// - context.Canceled if the client disconnected
 func (c *Controller) writeMessagesToClient(ctx context.Context) error {
 	for {
 		select {
 		case <-ctx.Done():
-			return ctx.Err()
+			return nil
 		case msg, ok := <-c.communicationChannel:
 			if !ok {
 				err := fmt.Errorf("communication channel closed, no error occurred")
@@ -152,13 +152,14 @@ func (c *Controller) writeMessagesToClient(ctx context.Context) error {
 // readMessagesFromClient continuously reads messages from a client WebSocket connection,
 // processes each message, and handles actions based on the message type.
 //
-// No errors are expected during normal operation.
+// Expected errors during normal operation:
+// - context.Canceled if the client disconnected
 func (c *Controller) readMessagesFromClient(ctx context.Context) error {
 	for {
 		select {
 		case <-ctx.Done():
 			c.logger.Info().Msg("context canceled, stopping read message loop")
-			return ctx.Err()
+			return nil
 		default:
 			msg, err := c.readMessage()
 			if err != nil {
@@ -166,18 +167,18 @@ func (c *Controller) readMessagesFromClient(ctx context.Context) error {
 					return nil
 				}
 				c.logger.Warn().Err(err).Msg("error reading message from client")
-				return err
+				return fmt.Errorf("failed to read message from client: %w", err)
 			}
 
 			baseMsg, validatedMsg, err := c.parseAndValidateMessage(msg)
 			if err != nil {
 				c.logger.Debug().Err(err).Msg("error parsing and validating client message")
-				return err
+				return fmt.Errorf("failed to parse and validate client message: %w", err)
 			}
 
 			if err := c.handleAction(ctx, validatedMsg); err != nil {
 				c.logger.Warn().Err(err).Str("action", baseMsg.Action).Msg("error handling action")
-				return err
+				return fmt.Errorf("failed to handle message action: %w", err)
 			}
 		}
 	}
@@ -274,18 +275,11 @@ func (c *Controller) handleListSubscriptions(ctx context.Context, msg models.Lis
 }
 
 func (c *Controller) shutdownConnection() {
-	if !c.shutdown.CompareAndSwap(false, true) {
-		return
-	}
-
 	defer func() {
 		if err := c.conn.Close(); err != nil {
 			c.logger.Error().Err(err).Msg("error closing connection")
 		}
-		// it's not safe to close this here,
-		// because the data providers could continue to write out new messages
-		// TODO: will be included as a part of PR #6642
-		close(c.communicationChannel)
+		// TODO: safe closing communicationChannel will be included as a part of PR #6642
 	}()
 
 	err := c.dataProviders.ForEach(func(_ uuid.UUID, dp dp.DataProvider) error {
@@ -302,7 +296,8 @@ func (c *Controller) shutdownConnection() {
 // keepalive sends a ping message periodically to keep the WebSocket connection alive
 // and avoid timeouts.
 //
-// No errors are expected during normal operation.
+// Expected errors during normal operation:
+// - context.Canceled if the client disconnected
 func (c *Controller) keepalive(ctx context.Context) error {
 	pingTicker := time.NewTicker(PingPeriod)
 	defer pingTicker.Stop()
@@ -310,7 +305,7 @@ func (c *Controller) keepalive(ctx context.Context) error {
 	for {
 		select {
 		case <-ctx.Done():
-			return ctx.Err()
+			return nil
 		case <-pingTicker.C:
 			err := c.conn.WriteControl(websocket.PingMessage, time.Now().Add(WriteWait))
 			if err != nil {
