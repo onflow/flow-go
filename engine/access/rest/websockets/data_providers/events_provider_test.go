@@ -240,11 +240,11 @@ func (s *EventsProviderSuite) TestEventsDataProvider_InvalidArguments() {
 				ctx,
 				s.log,
 				s.api,
-				s.chain,
-				state_stream.DefaultEventFilterConfig,
 				topic,
 				test.arguments,
-				send)
+				send,
+				s.chain,
+				state_stream.DefaultEventFilterConfig)
 			s.Require().Nil(provider)
 			s.Require().Error(err)
 			s.Require().Contains(err.Error(), test.expectedErrorMsg)
@@ -279,11 +279,11 @@ func (s *EventsProviderSuite) TestMessageIndexEventProviderResponse_HappyPath() 
 		ctx,
 		s.log,
 		s.api,
-		s.chain,
-		state_stream.DefaultEventFilterConfig,
 		topic,
 		arguments,
-		send)
+		send,
+		s.chain,
+		state_stream.DefaultEventFilterConfig)
 	s.Require().NotNil(provider)
 	s.Require().NoError(err)
 

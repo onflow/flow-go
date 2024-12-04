@@ -96,7 +96,7 @@ func (s *DataProviderFactoryImpl) NewDataProvider(
 	case BlockDigestsTopic:
 		return NewBlockDigestsDataProvider(ctx, s.logger, s.accessApi, topic, arguments, ch)
 	case EventsTopic:
-		return NewEventsDataProvider(ctx, s.logger, s.stateStreamApi, s.chain, s.eventFilterConfig, topic, arguments, ch)
+		return NewEventsDataProvider(ctx, s.logger, s.stateStreamApi, topic, arguments, ch, s.chain, s.eventFilterConfig)
 		// TODO: Implemented handlers for each topic should be added in respective case
 	case AccountStatusesTopic,
 		TransactionStatusesTopic:
