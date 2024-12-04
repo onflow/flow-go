@@ -265,16 +265,16 @@ func (b *backendSubscribeTransactions) searchForTransactionResult(
 			txInfo.TransactionID,
 			txInfo.eventEncodingVersion,
 		)
-	}
 
-	if err != nil {
-		// if either the storage or execution node reported no results
-		if status.Code(err) == codes.NotFound {
-			// No result yet, indicate that it has not been executed
-			return nil, nil
+		if err != nil {
+			// if either the execution node reported no results
+			if status.Code(err) == codes.NotFound {
+				// No result yet, indicate that it has not been executed
+				return nil, nil
+			}
+			// Other Error trying to retrieve the result, return with err
+			return nil, err
 		}
-		// Other Error trying to retrieve the result, return with err
-		return nil, err
 	}
 
 	return txResult, nil
