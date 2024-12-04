@@ -3,6 +3,7 @@ package handler
 import (
 	"encoding/binary"
 	"fmt"
+	"strings"
 
 	gethCommon "github.com/onflow/go-ethereum/common"
 
@@ -25,6 +26,14 @@ const (
 		countEncodingSize +
 		heightEncodingSize
 )
+
+func IsBlockHashListBucketKeyFormat(id flow.RegisterID) bool {
+	return strings.HasPrefix(id.Key, "BlockHashListBucket")
+}
+
+func IsBlockHashListMetaKey(id flow.RegisterID) bool {
+	return id.Key == blockHashListMetaKey
+}
 
 // BlockHashList stores the last `capacity` number of block hashes
 //
