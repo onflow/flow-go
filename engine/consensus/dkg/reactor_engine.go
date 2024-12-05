@@ -154,7 +154,7 @@ func (e *ReactorEngine) startDKGForEpoch(currentEpochCounter uint64, first *flow
 		Hex("first_block_id", firstID[:]).        // id of first block in EpochSetup phase
 		Logger()
 
-	// if we have dkgState the dkg for this epoch already, exit
+	// if we have started the dkg for this epoch already, exit
 	started, err := e.dkgState.GetDKGStarted(nextEpochCounter)
 	if err != nil {
 		// unexpected storage-level error
