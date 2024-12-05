@@ -43,6 +43,10 @@ on:
         type: boolean
         description: 'Build amd64 `without_adx` and `without_netgo_without_adx` images, and arm64 images'
         required: false
+      private_build:
+        type: boolean
+        description: 'Build private images'
+        required: false
 
 jobs:
   # matrix_builder generates a matrix that includes the roles selected in the input
@@ -109,16 +113,30 @@ jobs:
         credentials_json: ${{ secrets.GCR_SERVICE_KEY_SECRET }}
     - name: Set up Google Cloud SDK
       uses: google-github-actions/setup-gcloud@v1
-    - name: Authenticate docker with gcloud
+
+    - name: Authenticate Docker with gcloud
       run: |
-        gcloud auth configure-docker
+        if [[ "${{ github.event.inputs.private_build }}" == "true" ]]; then
+          gcloud auth configure-docker us-central1-docker.pkg.dev
+        else
+          gcloud auth configure-docker
+        fi
+
+    - name: Set CONTAINER_REGISTRY
+      id: set-registry
+      run: |
+        if [[ "${{ github.event.inputs.private_build }}" == "true" ]]; then
+          echo "CONTAINER_REGISTRY=${{ vars.PRIVATE_REGISTRY }}" >> $GITHUB_ENV
+        else
+          echo "CONTAINER_REGISTRY=${{ vars.PUBLIC_REGISTRY }}" >> $GITHUB_ENV
+        fi
 
     - name: Build/Push ${{ matrix.role }} amd64 images with adx (default)
       env:
         IMAGE_TAG: ${{ inputs.docker_tag }}
         CADENCE_DEPLOY_KEY: ${{ secrets.CADENCE_DEPLOY_KEY }}
       run: |
-        make docker-build-${{ matrix.role }}-with-adx docker-push-${{ matrix.role }}-with-adx
+        make docker-build-${{ matrix.role }}-with-adx docker-push-${{ matrix.role }}-with-adx CONTAINER_REGISTRY=$CONTAINER_REGISTRY
 
     - name: Build/Push ${{ matrix.role }} amd64 images without netgo and without adx, arm64 images
       if: ${{ inputs.include_alternative_builds }}
@@ -128,7 +146,7 @@ jobs:
       run: |
         make docker-build-${{ matrix.role }}-without-adx docker-push-${{ matrix.role }}-without-adx \
           docker-build-${{ matrix.role }}-without-netgo-without-adx docker-push-${{ matrix.role }}-without-netgo-without-adx \
-          docker-cross-build-${{ matrix.role }}-arm docker-push-${{ matrix.role }}-arm
+          docker-cross-build-${{ matrix.role }}-arm docker-push-${{ matrix.role }}-arm CONTAINER_REGISTRY=$CONTAINER_REGISTRY
 
 
         
