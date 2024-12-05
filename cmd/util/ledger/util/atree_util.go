@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/onflow/atree"
+	"github.com/onflow/cadence/interpreter"
 
 	"github.com/onflow/cadence/common"
 	"github.com/onflow/cadence/runtime"
@@ -104,10 +105,11 @@ func LoadAtreeSlabsInStorage(
 }
 
 func CheckStorageHealth(
+	interpreter *interpreter.Interpreter,
 	address common.Address,
 	storage *runtime.Storage,
 	registers registers.Registers,
-	domains []string,
+	domains []common.StorageDomain,
 	nWorkers int,
 ) error {
 
@@ -117,7 +119,7 @@ func CheckStorageHealth(
 	}
 
 	for _, domain := range domains {
-		_ = storage.GetStorageMap(address, domain, false)
+		_ = storage.GetDomainStorageMap(interpreter, address, domain, false)
 	}
 
 	return storage.CheckHealth()

@@ -13,6 +13,7 @@ import (
 
 	"github.com/onflow/atree"
 	"github.com/onflow/cadence/common"
+	"github.com/onflow/cadence/interpreter"
 	"github.com/onflow/cadence/runtime"
 	"github.com/rs/zerolog"
 
@@ -91,9 +92,21 @@ func (m *FilterUnreferencedSlabsMigration) MigrateAccount(
 			Registers: accountRegisters,
 		},
 		nil,
+		runtime.StorageConfig{},
 	)
 
-	err := util.CheckStorageHealth(address, storage, accountRegisters, AllStorageMapDomains, m.nWorkers)
+	inter, err := interpreter.NewInterpreter(
+		nil,
+		nil,
+		&interpreter.Config{
+			Storage: storage,
+		},
+	)
+	if err != nil {
+		return fmt.Errorf("failed to create interpreter: %w", err)
+	}
+
+	err = util.CheckStorageHealth(inter, address, storage, accountRegisters, common.AllStorageDomains, m.nWorkers)
 	if err == nil {
 		return nil
 	}
