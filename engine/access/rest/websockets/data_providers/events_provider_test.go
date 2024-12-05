@@ -223,14 +223,14 @@ func (s *EventsProviderSuite) invalidArgumentsTestCases() []testErrType {
 		},
 		{
 			name: "invalid 'start_block_id' argument",
-			arguments: map[string]string{
+			arguments: map[string]interface{}{
 				"start_block_id": "invalid_block_id",
 			},
 			expectedErrorMsg: "invalid ID format",
 		},
 		{
 			name: "invalid 'start_block_height' argument",
-			arguments: map[string]string{
+			arguments: map[string]interface{}{
 				"start_block_height": "-1",
 			},
 			expectedErrorMsg: "value must be an unsigned 64 bit integer",
@@ -289,7 +289,7 @@ func (s *EventsProviderSuite) TestMessageIndexEventProviderResponse_HappyPath() 
 	s.api.On("SubscribeEventsFromStartBlockID", mock.Anything, mock.Anything, mock.Anything).Return(sub)
 
 	arguments :=
-		map[string]string{
+		map[string]interface{}{
 			"start_block_id": s.rootBlock.ID().String(),
 		}
 

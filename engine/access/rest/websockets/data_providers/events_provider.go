@@ -145,8 +145,12 @@ func parseEventsArguments(
 
 	// Parse 'start_block_id' if provided
 	if hasStartBlockID {
+		result, ok := startBlockIDIn.(string)
+		if !ok {
+			return args, fmt.Errorf("'start_block_id' must be a string")
+		}
 		var startBlockID parser.ID
-		err := startBlockID.Parse(startBlockIDIn)
+		err := startBlockID.Parse(result)
 		if err != nil {
 			return args, fmt.Errorf("invalid 'start_block_id': %w", err)
 		}
@@ -155,23 +159,32 @@ func parseEventsArguments(
 
 	// Parse 'start_block_height' if provided
 	if hasStartBlockHeight {
-		var err error
-		args.StartBlockHeight, err = util.ToUint64(startBlockHeightIn)
+		result, ok := startBlockHeightIn.(string)
+		if !ok {
+			return args, fmt.Errorf("'start_block_height' must be a string")
+		}
+		startBlockHeight, err := util.ToUint64(result)
 		if err != nil {
 			return args, fmt.Errorf("invalid 'start_block_height': %w", err)
 		}
+		args.StartBlockHeight = startBlockHeight
 	} else {
 		args.StartBlockHeight = request.EmptyHeight
 	}
 
+	// Parse 'event_types' as a JSON array
 	var eventTypes parser.EventTypes
 	if eventTypesIn, ok := arguments["event_types"]; ok && eventTypesIn != "" {
-		err := json.Unmarshal([]byte(eventTypesIn), &eventTypes) // Expect a JSON array
+		result, ok := eventTypesIn.(string)
+		if !ok {
+			return args, fmt.Errorf("'event_types' must be a string")
+		}
+		err := json.Unmarshal([]byte(result), &eventTypes) // Expect a JSON array
 		if err != nil {
 			return args, fmt.Errorf("could not parse 'event_types': %w", err)
 		}
 
-		err = eventTypes.Parse(strings.Split(eventTypesIn, ","))
+		err = eventTypes.Parse(strings.Split(result, ","))
 		if err != nil {
 			return args, fmt.Errorf("invalid 'event_types': %w", err)
 		}
@@ -180,7 +193,11 @@ func parseEventsArguments(
 	// Parse 'addresses' as []string{}
 	var addresses []string
 	if addressesIn, ok := arguments["addresses"]; ok && addressesIn != "" {
-		err := json.Unmarshal([]byte(addressesIn), &addresses) // Expect a JSON array
+		result, ok := addressesIn.(string)
+		if !ok {
+			return args, fmt.Errorf("'addresses' must be a string")
+		}
+		err := json.Unmarshal([]byte(result), &addresses) // Expect a JSON array
 		if err != nil {
 			return args, fmt.Errorf("could not parse 'addresses': %w", err)
 		}
@@ -189,7 +206,11 @@ func parseEventsArguments(
 	// Parse 'contracts' as []string{}
 	var contracts []string
 	if contractsIn, ok := arguments["contracts"]; ok && contractsIn != "" {
-		err := json.Unmarshal([]byte(contractsIn), &contracts) // Expect a JSON array
+		result, ok := contractsIn.(string)
+		if !ok {
+			return args, fmt.Errorf("'contracts' must be a string")
+		}
+		err := json.Unmarshal([]byte(result), &contracts) // Expect a JSON array
 		if err != nil {
 			return args, fmt.Errorf("could not parse 'contracts': %w", err)
 		}
