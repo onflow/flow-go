@@ -125,8 +125,7 @@ func (c *Controller) writeMessagesToClient(ctx context.Context) error {
 			return nil
 		case msg, ok := <-c.communicationChannel:
 			if !ok {
-				err := fmt.Errorf("communication channel closed, no error occurred")
-				return err
+				return fmt.Errorf("communication channel closed, no error occurred")
 			}
 			// TODO: handle 'response per second' limits
 
