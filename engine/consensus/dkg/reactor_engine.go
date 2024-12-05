@@ -432,14 +432,15 @@ func (e *ReactorEngine) end(nextEpochCounter uint64) func() error {
 		if crypto.IsDKGFailureError(err) {
 			// Failing to complete the DKG protocol is a rare but expected scenario, which we must handle.
 			// By convention, if we are leaving the happy path, we want to persist the _first_ failure symptom
-			// in the `dkgState`. If the write yields a `storage.ErrAlreadyExists`, we know the overall protocol
-			// has already abandoned the happy path, because on the happy path the ReactorEngine is the only writer.
-			// Then this function just stops and returns without error.
+			// in the `dkgState`. If the write yields a [storage.InvalidDKGStateTransitionError], it means that the state machine
+			// is in the terminal state([flow.RandomBeaconKeyCommitted]) as all other transitions(even to [flow.DKGStateFailure] -> [flow.DKGStateFailure])
+			// are allowed. If the protocol is in terminal state, and we have a failure symptom, then it means that recovery has happened
+			// before ending the DKG. In this case, we want to ignore the error and return without error.
 			e.log.Warn().Err(err).Msgf("node %s with index %d failed DKG locally", e.me.NodeID(), e.controller.GetIndex())
 			err := e.dkgState.SetDKGState(nextEpochCounter, flow.DKGStateFailure)
 			if err != nil {
-				if errors.Is(err, storage.ErrAlreadyExists) {
-					return nil // DKGState already being set is expected in case of epoch recovery
+				if storage.IsInvalidDKGStateTransitionError(err) {
+					return nil
 				}
 				return fmt.Errorf("failed to set dkg current state following dkg end error: %w", err)
 			}
