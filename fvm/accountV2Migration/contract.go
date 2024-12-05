@@ -108,13 +108,14 @@ func declareScheduleAccountV2MigrationFunction(environment runtime.Environment, 
 
 				addressGenerator := chainID.Chain().NewAddressGeneratorAtIndex(addressStartIndex)
 				for i := uint64(0); i < count; i++ {
-					address, err := addressGenerator.NextAddress()
-					if err != nil {
-						panic(err)
-					}
-
+					address := addressGenerator.CurrentAddress()
 					if !runtimeStorage.ScheduleV2Migration(common.Address(address)) {
 						return interpreter.FalseValue
+					}
+
+					_, err := addressGenerator.NextAddress()
+					if err != nil {
+						panic(err)
 					}
 				}
 
