@@ -15,7 +15,7 @@ import (
 // CAUTION: This method stores confidential information and should only be
 // used in the context of the secrets database. This is enforced in the above
 // layer (see storage.DKGState).
-// Error returns: storage.ErrAlreadyExists
+// Error returns: [storage.ErrAlreadyExists].
 func InsertMyBeaconPrivateKey(epochCounter uint64, info *encodable.RandomBeaconPrivKey) func(*badger.Txn) error {
 	return insert(makePrefix(codeBeaconPrivateKey, epochCounter), info)
 }
@@ -63,16 +63,13 @@ func RetrieveDKGStartedForEpoch(epochCounter uint64, started *bool) func(*badger
 	}
 }
 
-
 // UpsertDKGStateForEpoch stores the current state of Random Beacon Recoverable State Machine for the epoch, irrespective of whether an entry for
 // the given epoch counter already exists in the database or not.
-// CAUTION: this method has to be used only in the very specific edge-cases of epoch recovery. For storing the
-// DKG results obtained on the happy-path, please use method [InsertDKGStateForEpoch].
 func UpsertDKGStateForEpoch(epochCounter uint64, newState flow.DKGState) func(*badger.Txn) error {
 	return upsert(makePrefix(codeDKGState, epochCounter), newState)
 }
 
-// RetrieveDKGStateForEpoch retrieves the DKG end state for the epoch.
+// RetrieveDKGStateForEpoch retrieves the current DKG state for the epoch.
 // Error returns: [storage.ErrNotFound]
 func RetrieveDKGStateForEpoch(epochCounter uint64, currentState *flow.DKGState) func(*badger.Txn) error {
 	return retrieve(makePrefix(codeDKGState, epochCounter), currentState)

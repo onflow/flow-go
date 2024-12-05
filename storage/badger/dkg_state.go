@@ -80,7 +80,7 @@ func NewRecoverableRandomBeaconStateMachine(collector module.CacheMetrics, db *b
 // to guarantee only keys safe for signing are returned.
 // Error returns:
 //   - [storage.ErrAlreadyExists] - if there is already a key stored for given epoch.
-//   - [storage.InvalidTransitionRandomBeaconStateMachineErr] - if the requested state transition is invalid.
+//   - [storage.InvalidDKGStateTransitionError] - if the requested state transition is invalid.
 func (ds *RecoverablePrivateBeaconKeyStateMachine) InsertMyBeaconPrivateKey(epochCounter uint64, key crypto.PrivateKey) error {
 	if key == nil {
 		return fmt.Errorf("will not store nil beacon key")
@@ -126,13 +126,13 @@ func (ds *RecoverablePrivateBeaconKeyStateMachine) GetDKGStarted(epochCounter ui
 // data to be processed by the state machine before the transition can be made. For such cases there are dedicated methods that should be used, ex.
 // InsertMyBeaconPrivateKey and UpsertMyBeaconPrivateKey, which allow to store the needed data and perform the transition in one atomic operation.
 // Error returns:
-//   - [storage.InvalidTransitionRandomBeaconStateMachineErr] - if the requested state transition is invalid.
+//   - [storage.InvalidDKGStateTransitionError] - if the requested state transition is invalid.
 func (ds *RecoverablePrivateBeaconKeyStateMachine) SetDKGState(epochCounter uint64, newState flow.DKGState) error {
 	return operation.RetryOnConflictTx(ds.db, transaction.Update, ds.processStateTransition(epochCounter, newState))
 }
 
 // Error returns:
-//   - storage.InvalidTransitionRandomBeaconStateMachineErr - if the requested state transition is invalid
+//   - storage.InvalidDKGStateTransitionError - if the requested state transition is invalid
 func (ds *RecoverablePrivateBeaconKeyStateMachine) processStateTransition(epochCounter uint64, newState flow.DKGState) func(*transaction.Tx) error {
 	return func(tx *transaction.Tx) error {
 		var currentState flow.DKGState
@@ -147,14 +147,14 @@ func (ds *RecoverablePrivateBeaconKeyStateMachine) processStateTransition(epochC
 
 		allowedStates := allowedStateTransitions[currentState]
 		if slices.Index(allowedStates, newState) < 0 {
-			return storage.NewInvalidTransitionRandomBeaconStateMachineErr(currentState, newState)
+			return storage.NewInvalidDKGStateTransitionError(currentState, newState)
 		}
 
 		// ensure invariant holds and we still have a valid private key stored
 		if newState == flow.RandomBeaconKeyCommitted || newState == flow.DKGStateCompleted {
 			_, err = ds.keyCache.Get(epochCounter)(tx.DBTxn)
 			if err != nil {
-				return storage.NewInvalidTransitionRandomBeaconStateMachineErrf(currentState, newState, "cannot transition without a valid random beacon key: %w", err)
+				return storage.NewInvalidDKGStateTransitionErrorf(currentState, newState, "cannot transition without a valid random beacon key: %w", err)
 			}
 		}
 
