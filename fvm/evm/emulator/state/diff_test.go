@@ -13,7 +13,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
-func TestStateDiff(t *testing.T) {
+func StateDiff(t *testing.T) {
 	offchainState, err := state.ImportEVMStateFromGob("/var/flow2/evm-state-from-gobs-218215348/")
 	require.NoError(t, err)
 
@@ -25,7 +25,7 @@ func TestStateDiff(t *testing.T) {
 	require.Len(t, differences, 0)
 }
 
-func TestEVMStateDiff(t *testing.T) {
+func EVMStateDiff(t *testing.T) {
 
 	state1 := EVMStateFromReplayGobDir(t, "/var/flow2/evm-state-from-gobs-218215348/", uint64(218215348))
 	// state2 := EVMStateFromReplayGobDir(t, "/var/flow2/evm-state-from-gobs-218215348/", uint64(218215348))
