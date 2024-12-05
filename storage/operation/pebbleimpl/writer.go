@@ -1,6 +1,7 @@
 package pebbleimpl
 
 import (
+	"bytes"
 	"fmt"
 
 	"github.com/cockroachdb/pebble"
@@ -102,8 +103,13 @@ func (b *ReaderBatchWriter) Delete(key []byte) error {
 
 // DeleteByRange removes all keys with a prefix that falls within the
 // range [start, end], both inclusive.
-// No errors expected during normal operation
+// It returns error if endPrefix < startPrefix
+// no other errors are expected during normal operation
 func (b *ReaderBatchWriter) DeleteByRange(globalReader storage.Reader, startPrefix, endPrefix []byte) error {
+	if bytes.Compare(startPrefix, endPrefix) > 0 {
+		return fmt.Errorf("startPrefix key must be less than or equal to endPrefix key")
+	}
+
 	// DeleteRange takes the prefix range with start (inclusive) and end (exclusive, note: not inclusive).
 	// therefore, we need to increment the endPrefix to make it inclusive.
 	start, end, hasUpperBound := storage.StartEndPrefixToLowerUpperBound(startPrefix, endPrefix)

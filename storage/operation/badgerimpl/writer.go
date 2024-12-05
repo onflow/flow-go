@@ -103,7 +103,8 @@ func (b *ReaderBatchWriter) Delete(key []byte) error {
 
 // DeleteByRange removes all keys with a prefix that falls within the
 // range [start, end], both inclusive.
-// No errors expected during normal operation
+// It returns error if endPrefix < startPrefix
+// no other errors are expected during normal operation
 func (b *ReaderBatchWriter) DeleteByRange(globalReader storage.Reader, startPrefix, endPrefix []byte) error {
 	err := operation.IterateKeysInPrefixRange(startPrefix, endPrefix, func(key []byte) error {
 		err := b.batch.Delete(key)

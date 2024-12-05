@@ -1,6 +1,9 @@
 package operation
 
 import (
+	"bytes"
+	"fmt"
+
 	"github.com/vmihailenco/msgpack"
 
 	"github.com/onflow/flow-go/module/irrecoverable"
@@ -43,13 +46,22 @@ func Remove(key []byte) func(storage.Writer) error {
 	}
 }
 
-// RemoveByPrefix removes all keys with the given prefix defined by [startPrefix, endPrefix] (both inclusive).
-// If no keys exist with the given prefix, this is a no-op.
+// RemoveByPrefix removes all keys with the given prefix
 // Error returns:
 // * generic error in case of unexpected database error
 func RemoveByPrefix(reader storage.Reader, key []byte) func(storage.Writer) error {
+	return RemoveByRange(reader, key, key)
+}
+
+// RemoveByRange removes all keys with a prefix that falls within the range [start, end], both inclusive.
+// It returns error if endPrefix < startPrefix
+// no other errors are expected during normal operation
+func RemoveByRange(reader storage.Reader, startPrefix []byte, endPrefix []byte) func(storage.Writer) error {
 	return func(w storage.Writer) error {
-		err := w.DeleteByRange(reader, key, key)
+		if bytes.Compare(startPrefix, endPrefix) > 0 {
+			return fmt.Errorf("startPrefix key must be less than or equal to endPrefix key")
+		}
+		err := w.DeleteByRange(reader, startPrefix, endPrefix)
 		if err != nil {
 			return irrecoverable.NewExceptionf("could not delete item: %w", err)
 		}

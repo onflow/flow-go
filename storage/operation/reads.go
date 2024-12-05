@@ -17,11 +17,11 @@ import (
 // return (false, err) if running into any exception, the iteration should be stopped.
 type CheckFunc func(key []byte) (bool, error)
 
-// createFunc returns a pointer to an initialized entity that we can potentially
+// CreateFunc returns a pointer to an initialized entity that we can potentially
 // decode the next value into during a badger DB iteration.
 type CreateFunc func() interface{}
 
-// handleFunc is a function that starts the processing of the current key-value
+// HandleFunc is a function that starts the processing of the current key-value
 // pair during a badger iteration. It should be called after the key was checked
 // and the entity was decoded.
 // No errors are expected during normal operation. Any errors will halt the iteration.
