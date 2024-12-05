@@ -53,6 +53,11 @@ func (i *badgerIterator) Valid() bool {
 		return false
 	}
 
+	// if upper bound is nil, then there's no upper bound, so it's always valid
+	if i.upperBound == nil {
+		return true
+	}
+
 	// check if the key is within the upperbound (exclusive)
 	key := i.iter.Item().Key()
 	// note: for the boundary case,

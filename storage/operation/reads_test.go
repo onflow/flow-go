@@ -61,6 +61,58 @@ func TestIterateKeysInPrefixRange(t *testing.T) {
 	})
 }
 
+func TestIterationBoundary(t *testing.T) {
+	dbtest.RunWithStorages(t, func(t *testing.T, r storage.Reader, withWriter dbtest.WithWriter) {
+		// Define the prefix range
+		prefixStart := []byte{0x01}
+		prefixEnd := []byte{0xff}
+
+		// Create a range of keys around the prefix start/end values
+		keys := [][]byte{
+			{0x00},
+			{0x00, 0x00},
+			{0x00, 0xff},
+			{0x01},
+			{0x01, 0x00},
+			{0x01, 0xff},
+			{0x02},
+			{0xff},
+			{0xff, 0x00},
+			{0xff, 0xff},
+		}
+
+		expectedKeys := [][]byte{
+			{0x01},
+			{0x01, 0x00},
+			{0x01, 0xff},
+			{0x02},
+			{0xff},
+			{0xff, 0x00},
+			{0xff, 0xff},
+		}
+
+		// Insert the keys into the storage
+		require.NoError(t, withWriter(func(writer storage.Writer) error {
+			for _, key := range keys {
+				value := []byte{0x00} // value are skipped, doesn't matter
+				err := operation.Upsert(key, value)(writer)
+				if err != nil {
+					return err
+				}
+			}
+			return nil
+		}))
+
+		// Forward iteration and check boundaries
+		var found [][]byte
+		require.NoError(t, operation.IterateKeysInPrefixRange(prefixStart, prefixEnd, func(key []byte) error {
+			found = append(found, key)
+			return nil
+		})(r), "should iterate forward without error")
+		require.ElementsMatch(t, expectedKeys, found, "forward iteration should return the correct keys in range")
+	})
+}
+
 func TestTraverse(t *testing.T) {
 	dbtest.RunWithStorages(t, func(t *testing.T, r storage.Reader, withWriter dbtest.WithWriter) {
 		keyVals := map[[2]byte]uint64{
