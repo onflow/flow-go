@@ -23,7 +23,7 @@ var allowedStateTransitions = map[flow.DKGState][]flow.DKGState{
 	flow.DKGStateStarted:          {flow.DKGStateCompleted, flow.DKGStateFailure, flow.RandomBeaconKeyCommitted},
 	flow.DKGStateCompleted:        {flow.RandomBeaconKeyCommitted, flow.DKGStateFailure},
 	flow.RandomBeaconKeyCommitted: {flow.RandomBeaconKeyCommitted},
-	flow.DKGStateFailure:          {flow.RandomBeaconKeyCommitted},
+	flow.DKGStateFailure:          {flow.RandomBeaconKeyCommitted, flow.DKGStateFailure},
 	flow.DKGStateUninitialized:    {flow.DKGStateStarted, flow.DKGStateFailure, flow.RandomBeaconKeyCommitted},
 }
 

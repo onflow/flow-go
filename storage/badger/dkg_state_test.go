@@ -275,10 +275,9 @@ func TestDKGState_FailureState(t *testing.T) {
 			require.True(t, storage.IsInvalidDKGStateTransitionError(err))
 		})
 
-		t.Run("-> flow.DKGStateFailure, not allowed", func(t *testing.T) {
+		t.Run("-> flow.DKGStateFailure, should be allowed", func(t *testing.T) {
 			err = store.SetDKGState(setupState(), flow.DKGStateFailure)
-			require.Error(t, err)
-			require.True(t, storage.IsInvalidDKGStateTransitionError(err))
+			require.NoError(t, err)
 		})
 
 		t.Run("-> flow.DKGStateCompleted, not allowed", func(t *testing.T) {
