@@ -99,7 +99,7 @@ func TestDKGState_StartedState(t *testing.T) {
 		epochCounter := setupState()
 
 		actualState, err := store.GetDKGState(epochCounter)
-		require.NoError(t, err, storage.ErrNotFound)
+		require.NoError(t, err)
 		require.Equal(t, flow.DKGStateStarted, actualState)
 
 		started, err := store.GetDKGStarted(epochCounter)
@@ -172,7 +172,7 @@ func TestDKGState_CompletedState(t *testing.T) {
 		epochCounter := setupState()
 
 		actualState, err := store.GetDKGState(epochCounter)
-		require.NoError(t, err, storage.ErrNotFound)
+		require.NoError(t, err)
 		require.Equal(t, flow.DKGStateCompleted, actualState)
 
 		started, err := store.GetDKGStarted(epochCounter)
