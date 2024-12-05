@@ -54,7 +54,7 @@ func (c *Controller) HandleConnection(ctx context.Context) {
 	err := c.configureKeepalive()
 	if err != nil {
 		// TODO: add error handling here
-		c.logger.Error().Err(err).Msg("error configuring connection")
+		c.logger.Error().Err(err).Msg("error configuring keepalive connection")
 		c.shutdownConnection()
 		return
 	}
@@ -135,13 +135,11 @@ func (c *Controller) writeMessagesToClient(ctx context.Context) error {
 			// if the client is slow or unresponsive. This prevents resource exhaustion
 			// and allows the server to gracefully handle timeouts for delayed writes.
 			if err := c.conn.SetWriteDeadline(time.Now().Add(WriteWait)); err != nil {
-				c.logger.Error().Err(err).Msg("failed to set the write deadline")
-				return err
+				return fmt.Errorf("failed to set the write deadline: %w", err)
 			}
 			err := c.conn.WriteJSON(msg)
 			if err != nil {
-				c.logger.Error().Err(err).Msg("error writing to connection")
-				return err
+				return fmt.Errorf("failed to write message to connection: %w", err)
 			}
 		}
 	}
@@ -156,7 +154,6 @@ func (c *Controller) readMessagesFromClient(ctx context.Context) error {
 	for {
 		select {
 		case <-ctx.Done():
-			c.logger.Info().Msg("context canceled, stopping read message loop")
 			return ctx.Err()
 		default:
 			msg, err := c.readMessage()
@@ -164,18 +161,15 @@ func (c *Controller) readMessagesFromClient(ctx context.Context) error {
 				if websocket.IsCloseError(err, websocket.CloseNormalClosure, websocket.CloseAbnormalClosure) {
 					return nil
 				}
-				c.logger.Warn().Err(err).Msg("error reading message from client")
 				return fmt.Errorf("failed to read message from client: %w", err)
 			}
 
-			baseMsg, validatedMsg, err := c.parseAndValidateMessage(msg)
+			_, validatedMsg, err := c.parseAndValidateMessage(msg)
 			if err != nil {
-				c.logger.Debug().Err(err).Msg("error parsing and validating client message")
 				return fmt.Errorf("failed to parse and validate client message: %w", err)
 			}
 
 			if err := c.handleAction(ctx, validatedMsg); err != nil {
-				c.logger.Warn().Err(err).Str("action", baseMsg.Action).Msg("error handling action")
 				return fmt.Errorf("failed to handle message action: %w", err)
 			}
 		}
@@ -221,7 +215,6 @@ func (c *Controller) parseAndValidateMessage(message json.RawMessage) (models.Ba
 		validatedMsg = listMsg
 
 	default:
-		c.logger.Debug().Str("action", baseMsg.Action).Msg("unknown action type")
 		return baseMsg, nil, fmt.Errorf("unknown action type: %s", baseMsg.Action)
 	}
 
@@ -318,9 +311,6 @@ func (c *Controller) keepalive(ctx context.Context) error {
 		case <-pingTicker.C:
 			err := c.conn.WriteControl(websocket.PingMessage, time.Now().Add(WriteWait))
 			if err != nil {
-				// Log error and exit the loop on failure
-				c.logger.Debug().Err(err).Msg("failed to send ping")
-
 				return fmt.Errorf("failed to write ping message: %w", err)
 			}
 		}
