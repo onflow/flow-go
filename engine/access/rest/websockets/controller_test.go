@@ -128,14 +128,24 @@ func (s *ControllerSuite) TestControllerShutdown() {
 			Topic:              dp.BlocksTopic,
 			Arguments:          nil,
 		}
+		msg, err := json.Marshal(requestMessage)
+		s.Require().NoError(err)
 
+		// This is due to how the mock library compares arguments: it requires the
+		// pointers passed in `On` to match the exact memory address of the pointer
+		// passed at runtime. Since these pointers are not guaranteed to be the same,
+		// strict matching (`&msg`) will fail.
+		//
+		// Using `mock.Anything` bypasses this strict matching. The `Run` function
+		// then allows us to simulate the behavior of `ReadJSON` by taking the argument
+		// provided during the method call (a dynamically allocated `*json.RawMessage`)
+		// and setting its value (`*reqMsg = msg`). This ensures that the behavior
+		// mimics the real method while avoiding argument mismatch issues.
 		s.connection.
 			On("ReadJSON", mock.Anything).
 			Run(func(args mock.Arguments) {
 				reqMsg, ok := args.Get(0).(*json.RawMessage)
 				s.Require().True(ok)
-				msg, err := json.Marshal(requestMessage)
-				s.Require().NoError(err)
 				*reqMsg = msg
 			}).
 			Return(nil).
