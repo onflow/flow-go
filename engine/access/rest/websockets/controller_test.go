@@ -203,7 +203,7 @@ func (s *ControllerSuite) TestKeepaliveHappyCase() {
 	expectedCalls := 3 // expected 3 ping messages for 30 seconds
 	s.Require().Eventually(func() bool {
 		return len(s.connection.Calls) == expectedCalls
-	}, 30*time.Second, 1*time.Second, "not all ping messages were sent")
+	}, time.Duration(expectedCalls)*PongWait, 1*time.Second, "not all ping messages were sent")
 
 	s.connection.On("Close").Return(nil).Once()
 	controller.shutdownConnection()
