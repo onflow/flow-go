@@ -79,8 +79,9 @@ func (c *Controller) HandleConnection(ctx context.Context) {
 	if err = g.Wait(); err != nil {
 		//TODO: add error handling here
 		c.logger.Error().Err(err).Msg("error detected in one of the goroutines")
-		c.shutdownConnection()
 	}
+
+	c.shutdownConnection()
 }
 
 // configureKeepalive sets up the WebSocket connection with a read deadline
