@@ -4,8 +4,6 @@ import (
 	"crypto"
 	"testing"
 
-	"github.com/stretchr/testify/require"
-
 	sdk "github.com/onflow/flow-go-sdk"
 	sdkcrypto "github.com/onflow/flow-go-sdk/crypto"
 	"github.com/onflow/flow-go/engine/consensus/dkg"
@@ -36,7 +34,6 @@ type node struct {
 	account           *nodeAccount
 	dkgContractClient *DKGClientWrapper
 	dkgState          storage.DKGState
-	safeBeaconKeys    storage.SafeBeaconKeys
 	messagingEngine   *dkg.MessagingEngine
 	reactorEngine     *dkg.ReactorEngine
 }
@@ -54,8 +51,6 @@ func (n *node) Ready() <-chan struct{} {
 }
 
 func (n *node) Done() <-chan struct{} {
-	require.NoError(n.t, n.PublicDB.Close())
-	require.NoError(n.t, n.SecretsDB.Close())
 	return util.AllDone(n.messagingEngine, n.reactorEngine)
 }
 

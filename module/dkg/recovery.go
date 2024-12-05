@@ -167,7 +167,7 @@ func (b *BeaconKeyRecovery) recoverMyBeaconPrivateKey(final protocol.Snapshot) e
 		if err != nil {
 			return fmt.Errorf("could not overwrite my beacon private key for the next epoch: %w", err)
 		}
-		log.Info().Msgf("succesfully recovered my beacon private key for the next epoch")
+		log.Warn().Msgf("succesfully recovered my beacon private key for the next epoch")
 	} else {
 		log.Debug().Msgf("my beacon key is not part of the next epoch DKG")
 	}
