@@ -58,7 +58,7 @@ func TestChunkDataPack_Remove(t *testing.T) {
 	})
 }
 
-// TestChunkDataPack_BatchStore evaluates correct batch storage and retrieval of chunk data packs in the storage.
+// TestChunkDataPacks_BatchStore evaluates correct batch storage and retrieval of chunk data packs in the storage.
 func TestChunkDataPacks_BatchStore(t *testing.T) {
 	WithChunkDataPacks(t, 100, func(t *testing.T, chunkDataPacks []*flow.ChunkDataPack, chunkDataPackStore *badgerstorage.ChunkDataPacks, db *badger.DB) {
 		batch := badgerstorage.NewBatch(db)
