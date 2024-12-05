@@ -41,12 +41,23 @@ func (i *badgerIterator) First() {
 
 // Valid returns whether the iterator is positioned at a valid key-value pair.
 func (i *badgerIterator) Valid() bool {
-	// if it's beyond the upper bound, it's invalid
+	// Note: we didn't specify the iteration range with the badger IteratorOptions,
+	// because the IterationOptions only allows us to specify a single prefix, whereas
+	// we need to specify a range of prefixes. So we have to manually check the bounds here.
+	// The First() method, which calls Seek(i.lowerBound), ensures the iteration starts from
+	// the lowerBound, and the upperbound is checked here by first checking if it's
+	// reaching the end of the iteration, then checking if the key is within the upperbound.
+
+	// check if it's reaching the end of the iteration
 	if !i.iter.Valid() {
 		return false
 	}
+
+	// check if the key is within the upperbound (exclusive)
 	key := i.iter.Item().Key()
-	// "< 0" means "key < upperBound"
+	// note: for the boundary case,
+	// upperBound is the exclusive upper bound, should not be included in the iteration,
+	// so if key == upperBound, it's invalid, should return false.
 	valid := bytes.Compare(key, i.upperBound) < 0
 	return valid
 }
