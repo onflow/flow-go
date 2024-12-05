@@ -51,13 +51,11 @@ func TestDKGState_UninitializedState(t *testing.T) {
 		})
 
 		t.Run("-> flow.DKGStateStarted, should be allowed", func(t *testing.T) {
-			epochCounter++
 			err = store.SetDKGState(setupState(), flow.DKGStateStarted)
 			require.NoError(t, err)
 		})
 
 		t.Run("-> flow.DKGStateFailure, should be allowed", func(t *testing.T) {
-			epochCounter++
 			err = store.SetDKGState(setupState(), flow.DKGStateFailure)
 			require.NoError(t, err)
 		})
