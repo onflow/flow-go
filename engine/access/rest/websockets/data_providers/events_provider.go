@@ -58,7 +58,7 @@ func NewEventsDataProvider(
 	}
 
 	// Initialize arguments passed to the provider.
-	eventArgs, err := ParseEventsArguments(arguments, chain, eventFilterConfig)
+	eventArgs, err := parseEventsArguments(arguments, chain, eventFilterConfig)
 	if err != nil {
 		return nil, fmt.Errorf("invalid arguments for events data provider: %w", err)
 	}
@@ -127,8 +127,8 @@ func (p *EventsDataProvider) createSubscription(ctx context.Context, args Events
 	return p.stateStreamApi.SubscribeEventsFromLatest(ctx, args.Filter)
 }
 
-// ParseEventsArguments validates and initializes the events arguments.
-func ParseEventsArguments(
+// parseEventsArguments validates and initializes the events arguments.
+func parseEventsArguments(
 	arguments models.Arguments,
 	chain flow.Chain,
 	eventFilterConfig state_stream.EventFilterConfig,
