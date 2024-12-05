@@ -61,6 +61,18 @@ func TestIterateKeysInPrefixRange(t *testing.T) {
 	})
 }
 
+// TestIterateInvalidRange tests that error should return if startPrefix > endPrefix
+func TestIterateInvalidRange(t *testing.T) {
+	dbtest.RunWithStorages(t, func(t *testing.T, r storage.Reader, withWriter dbtest.WithWriter) {
+
+		var found [][]byte
+		require.Error(t, operation.IterateKeysInPrefixRange([]byte{0x02}, []byte{0x01}, func(key []byte) error {
+			found = append(found, key)
+			return nil
+		})(r))
+	})
+}
+
 func TestIterationBoundary(t *testing.T) {
 	dbtest.RunWithStorages(t, func(t *testing.T, r storage.Reader, withWriter dbtest.WithWriter) {
 		// Define the prefix range

@@ -5,17 +5,30 @@ import (
 )
 
 // Iterator is an interface for iterating over key-value pairs in a storage backend.
+// A common usage is:
+//
+//		defer it.Close()
+//
+//		for it.First(); it.Valid(); it.Next() {
+//	 		item := it.IterItem()
+//	 	}
 type Iterator interface {
 	// First seeks to the smallest key greater than or equal to the given key.
+	// This method must be called because it's necessary for the badger implementation
+	// to move the iteration cursor to the first key in the iteration range.
+	// This method must be called before calling Valid, Next, IterItem, or Close.
 	First()
 
 	// Valid returns whether the iterator is positioned at a valid key-value pair.
+	// If Valid returns false, the iterator is done and must be closed.
 	Valid() bool
 
 	// Next advances the iterator to the next key-value pair.
+	// The next key-value pair might be invalid, so you should call Valid() to check.
 	Next()
 
 	// IterItem returns the current key-value pair, or nil if done.
+	// A best practice is always to call Valid() before calling IterItem.
 	IterItem() IterItem
 
 	// Close closes the iterator. Iterator must be closed, otherwise it causes memory leak.
@@ -49,7 +62,7 @@ type Reader interface {
 	// other errors are exceptions
 	//
 	// The caller should not modify the contents of the returned slice, but it is
-	// safe to modify the contents of the argument after Get returns. The
+	// safe to modify the contents of the `key` argument after Get returns. The
 	// returned slice will remain valid until the returned Closer is closed. On
 	// success, the caller MUST call closer.Close() or a memory leak will occur.
 	Get(key []byte) (value []byte, closer io.Closer, err error)
@@ -63,7 +76,7 @@ type Reader interface {
 }
 
 // Writer is an interface for batch writing to a storage backend.
-// It cannot be used concurrently for writing.
+// One Writer instance cannot be used concurrently by multiple goroutines.
 type Writer interface {
 	// Set sets the value for the given key. It overwrites any previous value
 	// for that key; a DB is not a multi-map.
@@ -117,18 +130,21 @@ func OnCommitSucceed(b ReaderBatchWriter, onSuccessFn func()) {
 	})
 }
 
+// StartEndPrefixToLowerUpperBound returns the lower and upper bounds for a range of keys
+// specified by the start and end prefixes.
+// the lower and upper bounds are used for the key iteration.
+// The return value lowerBound specifies the smallest key to iterate and it's inclusive.
+// The return value upperBound specifies the largest key to iterate and it's exclusive (not inclusive)
+// in order to match all keys prefixed with `endPrefix`, we increment the bytes of `endPrefix` by 1,
+// for instance, to iterate keys between "hello" and "world",
+// we use "hello" as LowerBound, "worle" as UpperBound, so that "world", "world1", "worldffff...ffff"
+// will all be included.
 func StartEndPrefixToLowerUpperBound(startPrefix, endPrefix []byte) (lowerBound, upperBound []byte) {
-	// Return value lowerBound specifies the smallest key to iterate and it's inclusive.
-	// Return value upperBound specifies the largest key to iterate and it's exclusive (not inclusive)
-	// in order to match all keys prefixed with `endPrefix`, we increment the bytes of `endPrefix` by 1,
-	// for instance, to iterate keys between "hello" and "world",
-	// we use "hello" as LowerBound, "worle" as UpperBound, so that "world", "world1", "worldffff...ffff"
-	// will all be included.
 	return startPrefix, PrefixUpperBound(endPrefix)
 }
 
 // PrefixUpperBound returns a key K such that all possible keys beginning with the input prefix
-// sort lower than K according to the byte-wise lexicographic key ordering used by Pebble.
+// sort lower than K according to the byte-wise lexicographic key ordering.
 // This is used to define an upper bound for iteration, when we want to iterate over
 // all keys beginning with a given prefix.
 // referred to https://pkg.go.dev/github.com/cockroachdb/pebble#example-Iterator-PrefixIteration

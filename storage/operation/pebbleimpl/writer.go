@@ -1,9 +1,12 @@
 package pebbleimpl
 
 import (
+	"fmt"
+
 	"github.com/cockroachdb/pebble"
 
 	"github.com/onflow/flow-go/storage"
+	"github.com/onflow/flow-go/storage/operation"
 	op "github.com/onflow/flow-go/storage/operation"
 )
 
@@ -100,9 +103,19 @@ func (b *ReaderBatchWriter) Delete(key []byte) error {
 // DeleteByRange removes all keys with a prefix that falls within the
 // range [start, end], both inclusive.
 // No errors expected during normal operation
-func (b *ReaderBatchWriter) DeleteByRange(_ storage.Reader, startPrefix, endPrefix []byte) error {
+func (b *ReaderBatchWriter) DeleteByRange(globalReader storage.Reader, startPrefix, endPrefix []byte) error {
 	// DeleteRange takes the prefix range with start (inclusive) and end (exclusive, note: not inclusive).
 	// therefore, we need to increment the endPrefix to make it inclusive.
 	start, end := storage.StartEndPrefixToLowerUpperBound(startPrefix, endPrefix)
-	return b.batch.DeleteRange(start, end, pebble.Sync)
+	if len(end) > 0 {
+		return b.batch.DeleteRange(start, end, pebble.Sync)
+	}
+
+	return operation.IterateKeysInPrefixRange(startPrefix, endPrefix, func(key []byte) error {
+		err := b.batch.Delete(key, pebble.Sync)
+		if err != nil {
+			return fmt.Errorf("could not add key to delete batch (%v): %w", key, err)
+		}
+		return nil
+	})(globalReader)
 }

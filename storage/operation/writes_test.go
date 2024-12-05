@@ -244,6 +244,53 @@ func TestRemoveRange(t *testing.T) {
 	})
 }
 
+func TestRemoveFrom(t *testing.T) {
+	dbtest.RunWithStorages(t, func(t *testing.T, r storage.Reader, withWriter dbtest.WithWriter) {
+
+		// Define the prefix
+		prefix := []byte{0xff}
+
+		// Create a range of keys around the boundaries of the prefix
+		keys := [][]byte{
+			{0x10, 0x00},
+			{0xff},
+			{0xff, 0x00},
+			{0xff, 0xff},
+		}
+
+		// Keys expected to be in the prefix range
+		includeStart, includeEnd := 1, 3
+
+		// Insert the keys into the storage
+		require.NoError(t, withWriter(func(writer storage.Writer) error {
+			for _, key := range keys {
+				value := []byte{0x00} // value are skipped, doesn't matter
+				err := operation.Upsert(key, value)(writer)
+				if err != nil {
+					return err
+				}
+			}
+			return nil
+		}))
+
+		// Remove the keys in the prefix range
+		require.NoError(t, withWriter(operation.RemoveByPrefix(r, prefix)))
+
+		// Verify that the keys in the prefix range have been removed
+		for i, key := range keys {
+			var exists bool
+			require.NoError(t, operation.Exists(key, &exists)(r))
+			t.Logf("key %x exists: %t", key, exists)
+
+			deleted := includeStart <= i && i <= includeEnd
+
+			// An item that was not deleted must exist
+			require.Equal(t, !deleted, exists,
+				fmt.Errorf("a key %x should be deleted (%v), but actually exists (%v)", key, deleted, exists))
+		}
+	})
+}
+
 type Entity struct {
 	ID uint64
 }
