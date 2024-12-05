@@ -53,6 +53,8 @@ func (b dbReader) Get(key []byte) ([]byte, io.Closer, error) {
 //   - have a prefix equal to startPrefix OR
 //   - have a prefix equal to the endPrefix OR
 //   - have a prefix that is lexicographically between startPrefix and endPrefix
+//
+// no errors are expected during normal operation
 func (b dbReader) NewIter(startPrefix, endPrefix []byte, ops storage.IteratorOption) (storage.Iterator, error) {
 	return newBadgerIterator(b.db, startPrefix, endPrefix, ops), nil
 }

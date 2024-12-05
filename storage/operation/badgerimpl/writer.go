@@ -20,7 +20,7 @@ type ReaderBatchWriter struct {
 var _ storage.ReaderBatchWriter = (*ReaderBatchWriter)(nil)
 
 // GlobalReader returns a database-backed reader which reads the latest committed global database state ("read-committed isolation").
-// This reader will not read writes written to ReaderBatchWriter.Writer until the write batch is committed.
+// This reader will not read un-committed writes written to ReaderBatchWriter.Writer until the write batch is committed.
 // This reader may observe different values for the same key on subsequent reads.
 func (b *ReaderBatchWriter) GlobalReader() storage.Reader {
 	return b.globalReader
