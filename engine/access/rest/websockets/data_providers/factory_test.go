@@ -13,6 +13,7 @@ import (
 	"github.com/onflow/flow-go/engine/access/rest/websockets/models"
 	"github.com/onflow/flow-go/engine/access/state_stream"
 	statestreammock "github.com/onflow/flow-go/engine/access/state_stream/mock"
+	"github.com/onflow/flow-go/engine/access/subscription"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -46,7 +47,13 @@ func (s *DataProviderFactorySuite) SetupTest() {
 
 	chain := flow.Testnet.Chain()
 
-	s.factory = NewDataProviderFactory(log, s.stateStreamApi, s.accessApi, chain, state_stream.DefaultEventFilterConfig)
+	s.factory = NewDataProviderFactory(
+		log,
+		s.stateStreamApi,
+		s.accessApi,
+		chain,
+		state_stream.DefaultEventFilterConfig,
+		subscription.DefaultHeartbeatInterval)
 	s.Require().NotNil(s.factory)
 }
 
@@ -61,8 +68,6 @@ func (s *DataProviderFactorySuite) setupSubscription(apiCall *mock.Call) {
 // TestSupportedTopics verifies that supported topics return a valid provider and no errors.
 // Each test case includes a topic and arguments for which a data provider should be created.
 func (s *DataProviderFactorySuite) TestSupportedTopics() {
-	s.T().Parallel()
-
 	// Define supported topics and check if each returns the correct provider without errors
 	testCases := []struct {
 		name               string

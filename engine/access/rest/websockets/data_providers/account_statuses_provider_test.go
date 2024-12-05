@@ -3,7 +3,6 @@ package data_providers
 import (
 	"context"
 	"fmt"
-	"github.com/onflow/flow-go/engine/access/state_stream/backend"
 	"strconv"
 	"testing"
 
@@ -13,6 +12,7 @@ import (
 
 	"github.com/onflow/flow-go/engine/access/rest/websockets/models"
 	"github.com/onflow/flow-go/engine/access/state_stream"
+	"github.com/onflow/flow-go/engine/access/state_stream/backend"
 	ssmock "github.com/onflow/flow-go/engine/access/state_stream/mock"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/utils/unittest"
