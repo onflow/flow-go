@@ -20,7 +20,7 @@ const (
 	// which contains the public key share that matches the private key share that the node has obtained.
 	// A node can obtain a key share by successfully completing the DKG process or by manually injecting a key share obtained
 	// by other means (e.g. key recovery).
-	// Despite the key origin this is a terminal state which defines a safe Random Beacon key for the next epoch and allow node
+	// Regardless of the key origin, this is a terminal state which defines a safe Random Beacon key for the next epoch and allows the node
 	// to participate in the Random Beacon protocol.
 	RandomBeaconKeyCommitted
 	// DKGStateFailure - DKG process has failed, this state indicates that we have left the happy path.

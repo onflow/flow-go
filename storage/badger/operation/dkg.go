@@ -63,11 +63,6 @@ func RetrieveDKGStartedForEpoch(epochCounter uint64, started *bool) func(*badger
 	}
 }
 
-// InsertDKGStateForEpoch stores the DKG current state of Random Beacon Recoverable State Machine for the epoch.
-// Error returns: [storage.ErrAlreadyExists]
-func InsertDKGStateForEpoch(epochCounter uint64, newState flow.DKGState) func(*badger.Txn) error {
-	return insert(makePrefix(codeDKGState, epochCounter), newState)
-}
 
 // UpsertDKGStateForEpoch stores the current state of Random Beacon Recoverable State Machine for the epoch, irrespective of whether an entry for
 // the given epoch counter already exists in the database or not.
@@ -79,6 +74,6 @@ func UpsertDKGStateForEpoch(epochCounter uint64, newState flow.DKGState) func(*b
 
 // RetrieveDKGStateForEpoch retrieves the DKG end state for the epoch.
 // Error returns: [storage.ErrNotFound]
-func RetrieveDKGStateForEpoch(epochCounter uint64, newState *flow.DKGState) func(*badger.Txn) error {
-	return retrieve(makePrefix(codeDKGState, epochCounter), newState)
+func RetrieveDKGStateForEpoch(epochCounter uint64, currentState *flow.DKGState) func(*badger.Txn) error {
+	return retrieve(makePrefix(codeDKGState, epochCounter), currentState)
 }

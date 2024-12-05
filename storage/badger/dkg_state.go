@@ -21,7 +21,7 @@ import (
 // allowedStateTransitions defines the allowed state transitions for the Recoverable Random Beacon State Machine.
 var allowedStateTransitions = map[flow.DKGState][]flow.DKGState{
 	flow.DKGStateStarted:          {flow.DKGStateCompleted, flow.DKGStateFailure, flow.RandomBeaconKeyCommitted},
-	flow.DKGStateCompleted:        {flow.RandomBeaconKeyCommitted, flow.DKGStateFailure, flow.RandomBeaconKeyCommitted},
+	flow.DKGStateCompleted:        {flow.RandomBeaconKeyCommitted, flow.DKGStateFailure},
 	flow.RandomBeaconKeyCommitted: {flow.RandomBeaconKeyCommitted},
 	flow.DKGStateFailure:          {flow.RandomBeaconKeyCommitted},
 	flow.DKGStateUninitialized:    {flow.DKGStateStarted, flow.DKGStateFailure, flow.RandomBeaconKeyCommitted},
@@ -29,8 +29,6 @@ var allowedStateTransitions = map[flow.DKGState][]flow.DKGState{
 
 // RecoverablePrivateBeaconKeyStateMachine stores state information about in-progress and completed DKGs, including
 // computed keys. Must be instantiated using secrets database.
-// RecoverablePrivateBeaconKeyStateMachine is a specific module that allows to overwrite the beacon private key for a given epoch.
-// This module is used *ONLY* in the epoch recovery process and only by the consensus participants.
 // Each consensus participant takes part in the DKG, and after successfully finishing the DKG protocol it obtains a
 // random beacon private key, which is stored in the database along with DKG current state [flow.DKGStateCompleted].
 // If for any reason the DKG fails, then the private key will be nil and DKG current state will be [flow.DKGStateFailure].
@@ -78,7 +76,7 @@ func NewRecoverableRandomBeaconStateMachine(collector module.CacheMetrics, db *b
 // InsertMyBeaconPrivateKey stores the random beacon private key for an epoch.
 //
 // CAUTION: these keys are stored before they are validated against the
-// canonical key vector and may not be valid for use in signing. Use SafeBeaconKeys
+// canonical key vector and may not be valid for use in signing. Use storage.SafeBeaconKeys interface
 // to guarantee only keys safe for signing are returned.
 // Error returns:
 //   - [storage.ErrAlreadyExists] - if there is already a key stored for given epoch.
@@ -100,7 +98,7 @@ func (ds *RecoverablePrivateBeaconKeyStateMachine) InsertMyBeaconPrivateKey(epoc
 // UnsafeRetrieveMyBeaconPrivateKey retrieves the random beacon private key for an epoch.
 //
 // CAUTION: these keys are stored before they are validated against the
-// canonical key vector and may not be valid for use in signing. Use SafeBeaconKeys
+// canonical key vector and may not be valid for use in signing. Use storage.SafeBeaconKeys interface
 // to guarantee only keys safe for signing are returned
 // Error returns:
 //   - [storage.ErrNotFound] - if there is no key stored for given epoch.
@@ -239,6 +237,7 @@ func (ds *RecoverablePrivateBeaconKeyStateMachine) UpsertMyBeaconPrivateKey(epoc
 	if err != nil {
 		return fmt.Errorf("could not overwrite beacon key for epoch %d: %w", epochCounter, err)
 	}
+	// manually add the key to cache (next line does not touch database)
 	ds.keyCache.Insert(epochCounter, encodableKey)
 	return nil
 }

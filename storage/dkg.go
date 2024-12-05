@@ -24,7 +24,7 @@ type SafeBeaconKeys interface {
 	RetrieveMyBeaconPrivateKey(epochCounter uint64) (key crypto.PrivateKey, safe bool, err error)
 }
 
-// DKGStateReader is a ready-only interface for reading state of the Random Beacon Recoverable State Machine.
+// DKGStateReader is a read-only interface for reading state of the Random Beacon Recoverable State Machine.
 type DKGStateReader interface {
 	SafeBeaconKeys
 
