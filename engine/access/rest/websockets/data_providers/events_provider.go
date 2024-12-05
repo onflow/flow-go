@@ -8,8 +8,6 @@ import (
 	"strings"
 
 	"github.com/rs/zerolog"
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 
 	"github.com/onflow/flow-go/engine/access/rest/common/parser"
 	"github.com/onflow/flow-go/engine/access/rest/http/request"
@@ -81,10 +79,10 @@ func NewEventsDataProvider(
 //
 // No errors are expected during normal operations.
 func (p *EventsDataProvider) Run() error {
-	return subscription.HandleSubscription(p.subscription, p.handleResponse(p.send))
+	return subscription.HandleSubscription(p.subscription, p.handleResponse())
 }
 
-func (p *EventsDataProvider) handleResponse(send chan<- interface{}) func(eventsResponse *backend.EventsResponse) error {
+func (p *EventsDataProvider) handleResponse() func(eventsResponse *backend.EventsResponse) error {
 	blocksSinceLastMessage := uint64(0)
 	messageIndex := counters.NewMonotonousCounter(1)
 
@@ -101,10 +99,10 @@ func (p *EventsDataProvider) handleResponse(send chan<- interface{}) func(events
 
 		index := messageIndex.Value()
 		if ok := messageIndex.Set(messageIndex.Value() + 1); !ok {
-			return status.Errorf(codes.Internal, "message index already incremented to %d", messageIndex.Value())
+			return fmt.Errorf("message index already incremented to: %d", messageIndex.Value())
 		}
 
-		send <- &models.EventResponse{
+		p.send <- &models.EventResponse{
 			BlockId:        eventsResponse.BlockID.String(),
 			BlockHeight:    strconv.FormatUint(eventsResponse.Height, 10),
 			BlockTimestamp: eventsResponse.BlockTimestamp,
@@ -167,7 +165,6 @@ func ParseEventsArguments(
 	}
 
 	var eventTypes parser.EventTypes
-	// Parse 'event_types' as []string{}
 	if eventTypesIn, ok := arguments["event_types"]; ok && eventTypesIn != "" {
 		err := json.Unmarshal([]byte(eventTypesIn), &eventTypes) // Expect a JSON array
 		if err != nil {

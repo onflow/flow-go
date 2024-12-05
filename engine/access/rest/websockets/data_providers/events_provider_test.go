@@ -262,7 +262,8 @@ func (s *EventsProviderSuite) TestEventsDataProvider_InvalidArguments() {
 				send,
 				s.chain,
 				state_stream.DefaultEventFilterConfig,
-				subscription.DefaultHeartbeatInterval)
+				subscription.DefaultHeartbeatInterval,
+			)
 			s.Require().Nil(provider)
 			s.Require().Error(err)
 			s.Require().Contains(err.Error(), test.expectedErrorMsg)

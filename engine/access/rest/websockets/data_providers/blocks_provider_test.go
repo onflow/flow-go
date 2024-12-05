@@ -75,7 +75,8 @@ func (s *BlocksProviderSuite) SetupTest() {
 	}
 	s.finalizedBlock = parent
 
-	s.factory = NewDataProviderFactory(s.log,
+	s.factory = NewDataProviderFactory(
+		s.log,
 		nil,
 		s.api,
 		flow.Testnet.Chain(),
