@@ -242,8 +242,7 @@ func (s *ControllerSuite) TestKeepaliveContextCancel() {
 
 	// Start the keepalive process with the context canceled
 	err := controller.keepalive(ctx)
-	s.Require().Error(err)
-	s.Require().ErrorIs(context.Canceled, err)
+	s.Require().NoError(err)
 
 	// Assert expectations
 	s.connection.AssertExpectations(s.T()) // Should not invoke WriteMessage after context cancellation

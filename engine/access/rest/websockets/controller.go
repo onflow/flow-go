@@ -122,7 +122,7 @@ func (c *Controller) writeMessagesToClient(ctx context.Context) error {
 	for {
 		select {
 		case <-ctx.Done():
-			return ctx.Err()
+			return nil
 		case msg, ok := <-c.communicationChannel:
 			if !ok {
 				err := fmt.Errorf("communication channel closed, no error occurred")
@@ -155,7 +155,7 @@ func (c *Controller) readMessagesFromClient(ctx context.Context) error {
 	for {
 		select {
 		case <-ctx.Done():
-			return ctx.Err()
+			return nil
 		default:
 			msg, err := c.readMessage()
 			if err != nil {
@@ -308,7 +308,7 @@ func (c *Controller) keepalive(ctx context.Context) error {
 	for {
 		select {
 		case <-ctx.Done():
-			return ctx.Err()
+			return nil
 		case <-pingTicker.C:
 			err := c.conn.WriteControl(websocket.PingMessage, time.Now().Add(WriteWait))
 			if err != nil {
