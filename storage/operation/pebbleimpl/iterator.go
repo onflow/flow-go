@@ -15,11 +15,16 @@ type pebbleIterator struct {
 var _ storage.Iterator = (*pebbleIterator)(nil)
 
 func newPebbleIterator(reader pebble.Reader, startPrefix, endPrefix []byte, ops storage.IteratorOption) (*pebbleIterator, error) {
-	lowerBound, upperBound := storage.StartEndPrefixToLowerUpperBound(startPrefix, endPrefix)
+	lowerBound, upperBound, hasUpperBound := storage.StartEndPrefixToLowerUpperBound(startPrefix, endPrefix)
 
 	options := pebble.IterOptions{
 		LowerBound: lowerBound,
 		UpperBound: upperBound,
+	}
+
+	// setting UpperBound to nil if there is no upper bound
+	if !hasUpperBound {
+		options.UpperBound = nil
 	}
 
 	iter, err := reader.NewIter(&options)

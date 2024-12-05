@@ -106,8 +106,8 @@ func (b *ReaderBatchWriter) Delete(key []byte) error {
 func (b *ReaderBatchWriter) DeleteByRange(globalReader storage.Reader, startPrefix, endPrefix []byte) error {
 	// DeleteRange takes the prefix range with start (inclusive) and end (exclusive, note: not inclusive).
 	// therefore, we need to increment the endPrefix to make it inclusive.
-	start, end := storage.StartEndPrefixToLowerUpperBound(startPrefix, endPrefix)
-	if len(end) > 0 {
+	start, end, hasUpperBound := storage.StartEndPrefixToLowerUpperBound(startPrefix, endPrefix)
+	if hasUpperBound {
 		return b.batch.DeleteRange(start, end, pebble.Sync)
 	}
 

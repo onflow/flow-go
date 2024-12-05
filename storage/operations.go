@@ -135,12 +135,20 @@ func OnCommitSucceed(b ReaderBatchWriter, onSuccessFn func()) {
 // the lower and upper bounds are used for the key iteration.
 // The return value lowerBound specifies the smallest key to iterate and it's inclusive.
 // The return value upperBound specifies the largest key to iterate and it's exclusive (not inclusive)
+// The return value hasUpperBound specifies whether there is upperBound
 // in order to match all keys prefixed with `endPrefix`, we increment the bytes of `endPrefix` by 1,
 // for instance, to iterate keys between "hello" and "world",
 // we use "hello" as LowerBound, "worle" as UpperBound, so that "world", "world1", "worldffff...ffff"
 // will all be included.
-func StartEndPrefixToLowerUpperBound(startPrefix, endPrefix []byte) (lowerBound, upperBound []byte) {
-	return startPrefix, PrefixUpperBound(endPrefix)
+func StartEndPrefixToLowerUpperBound(startPrefix, endPrefix []byte) (lowerBound, upperBound []byte, hasUpperBound bool) {
+	// if the endPrefix is all 1s, such as []byte{0xff, 0xff, ...}, there is no upper-bound
+	// so we return the startPrefix as the lower-bound, and nil as the upper-bound, and false for hasUpperBound
+	upperBound = PrefixUpperBound(endPrefix)
+	if upperBound == nil {
+		return startPrefix, nil, false
+	}
+
+	return startPrefix, upperBound, true
 }
 
 // PrefixUpperBound returns a key K such that all possible keys beginning with the input prefix
@@ -148,6 +156,8 @@ func StartEndPrefixToLowerUpperBound(startPrefix, endPrefix []byte) (lowerBound,
 // This is used to define an upper bound for iteration, when we want to iterate over
 // all keys beginning with a given prefix.
 // referred to https://pkg.go.dev/github.com/cockroachdb/pebble#example-Iterator-PrefixIteration
+// when the prefix is all 1s, such as []byte{0xff}, or []byte(0xff, 0xff} etc, there is no upper-bound
+// It returns nil in this case.
 func PrefixUpperBound(prefix []byte) []byte {
 	end := make([]byte, len(prefix))
 	copy(end, prefix)

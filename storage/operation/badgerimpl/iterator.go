@@ -9,9 +9,10 @@ import (
 )
 
 type badgerIterator struct {
-	iter       *badger.Iterator
-	lowerBound []byte
-	upperBound []byte
+	iter          *badger.Iterator
+	lowerBound    []byte
+	upperBound    []byte
+	hasUpperBound bool // whether there's an upper bound
 }
 
 var _ storage.Iterator = (*badgerIterator)(nil)
@@ -25,12 +26,13 @@ func newBadgerIterator(db *badger.DB, startPrefix, endPrefix []byte, ops storage
 	tx := db.NewTransaction(false)
 	iter := tx.NewIterator(options)
 
-	lowerBound, upperBound := storage.StartEndPrefixToLowerUpperBound(startPrefix, endPrefix)
+	lowerBound, upperBound, hasUpperBound := storage.StartEndPrefixToLowerUpperBound(startPrefix, endPrefix)
 
 	return &badgerIterator{
-		iter:       iter,
-		lowerBound: lowerBound,
-		upperBound: upperBound,
+		iter:          iter,
+		lowerBound:    lowerBound,
+		upperBound:    upperBound,
+		hasUpperBound: hasUpperBound,
 	}
 }
 
@@ -54,7 +56,7 @@ func (i *badgerIterator) Valid() bool {
 	}
 
 	// if upper bound is nil, then there's no upper bound, so it's always valid
-	if i.upperBound == nil {
+	if !i.hasUpperBound {
 		return true
 	}
 
