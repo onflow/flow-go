@@ -6,15 +6,19 @@ import (
 	"testing"
 
 	"github.com/onflow/cadence"
+	"github.com/onflow/cadence/common"
 	"github.com/onflow/cadence/encoding/ccf"
 	jsoncdc "github.com/onflow/cadence/encoding/json"
 	"github.com/onflow/cadence/format"
+	"github.com/onflow/cadence/runtime"
 	"github.com/onflow/cadence/stdlib"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/engine/execution/testutil"
 	"github.com/onflow/flow-go/fvm"
+	"github.com/onflow/flow-go/fvm/accountV2Migration"
+	reusableRuntime "github.com/onflow/flow-go/fvm/runtime"
 	"github.com/onflow/flow-go/fvm/storage/snapshot"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -1776,6 +1780,43 @@ func TestAccountV2Migration_getAccountStorageFormat(t *testing.T) {
 				`
                     import AccountV2Migration from %[1]s
 
+                    access(all) fun main() {
+                        let storageFormat = AccountV2Migration.getAccountStorageFormat(address: %[1]s)
+                        assert(storageFormat == AccountV2Migration.StorageFormat.V1)
+                    }
+                `,
+				serviceAddress.HexWithPrefix(),
+			)))
+
+			_, output, err := vm.Run(ctx, script, snapshotTree)
+			require.NoError(t, err)
+			require.NoError(t, output.Err)
+		}),
+	)
+}
+
+func TestAccountV2Migration_migrate(t *testing.T) {
+
+	t.Run(
+		"service account",
+		newVMTest().withContextOptions(
+			fvm.WithAuthorizationChecksEnabled(false),
+			fvm.WithSequenceNumberCheckAndIncrementEnabled(false),
+		).run(func(
+			t *testing.T,
+			vm fvm.VM,
+			chain flow.Chain,
+			ctx fvm.Context,
+			snapshotTree snapshot.SnapshotTree,
+		) {
+			serviceAddress := chain.ServiceAddress()
+
+			// Ensure the account is in V1 format after bootstrapping
+
+			script := fvm.Script([]byte(fmt.Sprintf(
+				`
+                    import AccountV2Migration from %[1]s
+
 					access(all) fun main() {
 						let storageFormat = AccountV2Migration.getAccountStorageFormat(address: %[1]s)
 						assert(storageFormat == AccountV2Migration.StorageFormat.V1)
@@ -1785,6 +1826,88 @@ func TestAccountV2Migration_getAccountStorageFormat(t *testing.T) {
 			)))
 
 			_, output, err := vm.Run(ctx, script, snapshotTree)
+			require.NoError(t, err)
+			require.NoError(t, output.Err)
+
+			// Enable the storage format V2 feature for all subsequent transactions and scripts
+
+			ctx = fvm.NewContextFromParent(
+				ctx,
+				fvm.WithReusableCadenceRuntimePool(
+					reusableRuntime.NewReusableCadenceRuntimePool(
+						1,
+						runtime.Config{
+							StorageFormatV2Enabled: true,
+						},
+					),
+				),
+			)
+
+			// Enable the account V2 migration and migrate the first batch
+
+			serviceAddressIndex, err := chain.IndexFromAddress(serviceAddress)
+			require.NoError(t, err)
+
+			batchSize := serviceAddressIndex + 1
+
+			tx := fvm.Transaction(
+				flow.NewTransactionBody().
+					SetScript([]byte(fmt.Sprintf(
+						`
+                            import AccountV2Migration from %[1]s
+
+                            transaction {
+                                prepare(signer: auth(Storage) &Account) {
+                                    let admin = signer.storage
+                                        .borrow<&AccountV2Migration.Admin>(
+                                            from: AccountV2Migration.adminStoragePath
+                                        )
+                                        ?? panic("missing account V2 migration admin resource")
+                                    admin.setEnabled(true)
+                                    admin.setBatchSize(%[2]d)
+                                    admin.migrateNextBatch()
+                                }
+                            }
+                        `,
+						serviceAddress.HexWithPrefix(),
+						batchSize,
+					))).
+					AddAuthorizer(chain.ServiceAddress()),
+				0,
+			)
+			executionSnapshot, output, err := vm.Run(ctx, tx, snapshotTree)
+			require.NoError(t, err)
+			require.NoError(t, output.Err)
+
+			require.Len(t, output.Events, 1)
+
+			event := output.Events[0]
+
+			accountV2MigrationLocation := common.AddressLocation{
+				Address: common.Address(serviceAddress),
+				Name:    accountV2Migration.ContractName,
+			}
+			expectedEventTypeID := accountV2MigrationLocation.
+				TypeID(nil, accountV2Migration.MigratedEventTypeQualifiedIdentifier)
+			assert.Equal(t, flow.EventType(expectedEventTypeID), event.Type)
+
+			snapshotTree = snapshotTree.Append(executionSnapshot)
+
+			// Ensure the account is in V2 format after the migration
+
+			script = fvm.Script([]byte(fmt.Sprintf(
+				`
+                    import AccountV2Migration from %[1]s
+
+					access(all) fun main() {
+						let storageFormat = AccountV2Migration.getAccountStorageFormat(address: %[1]s)
+						assert(storageFormat == AccountV2Migration.StorageFormat.V2)
+					}
+				`,
+				serviceAddress.HexWithPrefix(),
+			)))
+
+			_, output, err = vm.Run(ctx, script, snapshotTree)
 			require.NoError(t, err)
 			require.NoError(t, output.Err)
 		}),

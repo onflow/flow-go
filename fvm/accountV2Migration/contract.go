@@ -220,3 +220,5 @@ func declareGetAccountStorageFormatFunction(environment runtime.Environment, cha
 		accountV2MigrationLocation,
 	)
 }
+
+const MigratedEventTypeQualifiedIdentifier = ContractName + ".Migrated"
