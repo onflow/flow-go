@@ -47,10 +47,19 @@ func (f *combinedVoteProcessorFactoryBaseV3) Create(log zerolog.Logger, block *m
 	// message that has to be verified against aggregated signature
 	msg := verification.MakeVoteMessage(block.View, block.BlockID)
 
+	dkg, err := f.committee.DKG(block.View)
+	if err != nil {
+		return nil, fmt.Errorf("could not get DKG info at block %v: %w", block.BlockID, err)
+	}
+
 	// prepare the staking public keys of participants
 	stakingKeys := make([]crypto.PublicKey, 0, len(allParticipants))
+	beaconKeys := make([]crypto.PublicKey, 0, len(allParticipants))
 	for _, participant := range allParticipants {
 		stakingKeys = append(stakingKeys, participant.StakingPubKey)
+		if pk, err := dkg.KeyShare(participant.NodeID); err == nil {
+			beaconKeys = append(beaconKeys, pk)
+		}
 	}
 
 	stakingSigAggtor, err := signature.NewWeightedSignatureAggregator(allParticipants, stakingKeys, msg, msig.ConsensusVoteTag)
@@ -58,28 +67,13 @@ func (f *combinedVoteProcessorFactoryBaseV3) Create(log zerolog.Logger, block *m
 		return nil, fmt.Errorf("could not create aggregator for staking signatures: %w", err)
 	}
 
-	dkg, err := f.committee.DKG(block.View)
+	beaconAggregator, err := signature.NewWeightedSignatureAggregator(allParticipants, beaconKeys, msg, msig.RandomBeaconTag)
 	if err != nil {
-		return nil, fmt.Errorf("could not get DKG info at block %v: %w", block.BlockID, err)
-	}
-
-	// prepare the random beacon public keys of participants
-	beaconKeys := make([]crypto.PublicKey, 0, len(allParticipants))
-	for _, participant := range allParticipants {
-		pk, err := dkg.KeyShare(participant.NodeID)
-		if err != nil {
-			return nil, fmt.Errorf("could not get random beacon key share for %x: %w", participant.NodeID, err)
-		}
-		beaconKeys = append(beaconKeys, pk)
-	}
-
-	rbSigAggtor, err := signature.NewWeightedSignatureAggregator(allParticipants, beaconKeys, msg, msig.RandomBeaconTag)
-	if err != nil {
-		return nil, fmt.Errorf("could not create aggregator for thershold signatures: %w", err)
+		return nil, fmt.Errorf("could not create aggregator for threshold signatures: %w", err)
 	}
 
 	threshold := msig.RandomBeaconThreshold(int(dkg.Size()))
-	randomBeaconInspector, err := signature.NewRandomBeaconInspector(dkg.GroupKey(), beaconKeys, threshold, msg)
+	randomBeaconInspector, err := signature.NewRandomBeaconInspector(dkg.GroupKey(), dkg.KeyShares(), threshold, msg)
 	if err != nil {
 		return nil, fmt.Errorf("could not create random beacon inspector: %w", err)
 	}
@@ -94,7 +88,7 @@ func (f *combinedVoteProcessorFactoryBaseV3) Create(log zerolog.Logger, block *m
 		log:               log.With().Hex("block_id", block.BlockID[:]).Logger(),
 		block:             block,
 		stakingSigAggtor:  stakingSigAggtor,
-		rbSigAggtor:       rbSigAggtor,
+		rbSigAggtor:       beaconAggregator,
 		rbRector:          rbRector,
 		onQCCreated:       f.onQCCreated,
 		packer:            f.packer,

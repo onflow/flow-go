@@ -48,12 +48,17 @@ type BaseSuite struct {
 	RequiredSealApprovals uint // defaults to 0 (no approvals required)
 	// Consensus Node proposal duration
 	ConsensusProposalDuration time.Duration
+	// NumOfConsensusNodes is the number of consensus nodes in the network
+	NumOfConsensusNodes uint
 }
 
 // SetupTest is run automatically by the testing framework before each test case.
 func (s *BaseSuite) SetupTest() {
 	if s.ConsensusProposalDuration == 0 {
 		s.ConsensusProposalDuration = time.Millisecond * 250
+	}
+	if s.NumOfConsensusNodes == 0 {
+		s.NumOfConsensusNodes = 2
 	}
 
 	minEpochLength := s.StakingAuctionLen + s.DKGPhaseLen*3 + 20
@@ -95,12 +100,14 @@ func (s *BaseSuite) SetupTest() {
 		testnet.NewNodeConfig(flow.RoleAccess, accessConfig...),
 		testnet.NewNodeConfig(flow.RoleAccess, testnet.WithLogLevel(zerolog.WarnLevel)),
 		testnet.NewNodeConfig(flow.RoleCollection, collectionConfigs...),
-		testnet.NewNodeConfig(flow.RoleConsensus, consensusConfigs...),
-		testnet.NewNodeConfig(flow.RoleConsensus, consensusConfigs...),
 		testnet.NewNodeConfig(flow.RoleExecution, testnet.WithLogLevel(zerolog.WarnLevel), testnet.WithAdditionalFlag("--extensive-logging=true")),
 		testnet.NewNodeConfig(flow.RoleExecution, testnet.WithLogLevel(zerolog.WarnLevel)),
 		testnet.NewNodeConfig(flow.RoleVerification, testnet.WithLogLevel(zerolog.WarnLevel)),
 		ghostNode,
+	}
+
+	for i := uint(0); i < s.NumOfConsensusNodes; i++ {
+		confs = append(confs, testnet.NewNodeConfig(flow.RoleConsensus, consensusConfigs...))
 	}
 
 	netConf := testnet.NewNetworkConfigWithEpochConfig("epochs-tests", confs, s.StakingAuctionLen, s.DKGPhaseLen, s.EpochLen, s.FinalizationSafetyThreshold)

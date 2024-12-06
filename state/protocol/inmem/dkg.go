@@ -44,6 +44,11 @@ func (d *DKG) KeyShare(nodeID flow.Identifier) (crypto.PublicKey, error) {
 	return d.DKGParticipantKeys[index], nil
 }
 
+// KeyShares returns all public key shares that are result of the distributed key generation.
+func (d *DKG) KeyShares() []crypto.PublicKey {
+	return d.DKGParticipantKeys
+}
+
 // NodeID returns the node identifier for the given index.
 // An exception is returned if the index is ≥ Size().
 // Intended for use outside the hotpath, with runtime
