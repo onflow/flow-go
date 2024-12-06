@@ -65,7 +65,6 @@ func TestFinalizer(t *testing.T) {
 			defer cleanup()
 
 			pusher := collectionmock.NewGuaranteedCollectionPublisher(t)
-			pusher.On("SubmitCollectionGuarantee", mock.Anything)
 			finalizer := collection.NewFinalizer(db, pool, pusher, metrics)
 
 			fakeBlockID := unittest.IdentifierFixture()
@@ -78,7 +77,7 @@ func TestFinalizer(t *testing.T) {
 			defer cleanup()
 
 			pusher := collectionmock.NewGuaranteedCollectionPublisher(t)
-			pusher.On("SubmitCollectionGuarantee", mock.Anything)
+			pusher.On("SubmitCollectionGuarantee", mock.Anything).Once()
 			finalizer := collection.NewFinalizer(db, pool, pusher, metrics)
 
 			// tx1 is included in the finalized block
@@ -104,7 +103,6 @@ func TestFinalizer(t *testing.T) {
 			defer cleanup()
 
 			pusher := collectionmock.NewGuaranteedCollectionPublisher(t)
-			pusher.On("SubmitCollectionGuarantee", mock.Anything)
 			finalizer := collection.NewFinalizer(db, pool, pusher, metrics)
 
 			// create a new block that isn't connected to a parent
