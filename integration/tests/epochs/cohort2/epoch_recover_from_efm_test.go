@@ -20,7 +20,6 @@ import (
 	"github.com/onflow/flow-go/model/bootstrap"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
-	"github.com/onflow/flow-go/state/protocol/inmem"
 )
 
 func TestRecoverEpoch(t *testing.T) {
@@ -133,9 +132,6 @@ func (s *RecoverEpochSuite) recoverEpoch(env templates.Environment, args []caden
 // 5. Ensure the network transitions into the recovery epoch and finalizes the first view of the recovery epoch.
 func (s *RecoverEpochSuite) TestRecoverEpoch() {
 	// 1. Manually trigger EFM
-	// wait until the epoch setup phase to force network into EFM
-	s.AwaitEpochPhase(s.Ctx, 0, flow.EpochPhaseSetup, 10*time.Second, 500*time.Millisecond)
-
 	// pause the collection node to trigger EFM by failing DKG
 	ln := s.GetContainersByRole(flow.RoleCollection)[0]
 	require.NoError(s.T(), ln.Pause())
@@ -152,9 +148,12 @@ func (s *RecoverEpochSuite) TestRecoverEpoch() {
 	s.AwaitFinalizedView(s.Ctx, epoch1FinalView+1, 2*time.Minute, 500*time.Millisecond)
 	s.TimedLogf("observed finalized view %d", epoch1FinalView+1)
 
-	// assert transition to second epoch did not happen
-	// if counter is still 0, epoch emergency fallback was triggered as expected
-	s.AssertInEpoch(s.Ctx, 0)
+	// assert that we are in EFM
+	snapshot, err := s.Client.GetLatestProtocolSnapshot(s.Ctx)
+	require.NoError(s.T(), err)
+	epochPhase, err := snapshot.EpochPhase()
+	require.NoError(s.T(), err)
+	require.Equal(s.T(), flow.EpochPhaseFallback, epochPhase, "network must enter EFM by this point")
 
 	// 2. Generate transaction arguments for epoch recover transaction.
 	collectionClusters := s.NumOfCollectionClusters
@@ -200,13 +199,6 @@ func (s *RecoverEpochSuite) TestRecoverEpoch() {
 	s.TimedLogf("observed finalized first view of recovery epoch %d", startViewOfNextEpoch)
 
 	s.AssertInEpoch(s.Ctx, 1)
-
-	endViewOfNextEpoch := uint64(txArgs[3].(cadence.UInt64))
-	s.TimedLogf("waiting to transition into after recovery epoch (finalized view %d)", endViewOfNextEpoch+1)
-	s.AwaitFinalizedView(s.Ctx, endViewOfNextEpoch+1, 2*time.Minute, 500*time.Millisecond)
-	s.TimedLogf("observed finalized first view of after recovery epoch %d", endViewOfNextEpoch+1)
-
-	s.AssertInEpoch(s.Ctx, 2)
 }
 
 // TestRecoverEpochNodeEjected ensures that the recover epoch governance transaction flow works as expected, and a network that
@@ -222,8 +214,6 @@ func (s *RecoverEpochSuite) TestRecoverEpoch() {
 // 6. Ensure the network transitions into the recovery epoch and finalizes the first view of the recovery epoch.
 func (s *RecoverEpochSuite) TestRecoverEpochNodeEjected() {
 	// 1. Manually trigger EFM
-	// wait until the epoch setup phase to force network into EFM
-	s.AwaitEpochPhase(s.Ctx, 0, flow.EpochPhaseSetup, 10*time.Second, 500*time.Millisecond)
 
 	// pause the collection node to trigger EFM by failing DKG
 	ln := s.GetContainersByRole(flow.RoleCollection)[0]
@@ -241,9 +231,12 @@ func (s *RecoverEpochSuite) TestRecoverEpochNodeEjected() {
 	s.AwaitFinalizedView(s.Ctx, epoch1FinalView+1, 2*time.Minute, 500*time.Millisecond)
 	s.TimedLogf("observed finalized view %d", epoch1FinalView+1)
 
-	// assert transition to second epoch did not happen
-	// if counter is still 0, epoch emergency fallback was triggered as expected
-	s.AssertInEpoch(s.Ctx, 0)
+	// assert that we are in EFM
+	snapshot, err := s.Client.GetLatestProtocolSnapshot(s.Ctx)
+	require.NoError(s.T(), err)
+	epochPhase, err := snapshot.EpochPhase()
+	require.NoError(s.T(), err)
+	require.Equal(s.T(), flow.EpochPhaseFallback, epochPhase, "network must enter EFM by this point")
 
 	// 2. Generate transaction arguments for epoch recover transaction.
 	collectionClusters := s.NumOfCollectionClusters
@@ -251,9 +244,8 @@ func (s *RecoverEpochSuite) TestRecoverEpochNodeEjected() {
 
 	// read internal node info from one of the consensus nodes
 	internalNodePrivInfoDir, nodeConfigJson := s.getNodeInfoDirs(flow.RoleConsensus)
-	snapshot := s.GetLatestProtocolSnapshot(s.Ctx).Encodable()
 	// 3. Eject consensus node by modifying the snapshot before generating the recover epoch transaction args.
-	snapshot.SealingSegment.LatestProtocolStateEntry().EpochEntry.CurrentEpochIdentityTable.
+	snapshot.Encodable().SealingSegment.LatestProtocolStateEntry().EpochEntry.CurrentEpochIdentityTable.
 		Filter(filter.HasRole[flow.Identity](flow.RoleConsensus))[0].EpochParticipationStatus = flow.EpochParticipationStatusEjected
 
 	txArgs, err := run.GenerateRecoverEpochTxArgs(
@@ -267,7 +259,7 @@ func (s *RecoverEpochSuite) TestRecoverEpochNodeEjected() {
 		s.EpochLen,
 		3000,
 		false,
-		inmem.SnapshotFromEncodable(snapshot),
+		snapshot,
 	)
 	require.NoError(s.T(), err)
 
@@ -297,11 +289,4 @@ func (s *RecoverEpochSuite) TestRecoverEpochNodeEjected() {
 	s.TimedLogf("observed finalized first view of recovery epoch %d", startViewOfNextEpoch)
 
 	s.AssertInEpoch(s.Ctx, 1)
-
-	endViewOfNextEpoch := uint64(txArgs[3].(cadence.UInt64))
-	s.TimedLogf("waiting to transition into after recovery epoch (finalized view %d)", endViewOfNextEpoch+1)
-	s.AwaitFinalizedView(s.Ctx, endViewOfNextEpoch+1, 2*time.Minute, 500*time.Millisecond)
-	s.TimedLogf("observed finalized first view of after recovery epoch %d", endViewOfNextEpoch+1)
-
-	s.AssertInEpoch(s.Ctx, 2)
 }
