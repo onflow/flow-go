@@ -21,7 +21,7 @@ import (
 type Finalizer struct {
 	db           *badger.DB
 	transactions mempool.Transactions
-	prov         collection.GuaranteedCollectionPublisher
+	pusher       collection.GuaranteedCollectionPublisher
 	metrics      module.CollectionMetrics
 }
 
@@ -29,13 +29,13 @@ type Finalizer struct {
 func NewFinalizer(
 	db *badger.DB,
 	transactions mempool.Transactions,
-	prov collection.GuaranteedCollectionPublisher,
+	pusher collection.GuaranteedCollectionPublisher,
 	metrics module.CollectionMetrics,
 ) *Finalizer {
 	f := &Finalizer{
 		db:           db,
 		transactions: transactions,
-		prov:         prov,
+		pusher:       pusher,
 		metrics:      metrics,
 	}
 	return f
@@ -159,7 +159,7 @@ func (f *Finalizer) MakeFinal(blockID flow.Identifier) error {
 			// collection.
 
 			// TODO add real signatures here (2711)
-			f.prov.SubmitCollectionGuarantee(&flow.CollectionGuarantee{
+			f.pusher.SubmitCollectionGuarantee(&flow.CollectionGuarantee{
 				CollectionID:     payload.Collection.ID(),
 				ReferenceBlockID: payload.ReferenceBlockID,
 				ChainID:          header.ChainID,

@@ -64,9 +64,9 @@ func TestFinalizer(t *testing.T) {
 			bootstrap()
 			defer cleanup()
 
-			prov := collectionmock.NewGuaranteedCollectionPublisher(t)
-			prov.On("SubmitCollectionGuarantee", mock.Anything)
-			finalizer := collection.NewFinalizer(db, pool, prov, metrics)
+			pusher := collectionmock.NewGuaranteedCollectionPublisher(t)
+			pusher.On("SubmitCollectionGuarantee", mock.Anything)
+			finalizer := collection.NewFinalizer(db, pool, pusher, metrics)
 
 			fakeBlockID := unittest.IdentifierFixture()
 			err := finalizer.MakeFinal(fakeBlockID)
@@ -77,9 +77,9 @@ func TestFinalizer(t *testing.T) {
 			bootstrap()
 			defer cleanup()
 
-			prov := collectionmock.NewGuaranteedCollectionPublisher(t)
-			prov.On("SubmitCollectionGuarantee", mock.Anything)
-			finalizer := collection.NewFinalizer(db, pool, prov, metrics)
+			pusher := collectionmock.NewGuaranteedCollectionPublisher(t)
+			pusher.On("SubmitCollectionGuarantee", mock.Anything)
+			finalizer := collection.NewFinalizer(db, pool, pusher, metrics)
 
 			// tx1 is included in the finalized block
 			tx1 := unittest.TransactionBodyFixture(func(tx *flow.TransactionBody) { tx.ProposalKey.SequenceNumber = 1 })
@@ -103,9 +103,9 @@ func TestFinalizer(t *testing.T) {
 			bootstrap()
 			defer cleanup()
 
-			prov := collectionmock.NewGuaranteedCollectionPublisher(t)
-			prov.On("SubmitCollectionGuarantee", mock.Anything)
-			finalizer := collection.NewFinalizer(db, pool, prov, metrics)
+			pusher := collectionmock.NewGuaranteedCollectionPublisher(t)
+			pusher.On("SubmitCollectionGuarantee", mock.Anything)
+			finalizer := collection.NewFinalizer(db, pool, pusher, metrics)
 
 			// create a new block that isn't connected to a parent
 			block := unittest.ClusterBlockWithParent(genesis)
@@ -122,8 +122,8 @@ func TestFinalizer(t *testing.T) {
 			bootstrap()
 			defer cleanup()
 
-			prov := collectionmock.NewGuaranteedCollectionPublisher(t)
-			finalizer := collection.NewFinalizer(db, pool, prov, metrics)
+			pusher := collectionmock.NewGuaranteedCollectionPublisher(t)
+			finalizer := collection.NewFinalizer(db, pool, pusher, metrics)
 
 			// create a block with empty payload on genesis
 			block := unittest.ClusterBlockWithParent(genesis)
@@ -140,15 +140,15 @@ func TestFinalizer(t *testing.T) {
 			assert.Equal(t, block.ID(), final.ID())
 
 			// collection should not have been propagated
-			prov.AssertNotCalled(t, "SubmitCollectionGuarantee", mock.Anything)
+			pusher.AssertNotCalled(t, "SubmitCollectionGuarantee", mock.Anything)
 		})
 
 		t.Run("finalize single block", func(t *testing.T) {
 			bootstrap()
 			defer cleanup()
 
-			prov := collectionmock.NewGuaranteedCollectionPublisher(t)
-			finalizer := collection.NewFinalizer(db, pool, prov, metrics)
+			pusher := collectionmock.NewGuaranteedCollectionPublisher(t)
+			finalizer := collection.NewFinalizer(db, pool, pusher, metrics)
 
 			// tx1 is included in the finalized block and mempool
 			tx1 := unittest.TransactionBodyFixture(func(tx *flow.TransactionBody) { tx.ProposalKey.SequenceNumber = 1 })
@@ -162,8 +162,8 @@ func TestFinalizer(t *testing.T) {
 			block.SetPayload(model.PayloadFromTransactions(refBlock.ID(), &tx1))
 			insert(block)
 
-			// block should be passed to provider
-			prov.On("SubmitCollectionGuarantee", &flow.CollectionGuarantee{
+			// block should be passed to pusher
+			pusher.On("SubmitCollectionGuarantee", &flow.CollectionGuarantee{
 				CollectionID:     block.Payload.Collection.ID(),
 				ReferenceBlockID: refBlock.ID(),
 				ChainID:          block.Header.ChainID,
@@ -192,8 +192,8 @@ func TestFinalizer(t *testing.T) {
 			bootstrap()
 			defer cleanup()
 
-			prov := collectionmock.NewGuaranteedCollectionPublisher(t)
-			finalizer := collection.NewFinalizer(db, pool, prov, metrics)
+			pusher := collectionmock.NewGuaranteedCollectionPublisher(t)
+			finalizer := collection.NewFinalizer(db, pool, pusher, metrics)
 
 			// tx1 is included in the first finalized block and mempool
 			tx1 := unittest.TransactionBodyFixture(func(tx *flow.TransactionBody) { tx.ProposalKey.SequenceNumber = 1 })
@@ -212,15 +212,15 @@ func TestFinalizer(t *testing.T) {
 			block2.SetPayload(model.PayloadFromTransactions(refBlock.ID(), &tx2))
 			insert(block2)
 
-			// both blocks should be passed to provider
-			prov.On("SubmitCollectionGuarantee", &flow.CollectionGuarantee{
+			// both blocks should be passed to pusher
+			pusher.On("SubmitCollectionGuarantee", &flow.CollectionGuarantee{
 				CollectionID:     block1.Payload.Collection.ID(),
 				ReferenceBlockID: refBlock.ID(),
 				ChainID:          block1.Header.ChainID,
 				SignerIndices:    block1.Header.ParentVoterIndices,
 				Signature:        nil,
 			}).Once()
-			prov.On("SubmitCollectionGuarantee", &flow.CollectionGuarantee{
+			pusher.On("SubmitCollectionGuarantee", &flow.CollectionGuarantee{
 				CollectionID:     block2.Payload.Collection.ID(),
 				ReferenceBlockID: refBlock.ID(),
 				ChainID:          block2.Header.ChainID,
@@ -247,8 +247,8 @@ func TestFinalizer(t *testing.T) {
 			bootstrap()
 			defer cleanup()
 
-			prov := collectionmock.NewGuaranteedCollectionPublisher(t)
-			finalizer := collection.NewFinalizer(db, pool, prov, metrics)
+			pusher := collectionmock.NewGuaranteedCollectionPublisher(t)
+			finalizer := collection.NewFinalizer(db, pool, pusher, metrics)
 
 			// tx1 is included in the finalized parent block and mempool
 			tx1 := unittest.TransactionBodyFixture(func(tx *flow.TransactionBody) { tx.ProposalKey.SequenceNumber = 1 })
@@ -267,8 +267,8 @@ func TestFinalizer(t *testing.T) {
 			block2.SetPayload(model.PayloadFromTransactions(refBlock.ID(), &tx2))
 			insert(block2)
 
-			// block should be passed to provider
-			prov.On("SubmitCollectionGuarantee", &flow.CollectionGuarantee{
+			// block should be passed to pusher
+			pusher.On("SubmitCollectionGuarantee", &flow.CollectionGuarantee{
 				CollectionID:     block1.Payload.Collection.ID(),
 				ReferenceBlockID: refBlock.ID(),
 				ChainID:          block1.Header.ChainID,
@@ -297,8 +297,8 @@ func TestFinalizer(t *testing.T) {
 			bootstrap()
 			defer cleanup()
 
-			prov := collectionmock.NewGuaranteedCollectionPublisher(t)
-			finalizer := collection.NewFinalizer(db, pool, prov, metrics)
+			pusher := collectionmock.NewGuaranteedCollectionPublisher(t)
+			finalizer := collection.NewFinalizer(db, pool, pusher, metrics)
 
 			// tx1 is included in the finalized block and mempool
 			tx1 := unittest.TransactionBodyFixture(func(tx *flow.TransactionBody) { tx.ProposalKey.SequenceNumber = 1 })
@@ -317,8 +317,8 @@ func TestFinalizer(t *testing.T) {
 			block2.SetPayload(model.PayloadFromTransactions(refBlock.ID(), &tx2))
 			insert(block2)
 
-			// block should be passed to provider
-			prov.On("SubmitCollectionGuarantee", &flow.CollectionGuarantee{
+			// block should be passed to pusher
+			pusher.On("SubmitCollectionGuarantee", &flow.CollectionGuarantee{
 				CollectionID:     block1.Payload.Collection.ID(),
 				ReferenceBlockID: refBlock.ID(),
 				ChainID:          block1.Header.ChainID,
