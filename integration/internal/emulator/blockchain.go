@@ -51,6 +51,7 @@ import (
 	"github.com/onflow/flow-go/fvm/environment"
 	fvmerrors "github.com/onflow/flow-go/fvm/errors"
 	reusableRuntime "github.com/onflow/flow-go/fvm/runtime"
+	"github.com/onflow/flow-go/fvm/systemcontracts"
 	flowgo "github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/metrics"
 )
@@ -129,7 +130,9 @@ func (b *Blockchain) ReloadBlockchain() (*Blockchain, error) {
 		fvm.WithReusableCadenceRuntimePool(
 			reusableRuntime.NewReusableCadenceRuntimePool(
 				0,
-				runtime.Config{}),
+				runtime.Config{
+					StorageFormatV2Enabled: b.conf.AccountStorageFormatV2Enabled,
+				}),
 		),
 		fvm.WithEntropyProvider(b.entropyProvider),
 		fvm.WithEVMEnabled(true),
@@ -1002,13 +1005,24 @@ func (b *Blockchain) systemChunkTransaction() (*flowgo.TransactionBody, error) {
 		},
 	)
 
+	sc := systemcontracts.SystemContractsForChain(b.conf.ChainID)
+
 	// TODO: move this to `templates.Environment` struct
 	script = strings.ReplaceAll(
 		script,
 		`import EVM from "EVM"`,
 		fmt.Sprintf(
 			"import EVM from %s",
-			serviceAddress.HexWithPrefix(),
+			sc.EVMContract.Address.HexWithPrefix(),
+		),
+	)
+
+	script = strings.ReplaceAll(
+		script,
+		`import AccountV2Migration from "AccountV2Migration"`,
+		fmt.Sprintf(
+			`import AccountV2Migration from %s`,
+			sc.AccountV2Migration.Address.HexWithPrefix(),
 		),
 	)
 
