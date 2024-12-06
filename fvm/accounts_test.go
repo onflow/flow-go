@@ -1890,6 +1890,15 @@ func TestAccountV2Migration_migrate(t *testing.T) {
 				TypeID(nil, accountV2Migration.MigratedEventTypeQualifiedIdentifier)
 			assert.Equal(t, flow.EventType(expectedEventTypeID), event.Type)
 
+			decodedEventPayload, err := ccf.Decode(nil, event.Payload)
+			require.NoError(t, err)
+
+			require.IsType(t, cadence.Event{}, decodedEventPayload)
+
+			eventFields := decodedEventPayload.(cadence.Composite).FieldsMappedByName()
+			assert.Equal(t, cadence.UInt64(1), eventFields["addressStartIndex"])
+			assert.Equal(t, cadence.UInt64(batchSize), eventFields["count"])
+
 			snapshotTree = snapshotTree.Append(executionSnapshot)
 
 			// Ensure the account is in V2 format after the migration
