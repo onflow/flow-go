@@ -77,6 +77,7 @@ type Reader interface {
 	Get(key []byte) (value []byte, closer io.Closer, err error)
 
 	// NewIter returns a new Iterator for the given key prefix range [startPrefix, endPrefix], both inclusive.
+	// We require that startPrefix ≤ endPrefix (otherwise this function errors).
 	// Specifically, all keys that meet ANY of the following conditions are included in the iteration:
 	//   - have a prefix equal to startPrefix OR
 	//   - have a prefix equal to the endPrefix OR
