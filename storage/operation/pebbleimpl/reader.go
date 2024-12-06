@@ -30,8 +30,9 @@ func (noopCloser) Close() error { return nil }
 //
 // The caller should not modify the contents of the returned slice, but it is
 // safe to modify the contents of the argument after Get returns. The
-// returned slice will remain valid until the returned Closer is closed. On
-// success, the caller MUST call closer.Close() or a memory leak will occur.
+// returned slice will remain valid until the returned Closer is closed.
+// when err == nil, the caller MUST call closer.Close() or a memory leak will occur.
+// when err != nil, then the caller io.Closer is nil, and should not be called
 func (b dbReader) Get(key []byte) ([]byte, io.Closer, error) {
 	value, closer, err := b.db.Get(key)
 

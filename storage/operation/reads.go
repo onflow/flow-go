@@ -121,26 +121,37 @@ func Traverse(prefix []byte, iterFunc IterationFunc, opt storage.IteratorOption)
 	return Iterate(prefix, prefix, iterFunc, opt)
 }
 
-// Exists returns true if a key exists in the database.
+// Exists takes a key and a pointer to an a boolean variable `keyExists` as inputs and returns an function.
+// When this returned function is executed (and only then), it will write into the `keyExists` whether
+// the key exists.
 // No errors are expected during normal operation.
 func Exists(key []byte, keyExists *bool) func(storage.Reader) error {
 	return func(r storage.Reader) error {
-		_, closer, err := r.Get(key)
+		exists, err := KeyExists(r, key)
 		if err != nil {
-			// the key does not exist in the database
-			if errors.Is(err, storage.ErrNotFound) {
-				*keyExists = false
-				return nil
-			}
-			// exception while checking for the key
-			return irrecoverable.NewExceptionf("could not load data: %w", err)
+			return err
 		}
-		defer closer.Close()
-
-		// the key does exist in the database
-		*keyExists = true
+		*keyExists = exists
 		return nil
 	}
+}
+
+// KeyExists returns true if a key exists in the database.
+// No errors are expected during normal operation.
+func KeyExists(r storage.Reader, key []byte) (bool, error) {
+	_, closer, err := r.Get(key)
+	if err != nil {
+		// the key does not exist in the database
+		if errors.Is(err, storage.ErrNotFound) {
+			return false, nil
+		}
+		// exception while checking for the key
+		return false, irrecoverable.NewExceptionf("could not load data: %w", err)
+	}
+	defer closer.Close()
+
+	// the key does exist in the database
+	return true, nil
 }
 
 // Retrieve will retrieve the binary data under the given key from the database
