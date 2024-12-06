@@ -54,11 +54,11 @@ func (f *combinedVoteProcessorFactoryBaseV3) Create(log zerolog.Logger, block *m
 
 	// prepare the staking public keys of participants
 	stakingKeys := make([]crypto.PublicKey, 0, len(allParticipants))
-	stakingBeaconKeys := make([]crypto.PublicKey, 0, len(allParticipants))
+	beaconKeys := make([]crypto.PublicKey, 0, len(allParticipants))
 	for _, participant := range allParticipants {
 		stakingKeys = append(stakingKeys, participant.StakingPubKey)
 		if pk, err := dkg.KeyShare(participant.NodeID); err == nil {
-			stakingBeaconKeys = append(stakingBeaconKeys, pk)
+			beaconKeys = append(beaconKeys, pk)
 		}
 	}
 
@@ -67,7 +67,7 @@ func (f *combinedVoteProcessorFactoryBaseV3) Create(log zerolog.Logger, block *m
 		return nil, fmt.Errorf("could not create aggregator for staking signatures: %w", err)
 	}
 
-	rbSigAggtor, err := signature.NewWeightedSignatureAggregator(allParticipants, stakingBeaconKeys, msg, msig.RandomBeaconTag)
+	beaconAggregator, err := signature.NewWeightedSignatureAggregator(allParticipants, beaconKeys, msg, msig.RandomBeaconTag)
 	if err != nil {
 		return nil, fmt.Errorf("could not create aggregator for threshold signatures: %w", err)
 	}
@@ -88,7 +88,7 @@ func (f *combinedVoteProcessorFactoryBaseV3) Create(log zerolog.Logger, block *m
 		log:               log.With().Hex("block_id", block.BlockID[:]).Logger(),
 		block:             block,
 		stakingSigAggtor:  stakingSigAggtor,
-		rbSigAggtor:       rbSigAggtor,
+		rbSigAggtor:       beaconAggregator,
 		rbRector:          rbRector,
 		onQCCreated:       f.onQCCreated,
 		packer:            f.packer,
