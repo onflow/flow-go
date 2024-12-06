@@ -74,7 +74,6 @@ type Reader interface {
 	// safe to modify the contents of the `key` argument after Get returns. The
 	// returned slice will remain valid until the returned Closer is closed.
 	// when err == nil, the caller MUST call closer.Close() or a memory leak will occur.
-	// when err != nil, then the caller io.Closer is nil, and should not be called
 	Get(key []byte) (value []byte, closer io.Closer, err error)
 
 	// NewIter returns a new Iterator for the given key prefix range [startPrefix, endPrefix], both inclusive.

@@ -30,7 +30,6 @@ func (noopCloser) Close() error { return nil }
 // safe to modify the contents of the argument after Get returns. The
 // returned slice will remain valid until the returned Closer is closed.
 // when err == nil, the caller MUST call closer.Close() or a memory leak will occur.
-// when err != nil, then the caller io.Closer is nil, and should not be called
 func (b dbReader) Get(key []byte) ([]byte, io.Closer, error) {
 	tx := b.db.NewTransaction(false)
 	defer tx.Discard()
@@ -38,14 +37,14 @@ func (b dbReader) Get(key []byte) ([]byte, io.Closer, error) {
 	item, err := tx.Get(key)
 	if err != nil {
 		if errors.Is(err, badger.ErrKeyNotFound) {
-			return nil, nil, storage.ErrNotFound
+			return nil, noopCloser{}, storage.ErrNotFound
 		}
-		return nil, nil, irrecoverable.NewExceptionf("could not load data: %w", err)
+		return nil, noopCloser{}, irrecoverable.NewExceptionf("could not load data: %w", err)
 	}
 
 	value, err := item.ValueCopy(nil)
 	if err != nil {
-		return nil, nil, irrecoverable.NewExceptionf("could not load value: %w", err)
+		return nil, noopCloser{}, irrecoverable.NewExceptionf("could not load value: %w", err)
 	}
 
 	return value, noopCloser{}, nil
