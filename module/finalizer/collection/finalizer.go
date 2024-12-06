@@ -158,7 +158,7 @@ func (f *Finalizer) MakeFinal(blockID flow.Identifier) error {
 			// For now, we just use the parent signers as the guarantors of this
 			// collection.
 
-			// TODO add real signatures here (2711)
+			// TODO add real signatures here (https://github.com/onflow/flow-go-internal/issues/4569)
 			f.pusher.SubmitCollectionGuarantee(&flow.CollectionGuarantee{
 				CollectionID:     payload.Collection.ID(),
 				ReferenceBlockID: payload.ReferenceBlockID,
