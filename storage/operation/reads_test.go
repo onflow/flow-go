@@ -53,7 +53,7 @@ func TestIterateKeysInPrefixRange(t *testing.T) {
 
 		// Forward iteration and check boundaries
 		var found [][]byte
-		require.NoError(t, operation.IterateKeysInPrefixRange(prefixStart, prefixEnd, func(key []byte) error {
+		require.NoError(t, operation.Iterate(prefixStart, prefixEnd, func(key []byte) error {
 			found = append(found, key)
 			return nil
 		})(r), "should iterate forward without error")
@@ -66,7 +66,7 @@ func TestIterateInvalidRange(t *testing.T) {
 	dbtest.RunWithStorages(t, func(t *testing.T, r storage.Reader, withWriter dbtest.WithWriter) {
 
 		var found [][]byte
-		require.Error(t, operation.IterateKeysInPrefixRange([]byte{0x02}, []byte{0x01}, func(key []byte) error {
+		require.Error(t, operation.Iterate([]byte{0x02}, []byte{0x01}, func(key []byte) error {
 			found = append(found, key)
 			return nil
 		})(r))
@@ -118,7 +118,7 @@ func TestIterationBoundary(t *testing.T) {
 
 		// Forward iteration and check boundaries
 		var found [][]byte
-		require.NoError(t, operation.IterateKeysInPrefixRange(prefixStart, prefixEnd, func(key []byte) error {
+		require.NoError(t, operation.Iterate(prefixStart, prefixEnd, func(key []byte) error {
 			found = append(found, key)
 			return nil
 		})(r), "should iterate forward without error")

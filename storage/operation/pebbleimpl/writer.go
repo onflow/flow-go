@@ -117,11 +117,11 @@ func (b *ReaderBatchWriter) DeleteByRange(globalReader storage.Reader, startPref
 		return b.batch.DeleteRange(start, end, pebble.Sync)
 	}
 
-	return operation.IterateKeysInPrefixRange(startPrefix, endPrefix, func(key []byte) error {
+	return operation.IterateKeysByPrefixRange(globalReader, startPrefix, endPrefix, func(key []byte) error {
 		err := b.batch.Delete(key, pebble.Sync)
 		if err != nil {
 			return fmt.Errorf("could not add key to delete batch (%v): %w", key, err)
 		}
 		return nil
-	})(globalReader)
+	})
 }
