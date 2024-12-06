@@ -96,7 +96,11 @@ func ParseBlocksArguments(arguments models.Arguments) (BlocksArguments, error) {
 
 	// Parse 'block_status'
 	if blockStatusIn, ok := arguments["block_status"]; ok {
-		blockStatus, err := parser.ParseBlockStatus(blockStatusIn)
+		result, ok := blockStatusIn.(string)
+		if !ok {
+			return args, fmt.Errorf("'block_status' must be string")
+		}
+		blockStatus, err := parser.ParseBlockStatus(result)
 		if err != nil {
 			return args, err
 		}
@@ -113,24 +117,31 @@ func ParseBlocksArguments(arguments models.Arguments) (BlocksArguments, error) {
 		return args, fmt.Errorf("can only provide either 'start_block_id' or 'start_block_height'")
 	}
 
-	// Parse 'start_block_id' if provided
 	if hasStartBlockID {
+		result, ok := startBlockIDIn.(string)
+		if !ok {
+			return args, fmt.Errorf("'start_block_id' must be a string")
+		}
 		var startBlockID parser.ID
-		err := startBlockID.Parse(startBlockIDIn)
+		err := startBlockID.Parse(result)
 		if err != nil {
 			return args, err
 		}
 		args.StartBlockID = startBlockID.Flow()
 	}
 
-	// Parse 'start_block_height' if provided
 	if hasStartBlockHeight {
-		var err error
-		args.StartBlockHeight, err = util.ToUint64(startBlockHeightIn)
+		result, ok := startBlockHeightIn.(string)
+		if !ok {
+			return args, fmt.Errorf("'start_block_height' must be a string")
+		}
+		startBlockHeight, err := util.ToUint64(result)
 		if err != nil {
 			return args, fmt.Errorf("invalid 'start_block_height': %w", err)
 		}
+		args.StartBlockHeight = startBlockHeight
 	} else {
+		// Default value if 'start_block_height' is not provided
 		args.StartBlockHeight = request.EmptyHeight
 	}
 
