@@ -74,13 +74,13 @@ func NewBaseView(ledger atree.Ledger, rootAddress flow.Address) (*BaseView, erro
 	// fetch the account collection, if not exist, create one
 	view.accounts, view.accountSetupOnCommit, err = view.fetchOrCreateCollection(AccountsStorageIDKey)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to fetch or create account collection with key %v: %w", AccountsStorageIDKey, err)
 	}
 
 	// fetch the code collection, if not exist, create one
 	view.codes, view.codeSetupOnCommit, err = view.fetchOrCreateCollection(CodesStorageIDKey)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to fetch or create code collection with key %v: %w", CodesStorageIDKey, err)
 	}
 
 	return view, nil
@@ -485,7 +485,10 @@ func (v *BaseView) fetchOrCreateCollection(path string) (collection *Collection,
 	}
 	if len(collectionID) == 0 {
 		collection, err = v.collectionProvider.NewCollection()
-		return collection, true, err
+		if err != nil {
+			return collection, true, fmt.Errorf("fail to create collection with key %v: %w", path, err)
+		}
+		return collection, true, nil
 	}
 	collection, err = v.collectionProvider.CollectionByID(collectionID)
 	return collection, false, err
