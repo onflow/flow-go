@@ -146,7 +146,7 @@ func (e *Engine) processOutboundMessages(ctx context.Context) error {
 // Because the pusher engine does not accept inputs from the network,
 // always drop any messages and return an error.
 func (e *Engine) Process(channel channels.Channel, originID flow.Identifier, message any) error {
-	return fmt.Errorf("pusher engine should only receive local messages on the same node")
+	return fmt.Errorf("pusher engine should only receive local messages on the same node: got message %T on channel %v from origin %v", message, channel, originID)
 }
 
 // SubmitCollectionGuarantee adds a collection guarantee to the engine's queue

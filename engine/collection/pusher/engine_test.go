@@ -97,8 +97,6 @@ func (suite *Suite) TestSubmitCollectionGuarantee() {
 		Run(func(_ mock.Arguments) { close(done) }).Return(nil).Once()
 
 	suite.engine.SubmitCollectionGuarantee(guarantee)
-	// TODO signature?
-	//suite.Require().Nil(err)
 
 	unittest.RequireCloseBefore(suite.T(), done, time.Second, "message not sent")
 
