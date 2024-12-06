@@ -1863,7 +1863,6 @@ func TestAccountV2Migration_migrate(t *testing.T) {
                                             from: AccountV2Migration.adminStoragePath
                                         )
                                         ?? panic("missing account V2 migration admin resource")
-                                    admin.setEnabled(true)
                                     admin.setBatchSize(%[2]d)
                                     admin.migrateNextBatch()
                                 }

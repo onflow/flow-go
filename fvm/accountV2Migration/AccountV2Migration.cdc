@@ -22,11 +22,6 @@ contract AccountV2Migration {
     access(all)
     resource Admin {
         access(all)
-        fun setEnabled(_ isEnabled: Bool) {
-            AccountV2Migration.isEnabled = isEnabled
-        }
-
-        access(all)
         fun setNextAddressStartIndex(_ nextAddressStartIndex: UInt64) {
             AccountV2Migration.nextAddressStartIndex = nextAddressStartIndex
         }
@@ -46,9 +41,6 @@ contract AccountV2Migration {
     let adminStoragePath: StoragePath
 
     access(all)
-    var isEnabled: Bool
-
-    access(all)
     var nextAddressStartIndex: UInt64
 
     access(all)
@@ -56,9 +48,8 @@ contract AccountV2Migration {
 
     init() {
         self.adminStoragePath = /storage/accountV2MigrationAdmin
-        self.isEnabled = false
         self.nextAddressStartIndex = 1
-        self.batchSize = 10
+        self.batchSize = 0
 
         self.account.storage.save(
             <-create Admin(),
@@ -68,10 +59,6 @@ contract AccountV2Migration {
 
     access(contract)
     fun migrateNextBatch() {
-        if !self.isEnabled {
-            return
-        }
-
         let batchSize = self.batchSize
         if batchSize <= 0 {
             return
