@@ -150,6 +150,8 @@ func OnCommitSucceed(b ReaderBatchWriter, onSuccessFn func()) {
 // for instance, to iterate keys between "hello" and "world",
 // we use "hello" as LowerBound, "worle" as UpperBound, so that "world", "world1", "worldffff...ffff"
 // will all be included.
+// In the case that the endPrefix is all 1s, such as []byte{0xff, 0xff, ...}, there is no upper-bound,
+// it returns (startPrefix, nil, false)
 func StartEndPrefixToLowerUpperBound(startPrefix, endPrefix []byte) (lowerBound, upperBound []byte, hasUpperBound bool) {
 	// if the endPrefix is all 1s, such as []byte{0xff, 0xff, ...}, there is no upper-bound
 	// so we return the startPrefix as the lower-bound, and nil as the upper-bound, and false for hasUpperBound

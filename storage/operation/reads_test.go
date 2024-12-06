@@ -73,6 +73,7 @@ func TestIterateInvalidRange(t *testing.T) {
 	})
 }
 
+// TestIterationBoundary tests that when the prefixEnd is all 1s, the iteration should include the last key
 func TestIterationBoundary(t *testing.T) {
 	dbtest.RunWithStorages(t, func(t *testing.T, r storage.Reader, withWriter dbtest.WithWriter) {
 		// Define the prefix range
