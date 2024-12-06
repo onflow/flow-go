@@ -8,6 +8,7 @@ import (
 	"github.com/onflow/flow-core-contracts/lib/go/contracts"
 	"github.com/onflow/flow-core-contracts/lib/go/templates"
 
+	"github.com/onflow/flow-go/fvm/accountV2Migration"
 	"github.com/onflow/flow-go/fvm/blueprints"
 	"github.com/onflow/flow-go/fvm/environment"
 	"github.com/onflow/flow-go/fvm/errors"
@@ -446,6 +447,8 @@ func (b *bootstrapExecutor) Execute() error {
 
 	// set the list of nodes which are allowed to stake in this network
 	b.setStakingAllowlist(service, b.identities.NodeIDs())
+
+	b.deployAccountV2MigrationContract(service)
 
 	return nil
 }
@@ -1065,6 +1068,19 @@ func (b *bootstrapExecutor) deployStakingCollection(
 	)
 	env.StakingCollectionAddress = deployTo.String()
 	panicOnMetaInvokeErrf("failed to deploy FlowStakingCollection contract: %s", txError, err)
+}
+
+func (b *bootstrapExecutor) deployAccountV2MigrationContract(deployTo flow.Address) {
+	tx := blueprints.DeployContractTransaction(
+		deployTo,
+		accountV2Migration.ContractCode,
+		accountV2Migration.ContractName,
+	)
+	txError, err := b.invokeMetaTransaction(
+		b.ctx,
+		Transaction(tx, 0),
+	)
+	panicOnMetaInvokeErrf("failed to deploy AccountV2Migration contract: %s", txError, err)
 }
 
 func (b *bootstrapExecutor) setContractDeploymentRestrictions(

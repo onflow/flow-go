@@ -10,6 +10,7 @@ import (
 	"go.opentelemetry.io/otel/attribute"
 	otelTrace "go.opentelemetry.io/otel/trace"
 
+	"github.com/onflow/flow-go/fvm/accountV2Migration"
 	"github.com/onflow/flow-go/fvm/environment"
 	"github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/fvm/evm"
@@ -189,11 +190,12 @@ func (executor *transactionExecutor) preprocess() error {
 // infrequently modified and are expensive to compute.  For now this includes
 // reading meter parameter overrides and parsing programs.
 func (executor *transactionExecutor) preprocessTransactionBody() error {
-	// setup evm
+	chainID := executor.ctx.Chain.ChainID()
+
+	// setup EVM
 	if executor.ctx.EVMEnabled {
-		chain := executor.ctx.Chain
 		err := evm.SetupEnvironment(
-			chain.ChainID(),
+			chainID,
 			executor.env,
 			executor.cadenceRuntime.TxRuntimeEnv,
 			executor.ctx.EVMTracer,
@@ -202,6 +204,12 @@ func (executor *transactionExecutor) preprocessTransactionBody() error {
 			return err
 		}
 	}
+
+	accountV2Migration.DeclareFunctions(
+		executor.cadenceRuntime.TxRuntimeEnv,
+		chainID,
+	)
+
 	// get meter parameters
 	executionParameters, executionStateRead, err := getExecutionParameters(
 		executor.env.Logger(),
@@ -257,11 +265,12 @@ func (executor *transactionExecutor) execute() error {
 }
 
 func (executor *transactionExecutor) ExecuteTransactionBody() error {
-	// setup evm
+	chainID := executor.ctx.Chain.ChainID()
+
+	// setup EVM
 	if executor.ctx.EVMEnabled {
-		chain := executor.ctx.Chain
 		err := evm.SetupEnvironment(
-			chain.ChainID(),
+			chainID,
 			executor.env,
 			executor.cadenceRuntime.TxRuntimeEnv,
 			executor.ctx.EVMTracer,
@@ -270,6 +279,11 @@ func (executor *transactionExecutor) ExecuteTransactionBody() error {
 			return err
 		}
 	}
+
+	accountV2Migration.DeclareFunctions(
+		executor.cadenceRuntime.TxRuntimeEnv,
+		chainID,
+	)
 
 	var invalidator derived.TransactionInvalidator
 	if !executor.errs.CollectedError() {
