@@ -28,7 +28,10 @@ type CreateFunc func() interface{}
 type HandleFunc func() error
 type IterationFunc func() (CheckFunc, CreateFunc, HandleFunc)
 
-// IterateKeysInPrefixRange will iterate over all keys with prefixes in the range [startPrefix, endPrefix] (both inclusive)
+// IterateKeysInPrefixRange will iterate over all entries in the database, where the key starts with a prefixes in
+// the range [startPrefix, endPrefix] (both inclusive). We require that startPrefix <= endPrefix (otherwise this
+// function errors). On every such key, the `check` function is called. If `check` errors, iteration is aborted.
+// No errors expected during normal operations.
 func IterateKeysInPrefixRange(startPrefix []byte, endPrefix []byte, check func(key []byte) error) func(storage.Reader) error {
 	return Iterate(startPrefix, endPrefix, func() (CheckFunc, CreateFunc, HandleFunc) {
 		return func(key []byte) (bool, error) {
@@ -164,8 +167,10 @@ func Retrieve(key []byte, entity interface{}) func(storage.Reader) error {
 	}
 }
 
-// FindHighestAtOrBelow finds the highest key with the given prefix and
-// height equal to or below the given height.
+// FindHighestAtOrBelow is for database entries that are indexed by block height. It is suitable to search
+// keys with the format prefix` + `height` (where "+" denotes concatenation of binary strings). The height
+// is encoded as Big-Endian (entries with numerically smaller height have lexicographically smaller key).
+// The function finds the *highest* key with the given prefix and height equal to or below the given height.
 func FindHighestAtOrBelow(prefix []byte, height uint64, entity interface{}) func(storage.Reader) error {
 	return func(r storage.Reader) error {
 		if len(prefix) == 0 {
@@ -180,9 +185,12 @@ func FindHighestAtOrBelow(prefix []byte, height uint64, entity interface{}) func
 		defer it.Close()
 
 		var highestKey []byte
+
 		// find highest value below the given height
 		for it.First(); it.Valid(); it.Next() {
-			highestKey = it.IterItem().Key()
+			// copy the key to avoid the underlying slices of the key
+			// being modified by the Next() call
+			highestKey = it.IterItem().KeyCopy(highestKey)
 		}
 
 		if len(highestKey) == 0 {

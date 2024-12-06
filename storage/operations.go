@@ -27,8 +27,9 @@ type Iterator interface {
 	// The next key-value pair might be invalid, so you should call Valid() to check.
 	Next()
 
-	// IterItem returns the current key-value pair, or nil if done.
-	// A best practice is always to call Valid() before calling IterItem.
+	// IterItem returns the current key-value pair, or nil if Valid returns false.
+	// Always to call Valid() before calling IterItem.
+	// Note, the returned item is only valid until the Next() method is called.
 	IterItem() IterItem
 
 	// Close closes the iterator. Iterator must be closed, otherwise it causes memory leak.
@@ -38,7 +39,15 @@ type Iterator interface {
 
 // IterItem is an interface for iterating over key-value pairs in a storage backend.
 type IterItem interface {
+	// Key returns the key of the current key-value pair
+	// Key is only valid until the Iterator.Next() method is called
+	// If you need to use it outside its validity, please use KeyCopy
 	Key() []byte
+
+	// KeyCopy returns a copy of the key of the item, writing it to dst slice.
+	// If nil is passed, or capacity of dst isn't sufficient, a new slice would be allocated and
+	// returned.
+	KeyCopy(dst []byte) []byte
 
 	// Value returns the value of the current key-value pair
 	// The reason it takes a function is to follow badgerDB's API pattern

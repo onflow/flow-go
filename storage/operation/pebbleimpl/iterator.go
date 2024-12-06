@@ -67,6 +67,11 @@ func (i pebbleIterItem) Key() []byte {
 	return i.iter.Key()
 }
 
+// KeyCopy returns a copy of the key of the item, writing it to dst slice.
+func (i pebbleIterItem) KeyCopy(dst []byte) []byte {
+	return append(dst[:0], i.iter.Key()...)
+}
+
 func (i pebbleIterItem) Value(fn func([]byte) error) error {
 	val, err := i.iter.ValueAndErr()
 	if err != nil {
