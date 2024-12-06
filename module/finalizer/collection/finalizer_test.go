@@ -8,13 +8,12 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
+	collectionmock "github.com/onflow/flow-go/engine/collection/mock"
 	model "github.com/onflow/flow-go/model/cluster"
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/model/messages"
 	"github.com/onflow/flow-go/module/finalizer/collection"
 	"github.com/onflow/flow-go/module/mempool/herocache"
 	"github.com/onflow/flow-go/module/metrics"
-	"github.com/onflow/flow-go/network/mocknetwork"
 	cluster "github.com/onflow/flow-go/state/cluster/badger"
 	"github.com/onflow/flow-go/storage/badger/operation"
 	"github.com/onflow/flow-go/storage/badger/procedure"
@@ -65,9 +64,8 @@ func TestFinalizer(t *testing.T) {
 			bootstrap()
 			defer cleanup()
 
-			prov := new(mocknetwork.Engine)
-			prov.On("SubmitLocal", mock.Anything)
-			finalizer := collection.NewFinalizer(db, pool, prov, metrics)
+			pusher := collectionmock.NewGuaranteedCollectionPublisher(t)
+			finalizer := collection.NewFinalizer(db, pool, pusher, metrics)
 
 			fakeBlockID := unittest.IdentifierFixture()
 			err := finalizer.MakeFinal(fakeBlockID)
@@ -78,9 +76,9 @@ func TestFinalizer(t *testing.T) {
 			bootstrap()
 			defer cleanup()
 
-			prov := new(mocknetwork.Engine)
-			prov.On("SubmitLocal", mock.Anything)
-			finalizer := collection.NewFinalizer(db, pool, prov, metrics)
+			pusher := collectionmock.NewGuaranteedCollectionPublisher(t)
+			pusher.On("SubmitCollectionGuarantee", mock.Anything).Once()
+			finalizer := collection.NewFinalizer(db, pool, pusher, metrics)
 
 			// tx1 is included in the finalized block
 			tx1 := unittest.TransactionBodyFixture(func(tx *flow.TransactionBody) { tx.ProposalKey.SequenceNumber = 1 })
@@ -104,9 +102,8 @@ func TestFinalizer(t *testing.T) {
 			bootstrap()
 			defer cleanup()
 
-			prov := new(mocknetwork.Engine)
-			prov.On("SubmitLocal", mock.Anything)
-			finalizer := collection.NewFinalizer(db, pool, prov, metrics)
+			pusher := collectionmock.NewGuaranteedCollectionPublisher(t)
+			finalizer := collection.NewFinalizer(db, pool, pusher, metrics)
 
 			// create a new block that isn't connected to a parent
 			block := unittest.ClusterBlockWithParent(genesis)
@@ -123,8 +120,8 @@ func TestFinalizer(t *testing.T) {
 			bootstrap()
 			defer cleanup()
 
-			prov := new(mocknetwork.Engine)
-			finalizer := collection.NewFinalizer(db, pool, prov, metrics)
+			pusher := collectionmock.NewGuaranteedCollectionPublisher(t)
+			finalizer := collection.NewFinalizer(db, pool, pusher, metrics)
 
 			// create a block with empty payload on genesis
 			block := unittest.ClusterBlockWithParent(genesis)
@@ -141,16 +138,15 @@ func TestFinalizer(t *testing.T) {
 			assert.Equal(t, block.ID(), final.ID())
 
 			// collection should not have been propagated
-			prov.AssertNotCalled(t, "SubmitLocal", mock.Anything)
+			pusher.AssertNotCalled(t, "SubmitCollectionGuarantee", mock.Anything)
 		})
 
 		t.Run("finalize single block", func(t *testing.T) {
 			bootstrap()
 			defer cleanup()
 
-			prov := new(mocknetwork.Engine)
-			prov.On("SubmitLocal", mock.Anything)
-			finalizer := collection.NewFinalizer(db, pool, prov, metrics)
+			pusher := collectionmock.NewGuaranteedCollectionPublisher(t)
+			finalizer := collection.NewFinalizer(db, pool, pusher, metrics)
 
 			// tx1 is included in the finalized block and mempool
 			tx1 := unittest.TransactionBodyFixture(func(tx *flow.TransactionBody) { tx.ProposalKey.SequenceNumber = 1 })
@@ -163,6 +159,15 @@ func TestFinalizer(t *testing.T) {
 			block := unittest.ClusterBlockWithParent(genesis)
 			block.SetPayload(model.PayloadFromTransactions(refBlock.ID(), &tx1))
 			insert(block)
+
+			// block should be passed to pusher
+			pusher.On("SubmitCollectionGuarantee", &flow.CollectionGuarantee{
+				CollectionID:     block.Payload.Collection.ID(),
+				ReferenceBlockID: refBlock.ID(),
+				ChainID:          block.Header.ChainID,
+				SignerIndices:    block.Header.ParentVoterIndices,
+				Signature:        nil,
+			}).Once()
 
 			// finalize the block
 			err := finalizer.MakeFinal(block.ID())
@@ -178,18 +183,6 @@ func TestFinalizer(t *testing.T) {
 			assert.Nil(t, err)
 			assert.Equal(t, block.ID(), final.ID())
 			assertClusterBlocksIndexedByReferenceHeight(t, db, refBlock.Height, final.ID())
-
-			// block should be passed to provider
-			prov.AssertNumberOfCalls(t, "SubmitLocal", 1)
-			prov.AssertCalled(t, "SubmitLocal", &messages.SubmitCollectionGuarantee{
-				Guarantee: flow.CollectionGuarantee{
-					CollectionID:     block.Payload.Collection.ID(),
-					ReferenceBlockID: refBlock.ID(),
-					ChainID:          block.Header.ChainID,
-					SignerIndices:    block.Header.ParentVoterIndices,
-					Signature:        nil,
-				},
-			})
 		})
 
 		// when finalizing a block with un-finalized ancestors, those ancestors should be finalized as well
@@ -197,9 +190,8 @@ func TestFinalizer(t *testing.T) {
 			bootstrap()
 			defer cleanup()
 
-			prov := new(mocknetwork.Engine)
-			prov.On("SubmitLocal", mock.Anything)
-			finalizer := collection.NewFinalizer(db, pool, prov, metrics)
+			pusher := collectionmock.NewGuaranteedCollectionPublisher(t)
+			finalizer := collection.NewFinalizer(db, pool, pusher, metrics)
 
 			// tx1 is included in the first finalized block and mempool
 			tx1 := unittest.TransactionBodyFixture(func(tx *flow.TransactionBody) { tx.ProposalKey.SequenceNumber = 1 })
@@ -218,6 +210,22 @@ func TestFinalizer(t *testing.T) {
 			block2.SetPayload(model.PayloadFromTransactions(refBlock.ID(), &tx2))
 			insert(block2)
 
+			// both blocks should be passed to pusher
+			pusher.On("SubmitCollectionGuarantee", &flow.CollectionGuarantee{
+				CollectionID:     block1.Payload.Collection.ID(),
+				ReferenceBlockID: refBlock.ID(),
+				ChainID:          block1.Header.ChainID,
+				SignerIndices:    block1.Header.ParentVoterIndices,
+				Signature:        nil,
+			}).Once()
+			pusher.On("SubmitCollectionGuarantee", &flow.CollectionGuarantee{
+				CollectionID:     block2.Payload.Collection.ID(),
+				ReferenceBlockID: refBlock.ID(),
+				ChainID:          block2.Header.ChainID,
+				SignerIndices:    block2.Header.ParentVoterIndices,
+				Signature:        nil,
+			}).Once()
+
 			// finalize block2 (should indirectly finalize block1 as well)
 			err := finalizer.MakeFinal(block2.ID())
 			assert.Nil(t, err)
@@ -231,36 +239,14 @@ func TestFinalizer(t *testing.T) {
 			assert.Nil(t, err)
 			assert.Equal(t, block2.ID(), final.ID())
 			assertClusterBlocksIndexedByReferenceHeight(t, db, refBlock.Height, block1.ID(), block2.ID())
-
-			// both blocks should be passed to provider
-			prov.AssertNumberOfCalls(t, "SubmitLocal", 2)
-			prov.AssertCalled(t, "SubmitLocal", &messages.SubmitCollectionGuarantee{
-				Guarantee: flow.CollectionGuarantee{
-					CollectionID:     block1.Payload.Collection.ID(),
-					ReferenceBlockID: refBlock.ID(),
-					ChainID:          block1.Header.ChainID,
-					SignerIndices:    block1.Header.ParentVoterIndices,
-					Signature:        nil,
-				},
-			})
-			prov.AssertCalled(t, "SubmitLocal", &messages.SubmitCollectionGuarantee{
-				Guarantee: flow.CollectionGuarantee{
-					CollectionID:     block2.Payload.Collection.ID(),
-					ReferenceBlockID: refBlock.ID(),
-					ChainID:          block2.Header.ChainID,
-					SignerIndices:    block2.Header.ParentVoterIndices,
-					Signature:        nil,
-				},
-			})
 		})
 
 		t.Run("finalize with un-finalized child", func(t *testing.T) {
 			bootstrap()
 			defer cleanup()
 
-			prov := new(mocknetwork.Engine)
-			prov.On("SubmitLocal", mock.Anything)
-			finalizer := collection.NewFinalizer(db, pool, prov, metrics)
+			pusher := collectionmock.NewGuaranteedCollectionPublisher(t)
+			finalizer := collection.NewFinalizer(db, pool, pusher, metrics)
 
 			// tx1 is included in the finalized parent block and mempool
 			tx1 := unittest.TransactionBodyFixture(func(tx *flow.TransactionBody) { tx.ProposalKey.SequenceNumber = 1 })
@@ -279,6 +265,15 @@ func TestFinalizer(t *testing.T) {
 			block2.SetPayload(model.PayloadFromTransactions(refBlock.ID(), &tx2))
 			insert(block2)
 
+			// block should be passed to pusher
+			pusher.On("SubmitCollectionGuarantee", &flow.CollectionGuarantee{
+				CollectionID:     block1.Payload.Collection.ID(),
+				ReferenceBlockID: refBlock.ID(),
+				ChainID:          block1.Header.ChainID,
+				SignerIndices:    block1.Header.ParentVoterIndices,
+				Signature:        nil,
+			}).Once()
+
 			// finalize block1 (should NOT finalize block2)
 			err := finalizer.MakeFinal(block1.ID())
 			assert.Nil(t, err)
@@ -293,18 +288,6 @@ func TestFinalizer(t *testing.T) {
 			assert.Nil(t, err)
 			assert.Equal(t, block1.ID(), final.ID())
 			assertClusterBlocksIndexedByReferenceHeight(t, db, refBlock.Height, block1.ID())
-
-			// block should be passed to provider
-			prov.AssertNumberOfCalls(t, "SubmitLocal", 1)
-			prov.AssertCalled(t, "SubmitLocal", &messages.SubmitCollectionGuarantee{
-				Guarantee: flow.CollectionGuarantee{
-					CollectionID:     block1.Payload.Collection.ID(),
-					ReferenceBlockID: refBlock.ID(),
-					ChainID:          block1.Header.ChainID,
-					SignerIndices:    block1.Header.ParentVoterIndices,
-					Signature:        nil,
-				},
-			})
 		})
 
 		// when finalizing a block with a conflicting fork, the fork should not be finalized.
@@ -312,9 +295,8 @@ func TestFinalizer(t *testing.T) {
 			bootstrap()
 			defer cleanup()
 
-			prov := new(mocknetwork.Engine)
-			prov.On("SubmitLocal", mock.Anything)
-			finalizer := collection.NewFinalizer(db, pool, prov, metrics)
+			pusher := collectionmock.NewGuaranteedCollectionPublisher(t)
+			finalizer := collection.NewFinalizer(db, pool, pusher, metrics)
 
 			// tx1 is included in the finalized block and mempool
 			tx1 := unittest.TransactionBodyFixture(func(tx *flow.TransactionBody) { tx.ProposalKey.SequenceNumber = 1 })
@@ -333,6 +315,15 @@ func TestFinalizer(t *testing.T) {
 			block2.SetPayload(model.PayloadFromTransactions(refBlock.ID(), &tx2))
 			insert(block2)
 
+			// block should be passed to pusher
+			pusher.On("SubmitCollectionGuarantee", &flow.CollectionGuarantee{
+				CollectionID:     block1.Payload.Collection.ID(),
+				ReferenceBlockID: refBlock.ID(),
+				ChainID:          block1.Header.ChainID,
+				SignerIndices:    block1.Header.ParentVoterIndices,
+				Signature:        nil,
+			}).Once()
+
 			// finalize block1
 			err := finalizer.MakeFinal(block1.ID())
 			assert.Nil(t, err)
@@ -347,18 +338,6 @@ func TestFinalizer(t *testing.T) {
 			assert.Nil(t, err)
 			assert.Equal(t, block1.ID(), final.ID())
 			assertClusterBlocksIndexedByReferenceHeight(t, db, refBlock.Height, block1.ID())
-
-			// block should be passed to provider
-			prov.AssertNumberOfCalls(t, "SubmitLocal", 1)
-			prov.AssertCalled(t, "SubmitLocal", &messages.SubmitCollectionGuarantee{
-				Guarantee: flow.CollectionGuarantee{
-					CollectionID:     block1.Payload.Collection.ID(),
-					ReferenceBlockID: refBlock.ID(),
-					ChainID:          block1.Header.ChainID,
-					SignerIndices:    block1.Header.ParentVoterIndices,
-					Signature:        nil,
-				},
-			})
 		})
 	})
 }
