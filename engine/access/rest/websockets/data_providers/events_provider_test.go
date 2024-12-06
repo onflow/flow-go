@@ -64,6 +64,7 @@ func (s *EventsProviderSuite) subscribeEventsDataProviderTestCases() []testType 
 			name: "SubscribeBlocksFromStartBlockID happy path",
 			arguments: models.Arguments{
 				"start_block_id": s.rootBlock.ID().String(),
+				"event_types":    []string{"flow.AccountCreated", "flow.AccountUpdated"},
 			},
 			setupBackend: func(sub *ssmock.Subscription) {
 				s.api.On(

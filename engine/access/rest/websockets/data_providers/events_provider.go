@@ -2,12 +2,9 @@ package data_providers
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
-	"strconv"
-	"strings"
-
 	"github.com/rs/zerolog"
+	"strconv"
 
 	"github.com/onflow/flow-go/engine/access/rest/common/parser"
 	"github.com/onflow/flow-go/engine/access/rest/http/request"
@@ -175,16 +172,12 @@ func parseEventsArguments(
 	// Parse 'event_types' as a JSON array
 	var eventTypes parser.EventTypes
 	if eventTypesIn, ok := arguments["event_types"]; ok && eventTypesIn != "" {
-		result, ok := eventTypesIn.(string)
+		result, ok := eventTypesIn.([]string)
 		if !ok {
-			return args, fmt.Errorf("'event_types' must be a string")
-		}
-		err := json.Unmarshal([]byte(result), &eventTypes) // Expect a JSON array
-		if err != nil {
-			return args, fmt.Errorf("could not parse 'event_types': %w", err)
+			return args, fmt.Errorf("'event_types' must be an array of string")
 		}
 
-		err = eventTypes.Parse(strings.Split(result, ","))
+		err := eventTypes.Parse(result)
 		if err != nil {
 			return args, fmt.Errorf("invalid 'event_types': %w", err)
 		}
@@ -193,26 +186,18 @@ func parseEventsArguments(
 	// Parse 'addresses' as []string{}
 	var addresses []string
 	if addressesIn, ok := arguments["addresses"]; ok && addressesIn != "" {
-		result, ok := addressesIn.(string)
+		addresses, ok = addressesIn.([]string)
 		if !ok {
 			return args, fmt.Errorf("'addresses' must be a string")
-		}
-		err := json.Unmarshal([]byte(result), &addresses) // Expect a JSON array
-		if err != nil {
-			return args, fmt.Errorf("could not parse 'addresses': %w", err)
 		}
 	}
 
 	// Parse 'contracts' as []string{}
 	var contracts []string
 	if contractsIn, ok := arguments["contracts"]; ok && contractsIn != "" {
-		result, ok := contractsIn.(string)
+		contracts, ok = contractsIn.([]string)
 		if !ok {
 			return args, fmt.Errorf("'contracts' must be a string")
-		}
-		err := json.Unmarshal([]byte(result), &contracts) // Expect a JSON array
-		if err != nil {
-			return args, fmt.Errorf("could not parse 'contracts': %w", err)
 		}
 	}
 
