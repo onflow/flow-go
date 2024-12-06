@@ -154,28 +154,33 @@ func KeyExists(r storage.Reader, key []byte) (bool, error) {
 	return true, nil
 }
 
-// Retrieve will retrieve the binary data under the given key from the database
+// Retrieve returns a functor that retrieves the binary data under the given key from the database
+func Retrieve(key []byte, entity interface{}) func(storage.Reader) error {
+	return func(r storage.Reader) error {
+		return RetrieveByKey(r, key, entity)
+	}
+}
+
+// RetrieveByKey will retrieve the binary data under the given key from the database
 // and decode it into the given entity. The provided entity needs to be a
 // pointer to an initialized entity of the correct type.
 // Error returns:
 //   - storage.ErrNotFound if the key does not exist in the database
 //   - generic error in case of unexpected failure from the database layer, or failure
 //     to decode an existing database value
-func Retrieve(key []byte, entity interface{}) func(storage.Reader) error {
-	return func(r storage.Reader) error {
-		val, closer, err := r.Get(key)
-		if err != nil {
-			return err
-		}
-
-		defer closer.Close()
-
-		err = msgpack.Unmarshal(val, entity)
-		if err != nil {
-			return irrecoverable.NewExceptionf("could not decode entity: %w", err)
-		}
-		return nil
+func RetrieveByKey(r storage.Reader, key []byte, entity interface{}) error {
+	val, closer, err := r.Get(key)
+	if err != nil {
+		return err
 	}
+
+	defer closer.Close()
+
+	err = msgpack.Unmarshal(val, entity)
+	if err != nil {
+		return irrecoverable.NewExceptionf("could not decode entity: %w", err)
+	}
+	return nil
 }
 
 // FindHighestAtOrBelow is for database entries that are indexed by block height. It is suitable to search
