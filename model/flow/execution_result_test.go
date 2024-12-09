@@ -140,7 +140,7 @@ func TestExecutionResult_ServiceEventsByChunk(t *testing.T) {
 		})
 	})
 
-	// NOTE: service events in non-system chunks in unsupported by the old data model
+	// NOTE: service events in non-system chunks is unsupported by the old data model
 	t.Run("service only in non-system chunks", func(t *testing.T) {
 		result := unittest.ExecutionResultFixture()
 		unittest.WithServiceEvents(result.Chunks.Len() - 1)(result) // one service event per non-system chunk
@@ -160,7 +160,7 @@ func TestExecutionResult_ServiceEventsByChunk(t *testing.T) {
 		assert.Len(t, result.ServiceEventsByChunk(result.SystemChunk().Index), 0)
 	})
 
-	// NOTE: service events in non-system chunks in unsupported by the old data model
+	// NOTE: service events in non-system chunks is unsupported by the old data model
 	t.Run("service events in all chunks", func(t *testing.T) {
 		result := unittest.ExecutionResultFixture()
 		unittest.WithServiceEvents(result.Chunks.Len())(result) // one service event per chunk

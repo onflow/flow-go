@@ -251,7 +251,7 @@ func (s *ChunkVerifierTestSuite) TestEventsMismatch() {
 
 // TestServiceEventsMismatch tests verification behavior in case
 // of emitted service events not matching chunks'
-func (s *ChunkVerifierTestSuite) TestServiceEventsMismatch() {
+func (s *ChunkVerifierTestSuite) TestServiceEventsMismatch_SystemChunk() {
 	meta := s.GetTestSetup(s.T(), "doesn't matter", true, true)
 	vch := meta.RefreshChunkData(s.T())
 
@@ -275,7 +275,7 @@ func (s *ChunkVerifierTestSuite) TestServiceEventsMismatch() {
 }
 
 // TestServiceEventsAreChecked ensures that service events are in fact checked
-func (s *ChunkVerifierTestSuite) TestServiceEventsAreChecked() {
+func (s *ChunkVerifierTestSuite) TestServiceEventsAreChecked_SystemChunk() {
 	meta := s.GetTestSetup(s.T(), "doesn't matter", true, true)
 	vch := meta.RefreshChunkData(s.T())
 
