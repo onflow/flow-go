@@ -9,6 +9,7 @@ import (
 	"github.com/onflow/flow-go/access"
 	"github.com/onflow/flow-go/engine/access/rest/websockets/models"
 	"github.com/onflow/flow-go/engine/access/state_stream"
+	"github.com/onflow/flow-go/model/flow"
 )
 
 // Constants defining various topic names used to specify different types of
@@ -43,6 +44,10 @@ type DataProviderFactoryImpl struct {
 
 	stateStreamApi state_stream.API
 	accessApi      access.API
+
+	chain             flow.Chain
+	eventFilterConfig state_stream.EventFilterConfig
+	heartbeatInterval uint64
 }
 
 // NewDataProviderFactory creates a new DataProviderFactory
@@ -56,11 +61,17 @@ func NewDataProviderFactory(
 	logger zerolog.Logger,
 	stateStreamApi state_stream.API,
 	accessApi access.API,
+	chain flow.Chain,
+	eventFilterConfig state_stream.EventFilterConfig,
+	heartbeatInterval uint64,
 ) *DataProviderFactoryImpl {
 	return &DataProviderFactoryImpl{
-		logger:         logger,
-		stateStreamApi: stateStreamApi,
-		accessApi:      accessApi,
+		logger:            logger,
+		stateStreamApi:    stateStreamApi,
+		accessApi:         accessApi,
+		chain:             chain,
+		eventFilterConfig: eventFilterConfig,
+		heartbeatInterval: heartbeatInterval,
 	}
 }
 
@@ -87,9 +98,10 @@ func (s *DataProviderFactoryImpl) NewDataProvider(
 		return NewBlockHeadersDataProvider(ctx, s.logger, s.accessApi, topic, arguments, ch)
 	case BlockDigestsTopic:
 		return NewBlockDigestsDataProvider(ctx, s.logger, s.accessApi, topic, arguments, ch)
-	// TODO: Implemented handlers for each topic should be added in respective case
-	case EventsTopic,
-		AccountStatusesTopic,
+	case EventsTopic:
+		return NewEventsDataProvider(ctx, s.logger, s.stateStreamApi, topic, arguments, ch, s.chain, s.eventFilterConfig, s.heartbeatInterval)
+		// TODO: Implemented handlers for each topic should be added in respective case
+	case AccountStatusesTopic,
 		TransactionStatusesTopic:
 		return nil, fmt.Errorf(`topic "%s" not implemented yet`, topic)
 	default:
