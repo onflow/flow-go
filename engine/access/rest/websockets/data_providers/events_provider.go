@@ -3,8 +3,9 @@ package data_providers
 import (
 	"context"
 	"fmt"
-	"github.com/rs/zerolog"
 	"strconv"
+
+	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/engine/access/rest/common/parser"
 	"github.com/onflow/flow-go/engine/access/rest/http/request"
