@@ -24,6 +24,8 @@ func init() {
 
 // ChunkBodyV0 is the prior version of ChunkBody, used for computing backward-compatible IDs and tests.
 // Compared to ChunkBody, ChunkBodyV0 does not have the ServiceEventCount field.
+// Deprecated: to be removed in Mainnet27
+// TODO(mainnet27): Remove this data structure https://github.com/onflow/flow-go/issues/6773
 type ChunkBodyV0 struct {
 	CollectionIndex      uint
 	StartState           StateCommitment
@@ -57,6 +59,7 @@ type ChunkBody struct {
 	//     This was the implicit behaviour prior to the introduction of this field.
 	// (2) Otherwise, ServiceEventCount must be non-nil.
 	// Within an ExecutionResult, all chunks must use either representation (1) or (2), not both.
+	// TODO(mainnet27): make this field non-pointer https://github.com/onflow/flow-go/issues/6773
 	ServiceEventCount *uint16
 	BlockID           Identifier // Block id of the execution result this chunk belongs to
 
