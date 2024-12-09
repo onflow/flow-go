@@ -3,10 +3,11 @@ package data_providers
 import (
 	"context"
 	"fmt"
+	"strconv"
+
 	"github.com/rs/zerolog"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
-	"strconv"
 
 	"github.com/onflow/flow-go/engine/access/rest/common/parser"
 	"github.com/onflow/flow-go/engine/access/rest/http/request"
@@ -55,7 +56,7 @@ func NewAccountStatusesDataProvider(
 	}
 
 	// Initialize arguments passed to the provider.
-	accountStatusesArgs, err := ParseAccountStatusesArguments(arguments, chain, eventFilterConfig)
+	accountStatusesArgs, err := parseAccountStatusesArguments(arguments, chain, eventFilterConfig)
 	if err != nil {
 		return nil, fmt.Errorf("invalid arguments for account statuses data provider: %w", err)
 	}
@@ -66,7 +67,7 @@ func NewAccountStatusesDataProvider(
 		topic,
 		cancel,
 		send,
-		p.createSubscription(subCtx, accountStatusesArgs), // Set up a subscription to events based on arguments.
+		p.createSubscription(subCtx, accountStatusesArgs), // Set up a subscription to account statuses based on arguments.
 	)
 
 	return p, nil

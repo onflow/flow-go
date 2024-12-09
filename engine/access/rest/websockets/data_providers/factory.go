@@ -101,7 +101,7 @@ func (s *DataProviderFactoryImpl) NewDataProvider(
 	case EventsTopic:
 		return NewEventsDataProvider(ctx, s.logger, s.stateStreamApi, topic, arguments, ch, s.chain, s.eventFilterConfig, s.heartbeatInterval)
 	case AccountStatusesTopic:
-		return NewAccountStatusesDataProvider(ctx, s.logger, s.stateStreamApi, s.chain, s.eventFilterConfig, topic, arguments, ch)
+		return NewAccountStatusesDataProvider(ctx, s.logger, s.stateStreamApi, topic, arguments, ch, s.chain, s.eventFilterConfig, s.heartbeatInterval)
 	case TransactionStatusesTopic:
 		// TODO: Implemented handlers for each topic should be added in respective case
 		return nil, fmt.Errorf(`topic "%s" not implemented yet`, topic)

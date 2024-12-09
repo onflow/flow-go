@@ -57,6 +57,18 @@ func (s *EventsProviderSuite) SetupTest() {
 	s.Require().NotNil(s.factory)
 }
 
+// TestEventsDataProvider_HappyPath tests the behavior of the events data provider
+// when it is configured correctly and operating under normal conditions. It
+// validates that events are correctly streamed to the channel and ensures
+// no unexpected errors occur.
+func (s *EventsProviderSuite) TestEventsDataProvider_HappyPath() {
+	s.testHappyPath(
+		EventsTopic,
+		s.subscribeEventsDataProviderTestCases(),
+		s.requireEvents,
+	)
+}
+
 // subscribeEventsDataProviderTestCases generates test cases for events data providers.
 func (s *EventsProviderSuite) subscribeEventsDataProviderTestCases() []testType {
 	return []testType{
@@ -101,18 +113,6 @@ func (s *EventsProviderSuite) subscribeEventsDataProviderTestCases() []testType 
 			},
 		},
 	}
-}
-
-// TestEventsDataProvider_HappyPath tests the behavior of the events data provider
-// when it is configured correctly and operating under normal conditions. It
-// validates that events are correctly streamed to the channel and ensures
-// no unexpected errors occur.
-func (s *EventsProviderSuite) TestEventsDataProvider_HappyPath() {
-	s.testHappyPath(
-		EventsTopic,
-		s.subscribeEventsDataProviderTestCases(),
-		s.requireEvents,
-	)
 }
 
 // testHappyPath tests a variety of scenarios for data providers in
@@ -212,13 +212,13 @@ func (s *EventsProviderSuite) requireEvents(v interface{}, expectedEventsRespons
 // 1. Supplying both 'start_block_id' and 'start_block_height' simultaneously, which is not allowed.
 // 2. Providing invalid 'start_block_id' value.
 // 3. Providing invalid 'start_block_height' value.
-func (s *EventsProviderSuite) invalidArgumentsTestCases() []testErrType {
+func invalidArgumentsTestCases() []testErrType {
 	return []testErrType{
 		{
 			name: "provide both 'start_block_id' and 'start_block_height' arguments",
 			arguments: models.Arguments{
-				"start_block_id":     s.rootBlock.ID().String(),
-				"start_block_height": fmt.Sprintf("%d", s.rootBlock.Header.Height),
+				"start_block_id":     unittest.BlockFixture().ID().String(),
+				"start_block_height": fmt.Sprintf("%d", unittest.BlockFixture().Header.Height),
 			},
 			expectedErrorMsg: "can only provide either 'start_block_id' or 'start_block_height'",
 		},
@@ -252,7 +252,7 @@ func (s *EventsProviderSuite) TestEventsDataProvider_InvalidArguments() {
 
 	topic := EventsTopic
 
-	for _, test := range s.invalidArgumentsTestCases() {
+	for _, test := range invalidArgumentsTestCases() {
 		s.Run(test.name, func() {
 			provider, err := NewEventsDataProvider(
 				ctx,
