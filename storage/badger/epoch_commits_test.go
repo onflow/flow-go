@@ -2,6 +2,7 @@ package badger_test
 
 import (
 	"errors"
+	"github.com/onflow/flow-go/storage/badger/transaction"
 	"testing"
 
 	"github.com/dgraph-io/badger/v2"
@@ -27,7 +28,9 @@ func TestEpochCommitStoreAndRetrieve(t *testing.T) {
 
 		// store a commit in db
 		expected := unittest.EpochCommitFixture()
-		err = store.Store(expected)
+		err = transaction.Update(db, func(tx *transaction.Tx) error {
+			return store.StoreTx(expected)(tx)
+		})
 		require.NoError(t, err)
 
 		// retrieve the commit by ID
@@ -36,7 +39,9 @@ func TestEpochCommitStoreAndRetrieve(t *testing.T) {
 		assert.Equal(t, expected, actual)
 
 		// test storing same epoch commit
-		err = store.Store(expected)
+		err = transaction.Update(db, func(tx *transaction.Tx) error {
+			return store.StoreTx(expected)(tx)
+		})
 		require.NoError(t, err)
 	})
 }
