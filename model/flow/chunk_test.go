@@ -224,7 +224,7 @@ func TestChunk_ModelVersions_EncodeDecode(t *testing.T) {
 
 	t.Run("encoding v0 and decoding it into v1 should yield nil for ServiceEventCount", func(t *testing.T) {
 		var chunkv0 flow.ChunkBodyV0
-		unittest.CopyStructure(t, chunkFixture.ChunkBody, &chunkv0)
+		unittest.EncodeDecodeDifferentVersions(t, chunkFixture.ChunkBody, &chunkv0)
 
 		t.Run("json", func(t *testing.T) {
 			bz, err := json.Marshal(chunkv0)
@@ -289,7 +289,7 @@ func TestChunk_FingerprintBackwardCompatibility(t *testing.T) {
 	chunk.ServiceEventCount = nil
 	chunkBody := chunk.ChunkBody
 	var chunkBodyV0 flow.ChunkBodyV0
-	unittest.CopyStructure(t, chunkBody, &chunkBodyV0)
+	unittest.EncodeDecodeDifferentVersions(t, chunkBody, &chunkBodyV0)
 
 	// A nil ServiceEventCount fields indicates a prior model version.
 	// The ID calculation for the old and new model version should be the same.

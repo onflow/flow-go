@@ -74,7 +74,7 @@ func TestExecutionResult_FingerprintBackwardCompatibility(t *testing.T) {
 
 	// Copy all fields to the prior-version model
 	var resultv0 ExecutionResultV0
-	unittest.CopyStructure(t, result, &resultv0)
+	unittest.EncodeDecodeDifferentVersions(t, result, &resultv0)
 
 	assert.Equal(t, result.ID(), flow.MakeID(resultv0))
 	assert.Equal(t, fingerprint.Fingerprint(result), fingerprint.Fingerprint(resultv0))
