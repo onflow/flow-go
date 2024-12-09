@@ -66,7 +66,7 @@ type DKGv0 struct {
 
 var _ protocol.DKG = (*DKGv0)(nil)
 
-func newDKGv0(setup *flow.EpochSetup, commit *flow.EpochCommit) *DKGv0 {
+func NewDKGv0(setup *flow.EpochSetup, commit *flow.EpochCommit) *DKGv0 {
 	return &DKGv0{
 		Participants: setup.Participants.Filter(filter.IsConsensusCommitteeMember),
 		Commit:       commit,
