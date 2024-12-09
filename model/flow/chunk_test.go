@@ -166,8 +166,8 @@ func TestChunkTotalComputationUsedIsSet(t *testing.T) {
 }
 
 // TestChunkEncodeDecode test encoding and decoding properties.
-// In particular, we want to demonstrate that nil-ness of the ServiceEventCount field
-// is preserved by the encoding schemes we use, because this difference is meaningful and
+// In particular, we confirm that `nil` values of the ServiceEventCount field are preserved (and
+// not conflated with 0) by the encoding schemes we use, because this difference is meaningful and
 // important for backward compatibility (see [ChunkBody.ServiceEventCount] for details).
 func TestChunkEncodeDecode(t *testing.T) {
 	chunk := unittest.ChunkFixture(unittest.IdentifierFixture(), 0)
@@ -222,7 +222,7 @@ func TestChunk_ModelVersions_EncodeDecode(t *testing.T) {
 	chunkFixture := unittest.ChunkFixture(unittest.IdentifierFixture(), 1)
 	chunkFixture.ServiceEventCount = unittest.PtrTo[uint16](0) // non-nil extra field
 
-	t.Run("writing v0 and reading v1 should yield nil for new field", func(t *testing.T) {
+	t.Run("encoding v0 and decoding it into v1 should yield nil for ServiceEventCount", func(t *testing.T) {
 		var chunkv0 flow.ChunkBodyV0
 		unittest.CopyStructure(t, chunkFixture.ChunkBody, &chunkv0)
 
@@ -250,7 +250,7 @@ func TestChunk_ModelVersions_EncodeDecode(t *testing.T) {
 			assert.Nil(t, unmarshaled.ServiceEventCount)
 		})
 	})
-	t.Run("writing v1 and reading v0 does not error", func(t *testing.T) {
+	t.Run("encoding v1 and decoding it into v0 should not error", func(t *testing.T) {
 		chunkv1 := chunkFixture.ChunkBody
 		chunkv1.ServiceEventCount = unittest.PtrTo[uint16](0) // ensure non-nil ServiceEventCount field
 
@@ -278,9 +278,10 @@ func TestChunk_ModelVersions_EncodeDecode(t *testing.T) {
 }
 
 // FingerprintBackwardCompatibility ensures that the Fingerprint and ID functions
-// are backward compatible with old data model versions. Specifically, if the new
-// ServiceEventCount field is nil, then the new model should produce IDs consistent
-// with the old model.
+// are backward compatible with old data model versions. We emulate the
+// case where a peer running an older software version receives a `ChunkBody` that
+// was encoded in the new version. Specifically, if the new ServiceEventCount field
+// is nil, then the new model should produce IDs consistent with the old model.
 //
 // Backward compatibility is implemented by providing a custom EncodeRLP method.
 func TestChunk_FingerprintBackwardCompatibility(t *testing.T) {
