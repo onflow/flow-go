@@ -68,27 +68,22 @@ type ChunkBody struct {
 	NumberOfTransactions uint64 // number of transactions inside the collection
 }
 
-// EncodeRLP defines custom encoding logic for the Chunk type.
-// This method exists only so that the embedded ChunkBody's EncodeRLP method is
-// not interpreted as the RLP encoding for the entire Chunk.
-func (ch Chunk) EncodeRLP(w io.Writer) error {
-	return rlp.Encode(w, struct {
-		ChunkBody ChunkBody
-		Index     uint64
-		EndState  StateCommitment
-	}{
-		ChunkBody: ch.ChunkBody,
-		Index:     ch.Index,
-		EndState:  ch.EndState,
-	})
-}
+// We TEMPORARILY implement the [rlp.Encoder] interface to implement backwards-compatible ID computation.
+// TODO(mainnet27): remove EncodeRLP methods on Chunk and ChunkBody https://github.com/onflow/flow-go/issues/6773
+var _ rlp.Encoder = &ChunkBody{}
 
 // EncodeRLP defines custom encoding logic for the ChunkBody type.
+// NOTE: For correct operation when encoding a larger structure containing ChunkBody,
+// this method depends on Chunk also overriding EncodeRLP. Otherwise, since ChunkBody
+// is an embedded field, the RLP encoder will skip Chunk fields besides those in ChunkBody.
+//
 // The encoding is defined for backward compatibility with prior data model version (ChunkBodyV0):
 //   - All new ChunkBody instances must have non-nil ServiceEventCount field
 //   - A nil ServiceEventCount field indicates a v0 version of ChunkBody
 //   - when computing the ID of such a ChunkBody, the ServiceEventCount field is omitted from the fingerprint
-// No errors expected during normal operations. 
+//
+// No errors expected during normal operations.
+// TODO(mainnet27): remove this method https://github.com/onflow/flow-go/issues/6773
 func (ch ChunkBody) EncodeRLP(w io.Writer) error {
 	var err error
 	if ch.ServiceEventCount == nil {
@@ -138,6 +133,27 @@ type Chunk struct {
 	Index uint64 // chunk index inside the ER (starts from zero)
 	// EndState inferred from next chunk or from the ER
 	EndState StateCommitment
+}
+
+// We TEMPORARILY implement the [rlp.Encoder] interface to implement backwards-compatible ID computation.
+// TODO(mainnet27): remove EncodeRLP methods on Chunk and ChunkBody https://github.com/onflow/flow-go/issues/6773
+var _ rlp.Encoder = &Chunk{}
+
+// EncodeRLP defines custom encoding logic for the Chunk type.
+// This method exists only so that the embedded ChunkBody's EncodeRLP method is
+// not interpreted as the RLP encoding for the entire Chunk.
+// No errors expected during normal operation.
+// TODO(mainnet27): remove this method https://github.com/onflow/flow-go/issues/6773
+func (ch Chunk) EncodeRLP(w io.Writer) error {
+	return rlp.Encode(w, struct {
+		ChunkBody ChunkBody
+		Index     uint64
+		EndState  StateCommitment
+	}{
+		ChunkBody: ch.ChunkBody,
+		Index:     ch.Index,
+		EndState:  ch.EndState,
+	})
 }
 
 func NewChunk(
