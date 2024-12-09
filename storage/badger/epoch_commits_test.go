@@ -142,9 +142,7 @@ func (commit *epochCommitV0) UnmarshalMsgpack(b []byte) error {
 
 func TestStoreV0AndDecodeV1(t *testing.T) {
 	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
-		v1 := unittest.EpochCommitFixture(func(commit *flow.EpochCommit) {
-			commit.DKGIndexMap = nil
-		})
+		v1 := unittest.EpochCommitFixture()
 		v0 := &epochCommitV0{
 			Counter:            v1.Counter,
 			ClusterQCs:         v1.ClusterQCs,

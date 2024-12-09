@@ -14,7 +14,6 @@ func TestDKGv0(t *testing.T) {
 	otherParticipants := unittest.IdentityListFixture(10, unittest.WithAllRolesExcept(flow.RoleConsensus))
 	setup := unittest.EpochSetupFixture(unittest.WithParticipants(append(consensusParticipants, otherParticipants...).ToSkeleton()))
 	commit := unittest.EpochCommitFixture(unittest.WithDKGFromParticipants(setup.Participants))
-	commit.DKGIndexMap = nil // pretend we don't have the index map and we are forced to use the v0.
 	dkg := inmem.NewDKGv0(setup, commit)
 	t.Run("Index", func(t *testing.T) {
 		for i, participant := range consensusParticipants {

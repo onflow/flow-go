@@ -400,22 +400,46 @@ func (commit *EpochCommit) UnmarshalMsgpack(b []byte) error {
 // within map types.
 // NOTE: DecodeRLP is not needed, as this is only used for hashing.
 func (commit *EpochCommit) EncodeRLP(w io.Writer) error {
-	rlpEncodable := struct {
-		Counter            uint64
-		ClusterQCs         []ClusterQCVoteData
-		DKGGroupKey        []byte
-		DKGParticipantKeys [][]byte
-	}{
-		Counter:            commit.Counter,
-		ClusterQCs:         commit.ClusterQCs,
-		DKGGroupKey:        commit.DKGGroupKey.Encode(),
-		DKGParticipantKeys: make([][]byte, 0, len(commit.DKGParticipantKeys)),
-	}
-	for _, key := range commit.DKGParticipantKeys {
-		rlpEncodable.DKGParticipantKeys = append(rlpEncodable.DKGParticipantKeys, key.Encode())
-	}
+	if commit.DKGIndexMap == nil {
+		rlpEncodable := struct {
+			Counter            uint64
+			ClusterQCs         []ClusterQCVoteData
+			DKGGroupKey        []byte
+			DKGParticipantKeys [][]byte
+		}{
+			Counter:            commit.Counter,
+			ClusterQCs:         commit.ClusterQCs,
+			DKGGroupKey:        commit.DKGGroupKey.Encode(),
+			DKGParticipantKeys: make([][]byte, 0, len(commit.DKGParticipantKeys)),
+		}
+		for _, key := range commit.DKGParticipantKeys {
+			rlpEncodable.DKGParticipantKeys = append(rlpEncodable.DKGParticipantKeys, key.Encode())
+		}
 
-	return rlp.Encode(w, rlpEncodable)
+		return rlp.Encode(w, rlpEncodable)
+	} else {
+		rlpEncodable := struct {
+			Counter            uint64
+			ClusterQCs         []ClusterQCVoteData
+			DKGGroupKey        []byte
+			DKGParticipantKeys [][]byte
+			DKGIndexMap        IdentifierList
+		}{
+			Counter:            commit.Counter,
+			ClusterQCs:         commit.ClusterQCs,
+			DKGGroupKey:        commit.DKGGroupKey.Encode(),
+			DKGParticipantKeys: make([][]byte, 0, len(commit.DKGParticipantKeys)),
+			DKGIndexMap:        make(IdentifierList, len(commit.DKGIndexMap)),
+		}
+		for _, key := range commit.DKGParticipantKeys {
+			rlpEncodable.DKGParticipantKeys = append(rlpEncodable.DKGParticipantKeys, key.Encode())
+		}
+		for id, index := range commit.DKGIndexMap {
+			rlpEncodable.DKGIndexMap[index] = id
+		}
+
+		return rlp.Encode(w, rlpEncodable)
+	}
 }
 
 // ID returns the hash of the event contents.
