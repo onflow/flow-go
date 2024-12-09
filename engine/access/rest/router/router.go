@@ -11,8 +11,8 @@ import (
 
 	"github.com/onflow/flow-go/access"
 	"github.com/onflow/flow-go/engine/access/rest/common/middleware"
+	"github.com/onflow/flow-go/engine/access/rest/common/models"
 	flowhttp "github.com/onflow/flow-go/engine/access/rest/http"
-	"github.com/onflow/flow-go/engine/access/rest/http/models"
 	"github.com/onflow/flow-go/engine/access/rest/websockets"
 	dp "github.com/onflow/flow-go/engine/access/rest/websockets/data_providers"
 	legacyws "github.com/onflow/flow-go/engine/access/rest/websockets/legacy"
