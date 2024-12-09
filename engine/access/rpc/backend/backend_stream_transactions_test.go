@@ -34,6 +34,7 @@ import (
 	storagemock "github.com/onflow/flow-go/storage/mock"
 	"github.com/onflow/flow-go/utils/unittest"
 	"github.com/onflow/flow-go/utils/unittest/mocks"
+	accessproto "github.com/onflow/flow/protobuf/go/flow/access"
 
 	"github.com/onflow/flow/protobuf/go/flow/entities"
 )
@@ -120,6 +121,14 @@ func (s *TransactionStatusSuite) SetupTest() {
 	s.broadcaster = engine.NewBroadcaster()
 	s.blockTracker = subscriptionmock.NewBlockTracker(s.T())
 	s.resultsMap = map[flow.Identifier]*flow.ExecutionResult{}
+
+	s.colClient.On(
+		"SendTransaction",
+		mock.Anything,
+		mock.Anything,
+	).Return(&accessproto.SendTransactionResponse{}, nil).Maybe()
+
+	s.transactions.On("Store", mock.Anything).Return(nil).Maybe()
 
 	// generate blockCount consecutive blocks with associated seal, result and execution data
 	s.rootBlock = unittest.BlockFixture()
@@ -314,7 +323,7 @@ func (s *TransactionStatusSuite) TestSubscribeTransactionStatusHappyCase() {
 	}
 
 	// 1. Subscribe to transaction status and receive the first message with pending status
-	sub := s.backend.SubscribeTransactionStatuses(ctx, &transaction.TransactionBody, entities.EventEncodingVersion_CCF_V0)
+	sub := s.backend.SendAndSubscribeTransactionStatuses(ctx, &transaction.TransactionBody, entities.EventEncodingVersion_CCF_V0)
 	checkNewSubscriptionMessage(sub, flow.TransactionStatusPending)
 
 	// 2. Make transaction reference block sealed, and add a new finalized block that includes the transaction
@@ -380,7 +389,7 @@ func (s *TransactionStatusSuite) TestSubscribeTransactionStatusExpired() {
 	}
 
 	// Subscribe to transaction status and receive the first message with pending status
-	sub := s.backend.SubscribeTransactionStatuses(ctx, &transaction.TransactionBody, entities.EventEncodingVersion_CCF_V0)
+	sub := s.backend.SendAndSubscribeTransactionStatuses(ctx, &transaction.TransactionBody, entities.EventEncodingVersion_CCF_V0)
 	checkNewSubscriptionMessage(sub, flow.TransactionStatusPending)
 
 	// Generate 600 blocks without transaction included and check, that transaction still pending
