@@ -3,12 +3,10 @@ package data_providers
 import (
 	"context"
 	"fmt"
-	"strconv"
-	"strings"
-
 	"github.com/rs/zerolog"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+	"strconv"
 
 	"github.com/onflow/flow-go/engine/access/rest/common/parser"
 	"github.com/onflow/flow-go/engine/access/rest/http/request"
@@ -32,6 +30,8 @@ type AccountStatusesDataProvider struct {
 
 	logger         zerolog.Logger
 	stateStreamApi state_stream.API
+
+	heartbeatInterval uint64
 }
 
 var _ DataProvider = (*AccountStatusesDataProvider)(nil)
@@ -41,17 +41,20 @@ func NewAccountStatusesDataProvider(
 	ctx context.Context,
 	logger zerolog.Logger,
 	stateStreamApi state_stream.API,
-	chain flow.Chain,
-	eventFilterConfig state_stream.EventFilterConfig,
 	topic string,
 	arguments models.Arguments,
 	send chan<- interface{},
+	chain flow.Chain,
+	eventFilterConfig state_stream.EventFilterConfig,
+	heartbeatInterval uint64,
 ) (*AccountStatusesDataProvider, error) {
 	p := &AccountStatusesDataProvider{
-		logger:         logger.With().Str("component", "account-statuses-data-provider").Logger(),
-		stateStreamApi: stateStreamApi,
+		logger:            logger.With().Str("component", "account-statuses-data-provider").Logger(),
+		stateStreamApi:    stateStreamApi,
+		heartbeatInterval: heartbeatInterval,
 	}
 
+	// Initialize arguments passed to the provider.
 	accountStatusesArgs, err := ParseAccountStatusesArguments(arguments, chain, eventFilterConfig)
 	if err != nil {
 		return nil, fmt.Errorf("invalid arguments for account statuses data provider: %w", err)
@@ -73,7 +76,7 @@ func NewAccountStatusesDataProvider(
 //
 // No errors are expected during normal operations.
 func (p *AccountStatusesDataProvider) Run() error {
-	return subscription.HandleSubscription(p.subscription, p.handleResponse(p.send))
+	return subscription.HandleSubscription(p.subscription, p.handleResponse())
 }
 
 // createSubscription creates a new subscription using the specified input arguments.
@@ -92,16 +95,27 @@ func (p *AccountStatusesDataProvider) createSubscription(ctx context.Context, ar
 // handleResponse processes an account statuses and sends the formatted response.
 //
 // No errors are expected during normal operations.
-func (p *AccountStatusesDataProvider) handleResponse(send chan<- interface{}) func(accountStatusesResponse *backend.AccountStatusesResponse) error {
+func (p *AccountStatusesDataProvider) handleResponse() func(accountStatusesResponse *backend.AccountStatusesResponse) error {
+	blocksSinceLastMessage := uint64(0)
 	messageIndex := counters.NewMonotonousCounter(1)
 
 	return func(accountStatusesResponse *backend.AccountStatusesResponse) error {
+		// check if there are any events in the response. if not, do not send a message unless the last
+		// response was more than HeartbeatInterval blocks ago
+		if len(accountStatusesResponse.AccountEvents) == 0 {
+			blocksSinceLastMessage++
+			if blocksSinceLastMessage < p.heartbeatInterval {
+				return nil
+			}
+			blocksSinceLastMessage = 0
+		}
+
 		index := messageIndex.Value()
 		if ok := messageIndex.Set(messageIndex.Value() + 1); !ok {
 			return status.Errorf(codes.Internal, "message index already incremented to %d", messageIndex.Value())
 		}
 
-		send <- &models.AccountStatusesResponse{
+		p.send <- &models.AccountStatusesResponse{
 			BlockID:       accountStatusesResponse.BlockID.String(),
 			Height:        strconv.FormatUint(accountStatusesResponse.Height, 10),
 			AccountEvents: accountStatusesResponse.AccountEvents,
@@ -112,8 +126,8 @@ func (p *AccountStatusesDataProvider) handleResponse(send chan<- interface{}) fu
 	}
 }
 
-// ParseAccountStatusesArguments validates and initializes the account statuses arguments.
-func ParseAccountStatusesArguments(
+// parseAccountStatusesArguments validates and initializes the account statuses arguments.
+func parseAccountStatusesArguments(
 	arguments models.Arguments,
 	chain flow.Chain,
 	eventFilterConfig state_stream.EventFilterConfig,
@@ -121,8 +135,8 @@ func ParseAccountStatusesArguments(
 	var args AccountStatusesArguments
 
 	// Check for mutual exclusivity of start_block_id and start_block_height early
-	_, hasStartBlockID := arguments["start_block_id"]
-	_, hasStartBlockHeight := arguments["start_block_height"]
+	startBlockIDIn, hasStartBlockID := arguments["start_block_id"]
+	startBlockHeightIn, hasStartBlockHeight := arguments["start_block_height"]
 
 	if hasStartBlockID && hasStartBlockHeight {
 		return args, fmt.Errorf("can only provide either 'start_block_id' or 'start_block_height'")
@@ -130,8 +144,12 @@ func ParseAccountStatusesArguments(
 
 	// Parse 'start_block_id' if provided
 	if hasStartBlockID {
+		result, ok := startBlockIDIn.(string)
+		if !ok {
+			return args, fmt.Errorf("'start_block_id' must be a string")
+		}
 		var startBlockID parser.ID
-		err := startBlockID.Parse(arguments["start_block_id"])
+		err := startBlockID.Parse(result)
 		if err != nil {
 			return args, fmt.Errorf("invalid 'start_block_id': %w", err)
 		}
@@ -139,20 +157,30 @@ func ParseAccountStatusesArguments(
 	}
 
 	// Parse 'start_block_height' if provided
+	// Parse 'start_block_height' if provided
 	if hasStartBlockHeight {
-		var err error
-		args.StartBlockHeight, err = util.ToUint64(arguments["start_block_height"])
+		result, ok := startBlockHeightIn.(string)
+		if !ok {
+			return args, fmt.Errorf("'start_block_height' must be a string")
+		}
+		startBlockHeight, err := util.ToUint64(result)
 		if err != nil {
 			return args, fmt.Errorf("invalid 'start_block_height': %w", err)
 		}
+		args.StartBlockHeight = startBlockHeight
 	} else {
 		args.StartBlockHeight = request.EmptyHeight
 	}
 
-	// Parse 'event_types' as []string{}
+	// Parse 'event_types' as a JSON array
 	var eventTypes parser.EventTypes
 	if eventTypesIn, ok := arguments["event_types"]; ok && eventTypesIn != "" {
-		err := eventTypes.Parse(strings.Split(eventTypesIn, ","))
+		result, ok := eventTypesIn.([]string)
+		if !ok {
+			return args, fmt.Errorf("'event_types' must be an array of string")
+		}
+
+		err := eventTypes.Parse(result)
 		if err != nil {
 			return args, fmt.Errorf("invalid 'event_types': %w", err)
 		}
@@ -160,8 +188,11 @@ func ParseAccountStatusesArguments(
 
 	// Parse 'accountAddresses' as []string{}
 	var accountAddresses []string
-	if addressesIn, ok := arguments["accountAddresses"]; ok && addressesIn != "" {
-		accountAddresses = strings.Split(addressesIn, ",")
+	if accountAddressesIn, ok := arguments["account_addresses"]; ok && accountAddressesIn != "" {
+		accountAddresses, ok = accountAddressesIn.([]string)
+		if !ok {
+			return args, fmt.Errorf("'account_addresses' must be an array of string")
+		}
 	}
 
 	// Initialize the event filter with the parsed arguments
