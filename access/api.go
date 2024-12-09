@@ -206,7 +206,12 @@ type API interface {
 	// SubscribeTransactionStatuses streams transaction statuses starting from the reference block saved in the
 	// transaction itself until the block containing the transaction becomes sealed or expired. When the transaction
 	// status becomes TransactionStatusSealed or TransactionStatusExpired, the subscription will automatically shut down.
-	SubscribeTransactionStatuses(ctx context.Context, tx *flow.TransactionBody, requiredEventEncodingVersion entities.EventEncodingVersion) subscription.Subscription
+	SubscribeTransactionStatuses(ctx context.Context, txID flow.Identifier, blockID flow.Identifier, requiredEventEncodingVersion entities.EventEncodingVersion) subscription.Subscription
+
+	// SendAndSubscribeTransactionStatuses streams transaction statuses starting from the reference block saved in the
+	// transaction itself until the block containing the transaction becomes sealed or expired. When the transaction
+	// status becomes TransactionStatusSealed or TransactionStatusExpired, the subscription will automatically shut down.
+	SendAndSubscribeTransactionStatuses(ctx context.Context, tx *flow.TransactionBody, requiredEventEncodingVersion entities.EventEncodingVersion) subscription.Subscription
 }
 
 // TODO: Combine this with flow.TransactionResult?
