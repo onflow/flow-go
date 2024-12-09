@@ -18,6 +18,10 @@ func InsertEpochCommit(eventID flow.Identifier, event *flow.EpochCommit) func(*b
 	return insert(makePrefix(codeEpochCommit, eventID), event)
 }
 
+func InsertEpochCommitV0(eventID flow.Identifier, event any) func(*badger.Txn) error {
+	return insert(makePrefix(codeEpochCommit, eventID), event)
+}
+
 func RetrieveEpochCommit(eventID flow.Identifier, event *flow.EpochCommit) func(*badger.Txn) error {
 	return retrieve(makePrefix(codeEpochCommit, eventID), event)
 }
