@@ -288,21 +288,21 @@ func TestChunk_FingerprintBackwardCompatibility(t *testing.T) {
 	chunk := unittest.ChunkFixture(unittest.IdentifierFixture(), 1)
 	chunk.ServiceEventCount = nil
 	chunkBody := chunk.ChunkBody
-	var chunkv0 flow.ChunkBodyV0
-	unittest.CopyStructure(t, chunkBody, &chunkv0)
+	var chunkBodyV0 flow.ChunkBodyV0
+	unittest.CopyStructure(t, chunkBody, &chunkBodyV0)
 
 	// A nil ServiceEventCount fields indicates a prior model version.
 	// The ID calculation for the old and new model version should be the same.
 	t.Run("nil ServiceEventCount fields", func(t *testing.T) {
 		chunkBody.ServiceEventCount = nil
-		assert.Equal(t, flow.MakeID(chunkv0), flow.MakeID(chunkBody))
-		assert.Equal(t, fingerprint.Fingerprint(chunkv0), fingerprint.Fingerprint(chunkBody))
+		assert.Equal(t, flow.MakeID(chunkBodyV0), flow.MakeID(chunkBody))
+		assert.Equal(t, fingerprint.Fingerprint(chunkBodyV0), fingerprint.Fingerprint(chunkBody))
 	})
 	// A non-nil ServiceEventCount fields indicates an up-to-date model version.
 	// The ID calculation for the old and new model version should be different,
 	// because the new model should include the ServiceEventCount field value.
 	t.Run("non-nil ServiceEventCount fields", func(t *testing.T) {
 		chunkBody.ServiceEventCount = unittest.PtrTo[uint16](0)
-		assert.NotEqual(t, flow.MakeID(chunkv0), flow.MakeID(chunkBody))
+		assert.NotEqual(t, flow.MakeID(chunkBodyV0), flow.MakeID(chunkBody))
 	})
 }
