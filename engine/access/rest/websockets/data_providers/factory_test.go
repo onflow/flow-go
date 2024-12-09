@@ -53,7 +53,8 @@ func (s *DataProviderFactorySuite) SetupTest() {
 		s.accessApi,
 		chain,
 		state_stream.DefaultEventFilterConfig,
-		subscription.DefaultHeartbeatInterval)
+		subscription.DefaultHeartbeatInterval,
+	)
 	s.Require().NotNil(s.factory)
 }
 

@@ -2,14 +2,10 @@ package data_providers
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"strconv"
-	"strings"
 
 	"github.com/rs/zerolog"
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 
 	"github.com/onflow/flow-go/engine/access/rest/common/parser"
 	"github.com/onflow/flow-go/engine/access/rest/http/request"
@@ -60,7 +56,7 @@ func NewEventsDataProvider(
 	}
 
 	// Initialize arguments passed to the provider.
-	eventArgs, err := ParseEventsArguments(arguments, chain, eventFilterConfig)
+	eventArgs, err := parseEventsArguments(arguments, chain, eventFilterConfig)
 	if err != nil {
 		return nil, fmt.Errorf("invalid arguments for events data provider: %w", err)
 	}
@@ -81,10 +77,10 @@ func NewEventsDataProvider(
 //
 // No errors are expected during normal operations.
 func (p *EventsDataProvider) Run() error {
-	return subscription.HandleSubscription(p.subscription, p.handleResponse(p.send))
+	return subscription.HandleSubscription(p.subscription, p.handleResponse())
 }
 
-func (p *EventsDataProvider) handleResponse(send chan<- interface{}) func(eventsResponse *backend.EventsResponse) error {
+func (p *EventsDataProvider) handleResponse() func(eventsResponse *backend.EventsResponse) error {
 	blocksSinceLastMessage := uint64(0)
 	messageIndex := counters.NewMonotonousCounter(1)
 
@@ -101,10 +97,10 @@ func (p *EventsDataProvider) handleResponse(send chan<- interface{}) func(events
 
 		index := messageIndex.Value()
 		if ok := messageIndex.Set(messageIndex.Value() + 1); !ok {
-			return status.Errorf(codes.Internal, "message index already incremented to %d", messageIndex.Value())
+			return fmt.Errorf("message index already incremented to: %d", messageIndex.Value())
 		}
 
-		send <- &models.EventResponse{
+		p.send <- &models.EventResponse{
 			BlockId:        eventsResponse.BlockID.String(),
 			BlockHeight:    strconv.FormatUint(eventsResponse.Height, 10),
 			BlockTimestamp: eventsResponse.BlockTimestamp,
@@ -129,8 +125,8 @@ func (p *EventsDataProvider) createSubscription(ctx context.Context, args Events
 	return p.stateStreamApi.SubscribeEventsFromLatest(ctx, args.Filter)
 }
 
-// ParseEventsArguments validates and initializes the events arguments.
-func ParseEventsArguments(
+// parseEventsArguments validates and initializes the events arguments.
+func parseEventsArguments(
 	arguments models.Arguments,
 	chain flow.Chain,
 	eventFilterConfig state_stream.EventFilterConfig,
@@ -147,8 +143,12 @@ func ParseEventsArguments(
 
 	// Parse 'start_block_id' if provided
 	if hasStartBlockID {
+		result, ok := startBlockIDIn.(string)
+		if !ok {
+			return args, fmt.Errorf("'start_block_id' must be a string")
+		}
 		var startBlockID parser.ID
-		err := startBlockID.Parse(startBlockIDIn)
+		err := startBlockID.Parse(result)
 		if err != nil {
 			return args, fmt.Errorf("invalid 'start_block_id': %w", err)
 		}
@@ -157,24 +157,28 @@ func ParseEventsArguments(
 
 	// Parse 'start_block_height' if provided
 	if hasStartBlockHeight {
-		var err error
-		args.StartBlockHeight, err = util.ToUint64(startBlockHeightIn)
+		result, ok := startBlockHeightIn.(string)
+		if !ok {
+			return args, fmt.Errorf("'start_block_height' must be a string")
+		}
+		startBlockHeight, err := util.ToUint64(result)
 		if err != nil {
 			return args, fmt.Errorf("invalid 'start_block_height': %w", err)
 		}
+		args.StartBlockHeight = startBlockHeight
 	} else {
 		args.StartBlockHeight = request.EmptyHeight
 	}
 
+	// Parse 'event_types' as a JSON array
 	var eventTypes parser.EventTypes
-	// Parse 'event_types' as []string{}
 	if eventTypesIn, ok := arguments["event_types"]; ok && eventTypesIn != "" {
-		err := json.Unmarshal([]byte(eventTypesIn), &eventTypes) // Expect a JSON array
-		if err != nil {
-			return args, fmt.Errorf("could not parse 'event_types': %w", err)
+		result, ok := eventTypesIn.([]string)
+		if !ok {
+			return args, fmt.Errorf("'event_types' must be an array of string")
 		}
 
-		err = eventTypes.Parse(strings.Split(eventTypesIn, ","))
+		err := eventTypes.Parse(result)
 		if err != nil {
 			return args, fmt.Errorf("invalid 'event_types': %w", err)
 		}
@@ -183,18 +187,18 @@ func ParseEventsArguments(
 	// Parse 'addresses' as []string{}
 	var addresses []string
 	if addressesIn, ok := arguments["addresses"]; ok && addressesIn != "" {
-		err := json.Unmarshal([]byte(addressesIn), &addresses) // Expect a JSON array
-		if err != nil {
-			return args, fmt.Errorf("could not parse 'addresses': %w", err)
+		addresses, ok = addressesIn.([]string)
+		if !ok {
+			return args, fmt.Errorf("'addresses' must be a string")
 		}
 	}
 
 	// Parse 'contracts' as []string{}
 	var contracts []string
 	if contractsIn, ok := arguments["contracts"]; ok && contractsIn != "" {
-		err := json.Unmarshal([]byte(contractsIn), &contracts) // Expect a JSON array
-		if err != nil {
-			return args, fmt.Errorf("could not parse 'contracts': %w", err)
+		contracts, ok = contractsIn.([]string)
+		if !ok {
+			return args, fmt.Errorf("'contracts' must be a string")
 		}
 	}
 

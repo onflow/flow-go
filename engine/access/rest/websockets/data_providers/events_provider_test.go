@@ -64,6 +64,7 @@ func (s *EventsProviderSuite) subscribeEventsDataProviderTestCases() []testType 
 			name: "SubscribeBlocksFromStartBlockID happy path",
 			arguments: models.Arguments{
 				"start_block_id": s.rootBlock.ID().String(),
+				"event_types":    []string{"flow.AccountCreated", "flow.AccountUpdated"},
 			},
 			setupBackend: func(sub *ssmock.Subscription) {
 				s.api.On(
@@ -223,14 +224,14 @@ func (s *EventsProviderSuite) invalidArgumentsTestCases() []testErrType {
 		},
 		{
 			name: "invalid 'start_block_id' argument",
-			arguments: map[string]string{
+			arguments: map[string]interface{}{
 				"start_block_id": "invalid_block_id",
 			},
 			expectedErrorMsg: "invalid ID format",
 		},
 		{
 			name: "invalid 'start_block_height' argument",
-			arguments: map[string]string{
+			arguments: map[string]interface{}{
 				"start_block_height": "-1",
 			},
 			expectedErrorMsg: "value must be an unsigned 64 bit integer",
@@ -262,7 +263,8 @@ func (s *EventsProviderSuite) TestEventsDataProvider_InvalidArguments() {
 				send,
 				s.chain,
 				state_stream.DefaultEventFilterConfig,
-				subscription.DefaultHeartbeatInterval)
+				subscription.DefaultHeartbeatInterval,
+			)
 			s.Require().Nil(provider)
 			s.Require().Error(err)
 			s.Require().Contains(err.Error(), test.expectedErrorMsg)
@@ -288,7 +290,7 @@ func (s *EventsProviderSuite) TestMessageIndexEventProviderResponse_HappyPath() 
 	s.api.On("SubscribeEventsFromStartBlockID", mock.Anything, mock.Anything, mock.Anything).Return(sub)
 
 	arguments :=
-		map[string]string{
+		map[string]interface{}{
 			"start_block_id": s.rootBlock.ID().String(),
 		}
 
