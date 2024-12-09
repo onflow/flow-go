@@ -189,7 +189,7 @@ func parseEventsArguments(
 	if addressesIn, ok := arguments["addresses"]; ok && addressesIn != "" {
 		addresses, ok = addressesIn.([]string)
 		if !ok {
-			return args, fmt.Errorf("'addresses' must be a string")
+			return args, fmt.Errorf("'addresses' must be an array of string")
 		}
 	}
 
@@ -198,7 +198,7 @@ func parseEventsArguments(
 	if contractsIn, ok := arguments["contracts"]; ok && contractsIn != "" {
 		contracts, ok = contractsIn.([]string)
 		if !ok {
-			return args, fmt.Errorf("'contracts' must be a string")
+			return args, fmt.Errorf("'contracts' must be an array of string")
 		}
 	}
 
