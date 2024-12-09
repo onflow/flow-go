@@ -802,7 +802,7 @@ func BenchmarkFinal(b *testing.B) {
 	})
 }
 
-// BenchmarkFinal benchmarks retrieving the block by height from storage.
+// BenchmarkByHeight benchmarks retrieving the block by height from storage.
 func BenchmarkByHeight(b *testing.B) {
 	util.RunWithBootstrapState(b, unittest.RootSnapshotFixture(unittest.CompleteIdentitySet()), func(db *badger.DB, state *bprotocol.State) {
 		b.ResetTimer()
