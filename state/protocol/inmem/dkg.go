@@ -2,8 +2,8 @@ package inmem
 
 import (
 	"fmt"
-
 	"github.com/onflow/crypto"
+	"github.com/onflow/flow-go/model/flow/filter"
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/state/protocol"
@@ -14,7 +14,9 @@ type DKG flow.EpochCommit
 
 var _ protocol.DKG = (*DKG)(nil)
 
-func NewDKG(commit *flow.EpochCommit) *DKG { return (*DKG)(commit) }
+func NewDKG(commit *flow.EpochCommit) *DKG {
+	return (*DKG)(commit)
+}
 
 func (d *DKG) Size() uint                 { return uint(len(d.DKGParticipantKeys)) }
 func (d *DKG) GroupKey() crypto.PublicKey { return d.DKGGroupKey }
@@ -55,4 +57,50 @@ func (d *DKG) NodeID(index uint) (flow.Identifier, error) {
 		}
 	}
 	return flow.ZeroID, fmt.Errorf("inconsistent DKG state: missing index %d", index)
+}
+
+type DKGv0 struct {
+	Participants flow.IdentitySkeletonList
+	Commit       *flow.EpochCommit
+}
+
+var _ protocol.DKG = (*DKGv0)(nil)
+
+func newDKGv0(setup *flow.EpochSetup, commit *flow.EpochCommit) *DKGv0 {
+	return &DKGv0{
+		Participants: setup.Participants.Filter(filter.IsConsensusCommitteeMember),
+		Commit:       commit,
+	}
+}
+
+func (d DKGv0) Size() uint {
+	return uint(len(d.Participants))
+}
+
+func (d DKGv0) GroupKey() crypto.PublicKey {
+	return d.Commit.DKGGroupKey
+}
+
+func (d DKGv0) Index(nodeID flow.Identifier) (uint, error) {
+	index, exists := d.Participants.GetIndex(nodeID)
+	if !exists {
+		return 0, protocol.IdentityNotFoundError{NodeID: nodeID}
+	}
+	return index, nil
+}
+
+func (d DKGv0) KeyShare(nodeID flow.Identifier) (crypto.PublicKey, error) {
+	index, err := d.Index(nodeID)
+	if err != nil {
+		return nil, err
+	}
+	return d.Commit.DKGParticipantKeys[index], nil
+}
+
+func (d DKGv0) NodeID(index uint) (flow.Identifier, error) {
+	identity, exists := d.Participants.ByIndex(index)
+	if !exists {
+		return flow.ZeroID, fmt.Errorf("inconsistent DKG state: missing index %d", index)
+	}
+	return identity.NodeID, nil
 }
