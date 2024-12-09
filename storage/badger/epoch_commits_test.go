@@ -142,8 +142,9 @@ func (commit *epochCommitV0) UnmarshalMsgpack(b []byte) error {
 
 func TestStoreV0AndDecodeV1(t *testing.T) {
 	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
-		v1 := unittest.EpochCommitFixture()
-		//v1.DKGIndexMap = nil
+		v1 := unittest.EpochCommitFixture(func(commit *flow.EpochCommit) {
+			commit.DKGIndexMap = nil
+		})
 		v0 := &epochCommitV0{
 			Counter:            v1.Counter,
 			ClusterQCs:         v1.ClusterQCs,
@@ -164,7 +165,7 @@ func TestStoreV0AndDecodeV1(t *testing.T) {
 		require.NoError(t, err)
 		require.Equal(t, v1, &actual)
 		require.Equal(t, v0.ID(), actual.ID())
-		require.Nil(t, actual.DKGIndexMap)
+		require.Equal(t, v1, &actual)
 	})
 
 }
