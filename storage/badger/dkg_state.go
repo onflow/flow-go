@@ -73,11 +73,12 @@ func NewRecoverableRandomBeaconStateMachine(collector module.CacheMetrics, db *b
 	}, nil
 }
 
-// InsertMyBeaconPrivateKey stores the random beacon private key for an epoch.
+// InsertMyBeaconPrivateKey stores the random beacon private key for an epoch and transitions the
+// state machine into the [flow.DKGStateCompleted] state.
 //
 // CAUTION: these keys are stored before they are validated against the
-// canonical key vector and may not be valid for use in signing. Use storage.SafeBeaconKeys interface
-// to guarantee only keys safe for signing are returned.
+// canonical key vector and may not be valid for use in signing. Use [storage.SafeBeaconKeys]
+// interface to guarantee only keys safe for signing are returned.
 // Error returns:
 //   - [storage.ErrAlreadyExists] - if there is already a key stored for given epoch.
 //   - [storage.InvalidDKGStateTransitionError] - if the requested state transition is invalid.
@@ -168,7 +169,7 @@ func (ds *RecoverablePrivateBeaconKeyStateMachine) processStateTransition(epochC
 //   - [storage.ErrNotFound] - if there is no state stored for given epoch, meaning the state machine is in initial state.
 func (ds *RecoverablePrivateBeaconKeyStateMachine) GetDKGState(epochCounter uint64) (flow.DKGState, error) {
 	var currentState flow.DKGState
-	err := ds.db.Update(operation.RetrieveDKGStateForEpoch(epochCounter, &currentState))
+	err := ds.db.View(operation.RetrieveDKGStateForEpoch(epochCounter, &currentState))
 	return currentState, err
 }
 

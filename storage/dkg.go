@@ -24,7 +24,7 @@ type SafeBeaconKeys interface {
 	RetrieveMyBeaconPrivateKey(epochCounter uint64) (key crypto.PrivateKey, safe bool, err error)
 }
 
-// DKGStateReader is a read-only interface for reading state of the Random Beacon Recoverable State Machine.
+// DKGStateReader is a read-only interface for low-level reading of the Random Beacon Recoverable State Machine.
 type DKGStateReader interface {
 	SafeBeaconKeys
 
@@ -48,10 +48,11 @@ type DKGStateReader interface {
 	UnsafeRetrieveMyBeaconPrivateKey(epochCounter uint64) (crypto.PrivateKey, error)
 }
 
-// DKGState is the storage interface for storing all artifacts and state
-// related to the DKG process, including the latest state of a running or completed DKG, and computed beacon keys.
-// It allows to initiate state transitions to the Random Beacon Recoverable State Machine by calling respective methods.
-// It supports all state transitions for the happy path. Recovery from the epoch fallback mode is supported by the EpochRecoveryMyBeaconKey interface.
+// DKGState is the storage interface for storing all artifacts and state related to the DKG process,
+// including the latest state of a running or completed DKG, and computed beacon keys. DKGState
+// supports all state transitions that can occur for an individual node during the happy path
+// epoch switchover of the network as a whole. Recovery from the epoch fallback mode is supported
+// by the EpochRecoveryMyBeaconKey interface.
 type DKGState interface {
 	DKGStateReader
 
@@ -64,10 +65,11 @@ type DKGState interface {
 	//   - [storage.InvalidDKGStateTransitionError] - if the requested state transition is invalid.
 	SetDKGState(epochCounter uint64, newState flow.DKGState) error
 
-	// InsertMyBeaconPrivateKey stores the random beacon private key for an epoch.
+	// InsertMyBeaconPrivateKey stores the random beacon private key for an epoch and transitions the
+	// state machine into the [flow.DKGStateCompleted] state.
 	//
 	// CAUTION: these keys are stored before they are validated against the
-	// canonical key vector and may not be valid for use in signing. Use SafeBeaconKeys
+	// canonical key vector and may not be valid for use in signing. Use [SafeBeaconKeys]
 	// to guarantee only keys safe for signing are returned
 	// Error returns:
 	//   - [storage.ErrAlreadyExists] - if there is already a key stored for given epoch.
