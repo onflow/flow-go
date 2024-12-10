@@ -399,6 +399,9 @@ func (commit *EpochCommit) UnmarshalMsgpack(b []byte) error {
 // differently from JSON/msgpack, because it does not handle custom encoders
 // within map types.
 // NOTE: DecodeRLP is not needed, as this is only used for hashing.
+// TODO(EFM, #6794): Currently we implement RLP encoding based on availability of DKGIndexMap
+// this is needed to support backward compatibility, to guarantee that we will produce same hash
+// for the same event. This should be removed once we complete the network upgrade.
 func (commit *EpochCommit) EncodeRLP(w io.Writer) error {
 	if commit.DKGIndexMap == nil {
 		rlpEncodable := struct {

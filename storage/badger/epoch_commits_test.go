@@ -53,6 +53,11 @@ func TestEpochCommitStoreAndRetrieve(t *testing.T) {
 	})
 }
 
+// epochCommitV0 is a version of [flow.EpochCommit] without the [flow.DKGIndexMap] field.
+// This exact structure was used to current mainnet and we would like to ensure that new version of [flow.EpochCommit]
+// is backward compatible with this structure.
+// It is used only in tests.
+// TODO(EFM, #6794): Remove this once we complete the network upgrade
 type epochCommitV0 struct {
 	// Counter is the epoch counter of the epoch being committed
 	Counter uint64
@@ -93,6 +98,8 @@ func (commit *epochCommitV0) EncodeRLP(w io.Writer) error {
 	return rlp.Encode(w, rlpEncodable)
 }
 
+// encodableCommit represents encoding of epochCommitV0, it is used for serialization purposes and is used only in tests.
+// TODO(EFM, #6794): Remove this once we complete the network upgrade
 type encodableCommit struct {
 	Counter            uint64
 	ClusterQCs         []flow.ClusterQCVoteData
@@ -140,6 +147,10 @@ func (commit *epochCommitV0) UnmarshalMsgpack(b []byte) error {
 	return nil
 }
 
+// TestStoreV0AndDecodeV1 tests that an [flow.EpochCommit] without [flow.DKGIndexMap](v0) field can be stored and
+// later retrieved as a [flow.EpochCommit](v1) without any errors or data loss.
+// This test verifies that the [flow.EpochCommit] is backward compatible with respect to the [flow.DKGIndexMap] field.
+// TODO(EFM, #6794): Remove this once we complete the network upgrade
 func TestStoreV0AndDecodeV1(t *testing.T) {
 	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
 		v1 := unittest.EpochCommitFixture()
