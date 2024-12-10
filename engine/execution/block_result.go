@@ -2,6 +2,7 @@ package execution
 
 import (
 	"fmt"
+	"math"
 
 	"github.com/onflow/flow-go/fvm/storage/snapshot"
 	"github.com/onflow/flow-go/model/flow"
@@ -52,6 +53,12 @@ func (er *BlockExecutionResult) AllEvents() flow.EventsList {
 // ServiceEventCountForChunk returns the number of service events emitted in the given chunk.
 func (er *BlockExecutionResult) ServiceEventCountForChunk(chunkIndex int) uint16 {
 	serviceEventCount := len(er.collectionExecutionResults[chunkIndex].serviceEvents)
+	if serviceEventCount > math.MaxUint16 {
+		// The current protocol demands that the ServiceEventCount does not exceed 65535.
+		// For defensive programming, we explicitly enforce this limit as 65k could be produced by a bug.
+		// Execution nodes would be first to realize that this bound is violated, and crash (fail early).
+		panic(fmt.Sprintf("service event count (%d) exceeds maximum value of 65535", serviceEventCount))
+	}
 	return uint16(serviceEventCount)
 }
 
