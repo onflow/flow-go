@@ -6,6 +6,8 @@ import (
 	"strconv"
 
 	"github.com/rs/zerolog"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 
 	"github.com/onflow/flow-go/engine/access/rest/common/parser"
 	"github.com/onflow/flow-go/engine/access/rest/http/request"
@@ -18,15 +20,13 @@ import (
 	"github.com/onflow/flow-go/module/counters"
 )
 
-// EventsArguments contains the arguments required for subscribing to events
-type EventsArguments struct {
-	StartBlockID     flow.Identifier          // ID of the block to start subscription from
-	StartBlockHeight uint64                   // Height of the block to start subscription from
-	Filter           state_stream.EventFilter // Filter applied to events for a given subscription
+type AccountStatusesArguments struct {
+	StartBlockID     flow.Identifier                  // ID of the block to start subscription from
+	StartBlockHeight uint64                           // Height of the block to start subscription from
+	Filter           state_stream.AccountStatusFilter // Filter applied to events for a given subscription
 }
 
-// EventsDataProvider is responsible for providing events
-type EventsDataProvider struct {
+type AccountStatusesDataProvider struct {
 	*baseDataProvider
 
 	logger         zerolog.Logger
@@ -35,10 +35,10 @@ type EventsDataProvider struct {
 	heartbeatInterval uint64
 }
 
-var _ DataProvider = (*EventsDataProvider)(nil)
+var _ DataProvider = (*AccountStatusesDataProvider)(nil)
 
-// NewEventsDataProvider creates a new instance of EventsDataProvider.
-func NewEventsDataProvider(
+// NewAccountStatusesDataProvider creates a new instance of AccountStatusesDataProvider.
+func NewAccountStatusesDataProvider(
 	ctx context.Context,
 	logger zerolog.Logger,
 	stateStreamApi state_stream.API,
@@ -48,17 +48,17 @@ func NewEventsDataProvider(
 	chain flow.Chain,
 	eventFilterConfig state_stream.EventFilterConfig,
 	heartbeatInterval uint64,
-) (*EventsDataProvider, error) {
-	p := &EventsDataProvider{
-		logger:            logger.With().Str("component", "events-data-provider").Logger(),
+) (*AccountStatusesDataProvider, error) {
+	p := &AccountStatusesDataProvider{
+		logger:            logger.With().Str("component", "account-statuses-data-provider").Logger(),
 		stateStreamApi:    stateStreamApi,
 		heartbeatInterval: heartbeatInterval,
 	}
 
 	// Initialize arguments passed to the provider.
-	eventArgs, err := parseEventsArguments(arguments, chain, eventFilterConfig)
+	accountStatusesArgs, err := parseAccountStatusesArguments(arguments, chain, eventFilterConfig)
 	if err != nil {
-		return nil, fmt.Errorf("invalid arguments for events data provider: %w", err)
+		return nil, fmt.Errorf("invalid arguments for account statuses data provider: %w", err)
 	}
 
 	subCtx, cancel := context.WithCancel(ctx)
@@ -67,7 +67,7 @@ func NewEventsDataProvider(
 		topic,
 		cancel,
 		send,
-		p.createSubscription(subCtx, eventArgs), // Set up a subscription to events based on arguments.
+		p.createSubscription(subCtx, accountStatusesArgs), // Set up a subscription to account statuses based on arguments.
 	)
 
 	return p, nil
@@ -76,21 +76,34 @@ func NewEventsDataProvider(
 // Run starts processing the subscription for events and handles responses.
 //
 // No errors are expected during normal operations.
-func (p *EventsDataProvider) Run() error {
+func (p *AccountStatusesDataProvider) Run() error {
 	return subscription.HandleSubscription(p.subscription, p.handleResponse())
 }
 
-// handleResponse processes events and sends the formatted response.
+// createSubscription creates a new subscription using the specified input arguments.
+func (p *AccountStatusesDataProvider) createSubscription(ctx context.Context, args AccountStatusesArguments) subscription.Subscription {
+	if args.StartBlockID != flow.ZeroID {
+		return p.stateStreamApi.SubscribeAccountStatusesFromStartBlockID(ctx, args.StartBlockID, args.Filter)
+	}
+
+	if args.StartBlockHeight != request.EmptyHeight {
+		return p.stateStreamApi.SubscribeAccountStatusesFromStartHeight(ctx, args.StartBlockHeight, args.Filter)
+	}
+
+	return p.stateStreamApi.SubscribeAccountStatusesFromLatestBlock(ctx, args.Filter)
+}
+
+// handleResponse processes an account statuses and sends the formatted response.
 //
 // No errors are expected during normal operations.
-func (p *EventsDataProvider) handleResponse() func(eventsResponse *backend.EventsResponse) error {
+func (p *AccountStatusesDataProvider) handleResponse() func(accountStatusesResponse *backend.AccountStatusesResponse) error {
 	blocksSinceLastMessage := uint64(0)
 	messageIndex := counters.NewMonotonousCounter(1)
 
-	return func(eventsResponse *backend.EventsResponse) error {
+	return func(accountStatusesResponse *backend.AccountStatusesResponse) error {
 		// check if there are any events in the response. if not, do not send a message unless the last
 		// response was more than HeartbeatInterval blocks ago
-		if len(eventsResponse.Events) == 0 {
+		if len(accountStatusesResponse.AccountEvents) == 0 {
 			blocksSinceLastMessage++
 			if blocksSinceLastMessage < p.heartbeatInterval {
 				return nil
@@ -100,41 +113,27 @@ func (p *EventsDataProvider) handleResponse() func(eventsResponse *backend.Event
 
 		index := messageIndex.Value()
 		if ok := messageIndex.Set(messageIndex.Value() + 1); !ok {
-			return fmt.Errorf("message index already incremented to: %d", messageIndex.Value())
+			return status.Errorf(codes.Internal, "message index already incremented to %d", messageIndex.Value())
 		}
 
-		p.send <- &models.EventResponse{
-			BlockId:        eventsResponse.BlockID.String(),
-			BlockHeight:    strconv.FormatUint(eventsResponse.Height, 10),
-			BlockTimestamp: eventsResponse.BlockTimestamp,
-			Events:         eventsResponse.Events,
-			MessageIndex:   strconv.FormatUint(index, 10),
+		p.send <- &models.AccountStatusesResponse{
+			BlockID:       accountStatusesResponse.BlockID.String(),
+			Height:        strconv.FormatUint(accountStatusesResponse.Height, 10),
+			AccountEvents: accountStatusesResponse.AccountEvents,
+			MessageIndex:  strconv.FormatUint(index, 10),
 		}
 
 		return nil
 	}
 }
 
-// createSubscription creates a new subscription using the specified input arguments.
-func (p *EventsDataProvider) createSubscription(ctx context.Context, args EventsArguments) subscription.Subscription {
-	if args.StartBlockID != flow.ZeroID {
-		return p.stateStreamApi.SubscribeEventsFromStartBlockID(ctx, args.StartBlockID, args.Filter)
-	}
-
-	if args.StartBlockHeight != request.EmptyHeight {
-		return p.stateStreamApi.SubscribeEventsFromStartHeight(ctx, args.StartBlockHeight, args.Filter)
-	}
-
-	return p.stateStreamApi.SubscribeEventsFromLatest(ctx, args.Filter)
-}
-
-// parseEventsArguments validates and initializes the events arguments.
-func parseEventsArguments(
+// parseAccountStatusesArguments validates and initializes the account statuses arguments.
+func parseAccountStatusesArguments(
 	arguments models.Arguments,
 	chain flow.Chain,
 	eventFilterConfig state_stream.EventFilterConfig,
-) (EventsArguments, error) {
-	var args EventsArguments
+) (AccountStatusesArguments, error) {
+	var args AccountStatusesArguments
 
 	// Check for mutual exclusivity of start_block_id and start_block_height early
 	startBlockIDIn, hasStartBlockID := arguments["start_block_id"]
@@ -158,6 +157,7 @@ func parseEventsArguments(
 		args.StartBlockID = startBlockID.Flow()
 	}
 
+	// Parse 'start_block_height' if provided
 	// Parse 'start_block_height' if provided
 	if hasStartBlockHeight {
 		result, ok := startBlockHeightIn.(string)
@@ -187,26 +187,17 @@ func parseEventsArguments(
 		}
 	}
 
-	// Parse 'addresses' as []string{}
-	var addresses []string
-	if addressesIn, ok := arguments["addresses"]; ok && addressesIn != "" {
-		addresses, ok = addressesIn.([]string)
+	// Parse 'accountAddresses' as []string{}
+	var accountAddresses []string
+	if accountAddressesIn, ok := arguments["account_addresses"]; ok && accountAddressesIn != "" {
+		accountAddresses, ok = accountAddressesIn.([]string)
 		if !ok {
-			return args, fmt.Errorf("'addresses' must be an array of string")
-		}
-	}
-
-	// Parse 'contracts' as []string{}
-	var contracts []string
-	if contractsIn, ok := arguments["contracts"]; ok && contractsIn != "" {
-		contracts, ok = contractsIn.([]string)
-		if !ok {
-			return args, fmt.Errorf("'contracts' must be an array of string")
+			return args, fmt.Errorf("'account_addresses' must be an array of string")
 		}
 	}
 
 	// Initialize the event filter with the parsed arguments
-	filter, err := state_stream.NewEventFilter(eventFilterConfig, chain, eventTypes.Flow(), addresses, contracts)
+	filter, err := state_stream.NewAccountStatusFilter(eventFilterConfig, chain, eventTypes.Flow(), accountAddresses)
 	if err != nil {
 		return args, fmt.Errorf("failed to create event filter: %w", err)
 	}
