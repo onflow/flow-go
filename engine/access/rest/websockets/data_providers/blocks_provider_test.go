@@ -30,9 +30,10 @@ type testErrType struct {
 
 // testType represents a valid test scenario for subscribing
 type testType struct {
-	name         string
-	arguments    models.Arguments
-	setupBackend func(sub *statestreamsmock.Subscription)
+	name              string
+	arguments         models.Arguments
+	setupBackend      func(sub *statestreamsmock.Subscription)
+	expectedResponses []interface{}
 }
 
 // BlocksProviderSuite is a test suite for testing the block providers functionality.
@@ -137,6 +138,11 @@ func (s *BlocksProviderSuite) TestBlocksDataProvider_InvalidArguments() {
 // validBlockArgumentsTestCases defines test happy cases for block data providers.
 // Each test case specifies input arguments, and setup functions for the mock API used in the test.
 func (s *BlocksProviderSuite) validBlockArgumentsTestCases() []testType {
+	expectedResponses := make([]interface{}, len(s.blocks))
+	for i, b := range s.blocks {
+		expectedResponses[i] = b
+	}
+
 	return []testType{
 		{
 			name: "happy path with start_block_id argument",
@@ -152,6 +158,7 @@ func (s *BlocksProviderSuite) validBlockArgumentsTestCases() []testType {
 					flow.BlockStatusFinalized,
 				).Return(sub).Once()
 			},
+			expectedResponses: expectedResponses,
 		},
 		{
 			name: "happy path with start_block_height argument",
@@ -167,6 +174,7 @@ func (s *BlocksProviderSuite) validBlockArgumentsTestCases() []testType {
 					flow.BlockStatusFinalized,
 				).Return(sub).Once()
 			},
+			expectedResponses: expectedResponses,
 		},
 		{
 			name: "happy path without any start argument",
@@ -180,6 +188,7 @@ func (s *BlocksProviderSuite) validBlockArgumentsTestCases() []testType {
 					flow.BlockStatusFinalized,
 				).Return(sub).Once()
 			},
+			expectedResponses: expectedResponses,
 		},
 	}
 }
@@ -189,11 +198,13 @@ func (s *BlocksProviderSuite) validBlockArgumentsTestCases() []testType {
 // validates that blocks are correctly streamed to the channel and ensures
 // no unexpected errors occur.
 func (s *BlocksProviderSuite) TestBlocksDataProvider_HappyPath() {
-	s.testHappyPath(
+	testHappyPath(
+		s.T(),
 		BlocksTopic,
+		s.factory,
 		s.validBlockArgumentsTestCases(),
-		func(dataChan chan interface{}, blocks []*flow.Block) {
-			for _, block := range blocks {
+		func(dataChan chan interface{}) {
+			for _, block := range s.blocks {
 				dataChan <- block
 			}
 		},
@@ -202,11 +213,14 @@ func (s *BlocksProviderSuite) TestBlocksDataProvider_HappyPath() {
 }
 
 // requireBlocks ensures that the received block information matches the expected data.
-func (s *BlocksProviderSuite) requireBlock(v interface{}, expectedBlock *flow.Block) {
-	actualResponse, ok := v.(*models.BlockMessageResponse)
-	require.True(s.T(), ok, "unexpected response type: %T", v)
+func (s *BlocksProviderSuite) requireBlock(actual interface{}, expected interface{}) {
+	actualResponse, ok := actual.(*models.BlockMessageResponse)
+	require.True(s.T(), ok, "unexpected response type: %T", actual)
 
-	s.Require().Equal(expectedBlock, actualResponse.Block)
+	expectedResponse, ok := expected.(*flow.Block)
+	require.True(s.T(), ok, "unexpected response type: %T", expected)
+
+	s.Require().Equal(expectedResponse, actualResponse.Block)
 }
 
 // testHappyPath tests a variety of scenarios for data providers in
@@ -215,18 +229,23 @@ func (s *BlocksProviderSuite) requireBlock(v interface{}, expectedBlock *flow.Bl
 // as expected without encountering errors.
 //
 // Arguments:
-// - topic: The topic associated with the data provider.
-// - tests: A slice of test cases to run, each specifying setup and validation logic.
-// - sendData: A function to simulate emitting data into the subscription's data channel.
-// - requireFn: A function to validate the output received in the send channel.
-func (s *BlocksProviderSuite) testHappyPath(
+//   - t: The testing context.
+//   - topic: The topic associated with the data provider under test.
+//   - factory: An instance of DataProviderFactoryImpl used to create data providers.
+//   - tests: A slice of testType structs, each specifying the setup logic, arguments,
+//     and expected responses for the test case.
+//   - sendData: A function that simulates sending data into the subscription's data channel.
+//   - requireFn: A validation function to compare the received responses against the expected ones.
+func testHappyPath(
+	t *testing.T,
 	topic string,
+	factory *DataProviderFactoryImpl,
 	tests []testType,
-	sendData func(chan interface{}, []*flow.Block),
-	requireFn func(interface{}, *flow.Block),
+	sendData func(chan interface{}),
+	requireFn func(interface{}, interface{}),
 ) {
 	for _, test := range tests {
-		s.Run(test.name, func() {
+		t.Run(test.name, func(t *testing.T) {
 			ctx := context.Background()
 			send := make(chan interface{}, 10)
 
@@ -234,36 +253,36 @@ func (s *BlocksProviderSuite) testHappyPath(
 			dataChan := make(chan interface{})
 
 			// Create a mock subscription and mock the channel
-			sub := statestreamsmock.NewSubscription(s.T())
+			sub := statestreamsmock.NewSubscription(t)
 			sub.On("Channel").Return((<-chan interface{})(dataChan))
 			sub.On("Err").Return(nil)
 			test.setupBackend(sub)
 
 			// Create the data provider instance
-			provider, err := s.factory.NewDataProvider(ctx, topic, test.arguments, send)
-			s.Require().NotNil(provider)
-			s.Require().NoError(err)
+			provider, err := factory.NewDataProvider(ctx, topic, test.arguments, send)
+			require.NotNil(t, provider)
+			require.NoError(t, err)
 
 			// Run the provider in a separate goroutine
 			go func() {
 				err = provider.Run()
-				s.Require().NoError(err)
+				require.NoError(t, err)
 			}()
 
 			// Simulate emitting data to the data channel
 			go func() {
 				defer close(dataChan)
-				sendData(dataChan, s.blocks)
+				sendData(dataChan)
 			}()
 
 			// Collect responses
-			for _, b := range s.blocks {
-				unittest.RequireReturnsBefore(s.T(), func() {
+			for _, expected := range test.expectedResponses {
+				unittest.RequireReturnsBefore(t, func() {
 					v, ok := <-send
-					s.Require().True(ok, "channel closed while waiting for block %x %v: err: %v", b.Header.Height, b.ID(), sub.Err())
+					require.True(t, ok, "channel closed while waiting for response %v: err: %v", expected, sub.Err())
 
-					requireFn(v, b)
-				}, time.Second, fmt.Sprintf("timed out waiting for block %d %v", b.Header.Height, b.ID()))
+					requireFn(v, expected)
+				}, time.Second, fmt.Sprintf("timed out waiting for response %v", expected))
 			}
 
 			// Ensure the provider is properly closed after the test

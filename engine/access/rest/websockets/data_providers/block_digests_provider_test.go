@@ -54,6 +54,16 @@ func (s *BlockDigestsProviderSuite) TestBlockDigestsDataProvider_InvalidArgument
 // validBlockDigestsArgumentsTestCases defines test happy cases for block digests data providers.
 // Each test case specifies input arguments, and setup functions for the mock API used in the test.
 func (s *BlockDigestsProviderSuite) validBlockDigestsArgumentsTestCases() []testType {
+	expectedResponses := make([]interface{}, len(s.blocks))
+	for i, b := range s.blocks {
+		blockDigest := flow.NewBlockDigest(b.Header.ID(), b.Header.Height, b.Header.Timestamp)
+
+		var block models.BlockDigest
+		block.Build(blockDigest)
+
+		expectedResponses[i] = &models.BlockDigestMessageResponse{Block: &block}
+	}
+
 	return []testType{
 		{
 			name: "happy path with start_block_id argument",
@@ -69,6 +79,7 @@ func (s *BlockDigestsProviderSuite) validBlockDigestsArgumentsTestCases() []test
 					flow.BlockStatusFinalized,
 				).Return(sub).Once()
 			},
+			expectedResponses: expectedResponses,
 		},
 		{
 			name: "happy path with start_block_height argument",
@@ -84,6 +95,7 @@ func (s *BlockDigestsProviderSuite) validBlockDigestsArgumentsTestCases() []test
 					flow.BlockStatusFinalized,
 				).Return(sub).Once()
 			},
+			expectedResponses: expectedResponses,
 		},
 		{
 			name: "happy path without any start argument",
@@ -97,6 +109,7 @@ func (s *BlockDigestsProviderSuite) validBlockDigestsArgumentsTestCases() []test
 					flow.BlockStatusFinalized,
 				).Return(sub).Once()
 			},
+			expectedResponses: expectedResponses,
 		},
 	}
 }
@@ -106,11 +119,13 @@ func (s *BlockDigestsProviderSuite) validBlockDigestsArgumentsTestCases() []test
 // validates that block digests are correctly streamed to the channel and ensures
 // no unexpected errors occur.
 func (s *BlockDigestsProviderSuite) TestBlockDigestsDataProvider_HappyPath() {
-	s.testHappyPath(
+	testHappyPath(
+		s.T(),
 		BlockDigestsTopic,
+		s.factory,
 		s.validBlockDigestsArgumentsTestCases(),
-		func(dataChan chan interface{}, blocks []*flow.Block) {
-			for _, block := range blocks {
+		func(dataChan chan interface{}) {
+			for _, block := range s.blocks {
 				dataChan <- flow.NewBlockDigest(block.Header.ID(), block.Header.Height, block.Header.Timestamp)
 			}
 		},
@@ -119,11 +134,12 @@ func (s *BlockDigestsProviderSuite) TestBlockDigestsDataProvider_HappyPath() {
 }
 
 // requireBlockHeaders ensures that the received block header information matches the expected data.
-func (s *BlocksProviderSuite) requireBlockDigests(v interface{}, expectedBlock *flow.Block) {
-	actualResponse, ok := v.(*models.BlockDigestMessageResponse)
-	require.True(s.T(), ok, "unexpected response type: %T", v)
+func (s *BlocksProviderSuite) requireBlockDigests(actual interface{}, expected interface{}) {
+	actualResponse, ok := actual.(*models.BlockDigestMessageResponse)
+	require.True(s.T(), ok, "unexpected response type: %T", actual)
 
-	s.Require().Equal(expectedBlock.Header.ID(), actualResponse.Block.ID())
-	s.Require().Equal(expectedBlock.Header.Height, actualResponse.Block.Height)
-	s.Require().Equal(expectedBlock.Header.Timestamp, actualResponse.Block.Timestamp)
+	expectedResponse, ok := expected.(*models.BlockDigestMessageResponse)
+	require.True(s.T(), ok, "unexpected response type: %T", expected)
+
+	s.Require().Equal(expectedResponse.Block, actualResponse.Block)
 }
