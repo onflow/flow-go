@@ -510,7 +510,7 @@ func generateExecutionData(t *testing.T, blockID flow.Identifier, ced *execution
 	return executionDataID, executionDataRoot
 }
 
-func generateEvents(t *testing.T, includeServiceEvent bool, collection *flow.Collection) (flow.EventsList, []flow.ServiceEvent) {
+func generateEvents(t *testing.T, collection *flow.Collection, includeServiceEvent bool) (flow.EventsList, []flow.ServiceEvent) {
 	var chunkEvents flow.EventsList
 	serviceEvents := make([]flow.ServiceEvent, 0)
 
@@ -615,7 +615,7 @@ func (s *ChunkVerifierTestSuite) GetTestSetup(t *testing.T, script string, syste
 	}
 
 	// events
-	chunkEvents, serviceEvents := generateEvents(t, includeServiceEvents, collection)
+	chunkEvents, serviceEvents := generateEvents(t, collection, includeServiceEvents)
 	// make sure this includes events even for the service tx
 	require.NotEmpty(t, chunkEvents)
 
