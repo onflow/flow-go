@@ -171,7 +171,7 @@ func (e *ReactorEngine) startDKGForEpoch(currentEpochCounter uint64, first *flow
 	if err != nil {
 		// unexpected storage-level error
 		// TODO use irrecoverable context
-		log.Fatal().Err(err).Msg("could not set dkg dkgState")
+		log.Fatal().Err(err).Msg("could not transition DKG state machine into state DKGStateStarted")
 	}
 
 	curDKGInfo, err := e.getDKGInfo(firstID)
@@ -249,11 +249,11 @@ func (e *ReactorEngine) startDKGForEpoch(currentEpochCounter uint64, first *flow
 //
 // This function checks that the local DKG completed and that our locally computed
 // key share is consistent with the canonical key vector. When this function returns,
-// an current state for the just-completed DKG is guaranteed to be stored (if not, the
+// the current state for the just-completed DKG is guaranteed to be stored (if not, the
 // program will crash). Since this function is invoked synchronously before the end
 // of the current epoch, this guarantees that when we reach the end of the current epoch
-// we will either have a usable beacon key (successful DKG) or a DKG failure current state
-// stored, so we can safely fall back to using our staking key.
+// we will either have a usable beacon key committed (state [flow.RandomBeaconKeyCommitted])
+// or we persist [flow.DKGStateFailure], so we can safely fall back to using our staking key.
 //
 // CAUTION: This function is not safe for concurrent use. This is not enforced within
 // the ReactorEngine - instead we rely on the protocol event emission being single-threaded
