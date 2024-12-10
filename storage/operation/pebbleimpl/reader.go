@@ -10,6 +10,7 @@ import (
 
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/storage"
+	"github.com/onflow/flow-go/utils/noop"
 )
 
 type dbReader struct {
@@ -17,12 +18,6 @@ type dbReader struct {
 }
 
 var _ storage.Reader = (*dbReader)(nil)
-
-type noopCloser struct{}
-
-var _ io.Closer = (*noopCloser)(nil)
-
-func (noopCloser) Close() error { return nil }
 
 // Get gets the value for the given key. It returns ErrNotFound if the DB
 // does not contain the key.
@@ -37,11 +32,11 @@ func (b dbReader) Get(key []byte) ([]byte, io.Closer, error) {
 
 	if err != nil {
 		if errors.Is(err, pebble.ErrNotFound) {
-			return nil, noopCloser{}, storage.ErrNotFound
+			return nil, noop.Closer{}, storage.ErrNotFound
 		}
 
 		// exception while checking for the key
-		return nil, noopCloser{}, irrecoverable.NewExceptionf("could not load data: %w", err)
+		return nil, noop.Closer{}, irrecoverable.NewExceptionf("could not load data: %w", err)
 	}
 
 	return value, closer, nil

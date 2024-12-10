@@ -10,17 +10,12 @@ import (
 
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/storage"
+	"github.com/onflow/flow-go/utils/noop"
 )
 
 type dbReader struct {
 	db *badger.DB
 }
-
-type noopCloser struct{}
-
-var _ io.Closer = (*noopCloser)(nil)
-
-func (noopCloser) Close() error { return nil }
 
 // Get gets the value for the given key. It returns ErrNotFound if the DB
 // does not contain the key.
@@ -37,17 +32,17 @@ func (b dbReader) Get(key []byte) ([]byte, io.Closer, error) {
 	item, err := tx.Get(key)
 	if err != nil {
 		if errors.Is(err, badger.ErrKeyNotFound) {
-			return nil, noopCloser{}, storage.ErrNotFound
+			return nil, noop.Closer{}, storage.ErrNotFound
 		}
-		return nil, noopCloser{}, irrecoverable.NewExceptionf("could not load data: %w", err)
+		return nil, noop.Closer{}, irrecoverable.NewExceptionf("could not load data: %w", err)
 	}
 
 	value, err := item.ValueCopy(nil)
 	if err != nil {
-		return nil, noopCloser{}, irrecoverable.NewExceptionf("could not load value: %w", err)
+		return nil, noop.Closer{}, irrecoverable.NewExceptionf("could not load value: %w", err)
 	}
 
-	return value, noopCloser{}, nil
+	return value, noop.Closer{}, nil
 }
 
 // NewIter returns a new Iterator for the given key prefix range [startPrefix, endPrefix], both inclusive.
