@@ -19,7 +19,7 @@ var _ storage.Iterator = (*badgerIterator)(nil)
 
 func newBadgerIterator(db *badger.DB, startPrefix, endPrefix []byte, ops storage.IteratorOption) *badgerIterator {
 	options := badger.DefaultIteratorOptions
-	if ops.IterateKeyOnly {
+	if ops.BadgerIterateKeyOnly {
 		options.PrefetchValues = false
 	}
 

@@ -56,12 +56,13 @@ type IterItem interface {
 }
 
 type IteratorOption struct {
-	IterateKeyOnly bool // default false
+	BadgerIterateKeyOnly bool // default false
 }
 
 func DefaultIteratorOptions() IteratorOption {
 	return IteratorOption{
-		IterateKeyOnly: false, // only needed for badger. ignored by pebble
+		// only needed for badger. ignored by pebble
+		BadgerIterateKeyOnly: false,
 	}
 }
 
