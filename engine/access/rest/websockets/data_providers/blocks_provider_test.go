@@ -8,11 +8,14 @@ import (
 	"time"
 
 	"github.com/rs/zerolog"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
 	accessmock "github.com/onflow/flow-go/access/mock"
+	commonmodels "github.com/onflow/flow-go/engine/access/rest/common/models"
+	mockcommonmodels "github.com/onflow/flow-go/engine/access/rest/common/models/mock"
 	"github.com/onflow/flow-go/engine/access/rest/common/parser"
 	"github.com/onflow/flow-go/engine/access/rest/websockets/models"
 	"github.com/onflow/flow-go/engine/access/state_stream"
@@ -49,7 +52,8 @@ type BlocksProviderSuite struct {
 	rootBlock      flow.Block
 	finalizedBlock *flow.Header
 
-	factory *DataProviderFactoryImpl
+	factory       *DataProviderFactoryImpl
+	linkGenerator *mockcommonmodels.LinkGenerator
 }
 
 func TestBlocksProviderSuite(t *testing.T) {
@@ -59,6 +63,7 @@ func TestBlocksProviderSuite(t *testing.T) {
 func (s *BlocksProviderSuite) SetupTest() {
 	s.log = unittest.Logger()
 	s.api = accessmock.NewAPI(s.T())
+	s.linkGenerator = mockcommonmodels.NewLinkGenerator(s.T())
 
 	blockCount := 5
 	s.blocks = make([]*flow.Block, 0, blockCount)
@@ -69,10 +74,13 @@ func (s *BlocksProviderSuite) SetupTest() {
 
 	for i := 0; i < blockCount; i++ {
 		block := unittest.BlockWithParentFixture(parent)
+		transaction := unittest.TransactionFixture()
+		col := flow.CollectionFromTransactions([]*flow.Transaction{&transaction})
+		guarantee := col.Guarantee()
+		block.SetPayload(unittest.PayloadFixture(unittest.WithGuarantees(&guarantee)))
 		// update for next iteration
 		parent = block.Header
 		s.blocks = append(s.blocks, block)
-
 	}
 	s.finalizedBlock = parent
 
@@ -82,7 +90,9 @@ func (s *BlocksProviderSuite) SetupTest() {
 		s.api,
 		flow.Testnet.Chain(),
 		state_stream.DefaultEventFilterConfig,
-		subscription.DefaultHeartbeatInterval)
+		subscription.DefaultHeartbeatInterval,
+		s.linkGenerator,
+	)
 	s.Require().NotNil(s.factory)
 }
 
@@ -135,7 +145,7 @@ func (s *BlocksProviderSuite) TestBlocksDataProvider_InvalidArguments() {
 
 	for _, test := range s.invalidArgumentsTestCases() {
 		s.Run(test.name, func() {
-			provider, err := NewBlocksDataProvider(ctx, s.log, s.api, BlocksTopic, test.arguments, send)
+			provider, err := NewBlocksDataProvider(ctx, s.log, s.api, nil, BlocksTopic, test.arguments, send)
 			s.Require().Nil(provider)
 			s.Require().Error(err)
 			s.Require().Contains(err.Error(), test.expectedErrorMsg)
@@ -146,10 +156,8 @@ func (s *BlocksProviderSuite) TestBlocksDataProvider_InvalidArguments() {
 // validBlockArgumentsTestCases defines test happy cases for block data providers.
 // Each test case specifies input arguments, and setup functions for the mock API used in the test.
 func (s *BlocksProviderSuite) validBlockArgumentsTestCases() []testType {
-	expectedResponses := make([]interface{}, len(s.blocks))
-	for i, b := range s.blocks {
-		expectedResponses[i] = b
-	}
+	expectedResponses := expectedBlockResponses(s.blocks, s.linkGenerator, map[string]bool{}, flow.BlockStatusFinalized)
+	expectedPayloadExpandedResponse := expectedBlockResponses(s.blocks, s.linkGenerator, map[string]bool{commonmodels.ExpandableFieldPayload: true}, flow.BlockStatusFinalized)
 
 	return []testType{
 		{
@@ -198,6 +206,35 @@ func (s *BlocksProviderSuite) validBlockArgumentsTestCases() []testType {
 			},
 			expectedResponses: expectedResponses,
 		},
+		{
+			name: "happy path without any start argument",
+			arguments: models.Arguments{
+				"block_status": parser.Finalized,
+			},
+			setupBackend: func(sub *statestreamsmock.Subscription) {
+				s.api.On(
+					"SubscribeBlocksFromLatest",
+					mock.Anything,
+					flow.BlockStatusFinalized,
+				).Return(sub).Once()
+			},
+			expectedResponses: expectedResponses,
+		},
+		{
+			name: "happy path payload expanded",
+			arguments: models.Arguments{
+				"block_status": parser.Finalized,
+				"expand":       []string{"payload"},
+			},
+			setupBackend: func(sub *statestreamsmock.Subscription) {
+				s.api.On(
+					"SubscribeBlocksFromLatest",
+					mock.Anything,
+					flow.BlockStatusFinalized,
+				).Return(sub).Once()
+			},
+			expectedResponses: expectedPayloadExpandedResponse,
+		},
 	}
 }
 
@@ -206,6 +243,28 @@ func (s *BlocksProviderSuite) validBlockArgumentsTestCases() []testType {
 // validates that blocks are correctly streamed to the channel and ensures
 // no unexpected errors occur.
 func (s *BlocksProviderSuite) TestBlocksDataProvider_HappyPath() {
+	s.linkGenerator.On("BlockLink", mock.AnythingOfType("flow.Identifier")).Return(
+		func(id flow.Identifier) (string, error) {
+			for _, block := range s.blocks {
+				if block.ID() == id {
+					return fmt.Sprintf("/v1/blocks/%s", id), nil
+				}
+			}
+			return "", assert.AnError
+		},
+	)
+
+	s.linkGenerator.On("PayloadLink", mock.AnythingOfType("flow.Identifier")).Return(
+		func(id flow.Identifier) (string, error) {
+			for _, block := range s.blocks {
+				if block.ID() == id {
+					return fmt.Sprintf("/v1/blocks/%s/payload", id), nil
+				}
+			}
+			return "", assert.AnError
+		},
+	)
+
 	testHappyPath(
 		s.T(),
 		BlocksTopic,
@@ -225,10 +284,10 @@ func (s *BlocksProviderSuite) requireBlock(actual interface{}, expected interfac
 	actualResponse, ok := actual.(*models.BlockMessageResponse)
 	require.True(s.T(), ok, "unexpected response type: %T", actual)
 
-	expectedResponse, ok := expected.(*flow.Block)
+	expectedResponse, ok := expected.(*models.BlockMessageResponse)
 	require.True(s.T(), ok, "unexpected response type: %T", expected)
 
-	s.Require().Equal(expectedResponse, actualResponse.Block)
+	s.Require().Equal(expectedResponse.Block, actualResponse.Block)
 }
 
 // testHappyPath tests a variety of scenarios for data providers in
@@ -297,4 +356,24 @@ func testHappyPath(
 			provider.Close()
 		})
 	}
+}
+
+// expectedBlockResponses generates a list of expected block responses for the given blocks.
+func expectedBlockResponses(
+	blocks []*flow.Block,
+	linkGenerator *mockcommonmodels.LinkGenerator,
+	expand map[string]bool,
+	status flow.BlockStatus,
+) []interface{} {
+	responses := make([]interface{}, len(blocks))
+	for i, b := range blocks {
+		var block commonmodels.Block
+		block.Build(b, nil, linkGenerator, status, expand)
+
+		responses[i] = &models.BlockMessageResponse{
+			Block: &block,
+		}
+	}
+
+	return responses
 }

@@ -53,7 +53,9 @@ func (s *EventsProviderSuite) SetupTest() {
 		nil,
 		flow.Testnet.Chain(),
 		state_stream.DefaultEventFilterConfig,
-		subscription.DefaultHeartbeatInterval)
+		subscription.DefaultHeartbeatInterval,
+		nil,
+	)
 	s.Require().NotNil(s.factory)
 }
 

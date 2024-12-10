@@ -27,6 +27,8 @@ type RouterBuilder struct {
 	logger      zerolog.Logger
 	router      *mux.Router
 	v1SubRouter *mux.Router
+
+	LinkGenerator models.LinkGenerator
 }
 
 // NewRouterBuilder creates a new RouterBuilder instance with common middleware and a v1 sub-router.
@@ -43,9 +45,10 @@ func NewRouterBuilder(
 	v1SubRouter.Use(middleware.MetricsMiddleware(restCollector))
 
 	return &RouterBuilder{
-		logger:      logger,
-		router:      router,
-		v1SubRouter: v1SubRouter,
+		logger:        logger,
+		router:        router,
+		v1SubRouter:   v1SubRouter,
+		LinkGenerator: models.NewLinkGeneratorImpl(v1SubRouter),
 	}
 }
 
@@ -55,9 +58,8 @@ func (b *RouterBuilder) AddRestRoutes(
 	chain flow.Chain,
 	maxRequestSize int64,
 ) *RouterBuilder {
-	linkGenerator := models.NewLinkGeneratorImpl(b.v1SubRouter)
 	for _, r := range Routes {
-		h := flowhttp.NewHandler(b.logger, backend, r.Handler, linkGenerator, chain, maxRequestSize)
+		h := flowhttp.NewHandler(b.logger, backend, r.Handler, b.LinkGenerator, chain, maxRequestSize)
 		b.v1SubRouter.
 			Methods(r.Method).
 			Path(r.Pattern).

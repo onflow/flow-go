@@ -7,6 +7,8 @@ import (
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/access"
+	"github.com/onflow/flow-go/engine/access/rest/common"
+	commonmodels "github.com/onflow/flow-go/engine/access/rest/common/models"
 	"github.com/onflow/flow-go/engine/access/rest/common/parser"
 	"github.com/onflow/flow-go/engine/access/rest/http/request"
 	"github.com/onflow/flow-go/engine/access/rest/util"
@@ -20,14 +22,17 @@ type BlocksArguments struct {
 	StartBlockID     flow.Identifier  // ID of the block to start subscription from
 	StartBlockHeight uint64           // Height of the block to start subscription from
 	BlockStatus      flow.BlockStatus // Status of blocks to subscribe to
+	Expand           map[string]bool
 }
 
 // BlocksDataProvider is responsible for providing blocks
 type BlocksDataProvider struct {
 	*baseDataProvider
 
-	logger zerolog.Logger
-	api    access.API
+	logger        zerolog.Logger
+	api           access.API
+	arguments     BlocksArguments
+	linkGenerator commonmodels.LinkGenerator
 }
 
 var _ DataProvider = (*BlocksDataProvider)(nil)
@@ -37,17 +42,20 @@ func NewBlocksDataProvider(
 	ctx context.Context,
 	logger zerolog.Logger,
 	api access.API,
+	linkGenerator commonmodels.LinkGenerator,
 	topic string,
 	arguments models.Arguments,
 	send chan<- interface{},
 ) (*BlocksDataProvider, error) {
 	p := &BlocksDataProvider{
-		logger: logger.With().Str("component", "blocks-data-provider").Logger(),
-		api:    api,
+		logger:        logger.With().Str("component", "blocks-data-provider").Logger(),
+		api:           api,
+		linkGenerator: linkGenerator,
 	}
 
 	// Parse arguments passed to the provider.
-	blockArgs, err := ParseBlocksArguments(arguments)
+	var err error
+	p.arguments, err = ParseBlocksArguments(arguments)
 	if err != nil {
 		return nil, fmt.Errorf("invalid arguments: %w", err)
 	}
@@ -57,7 +65,7 @@ func NewBlocksDataProvider(
 		topic,
 		cancel,
 		send,
-		p.createSubscription(subCtx, blockArgs), // Set up a subscription to blocks based on arguments.
+		p.createSubscription(subCtx, p.arguments), // Set up a subscription to blocks based on arguments.
 	)
 
 	return p, nil
@@ -69,9 +77,13 @@ func NewBlocksDataProvider(
 func (p *BlocksDataProvider) Run() error {
 	return subscription.HandleSubscription(
 		p.subscription,
-		subscription.HandleResponse(p.send, func(block *flow.Block) (interface{}, error) {
+		subscription.HandleResponse(p.send, func(b *flow.Block) (interface{}, error) {
+			var block commonmodels.Block
+			//TODO: decide if execution result should be a part of response
+			block.Build(b, nil, p.linkGenerator, p.arguments.BlockStatus, p.arguments.Expand)
+
 			return &models.BlockMessageResponse{
-				Block: block,
+				Block: &block,
 			}, nil
 		}),
 	)
@@ -143,6 +155,17 @@ func ParseBlocksArguments(arguments models.Arguments) (BlocksArguments, error) {
 	} else {
 		// Default value if 'start_block_height' is not provided
 		args.StartBlockHeight = request.EmptyHeight
+	}
+
+	// Parse 'expand' as a JSON array of string
+	// expected values: "payload"
+	if expandIn, ok := arguments["expand"]; ok && expandIn != "" {
+		result, ok := expandIn.([]string)
+		if !ok {
+			return args, fmt.Errorf("'expand' must be an array of string")
+		}
+
+		args.Expand = common.SliceToMap(result)
 	}
 
 	return args, nil
