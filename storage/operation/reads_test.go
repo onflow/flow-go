@@ -12,6 +12,43 @@ import (
 	"github.com/onflow/flow-go/storage/operation/dbtest"
 )
 
+func TestFirst(t *testing.T) {
+	dbtest.RunWithStorages(t, func(t *testing.T, r storage.Reader, withWriter dbtest.WithWriter) {
+
+		// Create a range of keys around the prefix start/end values
+		keys := [][]byte{
+			{0x10, 0x00},
+			{0x10, 0xff},
+		}
+
+		// Insert the keys into the storage
+		require.NoError(t, withWriter(func(writer storage.Writer) error {
+			for _, key := range keys {
+				value := []byte{0x00} // value are skipped, doesn't matter
+				err := operation.Upsert(key, value)(writer)
+				if err != nil {
+					return err
+				}
+			}
+			return nil
+		}))
+
+		iter, err := r.NewIter([]byte{0x20}, []byte{0x30}, storage.DefaultIteratorOptions())
+		require.NoError(t, err)
+
+		// Check that the iterator is at the first key and return false when matching no key
+		require.False(t, iter.First())
+		require.NoError(t, iter.Close())
+
+		iter, err = r.NewIter([]byte{0x10}, []byte{0x30}, storage.DefaultIteratorOptions())
+		require.NoError(t, err)
+
+		// Check that the iterator is at the first key and return true when matching the first key
+		require.True(t, iter.First())
+		require.NoError(t, iter.Close())
+	})
+}
+
 func TestIterateKeysInPrefixRange(t *testing.T) {
 	dbtest.RunWithStorages(t, func(t *testing.T, r storage.Reader, withWriter dbtest.WithWriter) {
 		// Define the prefix range

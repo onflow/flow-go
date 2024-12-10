@@ -37,8 +37,9 @@ func newBadgerIterator(db *badger.DB, startPrefix, endPrefix []byte, ops storage
 }
 
 // First seeks to the smallest key greater than or equal to the given key.
-func (i *badgerIterator) First() {
+func (i *badgerIterator) First() bool {
 	i.iter.Seek(i.lowerBound)
+	return i.Valid()
 }
 
 // Valid returns whether the iterator is positioned at a valid key-value pair.

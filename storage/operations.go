@@ -17,7 +17,9 @@ type Iterator interface {
 	// This method must be called because it's necessary for the badger implementation
 	// to move the iteration cursor to the first key in the iteration range.
 	// This method must be called before calling Valid, Next, IterItem, or Close.
-	First()
+	// return true if the iterator is pointing to a valid key-value pair after calling First,
+	// return false otherwise.
+	First() bool
 
 	// Valid returns whether the iterator is positioned at a valid key-value pair.
 	// If Valid returns false, the iterator is done and must be closed.

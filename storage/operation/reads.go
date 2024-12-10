@@ -45,7 +45,7 @@ func IterateKeysByPrefixRange(r storage.Reader, startPrefix []byte, endPrefix []
 			}
 			return false, nil
 		}, nil, nil
-	}, storage.IteratorOption{IterateKeyOnly: true})
+	}, storage.IteratorOption{BadgerIterateKeyOnly: true})
 }
 
 // IterateKey will iterate over all entries in the database, where the key starts with a prefixes in
