@@ -203,14 +203,28 @@ type API interface {
 	//
 	// If invalid parameters will be supplied SubscribeBlockDigestsFromLatest will return a failed subscription.
 	SubscribeBlockDigestsFromLatest(ctx context.Context, blockStatus flow.BlockStatus) subscription.Subscription
-	// SubscribeTransactionStatuses streams transaction statuses starting from the reference block saved in the
-	// transaction itself until the block containing the transaction becomes sealed or expired. When the transaction
-	// status becomes TransactionStatusSealed or TransactionStatusExpired, the subscription will automatically shut down.
+	// SubscribeTransactionStatuses subscribes to transaction status updates for a given transaction ID.
+	// Monitoring begins from the specified block ID or the latest block if no block ID is provided.
+	// The subscription streams status updates until the transaction reaches a final state (TransactionStatusSealed or TransactionStatusExpired).
+	// When the transaction reaches one of these final statuses, the subscription will automatically terminate.
+	//
+	// Parameters:
+	//   - ctx: The context to manage the subscription's lifecycle, including cancellation.
+	//   - txID: The unique identifier of the transaction to monitor.
+	//   - blockID: The block ID from which to start monitoring. If set to flow.ZeroID, monitoring starts from the latest block.
+	//   - requiredEventEncodingVersion: The version of event encoding required for the subscription.
 	SubscribeTransactionStatuses(ctx context.Context, txID flow.Identifier, blockID flow.Identifier, requiredEventEncodingVersion entities.EventEncodingVersion) subscription.Subscription
-
-	// SendAndSubscribeTransactionStatuses streams transaction statuses starting from the reference block saved in the
-	// transaction itself until the block containing the transaction becomes sealed or expired. When the transaction
-	// status becomes TransactionStatusSealed or TransactionStatusExpired, the subscription will automatically shut down.
+	// SendAndSubscribeTransactionStatuses sends a transaction to the execution node and subscribes to its status updates.
+	// Monitoring begins from the reference block saved in the transaction itself and streams status updates until the transaction
+	// reaches a final state (TransactionStatusSealed or TransactionStatusExpired). Once a final status is reached, the subscription
+	// automatically terminates.
+	//
+	// Parameters:
+	//   - ctx: The context to manage the transaction sending and subscription lifecycle, including cancellation.
+	//   - tx: The transaction body to be sent and monitored.
+	//   - requiredEventEncodingVersion: The version of event encoding required for the subscription.
+	//
+	// If the transaction cannot be sent, the subscription will fail and return a failed subscription.
 	SendAndSubscribeTransactionStatuses(ctx context.Context, tx *flow.TransactionBody, requiredEventEncodingVersion entities.EventEncodingVersion) subscription.Subscription
 }
 

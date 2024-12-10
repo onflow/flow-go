@@ -21,6 +21,7 @@ import (
 	"github.com/onflow/flow/protobuf/go/flow/entities"
 )
 
+// sendTransaction defines a function type for sending a transaction.
 type sendTransaction func(ctx context.Context, tx *flow.TransactionBody) error
 
 // backendSubscribeTransactions handles transaction subscriptions.
@@ -45,69 +46,79 @@ type transactionSubscriptionMetadata struct {
 	shouldTriggerPending bool
 }
 
-// SendAndSubscribeTransactionStatuses subscribes to transaction status changes starting from the transaction reference block ID.
-// If invalid tx parameters will be supplied SendAndSubscribeTransactionStatuses will return a failed subscription.
+// SendAndSubscribeTransactionStatuses sends a transaction and subscribes to its status updates.
+// It starts monitoring the status from the transaction's reference block ID.
+// If the transaction cannot be sent or an error occurs during subscription creation, a failed subscription is returned.
 func (b *backendSubscribeTransactions) SendAndSubscribeTransactionStatuses(
 	ctx context.Context,
 	tx *flow.TransactionBody,
 	requiredEventEncodingVersion entities.EventEncodingVersion,
 ) subscription.Subscription {
-	err := b.sendTransaction(ctx, tx)
-	if err != nil {
-		return subscription.NewFailedSubscription(err, "transaction sending failed")
+	if err := b.sendTransaction(ctx, tx); err != nil {
+		b.log.Error().Err(err).Str("tx_id", tx.ID().String()).Msg("failed to send transaction")
+		return subscription.NewFailedSubscription(err, "failed to send transaction")
 	}
 
-	nextHeight, err := b.blockTracker.GetStartHeightFromBlockID(tx.ReferenceBlockID)
-	if err != nil {
-		return subscription.NewFailedSubscription(err, "could not get start height")
-	}
-
-	txInfo := transactionSubscriptionMetadata{
-		TransactionResult: &access.TransactionResult{
-			TransactionID: tx.ID(),
-			BlockID:       flow.ZeroID,
-			Status:        flow.TransactionStatusPending,
-		},
-		txReferenceBlockID:   tx.ReferenceBlockID,
-		blockWithTx:          nil,
-		eventEncodingVersion: requiredEventEncodingVersion,
-		shouldTriggerPending: true,
-	}
-
-	return b.subscriptionHandler.Subscribe(ctx, nextHeight, b.getTransactionStatusResponse(&txInfo))
+	return b.createSubscription(ctx, tx.ID(), tx.ReferenceBlockID, tx.ReferenceBlockID, requiredEventEncodingVersion, true)
 }
 
-// SubscribeTransactionStatuses subscribes to transaction status changes starting from the transaction reference block ID.
-// If invalid tx parameters will be supplied SubscribeTransactionStatuses will return a failed subscription.
+// SubscribeTransactionStatuses subscribes to the status updates of a transaction.
+// Monitoring starts from the specified block ID or the latest block if no block ID is provided.
+// If the block ID cannot be determined or an error occurs during subscription creation, a failed subscription is returned.
 func (b *backendSubscribeTransactions) SubscribeTransactionStatuses(
 	ctx context.Context,
 	txID flow.Identifier,
 	blockID flow.Identifier,
 	requiredEventEncodingVersion entities.EventEncodingVersion,
 ) subscription.Subscription {
+	// if no block ID provided, get latest block ID
 	if blockID == flow.ZeroID {
 		header, err := b.txLocalDataProvider.state.Sealed().Head()
 		if err != nil {
-			return subscription.NewFailedSubscription(err, "could not get latest block")
+			b.log.Error().Err(err).Msg("failed to retrieve latest block")
+			return subscription.NewFailedSubscription(err, "failed to retrieve latest block")
 		}
 		blockID = header.ID()
 	}
 
+	return b.createSubscription(ctx, txID, blockID, flow.ZeroID, requiredEventEncodingVersion, false)
+}
+
+// createSubscription initializes a subscription for monitoring a transaction's status.
+// If the start height cannot be determined, a failed subscription is returned.
+func (b *backendSubscribeTransactions) createSubscription(
+	ctx context.Context,
+	txID flow.Identifier,
+	blockID flow.Identifier,
+	referenceBlockID flow.Identifier,
+	requiredEventEncodingVersion entities.EventEncodingVersion,
+	shouldTriggerPending bool,
+) subscription.Subscription {
+	// Get height to start subscription from
 	nextHeight, err := b.blockTracker.GetStartHeightFromBlockID(blockID)
 	if err != nil {
-		return subscription.NewFailedSubscription(err, "could not get start height")
+		b.log.Error().Err(err).Str("block_id", blockID.String()).Msg("failed to get start height")
+		return subscription.NewFailedSubscription(err, "failed to get start height")
+	}
+
+	// choose initial transaction status
+	initialStatus := flow.TransactionStatusUnknown
+	if shouldTriggerPending {
+		// The status of the first pending transaction should be returned immediately, as the transaction has already been sent.
+		// This should occur only once for each subscription.
+		initialStatus = flow.TransactionStatusPending
 	}
 
 	txInfo := transactionSubscriptionMetadata{
 		TransactionResult: &access.TransactionResult{
 			TransactionID: txID,
 			BlockID:       flow.ZeroID,
-			Status:        flow.TransactionStatusUnknown,
+			Status:        initialStatus,
 		},
-		txReferenceBlockID:   blockID,
+		txReferenceBlockID:   referenceBlockID,
 		blockWithTx:          nil,
 		eventEncodingVersion: requiredEventEncodingVersion,
-		shouldTriggerPending: false,
+		shouldTriggerPending: shouldTriggerPending,
 	}
 
 	return b.subscriptionHandler.Subscribe(ctx, nextHeight, b.getTransactionStatusResponse(&txInfo))
@@ -122,16 +133,12 @@ func (b *backendSubscribeTransactions) getTransactionStatusResponse(txInfo *tran
 			return nil, err
 		}
 
-		// The status of the first pending transaction should be returned immediately, as the transaction has already been sent.
-		// This should occur only once for each subscription.
 		if txInfo.shouldTriggerPending {
-			txInfo.shouldTriggerPending = false
-			return b.generateResultsWithMissingStatuses(txInfo, flow.TransactionStatusUnknown)
+			return b.handlePendingStatus(txInfo)
 		}
 
-		// If the transaction status already reported the final status, return with no data available
-		if txInfo.Status == flow.TransactionStatusSealed || txInfo.Status == flow.TransactionStatusExpired {
-			return nil, fmt.Errorf("transaction final status %s was already reported: %w", txInfo.Status.String(), subscription.ErrEndOfData)
+		if b.isTransactionFinalStatus(txInfo) {
+			return nil, fmt.Errorf("transaction final status %s already reported: %w", txInfo.Status.String(), subscription.ErrEndOfData)
 		}
 
 		// If on this step transaction block not available, search for it.
@@ -185,6 +192,17 @@ func (b *backendSubscribeTransactions) getTransactionStatusResponse(txInfo *tran
 
 		return b.generateResultsWithMissingStatuses(txInfo, prevTxStatus)
 	}
+}
+
+// handlePendingStatus handles the initial pending status for a transaction.
+func (b *backendSubscribeTransactions) handlePendingStatus(txInfo *transactionSubscriptionMetadata) (interface{}, error) {
+	txInfo.shouldTriggerPending = false
+	return b.generateResultsWithMissingStatuses(txInfo, flow.TransactionStatusUnknown)
+}
+
+// isTransactionFinalStatus checks if a transaction has reached a final state (Sealed or Expired).
+func (b *backendSubscribeTransactions) isTransactionFinalStatus(txInfo *transactionSubscriptionMetadata) bool {
+	return txInfo.Status == flow.TransactionStatusSealed || txInfo.Status == flow.TransactionStatusExpired
 }
 
 // getTransactionStatus determines the current status of a transaction based on its metadata
