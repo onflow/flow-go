@@ -17,7 +17,6 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/state/protocol/protocol_state"
 	"github.com/onflow/flow-go/state/protocol/protocol_state/kvstore"
-	"github.com/onflow/flow-go/utils/unittest"
 )
 
 type ProtocolVersionUpgradeSuite struct {
@@ -25,23 +24,16 @@ type ProtocolVersionUpgradeSuite struct {
 }
 
 func TestProtocolVersionUpgrade(t *testing.T) {
-	// See https://github.com/onflow/flow-go/pull/5840/files#r1589483631
-	// Must merge and pin https://github.com/onflow/flow-core-contracts/pull/419 to re-enable test
-	unittest.SkipUnless(t, unittest.TEST_TODO, "skipped as it depends on VersionBeacon contract upgrade")
 	suite.Run(t, new(ProtocolVersionUpgradeSuite))
 }
 
-func (suite *ProtocolVersionUpgradeSuite) SetupTest() {
+func (s *ProtocolVersionUpgradeSuite) SetupTest() {
 	// Begin the test with a v0 kvstore, rather than the default v1.
 	// This lets us test upgrading v0->v1
-	protocolState, err := suite.net.BootstrapSnapshot.ProtocolState()
-	require.NoError(suite.T(), err)
-	finalizationThreshold := protocolState.GetFinalizationSafetyThreshold()
-	epochExtensionViewCount := protocolState.GetEpochExtensionViewCount()
-	suite.KVStoreFactory = func(epochStateID flow.Identifier) (protocol_state.KVStoreAPI, error) {
-		return kvstore.NewKVStoreV0(finalizationThreshold, epochExtensionViewCount, epochStateID)
+	s.KVStoreFactory = func(epochStateID flow.Identifier) (protocol_state.KVStoreAPI, error) {
+		return kvstore.NewKVStoreV0(10, 50, epochStateID)
 	}
-	suite.Suite.SetupTest()
+	s.Suite.SetupTest()
 }
 
 // TestProtocolStateVersionUpgradeServiceEvent tests the process of upgrading the protocol
