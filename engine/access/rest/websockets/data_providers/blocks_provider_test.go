@@ -15,7 +15,9 @@ import (
 	accessmock "github.com/onflow/flow-go/access/mock"
 	"github.com/onflow/flow-go/engine/access/rest/common/parser"
 	"github.com/onflow/flow-go/engine/access/rest/websockets/models"
+	"github.com/onflow/flow-go/engine/access/state_stream"
 	statestreamsmock "github.com/onflow/flow-go/engine/access/state_stream/mock"
+	"github.com/onflow/flow-go/engine/access/subscription"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -74,7 +76,13 @@ func (s *BlocksProviderSuite) SetupTest() {
 	}
 	s.finalizedBlock = parent
 
-	s.factory = NewDataProviderFactory(s.log, nil, s.api)
+	s.factory = NewDataProviderFactory(
+		s.log,
+		nil,
+		s.api,
+		flow.Testnet.Chain(),
+		state_stream.DefaultEventFilterConfig,
+		subscription.DefaultHeartbeatInterval)
 	s.Require().NotNil(s.factory)
 }
 
