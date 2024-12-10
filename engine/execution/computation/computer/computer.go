@@ -343,6 +343,7 @@ func (e *blockComputer) executeBlock(
 
 	numTxns := numberOfTransactionsInBlock(rawCollections)
 
+	// have access to protocol state at this point
 	collector := newResultCollector(
 		e.tracer,
 		blockSpan,

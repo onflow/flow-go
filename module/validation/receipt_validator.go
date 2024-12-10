@@ -382,7 +382,12 @@ func (v *receiptValidator) ValidatePayload(candidate *flow.Block) error {
 //   - engine.InvalidInputError if the result has malformed chunks
 //   - module.UnknownBlockError if blockID does not correspond to a block known by the protocol state
 func (v *receiptValidator) validateResult(result *flow.ExecutionResult, prevResult *flow.ExecutionResult) error {
-	err := v.verifyChunksFormat(result)
+	// TODO(6777): enforce result format
+	pstate, err := v.state.Final().ProtocolState()
+	versionUpgrade := pstate.GetVersionUpgrade() // can be nil, can be outdated
+	_ = versionUpgrade
+	//
+	err = v.verifyChunksFormat(result)
 	if err != nil {
 		return fmt.Errorf("invalid chunks format for result %v: %w", result.ID(), err)
 	}
