@@ -38,6 +38,7 @@ import (
 	"github.com/onflow/flow-go/cmd/util/cmd/snapshot"
 	system_addresses "github.com/onflow/flow-go/cmd/util/cmd/system-addresses"
 	truncate_database "github.com/onflow/flow-go/cmd/util/cmd/truncate-database"
+	verify_execution_result "github.com/onflow/flow-go/cmd/util/cmd/verify_execution_result"
 	"github.com/onflow/flow-go/cmd/util/cmd/version"
 	"github.com/onflow/flow-go/module/profiler"
 )
@@ -120,6 +121,7 @@ func addCommands() {
 	rootCmd.AddCommand(system_addresses.Cmd)
 	rootCmd.AddCommand(check_storage.Cmd)
 	rootCmd.AddCommand(generate_authorization_fixes.Cmd)
+	rootCmd.AddCommand(verify_execution_result.Cmd)
 }
 
 func initConfig() {
