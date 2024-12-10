@@ -3,8 +3,8 @@ package operation
 import "sync"
 
 type Callbacks struct {
-	sync.Mutex // protect callbacks
-	callbacks  []func(error)
+	sync.RWMutex // protect callbacks
+	callbacks    []func(error)
 }
 
 func (b *Callbacks) AddCallback(callback func(error)) {
@@ -15,8 +15,8 @@ func (b *Callbacks) AddCallback(callback func(error)) {
 }
 
 func (b *Callbacks) NotifyCallbacks(err error) {
-	b.Lock()
-	defer b.Unlock()
+	b.RLock()
+	defer b.RUnlock()
 
 	for _, callback := range b.callbacks {
 		callback(err)
