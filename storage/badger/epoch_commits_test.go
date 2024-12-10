@@ -2,25 +2,24 @@ package badger_test
 
 import (
 	"errors"
-	"github.com/onflow/crypto"
-	"github.com/onflow/flow-go/model/encodable"
-	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/storage/badger/operation"
-	"github.com/onflow/flow-go/storage/badger/transaction"
-	"github.com/onflow/go-ethereum/rlp"
-	"github.com/vmihailenco/msgpack/v4"
 	"io"
 	"testing"
 
 	"github.com/dgraph-io/badger/v2"
+	"github.com/onflow/crypto"
+	"github.com/onflow/go-ethereum/rlp"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/vmihailenco/msgpack/v4"
 
+	"github.com/onflow/flow-go/model/encodable"
+	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/storage"
-	"github.com/onflow/flow-go/utils/unittest"
-
 	badgerstorage "github.com/onflow/flow-go/storage/badger"
+	"github.com/onflow/flow-go/storage/badger/operation"
+	"github.com/onflow/flow-go/storage/badger/transaction"
+	"github.com/onflow/flow-go/utils/unittest"
 )
 
 // TestEpochCommitStoreAndRetrieve tests that a commit can be stored, retrieved and attempted to be stored again without an error

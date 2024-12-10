@@ -1,12 +1,14 @@
 package inmem_test
 
 import (
+	"testing"
+
+	"github.com/stretchr/testify/require"
+
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/state/protocol/inmem"
 	"github.com/onflow/flow-go/utils/unittest"
-	"github.com/stretchr/testify/require"
-	"testing"
 )
 
 // TestDKGv0 tests that the [inmem.DKG] is backward compatible with the v0 DKG protocol model.
