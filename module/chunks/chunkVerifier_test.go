@@ -303,10 +303,12 @@ func (s *ChunkVerifierTestSuite) TestServiceEventsMismatch_NonSystemChunk() {
 	require.NoError(s.T(), err)
 
 	s.snapshots[script] = &snapshot.ExecutionSnapshot{}
+	// overwrite the expected output for our custom transaction, passing
+	// in the non-matching EpochCommit event (should cause validation failure)
 	s.outputs[script] = fvm.ProcedureOutput{
 		ComputationUsed:        computationUsed,
 		ConvertedServiceEvents: flow.ServiceEventList{*epochCommitServiceEvent},
-		Events:                 meta.ChunkEvents[:3],
+		Events:                 meta.ChunkEvents[:3], // 2 default event + EpochSetup
 	}
 
 	_, err = s.verifier.Verify(vch)
