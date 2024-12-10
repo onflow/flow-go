@@ -141,12 +141,26 @@ func (e *Engine) processOutboundMessages(ctx context.Context) error {
 	}
 }
 
-// Process processes the given event from the node with the given origin ID in
-// a non-blocking manner. It returns the potential processing error when done.
-// Because the pusher engine does not accept inputs from the network,
-// always drop any messages and return an error.
+// Process is called by the networking layer, when peers broadcast messages with this node
+// as one of the recipients. The protocol specifies that Collector nodes broadcast Collection
+// Guarantees to Consensus Nodes and _only_ those. When the pusher engine (running only on
+// Collectors) receives a message, this message is evidence of byzantine behavior.
+// Byzantine inputs are internally handled by the pusher.Engine and do *not* result in
+// error returns. No errors expected during normal operation (including byzantine inputs).
 func (e *Engine) Process(channel channels.Channel, originID flow.Identifier, message any) error {
-	return fmt.Errorf("pusher engine should only receive local messages on the same node: got message %T on channel %v from origin %v", message, channel, originID)
+	// Targeting a collector node's pusher.Engine with messages could be considered as a slashable offense.
+	// Though, for generating cryptographic evidence, we need Message Forensics - see reference [1].
+	// Much further into the future, when we are implementing slashing challenges, we'll probably implement a
+	// dedicated consumer to post-process evidence of protocol violations into slashing challenges. For now,
+	// we just log this with the `KeySuspicious` to alert the node operator.
+	// [1] Message Forensics FLIP https://github.com/onflow/flips/pull/195)
+	errs := fmt.Errorf("collector node's pusher.Engine was targeted by message %T on channel %v", message, channel)
+	e.log.Warn().
+		Err(errs).
+		Bool(logging.KeySuspicious, true).
+		Str("peer_id", originID.String()).
+		Msg("potentially byzantine networking traffic detected")
+	return nil
 }
 
 // SubmitCollectionGuarantee adds a collection guarantee to the engine's queue

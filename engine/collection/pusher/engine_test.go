@@ -108,11 +108,13 @@ func (suite *Suite) TestSubmitCollectionGuaranteeNonLocal() {
 
 	guarantee := unittest.CollectionGuaranteeFixture()
 
-	// send from a non-allowed role
+	// verify that pusher.Engine handles any (potentially byzantine) input:
+	// A byzantine peer could target the collector node's pusher engine with messages
+	// The pusher should discard those and explicitly not get tricked into broadcasting
+	// collection guarantees which a byzantine peer might try to inject into the system.
 	sender := suite.identities.Filter(filter.HasRole[flow.Identity](flow.RoleVerification))[0]
 
 	err := suite.engine.Process(channels.PushGuarantees, sender.NodeID, guarantee)
-	suite.Require().Error(err)
-
+	suite.Require().NoError(err)
 	suite.conduit.AssertNumberOfCalls(suite.T(), "Multicast", 0)
 }
