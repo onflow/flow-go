@@ -31,7 +31,7 @@ type CreateFunc func() interface{}
 type HandleFunc func() error
 type IterationFunc func() (CheckFunc, CreateFunc, HandleFunc)
 
-// IterateKey will iterate over all entries in the database, where the key starts with a prefixes in
+// IterateKeysByPrefixRange will iterate over all entries in the database, where the key starts with a prefixes in
 // the range [startPrefix, endPrefix] (both inclusive). We require that startPrefix <= endPrefix (otherwise this
 // function errors). On every such key, the `check` function is called. If `check` errors, iteration is aborted.
 // In other words, error returned by the iteration functions will be propagated to the caller.
@@ -48,7 +48,7 @@ func IterateKeysByPrefixRange(r storage.Reader, startPrefix []byte, endPrefix []
 	}, storage.IteratorOption{BadgerIterateKeyOnly: true})
 }
 
-// IterateKey will iterate over all entries in the database, where the key starts with a prefixes in
+// IterateKeys will iterate over all entries in the database, where the key starts with a prefixes in
 // the range [startPrefix, endPrefix] (both inclusive).
 // No errors expected during normal operations.
 func IterateKeys(r storage.Reader, startPrefix []byte, endPrefix []byte, iterFunc IterationFunc, opt storage.IteratorOption) error {
