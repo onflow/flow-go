@@ -67,24 +67,28 @@ func (model *Modelv0) ID() flow.Identifier {
 	return makeVersionedModelID(model)
 }
 
-// Replicate instantiates a Protocol State Snapshot of the given `protocolVersion`.
-// It clones existing snapshot and performs a migration if `protocolVersion = 1`.
+// Replicate instantiates a Protocol State Snapshot of the given protocolVersion.
+// It clones existing snapshot if protocolVersion = currentVersion.
+// It transitions to next version if protocolVersion = currentVersion+1.
 // Expected errors during normal operations:
 //   - ErrIncompatibleVersionChange if replicating the Parent Snapshot into a Snapshot
 //     with the specified `protocolVersion` is not supported.
 func (model *Modelv0) Replicate(protocolVersion uint64) (protocol_state.KVStoreMutator, error) {
-	version := model.GetProtocolStateVersion()
-	if version == protocolVersion {
+	currentVersion := model.GetProtocolStateVersion()
+	if currentVersion == protocolVersion {
 		// no need for migration, return a complete copy
 		return clone.Clone(model), nil
 	} else if protocolVersion != 1 {
-		return nil, fmt.Errorf("unsupported replication version %d, expect %d: %w",
+		return nil, fmt.Errorf("unsupported replication currentVersion %d, expect %d: %w",
 			protocolVersion, 1, ErrIncompatibleVersionChange)
 	}
 
-	// perform actual replication to the next version
+	// perform actual replication to the next currentVersion
 	v1 := &Modelv1{
 		Modelv0: clone.Clone(*model),
+	}
+	if v1.GetProtocolStateVersion() != protocolVersion {
+		return nil, fmt.Errorf("sanity check: replicate resulted in unexpected version (%d != %d)", v1.GetProtocolStateVersion(), protocolVersion)
 	}
 	return v1, nil
 }
@@ -158,20 +162,33 @@ func (model *Modelv1) ID() flow.Identifier {
 	return makeVersionedModelID(model)
 }
 
-// Replicate instantiates a Protocol State Snapshot of the given `protocolVersion`.
-// It clones existing snapshot if `protocolVersion = 1`, other versions are not supported yet.
+// Replicate instantiates a Protocol State Snapshot of the given protocolVersion.
+// It clones existing snapshot if protocolVersion = currentVersion.
+// It transitions to next version if protocolVersion = currentVersion+1.
 // Expected errors during normal operations:
 //   - ErrIncompatibleVersionChange if replicating the Parent Snapshot into a Snapshot
 //     with the specified `protocolVersion` is not supported.
 func (model *Modelv1) Replicate(protocolVersion uint64) (protocol_state.KVStoreMutator, error) {
-	version := model.GetProtocolStateVersion()
-	if version == protocolVersion {
+	currentVersion := model.GetProtocolStateVersion()
+	if currentVersion == protocolVersion {
 		// no need for migration, return a complete copy
 		return clone.Clone(model), nil
-	} else {
-		return nil, fmt.Errorf("unsupported replication version %d: %w",
-			protocolVersion, ErrIncompatibleVersionChange)
 	}
+	nextVersion := currentVersion + 1
+	if protocolVersion != nextVersion {
+		// can only Replicate into model with numerically consecutive currentVersion
+		return nil, fmt.Errorf("unsupported replication currentVersion %d, expect %d: %w",
+			protocolVersion, 1, ErrIncompatibleVersionChange)
+	}
+
+	// perform actual replication to the next currentVersion
+	v2 := &Modelv2{
+		Modelv1: clone.Clone(*model),
+	}
+	if v2.GetProtocolStateVersion() != protocolVersion {
+		return nil, fmt.Errorf("sanity check: replicate resulted in unexpected version (%d != %d)", v2.GetProtocolStateVersion(), protocolVersion)
+	}
+	return v2, nil
 }
 
 // VersionedEncode encodes the key-value store, returning the version separately
@@ -190,9 +207,55 @@ func (model *Modelv1) GetProtocolStateVersion() uint64 {
 	return 1
 }
 
+// Modelv2 is v2 of the Protocol State key-value store.
+// This version adds the following changes:
+//   - Non-system-chunk service event validation support (adds ChunkBody.ServiceEventCount field)
+//   - EFM Recovery (adds EpochCommit.DKGIndexMap field)
+type Modelv2 struct {
+	Modelv1
+}
+
+// ID returns an identifier for this key-value store snapshot by hashing internal fields and version number.
+func (model *Modelv2) ID() flow.Identifier {
+	return makeVersionedModelID(model)
+}
+
+// Replicate instantiates a Protocol State Snapshot of the given protocolVersion.
+// It clones existing snapshot if protocolVersion = currentVersion, other versions are not supported yet.
+// Expected errors during normal operations:
+//   - ErrIncompatibleVersionChange if replicating the Parent Snapshot into a Snapshot
+//     with the specified `protocolVersion` is not supported.
+func (model *Modelv2) Replicate(protocolVersion uint64) (protocol_state.KVStoreMutator, error) {
+	currentVersion := model.GetProtocolStateVersion()
+	if currentVersion == protocolVersion {
+		// no need for migration, return a complete copy
+		return clone.Clone(model), nil
+	} else {
+		return nil, fmt.Errorf("unsupported replication currentVersion %d: %w",
+			protocolVersion, ErrIncompatibleVersionChange)
+	}
+}
+
+// VersionedEncode encodes the key-value store, returning the version separately
+// from the encoded bytes.
+// No errors are expected during normal operation.
+func (model *Modelv2) VersionedEncode() (uint64, []byte, error) {
+	return versionedEncode(model.GetProtocolStateVersion(), model)
+}
+
+// GetProtocolStateVersion returns the version of the Protocol State Snapshot
+// that is backing the `Reader` interface. It is the protocol version that originally
+// created the Protocol State Snapshot. Changes in the protocol state version
+// correspond to changes in the set of key-value pairs which are supported,
+// and which model is used for serialization.
+func (model *Modelv2) GetProtocolStateVersion() uint64 {
+	return 2
+}
+
 // NewDefaultKVStore constructs a default Key-Value Store of the *latest* protocol version for bootstrapping.
 // Currently, the KV store is largely empty.
 // TODO: Shortcut in bootstrapping; we will probably have to start with a non-empty KV store in the future;
+// TODO(efm-recovery): we need to bootstrap with v1 in order to test the upgrade to v2. Afterward, we should bootstrap with v2 by default for new networks.
 // Potentially we may need to carry over the KVStore during a spork (with possible migrations).
 func NewDefaultKVStore(finalizationSafetyThreshold, epochExtensionViewCount uint64, epochStateID flow.Identifier) (protocol_state.KVStoreAPI, error) {
 	modelv0, err := newKVStoreV0(finalizationSafetyThreshold, epochExtensionViewCount, epochStateID)
@@ -229,7 +292,7 @@ func NewKVStoreV0(finalizationSafetyThreshold, epochExtensionViewCount uint64, e
 // versionedModel generically represents a versioned protocol state model.
 type versionedModel interface {
 	GetProtocolStateVersion() uint64
-	*Modelv0 | *Modelv1
+	*Modelv0 | *Modelv1 | *Modelv2
 }
 
 // makeVersionedModelID produces an Identifier which includes both the model's
