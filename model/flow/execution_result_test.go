@@ -111,16 +111,19 @@ func TestExecutionResult_ServiceEventsByChunk(t *testing.T) {
 
 	t.Run("service events only in system chunk", func(t *testing.T) {
 		t.Run("nil ServiceEventCount field (old model)", func(t *testing.T) {
-			result := unittest.ExecutionResultFixture()
+			nServiceEvents := rand.Intn(10) + 1
+			result := unittest.ExecutionResultFixture(unittest.WithServiceEvents(nServiceEvents))
 			for _, chunk := range result.Chunks {
 				chunk.ServiceEventCount = nil
 			}
 
 			// should return empty list for all chunks
-			for chunkIndex := 0; chunkIndex < result.Chunks.Len(); chunkIndex++ {
+			for chunkIndex := 0; chunkIndex < result.Chunks.Len()-1; chunkIndex++ {
 				serviceEvents := result.ServiceEventsByChunk(uint64(chunkIndex))
 				assert.Len(t, serviceEvents, 0)
 			}
+			// should return list of service events for system chunk
+			assert.Equal(t, result.ServiceEvents, result.ServiceEventsByChunk(result.SystemChunk().Index))
 		})
 		t.Run("populated ServiceEventCount field", func(t *testing.T) {
 			nServiceEvents := rand.Intn(10) + 1
