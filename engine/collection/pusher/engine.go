@@ -13,7 +13,6 @@ import (
 	"github.com/onflow/flow-go/engine/common/fifoqueue"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
-	"github.com/onflow/flow-go/model/messages"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/component"
 	"github.com/onflow/flow-go/module/irrecoverable"
@@ -44,8 +43,7 @@ type Engine struct {
 	cm *component.ComponentManager
 }
 
-// TODO convert to network.MessageProcessor
-var _ network.Engine = (*Engine)(nil)
+var _ network.MessageProcessor = (*Engine)(nil)
 var _ component.Component = (*Engine)(nil)
 
 // New creates a new pusher engine.
@@ -120,17 +118,17 @@ func (e *Engine) outboundQueueWorker(ctx irrecoverable.SignalerContext, ready co
 // No errors expected during normal operations.
 func (e *Engine) processOutboundMessages(ctx context.Context) error {
 	for {
-		nextMessage, ok := e.queue.Pop()
+		item, ok := e.queue.Pop()
 		if !ok {
 			return nil
 		}
 
-		asSCGMsg, ok := nextMessage.(*messages.SubmitCollectionGuarantee)
+		guarantee, ok := item.(*flow.CollectionGuarantee)
 		if !ok {
-			return fmt.Errorf("invalid message type in pusher engine queue")
+			return fmt.Errorf("invalid type in pusher engine queue")
 		}
 
-		err := e.publishCollectionGuarantee(&asSCGMsg.Guarantee)
+		err := e.publishCollectionGuarantee(guarantee)
 		if err != nil {
 			return err
 		}
@@ -143,44 +141,32 @@ func (e *Engine) processOutboundMessages(ctx context.Context) error {
 	}
 }
 
-// SubmitLocal submits an event originating on the local node.
-func (e *Engine) SubmitLocal(event interface{}) {
-	ev, ok := event.(*messages.SubmitCollectionGuarantee)
-	if ok {
-		e.SubmitCollectionGuarantee(ev)
-	} else {
-		engine.LogError(e.log, fmt.Errorf("invalid message argument to pusher engine"))
-	}
-}
-
-// Submit submits the given event from the node with the given origin ID
-// for processing in a non-blocking manner. It returns instantly and logs
-// a potential processing error internally when done.
-func (e *Engine) Submit(channel channels.Channel, originID flow.Identifier, event interface{}) {
-	engine.LogError(e.log, fmt.Errorf("pusher engine should only receive local messages on the same node"))
-}
-
-// ProcessLocal processes an event originating on the local node.
-func (e *Engine) ProcessLocal(event interface{}) error {
-	ev, ok := event.(*messages.SubmitCollectionGuarantee)
-	if ok {
-		e.SubmitCollectionGuarantee(ev)
-		return nil
-	} else {
-		return fmt.Errorf("invalid message argument to pusher engine")
-	}
-}
-
-// Process processes the given event from the node with the given origin ID in
-// a blocking manner. It returns the potential processing error when done.
+// Process is called by the networking layer, when peers broadcast messages with this node
+// as one of the recipients. The protocol specifies that Collector nodes broadcast Collection
+// Guarantees to Consensus Nodes and _only_ those. When the pusher engine (running only on
+// Collectors) receives a message, this message is evidence of byzantine behavior.
+// Byzantine inputs are internally handled by the pusher.Engine and do *not* result in
+// error returns. No errors expected during normal operation (including byzantine inputs).
 func (e *Engine) Process(channel channels.Channel, originID flow.Identifier, message any) error {
-	return fmt.Errorf("pusher engine should only receive local messages on the same node")
+	// Targeting a collector node's pusher.Engine with messages could be considered as a slashable offense.
+	// Though, for generating cryptographic evidence, we need Message Forensics - see reference [1].
+	// Much further into the future, when we are implementing slashing challenges, we'll probably implement a
+	// dedicated consumer to post-process evidence of protocol violations into slashing challenges. For now,
+	// we just log this with the `KeySuspicious` to alert the node operator.
+	// [1] Message Forensics FLIP https://github.com/onflow/flips/pull/195)
+	errs := fmt.Errorf("collector node's pusher.Engine was targeted by message %T on channel %v", message, channel)
+	e.log.Warn().
+		Err(errs).
+		Bool(logging.KeySuspicious, true).
+		Str("peer_id", originID.String()).
+		Msg("potentially byzantine networking traffic detected")
+	return nil
 }
 
 // SubmitCollectionGuarantee adds a collection guarantee to the engine's queue
 // to later be published to consensus nodes.
-func (e *Engine) SubmitCollectionGuarantee(msg *messages.SubmitCollectionGuarantee) {
-	if e.queue.Push(msg) {
+func (e *Engine) SubmitCollectionGuarantee(guarantee *flow.CollectionGuarantee) {
+	if e.queue.Push(guarantee) {
 		e.notifier.Notify()
 	} else {
 		e.engMetrics.OutboundMessageDropped(metrics.EngineCollectionProvider, metrics.MessageCollectionGuarantee)
