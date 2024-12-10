@@ -1,6 +1,9 @@
 package storage
 
-import "github.com/dgraph-io/badger/v2"
+import (
+	"github.com/cockroachdb/pebble"
+	"github.com/dgraph-io/badger/v2"
+)
 
 type Transaction interface {
 	Set(key, val []byte) error
@@ -19,4 +22,10 @@ type BatchStorage interface {
 
 	// Flush will flush the write batch and update the cache.
 	Flush() error
+}
+
+type PebbleReaderBatchWriter interface {
+	ReaderWriter() (pebble.Reader, pebble.Writer)
+	IndexedBatch() *pebble.Batch
+	AddCallback(func())
 }
