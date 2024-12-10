@@ -1,38 +1,44 @@
 package flow
 
-// DKGEndState captures the final state of a completed DKG.
-type DKGEndState uint32
+// DKGState captures all possible states of the Recoverable Random Beacon State Machine.
+type DKGState uint32
 
 const (
-	// DKGEndStateUnknown - zero value for this enum, indicates unset value
-	DKGEndStateUnknown DKGEndState = iota
-	// DKGEndStateSuccess - the DKG completed, this node has a valid beacon key.
-	DKGEndStateSuccess
-	// DKGEndStateInconsistentKey - the DKG completed, this node has an invalid beacon key.
-	DKGEndStateInconsistentKey
-	// DKGEndStateNoKey - this node did not store a key, typically caused by a crash mid-DKG.
-	DKGEndStateNoKey
-	// DKGEndStateDKGFailure - the underlying DKG library reported an error.
-	DKGEndStateDKGFailure
-	// RandomBeaconKeyRecovered - this node has recovered its beacon key from a previous epoch.
-	// This occurs only for epochs which are entered through the EFM Recovery process (`flow.EpochRecover` service event).
-	RandomBeaconKeyRecovered
+	// DKGStateUninitialized - zero value for this enum, indicates that there is no initialized state.
+	// Conceptually, this is the 'initial' state of a finite state machine before any transitions.
+	DKGStateUninitialized DKGState = iota
+	// DKGStateStarted - the DKG process has been started. This state is set when the node enters the [flow.EpochPhaseSetup]
+	// phase and starts the DKG process, which will on the happy path result in generating a Random Beacon key.
+	DKGStateStarted
+	// DKGStateCompleted - the DKG process has been locally completed by this node. This state is set when the node successfully
+	// completes the DKG process and has generated a Random Beacon key.
+	// ATTENTION: This state does not imply that there is a safe Random Beacon key available for the next epoch. Only after
+	// the node enters [flow.EpochPhaseCommitted] and the [flow.EpochCommit] service event has been finalized, we can be sure
+	// that our beacon key share is part of the Random Beacon Committee for the next epoch, in this case the state will be [flow.RandomBeaconKeyCommitted].
+	DKGStateCompleted
+	// RandomBeaconKeyCommitted - the Random Beacon key has been committed. This state is set when the node has observed an [flow.EpochCommit]
+	// which contains the public key share that matches the private key share that the node has obtained.
+	// A node can obtain a key share by successfully completing the DKG process or by manually injecting a key share obtained
+	// by other means (e.g. key recovery).
+	// Regardless of the key origin, this is a terminal state which defines a safe Random Beacon key for the next epoch and allows the node
+	// to participate in the Random Beacon protocol.
+	RandomBeaconKeyCommitted
+	// DKGStateFailure - DKG process has failed, this state indicates that we have left the happy path.
+	DKGStateFailure
 )
 
-func (state DKGEndState) String() string {
+func (state DKGState) String() string {
 	switch state {
-	case DKGEndStateSuccess:
-		return "DKGEndStateSuccess"
-	case DKGEndStateInconsistentKey:
-		return "DKGEndStateInconsistentKey"
-	case DKGEndStateNoKey:
-		return "DKGEndStateNoKey"
-	case DKGEndStateDKGFailure:
-		return "DKGEndStateDKGFailure"
-	case RandomBeaconKeyRecovered:
-		return "RandomBeaconKeyRecovered"
+	case DKGStateStarted:
+		return "DKGStateStarted"
+	case DKGStateCompleted:
+		return "DKGStateCompleted"
+	case RandomBeaconKeyCommitted:
+		return "RandomBeaconKeyCommitted"
+	case DKGStateFailure:
+		return "DKGStateFailure"
 	default:
-		return "DKGEndStateUnknown"
+		return "DKGStateUninitialized"
 	}
 }
 
@@ -44,7 +50,7 @@ func (state DKGEndState) String() string {
 //   - The values in DKGIndexMap must form the set {0, 1, …, n-1}, as required by the low level cryptography
 //     module (convention simplifying the implementation).
 //
-// Flow's random beacon utilizes a threshold signature scheme run by the committee 𝒟.
+// Flow's Random Beacon utilizes a threshold signature scheme run by the committee 𝒟.
 // In the formal cryptographic protocol for a threshold signature with n parties, the
 // individual participants are identified by n public distinct non-negative integers, or simply indices.
 // These public indices are agreed upon by all participants and are used by the low-level
@@ -56,7 +62,7 @@ func (state DKGEndState) String() string {
 // the set {0, 1, ..., n-1}.
 //
 // On the protocol level, only consensus nodes (identified by their nodeIDs) are allowed to contribute
-// random beacon signature shares. Hence, the protocol level needs to map nodeIDs to the indices when
+// Random Beacon signature shares. Hence, the protocol level needs to map nodeIDs to the indices when
 // calling into the lower-level cryptographic primitives.
 //
 // CAUTION: It is important to cleanly differentiate between the consensus committee 𝒞, the DKG committee 𝒟
@@ -68,11 +74,11 @@ func (state DKGEndState) String() string {
 //   - The DKG committee 𝒟 is the set of parties that were authorized to participate in the DKG (happy path; or
 //     eligible to receive a private key share from an alternative source on the fallback path). Mathematically,
 //     the DKGIndexMap is a bijective function DKGIndexMap: 𝒟 ↦ {0,1,…,n-1}.
-//   - Only consensus nodes are allowed to contribute to the random beacon. Informally, we define ℛ as the
+//   - Only consensus nodes are allowed to contribute to the Random Beacon. Informally, we define ℛ as the
 //     as the subset of the consensus committee (ℛ ⊆ 𝒞), which _successfully_ completed the DKG (hence ℛ ⊆ 𝒟).
 //     Specifically, r ∈ ℛ iff and only if r has a private Random Beacon key share matching the respective public
 //     key share in the `EpochCommit` event. In other words, consensus nodes are in ℛ iff and only if they are able
-//     to submit valid random beacon votes. Based on this definition we note that ℛ ⊆ (𝒟 ∩ 𝒞).
+//     to submit valid Random Beacon votes. Based on this definition we note that ℛ ⊆ (𝒟 ∩ 𝒞).
 //
 // The protocol explicitly ALLOWS additional parties outside the current epoch's consensus committee to participate.
 // In particular, there can be a key-value pair (d,i) ∈ DKGIndexMap, such that the nodeID d is *not* a consensus
@@ -86,9 +92,9 @@ func (state DKGEndState) String() string {
 //
 // Nevertheless, there is an important liveness constraint: the committee ℛ should be a large number of nodes.
 // Specifically, an honest supermajority of consensus nodes must contain enough successful DKG participants
-// (about |𝒟|/2 + 1) to produce a valid group signature for the random beacon at each block [1, 3].
+// (about |𝒟|/2 + 1) to produce a valid group signature for the Random Beacon at each block [1, 3].
 // Therefore, we have the approximate lower bound |ℛ| ≳ n/2 + 1 = |𝒟|/2 + 1 = len(DKGIndexMap)/2 + 1.
-// Operating close to this lower bound would require that every random beacon key-holder ϱ ∈ ℛ remaining in the consensus committee is honest
+// Operating close to this lower bound would require that every Random Beacon key-holder ϱ ∈ ℛ remaining in the consensus committee is honest
 // (incl. quickly responsive) *all the time*. Such a reliability assumption is unsuited for decentralized production networks.
 // To reject configurations that are vulnerable to liveness failures, the protocol uses the threshold `t_safety`
 // (heuristic, see [2]), which is implemented on the smart contract level.

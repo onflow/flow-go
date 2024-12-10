@@ -61,7 +61,7 @@ func TestDKGStartedForEpoch(t *testing.T) {
 			epochCounter := rand.Uint64()
 
 			// set the flag, ensure no error
-			err := db.Update(InsertDKGStartedForEpoch(epochCounter))
+			err := db.Update(UpsertDKGStateForEpoch(epochCounter, flow.DKGStateStarted))
 			assert.NoError(t, err)
 
 			// read the flag, should be true now
@@ -78,23 +78,23 @@ func TestDKGStartedForEpoch(t *testing.T) {
 	})
 }
 
-func TestDKGEndStateForEpoch(t *testing.T) {
+func TestDKGSetStateForEpoch(t *testing.T) {
 	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
 		epochCounter := rand.Uint64()
 
-		// should be able to write end state
-		endState := flow.DKGEndStateSuccess
-		err := db.Update(InsertDKGEndStateForEpoch(epochCounter, endState))
+		// should be able to write new state
+		newState := flow.DKGStateStarted
+		err := db.Update(UpsertDKGStateForEpoch(epochCounter, newState))
 		assert.NoError(t, err)
 
-		// should be able to read end state
-		var readEndState flow.DKGEndState
-		err = db.View(RetrieveDKGEndStateForEpoch(epochCounter, &readEndState))
+		// should be able to read current state
+		var readCurrentState flow.DKGState
+		err = db.View(RetrieveDKGStateForEpoch(epochCounter, &readCurrentState))
 		assert.NoError(t, err)
-		assert.Equal(t, endState, readEndState)
+		assert.Equal(t, newState, readCurrentState)
 
-		// attempting to overwrite should error
-		err = db.Update(InsertDKGEndStateForEpoch(epochCounter, flow.DKGEndStateDKGFailure))
-		assert.ErrorIs(t, err, storage.ErrAlreadyExists)
+		// attempting to overwrite should succeed
+		err = db.Update(UpsertDKGStateForEpoch(epochCounter, flow.DKGStateFailure))
+		assert.NoError(t, err)
 	})
 }
