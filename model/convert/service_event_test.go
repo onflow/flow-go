@@ -100,6 +100,25 @@ func TestEventConversion(t *testing.T) {
 	},
 	)
 
+	// TODO(EFM, #6794): Remove this once we complete the network upgrade, this is only to test
+	//  backward compatibility of EpochCommit service event
+	t.Run("epoch commit, backward compatibility", func(t *testing.T) {
+
+		fixture, expected := unittest.EpochCommitV0FixtureByChainID(chainID)
+
+		// convert Cadence types to Go types
+		event, err := convert.ServiceEvent(chainID, fixture)
+		require.NoError(t, err)
+		require.NotNil(t, event)
+
+		// cast event type to epoch commit
+		actual, ok := event.Event.(*flow.EpochCommit)
+		require.True(t, ok)
+
+		assert.Equal(t, expected, actual)
+	},
+	)
+
 	t.Run("epoch recover", func(t *testing.T) {
 		fixture, expected := unittest.EpochRecoverFixtureByChainID(chainID)
 

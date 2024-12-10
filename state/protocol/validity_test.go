@@ -201,6 +201,53 @@ func TestBootstrapInvalidEpochCommit(t *testing.T) {
 	})
 }
 
+// TestIsValidEpochCommitBackwardCompatible tests that the implementation is backward compatible with the previous version of EpochCommit.
+// The main difference in validation logic is that the old version requires that number of consensus participants is
+// equal to the number of keys(random beacon participants) for new version of the [flow.EpochCommit] this is not required rather
+// we rely on a threshold for random beacon participants.
+// TODO(EFM, #6794): Remove this once we complete the network upgrade
+func TestIsValidEpochCommitBackwardCompatible(t *testing.T) {
+	_, result, _ := unittest.BootstrapFixture(participants)
+	setup := result.ServiceEvents[0].Event.(*flow.EpochSetup)
+	commit := result.ServiceEvents[1].Event.(*flow.EpochCommit)
+	requiredThreshold := protocol.RandomBeaconSafetyThreshold(uint(len(commit.DKGIndexMap)))
+	require.Less(t, int(requiredThreshold), len(commit.DKGParticipantKeys),
+		"threshold has to be at lower than the number of keys, otherwise the test is invalid")
+	// sample the required threshold, since it's lower than the number of keys it will be valid for the
+	// new version of the [flow.EpochCommit] but not for the v0 version since it doesn't have the [flow.DKGIndexMap] field.
+	sampled, err := setup.Participants.Filter(filter.IsConsensusCommitteeMember).Sample(requiredThreshold)
+	require.NoError(t, err)
+
+	// preserve the DKGIndexMap since we will be removing it later
+	dkgIndexMap := commit.DKGIndexMap
+
+	// since we are passing the new version validation result should be successful
+	err = protocol.IsValidEpochCommit(commit, setup)
+	require.NoError(t, err)
+
+	commit.DKGIndexMap = nil
+
+	// since we are passing the v0 version(because we have removed DKGIndexMap) validation result should be successful
+	// because number of participant keys is equal to the number of consensus participants.
+	err = protocol.IsValidEpochCommit(commit, setup)
+	require.NoError(t, err)
+
+	// now we are going to sample participants so the number of keys is not equal to the number of consensus participants
+	// but the threshold for random beacon participants is still met. This is valid for the new version of the [flow.EpochCommit]
+	// since it requires the [flow.DKGIndexMap] to be present, but it's invalid for the v0 version.
+	setup.Participants = sampled
+	commit.DKGIndexMap = dkgIndexMap
+	err = protocol.IsValidEpochCommit(commit, setup)
+	require.NoError(t, err)
+
+	commit.DKGIndexMap = nil
+
+	// since we are passing the v0 version(because we have removed DKGIndexMap) validation result should be an error
+	// because number of participant keys is not equal to the number of consensus participants and this is not valid for the v0 version.
+	err = protocol.IsValidEpochCommit(commit, setup)
+	require.Error(t, err)
+}
+
 // TestIsValidExtendingEpochSetup tests that implementation enforces the following protocol rules in case they are violated:
 // (a) We should only have a single epoch setup event per epoch.
 // (b) The setup event should have the counter increased by one

@@ -223,7 +223,7 @@ func (es *committedEpoch) ClusterByChainID(chainID flow.ChainID) (protocol.Clust
 }
 
 func (es *committedEpoch) DKG() (protocol.DKG, error) {
-	return NewDKG(es.commitEvent), nil
+	return NewDKG(es.setupEvent, es.commitEvent), nil
 }
 
 // heightBoundedEpoch represents an epoch (with counter N) for which we know either

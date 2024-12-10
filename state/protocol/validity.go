@@ -149,12 +149,24 @@ func IsValidExtendingEpochCommit(extendingCommit *flow.EpochCommit, epochState *
 	return nil
 }
 
+// IsValidEpochCommit implements a wrapper around the actual validation function to allow for backward-compatible validation
+// depending on the version of the [flow.EpochCommit] event. The version of the [flow.EpochCommit] is determined by the presence
+// of the [flow.DKGIndexMap] field.
+// TODO(EFM, #6794): Replace this with call to the actual validation function once we complete the network upgrade
+func IsValidEpochCommit(commit *flow.EpochCommit, setup *flow.EpochSetup) error {
+	if commit.DKGIndexMap == nil {
+		return isValidEpochCommitV0(commit, setup)
+	} else {
+		return isValidEpochCommit(commit, setup)
+	}
+}
+
 // IsValidEpochCommit checks whether an epoch commit service event is intrinsically valid.
 // Assumes the input flow.EpochSetup event has already been validated.
 // Expected errors during normal operations:
 // * protocol.InvalidServiceEventError if the EpochCommit is invalid.
 // This is a side-effect-free function. This function only returns protocol.InvalidServiceEventError as errors.
-func IsValidEpochCommit(commit *flow.EpochCommit, setup *flow.EpochSetup) error {
+func isValidEpochCommit(commit *flow.EpochCommit, setup *flow.EpochSetup) error {
 	if len(setup.Assignments) != len(commit.ClusterQCs) {
 		return NewInvalidServiceEventErrorf("number of clusters (%d) does not number of QCs (%d)", len(setup.Assignments), len(commit.ClusterQCs))
 	}
@@ -216,5 +228,33 @@ func IsValidEpochCommit(commit *flow.EpochCommit, setup *flow.EpochSetup) error 
 			signature.RandomBeaconThreshold(n), numberOfRandomBeaconParticipants)
 	}
 
+	return nil
+}
+
+// isValidEpochCommitV0 checks whether an epoch commit service event is intrinsically valid.
+// Assumes the input flow.EpochSetup event has already been validated.
+// Expected errors during normal operations:
+// * protocol.InvalidServiceEventError if the EpochCommit is invalid.
+// This is a side-effect-free function. This function only returns protocol.InvalidServiceEventError as errors.
+// TODO(EFM, #6794): This function is introduced to implement a backward-compatible validation of [flow.EpochCommit].
+// Remove this once we complete the network upgrade.
+func isValidEpochCommitV0(commit *flow.EpochCommit, setup *flow.EpochSetup) error {
+	if len(setup.Assignments) != len(commit.ClusterQCs) {
+		return NewInvalidServiceEventErrorf("number of clusters (%d) does not number of QCs (%d)", len(setup.Assignments), len(commit.ClusterQCs))
+	}
+
+	if commit.Counter != setup.Counter {
+		return NewInvalidServiceEventErrorf("inconsistent epoch counter between commit (%d) and setup (%d) events in same epoch", commit.Counter, setup.Counter)
+	}
+
+	// make sure we have a valid DKG public key
+	if commit.DKGGroupKey == nil {
+		return NewInvalidServiceEventErrorf("missing DKG public group key")
+	}
+
+	participants := setup.Participants.Filter(filter.IsConsensusCommitteeMember)
+	if len(participants) != len(commit.DKGParticipantKeys) {
+		return NewInvalidServiceEventErrorf("participant list (len=%d) does not match dkg key list (len=%d)", len(participants), len(commit.DKGParticipantKeys))
+	}
 	return nil
 }
