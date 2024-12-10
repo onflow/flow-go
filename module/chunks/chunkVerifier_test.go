@@ -31,6 +31,7 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
+// eventsList is the set of events emitted by each transaction, by default
 var eventsList = flow.EventsList{
 	{
 		Type:             "event.someType",
@@ -58,7 +59,8 @@ var testChain = flow.Emulator
 var epochSetupEvent, _ = unittest.EpochSetupFixtureByChainID(testChain)
 var epochCommitEvent, _ = unittest.EpochCommitFixtureByChainID(testChain)
 
-var systemEventsList = []flow.Event{
+// serviceEventsList is the list of service events emitted by default.
+var serviceEventsList = []flow.Event{
 	epochSetupEvent,
 }
 
@@ -72,6 +74,10 @@ type ChunkVerifierTestSuite struct {
 	verifier *chunks.ChunkVerifier
 	ledger   *completeLedger.Ledger
 
+	// Below, snapshots and outputs map transaction scripts to execution artifacts
+	// Test cases can inject a script when constructing a chunk, then associate
+	// it with the desired execution artifacts by adding entries to these maps.
+	// If no entry exists, then the default snapshot/output is used.
 	snapshots map[string]*snapshot.ExecutionSnapshot
 	outputs   map[string]fvm.ProcedureOutput
 }
@@ -139,7 +145,7 @@ func TestChunkVerifier(t *testing.T) {
 
 // TestHappyPath tests verification of the baseline verifiable chunk
 func (s *ChunkVerifierTestSuite) TestHappyPath() {
-	meta := s.GetTestSetup(s.T(), "", false)
+	meta := s.GetTestSetup(s.T(), "", false, false)
 	vch := meta.RefreshChunkData(s.T())
 
 	spockSecret, err := s.verifier.Verify(vch)
@@ -151,7 +157,7 @@ func (s *ChunkVerifierTestSuite) TestHappyPath() {
 func (s *ChunkVerifierTestSuite) TestMissingRegisterTouchForUpdate() {
 	unittest.SkipUnless(s.T(), unittest.TEST_DEPRECATED, "Check new partial ledger for missing keys")
 
-	meta := s.GetTestSetup(s.T(), "", false)
+	meta := s.GetTestSetup(s.T(), "", false, false)
 	vch := meta.RefreshChunkData(s.T())
 
 	// remove the second register touch
@@ -166,7 +172,7 @@ func (s *ChunkVerifierTestSuite) TestMissingRegisterTouchForUpdate() {
 func (s *ChunkVerifierTestSuite) TestMissingRegisterTouchForRead() {
 	unittest.SkipUnless(s.T(), unittest.TEST_DEPRECATED, "Check new partial ledger for missing keys")
 
-	meta := s.GetTestSetup(s.T(), "", false)
+	meta := s.GetTestSetup(s.T(), "", false, false)
 	vch := meta.RefreshChunkData(s.T())
 
 	// remove the second register touch
@@ -181,7 +187,7 @@ func (s *ChunkVerifierTestSuite) TestMissingRegisterTouchForRead() {
 // the state commitment computed after updating the partial trie
 // doesn't match the one provided by the chunks
 func (s *ChunkVerifierTestSuite) TestWrongEndState() {
-	meta := s.GetTestSetup(s.T(), "wrongEndState", false)
+	meta := s.GetTestSetup(s.T(), "wrongEndState", false, false)
 	vch := meta.RefreshChunkData(s.T())
 
 	// modify calculated end state, which is different from the one provided by the vch
@@ -201,7 +207,7 @@ func (s *ChunkVerifierTestSuite) TestWrongEndState() {
 // of failed transaction. if a transaction fails, it should
 // still change the state commitment.
 func (s *ChunkVerifierTestSuite) TestFailedTx() {
-	meta := s.GetTestSetup(s.T(), "failedTx", false)
+	meta := s.GetTestSetup(s.T(), "failedTx", false, false)
 	vch := meta.RefreshChunkData(s.T())
 
 	// modify the FVM output to include a failing tx. the input already has a failing tx, but we need to
@@ -223,7 +229,7 @@ func (s *ChunkVerifierTestSuite) TestFailedTx() {
 // TestEventsMismatch tests verification behavior in case
 // of emitted events not matching chunks
 func (s *ChunkVerifierTestSuite) TestEventsMismatch() {
-	meta := s.GetTestSetup(s.T(), "eventsMismatch", false)
+	meta := s.GetTestSetup(s.T(), "eventsMismatch", false, false)
 	vch := meta.RefreshChunkData(s.T())
 
 	// add an additional event to the list of events produced by FVM
@@ -245,8 +251,8 @@ func (s *ChunkVerifierTestSuite) TestEventsMismatch() {
 
 // TestServiceEventsMismatch tests verification behavior in case
 // of emitted service events not matching chunks'
-func (s *ChunkVerifierTestSuite) TestServiceEventsMismatch() {
-	meta := s.GetTestSetup(s.T(), "doesn't matter", true)
+func (s *ChunkVerifierTestSuite) TestServiceEventsMismatch_SystemChunk() {
+	meta := s.GetTestSetup(s.T(), "doesn't matter", true, true)
 	vch := meta.RefreshChunkData(s.T())
 
 	// modify the list of service events produced by FVM
@@ -257,6 +263,7 @@ func (s *ChunkVerifierTestSuite) TestServiceEventsMismatch() {
 	s.snapshots[string(serviceTxBody.Script)] = &snapshot.ExecutionSnapshot{}
 	s.outputs[string(serviceTxBody.Script)] = fvm.ProcedureOutput{
 		ComputationUsed:        computationUsed,
+		ServiceEvents:          unittest.EventsFixture(1),
 		ConvertedServiceEvents: flow.ServiceEventList{*epochCommitServiceEvent},
 		Events:                 meta.ChunkEvents,
 	}
@@ -268,8 +275,8 @@ func (s *ChunkVerifierTestSuite) TestServiceEventsMismatch() {
 }
 
 // TestServiceEventsAreChecked ensures that service events are in fact checked
-func (s *ChunkVerifierTestSuite) TestServiceEventsAreChecked() {
-	meta := s.GetTestSetup(s.T(), "doesn't matter", true)
+func (s *ChunkVerifierTestSuite) TestServiceEventsAreChecked_SystemChunk() {
+	meta := s.GetTestSetup(s.T(), "doesn't matter", true, true)
 	vch := meta.RefreshChunkData(s.T())
 
 	// setup the verifier output to include the correct data for the service events
@@ -282,9 +289,56 @@ func (s *ChunkVerifierTestSuite) TestServiceEventsAreChecked() {
 	assert.NoError(s.T(), err)
 }
 
+// Tests the case where a service event is emitted outside the system chunk
+// and the event computed by the VN does not match the Result.
+// NOTE: this test case relies on the ordering of transactions in generateCollection.
+func (s *ChunkVerifierTestSuite) TestServiceEventsMismatch_NonSystemChunk() {
+	script := "service event mismatch in non-system chunk"
+	meta := s.GetTestSetup(s.T(), script, false, true)
+	vch := meta.RefreshChunkData(s.T())
+
+	// modify the list of service events produced by FVM
+	// EpochSetup event is expected, but we emit EpochCommit here resulting in a chunk fault
+	epochCommitServiceEvent, err := convert.ServiceEvent(testChain, epochCommitEvent)
+	require.NoError(s.T(), err)
+
+	s.snapshots[script] = &snapshot.ExecutionSnapshot{}
+	// overwrite the expected output for our custom transaction, passing
+	// in the non-matching EpochCommit event (should cause validation failure)
+	s.outputs[script] = fvm.ProcedureOutput{
+		ComputationUsed:        computationUsed,
+		ConvertedServiceEvents: flow.ServiceEventList{*epochCommitServiceEvent},
+		Events:                 meta.ChunkEvents[:3], // 2 default event + EpochSetup
+	}
+
+	_, err = s.verifier.Verify(vch)
+
+	assert.Error(s.T(), err)
+	assert.True(s.T(), chunksmodels.IsChunkFaultError(err))
+	assert.IsType(s.T(), &chunksmodels.CFInvalidServiceEventsEmitted{}, err)
+}
+
+// Tests that service events are checked, when they appear outside the system chunk.
+// NOTE: this test case relies on the ordering of transactions in generateCollection.
+func (s *ChunkVerifierTestSuite) TestServiceEventsAreChecked_NonSystemChunk() {
+	script := "service event in non-system chunk"
+	meta := s.GetTestSetup(s.T(), script, false, true)
+	vch := meta.RefreshChunkData(s.T())
+
+	// setup the verifier output to include the correct data for the service events
+	output := generateDefaultOutput()
+	output.ConvertedServiceEvents = meta.ServiceEvents
+	output.Events = meta.ChunkEvents[:3] // 2 default events + 1 service event
+	s.outputs[script] = output
+
+	spockSecret, err := s.verifier.Verify(vch)
+	assert.NoError(s.T(), err)
+	assert.NotNil(s.T(), spockSecret)
+}
+
 // TestSystemChunkWithCollectionFails ensures verification fails for system chunks with collections
 func (s *ChunkVerifierTestSuite) TestSystemChunkWithCollectionFails() {
-	meta := s.GetTestSetup(s.T(), "doesn't matter", true)
+	meta := s.GetTestSetup(s.T(), "doesn't matter", true, true)
 
 	// add a collection to the system chunk
 	col := unittest.CollectionFixture(1)
@@ -301,7 +355,7 @@ func (s *ChunkVerifierTestSuite) TestSystemChunkWithCollectionFails() {
 // TestEmptyCollection tests verification behaviour if a
 // collection doesn't have any transaction.
 func (s *ChunkVerifierTestSuite) TestEmptyCollection() {
-	meta := s.GetTestSetup(s.T(), "", false)
+	meta := s.GetTestSetup(s.T(), "", false, false)
 
 	// reset test to use an empty collection
 	collection := unittest.CollectionFixture(0)
@@ -323,7 +377,7 @@ func (s *ChunkVerifierTestSuite) TestEmptyCollection() {
 }
 
 func (s *ChunkVerifierTestSuite) TestExecutionDataBlockMismatch() {
-	meta := s.GetTestSetup(s.T(), "", false)
+	meta := s.GetTestSetup(s.T(), "", false, false)
 
 	// modify Block in the ExecutionDataRoot
 	meta.ExecDataBlockID = unittest.IdentifierFixture()
@@ -337,7 +391,7 @@ func (s *ChunkVerifierTestSuite) TestExecutionDataBlockMismatch() {
 }
 
 func (s *ChunkVerifierTestSuite) TestExecutionDataChunkIdsLengthDiffers() {
-	meta := s.GetTestSetup(s.T(), "", false)
+	meta := s.GetTestSetup(s.T(), "", false, false)
 	vch := meta.RefreshChunkData(s.T())
 
 	// add an additional ChunkExecutionDataID into the ExecutionDataRoot passed into Verify
@@ -350,7 +404,7 @@ func (s *ChunkVerifierTestSuite) TestExecutionDataChunkIdsLengthDiffers() {
 }
 
 func (s *ChunkVerifierTestSuite) TestExecutionDataChunkIdMismatch() {
-	meta := s.GetTestSetup(s.T(), "", false)
+	meta := s.GetTestSetup(s.T(), "", false, false)
 	vch := meta.RefreshChunkData(s.T())
 
 	// modify one of the ChunkExecutionDataIDs passed into Verify
@@ -363,7 +417,7 @@ func (s *ChunkVerifierTestSuite) TestExecutionDataChunkIdMismatch() {
 }
 
 func (s *ChunkVerifierTestSuite) TestExecutionDataIdMismatch() {
-	meta := s.GetTestSetup(s.T(), "", false)
+	meta := s.GetTestSetup(s.T(), "", false, false)
 	vch := meta.RefreshChunkData(s.T())
 
 	// modify ExecutionDataID passed into Verify
@@ -456,13 +510,13 @@ func generateExecutionData(t *testing.T, blockID flow.Identifier, ced *execution
 	return executionDataID, executionDataRoot
 }
 
-func generateEvents(t *testing.T, isSystemChunk bool, collection *flow.Collection) (flow.EventsList, []flow.ServiceEvent) {
+func generateEvents(t *testing.T, collection *flow.Collection, includeServiceEvent bool) (flow.EventsList, []flow.ServiceEvent) {
 	var chunkEvents flow.EventsList
 	serviceEvents := make([]flow.ServiceEvent, 0)
 
 	// service events are also included as regular events
-	if isSystemChunk {
-		for _, e := range systemEventsList {
+	if includeServiceEvent {
+		for _, e := range serviceEventsList {
 			e := e
 			event, err := convert.ServiceEvent(testChain, e)
 			require.NoError(t, err)
@@ -500,6 +554,12 @@ func generateTransactionResults(t *testing.T, collection *flow.Collection) []flo
 	return txResults
 }
 
+// generateCollection generates a collection fixture that is predictable based on inputs.
+// Test cases in this file rely on the predictable pattern of collections generated here.
+// If this is a system chunk, we return a collection containing only the service transaction.
+// Otherwise, we return a collection with 5 transactions. Only the first of these 5 uses the input script.
+// The transaction script is the lookup key for determining the result of transaction execution,
+// so test cases can inject a desired transaction output associated with the input script.
 func generateCollection(t *testing.T, isSystemChunk bool, script string) *flow.Collection {
 	if isSystemChunk {
 		// the system chunk's data pack does not include the collection, but the execution data does.
@@ -510,11 +570,12 @@ func generateCollection(t *testing.T, isSystemChunk bool, script string) *flow.C
 	}
 
 	collectionSize := 5
-	magicTxIndex := 3
+	// add the user-specified transaction first
+	userSpecifiedTxIndex := 0
 
 	coll := unittest.CollectionFixture(collectionSize)
 	if script != "" {
-		coll.Transactions[magicTxIndex] = &flow.TransactionBody{Script: []byte(script)}
+		coll.Transactions[userSpecifiedTxIndex] = &flow.TransactionBody{Script: []byte(script)}
 	}
 
 	return &coll
@@ -540,7 +601,7 @@ func generateDefaultOutput() fvm.ProcedureOutput {
 	}
 }
 
-func (s *ChunkVerifierTestSuite) GetTestSetup(t *testing.T, script string, system bool) *testMetadata {
+func (s *ChunkVerifierTestSuite) GetTestSetup(t *testing.T, script string, system bool, includeServiceEvents bool) *testMetadata {
 	collection := generateCollection(t, system, script)
 	block := blockFixture(collection)
 
@@ -554,14 +615,9 @@ func (s *ChunkVerifierTestSuite) GetTestSetup(t *testing.T, script string, syste
 	}
 
 	// events
-	chunkEvents, serviceEvents := generateEvents(t, system, collection)
+	chunkEvents, serviceEvents := generateEvents(t, collection, includeServiceEvents)
 	// make sure this includes events even for the service tx
 	require.NotEmpty(t, chunkEvents)
-	if system {
-		require.Len(t, serviceEvents, 1)
-	} else {
-		require.Empty(t, serviceEvents)
-	}
 
 	// registerTouch and State setup
 	startState, proof, update := generateStateUpdates(t, s.ledger)
@@ -638,7 +694,9 @@ func (m *testMetadata) RefreshChunkData(t *testing.T) *verification.VerifiableCh
 			CollectionIndex: 0,
 			StartState:      flow.StateCommitment(m.StartState),
 			BlockID:         m.Header.ID(),
-			EventCollection: eventsMerkleRootHash,
+			// in these test cases, all defined service events correspond to the current chunk
+			ServiceEventCount: unittest.PtrTo(uint16(len(m.ServiceEvents))),
+			EventCollection:   eventsMerkleRootHash,
 		},
 		Index: 0,
 	}
