@@ -54,7 +54,7 @@ type ChunkBody struct {
 	//
 	// BACKWARD COMPATIBILITY:
 	// (1) If ServiceEventCount is nil, this indicates that this chunk was created by an older software version
-	//     which did support specifying a mapping between chunks and service events.
+	//     which did not support specifying a mapping between chunks and service events.
 	//     In this case, all service events are assumed to have been emitted in the system chunk (last chunk).
 	//     This was the implicit behaviour prior to the introduction of this field.
 	// (2) Otherwise, ServiceEventCount must be non-nil.
