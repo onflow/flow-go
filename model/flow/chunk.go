@@ -156,6 +156,19 @@ func (ch Chunk) EncodeRLP(w io.Writer) error {
 	})
 }
 
+// Deprecated:
+// TODO(mainnet27): remove this type https://github.com/onflow/flow-go/issues/6773
+type ChunkConstructor func(
+	blockID Identifier,
+	collectionIndex int,
+	startState StateCommitment,
+	numberOfTransactions int,
+	eventCollection Identifier,
+	serviceEventCount uint16,
+	endState StateCommitment,
+	totalComputationUsed uint64) *Chunk
+
+// NewChunk returns a Chunk compliant with Protocol Version 2 and later.
 func NewChunk(
 	blockID Identifier,
 	collectionIndex int,
@@ -174,6 +187,34 @@ func NewChunk(
 			NumberOfTransactions: uint64(numberOfTransactions),
 			EventCollection:      eventCollection,
 			ServiceEventCount:    &serviceEventCount,
+			TotalComputationUsed: totalComputationUsed,
+		},
+		Index:    uint64(collectionIndex),
+		EndState: endState,
+	}
+}
+
+// NewChunk_ProtocolVersion1 returns a Chunk compliant with Protocol Version 1.
+// TODO(mainnet27): remove this function https://github.com/onflow/flow-go/issues/6773
+// Deprecated: for backward compatibility only until upgrade to Protocol Version 2.
+func NewChunk_ProtocolVersion1(
+	blockID Identifier,
+	collectionIndex int,
+	startState StateCommitment,
+	numberOfTransactions int,
+	eventCollection Identifier,
+	serviceEventCount uint16, // ignored
+	endState StateCommitment,
+	totalComputationUsed uint64,
+) *Chunk {
+	return &Chunk{
+		ChunkBody: ChunkBody{
+			BlockID:              blockID,
+			CollectionIndex:      uint(collectionIndex),
+			StartState:           startState,
+			NumberOfTransactions: uint64(numberOfTransactions),
+			EventCollection:      eventCollection,
+			ServiceEventCount:    nil,
 			TotalComputationUsed: totalComputationUsed,
 		},
 		Index:    uint64(collectionIndex),

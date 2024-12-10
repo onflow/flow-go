@@ -306,6 +306,26 @@ func numberOfTransactionsInBlock(collections []*entity.CompleteCollection) int {
 	return numTxns
 }
 
+// selectChunkConstructorForProtocolVersion selects a [flow.Chunk] constructor to
+// use when constructing the [flow.ExecutionResult] for the input block. We select
+// based on the protocol version at the input block. When we process the version upgrade
+// event to protocol version 2, we begin populating the new [flow.ChunkBody.ServiceEventCount]
+// field.
+// Deprecated:
+// TODO(mainnet27): remove this function https://github.com/onflow/flow-go/issues/6773
+func (e *blockComputer) selectChunkConstructorForProtocolVersion(blockID flow.Identifier) (flow.ChunkConstructor, error) {
+	ps, err := e.protocolState.AtBlockID(blockID).ProtocolState()
+	if err != nil {
+		return nil, err
+	}
+	version := ps.GetProtocolStateVersion()
+	if version < 2 {
+		return flow.NewChunk_ProtocolVersion1, nil
+	} else {
+		return flow.NewChunk, nil
+	}
+}
+
 func (e *blockComputer) executeBlock(
 	ctx context.Context,
 	parentBlockExecutionResultID flow.Identifier,
@@ -343,6 +363,13 @@ func (e *blockComputer) executeBlock(
 
 	numTxns := numberOfTransactionsInBlock(rawCollections)
 
+	// We temporarily support chunk models associated with both protocol versions 1 and 2.
+	// TODO(mainnet27): remove this https://github.com/onflow/flow-go/issues/6773
+	versionedChunkConstructor, err := e.selectChunkConstructorForProtocolVersion(blockId)
+	if err != nil {
+		return nil, fmt.Errorf("could not select chunk constructor for current protocol version: %w", err)
+	}
+
 	// have access to protocol state at this point
 	collector := newResultCollector(
 		e.tracer,
@@ -358,6 +385,7 @@ func (e *blockComputer) executeBlock(
 		numTxns,
 		e.colResCons,
 		baseSnapshot,
+		versionedChunkConstructor,
 	)
 	defer collector.Stop()
 

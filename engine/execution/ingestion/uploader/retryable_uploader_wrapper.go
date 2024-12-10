@@ -242,7 +242,7 @@ func (b *BadgerRetryableUploaderWrapper) reconstructComputationResult(
 		CompleteCollections: completeCollections,
 	}
 
-	compRes := execution.NewEmptyComputationResult(executableBlock)
+	compRes := execution.NewEmptyComputationResult(executableBlock) // TODO(6777)
 
 	eventsByTxIndex := make(map[int]flow.EventsList, 0)
 	for _, event := range events {
