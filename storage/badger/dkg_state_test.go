@@ -13,8 +13,9 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
-// TestDKGState_UninitializedState checks that invariants are enforced for [flow.DKGStateUninitialized] state.
-// This test is written in a way that we start with initial state of the Recoverable Random Beacon State Machine and
+// TestDKGState_UninitializedState verifies that for new epochs, the RecoverableRandomBeaconStateMachine starts
+// in the state [flow.DKGStateUninitialized] and reports correct values for that Epoch's DKG state. 
+// For this test, we start with initial state of the Recoverable Random Beacon State Machine and
 // try to perform all possible actions and transitions in it.
 func TestDKGState_UninitializedState(t *testing.T) {
 	unittest.RunWithTypedBadgerDB(t, InitSecret, func(db *badger.DB) {
@@ -44,23 +45,23 @@ func TestDKGState_UninitializedState(t *testing.T) {
 		require.False(t, safe)
 		require.Nil(t, pk)
 
-		t.Run("-> flow.DKGStateUninitialized, not allowed", func(t *testing.T) {
+		t.Run("state transition flow.DKGStateUninitialized -> flow.DKGStateUninitialized should not be allowed", func(t *testing.T) {
 			err = store.SetDKGState(setupState(), flow.DKGStateUninitialized)
 			require.Error(t, err)
 			require.True(t, storage.IsInvalidDKGStateTransitionError(err))
 		})
 
-		t.Run("-> flow.DKGStateStarted, should be allowed", func(t *testing.T) {
+		t.Run("state transition flow.DKGStateUninitialized ->  flow.DKGStateStarted should be allowed", func(t *testing.T) {
 			err = store.SetDKGState(setupState(), flow.DKGStateStarted)
 			require.NoError(t, err)
 		})
 
-		t.Run("-> flow.DKGStateFailure, should be allowed", func(t *testing.T) {
+		t.Run("state transition flow.DKGStateUninitialized -> flow.DKGStateFailure should be allowed", func(t *testing.T) {
 			err = store.SetDKGState(setupState(), flow.DKGStateFailure)
 			require.NoError(t, err)
 		})
 
-		t.Run("-> flow.DKGStateCompleted, not allowed", func(t *testing.T) {
+		t.Run("state transition flow.DKGStateUninitialized -> flow.DKGStateCompleted should not be allowed", func(t *testing.T) {
 			epochCounter := setupState()
 			err = store.InsertMyBeaconPrivateKey(epochCounter, unittest.RandomBeaconPriv())
 			require.Error(t, err, "should not be able to enter completed state without starting")
@@ -70,7 +71,7 @@ func TestDKGState_UninitializedState(t *testing.T) {
 			require.True(t, storage.IsInvalidDKGStateTransitionError(err))
 		})
 
-		t.Run("-> flow.RandomBeaconKeyCommitted, should be allowed", func(t *testing.T) {
+		t.Run("state transition flow.DKGStateUninitialized -> flow.RandomBeaconKeyCommitted should be allowed", func(t *testing.T) {
 			epochCounter := setupState()
 			err = store.SetDKGState(epochCounter, flow.RandomBeaconKeyCommitted)
 			require.Error(t, err, "should not be able to set DKG state to recovered, only using dedicated interface")
@@ -81,9 +82,8 @@ func TestDKGState_UninitializedState(t *testing.T) {
 	})
 }
 
-// TestDKGState_StartedState checks that invariants are enforced for [flow.DKGStateStarted] state.
-// This test is written in a way that we start in [flow.DKGStateStarted] of the Recoverable Random Beacon State Machine and
-// try to perform all possible actions and transitions in it.
+// TestDKGState_StartedState verifies that for a DKG in the state [flow.DKGStateStarted], the RecoverableRandomBeaconStateMachine
+// reports correct values and permits / rejects state transitions according to the state machine specification.
 func TestDKGState_StartedState(t *testing.T) {
 	unittest.RunWithTypedBadgerDB(t, InitSecret, func(db *badger.DB) {
 		metrics := metrics.NewNoopCollector()
@@ -115,19 +115,19 @@ func TestDKGState_StartedState(t *testing.T) {
 		require.False(t, safe)
 		require.Nil(t, pk)
 
-		t.Run("-> flow.DKGStateUninitialized, not allowed", func(t *testing.T) {
+		t.Run("state transition flow.DKGStateStarted -> flow.DKGStateUninitialized should not be allowed", func(t *testing.T) {
 			err = store.SetDKGState(setupState(), flow.DKGStateUninitialized)
 			require.Error(t, err)
 			require.True(t, storage.IsInvalidDKGStateTransitionError(err))
 		})
 
-		t.Run("-> flow.DKGStateStarted, not allowed", func(t *testing.T) {
+		t.Run("state transition flow.DKGStateStarted -> flow.DKGStateStarted should not be allowed", func(t *testing.T) {
 			err = store.SetDKGState(setupState(), flow.DKGStateStarted)
 			require.Error(t, err)
 			require.True(t, storage.IsInvalidDKGStateTransitionError(err))
 		})
 
-		t.Run("-> flow.DKGStateFailure, should be allowed", func(t *testing.T) {
+		t.Run("state transition flow.DKGStateStarted -> flow.DKGStateFailure should be allowed", func(t *testing.T) {
 			err = store.SetDKGState(setupState(), flow.DKGStateFailure)
 			require.NoError(t, err)
 		})
@@ -141,7 +141,7 @@ func TestDKGState_StartedState(t *testing.T) {
 			require.NoError(t, err)
 		})
 
-		t.Run("-> flow.RandomBeaconKeyCommitted, should be allowed", func(t *testing.T) {
+		t.Run("state transition flow.DKGStateStarted -> flow.RandomBeaconKeyCommitted should be allowed", func(t *testing.T) {
 			epochCounter := setupState()
 			err = store.SetDKGState(epochCounter, flow.RandomBeaconKeyCommitted)
 			require.Error(t, err, "should not be able to set DKG state to recovered, only using dedicated interface")
@@ -152,9 +152,8 @@ func TestDKGState_StartedState(t *testing.T) {
 	})
 }
 
-// TestDKGState_CompletedState checks that invariants are enforced for [flow.DKGStateCompleted] state.
-// This test is written in a way that we start in [flow.DKGStateCompleted] of the Recoverable Random Beacon State Machine and
-// try to perform all possible actions and transitions in it. We enter [flow.DKGStateCompleted] by inserting a mock private key.
+// TestDKGState_CompletedState  verifies that for a DKG in the state [flow.DKGStateCompleted], the RecoverableRandomBeaconStateMachine
+// reports correct values and permits / rejects state transitions according to the state machine specification.
 func TestDKGState_CompletedState(t *testing.T) {
 	unittest.RunWithTypedBadgerDB(t, InitSecret, func(db *badger.DB) {
 		metrics := metrics.NewNoopCollector()
@@ -188,19 +187,19 @@ func TestDKGState_CompletedState(t *testing.T) {
 		require.False(t, safe)
 		require.Nil(t, pk)
 
-		t.Run("-> flow.DKGStateUninitialized, not allowed", func(t *testing.T) {
+		t.Run("state transition flow.DKGStateCompleted -> flow.DKGStateUninitialized should not be allowed", func(t *testing.T) {
 			err = store.SetDKGState(setupState(), flow.DKGStateUninitialized)
 			require.Error(t, err)
 			require.True(t, storage.IsInvalidDKGStateTransitionError(err))
 		})
 
-		t.Run("-> flow.DKGStateStarted, not allowed", func(t *testing.T) {
+		t.Run("state transition flow.DKGStateCompleted -> flow.DKGStateStarted should not be allowed", func(t *testing.T) {
 			err = store.SetDKGState(setupState(), flow.DKGStateStarted)
 			require.Error(t, err)
 			require.True(t, storage.IsInvalidDKGStateTransitionError(err))
 		})
 
-		t.Run("-> flow.DKGStateFailure, should be allowed", func(t *testing.T) {
+		t.Run("state transition flow.DKGStateCompleted -> flow.DKGStateFailure should be allowed", func(t *testing.T) {
 			err = store.SetDKGState(setupState(), flow.DKGStateFailure)
 			require.NoError(t, err)
 		})
@@ -229,9 +228,8 @@ func TestDKGState_CompletedState(t *testing.T) {
 	})
 }
 
-// TestDKGState_FailureState checks that invariants are enforced for [flow.DKGStateFailure] state.
-// This test is written in a way that we start with [flow.DKGStateFailure] of the Recoverable Random Beacon State Machine and
-// try to perform all possible actions and transitions in it.
+// TestDKGState_StartedState verifies that for a DKG in the state [flow.DKGStateFailure], the RecoverableRandomBeaconStateMachine
+// reports correct values and permits / rejects state transitions according to the state machine specification.
 func TestDKGState_FailureState(t *testing.T) {
 	unittest.RunWithTypedBadgerDB(t, InitSecret, func(db *badger.DB) {
 		metrics := metrics.NewNoopCollector()
@@ -263,13 +261,13 @@ func TestDKGState_FailureState(t *testing.T) {
 		require.False(t, safe)
 		require.Nil(t, pk)
 
-		t.Run("-> flow.DKGStateUninitialized, not allowed", func(t *testing.T) {
+		t.Run("state transition flow.DKGStateFailure -> flow.DKGStateUninitialized should not be allowed", func(t *testing.T) {
 			err = store.SetDKGState(setupState(), flow.DKGStateUninitialized)
 			require.Error(t, err)
 			require.True(t, storage.IsInvalidDKGStateTransitionError(err))
 		})
 
-		t.Run("-> flow.DKGStateStarted, not allowed", func(t *testing.T) {
+		t.Run("state transition flow.DKGStateFailure -> flow.DKGStateStarted should not be allowed", func(t *testing.T) {
 			err = store.SetDKGState(setupState(), flow.DKGStateStarted)
 			require.Error(t, err)
 			require.True(t, storage.IsInvalidDKGStateTransitionError(err))
@@ -293,7 +291,7 @@ func TestDKGState_FailureState(t *testing.T) {
 		t.Run("-> flow.RandomBeaconKeyCommitted, should be allowed", func(t *testing.T) {
 			epochCounter := setupState()
 			err = store.SetDKGState(epochCounter, flow.RandomBeaconKeyCommitted)
-			require.Error(t, err, "should not be able to set DKG state to recovered, only using dedicated interface")
+			require.Error(t, err, "should not be able to set state to RandomBeaconKeyCommitted, without a key being inserted first")
 			require.True(t, storage.IsInvalidDKGStateTransitionError(err))
 			expectedKey := unittest.RandomBeaconPriv()
 			err = store.UpsertMyBeaconPrivateKey(epochCounter, expectedKey)
@@ -306,9 +304,8 @@ func TestDKGState_FailureState(t *testing.T) {
 	})
 }
 
-// TestDKGState_RandomBeaconKeyCommittedState checks that invariants are enforced for [flow.RandomBeaconKeyCommitted] state.
-// This test is written in a way that we start with [flow.RandomBeaconKeyCommitted] state of the Recoverable Random Beacon State Machine and
-// try to perform all possible actions and transitions in it.
+// TestDKGState_StartedState verifies that for a DKG in the state [flow.RandomBeaconKeyCommitted], the RecoverableRandomBeaconStateMachine
+// reports correct values and permits / rejects state transitions according to the state machine specification.
 func TestDKGState_RandomBeaconKeyCommittedState(t *testing.T) {
 	unittest.RunWithTypedBadgerDB(t, InitSecret, func(db *badger.DB) {
 		metrics := metrics.NewNoopCollector()
@@ -340,19 +337,19 @@ func TestDKGState_RandomBeaconKeyCommittedState(t *testing.T) {
 		require.True(t, safe)
 		require.NotNil(t, pk)
 
-		t.Run("-> flow.DKGStateUninitialized, not allowed", func(t *testing.T) {
+		t.Run("state transition flow.RandomBeaconKeyCommitted -> flow.DKGStateUninitialized should not be allowed", func(t *testing.T) {
 			err = store.SetDKGState(setupState(), flow.DKGStateUninitialized)
 			require.Error(t, err)
 			require.True(t, storage.IsInvalidDKGStateTransitionError(err))
 		})
 
-		t.Run("-> flow.DKGStateStarted, not allowed", func(t *testing.T) {
+		t.Run("state transition flow.RandomBeaconKeyCommitted -> flow.DKGStateStarted should not be allowed", func(t *testing.T) {
 			err = store.SetDKGState(setupState(), flow.DKGStateStarted)
 			require.Error(t, err)
 			require.True(t, storage.IsInvalidDKGStateTransitionError(err))
 		})
 
-		t.Run("-> flow.DKGStateFailure, not allowed", func(t *testing.T) {
+		t.Run("state transition flow.RandomBeaconKeyCommitted -> flow.DKGStateFailure should not be allowed", func(t *testing.T) {
 			err = store.SetDKGState(setupState(), flow.DKGStateFailure)
 			require.Error(t, err)
 			require.True(t, storage.IsInvalidDKGStateTransitionError(err))
