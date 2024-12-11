@@ -11,7 +11,6 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
-// TODO: fails with input non-nil ChunkBody.ServiceEventCount
 func TestConvertExecutionResult(t *testing.T) {
 	t.Parallel()
 
@@ -26,7 +25,25 @@ func TestConvertExecutionResult(t *testing.T) {
 	assert.Equal(t, er, converted)
 }
 
-// TODO: fails with input non-nil ChunkBody.ServiceEventCount
+// Tests that Protobuf conversion is reversible for old chunk format (Protocol Version <2)
+// TODO(mainnet27, #6773): remove this function
+func TestConvertExecutionResult_ProtocolVersion1(t *testing.T) {
+	t.Parallel()
+
+	er := unittest.ExecutionResultFixture(unittest.WithServiceEvents(3))
+	for _, chunk := range er.Chunks {
+		chunk.ServiceEventCount = nil
+	}
+
+	msg, err := convert.ExecutionResultToMessage(er)
+	require.NoError(t, err)
+
+	converted, err := convert.MessageToExecutionResult(msg)
+	require.NoError(t, err)
+
+	assert.Equal(t, er, converted)
+}
+
 func TestConvertExecutionResults(t *testing.T) {
 	t.Parallel()
 
@@ -45,7 +62,6 @@ func TestConvertExecutionResults(t *testing.T) {
 	assert.Equal(t, results, converted)
 }
 
-// TODO: fails with input non-nil ChunkBody.ServiceEventCount
 func TestConvertExecutionResultMetaList(t *testing.T) {
 	t.Parallel()
 
