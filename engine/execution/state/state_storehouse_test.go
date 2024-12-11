@@ -208,7 +208,7 @@ func makeComputationResult(
 	commit flow.StateCommitment,
 ) *execution.ComputationResult {
 
-	computationResult := execution.NewEmptyComputationResult(completeBlock, flow.NewChunk) // TODO(6667)
+	computationResult := execution.NewEmptyComputationResult(completeBlock, flow.NewChunk)
 	numberOfChunks := 1
 	ceds := make([]*execution_data.ChunkExecutionData, numberOfChunks)
 	ceds[0] = unittest.ChunkExecutionDataFixture(t, 1024)

@@ -672,3 +672,14 @@ func ProtocolStateWithSourceFixture(source []byte) *protocolMock.State {
 	state.On("AtBlockID", mock.Anything).Return(snapshot)
 	return &state
 }
+
+func ProtocolStateWithVersionFixture(protocolVersion uint64) *protocolMock.State {
+	snapshot := &protocolMock.Snapshot{}
+	kvstore := &protocolMock.KVStoreReader{}
+	kvstore.On("GetProtocolStateVersion").Return(protocolVersion)
+	snapshot.On("RandomSource").Return(unittest.SignatureFixture(), nil)
+	snapshot.On("ProtocolState").Return(kvstore, nil)
+	state := protocolMock.State{}
+	state.On("AtBlockID", mock.Anything).Return(snapshot)
+	return &state
+}
