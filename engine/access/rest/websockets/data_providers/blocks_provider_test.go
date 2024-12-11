@@ -228,11 +228,12 @@ func (s *BlocksProviderSuite) requireBlock(v interface{}, expected interface{}) 
 // simulate various configurations and verifies that the data provider operates
 // as expected without encountering errors.
 //
-// TODO: update arguments
 // Arguments:
 // - topic: The topic associated with the data provider.
+// - factory: A factory for creating data provider instance.
 // - tests: A slice of test cases to run, each specifying setup and validation logic.
 // - sendData: A function to simulate emitting data into the subscription's data channel.
+// - expectedResponses: An expected responses to validate the received output.
 // - requireFn: A function to validate the output received in the send channel.
 func testHappyPath[T any](
 	t *testing.T,
