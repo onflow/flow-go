@@ -2,6 +2,7 @@ package execution
 
 import (
 	"fmt"
+	"math"
 
 	"github.com/onflow/flow-go/fvm/storage/snapshot"
 	"github.com/onflow/flow-go/model/flow"
@@ -49,23 +50,16 @@ func (er *BlockExecutionResult) AllEvents() flow.EventsList {
 	return res
 }
 
-// ServiceEventIndicesForChunk returns the list of service event indices associated with the given chunk.
-// Outputs are index ranges with no gaps, and index into the flow.ExecutionResult.ServiceEvents field.
-func (er *BlockExecutionResult) ServiceEventIndicesForChunk(chunkIndex int) []uint32 {
-	nServiceEventsForChunk := len(er.collectionExecutionResults[chunkIndex].serviceEvents)
-	if nServiceEventsForChunk == 0 {
-		return []uint32{}
+// ServiceEventCountForChunk returns the number of service events emitted in the given chunk.
+func (er *BlockExecutionResult) ServiceEventCountForChunk(chunkIndex int) uint16 {
+	serviceEventCount := len(er.collectionExecutionResults[chunkIndex].serviceEvents)
+	if serviceEventCount > math.MaxUint16 {
+		// The current protocol demands that the ServiceEventCount does not exceed 65535.
+		// For defensive programming, we explicitly enforce this limit as 65k could be produced by a bug.
+		// Execution nodes would be first to realize that this bound is violated, and crash (fail early).
+		panic(fmt.Sprintf("service event count (%d) exceeds maximum value of 65535", serviceEventCount))
 	}
-
-	firstIndex := 0
-	for i := 0; i < chunkIndex; i++ {
-		firstIndex += len(er.collectionExecutionResults[i].serviceEvents)
-	}
-	indices := make([]uint32, 0, nServiceEventsForChunk)
-	for i := firstIndex; i < firstIndex+nServiceEventsForChunk; i++ {
-		indices = append(indices, uint32(i))
-	}
-	return indices
+	return uint16(serviceEventCount)
 }
 
 func (er *BlockExecutionResult) AllServiceEvents() flow.EventsList {
@@ -218,7 +212,7 @@ func (ar *BlockAttestationResult) ChunkAt(index int) *flow.Chunk {
 		attestRes.startStateCommit,
 		len(execRes.TransactionResults()),
 		attestRes.eventCommit,
-		ar.ServiceEventIndicesForChunk(index),
+		ar.ServiceEventCountForChunk(index),
 		attestRes.endStateCommit,
 		execRes.executionSnapshot.TotalComputationUsed(),
 	)
