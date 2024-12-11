@@ -66,8 +66,6 @@ func (s *EventsProviderSuite) TestEventsDataProvider_HappyPath() {
 	expectedEvents := []flow.Event{
 		unittest.EventFixture(flow.EventAccountCreated, 0, 0, unittest.IdentifierFixture(), 0),
 		unittest.EventFixture(flow.EventAccountUpdated, 0, 0, unittest.IdentifierFixture(), 0),
-		unittest.EventFixture(flow.EventAccountCreated, 0, 0, unittest.IdentifierFixture(), 0),
-		unittest.EventFixture(flow.EventAccountUpdated, 0, 0, unittest.IdentifierFixture(), 0),
 	}
 
 	var expectedEventsResponses []backend.EventsResponse
