@@ -453,7 +453,6 @@ func StateSnapshotForKnownBlock(block *flow.Header, identities map[flow.Identifi
 		},
 	)
 	snapshot.On("Head").Return(block, nil)
-	MockProtocolStateVersion(snapshot, 2)
 	return snapshot
 }
 

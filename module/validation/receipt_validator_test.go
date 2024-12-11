@@ -4,6 +4,7 @@ import (
 	"errors"
 	"testing"
 
+	clone "github.com/huandu/go-clone/generic"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
@@ -176,6 +177,69 @@ func (s *ReceiptValidationSuite) TestReceiptTooFewChunks() {
 	err := s.receiptValidator.Validate(receipt)
 	s.Require().Error(err, "should reject with invalid chunks")
 	s.Assert().True(engine.IsInvalidInputError(err))
+}
+
+func (s *ReceiptValidationSuite) TestReceiptChunkModelVersions() {
+	valSubgrph := s.ValidSubgraphFixture()
+	receipt := unittest.ExecutionReceiptFixture(unittest.WithExecutorID(s.ExeID),
+		unittest.WithResult(valSubgrph.Result))
+	s.AddSubgraphFixtureToMempools(valSubgrph)
+
+	s.publicKey.On("Verify",
+		mock.Anything,
+		mock.Anything,
+		mock.Anything).Return(true, nil).Maybe()
+
+	receiptProtocolVersion1 := clone.Clone(receipt)
+	for _, chunk := range receiptProtocolVersion1.Chunks {
+		chunk.ServiceEventCount = nil
+	}
+	// fixture produces receipt already compliant with protocol version 2
+	receiptProtocolVersion2 := clone.Clone(receipt)
+
+	s.Run("protocol state version 1", func() {
+		s.ProtocolStateVersion = 1
+		s.Run("execution result compliant with protocol version 1", func() {
+			err := s.receiptValidator.Validate(receiptProtocolVersion1)
+			s.Require().NoError(err)
+		})
+		s.Run("execution result compliant with protocol version 2", func() {
+			err := s.receiptValidator.Validate(receiptProtocolVersion2)
+			s.Require().Error(err, "should reject new result model when protocol version is set to 1")
+			s.Assert().True(engine.IsInvalidInputError(err))
+		})
+	})
+	s.Run("protocol state version 2", func() {
+		s.ProtocolStateVersion = 2
+		s.Run("execution result compliant with protocol version 1", func() {
+			err := s.receiptValidator.Validate(receiptProtocolVersion1)
+			s.Require().Error(err, "should reject old result model when protocol version is set to 2")
+			s.Assert().True(engine.IsInvalidInputError(err))
+		})
+		s.Run("execution result compliant with protocol version 2", func() {
+			err := s.receiptValidator.Validate(receiptProtocolVersion2)
+			s.Require().NoError(err)
+		})
+	})
+}
+
+func (s *ReceiptValidationSuite) TestReceiptServiceEventCountMismatch() {
+	valSubgrph := s.ValidSubgraphFixture()
+	chunks := valSubgrph.Result.Chunks
+	valSubgrph.Result.Chunks = chunks[0 : len(chunks)-2] // drop the last chunk
+	receipt := unittest.ExecutionReceiptFixture(unittest.WithExecutorID(s.ExeID),
+		unittest.WithResult(valSubgrph.Result))
+	s.AddSubgraphFixtureToMempools(valSubgrph)
+
+	s.publicKey.On("Verify",
+		mock.Anything,
+		mock.Anything,
+		mock.Anything).Return(true, nil).Maybe()
+
+	err := s.receiptValidator.Validate(receipt)
+	s.Require().Error(err, "should reject with invalid chunks")
+	s.Assert().True(engine.IsInvalidInputError(err))
+
 }
 
 // TestReceiptForBlockWith0Collections tests handling of the edge case of a block that contains no
