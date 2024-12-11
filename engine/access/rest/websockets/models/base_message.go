@@ -11,3 +11,5 @@ type BaseMessageResponse struct {
 	Success      bool   `json:"success"`                 // Indicates success or failure
 	ErrorMessage string `json:"error_message,omitempty"` // Error message, if any
 }
+
+// TODO: add Action enum? subscribe, unsubscribe, list
