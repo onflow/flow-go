@@ -5,6 +5,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
+// Build creates a BlockDigest instance with data from the provided flow.BlockDigest.
 func (b *BlockDigest) Build(block *flow.BlockDigest) {
 	b.BlockId = block.ID().String()
 	b.Height = util.FromUint(block.Height)
