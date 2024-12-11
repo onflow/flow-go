@@ -120,6 +120,17 @@ func (s *DataProviderFactorySuite) TestSupportedTopics() {
 				s.stateStreamApi.AssertExpectations(s.T())
 			},
 		},
+		{
+			name:      "account statuses topic",
+			topic:     AccountStatusesTopic,
+			arguments: models.Arguments{},
+			setupSubscription: func() {
+				s.setupSubscription(s.stateStreamApi.On("SubscribeAccountStatusesFromLatestBlock", mock.Anything, mock.Anything))
+			},
+			assertExpectations: func() {
+				s.stateStreamApi.AssertExpectations(s.T())
+			},
+		},
 	}
 
 	for _, test := range testCases {
