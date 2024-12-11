@@ -664,7 +664,7 @@ func ProtocolStateWithSourceFixture(source []byte) *protocolMock.State {
 	}
 	snapshot := &protocolMock.Snapshot{}
 	kvstore := &protocolMock.KVStoreReader{}
-	// TODO(6777): current tests pass with version 1 and 2
+	// TODO(mainnet27, #6773): remove GetProtocolStateVersion mock
 	kvstore.On("GetProtocolStateVersion").Return(uint64(2))
 	snapshot.On("RandomSource").Return(source, nil)
 	snapshot.On("ProtocolState").Return(kvstore, nil)
@@ -673,6 +673,9 @@ func ProtocolStateWithSourceFixture(source []byte) *protocolMock.State {
 	return &state
 }
 
+// ProtocolStateWithVersionFixture is the same as ProtocolStateWithSourceFixture,
+// but it allows specifying the desired protocol version, rather than random source.
+// TODO(mainnet27, #6773): remove
 func ProtocolStateWithVersionFixture(protocolVersion uint64) *protocolMock.State {
 	snapshot := &protocolMock.Snapshot{}
 	kvstore := &protocolMock.KVStoreReader{}

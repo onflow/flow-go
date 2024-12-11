@@ -121,7 +121,7 @@ func (committer *fakeCommitter) CommitView(
 // in compliance with both protocol versions 1 and 2.
 // We do this by replicating the "single collection" test case from TestBlockExecutor_ExecuteBlock
 // and adding checks on the ServiceEventCount field of the output ExecutionResult.
-// TODO(mainnet27): remove this test case https://github.com/onflow/flow-go/issues/6773
+// TODO(mainnet27, #6773): remove this test case https://github.com/onflow/flow-go/issues/6773
 func TestBlockExecutor_ExecuteBlock_VersionAwareChunk(t *testing.T) {
 
 	rag := &RandomAddressGenerator{}

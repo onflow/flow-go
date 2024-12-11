@@ -141,7 +141,7 @@ type BlockAttestationResult struct {
 	*execution_data.BlockExecutionData
 
 	// Deprecated:
-	// TODO(mainnet27): remove this field https://github.com/onflow/flow-go/issues/6773
+	// TODO(mainnet27, #6773): remove this field https://github.com/onflow/flow-go/issues/6773
 	versionAwareChunkConstructor flow.ChunkConstructor
 }
 
@@ -212,7 +212,7 @@ func (ar *BlockAttestationResult) ChunkAt(index int) *flow.Chunk {
 		panic(fmt.Sprintf("execution snapshot is nil. Block ID: %s, EndState: %s", ar.Block.ID(), attestRes.endStateCommit))
 	}
 
-	// TODO(mainnet27): replace with flow.NewChunk https://github.com/onflow/flow-go/issues/6773
+	// TODO(mainnet27, #6773): replace with flow.NewChunk https://github.com/onflow/flow-go/issues/6773
 	return ar.versionAwareChunkConstructor(
 		ar.Block.ID(),
 		index,
