@@ -62,11 +62,43 @@ func (s *EventsProviderSuite) SetupTest() {
 // validates that events are correctly streamed to the channel and ensures
 // no unexpected errors occur.
 func (s *EventsProviderSuite) TestEventsDataProvider_HappyPath() {
-	s.testHappyPath(
+
+	expectedEvents := []flow.Event{
+		unittest.EventFixture(flow.EventAccountCreated, 0, 0, unittest.IdentifierFixture(), 0),
+		unittest.EventFixture(flow.EventAccountUpdated, 0, 0, unittest.IdentifierFixture(), 0),
+		unittest.EventFixture(flow.EventAccountCreated, 0, 0, unittest.IdentifierFixture(), 0),
+		unittest.EventFixture(flow.EventAccountUpdated, 0, 0, unittest.IdentifierFixture(), 0),
+	}
+
+	var expectedEventsResponses []backend.EventsResponse
+	for i := 0; i < len(expectedEvents); i++ {
+		expectedEventsResponses = append(expectedEventsResponses, backend.EventsResponse{
+			Height:         s.rootBlock.Header.Height,
+			BlockID:        s.rootBlock.ID(),
+			Events:         expectedEvents,
+			BlockTimestamp: s.rootBlock.Header.Timestamp,
+		})
+
+	}
+
+	testHappyPath(
+		s.T(),
 		EventsTopic,
+		s.factory,
 		s.subscribeEventsDataProviderTestCases(),
+		func(dataChan chan interface{}) {
+			//for _, block := range s.blocks {
+			//	dataChan <- block
+			//}
+
+			for i := 0; i < len(expectedEventsResponses); i++ {
+				dataChan <- &expectedEventsResponses[i]
+			}
+		},
+		expectedEventsResponses,
 		s.requireEvents,
 	)
+
 }
 
 // subscribeEventsDataProviderTestCases generates test cases for events data providers.
@@ -115,93 +147,15 @@ func (s *EventsProviderSuite) subscribeEventsDataProviderTestCases() []testType 
 	}
 }
 
-// testHappyPath tests a variety of scenarios for data providers in
-// happy path scenarios. This function runs parameterized test cases that
-// simulate various configurations and verifies that the data provider operates
-// as expected without encountering errors.
-//
-// Arguments:
-// - topic: The topic associated with the data provider.
-// - tests: A slice of test cases to run, each specifying setup and validation logic.
-// - requireFn: A function to validate the output received in the send channel.
-func (s *EventsProviderSuite) testHappyPath(
-	topic string,
-	tests []testType,
-	requireFn func(interface{}, *backend.EventsResponse),
-) {
-	expectedEvents := []flow.Event{
-		unittest.EventFixture(flow.EventAccountCreated, 0, 0, unittest.IdentifierFixture(), 0),
-		unittest.EventFixture(flow.EventAccountUpdated, 0, 0, unittest.IdentifierFixture(), 0),
-		unittest.EventFixture(flow.EventAccountCreated, 0, 0, unittest.IdentifierFixture(), 0),
-		unittest.EventFixture(flow.EventAccountUpdated, 0, 0, unittest.IdentifierFixture(), 0),
-	}
-
-	var expectedEventsResponses []backend.EventsResponse
-
-	for i := 0; i < len(expectedEvents); i++ {
-		expectedEventsResponses = append(expectedEventsResponses, backend.EventsResponse{
-			Height:         s.rootBlock.Header.Height,
-			BlockID:        s.rootBlock.ID(),
-			Events:         expectedEvents,
-			BlockTimestamp: s.rootBlock.Header.Timestamp,
-		})
-
-	}
-
-	for _, test := range tests {
-		s.Run(test.name, func() {
-			ctx := context.Background()
-			send := make(chan interface{}, 10)
-
-			// Create a channel to simulate the subscription's data channel
-			eventChan := make(chan interface{})
-
-			//	// Create a mock subscription and mock the channel
-			sub := ssmock.NewSubscription(s.T())
-			sub.On("Channel").Return((<-chan interface{})(eventChan))
-			sub.On("Err").Return(nil)
-			test.setupBackend(sub)
-
-			// Create the data provider instance
-			provider, err := s.factory.NewDataProvider(ctx, topic, test.arguments, send)
-			s.Require().NotNil(provider)
-			s.Require().NoError(err)
-
-			// Run the provider in a separate goroutine
-			go func() {
-				err = provider.Run()
-				s.Require().NoError(err)
-			}()
-
-			// Simulate emitting data to the events channel
-			go func() {
-				defer close(eventChan)
-
-				for i := 0; i < len(expectedEventsResponses); i++ {
-					eventChan <- &expectedEventsResponses[i]
-				}
-			}()
-
-			// Collect responses
-			for _, e := range expectedEventsResponses {
-				v, ok := <-send
-				s.Require().True(ok, "channel closed while waiting for event %v: err: %v", e.BlockID, sub.Err())
-
-				requireFn(v, &e)
-			}
-
-			// Ensure the provider is properly closed after the test
-			provider.Close()
-		})
-	}
-}
-
 // requireEvents ensures that the received event information matches the expected data.
-func (s *EventsProviderSuite) requireEvents(v interface{}, expectedEventsResponse *backend.EventsResponse) {
+func (s *EventsProviderSuite) requireEvents(v interface{}, expectedEventsResponse interface{}) {
+	expectedResponse, ok := expectedEventsResponse.(backend.EventsResponse)
+	require.True(s.T(), ok, "unexpected type: %T", expectedEventsResponse)
+
 	actualResponse, ok := v.(*models.EventResponse)
 	require.True(s.T(), ok, "Expected *models.EventResponse, got %T", v)
 
-	s.Require().ElementsMatch(expectedEventsResponse.Events, actualResponse.Events)
+	s.Require().ElementsMatch(expectedResponse.Events, actualResponse.Events)
 }
 
 // invalidArgumentsTestCases returns a list of test cases with invalid argument combinations
