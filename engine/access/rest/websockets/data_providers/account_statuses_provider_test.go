@@ -10,6 +10,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
+	"github.com/onflow/flow-go/engine/access/rest/util"
 	"github.com/onflow/flow-go/engine/access/rest/websockets/models"
 	"github.com/onflow/flow-go/engine/access/state_stream"
 	"github.com/onflow/flow-go/engine/access/state_stream/backend"
@@ -52,7 +53,9 @@ func (s *AccountStatusesProviderSuite) SetupTest() {
 		nil,
 		flow.Testnet.Chain(),
 		state_stream.DefaultEventFilterConfig,
-		subscription.DefaultHeartbeatInterval)
+		subscription.DefaultHeartbeatInterval,
+		nil,
+	)
 	s.Require().NotNil(s.factory)
 }
 
@@ -71,22 +74,32 @@ func (s *AccountStatusesProviderSuite) TestAccountStatusesDataProvider_HappyPath
 func (s *AccountStatusesProviderSuite) testHappyPath(
 	topic string,
 	tests []testType,
-	requireFn func(interface{}, *backend.AccountStatusesResponse),
+	requireFn func(interface{}, *models.AccountStatusesResponse),
 ) {
 	expectedEvents := []flow.Event{
 		unittest.EventFixture(state_stream.CoreEventAccountCreated, 0, 0, unittest.IdentifierFixture(), 0),
 		unittest.EventFixture(state_stream.CoreEventAccountKeyAdded, 0, 0, unittest.IdentifierFixture(), 0),
 	}
 
-	var expectedAccountStatusesResponses []backend.AccountStatusesResponse
+	var backendResponses []*backend.AccountStatusesResponse
+	var expectedResponses []*models.AccountStatusesResponse
 
 	for i := 0; i < len(expectedEvents); i++ {
-		expectedAccountStatusesResponses = append(expectedAccountStatusesResponses, backend.AccountStatusesResponse{
+		backendResponse := &backend.AccountStatusesResponse{
 			Height:  s.rootBlock.Header.Height,
 			BlockID: s.rootBlock.ID(),
 			AccountEvents: map[string]flow.EventsList{
 				unittest.RandomAddressFixture().String(): expectedEvents,
 			},
+		}
+		backendResponses = append(backendResponses, backendResponse)
+
+		var accountEvents models.AccountEvents
+		accountEvents.Build(backendResponse.AccountEvents)
+		expectedResponses = append(expectedResponses, &models.AccountStatusesResponse{
+			Height:        util.FromUint(s.rootBlock.Header.Height),
+			BlockID:       s.rootBlock.ID().String(),
+			AccountEvents: accountEvents,
 		})
 	}
 
@@ -119,17 +132,17 @@ func (s *AccountStatusesProviderSuite) testHappyPath(
 			go func() {
 				defer close(accStatusesChan)
 
-				for i := 0; i < len(expectedAccountStatusesResponses); i++ {
-					accStatusesChan <- &expectedAccountStatusesResponses[i]
+				for i := 0; i < len(backendResponses); i++ {
+					accStatusesChan <- backendResponses[i]
 				}
 			}()
 
 			// Collect responses
-			for _, e := range expectedAccountStatusesResponses {
+			for _, e := range expectedResponses {
 				v, ok := <-send
 				s.Require().True(ok, "channel closed while waiting for event %v: err: %v", e.BlockID, sub.Err())
 
-				requireFn(v, &e)
+				requireFn(v, e)
 			}
 
 			// Ensure the provider is properly closed after the test
@@ -186,7 +199,7 @@ func (s *AccountStatusesProviderSuite) subscribeAccountStatusesDataProviderTestC
 // requireAccountStatuses ensures that the received account statuses information matches the expected data.
 func (s *AccountStatusesProviderSuite) requireAccountStatuses(
 	v interface{},
-	expectedAccountStatusesResponse *backend.AccountStatusesResponse,
+	expectedAccountStatusesResponse *models.AccountStatusesResponse,
 ) {
 	_, ok := v.(*models.AccountStatusesResponse)
 	require.True(s.T(), ok, "Expected *models.AccountStatusesResponse, got %T", v)

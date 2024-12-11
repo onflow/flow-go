@@ -141,12 +141,9 @@ func (s *EventsProviderSuite) testHappyPath(
 	}
 
 	var backendResponses []*backend.EventsResponse
-	var expectedEventsResponses []*models.EventResponse
+	var expectedResponses []*models.EventResponse
 
 	for i := 0; i < len(expectedEvents); i++ {
-		var events commonmodels.Events
-		events.Build(expectedEvents)
-
 		backendResponses = append(backendResponses, &backend.EventsResponse{
 			Height:         s.rootBlock.Header.Height,
 			BlockID:        s.rootBlock.ID(),
@@ -154,7 +151,9 @@ func (s *EventsProviderSuite) testHappyPath(
 			BlockTimestamp: s.rootBlock.Header.Timestamp,
 		})
 
-		expectedEventsResponses = append(expectedEventsResponses, &models.EventResponse{
+		var events commonmodels.Events
+		events.Build(expectedEvents)
+		expectedResponses = append(expectedResponses, &models.EventResponse{
 			BlockHeight:    util.FromUint(s.rootBlock.Header.Height),
 			BlockId:        s.rootBlock.ID().String(),
 			Events:         events,
@@ -203,7 +202,7 @@ func (s *EventsProviderSuite) testHappyPath(
 			}()
 
 			// Collect responses
-			for _, e := range expectedEventsResponses {
+			for _, e := range expectedResponses {
 				v, ok := <-send
 				s.Require().True(ok, "channel closed while waiting for event %v: err: %v", e.BlockId, sub.Err())
 
