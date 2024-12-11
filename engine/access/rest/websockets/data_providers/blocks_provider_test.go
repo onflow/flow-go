@@ -295,6 +295,7 @@ func (s *BlocksProviderSuite) requireBlock(actual interface{}, expected interfac
 // simulate various configurations and verifies that the data provider operates
 // as expected without encountering errors.
 //
+// TODO: update arguments
 // Arguments:
 //   - t: The testing context.
 //   - topic: The topic associated with the data provider under test.
@@ -343,13 +344,13 @@ func testHappyPath(
 			}()
 
 			// Collect responses
-			for _, expected := range test.expectedResponses {
+			for i, expected := range test.expectedResponses {
 				unittest.RequireReturnsBefore(t, func() {
 					v, ok := <-send
 					require.True(t, ok, "channel closed while waiting for response %v: err: %v", expected, sub.Err())
 
 					requireFn(v, expected)
-				}, time.Second, fmt.Sprintf("timed out waiting for response %v", expected))
+				}, time.Second, fmt.Sprintf("timed out waiting for response %d %v", i, expected))
 			}
 
 			// Ensure the provider is properly closed after the test

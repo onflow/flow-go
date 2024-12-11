@@ -129,12 +129,12 @@ func (s *BlockDigestsProviderSuite) TestBlockDigestsDataProvider_HappyPath() {
 				dataChan <- flow.NewBlockDigest(block.Header.ID(), block.Header.Height, block.Header.Timestamp)
 			}
 		},
-		s.requireBlockDigests,
+		s.requireBlockDigest,
 	)
 }
 
 // requireBlockHeaders ensures that the received block header information matches the expected data.
-func (s *BlocksProviderSuite) requireBlockDigests(actual interface{}, expected interface{}) {
+func (s *BlocksProviderSuite) requireBlockDigest(actual interface{}, expected interface{}) {
 	actualResponse, ok := actual.(*models.BlockDigestMessageResponse)
 	require.True(s.T(), ok, "unexpected response type: %T", actual)
 

@@ -128,12 +128,12 @@ func (s *BlockHeadersProviderSuite) TestBlockHeadersDataProvider_HappyPath() {
 				dataChan <- block.Header
 			}
 		},
-		s.requireBlockHeaders,
+		s.requireBlockHeader,
 	)
 }
 
 // requireBlockHeaders ensures that the received block header information matches the expected data.
-func (s *BlockHeadersProviderSuite) requireBlockHeaders(actual interface{}, expected interface{}) {
+func (s *BlockHeadersProviderSuite) requireBlockHeader(actual interface{}, expected interface{}) {
 	actualResponse, ok := actual.(*models.BlockHeaderMessageResponse)
 	require.True(s.T(), ok, "unexpected response type: %T", actual)
 
