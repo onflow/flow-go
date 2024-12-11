@@ -66,58 +66,30 @@ func (s *EventsProviderSuite) SetupTest() {
 // validates that events are correctly streamed to the channel and ensures
 // no unexpected errors occur.
 func (s *EventsProviderSuite) TestEventsDataProvider_HappyPath() {
-	expectedEvents := []flow.Event{
-		unittest.EventFixture(flow.EventAccountCreated, 0, 0, unittest.IdentifierFixture(), 0),
-		unittest.EventFixture(flow.EventAccountUpdated, 0, 0, unittest.IdentifierFixture(), 0),
+	events := []flow.Event{
 		unittest.EventFixture(flow.EventAccountCreated, 0, 0, unittest.IdentifierFixture(), 0),
 		unittest.EventFixture(flow.EventAccountUpdated, 0, 0, unittest.IdentifierFixture(), 0),
 	}
 
-	var backendResponses []*backend.EventsResponse
-
-	for i := 0; i < len(expectedEvents); i++ {
-		backendResponses = append(backendResponses, &backend.EventsResponse{
-			Height:         s.rootBlock.Header.Height,
-			BlockID:        s.rootBlock.ID(),
-			Events:         expectedEvents,
-			BlockTimestamp: s.rootBlock.Header.Timestamp,
-		})
-	}
+	backendResponses := s.backendEventsResponses(events)
 
 	testHappyPath(
 		s.T(),
 		EventsTopic,
 		s.factory,
-		s.subscribeEventsDataProviderTestCases(expectedEvents),
+		s.subscribeEventsDataProviderTestCases(events, backendResponses),
 		func(dataChan chan interface{}) {
-			//for _, block := range s.blocks {
-			//	dataChan <- block
-			//}
-
 			for i := 0; i < len(backendResponses); i++ {
 				dataChan <- backendResponses[i]
 			}
 		},
 		s.requireEvents,
 	)
-
 }
 
 // subscribeEventsDataProviderTestCases generates test cases for events data providers.
-func (s *EventsProviderSuite) subscribeEventsDataProviderTestCases(events []flow.Event) []testType {
-	expectedResponses := make([]interface{}, len(events))
-
-	for i := 0; i < len(events); i++ {
-		var restEvents commonmodels.Events
-		restEvents.Build(events)
-
-		expectedResponses[i] = &models.EventResponse{
-			BlockHeight:    util.FromUint(s.rootBlock.Header.Height),
-			BlockId:        s.rootBlock.ID().String(),
-			Events:         restEvents,
-			BlockTimestamp: s.rootBlock.Header.Timestamp,
-		}
-	}
+func (s *EventsProviderSuite) subscribeEventsDataProviderTestCases(events []flow.Event, backendResponses []*backend.EventsResponse) []testType {
+	expectedResponses := s.expectedEventsResponses(events, backendResponses)
 
 	return []testType{
 		{
@@ -319,4 +291,41 @@ func (s *EventsProviderSuite) TestMessageIndexEventProviderResponse_HappyPath() 
 
 	// Ensure the provider is properly closed after the test
 	provider.Close()
+}
+
+// backendEventsResponses creates backend events responses based on the provided events.
+func (s *EventsProviderSuite) backendEventsResponses(events []flow.Event) []*backend.EventsResponse {
+	responses := make([]*backend.EventsResponse, len(events))
+
+	for i := range events {
+		responses[i] = &backend.EventsResponse{
+			Height:         s.rootBlock.Header.Height,
+			BlockID:        s.rootBlock.ID(),
+			Events:         events,
+			BlockTimestamp: s.rootBlock.Header.Timestamp,
+		}
+	}
+
+	return responses
+}
+
+// expectedEventsResponses creates the expected responses for the provided events and backend responses.
+func (s *EventsProviderSuite) expectedEventsResponses(
+	events []flow.Event,
+	backendResponses []*backend.EventsResponse,
+) []interface{} {
+	expectedResponses := make([]interface{}, len(events))
+
+	for i, resp := range backendResponses {
+		var restEvents commonmodels.Events
+		restEvents.Build(events)
+
+		expectedResponses[i] = &models.EventResponse{
+			BlockHeight:    util.FromUint(resp.Height),
+			BlockId:        resp.BlockID.String(),
+			Events:         restEvents,
+			BlockTimestamp: resp.BlockTimestamp,
+		}
+	}
+	return expectedResponses
 }
