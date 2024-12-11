@@ -15,7 +15,9 @@ import (
 	accessmock "github.com/onflow/flow-go/access/mock"
 	"github.com/onflow/flow-go/engine/access/rest/common/parser"
 	"github.com/onflow/flow-go/engine/access/rest/websockets/models"
+	"github.com/onflow/flow-go/engine/access/state_stream"
 	statestreamsmock "github.com/onflow/flow-go/engine/access/state_stream/mock"
+	"github.com/onflow/flow-go/engine/access/subscription"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -73,7 +75,13 @@ func (s *BlocksProviderSuite) SetupTest() {
 	}
 	s.finalizedBlock = parent
 
-	s.factory = NewDataProviderFactory(s.log, nil, s.api)
+	s.factory = NewDataProviderFactory(
+		s.log,
+		nil,
+		s.api,
+		flow.Testnet.Chain(),
+		state_stream.DefaultEventFilterConfig,
+		subscription.DefaultHeartbeatInterval)
 	s.Require().NotNil(s.factory)
 }
 
@@ -189,44 +197,54 @@ func (s *BlocksProviderSuite) validBlockArgumentsTestCases() []testType {
 // validates that blocks are correctly streamed to the channel and ensures
 // no unexpected errors occur.
 func (s *BlocksProviderSuite) TestBlocksDataProvider_HappyPath() {
-	s.testHappyPath(
+	testHappyPath(
+		s.T(),
 		BlocksTopic,
+		s.factory,
 		s.validBlockArgumentsTestCases(),
-		func(dataChan chan interface{}, blocks []*flow.Block) {
-			for _, block := range blocks {
+		func(dataChan chan interface{}) {
+			for _, block := range s.blocks {
 				dataChan <- block
 			}
 		},
+		s.blocks,
 		s.requireBlock,
 	)
 }
 
 // requireBlocks ensures that the received block information matches the expected data.
-func (s *BlocksProviderSuite) requireBlock(v interface{}, expectedBlock *flow.Block) {
+func (s *BlocksProviderSuite) requireBlock(v interface{}, expected interface{}) {
+	expectedBlock, ok := expected.(*flow.Block)
+	require.True(s.T(), ok, "unexpected type: %T", v)
+
 	actualResponse, ok := v.(*models.BlockMessageResponse)
 	require.True(s.T(), ok, "unexpected response type: %T", v)
 
 	s.Require().Equal(expectedBlock, actualResponse.Block)
 }
 
-// testHappyPath tests a variety of scenarios for data providers in
+// TestHappyPath tests a variety of scenarios for data providers in
 // happy path scenarios. This function runs parameterized test cases that
 // simulate various configurations and verifies that the data provider operates
 // as expected without encountering errors.
 //
+// TODO: update arguments
 // Arguments:
 // - topic: The topic associated with the data provider.
 // - tests: A slice of test cases to run, each specifying setup and validation logic.
 // - sendData: A function to simulate emitting data into the subscription's data channel.
 // - requireFn: A function to validate the output received in the send channel.
-func (s *BlocksProviderSuite) testHappyPath(
+func testHappyPath[T any](
+	t *testing.T,
 	topic string,
+	factory *DataProviderFactoryImpl,
 	tests []testType,
-	sendData func(chan interface{}, []*flow.Block),
-	requireFn func(interface{}, *flow.Block),
+	sendData func(chan interface{}),
+	expectedResponses []T,
+	requireFn func(interface{}, interface{}),
 ) {
 	for _, test := range tests {
-		s.Run(test.name, func() {
+		t.Run(test.name, func(t *testing.T) {
 			ctx := context.Background()
 			send := make(chan interface{}, 10)
 
@@ -234,36 +252,36 @@ func (s *BlocksProviderSuite) testHappyPath(
 			dataChan := make(chan interface{})
 
 			// Create a mock subscription and mock the channel
-			sub := statestreamsmock.NewSubscription(s.T())
+			sub := statestreamsmock.NewSubscription(t)
 			sub.On("Channel").Return((<-chan interface{})(dataChan))
 			sub.On("Err").Return(nil)
 			test.setupBackend(sub)
 
 			// Create the data provider instance
-			provider, err := s.factory.NewDataProvider(ctx, topic, test.arguments, send)
-			s.Require().NotNil(provider)
-			s.Require().NoError(err)
+			provider, err := factory.NewDataProvider(ctx, topic, test.arguments, send)
+			require.NotNil(t, provider)
+			require.NoError(t, err)
 
 			// Run the provider in a separate goroutine
 			go func() {
 				err = provider.Run()
-				s.Require().NoError(err)
+				require.NoError(t, err)
 			}()
 
 			// Simulate emitting data to the data channel
 			go func() {
 				defer close(dataChan)
-				sendData(dataChan, s.blocks)
+				sendData(dataChan)
 			}()
 
 			// Collect responses
-			for _, b := range s.blocks {
-				unittest.RequireReturnsBefore(s.T(), func() {
+			for i, expected := range expectedResponses {
+				unittest.RequireReturnsBefore(t, func() {
 					v, ok := <-send
-					s.Require().True(ok, "channel closed while waiting for block %x %v: err: %v", b.Header.Height, b.ID(), sub.Err())
+					require.True(t, ok, "channel closed while waiting for response %v: err: %v", expected, sub.Err())
 
-					requireFn(v, b)
-				}, time.Second, fmt.Sprintf("timed out waiting for block %d %v", b.Header.Height, b.ID()))
+					requireFn(v, expected)
+				}, time.Second, fmt.Sprintf("timed out waiting for response %d %v", i, expected))
 			}
 
 			// Ensure the provider is properly closed after the test
