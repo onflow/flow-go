@@ -132,6 +132,17 @@ func (s *DataProviderFactorySuite) TestSupportedTopics() {
 				s.stateStreamApi.AssertExpectations(s.T())
 			},
 		},
+		{
+			name:      "transaction statuses topic",
+			topic:     TransactionStatusesTopic,
+			arguments: models.Arguments{},
+			setupSubscription: func() {
+				s.setupSubscription(s.accessApi.On("SubscribeTransactionStatuses", mock.Anything, mock.Anything, mock.Anything, mock.Anything))
+			},
+			assertExpectations: func() {
+				s.stateStreamApi.AssertExpectations(s.T())
+			},
+		},
 	}
 
 	for _, test := range testCases {

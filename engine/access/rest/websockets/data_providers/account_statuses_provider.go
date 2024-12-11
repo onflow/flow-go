@@ -158,7 +158,6 @@ func parseAccountStatusesArguments(
 	}
 
 	// Parse 'start_block_height' if provided
-	// Parse 'start_block_height' if provided
 	if hasStartBlockHeight {
 		result, ok := startBlockHeightIn.(string)
 		if !ok {

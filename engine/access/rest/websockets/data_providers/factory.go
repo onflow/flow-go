@@ -103,8 +103,7 @@ func (s *DataProviderFactoryImpl) NewDataProvider(
 	case AccountStatusesTopic:
 		return NewAccountStatusesDataProvider(ctx, s.logger, s.stateStreamApi, topic, arguments, ch, s.chain, s.eventFilterConfig, s.heartbeatInterval)
 	case TransactionStatusesTopic:
-		// TODO: Implemented handlers for each topic should be added in respective case
-		return nil, fmt.Errorf(`topic "%s" not implemented yet`, topic)
+		return NewTransactionStatusesDataProvider(ctx, s.logger, s.accessApi, topic, arguments, ch)
 	default:
 		return nil, fmt.Errorf("unsupported topic \"%s\"", topic)
 	}
