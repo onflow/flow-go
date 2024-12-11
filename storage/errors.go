@@ -48,14 +48,6 @@ func IsInvalidDKGStateTransitionError(err error) bool {
 	return errors.As(err, &e)
 }
 
-// NewInvalidDKGStateTransitionError constructs a new InvalidDKGStateTransitionError error.
-func NewInvalidDKGStateTransitionError(from, to flow.DKGState) error {
-	return InvalidDKGStateTransitionError{
-		From: from,
-		To:   to,
-	}
-}
-
 // NewInvalidDKGStateTransitionErrorf constructs a new InvalidDKGStateTransitionError error with a formatted message.
 func NewInvalidDKGStateTransitionErrorf(from, to flow.DKGState, msg string, args ...any) error {
 	return InvalidDKGStateTransitionError{

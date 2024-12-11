@@ -148,7 +148,7 @@ func (ds *RecoverablePrivateBeaconKeyStateMachine) processStateTransition(epochC
 
 		allowedStates := allowedStateTransitions[currentState]
 		if slices.Index(allowedStates, newState) < 0 {
-			return storage.NewInvalidDKGStateTransitionError(currentState, newState)
+			return storage.NewInvalidDKGStateTransitionErrorf(currentState, newState, "not allowed")
 		}
 
 		// ensure invariant holds and we still have a valid private key stored
