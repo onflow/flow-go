@@ -140,7 +140,7 @@ func (s *AccountStatusesProviderSuite) subscribeAccountStatusesDataProviderTestC
 
 // requireAccountStatuses ensures that the received account statuses information matches the expected data.
 func (s *AccountStatusesProviderSuite) requireAccountStatuses(actual interface{}, expected interface{}) {
-	expectedResponse, ok := expected.(backend.AccountStatusesResponse)
+	expectedResponse, ok := expected.(*models.AccountStatusesResponse)
 	require.True(s.T(), ok, "Expected *models.AccountStatusesResponse, got %T", expected)
 
 	actualResponse, ok := actual.(*models.AccountStatusesResponse)

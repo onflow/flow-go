@@ -295,7 +295,6 @@ func (s *BlocksProviderSuite) requireBlock(actual interface{}, expected interfac
 // simulate various configurations and verifies that the data provider operates
 // as expected without encountering errors.
 //
-// TODO: update arguments
 // Arguments:
 //   - t: The testing context.
 //   - topic: The topic associated with the data provider under test.
