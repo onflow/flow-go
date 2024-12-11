@@ -7,6 +7,7 @@ import (
 
 	"github.com/rs/zerolog"
 
+	commonmodels "github.com/onflow/flow-go/engine/access/rest/common/models"
 	"github.com/onflow/flow-go/engine/access/rest/common/parser"
 	"github.com/onflow/flow-go/engine/access/rest/http/request"
 	"github.com/onflow/flow-go/engine/access/rest/util"
@@ -100,11 +101,14 @@ func (p *EventsDataProvider) handleResponse() func(eventsResponse *backend.Event
 			return fmt.Errorf("message index already incremented to: %d", messageIndex.Value())
 		}
 
+		var events commonmodels.Events
+		events.Build(eventsResponse.Events)
+
 		p.send <- &models.EventResponse{
 			BlockId:        eventsResponse.BlockID.String(),
 			BlockHeight:    strconv.FormatUint(eventsResponse.Height, 10),
 			BlockTimestamp: eventsResponse.BlockTimestamp,
-			Events:         eventsResponse.Events,
+			Events:         events,
 			MessageIndex:   strconv.FormatUint(index, 10),
 		}
 
