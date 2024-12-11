@@ -1066,7 +1066,7 @@ func (h *Handler) SubscribeBlocksFromStartBlockID(request *access.SubscribeBlock
 	}
 
 	sub := h.api.SubscribeBlocksFromStartBlockID(stream.Context(), startBlockID, blockStatus)
-	return subscription.HandleSubscription(sub, h.handleBlocksResponse(stream.Send, request.GetFullBlockResponse(), blockStatus))
+	return subscription.HandleRPCSubscription(sub, h.handleBlocksResponse(stream.Send, request.GetFullBlockResponse(), blockStatus))
 }
 
 // SubscribeBlocksFromStartHeight handles subscription requests for blocks started from block height.
@@ -1093,7 +1093,7 @@ func (h *Handler) SubscribeBlocksFromStartHeight(request *access.SubscribeBlocks
 	}
 
 	sub := h.api.SubscribeBlocksFromStartHeight(stream.Context(), request.GetStartBlockHeight(), blockStatus)
-	return subscription.HandleSubscription(sub, h.handleBlocksResponse(stream.Send, request.GetFullBlockResponse(), blockStatus))
+	return subscription.HandleRPCSubscription(sub, h.handleBlocksResponse(stream.Send, request.GetFullBlockResponse(), blockStatus))
 }
 
 // SubscribeBlocksFromLatest handles subscription requests for blocks started from latest sealed block.
@@ -1120,7 +1120,7 @@ func (h *Handler) SubscribeBlocksFromLatest(request *access.SubscribeBlocksFromL
 	}
 
 	sub := h.api.SubscribeBlocksFromLatest(stream.Context(), blockStatus)
-	return subscription.HandleSubscription(sub, h.handleBlocksResponse(stream.Send, request.GetFullBlockResponse(), blockStatus))
+	return subscription.HandleRPCSubscription(sub, h.handleBlocksResponse(stream.Send, request.GetFullBlockResponse(), blockStatus))
 }
 
 // handleBlocksResponse handles the subscription to block updates and sends
@@ -1179,7 +1179,7 @@ func (h *Handler) SubscribeBlockHeadersFromStartBlockID(request *access.Subscrib
 	}
 
 	sub := h.api.SubscribeBlockHeadersFromStartBlockID(stream.Context(), startBlockID, blockStatus)
-	return subscription.HandleSubscription(sub, h.handleBlockHeadersResponse(stream.Send))
+	return subscription.HandleRPCSubscription(sub, h.handleBlockHeadersResponse(stream.Send))
 }
 
 // SubscribeBlockHeadersFromStartHeight handles subscription requests for block headers started from block height.
@@ -1206,7 +1206,7 @@ func (h *Handler) SubscribeBlockHeadersFromStartHeight(request *access.Subscribe
 	}
 
 	sub := h.api.SubscribeBlockHeadersFromStartHeight(stream.Context(), request.GetStartBlockHeight(), blockStatus)
-	return subscription.HandleSubscription(sub, h.handleBlockHeadersResponse(stream.Send))
+	return subscription.HandleRPCSubscription(sub, h.handleBlockHeadersResponse(stream.Send))
 }
 
 // SubscribeBlockHeadersFromLatest handles subscription requests for block headers started from latest sealed block.
@@ -1233,7 +1233,7 @@ func (h *Handler) SubscribeBlockHeadersFromLatest(request *access.SubscribeBlock
 	}
 
 	sub := h.api.SubscribeBlockHeadersFromLatest(stream.Context(), blockStatus)
-	return subscription.HandleSubscription(sub, h.handleBlockHeadersResponse(stream.Send))
+	return subscription.HandleRPCSubscription(sub, h.handleBlockHeadersResponse(stream.Send))
 }
 
 // handleBlockHeadersResponse handles the subscription to block updates and sends
@@ -1293,7 +1293,7 @@ func (h *Handler) SubscribeBlockDigestsFromStartBlockID(request *access.Subscrib
 	}
 
 	sub := h.api.SubscribeBlockDigestsFromStartBlockID(stream.Context(), startBlockID, blockStatus)
-	return subscription.HandleSubscription(sub, h.handleBlockDigestsResponse(stream.Send))
+	return subscription.HandleRPCSubscription(sub, h.handleBlockDigestsResponse(stream.Send))
 }
 
 // SubscribeBlockDigestsFromStartHeight handles subscription requests for lightweight blocks started from block height.
@@ -1320,7 +1320,7 @@ func (h *Handler) SubscribeBlockDigestsFromStartHeight(request *access.Subscribe
 	}
 
 	sub := h.api.SubscribeBlockDigestsFromStartHeight(stream.Context(), request.GetStartBlockHeight(), blockStatus)
-	return subscription.HandleSubscription(sub, h.handleBlockDigestsResponse(stream.Send))
+	return subscription.HandleRPCSubscription(sub, h.handleBlockDigestsResponse(stream.Send))
 }
 
 // SubscribeBlockDigestsFromLatest handles subscription requests for lightweight block started from latest sealed block.
@@ -1347,7 +1347,7 @@ func (h *Handler) SubscribeBlockDigestsFromLatest(request *access.SubscribeBlock
 	}
 
 	sub := h.api.SubscribeBlockDigestsFromLatest(stream.Context(), blockStatus)
-	return subscription.HandleSubscription(sub, h.handleBlockDigestsResponse(stream.Send))
+	return subscription.HandleRPCSubscription(sub, h.handleBlockDigestsResponse(stream.Send))
 }
 
 // handleBlockDigestsResponse handles the subscription to block updates and sends
@@ -1433,17 +1433,21 @@ func (h *Handler) SendAndSubscribeTransactionStatuses(
 	sub := h.api.SubscribeTransactionStatuses(ctx, &tx, request.GetEventEncodingVersion())
 
 	messageIndex := counters.NewMonotonousCounter(0)
-	return subscription.HandleSubscription(sub, func(txResults []*TransactionResult) error {
+	return subscription.HandleRPCSubscription(sub, func(txResults []*TransactionResult) error {
 		for i := range txResults {
-			value := messageIndex.Increment()
+			index := messageIndex.Value()
+			if ok := messageIndex.Set(index + 1); !ok {
+				return status.Errorf(codes.Internal, "message index already incremented to %d", messageIndex.Value())
+			}
 
 			err = stream.Send(&access.SendAndSubscribeTransactionStatusesResponse{
 				TransactionResults: TransactionResultToMessage(txResults[i]),
-				MessageIndex:       value,
+				MessageIndex:       index,
 			})
 			if err != nil {
 				return rpc.ConvertError(err, "could not send response", codes.Internal)
 			}
+
 		}
 
 		return nil

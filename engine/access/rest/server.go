@@ -8,7 +8,9 @@ import (
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/access"
-	"github.com/onflow/flow-go/engine/access/rest/routes"
+	"github.com/onflow/flow-go/engine/access/rest/router"
+	"github.com/onflow/flow-go/engine/access/rest/websockets"
+	dp "github.com/onflow/flow-go/engine/access/rest/websockets/data_providers"
 	"github.com/onflow/flow-go/engine/access/state_stream"
 	"github.com/onflow/flow-go/engine/access/state_stream/backend"
 	"github.com/onflow/flow-go/model/flow"
@@ -27,10 +29,11 @@ const (
 )
 
 type Config struct {
-	ListenAddress string
-	WriteTimeout  time.Duration
-	ReadTimeout   time.Duration
-	IdleTimeout   time.Duration
+	ListenAddress  string
+	WriteTimeout   time.Duration
+	ReadTimeout    time.Duration
+	IdleTimeout    time.Duration
+	MaxRequestSize int64
 }
 
 // NewServer returns an HTTP server initialized with the REST API handler
@@ -41,11 +44,15 @@ func NewServer(serverAPI access.API,
 	restCollector module.RestMetrics,
 	stateStreamApi state_stream.API,
 	stateStreamConfig backend.Config,
+	wsConfig websockets.Config,
 ) (*http.Server, error) {
-	builder := routes.NewRouterBuilder(logger, restCollector).AddRestRoutes(serverAPI, chain)
+	builder := router.NewRouterBuilder(logger, restCollector).AddRestRoutes(serverAPI, chain, config.MaxRequestSize)
 	if stateStreamApi != nil {
-		builder.AddWsRoutes(stateStreamApi, chain, stateStreamConfig)
+		builder.AddLegacyWebsocketsRoutes(stateStreamApi, chain, stateStreamConfig, config.MaxRequestSize)
 	}
+
+	dataProviderFactory := dp.NewDataProviderFactory(logger, stateStreamApi, serverAPI)
+	builder.AddWebsocketsRoute(chain, wsConfig, config.MaxRequestSize, dataProviderFactory)
 
 	c := cors.New(cors.Options{
 		AllowedOrigins: []string{"*"},

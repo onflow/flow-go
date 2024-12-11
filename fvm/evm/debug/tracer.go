@@ -90,6 +90,9 @@ func (t *CallTracer) Collect(txID gethCommon.Hash) {
 	// remove the result
 	delete(t.resultsByTxID, txID)
 
+	// generate the trace ID, outside the go-routine
+	traceID := TraceID(txID, t.blockID)
+
 	// upload is concurrent and it doesn't produce any errors, as the
 	// client doesn't expect it, we don't want to break execution flow,
 	// in case there are errors we retry, and if we fail after retries
@@ -107,7 +110,7 @@ func (t *CallTracer) Collect(txID gethCommon.Hash) {
 					Msg("failed to collect EVM traces")
 			}
 		}()
-		if err := t.uploader.Upload(TraceID(txID, t.blockID), res); err != nil {
+		if err := t.uploader.Upload(traceID, res); err != nil {
 			l.Error().Err(err).
 				Str("traces", string(res)).
 				Msg("failed to upload trace results, no more retries")
@@ -165,12 +168,6 @@ func NewSafeTxTracer(ct *CallTracer) *tracers.Tracer {
 		if ct.tracer.OnTxStart != nil {
 			ct.tracer.OnTxStart(vm, tx, from)
 		}
-		// reset tracing to have fresh state
-		if err := ct.ResetTracer(); err != nil {
-			l.Error().Err(err).
-				Msg("failed to reset tracer")
-			return
-		}
 	}
 
 	wrapped.OnTxEnd = func(receipt *types.Receipt, err error) {
@@ -197,6 +194,13 @@ func NewSafeTxTracer(ct *CallTracer) *tracers.Tracer {
 			return
 		}
 		ct.resultsByTxID[receipt.TxHash] = res
+
+		// reset tracing to have fresh state
+		if err := ct.ResetTracer(); err != nil {
+			l.Error().Err(err).
+				Msg("failed to reset tracer")
+			return
+		}
 	}
 
 	wrapped.OnEnter = func(
