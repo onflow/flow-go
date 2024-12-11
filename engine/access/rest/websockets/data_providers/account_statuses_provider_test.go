@@ -204,7 +204,7 @@ func (s *AccountStatusesProviderSuite) requireAccountStatuses(
 	actualResponse, ok := v.(*models.AccountStatusesResponse)
 	require.True(s.T(), ok, "Expected *models.AccountStatusesResponse, got %T", v)
 
-	require.Equal(s.T(), expectedAccountStatusesResponse.BlockID.String(), actualResponse.BlockID)
+	require.Equal(s.T(), expectedAccountStatusesResponse.BlockID, actualResponse.BlockID)
 	require.Equal(s.T(), len(expectedAccountStatusesResponse.AccountEvents), len(actualResponse.AccountEvents))
 
 	for key, expectedEvents := range expectedAccountStatusesResponse.AccountEvents {
