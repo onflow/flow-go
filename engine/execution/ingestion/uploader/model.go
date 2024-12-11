@@ -53,7 +53,6 @@ func ComputationResultToBlockData(computationResult *execution.ComputationResult
 	}
 }
 
-// TODO(6777): BlockData doesn't include Chunk data
 func WriteComputationResultsTo(computationResult *execution.ComputationResult, writer io.Writer) error {
 	blockData := ComputationResultToBlockData(computationResult)
 
