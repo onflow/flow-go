@@ -11,6 +11,7 @@ import (
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/signature"
+	"github.com/onflow/flow-go/state"
 	"github.com/onflow/flow-go/state/fork"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/storage"
@@ -61,6 +62,49 @@ func (v *receiptValidator) verifySignature(receipt *flow.ExecutionReceiptMeta, n
 	return nil
 }
 
+// verifyChunkServiceEvents verifies that chunks are compliant with either protocol version v1 or v2,
+// depending on the current protocol version specified by the reference block (result.BlockID).
+// Expected errors during normal operations:
+//   - engine.InvalidInputError if the result has malformed chunks
+//   - module.UnknownBlockError when the executed block is unknown
+func (v *receiptValidator) verifyChunkServiceEvents(result *flow.ExecutionResult) error {
+	kvstore, err := v.state.AtBlockID(result.BlockID).ProtocolState()
+	if err != nil {
+		if errors.Is(err, state.ErrUnknownSnapshotReference) {
+			return module.NewUnknownBlockError("could not read protocol state for block %x: %w", result.BlockID, err)
+		}
+		return irrecoverable.NewExceptionf("could not read kvstore version: %w", err)
+	}
+	version := kvstore.GetProtocolStateVersion()
+
+	// PROTOCOL VERSION <2: all Chunk.ServiceEventCount must be nil
+	// TODO(mainnet27, #6773): remove this codepath
+	if version < 2 {
+		for i, chunk := range result.Chunks {
+			if chunk.ServiceEventCount != nil {
+				return engine.NewInvalidInputErrorf("invalid chunk format for protocol version %d: chunk %d has non-nil ServiceEventCount %v",
+					version, i, chunk.ServiceEventCount)
+			}
+		}
+		return nil
+	}
+
+	// PROTOCOL VERSION >=2: all Chunk.ServiceEventCount must be populated and sum to len(result.ServiceEvents)
+	chunkServiceEventCountTotal := 0
+	for i, chunk := range result.Chunks {
+		if chunk.ServiceEventCount == nil {
+			return engine.NewInvalidInputErrorf("invalid chunk format for protocol version %d: chunk %d has nil ServiceEventCount",
+				version, i)
+		}
+		chunkServiceEventCountTotal += int(*chunk.ServiceEventCount)
+	}
+	if chunkServiceEventCountTotal != len(result.ServiceEvents) {
+		return engine.NewInvalidInputErrorf("invalid chunk format for protocol version %d: service event count mismatch (%d != %d)",
+			version, chunkServiceEventCountTotal, len(result.ServiceEvents))
+	}
+	return nil
+}
+
 // verifyChunksFormat enforces that:
 //   - chunks are indexed without any gaps starting from zero
 //   - each chunk references the same blockID as the top-level execution result
@@ -80,6 +124,10 @@ func (v *receiptValidator) verifyChunksFormat(result *flow.ExecutionResult) erro
 		if chunk.BlockID != result.BlockID {
 			return engine.NewInvalidInputErrorf("invalid blockID, expected %v got %v", result.BlockID, chunk.BlockID)
 		}
+	}
+
+	if err := v.verifyChunkServiceEvents(result); err != nil {
+		return fmt.Errorf("invalid chunk service events: %w", err)
 	}
 
 	// For a block containing k collections, the Flow protocol prescribes that a valid execution result
