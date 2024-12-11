@@ -29,7 +29,6 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/epochs"
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
-	"github.com/onflow/flow-go/state/protocol"
 	protocolMock "github.com/onflow/flow-go/state/protocol/mock"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -659,12 +658,16 @@ func EntropyProviderFixture(source []byte) environment.EntropyProvider {
 // supports AtBlockID to return a snapshot mock.
 // The snapshot mock only supports RandomSource().
 // If input is nil, a random source fixture is generated.
-func ProtocolStateWithSourceFixture(source []byte) protocol.State {
+func ProtocolStateWithSourceFixture(source []byte) *protocolMock.State {
 	if source == nil {
 		source = unittest.SignatureFixture()
 	}
 	snapshot := &protocolMock.Snapshot{}
+	kvstore := &protocolMock.KVStoreReader{}
+	// TODO(6777): current tests pass with version 1 and 2
+	kvstore.On("GetProtocolStateVersion").Return(uint64(2))
 	snapshot.On("RandomSource").Return(source, nil)
+	snapshot.On("ProtocolState").Return(kvstore, nil)
 	state := protocolMock.State{}
 	state.On("AtBlockID", mock.Anything).Return(snapshot)
 	return &state

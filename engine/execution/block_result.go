@@ -190,7 +190,6 @@ func (ar *BlockAttestationResult) AppendCollectionAttestationResult(
 	ar.ChunkExecutionDatas = append(ar.ChunkExecutionDatas, chunkExecutionDatas)
 }
 
-// TODO(6777): pick a representation here
 func (ar *BlockAttestationResult) AllChunks() []*flow.Chunk {
 	chunks := make([]*flow.Chunk, len(ar.collectionAttestationResults))
 	for i := 0; i < len(ar.collectionAttestationResults); i++ {

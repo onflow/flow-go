@@ -403,12 +403,6 @@ func (collector *resultCollector) Finalize(
 		return nil, fmt.Errorf("failed to provide execution data: %w", err)
 	}
 
-	// TODO(6777): the point at which EN constructs the execution result
-	// determine ugprade view V1 (from ComputationResult.BlockExecutionResult)
-	// if block.view < V1:
-	//    produce dv2.1
-	// else:
-	//    produce dv2.2
 	executionResult := flow.NewExecutionResult(
 		collector.parentBlockExecutionResultID,
 		collector.result.ExecutableBlock.ID(),

@@ -284,6 +284,6 @@ func createTestComputationResult() *execution.ComputationResult {
 	blockA := unittest.BlockHeaderFixture()
 	start := unittest.StateCommitmentFixture()
 	blockB := unittest.ExecutableBlockFixtureWithParent(nil, blockA, &start)
-	testComputationResult := execution.NewEmptyComputationResult(blockB)
+	testComputationResult := execution.NewEmptyComputationResult(blockB, flow.NewChunk) // TODO(6667)
 	return testComputationResult
 }
