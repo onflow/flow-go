@@ -3,18 +3,31 @@ package metrics
 import (
 	"context"
 	"errors"
+	"net"
 	"net/http"
 	"strconv"
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/rs/zerolog"
+	"github.com/rs/zerolog/log"
+
+	"github.com/onflow/flow-go/module/component"
+	"github.com/onflow/flow-go/module/irrecoverable"
 )
+
+// metricsServerShutdownTimeout is the time to wait for the server to shut down gracefully
+const metricsServerShutdownTimeout = 5 * time.Second
 
 // Server is the http server that will be serving the /metrics request for prometheus
 type Server struct {
-	server *http.Server
-	log    zerolog.Logger
+	component.Component
+
+	address string
+	server  *http.Server
+	log     zerolog.Logger
+
+	startupCompleted chan struct{}
 }
 
 // NewServer creates a new server that will start on the specified port,
@@ -25,44 +38,72 @@ func NewServer(log zerolog.Logger, port uint) *Server {
 	mux := http.NewServeMux()
 	endpoint := "/metrics"
 	mux.Handle(endpoint, promhttp.Handler())
-	log.Info().Str("address", addr).Str("endpoint", endpoint).Msg("metrics server started")
 
 	m := &Server{
-		server: &http.Server{Addr: addr, Handler: mux},
-		log:    log,
+		address:          addr,
+		server:           &http.Server{Addr: addr, Handler: mux},
+		log:              log.With().Str("address", addr).Str("endpoint", endpoint).Logger(),
+		startupCompleted: make(chan struct{}),
 	}
+
+	m.Component = component.NewComponentManagerBuilder().
+		AddWorker(m.serve).
+		AddWorker(m.shutdownOnContextDone).
+		Build()
 
 	return m
 }
 
-// Ready returns a channel that will close when the network stack is ready.
-func (m *Server) Ready() <-chan struct{} {
-	ready := make(chan struct{})
-	go func() {
-		if err := m.server.ListenAndServe(); err != nil {
-			// http.ErrServerClosed is returned when Close or Shutdown is called
-			// we don't consider this an error, so print this with debug level instead
-			if errors.Is(err, http.ErrServerClosed) {
-				m.log.Debug().Err(err).Msg("metrics server shutdown")
-			} else {
-				m.log.Err(err).Msg("error shutting down metrics server")
-			}
+func (m *Server) serve(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
+	m.log.Info().Msg("starting metrics server on address")
+
+	l, err := net.Listen("tcp", m.address)
+	if err != nil {
+		m.log.Err(err).Msg("failed to start the metrics server")
+		ctx.Throw(err)
+		return
+	}
+
+	ready()
+
+	// pass the signaler context to the server so that the signaler context
+	// can control the server's lifetime
+	m.server.BaseContext = func(_ net.Listener) context.Context {
+		return ctx
+	}
+
+	err = m.server.Serve(l) // blocking call
+	if err != nil {
+		if errors.Is(err, http.ErrServerClosed) {
+			return
 		}
-	}()
-	go func() {
-		close(ready)
-	}()
-	return ready
+		log.Err(err).Msg("fatal error in the metrics server")
+		ctx.Throw(err)
+	}
 }
 
-// Done returns a channel that will close when shutdown is complete.
-func (m *Server) Done() <-chan struct{} {
-	done := make(chan struct{})
-	go func() {
-		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-		_ = m.server.Shutdown(ctx)
-		cancel()
-		close(done)
-	}()
-	return done
+func (m *Server) shutdownOnContextDone(ictx irrecoverable.SignalerContext, ready component.ReadyFunc) {
+	ready()
+	<-ictx.Done()
+
+	ctx, cancel := context.WithTimeout(context.Background(), metricsServerShutdownTimeout)
+	defer cancel()
+
+	// shutdown the server gracefully
+	err := m.server.Shutdown(ctx)
+	if err == nil {
+		m.log.Info().Msg("metrics server graceful shutdown completed")
+		return
+	}
+
+	if errors.Is(err, ctx.Err()) {
+		m.log.Warn().Msg("metrics server graceful shutdown timed out")
+		// shutdown the server forcefully
+		err := m.server.Close()
+		if err != nil {
+			m.log.Err(err).Msg("error closing metrics server")
+		}
+	} else {
+		m.log.Err(err).Msg("error shutting down metrics server")
+	}
 }
