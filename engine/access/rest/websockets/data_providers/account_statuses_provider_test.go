@@ -201,10 +201,19 @@ func (s *AccountStatusesProviderSuite) requireAccountStatuses(
 	v interface{},
 	expectedAccountStatusesResponse *models.AccountStatusesResponse,
 ) {
-	_, ok := v.(*models.AccountStatusesResponse)
+	actualResponse, ok := v.(*models.AccountStatusesResponse)
 	require.True(s.T(), ok, "Expected *models.AccountStatusesResponse, got %T", v)
 
-	//s.Require().ElementsMatch(expectedAccountStatusesResponse.AccountEvents, actualResponse.AccountEvents)
+	require.Equal(s.T(), expectedAccountStatusesResponse.BlockID.String(), actualResponse.BlockID)
+	require.Equal(s.T(), len(expectedAccountStatusesResponse.AccountEvents), len(actualResponse.AccountEvents))
+
+	for key, expectedEvents := range expectedAccountStatusesResponse.AccountEvents {
+		actualEvents, ok := actualResponse.AccountEvents[key]
+		require.True(s.T(), ok, "Missing key in actual AccountEvents: %s", key)
+
+		s.Require().Equal(expectedEvents, actualEvents, "Mismatch for key: %s", key)
+	}
+
 }
 
 // TestAccountStatusesDataProvider_InvalidArguments tests the behavior of the account statuses data provider
