@@ -2,6 +2,7 @@ package validation
 
 import (
 	"errors"
+	"math/rand"
 	"testing"
 
 	clone "github.com/huandu/go-clone/generic"
@@ -179,6 +180,10 @@ func (s *ReceiptValidationSuite) TestReceiptTooFewChunks() {
 	s.Assert().True(engine.IsInvalidInputError(err))
 }
 
+// TestReceiptChunkModelVersions tests that the receipt validator enforces
+// that receipts included in blocks use a data model consistent with the
+// reference block's protocol version.
+// TODO(mainnet27, #6773): remove this test case
 func (s *ReceiptValidationSuite) TestReceiptChunkModelVersions() {
 	valSubgrph := s.ValidSubgraphFixture()
 	receipt := unittest.ExecutionReceiptFixture(unittest.WithExecutorID(s.ExeID),
@@ -223,23 +228,63 @@ func (s *ReceiptValidationSuite) TestReceiptChunkModelVersions() {
 	})
 }
 
+// TestReceiptServiceEventCountMismatch tests that we reject any receipt where
+// the sum of service event counts specified by chunks is inconsistent with the
+// number of service events in the ExecutionResult.
 func (s *ReceiptValidationSuite) TestReceiptServiceEventCountMismatch() {
-	valSubgrph := s.ValidSubgraphFixture()
-	chunks := valSubgrph.Result.Chunks
-	valSubgrph.Result.Chunks = chunks[0 : len(chunks)-2] // drop the last chunk
-	receipt := unittest.ExecutionReceiptFixture(unittest.WithExecutorID(s.ExeID),
-		unittest.WithResult(valSubgrph.Result))
-	s.AddSubgraphFixtureToMempools(valSubgrph)
-
 	s.publicKey.On("Verify",
 		mock.Anything,
 		mock.Anything,
 		mock.Anything).Return(true, nil).Maybe()
 
-	err := s.receiptValidator.Validate(receipt)
-	s.Require().Error(err, "should reject with invalid chunks")
-	s.Assert().True(engine.IsInvalidInputError(err))
+	s.Run("result contains service events", func() {
+		valSubgrph := s.ValidSubgraphFixture()
+		receipt := unittest.ExecutionReceiptFixture(unittest.WithExecutorID(s.ExeID), unittest.WithResult(valSubgrph.Result))
+		result := &receipt.ExecutionResult
+		unittest.WithServiceEvents(10)(result) // also sets consistent ServiceEventCount fields for all chunks
+		s.AddSubgraphFixtureToMempools(valSubgrph)
 
+		s.Run("compliant chunk list", func() {
+			err := s.receiptValidator.Validate(receipt)
+			s.Require().NoError(err)
+		})
+		s.Run("chunk list has wrong sum of service event counts", func() {
+			*result.Chunks[rand.Intn(len(result.Chunks))].ServiceEventCount++
+			err := s.receiptValidator.Validate(receipt)
+			s.Require().Error(err, "should reject with invalid chunks")
+			s.Assert().True(engine.IsInvalidInputError(err))
+		})
+		s.Run("chunk list contains nil service event count field", func() {
+			result.Chunks[rand.Intn(len(result.Chunks))].ServiceEventCount = nil
+			err := s.receiptValidator.Validate(receipt)
+			s.Require().Error(err, "should reject with invalid chunks")
+			s.Assert().True(engine.IsInvalidInputError(err))
+		})
+	})
+
+	s.Run("result contains no service events", func() {
+		valSubgrph := s.ValidSubgraphFixture()
+		receipt := unittest.ExecutionReceiptFixture(unittest.WithExecutorID(s.ExeID), unittest.WithResult(valSubgrph.Result))
+		result := &receipt.ExecutionResult
+		s.AddSubgraphFixtureToMempools(valSubgrph)
+
+		s.Run("compliant chunk list", func() {
+			err := s.receiptValidator.Validate(receipt)
+			s.Require().NoError(err)
+		})
+		s.Run("chunk list has wrong sum of service event counts", func() {
+			*result.Chunks[rand.Intn(len(result.Chunks))].ServiceEventCount++
+			err := s.receiptValidator.Validate(receipt)
+			s.Require().Error(err, "should reject with invalid chunks")
+			s.Assert().True(engine.IsInvalidInputError(err))
+		})
+		s.Run("chunk list contains nil service event count field", func() {
+			result.Chunks[rand.Intn(len(result.Chunks))].ServiceEventCount = nil
+			err := s.receiptValidator.Validate(receipt)
+			s.Require().Error(err, "should reject with invalid chunks")
+			s.Assert().True(engine.IsInvalidInputError(err))
+		})
+	})
 }
 
 // TestReceiptForBlockWith0Collections tests handling of the edge case of a block that contains no
