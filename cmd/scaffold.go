@@ -107,14 +107,14 @@ type namedModuleFunc struct {
 	name string
 }
 
-// NamedComponentFunc is wrapper for ReadyDoneFactory with additional fields:
+// NamedComponentFactory is wrapper for ReadyDoneFactory with additional fields:
 // Name - name of the component
 // ErrorHandler - error handler for the component
 // Dependencies - list of dependencies for the component that should be ready before
 // the component is started
-type NamedComponentFunc[Input any] struct {
-	FN   ReadyDoneFactory[Input]
-	Name string
+type NamedComponentFactory[Input any] struct {
+	ComponentFactory ReadyDoneFactory[Input]
+	Name             string
 
 	ErrorHandler component.OnError
 	Dependencies *DependencyList
@@ -133,7 +133,7 @@ type FlowNodeBuilder struct {
 	*NodeConfig
 	flags                    *pflag.FlagSet
 	modules                  []namedModuleFunc
-	components               []NamedComponentFunc[*NodeConfig]
+	components               []NamedComponentFactory[*NodeConfig]
 	postShutdownFns          []func() error
 	preInitFns               []BuilderFunc
 	postInitFns              []BuilderFunc
@@ -1566,7 +1566,7 @@ func AddWorkersFromComponents[Input any](
 	log zerolog.Logger,
 	input Input,
 	componentBuilder component.ComponentManagerBuilder,
-	components []NamedComponentFunc[Input],
+	components []NamedComponentFactory[Input],
 ) {
 	// The parent/started channels are used to enforce serial startup.
 	// - parent is the started channel of the previous component.
@@ -1578,7 +1578,7 @@ func AddWorkersFromComponents[Input any](
 	parent := make(chan struct{})
 	close(parent)
 
-	asyncComponents := []NamedComponentFunc[Input]{}
+	asyncComponents := []NamedComponentFactory[Input]{}
 
 	// Run all components
 	for _, f := range components {
@@ -1620,7 +1620,7 @@ func AddWorkersFromComponents[Input any](
 // using their ReadyDoneAware interface. After components are updated to use the idempotent
 // ReadyDoneAware interface and explicitly wait for their dependencies to be ready, we can remove
 // this channel chaining.
-func WorkerFromComponent[Input any](log zerolog.Logger, input Input, v NamedComponentFunc[Input], dependencies <-chan struct{}, started func()) component.ComponentWorker {
+func WorkerFromComponent[Input any](log zerolog.Logger, input Input, v NamedComponentFactory[Input], dependencies <-chan struct{}, started func()) component.ComponentWorker {
 	// Add a closure that starts the component when the node is started, and then waits for it to exit
 	// gracefully.
 	// Startup for all components will happen in parallel, and components can use their dependencies'
@@ -1635,7 +1635,7 @@ func WorkerFromComponent[Input any](log zerolog.Logger, input Input, v NamedComp
 
 		logger.Info().Msg("component initialization started")
 		// First, build the component using the factory method.
-		readyAware, err := v.FN(input)
+		readyAware, err := v.ComponentFactory(input)
 		if err != nil {
 			ctx.Throw(fmt.Errorf("component %s initialization failed: %w", v.Name, err))
 		}
@@ -1689,7 +1689,7 @@ func WorkerFromComponent[Input any](log zerolog.Logger, input Input, v NamedComp
 func WorkerFromRestartableComponent[Input any](
 	log zerolog.Logger,
 	input Input,
-	v NamedComponentFunc[Input],
+	v NamedComponentFactory[Input],
 	parentReady <-chan struct{},
 	started func(),
 ) component.ComponentWorker {
@@ -1713,7 +1713,7 @@ func WorkerFromRestartableComponent[Input any](
 		// This may be called multiple times if the component is restarted
 		componentFactory := func() (component.Component, error) {
 			log.Info().Msg("component initialization started")
-			c, err := v.FN(input)
+			c, err := v.ComponentFactory(input)
 			if err != nil {
 				return nil, err
 			}
@@ -1774,9 +1774,9 @@ func (fnb *FlowNodeBuilder) AdminCommand(command string, f func(config *NodeConf
 // In both cases, the object is started when the node is run, and the node will wait for the
 // component to exit gracefully.
 func (fnb *FlowNodeBuilder) Component(name string, f ReadyDoneFactory[*NodeConfig]) NodeBuilder {
-	fnb.components = append(fnb.components, NamedComponentFunc[*NodeConfig]{
-		FN:   f,
-		Name: name,
+	fnb.components = append(fnb.components, NamedComponentFactory[*NodeConfig]{
+		ComponentFactory: f,
+		Name:             name,
 	})
 	return fnb
 }
@@ -1795,10 +1795,10 @@ func (fnb *FlowNodeBuilder) Component(name string, f ReadyDoneFactory[*NodeConfi
 func (fnb *FlowNodeBuilder) DependableComponent(name string, f ReadyDoneFactory[*NodeConfig], dependencies *DependencyList) NodeBuilder {
 	// Note: dependencies are passed as a struct to allow updating the list after calling this method.
 	// Passing a slice instead would result in out of sync metadata since slices are passed by reference
-	fnb.components = append(fnb.components, NamedComponentFunc[*NodeConfig]{
-		FN:           f,
-		Name:         name,
-		Dependencies: dependencies,
+	fnb.components = append(fnb.components, NamedComponentFactory[*NodeConfig]{
+		ComponentFactory: f,
+		Name:             name,
+		Dependencies:     dependencies,
 	})
 	return fnb
 }
@@ -1809,9 +1809,9 @@ func (fnb *FlowNodeBuilder) OverrideComponent(name string, f ReadyDoneFactory[*N
 	for i := 0; i < len(fnb.components); i++ {
 		if fnb.components[i].Name == name {
 			// found component with the name, override it.
-			fnb.components[i] = NamedComponentFunc[*NodeConfig]{
-				FN:   f,
-				Name: name,
+			fnb.components[i] = NamedComponentFactory[*NodeConfig]{
+				ComponentFactory: f,
+				Name:             name,
 			}
 
 			return fnb
@@ -1836,10 +1836,10 @@ func (fnb *FlowNodeBuilder) OverrideComponent(name string, f ReadyDoneFactory[*N
 //
 // Any irrecoverable errors thrown by the component will be passed to the provided error handler.
 func (fnb *FlowNodeBuilder) RestartableComponent(name string, f ReadyDoneFactory[*NodeConfig], errorHandler component.OnError) NodeBuilder {
-	fnb.components = append(fnb.components, NamedComponentFunc[*NodeConfig]{
-		FN:           f,
-		Name:         name,
-		ErrorHandler: errorHandler,
+	fnb.components = append(fnb.components, NamedComponentFactory[*NodeConfig]{
+		ComponentFactory: f,
+		Name:             name,
+		ErrorHandler:     errorHandler,
 	})
 	return fnb
 }
