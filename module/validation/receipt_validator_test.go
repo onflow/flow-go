@@ -1058,6 +1058,7 @@ func (s *ReceiptValidationSuite) TestException_ProtocolStateHead() {
 	snapshot := mock_protocol.NewSnapshot(s.T())
 	exception := errors.New("state.Head() exception")
 	snapshot.On("Head").Return(nil, exception)
+	unittest.MockProtocolStateVersion(snapshot, 2)
 	s.State.On("AtBlockID", valSubgrph.Block.ID()).Return(snapshot)
 
 	s.T().Run("Method Validate", func(t *testing.T) {

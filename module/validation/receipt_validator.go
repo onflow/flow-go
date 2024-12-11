@@ -126,10 +126,6 @@ func (v *receiptValidator) verifyChunksFormat(result *flow.ExecutionResult) erro
 		}
 	}
 
-	if err := v.verifyChunkServiceEvents(result); err != nil {
-		return fmt.Errorf("invalid chunk service events: %w", err)
-	}
-
 	// For a block containing k collections, the Flow protocol prescribes that a valid execution result
 	// must contain k+1 chunks. Specifically, we have one chunk per collection plus the system chunk.
 	// The system chunk must exist, even if block payload itself is empty.
@@ -144,6 +140,11 @@ func (v *receiptValidator) verifyChunksFormat(result *flow.ExecutionResult) erro
 	if result.Chunks.Len() != requiredChunks {
 		return engine.NewInvalidInputErrorf("invalid number of chunks, expected %d got %d", requiredChunks, result.Chunks.Len())
 	}
+
+	if err := v.verifyChunkServiceEvents(result); err != nil {
+		return fmt.Errorf("invalid chunk service events: %w", err)
+	}
+
 	return nil
 }
 
@@ -430,12 +431,7 @@ func (v *receiptValidator) ValidatePayload(candidate *flow.Block) error {
 //   - engine.InvalidInputError if the result has malformed chunks
 //   - module.UnknownBlockError if blockID does not correspond to a block known by the protocol state
 func (v *receiptValidator) validateResult(result *flow.ExecutionResult, prevResult *flow.ExecutionResult) error {
-	// TODO(6777): enforce result format
-	pstate, err := v.state.Final().ProtocolState()
-	versionUpgrade := pstate.GetVersionUpgrade() // can be nil, can be outdated
-	_ = versionUpgrade
-	//
-	err = v.verifyChunksFormat(result)
+	err := v.verifyChunksFormat(result)
 	if err != nil {
 		return fmt.Errorf("invalid chunks format for result %v: %w", result.ID(), err)
 	}

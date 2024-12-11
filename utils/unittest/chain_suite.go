@@ -73,7 +73,7 @@ func (bc *BaseChainSuite) SetupChain() {
 
 	// ~~~~~~~~~~~~~~~~~~~~~~~~~~ SETUP IDENTITIES ~~~~~~~~~~~~~~~~~~~~~~~~~~ //
 
-	// asign node Identities
+	// assign node Identities
 	con := IdentityFixture(WithRole(flow.RoleConsensus))
 	exe := IdentityFixture(WithRole(flow.RoleExecution))
 	ver := IdentityFixture(WithRole(flow.RoleVerification))
@@ -441,6 +441,7 @@ func StateSnapshotForKnownBlock(block *flow.Header, identities map[flow.Identifi
 		},
 	)
 	snapshot.On("Head").Return(block, nil)
+	MockProtocolStateVersion(snapshot, 2)
 	return snapshot
 }
 
@@ -580,4 +581,11 @@ func (bc *BaseChainSuite) AddSubgraphFixtureToMempools(subgraph subgraphFixture)
 	bc.PersistedResults[subgraph.PreviousResult.ID()] = subgraph.PreviousResult
 	bc.PersistedResults[subgraph.Result.ID()] = subgraph.Result
 	bc.Assigner.On("Assign", subgraph.IncorporatedResult.Result, subgraph.IncorporatedResult.IncorporatedBlockID).Return(subgraph.Assignment, nil).Maybe()
+}
+
+// MockProtocolStateVersion mocks the given protocol state version on the snapshot.
+func MockProtocolStateVersion(snapshot *protocol.Snapshot, version uint64) {
+	kvstore := &protocol.KVStoreReader{}
+	kvstore.On("GetProtocolStateVersion").Return(version)
+	snapshot.On("ProtocolState").Return(kvstore, nil)
 }

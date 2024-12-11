@@ -370,7 +370,6 @@ func (e *blockComputer) executeBlock(
 		return nil, fmt.Errorf("could not select chunk constructor for current protocol version: %w", err)
 	}
 
-	// have access to protocol state at this point
 	collector := newResultCollector(
 		e.tracer,
 		blockSpan,
