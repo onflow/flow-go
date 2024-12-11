@@ -27,7 +27,7 @@ func TestDKGState_UninitializedState(t *testing.T) {
 		}
 		epochCounter := setupState()
 
-		started, err := store.GetDKGStarted(epochCounter)
+		started, err := store.IsDKGStarted(epochCounter)
 		require.NoError(t, err)
 		require.False(t, started)
 
@@ -102,7 +102,7 @@ func TestDKGState_StartedState(t *testing.T) {
 		require.NoError(t, err)
 		require.Equal(t, flow.DKGStateStarted, actualState)
 
-		started, err := store.GetDKGStarted(epochCounter)
+		started, err := store.IsDKGStarted(epochCounter)
 		require.NoError(t, err)
 		require.True(t, started)
 
@@ -175,7 +175,7 @@ func TestDKGState_CompletedState(t *testing.T) {
 		require.NoError(t, err)
 		require.Equal(t, flow.DKGStateCompleted, actualState)
 
-		started, err := store.GetDKGStarted(epochCounter)
+		started, err := store.IsDKGStarted(epochCounter)
 		require.NoError(t, err)
 		require.True(t, started)
 
@@ -250,7 +250,7 @@ func TestDKGState_FailureState(t *testing.T) {
 		require.NoError(t, err)
 		require.Equal(t, flow.DKGStateFailure, actualState)
 
-		started, err := store.GetDKGStarted(epochCounter)
+		started, err := store.IsDKGStarted(epochCounter)
 		require.NoError(t, err)
 		require.True(t, started)
 
@@ -327,7 +327,7 @@ func TestDKGState_RandomBeaconKeyCommittedState(t *testing.T) {
 		require.NoError(t, err)
 		require.Equal(t, flow.RandomBeaconKeyCommitted, actualState)
 
-		started, err := store.GetDKGStarted(epochCounter)
+		started, err := store.IsDKGStarted(epochCounter)
 		require.NoError(t, err)
 		require.True(t, started)
 

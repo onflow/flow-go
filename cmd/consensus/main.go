@@ -338,7 +338,7 @@ func main() {
 					myBeaconPublicKeyShare)
 			}
 
-			started, err := myBeaconKeyStateMachine.GetDKGStarted(epochCounter)
+			started, err := myBeaconKeyStateMachine.IsDKGStarted(epochCounter)
 			if err != nil {
 				return fmt.Errorf("could not get DKG started flag for root epoch %d: %w", epochCounter, err)
 			}

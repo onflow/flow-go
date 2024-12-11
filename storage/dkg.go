@@ -1,9 +1,6 @@
 package storage
 
 import (
-	"errors"
-	"fmt"
-
 	"github.com/onflow/crypto"
 
 	"github.com/onflow/flow-go/model/flow"
@@ -34,9 +31,9 @@ type DKGStateReader interface {
 	//   - [storage.ErrNotFound] - if there is no state stored for given epoch, meaning the state machine is in initial state.
 	GetDKGState(epochCounter uint64) (flow.DKGState, error)
 
-	// GetDKGStarted checks whether the DKG has been started for the given epoch.
+	// IsDKGStarted checks whether the DKG has been started for the given epoch.
 	// No errors expected during normal operation.
-	GetDKGStarted(epochCounter uint64) (bool, error)
+	IsDKGStarted(epochCounter uint64) (bool, error)
 
 	// UnsafeRetrieveMyBeaconPrivateKey retrieves the random beacon private key for an epoch.
 	//
@@ -77,51 +74,20 @@ type DKGState interface {
 	InsertMyBeaconPrivateKey(epochCounter uint64, key crypto.PrivateKey) error
 }
 
-// EpochRecoveryMyBeaconKey is a specific interface that allows to overwrite the beacon private key for given epoch.
-// This interface is used *ONLY* in the epoch recovery process and only by the consensus participants.
-// Each consensus participant takes part in the DKG, after finishing the DKG protocol each replica obtains a random beacon
-// private key which is stored in the database along with DKG state which will be equal to [flow.RandomBeaconKeyCommitted].
-// If for any reason DKG fails, then the private key will be nil and DKG end state will be equal to [flow.DKGStateFailure].
+// EpochRecoveryMyBeaconKey is a specific interface that allows to overwrite the beacon private key for
+// a future epoch, provided that the state machine has not yet reached the [flow.RandomBeaconKeyCommitted]
+// state for the specified epoch.
+// This interface is used *ONLY* in the epoch recovery process and only by the consensus participants. On the happy path,
+// each consensus committee member takes part in the DKG, and after successfully finishing the DKG protocol it obtains a
+// random beacon private key, which is stored in the database along with DKG state [flow.DKGStateCompleted]. If for any
+// reason DKG fails, then the private key will be nil and DKG end state will be equal to [flow.DKGStateFailure].
 // This module allows to overwrite the random beacon private key in case of EFM recovery or other configuration issues.
 type EpochRecoveryMyBeaconKey interface {
 	DKGStateReader
 
-	// UpsertMyBeaconPrivateKey overwrites the random beacon private key for the epoch that recovers the protocol from
-	// Epoch Fallback Mode. Effectively, this function overwrites whatever might be available in the database with
-	// the given private key and sets the [flow.DKGState] to [flow.RandomBeaconKeyCommitted].
+	// UpsertMyBeaconPrivateKey overwrites the random beacon private key for the epoch that recovers the protocol
+	// from Epoch Fallback Mode. State transitions are allowed if and only if the current state is not equal to
+	// [flow.RandomBeaconKeyCommitted]. The resulting state of this method call is [flow.RandomBeaconKeyCommitted].
 	// No errors are expected during normal operations.
 	UpsertMyBeaconPrivateKey(epochCounter uint64, key crypto.PrivateKey) error
-}
-
-// InvalidDKGStateTransitionError is a sentinel error that is returned in case an invalid state transition is attempted.
-type InvalidDKGStateTransitionError struct {
-	err  error
-	From flow.DKGState
-	To   flow.DKGState
-}
-
-func (e InvalidDKGStateTransitionError) Error() string {
-	return fmt.Sprintf("invalid state transition from %s to %s: %s", e.From.String(), e.To.String(), e.err.Error())
-}
-
-func IsInvalidDKGStateTransitionError(err error) bool {
-	var e InvalidDKGStateTransitionError
-	return errors.As(err, &e)
-}
-
-// NewInvalidDKGStateTransitionError constructs a new InvalidDKGStateTransitionError error.
-func NewInvalidDKGStateTransitionError(from, to flow.DKGState) error {
-	return InvalidDKGStateTransitionError{
-		From: from,
-		To:   to,
-	}
-}
-
-// NewInvalidDKGStateTransitionErrorf constructs a new InvalidDKGStateTransitionError error with a formatted message.
-func NewInvalidDKGStateTransitionErrorf(from, to flow.DKGState, msg string, args ...any) error {
-	return InvalidDKGStateTransitionError{
-		From: from,
-		To:   to,
-		err:  fmt.Errorf(msg, args...),
-	}
 }

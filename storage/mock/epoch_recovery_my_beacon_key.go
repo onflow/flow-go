@@ -14,12 +14,12 @@ type EpochRecoveryMyBeaconKey struct {
 	mock.Mock
 }
 
-// GetDKGStarted provides a mock function with given fields: epochCounter
-func (_m *EpochRecoveryMyBeaconKey) GetDKGStarted(epochCounter uint64) (bool, error) {
+// IsDKGStarted provides a mock function with given fields: epochCounter
+func (_m *EpochRecoveryMyBeaconKey) IsDKGStarted(epochCounter uint64) (bool, error) {
 	ret := _m.Called(epochCounter)
 
 	if len(ret) == 0 {
-		panic("no return value specified for GetDKGStarted")
+		panic("no return value specified for IsDKGStarted")
 	}
 
 	var r0 bool

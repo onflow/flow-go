@@ -28,10 +28,10 @@ var allowedStateTransitions = map[flow.DKGState][]flow.DKGState{
 }
 
 // RecoverablePrivateBeaconKeyStateMachine stores state information about in-progress and completed DKGs, including
-// computed keys. Must be instantiated using secrets database.
-// Each consensus participant takes part in the DKG, and after successfully finishing the DKG protocol it obtains a
-// random beacon private key, which is stored in the database along with DKG current state [flow.DKGStateCompleted].
-// If for any reason the DKG fails, then the private key will be nil and DKG current state will be [flow.DKGStateFailure].
+// computed keys. Must be instantiated using secrets database. On the happy path, each consensus
+// committee member takes part in the DKG, and after successfully finishing the DKG protocol it obtains a
+// random beacon private key, which is stored in the database along with DKG state [flow.DKGStateCompleted].
+// If for any reason the DKG fails, then the private key will be nil and DKG state is set to [flow.DKGStateFailure].
 // When the epoch recovery takes place, we need to query the last valid beacon private key for the current replica and
 // also set it for use during the Recovery Epoch, otherwise replicas won't be able to vote for blocks during the Recovery Epoch.
 type RecoverablePrivateBeaconKeyStateMachine struct {
@@ -98,9 +98,9 @@ func (ds *RecoverablePrivateBeaconKeyStateMachine) InsertMyBeaconPrivateKey(epoc
 
 // UnsafeRetrieveMyBeaconPrivateKey retrieves the random beacon private key for an epoch.
 //
-// CAUTION: these keys are stored before they are validated against the
-// canonical key vector and may not be valid for use in signing. Use storage.SafeBeaconKeys interface
-// to guarantee only keys safe for signing are returned
+// CAUTION: these keys were stored before they are validated against the
+// canonical key vector and may not be valid for use in signing. Use [storage.SafeBeaconKeys]
+// interface to guarantee only keys safe for signing are returned
 // Error returns:
 //   - [storage.ErrNotFound] - if there is no key stored for given epoch.
 func (ds *RecoverablePrivateBeaconKeyStateMachine) UnsafeRetrieveMyBeaconPrivateKey(epochCounter uint64) (crypto.PrivateKey, error) {
@@ -113,9 +113,9 @@ func (ds *RecoverablePrivateBeaconKeyStateMachine) UnsafeRetrieveMyBeaconPrivate
 	return encodableKey.PrivateKey, nil
 }
 
-// GetDKGStarted checks whether the DKG has been started for the given epoch.
+// IsDKGStarted checks whether the DKG has been started for the given epoch.
 // No errors expected during normal operation.
-func (ds *RecoverablePrivateBeaconKeyStateMachine) GetDKGStarted(epochCounter uint64) (bool, error) {
+func (ds *RecoverablePrivateBeaconKeyStateMachine) IsDKGStarted(epochCounter uint64) (bool, error) {
 	var started bool
 	err := ds.db.View(operation.RetrieveDKGStartedForEpoch(epochCounter, &started))
 	return started, err
@@ -219,9 +219,9 @@ func (ds *RecoverablePrivateBeaconKeyStateMachine) RetrieveMyBeaconPrivateKey(ep
 	return
 }
 
-// UpsertMyBeaconPrivateKey overwrites the random beacon private key for the epoch that recovers the protocol from
-// Epoch Fallback Mode. Effectively, this function overwrites whatever might be available in the database with
-// the given private key and sets the [flow.DKGState] to [flow.RandomBeaconKeyCommitted].
+// UpsertMyBeaconPrivateKey overwrites the random beacon private key for the epoch that recovers the protocol
+// from Epoch Fallback Mode. State transitions are allowed if and only if the current state is not equal to
+// [flow.RandomBeaconKeyCommitted]. The resulting state of this method call is [flow.RandomBeaconKeyCommitted].
 // No errors are expected during normal operations.
 func (ds *RecoverablePrivateBeaconKeyStateMachine) UpsertMyBeaconPrivateKey(epochCounter uint64, key crypto.PrivateKey) error {
 	if key == nil {

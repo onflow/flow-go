@@ -155,7 +155,7 @@ func (e *ReactorEngine) startDKGForEpoch(currentEpochCounter uint64, first *flow
 		Logger()
 
 	// if we have started the dkg for this epoch already, exit
-	started, err := e.dkgState.GetDKGStarted(nextEpochCounter)
+	started, err := e.dkgState.IsDKGStarted(nextEpochCounter)
 	if err != nil {
 		// unexpected storage-level error
 		// TODO use irrecoverable context
@@ -246,6 +246,9 @@ func (e *ReactorEngine) startDKGForEpoch(currentEpochCounter uint64, first *flow
 
 // handleEpochCommittedPhaseStarted is invoked upon the transition to the EpochCommitted
 // phase, when the canonical beacon key vector is incorporated into the protocol state.
+// Alternatively we invoke this function preemptively on startup if we are in the
+// EpochCommitted Phase, in case the `EpochCommittedPhaseStarted` event was missed
+// due to a crash.
 //
 // This function checks that the local DKG completed and that our locally computed
 // key share is consistent with the canonical key vector. When this function returns,
