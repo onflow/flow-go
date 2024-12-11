@@ -165,7 +165,7 @@ func processSubpackages(subPkgs []*subpackage, allPkgs []*packages.Package, seen
 	return testMatrices
 }
 
-// processTopLevelPackages creates test matrix for the top level package excluding any packages from the exclude list.
+// processTopLevelPackage creates test matrix for the top level package excluding any packages from the exclude list.
 func processTopLevelPackage(pkg *flowGoPackage, allPkgs []*packages.Package, seenPath func(p string), seen func(p string) bool) *testMatrix {
 	var topLevelTestPkgStrBuilder strings.Builder
 	for _, p := range allPkgs {
