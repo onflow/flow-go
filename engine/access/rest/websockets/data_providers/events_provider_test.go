@@ -87,10 +87,6 @@ func (s *EventsProviderSuite) TestEventsDataProvider_HappyPath() {
 		s.factory,
 		s.subscribeEventsDataProviderTestCases(),
 		func(dataChan chan interface{}) {
-			//for _, block := range s.blocks {
-			//	dataChan <- block
-			//}
-
 			for i := 0; i < len(expectedEventsResponses); i++ {
 				dataChan <- &expectedEventsResponses[i]
 			}
@@ -98,7 +94,6 @@ func (s *EventsProviderSuite) TestEventsDataProvider_HappyPath() {
 		expectedEventsResponses,
 		s.requireEvents,
 	)
-
 }
 
 // subscribeEventsDataProviderTestCases generates test cases for events data providers.
@@ -148,14 +143,14 @@ func (s *EventsProviderSuite) subscribeEventsDataProviderTestCases() []testType 
 }
 
 // requireEvents ensures that the received event information matches the expected data.
-func (s *EventsProviderSuite) requireEvents(v interface{}, expectedEventsResponse interface{}) {
-	expectedResponse, ok := expectedEventsResponse.(backend.EventsResponse)
-	require.True(s.T(), ok, "unexpected type: %T", expectedEventsResponse)
+func (s *EventsProviderSuite) requireEvents(v interface{}, expectedResponse interface{}) {
+	expectedEventsResponse, ok := expectedResponse.(backend.EventsResponse)
+	require.True(s.T(), ok, "unexpected type: %T", expectedResponse)
 
 	actualResponse, ok := v.(*models.EventResponse)
 	require.True(s.T(), ok, "Expected *models.EventResponse, got %T", v)
 
-	s.Require().ElementsMatch(expectedResponse.Events, actualResponse.Events)
+	s.Require().ElementsMatch(expectedEventsResponse.Events, actualResponse.Events)
 }
 
 // invalidArgumentsTestCases returns a list of test cases with invalid argument combinations

@@ -61,25 +61,13 @@ func (s *AccountStatusesProviderSuite) SetupTest() {
 // validates that events are correctly streamed to the channel and ensures
 // no unexpected errors occur.
 func (s *AccountStatusesProviderSuite) TestAccountStatusesDataProvider_HappyPath() {
-	s.testHappyPath(
-		AccountStatusesTopic,
-		s.subscribeAccountStatusesDataProviderTestCases(),
-		s.requireAccountStatuses,
-	)
-}
 
-func (s *AccountStatusesProviderSuite) testHappyPath(
-	topic string,
-	tests []testType,
-	requireFn func(interface{}, *backend.AccountStatusesResponse),
-) {
 	expectedEvents := []flow.Event{
 		unittest.EventFixture(state_stream.CoreEventAccountCreated, 0, 0, unittest.IdentifierFixture(), 0),
 		unittest.EventFixture(state_stream.CoreEventAccountKeyAdded, 0, 0, unittest.IdentifierFixture(), 0),
 	}
 
 	var expectedAccountStatusesResponses []backend.AccountStatusesResponse
-
 	for i := 0; i < len(expectedEvents); i++ {
 		expectedAccountStatusesResponses = append(expectedAccountStatusesResponses, backend.AccountStatusesResponse{
 			Height:  s.rootBlock.Header.Height,
@@ -90,52 +78,19 @@ func (s *AccountStatusesProviderSuite) testHappyPath(
 		})
 	}
 
-	for _, test := range tests {
-		s.Run(test.name, func() {
-			ctx := context.Background()
-			send := make(chan interface{}, 10)
-
-			// Create a channel to simulate the subscription's data channel
-			accStatusesChan := make(chan interface{})
-
-			//	// Create a mock subscription and mock the channel
-			sub := ssmock.NewSubscription(s.T())
-			sub.On("Channel").Return((<-chan interface{})(accStatusesChan))
-			sub.On("Err").Return(nil)
-			test.setupBackend(sub)
-
-			// Create the data provider instance
-			provider, err := s.factory.NewDataProvider(ctx, topic, test.arguments, send)
-			s.Require().NotNil(provider)
-			s.Require().NoError(err)
-
-			// Run the provider in a separate goroutine
-			go func() {
-				err = provider.Run()
-				s.Require().NoError(err)
-			}()
-
-			// Simulate emitting data to the events channel
-			go func() {
-				defer close(accStatusesChan)
-
-				for i := 0; i < len(expectedAccountStatusesResponses); i++ {
-					accStatusesChan <- &expectedAccountStatusesResponses[i]
-				}
-			}()
-
-			// Collect responses
-			for _, e := range expectedAccountStatusesResponses {
-				v, ok := <-send
-				s.Require().True(ok, "channel closed while waiting for event %v: err: %v", e.BlockID, sub.Err())
-
-				requireFn(v, &e)
+	testHappyPath(
+		s.T(),
+		AccountStatusesTopic,
+		s.factory,
+		s.subscribeAccountStatusesDataProviderTestCases(),
+		func(dataChan chan interface{}) {
+			for i := 0; i < len(expectedAccountStatusesResponses); i++ {
+				dataChan <- &expectedAccountStatusesResponses[i]
 			}
-
-			// Ensure the provider is properly closed after the test
-			provider.Close()
-		})
-	}
+		},
+		expectedAccountStatusesResponses,
+		s.requireAccountStatuses,
+	)
 }
 
 func (s *AccountStatusesProviderSuite) subscribeAccountStatusesDataProviderTestCases() []testType {
@@ -186,8 +141,11 @@ func (s *AccountStatusesProviderSuite) subscribeAccountStatusesDataProviderTestC
 // requireAccountStatuses ensures that the received account statuses information matches the expected data.
 func (s *AccountStatusesProviderSuite) requireAccountStatuses(
 	v interface{},
-	expectedAccountStatusesResponse *backend.AccountStatusesResponse,
+	expectedResponse interface{},
 ) {
+	expectedAccountStatusesResponse, ok := expectedResponse.(backend.AccountStatusesResponse)
+	require.True(s.T(), ok, "unexpected type: %T", expectedResponse)
+
 	actualResponse, ok := v.(*models.AccountStatusesResponse)
 	require.True(s.T(), ok, "Expected *models.AccountStatusesResponse, got %T", v)
 
@@ -200,7 +158,6 @@ func (s *AccountStatusesProviderSuite) requireAccountStatuses(
 
 		s.Require().Equal(expectedEvents, actualEvents, "Mismatch for key: %s", key)
 	}
-
 }
 
 // TestAccountStatusesDataProvider_InvalidArguments tests the behavior of the account statuses data provider
