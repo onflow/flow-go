@@ -18,6 +18,10 @@ import (
 	"github.com/onflow/flow-go/utils/concurrentmap"
 )
 
+var (
+	ErrUnmarshalMessage = errors.New("failed to unmarshal message")
+)
+
 type Controller struct {
 	logger zerolog.Logger
 	config Config
@@ -260,7 +264,7 @@ func (c *Controller) handleUnsubscribe(ctx context.Context, msg models.Unsubscri
 
 	provider, ok := c.dataProviders.Get(id)
 	if !ok {
-		c.writeBaseErrorResponse(ctx, err, "unsubscribe")
+		c.writeBaseErrorResponse(ctx, fmt.Errorf("could not find data provider with such id"), "unsubscribe")
 		c.logger.Debug().Err(err).Msg("no active subscription with such ID found")
 		return
 	}
@@ -295,6 +299,7 @@ func (c *Controller) handleListSubscriptions(ctx context.Context) {
 	resp := models.ListSubscriptionsMessageResponse{
 		BaseMessageResponse: models.BaseMessageResponse{
 			Success: true,
+			Action:  "list_subscriptions",
 		},
 		Subscriptions: subs,
 	}
