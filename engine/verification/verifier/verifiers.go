@@ -126,7 +126,8 @@ func initStorages(chainID flow.ChainID, dataDir string, chunkDataPackDir string)
 		return nil, nil, nil, nil, nil, fmt.Errorf("could not init protocol state: %w", err)
 	}
 
-	chunkDataPackDB, err := storagepebble.OpenDefaultPebbleDB(chunkDataPackDir)
+	// require the chunk data pack data must exist before returning the storage module
+	chunkDataPackDB, err := storagepebble.MustOpenDefaultPebbleDB(chunkDataPackDir)
 	if err != nil {
 		return nil, nil, nil, nil, nil, fmt.Errorf("could not open chunk data pack DB: %w", err)
 	}
