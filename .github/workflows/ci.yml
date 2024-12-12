@@ -47,10 +47,15 @@ jobs:
         sudo apt-get update
         sudo apt-get install -y protobuf-compiler
         protoc --version
-    - name: Add protoc to PATH
-      run: echo "/usr/local/bin" >> $GITHUB_PATH
+    - name: Install protoc-gen-go
+      run: |
+        go install google.golang.org/protobuf/cmd/protoc-gen-go@v1.31.0
+        echo "$(go env GOPATH)/bin" >> $GITHUB_PATH
+    - name: Validate protoc-gen-go
+      run: which protoc-gen-go
     - name: Run go generate
       run: go generate ./...
+      working-directory: ${{ mat
       working-directory: ${{ matrix.dir }}
     - name: Run golangci-lint
       uses: golangci/golangci-lint-action@v3
