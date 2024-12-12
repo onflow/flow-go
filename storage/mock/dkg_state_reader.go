@@ -14,34 +14,6 @@ type DKGStateReader struct {
 	mock.Mock
 }
 
-// IsDKGStarted provides a mock function with given fields: epochCounter
-func (_m *DKGStateReader) IsDKGStarted(epochCounter uint64) (bool, error) {
-	ret := _m.Called(epochCounter)
-
-	if len(ret) == 0 {
-		panic("no return value specified for IsDKGStarted")
-	}
-
-	var r0 bool
-	var r1 error
-	if rf, ok := ret.Get(0).(func(uint64) (bool, error)); ok {
-		return rf(epochCounter)
-	}
-	if rf, ok := ret.Get(0).(func(uint64) bool); ok {
-		r0 = rf(epochCounter)
-	} else {
-		r0 = ret.Get(0).(bool)
-	}
-
-	if rf, ok := ret.Get(1).(func(uint64) error); ok {
-		r1 = rf(epochCounter)
-	} else {
-		r1 = ret.Error(1)
-	}
-
-	return r0, r1
-}
-
 // GetDKGState provides a mock function with given fields: epochCounter
 func (_m *DKGStateReader) GetDKGState(epochCounter uint64) (flow.DKGState, error) {
 	ret := _m.Called(epochCounter)
@@ -59,6 +31,34 @@ func (_m *DKGStateReader) GetDKGState(epochCounter uint64) (flow.DKGState, error
 		r0 = rf(epochCounter)
 	} else {
 		r0 = ret.Get(0).(flow.DKGState)
+	}
+
+	if rf, ok := ret.Get(1).(func(uint64) error); ok {
+		r1 = rf(epochCounter)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// IsDKGStarted provides a mock function with given fields: epochCounter
+func (_m *DKGStateReader) IsDKGStarted(epochCounter uint64) (bool, error) {
+	ret := _m.Called(epochCounter)
+
+	if len(ret) == 0 {
+		panic("no return value specified for IsDKGStarted")
+	}
+
+	var r0 bool
+	var r1 error
+	if rf, ok := ret.Get(0).(func(uint64) (bool, error)); ok {
+		return rf(epochCounter)
+	}
+	if rf, ok := ret.Get(0).(func(uint64) bool); ok {
+		r0 = rf(epochCounter)
+	} else {
+		r0 = ret.Get(0).(bool)
 	}
 
 	if rf, ok := ret.Get(1).(func(uint64) error); ok {
