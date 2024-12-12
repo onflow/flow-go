@@ -53,27 +53,33 @@ func run(*cobra.Command, []string) {
 	chainID := flow.ChainID(flagChain)
 	_ = chainID.Chain()
 
+	lg := log.With().
+		Str("chain", string(chainID)).
+		Str("datadir", flagDatadir).
+		Str("chunk_data_pack_dir", flagChunkDataPackDir).
+		Logger()
+
 	if flagFromTo != "" {
 		from, to, err := parseFromTo(flagFromTo)
 		if err != nil {
-			log.Fatal().Err(err).Msg("could not parse from_to")
+			lg.Fatal().Err(err).Msg("could not parse from_to")
 		}
 
-		log.Info().Msgf("verifying range from %d to %d", from, to)
+		lg.Info().Msgf("verifying range from %d to %d", from, to)
 		err = verifier.VerifyRange(from, to, chainID, flagDatadir, flagChunkDataPackDir)
 		if err != nil {
-			log.Fatal().Err(err).Msgf("could not verify range from %d to %d", from, to)
+			lg.Fatal().Err(err).Msgf("could not verify range from %d to %d", from, to)
 		}
-		log.Info().Msgf("successfully verified range from %d to %d", from, to)
+		lg.Info().Msgf("successfully verified range from %d to %d", from, to)
 
 	} else {
-		log.Info().Msgf("verifying last %d sealed blocks", flagLastK)
+		lg.Info().Msgf("verifying last %d sealed blocks", flagLastK)
 		err := verifier.VerifyLastKHeight(flagLastK, chainID, flagDatadir, flagChunkDataPackDir)
 		if err != nil {
-			log.Fatal().Err(err).Msg("could not verify last k height")
+			lg.Fatal().Err(err).Msg("could not verify last k height")
 		}
 
-		log.Info().Msgf("successfully verified last %d sealed blocks", flagLastK)
+		lg.Info().Msgf("successfully verified last %d sealed blocks", flagLastK)
 	}
 }
 
