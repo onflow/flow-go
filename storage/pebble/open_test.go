@@ -2,6 +2,7 @@ package pebble
 
 import (
 	"errors"
+	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -72,5 +73,31 @@ func TestNewBootstrappedRegistersWithPath(t *testing.T) {
 		require.Equal(t, firstHeight, registers.LatestHeight())
 
 		require.NoError(t, db2.Close())
+	})
+}
+
+func TestMustOpenDefaultPebbleDB(t *testing.T) {
+	t.Parallel()
+	unittest.RunWithTempDir(t, func(dir string) {
+		// verify error is returned when the db is not bootstrapped
+		_, err := MustOpenDefaultPebbleDB(dir)
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "not initialized")
+
+		// bootstrap the db
+		db, err := OpenDefaultPebbleDB(dir)
+		require.NoError(t, err)
+		require.NoError(t, initHeights(db, uint64(10)))
+		require.NoError(t, db.Close())
+		fmt.Println(dir)
+
+		// verify no error is returned when the db is bootstrapped
+		db, err = MustOpenDefaultPebbleDB(dir)
+		require.NoError(t, err)
+
+		h, err := latestStoredHeight(db)
+		require.NoError(t, err)
+		require.Equal(t, uint64(10), h)
+		require.NoError(t, db.Close())
 	})
 }
