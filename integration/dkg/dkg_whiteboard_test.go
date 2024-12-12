@@ -91,7 +91,7 @@ func createNode(
 
 	// keyKeys is used to store the private key resulting from the node's
 	// participation in the DKG run
-	dkgState, err := badger.NewDKGState(core.Metrics, core.SecretsDB)
+	dkgState, err := badger.NewRecoverableRandomBeaconStateMachine(core.Metrics, core.SecretsDB)
 	require.NoError(t, err)
 
 	// configure the state snapthost at firstBlock to return the desired
@@ -165,13 +165,10 @@ func createNode(
 	// reactorEngine consumes the EpochSetupPhaseStarted event
 	core.ProtocolEvents.AddConsumer(reactorEngine)
 
-	safeBeaconKeys := badger.NewSafeBeaconPrivateKeys(dkgState)
-
 	node := node{
 		t:               t,
 		GenericNode:     core,
 		dkgState:        dkgState,
-		safeBeaconKeys:  safeBeaconKeys,
 		messagingEngine: messagingEngine,
 		reactorEngine:   reactorEngine,
 	}
@@ -298,9 +295,7 @@ func TestWithWhiteboard(t *testing.T) {
 	signatures := []crypto.Signature{}
 	indices := []int{}
 	for i, n := range nodes {
-
-		// TODO: to replace with safeBeaconKeys
-		beaconKey, err := n.dkgState.RetrieveMyBeaconPrivateKey(nextEpochSetup.Counter)
+		beaconKey, err := n.dkgState.UnsafeRetrieveMyBeaconPrivateKey(nextEpochSetup.Counter)
 		require.NoError(t, err)
 
 		signature, err := beaconKey.Sign(sigData, hasher)
