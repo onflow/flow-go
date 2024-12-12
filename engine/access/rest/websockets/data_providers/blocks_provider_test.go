@@ -156,8 +156,8 @@ func (s *BlocksProviderSuite) TestBlocksDataProvider_InvalidArguments() {
 // validBlockArgumentsTestCases defines test happy cases for block data providers.
 // Each test case specifies input arguments, and setup functions for the mock API used in the test.
 func (s *BlocksProviderSuite) validBlockArgumentsTestCases() []testType {
-	expectedResponses := expectedBlockResponses(s.blocks, s.linkGenerator, map[string]bool{}, flow.BlockStatusFinalized)
-	expectedPayloadExpandedResponse := expectedBlockResponses(s.blocks, s.linkGenerator, map[string]bool{commonmodels.ExpandableFieldPayload: true}, flow.BlockStatusFinalized)
+	expectedResponses := s.expectedBlockResponses(s.blocks, s.linkGenerator, map[string]bool{}, flow.BlockStatusFinalized)
+	expectedPayloadExpandedResponse := s.expectedBlockResponses(s.blocks, s.linkGenerator, map[string]bool{commonmodels.ExpandableFieldPayload: true}, flow.BlockStatusFinalized)
 
 	return []testType{
 		{
@@ -359,7 +359,7 @@ func testHappyPath(
 }
 
 // expectedBlockResponses generates a list of expected block responses for the given blocks.
-func expectedBlockResponses(
+func (s *BlocksProviderSuite) expectedBlockResponses(
 	blocks []*flow.Block,
 	linkGenerator *mockcommonmodels.LinkGenerator,
 	expand map[string]bool,
@@ -368,7 +368,8 @@ func expectedBlockResponses(
 	responses := make([]interface{}, len(blocks))
 	for i, b := range blocks {
 		var block commonmodels.Block
-		block.Build(b, nil, linkGenerator, status, expand)
+		err := block.Build(b, nil, linkGenerator, status, expand)
+		s.Require().NoError(err)
 
 		responses[i] = &models.BlockMessageResponse{
 			Block: &block,

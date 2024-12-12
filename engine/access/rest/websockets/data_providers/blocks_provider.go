@@ -80,7 +80,10 @@ func (p *BlocksDataProvider) Run() error {
 		subscription.HandleResponse(p.send, func(b *flow.Block) (interface{}, error) {
 			var block commonmodels.Block
 			//TODO: decide if execution result should be a part of response
-			block.Build(b, nil, p.linkGenerator, p.arguments.BlockStatus, p.arguments.Expand)
+			err := block.Build(b, nil, p.linkGenerator, p.arguments.BlockStatus, p.arguments.Expand)
+			if err != nil {
+				return nil, fmt.Errorf("failed to build block response :%w", err)
+			}
 
 			return &models.BlockMessageResponse{
 				Block: &block,
