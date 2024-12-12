@@ -144,14 +144,17 @@ func (o *Orchestrator) corruptExecutionResult(receipt *flow.ExecutionReceipt) *f
 		BlockID:          receipt.ExecutionResult.BlockID,
 		// replace all chunks with new ones to simulate chunk corruption
 		Chunks: flow.ChunkList{
-			unittest.ChunkFixture(receipt.ExecutionResult.BlockID, 0, unittest.WithChunkStartState(receiptStartState)),
+			unittest.ChunkFixture(receipt.ExecutionResult.BlockID, 0,
+				unittest.WithChunkStartState(receiptStartState),
+				unittest.WithServiceEventCount(nil)), // TODO(mainnet27, #6773): remove this line
 		},
 		ServiceEvents:   receipt.ExecutionResult.ServiceEvents,
 		ExecutionDataID: receipt.ExecutionResult.ExecutionDataID,
 	}
 
 	if chunksNum > 1 {
-		result.Chunks = append(result.Chunks, unittest.ChunkListFixture(uint(chunksNum-1), receipt.ExecutionResult.BlockID)...)
+		result.Chunks = append(result.Chunks, unittest.ChunkListFixture(uint(chunksNum-1), receipt.ExecutionResult.BlockID,
+			unittest.WithServiceEventCount(nil))...) // TODO(mainnet27, #6773): remove this line
 	}
 
 	return result

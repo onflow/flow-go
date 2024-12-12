@@ -82,8 +82,8 @@ func (v *receiptValidator) verifyChunkServiceEvents(result *flow.ExecutionResult
 	if version < 2 {
 		for i, chunk := range result.Chunks {
 			if chunk.ServiceEventCount != nil {
-				return engine.NewInvalidInputErrorf("invalid chunk format for protocol version %d: chunk %d has non-nil ServiceEventCount %v",
-					version, i, chunk.ServiceEventCount)
+				return engine.NewInvalidInputErrorf("invalid chunk format for protocol version %d: chunk %d has non-nil ServiceEventCount %d",
+					version, i, *chunk.ServiceEventCount)
 			}
 		}
 		return nil

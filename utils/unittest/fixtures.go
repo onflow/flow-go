@@ -1324,6 +1324,12 @@ func WithChunkStartState(startState flow.StateCommitment) func(chunk *flow.Chunk
 	}
 }
 
+func WithServiceEventCount(count *uint16) func(*flow.Chunk) {
+	return func(chunk *flow.Chunk) {
+		chunk.ServiceEventCount = count
+	}
+}
+
 func ChunkFixture(
 	blockID flow.Identifier,
 	collectionIndex uint,
@@ -1350,10 +1356,10 @@ func ChunkFixture(
 	return chunk
 }
 
-func ChunkListFixture(n uint, blockID flow.Identifier) flow.ChunkList {
+func ChunkListFixture(n uint, blockID flow.Identifier, opts ...func(*flow.Chunk)) flow.ChunkList {
 	chunks := make([]*flow.Chunk, 0, n)
 	for i := uint64(0); i < uint64(n); i++ {
-		chunk := ChunkFixture(blockID, uint(i))
+		chunk := ChunkFixture(blockID, uint(i), opts...)
 		chunk.Index = i
 		chunks = append(chunks, chunk)
 	}
