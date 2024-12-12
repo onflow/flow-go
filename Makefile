@@ -77,7 +77,7 @@ unittest-main:
 .PHONY: install-mock-generators
 install-mock-generators:
 	cd ${GOPATH}; \
-    go install github.com/vektra/mockery/v2@v2.21.4; \
+    go install github.com/vektra/mockery/v2@v2.43.2; \
     go install github.com/golang/mock/mockgen@v1.6.0;
 
 .PHONY: install-tools
@@ -650,7 +650,7 @@ docker-push-collection-without-adx:
 docker-push-collection-without-netgo-without-adx:
 	docker push "$(CONTAINER_REGISTRY)/collection:$(IMAGE_TAG_NO_NETGO_NO_ADX)"
 
-.PHONY: docker-push-collection-arm 
+.PHONY: docker-push-collection-arm
 docker-push-collection-arm:
 	docker push "$(CONTAINER_REGISTRY)/collection:$(IMAGE_TAG_ARM)"
 
@@ -670,7 +670,7 @@ docker-push-consensus-without-adx:
 docker-push-consensus-without-netgo-without-adx:
 	docker push "$(CONTAINER_REGISTRY)/consensus:$(IMAGE_TAG_NO_NETGO_NO_ADX)"
 
-.PHONY: docker-push-consensus-arm 
+.PHONY: docker-push-consensus-arm
 docker-push-consensus-arm:
 	docker push "$(CONTAINER_REGISTRY)/consensus:$(IMAGE_TAG_ARM)"
 
@@ -694,7 +694,7 @@ docker-push-execution-without-adx:
 docker-push-execution-without-netgo-without-adx:
 	docker push "$(CONTAINER_REGISTRY)/execution:$(IMAGE_TAG_NO_NETGO_NO_ADX)"
 
-.PHONY: docker-push-execution-arm 
+.PHONY: docker-push-execution-arm
 docker-push-execution-arm:
 	docker push "$(CONTAINER_REGISTRY)/execution:$(IMAGE_TAG_ARM)"
 
@@ -718,7 +718,7 @@ docker-push-verification-corrupt:
 docker-push-verification-without-netgo-without-adx:
 	docker push "$(CONTAINER_REGISTRY)/verification:$(IMAGE_TAG_NO_NETGO_NO_ADX)"
 
-.PHONY: docker-push-verification-arm 
+.PHONY: docker-push-verification-arm
 docker-push-verification-arm:
 	docker push "$(CONTAINER_REGISTRY)/verification:$(IMAGE_TAG_ARM)"
 
@@ -742,7 +742,7 @@ docker-push-access-corrupt:
 docker-push-access-without-netgo-without-adx:
 	docker push "$(CONTAINER_REGISTRY)/access:$(IMAGE_TAG_NO_NETGO_NO_ADX)"
 
-.PHONY: docker-push-access-arm 
+.PHONY: docker-push-access-arm
 docker-push-access-arm:
 	docker push "$(CONTAINER_REGISTRY)/access:$(IMAGE_TAG_ARM)"
 
@@ -763,7 +763,7 @@ docker-push-observer-without-adx:
 docker-push-observer-without-netgo-without-adx:
 	docker push "$(CONTAINER_REGISTRY)/observer:$(IMAGE_TAG_NO_NETGO_NO_ADX)"
 
-.PHONY: docker-push-observer-arm 
+.PHONY: docker-push-observer-arm
 docker-push-observer-arm:
 	docker push "$(CONTAINER_REGISTRY)/observer:$(IMAGE_TAG_ARM)"
 
