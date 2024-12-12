@@ -2,6 +2,7 @@ package uploader
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"runtime/debug"
 	"sync"
@@ -13,17 +14,17 @@ import (
 	"go.uber.org/atomic"
 
 	"github.com/onflow/flow-go/engine/execution"
-	"github.com/onflow/flow-go/engine/execution/state/unittest"
+	exeunittest "github.com/onflow/flow-go/engine/execution/state/unittest"
+	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/metrics"
-	testutils "github.com/onflow/flow-go/utils/unittest"
-	unittest2 "github.com/onflow/flow-go/utils/unittest"
+	"github.com/onflow/flow-go/utils/unittest"
 )
 
 func Test_AsyncUploader(t *testing.T) {
 
-	computationResult := unittest.ComputationResultFixture(
+	computationResult := exeunittest.ComputationResultFixture(
 		t,
-		testutils.IdentifierFixture(),
+		unittest.IdentifierFixture(),
 		nil)
 
 	t.Run("uploads are run in parallel and emit metrics", func(t *testing.T) {
@@ -46,6 +47,8 @@ func Test_AsyncUploader(t *testing.T) {
 
 		metrics := &DummyCollector{}
 		async := NewAsyncUploader(uploader, 1*time.Nanosecond, 1, zerolog.Nop(), metrics)
+		ctx, cancel := irrecoverable.NewMockSignalerContextWithCancel(t, context.Background())
+		async.Start(ctx)
 
 		err := async.Upload(computationResult)
 		require.NoError(t, err)
@@ -63,6 +66,8 @@ func Test_AsyncUploader(t *testing.T) {
 		wgContinueUpload.Done() //release all
 
 		// shut down component
+		cancel()
+		unittest.AssertClosesBefore(t, async.Done(), 1*time.Second, "async uploader did not finish in time")
 		<-async.Done()
 
 		require.Equal(t, int64(0), metrics.Counter.Load())
@@ -89,6 +94,9 @@ func Test_AsyncUploader(t *testing.T) {
 		}
 
 		async := NewAsyncUploader(uploader, 1*time.Nanosecond, 5, zerolog.Nop(), &metrics.NoopCollector{})
+		ctx, cancel := irrecoverable.NewMockSignalerContextWithCancel(t, context.Background())
+		async.Start(ctx)
+		defer cancel()
 
 		err := async.Upload(computationResult)
 		require.NoError(t, err)
@@ -107,7 +115,7 @@ func Test_AsyncUploader(t *testing.T) {
 	// 2. shut down async uploader right after upload initiated (not completed)
 	// 3. assert that upload called only once even when trying to use retry mechanism
 	t.Run("stopping component stops retrying", func(t *testing.T) {
-		testutils.SkipUnless(t, testutils.TEST_FLAKY, "flaky")
+		unittest.SkipUnless(t, unittest.TEST_FLAKY, "flaky")
 
 		callCount := 0
 		t.Log("test started grID:", string(bytes.Fields(debug.Stack())[1]))
@@ -151,6 +159,8 @@ func Test_AsyncUploader(t *testing.T) {
 		}
 		t.Log("about to create NewAsyncUploader grID:", string(bytes.Fields(debug.Stack())[1]))
 		async := NewAsyncUploader(uploader, 1*time.Nanosecond, 5, zerolog.Nop(), &metrics.NoopCollector{})
+		ctx, cancel := irrecoverable.NewMockSignalerContextWithCancel(t, context.Background())
+		async.Start(ctx)
 		t.Log("about to call async.Upload() grID:", string(bytes.Fields(debug.Stack())[1]))
 		err := async.Upload(computationResult) // doesn't matter what we upload
 		require.NoError(t, err)
@@ -163,11 +173,11 @@ func Test_AsyncUploader(t *testing.T) {
 
 		// stop component and check that it's fully stopped
 		t.Log("about to initiate shutdown grID: ", string(bytes.Fields(debug.Stack())[1]))
-		c := async.Done()
+		cancel()
 		t.Log("about to notify upload() that shutdown started and can continue uploading grID:", string(bytes.Fields(debug.Stack())[1]))
 		wgShutdownStarted.Done()
 		t.Log("about to check async done channel is closed grID:", string(bytes.Fields(debug.Stack())[1]))
-		unittest2.RequireCloseBefore(t, c, 1*time.Second, "async uploader not closed in time")
+		unittest.RequireCloseBefore(t, async.Done(), 1*time.Second, "async uploader not closed in time")
 
 		t.Log("about to check if callCount is 1 grID:", string(bytes.Fields(debug.Stack())[1]))
 		require.Equal(t, 1, callCount)
@@ -190,12 +200,15 @@ func Test_AsyncUploader(t *testing.T) {
 		async.SetOnCompleteCallback(func(computationResult *execution.ComputationResult, err error) {
 			onCompleteCallbackCalled = true
 		})
+		ctx, cancel := irrecoverable.NewMockSignalerContextWithCancel(t, context.Background())
+		async.Start(ctx)
 
 		err := async.Upload(computationResult)
 		require.NoError(t, err)
 
 		wgUploadCalleded.Wait()
-		<-async.Done()
+		cancel()
+		unittest.AssertClosesBefore(t, async.Done(), 1*time.Second, "async uploader not done in time")
 
 		require.True(t, onCompleteCallbackCalled)
 	})
