@@ -67,7 +67,7 @@ func UseBlockHashCorrection(chainID flow.ChainID, evmHeightOfCurrentBlock uint64
 	// array of hashes.
 	if chainID == flow.Mainnet && evmHeightOfCurrentBlock < blockHashListFixHCUEVMHeightMainnet {
 		return fixedHashes[flow.Mainnet][queriedEVMHeight%256], true
-	} else if chainID == flow.Testnet && blockHashListBugIntroducedHCUEVMHeightTestnet <= evmHeightOfCurrentBlock && evmHeightOfCurrentBlock < blockHashListFixHCUEVMHeightTestnet {
+	} else if chainID == flow.Testnet && evmHeightOfCurrentBlock < blockHashListFixHCUEVMHeightTestnet {
 		return fixedHashes[flow.Testnet][queriedEVMHeight%256], true
 	}
 	return gethCommon.Hash{}, false
@@ -83,15 +83,10 @@ const blockHashListFixHCUEVMHeightMainnet = 8357079
 // PR: https://github.com/onflow/flow-go/pull/6734
 const blockHashListFixHCUEVMHeightTestnet = 16848829
 
-// Testnet52 - Spork
-// Flow Block: 218215350 cc7188f0bdac4c442cc3ee072557d7f7c8ca4462537da945b148d5d0efa7a1ff
-// PR: https://github.com/onflow/flow-go/pull/6377
-const blockHashListBugIntroducedHCUEVMHeightTestnet = 7038679
-
 // Testnet51 - Height Coordinated Upgrade 1
 // Flow Block: 212562161 1a520608c5457f228405c4c30fc39c8a0af7cf915fb2ede7ec5ccffc2a000f57
 // PR: https://github.com/onflow/flow-go/pull/6380
-const coinbaseAddressChangeEVMHeightTestnet = 1385491
+const coinbaseAddressChangeEVMHeightTestnet = 1385490
 
 var genesisCoinbaseAddressTestnet = types.Address(gethCommon.HexToAddress("0000000000000000000000021169100eecb7c1a6"))
 
