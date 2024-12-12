@@ -11,8 +11,6 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
-	commonmodels "github.com/onflow/flow-go/engine/access/rest/common/models"
-	"github.com/onflow/flow-go/engine/access/rest/util"
 	"github.com/onflow/flow-go/engine/access/rest/websockets/models"
 	"github.com/onflow/flow-go/engine/access/state_stream"
 	"github.com/onflow/flow-go/engine/access/state_stream/backend"
@@ -317,15 +315,10 @@ func (s *EventsProviderSuite) expectedEventsResponses(
 	expectedResponses := make([]interface{}, len(events))
 
 	for i, resp := range backendResponses {
-		var restEvents commonmodels.Events
-		restEvents.Build(events)
+		var expectedResponse models.EventResponse
+		expectedResponse.Build(resp, uint64(i))
 
-		expectedResponses[i] = &models.EventResponse{
-			BlockHeight:    util.FromUint(resp.Height),
-			BlockId:        resp.BlockID.String(),
-			Events:         restEvents,
-			BlockTimestamp: resp.BlockTimestamp,
-		}
+		expectedResponses[i] = &expectedResponse
 	}
 	return expectedResponses
 }
