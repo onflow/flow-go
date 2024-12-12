@@ -119,7 +119,7 @@ jobs:
         if [[ "${{ github.event.inputs.private_build }}" == "true" ]]; then
           gcloud auth configure-docker us-central1-docker.pkg.dev
         else
-          gcloud auth configure-docker
+          gcloud auth configure-docker us-docker.pkg.dev
         fi
 
     - name: Set CONTAINER_REGISTRY
