@@ -8,6 +8,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/onflow/flow-go/model/fingerprint"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/utils/rand"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -119,7 +120,7 @@ func TestChunkIndexIsSet(t *testing.T) {
 		unittest.StateCommitmentFixture(),
 		21,
 		unittest.IdentifierFixture(),
-		[]uint32{},
+		0,
 		unittest.StateCommitmentFixture(),
 		17995,
 	)
@@ -138,7 +139,7 @@ func TestChunkNumberOfTxsIsSet(t *testing.T) {
 		unittest.StateCommitmentFixture(),
 		int(i),
 		unittest.IdentifierFixture(),
-		[]uint32{},
+		0,
 		unittest.StateCommitmentFixture(),
 		17995,
 	)
@@ -156,7 +157,7 @@ func TestChunkTotalComputationUsedIsSet(t *testing.T) {
 		unittest.StateCommitmentFixture(),
 		21,
 		unittest.IdentifierFixture(),
-		[]uint32{},
+		0,
 		unittest.StateCommitmentFixture(),
 		i,
 	)
@@ -165,14 +166,14 @@ func TestChunkTotalComputationUsedIsSet(t *testing.T) {
 }
 
 // TestChunkEncodeDecode test encoding and decoding properties.
-// In particular, we want to demonstrate that nil-ness of the ServiceEventIndices field
-// is preserved by the encoding schemes we use, because this difference is meaningful and
-// important for backward compatibility (see [ChunkBody.ServiceEventIndices] for details).
+// In particular, we confirm that `nil` values of the ServiceEventCount field are preserved (and
+// not conflated with 0) by the encoding schemes we use, because this difference is meaningful and
+// important for backward compatibility (see [ChunkBody.ServiceEventCount] for details).
 func TestChunkEncodeDecode(t *testing.T) {
 	chunk := unittest.ChunkFixture(unittest.IdentifierFixture(), 0)
 
-	t.Run("encode/decode preserves nil ServiceEventIndices", func(t *testing.T) {
-		chunk.ServiceEventIndices = nil
+	t.Run("encode/decode preserves nil ServiceEventCount", func(t *testing.T) {
+		chunk.ServiceEventCount = nil
 		t.Run("json", func(t *testing.T) {
 			bz, err := json.Marshal(chunk)
 			require.NoError(t, err)
@@ -180,7 +181,7 @@ func TestChunkEncodeDecode(t *testing.T) {
 			err = json.Unmarshal(bz, unmarshaled)
 			require.NoError(t, err)
 			assert.Equal(t, chunk, unmarshaled)
-			assert.Nil(t, unmarshaled.ServiceEventIndices)
+			assert.Nil(t, unmarshaled.ServiceEventCount)
 		})
 		t.Run("cbor", func(t *testing.T) {
 			bz, err := cbor.Marshal(chunk)
@@ -189,11 +190,11 @@ func TestChunkEncodeDecode(t *testing.T) {
 			err = cbor.Unmarshal(bz, unmarshaled)
 			require.NoError(t, err)
 			assert.Equal(t, chunk, unmarshaled)
-			assert.Nil(t, unmarshaled.ServiceEventIndices)
+			assert.Nil(t, unmarshaled.ServiceEventCount)
 		})
 	})
-	t.Run("encode/decode preserves empty but non-nil ServiceEventIndices", func(t *testing.T) {
-		chunk.ServiceEventIndices = []uint32{}
+	t.Run("encode/decode preserves empty but non-nil ServiceEventCount", func(t *testing.T) {
+		chunk.ServiceEventCount = unittest.PtrTo[uint16](0)
 		t.Run("json", func(t *testing.T) {
 			bz, err := json.Marshal(chunk)
 			require.NoError(t, err)
@@ -201,7 +202,7 @@ func TestChunkEncodeDecode(t *testing.T) {
 			err = json.Unmarshal(bz, unmarshaled)
 			require.NoError(t, err)
 			assert.Equal(t, chunk, unmarshaled)
-			assert.NotNil(t, unmarshaled.ServiceEventIndices)
+			assert.NotNil(t, unmarshaled.ServiceEventCount)
 		})
 		t.Run("cbor", func(t *testing.T) {
 			bz, err := cbor.Marshal(chunk)
@@ -210,7 +211,7 @@ func TestChunkEncodeDecode(t *testing.T) {
 			err = cbor.Unmarshal(bz, unmarshaled)
 			require.NoError(t, err)
 			assert.Equal(t, chunk, unmarshaled)
-			assert.NotNil(t, unmarshaled.ServiceEventIndices)
+			assert.NotNil(t, unmarshaled.ServiceEventCount)
 		})
 	})
 }
@@ -219,11 +220,11 @@ func TestChunkEncodeDecode(t *testing.T) {
 // supported versions works as expected.
 func TestChunk_ModelVersions_EncodeDecode(t *testing.T) {
 	chunkFixture := unittest.ChunkFixture(unittest.IdentifierFixture(), 1)
-	chunkFixture.ServiceEventIndices = []uint32{1} // non-nil extra field
+	chunkFixture.ServiceEventCount = unittest.PtrTo[uint16](0) // non-nil extra field
 
-	t.Run("writing v0 and reading v1 should yield nil for new field", func(t *testing.T) {
+	t.Run("encoding v0 and decoding it into v1 should yield nil for ServiceEventCount", func(t *testing.T) {
 		var chunkv0 flow.ChunkBodyV0
-		unittest.CopyStructure(t, chunkFixture.ChunkBody, &chunkv0)
+		unittest.EncodeDecodeDifferentVersions(t, chunkFixture.ChunkBody, &chunkv0)
 
 		t.Run("json", func(t *testing.T) {
 			bz, err := json.Marshal(chunkv0)
@@ -234,7 +235,7 @@ func TestChunk_ModelVersions_EncodeDecode(t *testing.T) {
 			require.NoError(t, err)
 			assert.Equal(t, chunkv0.EventCollection, unmarshaled.EventCollection)
 			assert.Equal(t, chunkv0.BlockID, unmarshaled.BlockID)
-			assert.Nil(t, unmarshaled.ServiceEventIndices)
+			assert.Nil(t, unmarshaled.ServiceEventCount)
 		})
 
 		t.Run("cbor", func(t *testing.T) {
@@ -246,12 +247,12 @@ func TestChunk_ModelVersions_EncodeDecode(t *testing.T) {
 			require.NoError(t, err)
 			assert.Equal(t, chunkv0.EventCollection, unmarshaled.EventCollection)
 			assert.Equal(t, chunkv0.BlockID, unmarshaled.BlockID)
-			assert.Nil(t, unmarshaled.ServiceEventIndices)
+			assert.Nil(t, unmarshaled.ServiceEventCount)
 		})
 	})
-	t.Run("writing v1 and reading v0 does not error", func(t *testing.T) {
+	t.Run("encoding v1 and decoding it into v0 should not error", func(t *testing.T) {
 		chunkv1 := chunkFixture.ChunkBody
-		chunkv1.ServiceEventIndices = []uint32{0} // ensure non-nil ServiceEventIndices field
+		chunkv1.ServiceEventCount = unittest.PtrTo[uint16](0) // ensure non-nil ServiceEventCount field
 
 		t.Run("json", func(t *testing.T) {
 			bz, err := json.Marshal(chunkv1)
@@ -276,25 +277,32 @@ func TestChunk_ModelVersions_EncodeDecode(t *testing.T) {
 	})
 }
 
-// TestChunk_ModelVersions_IDConsistentAcrossVersions ensures that the ID function
-// is backward compatible with old data model versions.
-func TestChunk_ModelVersions_IDConsistentAcrossVersions(t *testing.T) {
+// FingerprintBackwardCompatibility ensures that the Fingerprint and ID functions
+// are backward compatible with old data model versions. We emulate the
+// case where a peer running an older software version receives a `ChunkBody` that
+// was encoded in the new version. Specifically, if the new ServiceEventCount field
+// is nil, then the new model should produce IDs consistent with the old model.
+//
+// Backward compatibility is implemented by providing a custom EncodeRLP method.
+func TestChunk_FingerprintBackwardCompatibility(t *testing.T) {
 	chunk := unittest.ChunkFixture(unittest.IdentifierFixture(), 1)
+	chunk.ServiceEventCount = nil
 	chunkBody := chunk.ChunkBody
-	var chunkv0 flow.ChunkBodyV0
-	unittest.CopyStructure(t, chunkBody, &chunkv0)
+	var chunkBodyV0 flow.ChunkBodyV0
+	unittest.EncodeDecodeDifferentVersions(t, chunkBody, &chunkBodyV0)
 
-	// A nil ServiceEventIndices fields indicates a prior model version.
+	// A nil ServiceEventCount fields indicates a prior model version.
 	// The ID calculation for the old and new model version should be the same.
-	t.Run("nil ServiceEventIndices fields", func(t *testing.T) {
-		chunkBody.ServiceEventIndices = nil
-		assert.Equal(t, flow.MakeID(chunkv0), flow.MakeID(chunkBody))
+	t.Run("nil ServiceEventCount fields", func(t *testing.T) {
+		chunkBody.ServiceEventCount = nil
+		assert.Equal(t, flow.MakeID(chunkBodyV0), flow.MakeID(chunkBody))
+		assert.Equal(t, fingerprint.Fingerprint(chunkBodyV0), fingerprint.Fingerprint(chunkBody))
 	})
-	// A non-nil ServiceEventIndices fields indicates an up-to-date model version.
+	// A non-nil ServiceEventCount fields indicates an up-to-date model version.
 	// The ID calculation for the old and new model version should be different,
-	// because the new model should include the ServiceEventIndices field value.
-	t.Run("non-nil ServiceEventIndices fields", func(t *testing.T) {
-		chunkBody.ServiceEventIndices = []uint32{}
-		assert.NotEqual(t, flow.MakeID(chunkv0), flow.MakeID(chunkBody))
+	// because the new model should include the ServiceEventCount field value.
+	t.Run("non-nil ServiceEventCount fields", func(t *testing.T) {
+		chunkBody.ServiceEventCount = unittest.PtrTo[uint16](0)
+		assert.NotEqual(t, flow.MakeID(chunkBodyV0), flow.MakeID(chunkBody))
 	})
 }

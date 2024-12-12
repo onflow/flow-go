@@ -275,13 +275,13 @@ func convertServiceEventEpochCommit(event flow.Event) (*flow.ServiceEvent, error
 	// parse DKG participants
 	commit.DKGParticipantKeys, err = convertDKGKeys(cdcDKGKeys.Values)
 	if err != nil {
-		return nil, fmt.Errorf("could not convert DKG keys: %w", err)
+		return nil, fmt.Errorf("could not convert Random Beacon keys: %w", err)
 	}
 
 	// parse DKG group key
 	commit.DKGGroupKey, err = convertDKGKey(cdcDKGGroupKey)
 	if err != nil {
-		return nil, fmt.Errorf("could not convert DKG group key: %w", err)
+		return nil, fmt.Errorf("could not convert Random Beacon group key: %w", err)
 	}
 
 	// parse DKG Index Map
@@ -469,13 +469,13 @@ func convertServiceEventEpochRecover(event flow.Event) (*flow.ServiceEvent, erro
 	// parse DKG participants
 	commit.DKGParticipantKeys, err = convertDKGKeys(cdcDKGKeys.Values)
 	if err != nil {
-		return nil, fmt.Errorf("failed to decode DKG key shares from EpochRecover event: %w", err)
+		return nil, fmt.Errorf("failed to decode Random Beacon key shares from EpochRecover event: %w", err)
 	}
 
 	// parse DKG group key
 	commit.DKGGroupKey, err = convertDKGKey(cdcDKGGroupKey)
 	if err != nil {
-		return nil, fmt.Errorf("failed to decode DKG group key from EpochRecover event: %w", err)
+		return nil, fmt.Errorf("failed to decode Random Beacon group key from EpochRecover event: %w", err)
 	}
 
 	// parse DKG Index Map
@@ -986,7 +986,7 @@ func convertClusterQCVotes(cdcClusterQCs []cadence.Value) (
 	return qcVoteDatas, nil
 }
 
-// convertDKGKeys converts hex-encoded DKG public keys as received by the DKG
+// convertDKGKeys converts hex-encoded public beacon keys as received by the DKG
 // smart contract into crypto.PublicKey representations suitable for inclusion
 // in the protocol state.
 func convertDKGKeys(cdcDKGKeys []cadence.Value) ([]crypto.PublicKey, error) {
@@ -994,14 +994,14 @@ func convertDKGKeys(cdcDKGKeys []cadence.Value) ([]crypto.PublicKey, error) {
 	for _, value := range cdcDKGKeys {
 		pubKey, err := convertDKGKey(value)
 		if err != nil {
-			return nil, fmt.Errorf("could not decode dkg public key: %w", err)
+			return nil, fmt.Errorf("could not decode public beacon key share: %w", err)
 		}
 		convertedKeys = append(convertedKeys, pubKey)
 	}
 	return convertedKeys, nil
 }
 
-// convertDKGKey converts a single hex-encoded DKG public key as received by the DKG
+// convertDKGKey converts a single hex-encoded public beacon keys as received by the DKG
 // smart contract into crypto.PublicKey representations suitable for inclusion
 // in the protocol state.
 func convertDKGKey(cdcDKGKeys cadence.Value) (crypto.PublicKey, error) {
@@ -1014,11 +1014,11 @@ func convertDKGKey(cdcDKGKeys cadence.Value) (crypto.PublicKey, error) {
 	// decode individual public keys
 	pubKeyBytes, err := hex.DecodeString(string(keyHex))
 	if err != nil {
-		return nil, fmt.Errorf("could not decode individual public key into bytes: %w", err)
+		return nil, fmt.Errorf("converting hex to bytes failed: %w", err)
 	}
 	pubKey, err := crypto.DecodePublicKey(crypto.BLSBLS12381, pubKeyBytes)
 	if err != nil {
-		return nil, fmt.Errorf("could not decode dkg public key: %w", err)
+		return nil, fmt.Errorf("could not decode bytes into a public key: %w", err)
 	}
 	return pubKey, nil
 }

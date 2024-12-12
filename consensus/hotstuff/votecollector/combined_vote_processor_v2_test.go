@@ -812,7 +812,7 @@ func TestCombinedVoteProcessorV2_BuildVerifyQC(t *testing.T) {
 		identity.StakingPubKey = stakingPriv.PublicKey()
 
 		keys := &storagemock.SafeBeaconKeys{}
-		// there is no DKG key for this epoch
+		// there is no Random Beacon key for this epoch
 		keys.On("RetrieveMyBeaconPrivateKey", epochCounter).Return(nil, false, nil)
 
 		beaconSignerStore := hsig.NewEpochAwareRandomBeaconKeyStore(epochLookup, keys)
@@ -833,7 +833,7 @@ func TestCombinedVoteProcessorV2_BuildVerifyQC(t *testing.T) {
 		}
 
 		keys := &storagemock.SafeBeaconKeys{}
-		// there is DKG key for this epoch
+		// there is Random Beacon key for this epoch
 		keys.On("RetrieveMyBeaconPrivateKey", epochCounter).Return(dkgKey, true, nil)
 
 		beaconSignerStore := hsig.NewEpochAwareRandomBeaconKeyStore(epochLookup, keys)

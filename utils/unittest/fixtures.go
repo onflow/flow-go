@@ -1326,9 +1326,10 @@ func ChunkFixture(
 ) *flow.Chunk {
 	chunk := &flow.Chunk{
 		ChunkBody: flow.ChunkBody{
-			CollectionIndex:      collectionIndex,
-			StartState:           StateCommitmentFixture(),
-			EventCollection:      IdentifierFixture(),
+			CollectionIndex: collectionIndex,
+			StartState:      StateCommitmentFixture(),
+			EventCollection: IdentifierFixture(),
+			//ServiceEventCount:    PtrTo[uint16](0),
 			TotalComputationUsed: 4200,
 			NumberOfTransactions: 42,
 			BlockID:              blockID,

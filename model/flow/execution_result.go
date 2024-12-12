@@ -84,19 +84,24 @@ func (er ExecutionResult) SystemChunk() *Chunk {
 
 // ServiceEventsByChunk returns the list of service events emitted during the given chunk.
 func (er ExecutionResult) ServiceEventsByChunk(chunkIndex uint64) ServiceEventList {
-	indices := er.Chunks[chunkIndex].ServiceEventIndices
-	// CASE 1: Service event indices are specified (non-nil)
-	if indices != nil {
-		serviceEventsForChunk := make(ServiceEventList, 0, len(indices))
-		for _, eventIndex := range indices {
-			serviceEventsForChunk = append(serviceEventsForChunk, er.ServiceEvents[eventIndex])
+	serviceEventCount := er.Chunks[chunkIndex].ServiceEventCount
+	// CASE 1: Service event count is specified (non-nil)
+	if serviceEventCount != nil {
+		if *serviceEventCount == 0 {
+			return nil
 		}
-		return serviceEventsForChunk
+
+		startIndex := 0
+		for i := uint64(0); i < chunkIndex; i++ {
+			startIndex += int(*er.Chunks[i].ServiceEventCount)
+		}
+		return er.ServiceEvents[startIndex : startIndex+int(*serviceEventCount)]
 	}
-	// CASE 2: Service event indices are omitted (nil)
+	// CASE 2: Service event count omitted (nil)
 	// This indicates the chunk was generated in an older data model version.
-	// In this case, any service events associated with the result are assumed
+	// In this case, all service events associated with the result are assumed
 	// to have been emitted within the system chunk (last chunk)
+	// TODO(mainnet27): remove this path https://github.com/onflow/flow-go/issues/6773
 	if chunkIndex == er.SystemChunk().Index {
 		return er.ServiceEvents
 	}

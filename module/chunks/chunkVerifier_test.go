@@ -28,7 +28,6 @@ import (
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
 	"github.com/onflow/flow-go/module/executiondatasync/provider"
 	"github.com/onflow/flow-go/module/metrics"
-	"github.com/onflow/flow-go/utils/slices"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -252,7 +251,7 @@ func (s *ChunkVerifierTestSuite) TestEventsMismatch() {
 
 // TestServiceEventsMismatch tests verification behavior in case
 // of emitted service events not matching chunks'
-func (s *ChunkVerifierTestSuite) TestServiceEventsMismatch() {
+func (s *ChunkVerifierTestSuite) TestServiceEventsMismatch_SystemChunk() {
 	meta := s.GetTestSetup(s.T(), "doesn't matter", true, true)
 	vch := meta.RefreshChunkData(s.T())
 
@@ -276,7 +275,7 @@ func (s *ChunkVerifierTestSuite) TestServiceEventsMismatch() {
 }
 
 // TestServiceEventsAreChecked ensures that service events are in fact checked
-func (s *ChunkVerifierTestSuite) TestServiceEventsAreChecked() {
+func (s *ChunkVerifierTestSuite) TestServiceEventsAreChecked_SystemChunk() {
 	meta := s.GetTestSetup(s.T(), "doesn't matter", true, true)
 	vch := meta.RefreshChunkData(s.T())
 
@@ -304,10 +303,12 @@ func (s *ChunkVerifierTestSuite) TestServiceEventsMismatch_NonSystemChunk() {
 	require.NoError(s.T(), err)
 
 	s.snapshots[script] = &snapshot.ExecutionSnapshot{}
+	// overwrite the expected output for our custom transaction, passing
+	// in the non-matching EpochCommit event (should cause validation failure)
 	s.outputs[script] = fvm.ProcedureOutput{
 		ComputationUsed:        computationUsed,
 		ConvertedServiceEvents: flow.ServiceEventList{*epochCommitServiceEvent},
-		Events:                 meta.ChunkEvents[:3],
+		Events:                 meta.ChunkEvents[:3], // 2 default event + EpochSetup
 	}
 
 	_, err = s.verifier.Verify(vch)
@@ -509,7 +510,7 @@ func generateExecutionData(t *testing.T, blockID flow.Identifier, ced *execution
 	return executionDataID, executionDataRoot
 }
 
-func generateEvents(t *testing.T, includeServiceEvent bool, collection *flow.Collection) (flow.EventsList, []flow.ServiceEvent) {
+func generateEvents(t *testing.T, collection *flow.Collection, includeServiceEvent bool) (flow.EventsList, []flow.ServiceEvent) {
 	var chunkEvents flow.EventsList
 	serviceEvents := make([]flow.ServiceEvent, 0)
 
@@ -614,7 +615,7 @@ func (s *ChunkVerifierTestSuite) GetTestSetup(t *testing.T, script string, syste
 	}
 
 	// events
-	chunkEvents, serviceEvents := generateEvents(t, includeServiceEvents, collection)
+	chunkEvents, serviceEvents := generateEvents(t, collection, includeServiceEvents)
 	// make sure this includes events even for the service tx
 	require.NotEmpty(t, chunkEvents)
 
@@ -694,8 +695,8 @@ func (m *testMetadata) RefreshChunkData(t *testing.T) *verification.VerifiableCh
 			StartState:      flow.StateCommitment(m.StartState),
 			BlockID:         m.Header.ID(),
 			// in these test cases, all defined service events correspond to the current chunk
-			ServiceEventIndices: slices.MakeRange(0, uint32(len(m.ServiceEvents))),
-			EventCollection:     eventsMerkleRootHash,
+			ServiceEventCount: unittest.PtrTo(uint16(len(m.ServiceEvents))),
+			EventCollection:   eventsMerkleRootHash,
 		},
 		Index: 0,
 	}
