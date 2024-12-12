@@ -74,7 +74,7 @@ func (s *AccountStatusesProviderSuite) TestAccountStatusesDataProvider_HappyPath
 		s.T(),
 		AccountStatusesTopic,
 		s.factory,
-		s.subscribeAccountStatusesDataProviderTestCases(events, backendResponses),
+		s.subscribeAccountStatusesDataProviderTestCases(backendResponses),
 		func(dataChan chan interface{}) {
 			for i := 0; i < len(backendResponses); i++ {
 				dataChan <- backendResponses[i]
@@ -85,10 +85,9 @@ func (s *AccountStatusesProviderSuite) TestAccountStatusesDataProvider_HappyPath
 }
 
 func (s *AccountStatusesProviderSuite) subscribeAccountStatusesDataProviderTestCases(
-	events []flow.Event,
 	backendResponses []*backend.AccountStatusesResponse,
 ) []testType {
-	expectedResponses := s.expectedAccountStatusesResponses(events, backendResponses)
+	expectedResponses := s.expectedAccountStatusesResponses(backendResponses)
 
 	return []testType{
 		{
@@ -282,8 +281,8 @@ func (s *AccountStatusesProviderSuite) backendAccountStatusesResponses(events []
 }
 
 // expectedAccountStatusesResponses creates the expected responses for the provided events and backend responses.
-func (s *AccountStatusesProviderSuite) expectedAccountStatusesResponses(events []flow.Event, backendResponses []*backend.AccountStatusesResponse) []interface{} {
-	expectedResponses := make([]interface{}, len(events))
+func (s *AccountStatusesProviderSuite) expectedAccountStatusesResponses(backendResponses []*backend.AccountStatusesResponse) []interface{} {
+	expectedResponses := make([]interface{}, len(backendResponses))
 
 	for i, resp := range backendResponses {
 		var expectedResponse models.AccountStatusesResponse

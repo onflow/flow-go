@@ -75,7 +75,7 @@ func (s *EventsProviderSuite) TestEventsDataProvider_HappyPath() {
 		s.T(),
 		EventsTopic,
 		s.factory,
-		s.subscribeEventsDataProviderTestCases(events, backendResponses),
+		s.subscribeEventsDataProviderTestCases(backendResponses),
 		func(dataChan chan interface{}) {
 			for i := 0; i < len(backendResponses); i++ {
 				dataChan <- backendResponses[i]
@@ -86,8 +86,8 @@ func (s *EventsProviderSuite) TestEventsDataProvider_HappyPath() {
 }
 
 // subscribeEventsDataProviderTestCases generates test cases for events data providers.
-func (s *EventsProviderSuite) subscribeEventsDataProviderTestCases(events []flow.Event, backendResponses []*backend.EventsResponse) []testType {
-	expectedResponses := s.expectedEventsResponses(events, backendResponses)
+func (s *EventsProviderSuite) subscribeEventsDataProviderTestCases(backendResponses []*backend.EventsResponse) []testType {
+	expectedResponses := s.expectedEventsResponses(backendResponses)
 
 	return []testType{
 		{
@@ -309,10 +309,9 @@ func (s *EventsProviderSuite) backendEventsResponses(events []flow.Event) []*bac
 
 // expectedEventsResponses creates the expected responses for the provided events and backend responses.
 func (s *EventsProviderSuite) expectedEventsResponses(
-	events []flow.Event,
 	backendResponses []*backend.EventsResponse,
 ) []interface{} {
-	expectedResponses := make([]interface{}, len(events))
+	expectedResponses := make([]interface{}, len(backendResponses))
 
 	for i, resp := range backendResponses {
 		var expectedResponse models.EventResponse
