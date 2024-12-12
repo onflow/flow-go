@@ -149,6 +149,7 @@ func FlowPublicKeyFromLibP2P(lpk lcrypto.PubKey) (fcrypto.PublicKey, error) {
 			return nil, lcrypto.ErrNotECDSAPubKey
 		}
 		// ferrying through DecodePublicKey to get the curve checks
+		//nolint:staticcheck // Reason: elliptic.Marshal is required for compatibility with existing systems.
 		pk_uncompressed := elliptic.Marshal(cryptoKey, cryptoKey.X, cryptoKey.Y)
 		// the first bit is the compression bit of X9.62
 		pubKey, err := crypto.DecodePublicKey(crypto.ECDSAP256, pk_uncompressed[1:])
