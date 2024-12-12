@@ -42,7 +42,12 @@ func VerifyLastKHeight(k uint64, chainID flow.ChainID, protocolDataDir string, c
 		return fmt.Errorf("could not get last sealed height: %w", err)
 	}
 
-	root := state.Params().SealedRoot().Height
+	rootHeader, err := state.Params().SealedRoot()
+	if err != nil {
+		return fmt.Errorf("could not get sealed root: %w", err)
+	}
+
+	root := rootHeader.Height
 
 	// preventing overflow
 	if k > lastSealed.Height+1 {
@@ -93,7 +98,12 @@ func VerifyRange(
 
 	log.Info().Msgf("verifying blocks from %d to %d", from, to)
 
-	root := state.Params().SealedRoot().Height
+	rootHeader, err := state.Params().SealedRoot()
+	if err != nil {
+		return fmt.Errorf("could not get sealed root: %w", err)
+	}
+
+	root := rootHeader.Height
 
 	if from <= root {
 		return fmt.Errorf("cannot verify blocks before the root block, from: %d, root: %d", from, root)
