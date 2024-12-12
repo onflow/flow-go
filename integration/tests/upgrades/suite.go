@@ -57,8 +57,8 @@ func (s *Suite) SetupTest() {
 
 	consensusConfigs := []func(config *testnet.NodeConfig){
 		testnet.WithAdditionalFlag("--cruise-ctl-fallback-proposal-duration=500ms"),
-		testnet.WithAdditionalFlag("--required-verification-seal-approvals=0"),
-		testnet.WithAdditionalFlag("--required-construction-seal-approvals=0"),
+		testnet.WithAdditionalFlag("--required-verification-seal-approvals=1"),
+		testnet.WithAdditionalFlag("--required-construction-seal-approvals=1"),
 		testnet.WithLogLevel(zerolog.InfoLevel),
 	}
 
