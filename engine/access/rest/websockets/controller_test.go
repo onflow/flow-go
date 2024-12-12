@@ -56,10 +56,16 @@ func (s *WsControllerSuite) TestSubscribeRequest() {
 			Once()
 
 		id := uuid.New()
+		done := make(chan struct{}, 1)
+
 		dataProvider.On("ID").Return(id)
+		dataProvider.On("Close").Return(nil).Maybe()
 		dataProvider.
 			On("Run").
-			Run(func(args mock.Arguments) {}).
+			Run(func(args mock.Arguments) {
+				for range done {
+				}
+			}).
 			Return(nil).
 			Once()
 
@@ -82,7 +88,6 @@ func (s *WsControllerSuite) TestSubscribeRequest() {
 			Return(nil).
 			Once()
 
-		done := make(chan struct{}, 1)
 		s.expectCloseConnection(conn, done)
 
 		conn.
@@ -182,10 +187,8 @@ func (s *WsControllerSuite) TestSubscribeRequest() {
 		conn, dataProviderFactory, dataProvider := newControllerMocks(t)
 		controller := NewWebSocketController(s.logger, s.wsConfig, conn, dataProviderFactory)
 
-		dataProvider.
-			On("ID").
-			Return(uuid.New())
-
+		dataProvider.On("ID").Return(uuid.New())
+		dataProvider.On("Close").Return(nil).Maybe()
 		dataProvider.
 			On("Run").
 			Run(func(args mock.Arguments) {}).
@@ -199,7 +202,7 @@ func (s *WsControllerSuite) TestSubscribeRequest() {
 
 		done := make(chan struct{}, 1)
 		s.expectSubscribeRequest(conn)
-		s.expectSubscribeResponse(conn, true)
+		s.expectSubscribeResponse(conn)
 		s.expectCloseConnection(conn, done)
 
 		conn.
@@ -232,16 +235,21 @@ func (s *WsControllerSuite) TestUnsubscribeRequest() {
 			Once()
 
 		id := uuid.New()
+		done := make(chan struct{}, 1)
+
 		dataProvider.On("ID").Return(id)
-		dataProvider.On("Close").Return(nil)
+		dataProvider.On("Close").Return(nil).Maybe()
 		dataProvider.
 			On("Run").
-			Run(func(args mock.Arguments) {}).
+			Run(func(args mock.Arguments) {
+				for range done {
+				}
+			}).
 			Return(nil).
 			Once()
 
 		s.expectSubscribeRequest(conn)
-		s.expectSubscribeResponse(conn, true)
+		s.expectSubscribeResponse(conn)
 
 		request := models.UnsubscribeMessageRequest{
 			BaseMessageRequest: models.BaseMessageRequest{Action: "unsubscribe"},
@@ -260,9 +268,6 @@ func (s *WsControllerSuite) TestUnsubscribeRequest() {
 			Return(nil).
 			Once()
 
-		done := make(chan struct{}, 1)
-		s.expectCloseConnection(conn, done)
-
 		conn.
 			On("WriteJSON", mock.Anything).
 			Return(func(msg interface{}) error {
@@ -278,6 +283,7 @@ func (s *WsControllerSuite) TestUnsubscribeRequest() {
 			}).
 			Once()
 
+		s.expectCloseConnection(conn, done)
 		ctx, cancel := context.WithDeadline(context.Background(), time.Now().Add(time.Second))
 		defer cancel()
 		controller.HandleConnection(ctx)
@@ -293,15 +299,21 @@ func (s *WsControllerSuite) TestUnsubscribeRequest() {
 			Once()
 
 		id := uuid.New()
+		done := make(chan struct{}, 1)
+
 		dataProvider.On("ID").Return(id)
+		dataProvider.On("Close").Return(nil).Maybe()
 		dataProvider.
 			On("Run").
-			Run(func(args mock.Arguments) {}).
+			Run(func(args mock.Arguments) {
+				for range done {
+				}
+			}).
 			Return(nil).
 			Once()
 
 		s.expectSubscribeRequest(conn)
-		s.expectSubscribeResponse(conn, true)
+		s.expectSubscribeResponse(conn)
 
 		request := models.UnsubscribeMessageRequest{
 			BaseMessageRequest: models.BaseMessageRequest{Action: "unsubscribe"},
@@ -320,9 +332,6 @@ func (s *WsControllerSuite) TestUnsubscribeRequest() {
 			Return(nil).
 			Once()
 
-		done := make(chan struct{}, 1)
-		s.expectCloseConnection(conn, done)
-
 		conn.
 			On("WriteJSON", mock.Anything).
 			Return(func(msg interface{}) error {
@@ -339,6 +348,7 @@ func (s *WsControllerSuite) TestUnsubscribeRequest() {
 			}).
 			Once()
 
+		s.expectCloseConnection(conn, done)
 		controller.HandleConnection(context.Background())
 	})
 
@@ -352,15 +362,21 @@ func (s *WsControllerSuite) TestUnsubscribeRequest() {
 			Once()
 
 		id := uuid.New()
+		done := make(chan struct{}, 1)
+
 		dataProvider.On("ID").Return(id)
+		dataProvider.On("Close").Return(nil).Maybe()
 		dataProvider.
 			On("Run").
-			Run(func(args mock.Arguments) {}).
+			Run(func(args mock.Arguments) {
+				for range done {
+				}
+			}).
 			Return(nil).
 			Once()
 
 		s.expectSubscribeRequest(conn)
-		s.expectSubscribeResponse(conn, true)
+		s.expectSubscribeResponse(conn)
 
 		request := models.UnsubscribeMessageRequest{
 			BaseMessageRequest: models.BaseMessageRequest{Action: "unsubscribe"},
@@ -379,9 +395,6 @@ func (s *WsControllerSuite) TestUnsubscribeRequest() {
 			Return(nil).
 			Once()
 
-		done := make(chan struct{}, 1)
-		s.expectCloseConnection(conn, done)
-
 		conn.
 			On("WriteJSON", mock.Anything).
 			Return(func(msg interface{}) error {
@@ -398,6 +411,7 @@ func (s *WsControllerSuite) TestUnsubscribeRequest() {
 			}).
 			Once()
 
+		s.expectCloseConnection(conn, done)
 		controller.HandleConnection(context.Background())
 	})
 }
@@ -412,18 +426,24 @@ func (s *WsControllerSuite) TestListSubscriptions() {
 			Return(dataProvider, nil).
 			Once()
 
+		done := make(chan struct{}, 1)
+
 		id := uuid.New()
 		topic := "blocks"
 		dataProvider.On("ID").Return(id)
 		dataProvider.On("Topic").Return(topic)
+		dataProvider.On("Close").Return(nil).Maybe()
 		dataProvider.
 			On("Run").
-			Run(func(args mock.Arguments) {}).
+			Run(func(args mock.Arguments) {
+				for range done {
+				}
+			}).
 			Return(nil).
 			Once()
 
 		s.expectSubscribeRequest(conn)
-		s.expectSubscribeResponse(conn, true)
+		s.expectSubscribeResponse(conn)
 
 		request := models.ListSubscriptionsMessageRequest{
 			BaseMessageRequest: models.BaseMessageRequest{Action: "list_subscriptions"},
@@ -440,9 +460,6 @@ func (s *WsControllerSuite) TestListSubscriptions() {
 			}).
 			Return(nil).
 			Once()
-
-		done := make(chan struct{}, 1)
-		s.expectCloseConnection(conn, done)
 
 		conn.
 			On("WriteJSON", mock.Anything).
@@ -461,6 +478,7 @@ func (s *WsControllerSuite) TestListSubscriptions() {
 			}).
 			Once()
 
+		s.expectCloseConnection(conn, done)
 		controller.HandleConnection(context.Background())
 	})
 }
@@ -478,6 +496,8 @@ func (s *WsControllerSuite) TestSubscribeBlocks() {
 
 		id := uuid.New()
 		dataProvider.On("ID").Return(id)
+		// data provider might finish by its own or controller will close it via Close()
+		dataProvider.On("Close").Return(nil).Maybe()
 
 		// Simulate data provider write a block to the controller
 		expectedBlock := unittest.BlockFixture()
@@ -491,7 +511,7 @@ func (s *WsControllerSuite) TestSubscribeBlocks() {
 
 		done := make(chan struct{}, 1)
 		s.expectSubscribeRequest(conn)
-		s.expectSubscribeResponse(conn, true)
+		s.expectSubscribeResponse(conn)
 		s.expectCloseConnection(conn, done)
 
 		// Expect a valid block to be passed to WriteJSON.
@@ -539,7 +559,7 @@ func (s *WsControllerSuite) TestSubscribeBlocks() {
 
 		done := make(chan struct{}, 1)
 		s.expectSubscribeRequest(conn)
-		s.expectSubscribeResponse(conn, true)
+		s.expectSubscribeResponse(conn)
 		s.expectCloseConnection(conn, done)
 
 		i := 0
@@ -620,14 +640,14 @@ func (s *WsControllerSuite) expectCloseConnection(conn *connmock.WebsocketConnec
 }
 
 // expectSubscribeResponse mocks the subscription response sent to the client.
-func (s *WsControllerSuite) expectSubscribeResponse(conn *connmock.WebsocketConnection, success bool) {
+func (s *WsControllerSuite) expectSubscribeResponse(conn *connmock.WebsocketConnection) {
 	conn.
 		On("WriteJSON", mock.Anything).
 		Run(func(args mock.Arguments) {
 			response, ok := args.Get(0).(models.SubscribeMessageResponse)
 			require.True(s.T(), ok)
 			require.Equal(s.T(), "subscribe", response.Action)
-			require.Equal(s.T(), success, response.Success)
+			require.Equal(s.T(), true, response.Success)
 		}).
 		Return(nil).
 		Once()
