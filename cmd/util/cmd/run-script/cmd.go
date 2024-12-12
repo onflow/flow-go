@@ -532,7 +532,7 @@ func (*api) SubscribeBlockDigestsFromLatest(
 	return nil
 }
 
-func (a *api) SubscribeTransactionStatuses(
+func (a *api) SubscribeTransactionStatusesFromStartBlockID(
 	_ context.Context,
 	_ flow.Identifier,
 	_ flow.Identifier,
@@ -541,6 +541,22 @@ func (a *api) SubscribeTransactionStatuses(
 	return nil
 }
 
+func (a *api) SubscribeTransactionStatusesFromStartHeight(
+	_ context.Context,
+	_ flow.Identifier,
+	_ uint64,
+	_ entities.EventEncodingVersion,
+) subscription.Subscription {
+	return nil
+}
+
+func (a *api) SubscribeTransactionStatusesFromLatest(
+	_ context.Context,
+	_ flow.Identifier,
+	_ entities.EventEncodingVersion,
+) subscription.Subscription {
+	return nil
+}
 func (a *api) SendAndSubscribeTransactionStatuses(
 	_ context.Context,
 	_ *flow.TransactionBody,
