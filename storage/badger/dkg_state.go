@@ -22,7 +22,7 @@ import (
 var allowedStateTransitions = map[flow.DKGState][]flow.DKGState{
 	flow.DKGStateStarted:          {flow.DKGStateCompleted, flow.DKGStateFailure, flow.RandomBeaconKeyCommitted},
 	flow.DKGStateCompleted:        {flow.RandomBeaconKeyCommitted, flow.DKGStateFailure},
-	flow.RandomBeaconKeyCommitted: {flow.RandomBeaconKeyCommitted},
+	flow.RandomBeaconKeyCommitted: {},
 	flow.DKGStateFailure:          {flow.RandomBeaconKeyCommitted, flow.DKGStateFailure},
 	flow.DKGStateUninitialized:    {flow.DKGStateStarted, flow.DKGStateFailure, flow.RandomBeaconKeyCommitted},
 }
@@ -88,11 +88,15 @@ func (ds *RecoverablePrivateBeaconKeyStateMachine) InsertMyBeaconPrivateKey(epoc
 	}
 	encodableKey := &encodable.RandomBeaconPrivKey{PrivateKey: key}
 	return operation.RetryOnConflictTx(ds.db, transaction.Update, func(tx *transaction.Tx) error {
-		err := ds.keyCache.PutTx(epochCounter, encodableKey)(tx)
+		currentState, err := retrieveCurrentStateTx(epochCounter)(tx.DBTxn)
 		if err != nil {
 			return err
 		}
-		return ds.processStateTransition(epochCounter, flow.DKGStateCompleted)(tx)
+		err = ds.keyCache.PutTx(epochCounter, encodableKey)(tx)
+		if err != nil {
+			return err
+		}
+		return ds.processStateTransition(epochCounter, currentState, flow.DKGStateCompleted)(tx)
 	})
 }
 
@@ -129,23 +133,24 @@ func (ds *RecoverablePrivateBeaconKeyStateMachine) IsDKGStarted(epochCounter uin
 // Error returns:
 //   - [storage.InvalidDKGStateTransitionError] - if the requested state transition is invalid.
 func (ds *RecoverablePrivateBeaconKeyStateMachine) SetDKGState(epochCounter uint64, newState flow.DKGState) error {
-	return operation.RetryOnConflictTx(ds.db, transaction.Update, ds.processStateTransition(epochCounter, newState))
+	return operation.RetryOnConflictTx(ds.db, transaction.Update, func(tx *transaction.Tx) error {
+		currentState, err := retrieveCurrentStateTx(epochCounter)(tx.DBTxn)
+		if err != nil {
+			return err
+		}
+
+		if newState == flow.RandomBeaconKeyCommitted {
+			return storage.NewInvalidDKGStateTransitionErrorf(currentState, newState, "cannot transition directly to committed state without evidence")
+		} else {
+			return operation.RetryOnConflictTx(ds.db, transaction.Update, ds.processStateTransition(epochCounter, currentState, newState))
+		}
+	})
 }
 
 // Error returns:
 //   - storage.InvalidDKGStateTransitionError - if the requested state transition is invalid
-func (ds *RecoverablePrivateBeaconKeyStateMachine) processStateTransition(epochCounter uint64, newState flow.DKGState) func(*transaction.Tx) error {
+func (ds *RecoverablePrivateBeaconKeyStateMachine) processStateTransition(epochCounter uint64, currentState, newState flow.DKGState) func(*transaction.Tx) error {
 	return func(tx *transaction.Tx) error {
-		var currentState flow.DKGState
-		err := operation.RetrieveDKGStateForEpoch(epochCounter, &currentState)(tx.DBTxn)
-		if err != nil {
-			if errors.Is(err, storage.ErrNotFound) {
-				currentState = flow.DKGStateUninitialized
-			} else {
-				return fmt.Errorf("could not retrieve current state for epoch %d: %w", epochCounter, err)
-			}
-		}
-
 		allowedStates := allowedStateTransitions[currentState]
 		if slices.Index(allowedStates, newState) < 0 {
 			return storage.NewInvalidDKGStateTransitionErrorf(currentState, newState, "not allowed")
@@ -153,7 +158,7 @@ func (ds *RecoverablePrivateBeaconKeyStateMachine) processStateTransition(epochC
 
 		// ensure invariant holds and we still have a valid private key stored
 		if newState == flow.RandomBeaconKeyCommitted || newState == flow.DKGStateCompleted {
-			_, err = ds.keyCache.Get(epochCounter)(tx.DBTxn)
+			_, err := ds.keyCache.Get(epochCounter)(tx.DBTxn)
 			if err != nil {
 				return storage.NewInvalidDKGStateTransitionErrorf(currentState, newState, "cannot transition without a valid random beacon key: %w", err)
 			}
@@ -219,21 +224,66 @@ func (ds *RecoverablePrivateBeaconKeyStateMachine) RetrieveMyBeaconPrivateKey(ep
 	return
 }
 
+// CommitMyBeaconPrivateKey commits the previously inserted random beacon private key for an epoch.
+// Effectively, this method transitions the state machine into the [flow.RandomBeaconKeyCommitted] state if the current state is [flow.DKGStateCompleted].
+// Caller needs to supply the [flow.EpochCommit] which is an evidence that the key has been indeed included for the given epoch.
+// No errors are expected during normal operations.
+func (ds *RecoverablePrivateBeaconKeyStateMachine) CommitMyBeaconPrivateKey(epochCounter uint64, commit *flow.EpochCommit) error {
+	return operation.RetryOnConflictTx(ds.db, transaction.Update, func(tx *transaction.Tx) error {
+		currentState, err := retrieveCurrentStateTx(epochCounter)(tx.DBTxn)
+		if err != nil {
+			return err
+		}
+
+		key, err := ds.keyCache.Get(epochCounter)(tx.DBTxn)
+		if err != nil {
+			return storage.NewInvalidDKGStateTransitionErrorf(currentState, flow.RandomBeaconKeyCommitted, "cannot transition without a valid random beacon key: %w", err)
+		}
+
+		publicKey := key.PublicKey()
+		if slices.Index(commit.DKGParticipantKeys, publicKey) < 0 {
+			return storage.NewInvalidDKGStateTransitionErrorf(currentState, flow.RandomBeaconKeyCommitted,
+				"previously storred key has not been found in epoch commit event: %s", publicKey)
+		}
+
+		return ds.processStateTransition(epochCounter, currentState, flow.RandomBeaconKeyCommitted)(tx)
+	})
+}
+
 // UpsertMyBeaconPrivateKey overwrites the random beacon private key for the epoch that recovers the protocol
 // from Epoch Fallback Mode. State transitions are allowed if and only if the current state is not equal to
 // [flow.RandomBeaconKeyCommitted]. The resulting state of this method call is [flow.RandomBeaconKeyCommitted].
 // No errors are expected during normal operations.
-func (ds *RecoverablePrivateBeaconKeyStateMachine) UpsertMyBeaconPrivateKey(epochCounter uint64, key crypto.PrivateKey) error {
+func (ds *RecoverablePrivateBeaconKeyStateMachine) UpsertMyBeaconPrivateKey(epochCounter uint64, key crypto.PrivateKey, commit *flow.EpochCommit) error {
 	if key == nil {
 		return fmt.Errorf("will not store nil beacon key")
 	}
 	encodableKey := &encodable.RandomBeaconPrivKey{PrivateKey: key}
 	err := operation.RetryOnConflictTx(ds.db, transaction.Update, func(tx *transaction.Tx) error {
-		err := operation.UpsertMyBeaconPrivateKey(epochCounter, encodableKey)(tx.DBTxn)
+		currentState, err := retrieveCurrentStateTx(epochCounter)(tx.DBTxn)
 		if err != nil {
 			return err
 		}
-		return ds.processStateTransition(epochCounter, flow.RandomBeaconKeyCommitted)(tx)
+		// if we are in committed state, we cannot overwrite the key, but we can ignore this input iff the provided key is the same
+		if currentState == flow.RandomBeaconKeyCommitted {
+			// check if the key is the same
+			storedKey, err := ds.keyCache.Get(epochCounter)(tx.DBTxn)
+			if err != nil {
+				return irrecoverable.NewExceptionf("could not retrieve a previously committed beacon key for epoch %d: %v", epochCounter, err)
+			}
+			if storedKey.Equals(key) {
+				return nil
+			} else {
+				return storage.NewInvalidDKGStateTransitionErrorf(currentState, flow.RandomBeaconKeyCommitted,
+					"cannot overwrite previously committed key for epoch: %d", epochCounter)
+			}
+		}
+
+		err = operation.UpsertMyBeaconPrivateKey(epochCounter, encodableKey)(tx.DBTxn)
+		if err != nil {
+			return err
+		}
+		return ds.processStateTransition(epochCounter, currentState, flow.RandomBeaconKeyCommitted)(tx)
 	})
 	if err != nil {
 		return fmt.Errorf("could not overwrite beacon key for epoch %d: %w", epochCounter, err)
@@ -241,4 +291,16 @@ func (ds *RecoverablePrivateBeaconKeyStateMachine) UpsertMyBeaconPrivateKey(epoc
 	// manually add the key to cache (next line does not touch database)
 	ds.keyCache.Insert(epochCounter, encodableKey)
 	return nil
+}
+
+func retrieveCurrentStateTx(epochCounter uint64) func(*badger.Txn) (flow.DKGState, error) {
+	return func(txn *badger.Txn) (flow.DKGState, error) {
+		currentState := flow.DKGStateUninitialized
+		err := operation.RetrieveDKGStateForEpoch(epochCounter, &currentState)(txn)
+		if err != nil && !errors.Is(err, storage.ErrNotFound) {
+			return currentState, fmt.Errorf("could not retrieve current state for epoch %d: %w", epochCounter, err)
+
+		}
+		return currentState, nil
+	}
 }

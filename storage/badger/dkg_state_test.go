@@ -1,17 +1,20 @@
 package badger
 
 import (
-	"math/rand"
 	"testing"
 
 	"github.com/dgraph-io/badger/v2"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/atomic"
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/utils/unittest"
 )
+
+// epochCounterGenerator defines a global variable for this test file that is used to generate unique epoch counters.
+var epochCounterGenerator = atomic.NewUint64(0)
 
 // TestDKGState_UninitializedState verifies that for new epochs, the RecoverableRandomBeaconStateMachine starts
 // in the state [flow.DKGStateUninitialized] and reports correct values for that Epoch's DKG state.
@@ -24,7 +27,7 @@ func TestDKGState_UninitializedState(t *testing.T) {
 		require.NoError(t, err)
 
 		setupState := func() uint64 {
-			return rand.Uint64()
+			return epochCounterGenerator.Add(1)
 		}
 		epochCounter := setupState()
 
@@ -78,7 +81,7 @@ func TestDKGState_UninitializedState(t *testing.T) {
 			err = store.SetDKGState(epochCounter, flow.RandomBeaconKeyCommitted)
 			require.Error(t, err, "should not be able to set DKG state to recovered, only using dedicated interface")
 			require.True(t, storage.IsInvalidDKGStateTransitionError(err))
-			err = store.UpsertMyBeaconPrivateKey(epochCounter, unittest.RandomBeaconPriv())
+			err = store.UpsertMyBeaconPrivateKey(epochCounter, unittest.RandomBeaconPriv(), nil)
 			require.NoError(t, err)
 		})
 	})
@@ -93,7 +96,7 @@ func TestDKGState_StartedState(t *testing.T) {
 		require.NoError(t, err)
 
 		setupState := func() uint64 {
-			epochCounter := rand.Uint64()
+			epochCounter := epochCounterGenerator.Add(1)
 			err = store.SetDKGState(epochCounter, flow.DKGStateStarted)
 			require.NoError(t, err)
 			return epochCounter
@@ -157,7 +160,7 @@ func TestDKGState_StartedState(t *testing.T) {
 
 		t.Run("state transition flow.DKGStateStarted -> flow.RandomBeaconKeyCommitted should be allowed, but only via upserting a key", func(t *testing.T) {
 			epochCounter := setupState()
-			err = store.UpsertMyBeaconPrivateKey(epochCounter, unittest.RandomBeaconPriv())
+			err = store.UpsertMyBeaconPrivateKey(epochCounter, unittest.RandomBeaconPriv(), nil)
 			require.NoError(t, err)
 			resultingState, err := store.GetDKGState(epochCounter)
 			require.NoError(t, err)
@@ -176,7 +179,7 @@ func TestDKGState_CompletedState(t *testing.T) {
 		require.NoError(t, err)
 
 		setupState := func() uint64 {
-			epochCounter := rand.Uint64()
+			epochCounter := epochCounterGenerator.Add(1)
 			err = store.SetDKGState(epochCounter, flow.DKGStateStarted)
 			require.NoError(t, err)
 			err = store.InsertMyBeaconPrivateKey(epochCounter, unittest.RandomBeaconPriv())
@@ -240,7 +243,7 @@ func TestDKGState_CompletedState(t *testing.T) {
 
 		t.Run("state transition flow.DKGStateCompleted -> flow.RandomBeaconKeyCommitted (recovery, overwriting existing key) should be allowed", func(t *testing.T) {
 			epochCounter := setupState()
-			err = store.UpsertMyBeaconPrivateKey(epochCounter, unittest.RandomBeaconPriv())
+			err = store.UpsertMyBeaconPrivateKey(epochCounter, unittest.RandomBeaconPriv(), nil)
 			require.NoError(t, err)
 			resultingState, err := store.GetDKGState(epochCounter)
 			require.NoError(t, err)
@@ -258,7 +261,7 @@ func TestDKGState_FailureState(t *testing.T) {
 		require.NoError(t, err)
 
 		setupState := func() uint64 {
-			epochCounter := rand.Uint64()
+			epochCounter := epochCounterGenerator.Add(1)
 			err = store.SetDKGState(epochCounter, flow.DKGStateFailure)
 			require.NoError(t, err)
 			return epochCounter
@@ -323,7 +326,7 @@ func TestDKGState_FailureState(t *testing.T) {
 		t.Run("state transition flow.DKGStateFailure -> flow.RandomBeaconKeyCommitted should be allowed via upserting the key (recovery path)", func(t *testing.T) {
 			epochCounter := setupState()
 			expectedKey := unittest.RandomBeaconPriv()
-			err = store.UpsertMyBeaconPrivateKey(epochCounter, expectedKey)
+			err = store.UpsertMyBeaconPrivateKey(epochCounter, expectedKey, nil)
 			require.NoError(t, err)
 			actualKey, safe, err := store.RetrieveMyBeaconPrivateKey(epochCounter)
 			require.NoError(t, err)
@@ -345,8 +348,8 @@ func TestDKGState_RandomBeaconKeyCommittedState(t *testing.T) {
 		require.NoError(t, err)
 
 		setupState := func() uint64 {
-			epochCounter := rand.Uint64()
-			err = store.UpsertMyBeaconPrivateKey(epochCounter, unittest.RandomBeaconPriv())
+			epochCounter := epochCounterGenerator.Add(1)
+			err = store.UpsertMyBeaconPrivateKey(epochCounter, unittest.RandomBeaconPriv(), nil)
 			require.NoError(t, err)
 			return epochCounter
 		}
@@ -406,7 +409,7 @@ func TestDKGState_RandomBeaconKeyCommittedState(t *testing.T) {
 			require.NoError(t, err)
 			require.Equal(t, flow.RandomBeaconKeyCommitted, resultingState)
 
-			err = store.UpsertMyBeaconPrivateKey(epochCounter, unittest.RandomBeaconPriv())
+			err = store.UpsertMyBeaconPrivateKey(epochCounter, unittest.RandomBeaconPriv(), nil)
 			require.NoError(t, err, "should be possible ONLY for the same private key")
 			resultingState, err = store.GetDKGState(epochCounter)
 			require.NoError(t, err)

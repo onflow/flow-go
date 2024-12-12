@@ -138,7 +138,7 @@ func (_m *EpochRecoveryMyBeaconKey) UnsafeRetrieveMyBeaconPrivateKey(epochCounte
 }
 
 // UpsertMyBeaconPrivateKey provides a mock function with given fields: epochCounter, key
-func (_m *EpochRecoveryMyBeaconKey) UpsertMyBeaconPrivateKey(epochCounter uint64, key crypto.PrivateKey) error {
+func (_m *EpochRecoveryMyBeaconKey) UpsertMyBeaconPrivateKey(epochCounter uint64, key crypto.PrivateKey, commit *flow.EpochCommit) error {
 	ret := _m.Called(epochCounter, key)
 
 	if len(ret) == 0 {
