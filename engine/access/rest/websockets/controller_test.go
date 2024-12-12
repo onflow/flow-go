@@ -70,9 +70,12 @@ func (s *WsControllerSuite) TestSubscribeRequest() {
 			Once()
 
 		request := models.SubscribeMessageRequest{
-			BaseMessageRequest: models.BaseMessageRequest{Action: "subscribe"},
-			Topic:              "blocks",
-			Arguments:          nil,
+			BaseMessageRequest: models.BaseMessageRequest{
+				MessageID: uuid.New().String(),
+				Action:    models.SubscribeAction,
+			},
+			Topic:     "blocks",
+			Arguments: nil,
 		}
 		requestJson, err := json.Marshal(request)
 		require.NoError(t, err)
@@ -93,17 +96,20 @@ func (s *WsControllerSuite) TestSubscribeRequest() {
 		conn.
 			On("WriteJSON", mock.Anything).
 			Return(func(msg interface{}) error {
+				defer close(done) // Signal that response has been sent
+
 				response, ok := msg.(models.SubscribeMessageResponse)
 				require.True(t, ok)
-				require.Equal(t, request.Action, response.Action)
 				require.True(t, response.Success)
+				require.Equal(t, request.MessageID, response.MessageID)
 				require.Equal(t, id.String(), response.ID)
 
-				close(done) // Signal that response has been sent
 				return websocket.ErrCloseSent
 			})
 
-		controller.HandleConnection(context.Background())
+		ctx, cancel := context.WithDeadline(context.Background(), time.Now().Add(time.Second))
+		defer cancel()
+		controller.HandleConnection(ctx)
 	})
 
 	s.T().Run("Parse and validate error", func(t *testing.T) {
@@ -137,19 +143,20 @@ func (s *WsControllerSuite) TestSubscribeRequest() {
 		conn.
 			On("WriteJSON", mock.Anything).
 			Return(func(msg interface{}) error {
+				defer close(done) // Signal that response has been sent
+
 				response, ok := msg.(models.BaseMessageResponse)
 				require.True(t, ok)
-				require.Empty(t, response.Action)
 				require.False(t, response.Success)
-				require.NotNil(t, response.ErrorMessage) //TODO: add kinds of errors for different data flows
+				require.NotEmpty(t, response.Error)
+				require.Equal(t, int(InvalidMessage), response.Error.Code)
 
-				s.T().Log(response.ErrorMessage)
-
-				close(done) // Signal that response has been sent
 				return websocket.ErrCloseSent
 			})
 
-		controller.HandleConnection(context.Background())
+		ctx, cancel := context.WithDeadline(context.Background(), time.Now().Add(time.Second))
+		defer cancel()
+		controller.HandleConnection(ctx)
 	})
 
 	s.T().Run("Error creating data provider", func(t *testing.T) {
@@ -168,19 +175,20 @@ func (s *WsControllerSuite) TestSubscribeRequest() {
 		conn.
 			On("WriteJSON", mock.Anything).
 			Return(func(msg interface{}) error {
+				defer close(done) // Signal that response has been sent
+
 				response, ok := msg.(models.BaseMessageResponse)
 				require.True(t, ok)
-				require.Equal(t, "subscribe", response.Action)
 				require.False(t, response.Success)
-				require.Equal(t, response.ErrorMessage, "error creating data provider")
+				require.NotEmpty(t, response.Error)
+				require.Equal(t, int(InvalidArgument), response.Error.Code)
 
-				s.T().Log(response.ErrorMessage)
-
-				close(done) // Signal that response has been sent
 				return websocket.ErrCloseSent
 			})
 
-		controller.HandleConnection(context.Background())
+		ctx, cancel := context.WithDeadline(context.Background(), time.Now().Add(time.Second))
+		defer cancel()
+		controller.HandleConnection(ctx)
 	})
 
 	s.T().Run("Run error", func(t *testing.T) {
@@ -201,26 +209,27 @@ func (s *WsControllerSuite) TestSubscribeRequest() {
 			Once()
 
 		done := make(chan struct{}, 1)
-		s.expectSubscribeRequest(conn)
-		s.expectSubscribeResponse(conn)
+		msgID := s.expectSubscribeRequest(conn)
+		s.expectSubscribeResponse(conn, msgID)
 		s.expectCloseConnection(conn, done)
 
 		conn.
 			On("WriteJSON", mock.Anything).
 			Return(func(msg interface{}) error {
+				defer close(done) // Signal that response has been sent
+
 				response, ok := msg.(models.BaseMessageResponse)
 				require.True(t, ok)
-				require.Equal(t, "", response.Action)
 				require.False(t, response.Success)
-				require.NotNil(t, response.ErrorMessage) //TODO: add kinds of errors for different data flows
+				require.NotEmpty(t, response.Error)
+				require.Equal(t, int(RunError), response.Error.Code)
 
-				s.T().Log(response.ErrorMessage)
-
-				close(done) // Signal that response has been sent
 				return websocket.ErrCloseSent
 			})
 
-		controller.HandleConnection(context.Background())
+		ctx, cancel := context.WithDeadline(context.Background(), time.Now().Add(time.Second))
+		defer cancel()
+		controller.HandleConnection(ctx)
 	})
 }
 
@@ -248,12 +257,15 @@ func (s *WsControllerSuite) TestUnsubscribeRequest() {
 			Return(nil).
 			Once()
 
-		s.expectSubscribeRequest(conn)
-		s.expectSubscribeResponse(conn)
+		msgID := s.expectSubscribeRequest(conn)
+		s.expectSubscribeResponse(conn, msgID)
 
 		request := models.UnsubscribeMessageRequest{
-			BaseMessageRequest: models.BaseMessageRequest{Action: "unsubscribe"},
-			ID:                 id.String(),
+			BaseMessageRequest: models.BaseMessageRequest{
+				MessageID: uuid.New().String(),
+				Action:    models.UnsubscribeAction,
+			},
+			SubscriptionID: id.String(),
 		}
 		requestJson, err := json.Marshal(request)
 		require.NoError(s.T(), err)
@@ -271,19 +283,21 @@ func (s *WsControllerSuite) TestUnsubscribeRequest() {
 		conn.
 			On("WriteJSON", mock.Anything).
 			Return(func(msg interface{}) error {
+				defer close(done)
+
 				response, ok := msg.(models.UnsubscribeMessageResponse)
 				require.True(t, ok)
-				require.Equal(t, request.Action, response.Action)
 				require.True(t, response.Success)
-				require.Empty(t, response.ErrorMessage)
-				require.Equal(t, request.ID, response.ID)
+				require.Empty(t, response.Error)
+				require.Equal(t, request.MessageID, response.MessageID)
+				require.Equal(t, request.SubscriptionID, response.SubscriptionID)
 
-				close(done)
 				return websocket.ErrCloseSent
 			}).
 			Once()
 
 		s.expectCloseConnection(conn, done)
+
 		ctx, cancel := context.WithDeadline(context.Background(), time.Now().Add(time.Second))
 		defer cancel()
 		controller.HandleConnection(ctx)
@@ -312,12 +326,15 @@ func (s *WsControllerSuite) TestUnsubscribeRequest() {
 			Return(nil).
 			Once()
 
-		s.expectSubscribeRequest(conn)
-		s.expectSubscribeResponse(conn)
+		msgID := s.expectSubscribeRequest(conn)
+		s.expectSubscribeResponse(conn, msgID)
 
 		request := models.UnsubscribeMessageRequest{
-			BaseMessageRequest: models.BaseMessageRequest{Action: "unsubscribe"},
-			ID:                 "invalid-uuid",
+			BaseMessageRequest: models.BaseMessageRequest{
+				MessageID: uuid.New().String(),
+				Action:    models.UnsubscribeAction,
+			},
+			SubscriptionID: "invalid-uuid",
 		}
 		requestJson, err := json.Marshal(request)
 		require.NoError(s.T(), err)
@@ -335,21 +352,24 @@ func (s *WsControllerSuite) TestUnsubscribeRequest() {
 		conn.
 			On("WriteJSON", mock.Anything).
 			Return(func(msg interface{}) error {
+				defer close(done)
+
 				response, ok := msg.(models.BaseMessageResponse)
 				require.True(t, ok)
-				require.Equal(t, request.Action, response.Action)
 				require.False(t, response.Success)
-				require.NotEmpty(t, response.ErrorMessage)
+				require.NotEmpty(t, response.Error)
+				require.Equal(t, request.MessageID, response.MessageID)
+				require.Equal(t, int(InvalidArgument), response.Error.Code)
 
-				s.T().Log(response.ErrorMessage)
-
-				close(done)
 				return websocket.ErrCloseSent
 			}).
 			Once()
 
 		s.expectCloseConnection(conn, done)
-		controller.HandleConnection(context.Background())
+
+		ctx, cancel := context.WithDeadline(context.Background(), time.Now().Add(time.Second))
+		defer cancel()
+		controller.HandleConnection(ctx)
 	})
 
 	s.T().Run("Unsubscribe from unknown subscription", func(t *testing.T) {
@@ -375,12 +395,15 @@ func (s *WsControllerSuite) TestUnsubscribeRequest() {
 			Return(nil).
 			Once()
 
-		s.expectSubscribeRequest(conn)
-		s.expectSubscribeResponse(conn)
+		msgID := s.expectSubscribeRequest(conn)
+		s.expectSubscribeResponse(conn, msgID)
 
 		request := models.UnsubscribeMessageRequest{
-			BaseMessageRequest: models.BaseMessageRequest{Action: "unsubscribe"},
-			ID:                 uuid.New().String(),
+			BaseMessageRequest: models.BaseMessageRequest{
+				MessageID: uuid.New().String(),
+				Action:    models.UnsubscribeAction,
+			},
+			SubscriptionID: uuid.New().String(),
 		}
 		requestJson, err := json.Marshal(request)
 		require.NoError(s.T(), err)
@@ -398,21 +421,25 @@ func (s *WsControllerSuite) TestUnsubscribeRequest() {
 		conn.
 			On("WriteJSON", mock.Anything).
 			Return(func(msg interface{}) error {
+				defer close(done)
+
 				response, ok := msg.(models.BaseMessageResponse)
 				require.True(t, ok)
-				require.Equal(t, request.Action, response.Action)
 				require.False(t, response.Success)
-				require.NotEmpty(t, response.ErrorMessage)
+				require.NotEmpty(t, response.Error)
 
-				s.T().Log(response.ErrorMessage)
+				require.Equal(t, request.MessageID, response.MessageID)
+				require.Equal(t, int(NotFound), response.Error.Code)
 
-				close(done)
 				return websocket.ErrCloseSent
 			}).
 			Once()
 
 		s.expectCloseConnection(conn, done)
-		controller.HandleConnection(context.Background())
+
+		ctx, cancel := context.WithDeadline(context.Background(), time.Now().Add(time.Second))
+		defer cancel()
+		controller.HandleConnection(ctx)
 	})
 }
 
@@ -442,11 +469,14 @@ func (s *WsControllerSuite) TestListSubscriptions() {
 			Return(nil).
 			Once()
 
-		s.expectSubscribeRequest(conn)
-		s.expectSubscribeResponse(conn)
+		msgID := s.expectSubscribeRequest(conn)
+		s.expectSubscribeResponse(conn, msgID)
 
 		request := models.ListSubscriptionsMessageRequest{
-			BaseMessageRequest: models.BaseMessageRequest{Action: "list_subscriptions"},
+			BaseMessageRequest: models.BaseMessageRequest{
+				MessageID: uuid.New().String(),
+				Action:    models.ListSubscriptionsAction,
+			},
 		}
 		requestJson, err := json.Marshal(request)
 		require.NoError(s.T(), err)
@@ -464,22 +494,26 @@ func (s *WsControllerSuite) TestListSubscriptions() {
 		conn.
 			On("WriteJSON", mock.Anything).
 			Return(func(msg interface{}) error {
+				defer close(done)
+
 				response, ok := msg.(models.ListSubscriptionsMessageResponse)
 				require.True(t, ok)
+				require.True(t, response.Success)
+				require.Empty(t, response.Error)
+				require.Equal(t, request.MessageID, response.MessageID)
 				require.Equal(t, 1, len(response.Subscriptions))
 				require.Equal(t, id.String(), response.Subscriptions[0].ID)
 				require.Equal(t, topic, response.Subscriptions[0].Topic)
-				require.Equal(t, response.Action, "list_subscriptions")
-				require.True(t, response.Success)
-				require.Empty(t, response.ErrorMessage)
 
-				close(done)
 				return websocket.ErrCloseSent
 			}).
 			Once()
 
 		s.expectCloseConnection(conn, done)
-		controller.HandleConnection(context.Background())
+
+		ctx, cancel := context.WithDeadline(context.Background(), time.Now().Add(time.Second))
+		defer cancel()
+		controller.HandleConnection(ctx)
 	})
 }
 
@@ -510,8 +544,8 @@ func (s *WsControllerSuite) TestSubscribeBlocks() {
 			Once()
 
 		done := make(chan struct{}, 1)
-		s.expectSubscribeRequest(conn)
-		s.expectSubscribeResponse(conn)
+		msgID := s.expectSubscribeRequest(conn)
+		s.expectSubscribeResponse(conn, msgID)
 		s.expectCloseConnection(conn, done)
 
 		// Expect a valid block to be passed to WriteJSON.
@@ -520,15 +554,19 @@ func (s *WsControllerSuite) TestSubscribeBlocks() {
 		conn.
 			On("WriteJSON", mock.Anything).
 			Return(func(msg interface{}) error {
+				defer close(done)
+
 				block, ok := msg.(flow.Block)
 				require.True(t, ok)
 				actualBlock = block
 
-				close(done)
 				return websocket.ErrCloseSent
 			})
 
-		controller.HandleConnection(context.Background())
+		ctx, cancel := context.WithDeadline(context.Background(), time.Now().Add(time.Second))
+		defer cancel()
+		controller.HandleConnection(ctx)
+
 		require.Equal(t, expectedBlock, actualBlock)
 	})
 
@@ -558,8 +596,8 @@ func (s *WsControllerSuite) TestSubscribeBlocks() {
 			Once()
 
 		done := make(chan struct{}, 1)
-		s.expectSubscribeRequest(conn)
-		s.expectSubscribeResponse(conn)
+		msgID := s.expectSubscribeRequest(conn)
+		s.expectSubscribeResponse(conn, msgID)
 		s.expectCloseConnection(conn, done)
 
 		i := 0
@@ -585,7 +623,10 @@ func (s *WsControllerSuite) TestSubscribeBlocks() {
 			}).
 			Times(len(expectedBlocks))
 
-		controller.HandleConnection(context.Background())
+		ctx, cancel := context.WithDeadline(context.Background(), time.Now().Add(time.Second))
+		defer cancel()
+		controller.HandleConnection(ctx)
+
 		require.Equal(t, expectedBlocks, actualBlocks)
 	})
 }
@@ -606,24 +647,29 @@ func newControllerMocks(t *testing.T) (*connmock.WebsocketConnection, *dpmock.Da
 }
 
 // expectSubscribeRequest mocks the client's subscription request.
-func (s *WsControllerSuite) expectSubscribeRequest(conn *connmock.WebsocketConnection) {
-	subscribeRequest := models.SubscribeMessageRequest{
-		BaseMessageRequest: models.BaseMessageRequest{Action: "subscribe"},
-		Topic:              "blocks",
+func (s *WsControllerSuite) expectSubscribeRequest(conn *connmock.WebsocketConnection) string {
+	request := models.SubscribeMessageRequest{
+		BaseMessageRequest: models.BaseMessageRequest{
+			MessageID: uuid.New().String(),
+			Action:    models.SubscribeAction,
+		},
+		Topic: "blocks",
 	}
-	subscribeRequestJson, err := json.Marshal(subscribeRequest)
+	requestJson, err := json.Marshal(request)
 	require.NoError(s.T(), err)
 
-	// The very first message from a client is a subscribeRequest to subscribe to some topic
+	// The very first message from a client is a request to subscribe to some topic
 	conn.
 		On("ReadJSON", mock.Anything).
 		Run(func(args mock.Arguments) {
 			msg, ok := args.Get(0).(*json.RawMessage)
 			require.True(s.T(), ok)
-			*msg = subscribeRequestJson
+			*msg = requestJson
 		}).
 		Return(nil).
 		Once()
+
+	return request.MessageID
 }
 
 func (s *WsControllerSuite) expectCloseConnection(conn *connmock.WebsocketConnection, done <-chan struct{}) {
@@ -640,13 +686,13 @@ func (s *WsControllerSuite) expectCloseConnection(conn *connmock.WebsocketConnec
 }
 
 // expectSubscribeResponse mocks the subscription response sent to the client.
-func (s *WsControllerSuite) expectSubscribeResponse(conn *connmock.WebsocketConnection) {
+func (s *WsControllerSuite) expectSubscribeResponse(conn *connmock.WebsocketConnection, msgId string) {
 	conn.
 		On("WriteJSON", mock.Anything).
 		Run(func(args mock.Arguments) {
 			response, ok := args.Get(0).(models.SubscribeMessageResponse)
 			require.True(s.T(), ok)
-			require.Equal(s.T(), "subscribe", response.Action)
+			require.Equal(s.T(), msgId, response.MessageID)
 			require.Equal(s.T(), true, response.Success)
 		}).
 		Return(nil).
