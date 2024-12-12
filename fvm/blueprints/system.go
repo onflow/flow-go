@@ -23,7 +23,7 @@ var systemChunkTransactionTemplate string
 
 const placeholderEVMAddress = "\"EVM\""
 
-const placeholderAccountV2MigrationAddress = "\"AccountV2Migration\""
+const placeholderMigrationAddress = "\"Migration\""
 
 func prepareSystemContractCode(chainID flow.ChainID) string {
 	sc := systemcontracts.SystemContractsForChain(chainID)
@@ -38,8 +38,8 @@ func prepareSystemContractCode(chainID flow.ChainID) string {
 	)
 	code = strings.ReplaceAll(
 		code,
-		placeholderAccountV2MigrationAddress,
-		sc.AccountV2Migration.Address.HexWithPrefix(),
+		placeholderMigrationAddress,
+		sc.Migration.Address.HexWithPrefix(),
 	)
 	return code
 }

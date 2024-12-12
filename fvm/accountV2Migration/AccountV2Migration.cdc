@@ -57,7 +57,7 @@ contract AccountV2Migration {
         )
     }
 
-    access(contract)
+    access(account)
     fun migrateNextBatch() {
         let batchSize = self.batchSize
         if batchSize <= 0 {

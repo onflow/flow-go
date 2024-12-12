@@ -44,6 +44,7 @@ const (
 	ContractNameEVM                        = "EVM"
 	ContractNameBurner                     = "Burner"
 	ContractNameCrypto                     = "Crypto"
+	ContractNameMigration                  = "Migration"
 	ContractNameAccountV2Migration         = "AccountV2Migration"
 
 	// AccountNameEVMStorage is not a contract, but a special account that is used to store EVM state
@@ -177,6 +178,7 @@ type SystemContracts struct {
 	Crypto SystemContract
 
 	// Migration contracts
+	Migration          SystemContract
 	AccountV2Migration SystemContract
 }
 
@@ -238,6 +240,7 @@ func (c SystemContracts) All() []SystemContract {
 		c.Burner,
 		c.Crypto,
 
+		c.Migration,
 		c.AccountV2Migration,
 	}
 }
@@ -378,6 +381,7 @@ func init() {
 		ContractNameBurner: burnerAddressFunc,
 		ContractNameCrypto: serviceAddressFunc,
 
+		ContractNameMigration:          serviceAddressFunc,
 		ContractNameAccountV2Migration: serviceAddressFunc,
 	}
 
@@ -436,6 +440,7 @@ func init() {
 			Burner: addressOfContract(ContractNameBurner),
 			Crypto: addressOfContract(ContractNameCrypto),
 
+			Migration:          addressOfContract(ContractNameMigration),
 			AccountV2Migration: addressOfContract(ContractNameAccountV2Migration),
 		}
 

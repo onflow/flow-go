@@ -1019,10 +1019,10 @@ func (b *Blockchain) systemChunkTransaction() (*flowgo.TransactionBody, error) {
 
 	script = strings.ReplaceAll(
 		script,
-		`import AccountV2Migration from "AccountV2Migration"`,
+		`import Migration from "Migration"`,
 		fmt.Sprintf(
-			`import AccountV2Migration from %s`,
-			sc.AccountV2Migration.Address.HexWithPrefix(),
+			`import Migration from %s`,
+			sc.Migration.Address.HexWithPrefix(),
 		),
 	)
 

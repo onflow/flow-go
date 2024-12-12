@@ -14,6 +14,7 @@ import (
 	"github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/fvm/evm/stdlib"
 	"github.com/onflow/flow-go/fvm/meter"
+	"github.com/onflow/flow-go/fvm/migration"
 	"github.com/onflow/flow-go/fvm/storage"
 	"github.com/onflow/flow-go/fvm/storage/logical"
 	"github.com/onflow/flow-go/fvm/systemcontracts"
@@ -449,6 +450,7 @@ func (b *bootstrapExecutor) Execute() error {
 	b.setStakingAllowlist(service, b.identities.NodeIDs())
 
 	b.deployAccountV2MigrationContract(service)
+	b.deployMigrationContract(service)
 
 	return nil
 }
@@ -1081,6 +1083,19 @@ func (b *bootstrapExecutor) deployAccountV2MigrationContract(deployTo flow.Addre
 		Transaction(tx, 0),
 	)
 	panicOnMetaInvokeErrf("failed to deploy AccountV2Migration contract: %s", txError, err)
+}
+
+func (b *bootstrapExecutor) deployMigrationContract(deployTo flow.Address) {
+	tx := blueprints.DeployContractTransaction(
+		deployTo,
+		migration.ContractCode(deployTo),
+		migration.ContractName,
+	)
+	txError, err := b.invokeMetaTransaction(
+		b.ctx,
+		Transaction(tx, 0),
+	)
+	panicOnMetaInvokeErrf("failed to deploy Migration contract: %s", txError, err)
 }
 
 func (b *bootstrapExecutor) setContractDeploymentRestrictions(
