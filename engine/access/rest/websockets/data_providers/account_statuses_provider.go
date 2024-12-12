@@ -3,7 +3,6 @@ package data_providers
 import (
 	"context"
 	"fmt"
-	"strconv"
 
 	"github.com/rs/zerolog"
 	"google.golang.org/grpc/codes"
@@ -116,15 +115,10 @@ func (p *AccountStatusesDataProvider) handleResponse() func(accountStatusesRespo
 			return status.Errorf(codes.Internal, "message index already incremented to %d", messageIndex.Value())
 		}
 
-		var accountEvents models.AccountEvents
-		accountEvents.Build(accountStatusesResponse.AccountEvents)
+		var response models.AccountStatusesResponse
+		response.Build(accountStatusesResponse, index)
 
-		p.send <- &models.AccountStatusesResponse{
-			BlockID:       accountStatusesResponse.BlockID.String(),
-			Height:        strconv.FormatUint(accountStatusesResponse.Height, 10),
-			AccountEvents: accountEvents,
-			MessageIndex:  strconv.FormatUint(index, 10),
-		}
+		p.send <- &response
 
 		return nil
 	}

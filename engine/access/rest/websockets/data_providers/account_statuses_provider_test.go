@@ -10,7 +10,6 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
-	"github.com/onflow/flow-go/engine/access/rest/util"
 	"github.com/onflow/flow-go/engine/access/rest/websockets/models"
 	"github.com/onflow/flow-go/engine/access/state_stream"
 	"github.com/onflow/flow-go/engine/access/state_stream/backend"
@@ -287,14 +286,10 @@ func (s *AccountStatusesProviderSuite) expectedAccountStatusesResponses(events [
 	expectedResponses := make([]interface{}, len(events))
 
 	for i, resp := range backendResponses {
-		var accountEvents models.AccountEvents
-		accountEvents.Build(resp.AccountEvents)
+		var expectedResponse models.AccountStatusesResponse
+		expectedResponse.Build(resp, uint64(i))
 
-		expectedResponses[i] = &models.AccountStatusesResponse{
-			Height:        util.FromUint(resp.Height),
-			BlockID:       resp.BlockID.String(),
-			AccountEvents: accountEvents,
-		}
+		expectedResponses[i] = &expectedResponse
 	}
 
 	return expectedResponses
