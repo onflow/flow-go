@@ -1,6 +1,8 @@
 package state
 
 import (
+	"encoding/gob"
+	"fmt"
 	"io"
 	"os"
 	"path/filepath"
@@ -8,6 +10,7 @@ import (
 	"github.com/onflow/atree"
 	gethCommon "github.com/onflow/go-ethereum/common"
 
+	"github.com/onflow/flow-go/fvm/evm/types"
 	"github.com/onflow/flow-go/model/flow"
 )
 
@@ -15,6 +18,7 @@ const (
 	ExportedAccountsFileName = "accounts.bin"
 	ExportedCodesFileName    = "codes.bin"
 	ExportedSlotsFileName    = "slots.bin"
+	ExportedStateGobFileName = "state.gob"
 )
 
 type Exporter struct {
@@ -36,8 +40,32 @@ func NewExporter(ledger atree.Ledger, root flow.Address) (*Exporter, error) {
 	}, nil
 }
 
+func (e *Exporter) ExportGob(path string) error {
+	fileName := filepath.Join(path, ExportedStateGobFileName)
+	// Open the file for reading
+	file, err := os.Create(fileName)
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+
+	state, err := Extract(e.root, e.baseView)
+	if err != nil {
+		return err
+	}
+
+	// Use gob to encode data
+	encoder := gob.NewEncoder(file)
+	err = encoder.Encode(state)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
 func (e *Exporter) Export(path string) error {
-	af, err := os.OpenFile(filepath.Join(path, ExportedAccountsFileName), os.O_RDWR, 0644)
+	af, err := os.Create(filepath.Join(path, ExportedAccountsFileName))
 	if err != nil {
 		return err
 	}
@@ -48,7 +76,7 @@ func (e *Exporter) Export(path string) error {
 		return err
 	}
 
-	cf, err := os.OpenFile(filepath.Join(path, ExportedCodesFileName), os.O_RDWR, 0644)
+	cf, err := os.Create(filepath.Join(path, ExportedCodesFileName))
 	if err != nil {
 		return err
 	}
@@ -59,7 +87,7 @@ func (e *Exporter) Export(path string) error {
 		return err
 	}
 
-	sf, err := os.OpenFile(filepath.Join(path, ExportedSlotsFileName), os.O_RDWR, 0644)
+	sf, err := os.Create(filepath.Join(path, ExportedSlotsFileName))
 	if err != nil {
 		return err
 	}
@@ -96,6 +124,12 @@ func (e *Exporter) exportAccounts(writer io.Writer) ([]gethCommon.Address, error
 		if err != nil {
 			return nil, err
 		}
+
+		_, err = DecodeAccount(encoded)
+		if err != nil {
+			return nil, fmt.Errorf("account can not be decoded: %w", err)
+		}
+
 		// write every account on a new line
 		_, err = writer.Write(append(encoded, byte('\n')))
 		if err != nil {
@@ -123,6 +157,12 @@ func (e *Exporter) exportCodes(writer io.Writer) error {
 		if err != nil {
 			return err
 		}
+
+		_, err = CodeInContextFromEncoded(encoded)
+		if err != nil {
+			return fmt.Errorf("error decoding code in context: %w", err)
+		}
+
 		// write every codes on a new line
 		_, err = writer.Write(append(encoded, byte('\n')))
 		if err != nil {
@@ -151,6 +191,12 @@ func (e *Exporter) exportSlots(addresses []gethCommon.Address, writer io.Writer)
 			if err != nil {
 				return err
 			}
+
+			_, err = types.SlotEntryFromEncoded(encoded)
+			if err != nil {
+				return fmt.Errorf("error decoding slot entry: %w", err)
+			}
+
 			// write every codes on a new line
 			_, err = writer.Write(append(encoded, byte('\n')))
 			if err != nil {
