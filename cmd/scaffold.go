@@ -26,8 +26,7 @@ import (
 	"google.golang.org/api/option"
 
 	"github.com/onflow/flow-go/crypto"
-	"github.com/onflow/flow-go/fvm"
-	"github.com/onflow/flow-go/fvm/environment"
+	"github.com/onflow/flow-go/fvm/initialize"
 
 	"github.com/onflow/flow-go/admin"
 	"github.com/onflow/flow-go/admin/commands"
@@ -1564,26 +1563,7 @@ func (fnb *FlowNodeBuilder) initLocal() error {
 }
 
 func (fnb *FlowNodeBuilder) initFvmOptions() {
-	blockFinder := environment.NewBlockFinder(fnb.Storage.Headers)
-	vmOpts := []fvm.Option{
-		fvm.WithChain(fnb.RootChainID.Chain()),
-		fvm.WithBlocks(blockFinder),
-		fvm.WithAccountStorageLimit(true),
-		// temporarily enable dependency check for all networks
-		fvm.WithDependencyCheckEnabled(true),
-	}
-	if fnb.RootChainID == flow.Testnet || fnb.RootChainID == flow.Sandboxnet || fnb.RootChainID == flow.Mainnet {
-		vmOpts = append(vmOpts,
-			fvm.WithTransactionFeesEnabled(true),
-		)
-	}
-	if fnb.RootChainID == flow.Testnet || fnb.RootChainID == flow.Sandboxnet || fnb.RootChainID == flow.Localnet || fnb.RootChainID == flow.Benchnet {
-		vmOpts = append(vmOpts,
-			fvm.WithContractDeploymentRestricted(false),
-		)
-	}
-
-	fnb.FvmOptions = vmOpts
+	fnb.FvmOptions = initialize.InitFvmOptions(fnb.RootChainID, fnb.Storage.Headers)
 }
 
 // handleModules initializes the given module.

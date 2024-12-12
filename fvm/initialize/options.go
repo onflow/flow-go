@@ -16,22 +16,23 @@ func InitFvmOptions(chainID flow.ChainID, headers storage.Headers) []fvm.Option 
 		fvm.WithChain(chainID.Chain()),
 		fvm.WithBlocks(blockFinder),
 		fvm.WithAccountStorageLimit(true),
+		// temporarily enable dependency check for all networks
+		fvm.WithDependencyCheckEnabled(true),
 	}
 	switch chainID {
 	case flow.Testnet,
 		flow.Sandboxnet,
-		flow.Previewnet,
 		flow.Mainnet:
 		vmOpts = append(vmOpts,
 			fvm.WithTransactionFeesEnabled(true),
 		)
 	}
-	switch chainID {
-	case flow.Testnet,
-		flow.Sandboxnet,
-		flow.Previewnet,
-		flow.Localnet,
-		flow.Benchnet:
+	if chainID == flow.Testnet || chainID == flow.Sandboxnet || chainID == flow.Mainnet {
+		vmOpts = append(vmOpts,
+			fvm.WithTransactionFeesEnabled(true),
+		)
+	}
+	if chainID == flow.Testnet || chainID == flow.Sandboxnet || chainID == flow.Localnet || chainID == flow.Benchnet {
 		vmOpts = append(vmOpts,
 			fvm.WithContractDeploymentRestricted(false),
 		)
