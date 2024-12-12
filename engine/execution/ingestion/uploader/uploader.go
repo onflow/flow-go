@@ -36,7 +36,7 @@ func NewAsyncUploader(uploader Uploader,
 		queue:               make(chan *execution.ComputationResult, 100),
 	}
 	builder := component.NewComponentManagerBuilder()
-	for range 3 {
+	for i := 0; i < 3; i++ {
 		builder.AddWorker(a.UploadWorker)
 	}
 	a.cm = builder.Build()
