@@ -3,9 +3,12 @@ package data_providers
 import (
 	"context"
 	"fmt"
+	"github.com/onflow/flow/protobuf/go/flow/entities"
+	"strconv"
 	"testing"
 
 	"github.com/rs/zerolog"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
@@ -13,6 +16,7 @@ import (
 	accessmock "github.com/onflow/flow-go/access/mock"
 	"github.com/onflow/flow-go/engine/access/rest/websockets/models"
 	"github.com/onflow/flow-go/engine/access/state_stream"
+	ssmock "github.com/onflow/flow-go/engine/access/state_stream/mock"
 	"github.com/onflow/flow-go/engine/access/subscription"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -22,7 +26,7 @@ type TransactionStatusesProviderSuite struct {
 	suite.Suite
 
 	log zerolog.Logger
-	api access.API
+	api *accessmock.API
 
 	chain          flow.Chain
 	rootBlock      flow.Block
@@ -74,22 +78,48 @@ func (s *TransactionStatusesProviderSuite) TestTransactionStatusesDataProvider_H
 
 func (s *TransactionStatusesProviderSuite) subscribeTransactionStatusesDataProviderTestCases() []testType {
 	return []testType{
-		//{
-		//	name: "SubscribeTransactionStatuses happy path",
-		//	arguments: models.Arguments{
-		//		"start_block_id": s.rootBlock.ID().String(),
-		//		"event_types":    []string{"flow.AccountCreated", "flow.AccountKeyAdded"},
-		//	},
-		//	setupBackend: func(sub *ssmock.Subscription) {
-		//		s.api.On(
-		//			"SubscribeTransactionStatuses",
-		//			mock.Anything,
-		//			mock.Anything,
-		//			s.rootBlock.ID(),
-		//			entities.EventEncodingVersion_JSON_CDC_V0,
-		//		).Return(sub).Once()
-		//	},
-		//},
+		{
+			name: "SubscribeAccountStatusesFromStartBlockID happy path",
+			arguments: models.Arguments{
+				"start_block_id": s.rootBlock.ID().String(),
+				"event_types":    []string{"flow.AccountCreated", "flow.AccountKeyAdded"},
+			},
+			setupBackend: func(sub *ssmock.Subscription) {
+				s.api.On(
+					"SubscribeTransactionStatusesFromStartBlockID",
+					mock.Anything,
+					s.rootBlock.ID(),
+					mock.Anything,
+					entities.EventEncodingVersion_JSON_CDC_V0,
+				).Return(sub).Once()
+			},
+		},
+		{
+			name: "SubscribeAccountStatusesFromStartHeight happy path",
+			arguments: models.Arguments{
+				"start_block_height": strconv.FormatUint(s.rootBlock.Header.Height, 10),
+			},
+			setupBackend: func(sub *ssmock.Subscription) {
+				s.api.On(
+					"SubscribeTransactionStatusesFromStartHeight",
+					mock.Anything,
+					s.rootBlock.Header.Height,
+					mock.Anything,
+					entities.EventEncodingVersion_JSON_CDC_V0,
+				).Return(sub).Once()
+			},
+		},
+		{
+			name:      "SubscribeAccountStatusesFromLatestBlock happy path",
+			arguments: models.Arguments{},
+			setupBackend: func(sub *ssmock.Subscription) {
+				s.api.On(
+					"SubscribeTransactionStatusesFromLatest",
+					mock.Anything,
+					entities.EventEncodingVersion_JSON_CDC_V0,
+				).Return(sub).Once()
+			},
+		},
 	}
 }
 
