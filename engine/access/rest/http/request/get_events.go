@@ -71,7 +71,7 @@ func (g *GetEvents) Parse(rawType string, rawStart string, rawEnd string, rawBlo
 	if rawType == "" {
 		return fmt.Errorf("event type must be provided")
 	}
-	var eventType EventType
+	var eventType parser.EventType
 	err = eventType.Parse(rawType)
 	if err != nil {
 		return err
