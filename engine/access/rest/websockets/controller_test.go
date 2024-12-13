@@ -938,7 +938,7 @@ func (s *WsControllerSuite) expectSubscribeResponse(conn *connmock.WebsocketConn
 }
 
 func (s *WsControllerSuite) expectKeepaliveClose(conn *connmock.WebsocketConnection, done <-chan struct{}) {
-	// We use maybe as a test may finish faster than keepalive routine trigger WriteControl
+	// We use Maybe() because a test may finish faster than keepalive routine trigger WriteControl
 	conn.
 		On("WriteControl", websocket.PingMessage, mock.Anything).
 		Return(func(int, time.Time) error {
