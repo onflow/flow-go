@@ -795,7 +795,6 @@ func (s *WsControllerSuite) TestKeepaliveHappyCase() {
 	conn.
 		On("WriteControl", websocket.PingMessage, mock.Anything).
 		Return(func(int, time.Time) error {
-			s.T().Log("---WRITE CONTROL")
 			if i == expectedCalls {
 				close(done)
 				return websocket.ErrCloseSent
