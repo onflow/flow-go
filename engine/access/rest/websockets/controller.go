@@ -398,10 +398,6 @@ func (c *Controller) keepalive(ctx context.Context) error {
 					return err
 				}
 
-				c.writeErrorResponse(
-					ctx,
-					err,
-					wrapErrorMessage(ConnectionWrite, "error sending ping", "", "", ""))
 				return fmt.Errorf("error sending ping: %w", err)
 			}
 		}
