@@ -96,7 +96,7 @@ func (s *WsControllerSuite) TestSubscribeRequest() {
 		conn.
 			On("WriteJSON", mock.Anything).
 			Return(func(msg interface{}) error {
-				defer close(done) // Signal that response has been sent
+				defer close(done)
 
 				response, ok := msg.(models.SubscribeMessageResponse)
 				require.True(t, ok)
@@ -143,7 +143,7 @@ func (s *WsControllerSuite) TestSubscribeRequest() {
 		conn.
 			On("WriteJSON", mock.Anything).
 			Return(func(msg interface{}) error {
-				defer close(done) // Signal that response has been sent
+				defer close(done)
 
 				response, ok := msg.(models.BaseMessageResponse)
 				require.True(t, ok)
@@ -175,7 +175,7 @@ func (s *WsControllerSuite) TestSubscribeRequest() {
 		conn.
 			On("WriteJSON", mock.Anything).
 			Return(func(msg interface{}) error {
-				defer close(done) // Signal that response has been sent
+				defer close(done)
 
 				response, ok := msg.(models.BaseMessageResponse)
 				require.True(t, ok)
@@ -216,7 +216,7 @@ func (s *WsControllerSuite) TestSubscribeRequest() {
 		conn.
 			On("WriteJSON", mock.Anything).
 			Return(func(msg interface{}) error {
-				defer close(done) // Signal that response has been sent
+				defer close(done)
 
 				response, ok := msg.(models.BaseMessageResponse)
 				require.True(t, ok)
