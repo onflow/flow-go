@@ -3,8 +3,6 @@ package data_providers
 import (
 	"context"
 	"fmt"
-	"github.com/onflow/flow-go/engine/access/rest/http/request"
-	"github.com/onflow/flow-go/engine/access/rest/util"
 	"strconv"
 
 	"github.com/rs/zerolog"
@@ -13,10 +11,13 @@ import (
 
 	"github.com/onflow/flow-go/access"
 	"github.com/onflow/flow-go/engine/access/rest/common/parser"
+	"github.com/onflow/flow-go/engine/access/rest/http/request"
+	"github.com/onflow/flow-go/engine/access/rest/util"
 	"github.com/onflow/flow-go/engine/access/rest/websockets/models"
 	"github.com/onflow/flow-go/engine/access/subscription"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/counters"
+
 	"github.com/onflow/flow/protobuf/go/flow/entities"
 )
 
