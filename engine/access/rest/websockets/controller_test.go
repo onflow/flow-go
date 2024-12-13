@@ -41,7 +41,7 @@ func TestWsControllerSuite(t *testing.T) {
 // TestSubscribeRequest tests the subscribe to topic flow.
 // We emulate a request message from a client, and a response message from a controller.
 func (s *WsControllerSuite) TestSubscribeRequest() {
-	//s.T().Parallel()
+	s.T().Parallel()
 
 	s.T().Run("Happy path", func(t *testing.T) {
 		t.Parallel()
@@ -191,7 +191,7 @@ func (s *WsControllerSuite) TestSubscribeRequest() {
 		controller.HandleConnection(context.Background())
 	})
 
-	s.T().Run("Run error", func(t *testing.T) {
+	s.T().Run("Provider execution error", func(t *testing.T) {
 		t.Parallel()
 
 		conn, dataProviderFactory, dataProvider := newControllerMocks(t)
@@ -235,7 +235,7 @@ func (s *WsControllerSuite) TestSubscribeRequest() {
 }
 
 func (s *WsControllerSuite) TestUnsubscribeRequest() {
-	//s.T().Parallel()
+	s.T().Parallel()
 
 	s.T().Run("Happy path", func(t *testing.T) {
 		t.Parallel()
@@ -273,7 +273,7 @@ func (s *WsControllerSuite) TestUnsubscribeRequest() {
 			SubscriptionID: id.String(),
 		}
 		requestJson, err := json.Marshal(request)
-		require.NoError(s.T(), err)
+		require.NoError(t, err)
 
 		conn.
 			On("ReadJSON", mock.Anything).
@@ -343,7 +343,7 @@ func (s *WsControllerSuite) TestUnsubscribeRequest() {
 			SubscriptionID: "invalid-uuid",
 		}
 		requestJson, err := json.Marshal(request)
-		require.NoError(s.T(), err)
+		require.NoError(t, err)
 
 		conn.
 			On("ReadJSON", mock.Anything).
@@ -413,7 +413,7 @@ func (s *WsControllerSuite) TestUnsubscribeRequest() {
 			SubscriptionID: uuid.New().String(),
 		}
 		requestJson, err := json.Marshal(request)
-		require.NoError(s.T(), err)
+		require.NoError(t, err)
 
 		conn.
 			On("ReadJSON", mock.Anything).
@@ -450,81 +450,84 @@ func (s *WsControllerSuite) TestUnsubscribeRequest() {
 }
 
 func (s *WsControllerSuite) TestListSubscriptions() {
-	//s.T().Parallel()
+	s.T().Parallel()
 
-	conn, dataProviderFactory, dataProvider := newControllerMocks(s.T())
-	controller := NewWebSocketController(s.logger, s.wsConfig, conn, dataProviderFactory)
+	s.T().Run("Happy path", func(t *testing.T) {
 
-	dataProviderFactory.
-		On("NewDataProvider", mock.Anything, mock.Anything, mock.Anything, mock.Anything).
-		Return(dataProvider, nil).
-		Once()
+		conn, dataProviderFactory, dataProvider := newControllerMocks(t)
+		controller := NewWebSocketController(s.logger, s.wsConfig, conn, dataProviderFactory)
 
-	done := make(chan struct{}, 1)
+		dataProviderFactory.
+			On("NewDataProvider", mock.Anything, mock.Anything, mock.Anything, mock.Anything).
+			Return(dataProvider, nil).
+			Once()
 
-	id := uuid.New()
-	topic := "blocks"
-	dataProvider.On("ID").Return(id)
-	dataProvider.On("Topic").Return(topic)
-	dataProvider.On("Close").Return(nil).Maybe()
-	dataProvider.
-		On("Run").
-		Run(func(args mock.Arguments) {
-			for range done {
-			}
-		}).
-		Return(nil).
-		Once()
+		done := make(chan struct{}, 1)
 
-	msgID := s.expectSubscribeRequest(conn)
-	s.expectSubscribeResponse(conn, msgID)
+		id := uuid.New()
+		topic := "blocks"
+		dataProvider.On("ID").Return(id)
+		dataProvider.On("Topic").Return(topic)
+		dataProvider.On("Close").Return(nil).Maybe()
+		dataProvider.
+			On("Run").
+			Run(func(args mock.Arguments) {
+				for range done {
+				}
+			}).
+			Return(nil).
+			Once()
 
-	request := models.ListSubscriptionsMessageRequest{
-		BaseMessageRequest: models.BaseMessageRequest{
-			MessageID: uuid.New().String(),
-			Action:    models.ListSubscriptionsAction,
-		},
-	}
-	requestJson, err := json.Marshal(request)
-	require.NoError(s.T(), err)
+		msgID := s.expectSubscribeRequest(conn)
+		s.expectSubscribeResponse(conn, msgID)
 
-	conn.
-		On("ReadJSON", mock.Anything).
-		Run(func(args mock.Arguments) {
-			msg, ok := args.Get(0).(*json.RawMessage)
-			require.True(s.T(), ok)
-			*msg = requestJson
-		}).
-		Return(nil).
-		Once()
+		request := models.ListSubscriptionsMessageRequest{
+			BaseMessageRequest: models.BaseMessageRequest{
+				MessageID: uuid.New().String(),
+				Action:    models.ListSubscriptionsAction,
+			},
+		}
+		requestJson, err := json.Marshal(request)
+		require.NoError(t, err)
 
-	conn.
-		On("WriteJSON", mock.Anything).
-		Return(func(msg interface{}) error {
-			defer close(done)
+		conn.
+			On("ReadJSON", mock.Anything).
+			Run(func(args mock.Arguments) {
+				msg, ok := args.Get(0).(*json.RawMessage)
+				require.True(t, ok)
+				*msg = requestJson
+			}).
+			Return(nil).
+			Once()
 
-			response, ok := msg.(models.ListSubscriptionsMessageResponse)
-			require.True(s.T(), ok)
-			require.True(s.T(), response.Success)
-			require.Empty(s.T(), response.Error)
-			require.Equal(s.T(), request.MessageID, response.MessageID)
-			require.Equal(s.T(), 1, len(response.Subscriptions))
-			require.Equal(s.T(), id.String(), response.Subscriptions[0].ID)
-			require.Equal(s.T(), topic, response.Subscriptions[0].Topic)
+		conn.
+			On("WriteJSON", mock.Anything).
+			Return(func(msg interface{}) error {
+				defer close(done)
 
-			return websocket.ErrCloseSent
-		}).
-		Once()
+				response, ok := msg.(models.ListSubscriptionsMessageResponse)
+				require.True(t, ok)
+				require.True(t, response.Success)
+				require.Empty(t, response.Error)
+				require.Equal(t, request.MessageID, response.MessageID)
+				require.Equal(t, 1, len(response.Subscriptions))
+				require.Equal(t, id.String(), response.Subscriptions[0].ID)
+				require.Equal(t, topic, response.Subscriptions[0].Topic)
 
-	s.expectCloseConnection(conn, done)
-	s.expectKeepaliveClose(conn, done)
+				return websocket.ErrCloseSent
+			}).
+			Once()
 
-	controller.HandleConnection(context.Background())
+		s.expectCloseConnection(conn, done)
+		s.expectKeepaliveClose(conn, done)
+
+		controller.HandleConnection(context.Background())
+	})
 }
 
 // TestSubscribeBlocks tests the functionality for streaming blocks to a subscriber.
 func (s *WsControllerSuite) TestSubscribeBlocks() {
-	//s.T().Parallel()
+	s.T().Parallel()
 
 	s.T().Run("Stream one block", func(t *testing.T) {
 		t.Parallel()
@@ -640,25 +643,27 @@ func (s *WsControllerSuite) TestSubscribeBlocks() {
 
 // TestConfigureKeepaliveConnection ensures that the WebSocket connection is configured correctly.
 func (s *WsControllerSuite) TestConfigureKeepaliveConnection() {
-	//s.T().Parallel()
+	s.T().Parallel()
 
-	conn := connmock.NewWebsocketConnection(s.T())
-	conn.On("SetPongHandler", mock.AnythingOfType("func(string) error")).Return(nil).Once()
-	conn.On("SetReadDeadline", mock.Anything).Return(nil)
+	s.T().Run("Happy path", func(t *testing.T) {
+		conn := connmock.NewWebsocketConnection(t)
+		conn.On("SetPongHandler", mock.AnythingOfType("func(string) error")).Return(nil).Once()
+		conn.On("SetReadDeadline", mock.Anything).Return(nil)
 
-	factory := dpmock.NewDataProviderFactory(s.T())
-	controller := NewWebSocketController(s.logger, s.wsConfig, conn, factory)
+		factory := dpmock.NewDataProviderFactory(t)
+		controller := NewWebSocketController(s.logger, s.wsConfig, conn, factory)
 
-	err := controller.configureKeepalive()
-	s.Require().NoError(err, "configureKeepalive should not return an error")
+		err := controller.configureKeepalive()
+		s.Require().NoError(err, "configureKeepalive should not return an error")
 
-	conn.AssertExpectations(s.T())
+		conn.AssertExpectations(t)
+	})
 }
 
 func (s *WsControllerSuite) TestControllerShutdown() {
-	//s.T().Parallel()
+	s.T().Parallel()
 
-	s.T().Run("keepalive routine failed", func(t *testing.T) {
+	s.T().Run("Keepalive routine failed", func(t *testing.T) {
 		t.Parallel()
 
 		conn := connmock.NewWebsocketConnection(t)
@@ -689,10 +694,10 @@ func (s *WsControllerSuite) TestControllerShutdown() {
 			Once()
 
 		controller.HandleConnection(context.Background())
-		conn.AssertExpectations(s.T())
+		conn.AssertExpectations(t)
 	})
 
-	s.T().Run("read routine failed", func(t *testing.T) {
+	s.T().Run("Read routine failed", func(t *testing.T) {
 		t.Parallel()
 
 		conn := connmock.NewWebsocketConnection(t)
@@ -711,10 +716,10 @@ func (s *WsControllerSuite) TestControllerShutdown() {
 			Once()
 
 		controller.HandleConnection(context.Background())
-		conn.AssertExpectations(s.T())
+		conn.AssertExpectations(t)
 	})
 
-	s.T().Run("write routine failed", func(t *testing.T) {
+	s.T().Run("Write routine failed", func(t *testing.T) {
 		t.Parallel()
 
 		conn, dataProviderFactory, dataProvider := newControllerMocks(t)
@@ -752,12 +757,12 @@ func (s *WsControllerSuite) TestControllerShutdown() {
 		controller.HandleConnection(context.Background())
 
 		// Ensure all expectations are met
-		conn.AssertExpectations(s.T())
-		dataProviderFactory.AssertExpectations(s.T())
-		dataProvider.AssertExpectations(s.T())
+		conn.AssertExpectations(t)
+		dataProviderFactory.AssertExpectations(t)
+		dataProvider.AssertExpectations(t)
 	})
 
-	s.T().Run("context closed", func(t *testing.T) {
+	s.T().Run("Context cancelled", func(t *testing.T) {
 		t.Parallel()
 
 		conn := connmock.NewWebsocketConnection(t)
@@ -777,88 +782,83 @@ func (s *WsControllerSuite) TestControllerShutdown() {
 		cancel()
 		controller.HandleConnection(ctx)
 
-		conn.AssertExpectations(s.T())
+		conn.AssertExpectations(t)
 	})
 }
 
-func (s *WsControllerSuite) TestKeepaliveHappyCase() {
-	//s.T().Parallel()
+func (s *WsControllerSuite) TestKeepaliveRoutine() {
+	s.T().Parallel()
 
-	conn := connmock.NewWebsocketConnection(s.T())
-	conn.On("Close").Return(nil).Once()
-	conn.On("SetPongHandler", mock.AnythingOfType("func(string) error")).Return(nil).Once()
-	conn.On("SetReadDeadline", mock.Anything).Return(nil)
+	s.T().Run("Successfully pings connection n times", func(t *testing.T) {
+		conn := connmock.NewWebsocketConnection(t)
+		conn.On("Close").Return(nil).Once()
+		conn.On("SetPongHandler", mock.AnythingOfType("func(string) error")).Return(nil).Once()
+		conn.On("SetReadDeadline", mock.Anything).Return(nil)
 
-	done := make(chan struct{}, 1)
-	i := 0
-	expectedCalls := 2
-	conn.
-		On("WriteControl", websocket.PingMessage, mock.Anything).
-		Return(func(int, time.Time) error {
-			if i == expectedCalls {
-				close(done)
-				return websocket.ErrCloseSent
+		done := make(chan struct{}, 1)
+		i := 0
+		expectedCalls := 2
+		conn.
+			On("WriteControl", websocket.PingMessage, mock.Anything).
+			Return(func(int, time.Time) error {
+				if i == expectedCalls {
+					close(done)
+					return websocket.ErrCloseSent
+				}
+
+				i += 1
+				return nil
+			}).
+			Times(expectedCalls + 1)
+
+		conn.On("ReadJSON", mock.Anything).Return(func(_ interface{}) error {
+			for range done {
 			}
+			return websocket.ErrCloseSent
+		})
 
-			i += 1
-			return nil
-		}).
-		Times(expectedCalls + 1)
+		factory := dpmock.NewDataProviderFactory(t)
+		controller := NewWebSocketController(s.logger, s.wsConfig, conn, factory)
+		controller.HandleConnection(context.Background())
 
-	conn.On("ReadJSON", mock.Anything).Return(func(_ interface{}) error {
-		for range done {
-		}
-		return websocket.ErrCloseSent
+		conn.AssertExpectations(t)
 	})
 
-	factory := dpmock.NewDataProviderFactory(s.T())
-	controller := NewWebSocketController(s.logger, s.wsConfig, conn, factory)
-	controller.HandleConnection(context.Background())
+	s.T().Run("Error on write to connection", func(t *testing.T) {
+		conn := connmock.NewWebsocketConnection(t)
+		conn.
+			On("WriteControl", websocket.PingMessage, mock.Anything).
+			Return(websocket.ErrCloseSent). //TODO: change to assert.AnError and rewrite test
+			Maybe()
 
-	conn.AssertExpectations(s.T())
-}
+		factory := dpmock.NewDataProviderFactory(t)
+		controller := NewWebSocketController(s.logger, s.wsConfig, conn, factory)
 
-// TestKeepaliveError tests the behavior of the keepalive function when there is an error in writing the ping.
-func (s *WsControllerSuite) TestKeepaliveError() {
-	//s.T().Parallel()
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
 
-	conn := connmock.NewWebsocketConnection(s.T())
-	conn.
-		On("WriteControl", websocket.PingMessage, mock.Anything).
-		Return(websocket.ErrCloseSent). //TODO: change to assert.AnError and rewrite test
-		Maybe()
+		err := controller.keepalive(ctx)
+		s.Require().Error(err)
+		s.Require().ErrorIs(websocket.ErrCloseSent, err)
 
-	factory := dpmock.NewDataProviderFactory(s.T())
-	controller := NewWebSocketController(s.logger, s.wsConfig, conn, factory)
+		conn.AssertExpectations(t)
+	})
 
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	s.T().Run("Context cancelled", func(t *testing.T) {
+		conn := connmock.NewWebsocketConnection(t)
+		factory := dpmock.NewDataProviderFactory(t)
+		controller := NewWebSocketController(s.logger, s.wsConfig, conn, factory)
 
-	err := controller.keepalive(ctx)
-	s.Require().Error(err)
-	s.Require().ErrorIs(websocket.ErrCloseSent, err)
+		ctx, cancel := context.WithCancel(context.Background())
+		cancel() // Immediately cancel the context
 
-	conn.AssertExpectations(s.T())
-}
+		// Start the keepalive process with the context canceled
+		err := controller.keepalive(ctx)
+		s.Require().Error(err)
+		s.Require().ErrorIs(context.Canceled, err) //TODO: should be nil
 
-// TestKeepaliveContextCancel tests the behavior of keepalive when the context is canceled before a ping is sent and
-// no ping message is sent after the context is canceled.
-func (s *WsControllerSuite) TestKeepaliveContextCancel() {
-	//s.T().Parallel()
-
-	conn := connmock.NewWebsocketConnection(s.T())
-	factory := dpmock.NewDataProviderFactory(s.T())
-	controller := NewWebSocketController(s.logger, s.wsConfig, conn, factory)
-
-	ctx, cancel := context.WithCancel(context.Background())
-	cancel() // Immediately cancel the context
-
-	// Start the keepalive process with the context canceled
-	err := controller.keepalive(ctx)
-	s.Require().Error(err)
-	s.Require().ErrorIs(context.Canceled, err) //TODO: should be nil
-
-	conn.AssertExpectations(s.T()) // Should not invoke WriteMessage after context cancellation
+		conn.AssertExpectations(t) // Should not invoke WriteMessage after context cancellation
+	})
 }
 
 // newControllerMocks initializes mock WebSocket connection, data provider, and data provider factory.
