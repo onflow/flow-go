@@ -59,29 +59,48 @@ func (b *backendSubscribeTransactions) SendAndSubscribeTransactionStatuses(
 		return subscription.NewFailedSubscription(err, "failed to send transaction")
 	}
 
-	return b.createSubscription(ctx, tx.ID(), tx.ReferenceBlockID, tx.ReferenceBlockID, requiredEventEncodingVersion, true)
+	return b.createSubscription(ctx, tx.ID(), tx.ReferenceBlockID, 0, tx.ReferenceBlockID, requiredEventEncodingVersion, true)
 }
 
-// SubscribeTransactionStatuses subscribes to the status updates of a transaction.
-// Monitoring starts from the specified block ID or the latest block if no block ID is provided.
-// If the block ID cannot be determined or an error occurs during subscription creation, a failed subscription is returned.
-func (b *backendSubscribeTransactions) SubscribeTransactionStatuses(
+// SubscribeTransactionStatusesFromStartHeight subscribes to the status updates of a transaction.
+// Monitoring starts from the specified block height.
+// If the block height cannot be determined or an error occurs during subscription creation, a failed subscription is returned.
+func (b *backendSubscribeTransactions) SubscribeTransactionStatusesFromStartHeight(
 	ctx context.Context,
 	txID flow.Identifier,
-	blockID flow.Identifier,
+	startHeight uint64,
 	requiredEventEncodingVersion entities.EventEncodingVersion,
 ) subscription.Subscription {
-	// if no block ID provided, get latest block ID
-	if blockID == flow.ZeroID {
-		header, err := b.txLocalDataProvider.state.Sealed().Head()
-		if err != nil {
-			b.log.Error().Err(err).Msg("failed to retrieve latest block")
-			return subscription.NewFailedSubscription(err, "failed to retrieve latest block")
-		}
-		blockID = header.ID()
+	return b.createSubscription(ctx, txID, flow.ZeroID, startHeight, flow.ZeroID, requiredEventEncodingVersion, false)
+}
+
+// SubscribeTransactionStatusesFromStartBlockID subscribes to the status updates of a transaction.
+// Monitoring starts from the specified block ID.
+// If the block ID cannot be determined or an error occurs during subscription creation, a failed subscription is returned.
+func (b *backendSubscribeTransactions) SubscribeTransactionStatusesFromStartBlockID(
+	ctx context.Context,
+	txID flow.Identifier,
+	startBlockID flow.Identifier,
+	requiredEventEncodingVersion entities.EventEncodingVersion,
+) subscription.Subscription {
+	return b.createSubscription(ctx, txID, startBlockID, 0, flow.ZeroID, requiredEventEncodingVersion, false)
+}
+
+// SubscribeTransactionStatusesFromLatest subscribes to the status updates of a transaction.
+// Monitoring starts from the latest block.
+// If the block cannot be retrieved or an error occurs during subscription creation, a failed subscription is returned.
+func (b *backendSubscribeTransactions) SubscribeTransactionStatusesFromLatest(
+	ctx context.Context,
+	txID flow.Identifier,
+	requiredEventEncodingVersion entities.EventEncodingVersion,
+) subscription.Subscription {
+	header, err := b.txLocalDataProvider.state.Sealed().Head()
+	if err != nil {
+		b.log.Error().Err(err).Msg("failed to retrieve latest block")
+		return subscription.NewFailedSubscription(err, "failed to retrieve latest block")
 	}
 
-	return b.createSubscription(ctx, txID, blockID, flow.ZeroID, requiredEventEncodingVersion, false)
+	return b.createSubscription(ctx, txID, header.ID(), 0, flow.ZeroID, requiredEventEncodingVersion, false)
 }
 
 // createSubscription initializes a subscription for monitoring a transaction's status.
@@ -89,16 +108,26 @@ func (b *backendSubscribeTransactions) SubscribeTransactionStatuses(
 func (b *backendSubscribeTransactions) createSubscription(
 	ctx context.Context,
 	txID flow.Identifier,
-	blockID flow.Identifier,
+	startBlockID flow.Identifier,
+	startBlockHeight uint64,
 	referenceBlockID flow.Identifier,
 	requiredEventEncodingVersion entities.EventEncodingVersion,
 	shouldTriggerPending bool,
 ) subscription.Subscription {
+	var nextHeight uint64
+	var err error
+
 	// Get height to start subscription from
-	nextHeight, err := b.blockTracker.GetStartHeightFromBlockID(blockID)
-	if err != nil {
-		b.log.Error().Err(err).Str("block_id", blockID.String()).Msg("failed to get start height")
-		return subscription.NewFailedSubscription(err, "failed to get start height")
+	if startBlockID == flow.ZeroID {
+		if nextHeight, err = b.blockTracker.GetStartHeightFromHeight(startBlockHeight); err != nil {
+			b.log.Error().Err(err).Uint64("block_height", startBlockHeight).Msg("failed to get start height")
+			return subscription.NewFailedSubscription(err, "failed to get start height")
+		}
+	} else {
+		if nextHeight, err = b.blockTracker.GetStartHeightFromBlockID(startBlockID); err != nil {
+			b.log.Error().Err(err).Str("block_id", startBlockID.String()).Msg("failed to get start height")
+			return subscription.NewFailedSubscription(err, "failed to get start height")
+		}
 	}
 
 	// choose initial transaction status

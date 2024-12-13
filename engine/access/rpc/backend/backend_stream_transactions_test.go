@@ -245,7 +245,7 @@ func (s *TransactionStatusSuite) addNewFinalizedBlock(parent *flow.Header, notif
 	}
 }
 
-// TestSubscribeTransactionStatusHappyCase tests the functionality of the SubscribeTransactionStatuses method in the Backend.
+// TestSubscribeTransactionStatusHappyCase tests the functionality of the SubscribeTransactionStatusesFromStartBlockID method in the Backend.
 // It covers the emulation of transaction stages from pending to sealed, and receiving status updates.
 func (s *TransactionStatusSuite) TestSubscribeTransactionStatusHappyCase() {
 	ctx, cancel := context.WithCancel(context.Background())
@@ -359,7 +359,7 @@ func (s *TransactionStatusSuite) TestSubscribeTransactionStatusHappyCase() {
 	}, 100*time.Millisecond, "timed out waiting for subscription to shutdown")
 }
 
-// TestSubscribeTransactionStatusExpired tests the functionality of the SubscribeTransactionStatuses method in the Backend
+// TestSubscribeTransactionStatusExpired tests the functionality of the SubscribeTransactionStatusesFromStartBlockID method in the Backend
 // when transaction become expired
 func (s *TransactionStatusSuite) TestSubscribeTransactionStatusExpired() {
 	ctx, cancel := context.WithCancel(context.Background())
