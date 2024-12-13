@@ -50,7 +50,7 @@ func (s *AccountStatusesProviderSuite) SetupTest() {
 		s.log,
 		s.api,
 		nil,
-		flow.Testnet.Chain(),
+		s.chain,
 		state_stream.DefaultEventFilterConfig,
 		subscription.DefaultHeartbeatInterval)
 	s.Require().NotNil(s.factory)

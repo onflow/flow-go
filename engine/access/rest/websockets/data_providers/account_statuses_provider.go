@@ -20,7 +20,8 @@ import (
 	"github.com/onflow/flow-go/module/counters"
 )
 
-type AccountStatusesArguments struct {
+// accountStatusesArguments contains the arguments required for subscribing to account statuses
+type accountStatusesArguments struct {
 	StartBlockID     flow.Identifier                  // ID of the block to start subscription from
 	StartBlockHeight uint64                           // Height of the block to start subscription from
 	Filter           state_stream.AccountStatusFilter // Filter applied to events for a given subscription
@@ -81,7 +82,7 @@ func (p *AccountStatusesDataProvider) Run() error {
 }
 
 // createSubscription creates a new subscription using the specified input arguments.
-func (p *AccountStatusesDataProvider) createSubscription(ctx context.Context, args AccountStatusesArguments) subscription.Subscription {
+func (p *AccountStatusesDataProvider) createSubscription(ctx context.Context, args accountStatusesArguments) subscription.Subscription {
 	if args.StartBlockID != flow.ZeroID {
 		return p.stateStreamApi.SubscribeAccountStatusesFromStartBlockID(ctx, args.StartBlockID, args.Filter)
 	}
@@ -132,8 +133,9 @@ func parseAccountStatusesArguments(
 	arguments models.Arguments,
 	chain flow.Chain,
 	eventFilterConfig state_stream.EventFilterConfig,
-) (AccountStatusesArguments, error) {
-	var args AccountStatusesArguments
+) (accountStatusesArguments, error) {
+	var args accountStatusesArguments
+	//var err error
 
 	// Check for mutual exclusivity of start_block_id and start_block_height early
 	startBlockIDIn, hasStartBlockID := arguments["start_block_id"]
@@ -158,16 +160,16 @@ func parseAccountStatusesArguments(
 	}
 
 	// Parse 'start_block_height' if provided
+	var err error
 	if hasStartBlockHeight {
 		result, ok := startBlockHeightIn.(string)
 		if !ok {
 			return args, fmt.Errorf("'start_block_height' must be a string")
 		}
-		startBlockHeight, err := util.ToUint64(result)
+		args.StartBlockHeight, err = util.ToUint64(result)
 		if err != nil {
 			return args, fmt.Errorf("invalid 'start_block_height': %w", err)
 		}
-		args.StartBlockHeight = startBlockHeight
 	} else {
 		args.StartBlockHeight = request.EmptyHeight
 	}
@@ -196,11 +198,10 @@ func parseAccountStatusesArguments(
 	}
 
 	// Initialize the event filter with the parsed arguments
-	filter, err := state_stream.NewAccountStatusFilter(eventFilterConfig, chain, eventTypes.Flow(), accountAddresses)
+	args.Filter, err = state_stream.NewAccountStatusFilter(eventFilterConfig, chain, eventTypes.Flow(), accountAddresses)
 	if err != nil {
 		return args, fmt.Errorf("failed to create event filter: %w", err)
 	}
-	args.Filter = filter
 
 	return args, nil
 }
