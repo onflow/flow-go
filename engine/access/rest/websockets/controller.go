@@ -78,6 +78,9 @@ func (c *Controller) HandleConnection(ctx context.Context) {
 	g.Go(func() error {
 		return c.writeMessages(gCtx)
 	})
+	g.Go(func() error {
+		return c.monitorInactivity(ctx)
+	})
 
 	if err = g.Wait(); err != nil {
 		if errors.Is(err, websocket.ErrCloseSent) {
@@ -115,6 +118,32 @@ func (c *Controller) configureKeepalive() error {
 	})
 
 	return nil
+}
+
+// monitorInactivity periodically checks for inactivity on the connection.
+//
+// Expected behavior:
+// - Terminates when all data providers are unsubscribed.
+// - Resets based on activity such as adding/removing subscriptions.
+//
+// Parameters:
+// - ctx: Context to control cancellation and timeouts.
+func (c *Controller) monitorInactivity(ctx context.Context) error {
+	for {
+		select {
+		case <-ctx.Done():
+			return nil
+		default:
+			if c.dataProviders.Size() == 0 {
+				<-time.After(c.config.InactivityTimeout)
+
+				if c.dataProviders.Size() == 0 {
+					// TODO: decide if we need to write response message with reason to client
+					return fmt.Errorf("no recent activity for %v", c.config.InactivityTimeout)
+				}
+			}
+		}
+	}
 }
 
 // writeMessages reads a messages from communication channel and passes them on to a client WebSocket connection.
