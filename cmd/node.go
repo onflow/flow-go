@@ -22,7 +22,8 @@ type Node interface {
 	// Run initiates all common components (logger, database, protocol state etc.)
 	// then starts each component. It also sets up a channel to gracefully shut
 	// down each component if a SIGINT is received.
-	Run()
+	// The context can also be used to signal the node to shutdown.
+	Run(ctx context.Context)
 }
 
 // FlowNodeImp is created by the FlowNodeBuilder with all components ready to be started.
@@ -86,8 +87,7 @@ func NewBaseNode(
 // which point it gracefully shuts down.
 // Any unhandled irrecoverable errors thrown in child components will propagate up to here and
 // result in a fatal error.
-func (node *NodeImp) Run() {
-	ctx := context.Background()
+func (node *NodeImp) Run(ctx context.Context) {
 
 	// Block until node is shutting down
 	err := node.run(ctx)
