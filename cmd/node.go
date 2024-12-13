@@ -22,25 +22,61 @@ type Node interface {
 	// Run initiates all common components (logger, database, protocol state etc.)
 	// then starts each component. It also sets up a channel to gracefully shut
 	// down each component if a SIGINT is received.
-	Run()
+	// The context can also be used to signal the node to shutdown.
+	Run(ctx context.Context)
 }
 
 // FlowNodeImp is created by the FlowNodeBuilder with all components ready to be started.
 // The Run function starts all the components, and is blocked until either a termination
 // signal is received or a irrecoverable error is encountered.
 type FlowNodeImp struct {
-	component.Component
+	NodeImp
 	*NodeConfig
+}
+
+// NodeImp can be used to create a node instance from:
+//   - a logger: to be used during startup and shutdown
+//   - a component: that will be started with Run
+//   - a cleanup function: that will be called after the component has been stopped
+//   - a fatal error handler: to handle any error received from the component
+type NodeImp struct {
+	component.Component
 	logger       zerolog.Logger
 	postShutdown func() error
 	fatalHandler func(error)
 }
 
 // NewNode returns a new node instance
-func NewNode(component component.Component, cfg *NodeConfig, logger zerolog.Logger, cleanup func() error, handleFatal func(error)) Node {
+func NewNode(
+	component component.Component,
+	cfg *NodeConfig,
+	logger zerolog.Logger,
+	cleanup func() error,
+	handleFatal func(error),
+) Node {
 	return &FlowNodeImp{
+		NodeConfig: cfg,
+		NodeImp: NewBaseNode(
+			component,
+			logger.With().
+				Str("node_role", cfg.BaseConfig.NodeRole).
+				Hex("spork_id", logging.ID(cfg.SporkID)).
+				Logger(),
+			cleanup,
+			handleFatal,
+		),
+	}
+}
+
+// NewBaseNode returns a new base node instance
+func NewBaseNode(
+	component component.Component,
+	logger zerolog.Logger,
+	cleanup func() error,
+	handleFatal func(error),
+) NodeImp {
+	return NodeImp{
 		Component:    component,
-		NodeConfig:   cfg,
 		logger:       logger,
 		postShutdown: cleanup,
 		fatalHandler: handleFatal,
@@ -51,13 +87,10 @@ func NewNode(component component.Component, cfg *NodeConfig, logger zerolog.Logg
 // which point it gracefully shuts down.
 // Any unhandled irrecoverable errors thrown in child components will propagate up to here and
 // result in a fatal error.
-func (node *FlowNodeImp) Run() {
-	// Cancelling this context notifies all child components that it's time to shutdown
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+func (node *NodeImp) Run(ctx context.Context) {
 
 	// Block until node is shutting down
-	err := node.run(ctx, cancel)
+	err := node.run(ctx)
 
 	// Any error received is considered fatal.
 	if err != nil {
@@ -73,14 +106,18 @@ func (node *FlowNodeImp) Run() {
 		node.logger.Error().Err(err).Msg("error encountered during cleanup")
 	}
 
-	node.logger.Info().Msgf("%s node shutdown complete", node.BaseConfig.NodeRole)
+	node.logger.Info().Msg("node shutdown complete")
 }
 
 // run starts the node and blocks until a SIGINT/SIGTERM is received or an error is encountered.
 // It returns:
 //   - nil if a termination signal is received, and all components have been gracefully stopped.
-//   - error if a irrecoverable error is received
-func (node *FlowNodeImp) run(ctx context.Context, shutdown context.CancelFunc) error {
+//   - error if an irrecoverable error is received
+func (node *NodeImp) run(ctx context.Context) error {
+	// Cancelling this context notifies all child components that it's time to shut down
+	ctx, shutdown := context.WithCancel(ctx)
+	defer shutdown()
+
 	// Components will pass unhandled irrecoverable errors to this channel via signalerCtx (or a
 	// child context). Any errors received on this channel should halt the node.
 	signalerCtx, errChan := irrecoverable.WithSignaler(ctx)
@@ -97,8 +134,7 @@ func (node *FlowNodeImp) run(ctx context.Context, shutdown context.CancelFunc) e
 		select {
 		case <-node.Ready():
 			node.logger.Info().
-				Hex("spork_id", logging.ID(node.SporkID)).
-				Msgf("%s node startup complete", node.BaseConfig.NodeRole)
+				Msg("node startup complete")
 		case <-ctx.Done():
 		}
 	}()
@@ -118,7 +154,7 @@ func (node *FlowNodeImp) run(ctx context.Context, shutdown context.CancelFunc) e
 
 	// 3: Shut down
 	// Send shutdown signal to components
-	node.logger.Info().Msgf("%s node shutting down", node.BaseConfig.NodeRole)
+	node.logger.Info().Msg("node shutting down")
 	shutdown()
 
 	// Block here until all components have stopped or an irrecoverable error is received.

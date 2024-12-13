@@ -1,6 +1,8 @@
 package main
 
 import (
+	"context"
+
 	nodebuilder "github.com/onflow/flow-go/cmd/observer/node_builder"
 )
 
@@ -22,5 +24,5 @@ func main() {
 	if err != nil {
 		anb.Logger.Fatal().Err(err).Send()
 	}
-	node.Run()
+	node.Run(context.Background())
 }

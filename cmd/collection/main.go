@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"time"
 
@@ -646,7 +647,7 @@ func main() {
 	if err != nil {
 		nodeBuilder.Logger.Fatal().Err(err).Send()
 	}
-	node.Run()
+	node.Run(context.Background())
 }
 
 // createQCContractClient creates QC contract client
