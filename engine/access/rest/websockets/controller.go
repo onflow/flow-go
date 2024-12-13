@@ -3,170 +3,229 @@ package websockets
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"golang.org/x/time/rate"
 	"sync"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/gorilla/websocket"
 	"github.com/rs/zerolog"
+	"golang.org/x/sync/errgroup"
 
-	dp "github.com/onflow/flow-go/engine/access/rest/websockets/data_provider"
+	dp "github.com/onflow/flow-go/engine/access/rest/websockets/data_providers"
 	"github.com/onflow/flow-go/engine/access/rest/websockets/models"
 	"github.com/onflow/flow-go/utils/concurrentmap"
 )
 
-type Controller struct {
-	logger               zerolog.Logger
-	config               Config
-	conn                 WebsocketConnection
-	communicationChannel chan interface{}
-	dataProviders        *concurrentmap.Map[uuid.UUID, dp.DataProvider]
-	dataProvidersFactory dp.Factory
-	shutdownOnce         sync.Once
+var (
+	ErrUnmarshalMessage = errors.New("failed to unmarshal message")
+)
 
-	limiter *rate.Limiter
+type Controller struct {
+	logger zerolog.Logger
+	config Config
+	conn   WebsocketConnection
+
+	// data channel which data providers write messages to.
+	// writer routine reads from this channel and writes messages to connection
+	multiplexedStream chan interface{}
+
+	dataProviders       *concurrentmap.Map[uuid.UUID, dp.DataProvider]
+	dataProviderFactory dp.DataProviderFactory
+	dataProvidersGroup  *sync.WaitGroup
+	limiter             *rate.Limiter
 }
 
 func NewWebSocketController(
 	logger zerolog.Logger,
 	config Config,
-	factory dp.Factory,
 	conn WebsocketConnection,
+	dataProviderFactory dp.DataProviderFactory,
 ) *Controller {
 	return &Controller{
-		logger:               logger.With().Str("component", "websocket-controller").Logger(),
-		config:               config,
-		conn:                 conn,
-		communicationChannel: make(chan interface{}, 10), //TODO: should it be buffered chan?
-		dataProviders:        concurrentmap.New[uuid.UUID, dp.DataProvider](),
-		dataProvidersFactory: factory,
-		shutdownOnce:         sync.Once{},
-		limiter:              rate.NewLimiter(rate.Limit(config.MaxResponsesPerSecond), 1),
+		logger:              logger.With().Str("component", "websocket-controller").Logger(),
+		config:              config,
+		conn:                conn,
+		multiplexedStream:   make(chan interface{}),
+		dataProviders:       concurrentmap.New[uuid.UUID, dp.DataProvider](),
+		dataProviderFactory: dataProviderFactory,
+		dataProvidersGroup:  &sync.WaitGroup{},
+		limiter:             rate.NewLimiter(rate.Limit(config.MaxResponsesPerSecond), 1),
 	}
 }
 
-// HandleConnection manages the WebSocket connection, adding context and error handling.
+// HandleConnection manages the lifecycle of a WebSocket connection,
+// including setup, message processing, and graceful shutdown.
+//
+// Parameters:
+// - ctx: The context for controlling cancellation and timeouts.
 func (c *Controller) HandleConnection(ctx context.Context) {
-	//TODO: configure the connection with ping-pong and deadlines
-	//TODO: spin up a response limit tracker routine
-	go c.readMessages(ctx)
-	c.writeMessages(ctx)
+	defer c.shutdownConnection()
+
+	err := c.configureKeepalive()
+	if err != nil {
+		c.logger.Error().Err(err).Msg("error configuring connection")
+		return
+	}
+
+	g, gCtx := errgroup.WithContext(ctx)
+
+	g.Go(func() error {
+		return c.readMessages(gCtx)
+	})
+	g.Go(func() error {
+		return c.keepalive(gCtx)
+	})
+	g.Go(func() error {
+		return c.writeMessages(gCtx)
+	})
+
+	if err = g.Wait(); err != nil {
+		if errors.Is(err, websocket.ErrCloseSent) {
+			return
+		}
+
+		c.logger.Error().Err(err).Msg("error detected in one of the goroutines")
+	}
+}
+
+// configureKeepalive sets up the WebSocket connection with a read deadline
+// and a handler for receiving pong messages from the client.
+//
+// The function does the following:
+//  1. Sets an initial read deadline to ensure the server doesn't wait indefinitely
+//     for a pong message from the client. If no message is received within the
+//     specified `pongWait` duration, the connection will be closed.
+//  2. Establishes a Pong handler that resets the read deadline every time a pong
+//     message is received from the client, allowing the server to continue waiting
+//     for further pong messages within the new deadline.
+//
+// No errors are expected during normal operation.
+func (c *Controller) configureKeepalive() error {
+	// Set the initial read deadline for the first pong message
+	// The Pong handler itself only resets the read deadline after receiving a Pong.
+	// It doesn't set an initial deadline. The initial read deadline is crucial to prevent the server from waiting
+	// forever if the client doesn't send Pongs.
+	if err := c.conn.SetReadDeadline(time.Now().Add(PongWait)); err != nil {
+		return fmt.Errorf("failed to set the initial read deadline: %w", err)
+	}
+
+	// Establish a Pong handler which sets the handler for pong messages received from the peer.
+	c.conn.SetPongHandler(func(string) error {
+		return c.conn.SetReadDeadline(time.Now().Add(PongWait))
+	})
+
+	return nil
 }
 
 // writeMessages reads a messages from communication channel and passes them on to a client WebSocket connection.
 // The communication channel is filled by data providers. Besides, the response limit tracker is involved in
 // write message regulation
-func (c *Controller) writeMessages(ctx context.Context) {
-	defer c.shutdownConnection()
-
+//
+// Expected errors during normal operation:
+// - context.Canceled if the client disconnected
+func (c *Controller) writeMessages(ctx context.Context) error {
 	for {
 		select {
 		case <-ctx.Done():
-			return
-		case msg, ok := <-c.communicationChannel:
+			return ctx.Err()
+		case message, ok := <-c.multiplexedStream:
 			if !ok {
-				return
+				return fmt.Errorf("multiplexed stream closed")
 			}
-			c.logger.Debug().Msgf("read message from communication channel: %s", msg)
+
+			if err := c.conn.SetWriteDeadline(time.Now().Add(WriteWait)); err != nil {
+				return fmt.Errorf("failed to set the write deadline: %w", err)
+			}
 
 			// blocking wait for the streamer's rate limit to have available capacity
 			if err := c.limiter.WaitN(ctx, 1); err != nil {
-				return
-			}
-			err := c.conn.WriteJSON(msg)
-			if err != nil {
-				if websocket.IsCloseError(err, websocket.CloseNormalClosure, websocket.CloseGoingAway) ||
-					websocket.IsUnexpectedCloseError(err, websocket.CloseNormalClosure, websocket.CloseGoingAway) {
-					return
-				}
-
-				c.logger.Error().Err(err).Msg("error writing to connection")
-				return
+				return fmt.Errorf("rate limiter error: %w", err)
 			}
 
-			c.logger.Debug().Msg("written message to client")
+			if err := c.conn.WriteJSON(message); err != nil {
+				return err
+			}
 		}
 	}
 }
 
 // readMessages continuously reads messages from a client WebSocket connection,
 // processes each message, and handles actions based on the message type.
-func (c *Controller) readMessages(ctx context.Context) {
-	defer c.shutdownConnection()
-
+//
+// Expected errors during normal operation:
+// - context.Canceled if the client disconnected
+func (c *Controller) readMessages(ctx context.Context) error {
 	for {
-		msg, err := c.readMessage()
-		if err != nil {
-			if websocket.IsCloseError(err, websocket.CloseNormalClosure, websocket.CloseAbnormalClosure) ||
-				websocket.IsUnexpectedCloseError(err, websocket.CloseNormalClosure, websocket.CloseGoingAway) {
-				return
+		var message json.RawMessage
+		if err := c.conn.ReadJSON(&message); err != nil {
+			if errors.Is(err, websocket.ErrCloseSent) {
+				return err
 			}
 
-			c.logger.Debug().Err(err).Msg("error reading message from client")
+			c.writeErrorResponse(
+				ctx,
+				err,
+				wrapErrorMessage(ConnectionRead, "error reading from conn", "", "", ""))
 			continue
 		}
 
-		baseMsg, validatedMsg, err := c.parseAndValidateMessage(msg)
+		validatedMsg, err := c.parseAndValidateMessage(message)
 		if err != nil {
-			c.logger.Debug().Err(err).Msg("error parsing and validating client message")
-			//TODO: write error to error channel
+			c.writeErrorResponse(
+				ctx,
+				err,
+				wrapErrorMessage(InvalidMessage, "error parsing message", "", "", ""))
 			continue
 		}
 
-		if err := c.handleAction(ctx, validatedMsg); err != nil {
-			c.logger.Debug().Err(err).Str("action", baseMsg.Action).Msg("error handling action")
-			//TODO: write error to error channel
+		if err = c.handleAction(ctx, validatedMsg); err != nil {
+			c.writeErrorResponse(
+				ctx,
+				err,
+				wrapErrorMessage(InvalidMessage, "error handling action", "", "", ""))
 			continue
 		}
 	}
 }
 
-func (c *Controller) readMessage() (json.RawMessage, error) {
-	var message json.RawMessage
-	if err := c.conn.ReadJSON(&message); err != nil {
-		return nil, fmt.Errorf("error reading JSON from client: %w", err)
-	}
-
-	return message, nil
-}
-
-func (c *Controller) parseAndValidateMessage(message json.RawMessage) (models.BaseMessageRequest, interface{}, error) {
+func (c *Controller) parseAndValidateMessage(message json.RawMessage) (interface{}, error) {
 	var baseMsg models.BaseMessageRequest
 	if err := json.Unmarshal(message, &baseMsg); err != nil {
-		return models.BaseMessageRequest{}, nil, fmt.Errorf("error unmarshalling base message: %w", err)
+		return nil, fmt.Errorf("error unmarshalling base message: %w", err)
 	}
 
 	var validatedMsg interface{}
 	switch baseMsg.Action {
-	case "subscribe":
+	case models.SubscribeAction:
 		var subscribeMsg models.SubscribeMessageRequest
 		if err := json.Unmarshal(message, &subscribeMsg); err != nil {
-			return baseMsg, nil, fmt.Errorf("error unmarshalling subscribe message: %w", err)
+			return nil, fmt.Errorf("error unmarshalling subscribe message: %w", err)
 		}
-		//TODO: add validation logic for `topic` field
 		validatedMsg = subscribeMsg
 
-	case "unsubscribe":
+	case models.UnsubscribeAction:
 		var unsubscribeMsg models.UnsubscribeMessageRequest
 		if err := json.Unmarshal(message, &unsubscribeMsg); err != nil {
-			return baseMsg, nil, fmt.Errorf("error unmarshalling unsubscribe message: %w", err)
+			return nil, fmt.Errorf("error unmarshalling unsubscribe message: %w", err)
 		}
 		validatedMsg = unsubscribeMsg
 
-	case "list_subscriptions":
+	case models.ListSubscriptionsAction:
 		var listMsg models.ListSubscriptionsMessageRequest
 		if err := json.Unmarshal(message, &listMsg); err != nil {
-			return baseMsg, nil, fmt.Errorf("error unmarshalling list subscriptions message: %w", err)
+			return nil, fmt.Errorf("error unmarshalling list subscriptions message: %w", err)
 		}
 		validatedMsg = listMsg
 
 	default:
 		c.logger.Debug().Str("action", baseMsg.Action).Msg("unknown action type")
-		return baseMsg, nil, fmt.Errorf("unknown action type: %s", baseMsg.Action)
+		return nil, fmt.Errorf("unknown action type: %s", baseMsg.Action)
 	}
 
-	return baseMsg, validatedMsg, nil
+	return validatedMsg, nil
 }
 
 func (c *Controller) handleAction(ctx context.Context, message interface{}) error {
@@ -184,60 +243,201 @@ func (c *Controller) handleAction(ctx context.Context, message interface{}) erro
 }
 
 func (c *Controller) handleSubscribe(ctx context.Context, msg models.SubscribeMessageRequest) {
-	dp := c.dataProvidersFactory.NewDataProvider(c.communicationChannel, msg.Topic)
-	c.dataProviders.Add(dp.ID(), dp)
-
-	// firstly, we want to write OK response to client and only after that we can start providing actual data
-	response := models.SubscribeMessageResponse{
-		BaseMessageResponse: models.BaseMessageResponse{
-			Success: true,
-		},
-		Topic: dp.Topic(),
-		ID:    dp.ID().String(),
+	// register new provider
+	provider, err := c.dataProviderFactory.NewDataProvider(ctx, msg.Topic, msg.Arguments, c.multiplexedStream)
+	if err != nil {
+		c.writeErrorResponse(
+			ctx,
+			err,
+			wrapErrorMessage(InvalidArgument, "error creating data provider", msg.MessageID, models.SubscribeAction, ""),
+		)
+		return
 	}
-	c.communicationChannel <- response
+	c.dataProviders.Add(provider.ID(), provider)
 
-	dp.Run(ctx)
+	// write OK response to client
+	responseOk := models.SubscribeMessageResponse{
+		BaseMessageResponse: models.BaseMessageResponse{
+			MessageID: msg.MessageID,
+			Success:   true,
+		},
+		ID: provider.ID().String(),
+	}
+	c.writeResponse(ctx, responseOk)
+
+	// run provider
+	c.dataProvidersGroup.Add(1)
+	go func() {
+		err = provider.Run()
+		if err != nil {
+			c.writeErrorResponse(
+				ctx,
+				err,
+				wrapErrorMessage(RunError, "data provider finished with error", msg.MessageID, "", ""),
+			)
+		}
+
+		c.dataProvidersGroup.Done()
+		c.dataProviders.Remove(provider.ID())
+	}()
 }
 
-func (c *Controller) handleUnsubscribe(_ context.Context, msg models.UnsubscribeMessageRequest) {
-	id, err := uuid.Parse(msg.ID)
+func (c *Controller) handleUnsubscribe(ctx context.Context, msg models.UnsubscribeMessageRequest) {
+	id, err := uuid.Parse(msg.SubscriptionID)
 	if err != nil {
-		c.logger.Debug().Err(err).Msg("error parsing message ID")
-		//TODO: return an error response to client
-		c.communicationChannel <- err
+		c.writeErrorResponse(
+			ctx,
+			err,
+			wrapErrorMessage(InvalidArgument, "error parsing message ID", msg.MessageID, models.UnsubscribeAction, msg.SubscriptionID),
+		)
 		return
 	}
 
-	dp, ok := c.dataProviders.Get(id)
-	if ok {
-		dp.Close()
-		c.dataProviders.Remove(id)
+	provider, ok := c.dataProviders.Get(id)
+	if !ok {
+		c.writeErrorResponse(
+			ctx,
+			err,
+			wrapErrorMessage(NotFound, "provider not found", msg.MessageID, models.UnsubscribeAction, msg.SubscriptionID),
+		)
+		return
 	}
+
+	err = provider.Close()
+	if err != nil {
+		c.writeErrorResponse(
+			ctx,
+			err,
+			wrapErrorMessage(InternalError, "provider close error", msg.MessageID, models.UnsubscribeAction, msg.SubscriptionID),
+		)
+		return
+	}
+
+	c.dataProviders.Remove(id)
+
+	responseOk := models.UnsubscribeMessageResponse{
+		BaseMessageResponse: models.BaseMessageResponse{
+			MessageID: msg.MessageID,
+			Success:   true,
+		},
+		SubscriptionID: msg.SubscriptionID,
+	}
+	c.writeResponse(ctx, responseOk)
 }
 
 func (c *Controller) handleListSubscriptions(ctx context.Context, msg models.ListSubscriptionsMessageRequest) {
-	//TODO: return a response to client
+	var subs []*models.SubscriptionEntry
+	err := c.dataProviders.ForEach(func(id uuid.UUID, provider dp.DataProvider) error {
+		subs = append(subs, &models.SubscriptionEntry{
+			ID:    id.String(),
+			Topic: provider.Topic(),
+		})
+		return nil
+	})
+
+	if err != nil {
+		c.writeErrorResponse(
+			ctx,
+			err,
+			wrapErrorMessage(NotFound, "error looking for subscription", msg.MessageID, models.ListSubscriptionsAction, ""),
+		)
+		return
+	}
+
+	responseOk := models.ListSubscriptionsMessageResponse{
+		BaseMessageResponse: models.BaseMessageResponse{
+			Success:   true,
+			MessageID: msg.MessageID,
+		},
+		Subscriptions: subs,
+	}
+	c.writeResponse(ctx, responseOk)
 }
 
 func (c *Controller) shutdownConnection() {
-	c.shutdownOnce.Do(func() {
-		defer func() {
-			close(c.communicationChannel)
+	err := c.conn.Close()
+	if err != nil {
+		c.logger.Debug().Err(err).Msg("error closing connection")
+	}
 
-			if err := c.conn.Close(); err != nil {
-				c.logger.Warn().Err(err).Msg("error closing connection")
-			}
-		}()
+	err = c.dataProviders.ForEach(func(_ uuid.UUID, dp dp.DataProvider) error {
+		//TODO: why did i think it's a good idea to return error in Close()? it's messy now
+		err = dp.Close()
+		if err != nil {
+			c.logger.Debug().Err(err).Msg("error closing data provider")
+		}
 
-		c.logger.Debug().Msg("shutting down connection")
-
-		_ = c.dataProviders.ForEach(func(id uuid.UUID, dp dp.DataProvider) error {
-			err := dp.Close()
-			c.logger.Error().Err(err).Msgf("error closing data provider: %s", id.String())
-			return nil
-		})
-
-		c.dataProviders.Clear()
+		return nil
 	})
+
+	if err != nil {
+		c.logger.Debug().Err(err).Msg("error closing data provider")
+	}
+
+	c.dataProviders.Clear()
+
+	// drain the channel as some providers may still send data to it during shutdown
+	go func() {
+		for range c.multiplexedStream {
+		}
+	}()
+
+	c.dataProvidersGroup.Wait()
+	close(c.multiplexedStream)
+}
+
+// keepalive sends a ping message periodically to keep the WebSocket connection alive
+// and avoid timeouts.
+//
+// Expected errors during normal operation:
+// - context.Canceled if the client disconnected
+func (c *Controller) keepalive(ctx context.Context) error {
+	pingTicker := time.NewTicker(PingPeriod)
+	defer pingTicker.Stop()
+
+	for {
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-pingTicker.C:
+			err := c.conn.WriteControl(websocket.PingMessage, time.Now().Add(WriteWait))
+			if err != nil {
+				if errors.Is(err, websocket.ErrCloseSent) {
+					return err
+				}
+
+				c.writeErrorResponse(
+					ctx,
+					err,
+					wrapErrorMessage(ConnectionWrite, "error sending ping", "", "", ""))
+				return fmt.Errorf("error sending ping: %w", err)
+			}
+		}
+	}
+}
+
+func (c *Controller) writeErrorResponse(ctx context.Context, err error, msg models.BaseMessageResponse) {
+	c.logger.Debug().Err(err).Msg(msg.Error.Message)
+	c.writeResponse(ctx, msg)
+}
+
+func (c *Controller) writeResponse(ctx context.Context, response interface{}) {
+	select {
+	case <-ctx.Done():
+		return
+	case c.multiplexedStream <- response:
+	}
+}
+
+func wrapErrorMessage(code Code, message string, msgId string, action string, subscriptionID string) models.BaseMessageResponse {
+	return models.BaseMessageResponse{
+		MessageID: msgId,
+		Success:   false,
+		Error: models.ErrorMessage{
+			Code:           int(code),
+			Message:        message,
+			Action:         action,
+			SubscriptionID: subscriptionID,
+		},
+	}
 }

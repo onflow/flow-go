@@ -8,7 +8,7 @@ import (
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/engine/access/rest/common"
-	"github.com/onflow/flow-go/engine/access/rest/websockets/data_provider"
+	dp "github.com/onflow/flow-go/engine/access/rest/websockets/data_providers"
 	"github.com/onflow/flow-go/model/flow"
 )
 
@@ -17,7 +17,7 @@ type Handler struct {
 
 	logger              zerolog.Logger
 	websocketConfig     Config
-	dataProviderFactory data_provider.Factory
+	dataProviderFactory dp.DataProviderFactory
 }
 
 var _ http.Handler = (*Handler)(nil)
@@ -26,14 +26,14 @@ func NewWebSocketHandler(
 	logger zerolog.Logger,
 	config Config,
 	chain flow.Chain,
-	factory data_provider.Factory,
 	maxRequestSize int64,
+	dataProviderFactory dp.DataProviderFactory,
 ) *Handler {
 	return &Handler{
 		HttpHandler:         common.NewHttpHandler(logger, chain, maxRequestSize),
 		websocketConfig:     config,
 		logger:              logger,
-		dataProviderFactory: factory,
+		dataProviderFactory: dataProviderFactory,
 	}
 }
 
@@ -61,7 +61,6 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	newConn := NewGorillaWebsocketConnection(conn)
-	controller := NewWebSocketController(logger, h.websocketConfig, h.dataProviderFactory, newConn)
-	controller.HandleConnection(context.Background())
+	controller := NewWebSocketController(logger, h.websocketConfig, NewWebsocketConnection(conn), h.dataProviderFactory)
+	controller.HandleConnection(context.TODO())
 }
