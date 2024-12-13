@@ -20,7 +20,8 @@ import (
 	"github.com/onflow/flow-go/module/counters"
 )
 
-type AccountStatusesArguments struct {
+// accountStatusesArguments contains the arguments required for subscribing to account statuses
+type accountStatusesArguments struct {
 	StartBlockID     flow.Identifier                  // ID of the block to start subscription from
 	StartBlockHeight uint64                           // Height of the block to start subscription from
 	Filter           state_stream.AccountStatusFilter // Filter applied to events for a given subscription
@@ -81,7 +82,7 @@ func (p *AccountStatusesDataProvider) Run() error {
 }
 
 // createSubscription creates a new subscription using the specified input arguments.
-func (p *AccountStatusesDataProvider) createSubscription(ctx context.Context, args AccountStatusesArguments) subscription.Subscription {
+func (p *AccountStatusesDataProvider) createSubscription(ctx context.Context, args accountStatusesArguments) subscription.Subscription {
 	if args.StartBlockID != flow.ZeroID {
 		return p.stateStreamApi.SubscribeAccountStatusesFromStartBlockID(ctx, args.StartBlockID, args.Filter)
 	}
@@ -132,8 +133,8 @@ func parseAccountStatusesArguments(
 	arguments models.Arguments,
 	chain flow.Chain,
 	eventFilterConfig state_stream.EventFilterConfig,
-) (AccountStatusesArguments, error) {
-	var args AccountStatusesArguments
+) (accountStatusesArguments, error) {
+	var args accountStatusesArguments
 	//var err error
 
 	// Check for mutual exclusivity of start_block_id and start_block_height early
