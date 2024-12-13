@@ -7,6 +7,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/assert"
+
 	"github.com/google/uuid"
 	"github.com/gorilla/websocket"
 	"github.com/rs/zerolog"
@@ -631,57 +633,62 @@ func (s *WsControllerSuite) TestSubscribeBlocks() {
 	})
 }
 
+// TestRateLimiter tests the rate-limiting functionality of the WebSocket controller.
+//
+// Test Steps:
+// 1. Create a mock WebSocket connection with behavior for `SetWriteDeadline` and `WriteJSON`.
+// 2. Configure the WebSocket controller with a rate limit of 2 responses per second.
+// 3. Simulate sending messages to the `multiplexedStream` channel.
+// 4. Collect timestamps of message writes to verify rate-limiting behavior.
+// 5. Assert that all messages are processed and that the delay between messages respects the configured rate limit.
+//
+// The test ensures that:
+// - The number of messages processed matches the total messages sent.
+// - The delay between consecutive messages falls within the expected range based on the rate limit, with a tolerance of 5ms.
 func (s *WsControllerSuite) TestRateLimiter() {
 	s.T().Run("Enforces response rate limit", func(t *testing.T) {
-		//conn, _, _ := newControllerMocks(t)
+		totalMessages := 5 // Number of messages to simulate.
+
+		// Step 1: Create a mock WebSocket connection.
 		conn := connmock.NewWebsocketConnection(t)
-		conn.On("Close").Return(nil).Once()
+		conn.On("SetWriteDeadline", mock.Anything).Return(nil).Times(totalMessages)
 
-		// Configure the controller with a specific rate limit
+		// Step 2: Configure the WebSocket controller with a rate limit.
 		config := NewDefaultWebsocketConfig()
-		config.MaxResponsesPerSecond = 2 // 2 messages per second
-		controller := NewWebSocketController(
-			s.logger,
-			config,
-			nil,
-			conn,
-		)
+		config.MaxResponsesPerSecond = 2 // 2 messages per second.
+		controller := NewWebSocketController(s.logger, config, conn, nil)
 
-		expectedTime := uint64(time.Second.Milliseconds()) / config.MaxResponsesPerSecond
-
-		// Simulate pushing messages into the communication channel
-		totalMessages := 5
-		for i := 1; i <= totalMessages; i++ {
-			controller.communicationChannel <- map[string]interface{}{
-				"message": i,
+		// Step 3: Simulate sending messages to the controller's `multiplexedStream`.
+		go func() {
+			for i := 0; i < totalMessages; i++ {
+				controller.multiplexedStream <- map[string]interface{}{
+					"message": i,
+				}
 			}
-		}
+			close(controller.multiplexedStream)
+		}()
 
-		// Capture timestamps to verify rate limiting
+		// Step 4: Collect timestamps of message writes for verification.
 		var timestamps []time.Time
-		conn.
-			On("WriteJSON", mock.Anything).
-			Run(func(args mock.Arguments) {
-				timestamps = append(timestamps, time.Now())
-			}).
-			Return(nil).
-			Times(totalMessages)
+		conn.On("WriteJSON", mock.Anything).Run(func(args mock.Arguments) {
+			timestamps = append(timestamps, time.Now())
+		}).Return(nil).Times(totalMessages)
 
-		// Execute writeMessages with a context
-		ctx, cancel := context.WithTimeout(context.Background(), time.Second*3)
-		defer cancel()
+		// Invoke the `writeMessages` method to process the stream.
+		_ = controller.writeMessages(context.Background())
 
-		controller.writeMessages(ctx)
-
-		// Assertions
+		// Step 5: Verify that all messages are processed.
 		require.Len(t, timestamps, totalMessages, "All messages should be processed")
 
-		const tolerance = 5 * time.Millisecond // Allow up to 5ms deviation
+		// Calculate the expected delay between messages based on the rate limit.
+		expectedDelay := time.Second / time.Duration(config.MaxResponsesPerSecond)
+		const tolerance = 5 * time.Millisecond // Allow up to 5ms deviation.
 
-		// Check that the time intervals between messages respect the rate limit
+		// Step 6: Assert that the delays respect the rate limit with tolerance.
 		for i := 1; i < len(timestamps); i++ {
 			delay := timestamps[i].Sub(timestamps[i-1])
-			require.GreaterOrEqual(t, delay, time.Duration(expectedTime)-tolerance, "Messages should respect rate limit")
+			assert.GreaterOrEqual(t, delay, expectedDelay-tolerance, "Messages should respect the minimum rate limit")
+			assert.LessOrEqual(t, delay, expectedDelay+tolerance, "Messages should respect the maximum rate limit")
 		}
 	})
 }

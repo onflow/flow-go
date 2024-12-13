@@ -5,9 +5,10 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"golang.org/x/time/rate"
 	"sync"
 	"time"
+
+	"golang.org/x/time/rate"
 
 	"github.com/google/uuid"
 	"github.com/gorilla/websocket"
@@ -136,13 +137,13 @@ func (c *Controller) writeMessages(ctx context.Context) error {
 				return fmt.Errorf("multiplexed stream closed")
 			}
 
-			if err := c.conn.SetWriteDeadline(time.Now().Add(WriteWait)); err != nil {
-				return fmt.Errorf("failed to set the write deadline: %w", err)
+			// wait for the rate limiter to allow the next message write.
+			if err := c.limiter.WaitN(ctx, 1); err != nil {
+				return fmt.Errorf("rate limiter wait failed: %w", err)
 			}
 
-			// blocking wait for the streamer's rate limit to have available capacity
-			if err := c.limiter.WaitN(ctx, 1); err != nil {
-				return fmt.Errorf("rate limiter error: %w", err)
+			if err := c.conn.SetWriteDeadline(time.Now().Add(WriteWait)); err != nil {
+				return fmt.Errorf("failed to set the write deadline: %w", err)
 			}
 
 			if err := c.conn.WriteJSON(message); err != nil {
