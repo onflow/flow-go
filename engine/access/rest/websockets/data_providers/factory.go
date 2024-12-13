@@ -31,7 +31,7 @@ type DataProviderFactory interface {
 	// and configuration parameters.
 	//
 	// No errors are expected during normal operations.
-	NewDataProvider(ctx context.Context, topic string, arguments models.Arguments, ch chan<- interface{}) (DataProvider, error)
+	NewDataProvider(ctx context.Context, topic string, args models.Arguments, ch chan<- interface{}) (DataProvider, error)
 }
 
 var _ DataProviderFactory = (*DataProviderFactoryImpl)(nil)
