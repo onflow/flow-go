@@ -91,8 +91,6 @@ func (s *WsControllerSuite) TestSubscribeRequest() {
 			Return(nil).
 			Once()
 
-		s.expectCloseConnection(conn, done)
-
 		conn.
 			On("WriteJSON", mock.Anything).
 			Return(func(msg interface{}) error {
@@ -107,8 +105,12 @@ func (s *WsControllerSuite) TestSubscribeRequest() {
 				return websocket.ErrCloseSent
 			})
 
-		s.expectKeepaliveClose(conn, done)
+		s.expectCloseConnection(conn, done)
 		controller.HandleConnection(context.Background())
+
+		conn.AssertExpectations(t)
+		dataProviderFactory.AssertExpectations(t)
+		dataProvider.AssertExpectations(t)
 	})
 
 	s.T().Run("Parse and validate error", func(t *testing.T) {
@@ -139,8 +141,6 @@ func (s *WsControllerSuite) TestSubscribeRequest() {
 			Once()
 
 		done := make(chan struct{}, 1)
-		s.expectCloseConnection(conn, done)
-
 		conn.
 			On("WriteJSON", mock.Anything).
 			Return(func(msg interface{}) error {
@@ -155,8 +155,12 @@ func (s *WsControllerSuite) TestSubscribeRequest() {
 				return websocket.ErrCloseSent
 			})
 
-		s.expectKeepaliveClose(conn, done)
+		s.expectCloseConnection(conn, done)
+
 		controller.HandleConnection(context.Background())
+
+		conn.AssertExpectations(t)
+		dataProviderFactory.AssertExpectations(t)
 	})
 
 	s.T().Run("Error creating data provider", func(t *testing.T) {
@@ -172,7 +176,6 @@ func (s *WsControllerSuite) TestSubscribeRequest() {
 
 		done := make(chan struct{}, 1)
 		s.expectSubscribeRequest(conn)
-		s.expectCloseConnection(conn, done)
 
 		conn.
 			On("WriteJSON", mock.Anything).
@@ -188,8 +191,12 @@ func (s *WsControllerSuite) TestSubscribeRequest() {
 				return websocket.ErrCloseSent
 			})
 
-		s.expectKeepaliveClose(conn, done)
+		s.expectCloseConnection(conn, done)
+
 		controller.HandleConnection(context.Background())
+
+		conn.AssertExpectations(t)
+		dataProviderFactory.AssertExpectations(t)
 	})
 
 	s.T().Run("Provider execution error", func(t *testing.T) {
@@ -215,7 +222,6 @@ func (s *WsControllerSuite) TestSubscribeRequest() {
 		done := make(chan struct{}, 1)
 		msgID := s.expectSubscribeRequest(conn)
 		s.expectSubscribeResponse(conn, msgID)
-		s.expectCloseConnection(conn, done)
 
 		conn.
 			On("WriteJSON", mock.Anything).
@@ -231,8 +237,13 @@ func (s *WsControllerSuite) TestSubscribeRequest() {
 				return websocket.ErrCloseSent
 			})
 
-		s.expectKeepaliveClose(conn, done)
+		s.expectCloseConnection(conn, done)
+
 		controller.HandleConnection(context.Background())
+
+		conn.AssertExpectations(t)
+		dataProviderFactory.AssertExpectations(t)
+		dataProvider.AssertExpectations(t)
 	})
 }
 
@@ -305,9 +316,12 @@ func (s *WsControllerSuite) TestUnsubscribeRequest() {
 			Once()
 
 		s.expectCloseConnection(conn, done)
-		s.expectKeepaliveClose(conn, done)
 
 		controller.HandleConnection(context.Background())
+
+		conn.AssertExpectations(t)
+		dataProviderFactory.AssertExpectations(t)
+		dataProvider.AssertExpectations(t)
 	})
 
 	s.T().Run("Invalid subscription uuid", func(t *testing.T) {
@@ -376,9 +390,12 @@ func (s *WsControllerSuite) TestUnsubscribeRequest() {
 			Once()
 
 		s.expectCloseConnection(conn, done)
-		s.expectKeepaliveClose(conn, done)
 
 		controller.HandleConnection(context.Background())
+
+		conn.AssertExpectations(t)
+		dataProviderFactory.AssertExpectations(t)
+		dataProvider.AssertExpectations(t)
 	})
 
 	s.T().Run("Unsubscribe from unknown subscription", func(t *testing.T) {
@@ -448,9 +465,12 @@ func (s *WsControllerSuite) TestUnsubscribeRequest() {
 			Once()
 
 		s.expectCloseConnection(conn, done)
-		s.expectKeepaliveClose(conn, done)
 
 		controller.HandleConnection(context.Background())
+
+		conn.AssertExpectations(t)
+		dataProviderFactory.AssertExpectations(t)
+		dataProvider.AssertExpectations(t)
 	})
 }
 
@@ -525,9 +545,12 @@ func (s *WsControllerSuite) TestListSubscriptions() {
 			Once()
 
 		s.expectCloseConnection(conn, done)
-		s.expectKeepaliveClose(conn, done)
 
 		controller.HandleConnection(context.Background())
+
+		conn.AssertExpectations(t)
+		dataProviderFactory.AssertExpectations(t)
+		dataProvider.AssertExpectations(t)
 	})
 }
 
@@ -564,7 +587,6 @@ func (s *WsControllerSuite) TestSubscribeBlocks() {
 		done := make(chan struct{}, 1)
 		msgID := s.expectSubscribeRequest(conn)
 		s.expectSubscribeResponse(conn, msgID)
-		s.expectCloseConnection(conn, done)
 
 		// Expect a valid block to be passed to WriteJSON.
 		// If we got to this point, the controller executed all its logic properly
@@ -582,8 +604,13 @@ func (s *WsControllerSuite) TestSubscribeBlocks() {
 				return websocket.ErrCloseSent
 			})
 
-		s.expectKeepaliveClose(conn, done)
+		s.expectCloseConnection(conn, done)
+
 		controller.HandleConnection(context.Background())
+
+		conn.AssertExpectations(t)
+		dataProviderFactory.AssertExpectations(t)
+		dataProvider.AssertExpectations(t)
 	})
 
 	s.T().Run("Stream many blocks", func(t *testing.T) {
@@ -617,7 +644,6 @@ func (s *WsControllerSuite) TestSubscribeBlocks() {
 		done := make(chan struct{}, 1)
 		msgID := s.expectSubscribeRequest(conn)
 		s.expectSubscribeResponse(conn, msgID)
-		s.expectCloseConnection(conn, done)
 
 		i := 0
 		actualBlocks := make([]*flow.Block, len(expectedBlocks))
@@ -643,8 +669,13 @@ func (s *WsControllerSuite) TestSubscribeBlocks() {
 			}).
 			Times(len(expectedBlocks))
 
-		s.expectKeepaliveClose(conn, done)
+		s.expectCloseConnection(conn, done)
+
 		controller.HandleConnection(context.Background())
+
+		conn.AssertExpectations(t)
+		dataProviderFactory.AssertExpectations(t)
+		dataProvider.AssertExpectations(t)
 	})
 }
 
@@ -753,7 +784,6 @@ func (s *WsControllerSuite) TestControllerShutdown() {
 		done := make(chan struct{}, 1)
 		msgID := s.expectSubscribeRequest(conn)
 		s.expectSubscribeResponse(conn, msgID)
-		s.expectCloseConnection(conn, done)
 
 		conn.
 			On("WriteJSON", mock.Anything).
@@ -761,6 +791,8 @@ func (s *WsControllerSuite) TestControllerShutdown() {
 				close(done)
 				return assert.AnError
 			})
+
+		s.expectCloseConnection(conn, done)
 
 		controller.HandleConnection(context.Background())
 
@@ -910,19 +942,6 @@ func (s *WsControllerSuite) expectSubscribeRequest(conn *connmock.WebsocketConne
 	return request.MessageID
 }
 
-func (s *WsControllerSuite) expectCloseConnection(conn *connmock.WebsocketConnection, done <-chan struct{}) {
-	// In the default case, no further communication is expected from the client.
-	// We wait for the writer routine to signal completion, allowing us to close the connection gracefully
-	conn.
-		On("ReadJSON", mock.Anything).
-		Return(func(msg interface{}) error {
-			for range done {
-			}
-			return websocket.ErrCloseSent
-		}).
-		Once()
-}
-
 // expectSubscribeResponse mocks the subscription response sent to the client.
 func (s *WsControllerSuite) expectSubscribeResponse(conn *connmock.WebsocketConnection, msgId string) {
 	conn.
@@ -937,8 +956,23 @@ func (s *WsControllerSuite) expectSubscribeResponse(conn *connmock.WebsocketConn
 		Once()
 }
 
-func (s *WsControllerSuite) expectKeepaliveClose(conn *connmock.WebsocketConnection, done <-chan struct{}) {
-	// We use maybe as a test may finish faster than keepalive routine trigger WriteControl
+func (s *WsControllerSuite) expectCloseConnection(conn *connmock.WebsocketConnection, done <-chan struct{}) {
+	// In the default case, no further communication is expected from the client.
+	// We wait for the writer routine to signal completion, allowing us to close the connection gracefully
+	conn.
+		On("ReadJSON", mock.Anything).
+		Return(func(msg interface{}) error {
+			for range done {
+			}
+			return websocket.ErrCloseSent
+		}).
+		Once()
+
+	s.expectKeepaliveRoutineShutdown(conn, done)
+}
+
+func (s *WsControllerSuite) expectKeepaliveRoutineShutdown(conn *connmock.WebsocketConnection, done <-chan struct{}) {
+	// We use Maybe() because a test may finish faster than keepalive routine trigger WriteControl
 	conn.
 		On("WriteControl", websocket.PingMessage, mock.Anything).
 		Return(func(int, time.Time) error {

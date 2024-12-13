@@ -66,13 +66,13 @@ func (c *Controller) HandleConnection(ctx context.Context) {
 	g, gCtx := errgroup.WithContext(ctx)
 
 	g.Go(func() error {
-		return c.readMessages(gCtx)
-	})
-	g.Go(func() error {
 		return c.keepalive(gCtx)
 	})
 	g.Go(func() error {
 		return c.writeMessages(gCtx)
+	})
+	g.Go(func() error {
+		return c.readMessages(gCtx)
 	})
 
 	if err = g.Wait(); err != nil {
@@ -111,6 +111,32 @@ func (c *Controller) configureKeepalive() error {
 	})
 
 	return nil
+}
+
+// keepalive sends a ping message periodically to keep the WebSocket connection alive
+// and avoid timeouts.
+//
+// Expected errors during normal operation:
+// - context.Canceled if the client disconnected
+func (c *Controller) keepalive(ctx context.Context) error {
+	pingTicker := time.NewTicker(PingPeriod)
+	defer pingTicker.Stop()
+
+	for {
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-pingTicker.C:
+			err := c.conn.WriteControl(websocket.PingMessage, time.Now().Add(WriteWait))
+			if err != nil {
+				if errors.Is(err, websocket.ErrCloseSent) {
+					return err
+				}
+
+				return fmt.Errorf("error sending ping: %w", err)
+			}
+		}
+	}
 }
 
 // writeMessages reads a messages from communication channel and passes them on to a client WebSocket connection.
@@ -362,32 +388,6 @@ func (c *Controller) shutdownConnection() {
 
 	c.dataProvidersGroup.Wait()
 	close(c.multiplexedStream)
-}
-
-// keepalive sends a ping message periodically to keep the WebSocket connection alive
-// and avoid timeouts.
-//
-// Expected errors during normal operation:
-// - context.Canceled if the client disconnected
-func (c *Controller) keepalive(ctx context.Context) error {
-	pingTicker := time.NewTicker(PingPeriod)
-	defer pingTicker.Stop()
-
-	for {
-		select {
-		case <-ctx.Done():
-			return ctx.Err()
-		case <-pingTicker.C:
-			err := c.conn.WriteControl(websocket.PingMessage, time.Now().Add(WriteWait))
-			if err != nil {
-				if errors.Is(err, websocket.ErrCloseSent) {
-					return err
-				}
-
-				return fmt.Errorf("error sending ping: %w", err)
-			}
-		}
-	}
 }
 
 func (c *Controller) writeErrorResponse(ctx context.Context, err error, msg models.BaseMessageResponse) {
