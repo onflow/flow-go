@@ -135,7 +135,6 @@ func parseAccountStatusesArguments(
 	eventFilterConfig state_stream.EventFilterConfig,
 ) (accountStatusesArguments, error) {
 	var args accountStatusesArguments
-	//var err error
 
 	// Check for mutual exclusivity of start_block_id and start_block_height early
 	startBlockIDIn, hasStartBlockID := arguments["start_block_id"]
