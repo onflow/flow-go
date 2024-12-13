@@ -164,11 +164,11 @@ func parseEventsArguments(
 		if !ok {
 			return args, fmt.Errorf("'start_block_height' must be a string")
 		}
-		startBlockHeight, err := util.ToUint64(result)
+		var err error
+		args.StartBlockHeight, err = util.ToUint64(result)
 		if err != nil {
 			return args, fmt.Errorf("invalid 'start_block_height': %w", err)
 		}
-		args.StartBlockHeight = startBlockHeight
 	} else {
 		args.StartBlockHeight = request.EmptyHeight
 	}

@@ -134,6 +134,7 @@ func parseAccountStatusesArguments(
 	eventFilterConfig state_stream.EventFilterConfig,
 ) (AccountStatusesArguments, error) {
 	var args AccountStatusesArguments
+	//var err error
 
 	// Check for mutual exclusivity of start_block_id and start_block_height early
 	startBlockIDIn, hasStartBlockID := arguments["start_block_id"]
@@ -158,17 +159,16 @@ func parseAccountStatusesArguments(
 	}
 
 	// Parse 'start_block_height' if provided
-	// Parse 'start_block_height' if provided
 	if hasStartBlockHeight {
 		result, ok := startBlockHeightIn.(string)
 		if !ok {
 			return args, fmt.Errorf("'start_block_height' must be a string")
 		}
-		startBlockHeight, err := util.ToUint64(result)
+		var err error
+		args.StartBlockHeight, err = util.ToUint64(result)
 		if err != nil {
 			return args, fmt.Errorf("invalid 'start_block_height': %w", err)
 		}
-		args.StartBlockHeight = startBlockHeight
 	} else {
 		args.StartBlockHeight = request.EmptyHeight
 	}
