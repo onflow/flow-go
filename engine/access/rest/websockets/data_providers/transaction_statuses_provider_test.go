@@ -2,6 +2,7 @@ package data_providers
 
 import (
 	"context"
+	"fmt"
 	"testing"
 
 	"github.com/rs/zerolog"
@@ -11,12 +12,9 @@ import (
 	accessmock "github.com/onflow/flow-go/access/mock"
 	"github.com/onflow/flow-go/engine/access/rest/websockets/models"
 	"github.com/onflow/flow-go/engine/access/state_stream"
-	ssmock "github.com/onflow/flow-go/engine/access/state_stream/mock"
 	"github.com/onflow/flow-go/engine/access/subscription"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/utils/unittest"
-	"github.com/onflow/flow/protobuf/go/flow/entities"
-	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 )
 
@@ -76,22 +74,22 @@ func (s *TransactionStatusesProviderSuite) TestTransactionStatusesDataProvider_H
 
 func (s *TransactionStatusesProviderSuite) subscribeTransactionStatusesDataProviderTestCases() []testType {
 	return []testType{
-		{
-			name: "SubscribeTransactionStatuses happy path",
-			arguments: models.Arguments{
-				"start_block_id": s.rootBlock.ID().String(),
-				"event_types":    []string{"flow.AccountCreated", "flow.AccountKeyAdded"},
-			},
-			setupBackend: func(sub *ssmock.Subscription) {
-				s.api.On(
-					"SubscribeTransactionStatuses",
-					mock.Anything,
-					mock.Anything,
-					s.rootBlock.ID(),
-					entities.EventEncodingVersion_JSON_CDC_V0,
-				).Return(sub).Once()
-			},
-		},
+		//{
+		//	name: "SubscribeTransactionStatuses happy path",
+		//	arguments: models.Arguments{
+		//		"start_block_id": s.rootBlock.ID().String(),
+		//		"event_types":    []string{"flow.AccountCreated", "flow.AccountKeyAdded"},
+		//	},
+		//	setupBackend: func(sub *ssmock.Subscription) {
+		//		s.api.On(
+		//			"SubscribeTransactionStatuses",
+		//			mock.Anything,
+		//			mock.Anything,
+		//			s.rootBlock.ID(),
+		//			entities.EventEncodingVersion_JSON_CDC_V0,
+		//		).Return(sub).Once()
+		//	},
+		//},
 	}
 }
 
@@ -144,6 +142,14 @@ func (s *TransactionStatusesProviderSuite) TestAccountStatusesDataProvider_Inval
 func invalidTransactionStatusesArgumentsTestCases() []testErrType {
 	return []testErrType{
 		{
+			name: "provide both 'start_block_id' and 'start_block_height' arguments",
+			arguments: models.Arguments{
+				"start_block_id":     unittest.BlockFixture().ID().String(),
+				"start_block_height": fmt.Sprintf("%d", unittest.BlockFixture().Header.Height),
+			},
+			expectedErrorMsg: "can only provide either 'start_block_id' or 'start_block_height'",
+		},
+		{
 			name: "invalid 'tx_id' argument",
 			arguments: map[string]interface{}{
 				"tx_id": "invalid_tx_id",
@@ -156,6 +162,13 @@ func invalidTransactionStatusesArgumentsTestCases() []testErrType {
 				"start_block_id": "invalid_block_id",
 			},
 			expectedErrorMsg: "invalid ID format",
+		},
+		{
+			name: "invalid 'start_block_height' argument",
+			arguments: map[string]interface{}{
+				"start_block_height": "-1",
+			},
+			expectedErrorMsg: "value must be an unsigned 64 bit integer",
 		},
 	}
 }

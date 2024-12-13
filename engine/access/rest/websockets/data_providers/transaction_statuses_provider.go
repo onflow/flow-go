@@ -3,6 +3,8 @@ package data_providers
 import (
 	"context"
 	"fmt"
+	"github.com/onflow/flow-go/engine/access/rest/http/request"
+	"github.com/onflow/flow-go/engine/access/rest/util"
 	"strconv"
 
 	"github.com/rs/zerolog"
@@ -18,9 +20,11 @@ import (
 	"github.com/onflow/flow/protobuf/go/flow/entities"
 )
 
-type TransactionStatusesArguments struct {
-	StartBlockID flow.Identifier // ID of the block to start subscription from
-	txID         flow.Identifier // ID of the transaction to monitor.
+// transactionStatusesArguments contains the arguments required for subscribing to transaction statuses
+type transactionStatusesArguments struct {
+	TxID             flow.Identifier // ID of the transaction to monitor.
+	StartBlockID     flow.Identifier // ID of the block to start subscription from
+	StartBlockHeight uint64          // Height of the block to start subscription from
 }
 
 type TransactionStatusesDataProvider struct {
@@ -73,9 +77,17 @@ func (p *TransactionStatusesDataProvider) Run() error {
 // createSubscription creates a new subscription using the specified input arguments.
 func (p *TransactionStatusesDataProvider) createSubscription(
 	ctx context.Context,
-	args TransactionStatusesArguments,
+	args transactionStatusesArguments,
 ) subscription.Subscription {
-	return p.api.SubscribeTransactionStatuses(ctx, args.txID, args.StartBlockID, entities.EventEncodingVersion_JSON_CDC_V0)
+	if args.StartBlockID != flow.ZeroID {
+		return p.api.SubscribeTransactionStatusesFromStartBlockID(ctx, args.TxID, args.StartBlockID, entities.EventEncodingVersion_JSON_CDC_V0)
+	}
+
+	if args.StartBlockHeight != request.EmptyHeight {
+		return p.api.SubscribeTransactionStatusesFromStartHeight(ctx, args.TxID, args.StartBlockHeight, entities.EventEncodingVersion_JSON_CDC_V0)
+	}
+
+	return p.api.SubscribeTransactionStatusesFromLatest(ctx, args.TxID, entities.EventEncodingVersion_JSON_CDC_V0)
 }
 
 // handleResponse processes an account statuses and sends the formatted response.
@@ -103,8 +115,16 @@ func (p *TransactionStatusesDataProvider) handleResponse() func(txResults []*acc
 // parseAccountStatusesArguments validates and initializes the account statuses arguments.
 func parseTransactionStatusesArguments(
 	arguments models.Arguments,
-) (TransactionStatusesArguments, error) {
-	var args TransactionStatusesArguments
+) (transactionStatusesArguments, error) {
+	var args transactionStatusesArguments
+
+	// Check for mutual exclusivity of start_block_id and start_block_height early
+	startBlockIDIn, hasStartBlockID := arguments["start_block_id"]
+	startBlockHeightIn, hasStartBlockHeight := arguments["start_block_height"]
+
+	if hasStartBlockID && hasStartBlockHeight {
+		return args, fmt.Errorf("can only provide either 'start_block_id' or 'start_block_height'")
+	}
 
 	if txIDIn, ok := arguments["tx_id"]; ok && txIDIn != "" {
 		result, ok := txIDIn.(string)
@@ -116,10 +136,11 @@ func parseTransactionStatusesArguments(
 		if err != nil {
 			return args, fmt.Errorf("invalid 'tx_id': %w", err)
 		}
-		args.txID = txID.Flow()
+		args.TxID = txID.Flow()
 	}
 
-	if startBlockIDIn, ok := arguments["start_block_id"]; ok && startBlockIDIn != "" {
+	// Parse 'start_block_id' if provided
+	if hasStartBlockID {
 		result, ok := startBlockIDIn.(string)
 		if !ok {
 			return args, fmt.Errorf("'start_block_id' must be a string")
@@ -130,6 +151,21 @@ func parseTransactionStatusesArguments(
 			return args, fmt.Errorf("invalid 'start_block_id': %w", err)
 		}
 		args.StartBlockID = startBlockID.Flow()
+	}
+
+	// Parse 'start_block_height' if provided
+	var err error
+	if hasStartBlockHeight {
+		result, ok := startBlockHeightIn.(string)
+		if !ok {
+			return args, fmt.Errorf("'start_block_height' must be a string")
+		}
+		args.StartBlockHeight, err = util.ToUint64(result)
+		if err != nil {
+			return args, fmt.Errorf("invalid 'start_block_height': %w", err)
+		}
+	} else {
+		args.StartBlockHeight = request.EmptyHeight
 	}
 
 	return args, nil
