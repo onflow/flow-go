@@ -234,18 +234,20 @@ func (ds *RecoverablePrivateBeaconKeyStateMachine) CommitMyBeaconPrivateKey(epoc
 		if err != nil {
 			return err
 		}
-
+		// if we are in committed state then there is nothing to do
+		if currentState == flow.RandomBeaconKeyCommitted {
+			return nil
+		}
 		key, err := ds.keyCache.Get(epochCounter)(tx.DBTxn)
 		if err != nil {
 			return storage.NewInvalidDKGStateTransitionErrorf(currentState, flow.RandomBeaconKeyCommitted, "cannot transition without a valid random beacon key: %w", err)
 		}
 
-		publicKey := key.PublicKey()
-		if slices.Index(commit.DKGParticipantKeys, publicKey) < 0 {
+		// verify that the key is part of the EpochCommit
+		if err = ensureKeyIncludedInEpoch(epochCounter, key, commit); err != nil {
 			return storage.NewInvalidDKGStateTransitionErrorf(currentState, flow.RandomBeaconKeyCommitted,
-				"previously storred key has not been found in epoch commit event: %s", publicKey)
+				"previously storred key has not been found in epoch commit event: %w", err)
 		}
-
 		return ds.processStateTransition(epochCounter, currentState, flow.RandomBeaconKeyCommitted)(tx)
 	})
 }
@@ -264,14 +266,20 @@ func (ds *RecoverablePrivateBeaconKeyStateMachine) UpsertMyBeaconPrivateKey(epoc
 		if err != nil {
 			return err
 		}
+		// verify that the key is part of the EpochCommit
+		if err = ensureKeyIncludedInEpoch(epochCounter, key, commit); err != nil {
+			return storage.NewInvalidDKGStateTransitionErrorf(currentState, flow.RandomBeaconKeyCommitted,
+				"previously storred key has not been found in epoch commit event: %w", err)
+		}
+
 		// if we are in committed state, we cannot overwrite the key, but we can ignore this input iff the provided key is the same
 		if currentState == flow.RandomBeaconKeyCommitted {
-			// check if the key is the same
+			// check if the stored key is equal to the provided key
 			storedKey, err := ds.keyCache.Get(epochCounter)(tx.DBTxn)
 			if err != nil {
 				return irrecoverable.NewExceptionf("could not retrieve a previously committed beacon key for epoch %d: %v", epochCounter, err)
 			}
-			if storedKey.Equals(key) {
+			if key.Equals(storedKey.PrivateKey) {
 				return nil
 			} else {
 				return storage.NewInvalidDKGStateTransitionErrorf(currentState, flow.RandomBeaconKeyCommitted,
@@ -293,6 +301,22 @@ func (ds *RecoverablePrivateBeaconKeyStateMachine) UpsertMyBeaconPrivateKey(epoc
 	return nil
 }
 
+// ensureKeyIncludedInEpoch performs a sanity check that the key is included in the epoch commit.
+// The key is expected to be part of the commit.
+// No errors are expected during normal operations.
+func ensureKeyIncludedInEpoch(epochCounter uint64, key crypto.PrivateKey, commit *flow.EpochCommit) error {
+	if commit.Counter != epochCounter {
+		return fmt.Errorf("commit counter does not match epoch counter: %d != %d", commit.Counter, epochCounter)
+	}
+	publicKey := key.PublicKey()
+	if slices.Index(commit.DKGParticipantKeys, publicKey) < 0 {
+		return fmt.Errorf("key not included in epoch commit: %s", publicKey)
+	}
+	return nil
+}
+
+// retrieveCurrentStateTx prepares a badger tx which retrieves the current state for the given epoch.
+// No errors are expected during normal operations.
 func retrieveCurrentStateTx(epochCounter uint64) func(*badger.Txn) (flow.DKGState, error) {
 	return func(txn *badger.Txn) (flow.DKGState, error) {
 		currentState := flow.DKGStateUninitialized
