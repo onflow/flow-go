@@ -346,7 +346,11 @@ func main() {
 			// perform this only if state machine is in initial state
 			if !started {
 				// store my beacon key for the first epoch post-spork
-				err = myBeaconKeyStateMachine.UpsertMyBeaconPrivateKey(epochCounter, beaconPrivateKey.PrivateKey, nil)
+				epochProtocolState, err := rootSnapshot.EpochProtocolState()
+				if err != nil {
+					return fmt.Errorf("could not get epoch protocol state for root snapshot: %w", err)
+				}
+				err = myBeaconKeyStateMachine.UpsertMyBeaconPrivateKey(epochCounter, beaconPrivateKey.PrivateKey, epochProtocolState.EpochCommit())
 				if err != nil {
 					return fmt.Errorf("could not upsert my beacon private key for root epoch %d: %w", epochCounter, err)
 				}

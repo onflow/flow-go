@@ -39,6 +39,7 @@ type BeaconKeyRecoverySuite struct {
 	currentEpochCounter uint64
 	nextEpochCounter    uint64
 	currentEpochPhase   flow.EpochPhase
+	epochCommit         *flow.EpochCommit
 }
 
 func (s *BeaconKeyRecoverySuite) SetupTest() {
@@ -53,10 +54,12 @@ func (s *BeaconKeyRecoverySuite) SetupTest() {
 	s.currentEpochPhase = flow.EpochPhaseCommitted
 	s.currentEpochCounter = uint64(0)
 	s.nextEpochCounter = uint64(1)
+	s.epochCommit = unittest.EpochCommitFixture(unittest.CommitWithCounter(s.nextEpochCounter))
 
 	s.local.On("NodeID").Return(unittest.IdentifierFixture()).Maybe()
 	s.epochProtocolState.On("Epoch").Return(s.currentEpochCounter).Maybe()
 	s.epochProtocolState.On("EpochPhase").Return(func() flow.EpochPhase { return s.currentEpochPhase }).Maybe()
+	s.epochProtocolState.On("EpochCommit").Return(s.epochCommit, nil).Maybe()
 	s.nextEpoch.On("Counter").Return(s.nextEpochCounter, nil).Maybe()
 
 	epochs := mockprotocol.NewEpochQuery(s.T())
@@ -307,7 +310,7 @@ func (s *BeaconKeyRecoverySuite) TestNewBeaconKeyRecovery_RecoverKey() {
 		dkg.On("KeyShare", s.local.NodeID()).Return(myBeaconKey.PublicKey(), nil).Once()
 		s.nextEpoch.On("DKG").Return(dkg, nil).Once()
 
-		dkgState.On("UpsertMyBeaconPrivateKey", s.nextEpochCounter, myBeaconKey).Return(nil).Once()
+		dkgState.On("UpsertMyBeaconPrivateKey", s.nextEpochCounter, myBeaconKey, s.epochCommit).Return(nil).Once()
 
 		recovery, err := NewBeaconKeyRecovery(unittest.Logger(), s.local, s.state, dkgState)
 		require.NoError(s.T(), err)
@@ -363,7 +366,7 @@ func (s *BeaconKeyRecoverySuite) TestEpochFallbackModeExited() {
 	dkg.On("KeyShare", s.local.NodeID()).Return(myBeaconKey.PublicKey(), nil).Once()
 	s.nextEpoch.On("DKG").Return(dkg, nil).Once()
 
-	s.dkgState.On("UpsertMyBeaconPrivateKey", s.nextEpochCounter, myBeaconKey).Return(nil).Once()
+	s.dkgState.On("UpsertMyBeaconPrivateKey", s.nextEpochCounter, myBeaconKey, s.epochCommit).Return(nil).Once()
 
 	recovery.EpochFallbackModeExited(s.currentEpochCounter, s.head)
 	s.dkgState.AssertNumberOfCalls(s.T(), "UpsertMyBeaconPrivateKey", 1)

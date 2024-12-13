@@ -137,17 +137,17 @@ func (_m *EpochRecoveryMyBeaconKey) UnsafeRetrieveMyBeaconPrivateKey(epochCounte
 	return r0, r1
 }
 
-// UpsertMyBeaconPrivateKey provides a mock function with given fields: epochCounter, key
+// UpsertMyBeaconPrivateKey provides a mock function with given fields: epochCounter, key, commit
 func (_m *EpochRecoveryMyBeaconKey) UpsertMyBeaconPrivateKey(epochCounter uint64, key crypto.PrivateKey, commit *flow.EpochCommit) error {
-	ret := _m.Called(epochCounter, key)
+	ret := _m.Called(epochCounter, key, commit)
 
 	if len(ret) == 0 {
 		panic("no return value specified for UpsertMyBeaconPrivateKey")
 	}
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(uint64, crypto.PrivateKey) error); ok {
-		r0 = rf(epochCounter, key)
+	if rf, ok := ret.Get(0).(func(uint64, crypto.PrivateKey, *flow.EpochCommit) error); ok {
+		r0 = rf(epochCounter, key, commit)
 	} else {
 		r0 = ret.Error(0)
 	}
