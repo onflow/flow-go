@@ -58,6 +58,7 @@ func (s *WsControllerSuite) TestSubscribeRequest() {
 		done := make(chan struct{}, 1)
 
 		dataProvider.On("ID").Return(id)
+		// data provider might finish on its own or controller will close it via Close()
 		dataProvider.On("Close").Return(nil).Maybe()
 		dataProvider.
 			On("Run").
@@ -198,6 +199,7 @@ func (s *WsControllerSuite) TestSubscribeRequest() {
 		controller := NewWebSocketController(s.logger, s.wsConfig, conn, dataProviderFactory)
 
 		dataProvider.On("ID").Return(uuid.New())
+		// data provider might finish on its own or controller will close it via Close()
 		dataProvider.On("Close").Return(nil).Maybe()
 		dataProvider.
 			On("Run").
@@ -252,6 +254,7 @@ func (s *WsControllerSuite) TestUnsubscribeRequest() {
 		done := make(chan struct{}, 1)
 
 		dataProvider.On("ID").Return(id)
+		// data provider might finish on its own or controller will close it via Close()
 		dataProvider.On("Close").Return(nil).Maybe()
 		dataProvider.
 			On("Run").
@@ -322,6 +325,7 @@ func (s *WsControllerSuite) TestUnsubscribeRequest() {
 		done := make(chan struct{}, 1)
 
 		dataProvider.On("ID").Return(id)
+		// data provider might finish on its own or controller will close it via Close()
 		dataProvider.On("Close").Return(nil).Maybe()
 		dataProvider.
 			On("Run").
@@ -392,6 +396,7 @@ func (s *WsControllerSuite) TestUnsubscribeRequest() {
 		done := make(chan struct{}, 1)
 
 		dataProvider.On("ID").Return(id)
+		// data provider might finish on its own or controller will close it via Close()
 		dataProvider.On("Close").Return(nil).Maybe()
 		dataProvider.
 			On("Run").
@@ -468,6 +473,7 @@ func (s *WsControllerSuite) TestListSubscriptions() {
 		topic := "blocks"
 		dataProvider.On("ID").Return(id)
 		dataProvider.On("Topic").Return(topic)
+		// data provider might finish on its own or controller will close it via Close()
 		dataProvider.On("Close").Return(nil).Maybe()
 		dataProvider.
 			On("Run").
@@ -542,7 +548,7 @@ func (s *WsControllerSuite) TestSubscribeBlocks() {
 
 		id := uuid.New()
 		dataProvider.On("ID").Return(id)
-		// data provider might finish by its own or controller will close it via Close()
+		// data provider might finish on its own or controller will close it via Close()
 		dataProvider.On("Close").Return(nil).Maybe()
 
 		// Simulate data provider write a block to the controller
@@ -593,6 +599,7 @@ func (s *WsControllerSuite) TestSubscribeBlocks() {
 
 		id := uuid.New()
 		dataProvider.On("ID").Return(id)
+		// data provider might finish on its own or controller will close it via Close()
 		dataProvider.On("Close").Return(nil).Maybe()
 
 		// Simulate data provider writes some blocks to the controller
@@ -667,7 +674,7 @@ func (s *WsControllerSuite) TestControllerShutdown() {
 		t.Parallel()
 
 		conn := connmock.NewWebsocketConnection(t)
-		conn.On("Close").Return(nil).Maybe()
+		conn.On("Close").Return(nil).Once()
 		conn.On("SetReadDeadline", mock.Anything).Return(nil).Once()
 		conn.On("SetPongHandler", mock.AnythingOfType("func(string) error")).Return(nil).Once()
 
@@ -682,7 +689,7 @@ func (s *WsControllerSuite) TestControllerShutdown() {
 				close(done)
 				return websocket.ErrCloseSent
 			}).
-			Maybe()
+			Once()
 
 		conn.
 			On("ReadJSON", mock.Anything).
@@ -701,7 +708,7 @@ func (s *WsControllerSuite) TestControllerShutdown() {
 		t.Parallel()
 
 		conn := connmock.NewWebsocketConnection(t)
-		conn.On("Close").Return(nil).Maybe()
+		conn.On("Close").Return(nil).Once()
 		conn.On("SetReadDeadline", mock.Anything).Return(nil).Once()
 		conn.On("SetPongHandler", mock.AnythingOfType("func(string) error")).Return(nil).Once()
 
@@ -732,6 +739,7 @@ func (s *WsControllerSuite) TestControllerShutdown() {
 
 		id := uuid.New()
 		dataProvider.On("ID").Return(id)
+		// data provider might finish on its own or controller will close it via Close()
 		dataProvider.On("Close").Return(nil).Maybe()
 
 		dataProvider.
@@ -766,7 +774,7 @@ func (s *WsControllerSuite) TestControllerShutdown() {
 		t.Parallel()
 
 		conn := connmock.NewWebsocketConnection(t)
-		conn.On("Close").Return(nil).Maybe()
+		conn.On("Close").Return(nil).Once()
 		conn.On("SetReadDeadline", mock.Anything).Return(nil).Once()
 		conn.On("SetPongHandler", mock.AnythingOfType("func(string) error")).Return(nil).Once()
 
@@ -829,7 +837,7 @@ func (s *WsControllerSuite) TestKeepaliveRoutine() {
 		conn.
 			On("WriteControl", websocket.PingMessage, mock.Anything).
 			Return(websocket.ErrCloseSent). //TODO: change to assert.AnError and rewrite test
-			Maybe()
+			Once()
 
 		factory := dpmock.NewDataProviderFactory(t)
 		controller := NewWebSocketController(s.logger, s.wsConfig, conn, factory)
@@ -930,6 +938,7 @@ func (s *WsControllerSuite) expectSubscribeResponse(conn *connmock.WebsocketConn
 }
 
 func (s *WsControllerSuite) expectKeepaliveClose(conn *connmock.WebsocketConnection, done <-chan struct{}) {
+	// We use maybe as a test may finish faster than keepalive routine trigger WriteControl
 	conn.
 		On("WriteControl", websocket.PingMessage, mock.Anything).
 		Return(func(int, time.Time) error {
