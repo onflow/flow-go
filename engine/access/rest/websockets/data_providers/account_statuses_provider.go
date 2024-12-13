@@ -159,12 +159,12 @@ func parseAccountStatusesArguments(
 	}
 
 	// Parse 'start_block_height' if provided
+	var err error
 	if hasStartBlockHeight {
 		result, ok := startBlockHeightIn.(string)
 		if !ok {
 			return args, fmt.Errorf("'start_block_height' must be a string")
 		}
-		var err error
 		args.StartBlockHeight, err = util.ToUint64(result)
 		if err != nil {
 			return args, fmt.Errorf("invalid 'start_block_height': %w", err)
@@ -197,11 +197,10 @@ func parseAccountStatusesArguments(
 	}
 
 	// Initialize the event filter with the parsed arguments
-	filter, err := state_stream.NewAccountStatusFilter(eventFilterConfig, chain, eventTypes.Flow(), accountAddresses)
+	args.Filter, err = state_stream.NewAccountStatusFilter(eventFilterConfig, chain, eventTypes.Flow(), accountAddresses)
 	if err != nil {
 		return args, fmt.Errorf("failed to create event filter: %w", err)
 	}
-	args.Filter = filter
 
 	return args, nil
 }
