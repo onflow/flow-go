@@ -1,10 +1,10 @@
 package badger
 
 import (
-	"github.com/onflow/crypto"
 	"testing"
 
 	"github.com/dgraph-io/badger/v2"
+	"github.com/onflow/crypto"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/atomic"
 
