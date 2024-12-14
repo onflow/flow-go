@@ -27,15 +27,5 @@ import (
 //			errToReturn = closeAndMergeError(closable, errToReturn)
 //		}()
 func CloseAndMergeError(closable io.Closer, err error) error {
-	var merr *multierror.Error
-	if err != nil {
-		merr = multierror.Append(merr, err)
-	}
-
-	closeError := closable.Close()
-	if closeError != nil {
-		merr = multierror.Append(merr, closeError)
-	}
-
-	return merr.ErrorOrNil()
+	return multierror.Append(err, closable.Close()).ErrorOrNil()
 }
