@@ -146,6 +146,15 @@ func (c *Controller) keepalive(ctx context.Context) error {
 // Expected errors during normal operation:
 // - context.Canceled if the client disconnected
 func (c *Controller) writeMessages(ctx context.Context) error {
+	defer func() {
+		// drain the channel as some providers may still send data to it after this routine shutdowns
+		// so, in order to not run into deadlock there should be at least 1 reader on the channel
+		go func() {
+			for range c.multiplexedStream {
+			}
+		}()
+	}()
+
 	for {
 		select {
 		case <-ctx.Done():
@@ -373,19 +382,11 @@ func (c *Controller) shutdownConnection() {
 
 		return nil
 	})
-
 	if err != nil {
 		c.logger.Debug().Err(err).Msg("error closing data provider")
 	}
 
 	c.dataProviders.Clear()
-
-	// drain the channel as some providers may still send data to it during shutdown
-	go func() {
-		for range c.multiplexedStream {
-		}
-	}()
-
 	c.dataProvidersGroup.Wait()
 	close(c.multiplexedStream)
 }

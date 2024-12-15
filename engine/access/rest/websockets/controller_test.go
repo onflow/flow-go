@@ -41,7 +41,9 @@ func TestWsControllerSuite(t *testing.T) {
 // TestSubscribeRequest tests the subscribe to topic flow.
 // We emulate a request message from a client, and a response message from a controller.
 func (s *WsControllerSuite) TestSubscribeRequest() {
-	s.T().Parallel()
+	// It still fails when run with -race even though we don't share any state
+	// (I tried changing logger & config to be unique in each test)
+	//s.T().Parallel()
 
 	s.T().Run("Happy path", func(t *testing.T) {
 		t.Parallel()
@@ -175,7 +177,7 @@ func (s *WsControllerSuite) TestSubscribeRequest() {
 			Once()
 
 		done := make(chan struct{}, 1)
-		s.expectSubscribeRequest(conn)
+		s.expectSubscribeRequest(t, conn)
 
 		conn.
 			On("WriteJSON", mock.Anything).
@@ -220,8 +222,8 @@ func (s *WsControllerSuite) TestSubscribeRequest() {
 			Once()
 
 		done := make(chan struct{}, 1)
-		msgID := s.expectSubscribeRequest(conn)
-		s.expectSubscribeResponse(conn, msgID)
+		msgID := s.expectSubscribeRequest(t, conn)
+		s.expectSubscribeResponse(t, conn, msgID)
 
 		conn.
 			On("WriteJSON", mock.Anything).
@@ -248,7 +250,7 @@ func (s *WsControllerSuite) TestSubscribeRequest() {
 }
 
 func (s *WsControllerSuite) TestUnsubscribeRequest() {
-	s.T().Parallel()
+	//s.T().Parallel()
 
 	s.T().Run("Happy path", func(t *testing.T) {
 		t.Parallel()
@@ -276,8 +278,8 @@ func (s *WsControllerSuite) TestUnsubscribeRequest() {
 			Return(nil).
 			Once()
 
-		msgID := s.expectSubscribeRequest(conn)
-		s.expectSubscribeResponse(conn, msgID)
+		msgID := s.expectSubscribeRequest(t, conn)
+		s.expectSubscribeResponse(t, conn, msgID)
 
 		request := models.UnsubscribeMessageRequest{
 			BaseMessageRequest: models.BaseMessageRequest{
@@ -350,8 +352,8 @@ func (s *WsControllerSuite) TestUnsubscribeRequest() {
 			Return(nil).
 			Once()
 
-		msgID := s.expectSubscribeRequest(conn)
-		s.expectSubscribeResponse(conn, msgID)
+		msgID := s.expectSubscribeRequest(t, conn)
+		s.expectSubscribeResponse(t, conn, msgID)
 
 		request := models.UnsubscribeMessageRequest{
 			BaseMessageRequest: models.BaseMessageRequest{
@@ -424,8 +426,8 @@ func (s *WsControllerSuite) TestUnsubscribeRequest() {
 			Return(nil).
 			Once()
 
-		msgID := s.expectSubscribeRequest(conn)
-		s.expectSubscribeResponse(conn, msgID)
+		msgID := s.expectSubscribeRequest(t, conn)
+		s.expectSubscribeResponse(t, conn, msgID)
 
 		request := models.UnsubscribeMessageRequest{
 			BaseMessageRequest: models.BaseMessageRequest{
@@ -475,7 +477,7 @@ func (s *WsControllerSuite) TestUnsubscribeRequest() {
 }
 
 func (s *WsControllerSuite) TestListSubscriptions() {
-	s.T().Parallel()
+	//s.T().Parallel()
 
 	s.T().Run("Happy path", func(t *testing.T) {
 
@@ -504,8 +506,8 @@ func (s *WsControllerSuite) TestListSubscriptions() {
 			Return(nil).
 			Once()
 
-		msgID := s.expectSubscribeRequest(conn)
-		s.expectSubscribeResponse(conn, msgID)
+		msgID := s.expectSubscribeRequest(t, conn)
+		s.expectSubscribeResponse(t, conn, msgID)
 
 		request := models.ListSubscriptionsMessageRequest{
 			BaseMessageRequest: models.BaseMessageRequest{
@@ -556,7 +558,7 @@ func (s *WsControllerSuite) TestListSubscriptions() {
 
 // TestSubscribeBlocks tests the functionality for streaming blocks to a subscriber.
 func (s *WsControllerSuite) TestSubscribeBlocks() {
-	s.T().Parallel()
+	//s.T().Parallel()
 
 	s.T().Run("Stream one block", func(t *testing.T) {
 		t.Parallel()
@@ -585,8 +587,8 @@ func (s *WsControllerSuite) TestSubscribeBlocks() {
 			Once()
 
 		done := make(chan struct{}, 1)
-		msgID := s.expectSubscribeRequest(conn)
-		s.expectSubscribeResponse(conn, msgID)
+		msgID := s.expectSubscribeRequest(t, conn)
+		s.expectSubscribeResponse(t, conn, msgID)
 
 		// Expect a valid block to be passed to WriteJSON.
 		// If we got to this point, the controller executed all its logic properly
@@ -642,8 +644,8 @@ func (s *WsControllerSuite) TestSubscribeBlocks() {
 			Once()
 
 		done := make(chan struct{}, 1)
-		msgID := s.expectSubscribeRequest(conn)
-		s.expectSubscribeResponse(conn, msgID)
+		msgID := s.expectSubscribeRequest(t, conn)
+		s.expectSubscribeResponse(t, conn, msgID)
 
 		i := 0
 		actualBlocks := make([]*flow.Block, len(expectedBlocks))
@@ -681,7 +683,7 @@ func (s *WsControllerSuite) TestSubscribeBlocks() {
 
 // TestConfigureKeepaliveConnection ensures that the WebSocket connection is configured correctly.
 func (s *WsControllerSuite) TestConfigureKeepaliveConnection() {
-	s.T().Parallel()
+	//s.T().Parallel()
 
 	s.T().Run("Happy path", func(t *testing.T) {
 		conn := connmock.NewWebsocketConnection(t)
@@ -699,7 +701,7 @@ func (s *WsControllerSuite) TestConfigureKeepaliveConnection() {
 }
 
 func (s *WsControllerSuite) TestControllerShutdown() {
-	s.T().Parallel()
+	//s.T().Parallel()
 
 	s.T().Run("Keepalive routine failed", func(t *testing.T) {
 		t.Parallel()
@@ -782,8 +784,8 @@ func (s *WsControllerSuite) TestControllerShutdown() {
 			Once()
 
 		done := make(chan struct{}, 1)
-		msgID := s.expectSubscribeRequest(conn)
-		s.expectSubscribeResponse(conn, msgID)
+		msgID := s.expectSubscribeRequest(t, conn)
+		s.expectSubscribeResponse(t, conn, msgID)
 
 		conn.
 			On("WriteJSON", mock.Anything).
@@ -827,7 +829,7 @@ func (s *WsControllerSuite) TestControllerShutdown() {
 }
 
 func (s *WsControllerSuite) TestKeepaliveRoutine() {
-	s.T().Parallel()
+	//s.T().Parallel()
 
 	s.T().Run("Successfully pings connection n times", func(t *testing.T) {
 		conn := connmock.NewWebsocketConnection(t)
@@ -917,7 +919,7 @@ func newControllerMocks(t *testing.T) (*connmock.WebsocketConnection, *dpmock.Da
 }
 
 // expectSubscribeRequest mocks the client's subscription request.
-func (s *WsControllerSuite) expectSubscribeRequest(conn *connmock.WebsocketConnection) string {
+func (s *WsControllerSuite) expectSubscribeRequest(t *testing.T, conn *connmock.WebsocketConnection) string {
 	request := models.SubscribeMessageRequest{
 		BaseMessageRequest: models.BaseMessageRequest{
 			MessageID: uuid.New().String(),
@@ -926,14 +928,14 @@ func (s *WsControllerSuite) expectSubscribeRequest(conn *connmock.WebsocketConne
 		Topic: "blocks",
 	}
 	requestJson, err := json.Marshal(request)
-	require.NoError(s.T(), err)
+	require.NoError(t, err)
 
 	// The very first message from a client is a request to subscribe to some topic
 	conn.
 		On("ReadJSON", mock.Anything).
 		Run(func(args mock.Arguments) {
 			msg, ok := args.Get(0).(*json.RawMessage)
-			require.True(s.T(), ok)
+			require.True(t, ok)
 			*msg = requestJson
 		}).
 		Return(nil).
@@ -943,14 +945,14 @@ func (s *WsControllerSuite) expectSubscribeRequest(conn *connmock.WebsocketConne
 }
 
 // expectSubscribeResponse mocks the subscription response sent to the client.
-func (s *WsControllerSuite) expectSubscribeResponse(conn *connmock.WebsocketConnection, msgId string) {
+func (s *WsControllerSuite) expectSubscribeResponse(t *testing.T, conn *connmock.WebsocketConnection, msgId string) {
 	conn.
 		On("WriteJSON", mock.Anything).
 		Run(func(args mock.Arguments) {
 			response, ok := args.Get(0).(models.SubscribeMessageResponse)
-			require.True(s.T(), ok)
-			require.Equal(s.T(), msgId, response.MessageID)
-			require.Equal(s.T(), true, response.Success)
+			require.True(t, ok)
+			require.Equal(t, msgId, response.MessageID)
+			require.Equal(t, true, response.Success)
 		}).
 		Return(nil).
 		Once()
