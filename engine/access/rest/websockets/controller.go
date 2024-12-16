@@ -18,10 +18,6 @@ import (
 	"github.com/onflow/flow-go/utils/concurrentmap"
 )
 
-var (
-	ErrUnmarshalMessage = errors.New("failed to unmarshal message")
-)
-
 type Controller struct {
 	logger zerolog.Logger
 	config Config
@@ -70,13 +66,13 @@ func (c *Controller) HandleConnection(ctx context.Context) {
 	g, gCtx := errgroup.WithContext(ctx)
 
 	g.Go(func() error {
-		return c.readMessages(gCtx)
-	})
-	g.Go(func() error {
 		return c.keepalive(gCtx)
 	})
 	g.Go(func() error {
 		return c.writeMessages(gCtx)
+	})
+	g.Go(func() error {
+		return c.readMessages(gCtx)
 	})
 	g.Go(func() error {
 		return c.monitorInactivity(ctx)
@@ -146,6 +142,32 @@ func (c *Controller) monitorInactivity(ctx context.Context) error {
 	}
 }
 
+// keepalive sends a ping message periodically to keep the WebSocket connection alive
+// and avoid timeouts.
+//
+// Expected errors during normal operation:
+// - context.Canceled if the client disconnected
+func (c *Controller) keepalive(ctx context.Context) error {
+	pingTicker := time.NewTicker(PingPeriod)
+	defer pingTicker.Stop()
+
+	for {
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-pingTicker.C:
+			err := c.conn.WriteControl(websocket.PingMessage, time.Now().Add(WriteWait))
+			if err != nil {
+				if errors.Is(err, websocket.ErrCloseSent) {
+					return err
+				}
+
+				return fmt.Errorf("error sending ping: %w", err)
+			}
+		}
+	}
+}
+
 // writeMessages reads a messages from communication channel and passes them on to a client WebSocket connection.
 // The communication channel is filled by data providers. Besides, the response limit tracker is involved in
 // write message regulation
@@ -193,7 +215,7 @@ func (c *Controller) readMessages(ctx context.Context) error {
 			continue
 		}
 
-		validatedMsg, err := c.parseAndValidateMessage(message)
+		err := c.parseAndValidateMessage(ctx, message)
 		if err != nil {
 			c.writeErrorResponse(
 				ctx,
@@ -201,21 +223,13 @@ func (c *Controller) readMessages(ctx context.Context) error {
 				wrapErrorMessage(InvalidMessage, "error parsing message", "", "", ""))
 			continue
 		}
-
-		if err = c.handleAction(ctx, validatedMsg); err != nil {
-			c.writeErrorResponse(
-				ctx,
-				err,
-				wrapErrorMessage(InvalidMessage, "error handling action", "", "", ""))
-			continue
-		}
 	}
 }
 
-func (c *Controller) parseAndValidateMessage(message json.RawMessage) (interface{}, error) {
+func (c *Controller) parseAndValidateMessage(ctx context.Context, message json.RawMessage) error {
 	var baseMsg models.BaseMessageRequest
 	if err := json.Unmarshal(message, &baseMsg); err != nil {
-		return nil, fmt.Errorf("error unmarshalling base message: %w", err)
+		return fmt.Errorf("error unmarshalling base message: %w", err)
 	}
 
 	var validatedMsg interface{}
@@ -223,33 +237,34 @@ func (c *Controller) parseAndValidateMessage(message json.RawMessage) (interface
 	case models.SubscribeAction:
 		var subscribeMsg models.SubscribeMessageRequest
 		if err := json.Unmarshal(message, &subscribeMsg); err != nil {
-			return nil, fmt.Errorf("error unmarshalling subscribe message: %w", err)
+			return fmt.Errorf("error unmarshalling subscribe message: %w", err)
 		}
 		validatedMsg = subscribeMsg
 
 	case models.UnsubscribeAction:
 		var unsubscribeMsg models.UnsubscribeMessageRequest
 		if err := json.Unmarshal(message, &unsubscribeMsg); err != nil {
-			return nil, fmt.Errorf("error unmarshalling unsubscribe message: %w", err)
+			return fmt.Errorf("error unmarshalling unsubscribe message: %w", err)
 		}
 		validatedMsg = unsubscribeMsg
 
 	case models.ListSubscriptionsAction:
 		var listMsg models.ListSubscriptionsMessageRequest
 		if err := json.Unmarshal(message, &listMsg); err != nil {
-			return nil, fmt.Errorf("error unmarshalling list subscriptions message: %w", err)
+			return fmt.Errorf("error unmarshalling list subscriptions message: %w", err)
 		}
 		validatedMsg = listMsg
 
 	default:
 		c.logger.Debug().Str("action", baseMsg.Action).Msg("unknown action type")
-		return nil, fmt.Errorf("unknown action type: %s", baseMsg.Action)
+		return fmt.Errorf("unknown action type: %s", baseMsg.Action)
 	}
 
-	return validatedMsg, nil
+	c.handleAction(ctx, validatedMsg)
+	return nil
 }
 
-func (c *Controller) handleAction(ctx context.Context, message interface{}) error {
+func (c *Controller) handleAction(ctx context.Context, message interface{}) {
 	switch msg := message.(type) {
 	case models.SubscribeMessageRequest:
 		c.handleSubscribe(ctx, msg)
@@ -257,10 +272,7 @@ func (c *Controller) handleAction(ctx context.Context, message interface{}) erro
 		c.handleUnsubscribe(ctx, msg)
 	case models.ListSubscriptionsMessageRequest:
 		c.handleListSubscriptions(ctx, msg)
-	default:
-		return fmt.Errorf("unknown message type: %T", msg)
 	}
-	return nil
 }
 
 func (c *Controller) handleSubscribe(ctx context.Context, msg models.SubscribeMessageRequest) {
@@ -294,7 +306,7 @@ func (c *Controller) handleSubscribe(ctx context.Context, msg models.SubscribeMe
 			c.writeErrorResponse(
 				ctx,
 				err,
-				wrapErrorMessage(RunError, "data provider finished with error", msg.MessageID, "", ""),
+				wrapErrorMessage(RunError, "data provider finished with error", "", "", ""),
 			)
 		}
 
@@ -405,36 +417,6 @@ func (c *Controller) shutdownConnection() {
 
 	c.dataProvidersGroup.Wait()
 	close(c.multiplexedStream)
-}
-
-// keepalive sends a ping message periodically to keep the WebSocket connection alive
-// and avoid timeouts.
-//
-// Expected errors during normal operation:
-// - context.Canceled if the client disconnected
-func (c *Controller) keepalive(ctx context.Context) error {
-	pingTicker := time.NewTicker(PingPeriod)
-	defer pingTicker.Stop()
-
-	for {
-		select {
-		case <-ctx.Done():
-			return ctx.Err()
-		case <-pingTicker.C:
-			err := c.conn.WriteControl(websocket.PingMessage, time.Now().Add(WriteWait))
-			if err != nil {
-				if errors.Is(err, websocket.ErrCloseSent) {
-					return err
-				}
-
-				c.writeErrorResponse(
-					ctx,
-					err,
-					wrapErrorMessage(ConnectionWrite, "error sending ping", "", "", ""))
-				return fmt.Errorf("error sending ping: %w", err)
-			}
-		}
-	}
 }
 
 func (c *Controller) writeErrorResponse(ctx context.Context, err error, msg models.BaseMessageResponse) {
