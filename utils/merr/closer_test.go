@@ -30,7 +30,7 @@ func TestCloseAndMergeError(t *testing.T) {
 
 	// Test case 2: only original error
 	err = CloseAndMergeError(closer, errors.New("original error"))
-	require.NotNil(t, err)
+	require.Error(t, err)
 	require.Contains(t, err.Error(), "original error")
 
 	// Test case 3: only close error
@@ -48,7 +48,7 @@ func TestCloseAndMergeError(t *testing.T) {
 	// Test case 5: original error is storage.ErrNotFound
 	err = CloseAndMergeError(closer, fmt.Errorf("not found error: %w", storage.ErrNotFound))
 	require.NotNil(t, err)
-	require.True(t, errors.Is(err, storage.ErrNotFound))
+	require.ErrorIs(t, err, storage.ErrNotFound)
 
 	// Test case 6: close error is storage.ErrNotFound
 	closer.closeError = fmt.Errorf("not found error: %w", storage.ErrNotFound)
