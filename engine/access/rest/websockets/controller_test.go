@@ -826,6 +826,36 @@ func (s *WsControllerSuite) TestControllerShutdown() {
 
 		conn.AssertExpectations(t)
 	})
+
+	s.T().Run("Inactivity tracking", func(t *testing.T) {
+		t.Parallel()
+
+		conn := connmock.NewWebsocketConnection(t)
+		conn.On("Close").Return(nil).Once()
+		conn.On("SetReadDeadline", mock.Anything).Return(nil).Once()
+		conn.On("SetPongHandler", mock.AnythingOfType("func(string) error")).Return(nil).Once()
+
+		factory := dpmock.NewDataProviderFactory(t)
+		// Mock with short inactivity timeout for testing
+		wsConfig := s.wsConfig
+
+		wsConfig.InactivityTimeout = 50 * time.Millisecond
+		controller := NewWebSocketController(s.logger, wsConfig, conn, factory)
+
+		conn.
+			On("ReadJSON", mock.Anything).
+			Return(func(interface{}) error {
+				// wait on read
+				<-time.After(wsConfig.InactivityTimeout + 10)
+				return websocket.ErrCloseSent
+			}).
+			Once()
+
+		controller.HandleConnection(context.Background())
+		time.Sleep(wsConfig.InactivityTimeout)
+
+		conn.AssertExpectations(t)
+	})
 }
 
 func (s *WsControllerSuite) TestKeepaliveRoutine() {
@@ -900,6 +930,25 @@ func (s *WsControllerSuite) TestKeepaliveRoutine() {
 
 		conn.AssertExpectations(t) // Should not invoke WriteMessage after context cancellation
 	})
+}
+
+// TestMonitorInactivity verifies that monitorInactivity returns an error
+// when the WebSocket connection has no subscriptions for the configured inactivity timeout.
+func (s *WsControllerSuite) TestMonitorInactivity() {
+	conn := connmock.NewWebsocketConnection(s.T())
+	factory := dpmock.NewDataProviderFactory(s.T())
+
+	// Mock with short inactivity timeout for testing
+	wsConfig := s.wsConfig
+
+	wsConfig.InactivityTimeout = 50 * time.Millisecond
+	controller := NewWebSocketController(s.logger, wsConfig, conn, factory)
+
+	err := controller.monitorInactivity(context.Background())
+	s.Require().Error(err)
+	s.Require().Equal(err, fmt.Errorf("no recent activity for %v", s.wsConfig.InactivityTimeout))
+
+	conn.AssertExpectations(s.T())
 }
 
 // newControllerMocks initializes mock WebSocket connection, data provider, and data provider factory.
