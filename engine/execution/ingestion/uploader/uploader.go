@@ -55,7 +55,6 @@ type AsyncUploader struct {
 	queue               chan *execution.ComputationResult
 	cm                  *component.ComponentManager
 	component.Component
-	// TODO Replace fifoqueue with channel, and make Upload() blocking
 }
 
 // UploadWorker implements a component worker which asynchronously uploads computation results
@@ -108,6 +107,8 @@ func (a *AsyncUploader) UploadTask(ctx context.Context, computationResult *execu
 		return retry.RetryableError(err)
 	})
 
+	// We only log upload errors here because the errors originate from an external cloud provider
+	// and the upload success is not critical to correct continued operation of the node
 	if err != nil {
 		a.log.Error().Err(err).
 			Hex("block_id", logging.Entity(computationResult.ExecutableBlock)).

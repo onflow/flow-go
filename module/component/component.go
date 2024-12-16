@@ -23,7 +23,7 @@ var ErrComponentShutdown = fmt.Errorf("component has already shut down")
 type Component interface {
 	module.Startable
 	// Ready returns a ready channel that is closed once startup has completed.
-	// Unlike the previous ReadyDoneAware interface, it has no effect on the state of the component,
+	// Unlike the previous [module.ReadyDoneAware] interface, it has no effect on the state of the component,
 	// and only exposes information about the component's state.
 	// To start the component, instead use the Start() method.
 	// Note that the ready channel may never close if errors are encountered during startup,
@@ -32,10 +32,10 @@ type Component interface {
 	Ready() <-chan struct{}
 
 	// Done returns a done channel that is closed once shutdown has completed.
-	// Unlike the previous ReadyDoneAware interface, it has no effect on the state of the component,
+	// Unlike the previous [module.ReadyDoneAware] interface, it has no effect on the state of the component,
 	// and only exposes information about the component's state.
 	// To shutdown the component, instead cancel the context that was passed to Start().
-	// Note that the done channel should be closed even if errors are encountered during shutdown.
+	// Implementations must close the done channel even if errors are encountered during shutdown.
 	// This should be an idempotent method.
 	Done() <-chan struct{}
 }
