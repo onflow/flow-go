@@ -203,12 +203,46 @@ func convertServiceEventEpochSetup(event flow.Event) (*flow.ServiceEvent, error)
 	return serviceEvent, nil
 }
 
+// convertServiceEventEpochCommit is a wrapper function to support backward-compatible event parsing for [flow.EpochCommit] events.
+// It delegates to the version-specific conversion function based on the number of fields in the event.
+// TODO(EFM, #6794): Replace this function with the body of `convertServiceEventEpochCommitV1` once the network upgrade is complete.
+func convertServiceEventEpochCommit(event flow.Event) (*flow.ServiceEvent, error) {
+	// decode bytes using ccf
+	payload, err := ccf.Decode(nil, event.Payload)
+	if err != nil {
+		return nil, fmt.Errorf("could not unmarshal event payload: %w", err)
+	}
+
+	cdcEvent, ok := payload.(cadence.Event)
+	if !ok {
+		return nil, invalidCadenceTypeError("payload", payload, cadence.Event{})
+	}
+
+	if cdcEvent.Type() == nil {
+		return nil, fmt.Errorf("EpochCommit event doesn't have type")
+	}
+
+	fields := cadence.FieldsMappedByName(cdcEvent)
+
+	switch len(fields) {
+	case 3:
+		return convertServiceEventEpochCommitV0(event)
+	case 5:
+		return convertServiceEventEpochCommitV1(event)
+	default:
+		return nil, fmt.Errorf(
+			"invalid number of fields in EpochCommit event, expect 3 or 5, got: %d",
+			len(fields),
+		)
+	}
+}
+
 // convertServiceEventEpochCommit converts a service event encoded as the generic
 // flow.Event type to a ServiceEvent type for an EpochCommit event.
 // CAUTION: This function must only be used for input events computed locally, by an
 // Execution or Verification Node; it is not resilient to malicious inputs.
 // No errors are expected during normal operation.
-func convertServiceEventEpochCommit(event flow.Event) (*flow.ServiceEvent, error) {
+func convertServiceEventEpochCommitV1(event flow.Event) (*flow.ServiceEvent, error) {
 	// decode bytes using ccf
 	payload, err := ccf.Decode(nil, event.Payload)
 	if err != nil {
@@ -294,6 +328,88 @@ func convertServiceEventEpochCommit(event flow.Event) (*flow.ServiceEvent, error
 		index := pair.Value.(cadence.Int).Int()
 		commit.DKGIndexMap[nodeID] = index
 	}
+
+	// create the service event
+	serviceEvent := &flow.ServiceEvent{
+		Type:  flow.ServiceEventCommit,
+		Event: commit,
+	}
+
+	return serviceEvent, nil
+}
+
+// convertServiceEventEpochCommit converts a service event encoded as the generic
+// flow.Event type to a ServiceEvent type for an EpochCommit event.
+// CAUTION: This function must only be used for input events computed locally, by an
+// Execution or Verification Node; it is not resilient to malicious inputs.
+// No errors are expected during normal operation.
+// TODO(EFM, #6794): Remove this once we complete the network upgrade
+func convertServiceEventEpochCommitV0(event flow.Event) (*flow.ServiceEvent, error) {
+	// decode bytes using ccf
+	payload, err := ccf.Decode(nil, event.Payload)
+	if err != nil {
+		return nil, fmt.Errorf("could not unmarshal event payload: %w", err)
+	}
+
+	cdcEvent, ok := payload.(cadence.Event)
+	if !ok {
+		return nil, invalidCadenceTypeError("payload", payload, cadence.Event{})
+	}
+
+	if cdcEvent.Type() == nil {
+		return nil, fmt.Errorf("EpochCommit event doesn't have type")
+	}
+
+	fields := cadence.FieldsMappedByName(cdcEvent)
+
+	const expectedFieldCount = 3
+	if len(fields) < expectedFieldCount {
+		return nil, fmt.Errorf(
+			"insufficient fields in EpochCommit event (%d < %d)",
+			len(fields),
+			expectedFieldCount,
+		)
+	}
+
+	// Extract EpochCommit event fields
+
+	counter, err := getField[cadence.UInt64](fields, "counter")
+	if err != nil {
+		return nil, fmt.Errorf("failed to decode EpochCommit event: %w", err)
+	}
+
+	cdcClusterQCVotes, err := getField[cadence.Array](fields, "clusterQCs")
+	if err != nil {
+		return nil, fmt.Errorf("failed to decode EpochCommit event: %w", err)
+	}
+
+	cdcDKGKeys, err := getField[cadence.Array](fields, "dkgPubKeys")
+	if err != nil {
+		return nil, fmt.Errorf("failed to decode EpochCommit event: %w", err)
+	}
+
+	commit := &flow.EpochCommit{
+		Counter: uint64(counter),
+	}
+
+	// parse cluster qc votes
+	commit.ClusterQCs, err = convertClusterQCVotes(cdcClusterQCVotes.Values)
+	if err != nil {
+		return nil, fmt.Errorf("could not convert cluster qc votes: %w", err)
+	}
+
+	// parse DKG group key and participants
+	// Note: this is read in the same order as `DKGClient.SubmitResult` ie. with the group public key first followed by individual keys
+	// https://github.com/onflow/flow-go/blob/feature/dkg/module/dkg/client.go#L182-L183
+	commit.DKGGroupKey, err = convertDKGKey(cdcDKGKeys.Values[0])
+	if err != nil {
+		return nil, fmt.Errorf("could not convert DKG group key: %w", err)
+	}
+	commit.DKGParticipantKeys, err = convertDKGKeys(cdcDKGKeys.Values[1:])
+	if err != nil {
+		return nil, fmt.Errorf("could not convert DKG keys: %w", err)
+	}
+	commit.DKGIndexMap = nil
 
 	// create the service event
 	serviceEvent := &flow.ServiceEvent{
