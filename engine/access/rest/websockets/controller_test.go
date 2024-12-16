@@ -896,8 +896,7 @@ func (s *WsControllerSuite) TestKeepaliveRoutine() {
 
 		// Start the keepalive process with the context canceled
 		err := controller.keepalive(ctx)
-		s.Require().Error(err)
-		s.Require().ErrorIs(context.Canceled, err) //TODO: should be nil
+		s.Require().NoError(err)
 
 		conn.AssertExpectations(t) // Should not invoke WriteMessage after context cancellation
 	})

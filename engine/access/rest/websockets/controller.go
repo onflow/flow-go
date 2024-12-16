@@ -125,7 +125,7 @@ func (c *Controller) keepalive(ctx context.Context) error {
 	for {
 		select {
 		case <-ctx.Done():
-			return ctx.Err()
+			return nil
 		case <-pingTicker.C:
 			err := c.conn.WriteControl(websocket.PingMessage, time.Now().Add(WriteWait))
 			if err != nil {
@@ -158,7 +158,7 @@ func (c *Controller) writeMessages(ctx context.Context) error {
 	for {
 		select {
 		case <-ctx.Done():
-			return ctx.Err()
+			return nil
 		case message, ok := <-c.multiplexedStream:
 			if !ok {
 				return fmt.Errorf("multiplexed stream closed")
