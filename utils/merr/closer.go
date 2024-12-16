@@ -9,6 +9,7 @@ import (
 // CloseAndMergeError close the closable and merge the closeErr with the given err into a multierror
 // Note: when using this function in a defer function, don't use as below:
 // func XXX() (
+//
 //	err error,
 //	) {
 //		defer func() {
@@ -18,6 +19,7 @@ import (
 //
 // Better to use as below:
 // func XXX() (
+//
 //	errToReturn error,
 //	) {
 //		defer func() {
