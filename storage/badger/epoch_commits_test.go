@@ -53,7 +53,7 @@ func TestEpochCommitStoreAndRetrieve(t *testing.T) {
 }
 
 // epochCommitV0 is a version of [flow.EpochCommit] without the [flow.DKGIndexMap] field.
-// This exact structure was used to current mainnet and we would like to ensure that new version of [flow.EpochCommit]
+// This exact structure was used prior to Protocol State Version 2, and we would like to ensure that new version of [flow.EpochCommit]
 // is backward compatible with this structure.
 // It is used only in tests.
 // TODO(EFM, #6794): Remove this once we complete the network upgrade

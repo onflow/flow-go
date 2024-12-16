@@ -204,8 +204,8 @@ func convertServiceEventEpochSetup(event flow.Event) (*flow.ServiceEvent, error)
 }
 
 // convertServiceEventEpochCommit is a wrapper function to support backward-compatible event parsing for [flow.EpochCommit] events.
-// It delegates to the appropriate version-specific conversion function based on the number of fields in the event.
-// TODO(EFM, #6794): Replace this function with a single version-specific conversion function once the network upgrade is complete.
+// It delegates to the version-specific conversion function based on the number of fields in the event.
+// TODO(EFM, #6794): Replace this function with the body of `convertServiceEventEpochCommitV1` once the network upgrade is complete.
 func convertServiceEventEpochCommit(event flow.Event) (*flow.ServiceEvent, error) {
 	// decode bytes using ccf
 	payload, err := ccf.Decode(nil, event.Payload)

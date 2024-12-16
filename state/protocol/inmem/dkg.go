@@ -16,7 +16,7 @@ type DKG flow.EpochCommit
 var _ protocol.DKG = (*DKG)(nil)
 
 // NewDKG creates a new DKG instance from the given setup and commit events.
-// TODO(EFM, #6794): Remove this once we complete the network upgrade, we should remove v0 model.
+// TODO(EFM, #6794): Remove branch `commit.DKGIndexMap == nil` once we complete the network upgrade.
 func NewDKG(setup *flow.EpochSetup, commit *flow.EpochCommit) protocol.DKG {
 	if commit.DKGIndexMap == nil {
 		return NewDKGv0(setup, commit)
@@ -66,7 +66,7 @@ func (d *DKG) NodeID(index uint) (flow.Identifier, error) {
 	return flow.ZeroID, fmt.Errorf("inconsistent DKG state: missing index %d", index)
 }
 
-// DKGv0 implements the protocol.DKG interface for the model which is currently active on mainnet.
+// DKGv0 implements the protocol.DKG interface for the EpochCommit model used before Protocol State Version 2.
 // This model is used for [flow.EpochCommit] events without the DKGIndexMap field.
 // TODO(EFM, #6794): Remove this once we complete the network upgrade
 type DKGv0 struct {

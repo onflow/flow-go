@@ -152,7 +152,7 @@ func IsValidExtendingEpochCommit(extendingCommit *flow.EpochCommit, epochState *
 // IsValidEpochCommit implements a wrapper around the actual validation function to allow for backward-compatible validation
 // depending on the version of the [flow.EpochCommit] event. The version of the [flow.EpochCommit] is determined by the presence
 // of the [flow.DKGIndexMap] field.
-// TODO(EFM, #6794): Replace this with call to the actual validation function once we complete the network upgrade
+// TODO(EFM, #6794): Replace this with the body of `isValidEpochCommit` once we complete the network upgrade.
 func IsValidEpochCommit(commit *flow.EpochCommit, setup *flow.EpochSetup) error {
 	if commit.DKGIndexMap == nil {
 		return isValidEpochCommitV0(commit, setup)
