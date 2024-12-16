@@ -11,6 +11,7 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
+// TODO: fails with input non-nil ChunkBody.ServiceEventCount
 func TestConvertExecutionResult(t *testing.T) {
 	t.Parallel()
 
@@ -25,6 +26,7 @@ func TestConvertExecutionResult(t *testing.T) {
 	assert.Equal(t, er, converted)
 }
 
+// TODO: fails with input non-nil ChunkBody.ServiceEventCount
 func TestConvertExecutionResults(t *testing.T) {
 	t.Parallel()
 
@@ -43,6 +45,7 @@ func TestConvertExecutionResults(t *testing.T) {
 	assert.Equal(t, results, converted)
 }
 
+// TODO: fails with input non-nil ChunkBody.ServiceEventCount
 func TestConvertExecutionResultMetaList(t *testing.T) {
 	t.Parallel()
 

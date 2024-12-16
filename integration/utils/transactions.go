@@ -24,7 +24,7 @@ var createAndSetupNodeTxScript string
 //go:embed templates/remove-node.cdc
 var removeNodeTxScript string
 
-//go:embed templates/set-protocol-state-version.cdc
+//go:embed "templates/set-protocol-state-version.cdc"
 var setProtocolStateVersionScript string
 
 func LocalnetEnv() templates.Environment {
@@ -195,6 +195,7 @@ func MakeSetProtocolStateVersionTx(
 	activeViewDiff uint64,
 ) (*sdk.Transaction, error) {
 	accountKey := adminAccount.Keys[adminAccountKeyID]
+
 	tx := sdk.NewTransaction().
 		SetScript([]byte(templates.ReplaceAddresses(setProtocolStateVersionScript, env))).
 		SetComputeLimit(9999).

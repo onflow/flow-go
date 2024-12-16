@@ -41,16 +41,16 @@ func ReadFullPartnerNodeInfos(log zerolog.Logger, partnerWeightsPath, partnerNod
 		}
 		err = ValidateNetworkPubKey(partner.NetworkPubKey)
 		if err != nil {
-			return nil, fmt.Errorf(fmt.Sprintf("invalid network public key: %s", partner.NetworkPubKey))
+			return nil, fmt.Errorf("invalid network public key: %s", partner.NetworkPubKey)
 		}
 		err = ValidateStakingPubKey(partner.StakingPubKey)
 		if err != nil {
-			return nil, fmt.Errorf(fmt.Sprintf("invalid staking public key: %s", partner.StakingPubKey))
+			return nil, fmt.Errorf("invalid staking public key: %s", partner.StakingPubKey)
 		}
 
 		weight := weights[partner.NodeID]
 		if valid := ValidateWeight(weight); !valid {
-			return nil, fmt.Errorf(fmt.Sprintf("invalid partner weight: %d", weight))
+			return nil, fmt.Errorf("invalid partner weight: %d", weight)
 		}
 
 		if weight != flow.DefaultInitialWeight {
