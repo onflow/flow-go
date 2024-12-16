@@ -306,10 +306,12 @@ func (ds *RecoverablePrivateBeaconKeyStateMachine) UpsertMyBeaconPrivateKey(epoc
 // No errors are expected during normal operations.
 func ensureKeyIncludedInEpoch(epochCounter uint64, key crypto.PrivateKey, commit *flow.EpochCommit) error {
 	if commit.Counter != epochCounter {
-		return fmt.Errorf("commit counter does not match epoch counter: %d != %d", commit.Counter, epochCounter)
+		return fmt.Errorf("commit counter does not match epoch counter: %d != %d", epochCounter, commit.Counter)
 	}
 	publicKey := key.PublicKey()
-	if slices.Index(commit.DKGParticipantKeys, publicKey) < 0 {
+	if slices.IndexFunc(commit.DKGParticipantKeys, func(lhs crypto.PublicKey) bool {
+		return lhs.Equals(publicKey)
+	}) < 0 {
 		return fmt.Errorf("key not included in epoch commit: %s", publicKey)
 	}
 	return nil

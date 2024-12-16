@@ -346,7 +346,7 @@ func (e *ReactorEngine) handleEpochCommittedPhaseStarted(currentEpochCounter uin
 		log.Fatal().Err(err).Msg("failed to retrieve epoch protocol state")
 		return
 	}
-	err = e.dkgState.CommitMyBeaconPrivateKey(nextEpochCounter, epochProtocolState.EpochCommit())
+	err = e.dkgState.CommitMyBeaconPrivateKey(nextEpochCounter, epochProtocolState.Entry().NextEpochCommit)
 	if err != nil {
 		// TODO use irrecoverable context
 		e.log.Fatal().Err(err).Msg("failed to set dkg current state")

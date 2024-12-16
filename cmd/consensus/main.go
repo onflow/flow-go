@@ -316,7 +316,7 @@ func main() {
 				return fmt.Errorf("could not load beacon key file: %w", err)
 			}
 
-			rootEpoch := node.State.AtBlockID(node.FinalizedRootBlock.ID()).Epochs().Current()
+			rootEpoch := rootSnapshot.Epochs().Current()
 			epochCounter, err := rootEpoch.Counter()
 			if err != nil {
 				return fmt.Errorf("could not get root epoch counter: %w", err)
