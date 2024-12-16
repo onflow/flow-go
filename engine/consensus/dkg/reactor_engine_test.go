@@ -378,15 +378,18 @@ func (suite *ReactorEngineSuite_CommittedPhase) SetupTest() {
 // * set the DKG end state to Success
 func (suite *ReactorEngineSuite_CommittedPhase) TestDKGSuccess() {
 
-	epochCommit := unittest.EpochCommitFixture(unittest.CommitWithCounter(suite.NextEpochCounter()))
+	entry := unittest.EpochStateFixture(unittest.WithNextEpochProtocolState(), func(entry *flow.RichEpochStateEntry) {
+		entry.NextEpochCommit.Counter = suite.NextEpochCounter()
+		entry.NextEpoch.CommitID = entry.NextEpochCommit.ID()
+	})
 	epochProtocolState := protocol.NewEpochProtocolState(suite.T())
-	epochProtocolState.On("EpochCommit").Return(epochCommit)
+	epochProtocolState.On("Entry").Return(entry)
 	suite.snap.On("EpochProtocolState").Return(epochProtocolState, nil)
-	suite.dkgState.On("CommitMyBeaconPrivateKey", suite.NextEpochCounter(), epochCommit).Return(nil).Once()
+	suite.dkgState.On("CommitMyBeaconPrivateKey", suite.NextEpochCounter(), entry.NextEpochCommit).Return(nil).Once()
 	suite.engine.EpochCommittedPhaseStarted(suite.epochCounter, suite.firstBlock)
 	suite.Require().Equal(0, suite.warnsLogged)
 	// ensure we commit my beacon private key
-	suite.dkgState.AssertCalled(suite.T(), "CommitMyBeaconPrivateKey", suite.NextEpochCounter(), epochCommit)
+	suite.dkgState.AssertCalled(suite.T(), "CommitMyBeaconPrivateKey", suite.NextEpochCounter(), entry.NextEpochCommit)
 }
 
 // TestInconsistentKey tests the path where we are checking the global DKG
@@ -444,11 +447,14 @@ func (suite *ReactorEngineSuite_CommittedPhase) TestStartupInCommittedPhase_DKGS
 	suite.dkgState.On("IsDKGStarted", suite.NextEpochCounter()).Return(true, nil).Once()
 	suite.DKGState = flow.DKGStateCompleted
 
-	epochCommit := unittest.EpochCommitFixture(unittest.CommitWithCounter(suite.NextEpochCounter()))
+	entry := unittest.EpochStateFixture(unittest.WithNextEpochProtocolState(), func(entry *flow.RichEpochStateEntry) {
+		entry.NextEpochCommit.Counter = suite.NextEpochCounter()
+		entry.NextEpoch.CommitID = entry.NextEpochCommit.ID()
+	})
 	epochProtocolState := protocol.NewEpochProtocolState(suite.T())
-	epochProtocolState.On("EpochCommit").Return(epochCommit)
+	epochProtocolState.On("Entry").Return(entry)
 	suite.snap.On("EpochProtocolState").Return(epochProtocolState, nil)
-	suite.dkgState.On("CommitMyBeaconPrivateKey", suite.NextEpochCounter(), epochCommit).Return(nil).Once()
+	suite.dkgState.On("CommitMyBeaconPrivateKey", suite.NextEpochCounter(), entry.NextEpochCommit).Return(nil).Once()
 
 	// start up the engine
 	unittest.AssertClosesBefore(suite.T(), suite.engine.Ready(), time.Second)
@@ -460,7 +466,7 @@ func (suite *ReactorEngineSuite_CommittedPhase) TestStartupInCommittedPhase_DKGS
 		mock.Anything,
 	)
 	// ensure we commit my beacon private key
-	suite.dkgState.AssertCalled(suite.T(), "CommitMyBeaconPrivateKey", suite.NextEpochCounter(), epochCommit)
+	suite.dkgState.AssertCalled(suite.T(), "CommitMyBeaconPrivateKey", suite.NextEpochCounter(), entry.NextEpochCommit)
 }
 
 // TestStartupInCommittedPhase_DKGSuccess tests that the dkg end state is correctly
