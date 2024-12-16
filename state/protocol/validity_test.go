@@ -213,16 +213,11 @@ func TestIsValidEpochCommitBackwardCompatible(t *testing.T) {
 	requiredThreshold := protocol.RandomBeaconSafetyThreshold(uint(len(commit.DKGIndexMap)))
 	require.Less(t, int(requiredThreshold), len(commit.DKGParticipantKeys),
 		"threshold has to be at lower than the number of keys, otherwise the test is invalid")
-	// sample the required threshold, since it's lower than the number of keys it will be valid for the
-	// new version of the [flow.EpochCommit] but not for the v0 version since it doesn't have the [flow.DKGIndexMap] field.
-	sampled, err := setup.Participants.Filter(filter.IsConsensusCommitteeMember).Sample(requiredThreshold)
-	require.NoError(t, err)
-
 	// preserve the DKGIndexMap since we will be removing it later
 	dkgIndexMap := commit.DKGIndexMap
 
 	// since we are passing the new version validation result should be successful
-	err = protocol.IsValidEpochCommit(commit, setup)
+	err := protocol.IsValidEpochCommit(commit, setup)
 	require.NoError(t, err)
 
 	commit.DKGIndexMap = nil
@@ -235,6 +230,8 @@ func TestIsValidEpochCommitBackwardCompatible(t *testing.T) {
 	// now we are going to sample participants so the number of keys is not equal to the number of consensus participants
 	// but the threshold for random beacon participants is still met. This is valid for the new version of the [flow.EpochCommit]
 	// since it requires the [flow.DKGIndexMap] to be present, but it's invalid for the v0 version.
+	sampled, err := setup.Participants.Filter(filter.IsConsensusCommitteeMember).Sample(requiredThreshold)
+	require.NoError(t, err)
 	setup.Participants = sampled
 	commit.DKGIndexMap = dkgIndexMap
 	err = protocol.IsValidEpochCommit(commit, setup)

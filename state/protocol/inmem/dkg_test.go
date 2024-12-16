@@ -14,8 +14,8 @@ import (
 // TestDKGv0 tests that the [inmem.DKG] is backward compatible with the v0 DKG protocol model.
 // We test this by creating a [inmem.DKG] instance from a v0 [flow.EpochSetup] and [flow.EpochCommit]
 // and verifying that the DKG methods return the expected values.
-// TODO(EFM, #6794): Remove this once we complete the network upgrade
-func TestDKGv0(t *testing.T) {
+// TODO(EFM, #6794): Update this test to use the new DKG model.
+func TestDKG(t *testing.T) {
 	consensusParticipants := unittest.IdentityListFixture(5, unittest.WithRole(flow.RoleConsensus)).Sort(flow.Canonical[flow.Identity])
 	otherParticipants := unittest.IdentityListFixture(10, unittest.WithAllRolesExcept(flow.RoleConsensus))
 	setup := unittest.EpochSetupFixture(unittest.WithParticipants(append(consensusParticipants, otherParticipants...).ToSkeleton()))
