@@ -44,7 +44,8 @@ func (d *DKG) KeyShare(nodeID flow.Identifier) (crypto.PublicKey, error) {
 	return d.DKGParticipantKeys[index], nil
 }
 
-// KeyShares returns all public key shares that are result of the distributed key generation.
+// KeyShares returns the public portions of all threshold key shares. Note that there might not
+// exist a private key corresponding to each entry (e.g. if the respective node failed the DKG).
 func (d *DKG) KeyShares() []crypto.PublicKey {
 	return d.DKGParticipantKeys
 }

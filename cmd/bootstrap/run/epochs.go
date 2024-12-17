@@ -89,7 +89,7 @@ func GenerateRecoverEpochTxArgs(log zerolog.Logger,
 	internalNodesMap := make(map[flow.Identifier]struct{})
 	for _, node := range internalNodes {
 		if !currentEpochIdentities.Exists(node.Identity()) {
-			log.Warn().Msgf("node ID found in internal node infos missing from protocol snapshot identities %s", node.NodeID)
+						log.Warn().Msgf("this node (ID %s) is not part of the network according to the bootstrapping data; we might not get any data", node.NodeID)
 		}
 		internalNodesMap[node.NodeID] = struct{}{}
 	}
@@ -145,7 +145,7 @@ func GenerateRecoverEpochTxArgs(log zerolog.Logger,
 	// included in the DKG committee since the threshold signature scheme operates on pre-defined number of participants and cannot be changed.
 	dkgGroupKeyCdc, cdcErr := cadence.NewString(hex.EncodeToString(currentEpochCommit.DKGGroupKey.Encode()))
 	if cdcErr != nil {
-		return nil, fmt.Errorf("failed to get dkg group key cadence string: %w", cdcErr)
+		return nil, fmt.Errorf("failed to convert Random Beacon group key to cadence representation: %w", cdcErr)
 	}
 
 	// copy DKG index map from the current epoch
@@ -158,10 +158,10 @@ func GenerateRecoverEpochTxArgs(log zerolog.Logger,
 	}
 	// copy DKG public keys from the current epoch
 	dkgPubKeys := make([]cadence.Value, 0)
-	for _, dkgPubKey := range currentEpochCommit.DKGParticipantKeys {
+	for k, dkgPubKey := range currentEpochCommit.DKGParticipantKeys {
 		dkgPubKeyCdc, cdcErr := cadence.NewString(hex.EncodeToString(dkgPubKey.Encode()))
 		if cdcErr != nil {
-			return nil, fmt.Errorf("failed to get dkg pub key cadence string for node: %w", cdcErr)
+			return nil, fmt.Errorf("failed convert public beacon key of participant %d to cadence representation: %w", k, cdcErr)
 		}
 		dkgPubKeys = append(dkgPubKeys, dkgPubKeyCdc)
 	}
@@ -170,7 +170,7 @@ func GenerateRecoverEpochTxArgs(log zerolog.Logger,
 	for _, id := range currentEpochIdentities {
 		nodeIdCdc, err := cadence.NewString(id.GetNodeID().String())
 		if err != nil {
-			return nil, fmt.Errorf("failed to convert node ID to cadence string %s: %w", id.GetNodeID(), err)
+			return nil, fmt.Errorf("failed to convert node ID %s to cadence string: %w", id.GetNodeID(), err)
 		}
 		nodeIds = append(nodeIds, nodeIdCdc)
 	}
