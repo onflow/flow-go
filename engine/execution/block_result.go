@@ -142,6 +142,7 @@ type BlockAttestationResult struct {
 
 	// Deprecated:
 	// TODO(mainnet27, #6773): remove this field https://github.com/onflow/flow-go/issues/6773
+	//   this is only temporarily needed produce different chunk Data Packs depending on the protocol version
 	versionAwareChunkConstructor flow.ChunkConstructor
 }
 

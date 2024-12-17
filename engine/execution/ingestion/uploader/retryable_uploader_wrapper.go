@@ -242,7 +242,7 @@ func (b *BadgerRetryableUploaderWrapper) reconstructComputationResult(
 		CompleteCollections: completeCollections,
 	}
 
-	// NOTE(#6777): The entity ultimately uploaded by this component is [uploader.BlockData].
+	// NOTE(#6777): The entity ultimately uploaded by this component is [uploader.BlockData],
 	// which does not include chunks, so we do not need to implement version-aware chunk construction here.
 	compRes := execution.NewEmptyComputationResult(executableBlock, flow.NewChunk)
 

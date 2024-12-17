@@ -255,6 +255,8 @@ func (s *ReceiptValidationSuite) TestReceiptServiceEventCountMismatch() {
 			s.Assert().True(engine.IsInvalidInputError(err))
 		})
 		s.Run("chunk list contains nil service event count field", func() {
+			// TODO(mainnet27, #6773): remove after changing ServiceEventCount field to value type https://github.com/onflow/flow-go/issues/6773
+
 			result.Chunks[rand.Intn(len(result.Chunks))].ServiceEventCount = nil
 			err := s.receiptValidator.Validate(receipt)
 			s.Require().Error(err, "should reject with invalid chunks")

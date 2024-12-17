@@ -664,7 +664,7 @@ func ProtocolStateWithSourceFixture(source []byte) *protocolMock.State {
 	}
 	snapshot := &protocolMock.Snapshot{}
 	kvstore := &protocolMock.KVStoreReader{}
-	// TODO(mainnet27, #6773): remove GetProtocolStateVersion mock
+	// TODO(mainnet27, #6773): remove GetProtocolStateVersion mock, because this is only temporarily needed in the execution node to produce different chunk Data Packs depending on the protocol version 
 	kvstore.On("GetProtocolStateVersion").Return(uint64(2))
 	snapshot.On("RandomSource").Return(source, nil)
 	snapshot.On("ProtocolState").Return(kvstore, nil)
@@ -675,7 +675,7 @@ func ProtocolStateWithSourceFixture(source []byte) *protocolMock.State {
 
 // ProtocolStateWithVersionFixture is the same as ProtocolStateWithSourceFixture,
 // but it allows specifying the desired protocol version, rather than random source.
-// TODO(mainnet27, #6773): remove
+// TODO(mainnet27, #6773): remove, because this is only temporarily needed in the execution node to produce different chunk Data Packs depending on the protocol version
 func ProtocolStateWithVersionFixture(protocolVersion uint64) *protocolMock.State {
 	snapshot := &protocolMock.Snapshot{}
 	kvstore := &protocolMock.KVStoreReader{}

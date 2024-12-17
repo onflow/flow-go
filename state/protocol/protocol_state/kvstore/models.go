@@ -33,9 +33,9 @@ func (model *UpgradableModel) SetVersionUpgrade(activator *protocol.ViewBasedAct
 
 // GetVersionUpgrade returns the upgrade version of protocol.
 // VersionUpgrade is a view-based activator that specifies the version which has to be applied
-// and the view from which on it has to be applied.
-// After an upgrade activation view has passed, the (version, view) data remains in the state
-// until the next upgrade is scheduled.
+// and the view from which on it has to be applied. After an upgrade activation view has passed,
+// the (version, view) data remains in the state until the next upgrade is scheduled (essentially
+// persisting the most recent past update until a subsequent update is scheduled).
 func (model *UpgradableModel) GetVersionUpgrade() *protocol.ViewBasedActivator[uint64] {
 	return model.VersionUpgrade
 }

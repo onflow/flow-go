@@ -62,11 +62,20 @@ func (v *receiptValidator) verifySignature(receipt *flow.ExecutionReceiptMeta, n
 	return nil
 }
 
-// verifyChunkServiceEvents verifies that chunks are compliant with either protocol version v1 or v2,
-// depending on the current protocol version specified by the reference block (result.BlockID).
+// verifyChunkServiceEvents enforces that the [flow.Chunk.ServiceEventCount] fields are protocol compliant:
+// The sum over all chunks must equal the number of elements in [flow.ExecutionResult.ServiceEvents]
 // Expected errors during normal operations:
 //   - engine.InvalidInputError if the result has malformed chunks
 //   - module.UnknownBlockError when the executed block is unknown
+//
+// TODO(mainnet27, #6773): remove logic for ServiceEventCount being nil after changing this field to value type https://github.com/onflow/flow-go/issues/6773
+// For backwards compatibility, we add TEMPORARY extension to this rule:
+//   - We represent [flow.Chunk.ServiceEventCount] as a pointer.
+//   - The ServiceEventCount being nil for _all_ chunks of the ExecutionResult, indicates that this chunk was
+//     created by an older software version which assumes that _all_ service events were emitted in the system
+//     chunk (last chunk). This was the implicit behaviour prior to the introduction of this field.
+// (2) Otherwise, the ServiceEventCount must be non-nil for _all_ chunks of the ExecutionResult
+// Within an ExecutionResult, all chunks must use either representation (1) or (2), not both.
 func (v *receiptValidator) verifyChunkServiceEvents(result *flow.ExecutionResult) error {
 	kvstore, err := v.state.AtBlockID(result.BlockID).ProtocolState()
 	if err != nil {

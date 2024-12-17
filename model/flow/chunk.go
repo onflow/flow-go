@@ -156,7 +156,9 @@ func (ch Chunk) EncodeRLP(w io.Writer) error {
 	})
 }
 
-// Deprecated:
+// Deprecated: this constructor is a TEMPORARY abstraction layer, that allows us to construct chunks according
+// to the old or the new protocol version model (without or with field [Chunk.ServiceEventCount] respectively),
+// depending on the block's view that this chunk belongs to.
 // TODO(mainnet27, #6773): remove this type https://github.com/onflow/flow-go/issues/6773
 type ChunkConstructor func(
 	blockID Identifier,
@@ -194,7 +196,8 @@ func NewChunk(
 	}
 }
 
-// NewChunk_ProtocolVersion1 returns a Chunk compliant with Protocol Version 1.
+// NewChunk_ProtocolVersion1 returns a Chunk compliant with Protocol Version 1, 
+// omitting the value of the field [Chunk.ServiceEventCount] respectively).
 // TODO(mainnet27, #6773): remove this function https://github.com/onflow/flow-go/issues/6773
 // Deprecated: for backward compatibility only until upgrade to Protocol Version 2.
 func NewChunk_ProtocolVersion1(

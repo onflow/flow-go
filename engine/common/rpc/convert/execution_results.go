@@ -149,7 +149,7 @@ func ServiceEventCountFieldToMessage(serviceEventCount *uint16) uint32 {
 // Deprecated:
 // TODO(mainnet27, #6773): remove this function
 func MessageToServiceEventCountField(msgField uint32) *uint16 {
-	if msgField&0xffff000 > 0 {
+	if msgField&0xffff0000 > 0 {
 		return nil
 	}
 	val := uint16(msgField)
