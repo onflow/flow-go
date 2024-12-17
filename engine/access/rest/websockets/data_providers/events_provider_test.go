@@ -76,7 +76,6 @@ func (s *EventsProviderSuite) TestEventsDataProvider_HappyPath() {
 			Events:         expectedEvents,
 			BlockTimestamp: s.rootBlock.Header.Timestamp,
 		})
-
 	}
 
 	testHappyPath(

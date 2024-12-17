@@ -3,7 +3,6 @@ package data_providers
 import (
 	"context"
 	"fmt"
-	"github.com/onflow/flow/protobuf/go/flow/entities"
 	"strconv"
 	"testing"
 
@@ -20,6 +19,8 @@ import (
 	"github.com/onflow/flow-go/engine/access/subscription"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/utils/unittest"
+
+	"github.com/onflow/flow/protobuf/go/flow/entities"
 )
 
 type TransactionStatusesProviderSuite struct {
@@ -59,43 +60,63 @@ func (s *TransactionStatusesProviderSuite) SetupTest() {
 }
 
 func (s *TransactionStatusesProviderSuite) TestTransactionStatusesDataProvider_HappyPath() {
+	id := unittest.IdentifierFixture()
+	cid := unittest.IdentifierFixture()
+	txr := access.TransactionResult{
+		Status:     flow.TransactionStatusSealed,
+		StatusCode: 10,
+		Events: []flow.Event{
+			unittest.EventFixture(flow.EventAccountCreated, 1, 0, id, 200),
+		},
+		ErrorMessage: "",
+		BlockID:      s.rootBlock.ID(),
+		CollectionID: cid,
+		BlockHeight:  s.rootBlock.Header.Height,
+	}
 
-	//testHappyPath(
-	//	s.T(),
-	//	AccountStatusesTopic,
-	//	s.factory,
-	//	s.subscribeTransactionStatusesDataProviderTestCases(),
-	//	func(dataChan chan interface{}) {
-	//		for i := 0; i < len(expectedAccountStatusesResponses); i++ {
-	//			dataChan <- &expectedAccountStatusesResponses[i]
-	//		}
-	//	},
-	//	expectedAccountStatusesResponses,
-	//	s.requireAccountStatuses,
-	//)
+	var expectedTxStatusesResponses [][]*access.TransactionResult
+	var expectedTxResultsResponses []*access.TransactionResult
+
+	for i := 0; i < 2; i++ {
+		expectedTxResultsResponses = append(expectedTxResultsResponses, &txr)
+		expectedTxStatusesResponses = append(expectedTxStatusesResponses, expectedTxResultsResponses)
+	}
+
+	testHappyPath(
+		s.T(),
+		TransactionStatusesTopic,
+		s.factory,
+		s.subscribeTransactionStatusesDataProviderTestCases(),
+		func(dataChan chan interface{}) {
+			for i := 0; i < len(expectedTxStatusesResponses); i++ {
+				dataChan <- expectedTxStatusesResponses[i]
+			}
+		},
+		expectedTxStatusesResponses,
+		s.requireTransactionStatuses,
+	)
 
 }
 
 func (s *TransactionStatusesProviderSuite) subscribeTransactionStatusesDataProviderTestCases() []testType {
 	return []testType{
 		{
-			name: "SubscribeAccountStatusesFromStartBlockID happy path",
+			name: "SubscribeTransactionStatusesFromStartBlockID happy path",
 			arguments: models.Arguments{
 				"start_block_id": s.rootBlock.ID().String(),
-				"event_types":    []string{"flow.AccountCreated", "flow.AccountKeyAdded"},
 			},
 			setupBackend: func(sub *ssmock.Subscription) {
 				s.api.On(
 					"SubscribeTransactionStatusesFromStartBlockID",
 					mock.Anything,
-					s.rootBlock.ID(),
 					mock.Anything,
+					s.rootBlock.ID(),
 					entities.EventEncodingVersion_JSON_CDC_V0,
 				).Return(sub).Once()
 			},
 		},
 		{
-			name: "SubscribeAccountStatusesFromStartHeight happy path",
+			name: "SubscribeTransactionStatusesFromStartHeight happy path",
 			arguments: models.Arguments{
 				"start_block_height": strconv.FormatUint(s.rootBlock.Header.Height, 10),
 			},
@@ -103,18 +124,19 @@ func (s *TransactionStatusesProviderSuite) subscribeTransactionStatusesDataProvi
 				s.api.On(
 					"SubscribeTransactionStatusesFromStartHeight",
 					mock.Anything,
-					s.rootBlock.Header.Height,
 					mock.Anything,
+					s.rootBlock.Header.Height,
 					entities.EventEncodingVersion_JSON_CDC_V0,
 				).Return(sub).Once()
 			},
 		},
 		{
-			name:      "SubscribeAccountStatusesFromLatestBlock happy path",
+			name:      "SubscribeTransactionStatusesFromLatest happy path",
 			arguments: models.Arguments{},
 			setupBackend: func(sub *ssmock.Subscription) {
 				s.api.On(
 					"SubscribeTransactionStatusesFromLatest",
+					mock.Anything,
 					mock.Anything,
 					entities.EventEncodingVersion_JSON_CDC_V0,
 				).Return(sub).Once()
@@ -123,14 +145,18 @@ func (s *TransactionStatusesProviderSuite) subscribeTransactionStatusesDataProvi
 	}
 }
 
-// requireAccountStatuses ensures that the received account statuses information matches the expected data.
-func (s *AccountStatusesProviderSuite) requireTransactionStatuses(
+// requireTransactionStatuses ensures that the received transaction statuses information matches the expected data.
+func (s *TransactionStatusesProviderSuite) requireTransactionStatuses(
 	v interface{},
 	expectedResponse interface{},
 ) {
-	_, ok := expectedResponse.([]access.TransactionResult)
+	expectedAccountStatusesResponse, ok := expectedResponse.([]*access.TransactionResult)
 	require.True(s.T(), ok, "unexpected type: %T", expectedResponse)
 
+	actualResponse, ok := v.(*models.TransactionStatusesResponse)
+	require.True(s.T(), ok, "Expected *models.AccountStatusesResponse, got %T", v)
+
+	s.Require().ElementsMatch(expectedAccountStatusesResponse, actualResponse.TransactionResults)
 }
 
 // TestAccountStatusesDataProvider_InvalidArguments tests the behavior of the transaction statuses data provider
