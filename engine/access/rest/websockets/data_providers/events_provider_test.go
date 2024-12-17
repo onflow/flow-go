@@ -145,6 +145,7 @@ func (s *EventsProviderSuite) requireEvents(actual interface{}, expected interfa
 	require.True(s.T(), ok, "Expected *models.EventResponse, got %T", actual)
 
 	s.Require().ElementsMatch(expectedResponse.Events, actualResponse.Events)
+	s.Require().Equal(expectedResponse.MessageIndex, actualResponse.MessageIndex)
 }
 
 // invalidArgumentsTestCases returns a list of test cases with invalid argument combinations
@@ -247,7 +248,8 @@ func (s *EventsProviderSuite) TestMessageIndexEventProviderResponse_HappyPath() 
 		send,
 		s.chain,
 		state_stream.DefaultEventFilterConfig,
-		subscription.DefaultHeartbeatInterval)
+		subscription.DefaultHeartbeatInterval,
+	)
 	s.Require().NotNil(provider)
 	s.Require().NoError(err)
 
@@ -307,7 +309,7 @@ func (s *EventsProviderSuite) backendEventsResponses(events []flow.Event) []*bac
 	return responses
 }
 
-// expectedEventsResponses creates the expected responses for the provided events and backend responses.
+// expectedEventsResponses creates the expected responses for the provided backend responses.
 func (s *EventsProviderSuite) expectedEventsResponses(
 	backendResponses []*backend.EventsResponse,
 ) []interface{} {
@@ -315,7 +317,7 @@ func (s *EventsProviderSuite) expectedEventsResponses(
 
 	for i, resp := range backendResponses {
 		var expectedResponse models.EventResponse
-		expectedResponse.Build(resp, uint64(i))
+		expectedResponse.Build(resp, uint64(i+1))
 
 		expectedResponses[i] = &expectedResponse
 	}

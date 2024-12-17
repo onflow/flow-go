@@ -146,6 +146,8 @@ func (s *AccountStatusesProviderSuite) requireAccountStatuses(actual interface{}
 
 	require.Equal(s.T(), expectedResponse.BlockID, actualResponse.BlockID)
 	require.Equal(s.T(), len(expectedResponse.AccountEvents), len(actualResponse.AccountEvents))
+	require.Equal(s.T(), expectedResponse.MessageIndex, actualResponse.MessageIndex)
+	require.Equal(s.T(), expectedResponse.Height, actualResponse.Height)
 
 	for key, expectedEvents := range expectedResponse.AccountEvents {
 		actualEvents, ok := actualResponse.AccountEvents[key]
@@ -286,7 +288,7 @@ func (s *AccountStatusesProviderSuite) expectedAccountStatusesResponses(backendR
 
 	for i, resp := range backendResponses {
 		var expectedResponse models.AccountStatusesResponse
-		expectedResponse.Build(resp, uint64(i))
+		expectedResponse.Build(resp, uint64(i+1))
 
 		expectedResponses[i] = &expectedResponse
 	}
