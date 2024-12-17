@@ -3,8 +3,6 @@ package votecollector
 import (
 	"errors"
 	"fmt"
-	"github.com/onflow/flow-go/module/irrecoverable"
-	"github.com/onflow/flow-go/state/protocol"
 
 	"github.com/onflow/crypto"
 	"github.com/rs/zerolog"
@@ -16,7 +14,9 @@ import (
 	"github.com/onflow/flow-go/consensus/hotstuff/verification"
 	"github.com/onflow/flow-go/model/encoding"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module/irrecoverable"
 	msig "github.com/onflow/flow-go/module/signature"
+	"github.com/onflow/flow-go/state/protocol"
 )
 
 /* **************** Base-Factory for CombinedVoteProcessors ***************** */

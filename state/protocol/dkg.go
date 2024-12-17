@@ -27,7 +27,7 @@ type DKG interface {
 	KeyShare(nodeID flow.Identifier) (crypto.PublicKey, error)
 
 	// KeyShares returns the public portions of all threshold key shares. Note that there might not
-	// exist a private key corresponding to each entry (e.g. if the respective node failed the DKG).	
+	// exist a private key corresponding to each entry (e.g. if the respective node failed the DKG).
 	KeyShares() []crypto.PublicKey
 
 	// NodeID returns the node identifier for the given index.

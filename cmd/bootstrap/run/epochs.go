@@ -89,7 +89,7 @@ func GenerateRecoverEpochTxArgs(log zerolog.Logger,
 	internalNodesMap := make(map[flow.Identifier]struct{})
 	for _, node := range internalNodes {
 		if !currentEpochIdentities.Exists(node.Identity()) {
-						log.Warn().Msgf("this node (ID %s) is not part of the network according to the bootstrapping data; we might not get any data", node.NodeID)
+			log.Warn().Msgf("this node (ID %s) is not part of the network according to the bootstrapping data; we might not get any data", node.NodeID)
 		}
 		internalNodesMap[node.NodeID] = struct{}{}
 	}
