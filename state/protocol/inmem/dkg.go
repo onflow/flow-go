@@ -97,6 +97,10 @@ func (d DKGv0) GroupKey() crypto.PublicKey {
 	return d.Commit.DKGGroupKey
 }
 
+func (d DKGv0) KeyShares() []crypto.PublicKey {
+	return d.Commit.DKGParticipantKeys
+}
+
 // Index returns the DKG index for the given node.
 // Expected error during normal operations:
 //   - protocol.IdentityNotFoundError if nodeID is not a known DKG participant
