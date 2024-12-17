@@ -3,6 +3,8 @@ package votecollector
 import (
 	"errors"
 	"fmt"
+	"github.com/onflow/flow-go/module/irrecoverable"
+	"github.com/onflow/flow-go/state/protocol"
 
 	"github.com/onflow/crypto"
 	"github.com/rs/zerolog"
@@ -66,14 +68,14 @@ func (f *combinedVoteProcessorFactoryBaseV3) Create(log zerolog.Logger, block *m
 	beaconKeys := make([]crypto.PublicKey, 0, len(allParticipants))
 	for _, participant := range allParticipants {
 		stakingKeys = append(stakingKeys, participant.StakingPubKey) // all nodes have staking keys
-		pk, err := dkg.KeyShare(participant.NodeID) // but only a subset of nodes might have random beacon keys
+		pk, err := dkg.KeyShare(participant.NodeID)                  // but only a subset of nodes might have random beacon keys
 		if err != nil {
 			if protocol.IsIdentityNotFound(err) {
 				continue
 			}
 			return nil, irrecoverable.NewException(fmt.Errorf("unexpected error retrieving random beacon key share for node %v: %w", participant.NodeID, err))
 		}
-		beaconParticipants = append(beaconParticipants, participant.NodeID)
+		beaconParticipants = append(beaconParticipants, participant)
 		beaconKeys = append(beaconKeys, pk)
 	}
 
@@ -82,7 +84,7 @@ func (f *combinedVoteProcessorFactoryBaseV3) Create(log zerolog.Logger, block *m
 		return nil, fmt.Errorf("could not create aggregator for staking signatures: %w", err)
 	}
 
-	beaconAggregator, err := signature.NewWeightedSignatureAggregator(allParticipants, beaconKeys, msg, msig.RandomBeaconTag)
+	beaconAggregator, err := signature.NewWeightedSignatureAggregator(beaconParticipants, beaconKeys, msg, msig.RandomBeaconTag)
 	if err != nil {
 		return nil, fmt.Errorf("could not create aggregator for threshold signatures: %w", err)
 	}
