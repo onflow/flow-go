@@ -946,7 +946,7 @@ func (s *WsControllerSuite) TestMonitorInactivity() {
 
 	err := controller.monitorInactivity(context.Background())
 	s.Require().Error(err)
-	s.Require().Equal(err, fmt.Errorf("no recent activity for %v", s.wsConfig.InactivityTimeout))
+	s.Require().Equal(err, fmt.Errorf("no recent activity for %v", wsConfig.InactivityTimeout))
 
 	conn.AssertExpectations(s.T())
 }
