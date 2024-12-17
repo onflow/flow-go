@@ -34,7 +34,7 @@ const (
 type Config struct {
 	MaxSubscriptionsPerConnection uint64
 	MaxResponsesPerSecond         uint64
-	SendMessageTimeout            time.Duration
+	SendMessageTimeout            time.Duration // TODO: Do we need this, if we have MaxResponsesPerSecond ?
 	MaxRequestSize                int64
 }
 
