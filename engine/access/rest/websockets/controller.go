@@ -49,13 +49,14 @@ func NewWebSocketController(
 // Parameters:
 // - ctx: The context for controlling cancellation and timeouts.
 func (c *Controller) HandleConnection(ctx context.Context) {
+	defer c.shutdownConnection()
 
 	// configuring the connection with appropriate read/write deadlines and handlers.
 	err := c.configureKeepalive()
 	if err != nil {
 		// TODO: add error handling here
 		c.logger.Error().Err(err).Msg("error configuring keepalive connection")
-		c.shutdownConnection()
+
 		return
 	}
 
@@ -80,8 +81,6 @@ func (c *Controller) HandleConnection(ctx context.Context) {
 		//TODO: add error handling here
 		c.logger.Error().Err(err).Msg("error detected in one of the goroutines")
 	}
-
-	c.shutdownConnection()
 }
 
 // configureKeepalive sets up the WebSocket connection with a read deadline
@@ -116,8 +115,7 @@ func (c *Controller) configureKeepalive() error {
 // The communication channel is filled by data providers. Besides, the response limit tracker is involved in
 // write message regulation
 //
-// Expected errors during normal operation:
-// - context.Canceled if the client disconnected
+// No errors are expected during normal operation. All errors are considered benign.
 func (c *Controller) writeMessagesToClient(ctx context.Context) error {
 	for {
 		select {
@@ -148,8 +146,7 @@ func (c *Controller) writeMessagesToClient(ctx context.Context) error {
 // readMessagesFromClient continuously reads messages from a client WebSocket connection,
 // processes each message, and handles actions based on the message type.
 //
-// Expected errors during normal operation:
-// - context.Canceled if the client disconnected
+// No errors are expected during normal operation. All errors are considered benign.
 func (c *Controller) readMessagesFromClient(ctx context.Context) error {
 	for {
 		select {
@@ -298,8 +295,7 @@ func (c *Controller) shutdownConnection() {
 // keepalive sends a ping message periodically to keep the WebSocket connection alive
 // and avoid timeouts.
 //
-// Expected errors during normal operation:
-// - context.Canceled if the client disconnected
+// No errors are expected during normal operation. All errors are considered benign.
 func (c *Controller) keepalive(ctx context.Context) error {
 	pingTicker := time.NewTicker(PingPeriod)
 	defer pingTicker.Stop()
