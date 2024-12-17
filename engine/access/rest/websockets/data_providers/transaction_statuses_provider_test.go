@@ -154,7 +154,7 @@ func (s *TransactionStatusesProviderSuite) requireTransactionStatuses(
 	require.True(s.T(), ok, "unexpected type: %T", expectedResponse)
 
 	actualResponse, ok := v.(*models.TransactionStatusesResponse)
-	require.True(s.T(), ok, "Expected *models.AccountStatusesResponse, got %T", v)
+	require.True(s.T(), ok, "Expected *models.TransactionStatusesResponse, got %T", v)
 
 	s.Require().ElementsMatch(expectedAccountStatusesResponse, actualResponse.TransactionResults)
 }
