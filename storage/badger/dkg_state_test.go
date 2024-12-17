@@ -281,8 +281,9 @@ func TestDKGState_CompletedState(t *testing.T) {
 	})
 }
 
-// TestDKGState_StartedState verifies that for a DKG in the state [flow.DKGStateFailure], the RecoverableRandomBeaconStateMachine
+// TestDKGState_FailureState verifies that for a DKG in the state [flow.DKGStateFailure], the RecoverableRandomBeaconStateMachine
 // reports correct values and permits / rejects state transitions according to the state machine specification.
+// This test is for a specific scenario when no private key has been inserted yet.
 func TestDKGState_FailureState(t *testing.T) {
 	unittest.RunWithTypedBadgerDB(t, InitSecret, func(db *badger.DB) {
 		metrics := metrics.NewNoopCollector()
@@ -345,6 +346,104 @@ func TestDKGState_FailureState(t *testing.T) {
 			err = store.InsertMyBeaconPrivateKey(setupState(), unittest.StakingPrivKeyFixture())
 			require.Error(t, err)
 			require.True(t, storage.IsInvalidDKGStateTransitionError(err))
+		})
+
+		t.Run("state transition flow.DKGStateFailure -> flow.RandomBeaconKeyCommitted is allowed, it should not proceed without a key being inserted first", func(t *testing.T) {
+			err = store.SetDKGState(setupState(), flow.RandomBeaconKeyCommitted)
+			require.Error(t, err, "should not be able to set DKG state to recovered, only using dedicated interface")
+			require.True(t, storage.IsInvalidDKGStateTransitionError(err))
+		})
+		t.Run("state transition flow.DKGStateFailure -> flow.RandomBeaconKeyCommitted should be allowed via upserting the key (recovery path)", func(t *testing.T) {
+			epochCounter := setupState()
+			expectedKey := unittest.StakingPrivKeyFixture()
+			evidence := unittest.EpochCommitFixture(func(commit *flow.EpochCommit) {
+				commit.Counter = epochCounter
+				commit.DKGParticipantKeys[0] = expectedKey.PublicKey()
+			})
+			err = store.UpsertMyBeaconPrivateKey(epochCounter, expectedKey, evidence)
+			require.NoError(t, err)
+			actualKey, safe, err := store.RetrieveMyBeaconPrivateKey(epochCounter)
+			require.NoError(t, err)
+			require.True(t, safe)
+			require.Equal(t, expectedKey, actualKey)
+			resultingState, err := store.GetDKGState(epochCounter)
+			require.NoError(t, err)
+			require.Equal(t, flow.RandomBeaconKeyCommitted, resultingState)
+		})
+	})
+}
+
+// TestDKGState_FailureStateAfterCompleted verifies that for a DKG in the state [flow.DKGStateFailure], the RecoverableRandomBeaconStateMachine
+// reports correct values and permits / rejects state transitions according to the state machine specification.
+// This test is for a specific scenario when the private key was previously stored,
+// which means that the state machine went through [flow.DKGStateCompleted] and then we have transitioned to [flow.DKGStateFailure].
+func TestDKGState_FailureStateAfterCompleted(t *testing.T) {
+	unittest.RunWithTypedBadgerDB(t, InitSecret, func(db *badger.DB) {
+		metrics := metrics.NewNoopCollector()
+		store, err := NewRecoverableRandomBeaconStateMachine(metrics, db)
+		require.NoError(t, err)
+
+		var storedPrivateKey crypto.PrivateKey
+		setupState := func() uint64 {
+			epochCounter := epochCounterGenerator.Add(1)
+			storedPrivateKey = unittest.StakingPrivKeyFixture()
+			err = store.SetDKGState(epochCounter, flow.DKGStateStarted)
+			require.NoError(t, err)
+			err = store.InsertMyBeaconPrivateKey(epochCounter, storedPrivateKey)
+			require.NoError(t, err)
+			err = store.SetDKGState(epochCounter, flow.DKGStateFailure)
+			require.NoError(t, err)
+			return epochCounter
+		}
+		epochCounter := setupState()
+
+		actualState, err := store.GetDKGState(epochCounter)
+		require.NoError(t, err)
+		require.Equal(t, flow.DKGStateFailure, actualState)
+
+		started, err := store.IsDKGStarted(epochCounter)
+		require.NoError(t, err)
+		require.True(t, started)
+
+		pk, err := store.UnsafeRetrieveMyBeaconPrivateKey(epochCounter)
+		require.NoError(t, err)
+		require.True(t, pk.Equals(storedPrivateKey))
+
+		pk, safe, err := store.RetrieveMyBeaconPrivateKey(epochCounter)
+		require.ErrorIs(t, err, storage.ErrNotFound)
+		require.False(t, safe)
+		require.Nil(t, pk)
+
+		t.Run("state transition flow.DKGStateFailure -> flow.DKGStateUninitialized should not be allowed", func(t *testing.T) {
+			err = store.SetDKGState(setupState(), flow.DKGStateUninitialized)
+			require.Error(t, err)
+			require.True(t, storage.IsInvalidDKGStateTransitionError(err))
+		})
+
+		t.Run("state transition flow.DKGStateFailure -> flow.DKGStateStarted should not be allowed", func(t *testing.T) {
+			err = store.SetDKGState(setupState(), flow.DKGStateStarted)
+			require.Error(t, err)
+			require.True(t, storage.IsInvalidDKGStateTransitionError(err))
+		})
+
+		t.Run("state transition flow.DKGStateFailure -> flow.DKGStateFailure should be allowed", func(t *testing.T) {
+			epochCounter := setupState()
+			err = store.SetDKGState(epochCounter, flow.DKGStateFailure)
+			require.NoError(t, err)
+			resultingState, err := store.GetDKGState(epochCounter)
+			require.NoError(t, err)
+			require.Equal(t, flow.DKGStateFailure, resultingState)
+		})
+
+		t.Run("state transition flow.DKGStateFailure -> flow.DKGStateCompleted should not be allowed", func(t *testing.T) {
+			err = store.SetDKGState(setupState(), flow.DKGStateCompleted)
+			require.Error(t, err)
+			require.True(t, storage.IsInvalidDKGStateTransitionError(err))
+		})
+
+		t.Run("state transition flow.DKGStateFailure -> flow.DKGStateCompleted by inserting a key should not be allowed", func(t *testing.T) {
+			err = store.InsertMyBeaconPrivateKey(setupState(), unittest.StakingPrivKeyFixture())
+			require.ErrorIs(t, err, storage.ErrAlreadyExists)
 		})
 
 		t.Run("state transition flow.DKGStateFailure -> flow.RandomBeaconKeyCommitted is allowed, it should not proceed without a key being inserted first", func(t *testing.T) {
