@@ -239,7 +239,9 @@ func (c *Controller) shutdownConnection() {
 
 		_ = c.dataProviders.ForEach(func(id uuid.UUID, dp dp.DataProvider) error {
 			err := dp.Close()
-			c.logger.Error().Err(err).Msgf("error closing data provider: %s", id.String())
+			c.logger.Error().Err(err).
+				Str("data_provider", id.String()).
+				Msg("error closing data provider")
 			return nil
 		})
 
