@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"sync"
 
 	"github.com/google/uuid"
 	"github.com/gorilla/websocket"
@@ -22,7 +21,6 @@ type Controller struct {
 	communicationChannel chan interface{}
 	dataProviders        *concurrentmap.Map[uuid.UUID, dp.DataProvider]
 	dataProviderFactory  dp.DataProviderFactory
-	shutdownOnce         sync.Once
 }
 
 func NewWebSocketController(
@@ -38,7 +36,6 @@ func NewWebSocketController(
 		communicationChannel: make(chan interface{}), //TODO: should it be buffered chan?
 		dataProviders:        concurrentmap.New[uuid.UUID, dp.DataProvider](),
 		dataProviderFactory:  dataProviderFactory,
-		shutdownOnce:         sync.Once{},
 	}
 }
 
@@ -228,23 +225,21 @@ func (c *Controller) handleListSubscriptions(ctx context.Context, msg models.Lis
 }
 
 func (c *Controller) shutdownConnection() {
-	c.shutdownOnce.Do(func() {
-		defer func() {
-			if err := c.conn.Close(); err != nil {
-				c.logger.Warn().Err(err).Msg("error closing connection")
-			}
-		}()
+	defer func() {
+		if err := c.conn.Close(); err != nil {
+			c.logger.Warn().Err(err).Msg("error closing connection")
+		}
+	}()
 
-		c.logger.Debug().Msg("shutting down connection")
+	c.logger.Debug().Msg("shutting down connection")
 
-		_ = c.dataProviders.ForEach(func(id uuid.UUID, dp dp.DataProvider) error {
-			err := dp.Close()
-			c.logger.Error().Err(err).
-				Str("data_provider", id.String()).
-				Msg("error closing data provider")
-			return nil
-		})
-
-		c.dataProviders.Clear()
+	_ = c.dataProviders.ForEach(func(id uuid.UUID, dp dp.DataProvider) error {
+		err := dp.Close()
+		c.logger.Error().Err(err).
+			Str("data_provider", id.String()).
+			Msg("error closing data provider")
+		return nil
 	})
+
+	c.dataProviders.Clear()
 }
