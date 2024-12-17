@@ -7,10 +7,11 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/assert"
+
 	"github.com/google/uuid"
 	"github.com/gorilla/websocket"
 	"github.com/rs/zerolog"
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
@@ -949,6 +950,66 @@ func (s *WsControllerSuite) TestMonitorInactivity() {
 	s.Require().Equal(err, fmt.Errorf("no recent activity for %v", wsConfig.InactivityTimeout))
 
 	conn.AssertExpectations(s.T())
+}
+
+// TestRateLimiter tests the rate-limiting functionality of the WebSocket controller.
+//
+// Test Steps:
+// 1. Create a mock WebSocket connection with behavior for `SetWriteDeadline` and `WriteJSON`.
+// 2. Configure the WebSocket controller with a rate limit of 2 responses per second.
+// 3. Simulate sending messages to the `multiplexedStream` channel.
+// 4. Collect timestamps of message writes to verify rate-limiting behavior.
+// 5. Assert that all messages are processed and that the delay between messages respects the configured rate limit.
+//
+// The test ensures that:
+// - The number of messages processed matches the total messages sent.
+// - The delay between consecutive messages falls within the expected range based on the rate limit, with a tolerance of 5ms.
+func (s *WsControllerSuite) TestRateLimiter() {
+	s.T().Run("Enforces response rate limit", func(t *testing.T) {
+		totalMessages := 5 // Number of messages to simulate.
+
+		// Step 1: Create a mock WebSocket connection.
+		conn := connmock.NewWebsocketConnection(t)
+		conn.On("SetWriteDeadline", mock.Anything).Return(nil).Times(totalMessages)
+
+		// Step 2: Configure the WebSocket controller with a rate limit.
+		config := NewDefaultWebsocketConfig()
+		config.MaxResponsesPerSecond = 2 // 2 messages per second.
+		controller := NewWebSocketController(s.logger, config, conn, nil)
+
+		// Step 3: Simulate sending messages to the controller's `multiplexedStream`.
+		go func() {
+			for i := 0; i < totalMessages; i++ {
+				controller.multiplexedStream <- map[string]interface{}{
+					"message": i,
+				}
+			}
+			close(controller.multiplexedStream)
+		}()
+
+		// Step 4: Collect timestamps of message writes for verification.
+		var timestamps []time.Time
+		conn.On("WriteJSON", mock.Anything).Run(func(args mock.Arguments) {
+			timestamps = append(timestamps, time.Now())
+		}).Return(nil).Times(totalMessages)
+
+		// Invoke the `writeMessages` method to process the stream.
+		_ = controller.writeMessages(context.Background())
+
+		// Step 5: Verify that all messages are processed.
+		require.Len(t, timestamps, totalMessages, "All messages should be processed")
+
+		// Calculate the expected delay between messages based on the rate limit.
+		expectedDelay := time.Second / time.Duration(config.MaxResponsesPerSecond)
+		const tolerance = 5 * time.Millisecond // Allow up to 5ms deviation.
+
+		// Step 6: Assert that the delays respect the rate limit with tolerance.
+		for i := 1; i < len(timestamps); i++ {
+			delay := timestamps[i].Sub(timestamps[i-1])
+			assert.GreaterOrEqual(t, delay, expectedDelay-tolerance, "Messages should respect the minimum rate limit")
+			assert.LessOrEqual(t, delay, expectedDelay+tolerance, "Messages should respect the maximum rate limit")
+		}
+	})
 }
 
 // newControllerMocks initializes mock WebSocket connection, data provider, and data provider factory.
