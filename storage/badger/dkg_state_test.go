@@ -151,11 +151,19 @@ func TestDKGState_StartedState(t *testing.T) {
 
 		t.Run("state transition flow.DKGStateStarted -> flow.DKGStateCompleted should be allowed, but only via inserting a key", func(t *testing.T) {
 			epochCounter := setupState()
-			err = store.InsertMyBeaconPrivateKey(epochCounter, unittest.StakingPrivKeyFixture())
+			expectedKey := unittest.StakingPrivKeyFixture()
+			err = store.InsertMyBeaconPrivateKey(epochCounter, expectedKey)
 			require.NoError(t, err)
 			resultingState, err := store.GetDKGState(epochCounter)
 			require.NoError(t, err)
 			require.Equal(t, flow.DKGStateCompleted, resultingState)
+			actualKey, err := store.UnsafeRetrieveMyBeaconPrivateKey(epochCounter)
+			require.NoError(t, err)
+			require.Equal(t, expectedKey, actualKey)
+			actualKey, safe, err = store.RetrieveMyBeaconPrivateKey(epochCounter)
+			require.ErrorIs(t, err, storage.ErrNotFound)
+			require.False(t, safe)
+			require.Nil(t, pk)
 		})
 
 		t.Run("while state transition flow.DKGStateStarted -> flow.RandomBeaconKeyCommitted is allowed, it should not proceed without a key being inserted first", func(t *testing.T) {
@@ -166,16 +174,23 @@ func TestDKGState_StartedState(t *testing.T) {
 
 		t.Run("state transition flow.DKGStateStarted -> flow.RandomBeaconKeyCommitted should be allowed, but only via upserting a key", func(t *testing.T) {
 			epochCounter := setupState()
-			pk := unittest.StakingPrivKeyFixture()
+			expectedKey := unittest.StakingPrivKeyFixture()
 			evidence := unittest.EpochCommitFixture(func(commit *flow.EpochCommit) {
 				commit.Counter = epochCounter
-				commit.DKGParticipantKeys[0] = pk.PublicKey()
+				commit.DKGParticipantKeys[0] = expectedKey.PublicKey()
 			})
-			err = store.UpsertMyBeaconPrivateKey(epochCounter, pk, evidence)
+			err = store.UpsertMyBeaconPrivateKey(epochCounter, expectedKey, evidence)
 			require.NoError(t, err)
 			resultingState, err := store.GetDKGState(epochCounter)
 			require.NoError(t, err)
 			require.Equal(t, flow.RandomBeaconKeyCommitted, resultingState)
+			actualKey, safe, err := store.RetrieveMyBeaconPrivateKey(epochCounter)
+			require.NoError(t, err)
+			require.True(t, safe)
+			require.Equal(t, expectedKey, actualKey)
+			actualKey, err = store.UnsafeRetrieveMyBeaconPrivateKey(epochCounter)
+			require.NoError(t, err)
+			require.Equal(t, expectedKey, actualKey)
 		})
 
 	})
@@ -190,16 +205,17 @@ func TestDKGState_CompletedState(t *testing.T) {
 		require.NoError(t, err)
 
 		var evidence *flow.EpochCommit
+		var expectedKey crypto.PrivateKey
 		setupState := func() uint64 {
 			epochCounter := epochCounterGenerator.Add(1)
 			err = store.SetDKGState(epochCounter, flow.DKGStateStarted)
 			require.NoError(t, err)
-			pkey := unittest.StakingPrivKeyFixture()
+			expectedKey = unittest.StakingPrivKeyFixture()
 			evidence = unittest.EpochCommitFixture(func(commit *flow.EpochCommit) {
 				commit.Counter = epochCounter
-				commit.DKGParticipantKeys[0] = pkey.PublicKey()
+				commit.DKGParticipantKeys[0] = expectedKey.PublicKey()
 			})
-			err = store.InsertMyBeaconPrivateKey(epochCounter, pkey)
+			err = store.InsertMyBeaconPrivateKey(epochCounter, expectedKey)
 			require.NoError(t, err)
 			return epochCounter
 		}
@@ -263,20 +279,34 @@ func TestDKGState_CompletedState(t *testing.T) {
 			resultingState, err := store.GetDKGState(epochCounter)
 			require.NoError(t, err)
 			require.Equal(t, flow.RandomBeaconKeyCommitted, resultingState)
+			actualKey, safe, err := store.RetrieveMyBeaconPrivateKey(epochCounter)
+			require.NoError(t, err)
+			require.True(t, safe)
+			require.Equal(t, expectedKey, actualKey)
+			actualKey, err = store.UnsafeRetrieveMyBeaconPrivateKey(epochCounter)
+			require.NoError(t, err)
+			require.Equal(t, expectedKey, actualKey)
 		})
 
 		t.Run("state transition flow.DKGStateCompleted -> flow.RandomBeaconKeyCommitted (recovery, overwriting existing key) should be allowed", func(t *testing.T) {
 			epochCounter := setupState()
-			pkey := unittest.StakingPrivKeyFixture()
+			expectedKey := unittest.StakingPrivKeyFixture()
 			evidence := unittest.EpochCommitFixture(func(commit *flow.EpochCommit) {
 				commit.Counter = epochCounter
-				commit.DKGParticipantKeys[0] = pkey.PublicKey()
+				commit.DKGParticipantKeys[0] = expectedKey.PublicKey()
 			})
-			err = store.UpsertMyBeaconPrivateKey(epochCounter, pkey, evidence)
+			err = store.UpsertMyBeaconPrivateKey(epochCounter, expectedKey, evidence)
 			require.NoError(t, err)
 			resultingState, err := store.GetDKGState(epochCounter)
 			require.NoError(t, err)
 			require.Equal(t, flow.RandomBeaconKeyCommitted, resultingState)
+			actualKey, safe, err := store.RetrieveMyBeaconPrivateKey(epochCounter)
+			require.NoError(t, err)
+			require.True(t, safe)
+			require.Equal(t, expectedKey, actualKey)
+			actualKey, err = store.UnsafeRetrieveMyBeaconPrivateKey(epochCounter)
+			require.NoError(t, err)
+			require.Equal(t, expectedKey, actualKey)
 		})
 	})
 }
@@ -362,13 +392,16 @@ func TestDKGState_FailureState(t *testing.T) {
 			})
 			err = store.UpsertMyBeaconPrivateKey(epochCounter, expectedKey, evidence)
 			require.NoError(t, err)
+			resultingState, err := store.GetDKGState(epochCounter)
+			require.NoError(t, err)
+			require.Equal(t, flow.RandomBeaconKeyCommitted, resultingState)
 			actualKey, safe, err := store.RetrieveMyBeaconPrivateKey(epochCounter)
 			require.NoError(t, err)
 			require.True(t, safe)
 			require.Equal(t, expectedKey, actualKey)
-			resultingState, err := store.GetDKGState(epochCounter)
+			actualKey, err = store.UnsafeRetrieveMyBeaconPrivateKey(epochCounter)
 			require.NoError(t, err)
-			require.Equal(t, flow.RandomBeaconKeyCommitted, resultingState)
+			require.Equal(t, expectedKey, actualKey)
 		})
 	})
 }
@@ -460,13 +493,16 @@ func TestDKGState_FailureStateAfterCompleted(t *testing.T) {
 			})
 			err = store.UpsertMyBeaconPrivateKey(epochCounter, expectedKey, evidence)
 			require.NoError(t, err)
+			resultingState, err := store.GetDKGState(epochCounter)
+			require.NoError(t, err)
+			require.Equal(t, flow.RandomBeaconKeyCommitted, resultingState)
 			actualKey, safe, err := store.RetrieveMyBeaconPrivateKey(epochCounter)
 			require.NoError(t, err)
 			require.True(t, safe)
 			require.Equal(t, expectedKey, actualKey)
-			resultingState, err := store.GetDKGState(epochCounter)
+			actualKey, err = store.UnsafeRetrieveMyBeaconPrivateKey(epochCounter)
 			require.NoError(t, err)
-			require.Equal(t, flow.RandomBeaconKeyCommitted, resultingState)
+			require.Equal(t, expectedKey, actualKey)
 		})
 	})
 }
@@ -547,12 +583,16 @@ func TestDKGState_RandomBeaconKeyCommittedState(t *testing.T) {
 			resultingState, err := store.GetDKGState(epochCounter)
 			require.NoError(t, err)
 			require.Equal(t, flow.RandomBeaconKeyCommitted, resultingState)
+			actualKey, safe, err := store.RetrieveMyBeaconPrivateKey(epochCounter)
+			require.NoError(t, err)
+			require.True(t, safe)
+			require.Equal(t, pkey, actualKey)
+			actualKey, err = store.UnsafeRetrieveMyBeaconPrivateKey(epochCounter)
+			require.NoError(t, err)
+			require.Equal(t, pkey, actualKey)
 
 			err = store.UpsertMyBeaconPrivateKey(epochCounter, pkey, evidence)
 			require.NoError(t, err, "should be possible ONLY for the same private key")
-			resultingState, err = store.GetDKGState(epochCounter)
-			require.NoError(t, err)
-			require.Equal(t, flow.RandomBeaconKeyCommitted, resultingState)
 		})
 
 		t.Run("state transition flow.RandomBeaconKeyCommitted -> flow.RandomBeaconKeyCommitted should not be allowed", func(t *testing.T) {
@@ -562,6 +602,13 @@ func TestDKGState_RandomBeaconKeyCommittedState(t *testing.T) {
 			resultingState, err := store.GetDKGState(epochCounter)
 			require.NoError(t, err)
 			require.Equal(t, flow.RandomBeaconKeyCommitted, resultingState)
+			actualKey, safe, err := store.RetrieveMyBeaconPrivateKey(epochCounter)
+			require.NoError(t, err)
+			require.True(t, safe)
+			require.Equal(t, pkey, actualKey)
+			actualKey, err = store.UnsafeRetrieveMyBeaconPrivateKey(epochCounter)
+			require.NoError(t, err)
+			require.Equal(t, pkey, actualKey)
 
 			err = store.UpsertMyBeaconPrivateKey(epochCounter, unittest.StakingPrivKeyFixture(), evidence)
 			require.Error(t, err, "cannot overwrite previously committed key")
