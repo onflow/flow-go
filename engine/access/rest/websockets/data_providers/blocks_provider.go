@@ -18,7 +18,7 @@ import (
 )
 
 // BlocksArguments contains the arguments required for subscribing to blocks / block headers / block digests
-type BlocksArguments struct {
+type blocksArguments struct {
 	StartBlockID     flow.Identifier  // ID of the block to start subscription from
 	StartBlockHeight uint64           // Height of the block to start subscription from
 	BlockStatus      flow.BlockStatus // Status of blocks to subscribe to
@@ -31,7 +31,7 @@ type BlocksDataProvider struct {
 
 	logger        zerolog.Logger
 	api           access.API
-	arguments     BlocksArguments
+	arguments     blocksArguments
 	linkGenerator commonmodels.LinkGenerator
 }
 
@@ -93,7 +93,7 @@ func (p *BlocksDataProvider) Run() error {
 }
 
 // createSubscription creates a new subscription using the specified input arguments.
-func (p *BlocksDataProvider) createSubscription(ctx context.Context, args BlocksArguments) subscription.Subscription {
+func (p *BlocksDataProvider) createSubscription(ctx context.Context, args blocksArguments) subscription.Subscription {
 	if args.StartBlockID != flow.ZeroID {
 		return p.api.SubscribeBlocksFromStartBlockID(ctx, args.StartBlockID, args.BlockStatus)
 	}
@@ -106,8 +106,8 @@ func (p *BlocksDataProvider) createSubscription(ctx context.Context, args Blocks
 }
 
 // ParseBlocksArguments validates and initializes the blocks arguments.
-func ParseBlocksArguments(arguments models.Arguments) (BlocksArguments, error) {
-	var args BlocksArguments
+func ParseBlocksArguments(arguments models.Arguments) (blocksArguments, error) {
+	var args blocksArguments
 
 	// Parse 'block_status'
 	if blockStatusIn, ok := arguments["block_status"]; ok {
@@ -150,11 +150,11 @@ func ParseBlocksArguments(arguments models.Arguments) (BlocksArguments, error) {
 		if !ok {
 			return args, fmt.Errorf("'start_block_height' must be a string")
 		}
-		startBlockHeight, err := util.ToUint64(result)
+		var err error
+		args.StartBlockHeight, err = util.ToUint64(result)
 		if err != nil {
 			return args, fmt.Errorf("invalid 'start_block_height': %w", err)
 		}
-		args.StartBlockHeight = startBlockHeight
 	} else {
 		// Default value if 'start_block_height' is not provided
 		args.StartBlockHeight = request.EmptyHeight

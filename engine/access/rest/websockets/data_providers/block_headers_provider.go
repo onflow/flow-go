@@ -73,7 +73,7 @@ func (p *BlockHeadersDataProvider) Run() error {
 }
 
 // createSubscription creates a new subscription using the specified input arguments.
-func (p *BlockHeadersDataProvider) createSubscription(ctx context.Context, args BlocksArguments) subscription.Subscription {
+func (p *BlockHeadersDataProvider) createSubscription(ctx context.Context, args blocksArguments) subscription.Subscription {
 	if args.StartBlockID != flow.ZeroID {
 		return p.api.SubscribeBlockHeadersFromStartBlockID(ctx, args.StartBlockID, args.BlockStatus)
 	}
