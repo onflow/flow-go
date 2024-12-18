@@ -12,22 +12,12 @@ import (
 	"go.uber.org/atomic"
 
 	"github.com/onflow/flow-go/engine/access/rest/common"
+	"github.com/onflow/flow-go/engine/access/rest/websockets"
 	"github.com/onflow/flow-go/engine/access/state_stream"
 	"github.com/onflow/flow-go/engine/access/state_stream/backend"
 	"github.com/onflow/flow-go/engine/access/subscription"
 	"github.com/onflow/flow-go/engine/common/rpc/convert"
 	"github.com/onflow/flow-go/model/flow"
-)
-
-const (
-	// Time allowed to read the next pong message from the peer.
-	pongWait = 10 * time.Second
-
-	// Send pings to peer with this period. Must be less than pongWait.
-	pingPeriod = (pongWait * 9) / 10
-
-	// Time allowed to write a message to the peer.
-	writeWait = 10 * time.Second
 )
 
 // WebsocketController holds the necessary components and parameters for handling a WebSocket subscription.
@@ -47,17 +37,17 @@ type WebsocketController struct {
 // manage incoming Pong messages. These methods allow to specify a time limit for reading from or writing to a WebSocket
 // connection. If the operation (reading or writing) takes longer than the specified deadline, the connection will be closed.
 func (wsController *WebsocketController) SetWebsocketConf() error {
-	err := wsController.conn.SetWriteDeadline(time.Now().Add(writeWait)) // Set the initial write deadline for the first ping message
+	err := wsController.conn.SetWriteDeadline(time.Now().Add(websockets.WriteWait)) // Set the initial write deadline for the first ping message
 	if err != nil {
 		return common.NewRestError(http.StatusInternalServerError, "Set the initial write deadline error: ", err)
 	}
-	err = wsController.conn.SetReadDeadline(time.Now().Add(pongWait)) // Set the initial read deadline for the first pong message
+	err = wsController.conn.SetReadDeadline(time.Now().Add(websockets.PongWait)) // Set the initial read deadline for the first pong message
 	if err != nil {
 		return common.NewRestError(http.StatusInternalServerError, "Set the initial read deadline error: ", err)
 	}
 	// Establish a Pong handler
 	wsController.conn.SetPongHandler(func(string) error {
-		err := wsController.conn.SetReadDeadline(time.Now().Add(pongWait))
+		err := wsController.conn.SetReadDeadline(time.Now().Add(websockets.PongWait))
 		if err != nil {
 			return err
 		}
@@ -111,7 +101,7 @@ func (wsController *WebsocketController) wsErrorHandler(err error) {
 // If an error occurs or the subscription channel is closed, it handles the error or termination accordingly.
 // The function uses a ticker to periodically send ping messages to the client to maintain the connection.
 func (wsController *WebsocketController) writeEvents(sub subscription.Subscription) {
-	ticker := time.NewTicker(pingPeriod)
+	ticker := time.NewTicker(websockets.PingPeriod)
 	defer ticker.Stop()
 
 	blocksSinceLastMessage := uint64(0)
@@ -137,7 +127,7 @@ func (wsController *WebsocketController) writeEvents(sub subscription.Subscripti
 				wsController.wsErrorHandler(common.NewRestError(http.StatusRequestTimeout, "subscription channel closed", err))
 				return
 			}
-			err := wsController.conn.SetWriteDeadline(time.Now().Add(writeWait))
+			err := wsController.conn.SetWriteDeadline(time.Now().Add(websockets.WriteWait))
 			if err != nil {
 				wsController.wsErrorHandler(common.NewRestError(http.StatusInternalServerError, "failed to set the initial write deadline: ", err))
 				return
@@ -178,7 +168,7 @@ func (wsController *WebsocketController) writeEvents(sub subscription.Subscripti
 				return
 			}
 		case <-ticker.C:
-			err := wsController.conn.SetWriteDeadline(time.Now().Add(writeWait))
+			err := wsController.conn.SetWriteDeadline(time.Now().Add(websockets.WriteWait))
 			if err != nil {
 				wsController.wsErrorHandler(common.NewRestError(http.StatusInternalServerError, "failed to set the initial write deadline: ", err))
 				return
