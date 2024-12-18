@@ -32,10 +32,9 @@ runs:
     - name: Set up Google Cloud SDK
       uses: google-github-actions/setup-gcloud@v1
 
-    - name: Authenticate Docker
+    - name: Authenticate with Private Docker Registry
       run: |
         gcloud auth configure-docker ${{ inputs.private_registry_host }} 
-        gcloud auth configure-docker 
       shell: bash
 
     - name: Pull and Push Images to Public Registry
@@ -56,3 +55,26 @@ runs:
           docker tag "${IMAGE_PRIVATE}" "${IMAGE_PUBLIC}"
           docker push "${IMAGE_PUBLIC}"
         done
+
+    - name: Authenticate Docker
+      run: |
+        gcloud auth configure-docker 
+      shell: bash
+
+    - name: Push Images to Public Registry
+      shell: bash
+      run: |
+        IMAGE_BASE_PRIVATE=${{ inputs.private_registry }}/${{ inputs.role }}
+        IMAGE_BASE_PUBLIC=${{ inputs.public_registry }}/${{ inputs.role }}
+
+        # Convert comma-separated tags input into an array
+        IFS=',' read -ra TAGS <<< "${{ inputs.tags }}"
+
+        for TAG in "${TAGS[@]}"; do
+          IMAGE_PRIVATE="${IMAGE_BASE_PRIVATE}:${TAG}"
+          IMAGE_PUBLIC="${IMAGE_BASE_PUBLIC}:${TAG}"
+
+          echo "Pushing Image ${IMAGE_PUBLIC} to Public registry"
+          docker push "${IMAGE_PUBLIC}"
+        done
+
