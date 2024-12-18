@@ -61,7 +61,6 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	newConn := NewGorillaWebsocketConnection(conn)
-	controller := NewWebSocketController(logger, h.websocketConfig, h.dataProviderFactory, newConn)
-	controller.HandleConnection(context.Background())
+	controller := NewWebSocketController(logger, h.websocketConfig, NewWebsocketConnection(conn), h.dataProviderFactory)
+	controller.HandleConnection(context.TODO())
 }
