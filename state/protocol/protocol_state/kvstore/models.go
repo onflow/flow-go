@@ -79,7 +79,8 @@ func (model *Modelv0) Replicate(protocolVersion uint64) (protocol_state.KVStoreM
 	if currentVersion == protocolVersion {
 		// no need for migration, return a complete copy
 		return clone.Clone(model), nil
-	} else if protocolVersion != 1 {
+	}
+	if protocolVersion != 1 {
 		return nil, fmt.Errorf("unsupported replication version %d, expect %d: %w",
 			protocolVersion, 1, ErrIncompatibleVersionChange)
 	}
@@ -209,7 +210,7 @@ func (model *Modelv1) GetProtocolStateVersion() uint64 {
 }
 
 // Modelv2 reflects a behavioural change of the protocol (compared to Modelv1). Despite there being no change of the
-// actual data model, we increment the version to coordinate switching between the old and the new protocol behaviour. 
+// actual data model, we increment the version to coordinate switching between the old and the new protocol behaviour.
 // This version adds the following changes:
 //   - Non-system-chunk service event validation support (adds ChunkBody.ServiceEventCount field)
 //   - EFM Recovery (adds EpochCommit.DKGIndexMap field)
