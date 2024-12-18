@@ -208,7 +208,8 @@ func (model *Modelv1) GetProtocolStateVersion() uint64 {
 	return 1
 }
 
-// Modelv2 is v2 of the Protocol State key-value store.
+// Modelv2 reflects a behavioural change of the protocol (compared to Modelv1). Despite there being no change of the
+// actual data model, we increment the version to coordinate switching between the old and the new protocol behaviour. 
 // This version adds the following changes:
 //   - Non-system-chunk service event validation support (adds ChunkBody.ServiceEventCount field)
 //   - EFM Recovery (adds EpochCommit.DKGIndexMap field)
