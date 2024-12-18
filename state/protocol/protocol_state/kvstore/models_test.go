@@ -167,9 +167,14 @@ func TestKVStoreAPI_Replicate(t *testing.T) {
 	})
 	t.Run("v1-invalid-upgrade", func(t *testing.T) {
 		model := &kvstore.Modelv1{}
-		newVersion, err := model.Replicate(model.GetProtocolStateVersion() + 10)
-		require.ErrorIs(t, err, kvstore.ErrIncompatibleVersionChange)
-		require.Nil(t, newVersion)
+		for _, version := range []uint64{
+			model.GetProtocolStateVersion() - 1,
+			model.GetProtocolStateVersion() + 10,
+		} {
+			newVersion, err := model.Replicate(version)
+			require.ErrorIs(t, err, kvstore.ErrIncompatibleVersionChange)
+			require.Nil(t, newVersion)
+		}
 	})
 	t.Run("v1->v2", func(t *testing.T) {
 		model := &kvstore.Modelv1{
