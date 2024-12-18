@@ -7,7 +7,10 @@ on:
         description: 'Tag to build & push'
         required: true
         type: string
-
+      skip_private_build:
+        description: 'Skip private build (true/false) can only be used when the image already exists'
+        required: false
+        type: boolean
 env:
   GO_VERSION: "1.22"
   PRIVATE_REGISTRY_HOST: us-central1-docker.pkg.dev
@@ -15,6 +18,7 @@ env:
 jobs:
   # Build and Push to Private Registry
   private-build:
+    if: ${{ inputs.skip_private_build != 'true' }}
     name: Build & Push to Private Container Registry
     runs-on: ubuntu-latest
     strategy:
