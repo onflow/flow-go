@@ -87,79 +87,79 @@ jobs:
           role: collection
           tags: "${{ inputs.tag }},${{ inputs.tag }}-without-adx,${{ inputs.tag }}-without-netgo-without-adx,${{ inputs.tag }}-arm"
 
-  promote-consensus:
-    name: Promote Consensus Role to Public Registry
-    runs-on: ubuntu-latest
-    needs: private-build
-    environment: Promote Consensus
-    steps:
-      - name: Checkout repo
-        uses: actions/checkout@v3
-
-      - name: Promote Consensus
-        uses: ./.github/actions/promote
-        with:
-          gcp_credentials: ${{ secrets.GCR_SERVICE_KEY_SECRET }}
-          private_registry: ${{ vars.PRIVATE_REGISTRY }}
-          public_registry: ${{ vars.PUBLIC_REGISTRY }}
-          registry_host: ${{ env.PRIVATE_REGISTRY_HOST }}
-          role: consensus
-          tags: "${{ inputs.tag }},${{ inputs.tag }}-without-adx,${{ inputs.tag }}-without-netgo-without-adx,${{ inputs.tag }}-arm"
-
-  promote-execution:
-    name: Promote Execution Role to Public Registry
-    runs-on: ubuntu-latest
-    needs: private-build
-    environment: Promote Execution
-    steps:
-      - name: Checkout repo
-        uses: actions/checkout@v3
-
-      - name: Promote Execution
-        uses: ./.github/actions/promote
-        with:
-          gcp_credentials: ${{ secrets.GCR_SERVICE_KEY_SECRET }}
-          private_registry: ${{ vars.PRIVATE_REGISTRY }}
-          public_registry: ${{ vars.PUBLIC_REGISTRY }}
-          registry_host: ${{ env.PRIVATE_REGISTRY_HOST }}
-          role: execution
-          tags: "${{ inputs.tag }},${{ inputs.tag }}-without-adx,${{ inputs.tag }}-without-netgo-without-adx,${{ inputs.tag }}-arm"
-
-  promote-observer:
-    name: Promote Observer Role to Public Registry
-    runs-on: ubuntu-latest
-    needs: private-build
-    environment: Promote Observer
-    steps:
-      - name: Checkout repo
-        uses: actions/checkout@v3
-
-      - name: Promote Observer
-        uses: ./.github/actions/promote
-        with:
-          gcp_credentials: ${{ secrets.GCR_SERVICE_KEY_SECRET }}
-          private_registry: ${{ vars.PRIVATE_REGISTRY }}
-          public_registry: ${{ vars.PUBLIC_REGISTRY }}
-          registry_host: ${{ env.PRIVATE_REGISTRY_HOST }}
-          role: observer
-          tags: "${{ inputs.tag }},${{ inputs.tag }}-without-adx,${{ inputs.tag }}-without-netgo-without-adx,${{ inputs.tag }}-arm"
-
-  promote-verification:
-    name: Promote Verification Role to Public Registry
-    runs-on: ubuntu-latest
-    needs: private-build
-    environment: Promote Verification
-    steps:
-      - name: Checkout repo
-        uses: actions/checkout@v3
-
-      - name: Promote Verification
-        uses: ./.github/actions/promote
-        with:
-          gcp_credentials: ${{ secrets.GCR_SERVICE_KEY_SECRET }}
-          private_registry: ${{ vars.PRIVATE_REGISTRY }}
-          public_registry: ${{ vars.PUBLIC_REGISTRY }}
-          registry_host: ${{ env.PRIVATE_REGISTRY_HOST }}
-          role: verification
-          tags: "${{ inputs.tag }},${{ inputs.tag }}-without-adx,${{ inputs.tag }}-without-netgo-without-adx,${{ inputs.tag }}-arm"
-
+  # promote-consensus:
+  #   name: Promote Consensus Role to Public Registry
+  #   runs-on: ubuntu-latest
+  #   needs: private-build
+  #   environment: Promote Consensus
+  #   steps:
+  #     - name: Checkout repo
+  #       uses: actions/checkout@v3
+  #
+  #     - name: Promote Consensus
+  #       uses: ./.github/actions/promote
+  #       with:
+  #         gcp_credentials: ${{ secrets.GCR_SERVICE_KEY_SECRET }}
+  #         private_registry: ${{ vars.PRIVATE_REGISTRY }}
+  #         public_registry: ${{ vars.PUBLIC_REGISTRY }}
+  #         registry_host: ${{ env.PRIVATE_REGISTRY_HOST }}
+  #         role: consensus
+  #         tags: "${{ inputs.tag }},${{ inputs.tag }}-without-adx,${{ inputs.tag }}-without-netgo-without-adx,${{ inputs.tag }}-arm"
+  #
+  # promote-execution:
+  #   name: Promote Execution Role to Public Registry
+  #   runs-on: ubuntu-latest
+  #   needs: private-build
+  #   environment: Promote Execution
+  #   steps:
+  #     - name: Checkout repo
+  #       uses: actions/checkout@v3
+  #
+  #     - name: Promote Execution
+  #       uses: ./.github/actions/promote
+  #       with:
+  #         gcp_credentials: ${{ secrets.GCR_SERVICE_KEY_SECRET }}
+  #         private_registry: ${{ vars.PRIVATE_REGISTRY }}
+  #         public_registry: ${{ vars.PUBLIC_REGISTRY }}
+  #         registry_host: ${{ env.PRIVATE_REGISTRY_HOST }}
+  #         role: execution
+  #         tags: "${{ inputs.tag }},${{ inputs.tag }}-without-adx,${{ inputs.tag }}-without-netgo-without-adx,${{ inputs.tag }}-arm"
+  #
+  # promote-observer:
+  #   name: Promote Observer Role to Public Registry
+  #   runs-on: ubuntu-latest
+  #   needs: private-build
+  #   environment: Promote Observer
+  #   steps:
+  #     - name: Checkout repo
+  #       uses: actions/checkout@v3
+  #
+  #     - name: Promote Observer
+  #       uses: ./.github/actions/promote
+  #       with:
+  #         gcp_credentials: ${{ secrets.GCR_SERVICE_KEY_SECRET }}
+  #         private_registry: ${{ vars.PRIVATE_REGISTRY }}
+  #         public_registry: ${{ vars.PUBLIC_REGISTRY }}
+  #         registry_host: ${{ env.PRIVATE_REGISTRY_HOST }}
+  #         role: observer
+  #         tags: "${{ inputs.tag }},${{ inputs.tag }}-without-adx,${{ inputs.tag }}-without-netgo-without-adx,${{ inputs.tag }}-arm"
+  #
+  # promote-verification:
+  #   name: Promote Verification Role to Public Registry
+  #   runs-on: ubuntu-latest
+  #   needs: private-build
+  #   environment: Promote Verification
+  #   steps:
+  #     - name: Checkout repo
+  #       uses: actions/checkout@v3
+  #
+  #     - name: Promote Verification
+  #       uses: ./.github/actions/promote
+  #       with:
+  #         gcp_credentials: ${{ secrets.GCR_SERVICE_KEY_SECRET }}
+  #         private_registry: ${{ vars.PRIVATE_REGISTRY }}
+  #         public_registry: ${{ vars.PUBLIC_REGISTRY }}
+  #         registry_host: ${{ env.PRIVATE_REGISTRY_HOST }}
+  #         role: verification
+  #         tags: "${{ inputs.tag }},${{ inputs.tag }}-without-adx,${{ inputs.tag }}-without-netgo-without-adx,${{ inputs.tag }}-arm"
+  #
