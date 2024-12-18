@@ -1,6 +1,8 @@
 module github.com/onflow/flow-go
 
-go 1.22
+go 1.22.0
+
+toolchain go1.22.10
 
 require (
 	cloud.google.com/go/compute/metadata v0.3.0
