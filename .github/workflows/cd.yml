@@ -71,7 +71,7 @@ jobs:
   promote-collection:
     name: Promote Collection Role to Public Registry
     runs-on: ubuntu-latest
-    needs: private-build
+    # needs: private-build
     environment: Promote Collection
     steps:
       - name: Checkout repo
