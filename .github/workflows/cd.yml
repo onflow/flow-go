@@ -12,47 +12,47 @@ env:
   PRIVATE_REGISTRY_HOST: us-central1-docker.pkg.dev
 
 jobs:
-  # Build and Push to Private Registry
-  private-build:
-    if: inputs.skip_private_build != 'true'
-    name: Build & Push to Private Container Registry
-    runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        role: [access, collection, consensus, execution, observer, verification]
-    environment: Private Docker Registry
-    steps:
-      - name: Setup Go
-        uses: actions/setup-go@v4
-        with:
-          go-version: ${{ env.GO_VERSION }}
-
-      - name: Checkout repo
-        uses: actions/checkout@v3
-
-      - id: auth
-        uses: google-github-actions/auth@v1
-        with:
-          credentials_json: ${{ secrets.GCR_SERVICE_KEY_SECRET }}
-
-      - name: Authenticate Docker with gcloud
-        run: gcloud auth configure-docker ${{ env.PRIVATE_REGISTRY_HOST }}
-
-      - name: Build & Push ${{ matrix.role }}
-        env:
-          CONTAINER_REGISTRY: ${{ vars.PRIVATE_REGISTRY }}
-        run: |
-          make docker-build-${{ matrix.role }}-with-adx docker-push-${{ matrix.role }}-with-adx CONTAINER_REGISTRY=${CONTAINER_REGISTRY}
-          make docker-build-${{ matrix.role }}-without-adx docker-push-${{ matrix.role }}-without-adx CONTAINER_REGISTRY=${CONTAINER_REGISTRY}
-          make docker-build-${{ matrix.role }}-without-netgo-without-adx docker-push-${{ matrix.role }}-without-netgo-without-adx CONTAINER_REGISTRY=${CONTAINER_REGISTRY}
-          make docker-cross-build-${{ matrix.role }}-arm docker-push-${{ matrix.role }}-arm CONTAINER_REGISTRY=${CONTAINER_REGISTRY}
+  # # Build and Push to Private Registry
+  # private-build:
+  #   if: inputs.skip_private_build != 'true'
+  #   name: Build & Push to Private Container Registry
+  #   runs-on: ubuntu-latest
+  #   strategy:
+  #     fail-fast: false
+  #     matrix:
+  #       role: [access, collection, consensus, execution, observer, verification]
+  #   environment: Private Docker Registry
+  #   steps:
+  #     - name: Setup Go
+  #       uses: actions/setup-go@v4
+  #       with:
+  #         go-version: ${{ env.GO_VERSION }}
+  #
+  #     - name: Checkout repo
+  #       uses: actions/checkout@v3
+  #
+  #     - id: auth
+  #       uses: google-github-actions/auth@v1
+  #       with:
+  #         credentials_json: ${{ secrets.GCR_SERVICE_KEY_SECRET }}
+  #
+  #     - name: Authenticate Docker with gcloud
+  #       run: gcloud auth configure-docker ${{ env.PRIVATE_REGISTRY_HOST }}
+  #
+  #     - name: Build & Push ${{ matrix.role }}
+  #       env:
+  #         CONTAINER_REGISTRY: ${{ vars.PRIVATE_REGISTRY }}
+  #       run: |
+  #         make docker-build-${{ matrix.role }}-with-adx docker-push-${{ matrix.role }}-with-adx CONTAINER_REGISTRY=${CONTAINER_REGISTRY}
+  #         make docker-build-${{ matrix.role }}-without-adx docker-push-${{ matrix.role }}-without-adx CONTAINER_REGISTRY=${CONTAINER_REGISTRY}
+  #         make docker-build-${{ matrix.role }}-without-netgo-without-adx docker-push-${{ matrix.role }}-without-netgo-without-adx CONTAINER_REGISTRY=${CONTAINER_REGISTRY}
+  #         make docker-cross-build-${{ matrix.role }}-arm docker-push-${{ matrix.role }}-arm CONTAINER_REGISTRY=${CONTAINER_REGISTRY}
 
   # Individual Promotion Jobs using the Base Tag for Full Tags
   promote-access:
     name: Promote Access Role to Public Registry
     runs-on: ubuntu-latest
-    needs: private-build
+    # needs: private-build
     environment: Promote Access
     steps:
       - name: Checkout repo
