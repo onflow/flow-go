@@ -59,7 +59,7 @@ jobs:
         uses: actions/checkout@v3
 
       - name: Promote Access
-        uses: ./.github/actions/promote
+        uses: ./actions/promote
         with:
           gcp_credentials: ${{ secrets.GCR_SERVICE_KEY_SECRET }}
           private_registry: ${{ vars.PRIVATE_REGISTRY }}
@@ -78,7 +78,7 @@ jobs:
         uses: actions/checkout@v3
 
       - name: Promote Collection
-        uses: ./.github/actions/promote
+        uses: ./actions/promote
         with:
           gcp_credentials: ${{ secrets.GCR_SERVICE_KEY_SECRET }}
           private_registry: ${{ vars.PRIVATE_REGISTRY }}
