@@ -174,7 +174,7 @@ func rootBlock(cmd *cobra.Command, args []string) {
 	log.Info().Msg("")
 
 	log.Info().Msg("running DKG for consensus nodes")
-	dkgData := runBeaconKG(model.FilterByRole(stakingNodes, flow.RoleConsensus))
+	randomBeaconData, dkgIndexMap := runBeaconKG(model.FilterByRole(stakingNodes, flow.RoleConsensus))
 	log.Info().Msg("")
 
 	// create flow.IdentityList representation of the participant set
@@ -200,8 +200,8 @@ func rootBlock(cmd *cobra.Command, args []string) {
 	log.Info().Msg("")
 
 	log.Info().Msg("constructing intermediary bootstrapping data")
-	epochSetup, epochCommit := constructRootEpochEvents(header.View, participants, assignments, clusterQCs, dkgData)
-	epochConfig := generateExecutionStateEpochConfig(epochSetup, clusterQCs, dkgData)
+	epochSetup, epochCommit := constructRootEpochEvents(header.View, participants, assignments, clusterQCs, randomBeaconData, dkgIndexMap)
+	epochConfig := generateExecutionStateEpochConfig(epochSetup, clusterQCs, randomBeaconData)
 	intermediaryEpochData := IntermediaryEpochData{
 		RootEpochSetup:       epochSetup,
 		RootEpochCommit:      epochCommit,
@@ -245,7 +245,7 @@ func rootBlock(cmd *cobra.Command, args []string) {
 		block,
 		model.FilterByRole(stakingNodes, flow.RoleConsensus),
 		model.FilterByRole(internalNodes, flow.RoleConsensus),
-		dkgData,
+		randomBeaconData,
 	)
 	log.Info().Msg("")
 }
@@ -286,7 +286,7 @@ func validateEpochConfig() error {
 func generateExecutionStateEpochConfig(
 	epochSetup *flow.EpochSetup,
 	clusterQCs []*flow.QuorumCertificate,
-	dkgData dkg.DKGData,
+	dkgData dkg.ThresholdKeySet,
 ) epochs.EpochConfig {
 
 	randomSource := make([]byte, flow.EpochSetupRandomSourceLength)

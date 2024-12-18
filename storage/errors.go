@@ -2,6 +2,9 @@ package storage
 
 import (
 	"errors"
+	"fmt"
+
+	"github.com/onflow/flow-go/model/flow"
 )
 
 var (
@@ -29,3 +32,28 @@ var (
 	// ErrNotBootstrapped is returned when the database has not been bootstrapped.
 	ErrNotBootstrapped = errors.New("pebble database not bootstrapped")
 )
+
+// InvalidDKGStateTransitionError is a sentinel error that is returned in case an invalid state transition is attempted.
+type InvalidDKGStateTransitionError struct {
+	err  error
+	From flow.DKGState
+	To   flow.DKGState
+}
+
+func (e InvalidDKGStateTransitionError) Error() string {
+	return fmt.Sprintf("invalid state transition from %s to %s: %s", e.From.String(), e.To.String(), e.err.Error())
+}
+
+func IsInvalidDKGStateTransitionError(err error) bool {
+	var e InvalidDKGStateTransitionError
+	return errors.As(err, &e)
+}
+
+// NewInvalidDKGStateTransitionErrorf constructs a new InvalidDKGStateTransitionError error with a formatted message.
+func NewInvalidDKGStateTransitionErrorf(from, to flow.DKGState, msg string, args ...any) error {
+	return InvalidDKGStateTransitionError{
+		From: from,
+		To:   to,
+		err:  fmt.Errorf(msg, args...),
+	}
+}

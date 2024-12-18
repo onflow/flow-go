@@ -19,6 +19,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	sdk "github.com/onflow/flow-go-sdk"
+
 	hotstuff "github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/engine/access/rest/util"
@@ -1325,9 +1326,10 @@ func ChunkFixture(
 ) *flow.Chunk {
 	chunk := &flow.Chunk{
 		ChunkBody: flow.ChunkBody{
-			CollectionIndex:      collectionIndex,
-			StartState:           StateCommitmentFixture(),
-			EventCollection:      IdentifierFixture(),
+			CollectionIndex: collectionIndex,
+			StartState:      StateCommitmentFixture(),
+			EventCollection: IdentifierFixture(),
+			//ServiceEventCount:    PtrTo[uint16](0),
 			TotalComputationUsed: 4200,
 			NumberOfTransactions: 42,
 			BlockID:              blockID,
@@ -2145,7 +2147,7 @@ func IndexFixture() *flow.Index {
 }
 
 func WithDKGFromParticipants(participants flow.IdentitySkeletonList) func(*flow.EpochCommit) {
-	dkgParticipants := participants.Filter(filter.IsValidDKGParticipant).Sort(flow.Canonical[flow.IdentitySkeleton])
+	dkgParticipants := participants.Filter(filter.IsConsensusCommitteeMember).Sort(flow.Canonical[flow.IdentitySkeleton])
 	return func(commit *flow.EpochCommit) {
 		commit.DKGParticipantKeys = nil
 		commit.DKGIndexMap = make(flow.DKGIndexMap)
@@ -2855,7 +2857,7 @@ func WithNextEpochProtocolState() func(entry *flow.RichEpochStateEntry) {
 func WithValidDKG() func(*flow.RichEpochStateEntry) {
 	return func(entry *flow.RichEpochStateEntry) {
 		commit := entry.CurrentEpochCommit
-		dkgParticipants := entry.CurrentEpochSetup.Participants.Filter(filter.IsValidDKGParticipant).Sort(flow.Canonical[flow.IdentitySkeleton])
+		dkgParticipants := entry.CurrentEpochSetup.Participants.Filter(filter.IsConsensusCommitteeMember).Sort(flow.Canonical[flow.IdentitySkeleton])
 		commit.DKGParticipantKeys = nil
 		commit.DKGIndexMap = make(flow.DKGIndexMap)
 		for index, nodeID := range dkgParticipants.NodeIDs() {

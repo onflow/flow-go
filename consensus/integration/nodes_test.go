@@ -258,7 +258,7 @@ func createRootBlockData(t *testing.T, participantData *run.ParticipantData) (*f
 
 	// add other roles to create a complete identity list
 	participants := unittest.CompleteIdentitySet(consensusParticipants...).Sort(flow.Canonical[flow.Identity])
-	dkgParticipants := participants.ToSkeleton().Filter(filter.IsValidDKGParticipant)
+	dkgParticipants := participants.ToSkeleton().Filter(filter.IsConsensusCommitteeMember)
 	dkgParticipantsKeys := make([]crypto.PublicKey, 0, len(consensusParticipants))
 	dkgIndexMap := make(flow.DKGIndexMap)
 	for index, participant := range dkgParticipants {
@@ -530,7 +530,7 @@ func createNode(
 	require.NoError(t, err)
 
 	keys := &storagemock.SafeBeaconKeys{}
-	// there is DKG key for this epoch
+	// there is Random Beacon key for this epoch
 	keys.On("RetrieveMyBeaconPrivateKey", mock.Anything).Return(
 		func(epochCounter uint64) crypto.PrivateKey {
 			dkgInfo, ok := participant.beaconInfoByEpoch[epochCounter]

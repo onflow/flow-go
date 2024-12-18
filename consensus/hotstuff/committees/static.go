@@ -148,6 +148,16 @@ func (s staticDKG) KeyShare(nodeID flow.Identifier) (crypto.PublicKey, error) {
 	return participant.KeyShare, nil
 }
 
+// KeyShares returns the public portions of all threshold key shares. Note that there might not
+// exist a private key corresponding to each entry (e.g. if the respective node failed the DKG).
+func (s staticDKG) KeyShares() []crypto.PublicKey {
+	participants := make([]crypto.PublicKey, len(s.dkgParticipants))
+	for _, participant := range s.dkgParticipants {
+		participants[participant.Index] = participant.KeyShare
+	}
+	return participants
+}
+
 // NodeID returns the node identifier for the given index.
 // An exception is returned if the index is ≥ Size().
 // Intended for use outside the hotpath, with runtime

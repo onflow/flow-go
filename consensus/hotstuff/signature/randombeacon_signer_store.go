@@ -42,9 +42,9 @@ func (s *EpochAwareRandomBeaconKeyStore) ByView(view uint64) (crypto.PrivateKey,
 	}
 
 	// When DKG has completed,
-	//   - if a node successfully generated the DKG key, the valid private key will be stored in database.
-	//   - if a node failed to generate the DKG key, we will save a record in database to indicate this
-	//      node has no private key for this epoch.
+	//   - if a node successfully generated the Random Beacon key, the valid private key will be stored in database.
+	//   - if a node failed to generate the Random Beacon key, we will save a record in database to indicate this
+	//     node has no private key for this epoch.
 	// Within the epoch, we can look up my random beacon private key for the epoch. There are 3 cases:
 	//   1. DKG has completed, and the private key is stored in database, and we can retrieve it (happy path)
 	//   2. DKG has completed, but we failed to generate a private key (unhappy path)

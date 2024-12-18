@@ -149,7 +149,7 @@ func finalize(cmd *cobra.Command, args []string) {
 	log.Info().Msgf("received votes total: %v", len(votes))
 
 	log.Info().Msg("reading dkg data")
-	dkgData := readDKGData()
+	dkgData, _ := readRandomBeaconKeys()
 	log.Info().Msg("")
 
 	log.Info().Msg("reading intermediary bootstrapping data")
@@ -347,29 +347,28 @@ func readRootBlock() *flow.Block {
 	return rootBlock
 }
 
-// readDKGData reads DKG data from disc, this file needs to be prepared with
-// rootblock command
-func readDKGData() dkg.DKGData {
-	encodableDKG, err := utils.ReadData[inmem.EncodableFullDKG](flagDKGDataPath)
+// readRandomBeaconKeys reads the threshold key data from disc.
+// This file needs to be prepared with rootblock command
+func readRandomBeaconKeys() (dkg.ThresholdKeySet, flow.DKGIndexMap) {
+	encodableDKG, err := utils.ReadData[inmem.ThresholdKeySet](flagDKGDataPath)
 	if err != nil {
-		log.Fatal().Err(err).Msg("could not read DKG data")
+		log.Fatal().Err(err).Msg("loading threshold key data for Random Beacon failed")
 	}
 
-	dkgData := dkg.DKGData{
+	dkgData := dkg.ThresholdKeySet{
 		PrivKeyShares: nil,
 		PubGroupKey:   encodableDKG.GroupKey.PublicKey,
 		PubKeyShares:  nil,
 	}
 
-	for _, pubKey := range encodableDKG.PubKeyShares {
-		dkgData.PubKeyShares = append(dkgData.PubKeyShares, pubKey.PublicKey)
+	indexMap := make(flow.DKGIndexMap, len(encodableDKG.Participants))
+	for i, participant := range encodableDKG.Participants {
+		dkgData.PubKeyShares = append(dkgData.PubKeyShares, participant.PubKeyShare.PublicKey)
+		dkgData.PrivKeyShares = append(dkgData.PrivKeyShares, participant.PrivKeyShare.PrivateKey)
+		indexMap[participant.NodeID] = i
 	}
 
-	for _, privKey := range encodableDKG.PrivKeyShares {
-		dkgData.PrivKeyShares = append(dkgData.PrivKeyShares, privKey.PrivateKey)
-	}
-
-	return dkgData
+	return dkgData, indexMap
 }
 
 // Validation utility methods ------------------------------------------------
