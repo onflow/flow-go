@@ -9,7 +9,6 @@ import (
 
 	"github.com/onflow/flow-go/engine/access/rest/common/parser"
 	"github.com/onflow/flow-go/engine/access/rest/http/request"
-	"github.com/onflow/flow-go/engine/access/rest/util"
 	"github.com/onflow/flow-go/engine/access/rest/websockets/models"
 	"github.com/onflow/flow-go/engine/access/state_stream"
 	"github.com/onflow/flow-go/engine/access/state_stream/backend"
@@ -136,42 +135,13 @@ func parseEventsArguments(
 ) (eventsArguments, error) {
 	var args eventsArguments
 
-	// Check for mutual exclusivity of start_block_id and start_block_height early
-	startBlockIDIn, hasStartBlockID := arguments["start_block_id"]
-	startBlockHeightIn, hasStartBlockHeight := arguments["start_block_height"]
-
-	if hasStartBlockID && hasStartBlockHeight {
-		return args, fmt.Errorf("can only provide either 'start_block_id' or 'start_block_height'")
+	// Parse block arguments
+	startBlockID, startBlockHeight, err := ParseStartBlock(arguments)
+	if err != nil {
+		return args, err
 	}
-
-	// Parse 'start_block_id' if provided
-	if hasStartBlockID {
-		result, ok := startBlockIDIn.(string)
-		if !ok {
-			return args, fmt.Errorf("'start_block_id' must be a string")
-		}
-		var startBlockID parser.ID
-		err := startBlockID.Parse(result)
-		if err != nil {
-			return args, fmt.Errorf("invalid 'start_block_id': %w", err)
-		}
-		args.StartBlockID = startBlockID.Flow()
-	}
-
-	// Parse 'start_block_height' if provided
-	var err error
-	if hasStartBlockHeight {
-		result, ok := startBlockHeightIn.(string)
-		if !ok {
-			return args, fmt.Errorf("'start_block_height' must be a string")
-		}
-		args.StartBlockHeight, err = util.ToUint64(result)
-		if err != nil {
-			return args, fmt.Errorf("invalid 'start_block_height': %w", err)
-		}
-	} else {
-		args.StartBlockHeight = request.EmptyHeight
-	}
+	args.StartBlockID = startBlockID
+	args.StartBlockHeight = startBlockHeight
 
 	// Parse 'event_types' as a JSON array
 	var eventTypes parser.EventTypes
