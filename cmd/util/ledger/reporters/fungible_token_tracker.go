@@ -23,10 +23,10 @@ import (
 
 const FungibleTokenTrackerReportPrefix = "fungible_token_report"
 
-var domains = []string{
-	common.PathDomainPublic.Identifier(),
-	common.PathDomainPrivate.Identifier(),
-	common.PathDomainStorage.Identifier(),
+var domains = []common.StorageDomain{
+	common.StorageDomainPathPublic,
+	common.StorageDomainPathPrivate,
+	common.StorageDomainPathStorage,
 }
 
 // FungibleTokenTracker iterates through stored cadence values over all accounts and check for any
@@ -142,6 +142,11 @@ func (r *FungibleTokenTracker) worker(
 	wg *sync.WaitGroup) {
 	for j := range jobs {
 
+		inter, err := interpreter.NewInterpreter(nil, nil, &interpreter.Config{})
+		if err != nil {
+			panic(err)
+		}
+
 		txnState := state.NewTransactionState(
 			NewStorageSnapshotFromPayload(j.payloads),
 			state.DefaultParameters())
@@ -149,6 +154,7 @@ func (r *FungibleTokenTracker) worker(
 		storage := cadenceRuntime.NewStorage(
 			&util.AccountsAtreeLedger{Accounts: accounts},
 			nil,
+			cadenceRuntime.StorageConfig{},
 		)
 
 		owner, err := common.BytesToAddress(j.owner[:])
@@ -156,18 +162,17 @@ func (r *FungibleTokenTracker) worker(
 			panic(err)
 		}
 
-		inter, err := interpreter.NewInterpreter(nil, nil, &interpreter.Config{})
-		if err != nil {
-			panic(err)
-		}
-
 		for _, domain := range domains {
-			storageMap := storage.GetStorageMap(owner, domain, true)
+			storageMap := storage.GetDomainStorageMap(inter, owner, domain, true)
 			itr := storageMap.Iterator(inter)
 			key, value := itr.Next()
 			for value != nil {
 				identifier := string(key.(interpreter.StringAtreeValue))
-				r.iterateChildren(append([]string{domain}, identifier), j.owner, value)
+				r.iterateChildren(
+					append([]string{domain.Identifier()}, identifier),
+					j.owner,
+					value,
+				)
 				key, value = itr.Next()
 			}
 		}
