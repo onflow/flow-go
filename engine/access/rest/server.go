@@ -58,7 +58,7 @@ func NewServer(serverAPI access.API,
 		chain,
 		stateStreamConfig.EventFilterConfig,
 		stateStreamConfig.HeartbeatInterval,
-		builder.LinkGenerator, // TODO: guess how to avoid public LinkGenerator
+		builder.LinkGenerator,
 	)
 	builder.AddWebsocketsRoute(chain, wsConfig, config.MaxRequestSize, dataProviderFactory)
 

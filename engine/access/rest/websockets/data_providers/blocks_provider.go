@@ -5,6 +5,8 @@ import (
 	"fmt"
 
 	"github.com/rs/zerolog"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 
 	"github.com/onflow/flow-go/access"
 	"github.com/onflow/flow-go/engine/access/rest/common"
@@ -79,8 +81,13 @@ func (p *BlocksDataProvider) Run() error {
 		p.subscription,
 		subscription.HandleResponse(p.send, func(b *flow.Block) (interface{}, error) {
 			var block commonmodels.Block
-			//TODO: decide if execution result should be a part of response
-			err := block.Build(b, nil, p.linkGenerator, p.arguments.BlockStatus, p.arguments.Expand)
+
+			executionResult, err := p.getExecutionResult(b)
+			if err != nil {
+				return nil, err
+			}
+
+			err = block.Build(b, executionResult, p.linkGenerator, p.arguments.BlockStatus, p.arguments.Expand)
 			if err != nil {
 				return nil, fmt.Errorf("failed to build block response :%w", err)
 			}
@@ -90,6 +97,21 @@ func (p *BlocksDataProvider) Run() error {
 			}, nil
 		}),
 	)
+}
+
+// getExecutionResult retrieves the execution result for the given block.
+// If the execution result is not yet available, it returns a nil execution result and no error.
+//
+// No errors are expected during normal operations.
+func (p *BlocksDataProvider) getExecutionResult(b *flow.Block) (*flow.ExecutionResult, error) {
+	executionResult, err := p.api.GetExecutionResultForBlockID(context.TODO(), b.ID())
+	if err != nil {
+		if se, ok := status.FromError(err); ok && se.Code() == codes.NotFound {
+			return nil, nil // Execution result not yet available
+		}
+		return nil, fmt.Errorf("failed to get execution result for block: %s, %d: %w", b.ID(), b.Header.Height, err)
+	}
+	return executionResult, nil
 }
 
 // createSubscription creates a new subscription using the specified input arguments.
@@ -161,7 +183,7 @@ func ParseBlocksArguments(arguments models.Arguments) (blocksArguments, error) {
 	}
 
 	// Parse 'expand' as a JSON array of string
-	// expected values: "payload"
+	// expected values: "payload", "execution_result"
 	if expandIn, ok := arguments["expand"]; ok && expandIn != "" {
 		result, ok := expandIn.([]string)
 		if !ok {

@@ -33,7 +33,9 @@ type BlocksProviderSuite struct {
 	log zerolog.Logger
 	api *accessmock.API
 
-	blocks         []*flow.Block
+	blocks    []*flow.Block
+	resultMap map[flow.Identifier]*flow.ExecutionResult
+
 	rootBlock      flow.Block
 	finalizedBlock *flow.Header
 
@@ -52,6 +54,7 @@ func (s *BlocksProviderSuite) SetupTest() {
 
 	blockCount := 5
 	s.blocks = make([]*flow.Block, 0, blockCount)
+	s.resultMap = make(map[flow.Identifier]*flow.ExecutionResult, blockCount)
 
 	s.rootBlock = unittest.BlockFixture()
 	s.rootBlock.Header.Height = 0
@@ -66,6 +69,7 @@ func (s *BlocksProviderSuite) SetupTest() {
 		// update for next iteration
 		parent = block.Header
 		s.blocks = append(s.blocks, block)
+		s.resultMap[block.ID()] = unittest.ExecutionResultFixture(unittest.WithExecutionResultBlockID(block.ID()))
 	}
 	s.finalizedBlock = parent
 
@@ -141,8 +145,9 @@ func (s *BlocksProviderSuite) TestBlocksDataProvider_InvalidArguments() {
 // validBlockArgumentsTestCases defines test happy cases for block data providers.
 // Each test case specifies input arguments, and setup functions for the mock API used in the test.
 func (s *BlocksProviderSuite) validBlockArgumentsTestCases() []testType {
-	expectedResponses := s.expectedBlockResponses(s.blocks, map[string]bool{}, flow.BlockStatusFinalized)
-	expectedPayloadExpandedResponse := s.expectedBlockResponses(s.blocks, map[string]bool{commonmodels.ExpandableFieldPayload: true}, flow.BlockStatusFinalized)
+	expectedResponses := s.expectedBlockResponses(s.blocks, s.resultMap, map[string]bool{}, flow.BlockStatusFinalized)
+	expectedPayloadExpandedResponse := s.expectedBlockResponses(s.blocks, s.resultMap, map[string]bool{commonmodels.ExpandableFieldPayload: true}, flow.BlockStatusFinalized)
+	expectedExecutionResultExpandedResponse := s.expectedBlockResponses(s.blocks, s.resultMap, map[string]bool{commonmodels.ExpandableExecutionResult: true}, flow.BlockStatusFinalized)
 
 	return []testType{
 		{
@@ -220,6 +225,21 @@ func (s *BlocksProviderSuite) validBlockArgumentsTestCases() []testType {
 			},
 			expectedResponses: expectedPayloadExpandedResponse,
 		},
+		{
+			name: "happy path execution result expanded",
+			arguments: models.Arguments{
+				"block_status": parser.Finalized,
+				"expand":       []string{"execution_result"},
+			},
+			setupBackend: func(sub *statestreamsmock.Subscription) {
+				s.api.On(
+					"SubscribeBlocksFromLatest",
+					mock.Anything,
+					flow.BlockStatusFinalized,
+				).Return(sub).Once()
+			},
+			expectedResponses: expectedExecutionResultExpandedResponse,
+		},
 	}
 }
 
@@ -250,6 +270,27 @@ func (s *BlocksProviderSuite) TestBlocksDataProvider_HappyPath() {
 		},
 	)
 
+	s.linkGenerator.On("ExecutionResultLink", mock.AnythingOfType("flow.Identifier")).Return(
+		func(id flow.Identifier) (string, error) {
+			for _, result := range s.resultMap {
+				if result.ID() == id {
+					return fmt.Sprintf("/v1/execution_results/%s", id), nil
+				}
+			}
+			return "", assert.AnError
+		},
+	)
+
+	s.api.On("GetExecutionResultForBlockID", mock.Anything, mock.AnythingOfType("flow.Identifier")).
+		Return(func(ctx context.Context, blockId flow.Identifier) (*flow.ExecutionResult, error) {
+			for id, result := range s.resultMap {
+				if id == blockId {
+					return result, nil
+				}
+			}
+			return nil, assert.AnError
+		})
+
 	testHappyPath(
 		s.T(),
 		BlocksTopic,
@@ -278,13 +319,14 @@ func (s *BlocksProviderSuite) requireBlock(actual interface{}, expected interfac
 // expectedBlockResponses generates a list of expected block responses for the given blocks.
 func (s *BlocksProviderSuite) expectedBlockResponses(
 	blocks []*flow.Block,
+	executionResults map[flow.Identifier]*flow.ExecutionResult,
 	expand map[string]bool,
 	status flow.BlockStatus,
 ) []interface{} {
 	responses := make([]interface{}, len(blocks))
 	for i, b := range blocks {
 		var block commonmodels.Block
-		err := block.Build(b, nil, s.linkGenerator, status, expand)
+		err := block.Build(b, executionResults[b.ID()], s.linkGenerator, status, expand)
 		s.Require().NoError(err)
 
 		responses[i] = &models.BlockMessageResponse{
