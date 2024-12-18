@@ -347,6 +347,14 @@ func RunWithBadgerDB(t testing.TB, f func(*badger.DB)) {
 	})
 }
 
+func RunWithBadgerDBAt(t testing.TB, dir string, f func(*badger.DB)) {
+	db := BadgerDB(t, dir)
+	defer func() {
+		assert.NoError(t, db.Close())
+	}()
+	f(db)
+}
+
 // RunWithTypedBadgerDB creates a Badger DB that is passed to f and closed
 // after f returns. The extra create parameter allows passing in a database
 // constructor function which instantiates a database with a particular type
@@ -394,6 +402,15 @@ func RunWithPebbleDB(t testing.TB, f func(*pebble.DB)) {
 		}()
 		f(db)
 	})
+}
+
+func RunWithPebbleDBAt(t testing.TB, dir string, f func(*pebble.DB)) {
+	db, err := pebble.Open(dir, &pebble.Options{})
+	require.NoError(t, err)
+	defer func() {
+		assert.NoError(t, db.Close())
+	}()
+	f(db)
 }
 
 func PebbleDB(t testing.TB, dir string) *pebble.DB {

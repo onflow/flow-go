@@ -1,6 +1,7 @@
 package dbtest
 
 import (
+	"path"
 	"testing"
 
 	"github.com/cockroachdb/pebble"
@@ -16,8 +17,14 @@ import (
 type WithWriter func(func(storage.Writer) error) error
 
 func RunWithStorages(t *testing.T, fn func(*testing.T, storage.Reader, WithWriter)) {
+	unittest.RunWithTempDir(t, func(dir string) {
+		RunWithStoragesAt(t, dir, fn)
+	})
+}
+
+func RunWithStoragesAt(t *testing.T, dir string, fn func(*testing.T, storage.Reader, WithWriter)) {
 	t.Run("BadgerStorage", func(t *testing.T) {
-		unittest.RunWithBadgerDB(t, func(db *badger.DB) {
+		unittest.RunWithBadgerDBAt(t, path.Join(dir, "badgertest"), func(db *badger.DB) {
 			withWriter := func(writing func(storage.Writer) error) error {
 				writer := badgerimpl.NewReaderBatchWriter(db)
 				err := writing(writer)
@@ -25,7 +32,10 @@ func RunWithStorages(t *testing.T, fn func(*testing.T, storage.Reader, WithWrite
 					return err
 				}
 
+				// now := time.Now()
+				// 30-40 microseconds
 				err = writer.Commit()
+				// fmt.Println("badger batch.Commit time:", time.Since(now).Microseconds())
 				if err != nil {
 					return err
 				}
@@ -38,7 +48,7 @@ func RunWithStorages(t *testing.T, fn func(*testing.T, storage.Reader, WithWrite
 	})
 
 	t.Run("PebbleStorage", func(t *testing.T) {
-		unittest.RunWithPebbleDB(t, func(db *pebble.DB) {
+		unittest.RunWithPebbleDBAt(t, path.Join(dir, "pebbletest"), func(db *pebble.DB) {
 			withWriter := func(writing func(storage.Writer) error) error {
 				writer := pebbleimpl.NewReaderBatchWriter(db)
 				err := writing(writer)
@@ -46,7 +56,10 @@ func RunWithStorages(t *testing.T, fn func(*testing.T, storage.Reader, WithWrite
 					return err
 				}
 
+				// now := time.Now()
+				// 3000-4000 microseconds with pebble.Batch updates
 				err = writer.Commit()
+				// fmt.Println("pebble batch.Commit time:", time.Since(now).Microseconds())
 				if err != nil {
 					return err
 				}
