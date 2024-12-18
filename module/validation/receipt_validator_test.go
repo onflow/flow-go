@@ -248,7 +248,18 @@ func (s *ReceiptValidationSuite) TestReceiptServiceEventCountMismatch() {
 			err := s.receiptValidator.Validate(receipt)
 			s.Require().NoError(err)
 		})
-		s.Run("chunk list has wrong sum of service event counts", func() {
+		s.Run("chunk list has too large service event count", func() {
+			*result.Chunks[rand.Intn(len(result.Chunks))].ServiceEventCount++
+			err := s.receiptValidator.Validate(receipt)
+			s.Require().Error(err, "should reject with invalid chunks")
+			s.Assert().True(engine.IsInvalidInputError(err))
+		})
+		s.Run("chunk list has too small service event count", func() {
+			for _, chunk := range result.Chunks {
+				if *chunk.ServiceEventCount > 0 {
+					*chunk.ServiceEventCount--
+				}
+			}
 			*result.Chunks[rand.Intn(len(result.Chunks))].ServiceEventCount++
 			err := s.receiptValidator.Validate(receipt)
 			s.Require().Error(err, "should reject with invalid chunks")
