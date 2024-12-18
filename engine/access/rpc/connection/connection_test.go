@@ -40,7 +40,11 @@ func TestProxyAccessAPI(t *testing.T) {
 
 	req := &access.PingRequest{}
 	expected := &access.PingResponse{}
-	cn.handler.On("Ping", testifymock.Anything, req).Return(expected, nil)
+	cn.handler.
+		On("Ping",
+			testifymock.Anything,
+			testifymock.AnythingOfType("*access.PingRequest")).
+		Return(expected, nil)
 
 	// create the factory
 	connectionFactory := new(ConnectionFactoryImpl)
@@ -85,7 +89,11 @@ func TestProxyExecutionAPI(t *testing.T) {
 
 	req := &execution.PingRequest{}
 	expected := &execution.PingResponse{}
-	en.handler.On("Ping", testifymock.Anything, req).Return(expected, nil)
+	en.handler.
+		On("Ping",
+			testifymock.Anything,
+			testifymock.AnythingOfType("*access.PingRequest")).
+		Return(expected, nil)
 
 	// create the factory
 	connectionFactory := new(ConnectionFactoryImpl)
@@ -130,7 +138,11 @@ func TestProxyAccessAPIConnectionReuse(t *testing.T) {
 
 	req := &access.PingRequest{}
 	expected := &access.PingResponse{}
-	cn.handler.On("Ping", testifymock.Anything, req).Return(expected, nil)
+	cn.handler.
+		On("Ping",
+			testifymock.Anything,
+			testifymock.AnythingOfType("*access.PingRequest")).
+		Return(expected, nil)
 
 	// create the factory
 	connectionFactory := new(ConnectionFactoryImpl)
@@ -188,7 +200,11 @@ func TestProxyExecutionAPIConnectionReuse(t *testing.T) {
 
 	req := &execution.PingRequest{}
 	expected := &execution.PingResponse{}
-	en.handler.On("Ping", testifymock.Anything, req).Return(expected, nil)
+	en.handler.
+		On("Ping",
+			testifymock.Anything,
+			testifymock.AnythingOfType("*access.PingRequest")).
+		Return(expected, nil)
 
 	// create the factory
 	connectionFactory := new(ConnectionFactoryImpl)
@@ -250,7 +266,12 @@ func TestExecutionNodeClientTimeout(t *testing.T) {
 	// setup the handler mock to not respond within the timeout
 	req := &execution.PingRequest{}
 	resp := &execution.PingResponse{}
-	en.handler.On("Ping", testifymock.Anything, req).After(timeout+time.Second).Return(resp, nil)
+	en.handler.
+		On("Ping",
+			testifymock.Anything,
+			testifymock.AnythingOfType("*access.PingRequest")).
+		After(timeout+time.Second).
+		Return(resp, nil)
 
 	// create the factory
 	connectionFactory := new(ConnectionFactoryImpl)
@@ -302,7 +323,12 @@ func TestCollectionNodeClientTimeout(t *testing.T) {
 	// setup the handler mock to not respond within the timeout
 	req := &access.PingRequest{}
 	resp := &access.PingResponse{}
-	cn.handler.On("Ping", testifymock.Anything, req).After(timeout+time.Second).Return(resp, nil)
+	cn.handler.
+		On("Ping",
+			testifymock.Anything,
+			testifymock.AnythingOfType("*access.PingRequest")).
+		After(timeout+time.Second).
+		Return(resp, nil)
 
 	// create the factory
 	connectionFactory := new(ConnectionFactoryImpl)
@@ -353,11 +379,22 @@ func TestConnectionPoolFull(t *testing.T) {
 	defer cn2.stop(t)
 	defer cn3.stop(t)
 
-	req := &access.PingRequest{}
 	expected := &access.PingResponse{}
-	cn1.handler.On("Ping", testifymock.Anything, req).Return(expected, nil)
-	cn2.handler.On("Ping", testifymock.Anything, req).Return(expected, nil)
-	cn3.handler.On("Ping", testifymock.Anything, req).Return(expected, nil)
+	cn1.handler.
+		On("Ping",
+			testifymock.Anything,
+			testifymock.AnythingOfType("*access.PingRequest")).
+		Return(expected, nil)
+	cn2.handler.
+		On("Ping",
+			testifymock.Anything,
+			testifymock.AnythingOfType("*access.PingRequest")).
+		Return(expected, nil)
+	cn3.handler.
+		On("Ping",
+			testifymock.Anything,
+			testifymock.AnythingOfType("*access.PingRequest")).
+		Return(expected, nil)
 
 	// create the factory
 	connectionFactory := new(ConnectionFactoryImpl)
@@ -436,7 +473,11 @@ func TestConnectionPoolStale(t *testing.T) {
 
 	req := &access.PingRequest{}
 	expected := &access.PingResponse{}
-	cn.handler.On("Ping", testifymock.Anything, req).Return(expected, nil)
+	cn.handler.
+		On("Ping",
+			testifymock.Anything,
+			testifymock.AnythingOfType("*access.PingRequest")).
+		Return(expected, nil)
 
 	// create the factory
 	connectionFactory := new(ConnectionFactoryImpl)
