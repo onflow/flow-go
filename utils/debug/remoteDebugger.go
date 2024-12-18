@@ -30,6 +30,7 @@ func NewRemoteDebugger(
 		fvm.WithLogger(logger),
 		fvm.WithChain(chain),
 		fvm.WithAuthorizationChecksEnabled(false),
+		fvm.WithEVMEnabled(true),
 	)
 
 	return &RemoteDebugger{
