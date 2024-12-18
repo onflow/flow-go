@@ -63,7 +63,7 @@ func (c *Controller) HandleConnection(ctx context.Context) {
 
 	err := c.configureKeepalive()
 	if err != nil {
-		c.logger.Error().Err(err).Msg("error configuring connection")
+		c.logger.Error().Err(err).Msg("error configuring keepalive connection")
 		return
 	}
 
@@ -149,8 +149,7 @@ func (c *Controller) monitorInactivity(ctx context.Context) error {
 // keepalive sends a ping message periodically to keep the WebSocket connection alive
 // and avoid timeouts.
 //
-// Expected errors during normal operation:
-// - context.Canceled if the client disconnected
+// No errors are expected during normal operation. All errors are considered benign.
 func (c *Controller) keepalive(ctx context.Context) error {
 	pingTicker := time.NewTicker(PingPeriod)
 	defer pingTicker.Stop()
@@ -202,6 +201,11 @@ func (c *Controller) writeMessages(ctx context.Context) error {
 				return fmt.Errorf("rate limiter wait failed: %w", err)
 			}
 
+			// Specifies a timeout for the write operation. If the write
+			// isn't completed within this duration, it fails with a timeout error.
+			// SetWriteDeadline ensures the write operation does not block indefinitely
+			// if the client is slow or unresponsive. This prevents resource exhaustion
+			// and allows the server to gracefully handle timeouts for delayed writes.
 			if err := c.conn.SetWriteDeadline(time.Now().Add(WriteWait)); err != nil {
 				return fmt.Errorf("failed to set the write deadline: %w", err)
 			}
