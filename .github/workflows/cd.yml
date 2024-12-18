@@ -45,6 +45,7 @@ jobs:
         run: gcloud auth configure-docker ${{ env.PRIVATE_REGISTRY_HOST }}
 
       - name: Build & Push ${{ matrix.role }}
+        if: inputs.skip_private_build != 'true'
         env:
           CONTAINER_REGISTRY: ${{ vars.PRIVATE_REGISTRY }}
         run: |
