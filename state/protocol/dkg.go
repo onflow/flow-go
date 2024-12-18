@@ -26,6 +26,10 @@ type DKG interface {
 	// * protocol.IdentityNotFoundError if nodeID is not a valid DKG participant.
 	KeyShare(nodeID flow.Identifier) (crypto.PublicKey, error)
 
+	// KeyShares returns the public portions of all threshold key shares. Note that there might not
+	// exist a private key corresponding to each entry (e.g. if the respective node failed the DKG).
+	KeyShares() []crypto.PublicKey
+
 	// NodeID returns the node identifier for the given index.
 	// An exception is returned if the index is ≥ Size().
 	// Intended for use outside the hotpath, with runtime
