@@ -20,9 +20,8 @@ type Environment interface {
 }
 
 // randomSourceFunctionType is the type of the `randomSource` function.
-// This defies the signature as `func (): [UInt8]`
+// This defines the signature as `func(): [UInt8]`
 var randomSourceFunctionType = &sema.FunctionType{
-	Parameters:           []sema.Parameter{},
 	ReturnTypeAnnotation: sema.NewTypeAnnotation(sema.ByteArrayType),
 }
 
@@ -34,12 +33,22 @@ type ReusableCadenceRuntime struct {
 	fvmEnv Environment
 }
 
-func NewReusableCadenceRuntime(rt runtime.Runtime, config runtime.Config) *ReusableCadenceRuntime {
+func NewReusableCadenceRuntime(
+	rt runtime.Runtime,
+	config runtime.Config,
+) *ReusableCadenceRuntime {
 	reusable := &ReusableCadenceRuntime{
 		Runtime:          rt,
 		TxRuntimeEnv:     runtime.NewBaseInterpreterEnvironment(config),
 		ScriptRuntimeEnv: runtime.NewScriptInterpreterEnvironment(config),
 	}
+
+	reusable.declareRandomSourceHistory()
+
+	return reusable
+}
+
+func (reusable *ReusableCadenceRuntime) declareRandomSourceHistory() {
 
 	// Declare the `randomSourceHistory` function. This function is **only** used by the
 	// System transaction, to fill the `RandomBeaconHistory` contract via the heartbeat
@@ -49,22 +58,32 @@ func NewReusableCadenceRuntime(rt runtime.Runtime, config runtime.Config) *Reusa
 	// it is not part of the cadence standard library, and can just be injected from here.
 	// It also doesnt need user documentation, since it is not (and should not)
 	// be called by the user. If it is called by the user it will panic.
+	functionType := randomSourceFunctionType
+
 	blockRandomSource := stdlib.StandardLibraryValue{
 		Name: "randomSourceHistory",
-		Type: randomSourceFunctionType,
+		Type: functionType,
 		Kind: common.DeclarationKindFunction,
 		Value: interpreter.NewUnmeteredStaticHostFunctionValue(
-			randomSourceFunctionType,
+			functionType,
 			func(invocation interpreter.Invocation) interpreter.Value {
-				if len(invocation.Arguments) != 0 {
+
+				actualArgumentCount := len(invocation.Arguments)
+				expectedArgumentCount := len(functionType.Parameters)
+
+				if actualArgumentCount != expectedArgumentCount {
 					panic(errors.NewInvalidArgumentErrorf(
-						"randomSourceHistory should be called without arguments"))
+						"incorrect number of arguments: got %d, expected %d",
+						actualArgumentCount,
+						expectedArgumentCount,
+					))
 				}
 
 				var err error
 				var source []byte
-				if reusable.fvmEnv != nil {
-					source, err = reusable.fvmEnv.RandomSourceHistory()
+				fvmEnv := reusable.fvmEnv
+				if fvmEnv != nil {
+					source, err = fvmEnv.RandomSourceHistory()
 				} else {
 					err = errors.NewOperationNotSupportedError("randomSourceHistory")
 				}
@@ -81,8 +100,6 @@ func NewReusableCadenceRuntime(rt runtime.Runtime, config runtime.Config) *Reusa
 	}
 
 	reusable.TxRuntimeEnv.DeclareValue(blockRandomSource, nil)
-
-	return reusable
 }
 
 func (reusable *ReusableCadenceRuntime) SetFvmEnvironment(fvmEnv Environment) {
