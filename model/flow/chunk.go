@@ -196,7 +196,7 @@ func NewChunk(
 	}
 }
 
-// NewChunk_ProtocolVersion1 returns a Chunk compliant with Protocol Version 1, 
+// NewChunk_ProtocolVersion1 returns a Chunk compliant with Protocol Version 1,
 // omitting the value of the field [Chunk.ServiceEventCount] respectively).
 // TODO(mainnet27, #6773): remove this function https://github.com/onflow/flow-go/issues/6773
 // Deprecated: for backward compatibility only until upgrade to Protocol Version 2.

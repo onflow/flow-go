@@ -74,6 +74,7 @@ func (v *receiptValidator) verifySignature(receipt *flow.ExecutionReceiptMeta, n
 //   - The ServiceEventCount being nil for _all_ chunks of the ExecutionResult, indicates that this chunk was
 //     created by an older software version which assumes that _all_ service events were emitted in the system
 //     chunk (last chunk). This was the implicit behaviour prior to the introduction of this field.
+//
 // (2) Otherwise, the ServiceEventCount must be non-nil for _all_ chunks of the ExecutionResult
 // Within an ExecutionResult, all chunks must use either representation (1) or (2), not both.
 func (v *receiptValidator) verifyChunkServiceEvents(result *flow.ExecutionResult) error {
