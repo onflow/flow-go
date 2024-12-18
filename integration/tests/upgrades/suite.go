@@ -57,8 +57,8 @@ func (s *Suite) SetupTest() {
 
 	consensusConfigs := []func(config *testnet.NodeConfig){
 		testnet.WithAdditionalFlag("--cruise-ctl-fallback-proposal-duration=500ms"),
-		testnet.WithAdditionalFlag("--required-verification-seal-approvals=1"),
-		testnet.WithAdditionalFlag("--required-construction-seal-approvals=1"),
+		testnet.WithAdditionalFlag("--required-verification-seal-approvals=0"),
+		testnet.WithAdditionalFlag("--required-construction-seal-approvals=0"),
 		testnet.WithLogLevel(zerolog.InfoLevel),
 	}
 
@@ -134,6 +134,15 @@ func (s *Suite) AwaitSnapshotAtView(view uint64, waitFor, tick time.Duration) (s
 		return head.View >= view
 	}, waitFor, tick)
 	return
+}
+
+func (s *Suite) AwaitProtocolVersion(v uint64, waitFor, tick time.Duration) {
+	require.Eventually(s.T(), func() bool {
+		snapshot := s.LatestProtocolStateSnapshot()
+		kvstore, err := snapshot.ProtocolState()
+		s.Require().NoError(err)
+		return kvstore.GetProtocolStateVersion() == v
+	}, waitFor, tick)
 }
 
 func (s *Suite) TearDownTest() {
