@@ -121,7 +121,7 @@ func (p *AccountStatusesDataProvider) handleResponse() func(accountStatusesRespo
 			BlockID:       accountStatusesResponse.BlockID.String(),
 			Height:        strconv.FormatUint(accountStatusesResponse.Height, 10),
 			AccountEvents: accountStatusesResponse.AccountEvents,
-			MessageIndex:  strconv.FormatUint(index, 10),
+			MessageIndex:  index,
 		}
 
 		return nil

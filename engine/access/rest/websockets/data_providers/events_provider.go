@@ -108,7 +108,7 @@ func (p *EventsDataProvider) handleResponse() func(eventsResponse *backend.Event
 			BlockHeight:    strconv.FormatUint(eventsResponse.Height, 10),
 			BlockTimestamp: eventsResponse.BlockTimestamp,
 			Events:         eventsResponse.Events,
-			MessageIndex:   strconv.FormatUint(index, 10),
+			MessageIndex:   index,
 		}
 
 		return nil
