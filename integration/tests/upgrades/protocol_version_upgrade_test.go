@@ -52,7 +52,7 @@ func (s *ProtocolVersionUpgradeSuite) TestProtocolStateVersionUpgradeServiceEven
 	const ACTIVE_VIEW_DIFF = 20 // active view is 20 above execution block view
 	const INITIAL_PROTOCOL_VERSION = uint64(0)
 	const NEXT_PROTOCOL_VERSION = uint64(1)    // valid version to upgrade to
-	const UNKNOWN_PROTOCOL_VERSION = uint64(2) // invalid version to upgrade to
+	const UNKNOWN_PROTOCOL_VERSION = uint64(3) // invalid version to upgrade to
 
 	// sanity check: we should start with a v0 kvstore
 	snapshot := s.LatestProtocolStateSnapshot()
@@ -94,8 +94,11 @@ func (s *ProtocolVersionUpgradeSuite) TestProtocolStateVersionUpgradeServiceEven
 	require.Equal(s.T(), NEXT_PROTOCOL_VERSION, actualProtocolVersion, "should have v1 after upgrade")
 
 	// 3. Upgrade to unknown version should halt progress
-	txResult = s.sendUpgradeProtocolVersionTx(ctx, env, UNKNOWN_PROTOCOL_VERSION, ACTIVE_VIEW_DIFF)
-	s.Require().NoError(txResult.Error)
+	// For now, we just upgrade through all versions until we reach latest+1
+	for version := actualProtocolVersion; version <= UNKNOWN_PROTOCOL_VERSION; version++ {
+		txResult = s.sendUpgradeProtocolVersionTx(ctx, env, UNKNOWN_PROTOCOL_VERSION, ACTIVE_VIEW_DIFF)
+		s.Require().NoError(txResult.Error)
+	}
 
 	_ = s.ReceiptState.WaitForReceiptFromAny(s.T(), flow.Identifier(txResult.BlockID))
 
