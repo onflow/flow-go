@@ -2,7 +2,8 @@ package utils
 
 // The google storage API only provides md5 and crc32 hence overriding the linter flag for md5
 import (
-	"crypto/md5" //nolint:gosec
+	// #nosec
+	"crypto/md5"
 	"io"
 	"os"
 )

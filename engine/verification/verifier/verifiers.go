@@ -24,6 +24,7 @@ import (
 // VerifyLastKHeight verifies the last k sealed blocks by verifying all chunks in the results.
 // It assumes the latest sealed block has been executed, and the chunk data packs have not been
 // pruned.
+// Note, it returns nil if certain block is not executed, in this case warning will be logged
 func VerifyLastKHeight(k uint64, chainID flow.ChainID, protocolDataDir string, chunkDataPackDir string) (err error) {
 	closer, storages, chunkDataPacks, state, verifier, err := initStorages(chainID, protocolDataDir, chunkDataPackDir)
 	if err != nil {
@@ -73,6 +74,7 @@ func VerifyLastKHeight(k uint64, chainID flow.ChainID, protocolDataDir string, c
 }
 
 // VerifyRange verifies all chunks in the results of the blocks in the given range.
+// Note, it returns nil if certain block is not executed, in this case warning will be logged
 func VerifyRange(
 	from, to uint64,
 	chainID flow.ChainID,
@@ -124,7 +126,8 @@ func initStorages(chainID flow.ChainID, dataDir string, chunkDataPackDir string)
 		return nil, nil, nil, nil, nil, fmt.Errorf("could not init protocol state: %w", err)
 	}
 
-	chunkDataPackDB, err := storagepebble.OpenDefaultPebbleDB(chunkDataPackDir)
+	// require the chunk data pack data must exist before returning the storage module
+	chunkDataPackDB, err := storagepebble.MustOpenDefaultPebbleDB(chunkDataPackDir)
 	if err != nil {
 		return nil, nil, nil, nil, nil, fmt.Errorf("could not open chunk data pack DB: %w", err)
 	}
@@ -147,6 +150,8 @@ func initStorages(chainID flow.ChainID, dataDir string, chunkDataPackDir string)
 	return closer, storages, chunkDataPacks, state, verifier, nil
 }
 
+// verifyHeight verifies all chunks in the results of the block at the given height.
+// Note: it returns nil if the block is not executed.
 func verifyHeight(
 	height uint64,
 	headers storage.Headers,
@@ -164,6 +169,11 @@ func verifyHeight(
 
 	result, err := results.ByBlockID(blockID)
 	if err != nil {
+		if errors.Is(err, storage.ErrNotFound) {
+			log.Warn().Uint64("height", height).Hex("block_id", blockID[:]).Msg("execution result not found")
+			return nil
+		}
+
 		return fmt.Errorf("could not get execution result by block ID %s: %w", blockID, err)
 	}
 	snapshot := state.AtBlockID(blockID)
