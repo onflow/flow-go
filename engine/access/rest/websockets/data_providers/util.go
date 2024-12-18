@@ -20,6 +20,7 @@ type testType struct {
 	setupBackend func(sub *statestreamsmock.Subscription)
 }
 
+// testErrType represents an error cases for subscribing
 type testErrType struct {
 	name             string
 	arguments        models.Arguments

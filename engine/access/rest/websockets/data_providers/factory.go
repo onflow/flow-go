@@ -15,12 +15,13 @@ import (
 // Constants defining various topic names used to specify different types of
 // data providers.
 const (
-	EventsTopic              = "events"
-	AccountStatusesTopic     = "account_statuses"
-	BlocksTopic              = "blocks"
-	BlockHeadersTopic        = "block_headers"
-	BlockDigestsTopic        = "block_digests"
-	TransactionStatusesTopic = "transaction_statuses"
+	EventsTopic                  = "events"
+	AccountStatusesTopic         = "account_statuses"
+	BlocksTopic                  = "blocks"
+	BlockHeadersTopic            = "block_headers"
+	BlockDigestsTopic            = "block_digests"
+	TransactionStatusesTopic     = "transaction_statuses"
+	SendTransactionStatusesTopic = "send_transaction_statuses"
 )
 
 // DataProviderFactory defines an interface for creating data providers
