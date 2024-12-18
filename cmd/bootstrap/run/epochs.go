@@ -19,6 +19,7 @@ import (
 )
 
 // GenerateRecoverEpochTxArgs generates the required transaction arguments for the `recoverEpoch` transaction.
+// No errors are expected during normal operation.
 func GenerateRecoverEpochTxArgs(log zerolog.Logger,
 	internalNodePrivInfoDir string,
 	nodeConfigJson string,
@@ -88,7 +89,7 @@ func GenerateRecoverEpochTxArgs(log zerolog.Logger,
 	internalNodesMap := make(map[flow.Identifier]struct{})
 	for _, node := range internalNodes {
 		if !currentEpochIdentities.Exists(node.Identity()) {
-			return nil, fmt.Errorf("node ID found in internal node infos missing from protocol snapshot identities %s: %w", node.NodeID, err)
+			log.Warn().Msgf("this node (ID %s) is not part of the network according to the bootstrapping data; we might not get any data", node.NodeID)
 		}
 		internalNodesMap[node.NodeID] = struct{}{}
 	}
@@ -105,7 +106,7 @@ func GenerateRecoverEpochTxArgs(log zerolog.Logger,
 	log.Info().Msg("computing collection node clusters")
 	assignments, clusters, err := common.ConstructClusterAssignment(log, partnerCollectors, internalCollectors, collectionClusters)
 	if err != nil {
-		log.Fatal().Err(err).Msg("unable to generate cluster assignment")
+		return nil, fmt.Errorf("unable to generate cluster assignment: %w", err)
 	}
 	log.Info().Msg("")
 
@@ -137,58 +138,55 @@ func GenerateRecoverEpochTxArgs(log zerolog.Logger,
 	if err != nil {
 		return nil, fmt.Errorf("failed to get epoch protocol state from snapshot: %w", err)
 	}
-	currentEpochDKG, err := epochProtocolState.DKG()
-	if err != nil {
-		return nil, fmt.Errorf("failed to get DKG for current epoch: %w", err)
-	}
+	currentEpochCommit := epochProtocolState.EpochCommit()
 
-	dkgGroupKeyCdc, cdcErr := cadence.NewString(hex.EncodeToString(currentEpochDKG.GroupKey().Encode()))
+	// NOTE: The RecoveryEpoch will re-use the last successful DKG output. This means that the random beacon committee can be
+	// different from the consensus committee. This could happen if the node was ejected from the consensus committee, but it still has to be
+	// included in the DKG committee since the threshold signature scheme operates on pre-defined number of participants and cannot be changed.
+	dkgGroupKeyCdc, cdcErr := cadence.NewString(hex.EncodeToString(currentEpochCommit.DKGGroupKey.Encode()))
 	if cdcErr != nil {
-		log.Fatal().Err(cdcErr).Msg("failed to get dkg group key cadence string")
-	}
-	dkgPubKeys := make([]cadence.Value, 0)
-	nodeIds := make([]cadence.Value, 0)
-	for _, id := range currentEpochIdentities {
-		if id.GetRole() == flow.RoleConsensus {
-			dkgPubKey, keyShareErr := currentEpochDKG.KeyShare(id.GetNodeID())
-			if keyShareErr != nil {
-				log.Fatal().Err(keyShareErr).Msg(fmt.Sprintf("failed to get dkg pub key share for node: %s", id.GetNodeID()))
-			}
-			dkgPubKeyCdc, cdcErr := cadence.NewString(hex.EncodeToString(dkgPubKey.Encode()))
-			if cdcErr != nil {
-				log.Fatal().Err(cdcErr).Msg(fmt.Sprintf("failed to get dkg pub key cadence string for node: %s", id.GetNodeID()))
-			}
-			dkgPubKeys = append(dkgPubKeys, dkgPubKeyCdc)
-		}
-		nodeIdCdc, err := cadence.NewString(id.GetNodeID().String())
-		if err != nil {
-			log.Fatal().Err(err).Msg(fmt.Sprintf("failed to convert node ID to cadence string: %s", id.GetNodeID()))
-		}
-		nodeIds = append(nodeIds, nodeIdCdc)
+		return nil, fmt.Errorf("failed to convert Random Beacon group key to cadence representation: %w", cdcErr)
 	}
 
+	// copy DKG index map from the current epoch
 	dkgIndexMapPairs := make([]cadence.KeyValuePair, 0)
-	for nodeID, index := range epochProtocolState.EpochCommit().DKGIndexMap {
+	for nodeID, index := range currentEpochCommit.DKGIndexMap {
 		dkgIndexMapPairs = append(dkgIndexMapPairs, cadence.KeyValuePair{
 			Key:   cadence.String(nodeID.String()),
 			Value: cadence.NewInt(index),
 		})
 	}
+	// copy DKG public keys from the current epoch
+	dkgPubKeys := make([]cadence.Value, 0)
+	for k, dkgPubKey := range currentEpochCommit.DKGParticipantKeys {
+		dkgPubKeyCdc, cdcErr := cadence.NewString(hex.EncodeToString(dkgPubKey.Encode()))
+		if cdcErr != nil {
+			return nil, fmt.Errorf("failed convert public beacon key of participant %d to cadence representation: %w", k, cdcErr)
+		}
+		dkgPubKeys = append(dkgPubKeys, dkgPubKeyCdc)
+	}
+	// fill node IDs
+	nodeIds := make([]cadence.Value, 0)
+	for _, id := range currentEpochIdentities {
+		nodeIdCdc, err := cadence.NewString(id.GetNodeID().String())
+		if err != nil {
+			return nil, fmt.Errorf("failed to convert node ID %s to cadence string: %w", id.GetNodeID(), err)
+		}
+		nodeIds = append(nodeIds, nodeIdCdc)
+	}
 
 	clusterQCAddress := systemcontracts.SystemContractsForChain(rootChainID).ClusterQC.Address.String()
 	qcVoteData, err := common.ConvertClusterQcsCdc(clusterQCs, clusters, clusterQCAddress)
 	if err != nil {
-		log.Fatal().Err(err).Msg("failed to convert cluster qcs to cadence type")
+		return nil, fmt.Errorf("failed to convert cluster qcs to cadence type")
 	}
-
 	currEpochFinalView, err := epoch.FinalView()
 	if err != nil {
-		log.Fatal().Err(err).Msg("failed to get final view of current epoch")
+		return nil, fmt.Errorf("failed to get final view of current epoch")
 	}
-
 	currEpochTargetEndTime, err := epoch.TargetEndTime()
 	if err != nil {
-		log.Fatal().Err(err).Msg("failed to get target end time of current epoch")
+		return nil, fmt.Errorf("failed to get target end time of current epoch")
 	}
 
 	// STEP III: compile list of arguments for `recoverEpoch` governance transaction.
