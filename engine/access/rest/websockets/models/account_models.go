@@ -5,5 +5,5 @@ type AccountStatusesResponse struct {
 	BlockID       string        `json:"blockID"`
 	Height        string        `json:"height"`
 	AccountEvents AccountEvents `json:"account_events"`
-	MessageIndex  string        `json:"message_index"`
+	MessageIndex  uint64        `json:"message_index"`
 }

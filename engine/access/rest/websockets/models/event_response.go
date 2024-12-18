@@ -19,5 +19,5 @@ func (e *EventResponse) Build(eventsResponse *backend.EventsResponse, index uint
 		Events:         events,
 	}
 
-	e.MessageIndex = strconv.FormatUint(index, 10)
+	e.MessageIndex = index
 }

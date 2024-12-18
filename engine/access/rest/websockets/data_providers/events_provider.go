@@ -84,7 +84,7 @@ func (p *EventsDataProvider) Run() error {
 // No errors are expected during normal operations.
 func (p *EventsDataProvider) handleResponse() func(eventsResponse *backend.EventsResponse) error {
 	blocksSinceLastMessage := uint64(0)
-	messageIndex := counters.NewMonotonousCounter(1)
+	messageIndex := counters.NewMonotonousCounter(0)
 
 	return func(eventsResponse *backend.EventsResponse) error {
 		// check if there are any events in the response. if not, do not send a message unless the last
@@ -97,10 +97,10 @@ func (p *EventsDataProvider) handleResponse() func(eventsResponse *backend.Event
 			blocksSinceLastMessage = 0
 		}
 
-		index := messageIndex.Value()
 		if ok := messageIndex.Set(messageIndex.Value() + 1); !ok {
 			return fmt.Errorf("message index already incremented to: %d", messageIndex.Value())
 		}
+		index := messageIndex.Value()
 
 		var response models.EventResponse
 		response.Build(eventsResponse, index)

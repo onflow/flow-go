@@ -15,6 +15,6 @@ func (e *AccountStatusesResponse) Build(accountStatusesResponse *backend.Account
 		BlockID:       accountStatusesResponse.BlockID.String(),
 		Height:        strconv.FormatUint(accountStatusesResponse.Height, 10),
 		AccountEvents: accountEvents,
-		MessageIndex:  strconv.FormatUint(index, 10),
+		MessageIndex:  index,
 	}
 }
