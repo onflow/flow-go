@@ -33,7 +33,7 @@ jobs:
       - id: auth
         uses: google-github-actions/auth@v1
         with:
-          credentials_json: ${{ secrets.GCR_SERVICE_KEY_SECRET }}
+          credentials_json: ${{ secrets.PRIVATE_REGISTRY_UPLOAD_SECRET }}
 
       - name: Authenticate Docker with gcloud
         run: gcloud auth configure-docker ${{ env.PRIVATE_REGISTRY_HOST }}
@@ -48,9 +48,9 @@ jobs:
           make docker-build-${{ matrix.role }}-without-netgo-without-adx docker-push-${{ matrix.role }}-without-netgo-without-adx CONTAINER_REGISTRY=${CONTAINER_REGISTRY}
           make docker-cross-build-${{ matrix.role }}-arm docker-push-${{ matrix.role }}-arm CONTAINER_REGISTRY=${CONTAINER_REGISTRY} 
 
-  # Individual Promotion Jobs using the Base Tag for Full Tags
+  # Individual Promotion Jobs with unique environments enables individual image promotion 
   promote-access:
-    name: Promote Access Role to Public Registry
+    name: Promote Access Image to Public Registry
     runs-on: ubuntu-latest
     needs: private-build
     environment: Public Access Image Promotion
@@ -61,7 +61,7 @@ jobs:
       - name: Promote Access
         uses: ./actions/promote-images
         with:
-          gcp_credentials: ${{ secrets.GCR_SERVICE_KEY_SECRET }}
+          gcp_credentials: ${{ secrets.PUBLIC_REGISTRY_PROMOTION_SECRET }}
           private_registry: ${{ vars.PRIVATE_REGISTRY }}
           private_registry_host: ${{ env.PRIVATE_REGISTRY_HOST }}
           public_registry: ${{ vars.PUBLIC_REGISTRY }}
@@ -69,7 +69,7 @@ jobs:
           tags: "${{ inputs.tag }},${{ inputs.tag }}-without-adx,${{ inputs.tag }}-without-netgo-without-adx,${{ inputs.tag }}-arm"
 
   promote-collection:
-    name: Promote Collection Role to Public Registry
+    name: Promote Collection Image to Public Registry
     runs-on: ubuntu-latest
     needs: private-build
     environment: Public Collection Image Promotion
@@ -80,7 +80,7 @@ jobs:
       - name: Promote Collection
         uses: ./actions/promote-images
         with:
-          gcp_credentials: ${{ secrets.GCR_SERVICE_KEY_SECRET }}
+          gcp_credentials: ${{ secrets.PUBLIC_REGISTRY_PROMOTION_SECRET }}
           private_registry: ${{ vars.PRIVATE_REGISTRY }}
           private_registry_host: ${{ env.PRIVATE_REGISTRY_HOST }}
           public_registry: ${{ vars.PUBLIC_REGISTRY }}
@@ -88,7 +88,7 @@ jobs:
           tags: "${{ inputs.tag }},${{ inputs.tag }}-without-adx,${{ inputs.tag }}-without-netgo-without-adx,${{ inputs.tag }}-arm"
 
   promote-consensus:
-    name: Promote Consensus Role to Public Registry
+    name: Promote Consensus Image to Public Registry
     runs-on: ubuntu-latest
     needs: private-build
     environment: Public Consensus Image Promotion
@@ -99,7 +99,7 @@ jobs:
       - name: Promote Consensus
         uses: ./actions/promote-images
         with:
-          gcp_credentials: ${{ secrets.GCR_SERVICE_KEY_SECRET }}
+          gcp_credentials: ${{ secrets.PUBLIC_REGISTRY_PROMOTION_SECRET }}
           private_registry: ${{ vars.PRIVATE_REGISTRY }}
           private_registry_host: ${{ env.PRIVATE_REGISTRY_HOST }}
           public_registry: ${{ vars.PUBLIC_REGISTRY }}
@@ -107,7 +107,7 @@ jobs:
           tags: "${{ inputs.tag }},${{ inputs.tag }}-without-adx,${{ inputs.tag }}-without-netgo-without-adx,${{ inputs.tag }}-arm"
 
   promote-execution:
-    name: Promote Execution Role to Public Registry
+    name: Promote Execution Image to Public Registry
     runs-on: ubuntu-latest
     needs: private-build
     environment: Public Execution Image Promotion
@@ -118,7 +118,7 @@ jobs:
       - name: Promote Execution
         uses: ./actions/promote-images
         with:
-          gcp_credentials: ${{ secrets.GCR_SERVICE_KEY_SECRET }}
+          gcp_credentials: ${{ secrets.PUBLIC_REGISTRY_PROMOTION_SECRET }}
           private_registry: ${{ vars.PRIVATE_REGISTRY }}
           private_registry_host: ${{ env.PRIVATE_REGISTRY_HOST }}
           public_registry: ${{ vars.PUBLIC_REGISTRY }}
@@ -126,7 +126,7 @@ jobs:
           tags: "${{ inputs.tag }},${{ inputs.tag }}-without-adx,${{ inputs.tag }}-without-netgo-without-adx,${{ inputs.tag }}-arm"
 
   promote-observer:
-    name: Promote Observer Role to Public Registry
+    name: Promote Observer Image to Public Registry
     runs-on: ubuntu-latest
     needs: private-build
     environment: Public Observer Image Promotion
@@ -137,7 +137,7 @@ jobs:
       - name: Promote Observer
         uses: ./actions/promote-images
         with:
-          gcp_credentials: ${{ secrets.GCR_SERVICE_KEY_SECRET }}
+          gcp_credentials: ${{ secrets.PUBLIC_REGISTRY_PROMOTION_SECRET }}
           private_registry: ${{ vars.PRIVATE_REGISTRY }}
           private_registry_host: ${{ env.PRIVATE_REGISTRY_HOST }}
           public_registry: ${{ vars.PUBLIC_REGISTRY }}
@@ -145,7 +145,7 @@ jobs:
           tags: "${{ inputs.tag }},${{ inputs.tag }}-without-adx,${{ inputs.tag }}-without-netgo-without-adx,${{ inputs.tag }}-arm"
 
   promote-verification:
-    name: Promote Verification Role to Public Registry
+    name: Promote Verification Image to Public Registry
     runs-on: ubuntu-latest
     needs: private-build
     environment: Public Verification Image Promotion
@@ -156,7 +156,7 @@ jobs:
       - name: Promote Verification
         uses: ./actions/promote-images
         with:
-          gcp_credentials: ${{ secrets.GCR_SERVICE_KEY_SECRET }}
+          gcp_credentials: ${{ secrets.PUBLIC_REGISTRY_PROMOTION_SECRET }}
           private_registry: ${{ vars.PRIVATE_REGISTRY }}
           private_registry_host: ${{ env.PRIVATE_REGISTRY_HOST }}
           public_registry: ${{ vars.PUBLIC_REGISTRY }}
