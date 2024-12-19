@@ -97,10 +97,10 @@ func (p *EventsDataProvider) handleResponse() func(eventsResponse *backend.Event
 			blocksSinceLastMessage = 0
 		}
 
+		index := messageIndex.Value()
 		if ok := messageIndex.Set(messageIndex.Value() + 1); !ok {
 			return fmt.Errorf("message index already incremented to: %d", messageIndex.Value())
 		}
-		index := messageIndex.Value()
 
 		p.send <- &models.EventResponse{
 			BlockId:        eventsResponse.BlockID.String(),

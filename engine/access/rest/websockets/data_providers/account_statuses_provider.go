@@ -111,10 +111,10 @@ func (p *AccountStatusesDataProvider) handleResponse() func(accountStatusesRespo
 			blocksSinceLastMessage = 0
 		}
 
+		index := messageIndex.Value()
 		if ok := messageIndex.Set(messageIndex.Value() + 1); !ok {
 			return status.Errorf(codes.Internal, "message index already incremented to %d", messageIndex.Value())
 		}
-		index := messageIndex.Value()
 
 		p.send <- &models.AccountStatusesResponse{
 			BlockID:       accountStatusesResponse.BlockID.String(),
