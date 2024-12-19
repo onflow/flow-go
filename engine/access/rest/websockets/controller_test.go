@@ -972,13 +972,11 @@ func (s *WsControllerSuite) expectKeepaliveRoutineShutdown(conn *connmock.Websoc
 	conn.
 		On("WriteControl", websocket.PingMessage, mock.Anything).
 		Return(func(int, time.Time) error {
-			for {
-				select {
-				case <-done:
-					return websocket.ErrCloseSent
-				default:
-					return nil
-				}
+			select {
+			case <-done:
+				return websocket.ErrCloseSent
+			default:
+				return nil
 			}
 		}).
 		Maybe()
