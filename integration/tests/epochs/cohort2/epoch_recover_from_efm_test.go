@@ -1,13 +1,9 @@
 package cohort2
 
 import (
-	"encoding/hex"
 	"fmt"
-	"github.com/onflow/crypto"
 	"github.com/onflow/flow-go/cmd/util/cmd/common"
-	"github.com/onflow/flow-go/fvm/systemcontracts"
-	"github.com/rs/zerolog"
-
+	"github.com/onflow/flow-go/utils/unittest"
 	"strings"
 	"testing"
 	"time"
@@ -44,9 +40,9 @@ func (s *RecoverEpochSuite) SetupTest() {
 	s.EpochLen = 150
 	s.FinalizationSafetyThreshold = 20
 	s.NumOfCollectionClusters = 1
-	// we need to use 3 consensus nodes to be able to eject a single node from the consensus committee
-	// and still have a Random Beacon committee which meets the protocol.RandomBeaconSafetyThreshold
-	s.NumOfConsensusNodes = 3
+	// we need to use 4 consensus nodes to be able to eject a single node and still have a super-majority and
+	// have a Random Beacon committee which meets the protocol.RandomBeaconSafetyThreshold.
+	s.NumOfConsensusNodes = 4
 
 	// run the generic setup, which starts up the network
 	s.BaseSuite.SetupTest()
@@ -296,21 +292,21 @@ func (s *RecoverEpochSuite) TestRecoverEpochNodeEjected() {
 	s.AssertInEpoch(s.Ctx, 1)
 }
 
-// TestRecoverEpochNodeEjected ensures that the recover epoch governance transaction flow works as expected, and a network that
+// TestRecoverEpochEjectNodeDifferentDKG ensures that the recover epoch governance transaction flow works as expected, and a network that
 // enters Epoch Fallback Mode can successfully recover.
-// For this specific scenario, we are testing a scenario where the consensus committee is a subset of the DKG committee, i.e.,
-// a node was ejected between epoch start and submitting the recover epoch transaction.
+// For this specific scenario, we are testing a scenario where the consensus committee and Random Beacon committee form a symmetric difference with
+// cardinality 1. In other words, there is a node which is part of the consensus committee but not part of the Random Beacon committee and
+// another node which is part of the Random Beacon committee but not part of the consensus committee.
 // This test will do the following:
 // 1. Triggers EFM by turning off the sole collection node before the end of the DKG forcing the DKG to fail.
 // 2. Generates epoch recover transaction args using the epoch efm-recover-tx-args.
 // 3. Eject consensus node by modifying the snapshot before generating the recover epoch transaction args.
-// 4. Submit recover epoch transaction.
-// 5. Ensure expected EpochRecover event is emitted.
-// 6. Ensure the network transitions into the recovery epoch and finalizes the first view of the recovery epoch.
+// 4. Eject consensus node from the Random Beacon committee by modifying the snapshot before generating the recover epoch transaction args.
+// 5. Submit recover epoch transaction.
+// 6. Ensure expected EpochRecover event is emitted.
+// 7. Ensure the network transitions into the recovery epoch and finalizes the first view of the recovery epoch.
 func (s *RecoverEpochSuite) TestRecoverEpochEjectNodeDifferentDKG() {
 	// 1. Manually trigger EFM
-	// wait until the epoch setup phase to force network into EFM
-	s.AwaitEpochPhase(s.Ctx, 0, flow.EpochPhaseSetup, 10*time.Second, 500*time.Millisecond)
 
 	// pause the collection node to trigger EFM by failing DKG
 	ln := s.GetContainersByRole(flow.RoleCollection)[0]
@@ -319,19 +315,21 @@ func (s *RecoverEpochSuite) TestRecoverEpochEjectNodeDifferentDKG() {
 	// start the paused collection node now that we are in EFM
 	require.NoError(s.T(), ln.Start())
 
-	// get final view form the latest snapshot
+	// get final view from the latest snapshot
 	epoch1FinalView, err := s.Net.BootstrapSnapshot.Epochs().Current().FinalView()
 	require.NoError(s.T(), err)
 
 	// Wait for at least the first view past the current epoch's original FinalView to be finalized.
-	// At this point we can observe that an extension has been added to the current epoch, indicating EFM.
 	s.TimedLogf("waiting for epoch transition (finalized view %d)", epoch1FinalView+1)
 	s.AwaitFinalizedView(s.Ctx, epoch1FinalView+1, 2*time.Minute, 500*time.Millisecond)
 	s.TimedLogf("observed finalized view %d", epoch1FinalView+1)
 
-	// assert transition to second epoch did not happen
-	// if counter is still 0, epoch emergency fallback was triggered as expected
-	s.AssertInEpoch(s.Ctx, 0)
+	// assert that we are in EFM
+	snapshot, err := s.Client.GetLatestProtocolSnapshot(s.Ctx)
+	require.NoError(s.T(), err)
+	epochPhase, err := snapshot.EpochPhase()
+	require.NoError(s.T(), err)
+	require.Equal(s.T(), flow.EpochPhaseFallback, epochPhase, "network must enter EFM by this point")
 
 	// 2. Generate transaction arguments for epoch recover transaction.
 	collectionClusters := s.NumOfCollectionClusters
@@ -339,15 +337,36 @@ func (s *RecoverEpochSuite) TestRecoverEpochEjectNodeDifferentDKG() {
 
 	// read internal node info from one of the consensus nodes
 	internalNodePrivInfoDir, nodeConfigJson := s.getNodeInfoDirs(flow.RoleConsensus)
-	snapshot := s.GetLatestProtocolSnapshot(s.Ctx).Encodable()
+	internalNodes, err := common.ReadFullInternalNodeInfos(unittest.Logger(), internalNodePrivInfoDir, nodeConfigJson)
+	require.NoError(s.T(), err)
 	// 3. Eject consensus node by modifying the snapshot before generating the recover epoch transaction args.
-	snapshot.SealingSegment.LatestProtocolStateEntry().EpochEntry.CurrentEpochIdentityTable.
-		Filter(filter.HasRole[flow.Identity](flow.RoleConsensus))[0].EpochParticipationStatus = flow.EpochParticipationStatusEjected
+	// By ejecting a node from the consensus committee but keeping it in the Random Beacon committee, we ensure that the there is a node
+	// which is not part of the consensus committee but is part of the Random Beacon committee.
+	currentIdentityTable := snapshot.Encodable().SealingSegment.LatestProtocolStateEntry().EpochEntry.CurrentEpochIdentityTable
+	ejectedIdentity := currentIdentityTable.Filter(filter.HasRole[flow.Identity](flow.RoleConsensus))[0]
+	ejectedIdentity.EpochParticipationStatus = flow.EpochParticipationStatusEjected
 
-	txArgs, err := run.GenerateRecoverEpochTxArgs(
+	// 4. Modify DKG data by removing the last node of the consensus committee from DKG committee. We can do this
+	// by altering the DKG index map and DKG public key shares.
+	// This way we ensure that consensus committee has a node which is not part of the Random Beacon committee.
+	randomBeaconParticipants := currentIdentityTable.Filter(filter.HasRole[flow.Identity](flow.RoleConsensus))
+	nConsensusNodes := len(randomBeaconParticipants) - 1
+
+	dkgIndexMap := make(flow.DKGIndexMap, nConsensusNodes)
+	for i, participant := range randomBeaconParticipants[:nConsensusNodes] {
+		dkgIndexMap[participant.NodeID] = i
+	}
+
+	epochProtocolState, err := snapshot.EpochProtocolState()
+	require.NoError(s.T(), err)
+	dkg, err := epochProtocolState.DKG()
+	require.NoError(s.T(), err)
+
+	// At this point we have a node which is part of the consensus committee but not part of the Random Beacon committee and
+	// another node which is part of the Random Beacon committee but not part of the consensus committee.
+	txArgs, err := run.GenerateRecoverTxArgsWithDKG(
 		s.Log,
-		internalNodePrivInfoDir,
-		nodeConfigJson,
+		internalNodes,
 		collectionClusters,
 		recoveryEpochCounter,
 		flow.Localnet,
@@ -355,17 +374,20 @@ func (s *RecoverEpochSuite) TestRecoverEpochEjectNodeDifferentDKG() {
 		s.EpochLen,
 		3000,
 		false,
-		inmem.SnapshotFromEncodable(snapshot),
+		dkgIndexMap,
+		dkg.KeyShares()[:nConsensusNodes],
+		dkg.GroupKey(),
+		snapshot,
 	)
 	require.NoError(s.T(), err)
 
-	// 4. Submit recover epoch transaction to the network.
+	// 5. Submit recover epoch transaction to the network.
 	env := utils.LocalnetEnv()
 	result := s.recoverEpoch(env, txArgs)
 	require.NoError(s.T(), result.Error)
 	require.Equal(s.T(), result.Status, sdk.TransactionStatusSealed)
 
-	// 5. Ensure expected EpochRecover event is emitted.
+	// 6. Ensure expected EpochRecover event is emitted.
 	eventType := ""
 	for _, evt := range result.Events {
 		if strings.Contains(evt.Type, "FlowEpoch.EpochRecover") {
@@ -378,146 +400,11 @@ func (s *RecoverEpochSuite) TestRecoverEpochEjectNodeDifferentDKG() {
 	require.NoError(s.T(), err)
 	require.Equal(s.T(), events[0].Events[0].Type, eventType)
 
-	// 6. Ensure the network transitions into the recovery epoch and finalizes the first view of the recovery epoch.
+	// 7. Ensure the network transitions into the recovery epoch and finalizes the first view of the recovery epoch.
 	startViewOfNextEpoch := uint64(txArgs[1].(cadence.UInt64))
 	s.TimedLogf("waiting to transition into recovery epoch (finalized view %d)", startViewOfNextEpoch)
 	s.AwaitFinalizedView(s.Ctx, startViewOfNextEpoch, 2*time.Minute, 500*time.Millisecond)
 	s.TimedLogf("observed finalized first view of recovery epoch %d", startViewOfNextEpoch)
 
 	s.AssertInEpoch(s.Ctx, 1)
-}
-
-// generateRecoverTxArgsWithCustomDKG generates the required transaction arguments for the `recoverEpoch` transaction.
-// No errors are expected during normal operation.
-func GenerateRecoverTxArgsWithDKG(log zerolog.Logger,
-	internalNodes []bootstrap.NodeInfo,
-	collectionClusters int,
-	recoveryEpochCounter uint64,
-	rootChainID flow.ChainID,
-	numViewsInStakingAuction uint64,
-	numViewsInEpoch uint64,
-	targetDuration uint64,
-	unsafeAllowOverWrite bool,
-	dkgIndexMap flow.DKGIndexMap,
-	dkgParticipantKeys []crypto.PublicKey,
-	dkgGroupKey crypto.PublicKey,
-	snapshot *inmem.Snapshot,
-) ([]cadence.Value, error) {
-	epoch := snapshot.Epochs().Current()
-
-	currentEpochIdentities, err := snapshot.Identities(filter.IsValidProtocolParticipant)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get  valid protocol participants from snapshot: %w", err)
-	}
-	// We need canonical ordering here; sanity check to enforce this:
-	if !currentEpochIdentities.Sorted(flow.Canonical[flow.Identity]) {
-		return nil, fmt.Errorf("identies from snapshot not in canonical order")
-	}
-
-	// separate collector nodes by internal and partner nodes
-	collectors := currentEpochIdentities.Filter(filter.HasRole[flow.Identity](flow.RoleCollection))
-	internalCollectors := make(flow.IdentityList, 0)
-	partnerCollectors := make(flow.IdentityList, 0)
-
-	internalNodesMap := make(map[flow.Identifier]struct{})
-	for _, node := range internalNodes {
-		internalNodesMap[node.NodeID] = struct{}{}
-	}
-
-	for _, collector := range collectors {
-		if _, ok := internalNodesMap[collector.NodeID]; ok {
-			internalCollectors = append(internalCollectors, collector)
-		} else {
-			partnerCollectors = append(partnerCollectors, collector)
-		}
-	}
-
-	assignments, clusters, err := common.ConstructClusterAssignment(log, partnerCollectors, internalCollectors, collectionClusters)
-	if err != nil {
-		return nil, fmt.Errorf("unable to generate cluster assignment: %w", err)
-	}
-
-	clusterBlocks := run.GenerateRootClusterBlocks(recoveryEpochCounter, clusters)
-	clusterQCs := run.ConstructRootQCsForClusters(log, clusters, internalNodes, clusterBlocks)
-
-	// NOTE: The RecoveryEpoch will re-use the last successful DKG output. This means that the random beacon committee can be
-	// different from the consensus committee. This could happen if the node was ejected from the consensus committee, but it still has to be
-	// included in the DKG committee since the threshold signature scheme operates on pre-defined number of participants and cannot be changed.
-	dkgGroupKeyCdc, cdcErr := cadence.NewString(hex.EncodeToString(dkgGroupKey.Encode()))
-	if cdcErr != nil {
-		return nil, fmt.Errorf("failed to get dkg group key cadence string: %w", cdcErr)
-	}
-
-	// copy DKG index map from the current epoch
-	dkgIndexMapPairs := make([]cadence.KeyValuePair, 0)
-	for nodeID, index := range dkgIndexMap {
-		dkgIndexMapPairs = append(dkgIndexMapPairs, cadence.KeyValuePair{
-			Key:   cadence.String(nodeID.String()),
-			Value: cadence.NewInt(index),
-		})
-	}
-	// copy DKG public keys from the current epoch
-	dkgPubKeys := make([]cadence.Value, 0)
-	for _, dkgPubKey := range dkgParticipantKeys {
-		dkgPubKeyCdc, cdcErr := cadence.NewString(hex.EncodeToString(dkgPubKey.Encode()))
-		if cdcErr != nil {
-			return nil, fmt.Errorf("failed to get dkg pub key cadence string for node: %w", cdcErr)
-		}
-		dkgPubKeys = append(dkgPubKeys, dkgPubKeyCdc)
-	}
-	// fill node IDs
-	nodeIds := make([]cadence.Value, 0)
-	for _, id := range currentEpochIdentities {
-		nodeIdCdc, err := cadence.NewString(id.GetNodeID().String())
-		if err != nil {
-			return nil, fmt.Errorf("failed to convert node ID to cadence string %s: %w", id.GetNodeID(), err)
-		}
-		nodeIds = append(nodeIds, nodeIdCdc)
-	}
-
-	clusterQCAddress := systemcontracts.SystemContractsForChain(rootChainID).ClusterQC.Address.String()
-	qcVoteData, err := common.ConvertClusterQcsCdc(clusterQCs, clusters, clusterQCAddress)
-	if err != nil {
-		return nil, fmt.Errorf("failed to convert cluster qcs to cadence type")
-	}
-	currEpochFinalView, err := epoch.FinalView()
-	if err != nil {
-		return nil, fmt.Errorf("failed to get final view of current epoch")
-	}
-	currEpochTargetEndTime, err := epoch.TargetEndTime()
-	if err != nil {
-		return nil, fmt.Errorf("failed to get target end time of current epoch")
-	}
-
-	args := []cadence.Value{
-		// recovery epoch counter
-		cadence.NewUInt64(recoveryEpochCounter),
-		// epoch start view
-		cadence.NewUInt64(currEpochFinalView + 1),
-		// staking phase end view
-		cadence.NewUInt64(currEpochFinalView + numViewsInStakingAuction),
-		// epoch end view
-		cadence.NewUInt64(currEpochFinalView + numViewsInEpoch),
-		// target duration
-		cadence.NewUInt64(targetDuration),
-		// target end time
-		cadence.NewUInt64(currEpochTargetEndTime),
-		// clusters,
-		common.ConvertClusterAssignmentsCdc(assignments),
-		// qcVoteData
-		cadence.NewArray(qcVoteData),
-		// dkg pub keys
-		cadence.NewArray(dkgPubKeys),
-		// dkg group key,
-		dkgGroupKeyCdc,
-		// dkg index map
-		cadence.NewDictionary(dkgIndexMapPairs),
-		// node ids
-		cadence.NewArray(nodeIds),
-		// recover the network by initializing a new recover epoch which will increment the smart contract epoch counter
-		// or overwrite the epoch metadata for the current epoch
-		cadence.NewBool(unsafeAllowOverWrite),
-	}
-
-	return args, nil
 }
