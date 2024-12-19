@@ -212,7 +212,7 @@ func (builder *LibP2PNodeBuilder) Build() (p2p.LibP2PNode, error) {
 			return nil, fmt.Errorf("could not create resolver: %w", err)
 		}
 
-		opts = append(opts, libp2p.MultiaddrResolver(swarm.ResolverFromMaDNS{resolver}))
+		opts = append(opts, libp2p.MultiaddrResolver(swarm.ResolverFromMaDNS{Resolver: resolver}))
 	}
 
 	if builder.resourceManager != nil {
