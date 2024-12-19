@@ -935,6 +935,11 @@ func WithFinalState(commit flow.StateCommitment) func(*flow.ExecutionResult) {
 func WithServiceEvents(n int) func(result *flow.ExecutionResult) {
 	return func(result *flow.ExecutionResult) {
 		result.ServiceEvents = ServiceEventsFixture(n)
+		// randomly assign service events to chunks
+		for i := 0; i < n; i++ {
+			chunkIndex := rand.Intn(result.Chunks.Len())
+			*result.Chunks[chunkIndex].ServiceEventCount++
+		}
 	}
 }
 
@@ -1319,6 +1324,12 @@ func WithChunkStartState(startState flow.StateCommitment) func(chunk *flow.Chunk
 	}
 }
 
+func WithServiceEventCount(count *uint16) func(*flow.Chunk) {
+	return func(chunk *flow.Chunk) {
+		chunk.ServiceEventCount = count
+	}
+}
+
 func ChunkFixture(
 	blockID flow.Identifier,
 	collectionIndex uint,
@@ -1326,10 +1337,10 @@ func ChunkFixture(
 ) *flow.Chunk {
 	chunk := &flow.Chunk{
 		ChunkBody: flow.ChunkBody{
-			CollectionIndex: collectionIndex,
-			StartState:      StateCommitmentFixture(),
-			EventCollection: IdentifierFixture(),
-			//ServiceEventCount:    PtrTo[uint16](0),
+			CollectionIndex:      collectionIndex,
+			StartState:           StateCommitmentFixture(),
+			EventCollection:      IdentifierFixture(),
+			ServiceEventCount:    PtrTo[uint16](0),
 			TotalComputationUsed: 4200,
 			NumberOfTransactions: 42,
 			BlockID:              blockID,
@@ -1345,10 +1356,10 @@ func ChunkFixture(
 	return chunk
 }
 
-func ChunkListFixture(n uint, blockID flow.Identifier) flow.ChunkList {
+func ChunkListFixture(n uint, blockID flow.Identifier, opts ...func(*flow.Chunk)) flow.ChunkList {
 	chunks := make([]*flow.Chunk, 0, n)
 	for i := uint64(0); i < uint64(n); i++ {
-		chunk := ChunkFixture(blockID, uint(i))
+		chunk := ChunkFixture(blockID, uint(i), opts...)
 		chunk.Index = i
 		chunks = append(chunks, chunk)
 	}
