@@ -2,8 +2,6 @@ package cohort2
 
 import (
 	"fmt"
-	"github.com/onflow/flow-go/cmd/util/cmd/common"
-	"github.com/onflow/flow-go/utils/unittest"
 	"strings"
 	"testing"
 	"time"
@@ -16,11 +14,13 @@ import (
 	sdk "github.com/onflow/flow-go-sdk"
 
 	"github.com/onflow/flow-go/cmd/bootstrap/run"
+	"github.com/onflow/flow-go/cmd/util/cmd/common"
 	"github.com/onflow/flow-go/integration/tests/epochs"
 	"github.com/onflow/flow-go/integration/utils"
 	"github.com/onflow/flow-go/model/bootstrap"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
+	"github.com/onflow/flow-go/utils/unittest"
 )
 
 func TestRecoverEpoch(t *testing.T) {
