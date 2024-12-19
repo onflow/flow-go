@@ -52,7 +52,7 @@ func (s *ProtocolVersionUpgradeSuite) TestProtocolStateVersionUpgradeServiceEven
 	const ACTIVE_VIEW_DIFF = 20 // active view is 20 above execution block view
 	const INITIAL_PROTOCOL_VERSION = uint64(0)
 	const NEXT_PROTOCOL_VERSION = uint64(1)    // valid version to upgrade to
-	const UNKNOWN_PROTOCOL_VERSION = uint64(2) // invalid version to upgrade to
+	const UNKNOWN_PROTOCOL_VERSION = uint64(3) // invalid version to upgrade to
 
 	// sanity check: we should start with a v0 kvstore
 	snapshot := s.LatestProtocolStateSnapshot()
@@ -94,18 +94,23 @@ func (s *ProtocolVersionUpgradeSuite) TestProtocolStateVersionUpgradeServiceEven
 	require.Equal(s.T(), NEXT_PROTOCOL_VERSION, actualProtocolVersion, "should have v1 after upgrade")
 
 	// 3. Upgrade to unknown version should halt progress
+	// For now, we just upgrade through all versions until we reach latest+1 (unknown)
+	for upgradeToVersion := actualProtocolVersion + 1; upgradeToVersion < UNKNOWN_PROTOCOL_VERSION; upgradeToVersion++ {
+		txResult = s.sendUpgradeProtocolVersionTx(ctx, env, upgradeToVersion, ACTIVE_VIEW_DIFF)
+		s.Require().NoError(txResult.Error)
+		s.AwaitProtocolVersion(upgradeToVersion, 30*time.Second, 500*time.Millisecond)
+	}
 	txResult = s.sendUpgradeProtocolVersionTx(ctx, env, UNKNOWN_PROTOCOL_VERSION, ACTIVE_VIEW_DIFF)
 	s.Require().NoError(txResult.Error)
-
 	_ = s.ReceiptState.WaitForReceiptFromAny(s.T(), flow.Identifier(txResult.BlockID))
 
 	executedInBlock, ok = s.BlockState.ByBlockID(flow.Identifier(txResult.BlockID))
 	require.True(s.T(), ok)
-	v2ActiveView := executedInBlock.Header.View + ACTIVE_VIEW_DIFF
+	unknownVersionActiveView := executedInBlock.Header.View + ACTIVE_VIEW_DIFF
 
-	// once consensus reaches v2ActiveView, progress should halt
+	// once consensus reaches unknownVersionActiveView, progress should halt
 	s.BlockState.WaitForHalt(s.T(), 10*time.Second, 100*time.Millisecond, time.Minute)
-	require.LessOrEqual(s.T(), s.BlockState.HighestProposedView(), v2ActiveView)
+	require.LessOrEqual(s.T(), s.BlockState.HighestProposedView(), unknownVersionActiveView)
 }
 
 // sendUpgradeProtocolVersionTx sends a governance transaction to upgrade the protocol state version.

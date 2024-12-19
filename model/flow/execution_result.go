@@ -101,7 +101,7 @@ func (er ExecutionResult) ServiceEventsByChunk(chunkIndex uint64) ServiceEventLi
 	// This indicates the chunk was generated in an older data model version.
 	// In this case, all service events associated with the result are assumed
 	// to have been emitted within the system chunk (last chunk)
-	// TODO(mainnet27): remove this path https://github.com/onflow/flow-go/issues/6773
+	// TODO(mainnet27, #6773): remove this path https://github.com/onflow/flow-go/issues/6773
 	if chunkIndex == er.SystemChunk().Index {
 		return er.ServiceEvents
 	}

@@ -49,6 +49,18 @@ func TestEncodeDecode(t *testing.T) {
 		require.NoError(t, err)
 		assert.Equal(t, model, decoded)
 	})
+
+	t.Run("v2", func(t *testing.T) {
+		model := &kvstore.Modelv2{}
+
+		version, encoded, err := model.VersionedEncode()
+		require.NoError(t, err)
+		assert.Equal(t, uint64(2), version)
+
+		decoded, err := kvstore.VersionedDecode(version, encoded)
+		require.NoError(t, err)
+		assert.Equal(t, model, decoded)
+	})
 }
 
 // TestKVStoreAPI tests that all supported model versions satisfy the public interfaces.
@@ -73,6 +85,16 @@ func TestKVStoreAPI(t *testing.T) {
 
 		version := model.GetProtocolStateVersion()
 		assert.Equal(t, uint64(1), version)
+	})
+
+	t.Run("v2", func(t *testing.T) {
+		model := &kvstore.Modelv2{}
+
+		// v0
+		assertModelIsUpgradable(t, model)
+
+		version := model.GetProtocolStateVersion()
+		assert.Equal(t, uint64(2), version)
 	})
 }
 
@@ -145,6 +167,36 @@ func TestKVStoreAPI_Replicate(t *testing.T) {
 	})
 	t.Run("v1-invalid-upgrade", func(t *testing.T) {
 		model := &kvstore.Modelv1{}
+		for _, version := range []uint64{
+			model.GetProtocolStateVersion() - 1,
+			model.GetProtocolStateVersion() + 10,
+		} {
+			newVersion, err := model.Replicate(version)
+			require.ErrorIs(t, err, kvstore.ErrIncompatibleVersionChange)
+			require.Nil(t, newVersion)
+		}
+	})
+	t.Run("v1->v2", func(t *testing.T) {
+		model := &kvstore.Modelv1{
+			Modelv0: kvstore.Modelv0{
+				UpgradableModel: kvstore.UpgradableModel{
+					VersionUpgrade: &protocol.ViewBasedActivator[uint64]{
+						Data:           13,
+						ActivationView: 1000,
+					},
+				},
+			},
+		}
+		newVersion, err := model.Replicate(2)
+		require.NoError(t, err)
+		require.Equal(t, uint64(2), newVersion.GetProtocolStateVersion())
+		require.NotEqual(t, newVersion.ID(), model.ID(), "two models with the same data but different version must have different ID")
+		_, ok := newVersion.(*kvstore.Modelv2)
+		require.True(t, ok, "expected Modelv2")
+		require.Equal(t, newVersion.GetVersionUpgrade(), model.GetVersionUpgrade())
+	})
+	t.Run("v2-invalid-upgrade", func(t *testing.T) {
+		model := &kvstore.Modelv2{}
 
 		for _, version := range []uint64{
 			model.GetProtocolStateVersion() - 1,
@@ -238,5 +290,4 @@ func TestKVStoreMutator_SetEpochExtensionViewCount(t *testing.T) {
 		require.ErrorIs(t, err, kvstore.ErrInvalidValue)
 		require.Equal(t, mutator.GetEpochExtensionViewCount(), oldValue, "value should be unchanged")
 	})
-
 }
