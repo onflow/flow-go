@@ -7,11 +7,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/stretchr/testify/assert"
-
 	"github.com/google/uuid"
 	"github.com/gorilla/websocket"
 	"github.com/rs/zerolog"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
@@ -19,24 +18,40 @@ import (
 	dpmock "github.com/onflow/flow-go/engine/access/rest/websockets/data_providers/mock"
 	connmock "github.com/onflow/flow-go/engine/access/rest/websockets/mock"
 	"github.com/onflow/flow-go/engine/access/rest/websockets/models"
+	"github.com/onflow/flow-go/engine/access/state_stream/backend"
+	streammock "github.com/onflow/flow-go/engine/access/state_stream/mock"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
+// WsControllerSuite is a test suite for the WebSocket Controller.
 type WsControllerSuite struct {
 	suite.Suite
 
 	logger   zerolog.Logger
 	wsConfig Config
+
+	connection          *connmock.WebsocketConnection
+	dataProviderFactory *dpmock.DataProviderFactory
+
+	streamApi    *streammock.API
+	streamConfig backend.Config
 }
 
+func TestControllerSuite(t *testing.T) {
+	suite.Run(t, new(WsControllerSuite))
+}
+
+// SetupTest initializes the test suite with required dependencies.
 func (s *WsControllerSuite) SetupTest() {
 	s.logger = unittest.Logger()
 	s.wsConfig = NewDefaultWebsocketConfig()
-}
 
-func TestWsControllerSuite(t *testing.T) {
-	suite.Run(t, new(WsControllerSuite))
+	s.connection = connmock.NewWebsocketConnection(s.T())
+	s.dataProviderFactory = dpmock.NewDataProviderFactory(s.T())
+
+	s.streamApi = streammock.NewAPI(s.T())
+	s.streamConfig = backend.Config{}
 }
 
 // TestSubscribeRequest tests the subscribe to topic flow.

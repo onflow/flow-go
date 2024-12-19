@@ -160,7 +160,8 @@ func (c *Controller) checkInactivity() {
 // keepalive sends a ping message periodically to keep the WebSocket connection alive
 // and avoid timeouts.
 //
-// No errors are expected during normal operation. All errors are considered benign.
+// Expected errors during normal operation:
+// - context.Canceled if the client disconnected
 func (c *Controller) keepalive(ctx context.Context) error {
 	pingTicker := time.NewTicker(PingPeriod)
 	defer pingTicker.Stop()
