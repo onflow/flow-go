@@ -13,21 +13,8 @@ type DataProvider struct {
 }
 
 // Close provides a mock function with given fields:
-func (_m *DataProvider) Close() error {
-	ret := _m.Called()
-
-	if len(ret) == 0 {
-		panic("no return value specified for Close")
-	}
-
-	var r0 error
-	if rf, ok := ret.Get(0).(func() error); ok {
-		r0 = rf()
-	} else {
-		r0 = ret.Error(0)
-	}
-
-	return r0
+func (_m *DataProvider) Close() {
+	_m.Called()
 }
 
 // ID provides a mock function with given fields:
