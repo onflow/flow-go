@@ -3,19 +3,19 @@ package data_providers
 import (
 	"context"
 	"fmt"
+
+	"github.com/rs/zerolog"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
+
+	"github.com/onflow/flow-go/access"
 	"github.com/onflow/flow-go/engine/access/rest/common/parser"
+	"github.com/onflow/flow-go/engine/access/rest/websockets/models"
 	"github.com/onflow/flow-go/engine/access/subscription"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/counters"
+
 	"github.com/onflow/flow/protobuf/go/flow/entities"
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
-	"strconv"
-
-	"github.com/rs/zerolog"
-
-	"github.com/onflow/flow-go/access"
-	"github.com/onflow/flow-go/engine/access/rest/websockets/models"
 )
 
 // sendTransactionStatusesArguments contains the arguments required for sending tx and subscribing to transaction statuses
@@ -83,18 +83,18 @@ func (p *SendTransactionStatusesDataProvider) createSubscription(
 // No errors are expected during normal operations.
 func (p *SendTransactionStatusesDataProvider) handleResponse() func(txResults []*access.TransactionResult) error {
 
-	messageIndex := counters.NewMonotonousCounter(1)
+	messageIndex := counters.NewMonotonousCounter(0)
 
 	return func(txResults []*access.TransactionResult) error {
 
-		index := messageIndex.Value()
 		if ok := messageIndex.Set(messageIndex.Value() + 1); !ok {
 			return status.Errorf(codes.Internal, "message index already incremented to %d", messageIndex.Value())
 		}
+		index := messageIndex.Value()
 
 		p.send <- &models.TransactionStatusesResponse{
 			TransactionResults: txResults,
-			MessageIndex:       strconv.FormatUint(index, 10),
+			MessageIndex:       index,
 		}
 
 		return nil

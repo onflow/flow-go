@@ -3,7 +3,6 @@ package data_providers
 import (
 	"context"
 	"fmt"
-	"strconv"
 
 	"github.com/rs/zerolog"
 	"google.golang.org/grpc/codes"
@@ -94,7 +93,7 @@ func (p *TransactionStatusesDataProvider) createSubscription(
 //
 // No errors are expected during normal operations.
 func (p *TransactionStatusesDataProvider) handleResponse() func(txResults []*access.TransactionResult) error {
-	messageIndex := counters.NewMonotonousCounter(1)
+	messageIndex := counters.NewMonotonousCounter(0)
 
 	return func(txResults []*access.TransactionResult) error {
 
@@ -105,7 +104,7 @@ func (p *TransactionStatusesDataProvider) handleResponse() func(txResults []*acc
 
 		p.send <- &models.TransactionStatusesResponse{
 			TransactionResults: txResults,
-			MessageIndex:       strconv.FormatUint(index, 10),
+			MessageIndex:       index,
 		}
 
 		return nil

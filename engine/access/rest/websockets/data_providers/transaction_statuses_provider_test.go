@@ -228,3 +228,82 @@ func invalidTransactionStatusesArgumentsTestCases() []testErrType {
 		},
 	}
 }
+
+// TestMessageIndexTransactionStatusesProviderResponse_HappyPath tests that MessageIndex values in response are strictly increasing.
+func (s *TransactionStatusesProviderSuite) TestMessageIndexTransactionStatusesProviderResponse_HappyPath() {
+	ctx := context.Background()
+	send := make(chan interface{}, 10)
+	topic := TransactionStatusesTopic
+	txStatusesCount := 4
+
+	// Create a channel to simulate the subscription's account statuses channel
+	txStatusesChan := make(chan interface{})
+
+	// Create a mock subscription and mock the channel
+	sub := ssmock.NewSubscription(s.T())
+	sub.On("Channel").Return((<-chan interface{})(txStatusesChan))
+	sub.On("Err").Return(nil)
+
+	s.api.On(
+		"SubscribeTransactionStatusesFromStartBlockID",
+		mock.Anything,
+		mock.Anything,
+		mock.Anything,
+		entities.EventEncodingVersion_JSON_CDC_V0,
+	).Return(sub)
+
+	arguments :=
+		map[string]interface{}{
+			"start_block_id": s.rootBlock.ID().String(),
+		}
+
+	// Create the TransactionStatusesDataProvider instance
+	provider, err := NewTransactionStatusesDataProvider(
+		ctx,
+		s.log,
+		s.api,
+		topic,
+		arguments,
+		send,
+	)
+	s.Require().NotNil(provider)
+	s.Require().NoError(err)
+
+	// Run the provider in a separate goroutine to simulate subscription processing
+	go func() {
+		err = provider.Run()
+		s.Require().NoError(err)
+	}()
+
+	// Simulate emitting data to the еч statuses channel
+	go func() {
+		defer close(txStatusesChan) // Close the channel when done
+
+		for i := 0; i < txStatusesCount; i++ {
+			txStatusesChan <- []*access.TransactionResult{}
+		}
+	}()
+
+	// Collect responses
+	var responses []*models.TransactionStatusesResponse
+	for i := 0; i < txStatusesCount; i++ {
+		res := <-send
+		txStatusesRes, ok := res.(*models.TransactionStatusesResponse)
+		s.Require().True(ok, "Expected *models.TransactionStatusesResponse, got %T", res)
+		responses = append(responses, txStatusesRes)
+	}
+
+	// Verifying that indices are starting from 0
+	s.Require().Equal(uint64(0), responses[0].MessageIndex, "Expected MessageIndex to start with 0")
+
+	// Verifying that indices are strictly increasing
+	for i := 1; i < len(responses); i++ {
+		prevIndex := responses[i-1].MessageIndex
+		currentIndex := responses[i].MessageIndex
+		s.Require().Equal(prevIndex+1, currentIndex, "Expected MessageIndex to increment by 1")
+	}
+
+	// Ensure the provider is properly closed after the test
+	provider.Close()
+
+}

@@ -7,5 +7,5 @@ import (
 // TransactionStatusesResponse is the response message for 'events' topic.
 type TransactionStatusesResponse struct {
 	TransactionResults []*access.TransactionResult `json:"transaction_results"`
-	MessageIndex       string                      `json:"message_index"`
+	MessageIndex       uint64                      `json:"message_index"`
 }
