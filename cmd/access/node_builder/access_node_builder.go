@@ -50,6 +50,7 @@ import (
 	"github.com/onflow/flow-go/engine/access/rest"
 	commonrest "github.com/onflow/flow-go/engine/access/rest/common"
 	"github.com/onflow/flow-go/engine/access/rest/router"
+	"github.com/onflow/flow-go/engine/access/rest/websockets"
 	"github.com/onflow/flow-go/engine/access/rpc"
 	"github.com/onflow/flow-go/engine/access/rpc/backend"
 	rpcConnection "github.com/onflow/flow-go/engine/access/rpc/connection"
@@ -227,8 +228,9 @@ func DefaultAccessNodeConfig() *AccessNodeConfig {
 				IdleTimeout:    rest.DefaultIdleTimeout,
 				MaxRequestSize: commonrest.DefaultMaxRequestSize,
 			},
-			MaxMsgSize:     grpcutils.DefaultMaxMsgSize,
-			CompressorName: grpcutils.NoCompressor,
+			MaxMsgSize:      grpcutils.DefaultMaxMsgSize,
+			CompressorName:  grpcutils.NoCompressor,
+			WebSocketConfig: websockets.NewDefaultWebsocketConfig(),
 		},
 		stateStreamConf: statestreambackend.Config{
 			MaxExecutionDataMsgSize: grpcutils.DefaultMaxMsgSize,

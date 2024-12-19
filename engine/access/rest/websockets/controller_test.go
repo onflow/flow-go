@@ -861,7 +861,8 @@ func (s *WsControllerSuite) TestControllerShutdown() {
 		conn.
 			On("ReadJSON", mock.Anything).
 			Return(func(interface{}) error {
-				// wait on read
+				// waiting more than InactivityTimeout to make sure that read message routine busy and do not return
+				// an error before than inactivity tracker initiate shut down
 				<-time.After(wsConfig.InactivityTimeout + 10)
 				return websocket.ErrCloseSent
 			}).
