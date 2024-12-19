@@ -5,6 +5,9 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
+const ExpandableFieldPayload = "payload"
+const ExpandableExecutionResult = "execution_result"
+
 func (b *Block) Build(
 	block *flow.Block,
 	execResult *flow.ExecutionResult,
@@ -23,7 +26,6 @@ func (b *Block) Build(
 
 	// add the payload to the response if it is specified as an expandable field
 	b.Expandable = &BlockExpandable{}
-	const ExpandableFieldPayload = "payload"
 	if expand[ExpandableFieldPayload] {
 		var payload BlockPayload
 		err := payload.Build(block.Payload)
@@ -43,7 +45,6 @@ func (b *Block) Build(
 	// execution result might not yet exist
 	if execResult != nil {
 		// add the execution result to the response if it is specified as an expandable field
-		const ExpandableExecutionResult = "execution_result"
 		if expand[ExpandableExecutionResult] {
 			var exeResult ExecutionResult
 			err := exeResult.Build(execResult, link)
