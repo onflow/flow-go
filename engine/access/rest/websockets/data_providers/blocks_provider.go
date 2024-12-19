@@ -109,41 +109,52 @@ func ParseBlocksArguments(arguments models.Arguments) (blocksArguments, error) {
 		return args, fmt.Errorf("'block_status' must be provided")
 	}
 
+	// Parse block arguments
+	startBlockID, startBlockHeight, err := ParseStartBlock(arguments)
+	if err != nil {
+		return args, err
+	}
+	args.StartBlockID = startBlockID
+	args.StartBlockHeight = startBlockHeight
+
+	return args, nil
+}
+
+func ParseStartBlock(arguments models.Arguments) (flow.Identifier, uint64, error) {
 	startBlockIDIn, hasStartBlockID := arguments["start_block_id"]
 	startBlockHeightIn, hasStartBlockHeight := arguments["start_block_height"]
 
-	// Ensure only one of start_block_id or start_block_height is provided
+	// Check for mutual exclusivity of start_block_id and start_block_height early
 	if hasStartBlockID && hasStartBlockHeight {
-		return args, fmt.Errorf("can only provide either 'start_block_id' or 'start_block_height'")
+		return flow.ZeroID, 0, fmt.Errorf("can only provide either 'start_block_id' or 'start_block_height'")
 	}
 
+	// Parse 'start_block_id'
 	if hasStartBlockID {
 		result, ok := startBlockIDIn.(string)
 		if !ok {
-			return args, fmt.Errorf("'start_block_id' must be a string")
+			return flow.ZeroID, request.EmptyHeight, fmt.Errorf("'start_block_id' must be a string")
 		}
 		var startBlockID parser.ID
 		err := startBlockID.Parse(result)
 		if err != nil {
-			return args, err
+			return flow.ZeroID, request.EmptyHeight, fmt.Errorf("invalid 'start_block_id': %w", err)
 		}
-		args.StartBlockID = startBlockID.Flow()
+		return startBlockID.Flow(), request.EmptyHeight, nil
 	}
 
+	// Parse 'start_block_height'
 	if hasStartBlockHeight {
 		result, ok := startBlockHeightIn.(string)
 		if !ok {
-			return args, fmt.Errorf("'start_block_height' must be a string")
+			return flow.ZeroID, 0, fmt.Errorf("'start_block_height' must be a string")
 		}
-		var err error
-		args.StartBlockHeight, err = util.ToUint64(result)
+		startBlockHeight, err := util.ToUint64(result)
 		if err != nil {
-			return args, fmt.Errorf("invalid 'start_block_height': %w", err)
+			return flow.ZeroID, request.EmptyHeight, fmt.Errorf("invalid 'start_block_height': %w", err)
 		}
-	} else {
-		// Default value if 'start_block_height' is not provided
-		args.StartBlockHeight = request.EmptyHeight
+		return flow.ZeroID, startBlockHeight, nil
 	}
 
-	return args, nil
+	return flow.ZeroID, request.EmptyHeight, nil
 }

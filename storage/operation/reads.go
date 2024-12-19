@@ -9,6 +9,7 @@ import (
 
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/storage"
+	"github.com/onflow/flow-go/utils/merr"
 )
 
 // CheckFunc is a function that checks if the value should be read and decoded.
@@ -51,7 +52,7 @@ func IterateKeysByPrefixRange(r storage.Reader, startPrefix []byte, endPrefix []
 // IterateKeys will iterate over all entries in the database, where the key starts with a prefixes in
 // the range [startPrefix, endPrefix] (both inclusive).
 // No errors expected during normal operations.
-func IterateKeys(r storage.Reader, startPrefix []byte, endPrefix []byte, iterFunc IterationFunc, opt storage.IteratorOption) error {
+func IterateKeys(r storage.Reader, startPrefix []byte, endPrefix []byte, iterFunc IterationFunc, opt storage.IteratorOption) (errToReturn error) {
 	if len(startPrefix) == 0 {
 		return fmt.Errorf("startPrefix prefix is empty")
 	}
@@ -69,7 +70,9 @@ func IterateKeys(r storage.Reader, startPrefix []byte, endPrefix []byte, iterFun
 	if err != nil {
 		return fmt.Errorf("can not create iterator: %w", err)
 	}
-	defer it.Close()
+	defer func() {
+		errToReturn = merr.CloseAndMergeError(it, errToReturn)
+	}()
 
 	for it.First(); it.Valid(); it.Next() {
 		item := it.IterItem()
@@ -130,7 +133,7 @@ func TraverseByPrefix(r storage.Reader, prefix []byte, iterFunc IterationFunc, o
 // When this returned function is executed (and only then), it will write into the `keyExists` whether
 // the key exists.
 // No errors are expected during normal operation.
-func KeyExists(r storage.Reader, key []byte) (bool, error) {
+func KeyExists(r storage.Reader, key []byte) (exist bool, errToReturn error) {
 	_, closer, err := r.Get(key)
 	if err != nil {
 		// the key does not exist in the database
@@ -140,7 +143,9 @@ func KeyExists(r storage.Reader, key []byte) (bool, error) {
 		// exception while checking for the key
 		return false, irrecoverable.NewExceptionf("could not load data: %w", err)
 	}
-	defer closer.Close()
+	defer func() {
+		errToReturn = merr.CloseAndMergeError(closer, errToReturn)
+	}()
 
 	// the key does exist in the database
 	return true, nil
@@ -153,13 +158,15 @@ func KeyExists(r storage.Reader, key []byte) (bool, error) {
 //   - storage.ErrNotFound if the key does not exist in the database
 //   - generic error in case of unexpected failure from the database layer, or failure
 //     to decode an existing database value
-func RetrieveByKey(r storage.Reader, key []byte, entity interface{}) error {
+func RetrieveByKey(r storage.Reader, key []byte, entity interface{}) (errToReturn error) {
 	val, closer, err := r.Get(key)
 	if err != nil {
 		return err
 	}
 
-	defer closer.Close()
+	defer func() {
+		errToReturn = merr.CloseAndMergeError(closer, errToReturn)
+	}()
 
 	err = msgpack.Unmarshal(val, entity)
 	if err != nil {
@@ -172,7 +179,7 @@ func RetrieveByKey(r storage.Reader, key []byte, entity interface{}) error {
 // keys with the format prefix` + `height` (where "+" denotes concatenation of binary strings). The height
 // is encoded as Big-Endian (entries with numerically smaller height have lexicographically smaller key).
 // The function finds the *highest* key with the given prefix and height equal to or below the given height.
-func FindHighestAtOrBelowByPrefix(r storage.Reader, prefix []byte, height uint64, entity interface{}) error {
+func FindHighestAtOrBelowByPrefix(r storage.Reader, prefix []byte, height uint64, entity interface{}) (errToReturn error) {
 	if len(prefix) == 0 {
 		return fmt.Errorf("prefix must not be empty")
 	}
@@ -182,7 +189,9 @@ func FindHighestAtOrBelowByPrefix(r storage.Reader, prefix []byte, height uint64
 	if err != nil {
 		return fmt.Errorf("can not create iterator: %w", err)
 	}
-	defer it.Close()
+	defer func() {
+		errToReturn = merr.CloseAndMergeError(it, errToReturn)
+	}()
 
 	var highestKey []byte
 
@@ -203,7 +212,9 @@ func FindHighestAtOrBelowByPrefix(r storage.Reader, prefix []byte, height uint64
 		return err
 	}
 
-	defer closer.Close()
+	defer func() {
+		errToReturn = merr.CloseAndMergeError(closer, errToReturn)
+	}()
 
 	err = msgpack.Unmarshal(val, entity)
 	if err != nil {
