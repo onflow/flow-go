@@ -66,7 +66,7 @@ func (c *Controller) HandleConnection(ctx context.Context) {
 	g, gCtx := errgroup.WithContext(ctx)
 
 	g.Go(func() error {
-		return c.readMessagesFromClient(gCtx)
+		return c.readMessages(gCtx)
 	})
 
 	g.Go(func() error {
@@ -74,7 +74,7 @@ func (c *Controller) HandleConnection(ctx context.Context) {
 	})
 
 	g.Go(func() error {
-		return c.writeMessagesToClient(gCtx)
+		return c.writeMessages(gCtx)
 	})
 
 	if err = g.Wait(); err != nil {
@@ -111,12 +111,12 @@ func (c *Controller) configureKeepalive() error {
 	return nil
 }
 
-// writeMessagesToClient reads a messages from communication channel and passes them on to a client WebSocket connection.
+// writeMessages reads a messages from communication channel and passes them on to a client WebSocket connection.
 // The communication channel is filled by data providers. Besides, the response limit tracker is involved in
 // write message regulation
 //
 // No errors are expected during normal operation. All errors are considered benign.
-func (c *Controller) writeMessagesToClient(ctx context.Context) error {
+func (c *Controller) writeMessages(ctx context.Context) error {
 	for {
 		select {
 		case <-ctx.Done():
@@ -143,11 +143,11 @@ func (c *Controller) writeMessagesToClient(ctx context.Context) error {
 	}
 }
 
-// readMessagesFromClient continuously reads messages from a client WebSocket connection,
+// readMessages continuously reads messages from a client WebSocket connection,
 // processes each message, and handles actions based on the message type.
 //
 // No errors are expected during normal operation. All errors are considered benign.
-func (c *Controller) readMessagesFromClient(ctx context.Context) error {
+func (c *Controller) readMessages(ctx context.Context) error {
 	for {
 		select {
 		case <-ctx.Done():
@@ -163,10 +163,12 @@ func (c *Controller) readMessagesFromClient(ctx context.Context) error {
 
 			_, validatedMsg, err := c.parseAndValidateMessage(msg)
 			if err != nil {
+				//TODO: write error to error channel
 				return fmt.Errorf("failed to parse and validate client message: %w", err)
 			}
 
 			if err := c.handleAction(ctx, validatedMsg); err != nil {
+				//TODO: write error to error channel
 				return fmt.Errorf("failed to handle message action: %w", err)
 			}
 		}
@@ -241,8 +243,16 @@ func (c *Controller) handleSubscribe(ctx context.Context, msg models.SubscribeMe
 
 	c.dataProviders.Add(dp.ID(), dp)
 
-	//TODO: return OK response to client
-	c.communicationChannel <- msg
+	//TODO: return correct OK response to client
+	response := models.SubscribeMessageResponse{
+		BaseMessageResponse: models.BaseMessageResponse{
+			Success: true,
+		},
+		Topic: dp.Topic(),
+		ID:    dp.ID().String(),
+	}
+
+	c.communicationChannel <- response
 
 	go func() {
 		err := dp.Run()
