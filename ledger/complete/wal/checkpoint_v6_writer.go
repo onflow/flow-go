@@ -19,6 +19,7 @@ import (
 	"github.com/onflow/flow-go/ledger/complete/mtrie/node"
 	"github.com/onflow/flow-go/ledger/complete/mtrie/trie"
 	utilsio "github.com/onflow/flow-go/utils/io"
+	"github.com/onflow/flow-go/utils/merr"
 )
 
 const subtrieLevel = 4
@@ -708,39 +709,7 @@ func decodeSubtrieCount(encoded []byte) (uint16, error) {
 	return binary.BigEndian.Uint16(encoded), nil
 }
 
-// closeAndMergeError close the closable and merge the closeErr with the given err into a multierror
-// Note: when using this function in a defer function, don't use as below:
-// func XXX() (
-//
-//	err error,
-//	) {
-//		def func() {
-//			// bad, because the definition of err might get overwritten
-//			err = closeAndMergeError(closable, err)
-//		}()
-//
-// Better to use as below:
-// func XXX() (
-//
-//	errToReturn error,
-//	) {
-//		def func() {
-//			// good, because the error to returned is only updated here, and guaranteed to be returned
-//			errToReturn = closeAndMergeError(closable, errToReturn)
-//		}()
-func closeAndMergeError(closable io.Closer, err error) error {
-	var merr *multierror.Error
-	if err != nil {
-		merr = multierror.Append(merr, err)
-	}
-
-	closeError := closable.Close()
-	if closeError != nil {
-		merr = multierror.Append(merr, closeError)
-	}
-
-	return merr.ErrorOrNil()
-}
+var closeAndMergeError = merr.CloseAndMergeError
 
 // withFile opens the file at the given path, and calls the given function with the opened file.
 // it handles closing the file and evicting the file from Linux page cache.
