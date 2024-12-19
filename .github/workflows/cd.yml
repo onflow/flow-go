@@ -20,7 +20,7 @@ jobs:
       fail-fast: false
       matrix:
         role: [access, collection, consensus, execution, observer, verification]
-    environment: Private Image Builds
+    environment: Private Registry Builds 
     steps:
       - name: Setup Go
         uses: actions/setup-go@v4
