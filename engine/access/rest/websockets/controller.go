@@ -260,8 +260,8 @@ func (c *Controller) handleSubscribe(ctx context.Context, msg models.SubscribeMe
 		BaseMessageResponse: models.BaseMessageResponse{
 			ClientMessageID: msg.ClientMessageID,
 			Success:         true,
+			SubscriptionID:  provider.ID().String(),
 		},
-		ID: provider.ID().String(),
 	}
 	c.writeResponse(ctx, responseOk)
 
@@ -310,8 +310,8 @@ func (c *Controller) handleUnsubscribe(ctx context.Context, msg models.Unsubscri
 		BaseMessageResponse: models.BaseMessageResponse{
 			ClientMessageID: msg.ClientMessageID,
 			Success:         true,
+			SubscriptionID:  msg.SubscriptionID,
 		},
-		SubscriptionID: msg.SubscriptionID,
 	}
 	c.writeResponse(ctx, responseOk)
 }
@@ -336,11 +336,9 @@ func (c *Controller) handleListSubscriptions(ctx context.Context, msg models.Lis
 	}
 
 	responseOk := models.ListSubscriptionsMessageResponse{
-		BaseMessageResponse: models.BaseMessageResponse{
-			Success:         true,
-			ClientMessageID: msg.ClientMessageID,
-		},
-		Subscriptions: subs,
+		Success:         true,
+		ClientMessageID: msg.ClientMessageID,
+		Subscriptions:   subs,
 	}
 	c.writeResponse(ctx, responseOk)
 }
@@ -381,11 +379,11 @@ func wrapErrorMessage(code Code, message string, msgId string, action string, su
 	return models.BaseMessageResponse{
 		ClientMessageID: msgId,
 		Success:         false,
+		SubscriptionID:  subscriptionID,
 		Error: models.ErrorMessage{
-			Code:           int(code),
-			Message:        message,
-			Action:         action,
-			SubscriptionID: subscriptionID,
+			Code:    int(code),
+			Message: message,
+			Action:  action,
 		},
 	}
 }

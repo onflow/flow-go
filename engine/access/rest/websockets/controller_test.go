@@ -45,10 +45,6 @@ func (s *WsControllerSuite) SetupTest() {
 // TestSubscribeRequest tests the subscribe to topic flow.
 // We emulate a request message from a client, and a response message from a controller.
 func (s *WsControllerSuite) TestSubscribeRequest() {
-	// It still fails when run with -race even though we don't share any state
-	// (I tried changing logger & config to be unique in each test)
-	//s.T().Parallel()
-
 	s.T().Run("Happy path", func(t *testing.T) {
 		t.Parallel()
 
@@ -105,7 +101,7 @@ func (s *WsControllerSuite) TestSubscribeRequest() {
 				require.True(t, ok)
 				require.True(t, response.Success)
 				require.Equal(t, request.ClientMessageID, response.ClientMessageID)
-				require.Equal(t, id.String(), response.ID)
+				require.Equal(t, id.String(), response.SubscriptionID)
 
 				return websocket.ErrCloseSent
 			})
@@ -253,8 +249,6 @@ func (s *WsControllerSuite) TestSubscribeRequest() {
 }
 
 func (s *WsControllerSuite) TestUnsubscribeRequest() {
-	//s.T().Parallel()
-
 	s.T().Run("Happy path", func(t *testing.T) {
 		t.Parallel()
 
@@ -477,8 +471,6 @@ func (s *WsControllerSuite) TestUnsubscribeRequest() {
 }
 
 func (s *WsControllerSuite) TestListSubscriptions() {
-	//s.T().Parallel()
-
 	s.T().Run("Happy path", func(t *testing.T) {
 
 		conn, dataProviderFactory, dataProvider := newControllerMocks(t)
@@ -557,8 +549,6 @@ func (s *WsControllerSuite) TestListSubscriptions() {
 
 // TestSubscribeBlocks tests the functionality for streaming blocks to a subscriber.
 func (s *WsControllerSuite) TestSubscribeBlocks() {
-	//s.T().Parallel()
-
 	s.T().Run("Stream one block", func(t *testing.T) {
 		t.Parallel()
 
@@ -682,8 +672,6 @@ func (s *WsControllerSuite) TestSubscribeBlocks() {
 
 // TestConfigureKeepaliveConnection ensures that the WebSocket connection is configured correctly.
 func (s *WsControllerSuite) TestConfigureKeepaliveConnection() {
-	//s.T().Parallel()
-
 	s.T().Run("Happy path", func(t *testing.T) {
 		conn := connmock.NewWebsocketConnection(t)
 		conn.On("SetPongHandler", mock.AnythingOfType("func(string) error")).Return(nil).Once()
@@ -700,8 +688,6 @@ func (s *WsControllerSuite) TestConfigureKeepaliveConnection() {
 }
 
 func (s *WsControllerSuite) TestControllerShutdown() {
-	//s.T().Parallel()
-
 	s.T().Run("Keepalive routine failed", func(t *testing.T) {
 		t.Parallel()
 
@@ -827,8 +813,6 @@ func (s *WsControllerSuite) TestControllerShutdown() {
 }
 
 func (s *WsControllerSuite) TestKeepaliveRoutine() {
-	//s.T().Parallel()
-
 	s.T().Run("Successfully pings connection n times", func(t *testing.T) {
 		conn := connmock.NewWebsocketConnection(t)
 		conn.On("Close").Return(nil).Once()

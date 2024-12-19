@@ -12,5 +12,4 @@ type SubscribeMessageRequest struct {
 // SubscribeMessageResponse represents the response to a subscription request.
 type SubscribeMessageResponse struct {
 	BaseMessageResponse
-	ID string `json:"id"` // Unique subscription ID
 }
