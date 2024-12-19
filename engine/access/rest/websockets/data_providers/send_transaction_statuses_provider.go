@@ -10,6 +10,7 @@ import (
 
 	"github.com/onflow/flow-go/access"
 	"github.com/onflow/flow-go/engine/access/rest/common/parser"
+	"github.com/onflow/flow-go/engine/access/rest/util"
 	"github.com/onflow/flow-go/engine/access/rest/websockets/models"
 	"github.com/onflow/flow-go/engine/access/subscription"
 	"github.com/onflow/flow-go/model/flow"
@@ -110,18 +111,33 @@ func parseSendTransactionStatusesArguments(
 	var tx flow.TransactionBody
 
 	if scriptIn, ok := arguments["script"]; ok && scriptIn != "" {
-		script, ok := scriptIn.([]byte)
+		result, ok := scriptIn.(string)
 		if !ok {
-			return args, fmt.Errorf("'script' must be a byte array")
+			return args, fmt.Errorf("'script' must be a string")
+		}
+
+		script, err := util.FromBase64(result)
+		if err != nil {
+			return args, fmt.Errorf("invalid 'script': %w", err)
 		}
 
 		tx.Script = script
 	}
 
 	if argumentsIn, ok := arguments["arguments"]; ok && argumentsIn != "" {
-		argumentsData, ok := argumentsIn.([][]byte)
+		result, ok := argumentsIn.([]string)
 		if !ok {
-			return args, fmt.Errorf("'arguments' must be a [][]byte type")
+			return args, fmt.Errorf("'arguments' must be a []string type")
+		}
+
+		var argumentsData [][]byte
+		for _, arg := range result {
+			argument, err := util.FromBase64(arg)
+			if err != nil {
+				return args, fmt.Errorf("invalid 'arguments': %w", err)
+			}
+
+			argumentsData = append(argumentsData, argument)
 		}
 
 		tx.Arguments = argumentsData
@@ -141,6 +157,79 @@ func parseSendTransactionStatusesArguments(
 
 		tx.ReferenceBlockID = referenceBlockID.Flow()
 	}
+
+	if gasLimitIn, ok := arguments["gas_limit"]; ok && gasLimitIn != "" {
+		result, ok := gasLimitIn.(string)
+		if !ok {
+			return args, fmt.Errorf("'gas_limit' must be a string")
+		}
+
+		gasLimit, err := util.ToUint64(result)
+		if err != nil {
+			return args, fmt.Errorf("invalid 'gas_limit': %w", err)
+		}
+		tx.GasLimit = gasLimit
+	}
+
+	if payerIn, ok := arguments["payer"]; ok && payerIn != "" {
+		result, ok := payerIn.(string)
+		if !ok {
+			return args, fmt.Errorf("'payerIn' must be a string")
+		}
+
+		payerAddr, err := flow.StringToAddress(result)
+		if err != nil {
+			return args, fmt.Errorf("invalid 'payer': %w", err)
+		}
+		tx.Payer = payerAddr
+	}
+
+	if proposalKeyIn, ok := arguments["proposal_key"]; ok && proposalKeyIn != "" {
+		proposalKey, ok := proposalKeyIn.(flow.ProposalKey)
+		if !ok {
+			return args, fmt.Errorf("'proposal_key' must be a object (ProposalKey)")
+		}
+
+		tx.ProposalKey = proposalKey
+	}
+
+	if authorizersIn, ok := arguments["authorizers"]; ok && authorizersIn != "" {
+		result, ok := authorizersIn.([]string)
+		if !ok {
+			return args, fmt.Errorf("'authorizers' must be a []string type")
+		}
+
+		var authorizersData []flow.Address
+		for _, auth := range result {
+			authorizer, err := flow.StringToAddress(auth)
+			if err != nil {
+				return args, fmt.Errorf("invalid 'authorizers': %w", err)
+			}
+
+			authorizersData = append(authorizersData, authorizer)
+		}
+
+		tx.Authorizers = authorizersData
+	}
+
+	if payloadSignaturesIn, ok := arguments["payload_signatures"]; ok && payloadSignaturesIn != "" {
+		payloadSignatures, ok := payloadSignaturesIn.([]flow.TransactionSignature)
+		if !ok {
+			return args, fmt.Errorf("'payload_signatures' must be an array of objects (TransactionSignature)")
+		}
+
+		tx.PayloadSignatures = payloadSignatures
+	}
+
+	if envelopeSignaturesIn, ok := arguments["envelope_signatures"]; ok && envelopeSignaturesIn != "" {
+		envelopeSignatures, ok := envelopeSignaturesIn.([]flow.TransactionSignature)
+		if !ok {
+			return args, fmt.Errorf("'payload_signatures' must be an array of objects (TransactionSignature)")
+		}
+
+		tx.EnvelopeSignatures = envelopeSignatures
+	}
+	args.Transaction = tx
 
 	return args, nil
 }
