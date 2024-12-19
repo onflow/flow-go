@@ -176,7 +176,7 @@ func (c *Controller) writeMessages(ctx context.Context) error {
 }
 
 // readMessages continuously reads messages from a client WebSocket connection,
-// processes each message, and handles actions based on the message type.
+// validates each message, and processes it based on the message type.
 //
 // Expected errors during normal operation:
 // - context.Canceled if the client disconnected
@@ -191,7 +191,7 @@ func (c *Controller) readMessages(ctx context.Context) error {
 			c.writeErrorResponse(
 				ctx,
 				err,
-				wrapErrorMessage(ConnectionRead, "error reading from conn", "", "", ""))
+				wrapErrorMessage(InvalidMessage, "error reading message", "", "", ""))
 			continue
 		}
 
@@ -212,47 +212,34 @@ func (c *Controller) parseAndValidateMessage(ctx context.Context, message json.R
 		return fmt.Errorf("error unmarshalling base message: %w", err)
 	}
 
-	var validatedMsg interface{}
 	switch baseMsg.Action {
 	case models.SubscribeAction:
 		var subscribeMsg models.SubscribeMessageRequest
 		if err := json.Unmarshal(message, &subscribeMsg); err != nil {
 			return fmt.Errorf("error unmarshalling subscribe message: %w", err)
 		}
-		validatedMsg = subscribeMsg
+		c.handleSubscribe(ctx, subscribeMsg)
 
 	case models.UnsubscribeAction:
 		var unsubscribeMsg models.UnsubscribeMessageRequest
 		if err := json.Unmarshal(message, &unsubscribeMsg); err != nil {
 			return fmt.Errorf("error unmarshalling unsubscribe message: %w", err)
 		}
-		validatedMsg = unsubscribeMsg
+		c.handleUnsubscribe(ctx, unsubscribeMsg)
 
 	case models.ListSubscriptionsAction:
 		var listMsg models.ListSubscriptionsMessageRequest
 		if err := json.Unmarshal(message, &listMsg); err != nil {
 			return fmt.Errorf("error unmarshalling list subscriptions message: %w", err)
 		}
-		validatedMsg = listMsg
+		c.handleListSubscriptions(ctx, listMsg)
 
 	default:
 		c.logger.Debug().Str("action", baseMsg.Action).Msg("unknown action type")
 		return fmt.Errorf("unknown action type: %s", baseMsg.Action)
 	}
 
-	c.handleAction(ctx, validatedMsg)
 	return nil
-}
-
-func (c *Controller) handleAction(ctx context.Context, message interface{}) {
-	switch msg := message.(type) {
-	case models.SubscribeMessageRequest:
-		c.handleSubscribe(ctx, msg)
-	case models.UnsubscribeMessageRequest:
-		c.handleUnsubscribe(ctx, msg)
-	case models.ListSubscriptionsMessageRequest:
-		c.handleListSubscriptions(ctx, msg)
-	}
 }
 
 func (c *Controller) handleSubscribe(ctx context.Context, msg models.SubscribeMessageRequest) {
@@ -262,7 +249,7 @@ func (c *Controller) handleSubscribe(ctx context.Context, msg models.SubscribeMe
 		c.writeErrorResponse(
 			ctx,
 			err,
-			wrapErrorMessage(InvalidArgument, "error creating data provider", msg.MessageID, models.SubscribeAction, ""),
+			wrapErrorMessage(InvalidArgument, "error creating data provider", msg.ClientMessageID, models.SubscribeAction, ""),
 		)
 		return
 	}
@@ -271,8 +258,8 @@ func (c *Controller) handleSubscribe(ctx context.Context, msg models.SubscribeMe
 	// write OK response to client
 	responseOk := models.SubscribeMessageResponse{
 		BaseMessageResponse: models.BaseMessageResponse{
-			MessageID: msg.MessageID,
-			Success:   true,
+			ClientMessageID: msg.ClientMessageID,
+			Success:         true,
 		},
 		ID: provider.ID().String(),
 	}
@@ -286,7 +273,7 @@ func (c *Controller) handleSubscribe(ctx context.Context, msg models.SubscribeMe
 			c.writeErrorResponse(
 				ctx,
 				err,
-				wrapErrorMessage(RunError, "data provider finished with error", "", "", ""),
+				wrapErrorMessage(SubscriptionError, "subscription finished with error", "", "", ""),
 			)
 		}
 
@@ -301,7 +288,7 @@ func (c *Controller) handleUnsubscribe(ctx context.Context, msg models.Unsubscri
 		c.writeErrorResponse(
 			ctx,
 			err,
-			wrapErrorMessage(InvalidArgument, "error parsing message ID", msg.MessageID, models.UnsubscribeAction, msg.SubscriptionID),
+			wrapErrorMessage(InvalidArgument, "error parsing message ID", msg.ClientMessageID, models.UnsubscribeAction, msg.SubscriptionID),
 		)
 		return
 	}
@@ -311,27 +298,18 @@ func (c *Controller) handleUnsubscribe(ctx context.Context, msg models.Unsubscri
 		c.writeErrorResponse(
 			ctx,
 			err,
-			wrapErrorMessage(NotFound, "provider not found", msg.MessageID, models.UnsubscribeAction, msg.SubscriptionID),
+			wrapErrorMessage(NotFound, "subscription not found", msg.ClientMessageID, models.UnsubscribeAction, msg.SubscriptionID),
 		)
 		return
 	}
 
-	err = provider.Close()
-	if err != nil {
-		c.writeErrorResponse(
-			ctx,
-			err,
-			wrapErrorMessage(InternalError, "provider close error", msg.MessageID, models.UnsubscribeAction, msg.SubscriptionID),
-		)
-		return
-	}
-
+	provider.Close()
 	c.dataProviders.Remove(id)
 
 	responseOk := models.UnsubscribeMessageResponse{
 		BaseMessageResponse: models.BaseMessageResponse{
-			MessageID: msg.MessageID,
-			Success:   true,
+			ClientMessageID: msg.ClientMessageID,
+			Success:         true,
 		},
 		SubscriptionID: msg.SubscriptionID,
 	}
@@ -352,15 +330,15 @@ func (c *Controller) handleListSubscriptions(ctx context.Context, msg models.Lis
 		c.writeErrorResponse(
 			ctx,
 			err,
-			wrapErrorMessage(NotFound, "error looking for subscription", msg.MessageID, models.ListSubscriptionsAction, ""),
+			wrapErrorMessage(NotFound, "error listing subscriptions", msg.ClientMessageID, models.ListSubscriptionsAction, ""),
 		)
 		return
 	}
 
 	responseOk := models.ListSubscriptionsMessageResponse{
 		BaseMessageResponse: models.BaseMessageResponse{
-			Success:   true,
-			MessageID: msg.MessageID,
+			Success:         true,
+			ClientMessageID: msg.ClientMessageID,
 		},
 		Subscriptions: subs,
 	}
@@ -373,13 +351,8 @@ func (c *Controller) shutdownConnection() {
 		c.logger.Debug().Err(err).Msg("error closing connection")
 	}
 
-	err = c.dataProviders.ForEach(func(_ uuid.UUID, dp dp.DataProvider) error {
-		//TODO: why did i think it's a good idea to return error in Close()? it's messy now
-		err = dp.Close()
-		if err != nil {
-			c.logger.Debug().Err(err).Msg("error closing data provider")
-		}
-
+	err = c.dataProviders.ForEach(func(_ uuid.UUID, provider dp.DataProvider) error {
+		provider.Close()
 		return nil
 	})
 	if err != nil {
@@ -406,8 +379,8 @@ func (c *Controller) writeResponse(ctx context.Context, response interface{}) {
 
 func wrapErrorMessage(code Code, message string, msgId string, action string, subscriptionID string) models.BaseMessageResponse {
 	return models.BaseMessageResponse{
-		MessageID: msgId,
-		Success:   false,
+		ClientMessageID: msgId,
+		Success:         false,
 		Error: models.ErrorMessage{
 			Code:           int(code),
 			Message:        message,
