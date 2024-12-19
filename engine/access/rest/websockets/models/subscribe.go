@@ -1,6 +1,6 @@
 package models
 
-type Arguments map[string]string
+type Arguments map[string]interface{}
 
 // SubscribeMessageRequest represents a request to subscribe to a topic.
 type SubscribeMessageRequest struct {
