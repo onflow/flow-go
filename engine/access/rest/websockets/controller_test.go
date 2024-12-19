@@ -18,6 +18,7 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/suite"
 
+	dp "github.com/onflow/flow-go/engine/access/rest/websockets/data_providers"
 	dpmock "github.com/onflow/flow-go/engine/access/rest/websockets/data_providers/mock"
 	connmock "github.com/onflow/flow-go/engine/access/rest/websockets/mock"
 	"github.com/onflow/flow-go/engine/access/rest/websockets/models"
@@ -94,7 +95,7 @@ func (s *WsControllerSuite) TestSubscribeRequest() {
 				MessageID: uuid.New().String(),
 				Action:    models.SubscribeAction,
 			},
-			Topic:     "blocks",
+			Topic:     dp.BlocksTopic,
 			Arguments: nil,
 		}
 		requestJson, err := json.Marshal(request)
@@ -510,7 +511,7 @@ func (s *WsControllerSuite) TestListSubscriptions() {
 		done := make(chan struct{}, 1)
 
 		id := uuid.New()
-		topic := "blocks"
+		topic := dp.BlocksTopic
 		dataProvider.On("ID").Return(id)
 		dataProvider.On("Topic").Return(topic)
 		// data provider might finish on its own or controller will close it via Close()
@@ -942,7 +943,7 @@ func (s *WsControllerSuite) expectSubscribeRequest(t *testing.T, conn *connmock.
 			MessageID: uuid.New().String(),
 			Action:    models.SubscribeAction,
 		},
-		Topic: "blocks",
+		Topic: dp.BlocksTopic,
 	}
 	requestJson, err := json.Marshal(request)
 	require.NoError(t, err)
