@@ -53,6 +53,11 @@ func (_m *AccessMetrics) ConnectionFromPoolUpdated() {
 	_m.Called()
 }
 
+// LatestPrunedHeight provides a mock function with given fields: lastPrunedHeight
+func (_m *AccessMetrics) LatestPrunedHeight(lastPrunedHeight uint64) {
+	_m.Called(lastPrunedHeight)
+}
+
 // NewConnectionEstablished provides a mock function with given fields:
 func (_m *AccessMetrics) NewConnectionEstablished() {
 	_m.Called()
