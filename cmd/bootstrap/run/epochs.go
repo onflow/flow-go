@@ -3,10 +3,10 @@ package run
 import (
 	"encoding/hex"
 	"fmt"
-	"github.com/onflow/crypto"
-	"github.com/rs/zerolog"
 
 	"github.com/onflow/cadence"
+	"github.com/onflow/crypto"
+	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/cmd/util/cmd/common"
 	"github.com/onflow/flow-go/fvm/systemcontracts"
