@@ -35,7 +35,7 @@ func NewAsyncUploader(uploader Uploader,
 		maxRetryNumber:      maxRetryNumber,
 		// we use a channel rather than a Fifoqueue here because a Fifoqueue might drop items when full,
 		// but it is not acceptable to skip uploading an execution result
-		queue:               make(chan *execution.ComputationResult, 20000),
+		queue: make(chan *execution.ComputationResult, 20000),
 	}
 	builder := component.NewComponentManagerBuilder()
 	for i := 0; i < 10; i++ {
