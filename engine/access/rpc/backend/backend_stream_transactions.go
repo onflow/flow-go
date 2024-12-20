@@ -120,12 +120,12 @@ func (b *backendSubscribeTransactions) createSubscription(
 	// Get height to start subscription from
 	if startBlockID == flow.ZeroID {
 		if nextHeight, err = b.blockTracker.GetStartHeightFromHeight(startBlockHeight); err != nil {
-			b.log.Error().Err(err).Uint64("block_height", startBlockHeight).Msg("failed to get start height")
+			b.log.Debug().Err(err).Uint64("block_height", startBlockHeight).Msg("failed to get start height")
 			return subscription.NewFailedSubscription(err, "failed to get start height")
 		}
 	} else {
 		if nextHeight, err = b.blockTracker.GetStartHeightFromBlockID(startBlockID); err != nil {
-			b.log.Error().Err(err).Str("block_id", startBlockID.String()).Msg("failed to get start height")
+			b.log.Debug().Err(err).Str("block_id", startBlockID.String()).Msg("failed to get start height")
 			return subscription.NewFailedSubscription(err, "failed to get start height")
 		}
 	}
