@@ -3355,3 +3355,209 @@ func Test_BlockHashListShouldWriteOnPush(t *testing.T) {
 			require.Equal(t, expectedBlockHashListBucket, newBlockHashListBucket)
 		}))
 }
+
+func TestResourceLoss(t *testing.T) {
+
+	t.Parallel()
+
+	newVMTest().
+		withBootstrapProcedureOptions().
+		withContextOptions(
+			fvm.WithReusableCadenceRuntimePool(
+				reusableRuntime.NewReusableCadenceRuntimePool(
+					1,
+					runtime.Config{},
+				),
+			),
+			fvm.WithContractDeploymentRestricted(false),
+			fvm.WithCadenceLogging(true),
+		).
+		run(
+			func(
+				t *testing.T,
+				vm fvm.VM,
+				chain flow.Chain,
+				ctx fvm.Context,
+				snapshotTree snapshot.SnapshotTree,
+			) {
+				// Create a private key
+				privateKeys, err := testutil.GenerateAccountPrivateKeys(1)
+				require.NoError(t, err)
+
+				// Bootstrap a ledger, creating an account with the provided private key and the root account.
+				snapshotTree, accounts, err := testutil.CreateAccounts(
+					vm,
+					snapshotTree,
+					privateKeys,
+					chain,
+				)
+				require.NoError(t, err)
+
+				account := accounts[0]
+
+				contractFoo := `
+                    access(all) contract Foo {
+
+                        access(all) resource Vault {
+
+                            access(all)
+                            var balance: UFix64
+
+                            init(balance: UFix64) {
+                                self.balance = balance
+                            }
+
+                            access(all) fun withdraw(amount: UFix64): @Vault {
+                                self.balance = self.balance - amount
+                                return <-create Vault(balance: amount)
+                            }
+
+                            access(all) fun deposit(from: @Vault) {
+                                self.balance = self.balance + from.balance
+                                destroy from
+                            }
+                        }
+
+                        access(all) fun createEmptyVault(): @Vault {
+                           return <- create Vault(balance: 0.0)
+                        }
+
+                        access(all) resource LotteryPool {
+
+                            access(contract)
+                            let jackpotPool: @Change
+
+                            access(contract)
+                            let lotteries: @{UInt64: Lottery}
+
+                            access(contract)
+                            var ticketsBought: UInt64
+
+                            init() {
+                                self.jackpotPool <- create Change()
+                                self.lotteries <- {0: <- create Lottery()}
+                                self.ticketsBought = 0
+                            }
+
+                            access(all)
+                            fun buyTickets() {
+                                var lotteryRef = self.borrowLotteryRef()!
+                                lotteryRef.buyNewTicket()
+
+                                // Uncomment this line, and then it works!
+                                //self.ticketsBought = self.ticketsBought + 1
+                            }
+
+                            access(self) fun borrowLotteryRef(): &Lottery? {
+                                 return &self.lotteries[0]
+                            }
+                        }
+
+                        access(all) resource Lottery {
+
+                            access(contract)
+                            let current: @Change
+
+                            init() {
+                                self.current <- create Change()
+                            }
+
+                            access(all) fun buyNewTicket() {
+                                var change = self.borrowCurrentLotteryChange()
+                                change.forceMerge()
+                            }
+
+                            access(contract)
+                            view fun borrowCurrentLotteryChange(): &Change {
+                                return &self.current
+                            }
+                        }
+
+                        access(all) resource Change {
+
+                            access(contract)
+                            var ftVault: @Vault?
+
+                            init() {
+                                self.ftVault <- Foo.createEmptyVault()
+                            }
+
+                            access(all) fun forceMerge() {
+                                 self.borrowVault().deposit(from: <- create Vault(balance: 5.0))
+                            }
+
+                            access(self)
+                            view fun borrowVault(): &Vault {
+                                return &self.ftVault as &Vault? ?? panic("Cannot borrow vault")
+                            }
+                        }
+
+                        init() {
+                            self.account.storage.save(<- create LotteryPool(), to: /storage/lottery_pool)
+                        }
+
+                        access(all) fun borrowLotteryPool(): &LotteryPool? {
+                            return self.account.storage.borrow<&LotteryPool>(from: /storage/lottery_pool)
+                        }
+
+                        access(all) fun logVaultBalance() {
+                            var pool = self.borrowLotteryPool()!
+                            log(pool.lotteries[0]!.current.ftVault!.balance)
+                        }
+                    }
+                `
+
+				var sequenceNumber uint64 = 0
+
+				runTransaction := func(code []byte) {
+					txBody := flow.NewTransactionBody().
+						SetScript(code).
+						SetPayer(chain.ServiceAddress()).
+						SetProposalKey(chain.ServiceAddress(), 0, sequenceNumber).
+						AddAuthorizer(account)
+
+					_ = testutil.SignPayload(txBody, account, privateKeys[0])
+					_ = testutil.SignEnvelope(txBody, chain.ServiceAddress(), unittest.ServiceAccountPrivateKey)
+
+					executionSnapshot, output, err := vm.Run(
+						ctx,
+						fvm.Transaction(txBody, 0),
+						snapshotTree,
+					)
+					require.NoError(t, err)
+					require.NoError(t, output.Err)
+
+					snapshotTree = snapshotTree.Append(executionSnapshot)
+
+					// increment sequence number
+					sequenceNumber++
+
+					fmt.Println(output.Logs)
+				}
+
+				runTransaction(utils.DeploymentTransaction(
+					"Foo",
+					[]byte(contractFoo),
+				))
+
+				buyTicketTx := []byte(fmt.Sprintf(`
+					import Foo from %s
+
+					transaction() {
+
+						prepare(acct: auth(Storage, Capabilities) &Account) {
+							var pool = Foo.borrowLotteryPool()!
+							pool.buyTickets()
+							Foo.logVaultBalance()
+						}
+
+						execute {}
+					}`,
+					account.HexWithPrefix(),
+				))
+
+				runTransaction(buyTicketTx)
+				runTransaction(buyTicketTx)
+			},
+		)(t)
+}
