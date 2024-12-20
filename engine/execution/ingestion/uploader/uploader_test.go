@@ -206,7 +206,7 @@ func Test_AsyncUploader(t *testing.T) {
 		err := async.Upload(computationResult)
 		require.NoError(t, err)
 
-		wgUploadCalleded.Wait()
+		unittest.AssertReturnsBefore(t, wgUploadCalleded.Wait, time.Second)
 		cancel()
 		unittest.AssertClosesBefore(t, async.Done(), 1*time.Second, "async uploader not done in time")
 
