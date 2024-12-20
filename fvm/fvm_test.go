@@ -3425,7 +3425,7 @@ func TestResourceLoss(t *testing.T) {
                         access(all) resource LotteryPool {
 
                             access(contract)
-                            let jackpotPool: @Change
+                            let jackpotPool: @Vault
 
                             access(contract)
                             let lotteries: @{UInt64: Lottery}
@@ -3434,7 +3434,7 @@ func TestResourceLoss(t *testing.T) {
                             var ticketsBought: UInt64
 
                             init() {
-                                self.jackpotPool <- create Change()
+                                self.jackpotPool <- Foo.createEmptyVault()
                                 self.lotteries <- {0: <- create Lottery()}
                                 self.ticketsBought = 0
                             }
@@ -3456,34 +3456,14 @@ func TestResourceLoss(t *testing.T) {
                         access(all) resource Lottery {
 
                             access(contract)
-                            let current: @Change
-
-                            init() {
-                                self.current <- create Change()
-                            }
-
-                            access(all) fun buyNewTicket() {
-                                var change = self.borrowCurrentLotteryChange()
-                                change.forceMerge()
-                            }
-
-                            access(contract)
-                            view fun borrowCurrentLotteryChange(): &Change {
-                                return &self.current
-                            }
-                        }
-
-                        access(all) resource Change {
-
-                            access(contract)
-                            var ftVault: @Vault?
+                            let ftVault: @Vault?
 
                             init() {
                                 self.ftVault <- Foo.createEmptyVault()
                             }
 
-                            access(all) fun forceMerge() {
-                                 self.borrowVault().deposit(from: <- create Vault(balance: 5.0))
+                            access(all) fun buyNewTicket() {
+                                self.borrowVault().deposit(from: <- create Vault(balance: 5.0))
                             }
 
                             access(self)
@@ -3502,7 +3482,7 @@ func TestResourceLoss(t *testing.T) {
 
                         access(all) fun logVaultBalance() {
                             var pool = self.borrowLotteryPool()!
-                            log(pool.lotteries[0]!.current.ftVault!.balance)
+                            log(pool.lotteries[0]!.ftVault!.balance)
                         }
                     }
                 `
@@ -3546,6 +3526,7 @@ func TestResourceLoss(t *testing.T) {
 					transaction() {
 
 						prepare(acct: auth(Storage, Capabilities) &Account) {
+						    Foo.logVaultBalance()
 							var pool = Foo.borrowLotteryPool()!
 							pool.buyTickets()
 							Foo.logVaultBalance()
