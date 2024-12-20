@@ -18,6 +18,7 @@ import (
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/chunks"
 	"github.com/onflow/flow-go/module/metrics"
+	"github.com/onflow/flow-go/module/util"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/storage"
 	storagepebble "github.com/onflow/flow-go/storage/pebble"
@@ -125,6 +126,14 @@ func verifyConcurrently(
 	var lowestErrHeight uint64 = ^uint64(0) // Initialize to max value of uint64
 	var mu sync.Mutex                       // To protect access to lowestErr and lowestErrHeight
 
+	lg := util.LogProgress(
+		log.Logger,
+		util.DefaultLogProgressConfig(
+			fmt.Sprintf("verifying heights progress for [%v:%v]", from, to),
+			int(to+1-from),
+		),
+	)
+
 	// Worker function
 	worker := func() {
 		for {
@@ -154,6 +163,8 @@ func verifyConcurrently(
 				} else {
 					log.Info().Uint64("height", height).Msg("verified height successfully")
 				}
+
+				lg(1) // log progress
 			}
 		}
 	}
