@@ -26,8 +26,6 @@ type Server struct {
 	address string
 	server  *http.Server
 	log     zerolog.Logger
-
-	startupCompleted chan struct{}
 }
 
 // NewServer creates a new server that will start on the specified port,
@@ -40,10 +38,9 @@ func NewServer(log zerolog.Logger, port uint) *Server {
 	mux.Handle(endpoint, promhttp.Handler())
 
 	m := &Server{
-		address:          addr,
-		server:           &http.Server{Addr: addr, Handler: mux},
-		log:              log.With().Str("address", addr).Str("endpoint", endpoint).Logger(),
-		startupCompleted: make(chan struct{}),
+		address: addr,
+		server:  &http.Server{Addr: addr, Handler: mux},
+		log:     log.With().Str("address", addr).Str("endpoint", endpoint).Logger(),
 	}
 
 	m.Component = component.NewComponentManagerBuilder().
