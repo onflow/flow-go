@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"errors"
 	"fmt"
 	"path/filepath"
 	"strings"
@@ -141,7 +142,7 @@ func (exeConf *ExecutionConfig) SetupFlags(flags *pflag.FlagSet) {
 func (exeConf *ExecutionConfig) ValidateFlags() error {
 	if exeConf.enableBlockDataUpload {
 		if exeConf.gcpBucketName == "" && exeConf.s3BucketName == "" {
-			return fmt.Errorf("invalid flag. gcp-bucket-name or s3-bucket-name required when blockdata-uploader is enabled")
+			return errors.New("invalid flag. gcp-bucket-name or s3-bucket-name required when blockdata-uploader is enabled")
 		}
 	}
 	if exeConf.executionDataAllowedPeers != "" {
