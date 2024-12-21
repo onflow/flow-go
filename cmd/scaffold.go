@@ -280,7 +280,7 @@ func (fnb *FlowNodeBuilder) EnqueuePingService() {
 				return head.Height, nil
 			},
 			HotstuffViewFun: func() (uint64, error) {
-				return 0, fmt.Errorf("hotstuff view reporting disabled")
+				return 0, errors.New("hotstuff view reporting disabled")
 			},
 		}
 
@@ -688,7 +688,7 @@ func (fnb *FlowNodeBuilder) EnqueueAdminServerInit() error {
 
 	if (fnb.AdminCert != NotSet || fnb.AdminKey != NotSet || fnb.AdminClientCAs != NotSet) &&
 		!(fnb.AdminCert != NotSet && fnb.AdminKey != NotSet && fnb.AdminClientCAs != NotSet) {
-		return fmt.Errorf("admin cert / key and client certs must all be provided to enable mutual TLS")
+		return errors.New("admin cert / key and client certs must all be provided to enable mutual TLS")
 	}
 
 	// create the updatable config manager
@@ -789,7 +789,7 @@ func (fnb *FlowNodeBuilder) PrintBuildVersionDetails() {
 
 func (fnb *FlowNodeBuilder) initNodeInfo() error {
 	if fnb.BaseConfig.nodeIDHex == NotSet {
-		return fmt.Errorf("cannot start without node ID")
+		return errors.New("cannot start without node ID")
 	}
 
 	nodeID, err := flow.HexStringToIdentifier(fnb.BaseConfig.nodeIDHex)
@@ -1114,7 +1114,7 @@ func (fnb *FlowNodeBuilder) initSecretsDB() error {
 	}
 
 	if fnb.BaseConfig.secretsdir == NotSet {
-		return fmt.Errorf("missing required flag '--secretsdir'")
+		return errors.New("missing required flag '--secretsdir'")
 	}
 
 	err := os.MkdirAll(fnb.BaseConfig.secretsdir, 0700)
@@ -1457,7 +1457,7 @@ func (fnb *FlowNodeBuilder) initLocal() error {
 		}
 
 		if info.Role != flow.RoleExecution {
-			return fmt.Errorf("observer mode is only available for execution nodes")
+			return errors.New("observer mode is only available for execution nodes")
 		}
 
 		id := flow.IdentitySkeleton{
@@ -1506,10 +1506,10 @@ func (fnb *FlowNodeBuilder) initLocal() error {
 
 	// ensure that the configured staking/network keys are consistent with the protocol state
 	if !self.NetworkPubKey.Equals(fnb.NetworkKey.PublicKey()) {
-		return fmt.Errorf("configured networking key does not match protocol state")
+		return errors.New("configured networking key does not match protocol state")
 	}
 	if !self.StakingPubKey.Equals(fnb.StakingKey.PublicKey()) {
-		return fmt.Errorf("configured staking key does not match protocol state")
+		return errors.New("configured staking key does not match protocol state")
 	}
 
 	fnb.Me, err = local.New(self.IdentitySkeleton, fnb.StakingKey)
