@@ -3360,7 +3360,80 @@ func TestResourceLoss(t *testing.T) {
 
 	t.Parallel()
 
-	newVMTest().
+	setupTest := func(
+		t *testing.T,
+		vm fvm.VM,
+		chain flow.Chain,
+		ctx fvm.Context,
+		snapshotTree snapshot.SnapshotTree,
+	) (flow.Address, func(code []byte) []string) {
+
+		// Create a private key
+		privateKeys, err := testutil.GenerateAccountPrivateKeys(1)
+		require.NoError(t, err)
+
+		// Bootstrap a ledger, creating an account with the provided private key and the root account.
+		snapshotTree, accounts, err := testutil.CreateAccounts(
+			vm,
+			snapshotTree,
+			privateKeys,
+			chain,
+		)
+		require.NoError(t, err)
+
+		account := accounts[0]
+
+		var sequenceNumber uint64 = 0
+
+		runTransaction := func(code []byte) []string {
+			txBody := flow.NewTransactionBody().
+				SetScript(code).
+				SetPayer(chain.ServiceAddress()).
+				SetProposalKey(chain.ServiceAddress(), 0, sequenceNumber).
+				AddAuthorizer(account)
+
+			_ = testutil.SignPayload(txBody, account, privateKeys[0])
+			_ = testutil.SignEnvelope(txBody, chain.ServiceAddress(), unittest.ServiceAccountPrivateKey)
+
+			executionSnapshot, output, err := vm.Run(
+				ctx,
+				fvm.Transaction(txBody, 0),
+				snapshotTree,
+			)
+			require.NoError(t, err)
+			require.NoError(t, output.Err)
+
+			snapshotTree = snapshotTree.Append(executionSnapshot)
+
+			// increment sequence number
+			sequenceNumber++
+
+			return output.Logs
+		}
+
+		return account, runTransaction
+	}
+
+	buyTicketTransaction := func(account flow.Address) []byte {
+		return []byte(fmt.Sprintf(`
+            import Foo from %s
+
+            transaction() {
+
+                prepare(acct: auth(Storage, Capabilities) &Account) {
+                    Foo.logVaultBalance()
+                    var pool = Foo.borrowLotteryPool()!
+                    pool.buyTickets()
+                    Foo.logVaultBalance()
+                }
+
+                execute {}
+            }`,
+			account.HexWithPrefix(),
+		))
+	}
+
+	t.Run("non optional vault", newVMTest().
 		withBootstrapProcedureOptions().
 		withContextOptions(
 			fvm.WithReusableCadenceRuntimePool(
@@ -3374,26 +3447,15 @@ func TestResourceLoss(t *testing.T) {
 		).
 		run(
 			func(
-				t *testing.T,
+				tt *testing.T,
 				vm fvm.VM,
 				chain flow.Chain,
 				ctx fvm.Context,
 				snapshotTree snapshot.SnapshotTree,
 			) {
-				// Create a private key
-				privateKeys, err := testutil.GenerateAccountPrivateKeys(1)
-				require.NoError(t, err)
+				account, runTransaction := setupTest(tt, vm, chain, ctx, snapshotTree)
 
-				// Bootstrap a ledger, creating an account with the provided private key and the root account.
-				snapshotTree, accounts, err := testutil.CreateAccounts(
-					vm,
-					snapshotTree,
-					privateKeys,
-					chain,
-				)
-				require.NoError(t, err)
-
-				account := accounts[0]
+				buyTicketTx := buyTicketTransaction(account)
 
 				contractFoo := `
                     access(all) contract Foo {
@@ -3425,41 +3487,118 @@ func TestResourceLoss(t *testing.T) {
                         access(all) resource LotteryPool {
 
                             access(contract)
-                            let jackpotPool: @Vault
-
-                            access(contract)
-                            let lotteries: @{UInt64: Lottery}
-
-                            access(contract)
-                            var ticketsBought: UInt64
+                            let ftVault: @Vault
 
                             init() {
-                                self.jackpotPool <- Foo.createEmptyVault()
-                                self.lotteries <- {0: <- create Lottery()}
-                                self.ticketsBought = 0
+                                self.ftVault <- Foo.createEmptyVault()
                             }
 
                             access(all)
                             fun buyTickets() {
-                                var lotteryRef = self.borrowLotteryRef()!
-                                lotteryRef.buyNewTicket()
-
-                                // Uncomment this line, and then it works!
-                                //self.ticketsBought = self.ticketsBought + 1
+                                self.borrowVault().deposit(from: <- create Vault(balance: 5.0))
                             }
 
-                            access(self) fun borrowLotteryRef(): &Lottery? {
-                                 return &self.lotteries[0]
+                            access(all) fun buyNewTicket() {
+                                self.borrowVault().deposit(from: <- create Vault(balance: 5.0))
+                            }
+
+                            access(self)
+                            view fun borrowVault(): &Vault {
+                                return &self.ftVault as &Vault
                             }
                         }
 
-                        access(all) resource Lottery {
+                        init() {
+                            self.account.storage.save(<- create LotteryPool(), to: /storage/lottery_pool)
+                        }
+
+                        access(all) fun borrowLotteryPool(): &LotteryPool? {
+                            return self.account.storage.borrow<&LotteryPool>(from: /storage/lottery_pool)
+                        }
+
+                        access(all) fun logVaultBalance() {
+                            var pool = self.borrowLotteryPool()!
+                            log(pool.ftVault.balance)
+                        }
+                    }
+                `
+
+				runTransaction(utils.DeploymentTransaction(
+					"Foo",
+					[]byte(contractFoo),
+				))
+
+				logs := runTransaction(buyTicketTx)
+				assert.Equal(tt, []string{"0.00000000", "5.00000000"}, logs)
+
+				logs = runTransaction(buyTicketTx)
+				assert.Equal(tt, []string{"5.00000000", "10.00000000"}, logs)
+			},
+		))
+
+	t.Run("optional vault", newVMTest().
+		withBootstrapProcedureOptions().
+		withContextOptions(
+			fvm.WithReusableCadenceRuntimePool(
+				reusableRuntime.NewReusableCadenceRuntimePool(
+					1,
+					runtime.Config{},
+				),
+			),
+			fvm.WithContractDeploymentRestricted(false),
+			fvm.WithCadenceLogging(true),
+		).
+		run(
+			func(
+				tt *testing.T,
+				vm fvm.VM,
+				chain flow.Chain,
+				ctx fvm.Context,
+				snapshotTree snapshot.SnapshotTree,
+			) {
+				account, runTransaction := setupTest(tt, vm, chain, ctx, snapshotTree)
+
+				buyTicketTx := buyTicketTransaction(account)
+
+				contractFoo := `
+                    access(all) contract Foo {
+
+                        access(all) resource Vault {
+
+                            access(all)
+                            var balance: UFix64
+
+                            init(balance: UFix64) {
+                                self.balance = balance
+                            }
+
+                            access(all) fun withdraw(amount: UFix64): @Vault {
+                                self.balance = self.balance - amount
+                                return <-create Vault(balance: amount)
+                            }
+
+                            access(all) fun deposit(from: @Vault) {
+                                self.balance = self.balance + from.balance
+                                destroy from
+                            }
+                        }
+
+                        access(all) fun createEmptyVault(): @Vault {
+                           return <- create Vault(balance: 0.0)
+                        }
+
+                        access(all) resource LotteryPool {
 
                             access(contract)
                             let ftVault: @Vault?
 
                             init() {
                                 self.ftVault <- Foo.createEmptyVault()
+                            }
+
+                            access(all)
+                            fun buyTickets() {
+                                self.borrowVault().deposit(from: <- create Vault(balance: 5.0))
                             }
 
                             access(all) fun buyNewTicket() {
@@ -3482,63 +3621,21 @@ func TestResourceLoss(t *testing.T) {
 
                         access(all) fun logVaultBalance() {
                             var pool = self.borrowLotteryPool()!
-                            log(pool.lotteries[0]!.ftVault!.balance)
+                            log(pool.ftVault!.balance)
                         }
                     }
                 `
-
-				var sequenceNumber uint64 = 0
-
-				runTransaction := func(code []byte) {
-					txBody := flow.NewTransactionBody().
-						SetScript(code).
-						SetPayer(chain.ServiceAddress()).
-						SetProposalKey(chain.ServiceAddress(), 0, sequenceNumber).
-						AddAuthorizer(account)
-
-					_ = testutil.SignPayload(txBody, account, privateKeys[0])
-					_ = testutil.SignEnvelope(txBody, chain.ServiceAddress(), unittest.ServiceAccountPrivateKey)
-
-					executionSnapshot, output, err := vm.Run(
-						ctx,
-						fvm.Transaction(txBody, 0),
-						snapshotTree,
-					)
-					require.NoError(t, err)
-					require.NoError(t, output.Err)
-
-					snapshotTree = snapshotTree.Append(executionSnapshot)
-
-					// increment sequence number
-					sequenceNumber++
-
-					fmt.Println(output.Logs)
-				}
 
 				runTransaction(utils.DeploymentTransaction(
 					"Foo",
 					[]byte(contractFoo),
 				))
 
-				buyTicketTx := []byte(fmt.Sprintf(`
-					import Foo from %s
+				logs := runTransaction(buyTicketTx)
+				assert.Equal(tt, []string{"0.00000000", "5.00000000"}, logs)
 
-					transaction() {
-
-						prepare(acct: auth(Storage, Capabilities) &Account) {
-						    Foo.logVaultBalance()
-							var pool = Foo.borrowLotteryPool()!
-							pool.buyTickets()
-							Foo.logVaultBalance()
-						}
-
-						execute {}
-					}`,
-					account.HexWithPrefix(),
-				))
-
-				runTransaction(buyTicketTx)
-				runTransaction(buyTicketTx)
+				logs = runTransaction(buyTicketTx)
+				assert.Equal(tt, []string{"5.00000000", "10.00000000"}, logs)
 			},
-		)(t)
+		))
 }
