@@ -53,7 +53,7 @@ func (s *TransactionStatusesProviderSuite) SetupTest() {
 		s.log,
 		nil,
 		s.api,
-		flow.Testnet.Chain(),
+		s.chain,
 		state_stream.DefaultEventFilterConfig,
 		subscription.DefaultHeartbeatInterval)
 	s.Require().NotNil(s.factory)
@@ -159,13 +159,13 @@ func (s *TransactionStatusesProviderSuite) requireTransactionStatuses(
 	s.Require().ElementsMatch(expectedAccountStatusesResponse, actualResponse.TransactionResults)
 }
 
-// TestAccountStatusesDataProvider_InvalidArguments tests the behavior of the transaction statuses data provider
+// TestTransactionStatusesDataProvider_InvalidArguments tests the behavior of the transaction statuses data provider
 // when invalid arguments are provided. It verifies that appropriate errors are returned
 // for missing or conflicting arguments.
 // This test covers the test cases:
 // 1. Invalid 'tx_id' argument.
 // 2. Invalid 'start_block_id' argument.
-func (s *TransactionStatusesProviderSuite) TestAccountStatusesDataProvider_InvalidArguments() {
+func (s *TransactionStatusesProviderSuite) TestTransactionStatusesDataProvider_InvalidArguments() {
 	ctx := context.Background()
 	send := make(chan interface{})
 
@@ -193,8 +193,10 @@ func (s *TransactionStatusesProviderSuite) TestAccountStatusesDataProvider_Inval
 // a set of input arguments, and the expected error message that should be returned.
 //
 // The test cases cover scenarios such as:
-// 1. Providing invalid 'tx_id' value.
-// 2. Providing invalid 'start_block_id' value.
+// 1. Providing both 'start_block_id' and 'start_block_height' simultaneously.
+// 2. Providing invalid 'tx_id' value.
+// 3. Providing invalid 'start_block_id' value.
+// 4. Invalid 'start_block_id' argument.
 func invalidTransactionStatusesArgumentsTestCases() []testErrType {
 	return []testErrType{
 		{
