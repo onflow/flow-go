@@ -43,9 +43,8 @@ type Builder struct {
 	log            zerolog.Logger
 	clusterEpoch   uint64 // the operating epoch for this cluster
 	// cache of values about the operating epoch which never change
-	refEpochFirstHeight uint64           // first height of this cluster's operating epoch
-	epochFinalHeight    *uint64          // last height of this cluster's operating epoch (nil if epoch not ended)
-	epochFinalID        *flow.Identifier // ID of last block in this cluster's operating epoch (nil if epoch not ended)
+	epochFinalHeight *uint64          // last height of this cluster's operating epoch (nil if epoch not ended)
+	epochFinalID     *flow.Identifier // ID of last block in this cluster's operating epoch (nil if epoch not ended)
 }
 
 func NewBuilder(
@@ -73,11 +72,6 @@ func NewBuilder(
 		config:         DefaultConfig(),
 		log:            log.With().Str("component", "cluster_builder").Logger(),
 		clusterEpoch:   epochCounter,
-	}
-
-	err := db.View(operation.RetrieveEpochFirstHeight(epochCounter, &b.refEpochFirstHeight))
-	if err != nil {
-		return nil, fmt.Errorf("could not get epoch first height: %w", err)
 	}
 
 	for _, apply := range opts {
