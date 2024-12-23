@@ -40,6 +40,8 @@ type WebsocketSubscriptionSuite struct {
 	cancel context.CancelFunc
 
 	net *testnet.FlowNetwork
+
+	grpcClient accessproto.AccessAPIClient
 }
 
 func (s *WebsocketSubscriptionSuite) TearDownTest() {
@@ -59,7 +61,7 @@ func (s *WebsocketSubscriptionSuite) SetupTest() {
 	// access node
 	bridgeANConfig := testnet.NewNodeConfig(
 		flow.RoleAccess,
-		testnet.WithLogLevel(zerolog.InfoLevel),
+		testnet.WithLogLevel(zerolog.DebugLevel),
 		testnet.WithAdditionalFlag("--execution-data-sync-enabled=true"),
 		testnet.WithAdditionalFlagf("--execution-data-dir=%s", testnet.DefaultExecutionDataServiceDir),
 		testnet.WithAdditionalFlag("--execution-data-retry-delay=1s"),
@@ -93,7 +95,7 @@ func (s *WebsocketSubscriptionSuite) SetupTest() {
 		ghostNode,
 	}
 
-	conf := testnet.NewNetworkConfig("access_api_test", nodeConfigs)
+	conf := testnet.NewNetworkConfig("websockets_subscriptions_test", nodeConfigs)
 	s.net = testnet.PrepareFlowNetwork(s.T(), conf, flow.Localnet)
 
 	// start the network
@@ -105,18 +107,47 @@ func (s *WebsocketSubscriptionSuite) SetupTest() {
 
 // TestRestEventStreaming tests event streaming route on REST
 func (s *WebsocketSubscriptionSuite) TestBlockHeaders() {
+	//accessUrl := fmt.Sprintf("localhost:%s", s.net.ContainerByName(testnet.PrimaryAN).Port(testnet.GRPCPort))
+	//grpcClient, err := getAccessAPIClient(accessUrl)
+	//s.Require().NoError(err)
+
 	restAddr := s.net.ContainerByName(testnet.PrimaryAN).Addr(testnet.RESTPort)
+	client, err := getWSClient(s.ctx, getWebsocketsUrl(restAddr))
+	s.Require().NoError(err)
+
+	//subscriptionRequest := models.SubscribeMessageRequest{
+	//	BaseMessageRequest: models.BaseMessageRequest{
+	//		Action:    models.SubscribeAction,
+	//		MessageID: uuid.New().String(),
+	//	},
+	//	Topic:     data_providers.BlockHeadersTopic,
+	//	Arguments: models.Arguments{"block_status": parser.Finalized},
+	//}
+	//
+	//s.testWebsocketSubscription(
+	//	client,
+	//	subscriptionRequest,
+	//	func(receivedResponses []interface{}) {
+	//		var blockHeaderResponses []*models.BlockHeaderMessageResponse
+	//		for _, resp := range receivedResponses {
+	//			if blockResp, ok := resp.(*models.BlockHeaderMessageResponse); ok {
+	//				blockHeaderResponses = append(blockHeaderResponses, blockResp)
+	//			}
+	//		}
+	//		s.validateBlockHeaders(grpcClient, blockHeaderResponses)
+	//	})
 
 	//TODO: move common to separate func to reuse for other subscriptions
 	s.T().Run("block headers streaming", func(t *testing.T) {
-		client, err := getWSClient(s.ctx, getWebsocketsUrl(restAddr))
-		require.NoError(t, err)
-
 		var receivedResponse []*models.BlockHeaderMessageResponse
 		clientMessageID := uuid.New().String()
 
 		go func() {
-			err := client.WriteJSON(s.subscribeMessageRequest(clientMessageID, data_providers.BlockHeadersTopic, models.Arguments{"block_status": parser.Finalized}))
+			err := client.WriteJSON(s.subscribeMessageRequest(
+				clientMessageID,
+				data_providers.BlockHeadersTopic,
+				models.Arguments{"block_status": parser.Finalized},
+			))
 			require.NoError(s.T(), err)
 
 			time.Sleep(15 * time.Second)
@@ -125,11 +156,11 @@ func (s *WebsocketSubscriptionSuite) TestBlockHeaders() {
 			client.Close()
 		}()
 
-		responseChan := make(chan *models.BlockHeaderMessageResponse)
+		responseChan := make(chan interface{}) // Channel to handle different response types
 		go func() {
 			for {
-				resp := &models.BlockHeaderMessageResponse{}
-				err := client.ReadJSON(resp)
+				var resp interface{}
+				err := client.ReadJSON(&resp)
 				if err != nil {
 					if websocket.IsUnexpectedCloseError(err, websocket.CloseGoingAway) {
 						s.T().Logf("unexpected close error: %v", err)
@@ -138,14 +169,30 @@ func (s *WebsocketSubscriptionSuite) TestBlockHeaders() {
 					close(responseChan) // Close the response channel when the client connection is closed
 					return
 				}
-				//TODO: add verify for success response message
+
 				responseChan <- resp
+				s.T().Logf("!!!! RESPONSE: %v", resp)
 			}
 		}()
 
+		// Process received responses
 		// collect received responses during 15 seconds
+		//TODO: add verify for success response message
 		for response := range responseChan {
-			receivedResponse = append(receivedResponse, response)
+			switch resp := response.(type) {
+			case *models.BlockHeaderMessageResponse:
+				receivedResponse = append(receivedResponse, resp)
+				s.log.Info().Msgf("Received *BlockHeaderMessageResponse: %v", resp)
+			case *models.BlockMessageResponse:
+				s.log.Info().Msgf("Received *BlocksMessageResponse: %v", resp)
+			case *models.BlockDigestMessageResponse:
+				s.log.Info().Msgf("Received *BlockDigestsMessageResponse: %v", resp)
+
+			case *models.BaseMessageResponse:
+				s.log.Info().Msgf("Received *BaseMessageResponse: %v", resp)
+			default:
+				s.T().Errorf("unexpected response type: %v", resp)
+			}
 		}
 
 		// check block headers
@@ -162,7 +209,6 @@ func (s *WebsocketSubscriptionSuite) receivedResponse(receivedResponse []*models
 	defer grpcCancel()
 
 	grpcAddr := s.net.ContainerByName(testnet.PrimaryAN).Addr(testnet.GRPCPort)
-
 	grpcConn, err := grpc.DialContext(grpcCtx, grpcAddr, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	require.NoError(s.T(), err, "failed to connect to access node")
 	defer grpcConn.Close()
@@ -189,6 +235,25 @@ func (s *WebsocketSubscriptionSuite) receivedResponse(receivedResponse []*models
 	}
 }
 
+func (s *WebsocketSubscriptionSuite) validateBlockHeaders(
+	grpcClient accessproto.AccessAPIClient,
+	receivedResponses []*models.BlockHeaderMessageResponse,
+) {
+	require.NotEmpty(s.T(), receivedResponses, "expected received block headers")
+	for _, response := range receivedResponses {
+		grpcResponse, err := grpcClient.GetBlockHeaderByID(s.ctx, &accessproto.GetBlockHeaderByIDRequest{
+			Id: convert.IdentifierToMessage(response.Header.ID()),
+		})
+		require.NoError(s.T(), err)
+
+		expected := grpcResponse.Block
+		require.Equal(s.T(), expected.Height, response.Header.Height)
+		require.Equal(s.T(), expected.Timestamp, response.Header.Timestamp)
+		require.Equal(s.T(), expected.ParentId, response.Header.ParentID)
+		require.Equal(s.T(), expected.PayloadHash, response.Header.PayloadHash)
+	}
+}
+
 func (s *WebsocketSubscriptionSuite) subscribeMessageRequest(clientMessageID string, topic string, arguments models.Arguments) interface{} {
 	return models.SubscribeMessageRequest{
 		BaseMessageRequest: models.BaseMessageRequest{
@@ -210,8 +275,62 @@ func (s *WebsocketSubscriptionSuite) unsubscribeMessageRequest(clientMessageID s
 	}
 }
 
+func (s *WebsocketSubscriptionSuite) listSubscriptionsMessageRequest(clientMessageID string) interface{} {
+	return models.ListSubscriptionsMessageRequest{
+		BaseMessageRequest: models.BaseMessageRequest{
+			Action:    models.ListSubscriptionsAction,
+			MessageID: clientMessageID,
+		},
+	}
+}
+
 // getWebsocketsUrl is a helper function that creates websocket url
 func getWebsocketsUrl(accessAddr string) string {
 	u, _ := url.Parse("http://" + accessAddr + "/v1/ws")
 	return u.String()
+}
+
+//func (s *WebsocketSubscriptionSuite) setupGRPCClient() accessproto.AccessAPIClient {
+//	grpcAddr := s.net.ContainerByName(testnet.PrimaryAN).Addr(testnet.GRPCPort)
+//	conn, err := grpc.Dial(grpcAddr, grpc.WithTransportCredentials(insecure.NewCredentials()))
+//	require.NoError(s.T(), err)
+//	s.T().Cleanup(func() { conn.Close() })
+//	return accessproto.NewAccessAPIClient(conn)
+//}
+
+func (s *WebsocketSubscriptionSuite) testWebsocketSubscription(
+	client *websocket.Conn,
+	subscriptionRequest models.SubscribeMessageRequest,
+	validate func([]interface{}),
+) {
+	go func() {
+		require.NoError(s.T(), client.WriteJSON(subscriptionRequest))
+		time.Sleep(15 * time.Second)
+		client.Close()
+	}()
+
+	responseChan := make(chan interface{})
+	go s.listenForResponses(client, responseChan)
+
+	var receivedResponses []interface{}
+	for resp := range responseChan {
+		receivedResponses = append(receivedResponses, resp)
+	}
+
+	validate(receivedResponses)
+}
+
+func (s *WebsocketSubscriptionSuite) listenForResponses(client *websocket.Conn, responseChan chan interface{}) {
+	defer close(responseChan)
+	for {
+		var resp interface{}
+		if err := client.ReadJSON(&resp); err != nil {
+			if websocket.IsUnexpectedCloseError(err, websocket.CloseGoingAway) {
+				s.T().Logf("unexpected close error: %v", err)
+				require.NoError(s.T(), err)
+			}
+			return
+		}
+		responseChan <- resp
+	}
 }
