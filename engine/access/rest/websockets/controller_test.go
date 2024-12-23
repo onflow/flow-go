@@ -15,11 +15,10 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
+	dp "github.com/onflow/flow-go/engine/access/rest/websockets/data_providers"
 	dpmock "github.com/onflow/flow-go/engine/access/rest/websockets/data_providers/mock"
 	connmock "github.com/onflow/flow-go/engine/access/rest/websockets/mock"
 	"github.com/onflow/flow-go/engine/access/rest/websockets/models"
-	"github.com/onflow/flow-go/engine/access/state_stream/backend"
-	streammock "github.com/onflow/flow-go/engine/access/state_stream/mock"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -30,12 +29,6 @@ type WsControllerSuite struct {
 
 	logger   zerolog.Logger
 	wsConfig Config
-
-	connection          *connmock.WebsocketConnection
-	dataProviderFactory *dpmock.DataProviderFactory
-
-	streamApi    *streammock.API
-	streamConfig backend.Config
 }
 
 func TestControllerSuite(t *testing.T) {
@@ -46,21 +39,11 @@ func TestControllerSuite(t *testing.T) {
 func (s *WsControllerSuite) SetupTest() {
 	s.logger = unittest.Logger()
 	s.wsConfig = NewDefaultWebsocketConfig()
-
-	s.connection = connmock.NewWebsocketConnection(s.T())
-	s.dataProviderFactory = dpmock.NewDataProviderFactory(s.T())
-
-	s.streamApi = streammock.NewAPI(s.T())
-	s.streamConfig = backend.Config{}
 }
 
 // TestSubscribeRequest tests the subscribe to topic flow.
 // We emulate a request message from a client, and a response message from a controller.
 func (s *WsControllerSuite) TestSubscribeRequest() {
-	// It still fails when run with -race even though we don't share any state
-	// (I tried changing logger & config to be unique in each test)
-	//s.T().Parallel()
-
 	s.T().Run("Happy path", func(t *testing.T) {
 		t.Parallel()
 
@@ -73,7 +56,7 @@ func (s *WsControllerSuite) TestSubscribeRequest() {
 			Once()
 
 		id := uuid.New()
-		done := make(chan struct{}, 1)
+		done := make(chan struct{})
 
 		dataProvider.On("ID").Return(id)
 		// data provider might finish on its own or controller will close it via Close()
@@ -81,18 +64,17 @@ func (s *WsControllerSuite) TestSubscribeRequest() {
 		dataProvider.
 			On("Run").
 			Run(func(args mock.Arguments) {
-				for range done {
-				}
+				<-done
 			}).
 			Return(nil).
 			Once()
 
 		request := models.SubscribeMessageRequest{
 			BaseMessageRequest: models.BaseMessageRequest{
-				MessageID: uuid.New().String(),
-				Action:    models.SubscribeAction,
+				ClientMessageID: uuid.New().String(),
+				Action:          models.SubscribeAction,
 			},
-			Topic:     "blocks",
+			Topic:     dp.BlocksTopic,
 			Arguments: nil,
 		}
 		requestJson, err := json.Marshal(request)
@@ -117,8 +99,8 @@ func (s *WsControllerSuite) TestSubscribeRequest() {
 				response, ok := msg.(models.SubscribeMessageResponse)
 				require.True(t, ok)
 				require.True(t, response.Success)
-				require.Equal(t, request.MessageID, response.MessageID)
-				require.Equal(t, id.String(), response.ID)
+				require.Equal(t, request.ClientMessageID, response.ClientMessageID)
+				require.Equal(t, id.String(), response.SubscriptionID)
 
 				return websocket.ErrCloseSent
 			})
@@ -158,7 +140,7 @@ func (s *WsControllerSuite) TestSubscribeRequest() {
 			Return(nil).
 			Once()
 
-		done := make(chan struct{}, 1)
+		done := make(chan struct{})
 		conn.
 			On("WriteJSON", mock.Anything).
 			Return(func(msg interface{}) error {
@@ -192,7 +174,7 @@ func (s *WsControllerSuite) TestSubscribeRequest() {
 			Return(nil, fmt.Errorf("error creating data provider")).
 			Once()
 
-		done := make(chan struct{}, 1)
+		done := make(chan struct{})
 		s.expectSubscribeRequest(t, conn)
 
 		conn.
@@ -237,7 +219,7 @@ func (s *WsControllerSuite) TestSubscribeRequest() {
 			Return(dataProvider, nil).
 			Once()
 
-		done := make(chan struct{}, 1)
+		done := make(chan struct{})
 		msgID := s.expectSubscribeRequest(t, conn)
 		s.expectSubscribeResponse(t, conn, msgID)
 
@@ -250,7 +232,7 @@ func (s *WsControllerSuite) TestSubscribeRequest() {
 				require.True(t, ok)
 				require.False(t, response.Success)
 				require.NotEmpty(t, response.Error)
-				require.Equal(t, int(RunError), response.Error.Code)
+				require.Equal(t, int(SubscriptionError), response.Error.Code)
 
 				return websocket.ErrCloseSent
 			})
@@ -266,8 +248,6 @@ func (s *WsControllerSuite) TestSubscribeRequest() {
 }
 
 func (s *WsControllerSuite) TestUnsubscribeRequest() {
-	//s.T().Parallel()
-
 	s.T().Run("Happy path", func(t *testing.T) {
 		t.Parallel()
 
@@ -280,7 +260,7 @@ func (s *WsControllerSuite) TestUnsubscribeRequest() {
 			Once()
 
 		id := uuid.New()
-		done := make(chan struct{}, 1)
+		done := make(chan struct{})
 
 		dataProvider.On("ID").Return(id)
 		// data provider might finish on its own or controller will close it via Close()
@@ -288,8 +268,7 @@ func (s *WsControllerSuite) TestUnsubscribeRequest() {
 		dataProvider.
 			On("Run").
 			Run(func(args mock.Arguments) {
-				for range done {
-				}
+				<-done
 			}).
 			Return(nil).
 			Once()
@@ -299,8 +278,8 @@ func (s *WsControllerSuite) TestUnsubscribeRequest() {
 
 		request := models.UnsubscribeMessageRequest{
 			BaseMessageRequest: models.BaseMessageRequest{
-				MessageID: uuid.New().String(),
-				Action:    models.UnsubscribeAction,
+				ClientMessageID: uuid.New().String(),
+				Action:          models.UnsubscribeAction,
 			},
 			SubscriptionID: id.String(),
 		}
@@ -326,7 +305,7 @@ func (s *WsControllerSuite) TestUnsubscribeRequest() {
 				require.True(t, ok)
 				require.True(t, response.Success)
 				require.Empty(t, response.Error)
-				require.Equal(t, request.MessageID, response.MessageID)
+				require.Equal(t, request.ClientMessageID, response.ClientMessageID)
 				require.Equal(t, request.SubscriptionID, response.SubscriptionID)
 
 				return websocket.ErrCloseSent
@@ -354,7 +333,7 @@ func (s *WsControllerSuite) TestUnsubscribeRequest() {
 			Once()
 
 		id := uuid.New()
-		done := make(chan struct{}, 1)
+		done := make(chan struct{})
 
 		dataProvider.On("ID").Return(id)
 		// data provider might finish on its own or controller will close it via Close()
@@ -362,8 +341,7 @@ func (s *WsControllerSuite) TestUnsubscribeRequest() {
 		dataProvider.
 			On("Run").
 			Run(func(args mock.Arguments) {
-				for range done {
-				}
+				<-done
 			}).
 			Return(nil).
 			Once()
@@ -373,8 +351,8 @@ func (s *WsControllerSuite) TestUnsubscribeRequest() {
 
 		request := models.UnsubscribeMessageRequest{
 			BaseMessageRequest: models.BaseMessageRequest{
-				MessageID: uuid.New().String(),
-				Action:    models.UnsubscribeAction,
+				ClientMessageID: uuid.New().String(),
+				Action:          models.UnsubscribeAction,
 			},
 			SubscriptionID: "invalid-uuid",
 		}
@@ -400,7 +378,7 @@ func (s *WsControllerSuite) TestUnsubscribeRequest() {
 				require.True(t, ok)
 				require.False(t, response.Success)
 				require.NotEmpty(t, response.Error)
-				require.Equal(t, request.MessageID, response.MessageID)
+				require.Equal(t, request.ClientMessageID, response.ClientMessageID)
 				require.Equal(t, int(InvalidArgument), response.Error.Code)
 
 				return websocket.ErrCloseSent
@@ -428,7 +406,7 @@ func (s *WsControllerSuite) TestUnsubscribeRequest() {
 			Once()
 
 		id := uuid.New()
-		done := make(chan struct{}, 1)
+		done := make(chan struct{})
 
 		dataProvider.On("ID").Return(id)
 		// data provider might finish on its own or controller will close it via Close()
@@ -436,8 +414,7 @@ func (s *WsControllerSuite) TestUnsubscribeRequest() {
 		dataProvider.
 			On("Run").
 			Run(func(args mock.Arguments) {
-				for range done {
-				}
+				<-done
 			}).
 			Return(nil).
 			Once()
@@ -447,8 +424,8 @@ func (s *WsControllerSuite) TestUnsubscribeRequest() {
 
 		request := models.UnsubscribeMessageRequest{
 			BaseMessageRequest: models.BaseMessageRequest{
-				MessageID: uuid.New().String(),
-				Action:    models.UnsubscribeAction,
+				ClientMessageID: uuid.New().String(),
+				Action:          models.UnsubscribeAction,
 			},
 			SubscriptionID: uuid.New().String(),
 		}
@@ -475,7 +452,7 @@ func (s *WsControllerSuite) TestUnsubscribeRequest() {
 				require.False(t, response.Success)
 				require.NotEmpty(t, response.Error)
 
-				require.Equal(t, request.MessageID, response.MessageID)
+				require.Equal(t, request.ClientMessageID, response.ClientMessageID)
 				require.Equal(t, int(NotFound), response.Error.Code)
 
 				return websocket.ErrCloseSent
@@ -493,8 +470,6 @@ func (s *WsControllerSuite) TestUnsubscribeRequest() {
 }
 
 func (s *WsControllerSuite) TestListSubscriptions() {
-	//s.T().Parallel()
-
 	s.T().Run("Happy path", func(t *testing.T) {
 
 		conn, dataProviderFactory, dataProvider := newControllerMocks(t)
@@ -505,10 +480,10 @@ func (s *WsControllerSuite) TestListSubscriptions() {
 			Return(dataProvider, nil).
 			Once()
 
-		done := make(chan struct{}, 1)
+		done := make(chan struct{})
 
 		id := uuid.New()
-		topic := "blocks"
+		topic := dp.BlocksTopic
 		dataProvider.On("ID").Return(id)
 		dataProvider.On("Topic").Return(topic)
 		// data provider might finish on its own or controller will close it via Close()
@@ -516,8 +491,7 @@ func (s *WsControllerSuite) TestListSubscriptions() {
 		dataProvider.
 			On("Run").
 			Run(func(args mock.Arguments) {
-				for range done {
-				}
+				<-done
 			}).
 			Return(nil).
 			Once()
@@ -527,8 +501,8 @@ func (s *WsControllerSuite) TestListSubscriptions() {
 
 		request := models.ListSubscriptionsMessageRequest{
 			BaseMessageRequest: models.BaseMessageRequest{
-				MessageID: uuid.New().String(),
-				Action:    models.ListSubscriptionsAction,
+				ClientMessageID: uuid.New().String(),
+				Action:          models.ListSubscriptionsAction,
 			},
 		}
 		requestJson, err := json.Marshal(request)
@@ -553,7 +527,7 @@ func (s *WsControllerSuite) TestListSubscriptions() {
 				require.True(t, ok)
 				require.True(t, response.Success)
 				require.Empty(t, response.Error)
-				require.Equal(t, request.MessageID, response.MessageID)
+				require.Equal(t, request.ClientMessageID, response.ClientMessageID)
 				require.Equal(t, 1, len(response.Subscriptions))
 				require.Equal(t, id.String(), response.Subscriptions[0].ID)
 				require.Equal(t, topic, response.Subscriptions[0].Topic)
@@ -574,8 +548,6 @@ func (s *WsControllerSuite) TestListSubscriptions() {
 
 // TestSubscribeBlocks tests the functionality for streaming blocks to a subscriber.
 func (s *WsControllerSuite) TestSubscribeBlocks() {
-	//s.T().Parallel()
-
 	s.T().Run("Stream one block", func(t *testing.T) {
 		t.Parallel()
 
@@ -602,7 +574,7 @@ func (s *WsControllerSuite) TestSubscribeBlocks() {
 			Return(nil).
 			Once()
 
-		done := make(chan struct{}, 1)
+		done := make(chan struct{})
 		msgID := s.expectSubscribeRequest(t, conn)
 		s.expectSubscribeResponse(t, conn, msgID)
 
@@ -659,7 +631,7 @@ func (s *WsControllerSuite) TestSubscribeBlocks() {
 			Return(nil).
 			Once()
 
-		done := make(chan struct{}, 1)
+		done := make(chan struct{})
 		msgID := s.expectSubscribeRequest(t, conn)
 		s.expectSubscribeResponse(t, conn, msgID)
 
@@ -699,8 +671,6 @@ func (s *WsControllerSuite) TestSubscribeBlocks() {
 
 // TestConfigureKeepaliveConnection ensures that the WebSocket connection is configured correctly.
 func (s *WsControllerSuite) TestConfigureKeepaliveConnection() {
-	//s.T().Parallel()
-
 	s.T().Run("Happy path", func(t *testing.T) {
 		conn := connmock.NewWebsocketConnection(t)
 		conn.On("SetPongHandler", mock.AnythingOfType("func(string) error")).Return(nil).Once()
@@ -717,8 +687,6 @@ func (s *WsControllerSuite) TestConfigureKeepaliveConnection() {
 }
 
 func (s *WsControllerSuite) TestControllerShutdown() {
-	//s.T().Parallel()
-
 	s.T().Run("Keepalive routine failed", func(t *testing.T) {
 		t.Parallel()
 
@@ -731,7 +699,7 @@ func (s *WsControllerSuite) TestControllerShutdown() {
 		controller := NewWebSocketController(s.logger, s.wsConfig, conn, factory)
 
 		// Mock keepalive to return an error
-		done := make(chan struct{}, 1)
+		done := make(chan struct{})
 		conn.
 			On("WriteControl", websocket.PingMessage, mock.Anything).
 			Return(func(int, time.Time) error {
@@ -743,8 +711,7 @@ func (s *WsControllerSuite) TestControllerShutdown() {
 		conn.
 			On("ReadJSON", mock.Anything).
 			Return(func(interface{}) error {
-				for range done {
-				}
+				<-done
 				return websocket.ErrCloseSent
 			}).
 			Once()
@@ -799,7 +766,7 @@ func (s *WsControllerSuite) TestControllerShutdown() {
 			Return(nil).
 			Once()
 
-		done := make(chan struct{}, 1)
+		done := make(chan struct{})
 		msgID := s.expectSubscribeRequest(t, conn)
 		s.expectSubscribeResponse(t, conn, msgID)
 
@@ -876,15 +843,13 @@ func (s *WsControllerSuite) TestControllerShutdown() {
 }
 
 func (s *WsControllerSuite) TestKeepaliveRoutine() {
-	//s.T().Parallel()
-
 	s.T().Run("Successfully pings connection n times", func(t *testing.T) {
 		conn := connmock.NewWebsocketConnection(t)
 		conn.On("Close").Return(nil).Once()
 		conn.On("SetPongHandler", mock.AnythingOfType("func(string) error")).Return(nil).Once()
 		conn.On("SetReadDeadline", mock.Anything).Return(nil)
 
-		done := make(chan struct{}, 1)
+		done := make(chan struct{})
 		i := 0
 		expectedCalls := 2
 		conn.
@@ -901,8 +866,7 @@ func (s *WsControllerSuite) TestKeepaliveRoutine() {
 			Times(expectedCalls + 1)
 
 		conn.On("ReadJSON", mock.Anything).Return(func(_ interface{}) error {
-			for range done {
-			}
+			<-done
 			return websocket.ErrCloseSent
 		})
 
@@ -1047,10 +1011,10 @@ func newControllerMocks(t *testing.T) (*connmock.WebsocketConnection, *dpmock.Da
 func (s *WsControllerSuite) expectSubscribeRequest(t *testing.T, conn *connmock.WebsocketConnection) string {
 	request := models.SubscribeMessageRequest{
 		BaseMessageRequest: models.BaseMessageRequest{
-			MessageID: uuid.New().String(),
-			Action:    models.SubscribeAction,
+			ClientMessageID: uuid.New().String(),
+			Action:          models.SubscribeAction,
 		},
-		Topic: "blocks",
+		Topic: dp.BlocksTopic,
 	}
 	requestJson, err := json.Marshal(request)
 	require.NoError(t, err)
@@ -1066,7 +1030,7 @@ func (s *WsControllerSuite) expectSubscribeRequest(t *testing.T, conn *connmock.
 		Return(nil).
 		Once()
 
-	return request.MessageID
+	return request.ClientMessageID
 }
 
 // expectSubscribeResponse mocks the subscription response sent to the client.
@@ -1076,7 +1040,7 @@ func (s *WsControllerSuite) expectSubscribeResponse(t *testing.T, conn *connmock
 		Run(func(args mock.Arguments) {
 			response, ok := args.Get(0).(models.SubscribeMessageResponse)
 			require.True(t, ok)
-			require.Equal(t, msgId, response.MessageID)
+			require.Equal(t, msgId, response.ClientMessageID)
 			require.Equal(t, true, response.Success)
 		}).
 		Return(nil).
@@ -1089,8 +1053,7 @@ func (s *WsControllerSuite) expectCloseConnection(conn *connmock.WebsocketConnec
 	conn.
 		On("ReadJSON", mock.Anything).
 		Return(func(msg interface{}) error {
-			for range done {
-			}
+			<-done
 			return websocket.ErrCloseSent
 		}).
 		Once()
@@ -1103,13 +1066,11 @@ func (s *WsControllerSuite) expectKeepaliveRoutineShutdown(conn *connmock.Websoc
 	conn.
 		On("WriteControl", websocket.PingMessage, mock.Anything).
 		Return(func(int, time.Time) error {
-			for {
-				select {
-				case <-done:
-					return websocket.ErrCloseSent
-				default:
-					return nil
-				}
+			select {
+			case <-done:
+				return websocket.ErrCloseSent
+			default:
+				return nil
 			}
 		}).
 		Maybe()
