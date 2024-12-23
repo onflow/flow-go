@@ -26,6 +26,7 @@ type transactionStatusesArguments struct {
 	StartBlockHeight uint64          // Height of the block to start subscription from
 }
 
+// TransactionStatusesDataProvider is responsible for providing tx statuses
 type TransactionStatusesDataProvider struct {
 	*baseDataProvider
 
