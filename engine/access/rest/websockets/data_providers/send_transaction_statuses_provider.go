@@ -224,7 +224,7 @@ func parseSendTransactionStatusesArguments(
 	if envelopeSignaturesIn, ok := arguments["envelope_signatures"]; ok && envelopeSignaturesIn != "" {
 		envelopeSignatures, ok := envelopeSignaturesIn.([]flow.TransactionSignature)
 		if !ok {
-			return args, fmt.Errorf("'payload_signatures' must be an array of objects (TransactionSignature)")
+			return args, fmt.Errorf("'envelope_signatures' must be an array of objects (TransactionSignature)")
 		}
 
 		tx.EnvelopeSignatures = envelopeSignatures

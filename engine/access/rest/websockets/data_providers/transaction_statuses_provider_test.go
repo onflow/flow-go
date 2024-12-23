@@ -59,28 +59,12 @@ func (s *TransactionStatusesProviderSuite) SetupTest() {
 	s.Require().NotNil(s.factory)
 }
 
+// TestTransactionStatusesDataProvider_HappyPath tests the behavior of the transaction statuses data provider
+// when it is configured correctly and operating under normal conditions. It
+// validates that tx statuses are correctly streamed to the channel and ensures
+// no unexpected errors occur.
 func (s *TransactionStatusesProviderSuite) TestTransactionStatusesDataProvider_HappyPath() {
-	id := unittest.IdentifierFixture()
-	cid := unittest.IdentifierFixture()
-	txr := access.TransactionResult{
-		Status:     flow.TransactionStatusSealed,
-		StatusCode: 10,
-		Events: []flow.Event{
-			unittest.EventFixture(flow.EventAccountCreated, 1, 0, id, 200),
-		},
-		ErrorMessage: "",
-		BlockID:      s.rootBlock.ID(),
-		CollectionID: cid,
-		BlockHeight:  s.rootBlock.Header.Height,
-	}
-
-	var expectedTxStatusesResponses [][]*access.TransactionResult
-	var expectedTxResultsResponses []*access.TransactionResult
-
-	for i := 0; i < 2; i++ {
-		expectedTxResultsResponses = append(expectedTxResultsResponses, &txr)
-		expectedTxStatusesResponses = append(expectedTxStatusesResponses, expectedTxResultsResponses)
-	}
+	expectedResponse := expectedTransactionStatusesResponse(s.rootBlock)
 
 	testHappyPath(
 		s.T(),
@@ -88,14 +72,13 @@ func (s *TransactionStatusesProviderSuite) TestTransactionStatusesDataProvider_H
 		s.factory,
 		s.subscribeTransactionStatusesDataProviderTestCases(),
 		func(dataChan chan interface{}) {
-			for i := 0; i < len(expectedTxStatusesResponses); i++ {
-				dataChan <- expectedTxStatusesResponses[i]
+			for i := 0; i < len(expectedResponse); i++ {
+				dataChan <- expectedResponse[i]
 			}
 		},
-		expectedTxStatusesResponses,
+		expectedResponse,
 		s.requireTransactionStatuses,
 	)
-
 }
 
 func (s *TransactionStatusesProviderSuite) subscribeTransactionStatusesDataProviderTestCases() []testType {
@@ -195,7 +178,7 @@ func (s *TransactionStatusesProviderSuite) TestTransactionStatusesDataProvider_I
 // The test cases cover scenarios such as:
 // 1. Providing both 'start_block_id' and 'start_block_height' simultaneously.
 // 2. Providing invalid 'tx_id' value.
-// 3. Providing invalid 'start_block_id' value.
+// 3. Providing invalid 'start_block_id'  value.
 // 4. Invalid 'start_block_id' argument.
 func invalidTransactionStatusesArgumentsTestCases() []testErrType {
 	return []testErrType{
@@ -307,5 +290,30 @@ func (s *TransactionStatusesProviderSuite) TestMessageIndexTransactionStatusesPr
 
 	// Ensure the provider is properly closed after the test
 	provider.Close()
+}
 
+func expectedTransactionStatusesResponse(block flow.Block) [][]*access.TransactionResult {
+	id := unittest.IdentifierFixture()
+	cid := unittest.IdentifierFixture()
+	txr := access.TransactionResult{
+		Status:     flow.TransactionStatusSealed,
+		StatusCode: 10,
+		Events: []flow.Event{
+			unittest.EventFixture(flow.EventAccountCreated, 1, 0, id, 200),
+		},
+		ErrorMessage: "",
+		BlockID:      block.ID(),
+		CollectionID: cid,
+		BlockHeight:  block.Header.Height,
+	}
+
+	var expectedTxStatusesResponses [][]*access.TransactionResult
+	var expectedTxResultsResponses []*access.TransactionResult
+
+	for i := 0; i < 2; i++ {
+		expectedTxResultsResponses = append(expectedTxResultsResponses, &txr)
+		expectedTxStatusesResponses = append(expectedTxStatusesResponses, expectedTxResultsResponses)
+	}
+
+	return expectedTxStatusesResponses
 }
