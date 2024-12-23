@@ -1,6 +1,8 @@
 package main
 
 import (
+	"context"
+
 	"github.com/onflow/flow-go/cmd"
 	"github.com/onflow/flow-go/model/flow"
 )
@@ -19,5 +21,5 @@ func main() {
 	if err != nil {
 		exeBuilder.FlowNodeBuilder.Logger.Fatal().Err(err).Send()
 	}
-	node.Run()
+	node.Run(context.Background())
 }

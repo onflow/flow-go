@@ -1,6 +1,8 @@
 package main
 
 import (
+	"context"
+
 	"github.com/spf13/pflag"
 
 	"github.com/onflow/flow-go/cmd"
@@ -45,5 +47,5 @@ func main() {
 	if err != nil {
 		nodeBuilder.Logger.Fatal().Err(err).Send()
 	}
-	node.Run()
+	node.Run(context.Background())
 }
