@@ -71,7 +71,7 @@ import (
 	"github.com/onflow/flow-go/module/execution"
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
 	execdatacache "github.com/onflow/flow-go/module/executiondatasync/execution_data/cache"
-	"github.com/onflow/flow-go/module/executiondatasync/pruner"
+	edpruner "github.com/onflow/flow-go/module/executiondatasync/pruner"
 	edstorage "github.com/onflow/flow-go/module/executiondatasync/storage"
 	"github.com/onflow/flow-go/module/executiondatasync/tracker"
 	finalizer "github.com/onflow/flow-go/module/finalizer/consensus"
@@ -168,6 +168,9 @@ type ObserverServiceConfig struct {
 	registerCacheType                    string
 	registerCacheSize                    uint
 	programCacheSize                     uint
+	registerDBPruningEnabled             bool
+	registerDBPruneTickerInterval        time.Duration
+	registerDBPruneThrottleDelay         time.Duration
 	registerDBPruneThreshold             uint64
 	websocketConfig                      websockets.Config
 }
@@ -233,8 +236,8 @@ func DefaultObserverServiceConfig() *ObserverServiceConfig {
 		executionDataIndexingEnabled:         false,
 		executionDataDBMode:                  execution_data.ExecutionDataDBModeBadger.String(),
 		executionDataPrunerHeightRangeTarget: 0,
-		executionDataPrunerThreshold:         pruner.DefaultThreshold,
-		executionDataPruningInterval:         pruner.DefaultPruningInterval,
+		executionDataPrunerThreshold:         edpruner.DefaultThreshold,
+		executionDataPruningInterval:         edpruner.DefaultPruningInterval,
 		localServiceAPIEnabled:               false,
 		versionControlEnabled:                true,
 		stopControlEnabled:                   false,
@@ -248,13 +251,16 @@ func DefaultObserverServiceConfig() *ObserverServiceConfig {
 			RetryDelay:         edrequester.DefaultRetryDelay,
 			MaxRetryDelay:      edrequester.DefaultMaxRetryDelay,
 		},
-		scriptExecMinBlock:       0,
-		scriptExecMaxBlock:       math.MaxUint64,
-		registerCacheType:        pstorage.CacheTypeTwoQueue.String(),
-		registerCacheSize:        0,
-		programCacheSize:         0,
-		registerDBPruneThreshold: pruner.DefaultThreshold,
-		websocketConfig:          websockets.NewDefaultWebsocketConfig(),
+		scriptExecMinBlock:            0,
+		scriptExecMaxBlock:            math.MaxUint64,
+		registerCacheType:             pstorage.CacheTypeTwoQueue.String(),
+		registerCacheSize:             0,
+		programCacheSize:              0,
+		registerDBPruningEnabled:      false,
+		registerDBPruneTickerInterval: pstorage.DefaultPruneTickerInterval,
+		registerDBPruneThrottleDelay:  pstorage.DefaultPruneThrottleDelay,
+		registerDBPruneThreshold:      pstorage.DefaultPruneThreshold,
+		websocketConfig:               websockets.NewDefaultWebsocketConfig(),
 	}
 }
 
@@ -287,9 +293,12 @@ type ObserverServiceBuilder struct {
 	ExecutionDataRequester    state_synchronization.ExecutionDataRequester
 	ExecutionDataStore        execution_data.ExecutionDataStore
 	ExecutionDataBlobstore    blobs.Blobstore
-	ExecutionDataPruner       *pruner.Pruner
+	ExecutionDataPruner       *edpruner.Pruner
 	ExecutionDatastoreManager edstorage.DatastoreManager
 	ExecutionDataTracker      tracker.Storage
+
+	RegisterDB                   *pebble.DB
+	RegisterDBPrunerDependencies *cmd.DependencyList
 
 	RegistersAsyncStore *execution.RegistersAsyncStore
 	Reporter            *index.Reporter
@@ -308,9 +317,10 @@ type ObserverServiceBuilder struct {
 	// Public network
 	peerID peer.ID
 
-	TransactionMetrics *metrics.TransactionCollector
-	RestMetrics        *metrics.RestCollector
-	AccessMetrics      module.AccessMetrics
+	TransactionMetrics      *metrics.TransactionCollector
+	RestMetrics             *metrics.RestCollector
+	AccessMetrics           module.AccessMetrics
+	RegisterDBPrunerMetrics *metrics.RegisterDBPrunerCollector
 
 	// grpc servers
 	secureGrpcServer      *grpcserver.GrpcServer
@@ -579,10 +589,11 @@ func NewFlowObserverServiceBuilder(opts ...Option) *ObserverServiceBuilder {
 		opt(config)
 	}
 	anb := &ObserverServiceBuilder{
-		ObserverServiceConfig: config,
-		FlowNodeBuilder:       cmd.FlowNode("observer"),
-		FollowerDistributor:   pubsub.NewFollowerDistributor(),
-		IndexerDependencies:   cmd.NewDependencyList(),
+		ObserverServiceConfig:        config,
+		FlowNodeBuilder:              cmd.FlowNode("observer"),
+		FollowerDistributor:          pubsub.NewFollowerDistributor(),
+		IndexerDependencies:          cmd.NewDependencyList(),
+		RegisterDBPrunerDependencies: cmd.NewDependencyList(),
 	}
 	anb.FollowerDistributor.AddProposalViolationConsumer(notifications.NewSlashingViolationsConsumer(anb.Logger))
 	// the observer gets a version of the root snapshot file that does not contain any node addresses
@@ -708,6 +719,20 @@ func (builder *ObserverServiceBuilder) extraFlags() {
 			"execution-data-pruning-interval",
 			defaultConfig.executionDataPruningInterval,
 			"duration after which the pruner tries to prune execution data. The default value is 10 minutes")
+
+		// RegisterDB pruning
+		flags.BoolVar(&builder.registerDBPruningEnabled,
+			"registerdb-pruning-enabled",
+			defaultConfig.registerDBPruningEnabled,
+			"whether to enable pruning for the register db")
+		flags.DurationVar(&builder.registerDBPruneThrottleDelay,
+			"registerdb-prune-throttle-delay",
+			defaultConfig.registerDBPruneThrottleDelay,
+			"delay between batches of registers during register db pruning")
+		flags.DurationVar(&builder.registerDBPruneTickerInterval,
+			"registerdb-prune-ticker-interval",
+			defaultConfig.registerDBPruneTickerInterval,
+			"interval between register db pruning cycles. The default value is 10 minutes")
 
 		// ExecutionDataRequester config
 		flags.BoolVar(&builder.executionDataSyncEnabled,
@@ -1064,6 +1089,10 @@ func (builder *ObserverServiceBuilder) BuildExecutionSyncComponents() *ObserverS
 	requesterDependable := module.NewProxiedReadyDoneAware()
 	builder.IndexerDependencies.Add(requesterDependable)
 
+	// setup dependency chain to ensure register db pruner starts after the indexer
+	indexerDependable := module.NewProxiedReadyDoneAware()
+	builder.RegisterDBPrunerDependencies.Add(indexerDependable)
+
 	executionDataPrunerEnabled := builder.executionDataPrunerHeightRangeTarget != 0
 
 	builder.
@@ -1286,16 +1315,16 @@ func (builder *ObserverServiceBuilder) BuildExecutionSyncComponents() *ObserverS
 			}
 
 			var err error
-			builder.ExecutionDataPruner, err = pruner.NewPruner(
+			builder.ExecutionDataPruner, err = edpruner.NewPruner(
 				node.Logger,
 				prunerMetrics,
 				builder.ExecutionDataTracker,
-				pruner.WithPruneCallback(func(ctx context.Context) error {
+				edpruner.WithPruneCallback(func(ctx context.Context) error {
 					return builder.ExecutionDatastoreManager.CollectGarbage(ctx)
 				}),
-				pruner.WithHeightRangeTarget(builder.executionDataPrunerHeightRangeTarget),
-				pruner.WithThreshold(builder.executionDataPrunerThreshold),
-				pruner.WithPruningInterval(builder.executionDataPruningInterval),
+				edpruner.WithHeightRangeTarget(builder.executionDataPrunerHeightRangeTarget),
+				edpruner.WithThreshold(builder.executionDataPrunerThreshold),
+				edpruner.WithPruningInterval(builder.executionDataPruningInterval),
 			)
 			if err != nil {
 				return nil, fmt.Errorf("failed to create execution data pruner: %w", err)
@@ -1319,16 +1348,16 @@ func (builder *ObserverServiceBuilder) BuildExecutionSyncComponents() *ObserverS
 			// Note: using a DependableComponent here to ensure that the indexer does not block
 			// other components from starting while bootstrapping the register db since it may
 			// take hours to complete.
-
-			pdb, err := pstorage.OpenRegisterPebbleDB(builder.registersDBPath)
+			var err error
+			builder.RegisterDB, err = pstorage.OpenRegisterPebbleDB(builder.registersDBPath)
 			if err != nil {
 				return nil, fmt.Errorf("could not open registers db: %w", err)
 			}
 			builder.ShutdownFunc(func() error {
-				return pdb.Close()
+				return builder.RegisterDB.Close()
 			})
 
-			bootstrapped, err := pstorage.IsBootstrapped(pdb)
+			bootstrapped, err := pstorage.IsBootstrapped(builder.RegisterDB)
 			if err != nil {
 				return nil, fmt.Errorf("could not check if registers db is bootstrapped: %w", err)
 			}
@@ -1360,7 +1389,7 @@ func (builder *ObserverServiceBuilder) BuildExecutionSyncComponents() *ObserverS
 				}
 
 				rootHash := ledger.RootHash(builder.RootSeal.FinalState)
-				bootstrap, err := pstorage.NewRegisterBootstrap(pdb, checkpointFile, checkpointHeight, rootHash, builder.Logger)
+				bootstrap, err := pstorage.NewRegisterBootstrap(builder.RegisterDB, checkpointFile, checkpointHeight, rootHash, builder.Logger)
 				if err != nil {
 					return nil, fmt.Errorf("could not create registers bootstrap: %w", err)
 				}
@@ -1373,7 +1402,7 @@ func (builder *ObserverServiceBuilder) BuildExecutionSyncComponents() *ObserverS
 				}
 			}
 
-			registers, err := pstorage.NewRegisters(pdb, builder.registerDBPruneThreshold)
+			registers, err := pstorage.NewRegisters(builder.RegisterDB, builder.registerDBPruneThreshold)
 			if err != nil {
 				return nil, fmt.Errorf("could not create registers storage: %w", err)
 			}
@@ -1472,8 +1501,31 @@ func (builder *ObserverServiceBuilder) BuildExecutionSyncComponents() *ObserverS
 				builder.StopControl.RegisterHeightRecorder(builder.ExecutionIndexer)
 			}
 
+			// add indexer into ReadyDoneAware dependency passed to pruner. This allows the register db pruner
+			// to wait for the indexer to be ready before starting.
+			indexerDependable.Init(builder.ExecutionIndexer)
+
 			return builder.ExecutionIndexer, nil
-		}, builder.IndexerDependencies)
+		}, builder.IndexerDependencies).
+			DependableComponent("register db pruner", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
+				if !builder.registerDBPruningEnabled {
+					return &module.NoopReadyDoneAware{}, nil
+				}
+
+				registerDBPruner, err := pstorage.NewRegisterPruner(
+					node.Logger,
+					builder.RegisterDB,
+					builder.RegisterDBPrunerMetrics,
+					pstorage.WithPruneThreshold(builder.registerDBPruneThreshold),
+					pstorage.WithPruneThrottleDelay(builder.registerDBPruneThrottleDelay),
+					pstorage.WithPruneTickerInterval(builder.registerDBPruneTickerInterval),
+				)
+				if err != nil {
+					return nil, fmt.Errorf("failed to create register db pruner: %w", err)
+				}
+
+				return registerDBPruner, nil
+			}, builder.RegisterDBPrunerDependencies)
 	}
 
 	if builder.stateStreamConf.ListenAddr != "" {
@@ -1702,11 +1754,16 @@ func (builder *ObserverServiceBuilder) enqueueRPCServer() {
 		builder.RestMetrics = m
 		return nil
 	})
+	builder.Module("register db metrics", func(node *cmd.NodeConfig) error {
+		builder.RegisterDBPrunerMetrics = metrics.NewRegisterDBPrunerCollector()
+		return nil
+	})
 	builder.Module("access metrics", func(node *cmd.NodeConfig) error {
 		builder.AccessMetrics = metrics.NewAccessCollector(
 			metrics.WithTransactionMetrics(builder.TransactionMetrics),
 			metrics.WithBackendScriptsMetrics(builder.TransactionMetrics),
 			metrics.WithRestMetrics(builder.RestMetrics),
+			metrics.WithRegisterDBPrunerMetrics(builder.RegisterDBPrunerMetrics),
 		)
 		return nil
 	})

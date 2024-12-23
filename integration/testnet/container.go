@@ -257,6 +257,10 @@ func (c *Container) DBPath() string {
 	return filepath.Join(c.datadir, DefaultFlowDBDir)
 }
 
+func (c *Container) PebbleDBPath() string {
+	return filepath.Join(c.datadir, DefaultExecutionStateDir)
+}
+
 func (c *Container) ExecutionDataDBPath() string {
 	return filepath.Join(c.datadir, DefaultExecutionDataServiceDir)
 }
