@@ -236,10 +236,6 @@ func (c *Controller) writeMessages(ctx context.Context) error {
 // - context.Canceled if the client disconnected
 func (c *Controller) readMessages(ctx context.Context) error {
 	for {
-		if err := c.conn.SetReadDeadline(time.Now().Add(10 * time.Second)); err != nil {
-			return fmt.Errorf("failed to set the read deadline: %w", err)
-		}
-
 		var message json.RawMessage
 		if err := c.conn.ReadJSON(&message); err != nil {
 			if errors.Is(err, websocket.ErrCloseSent) {
@@ -253,8 +249,6 @@ func (c *Controller) readMessages(ctx context.Context) error {
 			continue
 		}
 
-		c.logger.Debug().Msgf("!!!! go to parseAndValidateMessage error")
-
 		err := c.parseAndValidateMessage(ctx, message)
 		if err != nil {
 			c.logger.Debug().Msgf("!!!! parseAndValidateMessage error %v", err)
@@ -264,6 +258,7 @@ func (c *Controller) readMessages(ctx context.Context) error {
 				wrapErrorMessage(InvalidMessage, "error parsing message", "", "", ""))
 			continue
 		}
+		c.logger.Debug().Msgf("!!!! success")
 	}
 }
 
