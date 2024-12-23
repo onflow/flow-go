@@ -51,7 +51,13 @@ func NewServer(serverAPI access.API,
 		builder.AddLegacyWebsocketsRoutes(stateStreamApi, chain, stateStreamConfig, config.MaxRequestSize)
 	}
 
-	dataProviderFactory := dp.NewDataProviderFactory(logger, stateStreamApi, serverAPI)
+	dataProviderFactory := dp.NewDataProviderFactory(
+		logger,
+		stateStreamApi,
+		serverAPI,
+		chain,
+		stateStreamConfig.EventFilterConfig,
+		stateStreamConfig.HeartbeatInterval)
 	builder.AddWebsocketsRoute(chain, wsConfig, config.MaxRequestSize, dataProviderFactory)
 
 	c := cors.New(cors.Options{

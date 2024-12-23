@@ -29,13 +29,18 @@ const (
 	// if the client is slow or unresponsive. This prevents resource exhaustion
 	// and allows the server to gracefully handle timeouts for delayed writes.
 	WriteWait = 10 * time.Second
+
+	DefaultInactivityTimeout time.Duration = 1 * time.Minute
 )
 
 type Config struct {
 	MaxSubscriptionsPerConnection uint64
 	MaxResponsesPerSecond         uint64
-	SendMessageTimeout            time.Duration
+	SendMessageTimeout            time.Duration // TODO: Do we need this, if we have MaxResponsesPerSecond ?
 	MaxRequestSize                int64
+	// InactivityTimeout specifies the duration a WebSocket connection can remain open without any active subscriptions
+	// before being automatically closed
+	InactivityTimeout time.Duration
 }
 
 func NewDefaultWebsocketConfig() Config {
@@ -44,5 +49,6 @@ func NewDefaultWebsocketConfig() Config {
 		MaxResponsesPerSecond:         1000,
 		SendMessageTimeout:            10 * time.Second,
 		MaxRequestSize:                1024,
+		InactivityTimeout:             DefaultInactivityTimeout,
 	}
 }
