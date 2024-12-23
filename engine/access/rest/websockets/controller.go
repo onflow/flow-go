@@ -18,6 +18,7 @@ import (
 	dp "github.com/onflow/flow-go/engine/access/rest/websockets/data_providers"
 	"github.com/onflow/flow-go/engine/access/rest/websockets/models"
 	"github.com/onflow/flow-go/utils/concurrentmap"
+	"github.com/onflow/flow-go/utils/concurrentticker"
 )
 
 type Controller struct {
@@ -33,6 +34,7 @@ type Controller struct {
 	dataProviderFactory dp.DataProviderFactory
 	dataProvidersGroup  *sync.WaitGroup
 	limiter             *rate.Limiter
+	inactivityTracker   *concurrentticker.Ticker
 }
 
 func NewWebSocketController(
@@ -50,6 +52,7 @@ func NewWebSocketController(
 		dataProviderFactory: dataProviderFactory,
 		dataProvidersGroup:  &sync.WaitGroup{},
 		limiter:             rate.NewLimiter(rate.Limit(config.MaxResponsesPerSecond), 1),
+		inactivityTracker:   concurrentticker.NewTicker(config.InactivityTimeout),
 	}
 }
 
@@ -129,27 +132,36 @@ func (c *Controller) configureKeepalive() error {
 // Parameters:
 // - ctx: Context to control cancellation and timeouts.
 func (c *Controller) monitorInactivity(ctx context.Context) error {
+	defer c.inactivityTracker.Stop()
+
 	for {
 		select {
 		case <-ctx.Done():
 			return nil
-		default:
+		case <-c.inactivityTracker.C():
 			if c.dataProviders.Size() == 0 {
-				<-time.After(c.config.InactivityTimeout)
-
-				if c.dataProviders.Size() == 0 {
-					// TODO: decide if we need to write response message with reason to client
-					return fmt.Errorf("no recent activity for %v", c.config.InactivityTimeout)
-				}
+				// Optionally send a message to the client indicating the reason for closure.
+				c.logger.Info().Msg("Connection inactive, closing due to timeout.")
+				return fmt.Errorf("no recent activity for %v", c.config.InactivityTimeout)
 			}
 		}
+	}
+}
+
+// checkInactivity checks if there are no active data providers
+// and resets the inactivity timer. This function should be called after removing a data provider
+// to update the inactivity tracker and ensure it reflects the current state.
+func (c *Controller) checkInactivity() {
+	if c.dataProviders.Size() == 0 {
+		c.inactivityTracker.Reset(c.config.InactivityTimeout)
 	}
 }
 
 // keepalive sends a ping message periodically to keep the WebSocket connection alive
 // and avoid timeouts.
 //
-// No errors are expected during normal operation. All errors are considered benign.
+// Expected errors during normal operation:
+// - context.Canceled if the client disconnected
 func (c *Controller) keepalive(ctx context.Context) error {
 	pingTicker := time.NewTicker(PingPeriod)
 	defer pingTicker.Stop()
@@ -343,6 +355,7 @@ func (c *Controller) handleSubscribe(ctx context.Context, msg models.SubscribeMe
 
 		c.dataProvidersGroup.Done()
 		c.dataProviders.Remove(provider.ID())
+		c.checkInactivity()
 	}()
 }
 
@@ -378,6 +391,7 @@ func (c *Controller) handleUnsubscribe(ctx context.Context, msg models.Unsubscri
 	}
 
 	c.dataProviders.Remove(id)
+	c.checkInactivity()
 
 	responseOk := models.UnsubscribeMessageResponse{
 		BaseMessageResponse: models.BaseMessageResponse{
