@@ -1,59 +1,165 @@
 name: CD
 
 on:
-# Workflow dispatch for now, while we're testing environments
-  # push:
-  #   tags:
-  #     - '*'
-  #     - "!daily-*"
   workflow_dispatch:
     inputs:
       tag:
-        description: 'Tag/commit'
+        description: 'Tag to build & push'
         required: true
         type: string
-
-
 env:
   GO_VERSION: "1.22"
+  PRIVATE_REGISTRY_HOST: us-central1-docker.pkg.dev
 
 jobs:
-  docker-push:
-    name: Push to container registry
+  # Build and Push to Private Registry
+  private-build:
+    name: Build & Push to Private Container Registry
     runs-on: ubuntu-latest
-    environment: Production Docker Registry
+    strategy:
+      fail-fast: false
+      matrix:
+        role: [access, collection, consensus, execution, observer, verification]
+    environment: Private Registry Builds 
     steps:
-    - name: Setup Go
-      uses: actions/setup-go@v4
-      timeout-minutes: 10 # fail fast. sometimes this step takes an extremely long time
-      with:
-        go-version: ${{ env.GO_VERSION }}
-    - name: Checkout repo
-      uses: actions/checkout@v2
-      with:
-        ref: ${{ inputs.tag }}
-    # Provide Google Service Account credentials to Github Action, allowing interaction with the Google Container Registry
-    # Logging in as github-actions@dl-flow.iam.gserviceaccount.com
-    - id: auth
-      uses: google-github-actions/auth@v1
-      with:
-        credentials_json: ${{ secrets.GCR_SERVICE_KEY_SECRET }}
-    - name: Set up Google Cloud SDK
-      uses: google-github-actions/setup-gcloud@v1
-    - name: Authenticate docker with gcloud
-      run: |
-        gcloud auth configure-docker
-    - name: Docker build
-      env:
-        CADENCE_DEPLOY_KEY: ${{ secrets.CADENCE_DEPLOY_KEY }}
-      run: |
-        make docker-build-flow-with-adx
-        make docker-build-flow-without-adx
-        make docker-build-flow-without-netgo-without-adx
-        make docker-cross-build-flow-arm
-    - name: Docker push
-      run: |
-        make docker-push-flow-with-adx
-        make docker-push-flow-without-adx
-        make docker-push-flow-without-netgo-without-adx
-        make docker-push-flow-arm
+      - name: Setup Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: ${{ env.GO_VERSION }}
+
+      - name: Checkout repo
+        uses: actions/checkout@v3
+
+      - id: auth
+        uses: google-github-actions/auth@v1
+        with:
+          credentials_json: ${{ secrets.PRIVATE_REGISTRY_UPLOAD_SECRET }}
+
+      - name: Authenticate Docker with gcloud
+        run: gcloud auth configure-docker ${{ env.PRIVATE_REGISTRY_HOST }}
+
+      - name: Build & Push ${{ matrix.role }}
+        env:
+          IMAGE_TAG: ${{ inputs.tag }}
+          CONTAINER_REGISTRY: ${{ vars.PRIVATE_REGISTRY }}
+        run: |
+          make docker-build-${{ matrix.role }}-with-adx docker-push-${{ matrix.role }}-with-adx CONTAINER_REGISTRY=${CONTAINER_REGISTRY}
+          make docker-build-${{ matrix.role }}-without-adx docker-push-${{ matrix.role }}-without-adx CONTAINER_REGISTRY=${CONTAINER_REGISTRY}
+          make docker-build-${{ matrix.role }}-without-netgo-without-adx docker-push-${{ matrix.role }}-without-netgo-without-adx CONTAINER_REGISTRY=${CONTAINER_REGISTRY}
+          make docker-cross-build-${{ matrix.role }}-arm docker-push-${{ matrix.role }}-arm CONTAINER_REGISTRY=${CONTAINER_REGISTRY} 
+
+  # Individual Promotion Jobs with unique environments enables individual image promotion 
+  promote-access:
+    name: Promote Access Image to Public Registry
+    runs-on: ubuntu-latest
+    needs: private-build
+    environment: Public Access Image Promotion
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v3
+
+      - name: Promote Access
+        uses: ./actions/promote-images
+        with:
+          gcp_credentials: ${{ secrets.PUBLIC_REGISTRY_PROMOTION_SECRET }}
+          private_registry: ${{ vars.PRIVATE_REGISTRY }}
+          private_registry_host: ${{ env.PRIVATE_REGISTRY_HOST }}
+          public_registry: ${{ vars.PUBLIC_REGISTRY }}
+          role: access
+          tags: "${{ inputs.tag }},${{ inputs.tag }}-without-adx,${{ inputs.tag }}-without-netgo-without-adx,${{ inputs.tag }}-arm"
+
+  promote-collection:
+    name: Promote Collection Image to Public Registry
+    runs-on: ubuntu-latest
+    needs: private-build
+    environment: Public Collection Image Promotion
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v3
+
+      - name: Promote Collection
+        uses: ./actions/promote-images
+        with:
+          gcp_credentials: ${{ secrets.PUBLIC_REGISTRY_PROMOTION_SECRET }}
+          private_registry: ${{ vars.PRIVATE_REGISTRY }}
+          private_registry_host: ${{ env.PRIVATE_REGISTRY_HOST }}
+          public_registry: ${{ vars.PUBLIC_REGISTRY }}
+          role: collection
+          tags: "${{ inputs.tag }},${{ inputs.tag }}-without-adx,${{ inputs.tag }}-without-netgo-without-adx,${{ inputs.tag }}-arm"
+
+  promote-consensus:
+    name: Promote Consensus Image to Public Registry
+    runs-on: ubuntu-latest
+    needs: private-build
+    environment: Public Consensus Image Promotion
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v3
+
+      - name: Promote Consensus
+        uses: ./actions/promote-images
+        with:
+          gcp_credentials: ${{ secrets.PUBLIC_REGISTRY_PROMOTION_SECRET }}
+          private_registry: ${{ vars.PRIVATE_REGISTRY }}
+          private_registry_host: ${{ env.PRIVATE_REGISTRY_HOST }}
+          public_registry: ${{ vars.PUBLIC_REGISTRY }}
+          role: consensus
+          tags: "${{ inputs.tag }},${{ inputs.tag }}-without-adx,${{ inputs.tag }}-without-netgo-without-adx,${{ inputs.tag }}-arm"
+
+  promote-execution:
+    name: Promote Execution Image to Public Registry
+    runs-on: ubuntu-latest
+    needs: private-build
+    environment: Public Execution Image Promotion
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v3
+
+      - name: Promote Execution
+        uses: ./actions/promote-images
+        with:
+          gcp_credentials: ${{ secrets.PUBLIC_REGISTRY_PROMOTION_SECRET }}
+          private_registry: ${{ vars.PRIVATE_REGISTRY }}
+          private_registry_host: ${{ env.PRIVATE_REGISTRY_HOST }}
+          public_registry: ${{ vars.PUBLIC_REGISTRY }}
+          role: execution
+          tags: "${{ inputs.tag }},${{ inputs.tag }}-without-adx,${{ inputs.tag }}-without-netgo-without-adx,${{ inputs.tag }}-arm"
+
+  promote-observer:
+    name: Promote Observer Image to Public Registry
+    runs-on: ubuntu-latest
+    needs: private-build
+    environment: Public Observer Image Promotion
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v3
+
+      - name: Promote Observer
+        uses: ./actions/promote-images
+        with:
+          gcp_credentials: ${{ secrets.PUBLIC_REGISTRY_PROMOTION_SECRET }}
+          private_registry: ${{ vars.PRIVATE_REGISTRY }}
+          private_registry_host: ${{ env.PRIVATE_REGISTRY_HOST }}
+          public_registry: ${{ vars.PUBLIC_REGISTRY }}
+          role: observer
+          tags: "${{ inputs.tag }},${{ inputs.tag }}-without-adx,${{ inputs.tag }}-without-netgo-without-adx,${{ inputs.tag }}-arm"
+
+  promote-verification:
+    name: Promote Verification Image to Public Registry
+    runs-on: ubuntu-latest
+    needs: private-build
+    environment: Public Verification Image Promotion
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v3
+
+      - name: Promote Verification
+        uses: ./actions/promote-images
+        with:
+          gcp_credentials: ${{ secrets.PUBLIC_REGISTRY_PROMOTION_SECRET }}
+          private_registry: ${{ vars.PRIVATE_REGISTRY }}
+          private_registry_host: ${{ env.PRIVATE_REGISTRY_HOST }}
+          public_registry: ${{ vars.PUBLIC_REGISTRY }}
+          role: verification
+          tags: "${{ inputs.tag }},${{ inputs.tag }}-without-adx,${{ inputs.tag }}-without-netgo-without-adx,${{ inputs.tag }}-arm"
+
