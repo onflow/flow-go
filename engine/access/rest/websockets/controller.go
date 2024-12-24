@@ -236,29 +236,35 @@ func (c *Controller) writeMessages(ctx context.Context) error {
 // - context.Canceled if the client disconnected
 func (c *Controller) readMessages(ctx context.Context) error {
 	for {
-		var message json.RawMessage
-		if err := c.conn.ReadJSON(&message); err != nil {
-			//if errors.Is(err, websocket.ErrCloseSent) {
-			//	return err
-			//}
-			if _, ok := err.(*websocket.CloseError); !ok {
-				return err
+		select {
+		case <-ctx.Done():
+			return nil
+		default:
+			var message json.RawMessage
+			if err := c.conn.ReadJSON(&message); err != nil {
+				//if errors.Is(err, websocket.ErrCloseSent) {
+				//	return err
+				//}
+				var closeErr *websocket.CloseError
+				if errors.As(err, &closeErr) {
+					return err
+				}
+
+				c.writeErrorResponse(
+					ctx,
+					err,
+					wrapErrorMessage(InvalidMessage, "error reading message", "", "", ""))
+				continue
 			}
 
-			c.writeErrorResponse(
-				ctx,
-				err,
-				wrapErrorMessage(InvalidMessage, "error reading message", "", "", ""))
-			continue
-		}
-
-		err := c.parseAndValidateMessage(ctx, message)
-		if err != nil {
-			c.writeErrorResponse(
-				ctx,
-				err,
-				wrapErrorMessage(InvalidMessage, "error parsing message", "", "", ""))
-			continue
+			err := c.parseAndValidateMessage(ctx, message)
+			if err != nil {
+				c.writeErrorResponse(
+					ctx,
+					err,
+					wrapErrorMessage(InvalidMessage, "error parsing message", "", "", ""))
+				continue
+			}
 		}
 	}
 }
