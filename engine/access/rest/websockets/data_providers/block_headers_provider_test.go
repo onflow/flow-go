@@ -106,20 +106,26 @@ func (s *BlockHeadersProviderSuite) validBlockHeadersArgumentsTestCases() []test
 // validates that block headers are correctly streamed to the channel and ensures
 // no unexpected errors occur.
 func (s *BlockHeadersProviderSuite) TestBlockHeadersDataProvider_HappyPath() {
-	s.testHappyPath(
+	testHappyPath(
+		s.T(),
 		BlockHeadersTopic,
+		s.factory,
 		s.validBlockHeadersArgumentsTestCases(),
-		func(dataChan chan interface{}, blocks []*flow.Block) {
-			for _, block := range blocks {
+		func(dataChan chan interface{}) {
+			for _, block := range s.blocks {
 				dataChan <- block.Header
 			}
 		},
-		s.requireBlockHeaders,
+		s.blocks,
+		s.requireBlockHeader,
 	)
 }
 
 // requireBlockHeaders ensures that the received block header information matches the expected data.
-func (s *BlockHeadersProviderSuite) requireBlockHeaders(v interface{}, expectedBlock *flow.Block) {
+func (s *BlockHeadersProviderSuite) requireBlockHeader(v interface{}, expected interface{}) {
+	expectedBlock, ok := expected.(*flow.Block)
+	require.True(s.T(), ok, "unexpected type: %T", v)
+
 	actualResponse, ok := v.(*models.BlockHeaderMessageResponse)
 	require.True(s.T(), ok, "unexpected response type: %T", v)
 
