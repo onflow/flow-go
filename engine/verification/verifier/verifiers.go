@@ -1,8 +1,10 @@
 package verifier
 
 import (
+	"context"
 	"errors"
 	"fmt"
+	"sync"
 
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
@@ -25,7 +27,7 @@ import (
 // It assumes the latest sealed block has been executed, and the chunk data packs have not been
 // pruned.
 // Note, it returns nil if certain block is not executed, in this case warning will be logged
-func VerifyLastKHeight(k uint64, chainID flow.ChainID, protocolDataDir string, chunkDataPackDir string) (err error) {
+func VerifyLastKHeight(k uint64, chainID flow.ChainID, protocolDataDir string, chunkDataPackDir string, nWorker uint) (err error) {
 	closer, storages, chunkDataPacks, state, verifier, err := initStorages(chainID, protocolDataDir, chunkDataPackDir)
 	if err != nil {
 		return fmt.Errorf("could not init storages: %w", err)
@@ -62,12 +64,9 @@ func VerifyLastKHeight(k uint64, chainID flow.ChainID, protocolDataDir string, c
 
 	log.Info().Msgf("verifying blocks from %d to %d", from, to)
 
-	for height := from; height <= to; height++ {
-		log.Info().Uint64("height", height).Msg("verifying height")
-		err := verifyHeight(height, storages.Headers, chunkDataPacks, storages.Results, state, verifier)
-		if err != nil {
-			return fmt.Errorf("could not verify height %d: %w", height, err)
-		}
+	err = verifyConcurrently(from, to, nWorker, storages.Headers, chunkDataPacks, storages.Results, state, verifier, verifyHeight)
+	if err != nil {
+		return err
 	}
 
 	return nil
@@ -79,6 +78,7 @@ func VerifyRange(
 	from, to uint64,
 	chainID flow.ChainID,
 	protocolDataDir string, chunkDataPackDir string,
+	nWorker uint,
 ) (err error) {
 	closer, storages, chunkDataPacks, state, verifier, err := initStorages(chainID, protocolDataDir, chunkDataPackDir)
 	if err != nil {
@@ -99,12 +99,94 @@ func VerifyRange(
 		return fmt.Errorf("cannot verify blocks before the root block, from: %d, root: %d", from, root)
 	}
 
-	for height := from; height <= to; height++ {
-		log.Info().Uint64("height", height).Msg("verifying height")
-		err := verifyHeight(height, storages.Headers, chunkDataPacks, storages.Results, state, verifier)
-		if err != nil {
-			return fmt.Errorf("could not verify height %d: %w", height, err)
+	err = verifyConcurrently(from, to, nWorker, storages.Headers, chunkDataPacks, storages.Results, state, verifier, verifyHeight)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func verifyConcurrently(
+	from, to uint64,
+	nWorker uint,
+	headers storage.Headers,
+	chunkDataPacks storage.ChunkDataPacks,
+	results storage.ExecutionResults,
+	state protocol.State,
+	verifier module.ChunkVerifier,
+	verifyHeight func(uint64, storage.Headers, storage.ChunkDataPacks, storage.ExecutionResults, protocol.State, module.ChunkVerifier) error,
+) error {
+	tasks := make(chan uint64, int(nWorker))
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel() // Ensure cancel is called to release resources
+
+	var lowestErr error
+	var lowestErrHeight uint64 = ^uint64(0) // Initialize to max value of uint64
+	var mu sync.Mutex                       // To protect access to lowestErr and lowestErrHeight
+
+	// Worker function
+	worker := func() {
+		for {
+			select {
+			case <-ctx.Done():
+				return // Stop processing tasks if context is canceled
+			case height, ok := <-tasks:
+				if !ok {
+					return // Exit if the tasks channel is closed
+				}
+				log.Info().Uint64("height", height).Msg("verifying height")
+				err := verifyHeight(height, headers, chunkDataPacks, results, state, verifier)
+				if err != nil {
+					log.Error().Uint64("height", height).Err(err).Msg("error encountered while verifying height")
+
+					// when encountered an error, the error might not be from the lowest height that had
+					// error, so we need to first cancel the context to stop worker from processing further tasks
+					// and wait until all workers are done, which will ensure all the heights before this height
+					// that had error are processed. Then we can safely update the lowestErr and lowestErrHeight
+					mu.Lock()
+					if height < lowestErrHeight {
+						lowestErr = err
+						lowestErrHeight = height
+						cancel() // Cancel context to stop further task dispatch
+					}
+					mu.Unlock()
+				} else {
+					log.Info().Uint64("height", height).Msg("verified height successfully")
+				}
+			}
 		}
+	}
+
+	// Start nWorker workers
+	var wg sync.WaitGroup
+	for i := 0; i < int(nWorker); i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			worker()
+		}()
+	}
+
+	// Send tasks to workers
+	go func() {
+		defer close(tasks) // Close tasks channel once all tasks are pushed
+		for height := from; height <= to; height++ {
+			select {
+			case <-ctx.Done():
+				return // Stop pushing tasks if context is canceled
+			case tasks <- height:
+			}
+		}
+	}()
+
+	// Wait for all workers to complete
+	wg.Wait()
+
+	// Check if there was an error
+	if lowestErr != nil {
+		log.Error().Uint64("height", lowestErrHeight).Err(lowestErr).Msg("error encountered while verifying height")
+		return fmt.Errorf("could not verify height %d: %w", lowestErrHeight, lowestErr)
 	}
 
 	return nil
