@@ -238,7 +238,10 @@ func (c *Controller) readMessages(ctx context.Context) error {
 	for {
 		var message json.RawMessage
 		if err := c.conn.ReadJSON(&message); err != nil {
-			if errors.Is(err, websocket.ErrCloseSent) {
+			//if errors.Is(err, websocket.ErrCloseSent) {
+			//	return err
+			//}
+			if _, ok := err.(*websocket.CloseError); !ok {
 				return err
 			}
 
@@ -251,20 +254,16 @@ func (c *Controller) readMessages(ctx context.Context) error {
 
 		err := c.parseAndValidateMessage(ctx, message)
 		if err != nil {
-			c.logger.Debug().Msgf("!!!! parseAndValidateMessage error %v", err)
 			c.writeErrorResponse(
 				ctx,
 				err,
 				wrapErrorMessage(InvalidMessage, "error parsing message", "", "", ""))
 			continue
 		}
-		c.logger.Debug().Msgf("!!!! success")
 	}
 }
 
 func (c *Controller) parseAndValidateMessage(ctx context.Context, message json.RawMessage) error {
-	c.logger.Debug().Msg("!!!! parseAndValidateMessage")
-
 	var baseMsg models.BaseMessageRequest
 	if err := json.Unmarshal(message, &baseMsg); err != nil {
 		return fmt.Errorf("error unmarshalling base message: %w", err)
