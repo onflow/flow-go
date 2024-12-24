@@ -3,7 +3,6 @@ package data_providers
 import (
 	"context"
 	"fmt"
-	"strconv"
 
 	"github.com/rs/zerolog"
 	"google.golang.org/grpc/codes"
@@ -99,7 +98,7 @@ func (p *AccountStatusesDataProvider) createSubscription(ctx context.Context, ar
 // No errors are expected during normal operations.
 func (p *AccountStatusesDataProvider) handleResponse() func(accountStatusesResponse *backend.AccountStatusesResponse) error {
 	blocksSinceLastMessage := uint64(0)
-	messageIndex := counters.NewMonotonousCounter(1)
+	messageIndex := counters.NewMonotonousCounter(0)
 
 	return func(accountStatusesResponse *backend.AccountStatusesResponse) error {
 		// check if there are any events in the response. if not, do not send a message unless the last
@@ -112,17 +111,15 @@ func (p *AccountStatusesDataProvider) handleResponse() func(accountStatusesRespo
 			blocksSinceLastMessage = 0
 		}
 
-		index := messageIndex.Value()
 		if ok := messageIndex.Set(messageIndex.Value() + 1); !ok {
 			return status.Errorf(codes.Internal, "message index already incremented to %d", messageIndex.Value())
 		}
+		index := messageIndex.Value()
 
-		p.send <- &models.AccountStatusesResponse{
-			BlockID:       accountStatusesResponse.BlockID.String(),
-			Height:        strconv.FormatUint(accountStatusesResponse.Height, 10),
-			AccountEvents: accountStatusesResponse.AccountEvents,
-			MessageIndex:  strconv.FormatUint(index, 10),
-		}
+		var response models.AccountStatusesResponse
+		response.Build(accountStatusesResponse, index)
+
+		p.send <- &response
 
 		return nil
 	}

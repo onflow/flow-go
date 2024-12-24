@@ -57,7 +57,9 @@ func NewServer(serverAPI access.API,
 		serverAPI,
 		chain,
 		stateStreamConfig.EventFilterConfig,
-		stateStreamConfig.HeartbeatInterval)
+		stateStreamConfig.HeartbeatInterval,
+		builder.LinkGenerator,
+	)
 	builder.AddWebsocketsRoute(chain, wsConfig, config.MaxRequestSize, dataProviderFactory)
 
 	c := cors.New(cors.Options{

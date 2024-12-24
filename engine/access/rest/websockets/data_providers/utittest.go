@@ -15,9 +15,10 @@ import (
 
 // testType represents a valid test scenario for subscribing
 type testType struct {
-	name         string
-	arguments    models.Arguments
-	setupBackend func(sub *statestreamsmock.Subscription)
+	name              string
+	arguments         models.Arguments
+	setupBackend      func(sub *statestreamsmock.Subscription)
+	expectedResponses []interface{}
 }
 
 type testErrType struct {
@@ -32,19 +33,18 @@ type testErrType struct {
 // as expected without encountering errors.
 //
 // Arguments:
+// - t: The testing context.
 // - topic: The topic associated with the data provider.
 // - factory: A factory for creating data provider instance.
 // - tests: A slice of test cases to run, each specifying setup and validation logic.
 // - sendData: A function to simulate emitting data into the subscription's data channel.
-// - expectedResponses: An expected responses to validate the received output.
 // - requireFn: A function to validate the output received in the send channel.
-func testHappyPath[T any](
+func testHappyPath(
 	t *testing.T,
 	topic string,
 	factory *DataProviderFactoryImpl,
 	tests []testType,
 	sendData func(chan interface{}),
-	expectedResponses []T,
 	requireFn func(interface{}, interface{}),
 ) {
 	for _, test := range tests {
@@ -79,7 +79,7 @@ func testHappyPath[T any](
 			}()
 
 			// Collect responses
-			for i, expected := range expectedResponses {
+			for i, expected := range test.expectedResponses {
 				unittest.RequireReturnsBefore(t, func() {
 					v, ok := <-send
 					require.True(t, ok, "channel closed while waiting for response %v: err: %v", expected, sub.Err())

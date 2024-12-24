@@ -54,7 +54,7 @@ func Decorate(r *http.Request, chain flow.Chain) *Request {
 	}
 
 	if expandFields, found := middleware.GetFieldsToExpand(r); found {
-		decoratedReq.ExpandFields = sliceToMap(expandFields)
+		decoratedReq.ExpandFields = SliceToMap(expandFields)
 	}
 
 	if selectFields, found := middleware.GetFieldsToSelect(r); found {
@@ -62,14 +62,6 @@ func Decorate(r *http.Request, chain flow.Chain) *Request {
 	}
 
 	return decoratedReq
-}
-
-func sliceToMap(values []string) map[string]bool {
-	valueMap := make(map[string]bool, len(values))
-	for _, v := range values {
-		valueMap[v] = true
-	}
-	return valueMap
 }
 
 func toStringArray(in string) []string {

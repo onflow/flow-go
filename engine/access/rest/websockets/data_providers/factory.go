@@ -7,6 +7,7 @@ import (
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/access"
+	commonmodels "github.com/onflow/flow-go/engine/access/rest/common/models"
 	"github.com/onflow/flow-go/engine/access/rest/websockets/models"
 	"github.com/onflow/flow-go/engine/access/state_stream"
 	"github.com/onflow/flow-go/model/flow"
@@ -48,6 +49,8 @@ type DataProviderFactoryImpl struct {
 	chain             flow.Chain
 	eventFilterConfig state_stream.EventFilterConfig
 	heartbeatInterval uint64
+
+	linkGenerator commonmodels.LinkGenerator
 }
 
 // NewDataProviderFactory creates a new DataProviderFactory
@@ -64,6 +67,7 @@ func NewDataProviderFactory(
 	chain flow.Chain,
 	eventFilterConfig state_stream.EventFilterConfig,
 	heartbeatInterval uint64,
+	linkGenerator commonmodels.LinkGenerator,
 ) *DataProviderFactoryImpl {
 	return &DataProviderFactoryImpl{
 		logger:            logger,
@@ -72,6 +76,7 @@ func NewDataProviderFactory(
 		chain:             chain,
 		eventFilterConfig: eventFilterConfig,
 		heartbeatInterval: heartbeatInterval,
+		linkGenerator:     linkGenerator,
 	}
 }
 
@@ -93,7 +98,7 @@ func (s *DataProviderFactoryImpl) NewDataProvider(
 ) (DataProvider, error) {
 	switch topic {
 	case BlocksTopic:
-		return NewBlocksDataProvider(ctx, s.logger, s.accessApi, topic, arguments, ch)
+		return NewBlocksDataProvider(ctx, s.logger, s.accessApi, s.linkGenerator, topic, arguments, ch)
 	case BlockHeadersTopic:
 		return NewBlockHeadersDataProvider(ctx, s.logger, s.accessApi, topic, arguments, ch)
 	case BlockDigestsTopic:
@@ -103,8 +108,7 @@ func (s *DataProviderFactoryImpl) NewDataProvider(
 	case AccountStatusesTopic:
 		return NewAccountStatusesDataProvider(ctx, s.logger, s.stateStreamApi, topic, arguments, ch, s.chain, s.eventFilterConfig, s.heartbeatInterval)
 	case TransactionStatusesTopic:
-		// TODO: Implemented handlers for each topic should be added in respective case
-		return nil, fmt.Errorf(`topic "%s" not implemented yet`, topic)
+		return NewTransactionStatusesDataProvider(ctx, s.logger, s.accessApi, s.linkGenerator, topic, arguments, ch)
 	default:
 		return nil, fmt.Errorf("unsupported topic \"%s\"", topic)
 	}

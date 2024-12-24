@@ -52,7 +52,9 @@ func (s *AccountStatusesProviderSuite) SetupTest() {
 		nil,
 		s.chain,
 		state_stream.DefaultEventFilterConfig,
-		subscription.DefaultHeartbeatInterval)
+		subscription.DefaultHeartbeatInterval,
+		nil,
+	)
 	s.Require().NotNil(s.factory)
 }
 
@@ -61,39 +63,32 @@ func (s *AccountStatusesProviderSuite) SetupTest() {
 // validates that events are correctly streamed to the channel and ensures
 // no unexpected errors occur.
 func (s *AccountStatusesProviderSuite) TestAccountStatusesDataProvider_HappyPath() {
-
-	expectedEvents := []flow.Event{
+	events := []flow.Event{
 		unittest.EventFixture(state_stream.CoreEventAccountCreated, 0, 0, unittest.IdentifierFixture(), 0),
 		unittest.EventFixture(state_stream.CoreEventAccountKeyAdded, 0, 0, unittest.IdentifierFixture(), 0),
 	}
 
-	var expectedAccountStatusesResponses []backend.AccountStatusesResponse
-	for i := 0; i < len(expectedEvents); i++ {
-		expectedAccountStatusesResponses = append(expectedAccountStatusesResponses, backend.AccountStatusesResponse{
-			Height:  s.rootBlock.Header.Height,
-			BlockID: s.rootBlock.ID(),
-			AccountEvents: map[string]flow.EventsList{
-				unittest.RandomAddressFixture().String(): expectedEvents,
-			},
-		})
-	}
+	backendResponses := s.backendAccountStatusesResponses(events)
 
 	testHappyPath(
 		s.T(),
 		AccountStatusesTopic,
 		s.factory,
-		s.subscribeAccountStatusesDataProviderTestCases(),
+		s.subscribeAccountStatusesDataProviderTestCases(backendResponses),
 		func(dataChan chan interface{}) {
-			for i := 0; i < len(expectedAccountStatusesResponses); i++ {
-				dataChan <- &expectedAccountStatusesResponses[i]
+			for i := 0; i < len(backendResponses); i++ {
+				dataChan <- backendResponses[i]
 			}
 		},
-		expectedAccountStatusesResponses,
 		s.requireAccountStatuses,
 	)
 }
 
-func (s *AccountStatusesProviderSuite) subscribeAccountStatusesDataProviderTestCases() []testType {
+func (s *AccountStatusesProviderSuite) subscribeAccountStatusesDataProviderTestCases(
+	backendResponses []*backend.AccountStatusesResponse,
+) []testType {
+	expectedResponses := s.expectedAccountStatusesResponses(backendResponses)
+
 	return []testType{
 		{
 			name: "SubscribeAccountStatusesFromStartBlockID happy path",
@@ -109,6 +104,7 @@ func (s *AccountStatusesProviderSuite) subscribeAccountStatusesDataProviderTestC
 					mock.Anything,
 				).Return(sub).Once()
 			},
+			expectedResponses: expectedResponses,
 		},
 		{
 			name: "SubscribeAccountStatusesFromStartHeight happy path",
@@ -123,6 +119,7 @@ func (s *AccountStatusesProviderSuite) subscribeAccountStatusesDataProviderTestC
 					mock.Anything,
 				).Return(sub).Once()
 			},
+			expectedResponses: expectedResponses,
 		},
 		{
 			name:      "SubscribeAccountStatusesFromLatestBlock happy path",
@@ -134,25 +131,25 @@ func (s *AccountStatusesProviderSuite) subscribeAccountStatusesDataProviderTestC
 					mock.Anything,
 				).Return(sub).Once()
 			},
+			expectedResponses: expectedResponses,
 		},
 	}
 }
 
 // requireAccountStatuses ensures that the received account statuses information matches the expected data.
-func (s *AccountStatusesProviderSuite) requireAccountStatuses(
-	v interface{},
-	expectedResponse interface{},
-) {
-	expectedAccountStatusesResponse, ok := expectedResponse.(backend.AccountStatusesResponse)
-	require.True(s.T(), ok, "unexpected type: %T", expectedResponse)
+func (s *AccountStatusesProviderSuite) requireAccountStatuses(actual interface{}, expected interface{}) {
+	expectedResponse, ok := expected.(*models.AccountStatusesResponse)
+	require.True(s.T(), ok, "Expected *models.AccountStatusesResponse, got %T", expected)
 
-	actualResponse, ok := v.(*models.AccountStatusesResponse)
-	require.True(s.T(), ok, "Expected *models.AccountStatusesResponse, got %T", v)
+	actualResponse, ok := actual.(*models.AccountStatusesResponse)
+	require.True(s.T(), ok, "Expected *models.AccountStatusesResponse, got %T", actual)
 
-	require.Equal(s.T(), expectedAccountStatusesResponse.BlockID.String(), actualResponse.BlockID)
-	require.Equal(s.T(), len(expectedAccountStatusesResponse.AccountEvents), len(actualResponse.AccountEvents))
+	require.Equal(s.T(), expectedResponse.BlockID, actualResponse.BlockID)
+	require.Equal(s.T(), len(expectedResponse.AccountEvents), len(actualResponse.AccountEvents))
+	require.Equal(s.T(), expectedResponse.MessageIndex, actualResponse.MessageIndex)
+	require.Equal(s.T(), expectedResponse.Height, actualResponse.Height)
 
-	for key, expectedEvents := range expectedAccountStatusesResponse.AccountEvents {
+	for key, expectedEvents := range expectedResponse.AccountEvents {
 		actualEvents, ok := actualResponse.AccountEvents[key]
 		require.True(s.T(), ok, "Missing key in actual AccountEvents: %s", key)
 
@@ -255,15 +252,46 @@ func (s *AccountStatusesProviderSuite) TestMessageIndexAccountStatusesProviderRe
 	}
 
 	// Verifying that indices are starting from 1
-	s.Require().Equal("1", responses[0].MessageIndex, "Expected MessageIndex to start with 1")
+	s.Require().Equal(uint64(1), responses[0].MessageIndex, "Expected MessageIndex to start with 1")
 
 	// Verifying that indices are strictly increasing
 	for i := 1; i < len(responses); i++ {
-		prevIndex, _ := strconv.Atoi(responses[i-1].MessageIndex)
-		currentIndex, _ := strconv.Atoi(responses[i].MessageIndex)
+		prevIndex := responses[i-1].MessageIndex
+		currentIndex := responses[i].MessageIndex
 		s.Require().Equal(prevIndex+1, currentIndex, "Expected MessageIndex to increment by 1")
 	}
 
 	// Ensure the provider is properly closed after the test
 	provider.Close()
+}
+
+// backendAccountStatusesResponses creates backend account statuses responses based on the provided events.
+func (s *AccountStatusesProviderSuite) backendAccountStatusesResponses(events []flow.Event) []*backend.AccountStatusesResponse {
+	responses := make([]*backend.AccountStatusesResponse, len(events))
+
+	for i := range events {
+		responses[i] = &backend.AccountStatusesResponse{
+			Height:  s.rootBlock.Header.Height,
+			BlockID: s.rootBlock.ID(),
+			AccountEvents: map[string]flow.EventsList{
+				unittest.RandomAddressFixture().String(): events,
+			},
+		}
+	}
+
+	return responses
+}
+
+// expectedAccountStatusesResponses creates the expected responses for the provided events and backend responses.
+func (s *AccountStatusesProviderSuite) expectedAccountStatusesResponses(backendResponses []*backend.AccountStatusesResponse) []interface{} {
+	expectedResponses := make([]interface{}, len(backendResponses))
+
+	for i, resp := range backendResponses {
+		var expectedResponse models.AccountStatusesResponse
+		expectedResponse.Build(resp, uint64(i+1))
+
+		expectedResponses[i] = &expectedResponse
+	}
+
+	return expectedResponses
 }

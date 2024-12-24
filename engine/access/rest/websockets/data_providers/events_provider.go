@@ -3,7 +3,6 @@ package data_providers
 import (
 	"context"
 	"fmt"
-	"strconv"
 
 	"github.com/rs/zerolog"
 
@@ -85,7 +84,7 @@ func (p *EventsDataProvider) Run() error {
 // No errors are expected during normal operations.
 func (p *EventsDataProvider) handleResponse() func(eventsResponse *backend.EventsResponse) error {
 	blocksSinceLastMessage := uint64(0)
-	messageIndex := counters.NewMonotonousCounter(1)
+	messageIndex := counters.NewMonotonousCounter(0)
 
 	return func(eventsResponse *backend.EventsResponse) error {
 		// check if there are any events in the response. if not, do not send a message unless the last
@@ -98,18 +97,15 @@ func (p *EventsDataProvider) handleResponse() func(eventsResponse *backend.Event
 			blocksSinceLastMessage = 0
 		}
 
-		index := messageIndex.Value()
 		if ok := messageIndex.Set(messageIndex.Value() + 1); !ok {
 			return fmt.Errorf("message index already incremented to: %d", messageIndex.Value())
 		}
+		index := messageIndex.Value()
 
-		p.send <- &models.EventResponse{
-			BlockId:        eventsResponse.BlockID.String(),
-			BlockHeight:    strconv.FormatUint(eventsResponse.Height, 10),
-			BlockTimestamp: eventsResponse.BlockTimestamp,
-			Events:         eventsResponse.Events,
-			MessageIndex:   strconv.FormatUint(index, 10),
-		}
+		var response models.EventResponse
+		response.Build(eventsResponse, index)
+
+		p.send <- &response
 
 		return nil
 	}
