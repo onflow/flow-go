@@ -11,3 +11,10 @@ type BaseMessageResponse struct {
 	Success      bool   `json:"success"`                 // Indicates success or failure
 	ErrorMessage string `json:"error_message,omitempty"` // Error message, if any
 }
+
+// BaseDataProvidersResponse represents a base structure for responses from subscriptions.
+type BaseDataProvidersResponse struct {
+	ID    string      `json:"id"`    // Unique subscription ID
+	Topic string      `json:"topic"` // Topic of the subscription
+	Data  interface{} `json:"data"`  // Data that's being returned within a subscription.
+}

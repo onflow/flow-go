@@ -203,8 +203,11 @@ func (s *BlocksProviderSuite) requireBlock(v interface{}, expected interface{}) 
 	expectedBlock, ok := expected.(*flow.Block)
 	require.True(s.T(), ok, "unexpected type: %T", v)
 
-	actualResponse, ok := v.(*models.BlockMessageResponse)
+	actualResponse, ok := v.(*models.BaseDataProvidersResponse)
 	require.True(s.T(), ok, "unexpected response type: %T", v)
 
-	s.Require().Equal(expectedBlock, actualResponse.Block)
+	actualResponseBlock, ok := actualResponse.Data.(*models.BlockMessageResponse)
+	require.True(s.T(), ok, "unexpected response data type: %T", v)
+
+	s.Require().Equal(expectedBlock, actualResponseBlock.Block)
 }
