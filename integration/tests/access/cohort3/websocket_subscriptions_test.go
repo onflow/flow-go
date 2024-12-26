@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/stretchr/testify/assert"
 	"net/url"
 	"strings"
 	"testing"
@@ -27,6 +28,8 @@ import (
 
 	accessproto "github.com/onflow/flow/protobuf/go/flow/access"
 )
+
+const InactivityTimeout = 20
 
 func TestWebsocketSubscription(t *testing.T) {
 	suite.Run(t, new(WebsocketSubscriptionSuite))
@@ -63,13 +66,13 @@ func (s *WebsocketSubscriptionSuite) SetupTest() {
 	// access node
 	bridgeANConfig := testnet.NewNodeConfig(
 		flow.RoleAccess,
-		testnet.WithLogLevel(zerolog.InfoLevel),
+		testnet.WithLogLevel(zerolog.ErrorLevel),
 		testnet.WithAdditionalFlag("--execution-data-sync-enabled=true"),
 		testnet.WithAdditionalFlagf("--execution-data-dir=%s", testnet.DefaultExecutionDataServiceDir),
 		testnet.WithAdditionalFlag("--execution-data-retry-delay=1s"),
 		testnet.WithAdditionalFlag("--execution-data-indexing-enabled=true"),
 		testnet.WithAdditionalFlagf("--execution-state-dir=%s", testnet.DefaultExecutionStateDir),
-		testnet.WithAdditionalFlag("--websocket-inactivity-timeout=15s"),
+		testnet.WithAdditionalFlagf("--websocket-inactivity-timeout=%ds", InactivityTimeout),
 	)
 
 	// add the ghost (access) node config
@@ -111,6 +114,59 @@ func (s *WebsocketSubscriptionSuite) SetupTest() {
 	var err error
 	s.grpcClient, err = getAccessAPIClient(accessUrl)
 	s.Require().NoError(err)
+}
+
+// TestInactivityHeaders tests that the WebSocket connection closes due to inactivity
+// after the specified timeout duration.
+//
+// Steps:
+// 1. Get the WebSocket server address from the testnet container.
+// 2. Establish a WebSocket client connection to the server.
+// 3. Start a goroutine to continuously read messages from the WebSocket client.
+// 4. Wait for the server to close the connection due to inactivity.
+// 5. Verify that the actual inactivity duration is within the expected timeout range.
+func (s *WebsocketSubscriptionSuite) TestInactivityHeaders() {
+	// Step 1: Get the WebSocket server address.
+	restAddr := s.net.ContainerByName(testnet.PrimaryAN).Addr(testnet.RESTPort)
+	client, err := getWSClient(s.ctx, getWebsocketsUrl(restAddr))
+	s.Require().NoError(err)
+	defer client.Close()
+
+	// Set a timeout for the entire test in case the server takes too long.
+	testTimeout := time.After((InactivityTimeout * 1.5) * time.Second)
+
+	// Expected inactivity duration in seconds based on the timeout.
+	expectedInactivityDuration := InactivityTimeout * time.Second
+	start := time.Now()
+	var actualInactivityDuration time.Duration
+
+	// Channel to receive any errors from the goroutine reading WebSocket messages.
+	readError := make(chan error, 1)
+
+	// Step 2: Start a goroutine to read messages and detect closure.
+	go func() {
+		for {
+			// Continuously try to read messages from the WebSocket connection.
+			if _, _, err := client.ReadMessage(); err != nil {
+				// If an error occurs (e.g., connection closure), capture the time elapsed.
+				actualInactivityDuration = time.Since(start)
+				readError <- err
+				return
+			}
+		}
+	}()
+
+	// Step 3: Wait for server to close the connection due to inactivity or timeout.
+	select {
+	case err = <-readError:
+		// Step 4: Assert that the WebSocket closure was not unexpected.
+		assert.False(s.T(), websocket.IsUnexpectedCloseError(err, websocket.CloseNormalClosure, websocket.CloseAbnormalClosure))
+
+		// Step 5: Verify that the actual inactivity duration is within the expected range.
+		assert.LessOrEqual(s.T(), actualInactivityDuration, expectedInactivityDuration)
+	case <-testTimeout:
+		s.T().Fatal("Test timed out waiting for WebSocket closure due to inactivity")
+	}
 }
 
 // TestRestEventStreaming tests event streaming route on REST
