@@ -12,7 +12,6 @@ import (
 	commonmodels "github.com/onflow/flow-go/engine/access/rest/common/models"
 	"github.com/onflow/flow-go/engine/access/rest/common/parser"
 	"github.com/onflow/flow-go/engine/access/rest/http/request"
-	"github.com/onflow/flow-go/engine/access/rest/util"
 	"github.com/onflow/flow-go/engine/access/rest/websockets/models"
 	"github.com/onflow/flow-go/engine/access/subscription"
 	"github.com/onflow/flow-go/model/flow"
@@ -28,6 +27,7 @@ type transactionStatusesArguments struct {
 	StartBlockHeight uint64          // Height of the block to start subscription from
 }
 
+// TransactionStatusesDataProvider is responsible for providing tx statuses
 type TransactionStatusesDataProvider struct {
 	*baseDataProvider
 
@@ -75,7 +75,18 @@ func NewTransactionStatusesDataProvider(
 //
 // No errors are expected during normal operations.
 func (p *TransactionStatusesDataProvider) Run() error {
-	return subscription.HandleSubscription(p.subscription, p.handleResponse())
+	messageIndex := counters.NewMonotonousCounter(0)
+
+	return subscription.HandleSubscription(p.subscription, subscription.HandleResponse(p.send, func(txResults []*access.TransactionResult) (interface{}, error) {
+		index := messageIndex.Value()
+		if ok := messageIndex.Set(messageIndex.Value() + 1); !ok {
+			return nil, status.Errorf(codes.Internal, "message index already incremented to %d", messageIndex.Value())
+		}
+		var response models.TransactionStatusesResponse
+		response.Build(p.linkGenerator, txResults, index)
+
+		return &response, nil
+	}))
 }
 
 // createSubscription creates a new subscription using the specified input arguments.
@@ -94,41 +105,19 @@ func (p *TransactionStatusesDataProvider) createSubscription(
 	return p.api.SubscribeTransactionStatusesFromLatest(ctx, args.TxID, entities.EventEncodingVersion_JSON_CDC_V0)
 }
 
-// handleResponse processes an account statuses and sends the formatted response.
-//
-// No errors are expected during normal operations.
-func (p *TransactionStatusesDataProvider) handleResponse() func(txResults []*access.TransactionResult) error {
-	messageIndex := counters.NewMonotonousCounter(1)
-
-	return func(txResults []*access.TransactionResult) error {
-
-		index := messageIndex.Value()
-		if ok := messageIndex.Set(messageIndex.Value() + 1); !ok {
-			return status.Errorf(codes.Internal, "message index already incremented to %d", messageIndex.Value())
-		}
-
-		var response models.TransactionStatusesResponse
-		response.Build(p.linkGenerator, txResults, index)
-
-		p.send <- &response
-
-		return nil
-	}
-}
-
 // parseAccountStatusesArguments validates and initializes the account statuses arguments.
 func parseTransactionStatusesArguments(
 	arguments models.Arguments,
 ) (transactionStatusesArguments, error) {
 	var args transactionStatusesArguments
 
-	// Check for mutual exclusivity of start_block_id and start_block_height early
-	startBlockIDIn, hasStartBlockID := arguments["start_block_id"]
-	startBlockHeightIn, hasStartBlockHeight := arguments["start_block_height"]
-
-	if hasStartBlockID && hasStartBlockHeight {
-		return args, fmt.Errorf("can only provide either 'start_block_id' or 'start_block_height'")
+	// Parse block arguments
+	startBlockID, startBlockHeight, err := ParseStartBlock(arguments)
+	if err != nil {
+		return args, err
 	}
+	args.StartBlockID = startBlockID
+	args.StartBlockHeight = startBlockHeight
 
 	if txIDIn, ok := arguments["tx_id"]; ok && txIDIn != "" {
 		result, ok := txIDIn.(string)
@@ -141,35 +130,6 @@ func parseTransactionStatusesArguments(
 			return args, fmt.Errorf("invalid 'tx_id': %w", err)
 		}
 		args.TxID = txID.Flow()
-	}
-
-	// Parse 'start_block_id' if provided
-	if hasStartBlockID {
-		result, ok := startBlockIDIn.(string)
-		if !ok {
-			return args, fmt.Errorf("'start_block_id' must be a string")
-		}
-		var startBlockID parser.ID
-		err := startBlockID.Parse(result)
-		if err != nil {
-			return args, fmt.Errorf("invalid 'start_block_id': %w", err)
-		}
-		args.StartBlockID = startBlockID.Flow()
-	}
-
-	// Parse 'start_block_height' if provided
-	var err error
-	if hasStartBlockHeight {
-		result, ok := startBlockHeightIn.(string)
-		if !ok {
-			return args, fmt.Errorf("'start_block_height' must be a string")
-		}
-		args.StartBlockHeight, err = util.ToUint64(result)
-		if err != nil {
-			return args, fmt.Errorf("invalid 'start_block_height': %w", err)
-		}
-	} else {
-		args.StartBlockHeight = request.EmptyHeight
 	}
 
 	return args, nil

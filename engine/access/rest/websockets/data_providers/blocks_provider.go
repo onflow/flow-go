@@ -146,41 +146,13 @@ func ParseBlocksArguments(arguments models.Arguments) (blocksArguments, error) {
 		return args, fmt.Errorf("'block_status' must be provided")
 	}
 
-	startBlockIDIn, hasStartBlockID := arguments["start_block_id"]
-	startBlockHeightIn, hasStartBlockHeight := arguments["start_block_height"]
-
-	// Ensure only one of start_block_id or start_block_height is provided
-	if hasStartBlockID && hasStartBlockHeight {
-		return args, fmt.Errorf("can only provide either 'start_block_id' or 'start_block_height'")
+	// Parse block arguments
+	startBlockID, startBlockHeight, err := ParseStartBlock(arguments)
+	if err != nil {
+		return args, err
 	}
-
-	if hasStartBlockID {
-		result, ok := startBlockIDIn.(string)
-		if !ok {
-			return args, fmt.Errorf("'start_block_id' must be a string")
-		}
-		var startBlockID parser.ID
-		err := startBlockID.Parse(result)
-		if err != nil {
-			return args, err
-		}
-		args.StartBlockID = startBlockID.Flow()
-	}
-
-	if hasStartBlockHeight {
-		result, ok := startBlockHeightIn.(string)
-		if !ok {
-			return args, fmt.Errorf("'start_block_height' must be a string")
-		}
-		var err error
-		args.StartBlockHeight, err = util.ToUint64(result)
-		if err != nil {
-			return args, fmt.Errorf("invalid 'start_block_height': %w", err)
-		}
-	} else {
-		// Default value if 'start_block_height' is not provided
-		args.StartBlockHeight = request.EmptyHeight
-	}
+	args.StartBlockID = startBlockID
+	args.StartBlockHeight = startBlockHeight
 
 	// Parse 'expand' as a JSON array of string
 	// expected values: "payload", "execution_result"
@@ -194,4 +166,43 @@ func ParseBlocksArguments(arguments models.Arguments) (blocksArguments, error) {
 	}
 
 	return args, nil
+}
+
+func ParseStartBlock(arguments models.Arguments) (flow.Identifier, uint64, error) {
+	startBlockIDIn, hasStartBlockID := arguments["start_block_id"]
+	startBlockHeightIn, hasStartBlockHeight := arguments["start_block_height"]
+
+	// Check for mutual exclusivity of start_block_id and start_block_height early
+	if hasStartBlockID && hasStartBlockHeight {
+		return flow.ZeroID, 0, fmt.Errorf("can only provide either 'start_block_id' or 'start_block_height'")
+	}
+
+	// Parse 'start_block_id'
+	if hasStartBlockID {
+		result, ok := startBlockIDIn.(string)
+		if !ok {
+			return flow.ZeroID, request.EmptyHeight, fmt.Errorf("'start_block_id' must be a string")
+		}
+		var startBlockID parser.ID
+		err := startBlockID.Parse(result)
+		if err != nil {
+			return flow.ZeroID, request.EmptyHeight, fmt.Errorf("invalid 'start_block_id': %w", err)
+		}
+		return startBlockID.Flow(), request.EmptyHeight, nil
+	}
+
+	// Parse 'start_block_height'
+	if hasStartBlockHeight {
+		result, ok := startBlockHeightIn.(string)
+		if !ok {
+			return flow.ZeroID, 0, fmt.Errorf("'start_block_height' must be a string")
+		}
+		startBlockHeight, err := util.ToUint64(result)
+		if err != nil {
+			return flow.ZeroID, request.EmptyHeight, fmt.Errorf("invalid 'start_block_height': %w", err)
+		}
+		return flow.ZeroID, startBlockHeight, nil
+	}
+
+	return flow.ZeroID, request.EmptyHeight, nil
 }

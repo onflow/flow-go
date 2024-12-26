@@ -1,8 +1,6 @@
 package models
 
 import (
-	"strconv"
-
 	"github.com/onflow/flow-go/access"
 	commonmodels "github.com/onflow/flow-go/engine/access/rest/common/models"
 )
@@ -23,5 +21,5 @@ func (t *TransactionStatusesResponse) Build(
 	}
 
 	t.TransactionResults = transactionResults
-	t.MessageIndex = strconv.FormatUint(index, 10)
+	t.MessageIndex = index
 }

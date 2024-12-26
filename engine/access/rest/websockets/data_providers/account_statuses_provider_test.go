@@ -251,8 +251,8 @@ func (s *AccountStatusesProviderSuite) TestMessageIndexAccountStatusesProviderRe
 		responses = append(responses, accountStatusesRes)
 	}
 
-	// Verifying that indices are starting from 1
-	s.Require().Equal(uint64(1), responses[0].MessageIndex, "Expected MessageIndex to start with 1")
+	// Verifying that indices are starting from 0
+	s.Require().Equal(uint64(0), responses[0].MessageIndex, "Expected MessageIndex to start with 0")
 
 	// Verifying that indices are strictly increasing
 	for i := 1; i < len(responses); i++ {
@@ -288,7 +288,7 @@ func (s *AccountStatusesProviderSuite) expectedAccountStatusesResponses(backendR
 
 	for i, resp := range backendResponses {
 		var expectedResponse models.AccountStatusesResponse
-		expectedResponse.Build(resp, uint64(i+1))
+		expectedResponse.Build(resp, uint64(i))
 
 		expectedResponses[i] = &expectedResponse
 	}

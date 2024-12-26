@@ -21,6 +21,7 @@ type testType struct {
 	expectedResponses []interface{}
 }
 
+// testErrType represents an error cases for subscribing
 type testErrType struct {
 	name             string
 	arguments        models.Arguments
