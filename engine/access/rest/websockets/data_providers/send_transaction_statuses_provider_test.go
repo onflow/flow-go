@@ -82,7 +82,7 @@ func (s *TransactionStatusesProviderSuite) TestSendTransactionStatusesDataProvid
 
 	testHappyPath(
 		s.T(),
-		SendTransactionStatusesTopic,
+		SendAndGetTransactionStatusesTopic,
 		s.factory,
 		sendTxStatutesTestCases,
 		func(dataChan chan interface{}) {
@@ -99,23 +99,11 @@ func (s *TransactionStatusesProviderSuite) TestSendTransactionStatusesDataProvid
 // TestSendTransactionStatusesDataProvider_InvalidArguments tests the behavior of the send transaction statuses data provider
 // when invalid arguments are provided. It verifies that appropriate errors are returned
 // for missing or conflicting arguments.
-// This test covers the test cases:
-// 1. Invalid 'script' type.
-// 2. Invalid 'script' value.
-// 3. Invalid 'arguments' type.
-// 4. Invalid 'arguments' value.
-// 5. Invalid 'reference_block_id' value.
-// 6. Invalid 'gas_limit' value.
-// 7. Invalid 'payer' value.
-// 8. Invalid 'proposal_key' value.
-// 9. Invalid 'authorizers' value.
-// 10. Invalid 'payload_signatures' value.
-// 11. Invalid 'envelope_signatures' value.
 func (s *SendTransactionStatusesProviderSuite) TestSendTransactionStatusesDataProvider_InvalidArguments() {
 	ctx := context.Background()
 	send := make(chan interface{})
 
-	topic := SendTransactionStatusesTopic
+	topic := SendAndGetTransactionStatusesTopic
 
 	for _, test := range invalidSendTransactionStatusesArgumentsTestCases() {
 		s.Run(test.name, func() {
