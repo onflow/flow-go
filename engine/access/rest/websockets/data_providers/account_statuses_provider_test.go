@@ -254,13 +254,13 @@ func (s *AccountStatusesProviderSuite) TestMessageIndexAccountStatusesProviderRe
 		responses = append(responses, accountStatusesRes)
 	}
 
-	// Verifying that indices are starting from 1
-	s.Require().Equal("1", responses[0].MessageIndex, "Expected MessageIndex to start with 1")
+	// Verifying that indices are starting from 0
+	s.Require().Equal(uint64(0), responses[0].MessageIndex, "Expected MessageIndex to start with 0")
 
 	// Verifying that indices are strictly increasing
 	for i := 1; i < len(responses); i++ {
-		prevIndex, _ := strconv.Atoi(responses[i-1].MessageIndex)
-		currentIndex, _ := strconv.Atoi(responses[i].MessageIndex)
+		prevIndex := responses[i-1].MessageIndex
+		currentIndex := responses[i].MessageIndex
 		s.Require().Equal(prevIndex+1, currentIndex, "Expected MessageIndex to increment by 1")
 	}
 
