@@ -2,6 +2,7 @@ package cohort3
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"net/url"
@@ -16,6 +17,7 @@ import (
 	"github.com/stretchr/testify/suite"
 
 	"github.com/onflow/flow-go/engine/access/rest/common/parser"
+	"github.com/onflow/flow-go/engine/access/rest/util"
 	"github.com/onflow/flow-go/engine/access/rest/websockets/data_providers"
 	"github.com/onflow/flow-go/engine/access/rest/websockets/models"
 	"github.com/onflow/flow-go/engine/common/rpc/convert"
@@ -104,33 +106,22 @@ func (s *WebsocketSubscriptionSuite) SetupTest() {
 	s.ctx, s.cancel = context.WithCancel(context.Background())
 
 	s.net.Start(s.ctx)
+
+	accessUrl := fmt.Sprintf("localhost:%s", s.net.ContainerByName(testnet.PrimaryAN).Port(testnet.GRPCPort))
+	var err error
+	s.grpcClient, err = getAccessAPIClient(accessUrl)
+	s.Require().NoError(err)
 }
 
 // TestRestEventStreaming tests event streaming route on REST
-func (s *WebsocketSubscriptionSuite) TestBlockHeaders() {
-	accessUrl := fmt.Sprintf("localhost:%s", s.net.ContainerByName(testnet.PrimaryAN).Port(testnet.GRPCPort))
-	grpcClient, err := getAccessAPIClient(accessUrl)
-	s.Require().NoError(err)
-
+func (s *WebsocketSubscriptionSuite) TestHappyCase() {
 	restAddr := s.net.ContainerByName(testnet.PrimaryAN).Addr(testnet.RESTPort)
-	client, err := getWSClient(s.ctx, getWebsocketsUrl(restAddr))
+	wsClient, err := getWSClient(s.ctx, getWebsocketsUrl(restAddr))
 	s.Require().NoError(err)
 
-	//
-	//s.testWebsocketSubscription(
-	//	client,
-	//	subscriptionRequest,
-	//	func(receivedResponses []interface{}) {
-	//		var blockHeaderResponses []*models.BlockHeaderMessageResponse
-	//		for _, resp := range receivedResponses {
-	//			if blockResp, ok := resp.(*models.BlockHeaderMessageResponse); ok {
-	//				blockHeaderResponses = append(blockHeaderResponses, blockResp)
-	//			}
-	//		}
-	//		s.validateBlockHeaders(grpcClient, blockHeaderResponses)
-	//	})
+	defer wsClient.Close()
 
-	//TODO: move common to separate func to reuse for other subscriptions
+	// tests streaming block headers
 	s.T().Run("block headers streaming", func(t *testing.T) {
 		clientMessageID := uuid.New().String()
 
@@ -143,90 +134,89 @@ func (s *WebsocketSubscriptionSuite) TestBlockHeaders() {
 			Arguments: models.Arguments{"block_status": parser.Finalized},
 		}
 
-		go func() {
-			err := client.WriteJSON(subscriptionRequest)
-			require.NoError(s.T(), err)
-
-			time.Sleep(10 * time.Second)
-			// close connection after 15 seconds
-			//TODO: add unsubscribe
-			client.Close()
-		}()
-
-		var receivedResponse []interface{}
-		for {
-			var resp interface{}
-
-			err = client.ReadJSON(&resp)
-			if err != nil {
-				s.T().Logf("websocket error: %v", err)
-
-				var closeErr *websocket.CloseError
-				if errors.As(err, &closeErr) {
-					s.T().Logf("websocket close error: %v", closeErr)
-					break
-				}
-
-				if strings.Contains(err.Error(), "use of closed network connection") {
-					s.T().Logf("websocket connection already closed: %v", err)
-					break
-				}
-
-				require.Fail(t, fmt.Sprintf("unexpected websocket error, %v", err))
-			}
-			receivedResponse = append(receivedResponse, resp)
-			s.T().Logf("!!!! RESPONSE: %v", resp)
-		}
-
-		// Process received responses
-		// collect received responses during 15 seconds
-		var receivedHeadersResponse []models.BlockHeaderMessageResponse
-
-		//TODO: add verify for success response message
-		for _, response := range receivedResponse {
-			switch resp := response.(type) {
-			case models.BlockHeaderMessageResponse:
-				receivedHeadersResponse = append(receivedHeadersResponse, resp)
-				s.log.Info().Msgf("Received BlockHeaderMessageResponse: %v", resp)
-			case *models.BlockMessageResponse:
-				s.log.Info().Msgf("Received *BlocksMessageResponse: %v", resp)
-			case *models.BlockDigestMessageResponse:
-				s.log.Info().Msgf("Received *BlockDigestsMessageResponse: %v", resp)
-
-			case *models.BaseMessageResponse:
-				s.log.Info().Msgf("Received *BaseMessageResponse: %v", resp)
-			default:
-				s.T().Errorf("unexpected response type: %T", resp)
-			}
-		}
-
-		// check block headers
-		s.validateBlockHeaders(grpcClient, receivedHeadersResponse)
+		testWebsocketSubscription[models.BlockHeaderMessageResponse](
+			t,
+			wsClient,
+			subscriptionRequest,
+			s.validateBlockHeaders,
+			10*time.Second,
+		)
 	})
+
+	//// tests streaming block digests headers
+	//s.T().Run("block digests streaming", func(t *testing.T) {
+	//	clientMessageID := uuid.New().String()
+	//
+	//	subscriptionRequest := models.SubscribeMessageRequest{
+	//		BaseMessageRequest: models.BaseMessageRequest{
+	//			Action:          models.SubscribeAction,
+	//			ClientMessageID: clientMessageID,
+	//		},
+	//		Topic:     data_providers.BlockDigestsTopic,
+	//		Arguments: models.Arguments{"block_status": parser.Finalized},
+	//	}
+	//
+	//	testWebsocketSubscription[models.BlockDigestMessageResponse](
+	//		t,
+	//		wsClient,
+	//		subscriptionRequest,
+	//		s.validateBlockDigests,
+	//		5*time.Second,
+	//	)
+	//})
 }
 
+// validateBlockHeaders validates the received block header responses against gRPC responses.
 func (s *WebsocketSubscriptionSuite) validateBlockHeaders(
-	grpcClient accessproto.AccessAPIClient,
 	receivedResponses []models.BlockHeaderMessageResponse,
 ) {
-	//require.NotEmpty(s.T(), receivedResponses, "expected received block headers")
+	require.NotEmpty(s.T(), receivedResponses, "expected received block headers")
 
 	for _, response := range receivedResponses {
 		id, err := flow.HexStringToIdentifier(response.Header.Id)
 		require.NoError(s.T(), err)
 
-		grpcResponse, err := grpcClient.GetBlockHeaderByID(s.ctx, &accessproto.GetBlockHeaderByIDRequest{
+		grpcResponse, err := s.grpcClient.GetBlockHeaderByID(s.ctx, &accessproto.GetBlockHeaderByIDRequest{
 			Id: convert.IdentifierToMessage(id),
 		})
 		require.NoError(s.T(), err)
 
-		expected := grpcResponse.Block
-		require.Equal(s.T(), expected.Height, response.Header.Height)
-		require.Equal(s.T(), expected.Timestamp, response.Header.Timestamp)
-		require.Equal(s.T(), expected.ParentId, response.Header.ParentId)
+		grpcExpected := grpcResponse.Block
+		actual := response.Header
+
+		require.Equal(s.T(), convert.MessageToIdentifier(grpcExpected.Id).String(), actual.Id)
+		require.Equal(s.T(), util.FromUint(grpcExpected.Height), actual.Height)
+		require.Equal(s.T(), grpcExpected.Timestamp.AsTime(), actual.Timestamp)
+		require.Equal(s.T(), convert.MessageToIdentifier(grpcExpected.ParentId).String(), actual.ParentId)
 	}
 }
 
+// validateBlockDigests validates the received block digest responses against gRPC responses.
+func (s *WebsocketSubscriptionSuite) validateBlockDigests(
+	receivedResponses []models.BlockDigestMessageResponse,
+) {
+	require.NotEmpty(s.T(), receivedResponses, "expected received block digests")
+
+	for _, response := range receivedResponses {
+		s.T().Logf("received response: %s", response.Block.Height)
+		id, err := flow.HexStringToIdentifier(response.Block.BlockId)
+		require.NoError(s.T(), err)
+
+		grpcResponse, err := s.grpcClient.GetBlockHeaderByID(s.ctx, &accessproto.GetBlockHeaderByIDRequest{
+			Id: convert.IdentifierToMessage(id),
+		})
+		require.NoError(s.T(), err)
+
+		grpcExpected := grpcResponse.Block
+		actual := response.Block
+
+		require.Equal(s.T(), convert.MessageToIdentifier(grpcExpected.Id).String(), actual.BlockId)
+		require.Equal(s.T(), util.FromUint(grpcExpected.Height), actual.Height)
+		require.Equal(s.T(), grpcExpected.Timestamp.AsTime(), actual.Timestamp)
+	}
+}
+
+// subscribeMessageRequest creates a subscription message request.
 func (s *WebsocketSubscriptionSuite) subscribeMessageRequest(clientMessageID string, topic string, arguments models.Arguments) interface{} {
 	return models.SubscribeMessageRequest{
 		BaseMessageRequest: models.BaseMessageRequest{
@@ -238,6 +228,7 @@ func (s *WebsocketSubscriptionSuite) subscribeMessageRequest(clientMessageID str
 	}
 }
 
+// unsubscribeMessageRequest creates an unsubscribe message request.
 func (s *WebsocketSubscriptionSuite) unsubscribeMessageRequest(clientMessageID string, subscriptionID string) interface{} {
 	return models.UnsubscribeMessageRequest{
 		BaseMessageRequest: models.BaseMessageRequest{
@@ -248,6 +239,7 @@ func (s *WebsocketSubscriptionSuite) unsubscribeMessageRequest(clientMessageID s
 	}
 }
 
+// listSubscriptionsMessageRequest creates a list subscriptions message request.
 func (s *WebsocketSubscriptionSuite) listSubscriptionsMessageRequest(clientMessageID string) interface{} {
 	return models.ListSubscriptionsMessageRequest{
 		BaseMessageRequest: models.BaseMessageRequest{
@@ -263,47 +255,122 @@ func getWebsocketsUrl(accessAddr string) string {
 	return u.String()
 }
 
-//func (s *WebsocketSubscriptionSuite) setupGRPCClient() accessproto.AccessAPIClient {
-//	grpcAddr := s.net.ContainerByName(testnet.PrimaryAN).Addr(testnet.GRPCPort)
-//	conn, err := grpc.Dial(grpcAddr, grpc.WithTransportCredentials(insecure.NewCredentials()))
-//	require.NoError(s.T(), err)
-//	s.T().Cleanup(func() { conn.Close() })
-//	return accessproto.NewAccessAPIClient(conn)
-//}
-
-func (s *WebsocketSubscriptionSuite) testWebsocketSubscription(
+// testWebsocketSubscription tests a websocket subscription and validates responses.
+//
+// This function handles the lifecycle of a websocket connection for a specific subscription,
+// including sending a subscription request, listening for incoming responses, and validating
+// them using a provided validation function. The websocket connection is closed automatically
+// after a predefined time interval.
+func testWebsocketSubscription[T any](
+	t *testing.T,
 	client *websocket.Conn,
 	subscriptionRequest models.SubscribeMessageRequest,
-	validate func([]interface{}),
+	validate func([]T),
+	duration time.Duration,
 ) {
-	go func() {
-		require.NoError(s.T(), client.WriteJSON(subscriptionRequest))
-		time.Sleep(15 * time.Second)
-		client.Close()
-	}()
+	// subscribe to specific topic
+	require.NoError(t, client.WriteJSON(subscriptionRequest))
 
-	responseChan := make(chan interface{})
-	s.listenForResponses(client, responseChan)
+	responses, _, subscribeMessageResponses, _, _ := listenWebSocketResponses[T](t, client, duration)
 
-	var receivedResponses []interface{}
-	for resp := range responseChan {
-		receivedResponses = append(receivedResponses, resp)
+	// validate subscribe response
+	require.Equal(t, 1, len(subscribeMessageResponses))
+	require.Equal(t, subscriptionRequest.ClientMessageID, subscribeMessageResponses[0].ClientMessageID)
+
+	// Use the provided validation function to ensure the received responses of type T are correct.
+	validate(responses)
+
+	// unsubscribe from specific topic
+	unsubscriptionRequest := models.UnsubscribeMessageRequest{
+		BaseMessageRequest: models.BaseMessageRequest{
+			Action:          models.SubscribeAction,
+			ClientMessageID: subscriptionRequest.ClientMessageID,
+		},
+		SubscriptionID: subscribeMessageResponses[0].SubscriptionID,
 	}
 
-	validate(receivedResponses)
+	require.NoError(t, client.WriteJSON(unsubscriptionRequest))
 }
 
-func (s *WebsocketSubscriptionSuite) listenForResponses(client *websocket.Conn, responseChan chan interface{}) {
-	defer close(responseChan)
+// listenWebSocketResponses listens for websocket responses for a specified duration
+// and unmarshalls them into expected types.
+//
+// Parameters:
+//   - t: The *testing.T object used for managing test lifecycle and assertions.
+//   - client: The websocket connection to read messages from.
+//   - duration: The maximum time to listen for messages before stopping.
+func listenWebSocketResponses[T any](
+	t *testing.T,
+	client *websocket.Conn,
+	duration time.Duration,
+) (
+	[]T,
+	[]models.BaseMessageResponse,
+	[]models.SubscribeMessageResponse,
+	[]models.UnsubscribeMessageResponse,
+	[]models.ListSubscriptionsMessageResponse,
+) {
+	var responses []T
+	var baseMessageResponses []models.BaseMessageResponse
+	var subscribeMessageResponses []models.SubscribeMessageResponse
+	var unsubscribeMessageResponses []models.UnsubscribeMessageResponse
+	var listSubscriptionsMessageResponses []models.ListSubscriptionsMessageResponse
+
+	timer := time.NewTimer(duration)
+	defer timer.Stop()
+
 	for {
-		var resp interface{}
-		if err := client.ReadJSON(&resp); err != nil {
-			if websocket.IsUnexpectedCloseError(err, websocket.CloseGoingAway) {
-				s.T().Logf("unexpected close error: %v", err)
-				require.NoError(s.T(), err)
+		select {
+		case <-timer.C:
+			t.Logf("stopping websocket response listener after %s", duration)
+			return responses, baseMessageResponses, subscribeMessageResponses, unsubscribeMessageResponses, listSubscriptionsMessageResponses
+		default:
+			_, messageBytes, err := client.ReadMessage()
+			if err != nil {
+				t.Logf("websocket error: %v", err)
+
+				var closeErr *websocket.CloseError
+				if errors.As(err, &closeErr) || strings.Contains(err.Error(), "use of closed network connection") {
+					t.Logf("websocket close error: %v", closeErr)
+					return responses, baseMessageResponses, subscribeMessageResponses, unsubscribeMessageResponses, listSubscriptionsMessageResponses
+				}
+
+				require.FailNow(t, fmt.Sprintf("unexpected websocket error, %v", err))
 			}
-			return
+
+			//// Try unmarshalling into BaseMessageResponse and validate
+			//var baseResp models.BaseMessageResponse
+			//if err := json.Unmarshal(messageBytes, &baseResp); err == nil && baseResp.ClientMessageID != "" {
+			//	baseMessageResponses = append(baseMessageResponses, baseResp)
+			//	continue
+			//}
+
+			var subscribeResp models.SubscribeMessageResponse
+			if err := json.Unmarshal(messageBytes, &subscribeResp); err == nil && subscribeResp.ClientMessageID != "" && subscribeResp.SubscriptionID != "" {
+				subscribeMessageResponses = append(subscribeMessageResponses, subscribeResp)
+				continue
+			}
+
+			// Try unmarshalling into UnsubscribeMessageResponse and validate
+			var unsubscribeResp models.UnsubscribeMessageResponse
+			if err := json.Unmarshal(messageBytes, &unsubscribeResp); err == nil && unsubscribeResp.SubscriptionID == "" && subscribeResp.ClientMessageID != "" {
+				unsubscribeMessageResponses = append(unsubscribeMessageResponses, unsubscribeResp)
+				continue
+			}
+
+			//TODO: differentiate SubscribeMessageResponse and UnsubscribeMessageResponse, BaseMessageResponse
+			// Try unmarshalling into SubscribeMessageResponse and validate
+			//// Try unmarshalling into ListSubscriptionsMessageResponse and validate
+			//var listResp models.ListSubscriptionsMessageResponse
+			//if err := json.Unmarshal(messageBytes, &listResp); err == nil && listResp.ClientMessageID != "" {
+			//	listSubscriptionsMessageResponses = append(listSubscriptionsMessageResponses, listResp)
+			//	continue
+			//}
+
+			var genericResp T
+			if err := json.Unmarshal(messageBytes, &genericResp); err == nil {
+				responses = append(responses, genericResp)
+			}
 		}
-		responseChan <- resp
 	}
 }
