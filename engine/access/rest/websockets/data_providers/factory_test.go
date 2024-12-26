@@ -144,7 +144,7 @@ func (s *DataProviderFactorySuite) TestSupportedTopics() {
 		},
 		{
 			name:      "send transaction statuses topic",
-			topic:     SendTransactionStatusesTopic,
+			topic:     SendAndGetTransactionStatusesTopic,
 			arguments: models.Arguments{},
 			setupSubscription: func() {
 				s.setupSubscription(s.accessApi.On("SendAndSubscribeTransactionStatuses", mock.Anything, mock.Anything, mock.Anything))
