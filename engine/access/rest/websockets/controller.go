@@ -18,7 +18,6 @@ import (
 	dp "github.com/onflow/flow-go/engine/access/rest/websockets/data_providers"
 	"github.com/onflow/flow-go/engine/access/rest/websockets/models"
 	"github.com/onflow/flow-go/utils/concurrentmap"
-	"github.com/onflow/flow-go/utils/concurrentticker"
 )
 
 type Controller struct {
@@ -34,7 +33,6 @@ type Controller struct {
 	dataProviderFactory dp.DataProviderFactory
 	dataProvidersGroup  *sync.WaitGroup
 	limiter             *rate.Limiter
-	inactivityTracker   *concurrentticker.Ticker
 }
 
 func NewWebSocketController(
@@ -52,7 +50,6 @@ func NewWebSocketController(
 		dataProviderFactory: dataProviderFactory,
 		dataProvidersGroup:  &sync.WaitGroup{},
 		limiter:             rate.NewLimiter(rate.Limit(config.MaxResponsesPerSecond), 1),
-		inactivityTracker:   concurrentticker.NewTicker(config.InactivityTimeout),
 	}
 }
 
@@ -80,9 +77,6 @@ func (c *Controller) HandleConnection(ctx context.Context) {
 	})
 	g.Go(func() error {
 		return c.readMessages(gCtx)
-	})
-	g.Go(func() error {
-		return c.monitorInactivity(ctx)
 	})
 
 	if err = g.Wait(); err != nil {
@@ -123,40 +117,6 @@ func (c *Controller) configureKeepalive() error {
 	return nil
 }
 
-// monitorInactivity periodically checks for inactivity on the connection.
-//
-// Expected behavior:
-// - Terminates when all data providers are unsubscribed.
-// - Resets based on activity such as adding/removing subscriptions.
-//
-// Parameters:
-// - ctx: Context to control cancellation and timeouts.
-func (c *Controller) monitorInactivity(ctx context.Context) error {
-	defer c.inactivityTracker.Stop()
-
-	for {
-		select {
-		case <-ctx.Done():
-			return nil
-		case <-c.inactivityTracker.C():
-			if c.dataProviders.Size() == 0 {
-				// Optionally send a message to the client indicating the reason for closure.
-				c.logger.Info().Msg("Connection inactive, closing due to timeout.")
-				return fmt.Errorf("no recent activity for %v", c.config.InactivityTimeout)
-			}
-		}
-	}
-}
-
-// checkInactivity checks if there are no active data providers
-// and resets the inactivity timer. This function should be called after removing a data provider
-// to update the inactivity tracker and ensure it reflects the current state.
-func (c *Controller) checkInactivity() {
-	if c.dataProviders.Size() == 0 {
-		c.inactivityTracker.Reset(c.config.InactivityTimeout)
-	}
-}
-
 // keepalive sends a ping message periodically to keep the WebSocket connection alive
 // and avoid timeouts.
 //
@@ -185,11 +145,16 @@ func (c *Controller) keepalive(ctx context.Context) error {
 
 // writeMessages reads a messages from communication channel and passes them on to a client WebSocket connection.
 // The communication channel is filled by data providers. Besides, the response limit tracker is involved in
-// write message regulation
-//
-// Expected errors during normal operation:
-// - context.Canceled if the client disconnected
+// write message regulation.
+// The function tracks the last message sent and periodically checks for inactivity.
+// If no messages are sent within InactivityTimeout and no active data providers exist,
+// the connection will be closed.
 func (c *Controller) writeMessages(ctx context.Context) error {
+	inactivityTicker := time.NewTicker(c.config.InactivityTimeout / 10)
+	defer inactivityTicker.Stop()
+
+	lastMessageSentAt := time.Now()
+
 	defer func() {
 		// drain the channel as some providers may still send data to it after this routine shutdowns
 		// so, in order to not run into deadlock there should be at least 1 reader on the channel
@@ -224,6 +189,17 @@ func (c *Controller) writeMessages(ctx context.Context) error {
 
 			if err := c.conn.WriteJSON(message); err != nil {
 				return err
+			}
+
+			// Update lastMessageSentAt
+			lastMessageSentAt = time.Now()
+
+		case <-inactivityTicker.C:
+			// Periodically check inactivity
+			if time.Since(lastMessageSentAt) > c.config.InactivityTimeout && c.dataProviders.Size() == 0 {
+				// Optionally send a message to the client indicating the reason for closure.
+				c.logger.Info().Msg("Connection inactive, closing due to timeout.")
+				return fmt.Errorf("no recent activity for %v", c.config.InactivityTimeout)
 			}
 		}
 	}
@@ -346,7 +322,6 @@ func (c *Controller) handleSubscribe(ctx context.Context, msg models.SubscribeMe
 
 		c.dataProvidersGroup.Done()
 		c.dataProviders.Remove(provider.ID())
-		c.checkInactivity()
 	}()
 }
 
@@ -382,7 +357,6 @@ func (c *Controller) handleUnsubscribe(ctx context.Context, msg models.Unsubscri
 	}
 
 	c.dataProviders.Remove(id)
-	c.checkInactivity()
 
 	responseOk := models.UnsubscribeMessageResponse{
 		BaseMessageResponse: models.BaseMessageResponse{

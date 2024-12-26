@@ -863,7 +863,7 @@ func (s *WsControllerSuite) TestControllerShutdown() {
 			Return(func(interface{}) error {
 				// waiting more than InactivityTimeout to make sure that read message routine busy and do not return
 				// an error before than inactivity tracker initiate shut down
-				<-time.After(wsConfig.InactivityTimeout + 10)
+				<-time.After(wsConfig.InactivityTimeout)
 				return websocket.ErrCloseSent
 			}).
 			Once()
@@ -947,25 +947,6 @@ func (s *WsControllerSuite) TestKeepaliveRoutine() {
 
 		conn.AssertExpectations(t) // Should not invoke WriteMessage after context cancellation
 	})
-}
-
-// TestMonitorInactivity verifies that monitorInactivity returns an error
-// when the WebSocket connection has no subscriptions for the configured inactivity timeout.
-func (s *WsControllerSuite) TestMonitorInactivity() {
-	conn := connmock.NewWebsocketConnection(s.T())
-	factory := dpmock.NewDataProviderFactory(s.T())
-
-	// Mock with short inactivity timeout for testing
-	wsConfig := s.wsConfig
-
-	wsConfig.InactivityTimeout = 50 * time.Millisecond
-	controller := NewWebSocketController(s.logger, wsConfig, conn, factory)
-
-	err := controller.monitorInactivity(context.Background())
-	s.Require().Error(err)
-	s.Require().Equal(err, fmt.Errorf("no recent activity for %v", wsConfig.InactivityTimeout))
-
-	conn.AssertExpectations(s.T())
 }
 
 // TestRateLimiter tests the rate-limiting functionality of the WebSocket controller.
