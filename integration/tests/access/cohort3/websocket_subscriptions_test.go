@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/stretchr/testify/assert"
 	"net/url"
 	"strings"
 	"testing"
@@ -14,10 +13,11 @@ import (
 	"github.com/google/uuid"
 	"github.com/gorilla/websocket"
 	"github.com/rs/zerolog"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
-	"github.com/onflow/flow-go/engine/access/rest/common/parser"
+	commonmodels "github.com/onflow/flow-go/engine/access/rest/common/models"
 	"github.com/onflow/flow-go/engine/access/rest/util"
 	"github.com/onflow/flow-go/engine/access/rest/websockets/data_providers"
 	"github.com/onflow/flow-go/engine/access/rest/websockets/models"
@@ -169,37 +169,58 @@ func (s *WebsocketSubscriptionSuite) TestInactivityHeaders() {
 	}
 }
 
-// TestRestEventStreaming tests event streaming route on REST
-func (s *WebsocketSubscriptionSuite) TestHappyCase() {
+func (s *WebsocketSubscriptionSuite) TestHappyCases() {
 	restAddr := s.net.ContainerByName(testnet.PrimaryAN).Addr(testnet.RESTPort)
 	wsClient, err := getWSClient(s.ctx, getWebsocketsUrl(restAddr))
 	s.Require().NoError(err)
 
 	defer wsClient.Close()
 
-	// tests streaming block headers
-	s.T().Run("block headers streaming", func(t *testing.T) {
-		clientMessageID := uuid.New().String()
+	// tests streaming blocks
+	//s.T().Run("blocks streaming", func(t *testing.T) {
+	//	clientMessageID := uuid.New().String()
+	//
+	//	subscriptionRequest := models.SubscribeMessageRequest{
+	//		BaseMessageRequest: models.BaseMessageRequest{
+	//			Action:          models.SubscribeAction,
+	//			ClientMessageID: clientMessageID,
+	//		},
+	//		Topic:     data_providers.BlocksTopic,
+	//		Arguments: models.Arguments{"block_status": parser.Finalized},
+	//	}
+	//
+	//	testWebsocketSubscription[models.BlockMessageResponse](
+	//		t,
+	//		wsClient,
+	//		subscriptionRequest,
+	//		s.validateBlocks,
+	//		5*time.Second,
+	//	)
+	//})
 
-		subscriptionRequest := models.SubscribeMessageRequest{
-			BaseMessageRequest: models.BaseMessageRequest{
-				Action:          models.SubscribeAction,
-				ClientMessageID: clientMessageID,
-			},
-			Topic:     data_providers.BlockHeadersTopic,
-			Arguments: models.Arguments{"block_status": parser.Finalized},
-		}
+	//// tests streaming block headers
+	//s.T().Run("block headers streaming", func(t *testing.T) {
+	//	clientMessageID := uuid.New().String()
+	//
+	//	subscriptionRequest := models.SubscribeMessageRequest{
+	//		BaseMessageRequest: models.BaseMessageRequest{
+	//			Action:          models.SubscribeAction,
+	//			ClientMessageID: clientMessageID,
+	//		},
+	//		Topic:     data_providers.BlockHeadersTopic,
+	//		Arguments: models.Arguments{"block_status": parser.Finalized},
+	//	}
+	//
+	//	testWebsocketSubscription[models.BlockHeaderMessageResponse](
+	//		t,
+	//		wsClient,
+	//		subscriptionRequest,
+	//		s.validateBlockHeaders,
+	//		10*time.Second,
+	//	)
+	//})
 
-		testWebsocketSubscription[models.BlockHeaderMessageResponse](
-			t,
-			wsClient,
-			subscriptionRequest,
-			s.validateBlockHeaders,
-			10*time.Second,
-		)
-	})
-
-	//// tests streaming block digests headers
+	//// tests streaming block digests
 	//s.T().Run("block digests streaming", func(t *testing.T) {
 	//	clientMessageID := uuid.New().String()
 	//
@@ -220,6 +241,53 @@ func (s *WebsocketSubscriptionSuite) TestHappyCase() {
 	//		5*time.Second,
 	//	)
 	//})
+
+	// tests streaming events
+	s.T().Run("events streaming", func(t *testing.T) {
+		clientMessageID := uuid.New().String()
+
+		subscriptionRequest := models.SubscribeMessageRequest{
+			BaseMessageRequest: models.BaseMessageRequest{
+				Action:          models.SubscribeAction,
+				ClientMessageID: clientMessageID,
+			},
+			Topic:     data_providers.EventsTopic,
+			Arguments: models.Arguments{},
+		}
+
+		testWebsocketSubscription[models.EventResponse](
+			t,
+			wsClient,
+			subscriptionRequest,
+			s.validateEvents,
+			5*time.Second,
+		)
+	})
+}
+
+// validateBlocks validates the received block responses against gRPC responses.
+func (s *WebsocketSubscriptionSuite) validateBlocks(
+	receivedResponses []*models.BlockMessageResponse,
+) {
+	require.NotEmpty(s.T(), receivedResponses, "expected received block headers")
+
+	for _, response := range receivedResponses {
+		id, err := flow.HexStringToIdentifier(response.Block.Header.Id)
+		require.NoError(s.T(), err)
+
+		grpcResponse, err := s.grpcClient.GetBlockHeaderByID(s.ctx, &accessproto.GetBlockHeaderByIDRequest{
+			Id: convert.IdentifierToMessage(id),
+		})
+		require.NoError(s.T(), err)
+
+		grpcExpected := grpcResponse.Block
+		actual := response.Block
+
+		require.Equal(s.T(), convert.MessageToIdentifier(grpcExpected.Id).String(), actual.Header.Id)
+		require.Equal(s.T(), util.FromUint(grpcExpected.Height), actual.Header.Height)
+		require.Equal(s.T(), grpcExpected.Timestamp.AsTime(), actual.Header.Timestamp)
+		require.Equal(s.T(), convert.MessageToIdentifier(grpcExpected.ParentId).String(), actual.Header.ParentId)
+	}
 }
 
 // validateBlockHeaders validates the received block header responses against gRPC responses.
@@ -249,7 +317,7 @@ func (s *WebsocketSubscriptionSuite) validateBlockHeaders(
 
 // validateBlockDigests validates the received block digest responses against gRPC responses.
 func (s *WebsocketSubscriptionSuite) validateBlockDigests(
-	receivedResponses []models.BlockDigestMessageResponse,
+	receivedResponses []*models.BlockDigestMessageResponse,
 ) {
 	require.NotEmpty(s.T(), receivedResponses, "expected received block digests")
 
@@ -270,6 +338,56 @@ func (s *WebsocketSubscriptionSuite) validateBlockDigests(
 		require.Equal(s.T(), util.FromUint(grpcExpected.Height), actual.Height)
 		require.Equal(s.T(), grpcExpected.Timestamp.AsTime(), actual.Timestamp)
 	}
+}
+
+// validateEvents is a helper function that encapsulates logic for comparing received events from rest state streaming and
+// events which received from grpc api
+func (s *WebsocketSubscriptionSuite) validateEvents(receivedEventsResponse []*models.EventResponse) {
+	// make sure there are received events
+	require.GreaterOrEqual(s.T(), len(receivedEventsResponse), 1, "expect received events")
+
+	// Variable to keep track of non-empty event response count
+	nonEmptyResponseCount := 0
+	for _, receivedEventResponse := range receivedEventsResponse {
+		// Create a map where key is event type and value is list of events with this event typ
+		receivedEventMap := make(map[string][]commonmodels.Event)
+		for _, event := range receivedEventResponse.Events {
+			eventType := event.Type_
+			receivedEventMap[eventType] = append(receivedEventMap[eventType], event)
+		}
+
+		for eventType, receivedEventList := range receivedEventMap {
+			blockId, err := flow.HexStringToIdentifier(receivedEventResponse.BlockId)
+			require.NoError(s.T(), err)
+
+			// get events by block id and event type
+			response, err := s.grpcClient.GetEventsForBlockIDs(
+				s.ctx,
+				&accessproto.GetEventsForBlockIDsRequest{
+					BlockIds: [][]byte{convert.IdentifierToMessage(blockId)},
+					Type:     eventType,
+				},
+			)
+			require.NoError(s.T(), err)
+			require.Equal(s.T(), 1, len(response.Results), "expect to get 1 result")
+
+			expectedEventsResult := response.Results[0]
+			require.Equal(s.T(), util.FromUint(expectedEventsResult.BlockHeight), receivedEventResponse.BlockHeight, "expect the same block height")
+			require.Equal(s.T(), len(expectedEventsResult.Events), len(receivedEventList), "expect the same count of events: want: %+v, got: %+v", expectedEventsResult.Events, receivedEventList)
+
+			for i, event := range receivedEventList {
+				require.Equal(s.T(), util.FromUint(expectedEventsResult.Events[i].EventIndex), event.EventIndex, "expect the same event index")
+				require.Equal(s.T(), convert.MessageToIdentifier(expectedEventsResult.Events[i].TransactionId).String(), event.TransactionId, "expect the same transaction id")
+			}
+
+			// Check if the current response has non-empty events
+			if len(receivedEventResponse.Events) > 0 {
+				nonEmptyResponseCount++
+			}
+		}
+	}
+	// Ensure that at least one response had non-empty events
+	require.GreaterOrEqual(s.T(), nonEmptyResponseCount, 1, "expect at least one response with non-empty events")
 }
 
 // subscribeMessageRequest creates a subscription message request.
@@ -321,13 +439,13 @@ func testWebsocketSubscription[T any](
 	t *testing.T,
 	client *websocket.Conn,
 	subscriptionRequest models.SubscribeMessageRequest,
-	validate func([]T),
+	validate func([]*T),
 	duration time.Duration,
 ) {
 	// subscribe to specific topic
 	require.NoError(t, client.WriteJSON(subscriptionRequest))
 
-	responses, _, subscribeMessageResponses, _, _ := listenWebSocketResponses[T](t, client, duration)
+	responses, _, subscribeMessageResponses, _, _ := listenWebSocketResponses[T](t, client, duration, subscriptionRequest.ClientMessageID)
 
 	// validate subscribe response
 	require.Equal(t, 1, len(subscribeMessageResponses))
@@ -359,18 +477,19 @@ func listenWebSocketResponses[T any](
 	t *testing.T,
 	client *websocket.Conn,
 	duration time.Duration,
+	clientMessageID string,
 ) (
-	[]T,
-	[]models.BaseMessageResponse,
-	[]models.SubscribeMessageResponse,
-	[]models.UnsubscribeMessageResponse,
-	[]models.ListSubscriptionsMessageResponse,
+	[]*T,
+	[]*models.BaseMessageResponse,
+	[]*models.SubscribeMessageResponse,
+	[]*models.UnsubscribeMessageResponse,
+	[]*models.ListSubscriptionsMessageResponse,
 ) {
-	var responses []T
-	var baseMessageResponses []models.BaseMessageResponse
-	var subscribeMessageResponses []models.SubscribeMessageResponse
-	var unsubscribeMessageResponses []models.UnsubscribeMessageResponse
-	var listSubscriptionsMessageResponses []models.ListSubscriptionsMessageResponse
+	var responses []*T
+	var baseMessageResponses []*models.BaseMessageResponse
+	var subscribeMessageResponses []*models.SubscribeMessageResponse
+	var unsubscribeMessageResponses []*models.UnsubscribeMessageResponse
+	var listSubscriptionsMessageResponses []*models.ListSubscriptionsMessageResponse
 
 	timer := time.NewTimer(duration)
 	defer timer.Stop()
@@ -394,38 +513,44 @@ func listenWebSocketResponses[T any](
 				require.FailNow(t, fmt.Sprintf("unexpected websocket error, %v", err))
 			}
 
+			//TODO: differentiate SubscribeMessageResponse and UnsubscribeMessageResponse, BaseMessageResponse
 			//// Try unmarshalling into BaseMessageResponse and validate
 			//var baseResp models.BaseMessageResponse
-			//if err := json.Unmarshal(messageBytes, &baseResp); err == nil && baseResp.ClientMessageID != "" {
+			//if err := json.Unmarshal(messageBytes, &baseResp); err == nil && baseResp.ClientMessageID == clientMessageID {
 			//	baseMessageResponses = append(baseMessageResponses, baseResp)
 			//	continue
 			//}
 
 			var subscribeResp models.SubscribeMessageResponse
-			if err := json.Unmarshal(messageBytes, &subscribeResp); err == nil && subscribeResp.ClientMessageID != "" && subscribeResp.SubscriptionID != "" {
-				subscribeMessageResponses = append(subscribeMessageResponses, subscribeResp)
+			err = json.Unmarshal(messageBytes, &subscribeResp)
+			if err == nil &&
+				subscribeResp.ClientMessageID == clientMessageID &&
+				subscribeResp.SubscriptionID != "" {
+				subscribeMessageResponses = append(subscribeMessageResponses, &subscribeResp)
 				continue
 			}
 
 			// Try unmarshalling into UnsubscribeMessageResponse and validate
 			var unsubscribeResp models.UnsubscribeMessageResponse
-			if err := json.Unmarshal(messageBytes, &unsubscribeResp); err == nil && unsubscribeResp.SubscriptionID == "" && subscribeResp.ClientMessageID != "" {
-				unsubscribeMessageResponses = append(unsubscribeMessageResponses, unsubscribeResp)
+			err = json.Unmarshal(messageBytes, &unsubscribeResp)
+			if err == nil &&
+				unsubscribeResp.SubscriptionID == "" &&
+				subscribeResp.ClientMessageID == clientMessageID {
+				unsubscribeMessageResponses = append(unsubscribeMessageResponses, &unsubscribeResp)
 				continue
 			}
 
-			//TODO: differentiate SubscribeMessageResponse and UnsubscribeMessageResponse, BaseMessageResponse
-			// Try unmarshalling into SubscribeMessageResponse and validate
 			//// Try unmarshalling into ListSubscriptionsMessageResponse and validate
 			//var listResp models.ListSubscriptionsMessageResponse
-			//if err := json.Unmarshal(messageBytes, &listResp); err == nil && listResp.ClientMessageID != "" {
+			//if err := json.Unmarshal(messageBytes, &listResp); err == nil && listResp.ClientMessageID == clientMessageID {
 			//	listSubscriptionsMessageResponses = append(listSubscriptionsMessageResponses, listResp)
 			//	continue
 			//}
 
+			//TODO: update Unmarshal according to changes for issue #6819
 			var genericResp T
-			if err := json.Unmarshal(messageBytes, &genericResp); err == nil {
-				responses = append(responses, genericResp)
+			if err := json.Unmarshal(messageBytes, &genericResp); err == nil && &genericResp != nil {
+				responses = append(responses, &genericResp)
 			}
 		}
 	}
