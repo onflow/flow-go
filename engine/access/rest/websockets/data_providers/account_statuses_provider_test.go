@@ -146,14 +146,17 @@ func (s *AccountStatusesProviderSuite) requireAccountStatuses(
 	expectedAccountStatusesResponse, ok := expectedResponse.(backend.AccountStatusesResponse)
 	require.True(s.T(), ok, "unexpected type: %T", expectedResponse)
 
-	actualResponse, ok := v.(*models.AccountStatusesResponse)
-	require.True(s.T(), ok, "Expected *models.AccountStatusesResponse, got %T", v)
+	actualResponse, ok := v.(*models.BaseDataProvidersResponse)
+	require.True(s.T(), ok, "Expected *models.BaseDataProvidersResponse, got %T", v)
 
-	require.Equal(s.T(), expectedAccountStatusesResponse.BlockID.String(), actualResponse.BlockID)
-	require.Equal(s.T(), len(expectedAccountStatusesResponse.AccountEvents), len(actualResponse.AccountEvents))
+	actualResponseData, ok := actualResponse.Data.(*models.AccountStatusesResponse)
+	require.True(s.T(), ok, "unexpected response data type: %T", v)
+
+	require.Equal(s.T(), expectedAccountStatusesResponse.BlockID.String(), actualResponseData.BlockID)
+	require.Equal(s.T(), len(expectedAccountStatusesResponse.AccountEvents), len(actualResponseData.AccountEvents))
 
 	for key, expectedEvents := range expectedAccountStatusesResponse.AccountEvents {
-		actualEvents, ok := actualResponse.AccountEvents[key]
+		actualEvents, ok := actualResponseData.AccountEvents[key]
 		require.True(s.T(), ok, "Missing key in actual AccountEvents: %s", key)
 
 		s.Require().Equal(expectedEvents, actualEvents, "Mismatch for key: %s", key)
@@ -249,9 +252,11 @@ func (s *AccountStatusesProviderSuite) TestMessageIndexAccountStatusesProviderRe
 	var responses []*models.AccountStatusesResponse
 	for i := 0; i < accountStatusesCount; i++ {
 		res := <-send
-		accountStatusesRes, ok := res.(*models.AccountStatusesResponse)
+		accountStatusesRes, ok := res.(*models.BaseDataProvidersResponse)
+		s.Require().True(ok, "Expected *models.BaseDataProvidersResponse, got %T", res)
+		accountStatusesResData, ok := accountStatusesRes.Data.(*models.AccountStatusesResponse)
 		s.Require().True(ok, "Expected *models.AccountStatusesResponse, got %T", res)
-		responses = append(responses, accountStatusesRes)
+		responses = append(responses, accountStatusesResData)
 	}
 
 	// Verifying that indices are starting from 0
