@@ -601,6 +601,26 @@ contract EVM {
         ) as! Result
     }
 
+    /// Calls a contract function with the given data.
+    /// The execution is limited by the given amount of gas.
+    /// The transaction state changes are not persisted.
+    access(all)
+    fun dryCall(
+        from: EVMAddress,
+        to: EVMAddress,
+        data: [UInt8],
+        gasLimit: UInt64,
+        value: Balance,
+    ): Result {
+        return InternalEVM.dryCall(
+            from: from.bytes,
+            to: to.bytes,
+            data: data,
+            gasLimit: gasLimit,
+            value: value.attoflow
+        ) as! Result
+    }
+
     /// Runs a batch of RLP-encoded EVM transactions, deducts the gas fees,
     /// and deposits the gas fees into the provided coinbase address.
     /// An invalid transaction is not executed and not included in the block.
