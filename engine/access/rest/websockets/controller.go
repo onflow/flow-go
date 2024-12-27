@@ -1,3 +1,72 @@
+// Package websockets provides a number of abstractions for managing WebSocket connections.
+// It supports handling client subscriptions, sending messages, and maintaining
+// the lifecycle of WebSocket connections with robust keepalive mechanisms.
+//
+// Overview
+//
+// The architecture of this package consists of three main components:
+//
+// 1. **Connection**: Responsible for providing a channel that allows the client
+//    to communicate with the server. It encapsulates WebSocket-level operations
+//    such as sending and receiving messages.
+// 2. **Data Providers**: Standalone units responsible for fetching data from
+//    the blockchain (protocol). These providers act as sources of data that are
+//    sent to clients based on their subscriptions.
+// 3. **Controller**: Acts as a mediator between the connection and data providers.
+//    It governs client subscriptions, handles client requests and responses,
+//    validates messages, and manages error handling. The controller ensures smooth
+//    coordination between the client and the data-fetching units.
+//
+// ### Controller Details
+//
+// The `Controller` is the core component that coordinates the interactions between
+// the client and data providers. It achieves this through three routines that run
+// in parallel (writer, reader, and keepalive routine). If any of the three routines
+// fails with an error, the remaining routines will be canceled using the provided
+// context to ensure proper cleanup and termination.
+//
+// 1. **Reader Routine**:
+//    - Reads messages from the client WebSocket connection.
+//    - Parses and validates the messages.
+//    - Handles the messages by triggering the appropriate actions, such as subscribing
+//      to a topic or unsubscribing from an existing subscription.
+//    - Ensures proper validation of message formats and data before passing them to
+//      the internal handlers.
+//
+// 2. **Writer Routine**:
+//    - Listens to the `multiplexedStream`, which is a channel filled by data providers
+//      with messages that clients have subscribed to.
+//    - Writes these messages to the client WebSocket connection.
+//    - Ensures the outgoing messages respect the required deadlines to maintain the
+//      stability of the connection.
+//
+// 3. **Keepalive Routine**:
+//    - Periodically sends a WebSocket ping control message to the client to indicate
+//      that the controller and all its subscriptions are working as expected.
+//    - Ensures the connection remains clean and avoids timeout scenarios due to
+//      inactivity.
+//    - Resets the connection's read deadline whenever a pong message is received.
+//
+// Example
+//
+// Usage typically involves creating a `Controller` instance and invoking its
+// `HandleConnection` method to manage a single WebSocket connection:
+//
+//     logger := zerolog.New(os.Stdout)
+//     config := websockets.Config{/* configuration options */}
+//     conn := /* a WebsocketConnection implementation */
+//     factory := /* a DataProviderFactory implementation */
+//
+//     controller := websockets.NewWebSocketController(logger, config, conn, factory)
+//     ctx := context.Background()
+//     controller.HandleConnection(ctx)
+//
+//
+// Package Constants
+//
+// This package expects constants like `PongWait` and `WriteWait` for controlling
+// the read/write deadlines. They need to be defined in your application as appropriate.
+
 package websockets
 
 import (
@@ -136,9 +205,8 @@ func (c *Controller) keepalive(ctx context.Context) error {
 	}
 }
 
-// writeMessages reads a messages from communication channel and passes them on to a client WebSocket connection.
-// The communication channel is filled by data providers. Besides, the response limit tracker is involved in
-// write message regulation
+// writeMessages reads a messages from multiplexed stream and passes them on to a client WebSocket connection.
+// The multiplexed stream channel is filled by data providers
 func (c *Controller) writeMessages(ctx context.Context) error {
 	defer func() {
 		// drain the channel as some providers may still send data to it after this routine shutdowns
