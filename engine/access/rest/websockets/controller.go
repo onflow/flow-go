@@ -92,8 +92,31 @@ type Controller struct {
 	config Config
 	conn   WebsocketConnection
 
-	// data channel which data providers write messages to.
-	// writer routine reads from this channel and writes messages to connection
+	// The `multiplexedStream` is a core channel used for communication between the
+	// `Controller` and Data Providers. Its lifecycle is as follows:
+	//
+	// 1. **Data Providers**:
+	//    - Data providers write their data into this channel, which is consumed by
+	//      the writer routine to send messages to the client.
+	// 2. **Reader Routine**:
+	//    - Writes OK/error responses to the channel as a result of processing client messages.
+	// 3. **Writer Routine**:
+	//    - Reads messages from this channel and forwards them to the client WebSocket connection.
+	//
+	// 4. **Channel Closing**:
+	//    - The `Controller` is responsible for starting and managing the lifecycle of the channel.
+	//    - If an unrecoverable error occurs in any of the three routines (reader, writer, or keepalive),
+	//      the parent context is canceled. This triggers data providers to stop their work.
+	//    - The `multiplexedStream` will not be closed until all data providers signal that
+	//      they have stopped writing to it via the `dataProvidersGroup` wait group.
+	//
+	// 5. **Edge Case - Writer Routine Finished Before Providers**:
+	//    - If the writer routine finishes before all data providers, a separate draining routine
+	//      ensures that the `multiplexedStream` is fully drained to prevent deadlocks.
+	//      All remaining messages in this case will be discarded.
+	//
+	// This design ensures that the channel is only closed when it is safe to do so, avoiding
+	// issues such as sending on a closed channel while maintaining proper cleanup.
 	multiplexedStream chan interface{}
 
 	dataProviders       *concurrentmap.Map[uuid.UUID, dp.DataProvider]
