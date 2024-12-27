@@ -35,7 +35,6 @@ import (
 // to the verifier engine.
 type Engine struct {
 	// common
-	unit  *engine.Unit
 	state protocol.State // used to verify the origin ID of chunk data response, and sealing status.
 
 	// monitoring
@@ -73,7 +72,6 @@ func New(
 	stopAtHeight uint64,
 ) *Engine {
 	e := &Engine{
-		unit:          engine.NewUnit(),
 		metrics:       metrics,
 		tracer:        tracer,
 		log:           log.With().Str("engine", "fetcher").Logger(),
@@ -105,16 +103,12 @@ func (e *Engine) Ready() <-chan struct{} {
 	if e.chunkConsumerNotifier == nil {
 		e.log.Fatal().Msg("missing chunk consumer notifier callback in verification fetcher engine")
 	}
-	return e.unit.Ready(func() {
-		<-e.requester.Ready()
-	})
+	return e.requester.Ready()
 }
 
 // Done terminates the engine and returns a channel that is closed when the termination is done
 func (e *Engine) Done() <-chan struct{} {
-	return e.unit.Done(func() {
-		<-e.requester.Done()
-	})
+	return e.requester.Done()
 }
 
 // ProcessAssignedChunk is the entry point of fetcher engine.
@@ -170,7 +164,8 @@ func (e *Engine) ProcessAssignedChunk(locator *chunks.Locator) {
 // processAssignedChunkWithTracing encapsulates the logic of processing assigned chunk with tracing enabled.
 func (e *Engine) processAssignedChunkWithTracing(chunk *flow.Chunk, result *flow.ExecutionResult, chunkLocatorID flow.Identifier) (bool, uint64, error) {
 
-	span, _ := e.tracer.StartBlockSpan(e.unit.Ctx(), result.BlockID, trace.VERProcessAssignedChunk)
+	// We don't have any existing information and don't need cancellation, so use a background (empty) context
+	span, _ := e.tracer.StartBlockSpan(context.Background(), result.BlockID, trace.VERProcessAssignedChunk)
 	span.SetAttributes(attribute.Int("collection_index", int(chunk.CollectionIndex)))
 	defer span.End()
 
