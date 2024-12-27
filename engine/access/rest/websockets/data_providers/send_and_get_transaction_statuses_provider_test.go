@@ -6,8 +6,10 @@ import (
 
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
+	"github.com/onflow/flow-go/access"
 	accessmock "github.com/onflow/flow-go/access/mock"
 	"github.com/onflow/flow-go/engine/access/rest/websockets/models"
 	"github.com/onflow/flow-go/engine/access/state_stream"
@@ -59,7 +61,7 @@ func (s *SendTransactionStatusesProviderSuite) SetupTest() {
 // when it is configured correctly and operating under normal conditions. It
 // validates that tx statuses are correctly streamed to the channel and ensures
 // no unexpected errors occur.
-func (s *TransactionStatusesProviderSuite) TestSendTransactionStatusesDataProvider_HappyPath() {
+func (s *SendTransactionStatusesProviderSuite) TestSendTransactionStatusesDataProvider_HappyPath() {
 
 	sendTxStatutesTestCases := []testType{
 		{
@@ -86,13 +88,27 @@ func (s *TransactionStatusesProviderSuite) TestSendTransactionStatusesDataProvid
 		s.factory,
 		sendTxStatutesTestCases,
 		func(dataChan chan interface{}) {
-			for i := 0; i < len(expectedResponse); i++ {
-				dataChan <- expectedResponse[i]
-			}
+			dataChan <- expectedResponse
 		},
 		expectedResponse,
 		s.requireTransactionStatuses,
 	)
+
+}
+
+// requireTransactionStatuses ensures that the received transaction statuses information matches the expected data.
+func (s *SendTransactionStatusesProviderSuite) requireTransactionStatuses(
+	v interface{},
+	expectedResponse interface{},
+) {
+	expectedTxStatusesResponse, ok := expectedResponse.(*access.TransactionResult)
+	require.True(s.T(), ok, "unexpected type: %T", expectedResponse)
+
+	actualResponse, ok := v.(*models.TransactionStatusesResponse)
+	require.True(s.T(), ok, "Expected *models.TransactionStatusesResponse, got %T", v)
+
+	require.Equal(s.T(), expectedTxStatusesResponse.BlockID, actualResponse.TransactionResult.BlockID)
+	require.Equal(s.T(), expectedTxStatusesResponse.BlockHeight, actualResponse.TransactionResult.BlockHeight)
 
 }
 
@@ -107,7 +123,7 @@ func (s *SendTransactionStatusesProviderSuite) TestSendTransactionStatusesDataPr
 
 	for _, test := range invalidSendTransactionStatusesArgumentsTestCases() {
 		s.Run(test.name, func() {
-			provider, err := NewSendTransactionStatusesDataProvider(
+			provider, err := NewSendAndGetTransactionStatusesDataProvider(
 				ctx,
 				s.log,
 				s.api,
