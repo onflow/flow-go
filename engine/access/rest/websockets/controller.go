@@ -107,6 +107,11 @@ type Controller struct {
 	//    - Reads messages from this channel and forwards them to the client WebSocket connection.
 	//
 	// 4. **Channel Closing**:
+	//      The intention to close the channel comes from the reader-from-this-channel routines (controller's routines),
+	//      not the writer-to-this-channel routines (data providers).
+	//      Therefore, we have to signal the data providers to stop writing, wait for them to finish write operations,
+	//      and only after that we can close the channel.
+	//
 	//    - The `Controller` is responsible for starting and managing the lifecycle of the channel.
 	//    - If an unrecoverable error occurs in any of the three routines (reader, writer, or keepalive),
 	//      the parent context is canceled. This triggers data providers to stop their work.
