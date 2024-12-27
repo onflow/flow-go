@@ -104,12 +104,14 @@ func (s *SendTransactionStatusesProviderSuite) requireTransactionStatuses(
 	expectedTxStatusesResponse, ok := expectedResponse.(*access.TransactionResult)
 	require.True(s.T(), ok, "unexpected type: %T", expectedResponse)
 
-	actualResponse, ok := v.(*models.TransactionStatusesResponse)
-	require.True(s.T(), ok, "Expected *models.TransactionStatusesResponse, got %T", v)
+	actualResponse, ok := v.(*models.BaseDataProvidersResponse)
+	require.True(s.T(), ok, "Expected *models.BaseDataProvidersResponse, got %T", v)
 
-	require.Equal(s.T(), expectedTxStatusesResponse.BlockID, actualResponse.TransactionResult.BlockID)
-	require.Equal(s.T(), expectedTxStatusesResponse.BlockHeight, actualResponse.TransactionResult.BlockHeight)
+	actualResponseData, ok := actualResponse.Data.(*models.TransactionStatusesResponse)
+	require.True(s.T(), ok, "unexpected response data type: %T", v)
 
+	require.Equal(s.T(), expectedTxStatusesResponse.BlockID, actualResponseData.TransactionResult.BlockID)
+	require.Equal(s.T(), expectedTxStatusesResponse.BlockHeight, actualResponseData.TransactionResult.BlockHeight)
 }
 
 // TestSendTransactionStatusesDataProvider_InvalidArguments tests the behavior of the send transaction statuses data provider

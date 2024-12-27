@@ -93,9 +93,13 @@ func (p *SendAndGetTransactionStatusesDataProvider) handleResponse() func(txResu
 				return status.Errorf(codes.Internal, "message index already incremented to %d", messageIndex.Value())
 			}
 
-			p.send <- &models.TransactionStatusesResponse{
-				TransactionResult: txResults[i],
-				MessageIndex:      index,
+			p.send <- &models.BaseDataProvidersResponse{
+				ID:    p.ID().String(),
+				Topic: p.Topic(),
+				Data: &models.TransactionStatusesResponse{
+					TransactionResult: txResults[i],
+					MessageIndex:      index,
+				},
 			}
 		}
 

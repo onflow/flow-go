@@ -134,11 +134,14 @@ func (s *TransactionStatusesProviderSuite) requireTransactionStatuses(
 	expectedTxStatusesResponse, ok := expectedResponse.(*access.TransactionResult)
 	require.True(s.T(), ok, "unexpected type: %T", expectedResponse)
 
-	actualResponse, ok := v.(*models.TransactionStatusesResponse)
-	require.True(s.T(), ok, "Expected *models.TransactionStatusesResponse, got %T", v)
+	actualResponse, ok := v.(*models.BaseDataProvidersResponse)
+	require.True(s.T(), ok, "Expected *models.BaseDataProvidersResponse, got %T", v)
 
-	require.Equal(s.T(), expectedTxStatusesResponse.BlockID, actualResponse.TransactionResult.BlockID)
-	require.Equal(s.T(), expectedTxStatusesResponse.BlockHeight, actualResponse.TransactionResult.BlockHeight)
+	actualResponseData, ok := actualResponse.Data.(*models.TransactionStatusesResponse)
+	require.True(s.T(), ok, "unexpected response data type: %T", v)
+
+	require.Equal(s.T(), expectedTxStatusesResponse.BlockID, actualResponseData.TransactionResult.BlockID)
+	require.Equal(s.T(), expectedTxStatusesResponse.BlockHeight, actualResponseData.TransactionResult.BlockHeight)
 }
 
 // TestTransactionStatusesDataProvider_InvalidArguments tests the behavior of the transaction statuses data provider
@@ -273,9 +276,14 @@ func (s *TransactionStatusesProviderSuite) TestMessageIndexTransactionStatusesPr
 	var responses []*models.TransactionStatusesResponse
 	for i := 0; i < txStatusesCount; i++ {
 		res := <-send
-		txStatusesRes, ok := res.(*models.TransactionStatusesResponse)
+
+		txStatusesRes, ok := res.(*models.BaseDataProvidersResponse)
+		s.Require().True(ok, "Expected *models.BaseDataProvidersResponse, got %T", res)
+
+		txStatusesResData, ok := txStatusesRes.Data.(*models.TransactionStatusesResponse)
 		s.Require().True(ok, "Expected *models.TransactionStatusesResponse, got %T", res)
-		responses = append(responses, txStatusesRes)
+
+		responses = append(responses, txStatusesResData)
 	}
 
 	// Verifying that indices are starting from 0
