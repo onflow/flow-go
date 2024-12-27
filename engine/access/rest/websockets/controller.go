@@ -17,6 +17,9 @@
 //    validates messages, and manages error handling. The controller ensures smooth
 //    coordination between the client and the data-fetching units.
 //
+// Basically, it is an N:1:1 approach: N data providers, 1 controller, 1 websocket connection.
+// This allows a client to receive messages from different subscriptions over a single connection.
+//
 // ### Controller Details
 //
 // The `Controller` is the core component that coordinates the interactions between
