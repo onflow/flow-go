@@ -72,9 +72,7 @@ func (s *TransactionStatusesProviderSuite) TestTransactionStatusesDataProvider_H
 		s.factory,
 		s.subscribeTransactionStatusesDataProviderTestCases(),
 		func(dataChan chan interface{}) {
-			for i := 0; i < len(expectedResponse); i++ {
-				dataChan <- expectedResponse[i]
-			}
+			dataChan <- expectedResponse
 		},
 		expectedResponse,
 		s.requireTransactionStatuses,
@@ -133,21 +131,19 @@ func (s *TransactionStatusesProviderSuite) requireTransactionStatuses(
 	v interface{},
 	expectedResponse interface{},
 ) {
-	expectedAccountStatusesResponse, ok := expectedResponse.([]*access.TransactionResult)
+	expectedTxStatusesResponse, ok := expectedResponse.(*access.TransactionResult)
 	require.True(s.T(), ok, "unexpected type: %T", expectedResponse)
 
 	actualResponse, ok := v.(*models.TransactionStatusesResponse)
 	require.True(s.T(), ok, "Expected *models.TransactionStatusesResponse, got %T", v)
 
-	s.Require().ElementsMatch(expectedAccountStatusesResponse, actualResponse.TransactionResults)
+	require.Equal(s.T(), expectedTxStatusesResponse.BlockID, actualResponse.TransactionResult.BlockID)
+	require.Equal(s.T(), expectedTxStatusesResponse.BlockHeight, actualResponse.TransactionResult.BlockHeight)
 }
 
 // TestTransactionStatusesDataProvider_InvalidArguments tests the behavior of the transaction statuses data provider
 // when invalid arguments are provided. It verifies that appropriate errors are returned
 // for missing or conflicting arguments.
-// This test covers the test cases:
-// 1. Invalid 'tx_id' argument.
-// 2. Invalid 'start_block_id' argument.
 func (s *TransactionStatusesProviderSuite) TestTransactionStatusesDataProvider_InvalidArguments() {
 	ctx := context.Background()
 	send := make(chan interface{})
@@ -260,13 +256,17 @@ func (s *TransactionStatusesProviderSuite) TestMessageIndexTransactionStatusesPr
 		s.Require().NoError(err)
 	}()
 
-	// Simulate emitting data to the еч statuses channel
+	// Simulate emitting data to the tx statuses channel
+	var txResults []*access.TransactionResult
+	for i := 0; i < txStatusesCount; i++ {
+		txResults = append(txResults, &access.TransactionResult{
+			BlockHeight: s.rootBlock.Header.Height,
+		})
+	}
 	go func() {
 		defer close(txStatusesChan) // Close the channel when done
 
-		for i := 0; i < txStatusesCount; i++ {
-			txStatusesChan <- []*access.TransactionResult{}
-		}
+		txStatusesChan <- txResults
 	}()
 
 	// Collect responses
@@ -292,7 +292,7 @@ func (s *TransactionStatusesProviderSuite) TestMessageIndexTransactionStatusesPr
 	provider.Close()
 }
 
-func expectedTransactionStatusesResponse(block flow.Block) [][]*access.TransactionResult {
+func expectedTransactionStatusesResponse(block flow.Block) []*access.TransactionResult {
 	id := unittest.IdentifierFixture()
 	cid := unittest.IdentifierFixture()
 	txr := access.TransactionResult{
@@ -307,13 +307,11 @@ func expectedTransactionStatusesResponse(block flow.Block) [][]*access.Transacti
 		BlockHeight:  block.Header.Height,
 	}
 
-	var expectedTxStatusesResponses [][]*access.TransactionResult
 	var expectedTxResultsResponses []*access.TransactionResult
 
 	for i := 0; i < 2; i++ {
 		expectedTxResultsResponses = append(expectedTxResultsResponses, &txr)
-		expectedTxStatusesResponses = append(expectedTxStatusesResponses, expectedTxResultsResponses)
 	}
 
-	return expectedTxStatusesResponses
+	return expectedTxResultsResponses
 }

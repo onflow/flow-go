@@ -6,8 +6,10 @@ import (
 
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
+	"github.com/onflow/flow-go/access"
 	accessmock "github.com/onflow/flow-go/access/mock"
 	"github.com/onflow/flow-go/engine/access/rest/websockets/models"
 	"github.com/onflow/flow-go/engine/access/state_stream"
@@ -59,7 +61,7 @@ func (s *SendTransactionStatusesProviderSuite) SetupTest() {
 // when it is configured correctly and operating under normal conditions. It
 // validates that tx statuses are correctly streamed to the channel and ensures
 // no unexpected errors occur.
-func (s *TransactionStatusesProviderSuite) TestSendTransactionStatusesDataProvider_HappyPath() {
+func (s *SendTransactionStatusesProviderSuite) TestSendTransactionStatusesDataProvider_HappyPath() {
 
 	sendTxStatutesTestCases := []testType{
 		{
@@ -82,13 +84,11 @@ func (s *TransactionStatusesProviderSuite) TestSendTransactionStatusesDataProvid
 
 	testHappyPath(
 		s.T(),
-		SendTransactionStatusesTopic,
+		SendAndGetTransactionStatusesTopic,
 		s.factory,
 		sendTxStatutesTestCases,
 		func(dataChan chan interface{}) {
-			for i := 0; i < len(expectedResponse); i++ {
-				dataChan <- expectedResponse[i]
-			}
+			dataChan <- expectedResponse
 		},
 		expectedResponse,
 		s.requireTransactionStatuses,
@@ -96,30 +96,34 @@ func (s *TransactionStatusesProviderSuite) TestSendTransactionStatusesDataProvid
 
 }
 
+// requireTransactionStatuses ensures that the received transaction statuses information matches the expected data.
+func (s *SendTransactionStatusesProviderSuite) requireTransactionStatuses(
+	v interface{},
+	expectedResponse interface{},
+) {
+	expectedTxStatusesResponse, ok := expectedResponse.(*access.TransactionResult)
+	require.True(s.T(), ok, "unexpected type: %T", expectedResponse)
+
+	actualResponse, ok := v.(*models.TransactionStatusesResponse)
+	require.True(s.T(), ok, "Expected *models.TransactionStatusesResponse, got %T", v)
+
+	require.Equal(s.T(), expectedTxStatusesResponse.BlockID, actualResponse.TransactionResult.BlockID)
+	require.Equal(s.T(), expectedTxStatusesResponse.BlockHeight, actualResponse.TransactionResult.BlockHeight)
+
+}
+
 // TestSendTransactionStatusesDataProvider_InvalidArguments tests the behavior of the send transaction statuses data provider
 // when invalid arguments are provided. It verifies that appropriate errors are returned
 // for missing or conflicting arguments.
-// This test covers the test cases:
-// 1. Invalid 'script' type.
-// 2. Invalid 'script' value.
-// 3. Invalid 'arguments' type.
-// 4. Invalid 'arguments' value.
-// 5. Invalid 'reference_block_id' value.
-// 6. Invalid 'gas_limit' value.
-// 7. Invalid 'payer' value.
-// 8. Invalid 'proposal_key' value.
-// 9. Invalid 'authorizers' value.
-// 10. Invalid 'payload_signatures' value.
-// 11. Invalid 'envelope_signatures' value.
 func (s *SendTransactionStatusesProviderSuite) TestSendTransactionStatusesDataProvider_InvalidArguments() {
 	ctx := context.Background()
 	send := make(chan interface{})
 
-	topic := SendTransactionStatusesTopic
+	topic := SendAndGetTransactionStatusesTopic
 
 	for _, test := range invalidSendTransactionStatusesArgumentsTestCases() {
 		s.Run(test.name, func() {
-			provider, err := NewSendTransactionStatusesDataProvider(
+			provider, err := NewSendAndGetTransactionStatusesDataProvider(
 				ctx,
 				s.log,
 				s.api,
