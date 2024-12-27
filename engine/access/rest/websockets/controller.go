@@ -115,9 +115,6 @@ func (c *Controller) configureKeepalive() error {
 
 // keepalive sends a ping message periodically to keep the WebSocket connection alive
 // and avoid timeouts.
-//
-// Expected errors during normal operation:
-// - context.Canceled if the client disconnected
 func (c *Controller) keepalive(ctx context.Context) error {
 	pingTicker := time.NewTicker(PingPeriod)
 	defer pingTicker.Stop()
@@ -142,9 +139,6 @@ func (c *Controller) keepalive(ctx context.Context) error {
 // writeMessages reads a messages from communication channel and passes them on to a client WebSocket connection.
 // The communication channel is filled by data providers. Besides, the response limit tracker is involved in
 // write message regulation
-//
-// Expected errors during normal operation:
-// - context.Canceled if the client disconnected
 func (c *Controller) writeMessages(ctx context.Context) error {
 	defer func() {
 		// drain the channel as some providers may still send data to it after this routine shutdowns
@@ -161,7 +155,7 @@ func (c *Controller) writeMessages(ctx context.Context) error {
 			return nil
 		case message, ok := <-c.multiplexedStream:
 			if !ok {
-				return fmt.Errorf("multiplexed stream closed")
+				return nil
 			}
 
 			if err := c.conn.SetWriteDeadline(time.Now().Add(WriteWait)); err != nil {
@@ -177,9 +171,6 @@ func (c *Controller) writeMessages(ctx context.Context) error {
 
 // readMessages continuously reads messages from a client WebSocket connection,
 // validates each message, and processes it based on the message type.
-//
-// Expected errors during normal operation:
-// - context.Canceled if the client disconnected
 func (c *Controller) readMessages(ctx context.Context) error {
 	for {
 		var message json.RawMessage
@@ -195,7 +186,7 @@ func (c *Controller) readMessages(ctx context.Context) error {
 			continue
 		}
 
-		err := c.parseAndValidateMessage(ctx, message)
+		err := c.handleMessage(ctx, message)
 		if err != nil {
 			c.writeErrorResponse(
 				ctx,
@@ -206,7 +197,7 @@ func (c *Controller) readMessages(ctx context.Context) error {
 	}
 }
 
-func (c *Controller) parseAndValidateMessage(ctx context.Context, message json.RawMessage) error {
+func (c *Controller) handleMessage(ctx context.Context, message json.RawMessage) error {
 	var baseMsg models.BaseMessageRequest
 	if err := json.Unmarshal(message, &baseMsg); err != nil {
 		return fmt.Errorf("error unmarshalling base message: %w", err)

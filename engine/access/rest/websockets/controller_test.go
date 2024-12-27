@@ -152,7 +152,6 @@ func (s *WsControllerSuite) TestSubscribeRequest() {
 				require.False(t, response.Success)
 				require.NotEmpty(t, response.Error)
 				require.Equal(t, int(InvalidMessage), response.Error.Code)
-
 				return websocket.ErrCloseSent
 			})
 
