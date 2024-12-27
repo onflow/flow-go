@@ -126,8 +126,11 @@ func (s *BlockHeadersProviderSuite) requireBlockHeader(v interface{}, expected i
 	expectedBlock, ok := expected.(*flow.Block)
 	require.True(s.T(), ok, "unexpected type: %T", v)
 
-	actualResponse, ok := v.(*models.BlockHeaderMessageResponse)
+	actualResponse, ok := v.(*models.BaseDataProvidersResponse)
 	require.True(s.T(), ok, "unexpected response type: %T", v)
 
-	s.Require().Equal(expectedBlock.Header, actualResponse.Header)
+	actualResponseData, ok := actualResponse.Data.(*models.BlockHeaderMessageResponse)
+	require.True(s.T(), ok, "unexpected response data type: %T", v)
+
+	s.Require().Equal(expectedBlock.Header, actualResponseData.Header)
 }

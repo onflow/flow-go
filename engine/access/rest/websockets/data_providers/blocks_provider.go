@@ -70,7 +70,6 @@ func (p *BlocksDataProvider) Run() error {
 	return subscription.HandleSubscription(
 		p.subscription,
 		subscription.HandleResponse(p.send, func(block *flow.Block) (interface{}, error) {
-
 			return &models.BaseDataProvidersResponse{
 				ID:    p.ID().String(),
 				Topic: p.Topic(),

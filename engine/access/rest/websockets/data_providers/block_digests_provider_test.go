@@ -126,10 +126,13 @@ func (s *BlocksProviderSuite) requireBlockDigest(v interface{}, expected interfa
 	expectedBlock, ok := expected.(*flow.Block)
 	require.True(s.T(), ok, "unexpected type: %T", v)
 
-	actualResponse, ok := v.(*models.BlockDigestMessageResponse)
+	actualResponse, ok := v.(*models.BaseDataProvidersResponse)
 	require.True(s.T(), ok, "unexpected response type: %T", v)
 
-	s.Require().Equal(expectedBlock.Header.ID(), actualResponse.Block.ID())
-	s.Require().Equal(expectedBlock.Header.Height, actualResponse.Block.Height)
-	s.Require().Equal(expectedBlock.Header.Timestamp, actualResponse.Block.Timestamp)
+	actualResponseData, ok := actualResponse.Data.(*models.BlockDigestMessageResponse)
+	require.True(s.T(), ok, "unexpected response data type: %T", v)
+
+	s.Require().Equal(expectedBlock.Header.ID(), actualResponseData.Block.ID())
+	s.Require().Equal(expectedBlock.Header.Height, actualResponseData.Block.Height)
+	s.Require().Equal(expectedBlock.Header.Timestamp, actualResponseData.Block.Timestamp)
 }

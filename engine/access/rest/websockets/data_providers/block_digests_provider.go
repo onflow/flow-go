@@ -61,9 +61,14 @@ func (p *BlockDigestsDataProvider) Run() error {
 	return subscription.HandleSubscription(
 		p.subscription,
 		subscription.HandleResponse(p.send, func(block *flow.BlockDigest) (interface{}, error) {
-			return &models.BlockDigestMessageResponse{
-				Block: block,
+			return &models.BaseDataProvidersResponse{
+				ID:    p.ID().String(),
+				Topic: p.Topic(),
+				Data: &models.BlockDigestMessageResponse{
+					Block: block,
+				},
 			}, nil
+
 		}),
 	)
 }
