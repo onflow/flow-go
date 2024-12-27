@@ -102,12 +102,16 @@ func (p *EventsDataProvider) handleResponse() func(eventsResponse *backend.Event
 			return fmt.Errorf("message index already incremented to: %d", messageIndex.Value())
 		}
 
-		p.send <- &models.EventResponse{
-			BlockId:        eventsResponse.BlockID.String(),
-			BlockHeight:    strconv.FormatUint(eventsResponse.Height, 10),
-			BlockTimestamp: eventsResponse.BlockTimestamp,
-			Events:         eventsResponse.Events,
-			MessageIndex:   index,
+		p.send <- &models.BaseDataProvidersResponse{
+			ID:    p.ID().String(),
+			Topic: p.Topic(),
+			Data: &models.EventResponse{
+				BlockId:        eventsResponse.BlockID.String(),
+				BlockHeight:    strconv.FormatUint(eventsResponse.Height, 10),
+				BlockTimestamp: eventsResponse.BlockTimestamp,
+				Events:         eventsResponse.Events,
+				MessageIndex:   index,
+			},
 		}
 
 		return nil

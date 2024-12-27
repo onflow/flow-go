@@ -254,8 +254,10 @@ func (s *AccountStatusesProviderSuite) TestMessageIndexAccountStatusesProviderRe
 		res := <-send
 		accountStatusesRes, ok := res.(*models.BaseDataProvidersResponse)
 		s.Require().True(ok, "Expected *models.BaseDataProvidersResponse, got %T", res)
+
 		accountStatusesResData, ok := accountStatusesRes.Data.(*models.AccountStatusesResponse)
 		s.Require().True(ok, "Expected *models.AccountStatusesResponse, got %T", res)
+
 		responses = append(responses, accountStatusesResData)
 	}
 

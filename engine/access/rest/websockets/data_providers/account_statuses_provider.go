@@ -116,13 +116,6 @@ func (p *AccountStatusesDataProvider) handleResponse() func(accountStatusesRespo
 			return status.Errorf(codes.Internal, "message index already incremented to %d", messageIndex.Value())
 		}
 
-		//p.send <- &models.AccountStatusesResponse{
-		//	BlockID:       accountStatusesResponse.BlockID.String(),
-		//	Height:        strconv.FormatUint(accountStatusesResponse.Height, 10),
-		//	AccountEvents: accountStatusesResponse.AccountEvents,
-		//	MessageIndex:  index,
-		//}
-
 		p.send <- &models.BaseDataProvidersResponse{
 			ID:    p.ID().String(),
 			Topic: p.Topic(),

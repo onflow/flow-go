@@ -144,10 +144,13 @@ func (s *EventsProviderSuite) requireEvents(v interface{}, expectedResponse inte
 	expectedEventsResponse, ok := expectedResponse.(backend.EventsResponse)
 	require.True(s.T(), ok, "unexpected type: %T", expectedResponse)
 
-	actualResponse, ok := v.(*models.EventResponse)
+	actualResponse, ok := v.(*models.BaseDataProvidersResponse)
 	require.True(s.T(), ok, "Expected *models.EventResponse, got %T", v)
 
-	s.Require().ElementsMatch(expectedEventsResponse.Events, actualResponse.Events)
+	actualResponseData, ok := actualResponse.Data.(*models.EventResponse)
+	require.True(s.T(), ok, "unexpected response data type: %T", v)
+
+	s.Require().ElementsMatch(expectedEventsResponse.Events, actualResponseData.Events)
 }
 
 // invalidArgumentsTestCases returns a list of test cases with invalid argument combinations
@@ -275,9 +278,13 @@ func (s *EventsProviderSuite) TestMessageIndexEventProviderResponse_HappyPath() 
 	var responses []*models.EventResponse
 	for i := 0; i < eventsCount; i++ {
 		res := <-send
-		eventRes, ok := res.(*models.EventResponse)
+		eventRes, ok := res.(*models.BaseDataProvidersResponse)
+		s.Require().True(ok, "Expected *models.BaseDataProvidersResponse, got %T", res)
+
+		eventResData, ok := eventRes.Data.(*models.EventResponse)
 		s.Require().True(ok, "Expected *models.EventResponse, got %T", res)
-		responses = append(responses, eventRes)
+
+		responses = append(responses, eventResData)
 	}
 
 	// Verifying that indices are starting from 1
