@@ -12,5 +12,5 @@ type EventResponse struct {
 	BlockHeight    string       `json:"block_height"`
 	BlockTimestamp time.Time    `json:"block_timestamp"`
 	Events         []flow.Event `json:"events"`
-	MessageIndex   string       `json:"message_index"`
+	MessageIndex   uint64       `json:"message_index"`
 }
