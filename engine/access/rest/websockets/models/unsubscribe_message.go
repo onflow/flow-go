@@ -9,5 +9,4 @@ type UnsubscribeMessageRequest struct {
 // UnsubscribeMessageResponse represents the response to an unsubscription request.
 type UnsubscribeMessageResponse struct {
 	BaseMessageResponse
-	SubscriptionID string `json:"id"`
 }

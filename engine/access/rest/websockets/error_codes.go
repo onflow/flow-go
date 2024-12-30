@@ -3,12 +3,8 @@ package websockets
 type Code int
 
 const (
-	Ok Code = iota
-	ConnectionRead
-	ConnectionWrite
-	InvalidMessage
-	NotFound
+	InvalidMessage Code = iota
 	InvalidArgument
-	RunError
-	InternalError
+	NotFound
+	SubscriptionError
 )
