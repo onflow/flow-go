@@ -292,10 +292,10 @@ func (c *Controller) writeMessages(ctx context.Context) error {
 			lastMessageSentAt = time.Now()
 
 		case <-inactivityTicker.C:
-			// Periodically check inactivity
+			// Returns when there are no active subscriptions and the connection has been inactive
+			// for an InactivityTimeout duration.
 			if time.Since(lastMessageSentAt) > c.config.InactivityTimeout && c.dataProviders.Size() == 0 {
-				// Optionally send a message to the client indicating the reason for closure.
-				c.logger.Info().Msg("Connection inactive, closing due to timeout.")
+				c.logger.Info().Msgf("connection inactive, closing due to timeout: %v, ", c.config.InactivityTimeout)
 				return fmt.Errorf("no recent activity for %v", c.config.InactivityTimeout)
 			}
 		}
