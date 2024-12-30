@@ -18,6 +18,7 @@ var (
 	flagChunkDataPackDir string
 	flagChain            string
 	flagFromTo           string
+	flagWorkerCount      uint // number of workers to verify the blocks concurrently
 )
 
 // # verify the last 100 sealed blocks
@@ -47,33 +48,47 @@ func init() {
 
 	Cmd.Flags().StringVar(&flagFromTo, "from_to", "",
 		"the height range to verify blocks (inclusive), i.e, 1-1000, 1000-2000, 2000-3000, etc.")
+
+	Cmd.Flags().UintVar(&flagWorkerCount, "worker_count", 1,
+		"number of workers to use for verification, default is 1")
+
 }
 
 func run(*cobra.Command, []string) {
 	chainID := flow.ChainID(flagChain)
 	_ = chainID.Chain()
 
+	if flagWorkerCount < 1 {
+		log.Fatal().Msgf("worker count must be at least 1, but got %v", flagWorkerCount)
+	}
+
+	lg := log.With().
+		Str("chain", string(chainID)).
+		Str("datadir", flagDatadir).
+		Str("chunk_data_pack_dir", flagChunkDataPackDir).
+		Logger()
+
 	if flagFromTo != "" {
 		from, to, err := parseFromTo(flagFromTo)
 		if err != nil {
-			log.Fatal().Err(err).Msg("could not parse from_to")
+			lg.Fatal().Err(err).Msg("could not parse from_to")
 		}
 
-		log.Info().Msgf("verifying range from %d to %d", from, to)
-		err = verifier.VerifyRange(from, to, chainID, flagDatadir, flagChunkDataPackDir)
+		lg.Info().Msgf("verifying range from %d to %d", from, to)
+		err = verifier.VerifyRange(from, to, chainID, flagDatadir, flagChunkDataPackDir, flagWorkerCount)
 		if err != nil {
-			log.Fatal().Err(err).Msgf("could not verify range from %d to %d", from, to)
+			lg.Fatal().Err(err).Msgf("could not verify range from %d to %d", from, to)
 		}
-		log.Info().Msgf("successfully verified range from %d to %d", from, to)
+		lg.Info().Msgf("successfully verified range from %d to %d", from, to)
 
 	} else {
-		log.Info().Msgf("verifying last %d sealed blocks", flagLastK)
-		err := verifier.VerifyLastKHeight(flagLastK, chainID, flagDatadir, flagChunkDataPackDir)
+		lg.Info().Msgf("verifying last %d sealed blocks", flagLastK)
+		err := verifier.VerifyLastKHeight(flagLastK, chainID, flagDatadir, flagChunkDataPackDir, flagWorkerCount)
 		if err != nil {
-			log.Fatal().Err(err).Msg("could not verify last k height")
+			lg.Fatal().Err(err).Msg("could not verify last k height")
 		}
 
-		log.Info().Msgf("successfully verified last %d sealed blocks", flagLastK)
+		lg.Info().Msgf("successfully verified last %d sealed blocks", flagLastK)
 	}
 }
 
