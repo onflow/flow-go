@@ -96,8 +96,7 @@ func (b *backendSubscribeTransactions) SubscribeTransactionStatusesFromLatest(
 ) subscription.Subscription {
 	header, err := b.txLocalDataProvider.state.Sealed().Head()
 	if err != nil {
-		b.log.Error().Err(err).Msg("failed to retrieve latest block")
-		return subscription.NewFailedSubscription(err, "failed to retrieve latest block")
+		irrecoverable.Throw(ctx, err)
 	}
 
 	return b.createSubscription(ctx, txID, header.ID(), 0, flow.ZeroID, requiredEventEncodingVersion, false)
