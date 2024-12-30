@@ -80,8 +80,6 @@ import (
 	"sync"
 	"time"
 
-	"golang.org/x/time/rate"
-
 	"github.com/google/uuid"
 	"github.com/gorilla/websocket"
 	"github.com/rs/zerolog"
@@ -132,7 +130,6 @@ type Controller struct {
 	dataProviders       *concurrentmap.Map[uuid.UUID, dp.DataProvider]
 	dataProviderFactory dp.DataProviderFactory
 	dataProvidersGroup  *sync.WaitGroup
-	limiter             *rate.Limiter
 }
 
 func NewWebSocketController(
@@ -149,7 +146,6 @@ func NewWebSocketController(
 		dataProviders:       concurrentmap.New[uuid.UUID, dp.DataProvider](),
 		dataProviderFactory: dataProviderFactory,
 		dataProvidersGroup:  &sync.WaitGroup{},
-		limiter:             rate.NewLimiter(rate.Limit(config.MaxResponsesPerSecond), 1),
 	}
 }
 
@@ -241,8 +237,7 @@ func (c *Controller) keepalive(ctx context.Context) error {
 }
 
 // writeMessages reads a messages from multiplexed stream and passes them on to a client WebSocket connection.
-// The multiplexed stream channel is filled by data providers. Besides, the response limit tracker is involved in
-// write message regulation.
+// The multiplexed stream channel is filled by data providers.
 // The function tracks the last message sent and periodically checks for inactivity.
 // If no messages are sent within InactivityTimeout and no active data providers exist,
 // the connection will be closed.
@@ -268,11 +263,6 @@ func (c *Controller) writeMessages(ctx context.Context) error {
 		case message, ok := <-c.multiplexedStream:
 			if !ok {
 				return nil
-			}
-
-			// wait for the rate limiter to allow the next message write.
-			if err := c.limiter.WaitN(ctx, 1); err != nil {
-				return fmt.Errorf("rate limiter wait failed: %w", err)
 			}
 
 			// Specifies a timeout for the write operation. If the write
