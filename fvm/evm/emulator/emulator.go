@@ -258,8 +258,6 @@ func (bl *BlockView) DryRunTransaction(
 	tx *gethTypes.Transaction,
 	from gethCommon.Address,
 ) (*types.Result, error) {
-	var txResult *types.Result
-
 	// create a new procedure
 	proc, err := bl.newProcedure()
 	if err != nil {
@@ -283,22 +281,8 @@ func (bl *BlockView) DryRunTransaction(
 	// we need to skip nonce check for dry run
 	msg.SkipAccountChecks = true
 
-	// call tracer
-	if proc.evm.Config.Tracer != nil && proc.evm.Config.Tracer.OnTxStart != nil {
-		proc.evm.Config.Tracer.OnTxStart(proc.evm.GetVMContext(), tx, msg.From)
-	}
-
-	// return without committing the state
-	txResult, err = proc.run(msg, tx.Hash(), tx.Type())
-
-	// call tracer on tx end
-	if proc.evm.Config.Tracer != nil &&
-		proc.evm.Config.Tracer.OnTxEnd != nil &&
-		txResult != nil {
-		proc.evm.Config.Tracer.OnTxEnd(txResult.Receipt(), txResult.ValidationError)
-	}
-
-	return txResult, err
+	// run and return without committing the state changes
+	return proc.run(msg, tx.Hash(), tx.Type())
 }
 
 func (bl *BlockView) newProcedure() (*procedure, error) {
