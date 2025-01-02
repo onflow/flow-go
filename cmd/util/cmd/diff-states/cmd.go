@@ -405,7 +405,7 @@ func diffAccount(
 		).DiffStates(
 			accountRegisters1,
 			accountRegisters2,
-			util.StorageMapDomains,
+			common.AllStorageDomains,
 		)
 	}
 

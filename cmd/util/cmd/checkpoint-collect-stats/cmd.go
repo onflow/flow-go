@@ -9,6 +9,7 @@ import (
 	"sync"
 
 	"github.com/montanaflynn/stats"
+	"github.com/onflow/cadence/common"
 	"github.com/pkg/profile"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
@@ -460,7 +461,7 @@ func getTypeStats(t string, values []float64) RegisterStatsByTypes {
 }
 
 func getStats(valueSizesByType sizesByType) []RegisterStatsByTypes {
-	domainStats := make([]RegisterStatsByTypes, 0, len(util.StorageMapDomains))
+	domainStats := make([]RegisterStatsByTypes, 0, len(common.AllStorageDomains))
 	var allDomainSizes []float64
 
 	statsByTypes := make([]RegisterStatsByTypes, 0, len(valueSizesByType))
@@ -514,7 +515,7 @@ func getType(key ledger.Key) string {
 		return "atree slab"
 	}
 
-	isDomain := slices.Contains(util.StorageMapDomains, kstr)
+	_, isDomain := common.AllStorageDomainsByIdentifier[kstr]
 	if isDomain {
 		return domainTypePrefix + kstr
 	}

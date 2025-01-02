@@ -111,7 +111,8 @@ func createEVMStorage(t *testing.T, ledger atree.Ledger, address common.Address)
 }
 
 func createCadenceStorage(t *testing.T, ledger atree.Ledger, address common.Address) {
-	storage := runtime.NewStorage(ledger, nil)
+
+	storage := runtime.NewStorage(ledger, nil, runtime.StorageConfig{})
 
 	inter, err := interpreter.NewInterpreter(
 		nil,
@@ -123,13 +124,17 @@ func createCadenceStorage(t *testing.T, ledger atree.Ledger, address common.Addr
 	require.NoError(t, err)
 
 	// Create storage and public domains
-	for _, domain := range []string{"storage", "public"} {
-		storageDomain := storage.GetStorageMap(address, domain, true)
+	for _, domain := range []common.StorageDomain{
+		common.StorageDomainPathStorage,
+		common.StorageDomainPathPublic,
+	} {
+		storageDomain := storage.GetDomainStorageMap(inter, address, domain, true)
 
 		// Create large domain map so there are more than one atree registers under the hood.
 		for i := 0; i < 100; i++ {
-			key := interpreter.StringStorageMapKey(domain + "_key_" + strconv.Itoa(i))
-			value := interpreter.NewUnmeteredStringValue(domain + "_value_" + strconv.Itoa(i))
+			domainStr := domain.Identifier()
+			key := interpreter.StringStorageMapKey(domainStr + "_key_" + strconv.Itoa(i))
+			value := interpreter.NewUnmeteredStringValue(domainStr + "_value_" + strconv.Itoa(i))
 			storageDomain.SetValue(inter, key, value)
 		}
 	}
