@@ -30,8 +30,8 @@ const (
 	// and allows the server to gracefully handle timeouts for delayed writes.
 	WriteWait = 10 * time.Second
 
-	// DefaultInactivityTimeout is the default duration which can remain WebSocket connection open without any active
-	// subscriptions.
+	// DefaultInactivityTimeout is the default duration a WebSocket connection can remain open without any active subscriptions
+	// before being automatically closed
 	DefaultInactivityTimeout time.Duration = 1 * time.Minute
 )
 
