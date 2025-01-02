@@ -20,6 +20,7 @@ type testType struct {
 	setupBackend func(sub *statestreamsmock.Subscription)
 }
 
+// testErrType represents an error cases for subscribing
 type testErrType struct {
 	name             string
 	arguments        models.Arguments
@@ -63,8 +64,12 @@ func testHappyPath[T any](
 
 			// Create the data provider instance
 			provider, err := factory.NewDataProvider(ctx, topic, test.arguments, send)
+
 			require.NotNil(t, provider)
 			require.NoError(t, err)
+
+			// Ensure the provider is properly closed after the test
+			defer provider.Close()
 
 			// Run the provider in a separate goroutine
 			go func() {
@@ -87,9 +92,6 @@ func testHappyPath[T any](
 					requireFn(v, expected)
 				}, time.Second, fmt.Sprintf("timed out waiting for response %d %v", i, expected))
 			}
-
-			// Ensure the provider is properly closed after the test
-			provider.Close()
 		})
 	}
 }

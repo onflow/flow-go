@@ -76,7 +76,6 @@ func (s *EventsProviderSuite) TestEventsDataProvider_HappyPath() {
 			Events:         expectedEvents,
 			BlockTimestamp: s.rootBlock.Header.Timestamp,
 		})
-
 	}
 
 	testHappyPath(
@@ -252,8 +251,12 @@ func (s *EventsProviderSuite) TestMessageIndexEventProviderResponse_HappyPath() 
 		s.chain,
 		state_stream.DefaultEventFilterConfig,
 		subscription.DefaultHeartbeatInterval)
+
 	s.Require().NotNil(provider)
 	s.Require().NoError(err)
+
+	// Ensure the provider is properly closed after the test
+	defer provider.Close()
 
 	// Run the provider in a separate goroutine to simulate subscription processing
 	go func() {
@@ -290,7 +293,4 @@ func (s *EventsProviderSuite) TestMessageIndexEventProviderResponse_HappyPath() 
 		currentIndex := responses[i].MessageIndex
 		s.Require().Equal(prevIndex+1, currentIndex, "Expected MessageIndex to increment by 1")
 	}
-
-	// Ensure the provider is properly closed after the test
-	provider.Close()
 }

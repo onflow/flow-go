@@ -15,12 +15,13 @@ import (
 // Constants defining various topic names used to specify different types of
 // data providers.
 const (
-	EventsTopic              = "events"
-	AccountStatusesTopic     = "account_statuses"
-	BlocksTopic              = "blocks"
-	BlockHeadersTopic        = "block_headers"
-	BlockDigestsTopic        = "block_digests"
-	TransactionStatusesTopic = "transaction_statuses"
+	EventsTopic                        = "events"
+	AccountStatusesTopic               = "account_statuses"
+	BlocksTopic                        = "blocks"
+	BlockHeadersTopic                  = "block_headers"
+	BlockDigestsTopic                  = "block_digests"
+	TransactionStatusesTopic           = "transaction_statuses"
+	SendAndGetTransactionStatusesTopic = "send_and_get_transaction_statuses"
 )
 
 // DataProviderFactory defines an interface for creating data providers
@@ -103,8 +104,9 @@ func (s *DataProviderFactoryImpl) NewDataProvider(
 	case AccountStatusesTopic:
 		return NewAccountStatusesDataProvider(ctx, s.logger, s.stateStreamApi, topic, arguments, ch, s.chain, s.eventFilterConfig, s.heartbeatInterval)
 	case TransactionStatusesTopic:
-		// TODO: Implemented handlers for each topic should be added in respective case
-		return nil, fmt.Errorf(`topic "%s" not implemented yet`, topic)
+		return NewTransactionStatusesDataProvider(ctx, s.logger, s.accessApi, topic, arguments, ch)
+	case SendAndGetTransactionStatusesTopic:
+		return NewSendAndGetTransactionStatusesDataProvider(ctx, s.logger, s.accessApi, topic, arguments, ch)
 	default:
 		return nil, fmt.Errorf("unsupported topic \"%s\"", topic)
 	}

@@ -868,6 +868,37 @@ func (s *WsControllerSuite) TestControllerShutdown() {
 
 		conn.AssertExpectations(t)
 	})
+
+	s.T().Run("Inactivity tracking", func(t *testing.T) {
+		t.Parallel()
+
+		conn := connmock.NewWebsocketConnection(t)
+		conn.On("Close").Return(nil).Once()
+		conn.On("SetReadDeadline", mock.Anything).Return(nil).Once()
+		conn.On("SetPongHandler", mock.AnythingOfType("func(string) error")).Return(nil).Once()
+
+		factory := dpmock.NewDataProviderFactory(t)
+		// Mock with short inactivity timeout for testing
+		wsConfig := s.wsConfig
+
+		wsConfig.InactivityTimeout = 50 * time.Millisecond
+		controller := NewWebSocketController(s.logger, wsConfig, conn, factory)
+
+		conn.
+			On("ReadJSON", mock.Anything).
+			Return(func(interface{}) error {
+				// waiting more than InactivityTimeout to make sure that read message routine busy and do not return
+				// an error before than inactivity tracker initiate shut down
+				<-time.After(wsConfig.InactivityTimeout)
+				return websocket.ErrCloseSent
+			}).
+			Once()
+
+		controller.HandleConnection(context.Background())
+		time.Sleep(wsConfig.InactivityTimeout)
+
+		conn.AssertExpectations(t)
+	})
 }
 
 func (s *WsControllerSuite) TestKeepaliveRoutine() {
