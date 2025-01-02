@@ -14,6 +14,8 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
+	accessproto "github.com/onflow/flow/protobuf/go/flow/access"
+
 	accessapi "github.com/onflow/flow-go/access"
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/engine/access/index"
@@ -121,6 +123,14 @@ func (s *TransactionStatusSuite) SetupTest() {
 	s.blockTracker = subscriptionmock.NewBlockTracker(s.T())
 	s.resultsMap = map[flow.Identifier]*flow.ExecutionResult{}
 
+	s.colClient.On(
+		"SendTransaction",
+		mock.Anything,
+		mock.Anything,
+	).Return(&accessproto.SendTransactionResponse{}, nil).Maybe()
+
+	s.transactions.On("Store", mock.Anything).Return(nil).Maybe()
+
 	// generate blockCount consecutive blocks with associated seal, result and execution data
 	s.rootBlock = unittest.BlockFixture()
 	rootResult := unittest.ExecutionResultFixture(unittest.WithBlock(&s.rootBlock))
@@ -148,7 +158,7 @@ func (s *TransactionStatusSuite) SetupTest() {
 	require.NoError(s.T(), err)
 
 	s.blocks.On("ByHeight", mock.AnythingOfType("uint64")).Return(mocks.StorageMapGetter(s.blockMap))
-	s.state.On("Final").Return(s.finalSnapshot, nil)
+	s.state.On("Final").Return(s.finalSnapshot, nil).Maybe()
 	s.state.On("AtBlockID", mock.AnythingOfType("flow.Identifier")).Return(func(blockID flow.Identifier) protocolint.Snapshot {
 		s.tempSnapshot.On("Head").Unset()
 		s.tempSnapshot.On("Head").Return(func() *flow.Header {
@@ -162,12 +172,12 @@ func (s *TransactionStatusSuite) SetupTest() {
 		}, nil)
 
 		return s.tempSnapshot
-	}, nil)
+	}, nil).Maybe()
 
 	s.finalSnapshot.On("Head").Return(func() *flow.Header {
 		finalizedHeader := s.finalizedBlock.Header
 		return finalizedHeader
-	}, nil)
+	}, nil).Maybe()
 
 	s.blockTracker.On("GetStartHeightFromBlockID", mock.Anything).Return(func(_ flow.Identifier) (uint64, error) {
 		finalizedHeader := s.finalizedBlock.Header
@@ -235,7 +245,7 @@ func (s *TransactionStatusSuite) addNewFinalizedBlock(parent *flow.Header, notif
 	}
 }
 
-// TestSubscribeTransactionStatusHappyCase tests the functionality of the SubscribeTransactionStatuses method in the Backend.
+// TestSubscribeTransactionStatusHappyCase tests the functionality of the SubscribeTransactionStatusesFromStartBlockID method in the Backend.
 // It covers the emulation of transaction stages from pending to sealed, and receiving status updates.
 func (s *TransactionStatusSuite) TestSubscribeTransactionStatusHappyCase() {
 	ctx, cancel := context.WithCancel(context.Background())
@@ -314,7 +324,7 @@ func (s *TransactionStatusSuite) TestSubscribeTransactionStatusHappyCase() {
 	}
 
 	// 1. Subscribe to transaction status and receive the first message with pending status
-	sub := s.backend.SubscribeTransactionStatuses(ctx, &transaction.TransactionBody, entities.EventEncodingVersion_CCF_V0)
+	sub := s.backend.SendAndSubscribeTransactionStatuses(ctx, &transaction.TransactionBody, entities.EventEncodingVersion_CCF_V0)
 	checkNewSubscriptionMessage(sub, flow.TransactionStatusPending)
 
 	// 2. Make transaction reference block sealed, and add a new finalized block that includes the transaction
@@ -349,7 +359,7 @@ func (s *TransactionStatusSuite) TestSubscribeTransactionStatusHappyCase() {
 	}, 100*time.Millisecond, "timed out waiting for subscription to shutdown")
 }
 
-// TestSubscribeTransactionStatusExpired tests the functionality of the SubscribeTransactionStatuses method in the Backend
+// TestSubscribeTransactionStatusExpired tests the functionality of the SubscribeTransactionStatusesFromStartBlockID method in the Backend
 // when transaction become expired
 func (s *TransactionStatusSuite) TestSubscribeTransactionStatusExpired() {
 	ctx, cancel := context.WithCancel(context.Background())
@@ -380,7 +390,7 @@ func (s *TransactionStatusSuite) TestSubscribeTransactionStatusExpired() {
 	}
 
 	// Subscribe to transaction status and receive the first message with pending status
-	sub := s.backend.SubscribeTransactionStatuses(ctx, &transaction.TransactionBody, entities.EventEncodingVersion_CCF_V0)
+	sub := s.backend.SendAndSubscribeTransactionStatuses(ctx, &transaction.TransactionBody, entities.EventEncodingVersion_CCF_V0)
 	checkNewSubscriptionMessage(sub, flow.TransactionStatusPending)
 
 	// Generate 600 blocks without transaction included and check, that transaction still pending
