@@ -158,15 +158,15 @@ func (s *WebsocketSubscriptionSuite) TestInactivityHeaders() {
 
 		s.Require().NoError(wsClient.WriteJSON(subscriptionRequest))
 
-		_, _, subscribeResponses, _, _ := listenWebSocketResponses[models.EventResponse](
+		_, baseResponses, _ := listenWebSocketResponses[models.EventResponse](
 			s.T(),
 			wsClient,
 			5*time.Second,
 			subscriptionRequest.ClientMessageID,
 		)
 
-		s.Require().Equal(1, len(subscribeResponses))
-		subscribeResponse := subscribeResponses[0]
+		s.Require().Equal(1, len(baseResponses))
+		subscribeResponse := baseResponses[0]
 		s.Require().True(subscribeResponse.Success)
 
 		// Step 3: Unsubscribe from the topic
@@ -181,15 +181,15 @@ func (s *WebsocketSubscriptionSuite) TestInactivityHeaders() {
 		s.Require().NoError(wsClient.WriteJSON(unsubscribeRequest))
 
 		// TODO: Somehow unsubscription are not return properly, but result appended to subscriptions
-		_, _, unsubscribeResponses, _, _ := listenWebSocketResponses[models.EventResponse](
+		_, baseResponses, _ = listenWebSocketResponses[models.EventResponse](
 			s.T(),
 			wsClient,
 			5*time.Second,
 			unsubscribeRequest.ClientMessageID,
 		)
 
-		s.Require().Equal(1, len(unsubscribeResponses))
-		unsubscribeResponse := unsubscribeResponses[0]
+		s.Require().Equal(1, len(baseResponses))
+		unsubscribeResponse := baseResponses[0]
 		s.Require().True(unsubscribeResponse.Success)
 
 		// Step 4: Monitor inactivity after unsubscription
@@ -499,11 +499,13 @@ func testWebsocketSubscription[T any](
 	// subscribe to specific topic
 	require.NoError(t, client.WriteJSON(subscriptionRequest))
 
-	responses, _, subscribeMessageResponses, _, _ := listenWebSocketResponses[T](t, client, duration, subscriptionRequest.ClientMessageID)
+	responses, baseMessageResponses, _ := listenWebSocketResponses[T](t, client, duration, subscriptionRequest.ClientMessageID)
 
 	// validate subscribe response
-	require.Equal(t, 1, len(subscribeMessageResponses))
-	require.Equal(t, subscriptionRequest.ClientMessageID, subscribeMessageResponses[0].ClientMessageID)
+	require.Equal(t, 1, len(baseMessageResponses))
+
+	subscribeMessageResponse := baseMessageResponses[0]
+	require.Equal(t, subscriptionRequest.ClientMessageID, subscribeMessageResponse.ClientMessageID)
 
 	// Use the provided validation function to ensure the received responses of type T are correct.
 	validate(responses)
@@ -514,7 +516,7 @@ func testWebsocketSubscription[T any](
 			Action:          models.SubscribeAction,
 			ClientMessageID: subscriptionRequest.ClientMessageID,
 		},
-		SubscriptionID: subscribeMessageResponses[0].SubscriptionID,
+		SubscriptionID: subscribeMessageResponse.SubscriptionID,
 	}
 
 	require.NoError(t, client.WriteJSON(unsubscriptionRequest))
@@ -535,14 +537,10 @@ func listenWebSocketResponses[T any](
 ) (
 	[]*T,
 	[]*models.BaseMessageResponse,
-	[]*models.SubscribeMessageResponse,
-	[]*models.UnsubscribeMessageResponse,
 	[]*models.ListSubscriptionsMessageResponse,
 ) {
 	var responses []*T
 	var baseMessageResponses []*models.BaseMessageResponse
-	var subscribeMessageResponses []*models.SubscribeMessageResponse
-	var unsubscribeMessageResponses []*models.UnsubscribeMessageResponse
 	var listSubscriptionsMessageResponses []*models.ListSubscriptionsMessageResponse
 
 	timer := time.NewTimer(duration)
@@ -552,7 +550,7 @@ func listenWebSocketResponses[T any](
 		select {
 		case <-timer.C:
 			t.Logf("stopping websocket response listener after %s", duration)
-			return responses, baseMessageResponses, subscribeMessageResponses, unsubscribeMessageResponses, listSubscriptionsMessageResponses
+			return responses, baseMessageResponses, listSubscriptionsMessageResponses
 		default:
 			_, messageBytes, err := client.ReadMessage()
 			if err != nil {
@@ -561,43 +559,24 @@ func listenWebSocketResponses[T any](
 				var closeErr *websocket.CloseError
 				if errors.As(err, &closeErr) || strings.Contains(err.Error(), "use of closed network connection") {
 					t.Logf("websocket close error: %v", closeErr)
-					return responses, baseMessageResponses, subscribeMessageResponses, unsubscribeMessageResponses, listSubscriptionsMessageResponses
+					return responses, baseMessageResponses, listSubscriptionsMessageResponses
 				}
 
 				require.FailNow(t, fmt.Sprintf("unexpected websocket error, %v", err))
 			}
 
-			//TODO: differentiate SubscribeMessageResponse and UnsubscribeMessageResponse, BaseMessageResponse
-			//// Try unmarshalling into BaseMessageResponse and validate
-			//var baseResp models.BaseMessageResponse
-			//if err := json.Unmarshal(messageBytes, &baseResp); err == nil && baseResp.ClientMessageID == clientMessageID {
-			//	baseMessageResponses = append(baseMessageResponses, baseResp)
-			//	continue
-			//}
-
-			var subscribeResp models.SubscribeMessageResponse
-			err = json.Unmarshal(messageBytes, &subscribeResp)
-			if err == nil &&
-				subscribeResp.ClientMessageID == clientMessageID &&
-				subscribeResp.SubscriptionID != "" {
-				subscribeMessageResponses = append(subscribeMessageResponses, &subscribeResp)
-				continue
-			}
-
-			// Try unmarshalling into UnsubscribeMessageResponse and validate
-			var unsubscribeResp models.UnsubscribeMessageResponse
-			err = json.Unmarshal(messageBytes, &unsubscribeResp)
-			if err == nil &&
-				unsubscribeResp.SubscriptionID == "" &&
-				subscribeResp.ClientMessageID == clientMessageID {
-				unsubscribeMessageResponses = append(unsubscribeMessageResponses, &unsubscribeResp)
+			// BaseMessageResponse and validate
+			var baseResp models.BaseMessageResponse
+			if err := json.Unmarshal(messageBytes, &baseResp); err == nil && baseResp.ClientMessageID == clientMessageID {
+				baseMessageResponses = append(baseMessageResponses, &baseResp)
 				continue
 			}
 
 			//// Try unmarshalling into ListSubscriptionsMessageResponse and validate
 			//var listResp models.ListSubscriptionsMessageResponse
-			//if err := json.Unmarshal(messageBytes, &listResp); err == nil && listResp.ClientMessageID == clientMessageID {
-			//	listSubscriptionsMessageResponses = append(listSubscriptionsMessageResponses, listResp)
+			//if err := json.Unmarshal(messageBytes, &listResp); err == nil &&
+			//	listResp.ClientMessageID == clientMessageID {
+			//	listSubscriptionsMessageResponses = append(listSubscriptionsMessageResponses, &listResp)
 			//	continue
 			//}
 
