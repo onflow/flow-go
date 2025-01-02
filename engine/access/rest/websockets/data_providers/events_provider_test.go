@@ -292,9 +292,6 @@ func (s *EventsProviderSuite) TestMessageIndexEventProviderResponse_HappyPath() 
 		currentIndex := responses[i].MessageIndex
 		s.Require().Equal(prevIndex+1, currentIndex, "Expected MessageIndex to increment by 1")
 	}
-
-	//// Ensure the provider is properly closed after the test
-	//provider.Close()
 }
 
 // backendEventsResponses creates backend events responses based on the provided events.
