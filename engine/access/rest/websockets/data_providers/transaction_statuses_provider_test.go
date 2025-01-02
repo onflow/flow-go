@@ -83,15 +83,13 @@ func (s *TransactionStatusesProviderSuite) TestTransactionStatusesDataProvider_H
 		s.factory,
 		s.subscribeTransactionStatusesDataProviderTestCases(backendResponse),
 		func(dataChan chan interface{}) {
-			for i := 0; i < len(backendResponse); i++ {
-				dataChan <- backendResponse[i]
-			}
+			dataChan <- backendResponse
 		},
 		s.requireTransactionStatuses,
 	)
 }
 
-func (s *TransactionStatusesProviderSuite) subscribeTransactionStatusesDataProviderTestCases(backendResponses [][]*access.TransactionResult) []testType {
+func (s *TransactionStatusesProviderSuite) subscribeTransactionStatusesDataProviderTestCases(backendResponses []*access.TransactionResult) []testType {
 	expectedResponses := s.expectedTransactionStatusesResponses(backendResponses)
 
 	return []testType{
@@ -148,19 +146,18 @@ func (s *TransactionStatusesProviderSuite) requireTransactionStatuses(
 	actual interface{},
 	expected interface{},
 ) {
-	expectedAccountStatusesResponse, ok := expected.(*models.TransactionStatusesResponse)
-	require.True(s.T(), ok, "Expected *models.AccountStatusesResponse, got %T", expected)
+	expectedTxStatusesResponse, ok := expected.(*models.TransactionStatusesResponse)
+	require.True(s.T(), ok, "expected *models.TransactionStatusesResponse, got %T", expected)
 
 	actualResponse, ok := actual.(*models.TransactionStatusesResponse)
-	require.True(s.T(), ok, "Expected *models.AccountStatusesResponse, got %T", actual)
+	require.True(s.T(), ok, "expected *models.TransactionStatusesResponse, got %T", actual)
 
-	s.Require().ElementsMatch(expectedAccountStatusesResponse.TransactionResults, actualResponse.TransactionResults)
-	s.Require().Equal(expectedAccountStatusesResponse.MessageIndex, actualResponse.MessageIndex)
+	require.Equal(s.T(), expectedTxStatusesResponse.TransactionResult.BlockId, actualResponse.TransactionResult.BlockId)
 }
 
 // expectedTransactionStatusesResponses creates the expected responses for the provided backend responses.
 func (s *TransactionStatusesProviderSuite) expectedTransactionStatusesResponses(
-	backendResponses [][]*access.TransactionResult,
+	backendResponses []*access.TransactionResult,
 ) []interface{} {
 	expectedResponses := make([]interface{}, len(backendResponses))
 
@@ -177,9 +174,6 @@ func (s *TransactionStatusesProviderSuite) expectedTransactionStatusesResponses(
 // TestTransactionStatusesDataProvider_InvalidArguments tests the behavior of the transaction statuses data provider
 // when invalid arguments are provided. It verifies that appropriate errors are returned
 // for missing or conflicting arguments.
-// This test covers the test cases:
-// 1. Invalid 'tx_id' argument.
-// 2. Invalid 'start_block_id' argument.
 func (s *TransactionStatusesProviderSuite) TestTransactionStatusesDataProvider_InvalidArguments() {
 	ctx := context.Background()
 	send := make(chan interface{})
@@ -270,6 +264,12 @@ func (s *TransactionStatusesProviderSuite) TestMessageIndexTransactionStatusesPr
 		entities.EventEncodingVersion_JSON_CDC_V0,
 	).Return(sub)
 
+	s.linkGenerator.On("TransactionResultLink", mock.AnythingOfType("flow.Identifier")).Return(
+		func(id flow.Identifier) (string, error) {
+			return "some_link", nil
+		},
+	)
+
 	arguments :=
 		map[string]interface{}{
 			"start_block_id": s.rootBlock.ID().String(),
@@ -285,6 +285,10 @@ func (s *TransactionStatusesProviderSuite) TestMessageIndexTransactionStatusesPr
 		arguments,
 		send,
 	)
+
+	// Ensure the provider is properly closed after the test
+	defer provider.Close()
+
 	s.Require().NotNil(provider)
 	s.Require().NoError(err)
 
@@ -295,12 +299,17 @@ func (s *TransactionStatusesProviderSuite) TestMessageIndexTransactionStatusesPr
 	}()
 
 	// Simulate emitting data to the tx statuses channel
+	var txResults []*access.TransactionResult
+	for i := 0; i < txStatusesCount; i++ {
+		txResults = append(txResults, &access.TransactionResult{
+			BlockHeight: s.rootBlock.Header.Height,
+		})
+	}
+
 	go func() {
 		defer close(txStatusesChan) // Close the channel when done
 
-		for i := 0; i < txStatusesCount; i++ {
-			txStatusesChan <- []*access.TransactionResult{}
-		}
+		txStatusesChan <- txResults
 	}()
 
 	// Collect responses
@@ -321,12 +330,9 @@ func (s *TransactionStatusesProviderSuite) TestMessageIndexTransactionStatusesPr
 		currentIndex := responses[i].MessageIndex
 		s.Require().Equal(prevIndex+1, currentIndex, "Expected MessageIndex to increment by 1")
 	}
-
-	// Ensure the provider is properly closed after the test
-	provider.Close()
 }
 
-func backendTransactionStatusesResponse(block flow.Block) [][]*access.TransactionResult {
+func backendTransactionStatusesResponse(block flow.Block) []*access.TransactionResult {
 	id := unittest.IdentifierFixture()
 	cid := unittest.IdentifierFixture()
 	txr := access.TransactionResult{
@@ -341,13 +347,11 @@ func backendTransactionStatusesResponse(block flow.Block) [][]*access.Transactio
 		BlockHeight:  block.Header.Height,
 	}
 
-	var expectedTxStatusesResponses [][]*access.TransactionResult
 	var expectedTxResultsResponses []*access.TransactionResult
 
 	for i := 0; i < 2; i++ {
 		expectedTxResultsResponses = append(expectedTxResultsResponses, &txr)
-		expectedTxStatusesResponses = append(expectedTxStatusesResponses, expectedTxResultsResponses)
 	}
 
-	return expectedTxStatusesResponses
+	return expectedTxResultsResponses
 }

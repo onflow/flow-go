@@ -75,18 +75,7 @@ func NewTransactionStatusesDataProvider(
 //
 // No errors are expected during normal operations.
 func (p *TransactionStatusesDataProvider) Run() error {
-	messageIndex := counters.NewMonotonousCounter(0)
-
-	return subscription.HandleSubscription(p.subscription, subscription.HandleResponse(p.send, func(txResults []*access.TransactionResult) (interface{}, error) {
-		index := messageIndex.Value()
-		if ok := messageIndex.Set(messageIndex.Value() + 1); !ok {
-			return nil, status.Errorf(codes.Internal, "message index already incremented to %d", messageIndex.Value())
-		}
-		var response models.TransactionStatusesResponse
-		response.Build(p.linkGenerator, txResults, index)
-
-		return &response, nil
-	}))
+	return subscription.HandleSubscription(p.subscription, p.handleResponse())
 }
 
 // createSubscription creates a new subscription using the specified input arguments.
@@ -103,6 +92,30 @@ func (p *TransactionStatusesDataProvider) createSubscription(
 	}
 
 	return p.api.SubscribeTransactionStatusesFromLatest(ctx, args.TxID, entities.EventEncodingVersion_JSON_CDC_V0)
+}
+
+// handleResponse processes a tx statuses and sends the formatted response.
+//
+// No errors are expected during normal operations.
+func (p *TransactionStatusesDataProvider) handleResponse() func(txResults []*access.TransactionResult) error {
+	messageIndex := counters.NewMonotonousCounter(0)
+
+	return func(txResults []*access.TransactionResult) error {
+
+		for i := range txResults {
+			index := messageIndex.Value()
+			if ok := messageIndex.Set(messageIndex.Value() + 1); !ok {
+				return status.Errorf(codes.Internal, "message index already incremented to %d", messageIndex.Value())
+			}
+
+			var response models.TransactionStatusesResponse
+			response.Build(p.linkGenerator, txResults[i], index)
+
+			p.send <- &response
+		}
+
+		return nil
+	}
 }
 
 // parseAccountStatusesArguments validates and initializes the account statuses arguments.

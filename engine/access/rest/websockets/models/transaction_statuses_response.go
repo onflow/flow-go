@@ -8,18 +8,13 @@ import (
 // Build creates TransactionStatusesResponse instance.
 func (t *TransactionStatusesResponse) Build(
 	linkGenerator commonmodels.LinkGenerator,
-	txResults []*access.TransactionResult,
+	txResult *access.TransactionResult,
 	index uint64,
 ) {
-	transactionResults := make([]*commonmodels.TransactionResult, len(txResults))
-	for i, txResult := range txResults {
-		var transactionResult commonmodels.TransactionResult
-		txID := txResult.TransactionID
-		transactionResult.Build(txResult, txID, linkGenerator)
+	var transactionResult commonmodels.TransactionResult
+	txID := txResult.TransactionID
+	transactionResult.Build(txResult, txID, linkGenerator)
 
-		transactionResults[i] = &transactionResult
-	}
-
-	t.TransactionResults = transactionResults
+	t.TransactionResult = &transactionResult
 	t.MessageIndex = index
 }

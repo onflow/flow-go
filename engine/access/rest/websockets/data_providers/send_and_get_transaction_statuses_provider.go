@@ -20,12 +20,12 @@ import (
 	"github.com/onflow/flow/protobuf/go/flow/entities"
 )
 
-// sendTransactionStatusesArguments contains the arguments required for sending tx and subscribing to transaction statuses
-type sendTransactionStatusesArguments struct {
+// sendAndGetTransactionStatusesArguments contains the arguments required for sending tx and subscribing to transaction statuses
+type sendAndGetTransactionStatusesArguments struct {
 	Transaction flow.TransactionBody // The transaction body to be sent and monitored.
 }
 
-type SendTransactionStatusesDataProvider struct {
+type SendAndGetTransactionStatusesDataProvider struct {
 	*baseDataProvider
 
 	logger        zerolog.Logger
@@ -33,9 +33,9 @@ type SendTransactionStatusesDataProvider struct {
 	linkGenerator commonmodels.LinkGenerator
 }
 
-var _ DataProvider = (*SendTransactionStatusesDataProvider)(nil)
+var _ DataProvider = (*SendAndGetTransactionStatusesDataProvider)(nil)
 
-func NewSendTransactionStatusesDataProvider(
+func NewSendAndGetTransactionStatusesDataProvider(
 	ctx context.Context,
 	logger zerolog.Logger,
 	api access.API,
@@ -43,15 +43,15 @@ func NewSendTransactionStatusesDataProvider(
 	topic string,
 	arguments models.Arguments,
 	send chan<- interface{},
-) (*SendTransactionStatusesDataProvider, error) {
-	p := &SendTransactionStatusesDataProvider{
+) (*SendAndGetTransactionStatusesDataProvider, error) {
+	p := &SendAndGetTransactionStatusesDataProvider{
 		logger:        logger.With().Str("component", "send-transaction-statuses-data-provider").Logger(),
 		api:           api,
 		linkGenerator: linkGenerator,
 	}
 
 	// Initialize arguments passed to the provider.
-	sendTxStatusesArgs, err := parseSendTransactionStatusesArguments(arguments)
+	sendTxStatusesArgs, err := parseSendAndGetTransactionStatusesArguments(arguments)
 	if err != nil {
 		return nil, fmt.Errorf("invalid arguments for send tx statuses data provider: %w", err)
 	}
@@ -71,35 +71,47 @@ func NewSendTransactionStatusesDataProvider(
 // Run starts processing the subscription for events and handles responses.
 //
 // No errors are expected during normal operations.
-func (p *SendTransactionStatusesDataProvider) Run() error {
-	messageIndex := counters.NewMonotonousCounter(0)
-
-	return subscription.HandleSubscription(p.subscription, subscription.HandleResponse(p.send, func(txResults []*access.TransactionResult) (interface{}, error) {
-		index := messageIndex.Value()
-		if ok := messageIndex.Set(messageIndex.Value() + 1); !ok {
-			return nil, status.Errorf(codes.Internal, "message index already incremented to %d", messageIndex.Value())
-		}
-
-		var response models.TransactionStatusesResponse
-		response.Build(p.linkGenerator, txResults, index)
-
-		return &response, nil
-	}))
+func (p *SendAndGetTransactionStatusesDataProvider) Run() error {
+	return subscription.HandleSubscription(p.subscription, p.handleResponse())
 }
 
 // createSubscription creates a new subscription using the specified input arguments.
-func (p *SendTransactionStatusesDataProvider) createSubscription(
+func (p *SendAndGetTransactionStatusesDataProvider) createSubscription(
 	ctx context.Context,
-	args sendTransactionStatusesArguments,
+	args sendAndGetTransactionStatusesArguments,
 ) subscription.Subscription {
 	return p.api.SendAndSubscribeTransactionStatuses(ctx, &args.Transaction, entities.EventEncodingVersion_JSON_CDC_V0)
 }
 
-// parseAccountStatusesArguments validates and initializes the account statuses arguments.
-func parseSendTransactionStatusesArguments(
+// handleResponse processes a tx statuses and sends the formatted response.
+//
+// No errors are expected during normal operations.
+func (p *SendAndGetTransactionStatusesDataProvider) handleResponse() func(txResults []*access.TransactionResult) error {
+	messageIndex := counters.NewMonotonousCounter(0)
+
+	return func(txResults []*access.TransactionResult) error {
+
+		for i := range txResults {
+			index := messageIndex.Value()
+			if ok := messageIndex.Set(messageIndex.Value() + 1); !ok {
+				return status.Errorf(codes.Internal, "message index already incremented to %d", messageIndex.Value())
+			}
+
+			var response models.TransactionStatusesResponse
+			response.Build(p.linkGenerator, txResults[i], index)
+
+			p.send <- &response
+		}
+
+		return nil
+	}
+}
+
+// parseSendAndGetTransactionStatusesArguments validates and initializes the account statuses arguments.
+func parseSendAndGetTransactionStatusesArguments(
 	arguments models.Arguments,
-) (sendTransactionStatusesArguments, error) {
-	var args sendTransactionStatusesArguments
+) (sendAndGetTransactionStatusesArguments, error) {
+	var args sendAndGetTransactionStatusesArguments
 	var tx flow.TransactionBody
 
 	if scriptIn, ok := arguments["script"]; ok && scriptIn != "" {
