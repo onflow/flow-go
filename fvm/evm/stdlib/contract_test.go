@@ -18,6 +18,7 @@ import (
 	. "github.com/onflow/cadence/test_utils/runtime_utils"
 	coreContracts "github.com/onflow/flow-core-contracts/lib/go/contracts"
 	coreContractstemplates "github.com/onflow/flow-core-contracts/lib/go/templates"
+	gethTypes "github.com/onflow/go-ethereum/core/types"
 	"github.com/onflow/go-ethereum/crypto"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -4285,6 +4286,124 @@ func TestEVMDryRun(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, types.StatusSuccessful, res.Status)
 	assert.True(t, dryRunCalled)
+}
+
+func TestEVMDryCall(t *testing.T) {
+
+	t.Parallel()
+
+	dryCallCalled := false
+
+	contractsAddress := flow.BytesToAddress([]byte{0x1})
+	handler := &testContractHandler{
+		evmContractAddress: common.Address(contractsAddress),
+		dryRun: func(tx []byte, from types.Address) *types.ResultSummary {
+			dryCallCalled = true
+			gethTx := &gethTypes.Transaction{}
+			if err := gethTx.UnmarshalBinary(tx); err != nil {
+				require.Fail(t, err.Error())
+			}
+
+			require.NotNil(t, gethTx.To())
+
+			assert.Equal(
+				t,
+				types.Address{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 10, 0, 0, 0, 0, 0, 0, 0, 0, 10},
+				from,
+			)
+			assert.Equal(
+				t,
+				types.Address{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 10, 0, 0, 0, 0, 0, 0, 0, 0, 15},
+				types.NewAddress(*gethTx.To()),
+			)
+			assert.Equal(t, []byte{255, 107, 204, 122}, gethTx.Data())
+			assert.Equal(t, uint64(33_000), gethTx.Gas())
+			assert.Equal(t, big.NewInt(150), gethTx.Value())
+
+			return &types.ResultSummary{
+				Status: types.StatusSuccessful,
+			}
+		},
+	}
+
+	transactionEnvironment := newEVMTransactionEnvironment(handler, contractsAddress)
+	scriptEnvironment := newEVMScriptEnvironment(handler, contractsAddress)
+
+	rt := runtime.NewInterpreterRuntime(runtime.Config{})
+
+	accountCodes := map[common.Location][]byte{}
+	var events []cadence.Event
+
+	runtimeInterface := &TestRuntimeInterface{
+		Storage: NewTestLedger(nil, nil),
+		OnGetSigningAccounts: func() ([]runtime.Address, error) {
+			return []runtime.Address{runtime.Address(contractsAddress)}, nil
+		},
+		OnResolveLocation: newLocationResolver(contractsAddress),
+		OnUpdateAccountContractCode: func(location common.AddressLocation, code []byte) error {
+			accountCodes[location] = code
+			return nil
+		},
+		OnGetAccountContractCode: func(location common.AddressLocation) (code []byte, err error) {
+			code = accountCodes[location]
+			return code, nil
+		},
+		OnEmitEvent: func(event cadence.Event) error {
+			events = append(events, event)
+			return nil
+		},
+		OnDecodeArgument: func(b []byte, t cadence.Type) (cadence.Value, error) {
+			return json.Decode(nil, b)
+		},
+	}
+
+	nextTransactionLocation := NewTransactionLocationGenerator()
+	nextScriptLocation := NewScriptLocationGenerator()
+
+	// Deploy contracts
+
+	deployContracts(
+		t,
+		rt,
+		contractsAddress,
+		runtimeInterface,
+		transactionEnvironment,
+		nextTransactionLocation,
+	)
+
+	// Run script
+
+	script := []byte(`
+      import EVM from 0x1
+
+      access(all)
+      fun main(): EVM.Result {
+          return EVM.dryCall(
+            from: EVM.EVMAddress(bytes: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 10, 0, 0, 0, 0, 0, 0, 0, 0, 10]),
+            to: EVM.EVMAddress(bytes: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 10, 0, 0, 0, 0, 0, 0, 0, 0, 15]),
+            data: [255, 107, 204, 122],
+            gasLimit: 33000,
+            value: EVM.Balance(attoflow: 150)
+          )
+      }
+    `)
+
+	val, err := rt.ExecuteScript(
+		runtime.Script{
+			Source:    script,
+			Arguments: nil,
+		},
+		runtime.Context{
+			Interface:   runtimeInterface,
+			Environment: scriptEnvironment,
+			Location:    nextScriptLocation(),
+		},
+	)
+	require.NoError(t, err)
+	res, err := impl.ResultSummaryFromEVMResultValue(val)
+	require.NoError(t, err)
+	assert.Equal(t, types.StatusSuccessful, res.Status)
+	assert.True(t, dryCallCalled)
 }
 
 func TestEVMBatchRun(t *testing.T) {
