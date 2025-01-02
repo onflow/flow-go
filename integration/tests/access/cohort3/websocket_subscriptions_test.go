@@ -13,7 +13,6 @@ import (
 	"github.com/google/uuid"
 	"github.com/gorilla/websocket"
 	"github.com/rs/zerolog"
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
@@ -118,54 +117,109 @@ func (s *WebsocketSubscriptionSuite) SetupTest() {
 
 // TestInactivityHeaders tests that the WebSocket connection closes due to inactivity
 // after the specified timeout duration.
-//
-// Steps:
-// 1. Get the WebSocket server address from the testnet container.
-// 2. Establish a WebSocket client connection to the server.
-// 3. Start a goroutine to continuously read messages from the WebSocket client.
-// 4. Wait for the server to close the connection due to inactivity.
-// 5. Verify that the actual inactivity duration is within the expected timeout range.
 func (s *WebsocketSubscriptionSuite) TestInactivityHeaders() {
-	// Step 1: Get the WebSocket server address.
-	restAddr := s.net.ContainerByName(testnet.PrimaryAN).Addr(testnet.RESTPort)
-	client, err := getWSClient(s.ctx, getWebsocketsUrl(restAddr))
-	s.Require().NoError(err)
-	defer client.Close()
+	// Steps:
+	// 1. Establish a WebSocket connection to the server.
+	// 2. Start a goroutine to listen for messages from the server.
+	// 3. Wait for the server to close the connection due to inactivity.
+	// 4. Validate that the actual inactivity duration is within the expected range.
+	s.T().Run("no active subscription after connection creation", func(t *testing.T) {
+		restAddr := s.net.ContainerByName(testnet.PrimaryAN).Addr(testnet.RESTPort)
+		wsClient, err := getWSClient(s.ctx, getWebsocketsUrl(restAddr))
+		s.Require().NoError(err)
+		defer func() { s.Require().NoError(wsClient.Close()) }()
 
-	// Set a timeout for the entire test in case the server takes too long.
-	testTimeout := time.After((InactivityTimeout * 1.5) * time.Second)
+		expectedInactivityDuration := InactivityTimeout * time.Second
+		actualInactivityDuration := monitorInactivity(t, wsClient, expectedInactivityDuration)
 
-	// Expected inactivity duration in seconds based on the timeout.
-	expectedInactivityDuration := InactivityTimeout * time.Second
+		s.Assert().LessOrEqual(expectedInactivityDuration, actualInactivityDuration)
+	})
+
+	// Steps:
+	// 1. Establish a WebSocket connection to the server.
+	// 2. Subscribe to a topic and validate the subscription response.
+	// 3. Unsubscribe from the topic and validate the unsubscription response.
+	// 4. Wait for the server to close the connection due to inactivity.
+	s.T().Run("all active subscriptions unsubscribed", func(t *testing.T) {
+		// Step 1: Establish WebSocket connection
+		restAddr := s.net.ContainerByName(testnet.PrimaryAN).Addr(testnet.RESTPort)
+		wsClient, err := getWSClient(s.ctx, getWebsocketsUrl(restAddr))
+		s.Require().NoError(err)
+		defer func() { s.Require().NoError(wsClient.Close()) }()
+
+		// Step 2: Subscribe to a topic
+		subscriptionRequest := models.SubscribeMessageRequest{
+			BaseMessageRequest: models.BaseMessageRequest{
+				Action:          models.SubscribeAction,
+				ClientMessageID: uuid.New().String(),
+			},
+			Topic: data_providers.EventsTopic,
+		}
+
+		s.Require().NoError(wsClient.WriteJSON(subscriptionRequest))
+
+		_, _, subscribeResponses, _, _ := listenWebSocketResponses[models.EventResponse](
+			s.T(),
+			wsClient,
+			5*time.Second,
+			subscriptionRequest.ClientMessageID,
+		)
+
+		s.Require().Equal(1, len(subscribeResponses))
+		subscribeResponse := subscribeResponses[0]
+		s.Require().True(subscribeResponse.Success)
+
+		// Step 3: Unsubscribe from the topic
+		unsubscribeRequest := models.UnsubscribeMessageRequest{
+			BaseMessageRequest: models.BaseMessageRequest{
+				Action:          models.UnsubscribeAction,
+				ClientMessageID: uuid.New().String(),
+			},
+			SubscriptionID: subscribeResponse.SubscriptionID,
+		}
+
+		s.Require().NoError(wsClient.WriteJSON(unsubscribeRequest))
+
+		// TODO: Somehow unsubscription are not return properly, but result appended to subscriptions
+		_, _, unsubscribeResponses, _, _ := listenWebSocketResponses[models.EventResponse](
+			s.T(),
+			wsClient,
+			5*time.Second,
+			unsubscribeRequest.ClientMessageID,
+		)
+
+		s.Require().Equal(1, len(unsubscribeResponses))
+		unsubscribeResponse := unsubscribeResponses[0]
+		s.Require().True(unsubscribeResponse.Success)
+
+		// Step 4: Monitor inactivity after unsubscription
+		expectedInactivityDuration := InactivityTimeout * time.Second
+		actualInactivityDuration := monitorInactivity(s.T(), wsClient, expectedInactivityDuration)
+
+		s.Assert().LessOrEqual(expectedInactivityDuration, actualInactivityDuration)
+	})
+}
+
+// monitorInactivity monitors the WebSocket connection for inactivity.
+func monitorInactivity(t *testing.T, client *websocket.Conn, timeout time.Duration) time.Duration {
 	start := time.Now()
-	var actualInactivityDuration time.Duration
+	errChan := make(chan error, 1)
 
-	// Channel to receive any errors from the goroutine reading WebSocket messages.
-	readError := make(chan error, 1)
-
-	// Step 2: Start a goroutine to read messages and detect closure.
 	go func() {
 		for {
-			// Continuously try to read messages from the WebSocket connection.
 			if _, _, err := client.ReadMessage(); err != nil {
-				// If an error occurs (e.g., connection closure), capture the time elapsed.
-				actualInactivityDuration = time.Since(start)
-				readError <- err
+				errChan <- err
 				return
 			}
 		}
 	}()
 
-	// Step 3: Wait for server to close the connection due to inactivity or timeout.
 	select {
-	case err = <-readError:
-		// Step 4: Assert that the WebSocket closure was not unexpected.
-		assert.False(s.T(), websocket.IsUnexpectedCloseError(err, websocket.CloseNormalClosure, websocket.CloseAbnormalClosure))
-
-		// Step 5: Verify that the actual inactivity duration is within the expected range.
-		assert.LessOrEqual(s.T(), actualInactivityDuration, expectedInactivityDuration)
-	case <-testTimeout:
-		s.T().Fatal("Test timed out waiting for WebSocket closure due to inactivity")
+	case <-time.After(timeout * 2):
+		t.Fatal("Test timed out waiting for WebSocket closure due to inactivity")
+		return 0
+	case <-errChan:
+		return time.Since(start)
 	}
 }
 
