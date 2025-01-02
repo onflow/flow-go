@@ -72,6 +72,12 @@ type DKGState interface {
 	//   - [storage.ErrAlreadyExists] - if there is already a key stored for given epoch.
 	//   - [storage.InvalidDKGStateTransitionError] - if the requested state transition is invalid.
 	InsertMyBeaconPrivateKey(epochCounter uint64, key crypto.PrivateKey) error
+
+	// CommitMyBeaconPrivateKey commits the previously inserted random beacon private key for an epoch.
+	// Effectively, this method transitions the state machine into the [flow.RandomBeaconKeyCommitted] state if the current state is [flow.DKGStateCompleted].
+	// Caller needs to supply the [flow.EpochCommit] which is an evidence that the key has been indeed included for the given epoch.
+	// No errors are expected during normal operations.
+	CommitMyBeaconPrivateKey(epochCounter uint64, commit *flow.EpochCommit) error
 }
 
 // EpochRecoveryMyBeaconKey is a specific interface that allows to overwrite the beacon private key for
@@ -89,5 +95,5 @@ type EpochRecoveryMyBeaconKey interface {
 	// from Epoch Fallback Mode. State transitions are allowed if and only if the current state is not equal to
 	// [flow.RandomBeaconKeyCommitted]. The resulting state of this method call is [flow.RandomBeaconKeyCommitted].
 	// No errors are expected during normal operations.
-	UpsertMyBeaconPrivateKey(epochCounter uint64, key crypto.PrivateKey) error
+	UpsertMyBeaconPrivateKey(epochCounter uint64, key crypto.PrivateKey, commit *flow.EpochCommit) error
 }
