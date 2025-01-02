@@ -286,11 +286,11 @@ func (s *TransactionStatusesProviderSuite) TestMessageIndexTransactionStatusesPr
 		send,
 	)
 
-	// Ensure the provider is properly closed after the test
-	defer provider.Close()
-
 	s.Require().NotNil(provider)
 	s.Require().NoError(err)
+
+	// Ensure the provider is properly closed after the test
+	defer provider.Close()
 
 	// Run the provider in a separate goroutine to simulate subscription processing
 	go func() {
