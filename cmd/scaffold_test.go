@@ -284,7 +284,7 @@ func TestOverrideModules(t *testing.T) {
 
 type testComponentDefinition struct {
 	name         string
-	factory      ReadyDoneFactory
+	factory      ReadyDoneFactory[*NodeConfig]
 	errorHandler component.OnError
 }
 
