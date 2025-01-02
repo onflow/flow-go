@@ -1,8 +1,6 @@
 package models
 
 import (
-	"strconv"
-
 	"github.com/onflow/flow-go/access"
 	commonmodels "github.com/onflow/flow-go/engine/access/rest/common/models"
 )
@@ -10,18 +8,13 @@ import (
 // Build creates TransactionStatusesResponse instance.
 func (t *TransactionStatusesResponse) Build(
 	linkGenerator commonmodels.LinkGenerator,
-	txResults []*access.TransactionResult,
+	txResult *access.TransactionResult,
 	index uint64,
 ) {
-	transactionResults := make([]*commonmodels.TransactionResult, len(txResults))
-	for i, txResult := range txResults {
-		var transactionResult commonmodels.TransactionResult
-		txID := txResult.TransactionID
-		transactionResult.Build(txResult, txID, linkGenerator)
+	var transactionResult commonmodels.TransactionResult
+	txID := txResult.TransactionID
+	transactionResult.Build(txResult, txID, linkGenerator)
 
-		transactionResults[i] = &transactionResult
-	}
-
-	t.TransactionResults = transactionResults
-	t.MessageIndex = strconv.FormatUint(index, 10)
+	t.TransactionResult = &transactionResult
+	t.MessageIndex = index
 }

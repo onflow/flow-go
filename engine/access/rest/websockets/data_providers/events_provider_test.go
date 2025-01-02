@@ -250,8 +250,12 @@ func (s *EventsProviderSuite) TestMessageIndexEventProviderResponse_HappyPath() 
 		state_stream.DefaultEventFilterConfig,
 		subscription.DefaultHeartbeatInterval,
 	)
+
 	s.Require().NotNil(provider)
 	s.Require().NoError(err)
+
+	// Ensure the provider is properly closed after the test
+	defer provider.Close()
 
 	// Run the provider in a separate goroutine to simulate subscription processing
 	go func() {
@@ -280,7 +284,7 @@ func (s *EventsProviderSuite) TestMessageIndexEventProviderResponse_HappyPath() 
 	}
 
 	// Verifying that indices are starting from 1
-	s.Require().Equal(uint64(1), responses[0].MessageIndex, "Expected MessageIndex to start with 1")
+	s.Require().Equal(uint64(0), responses[0].MessageIndex, "Expected MessageIndex to start with 0")
 
 	// Verifying that indices are strictly increasing
 	for i := 1; i < len(responses); i++ {
@@ -288,9 +292,6 @@ func (s *EventsProviderSuite) TestMessageIndexEventProviderResponse_HappyPath() 
 		currentIndex := responses[i].MessageIndex
 		s.Require().Equal(prevIndex+1, currentIndex, "Expected MessageIndex to increment by 1")
 	}
-
-	// Ensure the provider is properly closed after the test
-	provider.Close()
 }
 
 // backendEventsResponses creates backend events responses based on the provided events.
@@ -317,7 +318,7 @@ func (s *EventsProviderSuite) expectedEventsResponses(
 
 	for i, resp := range backendResponses {
 		var expectedResponse models.EventResponse
-		expectedResponse.Build(resp, uint64(i+1))
+		expectedResponse.Build(resp, uint64(i))
 
 		expectedResponses[i] = &expectedResponse
 	}

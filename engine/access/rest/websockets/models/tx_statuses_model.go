@@ -6,6 +6,6 @@ import (
 
 // TransactionStatusesResponse is the response message for 'events' topic.
 type TransactionStatusesResponse struct {
-	TransactionResults []*commonmodels.TransactionResult `json:"transaction_results"`
-	MessageIndex       string                            `json:"message_index"`
+	TransactionResult *commonmodels.TransactionResult `json:"transaction_result"`
+	MessageIndex      uint64                          `json:"message_index"`
 }

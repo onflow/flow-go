@@ -107,12 +107,17 @@ type namedModuleFunc struct {
 	name string
 }
 
-type namedComponentFunc struct {
-	fn   ReadyDoneFactory
-	name string
+// NamedComponentFactory is wrapper for ReadyDoneFactory with additional fields:
+// Name - name of the component
+// ErrorHandler - error handler for the component
+// Dependencies - list of dependencies for the component that should be ready before
+// the component is started
+type NamedComponentFactory[Input any] struct {
+	ComponentFactory ReadyDoneFactory[Input]
+	Name             string
 
-	errorHandler component.OnError
-	dependencies *DependencyList
+	ErrorHandler component.OnError
+	Dependencies *DependencyList
 }
 
 // FlowNodeBuilder is the default builder struct used for all flow nodes
@@ -128,7 +133,7 @@ type FlowNodeBuilder struct {
 	*NodeConfig
 	flags                    *pflag.FlagSet
 	modules                  []namedModuleFunc
-	components               []namedComponentFunc
+	components               []NamedComponentFactory[*NodeConfig]
 	postShutdownFns          []func() error
 	preInitFns               []BuilderFunc
 	postInitFns              []BuilderFunc
@@ -1549,10 +1554,20 @@ func (fnb *FlowNodeBuilder) handleModules() error {
 	return nil
 }
 
-// handleComponents registers the component's factory method with the ComponentManager to be run
+func (fnb *FlowNodeBuilder) handleComponents() error {
+	AddWorkersFromComponents(fnb.Logger, fnb.NodeConfig, fnb.componentBuilder, fnb.components)
+	return nil
+}
+
+// AddWorkersFromComponents registers the component's factory method with the ComponentManager to be run
 // when the node starts.
 // It uses signal channels to ensure that components are started serially.
-func (fnb *FlowNodeBuilder) handleComponents() error {
+func AddWorkersFromComponents[Input any](
+	log zerolog.Logger,
+	input Input,
+	componentBuilder component.ComponentManagerBuilder,
+	components []NamedComponentFactory[Input],
+) {
 	// The parent/started channels are used to enforce serial startup.
 	// - parent is the started channel of the previous component.
 	// - when a component is ready, it closes its started channel by calling the provided callback.
@@ -1563,27 +1578,22 @@ func (fnb *FlowNodeBuilder) handleComponents() error {
 	parent := make(chan struct{})
 	close(parent)
 
-	var err error
-	asyncComponents := []namedComponentFunc{}
+	asyncComponents := []NamedComponentFactory[Input]{}
 
 	// Run all components
-	for _, f := range fnb.components {
+	for _, f := range components {
 		// Components with explicit dependencies are not started serially
-		if f.dependencies != nil {
+		if f.Dependencies != nil {
 			asyncComponents = append(asyncComponents, f)
 			continue
 		}
 
 		started := make(chan struct{})
 
-		if f.errorHandler != nil {
-			err = fnb.handleRestartableComponent(f, parent, func() { close(started) })
+		if f.ErrorHandler != nil {
+			componentBuilder.AddWorker(WorkerFromRestartableComponent(log, input, f, parent, func() { close(started) }))
 		} else {
-			err = fnb.handleComponent(f, parent, func() { close(started) })
-		}
-
-		if err != nil {
-			return fmt.Errorf("could not handle component %s: %w", f.name, err)
+			componentBuilder.AddWorker(WorkerFromComponent(log, input, f, parent, func() { close(started) }))
 		}
 
 		parent = started
@@ -1592,17 +1602,12 @@ func (fnb *FlowNodeBuilder) handleComponents() error {
 	// Components with explicit dependencies are run asynchronously, which means dependencies in
 	// the dependency list must be initialized outside of the component factory.
 	for _, f := range asyncComponents {
-		fnb.Logger.Debug().Str("component", f.name).Int("dependencies", len(f.dependencies.components)).Msg("handling component asynchronously")
-		err = fnb.handleComponent(f, util.AllReady(f.dependencies.components...), func() {})
-		if err != nil {
-			return fmt.Errorf("could not handle dependable component %s: %w", f.name, err)
-		}
+		log.Debug().Str("component", f.Name).Int("dependencies", len(f.Dependencies.Components)).Msg("handling component asynchronously")
+		componentBuilder.AddWorker(WorkerFromComponent(log, input, f, util.AllReady(f.Dependencies.Components...), func() {}))
 	}
-
-	return nil
 }
 
-// handleComponent constructs a component using the provided ReadyDoneFactory, and registers a
+// WorkerFromComponent constructs a component using the provided ReadyDoneFactory, and registers a
 // worker with the ComponentManager to be run when the node is started.
 //
 // The ComponentManager starts all workers in parallel. Since some components have non-idempotent
@@ -1615,27 +1620,27 @@ func (fnb *FlowNodeBuilder) handleComponents() error {
 // using their ReadyDoneAware interface. After components are updated to use the idempotent
 // ReadyDoneAware interface and explicitly wait for their dependencies to be ready, we can remove
 // this channel chaining.
-func (fnb *FlowNodeBuilder) handleComponent(v namedComponentFunc, dependencies <-chan struct{}, started func()) error {
+func WorkerFromComponent[Input any](log zerolog.Logger, input Input, v NamedComponentFactory[Input], dependencies <-chan struct{}, started func()) component.ComponentWorker {
 	// Add a closure that starts the component when the node is started, and then waits for it to exit
 	// gracefully.
 	// Startup for all components will happen in parallel, and components can use their dependencies'
 	// ReadyDoneAware interface to wait until they are ready.
-	fnb.componentBuilder.AddWorker(func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
+	return func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
 		// wait for the dependencies to be ready before starting
 		if err := util.WaitClosed(ctx, dependencies); err != nil {
 			return
 		}
 
-		logger := fnb.Logger.With().Str("component", v.name).Logger()
+		logger := log.With().Str("component", v.Name).Logger()
 
 		logger.Info().Msg("component initialization started")
 		// First, build the component using the factory method.
-		readyAware, err := v.fn(fnb.NodeConfig)
+		readyAware, err := v.ComponentFactory(input)
 		if err != nil {
-			ctx.Throw(fmt.Errorf("component %s initialization failed: %w", v.name, err))
+			ctx.Throw(fmt.Errorf("component %s initialization failed: %w", v.Name, err))
 		}
 		if readyAware == nil {
-			ctx.Throw(fmt.Errorf("component %s initialization failed: nil component", v.name))
+			ctx.Throw(fmt.Errorf("component %s initialization failed: nil component", v.Name))
 		}
 		logger.Info().Msg("component initialization complete")
 
@@ -1671,20 +1676,24 @@ func (fnb *FlowNodeBuilder) handleComponent(v namedComponentFunc, dependencies <
 		// Finally, wait until component has finished shutting down.
 		<-readyAware.Done()
 		logger.Info().Msg("component shutdown complete")
-	})
-
-	return nil
+	}
 }
 
-// handleRestartableComponent constructs a component using the provided ReadyDoneFactory, and
+// WorkerFromRestartableComponent constructs a component using the provided ReadyDoneFactory, and
 // registers a worker with the ComponentManager to be run when the node is started.
 //
 // Restartable Components are components that can be restarted after successfully handling
 // an irrecoverable error.
 //
 // Any irrecoverable errors thrown by the component will be passed to the provided error handler.
-func (fnb *FlowNodeBuilder) handleRestartableComponent(v namedComponentFunc, parentReady <-chan struct{}, started func()) error {
-	fnb.componentBuilder.AddWorker(func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
+func WorkerFromRestartableComponent[Input any](
+	log zerolog.Logger,
+	input Input,
+	v NamedComponentFactory[Input],
+	parentReady <-chan struct{},
+	started func(),
+) component.ComponentWorker {
+	return func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
 		// wait for the previous component to be ready before starting
 		if err := util.WaitClosed(ctx, parentReady); err != nil {
 			return
@@ -1699,12 +1708,12 @@ func (fnb *FlowNodeBuilder) handleRestartableComponent(v namedComponentFunc, par
 		// from within the componentFactory
 		started()
 
-		log := fnb.Logger.With().Str("component", v.name).Logger()
+		log := log.With().Str("component", v.Name).Logger()
 
 		// This may be called multiple times if the component is restarted
 		componentFactory := func() (component.Component, error) {
 			log.Info().Msg("component initialization started")
-			c, err := v.fn(fnb.NodeConfig)
+			c, err := v.ComponentFactory(input)
 			if err != nil {
 				return nil, err
 			}
@@ -1723,15 +1732,13 @@ func (fnb *FlowNodeBuilder) handleRestartableComponent(v namedComponentFunc, par
 			return c.(component.Component), nil
 		}
 
-		err := component.RunComponent(ctx, componentFactory, v.errorHandler)
+		err := component.RunComponent(ctx, componentFactory, v.ErrorHandler)
 		if err != nil && !errors.Is(err, ctx.Err()) {
-			ctx.Throw(fmt.Errorf("component %s encountered an unhandled irrecoverable error: %w", v.name, err))
+			ctx.Throw(fmt.Errorf("component %s encountered an unhandled irrecoverable error: %w", v.Name, err))
 		}
 
 		log.Info().Msg("component shutdown complete")
-	})
-
-	return nil
+	}
 }
 
 // ExtraFlags enables binding additional flags beyond those defined in BaseConfig.
@@ -1766,10 +1773,10 @@ func (fnb *FlowNodeBuilder) AdminCommand(command string, f func(config *NodeConf
 // The ReadyDoneFactory may return either a `Component` or `ReadyDoneAware` instance.
 // In both cases, the object is started when the node is run, and the node will wait for the
 // component to exit gracefully.
-func (fnb *FlowNodeBuilder) Component(name string, f ReadyDoneFactory) NodeBuilder {
-	fnb.components = append(fnb.components, namedComponentFunc{
-		fn:   f,
-		name: name,
+func (fnb *FlowNodeBuilder) Component(name string, f ReadyDoneFactory[*NodeConfig]) NodeBuilder {
+	fnb.components = append(fnb.components, NamedComponentFactory[*NodeConfig]{
+		ComponentFactory: f,
+		Name:             name,
 	})
 	return fnb
 }
@@ -1785,26 +1792,26 @@ func (fnb *FlowNodeBuilder) Component(name string, f ReadyDoneFactory) NodeBuild
 // IMPORTANT: Dependable components are started in parallel with no guaranteed run order, so all
 // dependencies must be initialized outside of the ReadyDoneFactory, and their `Ready()` method
 // MUST be idempotent.
-func (fnb *FlowNodeBuilder) DependableComponent(name string, f ReadyDoneFactory, dependencies *DependencyList) NodeBuilder {
+func (fnb *FlowNodeBuilder) DependableComponent(name string, f ReadyDoneFactory[*NodeConfig], dependencies *DependencyList) NodeBuilder {
 	// Note: dependencies are passed as a struct to allow updating the list after calling this method.
 	// Passing a slice instead would result in out of sync metadata since slices are passed by reference
-	fnb.components = append(fnb.components, namedComponentFunc{
-		fn:           f,
-		name:         name,
-		dependencies: dependencies,
+	fnb.components = append(fnb.components, NamedComponentFactory[*NodeConfig]{
+		ComponentFactory: f,
+		Name:             name,
+		Dependencies:     dependencies,
 	})
 	return fnb
 }
 
 // OverrideComponent adds given builder function to the components set of the node builder. If a builder function with that name
 // already exists, it will be overridden.
-func (fnb *FlowNodeBuilder) OverrideComponent(name string, f ReadyDoneFactory) NodeBuilder {
+func (fnb *FlowNodeBuilder) OverrideComponent(name string, f ReadyDoneFactory[*NodeConfig]) NodeBuilder {
 	for i := 0; i < len(fnb.components); i++ {
-		if fnb.components[i].name == name {
+		if fnb.components[i].Name == name {
 			// found component with the name, override it.
-			fnb.components[i] = namedComponentFunc{
-				fn:   f,
-				name: name,
+			fnb.components[i] = NamedComponentFactory[*NodeConfig]{
+				ComponentFactory: f,
+				Name:             name,
 			}
 
 			return fnb
@@ -1828,11 +1835,11 @@ func (fnb *FlowNodeBuilder) OverrideComponent(name string, f ReadyDoneFactory) N
 // Note: The ReadyDoneFactory method may be called multiple times if the component is restarted.
 //
 // Any irrecoverable errors thrown by the component will be passed to the provided error handler.
-func (fnb *FlowNodeBuilder) RestartableComponent(name string, f ReadyDoneFactory, errorHandler component.OnError) NodeBuilder {
-	fnb.components = append(fnb.components, namedComponentFunc{
-		fn:           f,
-		name:         name,
-		errorHandler: errorHandler,
+func (fnb *FlowNodeBuilder) RestartableComponent(name string, f ReadyDoneFactory[*NodeConfig], errorHandler component.OnError) NodeBuilder {
+	fnb.components = append(fnb.components, NamedComponentFactory[*NodeConfig]{
+		ComponentFactory: f,
+		Name:             name,
+		ErrorHandler:     errorHandler,
 	})
 	return fnb
 }

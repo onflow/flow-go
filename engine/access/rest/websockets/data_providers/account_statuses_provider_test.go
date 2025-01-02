@@ -227,6 +227,9 @@ func (s *AccountStatusesProviderSuite) TestMessageIndexAccountStatusesProviderRe
 	s.Require().NotNil(provider)
 	s.Require().NoError(err)
 
+	// Ensure the provider is properly closed after the test
+	defer provider.Close()
+
 	// Run the provider in a separate goroutine to simulate subscription processing
 	go func() {
 		err = provider.Run()
@@ -251,8 +254,8 @@ func (s *AccountStatusesProviderSuite) TestMessageIndexAccountStatusesProviderRe
 		responses = append(responses, accountStatusesRes)
 	}
 
-	// Verifying that indices are starting from 1
-	s.Require().Equal(uint64(1), responses[0].MessageIndex, "Expected MessageIndex to start with 1")
+	// Verifying that indices are starting from 0
+	s.Require().Equal(uint64(0), responses[0].MessageIndex, "Expected MessageIndex to start with 0")
 
 	// Verifying that indices are strictly increasing
 	for i := 1; i < len(responses); i++ {
@@ -260,9 +263,6 @@ func (s *AccountStatusesProviderSuite) TestMessageIndexAccountStatusesProviderRe
 		currentIndex := responses[i].MessageIndex
 		s.Require().Equal(prevIndex+1, currentIndex, "Expected MessageIndex to increment by 1")
 	}
-
-	// Ensure the provider is properly closed after the test
-	provider.Close()
 }
 
 // backendAccountStatusesResponses creates backend account statuses responses based on the provided events.
@@ -288,7 +288,7 @@ func (s *AccountStatusesProviderSuite) expectedAccountStatusesResponses(backendR
 
 	for i, resp := range backendResponses {
 		var expectedResponse models.AccountStatusesResponse
-		expectedResponse.Build(resp, uint64(i+1))
+		expectedResponse.Build(resp, uint64(i))
 
 		expectedResponses[i] = &expectedResponse
 	}
