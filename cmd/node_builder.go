@@ -33,7 +33,10 @@ import (
 const NotSet = "not set"
 
 type BuilderFunc func(nodeConfig *NodeConfig) error
-type ReadyDoneFactory func(node *NodeConfig) (module.ReadyDoneAware, error)
+
+// ReadyDoneFactory is a function that returns a ReadyDoneAware component or an error if
+// the factory cannot create the component
+type ReadyDoneFactory[Input any] func(input Input) (module.ReadyDoneAware, error)
 
 // NodeBuilder declares the initialization methods needed to bootstrap up a Flow node
 type NodeBuilder interface {
@@ -73,7 +76,7 @@ type NodeBuilder interface {
 	// The ReadyDoneFactory may return either a `Component` or `ReadyDoneAware` instance.
 	// In both cases, the object is started according to its interface when the node is run,
 	// and the node will wait for the component to exit gracefully.
-	Component(name string, f ReadyDoneFactory) NodeBuilder
+	Component(name string, f ReadyDoneFactory[*NodeConfig]) NodeBuilder
 
 	// DependableComponent adds a new component to the node that conforms to the ReadyDoneAware
 	// interface. The builder will wait until all of the components in the dependencies list are ready
@@ -86,7 +89,7 @@ type NodeBuilder interface {
 	// IMPORTANT: Dependable components are started in parallel with no guaranteed run order, so all
 	// dependencies must be initialized outside of the ReadyDoneFactory, and their `Ready()` method
 	// MUST be idempotent.
-	DependableComponent(name string, f ReadyDoneFactory, dependencies *DependencyList) NodeBuilder
+	DependableComponent(name string, f ReadyDoneFactory[*NodeConfig], dependencies *DependencyList) NodeBuilder
 
 	// RestartableComponent adds a new component to the node that conforms to the ReadyDoneAware
 	// interface, and calls the provided error handler when an irrecoverable error is encountered.
@@ -94,7 +97,7 @@ type NodeBuilder interface {
 	// can/should be independently restarted when an irrecoverable error is encountered.
 	//
 	// Any irrecoverable errors thrown by the component will be passed to the provided error handler.
-	RestartableComponent(name string, f ReadyDoneFactory, errorHandler component.OnError) NodeBuilder
+	RestartableComponent(name string, f ReadyDoneFactory[*NodeConfig], errorHandler component.OnError) NodeBuilder
 
 	// ShutdownFunc adds a callback function that is called after all components have exited.
 	// All shutdown functions are called regardless of errors returned by previous callbacks. Any
@@ -299,16 +302,16 @@ func DefaultBaseConfig() *BaseConfig {
 // DependencyList is a slice of ReadyDoneAware implementations that are used by DependableComponent
 // to define the list of dependencies that must be ready before starting the component.
 type DependencyList struct {
-	components []module.ReadyDoneAware
+	Components []module.ReadyDoneAware
 }
 
 func NewDependencyList(components ...module.ReadyDoneAware) *DependencyList {
 	return &DependencyList{
-		components: components,
+		Components: components,
 	}
 }
 
 // Add adds a new ReadyDoneAware implementation to the list of dependencies.
 func (d *DependencyList) Add(component module.ReadyDoneAware) {
-	d.components = append(d.components, component)
+	d.Components = append(d.Components, component)
 }
