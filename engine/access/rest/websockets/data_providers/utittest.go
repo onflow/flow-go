@@ -64,6 +64,10 @@ func testHappyPath[T any](
 
 			// Create the data provider instance
 			provider, err := factory.NewDataProvider(ctx, topic, test.arguments, send)
+
+			// Ensure the provider is properly closed after the test
+			defer provider.Close()
+
 			require.NotNil(t, provider)
 			require.NoError(t, err)
 
@@ -88,9 +92,6 @@ func testHappyPath[T any](
 					requireFn(v, expected)
 				}, time.Second, fmt.Sprintf("timed out waiting for response %d %v", i, expected))
 			}
-
-			// Ensure the provider is properly closed after the test
-			provider.Close()
 		})
 	}
 }

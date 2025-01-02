@@ -247,6 +247,10 @@ func (s *TransactionStatusesProviderSuite) TestMessageIndexTransactionStatusesPr
 		arguments,
 		send,
 	)
+
+	// Ensure the provider is properly closed after the test
+	defer provider.Close()
+
 	s.Require().NotNil(provider)
 	s.Require().NoError(err)
 
@@ -287,9 +291,6 @@ func (s *TransactionStatusesProviderSuite) TestMessageIndexTransactionStatusesPr
 		currentIndex := responses[i].MessageIndex
 		s.Require().Equal(prevIndex+1, currentIndex, "Expected MessageIndex to increment by 1")
 	}
-
-	// Ensure the provider is properly closed after the test
-	provider.Close()
 }
 
 func expectedTransactionStatusesResponse(block flow.Block) []*access.TransactionResult {

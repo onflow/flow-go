@@ -227,6 +227,10 @@ func (s *AccountStatusesProviderSuite) TestMessageIndexAccountStatusesProviderRe
 		state_stream.DefaultEventFilterConfig,
 		subscription.DefaultHeartbeatInterval,
 	)
+
+	// Ensure the provider is properly closed after the test
+	defer provider.Close()
+
 	s.Require().NotNil(provider)
 	s.Require().NoError(err)
 
@@ -263,7 +267,4 @@ func (s *AccountStatusesProviderSuite) TestMessageIndexAccountStatusesProviderRe
 		currentIndex := responses[i].MessageIndex
 		s.Require().Equal(prevIndex+1, currentIndex, "Expected MessageIndex to increment by 1")
 	}
-
-	// Ensure the provider is properly closed after the test
-	provider.Close()
 }

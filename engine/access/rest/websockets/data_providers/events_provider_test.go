@@ -251,6 +251,10 @@ func (s *EventsProviderSuite) TestMessageIndexEventProviderResponse_HappyPath() 
 		s.chain,
 		state_stream.DefaultEventFilterConfig,
 		subscription.DefaultHeartbeatInterval)
+
+	// Ensure the provider is properly closed after the test
+	defer provider.Close()
+
 	s.Require().NotNil(provider)
 	s.Require().NoError(err)
 
@@ -290,6 +294,6 @@ func (s *EventsProviderSuite) TestMessageIndexEventProviderResponse_HappyPath() 
 		s.Require().Equal(prevIndex+1, currentIndex, "Expected MessageIndex to increment by 1")
 	}
 
-	// Ensure the provider is properly closed after the test
-	provider.Close()
+	//// Ensure the provider is properly closed after the test
+	//provider.Close()
 }
