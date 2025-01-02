@@ -3,7 +3,6 @@ package data_providers
 import (
 	"context"
 	"fmt"
-	"strconv"
 
 	"github.com/rs/zerolog"
 
@@ -102,13 +101,10 @@ func (p *EventsDataProvider) handleResponse() func(eventsResponse *backend.Event
 			return fmt.Errorf("message index already incremented to: %d", messageIndex.Value())
 		}
 
-		p.send <- &models.EventResponse{
-			BlockId:        eventsResponse.BlockID.String(),
-			BlockHeight:    strconv.FormatUint(eventsResponse.Height, 10),
-			BlockTimestamp: eventsResponse.BlockTimestamp,
-			Events:         eventsResponse.Events,
-			MessageIndex:   index,
-		}
+		var response models.EventResponse
+		response.Build(eventsResponse, index)
+
+		p.send <- &response
 
 		return nil
 	}

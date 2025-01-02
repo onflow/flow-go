@@ -45,15 +45,14 @@ func (s *DataProviderFactorySuite) SetupTest() {
 	s.ctx = context.Background()
 	s.ch = make(chan interface{})
 
-	chain := flow.Testnet.Chain()
-
 	s.factory = NewDataProviderFactory(
 		log,
 		s.stateStreamApi,
 		s.accessApi,
-		chain,
+		flow.Testnet.Chain(),
 		state_stream.DefaultEventFilterConfig,
 		subscription.DefaultHeartbeatInterval,
+		nil,
 	)
 	s.Require().NotNil(s.factory)
 }
