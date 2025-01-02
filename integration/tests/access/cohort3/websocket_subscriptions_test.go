@@ -17,6 +17,7 @@ import (
 	"github.com/stretchr/testify/suite"
 
 	commonmodels "github.com/onflow/flow-go/engine/access/rest/common/models"
+	"github.com/onflow/flow-go/engine/access/rest/common/parser"
 	"github.com/onflow/flow-go/engine/access/rest/util"
 	"github.com/onflow/flow-go/engine/access/rest/websockets/data_providers"
 	"github.com/onflow/flow-go/engine/access/rest/websockets/models"
@@ -225,79 +226,91 @@ func monitorInactivity(t *testing.T, client *websocket.Conn, timeout time.Durati
 
 func (s *WebsocketSubscriptionSuite) TestHappyCases() {
 	restAddr := s.net.ContainerByName(testnet.PrimaryAN).Addr(testnet.RESTPort)
-	wsClient, err := getWSClient(s.ctx, getWebsocketsUrl(restAddr))
-	s.Require().NoError(err)
 
-	defer wsClient.Close()
+	//tests streaming blocks
+	s.T().Run("blocks streaming", func(t *testing.T) {
+		wsClient, err := getWSClient(s.ctx, getWebsocketsUrl(restAddr))
+		s.Require().NoError(err)
+		defer wsClient.Close()
 
-	// tests streaming blocks
-	//s.T().Run("blocks streaming", func(t *testing.T) {
-	//	clientMessageID := uuid.New().String()
-	//
-	//	subscriptionRequest := models.SubscribeMessageRequest{
-	//		BaseMessageRequest: models.BaseMessageRequest{
-	//			Action:          models.SubscribeAction,
-	//			ClientMessageID: clientMessageID,
-	//		},
-	//		Topic:     data_providers.BlocksTopic,
-	//		Arguments: models.Arguments{"block_status": parser.Finalized},
-	//	}
-	//
-	//	testWebsocketSubscription[models.BlockMessageResponse](
-	//		t,
-	//		wsClient,
-	//		subscriptionRequest,
-	//		s.validateBlocks,
-	//		5*time.Second,
-	//	)
-	//})
+		clientMessageID := uuid.New().String()
 
-	//// tests streaming block headers
-	//s.T().Run("block headers streaming", func(t *testing.T) {
-	//	clientMessageID := uuid.New().String()
-	//
-	//	subscriptionRequest := models.SubscribeMessageRequest{
-	//		BaseMessageRequest: models.BaseMessageRequest{
-	//			Action:          models.SubscribeAction,
-	//			ClientMessageID: clientMessageID,
-	//		},
-	//		Topic:     data_providers.BlockHeadersTopic,
-	//		Arguments: models.Arguments{"block_status": parser.Finalized},
-	//	}
-	//
-	//	testWebsocketSubscription[models.BlockHeaderMessageResponse](
-	//		t,
-	//		wsClient,
-	//		subscriptionRequest,
-	//		s.validateBlockHeaders,
-	//		10*time.Second,
-	//	)
-	//})
+		subscriptionRequest := models.SubscribeMessageRequest{
+			BaseMessageRequest: models.BaseMessageRequest{
+				Action:          models.SubscribeAction,
+				ClientMessageID: clientMessageID,
+			},
+			Topic:     data_providers.BlocksTopic,
+			Arguments: models.Arguments{"block_status": parser.Finalized},
+		}
 
-	//// tests streaming block digests
-	//s.T().Run("block digests streaming", func(t *testing.T) {
-	//	clientMessageID := uuid.New().String()
-	//
-	//	subscriptionRequest := models.SubscribeMessageRequest{
-	//		BaseMessageRequest: models.BaseMessageRequest{
-	//			Action:          models.SubscribeAction,
-	//			ClientMessageID: clientMessageID,
-	//		},
-	//		Topic:     data_providers.BlockDigestsTopic,
-	//		Arguments: models.Arguments{"block_status": parser.Finalized},
-	//	}
-	//
-	//	testWebsocketSubscription[models.BlockDigestMessageResponse](
-	//		t,
-	//		wsClient,
-	//		subscriptionRequest,
-	//		s.validateBlockDigests,
-	//		5*time.Second,
-	//	)
-	//})
+		testWebsocketSubscription[models.BlockMessageResponse](
+			t,
+			wsClient,
+			subscriptionRequest,
+			s.validateBlocks,
+			5*time.Second,
+		)
+	})
+
+	// tests streaming block headers
+	s.T().Run("block headers streaming", func(t *testing.T) {
+		wsClient, err := getWSClient(s.ctx, getWebsocketsUrl(restAddr))
+		s.Require().NoError(err)
+		defer wsClient.Close()
+
+		clientMessageID := uuid.New().String()
+
+		subscriptionRequest := models.SubscribeMessageRequest{
+			BaseMessageRequest: models.BaseMessageRequest{
+				Action:          models.SubscribeAction,
+				ClientMessageID: clientMessageID,
+			},
+			Topic:     data_providers.BlockHeadersTopic,
+			Arguments: models.Arguments{"block_status": parser.Finalized},
+		}
+
+		testWebsocketSubscription[models.BlockHeaderMessageResponse](
+			t,
+			wsClient,
+			subscriptionRequest,
+			s.validateBlockHeaders,
+			10*time.Second,
+		)
+	})
+
+	// tests streaming block digests
+	s.T().Run("block digests streaming", func(t *testing.T) {
+		wsClient, err := getWSClient(s.ctx, getWebsocketsUrl(restAddr))
+		s.Require().NoError(err)
+		defer wsClient.Close()
+
+		clientMessageID := uuid.New().String()
+
+		subscriptionRequest := models.SubscribeMessageRequest{
+			BaseMessageRequest: models.BaseMessageRequest{
+				Action:          models.SubscribeAction,
+				ClientMessageID: clientMessageID,
+			},
+			Topic:     data_providers.BlockDigestsTopic,
+			Arguments: models.Arguments{"block_status": parser.Finalized},
+		}
+
+		testWebsocketSubscription[models.BlockDigestMessageResponse](
+			t,
+			wsClient,
+			subscriptionRequest,
+			s.validateBlockDigests,
+			5*time.Second,
+		)
+	})
 
 	// tests streaming events
 	s.T().Run("events streaming", func(t *testing.T) {
+		wsClient, err := getWSClient(s.ctx, getWebsocketsUrl(restAddr))
+		s.Require().NoError(err)
+		defer wsClient.Close()
+
 		clientMessageID := uuid.New().String()
 
 		subscriptionRequest := models.SubscribeMessageRequest{
@@ -346,7 +359,7 @@ func (s *WebsocketSubscriptionSuite) validateBlocks(
 
 // validateBlockHeaders validates the received block header responses against gRPC responses.
 func (s *WebsocketSubscriptionSuite) validateBlockHeaders(
-	receivedResponses []models.BlockHeaderMessageResponse,
+	receivedResponses []*models.BlockHeaderMessageResponse,
 ) {
 	require.NotEmpty(s.T(), receivedResponses, "expected received block headers")
 
