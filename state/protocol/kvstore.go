@@ -38,8 +38,9 @@ type KVStoreReader interface {
 
 	// GetVersionUpgrade returns the upgrade version of protocol.
 	// VersionUpgrade is a view-based activator that specifies the version which has to be applied
-	// and the view from which on it has to be applied. It may return the current protocol version
-	// with a past view if the upgrade has already been activated.
+	// and the view from which on it has to be applied. After an upgrade activation view has passed,
+	// the (version, view) data remains in the state until the next upgrade is scheduled (essentially
+	// persisting the most recent past update until a subsequent update is scheduled).
 	GetVersionUpgrade() *ViewBasedActivator[uint64]
 
 	// GetEpochStateID returns the state ID of the epoch state.
