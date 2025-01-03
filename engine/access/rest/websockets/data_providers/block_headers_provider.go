@@ -61,8 +61,12 @@ func (p *BlockHeadersDataProvider) Run() error {
 	return subscription.HandleSubscription(
 		p.subscription,
 		subscription.HandleResponse(p.send, func(header *flow.Header) (interface{}, error) {
-			return &models.BlockHeaderMessageResponse{
-				Header: header,
+			return &models.BaseDataProvidersResponse{
+				SubscriptionID: p.ID().String(),
+				Topic:          p.Topic(),
+				Payload: &models.BlockHeaderMessageResponse{
+					Header: header,
+				},
 			}, nil
 		}),
 	)

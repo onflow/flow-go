@@ -104,9 +104,13 @@ func (p *TransactionStatusesDataProvider) handleResponse() func(txResults []*acc
 				return status.Errorf(codes.Internal, "message index already incremented to %d", messageIndex.Value())
 			}
 
-			p.send <- &models.TransactionStatusesResponse{
-				TransactionResult: txResults[i],
-				MessageIndex:      index,
+			p.send <- &models.BaseDataProvidersResponse{
+				SubscriptionID: p.ID().String(),
+				Topic:          p.Topic(),
+				Payload: &models.TransactionStatusesResponse{
+					TransactionResult: txResults[i],
+					MessageIndex:      index,
+				},
 			}
 		}
 
