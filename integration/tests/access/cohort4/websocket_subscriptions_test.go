@@ -23,6 +23,7 @@ import (
 	"github.com/onflow/flow-go/engine/access/rest/websockets/models"
 	"github.com/onflow/flow-go/engine/common/rpc/convert"
 	"github.com/onflow/flow-go/integration/testnet"
+	"github.com/onflow/flow-go/integration/tests/access/common"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/utils/unittest"
 
@@ -112,7 +113,7 @@ func (s *WebsocketSubscriptionSuite) SetupTest() {
 
 	accessUrl := fmt.Sprintf("localhost:%s", s.net.ContainerByName(testnet.PrimaryAN).Port(testnet.GRPCPort))
 	var err error
-	s.grpcClient, err = getAccessAPIClient(accessUrl)
+	s.grpcClient, err = common.GetAccessAPIClient(accessUrl)
 	s.Require().NoError(err)
 }
 
@@ -126,7 +127,7 @@ func (s *WebsocketSubscriptionSuite) TestInactivityHeaders() {
 	// 4. Validate that the actual inactivity duration is within the expected range.
 	s.T().Run("no active subscription after connection creation", func(t *testing.T) {
 		restAddr := s.net.ContainerByName(testnet.PrimaryAN).Addr(testnet.RESTPort)
-		wsClient, err := getWSClient(s.ctx, getWebsocketsUrl(restAddr))
+		wsClient, err := common.GetWSClient(s.ctx, getWebsocketsUrl(restAddr))
 		s.Require().NoError(err)
 		defer func() { s.Require().NoError(wsClient.Close()) }()
 
@@ -144,7 +145,7 @@ func (s *WebsocketSubscriptionSuite) TestInactivityHeaders() {
 	s.T().Run("all active subscriptions unsubscribed", func(t *testing.T) {
 		// Step 1: Establish WebSocket connection
 		restAddr := s.net.ContainerByName(testnet.PrimaryAN).Addr(testnet.RESTPort)
-		wsClient, err := getWSClient(s.ctx, getWebsocketsUrl(restAddr))
+		wsClient, err := common.GetWSClient(s.ctx, getWebsocketsUrl(restAddr))
 		s.Require().NoError(err)
 		defer func() { s.Require().NoError(wsClient.Close()) }()
 
@@ -229,7 +230,7 @@ func (s *WebsocketSubscriptionSuite) TestHappyCases() {
 
 	//tests streaming blocks
 	s.T().Run("blocks streaming", func(t *testing.T) {
-		wsClient, err := getWSClient(s.ctx, getWebsocketsUrl(restAddr))
+		wsClient, err := common.GetWSClient(s.ctx, getWebsocketsUrl(restAddr))
 		s.Require().NoError(err)
 		defer wsClient.Close()
 
@@ -255,7 +256,7 @@ func (s *WebsocketSubscriptionSuite) TestHappyCases() {
 
 	// tests streaming block headers
 	s.T().Run("block headers streaming", func(t *testing.T) {
-		wsClient, err := getWSClient(s.ctx, getWebsocketsUrl(restAddr))
+		wsClient, err := common.GetWSClient(s.ctx, getWebsocketsUrl(restAddr))
 		s.Require().NoError(err)
 		defer wsClient.Close()
 
@@ -281,7 +282,7 @@ func (s *WebsocketSubscriptionSuite) TestHappyCases() {
 
 	// tests streaming block digests
 	s.T().Run("block digests streaming", func(t *testing.T) {
-		wsClient, err := getWSClient(s.ctx, getWebsocketsUrl(restAddr))
+		wsClient, err := common.GetWSClient(s.ctx, getWebsocketsUrl(restAddr))
 		s.Require().NoError(err)
 		defer wsClient.Close()
 
@@ -307,7 +308,7 @@ func (s *WebsocketSubscriptionSuite) TestHappyCases() {
 
 	// tests streaming events
 	s.T().Run("events streaming", func(t *testing.T) {
-		wsClient, err := getWSClient(s.ctx, getWebsocketsUrl(restAddr))
+		wsClient, err := common.GetWSClient(s.ctx, getWebsocketsUrl(restAddr))
 		s.Require().NoError(err)
 		defer wsClient.Close()
 
