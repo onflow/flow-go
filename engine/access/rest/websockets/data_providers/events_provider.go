@@ -103,7 +103,7 @@ func (p *EventsDataProvider) handleResponse() func(eventsResponse *backend.Event
 		}
 
 		p.send <- &models.EventResponse{
-			BlockId:        eventsResponse.BlockID.String(),
+			BlockID:        eventsResponse.BlockID.String(),
 			BlockHeight:    strconv.FormatUint(eventsResponse.Height, 10),
 			BlockTimestamp: eventsResponse.BlockTimestamp,
 			Events:         eventsResponse.Events,

@@ -6,5 +6,5 @@ const (
 	InvalidMessage Code = iota
 	InvalidArgument
 	NotFound
-	SubscriptionError
+	InternalError
 )
