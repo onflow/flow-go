@@ -235,7 +235,7 @@ type API interface {
 	//   - txID: The unique identifier of the transaction to monitor.
 	//   - requiredEventEncodingVersion: The version of event encoding required for the subscription.
 	SubscribeTransactionStatusesFromLatest(ctx context.Context, txID flow.Identifier, requiredEventEncodingVersion entities.EventEncodingVersion) subscription.Subscription
-	// SendAndSubscribeTransactionStatuses sends a transaction to the execution node and subscribes to its status updates.
+	// SendAndSubscribeTransactionStatuses sends a transaction to the network and subscribes to its status updates.
 	// Monitoring begins from the reference block saved in the transaction itself and streams status updates until the transaction
 	// reaches a final state (TransactionStatusSealed or TransactionStatusExpired). Once a final status is reached, the subscription
 	// automatically terminates.

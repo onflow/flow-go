@@ -169,7 +169,6 @@ type ObserverServiceConfig struct {
 	registerCacheSize                    uint
 	programCacheSize                     uint
 	registerDBPruneThreshold             uint64
-	websocketConfig                      websockets.Config
 }
 
 // DefaultObserverServiceConfig defines all the default values for the ObserverServiceConfig
@@ -200,8 +199,9 @@ func DefaultObserverServiceConfig() *ObserverServiceConfig {
 				IdleTimeout:    rest.DefaultIdleTimeout,
 				MaxRequestSize: commonrest.DefaultMaxRequestSize,
 			},
-			MaxMsgSize:     grpcutils.DefaultMaxMsgSize,
-			CompressorName: grpcutils.NoCompressor,
+			MaxMsgSize:      grpcutils.DefaultMaxMsgSize,
+			CompressorName:  grpcutils.NoCompressor,
+			WebSocketConfig: websockets.NewDefaultWebsocketConfig(),
 		},
 		stateStreamConf: statestreambackend.Config{
 			MaxExecutionDataMsgSize: grpcutils.DefaultMaxMsgSize,
@@ -254,7 +254,6 @@ func DefaultObserverServiceConfig() *ObserverServiceConfig {
 		registerCacheSize:        0,
 		programCacheSize:         0,
 		registerDBPruneThreshold: pruner.DefaultThreshold,
-		websocketConfig:          websockets.NewDefaultWebsocketConfig(),
 	}
 }
 
@@ -814,6 +813,11 @@ func (builder *ObserverServiceBuilder) extraFlags() {
 			"registerdb-pruning-threshold",
 			defaultConfig.registerDBPruneThreshold,
 			fmt.Sprintf("specifies the number of blocks below the latest stored block height to keep in register db. default: %d", defaultConfig.registerDBPruneThreshold))
+
+		flags.DurationVar(&builder.rpcConf.WebSocketConfig.InactivityTimeout,
+			"websocket-inactivity-timeout",
+			defaultConfig.rpcConf.WebSocketConfig.InactivityTimeout,
+			"specifies the duration a WebSocket connection can remain open without any active subscriptions before being automatically closed")
 	}).ValidateFlags(func() error {
 		if builder.executionDataSyncEnabled {
 			if builder.executionDataConfig.FetchTimeout <= 0 {

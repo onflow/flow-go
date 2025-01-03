@@ -336,6 +336,9 @@ jobs:
           - name: Access Cohort3 Integration Tests
             make: make -C integration access-cohort3-tests
             runner: ubuntu-latest
+          - name: Access Cohort4 Integration Tests
+            make: make -C integration access-cohort4-tests
+            runner: ubuntu-latest
             # test suite has single test which is flaky and needs to be fixed - reminder here to put it back when it's fixed
 #          - name: BFT (Framework) Integration Tests
 #            make: make -C integration bft-framework-tests

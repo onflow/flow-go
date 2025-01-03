@@ -233,6 +233,9 @@ func (s *AccountStatusesProviderSuite) TestMessageIndexAccountStatusesProviderRe
 	s.Require().NotNil(provider)
 	s.Require().NoError(err)
 
+	// Ensure the provider is properly closed after the test
+	defer provider.Close()
+
 	// Run the provider in a separate goroutine to simulate subscription processing
 	go func() {
 		err = provider.Run()
@@ -270,7 +273,4 @@ func (s *AccountStatusesProviderSuite) TestMessageIndexAccountStatusesProviderRe
 		currentIndex := responses[i].MessageIndex
 		s.Require().Equal(prevIndex+1, currentIndex, "Expected MessageIndex to increment by 1")
 	}
-
-	// Ensure the provider is properly closed after the test
-	provider.Close()
 }
