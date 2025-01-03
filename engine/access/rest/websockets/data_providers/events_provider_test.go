@@ -147,7 +147,7 @@ func (s *EventsProviderSuite) requireEvents(v interface{}, expectedResponse inte
 	actualResponse, ok := v.(*models.BaseDataProvidersResponse)
 	require.True(s.T(), ok, "Expected *models.EventResponse, got %T", v)
 
-	actualResponseData, ok := actualResponse.Data.(*models.EventResponse)
+	actualResponseData, ok := actualResponse.Payload.(*models.EventResponse)
 	require.True(s.T(), ok, "unexpected response data type: %T", v)
 
 	s.Require().ElementsMatch(expectedEventsResponse.Events, actualResponseData.Events)
@@ -285,7 +285,7 @@ func (s *EventsProviderSuite) TestMessageIndexEventProviderResponse_HappyPath() 
 		eventRes, ok := res.(*models.BaseDataProvidersResponse)
 		s.Require().True(ok, "Expected *models.BaseDataProvidersResponse, got %T", res)
 
-		eventResData, ok := eventRes.Data.(*models.EventResponse)
+		eventResData, ok := eventRes.Payload.(*models.EventResponse)
 		s.Require().True(ok, "Expected *models.EventResponse, got %T", res)
 
 		responses = append(responses, eventResData)

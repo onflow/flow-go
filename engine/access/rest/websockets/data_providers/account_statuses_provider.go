@@ -117,9 +117,9 @@ func (p *AccountStatusesDataProvider) handleResponse() func(accountStatusesRespo
 		}
 
 		p.send <- &models.BaseDataProvidersResponse{
-			ID:    p.ID().String(),
-			Topic: p.Topic(),
-			Data: &models.AccountStatusesResponse{
+			SubscriptionID: p.ID().String(),
+			Topic:          p.Topic(),
+			Payload: &models.AccountStatusesResponse{
 				BlockID:       accountStatusesResponse.BlockID.String(),
 				Height:        strconv.FormatUint(accountStatusesResponse.Height, 10),
 				AccountEvents: accountStatusesResponse.AccountEvents,

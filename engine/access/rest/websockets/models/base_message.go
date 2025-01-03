@@ -22,7 +22,7 @@ type BaseMessageResponse struct {
 
 // BaseDataProvidersResponse represents a base structure for responses from subscriptions.
 type BaseDataProvidersResponse struct {
-	ID    string      `json:"id"`    // Unique subscription ID
-	Topic string      `json:"topic"` // Topic of the subscription
-	Data  interface{} `json:"data"`  // Data that's being returned within a subscription.
+	SubscriptionID string      `json:"subscription_id"` // Unique subscriptionID
+	Topic          string      `json:"topic"`           // Topic of the subscription
+	Payload        interface{} `json:"payload"`         // Payload that's being returned within a subscription.
 }

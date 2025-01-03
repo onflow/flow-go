@@ -71,9 +71,9 @@ func (p *BlocksDataProvider) Run() error {
 		p.subscription,
 		subscription.HandleResponse(p.send, func(block *flow.Block) (interface{}, error) {
 			return &models.BaseDataProvidersResponse{
-				ID:    p.ID().String(),
-				Topic: p.Topic(),
-				Data: &models.BlockMessageResponse{
+				SubscriptionID: p.ID().String(),
+				Topic:          p.Topic(),
+				Payload: &models.BlockMessageResponse{
 					Block: block,
 				},
 			}, nil

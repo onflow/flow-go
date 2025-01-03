@@ -137,7 +137,7 @@ func (s *TransactionStatusesProviderSuite) requireTransactionStatuses(
 	actualResponse, ok := v.(*models.BaseDataProvidersResponse)
 	require.True(s.T(), ok, "Expected *models.BaseDataProvidersResponse, got %T", v)
 
-	actualResponseData, ok := actualResponse.Data.(*models.TransactionStatusesResponse)
+	actualResponseData, ok := actualResponse.Payload.(*models.TransactionStatusesResponse)
 	require.True(s.T(), ok, "unexpected response data type: %T", v)
 
 	require.Equal(s.T(), expectedTxStatusesResponse.BlockID, actualResponseData.TransactionResult.BlockID)
@@ -284,7 +284,7 @@ func (s *TransactionStatusesProviderSuite) TestMessageIndexTransactionStatusesPr
 		txStatusesRes, ok := res.(*models.BaseDataProvidersResponse)
 		s.Require().True(ok, "Expected *models.BaseDataProvidersResponse, got %T", res)
 
-		txStatusesResData, ok := txStatusesRes.Data.(*models.TransactionStatusesResponse)
+		txStatusesResData, ok := txStatusesRes.Payload.(*models.TransactionStatusesResponse)
 		s.Require().True(ok, "Expected *models.TransactionStatusesResponse, got %T", res)
 
 		responses = append(responses, txStatusesResData)

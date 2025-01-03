@@ -149,7 +149,7 @@ func (s *AccountStatusesProviderSuite) requireAccountStatuses(
 	actualResponse, ok := v.(*models.BaseDataProvidersResponse)
 	require.True(s.T(), ok, "Expected *models.BaseDataProvidersResponse, got %T", v)
 
-	actualResponseData, ok := actualResponse.Data.(*models.AccountStatusesResponse)
+	actualResponseData, ok := actualResponse.Payload.(*models.AccountStatusesResponse)
 	require.True(s.T(), ok, "unexpected response data type: %T", v)
 
 	require.Equal(s.T(), expectedAccountStatusesResponse.BlockID.String(), actualResponseData.BlockID)
@@ -258,7 +258,7 @@ func (s *AccountStatusesProviderSuite) TestMessageIndexAccountStatusesProviderRe
 		accountStatusesRes, ok := res.(*models.BaseDataProvidersResponse)
 		s.Require().True(ok, "Expected *models.BaseDataProvidersResponse, got %T", res)
 
-		accountStatusesResData, ok := accountStatusesRes.Data.(*models.AccountStatusesResponse)
+		accountStatusesResData, ok := accountStatusesRes.Payload.(*models.AccountStatusesResponse)
 		s.Require().True(ok, "Expected *models.AccountStatusesResponse, got %T", res)
 
 		responses = append(responses, accountStatusesResData)

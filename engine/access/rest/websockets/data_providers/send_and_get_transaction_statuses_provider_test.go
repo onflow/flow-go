@@ -107,7 +107,7 @@ func (s *SendTransactionStatusesProviderSuite) requireTransactionStatuses(
 	actualResponse, ok := v.(*models.BaseDataProvidersResponse)
 	require.True(s.T(), ok, "Expected *models.BaseDataProvidersResponse, got %T", v)
 
-	actualResponseData, ok := actualResponse.Data.(*models.TransactionStatusesResponse)
+	actualResponseData, ok := actualResponse.Payload.(*models.TransactionStatusesResponse)
 	require.True(s.T(), ok, "unexpected response data type: %T", v)
 
 	require.Equal(s.T(), expectedTxStatusesResponse.BlockID, actualResponseData.TransactionResult.BlockID)

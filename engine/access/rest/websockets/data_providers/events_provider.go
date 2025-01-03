@@ -103,9 +103,9 @@ func (p *EventsDataProvider) handleResponse() func(eventsResponse *backend.Event
 		}
 
 		p.send <- &models.BaseDataProvidersResponse{
-			ID:    p.ID().String(),
-			Topic: p.Topic(),
-			Data: &models.EventResponse{
+			SubscriptionID: p.ID().String(),
+			Topic:          p.Topic(),
+			Payload: &models.EventResponse{
 				BlockId:        eventsResponse.BlockID.String(),
 				BlockHeight:    strconv.FormatUint(eventsResponse.Height, 10),
 				BlockTimestamp: eventsResponse.BlockTimestamp,

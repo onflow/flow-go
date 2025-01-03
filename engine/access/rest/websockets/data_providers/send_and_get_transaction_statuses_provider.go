@@ -94,9 +94,9 @@ func (p *SendAndGetTransactionStatusesDataProvider) handleResponse() func(txResu
 			}
 
 			p.send <- &models.BaseDataProvidersResponse{
-				ID:    p.ID().String(),
-				Topic: p.Topic(),
-				Data: &models.TransactionStatusesResponse{
+				SubscriptionID: p.ID().String(),
+				Topic:          p.Topic(),
+				Payload: &models.TransactionStatusesResponse{
 					TransactionResult: txResults[i],
 					MessageIndex:      index,
 				},

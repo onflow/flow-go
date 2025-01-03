@@ -129,7 +129,7 @@ func (s *BlocksProviderSuite) requireBlockDigest(v interface{}, expected interfa
 	actualResponse, ok := v.(*models.BaseDataProvidersResponse)
 	require.True(s.T(), ok, "unexpected response type: %T", v)
 
-	actualResponseData, ok := actualResponse.Data.(*models.BlockDigestMessageResponse)
+	actualResponseData, ok := actualResponse.Payload.(*models.BlockDigestMessageResponse)
 	require.True(s.T(), ok, "unexpected response data type: %T", v)
 
 	s.Require().Equal(expectedBlock.Header.ID(), actualResponseData.Block.ID())
