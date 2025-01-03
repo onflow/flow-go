@@ -370,8 +370,8 @@ func (h *Handler) handleEventsResponse(send sendSubscribeEventsResponseFunc, hea
 			if blocksSinceLastMessage < heartbeatInterval {
 				return nil
 			}
-			blocksSinceLastMessage = 0
 		}
+		blocksSinceLastMessage = 0
 
 		// BlockExecutionData contains CCF encoded events, and the Access API returns JSON-CDC events.
 		// convert event payload formats.
@@ -490,8 +490,8 @@ func (h *Handler) handleAccountStatusesResponse(
 			if blocksSinceLastMessage < heartbeatInterval {
 				return nil
 			}
-			blocksSinceLastMessage = 0
 		}
+		blocksSinceLastMessage = 0
 
 		results, err := convertAccountsStatusesResultsToMessage(evenVersion, resp)
 		if err != nil {
