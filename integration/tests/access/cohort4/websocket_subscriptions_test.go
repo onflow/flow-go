@@ -1,4 +1,4 @@
-package cohort3
+package cohort4
 
 import (
 	"context"
@@ -513,7 +513,6 @@ func testWebsocketSubscription[T any](
 	require.NoError(t, client.WriteJSON(subscriptionRequest))
 
 	responses, baseMessageResponses, _ := listenWebSocketResponses[T](t, client, duration, subscriptionRequest.ClientMessageID)
-
 	// validate subscribe response
 	require.Equal(t, 1, len(baseMessageResponses))
 
@@ -531,7 +530,6 @@ func testWebsocketSubscription[T any](
 		},
 		SubscriptionID: subscribeMessageResponse.SubscriptionID,
 	}
-
 	require.NoError(t, client.WriteJSON(unsubscriptionRequest))
 }
 

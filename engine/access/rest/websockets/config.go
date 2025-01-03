@@ -30,13 +30,17 @@ const (
 	// and allows the server to gracefully handle timeouts for delayed writes.
 	WriteWait = 10 * time.Second
 
+	// DefaultInactivityTimeout is the default duration a WebSocket connection can remain open without any active subscriptions
+	// before being automatically closed
 	DefaultInactivityTimeout time.Duration = 1 * time.Minute
 )
 
 type Config struct {
 	MaxSubscriptionsPerConnection uint64
 	MaxResponsesPerSecond         uint64
-	InactivityTimeout             time.Duration
+	// InactivityTimeout specifies the duration a WebSocket connection can remain open without any active subscriptions
+	// before being automatically closed
+	InactivityTimeout time.Duration
 }
 
 func NewDefaultWebsocketConfig() Config {
