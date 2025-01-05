@@ -297,30 +297,36 @@ func (c *Controller) writeMessages(ctx context.Context) error {
 // validates each message, and processes it based on the message type.
 func (c *Controller) readMessages(ctx context.Context) error {
 	for {
-		var message json.RawMessage
-		if err := c.conn.ReadJSON(&message); err != nil {
-			//if errors.Is(err, websocket.ErrCloseSent) {
-			//	return err
-			//}
-			var closeErr *websocket.CloseError
-			if errors.As(err, &closeErr) {
-				return err
+		select {
+		case <-ctx.Done():
+			return nil
+		default:
+			var message json.RawMessage
+			if err := c.conn.ReadJSON(&message); err != nil {
+				if errors.Is(err, websocket.ErrCloseSent) {
+					return err
+				}
+
+				var closeErr *websocket.CloseError
+				if errors.As(err, &closeErr) {
+					return err
+				}
+
+				c.writeErrorResponse(
+					ctx,
+					err,
+					wrapErrorMessage(InvalidMessage, "error reading message", "", "", ""))
+				continue
 			}
 
-			c.writeErrorResponse(
-				ctx,
-				err,
-				wrapErrorMessage(InvalidMessage, "error reading message", "", "", ""))
-			continue
-		}
-
-		err := c.handleMessage(ctx, message)
-		if err != nil {
-			c.writeErrorResponse(
-				ctx,
-				err,
-				wrapErrorMessage(InvalidMessage, "error parsing message", "", "", ""))
-			continue
+			err := c.handleMessage(ctx, message)
+			if err != nil {
+				c.writeErrorResponse(
+					ctx,
+					err,
+					wrapErrorMessage(InvalidMessage, "error parsing message", "", "", ""))
+				continue
+			}
 		}
 	}
 }

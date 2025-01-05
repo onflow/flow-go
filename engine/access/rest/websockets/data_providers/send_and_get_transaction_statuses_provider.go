@@ -10,9 +10,10 @@ import (
 
 	"github.com/onflow/flow-go/access"
 	commonmodels "github.com/onflow/flow-go/engine/access/rest/common/models"
-	"github.com/onflow/flow-go/engine/access/rest/common/parser"
+	commonparser "github.com/onflow/flow-go/engine/access/rest/common/parser"
 	"github.com/onflow/flow-go/engine/access/rest/util"
 	"github.com/onflow/flow-go/engine/access/rest/websockets/models"
+	"github.com/onflow/flow-go/engine/access/rest/websockets/parser"
 	"github.com/onflow/flow-go/engine/access/subscription"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/counters"
@@ -129,13 +130,18 @@ func parseSendAndGetTransactionStatusesArguments(
 	}
 
 	if argumentsIn, ok := arguments["arguments"]; ok && argumentsIn != "" {
-		result, ok := argumentsIn.([]string)
+		result, ok := argumentsIn.([]interface{})
 		if !ok {
-			return args, fmt.Errorf("'arguments' must be a []string type")
+			return args, fmt.Errorf("'arguments' must be an array")
 		}
 
 		var argumentsData [][]byte
-		for _, arg := range result {
+		for _, value := range result {
+			arg, ok := value.(string)
+			if !ok {
+				return args, fmt.Errorf("'argument' must be a string")
+			}
+
 			argument, err := util.FromBase64(arg)
 			if err != nil {
 				return args, fmt.Errorf("invalid 'arguments': %w", err)
@@ -153,7 +159,7 @@ func parseSendAndGetTransactionStatusesArguments(
 			return args, fmt.Errorf("'reference_block_id' must be a string")
 		}
 
-		var referenceBlockID parser.ID
+		var referenceBlockID commonparser.ID
 		err := referenceBlockID.Parse(result)
 		if err != nil {
 			return args, fmt.Errorf("invalid 'reference_block_id': %w", err)
@@ -178,7 +184,7 @@ func parseSendAndGetTransactionStatusesArguments(
 	if payerIn, ok := arguments["payer"]; ok && payerIn != "" {
 		result, ok := payerIn.(string)
 		if !ok {
-			return args, fmt.Errorf("'payerIn' must be a string")
+			return args, fmt.Errorf("'payer' must be a string")
 		}
 
 		payerAddr, err := flow.StringToAddress(result)
@@ -189,23 +195,34 @@ func parseSendAndGetTransactionStatusesArguments(
 	}
 
 	if proposalKeyIn, ok := arguments["proposal_key"]; ok && proposalKeyIn != "" {
-		proposalKey, ok := proposalKeyIn.(flow.ProposalKey)
+		key, ok := proposalKeyIn.(interface{})
 		if !ok {
-			return args, fmt.Errorf("'proposal_key' must be a object (ProposalKey)")
+			return args, fmt.Errorf("'proposal_key' must be an object (ProposalKey)")
 		}
 
-		tx.ProposalKey = proposalKey
+		var proposalKey parser.ProposalKey
+		err := proposalKey.Parse(key)
+		if err != nil {
+			return args, fmt.Errorf("invalid 'proposal_key': %w", err)
+		}
+
+		tx.ProposalKey = proposalKey.Flow()
 	}
 
 	if authorizersIn, ok := arguments["authorizers"]; ok && authorizersIn != "" {
-		result, ok := authorizersIn.([]string)
+		result, ok := authorizersIn.([]interface{})
 		if !ok {
-			return args, fmt.Errorf("'authorizers' must be a []string type")
+			return args, fmt.Errorf("'authorizers' must be an array")
 		}
 
 		var authorizersData []flow.Address
-		for _, auth := range result {
-			authorizer, err := flow.StringToAddress(auth)
+		for i, auth := range result {
+			authStr, ok := auth.(string)
+			if !ok {
+				return args, fmt.Errorf("invalid 'authorizer':%v, index: %d: must be a string", auth, i)
+			}
+
+			authorizer, err := flow.StringToAddress(authStr)
 			if err != nil {
 				return args, fmt.Errorf("invalid 'authorizers': %w", err)
 			}
@@ -217,21 +234,34 @@ func parseSendAndGetTransactionStatusesArguments(
 	}
 
 	if payloadSignaturesIn, ok := arguments["payload_signatures"]; ok && payloadSignaturesIn != "" {
-		payloadSignatures, ok := payloadSignaturesIn.([]flow.TransactionSignature)
+		signatures, ok := payloadSignaturesIn.([]interface{})
 		if !ok {
-			return args, fmt.Errorf("'payload_signatures' must be an array of objects (TransactionSignature)")
+			return args, fmt.Errorf("'payload_signatures' must be an array")
 		}
 
-		tx.PayloadSignatures = payloadSignatures
+		var payloadSignatures parser.TransactionSignatures
+		err := payloadSignatures.Parse(signatures)
+		if err != nil {
+			return args, fmt.Errorf("invalid 'payload_signatures': %w", err)
+		}
+
+		tx.PayloadSignatures = payloadSignatures.Flow()
 	}
 
 	if envelopeSignaturesIn, ok := arguments["envelope_signatures"]; ok && envelopeSignaturesIn != "" {
-		envelopeSignatures, ok := envelopeSignaturesIn.([]flow.TransactionSignature)
+		signatures, ok := envelopeSignaturesIn.([]interface{})
 		if !ok {
-			return args, fmt.Errorf("'envelope_signatures' must be an array of objects (TransactionSignature)")
+			return args, fmt.Errorf("'envelope_signatures' must be an array")
 		}
 
-		tx.EnvelopeSignatures = envelopeSignatures
+		var envelopeSignatures parser.TransactionSignatures
+		err := envelopeSignatures.Parse(signatures)
+		if err != nil {
+			return args, fmt.Errorf("invalid 'envelope_signatures': %w", err)
+		}
+
+		tx.EnvelopeSignatures = envelopeSignatures.Flow()
+
 	}
 	args.Transaction = tx
 

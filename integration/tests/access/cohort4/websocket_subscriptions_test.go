@@ -6,12 +6,15 @@ import (
 	"errors"
 	"fmt"
 	"net/url"
-	"strings"
+	"strconv"
 	"testing"
 	"time"
 
 	"github.com/google/uuid"
 	"github.com/gorilla/websocket"
+	sdk "github.com/onflow/flow-go-sdk"
+	sdkcrypto "github.com/onflow/flow-go-sdk/crypto"
+	"github.com/onflow/flow-go-sdk/templates"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
@@ -21,9 +24,11 @@ import (
 	"github.com/onflow/flow-go/engine/access/rest/util"
 	"github.com/onflow/flow-go/engine/access/rest/websockets/data_providers"
 	"github.com/onflow/flow-go/engine/access/rest/websockets/models"
+	"github.com/onflow/flow-go/engine/access/rpc/backend"
 	"github.com/onflow/flow-go/engine/common/rpc/convert"
 	"github.com/onflow/flow-go/integration/testnet"
 	"github.com/onflow/flow-go/integration/tests/access/common"
+	"github.com/onflow/flow-go/integration/tests/lib"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/utils/unittest"
 
@@ -47,7 +52,8 @@ type WebsocketSubscriptionSuite struct {
 
 	net *testnet.FlowNetwork
 
-	grpcClient accessproto.AccessAPIClient
+	grpcClient    accessproto.AccessAPIClient
+	serviceClient *testnet.Client
 }
 
 func (s *WebsocketSubscriptionSuite) TearDownTest() {
@@ -72,8 +78,10 @@ func (s *WebsocketSubscriptionSuite) SetupTest() {
 		testnet.WithAdditionalFlagf("--execution-data-dir=%s", testnet.DefaultExecutionDataServiceDir),
 		testnet.WithAdditionalFlag("--execution-data-retry-delay=1s"),
 		testnet.WithAdditionalFlag("--execution-data-indexing-enabled=true"),
+		testnet.WithAdditionalFlagf("--tx-result-query-mode=%s", backend.IndexQueryModeExecutionNodesOnly),
 		testnet.WithAdditionalFlagf("--execution-state-dir=%s", testnet.DefaultExecutionStateDir),
 		testnet.WithAdditionalFlagf("--websocket-inactivity-timeout=%ds", InactivityTimeout),
+		testnet.WithMetricsServer(),
 	)
 
 	// add the ghost (access) node config
@@ -115,6 +123,18 @@ func (s *WebsocketSubscriptionSuite) SetupTest() {
 	var err error
 	s.grpcClient, err = common.GetAccessAPIClient(accessUrl)
 	s.Require().NoError(err)
+
+	s.serviceClient, err = s.net.ContainerByName(testnet.PrimaryAN).TestnetClient()
+	s.Require().NoError(err)
+
+	// pause until the network is progressing
+	var header *sdk.BlockHeader
+	s.Require().Eventually(func() bool {
+		header, err = s.serviceClient.GetLatestSealedBlockHeader(s.ctx)
+		s.Require().NoError(err)
+
+		return header.Height > 0
+	}, 30*time.Second, 1*time.Second)
 }
 
 // TestInactivityHeaders tests that the WebSocket connection closes due to inactivity
@@ -331,11 +351,124 @@ func (s *WebsocketSubscriptionSuite) TestHappyCases() {
 			5*time.Second,
 		)
 	})
+
+	// tests transaction statuses streaming
+	s.T().Run("transaction statuses streaming", func(t *testing.T) {
+		tx := s.createAccountTx()
+
+		// Send the transaction
+		err := s.serviceClient.SendTransaction(s.ctx, tx)
+		s.Require().NoError(err)
+		s.T().Logf("txId %v", flow.Identifier(tx.ID()))
+
+		wsClient, err := common.GetWSClient(s.ctx, getWebsocketsUrl(restAddr))
+		s.Require().NoError(err)
+		defer wsClient.Close()
+
+		clientMessageID := uuid.New().String()
+
+		subscriptionRequest := models.SubscribeMessageRequest{
+			BaseMessageRequest: models.BaseMessageRequest{
+				Action:          models.SubscribeAction,
+				ClientMessageID: clientMessageID,
+			},
+			Topic: data_providers.TransactionStatusesTopic,
+			Arguments: models.Arguments{
+				"tx_id": tx.ID().String(),
+			},
+		}
+
+		testWebsocketSubscription[models.TransactionStatusesResponse](
+			t,
+			wsClient,
+			subscriptionRequest,
+			s.validateTransactionStatuses,
+			10*time.Second,
+		)
+	})
+
+	// tests send and subscribe transaction statuses
+	s.T().Run("send and subscribe to transaction statuses", func(t *testing.T) {
+		tx := s.createAccountTx()
+
+		convertToProposalKey := func(key sdk.ProposalKey) models.ProposalKey {
+			return models.ProposalKey{
+				Address:        flow.Address(key.Address).String(),
+				KeyIndex:       strconv.FormatUint(uint64(key.KeyIndex), 10),
+				SequenceNumber: strconv.FormatUint(key.SequenceNumber, 10),
+			}
+		}
+
+		convertToArguments := func(arguments [][]byte) []string {
+			wsArguments := make([]string, len(arguments))
+			for i, arg := range arguments {
+				wsArguments[i] = util.ToBase64(arg)
+			}
+
+			return wsArguments
+		}
+
+		convertToAuthorizers := func(authorizers []sdk.Address) []string {
+			wsAuthorizers := make([]string, len(authorizers))
+			for i, authorizer := range authorizers {
+				wsAuthorizers[i] = authorizer.String()
+			}
+
+			return wsAuthorizers
+		}
+
+		convertToSig := func(sigs []sdk.TransactionSignature) []models.TransactionSignature {
+			wsSigs := make([]models.TransactionSignature, len(sigs))
+			for i, sig := range sigs {
+				wsSigs[i] = models.TransactionSignature{
+					Address:     sig.Address.String(),
+					SignerIndex: strconv.Itoa(sig.SignerIndex),
+					KeyIndex:    strconv.FormatUint(uint64(sig.KeyIndex), 10),
+					Signature:   util.ToBase64(sig.Signature),
+				}
+			}
+
+			return wsSigs
+		}
+
+		clientMessageID := uuid.New().String()
+
+		subscriptionRequest := models.SubscribeMessageRequest{
+			BaseMessageRequest: models.BaseMessageRequest{
+				Action:          models.SubscribeAction,
+				ClientMessageID: clientMessageID,
+			},
+			Topic: data_providers.SendAndGetTransactionStatusesTopic,
+			Arguments: models.Arguments{
+				"script":              util.ToBase64(tx.Script),
+				"arguments":           convertToArguments(tx.Arguments),
+				"reference_block_id":  tx.ReferenceBlockID.String(),
+				"gas_limit":           strconv.FormatUint(tx.GasLimit, 10),
+				"payer":               tx.Payer.String(),
+				"proposal_key":        convertToProposalKey(tx.ProposalKey),
+				"authorizers":         convertToAuthorizers(tx.Authorizers),
+				"payload_signatures":  convertToSig(tx.PayloadSignatures),
+				"envelope_signatures": convertToSig(tx.EnvelopeSignatures),
+			},
+		}
+
+		wsClient, err := common.GetWSClient(s.ctx, getWebsocketsUrl(restAddr))
+		s.Require().NoError(err)
+		defer wsClient.Close()
+
+		testWebsocketSubscription[models.TransactionStatusesResponse](
+			t,
+			wsClient,
+			subscriptionRequest,
+			s.validateTransactionStatuses,
+			10*time.Second,
+		)
+	})
 }
 
 // validateBlocks validates the received block responses against gRPC responses.
 func (s *WebsocketSubscriptionSuite) validateBlocks(
-	receivedResponses []*models.BlockMessageResponse,
+	receivedResponses []models.BlockMessageResponse,
 ) {
 	require.NotEmpty(s.T(), receivedResponses, "expected received block headers")
 
@@ -360,7 +493,7 @@ func (s *WebsocketSubscriptionSuite) validateBlocks(
 
 // validateBlockHeaders validates the received block header responses against gRPC responses.
 func (s *WebsocketSubscriptionSuite) validateBlockHeaders(
-	receivedResponses []*models.BlockHeaderMessageResponse,
+	receivedResponses []models.BlockHeaderMessageResponse,
 ) {
 	require.NotEmpty(s.T(), receivedResponses, "expected received block headers")
 
@@ -385,7 +518,7 @@ func (s *WebsocketSubscriptionSuite) validateBlockHeaders(
 
 // validateBlockDigests validates the received block digest responses against gRPC responses.
 func (s *WebsocketSubscriptionSuite) validateBlockDigests(
-	receivedResponses []*models.BlockDigestMessageResponse,
+	receivedResponses []models.BlockDigestMessageResponse,
 ) {
 	require.NotEmpty(s.T(), receivedResponses, "expected received block digests")
 
@@ -410,7 +543,7 @@ func (s *WebsocketSubscriptionSuite) validateBlockDigests(
 
 // validateEvents is a helper function that encapsulates logic for comparing received events from rest state streaming and
 // events which received from grpc api
-func (s *WebsocketSubscriptionSuite) validateEvents(receivedEventsResponse []*models.EventResponse) {
+func (s *WebsocketSubscriptionSuite) validateEvents(receivedEventsResponse []models.EventResponse) {
 	// make sure there are received events
 	require.GreaterOrEqual(s.T(), len(receivedEventsResponse), 1, "expect received events")
 
@@ -456,6 +589,43 @@ func (s *WebsocketSubscriptionSuite) validateEvents(receivedEventsResponse []*mo
 	}
 	// Ensure that at least one response had non-empty events
 	require.GreaterOrEqual(s.T(), nonEmptyResponseCount, 1, "expect at least one response with non-empty events")
+}
+
+// validateAccountStatuses is a helper function that encapsulates logic for comparing received account statuses
+func (s *WebsocketSubscriptionSuite) validateAccountStatuses(receivedAccountStatusesResponses []*models.AccountStatusesResponse) {
+}
+
+// validateTransactionStatuses is a helper function that encapsulates logic for comparing received transaction statuses
+func (s *WebsocketSubscriptionSuite) validateTransactionStatuses(receivedTransactionStatusesResponses []models.TransactionStatusesResponse) {
+	expectedCount := 4 // pending, finalized, executed, sealed
+	require.GreaterOrEqual(s.T(), len(receivedTransactionStatusesResponses), expectedCount, "expect received statuses")
+
+	expectedCounter := uint64(0)
+	lastReportedTxStatus := commonmodels.PENDING_TransactionStatus
+
+	// Define the expected sequence of statuses
+	// Expected order: pending(0) -> finalized(1) -> executed(2) -> sealed(3)
+	expectedStatuses := []commonmodels.TransactionStatus{
+		commonmodels.PENDING_TransactionStatus,
+		commonmodels.FINALIZED_TransactionStatus,
+		commonmodels.EXECUTED_TransactionStatus,
+		commonmodels.SEALED_TransactionStatus,
+	}
+
+	for _, transactionStatusResponse := range receivedTransactionStatusesResponses {
+		s.Assert().Equal(expectedCounter, transactionStatusResponse.MessageIndex)
+
+		actualStatus := *transactionStatusResponse.TransactionResult.Status
+
+		// Check if all statuses received one by one. The subscription should send responses for each of the statuses,
+		// and the message should be sent in the order of transaction statuses.
+		s.Assert().Equal(expectedStatuses[expectedCounter], actualStatus)
+
+		expectedCounter++
+		lastReportedTxStatus = actualStatus
+	}
+	// Check, if the last transaction status is sealed.
+	s.Assert().Equal(commonmodels.SEALED_TransactionStatus, lastReportedTxStatus)
 }
 
 // subscribeMessageRequest creates a subscription message request.
@@ -507,7 +677,7 @@ func testWebsocketSubscription[T any](
 	t *testing.T,
 	client *websocket.Conn,
 	subscriptionRequest models.SubscribeMessageRequest,
-	validate func([]*T),
+	validate func([]T),
 	duration time.Duration,
 ) {
 	// subscribe to specific topic
@@ -547,13 +717,13 @@ func listenWebSocketResponses[T any](
 	duration time.Duration,
 	clientMessageID string,
 ) (
-	[]*T,
-	[]*models.BaseMessageResponse,
-	[]*models.ListSubscriptionsMessageResponse,
+	[]T,
+	[]models.BaseMessageResponse,
+	[]models.ListSubscriptionsMessageResponse,
 ) {
-	var responses []*T
-	var baseMessageResponses []*models.BaseMessageResponse
-	var listSubscriptionsMessageResponses []*models.ListSubscriptionsMessageResponse
+	var responses []T
+	var baseMessageResponses []models.BaseMessageResponse
+	var listSubscriptionsMessageResponses []models.ListSubscriptionsMessageResponse
 
 	timer := time.NewTimer(duration)
 	defer timer.Stop()
@@ -569,7 +739,7 @@ func listenWebSocketResponses[T any](
 				t.Logf("websocket error: %v", err)
 
 				var closeErr *websocket.CloseError
-				if errors.As(err, &closeErr) || strings.Contains(err.Error(), "use of closed network connection") {
+				if errors.As(err, &closeErr) {
 					t.Logf("websocket close error: %v", closeErr)
 					return responses, baseMessageResponses, listSubscriptionsMessageResponses
 				}
@@ -580,7 +750,7 @@ func listenWebSocketResponses[T any](
 			// BaseMessageResponse and validate
 			var baseResp models.BaseMessageResponse
 			if err := json.Unmarshal(messageBytes, &baseResp); err == nil && baseResp.ClientMessageID == clientMessageID {
-				baseMessageResponses = append(baseMessageResponses, &baseResp)
+				baseMessageResponses = append(baseMessageResponses, baseResp)
 				continue
 			}
 
@@ -595,8 +765,42 @@ func listenWebSocketResponses[T any](
 			//TODO: update Unmarshal according to changes for issue #6819
 			var genericResp T
 			if err := json.Unmarshal(messageBytes, &genericResp); err == nil && &genericResp != nil {
-				responses = append(responses, &genericResp)
+				responses = append(responses, genericResp)
 			}
 		}
 	}
+}
+
+// createAndSendTx creates a new account transaction
+func (s *WebsocketSubscriptionSuite) createAccountTx() *sdk.Transaction {
+	latestBlockID, err := s.serviceClient.GetLatestBlockID(s.ctx)
+	s.Require().NoError(err)
+
+	// create new account to deploy Counter to
+	accountPrivateKey := lib.RandomPrivateKey()
+
+	accountKey := sdk.NewAccountKey().
+		FromPrivateKey(accountPrivateKey).
+		SetHashAlgo(sdkcrypto.SHA3_256).
+		SetWeight(sdk.AccountKeyWeightThreshold)
+
+	serviceAddress := sdk.Address(s.serviceClient.Chain.ServiceAddress())
+
+	// Generate the account creation transaction
+	createAccountTx, err := templates.CreateAccount(
+		[]*sdk.AccountKey{accountKey},
+		nil, serviceAddress)
+	s.Require().NoError(err)
+
+	// Generate the account creation transaction
+	createAccountTx.
+		SetReferenceBlockID(sdk.Identifier(latestBlockID)).
+		SetProposalKey(serviceAddress, 0, s.serviceClient.GetAndIncrementSeqNumber()).
+		SetPayer(serviceAddress).
+		SetComputeLimit(flow.DefaultMaxTransactionGasLimit)
+
+	createAccountTx, err = s.serviceClient.SignTransaction(createAccountTx)
+	s.Require().NoError(err)
+
+	return createAccountTx
 }
