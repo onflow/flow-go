@@ -195,13 +195,8 @@ func parseSendAndGetTransactionStatusesArguments(
 	}
 
 	if proposalKeyIn, ok := arguments["proposal_key"]; ok && proposalKeyIn != "" {
-		key, ok := proposalKeyIn.(interface{})
-		if !ok {
-			return args, fmt.Errorf("'proposal_key' must be an object (ProposalKey)")
-		}
-
 		var proposalKey parser.ProposalKey
-		err := proposalKey.Parse(key)
+		err := proposalKey.Parse(proposalKeyIn)
 		if err != nil {
 			return args, fmt.Errorf("invalid 'proposal_key': %w", err)
 		}
