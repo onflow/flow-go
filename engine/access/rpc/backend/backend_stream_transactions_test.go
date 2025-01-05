@@ -7,14 +7,15 @@ import (
 	"testing"
 	"time"
 
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
+
 	"github.com/dgraph-io/badger/v2"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
-
-	accessproto "github.com/onflow/flow/protobuf/go/flow/access"
 
 	accessapi "github.com/onflow/flow-go/access"
 	"github.com/onflow/flow-go/engine"
@@ -24,6 +25,7 @@ import (
 	connectionmock "github.com/onflow/flow-go/engine/access/rpc/connection/mock"
 	"github.com/onflow/flow-go/engine/access/subscription"
 	subscriptionmock "github.com/onflow/flow-go/engine/access/subscription/mock"
+	commonrpc "github.com/onflow/flow-go/engine/common/rpc"
 	"github.com/onflow/flow-go/engine/common/rpc/convert"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
@@ -32,6 +34,7 @@ import (
 	syncmock "github.com/onflow/flow-go/module/state_synchronization/mock"
 	protocolint "github.com/onflow/flow-go/state/protocol"
 	protocol "github.com/onflow/flow-go/state/protocol/mock"
+	"github.com/onflow/flow-go/storage"
 	bstorage "github.com/onflow/flow-go/storage/badger"
 	storagemock "github.com/onflow/flow-go/storage/mock"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -100,9 +103,6 @@ func (s *TransactionStatusSuite) SetupTest() {
 	s.tempSnapshot = &protocol.Snapshot{}
 	s.db, s.dbDir = unittest.TempBadgerDB(s.T())
 
-	params := protocol.NewParams(s.T())
-	s.state.On("Params").Return(params)
-
 	s.blocks = storagemock.NewBlocks(s.T())
 	s.headers = storagemock.NewHeaders(s.T())
 	s.transactions = storagemock.NewTransactions(s.T())
@@ -123,18 +123,23 @@ func (s *TransactionStatusSuite) SetupTest() {
 	s.blockTracker = subscriptionmock.NewBlockTracker(s.T())
 	s.resultsMap = map[flow.Identifier]*flow.ExecutionResult{}
 
-	s.colClient.On(
-		"SendTransaction",
-		mock.Anything,
-		mock.Anything,
-	).Return(&accessproto.SendTransactionResponse{}, nil).Maybe()
-
-	s.transactions.On("Store", mock.Anything).Return(nil).Maybe()
+	s.execClient.On("GetTransactionResult", mock.Anything, mock.Anything).Return(nil, status.Error(codes.NotFound, "not found")).Maybe()
+	s.connectionFactory.On("GetExecutionAPIClient", mock.Anything).Return(s.execClient, &mocks.MockCloser{}, nil).Maybe()
 
 	// generate blockCount consecutive blocks with associated seal, result and execution data
 	s.rootBlock = unittest.BlockFixture()
 	rootResult := unittest.ExecutionResultFixture(unittest.WithBlock(&s.rootBlock))
 	s.resultsMap[s.rootBlock.ID()] = rootResult
+
+	params := protocol.NewParams(s.T())
+	params.On("FinalizedRoot").Return(s.rootBlock.Header).Maybe()
+	s.state.On("Params").Return(params).Maybe()
+
+	var receipts flow.ExecutionReceiptList
+	executionNodes := unittest.IdentityListFixture(2, unittest.WithRole(flow.RoleExecution))
+	receipts = unittest.ReceiptsForBlockFixture(&s.rootBlock, executionNodes.NodeIDs())
+	s.receipts.On("ByBlockID", mock.AnythingOfType("flow.Identifier")).Return(receipts, nil).Maybe()
+	s.finalSnapshot.On("Identities", mock.Anything).Return(executionNodes, nil).Maybe()
 
 	var err error
 	s.lastFullBlockHeight, err = counters.NewPersistentStrictMonotonicCounter(
@@ -158,7 +163,7 @@ func (s *TransactionStatusSuite) SetupTest() {
 	require.NoError(s.T(), err)
 
 	s.blocks.On("ByHeight", mock.AnythingOfType("uint64")).Return(mocks.StorageMapGetter(s.blockMap))
-	s.state.On("Final").Return(s.finalSnapshot, nil).Maybe()
+	s.state.On("Final").Return(s.finalSnapshot, nil)
 	s.state.On("AtBlockID", mock.AnythingOfType("flow.Identifier")).Return(func(blockID flow.Identifier) protocolint.Snapshot {
 		s.tempSnapshot.On("Head").Unset()
 		s.tempSnapshot.On("Head").Return(func() *flow.Header {
@@ -172,12 +177,12 @@ func (s *TransactionStatusSuite) SetupTest() {
 		}, nil)
 
 		return s.tempSnapshot
-	}, nil).Maybe()
+	}, nil)
 
 	s.finalSnapshot.On("Head").Return(func() *flow.Header {
 		finalizedHeader := s.finalizedBlock.Header
 		return finalizedHeader
-	}, nil).Maybe()
+	}, nil)
 
 	s.blockTracker.On("GetStartHeightFromBlockID", mock.Anything).Return(func(_ flow.Identifier) (uint64, error) {
 		finalizedHeader := s.finalizedBlock.Header
@@ -229,6 +234,14 @@ func (s *TransactionStatusSuite) backendParams() Params {
 		TxResultQueryMode:   IndexQueryModeLocalOnly,
 		EventsIndex:         index.NewEventsIndex(s.indexReporter, s.events),
 		LastFullBlockHeight: s.lastFullBlockHeight,
+		ExecNodeIdentitiesProvider: commonrpc.NewExecutionNodeIdentitiesProvider(
+			s.log,
+			s.state,
+			s.receipts,
+			nil,
+			nil,
+		),
+		ConnFactory: s.connectionFactory,
 	}
 }
 
@@ -245,7 +258,7 @@ func (s *TransactionStatusSuite) addNewFinalizedBlock(parent *flow.Header, notif
 	}
 }
 
-// TestSubscribeTransactionStatusHappyCase tests the functionality of the SubscribeTransactionStatusesFromStartBlockID method in the Backend.
+// TestSubscribeTransactionStatusHappyCase tests the functionality of the SubscribeTransactionStatuses method in the Backend.
 // It covers the emulation of transaction stages from pending to sealed, and receiving status updates.
 func (s *TransactionStatusSuite) TestSubscribeTransactionStatusHappyCase() {
 	ctx, cancel := context.WithCancel(context.Background())
@@ -256,36 +269,20 @@ func (s *TransactionStatusSuite) TestSubscribeTransactionStatusHappyCase() {
 		finalizedHeader := s.finalizedBlock.Header
 		return finalizedHeader.Height, nil
 	}, nil)
-	s.blocks.On("ByID", mock.AnythingOfType("flow.Identifier")).Return(func(blockID flow.Identifier) (*flow.Block, error) {
-		for _, block := range s.blockMap {
-			if block.ID() == blockID {
-				return block, nil
-			}
-		}
 
-		return nil, nil
-	}, nil)
 	s.sealedSnapshot.On("Head").Return(func() *flow.Header {
 		return s.sealedBlock.Header
 	}, nil)
 	s.state.On("Sealed").Return(s.sealedSnapshot, nil)
-	s.results.On("ByBlockID", mock.AnythingOfType("flow.Identifier")).Return(mocks.StorageMapGetter(s.resultsMap))
 
 	// Generate sent transaction with ref block of the current finalized block
 	transaction := unittest.TransactionFixture()
 	transaction.SetReferenceBlockID(s.finalizedBlock.ID())
-	s.transactions.On("ByID", mock.AnythingOfType("flow.Identifier")).Return(&transaction.TransactionBody, nil)
 
 	col := flow.CollectionFromTransactions([]*flow.Transaction{&transaction})
 	guarantee := col.Guarantee()
 	light := col.Light()
 	txId := transaction.ID()
-	txResult := flow.LightTransactionResult{
-		TransactionID:   txId,
-		Failed:          false,
-		ComputationUsed: 0,
-	}
-
 	eventsForTx := unittest.EventsFixture(1, flow.EventAccountCreated)
 	eventMessages := make([]*entities.Event, 1)
 	for j, event := range eventsForTx {
@@ -298,11 +295,21 @@ func (s *TransactionStatusSuite) TestSubscribeTransactionStatusHappyCase() {
 		mock.AnythingOfType("flow.Identifier"),
 	).Return(eventsForTx, nil)
 
+	hasTransactionResultInStorage := false
 	s.transactionResults.On(
 		"ByBlockIDTransactionID",
 		mock.AnythingOfType("flow.Identifier"),
 		mock.AnythingOfType("flow.Identifier"),
-	).Return(&txResult, nil)
+	).Return(func(blockID flow.Identifier, transactionID flow.Identifier) (*flow.LightTransactionResult, error) {
+		if hasTransactionResultInStorage {
+			return &flow.LightTransactionResult{
+				TransactionID:   txId,
+				Failed:          false,
+				ComputationUsed: 0,
+			}, nil
+		}
+		return nil, storage.ErrNotFound
+	}).Twice()
 
 	// Create a special common function to read subscription messages from the channel and check converting it to transaction info
 	// and check results for correctness
@@ -324,7 +331,7 @@ func (s *TransactionStatusSuite) TestSubscribeTransactionStatusHappyCase() {
 	}
 
 	// 1. Subscribe to transaction status and receive the first message with pending status
-	sub := s.backend.SendAndSubscribeTransactionStatuses(ctx, &transaction.TransactionBody, entities.EventEncodingVersion_CCF_V0)
+	sub := s.backend.SubscribeTransactionStatuses(ctx, &transaction.TransactionBody, entities.EventEncodingVersion_CCF_V0)
 	checkNewSubscriptionMessage(sub, flow.TransactionStatusPending)
 
 	// 2. Make transaction reference block sealed, and add a new finalized block that includes the transaction
@@ -338,6 +345,8 @@ func (s *TransactionStatusSuite) TestSubscribeTransactionStatusHappyCase() {
 	// 3. Add one more finalized block on top of the transaction block and add execution results to storage
 	finalizedResult := unittest.ExecutionResultFixture(unittest.WithBlock(s.finalizedBlock))
 	s.resultsMap[s.finalizedBlock.ID()] = finalizedResult
+	// init transaction result for storage
+	hasTransactionResultInStorage = true
 	s.addNewFinalizedBlock(s.finalizedBlock.Header, true)
 	checkNewSubscriptionMessage(sub, flow.TransactionStatusExecuted)
 
@@ -359,7 +368,7 @@ func (s *TransactionStatusSuite) TestSubscribeTransactionStatusHappyCase() {
 	}, 100*time.Millisecond, "timed out waiting for subscription to shutdown")
 }
 
-// TestSubscribeTransactionStatusExpired tests the functionality of the SubscribeTransactionStatusesFromStartBlockID method in the Backend
+// TestSubscribeTransactionStatusExpired tests the functionality of the SubscribeTransactionStatuses method in the Backend
 // when transaction become expired
 func (s *TransactionStatusSuite) TestSubscribeTransactionStatusExpired() {
 	ctx, cancel := context.WithCancel(context.Background())
@@ -390,7 +399,7 @@ func (s *TransactionStatusSuite) TestSubscribeTransactionStatusExpired() {
 	}
 
 	// Subscribe to transaction status and receive the first message with pending status
-	sub := s.backend.SendAndSubscribeTransactionStatuses(ctx, &transaction.TransactionBody, entities.EventEncodingVersion_CCF_V0)
+	sub := s.backend.SubscribeTransactionStatuses(ctx, &transaction.TransactionBody, entities.EventEncodingVersion_CCF_V0)
 	checkNewSubscriptionMessage(sub, flow.TransactionStatusPending)
 
 	// Generate 600 blocks without transaction included and check, that transaction still pending
