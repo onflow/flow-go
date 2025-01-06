@@ -4,9 +4,9 @@ import (
 	"encoding/hex"
 	"fmt"
 
-	"github.com/rs/zerolog"
-
 	"github.com/onflow/cadence"
+	"github.com/onflow/crypto"
+	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/cmd/util/cmd/common"
 	"github.com/onflow/flow-go/fvm/systemcontracts"
@@ -30,6 +30,51 @@ func GenerateRecoverEpochTxArgs(log zerolog.Logger,
 	numViewsInEpoch uint64,
 	recoveryEpochTargetDuration uint64,
 	unsafeAllowOverWrite bool,
+	snapshot *inmem.Snapshot,
+) ([]cadence.Value, error) {
+	log.Info().Msg("collecting internal node network and staking keys")
+	internalNodes, err := common.ReadFullInternalNodeInfos(log, internalNodePrivInfoDir, nodeConfigJson)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read full internal node infos: %w", err)
+	}
+
+	epochProtocolState, err := snapshot.EpochProtocolState()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get epoch protocol state from snapshot: %w", err)
+	}
+	currentEpochCommit := epochProtocolState.EpochCommit()
+
+	return GenerateRecoverTxArgsWithDKG(
+		log,
+		internalNodes,
+		collectionClusters,
+		recoveryEpochCounter,
+		rootChainID,
+		numViewsInStakingAuction,
+		numViewsInEpoch,
+		recoveryEpochTargetDuration,
+		unsafeAllowOverWrite,
+		currentEpochCommit.DKGIndexMap,
+		currentEpochCommit.DKGParticipantKeys,
+		currentEpochCommit.DKGGroupKey,
+		snapshot,
+	)
+}
+
+// GenerateRecoverTxArgsWithDKG generates the required transaction arguments for the `recoverEpoch` transaction.
+// No errors are expected during normal operation.
+func GenerateRecoverTxArgsWithDKG(log zerolog.Logger,
+	internalNodes []bootstrap.NodeInfo,
+	collectionClusters int,
+	recoveryEpochCounter uint64,
+	rootChainID flow.ChainID,
+	numViewsInStakingAuction uint64,
+	numViewsInEpoch uint64,
+	recoveryEpochTargetDuration uint64,
+	unsafeAllowOverWrite bool,
+	dkgIndexMap flow.DKGIndexMap,
+	dkgParticipantKeys []crypto.PublicKey,
+	dkgGroupKey crypto.PublicKey,
 	snapshot *inmem.Snapshot,
 ) ([]cadence.Value, error) {
 	epoch := snapshot.Epochs().Current()
@@ -80,12 +125,6 @@ func GenerateRecoverEpochTxArgs(log zerolog.Logger,
 	internalCollectors := make(flow.IdentityList, 0)
 	partnerCollectors := make(flow.IdentityList, 0)
 
-	log.Info().Msg("collecting internal node network and staking keys")
-	internalNodes, err := common.ReadFullInternalNodeInfos(log, internalNodePrivInfoDir, nodeConfigJson)
-	if err != nil {
-		return nil, fmt.Errorf("failed to read full internal node infos: %w", err)
-	}
-
 	internalNodesMap := make(map[flow.Identifier]struct{})
 	for _, node := range internalNodes {
 		if !currentEpochIdentities.Exists(node.Identity()) {
@@ -93,7 +132,6 @@ func GenerateRecoverEpochTxArgs(log zerolog.Logger,
 		}
 		internalNodesMap[node.NodeID] = struct{}{}
 	}
-	log.Info().Msg("")
 
 	for _, collector := range collectors {
 		if _, ok := internalNodesMap[collector.NodeID]; ok {
@@ -134,23 +172,17 @@ func GenerateRecoverEpochTxArgs(log zerolog.Logger,
 	// The EFM Recovery State Machine will heuristically reject recovery attempts (specifically reject EpochRecover Service
 	// events, when the intersection between consensus and random beacon committees is too small.
 
-	epochProtocolState, err := snapshot.EpochProtocolState()
-	if err != nil {
-		return nil, fmt.Errorf("failed to get epoch protocol state from snapshot: %w", err)
-	}
-	currentEpochCommit := epochProtocolState.EpochCommit()
-
 	// NOTE: The RecoveryEpoch will re-use the last successful DKG output. This means that the random beacon committee can be
 	// different from the consensus committee. This could happen if the node was ejected from the consensus committee, but it still has to be
 	// included in the DKG committee since the threshold signature scheme operates on pre-defined number of participants and cannot be changed.
-	dkgGroupKeyCdc, cdcErr := cadence.NewString(hex.EncodeToString(currentEpochCommit.DKGGroupKey.Encode()))
+	dkgGroupKeyCdc, cdcErr := cadence.NewString(hex.EncodeToString(dkgGroupKey.Encode()))
 	if cdcErr != nil {
 		return nil, fmt.Errorf("failed to convert Random Beacon group key to cadence representation: %w", cdcErr)
 	}
 
 	// copy DKG index map from the current epoch
 	dkgIndexMapPairs := make([]cadence.KeyValuePair, 0)
-	for nodeID, index := range currentEpochCommit.DKGIndexMap {
+	for nodeID, index := range dkgIndexMap {
 		dkgIndexMapPairs = append(dkgIndexMapPairs, cadence.KeyValuePair{
 			Key:   cadence.String(nodeID.String()),
 			Value: cadence.NewInt(index),
@@ -158,7 +190,7 @@ func GenerateRecoverEpochTxArgs(log zerolog.Logger,
 	}
 	// copy DKG public keys from the current epoch
 	dkgPubKeys := make([]cadence.Value, 0)
-	for k, dkgPubKey := range currentEpochCommit.DKGParticipantKeys {
+	for k, dkgPubKey := range dkgParticipantKeys {
 		dkgPubKeyCdc, cdcErr := cadence.NewString(hex.EncodeToString(dkgPubKey.Encode()))
 		if cdcErr != nil {
 			return nil, fmt.Errorf("failed convert public beacon key of participant %d to cadence representation: %w", k, cdcErr)

@@ -26,8 +26,8 @@ func RandomBeaconKG(n int, seed []byte) (model.ThresholdKeySet, error) {
 		return dkgData, nil
 	}
 
-	skShares, pkShares, pkGroup, err := crypto.BLSThresholdKeyGen(int(n),
-		signature.RandomBeaconThreshold(int(n)), seed)
+	skShares, pkShares, pkGroup, err := crypto.BLSThresholdKeyGen(n,
+		signature.RandomBeaconThreshold(n), seed)
 	if err != nil {
 		return model.ThresholdKeySet{}, fmt.Errorf("Beacon KeyGen failed: %w", err)
 	}
