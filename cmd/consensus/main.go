@@ -317,7 +317,7 @@ func main() {
 			}
 
 			rootEpoch := rootSnapshot.Epochs().Current()
-			epochCounter, err := rootEpoch.Counter()
+			rootEpochCounter, err := rootEpoch.Counter()
 			if err != nil {
 				return fmt.Errorf("could not get root epoch counter: %w", err)
 			}
@@ -338,21 +338,20 @@ func main() {
 					myBeaconPublicKeyShare)
 			}
 
-			started, err := myBeaconKeyStateMachine.IsDKGStarted(epochCounter)
+			// store my beacon key for the first epoch post-spork (only if we haven't run this logic before, i.e. state machine is in initial state)
+			started, err := myBeaconKeyStateMachine.IsDKGStarted(rootEpochCounter)
 			if err != nil {
-				return fmt.Errorf("could not get DKG started flag for root epoch %d: %w", epochCounter, err)
+				return fmt.Errorf("could not get DKG started flag for root epoch %d: %w", rootEpochCounter, err)
 			}
-
-			// perform this only if state machine is in initial state
 			if !started {
 				// store my beacon key for the first epoch post-spork
 				epochProtocolState, err := rootSnapshot.EpochProtocolState()
 				if err != nil {
 					return fmt.Errorf("could not get epoch protocol state for root snapshot: %w", err)
 				}
-				err = myBeaconKeyStateMachine.UpsertMyBeaconPrivateKey(epochCounter, beaconPrivateKey.PrivateKey, epochProtocolState.EpochCommit())
+				err = myBeaconKeyStateMachine.UpsertMyBeaconPrivateKey(rootEpochCounter, beaconPrivateKey.PrivateKey, epochProtocolState.EpochCommit())
 				if err != nil {
-					return fmt.Errorf("could not upsert my beacon private key for root epoch %d: %w", epochCounter, err)
+					return fmt.Errorf("could not upsert my beacon private key for root epoch %d: %w", rootEpochCounter, err)
 				}
 			}
 
