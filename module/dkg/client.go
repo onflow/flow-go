@@ -196,7 +196,7 @@ func (c *Client) Broadcast(msg model.BroadcastDKGMessage) error {
 // submitResult_ProtocolV1 submits this node's locally computed DKG result (public key vector)
 // to the FlowDKG smart contract, using the submission API associated with Protocol Version 1.
 // Input public keys are expected to be either all nil or all non-nil.
-// Deprecated: This function is a temporary measure to provide backward compatibility between Protocol Versions 1 and 2.
+// Deprecated: This is a temporary function to provide backward compatibility between Protocol Versions 1 and 2.
 // Protocol Version 2 introduces the DKG index map, which must be included in result submissions (see SubmitParametersAndResult).
 // TODO(mainnet27, #6792): remove this function
 func (c *Client) submitResult_ProtocolV1(groupPublicKey crypto.PublicKey, publicKeys []crypto.PublicKey) error {
