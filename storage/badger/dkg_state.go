@@ -22,7 +22,7 @@ import (
 var allowedStateTransitions = map[flow.DKGState][]flow.DKGState{
 	flow.DKGStateStarted:          {flow.DKGStateCompleted, flow.DKGStateFailure, flow.RandomBeaconKeyCommitted},
 	flow.DKGStateCompleted:        {flow.RandomBeaconKeyCommitted, flow.DKGStateFailure},
-	flow.RandomBeaconKeyCommitted: {},
+	flow.RandomBeaconKeyCommitted: {},  // overwriting an already-committed key with a different one is not allowed!
 	flow.DKGStateFailure:          {flow.RandomBeaconKeyCommitted, flow.DKGStateFailure},
 	flow.DKGStateUninitialized:    {flow.DKGStateStarted, flow.DKGStateFailure, flow.RandomBeaconKeyCommitted},
 }
@@ -224,9 +224,11 @@ func (ds *RecoverablePrivateBeaconKeyStateMachine) RetrieveMyBeaconPrivateKey(ep
 	return
 }
 
-// CommitMyBeaconPrivateKey commits the previously inserted random beacon private key for an epoch.
-// Effectively, this method transitions the state machine into the [flow.RandomBeaconKeyCommitted] state if the current state is [flow.DKGStateCompleted].
-// Caller needs to supply the [flow.EpochCommit] which is an evidence that the key has been indeed included for the given epoch.
+// CommitMyBeaconPrivateKey commits the previously inserted random beacon private key for an epoch. Effectively, this method
+// transitions the state machine into the [flow.RandomBeaconKeyCommitted] state if the current state is [flow.DKGStateCompleted].
+// The caller needs to supply the [flow.EpochCommit] as evidence that the stored key is valid for the specified epoch. Repeated
+// calls for the same epoch are accepted (idempotent operation), if and only if the provided EpochCommit confirms the already
+// committed key.
 // No errors are expected during normal operations.
 func (ds *RecoverablePrivateBeaconKeyStateMachine) CommitMyBeaconPrivateKey(epochCounter uint64, commit *flow.EpochCommit) error {
 	return operation.RetryOnConflictTx(ds.db, transaction.Update, func(tx *transaction.Tx) error {
@@ -246,15 +248,17 @@ func (ds *RecoverablePrivateBeaconKeyStateMachine) CommitMyBeaconPrivateKey(epoc
 		// verify that the key is part of the EpochCommit
 		if err = ensureKeyIncludedInEpoch(epochCounter, key, commit); err != nil {
 			return storage.NewInvalidDKGStateTransitionErrorf(currentState, flow.RandomBeaconKeyCommitted,
-				"previously storred key has not been found in epoch commit event: %w", err)
+				"previously stored key has not been found in epoch commit event: %w", err)
 		}
 		return ds.processStateTransition(epochCounter, currentState, flow.RandomBeaconKeyCommitted)(tx)
 	})
 }
 
 // UpsertMyBeaconPrivateKey overwrites the random beacon private key for the epoch that recovers the protocol
-// from Epoch Fallback Mode. State transitions are allowed if and only if the current state is not equal to
-// [flow.RandomBeaconKeyCommitted]. The resulting state of this method call is [flow.RandomBeaconKeyCommitted].
+	// from Epoch Fallback Mode. The resulting state of this method call is [flow.RandomBeaconKeyCommitted].
+	// State transitions are allowed if and only if the current state is not equal to [flow.RandomBeaconKeyCommitted]. 
+	// Repeated calls for the same epoch are idempotent, if and only if the provided EpochCommit confirms the already
+	// committed key (error otherwise).
 // No errors are expected during normal operations.
 func (ds *RecoverablePrivateBeaconKeyStateMachine) UpsertMyBeaconPrivateKey(epochCounter uint64, key crypto.PrivateKey, commit *flow.EpochCommit) error {
 	if key == nil {
@@ -269,23 +273,22 @@ func (ds *RecoverablePrivateBeaconKeyStateMachine) UpsertMyBeaconPrivateKey(epoc
 		// verify that the key is part of the EpochCommit
 		if err = ensureKeyIncludedInEpoch(epochCounter, key, commit); err != nil {
 			return storage.NewInvalidDKGStateTransitionErrorf(currentState, flow.RandomBeaconKeyCommitted,
-				"previously storred key has not been found in epoch commit event: %w", err)
+				"according to EpochCommit event, the input random beacon key is not valid for signing: %w", err)
 		}
 
-		// if we are in committed state, we cannot overwrite the key, but we can ignore this input iff the provided key is the same
+		// Repeated calls for same epoch are idempotent, but only if they consistently confirm the stored private key. We explicitly
+		// enforce consistency with the already committed key here. Repetitions are considered rare, so performance overhead is acceptable.
 		if currentState == flow.RandomBeaconKeyCommitted {
-			// check if the stored key is equal to the provided key
 			storedKey, err := ds.keyCache.Get(epochCounter)(tx.DBTxn)
 			if err != nil {
 				return irrecoverable.NewExceptionf("could not retrieve a previously committed beacon key for epoch %d: %v", epochCounter, err)
 			}
-			if key.Equals(storedKey.PrivateKey) {
-				return nil
-			} else {
+			if !key.Equals(storedKey.PrivateKey) {
 				return storage.NewInvalidDKGStateTransitionErrorf(currentState, flow.RandomBeaconKeyCommitted,
 					"cannot overwrite previously committed key for epoch: %d", epochCounter)
 			}
-		}
+			return nil
+		} // The following code will be reached if and only if no other Random Beacon key has previously been committed for this epoch.			
 
 		err = operation.UpsertMyBeaconPrivateKey(epochCounter, encodableKey)(tx.DBTxn)
 		if err != nil {
@@ -301,18 +304,32 @@ func (ds *RecoverablePrivateBeaconKeyStateMachine) UpsertMyBeaconPrivateKey(epoc
 	return nil
 }
 
-// ensureKeyIncludedInEpoch performs a sanity check that the key is included in the epoch commit.
-// The key is expected to be part of the commit.
+// ensureKeyIncludedInEpoch enforces that the input private `key` matches the public Random Beacon key in `EpochCommit` for this node.
 // No errors are expected during normal operations.
-func ensureKeyIncludedInEpoch(epochCounter uint64, key crypto.PrivateKey, commit *flow.EpochCommit) error {
+func (ds *RecoverablePrivateBeaconKeyStateMachine) ensureKeyIncludedInEpoch(epochCounter uint64, key crypto.PrivateKey, commit *flow.EpochCommit) error {
 	if commit.Counter != epochCounter {
 		return fmt.Errorf("commit counter does not match epoch counter: %d != %d", epochCounter, commit.Counter)
 	}
 	publicKey := key.PublicKey()
-	if slices.IndexFunc(commit.DKGParticipantKeys, func(lhs crypto.PublicKey) bool {
-		return lhs.Equals(publicKey)
-	}) < 0 {
-		return fmt.Errorf("key not included in epoch commit: %s", publicKey)
+	// TODO(EFM, #6794): allowing a nil DKGIndexMap is a temporary shortcut for backwards compatibility. This should be removed once we complete the network upgrade:
+	if commit.DKGIndexMap == nil {
+		// If commit.DKGIndexMap is nil, we verify that there exists *some* public key in the EpochCommit that matches our private key. This is a much weaker sanity
+		// check than enforcing that the public Beacon key in the EpochCommit corresponding to *my* NodeID matches the locally stored private key. However,
+		// the check still catches the case where the DKG smart contract determined a different public key for this node compared to the node local DKG result.
+		// Nevertheless, we remain vulnerable to misconfigurations, where the node operator mixed up keys.
+		isMatchingKey := func(lhs crypto.PublicKey) bool { return lhs.Equals(publicKey) }
+		if slices.IndexFunc(commit.DKGParticipantKeys, isMatchingKey) < 0 {
+			return fmt.Errorf("key not included in epoch commit: %s", publicKey)
+		}
+		return nil
+	} // the following code will be reached if and only if `commit` follows the new protocol convention, where `EpochCommit.DKGIndexMap` is not nil
+
+	keyIndex, exists := commit.DKGIndexMap[ds.myNodeID]
+	if !exists {
+		return fmt.Errorf("this node is not part of the random beacon committee as specified by the EpochCommit event")
+	}
+	if !commit.DKGParticipantKeys[keyIndex].Equals(publicKey) {
+		return fmt.Errorf("provided private key does not match random beacon public key in the EpochCommit event")
 	}
 	return nil
 }
@@ -325,7 +342,6 @@ func retrieveCurrentStateTx(epochCounter uint64) func(*badger.Txn) (flow.DKGStat
 		err := operation.RetrieveDKGStateForEpoch(epochCounter, &currentState)(txn)
 		if err != nil && !errors.Is(err, storage.ErrNotFound) {
 			return currentState, fmt.Errorf("could not retrieve current state for epoch %d: %w", epochCounter, err)
-
 		}
 		return currentState, nil
 	}
