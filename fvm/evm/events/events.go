@@ -5,9 +5,7 @@ import (
 
 	"github.com/onflow/cadence"
 	"github.com/onflow/cadence/encoding/ccf"
-	"github.com/onflow/go-ethereum/accounts/abi"
 	gethCommon "github.com/onflow/go-ethereum/common"
-	gethVM "github.com/onflow/go-ethereum/core/vm"
 
 	"github.com/onflow/flow-go/fvm/evm/stdlib"
 	"github.com/onflow/flow-go/fvm/evm/types"
@@ -64,21 +62,13 @@ func (p *transactionEvent) ToCadence(chainID flow.ChainID) (cadence.Event, error
 
 	eventType := stdlib.CadenceTypesForChain(chainID).TransactionExecuted
 
-	errorMessage := p.Result.ErrorMsg()
-	if p.Result.ResultSummary().ErrorCode == types.ExecutionErrCodeExecutionReverted {
-		reason, errUnpack := abi.UnpackRevert(p.Result.ReturnedData)
-		if errUnpack == nil {
-			errorMessage = fmt.Sprintf("%v: %v", gethVM.ErrExecutionReverted.Error(), reason)
-		}
-	}
-
 	return cadence.NewEvent([]cadence.Value{
 		hashToCadenceArrayValue(p.Result.TxHash),
 		cadence.NewUInt16(p.Result.Index),
 		cadence.NewUInt8(p.Result.TxType),
 		bytesToCadenceUInt8ArrayValue(p.Payload),
 		cadence.NewUInt16(uint16(p.Result.ResultSummary().ErrorCode)),
-		cadence.String(errorMessage),
+		cadence.String(p.Result.ErrorMessageWithRevertReason()),
 		cadence.NewUInt64(p.Result.GasConsumed),
 		cadence.String(p.Result.DeployedContractAddressString()),
 		bytesToCadenceUInt8ArrayValue(encodedLogs),
