@@ -141,11 +141,12 @@ func (ds *RecoverablePrivateBeaconKeyStateMachine) SetDKGState(epochCounter uint
 			return err
 		}
 
-		if newState == flow.RandomBeaconKeyCommitted {
-			return storage.NewInvalidDKGStateTransitionErrorf(currentState, newState, "cannot transition directly to committed state without evidence")
-		} else {
-			return operation.RetryOnConflictTx(ds.db, transaction.Update, ds.processStateTransition(epochCounter, currentState, newState))
+		// `DKGStateStarted` or `DKGStateFailure` are the only accepted values for the target state, because transitioning
+		// into other states requires auxiliary information (e.g. key and or `EpochCommit` events) or is forbidden altogether.
+		if newState != flow.DKGStateStarted && newState != flow.DKGStateFailure {
+			return storage.NewInvalidDKGStateTransitionErrorf(currentState, newState, "transitioning into the target state is not allowed (at all or without auxiliary data)")
 		}
+		return operation.RetryOnConflictTx(ds.db, transaction.Update, ds.processStateTransition(epochCounter, currentState, newState))
 	})
 }
 
