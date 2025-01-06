@@ -294,19 +294,25 @@ func (s *RecoverEpochSuite) TestRecoverEpochNodeEjected() {
 
 // TestRecoverEpochEjectNodeDifferentDKG ensures that the recover epoch governance transaction flow works as expected, and a network that
 // enters Epoch Fallback Mode can successfully recover.
-// For this specific scenario, we are testing a scenario where the consensus committee and Random Beacon committee form a symmetric difference with
-// cardinality 1. In other words, there is a node which is part of the consensus committee but not part of the Random Beacon committee and
-// another node which is part of the Random Beacon committee but not part of the consensus committee.
+// Here, we are testing a scenario where the consensus committee 𝒞 and Random Beacon committee 𝒟 form a symmetric difference with
+// cardinality 1. Formally, |𝒞 ∖ 𝒟| = 1 and |𝒟 \ 𝒞| = 1. In other words, there is a node which is part of the consensus committee but not
+// part of the Random Beacon committee and another node which is part of the Random Beacon committee but not part of the consensus committee.
+// We remove the first consensus node from the Consensus Committee, and the last consensus node from the Random Beacon Committee. For example,
+// if the original consensus set is {A, B, C, D} then:
+//   - the post-recovery consensus committee is {B, C, D}
+//   - the post-recovery random beacon committee is {A, B, C}
+//
 // This test will do the following:
-// 1. Triggers EFM by turning off the sole collection node before the end of the DKG forcing the DKG to fail.
-// 2. Generates epoch recover transaction args using the tooling [run.GenerateRecoverTxArgsWithDKG], which would also be used for mainnet recovery.
-// 3. Eject consensus node by modifying the snapshot before generating the recover epoch transaction args.
-// 4. Eject consensus node from the Random Beacon committee by modifying the snapshot before generating the recover epoch transaction args.
-// 5. Submit recover epoch transaction.
-// 6. Ensure expected EpochRecover event is emitted.
-// 7. Ensure the network transitions into the recovery epoch and finalizes the first view of the recovery epoch.
+//  1. Triggers EFM by turning off the sole collection node before the end of the DKG forcing the DKG to fail.
+//  2. Eject the first consensus node by modifying the epoch snapshot.
+//  3. Drop the last consensus node from the Random Beacon committee. This hack works only for threshold systems with an even number of participants,
+//     without changing the threshold - hence we need to start this test with 4 consensus nodes.
+//  4. Generates epoch recover transaction args using the tooling [run.GenerateRecoverTxArgsWithDKG] provided for the governance committee.
+//  5. Submit recover epoch transaction.
+//  6. Ensure expected EpochRecover event is emitted.
+//  7. Ensure the network transitions into the recovery epoch and finalizes the first view of the recovery epoch.
 func (s *RecoverEpochSuite) TestRecoverEpochEjectNodeDifferentDKG() {
-	// 1. Manually trigger EFM
+	//  1. Triggers EFM by turning off the sole collection node before the end of the DKG forcing the DKG to fail.
 
 	// pause the collection node to trigger EFM by failing DKG
 	ln := s.GetContainersByRole(flow.RoleCollection)[0]
@@ -331,22 +337,14 @@ func (s *RecoverEpochSuite) TestRecoverEpochEjectNodeDifferentDKG() {
 	require.NoError(s.T(), err)
 	require.Equal(s.T(), flow.EpochPhaseFallback, epochPhase, "network must enter EFM by this point")
 
-	// 2. Generate transaction arguments for epoch recover transaction.
-	collectionClusters := s.NumOfCollectionClusters
-	recoveryEpochCounter := uint64(1)
-
-	// read internal node info from one of the consensus nodes
-	internalNodePrivInfoDir, nodeConfigJson := s.getNodeInfoDirs(flow.RoleConsensus)
-	internalNodes, err := common.ReadFullInternalNodeInfos(unittest.Logger(), internalNodePrivInfoDir, nodeConfigJson)
-	require.NoError(s.T(), err)
-	// 3. Eject the FIRST consensus node by modifying the snapshot before generating the recover epoch transaction args.
+	// 2. Eject the FIRST consensus node by modifying the snapshot before generating the recover epoch transaction args.
 	// By ejecting a node from the consensus committee but keeping it in the Random Beacon committee, we ensure that the there is a node
 	// which is not part of the consensus committee but is part of the Random Beacon committee.
 	currentIdentityTable := snapshot.Encodable().SealingSegment.LatestProtocolStateEntry().EpochEntry.CurrentEpochIdentityTable
 	ejectedIdentity := currentIdentityTable.Filter(filter.HasRole[flow.Identity](flow.RoleConsensus))[0]
-	ejectedIdentity.EpochParticipationStatus = flow.EpochParticipationStatusEjected  // writes through to `currentIdentityTable`
+	ejectedIdentity.EpochParticipationStatus = flow.EpochParticipationStatusEjected // writes through to `currentIdentityTable`
 
-	// 4. Modify DKG data by removing the last node of the consensus committee from DKG committee. This way we ensure that consensus
+	// 3. Modify DKG data by removing the last node of the consensus committee from DKG committee. This way we ensure that consensus
 	// committee has a node which is not part of the Random Beacon committee. For threshold committees of *even size*, we can remove a
 	// single node without changing the threshold (see [ref. 1] for details). In other words, we can just pretend that there was originally
 	// one node less in the DKG, while the same number of signatures (threshold +1) are sufficient to construct a group signature.
@@ -356,9 +354,10 @@ func (s *RecoverEpochSuite) TestRecoverEpochEjectNodeDifferentDKG() {
 	randomBeaconParticipants := currentIdentityTable.Filter(filter.HasRole[flow.Identity](flow.RoleConsensus))
 	nConsensusNodes := len(randomBeaconParticipants) - 1
 
+	//  4. Generates epoch recover transaction args using the tooling [run.GenerateRecoverTxArgsWithDKG] provided for the governance committee.
 	recoveryDkgIndexMap := make(flow.DKGIndexMap, nConsensusNodes)
 	for i, participant := range randomBeaconParticipants[:nConsensusNodes] {
-		dkgIndexMap[participant.NodeID] = i
+		recoveryDkgIndexMap[participant.NodeID] = i
 	}
 
 	epochProtocolState, err := snapshot.EpochProtocolState()
@@ -366,10 +365,17 @@ func (s *RecoverEpochSuite) TestRecoverEpochEjectNodeDifferentDKG() {
 	dkg, err := epochProtocolState.DKG()
 	require.NoError(s.T(), err)
 	recoveryThresholdKeyShares := dkg.KeyShares()[:nConsensusNodes]
-	recoveryThresholdGroupKey := dkg.GroupKey()	
+	recoveryThresholdGroupKey := dkg.GroupKey()
+
+	// read internal node info from one of the consensus nodes
+	internalNodePrivInfoDir, nodeConfigJson := s.getNodeInfoDirs(flow.RoleConsensus)
+	internalNodes, err := common.ReadFullInternalNodeInfos(unittest.Logger(), internalNodePrivInfoDir, nodeConfigJson)
+	require.NoError(s.T(), err)
 
 	// At this point we have a node which is part of the consensus committee but not part of the Random Beacon committee and
 	// another node which is part of the Random Beacon committee but not part of the consensus committee.
+	collectionClusters := s.NumOfCollectionClusters
+	recoveryEpochCounter := uint64(1)
 	txArgs, err := run.GenerateRecoverTxArgsWithDKG(
 		s.Log,
 		internalNodes,

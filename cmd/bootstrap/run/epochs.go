@@ -125,7 +125,6 @@ func GenerateRecoverTxArgsWithDKG(log zerolog.Logger,
 	internalCollectors := make(flow.IdentityList, 0)
 	partnerCollectors := make(flow.IdentityList, 0)
 
-	log.Info().Msg("collecting internal node network and staking keys")
 	internalNodesMap := make(map[flow.Identifier]struct{})
 	for _, node := range internalNodes {
 		if !currentEpochIdentities.Exists(node.Identity()) {
@@ -133,7 +132,6 @@ func GenerateRecoverTxArgsWithDKG(log zerolog.Logger,
 		}
 		internalNodesMap[node.NodeID] = struct{}{}
 	}
-	log.Info().Msg("")
 
 	for _, collector := range collectors {
 		if _, ok := internalNodesMap[collector.NodeID]; ok {
