@@ -352,6 +352,38 @@ func (s *WebsocketSubscriptionSuite) TestHappyCases() {
 		)
 	})
 
+	// tests streaming account statuses
+	s.T().Run("account statuses streaming", func(t *testing.T) {
+		wsClient, err := common.GetWSClient(s.ctx, getWebsocketsUrl(restAddr))
+		s.Require().NoError(err)
+		defer wsClient.Close()
+
+		clientMessageID := uuid.New().String()
+
+		subscriptionRequest := models.SubscribeMessageRequest{
+			BaseMessageRequest: models.BaseMessageRequest{
+				Action:          models.SubscribeAction,
+				ClientMessageID: clientMessageID,
+			},
+			Topic:     data_providers.AccountStatusesTopic,
+			Arguments: models.Arguments{},
+		}
+
+		// Create and send account transaction
+		tx := s.createAccountTx()
+		err = s.serviceClient.SendTransaction(s.ctx, tx)
+		s.Require().NoError(err)
+		s.T().Logf("txId %v", flow.Identifier(tx.ID()))
+
+		testWebsocketSubscription[models.AccountStatusesResponse](
+			t,
+			wsClient,
+			subscriptionRequest,
+			s.validateAccountStatuses,
+			5*time.Second,
+		)
+	})
+
 	// tests transaction statuses streaming
 	s.T().Run("transaction statuses streaming", func(t *testing.T) {
 		tx := s.createAccountTx()
@@ -547,52 +579,78 @@ func (s *WebsocketSubscriptionSuite) validateEvents(receivedEventsResponse []mod
 	// make sure there are received events
 	require.GreaterOrEqual(s.T(), len(receivedEventsResponse), 1, "expect received events")
 
-	// Variable to keep track of non-empty event response count
-	nonEmptyResponseCount := 0
+	expectedCounter := uint64(0)
 	for _, receivedEventResponse := range receivedEventsResponse {
-		// Create a map where key is event type and value is list of events with this event typ
-		receivedEventMap := make(map[string][]commonmodels.Event)
-		for _, event := range receivedEventResponse.Events {
-			eventType := event.Type_
-			receivedEventMap[eventType] = append(receivedEventMap[eventType], event)
-		}
+		require.Equal(s.T(), expectedCounter, receivedEventResponse.MessageIndex)
+		expectedCounter++
 
-		for eventType, receivedEventList := range receivedEventMap {
-			blockId, err := flow.HexStringToIdentifier(receivedEventResponse.BlockId)
-			require.NoError(s.T(), err)
+		blockId, err := flow.HexStringToIdentifier(receivedEventResponse.BlockId)
+		require.NoError(s.T(), err)
 
-			// get events by block id and event type
-			response, err := s.grpcClient.GetEventsForBlockIDs(
-				s.ctx,
-				&accessproto.GetEventsForBlockIDsRequest{
-					BlockIds: [][]byte{convert.IdentifierToMessage(blockId)},
-					Type:     eventType,
-				},
-			)
-			require.NoError(s.T(), err)
-			require.Equal(s.T(), 1, len(response.Results), "expect to get 1 result")
-
-			expectedEventsResult := response.Results[0]
-			require.Equal(s.T(), util.FromUint(expectedEventsResult.BlockHeight), receivedEventResponse.BlockHeight, "expect the same block height")
-			require.Equal(s.T(), len(expectedEventsResult.Events), len(receivedEventList), "expect the same count of events: want: %+v, got: %+v", expectedEventsResult.Events, receivedEventList)
-
-			for i, event := range receivedEventList {
-				require.Equal(s.T(), util.FromUint(expectedEventsResult.Events[i].EventIndex), event.EventIndex, "expect the same event index")
-				require.Equal(s.T(), convert.MessageToIdentifier(expectedEventsResult.Events[i].TransactionId).String(), event.TransactionId, "expect the same transaction id")
-			}
-
-			// Check if the current response has non-empty events
-			if len(receivedEventResponse.Events) > 0 {
-				nonEmptyResponseCount++
-			}
-		}
+		s.validateEventsForBlock(
+			receivedEventResponse.BlockHeight,
+			receivedEventResponse.Events,
+			blockId,
+		)
 	}
-	// Ensure that at least one response had non-empty events
-	require.GreaterOrEqual(s.T(), nonEmptyResponseCount, 1, "expect at least one response with non-empty events")
 }
 
 // validateAccountStatuses is a helper function that encapsulates logic for comparing received account statuses
-func (s *WebsocketSubscriptionSuite) validateAccountStatuses(receivedAccountStatusesResponses []*models.AccountStatusesResponse) {
+func (s *WebsocketSubscriptionSuite) validateAccountStatuses(receivedAccountStatusesResponses []models.AccountStatusesResponse) {
+	expectedCounter := uint64(0)
+
+	for _, receivedAccountStatusResponse := range receivedAccountStatusesResponses {
+		require.Equal(s.T(), expectedCounter, receivedAccountStatusResponse.MessageIndex)
+		expectedCounter++
+
+		blockId, err := flow.HexStringToIdentifier(receivedAccountStatusResponse.BlockID)
+		require.NoError(s.T(), err)
+
+		for _, events := range receivedAccountStatusResponse.AccountEvents {
+			s.validateEventsForBlock(receivedAccountStatusResponse.Height, events, blockId)
+		}
+	}
+}
+
+// groupEventsByType groups events by their type.
+func groupEventsByType(events commonmodels.Events) map[string]commonmodels.Events {
+	eventMap := make(map[string]commonmodels.Events)
+	for _, event := range events {
+		eventType := event.Type_
+		eventMap[eventType] = append(eventMap[eventType], event)
+	}
+
+	return eventMap
+}
+
+// validateEventsForBlock validates events against the gRPC response for a specific block.
+func (s *WebsocketSubscriptionSuite) validateEventsForBlock(blockHeight string, events []commonmodels.Event, blockID flow.Identifier) {
+	receivedEventMap := groupEventsByType(events)
+
+	for eventType, receivedEventList := range receivedEventMap {
+		// Get events by block ID and event type
+		response, err := s.grpcClient.GetEventsForBlockIDs(
+			s.ctx,
+			&accessproto.GetEventsForBlockIDsRequest{
+				BlockIds: [][]byte{convert.IdentifierToMessage(blockID)},
+				Type:     eventType,
+			},
+		)
+		require.NoError(s.T(), err)
+		require.Equal(s.T(), 1, len(response.Results), "expect to get 1 result")
+
+		expectedEventsResult := response.Results[0]
+		require.Equal(s.T(), util.FromUint(expectedEventsResult.BlockHeight), blockHeight, "expect the same block height")
+		require.Equal(s.T(), len(expectedEventsResult.Events), len(receivedEventList), "expect the same count of events: want: %+v, got: %+v", expectedEventsResult.Events, receivedEventList)
+
+		for i, event := range receivedEventList {
+			expectedEvent := expectedEventsResult.Events[i]
+
+			require.Equal(s.T(), util.FromUint(expectedEvent.EventIndex), event.EventIndex, "expect the same event index")
+			require.Equal(s.T(), convert.MessageToIdentifier(expectedEvent.TransactionId).String(), event.TransactionId, "expect the same transaction id")
+			require.Equal(s.T(), util.FromUint(expectedEvent.TransactionIndex), event.TransactionIndex, "expect the same transaction index")
+		}
+	}
 }
 
 // validateTransactionStatuses is a helper function that encapsulates logic for comparing received transaction statuses
