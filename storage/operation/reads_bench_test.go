@@ -55,7 +55,7 @@ func BenchmarkIterate(t *testing.B) {
 
 		t.ResetTimer()
 		var found [][]byte
-		require.NoError(t, operation.IterateKeysInPrefixRange(prefix1, prefix2, func(key []byte) error {
+		require.NoError(t, operation.Iterate(prefix1, prefix2, func(key []byte) error {
 			found = append(found, key)
 			return nil
 		})(r), "should iterate forward without error")

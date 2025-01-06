@@ -16,6 +16,7 @@ import (
 	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/storage/operation"
 	"github.com/onflow/flow-go/storage/operation/dbtest"
+	"github.com/onflow/flow-go/utils/unittest"
 )
 
 func TestReadWrite(t *testing.T) {
@@ -331,10 +332,10 @@ func TestRemoveByPrefix(t *testing.T) {
 		}
 
 		actual := make([][]byte, 0)
-		err = operation.Iterate([]byte{keys[0][0]}, operation.PrefixUpperBound(keys[len(keys)-1]), operation.KeyOnlyIterateFunc(func(key []byte) error {
+		err = operation.Iterate([]byte{keys[0][0]}, storage.PrefixUpperBound(keys[len(keys)-1]), func(key []byte) error {
 			actual = append(actual, key)
 			return nil
-		}), storage.DefaultIteratorOptions())(r)
+		})(r)
 		require.NoError(t, err)
 		require.Equal(t, expected, actual, "expected keys to match expected values")
 	})
