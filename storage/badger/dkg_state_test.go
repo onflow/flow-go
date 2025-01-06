@@ -24,7 +24,8 @@ var epochCounterGenerator = atomic.NewUint64(0)
 func TestDKGState_UninitializedState(t *testing.T) {
 	unittest.RunWithTypedBadgerDB(t, InitSecret, func(db *badger.DB) {
 		metrics := metrics.NewNoopCollector()
-		store, err := NewRecoverableRandomBeaconStateMachine(metrics, db)
+		myNodeID := unittest.IdentifierFixture()
+		store, err := NewRecoverableRandomBeaconStateMachine(metrics, db, myNodeID)
 		require.NoError(t, err)
 
 		setupState := func() uint64 {
@@ -98,7 +99,8 @@ func TestDKGState_UninitializedState(t *testing.T) {
 func TestDKGState_StartedState(t *testing.T) {
 	unittest.RunWithTypedBadgerDB(t, InitSecret, func(db *badger.DB) {
 		metrics := metrics.NewNoopCollector()
-		store, err := NewRecoverableRandomBeaconStateMachine(metrics, db)
+		myNodeID := unittest.IdentifierFixture()
+		store, err := NewRecoverableRandomBeaconStateMachine(metrics, db, myNodeID)
 		require.NoError(t, err)
 
 		setupState := func() uint64 {
@@ -201,7 +203,8 @@ func TestDKGState_StartedState(t *testing.T) {
 func TestDKGState_CompletedState(t *testing.T) {
 	unittest.RunWithTypedBadgerDB(t, InitSecret, func(db *badger.DB) {
 		metrics := metrics.NewNoopCollector()
-		store, err := NewRecoverableRandomBeaconStateMachine(metrics, db)
+		myNodeID := unittest.IdentifierFixture()
+		store, err := NewRecoverableRandomBeaconStateMachine(metrics, db, myNodeID)
 		require.NoError(t, err)
 
 		var evidence *flow.EpochCommit
@@ -317,9 +320,9 @@ func TestDKGState_CompletedState(t *testing.T) {
 func TestDKGState_FailureState(t *testing.T) {
 	unittest.RunWithTypedBadgerDB(t, InitSecret, func(db *badger.DB) {
 		metrics := metrics.NewNoopCollector()
-		store, err := NewRecoverableRandomBeaconStateMachine(metrics, db)
+		myNodeID := unittest.IdentifierFixture()
+		store, err := NewRecoverableRandomBeaconStateMachine(metrics, db, myNodeID)
 		require.NoError(t, err)
-
 		setupState := func() uint64 {
 			epochCounter := epochCounterGenerator.Add(1)
 			err = store.SetDKGState(epochCounter, flow.DKGStateFailure)
@@ -413,7 +416,8 @@ func TestDKGState_FailureState(t *testing.T) {
 func TestDKGState_FailureStateAfterCompleted(t *testing.T) {
 	unittest.RunWithTypedBadgerDB(t, InitSecret, func(db *badger.DB) {
 		metrics := metrics.NewNoopCollector()
-		store, err := NewRecoverableRandomBeaconStateMachine(metrics, db)
+		myNodeID := unittest.IdentifierFixture()
+		store, err := NewRecoverableRandomBeaconStateMachine(metrics, db, myNodeID)
 		require.NoError(t, err)
 
 		var storedPrivateKey crypto.PrivateKey
@@ -512,7 +516,8 @@ func TestDKGState_FailureStateAfterCompleted(t *testing.T) {
 func TestDKGState_RandomBeaconKeyCommittedState(t *testing.T) {
 	unittest.RunWithTypedBadgerDB(t, InitSecret, func(db *badger.DB) {
 		metrics := metrics.NewNoopCollector()
-		store, err := NewRecoverableRandomBeaconStateMachine(metrics, db)
+		myNodeID := unittest.IdentifierFixture()
+		store, err := NewRecoverableRandomBeaconStateMachine(metrics, db, myNodeID)
 		require.NoError(t, err)
 
 		var evidence *flow.EpochCommit
@@ -630,7 +635,7 @@ func TestDKGState_RandomBeaconKeyCommittedState(t *testing.T) {
 func TestSecretDBRequirement(t *testing.T) {
 	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
 		metrics := metrics.NewNoopCollector()
-		_, err := NewRecoverableRandomBeaconStateMachine(metrics, db)
+		_, err := NewRecoverableRandomBeaconStateMachine(metrics, db, unittest.IdentifierFixture())
 		require.Error(t, err)
 	})
 }

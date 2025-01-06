@@ -22,7 +22,7 @@ import (
 var allowedStateTransitions = map[flow.DKGState][]flow.DKGState{
 	flow.DKGStateStarted:          {flow.DKGStateCompleted, flow.DKGStateFailure, flow.RandomBeaconKeyCommitted},
 	flow.DKGStateCompleted:        {flow.RandomBeaconKeyCommitted, flow.DKGStateFailure},
-	flow.RandomBeaconKeyCommitted: {},  // overwriting an already-committed key with a different one is not allowed!
+	flow.RandomBeaconKeyCommitted: {}, // overwriting an already-committed key with a different one is not allowed!
 	flow.DKGStateFailure:          {flow.RandomBeaconKeyCommitted, flow.DKGStateFailure},
 	flow.DKGStateUninitialized:    {flow.DKGStateStarted, flow.DKGStateFailure, flow.RandomBeaconKeyCommitted},
 }
@@ -37,13 +37,14 @@ var allowedStateTransitions = map[flow.DKGState][]flow.DKGState{
 type RecoverablePrivateBeaconKeyStateMachine struct {
 	db       *badger.DB
 	keyCache *Cache[uint64, *encodable.RandomBeaconPrivKey]
+	myNodeID flow.Identifier
 }
 
 var _ storage.EpochRecoveryMyBeaconKey = (*RecoverablePrivateBeaconKeyStateMachine)(nil)
 
 // NewRecoverableRandomBeaconStateMachine returns the RecoverablePrivateBeaconKeyStateMachine implementation backed by Badger DB.
 // No errors are expected during normal operations.
-func NewRecoverableRandomBeaconStateMachine(collector module.CacheMetrics, db *badger.DB) (*RecoverablePrivateBeaconKeyStateMachine, error) {
+func NewRecoverableRandomBeaconStateMachine(collector module.CacheMetrics, db *badger.DB, myNodeID flow.Identifier) (*RecoverablePrivateBeaconKeyStateMachine, error) {
 	err := operation.EnsureSecretDB(db)
 	if err != nil {
 		return nil, fmt.Errorf("cannot instantiate dkg state storage in non-secret db: %w", err)
@@ -70,6 +71,7 @@ func NewRecoverableRandomBeaconStateMachine(collector module.CacheMetrics, db *b
 	return &RecoverablePrivateBeaconKeyStateMachine{
 		db:       db,
 		keyCache: cache,
+		myNodeID: myNodeID,
 	}, nil
 }
 
@@ -246,7 +248,7 @@ func (ds *RecoverablePrivateBeaconKeyStateMachine) CommitMyBeaconPrivateKey(epoc
 		}
 
 		// verify that the key is part of the EpochCommit
-		if err = ensureKeyIncludedInEpoch(epochCounter, key, commit); err != nil {
+		if err = ds.ensureKeyIncludedInEpoch(epochCounter, key, commit); err != nil {
 			return storage.NewInvalidDKGStateTransitionErrorf(currentState, flow.RandomBeaconKeyCommitted,
 				"previously stored key has not been found in epoch commit event: %w", err)
 		}
@@ -255,10 +257,10 @@ func (ds *RecoverablePrivateBeaconKeyStateMachine) CommitMyBeaconPrivateKey(epoc
 }
 
 // UpsertMyBeaconPrivateKey overwrites the random beacon private key for the epoch that recovers the protocol
-	// from Epoch Fallback Mode. The resulting state of this method call is [flow.RandomBeaconKeyCommitted].
-	// State transitions are allowed if and only if the current state is not equal to [flow.RandomBeaconKeyCommitted]. 
-	// Repeated calls for the same epoch are idempotent, if and only if the provided EpochCommit confirms the already
-	// committed key (error otherwise).
+// from Epoch Fallback Mode. The resulting state of this method call is [flow.RandomBeaconKeyCommitted].
+// State transitions are allowed if and only if the current state is not equal to [flow.RandomBeaconKeyCommitted].
+// Repeated calls for the same epoch are idempotent, if and only if the provided EpochCommit confirms the already
+// committed key (error otherwise).
 // No errors are expected during normal operations.
 func (ds *RecoverablePrivateBeaconKeyStateMachine) UpsertMyBeaconPrivateKey(epochCounter uint64, key crypto.PrivateKey, commit *flow.EpochCommit) error {
 	if key == nil {
@@ -271,7 +273,7 @@ func (ds *RecoverablePrivateBeaconKeyStateMachine) UpsertMyBeaconPrivateKey(epoc
 			return err
 		}
 		// verify that the key is part of the EpochCommit
-		if err = ensureKeyIncludedInEpoch(epochCounter, key, commit); err != nil {
+		if err = ds.ensureKeyIncludedInEpoch(epochCounter, key, commit); err != nil {
 			return storage.NewInvalidDKGStateTransitionErrorf(currentState, flow.RandomBeaconKeyCommitted,
 				"according to EpochCommit event, the input random beacon key is not valid for signing: %w", err)
 		}
@@ -288,7 +290,7 @@ func (ds *RecoverablePrivateBeaconKeyStateMachine) UpsertMyBeaconPrivateKey(epoc
 					"cannot overwrite previously committed key for epoch: %d", epochCounter)
 			}
 			return nil
-		} // The following code will be reached if and only if no other Random Beacon key has previously been committed for this epoch.			
+		} // The following code will be reached if and only if no other Random Beacon key has previously been committed for this epoch.
 
 		err = operation.UpsertMyBeaconPrivateKey(epochCounter, encodableKey)(tx.DBTxn)
 		if err != nil {

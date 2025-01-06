@@ -212,7 +212,11 @@ func main() {
 			return nil
 		}).
 		Module("dkg state", func(node *cmd.NodeConfig) error {
-			myBeaconKeyStateMachine, err = bstorage.NewRecoverableRandomBeaconStateMachine(node.Metrics.Cache, node.SecretsDB)
+			myBeaconKeyStateMachine, err = bstorage.NewRecoverableRandomBeaconStateMachine(
+				node.Metrics.Cache,
+				node.SecretsDB,
+				node.NodeID,
+			)
 			return err
 		}).
 		Module("updatable sealing config", func(node *cmd.NodeConfig) error {

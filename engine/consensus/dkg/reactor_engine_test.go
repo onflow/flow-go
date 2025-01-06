@@ -480,7 +480,7 @@ func (suite *ReactorEngineSuite_CommittedPhase) TestStartupInCommittedPhase_DKGS
 	suite.DKGState = flow.DKGStateFailure
 
 	// start up the engine
-	unittest.AssertClosesBefore(suite.T(), suite.engine.Ready(), 100*time.Second)
+	unittest.AssertClosesBefore(suite.T(), suite.engine.Ready(), time.Second)
 
 	// we should not have instantiated the DKG
 	suite.factory.AssertNotCalled(suite.T(), "Create",
