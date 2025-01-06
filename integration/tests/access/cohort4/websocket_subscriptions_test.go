@@ -218,7 +218,7 @@ func (s *WebsocketSubscriptionSuite) TestInactivityHeaders() {
 		expectedInactivityDuration := InactivityTimeout * time.Second
 		actualInactivityDuration := monitorInactivity(s.T(), wsClient, expectedInactivityDuration)
 
-		s.Assert().LessOrEqual(expectedInactivityDuration, actualInactivityDuration)
+		s.LessOrEqual(expectedInactivityDuration, actualInactivityDuration)
 	})
 }
 
@@ -242,6 +242,137 @@ func monitorInactivity(t *testing.T, client *websocket.Conn, timeout time.Durati
 		return 0
 	case <-errChan:
 		return time.Since(start)
+	}
+}
+
+// TestSubscriptionErrorCases tests error cases for subscriptions.
+func (s *WebsocketSubscriptionSuite) TestSubscriptionErrorCases() {
+	tests := []struct {
+		name           string
+		message        models.SubscribeMessageRequest
+		expectedErrMsg string
+	}{
+		{
+			name: "Invalid Topic",
+			message: models.SubscribeMessageRequest{
+				BaseMessageRequest: models.BaseMessageRequest{
+					Action:          models.SubscribeAction,
+					ClientMessageID: uuid.New().String(),
+				},
+				Topic: "invalid_topic", // Topic that doesn't exist
+			},
+			expectedErrMsg: "error creating data provider", // Update based on expected error message
+		},
+		{
+			name: "Invalid Arguments",
+			message: models.SubscribeMessageRequest{
+				BaseMessageRequest: models.BaseMessageRequest{
+					Action:          models.SubscribeAction,
+					ClientMessageID: uuid.New().String(),
+				},
+				Topic:     "valid_topic",
+				Arguments: map[string]interface{}{"invalid_arg": 42}, // Invalid argument
+			},
+			expectedErrMsg: "error creating data provider",
+		},
+		{
+			name: "Empty Topic",
+			message: models.SubscribeMessageRequest{
+				BaseMessageRequest: models.BaseMessageRequest{
+					Action:          models.SubscribeAction,
+					ClientMessageID: uuid.New().String(),
+				},
+				Topic: "", // Empty topic
+			},
+			expectedErrMsg: "error creating data provider",
+		},
+	}
+
+	restAddr := s.net.ContainerByName(testnet.PrimaryAN).Addr(testnet.RESTPort)
+	wsClient, err := common.GetWSClient(s.ctx, getWebsocketsUrl(restAddr))
+	s.Require().NoError(err)
+	defer func() { s.Require().NoError(wsClient.Close()) }()
+
+	for _, tt := range tests {
+		s.Run(tt.name, func() {
+			// Send subscription message
+			err := wsClient.WriteJSON(tt.message)
+			require.NoError(s.T(), err, "failed to send subscription message")
+
+			// Receive response
+			var response models.BaseMessageResponse
+			err = wsClient.ReadJSON(&response)
+			require.NoError(s.T(), err, "failed to read subscription response")
+
+			// Validate response
+			s.False(response.Success)
+			s.Contains(response.Error.Message, tt.expectedErrMsg)
+		})
+	}
+}
+
+// TestUnsubscriptionErrorCases tests error cases for unsubscriptions.
+func (s *WebsocketSubscriptionSuite) TestUnsubscriptionErrorCases() {
+	tests := []struct {
+		name           string
+		message        models.UnsubscribeMessageRequest
+		expectedErrMsg string
+	}{
+		{
+			name: "Invalid Subscription ID",
+			message: models.UnsubscribeMessageRequest{
+				BaseMessageRequest: models.BaseMessageRequest{
+					Action:          models.UnsubscribeAction,
+					ClientMessageID: uuid.New().String(),
+				},
+				SubscriptionID: "invalid_subscription_id", // Invalid UUID format
+			},
+			expectedErrMsg: "error parsing subscription ID",
+		},
+		{
+			name: "Non-Existent Subscription ID",
+			message: models.UnsubscribeMessageRequest{
+				BaseMessageRequest: models.BaseMessageRequest{
+					Action:          models.UnsubscribeAction,
+					ClientMessageID: uuid.New().String(),
+				},
+				SubscriptionID: uuid.New().String(), // Valid UUID but not associated with an active subscription
+			},
+			expectedErrMsg: "subscription not found",
+		},
+		{
+			name: "Empty Subscription ID",
+			message: models.UnsubscribeMessageRequest{
+				BaseMessageRequest: models.BaseMessageRequest{
+					Action:          models.UnsubscribeAction,
+					ClientMessageID: uuid.New().String(),
+				},
+				SubscriptionID: "", // Empty subscription ID
+			},
+			expectedErrMsg: "error parsing subscription ID",
+		},
+	}
+
+	restAddr := s.net.ContainerByName(testnet.PrimaryAN).Addr(testnet.RESTPort)
+	wsClient, err := common.GetWSClient(s.ctx, getWebsocketsUrl(restAddr))
+	s.Require().NoError(err)
+	defer func() { s.Require().NoError(wsClient.Close()) }()
+
+	for _, tt := range tests {
+		s.Run(tt.name, func() {
+			// Send unsubscription message
+			err := wsClient.WriteJSON(tt.message)
+			require.NoError(s.T(), err, "failed to send unsubscription message")
+
+			// Receive response
+			var response models.BaseMessageResponse
+			err = wsClient.ReadJSON(&response)
+			require.NoError(s.T(), err, "failed to read unsubscription response")
+
+			// Validate response
+			s.False(response.Success)
+			s.Contains(response.Error.Message, tt.expectedErrMsg)
+		})
 	}
 }
 
