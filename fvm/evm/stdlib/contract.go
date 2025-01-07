@@ -178,11 +178,30 @@ var InternalEVMTypeDryRunFunctionType = &sema.FunctionType{
 	ReturnTypeAnnotation: sema.NewTypeAnnotation(sema.AnyStructType),
 }
 
-// InternalEVM.dryCall
+// InternalEVM.batchRun
 
-const InternalEVMTypeDryCallFunctionName = "dryCall"
+const InternalEVMTypeBatchRunFunctionName = "batchRun"
 
-var InternalEVMTypeDryCallFunctionType = &sema.FunctionType{
+var InternalEVMTypeBatchRunFunctionType *sema.FunctionType = &sema.FunctionType{
+	Parameters: []sema.Parameter{
+		{
+			Label:          "txs",
+			TypeAnnotation: sema.NewTypeAnnotation(EVMTransactionsBatchBytesType),
+		},
+		{
+			Label:          "coinbase",
+			TypeAnnotation: sema.NewTypeAnnotation(EVMAddressBytesType),
+		},
+	},
+	// Actually [EVM.Result], but cannot refer to it here
+	ReturnTypeAnnotation: sema.NewTypeAnnotation(sema.NewVariableSizedType(nil, sema.AnyStructType)),
+}
+
+// InternalEVM.call
+
+const InternalEVMTypeCallFunctionName = "call"
+
+var InternalEVMTypeCallFunctionType = &sema.FunctionType{
 	Parameters: []sema.Parameter{
 		{
 			Label:          "from",
@@ -209,30 +228,11 @@ var InternalEVMTypeDryCallFunctionType = &sema.FunctionType{
 	ReturnTypeAnnotation: sema.NewTypeAnnotation(sema.AnyStructType),
 }
 
-// InternalEVM.batchRun
+// InternalEVM.dryCall
 
-const InternalEVMTypeBatchRunFunctionName = "batchRun"
+const InternalEVMTypeDryCallFunctionName = "dryCall"
 
-var InternalEVMTypeBatchRunFunctionType *sema.FunctionType = &sema.FunctionType{
-	Parameters: []sema.Parameter{
-		{
-			Label:          "txs",
-			TypeAnnotation: sema.NewTypeAnnotation(EVMTransactionsBatchBytesType),
-		},
-		{
-			Label:          "coinbase",
-			TypeAnnotation: sema.NewTypeAnnotation(EVMAddressBytesType),
-		},
-	},
-	// Actually [EVM.Result], but cannot refer to it here
-	ReturnTypeAnnotation: sema.NewTypeAnnotation(sema.NewVariableSizedType(nil, sema.AnyStructType)),
-}
-
-// InternalEVM.call
-
-const InternalEVMTypeCallFunctionName = "call"
-
-var InternalEVMTypeCallFunctionType = &sema.FunctionType{
+var InternalEVMTypeDryCallFunctionType = &sema.FunctionType{
 	Parameters: []sema.Parameter{
 		{
 			Label:          "from",
@@ -467,12 +467,6 @@ var InternalEVMContractType = func() *sema.CompositeType {
 		),
 		sema.NewUnmeteredPublicFunctionMember(
 			ty,
-			InternalEVMTypeDryCallFunctionName,
-			InternalEVMTypeDryCallFunctionType,
-			"",
-		),
-		sema.NewUnmeteredPublicFunctionMember(
-			ty,
 			InternalEVMTypeBatchRunFunctionName,
 			InternalEVMTypeBatchRunFunctionType,
 			"",
@@ -487,6 +481,12 @@ var InternalEVMContractType = func() *sema.CompositeType {
 			ty,
 			InternalEVMTypeCallFunctionName,
 			InternalEVMTypeCallFunctionType,
+			"",
+		),
+		sema.NewUnmeteredPublicFunctionMember(
+			ty,
+			InternalEVMTypeDryCallFunctionName,
+			InternalEVMTypeDryCallFunctionType,
 			"",
 		),
 		sema.NewUnmeteredPublicFunctionMember(
