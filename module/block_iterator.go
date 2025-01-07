@@ -19,8 +19,11 @@ type BlockIterator interface {
 
 	// Checkpoint saves the current state of the iterator
 	// so that it can be resumed later
+	// when Checkpoint is called, if SaveNextFunc is called with block A,
+	// then after restart, the iterator will resume from A.
 	Checkpoint() error
 }
 
-// SaveProgressFunc is a function that saves the progress of the iterator
-type SaveProgressFunc func(uint64) error
+// SaveNextFunc is a function that saves the next block to be iterated
+// the uint64 argument is the height or view of the block, depending on the iterator
+type SaveNextFunc func(uint64) error

@@ -29,17 +29,17 @@ func TestIterateHeight(t *testing.T) {
 			require.NoError(t, db.Update(operation.IndexBlockHeight(b.Height, b.ID())))
 		}
 
-		var savedHeight uint64
-		saveProgress := func(height uint64) error {
-			savedHeight = height
+		var savedNextHeight uint64
+		saveNext := func(height uint64) error {
+			savedNextHeight = height
 			return nil
 		}
 
 		// create iterator
-		// b0 is the root block, iterate from b1 to b10
+		// b0 is the root block, iterate from b1 to b3
 		job := module.IterateJob{Start: b1.Height, End: b3.Height}
 		headers := storagebadger.NewHeaders(&metrics.NoopCollector{}, db)
-		iter, err := NewHeightIterator(headers, saveProgress, context.Background(), job)
+		iter, err := NewHeightIterator(headers, saveNext, context.Background(), job)
 		require.NoError(t, err)
 
 		// iterate through all blocks
@@ -60,8 +60,6 @@ func TestIterateHeight(t *testing.T) {
 			}
 		}
 
-		// note: b6 is not visited, because it's not the sibling of b8, even if they are at the same height
-		// that's because b6 and b8 doesn't have the same parent.
 		// verify all blocks are visited
 		for _, b := range bs {
 			_, ok := visited[b.ID()]
@@ -72,7 +70,8 @@ func TestIterateHeight(t *testing.T) {
 
 		// save the next to iterate height and verify
 		require.NoError(t, iter.Checkpoint())
-		require.Equal(t, b3.Height+1, savedHeight,
-			fmt.Sprintf("saved height should be %v, but got %v", b3.Height, savedHeight))
+		require.Equal(t, b3.Height+1, savedNextHeight,
+			fmt.Sprintf("saved next height should be %v, but got %v", b3.Height, savedNextHeight))
+
 	})
 }

@@ -11,8 +11,8 @@ import (
 
 type HeightIterator struct {
 	// dependencies
-	headers      storage.Headers
-	saveProgress module.SaveProgressFunc // for saving the next height to be iterated for resuming the iteration
+	headers  storage.Headers
+	saveNext module.SaveNextFunc // for saving the next height to be iterated for resuming the iteration
 
 	// config
 	endHeight uint64
@@ -27,16 +27,16 @@ var _ module.BlockIterator = (*HeightIterator)(nil)
 // caller must ensure that both job.Start and job.End are finalized height
 func NewHeightIterator(
 	headers storage.Headers,
-	saveProgress module.SaveProgressFunc,
+	saveNext module.SaveNextFunc,
 	ctx context.Context,
 	job module.IterateJob,
 ) (module.BlockIterator, error) {
 	return &HeightIterator{
-		headers:      headers,
-		saveProgress: saveProgress,
-		endHeight:    job.End,
-		ctx:          ctx,
-		nextHeight:   job.Start,
+		headers:    headers,
+		saveNext:   saveNext,
+		endHeight:  job.End,
+		ctx:        ctx,
+		nextHeight: job.Start,
 	}, nil
 }
 
@@ -68,7 +68,7 @@ func (b *HeightIterator) Next() (flow.Identifier, bool, error) {
 
 // Checkpoint saves the iteration progress to storage
 func (b *HeightIterator) Checkpoint() error {
-	err := b.saveProgress(b.nextHeight)
+	err := b.saveNext(b.nextHeight)
 	if err != nil {
 		return fmt.Errorf("failed to save progress at view %v: %w", b.nextHeight, err)
 	}
