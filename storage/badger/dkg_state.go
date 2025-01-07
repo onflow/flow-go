@@ -22,7 +22,7 @@ import (
 var allowedStateTransitions = map[flow.DKGState][]flow.DKGState{
 	flow.DKGStateStarted:          {flow.DKGStateCompleted, flow.DKGStateFailure, flow.RandomBeaconKeyCommitted},
 	flow.DKGStateCompleted:        {flow.RandomBeaconKeyCommitted, flow.DKGStateFailure},
-	flow.RandomBeaconKeyCommitted: {flow.RandomBeaconKeyCommitted},
+	flow.RandomBeaconKeyCommitted: {}, // overwriting an already-committed key with a different one is not allowed!
 	flow.DKGStateFailure:          {flow.RandomBeaconKeyCommitted, flow.DKGStateFailure},
 	flow.DKGStateUninitialized:    {flow.DKGStateStarted, flow.DKGStateFailure, flow.RandomBeaconKeyCommitted},
 }
@@ -34,16 +34,18 @@ var allowedStateTransitions = map[flow.DKGState][]flow.DKGState{
 // If for any reason the DKG fails, then the private key will be nil and DKG state is set to [flow.DKGStateFailure].
 // When the epoch recovery takes place, we need to query the last valid beacon private key for the current replica and
 // also set it for use during the Recovery Epoch, otherwise replicas won't be able to vote for blocks during the Recovery Epoch.
+// CAUTION: This implementation heavily depends on atomic Badger transactions with interleaved reads and writes for correctness.
 type RecoverablePrivateBeaconKeyStateMachine struct {
 	db       *badger.DB
 	keyCache *Cache[uint64, *encodable.RandomBeaconPrivKey]
+	myNodeID flow.Identifier
 }
 
 var _ storage.EpochRecoveryMyBeaconKey = (*RecoverablePrivateBeaconKeyStateMachine)(nil)
 
 // NewRecoverableRandomBeaconStateMachine returns the RecoverablePrivateBeaconKeyStateMachine implementation backed by Badger DB.
 // No errors are expected during normal operations.
-func NewRecoverableRandomBeaconStateMachine(collector module.CacheMetrics, db *badger.DB) (*RecoverablePrivateBeaconKeyStateMachine, error) {
+func NewRecoverableRandomBeaconStateMachine(collector module.CacheMetrics, db *badger.DB, myNodeID flow.Identifier) (*RecoverablePrivateBeaconKeyStateMachine, error) {
 	err := operation.EnsureSecretDB(db)
 	if err != nil {
 		return nil, fmt.Errorf("cannot instantiate dkg state storage in non-secret db: %w", err)
@@ -70,6 +72,7 @@ func NewRecoverableRandomBeaconStateMachine(collector module.CacheMetrics, db *b
 	return &RecoverablePrivateBeaconKeyStateMachine{
 		db:       db,
 		keyCache: cache,
+		myNodeID: myNodeID,
 	}, nil
 }
 
@@ -88,11 +91,15 @@ func (ds *RecoverablePrivateBeaconKeyStateMachine) InsertMyBeaconPrivateKey(epoc
 	}
 	encodableKey := &encodable.RandomBeaconPrivKey{PrivateKey: key}
 	return operation.RetryOnConflictTx(ds.db, transaction.Update, func(tx *transaction.Tx) error {
-		err := ds.keyCache.PutTx(epochCounter, encodableKey)(tx)
+		currentState, err := retrieveCurrentStateTx(epochCounter)(tx.DBTxn)
 		if err != nil {
 			return err
 		}
-		return ds.processStateTransition(epochCounter, flow.DKGStateCompleted)(tx)
+		err = ds.keyCache.PutTx(epochCounter, encodableKey)(tx)
+		if err != nil {
+			return err
+		}
+		return ds.processStateTransition(epochCounter, currentState, flow.DKGStateCompleted)(tx)
 	})
 }
 
@@ -129,23 +136,25 @@ func (ds *RecoverablePrivateBeaconKeyStateMachine) IsDKGStarted(epochCounter uin
 // Error returns:
 //   - [storage.InvalidDKGStateTransitionError] - if the requested state transition is invalid.
 func (ds *RecoverablePrivateBeaconKeyStateMachine) SetDKGState(epochCounter uint64, newState flow.DKGState) error {
-	return operation.RetryOnConflictTx(ds.db, transaction.Update, ds.processStateTransition(epochCounter, newState))
+	return operation.RetryOnConflictTx(ds.db, transaction.Update, func(tx *transaction.Tx) error {
+		currentState, err := retrieveCurrentStateTx(epochCounter)(tx.DBTxn)
+		if err != nil {
+			return err
+		}
+
+		// `DKGStateStarted` or `DKGStateFailure` are the only accepted values for the target state, because transitioning
+		// into other states requires auxiliary information (e.g. key and or `EpochCommit` events) or is forbidden altogether.
+		if newState != flow.DKGStateStarted && newState != flow.DKGStateFailure {
+			return storage.NewInvalidDKGStateTransitionErrorf(currentState, newState, "transitioning into the target state is not allowed (at all or without auxiliary data)")
+		}
+		return operation.RetryOnConflictTx(ds.db, transaction.Update, ds.processStateTransition(epochCounter, currentState, newState))
+	})
 }
 
 // Error returns:
 //   - storage.InvalidDKGStateTransitionError - if the requested state transition is invalid
-func (ds *RecoverablePrivateBeaconKeyStateMachine) processStateTransition(epochCounter uint64, newState flow.DKGState) func(*transaction.Tx) error {
+func (ds *RecoverablePrivateBeaconKeyStateMachine) processStateTransition(epochCounter uint64, currentState, newState flow.DKGState) func(*transaction.Tx) error {
 	return func(tx *transaction.Tx) error {
-		var currentState flow.DKGState
-		err := operation.RetrieveDKGStateForEpoch(epochCounter, &currentState)(tx.DBTxn)
-		if err != nil {
-			if errors.Is(err, storage.ErrNotFound) {
-				currentState = flow.DKGStateUninitialized
-			} else {
-				return fmt.Errorf("could not retrieve current state for epoch %d: %w", epochCounter, err)
-			}
-		}
-
 		allowedStates := allowedStateTransitions[currentState]
 		if slices.Index(allowedStates, newState) < 0 {
 			return storage.NewInvalidDKGStateTransitionErrorf(currentState, newState, "not allowed")
@@ -153,7 +162,7 @@ func (ds *RecoverablePrivateBeaconKeyStateMachine) processStateTransition(epochC
 
 		// ensure invariant holds and we still have a valid private key stored
 		if newState == flow.RandomBeaconKeyCommitted || newState == flow.DKGStateCompleted {
-			_, err = ds.keyCache.Get(epochCounter)(tx.DBTxn)
+			_, err := ds.keyCache.Get(epochCounter)(tx.DBTxn)
 			if err != nil {
 				return storage.NewInvalidDKGStateTransitionErrorf(currentState, newState, "cannot transition without a valid random beacon key: %w", err)
 			}
@@ -219,21 +228,79 @@ func (ds *RecoverablePrivateBeaconKeyStateMachine) RetrieveMyBeaconPrivateKey(ep
 	return
 }
 
-// UpsertMyBeaconPrivateKey overwrites the random beacon private key for the epoch that recovers the protocol
-// from Epoch Fallback Mode. State transitions are allowed if and only if the current state is not equal to
-// [flow.RandomBeaconKeyCommitted]. The resulting state of this method call is [flow.RandomBeaconKeyCommitted].
+// CommitMyBeaconPrivateKey commits the previously inserted random beacon private key for an epoch. Effectively, this method
+// transitions the state machine into the [flow.RandomBeaconKeyCommitted] state if the current state is [flow.DKGStateCompleted].
+// The caller needs to supply the [flow.EpochCommit] as evidence that the stored key is valid for the specified epoch. Repeated
+// calls for the same epoch are accepted (idempotent operation), if and only if the provided EpochCommit confirms the already
+// committed key.
 // No errors are expected during normal operations.
-func (ds *RecoverablePrivateBeaconKeyStateMachine) UpsertMyBeaconPrivateKey(epochCounter uint64, key crypto.PrivateKey) error {
+func (ds *RecoverablePrivateBeaconKeyStateMachine) CommitMyBeaconPrivateKey(epochCounter uint64, commit *flow.EpochCommit) error {
+	return operation.RetryOnConflictTx(ds.db, transaction.Update, func(tx *transaction.Tx) error {
+		currentState, err := retrieveCurrentStateTx(epochCounter)(tx.DBTxn)
+		if err != nil {
+			return err
+		}
+
+		// Repeated calls for same epoch are idempotent, but only if they consistently confirm the stored private key. We explicitly
+		// enforce consistency with the already committed key here. Repetitions are considered rare, so performance overhead is acceptable.
+		key, err := ds.keyCache.Get(epochCounter)(tx.DBTxn)
+		if err != nil {
+			return storage.NewInvalidDKGStateTransitionErrorf(currentState, flow.RandomBeaconKeyCommitted, "cannot transition without a valid random beacon key: %w", err)
+		}
+		// verify that the key is part of the EpochCommit
+		if err = ds.ensureKeyIncludedInEpoch(epochCounter, key, commit); err != nil {
+			return storage.NewInvalidDKGStateTransitionErrorf(currentState, flow.RandomBeaconKeyCommitted,
+				"according to EpochCommit event, my stored random beacon key is not valid for signing: %w", err)
+		}
+		// transition to RandomBeaconKeyCommitted, unless this is a repeated call, in which case there is nothing else to do
+		if currentState == flow.RandomBeaconKeyCommitted {
+			return nil
+		}
+		return ds.processStateTransition(epochCounter, currentState, flow.RandomBeaconKeyCommitted)(tx)
+	})
+}
+
+// UpsertMyBeaconPrivateKey overwrites the random beacon private key for the epoch that recovers the protocol
+// from Epoch Fallback Mode. The resulting state of this method call is [flow.RandomBeaconKeyCommitted].
+// State transitions are allowed if and only if the current state is not equal to [flow.RandomBeaconKeyCommitted].
+// Repeated calls for the same epoch are idempotent, if and only if the provided EpochCommit confirms the already
+// committed key (error otherwise).
+// No errors are expected during normal operations.
+func (ds *RecoverablePrivateBeaconKeyStateMachine) UpsertMyBeaconPrivateKey(epochCounter uint64, key crypto.PrivateKey, commit *flow.EpochCommit) error {
 	if key == nil {
 		return fmt.Errorf("will not store nil beacon key")
 	}
 	encodableKey := &encodable.RandomBeaconPrivKey{PrivateKey: key}
 	err := operation.RetryOnConflictTx(ds.db, transaction.Update, func(tx *transaction.Tx) error {
-		err := operation.UpsertMyBeaconPrivateKey(epochCounter, encodableKey)(tx.DBTxn)
+		currentState, err := retrieveCurrentStateTx(epochCounter)(tx.DBTxn)
 		if err != nil {
 			return err
 		}
-		return ds.processStateTransition(epochCounter, flow.RandomBeaconKeyCommitted)(tx)
+		// verify that the key is part of the EpochCommit
+		if err = ds.ensureKeyIncludedInEpoch(epochCounter, key, commit); err != nil {
+			return storage.NewInvalidDKGStateTransitionErrorf(currentState, flow.RandomBeaconKeyCommitted,
+				"according to EpochCommit event, the input random beacon key is not valid for signing: %w", err)
+		}
+
+		// Repeated calls for same epoch are idempotent, but only if they consistently confirm the stored private key. We explicitly
+		// enforce consistency with the already committed key here. Repetitions are considered rare, so performance overhead is acceptable.
+		if currentState == flow.RandomBeaconKeyCommitted {
+			storedKey, err := ds.keyCache.Get(epochCounter)(tx.DBTxn)
+			if err != nil {
+				return irrecoverable.NewExceptionf("could not retrieve a previously committed beacon key for epoch %d: %v", epochCounter, err)
+			}
+			if !key.Equals(storedKey.PrivateKey) {
+				return storage.NewInvalidDKGStateTransitionErrorf(currentState, flow.RandomBeaconKeyCommitted,
+					"cannot overwrite previously committed key for epoch: %d", epochCounter)
+			}
+			return nil
+		} // The following code will be reached if and only if no other Random Beacon key has previously been committed for this epoch.
+
+		err = operation.UpsertMyBeaconPrivateKey(epochCounter, encodableKey)(tx.DBTxn)
+		if err != nil {
+			return err
+		}
+		return ds.processStateTransition(epochCounter, currentState, flow.RandomBeaconKeyCommitted)(tx)
 	})
 	if err != nil {
 		return fmt.Errorf("could not overwrite beacon key for epoch %d: %w", epochCounter, err)
@@ -241,4 +308,47 @@ func (ds *RecoverablePrivateBeaconKeyStateMachine) UpsertMyBeaconPrivateKey(epoc
 	// manually add the key to cache (next line does not touch database)
 	ds.keyCache.Insert(epochCounter, encodableKey)
 	return nil
+}
+
+// ensureKeyIncludedInEpoch enforces that the input private `key` matches the public Random Beacon key in `EpochCommit` for this node.
+// No errors are expected during normal operations.
+func (ds *RecoverablePrivateBeaconKeyStateMachine) ensureKeyIncludedInEpoch(epochCounter uint64, key crypto.PrivateKey, commit *flow.EpochCommit) error {
+	if commit.Counter != epochCounter {
+		return fmt.Errorf("commit counter does not match epoch counter: %d != %d", epochCounter, commit.Counter)
+	}
+	publicKey := key.PublicKey()
+	// TODO(EFM, #6794): allowing a nil DKGIndexMap is a temporary shortcut for backwards compatibility. This should be removed once we complete the network upgrade:
+	if commit.DKGIndexMap == nil {
+		// If commit.DKGIndexMap is nil, we verify that there exists *some* public key in the EpochCommit that matches our private key. This is a much weaker sanity
+		// check than enforcing that the public Beacon key in the EpochCommit corresponding to *my* NodeID matches the locally stored private key. However,
+		// the check still catches the case where the DKG smart contract determined a different public key for this node compared to the node local DKG result.
+		// Nevertheless, we remain vulnerable to misconfigurations, where the node operator mixed up keys.
+		isMatchingKey := func(lhs crypto.PublicKey) bool { return lhs.Equals(publicKey) }
+		if slices.IndexFunc(commit.DKGParticipantKeys, isMatchingKey) < 0 {
+			return fmt.Errorf("key not included in epoch commit: %s", publicKey)
+		}
+		return nil
+	} // the following code will be reached if and only if `commit` follows the new protocol convention, where `EpochCommit.DKGIndexMap` is not nil
+
+	keyIndex, exists := commit.DKGIndexMap[ds.myNodeID]
+	if !exists {
+		return fmt.Errorf("this node is not part of the random beacon committee as specified by the EpochCommit event")
+	}
+	if !commit.DKGParticipantKeys[keyIndex].Equals(publicKey) {
+		return fmt.Errorf("provided private key does not match random beacon public key in the EpochCommit event")
+	}
+	return nil
+}
+
+// retrieveCurrentStateTx prepares a badger tx which retrieves the current state for the given epoch.
+// No errors are expected during normal operations.
+func retrieveCurrentStateTx(epochCounter uint64) func(*badger.Txn) (flow.DKGState, error) {
+	return func(txn *badger.Txn) (flow.DKGState, error) {
+		currentState := flow.DKGStateUninitialized
+		err := operation.RetrieveDKGStateForEpoch(epochCounter, &currentState)(txn)
+		if err != nil && !errors.Is(err, storage.ErrNotFound) {
+			return currentState, fmt.Errorf("could not retrieve current state for epoch %d: %w", epochCounter, err)
+		}
+		return currentState, nil
+	}
 }

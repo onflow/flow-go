@@ -72,6 +72,14 @@ type DKGState interface {
 	//   - [storage.ErrAlreadyExists] - if there is already a key stored for given epoch.
 	//   - [storage.InvalidDKGStateTransitionError] - if the requested state transition is invalid.
 	InsertMyBeaconPrivateKey(epochCounter uint64, key crypto.PrivateKey) error
+
+	// CommitMyBeaconPrivateKey commits the previously inserted random beacon private key for an epoch. Effectively, this method
+	// transitions the state machine into the [flow.RandomBeaconKeyCommitted] state if the current state is [flow.DKGStateCompleted].
+	// The caller needs to supply the [flow.EpochCommit] as evidence that the stored key is valid for the specified epoch. Repeated
+	// calls for the same epoch are accepted (idempotent operation),if and only if the provided EpochCommit confirms the already
+	// committed key.
+	// No errors are expected during normal operations.
+	CommitMyBeaconPrivateKey(epochCounter uint64, commit *flow.EpochCommit) error
 }
 
 // EpochRecoveryMyBeaconKey is a specific interface that allows to overwrite the beacon private key for
@@ -86,8 +94,10 @@ type EpochRecoveryMyBeaconKey interface {
 	DKGStateReader
 
 	// UpsertMyBeaconPrivateKey overwrites the random beacon private key for the epoch that recovers the protocol
-	// from Epoch Fallback Mode. State transitions are allowed if and only if the current state is not equal to
-	// [flow.RandomBeaconKeyCommitted]. The resulting state of this method call is [flow.RandomBeaconKeyCommitted].
+	// from Epoch Fallback Mode. The resulting state of this method call is [flow.RandomBeaconKeyCommitted].
+	// State transitions are allowed if and only if the current state is not equal to [flow.RandomBeaconKeyCommitted].
+	// Repeated calls for the same epoch are idempotent, if and only if the provided EpochCommit confirms the already
+	// committed key (error otherwise).
 	// No errors are expected during normal operations.
-	UpsertMyBeaconPrivateKey(epochCounter uint64, key crypto.PrivateKey) error
+	UpsertMyBeaconPrivateKey(epochCounter uint64, key crypto.PrivateKey, commit *flow.EpochCommit) error
 }
