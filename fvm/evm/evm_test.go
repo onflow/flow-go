@@ -2132,7 +2132,7 @@ func TestDryCall(t *testing.T) {
 		ctx fvm.Context,
 		vm fvm.VM,
 		snapshot snapshot.SnapshotTree,
-	) *types.ResultSummary {
+	) (*types.ResultSummary, *snapshot.ExecutionSnapshot) {
 		code := []byte(fmt.Sprintf(`
 			import EVM from %s
 
@@ -2164,17 +2164,18 @@ func TestDryCall(t *testing.T) {
 			json.MustEncode(cadence.NewUInt64(tx.Gas())),
 			json.MustEncode(cadence.NewUInt(uint(tx.Value().Uint64()))),
 		)
-		_, output, err := vm.Run(
+		execSnapshot, output, err := vm.Run(
 			ctx,
 			script,
-			snapshot)
+			snapshot,
+		)
 		require.NoError(t, err)
 		require.NoError(t, output.Err)
 		require.Len(t, output.Events, 0)
 
 		result, err := impl.ResultSummaryFromEVMResultValue(output.Value)
 		require.NoError(t, err)
-		return result
+		return result, execSnapshot
 	}
 
 	// this test checks that gas limit is correctly used and gas usage correctly reported
@@ -2198,7 +2199,7 @@ func TestDryCall(t *testing.T) {
 					big.NewInt(0),
 					data,
 				)
-				result := dryCall(t, tx, ctx, vm, snapshot)
+				result, _ := dryCall(t, tx, ctx, vm, snapshot)
 				require.Equal(t, types.ErrCodeNoError, result.ErrorCode)
 				require.Equal(t, types.StatusSuccessful, result.Status)
 				require.Greater(t, result.GasConsumed, uint64(0))
@@ -2214,7 +2215,7 @@ func TestDryCall(t *testing.T) {
 					big.NewInt(0),
 					data,
 				)
-				result = dryCall(t, tx, ctx, vm, snapshot)
+				result, _ = dryCall(t, tx, ctx, vm, snapshot)
 				require.Equal(t, types.ExecutionErrCodeOutOfGas, result.ErrorCode)
 				require.Equal(t, types.StatusFailed, result.Status)
 				require.Equal(t, result.GasConsumed, limit)
@@ -2281,6 +2282,7 @@ func TestDryCall(t *testing.T) {
 				require.NoError(t, err)
 				require.NoError(t, output.Err)
 				assert.Len(t, output.Events, 1)
+				assert.Len(t, state.UpdatedRegisterIDs(), 4)
 				assert.Equal(
 					t,
 					flow.EventType("A.f8d6e0586b0a20c7.EVM.TransactionExecuted"),
@@ -2336,7 +2338,7 @@ func TestDryCall(t *testing.T) {
 					0,
 				)
 
-				_, output, err = vm.Run(
+				state, output, err = vm.Run(
 					ctx,
 					tx,
 					snapshot,
@@ -2344,6 +2346,7 @@ func TestDryCall(t *testing.T) {
 				require.NoError(t, err)
 				require.NoError(t, output.Err)
 				assert.Len(t, output.Events, 0)
+				assert.Len(t, state.UpdatedRegisterIDs(), 0)
 			})
 	})
 
@@ -2369,7 +2372,8 @@ func TestDryCall(t *testing.T) {
 					data,
 				)
 
-				result := dryCall(t, tx, ctx, vm, snapshot)
+				result, state := dryCall(t, tx, ctx, vm, snapshot)
+				require.Len(t, state.UpdatedRegisterIDs(), 0)
 				require.Equal(t, types.ErrCodeNoError, result.ErrorCode)
 				require.Equal(t, types.StatusSuccessful, result.Status)
 				require.Greater(t, result.GasConsumed, uint64(0))
@@ -2408,12 +2412,14 @@ func TestDryCall(t *testing.T) {
 					json.MustEncode(coinbase),
 				)
 
-				_, output, err := vm.Run(
+				state, output, err := vm.Run(
 					ctx,
 					script,
-					snapshot)
+					snapshot,
+				)
 				require.NoError(t, err)
 				require.NoError(t, output.Err)
+				require.Len(t, state.UpdatedRegisterIDs(), 0)
 
 				res, err := impl.ResultSummaryFromEVMResultValue(output.Value)
 				require.NoError(t, err)
@@ -2443,7 +2449,7 @@ func TestDryCall(t *testing.T) {
 					data,
 				)
 
-				result := dryCall(t, tx, ctx, vm, snapshot)
+				result, _ := dryCall(t, tx, ctx, vm, snapshot)
 				assert.Equal(t, types.ValidationErrCodeInsufficientFunds, result.ErrorCode)
 				assert.Equal(t, types.StatusInvalid, result.Status)
 				assert.Equal(t, types.InvalidTransactionGasCost, int(result.GasConsumed))
@@ -2459,7 +2465,7 @@ func TestDryCall(t *testing.T) {
 					data,
 				)
 
-				result = dryCall(t, tx, ctx, vm, snapshot)
+				result, _ = dryCall(t, tx, ctx, vm, snapshot)
 				assert.Equal(t, types.ExecutionErrCodeExecutionReverted, result.ErrorCode)
 				assert.Equal(t, types.StatusFailed, result.Status)
 				assert.Equal(t, uint64(21331), result.GasConsumed)
