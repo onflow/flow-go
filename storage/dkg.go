@@ -73,11 +73,11 @@ type DKGState interface {
 	//   - [storage.InvalidDKGStateTransitionError] - if the requested state transition is invalid.
 	InsertMyBeaconPrivateKey(epochCounter uint64, key crypto.PrivateKey) error
 
-// CommitMyBeaconPrivateKey commits the previously inserted random beacon private key for an epoch. Effectively, this method
-// transitions the state machine into the [flow.RandomBeaconKeyCommitted] state if the current state is [flow.DKGStateCompleted].
-// The caller needs to supply the [flow.EpochCommit] as evidence that the stored key is valid for the specified epoch. Repeated
-// calls for the same epoch are accepted (idempotent operation),if and only if the provided EpochCommit confirms the already
-// committed key.
+	// CommitMyBeaconPrivateKey commits the previously inserted random beacon private key for an epoch. Effectively, this method
+	// transitions the state machine into the [flow.RandomBeaconKeyCommitted] state if the current state is [flow.DKGStateCompleted].
+	// The caller needs to supply the [flow.EpochCommit] as evidence that the stored key is valid for the specified epoch. Repeated
+	// calls for the same epoch are accepted (idempotent operation),if and only if the provided EpochCommit confirms the already
+	// committed key.
 	// No errors are expected during normal operations.
 	CommitMyBeaconPrivateKey(epochCounter uint64, commit *flow.EpochCommit) error
 }
@@ -95,7 +95,7 @@ type EpochRecoveryMyBeaconKey interface {
 
 	// UpsertMyBeaconPrivateKey overwrites the random beacon private key for the epoch that recovers the protocol
 	// from Epoch Fallback Mode. The resulting state of this method call is [flow.RandomBeaconKeyCommitted].
-	// State transitions are allowed if and only if the current state is not equal to [flow.RandomBeaconKeyCommitted]. 
+	// State transitions are allowed if and only if the current state is not equal to [flow.RandomBeaconKeyCommitted].
 	// Repeated calls for the same epoch are idempotent, if and only if the provided EpochCommit confirms the already
 	// committed key (error otherwise).
 	// No errors are expected during normal operations.
