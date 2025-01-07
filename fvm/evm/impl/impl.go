@@ -435,69 +435,59 @@ func newInternalEVMTypeCallFunction(
 		gauge,
 		stdlib.InternalEVMTypeCallFunctionType,
 		func(invocation interpreter.Invocation) interpreter.Value {
+			callArgs, err := parseCallArguments(invocation)
+			if err != nil {
+				panic(err)
+			}
+
 			inter := invocation.Interpreter
 			locationRange := invocation.LocationRange
 
-			// Get from address
-
-			fromAddressValue, ok := invocation.Arguments[0].(*interpreter.ArrayValue)
-			if !ok {
-				panic(errors.NewUnreachableError())
-			}
-
-			fromAddress, err := AddressBytesArrayValueToEVMAddress(inter, locationRange, fromAddressValue)
-			if err != nil {
-				panic(err)
-			}
-
-			// Get to address
-
-			toAddressValue, ok := invocation.Arguments[1].(*interpreter.ArrayValue)
-			if !ok {
-				panic(errors.NewUnreachableError())
-			}
-
-			toAddress, err := AddressBytesArrayValueToEVMAddress(inter, locationRange, toAddressValue)
-			if err != nil {
-				panic(err)
-			}
-
-			// Get data
-
-			dataValue, ok := invocation.Arguments[2].(*interpreter.ArrayValue)
-			if !ok {
-				panic(errors.NewUnreachableError())
-			}
-
-			data, err := interpreter.ByteArrayValueToByteSlice(inter, dataValue, locationRange)
-			if err != nil {
-				panic(err)
-			}
-
-			// Get gas limit
-
-			gasLimitValue, ok := invocation.Arguments[3].(interpreter.UInt64Value)
-			if !ok {
-				panic(errors.NewUnreachableError())
-			}
-
-			gasLimit := types.GasLimit(gasLimitValue)
-
-			// Get balance
-
-			balanceValue, ok := invocation.Arguments[4].(interpreter.UIntValue)
-			if !ok {
-				panic(errors.NewUnreachableError())
-			}
-
-			balance := types.NewBalance(balanceValue.BigInt)
 			// Call
 
 			const isAuthorized = true
-			account := handler.AccountByAddress(fromAddress, isAuthorized)
-			result := account.Call(toAddress, data, gasLimit, balance)
+			account := handler.AccountByAddress(callArgs.from, isAuthorized)
+			result := account.Call(callArgs.to, callArgs.data, callArgs.gasLimit, callArgs.balance)
 
 			return NewResultValue(handler, gauge, inter, locationRange, result)
+		},
+	)
+}
+
+func newInternalEVMTypeDryCallFunction(
+	gauge common.MemoryGauge,
+	handler types.ContractHandler,
+) *interpreter.HostFunctionValue {
+	return interpreter.NewStaticHostFunctionValue(
+		gauge,
+		stdlib.InternalEVMTypeDryCallFunctionType,
+		func(invocation interpreter.Invocation) interpreter.Value {
+			callArgs, err := parseCallArguments(invocation)
+			if err != nil {
+				panic(err)
+			}
+			to := callArgs.to.ToCommon()
+
+			tx := gethTypes.NewTx(&gethTypes.LegacyTx{
+				Nonce:    0,
+				To:       &to,
+				Gas:      uint64(callArgs.gasLimit),
+				Data:     callArgs.data,
+				GasPrice: big.NewInt(0),
+				Value:    callArgs.balance,
+			})
+
+			txPayload, err := tx.MarshalBinary()
+			if err != nil {
+				panic(err)
+			}
+
+			// call contract function
+			inter := invocation.Interpreter
+			locationRange := invocation.LocationRange
+
+			res := handler.DryRun(txPayload, callArgs.from)
+			return NewResultValue(handler, gauge, inter, locationRange, res)
 		},
 	)
 }
@@ -898,95 +888,6 @@ func newInternalEVMTypeDryRunFunction(
 	)
 }
 
-func newInternalEVMTypeDryCallFunction(
-	gauge common.MemoryGauge,
-	handler types.ContractHandler,
-) *interpreter.HostFunctionValue {
-	return interpreter.NewStaticHostFunctionValue(
-		gauge,
-		stdlib.InternalEVMTypeDryCallFunctionType,
-		func(invocation interpreter.Invocation) interpreter.Value {
-			inter := invocation.Interpreter
-			locationRange := invocation.LocationRange
-
-			// Get from address
-
-			fromAddressValue, ok := invocation.Arguments[0].(*interpreter.ArrayValue)
-			if !ok {
-				panic(errors.NewUnreachableError())
-			}
-
-			fromAddress, err := AddressBytesArrayValueToEVMAddress(inter, locationRange, fromAddressValue)
-			if err != nil {
-				panic(err)
-			}
-
-			// Get to address
-
-			toAddressValue, ok := invocation.Arguments[1].(*interpreter.ArrayValue)
-			if !ok {
-				panic(errors.NewUnreachableError())
-			}
-
-			toAddress, err := AddressBytesArrayValueToEVMAddress(inter, locationRange, toAddressValue)
-			if err != nil {
-				panic(err)
-			}
-
-			to := toAddress.ToCommon()
-
-			// Get data
-
-			dataValue, ok := invocation.Arguments[2].(*interpreter.ArrayValue)
-			if !ok {
-				panic(errors.NewUnreachableError())
-			}
-
-			data, err := interpreter.ByteArrayValueToByteSlice(inter, dataValue, locationRange)
-			if err != nil {
-				panic(err)
-			}
-
-			// Get gas limit
-
-			gasLimitValue, ok := invocation.Arguments[3].(interpreter.UInt64Value)
-			if !ok {
-				panic(errors.NewUnreachableError())
-			}
-
-			gasLimit := types.GasLimit(gasLimitValue)
-
-			// Get balance
-
-			balanceValue, ok := invocation.Arguments[4].(interpreter.UIntValue)
-			if !ok {
-				panic(errors.NewUnreachableError())
-			}
-
-			balance := types.NewBalance(balanceValue.BigInt)
-
-			tx := gethTypes.NewTx(&gethTypes.LegacyTx{
-				Nonce:    0,
-				To:       &to,
-				Gas:      uint64(gasLimit),
-				Data:     data,
-				GasPrice: big.NewInt(0),
-				Value:    balance,
-			})
-
-			txPayload, err := tx.MarshalBinary()
-			if err != nil {
-				panic(err)
-			}
-
-			// call contract function
-
-			res := handler.DryRun(txPayload, fromAddress)
-			return NewResultValue(handler, gauge, inter, locationRange, res)
-		},
-	)
-}
-
 func newInternalEVMTypeBatchRunFunction(
 	gauge common.MemoryGauge,
 	handler types.ContractHandler,
@@ -1252,4 +1153,82 @@ func ResultSummaryFromEVMResultValue(val cadence.Value) (*types.ResultSummary, e
 		DeployedContractAddress: convertedDeployedAddress,
 	}, nil
 
+}
+
+type callArguments struct {
+	from     types.Address
+	to       types.Address
+	data     []byte
+	gasLimit types.GasLimit
+	balance  types.Balance
+}
+
+func parseCallArguments(invocation interpreter.Invocation) (
+	*callArguments,
+	error,
+) {
+	inter := invocation.Interpreter
+	locationRange := invocation.LocationRange
+
+	// Get from address
+
+	fromAddressValue, ok := invocation.Arguments[0].(*interpreter.ArrayValue)
+	if !ok {
+		return nil, errors.NewUnreachableError()
+	}
+
+	fromAddress, err := AddressBytesArrayValueToEVMAddress(inter, locationRange, fromAddressValue)
+	if err != nil {
+		return nil, err
+	}
+
+	// Get to address
+
+	toAddressValue, ok := invocation.Arguments[1].(*interpreter.ArrayValue)
+	if !ok {
+		return nil, errors.NewUnreachableError()
+	}
+
+	toAddress, err := AddressBytesArrayValueToEVMAddress(inter, locationRange, toAddressValue)
+	if err != nil {
+		return nil, err
+	}
+
+	// Get data
+
+	dataValue, ok := invocation.Arguments[2].(*interpreter.ArrayValue)
+	if !ok {
+		return nil, errors.NewUnreachableError()
+	}
+
+	data, err := interpreter.ByteArrayValueToByteSlice(inter, dataValue, locationRange)
+	if err != nil {
+		return nil, err
+	}
+
+	// Get gas limit
+
+	gasLimitValue, ok := invocation.Arguments[3].(interpreter.UInt64Value)
+	if !ok {
+		panic(errors.NewUnreachableError())
+	}
+
+	gasLimit := types.GasLimit(gasLimitValue)
+
+	// Get balance
+
+	balanceValue, ok := invocation.Arguments[4].(interpreter.UIntValue)
+	if !ok {
+		return nil, errors.NewUnreachableError()
+	}
+
+	balance := types.NewBalance(balanceValue.BigInt)
+
+	return &callArguments{
+		from:     fromAddress,
+		to:       toAddress,
+		data:     data,
+		gasLimit: gasLimit,
+		balance:  balance,
+	}, nil
 }
