@@ -34,6 +34,7 @@ var allowedStateTransitions = map[flow.DKGState][]flow.DKGState{
 // If for any reason the DKG fails, then the private key will be nil and DKG state is set to [flow.DKGStateFailure].
 // When the epoch recovery takes place, we need to query the last valid beacon private key for the current replica and
 // also set it for use during the Recovery Epoch, otherwise replicas won't be able to vote for blocks during the Recovery Epoch.
+// CAUTION: This implementation heavily depends on atomic Badger transactions with interleaved reads and writes for correctness.
 type RecoverablePrivateBeaconKeyStateMachine struct {
 	db       *badger.DB
 	keyCache *Cache[uint64, *encodable.RandomBeaconPrivKey]
