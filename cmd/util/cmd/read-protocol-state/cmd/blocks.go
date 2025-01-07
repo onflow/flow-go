@@ -216,6 +216,7 @@ func run(*cobra.Command, []string) {
 			log.Fatal().Err(err).Msg("could not get root block")
 		}
 
+		// find the last executed and sealed block
 		for h := sealed.Header.Height; h >= root.Header.Height; h-- {
 			block, err := reader.GetBlockByHeight(h)
 			if err != nil {
@@ -233,8 +234,7 @@ func run(*cobra.Command, []string) {
 			}
 		}
 
-		// use binary search to find the last executed and sealed block
-
+		log.Fatal().Msg("could not find executed block")
 	}
 
 	log.Fatal().Msgf("missing flag, try --final or --sealed or --height or --executed or --block-id")
