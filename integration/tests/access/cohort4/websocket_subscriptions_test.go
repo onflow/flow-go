@@ -376,6 +376,9 @@ func (s *WebsocketSubscriptionSuite) TestUnsubscriptionErrorCases() {
 	}
 }
 
+// TestHappyCases tests various scenarios for websocket subscriptions including
+// streaming blocks, block headers, block digests, events, account statuses,
+// and transaction statuses.
 func (s *WebsocketSubscriptionSuite) TestHappyCases() {
 	restAddr := s.net.ContainerByName(testnet.PrimaryAN).Addr(testnet.RESTPort)
 
@@ -554,8 +557,8 @@ func (s *WebsocketSubscriptionSuite) TestHappyCases() {
 	s.T().Run("send and subscribe to transaction statuses", func(t *testing.T) {
 		tx := s.createAccountTx()
 
-		convertToProposalKey := func(key sdk.ProposalKey) models.ProposalKey {
-			return models.ProposalKey{
+		convertToProposalKey := func(key sdk.ProposalKey) commonmodels.ProposalKey {
+			return commonmodels.ProposalKey{
 				Address:        flow.Address(key.Address).String(),
 				KeyIndex:       strconv.FormatUint(uint64(key.KeyIndex), 10),
 				SequenceNumber: strconv.FormatUint(key.SequenceNumber, 10),
@@ -580,14 +583,13 @@ func (s *WebsocketSubscriptionSuite) TestHappyCases() {
 			return wsAuthorizers
 		}
 
-		convertToSig := func(sigs []sdk.TransactionSignature) []models.TransactionSignature {
-			wsSigs := make([]models.TransactionSignature, len(sigs))
+		convertToSig := func(sigs []sdk.TransactionSignature) []commonmodels.TransactionSignature {
+			wsSigs := make([]commonmodels.TransactionSignature, len(sigs))
 			for i, sig := range sigs {
-				wsSigs[i] = models.TransactionSignature{
-					Address:     sig.Address.String(),
-					SignerIndex: strconv.Itoa(sig.SignerIndex),
-					KeyIndex:    strconv.FormatUint(uint64(sig.KeyIndex), 10),
-					Signature:   util.ToBase64(sig.Signature),
+				wsSigs[i] = commonmodels.TransactionSignature{
+					Address:   sig.Address.String(),
+					KeyIndex:  strconv.FormatUint(uint64(sig.KeyIndex), 10),
+					Signature: util.ToBase64(sig.Signature),
 				}
 			}
 

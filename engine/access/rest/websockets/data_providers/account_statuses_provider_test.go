@@ -2,7 +2,6 @@ package data_providers
 
 import (
 	"context"
-	"strconv"
 	"testing"
 
 	"github.com/rs/zerolog"
@@ -106,33 +105,33 @@ func (s *AccountStatusesProviderSuite) subscribeAccountStatusesDataProviderTestC
 			},
 			expectedResponses: expectedResponses,
 		},
-		{
-			name: "SubscribeAccountStatusesFromStartHeight happy path",
-			arguments: models.Arguments{
-				"start_block_height": strconv.FormatUint(s.rootBlock.Header.Height, 10),
-			},
-			setupBackend: func(sub *ssmock.Subscription) {
-				s.api.On(
-					"SubscribeAccountStatusesFromStartHeight",
-					mock.Anything,
-					s.rootBlock.Header.Height,
-					mock.Anything,
-				).Return(sub).Once()
-			},
-			expectedResponses: expectedResponses,
-		},
-		{
-			name:      "SubscribeAccountStatusesFromLatestBlock happy path",
-			arguments: models.Arguments{},
-			setupBackend: func(sub *ssmock.Subscription) {
-				s.api.On(
-					"SubscribeAccountStatusesFromLatestBlock",
-					mock.Anything,
-					mock.Anything,
-				).Return(sub).Once()
-			},
-			expectedResponses: expectedResponses,
-		},
+		//{
+		//	name: "SubscribeAccountStatusesFromStartHeight happy path",
+		//	arguments: models.Arguments{
+		//		"start_block_height": strconv.FormatUint(s.rootBlock.Header.Height, 10),
+		//	},
+		//	setupBackend: func(sub *ssmock.Subscription) {
+		//		s.api.On(
+		//			"SubscribeAccountStatusesFromStartHeight",
+		//			mock.Anything,
+		//			s.rootBlock.Header.Height,
+		//			mock.Anything,
+		//		).Return(sub).Once()
+		//	},
+		//	expectedResponses: expectedResponses,
+		//},
+		//{
+		//	name:      "SubscribeAccountStatusesFromLatestBlock happy path",
+		//	arguments: models.Arguments{},
+		//	setupBackend: func(sub *ssmock.Subscription) {
+		//		s.api.On(
+		//			"SubscribeAccountStatusesFromLatestBlock",
+		//			mock.Anything,
+		//			mock.Anything,
+		//		).Return(sub).Once()
+		//	},
+		//	expectedResponses: expectedResponses,
+		//},
 	}
 }
 

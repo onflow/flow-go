@@ -1,7 +1,9 @@
 package data_providers
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
 
 	"github.com/rs/zerolog"
@@ -11,9 +13,7 @@ import (
 	"github.com/onflow/flow-go/access"
 	commonmodels "github.com/onflow/flow-go/engine/access/rest/common/models"
 	commonparser "github.com/onflow/flow-go/engine/access/rest/common/parser"
-	"github.com/onflow/flow-go/engine/access/rest/util"
 	"github.com/onflow/flow-go/engine/access/rest/websockets/models"
-	"github.com/onflow/flow-go/engine/access/rest/websockets/parser"
 	"github.com/onflow/flow-go/engine/access/subscription"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/counters"
@@ -44,6 +44,7 @@ func NewSendAndGetTransactionStatusesDataProvider(
 	topic string,
 	arguments models.Arguments,
 	send chan<- interface{},
+	chain flow.Chain,
 ) (*SendAndGetTransactionStatusesDataProvider, error) {
 	p := &SendAndGetTransactionStatusesDataProvider{
 		logger:        logger.With().Str("component", "send-transaction-statuses-data-provider").Logger(),
@@ -52,7 +53,7 @@ func NewSendAndGetTransactionStatusesDataProvider(
 	}
 
 	// Initialize arguments passed to the provider.
-	sendTxStatusesArgs, err := parseSendAndGetTransactionStatusesArguments(arguments)
+	sendTxStatusesArgs, err := parseSendAndGetTransactionStatusesArguments(arguments, chain)
 	if err != nil {
 		return nil, fmt.Errorf("invalid arguments for send tx statuses data provider: %w", err)
 	}
@@ -111,154 +112,26 @@ func (p *SendAndGetTransactionStatusesDataProvider) handleResponse() func(txResu
 // parseSendAndGetTransactionStatusesArguments validates and initializes the account statuses arguments.
 func parseSendAndGetTransactionStatusesArguments(
 	arguments models.Arguments,
+	chain flow.Chain,
 ) (sendAndGetTransactionStatusesArguments, error) {
 	var args sendAndGetTransactionStatusesArguments
-	var tx flow.TransactionBody
 
-	if scriptIn, ok := arguments["script"]; ok && scriptIn != "" {
-		result, ok := scriptIn.(string)
-		if !ok {
-			return args, fmt.Errorf("'script' must be a string")
-		}
-
-		script, err := util.FromBase64(result)
-		if err != nil {
-			return args, fmt.Errorf("invalid 'script': %w", err)
-		}
-
-		tx.Script = script
+	// Convert the arguments map to JSON
+	rawJSON, err := json.Marshal(arguments)
+	if err != nil {
+		return args, fmt.Errorf("failed to marshal arguments: %w", err)
 	}
 
-	if argumentsIn, ok := arguments["arguments"]; ok && argumentsIn != "" {
-		result, ok := argumentsIn.([]interface{})
-		if !ok {
-			return args, fmt.Errorf("'arguments' must be an array")
-		}
+	// Create an io.Reader from the JSON bytes
+	rawReader := bytes.NewReader(rawJSON)
 
-		var argumentsData [][]byte
-		for _, value := range result {
-			arg, ok := value.(string)
-			if !ok {
-				return args, fmt.Errorf("'argument' must be a string")
-			}
-
-			argument, err := util.FromBase64(arg)
-			if err != nil {
-				return args, fmt.Errorf("invalid 'arguments': %w", err)
-			}
-
-			argumentsData = append(argumentsData, argument)
-		}
-
-		tx.Arguments = argumentsData
+	var tx commonparser.Transaction
+	err = tx.Parse(rawReader, chain)
+	if err != nil {
+		return args, fmt.Errorf("failed to parse transaction: %w", err)
 	}
 
-	if referenceBlockIDIn, ok := arguments["reference_block_id"]; ok && referenceBlockIDIn != "" {
-		result, ok := referenceBlockIDIn.(string)
-		if !ok {
-			return args, fmt.Errorf("'reference_block_id' must be a string")
-		}
-
-		var referenceBlockID commonparser.ID
-		err := referenceBlockID.Parse(result)
-		if err != nil {
-			return args, fmt.Errorf("invalid 'reference_block_id': %w", err)
-		}
-
-		tx.ReferenceBlockID = referenceBlockID.Flow()
-	}
-
-	if gasLimitIn, ok := arguments["gas_limit"]; ok && gasLimitIn != "" {
-		result, ok := gasLimitIn.(string)
-		if !ok {
-			return args, fmt.Errorf("'gas_limit' must be a string")
-		}
-
-		gasLimit, err := util.ToUint64(result)
-		if err != nil {
-			return args, fmt.Errorf("invalid 'gas_limit': %w", err)
-		}
-		tx.GasLimit = gasLimit
-	}
-
-	if payerIn, ok := arguments["payer"]; ok && payerIn != "" {
-		result, ok := payerIn.(string)
-		if !ok {
-			return args, fmt.Errorf("'payer' must be a string")
-		}
-
-		payerAddr, err := flow.StringToAddress(result)
-		if err != nil {
-			return args, fmt.Errorf("invalid 'payer': %w", err)
-		}
-		tx.Payer = payerAddr
-	}
-
-	if proposalKeyIn, ok := arguments["proposal_key"]; ok && proposalKeyIn != "" {
-		var proposalKey parser.ProposalKey
-		err := proposalKey.Parse(proposalKeyIn)
-		if err != nil {
-			return args, fmt.Errorf("invalid 'proposal_key': %w", err)
-		}
-
-		tx.ProposalKey = proposalKey.Flow()
-	}
-
-	if authorizersIn, ok := arguments["authorizers"]; ok && authorizersIn != "" {
-		result, ok := authorizersIn.([]interface{})
-		if !ok {
-			return args, fmt.Errorf("'authorizers' must be an array")
-		}
-
-		var authorizersData []flow.Address
-		for i, auth := range result {
-			authStr, ok := auth.(string)
-			if !ok {
-				return args, fmt.Errorf("invalid 'authorizer':%v, index: %d: must be a string", auth, i)
-			}
-
-			authorizer, err := flow.StringToAddress(authStr)
-			if err != nil {
-				return args, fmt.Errorf("invalid 'authorizers': %w", err)
-			}
-
-			authorizersData = append(authorizersData, authorizer)
-		}
-
-		tx.Authorizers = authorizersData
-	}
-
-	if payloadSignaturesIn, ok := arguments["payload_signatures"]; ok && payloadSignaturesIn != "" {
-		signatures, ok := payloadSignaturesIn.([]interface{})
-		if !ok {
-			return args, fmt.Errorf("'payload_signatures' must be an array")
-		}
-
-		var payloadSignatures parser.TransactionSignatures
-		err := payloadSignatures.Parse(signatures)
-		if err != nil {
-			return args, fmt.Errorf("invalid 'payload_signatures': %w", err)
-		}
-
-		tx.PayloadSignatures = payloadSignatures.Flow()
-	}
-
-	if envelopeSignaturesIn, ok := arguments["envelope_signatures"]; ok && envelopeSignaturesIn != "" {
-		signatures, ok := envelopeSignaturesIn.([]interface{})
-		if !ok {
-			return args, fmt.Errorf("'envelope_signatures' must be an array")
-		}
-
-		var envelopeSignatures parser.TransactionSignatures
-		err := envelopeSignatures.Parse(signatures)
-		if err != nil {
-			return args, fmt.Errorf("invalid 'envelope_signatures': %w", err)
-		}
-
-		tx.EnvelopeSignatures = envelopeSignatures.Flow()
-
-	}
-	args.Transaction = tx
+	args.Transaction = tx.Flow()
 
 	return args, nil
 }
