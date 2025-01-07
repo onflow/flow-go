@@ -7,6 +7,10 @@
 /cmd/consensus/** @AlexHentschel @durkmurder @jordanschalm
 /engine/consensus/** @AlexHentschel @durkmurder @jordanschalm
 
+# Protocol state
+/state/protocol/** @AlexHentschel @durkmurder @jordanschalm
+/state/cluster/** @AlexHentschel @durkmurder @jordanschalm
+
 # Execution Stream
 /cmd/execution/** @zhangchiqing
 /engine/execution/** @zhangchiqing
