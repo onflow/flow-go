@@ -78,18 +78,31 @@ func TestDKGState_UninitializedState(t *testing.T) {
 			require.True(t, storage.IsInvalidDKGStateTransitionError(err))
 		})
 
-		t.Run("state transition flow.DKGStateUninitialized -> flow.RandomBeaconKeyCommitted should be allowed", func(t *testing.T) {
-			epochCounter := setupState()
-			err = store.SetDKGState(epochCounter, flow.RandomBeaconKeyCommitted)
+		t.Run("while state transition flow.DKGStateUninitialized -> flow.RandomBeaconKeyCommitted is allowed, it should not proceed without a key being inserted first", func(t *testing.T) {
+			err = store.SetDKGState(setupState(), flow.RandomBeaconKeyCommitted)
 			require.Error(t, err, "should not be able to set DKG state to recovered, only using dedicated interface")
 			require.True(t, storage.IsInvalidDKGStateTransitionError(err))
-			pk := unittest.StakingPrivKeyFixture()
+		})
+
+		t.Run("state transition flow.DKGStateUninitialized -> flow.RandomBeaconKeyCommitted should be allowed, but only via upserting a key", func(t *testing.T) {
+			epochCounter := setupState()
+			expectedKey := unittest.StakingPrivKeyFixture()
 			evidence := unittest.EpochCommitFixture(func(commit *flow.EpochCommit) {
 				commit.Counter = epochCounter
-				commit.DKGParticipantKeys[0] = pk.PublicKey()
+				commit.DKGParticipantKeys[0] = expectedKey.PublicKey()
 			})
-			err = store.UpsertMyBeaconPrivateKey(epochCounter, pk, evidence)
+			err = store.UpsertMyBeaconPrivateKey(epochCounter, expectedKey, evidence)
 			require.NoError(t, err)
+			resultingState, err := store.GetDKGState(epochCounter)
+			require.NoError(t, err)
+			require.Equal(t, flow.RandomBeaconKeyCommitted, resultingState)
+			actualKey, safe, err := store.RetrieveMyBeaconPrivateKey(epochCounter)
+			require.NoError(t, err)
+			require.True(t, safe)
+			require.Equal(t, expectedKey, actualKey)
+			actualKey, err = store.UnsafeRetrieveMyBeaconPrivateKey(epochCounter)
+			require.NoError(t, err)
+			require.Equal(t, expectedKey, actualKey)
 		})
 	})
 }
@@ -194,7 +207,6 @@ func TestDKGState_StartedState(t *testing.T) {
 			require.NoError(t, err)
 			require.Equal(t, expectedKey, actualKey)
 		})
-
 	})
 }
 
