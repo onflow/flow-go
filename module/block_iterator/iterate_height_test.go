@@ -29,17 +29,13 @@ func TestIterateHeight(t *testing.T) {
 			require.NoError(t, db.Update(operation.IndexBlockHeight(b.Height, b.ID())))
 		}
 
-		var savedNextHeight uint64
-		saveNext := func(height uint64) error {
-			savedNextHeight = height
-			return nil
-		}
+		progress := &saveNextHeight{}
 
 		// create iterator
 		// b0 is the root block, iterate from b1 to b3
 		job := module.IterateJob{Start: b1.Height, End: b3.Height}
 		headers := storagebadger.NewHeaders(&metrics.NoopCollector{}, db)
-		iter, err := NewHeightIterator(headers, saveNext, context.Background(), job)
+		iter, err := NewHeightIterator(headers, progress, context.Background(), job)
 		require.NoError(t, err)
 
 		// iterate through all blocks
@@ -69,9 +65,30 @@ func TestIterateHeight(t *testing.T) {
 		require.Empty(t, visited)
 
 		// save the next to iterate height and verify
+
 		require.NoError(t, iter.Checkpoint())
+
+		savedNextHeight, err := progress.ReadNext()
+		require.NoError(t, err)
+
 		require.Equal(t, b3.Height+1, savedNextHeight,
 			fmt.Sprintf("saved next height should be %v, but got %v", b3.Height, savedNextHeight))
 
 	})
+}
+
+type saveNextHeight struct {
+	savedNextHeight uint64
+}
+
+var _ module.IterateProgressWriter = (*saveNextHeight)(nil)
+var _ module.IterateProgressReader = (*saveNextHeight)(nil)
+
+func (s *saveNextHeight) SaveNext(height uint64) error {
+	s.savedNextHeight = height
+	return nil
+}
+
+func (s *saveNextHeight) ReadNext() (uint64, error) {
+	return s.savedNextHeight, nil
 }
