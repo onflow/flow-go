@@ -1,8 +1,5 @@
 # Protocol owners are not generally differentiated by sub-area for simplicity
-/** @jordanschalm @AlexHentschel @durkmurder @zhangchiqing @peterargue @Kay-Zee @janezpodhostnik 
+/** @jordanschalm @AlexHentschel @durkmurder @zhangchiqing @peterargue @Kay-Zee @janezpodhostnik @tarakby
 
 # FVM specific
 /fvm/** @janezpodhostnik @zhangchiqing 
-
-# Cryptography 
-/crypto/** @tarakby
