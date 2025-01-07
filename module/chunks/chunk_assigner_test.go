@@ -46,7 +46,7 @@ func (a *PublicAssignmentTestSuite) TestByNodeID() {
 	// creates ids and twice chunks of the ids
 	ids := unittest.IdentityListFixture(size)
 	chunks := a.CreateChunks(2*size, a.T())
-	assignment := chmodels.NewAssignment()
+	assignmentBuilder := chmodels.NewAssignmentBuilder()
 
 	// assigns two chunks to each verifier node
 	// j keeps track of chunks
@@ -54,12 +54,13 @@ func (a *PublicAssignmentTestSuite) TestByNodeID() {
 	for i := 0; i < size; i++ {
 		c, ok := chunks.ByIndex(uint64(j))
 		require.True(a.T(), ok, "chunk out of range requested")
-		assignment.Add(c, append(assignment.Verifiers(c), ids[i].NodeID))
+		assignmentBuilder.Add(c, append(assignmentBuilder.Build().Verifiers(c), ids[i].NodeID))
 		j++
 		c, ok = chunks.ByIndex(uint64(j))
 		require.True(a.T(), ok, "chunk out of range requested")
-		assignment.Add(c, append(assignment.Verifiers(c), ids[i].NodeID))
+		assignmentBuilder.Add(c, append(assignmentBuilder.Build().Verifiers(c), ids[i].NodeID))
 	}
+	assignment := assignmentBuilder.Build()
 
 	// evaluating the chunk assignment
 	// each verifier should have two certain chunks based on the assignment
@@ -85,13 +86,13 @@ func (a *PublicAssignmentTestSuite) TestAssignDuplicate() {
 	// creates ids and twice chunks of the ids
 	var ids flow.IdentityList = unittest.IdentityListFixture(size)
 	chunks := a.CreateChunks(2, a.T())
-	assignment := chmodels.NewAssignment()
+	assignmentBuilder := chmodels.NewAssignmentBuilder()
 
 	// assigns first chunk to non-duplicate list of verifiers
 	c, ok := chunks.ByIndex(uint64(0))
 	require.True(a.T(), ok, "chunk out of range requested")
-	assignment.Add(c, ids.NodeIDs())
-	require.Len(a.T(), assignment.Verifiers(c), size)
+	assignmentBuilder.Add(c, ids.NodeIDs())
+	require.Len(a.T(), assignmentBuilder.Build().Verifiers(c), size)
 
 	// duplicates first verifier, hence size increases by 1
 	ids = append(ids, ids[0])
@@ -99,9 +100,9 @@ func (a *PublicAssignmentTestSuite) TestAssignDuplicate() {
 	// assigns second chunk to a duplicate list of verifiers
 	c, ok = chunks.ByIndex(uint64(1))
 	require.True(a.T(), ok, "chunk out of range requested")
-	assignment.Add(c, ids.NodeIDs())
+	assignmentBuilder.Add(c, ids.NodeIDs())
 	// should be size not size + 1
-	require.Len(a.T(), assignment.Verifiers(c), size)
+	require.Len(a.T(), assignmentBuilder.Build().Verifiers(c), size)
 }
 
 // TestPermuteEntirely tests permuting an entire IdentityList against

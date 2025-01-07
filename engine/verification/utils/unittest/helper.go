@@ -266,23 +266,23 @@ func isSystemChunk(index uint64, chunkNum int) bool {
 	return int(index) == chunkNum-1
 }
 
-func CreateExecutionResult(blockID flow.Identifier, options ...func(result *flow.ExecutionResult, assignments *chunks.Assignment)) (*flow.ExecutionResult, *chunks.Assignment) {
+func CreateExecutionResult(blockID flow.Identifier, options ...func(result *flow.ExecutionResult, assignments *chunks.AssignmentBuilder)) (*flow.ExecutionResult, *chunks.Assignment) {
 	result := &flow.ExecutionResult{
 		BlockID: blockID,
 		Chunks:  flow.ChunkList{},
 	}
-	assignments := chunks.NewAssignment()
+	assignmentsBuilder := chunks.NewAssignmentBuilder()
 
 	for _, option := range options {
-		option(result, assignments)
+		option(result, assignmentsBuilder)
 	}
-	return result, assignments
+	return result, assignmentsBuilder.Build()
 }
 
-func WithChunks(setAssignees ...func(flow.Identifier, uint64, *chunks.Assignment) *flow.Chunk) func(*flow.ExecutionResult, *chunks.Assignment) {
-	return func(result *flow.ExecutionResult, assignment *chunks.Assignment) {
+func WithChunks(setAssignees ...func(flow.Identifier, uint64, *chunks.AssignmentBuilder) *flow.Chunk) func(*flow.ExecutionResult, *chunks.AssignmentBuilder) {
+	return func(result *flow.ExecutionResult, assignmentBuilder *chunks.AssignmentBuilder) {
 		for i, setAssignee := range setAssignees {
-			chunk := setAssignee(result.BlockID, uint64(i), assignment)
+			chunk := setAssignee(result.BlockID, uint64(i), assignmentBuilder)
 			result.Chunks.Insert(chunk)
 		}
 	}
@@ -301,11 +301,11 @@ func ChunkWithIndex(blockID flow.Identifier, index int) *flow.Chunk {
 	return chunk
 }
 
-func WithAssignee(assignee flow.Identifier) func(flow.Identifier, uint64, *chunks.Assignment) *flow.Chunk {
-	return func(blockID flow.Identifier, index uint64, assignment *chunks.Assignment) *flow.Chunk {
+func WithAssignee(assignee flow.Identifier) func(flow.Identifier, uint64, *chunks.AssignmentBuilder) *flow.Chunk {
+	return func(blockID flow.Identifier, index uint64, assignmentBuilder *chunks.AssignmentBuilder) *flow.Chunk {
 		chunk := ChunkWithIndex(blockID, int(index))
 		fmt.Printf("with assignee: %v, chunk id: %v\n", index, chunk.ID())
-		assignment.Add(chunk, flow.IdentifierList{assignee})
+		assignmentBuilder.Add(chunk, flow.IdentifierList{assignee})
 		return chunk
 	}
 }
@@ -336,7 +336,7 @@ func MockChunkAssignmentFixture(chunkAssigner *mock.ChunkAssigner,
 
 	for _, completeER := range completeERs {
 		for _, receipt := range completeER.Receipts {
-			a := chunks.NewAssignment()
+			a := chunks.NewAssignmentBuilder()
 
 			_, duplicate := visited[receipt.ExecutionResult.ID()]
 			if duplicate {
@@ -356,8 +356,9 @@ func MockChunkAssignmentFixture(chunkAssigner *mock.ChunkAssigner,
 				}
 
 			}
+			assignment := a.Build()
 
-			chunkAssigner.On("Assign", &receipt.ExecutionResult, completeER.ContainerBlock.ID()).Return(a, nil)
+			chunkAssigner.On("Assign", &receipt.ExecutionResult, completeER.ContainerBlock.ID()).Return(assignment, nil)
 			visited[receipt.ExecutionResult.ID()] = struct{}{}
 		}
 	}

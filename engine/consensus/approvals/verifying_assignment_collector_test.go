@@ -302,13 +302,13 @@ func (s *AssignmentCollectorTestSuite) TestProcessApproval_BeforeIncorporatedRes
 // rate limiting is respected.
 func (s *AssignmentCollectorTestSuite) TestRequestMissingApprovals() {
 	// build new assignment with 2 verifiers
-	assignment := chunks.NewAssignment()
+	assignmentBuilder := chunks.NewAssignmentBuilder()
 	for _, chunk := range s.Chunks {
 		verifiers := s.ChunksAssignment.Verifiers(chunk)
-		assignment.Add(chunk, verifiers[:2])
+		assignmentBuilder.Add(chunk, verifiers[:2])
 	}
 	// replace old one
-	s.ChunksAssignment = assignment
+	s.ChunksAssignment = assignmentBuilder.Build()
 
 	incorporatedBlocks := make([]*flow.Header, 0)
 

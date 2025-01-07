@@ -87,7 +87,7 @@ func SetupTest(options ...func(suite *AssignerEngineTestSuite)) *AssignerEngineT
 
 // createContainerBlock creates and returns a block that contains an execution receipt, with its corresponding chunks assignment based
 // on the input options.
-func createContainerBlock(options ...func(result *flow.ExecutionResult, assignments *chunks.Assignment)) (*flow.Block, *chunks.Assignment) {
+func createContainerBlock(options ...func(result *flow.ExecutionResult, assignments *chunks.AssignmentBuilder)) (*flow.Block, *chunks.Assignment) {
 	result, assignment := vertestutils.CreateExecutionResult(unittest.IdentifierFixture(), options...)
 	receipt := &flow.ExecutionReceipt{
 		ExecutorID:      unittest.IdentifierFixture(),

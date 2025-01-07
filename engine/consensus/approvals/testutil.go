@@ -42,7 +42,7 @@ func (s *BaseApprovalsTestSuite) SetupTest() {
 	s.Block = unittest.BlockHeaderWithParentFixture(s.ParentBlock)
 	verifiers := make(flow.IdentifierList, 0)
 	s.AuthorizedVerifiers = make(map[flow.Identifier]*flow.Identity)
-	s.ChunksAssignment = chunks.NewAssignment()
+	assignmentBuilder := chunks.NewAssignmentBuilder()
 	s.Chunks = unittest.ChunkListFixture(50, s.Block.ID())
 	// mock public key to mock signature verifications
 	s.PublicKey = &module.PublicKey{}
@@ -59,8 +59,9 @@ func (s *BaseApprovalsTestSuite) SetupTest() {
 
 	// create assignment
 	for _, chunk := range s.Chunks {
-		s.ChunksAssignment.Add(chunk, verifiers)
+		assignmentBuilder.Add(chunk, verifiers)
 	}
+	s.ChunksAssignment = assignmentBuilder.Build()
 
 	s.VerID = verifiers[0]
 	result := unittest.ExecutionResultFixture()

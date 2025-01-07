@@ -4,15 +4,30 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
-// Assignment is assignment map of the chunks to the list of the verifier nodes
+// Assignment is an immutable map from chunks to a list of the verifier nodes
+// that are assigned to verify that chunk
 type Assignment struct {
 	// TODO: use a slice here instead of a map, which will be more performant
 	verifiersForChunk map[uint64]map[flow.Identifier]struct{}
 }
 
-func NewAssignment() *Assignment {
-	return &Assignment{
+// AssignmentBuilder is a helper to create a new Assignment map
+type AssignmentBuilder struct {
+	verifiersForChunk map[uint64]map[flow.Identifier]struct{}
+}
+
+func NewAssignmentBuilder() *AssignmentBuilder {
+	return &AssignmentBuilder{
 		verifiersForChunk: make(map[uint64]map[flow.Identifier]struct{}),
+	}
+}
+
+func (a *AssignmentBuilder) Build() *Assignment {
+	// TODO is this correct?
+	// the underlying data can still be modified by the Builder,
+	// but the Builder ideally shouldn't be kept around or reused, so it should be sufficient
+	return &Assignment{
+		verifiersForChunk: a.verifiersForChunk,
 	}
 }
 
@@ -38,9 +53,9 @@ func (a *Assignment) HasVerifier(chunk *flow.Chunk, identifier flow.Identifier) 
 	return isAssigned
 }
 
-// Add records the list of verifier nodes as the assigned verifiers of the chunk
-// it returns an error if the list of verifiers is empty or contains duplicate ids
-func (a *Assignment) Add(chunk *flow.Chunk, verifiers flow.IdentifierList) {
+// Add records the list of verifier nodes as the assigned verifiers of the chunk.
+// It returns an error if the list of verifiers is empty or contains duplicate ids
+func (a *AssignmentBuilder) Add(chunk *flow.Chunk, verifiers flow.IdentifierList) {
 	// sorts verifiers list based on their identifier
 	v := make(map[flow.Identifier]struct{})
 	for _, id := range verifiers {

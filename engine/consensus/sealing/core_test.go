@@ -594,12 +594,13 @@ func (s *ApprovalProcessingCoreTestSuite) TestRequestPendingApprovals() {
 
 		prevResult = ir.Result
 
-		s.ChunksAssignment = chunks.NewAssignment()
+		assignmentBuilder := chunks.NewAssignmentBuilder()
 
 		for _, chunk := range ir.Result.Chunks {
 			// assign the verifier to this chunk
-			s.ChunksAssignment.Add(chunk, verifiers)
+			assignmentBuilder.Add(chunk, verifiers)
 		}
+		s.ChunksAssignment = assignmentBuilder.Build()
 
 		err := s.core.processIncorporatedResult(ir)
 		require.NoError(s.T(), err)

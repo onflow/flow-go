@@ -118,7 +118,7 @@ func chunkAssignment(ids flow.IdentifierList, chunks flow.ChunkList, rng random.
 	}
 
 	// creates an assignment
-	assignment := chunkmodels.NewAssignment()
+	assignmentBuilder := chunkmodels.NewAssignmentBuilder()
 
 	// permutes the entire slice
 	err := rng.Shuffle(len(ids), ids.Swap)
@@ -159,9 +159,9 @@ func chunkAssignment(ids flow.IdentifierList, chunks flow.ChunkList, rng random.
 		if !ok {
 			return nil, fmt.Errorf("chunk out of range requested: %v", i)
 		}
-		assignment.Add(chunk, assignees)
+		assignmentBuilder.Add(chunk, assignees)
 	}
-	return assignment, nil
+	return assignmentBuilder.Build(), nil
 }
 
 func fingerPrint(blockID flow.Identifier, resultID flow.Identifier, alpha int) (hash.Hash, error) {
