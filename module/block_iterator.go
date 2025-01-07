@@ -4,6 +4,8 @@ import "github.com/onflow/flow-go/model/flow"
 
 // IterateJob defines the range of blocks to iterate over
 // the range could be either view based range or height based range.
+// when specifying the range, the start and end are inclusive, and the end must be greater than or
+// equal to the start
 type IterateJob struct {
 	Start uint64 // the start of the range
 	End   uint64 // the end of the range
