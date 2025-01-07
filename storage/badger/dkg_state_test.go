@@ -740,6 +740,94 @@ func TestDKGState_InsertedKeyIsIncludedInTheEpoch(t *testing.T) {
 	})
 }
 
+// TestDKGState_UpsertedKeyIsIncludedInTheEpoch verifies that the upserted key is included in the epoch commit evidence.
+// This test ensures that key is part of random beacon committee as well as the upserted key matches the local node ID.
+func TestDKGState_UpsertedKeyIsIncludedInTheEpoch(t *testing.T) {
+	unittest.RunWithTypedBadgerDB(t, InitSecret, func(db *badger.DB) {
+		metrics := metrics.NewNoopCollector()
+		myNodeID := unittest.IdentifierFixture()
+		store, err := NewRecoverableRandomBeaconStateMachine(metrics, db, myNodeID)
+		require.NoError(t, err)
+
+		setupState := func() uint64 {
+			epochCounter := epochCounterGenerator.Add(1)
+			err = store.SetDKGState(epochCounter, flow.DKGStateStarted)
+			require.NoError(t, err)
+			return epochCounter
+		}
+
+		t.Run("upserted key is included in the epoch, evidence with DKGIndexMap", func(t *testing.T) {
+			epochCounter := setupState()
+			expectedKey := unittest.StakingPrivKeyFixture()
+			evidence := unittest.EpochCommitFixture(func(commit *flow.EpochCommit) {
+				commit.Counter = epochCounter
+				commit.DKGParticipantKeys[0] = expectedKey.PublicKey()
+				commit.DKGIndexMap = flow.DKGIndexMap{
+					myNodeID:                     0,
+					unittest.IdentifierFixture(): 1,
+				}
+			})
+			err = store.UpsertMyBeaconPrivateKey(epochCounter, expectedKey, evidence)
+			require.NoError(t, err)
+		})
+
+		// TODO(EFM, #6794): allowing a nil DKGIndexMap is a temporary shortcut for backwards compatibility. This should be removed once we complete the network upgrade:
+		t.Run("upserted key is included in the epoch, evidence without DKGIndexMap", func(t *testing.T) {
+			epochCounter := setupState()
+			expectedKey := unittest.StakingPrivKeyFixture()
+			evidence := unittest.EpochCommitFixture(func(commit *flow.EpochCommit) {
+				commit.Counter = epochCounter
+				commit.DKGParticipantKeys[0] = expectedKey.PublicKey()
+			})
+			err = store.UpsertMyBeaconPrivateKey(epochCounter, expectedKey, evidence)
+			require.NoError(t, err)
+		})
+
+		// TODO(EFM, #6794): allowing a nil DKGIndexMap is a temporary shortcut for backwards compatibility. This should be removed once we complete the network upgrade:
+		t.Run("upserted key is not included in the epoch, evidence without DKGIndexMap", func(t *testing.T) {
+			epochCounter := setupState()
+			expectedKey := unittest.StakingPrivKeyFixture()
+			evidence := unittest.EpochCommitFixture(func(commit *flow.EpochCommit) {
+				commit.Counter = epochCounter
+			})
+			err = store.UpsertMyBeaconPrivateKey(epochCounter, expectedKey, evidence)
+			require.Error(t, err)
+			require.True(t, storage.IsInvalidDKGStateTransitionError(err))
+		})
+
+		t.Run("upserted key is included in the epoch but current node is not part of the random beacon committee", func(t *testing.T) {
+			epochCounter := setupState()
+			expectedKey := unittest.StakingPrivKeyFixture()
+			evidence := unittest.EpochCommitFixture(func(commit *flow.EpochCommit) {
+				commit.Counter = epochCounter
+				commit.DKGParticipantKeys[0] = expectedKey.PublicKey()
+				commit.DKGIndexMap = flow.DKGIndexMap{
+					unittest.IdentifierFixture(): 0,
+					unittest.IdentifierFixture(): 1,
+				}
+			})
+			err = store.UpsertMyBeaconPrivateKey(epochCounter, expectedKey, evidence)
+			require.Error(t, err)
+			require.True(t, storage.IsInvalidDKGStateTransitionError(err))
+		})
+
+		t.Run("upserted key is included in the epoch but current node's key doesn't match upserted key", func(t *testing.T) {
+			epochCounter := setupState()
+			expectedKey := unittest.StakingPrivKeyFixture()
+			evidence := unittest.EpochCommitFixture(func(commit *flow.EpochCommit) {
+				commit.Counter = epochCounter
+				commit.DKGIndexMap = flow.DKGIndexMap{
+					myNodeID:                     0,
+					unittest.IdentifierFixture(): 1,
+				}
+			})
+			err = store.UpsertMyBeaconPrivateKey(epochCounter, expectedKey, evidence)
+			require.Error(t, err)
+			require.True(t, storage.IsInvalidDKGStateTransitionError(err))
+		})
+	})
+}
+
 // TestSecretDBRequirement tests that the RecoverablePrivateBeaconKeyStateMachine constructor will return an
 // error if instantiated using a database not marked with the correct type.
 func TestSecretDBRequirement(t *testing.T) {
