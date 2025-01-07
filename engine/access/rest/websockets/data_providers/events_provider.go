@@ -3,7 +3,6 @@ package data_providers
 import (
 	"context"
 	"fmt"
-	"strconv"
 
 	"github.com/rs/zerolog"
 
@@ -26,7 +25,7 @@ type eventsArguments struct {
 
 // EventsDataProvider is responsible for providing events
 type EventsDataProvider struct {
-	*baseDataProvider
+	*BaseDataProvider
 
 	logger         zerolog.Logger
 	stateStreamApi state_stream.API
@@ -62,7 +61,7 @@ func NewEventsDataProvider(
 
 	subCtx, cancel := context.WithCancel(ctx)
 
-	p.baseDataProvider = newBaseDataProvider(
+	p.BaseDataProvider = newBaseDataProvider(
 		topic,
 		cancel,
 		send,
@@ -102,17 +101,13 @@ func (p *EventsDataProvider) handleResponse() func(eventsResponse *backend.Event
 			return fmt.Errorf("message index already incremented to: %d", messageIndex.Value())
 		}
 
-		p.send <- &models.BaseDataProvidersResponse{
-			SubscriptionID: p.ID().String(),
-			Topic:          p.Topic(),
-			Payload: &models.EventResponse{
-				BlockId:        eventsResponse.BlockID.String(),
-				BlockHeight:    strconv.FormatUint(eventsResponse.Height, 10),
-				BlockTimestamp: eventsResponse.BlockTimestamp,
-				Events:         eventsResponse.Events,
-				MessageIndex:   index,
-			},
-		}
+		var eventsPayload models.EventResponse
+		eventsPayload.Build(eventsResponse, index)
+
+		var response models.BaseDataProvidersResponse
+		response.Build(p.ID().String(), p.Topic(), &eventsPayload)
+
+		p.send <- &response
 
 		return nil
 	}

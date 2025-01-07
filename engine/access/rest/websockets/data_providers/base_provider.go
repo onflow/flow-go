@@ -8,8 +8,8 @@ import (
 	"github.com/onflow/flow-go/engine/access/subscription"
 )
 
-// baseDataProvider holds common objects for the provider
-type baseDataProvider struct {
+// BaseDataProvider holds common objects for the provider
+type BaseDataProvider struct {
 	id           uuid.UUID
 	topic        string
 	cancel       context.CancelFunc
@@ -17,14 +17,14 @@ type baseDataProvider struct {
 	subscription subscription.Subscription
 }
 
-// newBaseDataProvider creates a new instance of baseDataProvider.
+// newBaseDataProvider creates a new instance of BaseDataProvider.
 func newBaseDataProvider(
 	topic string,
 	cancel context.CancelFunc,
 	send chan<- interface{},
 	subscription subscription.Subscription,
-) *baseDataProvider {
-	return &baseDataProvider{
+) *BaseDataProvider {
+	return &BaseDataProvider{
 		id:           uuid.New(),
 		topic:        topic,
 		cancel:       cancel,
@@ -34,18 +34,18 @@ func newBaseDataProvider(
 }
 
 // ID returns the unique identifier of the data provider.
-func (b *baseDataProvider) ID() uuid.UUID {
+func (b *BaseDataProvider) ID() uuid.UUID {
 	return b.id
 }
 
 // Topic returns the topic associated with the data provider.
-func (b *baseDataProvider) Topic() string {
+func (b *BaseDataProvider) Topic() string {
 	return b.topic
 }
 
 // Close terminates the data provider.
 //
 // No errors are expected during normal operations.
-func (b *baseDataProvider) Close() {
+func (b *BaseDataProvider) Close() {
 	b.cancel()
 }

@@ -15,7 +15,7 @@ import (
 
 // BlockDigestsDataProvider is responsible for providing block digests
 type BlockDigestsDataProvider struct {
-	*baseDataProvider
+	*BaseDataProvider
 
 	logger zerolog.Logger
 	api    access.API
@@ -44,7 +44,7 @@ func NewBlockDigestsDataProvider(
 	}
 
 	subCtx, cancel := context.WithCancel(ctx)
-	p.baseDataProvider = newBaseDataProvider(
+	p.BaseDataProvider = newBaseDataProvider(
 		topic,
 		cancel,
 		send,
@@ -60,15 +60,18 @@ func NewBlockDigestsDataProvider(
 func (p *BlockDigestsDataProvider) Run() error {
 	return subscription.HandleSubscription(
 		p.subscription,
-		subscription.HandleResponse(p.send, func(block *flow.BlockDigest) (interface{}, error) {
-			return &models.BaseDataProvidersResponse{
-				SubscriptionID: p.ID().String(),
-				Topic:          p.Topic(),
-				Payload: &models.BlockDigestMessageResponse{
-					Block: block,
-				},
-			}, nil
+		subscription.HandleResponse(p.send, func(b *flow.BlockDigest) (interface{}, error) {
+			var block models.BlockDigest
+			block.Build(b)
 
+			var response models.BaseDataProvidersResponse
+			response.Build(
+				p.ID().String(),
+				p.Topic(),
+				&block,
+			)
+
+			return &response, nil
 		}),
 	)
 }

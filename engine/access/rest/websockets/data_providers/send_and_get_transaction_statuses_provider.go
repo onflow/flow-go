@@ -9,6 +9,7 @@ import (
 	"google.golang.org/grpc/status"
 
 	"github.com/onflow/flow-go/access"
+	commonmodels "github.com/onflow/flow-go/engine/access/rest/common/models"
 	"github.com/onflow/flow-go/engine/access/rest/common/parser"
 	"github.com/onflow/flow-go/engine/access/rest/util"
 	"github.com/onflow/flow-go/engine/access/rest/websockets/models"
@@ -25,10 +26,11 @@ type sendAndGetTransactionStatusesArguments struct {
 }
 
 type SendAndGetTransactionStatusesDataProvider struct {
-	*baseDataProvider
+	*BaseDataProvider
 
-	logger zerolog.Logger
-	api    access.API
+	logger        zerolog.Logger
+	api           access.API
+	linkGenerator commonmodels.LinkGenerator
 }
 
 var _ DataProvider = (*SendAndGetTransactionStatusesDataProvider)(nil)
@@ -37,13 +39,15 @@ func NewSendAndGetTransactionStatusesDataProvider(
 	ctx context.Context,
 	logger zerolog.Logger,
 	api access.API,
+	linkGenerator commonmodels.LinkGenerator,
 	topic string,
 	arguments models.Arguments,
 	send chan<- interface{},
 ) (*SendAndGetTransactionStatusesDataProvider, error) {
 	p := &SendAndGetTransactionStatusesDataProvider{
-		logger: logger.With().Str("component", "send-transaction-statuses-data-provider").Logger(),
-		api:    api,
+		logger:        logger.With().Str("component", "send-transaction-statuses-data-provider").Logger(),
+		api:           api,
+		linkGenerator: linkGenerator,
 	}
 
 	// Initialize arguments passed to the provider.
@@ -54,7 +58,7 @@ func NewSendAndGetTransactionStatusesDataProvider(
 
 	subCtx, cancel := context.WithCancel(ctx)
 
-	p.baseDataProvider = newBaseDataProvider(
+	p.BaseDataProvider = newBaseDataProvider(
 		topic,
 		cancel,
 		send,
@@ -93,14 +97,13 @@ func (p *SendAndGetTransactionStatusesDataProvider) handleResponse() func(txResu
 				return status.Errorf(codes.Internal, "message index already incremented to %d", messageIndex.Value())
 			}
 
-			p.send <- &models.BaseDataProvidersResponse{
-				SubscriptionID: p.ID().String(),
-				Topic:          p.Topic(),
-				Payload: &models.TransactionStatusesResponse{
-					TransactionResult: txResults[i],
-					MessageIndex:      index,
-				},
-			}
+			var txStatusesPayload models.TransactionStatusesResponse
+			txStatusesPayload.Build(p.linkGenerator, txResults[i], index)
+
+			var response models.BaseDataProvidersResponse
+			response.Build(p.ID().String(), p.Topic(), &txStatusesPayload)
+
+			p.send <- &response
 		}
 
 		return nil

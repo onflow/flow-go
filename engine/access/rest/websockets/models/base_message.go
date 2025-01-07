@@ -26,3 +26,20 @@ type BaseDataProvidersResponse struct {
 	Topic          string      `json:"topic"`           // Topic of the subscription
 	Payload        interface{} `json:"payload"`         // Payload that's being returned within a subscription.
 }
+
+// Build creates BaseDataProvidersResponse instance for consistent responses of the data providers.
+//func (b *BaseDataProvidersResponse) Build(baseDataProvider *data_providers.BaseDataProvider, payload interface{}) {
+//	*b = BaseDataProvidersResponse{
+//		SubscriptionID: baseDataProvider.ID().String(),
+//		Topic:          baseDataProvider.Topic(),
+//		Payload:        payload,
+//	}
+//}
+
+func (b *BaseDataProvidersResponse) Build(subscriptionID string, topic string, payload interface{}) {
+	*b = BaseDataProvidersResponse{
+		SubscriptionID: subscriptionID,
+		Topic:          topic,
+		Payload:        payload,
+	}
+}

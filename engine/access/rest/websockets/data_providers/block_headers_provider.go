@@ -7,6 +7,7 @@ import (
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/access"
+	commonmodels "github.com/onflow/flow-go/engine/access/rest/common/models"
 	"github.com/onflow/flow-go/engine/access/rest/http/request"
 	"github.com/onflow/flow-go/engine/access/rest/websockets/models"
 	"github.com/onflow/flow-go/engine/access/subscription"
@@ -15,7 +16,7 @@ import (
 
 // BlockHeadersDataProvider is responsible for providing block headers
 type BlockHeadersDataProvider struct {
-	*baseDataProvider
+	*BaseDataProvider
 
 	logger zerolog.Logger
 	api    access.API
@@ -44,7 +45,7 @@ func NewBlockHeadersDataProvider(
 	}
 
 	subCtx, cancel := context.WithCancel(ctx)
-	p.baseDataProvider = newBaseDataProvider(
+	p.BaseDataProvider = newBaseDataProvider(
 		topic,
 		cancel,
 		send,
@@ -60,14 +61,18 @@ func NewBlockHeadersDataProvider(
 func (p *BlockHeadersDataProvider) Run() error {
 	return subscription.HandleSubscription(
 		p.subscription,
-		subscription.HandleResponse(p.send, func(header *flow.Header) (interface{}, error) {
-			return &models.BaseDataProvidersResponse{
-				SubscriptionID: p.ID().String(),
-				Topic:          p.Topic(),
-				Payload: &models.BlockHeaderMessageResponse{
-					Header: header,
-				},
-			}, nil
+		subscription.HandleResponse(p.send, func(h *flow.Header) (interface{}, error) {
+			var header commonmodels.BlockHeader
+			header.Build(h)
+
+			var response models.BaseDataProvidersResponse
+			response.Build(
+				p.ID().String(),
+				p.Topic(),
+				&header,
+			)
+
+			return &response, nil
 		}),
 	)
 }
