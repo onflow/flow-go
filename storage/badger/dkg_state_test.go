@@ -521,15 +521,15 @@ func TestDKGState_RandomBeaconKeyCommittedState(t *testing.T) {
 		require.NoError(t, err)
 
 		var evidence *flow.EpochCommit
-		var pkey crypto.PrivateKey
+		var privateKey crypto.PrivateKey
 		setupState := func() uint64 {
 			epochCounter := epochCounterGenerator.Add(1)
-			pkey = unittest.StakingPrivKeyFixture()
+			privateKey = unittest.StakingPrivKeyFixture()
 			evidence = unittest.EpochCommitFixture(func(commit *flow.EpochCommit) {
 				commit.Counter = epochCounter
-				commit.DKGParticipantKeys[0] = pkey.PublicKey()
+				commit.DKGParticipantKeys[0] = privateKey.PublicKey()
 			})
-			err = store.UpsertMyBeaconPrivateKey(epochCounter, pkey, evidence)
+			err = store.UpsertMyBeaconPrivateKey(epochCounter, privateKey, evidence)
 			require.NoError(t, err)
 			return epochCounter
 		}
@@ -591,12 +591,12 @@ func TestDKGState_RandomBeaconKeyCommittedState(t *testing.T) {
 			actualKey, safe, err := store.RetrieveMyBeaconPrivateKey(epochCounter)
 			require.NoError(t, err)
 			require.True(t, safe)
-			require.Equal(t, pkey, actualKey)
+			require.Equal(t, privateKey, actualKey)
 			actualKey, err = store.UnsafeRetrieveMyBeaconPrivateKey(epochCounter)
 			require.NoError(t, err)
-			require.Equal(t, pkey, actualKey)
+			require.Equal(t, privateKey, actualKey)
 
-			err = store.UpsertMyBeaconPrivateKey(epochCounter, pkey, evidence)
+			err = store.UpsertMyBeaconPrivateKey(epochCounter, privateKey, evidence)
 			require.NoError(t, err, "should be possible ONLY for the same private key")
 		})
 
@@ -610,10 +610,10 @@ func TestDKGState_RandomBeaconKeyCommittedState(t *testing.T) {
 			actualKey, safe, err := store.RetrieveMyBeaconPrivateKey(epochCounter)
 			require.NoError(t, err)
 			require.True(t, safe)
-			require.Equal(t, pkey, actualKey)
+			require.Equal(t, privateKey, actualKey)
 			actualKey, err = store.UnsafeRetrieveMyBeaconPrivateKey(epochCounter)
 			require.NoError(t, err)
-			require.Equal(t, pkey, actualKey)
+			require.Equal(t, privateKey, actualKey)
 
 			otherKey := unittest.StakingPrivKeyFixture()
 			otherEvidence := unittest.EpochCommitFixture(func(commit *flow.EpochCommit) {

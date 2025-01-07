@@ -240,19 +240,21 @@ func (ds *RecoverablePrivateBeaconKeyStateMachine) CommitMyBeaconPrivateKey(epoc
 		if err != nil {
 			return err
 		}
-		// if we are in committed state then there is nothing to do
-		if currentState == flow.RandomBeaconKeyCommitted {
-			return nil
-		}
+
+		// Repeated calls for same epoch are idempotent, but only if they consistently confirm the stored private key. We explicitly
+		// enforce consistency with the already committed key here. Repetitions are considered rare, so performance overhead is acceptable.
 		key, err := ds.keyCache.Get(epochCounter)(tx.DBTxn)
 		if err != nil {
 			return storage.NewInvalidDKGStateTransitionErrorf(currentState, flow.RandomBeaconKeyCommitted, "cannot transition without a valid random beacon key: %w", err)
 		}
-
 		// verify that the key is part of the EpochCommit
 		if err = ds.ensureKeyIncludedInEpoch(epochCounter, key, commit); err != nil {
 			return storage.NewInvalidDKGStateTransitionErrorf(currentState, flow.RandomBeaconKeyCommitted,
-				"previously stored key has not been found in epoch commit event: %w", err)
+				"according to EpochCommit event, my stored random beacon key is not valid for signing: %w", err)
+		}
+		// transition to RandomBeaconKeyCommitted, unless this is a repeated call, in which case there is nothing else to do
+		if currentState == flow.RandomBeaconKeyCommitted {
+			return nil
 		}
 		return ds.processStateTransition(epochCounter, currentState, flow.RandomBeaconKeyCommitted)(tx)
 	})
