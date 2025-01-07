@@ -21,3 +21,6 @@ type BlockIterator interface {
 	// so that it can be resumed later
 	Checkpoint() error
 }
+
+// SaveProgressFunc is a function that saves the progress of the iterator
+type SaveProgressFunc func(uint64) error

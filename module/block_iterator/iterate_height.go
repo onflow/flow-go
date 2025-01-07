@@ -9,13 +9,10 @@ import (
 	"github.com/onflow/flow-go/storage"
 )
 
-// TODO: move up
-type SaveProgressFunc func(uint64) error
-
 type HeightIterator struct {
 	// dependencies
 	headers      storage.Headers
-	saveProgress SaveProgressFunc // for saving the next height to be iterated for resuming the iteration
+	saveProgress module.SaveProgressFunc // for saving the next height to be iterated for resuming the iteration
 
 	// config
 	endHeight uint64
@@ -30,7 +27,7 @@ var _ module.BlockIterator = (*HeightIterator)(nil)
 // caller must ensure that both job.Start and job.End are finalized height
 func NewHeightIterator(
 	headers storage.Headers,
-	saveProgress SaveProgressFunc,
+	saveProgress module.SaveProgressFunc,
 	ctx context.Context,
 	job module.IterateJob,
 ) (module.BlockIterator, error) {
