@@ -154,7 +154,7 @@ func (s *WebsocketSubscriptionSuite) TestInactivityHeaders() {
 		expectedInactivityDuration := InactivityTimeout * time.Second
 		actualInactivityDuration := monitorInactivity(t, wsClient, expectedInactivityDuration)
 
-		s.Assert().LessOrEqual(expectedInactivityDuration, actualInactivityDuration)
+		s.Require().LessOrEqual(expectedInactivityDuration, actualInactivityDuration)
 	})
 
 	// Steps:
@@ -297,12 +297,12 @@ func (s *WebsocketSubscriptionSuite) TestSubscriptionErrorCases() {
 		s.Run(tt.name, func() {
 			// Send subscription message
 			err := wsClient.WriteJSON(tt.message)
-			require.NoError(s.T(), err, "failed to send subscription message")
+			s.Require().NoError(err, "failed to send subscription message")
 
 			// Receive response
 			var response models.BaseMessageResponse
 			err = wsClient.ReadJSON(&response)
-			require.NoError(s.T(), err, "failed to read subscription response")
+			s.Require().NoError(err, "failed to read subscription response")
 
 			// Validate response
 			s.False(response.Success)
@@ -362,12 +362,12 @@ func (s *WebsocketSubscriptionSuite) TestUnsubscriptionErrorCases() {
 		s.Run(tt.name, func() {
 			// Send unsubscription message
 			err := wsClient.WriteJSON(tt.message)
-			require.NoError(s.T(), err, "failed to send unsubscription message")
+			s.Require().NoError(err, "failed to send unsubscription message")
 
 			// Receive response
 			var response models.BaseMessageResponse
 			err = wsClient.ReadJSON(&response)
-			require.NoError(s.T(), err, "failed to read unsubscription response")
+			s.Require().NoError(err, "failed to read unsubscription response")
 
 			// Validate response
 			s.False(response.Success)
@@ -639,12 +639,12 @@ func (s *WebsocketSubscriptionSuite) validateBlocks(
 
 	for _, response := range receivedResponses {
 		id, err := flow.HexStringToIdentifier(response.Block.Header.Id)
-		require.NoError(s.T(), err)
+		s.Require().NoError(err)
 
 		grpcResponse, err := s.grpcClient.GetBlockHeaderByID(s.ctx, &accessproto.GetBlockHeaderByIDRequest{
 			Id: convert.IdentifierToMessage(id),
 		})
-		require.NoError(s.T(), err)
+		s.Require().NoError(err)
 
 		grpcExpected := grpcResponse.Block
 		actual := response.Block
@@ -664,12 +664,12 @@ func (s *WebsocketSubscriptionSuite) validateBlockHeaders(
 
 	for _, response := range receivedResponses {
 		id, err := flow.HexStringToIdentifier(response.Header.Id)
-		require.NoError(s.T(), err)
+		s.Require().NoError(err)
 
 		grpcResponse, err := s.grpcClient.GetBlockHeaderByID(s.ctx, &accessproto.GetBlockHeaderByIDRequest{
 			Id: convert.IdentifierToMessage(id),
 		})
-		require.NoError(s.T(), err)
+		s.Require().NoError(err)
 
 		grpcExpected := grpcResponse.Block
 		actual := response.Header
@@ -690,12 +690,12 @@ func (s *WebsocketSubscriptionSuite) validateBlockDigests(
 	for _, response := range receivedResponses {
 		s.T().Logf("received response: %s", response.Block.Height)
 		id, err := flow.HexStringToIdentifier(response.Block.BlockId)
-		require.NoError(s.T(), err)
+		s.Require().NoError(err)
 
 		grpcResponse, err := s.grpcClient.GetBlockHeaderByID(s.ctx, &accessproto.GetBlockHeaderByIDRequest{
 			Id: convert.IdentifierToMessage(id),
 		})
-		require.NoError(s.T(), err)
+		s.Require().NoError(err)
 
 		grpcExpected := grpcResponse.Block
 		actual := response.Block
@@ -718,7 +718,7 @@ func (s *WebsocketSubscriptionSuite) validateEvents(receivedEventsResponse []mod
 		expectedCounter++
 
 		blockId, err := flow.HexStringToIdentifier(receivedEventResponse.BlockId)
-		require.NoError(s.T(), err)
+		s.Require().NoError(err)
 
 		s.validateEventsForBlock(
 			receivedEventResponse.BlockHeight,
@@ -737,7 +737,7 @@ func (s *WebsocketSubscriptionSuite) validateAccountStatuses(receivedAccountStat
 		expectedCounter++
 
 		blockId, err := flow.HexStringToIdentifier(receivedAccountStatusResponse.BlockID)
-		require.NoError(s.T(), err)
+		s.Require().NoError(err)
 
 		for _, events := range receivedAccountStatusResponse.AccountEvents {
 			s.validateEventsForBlock(receivedAccountStatusResponse.Height, events, blockId)
@@ -769,7 +769,7 @@ func (s *WebsocketSubscriptionSuite) validateEventsForBlock(blockHeight string, 
 				Type:     eventType,
 			},
 		)
-		require.NoError(s.T(), err)
+		s.Require().NoError(err)
 		require.Equal(s.T(), 1, len(response.Results), "expect to get 1 result")
 
 		expectedEventsResult := response.Results[0]
@@ -804,19 +804,19 @@ func (s *WebsocketSubscriptionSuite) validateTransactionStatuses(receivedTransac
 	}
 
 	for _, transactionStatusResponse := range receivedTransactionStatusesResponses {
-		s.Assert().Equal(expectedCounter, transactionStatusResponse.MessageIndex)
+		s.Require().Equal(expectedCounter, transactionStatusResponse.MessageIndex)
 
 		actualStatus := *transactionStatusResponse.TransactionResult.Status
 
 		// Check if all statuses received one by one. The subscription should send responses for each of the statuses,
 		// and the message should be sent in the order of transaction statuses.
-		s.Assert().Equal(expectedStatuses[expectedCounter], actualStatus)
+		s.Require().Equal(expectedStatuses[expectedCounter], actualStatus)
 
 		expectedCounter++
 		lastReportedTxStatus = actualStatus
 	}
 	// Check, if the last transaction status is sealed.
-	s.Assert().Equal(commonmodels.SEALED_TransactionStatus, lastReportedTxStatus)
+	s.Require().Equal(commonmodels.SEALED_TransactionStatus, lastReportedTxStatus)
 }
 
 // subscribeMessageRequest creates a subscription message request.
