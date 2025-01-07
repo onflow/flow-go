@@ -14,6 +14,24 @@ type DKGState struct {
 	mock.Mock
 }
 
+// CommitMyBeaconPrivateKey provides a mock function with given fields: epochCounter, commit
+func (_m *DKGState) CommitMyBeaconPrivateKey(epochCounter uint64, commit *flow.EpochCommit) error {
+	ret := _m.Called(epochCounter, commit)
+
+	if len(ret) == 0 {
+		panic("no return value specified for CommitMyBeaconPrivateKey")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(uint64, *flow.EpochCommit) error); ok {
+		r0 = rf(epochCounter, commit)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
 // GetDKGState provides a mock function with given fields: epochCounter
 func (_m *DKGState) GetDKGState(epochCounter uint64) (flow.DKGState, error) {
 	ret := _m.Called(epochCounter)

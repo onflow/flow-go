@@ -288,12 +288,13 @@ func (e *ReactorEngine) handleEpochCommittedPhaseStarted(currentEpochCounter uin
 		log.Warn().Msgf("checking beacon key consistency: exiting because dkg didn't reach completed state: %s", currentState.String())
 		return
 	}
+	snapshot := e.State.AtBlockID(firstBlock.ID())
 
 	// Since epoch phase transitions are emitted when the first block of the new
 	// phase is finalized, the block's snapshot is guaranteed to already be
 	// accessible in the protocol state at this point (even though the Badger
 	// transaction finalizing the block has not been committed yet).
-	nextDKG, err := e.State.AtBlockID(firstBlock.ID()).Epochs().Next().DKG()
+	nextDKG, err := snapshot.Epochs().Next().DKG()
 	if err != nil {
 		// CAUTION: this should never happen, indicates a storage failure or corruption
 		// TODO use irrecoverable context
@@ -339,7 +340,13 @@ func (e *ReactorEngine) handleEpochCommittedPhaseStarted(currentEpochCounter uin
 		return
 	}
 
-	err = e.dkgState.SetDKGState(nextEpochCounter, flow.RandomBeaconKeyCommitted)
+	epochProtocolState, err := snapshot.EpochProtocolState()
+	if err != nil {
+		// TODO use irrecoverable context
+		log.Fatal().Err(err).Msg("failed to retrieve epoch protocol state")
+		return
+	}
+	err = e.dkgState.CommitMyBeaconPrivateKey(nextEpochCounter, epochProtocolState.Entry().NextEpochCommit)
 	if err != nil {
 		// TODO use irrecoverable context
 		e.log.Fatal().Err(err).Msg("failed to set dkg current state")
