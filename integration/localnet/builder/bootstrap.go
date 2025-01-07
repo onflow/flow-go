@@ -87,7 +87,7 @@ func init() {
 	flag.Uint64Var(&numViewsEpoch, "epoch-length", 10000, "number of views in epoch")
 	flag.Uint64Var(&numViewsInStakingPhase, "epoch-staking-phase-length", 2000, "number of views in epoch staking phase")
 	flag.Uint64Var(&numViewsInDKGPhase, "epoch-dkg-phase-length", 2000, "number of views in epoch dkg phase")
-	flag.Uint64Var(&finalizationSafetyThreshold, "epoch-commit-safety-threshold", 1000, "number of views for safety threshold T (assume: one finalization occurs within T blocks)")
+	flag.Uint64Var(&finalizationSafetyThreshold, "finalization-safety-threshold", 1000, "number of views for safety threshold T (assume: one finalization occurs within T blocks)")
 	flag.BoolVar(&profiler, "profiler", DefaultProfiler, "whether to enable the auto-profiler")
 	flag.BoolVar(&profileUploader, "profile-uploader", DefaultProfileUploader, "whether to upload profiles to the cloud")
 	flag.BoolVar(&tracing, "tracing", DefaultTracing, "whether to enable low-overhead tracing in flow")
