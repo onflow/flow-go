@@ -26,7 +26,7 @@ type accountStatusesArguments struct {
 }
 
 type AccountStatusesDataProvider struct {
-	*BaseDataProvider
+	*baseDataProvider
 
 	logger         zerolog.Logger
 	stateStreamApi state_stream.API
@@ -62,7 +62,7 @@ func NewAccountStatusesDataProvider(
 
 	subCtx, cancel := context.WithCancel(ctx)
 
-	p.BaseDataProvider = newBaseDataProvider(
+	p.baseDataProvider = newBaseDataProvider(
 		topic,
 		cancel,
 		send,

@@ -16,7 +16,7 @@ import (
 
 // BlockHeadersDataProvider is responsible for providing block headers
 type BlockHeadersDataProvider struct {
-	*BaseDataProvider
+	*baseDataProvider
 
 	logger zerolog.Logger
 	api    access.API
@@ -45,7 +45,7 @@ func NewBlockHeadersDataProvider(
 	}
 
 	subCtx, cancel := context.WithCancel(ctx)
-	p.BaseDataProvider = newBaseDataProvider(
+	p.baseDataProvider = newBaseDataProvider(
 		topic,
 		cancel,
 		send,

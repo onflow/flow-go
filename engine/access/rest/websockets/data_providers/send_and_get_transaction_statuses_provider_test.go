@@ -73,7 +73,7 @@ func (s *TransactionStatusesProviderSuite) TestSendTransactionStatusesDataProvid
 	)
 
 	backendResponse := backendTransactionStatusesResponse(s.rootBlock)
-	expectedResponse := s.expectedTransactionStatusesResponses(backendResponse)
+	expectedResponse := s.expectedTransactionStatusesResponses(backendResponse, SendAndGetTransactionStatusesTopic)
 
 	sendTxStatutesTestCases := []testType{
 		{
@@ -111,16 +111,20 @@ func (s *SendTransactionStatusesProviderSuite) requireTransactionStatuses(
 	actual interface{},
 	expected interface{},
 ) {
-	expectedTxStatusesResponse, ok := expected.(*models.TransactionStatusesResponse)
-	require.True(s.T(), ok, "expected *models.TransactionStatusesResponse, got %T", expected)
+	expectedResponse, ok := expected.(*models.BaseDataProvidersResponse)
+	require.True(s.T(), ok, "Expected *models.BaseDataProvidersResponse, got %T", expected)
+
+	expectedResponsePayload, ok := expectedResponse.Payload.(*models.TransactionStatusesResponse)
+	require.True(s.T(), ok, "Unexpected response payload type: %T", expectedResponse.Payload)
 
 	actualResponse, ok := actual.(*models.BaseDataProvidersResponse)
 	require.True(s.T(), ok, "Expected *models.BaseDataProvidersResponse, got %T", actual)
 
 	actualResponsePayload, ok := actualResponse.Payload.(*models.TransactionStatusesResponse)
-	require.True(s.T(), ok, "unexpected response payload type: %T", actualResponse.Payload)
+	require.True(s.T(), ok, "Unexpected response payload type: %T", actualResponse.Payload)
 
-	require.Equal(s.T(), expectedTxStatusesResponse.TransactionResult.BlockId, actualResponsePayload.TransactionResult.BlockId)
+	require.Equal(s.T(), expectedResponse.Topic, actualResponse.Topic)
+	require.Equal(s.T(), expectedResponsePayload.TransactionResult.BlockId, actualResponsePayload.TransactionResult.BlockId)
 }
 
 // TestSendTransactionStatusesDataProvider_InvalidArguments tests the behavior of the send transaction statuses data provider

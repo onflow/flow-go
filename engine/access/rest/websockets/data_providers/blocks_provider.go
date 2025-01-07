@@ -25,7 +25,7 @@ type blocksArguments struct {
 
 // BlocksDataProvider is responsible for providing blocks
 type BlocksDataProvider struct {
-	*BaseDataProvider
+	*baseDataProvider
 
 	logger        zerolog.Logger
 	api           access.API
@@ -59,7 +59,7 @@ func NewBlocksDataProvider(
 	}
 
 	subCtx, cancel := context.WithCancel(ctx)
-	p.BaseDataProvider = newBaseDataProvider(
+	p.baseDataProvider = newBaseDataProvider(
 		topic,
 		cancel,
 		send,

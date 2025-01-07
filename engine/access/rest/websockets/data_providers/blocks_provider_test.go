@@ -241,13 +241,13 @@ func (s *BlocksProviderSuite) TestBlocksDataProvider_HappyPath() {
 // requireBlocks ensures that the received block information matches the expected data.
 func (s *BlocksProviderSuite) requireBlock(actual interface{}, expected interface{}) {
 	expectedResponse, ok := expected.(*models.BaseDataProvidersResponse)
-	require.True(s.T(), ok, "unexpected response type: %T", expected)
+	require.True(s.T(), ok, "Expected *models.BaseDataProvidersResponse, got %T", expected)
 
 	expectedResponsePayload, ok := expectedResponse.Payload.(*commonmodels.Block)
-	require.True(s.T(), ok, "unexpected response type: %T", expectedResponse.Payload)
+	require.True(s.T(), ok, "unexpected response payload type: %T", expectedResponse.Payload)
 
 	actualResponse, ok := actual.(*models.BaseDataProvidersResponse)
-	require.True(s.T(), ok, "unexpected response type: %T", actual)
+	require.True(s.T(), ok, "Expected *models.BaseDataProvidersResponse, got %T", actual)
 
 	actualResponsePayload, ok := actualResponse.Payload.(*commonmodels.Block)
 	require.True(s.T(), ok, "unexpected response payload type: %T", actualResponse.Payload)

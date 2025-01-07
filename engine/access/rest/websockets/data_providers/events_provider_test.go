@@ -138,17 +138,20 @@ func (s *EventsProviderSuite) subscribeEventsDataProviderTestCases(backendRespon
 
 // requireEvents ensures that the received event information matches the expected data.
 func (s *EventsProviderSuite) requireEvents(actual interface{}, expected interface{}) {
-	expectedResponse, ok := expected.(*models.EventResponse)
-	require.True(s.T(), ok, "Expected *models.EventResponse, got %T", expected)
+	expectedResponse, ok := expected.(*models.BaseDataProvidersResponse)
+	require.True(s.T(), ok, "Expected *models.BaseDataProvidersResponse, got %T", expected)
+
+	expectedResponsePayload, ok := expectedResponse.Payload.(*models.EventResponse)
+	require.True(s.T(), ok, "Unexpected response payload type: %T", expectedResponse.Payload)
 
 	actualResponse, ok := actual.(*models.BaseDataProvidersResponse)
 	require.True(s.T(), ok, "Expected *models.BaseDataProvidersResponse, got %T", actual)
 
 	actualResponsePayload, ok := actualResponse.Payload.(*models.EventResponse)
-	require.True(s.T(), ok, "unexpected response payload type: %T", actualResponse.Payload)
+	require.True(s.T(), ok, "Unexpected response payload type: %T", actualResponse.Payload)
 
-	s.Require().ElementsMatch(expectedResponse.Events, actualResponsePayload.Events)
-	s.Require().Equal(expectedResponse.MessageIndex, actualResponsePayload.MessageIndex)
+	s.Require().ElementsMatch(expectedResponsePayload.Events, actualResponsePayload.Events)
+	s.Require().Equal(expectedResponsePayload.MessageIndex, actualResponsePayload.MessageIndex)
 }
 
 // invalidArgumentsTestCases returns a list of test cases with invalid argument combinations
@@ -324,10 +327,13 @@ func (s *EventsProviderSuite) expectedEventsResponses(
 	expectedResponses := make([]interface{}, len(backendResponses))
 
 	for i, resp := range backendResponses {
-		var expectedResponse models.EventResponse
-		expectedResponse.Build(resp, uint64(i))
+		var expectedResponsePayload models.EventResponse
+		expectedResponsePayload.Build(resp, uint64(i))
 
-		expectedResponses[i] = &expectedResponse
+		expectedResponses[i] = &models.BaseDataProvidersResponse{
+			Topic:   EventsTopic,
+			Payload: &expectedResponsePayload,
+		}
 	}
 	return expectedResponses
 }

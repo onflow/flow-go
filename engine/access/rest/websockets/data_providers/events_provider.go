@@ -25,7 +25,7 @@ type eventsArguments struct {
 
 // EventsDataProvider is responsible for providing events
 type EventsDataProvider struct {
-	*BaseDataProvider
+	*baseDataProvider
 
 	logger         zerolog.Logger
 	stateStreamApi state_stream.API
@@ -61,7 +61,7 @@ func NewEventsDataProvider(
 
 	subCtx, cancel := context.WithCancel(ctx)
 
-	p.BaseDataProvider = newBaseDataProvider(
+	p.baseDataProvider = newBaseDataProvider(
 		topic,
 		cancel,
 		send,

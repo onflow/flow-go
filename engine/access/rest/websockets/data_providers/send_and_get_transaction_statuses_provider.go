@@ -26,7 +26,7 @@ type sendAndGetTransactionStatusesArguments struct {
 }
 
 type SendAndGetTransactionStatusesDataProvider struct {
-	*BaseDataProvider
+	*baseDataProvider
 
 	logger        zerolog.Logger
 	api           access.API
@@ -58,7 +58,7 @@ func NewSendAndGetTransactionStatusesDataProvider(
 
 	subCtx, cancel := context.WithCancel(ctx)
 
-	p.BaseDataProvider = newBaseDataProvider(
+	p.baseDataProvider = newBaseDataProvider(
 		topic,
 		cancel,
 		send,

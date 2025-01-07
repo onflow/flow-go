@@ -60,8 +60,6 @@ func (s *BlockHeadersProviderSuite) validBlockHeadersArgumentsTestCases() []test
 		var header commonmodels.BlockHeader
 		header.Build(b.Header)
 
-		//expectedResponses[i] = &models.BlockHeaderMessageResponse{Header: &header}
-
 		expectedResponses[i] = &models.BaseDataProvidersResponse{
 			Topic:   BlockHeadersTopic,
 			Payload: &header,
@@ -140,16 +138,16 @@ func (s *BlockHeadersProviderSuite) TestBlockHeadersDataProvider_HappyPath() {
 // requireBlockHeaders ensures that the received block header information matches the expected data.
 func (s *BlockHeadersProviderSuite) requireBlockHeader(actual interface{}, expected interface{}) {
 	expectedResponse, ok := expected.(*models.BaseDataProvidersResponse)
-	require.True(s.T(), ok, "unexpected response type: %T", expected)
+	require.True(s.T(), ok, "Expected *models.BaseDataProvidersResponse, got %T", expected)
 
 	expectedResponsePayload, ok := expectedResponse.Payload.(*commonmodels.BlockHeader)
-	require.True(s.T(), ok, "unexpected response type: %T", expectedResponse.Payload)
+	require.True(s.T(), ok, "Unexpected response payload type: %T", expectedResponse.Payload)
 
 	actualResponse, ok := actual.(*models.BaseDataProvidersResponse)
-	require.True(s.T(), ok, "unexpected response type: %T", actual)
+	require.True(s.T(), ok, "Expected *models.BaseDataProvidersResponse, got %T", actual)
 
 	actualResponsePayload, ok := actualResponse.Payload.(*commonmodels.BlockHeader)
-	require.True(s.T(), ok, "unexpected response payload type: %T", actualResponse.Payload)
+	require.True(s.T(), ok, "Unexpected response payload type: %T", actualResponse.Payload)
 
 	s.Require().Equal(expectedResponse.Topic, actualResponse.Topic)
 	s.Require().Equal(expectedResponsePayload, actualResponsePayload)
