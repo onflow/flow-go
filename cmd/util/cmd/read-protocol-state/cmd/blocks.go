@@ -211,7 +211,12 @@ func run(*cobra.Command, []string) {
 			log.Fatal().Err(err).Msg("could not get sealed block")
 		}
 
-		for h := sealed.Header.Height; h >= uint64(0); h-- {
+		root, err := reader.GetRoot()
+		if err != nil {
+			log.Fatal().Err(err).Msg("could not get root block")
+		}
+
+		for h := sealed.Header.Height; h >= root.Header.Height; h-- {
 			block, err := reader.GetBlockByHeight(h)
 			if err != nil {
 				log.Fatal().Err(err).Msgf("could not get block by height: %v", h)
