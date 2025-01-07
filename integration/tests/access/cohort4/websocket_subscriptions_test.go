@@ -642,7 +642,7 @@ func (s *WebsocketSubscriptionSuite) TestHappyCases() {
 func (s *WebsocketSubscriptionSuite) validateBlocks(
 	receivedResponses []models.BlockMessageResponse,
 ) {
-	require.NotEmpty(s.T(), receivedResponses, "expected received block headers")
+	s.Require().NotEmpty(receivedResponses, "expected received block headers")
 
 	for _, response := range receivedResponses {
 		id, err := flow.HexStringToIdentifier(response.Block.Header.Id)
@@ -656,10 +656,10 @@ func (s *WebsocketSubscriptionSuite) validateBlocks(
 		grpcExpected := grpcResponse.Block
 		actual := response.Block
 
-		require.Equal(s.T(), convert.MessageToIdentifier(grpcExpected.Id).String(), actual.Header.Id)
-		require.Equal(s.T(), util.FromUint(grpcExpected.Height), actual.Header.Height)
-		require.Equal(s.T(), grpcExpected.Timestamp.AsTime(), actual.Header.Timestamp)
-		require.Equal(s.T(), convert.MessageToIdentifier(grpcExpected.ParentId).String(), actual.Header.ParentId)
+		s.Require().Equal(convert.MessageToIdentifier(grpcExpected.Id).String(), actual.Header.Id)
+		s.Require().Equal(util.FromUint(grpcExpected.Height), actual.Header.Height)
+		s.Require().Equal(grpcExpected.Timestamp.AsTime(), actual.Header.Timestamp)
+		s.Require().Equal(convert.MessageToIdentifier(grpcExpected.ParentId).String(), actual.Header.ParentId)
 	}
 }
 
@@ -667,7 +667,7 @@ func (s *WebsocketSubscriptionSuite) validateBlocks(
 func (s *WebsocketSubscriptionSuite) validateBlockHeaders(
 	receivedResponses []models.BlockHeaderMessageResponse,
 ) {
-	require.NotEmpty(s.T(), receivedResponses, "expected received block headers")
+	s.Require().NotEmpty(receivedResponses, "expected received block headers")
 
 	for _, response := range receivedResponses {
 		id, err := flow.HexStringToIdentifier(response.Header.Id)
@@ -681,10 +681,10 @@ func (s *WebsocketSubscriptionSuite) validateBlockHeaders(
 		grpcExpected := grpcResponse.Block
 		actual := response.Header
 
-		require.Equal(s.T(), convert.MessageToIdentifier(grpcExpected.Id).String(), actual.Id)
-		require.Equal(s.T(), util.FromUint(grpcExpected.Height), actual.Height)
-		require.Equal(s.T(), grpcExpected.Timestamp.AsTime(), actual.Timestamp)
-		require.Equal(s.T(), convert.MessageToIdentifier(grpcExpected.ParentId).String(), actual.ParentId)
+		s.Require().Equal(convert.MessageToIdentifier(grpcExpected.Id).String(), actual.Id)
+		s.Require().Equal(util.FromUint(grpcExpected.Height), actual.Height)
+		s.Require().Equal(grpcExpected.Timestamp.AsTime(), actual.Timestamp)
+		s.Require().Equal(convert.MessageToIdentifier(grpcExpected.ParentId).String(), actual.ParentId)
 	}
 }
 
@@ -692,7 +692,7 @@ func (s *WebsocketSubscriptionSuite) validateBlockHeaders(
 func (s *WebsocketSubscriptionSuite) validateBlockDigests(
 	receivedResponses []models.BlockDigestMessageResponse,
 ) {
-	require.NotEmpty(s.T(), receivedResponses, "expected received block digests")
+	s.Require().NotEmpty(receivedResponses, "expected received block digests")
 
 	for _, response := range receivedResponses {
 		s.T().Logf("received response: %s", response.Block.Height)
@@ -707,9 +707,9 @@ func (s *WebsocketSubscriptionSuite) validateBlockDigests(
 		grpcExpected := grpcResponse.Block
 		actual := response.Block
 
-		require.Equal(s.T(), convert.MessageToIdentifier(grpcExpected.Id).String(), actual.BlockId)
-		require.Equal(s.T(), util.FromUint(grpcExpected.Height), actual.Height)
-		require.Equal(s.T(), grpcExpected.Timestamp.AsTime(), actual.Timestamp)
+		s.Require().Equal(convert.MessageToIdentifier(grpcExpected.Id).String(), actual.BlockId)
+		s.Require().Equal(util.FromUint(grpcExpected.Height), actual.Height)
+		s.Require().Equal(grpcExpected.Timestamp.AsTime(), actual.Timestamp)
 	}
 }
 
@@ -717,11 +717,11 @@ func (s *WebsocketSubscriptionSuite) validateBlockDigests(
 // events which received from grpc api
 func (s *WebsocketSubscriptionSuite) validateEvents(receivedEventsResponse []models.EventResponse) {
 	// make sure there are received events
-	require.GreaterOrEqual(s.T(), len(receivedEventsResponse), 1, "expect received events")
+	s.Require().GreaterOrEqual(len(receivedEventsResponse), 1, "expect received events")
 
 	expectedCounter := uint64(0)
 	for _, receivedEventResponse := range receivedEventsResponse {
-		require.Equal(s.T(), expectedCounter, receivedEventResponse.MessageIndex)
+		s.Require().Equal(expectedCounter, receivedEventResponse.MessageIndex)
 		expectedCounter++
 
 		blockId, err := flow.HexStringToIdentifier(receivedEventResponse.BlockId)
@@ -740,7 +740,7 @@ func (s *WebsocketSubscriptionSuite) validateAccountStatuses(receivedAccountStat
 	expectedCounter := uint64(0)
 
 	for _, receivedAccountStatusResponse := range receivedAccountStatusesResponses {
-		require.Equal(s.T(), expectedCounter, receivedAccountStatusResponse.MessageIndex)
+		s.Require().Equal(expectedCounter, receivedAccountStatusResponse.MessageIndex)
 		expectedCounter++
 
 		blockId, err := flow.HexStringToIdentifier(receivedAccountStatusResponse.BlockID)
@@ -777,18 +777,18 @@ func (s *WebsocketSubscriptionSuite) validateEventsForBlock(blockHeight string, 
 			},
 		)
 		s.Require().NoError(err)
-		require.Equal(s.T(), 1, len(response.Results), "expect to get 1 result")
+		s.Require().Equal(1, len(response.Results), "expect to get 1 result")
 
 		expectedEventsResult := response.Results[0]
-		require.Equal(s.T(), util.FromUint(expectedEventsResult.BlockHeight), blockHeight, "expect the same block height")
-		require.Equal(s.T(), len(expectedEventsResult.Events), len(receivedEventList), "expect the same count of events: want: %+v, got: %+v", expectedEventsResult.Events, receivedEventList)
+		s.Require().Equal(util.FromUint(expectedEventsResult.BlockHeight), blockHeight, "expect the same block height")
+		s.Require().Equal(len(expectedEventsResult.Events), len(receivedEventList), "expect the same count of events: want: %+v, got: %+v", expectedEventsResult.Events, receivedEventList)
 
 		for i, event := range receivedEventList {
 			expectedEvent := expectedEventsResult.Events[i]
 
-			require.Equal(s.T(), util.FromUint(expectedEvent.EventIndex), event.EventIndex, "expect the same event index")
-			require.Equal(s.T(), convert.MessageToIdentifier(expectedEvent.TransactionId).String(), event.TransactionId, "expect the same transaction id")
-			require.Equal(s.T(), util.FromUint(expectedEvent.TransactionIndex), event.TransactionIndex, "expect the same transaction index")
+			s.Require().Equal(util.FromUint(expectedEvent.EventIndex), event.EventIndex, "expect the same event index")
+			s.Require().Equal(convert.MessageToIdentifier(expectedEvent.TransactionId).String(), event.TransactionId, "expect the same transaction id")
+			s.Require().Equal(util.FromUint(expectedEvent.TransactionIndex), event.TransactionIndex, "expect the same transaction index")
 		}
 	}
 }
@@ -796,7 +796,7 @@ func (s *WebsocketSubscriptionSuite) validateEventsForBlock(blockHeight string, 
 // validateTransactionStatuses is a helper function that encapsulates logic for comparing received transaction statuses
 func (s *WebsocketSubscriptionSuite) validateTransactionStatuses(receivedTransactionStatusesResponses []models.TransactionStatusesResponse) {
 	expectedCount := 4 // pending, finalized, executed, sealed
-	require.GreaterOrEqual(s.T(), len(receivedTransactionStatusesResponses), expectedCount, "expect received statuses")
+	s.Require().GreaterOrEqual(len(receivedTransactionStatusesResponses), expectedCount, "expect received statuses")
 
 	expectedCounter := uint64(0)
 	lastReportedTxStatus := commonmodels.PENDING_TransactionStatus
@@ -950,7 +950,6 @@ func listenWebSocketResponses[T any](
 
 				var closeErr *websocket.CloseError
 				if errors.As(err, &closeErr) {
-					t.Logf("websocket close error: %v", closeErr)
 					return responses, baseMessageResponses, listSubscriptionsMessageResponses
 				}
 
