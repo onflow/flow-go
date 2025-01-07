@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"errors"
 	"fmt"
 
 	"github.com/rs/zerolog/log"
@@ -13,10 +14,11 @@ import (
 )
 
 var (
-	flagHeight  uint64
-	flagBlockID string
-	flagFinal   bool
-	flagSealed  bool
+	flagHeight   uint64
+	flagBlockID  string
+	flagFinal    bool
+	flagSealed   bool
+	flagExecuted bool
 )
 
 var Cmd = &cobra.Command{
@@ -39,17 +41,22 @@ func init() {
 
 	Cmd.Flags().BoolVar(&flagSealed, "sealed", false,
 		"get sealed block")
+
+	Cmd.Flags().BoolVar(&flagExecuted, "executed", false,
+		"get last executed and sealed block")
 }
 
 type Reader struct {
-	state  protocol.State
-	blocks storage.Blocks
+	state   protocol.State
+	blocks  storage.Blocks
+	commits storage.Commits
 }
 
 func NewReader(state protocol.State, storages *storage.All) *Reader {
 	return &Reader{
-		state:  state,
-		blocks: storages.Blocks,
+		state:   state,
+		blocks:  storages.Blocks,
+		commits: storages.Commits,
 	}
 }
 
@@ -101,6 +108,16 @@ func (r *Reader) GetSealed() (*flow.Block, error) {
 	return block, nil
 }
 
+func (r *Reader) GetRoot() (*flow.Block, error) {
+	header := r.state.Params().SealedRoot()
+
+	block, err := r.getBlockByHeader(header)
+	if err != nil {
+		return nil, fmt.Errorf("could not get block by header: %w", err)
+	}
+	return block, nil
+}
+
 func (r *Reader) GetBlockByID(blockID flow.Identifier) (*flow.Block, error) {
 	header, err := r.state.AtBlockID(blockID).Head()
 	if err != nil {
@@ -112,6 +129,22 @@ func (r *Reader) GetBlockByID(blockID flow.Identifier) (*flow.Block, error) {
 		return nil, fmt.Errorf("could not get block by header: %w", err)
 	}
 	return block, nil
+}
+
+// IsExecuted returns true if the block is executed
+// this only works for execution node.
+func (r *Reader) IsExecuted(blockID flow.Identifier) (bool, error) {
+	_, err := r.commits.ByBlockID(blockID)
+	if err == nil {
+		return true, nil
+	}
+
+	// statecommitment not exists means the block hasn't been executed yet
+	if errors.Is(err, storage.ErrNotFound) {
+		return false, nil
+	}
+
+	return false, err
 }
 
 func run(*cobra.Command, []string) {
@@ -171,5 +204,33 @@ func run(*cobra.Command, []string) {
 		return
 	}
 
-	log.Fatal().Msgf("missing flag, try --final or --sealed or --height or --block-id")
+	if flagExecuted {
+		log.Info().Msgf("get last executed and sealed block")
+		sealed, err := reader.GetSealed()
+		if err != nil {
+			log.Fatal().Err(err).Msg("could not get sealed block")
+		}
+
+		for h := sealed.Header.Height; h >= uint64(0); h-- {
+			block, err := reader.GetBlockByHeight(h)
+			if err != nil {
+				log.Fatal().Err(err).Msgf("could not get block by height: %v", h)
+			}
+
+			executed, err := reader.IsExecuted(block.ID())
+			if err != nil {
+				log.Fatal().Err(err).Msgf("could not check block executed or not: %v", h)
+			}
+
+			if executed {
+				common.PrettyPrintEntity(block)
+				return
+			}
+		}
+
+		// use binary search to find the last executed and sealed block
+
+	}
+
+	log.Fatal().Msgf("missing flag, try --final or --sealed or --height or --executed or --block-id")
 }
