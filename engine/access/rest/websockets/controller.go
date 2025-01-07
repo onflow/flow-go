@@ -242,7 +242,7 @@ func (c *Controller) keepalive(ctx context.Context) error {
 // If no messages are sent within InactivityTimeout and no active data providers exist,
 // the connection will be closed.
 func (c *Controller) writeMessages(ctx context.Context) error {
-	inactivityTicker := time.NewTicker(c.config.InactivityTimeout / 10)
+	inactivityTicker := time.NewTicker(c.inactivityTickerPeriod())
 	defer inactivityTicker.Stop()
 
 	lastMessageSentAt := time.Now()
@@ -291,6 +291,10 @@ func (c *Controller) writeMessages(ctx context.Context) error {
 			}
 		}
 	}
+}
+
+func (c *Controller) inactivityTickerPeriod() time.Duration {
+	return c.config.InactivityTimeout / 10
 }
 
 // readMessages continuously reads messages from a client WebSocket connection,
@@ -365,18 +369,18 @@ func (c *Controller) handleSubscribe(ctx context.Context, msg models.SubscribeMe
 		c.writeErrorResponse(
 			ctx,
 			err,
-			wrapErrorMessage(InvalidArgument, "error parsing subscription id", msg.SubscriptionID),
+			wrapErrorMessage(InvalidMessage, "error parsing subscription id", msg.SubscriptionID),
 		)
 		return
 	}
 
 	// register new provider
-	provider, err := c.dataProviderFactory.NewDataProvider(ctx, msg.Topic, msg.Arguments, c.multiplexedStream)
+	provider, err := c.dataProviderFactory.NewDataProvider(ctx, subscriptionID, msg.Topic, msg.Arguments, c.multiplexedStream)
 	if err != nil {
 		c.writeErrorResponse(
 			ctx,
 			err,
-			wrapErrorMessage(InvalidArgument, "error creating data provider", subscriptionID.String()),
+			wrapErrorMessage(InvalidMessage, "error creating data provider", subscriptionID.String()),
 		)
 		return
 	}
@@ -398,7 +402,7 @@ func (c *Controller) handleSubscribe(ctx context.Context, msg models.SubscribeMe
 			c.writeErrorResponse(
 				ctx,
 				err,
-				wrapErrorMessage(InternalError, "internal error", subscriptionID.String()),
+				wrapErrorMessage(InternalServerError, "internal error", subscriptionID.String()),
 			)
 		}
 
@@ -413,7 +417,7 @@ func (c *Controller) handleUnsubscribe(ctx context.Context, msg models.Unsubscri
 		c.writeErrorResponse(
 			ctx,
 			err,
-			wrapErrorMessage(InvalidArgument, "error parsing subscription id", msg.SubscriptionID),
+			wrapErrorMessage(InvalidMessage, "error parsing subscription id", msg.SubscriptionID),
 		)
 		return
 	}
@@ -443,8 +447,8 @@ func (c *Controller) handleListSubscriptions(ctx context.Context, msg models.Lis
 	var subs []*models.SubscriptionEntry
 	err := c.dataProviders.ForEach(func(id uuid.UUID, provider dp.DataProvider) error {
 		subs = append(subs, &models.SubscriptionEntry{
-			ID:    id.String(),
-			Topic: provider.Topic(),
+			SubscriptionID: id.String(),
+			Topic:          provider.Topic(),
 		})
 		return nil
 	})

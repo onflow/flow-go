@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/engine/access/rest/websockets/models"
@@ -63,7 +64,7 @@ func testHappyPath[T any](
 			test.setupBackend(sub)
 
 			// Create the data provider instance
-			provider, err := factory.NewDataProvider(ctx, topic, test.arguments, send)
+			provider, err := factory.NewDataProvider(ctx, uuid.New(), topic, test.arguments, send)
 
 			require.NotNil(t, provider)
 			require.NoError(t, err)

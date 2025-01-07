@@ -6,6 +6,7 @@ import (
 	"strconv"
 	"testing"
 
+	"github.com/google/uuid"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -120,7 +121,7 @@ func (s *BlocksProviderSuite) TestBlocksDataProvider_InvalidArguments() {
 
 	for _, test := range s.invalidArgumentsTestCases() {
 		s.Run(test.name, func() {
-			provider, err := NewBlocksDataProvider(ctx, s.log, s.api, BlocksTopic, test.arguments, send)
+			provider, err := NewBlocksDataProvider(ctx, s.log, s.api, uuid.New(), BlocksTopic, test.arguments, send)
 			s.Require().Nil(provider)
 			s.Require().Error(err)
 			s.Require().Contains(err.Error(), test.expectedErrorMsg)

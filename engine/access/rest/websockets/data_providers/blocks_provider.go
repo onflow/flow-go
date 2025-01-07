@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/google/uuid"
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/access"
@@ -37,6 +38,7 @@ func NewBlocksDataProvider(
 	ctx context.Context,
 	logger zerolog.Logger,
 	api access.API,
+	subscriptionID uuid.UUID,
 	topic string,
 	arguments models.Arguments,
 	send chan<- interface{},
@@ -54,6 +56,7 @@ func NewBlocksDataProvider(
 
 	subCtx, cancel := context.WithCancel(ctx)
 	p.baseDataProvider = newBaseDataProvider(
+		subscriptionID,
 		topic,
 		cancel,
 		send,

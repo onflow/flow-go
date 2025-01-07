@@ -51,7 +51,7 @@ func (s *WsControllerSuite) TestSubscribeRequest() {
 		controller := NewWebSocketController(s.logger, s.wsConfig, conn, dataProviderFactory)
 
 		dataProviderFactory.
-			On("NewDataProvider", mock.Anything, mock.Anything, mock.Anything, mock.Anything).
+			On("NewDataProvider", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).
 			Return(dataProvider, nil).
 			Once()
 
@@ -163,7 +163,7 @@ func (s *WsControllerSuite) TestSubscribeRequest() {
 		controller := NewWebSocketController(s.logger, s.wsConfig, conn, dataProviderFactory)
 
 		dataProviderFactory.
-			On("NewDataProvider", mock.Anything, mock.Anything, mock.Anything, mock.Anything).
+			On("NewDataProvider", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).
 			Return(nil, fmt.Errorf("error creating data provider")).
 			Once()
 
@@ -179,7 +179,7 @@ func (s *WsControllerSuite) TestSubscribeRequest() {
 				response, ok := msg.(models.BaseMessageResponse)
 				require.True(t, ok)
 				require.NotEmpty(t, response.Error)
-				require.Equal(t, int(InvalidArgument), response.Error.Code)
+				require.Equal(t, int(InvalidMessage), response.Error.Code)
 
 				return websocket.ErrCloseSent
 			})
@@ -207,7 +207,7 @@ func (s *WsControllerSuite) TestSubscribeRequest() {
 			Once()
 
 		dataProviderFactory.
-			On("NewDataProvider", mock.Anything, mock.Anything, mock.Anything, mock.Anything).
+			On("NewDataProvider", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).
 			Return(dataProvider, nil).
 			Once()
 
@@ -224,7 +224,7 @@ func (s *WsControllerSuite) TestSubscribeRequest() {
 				response, ok := msg.(models.BaseMessageResponse)
 				require.True(t, ok)
 				require.NotEmpty(t, response.Error)
-				require.Equal(t, int(InternalError), response.Error.Code)
+				require.Equal(t, int(InternalServerError), response.Error.Code)
 
 				return websocket.ErrCloseSent
 			})
@@ -247,7 +247,7 @@ func (s *WsControllerSuite) TestUnsubscribeRequest() {
 		controller := NewWebSocketController(s.logger, s.wsConfig, conn, dataProviderFactory)
 
 		dataProviderFactory.
-			On("NewDataProvider", mock.Anything, mock.Anything, mock.Anything, mock.Anything).
+			On("NewDataProvider", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).
 			Return(dataProvider, nil).
 			Once()
 
@@ -316,7 +316,7 @@ func (s *WsControllerSuite) TestUnsubscribeRequest() {
 		controller := NewWebSocketController(s.logger, s.wsConfig, conn, dataProviderFactory)
 
 		dataProviderFactory.
-			On("NewDataProvider", mock.Anything, mock.Anything, mock.Anything, mock.Anything).
+			On("NewDataProvider", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).
 			Return(dataProvider, nil).
 			Once()
 
@@ -363,7 +363,7 @@ func (s *WsControllerSuite) TestUnsubscribeRequest() {
 				require.True(t, ok)
 				require.NotEmpty(t, response.Error)
 				require.Equal(t, request.SubscriptionID, response.SubscriptionID)
-				require.Equal(t, int(InvalidArgument), response.Error.Code)
+				require.Equal(t, int(InvalidMessage), response.Error.Code)
 
 				return websocket.ErrCloseSent
 			}).
@@ -385,7 +385,7 @@ func (s *WsControllerSuite) TestUnsubscribeRequest() {
 		controller := NewWebSocketController(s.logger, s.wsConfig, conn, dataProviderFactory)
 
 		dataProviderFactory.
-			On("NewDataProvider", mock.Anything, mock.Anything, mock.Anything, mock.Anything).
+			On("NewDataProvider", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).
 			Return(dataProvider, nil).
 			Once()
 
@@ -456,7 +456,7 @@ func (s *WsControllerSuite) TestListSubscriptions() {
 		controller := NewWebSocketController(s.logger, s.wsConfig, conn, dataProviderFactory)
 
 		dataProviderFactory.
-			On("NewDataProvider", mock.Anything, mock.Anything, mock.Anything, mock.Anything).
+			On("NewDataProvider", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).
 			Return(dataProvider, nil).
 			Once()
 
@@ -507,7 +507,7 @@ func (s *WsControllerSuite) TestListSubscriptions() {
 				require.Empty(t, response.Error)
 				require.Empty(t, response.SubscriptionID)
 				require.Equal(t, 1, len(response.Subscriptions))
-				require.Equal(t, subscriptionID, response.Subscriptions[0].ID)
+				require.Equal(t, subscriptionID, response.Subscriptions[0].SubscriptionID)
 				require.Equal(t, topic, response.Subscriptions[0].Topic)
 
 				return websocket.ErrCloseSent
@@ -533,7 +533,7 @@ func (s *WsControllerSuite) TestSubscribeBlocks() {
 		controller := NewWebSocketController(s.logger, s.wsConfig, conn, dataProviderFactory)
 
 		dataProviderFactory.
-			On("NewDataProvider", mock.Anything, mock.Anything, mock.Anything, mock.Anything).
+			On("NewDataProvider", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).
 			Return(dataProvider, nil).
 			Once()
 
@@ -587,7 +587,7 @@ func (s *WsControllerSuite) TestSubscribeBlocks() {
 		controller := NewWebSocketController(s.logger, s.wsConfig, conn, dataProviderFactory)
 
 		dataProviderFactory.
-			On("NewDataProvider", mock.Anything, mock.Anything, mock.Anything, mock.Anything).
+			On("NewDataProvider", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).
 			Return(dataProvider, nil).
 			Once()
 
@@ -725,7 +725,7 @@ func (s *WsControllerSuite) TestControllerShutdown() {
 		controller := NewWebSocketController(s.logger, s.wsConfig, conn, dataProviderFactory)
 
 		dataProviderFactory.
-			On("NewDataProvider", mock.Anything, mock.Anything, mock.Anything, mock.Anything).
+			On("NewDataProvider", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).
 			Return(dataProvider, nil).
 			Once()
 
@@ -803,15 +803,14 @@ func (s *WsControllerSuite) TestControllerShutdown() {
 		conn.
 			On("ReadJSON", mock.Anything).
 			Return(func(interface{}) error {
-				// waiting more than InactivityTimeout to make sure that read message routine busy and do not return
-				// an error before than inactivity tracker initiate shut down
-				<-time.After(wsConfig.InactivityTimeout)
+				// make sure the reader routine sleeps for more time than InactivityTimeout + inactivity ticker period.
+				// meanwhile, the writer routine must shut down the controller.
+				<-time.After(wsConfig.InactivityTimeout + controller.inactivityTickerPeriod()*2)
 				return websocket.ErrCloseSent
 			}).
 			Once()
 
 		controller.HandleConnection(context.Background())
-		time.Sleep(wsConfig.InactivityTimeout)
 
 		conn.AssertExpectations(t)
 	})
