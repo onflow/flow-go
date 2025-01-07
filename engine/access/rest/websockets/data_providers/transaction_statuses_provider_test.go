@@ -6,6 +6,7 @@ import (
 	"strconv"
 	"testing"
 
+	"github.com/google/uuid"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -156,6 +157,7 @@ func (s *TransactionStatusesProviderSuite) TestTransactionStatusesDataProvider_I
 				ctx,
 				s.log,
 				s.api,
+				uuid.New(),
 				topic,
 				test.arguments,
 				send,
@@ -243,6 +245,7 @@ func (s *TransactionStatusesProviderSuite) TestMessageIndexTransactionStatusesPr
 		ctx,
 		s.log,
 		s.api,
+		uuid.New(),
 		topic,
 		arguments,
 		send,
