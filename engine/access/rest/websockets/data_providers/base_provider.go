@@ -34,6 +34,11 @@ func newBaseDataProvider(
 	}
 }
 
+// ID returns the subscription ID associated with current data provider
+func (b *baseDataProvider) ID() uuid.UUID {
+	return b.subscriptionID
+}
+
 // Topic returns the topic associated with the data provider.
 func (b *baseDataProvider) Topic() string {
 	return b.topic
