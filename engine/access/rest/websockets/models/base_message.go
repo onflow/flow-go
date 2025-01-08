@@ -28,14 +28,6 @@ type BaseDataProvidersResponse struct {
 }
 
 // Build creates BaseDataProvidersResponse instance for consistent responses of the data providers.
-//func (b *BaseDataProvidersResponse) Build(baseDataProvider *data_providers.baseDataProvider, payload interface{}) {
-//	*b = BaseDataProvidersResponse{
-//		SubscriptionID: baseDataProvider.ID().String(),
-//		Topic:          baseDataProvider.Topic(),
-//		Payload:        payload,
-//	}
-//}
-
 func (b *BaseDataProvidersResponse) Build(subscriptionID string, topic string, payload interface{}) {
 	*b = BaseDataProvidersResponse{
 		SubscriptionID: subscriptionID,
