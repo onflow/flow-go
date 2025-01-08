@@ -1,6 +1,10 @@
 package module
 
-import "github.com/onflow/flow-go/model/flow"
+import (
+	"fmt"
+
+	"github.com/onflow/flow-go/model/flow"
+)
 
 // IterateJob defines the range of blocks to iterate over
 // the range could be either view based range or height based range.
@@ -18,14 +22,26 @@ type IteratorJobCreator interface {
 	CreateJob(IterateProgressReader) (IterateJob, error)
 }
 
+// IterateProgressReader reads the progress of the iterator, useful for resuming the iteration
+// after restart
 type IterateProgressReader interface {
-	// ReadNext reads the next to iterate
+	// ReadNext reads the next block to iterate
+	// caller must ensure the reader is created by the IterateProgressInitializer,
+	// otherwise ReadNext would return exception.
 	ReadNext() (uint64, error)
 }
 
+// IterateProgressWriter saves the progress of the iterator
 type IterateProgressWriter interface {
 	// SaveNext persists the next block to be iterated
 	SaveNext(uint64) error
+}
+
+// IterateProgressInitializer is an interface for initializing the progress of the iterator
+// a initializer must be used to ensures the initial next block to be iterated is saved in
+// storage before creating the block iterator
+type IterateProgressInitializer interface {
+	Init() (IterateProgressReader, IterateProgressWriter, error)
 }
 
 // BlockIterator is an interface for iterating over blocks
@@ -49,6 +65,50 @@ type IteratorCreator interface {
 	// CreateIterator takes iterate job which specifies the range of blocks to iterate over
 	// and a progress writer which is used to save the progress of the iterator,
 	// and returns a block iterator that can be used to iterate over the blocks
-	// if the end of the
+	// Note: it's up to the implementation to decide how often the progress is saved,
+	// it is wise to consider the trade-off between the performance and the progress saving,
+	// if the progress is saved too often, it might impact the iteration performance, however,
+	// if the progress is only saved at the end of the iteration, then if the iteration
+	// was interrupted, then the iterator will start from the beginning of the range again,
+	// which means some blocks might be iterated multiple times.
 	CreateIterator(IterateJob, IterateProgressWriter) (BlockIterator, error)
+}
+
+type IteratorFactory struct {
+	progressReader IterateProgressReader
+	progressWriter IterateProgressWriter
+	creator        IteratorCreator
+	jobCreator     IteratorJobCreator
+}
+
+func NewIteratorFactory(
+	initializer IterateProgressInitializer,
+	creator IteratorCreator,
+	jobCreator IteratorJobCreator,
+) (*IteratorFactory, error) {
+	progressReader, progressWriter, err := initializer.Init()
+	if err != nil {
+		return nil, fmt.Errorf("failed to initialize progress: %w", err)
+	}
+
+	return &IteratorFactory{
+		progressReader: progressReader,
+		progressWriter: progressWriter,
+		creator:        creator,
+		jobCreator:     jobCreator,
+	}, nil
+}
+
+func (f *IteratorFactory) Create() (BlockIterator, error) {
+	job, err := f.jobCreator.CreateJob(f.progressReader)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create job for block iteration: %w", err)
+	}
+
+	iterator, err := f.creator.CreateIterator(job, f.progressWriter)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create block iterator: %w", err)
+	}
+
+	return iterator, nil
 }
