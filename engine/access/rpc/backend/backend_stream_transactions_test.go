@@ -245,9 +245,9 @@ func (s *TransactionStatusSuite) addNewFinalizedBlock(parent *flow.Header, notif
 	}
 }
 
-// TestSubscribeTransactionStatusHappyCase tests the functionality of the SubscribeTransactionStatusesFromStartBlockID method in the Backend.
+// TestSendAndSubscribeTransactionStatusHappyCase tests the functionality of the SubscribeTransactionStatusesFromStartBlockID method in the Backend.
 // It covers the emulation of transaction stages from pending to sealed, and receiving status updates.
-func (s *TransactionStatusSuite) TestSubscribeTransactionStatusHappyCase() {
+func (s *TransactionStatusSuite) TestSendAndSubscribeTransactionStatusHappyCase() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
@@ -345,6 +345,122 @@ func (s *TransactionStatusSuite) TestSubscribeTransactionStatusHappyCase() {
 	s.sealedBlock = s.finalizedBlock
 	s.addNewFinalizedBlock(s.sealedBlock.Header, true)
 	checkNewSubscriptionMessage(sub, flow.TransactionStatusSealed)
+
+	//// 5. Stop subscription
+	s.sealedBlock = s.finalizedBlock
+	s.addNewFinalizedBlock(s.sealedBlock.Header, true)
+
+	// Ensure subscription shuts down gracefully
+	unittest.RequireReturnsBefore(s.T(), func() {
+		v, ok := <-sub.Channel()
+		assert.Nil(s.T(), v)
+		assert.False(s.T(), ok)
+		assert.NoError(s.T(), sub.Err())
+	}, 100*time.Millisecond, "timed out waiting for subscription to shutdown")
+}
+
+// TestSubscribeTransactionStatusHappyCase tests the functionality of the SubscribeTransactionStatusesFromStartBlockID method in the Backend.
+// It covers the emulation of transaction stages from pending to sealed, and receiving status updates.
+func (s *TransactionStatusSuite) TestSubscribeTransactionStatusHappyCase() {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	s.reporter.On("LowestIndexedHeight").Return(s.rootBlock.Header.Height, nil)
+	s.reporter.On("HighestIndexedHeight").Return(func() (uint64, error) {
+		finalizedHeader := s.finalizedBlock.Header
+		return finalizedHeader.Height, nil
+	}, nil)
+	s.blocks.On("ByID", mock.AnythingOfType("flow.Identifier")).Return(func(blockID flow.Identifier) (*flow.Block, error) {
+		for _, block := range s.blockMap {
+			if block.ID() == blockID {
+				return block, nil
+			}
+		}
+
+		return nil, nil
+	}, nil)
+	s.sealedSnapshot.On("Head").Return(func() *flow.Header {
+		return s.sealedBlock.Header
+	}, nil)
+	s.state.On("Sealed").Return(s.sealedSnapshot, nil)
+	s.results.On("ByBlockID", mock.AnythingOfType("flow.Identifier")).Return(mocks.StorageMapGetter(s.resultsMap))
+
+	// Generate sent transaction with ref block of the current finalized block
+	transaction := unittest.TransactionFixture()
+	transaction.SetReferenceBlockID(s.finalizedBlock.ID())
+	s.transactions.On("ByID", mock.AnythingOfType("flow.Identifier")).Return(&transaction.TransactionBody, nil)
+
+	col := flow.CollectionFromTransactions([]*flow.Transaction{&transaction})
+	guarantee := col.Guarantee()
+	light := col.Light()
+	txId := transaction.ID()
+	txResult := flow.LightTransactionResult{
+		TransactionID:   txId,
+		Failed:          false,
+		ComputationUsed: 0,
+	}
+
+	eventsForTx := unittest.EventsFixture(1, flow.EventAccountCreated)
+	eventMessages := make([]*entities.Event, 1)
+	for j, event := range eventsForTx {
+		eventMessages[j] = convert.EventToMessage(event)
+	}
+
+	s.events.On(
+		"ByBlockIDTransactionID",
+		mock.AnythingOfType("flow.Identifier"),
+		mock.AnythingOfType("flow.Identifier"),
+	).Return(eventsForTx, nil)
+
+	s.transactionResults.On(
+		"ByBlockIDTransactionID",
+		mock.AnythingOfType("flow.Identifier"),
+		mock.AnythingOfType("flow.Identifier"),
+	).Return(&txResult, nil)
+
+	// Create a special common function to read subscription messages from the channel and check converting it to transaction info
+	// and check results for correctness
+	checkNewSubscriptionMessage := func(sub subscription.Subscription, expectedTxStatuses []flow.TransactionStatus) {
+		unittest.RequireReturnsBefore(s.T(), func() {
+			v, ok := <-sub.Channel()
+			require.True(s.T(), ok,
+				"channel closed while waiting for transaction info:\n\t- txID %x\n\t- blockID: %x \n\t- err: %v",
+				txId, s.finalizedBlock.ID(), sub.Err())
+
+			txResults, ok := v.([]*accessapi.TransactionResult)
+			require.True(s.T(), ok, "unexpected response type: %T", v)
+			require.Len(s.T(), txResults, len(expectedTxStatuses))
+
+			for i, expectedTxStatus := range expectedTxStatuses {
+				result := txResults[i]
+				assert.Equal(s.T(), txId, result.TransactionID)
+				assert.Equal(s.T(), expectedTxStatus, result.Status)
+			}
+
+		}, 120*time.Second, fmt.Sprintf("timed out waiting for transaction info:\n\t- txID: %x\n\t- blockID: %x", txId, s.finalizedBlock.ID()))
+	}
+	s.sealedBlock = s.finalizedBlock
+	s.addNewFinalizedBlock(s.sealedBlock.Header, true, func(block *flow.Block) {
+		block.SetPayload(unittest.PayloadFixture(unittest.WithGuarantees(&guarantee)))
+		s.collections.On("LightByID", mock.AnythingOfType("flow.Identifier")).Return(&light, nil).Maybe()
+	})
+	finalizedResult := unittest.ExecutionResultFixture(unittest.WithBlock(s.finalizedBlock))
+	s.resultsMap[s.finalizedBlock.ID()] = finalizedResult
+	s.addNewFinalizedBlock(s.finalizedBlock.Header, true)
+	s.sealedBlock = s.finalizedBlock
+	s.addNewFinalizedBlock(s.sealedBlock.Header, true)
+
+	sub := s.backend.SubscribeTransactionStatusesFromLatest(ctx, txId, entities.EventEncodingVersion_CCF_V0)
+
+	checkNewSubscriptionMessage(
+		sub,
+		[]flow.TransactionStatus{
+			flow.TransactionStatusPending,
+			flow.TransactionStatusFinalized,
+			flow.TransactionStatusExecuted,
+			flow.TransactionStatusSealed,
+		},
+	)
 
 	//// 5. Stop subscription
 	s.sealedBlock = s.finalizedBlock

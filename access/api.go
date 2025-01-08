@@ -205,8 +205,8 @@ type API interface {
 	SubscribeBlockDigestsFromLatest(ctx context.Context, blockStatus flow.BlockStatus) subscription.Subscription
 	// SubscribeTransactionStatusesFromStartBlockID subscribes to transaction status updates for a given transaction ID.
 	// Monitoring begins from the specified block ID. The subscription streams status updates until the transaction
-	// reaches a final state (TransactionStatusSealed or TransactionStatusExpired). When the transaction reaches one of
-	// these final statuses, the subscription will automatically terminate.
+	// reaches the final state ([flow.TransactionStatusSealed] or [flow.TransactionStatusExpired]). When the transaction reaches one of
+	// these final states, the subscription will automatically terminate.
 	//
 	// Parameters:
 	//   - ctx: The context to manage the subscription's lifecycle, including cancellation.
@@ -216,8 +216,8 @@ type API interface {
 	SubscribeTransactionStatusesFromStartBlockID(ctx context.Context, txID flow.Identifier, startBlockID flow.Identifier, requiredEventEncodingVersion entities.EventEncodingVersion) subscription.Subscription
 	// SubscribeTransactionStatusesFromStartHeight subscribes to transaction status updates for a given transaction ID.
 	// Monitoring begins from the specified block height. The subscription streams status updates until the transaction
-	// reaches a final state (TransactionStatusSealed or TransactionStatusExpired). When the transaction reaches one of
-	// these final statuses, the subscription will automatically terminate.
+	// reaches the final state ([flow.TransactionStatusSealed] or [flow.TransactionStatusExpired]). When the transaction reaches one of
+	// these final states, the subscription will automatically terminate.
 	//
 	// Parameters:
 	//   - ctx: The context to manage the subscription's lifecycle, including cancellation.
@@ -227,8 +227,8 @@ type API interface {
 	SubscribeTransactionStatusesFromStartHeight(ctx context.Context, txID flow.Identifier, startHeight uint64, requiredEventEncodingVersion entities.EventEncodingVersion) subscription.Subscription
 	// SubscribeTransactionStatusesFromLatest subscribes to transaction status updates for a given transaction ID.
 	// Monitoring begins from the latest block. The subscription streams status updates until the transaction
-	// reaches a final state (TransactionStatusSealed or TransactionStatusExpired). When the transaction reaches one of
-	// these final statuses, the subscription will automatically terminate.
+	// reaches the final state ([flow.TransactionStatusSealed] or [flow.TransactionStatusExpired]). When the transaction reaches one of
+	// these final states, the subscription will automatically terminate.
 	//
 	// Parameters:
 	//   - ctx: The context to manage the subscription's lifecycle, including cancellation.
@@ -237,7 +237,7 @@ type API interface {
 	SubscribeTransactionStatusesFromLatest(ctx context.Context, txID flow.Identifier, requiredEventEncodingVersion entities.EventEncodingVersion) subscription.Subscription
 	// SendAndSubscribeTransactionStatuses sends a transaction to the execution node and subscribes to its status updates.
 	// Monitoring begins from the reference block saved in the transaction itself and streams status updates until the transaction
-	// reaches a final state (TransactionStatusSealed or TransactionStatusExpired). Once a final status is reached, the subscription
+	// reaches the final state ([flow.TransactionStatusSealed] or [flow.TransactionStatusExpired]). Once the final status has been reached, the subscription
 	// automatically terminates.
 	//
 	// Parameters:
@@ -259,6 +259,14 @@ type TransactionResult struct {
 	TransactionID flow.Identifier
 	CollectionID  flow.Identifier
 	BlockHeight   uint64
+}
+
+func (r *TransactionResult) IsExecuted() bool {
+	return r.Status == flow.TransactionStatusExecuted || r.Status == flow.TransactionStatusSealed
+}
+
+func (r *TransactionResult) IsFinal() bool {
+	return r.Status == flow.TransactionStatusSealed || r.Status == flow.TransactionStatusExpired
 }
 
 func TransactionResultToMessage(result *TransactionResult) *access.TransactionResultResponse {
