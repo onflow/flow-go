@@ -4,7 +4,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
-// Assignment is an immutable list that, for each chunk (in order),
+// Assignment is an immutable list that, for each chunk (in order of chunk.Index),
 // records the set of verifier nodes that are assigned to verify that chunk.
 type Assignment struct {
 	verifiersForChunk []map[flow.Identifier]struct{}
@@ -21,6 +21,7 @@ func NewAssignmentBuilder() *AssignmentBuilder {
 	}
 }
 
+// Build completes the assignment and makes it immutable.
 func (a *AssignmentBuilder) Build() *Assignment {
 	// TODO is this correct?
 	// the underlying data can still be modified by the Builder,
@@ -34,7 +35,7 @@ func (a *AssignmentBuilder) Build() *Assignment {
 func (a *Assignment) Verifiers(chunk *flow.Chunk) flow.IdentifierList {
 	v := make([]flow.Identifier, 0)
 	if chunk.Index >= uint64(len(a.verifiersForChunk)) {
-		// the chunk does not exist, so it has no verifiers
+		// the chunk does not exist in the assignment, so it has no verifiers
 		return v
 	}
 	for id := range a.verifiersForChunk[chunk.Index] {
@@ -57,6 +58,7 @@ func (a *Assignment) HasVerifier(chunk *flow.Chunk, identifier flow.Identifier) 
 }
 
 // Add records the list of verifier nodes as the assigned verifiers of the chunk.
+// Requires chunks to be added in order of their Index (increasing by 1 each time).
 // It returns an error if the list of verifiers is empty or contains duplicate ids
 func (a *AssignmentBuilder) Add(chunk *flow.Chunk, verifiers flow.IdentifierList) {
 	if chunk.Index != uint64(len(a.verifiersForChunk)) {
