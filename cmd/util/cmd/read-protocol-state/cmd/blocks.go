@@ -43,7 +43,7 @@ func init() {
 		"get sealed block")
 
 	Cmd.Flags().BoolVar(&flagExecuted, "executed", false,
-		"get last executed and sealed block")
+		"get last executed and sealed block (execution node only)")
 }
 
 type Reader struct {
