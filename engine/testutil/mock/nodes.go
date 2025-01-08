@@ -140,6 +140,7 @@ func (n CollectionNode) Start(t *testing.T) {
 	n.IngestionEngine.Start(n.Ctx)
 	n.EpochManagerEngine.Start(n.Ctx)
 	n.ProviderEngine.Start(n.Ctx)
+	n.PusherEngine.Start(n.Ctx)
 }
 
 func (n CollectionNode) Ready() <-chan struct{} {

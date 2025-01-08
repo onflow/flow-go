@@ -46,7 +46,6 @@ func (b *baseDataProvider) Topic() string {
 // Close terminates the data provider.
 //
 // No errors are expected during normal operations.
-func (b *baseDataProvider) Close() error {
+func (b *baseDataProvider) Close() {
 	b.cancel()
-	return nil
 }

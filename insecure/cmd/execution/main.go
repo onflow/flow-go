@@ -1,6 +1,8 @@
 package main
 
 import (
+	"context"
+
 	"github.com/onflow/flow-go/cmd"
 	insecmd "github.com/onflow/flow-go/insecure/cmd"
 	"github.com/onflow/flow-go/model/flow"
@@ -23,5 +25,5 @@ func main() {
 	if err != nil {
 		corruptedExecutionBuilder.Logger.Fatal().Err(err).Send()
 	}
-	node.Run()
+	node.Run(context.Background())
 }

@@ -113,6 +113,7 @@ const (
 	ResourceFollowerLoopCertifiedBlocksChannel    = "follower_loop_certified_blocks_channel"    // follower loop, certified blocks buffered channel
 	ResourceClusterBlockProposalQueue             = "cluster_compliance_proposal_queue"         // collection node, compliance engine
 	ResourceTransactionIngestQueue                = "ingest_transaction_queue"                  // collection node, ingest engine
+	ResourceSubmitCollectionGuaranteesQueue       = "pusher_col_guarantee_queue"                // collection node, pusher engine
 	ResourceBeaconKey                             = "beacon-key"                                // consensus node, DKG engine
 	ResourceDKGMessage                            = "dkg_private_message"                       // consensus, DKG messaging engine
 	ResourceApprovalQueue                         = "sealing_approval_queue"                    // consensus node, sealing engine

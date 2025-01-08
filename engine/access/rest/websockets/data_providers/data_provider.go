@@ -14,7 +14,7 @@ type DataProvider interface {
 	// Close terminates the data provider.
 	//
 	// No errors are expected during normal operations.
-	Close() error
+	Close()
 	// Run starts processing the subscription and handles responses.
 	//
 	// The separation of the data provider's creation and its Run() method

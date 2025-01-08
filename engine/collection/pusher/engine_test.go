@@ -1,8 +1,10 @@
 package pusher_test
 
 import (
+	"context"
 	"io"
 	"testing"
+	"time"
 
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/mock"
@@ -11,7 +13,7 @@ import (
 	"github.com/onflow/flow-go/engine/collection/pusher"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
-	"github.com/onflow/flow-go/model/messages"
+	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/metrics"
 	module "github.com/onflow/flow-go/module/mock"
 	"github.com/onflow/flow-go/network/channels"
@@ -82,18 +84,21 @@ func TestPusherEngine(t *testing.T) {
 
 // should be able to submit collection guarantees to consensus nodes
 func (suite *Suite) TestSubmitCollectionGuarantee() {
+	ctx, cancel := irrecoverable.NewMockSignalerContextWithCancel(suite.T(), context.Background())
+	suite.engine.Start(ctx)
+	defer cancel()
+	done := make(chan struct{})
 
 	guarantee := unittest.CollectionGuaranteeFixture()
 
 	// should submit the collection to consensus nodes
 	consensus := suite.identities.Filter(filter.HasRole[flow.Identity](flow.RoleConsensus))
-	suite.conduit.On("Publish", guarantee, consensus[0].NodeID).Return(nil)
+	suite.conduit.On("Publish", guarantee, consensus[0].NodeID).
+		Run(func(_ mock.Arguments) { close(done) }).Return(nil).Once()
 
-	msg := &messages.SubmitCollectionGuarantee{
-		Guarantee: *guarantee,
-	}
-	err := suite.engine.ProcessLocal(msg)
-	suite.Require().Nil(err)
+	suite.engine.SubmitCollectionGuarantee(guarantee)
+
+	unittest.RequireCloseBefore(suite.T(), done, time.Second, "message not sent")
 
 	suite.conduit.AssertExpectations(suite.T())
 }
@@ -103,14 +108,13 @@ func (suite *Suite) TestSubmitCollectionGuaranteeNonLocal() {
 
 	guarantee := unittest.CollectionGuaranteeFixture()
 
-	// send from a non-allowed role
+	// verify that pusher.Engine handles any (potentially byzantine) input:
+	// A byzantine peer could target the collector node's pusher engine with messages
+	// The pusher should discard those and explicitly not get tricked into broadcasting
+	// collection guarantees which a byzantine peer might try to inject into the system.
 	sender := suite.identities.Filter(filter.HasRole[flow.Identity](flow.RoleVerification))[0]
 
-	msg := &messages.SubmitCollectionGuarantee{
-		Guarantee: *guarantee,
-	}
-	err := suite.engine.Process(channels.PushGuarantees, sender.NodeID, msg)
-	suite.Require().Error(err)
-
+	err := suite.engine.Process(channels.PushGuarantees, sender.NodeID, guarantee)
+	suite.Require().NoError(err)
 	suite.conduit.AssertNumberOfCalls(suite.T(), "Multicast", 0)
 }
