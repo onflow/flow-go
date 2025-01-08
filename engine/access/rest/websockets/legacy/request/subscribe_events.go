@@ -81,7 +81,7 @@ func (g *SubscribeEvents) Parse(
 		g.StartHeight = 0
 	}
 
-	var eventTypes request.EventTypes
+	var eventTypes parser.EventTypes
 	err = eventTypes.Parse(rawTypes)
 	if err != nil {
 		return err

@@ -5,12 +5,6 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
-// SubmitCollectionGuarantee is a request to submit the given collection
-// guarantee to consensus nodes. Only valid as a node-local message.
-type SubmitCollectionGuarantee struct {
-	Guarantee flow.CollectionGuarantee
-}
-
 // CollectionRequest request all transactions from a collection with the given
 // fingerprint.
 type CollectionRequest struct {
