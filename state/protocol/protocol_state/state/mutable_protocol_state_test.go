@@ -65,7 +65,7 @@ func (s *StateMutatorSuite) SetupTest() {
 	s.parentState.On("GetProtocolStateVersion").Return(s.latestProtocolVersion)
 	s.parentState.On("GetVersionUpgrade").Return(nil) // no version upgrade by default
 	s.parentState.On("ID").Return(unittest.IdentifierFixture(), nil)
-	s.parentState.On("Replicate", s.latestProtocolVersion).Return(&s.evolvingState, nil)
+	s.parentState.On("Replicate", s.latestProtocolVersion).Return(&s.evolvingState, nil, nil)
 
 	// state replicated from the parent state; by default exactly the same as the parent state
 	// CAUTION: ID of evolving state must be defined by the tests.
@@ -274,7 +274,7 @@ func (s *StateMutatorSuite) Test_VersionUpgrade() {
 			Data:           newVersion,
 			ActivationView: s.candidate.View + 1,
 		}).Once()
-		s.parentState.On("Replicate", s.latestProtocolVersion).Return(&s.evolvingState, nil)
+		s.parentState.On("Replicate", s.latestProtocolVersion).Return(&s.evolvingState, nil, nil)
 		s.evolvingState.On("ID").Return(parentStateID, nil).Once()
 
 		for i := range s.kvStateMachines {
@@ -295,7 +295,7 @@ func (s *StateMutatorSuite) Test_VersionUpgrade() {
 			Data:           newVersion,
 			ActivationView: s.candidate.View,
 		}).Once()
-		s.parentState.On("Replicate", newVersion).Return(&s.evolvingState, nil)
+		s.parentState.On("Replicate", newVersion).Return(&s.evolvingState, nil, nil)
 		s.evolvingState.On("ID").Return(newStateID, nil).Once()
 
 		for i := range s.kvStateMachines {
@@ -318,7 +318,7 @@ func (s *StateMutatorSuite) Test_VersionUpgrade() {
 			Data:           newVersion,
 			ActivationView: s.candidate.View - 1,
 		}).Once()
-		s.parentState.On("Replicate", newVersion).Return(&s.evolvingState, nil)
+		s.parentState.On("Replicate", newVersion).Return(&s.evolvingState, nil, nil)
 		s.evolvingState.On("ID").Return(newStateID, nil).Once()
 
 		for i := range s.kvStateMachines {
@@ -339,7 +339,7 @@ func (s *StateMutatorSuite) Test_VersionUpgrade() {
 			Data:           s.latestProtocolVersion,
 			ActivationView: s.candidate.View - 1,
 		}).Once()
-		s.parentState.On("Replicate", s.latestProtocolVersion).Return(&s.evolvingState, nil)
+		s.parentState.On("Replicate", s.latestProtocolVersion).Return(&s.evolvingState, nil, nil)
 		s.evolvingState.On("ID").Return(parentStateID, nil).Once()
 
 		for i := range s.kvStateMachines {
@@ -414,7 +414,7 @@ func (s *StateMutatorSuite) Test_ReplicateFails() {
 	s.parentState = *protocol_statemock.NewKVStoreAPI(s.T())
 	s.parentState.On("GetProtocolStateVersion").Return(s.latestProtocolVersion)
 	s.parentState.On("GetVersionUpgrade").Return(nil).Once()
-	s.parentState.On("Replicate", s.latestProtocolVersion).Return(nil, exception).Once()
+	s.parentState.On("Replicate", s.latestProtocolVersion).Return(nil, nil, exception).Once()
 
 	// `SetupTest` initializes the mock factories to expect to be called, so we overwrite the mocks here:
 	s.kvStateMachineFactories[0] = *protocol_statemock.NewKeyValueStoreStateMachineFactory(s.T())

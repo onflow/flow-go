@@ -1,6 +1,7 @@
 package operation
 
 import (
+	"encoding/binary"
 	"errors"
 
 	"github.com/dgraph-io/badger/v2"
@@ -73,4 +74,32 @@ func UpsertDKGStateForEpoch(epochCounter uint64, newState flow.DKGState) func(*b
 // Error returns: [storage.ErrNotFound]
 func RetrieveDKGStateForEpoch(epochCounter uint64, currentState *flow.DKGState) func(*badger.Txn) error {
 	return retrieve(makePrefix(codeDKGState, epochCounter), currentState)
+}
+
+func RetrieveStoredEpochStates() func(*badger.Txn) ([]uint64, []uint32, error) {
+	return func(tx *badger.Txn) ([]uint64, []uint32, error) {
+		var epochs []uint64
+		var states []uint32
+		err := traverse(makePrefix(codeDKGState), func() (checkFunc, createFunc, handleFunc) {
+			var epochCounter uint64
+			check := func(key []byte) bool {
+				epochCounter = binary.BigEndian.Uint64(key[1:]) // omit code
+				return true
+			}
+			var state uint32
+			create := func() interface{} {
+				return &state
+			}
+			handle := func() error {
+				epochs = append(epochs, epochCounter)
+				states = append(states, state)
+				return nil
+			}
+			return check, create, handle
+		})(tx)
+		if err != nil {
+			return nil, nil, err
+		}
+		return epochs, states, nil
+	}
 }

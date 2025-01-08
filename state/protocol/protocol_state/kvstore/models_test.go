@@ -115,7 +115,7 @@ func TestKVStoreAPI_Replicate(t *testing.T) {
 				},
 			},
 		}
-		cpy, err := model.Replicate(model.GetProtocolStateVersion())
+		cpy, _, err := model.Replicate(model.GetProtocolStateVersion())
 		require.NoError(t, err)
 		require.True(t, reflect.DeepEqual(model, cpy)) // expect the same model
 		require.Equal(t, cpy.ID(), model.ID())
@@ -132,7 +132,7 @@ func TestKVStoreAPI_Replicate(t *testing.T) {
 				},
 			},
 		}
-		newVersion, err := model.Replicate(1)
+		newVersion, _, err := model.Replicate(1)
 		require.NoError(t, err)
 		require.Equal(t, uint64(1), newVersion.GetProtocolStateVersion())
 		require.NotEqual(t, newVersion.ID(), model.ID(), "two models with the same data but different version must have different ID")
@@ -142,7 +142,7 @@ func TestKVStoreAPI_Replicate(t *testing.T) {
 	})
 	t.Run("v0-invalid-upgrade", func(t *testing.T) {
 		model := &kvstore.Modelv0{}
-		newVersion, err := model.Replicate(model.GetProtocolStateVersion() + 10)
+		newVersion, _, err := model.Replicate(model.GetProtocolStateVersion() + 10)
 		require.ErrorIs(t, err, kvstore.ErrIncompatibleVersionChange)
 		require.Nil(t, newVersion)
 	})
@@ -158,7 +158,7 @@ func TestKVStoreAPI_Replicate(t *testing.T) {
 				EpochStateID: unittest.IdentifierFixture(),
 			},
 		}
-		cpy, err := model.Replicate(model.GetProtocolStateVersion())
+		cpy, _, err := model.Replicate(model.GetProtocolStateVersion())
 		require.NoError(t, err)
 		require.True(t, reflect.DeepEqual(model, cpy))
 
@@ -171,7 +171,7 @@ func TestKVStoreAPI_Replicate(t *testing.T) {
 			model.GetProtocolStateVersion() - 1,
 			model.GetProtocolStateVersion() + 10,
 		} {
-			newVersion, err := model.Replicate(version)
+			newVersion, _, err := model.Replicate(version)
 			require.ErrorIs(t, err, kvstore.ErrIncompatibleVersionChange)
 			require.Nil(t, newVersion)
 		}
@@ -187,7 +187,7 @@ func TestKVStoreAPI_Replicate(t *testing.T) {
 				},
 			},
 		}
-		newVersion, err := model.Replicate(2)
+		newVersion, _, err := model.Replicate(2)
 		require.NoError(t, err)
 		require.Equal(t, uint64(2), newVersion.GetProtocolStateVersion())
 		require.NotEqual(t, newVersion.ID(), model.ID(), "two models with the same data but different version must have different ID")
@@ -203,7 +203,7 @@ func TestKVStoreAPI_Replicate(t *testing.T) {
 			model.GetProtocolStateVersion() + 1,
 			model.GetProtocolStateVersion() + 10,
 		} {
-			newVersion, err := model.Replicate(version)
+			newVersion, _, err := model.Replicate(version)
 			require.ErrorIs(t, err, kvstore.ErrIncompatibleVersionChange)
 			require.Nil(t, newVersion)
 		}
@@ -268,7 +268,7 @@ func TestKVStoreMutator_SetEpochExtensionViewCount(t *testing.T) {
 	t.Run("happy-path", func(t *testing.T) {
 		store, err := kvstore.NewDefaultKVStore(safetyParams.FinalizationSafetyThreshold, safetyParams.EpochExtensionViewCount, epochStateID)
 		require.NoError(t, err)
-		mutator, err := store.Replicate(store.GetProtocolStateVersion())
+		mutator, _, err := store.Replicate(store.GetProtocolStateVersion())
 		require.NoError(t, err)
 
 		newValue := safetyParams.FinalizationSafetyThreshold*2 + 1
@@ -280,7 +280,7 @@ func TestKVStoreMutator_SetEpochExtensionViewCount(t *testing.T) {
 	t.Run("invalid-value", func(t *testing.T) {
 		store, err := kvstore.NewDefaultKVStore(safetyParams.FinalizationSafetyThreshold, safetyParams.EpochExtensionViewCount, epochStateID)
 		require.NoError(t, err)
-		mutator, err := store.Replicate(store.GetProtocolStateVersion())
+		mutator, _, err := store.Replicate(store.GetProtocolStateVersion())
 		require.NoError(t, err)
 
 		oldValue := mutator.GetEpochExtensionViewCount()

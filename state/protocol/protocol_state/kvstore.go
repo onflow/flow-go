@@ -40,7 +40,7 @@ type KVStoreAPI interface {
 	// Expected errors during normal operations:
 	//  - kvstore.ErrIncompatibleVersionChange if replicating the Parent Snapshot into a Snapshot
 	//    with the specified `protocolVersion` is not supported.
-	Replicate(protocolVersion uint64) (KVStoreMutator, error)
+	Replicate(protocolVersion uint64) (KVStoreMutator, transaction.DeferredDBUpdate, error)
 }
 
 // KVStoreMutator is the latest read-writer interface to the Protocol State key-value store.

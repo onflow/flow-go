@@ -205,16 +205,21 @@ func (s *MutableProtocolState) EvolveState(
 		return flow.ZeroID, nil, fmt.Errorf("extracting service events from candidate seals failed: %w", err)
 	}
 
-	parentStateID, stateMachines, evolvingState, err := s.initializeOrthogonalStateMachines(parentBlockID, candidateView)
+	parentStateID, stateMachines, evolvingState, dbMigrationOp, err := s.initializeOrthogonalStateMachines(parentBlockID, candidateView)
 	if err != nil {
 		return flow.ZeroID, nil, fmt.Errorf("failure initializing sub-state machines for evolving the Protocol State: %w", err)
+	}
+	blockPersistDbUpdates := transaction.NewDeferredBlockPersist()
+	if dbMigrationOp != nil {
+		blockPersistDbUpdates.AddDbOp(dbMigrationOp)
 	}
 
 	resultingStateID, dbUpdates, err := s.build(parentStateID, stateMachines, serviceEvents, evolvingState)
 	if err != nil {
 		return flow.ZeroID, nil, fmt.Errorf("evolving and building the resulting Protocol State failed: %w", err)
 	}
-	return resultingStateID, dbUpdates, nil
+	blockPersistDbUpdates.AddIndexingOps(dbUpdates.Pending())
+	return resultingStateID, blockPersistDbUpdates, nil
 }
 
 // initializeOrthogonalStateMachines instantiates the sub-state machines that in aggregate evolve the protocol state.
@@ -232,13 +237,13 @@ func (s *MutableProtocolState) EvolveState(
 func (s *MutableProtocolState) initializeOrthogonalStateMachines(
 	parentBlockID flow.Identifier,
 	candidateView uint64,
-) (flow.Identifier, []protocol_state.KeyValueStoreStateMachine, protocol_state.KVStoreMutator, error) {
+) (flow.Identifier, []protocol_state.KeyValueStoreStateMachine, protocol_state.KVStoreMutator, transaction.DeferredDBUpdate, error) {
 	parentState, err := s.kvStoreSnapshots.ByBlockID(parentBlockID)
 	if err != nil {
 		if errors.Is(err, storage.ErrNotFound) {
-			return flow.ZeroID, nil, nil, irrecoverable.NewExceptionf("Protocol State at parent block %v was not found: %w", parentBlockID, err)
+			return flow.ZeroID, nil, nil, nil, irrecoverable.NewExceptionf("Protocol State at parent block %v was not found: %w", parentBlockID, err)
 		}
-		return flow.ZeroID, nil, nil, fmt.Errorf("unexpected exception while retrieving Protocol State at parent block %v: %w", parentBlockID, err)
+		return flow.ZeroID, nil, nil, nil, fmt.Errorf("unexpected exception while retrieving Protocol State at parent block %v: %w", parentBlockID, err)
 	}
 
 	protocolVersion := parentState.GetProtocolStateVersion()
@@ -248,23 +253,33 @@ func (s *MutableProtocolState) initializeOrthogonalStateMachines(
 		}
 	}
 
-	evolvingState, err := parentState.Replicate(protocolVersion)
+	evolvingState, dbMigrationOp, err := parentState.Replicate(protocolVersion)
 	if err != nil {
 		if errors.Is(err, kvstore.ErrIncompatibleVersionChange) {
-			return flow.ZeroID, nil, nil, irrecoverable.NewExceptionf("replicating parent block's protocol state failed due to unsupported version: %w", err)
+			return flow.ZeroID, nil, nil, nil, irrecoverable.NewExceptionf("replicating parent block's protocol state failed due to unsupported version: %w", err)
 		}
-		return flow.ZeroID, nil, nil, fmt.Errorf("could not replicate parent KV store (version=%d) to protocol version %d: %w", parentState.GetProtocolStateVersion(), protocolVersion, err)
+		return flow.ZeroID, nil, nil, nil, fmt.Errorf("could not replicate parent KV store (version=%d) to protocol version %d: %w", parentState.GetProtocolStateVersion(), protocolVersion, err)
+	}
+	if dbMigrationOp != nil {
+		dbMigrationOp = func(tx *transaction.Tx) error {
+			err := dbMigrationOp(tx)
+			if err != nil {
+				return fmt.Errorf("could not migrate storage from %d to %d: %w",
+					parentState.GetProtocolStateVersion(), protocolVersion, err)
+			}
+			return nil
+		}
 	}
 
 	stateMachines := make([]protocol_state.KeyValueStoreStateMachine, 0, len(s.kvStateMachineFactories))
 	for _, factory := range s.kvStateMachineFactories {
 		stateMachine, err := factory.Create(candidateView, parentBlockID, parentState, evolvingState)
 		if err != nil {
-			return flow.ZeroID, nil, nil, fmt.Errorf("could not create state machine: %w", err)
+			return flow.ZeroID, nil, nil, nil, fmt.Errorf("could not create state machine: %w", err)
 		}
 		stateMachines = append(stateMachines, stateMachine)
 	}
-	return parentState.ID(), stateMachines, evolvingState, nil
+	return parentState.ID(), stateMachines, evolvingState, dbMigrationOp, nil
 }
 
 // serviceEventsFromSeals arranges the sealed results in order of increasing height of the executed blocks
