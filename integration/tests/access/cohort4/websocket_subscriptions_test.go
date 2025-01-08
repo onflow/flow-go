@@ -1,8 +1,8 @@
 package cohort4
 
 import (
+	"bytes"
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"net/url"
@@ -19,6 +19,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
+	restcommon "github.com/onflow/flow-go/engine/access/rest/common"
 	commonmodels "github.com/onflow/flow-go/engine/access/rest/common/models"
 	"github.com/onflow/flow-go/engine/access/rest/common/parser"
 	"github.com/onflow/flow-go/engine/access/rest/util"
@@ -52,8 +53,9 @@ type WebsocketSubscriptionSuite struct {
 
 	net *testnet.FlowNetwork
 
-	grpcClient    accessproto.AccessAPIClient
-	serviceClient *testnet.Client
+	grpcClient        accessproto.AccessAPIClient
+	serviceClient     *testnet.Client
+	restAccessAddress string
 }
 
 func (s *WebsocketSubscriptionSuite) TearDownTest() {
@@ -127,6 +129,8 @@ func (s *WebsocketSubscriptionSuite) SetupTest() {
 	s.serviceClient, err = s.net.ContainerByName(testnet.PrimaryAN).TestnetClient()
 	s.Require().NoError(err)
 
+	s.restAccessAddress = s.net.ContainerByName(testnet.PrimaryAN).Addr(testnet.RESTPort)
+
 	// pause until the network is progressing
 	var header *sdk.BlockHeader
 	s.Require().Eventually(func() bool {
@@ -146,8 +150,7 @@ func (s *WebsocketSubscriptionSuite) TestInactivityHeaders() {
 	// 3. Wait for the server to close the connection due to inactivity.
 	// 4. Validate that the actual inactivity duration is within the expected range.
 	s.T().Run("no active subscription after connection creation", func(t *testing.T) {
-		restAddr := s.net.ContainerByName(testnet.PrimaryAN).Addr(testnet.RESTPort)
-		wsClient, err := common.GetWSClient(s.ctx, getWebsocketsUrl(restAddr))
+		wsClient, err := common.GetWSClient(s.ctx, getWebsocketsUrl(s.restAccessAddress))
 		s.Require().NoError(err)
 		defer func() { s.Require().NoError(wsClient.Close()) }()
 
@@ -164,8 +167,7 @@ func (s *WebsocketSubscriptionSuite) TestInactivityHeaders() {
 	// 4. Wait for the server to close the connection due to inactivity.
 	s.T().Run("all active subscriptions unsubscribed", func(t *testing.T) {
 		// Step 1: Establish WebSocket connection
-		restAddr := s.net.ContainerByName(testnet.PrimaryAN).Addr(testnet.RESTPort)
-		wsClient, err := common.GetWSClient(s.ctx, getWebsocketsUrl(restAddr))
+		wsClient, err := common.GetWSClient(s.ctx, getWebsocketsUrl(s.restAccessAddress))
 		s.Require().NoError(err)
 		defer func() { s.Require().NoError(wsClient.Close()) }()
 
@@ -288,8 +290,7 @@ func (s *WebsocketSubscriptionSuite) TestSubscriptionErrorCases() {
 		},
 	}
 
-	restAddr := s.net.ContainerByName(testnet.PrimaryAN).Addr(testnet.RESTPort)
-	wsClient, err := common.GetWSClient(s.ctx, getWebsocketsUrl(restAddr))
+	wsClient, err := common.GetWSClient(s.ctx, getWebsocketsUrl(s.restAccessAddress))
 	s.Require().NoError(err)
 	defer func() { s.Require().NoError(wsClient.Close()) }()
 
@@ -353,8 +354,7 @@ func (s *WebsocketSubscriptionSuite) TestUnsubscriptionErrorCases() {
 		},
 	}
 
-	restAddr := s.net.ContainerByName(testnet.PrimaryAN).Addr(testnet.RESTPort)
-	wsClient, err := common.GetWSClient(s.ctx, getWebsocketsUrl(restAddr))
+	wsClient, err := common.GetWSClient(s.ctx, getWebsocketsUrl(s.restAccessAddress))
 	s.Require().NoError(err)
 	defer func() { s.Require().NoError(wsClient.Close()) }()
 
@@ -376,28 +376,94 @@ func (s *WebsocketSubscriptionSuite) TestUnsubscriptionErrorCases() {
 	}
 }
 
+// TestListOfSubscriptions tests the websocket request for the list of active subscription and its response
+func (s *WebsocketSubscriptionSuite) TestListOfSubscriptions() {
+	wsClient, err := common.GetWSClient(s.ctx, getWebsocketsUrl(s.restAccessAddress))
+	s.Require().NoError(err)
+	defer func() { s.Require().NoError(wsClient.Close()) }()
+
+	// create blocks subscription request message
+	blocksMessageID := uuid.New().String()
+	subscriptionToBlocksRequest := s.subscribeMessageRequest(
+		blocksMessageID,
+		data_providers.BlocksTopic,
+		models.Arguments{"block_status": parser.Finalized},
+	)
+
+	// send blocks subscription message
+	s.Require().NoError(wsClient.WriteJSON(subscriptionToBlocksRequest))
+
+	// verify success subscribe response
+	_, baseResponses, _ := listenWebSocketResponses[models.BlockMessageResponse](s.T(), wsClient, 1*time.Second, blocksMessageID)
+	s.Require().Equal(1, len(baseResponses))
+	subscribeResponse := baseResponses[0]
+	s.Require().True(subscribeResponse.Success)
+	s.Require().Equal(blocksMessageID, subscribeResponse.ClientMessageID)
+	subscribeBlocksID := subscribeResponse.SubscriptionID
+
+	// create block headers subscription request message
+	blockHeadersMessageID := uuid.New().String()
+	subscriptionToBlockHeadersRequest := s.subscribeMessageRequest(
+		blockHeadersMessageID,
+		data_providers.BlockHeadersTopic,
+		models.Arguments{"block_status": parser.Finalized},
+	)
+
+	// send block headers subscription message
+	s.Require().NoError(wsClient.WriteJSON(subscriptionToBlockHeadersRequest))
+
+	// verify success subscribe response
+	_, baseResponses, _ = listenWebSocketResponses[models.BlockHeaderMessageResponse](s.T(), wsClient, 1*time.Second, blockHeadersMessageID)
+	s.Require().Equal(1, len(baseResponses))
+	subscribeResponse = baseResponses[0]
+	s.Require().True(subscribeResponse.Success)
+	s.Require().Equal(blockHeadersMessageID, subscribeResponse.ClientMessageID)
+	subscribeBlockHeadersID := subscribeResponse.SubscriptionID
+
+	// create list of subscription request message
+	listOfSubscriptionsMessageID := uuid.New().String()
+	listOfSubscriptionRequest := s.listSubscriptionsMessageRequest(listOfSubscriptionsMessageID)
+	// send list of subscription message
+	s.Require().NoError(wsClient.WriteJSON(listOfSubscriptionRequest))
+
+	_, _, responses := listenWebSocketResponses[models.BlockMessageResponse](s.T(), wsClient, 1*time.Second, listOfSubscriptionsMessageID)
+
+	// validate list of active subscriptions response
+	s.Require().Equal(1, len(responses))
+	expectedSubscriptions := []*models.SubscriptionEntry{
+		{
+			ID:    subscribeBlocksID,
+			Topic: data_providers.BlocksTopic,
+		},
+		{
+			ID:    subscribeBlockHeadersID,
+			Topic: data_providers.BlockHeadersTopic,
+		},
+	}
+
+	listOfSubscriptionResponse := responses[0]
+	s.Require().True(listOfSubscriptionResponse.Success)
+	s.Require().Equal(listOfSubscriptionsMessageID, listOfSubscriptionResponse.ClientMessageID)
+	s.Require().Equal(expectedSubscriptions, listOfSubscriptionResponse.Subscriptions)
+}
+
 // TestHappyCases tests various scenarios for websocket subscriptions including
 // streaming blocks, block headers, block digests, events, account statuses,
 // and transaction statuses.
 func (s *WebsocketSubscriptionSuite) TestHappyCases() {
-	restAddr := s.net.ContainerByName(testnet.PrimaryAN).Addr(testnet.RESTPort)
-
 	//tests streaming blocks
 	s.T().Run("blocks streaming", func(t *testing.T) {
-		wsClient, err := common.GetWSClient(s.ctx, getWebsocketsUrl(restAddr))
+		wsClient, err := common.GetWSClient(s.ctx, getWebsocketsUrl(s.restAccessAddress))
 		s.Require().NoError(err)
-		defer wsClient.Close()
+		defer func() { s.Require().NoError(wsClient.Close()) }()
 
 		clientMessageID := uuid.New().String()
 
-		subscriptionRequest := models.SubscribeMessageRequest{
-			BaseMessageRequest: models.BaseMessageRequest{
-				Action:          models.SubscribeAction,
-				ClientMessageID: clientMessageID,
-			},
-			Topic:     data_providers.BlocksTopic,
-			Arguments: models.Arguments{"block_status": parser.Finalized},
-		}
+		subscriptionRequest := s.subscribeMessageRequest(
+			clientMessageID,
+			data_providers.BlocksTopic,
+			models.Arguments{"block_status": parser.Finalized},
+		)
 
 		testWebsocketSubscription[models.BlockMessageResponse](
 			t,
@@ -411,20 +477,17 @@ func (s *WebsocketSubscriptionSuite) TestHappyCases() {
 
 	// tests streaming block headers
 	s.T().Run("block headers streaming", func(t *testing.T) {
-		wsClient, err := common.GetWSClient(s.ctx, getWebsocketsUrl(restAddr))
+		wsClient, err := common.GetWSClient(s.ctx, getWebsocketsUrl(s.restAccessAddress))
 		s.Require().NoError(err)
-		defer wsClient.Close()
+		defer func() { s.Require().NoError(wsClient.Close()) }()
 
 		clientMessageID := uuid.New().String()
 
-		subscriptionRequest := models.SubscribeMessageRequest{
-			BaseMessageRequest: models.BaseMessageRequest{
-				Action:          models.SubscribeAction,
-				ClientMessageID: clientMessageID,
-			},
-			Topic:     data_providers.BlockHeadersTopic,
-			Arguments: models.Arguments{"block_status": parser.Finalized},
-		}
+		subscriptionRequest := s.subscribeMessageRequest(
+			clientMessageID,
+			data_providers.BlockHeadersTopic,
+			models.Arguments{"block_status": parser.Finalized},
+		)
 
 		testWebsocketSubscription[models.BlockHeaderMessageResponse](
 			t,
@@ -438,20 +501,17 @@ func (s *WebsocketSubscriptionSuite) TestHappyCases() {
 
 	// tests streaming block digests
 	s.T().Run("block digests streaming", func(t *testing.T) {
-		wsClient, err := common.GetWSClient(s.ctx, getWebsocketsUrl(restAddr))
+		wsClient, err := common.GetWSClient(s.ctx, getWebsocketsUrl(s.restAccessAddress))
 		s.Require().NoError(err)
-		defer wsClient.Close()
+		defer func() { s.Require().NoError(wsClient.Close()) }()
 
 		clientMessageID := uuid.New().String()
 
-		subscriptionRequest := models.SubscribeMessageRequest{
-			BaseMessageRequest: models.BaseMessageRequest{
-				Action:          models.SubscribeAction,
-				ClientMessageID: clientMessageID,
-			},
-			Topic:     data_providers.BlockDigestsTopic,
-			Arguments: models.Arguments{"block_status": parser.Finalized},
-		}
+		subscriptionRequest := s.subscribeMessageRequest(
+			clientMessageID,
+			data_providers.BlockDigestsTopic,
+			models.Arguments{"block_status": parser.Finalized},
+		)
 
 		testWebsocketSubscription[models.BlockDigestMessageResponse](
 			t,
@@ -465,20 +525,17 @@ func (s *WebsocketSubscriptionSuite) TestHappyCases() {
 
 	// tests streaming events
 	s.T().Run("events streaming", func(t *testing.T) {
-		wsClient, err := common.GetWSClient(s.ctx, getWebsocketsUrl(restAddr))
+		wsClient, err := common.GetWSClient(s.ctx, getWebsocketsUrl(s.restAccessAddress))
 		s.Require().NoError(err)
-		defer wsClient.Close()
+		defer func() { s.Require().NoError(wsClient.Close()) }()
 
 		clientMessageID := uuid.New().String()
 
-		subscriptionRequest := models.SubscribeMessageRequest{
-			BaseMessageRequest: models.BaseMessageRequest{
-				Action:          models.SubscribeAction,
-				ClientMessageID: clientMessageID,
-			},
-			Topic:     data_providers.EventsTopic,
-			Arguments: models.Arguments{},
-		}
+		subscriptionRequest := s.subscribeMessageRequest(
+			clientMessageID,
+			data_providers.EventsTopic,
+			models.Arguments{},
+		)
 
 		testWebsocketSubscription[models.EventResponse](
 			t,
@@ -492,20 +549,17 @@ func (s *WebsocketSubscriptionSuite) TestHappyCases() {
 
 	// tests streaming account statuses
 	s.T().Run("account statuses streaming", func(t *testing.T) {
-		wsClient, err := common.GetWSClient(s.ctx, getWebsocketsUrl(restAddr))
+		wsClient, err := common.GetWSClient(s.ctx, getWebsocketsUrl(s.restAccessAddress))
 		s.Require().NoError(err)
-		defer wsClient.Close()
+		defer func() { s.Require().NoError(wsClient.Close()) }()
 
 		clientMessageID := uuid.New().String()
 
-		subscriptionRequest := models.SubscribeMessageRequest{
-			BaseMessageRequest: models.BaseMessageRequest{
-				Action:          models.SubscribeAction,
-				ClientMessageID: clientMessageID,
-			},
-			Topic:     data_providers.AccountStatusesTopic,
-			Arguments: models.Arguments{},
-		}
+		subscriptionRequest := s.subscribeMessageRequest(
+			clientMessageID,
+			data_providers.AccountStatusesTopic,
+			models.Arguments{},
+		)
 
 		// Create and send account transaction
 		tx := s.createAccountTx()
@@ -532,22 +586,19 @@ func (s *WebsocketSubscriptionSuite) TestHappyCases() {
 	//	s.Require().NoError(err)
 	//	s.T().Logf("txId %v", flow.Identifier(tx.ID()))
 	//
-	//	wsClient, err := common.GetWSClient(s.ctx, getWebsocketsUrl(restAddr))
+	//	wsClient, err := common.GetWSClient(s.ctx, getWebsocketsUrl(s.restAccessAddress))
 	//	s.Require().NoError(err)
-	//	defer wsClient.Close()
+	//	defer func() { s.Require().NoError(wsClient.Close()) }()
 	//
 	//	clientMessageID := uuid.New().String()
 	//
-	//	subscriptionRequest := models.SubscribeMessageRequest{
-	//		BaseMessageRequest: models.BaseMessageRequest{
-	//			Action:          models.SubscribeAction,
-	//			ClientMessageID: clientMessageID,
-	//		},
-	//		Topic: data_providers.TransactionStatusesTopic,
-	//		Arguments: models.Arguments{
-	//			"tx_id": tx.ID().String(),
-	//		},
-	//	}
+	//subscriptionRequest := s.subscribeMessageRequest(
+	//	clientMessageID,
+	//	data_providers.TransactionStatusesTopic,
+	//	models.Arguments{
+	//		"tx_id": tx.ID().String(),
+	//	},
+	//)
 	//
 	//	testWebsocketSubscription[models.TransactionStatusesResponse](
 	//		t,
@@ -604,13 +655,10 @@ func (s *WebsocketSubscriptionSuite) TestHappyCases() {
 
 		clientMessageID := uuid.New().String()
 
-		subscriptionRequest := models.SubscribeMessageRequest{
-			BaseMessageRequest: models.BaseMessageRequest{
-				Action:          models.SubscribeAction,
-				ClientMessageID: clientMessageID,
-			},
-			Topic: data_providers.SendAndGetTransactionStatusesTopic,
-			Arguments: models.Arguments{
+		subscriptionRequest := s.subscribeMessageRequest(
+			clientMessageID,
+			data_providers.SendAndGetTransactionStatusesTopic,
+			models.Arguments{
 				"script":              util.ToBase64(tx.Script),
 				"arguments":           convertToArguments(tx.Arguments),
 				"reference_block_id":  tx.ReferenceBlockID.String(),
@@ -621,11 +669,11 @@ func (s *WebsocketSubscriptionSuite) TestHappyCases() {
 				"payload_signatures":  convertToSig(tx.PayloadSignatures),
 				"envelope_signatures": convertToSig(tx.EnvelopeSignatures),
 			},
-		}
+		)
 
-		wsClient, err := common.GetWSClient(s.ctx, getWebsocketsUrl(restAddr))
+		wsClient, err := common.GetWSClient(s.ctx, getWebsocketsUrl(s.restAccessAddress))
 		s.Require().NoError(err)
-		defer wsClient.Close()
+		defer func() { s.Require().NoError(wsClient.Close()) }()
 
 		testWebsocketSubscription[models.TransactionStatusesResponse](
 			t,
@@ -827,7 +875,11 @@ func (s *WebsocketSubscriptionSuite) validateTransactionStatuses(receivedTransac
 }
 
 // subscribeMessageRequest creates a subscription message request.
-func (s *WebsocketSubscriptionSuite) subscribeMessageRequest(clientMessageID string, topic string, arguments models.Arguments) interface{} {
+func (s *WebsocketSubscriptionSuite) subscribeMessageRequest(
+	clientMessageID string,
+	topic string,
+	arguments models.Arguments,
+) models.SubscribeMessageRequest {
 	return models.SubscribeMessageRequest{
 		BaseMessageRequest: models.BaseMessageRequest{
 			Action:          models.SubscribeAction,
@@ -839,7 +891,10 @@ func (s *WebsocketSubscriptionSuite) subscribeMessageRequest(clientMessageID str
 }
 
 // unsubscribeMessageRequest creates an unsubscribe message request.
-func (s *WebsocketSubscriptionSuite) unsubscribeMessageRequest(clientMessageID string, subscriptionID string) interface{} {
+func (s *WebsocketSubscriptionSuite) unsubscribeMessageRequest(
+	clientMessageID string,
+	subscriptionID string,
+) models.UnsubscribeMessageRequest {
 	return models.UnsubscribeMessageRequest{
 		BaseMessageRequest: models.BaseMessageRequest{
 			Action:          models.UnsubscribeAction,
@@ -850,7 +905,7 @@ func (s *WebsocketSubscriptionSuite) unsubscribeMessageRequest(clientMessageID s
 }
 
 // listSubscriptionsMessageRequest creates a list subscriptions message request.
-func (s *WebsocketSubscriptionSuite) listSubscriptionsMessageRequest(clientMessageID string) interface{} {
+func (s *WebsocketSubscriptionSuite) listSubscriptionsMessageRequest(clientMessageID string) models.ListSubscriptionsMessageRequest {
 	return models.ListSubscriptionsMessageRequest{
 		BaseMessageRequest: models.BaseMessageRequest{
 			Action:          models.ListSubscriptionsAction,
@@ -956,24 +1011,24 @@ func listenWebSocketResponses[T any](
 				require.FailNow(t, fmt.Sprintf("unexpected websocket error, %v", err))
 			}
 
-			// BaseMessageResponse and validate
 			var baseResp models.BaseMessageResponse
-			if err := json.Unmarshal(messageBytes, &baseResp); err == nil && baseResp.ClientMessageID == clientMessageID {
+			err = restcommon.ParseBody(bytes.NewReader(messageBytes), &baseResp)
+			if err == nil && baseResp.ClientMessageID == clientMessageID {
 				baseMessageResponses = append(baseMessageResponses, baseResp)
 				continue
 			}
 
-			//// Try unmarshalling into ListSubscriptionsMessageResponse and validate
-			//var listResp models.ListSubscriptionsMessageResponse
-			//if err := json.Unmarshal(messageBytes, &listResp); err == nil &&
-			//	listResp.ClientMessageID == clientMessageID {
-			//	listSubscriptionsMessageResponses = append(listSubscriptionsMessageResponses, &listResp)
-			//	continue
-			//}
+			var listResp models.ListSubscriptionsMessageResponse
+			err = restcommon.ParseBody(bytes.NewReader(messageBytes), &listResp)
+			if err == nil && listResp.ClientMessageID == clientMessageID {
+				listSubscriptionsMessageResponses = append(listSubscriptionsMessageResponses, listResp)
+				continue
+			}
 
 			//TODO: update Unmarshal according to changes for issue #6819
 			var genericResp T
-			if err := json.Unmarshal(messageBytes, &genericResp); err == nil && &genericResp != nil {
+			err = restcommon.ParseBody(bytes.NewReader(messageBytes), &genericResp)
+			if err == nil {
 				responses = append(responses, genericResp)
 			}
 		}
