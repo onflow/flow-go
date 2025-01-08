@@ -3,6 +3,7 @@ package cohort4
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"net/url"
@@ -182,7 +183,7 @@ func (s *WebsocketSubscriptionSuite) TestInactivityHeaders() {
 
 		s.Require().NoError(wsClient.WriteJSON(subscriptionRequest))
 
-		_, baseResponses, _ := listenWebSocketResponses[models.EventResponse](
+		_, baseResponses, _ := listenWebSocketResponses(
 			s.T(),
 			wsClient,
 			5*time.Second,
@@ -205,7 +206,7 @@ func (s *WebsocketSubscriptionSuite) TestInactivityHeaders() {
 		s.Require().NoError(wsClient.WriteJSON(unsubscribeRequest))
 
 		// TODO: Somehow unsubscription are not return properly, but result appended to subscriptions
-		_, baseResponses, _ = listenWebSocketResponses[models.EventResponse](
+		_, baseResponses, _ = listenWebSocketResponses(
 			s.T(),
 			wsClient,
 			5*time.Second,
@@ -394,7 +395,7 @@ func (s *WebsocketSubscriptionSuite) TestListOfSubscriptions() {
 	s.Require().NoError(wsClient.WriteJSON(subscriptionToBlocksRequest))
 
 	// verify success subscribe response
-	_, baseResponses, _ := listenWebSocketResponses[models.BlockMessageResponse](s.T(), wsClient, 1*time.Second, blocksMessageID)
+	_, baseResponses, _ := listenWebSocketResponses(s.T(), wsClient, 1*time.Second, blocksMessageID)
 	s.Require().Equal(1, len(baseResponses))
 	subscribeResponse := baseResponses[0]
 	s.Require().True(subscribeResponse.Success)
@@ -413,7 +414,7 @@ func (s *WebsocketSubscriptionSuite) TestListOfSubscriptions() {
 	s.Require().NoError(wsClient.WriteJSON(subscriptionToBlockHeadersRequest))
 
 	// verify success subscribe response
-	_, baseResponses, _ = listenWebSocketResponses[models.BlockHeaderMessageResponse](s.T(), wsClient, 1*time.Second, blockHeadersMessageID)
+	_, baseResponses, _ = listenWebSocketResponses(s.T(), wsClient, 1*time.Second, blockHeadersMessageID)
 	s.Require().Equal(1, len(baseResponses))
 	subscribeResponse = baseResponses[0]
 	s.Require().True(subscribeResponse.Success)
@@ -426,7 +427,7 @@ func (s *WebsocketSubscriptionSuite) TestListOfSubscriptions() {
 	// send list of subscription message
 	s.Require().NoError(wsClient.WriteJSON(listOfSubscriptionRequest))
 
-	_, _, responses := listenWebSocketResponses[models.BlockMessageResponse](s.T(), wsClient, 1*time.Second, listOfSubscriptionsMessageID)
+	_, _, responses := listenWebSocketResponses(s.T(), wsClient, 1*time.Second, listOfSubscriptionsMessageID)
 
 	// validate list of active subscriptions response
 	s.Require().Equal(1, len(responses))
@@ -465,7 +466,7 @@ func (s *WebsocketSubscriptionSuite) TestHappyCases() {
 			models.Arguments{"block_status": parser.Finalized},
 		)
 
-		testWebsocketSubscription[models.BlockMessageResponse](
+		testWebsocketSubscription(
 			t,
 			wsClient,
 			subscriptionRequest,
@@ -489,7 +490,7 @@ func (s *WebsocketSubscriptionSuite) TestHappyCases() {
 			models.Arguments{"block_status": parser.Finalized},
 		)
 
-		testWebsocketSubscription[models.BlockHeaderMessageResponse](
+		testWebsocketSubscription(
 			t,
 			wsClient,
 			subscriptionRequest,
@@ -513,7 +514,7 @@ func (s *WebsocketSubscriptionSuite) TestHappyCases() {
 			models.Arguments{"block_status": parser.Finalized},
 		)
 
-		testWebsocketSubscription[models.BlockDigestMessageResponse](
+		testWebsocketSubscription(
 			t,
 			wsClient,
 			subscriptionRequest,
@@ -537,7 +538,7 @@ func (s *WebsocketSubscriptionSuite) TestHappyCases() {
 			models.Arguments{},
 		)
 
-		testWebsocketSubscription[models.EventResponse](
+		testWebsocketSubscription(
 			t,
 			wsClient,
 			subscriptionRequest,
@@ -567,7 +568,7 @@ func (s *WebsocketSubscriptionSuite) TestHappyCases() {
 		s.Require().NoError(err)
 		s.T().Logf("txId %v", flow.Identifier(tx.ID()))
 
-		testWebsocketSubscription[models.AccountStatusesResponse](
+		testWebsocketSubscription(
 			t,
 			wsClient,
 			subscriptionRequest,
@@ -600,7 +601,7 @@ func (s *WebsocketSubscriptionSuite) TestHappyCases() {
 	//	},
 	//)
 	//
-	//	testWebsocketSubscription[models.TransactionStatusesResponse](
+	//	testWebsocketSubscription(
 	//		t,
 	//		wsClient,
 	//		subscriptionRequest,
@@ -675,7 +676,7 @@ func (s *WebsocketSubscriptionSuite) TestHappyCases() {
 		s.Require().NoError(err)
 		defer func() { s.Require().NoError(wsClient.Close()) }()
 
-		testWebsocketSubscription[models.TransactionStatusesResponse](
+		testWebsocketSubscription(
 			t,
 			wsClient,
 			subscriptionRequest,
@@ -688,12 +689,24 @@ func (s *WebsocketSubscriptionSuite) TestHappyCases() {
 
 // validateBlocks validates the received block responses against gRPC responses.
 func (s *WebsocketSubscriptionSuite) validateBlocks(
-	receivedResponses []models.BlockMessageResponse,
+	expectedSubscriptionID string,
+	receivedResponses []models.BaseDataProvidersResponse,
 ) {
 	s.Require().NotEmpty(receivedResponses, "expected received block headers")
 
 	for _, response := range receivedResponses {
-		id, err := flow.HexStringToIdentifier(response.Block.Header.Id)
+		//TODO : add require for subscription id
+		s.Require().Equal(data_providers.BlocksTopic, response.Topic)
+
+		// Convert the payload map to JSON
+		payloadRaw, err := json.Marshal(response.Payload)
+		s.Require().NoError(err)
+
+		var payload commonmodels.Block
+		err = restcommon.ParseBody(bytes.NewReader(payloadRaw), &payload)
+		s.Require().NoError(err)
+
+		id, err := flow.HexStringToIdentifier(payload.Header.Id)
 		s.Require().NoError(err)
 
 		grpcResponse, err := s.grpcClient.GetBlockHeaderByID(s.ctx, &accessproto.GetBlockHeaderByIDRequest{
@@ -702,23 +715,34 @@ func (s *WebsocketSubscriptionSuite) validateBlocks(
 		s.Require().NoError(err)
 
 		grpcExpected := grpcResponse.Block
-		actual := response.Block
 
-		s.Require().Equal(convert.MessageToIdentifier(grpcExpected.Id).String(), actual.Header.Id)
-		s.Require().Equal(util.FromUint(grpcExpected.Height), actual.Header.Height)
-		s.Require().Equal(grpcExpected.Timestamp.AsTime(), actual.Header.Timestamp)
-		s.Require().Equal(convert.MessageToIdentifier(grpcExpected.ParentId).String(), actual.Header.ParentId)
+		s.Require().Equal(convert.MessageToIdentifier(grpcExpected.Id).String(), payload.Header.Id)
+		s.Require().Equal(util.FromUint(grpcExpected.Height), payload.Header.Height)
+		s.Require().Equal(grpcExpected.Timestamp.AsTime(), payload.Header.Timestamp)
+		s.Require().Equal(convert.MessageToIdentifier(grpcExpected.ParentId).String(), payload.Header.ParentId)
 	}
 }
 
 // validateBlockHeaders validates the received block header responses against gRPC responses.
 func (s *WebsocketSubscriptionSuite) validateBlockHeaders(
-	receivedResponses []models.BlockHeaderMessageResponse,
+	expectedSubscriptionID string,
+	receivedResponses []models.BaseDataProvidersResponse,
 ) {
 	s.Require().NotEmpty(receivedResponses, "expected received block headers")
 
 	for _, response := range receivedResponses {
-		id, err := flow.HexStringToIdentifier(response.Header.Id)
+		//TODO : add require for subscription id
+		s.Require().Equal(data_providers.BlockHeadersTopic, response.Topic)
+
+		// Convert the payload map to JSON
+		payloadRaw, err := json.Marshal(response.Payload)
+		s.Require().NoError(err)
+
+		var payload commonmodels.BlockHeader
+		err = restcommon.ParseBody(bytes.NewReader(payloadRaw), &payload)
+		s.Require().NoError(err)
+
+		id, err := flow.HexStringToIdentifier(payload.Id)
 		s.Require().NoError(err)
 
 		grpcResponse, err := s.grpcClient.GetBlockHeaderByID(s.ctx, &accessproto.GetBlockHeaderByIDRequest{
@@ -727,24 +751,34 @@ func (s *WebsocketSubscriptionSuite) validateBlockHeaders(
 		s.Require().NoError(err)
 
 		grpcExpected := grpcResponse.Block
-		actual := response.Header
 
-		s.Require().Equal(convert.MessageToIdentifier(grpcExpected.Id).String(), actual.Id)
-		s.Require().Equal(util.FromUint(grpcExpected.Height), actual.Height)
-		s.Require().Equal(grpcExpected.Timestamp.AsTime(), actual.Timestamp)
-		s.Require().Equal(convert.MessageToIdentifier(grpcExpected.ParentId).String(), actual.ParentId)
+		s.Require().Equal(convert.MessageToIdentifier(grpcExpected.Id).String(), payload.Id)
+		s.Require().Equal(util.FromUint(grpcExpected.Height), payload.Height)
+		s.Require().Equal(grpcExpected.Timestamp.AsTime(), payload.Timestamp)
+		s.Require().Equal(convert.MessageToIdentifier(grpcExpected.ParentId).String(), payload.ParentId)
 	}
 }
 
 // validateBlockDigests validates the received block digest responses against gRPC responses.
 func (s *WebsocketSubscriptionSuite) validateBlockDigests(
-	receivedResponses []models.BlockDigestMessageResponse,
+	expectedSubscriptionID string,
+	receivedResponses []models.BaseDataProvidersResponse,
 ) {
 	s.Require().NotEmpty(receivedResponses, "expected received block digests")
 
 	for _, response := range receivedResponses {
-		s.T().Logf("received response: %s", response.Block.Height)
-		id, err := flow.HexStringToIdentifier(response.Block.BlockId)
+		//TODO : add require for subscription id
+		s.Require().Equal(data_providers.BlockDigestsTopic, response.Topic)
+
+		// Convert the payload map to JSON
+		payloadRaw, err := json.Marshal(response.Payload)
+		s.Require().NoError(err)
+
+		var payload models.BlockDigest
+		err = restcommon.ParseBody(bytes.NewReader(payloadRaw), &payload)
+		s.Require().NoError(err)
+
+		id, err := flow.HexStringToIdentifier(payload.BlockId)
 		s.Require().NoError(err)
 
 		grpcResponse, err := s.grpcClient.GetBlockHeaderByID(s.ctx, &accessproto.GetBlockHeaderByIDRequest{
@@ -753,49 +787,76 @@ func (s *WebsocketSubscriptionSuite) validateBlockDigests(
 		s.Require().NoError(err)
 
 		grpcExpected := grpcResponse.Block
-		actual := response.Block
 
-		s.Require().Equal(convert.MessageToIdentifier(grpcExpected.Id).String(), actual.BlockId)
-		s.Require().Equal(util.FromUint(grpcExpected.Height), actual.Height)
-		s.Require().Equal(grpcExpected.Timestamp.AsTime(), actual.Timestamp)
+		s.Require().Equal(convert.MessageToIdentifier(grpcExpected.Id).String(), payload.BlockId)
+		s.Require().Equal(util.FromUint(grpcExpected.Height), payload.Height)
+		s.Require().Equal(grpcExpected.Timestamp.AsTime(), payload.Timestamp)
 	}
 }
 
 // validateEvents is a helper function that encapsulates logic for comparing received events from rest state streaming and
 // events which received from grpc api
-func (s *WebsocketSubscriptionSuite) validateEvents(receivedEventsResponse []models.EventResponse) {
+func (s *WebsocketSubscriptionSuite) validateEvents(
+	expectedSubscriptionID string,
+	receivedEventsResponse []models.BaseDataProvidersResponse,
+) {
 	// make sure there are received events
 	s.Require().GreaterOrEqual(len(receivedEventsResponse), 1, "expect received events")
 
 	expectedCounter := uint64(0)
 	for _, receivedEventResponse := range receivedEventsResponse {
-		s.Require().Equal(expectedCounter, receivedEventResponse.MessageIndex)
+		//TODO : add require for subscription id
+		s.Require().Equal(data_providers.EventsTopic, receivedEventResponse.Topic)
+
+		// Convert the payload map to JSON
+		payloadRaw, err := json.Marshal(receivedEventResponse.Payload)
+		s.Require().NoError(err)
+
+		var payload models.EventResponse
+		err = restcommon.ParseBody(bytes.NewReader(payloadRaw), &payload)
+		s.Require().NoError(err)
+
+		s.Require().Equal(expectedCounter, payload.MessageIndex)
 		expectedCounter++
 
-		blockId, err := flow.HexStringToIdentifier(receivedEventResponse.BlockId)
+		blockId, err := flow.HexStringToIdentifier(payload.BlockId)
 		s.Require().NoError(err)
 
 		s.validateEventsForBlock(
-			receivedEventResponse.BlockHeight,
-			receivedEventResponse.Events,
+			payload.BlockHeight,
+			payload.Events,
 			blockId,
 		)
 	}
 }
 
 // validateAccountStatuses is a helper function that encapsulates logic for comparing received account statuses
-func (s *WebsocketSubscriptionSuite) validateAccountStatuses(receivedAccountStatusesResponses []models.AccountStatusesResponse) {
+func (s *WebsocketSubscriptionSuite) validateAccountStatuses(
+	expectedSubscriptionID string,
+	receivedAccountStatusesResponses []models.BaseDataProvidersResponse,
+) {
 	expectedCounter := uint64(0)
 
 	for _, receivedAccountStatusResponse := range receivedAccountStatusesResponses {
-		s.Require().Equal(expectedCounter, receivedAccountStatusResponse.MessageIndex)
-		expectedCounter++
+		//TODO : add require for subscription id
+		s.Require().Equal(data_providers.AccountStatusesTopic, receivedAccountStatusResponse.Topic)
 
-		blockId, err := flow.HexStringToIdentifier(receivedAccountStatusResponse.BlockID)
+		// Convert the payload map to JSON
+		payloadRaw, err := json.Marshal(receivedAccountStatusResponse.Payload)
 		s.Require().NoError(err)
 
-		for _, events := range receivedAccountStatusResponse.AccountEvents {
-			s.validateEventsForBlock(receivedAccountStatusResponse.Height, events, blockId)
+		var payload models.AccountStatusesResponse
+		err = restcommon.ParseBody(bytes.NewReader(payloadRaw), &payload)
+		s.Require().NoError(err)
+
+		s.Require().Equal(expectedCounter, payload.MessageIndex)
+		expectedCounter++
+
+		blockId, err := flow.HexStringToIdentifier(payload.BlockID)
+		s.Require().NoError(err)
+
+		for _, events := range payload.AccountEvents {
+			s.validateEventsForBlock(payload.Height, events, blockId)
 		}
 	}
 }
@@ -842,7 +903,10 @@ func (s *WebsocketSubscriptionSuite) validateEventsForBlock(blockHeight string, 
 }
 
 // validateTransactionStatuses is a helper function that encapsulates logic for comparing received transaction statuses
-func (s *WebsocketSubscriptionSuite) validateTransactionStatuses(receivedTransactionStatusesResponses []models.TransactionStatusesResponse) {
+func (s *WebsocketSubscriptionSuite) validateTransactionStatuses(
+	expectedSubscriptionID string,
+	receivedTransactionStatusesResponses []models.BaseDataProvidersResponse,
+) {
 	expectedCount := 4 // pending, finalized, executed, sealed
 	s.Require().GreaterOrEqual(len(receivedTransactionStatusesResponses), expectedCount, "expect received statuses")
 
@@ -859,16 +923,27 @@ func (s *WebsocketSubscriptionSuite) validateTransactionStatuses(receivedTransac
 	}
 
 	for _, transactionStatusResponse := range receivedTransactionStatusesResponses {
-		s.Require().Equal(expectedCounter, transactionStatusResponse.MessageIndex)
+		//TODO : add require for subscription id
+		s.Require().Equal(data_providers.SendAndGetTransactionStatusesTopic, transactionStatusResponse.Topic)
 
-		actualStatus := *transactionStatusResponse.TransactionResult.Status
+		// Convert the payload map to JSON
+		payloadRaw, err := json.Marshal(transactionStatusResponse.Payload)
+		s.Require().NoError(err)
+
+		var payload models.TransactionStatusesResponse
+		err = restcommon.ParseBody(bytes.NewReader(payloadRaw), &payload)
+		s.Require().NoError(err)
+
+		s.Require().Equal(expectedCounter, payload.MessageIndex)
+
+		payloadStatus := *payload.TransactionResult.Status
 
 		// Check if all statuses received one by one. The subscription should send responses for each of the statuses,
 		// and the message should be sent in the order of transaction statuses.
-		s.Require().Equal(expectedStatuses[expectedCounter], actualStatus)
+		s.Require().Equal(expectedStatuses[expectedCounter], payloadStatus)
 
 		expectedCounter++
-		lastReportedTxStatus = actualStatus
+		lastReportedTxStatus = payloadStatus
 	}
 	// Check, if the last transaction status is sealed.
 	s.Require().Equal(commonmodels.SEALED_TransactionStatus, lastReportedTxStatus)
@@ -926,18 +1001,18 @@ func getWebsocketsUrl(accessAddr string) string {
 // including sending a subscription request, listening for incoming responses, and validating
 // them using a provided validation function. The websocket connection is closed automatically
 // after a predefined time interval.
-func testWebsocketSubscription[T any](
+func testWebsocketSubscription(
 	t *testing.T,
 	client *websocket.Conn,
 	subscriptionRequest models.SubscribeMessageRequest,
-	validate func([]T),
+	validate func(string, []models.BaseDataProvidersResponse),
 	duration time.Duration,
 	unsubscribe bool,
 ) {
 	// subscribe to specific topic
 	require.NoError(t, client.WriteJSON(subscriptionRequest))
 
-	responses, baseMessageResponses, _ := listenWebSocketResponses[T](t, client, duration, subscriptionRequest.ClientMessageID)
+	responses, baseMessageResponses, _ := listenWebSocketResponses(t, client, duration, subscriptionRequest.ClientMessageID)
 	// validate subscribe response
 	require.Equal(t, 1, len(baseMessageResponses))
 
@@ -945,7 +1020,7 @@ func testWebsocketSubscription[T any](
 	require.Equal(t, subscriptionRequest.ClientMessageID, subscribeMessageResponse.ClientMessageID)
 
 	// Use the provided validation function to ensure the received responses of type T are correct.
-	validate(responses)
+	validate(subscriptionRequest.ClientMessageID, responses)
 
 	// unsubscribe from topic
 	if unsubscribe {
@@ -959,7 +1034,7 @@ func testWebsocketSubscription[T any](
 		}
 		require.NoError(t, client.WriteJSON(unsubscriptionRequest))
 
-		responses, baseMessageResponses, _ = listenWebSocketResponses[T](t, client, 1*time.Millisecond, subscriptionRequest.ClientMessageID)
+		responses, baseMessageResponses, _ = listenWebSocketResponses(t, client, 1*time.Millisecond, subscriptionRequest.ClientMessageID)
 
 		// validate unsubscribe response
 		require.Equal(t, 1, len(baseMessageResponses))
@@ -976,17 +1051,17 @@ func testWebsocketSubscription[T any](
 //   - t: The *testing.T object used for managing test lifecycle and assertions.
 //   - client: The websocket connection to read messages from.
 //   - duration: The maximum time to listen for messages before stopping.
-func listenWebSocketResponses[T any](
+func listenWebSocketResponses(
 	t *testing.T,
 	client *websocket.Conn,
 	duration time.Duration,
 	clientMessageID string,
 ) (
-	[]T,
+	[]models.BaseDataProvidersResponse,
 	[]models.BaseMessageResponse,
 	[]models.ListSubscriptionsMessageResponse,
 ) {
-	responses := make([]T, 0)
+	baseDataProvidersResponses := make([]models.BaseDataProvidersResponse, 0)
 	baseMessageResponses := make([]models.BaseMessageResponse, 0)
 	listSubscriptionsMessageResponses := make([]models.ListSubscriptionsMessageResponse, 0)
 
@@ -997,7 +1072,7 @@ func listenWebSocketResponses[T any](
 		select {
 		case <-timer.C:
 			t.Logf("stopping websocket response listener after %s", duration)
-			return responses, baseMessageResponses, listSubscriptionsMessageResponses
+			return baseDataProvidersResponses, baseMessageResponses, listSubscriptionsMessageResponses
 		default:
 			_, messageBytes, err := client.ReadMessage()
 			if err != nil {
@@ -1005,7 +1080,7 @@ func listenWebSocketResponses[T any](
 
 				var closeErr *websocket.CloseError
 				if errors.As(err, &closeErr) {
-					return responses, baseMessageResponses, listSubscriptionsMessageResponses
+					return baseDataProvidersResponses, baseMessageResponses, listSubscriptionsMessageResponses
 				}
 
 				require.FailNow(t, fmt.Sprintf("unexpected websocket error, %v", err))
@@ -1025,11 +1100,10 @@ func listenWebSocketResponses[T any](
 				continue
 			}
 
-			//TODO: update Unmarshal according to changes for issue #6819
-			var genericResp T
-			err = restcommon.ParseBody(bytes.NewReader(messageBytes), &genericResp)
+			var baseDataProvidersResponse models.BaseDataProvidersResponse
+			err = restcommon.ParseBody(bytes.NewReader(messageBytes), &baseDataProvidersResponse)
 			if err == nil {
-				responses = append(responses, genericResp)
+				baseDataProvidersResponses = append(baseDataProvidersResponses, baseDataProvidersResponse)
 			}
 		}
 	}
