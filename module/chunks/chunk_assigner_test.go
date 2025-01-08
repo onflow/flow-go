@@ -48,34 +48,25 @@ func (a *PublicAssignmentTestSuite) TestByNodeID() {
 	chunks := a.CreateChunks(2*size, a.T())
 	assignmentBuilder := chmodels.NewAssignmentBuilder()
 
-	// assigns two chunks to each verifier node
-	// j keeps track of chunks
-	j := 0
-	for i := 0; i < size; i++ {
-		c, ok := chunks.ByIndex(uint64(j))
-		require.True(a.T(), ok, "chunk out of range requested")
-		assignmentBuilder.Add(c, append(assignmentBuilder.Build().Verifiers(c), ids[i].NodeID))
-		j++
-		c, ok = chunks.ByIndex(uint64(j))
-		require.True(a.T(), ok, "chunk out of range requested")
-		assignmentBuilder.Add(c, append(assignmentBuilder.Build().Verifiers(c), ids[i].NodeID))
+	// assign each chunk to exactly one verifier, in round-robin order
+	// Since there are 2x as many chunks as verifiers, each verifier will have 2 chunks
+	for j, chunk := range chunks {
+		v := ids[j%size].NodeID
+		assignmentBuilder.Add(chunk, flow.IdentifierList{v})
 	}
 	assignment := assignmentBuilder.Build()
 
 	// evaluating the chunk assignment
 	// each verifier should have two certain chunks based on the assignment
-	// j keeps track of chunks
-	j = 0
 	for i := 0; i < size; i++ {
 		assignedChunks := assignment.ByNodeID(ids[i].NodeID)
 		require.Len(a.T(), assignedChunks, 2)
-		c, ok := chunks.ByIndex(uint64(j))
+		c, ok := chunks.ByIndex(uint64(i))
 		require.True(a.T(), ok, "chunk out of range requested")
 		require.Contains(a.T(), assignedChunks, c.Index)
-		j++
-		c, ok = chunks.ByIndex(uint64(j))
+		c2, ok := chunks.ByIndex(uint64(i + size))
 		require.True(a.T(), ok, "chunk out of range requested")
-		require.Contains(a.T(), assignedChunks, c.Index)
+		require.Contains(a.T(), assignedChunks, c2.Index)
 	}
 
 }
