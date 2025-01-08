@@ -154,72 +154,38 @@ func (s *EventsProviderSuite) requireEvents(actual interface{}, expected interfa
 	s.Require().Equal(expectedResponsePayload.MessageIndex, actualResponsePayload.MessageIndex)
 }
 
-// invalidArgumentsTestCases returns a list of test cases with invalid argument combinations
-// for testing the behavior of events data providers. Each test case includes a name,
-// a set of input arguments, and the expected error message that should be returned.
-//
-// The test cases cover scenarios such as:
-// 1. Supplying both 'start_block_id' and 'start_block_height' simultaneously, which is not allowed.
-// 2. Providing invalid 'start_block_id' value.
-// 3. Providing invalid 'start_block_height' value.
-func invalidArgumentsTestCases() []testErrType {
-	return []testErrType{
-		{
-			name: "provide both 'start_block_id' and 'start_block_height' arguments",
-			arguments: models.Arguments{
-				"start_block_id":     unittest.BlockFixture().ID().String(),
-				"start_block_height": fmt.Sprintf("%d", unittest.BlockFixture().Header.Height),
-			},
-			expectedErrorMsg: "can only provide either 'start_block_id' or 'start_block_height'",
-		},
-		{
-			name: "invalid 'start_block_id' argument",
-			arguments: map[string]interface{}{
-				"start_block_id": "invalid_block_id",
-			},
-			expectedErrorMsg: "invalid ID format",
-		},
-		{
-			name: "invalid 'start_block_height' argument",
-			arguments: map[string]interface{}{
-				"start_block_height": "-1",
-			},
-			expectedErrorMsg: "value must be an unsigned 64 bit integer",
-		},
+// backendEventsResponses creates backend events responses based on the provided events.
+func (s *EventsProviderSuite) backendEventsResponses(events []flow.Event) []*backend.EventsResponse {
+	responses := make([]*backend.EventsResponse, len(events))
+
+	for i := range events {
+		responses[i] = &backend.EventsResponse{
+			Height:         s.rootBlock.Header.Height,
+			BlockID:        s.rootBlock.ID(),
+			Events:         events,
+			BlockTimestamp: s.rootBlock.Header.Timestamp,
+		}
 	}
+
+	return responses
 }
 
-// TestEventsDataProvider_InvalidArguments tests the behavior of the event data provider
-// when invalid arguments are provided. It verifies that appropriate errors are returned
-// for missing or conflicting arguments.
-// This test covers the test cases:
-// 1. Providing both 'start_block_id' and 'start_block_height' simultaneously.
-// 2. Invalid 'start_block_id' argument.
-// 3. Invalid 'start_block_height' argument.
-func (s *EventsProviderSuite) TestEventsDataProvider_InvalidArguments() {
-	ctx := context.Background()
-	send := make(chan interface{})
+// expectedEventsResponses creates the expected responses for the provided backend responses.
+func (s *EventsProviderSuite) expectedEventsResponses(
+	backendResponses []*backend.EventsResponse,
+) []interface{} {
+	expectedResponses := make([]interface{}, len(backendResponses))
 
-	topic := EventsTopic
+	for i, resp := range backendResponses {
+		var expectedResponsePayload models.EventResponse
+		expectedResponsePayload.Build(resp, uint64(i))
 
-	for _, test := range invalidArgumentsTestCases() {
-		s.Run(test.name, func() {
-			provider, err := NewEventsDataProvider(
-				ctx,
-				s.log,
-				s.api,
-				topic,
-				test.arguments,
-				send,
-				s.chain,
-				state_stream.DefaultEventFilterConfig,
-				subscription.DefaultHeartbeatInterval,
-			)
-			s.Require().Nil(provider)
-			s.Require().Error(err)
-			s.Require().Contains(err.Error(), test.expectedErrorMsg)
-		})
+		expectedResponses[i] = &models.BaseDataProvidersResponse{
+			Topic:   EventsTopic,
+			Payload: &expectedResponsePayload,
+		}
 	}
+	return expectedResponses
 }
 
 // TestMessageIndexEventProviderResponse_HappyPath tests that MessageIndex values in response are strictly increasing.
@@ -304,36 +270,70 @@ func (s *EventsProviderSuite) TestMessageIndexEventProviderResponse_HappyPath() 
 	}
 }
 
-// backendEventsResponses creates backend events responses based on the provided events.
-func (s *EventsProviderSuite) backendEventsResponses(events []flow.Event) []*backend.EventsResponse {
-	responses := make([]*backend.EventsResponse, len(events))
+// TestEventsDataProvider_InvalidArguments tests the behavior of the event data provider
+// when invalid arguments are provided. It verifies that appropriate errors are returned
+// for missing or conflicting arguments.
+// This test covers the test cases:
+// 1. Providing both 'start_block_id' and 'start_block_height' simultaneously.
+// 2. Invalid 'start_block_id' argument.
+// 3. Invalid 'start_block_height' argument.
+func (s *EventsProviderSuite) TestEventsDataProvider_InvalidArguments() {
+	ctx := context.Background()
+	send := make(chan interface{})
 
-	for i := range events {
-		responses[i] = &backend.EventsResponse{
-			Height:         s.rootBlock.Header.Height,
-			BlockID:        s.rootBlock.ID(),
-			Events:         events,
-			BlockTimestamp: s.rootBlock.Header.Timestamp,
-		}
+	topic := EventsTopic
+
+	for _, test := range invalidArgumentsTestCases() {
+		s.Run(test.name, func() {
+			provider, err := NewEventsDataProvider(
+				ctx,
+				s.log,
+				s.api,
+				topic,
+				test.arguments,
+				send,
+				s.chain,
+				state_stream.DefaultEventFilterConfig,
+				subscription.DefaultHeartbeatInterval,
+			)
+			s.Require().Nil(provider)
+			s.Require().Error(err)
+			s.Require().Contains(err.Error(), test.expectedErrorMsg)
+		})
 	}
-
-	return responses
 }
 
-// expectedEventsResponses creates the expected responses for the provided backend responses.
-func (s *EventsProviderSuite) expectedEventsResponses(
-	backendResponses []*backend.EventsResponse,
-) []interface{} {
-	expectedResponses := make([]interface{}, len(backendResponses))
-
-	for i, resp := range backendResponses {
-		var expectedResponsePayload models.EventResponse
-		expectedResponsePayload.Build(resp, uint64(i))
-
-		expectedResponses[i] = &models.BaseDataProvidersResponse{
-			Topic:   EventsTopic,
-			Payload: &expectedResponsePayload,
-		}
+// invalidArgumentsTestCases returns a list of test cases with invalid argument combinations
+// for testing the behavior of events data providers. Each test case includes a name,
+// a set of input arguments, and the expected error message that should be returned.
+//
+// The test cases cover scenarios such as:
+// 1. Supplying both 'start_block_id' and 'start_block_height' simultaneously, which is not allowed.
+// 2. Providing invalid 'start_block_id' value.
+// 3. Providing invalid 'start_block_height' value.
+func invalidArgumentsTestCases() []testErrType {
+	return []testErrType{
+		{
+			name: "provide both 'start_block_id' and 'start_block_height' arguments",
+			arguments: models.Arguments{
+				"start_block_id":     unittest.BlockFixture().ID().String(),
+				"start_block_height": fmt.Sprintf("%d", unittest.BlockFixture().Header.Height),
+			},
+			expectedErrorMsg: "can only provide either 'start_block_id' or 'start_block_height'",
+		},
+		{
+			name: "invalid 'start_block_id' argument",
+			arguments: map[string]interface{}{
+				"start_block_id": "invalid_block_id",
+			},
+			expectedErrorMsg: "invalid ID format",
+		},
+		{
+			name: "invalid 'start_block_height' argument",
+			arguments: map[string]interface{}{
+				"start_block_height": "-1",
+			},
+			expectedErrorMsg: "value must be an unsigned 64 bit integer",
+		},
 	}
-	return expectedResponses
 }

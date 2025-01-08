@@ -162,6 +162,30 @@ func (s *TransactionStatusesProviderSuite) requireTransactionStatuses(
 	require.Equal(s.T(), expectedResponsePayload.TransactionResult.BlockId, actualResponsePayload.TransactionResult.BlockId)
 }
 
+func backendTransactionStatusesResponse(block flow.Block) []*access.TransactionResult {
+	id := unittest.IdentifierFixture()
+	cid := unittest.IdentifierFixture()
+	txr := access.TransactionResult{
+		Status:     flow.TransactionStatusSealed,
+		StatusCode: 10,
+		Events: []flow.Event{
+			unittest.EventFixture(flow.EventAccountCreated, 1, 0, id, 200),
+		},
+		ErrorMessage: "",
+		BlockID:      block.ID(),
+		CollectionID: cid,
+		BlockHeight:  block.Header.Height,
+	}
+
+	var expectedTxResultsResponses []*access.TransactionResult
+
+	for i := 0; i < 2; i++ {
+		expectedTxResultsResponses = append(expectedTxResultsResponses, &txr)
+	}
+
+	return expectedTxResultsResponses
+}
+
 // expectedTransactionStatusesResponses creates the expected responses for the provided backend responses.
 func (s *TransactionStatusesProviderSuite) expectedTransactionStatusesResponses(
 	backendResponses []*access.TransactionResult,
@@ -180,76 +204,6 @@ func (s *TransactionStatusesProviderSuite) expectedTransactionStatusesResponses(
 	}
 
 	return expectedResponses
-}
-
-// TestTransactionStatusesDataProvider_InvalidArguments tests the behavior of the transaction statuses data provider
-// when invalid arguments are provided. It verifies that appropriate errors are returned
-// for missing or conflicting arguments.
-func (s *TransactionStatusesProviderSuite) TestTransactionStatusesDataProvider_InvalidArguments() {
-	ctx := context.Background()
-	send := make(chan interface{})
-
-	topic := TransactionStatusesTopic
-
-	for _, test := range invalidTransactionStatusesArgumentsTestCases() {
-		s.Run(test.name, func() {
-			provider, err := NewTransactionStatusesDataProvider(
-				ctx,
-				s.log,
-				s.api,
-				s.linkGenerator,
-				topic,
-				test.arguments,
-				send,
-			)
-			s.Require().Nil(provider)
-			s.Require().Error(err)
-			s.Require().Contains(err.Error(), test.expectedErrorMsg)
-		})
-	}
-}
-
-// invalidTransactionStatusesArgumentsTestCases returns a list of test cases with invalid argument combinations
-// for testing the behavior of transaction statuses data providers. Each test case includes a name,
-// a set of input arguments, and the expected error message that should be returned.
-//
-// The test cases cover scenarios such as:
-// 1. Providing both 'start_block_id' and 'start_block_height' simultaneously.
-// 2. Providing invalid 'tx_id' value.
-// 3. Providing invalid 'start_block_id'  value.
-// 4. Invalid 'start_block_id' argument.
-func invalidTransactionStatusesArgumentsTestCases() []testErrType {
-	return []testErrType{
-		{
-			name: "provide both 'start_block_id' and 'start_block_height' arguments",
-			arguments: models.Arguments{
-				"start_block_id":     unittest.BlockFixture().ID().String(),
-				"start_block_height": fmt.Sprintf("%d", unittest.BlockFixture().Header.Height),
-			},
-			expectedErrorMsg: "can only provide either 'start_block_id' or 'start_block_height'",
-		},
-		{
-			name: "invalid 'tx_id' argument",
-			arguments: map[string]interface{}{
-				"tx_id": "invalid_tx_id",
-			},
-			expectedErrorMsg: "invalid ID format",
-		},
-		{
-			name: "invalid 'start_block_id' argument",
-			arguments: map[string]interface{}{
-				"start_block_id": "invalid_block_id",
-			},
-			expectedErrorMsg: "invalid ID format",
-		},
-		{
-			name: "invalid 'start_block_height' argument",
-			arguments: map[string]interface{}{
-				"start_block_height": "-1",
-			},
-			expectedErrorMsg: "value must be an unsigned 64 bit integer",
-		},
-	}
 }
 
 // TestMessageIndexTransactionStatusesProviderResponse_HappyPath tests that MessageIndex values in response are strictly increasing.
@@ -348,26 +302,72 @@ func (s *TransactionStatusesProviderSuite) TestMessageIndexTransactionStatusesPr
 	}
 }
 
-func backendTransactionStatusesResponse(block flow.Block) []*access.TransactionResult {
-	id := unittest.IdentifierFixture()
-	cid := unittest.IdentifierFixture()
-	txr := access.TransactionResult{
-		Status:     flow.TransactionStatusSealed,
-		StatusCode: 10,
-		Events: []flow.Event{
-			unittest.EventFixture(flow.EventAccountCreated, 1, 0, id, 200),
+// TestTransactionStatusesDataProvider_InvalidArguments tests the behavior of the transaction statuses data provider
+// when invalid arguments are provided. It verifies that appropriate errors are returned
+// for missing or conflicting arguments.
+func (s *TransactionStatusesProviderSuite) TestTransactionStatusesDataProvider_InvalidArguments() {
+	ctx := context.Background()
+	send := make(chan interface{})
+
+	topic := TransactionStatusesTopic
+
+	for _, test := range invalidTransactionStatusesArgumentsTestCases() {
+		s.Run(test.name, func() {
+			provider, err := NewTransactionStatusesDataProvider(
+				ctx,
+				s.log,
+				s.api,
+				s.linkGenerator,
+				topic,
+				test.arguments,
+				send,
+			)
+			s.Require().Nil(provider)
+			s.Require().Error(err)
+			s.Require().Contains(err.Error(), test.expectedErrorMsg)
+		})
+	}
+}
+
+// invalidTransactionStatusesArgumentsTestCases returns a list of test cases with invalid argument combinations
+// for testing the behavior of transaction statuses data providers. Each test case includes a name,
+// a set of input arguments, and the expected error message that should be returned.
+//
+// The test cases cover scenarios such as:
+// 1. Providing both 'start_block_id' and 'start_block_height' simultaneously.
+// 2. Providing invalid 'tx_id' value.
+// 3. Providing invalid 'start_block_id'  value.
+// 4. Invalid 'start_block_id' argument.
+func invalidTransactionStatusesArgumentsTestCases() []testErrType {
+	return []testErrType{
+		{
+			name: "provide both 'start_block_id' and 'start_block_height' arguments",
+			arguments: models.Arguments{
+				"start_block_id":     unittest.BlockFixture().ID().String(),
+				"start_block_height": fmt.Sprintf("%d", unittest.BlockFixture().Header.Height),
+			},
+			expectedErrorMsg: "can only provide either 'start_block_id' or 'start_block_height'",
 		},
-		ErrorMessage: "",
-		BlockID:      block.ID(),
-		CollectionID: cid,
-		BlockHeight:  block.Header.Height,
+		{
+			name: "invalid 'tx_id' argument",
+			arguments: map[string]interface{}{
+				"tx_id": "invalid_tx_id",
+			},
+			expectedErrorMsg: "invalid ID format",
+		},
+		{
+			name: "invalid 'start_block_id' argument",
+			arguments: map[string]interface{}{
+				"start_block_id": "invalid_block_id",
+			},
+			expectedErrorMsg: "invalid ID format",
+		},
+		{
+			name: "invalid 'start_block_height' argument",
+			arguments: map[string]interface{}{
+				"start_block_height": "-1",
+			},
+			expectedErrorMsg: "value must be an unsigned 64 bit integer",
+		},
 	}
-
-	var expectedTxResultsResponses []*access.TransactionResult
-
-	for i := 0; i < 2; i++ {
-		expectedTxResultsResponses = append(expectedTxResultsResponses, &txr)
-	}
-
-	return expectedTxResultsResponses
 }

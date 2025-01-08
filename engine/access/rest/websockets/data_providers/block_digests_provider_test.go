@@ -28,27 +28,23 @@ func (s *BlockDigestsProviderSuite) SetupTest() {
 	s.BlocksProviderSuite.SetupTest()
 }
 
-// TestBlockDigestsDataProvider_InvalidArguments tests the behavior of the block digests data provider
-// when invalid arguments are provided. It verifies that appropriate errors are returned
-// for missing or conflicting arguments.
-// This test covers the test cases:
-// 1. Missing 'block_status' argument.
-// 2. Invalid 'block_status' argument.
-// 3. Providing both 'start_block_id' and 'start_block_height' simultaneously.
-func (s *BlockDigestsProviderSuite) TestBlockDigestsDataProvider_InvalidArguments() {
-	ctx := context.Background()
-	send := make(chan interface{})
-
-	topic := BlockDigestsTopic
-
-	for _, test := range s.invalidArgumentsTestCases() {
-		s.Run(test.name, func() {
-			provider, err := NewBlockDigestsDataProvider(ctx, s.log, s.api, topic, test.arguments, send)
-			s.Require().Nil(provider)
-			s.Require().Error(err)
-			s.Require().Contains(err.Error(), test.expectedErrorMsg)
-		})
-	}
+// TestBlockDigestsDataProvider_HappyPath tests the behavior of the block digests data provider
+// when it is configured correctly and operating under normal conditions. It
+// validates that block digests are correctly streamed to the channel and ensures
+// no unexpected errors occur.
+func (s *BlockDigestsProviderSuite) TestBlockDigestsDataProvider_HappyPath() {
+	testHappyPath(
+		s.T(),
+		BlockDigestsTopic,
+		s.factory,
+		s.validBlockDigestsArgumentsTestCases(),
+		func(dataChan chan interface{}) {
+			for _, block := range s.blocks {
+				dataChan <- flow.NewBlockDigest(block.Header.ID(), block.Header.Height, block.Header.Timestamp)
+			}
+		},
+		s.requireBlockDigest,
+	)
 }
 
 // validBlockDigestsArgumentsTestCases defines test happy cases for block digests data providers.
@@ -117,25 +113,6 @@ func (s *BlockDigestsProviderSuite) validBlockDigestsArgumentsTestCases() []test
 	}
 }
 
-// TestBlockDigestsDataProvider_HappyPath tests the behavior of the block digests data provider
-// when it is configured correctly and operating under normal conditions. It
-// validates that block digests are correctly streamed to the channel and ensures
-// no unexpected errors occur.
-func (s *BlockDigestsProviderSuite) TestBlockDigestsDataProvider_HappyPath() {
-	testHappyPath(
-		s.T(),
-		BlockDigestsTopic,
-		s.factory,
-		s.validBlockDigestsArgumentsTestCases(),
-		func(dataChan chan interface{}) {
-			for _, block := range s.blocks {
-				dataChan <- flow.NewBlockDigest(block.Header.ID(), block.Header.Height, block.Header.Timestamp)
-			}
-		},
-		s.requireBlockDigest,
-	)
-}
-
 // requireBlockDigest ensures that the received block header information matches the expected data.
 func (s *BlocksProviderSuite) requireBlockDigest(actual interface{}, expected interface{}) {
 	expectedResponse, ok := expected.(*models.BaseDataProvidersResponse)
@@ -152,4 +129,27 @@ func (s *BlocksProviderSuite) requireBlockDigest(actual interface{}, expected in
 
 	s.Require().Equal(expectedResponse.Topic, actualResponse.Topic)
 	s.Require().Equal(expectedResponsePayload, actualResponsePayload)
+}
+
+// TestBlockDigestsDataProvider_InvalidArguments tests the behavior of the block digests data provider
+// when invalid arguments are provided. It verifies that appropriate errors are returned
+// for missing or conflicting arguments.
+// This test covers the test cases:
+// 1. Missing 'block_status' argument.
+// 2. Invalid 'block_status' argument.
+// 3. Providing both 'start_block_id' and 'start_block_height' simultaneously.
+func (s *BlockDigestsProviderSuite) TestBlockDigestsDataProvider_InvalidArguments() {
+	ctx := context.Background()
+	send := make(chan interface{})
+
+	topic := BlockDigestsTopic
+
+	for _, test := range s.invalidArgumentsTestCases() {
+		s.Run(test.name, func() {
+			provider, err := NewBlockDigestsDataProvider(ctx, s.log, s.api, topic, test.arguments, send)
+			s.Require().Nil(provider)
+			s.Require().Error(err)
+			s.Require().Contains(err.Error(), test.expectedErrorMsg)
+		})
+	}
 }

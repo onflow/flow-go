@@ -164,6 +164,23 @@ func (s *AccountStatusesProviderSuite) requireAccountStatuses(actual interface{}
 	}
 }
 
+// expectedAccountStatusesResponses creates the expected responses for the provided events and backend responses.
+func (s *AccountStatusesProviderSuite) expectedAccountStatusesResponses(backendResponses []*backend.AccountStatusesResponse) []interface{} {
+	expectedResponses := make([]interface{}, len(backendResponses))
+
+	for i, resp := range backendResponses {
+		var expectedResponsePayload models.AccountStatusesResponse
+		expectedResponsePayload.Build(resp, uint64(i))
+
+		expectedResponses[i] = &models.BaseDataProvidersResponse{
+			Topic:   AccountStatusesTopic,
+			Payload: &expectedResponsePayload,
+		}
+	}
+
+	return expectedResponses
+}
+
 // TestAccountStatusesDataProvider_InvalidArguments tests the behavior of the account statuses data provider
 // when invalid arguments are provided. It verifies that appropriate errors are returned
 // for missing or conflicting arguments.
@@ -291,21 +308,4 @@ func (s *AccountStatusesProviderSuite) backendAccountStatusesResponses(events []
 	}
 
 	return responses
-}
-
-// expectedAccountStatusesResponses creates the expected responses for the provided events and backend responses.
-func (s *AccountStatusesProviderSuite) expectedAccountStatusesResponses(backendResponses []*backend.AccountStatusesResponse) []interface{} {
-	expectedResponses := make([]interface{}, len(backendResponses))
-
-	for i, resp := range backendResponses {
-		var expectedResponsePayload models.AccountStatusesResponse
-		expectedResponsePayload.Build(resp, uint64(i))
-
-		expectedResponses[i] = &models.BaseDataProvidersResponse{
-			Topic:   AccountStatusesTopic,
-			Payload: &expectedResponsePayload,
-		}
-	}
-
-	return expectedResponses
 }
