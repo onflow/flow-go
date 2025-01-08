@@ -353,6 +353,9 @@ func MockChunkAssignmentFixture(chunkAssigner *mock.ChunkAssigner,
 					expectedLocatorIds = append(expectedLocatorIds, locatorID)
 					expectedChunkIds = append(expectedChunkIds, chunk.ID())
 					a.Add(chunk, verIds.NodeIDs())
+				} else {
+					// TODO the chunk has no verifiers assigned (error?)
+					a.Add(chunk, flow.IdentifierList{})
 				}
 
 			}
