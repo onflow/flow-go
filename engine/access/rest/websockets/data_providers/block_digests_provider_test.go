@@ -61,7 +61,10 @@ func (s *BlockDigestsProviderSuite) validBlockDigestsArgumentsTestCases() []test
 		var block models.BlockDigest
 		block.Build(blockDigest)
 
-		expectedResponses[i] = &models.BlockDigestMessageResponse{Block: &block}
+		expectedResponses[i] = &models.BaseDataProvidersResponse{
+			Topic:   BlockDigestsTopic,
+			Payload: &block,
+		}
 	}
 
 	return []testType{
@@ -133,13 +136,20 @@ func (s *BlockDigestsProviderSuite) TestBlockDigestsDataProvider_HappyPath() {
 	)
 }
 
-// requireBlockHeaders ensures that the received block header information matches the expected data.
+// requireBlockDigest ensures that the received block header information matches the expected data.
 func (s *BlocksProviderSuite) requireBlockDigest(actual interface{}, expected interface{}) {
-	actualResponse, ok := actual.(*models.BlockDigestMessageResponse)
-	require.True(s.T(), ok, "unexpected response type: %T", actual)
+	expectedResponse, ok := expected.(*models.BaseDataProvidersResponse)
+	require.True(s.T(), ok, "Expected *models.BaseDataProvidersResponse, got %T", expected)
 
-	expectedResponse, ok := expected.(*models.BlockDigestMessageResponse)
-	require.True(s.T(), ok, "unexpected response type: %T", expected)
+	expectedResponsePayload, ok := expectedResponse.Payload.(*models.BlockDigest)
+	require.True(s.T(), ok, "Unexpected response payload type: %T", expectedResponse.Payload)
 
-	s.Require().Equal(expectedResponse.Block, actualResponse.Block)
+	actualResponse, ok := actual.(*models.BaseDataProvidersResponse)
+	require.True(s.T(), ok, "Expected *models.BaseDataProvidersResponse, got %T", actual)
+
+	actualResponsePayload, ok := actualResponse.Payload.(*models.BlockDigest)
+	require.True(s.T(), ok, "Unexpected response payload type: %T", actualResponse.Payload)
+
+	s.Require().Equal(expectedResponse.Topic, actualResponse.Topic)
+	s.Require().Equal(expectedResponsePayload, actualResponsePayload)
 }

@@ -138,14 +138,20 @@ func (s *EventsProviderSuite) subscribeEventsDataProviderTestCases(backendRespon
 
 // requireEvents ensures that the received event information matches the expected data.
 func (s *EventsProviderSuite) requireEvents(actual interface{}, expected interface{}) {
-	expectedResponse, ok := expected.(*models.EventResponse)
-	require.True(s.T(), ok, "Expected *models.EventResponse, got %T", expected)
+	expectedResponse, ok := expected.(*models.BaseDataProvidersResponse)
+	require.True(s.T(), ok, "Expected *models.BaseDataProvidersResponse, got %T", expected)
 
-	actualResponse, ok := actual.(*models.EventResponse)
-	require.True(s.T(), ok, "Expected *models.EventResponse, got %T", actual)
+	expectedResponsePayload, ok := expectedResponse.Payload.(*models.EventResponse)
+	require.True(s.T(), ok, "Unexpected response payload type: %T", expectedResponse.Payload)
 
-	s.Require().ElementsMatch(expectedResponse.Events, actualResponse.Events)
-	s.Require().Equal(expectedResponse.MessageIndex, actualResponse.MessageIndex)
+	actualResponse, ok := actual.(*models.BaseDataProvidersResponse)
+	require.True(s.T(), ok, "Expected *models.BaseDataProvidersResponse, got %T", actual)
+
+	actualResponsePayload, ok := actualResponse.Payload.(*models.EventResponse)
+	require.True(s.T(), ok, "Unexpected response payload type: %T", actualResponse.Payload)
+
+	s.Require().ElementsMatch(expectedResponsePayload.Events, actualResponsePayload.Events)
+	s.Require().Equal(expectedResponsePayload.MessageIndex, actualResponsePayload.MessageIndex)
 }
 
 // invalidArgumentsTestCases returns a list of test cases with invalid argument combinations
@@ -278,12 +284,16 @@ func (s *EventsProviderSuite) TestMessageIndexEventProviderResponse_HappyPath() 
 	var responses []*models.EventResponse
 	for i := 0; i < eventsCount; i++ {
 		res := <-send
-		eventRes, ok := res.(*models.EventResponse)
+		eventRes, ok := res.(*models.BaseDataProvidersResponse)
+		s.Require().True(ok, "Expected *models.BaseDataProvidersResponse, got %T", res)
+
+		eventResData, ok := eventRes.Payload.(*models.EventResponse)
 		s.Require().True(ok, "Expected *models.EventResponse, got %T", res)
-		responses = append(responses, eventRes)
+
+		responses = append(responses, eventResData)
 	}
 
-	// Verifying that indices are starting from 1
+	// Verifying that indices are starting from 0
 	s.Require().Equal(uint64(0), responses[0].MessageIndex, "Expected MessageIndex to start with 0")
 
 	// Verifying that indices are strictly increasing
@@ -317,10 +327,13 @@ func (s *EventsProviderSuite) expectedEventsResponses(
 	expectedResponses := make([]interface{}, len(backendResponses))
 
 	for i, resp := range backendResponses {
-		var expectedResponse models.EventResponse
-		expectedResponse.Build(resp, uint64(i))
+		var expectedResponsePayload models.EventResponse
+		expectedResponsePayload.Build(resp, uint64(i))
 
-		expectedResponses[i] = &expectedResponse
+		expectedResponses[i] = &models.BaseDataProvidersResponse{
+			Topic:   EventsTopic,
+			Payload: &expectedResponsePayload,
+		}
 	}
 	return expectedResponses
 }

@@ -77,7 +77,7 @@ func (s *TransactionStatusesProviderSuite) TestSendTransactionStatusesDataProvid
 	)
 
 	backendResponse := backendTransactionStatusesResponse(s.rootBlock)
-	expectedResponse := s.expectedTransactionStatusesResponses(backendResponse)
+	expectedResponse := s.expectedTransactionStatusesResponses(backendResponse, SendAndGetTransactionStatusesTopic)
 
 	sendTxStatutesTestCases := []testType{
 		{
@@ -109,16 +109,23 @@ func (s *TransactionStatusesProviderSuite) TestSendTransactionStatusesDataProvid
 
 // requireTransactionStatuses ensures that the received transaction statuses information matches the expected data.
 func (s *SendTransactionStatusesProviderSuite) requireTransactionStatuses(
-	v interface{},
-	expectedResponse interface{},
+	actual interface{},
+	expected interface{},
 ) {
-	expectedTxStatusesResponse, ok := expectedResponse.(*models.TransactionStatusesResponse)
-	require.True(s.T(), ok, "expected *models.TransactionStatusesResponse, got %T", expectedResponse)
+	expectedResponse, ok := expected.(*models.BaseDataProvidersResponse)
+	require.True(s.T(), ok, "Expected *models.BaseDataProvidersResponse, got %T", expected)
 
-	actualResponse, ok := v.(*models.TransactionStatusesResponse)
-	require.True(s.T(), ok, "expected *models.TransactionStatusesResponse, got %T", v)
+	expectedResponsePayload, ok := expectedResponse.Payload.(*models.TransactionStatusesResponse)
+	require.True(s.T(), ok, "Unexpected response payload type: %T", expectedResponse.Payload)
 
-	require.Equal(s.T(), expectedTxStatusesResponse.TransactionResult.BlockId, actualResponse.TransactionResult.BlockId)
+	actualResponse, ok := actual.(*models.BaseDataProvidersResponse)
+	require.True(s.T(), ok, "Expected *models.BaseDataProvidersResponse, got %T", actual)
+
+	actualResponsePayload, ok := actualResponse.Payload.(*models.TransactionStatusesResponse)
+	require.True(s.T(), ok, "Unexpected response payload type: %T", actualResponse.Payload)
+
+	require.Equal(s.T(), expectedResponse.Topic, actualResponse.Topic)
+	require.Equal(s.T(), expectedResponsePayload.TransactionResult.BlockId, actualResponsePayload.TransactionResult.BlockId)
 }
 
 // TestSendTransactionStatusesDataProvider_InvalidArguments tests the behavior of the send transaction statuses data provider

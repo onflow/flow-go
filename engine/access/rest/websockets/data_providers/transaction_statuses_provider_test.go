@@ -90,7 +90,7 @@ func (s *TransactionStatusesProviderSuite) TestTransactionStatusesDataProvider_H
 }
 
 func (s *TransactionStatusesProviderSuite) subscribeTransactionStatusesDataProviderTestCases(backendResponses []*access.TransactionResult) []testType {
-	expectedResponses := s.expectedTransactionStatusesResponses(backendResponses)
+	expectedResponses := s.expectedTransactionStatusesResponses(backendResponses, TransactionStatusesTopic)
 
 	return []testType{
 		{
@@ -146,26 +146,37 @@ func (s *TransactionStatusesProviderSuite) requireTransactionStatuses(
 	actual interface{},
 	expected interface{},
 ) {
-	expectedTxStatusesResponse, ok := expected.(*models.TransactionStatusesResponse)
-	require.True(s.T(), ok, "expected *models.TransactionStatusesResponse, got %T", expected)
+	expectedResponse, ok := expected.(*models.BaseDataProvidersResponse)
+	require.True(s.T(), ok, "Expected *models.BaseDataProvidersResponse, got %T", expected)
 
-	actualResponse, ok := actual.(*models.TransactionStatusesResponse)
-	require.True(s.T(), ok, "expected *models.TransactionStatusesResponse, got %T", actual)
+	expectedResponsePayload, ok := expectedResponse.Payload.(*models.TransactionStatusesResponse)
+	require.True(s.T(), ok, "Unexpected response payload type: %T", expectedResponse.Payload)
 
-	require.Equal(s.T(), expectedTxStatusesResponse.TransactionResult.BlockId, actualResponse.TransactionResult.BlockId)
+	actualResponse, ok := actual.(*models.BaseDataProvidersResponse)
+	require.True(s.T(), ok, "Expected *models.BaseDataProvidersResponse, got %T", actual)
+
+	actualResponsePayload, ok := actualResponse.Payload.(*models.TransactionStatusesResponse)
+	require.True(s.T(), ok, "Unexpected response payload type: %T", actualResponse.Payload)
+
+	require.Equal(s.T(), expectedResponse.Topic, actualResponse.Topic)
+	require.Equal(s.T(), expectedResponsePayload.TransactionResult.BlockId, actualResponsePayload.TransactionResult.BlockId)
 }
 
 // expectedTransactionStatusesResponses creates the expected responses for the provided backend responses.
 func (s *TransactionStatusesProviderSuite) expectedTransactionStatusesResponses(
 	backendResponses []*access.TransactionResult,
+	topic string,
 ) []interface{} {
 	expectedResponses := make([]interface{}, len(backendResponses))
 
 	for i, resp := range backendResponses {
-		var expectedResponse models.TransactionStatusesResponse
-		expectedResponse.Build(s.linkGenerator, resp, uint64(i))
+		var expectedResponsePayload models.TransactionStatusesResponse
+		expectedResponsePayload.Build(s.linkGenerator, resp, uint64(i))
 
-		expectedResponses[i] = &expectedResponse
+		expectedResponses[i] = &models.BaseDataProvidersResponse{
+			Topic:   topic,
+			Payload: &expectedResponsePayload,
+		}
 	}
 
 	return expectedResponses
@@ -316,9 +327,14 @@ func (s *TransactionStatusesProviderSuite) TestMessageIndexTransactionStatusesPr
 	var responses []*models.TransactionStatusesResponse
 	for i := 0; i < txStatusesCount; i++ {
 		res := <-send
-		txStatusesRes, ok := res.(*models.TransactionStatusesResponse)
+
+		txStatusesRes, ok := res.(*models.BaseDataProvidersResponse)
+		s.Require().True(ok, "Expected *models.BaseDataProvidersResponse, got %T", res)
+
+		txStatusesResData, ok := txStatusesRes.Payload.(*models.TransactionStatusesResponse)
 		s.Require().True(ok, "Expected *models.TransactionStatusesResponse, got %T", res)
-		responses = append(responses, txStatusesRes)
+
+		responses = append(responses, txStatusesResData)
 	}
 
 	// Verifying that indices are starting from 0

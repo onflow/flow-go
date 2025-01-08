@@ -64,9 +64,14 @@ func (p *BlockDigestsDataProvider) Run() error {
 			var block models.BlockDigest
 			block.Build(b)
 
-			return &models.BlockDigestMessageResponse{
-				Block: &block,
-			}, nil
+			var response models.BaseDataProvidersResponse
+			response.Build(
+				p.ID().String(),
+				p.Topic(),
+				&block,
+			)
+
+			return &response, nil
 		}),
 	)
 }

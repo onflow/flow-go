@@ -138,19 +138,26 @@ func (s *AccountStatusesProviderSuite) subscribeAccountStatusesDataProviderTestC
 
 // requireAccountStatuses ensures that the received account statuses information matches the expected data.
 func (s *AccountStatusesProviderSuite) requireAccountStatuses(actual interface{}, expected interface{}) {
-	expectedResponse, ok := expected.(*models.AccountStatusesResponse)
-	require.True(s.T(), ok, "Expected *models.AccountStatusesResponse, got %T", expected)
+	expectedResponse, ok := expected.(*models.BaseDataProvidersResponse)
+	require.True(s.T(), ok, "Expected *models.BaseDataProvidersResponse, got %T", expected)
 
-	actualResponse, ok := actual.(*models.AccountStatusesResponse)
-	require.True(s.T(), ok, "Expected *models.AccountStatusesResponse, got %T", actual)
+	expectedResponsePayload, ok := expectedResponse.Payload.(*models.AccountStatusesResponse)
+	require.True(s.T(), ok, "Unexpected response payload type: %T", expectedResponse.Payload)
 
-	require.Equal(s.T(), expectedResponse.BlockID, actualResponse.BlockID)
-	require.Equal(s.T(), len(expectedResponse.AccountEvents), len(actualResponse.AccountEvents))
-	require.Equal(s.T(), expectedResponse.MessageIndex, actualResponse.MessageIndex)
-	require.Equal(s.T(), expectedResponse.Height, actualResponse.Height)
+	actualResponse, ok := actual.(*models.BaseDataProvidersResponse)
+	require.True(s.T(), ok, "Expected *models.BaseDataProvidersResponse, got %T", actual)
 
-	for key, expectedEvents := range expectedResponse.AccountEvents {
-		actualEvents, ok := actualResponse.AccountEvents[key]
+	actualResponsePayload, ok := actualResponse.Payload.(*models.AccountStatusesResponse)
+	require.True(s.T(), ok, "Unexpected response payload type: %T", actualResponse.Payload)
+
+	require.Equal(s.T(), expectedResponsePayload.BlockID, actualResponsePayload.BlockID)
+	require.Equal(s.T(), len(expectedResponsePayload.AccountEvents), len(actualResponsePayload.AccountEvents))
+	require.Equal(s.T(), expectedResponsePayload.MessageIndex, actualResponsePayload.MessageIndex)
+	require.Equal(s.T(), expectedResponsePayload.Height, actualResponsePayload.Height)
+	require.Equal(s.T(), expectedResponse.Topic, actualResponse.Topic)
+
+	for key, expectedEvents := range expectedResponsePayload.AccountEvents {
+		actualEvents, ok := actualResponsePayload.AccountEvents[key]
 		require.True(s.T(), ok, "Missing key in actual AccountEvents: %s", key)
 
 		s.Require().Equal(expectedEvents, actualEvents, "Mismatch for key: %s", key)
@@ -249,9 +256,13 @@ func (s *AccountStatusesProviderSuite) TestMessageIndexAccountStatusesProviderRe
 	var responses []*models.AccountStatusesResponse
 	for i := 0; i < accountStatusesCount; i++ {
 		res := <-send
-		accountStatusesRes, ok := res.(*models.AccountStatusesResponse)
+		accountStatusesRes, ok := res.(*models.BaseDataProvidersResponse)
+		s.Require().True(ok, "Expected *models.BaseDataProvidersResponse, got %T", res)
+
+		accountStatusesResData, ok := accountStatusesRes.Payload.(*models.AccountStatusesResponse)
 		s.Require().True(ok, "Expected *models.AccountStatusesResponse, got %T", res)
-		responses = append(responses, accountStatusesRes)
+
+		responses = append(responses, accountStatusesResData)
 	}
 
 	// Verifying that indices are starting from 0
@@ -287,10 +298,13 @@ func (s *AccountStatusesProviderSuite) expectedAccountStatusesResponses(backendR
 	expectedResponses := make([]interface{}, len(backendResponses))
 
 	for i, resp := range backendResponses {
-		var expectedResponse models.AccountStatusesResponse
-		expectedResponse.Build(resp, uint64(i))
+		var expectedResponsePayload models.AccountStatusesResponse
+		expectedResponsePayload.Build(resp, uint64(i))
 
-		expectedResponses[i] = &expectedResponse
+		expectedResponses[i] = &models.BaseDataProvidersResponse{
+			Topic:   AccountStatusesTopic,
+			Payload: &expectedResponsePayload,
+		}
 	}
 
 	return expectedResponses

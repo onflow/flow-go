@@ -240,13 +240,20 @@ func (s *BlocksProviderSuite) TestBlocksDataProvider_HappyPath() {
 
 // requireBlocks ensures that the received block information matches the expected data.
 func (s *BlocksProviderSuite) requireBlock(actual interface{}, expected interface{}) {
-	actualResponse, ok := actual.(*models.BlockMessageResponse)
-	require.True(s.T(), ok, "unexpected response type: %T", actual)
+	expectedResponse, ok := expected.(*models.BaseDataProvidersResponse)
+	require.True(s.T(), ok, "Expected *models.BaseDataProvidersResponse, got %T", expected)
 
-	expectedResponse, ok := expected.(*models.BlockMessageResponse)
-	require.True(s.T(), ok, "unexpected response type: %T", expected)
+	expectedResponsePayload, ok := expectedResponse.Payload.(*commonmodels.Block)
+	require.True(s.T(), ok, "unexpected response payload type: %T", expectedResponse.Payload)
 
-	s.Require().Equal(expectedResponse.Block, actualResponse.Block)
+	actualResponse, ok := actual.(*models.BaseDataProvidersResponse)
+	require.True(s.T(), ok, "Expected *models.BaseDataProvidersResponse, got %T", actual)
+
+	actualResponsePayload, ok := actualResponse.Payload.(*commonmodels.Block)
+	require.True(s.T(), ok, "unexpected response payload type: %T", actualResponse.Payload)
+
+	s.Require().Equal(expectedResponse.Topic, actualResponse.Topic)
+	s.Require().Equal(expectedResponsePayload, actualResponsePayload)
 }
 
 // expectedBlockResponses generates a list of expected block responses for the given blocks.
@@ -261,8 +268,9 @@ func (s *BlocksProviderSuite) expectedBlockResponses(
 		err := block.Build(b, nil, s.linkGenerator, status, expand)
 		s.Require().NoError(err)
 
-		responses[i] = &models.BlockMessageResponse{
-			Block: &block,
+		responses[i] = &models.BaseDataProvidersResponse{
+			Topic:   BlocksTopic,
+			Payload: &block,
 		}
 	}
 
