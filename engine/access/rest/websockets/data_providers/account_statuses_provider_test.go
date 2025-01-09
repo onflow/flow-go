@@ -5,6 +5,7 @@ import (
 	"strconv"
 	"testing"
 
+	"github.com/google/uuid"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -183,6 +184,7 @@ func (s *AccountStatusesProviderSuite) TestAccountStatusesDataProvider_InvalidAr
 				ctx,
 				s.log,
 				s.api,
+				uuid.New(),
 				topic,
 				test.arguments,
 				send,
@@ -224,6 +226,7 @@ func (s *AccountStatusesProviderSuite) TestMessageIndexAccountStatusesProviderRe
 		ctx,
 		s.log,
 		s.api,
+		uuid.New(),
 		topic,
 		arguments,
 		send,

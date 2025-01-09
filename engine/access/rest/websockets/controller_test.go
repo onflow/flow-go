@@ -51,14 +51,11 @@ func (s *WsControllerSuite) TestSubscribeRequest() {
 		controller := NewWebSocketController(s.logger, s.wsConfig, conn, dataProviderFactory)
 
 		dataProviderFactory.
-			On("NewDataProvider", mock.Anything, mock.Anything, mock.Anything, mock.Anything).
+			On("NewDataProvider", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).
 			Return(dataProvider, nil).
 			Once()
 
-		id := uuid.New()
 		done := make(chan struct{})
-
-		dataProvider.On("ID").Return(id)
 		// data provider might finish on its own or controller will close it via Close()
 		dataProvider.On("Close").Return(nil).Maybe()
 		dataProvider.
@@ -71,8 +68,8 @@ func (s *WsControllerSuite) TestSubscribeRequest() {
 
 		request := models.SubscribeMessageRequest{
 			BaseMessageRequest: models.BaseMessageRequest{
-				ClientMessageID: uuid.New().String(),
-				Action:          models.SubscribeAction,
+				SubscriptionID: uuid.New().String(),
+				Action:         models.SubscribeAction,
 			},
 			Topic:     dp.BlocksTopic,
 			Arguments: nil,
@@ -98,9 +95,7 @@ func (s *WsControllerSuite) TestSubscribeRequest() {
 
 				response, ok := msg.(models.SubscribeMessageResponse)
 				require.True(t, ok)
-				require.True(t, response.Success)
-				require.Equal(t, request.ClientMessageID, response.ClientMessageID)
-				require.Equal(t, id.String(), response.SubscriptionID)
+				require.Equal(t, request.SubscriptionID, response.SubscriptionID)
 
 				return websocket.ErrCloseSent
 			})
@@ -148,7 +143,6 @@ func (s *WsControllerSuite) TestSubscribeRequest() {
 
 				response, ok := msg.(models.BaseMessageResponse)
 				require.True(t, ok)
-				require.False(t, response.Success)
 				require.NotEmpty(t, response.Error)
 				require.Equal(t, int(InvalidMessage), response.Error.Code)
 				return websocket.ErrCloseSent
@@ -169,12 +163,13 @@ func (s *WsControllerSuite) TestSubscribeRequest() {
 		controller := NewWebSocketController(s.logger, s.wsConfig, conn, dataProviderFactory)
 
 		dataProviderFactory.
-			On("NewDataProvider", mock.Anything, mock.Anything, mock.Anything, mock.Anything).
+			On("NewDataProvider", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).
 			Return(nil, fmt.Errorf("error creating data provider")).
 			Once()
 
 		done := make(chan struct{})
-		s.expectSubscribeRequest(t, conn)
+		subscriptionID := uuid.New().String()
+		s.expectSubscribeRequest(t, conn, subscriptionID)
 
 		conn.
 			On("WriteJSON", mock.Anything).
@@ -183,9 +178,8 @@ func (s *WsControllerSuite) TestSubscribeRequest() {
 
 				response, ok := msg.(models.BaseMessageResponse)
 				require.True(t, ok)
-				require.False(t, response.Success)
 				require.NotEmpty(t, response.Error)
-				require.Equal(t, int(InvalidArgument), response.Error.Code)
+				require.Equal(t, int(InvalidMessage), response.Error.Code)
 
 				return websocket.ErrCloseSent
 			})
@@ -204,7 +198,6 @@ func (s *WsControllerSuite) TestSubscribeRequest() {
 		conn, dataProviderFactory, dataProvider := newControllerMocks(t)
 		controller := NewWebSocketController(s.logger, s.wsConfig, conn, dataProviderFactory)
 
-		dataProvider.On("ID").Return(uuid.New())
 		// data provider might finish on its own or controller will close it via Close()
 		dataProvider.On("Close").Return(nil).Maybe()
 		dataProvider.
@@ -214,13 +207,14 @@ func (s *WsControllerSuite) TestSubscribeRequest() {
 			Once()
 
 		dataProviderFactory.
-			On("NewDataProvider", mock.Anything, mock.Anything, mock.Anything, mock.Anything).
+			On("NewDataProvider", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).
 			Return(dataProvider, nil).
 			Once()
 
 		done := make(chan struct{})
-		msgID := s.expectSubscribeRequest(t, conn)
-		s.expectSubscribeResponse(t, conn, msgID)
+		subscriptionID := uuid.New().String()
+		s.expectSubscribeRequest(t, conn, subscriptionID)
+		s.expectSubscribeResponse(t, conn, subscriptionID)
 
 		conn.
 			On("WriteJSON", mock.Anything).
@@ -229,9 +223,8 @@ func (s *WsControllerSuite) TestSubscribeRequest() {
 
 				response, ok := msg.(models.BaseMessageResponse)
 				require.True(t, ok)
-				require.False(t, response.Success)
 				require.NotEmpty(t, response.Error)
-				require.Equal(t, int(SubscriptionError), response.Error.Code)
+				require.Equal(t, int(InternalServerError), response.Error.Code)
 
 				return websocket.ErrCloseSent
 			})
@@ -254,14 +247,11 @@ func (s *WsControllerSuite) TestUnsubscribeRequest() {
 		controller := NewWebSocketController(s.logger, s.wsConfig, conn, dataProviderFactory)
 
 		dataProviderFactory.
-			On("NewDataProvider", mock.Anything, mock.Anything, mock.Anything, mock.Anything).
+			On("NewDataProvider", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).
 			Return(dataProvider, nil).
 			Once()
 
-		id := uuid.New()
 		done := make(chan struct{})
-
-		dataProvider.On("ID").Return(id)
 		// data provider might finish on its own or controller will close it via Close()
 		dataProvider.On("Close").Return(nil).Maybe()
 		dataProvider.
@@ -272,15 +262,15 @@ func (s *WsControllerSuite) TestUnsubscribeRequest() {
 			Return(nil).
 			Once()
 
-		msgID := s.expectSubscribeRequest(t, conn)
-		s.expectSubscribeResponse(t, conn, msgID)
+		subscriptionID := uuid.New().String()
+		s.expectSubscribeRequest(t, conn, subscriptionID)
+		s.expectSubscribeResponse(t, conn, subscriptionID)
 
 		request := models.UnsubscribeMessageRequest{
 			BaseMessageRequest: models.BaseMessageRequest{
-				ClientMessageID: uuid.New().String(),
-				Action:          models.UnsubscribeAction,
+				SubscriptionID: subscriptionID,
+				Action:         models.UnsubscribeAction,
 			},
-			SubscriptionID: id.String(),
 		}
 		requestJson, err := json.Marshal(request)
 		require.NoError(t, err)
@@ -302,9 +292,8 @@ func (s *WsControllerSuite) TestUnsubscribeRequest() {
 
 				response, ok := msg.(models.UnsubscribeMessageResponse)
 				require.True(t, ok)
-				require.True(t, response.Success)
 				require.Empty(t, response.Error)
-				require.Equal(t, request.ClientMessageID, response.ClientMessageID)
+				require.Equal(t, request.SubscriptionID, response.SubscriptionID)
 				require.Equal(t, request.SubscriptionID, response.SubscriptionID)
 
 				return websocket.ErrCloseSent
@@ -327,14 +316,11 @@ func (s *WsControllerSuite) TestUnsubscribeRequest() {
 		controller := NewWebSocketController(s.logger, s.wsConfig, conn, dataProviderFactory)
 
 		dataProviderFactory.
-			On("NewDataProvider", mock.Anything, mock.Anything, mock.Anything, mock.Anything).
+			On("NewDataProvider", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).
 			Return(dataProvider, nil).
 			Once()
 
-		id := uuid.New()
 		done := make(chan struct{})
-
-		dataProvider.On("ID").Return(id)
 		// data provider might finish on its own or controller will close it via Close()
 		dataProvider.On("Close").Return(nil).Maybe()
 		dataProvider.
@@ -345,15 +331,15 @@ func (s *WsControllerSuite) TestUnsubscribeRequest() {
 			Return(nil).
 			Once()
 
-		msgID := s.expectSubscribeRequest(t, conn)
-		s.expectSubscribeResponse(t, conn, msgID)
+		subscriptionID := uuid.New().String()
+		s.expectSubscribeRequest(t, conn, subscriptionID)
+		s.expectSubscribeResponse(t, conn, subscriptionID)
 
 		request := models.UnsubscribeMessageRequest{
 			BaseMessageRequest: models.BaseMessageRequest{
-				ClientMessageID: uuid.New().String(),
-				Action:          models.UnsubscribeAction,
+				SubscriptionID: "invalid-uuid",
+				Action:         models.UnsubscribeAction,
 			},
-			SubscriptionID: "invalid-uuid",
 		}
 		requestJson, err := json.Marshal(request)
 		require.NoError(t, err)
@@ -375,10 +361,9 @@ func (s *WsControllerSuite) TestUnsubscribeRequest() {
 
 				response, ok := msg.(models.BaseMessageResponse)
 				require.True(t, ok)
-				require.False(t, response.Success)
 				require.NotEmpty(t, response.Error)
-				require.Equal(t, request.ClientMessageID, response.ClientMessageID)
-				require.Equal(t, int(InvalidArgument), response.Error.Code)
+				require.Equal(t, request.SubscriptionID, response.SubscriptionID)
+				require.Equal(t, int(InvalidMessage), response.Error.Code)
 
 				return websocket.ErrCloseSent
 			}).
@@ -400,14 +385,11 @@ func (s *WsControllerSuite) TestUnsubscribeRequest() {
 		controller := NewWebSocketController(s.logger, s.wsConfig, conn, dataProviderFactory)
 
 		dataProviderFactory.
-			On("NewDataProvider", mock.Anything, mock.Anything, mock.Anything, mock.Anything).
+			On("NewDataProvider", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).
 			Return(dataProvider, nil).
 			Once()
 
-		id := uuid.New()
 		done := make(chan struct{})
-
-		dataProvider.On("ID").Return(id)
 		// data provider might finish on its own or controller will close it via Close()
 		dataProvider.On("Close").Return(nil).Maybe()
 		dataProvider.
@@ -418,15 +400,15 @@ func (s *WsControllerSuite) TestUnsubscribeRequest() {
 			Return(nil).
 			Once()
 
-		msgID := s.expectSubscribeRequest(t, conn)
-		s.expectSubscribeResponse(t, conn, msgID)
+		subscriptionID := uuid.New().String()
+		s.expectSubscribeRequest(t, conn, subscriptionID)
+		s.expectSubscribeResponse(t, conn, subscriptionID)
 
 		request := models.UnsubscribeMessageRequest{
 			BaseMessageRequest: models.BaseMessageRequest{
-				ClientMessageID: uuid.New().String(),
-				Action:          models.UnsubscribeAction,
+				SubscriptionID: uuid.New().String(), // unknown subscription id
+				Action:         models.UnsubscribeAction,
 			},
-			SubscriptionID: uuid.New().String(),
 		}
 		requestJson, err := json.Marshal(request)
 		require.NoError(t, err)
@@ -448,10 +430,9 @@ func (s *WsControllerSuite) TestUnsubscribeRequest() {
 
 				response, ok := msg.(models.BaseMessageResponse)
 				require.True(t, ok)
-				require.False(t, response.Success)
-				require.NotEmpty(t, response.Error)
+				require.Equal(t, request.SubscriptionID, response.SubscriptionID)
 
-				require.Equal(t, request.ClientMessageID, response.ClientMessageID)
+				require.NotEmpty(t, response.Error)
 				require.Equal(t, int(NotFound), response.Error.Code)
 
 				return websocket.ErrCloseSent
@@ -475,15 +456,13 @@ func (s *WsControllerSuite) TestListSubscriptions() {
 		controller := NewWebSocketController(s.logger, s.wsConfig, conn, dataProviderFactory)
 
 		dataProviderFactory.
-			On("NewDataProvider", mock.Anything, mock.Anything, mock.Anything, mock.Anything).
+			On("NewDataProvider", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).
 			Return(dataProvider, nil).
 			Once()
 
 		done := make(chan struct{})
 
-		id := uuid.New()
 		topic := dp.BlocksTopic
-		dataProvider.On("ID").Return(id)
 		dataProvider.On("Topic").Return(topic)
 		// data provider might finish on its own or controller will close it via Close()
 		dataProvider.On("Close").Return(nil).Maybe()
@@ -495,13 +474,14 @@ func (s *WsControllerSuite) TestListSubscriptions() {
 			Return(nil).
 			Once()
 
-		msgID := s.expectSubscribeRequest(t, conn)
-		s.expectSubscribeResponse(t, conn, msgID)
+		subscriptionID := uuid.New().String()
+		s.expectSubscribeRequest(t, conn, subscriptionID)
+		s.expectSubscribeResponse(t, conn, subscriptionID)
 
 		request := models.ListSubscriptionsMessageRequest{
 			BaseMessageRequest: models.BaseMessageRequest{
-				ClientMessageID: uuid.New().String(),
-				Action:          models.ListSubscriptionsAction,
+				SubscriptionID: "",
+				Action:         models.ListSubscriptionsAction,
 			},
 		}
 		requestJson, err := json.Marshal(request)
@@ -524,11 +504,10 @@ func (s *WsControllerSuite) TestListSubscriptions() {
 
 				response, ok := msg.(models.ListSubscriptionsMessageResponse)
 				require.True(t, ok)
-				require.True(t, response.Success)
 				require.Empty(t, response.Error)
-				require.Equal(t, request.ClientMessageID, response.ClientMessageID)
+				require.Empty(t, response.SubscriptionID)
 				require.Equal(t, 1, len(response.Subscriptions))
-				require.Equal(t, id.String(), response.Subscriptions[0].ID)
+				require.Equal(t, subscriptionID, response.Subscriptions[0].SubscriptionID)
 				require.Equal(t, topic, response.Subscriptions[0].Topic)
 
 				return websocket.ErrCloseSent
@@ -554,12 +533,10 @@ func (s *WsControllerSuite) TestSubscribeBlocks() {
 		controller := NewWebSocketController(s.logger, s.wsConfig, conn, dataProviderFactory)
 
 		dataProviderFactory.
-			On("NewDataProvider", mock.Anything, mock.Anything, mock.Anything, mock.Anything).
+			On("NewDataProvider", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).
 			Return(dataProvider, nil).
 			Once()
 
-		id := uuid.New()
-		dataProvider.On("ID").Return(id)
 		// data provider might finish on its own or controller will close it via Close()
 		dataProvider.On("Close").Return(nil).Maybe()
 
@@ -574,8 +551,9 @@ func (s *WsControllerSuite) TestSubscribeBlocks() {
 			Once()
 
 		done := make(chan struct{})
-		msgID := s.expectSubscribeRequest(t, conn)
-		s.expectSubscribeResponse(t, conn, msgID)
+		subscriptionID := uuid.New().String()
+		s.expectSubscribeRequest(t, conn, subscriptionID)
+		s.expectSubscribeResponse(t, conn, subscriptionID)
 
 		// Expect a valid block to be passed to WriteJSON.
 		// If we got to this point, the controller executed all its logic properly
@@ -609,12 +587,10 @@ func (s *WsControllerSuite) TestSubscribeBlocks() {
 		controller := NewWebSocketController(s.logger, s.wsConfig, conn, dataProviderFactory)
 
 		dataProviderFactory.
-			On("NewDataProvider", mock.Anything, mock.Anything, mock.Anything, mock.Anything).
+			On("NewDataProvider", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).
 			Return(dataProvider, nil).
 			Once()
 
-		id := uuid.New()
-		dataProvider.On("ID").Return(id)
 		// data provider might finish on its own or controller will close it via Close()
 		dataProvider.On("Close").Return(nil).Maybe()
 
@@ -631,8 +607,9 @@ func (s *WsControllerSuite) TestSubscribeBlocks() {
 			Once()
 
 		done := make(chan struct{})
-		msgID := s.expectSubscribeRequest(t, conn)
-		s.expectSubscribeResponse(t, conn, msgID)
+		subscriptionID := uuid.New().String()
+		s.expectSubscribeRequest(t, conn, subscriptionID)
+		s.expectSubscribeResponse(t, conn, subscriptionID)
 
 		i := 0
 		actualBlocks := make([]*flow.Block, len(expectedBlocks))
@@ -748,12 +725,10 @@ func (s *WsControllerSuite) TestControllerShutdown() {
 		controller := NewWebSocketController(s.logger, s.wsConfig, conn, dataProviderFactory)
 
 		dataProviderFactory.
-			On("NewDataProvider", mock.Anything, mock.Anything, mock.Anything, mock.Anything).
+			On("NewDataProvider", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).
 			Return(dataProvider, nil).
 			Once()
 
-		id := uuid.New()
-		dataProvider.On("ID").Return(id)
 		// data provider might finish on its own or controller will close it via Close()
 		dataProvider.On("Close").Return(nil).Maybe()
 
@@ -766,8 +741,9 @@ func (s *WsControllerSuite) TestControllerShutdown() {
 			Once()
 
 		done := make(chan struct{})
-		msgID := s.expectSubscribeRequest(t, conn)
-		s.expectSubscribeResponse(t, conn, msgID)
+		subscriptionID := uuid.New().String()
+		s.expectSubscribeRequest(t, conn, subscriptionID)
+		s.expectSubscribeResponse(t, conn, subscriptionID)
 
 		conn.
 			On("WriteJSON", mock.Anything).
@@ -827,15 +803,14 @@ func (s *WsControllerSuite) TestControllerShutdown() {
 		conn.
 			On("ReadJSON", mock.Anything).
 			Return(func(interface{}) error {
-				// waiting more than InactivityTimeout to make sure that read message routine busy and do not return
-				// an error before than inactivity tracker initiate shut down
-				<-time.After(wsConfig.InactivityTimeout)
+				// make sure the reader routine sleeps for more time than InactivityTimeout + inactivity ticker period.
+				// meanwhile, the writer routine must shut down the controller.
+				<-time.After(wsConfig.InactivityTimeout + controller.inactivityTickerPeriod()*2)
 				return websocket.ErrCloseSent
 			}).
 			Once()
 
 		controller.HandleConnection(context.Background())
-		time.Sleep(wsConfig.InactivityTimeout)
 
 		conn.AssertExpectations(t)
 	})
@@ -987,11 +962,11 @@ func newControllerMocks(t *testing.T) (*connmock.WebsocketConnection, *dpmock.Da
 }
 
 // expectSubscribeRequest mocks the client's subscription request.
-func (s *WsControllerSuite) expectSubscribeRequest(t *testing.T, conn *connmock.WebsocketConnection) string {
+func (s *WsControllerSuite) expectSubscribeRequest(t *testing.T, conn *connmock.WebsocketConnection, subscriptionID string) {
 	request := models.SubscribeMessageRequest{
 		BaseMessageRequest: models.BaseMessageRequest{
-			ClientMessageID: uuid.New().String(),
-			Action:          models.SubscribeAction,
+			SubscriptionID: subscriptionID,
+			Action:         models.SubscribeAction,
 		},
 		Topic: dp.BlocksTopic,
 	}
@@ -1008,19 +983,16 @@ func (s *WsControllerSuite) expectSubscribeRequest(t *testing.T, conn *connmock.
 		}).
 		Return(nil).
 		Once()
-
-	return request.ClientMessageID
 }
 
 // expectSubscribeResponse mocks the subscription response sent to the client.
-func (s *WsControllerSuite) expectSubscribeResponse(t *testing.T, conn *connmock.WebsocketConnection, msgId string) {
+func (s *WsControllerSuite) expectSubscribeResponse(t *testing.T, conn *connmock.WebsocketConnection, subscriptionID string) {
 	conn.
 		On("WriteJSON", mock.Anything).
 		Run(func(args mock.Arguments) {
 			response, ok := args.Get(0).(models.SubscribeMessageResponse)
 			require.True(t, ok)
-			require.Equal(t, msgId, response.ClientMessageID)
-			require.Equal(t, true, response.Success)
+			require.Equal(t, subscriptionID, response.SubscriptionID)
 		}).
 		Return(nil).
 		Once()

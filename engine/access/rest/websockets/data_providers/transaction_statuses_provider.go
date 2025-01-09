@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/google/uuid"
 	"github.com/rs/zerolog"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -43,6 +44,7 @@ func NewTransactionStatusesDataProvider(
 	logger zerolog.Logger,
 	api access.API,
 	linkGenerator commonmodels.LinkGenerator,
+	subscriptionID uuid.UUID,
 	topic string,
 	arguments models.Arguments,
 	send chan<- interface{},
@@ -62,6 +64,7 @@ func NewTransactionStatusesDataProvider(
 	subCtx, cancel := context.WithCancel(ctx)
 
 	p.baseDataProvider = newBaseDataProvider(
+		subscriptionID,
 		topic,
 		cancel,
 		send,

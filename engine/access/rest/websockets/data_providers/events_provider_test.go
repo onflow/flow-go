@@ -6,6 +6,7 @@ import (
 	"strconv"
 	"testing"
 
+	"github.com/google/uuid"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -208,6 +209,7 @@ func (s *EventsProviderSuite) TestEventsDataProvider_InvalidArguments() {
 				ctx,
 				s.log,
 				s.api,
+				uuid.New(),
 				topic,
 				test.arguments,
 				send,
@@ -249,6 +251,7 @@ func (s *EventsProviderSuite) TestMessageIndexEventProviderResponse_HappyPath() 
 		ctx,
 		s.log,
 		s.api,
+		uuid.New(),
 		topic,
 		arguments,
 		send,
