@@ -2,9 +2,11 @@ package dkg
 
 import (
 	"context"
+	_ "embed"
 	"encoding/json"
 	"fmt"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/rs/zerolog"
@@ -21,6 +23,17 @@ import (
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/epochs"
 )
+
+// submitResultV1Script is a version of the DKG result submission script compatible with
+// Protocol Version 1 (omitting DKG index map field).
+// Deprecated:
+// TODO(mainnet27, #6792): remove
+//
+//go:embed dkg_submit_result_v1.cdc
+var submitResultV1Script string
+
+//go:embed dkg_check_v2.cdc
+var checkV2Script string
 
 // Client is a client to the Flow DKG contract. Allows functionality to Broadcast,
 // read a Broadcast and submit the final result of the DKG protocol
@@ -180,6 +193,115 @@ func (c *Client) Broadcast(msg model.BroadcastDKGMessage) error {
 	return nil
 }
 
+// submitResult_ProtocolV1 submits this node's locally computed DKG result (public key vector)
+// to the FlowDKG smart contract, using the submission API associated with Protocol Version 1.
+// Input public keys are expected to be either all nil or all non-nil.
+// Deprecated: This is a temporary function to provide backward compatibility between Protocol Versions 1 and 2.
+// Protocol Version 2 introduces the DKG index map, which must be included in result submissions (see SubmitParametersAndResult).
+// TODO(mainnet27, #6792): remove this function
+func (c *Client) submitResult_ProtocolV1(groupPublicKey crypto.PublicKey, publicKeys []crypto.PublicKey) error {
+	started := time.Now()
+	ctx, cancel := context.WithTimeout(context.Background(), epochs.TransactionSubmissionTimeout)
+	defer cancel()
+
+	// get account for given address
+	account, err := c.GetAccount(ctx)
+	if err != nil {
+		return fmt.Errorf("could not get account details: %w", err)
+	}
+
+	// get latest finalized block to execute transaction
+	latestBlock, err := c.FlowClient.GetLatestBlock(ctx, false)
+	if err != nil {
+		return fmt.Errorf("could not get latest block from node: %w", err)
+	}
+
+	tx := sdk.NewTransaction().
+		SetScript([]byte(templates.ReplaceAddresses(submitResultV1Script, c.env))).
+		SetComputeLimit(9999).
+		SetReferenceBlockID(latestBlock.ID).
+		SetProposalKey(account.Address, c.AccountKeyIndex, account.Keys[int(c.AccountKeyIndex)].SequenceNumber).
+		SetPayer(account.Address).
+		AddAuthorizer(account.Address)
+
+	// Note: We need to make sure that we pull the keys out in the same order that
+	// we have done here. Group Public key first followed by the individual public keys
+	finalSubmission := make([]cadence.Value, 0, len(publicKeys))
+
+	// first append group public key
+	if groupPublicKey != nil {
+		trimmedGroupHexString := trim0x(groupPublicKey.String())
+		cdcGroupString, err := cadence.NewString(trimmedGroupHexString)
+		if err != nil {
+			return fmt.Errorf("could not convert group key to cadence: %w", err)
+		}
+		finalSubmission = append(finalSubmission, cadence.NewOptional(cdcGroupString))
+	} else {
+		finalSubmission = append(finalSubmission, cadence.NewOptional(nil))
+	}
+
+	for _, publicKey := range publicKeys {
+
+		// append individual public keys
+		if publicKey != nil {
+			trimmedHexString := trim0x(publicKey.String())
+			cdcPubKey, err := cadence.NewString(trimmedHexString)
+			if err != nil {
+				return fmt.Errorf("could not convert pub keyshare to cadence: %w", err)
+			}
+			finalSubmission = append(finalSubmission, cadence.NewOptional(cdcPubKey))
+		} else {
+			finalSubmission = append(finalSubmission, cadence.NewOptional(nil))
+		}
+	}
+
+	err = tx.AddArgument(cadence.NewArray(finalSubmission))
+	if err != nil {
+		return fmt.Errorf("could not add argument to transaction: %w", err)
+	}
+
+	// sign envelope using account signer
+	err = tx.SignEnvelope(account.Address, c.AccountKeyIndex, c.Signer)
+	if err != nil {
+		return fmt.Errorf("could not sign transaction: %w", err)
+	}
+
+	c.Log.Info().Str("tx_id", tx.ID().Hex()).Msg("sending SubmitResult transaction")
+	txID, err := c.SendTransaction(ctx, tx)
+	if err != nil {
+		return fmt.Errorf("failed to submit transaction: %w", err)
+	}
+
+	err = c.WaitForSealed(ctx, txID, started)
+	if err != nil {
+		return fmt.Errorf("failed to wait for transaction seal: %w", err)
+	}
+
+	return nil
+}
+
+// checkDKGContractV2Compatible executes a script which imports a type only defined in the
+// FlowDKG smart contract version associated with Protocol Version 2.
+// By observing the result of this script execution, we can infer the current FlowDKG version.
+// Deprecated:
+// TODO(mainnet27, #6792): remove this function
+// Returns:
+//   - (true, nil) if the smart contract is certainly v2-compatible (script succeeds)
+//   - (false, nil) if the smart contract is certainly not v2-compatible (script fails with expected error)
+//   - (false, error) if we don't know whether the smart contract is v2-compatible (script fails with unexpected error)
+func (c *Client) checkDKGContractV2Compatible(ctx context.Context) (bool, error) {
+	script := []byte(templates.ReplaceAddresses(checkV2Script, c.env))
+	_, err := c.FlowClient.ExecuteScriptAtLatestBlock(ctx, script, nil)
+	if err == nil {
+		return true, nil
+	}
+	v1ErrorSubstring := "cannot find type in this scope: `FlowDKG.ResultSubmission`"
+	if strings.Contains(err.Error(), v1ErrorSubstring) {
+		return false, nil
+	}
+	return false, fmt.Errorf("unable to determine FlowDKG compatibility: %w", err)
+}
+
 // SubmitParametersAndResult posts the DKG setup parameters (`flow.DKGIndexMap`) and the node's locally-computed DKG result to
 // the DKG white-board smart contract. The DKG results are the node's local computation of the group public key and the public
 // key shares. Serialized public keys are encoded as lower-case hex strings.
@@ -195,6 +317,22 @@ func (c *Client) SubmitParametersAndResult(indexMap flow.DKGIndexMap, groupPubli
 	started := time.Now()
 	ctx, cancel := context.WithTimeout(context.Background(), epochs.TransactionSubmissionTimeout)
 	defer cancel()
+
+	// TODO(mainnet27, #6792): remove this code block
+	{
+		v2Compatible, err := c.checkDKGContractV2Compatible(ctx)
+		// CASE 1: we know FlowDKG is not v2 compatible - fallback to v1 submission
+		if !v2Compatible && err == nil {
+			c.Log.Debug().Msg("detected FlowDKG version incompatible with protocol v2 - falling back to v1 result submission")
+			return c.submitResult_ProtocolV1(groupPublicKey, publicKeys)
+		}
+		// CASE 2: we aren't sure whether FlowDKG is v2 compatible - fallback to v1 submission
+		if err != nil {
+			c.Log.Warn().Err(err).Msg("unable to determine FlowDKG compatibility - falling back to v1 result submission")
+			return c.submitResult_ProtocolV1(groupPublicKey, publicKeys)
+		}
+		// CASE 3: FlowDKG is compatible with v2 - proceed with happy path logic
+	}
 
 	// get account for given address
 	account, err := c.GetAccount(ctx)
@@ -265,7 +403,7 @@ func (c *Client) SubmitParametersAndResult(indexMap flow.DKGIndexMap, groupPubli
 		return fmt.Errorf("could not sign transaction: %w", err)
 	}
 
-	c.Log.Info().Str("tx_id", tx.ID().Hex()).Msg("sending SubmitResult transaction")
+	c.Log.Info().Str("tx_id", tx.ID().Hex()).Msg("sending SubmitParametersAndResult transaction")
 	txID, err := c.SendTransaction(ctx, tx)
 	if err != nil {
 		return fmt.Errorf("failed to submit transaction: %w", err)
