@@ -79,6 +79,8 @@ func RetrieveDKGStateForEpoch(epochCounter uint64, currentState *flow.DKGState) 
 
 // MigrateDKGEndStateFromV1 migrates the database that was used in protocol version v1 to the v2.
 // It reads already stored data by deprecated prefix and writes it to the new prefix with values converted to the new representation.
+// TODO(EFM, #6794): This function is introduced to implement a backward-compatible upgrade from v1 to v2.
+// Remove this once we complete the network upgrade.
 func MigrateDKGEndStateFromV1() func(txn *badger.Txn) error {
 	return func(txn *badger.Txn) error {
 		var ops []func(*badger.Txn) error
