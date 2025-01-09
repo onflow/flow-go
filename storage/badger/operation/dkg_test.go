@@ -133,7 +133,7 @@ func TestMigrateDKGEndStateFromV1(t *testing.T) {
 		err := db.Update(MigrateDKGEndStateFromV1())
 		assert.NoError(t, err)
 
-		assertMigrationSuccesfull := func() {
+		assertMigrationSuccessful := func() {
 			// ensure previous keys were removed
 			err = db.View(traverse(makePrefix(codeDKGEndState), func() (checkFunc, createFunc, handleFunc) {
 				assert.Fail(t, "no keys should have been found")
@@ -164,11 +164,11 @@ func TestMigrateDKGEndStateFromV1(t *testing.T) {
 				assertExpectedState(preMigrationStates[epochCounter], newState)
 			}
 		}
-		assertMigrationSuccesfull()
+		assertMigrationSuccessful()
 
 		// migrating again should be no-op
 		err = db.Update(MigrateDKGEndStateFromV1())
 		assert.NoError(t, err)
-		assertMigrationSuccesfull()
+		assertMigrationSuccessful()
 	})
 }
