@@ -6,11 +6,13 @@ import (
 
 // Assignment is an immutable list that, for each chunk (in order of chunk.Index),
 // records the set of verifier nodes that are assigned to verify that chunk.
+// Assignments are only constructed using AssignmentBuilder, and cannot be modified after construction.
 type Assignment struct {
 	verifiersForChunk []map[flow.Identifier]struct{}
 }
 
-// AssignmentBuilder is a helper to create a new Assignment
+// AssignmentBuilder is a helper to create a new Assignment.
+// AssignmentBuilder is not safe for concurrent use by multiple goroutines.
 type AssignmentBuilder struct {
 	verifiersForChunk []map[flow.Identifier]struct{}
 }
@@ -21,14 +23,11 @@ func NewAssignmentBuilder() *AssignmentBuilder {
 	}
 }
 
-// Build completes the assignment and makes it immutable.
+// Build constructs and returns the immutable assignment.
 func (a *AssignmentBuilder) Build() *Assignment {
-	// TODO is this correct?
-	// the underlying data can still be modified by the Builder,
-	// but the Builder ideally shouldn't be kept around or reused, so it should be sufficient
-	return &Assignment{
-		verifiersForChunk: a.verifiersForChunk,
-	}
+	assignment := &Assignment{verifiersForChunk: a.verifiersForChunk}
+	a.verifiersForChunk = nil // revoke builder's reference, to prevent modification of assignment
+	return assignment
 }
 
 // Verifiers returns the list of verifier nodes assigned to a chunk
@@ -59,17 +58,13 @@ func (a *Assignment) HasVerifier(chunk *flow.Chunk, identifier flow.Identifier) 
 
 // Add records the list of verifier nodes as the assigned verifiers of the chunk.
 // Requires chunks to be added in order of their Index (increasing by 1 each time).
-// It returns an error if the list of verifiers is empty or contains duplicate ids
+// Panics if chunks are not added in ascending Index order.
 func (a *AssignmentBuilder) Add(chunk *flow.Chunk, verifiers flow.IdentifierList) {
 	if chunk.Index != uint64(len(a.verifiersForChunk)) {
 		panic("chunks added out of order")
 	}
 	// sorts verifiers list based on their identifier
-	v := make(map[flow.Identifier]struct{})
-	for _, id := range verifiers {
-		v[id] = struct{}{}
-	}
-	a.verifiersForChunk = append(a.verifiersForChunk, v)
+	a.verifiersForChunk = append(a.verifiersForChunk, verifiers.Lookup())
 }
 
 // ByNodeID returns the indices of all chunks assigned to the given verifierID
