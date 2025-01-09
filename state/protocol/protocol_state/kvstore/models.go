@@ -2,8 +2,6 @@ package kvstore
 
 import (
 	"fmt"
-	"github.com/onflow/flow-go/storage/badger/operation"
-	"github.com/onflow/flow-go/storage/badger/transaction"
 
 	clone "github.com/huandu/go-clone/generic" //nolint:goimports
 
@@ -76,14 +74,14 @@ func (model *Modelv0) ID() flow.Identifier {
 // Expected errors during normal operations:
 //   - ErrIncompatibleVersionChange if replicating the Parent Snapshot into a Snapshot
 //     with the specified `protocolVersion` is not supported.
-func (model *Modelv0) Replicate(protocolVersion uint64) (protocol_state.KVStoreMutator, transaction.DeferredDBUpdate, error) {
+func (model *Modelv0) Replicate(protocolVersion uint64) (protocol_state.KVStoreMutator, error) {
 	currentVersion := model.GetProtocolStateVersion()
 	if currentVersion == protocolVersion {
 		// no need for migration, return a complete copy
-		return clone.Clone(model), nil, nil
+		return clone.Clone(model), nil
 	}
 	if protocolVersion != 1 {
-		return nil, nil, fmt.Errorf("unsupported replication version %d, expect %d: %w",
+		return nil, fmt.Errorf("unsupported replication version %d, expect %d: %w",
 			protocolVersion, 1, ErrIncompatibleVersionChange)
 	}
 
@@ -92,9 +90,9 @@ func (model *Modelv0) Replicate(protocolVersion uint64) (protocol_state.KVStoreM
 		Modelv0: clone.Clone(*model),
 	}
 	if v1.GetProtocolStateVersion() != protocolVersion {
-		return nil, nil, fmt.Errorf("sanity check: replicate resulted in unexpected version (%d != %d)", v1.GetProtocolStateVersion(), protocolVersion)
+		return nil, fmt.Errorf("sanity check: replicate resulted in unexpected version (%d != %d)", v1.GetProtocolStateVersion(), protocolVersion)
 	}
-	return v1, nil, nil
+	return v1, nil
 }
 
 // VersionedEncode encodes the key-value store, returning the version separately
@@ -172,16 +170,16 @@ func (model *Modelv1) ID() flow.Identifier {
 // Expected errors during normal operations:
 //   - ErrIncompatibleVersionChange if replicating the Parent Snapshot into a Snapshot
 //     with the specified `protocolVersion` is not supported.
-func (model *Modelv1) Replicate(protocolVersion uint64) (protocol_state.KVStoreMutator, transaction.DeferredDBUpdate, error) {
+func (model *Modelv1) Replicate(protocolVersion uint64) (protocol_state.KVStoreMutator, error) {
 	currentVersion := model.GetProtocolStateVersion()
 	if currentVersion == protocolVersion {
 		// no need for migration, return a complete copy
-		return clone.Clone(model), nil, nil
+		return clone.Clone(model), nil
 	}
 	nextVersion := currentVersion + 1
 	if protocolVersion != nextVersion {
 		// can only Replicate into model with numerically consecutive version
-		return nil, nil, fmt.Errorf("unsupported replication version %d, expect %d: %w",
+		return nil, fmt.Errorf("unsupported replication version %d, expect %d: %w",
 			protocolVersion, 1, ErrIncompatibleVersionChange)
 	}
 
@@ -190,40 +188,9 @@ func (model *Modelv1) Replicate(protocolVersion uint64) (protocol_state.KVStoreM
 		Modelv1: clone.Clone(*model),
 	}
 	if v2.GetProtocolStateVersion() != protocolVersion {
-		return nil, nil, fmt.Errorf("sanity check: replicate resulted in unexpected version (%d != %d)", v2.GetProtocolStateVersion(), protocolVersion)
+		return nil, fmt.Errorf("sanity check: replicate resulted in unexpected version (%d != %d)", v2.GetProtocolStateVersion(), protocolVersion)
 	}
-
-	dbMigration := func(tx *transaction.Tx) error {
-		epochs, states, err := operation.RetrieveStoredEpochStates()(tx.DBTxn)
-		if err != nil {
-			return fmt.Errorf("could not retrieve stored epoch states: %w", err)
-		}
-
-		convertState := func(state uint32) flow.DKGState {
-			switch state {
-			case 0: // DKGEndStateUnknown
-				return flow.DKGStateUninitialized
-			case 1: // DKGEndStateSuccess
-				return flow.RandomBeaconKeyCommitted
-			case 2, 3, 4: // DKGEndStateInconsistentKey, DKGEndStateNoKey, DKGEndStateDKGFailure
-				return flow.DKGStateFailure
-			default:
-				return flow.DKGStateUninitialized
-			}
-		}
-
-		for i, epoch := range epochs {
-			from := states[i]
-			to := convertState(from)
-			err = operation.UpsertDKGStateForEpoch(epoch, to)(tx.DBTxn)
-			if err != nil {
-				return fmt.Errorf("could not upsert DKG state for epoch %d: %w", epoch, err)
-			}
-		}
-		return nil
-	}
-
-	return v2, dbMigration, nil
+	return v2, nil
 }
 
 // VersionedEncode encodes the key-value store, returning the version separately
@@ -261,13 +228,13 @@ func (model *Modelv2) ID() flow.Identifier {
 // Expected errors during normal operations:
 //   - ErrIncompatibleVersionChange if replicating the Parent Snapshot into a Snapshot
 //     with the specified `protocolVersion` is not supported.
-func (model *Modelv2) Replicate(protocolVersion uint64) (protocol_state.KVStoreMutator, transaction.DeferredDBUpdate, error) {
+func (model *Modelv2) Replicate(protocolVersion uint64) (protocol_state.KVStoreMutator, error) {
 	currentVersion := model.GetProtocolStateVersion()
 	if currentVersion == protocolVersion {
 		// no need for migration, return a complete copy
-		return clone.Clone(model), nil, nil
+		return clone.Clone(model), nil
 	} else {
-		return nil, nil, fmt.Errorf("unsupported replication version %d: %w",
+		return nil, fmt.Errorf("unsupported replication version %d: %w",
 			protocolVersion, ErrIncompatibleVersionChange)
 	}
 }
