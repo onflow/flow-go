@@ -83,17 +83,19 @@ func (a *PublicAssignmentTestSuite) TestAssignDuplicate() {
 	c, ok := chunks.ByIndex(uint64(0))
 	require.True(a.T(), ok, "chunk out of range requested")
 	assignmentBuilder.Add(c, ids.NodeIDs())
-	require.Len(a.T(), assignmentBuilder.Build().Verifiers(c), size)
 
 	// duplicates first verifier, hence size increases by 1
 	ids = append(ids, ids[0])
 	require.Len(a.T(), ids, size+1)
 	// assigns second chunk to a duplicate list of verifiers
-	c, ok = chunks.ByIndex(uint64(1))
+	c2, ok := chunks.ByIndex(uint64(1))
 	require.True(a.T(), ok, "chunk out of range requested")
-	assignmentBuilder.Add(c, ids.NodeIDs())
+	assignmentBuilder.Add(c2, ids.NodeIDs())
+
+	assignment := assignmentBuilder.Build()
+	require.Len(a.T(), assignment.Verifiers(c), size)
 	// should be size not size + 1
-	require.Len(a.T(), assignmentBuilder.Build().Verifiers(c), size)
+	require.Len(a.T(), assignment.Verifiers(c2), size)
 }
 
 // TestPermuteEntirely tests permuting an entire IdentityList against
