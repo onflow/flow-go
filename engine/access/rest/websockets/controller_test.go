@@ -681,7 +681,6 @@ func (s *WsControllerSuite) TestSubscribeBlocks() {
 // - The number of messages processed matches the total messages sent.
 // - The delay between consecutive messages falls within the expected range based on the rate limit, with a tolerance of 5ms.
 func (s *WsControllerSuite) TestRateLimiter() {
-	s.T().Run("Enforces response rate limit", func(t *testing.T) {
 		totalMessages := 5 // Number of messages to simulate.
 
 		// Step 1: Create a mock WebSocket connection.
@@ -725,7 +724,6 @@ func (s *WsControllerSuite) TestRateLimiter() {
 			assert.GreaterOrEqual(t, delay, expectedDelay-tolerance, "Messages should respect the minimum rate limit")
 			assert.LessOrEqual(t, delay, expectedDelay+tolerance, "Messages should respect the maximum rate limit")
 		}
-	})
 }
 
 // TestConfigureKeepaliveConnection ensures that the WebSocket connection is configured correctly.
