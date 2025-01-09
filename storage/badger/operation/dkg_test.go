@@ -1,6 +1,7 @@
 package operation
 
 import (
+	"encoding/binary"
 	"math/rand"
 	"testing"
 
@@ -96,5 +97,78 @@ func TestDKGSetStateForEpoch(t *testing.T) {
 		// attempting to overwrite should succeed
 		err = db.Update(UpsertDKGStateForEpoch(epochCounter, flow.DKGStateFailure))
 		assert.NoError(t, err)
+	})
+}
+
+// TestMigrateDKGEndStateFromV1 tests the migration of DKG end states from v1 to v2.
+// All possible states in v1 are generated and then checked against the expected states in v2.
+// Afterward the states are then migrated we check that old key was indeed removed and new key was added.
+// This test also checks that the migration is idempotent after the first run.
+func TestMigrateDKGEndStateFromV1(t *testing.T) {
+	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
+		epochCounter := rand.Uint64() % 100
+
+		preMigrationStates := make(map[uint64]uint32)
+		for i := epochCounter; i < epochCounter+100; i++ {
+			state := rand.Uint32() % 5 // [0,4] were supported in v1
+			err := db.Update(insert(makePrefix(codeDKGEndState, i), state))
+			assert.NoError(t, err)
+			preMigrationStates[i] = state
+		}
+
+		assertExpectedState := func(oldState uint32, newState flow.DKGState) {
+			switch oldState {
+			case 0: // DKGEndStateUnknown
+				assert.Equal(t, flow.DKGStateUninitialized, newState)
+			case 1: // DKGEndStateSuccess
+				assert.Equal(t, flow.RandomBeaconKeyCommitted, newState)
+			case 2, 3, 4: // DKGEndStateInconsistentKey, DKGEndStateNoKey, DKGEndStateDKGFailure
+				assert.Equal(t, flow.DKGStateFailure, newState)
+			default:
+				assert.Fail(t, "unexpected state")
+			}
+		}
+
+		// migrate the state
+		err := db.Update(MigrateDKGEndStateFromV1())
+		assert.NoError(t, err)
+
+		assertMigrationSuccesfull := func() {
+			// ensure previous keys were removed
+			err = db.View(traverse(makePrefix(codeDKGEndState), func() (checkFunc, createFunc, handleFunc) {
+				assert.Fail(t, "no keys should have been found")
+				return nil, nil, nil
+			}))
+			assert.NoError(t, err)
+
+			migratedStates := make(map[uint64]flow.DKGState)
+			err = db.View(traverse(makePrefix(codeDKGState), func() (checkFunc, createFunc, handleFunc) {
+				var epochCounter uint64
+				check := func(key []byte) bool {
+					epochCounter = binary.BigEndian.Uint64(key[1:]) // omit code
+					return true
+				}
+				var newState flow.DKGState
+				create := func() interface{} {
+					return &newState
+				}
+				handle := func() error {
+					migratedStates[epochCounter] = newState
+					return nil
+				}
+				return check, create, handle
+			}))
+			assert.NoError(t, err)
+			assert.Equal(t, len(preMigrationStates), len(migratedStates))
+			for epochCounter, newState := range migratedStates {
+				assertExpectedState(preMigrationStates[epochCounter], newState)
+			}
+		}
+		assertMigrationSuccesfull()
+
+		// migrating again should be no-op
+		err = db.Update(MigrateDKGEndStateFromV1())
+		assert.NoError(t, err)
+		assertMigrationSuccesfull()
 	})
 }
