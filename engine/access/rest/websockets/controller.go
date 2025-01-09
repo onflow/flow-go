@@ -268,7 +268,7 @@ func (c *Controller) writeMessages(ctx context.Context) error {
 			if !ok {
 				return nil
 			}
-			
+
 			if err := c.limiter.WaitN(ctx, 1); err != nil {
 				return fmt.Errorf("rate limiter wait failed: %w", err)
 			}
