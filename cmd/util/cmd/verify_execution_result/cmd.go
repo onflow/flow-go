@@ -95,7 +95,7 @@ func run(*cobra.Command, []string) {
 func parseFromTo(fromTo string) (from, to uint64, err error) {
 	parts := strings.Split(fromTo, "-")
 	if len(parts) != 2 {
-		return 0, 0, fmt.Errorf("invalid format: expected 'from-to', got '%s'", fromTo)
+		return 0, 0, fmt.Errorf("invalid format: expected 'from_to', got '%s'", fromTo)
 	}
 
 	from, err = strconv.ParseUint(strings.TrimSpace(parts[0]), 10, 64)
