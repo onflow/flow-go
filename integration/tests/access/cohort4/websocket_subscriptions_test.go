@@ -17,13 +17,13 @@ import (
 	sdkcrypto "github.com/onflow/flow-go-sdk/crypto"
 	"github.com/onflow/flow-go-sdk/templates"
 	"github.com/rs/zerolog"
-	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
 	restcommon "github.com/onflow/flow-go/engine/access/rest/common"
 	commonmodels "github.com/onflow/flow-go/engine/access/rest/common/models"
 	"github.com/onflow/flow-go/engine/access/rest/common/parser"
 	"github.com/onflow/flow-go/engine/access/rest/util"
+	"github.com/onflow/flow-go/engine/access/rest/websockets"
 	"github.com/onflow/flow-go/engine/access/rest/websockets/data_providers"
 	"github.com/onflow/flow-go/engine/access/rest/websockets/models"
 	"github.com/onflow/flow-go/engine/access/rpc/backend"
@@ -183,8 +183,7 @@ func (s *WebsocketSubscriptionSuite) TestInactivityHeaders() {
 
 		s.Require().NoError(wsClient.WriteJSON(subscriptionRequest))
 
-		_, baseResponses, _ := listenWebSocketResponses(
-			s.T(),
+		_, baseResponses, _ := s.listenWebSocketResponses(
 			wsClient,
 			5*time.Second,
 			subscriptionRequest.SubscriptionID,
@@ -192,7 +191,7 @@ func (s *WebsocketSubscriptionSuite) TestInactivityHeaders() {
 
 		s.Require().Equal(1, len(baseResponses))
 		subscribeResponse := baseResponses[0]
-		s.verifyBaseMessageResponse(subscriptionRequest.SubscriptionID, baseResponses[0])
+		s.validateBaseMessageResponse(subscriptionRequest.SubscriptionID, baseResponses[0])
 
 		// Step 3: Unsubscribe from the topic
 		unsubscribeRequest := models.UnsubscribeMessageRequest{
@@ -205,15 +204,14 @@ func (s *WebsocketSubscriptionSuite) TestInactivityHeaders() {
 		s.Require().NoError(wsClient.WriteJSON(unsubscribeRequest))
 
 		// TODO: Somehow unsubscription are not return properly, but result appended to subscriptions
-		_, baseResponses, _ = listenWebSocketResponses(
-			s.T(),
+		_, baseResponses, _ = s.listenWebSocketResponses(
 			wsClient,
 			5*time.Second,
 			unsubscribeRequest.SubscriptionID,
 		)
 
 		//s.Require().Equal(1, len(baseResponses)) //TODO: check, cause we received 2 base messages, second - error message from provider Run - Context cancelled
-		s.verifyBaseMessageResponse(unsubscribeRequest.SubscriptionID, baseResponses[0])
+		s.validateBaseMessageResponse(unsubscribeRequest.SubscriptionID, baseResponses[0])
 
 		// Step 4: Monitor inactivity after unsubscription
 		expectedInactivityDuration := InactivityTimeout * time.Second
@@ -249,24 +247,28 @@ func monitorInactivity(t *testing.T, client *websocket.Conn, timeout time.Durati
 // TestSubscriptionErrorCases tests error cases for subscriptions.
 func (s *WebsocketSubscriptionSuite) TestSubscriptionErrorCases() {
 	tests := []struct {
-		name           string
-		message        models.SubscribeMessageRequest
-		expectedErrMsg string
+		name            string
+		message         models.SubscribeMessageRequest
+		expectedErrMsg  string
+		expectedErrCode websockets.Code
 	}{
 		{
-			name:           "Invalid Topic",
-			message:        s.subscribeMessageRequest(uuid.New().String(), "invalid_topic", models.Arguments{}),
-			expectedErrMsg: "error creating data provider", // Update based on expected error message
+			name:            "Invalid Topic",
+			message:         s.subscribeMessageRequest(uuid.New().String(), "invalid_topic", models.Arguments{}),
+			expectedErrMsg:  "error creating data provider", // Update based on expected error message
+			expectedErrCode: websockets.InvalidMessage,
 		},
 		{
-			name:           "Invalid Arguments",
-			message:        s.subscribeMessageRequest(uuid.New().String(), "valid_topic", models.Arguments{"invalid_arg": 42}),
-			expectedErrMsg: "error creating data provider",
+			name:            "Invalid Arguments",
+			message:         s.subscribeMessageRequest(uuid.New().String(), "valid_topic", models.Arguments{"invalid_arg": 42}),
+			expectedErrMsg:  "error creating data provider",
+			expectedErrCode: websockets.InvalidMessage,
 		},
 		{
-			name:           "Empty Topic",
-			message:        s.subscribeMessageRequest(uuid.New().String(), "", models.Arguments{}),
-			expectedErrMsg: "error creating data provider",
+			name:            "Empty Topic",
+			message:         s.subscribeMessageRequest(uuid.New().String(), "", models.Arguments{}),
+			expectedErrMsg:  "error creating data provider",
+			expectedErrCode: websockets.InvalidMessage,
 		},
 	}
 
@@ -287,7 +289,7 @@ func (s *WebsocketSubscriptionSuite) TestSubscriptionErrorCases() {
 
 			// Validate response
 			s.Contains(response.Error.Message, tt.expectedErrMsg)
-			//TODO: check error code
+			s.Require().Equal(int(tt.expectedErrCode), response.Error.Code)
 		})
 	}
 }
@@ -295,24 +297,28 @@ func (s *WebsocketSubscriptionSuite) TestSubscriptionErrorCases() {
 // TestUnsubscriptionErrorCases tests error cases for unsubscriptions.
 func (s *WebsocketSubscriptionSuite) TestUnsubscriptionErrorCases() {
 	tests := []struct {
-		name           string
-		message        models.UnsubscribeMessageRequest
-		expectedErrMsg string
+		name            string
+		message         models.UnsubscribeMessageRequest
+		expectedErrMsg  string
+		expectedErrCode websockets.Code
 	}{
 		{
-			name:           "Invalid Subscription ID",
-			message:        s.unsubscribeMessageRequest("invalid_subscription_id"),
-			expectedErrMsg: "error parsing subscription id",
+			name:            "Invalid Subscription ID",
+			message:         s.unsubscribeMessageRequest("invalid_subscription_id"),
+			expectedErrMsg:  "error parsing subscription id",
+			expectedErrCode: websockets.InvalidMessage,
 		},
 		{
-			name:           "Non-Existent Subscription ID",
-			message:        s.unsubscribeMessageRequest(uuid.New().String()), // Valid UUID but not associated with an active subscription
-			expectedErrMsg: "subscription not found",
+			name:            "Non-Existent Subscription ID",
+			message:         s.unsubscribeMessageRequest(uuid.New().String()), // Valid UUID but not associated with an active subscription
+			expectedErrMsg:  "subscription not found",
+			expectedErrCode: websockets.NotFound,
 		},
 		{
-			name:           "Empty Subscription ID",
-			message:        s.unsubscribeMessageRequest(""),
-			expectedErrMsg: "error parsing subscription id",
+			name:            "Empty Subscription ID",
+			message:         s.unsubscribeMessageRequest(""),
+			expectedErrMsg:  "error parsing subscription id",
+			expectedErrCode: websockets.InvalidMessage,
 		},
 	}
 
@@ -333,7 +339,7 @@ func (s *WebsocketSubscriptionSuite) TestUnsubscriptionErrorCases() {
 
 			// Validate response
 			s.Contains(response.Error.Message, tt.expectedErrMsg)
-			//TODO: check error code
+			s.Require().Equal(int(tt.expectedErrCode), response.Error.Code)
 		})
 	}
 }
@@ -357,9 +363,9 @@ func (s *WebsocketSubscriptionSuite) TestListOfSubscriptions() {
 	s.Require().NoError(wsClient.WriteJSON(subscriptionToBlocksRequest))
 
 	// verify success subscribe response
-	_, baseResponses, _ := listenWebSocketResponses(s.T(), wsClient, 1*time.Second, blocksSubscriptionID)
+	_, baseResponses, _ := s.listenWebSocketResponses(wsClient, 1*time.Second, blocksSubscriptionID)
 	s.Require().Equal(1, len(baseResponses))
-	s.verifyBaseMessageResponse(blocksSubscriptionID, baseResponses[0])
+	s.validateBaseMessageResponse(blocksSubscriptionID, baseResponses[0])
 
 	// 2. Create block headers subscription request message
 	blockHeadersSubscriptionID := uuid.New().String()
@@ -374,9 +380,9 @@ func (s *WebsocketSubscriptionSuite) TestListOfSubscriptions() {
 	s.Require().NoError(wsClient.WriteJSON(subscriptionToBlockHeadersRequest))
 
 	// verify success subscribe response
-	_, baseResponses, _ = listenWebSocketResponses(s.T(), wsClient, 1*time.Second, blockHeadersSubscriptionID)
+	_, baseResponses, _ = s.listenWebSocketResponses(wsClient, 1*time.Second, blockHeadersSubscriptionID)
 	//s.Require().Equal(1, len(baseResponses)) //TODO: check, cause we received 2 base messages, second - error message from provider Run - Context cancelled
-	s.verifyBaseMessageResponse(blockHeadersSubscriptionID, baseResponses[0])
+	s.validateBaseMessageResponse(blockHeadersSubscriptionID, baseResponses[0])
 
 	// 3. Create list of subscription request message
 	// TODO: remove subscription id for list od subscriptions request
@@ -385,7 +391,7 @@ func (s *WebsocketSubscriptionSuite) TestListOfSubscriptions() {
 	// send list of subscription message
 	s.Require().NoError(wsClient.WriteJSON(listOfSubscriptionRequest))
 
-	_, _, responses := listenWebSocketResponses(s.T(), wsClient, 1*time.Second, listOfSubscriptionsID)
+	_, _, responses := s.listenWebSocketResponses(wsClient, 1*time.Second, listOfSubscriptionsID)
 
 	// validate list of active subscriptions response
 	s.Require().Equal(1, len(responses))
@@ -403,7 +409,7 @@ func (s *WebsocketSubscriptionSuite) TestListOfSubscriptions() {
 	}
 
 	listOfSubscriptionResponse := responses[0]
-	s.verifyBaseMessageResponse(listOfSubscriptionsID, listOfSubscriptionResponse.BaseMessageResponse)
+	s.validateBaseMessageResponse(listOfSubscriptionsID, listOfSubscriptionResponse.BaseMessageResponse)
 	s.Require().Equal(expectedSubscriptions, listOfSubscriptionResponse.Subscriptions)
 }
 
@@ -411,226 +417,172 @@ func (s *WebsocketSubscriptionSuite) TestListOfSubscriptions() {
 // streaming blocks, block headers, block digests, events, account statuses,
 // and transaction statuses.
 func (s *WebsocketSubscriptionSuite) TestHappyCases() {
-	//tests streaming blocks
-	s.T().Run("blocks streaming", func(t *testing.T) {
-		wsClient, err := common.GetWSClient(s.ctx, getWebsocketsUrl(s.restAccessAddress))
-		s.Require().NoError(err)
-		defer func() { s.Require().NoError(wsClient.Close()) }()
-
-		subscriptionRequest := s.subscribeMessageRequest(
-			uuid.New().String(),
-			data_providers.BlocksTopic,
-			models.Arguments{"block_status": parser.Finalized},
-		)
-
-		testWebsocketSubscription(
-			t,
-			wsClient,
-			subscriptionRequest,
-			s.validateBlocks,
-			5*time.Second,
-			true,
-		)
-	})
-
-	// tests streaming block headers
-	s.T().Run("block headers streaming", func(t *testing.T) {
-		wsClient, err := common.GetWSClient(s.ctx, getWebsocketsUrl(s.restAccessAddress))
-		s.Require().NoError(err)
-		defer func() { s.Require().NoError(wsClient.Close()) }()
-
-		subscriptionRequest := s.subscribeMessageRequest(
-			uuid.New().String(),
-			data_providers.BlockHeadersTopic,
-			models.Arguments{"block_status": parser.Finalized},
-		)
-
-		testWebsocketSubscription(
-			t,
-			wsClient,
-			subscriptionRequest,
-			s.validateBlockHeaders,
-			5*time.Second,
-			true,
-		)
-	})
-
-	// tests streaming block digests
-	s.T().Run("block digests streaming", func(t *testing.T) {
-		wsClient, err := common.GetWSClient(s.ctx, getWebsocketsUrl(s.restAccessAddress))
-		s.Require().NoError(err)
-		defer func() { s.Require().NoError(wsClient.Close()) }()
-
-		subscriptionRequest := s.subscribeMessageRequest(
-			uuid.New().String(),
-			data_providers.BlockDigestsTopic,
-			models.Arguments{"block_status": parser.Finalized},
-		)
-
-		testWebsocketSubscription(
-			t,
-			wsClient,
-			subscriptionRequest,
-			s.validateBlockDigests,
-			5*time.Second,
-			true,
-		)
-	})
-
-	// tests streaming events
-	s.T().Run("events streaming", func(t *testing.T) {
-		wsClient, err := common.GetWSClient(s.ctx, getWebsocketsUrl(s.restAccessAddress))
-		s.Require().NoError(err)
-		defer func() { s.Require().NoError(wsClient.Close()) }()
-
-		subscriptionRequest := s.subscribeMessageRequest(
-			uuid.New().String(),
-			data_providers.EventsTopic,
-			models.Arguments{},
-		)
-
-		testWebsocketSubscription(
-			t,
-			wsClient,
-			subscriptionRequest,
-			s.validateEvents,
-			5*time.Second,
-			true,
-		)
-	})
-
-	// tests streaming account statuses
-	s.T().Run("account statuses streaming", func(t *testing.T) {
-		wsClient, err := common.GetWSClient(s.ctx, getWebsocketsUrl(s.restAccessAddress))
-		s.Require().NoError(err)
-		defer func() { s.Require().NoError(wsClient.Close()) }()
-
-		subscriptionRequest := s.subscribeMessageRequest(
-			uuid.New().String(),
-			data_providers.AccountStatusesTopic,
-			models.Arguments{},
-		)
-
-		// Create and send account transaction
-		tx := s.createAccountTx()
-		err = s.serviceClient.SendTransaction(s.ctx, tx)
-		s.Require().NoError(err)
-		s.T().Logf("txId %v", flow.Identifier(tx.ID()))
-
-		testWebsocketSubscription(
-			t,
-			wsClient,
-			subscriptionRequest,
-			s.validateAccountStatuses,
-			5*time.Second,
-			true,
-		)
-	})
-
-	//TODO: uncomment when error in rpc backend will be fixed (Andrii Slisarchuk PR)
-	//// tests transaction statuses streaming
-	//s.T().Run("transaction statuses streaming", func(t *testing.T) {
-	//	tx := s.createAccountTx()
-	//
-	//	// Send the transaction
-	//	err := s.serviceClient.SendTransaction(s.ctx, tx)
-	//	s.Require().NoError(err)
-	//	s.T().Logf("txId %v", flow.Identifier(tx.ID()))
-	//
-	//	wsClient, err := common.GetWSClient(s.ctx, getWebsocketsUrl(s.restAccessAddress))
-	//	s.Require().NoError(err)
-	//	defer func() { s.Require().NoError(wsClient.Close()) }()
-	//
-	//subscriptionRequest := s.subscribeMessageRequest(
-	//	uuid.New().String(),
-	//	data_providers.TransactionStatusesTopic,
-	//	models.Arguments{
-	//		"tx_id": tx.ID().String(),
-	//	},
-	//)
-	//
-	//	testWebsocketSubscription(
-	//		t,
-	//		wsClient,
-	//		subscriptionRequest,
-	//		s.validateTransactionStatuses,
-	//		10*time.Second,
-	//		false,
-	//	)
-	//})
-
-	// tests send and subscribe transaction statuses
-	s.T().Run("send and subscribe to transaction statuses", func(t *testing.T) {
-		tx := s.createAccountTx()
-
-		convertToProposalKey := func(key sdk.ProposalKey) commonmodels.ProposalKey {
-			return commonmodels.ProposalKey{
-				Address:        flow.Address(key.Address).String(),
-				KeyIndex:       strconv.FormatUint(uint64(key.KeyIndex), 10),
-				SequenceNumber: strconv.FormatUint(key.SequenceNumber, 10),
-			}
-		}
-
-		convertToArguments := func(arguments [][]byte) []string {
-			wsArguments := make([]string, len(arguments))
-			for i, arg := range arguments {
-				wsArguments[i] = util.ToBase64(arg)
-			}
-
-			return wsArguments
-		}
-
-		convertToAuthorizers := func(authorizers []sdk.Address) []string {
-			wsAuthorizers := make([]string, len(authorizers))
-			for i, authorizer := range authorizers {
-				wsAuthorizers[i] = authorizer.String()
-			}
-
-			return wsAuthorizers
-		}
-
-		convertToSig := func(sigs []sdk.TransactionSignature) []commonmodels.TransactionSignature {
-			wsSigs := make([]commonmodels.TransactionSignature, len(sigs))
-			for i, sig := range sigs {
-				wsSigs[i] = commonmodels.TransactionSignature{
-					Address:   sig.Address.String(),
-					KeyIndex:  strconv.FormatUint(uint64(sig.KeyIndex), 10),
-					Signature: util.ToBase64(sig.Signature),
-				}
-			}
-
-			return wsSigs
-		}
-
-		subscriptionRequest := s.subscribeMessageRequest(
-			uuid.New().String(),
-			data_providers.SendAndGetTransactionStatusesTopic,
-			models.Arguments{
-				"script":              util.ToBase64(tx.Script),
-				"arguments":           convertToArguments(tx.Arguments),
-				"reference_block_id":  tx.ReferenceBlockID.String(),
-				"gas_limit":           strconv.FormatUint(tx.GasLimit, 10),
-				"payer":               tx.Payer.String(),
-				"proposal_key":        convertToProposalKey(tx.ProposalKey),
-				"authorizers":         convertToAuthorizers(tx.Authorizers),
-				"payload_signatures":  convertToSig(tx.PayloadSignatures),
-				"envelope_signatures": convertToSig(tx.EnvelopeSignatures),
+	tests := []struct {
+		name                               string
+		topic                              string
+		prepareArguments                   func() models.Arguments
+		validateFunc                       func(string, []models.BaseDataProvidersResponse)
+		listenSubscriptionResponseDuration time.Duration
+		testUnsubscribe                    bool
+	}{
+		{
+			name:  "Blocks streaming",
+			topic: data_providers.BlocksTopic,
+			prepareArguments: func() models.Arguments {
+				return models.Arguments{"block_status": parser.Finalized}
 			},
-		)
+			validateFunc:                       s.validateBlocks,
+			listenSubscriptionResponseDuration: 5 * time.Second,
+			testUnsubscribe:                    true,
+		},
+		{
+			name:  "Block headers streaming",
+			topic: data_providers.BlockHeadersTopic,
+			prepareArguments: func() models.Arguments {
+				return models.Arguments{"block_status": parser.Finalized}
+			},
+			validateFunc:                       s.validateBlockHeaders,
+			listenSubscriptionResponseDuration: 5 * time.Second,
+			testUnsubscribe:                    true,
+		},
+		{
+			name:  "Block digests streaming",
+			topic: data_providers.BlockDigestsTopic,
+			prepareArguments: func() models.Arguments {
+				return models.Arguments{"block_status": parser.Finalized}
+			},
+			validateFunc:                       s.validateBlockDigests,
+			listenSubscriptionResponseDuration: 5 * time.Second,
+			testUnsubscribe:                    true,
+		},
+		{
+			name:  "Events streaming",
+			topic: data_providers.EventsTopic,
+			prepareArguments: func() models.Arguments {
+				return models.Arguments{}
+			},
+			validateFunc:                       s.validateEvents,
+			listenSubscriptionResponseDuration: 5 * time.Second,
+			testUnsubscribe:                    true,
+		},
+		{
+			name:  "Account statuses streaming",
+			topic: data_providers.AccountStatusesTopic,
+			prepareArguments: func() models.Arguments {
+				tx := s.createAccountTx()
+				err := s.serviceClient.SendTransaction(s.ctx, tx)
+				s.Require().NoError(err)
+				s.T().Logf("txId %v", flow.Identifier(tx.ID()))
 
-		wsClient, err := common.GetWSClient(s.ctx, getWebsocketsUrl(s.restAccessAddress))
-		s.Require().NoError(err)
-		defer func() { s.Require().NoError(wsClient.Close()) }()
+				return models.Arguments{}
+			},
+			validateFunc:                       s.validateAccountStatuses,
+			listenSubscriptionResponseDuration: 5 * time.Second,
+			testUnsubscribe:                    true,
+		},
+		//TODO: uncomment when error in rpc backend will be fixed (Andrii Slisarchuk PR)
+		//{
+		//	name:  "Transaction statuses streaming",
+		//	topic: data_providers.TransactionStatusesTopic,
+		//	prepareArguments: func() models.Arguments {
+		//		tx := s.createAccountTx()
+		//
+		//		// Send the transaction
+		//		err := s.serviceClient.SendTransaction(s.ctx, tx)
+		//		s.Require().NoError(err)
+		//		s.T().Logf("txId %v", flow.Identifier(tx.ID()))
+		//
+		//		return models.Arguments{
+		//			"tx_id": tx.ID().String(),
+		//		}
+		//	},
+		//	validateFunc:                       s.validateTransactionStatuses,
+		//	listenSubscriptionResponseDuration: 15 * time.Second,
+		//	testUnsubscribe:                    true,
+		//},
+		{
+			name:  "Send and subscribe to transaction statuses",
+			topic: data_providers.SendAndGetTransactionStatusesTopic,
+			prepareArguments: func() models.Arguments {
+				tx := s.createAccountTx()
 
-		testWebsocketSubscription(
-			t,
-			wsClient,
-			subscriptionRequest,
-			s.validateTransactionStatuses,
-			10*time.Second,
-			false,
-		)
-	})
+				convertToProposalKey := func(key sdk.ProposalKey) commonmodels.ProposalKey {
+					return commonmodels.ProposalKey{
+						Address:        flow.Address(key.Address).String(),
+						KeyIndex:       strconv.FormatUint(uint64(key.KeyIndex), 10),
+						SequenceNumber: strconv.FormatUint(key.SequenceNumber, 10),
+					}
+				}
+
+				convertToArguments := func(arguments [][]byte) []string {
+					wsArguments := make([]string, len(arguments))
+					for i, arg := range arguments {
+						wsArguments[i] = util.ToBase64(arg)
+					}
+
+					return wsArguments
+				}
+
+				convertToAuthorizers := func(authorizers []sdk.Address) []string {
+					wsAuthorizers := make([]string, len(authorizers))
+					for i, authorizer := range authorizers {
+						wsAuthorizers[i] = authorizer.String()
+					}
+
+					return wsAuthorizers
+				}
+
+				convertToSig := func(sigs []sdk.TransactionSignature) []commonmodels.TransactionSignature {
+					wsSigs := make([]commonmodels.TransactionSignature, len(sigs))
+					for i, sig := range sigs {
+						wsSigs[i] = commonmodels.TransactionSignature{
+							Address:   sig.Address.String(),
+							KeyIndex:  strconv.FormatUint(uint64(sig.KeyIndex), 10),
+							Signature: util.ToBase64(sig.Signature),
+						}
+					}
+
+					return wsSigs
+				}
+				return models.Arguments{
+					"script":              util.ToBase64(tx.Script),
+					"arguments":           convertToArguments(tx.Arguments),
+					"reference_block_id":  tx.ReferenceBlockID.String(),
+					"gas_limit":           strconv.FormatUint(tx.GasLimit, 10),
+					"payer":               tx.Payer.String(),
+					"proposal_key":        convertToProposalKey(tx.ProposalKey),
+					"authorizers":         convertToAuthorizers(tx.Authorizers),
+					"payload_signatures":  convertToSig(tx.PayloadSignatures),
+					"envelope_signatures": convertToSig(tx.EnvelopeSignatures),
+				}
+			},
+			validateFunc:                       s.validateTransactionStatuses,
+			listenSubscriptionResponseDuration: 10 * time.Second,
+			testUnsubscribe:                    false,
+		},
+	}
+
+	for _, tt := range tests {
+		s.Run(tt.name, func() {
+			wsClient, err := common.GetWSClient(s.ctx, getWebsocketsUrl(s.restAccessAddress))
+			s.Require().NoError(err)
+			defer func() { s.Require().NoError(wsClient.Close()) }()
+
+			subscriptionRequest := s.subscribeMessageRequest(
+				uuid.New().String(),
+				tt.topic,
+				tt.prepareArguments(),
+			)
+
+			s.testWebsocketSubscription(
+				wsClient,
+				subscriptionRequest,
+				tt.validateFunc,
+				tt.listenSubscriptionResponseDuration,
+				tt.testUnsubscribe,
+			)
+		})
+	}
 }
 
 // validateBlocks validates the received block responses against gRPC responses.
@@ -853,8 +805,9 @@ func (s *WebsocketSubscriptionSuite) validateTransactionStatuses(
 	expectedSubscriptionID string,
 	receivedTransactionStatusesResponses []models.BaseDataProvidersResponse,
 ) {
+	s.T().Logf("receivedTransactionStatusesResponses %v", receivedTransactionStatusesResponses)
 	expectedCount := 4 // pending, finalized, executed, sealed
-	s.Require().GreaterOrEqual(len(receivedTransactionStatusesResponses), expectedCount, "expect received statuses")
+	s.Require().Equal(expectedCount, len(receivedTransactionStatusesResponses), fmt.Sprintf("expected %d transaction statuses", expectedCount))
 
 	expectedCounter := uint64(0)
 	lastReportedTxStatus := commonmodels.PENDING_TransactionStatus
@@ -943,8 +896,7 @@ func getWebsocketsUrl(accessAddr string) string {
 // including sending a subscription request, listening for incoming responses, and validating
 // them using a provided validation function. The websocket connection is closed automatically
 // after a predefined time interval.
-func testWebsocketSubscription(
-	t *testing.T,
+func (s *WebsocketSubscriptionSuite) testWebsocketSubscription(
 	client *websocket.Conn,
 	subscriptionRequest models.SubscribeMessageRequest,
 	validate func(string, []models.BaseDataProvidersResponse),
@@ -952,16 +904,12 @@ func testWebsocketSubscription(
 	unsubscribe bool,
 ) {
 	// subscribe to specific topic
-	require.NoError(t, client.WriteJSON(subscriptionRequest))
+	s.Require().NoError(client.WriteJSON(subscriptionRequest))
 
-	responses, baseMessageResponses, _ := listenWebSocketResponses(t, client, duration, subscriptionRequest.SubscriptionID)
+	responses, baseMessageResponses, _ := s.listenWebSocketResponses(client, duration, subscriptionRequest.SubscriptionID)
 	// validate subscribe response
-	require.Equal(t, 1, len(baseMessageResponses))
-
-	subscribeMessageResponse := baseMessageResponses[0]
-	require.Equal(t, subscriptionRequest.SubscriptionID, subscribeMessageResponse.SubscriptionID)
-	require.Equal(t, 0, subscribeMessageResponse.Error.Code)
-	require.Empty(t, subscribeMessageResponse.Error.Message)
+	s.Require().Equal(1, len(baseMessageResponses))
+	s.validateBaseMessageResponse(subscriptionRequest.SubscriptionID, baseMessageResponses[0])
 
 	// Use the provided validation function to ensure the received responses of type T are correct.
 	validate(subscriptionRequest.SubscriptionID, responses)
@@ -969,23 +917,13 @@ func testWebsocketSubscription(
 	// unsubscribe from topic
 	if unsubscribe {
 		// unsubscribe from specific topic
-		unsubscriptionRequest := models.UnsubscribeMessageRequest{
-			BaseMessageRequest: models.BaseMessageRequest{
-				Action:         models.UnsubscribeAction,
-				SubscriptionID: subscriptionRequest.SubscriptionID,
-			},
-		}
-		require.NoError(t, client.WriteJSON(unsubscriptionRequest))
+		unsubscriptionRequest := s.unsubscribeMessageRequest(subscriptionRequest.SubscriptionID)
+		s.Require().NoError(client.WriteJSON(unsubscriptionRequest))
 
-		responses, baseMessageResponses, _ = listenWebSocketResponses(t, client, 1*time.Millisecond, subscriptionRequest.SubscriptionID)
-
+		_, baseMessageResponses, _ = s.listenWebSocketResponses(client, 1*time.Second, subscriptionRequest.SubscriptionID)
 		// validate unsubscribe response
 		//require.Equal(t, 1, len(baseMessageResponses)) //TODO:
-
-		unsubscribeMessageResponse := baseMessageResponses[0]
-		require.Equal(t, unsubscriptionRequest.SubscriptionID, unsubscribeMessageResponse.SubscriptionID)
-		require.Equal(t, 0, unsubscribeMessageResponse.Error.Code)
-		require.Empty(t, unsubscribeMessageResponse.Error.Message)
+		s.validateBaseMessageResponse(unsubscriptionRequest.SubscriptionID, baseMessageResponses[0])
 	}
 }
 
@@ -993,11 +931,10 @@ func testWebsocketSubscription(
 // and unmarshalls them into expected types.
 //
 // Parameters:
-//   - t: The *testing.T object used for managing test lifecycle and assertions.
 //   - client: The websocket connection to read messages from.
 //   - duration: The maximum time to listen for messages before stopping.
-func listenWebSocketResponses(
-	t *testing.T,
+//   - subscriptionID: The subscription ID used to filter relevant responses.
+func (s *WebsocketSubscriptionSuite) listenWebSocketResponses(
 	client *websocket.Conn,
 	duration time.Duration,
 	subscriptionID string,
@@ -1016,19 +953,19 @@ func listenWebSocketResponses(
 	for {
 		select {
 		case <-timer.C:
-			t.Logf("stopping websocket response listener after %s", duration)
+			s.T().Logf("stopping websocket response listener after %s", duration)
 			return baseDataProvidersResponses, baseMessageResponses, listSubscriptionsMessageResponses
 		default:
 			_, messageBytes, err := client.ReadMessage()
 			if err != nil {
-				t.Logf("websocket error: %v", err)
+				s.T().Logf("websocket error: %v", err)
 
 				var closeErr *websocket.CloseError
 				if errors.As(err, &closeErr) {
 					return baseDataProvidersResponses, baseMessageResponses, listSubscriptionsMessageResponses
 				}
 
-				require.FailNow(t, fmt.Sprintf("unexpected websocket error, %v", err))
+				s.Require().FailNow(fmt.Sprintf("unexpected websocket error, %v", err))
 			}
 
 			var baseResp models.BaseMessageResponse
@@ -1054,7 +991,8 @@ func listenWebSocketResponses(
 	}
 }
 
-func (s *WebsocketSubscriptionSuite) verifyBaseMessageResponse(expectedSubscriptionID string, actualResponse models.BaseMessageResponse) {
+// validateBaseMessageResponse validates the properties of a success BaseMessageResponse.
+func (s *WebsocketSubscriptionSuite) validateBaseMessageResponse(expectedSubscriptionID string, actualResponse models.BaseMessageResponse) {
 	s.Require().Equal(expectedSubscriptionID, actualResponse.SubscriptionID)
 	s.Require().Equal(0, actualResponse.Error.Code)
 	s.Require().Empty(actualResponse.Error.Message)
