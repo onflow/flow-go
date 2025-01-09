@@ -116,7 +116,7 @@ func MigrateDKGEndStateFromV1() func(txn *badger.Txn) error {
 			return check, create, handle
 		})(txn)
 		if err != nil {
-			return fmt.Errorf("could not collect ")
+			return fmt.Errorf("could not collect deprecated DKG end states: %w", err)
 		}
 
 		for _, op := range ops {
