@@ -159,7 +159,7 @@ func chunkAssignment(ids flow.IdentifierList, chunks flow.ChunkList, rng random.
 		if !ok {
 			return nil, fmt.Errorf("chunk out of range requested: %v", i)
 		}
-		assignmentBuilder.Add(chunk, assignees)
+		assignmentBuilder.Add(chunk.Index, assignees)
 	}
 	return assignmentBuilder.Build(), nil
 }

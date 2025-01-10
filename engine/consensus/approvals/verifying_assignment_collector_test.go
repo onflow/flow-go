@@ -304,8 +304,8 @@ func (s *AssignmentCollectorTestSuite) TestRequestMissingApprovals() {
 	// build new assignment with 2 verifiers
 	assignmentBuilder := chunks.NewAssignmentBuilder()
 	for _, chunk := range s.Chunks {
-		verifiers := s.ChunksAssignment.Verifiers(chunk)
-		assignmentBuilder.Add(chunk, verifiers[:2])
+		verifiers := s.ChunksAssignment.Verifiers(chunk.Index)
+		assignmentBuilder.Add(chunk.Index, verifiers[:2])
 	}
 	// replace old one
 	s.ChunksAssignment = assignmentBuilder.Build()

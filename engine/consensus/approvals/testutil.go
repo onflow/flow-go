@@ -59,7 +59,7 @@ func (s *BaseApprovalsTestSuite) SetupTest() {
 
 	// create assignment
 	for _, chunk := range s.Chunks {
-		assignmentBuilder.Add(chunk, verifiers)
+		assignmentBuilder.Add(chunk.Index, verifiers)
 	}
 	s.ChunksAssignment = assignmentBuilder.Build()
 

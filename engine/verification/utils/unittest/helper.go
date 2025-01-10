@@ -305,7 +305,7 @@ func WithAssignee(assignee flow.Identifier) func(flow.Identifier, uint64, *chunk
 	return func(blockID flow.Identifier, index uint64, assignmentBuilder *chunks.AssignmentBuilder) *flow.Chunk {
 		chunk := ChunkWithIndex(blockID, int(index))
 		fmt.Printf("with assignee: %v, chunk id: %v\n", index, chunk.ID())
-		assignmentBuilder.Add(chunk, flow.IdentifierList{assignee})
+		assignmentBuilder.Add(chunk.Index, flow.IdentifierList{assignee})
 		return chunk
 	}
 }
@@ -352,10 +352,10 @@ func MockChunkAssignmentFixture(chunkAssigner *mock.ChunkAssigner,
 					}.ID()
 					expectedLocatorIds = append(expectedLocatorIds, locatorID)
 					expectedChunkIds = append(expectedChunkIds, chunk.ID())
-					a.Add(chunk, verIds.NodeIDs())
+					a.Add(chunk.Index, verIds.NodeIDs())
 				} else {
 					// the chunk has no verifiers assigned
-					a.Add(chunk, flow.IdentifierList{})
+					a.Add(chunk.Index, flow.IdentifierList{})
 				}
 
 			}

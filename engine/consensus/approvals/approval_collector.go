@@ -36,7 +36,7 @@ func NewApprovalCollector(
 ) (*ApprovalCollector, error) {
 	chunkCollectors := make([]*ChunkApprovalCollector, 0, result.Result.Chunks.Len())
 	for _, chunk := range result.Result.Chunks {
-		chunkAssignment := assignment.Verifiers(chunk).Lookup()
+		chunkAssignment := assignment.Verifiers(chunk.Index).Lookup()
 		collector := NewChunkApprovalCollector(chunkAssignment, requiredApprovalsForSealConstruction)
 		chunkCollectors = append(chunkCollectors, collector)
 	}

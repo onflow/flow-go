@@ -291,7 +291,7 @@ func (s *sealValidator) validateSeal(seal *flow.Seal, incorporatedResult *flow.I
 
 		// only Verification Nodes that were assigned to the chunk are allowed to approve it
 		for _, signerId := range chunkSigs.SignerIDs {
-			if !assignments.HasVerifier(chunk, signerId) {
+			if !assignments.HasVerifier(chunk.Index, signerId) {
 				return engine.NewInvalidInputErrorf("invalid signer id at chunk: %d", chunk.Index)
 			}
 		}

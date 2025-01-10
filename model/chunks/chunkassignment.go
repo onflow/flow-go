@@ -31,13 +31,13 @@ func (a *AssignmentBuilder) Build() *Assignment {
 }
 
 // Verifiers returns the list of verifier nodes assigned to a chunk
-func (a *Assignment) Verifiers(chunk *flow.Chunk) flow.IdentifierList {
+func (a *Assignment) Verifiers(chunkIdx uint64) flow.IdentifierList {
 	v := make([]flow.Identifier, 0)
-	if chunk.Index >= uint64(len(a.verifiersForChunk)) {
+	if chunkIdx >= uint64(len(a.verifiersForChunk)) {
 		// the chunk does not exist in the assignment, so it has no verifiers
 		return v
 	}
-	for id := range a.verifiersForChunk[chunk.Index] {
+	for id := range a.verifiersForChunk[chunkIdx] {
 		v = append(v, id)
 	}
 	return v
@@ -45,13 +45,13 @@ func (a *Assignment) Verifiers(chunk *flow.Chunk) flow.IdentifierList {
 
 // HasVerifier checks if a chunk is assigned to the given verifier
 // TODO: method should probably error if chunk has unknown index
-func (a *Assignment) HasVerifier(chunk *flow.Chunk, identifier flow.Identifier) bool {
-	if chunk.Index >= uint64(len(a.verifiersForChunk)) {
+func (a *Assignment) HasVerifier(chunkIdx uint64, identifier flow.Identifier) bool {
+	if chunkIdx >= uint64(len(a.verifiersForChunk)) {
 		// is verifier assigned to this chunk?
 		// No, because we only assign verifiers to existing chunks
 		return false
 	}
-	assignedVerifiers := a.verifiersForChunk[chunk.Index]
+	assignedVerifiers := a.verifiersForChunk[chunkIdx]
 	_, isAssigned := assignedVerifiers[identifier]
 	return isAssigned
 }
@@ -59,8 +59,8 @@ func (a *Assignment) HasVerifier(chunk *flow.Chunk, identifier flow.Identifier) 
 // Add records the list of verifier nodes as the assigned verifiers of the chunk.
 // Requires chunks to be added in order of their Index (increasing by 1 each time).
 // Panics if chunks are not added in ascending Index order.
-func (a *AssignmentBuilder) Add(chunk *flow.Chunk, verifiers flow.IdentifierList) {
-	if chunk.Index != uint64(len(a.verifiersForChunk)) {
+func (a *AssignmentBuilder) Add(chunkIdx uint64, verifiers flow.IdentifierList) {
+	if chunkIdx != uint64(len(a.verifiersForChunk)) {
 		panic("chunks added out of order")
 	}
 	// sorts verifiers list based on their identifier

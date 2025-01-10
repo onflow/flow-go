@@ -52,7 +52,7 @@ func (a *PublicAssignmentTestSuite) TestByNodeID() {
 	// Since there are 2x as many chunks as verifiers, each verifier will have 2 chunks
 	for j, chunk := range chunks {
 		v := ids[j%size].NodeID
-		assignmentBuilder.Add(chunk, flow.IdentifierList{v})
+		assignmentBuilder.Add(chunk.Index, flow.IdentifierList{v})
 	}
 	assignment := assignmentBuilder.Build()
 
@@ -74,28 +74,23 @@ func (a *PublicAssignmentTestSuite) TestByNodeID() {
 // TestAssignDuplicate tests assign Add duplicate verifiers
 func (a *PublicAssignmentTestSuite) TestAssignDuplicate() {
 	size := 5
-	// creates ids and twice chunks of the ids
+	// creates verifier ids
 	var ids flow.IdentityList = unittest.IdentityListFixture(size)
-	chunks := a.CreateChunks(2, a.T())
 	assignmentBuilder := chmodels.NewAssignmentBuilder()
 
 	// assigns first chunk to non-duplicate list of verifiers
-	c, ok := chunks.ByIndex(uint64(0))
-	require.True(a.T(), ok, "chunk out of range requested")
-	assignmentBuilder.Add(c, ids.NodeIDs())
+	assignmentBuilder.Add(0, ids.NodeIDs())
 
 	// duplicates first verifier, hence size increases by 1
 	ids = append(ids, ids[0])
 	require.Len(a.T(), ids, size+1)
 	// assigns second chunk to a duplicate list of verifiers
-	c2, ok := chunks.ByIndex(uint64(1))
-	require.True(a.T(), ok, "chunk out of range requested")
-	assignmentBuilder.Add(c2, ids.NodeIDs())
+	assignmentBuilder.Add(1, ids.NodeIDs())
 
 	assignment := assignmentBuilder.Build()
-	require.Len(a.T(), assignment.Verifiers(c), size)
+	require.Len(a.T(), assignment.Verifiers(0), size)
 	// should be size not size + 1
-	require.Len(a.T(), assignment.Verifiers(c2), size)
+	require.Len(a.T(), assignment.Verifiers(1), size)
 }
 
 // TestPermuteEntirely tests permuting an entire IdentityList against
@@ -274,7 +269,7 @@ func (a *PublicAssignmentTestSuite) ChunkAssignmentScenario(chunkNum, verNum, al
 
 	for _, chunk := range result.Chunks {
 		// each chunk should be assigned to alpha verifiers
-		require.Equal(a.T(), p1.Verifiers(chunk).Len(), alpha)
+		require.Equal(a.T(), p1.Verifiers(chunk.Index).Len(), alpha)
 	}
 }
 

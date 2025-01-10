@@ -598,7 +598,7 @@ func (s *ApprovalProcessingCoreTestSuite) TestRequestPendingApprovals() {
 
 		for _, chunk := range ir.Result.Chunks {
 			// assign the verifier to this chunk
-			assignmentBuilder.Add(chunk, verifiers)
+			assignmentBuilder.Add(chunk.Index, verifiers)
 		}
 		s.ChunksAssignment = assignmentBuilder.Build()
 

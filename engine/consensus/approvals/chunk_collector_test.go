@@ -30,7 +30,7 @@ func (s *ChunkApprovalCollectorTestSuite) SetupTest() {
 	s.BaseApprovalsTestSuite.SetupTest()
 	s.chunk = s.Chunks[0]
 	s.chunkAssignment = make(map[flow.Identifier]struct{})
-	for _, verifier := range s.ChunksAssignment.Verifiers(s.chunk) {
+	for _, verifier := range s.ChunksAssignment.Verifiers(s.chunk.Index) {
 		s.chunkAssignment[verifier] = struct{}{}
 	}
 	s.collector = NewChunkApprovalCollector(s.chunkAssignment, uint(len(s.chunkAssignment)))
