@@ -1,4 +1,4 @@
-package badger_test
+package store_test
 
 import (
 	"errors"
