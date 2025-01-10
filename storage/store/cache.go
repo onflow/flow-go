@@ -28,6 +28,7 @@ func withStore[K comparable, V any](store storeFunc[K, V]) func(*Cache[K, V]) {
 
 // nolint:unused
 <<<<<<< HEAD
+<<<<<<< HEAD
 func noStore[K comparable, V any](_ storage.ReaderBatchWriter, _ K, _ V) error {
 	return fmt.Errorf("no store function for cache put available")
 }
@@ -43,17 +44,23 @@ func noStore[K comparable, V any](_ K, _ V) func(storage.ReaderBatchWriter) erro
 	return func(tx storage.ReaderBatchWriter) error {
 		return fmt.Errorf("no store function for cache put available")
 	}
+=======
+func noStore[K comparable, V any](_ storage.ReaderBatchWriter, _ K, _ V) error {
+	return fmt.Errorf("no store function for cache put available")
+>>>>>>> b11f944cf5 (fix approvals)
 }
 
 // nolint: unused
-func noopStore[K comparable, V any](_ K, _ V) func(storage.ReaderBatchWriter) error {
-	return func(tx storage.ReaderBatchWriter) error {
-		return nil
-	}
+func noopStore[K comparable, V any](_ storage.ReaderBatchWriter, _ K, _ V) error {
+	return nil
 }
 
+<<<<<<< HEAD
 type retrieveFunc[K comparable, V any] func(key K) func(storage.Reader) (V, error)
 >>>>>>> 987642e121 (storage update refactor approvals)
+=======
+type retrieveFunc[K comparable, V any] func(r storage.Reader, key K) (V, error)
+>>>>>>> b11f944cf5 (fix approvals)
 
 // nolint:unused
 func withRetrieve[K comparable, V any](retrieve retrieveFunc[K, V]) func(*Cache[K, V]) {
@@ -63,6 +70,7 @@ func withRetrieve[K comparable, V any](retrieve retrieveFunc[K, V]) func(*Cache[
 }
 
 // nolint:unused
+<<<<<<< HEAD
 <<<<<<< HEAD
 func noRetrieve[K comparable, V any](_ storage.Reader, _ K) (V, error) {
 	var nullV V
@@ -74,6 +82,11 @@ func noRetrieve[K comparable, V any](_ K) func(storage.Reader) (V, error) {
 		return nullV, fmt.Errorf("no retrieve function for cache get available")
 	}
 >>>>>>> 987642e121 (storage update refactor approvals)
+=======
+func noRetrieve[K comparable, V any](_ storage.Reader, _ K) (V, error) {
+	var nullV V
+	return nullV, fmt.Errorf("no retrieve function for cache get available")
+>>>>>>> b11f944cf5 (fix approvals)
 }
 
 type Cache[K comparable, V any] struct {
@@ -113,11 +126,15 @@ func (c *Cache[K, V]) IsCached(key K) bool {
 // injected. During normal operations, the following error returns are expected:
 //   - `storage.ErrNotFound` if key is unknown.
 <<<<<<< HEAD
+<<<<<<< HEAD
+=======
+>>>>>>> b11f944cf5 (fix approvals)
 func (c *Cache[K, V]) Get(r storage.Reader, key K) (V, error) {
 	// check if we have it in the cache
 	resource, cached := c.cache.Get(key)
 	if cached {
 		c.metrics.CacheHit(c.resource)
+<<<<<<< HEAD
 		return resource, nil
 	}
 
@@ -172,6 +189,30 @@ func (c *Cache[K, V]) Get(key K) func(storage.Reader) (V, error) {
 		return resource, nil
 	}
 >>>>>>> 987642e121 (storage update refactor approvals)
+=======
+		return resource, nil
+	}
+
+	// get it from the database
+	resource, err := c.retrieve(r, key)
+	if err != nil {
+		if errors.Is(err, storage.ErrNotFound) {
+			c.metrics.CacheNotFound(c.resource)
+		}
+		var nullV V
+		return nullV, fmt.Errorf("could not retrieve resource: %w", err)
+	}
+
+	c.metrics.CacheMiss(c.resource)
+
+	// cache the resource and eject least recently used one if we reached limit
+	evicted := c.cache.Add(key, resource)
+	if !evicted {
+		c.metrics.CacheEntries(c.resource, uint(c.cache.Len()))
+	}
+
+	return resource, nil
+>>>>>>> b11f944cf5 (fix approvals)
 }
 
 func (c *Cache[K, V]) Remove(key K) {
@@ -189,10 +230,14 @@ func (c *Cache[K, V]) Insert(key K, resource V) {
 
 // PutTx will return tx which adds a resource to the cache with the given ID.
 <<<<<<< HEAD
+<<<<<<< HEAD
+=======
+>>>>>>> b11f944cf5 (fix approvals)
 func (c *Cache[K, V]) PutTx(rw storage.ReaderBatchWriter, key K, resource V) error {
 	storage.OnCommitSucceed(rw, func() {
 		c.Insert(key, resource)
 	})
+<<<<<<< HEAD
 
 	err := c.store(rw, key, resource)
 	if err != nil {
@@ -203,18 +248,17 @@ func (c *Cache[K, V]) PutTx(rw storage.ReaderBatchWriter, key K, resource V) err
 =======
 func (c *Cache[K, V]) PutTx(key K, resource V) func(storage.ReaderBatchWriter) error {
 	storeOps := c.store(key, resource) // assemble DB operations to store resource (no execution)
+=======
+>>>>>>> b11f944cf5 (fix approvals)
 
-	return func(rw storage.ReaderBatchWriter) error {
-		storage.OnCommitSucceed(rw, func() {
-			c.Insert(key, resource)
-		})
-
-		err := storeOps(rw) // execute operations to store resource
-		if err != nil {
-			return fmt.Errorf("could not store resource: %w", err)
-		}
-
-		return nil
+	err := c.store(rw, key, resource)
+	if err != nil {
+		return fmt.Errorf("could not store resource: %w", err)
 	}
+<<<<<<< HEAD
 >>>>>>> 987642e121 (storage update refactor approvals)
+=======
+
+	return nil
+>>>>>>> b11f944cf5 (fix approvals)
 }
