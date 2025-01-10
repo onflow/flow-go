@@ -105,7 +105,7 @@ func (p *EventsDataProvider) handleResponse() func(eventsResponse *backend.Event
 		eventsPayload.Build(eventsResponse, index)
 
 		var response models.BaseDataProvidersResponse
-		response.Build(p.ID().String(), p.Topic(), &eventsPayload)
+		response.Build(p.ID(), p.Topic(), &eventsPayload)
 
 		p.send <- &response
 

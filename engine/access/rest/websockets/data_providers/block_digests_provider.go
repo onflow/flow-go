@@ -66,7 +66,7 @@ func (p *BlockDigestsDataProvider) Run() error {
 
 			var response models.BaseDataProvidersResponse
 			response.Build(
-				p.ID().String(),
+				p.ID(),
 				p.Topic(),
 				&block,
 			)

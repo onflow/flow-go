@@ -112,7 +112,7 @@ func (p *TransactionStatusesDataProvider) handleResponse() func(txResults []*acc
 			txStatusesPayload.Build(p.linkGenerator, txResults[i], index)
 
 			var response models.BaseDataProvidersResponse
-			response.Build(p.ID().String(), p.Topic(), &txStatusesPayload)
+			response.Build(p.ID(), p.Topic(), &txStatusesPayload)
 
 			p.send <- &response
 		}

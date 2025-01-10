@@ -85,7 +85,7 @@ func (p *BlocksDataProvider) Run() error {
 			}
 
 			var response models.BaseDataProvidersResponse
-			response.Build(p.ID().String(), p.Topic(), &block)
+			response.Build(p.ID(), p.Topic(), &block)
 
 			return &response, nil
 		}),

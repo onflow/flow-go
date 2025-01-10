@@ -1,5 +1,7 @@
 package models
 
+import "github.com/google/uuid"
+
 const (
 	SubscribeAction         = "subscribe"
 	UnsubscribeAction       = "unsubscribe"
@@ -28,9 +30,9 @@ type BaseDataProvidersResponse struct {
 }
 
 // Build creates BaseDataProvidersResponse instance for consistent responses of the data providers.
-func (b *BaseDataProvidersResponse) Build(subscriptionID string, topic string, payload interface{}) {
+func (b *BaseDataProvidersResponse) Build(subscriptionID uuid.UUID, topic string, payload interface{}) {
 	*b = BaseDataProvidersResponse{
-		SubscriptionID: subscriptionID,
+		SubscriptionID: subscriptionID.String(),
 		Topic:          topic,
 		Payload:        payload,
 	}

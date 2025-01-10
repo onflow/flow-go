@@ -67,7 +67,7 @@ func (p *BlockHeadersDataProvider) Run() error {
 
 			var response models.BaseDataProvidersResponse
 			response.Build(
-				p.ID().String(),
+				p.ID(),
 				p.Topic(),
 				&header,
 			)

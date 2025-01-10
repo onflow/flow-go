@@ -119,7 +119,7 @@ func (p *AccountStatusesDataProvider) handleResponse() func(accountStatusesRespo
 		accountStatusesPayload.Build(accountStatusesResponse, index)
 
 		var response models.BaseDataProvidersResponse
-		response.Build(p.ID().String(), p.Topic(), &accountStatusesPayload)
+		response.Build(p.ID(), p.Topic(), &accountStatusesPayload)
 
 		p.send <- &response
 
