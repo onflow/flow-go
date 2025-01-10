@@ -69,7 +69,7 @@ func New(
 	log zerolog.Logger,
 	state protocol.State,
 	headers storage.Headers,
-	txErrorMessagesProcessedHeight storage.ConsumerProgress,
+	txErrorMessagesProcessedHeight storage.ConsumerProgressInitializer,
 	txErrorMessagesCore *TxErrorMessagesCore,
 ) (*Engine, error) {
 	e := &Engine{
