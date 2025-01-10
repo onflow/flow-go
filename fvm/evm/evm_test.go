@@ -1538,7 +1538,8 @@ func TestDryRun(t *testing.T) {
 				_, output, err := vm.Run(
 					ctx,
 					script,
-					snapshot)
+					snapshot,
+				)
 				require.NoError(t, err)
 				require.NoError(t, output.Err)
 
@@ -1765,7 +1766,7 @@ func TestDryRun(t *testing.T) {
 				))
 
 				// use the gas estimation from Evm.dryRun with the necessary buffer gas
-				gasLimit := dryRunResult.GasConsumed + gethParams.SstoreSentryGasEIP2200 + gethParams.SstoreClearsScheduleRefundEIP3529
+				gasLimit := dryRunResult.GasConsumed + gethParams.SstoreClearsScheduleRefundEIP3529
 				innerTxBytes = testAccount.PrepareSignAndEncodeTx(t,
 					testContract.DeployedAt.ToCommon(),
 					data,
@@ -1790,7 +1791,8 @@ func TestDryRun(t *testing.T) {
 				_, output, err = vm.Run(
 					ctx,
 					script,
-					snapshot)
+					snapshot,
+				)
 				require.NoError(t, err)
 				require.NoError(t, output.Err)
 
