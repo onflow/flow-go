@@ -11,7 +11,6 @@ import (
 	"github.com/onflow/cadence/encoding/ccf"
 	jsoncdc "github.com/onflow/cadence/encoding/json"
 	"github.com/onflow/cadence/runtime/stdlib"
-	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/crypto"
@@ -29,8 +28,6 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/epochs"
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
-	"github.com/onflow/flow-go/state/protocol"
-	protocolMock "github.com/onflow/flow-go/state/protocol/mock"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -659,13 +656,52 @@ func EntropyProviderFixture(source []byte) environment.EntropyProvider {
 // supports AtBlockID to return a snapshot mock.
 // The snapshot mock only supports RandomSource().
 // If input is nil, a random source fixture is generated.
-func ProtocolStateWithSourceFixture(source []byte) protocol.State {
+func ProtocolStateWithSourceFixture(source []byte) flow.ProtocolSnapshotExecutionSubsetProvider {
 	if source == nil {
 		source = unittest.SignatureFixture()
 	}
-	snapshot := &protocolMock.Snapshot{}
-	snapshot.On("RandomSource").Return(source, nil)
-	state := protocolMock.State{}
-	state.On("AtBlockID", mock.Anything).Return(snapshot)
-	return &state
+	snapshot := mockSnapshotSubset{
+		randomSourceFunc: func() ([]byte, error) {
+			return source, nil
+		},
+		versionBeaconFunc: func() (*flow.SealedVersionBeacon, error) {
+			return &flow.SealedVersionBeacon{VersionBeacon: unittest.VersionBeaconFixture()}, nil
+		},
+	}
+
+	provider := mockProtocolStateSnapshotProvider{
+		snapshotFunc: func(blockID flow.Identifier) flow.ProtocolSnapshotExecutionSubset {
+			return snapshot
+		},
+	}
+	return provider
 }
+
+type mockProtocolStateSnapshotProvider struct {
+	snapshotFunc func(blockID flow.Identifier) flow.ProtocolSnapshotExecutionSubset
+}
+
+func (m mockProtocolStateSnapshotProvider) AtBlockID(blockID flow.Identifier) flow.ProtocolSnapshotExecutionSubset {
+	return m.snapshotFunc(blockID)
+}
+
+type mockSnapshotSubset struct {
+	randomSourceFunc  func() ([]byte, error)
+	versionBeaconFunc func() (*flow.SealedVersionBeacon, error)
+}
+
+func (m mockSnapshotSubset) RandomSource() ([]byte, error) {
+	if m.randomSourceFunc == nil {
+		return nil, errors.New("random source not implemented")
+	}
+	return m.randomSourceFunc()
+}
+
+func (m mockSnapshotSubset) VersionBeacon() (*flow.SealedVersionBeacon, error) {
+	if m.versionBeaconFunc == nil {
+		return nil, errors.New("version beacon not implemented")
+	}
+	return m.versionBeaconFunc()
+}
+
+var _ flow.ProtocolSnapshotExecutionSubset = (*mockSnapshotSubset)(nil)

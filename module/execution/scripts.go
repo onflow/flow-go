@@ -75,7 +75,7 @@ func NewScripts(
 	log zerolog.Logger,
 	metrics module.ExecutionMetrics,
 	chainID flow.ChainID,
-	entropy query.EntropyProviderPerBlock,
+	protocolSnapshotProvider flow.ProtocolSnapshotExecutionSubsetProvider,
 	header storage.Headers,
 	registerAtHeight RegisterAtHeight,
 	queryConf query.QueryConfig,
@@ -98,7 +98,7 @@ func NewScripts(
 		vm,
 		vmCtx,
 		derivedChainData,
-		entropy,
+		protocolSnapshotProvider,
 	)
 
 	return &Scripts{

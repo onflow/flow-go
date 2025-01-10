@@ -110,14 +110,14 @@ func NewDefaultConfig() QueryConfig {
 }
 
 type QueryExecutor struct {
-	config           QueryConfig
-	logger           zerolog.Logger
-	metrics          module.ExecutionMetrics
-	vm               fvm.VM
-	vmCtx            fvm.Context
-	derivedChainData *derived.DerivedChainData
-	rngLock          *sync.Mutex
-	entropyPerBlock  EntropyProviderPerBlock
+	config                QueryConfig
+	logger                zerolog.Logger
+	metrics               module.ExecutionMetrics
+	vm                    fvm.VM
+	vmCtx                 fvm.Context
+	derivedChainData      *derived.DerivedChainData
+	rngLock               *sync.Mutex
+	protocolStateSnapshot flow.ProtocolSnapshotExecutionSubsetProvider
 }
 
 var _ Executor = &QueryExecutor{}
@@ -129,20 +129,20 @@ func NewQueryExecutor(
 	vm fvm.VM,
 	vmCtx fvm.Context,
 	derivedChainData *derived.DerivedChainData,
-	entropyPerBlock EntropyProviderPerBlock,
+	protocolStateSnapshot flow.ProtocolSnapshotExecutionSubsetProvider,
 ) *QueryExecutor {
 	if config.ComputationLimit > 0 {
 		vmCtx = fvm.NewContextFromParent(vmCtx, fvm.WithComputationLimit(config.ComputationLimit))
 	}
 	return &QueryExecutor{
-		config:           config,
-		logger:           logger,
-		metrics:          metrics,
-		vm:               vm,
-		vmCtx:            vmCtx,
-		derivedChainData: derivedChainData,
-		rngLock:          &sync.Mutex{},
-		entropyPerBlock:  entropyPerBlock,
+		config:                config,
+		logger:                logger,
+		metrics:               metrics,
+		vm:                    vm,
+		vmCtx:                 vmCtx,
+		derivedChainData:      derivedChainData,
+		rngLock:               &sync.Mutex{},
+		protocolStateSnapshot: protocolStateSnapshot,
 	}
 }
 
@@ -215,7 +215,7 @@ func (e *QueryExecutor) ExecuteScript(
 		fvm.NewContextFromParent(
 			e.vmCtx,
 			fvm.WithBlockHeader(blockHeader),
-			fvm.WithEntropyProvider(e.entropyPerBlock.AtBlockID(blockHeader.ID())),
+			fvm.WithProtocolStateSnapshot(e.protocolStateSnapshot.AtBlockID(blockHeader.ID())),
 			fvm.WithDerivedBlockData(
 				e.derivedChainData.NewDerivedBlockDataForScript(blockHeader.ID()))),
 		fvm.NewScriptWithContextAndArgs(script, requestCtx, arguments...),

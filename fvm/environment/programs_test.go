@@ -156,9 +156,7 @@ func Test_Programs(t *testing.T) {
 		fvm.WithAuthorizationChecksEnabled(false),
 		fvm.WithSequenceNumberCheckAndIncrementEnabled(false),
 		fvm.WithCadenceLogging(true),
-		fvm.WithDerivedBlockData(derivedBlockData),
-		// disable reading version from node version beacon otherwise it loads an extra contract
-		fvm.WithReadVersionFromNodeVersionBeacon(false))
+		fvm.WithDerivedBlockData(derivedBlockData))
 
 	var contractASnapshot *snapshot.ExecutionSnapshot
 	var contractBSnapshot *snapshot.ExecutionSnapshot
@@ -615,9 +613,7 @@ func Test_ProgramsDoubleCounting(t *testing.T) {
 		fvm.WithSequenceNumberCheckAndIncrementEnabled(false),
 		fvm.WithCadenceLogging(true),
 		fvm.WithDerivedBlockData(derivedBlockData),
-		fvm.WithMetricsReporter(metrics),
-		// disable reading version from node version beacon otherwise it loads an extra contract
-		fvm.WithReadVersionFromNodeVersionBeacon(false))
+		fvm.WithMetricsReporter(metrics))
 
 	t.Run("deploy contracts and ensure cache is empty", func(t *testing.T) {
 		// deploy contract A

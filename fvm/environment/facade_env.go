@@ -105,7 +105,7 @@ func newFacadeEnvironment(
 
 		SystemContracts: systemContracts,
 		MinimumCadenceRequiredVersion: NewMinimumCadenceRequiredVersion(
-			txnState,
+			params.ExecutionVersionProvider,
 		),
 
 		UUIDGenerator: NewUUIDGenerator(

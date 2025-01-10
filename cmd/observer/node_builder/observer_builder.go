@@ -57,6 +57,7 @@ import (
 	"github.com/onflow/flow-go/engine/common/stop"
 	synceng "github.com/onflow/flow-go/engine/common/synchronization"
 	"github.com/onflow/flow-go/engine/common/version"
+	"github.com/onflow/flow-go/engine/execution/computation"
 	"github.com/onflow/flow-go/engine/execution/computation/query"
 	"github.com/onflow/flow-go/fvm/storage/derived"
 	"github.com/onflow/flow-go/ledger"
@@ -1519,7 +1520,7 @@ func (builder *ObserverServiceBuilder) BuildExecutionSyncComponents() *ObserverS
 				builder.Logger,
 				metrics.NewExecutionCollector(builder.Tracer),
 				builder.RootChainID,
-				query.NewProtocolStateWrapper(builder.State),
+				computation.NewProtocolStateWrapper(builder.State),
 				builder.Storage.Headers,
 				builder.ExecutionIndexerCore.RegisterValue,
 				builder.scriptExecutorConfig,

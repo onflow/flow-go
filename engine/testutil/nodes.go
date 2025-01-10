@@ -685,7 +685,7 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity bootstrap.NodeInfo, ide
 		node.Metrics,
 		node.Tracer,
 		node.Me,
-		node.State,
+		computation.NewProtocolStateWrapper(node.State),
 		vmCtx,
 		committer,
 		prov,
