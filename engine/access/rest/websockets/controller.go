@@ -311,6 +311,7 @@ func (c *Controller) readMessages(ctx context.Context) error {
 	for {
 		select {
 		case <-ctx.Done():
+			c.logger.Error().Msgf("!!! controller read: ctx.DONE()")
 			return nil
 		default:
 			var message json.RawMessage
@@ -321,6 +322,7 @@ func (c *Controller) readMessages(ctx context.Context) error {
 
 				var closeErr *websocket.CloseError
 				if errors.As(err, &closeErr) {
+					c.logger.Error().Msgf("!!! controller read json: %v ", err)
 					return err
 				}
 
@@ -416,11 +418,14 @@ func (c *Controller) handleSubscribe(ctx context.Context, msg models.SubscribeMe
 	c.dataProvidersGroup.Add(1)
 	go func() {
 		err = provider.Run()
-		if err != nil {
+		if err != nil && c.dataProviders.Has(subscriptionID) {
+			// Ensure the context.Canceled error was not initiated by closing this provider
+			// during the unsubscribe action. Without this check, the base error context.Canceled
+			// will always be sent, even when simply unsubscribing from a topic.
 			c.writeErrorResponse(
 				ctx,
 				err,
-				wrapErrorMessage(InternalServerError, "internal error", subscriptionID.String()),
+				wrapErrorMessage(InternalServerError, err.Error(), subscriptionID.String()),
 			)
 		}
 

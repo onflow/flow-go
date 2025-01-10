@@ -210,7 +210,7 @@ func (s *WebsocketSubscriptionSuite) TestInactivityHeaders() {
 			unsubscribeRequest.SubscriptionID,
 		)
 
-		//s.Require().Equal(1, len(baseResponses)) //TODO: check, cause we received 2 base messages, second - error message from provider Run - Context cancelled
+		s.Require().Equal(1, len(baseResponses))
 		s.validateBaseMessageResponse(unsubscribeRequest.SubscriptionID, baseResponses[0])
 
 		// Step 4: Monitor inactivity after unsubscription
@@ -381,7 +381,7 @@ func (s *WebsocketSubscriptionSuite) TestListOfSubscriptions() {
 
 	// verify success subscribe response
 	_, baseResponses, _ = s.listenWebSocketResponses(wsClient, 1*time.Second, blockHeadersSubscriptionID)
-	//s.Require().Equal(1, len(baseResponses)) //TODO: check, cause we received 2 base messages, second - error message from provider Run - Context cancelled
+	s.Require().Equal(1, len(baseResponses))
 	s.validateBaseMessageResponse(blockHeadersSubscriptionID, baseResponses[0])
 
 	// 3. Create list of subscription request message
@@ -921,9 +921,9 @@ func (s *WebsocketSubscriptionSuite) testWebsocketSubscription(
 		unsubscriptionRequest := s.unsubscribeMessageRequest(subscriptionRequest.SubscriptionID)
 		s.Require().NoError(client.WriteJSON(unsubscriptionRequest))
 
-		_, baseMessageResponses, _ = s.listenWebSocketResponses(client, 1*time.Second, subscriptionRequest.SubscriptionID)
+		_, baseMessageResponses, _ = s.listenWebSocketResponses(client, 3*time.Second, subscriptionRequest.SubscriptionID)
 		// validate unsubscribe response
-		//require.Equal(t, 1, len(baseMessageResponses)) //TODO:
+		s.Require().Equal(1, len(baseMessageResponses))
 		s.validateBaseMessageResponse(unsubscriptionRequest.SubscriptionID, baseMessageResponses[0])
 	}
 }
