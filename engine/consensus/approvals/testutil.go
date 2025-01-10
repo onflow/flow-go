@@ -43,7 +43,7 @@ func (s *BaseApprovalsTestSuite) SetupTest() {
 	verifiers := make(flow.IdentifierList, 0)
 	s.AuthorizedVerifiers = make(map[flow.Identifier]*flow.Identity)
 	s.ChunksAssignment = chunks.NewAssignment()
-	s.Chunks = unittest.ChunkListFixture(50, s.Block.ID())
+	s.Chunks = unittest.ChunkListFixture(50, s.Block.ID(), unittest.StateCommitmentFixture())
 	// mock public key to mock signature verifications
 	s.PublicKey = &module.PublicKey{}
 

@@ -501,7 +501,7 @@ func ExecutionResultForkFixture(t *testing.T) (*flow.ExecutionResult, *flow.Exec
 	resultB := &flow.ExecutionResult{
 		PreviousResultID: resultA.PreviousResultID,
 		BlockID:          resultA.BlockID,
-		Chunks:           append(flow.ChunkList{resultA.Chunks[0]}, unittest.ChunkListFixture(1, resultA.BlockID)...),
+		Chunks:           append(flow.ChunkList{resultA.Chunks[0]}, unittest.ChunkListFixture(1, resultA.BlockID, resultA.Chunks[0].EndState)...),
 		ServiceEvents:    nil,
 	}
 
