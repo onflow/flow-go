@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/cockroachdb/pebble"
 	"github.com/stretchr/testify/require"
@@ -200,7 +201,22 @@ func TestRemoveDiskUsage(t *testing.T) {
 
 		// Trigger compaction
 		require.NoError(t, db.Compact(prefix, []byte{2}, true))
-		wg.Wait()
+
+		// Use a timer to implement a timeout for wg.Wait()
+		timeout := time.After(30 * time.Second)
+		done := make(chan struct{})
+
+		go func() {
+			wg.Wait()
+			close(done)
+		}()
+
+		select {
+		case <-done:
+			// WaitGroup finished successfully
+		case <-timeout:
+			t.Fatal("Test timed out waiting for WAL files to be deleted")
+		}
 
 		// Verify the disk usage is reduced
 		sizeAfter := getFolderSize(t, dir)
