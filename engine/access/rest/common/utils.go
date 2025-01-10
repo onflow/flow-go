@@ -55,3 +55,26 @@ func ParseBody(raw io.Reader, dst interface{}) error {
 
 	return nil
 }
+
+// ParseInterfacesToString converts a slice of interface{} to a slice of strings.
+//
+// No errors are expected during normal operations.
+func ParseInterfacesToString(value interface{}) ([]string, error) {
+	// Check if value is []interface{}
+	interfaceSlice, ok := value.([]interface{})
+	if !ok {
+		return nil, fmt.Errorf("'%s' must be an array", value)
+	}
+
+	// Convert []interface{} to []string
+	result := make([]string, len(interfaceSlice))
+	for i, v := range interfaceSlice {
+		str, ok := v.(string)
+		if !ok {
+			return nil, fmt.Errorf("'%s' must be an array of strings", value)
+		}
+		result[i] = str
+	}
+
+	return result, nil
+}

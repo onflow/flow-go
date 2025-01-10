@@ -385,7 +385,6 @@ func (s *WebsocketSubscriptionSuite) TestListOfSubscriptions() {
 	s.validateBaseMessageResponse(blockHeadersSubscriptionID, baseResponses[0])
 
 	// 3. Create list of subscription request message
-	// TODO: remove subscription id for list od subscriptions request
 	listOfSubscriptionsID := uuid.New().String()
 	listOfSubscriptionRequest := s.listSubscriptionsMessageRequest(listOfSubscriptionsID)
 	// send list of subscription message
@@ -395,6 +394,7 @@ func (s *WebsocketSubscriptionSuite) TestListOfSubscriptions() {
 
 	// validate list of active subscriptions response
 	s.Require().Equal(1, len(responses))
+	listOfSubscriptionResponse := responses[0]
 	expectedSubscriptions := []*models.SubscriptionEntry{
 		{
 			SubscriptionID: blocksSubscriptionID,
@@ -407,8 +407,6 @@ func (s *WebsocketSubscriptionSuite) TestListOfSubscriptions() {
 			Arguments:      nil, //TODO: change to blockHeadersSubscriptionArguments when arguments will be fixed in #6847
 		},
 	}
-
-	listOfSubscriptionResponse := responses[0]
 	s.validateBaseMessageResponse(listOfSubscriptionsID, listOfSubscriptionResponse.BaseMessageResponse)
 	s.Require().Equal(expectedSubscriptions, listOfSubscriptionResponse.Subscriptions)
 }
@@ -474,10 +472,12 @@ func (s *WebsocketSubscriptionSuite) TestHappyCases() {
 				s.Require().NoError(err)
 				s.T().Logf("txId %v", flow.Identifier(tx.ID()))
 
-				return models.Arguments{}
+				return models.Arguments{
+					"event_types": []string{"flow.AccountCreated", "flow.AccountKeyAdded"},
+				}
 			},
 			validateFunc:                       s.validateAccountStatuses,
-			listenSubscriptionResponseDuration: 5 * time.Second,
+			listenSubscriptionResponseDuration: 10 * time.Second,
 			testUnsubscribe:                    true,
 		},
 		//TODO: uncomment when error in rpc backend will be fixed (Andrii Slisarchuk PR)
@@ -696,13 +696,13 @@ func (s *WebsocketSubscriptionSuite) validateBlockDigests(
 // events which received from grpc api
 func (s *WebsocketSubscriptionSuite) validateEvents(
 	expectedSubscriptionID string,
-	receivedEventsResponse []models.BaseDataProvidersResponse,
+	receivedResponses []models.BaseDataProvidersResponse,
 ) {
 	// make sure there are received events
-	s.Require().GreaterOrEqual(len(receivedEventsResponse), 1, "expect received events")
+	s.Require().GreaterOrEqual(len(receivedResponses), 1, "expect received events")
 
 	expectedCounter := uint64(0)
-	for _, receivedEventResponse := range receivedEventsResponse {
+	for _, receivedEventResponse := range receivedResponses {
 		s.Require().Equal(expectedSubscriptionID, receivedEventResponse.SubscriptionID)
 		s.Require().Equal(data_providers.EventsTopic, receivedEventResponse.Topic)
 
@@ -731,11 +731,12 @@ func (s *WebsocketSubscriptionSuite) validateEvents(
 // validateAccountStatuses is a helper function that encapsulates logic for comparing received account statuses
 func (s *WebsocketSubscriptionSuite) validateAccountStatuses(
 	expectedSubscriptionID string,
-	receivedAccountStatusesResponses []models.BaseDataProvidersResponse,
+	receivedResponses []models.BaseDataProvidersResponse,
 ) {
-	expectedCounter := uint64(0)
+	s.Require().NotEmpty(receivedResponses, "expected received block digests")
 
-	for _, receivedAccountStatusResponse := range receivedAccountStatusesResponses {
+	expectedCounter := uint64(0)
+	for _, receivedAccountStatusResponse := range receivedResponses {
 		s.Require().Equal(expectedSubscriptionID, receivedAccountStatusResponse.SubscriptionID)
 		s.Require().Equal(data_providers.AccountStatusesTopic, receivedAccountStatusResponse.Topic)
 
@@ -803,11 +804,11 @@ func (s *WebsocketSubscriptionSuite) validateEventsForBlock(blockHeight string, 
 // validateTransactionStatuses is a helper function that encapsulates logic for comparing received transaction statuses
 func (s *WebsocketSubscriptionSuite) validateTransactionStatuses(
 	expectedSubscriptionID string,
-	receivedTransactionStatusesResponses []models.BaseDataProvidersResponse,
+	receivedResponses []models.BaseDataProvidersResponse,
 ) {
-	s.T().Logf("receivedTransactionStatusesResponses %v", receivedTransactionStatusesResponses)
+	s.T().Logf("receivedTransactionStatusesResponses %v", receivedResponses)
 	expectedCount := 4 // pending, finalized, executed, sealed
-	s.Require().Equal(expectedCount, len(receivedTransactionStatusesResponses), fmt.Sprintf("expected %d transaction statuses", expectedCount))
+	s.Require().Equal(expectedCount, len(receivedResponses), fmt.Sprintf("expected %d transaction statuses", expectedCount))
 
 	expectedCounter := uint64(0)
 	lastReportedTxStatus := commonmodels.PENDING_TransactionStatus
@@ -821,7 +822,7 @@ func (s *WebsocketSubscriptionSuite) validateTransactionStatuses(
 		commonmodels.SEALED_TransactionStatus,
 	}
 
-	for _, transactionStatusResponse := range receivedTransactionStatusesResponses {
+	for _, transactionStatusResponse := range receivedResponses {
 		s.Require().Equal(expectedSubscriptionID, transactionStatusResponse.SubscriptionID)
 		s.Require().Equal(data_providers.SendAndGetTransactionStatusesTopic, transactionStatusResponse.Topic)
 
