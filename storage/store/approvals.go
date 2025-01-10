@@ -1,4 +1,4 @@
-package badger
+package store
 
 import (
 	"errors"
@@ -20,7 +20,7 @@ type ResultApprovals struct {
 	cache *Cache[flow.Identifier, *flow.ResultApproval]
 }
 
-func NewResultApprovals(collector module.CacheMetrics, db *badger.DB) *ResultApprovals {
+func NewResultApprovals(collector module.CacheMetrics, db storage.DB) *ResultApprovals {
 
 	store := func(key flow.Identifier, val *flow.ResultApproval) func(*transaction.Tx) error {
 		return transaction.WithTx(operation.SkipDuplicates(operation.InsertResultApproval(val)))
