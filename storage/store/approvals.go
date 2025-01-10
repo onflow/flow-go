@@ -20,16 +20,14 @@ type ResultApprovals struct {
 }
 
 func NewResultApprovals(collector module.CacheMetrics, db storage.DB) *ResultApprovals {
-	store := func(key flow.Identifier, val *flow.ResultApproval) func(rw storage.ReaderBatchWriter) error {
-		return storage.OnlyWriter(operation.InsertResultApproval(val))
+	store := func(rw storage.ReaderBatchWriter, key flow.Identifier, val *flow.ResultApproval) error {
+		return operation.InsertResultApproval(rw.Writer(), val)
 	}
 
-	retrieve := func(approvalID flow.Identifier) func(r storage.Reader) (*flow.ResultApproval, error) {
+	retrieve := func(r storage.Reader, approvalID flow.Identifier) (*flow.ResultApproval, error) {
 		var approval flow.ResultApproval
-		return func(r storage.Reader) (*flow.ResultApproval, error) {
-			err := operation.RetrieveResultApproval(approvalID, &approval)(r)
-			return &approval, err
-		}
+		err := operation.RetrieveResultApproval(r, approvalID, &approval)
+		return &approval, err
 	}
 
 	res := &ResultApprovals{
@@ -44,64 +42,60 @@ func NewResultApprovals(collector module.CacheMetrics, db storage.DB) *ResultApp
 	return res
 }
 
-func (r *ResultApprovals) store(approval *flow.ResultApproval) func(storage.ReaderBatchWriter) error {
-	return r.cache.PutTx(approval.ID(), approval)
+func (r *ResultApprovals) store(rw storage.ReaderBatchWriter, approval *flow.ResultApproval) error {
+	return r.cache.PutTx(rw, approval.ID(), approval)
 }
 
-func (r *ResultApprovals) byID(approvalID flow.Identifier) func(storage.Reader) (*flow.ResultApproval, error) {
-	return func(reader storage.Reader) (*flow.ResultApproval, error) {
-		val, err := r.cache.Get(approvalID)(reader)
-		if err != nil {
-			return nil, err
-		}
-		return val, nil
+func (r *ResultApprovals) byID(reader storage.Reader, approvalID flow.Identifier) (*flow.ResultApproval, error) {
+	val, err := r.cache.Get(reader, approvalID)
+	if err != nil {
+		return nil, err
 	}
+	return val, nil
 }
 
-func (r *ResultApprovals) byChunk(resultID flow.Identifier, chunkIndex uint64) func(storage.Reader) (*flow.ResultApproval, error) {
-	return func(reader storage.Reader) (*flow.ResultApproval, error) {
-		var approvalID flow.Identifier
-		err := operation.LookupResultApproval(resultID, chunkIndex, &approvalID)(reader)
-		if err != nil {
-			return nil, fmt.Errorf("could not lookup result approval ID: %w", err)
-		}
-		return r.byID(approvalID)(reader)
+func (r *ResultApprovals) byChunk(reader storage.Reader, resultID flow.Identifier, chunkIndex uint64) (*flow.ResultApproval, error) {
+	var approvalID flow.Identifier
+	err := operation.LookupResultApproval(reader, resultID, chunkIndex, &approvalID)
+	if err != nil {
+		return nil, fmt.Errorf("could not lookup result approval ID: %w", err)
 	}
+	return r.byID(reader, approvalID)
 }
 
 // CAUTION: Caller must acquire `indexing` lock.
-func (r *ResultApprovals) index(resultID flow.Identifier, chunkIndex uint64, approvalID flow.Identifier) func(storage.ReaderBatchWriter) error {
-	return func(rw storage.ReaderBatchWriter) error {
-		var storedApprovalID flow.Identifier
-		err := operation.LookupResultApproval(resultID, chunkIndex, &storedApprovalID)(rw.GlobalReader())
-		if err != nil {
-			if !errors.Is(err, storage.ErrNotFound) {
-				return fmt.Errorf("could not lookup result approval ID: %w", err)
-			}
-
-			// no approval found, index the approval
-
-			return operation.UnsafeIndexResultApproval(resultID, chunkIndex, approvalID)(rw.Writer())
+func (r *ResultApprovals) index(rw storage.ReaderBatchWriter, resultID flow.Identifier, chunkIndex uint64, approvalID flow.Identifier) error {
+	var storedApprovalID flow.Identifier
+	err := operation.LookupResultApproval(rw.GlobalReader(), resultID, chunkIndex, &storedApprovalID)
+	if err != nil {
+		if !errors.Is(err, storage.ErrNotFound) {
+			return fmt.Errorf("could not lookup result approval ID: %w", err)
 		}
 
-		// an approval is already indexed, double check if it is the same
-		// We don't allow indexing multiple approvals per chunk because the
-		// store is only used within Verification nodes, and it is impossible
-		// for a Verification node to compute different approvals for the same
-		// chunk.
+		// no approval found, index the approval
 
-		if storedApprovalID != approvalID {
-			return fmt.Errorf("attempting to store conflicting approval (result: %v, chunk index: %d): storing: %v, stored: %v. %w",
-				resultID, chunkIndex, approvalID, storedApprovalID, storage.ErrDataMismatch)
-		}
-
-		return nil
+		return operation.UnsafeIndexResultApproval(rw.Writer(), resultID, chunkIndex, approvalID)
 	}
+
+	// an approval is already indexed, double check if it is the same
+	// We don't allow indexing multiple approvals per chunk because the
+	// store is only used within Verification nodes, and it is impossible
+	// for a Verification node to compute different approvals for the same
+	// chunk.
+
+	if storedApprovalID != approvalID {
+		return fmt.Errorf("attempting to store conflicting approval (result: %v, chunk index: %d): storing: %v, stored: %v. %w",
+			resultID, chunkIndex, approvalID, storedApprovalID, storage.ErrDataMismatch)
+	}
+
+	return nil
 }
 
 // Store stores a ResultApproval
 func (r *ResultApprovals) Store(approval *flow.ResultApproval) error {
-	return r.db.WithReaderBatchWriter(r.store(approval))
+	return r.db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+		return r.store(rw, approval)
+	})
 }
 
 // Index indexes a ResultApproval by chunk (ResultID + chunk index).
@@ -116,7 +110,10 @@ func (r *ResultApprovals) Index(resultID flow.Identifier, chunkIndex uint64, app
 	r.indexing.Lock()
 	defer r.indexing.Unlock()
 
-	err := r.db.WithReaderBatchWriter(r.index(resultID, chunkIndex, approvalID))
+	err := r.db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+		return r.index(rw, resultID, chunkIndex, approvalID)
+	})
+
 	if err != nil {
 		return fmt.Errorf("could not index result approval: %w", err)
 	}
@@ -125,12 +122,12 @@ func (r *ResultApprovals) Index(resultID flow.Identifier, chunkIndex uint64, app
 
 // ByID retrieves a ResultApproval by its ID
 func (r *ResultApprovals) ByID(approvalID flow.Identifier) (*flow.ResultApproval, error) {
-	return r.byID(approvalID)(r.db.Reader())
+	return r.byID(r.db.Reader(), approvalID)
 }
 
 // ByChunk retrieves a ResultApproval by result ID and chunk index. The
 // ResultApprovals store is only used within a verification node, where it is
 // assumed that there is never more than one approval per chunk.
 func (r *ResultApprovals) ByChunk(resultID flow.Identifier, chunkIndex uint64) (*flow.ResultApproval, error) {
-	return r.byChunk(resultID, chunkIndex)(r.db.Reader())
+	return r.byChunk(r.db.Reader(), resultID, chunkIndex)
 }
