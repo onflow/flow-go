@@ -166,16 +166,6 @@ func WithEventCollectionSizeLimit(limit uint64) Option {
 	}
 }
 
-// WithEntropyProvider sets the entropy provider of a virtual machine context.
-//
-// The VM uses the input to provide entropy to the Cadence runtime randomness functions.
-func WithEntropyProvider(source environment.EntropyProvider) Option {
-	return func(ctx Context) Context {
-		ctx.EntropyProvider = source
-		return ctx
-	}
-}
-
 // WithBlockHeader sets the block header for a virtual machine context.
 //
 // The VM uses the header to provide current block information to the Cadence runtime.
@@ -381,11 +371,34 @@ func WithAllowProgramCacheWritesInScriptsEnabled(enabled bool) Option {
 	}
 }
 
-// WithReadVersionFromNodeVersionBeacon sets whether the version from the node version beacon should be read
-// this should only be disabled for testing
-func WithReadVersionFromNodeVersionBeacon(enabled bool) Option {
+// WithEntropyProvider sets the entropy provider of a virtual machine context.
+//
+// The VM uses the input to provide entropy to the Cadence runtime randomness functions.
+func WithEntropyProvider(source environment.EntropyProvider) Option {
 	return func(ctx Context) Context {
-		ctx.ReadVersionFromNodeVersionBeacon = enabled
+		ctx.EntropyProvider = source
+		return ctx
+	}
+}
+
+// WithExecutionVersionProvider sets the execution version provider of a virtual machine context.
+//
+// this is used to provide the execution version to the Cadence runtime.
+func WithExecutionVersionProvider(provider environment.ExecutionVersionProvider) Option {
+	return func(ctx Context) Context {
+		ctx.ExecutionVersionProvider = provider
+		return ctx
+	}
+}
+
+// WithProtocolStateSnapshot sets all the necessary components from a subset of the protocol state
+// to the virtual machine context.
+func WithProtocolStateSnapshot(snapshot flow.ProtocolSnapshotExecutionSubset) Option {
+	return func(ctx Context) Context {
+
+		ctx = WithEntropyProvider(snapshot)(ctx)
+
+		ctx = WithExecutionVersionProvider(environment.NewVersionBeaconExecutionVersionProvider(snapshot.VersionBeacon))(ctx)
 		return ctx
 	}
 }
