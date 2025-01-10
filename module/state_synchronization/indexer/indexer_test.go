@@ -17,6 +17,7 @@ import (
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data/mock"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	mempool "github.com/onflow/flow-go/module/mempool/mock"
+	"github.com/onflow/flow-go/storage"
 	storagemock "github.com/onflow/flow-go/storage/mock"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -82,7 +83,7 @@ func newIndexerTest(t *testing.T, availableBlocks int, lastIndexedIndex int) *in
 		indexerCoreTest.indexer,
 		exeCache,
 		test.latestHeight,
-		progress,
+		&mockProgressInitializer{progress: progress},
 	)
 	require.NoError(t, err)
 
@@ -119,6 +120,19 @@ func (w *indexerTest) run(ctx irrecoverable.SignalerContext, reachHeight uint64,
 	cancel()
 
 	unittest.RequireCloseBefore(w.t, w.worker.Done(), testTimeout, "timeout waiting for the consumer to be done")
+}
+
+type mockProgressInitializer struct {
+	progress *mockProgress
+}
+
+func (m *mockProgressInitializer) Initialize(defaultIndex uint64) (storage.ConsumerProgress, error) {
+	err := m.progress.InitProcessedIndex(defaultIndex)
+	if err != nil {
+		return nil, err
+	}
+
+	return m.progress, nil
 }
 
 type mockProgress struct {
