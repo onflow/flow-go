@@ -877,10 +877,11 @@ func (suite *Suite) TestGetTransactionResult() {
 
 		processedHeightInitializer := store.NewConsumerProgress(badgerimpl.ToDB(db), module.ConsumeProgressIngestionEngineBlockHeight)
 
-		processedHeight, err := processedHeightInitializer.Initialize(suite.rootBlock.Height)
+		lastFullBlockHeightProgress, err := store.NewConsumerProgress(badgerimpl.ToDB(db), module.ConsumeProgressLastFullBlockHeight).
+			Initialize(suite.rootBlock.Height)
 		require.NoError(suite.T(), err)
 
-		lastFullBlockHeight, err := counters.NewPersistentStrictMonotonicCounter(processedHeight)
+		lastFullBlockHeight, err := counters.NewPersistentStrictMonotonicCounter(lastFullBlockHeightProgress)
 		require.NoError(suite.T(), err)
 
 		// create the ingest engine
@@ -1132,10 +1133,12 @@ func (suite *Suite) TestExecuteScript() {
 			Once()
 
 		processedHeightInitializer := store.NewConsumerProgress(badgerimpl.ToDB(db), module.ConsumeProgressIngestionEngineBlockHeight)
-		processedHeight, err := processedHeightInitializer.Initialize(suite.rootBlock.Height)
+
+		lastFullBlockHeightInitializer := store.NewConsumerProgress(badgerimpl.ToDB(db), module.ConsumeProgressLastFullBlockHeight)
+		lastFullBlockHeightProgress, err := lastFullBlockHeightInitializer.Initialize(suite.rootBlock.Height)
 		require.NoError(suite.T(), err)
 
-		lastFullBlockHeight, err := counters.NewPersistentStrictMonotonicCounter(processedHeight)
+		lastFullBlockHeight, err := counters.NewPersistentStrictMonotonicCounter(lastFullBlockHeightProgress)
 		require.NoError(suite.T(), err)
 
 		// create the ingest engine
