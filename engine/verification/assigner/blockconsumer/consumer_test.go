@@ -5,6 +5,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/dgraph-io/badger/v2"
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
@@ -17,8 +18,7 @@ import (
 	"github.com/onflow/flow-go/module/jobqueue"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/module/trace"
-	"github.com/onflow/flow-go/storage"
-	"github.com/onflow/flow-go/storage/operation/dbtest"
+	"github.com/onflow/flow-go/storage/operation/badgerimpl"
 	"github.com/onflow/flow-go/storage/store"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -118,10 +118,11 @@ func withConsumer(
 	process func(notifier module.ProcessingNotifier, block *flow.Block),
 	withBlockConsumer func(*blockconsumer.BlockConsumer, []*flow.Block),
 ) {
-	dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
+
+	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
 		maxProcessing := uint64(workerCount)
 
-		processedHeight := store.NewConsumerProgress(db, module.ConsumeProgressVerificationBlockHeight)
+		processedHeight := store.NewConsumerProgress(badgerimpl.ToDB(db), module.ConsumeProgressVerificationBlockHeight)
 		collector := &metrics.NoopCollector{}
 		tracer := trace.NewNoopTracer()
 		log := unittest.Logger()
