@@ -127,11 +127,6 @@ type mockProgressInitializer struct {
 }
 
 func (m *mockProgressInitializer) Initialize(defaultIndex uint64) (storage.ConsumerProgress, error) {
-	err := m.progress.InitProcessedIndex(defaultIndex)
-	if err != nil {
-		return nil, err
-	}
-
 	return m.progress, nil
 }
 
