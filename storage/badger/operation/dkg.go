@@ -121,7 +121,7 @@ func MigrateDKGEndStateFromV1() func(txn *badger.Txn) error {
 
 		for _, op := range ops {
 			if err := op(txn); err != nil {
-				return err
+				return fmt.Errorf("aborting conversion from DKG end states: %w", err)
 			}
 		}
 		return nil
