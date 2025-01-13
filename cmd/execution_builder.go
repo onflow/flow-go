@@ -61,7 +61,6 @@ import (
 	"github.com/onflow/flow-go/engine/execution/state/bootstrap"
 	"github.com/onflow/flow-go/engine/execution/storehouse"
 	"github.com/onflow/flow-go/fvm"
-	"github.com/onflow/flow-go/fvm/evm/debug"
 	"github.com/onflow/flow-go/fvm/storage/snapshot"
 	"github.com/onflow/flow-go/fvm/systemcontracts"
 	ledgerpkg "github.com/onflow/flow-go/ledger"
@@ -526,23 +525,6 @@ func (exeNode *ExecutionNode) LoadProviderEngine(
 		)},
 		node.FvmOptions...,
 	)
-
-	if exeNode.exeConf.evmTracingEnabled {
-		var err error
-		evmTraceUploader := debug.NewNoopUploader()
-		if len(exeNode.exeConf.evmTracesGCPBucket) > 0 {
-			evmTraceUploader, err = debug.NewGCPUploader(exeNode.exeConf.evmTracesGCPBucket)
-			if err != nil {
-				return nil, fmt.Errorf("could not create evm trace uploader: %w", err)
-			}
-		}
-		evmTracer, err := debug.NewEVMCallTracer(evmTraceUploader, node.Logger)
-		if err != nil {
-			return nil, fmt.Errorf("could not create evm tracer: %w", err)
-		}
-
-		opts = append(opts, fvm.WithEVMTracer(evmTracer))
-	}
 
 	vmCtx := fvm.NewContext(opts...)
 
