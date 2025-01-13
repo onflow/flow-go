@@ -10,7 +10,7 @@ type Events interface {
 	Store(blockID flow.Identifier, blockEvents []flow.EventsList) error
 
 	// BatchStore will store events for the given block ID in a given batch
-	BatchStore(blockID flow.Identifier, events []flow.EventsList, batch BatchStorage) error
+	BatchStore(blockID flow.Identifier, events []flow.EventsList, batch ReaderBatchWriter) error
 
 	// ByBlockID returns the events for the given block ID
 	ByBlockID(blockID flow.Identifier) ([]flow.Event, error)
@@ -27,14 +27,14 @@ type Events interface {
 	// BatchRemoveByBlockID removes events keyed by a blockID in provided batch
 	// No errors are expected during normal operation, even if no entries are matched.
 	// If Badger unexpectedly fails to process the request, the error is wrapped in a generic error and returned.
-	BatchRemoveByBlockID(blockID flow.Identifier, batch BatchStorage) error
+	BatchRemoveByBlockID(blockID flow.Identifier, batch ReaderBatchWriter) error
 }
 
 type ServiceEvents interface {
 	// BatchStore stores service events keyed by a blockID in provided batch
 	// No errors are expected during normal operation, even if no entries are matched.
 	// If Badger unexpectedly fails to process the request, the error is wrapped in a generic error and returned.
-	BatchStore(blockID flow.Identifier, events []flow.Event, batch BatchStorage) error
+	BatchStore(blockID flow.Identifier, events []flow.Event, batch ReaderBatchWriter) error
 
 	// ByBlockID returns the events for the given block ID
 	ByBlockID(blockID flow.Identifier) ([]flow.Event, error)
@@ -42,5 +42,5 @@ type ServiceEvents interface {
 	// BatchRemoveByBlockID removes service events keyed by a blockID in provided batch
 	// No errors are expected during normal operation, even if no entries are matched.
 	// If Badger unexpectedly fails to process the request, the error is wrapped in a generic error and returned.
-	BatchRemoveByBlockID(blockID flow.Identifier, batch BatchStorage) error
+	BatchRemoveByBlockID(blockID flow.Identifier, batch ReaderBatchWriter) error
 }
