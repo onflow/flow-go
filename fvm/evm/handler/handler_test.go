@@ -1,12 +1,10 @@
 package handler_test
 
 import (
-	"encoding/json"
 	"fmt"
 	"math"
 	"math/big"
 	"testing"
-	"time"
 
 	"github.com/onflow/cadence/common"
 	gethCommon "github.com/onflow/go-ethereum/common"
@@ -15,12 +13,10 @@ import (
 	gethVM "github.com/onflow/go-ethereum/core/vm"
 	gethParams "github.com/onflow/go-ethereum/params"
 	"github.com/onflow/go-ethereum/rlp"
-	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/fvm/errors"
-	"github.com/onflow/flow-go/fvm/evm/debug"
 	"github.com/onflow/flow-go/fvm/evm/emulator"
 	"github.com/onflow/flow-go/fvm/evm/handler"
 	"github.com/onflow/flow-go/fvm/evm/handler/coa"
@@ -71,7 +67,7 @@ func TestHandler_TransactionRunOrPanic(t *testing.T) {
 							return new(big.Int), nil
 						},
 					}
-					handler := handler.NewContractHandler(flow.Emulator, rootAddr, flowTokenAddress, rootAddr, bs, aa, backend, em, debug.NopTracer)
+					handler := handler.NewContractHandler(flow.Emulator, rootAddr, flowTokenAddress, rootAddr, bs, aa, backend, em)
 
 					coinbase := types.NewAddress(gethCommon.Address{})
 
@@ -144,7 +140,7 @@ func TestHandler_TransactionRunOrPanic(t *testing.T) {
 							return new(big.Int), nil
 						},
 					}
-					handler := handler.NewContractHandler(flow.Testnet, rootAddr, flowTokenAddress, rootAddr, bs, aa, backend, em, debug.NopTracer)
+					handler := handler.NewContractHandler(flow.Testnet, rootAddr, flowTokenAddress, rootAddr, bs, aa, backend, em)
 
 					coinbase := types.NewAddress(gethCommon.Address{})
 
@@ -205,7 +201,7 @@ func TestHandler_TransactionRunOrPanic(t *testing.T) {
 								return new(big.Int), nil
 							},
 						}
-						handler := handler.NewContractHandler(flow.Testnet, rootAddr, flowTokenAddress, rootAddr, bs, aa, backend, em, debug.NopTracer)
+						handler := handler.NewContractHandler(flow.Testnet, rootAddr, flowTokenAddress, rootAddr, bs, aa, backend, em)
 						assertPanic(t, errors.IsFailure, func() {
 							tx := eoa.PrepareSignAndEncodeTx(
 								t,
@@ -477,7 +473,7 @@ func TestHandler_COA(t *testing.T) {
 							},
 						}
 
-						handler := handler.NewContractHandler(flow.Testnet, rootAddr, flowTokenAddress, rootAddr, bs, aa, backend, em, debug.NopTracer)
+						handler := handler.NewContractHandler(flow.Testnet, rootAddr, flowTokenAddress, rootAddr, bs, aa, backend, em)
 
 						account := handler.AccountByAddress(testutils.RandomAddress(t), false)
 						account.Withdraw(types.NewBalanceFromUFix64(1))
@@ -494,7 +490,7 @@ func TestHandler_COA(t *testing.T) {
 							},
 						}
 
-						handler := handler.NewContractHandler(flow.Testnet, rootAddr, flowTokenAddress, rootAddr, bs, aa, backend, em, debug.NopTracer)
+						handler := handler.NewContractHandler(flow.Testnet, rootAddr, flowTokenAddress, rootAddr, bs, aa, backend, em)
 						account := handler.AccountByAddress(testutils.RandomAddress(t), true)
 
 						account.Withdraw(types.NewBalanceFromUFix64(1))
@@ -511,7 +507,7 @@ func TestHandler_COA(t *testing.T) {
 							},
 						}
 
-						handler := handler.NewContractHandler(flow.Testnet, rootAddr, flowTokenAddress, rootAddr, bs, aa, backend, em, debug.NopTracer)
+						handler := handler.NewContractHandler(flow.Testnet, rootAddr, flowTokenAddress, rootAddr, bs, aa, backend, em)
 						account := handler.AccountByAddress(testutils.RandomAddress(t), true)
 
 						account.Withdraw(types.NewBalanceFromUFix64(0))
@@ -528,7 +524,7 @@ func TestHandler_COA(t *testing.T) {
 							},
 						}
 
-						handler := handler.NewContractHandler(flow.Testnet, rootAddr, flowTokenAddress, rootAddr, bs, aa, backend, em, debug.NopTracer)
+						handler := handler.NewContractHandler(flow.Testnet, rootAddr, flowTokenAddress, rootAddr, bs, aa, backend, em)
 						account := handler.AccountByAddress(testutils.RandomAddress(t), true)
 
 						account.Withdraw(types.NewBalanceFromUFix64(0))
@@ -558,7 +554,7 @@ func TestHandler_COA(t *testing.T) {
 							},
 						}
 
-						handler := handler.NewContractHandler(flow.Testnet, rootAddr, flowTokenAddress, rootAddr, bs, aa, backend, em, debug.NopTracer)
+						handler := handler.NewContractHandler(flow.Testnet, rootAddr, flowTokenAddress, rootAddr, bs, aa, backend, em)
 						account := handler.AccountByAddress(testutils.RandomAddress(t), true)
 
 						account.Deposit(types.NewFlowTokenVault(types.NewBalanceFromUFix64(1)))
@@ -575,7 +571,7 @@ func TestHandler_COA(t *testing.T) {
 							},
 						}
 
-						handler := handler.NewContractHandler(flow.Testnet, rootAddr, flowTokenAddress, rootAddr, bs, aa, backend, em, debug.NopTracer)
+						handler := handler.NewContractHandler(flow.Testnet, rootAddr, flowTokenAddress, rootAddr, bs, aa, backend, em)
 						account := handler.AccountByAddress(testutils.RandomAddress(t), true)
 
 						account.Deposit(types.NewFlowTokenVault(types.NewBalanceFromUFix64(1)))
@@ -775,7 +771,7 @@ func TestHandler_TransactionRun(t *testing.T) {
 							}, nil
 						},
 					}
-					handler := handler.NewContractHandler(chainID, rootAddr, flowTokenAddress, rootAddr, bs, aa, backend, em, debug.NopTracer)
+					handler := handler.NewContractHandler(chainID, rootAddr, flowTokenAddress, rootAddr, bs, aa, backend, em)
 					tx := eoa.PrepareSignAndEncodeTx(
 						t,
 						gethCommon.Address{},
@@ -824,7 +820,7 @@ func TestHandler_TransactionRun(t *testing.T) {
 							return new(big.Int), nil
 						},
 					}
-					handler := handler.NewContractHandler(chainID, rootAddr, flowTokenAddress, rootAddr, bs, aa, backend, em, debug.NopTracer)
+					handler := handler.NewContractHandler(chainID, rootAddr, flowTokenAddress, rootAddr, bs, aa, backend, em)
 
 					tx := eoa.PrepareSignAndEncodeTx(
 						t,
@@ -862,7 +858,7 @@ func TestHandler_TransactionRun(t *testing.T) {
 							return new(big.Int), nil
 						},
 					}
-					handler := handler.NewContractHandler(chainID, rootAddr, flowTokenAddress, rootAddr, bs, aa, backend, em, debug.NopTracer)
+					handler := handler.NewContractHandler(chainID, rootAddr, flowTokenAddress, rootAddr, bs, aa, backend, em)
 
 					coinbase := types.NewAddress(gethCommon.Address{})
 
@@ -959,7 +955,7 @@ func TestHandler_TransactionRun(t *testing.T) {
 							}, nil
 						},
 					}
-					handler := handler.NewContractHandler(chainID, rootAddr, flowTokenAddress, randomBeaconAddress, bs, aa, backend, em, debug.NopTracer)
+					handler := handler.NewContractHandler(chainID, rootAddr, flowTokenAddress, randomBeaconAddress, bs, aa, backend, em)
 
 					gasLimit := uint64(100_000)
 
@@ -1063,7 +1059,7 @@ func TestHandler_TransactionRun(t *testing.T) {
 							return new(big.Int), nil
 						},
 					}
-					handler := handler.NewContractHandler(chainID, rootAddr, flowTokenAddress, randomBeaconAddress, bs, aa, backend, em, debug.NopTracer)
+					handler := handler.NewContractHandler(chainID, rootAddr, flowTokenAddress, randomBeaconAddress, bs, aa, backend, em)
 					coinbase := types.NewAddress(gethCommon.Address{})
 
 					// batch run empty transactions
@@ -1131,245 +1127,13 @@ func TestHandler_TransactionRun(t *testing.T) {
 						},
 					}
 
-					handler := handler.NewContractHandler(chainID, rootAddr, flowTokenAddress, randomBeaconAddress, bs, aa, backend, em, debug.NopTracer)
+					handler := handler.NewContractHandler(chainID, rootAddr, flowTokenAddress, randomBeaconAddress, bs, aa, backend, em)
 
 					rs := handler.DryRun(rlpTx, from)
 					require.Equal(t, types.StatusSuccessful, rs.Status)
 					require.Equal(t, result.GasConsumed, rs.GasConsumed)
 					require.Equal(t, types.ErrCodeNoError, rs.ErrorCode)
 					require.True(t, called)
-				})
-			})
-		})
-	})
-
-	t.Run("transaction run with tracing", func(t *testing.T) {
-		t.Parallel()
-
-		testutils.RunWithTestBackend(t, func(backend *testutils.TestBackend) {
-			testutils.RunWithTestFlowEVMRootAddress(t, backend, func(rootAddr flow.Address) {
-				testutils.RunWithEOATestAccount(t, backend, rootAddr, func(eoa *testutils.EOATestAccount) {
-
-					txID := gethCommon.HexToHash("0x1")
-					blockID := flow.Identifier{0x02}
-					uploaded := make(chan struct{})
-
-					result := &types.Result{
-						TxHash:       txID,
-						ReturnedData: testutils.RandomData(t),
-						Logs: []*gethTypes.Log{
-							testutils.GetRandomLogFixture(t),
-						},
-					}
-
-					uploader := &testutils.MockUploader{
-						UploadFunc: func(id string, message json.RawMessage) error {
-							assert.NotEmpty(t, message)
-							assert.Equal(t, debug.TraceID(txID, blockID), id)
-							close(uploaded)
-							return nil
-						},
-					}
-
-					tracer, err := debug.NewEVMCallTracer(uploader, zerolog.Nop())
-					require.NoError(t, err)
-					tracer.WithBlockID(blockID)
-
-					bs := handler.NewBlockStore(chainID, backend, rootAddr)
-					aa := handler.NewAddressAllocator()
-
-					em := &testutils.TestEmulator{
-						RunTransactionFunc: func(tx *gethTypes.Transaction) (*types.Result, error) {
-							tr := tracer.TxTracer()
-							// mock some calls
-							from := eoa.Address().ToCommon()
-							tr.OnTxStart(nil, tx, from)
-							tr.OnEnter(0, byte(gethVM.ADD), from, *tx.To(), tx.Data(), 20, big.NewInt(2))
-							tr.OnExit(0, []byte{0x02}, 200, nil, false)
-							tr.OnTxEnd(result.Receipt(), nil)
-							return result, nil
-						},
-						BalanceOfFunc: func(address types.Address) (*big.Int, error) {
-							return big.NewInt(0), nil
-						},
-					}
-
-					handler := handler.NewContractHandler(chainID, rootAddr, flowTokenAddress, rootAddr, bs, aa, backend, em, tracer)
-
-					tx := eoa.PrepareSignAndEncodeTx(
-						t,
-						gethCommon.Address{},
-						nil,
-						nil,
-						100_000,
-						big.NewInt(1),
-					)
-
-					_ = handler.Run(tx, types.NewAddress(gethCommon.Address{}))
-
-					assert.Eventuallyf(t, func() bool {
-						<-uploaded
-						return true
-					}, time.Second, time.Millisecond*100, "upload not executed")
-				})
-			})
-		})
-	})
-
-	// this test makes sure that even if tracing process fails it doesn't affect the execution flow
-	// it also makes sure the upload is retried and then we panic
-	t.Run("test - transaction run with tracing failure", func(t *testing.T) {
-		t.Parallel()
-
-		testutils.RunWithTestBackend(t, func(backend *testutils.TestBackend) {
-			testutils.RunWithTestFlowEVMRootAddress(t, backend, func(rootAddr flow.Address) {
-				testutils.RunWithEOATestAccount(t, backend, rootAddr, func(eoa *testutils.EOATestAccount) {
-
-					uploaded := make(chan struct{})
-					result := &types.Result{
-						TxHash:       gethCommon.HexToHash("0x1"),
-						ReturnedData: testutils.RandomData(t),
-						Logs: []*gethTypes.Log{
-							testutils.GetRandomLogFixture(t),
-						},
-					}
-
-					uploader := &testutils.MockUploader{
-						UploadFunc: func(id string, message json.RawMessage) error {
-							close(uploaded)
-							panic("total failure")
-						},
-					}
-
-					tracer, err := debug.NewEVMCallTracer(uploader, zerolog.Nop())
-					require.NoError(t, err)
-					tracer.WithBlockID(flow.Identifier{0x1})
-
-					bs := handler.NewBlockStore(defaultChainID, backend, rootAddr)
-					aa := handler.NewAddressAllocator()
-
-					em := &testutils.TestEmulator{
-						RunTransactionFunc: func(tx *gethTypes.Transaction) (*types.Result, error) {
-							tr := tracer.TxTracer()
-							tr.OnTxStart(nil, tx, gethCommon.Address{})
-							tr.OnEnter(0, 0, gethCommon.Address{}, *tx.To(), []byte{0x01, 0x02}, 10, big.NewInt(1))
-							tr.OnExit(0, []byte{0x02}, 200, nil, false)
-							tr.OnTxEnd(&gethTypes.Receipt{TxHash: result.TxHash}, nil)
-							return result, nil
-						},
-						BalanceOfFunc: func(address types.Address) (*big.Int, error) {
-							return big.NewInt(0), nil
-						},
-					}
-
-					handler := handler.NewContractHandler(chainID, rootAddr, flowTokenAddress, rootAddr, bs, aa, backend, em, tracer)
-
-					tx := eoa.PrepareSignAndEncodeTx(
-						t,
-						gethCommon.Address{},
-						nil,
-						nil,
-						100_000,
-						big.NewInt(1),
-					)
-
-					res := handler.Run(tx, types.NewAddress(gethCommon.Address{}))
-
-					assert.Eventuallyf(t, func() bool {
-						<-uploaded
-						return true
-					}, time.Second*5, time.Millisecond*100, "upload not executed")
-
-					require.Equal(t, types.StatusSuccessful, res.Status)
-				})
-			})
-		})
-	})
-
-	t.Run("test - transaction batch run with tracing", func(t *testing.T) {
-		t.Parallel()
-
-		testutils.RunWithTestBackend(t, func(backend *testutils.TestBackend) {
-			testutils.RunWithTestFlowEVMRootAddress(t, backend, func(rootAddr flow.Address) {
-				testutils.RunWithEOATestAccount(t, backend, rootAddr, func(eoa *testutils.EOATestAccount) {
-					bs := handler.NewBlockStore(defaultChainID, backend, rootAddr)
-					aa := handler.NewAddressAllocator()
-
-					const batchSize = 3
-					runResults := make([]*types.Result, batchSize)
-					traceResults := make([]json.RawMessage, batchSize)
-					uploaded := make(chan struct{}, batchSize)
-					uploadedVals := make(map[string]json.RawMessage)
-					blockID := flow.Identifier{0x02}
-
-					uploader := &testutils.MockUploader{
-						UploadFunc: func(id string, message json.RawMessage) error {
-							uploadedVals[id] = message
-							uploaded <- struct{}{}
-							return nil
-						},
-					}
-
-					tracer, err := debug.NewEVMCallTracer(uploader, zerolog.Nop())
-					require.NoError(t, err)
-					tracer.WithBlockID(blockID)
-
-					em := &testutils.TestEmulator{
-						BatchRunTransactionFunc: func(txs []*gethTypes.Transaction) ([]*types.Result, error) {
-							runResults = make([]*types.Result, len(txs))
-							tr := tracer.TxTracer()
-							for i, tx := range txs {
-								from := gethCommon.Address{byte(i)}
-								tr.OnTxStart(nil, tx, from)
-								tr.OnEnter(0, 0, from, *tx.To(), []byte{0x01, 0x02}, 10, big.NewInt(1))
-								tr.OnExit(0, []byte{0x02}, 200, nil, false)
-								tr.OnTxEnd(&gethTypes.Receipt{TxHash: tx.Hash()}, nil)
-								runResults[i] = &types.Result{
-									TxHash: tx.Hash(),
-									Logs: []*gethTypes.Log{
-										testutils.GetRandomLogFixture(t),
-									},
-								}
-								traceResults[i] = tracer.GetResultByTxHash(tx.Hash())
-							}
-							return runResults, nil
-						},
-						BalanceOfFunc: func(address types.Address) (*big.Int, error) {
-							return big.NewInt(0), nil
-						},
-					}
-
-					handler := handler.NewContractHandler(chainID, rootAddr, flowTokenAddress, randomBeaconAddress, bs, aa, backend, em, tracer)
-
-					coinbase := types.NewAddress(gethCommon.Address{})
-
-					txs := make([][]byte, batchSize)
-					for i := range txs {
-						txs[i] = eoa.PrepareSignAndEncodeTx(
-							t,
-							gethCommon.Address{},
-							nil,
-							nil,
-							100_000,
-							big.NewInt(1),
-						)
-					}
-
-					_ = handler.BatchRun(txs, coinbase)
-
-					for i := 0; i < batchSize; i++ {
-						assert.Eventuallyf(t, func() bool {
-							<-uploaded
-							return true
-						}, time.Second, time.Millisecond*100, "upload not executed")
-					}
-
-					for i, r := range runResults {
-						id := debug.TraceID(r.TxHash, blockID)
-						val, ok := uploadedVals[id]
-						require.True(t, ok)
-						require.Equal(t, traceResults[i], val)
-					}
 				})
 			})
 		})
@@ -1465,7 +1229,7 @@ func TestHandler_Metrics(t *testing.T) {
 					handler.NewAddressAllocator(),
 					backend,
 					em,
-					debug.NopTracer)
+				)
 
 				tx := eoa.PrepareSignAndEncodeTx(
 					t,
@@ -1557,6 +1321,5 @@ func SetupHandler(t testing.TB, backend types.Backend, rootAddr flow.Address) *h
 		handler.NewAddressAllocator(),
 		backend,
 		emulator.NewEmulator(backend, rootAddr),
-		debug.NopTracer,
 	)
 }
