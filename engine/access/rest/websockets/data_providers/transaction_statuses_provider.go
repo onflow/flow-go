@@ -62,6 +62,7 @@ func NewTransactionStatusesDataProvider(
 	p.baseDataProvider = newBaseDataProvider(
 		subscriptionID,
 		topic,
+		arguments,
 		cancel,
 		send,
 		p.createSubscription(subCtx, txStatusesArgs), // Set up a subscription to tx statuses based on arguments.

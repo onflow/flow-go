@@ -2,6 +2,8 @@ package data_providers
 
 import (
 	"github.com/google/uuid"
+
+	"github.com/onflow/flow-go/engine/access/rest/websockets/models"
 )
 
 // The DataProvider is the interface abstracts of the actual data provider used by the WebSocketCollector.
@@ -11,6 +13,8 @@ type DataProvider interface {
 	ID() uuid.UUID
 	// Topic returns the topic associated with the data provider.
 	Topic() string
+	// Arguments returns the arguments associated with the data provider.
+	Arguments() models.Arguments
 	// Close terminates the data provider.
 	//
 	// No errors are expected during normal operations.

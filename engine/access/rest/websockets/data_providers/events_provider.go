@@ -67,6 +67,7 @@ func NewEventsDataProvider(
 	p.baseDataProvider = newBaseDataProvider(
 		subscriptionID,
 		topic,
+		arguments,
 		cancel,
 		send,
 		p.createSubscription(subCtx, eventArgs), // Set up a subscription to events based on arguments.
