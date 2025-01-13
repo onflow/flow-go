@@ -2,6 +2,7 @@ package backend
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"github.com/onflow/flow-go/storage"
 	"os"
@@ -172,6 +173,25 @@ func (s *TransactionStatusSuite) SetupTest() {
 	require.NoError(s.T(), err)
 
 	s.blocks.On("ByHeight", mock.AnythingOfType("uint64")).Return(mocks.StorageMapGetter(s.blockMap))
+	s.blocks.On("ByID", mock.Anything).Return(
+		func(blockID flow.Identifier) *flow.Block {
+			for _, block := range s.blockMap {
+				if block.ID() == blockID {
+					return block
+				}
+			}
+			return nil
+		},
+		func(blockID flow.Identifier) error {
+			for _, block := range s.blockMap {
+				if block.ID() == blockID {
+					return nil
+				}
+			}
+			return errors.New("block not found")
+		},
+	)
+
 	s.state.On("Final").Return(s.finalSnapshot, nil).Maybe()
 	s.state.On("AtBlockID", mock.AnythingOfType("flow.Identifier")).Return(func(blockID flow.Identifier) protocolint.Snapshot {
 		s.tempSnapshot.On("Head").Unset()
@@ -429,7 +449,7 @@ func (s *TransactionStatusSuite) TestSubscribeTransactionStatusHappyCase() {
 			}, nil
 		}
 		return nil, storage.ErrNotFound
-	}).Twice()
+	})
 
 	// Create a special common function to read subscription messages from the channel and check converting it to transaction info
 	// and check results for correctness
