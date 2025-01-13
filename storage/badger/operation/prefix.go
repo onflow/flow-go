@@ -72,8 +72,9 @@ const (
 	codeEpochSetup         = 61 // EpochSetup service event, keyed by ID
 	codeEpochCommit        = 62 // EpochCommit service event, keyed by ID
 	codeBeaconPrivateKey   = 63 // BeaconPrivateKey, keyed by epoch counter
-	_                      = 64 // [DEPRECATED] flag that the DKG for an epoch has been started
-	codeDKGState           = 65 // current state of Recoverable Random Beacon State Machine for given epoch
+	_                      = 64 // [DEPRECATED] flag that the DKG for an epoch has been started, used in protocol version v1
+	codeDKGEndState        = 65 // [DEPRECATED] flag for DKG end state, used in protocol version v1
+	codeDKGState           = 66 // current state of Recoverable Random Beacon State Machine for given epoch
 	codeVersionBeacon      = 67 // flag for storing version beacons
 	codeEpochProtocolState = 68
 	codeProtocolKVStore    = 69

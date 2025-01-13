@@ -1,7 +1,9 @@
 package operation
 
 import (
+	"encoding/binary"
 	"errors"
+	"fmt"
 
 	"github.com/dgraph-io/badger/v2"
 
@@ -73,4 +75,55 @@ func UpsertDKGStateForEpoch(epochCounter uint64, newState flow.DKGState) func(*b
 // Error returns: [storage.ErrNotFound]
 func RetrieveDKGStateForEpoch(epochCounter uint64, currentState *flow.DKGState) func(*badger.Txn) error {
 	return retrieve(makePrefix(codeDKGState, epochCounter), currentState)
+}
+
+// MigrateDKGEndStateFromV1 migrates the database that was used in protocol version v1 to the v2.
+// It reads already stored data by deprecated prefix and writes it to the new prefix with values converted to the new representation.
+// TODO(EFM, #6794): This function is introduced to implement a backward-compatible upgrade from v1 to v2.
+// Remove this once we complete the network upgrade.
+func MigrateDKGEndStateFromV1() func(txn *badger.Txn) error {
+	return func(txn *badger.Txn) error {
+		var ops []func(*badger.Txn) error
+		err := traverse(makePrefix(codeDKGEndState), func() (checkFunc, createFunc, handleFunc) {
+			var epochCounter uint64
+			check := func(key []byte) bool {
+				epochCounter = binary.BigEndian.Uint64(key[1:]) // omit code
+				return true
+			}
+			var oldState uint32
+			create := func() interface{} {
+				return &oldState
+			}
+			handle := func() error {
+				newState := flow.DKGStateUninitialized
+				switch oldState {
+				case 0: // DKGEndStateUnknown
+					newState = flow.DKGStateUninitialized
+				case 1: // DKGEndStateSuccess
+					newState = flow.RandomBeaconKeyCommitted
+				case 2, 3, 4: // DKGEndStateInconsistentKey, DKGEndStateNoKey, DKGEndStateDKGFailure
+					newState = flow.DKGStateFailure
+				}
+
+				// schedule upsert of the new state and removal of the old state
+				// this will be executed after to split collecting and modifying of data.
+				ops = append(ops,
+					UpsertDKGStateForEpoch(epochCounter, newState),
+					remove(makePrefix(codeDKGEndState, epochCounter)))
+
+				return nil
+			}
+			return check, create, handle
+		})(txn)
+		if err != nil {
+			return fmt.Errorf("could not collect deprecated DKG end states: %w", err)
+		}
+
+		for _, op := range ops {
+			if err := op(txn); err != nil {
+				return fmt.Errorf("aborting conversion from DKG end states: %w", err)
+			}
+		}
+		return nil
+	}
 }
