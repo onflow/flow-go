@@ -203,18 +203,12 @@ func (s *WebsocketSubscriptionSuite) TestInactivityHeaders() {
 
 		s.Require().NoError(wsClient.WriteJSON(unsubscribeRequest))
 
-		// TODO: Somehow unsubscription are not return properly, but result appended to subscriptions
-		_, baseResponses, _ = s.listenWebSocketResponses(
-			wsClient,
-			5*time.Second,
-			unsubscribeRequest.SubscriptionID,
-		)
-
-		s.Require().Equal(1, len(baseResponses))
-		s.validateBaseMessageResponse(unsubscribeRequest.SubscriptionID, baseResponses[0])
+		var response models.BaseMessageResponse
+		err = wsClient.ReadJSON(&response)
+		s.validateBaseMessageResponse(unsubscribeRequest.SubscriptionID, response)
 
 		// Step 4: Monitor inactivity after unsubscription
-		expectedInactivityDuration := InactivityTimeout * time.Second
+		expectedInactivityDuration := InactivityTimeout * time.Second // TODO: use inactivity ticker duration instead of 1 Second
 		actualInactivityDuration := monitorInactivity(s.T(), wsClient, expectedInactivityDuration)
 
 		s.LessOrEqual(expectedInactivityDuration, actualInactivityDuration)
@@ -557,7 +551,7 @@ func (s *WebsocketSubscriptionSuite) TestHappyCases() {
 				}
 			},
 			validateFunc:                       s.validateTransactionStatuses,
-			listenSubscriptionResponseDuration: 10 * time.Second, //TODO: flaky behaviour with other subtests (received 3 statuses, expected 4)
+			listenSubscriptionResponseDuration: 10 * time.Second, //TODO: flaky behaviour with other subtests (received 3 statuses, expected 4), check when error in rpc backend will be fixed
 			testUnsubscribe:                    false,
 		},
 	}
