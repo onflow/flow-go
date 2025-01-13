@@ -52,7 +52,7 @@ func (a *PublicAssignmentTestSuite) TestByNodeID() {
 	// Since there are 2x as many chunks as verifiers, each verifier will have 2 chunks
 	for j, chunk := range chunks {
 		v := ids[j%size].NodeID
-		assignmentBuilder.Add(chunk.Index, flow.IdentifierList{v})
+		require.NoError(a.T(), assignmentBuilder.Add(chunk.Index, flow.IdentifierList{v}))
 	}
 	assignment := assignmentBuilder.Build()
 
@@ -71,26 +71,22 @@ func (a *PublicAssignmentTestSuite) TestByNodeID() {
 
 }
 
-// TestAssignDuplicate tests assign Add duplicate verifiers
+// TestAssignDuplicate tests that duplicate verifiers for a chunk are not allowed
+// since it would weaken the protocol's security
 func (a *PublicAssignmentTestSuite) TestAssignDuplicate() {
 	size := 5
 	// creates verifier ids
-	var ids flow.IdentityList = unittest.IdentityListFixture(size)
+	var ids = unittest.IdentityListFixture(size)
 	assignmentBuilder := chmodels.NewAssignmentBuilder()
 
 	// assigns first chunk to non-duplicate list of verifiers
-	assignmentBuilder.Add(0, ids.NodeIDs())
+	require.NoError(a.T(), assignmentBuilder.Add(0, ids.NodeIDs()))
 
 	// duplicates first verifier, hence size increases by 1
 	ids = append(ids, ids[0])
 	require.Len(a.T(), ids, size+1)
 	// assigns second chunk to a duplicate list of verifiers
-	assignmentBuilder.Add(1, ids.NodeIDs())
-
-	assignment := assignmentBuilder.Build()
-	require.Len(a.T(), assignment.Verifiers(0), size)
-	// should be size not size + 1
-	require.Len(a.T(), assignment.Verifiers(1), size)
+	require.Error(a.T(), assignmentBuilder.Add(1, ids.NodeIDs()))
 }
 
 // TestPermuteEntirely tests permuting an entire IdentityList against
@@ -269,7 +265,9 @@ func (a *PublicAssignmentTestSuite) ChunkAssignmentScenario(chunkNum, verNum, al
 
 	for _, chunk := range result.Chunks {
 		// each chunk should be assigned to alpha verifiers
-		require.Equal(a.T(), p1.Verifiers(chunk.Index).Len(), alpha)
+		verifiers, err := p1.Verifiers(chunk.Index)
+		require.NoError(a.T(), err)
+		require.Equal(a.T(), verifiers.Len(), alpha)
 	}
 }
 

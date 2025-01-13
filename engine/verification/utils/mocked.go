@@ -26,7 +26,10 @@ func (m *MockAssigner) Assign(result *flow.ExecutionResult, blockID flow.Identif
 	a := chmodel.NewAssignmentBuilder()
 	for _, c := range result.Chunks {
 		if m.isAssigned(c.Index) {
-			a.Add(c.Index, flow.IdentifierList{m.me})
+			err := a.Add(c.Index, flow.IdentifierList{m.me})
+			if err != nil {
+				return nil, err
+			}
 		}
 	}
 

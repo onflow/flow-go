@@ -92,7 +92,9 @@ func (s *ApprovalCollectorTestSuite) TestCollectMissingVerifiers() {
 
 	assignedVerifiers := make(map[uint64]flow.IdentifierList)
 	for _, chunk := range s.Chunks {
-		assignedVerifiers[chunk.Index] = s.ChunksAssignment.Verifiers(chunk.Index)
+		verifiers, err := s.ChunksAssignment.Verifiers(chunk.Index)
+		require.NoError(s.T(), err)
+		assignedVerifiers[chunk.Index] = verifiers
 	}
 
 	// no approvals processed

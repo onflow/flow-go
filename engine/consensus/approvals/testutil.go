@@ -4,6 +4,7 @@ import (
 	"github.com/gammazero/workerpool"
 	"github.com/onflow/crypto/hash"
 	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
 	"github.com/onflow/flow-go/model/chunks"
@@ -59,7 +60,7 @@ func (s *BaseApprovalsTestSuite) SetupTest() {
 
 	// create assignment
 	for _, chunk := range s.Chunks {
-		assignmentBuilder.Add(chunk.Index, verifiers)
+		require.NoError(s.T(), assignmentBuilder.Add(chunk.Index, verifiers))
 	}
 	s.ChunksAssignment = assignmentBuilder.Build()
 

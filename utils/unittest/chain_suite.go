@@ -515,7 +515,7 @@ func (bc *BaseChainSuite) ValidSubgraphFixture() subgraphFixture {
 	for _, chunk := range incorporatedResult.Result.Chunks {
 		assignedVerifiers, err := bc.Approvers.Sample(assignedVerifiersPerChunk)
 		require.NoError(bc.T(), err)
-		assignmentBuilder.Add(chunk.Index, assignedVerifiers.NodeIDs())
+		require.NoError(bc.T(), assignmentBuilder.Add(chunk.Index, assignedVerifiers.NodeIDs()))
 
 		// generate approvals
 		chunkApprovals := make(map[flow.Identifier]*flow.ResultApproval)
@@ -555,7 +555,7 @@ func (bc *BaseChainSuite) Extend(block *flow.Block) {
 		for _, chunk := range incorporatedResult.Result.Chunks {
 			assignedVerifiers, err := bc.Approvers.Sample(assignedVerifiersPerChunk)
 			require.NoError(bc.T(), err)
-			assignmentBuilder.Add(chunk.Index, assignedVerifiers.NodeIDs())
+			require.NoError(bc.T(), assignmentBuilder.Add(chunk.Index, assignedVerifiers.NodeIDs()))
 
 			// generate approvals
 			chunkApprovals := make(map[flow.Identifier]*flow.ResultApproval)

@@ -690,7 +690,8 @@ func (s *SealValidationSuite) validSealForResult(result *flow.ExecutionResult) *
 	assignment := s.Assignments[result.ID()]
 	for _, chunk := range result.Chunks {
 		aggregatedSigs := &seal.AggregatedApprovalSigs[chunk.Index]
-		assignedVerifiers := assignment.Verifiers(chunk.Index)
+		assignedVerifiers, err := assignment.Verifiers(chunk.Index)
+		require.NoError(s.T(), err)
 		aggregatedSigs.SignerIDs = assignedVerifiers[:]
 		aggregatedSigs.VerifierSignatures = unittest.SignaturesFixture(len(assignedVerifiers))
 
