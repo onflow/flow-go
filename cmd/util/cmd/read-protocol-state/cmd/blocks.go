@@ -159,6 +159,12 @@ func run(*cobra.Command, []string) {
 
 	reader := NewReader(state, storages)
 
+	// making sure only one flag is being used
+	err = checkOnlyOneFlagIsUsed(flagHeight, flagBlockID, flagFinal, flagSealed, flagExecuted)
+	if err != nil {
+		log.Fatal().Err(err).Msg("could not get block")
+	}
+
 	if flagHeight > 0 {
 		log.Info().Msgf("get block by height: %v", flagHeight)
 		block, err := reader.GetBlockByHeight(flagHeight)
@@ -237,5 +243,30 @@ func run(*cobra.Command, []string) {
 		log.Fatal().Msg("could not find executed block")
 	}
 
-	log.Fatal().Msgf("missing flag, try --final or --sealed or --height or --executed or --block-id")
+	log.Fatal().Msgf("missing flag, try --final or --sealed or --height or --executed or --block-id, note that only one flag can be used at a time")
+}
+
+func checkOnlyOneFlagIsUsed(height uint64, blockID string, final, sealed, executed bool) error {
+	flags := make([]string, 0, 5)
+	if height > 0 {
+		flags = append(flags, "height")
+	}
+	if blockID != "" {
+		flags = append(flags, "blockID")
+	}
+	if final {
+		flags = append(flags, "final")
+	}
+	if sealed {
+		flags = append(flags, "sealed")
+	}
+	if executed {
+		flags = append(flags, "executed")
+	}
+
+	if len(flags) != 1 {
+		return fmt.Errorf("only one flag can be used at a time, used flags: %v", flags)
+	}
+
+	return nil
 }
