@@ -15,6 +15,8 @@ type Events struct {
 	cache *Cache[flow.Identifier, []flow.Event]
 }
 
+var _ storage.Events = (*Events)(nil)
+
 func NewEvents(collector module.CacheMetrics, db storage.DB) *Events {
 	retrieve := func(r storage.Reader, blockID flow.Identifier) ([]flow.Event, error) {
 		var events []flow.Event
