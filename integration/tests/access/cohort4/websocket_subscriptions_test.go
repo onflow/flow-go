@@ -393,12 +393,12 @@ func (s *WebsocketSubscriptionSuite) TestListOfSubscriptions() {
 		{
 			SubscriptionID: blocksSubscriptionID,
 			Topic:          data_providers.BlocksTopic,
-			Arguments:      nil, //TODO: change to blocksSubscriptionArguments when arguments will be fixed in #6847
+			Arguments:      blocksSubscriptionArguments,
 		},
 		{
 			SubscriptionID: blockHeadersSubscriptionID,
 			Topic:          data_providers.BlockHeadersTopic,
-			Arguments:      nil, //TODO: change to blockHeadersSubscriptionArguments when arguments will be fixed in #6847
+			Arguments:      blocksSubscriptionArguments,
 		},
 	}
 	s.validateBaseMessageResponse(listOfSubscriptionsID, listOfSubscriptionResponse.BaseMessageResponse)
