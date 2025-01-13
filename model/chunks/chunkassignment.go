@@ -4,6 +4,8 @@ import (
 	"errors"
 	"fmt"
 
+	"golang.org/x/exp/maps"
+
 	"github.com/onflow/flow-go/model/flow"
 )
 
@@ -44,16 +46,13 @@ func (a *AssignmentBuilder) Build() *Assignment {
 // that for each chunk in a block, a verifier assignment exists (though it may be empty) and
 // that each block must at least have one chunk.
 // Errors: ErrUnknownChunkIndex if the chunk index is not present in the assignment
-func (a *Assignment) Verifiers(chunkIdx uint64) (flow.IdentifierList, error) {
+func (a *Assignment) Verifiers(chunkIdx uint64) (map[flow.Identifier]struct{}, error) {
 	if chunkIdx >= uint64(len(a.verifiersForChunk)) {
 		return nil, ErrUnknownChunkIndex
 	}
 	assignedVerifiers := a.verifiersForChunk[chunkIdx]
-	v := make([]flow.Identifier, 0, len(assignedVerifiers))
-	for id := range a.verifiersForChunk[chunkIdx] {
-		v = append(v, id)
-	}
-	return v, nil
+	// return a copy to prevent modification
+	return maps.Clone(assignedVerifiers), nil
 }
 
 // HasVerifier checks if a chunk is assigned to the given verifier

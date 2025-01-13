@@ -267,7 +267,7 @@ func (a *PublicAssignmentTestSuite) ChunkAssignmentScenario(chunkNum, verNum, al
 		// each chunk should be assigned to alpha verifiers
 		verifiers, err := p1.Verifiers(chunk.Index)
 		require.NoError(a.T(), err)
-		require.Equal(a.T(), verifiers.Len(), alpha)
+		require.Equal(a.T(), len(verifiers), alpha)
 	}
 }
 

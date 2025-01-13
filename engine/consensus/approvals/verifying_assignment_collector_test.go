@@ -306,7 +306,11 @@ func (s *AssignmentCollectorTestSuite) TestRequestMissingApprovals() {
 	for _, chunk := range s.Chunks {
 		verifiers, err := s.ChunksAssignment.Verifiers(chunk.Index)
 		require.NoError(s.T(), err)
-		require.NoError(s.T(), assignmentBuilder.Add(chunk.Index, verifiers[:2]))
+		v := make([]flow.Identifier, 0, len(verifiers))
+		for id := range verifiers {
+			v = append(v, id)
+		}
+		require.NoError(s.T(), assignmentBuilder.Add(chunk.Index, v[:2]))
 	}
 	// replace old one
 	s.ChunksAssignment = assignmentBuilder.Build()
