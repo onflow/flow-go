@@ -8,7 +8,6 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/montanaflynn/stats"
 	"github.com/pkg/profile"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
@@ -58,6 +57,10 @@ const (
 	blockHashListMetaKey         = "BlockHashListMeta"
 	blockHashListBucketKeyPrefix = "BlockHashListBucket"
 )
+
+// percentiles are Tukey's seven-number summary (without
+// the 0 and 100 because min and max are always included).
+var percentiles = []float64{12.5, 25.0, 50.0, 75.0, 87.5}
 
 var Cmd = &cobra.Command{
 	Use:   "checkpoint-collect-stats",
@@ -109,17 +112,9 @@ type PayloadStats struct {
 }
 
 type RegisterStatsByTypes struct {
-	Type                    string                 `json:"type"`
-	Counts                  uint64                 `json:"counts"`
-	ValueSizeTotal          float64                `json:"value_size_total"`
-	ValueSizeMin            float64                `json:"value_size_min"`
-	ValueSize25thPercentile float64                `json:"value_size_25th_percentile"`
-	ValueSizeMedian         float64                `json:"value_size_median"`
-	ValueSize75thPercentile float64                `json:"value_size_75th_percentile"`
-	ValueSize95thPercentile float64                `json:"value_size_95th_percentile"`
-	ValueSize99thPercentile float64                `json:"value_size_99th_percentile"`
-	ValueSizeMax            float64                `json:"value_size_max"`
-	SubTypes                []RegisterStatsByTypes `json:"subtypes,omitempty"`
+	Type string `json:"type"`
+	stats
+	SubTypes []RegisterStatsByTypes `json:"subtypes,omitempty"`
 }
 
 type PayloadInfo struct {
@@ -130,17 +125,10 @@ type PayloadInfo struct {
 }
 
 type AccountStats struct {
-	AccountCount              uint64         `json:"total_account_count"`
-	AccountSizeMin            float64        `json:"account_size_min"`
-	AccountSize25thPercentile float64        `json:"account_size_25th_percentile"`
-	AccountSizeMedian         float64        `json:"account_size_median"`
-	AccountSize75thPercentile float64        `json:"account_size_75th_percentile"`
-	AccountSize95thPercentile float64        `json:"account_size_95th_percentile"`
-	AccountSize99thPercentile float64        `json:"account_size_99th_percentile"`
-	AccountSizeMax            float64        `json:"account_size_max"`
-	ServiceAccount            *AccountInfo   `json:"service_account,omitempty"`
-	EVMAccount                *AccountInfo   `json:"evm_account,omitempty"`
-	TopN                      []*AccountInfo `json:"largest_accounts"`
+	stats
+	ServiceAccount *AccountInfo   `json:"service_account,omitempty"`
+	EVMAccount     *AccountInfo   `json:"evm_account,omitempty"`
+	TopN           []*AccountInfo `json:"largest_accounts"`
 }
 
 type AccountInfo struct {
@@ -245,7 +233,7 @@ func run(*cobra.Command, []string) {
 	go func() {
 		defer wg.Done()
 
-		statsByTypes := getStats(valueSizesByType)
+		statsByTypes := getRegisterStats(valueSizesByType)
 
 		// Sort top N largest payloads by payload size in descending order
 		slices.SortFunc(largestPayloads.Tree, func(a, b PayloadInfo) int {
@@ -283,24 +271,17 @@ func run(*cobra.Command, []string) {
 			return cmp.Compare(b.PayloadSize, a.PayloadSize)
 		})
 
-		stats := getTypeStats("", accountSizesSlice)
+		stats := getValueStats(accountSizesSlice, percentiles)
 
 		evmAccountAddress := systemcontracts.SystemContractsForChain(chainID).EVMStorage.Address
 
 		serviceAccountAddress := serviceAccountAddressForChain(chainID)
 
 		acctStats := &AccountStats{
-			AccountCount:              uint64(len(accountsSlice)),
-			ServiceAccount:            accounts[string(serviceAccountAddress[:])],
-			EVMAccount:                accounts[string(evmAccountAddress[:])],
-			TopN:                      accountsSlice[:flagTopN],
-			AccountSizeMin:            stats.ValueSizeMin,
-			AccountSize25thPercentile: stats.ValueSize25thPercentile,
-			AccountSizeMedian:         stats.ValueSizeMedian,
-			AccountSize75thPercentile: stats.ValueSize75thPercentile,
-			AccountSize95thPercentile: stats.ValueSize95thPercentile,
-			AccountSize99thPercentile: stats.ValueSize99thPercentile,
-			AccountSizeMax:            stats.ValueSizeMax,
+			stats:          stats,
+			ServiceAccount: accounts[string(serviceAccountAddress[:])],
+			EVMAccount:     accounts[string(evmAccountAddress[:])],
+			TopN:           accountsSlice[:flagTopN],
 		}
 
 		writeStats(accountStatsReportName, acctStats)
@@ -404,69 +385,17 @@ func getPayloadStatsFromCheckpoint(payloadCallBack func(payload *ledger.Payload)
 	return ledgerStats
 }
 
-func getTypeStats(t string, values []float64) RegisterStatsByTypes {
-	sum, err := stats.Sum(values)
-	if err != nil {
-		log.Fatal().Err(err).Msg("cannot compute the sum of values")
-	}
-
-	min, err := stats.Min(values)
-	if err != nil {
-		log.Fatal().Err(err).Msg("cannot compute the min of values")
-	}
-
-	percentile25, err := stats.Percentile(values, 25)
-	if err != nil {
-		log.Fatal().Err(err).Msg("cannot compute the 25th percentile of values")
-	}
-
-	median, err := stats.Median(values)
-	if err != nil {
-		log.Fatal().Err(err).Msg("cannot compute the median of values")
-	}
-
-	percentile75, err := stats.Percentile(values, 75)
-	if err != nil {
-		log.Fatal().Err(err).Msg("cannot compute the 75th percentile of values")
-	}
-
-	percentile95, err := stats.Percentile(values, 95)
-	if err != nil {
-		log.Fatal().Err(err).Msg("cannot compute the 95th percentile of values")
-	}
-
-	percentile99, err := stats.Percentile(values, 99)
-	if err != nil {
-		log.Fatal().Err(err).Msg("cannot compute the 99th percentile of values")
-	}
-
-	max, err := stats.Max(values)
-	if err != nil {
-		log.Fatal().Err(err).Msg("cannot compute the max of values")
-	}
-
-	return RegisterStatsByTypes{
-		Type:                    t,
-		Counts:                  uint64(len(values)),
-		ValueSizeTotal:          sum,
-		ValueSizeMin:            min,
-		ValueSize25thPercentile: percentile25,
-		ValueSizeMedian:         median,
-		ValueSize75thPercentile: percentile75,
-		ValueSize95thPercentile: percentile95,
-		ValueSize99thPercentile: percentile99,
-		ValueSizeMax:            max,
-	}
-}
-
-func getStats(valueSizesByType sizesByType) []RegisterStatsByTypes {
+func getRegisterStats(valueSizesByType sizesByType) []RegisterStatsByTypes {
 	domainStats := make([]RegisterStatsByTypes, 0, len(util.StorageMapDomains))
 	var allDomainSizes []float64
 
 	statsByTypes := make([]RegisterStatsByTypes, 0, len(valueSizesByType))
 	for t, values := range valueSizesByType {
 
-		stats := getTypeStats(t, values)
+		stats := RegisterStatsByTypes{
+			Type:  t,
+			stats: getValueStats(values, percentiles),
+		}
 
 		if isDomainType(t) {
 			domainStats = append(domainStats, stats)
@@ -476,19 +405,22 @@ func getStats(valueSizesByType sizesByType) []RegisterStatsByTypes {
 		}
 	}
 
-	allDomainStats := getTypeStats("domain", allDomainSizes)
-	allDomainStats.SubTypes = domainStats
+	allDomainStats := RegisterStatsByTypes{
+		Type:     "domain",
+		stats:    getValueStats(allDomainSizes, percentiles),
+		SubTypes: domainStats,
+	}
 
 	statsByTypes = append(statsByTypes, allDomainStats)
 
 	// Sort domain stats by payload count in descending order
 	slices.SortFunc(allDomainStats.SubTypes, func(a, b RegisterStatsByTypes) int {
-		return cmp.Compare(b.Counts, a.Counts)
+		return cmp.Compare(b.Count, a.Count)
 	})
 
 	// Sort stats by payload count in descending order
 	slices.SortFunc(statsByTypes, func(a, b RegisterStatsByTypes) int {
-		return cmp.Compare(b.Counts, a.Counts)
+		return cmp.Compare(b.Count, a.Count)
 	})
 
 	return statsByTypes
