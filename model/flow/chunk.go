@@ -8,6 +8,8 @@ import (
 	"github.com/ipfs/go-cid"
 	"github.com/onflow/go-ethereum/rlp"
 	"github.com/vmihailenco/msgpack/v4"
+
+	cborcodec "github.com/onflow/flow-go/model/encoding/cbor"
 )
 
 var EmptyEventCollectionID Identifier
@@ -127,6 +129,43 @@ func (ch ChunkBody) EncodeRLP(w io.Writer) error {
 	return nil
 }
 
+func (ch ChunkBody) MarshalCBOR() ([]byte, error) {
+	if ch.ServiceEventCount == nil {
+		return cborcodec.EncMode.Marshal(struct {
+			CollectionIndex      uint
+			StartState           StateCommitment
+			EventCollection      Identifier
+			BlockID              Identifier
+			TotalComputationUsed uint64
+			NumberOfTransactions uint64
+		}{
+			CollectionIndex:      ch.CollectionIndex,
+			StartState:           ch.StartState,
+			EventCollection:      ch.EventCollection,
+			BlockID:              ch.BlockID,
+			TotalComputationUsed: ch.TotalComputationUsed,
+			NumberOfTransactions: ch.NumberOfTransactions,
+		})
+	}
+	return cborcodec.EncMode.Marshal(struct {
+		CollectionIndex      uint
+		StartState           StateCommitment
+		EventCollection      Identifier
+		ServiceEventCount    *uint16
+		BlockID              Identifier
+		TotalComputationUsed uint64
+		NumberOfTransactions uint64
+	}{
+		CollectionIndex:      ch.CollectionIndex,
+		StartState:           ch.StartState,
+		EventCollection:      ch.EventCollection,
+		ServiceEventCount:    ch.ServiceEventCount,
+		BlockID:              ch.BlockID,
+		TotalComputationUsed: ch.TotalComputationUsed,
+		NumberOfTransactions: ch.NumberOfTransactions,
+	})
+}
+
 type Chunk struct {
 	ChunkBody
 
@@ -146,6 +185,18 @@ var _ rlp.Encoder = &Chunk{}
 // TODO(mainnet27, #6773): remove this method https://github.com/onflow/flow-go/issues/6773
 func (ch Chunk) EncodeRLP(w io.Writer) error {
 	return rlp.Encode(w, struct {
+		ChunkBody ChunkBody
+		Index     uint64
+		EndState  StateCommitment
+	}{
+		ChunkBody: ch.ChunkBody,
+		Index:     ch.Index,
+		EndState:  ch.EndState,
+	})
+}
+
+func (ch Chunk) MarshalCBOR() ([]byte, error) {
+	return cborcodec.EncMode.Marshal(struct {
 		ChunkBody ChunkBody
 		Index     uint64
 		EndState  StateCommitment
