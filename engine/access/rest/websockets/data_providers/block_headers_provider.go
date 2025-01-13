@@ -50,6 +50,7 @@ func NewBlockHeadersDataProvider(
 	p.baseDataProvider = newBaseDataProvider(
 		subscriptionID,
 		topic,
+		arguments,
 		cancel,
 		send,
 		p.createSubscription(subCtx, blockArgs), // Set up a subscription to block headers based on arguments.

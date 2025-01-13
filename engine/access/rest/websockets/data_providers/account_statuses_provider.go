@@ -68,6 +68,7 @@ func NewAccountStatusesDataProvider(
 	p.baseDataProvider = newBaseDataProvider(
 		subscriptionID,
 		topic,
+		arguments,
 		cancel,
 		send,
 		p.createSubscription(subCtx, accountStatusesArgs), // Set up a subscription to account statuses based on arguments.

@@ -64,6 +64,7 @@ func NewBlocksDataProvider(
 	p.baseDataProvider = newBaseDataProvider(
 		subscriptionID,
 		topic,
+		arguments,
 		cancel,
 		send,
 		p.createSubscription(subCtx, p.arguments), // Set up a subscription to blocks based on arguments.

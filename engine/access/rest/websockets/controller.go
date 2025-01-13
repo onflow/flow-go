@@ -472,6 +472,7 @@ func (c *Controller) handleListSubscriptions(ctx context.Context, msg models.Lis
 		subs = append(subs, &models.SubscriptionEntry{
 			SubscriptionID: id.String(),
 			Topic:          provider.Topic(),
+			Arguments:      provider.Arguments(),
 		})
 		return nil
 	})
