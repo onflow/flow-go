@@ -20,7 +20,6 @@ import (
 	"github.com/onflow/flow-go/cmd/util/ledger/util"
 	"github.com/onflow/flow-go/fvm/evm/emulator/state"
 	"github.com/onflow/flow-go/fvm/evm/handler"
-	"github.com/onflow/flow-go/fvm/systemcontracts"
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/ledger/common/pathfinder"
 	"github.com/onflow/flow-go/ledger/complete"
@@ -124,19 +123,6 @@ type PayloadInfo struct {
 	Size    uint64 `json:"size"`
 }
 
-type AccountStats struct {
-	stats
-	ServiceAccount *AccountInfo   `json:"service_account,omitempty"`
-	EVMAccount     *AccountInfo   `json:"evm_account,omitempty"`
-	TopN           []*AccountInfo `json:"largest_accounts"`
-}
-
-type AccountInfo struct {
-	Address      string `json:"address"`
-	PayloadCount uint64 `json:"payload_count"`
-	PayloadSize  uint64 `json:"payload_size"`
-}
-
 type sizesByType map[string][]float64
 
 func run(*cobra.Command, []string) {
@@ -198,7 +184,7 @@ func run(*cobra.Command, []string) {
 		totalPayloadCount++
 
 		// Update payload sizes by type
-		typ := getType(key)
+		typ := getRegisterType(key)
 		valueSizesByType[typ] = append(valueSizesByType[typ], float64(valueSize))
 
 		// Update top N largest payloads
@@ -258,31 +244,7 @@ func run(*cobra.Command, []string) {
 	go func() {
 		defer wg.Done()
 
-		accountsSlice := make([]*AccountInfo, 0, len(accounts))
-		accountSizesSlice := make([]float64, 0, len(accounts))
-
-		for _, acct := range accounts {
-			accountsSlice = append(accountsSlice, acct)
-			accountSizesSlice = append(accountSizesSlice, float64(acct.PayloadSize))
-		}
-
-		// Sort accounts by payload size in descending order
-		slices.SortFunc(accountsSlice, func(a, b *AccountInfo) int {
-			return cmp.Compare(b.PayloadSize, a.PayloadSize)
-		})
-
-		stats := getValueStats(accountSizesSlice, percentiles)
-
-		evmAccountAddress := systemcontracts.SystemContractsForChain(chainID).EVMStorage.Address
-
-		serviceAccountAddress := serviceAccountAddressForChain(chainID)
-
-		acctStats := &AccountStats{
-			stats:          stats,
-			ServiceAccount: accounts[string(serviceAccountAddress[:])],
-			EVMAccount:     accounts[string(evmAccountAddress[:])],
-			TopN:           accountsSlice[:flagTopN],
-		}
+		acctStats := getAccountStatus(chainID, accounts)
 
 		writeStats(accountStatsReportName, acctStats)
 	}()
@@ -438,7 +400,7 @@ func isDomainType(typ string) bool {
 	return strings.HasPrefix(typ, domainTypePrefix)
 }
 
-func getType(key ledger.Key) string {
+func getRegisterType(key ledger.Key) string {
 	k := key.KeyParts[1].Value
 	kstr := string(k)
 
@@ -490,9 +452,4 @@ func getType(key ledger.Key) string {
 	log.Warn().Msgf("unknown payload key: %s", kstr)
 
 	return "others"
-}
-
-func serviceAccountAddressForChain(chainID flow.ChainID) flow.Address {
-	sc := systemcontracts.SystemContractsForChain(chainID)
-	return sc.FlowServiceAccount.Address
 }
