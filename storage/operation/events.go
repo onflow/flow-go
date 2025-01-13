@@ -13,18 +13,10 @@ func InsertEvent(w storage.Writer, blockID flow.Identifier, event flow.Event) er
 	return UpsertByKey(w, eventPrefix(codeEvent, blockID, event), event)
 }
 
-//TODO: remove commented functions
-
-//	func BatchInsertEvent(blockID flow.Identifier, event flow.Event) func(batch *badger.WriteBatch) error {
-//		return batchWrite(eventPrefix(codeEvent, blockID, event), event)
-//	}
 func InsertServiceEvent(w storage.Writer, blockID flow.Identifier, event flow.Event) error {
 	return UpsertByKey(w, eventPrefix(codeServiceEvent, blockID, event), event)
 }
 
-//	func BatchInsertServiceEvent(blockID flow.Identifier, event flow.Event) func(batch *badger.WriteBatch) error {
-//		return batchWrite(eventPrefix(codeServiceEvent, blockID, event), event)
-//	}
 func RetrieveEvents(r storage.Reader, blockID flow.Identifier, transactionID flow.Identifier, events *[]flow.Event) error {
 	iterationFunc := eventIterationFunc(events)
 	return TraverseByPrefix(r, MakePrefix(codeEvent, blockID, transactionID), iterationFunc, storage.DefaultIteratorOptions())
@@ -49,28 +41,9 @@ func RemoveServiceEventsByBlockID(r storage.Reader, w storage.Writer, blockID fl
 	return RemoveByKeyPrefix(r, w, MakePrefix(codeServiceEvent, blockID))
 }
 
-// // BatchRemoveServiceEventsByBlockID removes all service events for the given blockID.
-// // No errors are expected during normal operation, even if no entries are matched.
-// // If Badger unexpectedly fails to process the request, the error is wrapped in a generic error and returned.
-// func BatchRemoveServiceEventsByBlockID(blockID flow.Identifier, batch *badger.WriteBatch) func(*badger.Txn) error {
-// 	return func(txn *badger.Txn) error {
-// 		return batchRemoveByPrefix(makePrefix(codeServiceEvent, blockID))(txn, batch)
-// 	}
-// }
-
 func RemoveEventsByBlockID(r storage.Reader, w storage.Writer, blockID flow.Identifier) error {
 	return RemoveByKeyPrefix(r, w, MakePrefix(codeEvent, blockID))
 }
-
-// // BatchRemoveEventsByBlockID removes all events for the given blockID.
-// // No errors are expected during normal operation, even if no entries are matched.
-// // If Badger unexpectedly fails to process the request, the error is wrapped in a generic error and returned.
-// func BatchRemoveEventsByBlockID(blockID flow.Identifier, batch *badger.WriteBatch) func(*badger.Txn) error {
-// 	return func(txn *badger.Txn) error {
-// 		return batchRemoveByPrefix(makePrefix(codeEvent, blockID))(txn, batch)
-// 	}
-//
-// }
 
 // eventIterationFunc returns an in iteration function which returns all events found during traversal or iteration
 func eventIterationFunc(events *[]flow.Event) func() (CheckFunc, CreateFunc, HandleFunc) {
