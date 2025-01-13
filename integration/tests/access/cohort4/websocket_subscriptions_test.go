@@ -557,7 +557,7 @@ func (s *WebsocketSubscriptionSuite) TestHappyCases() {
 				}
 			},
 			validateFunc:                       s.validateTransactionStatuses,
-			listenSubscriptionResponseDuration: 10 * time.Second,
+			listenSubscriptionResponseDuration: 10 * time.Second, //TODO: flaky behaviour with other subtests (received 3 statuses, expected 4)
 			testUnsubscribe:                    false,
 		},
 	}
@@ -921,10 +921,12 @@ func (s *WebsocketSubscriptionSuite) testWebsocketSubscription(
 		unsubscriptionRequest := s.unsubscribeMessageRequest(subscriptionRequest.SubscriptionID)
 		s.Require().NoError(client.WriteJSON(unsubscriptionRequest))
 
-		_, baseMessageResponses, _ = s.listenWebSocketResponses(client, 3*time.Second, subscriptionRequest.SubscriptionID)
+		var response models.BaseMessageResponse
+		err := client.ReadJSON(&response)
+		s.Require().NoError(err, "failed to read subscription response")
+
 		// validate unsubscribe response
-		s.Require().Equal(1, len(baseMessageResponses))
-		s.validateBaseMessageResponse(unsubscriptionRequest.SubscriptionID, baseMessageResponses[0])
+		s.validateBaseMessageResponse(unsubscriptionRequest.SubscriptionID, response)
 	}
 }
 
@@ -948,12 +950,12 @@ func (s *WebsocketSubscriptionSuite) listenWebSocketResponses(
 	baseMessageResponses := make([]models.BaseMessageResponse, 0)
 	listSubscriptionsMessageResponses := make([]models.ListSubscriptionsMessageResponse, 0)
 
-	timer := time.NewTimer(duration)
-	defer timer.Stop()
+	ctx, cancel := context.WithTimeout(context.Background(), duration)
+	defer cancel()
 
 	for {
 		select {
-		case <-timer.C:
+		case <-ctx.Done():
 			s.T().Logf("stopping websocket response listener after %s", duration)
 			return baseDataProvidersResponses, baseMessageResponses, listSubscriptionsMessageResponses
 		default:
@@ -985,7 +987,7 @@ func (s *WebsocketSubscriptionSuite) listenWebSocketResponses(
 
 			var baseDataProvidersResponse models.BaseDataProvidersResponse
 			err = restcommon.ParseBody(bytes.NewReader(messageBytes), &baseDataProvidersResponse)
-			if err == nil {
+			if err == nil && baseDataProvidersResponse.SubscriptionID == subscriptionID {
 				baseDataProvidersResponses = append(baseDataProvidersResponses, baseDataProvidersResponse)
 			}
 		}
