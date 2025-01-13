@@ -680,7 +680,7 @@ func convertAndCheckValue(input *big.Int) (isValid bool, converted *uint256.Int)
 	// convert value into uint256
 	value, overflow := uint256.FromBig(input)
 	if overflow {
-		return true, nil
+		return false, nil
 	}
 	return true, value
 }
