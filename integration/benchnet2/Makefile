@@ -3,6 +3,7 @@ DOCKER_REGISTRY := us-west1-docker.pkg.dev/dl-flow-benchnet-automation/benchnet
 CONFIGURATION_BUCKET := flow-benchnet-automation
 
 # default values that callers can override when calling target
+# Node role counts
 ACCESS = 1
 COLLECTION = 2
 VALID_COLLECTION := $(shell test $(COLLECTION) -ge 2; echo $$?)
@@ -11,6 +12,11 @@ VALID_CONSENSUS := $(shell test $(CONSENSUS) -ge 2; echo $$?)
 EXECUTION = 2
 VALID_EXECUTION := $(shell test $(EXECUTION) -ge 2; echo $$?)
 VERIFICATION = 1
+# Epoch config
+EPOCH_LEN = 5000
+EPOCH_STAKING_PHASE_LEN = 500
+DKG_PHASE_LEN = 1000
+EPOCH_EXTENSION_LEN = 600
 
 validate:
 ifeq ($(strip $(VALID_EXECUTION)), 1)
@@ -50,10 +56,10 @@ gen-bootstrap: clone-flow
 		--root-height 0 \
 		--root-parent 0000000000000000000000000000000000000000000000000000000000000000 \
 		--epoch-counter 0 \
-		--epoch-length 5000 \
-		--epoch-staking-phase-length 500 \
-		--epoch-dkg-phase-length 1000 \
-		--epoch-extension-view-count=600 \
+		--epoch-length $(EPOCH_LEN) \
+		--epoch-staking-phase-length $(EPOCH_STAKING_PHASE_LEN) \
+		--epoch-dkg-phase-length $(DKG_PHASE_LEN) \
+		--epoch-extension-view-count=$(EPOCH_EXTENSION_LEN) \
 		--collection-clusters 1 \
 		--protocol-version=0 \
 		--epoch-commit-safety-threshold=100 \
