@@ -463,7 +463,9 @@ func (s *WsControllerSuite) TestListSubscriptions() {
 		done := make(chan struct{})
 
 		topic := dp.BlocksTopic
+		arguments := models.Arguments{}
 		dataProvider.On("Topic").Return(topic)
+		dataProvider.On("Arguments").Return(arguments)
 		// data provider might finish on its own or controller will close it via Close()
 		dataProvider.On("Close").Return(nil).Maybe()
 		dataProvider.
@@ -509,6 +511,7 @@ func (s *WsControllerSuite) TestListSubscriptions() {
 				require.Equal(t, 1, len(response.Subscriptions))
 				require.Equal(t, subscriptionID, response.Subscriptions[0].SubscriptionID)
 				require.Equal(t, topic, response.Subscriptions[0].Topic)
+				require.Equal(t, arguments, response.Subscriptions[0].Arguments)
 
 				return websocket.ErrCloseSent
 			}).
