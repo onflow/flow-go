@@ -301,14 +301,11 @@ func ChunkWithIndex(blockID flow.Identifier, index int) *flow.Chunk {
 	return chunk
 }
 
-func WithAssignee(assignee flow.Identifier) func(flow.Identifier, uint64, *chunks.AssignmentBuilder) *flow.Chunk {
+func WithAssignee(t *testing.T, assignee flow.Identifier) func(flow.Identifier, uint64, *chunks.AssignmentBuilder) *flow.Chunk {
 	return func(blockID flow.Identifier, index uint64, assignmentBuilder *chunks.AssignmentBuilder) *flow.Chunk {
 		chunk := ChunkWithIndex(blockID, int(index))
 		fmt.Printf("with assignee: %v, chunk id: %v\n", index, chunk.ID())
-		err := assignmentBuilder.Add(chunk.Index, flow.IdentifierList{assignee})
-		if err != nil {
-			panic(err)
-		}
+		require.NoError(t, assignmentBuilder.Add(chunk.Index, flow.IdentifierList{assignee}))
 		return chunk
 	}
 }
@@ -326,7 +323,8 @@ type ChunkAssignerFunc func(chunkIndex uint64, chunks int) bool
 //
 // It returns the list of chunk locator ids assigned to the input verification nodes, as well as the list of their chunk IDs.
 // All verification nodes are assigned the same chunks.
-func MockChunkAssignmentFixture(chunkAssigner *mock.ChunkAssigner,
+func MockChunkAssignmentFixture(t *testing.T,
+	chunkAssigner *mock.ChunkAssigner,
 	verIds flow.IdentityList,
 	completeERs CompleteExecutionReceiptList,
 	isAssigned ChunkAssignerFunc) (flow.IdentifierList, flow.IdentifierList) {
@@ -355,16 +353,10 @@ func MockChunkAssignmentFixture(chunkAssigner *mock.ChunkAssigner,
 					}.ID()
 					expectedLocatorIds = append(expectedLocatorIds, locatorID)
 					expectedChunkIds = append(expectedChunkIds, chunk.ID())
-					err := a.Add(chunk.Index, verIds.NodeIDs())
-					if err != nil {
-						panic(err)
-					}
+					require.NoError(t, a.Add(chunk.Index, verIds.NodeIDs()))
 				} else {
 					// the chunk has no verifiers assigned
-					err := a.Add(chunk.Index, flow.IdentifierList{})
-					if err != nil {
-						panic(err)
-					}
+					require.NoError(t, a.Add(chunk.Index, flow.IdentifierList{}))
 				}
 
 			}
@@ -532,7 +524,8 @@ func withConsumers(t *testing.T,
 	assignedChunkIDs := flow.IdentifierList{}
 	if authorized {
 		// only authorized verification node has some chunks assigned to it.
-		_, assignedChunkIDs = MockChunkAssignmentFixture(chunkAssigner,
+		_, assignedChunkIDs = MockChunkAssignmentFixture(t,
+			chunkAssigner,
 			flow.IdentityList{verID.Identity()},
 			completeERs,
 			EvenChunkIndexAssigner)
