@@ -377,14 +377,15 @@ func (proc *procedure) withdrawFrom(
 	if !isValid {
 		return types.NewInvalidResult(
 			call.Transaction(),
-			types.ErrInvalidBalance), nil
+			types.ErrInvalidBalance,
+		), nil
 	}
 
-	// check balance is not prone to rounding error
-	if types.BalanceConversionToUFix64ProneToRoundingError(call.Value) {
+	if types.BalanceInAttFlowValidForFlowVault(call.Value) {
 		return types.NewInvalidResult(
 			call.Transaction(),
-			types.ErrWithdrawBalanceRounding), nil
+			types.ErrWithdrawBalanceRounding,
+		), nil
 	}
 
 	// create bridge account if not exist
