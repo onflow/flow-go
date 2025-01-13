@@ -284,7 +284,7 @@ contract EVM {
         /// Casts the balance to a UFix64 (rounding down)
         /// Warning! casting a balance to a UFix64 which supports a lower level of precision
         /// (8 decimal points in compare to 18) might result in rounding down error.
-        /// Use the toAttoFlow function if you care need more accuracy.
+        /// Use the inAttoFLOW function if you care need more accuracy.
         access(all)
         view fun inFLOW(): UFix64 {
             return InternalEVM.castToFLOW(balance: self.attoflow)
@@ -442,10 +442,11 @@ contract EVM {
         }
 
         /// Withdraws the balance from the cadence owned account's balance
-        /// Note that amounts smaller than 10nF (10e-8) can't be withdrawn
+        /// Note that amounts smaller than 1e10 attoFlow can't be withdrawn
         /// given that Flow Token Vaults use UFix64s to store balances.
         /// If the given balance conversion to UFix64 results in
-        /// rounding error, this function would fail.
+        /// rounding loss, the withdrawal amount will be truncated to the
+        /// maximum precision for UFix64.
         access(Owner | Withdraw)
         fun withdraw(balance: Balance): @FlowToken.Vault {
             if balance.isZero() {

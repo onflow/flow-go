@@ -1296,7 +1296,7 @@ func TestCadenceOwnedAccountFunctionalities(t *testing.T) {
 			})
 	})
 
-	t.Run("test coa withdraw", func(t *testing.T) {
+	t.Run("test coa withdraw with rounding error", func(t *testing.T) {
 		t.Parallel()
 
 		RunWithNewEnvironment(t,
@@ -1314,8 +1314,9 @@ func TestCadenceOwnedAccountFunctionalities(t *testing.T) {
 
 				transaction() {
 					prepare(account: auth(BorrowValue) &Account) {
-						let admin = account.storage
-							.borrow<&FlowToken.Administrator>(from: /storage/flowTokenAdmin)!
+						let admin = account.storage.borrow<&FlowToken.Administrator>(
+							from: /storage/flowTokenAdmin
+						)!
 
 						let minter <- admin.createNewMinter(allowedAmount: 2.34)
 						let vault <- minter.mintTokens(amount: 2.34)
@@ -1324,10 +1325,282 @@ func TestCadenceOwnedAccountFunctionalities(t *testing.T) {
 						let cadenceOwnedAccount <- EVM.createCadenceOwnedAccount()
 						cadenceOwnedAccount.deposit(from: <-vault)
 
-						let bal = EVM.Balance(attoflow: 0)
-						bal.setFLOW(flow: 1.23)
+						let bal = EVM.Balance(attoflow: 9999999999)
 						let vault2 <- cadenceOwnedAccount.withdraw(balance: bal)
 						let balance = vault2.balance
+						destroy cadenceOwnedAccount
+						destroy vault2
+					}
+				}
+				`,
+					sc.EVMContract.Address.HexWithPrefix(),
+					sc.FlowToken.Address.HexWithPrefix(),
+				))
+
+				tx := fvm.Transaction(
+					flow.NewTransactionBody().
+						SetScript(code).
+						AddAuthorizer(sc.FlowServiceAccount.Address),
+					0,
+				)
+
+				_, output, err := vm.Run(
+					ctx,
+					tx,
+					snapshot,
+				)
+				require.NoError(t, err)
+				require.Error(t, output.Err)
+				require.ErrorContains(
+					t,
+					output.Err,
+					types.ErrWithdrawBalanceRounding.Error(),
+				)
+			},
+		)
+	})
+
+	t.Run("test coa withdraw with minimum allowed transfer", func(t *testing.T) {
+		t.Parallel()
+
+		RunWithNewEnvironment(t,
+			chain, func(
+				ctx fvm.Context,
+				vm fvm.VM,
+				snapshot snapshot.SnapshotTree,
+				testContract *TestContract,
+				testAccount *EOATestAccount,
+			) {
+				code := []byte(fmt.Sprintf(
+					`
+				import EVM from %s
+				import FlowToken from %s
+
+				transaction() {
+					prepare(account: auth(BorrowValue) &Account) {
+						let admin = account.storage.borrow<&FlowToken.Administrator>(
+							from: /storage/flowTokenAdmin
+						)!
+
+						let minter <- admin.createNewMinter(allowedAmount: 2.34)
+						let vault <- minter.mintTokens(amount: 2.34)
+						destroy minter
+
+						let cadenceOwnedAccount <- EVM.createCadenceOwnedAccount()
+						cadenceOwnedAccount.deposit(from: <-vault)
+
+						let bal = EVM.Balance(attoflow: 10000000000)
+						let vault2 <- cadenceOwnedAccount.withdraw(balance: bal)
+						let balance = vault2.balance
+						assert(balance == 0.00000001, message: "mismatching vault balance")
+						destroy cadenceOwnedAccount
+						destroy vault2
+					}
+				}
+				`,
+					sc.EVMContract.Address.HexWithPrefix(),
+					sc.FlowToken.Address.HexWithPrefix(),
+				))
+
+				tx := fvm.Transaction(
+					flow.NewTransactionBody().
+						SetScript(code).
+						AddAuthorizer(sc.FlowServiceAccount.Address),
+					0,
+				)
+
+				_, output, err := vm.Run(
+					ctx,
+					tx,
+					snapshot,
+				)
+				require.NoError(t, err)
+				require.NoError(t, output.Err)
+
+				withdrawEvent := output.Events[7]
+
+				ev, err := events.FlowEventToCadenceEvent(withdrawEvent)
+				require.NoError(t, err)
+
+				evPayload, err := events.DecodeFLOWTokensWithdrawnEventPayload(ev)
+				require.NoError(t, err)
+
+				// 2.34000000 - 0.00000001 = 2.33999999
+				expectedBalanceAfterWithdraw := big.NewInt(2_339_999_990_000_000_000)
+				require.Equal(t, expectedBalanceAfterWithdraw, evPayload.BalanceAfterInAttoFlow.Value)
+			},
+		)
+	})
+
+	t.Run("test coa withdraw with success", func(t *testing.T) {
+		t.Parallel()
+
+		RunWithNewEnvironment(t,
+			chain, func(
+				ctx fvm.Context,
+				vm fvm.VM,
+				snapshot snapshot.SnapshotTree,
+				testContract *TestContract,
+				testAccount *EOATestAccount,
+			) {
+				code := []byte(fmt.Sprintf(
+					`
+				import EVM from %s
+				import FlowToken from %s
+
+				transaction() {
+					prepare(account: auth(BorrowValue) &Account) {
+						let admin = account.storage.borrow<&FlowToken.Administrator>(
+							from: /storage/flowTokenAdmin
+						)!
+
+						let minter <- admin.createNewMinter(allowedAmount: 2.34)
+						let vault <- minter.mintTokens(amount: 2.34)
+						destroy minter
+
+						let cadenceOwnedAccount <- EVM.createCadenceOwnedAccount()
+						cadenceOwnedAccount.deposit(from: <-vault)
+
+						let bal = EVM.Balance(attoflow: 1230000780000000000)
+						let vault2 <- cadenceOwnedAccount.withdraw(balance: bal)
+						let balance = vault2.balance
+						assert(balance == 1.23000078, message: "mismatching vault balance")
+						destroy cadenceOwnedAccount
+						destroy vault2
+					}
+				}
+				`,
+					sc.EVMContract.Address.HexWithPrefix(),
+					sc.FlowToken.Address.HexWithPrefix(),
+				))
+
+				tx := fvm.Transaction(
+					flow.NewTransactionBody().
+						SetScript(code).
+						AddAuthorizer(sc.FlowServiceAccount.Address),
+					0,
+				)
+
+				_, output, err := vm.Run(
+					ctx,
+					tx,
+					snapshot,
+				)
+				require.NoError(t, err)
+				require.NoError(t, output.Err)
+
+				withdrawEvent := output.Events[7]
+
+				ev, err := events.FlowEventToCadenceEvent(withdrawEvent)
+				require.NoError(t, err)
+
+				evPayload, err := events.DecodeFLOWTokensWithdrawnEventPayload(ev)
+				require.NoError(t, err)
+
+				// 2.34000000 - 1.23000078 = 1.10999922
+				expectedBalanceAfterWithdraw := big.NewInt(1_109_999_220_000_000_000)
+				require.Equal(t, expectedBalanceAfterWithdraw, evPayload.BalanceAfterInAttoFlow.Value)
+			},
+		)
+	})
+
+	t.Run("test coa withdraw with value bigger than uint256", func(t *testing.T) {
+		t.Parallel()
+
+		RunWithNewEnvironment(t,
+			chain, func(
+				ctx fvm.Context,
+				vm fvm.VM,
+				snapshot snapshot.SnapshotTree,
+				testContract *TestContract,
+				testAccount *EOATestAccount,
+			) {
+				code := []byte(fmt.Sprintf(
+					`
+				import EVM from %s
+				import FlowToken from %s
+
+				transaction() {
+					prepare(account: auth(BorrowValue) &Account) {
+						let admin = account.storage.borrow<&FlowToken.Administrator>(
+							from: /storage/flowTokenAdmin
+						)!
+
+						let minter <- admin.createNewMinter(allowedAmount: 2.34)
+						let vault <- minter.mintTokens(amount: 2.34)
+						destroy minter
+
+						let cadenceOwnedAccount <- EVM.createCadenceOwnedAccount()
+						cadenceOwnedAccount.deposit(from: <-vault)
+
+						let bal = EVM.Balance(attoflow: 115792089237316195423570985008687907853269984665640564039457584007913129639936)
+						let vault2 <- cadenceOwnedAccount.withdraw(balance: bal)
+						let balance = vault2.balance
+						destroy cadenceOwnedAccount
+						destroy vault2
+					}
+				}
+				`,
+					sc.EVMContract.Address.HexWithPrefix(),
+					sc.FlowToken.Address.HexWithPrefix(),
+				))
+
+				tx := fvm.Transaction(
+					flow.NewTransactionBody().
+						SetScript(code).
+						AddAuthorizer(sc.FlowServiceAccount.Address),
+					0,
+				)
+
+				_, output, err := vm.Run(
+					ctx,
+					tx,
+					snapshot,
+				)
+				require.NoError(t, err)
+				require.Error(t, output.Err)
+				require.ErrorContains(
+					t,
+					output.Err,
+					types.ErrInvalidBalance.Error(),
+				)
+			},
+		)
+	})
+
+	t.Run("test coa withdraw with remainder truncation", func(t *testing.T) {
+		t.Parallel()
+
+		RunWithNewEnvironment(t,
+			chain, func(
+				ctx fvm.Context,
+				vm fvm.VM,
+				snapshot snapshot.SnapshotTree,
+				testContract *TestContract,
+				testAccount *EOATestAccount,
+			) {
+				code := []byte(fmt.Sprintf(
+					`
+				import EVM from %s
+				import FlowToken from %s
+
+				transaction() {
+					prepare(account: auth(BorrowValue) &Account) {
+						let admin = account.storage.borrow<&FlowToken.Administrator>(
+							from: /storage/flowTokenAdmin
+						)!
+
+						let minter <- admin.createNewMinter(allowedAmount: 2.34)
+						let vault <- minter.mintTokens(amount: 2.34)
+						destroy minter
+
+						let cadenceOwnedAccount <- EVM.createCadenceOwnedAccount()
+						cadenceOwnedAccount.deposit(from: <-vault)
+
+						let bal = EVM.Balance(attoflow: 1230000789912345678)
+						let vault2 <- cadenceOwnedAccount.withdraw(balance: bal)
+						let balance = vault2.balance
+						assert(balance == 1.23000078, message: "mismatching vault balance")
 						destroy cadenceOwnedAccount
 						destroy vault2
 					}
@@ -1346,7 +1619,8 @@ func TestCadenceOwnedAccountFunctionalities(t *testing.T) {
 				_, output, err := vm.Run(
 					ctx,
 					tx,
-					snapshot)
+					snapshot,
+				)
 				require.NoError(t, err)
 				require.NoError(t, output.Err)
 
@@ -1358,10 +1632,11 @@ func TestCadenceOwnedAccountFunctionalities(t *testing.T) {
 				evPayload, err := events.DecodeFLOWTokensWithdrawnEventPayload(ev)
 				require.NoError(t, err)
 
-				// 2.34 - 1.23 = 1.11
-				expectedBalanceAfterWithdraw := big.NewInt(1_110_000_000_000_000_000)
+				// 2.34000000 - 1.2300000078 = 1.10999922
+				expectedBalanceAfterWithdraw := big.NewInt(1_109_999_220_000_000_000)
 				require.Equal(t, expectedBalanceAfterWithdraw, evPayload.BalanceAfterInAttoFlow.Value)
-			})
+			},
+		)
 	})
 
 	t.Run("test coa transfer", func(t *testing.T) {
