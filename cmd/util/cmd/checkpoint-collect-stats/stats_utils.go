@@ -17,8 +17,8 @@ type stats struct {
 	Count       uint64  `json:"count"`
 	Sum         float64 `json:"sum"`
 	Min         float64 `json:"min"`
-	Max         float64 `json:"max"`
 	Percentiles []percentileValue
+	Max         float64 `json:"max"`
 }
 
 func getValueStats(values []float64, percentiles []float64) stats {

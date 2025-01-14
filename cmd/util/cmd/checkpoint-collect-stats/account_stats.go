@@ -4,21 +4,48 @@ import (
 	"cmp"
 	"slices"
 
+	"github.com/rs/zerolog/log"
+
 	"github.com/onflow/flow-go/fvm/systemcontracts"
 	"github.com/onflow/flow-go/model/flow"
 )
 
+type accountFormat uint8
+
+const (
+	accountFormatUnknown accountFormat = iota
+	accountFormatV1
+	accountFormatV2
+)
+
+func (format accountFormat) MarshalJSON() ([]byte, error) {
+	switch format {
+	case accountFormatV1:
+		return []byte("\"v1\""), nil
+
+	case accountFormatV2:
+		return []byte("\"v2\""), nil
+
+	default:
+		return []byte("\"unknown\""), nil
+	}
+}
+
 type AccountStats struct {
 	stats
-	ServiceAccount *AccountInfo   `json:"service_account,omitempty"`
-	EVMAccount     *AccountInfo   `json:"evm_account,omitempty"`
-	TopN           []*AccountInfo `json:"largest_accounts"`
+	FormatV1Count      int            `json:"account_format_v1_count"`
+	FormatV2Count      int            `json:"account_format_v2_count"`
+	AccountsInFormatV2 []string       `json:"accounts_in_format_v2,omitempty"`
+	ServiceAccount     *AccountInfo   `json:"service_account,omitempty"`
+	EVMAccount         *AccountInfo   `json:"evm_account,omitempty"`
+	TopN               []*AccountInfo `json:"largest_accounts"`
 }
 
 type AccountInfo struct {
-	Address      string `json:"address"`
-	PayloadCount uint64 `json:"payload_count"`
-	PayloadSize  uint64 `json:"payload_size"`
+	Address      string        `json:"address"`
+	Format       accountFormat `json:"account_format"`
+	PayloadCount uint64        `json:"payload_count"`
+	PayloadSize  uint64        `json:"payload_size"`
 }
 
 func getAccountStatus(
@@ -28,15 +55,35 @@ func getAccountStatus(
 	accountsSlice := make([]*AccountInfo, 0, len(accounts))
 	accountSizesSlice := make([]float64, 0, len(accounts))
 
+	var accountsInFormatV2 []string
+	var accountFormatV1Count, accountFormatV2Count int
+
 	for _, acct := range accounts {
 		accountsSlice = append(accountsSlice, acct)
 		accountSizesSlice = append(accountSizesSlice, float64(acct.PayloadSize))
+
+		switch acct.Format {
+		case accountFormatV1:
+			accountFormatV1Count++
+
+		case accountFormatV2:
+			accountFormatV2Count++
+			accountsInFormatV2 = append(accountsInFormatV2, acct.Address)
+
+		default:
+			if acct.Address != "" {
+				log.Info().Msgf("found account without account register nor domain register: %x", acct.Address)
+			}
+		}
 	}
 
 	// Sort accounts by payload size in descending order
 	slices.SortFunc(accountsSlice, func(a, b *AccountInfo) int {
 		return cmp.Compare(b.PayloadSize, a.PayloadSize)
 	})
+
+	// Sort accounts in format v2
+	slices.SortFunc(accountsInFormatV2, cmp.Compare)
 
 	stats := getValueStats(accountSizesSlice, percentiles)
 
@@ -45,10 +92,13 @@ func getAccountStatus(
 	serviceAccountAddress := serviceAccountAddressForChain(chainID)
 
 	return AccountStats{
-		stats:          stats,
-		ServiceAccount: accounts[string(serviceAccountAddress[:])],
-		EVMAccount:     accounts[string(evmAccountAddress[:])],
-		TopN:           accountsSlice[:flagTopN],
+		stats:              stats,
+		FormatV1Count:      accountFormatV1Count,
+		FormatV2Count:      accountFormatV2Count,
+		AccountsInFormatV2: accountsInFormatV2,
+		ServiceAccount:     accounts[string(serviceAccountAddress[:])],
+		EVMAccount:         accounts[string(evmAccountAddress[:])],
+		TopN:               accountsSlice[:flagTopN],
 	}
 }
 

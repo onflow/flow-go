@@ -46,6 +46,12 @@ const (
 )
 
 const (
+	// NOTE: this constant is defined in github.com/onflow/cadence/runtime/storage.go
+	// Use this contant directly from cadence runtime package after dependency is updated.
+	AccountStorageKey = "stored"
+)
+
+const (
 	domainTypePrefix         = "domain "
 	payloadChannelBufferSize = 100_000
 	initialAccountMapSize    = 5_000_000
@@ -97,7 +103,7 @@ func init() {
 		"Enable memory profiling")
 }
 
-type Stats struct {
+type LedgerStats struct {
 	LedgerStats  *complete.LedgerStats `json:",omitempty"`
 	PayloadStats *PayloadStats
 }
@@ -206,6 +212,21 @@ func run(*cobra.Command, []string) {
 		}
 		account.PayloadCount++
 		account.PayloadSize += uint64(size)
+
+		// Update account format
+		if isAccountRegister(key) {
+			if account.Format == accountFormatV1 {
+				log.Error().Msgf("found account register while domain register exists for %x", address)
+			} else {
+				account.Format = accountFormatV2
+			}
+		} else if isDomainRegister(key) {
+			if account.Format == accountFormatV2 {
+				log.Error().Msgf("found domain register while account register exists for %x", address)
+			} else {
+				account.Format = accountFormatV1
+			}
+		}
 	}
 
 	// At this point, all payload are processed.
@@ -226,7 +247,7 @@ func run(*cobra.Command, []string) {
 			return cmp.Compare(b.Size, a.Size)
 		})
 
-		stats := &Stats{
+		stats := &LedgerStats{
 			LedgerStats: ledgerStats,
 			PayloadStats: &PayloadStats{
 				TotalPayloadCount:     totalPayloadCount,
@@ -400,6 +421,18 @@ func isDomainType(typ string) bool {
 	return strings.HasPrefix(typ, domainTypePrefix)
 }
 
+func isDomainRegister(key ledger.Key) bool {
+	k := key.KeyParts[1].Value
+	kstr := string(k)
+	return slices.Contains(util.StorageMapDomains, kstr)
+}
+
+func isAccountRegister(key ledger.Key) bool {
+	k := key.KeyParts[1].Value
+	kstr := string(k)
+	return kstr == AccountStorageKey
+}
+
 func getRegisterType(key ledger.Key) string {
 	k := key.KeyParts[1].Value
 	kstr := string(k)
@@ -414,6 +447,8 @@ func getRegisterType(key ledger.Key) string {
 	}
 
 	switch kstr {
+	case AccountStorageKey:
+		return "account"
 	case flow.ContractNamesKey:
 		return "contract names"
 	case flow.AccountStatusKey:
