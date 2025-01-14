@@ -5,19 +5,14 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/fxamacker/cbor/v2"
-
 	cborcodec "github.com/onflow/flow-go/model/encoding/cbor"
 	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/codec"
 	_ "github.com/onflow/flow-go/utils/binstat"
 )
 
-var defaultDecMode, _ = cbor.DecOptions{ExtraReturnErrors: cbor.ExtraDecErrorUnknownField}.DecMode()
-
 // Codec represents a CBOR codec for our network.
-type Codec struct {
-}
+type Codec struct{}
 
 // NewCodec creates a new CBOR codec.
 func NewCodec() *Codec {
@@ -33,7 +28,7 @@ func (c *Codec) NewEncoder(w io.Writer) network.Encoder {
 
 // NewDecoder creates a new CBOR decoder with the given underlying reader.
 func (c *Codec) NewDecoder(r io.Reader) network.Decoder {
-	dec := defaultDecMode.NewDecoder(r)
+	dec := cborcodec.NetworkDecMode.NewDecoder(r)
 	return &Decoder{dec: dec}
 }
 
@@ -104,7 +99,7 @@ func (c *Codec) Decode(data []byte) (interface{}, error) {
 
 	// unmarshal the payload
 	//bs2 := binstat.EnterTimeVal(fmt.Sprintf("%s%s%s:%d", binstat.BinNet, ":wire>4(cbor)", what, code), int64(len(data))) // e.g. ~3net:wire>4(cbor)CodeEntityRequest:23
-	err = defaultDecMode.Unmarshal(data[1:], msgInterface) // all but first byte
+	err = cborcodec.NetworkDecMode.Unmarshal(data[1:], msgInterface) // all but first byte
 	//binstat.Leave(bs2)
 	if err != nil {
 		return nil, codec.NewMsgUnmarshalErr(data[0], what, err)

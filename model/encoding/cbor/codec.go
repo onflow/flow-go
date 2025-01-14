@@ -35,6 +35,11 @@ var EncMode = func() cbor.EncMode {
 // DecMode is the default DecMode to use when creating a new cbor Decoder
 var DecMode, _ = cbor.DecOptions{}.DecMode()
 
+// NetworkDecMode is the DecMode used for decoding messages over the network.
+// It returns an error if the message contains any extra field not present in the
+// target (struct we are unmarshalling into), which prevents some classes of spamming.
+var NetworkDecMode, _ = cbor.DecOptions{ExtraReturnErrors: cbor.ExtraDecErrorUnknownField}.DecMode()
+
 func (m *Marshaler) Marshal(val interface{}) ([]byte, error) {
 	return EncMode.Marshal(val)
 }
