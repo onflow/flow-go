@@ -81,6 +81,8 @@ import (
 	"sync"
 	"time"
 
+	"golang.org/x/time/rate"
+
 	"github.com/google/uuid"
 	"github.com/gorilla/websocket"
 	"github.com/rs/zerolog"
@@ -131,6 +133,7 @@ type Controller struct {
 	dataProviders       *concurrentmap.Map[uuid.UUID, dp.DataProvider]
 	dataProviderFactory dp.DataProviderFactory
 	dataProvidersGroup  *sync.WaitGroup
+	limiter             *rate.Limiter
 }
 
 func NewWebSocketController(
@@ -147,6 +150,7 @@ func NewWebSocketController(
 		dataProviders:       concurrentmap.New[uuid.UUID, dp.DataProvider](),
 		dataProviderFactory: dataProviderFactory,
 		dataProvidersGroup:  &sync.WaitGroup{},
+		limiter:             rate.NewLimiter(rate.Limit(config.MaxResponsesPerSecond), 1),
 	}
 }
 
@@ -264,6 +268,10 @@ func (c *Controller) writeMessages(ctx context.Context) error {
 		case message, ok := <-c.multiplexedStream:
 			if !ok {
 				return nil
+			}
+
+			if err := c.limiter.WaitN(ctx, 1); err != nil {
+				return fmt.Errorf("rate limiter wait failed: %w", err)
 			}
 
 			// Specifies a timeout for the write operation. If the write

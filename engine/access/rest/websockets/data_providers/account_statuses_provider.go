@@ -3,7 +3,6 @@ package data_providers
 import (
 	"context"
 	"fmt"
-	"strconv"
 
 	"github.com/google/uuid"
 	"github.com/rs/zerolog"
@@ -119,12 +118,10 @@ func (p *AccountStatusesDataProvider) handleResponse() func(accountStatusesRespo
 			return status.Errorf(codes.Internal, "message index already incremented to %d", messageIndex.Value())
 		}
 
-		p.send <- &models.AccountStatusesResponse{
-			BlockID:       accountStatusesResponse.BlockID.String(),
-			Height:        strconv.FormatUint(accountStatusesResponse.Height, 10),
-			AccountEvents: accountStatusesResponse.AccountEvents,
-			MessageIndex:  index,
-		}
+		var response models.AccountStatusesResponse
+		response.Build(accountStatusesResponse, index)
+
+		p.send <- &response
 
 		return nil
 	}

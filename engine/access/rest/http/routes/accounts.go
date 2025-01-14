@@ -3,12 +3,13 @@ package routes
 import (
 	"github.com/onflow/flow-go/access"
 	"github.com/onflow/flow-go/engine/access/rest/common"
+	commonmodels "github.com/onflow/flow-go/engine/access/rest/common/models"
 	"github.com/onflow/flow-go/engine/access/rest/http/models"
 	"github.com/onflow/flow-go/engine/access/rest/http/request"
 )
 
 // GetAccount handler retrieves account by address and returns the response
-func GetAccount(r *common.Request, backend access.API, link models.LinkGenerator) (interface{}, error) {
+func GetAccount(r *common.Request, backend access.API, link commonmodels.LinkGenerator) (interface{}, error) {
 	req, err := request.GetAccountRequest(r)
 	if err != nil {
 		return nil, common.NewBadRequestError(err)
