@@ -53,7 +53,9 @@ func (s *EventsProviderSuite) SetupTest() {
 		nil,
 		s.chain,
 		state_stream.DefaultEventFilterConfig,
-		subscription.DefaultHeartbeatInterval)
+		subscription.DefaultHeartbeatInterval,
+		nil,
+	)
 	s.Require().NotNil(s.factory)
 }
 
@@ -62,39 +64,31 @@ func (s *EventsProviderSuite) SetupTest() {
 // validates that events are correctly streamed to the channel and ensures
 // no unexpected errors occur.
 func (s *EventsProviderSuite) TestEventsDataProvider_HappyPath() {
-
-	expectedEvents := []flow.Event{
+	events := []flow.Event{
 		unittest.EventFixture(flow.EventAccountCreated, 0, 0, unittest.IdentifierFixture(), 0),
 		unittest.EventFixture(flow.EventAccountUpdated, 0, 0, unittest.IdentifierFixture(), 0),
 	}
 
-	var expectedEventsResponses []backend.EventsResponse
-	for i := 0; i < len(expectedEvents); i++ {
-		expectedEventsResponses = append(expectedEventsResponses, backend.EventsResponse{
-			Height:         s.rootBlock.Header.Height,
-			BlockID:        s.rootBlock.ID(),
-			Events:         expectedEvents,
-			BlockTimestamp: s.rootBlock.Header.Timestamp,
-		})
-	}
+	backendResponses := s.backendEventsResponses(events)
 
 	testHappyPath(
 		s.T(),
 		EventsTopic,
 		s.factory,
-		s.subscribeEventsDataProviderTestCases(),
+		s.subscribeEventsDataProviderTestCases(backendResponses),
 		func(dataChan chan interface{}) {
-			for i := 0; i < len(expectedEventsResponses); i++ {
-				dataChan <- &expectedEventsResponses[i]
+			for i := 0; i < len(backendResponses); i++ {
+				dataChan <- backendResponses[i]
 			}
 		},
-		expectedEventsResponses,
 		s.requireEvents,
 	)
 }
 
 // subscribeEventsDataProviderTestCases generates test cases for events data providers.
-func (s *EventsProviderSuite) subscribeEventsDataProviderTestCases() []testType {
+func (s *EventsProviderSuite) subscribeEventsDataProviderTestCases(backendResponses []*backend.EventsResponse) []testType {
+	expectedResponses := s.expectedEventsResponses(backendResponses)
+
 	return []testType{
 		{
 			name: "SubscribeBlocksFromStartBlockID happy path",
@@ -110,6 +104,7 @@ func (s *EventsProviderSuite) subscribeEventsDataProviderTestCases() []testType 
 					mock.Anything,
 				).Return(sub).Once()
 			},
+			expectedResponses: expectedResponses,
 		},
 		{
 			name: "SubscribeEventsFromStartHeight happy path",
@@ -124,6 +119,7 @@ func (s *EventsProviderSuite) subscribeEventsDataProviderTestCases() []testType 
 					mock.Anything,
 				).Return(sub).Once()
 			},
+			expectedResponses: expectedResponses,
 		},
 		{
 			name:      "SubscribeEventsFromLatest happy path",
@@ -135,19 +131,21 @@ func (s *EventsProviderSuite) subscribeEventsDataProviderTestCases() []testType 
 					mock.Anything,
 				).Return(sub).Once()
 			},
+			expectedResponses: expectedResponses,
 		},
 	}
 }
 
 // requireEvents ensures that the received event information matches the expected data.
-func (s *EventsProviderSuite) requireEvents(v interface{}, expectedResponse interface{}) {
-	expectedEventsResponse, ok := expectedResponse.(backend.EventsResponse)
-	require.True(s.T(), ok, "unexpected type: %T", expectedResponse)
+func (s *EventsProviderSuite) requireEvents(actual interface{}, expected interface{}) {
+	expectedResponse, ok := expected.(*models.EventResponse)
+	require.True(s.T(), ok, "Expected *models.EventResponse, got %T", expected)
 
-	actualResponse, ok := v.(*models.EventResponse)
-	require.True(s.T(), ok, "Expected *models.EventResponse, got %T", v)
+	actualResponse, ok := actual.(*models.EventResponse)
+	require.True(s.T(), ok, "Expected *models.EventResponse, got %T", actual)
 
-	s.Require().ElementsMatch(expectedEventsResponse.Events, actualResponse.Events)
+	s.Require().ElementsMatch(expectedResponse.Events, actualResponse.Events)
+	s.Require().Equal(expectedResponse.MessageIndex, actualResponse.MessageIndex)
 }
 
 // invalidArgumentsTestCases returns a list of test cases with invalid argument combinations
@@ -250,7 +248,8 @@ func (s *EventsProviderSuite) TestMessageIndexEventProviderResponse_HappyPath() 
 		send,
 		s.chain,
 		state_stream.DefaultEventFilterConfig,
-		subscription.DefaultHeartbeatInterval)
+		subscription.DefaultHeartbeatInterval,
+	)
 
 	s.Require().NotNil(provider)
 	s.Require().NoError(err)
@@ -293,4 +292,35 @@ func (s *EventsProviderSuite) TestMessageIndexEventProviderResponse_HappyPath() 
 		currentIndex := responses[i].MessageIndex
 		s.Require().Equal(prevIndex+1, currentIndex, "Expected MessageIndex to increment by 1")
 	}
+}
+
+// backendEventsResponses creates backend events responses based on the provided events.
+func (s *EventsProviderSuite) backendEventsResponses(events []flow.Event) []*backend.EventsResponse {
+	responses := make([]*backend.EventsResponse, len(events))
+
+	for i := range events {
+		responses[i] = &backend.EventsResponse{
+			Height:         s.rootBlock.Header.Height,
+			BlockID:        s.rootBlock.ID(),
+			Events:         events,
+			BlockTimestamp: s.rootBlock.Header.Timestamp,
+		}
+	}
+
+	return responses
+}
+
+// expectedEventsResponses creates the expected responses for the provided backend responses.
+func (s *EventsProviderSuite) expectedEventsResponses(
+	backendResponses []*backend.EventsResponse,
+) []interface{} {
+	expectedResponses := make([]interface{}, len(backendResponses))
+
+	for i, resp := range backendResponses {
+		var expectedResponse models.EventResponse
+		expectedResponse.Build(resp, uint64(i))
+
+		expectedResponses[i] = &expectedResponse
+	}
+	return expectedResponses
 }

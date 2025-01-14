@@ -14,6 +14,7 @@ import (
 
 	"github.com/onflow/flow-go/access"
 	accessmock "github.com/onflow/flow-go/access/mock"
+	mockcommonmodels "github.com/onflow/flow-go/engine/access/rest/common/models/mock"
 	"github.com/onflow/flow-go/engine/access/rest/websockets/models"
 	"github.com/onflow/flow-go/engine/access/state_stream"
 	ssmock "github.com/onflow/flow-go/engine/access/state_stream/mock"
@@ -34,7 +35,8 @@ type TransactionStatusesProviderSuite struct {
 	rootBlock      flow.Block
 	finalizedBlock *flow.Header
 
-	factory *DataProviderFactoryImpl
+	factory       *DataProviderFactoryImpl
+	linkGenerator *mockcommonmodels.LinkGenerator
 }
 
 func TestNewTransactionStatusesDataProvider(t *testing.T) {
@@ -44,6 +46,7 @@ func TestNewTransactionStatusesDataProvider(t *testing.T) {
 func (s *TransactionStatusesProviderSuite) SetupTest() {
 	s.log = unittest.Logger()
 	s.api = accessmock.NewAPI(s.T())
+	s.linkGenerator = mockcommonmodels.NewLinkGenerator(s.T())
 
 	s.chain = flow.Testnet.Chain()
 
@@ -56,7 +59,9 @@ func (s *TransactionStatusesProviderSuite) SetupTest() {
 		s.api,
 		s.chain,
 		state_stream.DefaultEventFilterConfig,
-		subscription.DefaultHeartbeatInterval)
+		subscription.DefaultHeartbeatInterval,
+		s.linkGenerator,
+	)
 	s.Require().NotNil(s.factory)
 }
 
@@ -65,22 +70,29 @@ func (s *TransactionStatusesProviderSuite) SetupTest() {
 // validates that tx statuses are correctly streamed to the channel and ensures
 // no unexpected errors occur.
 func (s *TransactionStatusesProviderSuite) TestTransactionStatusesDataProvider_HappyPath() {
-	expectedResponse := expectedTransactionStatusesResponse(s.rootBlock)
+	backendResponse := backendTransactionStatusesResponse(s.rootBlock)
+
+	s.linkGenerator.On("TransactionResultLink", mock.AnythingOfType("flow.Identifier")).Return(
+		func(id flow.Identifier) (string, error) {
+			return "some_link", nil
+		},
+	)
 
 	testHappyPath(
 		s.T(),
 		TransactionStatusesTopic,
 		s.factory,
-		s.subscribeTransactionStatusesDataProviderTestCases(),
+		s.subscribeTransactionStatusesDataProviderTestCases(backendResponse),
 		func(dataChan chan interface{}) {
-			dataChan <- expectedResponse
+			dataChan <- backendResponse
 		},
-		expectedResponse,
 		s.requireTransactionStatuses,
 	)
 }
 
-func (s *TransactionStatusesProviderSuite) subscribeTransactionStatusesDataProviderTestCases() []testType {
+func (s *TransactionStatusesProviderSuite) subscribeTransactionStatusesDataProviderTestCases(backendResponses []*access.TransactionResult) []testType {
+	expectedResponses := s.expectedTransactionStatusesResponses(backendResponses)
+
 	return []testType{
 		{
 			name: "SubscribeTransactionStatusesFromStartBlockID happy path",
@@ -96,6 +108,7 @@ func (s *TransactionStatusesProviderSuite) subscribeTransactionStatusesDataProvi
 					entities.EventEncodingVersion_JSON_CDC_V0,
 				).Return(sub).Once()
 			},
+			expectedResponses: expectedResponses,
 		},
 		{
 			name: "SubscribeTransactionStatusesFromStartHeight happy path",
@@ -111,6 +124,7 @@ func (s *TransactionStatusesProviderSuite) subscribeTransactionStatusesDataProvi
 					entities.EventEncodingVersion_JSON_CDC_V0,
 				).Return(sub).Once()
 			},
+			expectedResponses: expectedResponses,
 		},
 		{
 			name:      "SubscribeTransactionStatusesFromLatest happy path",
@@ -123,23 +137,39 @@ func (s *TransactionStatusesProviderSuite) subscribeTransactionStatusesDataProvi
 					entities.EventEncodingVersion_JSON_CDC_V0,
 				).Return(sub).Once()
 			},
+			expectedResponses: expectedResponses,
 		},
 	}
 }
 
 // requireTransactionStatuses ensures that the received transaction statuses information matches the expected data.
 func (s *TransactionStatusesProviderSuite) requireTransactionStatuses(
-	v interface{},
-	expectedResponse interface{},
+	actual interface{},
+	expected interface{},
 ) {
-	expectedTxStatusesResponse, ok := expectedResponse.(*access.TransactionResult)
-	require.True(s.T(), ok, "unexpected type: %T", expectedResponse)
+	expectedTxStatusesResponse, ok := expected.(*models.TransactionStatusesResponse)
+	require.True(s.T(), ok, "expected *models.TransactionStatusesResponse, got %T", expected)
 
-	actualResponse, ok := v.(*models.TransactionStatusesResponse)
-	require.True(s.T(), ok, "Expected *models.TransactionStatusesResponse, got %T", v)
+	actualResponse, ok := actual.(*models.TransactionStatusesResponse)
+	require.True(s.T(), ok, "expected *models.TransactionStatusesResponse, got %T", actual)
 
-	require.Equal(s.T(), expectedTxStatusesResponse.BlockID, actualResponse.TransactionResult.BlockID)
-	require.Equal(s.T(), expectedTxStatusesResponse.BlockHeight, actualResponse.TransactionResult.BlockHeight)
+	require.Equal(s.T(), expectedTxStatusesResponse.TransactionResult.BlockId, actualResponse.TransactionResult.BlockId)
+}
+
+// expectedTransactionStatusesResponses creates the expected responses for the provided backend responses.
+func (s *TransactionStatusesProviderSuite) expectedTransactionStatusesResponses(
+	backendResponses []*access.TransactionResult,
+) []interface{} {
+	expectedResponses := make([]interface{}, len(backendResponses))
+
+	for i, resp := range backendResponses {
+		var expectedResponse models.TransactionStatusesResponse
+		expectedResponse.Build(s.linkGenerator, resp, uint64(i))
+
+		expectedResponses[i] = &expectedResponse
+	}
+
+	return expectedResponses
 }
 
 // TestTransactionStatusesDataProvider_InvalidArguments tests the behavior of the transaction statuses data provider
@@ -157,6 +187,7 @@ func (s *TransactionStatusesProviderSuite) TestTransactionStatusesDataProvider_I
 				ctx,
 				s.log,
 				s.api,
+				s.linkGenerator,
 				topic,
 				test.arguments,
 				send,
@@ -234,6 +265,12 @@ func (s *TransactionStatusesProviderSuite) TestMessageIndexTransactionStatusesPr
 		entities.EventEncodingVersion_JSON_CDC_V0,
 	).Return(sub)
 
+	s.linkGenerator.On("TransactionResultLink", mock.AnythingOfType("flow.Identifier")).Return(
+		func(id flow.Identifier) (string, error) {
+			return "some_link", nil
+		},
+	)
+
 	arguments :=
 		map[string]interface{}{
 			"start_block_id": s.rootBlock.ID().String(),
@@ -244,6 +281,7 @@ func (s *TransactionStatusesProviderSuite) TestMessageIndexTransactionStatusesPr
 		ctx,
 		s.log,
 		s.api,
+		s.linkGenerator,
 		topic,
 		arguments,
 		send,
@@ -270,6 +308,7 @@ func (s *TransactionStatusesProviderSuite) TestMessageIndexTransactionStatusesPr
 			BlockHeight: s.rootBlock.Header.Height,
 		})
 	}
+
 	go func() {
 		defer close(txStatusesChan) // Close the channel when done
 
@@ -299,7 +338,7 @@ func (s *TransactionStatusesProviderSuite) TestMessageIndexTransactionStatusesPr
 	}
 }
 
-func expectedTransactionStatusesResponse(block flow.Block) []*access.TransactionResult {
+func backendTransactionStatusesResponse(block flow.Block) []*access.TransactionResult {
 	id := unittest.IdentifierFixture()
 	cid := unittest.IdentifierFixture()
 	txr := access.TransactionResult{
