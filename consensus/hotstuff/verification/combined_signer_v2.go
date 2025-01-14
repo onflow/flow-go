@@ -52,29 +52,6 @@ func NewCombinedSigner(
 	return sc
 }
 
-// CreateProposal will create a proposal with a combined signature for the given block.
-func (c *CombinedSigner) CreateProposal(block *model.Block) (*model.Proposal, error) {
-
-	// check that the block is created by us
-	if block.ProposerID != c.staking.NodeID() {
-		return nil, fmt.Errorf("can't create proposal for someone else's block")
-	}
-
-	// create the signature data
-	sigData, err := c.genSigData(block)
-	if err != nil {
-		return nil, fmt.Errorf("signing my proposal failed: %w", err)
-	}
-
-	// create the proposal
-	proposal := &model.Proposal{
-		Block:   block,
-		SigData: sigData,
-	}
-
-	return proposal, nil
-}
-
 // CreateVote will create a vote with a combined signature for the given block.
 func (c *CombinedSigner) CreateVote(block *model.Block) (*model.Vote, error) {
 

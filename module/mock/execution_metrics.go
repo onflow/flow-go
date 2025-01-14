@@ -71,11 +71,6 @@ func (_m *ExecutionMetrics) ExecutionCollectionExecuted(dur time.Duration, stats
 	_m.Called(dur, stats)
 }
 
-// ExecutionCollectionRequestRetried provides a mock function with given fields:
-func (_m *ExecutionMetrics) ExecutionCollectionRequestRetried() {
-	_m.Called()
-}
-
 // ExecutionCollectionRequestSent provides a mock function with given fields:
 func (_m *ExecutionMetrics) ExecutionCollectionRequestSent() {
 	_m.Called()

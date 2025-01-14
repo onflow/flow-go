@@ -5,7 +5,7 @@ linters-settings:
   goimports:
     # put imports beginning with prefix after 3rd-party packages;
     # it's a comma-separated list of prefixes
-    local-prefixes: github.com/onflow/flow-go
+    local-prefixes: github.com/onflow/flow-go/
 
   gosec:
     # To select a subset of rules to run.

@@ -14,6 +14,7 @@ import (
 
 	"github.com/onflow/flow-go/engine/access/rpc/connection"
 	"github.com/onflow/flow-go/engine/common/rpc"
+	commonrpc "github.com/onflow/flow-go/engine/common/rpc"
 	"github.com/onflow/flow-go/engine/common/rpc/convert"
 	fvmerrors "github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/model/flow"
@@ -24,14 +25,14 @@ import (
 )
 
 type backendAccounts struct {
-	log               zerolog.Logger
-	state             protocol.State
-	headers           storage.Headers
-	executionReceipts storage.ExecutionReceipts
-	connFactory       connection.ConnectionFactory
-	nodeCommunicator  Communicator
-	scriptExecutor    execution.ScriptExecutor
-	scriptExecMode    IndexQueryMode
+	log                        zerolog.Logger
+	state                      protocol.State
+	headers                    storage.Headers
+	connFactory                connection.ConnectionFactory
+	nodeCommunicator           Communicator
+	scriptExecutor             execution.ScriptExecutor
+	scriptExecMode             IndexQueryMode
+	execNodeIdentitiesProvider *commonrpc.ExecutionNodeIdentitiesProvider
 }
 
 // GetAccount returns the account details at the latest sealed block.
@@ -68,7 +69,7 @@ func (b *backendAccounts) GetAccountAtBlockHeight(
 ) (*flow.Account, error) {
 	blockID, err := b.headers.BlockIDByHeight(height)
 	if err != nil {
-		return nil, rpc.ConvertStorageError(err)
+		return nil, rpc.ConvertStorageError(resolveHeightError(b.state.Params(), height, err))
 	}
 
 	account, err := b.getAccountAtBlock(ctx, address, blockID, height)
@@ -108,7 +109,7 @@ func (b *backendAccounts) GetAccountBalanceAtBlockHeight(
 ) (uint64, error) {
 	blockID, err := b.headers.BlockIDByHeight(height)
 	if err != nil {
-		return 0, rpc.ConvertStorageError(err)
+		return 0, rpc.ConvertStorageError(resolveHeightError(b.state.Params(), height, err))
 	}
 
 	balance, err := b.getAccountBalanceAtBlock(ctx, address, blockID, height)
@@ -176,7 +177,7 @@ func (b *backendAccounts) GetAccountKeyAtBlockHeight(
 ) (*flow.AccountPublicKey, error) {
 	blockID, err := b.headers.BlockIDByHeight(height)
 	if err != nil {
-		return nil, rpc.ConvertStorageError(err)
+		return nil, rpc.ConvertStorageError(resolveHeightError(b.state.Params(), height, err))
 	}
 
 	accountKey, err := b.getAccountKeyAtBlock(ctx, address, keyIndex, blockID, height)
@@ -196,7 +197,7 @@ func (b *backendAccounts) GetAccountKeysAtBlockHeight(
 ) ([]flow.AccountPublicKey, error) {
 	blockID, err := b.headers.BlockIDByHeight(height)
 	if err != nil {
-		return nil, rpc.ConvertStorageError(err)
+		return nil, rpc.ConvertStorageError(resolveHeightError(b.state.Params(), height, err))
 	}
 
 	accountKeys, err := b.getAccountKeysAtBlock(ctx, address, blockID, height)
@@ -400,7 +401,7 @@ func (b *backendAccounts) getAccountFromLocalStorage(
 	// make sure data is available for the requested block
 	account, err := b.scriptExecutor.GetAccountAtBlockHeight(ctx, address, height)
 	if err != nil {
-		return nil, convertAccountError(err, address, height)
+		return nil, convertAccountError(resolveHeightError(b.state.Params(), height, err), address, height)
 	}
 	return account, nil
 }
@@ -419,7 +420,10 @@ func (b *backendAccounts) getAccountFromAnyExeNode(
 		BlockId: blockID[:],
 	}
 
-	execNodes, err := executionNodesForBlockID(ctx, blockID, b.executionReceipts, b.state, b.log)
+	execNodes, err := b.execNodeIdentitiesProvider.ExecutionNodesForBlockID(
+		ctx,
+		blockID,
+	)
 	if err != nil {
 		return nil, rpc.ConvertError(err, "failed to find execution node to query", codes.Internal)
 	}

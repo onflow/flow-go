@@ -29,6 +29,7 @@ type testCaseConfig struct {
 	nodeVersion string
 
 	versionEvents []*flow.SealedVersionBeacon
+	overrides     map[string]struct{}
 	expectedStart uint64
 	expectedEnd   uint64
 }
@@ -184,6 +185,51 @@ func TestVersionControlInitialization(t *testing.T) {
 			expectedStart: sealedRootBlockHeight + 12,
 			expectedEnd:   sealedRootBlockHeight + 13,
 		},
+		{
+			name:        "start and end version set, start ignored due to override",
+			nodeVersion: "0.0.2",
+			versionEvents: []*flow.SealedVersionBeacon{
+				VersionBeaconEvent(sealedRootBlockHeight+10, flow.VersionBoundary{BlockHeight: sealedRootBlockHeight + 12, Version: "0.0.1"}),
+				VersionBeaconEvent(latestBlockHeight-10, flow.VersionBoundary{BlockHeight: latestBlockHeight - 8, Version: "0.0.3"}),
+			},
+			overrides:     map[string]struct{}{"0.0.1": {}},
+			expectedStart: sealedRootBlockHeight,
+			expectedEnd:   latestBlockHeight - 9,
+		},
+		{
+			name:        "start and end version set, end ignored due to override",
+			nodeVersion: "0.0.2",
+			versionEvents: []*flow.SealedVersionBeacon{
+				VersionBeaconEvent(sealedRootBlockHeight+10, flow.VersionBoundary{BlockHeight: sealedRootBlockHeight + 12, Version: "0.0.1"}),
+				VersionBeaconEvent(latestBlockHeight-10, flow.VersionBoundary{BlockHeight: latestBlockHeight - 8, Version: "0.0.3"}),
+			},
+			overrides:     map[string]struct{}{"0.0.3": {}},
+			expectedStart: sealedRootBlockHeight + 12,
+			expectedEnd:   latestBlockHeight,
+		},
+		{
+			name:        "start and end version set, middle envent ignored due to override",
+			nodeVersion: "0.0.2",
+			versionEvents: []*flow.SealedVersionBeacon{
+				VersionBeaconEvent(sealedRootBlockHeight+10, flow.VersionBoundary{BlockHeight: sealedRootBlockHeight + 12, Version: "0.0.1"}),
+				VersionBeaconEvent(latestBlockHeight-3, flow.VersionBoundary{BlockHeight: latestBlockHeight - 1, Version: "0.0.3"}),
+				VersionBeaconEvent(latestBlockHeight-10, flow.VersionBoundary{BlockHeight: latestBlockHeight - 8, Version: "0.0.4"}),
+			},
+			overrides:     map[string]struct{}{"0.0.3": {}},
+			expectedStart: sealedRootBlockHeight + 12,
+			expectedEnd:   latestBlockHeight - 9,
+		},
+		{
+			name:        "pre-release version matches overrides",
+			nodeVersion: "0.0.2",
+			versionEvents: []*flow.SealedVersionBeacon{
+				VersionBeaconEvent(sealedRootBlockHeight+10, flow.VersionBoundary{BlockHeight: sealedRootBlockHeight + 12, Version: "0.0.1-pre-release.0"}),
+				VersionBeaconEvent(latestBlockHeight-10, flow.VersionBoundary{BlockHeight: latestBlockHeight - 8, Version: "0.0.3"}),
+			},
+			overrides:     map[string]struct{}{"0.0.1": {}},
+			expectedStart: sealedRootBlockHeight,
+			expectedEnd:   latestBlockHeight - 9,
+		},
 	}
 
 	for _, testCase := range testCases {
@@ -217,6 +263,7 @@ func TestVersionControlInitialization(t *testing.T) {
 				versionBeacons:             versionBeacons,
 				sealedRootBlockHeight:      sealedRootBlockHeight,
 				latestFinalizedBlockHeight: latestBlockHeight,
+				overrides:                  testCase.overrides,
 				signalerContext:            irrecoverable.NewMockSignalerContext(t, ctx),
 			})
 
@@ -320,6 +367,72 @@ func generateChecks(testCase testCaseConfig, finalizedRootBlockHeight, latestBlo
 	}
 
 	return checks
+}
+
+// TestVersionBoundaryReceived tests the behavior of the VersionControl component when a new
+// version beacon event is received.
+func TestVersionBoundaryReceived(t *testing.T) {
+	signalCtx := irrecoverable.NewMockSignalerContext(t, context.Background())
+
+	contract := &versionBeaconContract{}
+
+	// Create version event for initial height
+	latestHeight := uint64(10)
+	boundaryHeight := uint64(13)
+
+	vc := createVersionControlComponent(t, versionComponentTestConfigs{
+		nodeVersion:                "0.0.1",
+		versionBeacons:             contract,
+		sealedRootBlockHeight:      0,
+		latestFinalizedBlockHeight: latestHeight,
+		overrides:                  map[string]struct{}{"0.0.2": {}}, // skip event at 0.0.2
+		signalerContext:            signalCtx,
+	})
+
+	var assertUpdate func(height uint64, version *semver.Version)
+	var assertCallbackCalled, assertCallbackNotCalled func()
+
+	// Add a consumer to verify version updates
+	vc.AddVersionUpdatesConsumer(func(height uint64, version *semver.Version) {
+		assertUpdate(height, version)
+	})
+	assert.Len(t, vc.consumers, 1)
+
+	// At this point, both start and end heights are unset
+
+	// Add a new boundary, and finalize the block
+	latestHeight++ // 11
+	contract.AddBoundary(latestHeight, flow.VersionBoundary{BlockHeight: boundaryHeight, Version: "0.0.2"})
+
+	// This event should be skipped due to the override
+	assertUpdate, assertCallbackNotCalled = generateConsumerIgnoredAssertions(t)
+	vc.blockFinalized(signalCtx, latestHeight)
+	assertCallbackNotCalled()
+
+	// Next, add another new boundary and finalize the block
+	latestHeight++ // 12
+	contract.AddBoundary(latestHeight, flow.VersionBoundary{BlockHeight: boundaryHeight, Version: "0.0.3"})
+
+	assertUpdate, assertCallbackCalled = generateConsumerAssertions(t, boundaryHeight, semver.New("0.0.3"))
+	vc.blockFinalized(signalCtx, latestHeight)
+	assertCallbackCalled()
+
+	// Finally, finalize one more block to get past the boundary
+	latestHeight++ // 13
+	vc.blockFinalized(signalCtx, latestHeight)
+
+	// Check compatibility at key heights
+	compatible, err := vc.CompatibleAtBlock(10)
+	require.NoError(t, err)
+	assert.True(t, compatible)
+
+	compatible, err = vc.CompatibleAtBlock(12)
+	require.NoError(t, err)
+	assert.True(t, compatible)
+
+	compatible, err = vc.CompatibleAtBlock(13)
+	require.NoError(t, err)
+	assert.False(t, compatible)
 }
 
 // TestVersionBoundaryUpdated tests the behavior of the VersionControl component when the version is updated.
@@ -487,6 +600,23 @@ func TestNotificationSkippedForCompatibleVersions(t *testing.T) {
 	assert.True(t, compatible)
 }
 
+// TestIsOverriden tests the isOverridden method of the VersionControl component correctly matches
+// versions
+func TestIsOverriden(t *testing.T) {
+	vc := &VersionControl{
+		compatibilityOverrides: map[string]struct{}{"0.0.1": {}},
+	}
+
+	assert.True(t, vc.isOverridden(semver.New("0.0.1")))
+	assert.True(t, vc.isOverridden(semver.New("0.0.1-pre-release")))
+
+	assert.False(t, vc.isOverridden(semver.New("0.0.2")))
+	assert.False(t, vc.isOverridden(semver.New("0.0.2-pre-release")))
+
+	assert.False(t, vc.isOverridden(semver.New("1.0.1")))
+	assert.False(t, vc.isOverridden(semver.New("0.1.1")))
+}
+
 func generateConsumerAssertions(
 	t *testing.T,
 	boundaryHeight uint64,
@@ -507,12 +637,29 @@ func generateConsumerAssertions(
 	return assertUpdate, assertCalled
 }
 
+func generateConsumerIgnoredAssertions(
+	t *testing.T,
+) (func(uint64, *semver.Version), func()) {
+	called := false
+
+	assertUpdate := func(uint64, *semver.Version) {
+		called = true
+	}
+
+	assertNotCalled := func() {
+		assert.False(t, called)
+	}
+
+	return assertUpdate, assertNotCalled
+}
+
 // versionComponentTestConfigs contains custom tweaks for version control creation
 type versionComponentTestConfigs struct {
 	nodeVersion                string
 	versionBeacons             storage.VersionBeacons
 	sealedRootBlockHeight      uint64
 	latestFinalizedBlockHeight uint64
+	overrides                  map[string]struct{}
 	signalerContext            *irrecoverable.MockSignalerContext
 }
 
@@ -529,6 +676,10 @@ func createVersionControlComponent(
 		config.latestFinalizedBlockHeight,
 	)
 	require.NoError(t, err)
+
+	if config.overrides != nil {
+		vc.compatibilityOverrides = config.overrides
+	}
 
 	// Start the VersionControl component.
 	vc.Start(config.signalerContext)

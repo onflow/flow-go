@@ -57,10 +57,6 @@ type ExecutionConfig struct {
 	transactionExecutionMetricsEnabled    bool
 	transactionExecutionMetricsBufferSize uint
 
-	// evm tracing configuration
-	evmTracingEnabled  bool
-	evmTracesGCPBucket string
-
 	computationConfig        computation.ComputationConfig
 	receiptRequestWorkers    uint   // common provider engine workers
 	receiptRequestsCacheSize uint32 // common provider engine cache size
@@ -69,11 +65,10 @@ type ExecutionConfig struct {
 	// It works around an issue where some collection nodes are not configured with enough
 	// this works around an issue where some collection nodes are not configured with enough
 	// file descriptors causing connection failures.
-	onflowOnlyLNs            bool
-	enableStorehouse         bool
-	enableChecker            bool
-	enableNewIngestionEngine bool
-	publicAccessID           string
+	onflowOnlyLNs    bool
+	enableStorehouse bool
+	enableChecker    bool
+	publicAccessID   string
 }
 
 func (exeConf *ExecutionConfig) SetupFlags(flags *pflag.FlagSet) {
@@ -126,13 +121,13 @@ func (exeConf *ExecutionConfig) SetupFlags(flags *pflag.FlagSet) {
 	flags.IntVar(&exeConf.importCheckpointWorkerCount, "import-checkpoint-worker-count", 10, "number of workers to import checkpoint file during bootstrap")
 	flags.BoolVar(&exeConf.transactionExecutionMetricsEnabled, "tx-execution-metrics", true, "enable collection of transaction execution metrics")
 	flags.UintVar(&exeConf.transactionExecutionMetricsBufferSize, "tx-execution-metrics-buffer-size", 200, "buffer size for transaction execution metrics. The buffer size is the number of blocks that are kept in memory by the metrics provider engine")
-	flags.BoolVar(&exeConf.evmTracingEnabled, "evm-tracing-enabled", false, "enable EVM tracing, when set it will generate traces and upload them to the GCP bucket provided by the --evm-traces-gcp-bucket. Warning: this might affect speed of execution")
-	flags.StringVar(&exeConf.evmTracesGCPBucket, "evm-traces-gcp-bucket", "", "define GCP bucket name used for uploading EVM traces, must be used in combination with --evm-tracing-enabled. if left empty the upload step is skipped")
 
 	flags.BoolVar(&exeConf.onflowOnlyLNs, "temp-onflow-only-lns", false, "do not use unless required. forces node to only request collections from onflow collection nodes")
 	flags.BoolVar(&exeConf.enableStorehouse, "enable-storehouse", false, "enable storehouse to store registers on disk, default is false")
 	flags.BoolVar(&exeConf.enableChecker, "enable-checker", true, "enable checker to check the correctness of the execution result, default is true")
-	flags.BoolVar(&exeConf.enableNewIngestionEngine, "enable-new-ingestion-engine", true, "enable new ingestion engine, default is true")
+	// deprecated. Retain it to prevent nodes that previously had this configuration from crashing.
+	var deprecatedEnableNewIngestionEngine bool
+	flags.BoolVar(&deprecatedEnableNewIngestionEngine, "enable-new-ingestion-engine", true, "enable new ingestion engine, default is true")
 	flags.StringVar(&exeConf.publicAccessID, "public-access-id", "", "public access ID for the node")
 
 }

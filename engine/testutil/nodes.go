@@ -46,7 +46,6 @@ import (
 	"github.com/onflow/flow-go/engine/execution/computation/query"
 	"github.com/onflow/flow-go/engine/execution/ingestion"
 	exeFetcher "github.com/onflow/flow-go/engine/execution/ingestion/fetcher"
-	"github.com/onflow/flow-go/engine/execution/ingestion/loader"
 	"github.com/onflow/flow-go/engine/execution/ingestion/stop"
 	"github.com/onflow/flow-go/engine/execution/ingestion/uploader"
 	executionprovider "github.com/onflow/flow-go/engine/execution/provider"
@@ -616,7 +615,7 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity bootstrap.NodeInfo, ide
 	checkpointHeight := uint64(0)
 	require.NoError(t, esbootstrap.ImportRegistersFromCheckpoint(node.Log, checkpointFile, checkpointHeight, matchTrie.RootHash(), pebbledb, 2))
 
-	diskStore, err := storagepebble.NewRegisters(pebbledb)
+	diskStore, err := storagepebble.NewRegisters(pebbledb, storagepebble.PruningDisabled)
 	require.NoError(t, err)
 
 	reader := finalizedreader.NewFinalizedReader(headersStorage, checkpointHeight)
@@ -728,31 +727,25 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity bootstrap.NodeInfo, ide
 	)
 
 	fetcher := exeFetcher.NewCollectionFetcher(node.Log, requestEngine, node.State, false)
-	loader := loader.NewUnexecutedLoader(node.Log, node.State, node.Headers, execState)
 	rootHead, rootQC := getRoot(t, &node)
-	ingestionEngine, err := ingestion.New(
-		unit,
+	_, ingestionCore, err := ingestion.NewMachine(
 		node.Log,
-		node.Net,
+		node.ProtocolEvents,
+		requestEngine,
 		fetcher,
 		node.Headers,
 		node.Blocks,
 		collectionsStorage,
+		execState,
+		node.State,
+		node.Metrics,
 		computationEngine,
 		pusherEngine,
-		execState,
-		node.Metrics,
-		node.Tracer,
-		false,
-		nil,
 		uploader,
 		stopControl,
-		loader,
 	)
 	require.NoError(t, err)
-	requestEngine.WithHandle(ingestionEngine.OnCollection)
-
-	node.ProtocolEvents.AddConsumer(ingestionEngine)
+	node.ProtocolEvents.AddConsumer(stopControl)
 
 	followerCore, finalizer := createFollowerCore(t, &node, followerState, followerDistributor, rootHead, rootQC)
 	// mock out hotstuff validator
@@ -815,7 +808,7 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity bootstrap.NodeInfo, ide
 	return testmock.ExecutionNode{
 		GenericNode:         node,
 		FollowerState:       followerState,
-		IngestionEngine:     ingestionEngine,
+		IngestionEngine:     ingestionCore,
 		FollowerCore:        followerCore,
 		FollowerEngine:      followerEng,
 		SyncEngine:          syncEngine,

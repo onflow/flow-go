@@ -19,6 +19,7 @@ import (
 	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/network/p2p"
 	p2ptest "github.com/onflow/flow-go/network/p2p/test"
+	"github.com/onflow/flow-go/utils/concurrentmap"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -36,7 +37,7 @@ func TestGossipSubIHaveBrokenPromises_Below_Threshold(t *testing.T) {
 	sporkId := unittest.IdentifierFixture()
 	blockTopic := channels.TopicFromChannel(channels.PushBlocks, sporkId)
 
-	receivedIWants := unittest.NewProtectedMap[string, struct{}]()
+	receivedIWants := concurrentmap.New[string, struct{}]()
 	idProvider := unittest.NewUpdatableIDProvider(flow.IdentityList{})
 	spammer := corruptlibp2p.NewGossipSubRouterSpammerWithRpcInspector(t, sporkId, role, idProvider, func(id peer.ID, rpc *corrupt.RPC) error {
 		// override rpc inspector of the spammer node to keep track of the iwants it has received.
@@ -188,7 +189,7 @@ func TestGossipSubIHaveBrokenPromises_Above_Threshold(t *testing.T) {
 	sporkId := unittest.IdentifierFixture()
 	blockTopic := channels.TopicFromChannel(channels.PushBlocks, sporkId)
 
-	receivedIWants := unittest.NewProtectedMap[string, struct{}]()
+	receivedIWants := concurrentmap.New[string, struct{}]()
 	idProvider := unittest.NewUpdatableIDProvider(flow.IdentityList{})
 	spammer := corruptlibp2p.NewGossipSubRouterSpammerWithRpcInspector(t, sporkId, role, idProvider, func(id peer.ID, rpc *corrupt.RPC) error {
 		// override rpc inspector of the spammer node to keep track of the iwants it has received.
@@ -437,7 +438,7 @@ func TestGossipSubIHaveBrokenPromises_Above_Threshold(t *testing.T) {
 func spamIHaveBrokenPromise(t *testing.T,
 	spammer *corruptlibp2p.GossipSubRouterSpammer,
 	topic string,
-	receivedIWants *unittest.ProtectedMap[string, struct{}],
+	receivedIWants *concurrentmap.Map[string, struct{}],
 	victimNode p2p.LibP2PNode) {
 	rpcCount := 10
 	// we can't send more than one iHave per RPC in this test, as each iHave should have a distinct topic, and we only have one subscribed topic.

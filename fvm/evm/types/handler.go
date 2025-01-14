@@ -1,7 +1,7 @@
 package types
 
 import (
-	"github.com/onflow/cadence/runtime/common"
+	"github.com/onflow/cadence/common"
 	gethCommon "github.com/onflow/go-ethereum/common"
 )
 

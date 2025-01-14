@@ -59,7 +59,7 @@ func (s *CombinedVoteProcessorV3TestSuite) SetupTest() {
 	s.rbSigAggregator = &mockhotstuff.WeightedSignatureAggregator{}
 	s.reconstructor = &mockhotstuff.RandomBeaconReconstructor{}
 	s.packer = &mockhotstuff.Packer{}
-	s.proposal = helper.MakeProposal()
+	s.proposal = helper.MakeSignedProposal()
 
 	s.minRequiredShares = 9 // we require 9 RB shares to reconstruct signature
 	s.thresholdTotalWeight, s.rbSharesTotal = atomic.Uint64{}, atomic.Uint64{}
@@ -919,8 +919,8 @@ func TestCombinedVoteProcessorV3_PropertyCreatingQCLiveness(testifyT *testing.T)
 func TestCombinedVoteProcessorV3_BuildVerifyQC(t *testing.T) {
 	epochCounter := uint64(3)
 	epochLookup := &modulemock.EpochLookup{}
-	view := uint64(20)
-	epochLookup.On("EpochForView", view).Return(epochCounter, nil)
+	proposerView := uint64(20)
+	epochLookup.On("EpochForView", proposerView).Return(epochCounter, nil)
 
 	dkgData, err := bootstrapDKG.RandomBeaconKG(9, unittest.RandomBytes(32))
 	require.NoError(t, err)
@@ -991,9 +991,7 @@ func TestCombinedVoteProcessorV3_BuildVerifyQC(t *testing.T) {
 	}
 
 	leader := stakingSigners[0]
-
-	block := helper.MakeBlock(helper.WithBlockView(view),
-		helper.WithBlockProposer(leader.NodeID))
+	block := helper.MakeBlock(helper.WithBlockView(proposerView), helper.WithBlockProposer(leader.NodeID))
 
 	committee, err := committees.NewStaticCommittee(allIdentities, flow.ZeroID, dkgParticipants, dkgData.PubGroupKey)
 	require.NoError(t, err)
@@ -1009,8 +1007,9 @@ func TestCombinedVoteProcessorV3_BuildVerifyQC(t *testing.T) {
 	}
 
 	// create and sign proposal
-	proposal, err := signers[leader.NodeID].CreateProposal(block)
+	leaderVote, err := signers[leader.NodeID].CreateVote(block)
 	require.NoError(t, err)
+	proposal := helper.MakeSignedProposal(helper.WithProposal(helper.MakeProposal(helper.WithBlock(block))), helper.WithSigData(leaderVote.SigData))
 
 	qcCreated := false
 	onQCCreated := func(qc *flow.QuorumCertificate) {

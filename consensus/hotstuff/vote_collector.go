@@ -61,7 +61,7 @@ type VoteCollector interface {
 	// It returns nil if the block is valid.
 	// It returns model.InvalidProposalError if block is invalid.
 	// It returns other error if there is exception processing the block.
-	ProcessBlock(block *model.Proposal) error
+	ProcessBlock(block *model.SignedProposal) error
 
 	// AddVote adds a vote to the collector
 	// When enough votes have been added to produce a QC, the QC will be created asynchronously, and
@@ -116,5 +116,5 @@ type VoteProcessorFactory interface {
 	// Caller can be sure that proposal vote was successfully verified and processed.
 	// Expected error returns during normal operations:
 	// * model.InvalidProposalError - proposal has invalid proposer vote
-	Create(log zerolog.Logger, proposal *model.Proposal) (VerifyingVoteProcessor, error)
+	Create(log zerolog.Logger, proposal *model.SignedProposal) (VerifyingVoteProcessor, error)
 }
