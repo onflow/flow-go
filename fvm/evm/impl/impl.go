@@ -647,7 +647,7 @@ func newInternalEVMTypeWithdrawFunction(
 				panic(types.ErrInvalidBalance)
 			}
 
-			if types.BalanceInAttFlowValidForFlowVault(amountValue.BigInt) {
+			if !types.AttoFlowBalanceValidForFlowVault(amountValue.BigInt) {
 				panic(types.ErrWithdrawBalanceRounding)
 			}
 
