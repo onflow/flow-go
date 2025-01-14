@@ -311,7 +311,6 @@ func (c *Controller) readMessages(ctx context.Context) error {
 	for {
 		select {
 		case <-ctx.Done():
-			c.logger.Error().Msgf("!!! controller read: ctx.DONE()")
 			return nil
 		default:
 			var message json.RawMessage
@@ -322,7 +321,6 @@ func (c *Controller) readMessages(ctx context.Context) error {
 
 				var closeErr *websocket.CloseError
 				if errors.As(err, &closeErr) {
-					c.logger.Error().Msgf("!!! controller read json: %v ", err)
 					return err
 				}
 
