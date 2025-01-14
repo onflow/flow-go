@@ -16,8 +16,8 @@ type BaseMessageRequest struct {
 
 // BaseMessageResponse represents a base structure for outgoing messages.
 type BaseMessageResponse struct {
-	SubscriptionID string       `json:"subscription_id,omitempty"` // SubscriptionID might be empty in case of error response
-	Error          ErrorMessage `json:"error,omitempty"`           // Error might be empty in case of OK response
+	SubscriptionID string       `json:"subscription_id"` // SubscriptionID might be empty in case of error response
+	Error          ErrorMessage `json:"error,omitempty"` // Error might be empty in case of OK response
 }
 
 type ErrorMessage struct {
