@@ -499,6 +499,25 @@ contract EVM {
             ) as! Result
         }
 
+        /// Calls a contract function with the given data.
+        /// The execution is limited by the given amount of gas.
+        /// The transaction state changes are not persisted.
+        access(all)
+        fun dryCall(
+            to: EVMAddress,
+            data: [UInt8],
+            gasLimit: UInt64,
+            value: Balance,
+        ): Result {
+            return InternalEVM.dryCall(
+                from: self.addressBytes,
+                to: to.bytes,
+                data: data,
+                gasLimit: gasLimit,
+                value: value.attoflow
+            ) as! Result
+        }
+
         /// Bridges the given NFT to the EVM environment, requiring a Provider from which to withdraw a fee to fulfill
         /// the bridge request
         access(all)

@@ -4792,6 +4792,136 @@ func TestCadenceOwnedAccountCall(t *testing.T) {
 	require.Equal(t, expected, actual)
 }
 
+func TestCadenceOwnedAccountDryCall(t *testing.T) {
+
+	t.Parallel()
+
+	dryCallCalled := false
+
+	contractsAddress := flow.BytesToAddress([]byte{0x1})
+
+	handler := &testContractHandler{
+		evmContractAddress: common.Address(contractsAddress),
+		dryRun: func(tx []byte, from types.Address) *types.ResultSummary {
+			dryCallCalled = true
+			gethTx := &gethTypes.Transaction{}
+			if err := gethTx.UnmarshalBinary(tx); err != nil {
+				require.Fail(t, err.Error())
+			}
+
+			require.NotNil(t, gethTx.To())
+
+			assert.Equal(
+				t,
+				types.Address{4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+				from,
+			)
+			assert.Equal(
+				t,
+				types.Address{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 10, 0, 0, 0, 0, 0, 0, 0, 0, 15},
+				types.NewAddress(*gethTx.To()),
+			)
+			assert.Equal(t, []byte{4, 5, 6}, gethTx.Data())
+			assert.Equal(t, uint64(33_000), gethTx.Gas())
+			assert.Equal(t, big.NewInt(1230000000000000000), gethTx.Value())
+
+			return &types.ResultSummary{
+				Status:       types.StatusSuccessful,
+				ReturnedData: []byte{3, 1, 4},
+			}
+		},
+	}
+
+	transactionEnvironment := newEVMTransactionEnvironment(handler, contractsAddress)
+	scriptEnvironment := newEVMScriptEnvironment(handler, contractsAddress)
+
+	rt := runtime.NewInterpreterRuntime(runtime.Config{})
+
+	script := []byte(`
+      import EVM from 0x1
+
+      access(all)
+      fun main(): [UInt8] {
+          let cadenceOwnedAccount <- EVM.createCadenceOwnedAccount()
+          let bal = EVM.Balance(attoflow: 0)
+          bal.setFLOW(flow: 1.23)
+          let response = cadenceOwnedAccount.dryCall(
+              to: EVM.EVMAddress(
+                  bytes: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 10, 0, 0, 0, 0, 0, 0, 0, 0, 15]
+              ),
+              data: [4, 5, 6],
+              gasLimit: 33000,
+              value: bal
+          )
+          destroy cadenceOwnedAccount
+          return response.data
+      }
+	`)
+
+	accountCodes := map[common.Location][]byte{}
+	var events []cadence.Event
+
+	runtimeInterface := &TestRuntimeInterface{
+		Storage: NewTestLedger(nil, nil),
+		OnGetSigningAccounts: func() ([]runtime.Address, error) {
+			return []runtime.Address{runtime.Address(contractsAddress)}, nil
+		},
+		OnResolveLocation: newLocationResolver(contractsAddress),
+		OnUpdateAccountContractCode: func(location common.AddressLocation, code []byte) error {
+			accountCodes[location] = code
+			return nil
+		},
+		OnGetAccountContractCode: func(location common.AddressLocation) (code []byte, err error) {
+			code = accountCodes[location]
+			return code, nil
+		},
+		OnEmitEvent: func(event cadence.Event) error {
+			events = append(events, event)
+			return nil
+		},
+		OnDecodeArgument: func(b []byte, t cadence.Type) (cadence.Value, error) {
+			return json.Decode(nil, b)
+		},
+	}
+
+	nextTransactionLocation := NewTransactionLocationGenerator()
+	nextScriptLocation := NewScriptLocationGenerator()
+
+	// Deploy contracts
+
+	deployContracts(
+		t,
+		rt,
+		contractsAddress,
+		runtimeInterface,
+		transactionEnvironment,
+		nextTransactionLocation,
+	)
+
+	// Run script
+
+	actual, err := rt.ExecuteScript(
+		runtime.Script{
+			Source: script,
+		},
+		runtime.Context{
+			Interface:   runtimeInterface,
+			Environment: scriptEnvironment,
+			Location:    nextScriptLocation(),
+		},
+	)
+	require.NoError(t, err)
+
+	expected := cadence.NewArray([]cadence.Value{
+		cadence.UInt8(3),
+		cadence.UInt8(1),
+		cadence.UInt8(4),
+	}).WithType(cadence.NewVariableSizedArrayType(cadence.UInt8Type))
+
+	require.Equal(t, expected, actual)
+	require.True(t, dryCallCalled)
+}
+
 func TestEVMAddressDeposit(t *testing.T) {
 
 	t.Parallel()
