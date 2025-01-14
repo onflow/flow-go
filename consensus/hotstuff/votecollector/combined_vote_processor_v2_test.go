@@ -30,6 +30,7 @@ import (
 	"github.com/onflow/flow-go/module/local"
 	modulemock "github.com/onflow/flow-go/module/mock"
 	msig "github.com/onflow/flow-go/module/signature"
+	"github.com/onflow/flow-go/state/protocol/inmem"
 	storagemock "github.com/onflow/flow-go/storage/mock"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -782,8 +783,8 @@ func TestCombinedVoteProcessorV2_PropertyCreatingQCLiveness(testifyT *testing.T)
 func TestCombinedVoteProcessorV2_BuildVerifyQC(t *testing.T) {
 	epochCounter := uint64(3)
 	epochLookup := &modulemock.EpochLookup{}
-	proposerView := uint64(20)
-	epochLookup.On("EpochForView", proposerView).Return(epochCounter, nil)
+	view := uint64(20)
+	epochLookup.On("EpochForView", view).Return(epochCounter, nil)
 
 	// all committee members run DKG
 	dkgData, err := bootstrapDKG.RandomBeaconKG(11, unittest.RandomBytes(32))
@@ -824,6 +825,7 @@ func TestCombinedVoteProcessorV2_BuildVerifyQC(t *testing.T) {
 		signers[identity.NodeID] = verification.NewCombinedSigner(me, beaconSignerStore)
 	}
 
+	dkgIndexMap := make(flow.DKGIndexMap)
 	for _, identity := range beaconSigners {
 		stakingPriv := unittest.StakingPrivKeyFixture()
 		identity.StakingPubKey = stakingPriv.PublicKey()
@@ -832,6 +834,7 @@ func TestCombinedVoteProcessorV2_BuildVerifyQC(t *testing.T) {
 		dkgKey := encodable.RandomBeaconPrivKey{
 			PrivateKey: dkgData.PrivKeyShares[participantData.Index],
 		}
+		dkgIndexMap[identity.NodeID] = int(participantData.Index)
 
 		keys := &storagemock.SafeBeaconKeys{}
 		// there is Random Beacon key for this epoch
@@ -845,38 +848,28 @@ func TestCombinedVoteProcessorV2_BuildVerifyQC(t *testing.T) {
 		signers[identity.NodeID] = verification.NewCombinedSigner(me, beaconSignerStore)
 	}
 
-	//<<<<<<< HEAD
-	//	leader := allIdentities[0]
-	//
-	//	block := helper.MakeBlock(helper.WithBlockView(view),
-	//		helper.WithBlockProposer(leader.NodeID))
-	//=======
-	leader := stakingSigners[0]
-	parentBlock := helper.MakeBlock(helper.WithBlockView(proposerView - 1))
-	proposal := helper.MakeProposal(
-		helper.WithBlock(
-			helper.MakeBlock(
-				helper.WithBlockView(proposerView),
-				helper.WithParentBlock(parentBlock),
-				helper.WithBlockProposer(leader.NodeID))))
-	block := proposal.Block
-	//>>>>>>> master
+	leader := allIdentities[0]
 
-	committee, err := committees.NewStaticCommittee(allIdentities, flow.ZeroID, dkgParticipants, dkgData.PubGroupKey)
-	require.NoError(t, err)
+	block := helper.MakeBlock(helper.WithBlockView(view),
+		helper.WithBlockProposer(leader.NodeID),
+		helper.WithBlockQC(helper.MakeQC(helper.WithQCView(view-1))))
+	proposal := helper.MakeProposal(helper.WithBlock(block))
 
-	//<<<<<<< HEAD
-	//=======
-	//	committee := &mockhotstuff.DynamicCommittee{}
-	//	committee.On("LeaderForView", block.View).Return(leader.NodeID, nil).Maybe()
-	//	committee.On("QuorumThresholdForView", mock.Anything).Return(committees.WeightThresholdToBuildQC(allIdentities.ToSkeleton().TotalWeight()), nil)
-	//	committee.On("IdentitiesByEpoch", block.View).Return(allIdentities.ToSkeleton(), nil)
-	//	committee.On("IdentitiesByBlock", block.BlockID).Return(allIdentities, nil)
-	//	committee.On("IdentityByBlock", block.BlockID, leader.NodeID).Return(leader, nil)
-	//	committee.On("DKG", block.View).Return(inmemDKG, nil)
-	//	committee.On("Self").Return(leader.NodeID)
-	//
-	//>>>>>>> master
+	inmemDKG := inmem.NewDKG(nil, &flow.EpochCommit{
+		DKGGroupKey:        dkgData.PubGroupKey,
+		DKGParticipantKeys: dkgData.PubKeyShares,
+		DKGIndexMap:        dkgIndexMap,
+	})
+
+	committee := &mockhotstuff.DynamicCommittee{}
+	committee.On("LeaderForView", block.View).Return(leader.NodeID, nil).Maybe()
+	committee.On("QuorumThresholdForView", mock.Anything).Return(committees.WeightThresholdToBuildQC(allIdentities.ToSkeleton().TotalWeight()), nil)
+	committee.On("IdentitiesByEpoch", block.View).Return(allIdentities.ToSkeleton(), nil)
+	committee.On("IdentitiesByBlock", block.BlockID).Return(allIdentities, nil)
+	committee.On("IdentityByBlock", block.BlockID, leader.NodeID).Return(leader, nil)
+	committee.On("DKG", block.View).Return(inmemDKG, nil)
+	committee.On("Self").Return(leader.NodeID)
+
 	votes := make([]*model.Vote, 0, len(allIdentities))
 
 	// first staking signer will be leader collecting votes for proposal
@@ -890,8 +883,8 @@ func TestCombinedVoteProcessorV2_BuildVerifyQC(t *testing.T) {
 	// create and sign proposal
 	persist := mockhotstuff.NewPersister(t)
 	safetyData := &hotstuff.SafetyData{
-		LockedOneChainView:      parentBlock.View,
-		HighestAcknowledgedView: parentBlock.View,
+		LockedOneChainView:      block.View - 1,
+		HighestAcknowledgedView: block.View - 1,
 	}
 	persist.On("GetSafetyData", mock.Anything).Return(safetyData, nil).Once()
 	persist.On("PutSafetyData", mock.Anything).Return(nil)
@@ -900,6 +893,8 @@ func TestCombinedVoteProcessorV2_BuildVerifyQC(t *testing.T) {
 	vote, err := safetyRules.SignOwnProposal(proposal)
 	require.NoError(t, err)
 	signedProposal := helper.MakeSignedProposal(helper.WithProposal(proposal), helper.WithSigData(vote.SigData))
+
+	require.NoError(t, err)
 
 	qcCreated := false
 	onQCCreated := func(qc *flow.QuorumCertificate) {
