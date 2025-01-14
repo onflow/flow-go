@@ -324,3 +324,6 @@ require (
 
 // Using custom fork until https://github.com/onflow/flow-go/issues/5338 is resolved
 replace github.com/ipfs/boxo => github.com/onflow/boxo v0.0.0-20240201202436-f2477b92f483
+
+// TODO: remove after PR on onflow/flow https://github.com/onflow/flow/pull/1539 merged and flow version bumped
+replace github.com/onflow/flow => github.com/The-K-R-O-K/flow v0.0.0-20250114135520-4c3fcf5ad9dd
