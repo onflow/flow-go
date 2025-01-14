@@ -92,6 +92,9 @@ func (suite *BackfillTxErrorMessagesSuite) SetupTest() {
 	}
 
 	suite.params = protocolmock.NewParams(suite.T())
+	suite.params.On("SporkID").Return(unittest.IdentifierFixture(), nil)
+	suite.params.On("ProtocolVersion").Return(uint(unittest.Uint64InRange(10, 30)), nil)
+	suite.params.On("SporkRootBlockHeight").Return(suite.nodeRootBlock.Header.Height, nil)
 	suite.params.On("SealedRoot").Return(suite.nodeRootBlock.Header, nil)
 	suite.state.On("Params").Return(suite.params, nil).Maybe()
 

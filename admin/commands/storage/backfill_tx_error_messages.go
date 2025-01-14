@@ -4,8 +4,6 @@ import (
 	"context"
 	"fmt"
 
-	execproto "github.com/onflow/flow/protobuf/go/flow/execution"
-
 	"github.com/onflow/flow-go/admin"
 	"github.com/onflow/flow-go/admin/commands"
 	"github.com/onflow/flow-go/engine/access/index"
@@ -16,6 +14,8 @@ import (
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/storage"
+
+	execproto "github.com/onflow/flow/protobuf/go/flow/execution"
 )
 
 var _ commands.AdminCommand = (*BackfillTxErrorMessagesCommand)(nil)
