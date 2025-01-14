@@ -233,9 +233,7 @@ func (s *ReceiptValidationSuite) TestReceiptInconsistentChunkList() {
 	require.GreaterOrEqual(s.T(), chunks.Len(), 1)
 	// swap last chunk's start and end states
 	lastChunk := chunks[len(chunks)-1]
-	tmp := lastChunk.StartState
-	lastChunk.StartState = lastChunk.EndState
-	lastChunk.EndState = tmp
+	lastChunk.StartState, lastChunk.EndState = lastChunk.EndState, lastChunk.StartState
 
 	receipt := unittest.ExecutionReceiptFixture(unittest.WithExecutorID(s.ExeID),
 		unittest.WithResult(valSubgrph.Result))
