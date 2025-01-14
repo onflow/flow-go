@@ -381,7 +381,7 @@ func (proc *procedure) withdrawFrom(
 		), nil
 	}
 
-	if types.BalanceInAttFlowValidForFlowVault(call.Value) {
+	if !types.AttoFlowBalanceValidForFlowVault(call.Value) {
 		return types.NewInvalidResult(
 			call.Transaction(),
 			types.ErrWithdrawBalanceRounding,
