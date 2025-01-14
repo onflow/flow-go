@@ -18,7 +18,6 @@ import (
 	accessmock "github.com/onflow/flow-go/engine/access/mock"
 	"github.com/onflow/flow-go/engine/access/rpc/backend"
 	connectionmock "github.com/onflow/flow-go/engine/access/rpc/connection/mock"
-	commonrpc "github.com/onflow/flow-go/engine/common/rpc"
 	"github.com/onflow/flow-go/model/flow"
 	syncmock "github.com/onflow/flow-go/module/state_synchronization/mock"
 	"github.com/onflow/flow-go/state/protocol"
@@ -137,13 +136,13 @@ func (suite *BackfillTxErrorMessagesSuite) SetupTest() {
 		ScriptExecutionMode:  backend.IndexQueryModeExecutionNodesOnly,
 		TxResultQueryMode:    backend.IndexQueryModeExecutionNodesOnly,
 		ChainID:              flow.Testnet,
-		ExecNodeIdentitiesProvider: commonrpc.NewExecutionNodeIdentitiesProvider(
-			suite.log,
-			suite.state,
-			suite.receipts,
-			nil,
-			nil,
-		),
+		//ExecNodeIdentitiesProvider: commonrpc.NewExecutionNodeIdentitiesProvider(
+		//	suite.log,
+		//	suite.state,
+		//	suite.receipts,
+		//	nil,
+		//	nil,
+		//),
 	})
 	require.NoError(suite.T(), err)
 
