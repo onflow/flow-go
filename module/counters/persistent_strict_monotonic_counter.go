@@ -44,7 +44,7 @@ func NewPersistentStrictMonotonicCounter(consumerProgress storage.ConsumerProgre
 // Set sets the processed index, ensuring it is strictly monotonically increasing.
 //
 // Expected errors during normal operation:
-//   - codes.ErrIncorrectValue - if stored value is larger than processed.
+//   - codes.ErrIncorrectValue - if stored value is >= processed (requirement of strict monotonous increase is violated).
 //   - generic error in case of unexpected failure from the database layer or
 //     encoding failure.
 func (m *PersistentStrictMonotonicCounter) Set(processed uint64) error {
