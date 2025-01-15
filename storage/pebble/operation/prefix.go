@@ -11,9 +11,6 @@ const (
 	//lint:ignore U1000 Ignore unused variable warning
 	// job queue consumers and producers
 	codeJobConsumerProcessed = 70
-
-	// legacy codes (should be cleaned up)
-	codeChunkDataPack = 100
 )
 
 func makePrefix(code byte, keys ...interface{}) []byte {
