@@ -4,6 +4,7 @@ import (
 	"github.com/gammazero/workerpool"
 	"github.com/onflow/crypto/hash"
 	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
 	"github.com/onflow/flow-go/model/chunks"
@@ -42,7 +43,7 @@ func (s *BaseApprovalsTestSuite) SetupTest() {
 	s.Block = unittest.BlockHeaderWithParentFixture(s.ParentBlock)
 	verifiers := make(flow.IdentifierList, 0)
 	s.AuthorizedVerifiers = make(map[flow.Identifier]*flow.Identity)
-	s.ChunksAssignment = chunks.NewAssignment()
+	assignmentBuilder := chunks.NewAssignmentBuilder()
 	s.Chunks = unittest.ChunkListFixture(50, s.Block.ID(), unittest.StateCommitmentFixture())
 	// mock public key to mock signature verifications
 	s.PublicKey = &module.PublicKey{}
@@ -59,8 +60,9 @@ func (s *BaseApprovalsTestSuite) SetupTest() {
 
 	// create assignment
 	for _, chunk := range s.Chunks {
-		s.ChunksAssignment.Add(chunk, verifiers)
+		require.NoError(s.T(), assignmentBuilder.Add(chunk.Index, verifiers))
 	}
+	s.ChunksAssignment = assignmentBuilder.Build()
 
 	s.VerID = verifiers[0]
 	result := unittest.ExecutionResultFixture()

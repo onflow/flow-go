@@ -22,10 +22,6 @@ type InvalidInputError struct {
 	err error
 }
 
-func NewInvalidInputError(msg string) error {
-	return NewInvalidInputErrorf(msg)
-}
-
 func NewInvalidInputErrorf(msg string, args ...interface{}) error {
 	return InvalidInputError{
 		err: fmt.Errorf(msg, args...),
@@ -61,12 +57,6 @@ type NetworkTransmissionError struct {
 func NewNetworkTransmissionErrorf(msg string, args ...interface{}) error {
 	return NetworkTransmissionError{
 		err: fmt.Errorf(msg, args...),
-	}
-}
-
-func NewNetworkTransmissionError(msg string) error {
-	return NetworkTransmissionError{
-		err: fmt.Errorf(msg),
 	}
 }
 

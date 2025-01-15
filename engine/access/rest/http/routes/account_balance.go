@@ -5,12 +5,13 @@ import (
 
 	"github.com/onflow/flow-go/access"
 	"github.com/onflow/flow-go/engine/access/rest/common"
+	commonmodels "github.com/onflow/flow-go/engine/access/rest/common/models"
 	"github.com/onflow/flow-go/engine/access/rest/http/models"
 	"github.com/onflow/flow-go/engine/access/rest/http/request"
 )
 
 // GetAccountBalance handler retrieves an account balance by address and block height and returns the response
-func GetAccountBalance(r *common.Request, backend access.API, _ models.LinkGenerator) (interface{}, error) {
+func GetAccountBalance(r *common.Request, backend access.API, _ commonmodels.LinkGenerator) (interface{}, error) {
 	req, err := request.GetAccountBalanceRequest(r)
 	if err != nil {
 		return nil, common.NewBadRequestError(err)
