@@ -1,36 +1,31 @@
-package badger
+package store
 
 import (
 	"fmt"
-
-	"github.com/dgraph-io/badger/v2"
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/storage"
-	"github.com/onflow/flow-go/storage/badger/operation"
-	"github.com/onflow/flow-go/storage/badger/transaction"
+	"github.com/onflow/flow-go/storage/operation"
 )
 
 type ChunkDataPacks struct {
-	db             *badger.DB
+	db             storage.DB
 	collections    storage.Collections
 	byChunkIDCache *Cache[flow.Identifier, *storage.StoredChunkDataPack]
 }
 
-func NewChunkDataPacks(collector module.CacheMetrics, db *badger.DB, collections storage.Collections, byChunkIDCacheSize uint) *ChunkDataPacks {
+func NewChunkDataPacks(collector module.CacheMetrics, db storage.DB, collections storage.Collections, byChunkIDCacheSize uint) *ChunkDataPacks {
 
-	store := func(key flow.Identifier, val *storage.StoredChunkDataPack) func(*transaction.Tx) error {
-		return transaction.WithTx(operation.SkipDuplicates(operation.InsertChunkDataPack(val)))
+	store := func(rw storage.ReaderBatchWriter, key flow.Identifier, val *storage.StoredChunkDataPack) error {
+		return operation.InsertChunkDataPack(rw.Writer(), val)
 	}
 
-	retrieve := func(key flow.Identifier) func(tx *badger.Txn) (*storage.StoredChunkDataPack, error) {
-		return func(tx *badger.Txn) (*storage.StoredChunkDataPack, error) {
-			var c storage.StoredChunkDataPack
-			err := operation.RetrieveChunkDataPack(key, &c)(tx)
-			return &c, err
-		}
+	retrieve := func(r storage.Reader, key flow.Identifier) (*storage.StoredChunkDataPack, error) {
+		var c storage.StoredChunkDataPack
+		err := operation.RetrieveChunkDataPack(r, key, &c)
+		return &c, err
 	}
 
 	cache := newCache(collector, metrics.ResourceChunkDataPack,
@@ -50,61 +45,52 @@ func NewChunkDataPacks(collector module.CacheMetrics, db *badger.DB, collections
 // Remove removes multiple ChunkDataPacks cs keyed by their ChunkIDs in a batch.
 // No errors are expected during normal operation, even if no entries are matched.
 func (ch *ChunkDataPacks) Remove(chunkIDs []flow.Identifier) error {
-	batch := NewBatch(ch.db)
-
-	for _, c := range chunkIDs {
-		err := ch.BatchRemove(c, batch)
-		if err != nil {
-			return fmt.Errorf("cannot remove chunk data pack: %w", err)
+	return ch.db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+		for _, c := range chunkIDs {
+			err := ch.BatchRemove(c, rw)
+			if err != nil {
+				return fmt.Errorf("cannot remove chunk data pack: %w", err)
+			}
 		}
-	}
 
-	err := batch.Flush()
-	if err != nil {
-		return fmt.Errorf("cannot flush batch to remove chunk data pack: %w", err)
-	}
-	return nil
+		return nil
+	})
 }
 
 // BatchStore stores ChunkDataPack c keyed by its ChunkID in provided batch.
 // No errors are expected during normal operation, but it may return generic error
 // if entity is not serializable or Badger unexpectedly fails to process request
-func (ch *ChunkDataPacks) BatchStore(c *flow.ChunkDataPack, batch storage.BatchStorage) error {
+func (ch *ChunkDataPacks) BatchStore(c *flow.ChunkDataPack, rw storage.ReaderBatchWriter) error {
 	sc := storage.ToStoredChunkDataPack(c)
-	writeBatch := batch.GetWriter()
-	batch.OnSucceed(func() {
+	storage.OnCommitSucceed(rw, func() {
 		ch.byChunkIDCache.Insert(sc.ChunkID, sc)
 	})
-	return operation.BatchInsertChunkDataPack(sc)(writeBatch)
+	return operation.InsertChunkDataPack(rw.Writer(), sc)
 }
 
 // Store stores multiple ChunkDataPacks cs keyed by their ChunkIDs in a batch.
 // No errors are expected during normal operation, but it may return generic error
 func (ch *ChunkDataPacks) Store(cs []*flow.ChunkDataPack) error {
-	batch := NewBatch(ch.db)
-	for _, c := range cs {
-		err := ch.BatchStore(c, batch)
-		if err != nil {
-			return fmt.Errorf("cannot store chunk data pack: %w", err)
+	return ch.db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+		for _, c := range cs {
+			err := ch.BatchStore(c, rw)
+			if err != nil {
+				return fmt.Errorf("cannot store chunk data pack: %w", err)
+			}
 		}
-	}
 
-	err := batch.Flush()
-	if err != nil {
-		return fmt.Errorf("cannot flush batch: %w", err)
-	}
-	return nil
+		return nil
+	})
 }
 
 // BatchRemove removes ChunkDataPack c keyed by its ChunkID in provided batch
 // No errors are expected during normal operation, even if no entries are matched.
 // If Badger unexpectedly fails to process the request, the error is wrapped in a generic error and returned.
-func (ch *ChunkDataPacks) BatchRemove(chunkID flow.Identifier, batch storage.BatchStorage) error {
-	writeBatch := batch.GetWriter()
-	batch.OnSucceed(func() {
+func (ch *ChunkDataPacks) BatchRemove(chunkID flow.Identifier, rw storage.ReaderBatchWriter) error {
+	storage.OnCommitSucceed(rw, func() {
 		ch.byChunkIDCache.Remove(chunkID)
 	})
-	return operation.BatchRemoveChunkDataPack(chunkID)(writeBatch)
+	return operation.RemoveChunkDataPack(rw.Writer(), chunkID)
 }
 
 func (ch *ChunkDataPacks) ByChunkID(chunkID flow.Identifier) (*flow.ChunkDataPack, error) {
@@ -133,10 +119,7 @@ func (ch *ChunkDataPacks) ByChunkID(chunkID flow.Identifier) (*flow.ChunkDataPac
 }
 
 func (ch *ChunkDataPacks) byChunkID(chunkID flow.Identifier) (*storage.StoredChunkDataPack, error) {
-	tx := ch.db.NewTransaction(false)
-	defer tx.Discard()
-
-	schdp, err := ch.retrieveCHDP(chunkID)(tx)
+	schdp, err := ch.retrieveCHDP(chunkID)
 	if err != nil {
 		return nil, fmt.Errorf("could not retrive stored chunk data pack: %w", err)
 	}
@@ -144,12 +127,10 @@ func (ch *ChunkDataPacks) byChunkID(chunkID flow.Identifier) (*storage.StoredChu
 	return schdp, nil
 }
 
-func (ch *ChunkDataPacks) retrieveCHDP(chunkID flow.Identifier) func(*badger.Txn) (*storage.StoredChunkDataPack, error) {
-	return func(tx *badger.Txn) (*storage.StoredChunkDataPack, error) {
-		val, err := ch.byChunkIDCache.Get(chunkID)(tx)
-		if err != nil {
-			return nil, err
-		}
-		return val, nil
+func (ch *ChunkDataPacks) retrieveCHDP(chunkID flow.Identifier) (*storage.StoredChunkDataPack, error) {
+	val, err := ch.byChunkIDCache.Get(ch.db.Reader(), chunkID)
+	if err != nil {
+		return nil, err
 	}
+	return val, nil
 }
