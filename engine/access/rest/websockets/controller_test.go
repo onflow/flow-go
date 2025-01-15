@@ -849,10 +849,6 @@ func (s *WsControllerSuite) TestControllerShutdown() {
 		controller := NewWebSocketController(s.logger, s.wsConfig, conn, factory)
 
 		ctx, cancel := context.WithCancel(context.Background())
-		conn.On("ReadJSON", mock.Anything).Return(func(_ interface{}) error {
-			<-ctx.Done()
-			return websocket.ErrCloseSent
-		}).Once()
 
 		cancel()
 		controller.HandleConnection(ctx)

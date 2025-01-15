@@ -56,10 +56,10 @@ func ParseBody(raw io.Reader, dst interface{}) error {
 	return nil
 }
 
-// ParseInterfacesToString converts a slice of interface{} to a slice of strings.
+// ParseInterfaceToString converts a slice of interface{} to a slice of strings.
 //
 // No errors are expected during normal operations.
-func ParseInterfacesToString(value interface{}) ([]string, error) {
+func ParseInterfaceToString(value interface{}) ([]string, error) {
 	// Check if value is []string directly
 	if strSlice, ok := value.([]string); ok {
 		return strSlice, nil
