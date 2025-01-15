@@ -146,8 +146,11 @@ func (computer ExecutionParametersComputer) getExecutionParameters() (
 ) {
 	sc := systemcontracts.SystemContractsForChain(computer.ctx.Chain.ChainID())
 
-	// Check that the service account exists because all the settings are
-	// stored in it
+	// The execution parameters are stored in the ExecutionParametersAccount. This is
+	// just the service account for all networks except mainnet and testnet.
+	// For mainnet and testnet, the execution parameters are stored in a separate
+	// account, so that they are separated from the frequently changing data on the
+	// service account.
 	service := common.Address(sc.ExecutionParametersAccount.Address)
 
 	env := environment.NewScriptEnv(
