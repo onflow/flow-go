@@ -1113,6 +1113,7 @@ func (b *bootstrapExecutor) invokeMetaTransaction(
 ) {
 	// do not deduct fees or check storage in meta transactions
 	ctx := NewContextFromParent(parentCtx,
+		WithReadExecutionSettingsFromStateDisabled(true),
 		WithAccountStorageLimit(false),
 		WithTransactionFeesEnabled(false),
 		WithAuthorizationChecksEnabled(false),

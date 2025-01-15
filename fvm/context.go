@@ -328,6 +328,16 @@ func WithRandomSourceHistoryCallAllowed(allowed bool) Option {
 	}
 }
 
+// WithReadExecutionSettingsFromStateDisabled enables or disables reading execution settings from the state.
+// This is used only for bootstrapping, because the settings are not readable yet,
+// and in certain tests to avoid loading the necessary contracts to the programs cache
+func WithReadExecutionSettingsFromStateDisabled(disabled bool) Option {
+	return func(ctx Context) Context {
+		ctx.ReadExecutionSettingsFromStateDisabled = disabled
+		return ctx
+	}
+}
+
 // WithReusableCadenceRuntimePool set the (shared) RedusableCadenceRuntimePool
 // use for creating the cadence runtime.
 func WithReusableCadenceRuntimePool(

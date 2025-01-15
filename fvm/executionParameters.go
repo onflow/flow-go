@@ -7,18 +7,17 @@ import (
 
 	"github.com/rs/zerolog"
 
-	"github.com/onflow/flow-go/fvm/storage/snapshot"
-
 	"github.com/onflow/cadence"
 	"github.com/onflow/cadence/common"
 
-	"github.com/onflow/flow-go/fvm/blueprints"
 	"github.com/onflow/flow-go/fvm/environment"
 	"github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/fvm/meter"
 	"github.com/onflow/flow-go/fvm/storage"
 	"github.com/onflow/flow-go/fvm/storage/derived"
+	"github.com/onflow/flow-go/fvm/storage/snapshot"
 	"github.com/onflow/flow-go/fvm/storage/state"
+	"github.com/onflow/flow-go/fvm/systemcontracts"
 )
 
 func ProcedureStateParameters(
@@ -63,7 +62,14 @@ func getExecutionParameters(
 	proc Procedure,
 	txnState storage.TransactionPreparer,
 ) (state.ExecutionParameters, *snapshot.ExecutionSnapshot, error) {
+
 	meterParams := getBasicMeterParameters(ctx, proc)
+
+	if ctx.ReadExecutionSettingsFromStateDisabled {
+		return state.ExecutionParameters{
+			MeterParameters: meterParams,
+		}, &snapshot.ExecutionSnapshot{}, nil
+	}
 
 	executionParams, executionParamsStateRead, err := txnState.GetStateExecutionParameters(
 		txnState,
@@ -143,10 +149,7 @@ func (computer ExecutionParametersComputer) getExecutionParameters() (
 	derived.StateExecutionParameters,
 	error,
 ) {
-	// Check that the service account exists because all the settings are
-	// stored in it
-	serviceAddress := computer.ctx.Chain.ServiceAddress()
-	service := common.Address(serviceAddress)
+	sc := systemcontracts.SystemContractsForChain(computer.ctx.Chain.ChainID())
 
 	env := environment.NewScriptEnv(
 		context.Background(),
@@ -184,7 +187,7 @@ func (computer ExecutionParametersComputer) getExecutionParameters() (
 		return nil
 	}
 
-	computationWeights, err := GetExecutionEffortWeights(env, service)
+	computationWeights, err := GetExecutionEffortWeights(env, sc.FlowServiceAccount.Location())
 	err = setIfOk(
 		"execution effort weights",
 		err,
@@ -193,7 +196,7 @@ func (computer ExecutionParametersComputer) getExecutionParameters() (
 		return overrides, err
 	}
 
-	memoryWeights, err := GetExecutionMemoryWeights(env, service)
+	memoryWeights, err := GetExecutionMemoryWeights(env, sc.FlowServiceAccount.Location())
 	err = setIfOk(
 		"execution memory weights",
 		err,
@@ -202,7 +205,7 @@ func (computer ExecutionParametersComputer) getExecutionParameters() (
 		return overrides, err
 	}
 
-	memoryLimit, err := GetExecutionMemoryLimit(env, service)
+	memoryLimit, err := GetExecutionMemoryLimit(env, sc.FlowServiceAccount.Location())
 	err = setIfOk(
 		"execution memory limit",
 		err,
@@ -216,8 +219,8 @@ func (computer ExecutionParametersComputer) getExecutionParameters() (
 
 func getExecutionWeights[KindType common.ComputationKind | common.MemoryKind](
 	env environment.Environment,
-	service common.Address,
-	path cadence.Path,
+	contract common.AddressLocation,
+	functionName string,
 	defaultWeights map[KindType]uint64,
 ) (
 	map[KindType]uint64,
@@ -226,7 +229,7 @@ func getExecutionWeights[KindType common.ComputationKind | common.MemoryKind](
 	runtime := env.BorrowCadenceRuntime()
 	defer env.ReturnCadenceRuntime(runtime)
 
-	value, err := runtime.ReadStored(service, path)
+	value, err := runtime.InvokeContractFunction(contract, functionName, nil, nil)
 
 	if err != nil {
 		// this might be fatal, return as is
@@ -238,8 +241,8 @@ func getExecutionWeights[KindType common.ComputationKind | common.MemoryKind](
 		// this is a non-fatal error. It is expected if the weights are not
 		// set up on the network yet.
 		return nil, errors.NewCouldNotGetExecutionParameterFromStateError(
-			service.Hex(),
-			path.String())
+			contract,
+			functionName)
 	}
 
 	// Merge the default weights with the weights from the state.
@@ -287,7 +290,7 @@ func cadenceValueToWeights(value cadence.Value) (map[uint]uint64, bool) {
 // GetExecutionEffortWeights reads stored execution effort weights from the service account
 func GetExecutionEffortWeights(
 	env environment.Environment,
-	service common.Address,
+	service common.AddressLocation,
 ) (
 	computationWeights meter.ExecutionEffortWeights,
 	err error,
@@ -295,29 +298,29 @@ func GetExecutionEffortWeights(
 	return getExecutionWeights(
 		env,
 		service,
-		blueprints.TransactionFeesExecutionEffortWeightsPath,
+		systemcontracts.ContractServiceAccountFunction_getExecutionEffortWeights,
 		meter.DefaultComputationWeights)
 }
 
 // GetExecutionMemoryWeights reads stored execution memory weights from the service account
 func GetExecutionMemoryWeights(
 	env environment.Environment,
-	service common.Address,
+	serviceContract common.AddressLocation,
 ) (
 	memoryWeights meter.ExecutionMemoryWeights,
 	err error,
 ) {
 	return getExecutionWeights(
 		env,
-		service,
-		blueprints.TransactionFeesExecutionMemoryWeightsPath,
+		serviceContract,
+		systemcontracts.ContractServiceAccountFunction_getExecutionMemoryWeights,
 		meter.DefaultMemoryWeights)
 }
 
 // GetExecutionMemoryLimit reads the stored execution memory limit from the service account
 func GetExecutionMemoryLimit(
 	env environment.Environment,
-	service common.Address,
+	serviceContract common.AddressLocation,
 ) (
 	memoryLimit uint64,
 	err error,
@@ -325,9 +328,12 @@ func GetExecutionMemoryLimit(
 	runtime := env.BorrowCadenceRuntime()
 	defer env.ReturnCadenceRuntime(runtime)
 
-	value, err := runtime.ReadStored(
-		service,
-		blueprints.TransactionFeesExecutionMemoryLimitPath)
+	value, err := runtime.InvokeContractFunction(
+		serviceContract,
+		systemcontracts.ContractServiceAccountFunction_getExecutionMemoryLimit,
+		nil,
+		nil,
+	)
 	if err != nil {
 		// this might be fatal, return as is
 		return 0, err
@@ -337,8 +343,8 @@ func GetExecutionMemoryLimit(
 	if value == nil || !ok {
 		// this is a non-fatal error. It is expected if the weights are not set up on the network yet.
 		return 0, errors.NewCouldNotGetExecutionParameterFromStateError(
-			service.Hex(),
-			blueprints.TransactionFeesExecutionMemoryLimitPath.String())
+			serviceContract,
+			systemcontracts.ContractServiceAccountFunction_getExecutionMemoryLimit)
 	}
 
 	return uint64(memoryLimitRaw), nil

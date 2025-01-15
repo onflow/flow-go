@@ -2,6 +2,7 @@ package errors
 
 import (
 	"github.com/onflow/cadence"
+	"github.com/onflow/cadence/common"
 	"github.com/onflow/cadence/runtime"
 
 	"github.com/onflow/flow-go/model/flow"
@@ -287,15 +288,15 @@ func NewScriptExecutionTimedOutError() CodedError {
 // NewCouldNotGetExecutionParameterFromStateError constructs a new CodedError
 // which indicates that computation has exceeded its limit.
 func NewCouldNotGetExecutionParameterFromStateError(
-	address string,
-	path string,
+	location common.AddressLocation,
+	method string,
 ) CodedError {
 	return NewCodedError(
 		ErrCodeCouldNotDecodeExecutionParameterFromState,
 		"could not get execution parameter from the state "+
-			"(address: %s path: %s)",
-		address,
-		path)
+			"(location: %s method: %s)",
+		location.String(),
+		method)
 }
 
 // NewInvalidInternalStateAccessError constructs a new CodedError which

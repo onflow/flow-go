@@ -10,30 +10,33 @@ import (
 	"github.com/onflow/cadence"
 	"github.com/onflow/cadence/common"
 	"github.com/onflow/cadence/runtime"
+	"github.com/onflow/cadence/sema"
 
 	"github.com/onflow/flow-go/fvm"
-	"github.com/onflow/flow-go/fvm/blueprints"
 	"github.com/onflow/flow-go/fvm/environment"
 	fvmmock "github.com/onflow/flow-go/fvm/environment/mock"
 	"github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/fvm/meter"
 	reusableRuntime "github.com/onflow/flow-go/fvm/runtime"
 	"github.com/onflow/flow-go/fvm/runtime/testutil"
+	"github.com/onflow/flow-go/fvm/systemcontracts"
 )
 
 func TestGetExecutionMemoryWeights(t *testing.T) {
-	address := common.Address{}
+	address := common.AddressLocation{}
 
-	setupEnvMock := func(readStored func(
-		address common.Address,
-		path cadence.Path,
-		context runtime.Context,
+	setupEnvMock := func(invoke func(
+		common.AddressLocation,
+		string,
+		[]cadence.Value,
+		[]sema.Type,
+		runtime.Context,
 	) (cadence.Value, error)) environment.Environment {
 		envMock := &fvmmock.Environment{}
 		envMock.On("BorrowCadenceRuntime", mock.Anything).Return(
 			reusableRuntime.NewReusableCadenceRuntime(
 				&testutil.TestInterpreterRuntime{
-					ReadStoredFunc: readStored,
+					InvokeContractFunc: invoke,
 				},
 				runtime.Config{},
 			),
@@ -45,34 +48,52 @@ func TestGetExecutionMemoryWeights(t *testing.T) {
 	t.Run("return error if nothing is stored",
 		func(t *testing.T) {
 			envMock := setupEnvMock(
-				func(address common.Address, path cadence.Path, context runtime.Context) (cadence.Value, error) {
+				func(
+					common.AddressLocation,
+					string,
+					[]cadence.Value,
+					[]sema.Type,
+					runtime.Context,
+				) (cadence.Value, error) {
 					return nil, nil
 				})
 			_, err := fvm.GetExecutionMemoryWeights(envMock, address)
 			require.Error(t, err)
 			require.EqualError(t, err, errors.NewCouldNotGetExecutionParameterFromStateError(
-				address.Hex(),
-				blueprints.TransactionFeesExecutionMemoryWeightsPath.String()).Error())
+				address,
+				systemcontracts.ContractServiceAccountFunction_getExecutionMemoryWeights).Error())
 		},
 	)
 	t.Run("return error if can't parse stored",
 		func(t *testing.T) {
 			envMock := setupEnvMock(
-				func(address common.Address, path cadence.Path, context runtime.Context) (cadence.Value, error) {
+				func(
+					common.AddressLocation,
+					string,
+					[]cadence.Value,
+					[]sema.Type,
+					runtime.Context,
+				) (cadence.Value, error) {
 					return cadence.NewBool(false), nil
 				})
 			_, err := fvm.GetExecutionMemoryWeights(envMock, address)
 			require.Error(t, err)
 			require.EqualError(t, err, errors.NewCouldNotGetExecutionParameterFromStateError(
-				address.Hex(),
-				blueprints.TransactionFeesExecutionMemoryWeightsPath.String()).Error())
+				address,
+				systemcontracts.ContractServiceAccountFunction_getExecutionMemoryWeights).Error())
 		},
 	)
 	t.Run("return error if get stored returns error",
 		func(t *testing.T) {
 			someErr := fmt.Errorf("some error")
 			envMock := setupEnvMock(
-				func(address common.Address, path cadence.Path, context runtime.Context) (cadence.Value, error) {
+				func(
+					common.AddressLocation,
+					string,
+					[]cadence.Value,
+					[]sema.Type,
+					runtime.Context,
+				) (cadence.Value, error) {
 					return nil, someErr
 				})
 			_, err := fvm.GetExecutionMemoryWeights(envMock, address)
@@ -84,7 +105,13 @@ func TestGetExecutionMemoryWeights(t *testing.T) {
 		func(t *testing.T) {
 			someErr := fmt.Errorf("some error")
 			envMock := setupEnvMock(
-				func(address common.Address, path cadence.Path, context runtime.Context) (cadence.Value, error) {
+				func(
+					common.AddressLocation,
+					string,
+					[]cadence.Value,
+					[]sema.Type,
+					runtime.Context,
+				) (cadence.Value, error) {
 					return nil, someErr
 				})
 			_, err := fvm.GetExecutionMemoryWeights(envMock, address)
@@ -95,7 +122,13 @@ func TestGetExecutionMemoryWeights(t *testing.T) {
 	t.Run("no error if a dictionary is stored",
 		func(t *testing.T) {
 			envMock := setupEnvMock(
-				func(address common.Address, path cadence.Path, context runtime.Context) (cadence.Value, error) {
+				func(
+					common.AddressLocation,
+					string,
+					[]cadence.Value,
+					[]sema.Type,
+					runtime.Context,
+				) (cadence.Value, error) {
 					return cadence.NewDictionary([]cadence.KeyValuePair{}), nil
 				})
 			_, err := fvm.GetExecutionMemoryWeights(envMock, address)
@@ -105,7 +138,13 @@ func TestGetExecutionMemoryWeights(t *testing.T) {
 	t.Run("return defaults if empty dict is stored",
 		func(t *testing.T) {
 			envMock := setupEnvMock(
-				func(address common.Address, path cadence.Path, context runtime.Context) (cadence.Value, error) {
+				func(
+					common.AddressLocation,
+					string,
+					[]cadence.Value,
+					[]sema.Type,
+					runtime.Context,
+				) (cadence.Value, error) {
 					return cadence.NewDictionary([]cadence.KeyValuePair{}), nil
 				})
 			weights, err := fvm.GetExecutionMemoryWeights(envMock, address)
@@ -131,7 +170,13 @@ func TestGetExecutionMemoryWeights(t *testing.T) {
 			expectedWeights[0] = 0
 
 			envMock := setupEnvMock(
-				func(address common.Address, path cadence.Path, context runtime.Context) (cadence.Value, error) {
+				func(
+					common.AddressLocation,
+					string,
+					[]cadence.Value,
+					[]sema.Type,
+					runtime.Context,
+				) (cadence.Value, error) {
 					return cadence.NewDictionary([]cadence.KeyValuePair{
 						{
 							Value: cadence.UInt64(0),
@@ -152,18 +197,20 @@ func TestGetExecutionMemoryWeights(t *testing.T) {
 }
 
 func TestGetExecutionEffortWeights(t *testing.T) {
-	address := common.Address{}
+	address := common.AddressLocation{}
 
-	setupEnvMock := func(readStored func(
-		address common.Address,
-		path cadence.Path,
-		context runtime.Context,
+	setupEnvMock := func(invoke func(
+		common.AddressLocation,
+		string,
+		[]cadence.Value,
+		[]sema.Type,
+		runtime.Context,
 	) (cadence.Value, error)) environment.Environment {
 		envMock := &fvmmock.Environment{}
 		envMock.On("BorrowCadenceRuntime", mock.Anything).Return(
 			reusableRuntime.NewReusableCadenceRuntime(
 				&testutil.TestInterpreterRuntime{
-					ReadStoredFunc: readStored,
+					InvokeContractFunc: invoke,
 				},
 				runtime.Config{},
 			),
@@ -175,34 +222,52 @@ func TestGetExecutionEffortWeights(t *testing.T) {
 	t.Run("return error if nothing is stored",
 		func(t *testing.T) {
 			envMock := setupEnvMock(
-				func(address common.Address, path cadence.Path, context runtime.Context) (cadence.Value, error) {
+				func(
+					common.AddressLocation,
+					string,
+					[]cadence.Value,
+					[]sema.Type,
+					runtime.Context,
+				) (cadence.Value, error) {
 					return nil, nil
 				})
 			_, err := fvm.GetExecutionEffortWeights(envMock, address)
 			require.Error(t, err)
 			require.EqualError(t, err, errors.NewCouldNotGetExecutionParameterFromStateError(
-				address.Hex(),
-				blueprints.TransactionFeesExecutionEffortWeightsPath.String()).Error())
+				address,
+				systemcontracts.ContractServiceAccountFunction_getExecutionEffortWeights).Error())
 		},
 	)
 	t.Run("return error if can't parse stored",
 		func(t *testing.T) {
 			envMock := setupEnvMock(
-				func(address common.Address, path cadence.Path, context runtime.Context) (cadence.Value, error) {
+				func(
+					common.AddressLocation,
+					string,
+					[]cadence.Value,
+					[]sema.Type,
+					runtime.Context,
+				) (cadence.Value, error) {
 					return cadence.NewBool(false), nil
 				})
 			_, err := fvm.GetExecutionEffortWeights(envMock, address)
 			require.Error(t, err)
 			require.EqualError(t, err, errors.NewCouldNotGetExecutionParameterFromStateError(
-				address.Hex(),
-				blueprints.TransactionFeesExecutionEffortWeightsPath.String()).Error())
+				address,
+				systemcontracts.ContractServiceAccountFunction_getExecutionEffortWeights).Error())
 		},
 	)
 	t.Run("return error if get stored returns error",
 		func(t *testing.T) {
 			someErr := fmt.Errorf("some error")
 			envMock := setupEnvMock(
-				func(address common.Address, path cadence.Path, context runtime.Context) (cadence.Value, error) {
+				func(
+					common.AddressLocation,
+					string,
+					[]cadence.Value,
+					[]sema.Type,
+					runtime.Context,
+				) (cadence.Value, error) {
 					return nil, someErr
 				})
 			_, err := fvm.GetExecutionEffortWeights(envMock, address)
@@ -214,7 +279,13 @@ func TestGetExecutionEffortWeights(t *testing.T) {
 		func(t *testing.T) {
 			someErr := fmt.Errorf("some error")
 			envMock := setupEnvMock(
-				func(address common.Address, path cadence.Path, context runtime.Context) (cadence.Value, error) {
+				func(
+					common.AddressLocation,
+					string,
+					[]cadence.Value,
+					[]sema.Type,
+					runtime.Context,
+				) (cadence.Value, error) {
 					return nil, someErr
 				})
 			_, err := fvm.GetExecutionEffortWeights(envMock, address)
@@ -225,7 +296,13 @@ func TestGetExecutionEffortWeights(t *testing.T) {
 	t.Run("no error if a dictionary is stored",
 		func(t *testing.T) {
 			envMock := setupEnvMock(
-				func(address common.Address, path cadence.Path, context runtime.Context) (cadence.Value, error) {
+				func(
+					common.AddressLocation,
+					string,
+					[]cadence.Value,
+					[]sema.Type,
+					runtime.Context,
+				) (cadence.Value, error) {
 					return cadence.NewDictionary([]cadence.KeyValuePair{}), nil
 				})
 			_, err := fvm.GetExecutionEffortWeights(envMock, address)
@@ -235,7 +312,13 @@ func TestGetExecutionEffortWeights(t *testing.T) {
 	t.Run("return defaults if empty dict is stored",
 		func(t *testing.T) {
 			envMock := setupEnvMock(
-				func(address common.Address, path cadence.Path, context runtime.Context) (cadence.Value, error) {
+				func(
+					common.AddressLocation,
+					string,
+					[]cadence.Value,
+					[]sema.Type,
+					runtime.Context,
+				) (cadence.Value, error) {
 					return cadence.NewDictionary([]cadence.KeyValuePair{}), nil
 				})
 			weights, err := fvm.GetExecutionEffortWeights(envMock, address)
@@ -261,7 +344,13 @@ func TestGetExecutionEffortWeights(t *testing.T) {
 			expectedWeights[0] = 0
 
 			envMock := setupEnvMock(
-				func(address common.Address, path cadence.Path, context runtime.Context) (cadence.Value, error) {
+				func(
+					common.AddressLocation,
+					string,
+					[]cadence.Value,
+					[]sema.Type,
+					runtime.Context,
+				) (cadence.Value, error) {
 					return cadence.NewDictionary([]cadence.KeyValuePair{
 						{
 							Value: cadence.UInt64(0),

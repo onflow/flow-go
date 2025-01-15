@@ -20,6 +20,11 @@ type TransactionInfoParams struct {
 	// RandomSourceHistoryCallAllowed is true if the transaction is allowed to call the `entropy`
 	// cadence function to get the entropy of that block.
 	RandomSourceHistoryCallAllowed bool
+
+	// ReadExecutionSettingsFromStateDisabled is true if the transaction is not allowed to read execution settings from the state.
+	// This is used only for bootstrapping, because the settings are not readable yet,
+	// and in certain tests to avoid loading the necessary contracts to the programs cache
+	ReadExecutionSettingsFromStateDisabled bool
 }
 
 func DefaultTransactionInfoParams() TransactionInfoParams {

@@ -152,6 +152,9 @@ func Test_Programs(t *testing.T) {
 	mainSnapshot := setupProgramsTest(t)
 
 	context := fvm.NewContext(
+		// read execution settings from state disabled to avoid loading extra contracts
+		// which would make tests assertions harder
+		fvm.WithReadExecutionSettingsFromStateDisabled(true),
 		fvm.WithContractDeploymentRestricted(false),
 		fvm.WithAuthorizationChecksEnabled(false),
 		fvm.WithSequenceNumberCheckAndIncrementEnabled(false),
@@ -608,6 +611,9 @@ func Test_ProgramsDoubleCounting(t *testing.T) {
 
 	metrics := &metricsReporter{}
 	context := fvm.NewContext(
+		// read execution settings from state disabled to avoid loading extra contracts
+		// which would make tests assertions harder
+		fvm.WithReadExecutionSettingsFromStateDisabled(true),
 		fvm.WithContractDeploymentRestricted(false),
 		fvm.WithAuthorizationChecksEnabled(false),
 		fvm.WithSequenceNumberCheckAndIncrementEnabled(false),
