@@ -7,7 +7,7 @@ import (
 )
 
 // The DataProvider is the interface abstracts of the actual data provider used by the WebSocketCollector.
-// It provides methods for retrieving the provider's unique ID, topic, and a methods to close and run the provider.
+// It provides methods for retrieving the provider's unique ID, topic, arguments and a methods to close and run the provider.
 type DataProvider interface {
 	// ID returns the unique identifier of the data provider.
 	ID() uuid.UUID
