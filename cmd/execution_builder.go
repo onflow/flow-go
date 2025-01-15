@@ -92,7 +92,9 @@ import (
 	storageerr "github.com/onflow/flow-go/storage"
 	storage "github.com/onflow/flow-go/storage/badger"
 	"github.com/onflow/flow-go/storage/badger/procedure"
+	"github.com/onflow/flow-go/storage/operation/pebbleimpl"
 	storagepebble "github.com/onflow/flow-go/storage/pebble"
+	"github.com/onflow/flow-go/storage/store"
 	sutil "github.com/onflow/flow-go/storage/util"
 )
 
@@ -734,10 +736,8 @@ func (exeNode *ExecutionNode) LoadExecutionState(
 		}
 		return nil
 	})
-	// chunkDataPacks := storage.NewChunkDataPacks(node.Metrics.Cache,
-	// chunkDataPackDB, node.Storage.Collections, exeNode.exeConf.chunkDataPackCacheSize)
-	chunkDataPacks := storagepebble.NewChunkDataPacks(node.Metrics.Cache,
-		chunkDataPackDB, node.Storage.Collections, exeNode.exeConf.chunkDataPackCacheSize)
+	chunkDataPacks := store.NewChunkDataPacks(node.Metrics.Cache,
+		pebbleimpl.ToDB(chunkDataPackDB), node.Storage.Collections, exeNode.exeConf.chunkDataPackCacheSize)
 
 	// Needed for gRPC server, make sure to assign to main scoped vars
 	exeNode.events = storage.NewEvents(node.Metrics.Cache, node.DB)

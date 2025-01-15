@@ -20,7 +20,9 @@ import (
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/storage"
+	"github.com/onflow/flow-go/storage/operation/pebbleimpl"
 	storagepebble "github.com/onflow/flow-go/storage/pebble"
+	"github.com/onflow/flow-go/storage/store"
 )
 
 // VerifyLastKHeight verifies the last k sealed blocks by verifying all chunks in the results.
@@ -213,8 +215,8 @@ func initStorages(chainID flow.ChainID, dataDir string, chunkDataPackDir string)
 	if err != nil {
 		return nil, nil, nil, nil, nil, fmt.Errorf("could not open chunk data pack DB: %w", err)
 	}
-	chunkDataPacks := storagepebble.NewChunkDataPacks(metrics.NewNoopCollector(),
-		chunkDataPackDB, storages.Collections, 1000)
+	chunkDataPacks := store.NewChunkDataPacks(metrics.NewNoopCollector(),
+		pebbleimpl.ToDB(chunkDataPackDB), storages.Collections, 1000)
 
 	verifier := makeVerifier(log.Logger, chainID, storages.Headers)
 	closer := func() error {
