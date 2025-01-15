@@ -1145,6 +1145,26 @@ func (_m *API) Ping(ctx context.Context) error {
 	return r0
 }
 
+// SendAndSubscribeTransactionStatuses provides a mock function with given fields: ctx, tx, requiredEventEncodingVersion
+func (_m *API) SendAndSubscribeTransactionStatuses(ctx context.Context, tx *flow.TransactionBody, requiredEventEncodingVersion entities.EventEncodingVersion) subscription.Subscription {
+	ret := _m.Called(ctx, tx, requiredEventEncodingVersion)
+
+	if len(ret) == 0 {
+		panic("no return value specified for SendAndSubscribeTransactionStatuses")
+	}
+
+	var r0 subscription.Subscription
+	if rf, ok := ret.Get(0).(func(context.Context, *flow.TransactionBody, entities.EventEncodingVersion) subscription.Subscription); ok {
+		r0 = rf(ctx, tx, requiredEventEncodingVersion)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(subscription.Subscription)
+		}
+	}
+
+	return r0
+}
+
 // SendTransaction provides a mock function with given fields: ctx, tx
 func (_m *API) SendTransaction(ctx context.Context, tx *flow.TransactionBody) error {
 	ret := _m.Called(ctx, tx)
@@ -1343,17 +1363,57 @@ func (_m *API) SubscribeBlocksFromStartHeight(ctx context.Context, startHeight u
 	return r0
 }
 
-// SubscribeTransactionStatuses provides a mock function with given fields: ctx, tx, requiredEventEncodingVersion
-func (_m *API) SubscribeTransactionStatuses(ctx context.Context, tx *flow.TransactionBody, requiredEventEncodingVersion entities.EventEncodingVersion) subscription.Subscription {
-	ret := _m.Called(ctx, tx, requiredEventEncodingVersion)
+// SubscribeTransactionStatusesFromLatest provides a mock function with given fields: ctx, txID, requiredEventEncodingVersion
+func (_m *API) SubscribeTransactionStatusesFromLatest(ctx context.Context, txID flow.Identifier, requiredEventEncodingVersion entities.EventEncodingVersion) subscription.Subscription {
+	ret := _m.Called(ctx, txID, requiredEventEncodingVersion)
 
 	if len(ret) == 0 {
-		panic("no return value specified for SubscribeTransactionStatuses")
+		panic("no return value specified for SubscribeTransactionStatusesFromLatest")
 	}
 
 	var r0 subscription.Subscription
-	if rf, ok := ret.Get(0).(func(context.Context, *flow.TransactionBody, entities.EventEncodingVersion) subscription.Subscription); ok {
-		r0 = rf(ctx, tx, requiredEventEncodingVersion)
+	if rf, ok := ret.Get(0).(func(context.Context, flow.Identifier, entities.EventEncodingVersion) subscription.Subscription); ok {
+		r0 = rf(ctx, txID, requiredEventEncodingVersion)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(subscription.Subscription)
+		}
+	}
+
+	return r0
+}
+
+// SubscribeTransactionStatusesFromStartBlockID provides a mock function with given fields: ctx, txID, startBlockID, requiredEventEncodingVersion
+func (_m *API) SubscribeTransactionStatusesFromStartBlockID(ctx context.Context, txID flow.Identifier, startBlockID flow.Identifier, requiredEventEncodingVersion entities.EventEncodingVersion) subscription.Subscription {
+	ret := _m.Called(ctx, txID, startBlockID, requiredEventEncodingVersion)
+
+	if len(ret) == 0 {
+		panic("no return value specified for SubscribeTransactionStatusesFromStartBlockID")
+	}
+
+	var r0 subscription.Subscription
+	if rf, ok := ret.Get(0).(func(context.Context, flow.Identifier, flow.Identifier, entities.EventEncodingVersion) subscription.Subscription); ok {
+		r0 = rf(ctx, txID, startBlockID, requiredEventEncodingVersion)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(subscription.Subscription)
+		}
+	}
+
+	return r0
+}
+
+// SubscribeTransactionStatusesFromStartHeight provides a mock function with given fields: ctx, txID, startHeight, requiredEventEncodingVersion
+func (_m *API) SubscribeTransactionStatusesFromStartHeight(ctx context.Context, txID flow.Identifier, startHeight uint64, requiredEventEncodingVersion entities.EventEncodingVersion) subscription.Subscription {
+	ret := _m.Called(ctx, txID, startHeight, requiredEventEncodingVersion)
+
+	if len(ret) == 0 {
+		panic("no return value specified for SubscribeTransactionStatusesFromStartHeight")
+	}
+
+	var r0 subscription.Subscription
+	if rf, ok := ret.Get(0).(func(context.Context, flow.Identifier, uint64, entities.EventEncodingVersion) subscription.Subscription); ok {
+		r0 = rf(ctx, txID, startHeight, requiredEventEncodingVersion)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(subscription.Subscription)

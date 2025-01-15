@@ -1425,12 +1425,7 @@ func (h *Handler) SendAndSubscribeTransactionStatuses(
 		return status.Error(codes.InvalidArgument, err.Error())
 	}
 
-	err = h.api.SendTransaction(ctx, &tx)
-	if err != nil {
-		return err
-	}
-
-	sub := h.api.SubscribeTransactionStatuses(ctx, &tx, request.GetEventEncodingVersion())
+	sub := h.api.SendAndSubscribeTransactionStatuses(ctx, &tx, request.GetEventEncodingVersion())
 
 	messageIndex := counters.NewMonotonousCounter(0)
 	return subscription.HandleRPCSubscription(sub, func(txResults []*TransactionResult) error {
