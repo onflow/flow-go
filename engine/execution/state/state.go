@@ -7,8 +7,6 @@ import (
 	"math"
 	"sync"
 
-	"github.com/dgraph-io/badger/v2"
-
 	"github.com/onflow/flow-go/engine/execution"
 	"github.com/onflow/flow-go/engine/execution/storehouse"
 	"github.com/onflow/flow-go/fvm/storage/snapshot"
@@ -104,7 +102,7 @@ type state struct {
 	events             storage.Events
 	serviceEvents      storage.ServiceEvents
 	transactionResults storage.TransactionResults
-	db                 *badger.DB
+	db                 storage.DB
 
 	registerStore execution.RegisterStore
 	// when it is true, registers are stored in both register store and ledger
@@ -125,7 +123,7 @@ func NewExecutionState(
 	events storage.Events,
 	serviceEvents storage.ServiceEvents,
 	transactionResults storage.TransactionResults,
-	db *badger.DB,
+	db storage.DB,
 	tracer module.Tracer,
 	registerStore execution.RegisterStore,
 	enableRegisterStore bool,
