@@ -1,16 +1,18 @@
-package flow
+package protocol
 
-// ProtocolSnapshotExecutionSubset is a subset of the protocol state snapshot that is needed by the FVM
+import "github.com/onflow/flow-go/model/flow"
+
+// SnapshotExecutionSubset is a subset of the protocol state snapshot that is needed by the FVM
 // for execution.
-type ProtocolSnapshotExecutionSubset interface {
+type SnapshotExecutionSubset interface {
 	// RandomSource provides a source of entropy that can be
 	// expanded into randoms (using a pseudo-random generator).
 	// The returned slice should have at least 128 bits of entropy.
 	// The function doesn't error in normal operations, any
 	// error should be treated as an exception.
 	//
-	// `protocol.ProtocolSnapshotExecutionSubset` implements `EntropyProvider` interface
-	// Note that `ProtocolSnapshotExecutionSubset` possible errors for RandomSource() are:
+	// `protocol.SnapshotExecutionSubset` implements `EntropyProvider` interface
+	// Note that `SnapshotExecutionSubset` possible errors for RandomSource() are:
 	// - storage.ErrNotFound if the QC is unknown.
 	// - state.ErrUnknownSnapshotReference if the snapshot reference block is unknown
 	// However, at this stage, snapshot reference block should be known and the QC should also be known,
@@ -28,11 +30,11 @@ type ProtocolSnapshotExecutionSubset interface {
 	// The remaining entries are for all future block heights. Future version boundaries
 	// can be removed, in which case the emitted event will not contain the removed version
 	// boundaries.
-	VersionBeacon() (*SealedVersionBeacon, error)
+	VersionBeacon() (*flow.SealedVersionBeacon, error)
 }
 
-// ProtocolSnapshotExecutionSubsetProvider is an interface that provides a subset of the protocol state
+// SnapshotExecutionSubsetProvider is an interface that provides a subset of the protocol state
 // at a specific block.
-type ProtocolSnapshotExecutionSubsetProvider interface {
-	AtBlockID(blockID Identifier) ProtocolSnapshotExecutionSubset
+type SnapshotExecutionSubsetProvider interface {
+	AtBlockID(blockID flow.Identifier) SnapshotExecutionSubset
 }

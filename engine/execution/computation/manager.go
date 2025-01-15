@@ -18,6 +18,7 @@ import (
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/executiondatasync/provider"
 	"github.com/onflow/flow-go/module/mempool/entity"
+	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/utils/logging"
 )
 
@@ -90,7 +91,7 @@ func New(
 	metrics module.ExecutionMetrics,
 	tracer module.Tracer,
 	me module.Local,
-	protoState flow.ProtocolSnapshotExecutionSubsetProvider,
+	protoState protocol.SnapshotExecutionSubsetProvider,
 	vmCtx fvm.Context,
 	committer computer.ViewCommitter,
 	executionDataProvider provider.Provider,

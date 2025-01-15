@@ -18,6 +18,7 @@ import (
 	"github.com/onflow/flow-go/fvm/storage/snapshot"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/utils/debug"
 	"github.com/onflow/flow-go/utils/rand"
 )
@@ -117,7 +118,7 @@ type QueryExecutor struct {
 	vmCtx                 fvm.Context
 	derivedChainData      *derived.DerivedChainData
 	rngLock               *sync.Mutex
-	protocolStateSnapshot flow.ProtocolSnapshotExecutionSubsetProvider
+	protocolStateSnapshot protocol.SnapshotExecutionSubsetProvider
 }
 
 var _ Executor = &QueryExecutor{}
@@ -129,7 +130,7 @@ func NewQueryExecutor(
 	vm fvm.VM,
 	vmCtx fvm.Context,
 	derivedChainData *derived.DerivedChainData,
-	protocolStateSnapshot flow.ProtocolSnapshotExecutionSubsetProvider,
+	protocolStateSnapshot protocol.SnapshotExecutionSubsetProvider,
 ) *QueryExecutor {
 	if config.ComputationLimit > 0 {
 		vmCtx = fvm.NewContextFromParent(vmCtx, fvm.WithComputationLimit(config.ComputationLimit))

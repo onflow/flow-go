@@ -5,13 +5,14 @@ import (
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/verification"
+	"github.com/onflow/flow-go/state/protocol"
 )
 
 func FromChunkDataPack(
 	chunk *flow.Chunk,
 	chunkDataPack *flow.ChunkDataPack,
 	header *flow.Header,
-	snapshot flow.ProtocolSnapshotExecutionSubset,
+	snapshot protocol.SnapshotExecutionSubset,
 	result *flow.ExecutionResult,
 ) (*verification.VerifiableChunkData, error) {
 

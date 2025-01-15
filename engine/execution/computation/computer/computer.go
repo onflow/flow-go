@@ -24,6 +24,7 @@ import (
 	"github.com/onflow/flow-go/module/executiondatasync/provider"
 	"github.com/onflow/flow-go/module/mempool/entity"
 	"github.com/onflow/flow-go/module/trace"
+	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/utils/logging"
 )
 
@@ -114,7 +115,7 @@ type blockComputer struct {
 	spockHasher           hash.Hasher
 	receiptHasher         hash.Hasher
 	colResCons            []result.ExecutedCollectionConsumer
-	protocolState         flow.ProtocolSnapshotExecutionSubsetProvider
+	protocolState         protocol.SnapshotExecutionSubsetProvider
 	maxConcurrency        int
 }
 
@@ -145,7 +146,7 @@ func NewBlockComputer(
 	signer module.Local,
 	executionDataProvider provider.Provider,
 	colResCons []result.ExecutedCollectionConsumer,
-	state flow.ProtocolSnapshotExecutionSubsetProvider,
+	state protocol.SnapshotExecutionSubsetProvider,
 	maxConcurrency int,
 ) (BlockComputer, error) {
 	if maxConcurrency < 1 {

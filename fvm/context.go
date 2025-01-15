@@ -14,6 +14,7 @@ import (
 	"github.com/onflow/flow-go/fvm/tracing"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/state/protocol"
 )
 
 const (
@@ -405,7 +406,7 @@ func WithExecutionVersionProvider(provider environment.ExecutionVersionProvider)
 
 // WithProtocolStateSnapshot sets all the necessary components from a subset of the protocol state
 // to the virtual machine context.
-func WithProtocolStateSnapshot(snapshot flow.ProtocolSnapshotExecutionSubset) Option {
+func WithProtocolStateSnapshot(snapshot protocol.SnapshotExecutionSubset) Option {
 	return func(ctx Context) Context {
 
 		ctx = WithEntropyProvider(snapshot)(ctx)

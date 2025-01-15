@@ -13,6 +13,7 @@ import (
 	"github.com/onflow/flow-go/fvm/storage/snapshot"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/storage"
 )
 
@@ -75,7 +76,7 @@ func NewScripts(
 	log zerolog.Logger,
 	metrics module.ExecutionMetrics,
 	chainID flow.ChainID,
-	protocolSnapshotProvider flow.ProtocolSnapshotExecutionSubsetProvider,
+	protocolSnapshotProvider protocol.SnapshotExecutionSubsetProvider,
 	header storage.Headers,
 	registerAtHeight RegisterAtHeight,
 	queryConf query.QueryConfig,
