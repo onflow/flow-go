@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/google/uuid"
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/engine/access/rest/common/parser"
@@ -41,7 +40,7 @@ func NewEventsDataProvider(
 	ctx context.Context,
 	logger zerolog.Logger,
 	stateStreamApi state_stream.API,
-	subscriptionID uuid.UUID,
+	subscriptionID string,
 	topic string,
 	arguments models.Arguments,
 	send chan<- interface{},

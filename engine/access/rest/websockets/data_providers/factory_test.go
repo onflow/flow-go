@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/google/uuid"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/suite"
 
@@ -161,7 +160,7 @@ func (s *DataProviderFactorySuite) TestSupportedTopics() {
 			s.T().Parallel()
 			test.setupSubscription()
 
-			provider, err := s.factory.NewDataProvider(s.ctx, uuid.New(), test.topic, test.arguments, s.ch)
+			provider, err := s.factory.NewDataProvider(s.ctx, "dummy-id", test.topic, test.arguments, s.ch)
 			s.Require().NotNil(provider, "Expected provider for topic %s", test.topic)
 			s.Require().NoError(err, "Expected no error for topic %s", test.topic)
 			s.Require().Equal(test.topic, provider.Topic())
@@ -183,7 +182,7 @@ func (s *DataProviderFactorySuite) TestUnsupportedTopics() {
 	}
 
 	for _, topic := range unsupportedTopics {
-		provider, err := s.factory.NewDataProvider(s.ctx, uuid.New(), topic, nil, s.ch)
+		provider, err := s.factory.NewDataProvider(s.ctx, "dummy-id", topic, nil, s.ch)
 		s.Require().Nil(provider, "Expected no provider for unsupported topic %s", topic)
 		s.Require().Error(err, "Expected error for unsupported topic %s", topic)
 		s.Require().EqualError(err, fmt.Sprintf("unsupported topic \"%s\"", topic))

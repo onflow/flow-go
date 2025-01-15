@@ -69,7 +69,7 @@ func (s *WsControllerSuite) TestSubscribeRequest() {
 
 		request := models.SubscribeMessageRequest{
 			BaseMessageRequest: models.BaseMessageRequest{
-				SubscriptionID: uuid.New().String(),
+				SubscriptionID: "dummy-id",
 				Action:         models.SubscribeAction,
 			},
 			Topic:     dp.BlocksTopic,
@@ -169,7 +169,7 @@ func (s *WsControllerSuite) TestSubscribeRequest() {
 			Once()
 
 		done := make(chan struct{})
-		subscriptionID := uuid.New().String()
+		subscriptionID := "dummy-id"
 		s.expectSubscribeRequest(t, conn, subscriptionID)
 
 		conn.
@@ -213,7 +213,7 @@ func (s *WsControllerSuite) TestSubscribeRequest() {
 			Once()
 
 		done := make(chan struct{})
-		subscriptionID := uuid.New().String()
+		subscriptionID := "dummy-id"
 		s.expectSubscribeRequest(t, conn, subscriptionID)
 		s.expectSubscribeResponse(t, conn, subscriptionID)
 
@@ -263,7 +263,7 @@ func (s *WsControllerSuite) TestUnsubscribeRequest() {
 			Return(nil).
 			Once()
 
-		subscriptionID := uuid.New().String()
+		subscriptionID := "dummy-id"
 		s.expectSubscribeRequest(t, conn, subscriptionID)
 		s.expectSubscribeResponse(t, conn, subscriptionID)
 
@@ -332,13 +332,13 @@ func (s *WsControllerSuite) TestUnsubscribeRequest() {
 			Return(nil).
 			Once()
 
-		subscriptionID := uuid.New().String()
+		subscriptionID := "dummy-id"
 		s.expectSubscribeRequest(t, conn, subscriptionID)
 		s.expectSubscribeResponse(t, conn, subscriptionID)
 
 		request := models.UnsubscribeMessageRequest{
 			BaseMessageRequest: models.BaseMessageRequest{
-				SubscriptionID: "invalid-uuid",
+				SubscriptionID: uuid.New().String() + " .42", // invalid subscription ID
 				Action:         models.UnsubscribeAction,
 			},
 		}
@@ -401,13 +401,13 @@ func (s *WsControllerSuite) TestUnsubscribeRequest() {
 			Return(nil).
 			Once()
 
-		subscriptionID := uuid.New().String()
+		subscriptionID := "dummy-id"
 		s.expectSubscribeRequest(t, conn, subscriptionID)
 		s.expectSubscribeResponse(t, conn, subscriptionID)
 
 		request := models.UnsubscribeMessageRequest{
 			BaseMessageRequest: models.BaseMessageRequest{
-				SubscriptionID: uuid.New().String(), // unknown subscription id
+				SubscriptionID: "unknown-sub-id",
 				Action:         models.UnsubscribeAction,
 			},
 		}
@@ -475,7 +475,7 @@ func (s *WsControllerSuite) TestListSubscriptions() {
 			Return(nil).
 			Once()
 
-		subscriptionID := uuid.New().String()
+		subscriptionID := "dummy-id"
 		s.expectSubscribeRequest(t, conn, subscriptionID)
 		s.expectSubscribeResponse(t, conn, subscriptionID)
 
@@ -550,7 +550,7 @@ func (s *WsControllerSuite) TestSubscribeBlocks() {
 			Once()
 
 		done := make(chan struct{})
-		subscriptionID := uuid.New().String()
+		subscriptionID := "dummy-id"
 		s.expectSubscribeRequest(t, conn, subscriptionID)
 		s.expectSubscribeResponse(t, conn, subscriptionID)
 
@@ -606,7 +606,7 @@ func (s *WsControllerSuite) TestSubscribeBlocks() {
 			Once()
 
 		done := make(chan struct{})
-		subscriptionID := uuid.New().String()
+		subscriptionID := "dummy-id"
 		s.expectSubscribeRequest(t, conn, subscriptionID)
 		s.expectSubscribeResponse(t, conn, subscriptionID)
 
@@ -806,7 +806,7 @@ func (s *WsControllerSuite) TestControllerShutdown() {
 			Once()
 
 		done := make(chan struct{})
-		subscriptionID := uuid.New().String()
+		subscriptionID := "dummy-id"
 		s.expectSubscribeRequest(t, conn, subscriptionID)
 		s.expectSubscribeResponse(t, conn, subscriptionID)
 
