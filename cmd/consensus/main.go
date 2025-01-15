@@ -203,10 +203,11 @@ func main() {
 		PostInit(func(nodeConfig *cmd.NodeConfig) error {
 			// TODO(EFM, #6794): This function is introduced to implement a backward-compatible upgrade from v1 to v2.
 			// Remove this once we complete the network upgrade.
-			if err := operation.RetryOnConflict(nodeBuilder.SecretsDB.Update, operation.MigrateDKGEndStateFromV1(nodeConfig.Logger)); err != nil {
+			log := nodeConfig.Logger.With().Str("postinit", "dkg_end_state_migration").Logger()
+			if err := operation.RetryOnConflict(nodeBuilder.SecretsDB.Update, operation.MigrateDKGEndStateFromV1(log)); err != nil {
 				return fmt.Errorf("could not migrate DKG end state from v1 to v2: %w", err)
 			}
-			nodeConfig.Logger.Debug().Msgf("completed migrating DKG end state from v1 to v2")
+			log.Debug().Msgf("completed migrating DKG end state from v1 to v2")
 			return nil
 		}).
 		Module("machine account config", func(node *cmd.NodeConfig) error {
