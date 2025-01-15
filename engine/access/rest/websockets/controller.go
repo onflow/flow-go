@@ -77,6 +77,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"net/http"
 	"sync"
 	"time"
 
@@ -318,7 +319,7 @@ func (c *Controller) readMessages(ctx context.Context) error {
 			c.writeErrorResponse(
 				ctx,
 				err,
-				wrapErrorMessage(InvalidMessage, "error reading message", ""),
+				wrapErrorMessage(http.StatusBadRequest, "error reading message", ""),
 			)
 			continue
 		}
@@ -328,7 +329,7 @@ func (c *Controller) readMessages(ctx context.Context) error {
 			c.writeErrorResponse(
 				ctx,
 				err,
-				wrapErrorMessage(InvalidMessage, "error parsing message", ""),
+				wrapErrorMessage(http.StatusBadRequest, "error parsing message", ""),
 			)
 			continue
 		}
@@ -377,7 +378,7 @@ func (c *Controller) handleSubscribe(ctx context.Context, msg models.SubscribeMe
 		c.writeErrorResponse(
 			ctx,
 			err,
-			wrapErrorMessage(InvalidMessage, "error parsing subscription id", msg.SubscriptionID),
+			wrapErrorMessage(http.StatusBadRequest, "error parsing subscription id", msg.SubscriptionID),
 		)
 		return
 	}
@@ -388,7 +389,7 @@ func (c *Controller) handleSubscribe(ctx context.Context, msg models.SubscribeMe
 		c.writeErrorResponse(
 			ctx,
 			err,
-			wrapErrorMessage(InvalidMessage, "error creating data provider", subscriptionID.String()),
+			wrapErrorMessage(http.StatusBadRequest, "error creating data provider", subscriptionID.String()),
 		)
 		return
 	}
@@ -410,7 +411,7 @@ func (c *Controller) handleSubscribe(ctx context.Context, msg models.SubscribeMe
 			c.writeErrorResponse(
 				ctx,
 				err,
-				wrapErrorMessage(InternalServerError, "internal error", subscriptionID.String()),
+				wrapErrorMessage(http.StatusInternalServerError, "internal error", subscriptionID.String()),
 			)
 		}
 
@@ -425,7 +426,7 @@ func (c *Controller) handleUnsubscribe(ctx context.Context, msg models.Unsubscri
 		c.writeErrorResponse(
 			ctx,
 			err,
-			wrapErrorMessage(InvalidMessage, "error parsing subscription id", msg.SubscriptionID),
+			wrapErrorMessage(http.StatusBadRequest, "error parsing subscription id", msg.SubscriptionID),
 		)
 		return
 	}
@@ -435,7 +436,7 @@ func (c *Controller) handleUnsubscribe(ctx context.Context, msg models.Unsubscri
 		c.writeErrorResponse(
 			ctx,
 			err,
-			wrapErrorMessage(NotFound, "subscription not found", subscriptionID.String()),
+			wrapErrorMessage(http.StatusNotFound, "subscription not found", subscriptionID.String()),
 		)
 		return
 	}
@@ -451,7 +452,7 @@ func (c *Controller) handleUnsubscribe(ctx context.Context, msg models.Unsubscri
 	c.writeResponse(ctx, responseOk)
 }
 
-func (c *Controller) handleListSubscriptions(ctx context.Context, msg models.ListSubscriptionsMessageRequest) {
+func (c *Controller) handleListSubscriptions(ctx context.Context, _ models.ListSubscriptionsMessageRequest) {
 	var subs []*models.SubscriptionEntry
 	err := c.dataProviders.ForEach(func(id uuid.UUID, provider dp.DataProvider) error {
 		subs = append(subs, &models.SubscriptionEntry{
@@ -462,19 +463,12 @@ func (c *Controller) handleListSubscriptions(ctx context.Context, msg models.Lis
 		return nil
 	})
 
+	// intentionally ignored, this never happens
 	if err != nil {
-		c.writeErrorResponse(
-			ctx,
-			err,
-			wrapErrorMessage(NotFound, "error listing subscriptions", ""),
-		)
-		return
+		c.logger.Debug().Err(err).Msg("error listing subscriptions")
 	}
 
 	responseOk := models.ListSubscriptionsMessageResponse{
-		BaseMessageResponse: models.BaseMessageResponse{
-			SubscriptionID: msg.SubscriptionID,
-		},
 		Subscriptions: subs,
 	}
 	c.writeResponse(ctx, responseOk)
@@ -512,18 +506,18 @@ func (c *Controller) writeResponse(ctx context.Context, response interface{}) {
 	}
 }
 
-func wrapErrorMessage(code Code, message string, subscriptionID string) models.BaseMessageResponse {
+func wrapErrorMessage(code int, message string, subscriptionID string) models.BaseMessageResponse {
 	return models.BaseMessageResponse{
 		SubscriptionID: subscriptionID,
 		Error: models.ErrorMessage{
-			Code:    int(code),
+			Code:    code,
 			Message: message,
 		},
 	}
 }
 
 func (c *Controller) parseOrCreateSubscriptionID(id string) (uuid.UUID, error) {
-	// if client didn't provide subscription id, we create one for him
+	// if client didn't provide subscription id, we create one for them
 	if id == "" {
 		return uuid.New(), nil
 	}

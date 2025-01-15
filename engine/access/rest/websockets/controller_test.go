@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"net/http"
 	"testing"
 	"time"
 
@@ -144,7 +145,7 @@ func (s *WsControllerSuite) TestSubscribeRequest() {
 				response, ok := msg.(models.BaseMessageResponse)
 				require.True(t, ok)
 				require.NotEmpty(t, response.Error)
-				require.Equal(t, int(InvalidMessage), response.Error.Code)
+				require.Equal(t, http.StatusBadRequest, response.Error.Code)
 				return websocket.ErrCloseSent
 			})
 
@@ -179,7 +180,7 @@ func (s *WsControllerSuite) TestSubscribeRequest() {
 				response, ok := msg.(models.BaseMessageResponse)
 				require.True(t, ok)
 				require.NotEmpty(t, response.Error)
-				require.Equal(t, int(InvalidMessage), response.Error.Code)
+				require.Equal(t, http.StatusBadRequest, response.Error.Code)
 
 				return websocket.ErrCloseSent
 			})
@@ -224,7 +225,7 @@ func (s *WsControllerSuite) TestSubscribeRequest() {
 				response, ok := msg.(models.BaseMessageResponse)
 				require.True(t, ok)
 				require.NotEmpty(t, response.Error)
-				require.Equal(t, int(InternalServerError), response.Error.Code)
+				require.Equal(t, http.StatusInternalServerError, response.Error.Code)
 
 				return websocket.ErrCloseSent
 			})
@@ -363,7 +364,7 @@ func (s *WsControllerSuite) TestUnsubscribeRequest() {
 				require.True(t, ok)
 				require.NotEmpty(t, response.Error)
 				require.Equal(t, request.SubscriptionID, response.SubscriptionID)
-				require.Equal(t, int(InvalidMessage), response.Error.Code)
+				require.Equal(t, http.StatusBadRequest, response.Error.Code)
 
 				return websocket.ErrCloseSent
 			}).
@@ -433,7 +434,7 @@ func (s *WsControllerSuite) TestUnsubscribeRequest() {
 				require.Equal(t, request.SubscriptionID, response.SubscriptionID)
 
 				require.NotEmpty(t, response.Error)
-				require.Equal(t, int(NotFound), response.Error.Code)
+				require.Equal(t, http.StatusNotFound, response.Error.Code)
 
 				return websocket.ErrCloseSent
 			}).
@@ -506,8 +507,6 @@ func (s *WsControllerSuite) TestListSubscriptions() {
 
 				response, ok := msg.(models.ListSubscriptionsMessageResponse)
 				require.True(t, ok)
-				require.Empty(t, response.Error)
-				require.Empty(t, response.SubscriptionID)
 				require.Equal(t, 1, len(response.Subscriptions))
 				require.Equal(t, subscriptionID, response.Subscriptions[0].SubscriptionID)
 				require.Equal(t, topic, response.Subscriptions[0].Topic)

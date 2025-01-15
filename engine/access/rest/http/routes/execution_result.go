@@ -5,27 +5,26 @@ import (
 
 	"github.com/onflow/flow-go/access"
 	"github.com/onflow/flow-go/engine/access/rest/common"
+	commonmodels "github.com/onflow/flow-go/engine/access/rest/common/models"
 	"github.com/onflow/flow-go/engine/access/rest/http/request"
-
-	"github.com/onflow/flow-go/engine/access/rest/http/models"
 )
 
 // GetExecutionResultsByBlockIDs gets Execution Result payload by block IDs.
-func GetExecutionResultsByBlockIDs(r *common.Request, backend access.API, link models.LinkGenerator) (interface{}, error) {
+func GetExecutionResultsByBlockIDs(r *common.Request, backend access.API, link commonmodels.LinkGenerator) (interface{}, error) {
 	req, err := request.GetExecutionResultByBlockIDsRequest(r)
 	if err != nil {
 		return nil, common.NewBadRequestError(err)
 	}
 
 	// for each block ID we retrieve execution result
-	results := make([]models.ExecutionResult, len(req.BlockIDs))
+	results := make([]commonmodels.ExecutionResult, len(req.BlockIDs))
 	for i, id := range req.BlockIDs {
 		res, err := backend.GetExecutionResultForBlockID(r.Context(), id)
 		if err != nil {
 			return nil, err
 		}
 
-		var response models.ExecutionResult
+		var response commonmodels.ExecutionResult
 		err = response.Build(res, link)
 		if err != nil {
 			return nil, err
@@ -37,7 +36,7 @@ func GetExecutionResultsByBlockIDs(r *common.Request, backend access.API, link m
 }
 
 // GetExecutionResultByID gets execution result by the ID.
-func GetExecutionResultByID(r *common.Request, backend access.API, link models.LinkGenerator) (interface{}, error) {
+func GetExecutionResultByID(r *common.Request, backend access.API, link commonmodels.LinkGenerator) (interface{}, error) {
 	req, err := request.GetExecutionResultRequest(r)
 	if err != nil {
 		return nil, common.NewBadRequestError(err)
@@ -53,7 +52,7 @@ func GetExecutionResultByID(r *common.Request, backend access.API, link models.L
 		return nil, common.NewNotFoundError(err.Error(), err)
 	}
 
-	var response models.ExecutionResult
+	var response commonmodels.ExecutionResult
 	err = response.Build(res, link)
 	if err != nil {
 		return nil, err

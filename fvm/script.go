@@ -11,7 +11,6 @@ import (
 	"github.com/onflow/flow-go/fvm/environment"
 	"github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/fvm/evm"
-	"github.com/onflow/flow-go/fvm/evm/debug"
 	"github.com/onflow/flow-go/fvm/storage"
 	"github.com/onflow/flow-go/fvm/storage/logical"
 	"github.com/onflow/flow-go/model/flow"
@@ -207,7 +206,6 @@ func (executor *scriptExecutor) executeScript() error {
 			chain.ChainID(),
 			executor.env,
 			rt.ScriptRuntimeEnv,
-			debug.NopTracer, // we shouldn't trace during script execution
 		)
 		if err != nil {
 			return err
