@@ -10,4 +10,5 @@ type ListSubscriptionsMessageRequest struct {
 type ListSubscriptionsMessageResponse struct {
 	// Subscription list might be empty in case of no active subscriptions
 	Subscriptions []*SubscriptionEntry `json:"subscriptions"`
+	Action        string               `json:"action"`
 }

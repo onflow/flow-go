@@ -18,6 +18,7 @@ type BaseMessageRequest struct {
 type BaseMessageResponse struct {
 	SubscriptionID string       `json:"subscription_id"` // SubscriptionID might be empty in case of error response
 	Error          ErrorMessage `json:"error,omitempty"` // Error might be empty in case of OK response
+	Action         string       `json:"action"`
 }
 
 type ErrorMessage struct {

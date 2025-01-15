@@ -318,7 +318,7 @@ func (c *Controller) readMessages(ctx context.Context) error {
 			c.writeErrorResponse(
 				ctx,
 				err,
-				wrapErrorMessage(http.StatusBadRequest, "error reading message", ""),
+				wrapErrorMessage(http.StatusBadRequest, "error reading message", "", ""),
 			)
 			continue
 		}
@@ -328,7 +328,7 @@ func (c *Controller) readMessages(ctx context.Context) error {
 			c.writeErrorResponse(
 				ctx,
 				err,
-				wrapErrorMessage(http.StatusBadRequest, "error parsing message", ""),
+				wrapErrorMessage(http.StatusBadRequest, "error parsing message", "", ""),
 			)
 			continue
 		}
@@ -377,7 +377,8 @@ func (c *Controller) handleSubscribe(ctx context.Context, msg models.SubscribeMe
 		c.writeErrorResponse(
 			ctx,
 			err,
-			wrapErrorMessage(http.StatusBadRequest, "error parsing subscription id", msg.SubscriptionID),
+			wrapErrorMessage(http.StatusBadRequest, "error parsing subscription id",
+				models.SubscribeAction, msg.SubscriptionID),
 		)
 		return
 	}
@@ -388,7 +389,8 @@ func (c *Controller) handleSubscribe(ctx context.Context, msg models.SubscribeMe
 		c.writeErrorResponse(
 			ctx,
 			err,
-			wrapErrorMessage(http.StatusBadRequest, "error creating data provider", subscriptionID.String()),
+			wrapErrorMessage(http.StatusBadRequest, "error creating data provider",
+				models.SubscribeAction, subscriptionID.String()),
 		)
 		return
 	}
@@ -410,7 +412,8 @@ func (c *Controller) handleSubscribe(ctx context.Context, msg models.SubscribeMe
 			c.writeErrorResponse(
 				ctx,
 				err,
-				wrapErrorMessage(http.StatusInternalServerError, "internal error", subscriptionID.String()),
+				wrapErrorMessage(http.StatusInternalServerError, "internal error",
+					models.SubscribeAction, subscriptionID.String()),
 			)
 		}
 
@@ -425,7 +428,8 @@ func (c *Controller) handleUnsubscribe(ctx context.Context, msg models.Unsubscri
 		c.writeErrorResponse(
 			ctx,
 			err,
-			wrapErrorMessage(http.StatusBadRequest, "error parsing subscription id", msg.SubscriptionID),
+			wrapErrorMessage(http.StatusBadRequest, "error parsing subscription id",
+				models.UnsubscribeAction, msg.SubscriptionID),
 		)
 		return
 	}
@@ -435,7 +439,8 @@ func (c *Controller) handleUnsubscribe(ctx context.Context, msg models.Unsubscri
 		c.writeErrorResponse(
 			ctx,
 			err,
-			wrapErrorMessage(http.StatusNotFound, "subscription not found", subscriptionID.String()),
+			wrapErrorMessage(http.StatusNotFound, "subscription not found",
+				models.UnsubscribeAction, subscriptionID.String()),
 		)
 		return
 	}
@@ -468,6 +473,7 @@ func (c *Controller) handleListSubscriptions(ctx context.Context, _ models.ListS
 
 	responseOk := models.ListSubscriptionsMessageResponse{
 		Subscriptions: subs,
+		Action:        models.ListSubscriptionsAction,
 	}
 	c.writeResponse(ctx, responseOk)
 }
@@ -504,13 +510,14 @@ func (c *Controller) writeResponse(ctx context.Context, response interface{}) {
 	}
 }
 
-func wrapErrorMessage(code int, message string, subscriptionID string) models.BaseMessageResponse {
+func wrapErrorMessage(code int, message string, action string, subscriptionID string) models.BaseMessageResponse {
 	return models.BaseMessageResponse{
 		SubscriptionID: subscriptionID,
 		Error: models.ErrorMessage{
 			Code:    code,
 			Message: message,
 		},
+		Action: action,
 	}
 }
 

@@ -109,7 +109,7 @@ func (s *WsControllerSuite) TestSubscribeRequest() {
 		dataProvider.AssertExpectations(t)
 	})
 
-	s.T().Run("Parse and validate error", func(t *testing.T) {
+	s.T().Run("Validate message error", func(t *testing.T) {
 		t.Parallel()
 
 		conn, dataProviderFactory, _ := newControllerMocks(t)
@@ -146,6 +146,7 @@ func (s *WsControllerSuite) TestSubscribeRequest() {
 				require.True(t, ok)
 				require.NotEmpty(t, response.Error)
 				require.Equal(t, http.StatusBadRequest, response.Error.Code)
+				require.Equal(t, "", response.Action)
 				return websocket.ErrCloseSent
 			})
 
@@ -181,6 +182,7 @@ func (s *WsControllerSuite) TestSubscribeRequest() {
 				require.True(t, ok)
 				require.NotEmpty(t, response.Error)
 				require.Equal(t, http.StatusBadRequest, response.Error.Code)
+				require.Equal(t, models.SubscribeAction, response.Action)
 
 				return websocket.ErrCloseSent
 			})
@@ -226,6 +228,7 @@ func (s *WsControllerSuite) TestSubscribeRequest() {
 				require.True(t, ok)
 				require.NotEmpty(t, response.Error)
 				require.Equal(t, http.StatusInternalServerError, response.Error.Code)
+				require.Equal(t, models.SubscribeAction, response.Action)
 
 				return websocket.ErrCloseSent
 			})
@@ -365,6 +368,7 @@ func (s *WsControllerSuite) TestUnsubscribeRequest() {
 				require.NotEmpty(t, response.Error)
 				require.Equal(t, request.SubscriptionID, response.SubscriptionID)
 				require.Equal(t, http.StatusBadRequest, response.Error.Code)
+				require.Equal(t, models.UnsubscribeAction, response.Action)
 
 				return websocket.ErrCloseSent
 			}).
@@ -435,6 +439,8 @@ func (s *WsControllerSuite) TestUnsubscribeRequest() {
 
 				require.NotEmpty(t, response.Error)
 				require.Equal(t, http.StatusNotFound, response.Error.Code)
+
+				require.Equal(t, models.UnsubscribeAction, response.Action)
 
 				return websocket.ErrCloseSent
 			}).
@@ -508,6 +514,7 @@ func (s *WsControllerSuite) TestListSubscriptions() {
 				require.Equal(t, 1, len(response.Subscriptions))
 				require.Equal(t, subscriptionID, response.Subscriptions[0].SubscriptionID)
 				require.Equal(t, topic, response.Subscriptions[0].Topic)
+				require.Equal(t, models.ListSubscriptionsAction, response.Action)
 
 				return websocket.ErrCloseSent
 			}).
