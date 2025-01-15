@@ -46,7 +46,10 @@ const (
 	ContractNameCrypto                     = "Crypto"
 
 	// AccountNameEVMStorage is not a contract, but a special account that is used to store EVM state
-	AccountNameEVMStorage                 = "EVMStorageAccount"
+	AccountNameEVMStorage = "EVMStorageAccount"
+	// AccountNameExecutionParametersAccount is not a contract, but a special account that is used to store execution parameters
+	// This is generally just the service account. For mainnet and testnet, it is a separate account,
+	// in order to separate it away from the frequently changing data on the service account.
 	AccountNameExecutionParametersAccount = "ExecutionParametersAccount"
 
 	// Unqualified names of service events (not including address prefix or contract name)
@@ -101,6 +104,11 @@ var (
 	evmStorageAddressTestnet = flow.HexToAddress("1a54ed2be7552821")
 	// evmStorageAddressMainnet is the address of the EVM state storage contract on Mainnet
 	evmStorageAddressMainnet = flow.HexToAddress("d421a63faae318f9")
+
+	// executionParametersAddressTestnet is the address of the Execution Parameters contract on Testnet
+	executionParametersAddressTestnet = flow.HexToAddress("00000000000")
+	// executionParametersAddressMainnet is the address of the Execution Parameters contract on Mainnet
+	executionParametersAddressMainnet = flow.HexToAddress("00000000000")
 )
 
 // SystemContract represents a system contract on a particular chain.
@@ -348,8 +356,10 @@ func init() {
 
 	executionParametersAccountFunc := func(chain flow.ChainID) flow.Address {
 		switch chain {
+		case flow.Mainnet:
+			return executionParametersAddressMainnet
 		case flow.Testnet:
-			return flow.HexToAddress("b118676e2f11145f")
+			return executionParametersAddressTestnet
 		default:
 			return serviceAddressFunc(chain)
 		}
