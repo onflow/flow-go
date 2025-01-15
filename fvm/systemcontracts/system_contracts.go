@@ -46,7 +46,8 @@ const (
 	ContractNameCrypto                     = "Crypto"
 
 	// AccountNameEVMStorage is not a contract, but a special account that is used to store EVM state
-	AccountNameEVMStorage = "EVMStorageAccount"
+	AccountNameEVMStorage                 = "EVMStorageAccount"
+	AccountNameExecutionParametersAccount = "ExecutionParametersAccount"
 
 	// Unqualified names of service events (not including address prefix or contract name)
 
@@ -149,10 +150,11 @@ type SystemContracts struct {
 	DKG            SystemContract
 
 	// service account related contracts
-	FlowServiceAccount  SystemContract
-	NodeVersionBeacon   SystemContract
-	RandomBeaconHistory SystemContract
-	FlowStorageFees     SystemContract
+	FlowServiceAccount         SystemContract
+	NodeVersionBeacon          SystemContract
+	RandomBeaconHistory        SystemContract
+	FlowStorageFees            SystemContract
+	ExecutionParametersAccount SystemContract
 
 	// token related contracts
 	FlowFees                   SystemContract
@@ -344,16 +346,26 @@ func init() {
 		}
 	}
 
+	executionParametersAccountFunc := func(chain flow.ChainID) flow.Address {
+		switch chain {
+		case flow.Testnet:
+			return flow.HexToAddress("b118676e2f11145f")
+		default:
+			return serviceAddressFunc(chain)
+		}
+	}
+
 	contractAddressFunc = map[string]func(id flow.ChainID) flow.Address{
 		ContractNameIDTableStaking: epochAddressFunc,
 		ContractNameEpoch:          epochAddressFunc,
 		ContractNameClusterQC:      epochAddressFunc,
 		ContractNameDKG:            epochAddressFunc,
 
-		ContractNameNodeVersionBeacon:   serviceAddressFunc,
-		ContractNameRandomBeaconHistory: serviceAddressFunc,
-		ContractNameServiceAccount:      serviceAddressFunc,
-		ContractNameStorageFees:         serviceAddressFunc,
+		ContractNameNodeVersionBeacon:         serviceAddressFunc,
+		ContractNameRandomBeaconHistory:       serviceAddressFunc,
+		ContractNameServiceAccount:            serviceAddressFunc,
+		ContractNameStorageFees:               serviceAddressFunc,
+		AccountNameExecutionParametersAccount: executionParametersAccountFunc,
 
 		ContractNameFlowFees:                   nthAddressFunc(FlowFeesAccountIndex),
 		ContractNameFungibleToken:              nthAddressFunc(FungibleTokenAccountIndex),
@@ -406,10 +418,11 @@ func init() {
 			ClusterQC:      addressOfContract(ContractNameClusterQC),
 			DKG:            addressOfContract(ContractNameDKG),
 
-			FlowServiceAccount:  addressOfContract(ContractNameServiceAccount),
-			NodeVersionBeacon:   addressOfContract(ContractNameNodeVersionBeacon),
-			RandomBeaconHistory: addressOfContract(ContractNameRandomBeaconHistory),
-			FlowStorageFees:     addressOfContract(ContractNameStorageFees),
+			FlowServiceAccount:         addressOfContract(ContractNameServiceAccount),
+			NodeVersionBeacon:          addressOfContract(ContractNameNodeVersionBeacon),
+			RandomBeaconHistory:        addressOfContract(ContractNameRandomBeaconHistory),
+			FlowStorageFees:            addressOfContract(ContractNameStorageFees),
+			ExecutionParametersAccount: addressOfContract(AccountNameExecutionParametersAccount),
 
 			FlowFees:                   addressOfContract(ContractNameFlowFees),
 			FlowToken:                  addressOfContract(ContractNameFlowToken),
