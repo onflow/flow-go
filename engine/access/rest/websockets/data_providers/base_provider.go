@@ -11,17 +11,16 @@ import (
 
 // baseDataProvider holds common objects for the provider
 type baseDataProvider struct {
-	subscriptionID uuid.UUID
-	topic          string
-	arguments      models.Arguments
-	cancel         context.CancelFunc
-	send           chan<- interface{}
-	subscription   subscription.Subscription
+	id           uuid.UUID
+	topic        string
+	arguments    models.Arguments
+	cancel       context.CancelFunc
+	send         chan<- interface{}
+	subscription subscription.Subscription
 }
 
 // newBaseDataProvider creates a new instance of baseDataProvider.
 func newBaseDataProvider(
-	subscriptionID uuid.UUID,
 	topic string,
 	arguments models.Arguments,
 	cancel context.CancelFunc,
@@ -29,18 +28,18 @@ func newBaseDataProvider(
 	subscription subscription.Subscription,
 ) *baseDataProvider {
 	return &baseDataProvider{
-		subscriptionID: subscriptionID,
-		topic:          topic,
-		arguments:      arguments,
-		cancel:         cancel,
-		send:           send,
-		subscription:   subscription,
+		id:           uuid.New(),
+		topic:        topic,
+		arguments:    arguments,
+		cancel:       cancel,
+		send:         send,
+		subscription: subscription,
 	}
 }
 
-// ID returns the subscription ID associated with current data provider
+// ID returns the unique identifier of the data provider.
 func (b *baseDataProvider) ID() uuid.UUID {
-	return b.subscriptionID
+	return b.id
 }
 
 // Topic returns the topic associated with the data provider.
