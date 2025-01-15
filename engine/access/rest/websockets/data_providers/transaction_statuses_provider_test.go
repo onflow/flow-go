@@ -7,7 +7,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/google/uuid"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -199,8 +198,8 @@ func (s *TransactionStatusesProviderSuite) TestTransactionStatusesDataProvider_I
 				ctx,
 				s.log,
 				s.api,
+				"dummy-id",
 				s.linkGenerator,
-				uuid.New(),
 				topic,
 				test.arguments,
 				send,
@@ -294,8 +293,8 @@ func (s *TransactionStatusesProviderSuite) TestMessageIndexTransactionStatusesPr
 		ctx,
 		s.log,
 		s.api,
+		"dummy-id",
 		s.linkGenerator,
-		uuid.New(),
 		topic,
 		arguments,
 		send,

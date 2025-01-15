@@ -1,8 +1,6 @@
 package data_providers
 
 import (
-	"github.com/google/uuid"
-
 	"github.com/onflow/flow-go/engine/access/rest/websockets/models"
 )
 
@@ -10,7 +8,7 @@ import (
 // It provides methods for retrieving the provider's unique SubscriptionID, topic, and a methods to close and run the provider.
 type DataProvider interface {
 	// ID returns the unique identifier of the data provider.
-	ID() uuid.UUID
+	ID() string
 	// Topic returns the topic associated with the data provider.
 	Topic() string
 	// Arguments returns the arguments associated with the data provider.

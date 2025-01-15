@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/google/uuid"
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/access"
@@ -41,8 +40,8 @@ func NewBlocksDataProvider(
 	ctx context.Context,
 	logger zerolog.Logger,
 	api access.API,
+	subscriptionID string,
 	linkGenerator commonmodels.LinkGenerator,
-	subscriptionID uuid.UUID,
 	topic string,
 	arguments models.Arguments,
 	send chan<- interface{},
@@ -89,7 +88,7 @@ func (p *BlocksDataProvider) Run() error {
 			}
 
 			var response models.BaseDataProvidersResponse
-			response.Build(p.ID().String(), p.Topic(), &block)
+			response.Build(p.ID(), p.Topic(), &block)
 
 			return &response, nil
 		}),

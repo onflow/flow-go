@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/google/uuid"
 	"github.com/rs/zerolog"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -43,7 +42,7 @@ func NewAccountStatusesDataProvider(
 	ctx context.Context,
 	logger zerolog.Logger,
 	stateStreamApi state_stream.API,
-	subscriptionID uuid.UUID,
+	subscriptionID string,
 	topic string,
 	arguments models.Arguments,
 	send chan<- interface{},
@@ -124,7 +123,7 @@ func (p *AccountStatusesDataProvider) handleResponse() func(accountStatusesRespo
 		accountStatusesPayload.Build(accountStatusesResponse, index)
 
 		var response models.BaseDataProvidersResponse
-		response.Build(p.ID().String(), p.Topic(), &accountStatusesPayload)
+		response.Build(p.ID(), p.Topic(), &accountStatusesPayload)
 
 		p.send <- &response
 

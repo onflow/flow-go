@@ -6,7 +6,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/engine/access/rest/websockets/models"
@@ -64,7 +63,7 @@ func testHappyPath(
 			test.setupBackend(sub)
 
 			// Create the data provider instance
-			provider, err := factory.NewDataProvider(ctx, uuid.New(), topic, test.arguments, send)
+			provider, err := factory.NewDataProvider(ctx, "dummy-id", topic, test.arguments, send)
 
 			require.NotNil(t, provider)
 			require.NoError(t, err)
@@ -73,7 +72,9 @@ func testHappyPath(
 			defer provider.Close()
 
 			// Run the provider in a separate goroutine
+			done := make(chan struct{})
 			go func() {
+				defer close(done)
 				err = provider.Run()
 				require.NoError(t, err)
 			}()
@@ -83,6 +84,9 @@ func testHappyPath(
 				defer close(dataChan)
 				sendData(dataChan)
 			}()
+
+			// Wait for the provider goroutine to finish
+			unittest.RequireCloseBefore(t, done, time.Second, "provider failed to stop")
 
 			// Collect responses
 			for i, expected := range test.expectedResponses {

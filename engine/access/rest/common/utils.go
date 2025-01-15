@@ -60,6 +60,11 @@ func ParseBody(raw io.Reader, dst interface{}) error {
 //
 // No errors are expected during normal operations.
 func ParseInterfacesToString(value interface{}) ([]string, error) {
+	// Check if value is []string directly
+	if strSlice, ok := value.([]string); ok {
+		return strSlice, nil
+	}
+
 	// Check if value is []interface{}
 	interfaceSlice, ok := value.([]interface{})
 	if !ok {

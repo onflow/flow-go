@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/google/uuid"
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/access"
@@ -30,7 +29,7 @@ func NewBlockHeadersDataProvider(
 	ctx context.Context,
 	logger zerolog.Logger,
 	api access.API,
-	subscriptionID uuid.UUID,
+	subscriptionID string,
 	topic string,
 	arguments models.Arguments,
 	send chan<- interface{},
@@ -71,7 +70,7 @@ func (p *BlockHeadersDataProvider) Run() error {
 
 			var response models.BaseDataProvidersResponse
 			response.Build(
-				p.ID().String(),
+				p.ID(),
 				p.Topic(),
 				&header,
 			)

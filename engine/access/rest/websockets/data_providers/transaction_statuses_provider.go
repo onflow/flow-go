@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/google/uuid"
 	"github.com/rs/zerolog"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -43,8 +42,8 @@ func NewTransactionStatusesDataProvider(
 	ctx context.Context,
 	logger zerolog.Logger,
 	api access.API,
+	subscriptionID string,
 	linkGenerator commonmodels.LinkGenerator,
-	subscriptionID uuid.UUID,
 	topic string,
 	arguments models.Arguments,
 	send chan<- interface{},
@@ -116,7 +115,7 @@ func (p *TransactionStatusesDataProvider) handleResponse() func(txResults []*acc
 			txStatusesPayload.Build(p.linkGenerator, txResults[i], index)
 
 			var response models.BaseDataProvidersResponse
-			response.Build(p.ID().String(), p.Topic(), &txStatusesPayload)
+			response.Build(p.ID(), p.Topic(), &txStatusesPayload)
 
 			p.send <- &response
 		}
