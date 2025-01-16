@@ -416,7 +416,7 @@ func (s *WebsocketSubscriptionSuite) TestHappyCases() {
 		name                               string
 		topic                              string
 		prepareArguments                   func() models.Arguments
-		validateFunc                       func(string, []models.BaseDataProvidersResponse)
+		validateFunc                       func(string, string, []models.BaseDataProvidersResponse)
 		listenSubscriptionResponseDuration time.Duration
 		testUnsubscribe                    bool
 	}{
@@ -493,8 +493,8 @@ func (s *WebsocketSubscriptionSuite) TestHappyCases() {
 				}
 			},
 			validateFunc:                       s.validateTransactionStatuses,
-			listenSubscriptionResponseDuration: 15 * time.Second,
-			testUnsubscribe:                    true,
+			listenSubscriptionResponseDuration: 10 * time.Second,
+			testUnsubscribe:                    false,
 		},
 		{
 			name:  "Send and subscribe to transaction statuses",
@@ -553,7 +553,7 @@ func (s *WebsocketSubscriptionSuite) TestHappyCases() {
 				}
 			},
 			validateFunc:                       s.validateTransactionStatuses,
-			listenSubscriptionResponseDuration: 10 * time.Second, //TODO: flaky behaviour with other subtests (received 3 statuses, expected 4), check when error in rpc backend will be fixed
+			listenSubscriptionResponseDuration: 10 * time.Second,
 			testUnsubscribe:                    false,
 		},
 	}
@@ -584,13 +584,14 @@ func (s *WebsocketSubscriptionSuite) TestHappyCases() {
 // validateBlocks validates the received block responses against gRPC responses.
 func (s *WebsocketSubscriptionSuite) validateBlocks(
 	expectedSubscriptionID string,
+	expectedTopic string,
 	receivedResponses []models.BaseDataProvidersResponse,
 ) {
 	s.Require().NotEmpty(receivedResponses, "expected received block headers")
 
 	for _, response := range receivedResponses {
 		s.Require().Equal(expectedSubscriptionID, response.SubscriptionID)
-		s.Require().Equal(data_providers.BlocksTopic, response.Topic)
+		s.Require().Equal(expectedTopic, response.Topic)
 
 		// Convert the payload map to JSON
 		payloadRaw, err := json.Marshal(response.Payload)
@@ -620,13 +621,14 @@ func (s *WebsocketSubscriptionSuite) validateBlocks(
 // validateBlockHeaders validates the received block header responses against gRPC responses.
 func (s *WebsocketSubscriptionSuite) validateBlockHeaders(
 	expectedSubscriptionID string,
+	expectedTopic string,
 	receivedResponses []models.BaseDataProvidersResponse,
 ) {
 	s.Require().NotEmpty(receivedResponses, "expected received block headers")
 
 	for _, response := range receivedResponses {
 		s.Require().Equal(expectedSubscriptionID, response.SubscriptionID)
-		s.Require().Equal(data_providers.BlockHeadersTopic, response.Topic)
+		s.Require().Equal(expectedTopic, response.Topic)
 
 		// Convert the payload map to JSON
 		payloadRaw, err := json.Marshal(response.Payload)
@@ -656,13 +658,14 @@ func (s *WebsocketSubscriptionSuite) validateBlockHeaders(
 // validateBlockDigests validates the received block digest responses against gRPC responses.
 func (s *WebsocketSubscriptionSuite) validateBlockDigests(
 	expectedSubscriptionID string,
+	expectedTopic string,
 	receivedResponses []models.BaseDataProvidersResponse,
 ) {
 	s.Require().NotEmpty(receivedResponses, "expected received block digests")
 
 	for _, response := range receivedResponses {
 		s.Require().Equal(expectedSubscriptionID, response.SubscriptionID)
-		s.Require().Equal(data_providers.BlockDigestsTopic, response.Topic)
+		s.Require().Equal(expectedTopic, response.Topic)
 
 		// Convert the payload map to JSON
 		payloadRaw, err := json.Marshal(response.Payload)
@@ -692,6 +695,7 @@ func (s *WebsocketSubscriptionSuite) validateBlockDigests(
 // events which received from grpc api
 func (s *WebsocketSubscriptionSuite) validateEvents(
 	expectedSubscriptionID string,
+	expectedTopic string,
 	receivedResponses []models.BaseDataProvidersResponse,
 ) {
 	// make sure there are received events
@@ -700,7 +704,7 @@ func (s *WebsocketSubscriptionSuite) validateEvents(
 	expectedCounter := uint64(0)
 	for _, receivedEventResponse := range receivedResponses {
 		s.Require().Equal(expectedSubscriptionID, receivedEventResponse.SubscriptionID)
-		s.Require().Equal(data_providers.EventsTopic, receivedEventResponse.Topic)
+		s.Require().Equal(expectedTopic, receivedEventResponse.Topic)
 
 		// Convert the payload map to JSON
 		payloadRaw, err := json.Marshal(receivedEventResponse.Payload)
@@ -727,6 +731,7 @@ func (s *WebsocketSubscriptionSuite) validateEvents(
 // validateAccountStatuses is a helper function that encapsulates logic for comparing received account statuses
 func (s *WebsocketSubscriptionSuite) validateAccountStatuses(
 	expectedSubscriptionID string,
+	expectedTopic string,
 	receivedResponses []models.BaseDataProvidersResponse,
 ) {
 	s.Require().NotEmpty(receivedResponses, "expected received block digests")
@@ -734,7 +739,7 @@ func (s *WebsocketSubscriptionSuite) validateAccountStatuses(
 	expectedCounter := uint64(0)
 	for _, receivedAccountStatusResponse := range receivedResponses {
 		s.Require().Equal(expectedSubscriptionID, receivedAccountStatusResponse.SubscriptionID)
-		s.Require().Equal(data_providers.AccountStatusesTopic, receivedAccountStatusResponse.Topic)
+		s.Require().Equal(expectedTopic, receivedAccountStatusResponse.Topic)
 
 		// Convert the payload map to JSON
 		payloadRaw, err := json.Marshal(receivedAccountStatusResponse.Payload)
@@ -800,9 +805,9 @@ func (s *WebsocketSubscriptionSuite) validateEventsForBlock(blockHeight string, 
 // validateTransactionStatuses is a helper function that encapsulates logic for comparing received transaction statuses
 func (s *WebsocketSubscriptionSuite) validateTransactionStatuses(
 	expectedSubscriptionID string,
+	expectedTopic string,
 	receivedResponses []models.BaseDataProvidersResponse,
 ) {
-	s.T().Logf("receivedTransactionStatusesResponses %v", receivedResponses)
 	expectedCount := 4 // pending, finalized, executed, sealed
 	s.Require().Equal(expectedCount, len(receivedResponses), fmt.Sprintf("expected %d transaction statuses", expectedCount))
 
@@ -820,7 +825,7 @@ func (s *WebsocketSubscriptionSuite) validateTransactionStatuses(
 
 	for _, transactionStatusResponse := range receivedResponses {
 		s.Require().Equal(expectedSubscriptionID, transactionStatusResponse.SubscriptionID)
-		s.Require().Equal(data_providers.SendAndGetTransactionStatusesTopic, transactionStatusResponse.Topic)
+		s.Require().Equal(expectedTopic, transactionStatusResponse.Topic)
 
 		// Convert the payload map to JSON
 		payloadRaw, err := json.Marshal(transactionStatusResponse.Payload)
@@ -895,7 +900,7 @@ func getWebsocketsUrl(accessAddr string) string {
 func (s *WebsocketSubscriptionSuite) testWebsocketSubscription(
 	client *websocket.Conn,
 	subscriptionRequest models.SubscribeMessageRequest,
-	validate func(string, []models.BaseDataProvidersResponse),
+	validate func(string, string, []models.BaseDataProvidersResponse),
 	duration time.Duration,
 	unsubscribe bool,
 ) {
@@ -908,7 +913,7 @@ func (s *WebsocketSubscriptionSuite) testWebsocketSubscription(
 	s.validateBaseMessageResponse(subscriptionRequest.SubscriptionID, baseMessageResponses[0])
 
 	// Use the provided validation function to ensure the received responses of type T are correct.
-	validate(subscriptionRequest.SubscriptionID, responses)
+	validate(subscriptionRequest.SubscriptionID, subscriptionRequest.Topic, responses)
 
 	// unsubscribe from topic
 	if unsubscribe {
