@@ -7,6 +7,7 @@ import (
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/access"
+	commonmodels "github.com/onflow/flow-go/engine/access/rest/common/models"
 	"github.com/onflow/flow-go/engine/access/rest/http/request"
 	"github.com/onflow/flow-go/engine/access/rest/websockets/models"
 	"github.com/onflow/flow-go/engine/access/subscription"
@@ -60,9 +61,12 @@ func NewBlockHeadersDataProvider(
 func (p *BlockHeadersDataProvider) Run() error {
 	return subscription.HandleSubscription(
 		p.subscription,
-		subscription.HandleResponse(p.send, func(header *flow.Header) (interface{}, error) {
+		subscription.HandleResponse(p.send, func(h *flow.Header) (interface{}, error) {
+			var header commonmodels.BlockHeader
+			header.Build(h)
+
 			return &models.BlockHeaderMessageResponse{
-				Header: header,
+				Header: &header,
 			}, nil
 		}),
 	)

@@ -417,7 +417,7 @@ func (b *backendTransactions) getTransactionResultsByBlockIDFromExecutionNode(
 	)
 	if err != nil {
 		if IsInsufficientExecutionReceipts(err) {
-			return nil, status.Errorf(codes.NotFound, err.Error())
+			return nil, status.Error(codes.NotFound, err.Error())
 		}
 		return nil, rpc.ConvertError(err, "failed to retrieve result from any execution node", codes.Internal)
 	}
@@ -574,7 +574,7 @@ func (b *backendTransactions) getTransactionResultByIndexFromExecutionNode(
 	)
 	if err != nil {
 		if IsInsufficientExecutionReceipts(err) {
-			return nil, status.Errorf(codes.NotFound, err.Error())
+			return nil, status.Error(codes.NotFound, err.Error())
 		}
 		return nil, rpc.ConvertError(err, "failed to retrieve result from any execution node", codes.Internal)
 	}
@@ -762,7 +762,7 @@ func (b *backendTransactions) getTransactionResultFromExecutionNode(
 	if err != nil {
 		// if no execution receipt were found, return a NotFound GRPC error
 		if IsInsufficientExecutionReceipts(err) {
-			return nil, status.Errorf(codes.NotFound, err.Error())
+			return nil, status.Error(codes.NotFound, err.Error())
 		}
 		return nil, err
 	}
@@ -1002,7 +1002,7 @@ func (b *backendTransactions) LookupErrorMessageByTransactionID(
 	)
 	if err != nil {
 		if IsInsufficientExecutionReceipts(err) {
-			return "", status.Errorf(codes.NotFound, err.Error())
+			return "", status.Error(codes.NotFound, err.Error())
 		}
 		return "", rpc.ConvertError(err, "failed to select execution nodes", codes.Internal)
 	}
@@ -1057,7 +1057,7 @@ func (b *backendTransactions) LookupErrorMessageByIndex(
 	)
 	if err != nil {
 		if IsInsufficientExecutionReceipts(err) {
-			return "", status.Errorf(codes.NotFound, err.Error())
+			return "", status.Error(codes.NotFound, err.Error())
 		}
 		return "", rpc.ConvertError(err, "failed to select execution nodes", codes.Internal)
 	}
@@ -1117,7 +1117,7 @@ func (b *backendTransactions) LookupErrorMessagesByBlockID(
 	)
 	if err != nil {
 		if IsInsufficientExecutionReceipts(err) {
-			return nil, status.Errorf(codes.NotFound, err.Error())
+			return nil, status.Error(codes.NotFound, err.Error())
 		}
 		return nil, rpc.ConvertError(err, "failed to select execution nodes", codes.Internal)
 	}

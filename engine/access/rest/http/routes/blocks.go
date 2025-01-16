@@ -10,19 +10,19 @@ import (
 
 	"github.com/onflow/flow-go/access"
 	"github.com/onflow/flow-go/engine/access/rest/common"
-	"github.com/onflow/flow-go/engine/access/rest/http/models"
+	commonmodels "github.com/onflow/flow-go/engine/access/rest/common/models"
 	"github.com/onflow/flow-go/engine/access/rest/http/request"
 	"github.com/onflow/flow-go/model/flow"
 )
 
 // GetBlocksByIDs gets blocks by provided ID or list of IDs.
-func GetBlocksByIDs(r *common.Request, backend access.API, link models.LinkGenerator) (interface{}, error) {
+func GetBlocksByIDs(r *common.Request, backend access.API, link commonmodels.LinkGenerator) (interface{}, error) {
 	req, err := request.GetBlockByIDsRequest(r)
 	if err != nil {
 		return nil, common.NewBadRequestError(err)
 	}
 
-	blocks := make([]*models.Block, len(req.IDs))
+	blocks := make([]*commonmodels.Block, len(req.IDs))
 
 	for i, id := range req.IDs {
 		block, err := getBlock(forID(&id), r, backend, link)
@@ -36,7 +36,7 @@ func GetBlocksByIDs(r *common.Request, backend access.API, link models.LinkGener
 }
 
 // GetBlocksByHeight gets blocks by height.
-func GetBlocksByHeight(r *common.Request, backend access.API, link models.LinkGenerator) (interface{}, error) {
+func GetBlocksByHeight(r *common.Request, backend access.API, link commonmodels.LinkGenerator) (interface{}, error) {
 	req, err := request.GetBlockRequest(r)
 	if err != nil {
 		return nil, common.NewBadRequestError(err)
@@ -48,12 +48,12 @@ func GetBlocksByHeight(r *common.Request, backend access.API, link models.LinkGe
 			return nil, err
 		}
 
-		return []*models.Block{block}, nil
+		return []*commonmodels.Block{block}, nil
 	}
 
 	// if the query is /blocks/height=1000,1008,1049...
 	if req.HasHeights() {
-		blocks := make([]*models.Block, len(req.Heights))
+		blocks := make([]*commonmodels.Block, len(req.Heights))
 		for i, h := range req.Heights {
 			block, err := getBlock(forHeight(h), r, backend, link)
 			if err != nil {
@@ -79,7 +79,7 @@ func GetBlocksByHeight(r *common.Request, backend access.API, link models.LinkGe
 		}
 	}
 
-	blocks := make([]*models.Block, 0)
+	blocks := make([]*commonmodels.Block, 0)
 	// start and end height inclusive
 	for i := req.StartHeight; i <= req.EndHeight; i++ {
 		block, err := getBlock(forHeight(i), r, backend, link)
@@ -93,7 +93,7 @@ func GetBlocksByHeight(r *common.Request, backend access.API, link models.LinkGe
 }
 
 // GetBlockPayloadByID gets block payload by ID
-func GetBlockPayloadByID(r *common.Request, backend access.API, _ models.LinkGenerator) (interface{}, error) {
+func GetBlockPayloadByID(r *common.Request, backend access.API, _ commonmodels.LinkGenerator) (interface{}, error) {
 	req, err := request.GetBlockPayloadRequest(r)
 	if err != nil {
 		return nil, common.NewBadRequestError(err)
@@ -105,7 +105,7 @@ func GetBlockPayloadByID(r *common.Request, backend access.API, _ models.LinkGen
 		return nil, statusErr
 	}
 
-	var payload models.BlockPayload
+	var payload commonmodels.BlockPayload
 	err = payload.Build(blk.Payload)
 	if err != nil {
 		return nil, err
@@ -114,7 +114,7 @@ func GetBlockPayloadByID(r *common.Request, backend access.API, _ models.LinkGen
 	return payload, nil
 }
 
-func getBlock(option blockProviderOption, req *common.Request, backend access.API, link models.LinkGenerator) (*models.Block, error) {
+func getBlock(option blockProviderOption, req *common.Request, backend access.API, link commonmodels.LinkGenerator) (*commonmodels.Block, error) {
 	// lookup block
 	blkProvider := NewBlockProvider(backend, option)
 	blk, blockStatus, err := blkProvider.getBlock(req.Context())
@@ -124,7 +124,7 @@ func getBlock(option blockProviderOption, req *common.Request, backend access.AP
 
 	// lookup execution result
 	// (even if not specified as expandable, since we need the execution result ID to generate its expandable link)
-	var block models.Block
+	var block commonmodels.Block
 	executionResult, err := backend.GetExecutionResultForBlockID(req.Context(), blk.ID())
 	if err != nil {
 		// handle case where execution result is not yet available
