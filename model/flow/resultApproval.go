@@ -50,7 +50,7 @@ type ResultApproval struct {
 
 // ID generates a unique identifier using result approval body
 func (ra ResultApproval) ID() Identifier {
-	return MakeID(ra.Body)
+	return MakeID(ra)
 }
 
 // Checksum generates checksum using the result approval full content
