@@ -477,26 +477,25 @@ func (s *WebsocketSubscriptionSuite) TestHappyCases() {
 			listenSubscriptionResponseDuration: 10 * time.Second,
 			testUnsubscribe:                    true,
 		},
-		//TODO: uncomment when error in rpc backend will be fixed (Andrii Slisarchuk PR)
-		//{
-		//	name:  "Transaction statuses streaming",
-		//	topic: data_providers.TransactionStatusesTopic,
-		//	prepareArguments: func() models.Arguments {
-		//		tx := s.createAccountTx()
-		//
-		//		// Send the transaction
-		//		err := s.serviceClient.SendTransaction(s.ctx, tx)
-		//		s.Require().NoError(err)
-		//		s.T().Logf("txId %v", flow.Identifier(tx.ID()))
-		//
-		//		return models.Arguments{
-		//			"tx_id": tx.ID().String(),
-		//		}
-		//	},
-		//	validateFunc:                       s.validateTransactionStatuses,
-		//	listenSubscriptionResponseDuration: 15 * time.Second,
-		//	testUnsubscribe:                    true,
-		//},
+		{
+			name:  "Transaction statuses streaming",
+			topic: data_providers.TransactionStatusesTopic,
+			prepareArguments: func() models.Arguments {
+				tx := s.createAccountTx()
+
+				// Send the transaction
+				err := s.serviceClient.SendTransaction(s.ctx, tx)
+				s.Require().NoError(err)
+				s.T().Logf("txId %v", flow.Identifier(tx.ID()))
+
+				return models.Arguments{
+					"tx_id": tx.ID().String(),
+				}
+			},
+			validateFunc:                       s.validateTransactionStatuses,
+			listenSubscriptionResponseDuration: 15 * time.Second,
+			testUnsubscribe:                    true,
+		},
 		{
 			name:  "Send and subscribe to transaction statuses",
 			topic: data_providers.SendAndGetTransactionStatusesTopic,
