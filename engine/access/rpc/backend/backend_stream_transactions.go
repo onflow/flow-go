@@ -243,16 +243,7 @@ func (b *backendSubscribeTransactions) getTransactionStatusResponse(
 		// Get old status here, as it could be replaced by status from founded tx result
 		prevTxStatus := txInfo.Status
 
-		// Check, if transaction executed and transaction result already available
-		if txInfo.blockWithTx == nil {
-			txInfo.Status, err = b.txLocalDataProvider.DeriveUnknownTransactionStatus(txInfo.txReferenceBlockID)
-			if err != nil {
-				if !errors.Is(err, state.ErrUnknownSnapshotReference) {
-					irrecoverable.Throw(ctx, err)
-				}
-				return nil, rpc.ConvertStorageError(err)
-			}
-		} else if !txInfo.IsExecuted() {
+		if txInfo.blockWithTx != nil && !txInfo.IsExecuted() {
 			txResult, err := b.searchForTransactionResult(ctx, txInfo.TransactionID, txInfo.blockWithTx, txInfo.eventEncodingVersion)
 			if err != nil {
 				return nil, status.Errorf(codes.Internal, "failed to get execution result for block %s: %v", txInfo.BlockID, err)
@@ -264,7 +255,16 @@ func (b *backendSubscribeTransactions) getTransactionStatusResponse(
 			}
 		}
 
-		if prevTxStatus == txInfo.Status {
+		// Check, if transaction executed and transaction result already available
+		if txInfo.blockWithTx == nil {
+			txInfo.Status, err = b.txLocalDataProvider.DeriveUnknownTransactionStatus(txInfo.txReferenceBlockID)
+			if err != nil {
+				if !errors.Is(err, state.ErrUnknownSnapshotReference) {
+					irrecoverable.Throw(ctx, err)
+				}
+				return nil, rpc.ConvertStorageError(err)
+			}
+		} else {
 			// When a block with the transaction is available, it is possible to receive a new transaction status while
 			// searching for the transaction result. Otherwise, it remains unchanged. So, if the old and new transaction
 			// statuses are the same, the current transaction status should be retrieved.
