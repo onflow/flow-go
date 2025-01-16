@@ -6,12 +6,12 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"net/http"
 	"net/url"
 	"strconv"
 	"testing"
 	"time"
 
-	"github.com/google/uuid"
 	"github.com/gorilla/websocket"
 	sdk "github.com/onflow/flow-go-sdk"
 	sdkcrypto "github.com/onflow/flow-go-sdk/crypto"
@@ -23,7 +23,6 @@ import (
 	commonmodels "github.com/onflow/flow-go/engine/access/rest/common/models"
 	"github.com/onflow/flow-go/engine/access/rest/common/parser"
 	"github.com/onflow/flow-go/engine/access/rest/util"
-	"github.com/onflow/flow-go/engine/access/rest/websockets"
 	"github.com/onflow/flow-go/engine/access/rest/websockets/data_providers"
 	"github.com/onflow/flow-go/engine/access/rest/websockets/models"
 	"github.com/onflow/flow-go/engine/access/rpc/backend"
@@ -176,7 +175,7 @@ func (s *WebsocketSubscriptionSuite) TestInactivityHeaders() {
 		subscriptionRequest := models.SubscribeMessageRequest{
 			BaseMessageRequest: models.BaseMessageRequest{
 				Action:         models.SubscribeAction,
-				SubscriptionID: uuid.New().String(),
+				SubscriptionID: "events_id",
 			},
 			Topic: data_providers.EventsTopic,
 		}
@@ -244,25 +243,31 @@ func (s *WebsocketSubscriptionSuite) TestSubscriptionErrorCases() {
 		name            string
 		message         models.SubscribeMessageRequest
 		expectedErrMsg  string
-		expectedErrCode websockets.Code
+		expectedErrCode int
 	}{
 		{
+			name:            "Invalid Subscription ID",
+			message:         s.subscribeMessageRequest("invalid_subscription_id", data_providers.BlocksTopic, models.Arguments{}),
+			expectedErrMsg:  "error parsing subscription id", // id length > 20 symbols
+			expectedErrCode: http.StatusBadRequest,
+		},
+		{
 			name:            "Invalid Topic",
-			message:         s.subscribeMessageRequest(uuid.New().String(), "invalid_topic", models.Arguments{}),
+			message:         s.subscribeMessageRequest("", "invalid_topic", models.Arguments{}),
 			expectedErrMsg:  "error creating data provider", // Update based on expected error message
-			expectedErrCode: websockets.InvalidMessage,
+			expectedErrCode: http.StatusBadRequest,
 		},
 		{
 			name:            "Invalid Arguments",
-			message:         s.subscribeMessageRequest(uuid.New().String(), "valid_topic", models.Arguments{"invalid_arg": 42}),
+			message:         s.subscribeMessageRequest("", data_providers.BlocksTopic, models.Arguments{"invalid_arg": 42}),
 			expectedErrMsg:  "error creating data provider",
-			expectedErrCode: websockets.InvalidMessage,
+			expectedErrCode: http.StatusBadRequest,
 		},
 		{
 			name:            "Empty Topic",
-			message:         s.subscribeMessageRequest(uuid.New().String(), "", models.Arguments{}),
+			message:         s.subscribeMessageRequest("", "", models.Arguments{}),
 			expectedErrMsg:  "error creating data provider",
-			expectedErrCode: websockets.InvalidMessage,
+			expectedErrCode: http.StatusBadRequest,
 		},
 	}
 
@@ -283,7 +288,7 @@ func (s *WebsocketSubscriptionSuite) TestSubscriptionErrorCases() {
 
 			// Validate response
 			s.Contains(response.Error.Message, tt.expectedErrMsg)
-			s.Require().Equal(int(tt.expectedErrCode), response.Error.Code)
+			s.Require().Equal(tt.expectedErrCode, response.Error.Code)
 		})
 	}
 }
@@ -294,25 +299,25 @@ func (s *WebsocketSubscriptionSuite) TestUnsubscriptionErrorCases() {
 		name            string
 		message         models.UnsubscribeMessageRequest
 		expectedErrMsg  string
-		expectedErrCode websockets.Code
+		expectedErrCode int
 	}{
 		{
 			name:            "Invalid Subscription ID",
 			message:         s.unsubscribeMessageRequest("invalid_subscription_id"),
-			expectedErrMsg:  "error parsing subscription id",
-			expectedErrCode: websockets.InvalidMessage,
+			expectedErrMsg:  "error parsing subscription id", // id length > 20 symbols
+			expectedErrCode: http.StatusBadRequest,
 		},
 		{
 			name:            "Non-Existent Subscription ID",
-			message:         s.unsubscribeMessageRequest(uuid.New().String()), // Valid UUID but not associated with an active subscription
-			expectedErrMsg:  "subscription not found",
-			expectedErrCode: websockets.NotFound,
+			message:         s.unsubscribeMessageRequest("non_existent_id"),
+			expectedErrMsg:  "subscription not found", // not associated with an active subscription
+			expectedErrCode: http.StatusNotFound,
 		},
 		{
 			name:            "Empty Subscription ID",
 			message:         s.unsubscribeMessageRequest(""),
 			expectedErrMsg:  "error parsing subscription id",
-			expectedErrCode: websockets.InvalidMessage,
+			expectedErrCode: http.StatusBadRequest,
 		},
 	}
 
@@ -333,7 +338,7 @@ func (s *WebsocketSubscriptionSuite) TestUnsubscriptionErrorCases() {
 
 			// Validate response
 			s.Contains(response.Error.Message, tt.expectedErrMsg)
-			s.Require().Equal(int(tt.expectedErrCode), response.Error.Code)
+			s.Require().Equal(tt.expectedErrCode, response.Error.Code)
 		})
 	}
 }
@@ -345,7 +350,7 @@ func (s *WebsocketSubscriptionSuite) TestListOfSubscriptions() {
 	defer func() { s.Require().NoError(wsClient.Close()) }()
 
 	// 1. Create blocks subscription request message
-	blocksSubscriptionID := uuid.New().String()
+	blocksSubscriptionID := "blocks_id"
 	blocksSubscriptionArguments := models.Arguments{"block_status": parser.Finalized}
 	subscriptionToBlocksRequest := s.subscribeMessageRequest(
 		blocksSubscriptionID,
@@ -362,7 +367,7 @@ func (s *WebsocketSubscriptionSuite) TestListOfSubscriptions() {
 	s.validateBaseMessageResponse(blocksSubscriptionID, baseResponses[0])
 
 	// 2. Create block headers subscription request message
-	blockHeadersSubscriptionID := uuid.New().String()
+	blockHeadersSubscriptionID := "block_headers_id"
 	blockHeadersSubscriptionArguments := models.Arguments{"block_status": parser.Finalized}
 	subscriptionToBlockHeadersRequest := s.subscribeMessageRequest(
 		blockHeadersSubscriptionID,
@@ -379,12 +384,11 @@ func (s *WebsocketSubscriptionSuite) TestListOfSubscriptions() {
 	s.validateBaseMessageResponse(blockHeadersSubscriptionID, baseResponses[0])
 
 	// 3. Create list of subscription request message
-	listOfSubscriptionsID := uuid.New().String()
-	listOfSubscriptionRequest := s.listSubscriptionsMessageRequest(listOfSubscriptionsID)
+	listOfSubscriptionRequest := s.listSubscriptionsMessageRequest()
 	// send list of subscription message
 	s.Require().NoError(wsClient.WriteJSON(listOfSubscriptionRequest))
 
-	_, _, responses := s.listenWebSocketResponses(wsClient, 1*time.Second, listOfSubscriptionsID)
+	_, _, responses := s.listenWebSocketResponses(wsClient, 1*time.Second, "")
 
 	// validate list of active subscriptions response
 	s.Require().Equal(1, len(responses))
@@ -401,7 +405,6 @@ func (s *WebsocketSubscriptionSuite) TestListOfSubscriptions() {
 			Arguments:      blocksSubscriptionArguments,
 		},
 	}
-	s.validateBaseMessageResponse(listOfSubscriptionsID, listOfSubscriptionResponse.BaseMessageResponse)
 	s.Require().Equal(expectedSubscriptions, listOfSubscriptionResponse.Subscriptions)
 }
 
@@ -563,7 +566,7 @@ func (s *WebsocketSubscriptionSuite) TestHappyCases() {
 			defer func() { s.Require().NoError(wsClient.Close()) }()
 
 			subscriptionRequest := s.subscribeMessageRequest(
-				uuid.New().String(),
+				"dummy_id",
 				tt.topic,
 				tt.prepareArguments(),
 			)
@@ -870,11 +873,10 @@ func (s *WebsocketSubscriptionSuite) unsubscribeMessageRequest(subscriptionID st
 }
 
 // listSubscriptionsMessageRequest creates a list subscriptions message request.
-func (s *WebsocketSubscriptionSuite) listSubscriptionsMessageRequest(subscriptionID string) models.ListSubscriptionsMessageRequest {
+func (s *WebsocketSubscriptionSuite) listSubscriptionsMessageRequest() models.ListSubscriptionsMessageRequest {
 	return models.ListSubscriptionsMessageRequest{
 		BaseMessageRequest: models.BaseMessageRequest{
-			SubscriptionID: subscriptionID,
-			Action:         models.ListSubscriptionsAction,
+			Action: models.ListSubscriptionsAction,
 		},
 	}
 }
@@ -974,7 +976,7 @@ func (s *WebsocketSubscriptionSuite) listenWebSocketResponses(
 
 			var listResp models.ListSubscriptionsMessageResponse
 			err = restcommon.ParseBody(bytes.NewReader(messageBytes), &listResp)
-			if err == nil && listResp.SubscriptionID == subscriptionID {
+			if err == nil && listResp.Action == models.ListSubscriptionsAction {
 				listSubscriptionsMessageResponses = append(listSubscriptionsMessageResponses, listResp)
 				continue
 			}
