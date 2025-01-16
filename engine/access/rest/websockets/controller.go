@@ -301,6 +301,11 @@ func (c *Controller) writeMessages(ctx context.Context) error {
 	}
 }
 
+// inactivityTickerPeriod determines the interval at which the inactivity ticker is triggered.
+//
+// The inactivity ticker is used in the `writeMessages` routine to monitor periods of inactivity
+// in outgoing messages. If no messages are sent within the defined inactivity timeout
+// and there are no active data providers, the WebSocket connection will be terminated.
 func (c *Controller) inactivityTickerPeriod() time.Duration {
 	return c.config.InactivityTimeout / 10
 }

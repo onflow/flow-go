@@ -149,15 +149,18 @@ func (s *WebsocketSubscriptionSuite) TestInactivityTracker() {
 	// 2. Start a goroutine to listen for messages from the server.
 	// 3. Wait for the server to close the connection due to inactivity.
 	// 4. Validate that the actual inactivity duration is within the expected range.
+
+	inactivityTickerPeriod := InactivityTimeout / 10 // determines the interval at which the inactivity ticker checks for inactivity
+	expectedMinInactivityDuration := time.Duration(InactivityTimeout+inactivityTickerPeriod) * time.Second
+
 	s.T().Run("no active subscription after connection creation", func(t *testing.T) {
 		wsClient, err := common.GetWSClient(s.ctx, getWebsocketsUrl(s.restAccessAddress))
 		s.Require().NoError(err)
 		defer func() { s.Require().NoError(wsClient.Close()) }()
 
-		expectedInactivityDuration := InactivityTimeout * time.Second
-		actualInactivityDuration := monitorInactivity(t, wsClient, expectedInactivityDuration)
-
-		s.Require().LessOrEqual(expectedInactivityDuration, actualInactivityDuration)
+		actualInactivityDuration := monitorInactivity(t, wsClient, expectedMinInactivityDuration)
+		// Verify that the connection does not close before the InactivityTimeout + inactivity ticker period.
+		s.GreaterOrEqual(actualInactivityDuration, expectedMinInactivityDuration)
 	})
 
 	// Steps:
@@ -207,10 +210,10 @@ func (s *WebsocketSubscriptionSuite) TestInactivityTracker() {
 		s.validateBaseMessageResponse(unsubscribeRequest.SubscriptionID, response)
 
 		// Step 4: Monitor inactivity after unsubscription
-		expectedInactivityDuration := InactivityTimeout * time.Second // TODO: use InactivityTimeout + inactivityTickerPeriod() (1/10 InactivityTimeout) from Illia PR
-		actualInactivityDuration := monitorInactivity(s.T(), wsClient, expectedInactivityDuration)
 
-		s.LessOrEqual(expectedInactivityDuration, actualInactivityDuration)
+		actualInactivityDuration := monitorInactivity(s.T(), wsClient, expectedMinInactivityDuration)
+		// Verify that the connection does not close before the InactivityTimeout + inactivity ticker period.
+		s.GreaterOrEqual(actualInactivityDuration, expectedMinInactivityDuration)
 	})
 }
 
