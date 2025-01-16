@@ -43,7 +43,7 @@ var UnsafeDecMode, _ = cbor.DecOptions{}.DecMode()
 
 // DefaultDecMode is the DecMode used for decoding messages over the network.
 // It returns an error if the message contains any extra field not present in the
-// target (struct we are unmarshalling into), which prevents some classes of spamming.
+// target (struct we are unmarshalling into), which prevents some classes of resource exhaustion attacks.
 var DefaultDecMode, _ = cbor.DecOptions{ExtraReturnErrors: cbor.ExtraDecErrorUnknownField}.DecMode()
 
 func (m *Marshaler) Marshal(val interface{}) ([]byte, error) {
