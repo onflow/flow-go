@@ -80,6 +80,8 @@ import (
 	"sync"
 	"time"
 
+	"golang.org/x/time/rate"
+
 	"github.com/google/uuid"
 	"github.com/gorilla/websocket"
 	"github.com/rs/zerolog"
@@ -130,6 +132,7 @@ type Controller struct {
 	dataProviders       *concurrentmap.Map[uuid.UUID, dp.DataProvider]
 	dataProviderFactory dp.DataProviderFactory
 	dataProvidersGroup  *sync.WaitGroup
+	limiter             *rate.Limiter
 }
 
 func NewWebSocketController(
@@ -146,6 +149,7 @@ func NewWebSocketController(
 		dataProviders:       concurrentmap.New[uuid.UUID, dp.DataProvider](),
 		dataProviderFactory: dataProviderFactory,
 		dataProvidersGroup:  &sync.WaitGroup{},
+		limiter:             rate.NewLimiter(rate.Limit(config.MaxResponsesPerSecond), 1),
 	}
 }
 
@@ -159,7 +163,7 @@ func (c *Controller) HandleConnection(ctx context.Context) {
 
 	err := c.configureKeepalive()
 	if err != nil {
-		c.logger.Error().Err(err).Msg("error configuring connection")
+		c.logger.Error().Err(err).Msg("error configuring keepalive connection")
 		return
 	}
 
@@ -237,8 +241,16 @@ func (c *Controller) keepalive(ctx context.Context) error {
 }
 
 // writeMessages reads a messages from multiplexed stream and passes them on to a client WebSocket connection.
-// The multiplexed stream channel is filled by data providers
+// The multiplexed stream channel is filled by data providers.
+// The function tracks the last message sent and periodically checks for inactivity.
+// If no messages are sent within InactivityTimeout and no active data providers exist,
+// the connection will be closed.
 func (c *Controller) writeMessages(ctx context.Context) error {
+	inactivityTicker := time.NewTicker(c.config.InactivityTimeout / 10)
+	defer inactivityTicker.Stop()
+
+	lastMessageSentAt := time.Now()
+
 	defer func() {
 		// drain the channel as some providers may still send data to it after this routine shutdowns
 		// so, in order to not run into deadlock there should be at least 1 reader on the channel
@@ -257,12 +269,33 @@ func (c *Controller) writeMessages(ctx context.Context) error {
 				return nil
 			}
 
+			if err := c.limiter.WaitN(ctx, 1); err != nil {
+				return fmt.Errorf("rate limiter wait failed: %w", err)
+			}
+
+			// Specifies a timeout for the write operation. If the write
+			// isn't completed within this duration, it fails with a timeout error.
+			// SetWriteDeadline ensures the write operation does not block indefinitely
+			// if the client is slow or unresponsive. This prevents resource exhaustion
+			// and allows the server to gracefully handle timeouts for delayed writes.
 			if err := c.conn.SetWriteDeadline(time.Now().Add(WriteWait)); err != nil {
 				return fmt.Errorf("failed to set the write deadline: %w", err)
 			}
 
 			if err := c.conn.WriteJSON(message); err != nil {
 				return err
+			}
+
+			lastMessageSentAt = time.Now()
+
+		case <-inactivityTicker.C:
+			hasNoActiveSubscriptions := c.dataProviders.Size() == 0
+			exceedsInactivityTimeout := time.Since(lastMessageSentAt) > c.config.InactivityTimeout
+			if hasNoActiveSubscriptions && exceedsInactivityTimeout {
+				c.logger.Debug().
+					Dur("timeout", c.config.InactivityTimeout).
+					Msg("connection inactive, closing due to timeout")
+				return fmt.Errorf("no recent activity for %v", c.config.InactivityTimeout)
 			}
 		}
 	}

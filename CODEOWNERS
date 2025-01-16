@@ -1,51 +1,5 @@
-# Collection Stream
-/cmd/collection/** @jordanschalm
-/engine/collection/** @jordanschalm
-/protobuf/services/collection/** @jordanschalm
+# Protocol owners are not generally differentiated by sub-area for simplicity
+/** @onflow/flow-core-protocol
 
-# Consensus Stream
-/cmd/consensus/** @AlexHentschel @durkmurder @jordanschalm
-/engine/consensus/** @AlexHentschel @durkmurder @jordanschalm
-
-# Execution Stream
-/cmd/execution/** @zhangchiqing
-/engine/execution/** @zhangchiqing
-
-# Access Stream
-/access/** @peterargue
-/cmd/access/** @peterargue
-/cmd/observer/** @peterargue
-/engine/access/** @peterargue
-
-# Verification Stream
-/cmd/verification/** @zhangchiqing
-/engine/verification/** @zhangchiqing
-/integration/tests/verification @zhangchiqing
-
-# Ledger Stream
-/ledger/** @AlexHentschel
-
-# FVM Stream
-/fvm/** @janezpodhostnik
-
-# Networking Stream
-/network/** @Kay-Zee
-
-# Cryptography Stream
-/crypto/** @tarakby
-
-# Bootstrap and transit scripts
-/cmd/bootstrap/** @zhangchiqing
-
-# Dev Tools Stream
-.github/workflows/** @Kay-Zee
-/insecure/** @Kay-Zee
-/integration/benchnet2/** @Kay-Zee
-/tools/test_monitor/** @Kay-Zee
-
-# Performance Stream
-/integration/benchmark/** @Kay-Zee
-
-# Execution Sync
-/module/executiondatasync/** @peterargue
-/module/state_synchronization/** @peterargue
+# FVM specific
+/fvm/** @janezpodhostnik @zhangchiqing 
