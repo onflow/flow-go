@@ -10,10 +10,6 @@ type UnknownExecutionResultError struct {
 	err error
 }
 
-func NewUnknownExecutionResultError(msg string) error {
-	return NewUnknownExecutionResultErrorf(msg)
-}
-
 func NewUnknownExecutionResultErrorf(msg string, args ...interface{}) error {
 	return UnknownExecutionResultError{
 		err: fmt.Errorf(msg, args...),

@@ -534,30 +534,12 @@ func (*api) SubscribeBlockDigestsFromLatest(
 	return nil
 }
 
-func (a *api) SubscribeTransactionStatusesFromStartBlockID(
-	_ context.Context,
-	_ flow.Identifier,
-	_ flow.Identifier,
-	_ entities.EventEncodingVersion,
-) subscription.Subscription {
-	return subscription.NewFailedSubscription(ErrNotImplemented, "failed to call SubscribeTransactionStatusesFromStartBlockID")
-}
-
-func (a *api) SubscribeTransactionStatusesFromStartHeight(
-	_ context.Context,
-	_ flow.Identifier,
-	_ uint64,
-	_ entities.EventEncodingVersion,
-) subscription.Subscription {
-	return subscription.NewFailedSubscription(ErrNotImplemented, "failed to call SubscribeTransactionStatusesFromStartHeight")
-}
-
-func (a *api) SubscribeTransactionStatusesFromLatest(
+func (a *api) SubscribeTransactionStatuses(
 	_ context.Context,
 	_ flow.Identifier,
 	_ entities.EventEncodingVersion,
 ) subscription.Subscription {
-	return subscription.NewFailedSubscription(ErrNotImplemented, "failed to call SubscribeTransactionStatusesFromLatest")
+	return subscription.NewFailedSubscription(ErrNotImplemented, "failed to call SubscribeTransactionStatuses")
 }
 
 func (a *api) SendAndSubscribeTransactionStatuses(
