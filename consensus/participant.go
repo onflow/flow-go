@@ -74,16 +74,16 @@ func NewParticipant(
 		return nil, fmt.Errorf("could not initialize flow pacemaker: %w", err)
 	}
 
-	// initialize block producer
-	producer, err := blockproducer.New(modules.Signer, modules.Committee, builder)
-	if err != nil {
-		return nil, fmt.Errorf("could not initialize block producer: %w", err)
-	}
-
 	// initialize the safetyRules
 	safetyRules, err := safetyrules.New(modules.Signer, modules.Persist, modules.Committee)
 	if err != nil {
 		return nil, fmt.Errorf("could not initialize safety rules: %w", err)
+	}
+
+	// initialize block producer
+	producer, err := blockproducer.New(safetyRules, modules.Committee, builder)
+	if err != nil {
+		return nil, fmt.Errorf("could not initialize block producer: %w", err)
 	}
 
 	// initialize the event handler

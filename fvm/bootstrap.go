@@ -351,6 +351,7 @@ func (b *bootstrapExecutor) Execute() error {
 
 	b.deployViewResolver(service, &env)
 	b.deployBurner(service, &env)
+	b.deployCrypto(service, &env)
 
 	err = expectAccounts(1)
 	if err != nil {
@@ -521,6 +522,22 @@ func (b *bootstrapExecutor) deployBurner(deployTo flow.Address, env *templates.E
 	)
 	env.BurnerAddress = deployTo.String()
 	panicOnMetaInvokeErrf("failed to deploy burner contract: %s", txError, err)
+}
+
+func (b *bootstrapExecutor) deployCrypto(deployTo flow.Address, env *templates.Environment) {
+	contract := contracts.Crypto()
+
+	txError, err := b.invokeMetaTransaction(
+		b.ctx,
+		Transaction(
+			blueprints.DeployContractTransaction(
+				deployTo,
+				contract,
+				"Crypto"),
+			0),
+	)
+	env.CryptoAddress = deployTo.String()
+	panicOnMetaInvokeErrf("failed to deploy crypto contract: %s", txError, err)
 }
 
 func (b *bootstrapExecutor) deployMetadataViews(fungibleToken, nonFungibleToken flow.Address, env *templates.Environment) {

@@ -20,6 +20,7 @@ import (
 	"github.com/onflow/flow-go/consensus/hotstuff/helper"
 	mockhotstuff "github.com/onflow/flow-go/consensus/hotstuff/mocks"
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
+	"github.com/onflow/flow-go/consensus/hotstuff/safetyrules"
 	"github.com/onflow/flow-go/consensus/hotstuff/signature"
 	hsig "github.com/onflow/flow-go/consensus/hotstuff/signature"
 	hotstuffvalidator "github.com/onflow/flow-go/consensus/hotstuff/validator"
@@ -29,6 +30,7 @@ import (
 	"github.com/onflow/flow-go/module/local"
 	modulemock "github.com/onflow/flow-go/module/mock"
 	msig "github.com/onflow/flow-go/module/signature"
+	"github.com/onflow/flow-go/state/protocol/inmem"
 	storagemock "github.com/onflow/flow-go/storage/mock"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -56,7 +58,7 @@ func (s *CombinedVoteProcessorV2TestSuite) SetupTest() {
 
 	s.reconstructor = &mockhotstuff.RandomBeaconReconstructor{}
 	s.packer = &mockhotstuff.Packer{}
-	s.proposal = helper.MakeProposal()
+	s.proposal = helper.MakeSignedProposal()
 
 	s.minRequiredShares = 9 // we require 9 RB shares to reconstruct signature
 	s.rbSharesTotal = 0
@@ -823,6 +825,7 @@ func TestCombinedVoteProcessorV2_BuildVerifyQC(t *testing.T) {
 		signers[identity.NodeID] = verification.NewCombinedSigner(me, beaconSignerStore)
 	}
 
+	dkgIndexMap := make(flow.DKGIndexMap)
 	for _, identity := range beaconSigners {
 		stakingPriv := unittest.StakingPrivKeyFixture()
 		identity.StakingPubKey = stakingPriv.PublicKey()
@@ -831,6 +834,7 @@ func TestCombinedVoteProcessorV2_BuildVerifyQC(t *testing.T) {
 		dkgKey := encodable.RandomBeaconPrivKey{
 			PrivateKey: dkgData.PrivKeyShares[participantData.Index],
 		}
+		dkgIndexMap[identity.NodeID] = int(participantData.Index)
 
 		keys := &storagemock.SafeBeaconKeys{}
 		// there is Random Beacon key for this epoch
@@ -847,10 +851,24 @@ func TestCombinedVoteProcessorV2_BuildVerifyQC(t *testing.T) {
 	leader := allIdentities[0]
 
 	block := helper.MakeBlock(helper.WithBlockView(view),
-		helper.WithBlockProposer(leader.NodeID))
+		helper.WithBlockProposer(leader.NodeID),
+		helper.WithBlockQC(helper.MakeQC(helper.WithQCView(view-1))))
+	proposal := helper.MakeProposal(helper.WithBlock(block))
 
-	committee, err := committees.NewStaticCommittee(allIdentities, flow.ZeroID, dkgParticipants, dkgData.PubGroupKey)
-	require.NoError(t, err)
+	inmemDKG := inmem.NewDKG(nil, &flow.EpochCommit{
+		DKGGroupKey:        dkgData.PubGroupKey,
+		DKGParticipantKeys: dkgData.PubKeyShares,
+		DKGIndexMap:        dkgIndexMap,
+	})
+
+	committee := &mockhotstuff.DynamicCommittee{}
+	committee.On("LeaderForView", block.View).Return(leader.NodeID, nil).Maybe()
+	committee.On("QuorumThresholdForView", mock.Anything).Return(committees.WeightThresholdToBuildQC(allIdentities.ToSkeleton().TotalWeight()), nil)
+	committee.On("IdentitiesByEpoch", block.View).Return(allIdentities.ToSkeleton(), nil)
+	committee.On("IdentitiesByBlock", block.BlockID).Return(allIdentities, nil)
+	committee.On("IdentityByBlock", block.BlockID, leader.NodeID).Return(leader, nil)
+	committee.On("DKG", block.View).Return(inmemDKG, nil)
+	committee.On("Self").Return(leader.NodeID)
 
 	votes := make([]*model.Vote, 0, len(allIdentities))
 
@@ -863,7 +881,19 @@ func TestCombinedVoteProcessorV2_BuildVerifyQC(t *testing.T) {
 	}
 
 	// create and sign proposal
-	proposal, err := signers[leader.NodeID].CreateProposal(block)
+	persist := mockhotstuff.NewPersister(t)
+	safetyData := &hotstuff.SafetyData{
+		LockedOneChainView:      block.View - 1,
+		HighestAcknowledgedView: block.View - 1,
+	}
+	persist.On("GetSafetyData", mock.Anything).Return(safetyData, nil).Once()
+	persist.On("PutSafetyData", mock.Anything).Return(nil)
+	safetyRules, err := safetyrules.New(signers[leader.NodeID], persist, committee)
+	require.NoError(t, err)
+	vote, err := safetyRules.SignOwnProposal(proposal)
+	require.NoError(t, err)
+	signedProposal := helper.MakeSignedProposal(helper.WithProposal(proposal), helper.WithSigData(vote.SigData))
+
 	require.NoError(t, err)
 
 	qcCreated := false
@@ -882,7 +912,7 @@ func TestCombinedVoteProcessorV2_BuildVerifyQC(t *testing.T) {
 	}
 
 	voteProcessorFactory := NewCombinedVoteProcessorFactory(committee, onQCCreated)
-	voteProcessor, err := voteProcessorFactory.Create(unittest.Logger(), proposal)
+	voteProcessor, err := voteProcessorFactory.Create(unittest.Logger(), signedProposal)
 	require.NoError(t, err)
 
 	// process votes by new leader, this will result in producing new QC

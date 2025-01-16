@@ -12,6 +12,10 @@ import (
 // ErrUnknownReferenceBlock indicates that a transaction references an unknown block.
 var ErrUnknownReferenceBlock = errors.New("unknown reference block")
 
+// IndexReporterNotInitialized is returned when indexReporter is nil because
+// execution data syncing and indexing is disabled
+var IndexReporterNotInitialized = errors.New("index reported not initialized")
+
 // IncompleteTransactionError indicates that a transaction is missing one or more required fields.
 type IncompleteTransactionError struct {
 	MissingFields []string
@@ -114,4 +118,15 @@ func (e InsufficientBalanceError) Error() string {
 func IsInsufficientBalanceError(err error) bool {
 	var balanceError InsufficientBalanceError
 	return errors.As(err, &balanceError)
+}
+
+// IndexedHeightFarBehindError indicates that a node is far behind on indexing.
+type IndexedHeightFarBehindError struct {
+	SealedHeight  uint64
+	IndexedHeight uint64
+}
+
+func (e IndexedHeightFarBehindError) Error() string {
+	return fmt.Sprintf("the difference between the latest sealed height (%d) and indexed height (%d) exceeds the maximum gap allowed",
+		e.SealedHeight, e.IndexedHeight)
 }

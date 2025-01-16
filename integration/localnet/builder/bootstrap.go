@@ -16,8 +16,9 @@ import (
 	"github.com/go-yaml/yaml"
 
 	"github.com/onflow/flow-go/cmd/build"
-	"github.com/onflow/flow-go/integration/testnet"
 	"github.com/onflow/flow-go/model/flow"
+
+	"github.com/onflow/flow-go/integration/testnet"
 )
 
 const (
@@ -62,6 +63,7 @@ var (
 	numViewsInStakingPhase      uint64
 	numViewsInDKGPhase          uint64
 	numViewsEpoch               uint64
+	numViewsPerSecond           uint64
 	finalizationSafetyThreshold uint64
 	profiler                    bool
 	profileUploader             bool
@@ -88,6 +90,7 @@ func init() {
 	flag.Uint64Var(&numViewsInStakingPhase, "epoch-staking-phase-length", 2000, "number of views in epoch staking phase")
 	flag.Uint64Var(&numViewsInDKGPhase, "epoch-dkg-phase-length", 2000, "number of views in epoch dkg phase")
 	flag.Uint64Var(&finalizationSafetyThreshold, "finalization-safety-threshold", 1000, "number of views for safety threshold T (assume: one finalization occurs within T blocks)")
+	flag.Uint64Var(&numViewsPerSecond, "target-view-rate", 1, "target number of views per second")
 	flag.BoolVar(&profiler, "profiler", DefaultProfiler, "whether to enable the auto-profiler")
 	flag.BoolVar(&profileUploader, "profile-uploader", DefaultProfileUploader, "whether to upload profiles to the cloud")
 	flag.BoolVar(&tracing, "tracing", DefaultTracing, "whether to enable low-overhead tracing in flow")
@@ -126,6 +129,9 @@ func main() {
 	flowNetworkOpts := []testnet.NetworkConfigOpt{testnet.WithClusters(nClusters)}
 	if numViewsEpoch != 0 {
 		flowNetworkOpts = append(flowNetworkOpts, testnet.WithViewsInEpoch(numViewsEpoch))
+	}
+	if numViewsPerSecond != 0 {
+		flowNetworkOpts = append(flowNetworkOpts, testnet.WithViewsPerSecond(numViewsPerSecond))
 	}
 	if numViewsInStakingPhase != 0 {
 		flowNetworkOpts = append(flowNetworkOpts, testnet.WithViewsInStakingAuction(numViewsInStakingPhase))
@@ -390,14 +396,11 @@ func prepareExecutionService(container testnet.ContainerConfig, i int, n int) Se
 		panic(err)
 	}
 
-	enableNewIngestionEngine := true
-
 	service.Command = append(service.Command,
 		"--triedir=/trie",
 		fmt.Sprintf("--rpc-addr=%s:%s", container.ContainerName, testnet.GRPCPort),
 		fmt.Sprintf("--cadence-tracing=%t", cadenceTracing),
 		fmt.Sprintf("--extensive-tracing=%t", extesiveTracing),
-		fmt.Sprintf("--enable-new-ingestion-engine=%v", enableNewIngestionEngine),
 		"--execution-data-dir=/data/execution-data",
 		"--chunk-data-pack-dir=/data/chunk-data-pack",
 	)
@@ -454,8 +457,8 @@ func prepareObserverService(i int, observerName string, agPublicKey string) Serv
 
 	service := defaultService(observerName, DefaultObserverRole, dataDir, profilerDir, i)
 	service.Command = append(service.Command,
-		fmt.Sprintf("--bootstrap-node-addresses=%s:%s", testnet.PrimaryAN, testnet.PublicNetworkPort),
-		fmt.Sprintf("--bootstrap-node-public-keys=%s", agPublicKey),
+		fmt.Sprintf("--observer-mode-bootstrap-node-addresses=%s:%s", testnet.PrimaryAN, testnet.PublicNetworkPort),
+		fmt.Sprintf("--observer-mode-bootstrap-node-public-keys=%s", agPublicKey),
 		fmt.Sprintf("--upstream-node-addresses=%s:%s", testnet.PrimaryAN, testnet.GRPCSecurePort),
 		fmt.Sprintf("--upstream-node-public-keys=%s", agPublicKey),
 		fmt.Sprintf("--observer-networking-key-path=/bootstrap/private-root-information/%s_key", observerName),

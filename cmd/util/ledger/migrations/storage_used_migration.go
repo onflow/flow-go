@@ -6,7 +6,7 @@ import (
 
 	"github.com/onflow/flow-go/cmd/util/ledger/reporters"
 
-	"github.com/onflow/cadence/runtime/common"
+	"github.com/onflow/cadence/common"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 

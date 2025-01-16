@@ -273,7 +273,7 @@ func (s *MessageHubSuite) TestOnOwnProposal() {
 		expectedBroadcastMsg := messages.NewClusterBlockProposal(&block)
 
 		submitted := make(chan struct{}) // closed when proposal is submitted to hotstuff
-		hotstuffProposal := model.ProposalFromFlow(block.Header)
+		hotstuffProposal := model.SignedProposalFromFlow(block.Header)
 		s.voteAggregator.On("AddBlock", hotstuffProposal).Once()
 		s.hotstuff.On("SubmitProposal", hotstuffProposal).
 			Run(func(args mock.Arguments) { close(submitted) }).
@@ -334,7 +334,7 @@ func (s *MessageHubSuite) TestProcessMultipleMessagesHappyPath() {
 		s.payloads.On("ByBlockID", proposal.Header.ID()).Return(proposal.Payload, nil)
 
 		// unset chain and height to make sure they are correctly reconstructed
-		hotstuffProposal := model.ProposalFromFlow(proposal.Header)
+		hotstuffProposal := model.SignedProposalFromFlow(proposal.Header)
 		s.voteAggregator.On("AddBlock", hotstuffProposal)
 		s.hotstuff.On("SubmitProposal", hotstuffProposal)
 		expectedBroadcastMsg := messages.NewClusterBlockProposal(&proposal)

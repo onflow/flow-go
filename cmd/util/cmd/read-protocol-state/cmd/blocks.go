@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"errors"
 	"fmt"
 
 	"github.com/rs/zerolog/log"
@@ -13,10 +14,11 @@ import (
 )
 
 var (
-	flagHeight  uint64
-	flagBlockID string
-	flagFinal   bool
-	flagSealed  bool
+	flagHeight   uint64
+	flagBlockID  string
+	flagFinal    bool
+	flagSealed   bool
+	flagExecuted bool
 )
 
 var Cmd = &cobra.Command{
@@ -39,17 +41,22 @@ func init() {
 
 	Cmd.Flags().BoolVar(&flagSealed, "sealed", false,
 		"get sealed block")
+
+	Cmd.Flags().BoolVar(&flagExecuted, "executed", false,
+		"get last executed and sealed block (execution node only)")
 }
 
 type Reader struct {
-	state  protocol.State
-	blocks storage.Blocks
+	state   protocol.State
+	blocks  storage.Blocks
+	commits storage.Commits
 }
 
 func NewReader(state protocol.State, storages *storage.All) *Reader {
 	return &Reader{
-		state:  state,
-		blocks: storages.Blocks,
+		state:   state,
+		blocks:  storages.Blocks,
+		commits: storages.Commits,
 	}
 }
 
@@ -101,6 +108,16 @@ func (r *Reader) GetSealed() (*flow.Block, error) {
 	return block, nil
 }
 
+func (r *Reader) GetRoot() (*flow.Block, error) {
+	header := r.state.Params().SealedRoot()
+
+	block, err := r.getBlockByHeader(header)
+	if err != nil {
+		return nil, fmt.Errorf("could not get block by header: %w", err)
+	}
+	return block, nil
+}
+
 func (r *Reader) GetBlockByID(blockID flow.Identifier) (*flow.Block, error) {
 	header, err := r.state.AtBlockID(blockID).Head()
 	if err != nil {
@@ -114,6 +131,22 @@ func (r *Reader) GetBlockByID(blockID flow.Identifier) (*flow.Block, error) {
 	return block, nil
 }
 
+// IsExecuted returns true if the block is executed
+// this only works for execution node.
+func (r *Reader) IsExecuted(blockID flow.Identifier) (bool, error) {
+	_, err := r.commits.ByBlockID(blockID)
+	if err == nil {
+		return true, nil
+	}
+
+	// statecommitment not exists means the block hasn't been executed yet
+	if errors.Is(err, storage.ErrNotFound) {
+		return false, nil
+	}
+
+	return false, err
+}
+
 func run(*cobra.Command, []string) {
 	db := common.InitStorage(flagDatadir)
 	defer db.Close()
@@ -125,6 +158,12 @@ func run(*cobra.Command, []string) {
 	}
 
 	reader := NewReader(state, storages)
+
+	// making sure only one flag is being used
+	err = checkOnlyOneFlagIsUsed(flagHeight, flagBlockID, flagFinal, flagSealed, flagExecuted)
+	if err != nil {
+		log.Fatal().Err(err).Msg("could not get block")
+	}
 
 	if flagHeight > 0 {
 		log.Info().Msgf("get block by height: %v", flagHeight)
@@ -171,5 +210,63 @@ func run(*cobra.Command, []string) {
 		return
 	}
 
-	log.Fatal().Msgf("missing flag, try --final or --sealed or --height or --block-id")
+	if flagExecuted {
+		log.Info().Msgf("get last executed and sealed block")
+		sealed, err := reader.GetSealed()
+		if err != nil {
+			log.Fatal().Err(err).Msg("could not get sealed block")
+		}
+
+		root, err := reader.GetRoot()
+		if err != nil {
+			log.Fatal().Err(err).Msg("could not get root block")
+		}
+
+		// find the last executed and sealed block
+		for h := sealed.Header.Height; h >= root.Header.Height; h-- {
+			block, err := reader.GetBlockByHeight(h)
+			if err != nil {
+				log.Fatal().Err(err).Msgf("could not get block by height: %v", h)
+			}
+
+			executed, err := reader.IsExecuted(block.ID())
+			if err != nil {
+				log.Fatal().Err(err).Msgf("could not check block executed or not: %v", h)
+			}
+
+			if executed {
+				common.PrettyPrintEntity(block)
+				return
+			}
+		}
+
+		log.Fatal().Msg("could not find executed block")
+	}
+
+	log.Fatal().Msgf("missing flag, try --final or --sealed or --height or --executed or --block-id, note that only one flag can be used at a time")
+}
+
+func checkOnlyOneFlagIsUsed(height uint64, blockID string, final, sealed, executed bool) error {
+	flags := make([]string, 0, 5)
+	if height > 0 {
+		flags = append(flags, "height")
+	}
+	if blockID != "" {
+		flags = append(flags, "blockID")
+	}
+	if final {
+		flags = append(flags, "final")
+	}
+	if sealed {
+		flags = append(flags, "sealed")
+	}
+	if executed {
+		flags = append(flags, "executed")
+	}
+
+	if len(flags) != 1 {
+		return fmt.Errorf("only one flag can be used at a time, used flags: %v", flags)
+	}
+
+	return nil
 }

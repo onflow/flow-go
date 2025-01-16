@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/onflow/flow-go/engine/access/rest/models"
+	commonmodels "github.com/onflow/flow-go/engine/access/rest/common/models"
 	"github.com/onflow/flow-go/engine/access/rest/util"
 
 	"github.com/stretchr/testify/require"
@@ -91,7 +91,7 @@ func testFilter(t *testing.T, inputJson, exepectedJson string, description strin
 
 func TestExampleSelectFilter(t *testing.T) {
 
-	blocks := make([]models.Block, 2)
+	blocks := make([]commonmodels.Block, 2)
 	for i := range blocks {
 		block, err := generateBlock()
 		require.NoError(t, err)
@@ -122,7 +122,7 @@ func TestExampleSelectFilter(t *testing.T) {
 	require.Equal(t, string(byteValue), string(marshalled))
 }
 
-func generateBlock() (models.Block, error) {
+func generateBlock() (commonmodels.Block, error) {
 
 	dummySignature := "abcdef0123456789"
 	multipleDummySignatures := []string{dummySignature, dummySignature}
@@ -130,31 +130,31 @@ func generateBlock() (models.Block, error) {
 	dateString := "2021-11-20T11:45:26.371Z"
 	t, err := time.Parse(time.RFC3339, dateString)
 	if err != nil {
-		return models.Block{}, err
+		return commonmodels.Block{}, err
 	}
 
-	return models.Block{
-		Header: &models.BlockHeader{
+	return commonmodels.Block{
+		Header: &commonmodels.BlockHeader{
 			Id:                   dummyID,
 			ParentId:             dummyID,
 			Height:               "100",
 			Timestamp:            t,
 			ParentVoterSignature: dummySignature,
 		},
-		Payload: &models.BlockPayload{
-			CollectionGuarantees: []models.CollectionGuarantee{
+		Payload: &commonmodels.BlockPayload{
+			CollectionGuarantees: []commonmodels.CollectionGuarantee{
 				{
 					CollectionId:  "abcdef0123456789",
 					SignerIndices: fmt.Sprintf("%x", []byte{1}),
 					Signature:     dummySignature,
 				},
 			},
-			BlockSeals: []models.BlockSeal{
+			BlockSeals: []commonmodels.BlockSeal{
 				{
 					BlockId:    dummyID,
 					ResultId:   dummyID,
 					FinalState: "final",
-					AggregatedApprovalSignatures: []models.AggregatedSignature{
+					AggregatedApprovalSignatures: []commonmodels.AggregatedSignature{
 						{
 							VerifierSignatures: multipleDummySignatures,
 							SignerIds:          multipleDummySignatures,
@@ -163,10 +163,10 @@ func generateBlock() (models.Block, error) {
 				},
 			},
 		},
-		ExecutionResult: &models.ExecutionResult{
+		ExecutionResult: &commonmodels.ExecutionResult{
 			Id:      dummyID,
 			BlockId: dummyID,
-			Events: []models.Event{
+			Events: []commonmodels.Event{
 				{
 					Type_:            "type",
 					TransactionId:    dummyID,
@@ -182,7 +182,7 @@ func generateBlock() (models.Block, error) {
 					Payload:          "payload",
 				},
 			},
-			Links: &models.Links{
+			Links: &commonmodels.Links{
 				Self: "link",
 			},
 		},

@@ -521,13 +521,13 @@ func (bc *BaseChainSuite) ValidSubgraphFixture() subgraphFixture {
 	incorporatedResult := IncorporatedResult.Fixture(IncorporatedResult.WithResult(result))
 
 	// assign each chunk to 50% of validation Nodes and generate respective approvals
-	assignment := chunks.NewAssignment()
+	assignmentBuilder := chunks.NewAssignmentBuilder()
 	assignedVerifiersPerChunk := uint(len(bc.Approvers) / 2)
 	approvals := make(map[uint64]map[flow.Identifier]*flow.ResultApproval)
 	for _, chunk := range incorporatedResult.Result.Chunks {
 		assignedVerifiers, err := bc.Approvers.Sample(assignedVerifiersPerChunk)
 		require.NoError(bc.T(), err)
-		assignment.Add(chunk, assignedVerifiers.NodeIDs())
+		require.NoError(bc.T(), assignmentBuilder.Add(chunk.Index, assignedVerifiers.NodeIDs()))
 
 		// generate approvals
 		chunkApprovals := make(map[flow.Identifier]*flow.ResultApproval)
@@ -543,7 +543,7 @@ func (bc *BaseChainSuite) ValidSubgraphFixture() subgraphFixture {
 		Result:             result,
 		PreviousResult:     previousResult,
 		IncorporatedResult: incorporatedResult,
-		Assignment:         assignment,
+		Assignment:         assignmentBuilder.Build(),
 		Approvals:          approvals,
 	}
 }
@@ -561,13 +561,13 @@ func (bc *BaseChainSuite) Extend(block *flow.Block) {
 			IncorporatedResult.WithIncorporatedBlockID(blockID))
 
 		// assign each chunk to 50% of validation Nodes and generate respective approvals
-		assignment := chunks.NewAssignment()
+		assignmentBuilder := chunks.NewAssignmentBuilder()
 		assignedVerifiersPerChunk := uint(len(bc.Approvers) / 2)
 		approvals := make(map[uint64]map[flow.Identifier]*flow.ResultApproval)
 		for _, chunk := range incorporatedResult.Result.Chunks {
 			assignedVerifiers, err := bc.Approvers.Sample(assignedVerifiersPerChunk)
 			require.NoError(bc.T(), err)
-			assignment.Add(chunk, assignedVerifiers.NodeIDs())
+			require.NoError(bc.T(), assignmentBuilder.Add(chunk.Index, assignedVerifiers.NodeIDs()))
 
 			// generate approvals
 			chunkApprovals := make(map[flow.Identifier]*flow.ResultApproval)
@@ -576,6 +576,7 @@ func (bc *BaseChainSuite) Extend(block *flow.Block) {
 			}
 			approvals[chunk.Index] = chunkApprovals
 		}
+		assignment := assignmentBuilder.Build()
 		bc.Assigner.On("Assign", incorporatedResult.Result, incorporatedResult.IncorporatedBlockID).Return(assignment, nil).Maybe()
 		bc.Assignments[incorporatedResult.Result.ID()] = assignment
 		bc.PersistedResults[result.ID()] = result
