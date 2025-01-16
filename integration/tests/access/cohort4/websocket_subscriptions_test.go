@@ -207,6 +207,7 @@ func (s *WebsocketSubscriptionSuite) TestInactivityTracker() {
 
 		var response models.BaseMessageResponse
 		err = wsClient.ReadJSON(&response)
+		s.Require().NoError(err, "failed to read unsubscribe response")
 		s.validateBaseMessageResponse(unsubscribeRequest.SubscriptionID, response)
 
 		// Step 4: Monitor inactivity after unsubscription
