@@ -224,6 +224,26 @@ func (s *ReceiptValidationSuite) TestReceiptForBlockWith0Collections() {
 	})
 }
 
+// TestReceiptInconsistentChunkList tests that we reject receipts when the Start and End states
+// within the chunk list are inconsistent (e.g. chunk[0].EndState != chunk[1].StartState).
+func (s *ReceiptValidationSuite) TestReceiptInconsistentChunkList() {
+	s.publicKey.On("Verify", mock.Anything, mock.Anything, mock.Anything).Return(true, nil).Maybe()
+	valSubgrph := s.ValidSubgraphFixture()
+	chunks := valSubgrph.Result.Chunks
+	require.GreaterOrEqual(s.T(), chunks.Len(), 1)
+	// swap last chunk's start and end states
+	lastChunk := chunks[len(chunks)-1]
+	lastChunk.StartState, lastChunk.EndState = lastChunk.EndState, lastChunk.StartState
+
+	receipt := unittest.ExecutionReceiptFixture(unittest.WithExecutorID(s.ExeID),
+		unittest.WithResult(valSubgrph.Result))
+	s.AddSubgraphFixtureToMempools(valSubgrph)
+
+	err := s.receiptValidator.Validate(receipt)
+	s.Require().Error(err, "should reject with invalid chunks")
+	s.Assert().True(engine.IsInvalidInputError(err))
+}
+
 // TestReceiptTooManyChunks tests that we reject receipt with more chunks than expected
 func (s *ReceiptValidationSuite) TestReceiptTooManyChunks() {
 	valSubgrph := s.ValidSubgraphFixture()
