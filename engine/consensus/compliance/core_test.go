@@ -459,7 +459,7 @@ func (cs *CoreSuite) TestOnBlockProposal_FailsProtocolStateValidation() {
 		// make sure we fail to extend the state
 		*cs.state = protocol.ParticipantState{}
 		cs.state.On("Final").Return(func() protint.Snapshot { return cs.snapshot })
-		sentinelErr := state.NewInvalidExtensionError("")
+		sentinelErr := state.NewInvalidExtensionErrorf("")
 		cs.state.On("Extend", mock.Anything, mock.Anything).Return(sentinelErr)
 		cs.proposalViolationNotifier.On("OnInvalidBlockDetected", mock.Anything).Run(func(args mock.Arguments) {
 			err := args.Get(0).(flow.Slashable[model.InvalidProposalError])
@@ -489,7 +489,7 @@ func (cs *CoreSuite) TestOnBlockProposal_FailsProtocolStateValidation() {
 		// make sure we fail to extend the state
 		*cs.state = protocol.ParticipantState{}
 		cs.state.On("Final").Return(func() protint.Snapshot { return cs.snapshot })
-		cs.state.On("Extend", mock.Anything, mock.Anything).Return(state.NewOutdatedExtensionError(""))
+		cs.state.On("Extend", mock.Anything, mock.Anything).Return(state.NewOutdatedExtensionErrorf(""))
 
 		// the expected error should be handled within the Core
 		err := cs.core.OnBlockProposal(flow.Slashable[*messages.BlockProposal]{

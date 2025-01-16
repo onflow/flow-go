@@ -551,7 +551,7 @@ func (exeNode *ExecutionNode) LoadProviderEngine(
 		collector,
 		node.Tracer,
 		node.Me,
-		node.State,
+		computation.NewProtocolStateWrapper(node.State),
 		vmCtx,
 		ledgerViewCommitter,
 		executionDataProvider,
