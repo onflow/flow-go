@@ -65,7 +65,6 @@ const (
 	ContractStorageFeesFunction_calculateAccountCapacity                      = "calculateAccountCapacity"
 	ContractStorageFeesFunction_getAccountsCapacityForTransactionStorageCheck = "getAccountsCapacityForTransactionStorageCheck"
 	ContractStorageFeesFunction_defaultTokenAvailableBalance                  = "defaultTokenAvailableBalance"
-	ContractVersionBeacon_getCurrentVersionBoundary                           = "getCurrentVersionBoundary"
 
 	// These are the account indexes of system contracts as deployed by the default bootstrapping.
 	// On long-running networks some of these contracts might have been deployed after bootstrapping,

@@ -290,6 +290,8 @@ func ExecutionResultFixture(t *testing.T,
 		me.On("SignFunc", mock.Anything, mock.Anything, mock.Anything).
 			Return(nil, nil)
 
+		protocolState := testutil.ProtocolStateWithSourceFixture(source)
+
 		// create BlockComputer
 		bc, err := computer.NewBlockComputer(
 			vm,
@@ -301,7 +303,7 @@ func ExecutionResultFixture(t *testing.T,
 			me,
 			prov,
 			nil,
-			testutil.ProtocolStateWithSourceFixture(source),
+			protocolState,
 			testMaxConcurrency)
 		require.NoError(t, err)
 
