@@ -250,8 +250,8 @@ func (s *StakingVoteProcessorTestSuite) TestProcess_ConcurrentCreatingQC() {
 func TestStakingVoteProcessorV2_BuildVerifyQC(t *testing.T) {
 	epochCounter := uint64(3)
 	epochLookup := &modulemock.EpochLookup{}
-	view := uint64(20)
-	epochLookup.On("EpochForView", view).Return(epochCounter, nil)
+	proposerView := uint64(20)
+	epochLookup.On("EpochForView", proposerView).Return(epochCounter, nil)
 
 	// signers hold objects that are created with private key and can sign votes and proposals
 	signers := make(map[flow.Identifier]*verification.StakingSigner)
@@ -267,7 +267,7 @@ func TestStakingVoteProcessorV2_BuildVerifyQC(t *testing.T) {
 	}).Sort(flow.Canonical[flow.Identity])
 
 	leader := stakingSigners[0]
-	block := helper.MakeBlock(helper.WithBlockView(view), helper.WithBlockProposer(leader.NodeID))
+	block := helper.MakeBlock(helper.WithBlockView(proposerView), helper.WithBlockProposer(leader.NodeID))
 
 	committee := &mockhotstuff.DynamicCommittee{}
 	committee.On("IdentitiesByEpoch", block.View).Return(stakingSigners.ToSkeleton(), nil)
@@ -285,8 +285,10 @@ func TestStakingVoteProcessorV2_BuildVerifyQC(t *testing.T) {
 	}
 
 	// create and sign proposal
-	proposal, err := signers[leader.NodeID].CreateProposal(block)
+	leaderVote, err := signers[leader.NodeID].CreateVote(block)
 	require.NoError(t, err)
+	proposal := helper.MakeSignedProposal(helper.WithProposal(
+		helper.MakeProposal(helper.WithBlock(block))), helper.WithSigData(leaderVote.SigData))
 
 	qcCreated := false
 	onQCCreated := func(qc *flow.QuorumCertificate) {

@@ -8,14 +8,13 @@ import (
 	"net/http"
 	"sync"
 
-	"github.com/onflow/flow-go/module/state_synchronization"
-
 	"github.com/rs/zerolog"
 	"google.golang.org/grpc/credentials"
 
 	"github.com/onflow/flow-go/access"
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/engine/access/rest"
+	"github.com/onflow/flow-go/engine/access/rest/websockets"
 	"github.com/onflow/flow-go/engine/access/rpc/backend"
 	"github.com/onflow/flow-go/engine/access/state_stream"
 	statestreambackend "github.com/onflow/flow-go/engine/access/state_stream/backend"
@@ -25,6 +24,7 @@ import (
 	"github.com/onflow/flow-go/module/events"
 	"github.com/onflow/flow-go/module/grpcserver"
 	"github.com/onflow/flow-go/module/irrecoverable"
+	"github.com/onflow/flow-go/module/state_synchronization"
 	"github.com/onflow/flow-go/state/protocol"
 )
 
@@ -39,10 +39,11 @@ type Config struct {
 	CollectionAddr         string                           // the address of the upstream collection node
 	HistoricalAccessAddrs  string                           // the list of all access nodes from previous spork
 
-	BackendConfig  backend.Config // configurable options for creating Backend
-	RestConfig     rest.Config    // the REST server configuration
-	MaxMsgSize     uint           // GRPC max message size
-	CompressorName string         // GRPC compressor name
+	BackendConfig   backend.Config // configurable options for creating Backend
+	RestConfig      rest.Config    // the REST server configuration
+	MaxMsgSize      uint           // GRPC max message size
+	CompressorName  string         // GRPC compressor name
+	WebSocketConfig websockets.Config
 }
 
 // Engine exposes the server with a simplified version of the Access API.
@@ -76,7 +77,8 @@ type Engine struct {
 type Option func(*RPCEngineBuilder)
 
 // NewBuilder returns a new RPC engine builder.
-func NewBuilder(log zerolog.Logger,
+func NewBuilder(
+	log zerolog.Logger,
 	state protocol.State,
 	config Config,
 	chainID flow.ChainID,
@@ -241,8 +243,16 @@ func (e *Engine) serveREST(ctx irrecoverable.SignalerContext, ready component.Re
 
 	e.log.Info().Str("rest_api_address", e.config.RestConfig.ListenAddress).Msg("starting REST server on address")
 
-	r, err := rest.NewServer(e.restHandler, e.config.RestConfig, e.log, e.chain, e.restCollector, e.stateStreamBackend,
-		e.stateStreamConfig)
+	r, err := rest.NewServer(
+		e.restHandler,
+		e.config.RestConfig,
+		e.log,
+		e.chain,
+		e.restCollector,
+		e.stateStreamBackend,
+		e.stateStreamConfig,
+		e.config.WebSocketConfig,
+	)
 	if err != nil {
 		e.log.Err(err).Msg("failed to initialize the REST server")
 		ctx.Throw(err)

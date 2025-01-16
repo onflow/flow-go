@@ -10,6 +10,7 @@ import (
 	"github.com/onflow/flow-go/engine/execution"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/module/component"
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
 	"github.com/onflow/flow-go/module/mempool/entity"
 	"github.com/onflow/flow-go/storage"
@@ -34,6 +35,7 @@ type BadgerRetryableUploaderWrapper struct {
 	results            storage.ExecutionResults
 	transactionResults storage.TransactionResults
 	uploadStatusStore  storage.ComputationResultUploadStatus
+	component.Component
 }
 
 func NewBadgerRetryableUploaderWrapper(
@@ -99,15 +101,8 @@ func NewBadgerRetryableUploaderWrapper(
 		results:            results,
 		transactionResults: transactionResults,
 		uploadStatusStore:  uploadStatusStore,
+		Component:          uploader, // delegate to the AsyncUploader
 	}
-}
-
-func (b *BadgerRetryableUploaderWrapper) Ready() <-chan struct{} {
-	return b.uploader.Ready()
-}
-
-func (b *BadgerRetryableUploaderWrapper) Done() <-chan struct{} {
-	return b.uploader.Done()
 }
 
 func (b *BadgerRetryableUploaderWrapper) Upload(computationResult *execution.ComputationResult) error {

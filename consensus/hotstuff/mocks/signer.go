@@ -15,36 +15,6 @@ type Signer struct {
 	mock.Mock
 }
 
-// CreateProposal provides a mock function with given fields: block
-func (_m *Signer) CreateProposal(block *model.Block) (*model.Proposal, error) {
-	ret := _m.Called(block)
-
-	if len(ret) == 0 {
-		panic("no return value specified for CreateProposal")
-	}
-
-	var r0 *model.Proposal
-	var r1 error
-	if rf, ok := ret.Get(0).(func(*model.Block) (*model.Proposal, error)); ok {
-		return rf(block)
-	}
-	if rf, ok := ret.Get(0).(func(*model.Block) *model.Proposal); ok {
-		r0 = rf(block)
-	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*model.Proposal)
-		}
-	}
-
-	if rf, ok := ret.Get(1).(func(*model.Block) error); ok {
-		r1 = rf(block)
-	} else {
-		r1 = ret.Error(1)
-	}
-
-	return r0, r1
-}
-
 // CreateTimeout provides a mock function with given fields: curView, newestQC, lastViewTC
 func (_m *Signer) CreateTimeout(curView uint64, newestQC *flow.QuorumCertificate, lastViewTC *flow.TimeoutCertificate) (*model.TimeoutObject, error) {
 	ret := _m.Called(curView, newestQC, lastViewTC)

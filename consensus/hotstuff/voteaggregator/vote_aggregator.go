@@ -156,7 +156,7 @@ func (va *VoteAggregator) processQueuedMessages(ctx context.Context) error {
 
 		msg, ok := va.queuedBlocks.Pop()
 		if ok {
-			block := msg.(*model.Proposal)
+			block := msg.(*model.SignedProposal)
 			err := va.processQueuedBlock(block)
 			if err != nil {
 				return fmt.Errorf("could not process pending block %v: %w", block.Block.BlockID, err)
@@ -224,7 +224,7 @@ func (va *VoteAggregator) processQueuedVote(vote *model.Vote) error {
 // including the proposer's signature. Otherwise, VoteAggregator might crash or exhibit undefined
 // behaviour.
 // No errors are expected during normal operation.
-func (va *VoteAggregator) processQueuedBlock(block *model.Proposal) error {
+func (va *VoteAggregator) processQueuedBlock(block *model.SignedProposal) error {
 	// check if the block is for a view that has already been pruned (and is thus stale)
 	if block.Block.View < va.lowestRetainedView.Value() {
 		return nil
@@ -293,7 +293,7 @@ func (va *VoteAggregator) AddVote(vote *model.Vote) {
 // CAUTION: we expect that the input block's validity has been confirmed prior to calling AddBlock,
 // including the proposer's signature. Otherwise, VoteAggregator might crash or exhibit undefined
 // behaviour.
-func (va *VoteAggregator) AddBlock(block *model.Proposal) {
+func (va *VoteAggregator) AddBlock(block *model.SignedProposal) {
 	// It's ok to silently drop blocks in case our processing pipeline is full.
 	// It means that we are probably catching up.
 	if ok := va.queuedBlocks.Push(block); ok {
@@ -306,7 +306,7 @@ func (va *VoteAggregator) AddBlock(block *model.Proposal) {
 // InvalidBlock notifies the VoteAggregator about an invalid proposal, so that it
 // can process votes for the invalid block and slash the voters.
 // No errors are expected during normal operations
-func (va *VoteAggregator) InvalidBlock(proposal *model.Proposal) error {
+func (va *VoteAggregator) InvalidBlock(proposal *model.SignedProposal) error {
 	slashingVoteConsumer := func(vote *model.Vote) {
 		if proposal.Block.BlockID == vote.BlockID {
 			va.notifier.OnVoteForInvalidBlockDetected(vote, proposal)

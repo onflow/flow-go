@@ -60,7 +60,7 @@ func (_m *HotStuff) Start(_a0 irrecoverable.SignalerContext) {
 }
 
 // SubmitProposal provides a mock function with given fields: proposal
-func (_m *HotStuff) SubmitProposal(proposal *model.Proposal) {
+func (_m *HotStuff) SubmitProposal(proposal *model.SignedProposal) {
 	_m.Called(proposal)
 }
 

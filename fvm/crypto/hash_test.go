@@ -2,10 +2,9 @@ package crypto_test
 
 import (
 	"crypto/rand"
-	"testing"
-
 	"crypto/sha256"
 	"crypto/sha512"
+	"testing"
 
 	"github.com/onflow/crypto/hash"
 	"github.com/stretchr/testify/assert"

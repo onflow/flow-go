@@ -3,7 +3,7 @@ package state
 import (
 	"fmt"
 
-	"github.com/onflow/cadence/runtime/common"
+	"github.com/onflow/cadence/common"
 
 	"github.com/onflow/flow-go/fvm/meter"
 	"github.com/onflow/flow-go/fvm/storage/snapshot"
@@ -22,6 +22,7 @@ func (id NestedTransactionId) StateForTestingOnly() *ExecutionState {
 type Meter interface {
 	MeterComputation(kind common.ComputationKind, intensity uint) error
 	ComputationAvailable(kind common.ComputationKind, intensity uint) bool
+	ComputationRemaining(kind common.ComputationKind) uint
 	ComputationIntensities() meter.MeteredComputationIntensities
 	TotalComputationLimit() uint
 	TotalComputationUsed() uint64
@@ -43,6 +44,9 @@ type Meter interface {
 // common state management operations.
 type NestedTransactionPreparer interface {
 	Meter
+
+	// ExecutionParameters returns the execution parameters
+	ExecutionParameters() ExecutionParameters
 
 	// NumNestedTransactions returns the number of uncommitted nested
 	// transactions.  Note that the main transaction is not considered a
@@ -83,7 +87,7 @@ type NestedTransactionPreparer interface {
 	// the provided meter parameters. This returns error if the current nested
 	// transaction is program restricted.
 	BeginNestedTransactionWithMeterParams(
-		params meter.MeterParameters,
+		params ExecutionParameters,
 	) (
 		NestedTransactionId,
 		error,
@@ -199,6 +203,10 @@ func (txnState *transactionState) current() nestedTransactionStackFrame {
 	return txnState.nestedTransactions[txnState.NumNestedTransactions()]
 }
 
+func (txnState *transactionState) ExecutionParameters() ExecutionParameters {
+	return txnState.current().ExecutionParameters()
+}
+
 func (txnState *transactionState) NumNestedTransactions() int {
 	return len(txnState.nestedTransactions) - 1
 }
@@ -266,7 +274,7 @@ func (txnState *transactionState) BeginNestedTransaction() (
 }
 
 func (txnState *transactionState) BeginNestedTransactionWithMeterParams(
-	params meter.MeterParameters,
+	params ExecutionParameters,
 ) (
 	NestedTransactionId,
 	error,
@@ -449,6 +457,10 @@ func (txnState *transactionState) ComputationAvailable(
 	intensity uint,
 ) bool {
 	return txnState.current().ComputationAvailable(kind, intensity)
+}
+
+func (txnState *transactionState) ComputationRemaining(kind common.ComputationKind) uint {
+	return txnState.current().ComputationRemaining(kind)
 }
 
 func (txnState *transactionState) MeterMemory(

@@ -206,7 +206,7 @@ func (cs *CoreSuite) TestOnBlockProposalValidParent() {
 	// store the data for retrieval
 	cs.headerDB[block.Header.ParentID] = cs.head
 
-	hotstuffProposal := model.ProposalFromFlow(block.Header)
+	hotstuffProposal := model.SignedProposalFromFlow(block.Header)
 	cs.validator.On("ValidateProposal", hotstuffProposal).Return(nil)
 	cs.voteAggregator.On("AddBlock", hotstuffProposal).Once()
 	cs.hotstuff.On("SubmitProposal", hotstuffProposal)
@@ -232,7 +232,7 @@ func (cs *CoreSuite) TestOnBlockProposalValidAncestor() {
 	cs.headerDB[parent.ID()] = &parent
 	cs.headerDB[ancestor.ID()] = &ancestor
 
-	hotstuffProposal := model.ProposalFromFlow(block.Header)
+	hotstuffProposal := model.SignedProposalFromFlow(block.Header)
 	cs.validator.On("ValidateProposal", hotstuffProposal).Return(nil)
 	cs.voteAggregator.On("AddBlock", hotstuffProposal).Once()
 	cs.hotstuff.On("SubmitProposal", hotstuffProposal).Once()
@@ -280,7 +280,7 @@ func (cs *CoreSuite) TestOnBlockProposal_FailsHotStuffValidation() {
 	parent := unittest.ClusterBlockWithParent(&ancestor)
 	block := unittest.ClusterBlockWithParent(&parent)
 	proposal := messages.NewClusterBlockProposal(&block)
-	hotstuffProposal := model.ProposalFromFlow(block.Header)
+	hotstuffProposal := model.SignedProposalFromFlow(block.Header)
 
 	// store the data for retrieval
 	cs.headerDB[parent.ID()] = &parent
@@ -363,7 +363,7 @@ func (cs *CoreSuite) TestOnBlockProposal_FailsProtocolStateValidation() {
 	parent := unittest.ClusterBlockWithParent(&ancestor)
 	block := unittest.ClusterBlockWithParent(&parent)
 	proposal := messages.NewClusterBlockProposal(&block)
-	hotstuffProposal := model.ProposalFromFlow(block.Header)
+	hotstuffProposal := model.SignedProposalFromFlow(block.Header)
 
 	// store the data for retrieval
 	cs.headerDB[parent.ID()] = &parent
@@ -376,7 +376,7 @@ func (cs *CoreSuite) TestOnBlockProposal_FailsProtocolStateValidation() {
 		// make sure we fail to extend the state
 		*cs.state = clusterstate.MutableState{}
 		cs.state.On("Final").Return(func() clusterint.Snapshot { return cs.snapshot })
-		sentinelErr := state.NewInvalidExtensionError("")
+		sentinelErr := state.NewInvalidExtensionErrorf("")
 		cs.state.On("Extend", mock.Anything).Return(sentinelErr)
 		cs.proposalViolationNotifier.On("OnInvalidBlockDetected", mock.Anything).Run(func(args mock.Arguments) {
 			err := args.Get(0).(flow.Slashable[model.InvalidProposalError])
@@ -406,7 +406,7 @@ func (cs *CoreSuite) TestOnBlockProposal_FailsProtocolStateValidation() {
 		// make sure we fail to extend the state
 		*cs.state = clusterstate.MutableState{}
 		cs.state.On("Final").Return(func() clusterint.Snapshot { return cs.snapshot })
-		cs.state.On("Extend", mock.Anything).Return(state.NewOutdatedExtensionError(""))
+		cs.state.On("Extend", mock.Anything).Return(state.NewOutdatedExtensionErrorf(""))
 
 		// the expected error should be handled within the Core
 		err := cs.core.OnBlockProposal(flow.Slashable[*messages.ClusterBlockProposal]{
@@ -476,7 +476,7 @@ func (cs *CoreSuite) TestProcessBlockAndDescendants() {
 	cs.childrenDB[parentID] = append(cs.childrenDB[parentID], pending3)
 
 	for _, block := range []cluster.Block{parent, block1, block2, block3} {
-		hotstuffProposal := model.ProposalFromFlow(block.Header)
+		hotstuffProposal := model.SignedProposalFromFlow(block.Header)
 		cs.validator.On("ValidateProposal", hotstuffProposal).Return(nil)
 		cs.voteAggregator.On("AddBlock", hotstuffProposal).Once()
 		cs.hotstuff.On("SubmitProposal", hotstuffProposal).Once()
@@ -552,7 +552,7 @@ func (cs *CoreSuite) TestProposalBufferingOrder() {
 	}
 	cs.hotstuff.On("SubmitProposal", mock.Anything).Times(4).Run(
 		func(args mock.Arguments) {
-			header := args.Get(0).(*model.Proposal).Block
+			header := args.Get(0).(*model.SignedProposal).Block
 			assert.Equal(cs.T(), order[index], header.BlockID, "should submit correct header to hotstuff")
 			index++
 			cs.headerDB[header.BlockID] = proposalsLookup[header.BlockID]

@@ -21,6 +21,7 @@ import (
 	"github.com/onflow/flow-go/engine/access/index"
 	access "github.com/onflow/flow-go/engine/access/mock"
 	connectionmock "github.com/onflow/flow-go/engine/access/rpc/connection/mock"
+	commonrpc "github.com/onflow/flow-go/engine/common/rpc"
 	"github.com/onflow/flow-go/engine/common/rpc/convert"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/irrecoverable"
@@ -30,6 +31,7 @@ import (
 	storagemock "github.com/onflow/flow-go/storage/mock"
 	"github.com/onflow/flow-go/utils/unittest"
 	"github.com/onflow/flow-go/utils/unittest/generator"
+	"github.com/onflow/flow-go/utils/unittest/mocks"
 )
 
 var targetEvent string
@@ -175,16 +177,22 @@ func (s *BackendEventsSuite) SetupTest() {
 
 func (s *BackendEventsSuite) defaultBackend() *backendEvents {
 	return &backendEvents{
-		log:               s.log,
-		chain:             s.chainID.Chain(),
-		state:             s.state,
-		headers:           s.headers,
-		executionReceipts: s.receipts,
-		connFactory:       s.connectionFactory,
-		nodeCommunicator:  NewNodeCommunicator(false),
-		maxHeightRange:    DefaultMaxHeightRange,
-		queryMode:         IndexQueryModeExecutionNodesOnly,
-		eventsIndex:       s.eventsIndex,
+		log:              s.log,
+		chain:            s.chainID.Chain(),
+		state:            s.state,
+		headers:          s.headers,
+		connFactory:      s.connectionFactory,
+		nodeCommunicator: NewNodeCommunicator(false),
+		maxHeightRange:   DefaultMaxHeightRange,
+		queryMode:        IndexQueryModeExecutionNodesOnly,
+		eventsIndex:      s.eventsIndex,
+		execNodeIdentitiesProvider: commonrpc.NewExecutionNodeIdentitiesProvider(
+			s.log,
+			s.state,
+			s.receipts,
+			flow.IdentifierList{},
+			flow.IdentifierList{},
+		),
 	}
 }
 
@@ -202,7 +210,7 @@ func (s *BackendEventsSuite) setupExecutionNodes(block *flow.Block) {
 	s.receipts.On("ByBlockID", block.ID()).Return(receipts, nil)
 
 	s.connectionFactory.On("GetExecutionAPIClient", mock.Anything).
-		Return(s.execClient, &mockCloser{}, nil)
+		Return(s.execClient, &mocks.MockCloser{}, nil)
 }
 
 // setupENSuccessResponse configures the execution node client to return a successful response
@@ -429,6 +437,39 @@ func (s *BackendEventsSuite) TestGetEventsForHeightRange_HandlesErrors() {
 
 		response, err := backend.GetEventsForHeightRange(ctx, targetEvent, startHeight, endHeight, encoding)
 		s.Assert().Equal(codes.OutOfRange, status.Code(err))
+		s.Assert().Nil(response)
+	})
+
+	s.state.On("Params").Return(s.params)
+
+	s.Run("returns error for startHeight < spork root height", func() {
+		backend := s.defaultBackend()
+
+		sporkRootHeight := s.blocks[0].Header.Height - 10
+		startHeight := sporkRootHeight - 1
+
+		s.params.On("SporkRootBlockHeight").Return(sporkRootHeight).Once()
+		s.params.On("SealedRoot").Return(s.rootHeader, nil).Once()
+
+		response, err := backend.GetEventsForHeightRange(ctx, targetEvent, startHeight, endHeight, encoding)
+		s.Assert().Equal(codes.NotFound, status.Code(err))
+		s.Assert().ErrorContains(err, "Try to use a historic node")
+		s.Assert().Nil(response)
+	})
+
+	s.Run("returns error for startHeight < node root height", func() {
+		backend := s.defaultBackend()
+
+		sporkRootHeight := s.blocks[0].Header.Height - 10
+		nodeRootHeader := unittest.BlockHeaderWithHeight(s.blocks[0].Header.Height)
+		startHeight := nodeRootHeader.Height - 5
+
+		s.params.On("SporkRootBlockHeight").Return(sporkRootHeight).Once()
+		s.params.On("SealedRoot").Return(nodeRootHeader, nil).Once()
+
+		response, err := backend.GetEventsForHeightRange(ctx, targetEvent, startHeight, endHeight, encoding)
+		s.Assert().Equal(codes.NotFound, status.Code(err))
+		s.Assert().ErrorContains(err, "Try to use a different Access node")
 		s.Assert().Nil(response)
 	})
 }

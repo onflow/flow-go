@@ -145,8 +145,13 @@ func rootBlock(cmd *cobra.Command, args []string) {
 		log.Fatal().Err(err).Msg("invalid epoch timing config")
 	}
 
+	// Read partner node's information and internal node's information.
+	// With "internal nodes" we reference nodes, whose private keys we have. In comparison,
+	// for "partner nodes" we generally do not have their keys. However, we allow some overlap,
+	// in that we tolerate a configuration where information about an "internal node" is also
+	// duplicated in the list of "partner nodes".
 	log.Info().Msg("collecting partner network and staking keys")
-	partnerNodes, err := common.ReadFullPartnerNodeInfos(log, flagPartnerWeights, flagPartnerNodeInfoDir)
+	rawPartnerNodes, err := common.ReadFullPartnerNodeInfos(log, flagPartnerWeights, flagPartnerNodeInfoDir)
 	if err != nil {
 		log.Fatal().Err(err).Msg("failed to read full partner node infos")
 	}
@@ -160,12 +165,23 @@ func rootBlock(cmd *cobra.Command, args []string) {
 
 	log.Info().Msg("")
 
+	// we now convert to the strict meaning of: "internal nodes" vs "partner nodes"
+	//  • "internal nodes" we have they private keys for
+	//  • "partner nodes" we don't have the keys for
+	//  • both sets are disjoint (no common nodes)
+	log.Info().Msg("remove internal partner nodes")
+	partnerNodes := common.FilterInternalPartners(rawPartnerNodes, internalNodes)
+	log.Info().Msgf("removed %d internal partner nodes", len(rawPartnerNodes)-len(partnerNodes))
+
 	log.Info().Msg("checking constraints on consensus nodes")
 	checkConstraints(partnerNodes, internalNodes)
 	log.Info().Msg("")
 
 	log.Info().Msg("assembling network and staking keys")
-	stakingNodes := mergeNodeInfos(internalNodes, partnerNodes)
+	stakingNodes, err := mergeNodeInfos(internalNodes, partnerNodes)
+	if err != nil {
+		log.Fatal().Err(err).Msgf("failed to merge node infos")
+	}
 	err = common.WriteJSON(model.PathNodeInfosPub, flagOutdir, model.ToPublicNodeInfoList(stakingNodes))
 	if err != nil {
 		log.Fatal().Err(err).Msg("failed to write json")

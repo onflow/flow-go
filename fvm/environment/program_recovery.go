@@ -3,9 +3,9 @@ package environment
 import (
 	"fmt"
 
-	"github.com/onflow/cadence/runtime/ast"
-	"github.com/onflow/cadence/runtime/common"
-	"github.com/onflow/cadence/runtime/sema"
+	"github.com/onflow/cadence/ast"
+	"github.com/onflow/cadence/common"
+	"github.com/onflow/cadence/sema"
 
 	"github.com/onflow/flow-go/fvm/systemcontracts"
 	"github.com/onflow/flow-go/model/flow"
@@ -199,6 +199,11 @@ func RecoveredNonFungibleTokenCode(nonFungibleTokenAddress common.Address, contr
                   access(all)
                   fun deposit(token: @{NonFungibleToken.NFT}) {
                       %[2]s.recoveryPanic("Collection.deposit")
+                  }
+
+                  access(all)
+                  view fun getIDs(): [UInt64] {
+                      return self.ownedNFTs.keys
                   }
 
                   access(all)

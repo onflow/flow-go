@@ -11,7 +11,6 @@ import (
 	"golang.org/x/sync/errgroup"
 
 	migrators "github.com/onflow/flow-go/cmd/util/ledger/migrations"
-	"github.com/onflow/flow-go/cmd/util/ledger/reporters"
 	"github.com/onflow/flow-go/cmd/util/ledger/util"
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/ledger/common/hash"
@@ -356,41 +355,4 @@ func createTrieFromPayloads(logger zerolog.Logger, payloads []*ledger.Payload) (
 	}
 
 	return newTrie, nil
-}
-
-func newMigrations(
-	log zerolog.Logger,
-	outputDir string,
-	opts migrators.Options,
-) []migrators.NamedMigration {
-
-	log.Info().Msg("initializing migrations")
-
-	rwf := reporters.NewReportFileWriterFactory(outputDir, log)
-
-	namedMigrations := migrators.NewCadence1Migrations(
-		log,
-		outputDir,
-		rwf,
-		opts,
-	)
-
-	// At the end, fix up storage-used discrepancies
-	namedMigrations = append(
-		namedMigrations,
-		migrators.NamedMigration{
-			Name: "account-usage-migration",
-			Migrate: migrators.NewAccountBasedMigration(
-				log,
-				opts.NWorker,
-				[]migrators.AccountBasedMigration{
-					migrators.NewAccountUsageMigration(rwf),
-				},
-			),
-		},
-	)
-
-	log.Info().Msg("initialized migrations")
-
-	return namedMigrations
 }
