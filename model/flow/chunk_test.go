@@ -187,7 +187,7 @@ func TestChunkEncodeDecode(t *testing.T) {
 			bz, err := cborcodec.EncMode.Marshal(chunk)
 			require.NoError(t, err)
 			unmarshaled := new(flow.Chunk)
-			err = cborcodec.DecMode.Unmarshal(bz, unmarshaled)
+			err = cborcodec.UnsafeDecMode.Unmarshal(bz, unmarshaled)
 			require.NoError(t, err)
 			assert.Equal(t, chunk, unmarshaled)
 			assert.Nil(t, unmarshaled.ServiceEventCount)
@@ -196,7 +196,7 @@ func TestChunkEncodeDecode(t *testing.T) {
 			bz, err := cborcodec.EncMode.Marshal(chunk)
 			require.NoError(t, err)
 			unmarshaled := new(flow.Chunk)
-			err = cborcodec.NetworkDecMode.Unmarshal(bz, unmarshaled)
+			err = cborcodec.DefaultDecMode.Unmarshal(bz, unmarshaled)
 			require.NoError(t, err)
 			assert.Equal(t, chunk, unmarshaled)
 			assert.Nil(t, unmarshaled.ServiceEventCount)
@@ -217,7 +217,7 @@ func TestChunkEncodeDecode(t *testing.T) {
 			bz, err := cborcodec.EncMode.Marshal(chunk)
 			require.NoError(t, err)
 			unmarshaled := new(flow.Chunk)
-			err = cborcodec.DecMode.Unmarshal(bz, unmarshaled)
+			err = cborcodec.UnsafeDecMode.Unmarshal(bz, unmarshaled)
 			require.NoError(t, err)
 			assert.Equal(t, chunk, unmarshaled)
 			assert.NotNil(t, unmarshaled.ServiceEventCount)
@@ -226,7 +226,7 @@ func TestChunkEncodeDecode(t *testing.T) {
 			bz, err := cborcodec.EncMode.Marshal(chunk)
 			require.NoError(t, err)
 			unmarshaled := new(flow.Chunk)
-			err = cborcodec.NetworkDecMode.Unmarshal(bz, unmarshaled)
+			err = cborcodec.DefaultDecMode.Unmarshal(bz, unmarshaled)
 			require.NoError(t, err)
 			assert.Equal(t, chunk, unmarshaled)
 			assert.NotNil(t, unmarshaled.ServiceEventCount)
@@ -261,7 +261,7 @@ func TestChunk_ModelVersions_EncodeDecode(t *testing.T) {
 			require.NoError(t, err)
 
 			var unmarshaled flow.ChunkBody
-			err = cborcodec.DecMode.Unmarshal(bz, &unmarshaled)
+			err = cborcodec.UnsafeDecMode.Unmarshal(bz, &unmarshaled)
 			require.NoError(t, err)
 			assert.Equal(t, chunkv0.EventCollection, unmarshaled.EventCollection)
 			assert.Equal(t, chunkv0.BlockID, unmarshaled.BlockID)
@@ -273,7 +273,7 @@ func TestChunk_ModelVersions_EncodeDecode(t *testing.T) {
 			require.NoError(t, err)
 
 			var unmarshaled flow.ChunkBody
-			err = cborcodec.NetworkDecMode.Unmarshal(bz, &unmarshaled)
+			err = cborcodec.DefaultDecMode.Unmarshal(bz, &unmarshaled)
 			require.NoError(t, err)
 			assert.Equal(t, chunkv0.EventCollection, unmarshaled.EventCollection)
 			assert.Equal(t, chunkv0.BlockID, unmarshaled.BlockID)
@@ -300,7 +300,7 @@ func TestChunk_ModelVersions_EncodeDecode(t *testing.T) {
 				require.NoError(t, err)
 
 				var unmarshaled flow.ChunkBodyV0
-				err = cborcodec.DecMode.Unmarshal(bz, &unmarshaled)
+				err = cborcodec.UnsafeDecMode.Unmarshal(bz, &unmarshaled)
 				require.NoError(t, err)
 				assert.Equal(t, chunkv1.EventCollection, unmarshaled.EventCollection)
 				assert.Equal(t, chunkv1.BlockID, unmarshaled.BlockID)
@@ -313,7 +313,7 @@ func TestChunk_ModelVersions_EncodeDecode(t *testing.T) {
 				require.NoError(t, err)
 
 				var unmarshaled flow.ChunkBodyV0
-				err = cborcodec.NetworkDecMode.Unmarshal(bz, &unmarshaled)
+				err = cborcodec.DefaultDecMode.Unmarshal(bz, &unmarshaled)
 				assert.Error(t, err)
 				target := &cbor.UnknownFieldError{}
 				assert.ErrorAs(t, err, &target)
@@ -338,7 +338,7 @@ func TestChunk_ModelVersions_EncodeDecode(t *testing.T) {
 				require.NoError(t, err)
 
 				var unmarshaled flow.ChunkBodyV0
-				err = cborcodec.DecMode.Unmarshal(bz, &unmarshaled)
+				err = cborcodec.UnsafeDecMode.Unmarshal(bz, &unmarshaled)
 				require.NoError(t, err)
 				assert.Equal(t, chunkv1.EventCollection, unmarshaled.EventCollection)
 				assert.Equal(t, chunkv1.BlockID, unmarshaled.BlockID)
@@ -350,7 +350,7 @@ func TestChunk_ModelVersions_EncodeDecode(t *testing.T) {
 				require.NoError(t, err)
 
 				var unmarshaled flow.ChunkBodyV0
-				err = cborcodec.NetworkDecMode.Unmarshal(bz, &unmarshaled)
+				err = cborcodec.DefaultDecMode.Unmarshal(bz, &unmarshaled)
 				require.NoError(t, err)
 				assert.Equal(t, chunkv1.EventCollection, unmarshaled.EventCollection)
 				assert.Equal(t, chunkv1.BlockID, unmarshaled.BlockID)
