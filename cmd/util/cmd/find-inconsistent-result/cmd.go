@@ -11,7 +11,8 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/storage"
-	"github.com/onflow/flow-go/storage/badger/procedure"
+	"github.com/onflow/flow-go/storage/operation"
+	"github.com/onflow/flow-go/storage/operation/badgerimpl"
 )
 
 var NoMissmatchFoundError = errors.New("No missmatch found")
@@ -179,15 +180,20 @@ func findLastExecutedAndSealedHeight(state protocol.State, db *badger.DB) (uint6
 	}
 
 	var blockID flow.Identifier
-	var lastExecuted uint64
-	err = db.View(procedure.GetLastExecutedBlock(&lastExecuted, &blockID))
+	reader := badgerimpl.ToDB(db).Reader()
+	err = operation.RetrieveExecutedBlock(reader, &blockID)
 	if err != nil {
-		return 0, err
+		return 0, fmt.Errorf("could not lookup executed block %v: %w", blockID, err)
+	}
+
+	lastExecuted, err := state.AtBlockID(blockID).Head()
+	if err != nil {
+		return 0, fmt.Errorf("could not retrieve executed header %v: %w", blockID, err)
 	}
 
 	// the last sealed executed is min(last_sealed, last_executed)
-	if lastExecuted < lastSealed.Height {
-		return lastExecuted, nil
+	if lastExecuted.Height < lastSealed.Height {
+		return lastExecuted.Height, nil
 	}
 	return lastSealed.Height, nil
 }

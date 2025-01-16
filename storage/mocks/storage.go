@@ -515,7 +515,7 @@ func (m *MockEvents) EXPECT() *MockEventsMockRecorder {
 }
 
 // BatchRemoveByBlockID mocks base method.
-func (m *MockEvents) BatchRemoveByBlockID(arg0 flow.Identifier, arg1 storage.BatchStorage) error {
+func (m *MockEvents) BatchRemoveByBlockID(arg0 flow.Identifier, arg1 storage.ReaderBatchWriter) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "BatchRemoveByBlockID", arg0, arg1)
 	ret0, _ := ret[0].(error)
@@ -529,7 +529,7 @@ func (mr *MockEventsMockRecorder) BatchRemoveByBlockID(arg0, arg1 interface{}) *
 }
 
 // BatchStore mocks base method.
-func (m *MockEvents) BatchStore(arg0 flow.Identifier, arg1 []flow.EventsList, arg2 storage.BatchStorage) error {
+func (m *MockEvents) BatchStore(arg0 flow.Identifier, arg1 []flow.EventsList, arg2 storage.ReaderBatchWriter) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "BatchStore", arg0, arg1, arg2)
 	ret0, _ := ret[0].(error)
@@ -640,7 +640,7 @@ func (m *MockServiceEvents) EXPECT() *MockServiceEventsMockRecorder {
 }
 
 // BatchRemoveByBlockID mocks base method.
-func (m *MockServiceEvents) BatchRemoveByBlockID(arg0 flow.Identifier, arg1 storage.BatchStorage) error {
+func (m *MockServiceEvents) BatchRemoveByBlockID(arg0 flow.Identifier, arg1 storage.ReaderBatchWriter) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "BatchRemoveByBlockID", arg0, arg1)
 	ret0, _ := ret[0].(error)
@@ -654,7 +654,7 @@ func (mr *MockServiceEventsMockRecorder) BatchRemoveByBlockID(arg0, arg1 interfa
 }
 
 // BatchStore mocks base method.
-func (m *MockServiceEvents) BatchStore(arg0 flow.Identifier, arg1 []flow.Event, arg2 storage.BatchStorage) error {
+func (m *MockServiceEvents) BatchStore(arg0 flow.Identifier, arg1 []flow.Event, arg2 storage.ReaderBatchWriter) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "BatchStore", arg0, arg1, arg2)
 	ret0, _ := ret[0].(error)
@@ -706,7 +706,7 @@ func (m *MockTransactionResults) EXPECT() *MockTransactionResultsMockRecorder {
 }
 
 // BatchStore mocks base method.
-func (m *MockTransactionResults) BatchStore(arg0 flow.Identifier, arg1 []flow.TransactionResult, arg2 storage.BatchStorage) error {
+func (m *MockTransactionResults) BatchStore(arg0 flow.Identifier, arg1 []flow.TransactionResult, arg2 storage.ReaderBatchWriter) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "BatchStore", arg0, arg1, arg2)
 	ret0, _ := ret[0].(error)

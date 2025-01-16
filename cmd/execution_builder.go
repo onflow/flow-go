@@ -91,7 +91,8 @@ import (
 	"github.com/onflow/flow-go/state/protocol/blocktimer"
 	storageerr "github.com/onflow/flow-go/storage"
 	storage "github.com/onflow/flow-go/storage/badger"
-	"github.com/onflow/flow-go/storage/badger/procedure"
+	"github.com/onflow/flow-go/storage/operation"
+	"github.com/onflow/flow-go/storage/operation/badgerimpl"
 	"github.com/onflow/flow-go/storage/operation/pebbleimpl"
 	storagepebble "github.com/onflow/flow-go/storage/pebble"
 	"github.com/onflow/flow-go/storage/store"
@@ -279,9 +280,9 @@ func (exeNode *ExecutionNode) LoadExecutionMetrics(node *NodeConfig) error {
 	// report the highest executed block height as soon as possible
 	// this is guaranteed to exist because LoadBootstrapper has inserted
 	// the root block as executed block
-	var height uint64
 	var blockID flow.Identifier
-	err := node.DB.View(procedure.GetLastExecutedBlock(&height, &blockID))
+	reader := badgerimpl.ToDB(node.DB).Reader()
+	err := operation.RetrieveExecutedBlock(reader, &blockID)
 	if err != nil {
 		// database has not been bootstrapped yet
 		if errors.Is(err, storageerr.ErrNotFound) {
@@ -290,7 +291,12 @@ func (exeNode *ExecutionNode) LoadExecutionMetrics(node *NodeConfig) error {
 		return fmt.Errorf("could not get highest executed block: %w", err)
 	}
 
-	exeNode.collector.ExecutionLastExecutedBlockHeight(height)
+	executed, err := node.Storage.Headers.ByBlockID(blockID)
+	if err != nil {
+		return fmt.Errorf("could not get header by id: %v: %w", blockID, err)
+	}
+
+	exeNode.collector.ExecutionLastExecutedBlockHeight(executed.Height)
 	return nil
 }
 
