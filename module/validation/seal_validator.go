@@ -131,7 +131,7 @@ func (s *sealValidator) Validate(candidate *flow.Block) (*flow.Seal, error) {
 		byBlock[seal.BlockID] = seal
 	}
 	if len(payload.Seals) != len(byBlock) {
-		return nil, engine.NewInvalidInputError("multiple seals for the same block")
+		return nil, engine.NewInvalidInputErrorf("multiple seals for the same block")
 	}
 
 	// incorporatedResults collects execution results that are incorporated in unsealed
