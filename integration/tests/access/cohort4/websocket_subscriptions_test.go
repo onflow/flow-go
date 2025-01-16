@@ -141,9 +141,9 @@ func (s *WebsocketSubscriptionSuite) SetupTest() {
 	}, 30*time.Second, 1*time.Second)
 }
 
-// TestInactivityHeaders tests that the WebSocket connection closes due to inactivity
+// TestInactivityTracker tests that the WebSocket connection closes due to inactivity
 // after the specified timeout duration.
-func (s *WebsocketSubscriptionSuite) TestInactivityHeaders() {
+func (s *WebsocketSubscriptionSuite) TestInactivityTracker() {
 	// Steps:
 	// 1. Establish a WebSocket connection to the server.
 	// 2. Start a goroutine to listen for messages from the server.
@@ -207,7 +207,7 @@ func (s *WebsocketSubscriptionSuite) TestInactivityHeaders() {
 		s.validateBaseMessageResponse(unsubscribeRequest.SubscriptionID, response)
 
 		// Step 4: Monitor inactivity after unsubscription
-		expectedInactivityDuration := InactivityTimeout * time.Second // TODO: use inactivity ticker duration instead of 1 Second
+		expectedInactivityDuration := InactivityTimeout * time.Second // TODO: use InactivityTimeout + inactivityTickerPeriod() (1/10 InactivityTimeout) from Illia PR
 		actualInactivityDuration := monitorInactivity(s.T(), wsClient, expectedInactivityDuration)
 
 		s.LessOrEqual(expectedInactivityDuration, actualInactivityDuration)
@@ -402,7 +402,7 @@ func (s *WebsocketSubscriptionSuite) TestListOfSubscriptions() {
 		{
 			SubscriptionID: blockHeadersSubscriptionID,
 			Topic:          data_providers.BlockHeadersTopic,
-			Arguments:      blocksSubscriptionArguments,
+			Arguments:      blockHeadersSubscriptionArguments,
 		},
 	}
 	s.Require().Equal(expectedSubscriptions, listOfSubscriptionResponse.Subscriptions)
@@ -699,7 +699,7 @@ func (s *WebsocketSubscriptionSuite) validateEvents(
 	receivedResponses []models.BaseDataProvidersResponse,
 ) {
 	// make sure there are received events
-	s.Require().GreaterOrEqual(len(receivedResponses), 1, "expect received events")
+	s.Require().NotEmpty(receivedResponses, "expect received events")
 
 	expectedCounter := uint64(0)
 	for _, receivedEventResponse := range receivedResponses {
