@@ -1,6 +1,7 @@
 package matching
 
 import (
+	"context"
 	"sync"
 	"testing"
 	"time"
@@ -13,6 +14,7 @@ import (
 	"github.com/onflow/flow-go/engine"
 	mockconsensus "github.com/onflow/flow-go/engine/consensus/mock"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/metrics"
 	mockmodule "github.com/onflow/flow-go/module/mock"
 	"github.com/onflow/flow-go/network/channels"
@@ -57,6 +59,8 @@ func (s *MatchingEngineSuite) SetupTest() {
 	s.engine, err = NewEngine(unittest.Logger(), net, me, metrics, metrics, s.state, s.receipts, s.index, s.core)
 	require.NoError(s.T(), err)
 
+	ctx := irrecoverable.NewMockSignalerContext(s.T(), context.Background())
+	s.engine.Start(ctx)
 	<-s.engine.Ready()
 }
 

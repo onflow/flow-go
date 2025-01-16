@@ -11,6 +11,8 @@ import (
 	sealing "github.com/onflow/flow-go/engine/consensus"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/module/component"
+	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/channels"
@@ -27,7 +29,8 @@ const defaultIncorporatedBlockQueueCapacity = 10
 // Engine is a wrapper struct for `Core` which implements consensus algorithm.
 // Engine is responsible for handling incoming messages, queueing for processing, broadcasting proposals.
 type Engine struct {
-	unit                       *engine.Unit
+	component.Component
+	cm                         *component.ComponentManager
 	log                        zerolog.Logger
 	me                         module.Local
 	core                       sealing.MatchingCore
@@ -69,7 +72,6 @@ func NewEngine(
 
 	e := &Engine{
 		log:                        log.With().Str("engine", "matching.Engine").Logger(),
-		unit:                       engine.NewUnit(),
 		me:                         me,
 		core:                       core,
 		state:                      state,
@@ -89,23 +91,14 @@ func NewEngine(
 		return nil, fmt.Errorf("could not register for results: %w", err)
 	}
 
+	e.cm = component.NewComponentManagerBuilder().
+		AddWorker(e.inboundEventsProcessingLoop).
+		AddWorker(e.finalizationProcessingLoop).
+		AddWorker(e.blockIncorporatedEventsProcessingLoop).
+		Build()
+	e.Component = e.cm
+
 	return e, nil
-}
-
-// Ready returns a ready channel that is closed once the engine has fully
-// started. For consensus engine, this is true once the underlying consensus
-// algorithm has started.
-func (e *Engine) Ready() <-chan struct{} {
-	e.unit.Launch(e.inboundEventsProcessingLoop)
-	e.unit.Launch(e.finalizationProcessingLoop)
-	e.unit.Launch(e.blockIncorporatedEventsProcessingLoop)
-	return e.unit.Ready()
-}
-
-// Done returns a done channel that is closed once the engine has fully stopped.
-// For the consensus engine, we wait for hotstuff to finish.
-func (e *Engine) Done() <-chan struct{} {
-	return e.unit.Done()
 }
 
 // SubmitLocal submits an event originating on the local node.
@@ -206,11 +199,12 @@ func (e *Engine) processIncorporatedBlock(blockID flow.Identifier) error {
 }
 
 // finalizationProcessingLoop is a separate goroutine that performs processing of finalization events
-func (e *Engine) finalizationProcessingLoop() {
+func (e *Engine) finalizationProcessingLoop(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
 	finalizationNotifier := e.finalizationEventsNotifier.Channel()
+	ready()
 	for {
 		select {
-		case <-e.unit.Quit():
+		case <-ctx.Done():
 			return
 		case <-finalizationNotifier:
 			err := e.core.OnBlockFinalization()
@@ -222,15 +216,15 @@ func (e *Engine) finalizationProcessingLoop() {
 }
 
 // blockIncorporatedEventsProcessingLoop is a separate goroutine for processing block incorporated events.
-func (e *Engine) blockIncorporatedEventsProcessingLoop() {
+func (e *Engine) blockIncorporatedEventsProcessingLoop(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
 	c := e.blockIncorporatedNotifier.Channel()
-
+	ready()
 	for {
 		select {
-		case <-e.unit.Quit():
+		case <-ctx.Done():
 			return
 		case <-c:
-			err := e.processBlockIncorporatedEvents()
+			err := e.processBlockIncorporatedEvents(ctx)
 			if err != nil {
 				e.log.Fatal().Err(err).Msg("internal error processing block incorporated queued message")
 			}
@@ -238,15 +232,15 @@ func (e *Engine) blockIncorporatedEventsProcessingLoop() {
 	}
 }
 
-func (e *Engine) inboundEventsProcessingLoop() {
+func (e *Engine) inboundEventsProcessingLoop(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
 	c := e.inboundEventsNotifier.Channel()
-
+	ready()
 	for {
 		select {
-		case <-e.unit.Quit():
+		case <-ctx.Done():
 			return
 		case <-c:
-			err := e.processAvailableEvents()
+			err := e.processAvailableEvents(ctx)
 			if err != nil {
 				e.log.Fatal().Err(err).Msg("internal error processing queued message")
 			}
@@ -256,10 +250,10 @@ func (e *Engine) inboundEventsProcessingLoop() {
 
 // processBlockIncorporatedEvents performs processing of block incorporated hot stuff events.
 // No errors expected during normal operations.
-func (e *Engine) processBlockIncorporatedEvents() error {
+func (e *Engine) processBlockIncorporatedEvents(ctx irrecoverable.SignalerContext) error {
 	for {
 		select {
-		case <-e.unit.Quit():
+		case <-ctx.Done():
 			return nil
 		default:
 		}
@@ -282,10 +276,10 @@ func (e *Engine) processBlockIncorporatedEvents() error {
 // processAvailableEvents processes _all_ available events (untrusted messages
 // from other nodes as well as internally trusted.
 // No errors expected during normal operations.
-func (e *Engine) processAvailableEvents() error {
+func (e *Engine) processAvailableEvents(ctx irrecoverable.SignalerContext) error {
 	for {
 		select {
-		case <-e.unit.Quit():
+		case <-ctx.Done():
 			return nil
 		default:
 		}
