@@ -102,7 +102,7 @@ func (h *Handler) SubscribeExecutionData(request *executiondata.SubscribeExecuti
 
 	sub := h.api.SubscribeExecutionData(stream.Context(), startBlockID, request.GetStartBlockHeight())
 
-	return subscription.HandleSubscription(sub, handleSubscribeExecutionData(stream.Send, request.GetEventEncodingVersion()))
+	return subscription.HandleRPCSubscription(sub, handleSubscribeExecutionData(stream.Send, request.GetEventEncodingVersion()))
 }
 
 // SubscribeExecutionDataFromStartBlockID handles subscription requests for
@@ -129,7 +129,7 @@ func (h *Handler) SubscribeExecutionDataFromStartBlockID(request *executiondata.
 
 	sub := h.api.SubscribeExecutionDataFromStartBlockID(stream.Context(), startBlockID)
 
-	return subscription.HandleSubscription(sub, handleSubscribeExecutionData(stream.Send, request.GetEventEncodingVersion()))
+	return subscription.HandleRPCSubscription(sub, handleSubscribeExecutionData(stream.Send, request.GetEventEncodingVersion()))
 }
 
 // SubscribeExecutionDataFromStartBlockHeight handles subscription requests for
@@ -150,7 +150,7 @@ func (h *Handler) SubscribeExecutionDataFromStartBlockHeight(request *executiond
 
 	sub := h.api.SubscribeExecutionDataFromStartBlockHeight(stream.Context(), request.GetStartBlockHeight())
 
-	return subscription.HandleSubscription(sub, handleSubscribeExecutionData(stream.Send, request.GetEventEncodingVersion()))
+	return subscription.HandleRPCSubscription(sub, handleSubscribeExecutionData(stream.Send, request.GetEventEncodingVersion()))
 }
 
 // SubscribeExecutionDataFromLatest handles subscription requests for
@@ -171,7 +171,7 @@ func (h *Handler) SubscribeExecutionDataFromLatest(request *executiondata.Subscr
 
 	sub := h.api.SubscribeExecutionDataFromLatest(stream.Context())
 
-	return subscription.HandleSubscription(sub, handleSubscribeExecutionData(stream.Send, request.GetEventEncodingVersion()))
+	return subscription.HandleRPCSubscription(sub, handleSubscribeExecutionData(stream.Send, request.GetEventEncodingVersion()))
 }
 
 // SubscribeEvents is deprecated and will be removed in a future version.
@@ -213,7 +213,7 @@ func (h *Handler) SubscribeEvents(request *executiondata.SubscribeEventsRequest,
 
 	sub := h.api.SubscribeEvents(stream.Context(), startBlockID, request.GetStartBlockHeight(), filter)
 
-	return subscription.HandleSubscription(sub, h.handleEventsResponse(stream.Send, request.HeartbeatInterval, request.GetEventEncodingVersion()))
+	return subscription.HandleRPCSubscription(sub, h.handleEventsResponse(stream.Send, request.HeartbeatInterval, request.GetEventEncodingVersion()))
 }
 
 // SubscribeEventsFromStartBlockID handles subscription requests for events starting at the specified block ID.
@@ -248,7 +248,7 @@ func (h *Handler) SubscribeEventsFromStartBlockID(request *executiondata.Subscri
 
 	sub := h.api.SubscribeEventsFromStartBlockID(stream.Context(), startBlockID, filter)
 
-	return subscription.HandleSubscription(sub, h.handleEventsResponse(stream.Send, request.HeartbeatInterval, request.GetEventEncodingVersion()))
+	return subscription.HandleRPCSubscription(sub, h.handleEventsResponse(stream.Send, request.HeartbeatInterval, request.GetEventEncodingVersion()))
 }
 
 // SubscribeEventsFromStartHeight handles subscription requests for events starting at the specified block height.
@@ -278,7 +278,7 @@ func (h *Handler) SubscribeEventsFromStartHeight(request *executiondata.Subscrib
 
 	sub := h.api.SubscribeEventsFromStartHeight(stream.Context(), request.GetStartBlockHeight(), filter)
 
-	return subscription.HandleSubscription(sub, h.handleEventsResponse(stream.Send, request.HeartbeatInterval, request.GetEventEncodingVersion()))
+	return subscription.HandleRPCSubscription(sub, h.handleEventsResponse(stream.Send, request.HeartbeatInterval, request.GetEventEncodingVersion()))
 }
 
 // SubscribeEventsFromLatest handles subscription requests for events started from latest sealed block..
@@ -308,7 +308,7 @@ func (h *Handler) SubscribeEventsFromLatest(request *executiondata.SubscribeEven
 
 	sub := h.api.SubscribeEventsFromLatest(stream.Context(), filter)
 
-	return subscription.HandleSubscription(sub, h.handleEventsResponse(stream.Send, request.HeartbeatInterval, request.GetEventEncodingVersion()))
+	return subscription.HandleRPCSubscription(sub, h.handleEventsResponse(stream.Send, request.HeartbeatInterval, request.GetEventEncodingVersion()))
 }
 
 // handleSubscribeExecutionData handles the subscription to execution data and sends it to the client via the provided stream.
@@ -381,7 +381,10 @@ func (h *Handler) handleEventsResponse(send sendSubscribeEventsResponseFunc, hea
 			return status.Errorf(codes.Internal, "could not convert events to entity: %v", err)
 		}
 
-		index := messageIndex.Increment()
+		index := messageIndex.Value()
+		if ok := messageIndex.Set(index + 1); !ok {
+			return status.Errorf(codes.Internal, "message index already incremented to %d", messageIndex.Value())
+		}
 
 		err = send(&executiondata.SubscribeEventsResponse{
 			BlockHeight:    resp.Height,
@@ -495,7 +498,10 @@ func (h *Handler) handleAccountStatusesResponse(
 			return err
 		}
 
-		index := messageIndex.Increment()
+		index := messageIndex.Value()
+		if ok := messageIndex.Set(index + 1); !ok {
+			return status.Errorf(codes.Internal, "message index already incremented to %d", messageIndex.Value())
+		}
 
 		err = send(&executiondata.SubscribeAccountStatusesResponse{
 			BlockId:      convert.IdentifierToMessage(resp.BlockID),
@@ -540,7 +546,7 @@ func (h *Handler) SubscribeAccountStatusesFromStartBlockID(
 
 	sub := h.api.SubscribeAccountStatusesFromStartBlockID(stream.Context(), startBlockID, filter)
 
-	return subscription.HandleSubscription(sub, h.handleAccountStatusesResponse(request.HeartbeatInterval, request.GetEventEncodingVersion(), stream.Send))
+	return subscription.HandleRPCSubscription(sub, h.handleAccountStatusesResponse(request.HeartbeatInterval, request.GetEventEncodingVersion(), stream.Send))
 }
 
 // SubscribeAccountStatusesFromStartHeight streams account statuses for all blocks starting at the requested
@@ -567,7 +573,7 @@ func (h *Handler) SubscribeAccountStatusesFromStartHeight(
 
 	sub := h.api.SubscribeAccountStatusesFromStartHeight(stream.Context(), request.GetStartBlockHeight(), filter)
 
-	return subscription.HandleSubscription(sub, h.handleAccountStatusesResponse(request.HeartbeatInterval, request.GetEventEncodingVersion(), stream.Send))
+	return subscription.HandleRPCSubscription(sub, h.handleAccountStatusesResponse(request.HeartbeatInterval, request.GetEventEncodingVersion(), stream.Send))
 }
 
 // SubscribeAccountStatusesFromLatestBlock streams account statuses for all blocks starting
@@ -594,5 +600,5 @@ func (h *Handler) SubscribeAccountStatusesFromLatestBlock(
 
 	sub := h.api.SubscribeAccountStatusesFromLatestBlock(stream.Context(), filter)
 
-	return subscription.HandleSubscription(sub, h.handleAccountStatusesResponse(request.HeartbeatInterval, request.GetEventEncodingVersion(), stream.Send))
+	return subscription.HandleRPCSubscription(sub, h.handleAccountStatusesResponse(request.HeartbeatInterval, request.GetEventEncodingVersion(), stream.Send))
 }

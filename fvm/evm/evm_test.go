@@ -27,7 +27,6 @@ import (
 	"github.com/onflow/flow-go/fvm/evm/events"
 	"github.com/onflow/flow-go/fvm/evm/impl"
 	"github.com/onflow/flow-go/fvm/evm/stdlib"
-	"github.com/onflow/flow-go/fvm/evm/testutils"
 	. "github.com/onflow/flow-go/fvm/evm/testutils"
 	"github.com/onflow/flow-go/fvm/evm/types"
 	"github.com/onflow/flow-go/fvm/storage/snapshot"
@@ -112,12 +111,12 @@ func TestEVMRun(t *testing.T) {
 				// assert event fields are correct
 				require.Len(t, output.Events, 2)
 				txEvent := output.Events[0]
-				txEventPayload := testutils.TxEventToPayload(t, txEvent, sc.EVMContract.Address)
+				txEventPayload := TxEventToPayload(t, txEvent, sc.EVMContract.Address)
 				require.NoError(t, err)
 
 				// fee transfer event
 				feeTransferEvent := output.Events[1]
-				feeTranferEventPayload := testutils.TxEventToPayload(t, feeTransferEvent, sc.EVMContract.Address)
+				feeTranferEventPayload := TxEventToPayload(t, feeTransferEvent, sc.EVMContract.Address)
 				require.NoError(t, err)
 				require.Equal(t, uint16(types.ErrCodeNoError), feeTranferEventPayload.ErrorCode)
 				require.Equal(t, uint16(1), feeTranferEventPayload.Index)
@@ -379,7 +378,7 @@ func TestEVMRun(t *testing.T) {
 				require.NotEmpty(t, state.WriteSet)
 
 				txEvent := output.Events[0]
-				txEventPayload := testutils.TxEventToPayload(t, txEvent, sc.EVMContract.Address)
+				txEventPayload := TxEventToPayload(t, txEvent, sc.EVMContract.Address)
 
 				require.NotEmpty(t, txEventPayload.Hash)
 
@@ -391,6 +390,174 @@ func TestEVMRun(t *testing.T) {
 				last := log.Topics[len(log.Topics)-1] // last topic is the value set in the store method
 				assert.Equal(t, num, last.Big().Int64())
 			})
+	})
+
+	t.Run("testing EVM.run execution reverted with assert error", func(t *testing.T) {
+
+		t.Parallel()
+
+		RunWithNewEnvironment(t,
+			chain, func(
+				ctx fvm.Context,
+				vm fvm.VM,
+				snapshot snapshot.SnapshotTree,
+				testContract *TestContract,
+				testAccount *EOATestAccount,
+			) {
+				sc := systemcontracts.SystemContractsForChain(chain.ChainID())
+				code := []byte(fmt.Sprintf(
+					`
+					import EVM from %s
+
+					transaction(tx: [UInt8], coinbaseBytes: [UInt8; 20]){
+						prepare(account: &Account) {
+							let coinbase = EVM.EVMAddress(bytes: coinbaseBytes)
+							let res = EVM.run(tx: tx, coinbase: coinbase)
+
+							assert(res.status == EVM.Status.failed, message: "unexpected status")
+							assert(res.errorCode == 306, message: "unexpected error code")
+							assert(res.deployedContract == nil, message: "unexpected deployed contract")
+						}
+					}
+					`,
+					sc.EVMContract.Address.HexWithPrefix(),
+				))
+
+				coinbaseAddr := types.Address{1, 2, 3}
+				coinbaseBalance := getEVMAccountBalance(t, ctx, vm, snapshot, coinbaseAddr)
+				require.Zero(t, types.BalanceToBigInt(coinbaseBalance).Uint64())
+
+				innerTxBytes := testAccount.PrepareSignAndEncodeTx(t,
+					testContract.DeployedAt.ToCommon(),
+					testContract.MakeCallData(t, "assertError"),
+					big.NewInt(0),
+					uint64(100_000),
+					big.NewInt(1),
+				)
+
+				innerTx := cadence.NewArray(
+					ConvertToCadence(innerTxBytes),
+				).WithType(stdlib.EVMTransactionBytesCadenceType)
+
+				coinbase := cadence.NewArray(
+					ConvertToCadence(coinbaseAddr.Bytes()),
+				).WithType(stdlib.EVMAddressBytesCadenceType)
+
+				tx := fvm.Transaction(
+					flow.NewTransactionBody().
+						SetScript(code).
+						AddAuthorizer(sc.FlowServiceAccount.Address).
+						AddArgument(json.MustEncode(innerTx)).
+						AddArgument(json.MustEncode(coinbase)),
+					0)
+
+				state, output, err := vm.Run(
+					ctx,
+					tx,
+					snapshot,
+				)
+				require.NoError(t, err)
+				require.NoError(t, output.Err)
+				require.NotEmpty(t, state.WriteSet)
+
+				// assert event fields are correct
+				require.Len(t, output.Events, 2)
+				txEvent := output.Events[0]
+				txEventPayload := TxEventToPayload(t, txEvent, sc.EVMContract.Address)
+				require.NoError(t, err)
+
+				assert.Equal(
+					t,
+					"execution reverted: Assert Error Message",
+					txEventPayload.ErrorMessage,
+				)
+			},
+		)
+	})
+
+	t.Run("testing EVM.run execution reverted with custom error", func(t *testing.T) {
+
+		t.Parallel()
+
+		RunWithNewEnvironment(t,
+			chain, func(
+				ctx fvm.Context,
+				vm fvm.VM,
+				snapshot snapshot.SnapshotTree,
+				testContract *TestContract,
+				testAccount *EOATestAccount,
+			) {
+				sc := systemcontracts.SystemContractsForChain(chain.ChainID())
+				code := []byte(fmt.Sprintf(
+					`
+					import EVM from %s
+
+					transaction(tx: [UInt8], coinbaseBytes: [UInt8; 20]){
+						prepare(account: &Account) {
+							let coinbase = EVM.EVMAddress(bytes: coinbaseBytes)
+							let res = EVM.run(tx: tx, coinbase: coinbase)
+
+							assert(res.status == EVM.Status.failed, message: "unexpected status")
+							assert(res.errorCode == 306, message: "unexpected error code")
+							assert(res.deployedContract == nil, message: "unexpected deployed contract")
+						}
+					}
+					`,
+					sc.EVMContract.Address.HexWithPrefix(),
+				))
+
+				coinbaseAddr := types.Address{1, 2, 3}
+				coinbaseBalance := getEVMAccountBalance(t, ctx, vm, snapshot, coinbaseAddr)
+				require.Zero(t, types.BalanceToBigInt(coinbaseBalance).Uint64())
+
+				innerTxBytes := testAccount.PrepareSignAndEncodeTx(t,
+					testContract.DeployedAt.ToCommon(),
+					testContract.MakeCallData(t, "customError"),
+					big.NewInt(0),
+					uint64(100_000),
+					big.NewInt(1),
+				)
+
+				innerTx := cadence.NewArray(
+					ConvertToCadence(innerTxBytes),
+				).WithType(stdlib.EVMTransactionBytesCadenceType)
+
+				coinbase := cadence.NewArray(
+					ConvertToCadence(coinbaseAddr.Bytes()),
+				).WithType(stdlib.EVMAddressBytesCadenceType)
+
+				tx := fvm.Transaction(
+					flow.NewTransactionBody().
+						SetScript(code).
+						AddAuthorizer(sc.FlowServiceAccount.Address).
+						AddArgument(json.MustEncode(innerTx)).
+						AddArgument(json.MustEncode(coinbase)),
+					0)
+
+				state, output, err := vm.Run(
+					ctx,
+					tx,
+					snapshot,
+				)
+				require.NoError(t, err)
+				require.NoError(t, output.Err)
+				require.NotEmpty(t, state.WriteSet)
+
+				// assert event fields are correct
+				require.Len(t, output.Events, 2)
+				txEvent := output.Events[0]
+				txEventPayload := TxEventToPayload(t, txEvent, sc.EVMContract.Address)
+				require.NoError(t, err)
+
+				// Unlike assert errors, custom errors cannot be further examined
+				// or ABI decoded, as we do not have access to the contract's ABI.
+				assert.Equal(
+					t,
+					"execution reverted",
+					txEventPayload.ErrorMessage,
+				)
+			},
+		)
 	})
 }
 
@@ -512,7 +679,7 @@ func TestEVMBatchRun(t *testing.T) {
 
 				// last event is fee transfer event
 				feeTransferEvent := output.Events[batchCount]
-				feeTranferEventPayload := testutils.TxEventToPayload(t, feeTransferEvent, sc.EVMContract.Address)
+				feeTranferEventPayload := TxEventToPayload(t, feeTransferEvent, sc.EVMContract.Address)
 				require.NoError(t, err)
 				require.Equal(t, uint16(types.ErrCodeNoError), feeTranferEventPayload.ErrorCode)
 				require.Equal(t, uint16(batchCount), feeTranferEventPayload.Index)
@@ -996,7 +1163,7 @@ func TestEVMAddressDeposit(t *testing.T) {
 
 			// tx executed event
 			txEvent := output.Events[2]
-			txEventPayload := testutils.TxEventToPayload(t, txEvent, sc.EVMContract.Address)
+			txEventPayload := TxEventToPayload(t, txEvent, sc.EVMContract.Address)
 
 			// deposit event
 			depositEvent := output.Events[3]
@@ -1250,7 +1417,7 @@ func TestCadenceOwnedAccountFunctionalities(t *testing.T) {
 				))
 
 				addr := cadence.NewArray(
-					ConvertToCadence(testutils.RandomAddress(t).Bytes()),
+					ConvertToCadence(RandomAddress(t).Bytes()),
 				).WithType(stdlib.EVMAddressBytesCadenceType)
 
 				script := fvm.Script(code).WithArguments(

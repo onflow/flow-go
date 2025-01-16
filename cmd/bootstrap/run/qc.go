@@ -211,7 +211,7 @@ func GenerateQCParticipantData(allNodes, internalNodes []bootstrap.NodeInfo, dkg
 	// However, the logic in this function only supports the trusted dealer model!
 	// For further details see issue (Epic) https://github.com/onflow/flow-go/issues/6214
 	if len(allNodes) != len(dkgData.PrivKeyShares) {
-		return nil, fmt.Errorf("only trusted dealer for DKG supported: need exactly the same number of staking public keys as DKG private participants")
+		return nil, fmt.Errorf("only trusted dealer for DKG supported: need exactly the same number of staking public keys as DKG private participants (all=%d, dkg=%d)", len(allNodes), len(dkgData.PrivKeyShares))
 	}
 
 	// the index here is important - we assume allNodes is in the same order as the DKG

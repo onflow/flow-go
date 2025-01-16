@@ -3,10 +3,10 @@ package migrations
 import (
 	"fmt"
 
+	"github.com/onflow/cadence/common"
+	"github.com/onflow/cadence/interpreter"
 	"github.com/onflow/cadence/runtime"
-	"github.com/onflow/cadence/runtime/common"
-	"github.com/onflow/cadence/runtime/interpreter"
-	"github.com/onflow/cadence/runtime/stdlib"
+	"github.com/onflow/cadence/stdlib"
 	"github.com/onflow/crypto/hash"
 	"github.com/rs/zerolog"
 
@@ -16,6 +16,7 @@ import (
 	"github.com/onflow/flow-go/fvm/evm"
 	evmStdlib "github.com/onflow/flow-go/fvm/evm/stdlib"
 	"github.com/onflow/flow-go/fvm/storage/state"
+	"github.com/onflow/flow-go/fvm/systemcontracts"
 	"github.com/onflow/flow-go/model/flow"
 )
 
@@ -111,8 +112,11 @@ func (c InterpreterMigrationRuntimeConfig) NewRuntimeInterface(
 		}
 	}
 
+	sc := systemcontracts.SystemContractsForChain(chainID)
+
 	return util.NewMigrationRuntimeInterface(
 		chainID,
+		common.Address(sc.Crypto.Address),
 		getCodeFunc,
 		getContractNames,
 		getOrLoadProgram,
@@ -160,9 +164,7 @@ func NewInterpreterMigrationRuntime(
 ) {
 	basicMigrationRuntime := NewBasicMigrationRuntime(regs)
 
-	env := runtime.NewBaseInterpreterEnvironment(runtime.Config{
-		AttachmentsEnabled: true,
-	})
+	env := runtime.NewBaseInterpreterEnvironment(runtime.Config{})
 
 	runtimeInterface, err := config.NewRuntimeInterface(
 		chainID,

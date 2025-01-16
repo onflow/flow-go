@@ -4,14 +4,13 @@ import (
 	"fmt"
 	"math/big"
 
-	"github.com/onflow/cadence/runtime/common"
+	"github.com/onflow/cadence/common"
 	gethCommon "github.com/onflow/go-ethereum/common"
 	gethTypes "github.com/onflow/go-ethereum/core/types"
 	"go.opentelemetry.io/otel/attribute"
 
 	"github.com/onflow/flow-go/fvm/environment"
 	fvmErrors "github.com/onflow/flow-go/fvm/errors"
-	"github.com/onflow/flow-go/fvm/evm/debug"
 	"github.com/onflow/flow-go/fvm/evm/events"
 	"github.com/onflow/flow-go/fvm/evm/handler/coa"
 	"github.com/onflow/flow-go/fvm/evm/types"
@@ -30,7 +29,6 @@ type ContractHandler struct {
 	backend              types.Backend
 	emulator             types.Emulator
 	precompiledContracts []types.PrecompiledContract
-	tracer               debug.EVMTracer
 }
 
 var _ types.ContractHandler = &ContractHandler{}
@@ -45,7 +43,6 @@ func NewContractHandler(
 	addressAllocator types.AddressAllocator,
 	backend types.Backend,
 	emulator types.Emulator,
-	tracer debug.EVMTracer,
 ) *ContractHandler {
 	return &ContractHandler{
 		flowChainID:        flowChainID,
@@ -55,7 +52,6 @@ func NewContractHandler(
 		addressAllocator:   addressAllocator,
 		backend:            backend,
 		emulator:           emulator,
-		tracer:             tracer,
 		precompiledContracts: preparePrecompiledContracts(
 			evmContractAddress,
 			randomBeaconAddress,
@@ -307,9 +303,6 @@ func (h *ContractHandler) batchRun(rlpEncodedTxs [][]byte) ([]*types.Result, err
 			false,
 			r.Failed(),
 		)
-
-		// step 11 - collect traces
-		h.tracer.Collect(r.TxHash)
 	}
 
 	// update the block proposal
@@ -356,7 +349,7 @@ func (h *ContractHandler) commitBlockProposal() error {
 	// log evm block commitment
 	logger := h.backend.Logger()
 	logger.Info().
-		Uint64("height", bp.Height).
+		Uint64("evm_height", bp.Height).
 		Int("tx_count", len(bp.TxHashes)).
 		Uint64("total_gas_used", bp.TotalGasUsed).
 		Uint64("total_supply", bp.TotalSupply.Uint64()).
@@ -436,9 +429,6 @@ func (h *ContractHandler) run(rlpEncodedTx []byte) (*types.Result, error) {
 		false,
 		res.Failed(),
 	)
-
-	// step 11 - collect traces
-	h.tracer.Collect(res.TxHash)
 
 	return res, nil
 }
@@ -550,7 +540,6 @@ func (h *ContractHandler) getBlockContext() (types.BlockContext, error) {
 		},
 		ExtraPrecompiledContracts: h.precompiledContracts,
 		Random:                    bp.PrevRandao,
-		Tracer:                    h.tracer.TxTracer(),
 		TxCountSoFar:              uint(len(bp.TxHashes)),
 		TotalGasUsedSoFar:         bp.TotalGasUsed,
 		GasFeeCollector:           types.CoinbaseAddress,
@@ -645,9 +634,6 @@ func (h *ContractHandler) executeAndHandleCall(
 		true,
 		res.Failed(),
 	)
-
-	// step 10 - collect traces
-	h.tracer.Collect(res.TxHash)
 
 	return res, nil
 }

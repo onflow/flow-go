@@ -398,6 +398,14 @@ func (e *Core) onBlockExecuted(
 	return nil
 }
 
+func nonSystemTransactionCount(result flow.ExecutionResult) uint64 {
+	count := uint64(0)
+	for _, chunk := range result.Chunks {
+		count += chunk.NumberOfTransactions
+	}
+	return count
+}
+
 func (e *Core) onCollection(col *flow.Collection) error {
 	colID := col.ID()
 	e.log.Info().

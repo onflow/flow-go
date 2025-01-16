@@ -101,5 +101,5 @@ func (f *Forwarder) FaultTolerantClient() (access.AccessAPIClient, io.Closer, er
 		return f.upstream[f.roundRobin].client, f.upstream[f.roundRobin].closer, nil
 	}
 
-	return nil, nil, status.Errorf(codes.Unavailable, err.Error())
+	return nil, nil, status.Error(codes.Unavailable, err.Error())
 }

@@ -42,7 +42,7 @@ func (_m *ParticipantConsumer) OnQcTriggeredViewChange(oldView uint64, newView u
 }
 
 // OnReceiveProposal provides a mock function with given fields: currentView, proposal
-func (_m *ParticipantConsumer) OnReceiveProposal(currentView uint64, proposal *model.Proposal) {
+func (_m *ParticipantConsumer) OnReceiveProposal(currentView uint64, proposal *model.SignedProposal) {
 	_m.Called(currentView, proposal)
 }
 

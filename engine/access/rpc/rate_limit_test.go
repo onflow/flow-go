@@ -21,6 +21,7 @@ import (
 	"google.golang.org/grpc/status"
 
 	accessmock "github.com/onflow/flow-go/engine/access/mock"
+	"github.com/onflow/flow-go/engine/access/rest/websockets"
 	"github.com/onflow/flow-go/engine/access/rpc/backend"
 	statestreambackend "github.com/onflow/flow-go/engine/access/state_stream/backend"
 	"github.com/onflow/flow-go/model/flow"
@@ -115,6 +116,7 @@ func (suite *RateLimitTestSuite) SetupTest() {
 		UnsecureGRPCListenAddr: unittest.DefaultAddress,
 		SecureGRPCListenAddr:   unittest.DefaultAddress,
 		HTTPListenAddr:         unittest.DefaultAddress,
+		WebSocketConfig:        websockets.NewDefaultWebsocketConfig(),
 	}
 
 	// generate a server certificate that will be served by the GRPC server

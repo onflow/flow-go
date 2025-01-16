@@ -3,7 +3,7 @@ package stdlib_test
 import (
 	"testing"
 
-	"github.com/onflow/cadence/runtime/sema"
+	"github.com/onflow/cadence/sema"
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/fvm/evm/stdlib"

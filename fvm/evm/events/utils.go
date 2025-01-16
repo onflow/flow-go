@@ -3,6 +3,8 @@ package events
 import (
 	"github.com/onflow/cadence"
 	gethCommon "github.com/onflow/go-ethereum/common"
+
+	"github.com/onflow/flow-go/fvm/evm/types"
 )
 
 // cadenceArrayTypeOfUInt8 is the Cadence type [UInt8]
@@ -29,4 +31,17 @@ func hashToCadenceArrayValue(hash gethCommon.Hash) cadence.Array {
 	}
 	return cadence.NewArray(values).
 		WithType(cadenceHashType)
+}
+
+// checksumType is the Cadence type [UInt8;4]
+var checksumType = cadence.NewConstantSizedArrayType(types.ChecksumLength, cadence.UInt8Type)
+
+// checksumToCadenceArrayValue converts a checksum ([4]byte) into a Cadence array of type [UInt8;4]
+func checksumToCadenceArrayValue(checksum [types.ChecksumLength]byte) cadence.Array {
+	values := make([]cadence.Value, types.ChecksumLength)
+	for i := 0; i < types.ChecksumLength; i++ {
+		values[i] = cadence.NewUInt8(checksum[i])
+	}
+	return cadence.NewArray(values).
+		WithType(checksumType)
 }

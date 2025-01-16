@@ -50,7 +50,7 @@ func ReadFullPartnerNodeInfos(log zerolog.Logger, partnerWeightsPath, partnerNod
 
 		weight := weights[partner.NodeID]
 		if valid := ValidateWeight(weight); !valid {
-			return nil, fmt.Errorf("invalid partner weight: %d", weight)
+			return nil, fmt.Errorf("invalid partner weight %v: %d", partner.NodeID, weight)
 		}
 
 		if weight != flow.DefaultInitialWeight {
@@ -143,12 +143,12 @@ func ReadFullInternalNodeInfos(log zerolog.Logger, internalNodePrivInfoDir, inte
 		// validate every single internal node
 		err := ValidateNodeID(internal.NodeID)
 		if err != nil {
-			return nil, fmt.Errorf(fmt.Sprintf("invalid internal node ID: %s", internal.NodeID))
+			return nil, fmt.Errorf("invalid internal node ID: %s", internal.NodeID)
 		}
 		weight := weights[internal.Address]
 
 		if valid := ValidateWeight(weight); !valid {
-			return nil, fmt.Errorf(fmt.Sprintf("invalid partner weight: %d", weight))
+			return nil, fmt.Errorf("invalid partner weight %v: %d", internal.NodeID, weight)
 		}
 		if weight != flow.DefaultInitialWeight {
 			log.Warn().Msgf("internal node (id=%x) has non-default weight (%d != %d)", internal.NodeID, weight, flow.DefaultInitialWeight)
@@ -223,4 +223,21 @@ func internalWeightsByAddress(log zerolog.Logger, config string) map[string]uint
 	}
 
 	return weights
+}
+
+// FilterInternalPartners returns the `partners`, dropping any entries that are also in `internal`
+// Formally, this function implements the set difference `partners \ internal`.
+func FilterInternalPartners(partners []bootstrap.NodeInfo, internal []bootstrap.NodeInfo) []bootstrap.NodeInfo {
+	lookup := make(map[flow.Identifier]struct{})
+	for _, node := range internal {
+		lookup[node.NodeID] = struct{}{}
+	}
+
+	var filtered []bootstrap.NodeInfo
+	for _, node := range partners {
+		if _, ok := lookup[node.NodeID]; !ok {
+			filtered = append(filtered, node)
+		}
+	}
+	return filtered
 }

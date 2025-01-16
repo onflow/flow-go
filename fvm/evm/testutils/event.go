@@ -4,8 +4,8 @@ import (
 	"testing"
 
 	"github.com/onflow/cadence"
+	"github.com/onflow/cadence/common"
 	"github.com/onflow/cadence/encoding/ccf"
-	"github.com/onflow/cadence/runtime/common"
 	"github.com/stretchr/testify/require"
 	"gotest.tools/assert"
 

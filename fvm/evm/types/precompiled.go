@@ -2,6 +2,7 @@ package types
 
 import (
 	"bytes"
+	"fmt"
 
 	gethVM "github.com/onflow/go-ethereum/core/vm"
 	"github.com/onflow/go-ethereum/rlp"
@@ -17,15 +18,8 @@ type PrecompiledContract interface {
 	Address() Address
 }
 
-// RunCall captures a call to the RequiredGas method of a precompiled contract
-type RequiredGasCall struct {
-	Input  []byte
-	Output uint64
-}
-
 // RunCall captures a call to the Run method of a precompiled contract
 type RunCall struct {
-	Input    []byte
 	Output   []byte
 	ErrorMsg string
 }
@@ -33,7 +27,7 @@ type RunCall struct {
 // PrecompiledCalls captures all the calls to a precompiled contract
 type PrecompiledCalls struct {
 	Address          Address
-	RequiredGasCalls []RequiredGasCall
+	RequiredGasCalls []uint64
 	RunCalls         []RunCall
 }
 
@@ -43,8 +37,8 @@ func (pc *PrecompiledCalls) IsEmpty() bool {
 }
 
 const (
-	AggregatedPrecompiledCallsEncodingVersion  uint8 = 1
 	AggregatedPrecompiledCallsEncodingByteSize int   = 1
+	AggregatedPrecompiledCallsEncodingVersion  uint8 = 2 // current version
 )
 
 // AggregatedPrecompiledCalls aggregates a list of precompiled calls
@@ -85,5 +79,54 @@ func AggregatedPrecompileCallsFromEncoded(encoded []byte) (AggregatedPrecompiled
 	if len(encoded) == 0 {
 		return apc, nil
 	}
-	return apc, rlp.DecodeBytes(encoded[AggregatedPrecompiledCallsEncodingByteSize:], &apc)
+	switch int(encoded[0]) {
+	case 1:
+		return decodePrecompiledCallsV1(encoded)
+	case 2:
+		return apc, rlp.DecodeBytes(encoded[AggregatedPrecompiledCallsEncodingByteSize:], &apc)
+	default:
+		return nil, fmt.Errorf("unknown type for encoded AggregatedPrecompiledCalls received %d", int(encoded[0]))
+	}
+}
+
+func decodePrecompiledCallsV1(encoded []byte) (AggregatedPrecompiledCalls, error) {
+	legacy := make([]precompiledCallsV1, 0)
+	err := rlp.DecodeBytes(encoded[AggregatedPrecompiledCallsEncodingByteSize:], &legacy)
+	if err != nil {
+		return nil, err
+	}
+	apc := make([]PrecompiledCalls, len(legacy))
+	for i, ap := range legacy {
+		reqCalls := make([]uint64, len(ap.RequiredGasCalls))
+		for j, rc := range ap.RequiredGasCalls {
+			reqCalls[j] = rc.Output
+		}
+		runCalls := make([]RunCall, len(ap.RunCalls))
+		for j, rc := range ap.RunCalls {
+			runCalls[j] = RunCall{
+				Output:   rc.Output,
+				ErrorMsg: rc.ErrorMsg,
+			}
+		}
+		apc[i] = PrecompiledCalls{
+			Address:          ap.Address,
+			RequiredGasCalls: reqCalls,
+			RunCalls:         runCalls,
+		}
+	}
+	return apc, nil
+}
+
+// legacy encoding types
+type precompiledCallsV1 struct {
+	Address          Address
+	RequiredGasCalls []struct {
+		Input  []byte
+		Output uint64
+	}
+	RunCalls []struct {
+		Input    []byte
+		Output   []byte
+		ErrorMsg string
+	}
 }
