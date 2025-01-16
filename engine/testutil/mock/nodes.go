@@ -254,7 +254,7 @@ func (en ExecutionNode) Done(cancelFunc context.CancelFunc) {
 }
 
 func (en ExecutionNode) AssertHighestExecutedBlock(t *testing.T, header *flow.Header) {
-	height, blockID, err := en.ExecutionState.GetHighestExecutedBlockID(context.Background())
+	height, blockID, err := en.ExecutionState.GetLastExecutedBlockID(context.Background())
 	require.NoError(t, err)
 
 	require.Equal(t, header.ID(), blockID)

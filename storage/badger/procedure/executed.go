@@ -11,28 +11,10 @@ import (
 	"github.com/onflow/flow-go/storage/badger/operation"
 )
 
-// UpdateHighestExecutedBlockIfHigher updates the latest executed block to be the input block
-// if the input block has a greater height than the currently stored latest executed block.
-// The executed block index must have been initialized before calling this function.
-// Returns storage.ErrNotFound if the input block does not exist in storage.
-func UpdateHighestExecutedBlockIfHigher(header *flow.Header) func(txn *badger.Txn) error {
+// UpdateLastExecutedBlock updates the latest executed block to be the input block
+func UpdateLastExecutedBlock(header *flow.Header) func(txn *badger.Txn) error {
 	return func(txn *badger.Txn) error {
-		var blockID flow.Identifier
-		err := operation.RetrieveExecutedBlock(&blockID)(txn)
-		if err != nil {
-			return fmt.Errorf("cannot lookup executed block: %w", err)
-		}
-
-		var highest flow.Header
-		err = operation.RetrieveHeader(blockID, &highest)(txn)
-		if err != nil {
-			return fmt.Errorf("cannot retrieve executed header: %w", err)
-		}
-
-		if header.Height <= highest.Height {
-			return nil
-		}
-		err = operation.UpdateExecutedBlock(header.ID())(txn)
+		err := operation.UpdateExecutedBlock(header.ID())(txn)
 		if err != nil {
 			return fmt.Errorf("cannot update highest executed block: %w", err)
 		}
@@ -41,9 +23,9 @@ func UpdateHighestExecutedBlockIfHigher(header *flow.Header) func(txn *badger.Tx
 	}
 }
 
-// GetHighestExecutedBlock retrieves the height and ID of the latest block executed by this node.
+// GetLastExecutedBlock retrieves the height and ID of the latest block executed by this node.
 // Returns storage.ErrNotFound if no latest executed block has been stored.
-func GetHighestExecutedBlock(height *uint64, blockID *flow.Identifier) func(tx *badger.Txn) error {
+func GetLastExecutedBlock(height *uint64, blockID *flow.Identifier) func(tx *badger.Txn) error {
 	return func(tx *badger.Txn) error {
 		var highest flow.Header
 		err := operation.RetrieveExecutedBlock(blockID)(tx)
