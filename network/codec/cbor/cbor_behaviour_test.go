@@ -68,12 +68,12 @@ func TestBehaviour_DecodeExtraField(t *testing.T) {
 // extra field, not present in the target (struct into which we are decoding).
 //
 // This test validates that, when decoding a message which OMITS a field present
-// in the target, no error is returned. 
+// in the target, no error is returned.
 //
 // This behaviour is very useful for downwards compatibility: for example if we add
 // a new field B to a struct, nodes running the updated software can still decode
-// messages emitted by the old software - with the convention that in the decoded 
-// message, field B has the zero-value. 
+// messages emitted by the old software - with the convention that in the decoded
+// message, field B has the zero-value.
 // However, note that the reverse (i.e. downwards compatibility) is not true *by default*
 // Specifically the old software cannot decode the new struct, even if field B has the
 // zero value, as demonstrated by the test [TestBehaviour_DecodeExtraField] above.
