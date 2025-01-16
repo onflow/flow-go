@@ -59,7 +59,7 @@ func (b *backendSubscribeTransactions) SendAndSubscribeTransactionStatuses(
 		return subscription.NewFailedSubscription(err, "failed to send transaction")
 	}
 
-	return b.createSubscription(ctx, tx.ID(), tx.ReferenceBlockID, tx.ReferenceBlockID, requiredEventEncodingVersion, true)
+	return b.createSubscription(ctx, tx.ID(), tx.ReferenceBlockID, tx.ReferenceBlockID, requiredEventEncodingVersion)
 }
 
 // SubscribeTransactionStatuses subscribes to the status updates of a transaction.
@@ -75,7 +75,7 @@ func (b *backendSubscribeTransactions) SubscribeTransactionStatuses(
 		irrecoverable.Throw(ctx, err)
 	}
 
-	return b.createSubscription(ctx, txID, header.ID(), flow.ZeroID, requiredEventEncodingVersion, false)
+	return b.createSubscription(ctx, txID, header.ID(), flow.ZeroID, requiredEventEncodingVersion)
 }
 
 // createSubscription initializes a subscription for monitoring a transaction's status.
@@ -86,7 +86,6 @@ func (b *backendSubscribeTransactions) createSubscription(
 	startBlockID flow.Identifier,
 	referenceBlockID flow.Identifier,
 	requiredEventEncodingVersion entities.EventEncodingVersion,
-	shouldTriggerPending bool,
 ) subscription.Subscription {
 	// Get height to start subscription from
 	startHeight, err := b.blockTracker.GetStartHeightFromBlockID(startBlockID)
@@ -101,7 +100,7 @@ func (b *backendSubscribeTransactions) createSubscription(
 		return subscription.NewFailedSubscription(err, "failed to get tx reference block ID")
 	}
 
-	return b.subscriptionHandler.Subscribe(ctx, startHeight, b.getTransactionStatusResponse(txInfo, shouldTriggerPending, txInfo.IsFinal()))
+	return b.subscriptionHandler.Subscribe(ctx, startHeight, b.getTransactionStatusResponse(txInfo))
 }
 
 // fillCurrentTransactionResultState retrieves the current state of a transaction result and fills the transaction subscription metadata.
@@ -192,11 +191,8 @@ func (b *backendSubscribeTransactions) fillCurrentTransactionResultState(
 // subscription responses based on new blocks.
 func (b *backendSubscribeTransactions) getTransactionStatusResponse(
 	txInfo *transactionSubscriptionMetadata,
-	shouldTriggerPending bool,
-	shouldTriggerFinalized bool,
 ) func(context.Context, uint64) (interface{}, error) {
-	triggerPendingOnce := atomic.NewBool(false)
-	triggerFinalizedOnce := atomic.NewBool(false)
+	triggerMissingStatusesOnce := atomic.NewBool(false)
 
 	return func(ctx context.Context, height uint64) (interface{}, error) {
 		err := b.checkBlockReady(height)
@@ -204,15 +200,7 @@ func (b *backendSubscribeTransactions) getTransactionStatusResponse(
 			return nil, err
 		}
 
-		// TODO: If possible, this should be simplified, as we use the same pattern as for Pending
-		if shouldTriggerFinalized && triggerFinalizedOnce.CompareAndSwap(false, true) {
-			return b.generateResultsWithMissingStatuses(txInfo.TransactionResult, flow.TransactionStatusUnknown)
-		}
-
-		if shouldTriggerPending && triggerPendingOnce.CompareAndSwap(false, true) {
-			// The status of the first pending transaction should be returned immediately, as the transaction has already been sent.
-			// This should occur only once for each subscription.
-			txInfo.Status = flow.TransactionStatusPending
+		if triggerMissingStatusesOnce.CompareAndSwap(false, true) {
 			return b.generateResultsWithMissingStatuses(txInfo.TransactionResult, flow.TransactionStatusUnknown)
 		}
 
