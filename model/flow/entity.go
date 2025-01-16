@@ -20,6 +20,11 @@ type Entity interface {
 	Checksum() Identifier
 }
 
+// Hash is a hash of the implementor dynamic data and signatures (all fields basically).
+type Hash interface {
+	HashSelf() Identifier //TODO: change to Hash() when all existing Hash() functions are renamed
+}
+
 func EntitiesToIDs[T Entity](entities []T) []Identifier {
 	ids := make([]Identifier, 0, len(entities))
 	for _, entity := range entities {
