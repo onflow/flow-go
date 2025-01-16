@@ -105,9 +105,10 @@ var (
 	evmStorageAddressMainnet = flow.HexToAddress("d421a63faae318f9")
 
 	// executionParametersAddressTestnet is the address of the Execution Parameters contract on Testnet
-	executionParametersAddressTestnet = flow.HexToAddress("00000000000")
+	executionParametersAddressTestnet = flow.HexToAddress("a71b77409f5acbc1")
 	// executionParametersAddressMainnet is the address of the Execution Parameters contract on Mainnet
-	executionParametersAddressMainnet = flow.HexToAddress("00000000000")
+	// TODO: update this address once the Execution Parameters contract is deployed on Mainnet
+	executionParametersAddressMainnet = flow.HexToAddress("TODO")
 )
 
 // SystemContract represents a system contract on a particular chain.
