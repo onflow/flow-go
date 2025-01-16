@@ -4,10 +4,11 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/onflow/flow-go/storage"
 	"os"
 	"testing"
 	"time"
+
+	"github.com/onflow/flow-go/storage"
 
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -18,6 +19,8 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
+
+	accessproto "github.com/onflow/flow/protobuf/go/flow/access"
 
 	accessapi "github.com/onflow/flow-go/access"
 	"github.com/onflow/flow-go/engine"
@@ -40,7 +43,6 @@ import (
 	storagemock "github.com/onflow/flow-go/storage/mock"
 	"github.com/onflow/flow-go/utils/unittest"
 	"github.com/onflow/flow-go/utils/unittest/mocks"
-	accessproto "github.com/onflow/flow/protobuf/go/flow/access"
 
 	"github.com/onflow/flow/protobuf/go/flow/entities"
 )
@@ -485,7 +487,7 @@ func (s *TransactionStatusSuite) TestSubscribeTransactionStatusHappyCase() {
 	s.sealedBlock = s.finalizedBlock
 	s.addNewFinalizedBlock(s.sealedBlock.Header, true)
 
-	sub := s.backend.SubscribeTransactionStatusesFromLatest(ctx, txId, entities.EventEncodingVersion_CCF_V0)
+	sub := s.backend.SubscribeTransactionStatuses(ctx, txId, entities.EventEncodingVersion_CCF_V0)
 
 	checkNewSubscriptionMessage(
 		sub,
