@@ -1,7 +1,6 @@
 package derived
 
 import (
-	"github.com/coreos/go-semver/semver"
 	"github.com/onflow/cadence/runtime/common"
 
 	"github.com/onflow/flow-go/fvm/meter"
@@ -16,7 +15,6 @@ type MeterParamOverrides struct {
 // StateExecutionParameters are parameters needed for execution defined in the execution state.
 type StateExecutionParameters struct {
 	MeterParamOverrides
-	ExecutionVersion semver.Version
 }
 
 type ProgramInvalidator TableInvalidator[
