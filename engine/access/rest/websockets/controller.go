@@ -387,7 +387,7 @@ func (c *Controller) handleSubscribe(ctx context.Context, msg models.SubscribeMe
 		c.writeErrorResponse(
 			ctx,
 			err,
-			wrapErrorMessage(http.StatusBadRequest, "error parsing subscription id",
+			wrapErrorMessage(http.StatusBadRequest, fmt.Sprintf("error parsing subscription id: %s", err.Error()),
 				models.SubscribeAction, msg.SubscriptionID),
 		)
 		return
@@ -441,7 +441,7 @@ func (c *Controller) handleUnsubscribe(ctx context.Context, msg models.Unsubscri
 		c.writeErrorResponse(
 			ctx,
 			err,
-			wrapErrorMessage(http.StatusBadRequest, "error parsing subscription id",
+			wrapErrorMessage(http.StatusBadRequest, fmt.Sprintf("error parsing subscription id: %s", err.Error()),
 				models.UnsubscribeAction, msg.SubscriptionID),
 		)
 		return

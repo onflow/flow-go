@@ -247,8 +247,8 @@ func (s *WebsocketSubscriptionSuite) TestSubscriptionErrorCases() {
 	}{
 		{
 			name:            "Invalid Subscription ID",
-			message:         s.subscribeMessageRequest("invalid_subscription_id", data_providers.BlocksTopic, models.Arguments{}),
-			expectedErrMsg:  "error parsing subscription id", // id length > 20 symbols
+			message:         s.subscribeMessageRequest("invalid_subscription_id", data_providers.BlocksTopic, models.Arguments{}), // id length > 20 symbols
+			expectedErrMsg:  "error parsing subscription id: subscription ID provided by the client must not exceed 20 characters",
 			expectedErrCode: http.StatusBadRequest,
 		},
 		{
@@ -304,7 +304,7 @@ func (s *WebsocketSubscriptionSuite) TestUnsubscriptionErrorCases() {
 		{
 			name:            "Invalid Subscription ID",
 			message:         s.unsubscribeMessageRequest("invalid_subscription_id"),
-			expectedErrMsg:  "error parsing subscription id", // id length > 20 symbols
+			expectedErrMsg:  "error parsing subscription id: subscription ID provided by the client must not exceed 20 characters", // id length > 20 symbols
 			expectedErrCode: http.StatusBadRequest,
 		},
 		{
@@ -316,7 +316,7 @@ func (s *WebsocketSubscriptionSuite) TestUnsubscriptionErrorCases() {
 		{
 			name:            "Empty Subscription ID",
 			message:         s.unsubscribeMessageRequest(""),
-			expectedErrMsg:  "error parsing subscription id",
+			expectedErrMsg:  "error parsing subscription id: subscription ID provided by the client must not be empty",
 			expectedErrCode: http.StatusBadRequest,
 		},
 	}
