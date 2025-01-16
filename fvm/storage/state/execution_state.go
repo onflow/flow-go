@@ -4,8 +4,6 @@ import (
 	"fmt"
 	"math"
 
-	"github.com/coreos/go-semver/semver"
-
 	"github.com/onflow/cadence/common"
 	"github.com/onflow/crypto/hash"
 
@@ -30,8 +28,7 @@ type ExecutionState struct {
 	finalized bool
 
 	*spockState
-	meter            *meter.Meter
-	executionVersion semver.Version
+	meter *meter.Meter
 
 	// NOTE: parent and child state shares the same limits controller
 	*limitsController
@@ -46,7 +43,6 @@ type StateParameters struct {
 
 type ExecutionParameters struct {
 	meter.MeterParameters
-	ExecutionVersion semver.Version
 }
 
 func DefaultParameters() StateParameters {
@@ -144,7 +140,6 @@ func (state *ExecutionState) NewChildWithMeterParams(
 		finalized:        false,
 		spockState:       state.spockState.NewChild(),
 		meter:            meter.NewMeter(params.MeterParameters),
-		executionVersion: params.ExecutionVersion,
 		limitsController: state.limitsController,
 	}
 }
@@ -363,8 +358,7 @@ func (state *ExecutionState) checkSize(
 
 func (state *ExecutionState) ExecutionParameters() ExecutionParameters {
 	return ExecutionParameters{
-		MeterParameters:  state.meter.MeterParameters,
-		ExecutionVersion: state.executionVersion,
+		MeterParameters: state.meter.MeterParameters,
 	}
 }
 
