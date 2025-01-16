@@ -84,8 +84,8 @@ func TestInsertExecuted(t *testing.T) {
 				db.View(GetLastExecutedBlock(&height, &blockID)),
 			)
 
-			require.Equal(t, header5.ID(), blockID)
-			require.Equal(t, header5.Height, height)
+			require.Equal(t, header4.ID(), blockID)
+			require.Equal(t, header4.Height, height)
 		})
 	})
 }
