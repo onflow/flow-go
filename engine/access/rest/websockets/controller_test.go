@@ -1012,13 +1012,14 @@ func (s *WsControllerSuite) expectSubscribeResponse(t *testing.T, conn *connmock
 func (s *WsControllerSuite) expectCloseConnection(conn *connmock.WebsocketConnection, done <-chan struct{}) {
 	// In the default case, no further communication is expected from the client.
 	// We wait for the writer routine to signal completion, allowing us to close the connection gracefully
+	// This call is optional because it is not needed in cases where readMessages exits promptly when the context is canceled.
 	conn.
 		On("ReadJSON", mock.Anything).
 		Return(func(msg interface{}) error {
 			<-done
 			return websocket.ErrCloseSent
 		}).
-		Once()
+		Maybe()
 
 	s.expectKeepaliveRoutineShutdown(conn, done)
 }

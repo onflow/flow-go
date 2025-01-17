@@ -315,6 +315,13 @@ func (c *Controller) inactivityTickerPeriod() time.Duration {
 func (c *Controller) readMessages(ctx context.Context) error {
 	for {
 		select {
+		// ctx.Done() is necessary in readMessages() to gracefully handle the termination of the connection
+		// and prevent a potential panic ("repeated read on failed websocket connection"). If an error occurs in writeMessages(),
+		// it indirectly affect the keepalive mechanism.
+		// This can stop periodic ping messages from being sent to the server, causing the server to close the connection.
+		// Without ctx.Done(), readMessages could continue blocking on a read operation, eventually encountering an i/o timeout
+		// when no data arrives. By monitoring ctx.Done(), we ensure that readMessages exits promptly when the context is canceled
+		// due to errors elsewhere in the system or intentional shutdown.
 		case <-ctx.Done():
 			return nil
 		default:
