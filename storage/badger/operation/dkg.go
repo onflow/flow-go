@@ -111,7 +111,7 @@ func MigrateDKGEndStateFromV1(log zerolog.Logger) func(txn *badger.Txn) error {
 				ops = append(ops,
 					UpsertDKGStateForEpoch(epochCounter, newState),
 					remove(makePrefix(codeDKGEndState, epochCounter)))
-				log.Debug().Msgf("removing %d->%d, writing %d->%d", epochCounter, oldState, epochCounter, newState)
+				log.Info().Msgf("removing %d->%d, writing %d->%d", epochCounter, oldState, epochCounter, newState)
 
 				return nil
 			}
@@ -125,6 +125,9 @@ func MigrateDKGEndStateFromV1(log zerolog.Logger) func(txn *badger.Txn) error {
 			if err := op(txn); err != nil {
 				return fmt.Errorf("aborting conversion from DKG end states: %w", err)
 			}
+		}
+		if len(ops) > 0 {
+			log.Info().Msgf("finished migrating %d DKG end states", len(ops))
 		}
 		return nil
 	}

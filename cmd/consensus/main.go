@@ -209,7 +209,6 @@ func main() {
 			if err := operation.RetryOnConflict(nodeBuilder.SecretsDB.Update, operation.MigrateDKGEndStateFromV1(log)); err != nil {
 				return fmt.Errorf("could not migrate DKG end state from v1 to v2: %w", err)
 			}
-			log.Debug().Msgf("completed migrating DKG end state from v1 to v2")
 			return nil
 		}).
 		Module("machine account config", func(node *cmd.NodeConfig) error {
