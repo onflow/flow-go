@@ -213,7 +213,7 @@ func (e *Engine) inboundEventsProcessingLoop(ctx irrecoverable.SignalerContext, 
 		case <-ctx.Done():
 			return
 		case <-c:
-			err := e.processAvailableEvents(ctx)
+			err := e.processExecutionReceipts(ctx)
 			if err != nil {
 				e.log.Fatal().Err(err).Msg("internal error processing queued message")
 			}
@@ -246,10 +246,10 @@ func (e *Engine) processBlockIncorporatedEvents(ctx irrecoverable.SignalerContex
 	}
 }
 
-// processAvailableEvents processes _all_ available events (untrusted messages
+// processExecutionReceipts processes execution receipts
 // from other nodes as well as internally trusted.
 // No errors expected during normal operations.
-func (e *Engine) processAvailableEvents(ctx irrecoverable.SignalerContext) error {
+func (e *Engine) processExecutionReceipts(ctx irrecoverable.SignalerContext) error {
 	for {
 		select {
 		case <-ctx.Done():
@@ -257,16 +257,7 @@ func (e *Engine) processAvailableEvents(ctx irrecoverable.SignalerContext) error
 		default:
 		}
 
-		msg, ok := e.pendingIncorporatedBlocks.Pop()
-		if ok {
-			err := e.processIncorporatedBlock(msg.(flow.Identifier))
-			if err != nil {
-				return fmt.Errorf("could not process incorporated block: %w", err)
-			}
-			continue
-		}
-
-		msg, ok = e.pendingReceipts.Pop()
+		msg, ok := e.pendingReceipts.Pop()
 		if ok {
 			err := e.core.ProcessReceipt(msg.(*flow.ExecutionReceipt))
 			if err != nil {
