@@ -284,13 +284,13 @@ func (e *ReactorEngine) handleEpochCommittedPhaseStarted(currentEpochCounter uin
 
 		return
 	}
-	if currentState == flow.RandomBeaconKeyCommitted {
-		// this can happen if a healthy node which succeeded the DKG restarts in the EpochCommit phase
-		log.Debug().Msg("checking beacon key consistency after EpochCommit: observed committed beacon key for most recent dkg - exiting")
-		return
-	}
 	if currentState != flow.DKGStateCompleted {
-		log.Warn().Msgf("checking beacon key consistency after EpochCommit: exiting because dkg didn't reach completed state: %s", currentState.String())
+		if currentState == flow.RandomBeaconKeyCommitted {
+			// this can happen if a healthy node which succeeded the DKG restarts in the EpochCommit phase
+			log.Debug().Msg("checking beacon key consistency after EpochCommit: observed committed beacon key for most recent dkg - exiting")
+		} else {
+			log.Warn().Msgf("checking beacon key consistency after EpochCommit: exiting because dkg didn't reach completed state: %s", currentState.String())
+		}
 		return
 	}
 	snapshot := e.State.AtBlockID(firstBlock.ID())
