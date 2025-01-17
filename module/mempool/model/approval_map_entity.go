@@ -20,6 +20,9 @@ func (a *ApprovalMapEntity) ID() flow.Identifier {
 	return a.ChunkKey
 }
 
+// CheckSum implements flow.Entity.CheckSum for ApprovalMapEntity to make it
+// capable of being stored directly in mempools and storage. It makes the id of
+// the entire ApprovalMapEntity.
 func (a *ApprovalMapEntity) Checksum() flow.Identifier {
 	return flow.MakeID(a)
 }
