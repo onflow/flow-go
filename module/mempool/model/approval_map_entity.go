@@ -20,6 +20,6 @@ func (a *ApprovalMapEntity) ID() flow.Identifier {
 	return a.ChunkKey
 }
 
-func (a *ApprovalMapEntity) Hash() flow.Identifier {
+func (a *ApprovalMapEntity) Checksum() flow.Identifier {
 	return flow.MakeID(a)
 }
