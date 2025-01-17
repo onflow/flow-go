@@ -166,7 +166,7 @@ func (ms *MatchingSuite) TestOnReceiptInvalid() {
 	)
 
 	// check that _expected_ failure case of invalid receipt is handled without error
-	ms.receiptValidator.On("Validate", receipt).Return(engine.NewInvalidInputError("")).Once()
+	ms.receiptValidator.On("Validate", receipt).Return(engine.NewInvalidInputErrorf("")).Once()
 	wasAdded, err := ms.core.processReceipt(receipt)
 	ms.Require().NoError(err, "invalid receipt should be dropped but not error")
 	ms.Require().False(wasAdded, "invalid receipt should not be added")

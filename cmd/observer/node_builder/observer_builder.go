@@ -57,6 +57,7 @@ import (
 	"github.com/onflow/flow-go/engine/common/stop"
 	synceng "github.com/onflow/flow-go/engine/common/synchronization"
 	"github.com/onflow/flow-go/engine/common/version"
+	"github.com/onflow/flow-go/engine/execution/computation"
 	"github.com/onflow/flow-go/engine/execution/computation/query"
 	"github.com/onflow/flow-go/fvm/storage/derived"
 	"github.com/onflow/flow-go/ledger"
@@ -169,7 +170,6 @@ type ObserverServiceConfig struct {
 	registerCacheSize                    uint
 	programCacheSize                     uint
 	registerDBPruneThreshold             uint64
-	websocketConfig                      websockets.Config
 }
 
 // DefaultObserverServiceConfig defines all the default values for the ObserverServiceConfig
@@ -200,8 +200,9 @@ func DefaultObserverServiceConfig() *ObserverServiceConfig {
 				IdleTimeout:    rest.DefaultIdleTimeout,
 				MaxRequestSize: commonrest.DefaultMaxRequestSize,
 			},
-			MaxMsgSize:     grpcutils.DefaultMaxMsgSize,
-			CompressorName: grpcutils.NoCompressor,
+			MaxMsgSize:      grpcutils.DefaultMaxMsgSize,
+			CompressorName:  grpcutils.NoCompressor,
+			WebSocketConfig: websockets.NewDefaultWebsocketConfig(),
 		},
 		stateStreamConf: statestreambackend.Config{
 			MaxExecutionDataMsgSize: grpcutils.DefaultMaxMsgSize,
@@ -254,7 +255,6 @@ func DefaultObserverServiceConfig() *ObserverServiceConfig {
 		registerCacheSize:        0,
 		programCacheSize:         0,
 		registerDBPruneThreshold: pruner.DefaultThreshold,
-		websocketConfig:          websockets.NewDefaultWebsocketConfig(),
 	}
 }
 
@@ -814,6 +814,11 @@ func (builder *ObserverServiceBuilder) extraFlags() {
 			"registerdb-pruning-threshold",
 			defaultConfig.registerDBPruneThreshold,
 			fmt.Sprintf("specifies the number of blocks below the latest stored block height to keep in register db. default: %d", defaultConfig.registerDBPruneThreshold))
+
+		flags.DurationVar(&builder.rpcConf.WebSocketConfig.InactivityTimeout,
+			"websocket-inactivity-timeout",
+			defaultConfig.rpcConf.WebSocketConfig.InactivityTimeout,
+			"specifies the duration a WebSocket connection can remain open without any active subscriptions before being automatically closed")
 	}).ValidateFlags(func() error {
 		if builder.executionDataSyncEnabled {
 			if builder.executionDataConfig.FetchTimeout <= 0 {
@@ -1450,7 +1455,7 @@ func (builder *ObserverServiceBuilder) BuildExecutionSyncComponents() *ObserverS
 				builder.Logger,
 				metrics.NewExecutionCollector(builder.Tracer),
 				builder.RootChainID,
-				query.NewProtocolStateWrapper(builder.State),
+				computation.NewProtocolStateWrapper(builder.State),
 				builder.Storage.Headers,
 				builder.ExecutionIndexerCore.RegisterValue,
 				builder.scriptExecutorConfig,

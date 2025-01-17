@@ -34,8 +34,6 @@ type TransactionExecutorParams struct {
 
 	// Note: This is disabled only by tests
 	TransactionBodyExecutionEnabled bool
-
-	ReadVersionFromNodeVersionBeacon bool
 }
 
 func DefaultTransactionExecutorParams() TransactionExecutorParams {
@@ -44,7 +42,6 @@ func DefaultTransactionExecutorParams() TransactionExecutorParams {
 		SequenceNumberCheckAndIncrementEnabled: true,
 		AccountKeyWeightThreshold:              AccountKeyWeightThreshold,
 		TransactionBodyExecutionEnabled:        true,
-		ReadVersionFromNodeVersionBeacon:       true,
 	}
 }
 
@@ -196,7 +193,6 @@ func (executor *transactionExecutor) preprocessTransactionBody() error {
 			chain.ChainID(),
 			executor.env,
 			executor.cadenceRuntime.TxRuntimeEnv,
-			executor.ctx.EVMTracer,
 		)
 		if err != nil {
 			return err
@@ -264,7 +260,6 @@ func (executor *transactionExecutor) ExecuteTransactionBody() error {
 			chain.ChainID(),
 			executor.env,
 			executor.cadenceRuntime.TxRuntimeEnv,
-			executor.ctx.EVMTracer,
 		)
 		if err != nil {
 			return err

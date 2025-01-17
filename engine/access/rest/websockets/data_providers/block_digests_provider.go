@@ -60,16 +60,19 @@ func NewBlockDigestsDataProvider(
 func (p *BlockDigestsDataProvider) Run() error {
 	return subscription.HandleSubscription(
 		p.subscription,
-		subscription.HandleResponse(p.send, func(block *flow.BlockDigest) (interface{}, error) {
+		subscription.HandleResponse(p.send, func(b *flow.BlockDigest) (interface{}, error) {
+			var block models.BlockDigest
+			block.Build(b)
+
 			return &models.BlockDigestMessageResponse{
-				Block: block,
+				Block: &block,
 			}, nil
 		}),
 	)
 }
 
 // createSubscription creates a new subscription using the specified input arguments.
-func (p *BlockDigestsDataProvider) createSubscription(ctx context.Context, args BlocksArguments) subscription.Subscription {
+func (p *BlockDigestsDataProvider) createSubscription(ctx context.Context, args blocksArguments) subscription.Subscription {
 	if args.StartBlockID != flow.ZeroID {
 		return p.api.SubscribeBlockDigestsFromStartBlockID(ctx, args.StartBlockID, args.BlockStatus)
 	}

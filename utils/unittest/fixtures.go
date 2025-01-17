@@ -893,15 +893,14 @@ func WithBlock(block *flow.Block) func(*flow.ExecutionResult) {
 	return func(result *flow.ExecutionResult) {
 		startState := result.Chunks[0].StartState // retain previous start state in case it was user-defined
 		result.BlockID = blockID
-		result.Chunks = ChunkListFixture(uint(chunks), blockID)
-		result.Chunks[0].StartState = startState // set start state to value before update
+		result.Chunks = ChunkListFixture(uint(chunks), blockID, startState)
 		result.PreviousResultID = previousResultID
 	}
 }
 
 func WithChunks(n uint) func(*flow.ExecutionResult) {
 	return func(result *flow.ExecutionResult) {
-		result.Chunks = ChunkListFixture(n, result.BlockID)
+		result.Chunks = ChunkListFixture(n, result.BlockID, StateCommitmentFixture())
 	}
 }
 
@@ -966,7 +965,7 @@ func ExecutionResultFixture(opts ...func(*flow.ExecutionResult)) *flow.Execution
 	result := &flow.ExecutionResult{
 		PreviousResultID: IdentifierFixture(),
 		BlockID:          executedBlockID,
-		Chunks:           ChunkListFixture(2, executedBlockID),
+		Chunks:           ChunkListFixture(2, executedBlockID, StateCommitmentFixture()),
 		ExecutionDataID:  IdentifierFixture(),
 	}
 
@@ -1322,12 +1321,13 @@ func WithChunkStartState(startState flow.StateCommitment) func(chunk *flow.Chunk
 func ChunkFixture(
 	blockID flow.Identifier,
 	collectionIndex uint,
+	startState flow.StateCommitment,
 	opts ...func(*flow.Chunk),
 ) *flow.Chunk {
 	chunk := &flow.Chunk{
 		ChunkBody: flow.ChunkBody{
 			CollectionIndex:      collectionIndex,
-			StartState:           StateCommitmentFixture(),
+			StartState:           startState,
 			EventCollection:      IdentifierFixture(),
 			TotalComputationUsed: 4200,
 			NumberOfTransactions: 42,
@@ -1344,12 +1344,13 @@ func ChunkFixture(
 	return chunk
 }
 
-func ChunkListFixture(n uint, blockID flow.Identifier) flow.ChunkList {
+func ChunkListFixture(n uint, blockID flow.Identifier, startState flow.StateCommitment) flow.ChunkList {
 	chunks := make([]*flow.Chunk, 0, n)
 	for i := uint64(0); i < uint64(n); i++ {
-		chunk := ChunkFixture(blockID, uint(i))
+		chunk := ChunkFixture(blockID, uint(i), startState)
 		chunk.Index = i
 		chunks = append(chunks, chunk)
+		startState = chunk.EndState
 	}
 	return chunks
 }

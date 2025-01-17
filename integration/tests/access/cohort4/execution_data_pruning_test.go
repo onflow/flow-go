@@ -1,4 +1,4 @@
-package cohort3
+package cohort4
 
 import (
 	"context"
@@ -85,7 +85,7 @@ func (s *ExecutionDataPruningSuite) SetupTest() {
 		testnet.WithAdditionalFlagf("--event-query-mode=local-only"),
 		testnet.WithAdditionalFlagf("--execution-data-height-range-target=%d", s.heightRangeTarget),
 		testnet.WithAdditionalFlagf("--execution-data-height-range-threshold=%d", s.threshold),
-		testnet.WithAdditionalFlagf(fmt.Sprintf("--execution-data-pruning-interval=%s", s.pruningInterval)),
+		testnet.WithAdditionalFlagf("--execution-data-pruning-interval=%s", s.pruningInterval),
 	)
 
 	consensusConfigs := []func(config *testnet.NodeConfig){

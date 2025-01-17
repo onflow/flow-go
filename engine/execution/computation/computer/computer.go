@@ -115,7 +115,7 @@ type blockComputer struct {
 	spockHasher           hash.Hasher
 	receiptHasher         hash.Hasher
 	colResCons            []result.ExecutedCollectionConsumer
-	protocolState         protocol.State
+	protocolState         protocol.SnapshotExecutionSubsetProvider
 	maxConcurrency        int
 }
 
@@ -146,7 +146,7 @@ func NewBlockComputer(
 	signer module.Local,
 	executionDataProvider provider.Provider,
 	colResCons []result.ExecutedCollectionConsumer,
-	state protocol.State,
+	state protocol.SnapshotExecutionSubsetProvider,
 	maxConcurrency int,
 ) (BlockComputer, error) {
 	if maxConcurrency < 1 {
@@ -220,13 +220,7 @@ func (e *blockComputer) queueTransactionRequests(
 	collectionCtx := fvm.NewContextFromParent(
 		e.vmCtx,
 		fvm.WithBlockHeader(blockHeader),
-		// `protocol.Snapshot` implements `EntropyProvider` interface
-		// Note that `Snapshot` possible errors for RandomSource() are:
-		// - storage.ErrNotFound if the QC is unknown.
-		// - state.ErrUnknownSnapshotReference if the snapshot reference block is unknown
-		// However, at this stage, snapshot reference block should be known and the QC should also be known,
-		// so no error is expected in normal operations, as required by `EntropyProvider`.
-		fvm.WithEntropyProvider(e.protocolState.AtBlockID(blockId)),
+		fvm.WithProtocolStateSnapshot(e.protocolState.AtBlockID(blockId)),
 	)
 
 	for idx, collection := range rawCollections {
@@ -261,13 +255,7 @@ func (e *blockComputer) queueTransactionRequests(
 	systemCtx := fvm.NewContextFromParent(
 		e.systemChunkCtx,
 		fvm.WithBlockHeader(blockHeader),
-		// `protocol.Snapshot` implements `EntropyProvider` interface
-		// Note that `Snapshot` possible errors for RandomSource() are:
-		// - storage.ErrNotFound if the QC is unknown.
-		// - state.ErrUnknownSnapshotReference if the snapshot reference block is unknown
-		// However, at this stage, snapshot reference block should be known and the QC should also be known,
-		// so no error is expected in normal operations, as required by `EntropyProvider`.
-		fvm.WithEntropyProvider(e.protocolState.AtBlockID(blockId)),
+		fvm.WithProtocolStateSnapshot(e.protocolState.AtBlockID(blockId)),
 	)
 	systemCollectionLogger := systemCtx.Logger.With().
 		Str("block_id", blockIdStr).
