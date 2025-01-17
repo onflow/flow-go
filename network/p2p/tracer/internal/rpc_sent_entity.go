@@ -25,7 +25,7 @@ func (r rpcSentEntity) ID() flow.Identifier {
 // Checksum returns the node ID of the sender, it does not have any purpose in the cache.
 // It is implemented to satisfy the flow.Entity interface.
 func (r rpcSentEntity) Checksum() flow.Identifier {
-	return r.messageID
+	return flow.MakeID(r)
 }
 
 // newRPCSentEntity returns a new rpcSentEntity.
