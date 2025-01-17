@@ -95,16 +95,16 @@ func newCollectionNode(tb testing.TB) *collectionNode {
 	}
 }
 
-func (cn *collectionNode) start(t *testing.T) {
+func (cn *collectionNode) start(tb testing.TB) {
 	if cn.handler == nil {
-		t.Fatalf("collectionNode must be initialized using newCollectionNode")
+		tb.Fatalf("collectionNode must be initialized using newCollectionNode")
 	}
 
-	cn.setupNode(t)
+	cn.setupNode(tb)
 	access.RegisterAccessAPIServer(cn.server, cn.handler)
-	cn.node.start(t)
+	cn.node.start(tb)
 }
 
-func (cn *collectionNode) stop(t *testing.T) {
-	cn.node.stop(t)
+func (cn *collectionNode) stop(tb testing.TB) {
+	cn.node.stop(tb)
 }
