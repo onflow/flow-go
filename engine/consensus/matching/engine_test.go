@@ -11,7 +11,6 @@ import (
 	"github.com/stretchr/testify/suite"
 
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
-	"github.com/onflow/flow-go/engine"
 	mockconsensus "github.com/onflow/flow-go/engine/consensus/mock"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/irrecoverable"
@@ -139,15 +138,12 @@ func (s *MatchingEngineSuite) TestMultipleProcessingItems() {
 	s.core.AssertExpectations(s.T())
 }
 
-// TestProcessUnsupportedMessageType tests that Process and ProcessLocal correctly handle a case where invalid message type
-// was submitted from network layer.
+// TestProcessUnsupportedMessageType tests that Process correctly handles a case where invalid message type
+// (byzantine message) was submitted from network layer.
 func (s *MatchingEngineSuite) TestProcessUnsupportedMessageType() {
 	invalidEvent := uint64(42)
 	err := s.engine.Process("ch", unittest.IdentifierFixture(), invalidEvent)
 	// shouldn't result in error since byzantine inputs are expected
 	require.NoError(s.T(), err)
-	// in case of local processing error cannot be consumed since all inputs are trusted
-	err = s.engine.ProcessLocal(invalidEvent)
-	require.Error(s.T(), err)
-	require.True(s.T(), engine.IsIncompatibleInputTypeError(err))
+	// Local processing happens only via HandleReceipt, which will log.Fatal on invalid input
 }

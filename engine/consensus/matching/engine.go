@@ -101,63 +101,34 @@ func NewEngine(
 	return e, nil
 }
 
-// SubmitLocal submits an event originating on the local node.
-func (e *Engine) SubmitLocal(event interface{}) {
-	err := e.ProcessLocal(event)
-	if err != nil {
-		e.log.Fatal().Err(err).Msg("internal error processing event")
-	}
-}
-
-// Submit submits the given event from the node with the given origin ID
-// for processing in a non-blocking manner. It returns instantly and logs
-// a potential processing error internally when done.
-func (e *Engine) Submit(channel channels.Channel, originID flow.Identifier, event interface{}) {
-	err := e.Process(channel, originID, event)
-	if err != nil {
-		e.log.Fatal().Err(err).Msg("internal error processing event")
-	}
-}
-
-// ProcessLocal processes an event originating on the local node.
-func (e *Engine) ProcessLocal(event interface{}) error {
-	return e.process(e.me.NodeID(), event)
-}
-
-// Process processes the given event from the node with the given origin ID in
-// a blocking manner. It returns the potential processing error when done.
+// Process receives events from the network and checks their type,
+// before enqueuing them to be processed by a worker in a non-blocking manner.
+// No errors expected during normal operation (errors are logged instead).
 func (e *Engine) Process(channel channels.Channel, originID flow.Identifier, event interface{}) error {
-	err := e.process(originID, event)
-	if err != nil {
-		if engine.IsIncompatibleInputTypeError(err) {
-			e.log.Warn().Msgf("%v delivered unsupported message %T through %v", originID, event, channel)
-			return nil
-		}
-		return fmt.Errorf("unexpected error while processing engine message: %w", err)
+	receipt, ok := event.(*flow.ExecutionReceipt)
+	if !ok {
+		e.log.Warn().Msgf("%v delivered unsupported message %T through %v", originID, event, channel)
+		return nil
 	}
+	e.addReceiptToQueue(receipt)
 	return nil
 }
 
-// process events for the matching engine on the consensus node.
-func (e *Engine) process(originID flow.Identifier, event interface{}) error {
-	receipt, ok := event.(*flow.ExecutionReceipt)
-	if !ok {
-		return fmt.Errorf("no matching processor for message of type %T from origin %x: %w", event, originID[:],
-			engine.IncompatibleInputTypeError)
-	}
+// addReceiptToQueue adds an execution receipt to the queue of the matching engine, to be processed by a worker
+func (e *Engine) addReceiptToQueue(receipt *flow.ExecutionReceipt) {
 	e.metrics.MessageReceived(metrics.EngineSealing, metrics.MessageExecutionReceipt)
 	e.pendingReceipts.Push(receipt)
 	e.inboundEventsNotifier.Notify()
-	return nil
 }
 
-// HandleReceipt ingests receipts from the Requester module.
+// HandleReceipt ingests receipts from the Requester module, adding them to the queue.
 func (e *Engine) HandleReceipt(originID flow.Identifier, receipt flow.Entity) {
 	e.log.Debug().Msg("received receipt from requester engine")
-	err := e.process(originID, receipt)
-	if err != nil {
-		e.log.Fatal().Err(err).Msg("internal error processing event from requester module")
+	r, ok := receipt.(*flow.ExecutionReceipt)
+	if !ok {
+		e.log.Fatal().Err(engine.IncompatibleInputTypeError).Msg("internal error processing event from requester module")
 	}
+	e.addReceiptToQueue(r)
 }
 
 // OnFinalizedBlock implements the `OnFinalizedBlock` callback from the `hotstuff.FinalizationConsumer`
@@ -179,7 +150,7 @@ func (e *Engine) OnBlockIncorporated(incorporatedBlock *model.Block) {
 // for further processing by matching core.
 // Without the logic below, the sealing engine would produce IncorporatedResults
 // only from receipts received directly from ENs. sealing Core would not know about
-// Receipts that are incorporated by other nodes in their blocks blocks (but never
+// Receipts that are incorporated by other nodes in their blocks (but never
 // received directly from the EN).
 // No errors expected during normal operations.
 func (e *Engine) processIncorporatedBlock(blockID flow.Identifier) error {
@@ -232,6 +203,8 @@ func (e *Engine) blockIncorporatedEventsProcessingLoop(ctx irrecoverable.Signale
 	}
 }
 
+// inboundEventsProcessingLoop is a worker for processing execution receipts, received
+// from the network via Process, from the Requester module via HandleReceipt, or from incorporated blocks.
 func (e *Engine) inboundEventsProcessingLoop(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
 	c := e.inboundEventsNotifier.Channel()
 	ready()
