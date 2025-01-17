@@ -265,8 +265,10 @@ func NewDefaultKVStore(finalizationSafetyThreshold, epochExtensionViewCount uint
 	if err != nil {
 		return nil, fmt.Errorf("could not construct v0 kvstore: %w", err)
 	}
-	return &Modelv1{
-		Modelv0: *modelv0,
+	return &Modelv2{
+		Modelv1: Modelv1{
+			Modelv0: *modelv0,
+		},
 	}, nil
 }
 
