@@ -749,10 +749,11 @@ func (exeNode *ExecutionNode) LoadExecutionState(
 	chunkDataPacks := store.NewChunkDataPacks(node.Metrics.Cache,
 		pebbleimpl.ToDB(chunkDataPackDB), node.Storage.Collections, exeNode.exeConf.chunkDataPackCacheSize)
 
+	db := badgerimpl.ToDB(node.DB)
 	// Needed for gRPC server, make sure to assign to main scoped vars
-	exeNode.events = storage.NewEvents(node.Metrics.Cache, node.DB)
-	exeNode.serviceEvents = storage.NewServiceEvents(node.Metrics.Cache, node.DB)
-	exeNode.txResults = storage.NewTransactionResults(node.Metrics.Cache, node.DB, exeNode.exeConf.transactionResultsCacheSize)
+	exeNode.events = store.NewEvents(node.Metrics.Cache, db)
+	exeNode.serviceEvents = store.NewServiceEvents(node.Metrics.Cache, db)
+	exeNode.txResults = store.NewTransactionResults(node.Metrics.Cache, db, exeNode.exeConf.transactionResultsCacheSize)
 
 	exeNode.executionState = state.NewExecutionState(
 		exeNode.ledgerStorage,
@@ -766,7 +767,8 @@ func (exeNode *ExecutionNode) LoadExecutionState(
 		exeNode.events,
 		exeNode.serviceEvents,
 		exeNode.txResults,
-		node.DB,
+		db,
+		node.State,
 		node.Tracer,
 		exeNode.registerStore,
 		exeNode.exeConf.enableStorehouse,
