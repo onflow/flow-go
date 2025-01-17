@@ -17,7 +17,7 @@ import (
 // The wrapper adds the ability to "MY execution receipt", from the viewpoint
 // of an individual Execution Node.
 type MyExecutionReceipts struct {
-	genericReceipts     *ExecutionReceipts
+	genericReceipts     storage.ExecutionReceipts
 	db                  storage.DB
 	cache               *Cache[flow.Identifier, *flow.ExecutionReceipt]
 	indexingOwnReceipts sync.Mutex // lock to ensure only one receipt is stored per block
@@ -25,7 +25,7 @@ type MyExecutionReceipts struct {
 
 // NewMyExecutionReceipts creates instance of MyExecutionReceipts which is a wrapper wrapper around badger.ExecutionReceipts
 // It's useful for execution nodes to keep track of produced execution receipts.
-func NewMyExecutionReceipts(collector module.CacheMetrics, db storage.DB, receipts *ExecutionReceipts) *MyExecutionReceipts {
+func NewMyExecutionReceipts(collector module.CacheMetrics, db storage.DB, receipts storage.ExecutionReceipts) *MyExecutionReceipts {
 	mr := &MyExecutionReceipts{
 		genericReceipts: receipts,
 		db:              db,
@@ -56,7 +56,7 @@ func NewMyExecutionReceipts(collector module.CacheMetrics, db storage.DB, receip
 			return fmt.Errorf("could not check if stored a receipt for the same block before: %w", err)
 		}
 
-		err = receipts.storeTx(rw, receipt)
+		err = receipts.BatchStore(receipt, rw)
 		if err != nil {
 			return fmt.Errorf("could not store receipt: %w", err)
 		}
@@ -75,7 +75,7 @@ func NewMyExecutionReceipts(collector module.CacheMetrics, db storage.DB, receip
 		if err != nil {
 			return nil, fmt.Errorf("could not lookup receipt ID: %w", err)
 		}
-		receipt, err := receipts.byID(receiptID)
+		receipt, err := receipts.ByID(receiptID)
 		if err != nil {
 			return nil, err
 		}
