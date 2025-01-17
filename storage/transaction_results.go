@@ -16,6 +16,9 @@ type TransactionResults interface {
 
 	// ByBlockID gets all transaction results for a block, ordered by transaction index
 	ByBlockID(id flow.Identifier) ([]flow.TransactionResult, error)
+
+	// RemoveByBlockID removes all transaction results for a block
+	BatchRemoveByBlockID(id flow.Identifier, batch ReaderBatchWriter) error
 }
 
 // LightTransactionResults represents persistent storage for light transaction result
