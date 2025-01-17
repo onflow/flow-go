@@ -48,11 +48,11 @@ func (c CompleteCollection) IsCompleted() bool {
 }
 
 func (b *BlocksByCollection) ID() flow.Identifier {
-	return b.CollectionID
+	return flow.MakeID(b)
 }
 
 func (b *BlocksByCollection) Checksum() flow.Identifier {
-	return b.CollectionID
+	return flow.MakeID(b)
 }
 
 // ID lazy loads the Block.ID() into the private id field on the first call, and returns
