@@ -14,26 +14,17 @@ import (
 // ExecutionReceipts implements storage for execution receipts.
 type ExecutionReceipts struct {
 	db      storage.DB
-	results *ExecutionResults
+	results storage.ExecutionResults
 	cache   *Cache[flow.Identifier, *flow.ExecutionReceipt]
 }
 
 // NewExecutionReceipts Creates ExecutionReceipts instance which is a database of receipts which
 // supports storing and indexing receipts by receipt ID and block ID.
-func NewExecutionReceipts(collector module.CacheMetrics, db storage.DB, results *ExecutionResults, cacheSize uint) *ExecutionReceipts {
+func NewExecutionReceipts(collector module.CacheMetrics, db storage.DB, results storage.ExecutionResults, cacheSize uint) *ExecutionReceipts {
 	store := func(rw storage.ReaderBatchWriter, receiptTD flow.Identifier, receipt *flow.ExecutionReceipt) error {
 		receiptID := receipt.ID()
 
-		// // assemble DB operations to store result (no execution)
-		// storeResultOps := results.store(&receipt.ExecutionResult)
-		// // assemble DB operations to index receipt (no execution)
-		// storeReceiptOps := transaction.WithTx(operation.SkipDuplicates(operation.InsertExecutionReceiptMeta(receiptID, receipt.Meta())))
-		// // assemble DB operations to index receipt by the block it computes (no execution)
-		// indexReceiptOps := transaction.WithTx(operation.SkipDuplicates(
-		// 	operation.IndexExecutionReceipts(receipt.ExecutionResult.BlockID, receiptID),
-		// ))
-
-		err := results.store(rw, &receipt.ExecutionResult)
+		err := results.BatchStore(&receipt.ExecutionResult, rw)
 		if err != nil {
 			return fmt.Errorf("could not store result: %w", err)
 		}
@@ -54,7 +45,7 @@ func NewExecutionReceipts(collector module.CacheMetrics, db storage.DB, results 
 		if err != nil {
 			return nil, fmt.Errorf("could not retrieve receipt meta: %w", err)
 		}
-		result, err := results.byID(meta.ResultID)
+		result, err := results.ByID(meta.ResultID)
 		if err != nil {
 			return nil, fmt.Errorf("could not retrieve result: %w", err)
 		}
@@ -64,7 +55,7 @@ func NewExecutionReceipts(collector module.CacheMetrics, db storage.DB, results 
 	return &ExecutionReceipts{
 		db:      db,
 		results: results,
-		cache: newCache[flow.Identifier, *flow.ExecutionReceipt](collector, metrics.ResourceReceipt,
+		cache: newCache(collector, metrics.ResourceReceipt,
 			withLimit[flow.Identifier, *flow.ExecutionReceipt](cacheSize),
 			withStore(store),
 			withRetrieve(retrieve)),
