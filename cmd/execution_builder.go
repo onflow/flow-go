@@ -57,11 +57,11 @@ import (
 	exeprovider "github.com/onflow/flow-go/engine/execution/provider"
 	"github.com/onflow/flow-go/engine/execution/rpc"
 	"github.com/onflow/flow-go/engine/execution/scripts"
+	"github.com/onflow/flow-go/engine/execution/state"
 	"github.com/onflow/flow-go/engine/execution/state/bootstrap"
 	"github.com/onflow/flow-go/engine/execution/storehouse"
 	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/fvm/storage/snapshot"
-	"github.com/onflow/flow-go/fvm/storage/state"
 	"github.com/onflow/flow-go/fvm/systemcontracts"
 	ledgerpkg "github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/ledger/common/pathfinder"
@@ -309,8 +309,9 @@ func (exeNode *ExecutionNode) LoadSyncCore(node *NodeConfig) error {
 func (exeNode *ExecutionNode) LoadExecutionReceiptsStorage(
 	node *NodeConfig,
 ) error {
-	exeNode.results = store.NewExecutionResults(node.Metrics.Cache, badgerimpl.ToDB(node.DB))
-	exeNode.myReceipts = store.NewMyExecutionReceipts(node.Metrics.Cache, node.DB, node.Storage.Receipts.(*storage.ExecutionReceipts))
+	db := badgerimpl.ToDB(node.DB)
+	exeNode.results = store.NewExecutionResults(node.Metrics.Cache, db)
+	exeNode.myReceipts = store.NewMyExecutionReceipts(node.Metrics.Cache, db, node.Storage.Receipts)
 	return nil
 }
 
