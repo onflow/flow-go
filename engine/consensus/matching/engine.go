@@ -180,7 +180,7 @@ func (e *Engine) finalizationProcessingLoop(ctx irrecoverable.SignalerContext, r
 		case <-finalizationNotifier:
 			err := e.core.OnBlockFinalization()
 			if err != nil {
-				e.log.Fatal().Err(err).Msg("could not process last finalized event")
+				ctx.Throw(fmt.Errorf("could not process last finalized event: %w", err))
 			}
 		}
 	}
@@ -197,7 +197,7 @@ func (e *Engine) blockIncorporatedEventsProcessingLoop(ctx irrecoverable.Signale
 		case <-c:
 			err := e.processBlockIncorporatedEvents(ctx)
 			if err != nil {
-				e.log.Fatal().Err(err).Msg("internal error processing block incorporated queued message")
+				ctx.Throw(fmt.Errorf("internal error processing block incorporated queued message: %w", err))
 			}
 		}
 	}
@@ -215,7 +215,7 @@ func (e *Engine) inboundEventsProcessingLoop(ctx irrecoverable.SignalerContext, 
 		case <-c:
 			err := e.processExecutionReceipts(ctx)
 			if err != nil {
-				e.log.Fatal().Err(err).Msg("internal error processing queued message")
+				ctx.Throw(fmt.Errorf("internal error processing queued execution receipt: %w", err))
 			}
 		}
 	}
