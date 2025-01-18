@@ -18,8 +18,10 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/module/trace"
+	statemock "github.com/onflow/flow-go/state/protocol/mock"
 	storageerr "github.com/onflow/flow-go/storage"
 	storage "github.com/onflow/flow-go/storage/mock"
+	"github.com/onflow/flow-go/storage/operation/badgerimpl"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -48,8 +50,14 @@ func prepareTest(f func(t *testing.T, es state.ExecutionState, l *ledger.Ledger,
 			results := storage.NewExecutionResults(t)
 			myReceipts := storage.NewMyExecutionReceipts(t)
 
+			snapshot := new(statemock.Snapshot)
+			snapshot.On("Header").Return(&flow.Header{}, nil)
+			ps := new(statemock.State)
+			ps.On("Final").Return(snapshot)
+
+			db := badgerimpl.ToDB(badgerDB)
 			es := state.NewExecutionState(
-				ls, stateCommitments, blocks, headers, collections, chunkDataPacks, results, myReceipts, events, serviceEvents, txResults, badgerDB, trace.NewNoopTracer(),
+				ls, stateCommitments, blocks, headers, collections, chunkDataPacks, results, myReceipts, events, serviceEvents, txResults, db, ps, trace.NewNoopTracer(),
 				nil,
 				false,
 			)

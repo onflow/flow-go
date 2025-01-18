@@ -15,7 +15,7 @@ type Events struct {
 }
 
 // BatchRemoveByBlockID provides a mock function with given fields: blockID, batch
-func (_m *Events) BatchRemoveByBlockID(blockID flow.Identifier, batch storage.BatchStorage) error {
+func (_m *Events) BatchRemoveByBlockID(blockID flow.Identifier, batch storage.ReaderBatchWriter) error {
 	ret := _m.Called(blockID, batch)
 
 	if len(ret) == 0 {
@@ -23,7 +23,7 @@ func (_m *Events) BatchRemoveByBlockID(blockID flow.Identifier, batch storage.Ba
 	}
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(flow.Identifier, storage.BatchStorage) error); ok {
+	if rf, ok := ret.Get(0).(func(flow.Identifier, storage.ReaderBatchWriter) error); ok {
 		r0 = rf(blockID, batch)
 	} else {
 		r0 = ret.Error(0)
@@ -33,7 +33,7 @@ func (_m *Events) BatchRemoveByBlockID(blockID flow.Identifier, batch storage.Ba
 }
 
 // BatchStore provides a mock function with given fields: blockID, events, batch
-func (_m *Events) BatchStore(blockID flow.Identifier, events []flow.EventsList, batch storage.BatchStorage) error {
+func (_m *Events) BatchStore(blockID flow.Identifier, events []flow.EventsList, batch storage.ReaderBatchWriter) error {
 	ret := _m.Called(blockID, events, batch)
 
 	if len(ret) == 0 {
@@ -41,7 +41,7 @@ func (_m *Events) BatchStore(blockID flow.Identifier, events []flow.EventsList, 
 	}
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(flow.Identifier, []flow.EventsList, storage.BatchStorage) error); ok {
+	if rf, ok := ret.Get(0).(func(flow.Identifier, []flow.EventsList, storage.ReaderBatchWriter) error); ok {
 		r0 = rf(blockID, events, batch)
 	} else {
 		r0 = ret.Error(0)

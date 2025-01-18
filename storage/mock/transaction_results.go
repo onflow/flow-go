@@ -14,8 +14,26 @@ type TransactionResults struct {
 	mock.Mock
 }
 
+// BatchRemoveByBlockID provides a mock function with given fields: id, batch
+func (_m *TransactionResults) BatchRemoveByBlockID(id flow.Identifier, batch storage.ReaderBatchWriter) error {
+	ret := _m.Called(id, batch)
+
+	if len(ret) == 0 {
+		panic("no return value specified for BatchRemoveByBlockID")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(flow.Identifier, storage.ReaderBatchWriter) error); ok {
+		r0 = rf(id, batch)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
 // BatchStore provides a mock function with given fields: blockID, transactionResults, batch
-func (_m *TransactionResults) BatchStore(blockID flow.Identifier, transactionResults []flow.TransactionResult, batch storage.BatchStorage) error {
+func (_m *TransactionResults) BatchStore(blockID flow.Identifier, transactionResults []flow.TransactionResult, batch storage.ReaderBatchWriter) error {
 	ret := _m.Called(blockID, transactionResults, batch)
 
 	if len(ret) == 0 {
@@ -23,7 +41,7 @@ func (_m *TransactionResults) BatchStore(blockID flow.Identifier, transactionRes
 	}
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(flow.Identifier, []flow.TransactionResult, storage.BatchStorage) error); ok {
+	if rf, ok := ret.Get(0).(func(flow.Identifier, []flow.TransactionResult, storage.ReaderBatchWriter) error); ok {
 		r0 = rf(blockID, transactionResults, batch)
 	} else {
 		r0 = ret.Error(0)
