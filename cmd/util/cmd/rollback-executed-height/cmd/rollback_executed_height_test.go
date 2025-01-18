@@ -13,6 +13,7 @@ import (
 	"github.com/onflow/flow-go/engine/execution/testutil"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/module/trace"
+	statemock "github.com/onflow/flow-go/state/protocol/mock"
 	bstorage "github.com/onflow/flow-go/storage/badger"
 	"github.com/onflow/flow-go/storage/operation/badgerimpl"
 	"github.com/onflow/flow-go/storage/operation/pebbleimpl"
@@ -52,6 +53,11 @@ func TestReExecuteBlock(t *testing.T) {
 			err = headers.Store(genesis)
 			require.NoError(t, err)
 
+			snapshot := new(statemock.Snapshot)
+			snapshot.On("Header").Return(genesis, nil)
+			ps := new(statemock.State)
+			ps.On("Final").Return(snapshot)
+
 			// create execution state module
 			es := state.NewExecutionState(
 				nil,
@@ -66,7 +72,7 @@ func TestReExecuteBlock(t *testing.T) {
 				serviceEvents,
 				txResults,
 				db,
-				state,
+				ps,
 				trace.NewNoopTracer(),
 				nil,
 				false,
@@ -186,6 +192,11 @@ func TestReExecuteBlockWithDifferentResult(t *testing.T) {
 			err = headers.Store(genesis)
 			require.NoError(t, err)
 
+			snapshot := new(statemock.Snapshot)
+			snapshot.On("Header").Return(genesis, nil)
+			ps := new(statemock.State)
+			ps.On("Final").Return(snapshot)
+
 			// create execution state module
 			es := state.NewExecutionState(
 				nil,
@@ -200,7 +211,7 @@ func TestReExecuteBlockWithDifferentResult(t *testing.T) {
 				serviceEvents,
 				txResults,
 				db,
-				state,
+				ps,
 				trace.NewNoopTracer(),
 				nil,
 				false,
