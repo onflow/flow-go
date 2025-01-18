@@ -162,5 +162,5 @@ func LookupTransactionResultErrorMessagesByBlockIDUsingIndex(r storage.Reader, b
 		return check, create, handle
 	}
 
-	return TraverseByKey(r, MakePrefix(codeTransactionResultErrorMessageIndex, blockID), txErrIterFunc, storage.DefaultIteratorOptions())
+	return TraverseByPrefix(r, MakePrefix(codeTransactionResultErrorMessageIndex, blockID), txErrIterFunc, storage.DefaultIteratorOptions())
 }
