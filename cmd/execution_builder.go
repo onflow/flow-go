@@ -129,17 +129,22 @@ type ExecutionNode struct {
 
 	ingestionUnit *engine.Unit
 
-	collector              *metrics.ExecutionCollector
-	executionState         state.ExecutionState
-	followerState          protocol.FollowerState
-	committee              hotstuff.DynamicCommittee
-	ledgerStorage          *ledger.Ledger
-	registerStore          *storehouse.RegisterStore
-	events                 storageerr.Events
-	serviceEvents          storageerr.ServiceEvents
-	txResults              storageerr.TransactionResults
-	results                storageerr.ExecutionResults
-	myReceipts             storageerr.MyExecutionReceipts
+	collector      *metrics.ExecutionCollector
+	executionState state.ExecutionState
+	followerState  protocol.FollowerState
+	committee      hotstuff.DynamicCommittee
+	ledgerStorage  *ledger.Ledger
+	registerStore  *storehouse.RegisterStore
+
+	// storage
+	events        storageerr.Events
+	serviceEvents storageerr.ServiceEvents
+	txResults     storageerr.TransactionResults
+	results       storageerr.ExecutionResults
+	receipts      storageerr.ExecutionReceipts
+	myReceipts    storageerr.MyExecutionReceipts
+	commits       storageerr.Commits
+
 	providerEngine         exeprovider.ProviderEngine
 	checkerEng             *checker.Engine
 	syncCore               *chainsync.Core
@@ -203,7 +208,7 @@ func (builder *ExecutionNodeBuilder) LoadComponentsAndModules() {
 		Module("system specs", exeNode.LoadSystemSpecs).
 		Module("execution metrics", exeNode.LoadExecutionMetrics).
 		Module("sync core", exeNode.LoadSyncCore).
-		Module("execution receipts storage", exeNode.LoadExecutionReceiptsStorage).
+		Module("execution storage", exeNode.LoadExecutionStorage).
 		Module("follower distributor", exeNode.LoadFollowerDistributor).
 		Module("authorization checking function", exeNode.LoadAuthorizationCheckingFunction).
 		Module("execution data datastore", exeNode.LoadExecutionDataDatastore).
@@ -306,12 +311,19 @@ func (exeNode *ExecutionNode) LoadSyncCore(node *NodeConfig) error {
 	return err
 }
 
-func (exeNode *ExecutionNode) LoadExecutionReceiptsStorage(
+func (exeNode *ExecutionNode) LoadExecutionStorage(
 	node *NodeConfig,
 ) error {
 	db := badgerimpl.ToDB(node.DB)
+	exeNode.commits = store.NewCommits(node.Metrics.Cache, db)
 	exeNode.results = store.NewExecutionResults(node.Metrics.Cache, db)
-	exeNode.myReceipts = store.NewMyExecutionReceipts(node.Metrics.Cache, db, node.Storage.Receipts)
+	exeNode.receipts = store.NewExecutionReceipts(node.Metrics.Cache, db, exeNode.results, storage.DefaultCacheSize)
+	exeNode.myReceipts = store.NewMyExecutionReceipts(node.Metrics.Cache, db, exeNode.receipts)
+
+	// Needed for gRPC server, make sure to assign to main scoped vars
+	exeNode.events = store.NewEvents(node.Metrics.Cache, db)
+	exeNode.serviceEvents = store.NewServiceEvents(node.Metrics.Cache, db)
+	exeNode.txResults = store.NewTransactionResults(node.Metrics.Cache, db, exeNode.exeConf.transactionResultsCacheSize)
 	return nil
 }
 
@@ -751,14 +763,10 @@ func (exeNode *ExecutionNode) LoadExecutionState(
 		pebbleimpl.ToDB(chunkDataPackDB), node.Storage.Collections, exeNode.exeConf.chunkDataPackCacheSize)
 
 	db := badgerimpl.ToDB(node.DB)
-	// Needed for gRPC server, make sure to assign to main scoped vars
-	exeNode.events = store.NewEvents(node.Metrics.Cache, db)
-	exeNode.serviceEvents = store.NewServiceEvents(node.Metrics.Cache, db)
-	exeNode.txResults = store.NewTransactionResults(node.Metrics.Cache, db, exeNode.exeConf.transactionResultsCacheSize)
 
 	exeNode.executionState = state.NewExecutionState(
 		exeNode.ledgerStorage,
-		node.Storage.Commits,
+		exeNode.commits,
 		node.Storage.Blocks,
 		node.Storage.Headers,
 		node.Storage.Collections,
@@ -1325,7 +1333,7 @@ func (exeNode *ExecutionNode) LoadGrpcServer(
 		exeNode.events,
 		exeNode.results,
 		exeNode.txResults,
-		node.Storage.Commits,
+		exeNode.commits,
 		exeNode.metricsProvider,
 		node.RootChainID,
 		signature.NewBlockSignerDecoder(exeNode.committee),

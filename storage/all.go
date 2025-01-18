@@ -19,3 +19,11 @@ type All struct {
 	VersionBeacons            VersionBeacons
 	RegisterIndex             RegisterIndex
 }
+
+type Execution struct {
+	Results            ExecutionResults
+	Receipts           ExecutionReceipts
+	Commits            Commits
+	TransactionResults TransactionResults
+	Events             Events
+}
