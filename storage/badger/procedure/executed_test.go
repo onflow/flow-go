@@ -27,7 +27,7 @@ func TestInsertExecuted(t *testing.T) {
 			var height uint64
 			var blockID flow.Identifier
 			require.NoError(t,
-				db.View(GetHighestExecutedBlock(&height, &blockID)),
+				db.View(GetLastExecutedBlock(&height, &blockID)),
 			)
 
 			require.Equal(t, root.ID(), blockID)
@@ -37,13 +37,13 @@ func TestInsertExecuted(t *testing.T) {
 		t.Run("insert and get", func(t *testing.T) {
 			header1 := chain[1].Header
 			require.NoError(t,
-				db.Update(UpdateHighestExecutedBlockIfHigher(header1)),
+				db.Update(UpdateLastExecutedBlock(header1)),
 			)
 
 			var height uint64
 			var blockID flow.Identifier
 			require.NoError(t,
-				db.View(GetHighestExecutedBlock(&height, &blockID)),
+				db.View(GetLastExecutedBlock(&height, &blockID)),
 			)
 
 			require.Equal(t, header1.ID(), blockID)
@@ -54,15 +54,15 @@ func TestInsertExecuted(t *testing.T) {
 			header2 := chain[2].Header
 			header3 := chain[3].Header
 			require.NoError(t,
-				db.Update(UpdateHighestExecutedBlockIfHigher(header2)),
+				db.Update(UpdateLastExecutedBlock(header2)),
 			)
 			require.NoError(t,
-				db.Update(UpdateHighestExecutedBlockIfHigher(header3)),
+				db.Update(UpdateLastExecutedBlock(header3)),
 			)
 			var height uint64
 			var blockID flow.Identifier
 			require.NoError(t,
-				db.View(GetHighestExecutedBlock(&height, &blockID)),
+				db.View(GetLastExecutedBlock(&height, &blockID)),
 			)
 
 			require.Equal(t, header3.ID(), blockID)
@@ -73,19 +73,19 @@ func TestInsertExecuted(t *testing.T) {
 			header5 := chain[5].Header
 			header4 := chain[4].Header
 			require.NoError(t,
-				db.Update(UpdateHighestExecutedBlockIfHigher(header5)),
+				db.Update(UpdateLastExecutedBlock(header5)),
 			)
 			require.NoError(t,
-				db.Update(UpdateHighestExecutedBlockIfHigher(header4)),
+				db.Update(UpdateLastExecutedBlock(header4)),
 			)
 			var height uint64
 			var blockID flow.Identifier
 			require.NoError(t,
-				db.View(GetHighestExecutedBlock(&height, &blockID)),
+				db.View(GetLastExecutedBlock(&height, &blockID)),
 			)
 
-			require.Equal(t, header5.ID(), blockID)
-			require.Equal(t, header5.Height, height)
+			require.Equal(t, header4.ID(), blockID)
+			require.Equal(t, header4.Height, height)
 		})
 	})
 }
