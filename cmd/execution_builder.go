@@ -279,7 +279,7 @@ func (exeNode *ExecutionNode) LoadExecutionMetrics(node *NodeConfig) error {
 	// the root block as executed block
 	var height uint64
 	var blockID flow.Identifier
-	err := node.DB.View(procedure.GetHighestExecutedBlock(&height, &blockID))
+	err := node.DB.View(procedure.GetLastExecutedBlock(&height, &blockID))
 	if err != nil {
 		// database has not been bootstrapped yet
 		if errors.Is(err, storageerr.ErrNotFound) {
@@ -590,7 +590,7 @@ func (exeNode *ExecutionNode) LoadProviderEngine(
 
 	// Get latest executed block and a view at that block
 	ctx := context.Background()
-	height, blockID, err := exeNode.executionState.GetHighestExecutedBlockID(ctx)
+	height, blockID, err := exeNode.executionState.GetLastExecutedBlockID(ctx)
 	if err != nil {
 		return nil, fmt.Errorf(
 			"cannot get the latest executed block id at height %v: %w",
@@ -762,12 +762,12 @@ func (exeNode *ExecutionNode) LoadExecutionState(
 		exeNode.exeConf.enableStorehouse,
 	)
 
-	height, _, err := exeNode.executionState.GetHighestExecutedBlockID(context.Background())
+	height, _, err := exeNode.executionState.GetLastExecutedBlockID(context.Background())
 	if err != nil {
-		return nil, fmt.Errorf("could not get highest executed block: %w", err)
+		return nil, fmt.Errorf("could not get last executed block: %w", err)
 	}
 
-	log.Info().Msgf("execution state highest executed block height: %v", height)
+	log.Info().Msgf("execution state last executed block height: %v", height)
 	exeNode.collector.ExecutionLastExecutedBlockHeight(height)
 
 	return &module.NoopReadyDoneAware{}, nil
