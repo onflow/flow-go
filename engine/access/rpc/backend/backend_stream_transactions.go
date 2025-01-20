@@ -73,6 +73,7 @@ func (b *backendSubscribeTransactions) SubscribeTransactionStatuses(
 	if err != nil {
 		// throw the exception as the node must have the current sealed block in storage
 		irrecoverable.Throw(ctx, err)
+		return subscription.NewFailedSubscription(err, "failed to subscribe to transaction")
 	}
 
 	return b.createSubscription(ctx, txID, header.ID(), flow.ZeroID, requiredEventEncodingVersion)
