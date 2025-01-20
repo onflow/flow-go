@@ -30,6 +30,7 @@ type DataProvider interface {
 	// the context used for provider creation is no longer needed, as all
 	// necessary preparation steps should have been completed.
 	//
-	// No errors are expected during normal operations.
+	// Expected errors during normal operations:
+	//   - context.Canceled: if the operation is canceled, during an unsubscribe action.
 	Run() error
 }

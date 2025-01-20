@@ -23,6 +23,7 @@ import (
 	commonmodels "github.com/onflow/flow-go/engine/access/rest/common/models"
 	"github.com/onflow/flow-go/engine/access/rest/common/parser"
 	"github.com/onflow/flow-go/engine/access/rest/util"
+	"github.com/onflow/flow-go/engine/access/rest/websockets"
 	"github.com/onflow/flow-go/engine/access/rest/websockets/data_providers"
 	"github.com/onflow/flow-go/engine/access/rest/websockets/models"
 	"github.com/onflow/flow-go/engine/common/rpc/convert"
@@ -234,7 +235,7 @@ func (s *WebsocketSubscriptionSuite) TestMaxSubscriptionsPerConnection() {
 
 	blocksSubscriptionArguments := models.Arguments{"block_status": parser.Finalized}
 	// Expected error message when exceeding the maximum subscription limit.
-	expectedErrorMessage := fmt.Sprintf("maximum number of subscription reached: %d", MaxSubscriptionsPerConnection)
+	expectedErrorMessage := fmt.Sprintf("error creating new subscription: %s", websockets.ErrMaxSubscriptionsReached.Error())
 
 	// Loop to send subscription requests, including one request exceeding the limit.
 	for i := 1; i <= MaxSubscriptionsPerConnection+1; i++ {

@@ -93,6 +93,9 @@ import (
 	"github.com/onflow/flow-go/utils/concurrentmap"
 )
 
+// ErrMaxSubscriptionsReached is returned when the maximum number of active subscriptions per connection is exceeded.
+var ErrMaxSubscriptionsReached = errors.New("maximum number of subscriptions reached")
+
 type Controller struct {
 	logger zerolog.Logger
 	config Config
@@ -399,11 +402,16 @@ func (c *Controller) handleMessage(ctx context.Context, message json.RawMessage)
 	return nil
 }
 
+// handleSubscribe processes a subscription request.
+//
+// Expected error returns during normal operations:
+//   - ErrMaxSubscriptionsReached: if the maximum number of active subscriptions per connection is exceeded.
+//   - context.Canceled: if the operation is canceled, during an unsubscribe action.
 func (c *Controller) handleSubscribe(ctx context.Context, msg models.SubscribeMessageRequest) {
 	// Check if the maximum number of active subscriptions per connection has been reached.
 	// If the limit is exceeded, an error is returned, and the subscription request is rejected.
 	if uint64(c.activeSubscriptionsPerConnection.Load()) >= c.config.MaxSubscriptionsPerConnection {
-		err := fmt.Errorf("maximum number of subscription reached: %d", c.config.MaxSubscriptionsPerConnection)
+		err := fmt.Errorf("error creating new subscription: %w", ErrMaxSubscriptionsReached)
 		c.writeErrorResponse(
 			ctx,
 			err,
@@ -450,10 +458,10 @@ func (c *Controller) handleSubscribe(ctx context.Context, msg models.SubscribeMe
 	c.dataProvidersGroup.Add(1)
 	go func() {
 		err = provider.Run()
-		if err != nil && c.dataProviders.Has(subscriptionID) {
-			// Ensure the context.Canceled error was not initiated by closing this provider
-			// during the unsubscribe action. Without this check, the base error context.Canceled
-			// will always be sent, even when simply unsubscribing from a topic.
+		// context.Canceled error is expected cause was initiated by closing this provider
+		// during the unsubscribe action. Without this check, the base error context.Canceled
+		// will always be sent, even when simply unsubscribing from a topic.
+		if err != nil && !errors.Is(err, context.Canceled) {
 			c.writeErrorResponse(
 				ctx,
 				err,

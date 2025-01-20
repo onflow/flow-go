@@ -73,7 +73,8 @@ func NewTransactionStatusesDataProvider(
 
 // Run starts processing the subscription for events and handles responses.
 //
-// No errors are expected during normal operations.
+// Expected errors during normal operations:
+//   - context.Canceled: if the operation is canceled, during an unsubscribe action.
 func (p *TransactionStatusesDataProvider) Run() error {
 	return subscription.HandleSubscription(p.subscription, p.handleResponse())
 }
