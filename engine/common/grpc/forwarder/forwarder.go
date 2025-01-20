@@ -75,7 +75,7 @@ func (f *Forwarder) reconnectingClient(i int) error {
 // FaultTolerantClient implements an upstream connection that reconnects on errors
 // a reasonable amount of time.
 func (f *Forwarder) FaultTolerantClient() (access.AccessAPIClient, io.Closer, error) {
-	if f.upstream == nil || len(f.upstream) == 0 {
+	if len(f.upstream) == 0 {
 		return nil, nil, status.Errorf(codes.Unimplemented, "method not implemented")
 	}
 
@@ -101,5 +101,5 @@ func (f *Forwarder) FaultTolerantClient() (access.AccessAPIClient, io.Closer, er
 		return f.upstream[f.roundRobin].client, f.upstream[f.roundRobin].closer, nil
 	}
 
-	return nil, nil, status.Errorf(codes.Unavailable, err.Error())
+	return nil, nil, status.Error(codes.Unavailable, err.Error())
 }

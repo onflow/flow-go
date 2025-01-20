@@ -312,21 +312,3 @@ func (sys *SystemContracts) AccountsStorageCapacity(
 		},
 	)
 }
-
-var getCurrentVersionBoundarySpec = ContractFunctionSpec{
-	AddressFromChain: ServiceAddress,
-	LocationName:     systemcontracts.ContractNameNodeVersionBeacon,
-	FunctionName:     systemcontracts.ContractVersionBeacon_getCurrentVersionBoundary,
-	ArgumentTypes:    []sema.Type{},
-}
-
-// GetCurrentVersionBoundary executes the getCurrentVersionBoundary function on the NodeVersionBeacon contract.
-// the function will return the version boundary (version, block height) that is currently in effect.
-// the version boundary currently in effect is the highest one not above the current block height.
-// if there is no existing version boundary lower than the current block height, the function will return version 0 and block height 0.
-func (sys *SystemContracts) GetCurrentVersionBoundary() (cadence.Value, error) {
-	return sys.Invoke(
-		getCurrentVersionBoundarySpec,
-		[]cadence.Value{},
-	)
-}
