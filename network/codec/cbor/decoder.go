@@ -3,6 +3,7 @@ package cbor
 import (
 	"github.com/fxamacker/cbor/v2"
 
+	cborcodec "github.com/onflow/flow-go/model/encoding/cbor"
 	"github.com/onflow/flow-go/network/codec"
 	_ "github.com/onflow/flow-go/utils/binstat"
 )
@@ -40,7 +41,7 @@ func (d *Decoder) Decode() (interface{}, error) {
 
 	// unmarshal the payload
 	//bs2 := binstat.EnterTimeVal(fmt.Sprintf("%s%s%s:%d", binstat.BinNet, ":strm>2(cbor)", what, code), int64(len(data))) // e.g. ~3net:strm>2(cbor)CodeEntityRequest:23
-	err = defaultDecMode.Unmarshal(data[1:], msgInterface) // all but first byte
+	err = cborcodec.DefaultDecMode.Unmarshal(data[1:], msgInterface) // all but first byte
 	//binstat.Leave(bs2)
 	if err != nil {
 		return nil, codec.NewMsgUnmarshalErr(data[0], what, err)
