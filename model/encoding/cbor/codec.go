@@ -32,13 +32,19 @@ var EncMode = func() cbor.EncMode {
 	return encMode
 }()
 
-// DecMode is the default DecMode to use when creating a new cbor Decoder
-var DecMode, _ = cbor.DecOptions{}.DecMode()
+// UnsafeDecMode is a permissive mode for creating a new cbor Decoder.
+//
+// CAUTION: this encoding should only be used for encoding/decoding data within a node.
+// If used for decoding data that is shared between nodes, it makes the recipient VULNERABLE
+// to RESOURCE EXHAUSTION ATTACKS, where a byzantine sender could include garbage data in the
+// encoding, which would not be noticed by the recipient because the garbage data is dropped
+// at the decoding step - yet, it consumes the recipient's networking bandwidth.
+var UnsafeDecMode, _ = cbor.DecOptions{}.DecMode()
 
-// NetworkDecMode is the DecMode used for decoding messages over the network.
+// DefaultDecMode is the DecMode used for decoding messages over the network.
 // It returns an error if the message contains any extra field not present in the
-// target (struct we are unmarshalling into), which prevents some classes of spamming.
-var NetworkDecMode, _ = cbor.DecOptions{ExtraReturnErrors: cbor.ExtraDecErrorUnknownField}.DecMode()
+// target (struct we are unmarshalling into), which prevents some classes of resource exhaustion attacks.
+var DefaultDecMode, _ = cbor.DecOptions{ExtraReturnErrors: cbor.ExtraDecErrorUnknownField}.DecMode()
 
 func (m *Marshaler) Marshal(val interface{}) ([]byte, error) {
 	return EncMode.Marshal(val)
@@ -92,7 +98,7 @@ type Codec struct {
 func NewCodec(opts ...Option) *Codec {
 	c := &Codec{
 		encMode: EncMode,
-		decMode: DecMode,
+		decMode: UnsafeDecMode,
 	}
 
 	for _, opt := range opts {

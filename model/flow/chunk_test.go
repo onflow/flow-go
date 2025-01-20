@@ -183,20 +183,20 @@ func TestChunkEncodeDecode(t *testing.T) {
 			assert.Equal(t, chunk, unmarshaled)
 			assert.Nil(t, unmarshaled.ServiceEventCount)
 		})
-		t.Run("cbor default", func(t *testing.T) {
+		t.Run("lax non-BFT cbor decoding", func(t *testing.T) {
 			bz, err := cborcodec.EncMode.Marshal(chunk)
 			require.NoError(t, err)
 			unmarshaled := new(flow.Chunk)
-			err = cborcodec.DecMode.Unmarshal(bz, unmarshaled)
+			err = cborcodec.UnsafeDecMode.Unmarshal(bz, unmarshaled)
 			require.NoError(t, err)
 			assert.Equal(t, chunk, unmarshaled)
 			assert.Nil(t, unmarshaled.ServiceEventCount)
 		})
-		t.Run("cbor strict", func(t *testing.T) {
+		t.Run("default strict cbor decoding", func(t *testing.T) {
 			bz, err := cborcodec.EncMode.Marshal(chunk)
 			require.NoError(t, err)
 			unmarshaled := new(flow.Chunk)
-			err = cborcodec.NetworkDecMode.Unmarshal(bz, unmarshaled)
+			err = cborcodec.DefaultDecMode.Unmarshal(bz, unmarshaled)
 			require.NoError(t, err)
 			assert.Equal(t, chunk, unmarshaled)
 			assert.Nil(t, unmarshaled.ServiceEventCount)
@@ -213,20 +213,20 @@ func TestChunkEncodeDecode(t *testing.T) {
 			assert.Equal(t, chunk, unmarshaled)
 			assert.NotNil(t, unmarshaled.ServiceEventCount)
 		})
-		t.Run("cbor default", func(t *testing.T) {
+		t.Run("lax non-BFT cbor decoding", func(t *testing.T) {
 			bz, err := cborcodec.EncMode.Marshal(chunk)
 			require.NoError(t, err)
 			unmarshaled := new(flow.Chunk)
-			err = cborcodec.DecMode.Unmarshal(bz, unmarshaled)
+			err = cborcodec.UnsafeDecMode.Unmarshal(bz, unmarshaled)
 			require.NoError(t, err)
 			assert.Equal(t, chunk, unmarshaled)
 			assert.NotNil(t, unmarshaled.ServiceEventCount)
 		})
-		t.Run("cbor strict", func(t *testing.T) {
+		t.Run("default strict cbor decoding", func(t *testing.T) {
 			bz, err := cborcodec.EncMode.Marshal(chunk)
 			require.NoError(t, err)
 			unmarshaled := new(flow.Chunk)
-			err = cborcodec.NetworkDecMode.Unmarshal(bz, unmarshaled)
+			err = cborcodec.DefaultDecMode.Unmarshal(bz, unmarshaled)
 			require.NoError(t, err)
 			assert.Equal(t, chunk, unmarshaled)
 			assert.NotNil(t, unmarshaled.ServiceEventCount)
@@ -256,24 +256,24 @@ func TestChunk_ModelVersions_EncodeDecode(t *testing.T) {
 			assert.Nil(t, unmarshaled.ServiceEventCount)
 		})
 
-		t.Run("cbor default", func(t *testing.T) {
+		t.Run("lax non-BFT cbor decoding", func(t *testing.T) {
 			bz, err := cborcodec.EncMode.Marshal(chunkv0)
 			require.NoError(t, err)
 
 			var unmarshaled flow.ChunkBody
-			err = cborcodec.DecMode.Unmarshal(bz, &unmarshaled)
+			err = cborcodec.UnsafeDecMode.Unmarshal(bz, &unmarshaled)
 			require.NoError(t, err)
 			assert.Equal(t, chunkv0.EventCollection, unmarshaled.EventCollection)
 			assert.Equal(t, chunkv0.BlockID, unmarshaled.BlockID)
 			assert.Nil(t, unmarshaled.ServiceEventCount)
 		})
 
-		t.Run("cbor strict", func(t *testing.T) {
+		t.Run("default strict cbor decoding", func(t *testing.T) {
 			bz, err := cborcodec.EncMode.Marshal(chunkv0)
 			require.NoError(t, err)
 
 			var unmarshaled flow.ChunkBody
-			err = cborcodec.NetworkDecMode.Unmarshal(bz, &unmarshaled)
+			err = cborcodec.DefaultDecMode.Unmarshal(bz, &unmarshaled)
 			require.NoError(t, err)
 			assert.Equal(t, chunkv0.EventCollection, unmarshaled.EventCollection)
 			assert.Equal(t, chunkv0.BlockID, unmarshaled.BlockID)
@@ -295,17 +295,18 @@ func TestChunk_ModelVersions_EncodeDecode(t *testing.T) {
 				assert.Equal(t, chunkv1.EventCollection, unmarshaled.EventCollection)
 				assert.Equal(t, chunkv1.BlockID, unmarshaled.BlockID)
 			})
-			t.Run("cbor default - should not error", func(t *testing.T) {
+			t.Run("lax non-BFT cbor decoding - should not error", func(t *testing.T) {
+				// CAUTION: using the lax decoding is not safe for data structures that are exchanged between nodes!
 				bz, err := cborcodec.EncMode.Marshal(chunkv1)
 				require.NoError(t, err)
 
 				var unmarshaled flow.ChunkBodyV0
-				err = cborcodec.DecMode.Unmarshal(bz, &unmarshaled)
+				err = cborcodec.UnsafeDecMode.Unmarshal(bz, &unmarshaled)
 				require.NoError(t, err)
 				assert.Equal(t, chunkv1.EventCollection, unmarshaled.EventCollection)
 				assert.Equal(t, chunkv1.BlockID, unmarshaled.BlockID)
 			})
-			// In the stricter mode we use for network decoding, an error is expected
+			// In the stricter mode (default), which we use for decoding on the networking layer, an error is expected
 			// because the message includes a field not present in the v0 target,
 			// when the new ServiceEventCount field is non-nil
 			t.Run("cbor strict - error expected", func(t *testing.T) {
@@ -313,7 +314,7 @@ func TestChunk_ModelVersions_EncodeDecode(t *testing.T) {
 				require.NoError(t, err)
 
 				var unmarshaled flow.ChunkBodyV0
-				err = cborcodec.NetworkDecMode.Unmarshal(bz, &unmarshaled)
+				err = cborcodec.DefaultDecMode.Unmarshal(bz, &unmarshaled)
 				assert.Error(t, err)
 				target := &cbor.UnknownFieldError{}
 				assert.ErrorAs(t, err, &target)
@@ -333,12 +334,12 @@ func TestChunk_ModelVersions_EncodeDecode(t *testing.T) {
 				assert.Equal(t, chunkv1.EventCollection, unmarshaled.EventCollection)
 				assert.Equal(t, chunkv1.BlockID, unmarshaled.BlockID)
 			})
-			t.Run("cbor default", func(t *testing.T) {
+			t.Run("lax non-BFT cbor decoding", func(t *testing.T) {
 				bz, err := cborcodec.EncMode.Marshal(chunkv1)
 				require.NoError(t, err)
 
 				var unmarshaled flow.ChunkBodyV0
-				err = cborcodec.DecMode.Unmarshal(bz, &unmarshaled)
+				err = cborcodec.UnsafeDecMode.Unmarshal(bz, &unmarshaled)
 				require.NoError(t, err)
 				assert.Equal(t, chunkv1.EventCollection, unmarshaled.EventCollection)
 				assert.Equal(t, chunkv1.BlockID, unmarshaled.BlockID)
@@ -350,7 +351,7 @@ func TestChunk_ModelVersions_EncodeDecode(t *testing.T) {
 				require.NoError(t, err)
 
 				var unmarshaled flow.ChunkBodyV0
-				err = cborcodec.NetworkDecMode.Unmarshal(bz, &unmarshaled)
+				err = cborcodec.DefaultDecMode.Unmarshal(bz, &unmarshaled)
 				require.NoError(t, err)
 				assert.Equal(t, chunkv1.EventCollection, unmarshaled.EventCollection)
 				assert.Equal(t, chunkv1.BlockID, unmarshaled.BlockID)

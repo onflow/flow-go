@@ -6,7 +6,6 @@ import (
 	"testing"
 
 	"github.com/dgraph-io/badger/v2"
-	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 
 	"github.com/onflow/flow-go/model/encodable"
@@ -131,7 +130,7 @@ func TestMigrateDKGEndStateFromV1(t *testing.T) {
 		}
 
 		// migrate the state
-		err := db.Update(MigrateDKGEndStateFromV1(zerolog.Nop()))
+		err := db.Update(MigrateDKGEndStateFromV1(unittest.Logger()))
 		assert.NoError(t, err)
 
 		assertMigrationSuccessful := func() {
@@ -168,7 +167,7 @@ func TestMigrateDKGEndStateFromV1(t *testing.T) {
 		assertMigrationSuccessful()
 
 		// migrating again should be no-op
-		err = db.Update(MigrateDKGEndStateFromV1(zerolog.Nop()))
+		err = db.Update(MigrateDKGEndStateFromV1(unittest.Logger()))
 		assert.NoError(t, err)
 		assertMigrationSuccessful()
 	})
