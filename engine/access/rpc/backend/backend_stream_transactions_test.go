@@ -4,11 +4,12 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/onflow/flow-go/module/irrecoverable"
-	protocolint "github.com/onflow/flow-go/state/protocol"
 	"os"
 	"testing"
 	"time"
+
+	"github.com/onflow/flow-go/module/irrecoverable"
+	protocolint "github.com/onflow/flow-go/state/protocol"
 
 	"github.com/onflow/flow-go/storage"
 
