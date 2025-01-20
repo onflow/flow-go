@@ -25,16 +25,16 @@ import (
 // HandleFunc is a function provided to the requester engine to handle an entity
 // once it has been retrieved from a provider. The function should be non-blocking
 // and errors should be handled internally within the function.
-type HandleFunc func(originID flow.Identifier, entity flow.Entity)
+type HandleFunc[T flow.Entity] func(originID flow.Identifier, entity *T)
 
 // CreateFunc is a function that creates a `flow.Entity` with an underlying type
 // so that we can properly decode entities transmitted over the network.
-type CreateFunc func() flow.Entity
+type CreateFunc[T flow.Entity] func() T
 
 // Engine is a generic requester engine, handling the requesting of entities
 // on the flow network. It is the `request` part of the request-reply
 // pattern provided by the pair of generic exchange engines.
-type Engine struct {
+type Engine[T flow.Entity] struct {
 	unit     *engine.Unit
 	log      zerolog.Logger
 	cfg      Config
@@ -44,8 +44,8 @@ type Engine struct {
 	con      network.Conduit
 	channel  channels.Channel
 	selector flow.IdentityFilter[flow.Identity]
-	create   CreateFunc
-	handle   HandleFunc
+	create   CreateFunc[T]
+	handle   HandleFunc[T]
 
 	// changing the following state variables must be guarded by unit.Lock()
 	items                 map[flow.Identifier]*Item
@@ -56,8 +56,8 @@ type Engine struct {
 // New creates a new requester engine, operating on the provided network channel, and requesting entities from a node
 // within the set obtained by applying the provided selector filter. The options allow customization of the parameters
 // related to the batch and retry logic.
-func New(log zerolog.Logger, metrics module.EngineMetrics, net network.EngineRegistry, me module.Local, state protocol.State,
-	channel channels.Channel, selector flow.IdentityFilter[flow.Identity], create CreateFunc, options ...OptionFunc) (*Engine, error) {
+func New[T flow.Entity](log zerolog.Logger, metrics module.EngineMetrics, net network.EngineRegistry, me module.Local, state protocol.State,
+	channel channels.Channel, selector flow.IdentityFilter[flow.Identity], create CreateFunc[T], options ...OptionFunc) (*Engine[T], error) {
 
 	// initialize the default config
 	cfg := Config{
@@ -103,7 +103,7 @@ func New(log zerolog.Logger, metrics module.EngineMetrics, net network.EngineReg
 	}
 
 	// initialize the propagation engine with its dependencies
-	e := &Engine{
+	e := &Engine[T]{
 		unit:                  engine.NewUnit(),
 		log:                   log.With().Str("engine", "requester").Logger(),
 		cfg:                   cfg,
@@ -134,14 +134,14 @@ func New(log zerolog.Logger, metrics module.EngineMetrics, net network.EngineReg
 // function. It is done in a separate call so that the requester can be injected
 // into engines upon construction, and then provide a handle function to the
 // requester from that engine itself.
-func (e *Engine) WithHandle(handle HandleFunc) {
+func (e *Engine[T]) WithHandle(handle HandleFunc[T]) {
 	e.handle = handle
 }
 
 // Ready returns a ready channel that is closed once the engine has fully
 // started. For consensus engine, this is true once the underlying consensus
 // algorithm has started.
-func (e *Engine) Ready() <-chan struct{} {
+func (e *Engine[T]) Ready() <-chan struct{} {
 	if e.handle == nil {
 		panic("must initialize requester engine with handler")
 	}
@@ -151,12 +151,12 @@ func (e *Engine) Ready() <-chan struct{} {
 
 // Done returns a done channel that is closed once the engine has fully stopped.
 // For the consensus engine, we wait for hotstuff to finish.
-func (e *Engine) Done() <-chan struct{} {
+func (e *Engine[T]) Done() <-chan struct{} {
 	return e.unit.Done()
 }
 
 // SubmitLocal submits an message originating on the local node.
-func (e *Engine) SubmitLocal(message interface{}) {
+func (e *Engine[T]) SubmitLocal(message interface{}) {
 	e.unit.Launch(func() {
 		err := e.process(e.me.NodeID(), message)
 		if err != nil {
@@ -168,7 +168,7 @@ func (e *Engine) SubmitLocal(message interface{}) {
 // Submit submits the given message from the node with the given origin ID
 // for processing in a non-blocking manner. It returns instantly and logs
 // a potential processing error internally when done.
-func (e *Engine) Submit(channel channels.Channel, originID flow.Identifier, message interface{}) {
+func (e *Engine[T]) Submit(channel channels.Channel, originID flow.Identifier, message interface{}) {
 	e.unit.Launch(func() {
 		err := e.Process(channel, originID, message)
 		if err != nil {
@@ -178,7 +178,7 @@ func (e *Engine) Submit(channel channels.Channel, originID flow.Identifier, mess
 }
 
 // ProcessLocal processes an message originating on the local node.
-func (e *Engine) ProcessLocal(message interface{}) error {
+func (e *Engine[T]) ProcessLocal(message interface{}) error {
 	return e.unit.Do(func() error {
 		return e.process(e.me.NodeID(), message)
 	})
@@ -186,7 +186,7 @@ func (e *Engine) ProcessLocal(message interface{}) error {
 
 // Process processes the given message from the node with the given origin ID in
 // a blocking manner. It returns the potential processing error when done.
-func (e *Engine) Process(channel channels.Channel, originID flow.Identifier, message interface{}) error {
+func (e *Engine[T]) Process(channel channels.Channel, originID flow.Identifier, message interface{}) error {
 	return e.unit.Do(func() error {
 		return e.process(originID, message)
 	})
@@ -201,7 +201,7 @@ func (e *Engine) Process(channel channels.Channel, originID flow.Identifier, mes
 // control over which subset of providers to request a given entity from, such as
 // selection of a collection cluster. Use `filter.Any` if no additional selection
 // is required. Checks integrity of response to make sure that we got entity that we were requesting.
-func (e *Engine) EntityByID(entityID flow.Identifier, selector flow.IdentityFilter[flow.Identity]) {
+func (e *Engine[T]) EntityByID(entityID flow.Identifier, selector flow.IdentityFilter[flow.Identity]) {
 	e.addEntityRequest(entityID, selector, true)
 }
 
@@ -210,11 +210,11 @@ func (e *Engine) EntityByID(entityID flow.Identifier, selector flow.IdentityFilt
 // of valid providers for the data and allows finer-grained control
 // over which providers to request data from. Doesn't perform integrity check
 // can be used to get entities without knowing their ID.
-func (e *Engine) Query(key flow.Identifier, selector flow.IdentityFilter[flow.Identity]) {
+func (e *Engine[T]) Query(key flow.Identifier, selector flow.IdentityFilter[flow.Identity]) {
 	e.addEntityRequest(key, selector, false)
 }
 
-func (e *Engine) addEntityRequest(entityID flow.Identifier, selector flow.IdentityFilter[flow.Identity], checkIntegrity bool) {
+func (e *Engine[T]) addEntityRequest(entityID flow.Identifier, selector flow.IdentityFilter[flow.Identity], checkIntegrity bool) {
 	e.unit.Lock()
 	defer e.unit.Unlock()
 
@@ -238,7 +238,7 @@ func (e *Engine) addEntityRequest(entityID flow.Identifier, selector flow.Identi
 
 // Force will force the requester engine to dispatch all currently
 // valid batch requests.
-func (e *Engine) Force() {
+func (e *Engine[T]) Force() {
 	// exit early in case a forced dispatch is currently ongoing
 	if e.forcedDispatchOngoing.Load() {
 		return
@@ -266,7 +266,7 @@ func (e *Engine) Force() {
 	})
 }
 
-func (e *Engine) poll() {
+func (e *Engine[T]) poll() {
 	ticker := time.NewTicker(e.cfg.BatchInterval)
 
 PollLoop:
@@ -299,7 +299,7 @@ PollLoop:
 // if and only if there is something to request. In other words it cannot happen that
 // `dispatchRequest` sends no request, but there is something to be requested.
 // The boolean return value indicates whether a request was dispatched at all.
-func (e *Engine) dispatchRequest() (bool, error) {
+func (e *Engine[T]) dispatchRequest() (bool, error) {
 
 	e.unit.Lock()
 	defer e.unit.Unlock()
@@ -448,7 +448,7 @@ func (e *Engine) dispatchRequest() (bool, error) {
 }
 
 // process processes events for the propagation engine on the consensus node.
-func (e *Engine) process(originID flow.Identifier, message interface{}) error {
+func (e *Engine[T]) process(originID flow.Identifier, message interface{}) error {
 
 	e.metrics.MessageReceived(e.channel.String(), metrics.MessageEntityResponse)
 	defer e.metrics.MessageHandled(e.channel.String(), metrics.MessageEntityResponse)
@@ -461,7 +461,7 @@ func (e *Engine) process(originID flow.Identifier, message interface{}) error {
 	}
 }
 
-func (e *Engine) onEntityResponse(originID flow.Identifier, res *messages.EntityResponse) error {
+func (e *Engine[T]) onEntityResponse(originID flow.Identifier, res *messages.EntityResponse) error {
 	lg := e.log.With().Str("origin_id", originID.String()).Uint64("nonce", res.Nonce).Logger()
 
 	lg.Debug().Strs("entity_ids", flow.IdentifierList(res.EntityIDs).Strings()).Msg("entity response received")
@@ -547,7 +547,7 @@ func (e *Engine) onEntityResponse(originID flow.Identifier, res *messages.Entity
 		delete(e.items, entityID)
 
 		// process the entity
-		go e.handle(originID, entity)
+		go e.handle(originID, &entity)
 	}
 
 	// requeue requested entities that have not been delivered in the response
