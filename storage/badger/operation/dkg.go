@@ -6,6 +6,7 @@ import (
 	"fmt"
 
 	"github.com/dgraph-io/badger/v2"
+	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/model/encodable"
 	"github.com/onflow/flow-go/model/flow"
@@ -81,7 +82,7 @@ func RetrieveDKGStateForEpoch(epochCounter uint64, currentState *flow.DKGState) 
 // It reads already stored data by deprecated prefix and writes it to the new prefix with values converted to the new representation.
 // TODO(EFM, #6794): This function is introduced to implement a backward-compatible upgrade from v1 to v2.
 // Remove this once we complete the network upgrade.
-func MigrateDKGEndStateFromV1() func(txn *badger.Txn) error {
+func MigrateDKGEndStateFromV1(log zerolog.Logger) func(txn *badger.Txn) error {
 	return func(txn *badger.Txn) error {
 		var ops []func(*badger.Txn) error
 		err := traverse(makePrefix(codeDKGEndState), func() (checkFunc, createFunc, handleFunc) {
@@ -110,6 +111,7 @@ func MigrateDKGEndStateFromV1() func(txn *badger.Txn) error {
 				ops = append(ops,
 					UpsertDKGStateForEpoch(epochCounter, newState),
 					remove(makePrefix(codeDKGEndState, epochCounter)))
+				log.Info().Msgf("removing %d->%d, writing %d->%d", epochCounter, oldState, epochCounter, newState)
 
 				return nil
 			}
@@ -123,6 +125,9 @@ func MigrateDKGEndStateFromV1() func(txn *badger.Txn) error {
 			if err := op(txn); err != nil {
 				return fmt.Errorf("aborting conversion from DKG end states: %w", err)
 			}
+		}
+		if len(ops) > 0 {
+			log.Info().Msgf("finished migrating %d DKG end states", len(ops))
 		}
 		return nil
 	}

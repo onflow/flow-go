@@ -284,16 +284,24 @@ func (e *ReactorEngine) handleEpochCommittedPhaseStarted(currentEpochCounter uin
 
 		return
 	}
-	if currentState != flow.DKGStateCompleted {
-		log.Warn().Msgf("checking beacon key consistency: exiting because dkg didn't reach completed state: %s", currentState.String())
+	// (i) if I have a key (currentState == flow.DKGStateCompleted) which is consistent with the EpochCommit service event,
+	// then commit the key or (ii) if the key is already committed (currentState == flow.RandomBeaconKeyCommitted), then we
+	// expect it to be consistent with the EpochCommit service event. While (ii) is a sanity check, we have a severe problem
+	// if it is violated, because a node signing with an invalid Random beacon key will be slashed - so we better check!
+	// Our logic for committing a key is idempotent: it is a no-op when stating that a key `k` should be committed that previously
+	// has already been committed; while it errors if `k` is different from the previously-committed key. In other words, the
+	// sanity check (ii) is already included in the happy-path logic for (i). So we just repeat the happy-path logic also for
+	// currentState == flow.RandomBeaconKeyCommitted, because repeated calls only occur due to node crashes, which are rare.
+	if currentState != flow.DKGStateCompleted && currentState != flow.RandomBeaconKeyCommitted {
+		log.Warn().Msgf("checking beacon key consistency after EpochCommit: exiting because dkg didn't reach completed state: %s", currentState.String())
 		return
 	}
-	snapshot := e.State.AtBlockID(firstBlock.ID())
 
 	// Since epoch phase transitions are emitted when the first block of the new
 	// phase is finalized, the block's snapshot is guaranteed to already be
 	// accessible in the protocol state at this point (even though the Badger
 	// transaction finalizing the block has not been committed yet).
+	snapshot := e.State.AtBlockID(firstBlock.ID())
 	nextDKG, err := snapshot.Epochs().Next().DKG()
 	if err != nil {
 		// CAUTION: this should never happen, indicates a storage failure or corruption
