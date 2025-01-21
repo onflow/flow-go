@@ -19,6 +19,7 @@ import (
 	"github.com/onflow/flow-go/fvm/storage"
 	"github.com/onflow/flow-go/fvm/storage/derived"
 	"github.com/onflow/flow-go/fvm/storage/state"
+	"github.com/onflow/flow-go/fvm/systemcontracts"
 )
 
 func ProcedureStateParameters(
@@ -143,10 +144,14 @@ func (computer ExecutionParametersComputer) getExecutionParameters() (
 	derived.StateExecutionParameters,
 	error,
 ) {
-	// Check that the service account exists because all the settings are
-	// stored in it
-	serviceAddress := computer.ctx.Chain.ServiceAddress()
-	service := common.Address(serviceAddress)
+	sc := systemcontracts.SystemContractsForChain(computer.ctx.Chain.ChainID())
+
+	// The execution parameters are stored in the ExecutionParametersAccount. This is
+	// just the service account for all networks except mainnet and testnet.
+	// For mainnet and testnet, the execution parameters are stored in a separate
+	// account, so that they are separated from the frequently changing data on the
+	// service account.
+	service := common.Address(sc.ExecutionParametersAccount.Address)
 
 	env := environment.NewScriptEnv(
 		context.Background(),
