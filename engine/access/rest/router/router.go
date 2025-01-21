@@ -69,6 +69,9 @@ func (b *RouterBuilder) AddRestRoutes(
 	return b
 }
 
+// Deprecated: This handler represents an obsolete implementation of
+// WebSockets Stream Api, which parses topic name from a route (url).
+// The new implementation is under AddWebsocketsRoute function.
 // AddLegacyWebsocketsRoutes adds WebSocket routes to the router.
 func (b *RouterBuilder) AddLegacyWebsocketsRoutes(
 	stateStreamApi state_stream.API,
