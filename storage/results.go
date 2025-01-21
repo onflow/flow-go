@@ -18,6 +18,7 @@ type ExecutionResults interface {
 
 	// ByIDTx returns a functor which retrieves the execution result by its ID, as part of a future database transaction.
 	// When executing the functor, it returns `ErrNotFound` if no execution result with the respective ID is known.
+	// deprecated
 	ByIDTx(resultID flow.Identifier) func(*transaction.Tx) (*flow.ExecutionResult, error)
 
 	// Index indexes an execution result by block ID.
