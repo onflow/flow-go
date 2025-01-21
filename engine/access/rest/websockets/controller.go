@@ -85,7 +85,6 @@ import (
 
 	"github.com/gorilla/websocket"
 	"github.com/rs/zerolog"
-	"go.uber.org/atomic"
 	"golang.org/x/sync/errgroup"
 
 	dp "github.com/onflow/flow-go/engine/access/rest/websockets/data_providers"
@@ -137,10 +136,6 @@ type Controller struct {
 	dataProviderFactory dp.DataProviderFactory
 	dataProvidersGroup  *sync.WaitGroup
 	limiter             *rate.Limiter
-
-	// activeSubscriptionsPerConnection tracks the number of active WebSocket subscriptions
-	// for a single connection.
-	activeSubscriptionsPerConnection *atomic.Int64
 }
 
 func NewWebSocketController(
@@ -150,15 +145,17 @@ func NewWebSocketController(
 	dataProviderFactory dp.DataProviderFactory,
 ) *Controller {
 	return &Controller{
-		logger:                           logger.With().Str("component", "websocket-controller").Logger(),
-		config:                           config,
-		conn:                             conn,
-		multiplexedStream:                make(chan interface{}),
-		dataProviders:                    concurrentmap.New[SubscriptionID, dp.DataProvider](),
-		dataProviderFactory:              dataProviderFactory,
-		dataProvidersGroup:               &sync.WaitGroup{},
-		limiter:                          rate.NewLimiter(rate.Limit(config.MaxResponsesPerSecond), 1),
-		activeSubscriptionsPerConnection: atomic.NewInt64(0),
+		logger:              logger.With().Str("component", "websocket-controller").Logger(),
+		config:              config,
+		conn:                conn,
+		multiplexedStream:   make(chan interface{}),
+		dataProviders:       concurrentmap.New[SubscriptionID, dp.DataProvider](),
+		dataProviderFactory: dataProviderFactory,
+		dataProvidersGroup:  &sync.WaitGroup{},
+		limiter: rate.NewLimiter(
+			rate.Limit(config.MaxResponsesPerSecond*config.MaxSubscriptionsPerConnection),
+			1,
+		),
 	}
 }
 
@@ -410,7 +407,7 @@ func (c *Controller) handleMessage(ctx context.Context, message json.RawMessage)
 func (c *Controller) handleSubscribe(ctx context.Context, msg models.SubscribeMessageRequest) {
 	// Check if the maximum number of active subscriptions per connection has been reached.
 	// If the limit is exceeded, an error is returned, and the subscription request is rejected.
-	if uint64(c.activeSubscriptionsPerConnection.Load()) >= c.config.MaxSubscriptionsPerConnection {
+	if uint64(c.dataProviders.Size()) >= c.config.MaxSubscriptionsPerConnection {
 		err := fmt.Errorf("error creating new subscription: %w", ErrMaxSubscriptionsReached)
 		c.writeErrorResponse(
 			ctx,
@@ -443,7 +440,6 @@ func (c *Controller) handleSubscribe(ctx context.Context, msg models.SubscribeMe
 		return
 	}
 	c.dataProviders.Add(subscriptionID, provider)
-	c.activeSubscriptionsPerConnection.Add(1)
 
 	// write OK response to client
 	responseOk := models.SubscribeMessageResponse{
@@ -472,7 +468,6 @@ func (c *Controller) handleSubscribe(ctx context.Context, msg models.SubscribeMe
 
 		c.dataProvidersGroup.Done()
 		c.dataProviders.Remove(subscriptionID)
-		c.activeSubscriptionsPerConnection.Add(-1)
 	}()
 }
 
@@ -501,7 +496,6 @@ func (c *Controller) handleUnsubscribe(ctx context.Context, msg models.Unsubscri
 
 	provider.Close()
 	c.dataProviders.Remove(subscriptionID)
-	c.activeSubscriptionsPerConnection.Add(-1)
 
 	responseOk := models.UnsubscribeMessageResponse{
 		BaseMessageResponse: models.BaseMessageResponse{
