@@ -18,6 +18,9 @@ type All struct {
 	ProtocolKVStore           ProtocolKVStore
 	VersionBeacons            VersionBeacons
 	RegisterIndex             RegisterIndex
+
+	Results  ExecutionResults
+	Receipts ExecutionReceipts
 }
 
 type Execution struct {
