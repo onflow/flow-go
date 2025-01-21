@@ -520,7 +520,7 @@ func (c *Controller) parseOrCreateSubscriptionID(id string) (SubscriptionID, err
 	}
 
 	if c.dataProviders.Has(newId) {
-		return SubscriptionID{}, fmt.Errorf("such subscription is already in use: %s", newId)
+		return SubscriptionID{}, fmt.Errorf("subscription ID is already in use: %s", newId)
 	}
 
 	return newId, nil
