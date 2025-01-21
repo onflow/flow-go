@@ -706,7 +706,6 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 						},
 					),
 				),
-				fvm.WithReadVersionFromNodeVersionBeacon(false),
 			)
 
 			vm := fvm.NewVirtualMachine()
@@ -819,7 +818,6 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 					func(_ runtime.Config) runtime.Runtime {
 						return rt
 					})),
-			fvm.WithReadVersionFromNodeVersionBeacon(false),
 		)
 
 		vm := fvm.NewVirtualMachine()
@@ -934,7 +932,6 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 					func(_ runtime.Config) runtime.Runtime {
 						return rt
 					})),
-			fvm.WithReadVersionFromNodeVersionBeacon(false),
 		)
 
 		vm := fvm.NewVirtualMachine()

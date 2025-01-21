@@ -62,7 +62,7 @@ func TestDistinctChunkIDs_FullChunks(t *testing.T) {
 	require.NotEqual(t, blockIdA, blockIdB)
 
 	// generates a chunk associated with blockA
-	chunkA := unittest.ChunkFixture(blockIdA, 42)
+	chunkA := unittest.ChunkFixture(blockIdA, 42, unittest.StateCommitmentFixture())
 
 	// generates a deep copy of chunkA in chunkB
 	chunkB := *chunkA
@@ -80,7 +80,7 @@ func TestDistinctChunkIDs_FullChunks(t *testing.T) {
 
 // TestChunkList_Indices evaluates the Indices method of ChunkList on lists of different sizes.
 func TestChunkList_Indices(t *testing.T) {
-	cl := unittest.ChunkListFixture(5, unittest.IdentifierFixture())
+	cl := unittest.ChunkListFixture(5, unittest.IdentifierFixture(), unittest.StateCommitmentFixture())
 	t.Run("empty chunk subset indices", func(t *testing.T) {
 		// subset of chunk list that is empty should return an empty list
 		subset := flow.ChunkList{}

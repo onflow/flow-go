@@ -7,6 +7,7 @@ import (
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/access"
+	commonmodels "github.com/onflow/flow-go/engine/access/rest/common/models"
 	"github.com/onflow/flow-go/engine/access/rest/http/request"
 	"github.com/onflow/flow-go/engine/access/rest/websockets/models"
 	"github.com/onflow/flow-go/engine/access/subscription"
@@ -28,6 +29,7 @@ func NewBlockHeadersDataProvider(
 	ctx context.Context,
 	logger zerolog.Logger,
 	api access.API,
+	subscriptionID string,
 	topic string,
 	arguments models.Arguments,
 	send chan<- interface{},
@@ -45,6 +47,7 @@ func NewBlockHeadersDataProvider(
 
 	subCtx, cancel := context.WithCancel(ctx)
 	p.baseDataProvider = newBaseDataProvider(
+		subscriptionID,
 		topic,
 		cancel,
 		send,
@@ -60,16 +63,19 @@ func NewBlockHeadersDataProvider(
 func (p *BlockHeadersDataProvider) Run() error {
 	return subscription.HandleSubscription(
 		p.subscription,
-		subscription.HandleResponse(p.send, func(header *flow.Header) (interface{}, error) {
+		subscription.HandleResponse(p.send, func(h *flow.Header) (interface{}, error) {
+			var header commonmodels.BlockHeader
+			header.Build(h)
+
 			return &models.BlockHeaderMessageResponse{
-				Header: header,
+				Header: &header,
 			}, nil
 		}),
 	)
 }
 
 // createSubscription creates a new subscription using the specified input arguments.
-func (p *BlockHeadersDataProvider) createSubscription(ctx context.Context, args BlocksArguments) subscription.Subscription {
+func (p *BlockHeadersDataProvider) createSubscription(ctx context.Context, args blocksArguments) subscription.Subscription {
 	if args.StartBlockID != flow.ZeroID {
 		return p.api.SubscribeBlockHeadersFromStartBlockID(ctx, args.StartBlockID, args.BlockStatus)
 	}

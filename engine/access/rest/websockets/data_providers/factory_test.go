@@ -11,7 +11,9 @@ import (
 	accessmock "github.com/onflow/flow-go/access/mock"
 	"github.com/onflow/flow-go/engine/access/rest/common/parser"
 	"github.com/onflow/flow-go/engine/access/rest/websockets/models"
+	"github.com/onflow/flow-go/engine/access/state_stream"
 	statestreammock "github.com/onflow/flow-go/engine/access/state_stream/mock"
+	"github.com/onflow/flow-go/engine/access/subscription"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -43,7 +45,15 @@ func (s *DataProviderFactorySuite) SetupTest() {
 	s.ctx = context.Background()
 	s.ch = make(chan interface{})
 
-	s.factory = NewDataProviderFactory(log, s.stateStreamApi, s.accessApi)
+	s.factory = NewDataProviderFactory(
+		log,
+		s.stateStreamApi,
+		s.accessApi,
+		flow.Testnet.Chain(),
+		state_stream.DefaultEventFilterConfig,
+		subscription.DefaultHeartbeatInterval,
+		nil,
+	)
 	s.Require().NotNil(s.factory)
 }
 
@@ -99,6 +109,50 @@ func (s *DataProviderFactorySuite) TestSupportedTopics() {
 				s.accessApi.AssertExpectations(s.T())
 			},
 		},
+		{
+			name:      "events topic",
+			topic:     EventsTopic,
+			arguments: models.Arguments{},
+			setupSubscription: func() {
+				s.setupSubscription(s.stateStreamApi.On("SubscribeEventsFromLatest", mock.Anything, mock.Anything))
+			},
+			assertExpectations: func() {
+				s.stateStreamApi.AssertExpectations(s.T())
+			},
+		},
+		{
+			name:      "account statuses topic",
+			topic:     AccountStatusesTopic,
+			arguments: models.Arguments{},
+			setupSubscription: func() {
+				s.setupSubscription(s.stateStreamApi.On("SubscribeAccountStatusesFromLatestBlock", mock.Anything, mock.Anything))
+			},
+			assertExpectations: func() {
+				s.stateStreamApi.AssertExpectations(s.T())
+			},
+		},
+		{
+			name:      "transaction statuses topic",
+			topic:     TransactionStatusesTopic,
+			arguments: models.Arguments{},
+			setupSubscription: func() {
+				s.setupSubscription(s.accessApi.On("SubscribeTransactionStatusesFromLatest", mock.Anything, mock.Anything, mock.Anything))
+			},
+			assertExpectations: func() {
+				s.stateStreamApi.AssertExpectations(s.T())
+			},
+		},
+		{
+			name:      "send transaction statuses topic",
+			topic:     SendAndGetTransactionStatusesTopic,
+			arguments: models.Arguments{},
+			setupSubscription: func() {
+				s.setupSubscription(s.accessApi.On("SendAndSubscribeTransactionStatuses", mock.Anything, mock.Anything, mock.Anything))
+			},
+			assertExpectations: func() {
+				s.stateStreamApi.AssertExpectations(s.T())
+			},
+		},
 	}
 
 	for _, test := range testCases {
@@ -106,7 +160,7 @@ func (s *DataProviderFactorySuite) TestSupportedTopics() {
 			s.T().Parallel()
 			test.setupSubscription()
 
-			provider, err := s.factory.NewDataProvider(s.ctx, test.topic, test.arguments, s.ch)
+			provider, err := s.factory.NewDataProvider(s.ctx, "dummy-id", test.topic, test.arguments, s.ch)
 			s.Require().NotNil(provider, "Expected provider for topic %s", test.topic)
 			s.Require().NoError(err, "Expected no error for topic %s", test.topic)
 			s.Require().Equal(test.topic, provider.Topic())
@@ -128,7 +182,7 @@ func (s *DataProviderFactorySuite) TestUnsupportedTopics() {
 	}
 
 	for _, topic := range unsupportedTopics {
-		provider, err := s.factory.NewDataProvider(s.ctx, topic, nil, s.ch)
+		provider, err := s.factory.NewDataProvider(s.ctx, "dummy-id", topic, nil, s.ch)
 		s.Require().Nil(provider, "Expected no provider for unsupported topic %s", topic)
 		s.Require().Error(err, "Expected error for unsupported topic %s", topic)
 		s.Require().EqualError(err, fmt.Sprintf("unsupported topic \"%s\"", topic))

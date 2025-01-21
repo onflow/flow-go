@@ -50,6 +50,7 @@ import (
 	"github.com/onflow/flow-go/engine/access/rest"
 	commonrest "github.com/onflow/flow-go/engine/access/rest/common"
 	"github.com/onflow/flow-go/engine/access/rest/router"
+	"github.com/onflow/flow-go/engine/access/rest/websockets"
 	"github.com/onflow/flow-go/engine/access/rpc"
 	"github.com/onflow/flow-go/engine/access/rpc/backend"
 	rpcConnection "github.com/onflow/flow-go/engine/access/rpc/connection"
@@ -62,6 +63,7 @@ import (
 	"github.com/onflow/flow-go/engine/common/stop"
 	synceng "github.com/onflow/flow-go/engine/common/synchronization"
 	"github.com/onflow/flow-go/engine/common/version"
+	"github.com/onflow/flow-go/engine/execution/computation"
 	"github.com/onflow/flow-go/engine/execution/computation/query"
 	"github.com/onflow/flow-go/fvm/storage/derived"
 	"github.com/onflow/flow-go/ledger"
@@ -227,8 +229,9 @@ func DefaultAccessNodeConfig() *AccessNodeConfig {
 				IdleTimeout:    rest.DefaultIdleTimeout,
 				MaxRequestSize: commonrest.DefaultMaxRequestSize,
 			},
-			MaxMsgSize:     grpcutils.DefaultMaxMsgSize,
-			CompressorName: grpcutils.NoCompressor,
+			MaxMsgSize:      grpcutils.DefaultMaxMsgSize,
+			CompressorName:  grpcutils.NoCompressor,
+			WebSocketConfig: websockets.NewDefaultWebsocketConfig(),
 		},
 		stateStreamConf: statestreambackend.Config{
 			MaxExecutionDataMsgSize: grpcutils.DefaultMaxMsgSize,
@@ -989,7 +992,7 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 					builder.Logger,
 					metrics.NewExecutionCollector(builder.Tracer),
 					builder.RootChainID,
-					query.NewProtocolStateWrapper(builder.State),
+					computation.NewProtocolStateWrapper(builder.State),
 					builder.Storage.Headers,
 					builder.ExecutionIndexerCore.RegisterValue,
 					builder.scriptExecutorConfig,
@@ -1450,6 +1453,11 @@ func (builder *FlowAccessNodeBuilder) extraFlags() {
 			"registerdb-pruning-threshold",
 			defaultConfig.registerDBPruneThreshold,
 			fmt.Sprintf("specifies the number of blocks below the latest stored block height to keep in register db. default: %d", defaultConfig.registerDBPruneThreshold))
+
+		flags.DurationVar(&builder.rpcConf.WebSocketConfig.InactivityTimeout,
+			"websocket-inactivity-timeout",
+			defaultConfig.rpcConf.WebSocketConfig.InactivityTimeout,
+			"specifies the duration a WebSocket connection can remain open without any active subscriptions before being automatically closed")
 	}).ValidateFlags(func() error {
 		if builder.supportsObserver && (builder.PublicNetworkConfig.BindAddress == cmd.NotSet || builder.PublicNetworkConfig.BindAddress == "") {
 			return errors.New("public-network-address must be set if supports-observer is true")

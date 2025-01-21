@@ -719,7 +719,7 @@ func TestExtendReceiptsInvalid(t *testing.T) {
 		require.NoError(t, err)
 
 		// but receipt for block 2 is invalid, which the ParticipantState should reject with an InvalidExtensionError
-		validator.On("ValidatePayload", block3).Return(engine.NewInvalidInputError("")).Once()
+		validator.On("ValidatePayload", block3).Return(engine.NewInvalidInputErrorf("")).Once()
 		err = state.Extend(context.Background(), block3)
 		require.Error(t, err)
 		require.True(t, st.IsInvalidExtensionError(err), err)
@@ -2611,7 +2611,7 @@ func TestExtendInvalidSealsInBlock(t *testing.T) {
 				return seal
 			}, func(candidate *flow.Block) error {
 				if candidate.ID() == block3.ID() {
-					return engine.NewInvalidInputError("")
+					return engine.NewInvalidInputErrorf("")
 				}
 				_, err := all.Seals.HighestInFork(candidate.Header.ParentID)
 				return err

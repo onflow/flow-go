@@ -260,6 +260,7 @@ func New(params Params) (*Backend, error) {
 		executionResults:    params.ExecutionResults,
 		subscriptionHandler: params.SubscriptionHandler,
 		blockTracker:        params.BlockTracker,
+		sendTransaction:     b.SendTransaction,
 	}
 
 	retry.SetBackend(b)
