@@ -41,6 +41,7 @@ func NewAccountStatusesDataProvider(
 	ctx context.Context,
 	logger zerolog.Logger,
 	stateStreamApi state_stream.API,
+	subscriptionID string,
 	topic string,
 	arguments models.Arguments,
 	send chan<- interface{},
@@ -63,6 +64,7 @@ func NewAccountStatusesDataProvider(
 	subCtx, cancel := context.WithCancel(ctx)
 
 	p.baseDataProvider = newBaseDataProvider(
+		subscriptionID,
 		topic,
 		cancel,
 		send,

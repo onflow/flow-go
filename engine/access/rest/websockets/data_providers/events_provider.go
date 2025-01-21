@@ -40,6 +40,7 @@ func NewEventsDataProvider(
 	ctx context.Context,
 	logger zerolog.Logger,
 	stateStreamApi state_stream.API,
+	subscriptionID string,
 	topic string,
 	arguments models.Arguments,
 	send chan<- interface{},
@@ -62,6 +63,7 @@ func NewEventsDataProvider(
 	subCtx, cancel := context.WithCancel(ctx)
 
 	p.baseDataProvider = newBaseDataProvider(
+		subscriptionID,
 		topic,
 		cancel,
 		send,
@@ -103,7 +105,6 @@ func (p *EventsDataProvider) handleResponse() func(eventsResponse *backend.Event
 
 		var response models.EventResponse
 		response.Build(eventsResponse, index)
-
 		p.send <- &response
 
 		return nil
