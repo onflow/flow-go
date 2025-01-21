@@ -35,7 +35,7 @@ type ReadOnlyExecutionState interface {
 
 	GetExecutionResultID(context.Context, flow.Identifier) (flow.Identifier, error)
 
-	GetHighestExecutedBlockID(context.Context) (uint64, flow.Identifier, error)
+	GetLastExecutedBlockID(context.Context) (uint64, flow.Identifier, error)
 }
 
 // ScriptExecutionState is a subset of the `state.ExecutionState` interface purposed to only access the state
@@ -79,7 +79,7 @@ type FinalizedExecutionState interface {
 type ExecutionState interface {
 	ReadOnlyExecutionState
 
-	UpdateHighestExecutedBlockIfHigher(context.Context, *flow.Header) error
+	UpdateLastExecutedBlock(context.Context, *flow.Header) error
 
 	SaveExecutionResults(
 		ctx context.Context,
@@ -385,7 +385,7 @@ func (s *state) SaveExecutionResults(
 	}
 
 	//outside batch because it requires read access
-	err = s.UpdateHighestExecutedBlockIfHigher(childCtx, result.ExecutableBlock.Block.Header)
+	err = s.UpdateLastExecutedBlock(childCtx, result.ExecutableBlock.Block.Header)
 	if err != nil {
 		return fmt.Errorf("cannot update highest executed block: %w", err)
 	}
@@ -473,17 +473,12 @@ func (s *state) saveExecutionResults(
 	return nil
 }
 
-func (s *state) UpdateHighestExecutedBlockIfHigher(ctx context.Context, header *flow.Header) error {
-	if s.tracer != nil {
-		span, _ := s.tracer.StartSpanFromContext(ctx, trace.EXEUpdateHighestExecutedBlockIfHigher)
-		defer span.End()
-	}
-
-	return operation.RetryOnConflict(s.db.Update, procedure.UpdateHighestExecutedBlockIfHigher(header))
+func (s *state) UpdateLastExecutedBlock(ctx context.Context, header *flow.Header) error {
+	return operation.RetryOnConflict(s.db.Update, procedure.UpdateLastExecutedBlock(header))
 }
 
 // deprecated by storehouse's GetHighestFinalizedExecuted
-func (s *state) GetHighestExecutedBlockID(ctx context.Context) (uint64, flow.Identifier, error) {
+func (s *state) GetLastExecutedBlockID(ctx context.Context) (uint64, flow.Identifier, error) {
 	if s.enableRegisterStore {
 		// when storehouse is enabled, the highest executed block is consisted as
 		// the highest finalized and executed block
@@ -501,7 +496,7 @@ func (s *state) GetHighestExecutedBlockID(ctx context.Context) (uint64, flow.Ide
 
 	var blockID flow.Identifier
 	var height uint64
-	err := s.db.View(procedure.GetHighestExecutedBlock(&height, &blockID))
+	err := s.db.View(procedure.GetLastExecutedBlock(&height, &blockID))
 	if err != nil {
 		return 0, flow.ZeroID, err
 	}
@@ -522,7 +517,7 @@ func (s *state) GetHighestFinalizedExecuted() (uint64, error) {
 	}
 
 	// last executed height
-	executedHeight, _, err := s.GetHighestExecutedBlockID(context.Background())
+	executedHeight, _, err := s.GetLastExecutedBlockID(context.Background())
 	if err != nil {
 		return 0, fmt.Errorf("could not get highest executed block: %w", err)
 	}

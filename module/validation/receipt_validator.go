@@ -96,6 +96,14 @@ func (v *receiptValidator) verifyChunksFormat(result *flow.ExecutionResult) erro
 	if result.Chunks.Len() != requiredChunks {
 		return engine.NewInvalidInputErrorf("invalid number of chunks, expected %d got %d", requiredChunks, result.Chunks.Len())
 	}
+
+	// We have at least one chunk, check chunk state consistency
+	chunks := result.Chunks.Items()
+	for i := range len(chunks) - 1 {
+		if chunks[i].EndState != chunks[i+1].StartState {
+			return engine.NewInvalidInputErrorf("chunk state mismatch at index %v, EndState %v but next StartState %v", i, chunks[i].EndState, chunks[i+1].StartState)
+		}
+	}
 	return nil
 }
 

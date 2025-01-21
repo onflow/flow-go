@@ -505,7 +505,7 @@ func (c *Controller) handleUnsubscribe(ctx context.Context, msg models.Unsubscri
 
 func (c *Controller) handleListSubscriptions(ctx context.Context, _ models.ListSubscriptionsMessageRequest) {
 	var subs []*models.SubscriptionEntry
-	err := c.dataProviders.ForEach(func(id SubscriptionID, provider dp.DataProvider) error {
+	_ = c.dataProviders.ForEach(func(id SubscriptionID, provider dp.DataProvider) error {
 		subs = append(subs, &models.SubscriptionEntry{
 			SubscriptionID: id.String(),
 			Topic:          provider.Topic(),
@@ -513,11 +513,6 @@ func (c *Controller) handleListSubscriptions(ctx context.Context, _ models.ListS
 		})
 		return nil
 	})
-
-	// intentionally ignored, this never happens
-	if err != nil {
-		c.logger.Debug().Err(err).Msg("error listing subscriptions")
-	}
 
 	responseOk := models.ListSubscriptionsMessageResponse{
 		Subscriptions: subs,
@@ -532,13 +527,10 @@ func (c *Controller) shutdownConnection() {
 		c.logger.Debug().Err(err).Msg("error closing connection")
 	}
 
-	err = c.dataProviders.ForEach(func(_ SubscriptionID, provider dp.DataProvider) error {
+	_ = c.dataProviders.ForEach(func(_ SubscriptionID, provider dp.DataProvider) error {
 		provider.Close()
 		return nil
 	})
-	if err != nil {
-		c.logger.Debug().Err(err).Msg("error closing data provider")
-	}
 
 	c.dataProviders.Clear()
 	c.dataProvidersGroup.Wait()
@@ -576,7 +568,7 @@ func (c *Controller) parseOrCreateSubscriptionID(id string) (SubscriptionID, err
 	}
 
 	if c.dataProviders.Has(newId) {
-		return SubscriptionID{}, fmt.Errorf("such subscription is already in use: %s", newId)
+		return SubscriptionID{}, fmt.Errorf("subscription ID is already in use: %s", newId)
 	}
 
 	return newId, nil
