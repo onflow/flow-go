@@ -1347,7 +1347,7 @@ func (exeNode *ExecutionNode) LoadBootstrapper(node *NodeConfig) error {
 	// check if the execution database already exists
 	bootstrapper := bootstrap.NewBootstrapper(node.Logger)
 
-	commit, bootstrapped, err := bootstrapper.IsBootstrapped(node.DB)
+	commit, bootstrapped, err := bootstrapper.IsBootstrapped(badgerimpl.ToDB(node.DB))
 	if err != nil {
 		return fmt.Errorf("could not query database to know whether database has been bootstrapped: %w", err)
 	}

@@ -6,7 +6,6 @@ import (
 	"fmt"
 
 	"github.com/cockroachdb/pebble"
-	"github.com/dgraph-io/badger/v2"
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/engine/execution/state"
@@ -17,7 +16,6 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/storage/operation"
-	"github.com/onflow/flow-go/storage/operation/badgerimpl"
 	pStorage "github.com/onflow/flow-go/storage/pebble"
 )
 
@@ -78,10 +76,9 @@ func (b *Bootstrapper) BootstrapLedger(
 
 // IsBootstrapped returns whether the execution database has been bootstrapped, if yes, returns the
 // root statecommitment
-func (b *Bootstrapper) IsBootstrapped(bdb *badger.DB) (flow.StateCommitment, bool, error) {
+func (b *Bootstrapper) IsBootstrapped(db storage.DB) (flow.StateCommitment, bool, error) {
 	var commit flow.StateCommitment
 
-	db := badgerimpl.ToDB(bdb)
 	err := operation.LookupStateCommitment(db.Reader(), flow.ZeroID, &commit)
 	if errors.Is(err, storage.ErrNotFound) {
 		return flow.DummyStateCommitment, false, nil
@@ -95,12 +92,11 @@ func (b *Bootstrapper) IsBootstrapped(bdb *badger.DB) (flow.StateCommitment, boo
 }
 
 func (b *Bootstrapper) BootstrapExecutionDatabase(
-	bdb *badger.DB,
+	db storage.DB,
 	rootSeal *flow.Seal,
 ) error {
 
 	commit := rootSeal.FinalState
-	db := badgerimpl.ToDB(bdb)
 	err := db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 		w := rw.Writer()
 		err := operation.InsertExecutedBlock(w, rootSeal.BlockID)
