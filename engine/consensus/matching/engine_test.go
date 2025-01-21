@@ -37,6 +37,7 @@ type MatchingEngineSuite struct {
 
 	// Matching Engine
 	engine *Engine
+	cancel context.CancelFunc
 }
 
 func (s *MatchingEngineSuite) SetupTest() {
@@ -58,9 +59,17 @@ func (s *MatchingEngineSuite) SetupTest() {
 	s.engine, err = NewEngine(unittest.Logger(), net, me, metrics, metrics, s.state, s.receipts, s.index, s.core)
 	require.NoError(s.T(), err)
 
-	ctx := irrecoverable.NewMockSignalerContext(s.T(), context.Background())
+	ctx, cancel := irrecoverable.NewMockSignalerContextWithCancel(s.T(), context.Background())
+	s.cancel = cancel
 	s.engine.Start(ctx)
-	<-s.engine.Ready()
+	unittest.AssertClosesBefore(s.T(), s.engine.Ready(), 10*time.Millisecond)
+}
+
+func (s *MatchingEngineSuite) TearDownTest() {
+	if s.cancel != nil {
+		s.cancel()
+		unittest.AssertClosesBefore(s.T(), s.engine.Done(), 10*time.Millisecond)
+	}
 }
 
 // TestOnFinalizedBlock tests if finalized block gets processed when send through `Engine`.
