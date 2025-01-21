@@ -3,7 +3,6 @@ package testutils
 import (
 	"github.com/onflow/cadence/common"
 
-	"github.com/onflow/flow-go/fvm/evm/debug"
 	"github.com/onflow/flow-go/fvm/evm/emulator"
 	"github.com/onflow/flow-go/fvm/evm/handler"
 	"github.com/onflow/flow-go/fvm/evm/types"
@@ -25,7 +24,6 @@ func SetupHandler(
 		handler.NewAddressAllocator(),
 		backend,
 		emulator.NewEmulator(backend, rootAddr),
-		debug.NopTracer,
 	)
 }
 

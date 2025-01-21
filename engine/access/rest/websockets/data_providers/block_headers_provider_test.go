@@ -9,6 +9,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
+	commonmodels "github.com/onflow/flow-go/engine/access/rest/common/models"
 	"github.com/onflow/flow-go/engine/access/rest/common/parser"
 	"github.com/onflow/flow-go/engine/access/rest/websockets/models"
 	statestreamsmock "github.com/onflow/flow-go/engine/access/state_stream/mock"
@@ -43,7 +44,7 @@ func (s *BlockHeadersProviderSuite) TestBlockHeadersDataProvider_InvalidArgument
 
 	for _, test := range s.invalidArgumentsTestCases() {
 		s.Run(test.name, func() {
-			provider, err := NewBlockHeadersDataProvider(ctx, s.log, s.api, topic, test.arguments, send)
+			provider, err := NewBlockHeadersDataProvider(ctx, s.log, s.api, "dummy-id", topic, test.arguments, send)
 			s.Require().Nil(provider)
 			s.Require().Error(err)
 			s.Require().Contains(err.Error(), test.expectedErrorMsg)
@@ -54,6 +55,14 @@ func (s *BlockHeadersProviderSuite) TestBlockHeadersDataProvider_InvalidArgument
 // validBlockHeadersArgumentsTestCases defines test happy cases for block headers data providers.
 // Each test case specifies input arguments, and setup functions for the mock API used in the test.
 func (s *BlockHeadersProviderSuite) validBlockHeadersArgumentsTestCases() []testType {
+	expectedResponses := make([]interface{}, len(s.blocks))
+	for i, b := range s.blocks {
+		var header commonmodels.BlockHeader
+		header.Build(b.Header)
+
+		expectedResponses[i] = &models.BlockHeaderMessageResponse{Header: &header}
+	}
+
 	return []testType{
 		{
 			name: "happy path with start_block_id argument",
@@ -69,6 +78,7 @@ func (s *BlockHeadersProviderSuite) validBlockHeadersArgumentsTestCases() []test
 					flow.BlockStatusFinalized,
 				).Return(sub).Once()
 			},
+			expectedResponses: expectedResponses,
 		},
 		{
 			name: "happy path with start_block_height argument",
@@ -84,6 +94,7 @@ func (s *BlockHeadersProviderSuite) validBlockHeadersArgumentsTestCases() []test
 					flow.BlockStatusFinalized,
 				).Return(sub).Once()
 			},
+			expectedResponses: expectedResponses,
 		},
 		{
 			name: "happy path without any start argument",
@@ -97,6 +108,7 @@ func (s *BlockHeadersProviderSuite) validBlockHeadersArgumentsTestCases() []test
 					flow.BlockStatusFinalized,
 				).Return(sub).Once()
 			},
+			expectedResponses: expectedResponses,
 		},
 	}
 }
@@ -116,18 +128,17 @@ func (s *BlockHeadersProviderSuite) TestBlockHeadersDataProvider_HappyPath() {
 				dataChan <- block.Header
 			}
 		},
-		s.blocks,
 		s.requireBlockHeader,
 	)
 }
 
 // requireBlockHeaders ensures that the received block header information matches the expected data.
-func (s *BlockHeadersProviderSuite) requireBlockHeader(v interface{}, expected interface{}) {
-	expectedBlock, ok := expected.(*flow.Block)
-	require.True(s.T(), ok, "unexpected type: %T", v)
+func (s *BlockHeadersProviderSuite) requireBlockHeader(actual interface{}, expected interface{}) {
+	actualResponse, ok := actual.(*models.BlockHeaderMessageResponse)
+	require.True(s.T(), ok, "unexpected response type: %T", actual)
 
-	actualResponse, ok := v.(*models.BlockHeaderMessageResponse)
-	require.True(s.T(), ok, "unexpected response type: %T", v)
+	expectedResponse, ok := expected.(*models.BlockHeaderMessageResponse)
+	require.True(s.T(), ok, "unexpected response type: %T", expected)
 
-	s.Require().Equal(expectedBlock.Header, actualResponse.Header)
+	s.Require().Equal(expectedResponse.Header, actualResponse.Header)
 }

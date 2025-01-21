@@ -9,8 +9,8 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
-	"github.com/onflow/flow-go/access"
 	accessmock "github.com/onflow/flow-go/access/mock"
+	mockcommonmodels "github.com/onflow/flow-go/engine/access/rest/common/models/mock"
 	"github.com/onflow/flow-go/engine/access/rest/websockets/models"
 	"github.com/onflow/flow-go/engine/access/state_stream"
 	ssmock "github.com/onflow/flow-go/engine/access/state_stream/mock"
@@ -31,7 +31,8 @@ type SendTransactionStatusesProviderSuite struct {
 	rootBlock      flow.Block
 	finalizedBlock *flow.Header
 
-	factory *DataProviderFactoryImpl
+	factory       *DataProviderFactoryImpl
+	linkGenerator *mockcommonmodels.LinkGenerator
 }
 
 func TestNewSendTransactionStatusesDataProvider(t *testing.T) {
@@ -41,6 +42,7 @@ func TestNewSendTransactionStatusesDataProvider(t *testing.T) {
 func (s *SendTransactionStatusesProviderSuite) SetupTest() {
 	s.log = unittest.Logger()
 	s.api = accessmock.NewAPI(s.T())
+	s.linkGenerator = mockcommonmodels.NewLinkGenerator(s.T())
 
 	s.chain = flow.Testnet.Chain()
 
@@ -53,7 +55,9 @@ func (s *SendTransactionStatusesProviderSuite) SetupTest() {
 		s.api,
 		s.chain,
 		state_stream.DefaultEventFilterConfig,
-		subscription.DefaultHeartbeatInterval)
+		subscription.DefaultHeartbeatInterval,
+		s.linkGenerator,
+	)
 	s.Require().NotNil(s.factory)
 }
 
@@ -61,7 +65,15 @@ func (s *SendTransactionStatusesProviderSuite) SetupTest() {
 // when it is configured correctly and operating under normal conditions. It
 // validates that tx statuses are correctly streamed to the channel and ensures
 // no unexpected errors occur.
-func (s *SendTransactionStatusesProviderSuite) TestSendTransactionStatusesDataProvider_HappyPath() {
+func (s *TransactionStatusesProviderSuite) TestSendTransactionStatusesDataProvider_HappyPath() {
+	s.linkGenerator.On("TransactionResultLink", mock.AnythingOfType("flow.Identifier")).Return(
+		func(id flow.Identifier) (string, error) {
+			return "some_link", nil
+		},
+	)
+
+	backendResponse := backendTransactionStatusesResponse(s.rootBlock)
+	expectedResponse := s.expectedTransactionStatusesResponses(backendResponse)
 
 	sendTxStatutesTestCases := []testType{
 		{
@@ -77,10 +89,9 @@ func (s *SendTransactionStatusesProviderSuite) TestSendTransactionStatusesDataPr
 					entities.EventEncodingVersion_JSON_CDC_V0,
 				).Return(sub).Once()
 			},
+			expectedResponses: expectedResponse,
 		},
 	}
-
-	expectedResponse := expectedTransactionStatusesResponse(s.rootBlock)
 
 	testHappyPath(
 		s.T(),
@@ -88,9 +99,8 @@ func (s *SendTransactionStatusesProviderSuite) TestSendTransactionStatusesDataPr
 		s.factory,
 		sendTxStatutesTestCases,
 		func(dataChan chan interface{}) {
-			dataChan <- expectedResponse
+			dataChan <- backendResponse
 		},
-		expectedResponse,
 		s.requireTransactionStatuses,
 	)
 
@@ -101,15 +111,13 @@ func (s *SendTransactionStatusesProviderSuite) requireTransactionStatuses(
 	v interface{},
 	expectedResponse interface{},
 ) {
-	expectedTxStatusesResponse, ok := expectedResponse.(*access.TransactionResult)
-	require.True(s.T(), ok, "unexpected type: %T", expectedResponse)
+	expectedTxStatusesResponse, ok := expectedResponse.(*models.TransactionStatusesResponse)
+	require.True(s.T(), ok, "expected *models.TransactionStatusesResponse, got %T", expectedResponse)
 
 	actualResponse, ok := v.(*models.TransactionStatusesResponse)
-	require.True(s.T(), ok, "Expected *models.TransactionStatusesResponse, got %T", v)
+	require.True(s.T(), ok, "expected *models.TransactionStatusesResponse, got %T", v)
 
-	require.Equal(s.T(), expectedTxStatusesResponse.BlockID, actualResponse.TransactionResult.BlockID)
-	require.Equal(s.T(), expectedTxStatusesResponse.BlockHeight, actualResponse.TransactionResult.BlockHeight)
-
+	require.Equal(s.T(), expectedTxStatusesResponse.TransactionResult.BlockId, actualResponse.TransactionResult.BlockId)
 }
 
 // TestSendTransactionStatusesDataProvider_InvalidArguments tests the behavior of the send transaction statuses data provider
@@ -127,6 +135,8 @@ func (s *SendTransactionStatusesProviderSuite) TestSendTransactionStatusesDataPr
 				ctx,
 				s.log,
 				s.api,
+				"dummy-id",
+				s.linkGenerator,
 				topic,
 				test.arguments,
 				send,

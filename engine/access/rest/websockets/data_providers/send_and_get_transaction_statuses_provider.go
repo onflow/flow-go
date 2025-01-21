@@ -9,6 +9,7 @@ import (
 	"google.golang.org/grpc/status"
 
 	"github.com/onflow/flow-go/access"
+	commonmodels "github.com/onflow/flow-go/engine/access/rest/common/models"
 	"github.com/onflow/flow-go/engine/access/rest/common/parser"
 	"github.com/onflow/flow-go/engine/access/rest/util"
 	"github.com/onflow/flow-go/engine/access/rest/websockets/models"
@@ -27,8 +28,9 @@ type sendAndGetTransactionStatusesArguments struct {
 type SendAndGetTransactionStatusesDataProvider struct {
 	*baseDataProvider
 
-	logger zerolog.Logger
-	api    access.API
+	logger        zerolog.Logger
+	api           access.API
+	linkGenerator commonmodels.LinkGenerator
 }
 
 var _ DataProvider = (*SendAndGetTransactionStatusesDataProvider)(nil)
@@ -37,13 +39,16 @@ func NewSendAndGetTransactionStatusesDataProvider(
 	ctx context.Context,
 	logger zerolog.Logger,
 	api access.API,
+	subscriptionID string,
+	linkGenerator commonmodels.LinkGenerator,
 	topic string,
 	arguments models.Arguments,
 	send chan<- interface{},
 ) (*SendAndGetTransactionStatusesDataProvider, error) {
 	p := &SendAndGetTransactionStatusesDataProvider{
-		logger: logger.With().Str("component", "send-transaction-statuses-data-provider").Logger(),
-		api:    api,
+		logger:        logger.With().Str("component", "send-transaction-statuses-data-provider").Logger(),
+		api:           api,
+		linkGenerator: linkGenerator,
 	}
 
 	// Initialize arguments passed to the provider.
@@ -55,6 +60,7 @@ func NewSendAndGetTransactionStatusesDataProvider(
 	subCtx, cancel := context.WithCancel(ctx)
 
 	p.baseDataProvider = newBaseDataProvider(
+		subscriptionID,
 		topic,
 		cancel,
 		send,
@@ -93,10 +99,10 @@ func (p *SendAndGetTransactionStatusesDataProvider) handleResponse() func(txResu
 				return status.Errorf(codes.Internal, "message index already incremented to %d", messageIndex.Value())
 			}
 
-			p.send <- &models.TransactionStatusesResponse{
-				TransactionResult: txResults[i],
-				MessageIndex:      index,
-			}
+			var response models.TransactionStatusesResponse
+			response.Build(p.linkGenerator, txResults[i], index)
+
+			p.send <- &response
 		}
 
 		return nil

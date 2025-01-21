@@ -7,13 +7,13 @@ import (
 	otelTrace "go.opentelemetry.io/otel/trace"
 
 	"github.com/onflow/flow-go/fvm/environment"
-	"github.com/onflow/flow-go/fvm/evm/debug"
 	reusableRuntime "github.com/onflow/flow-go/fvm/runtime"
 	"github.com/onflow/flow-go/fvm/storage/derived"
 	"github.com/onflow/flow-go/fvm/storage/state"
 	"github.com/onflow/flow-go/fvm/tracing"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/state/protocol"
 )
 
 const (
@@ -47,8 +47,6 @@ type Context struct {
 	// AllowProgramCacheWritesInScripts determines if the program cache can be written to in scripts
 	// By default, the program cache is only updated by transactions.
 	AllowProgramCacheWritesInScripts bool
-
-	debug.EVMTracer
 }
 
 // NewContext initializes a new execution context with the provided options.
@@ -79,7 +77,6 @@ func defaultContext() Context {
 		MaxStateInteractionSize:           DefaultMaxInteractionSize,
 		TransactionExecutorParams:         DefaultTransactionExecutorParams(),
 		EnvironmentParams:                 environment.DefaultEnvironmentParams(),
-		EVMTracer:                         debug.NopTracer,
 	}
 	return ctx
 }
@@ -166,16 +163,6 @@ func WithMaxStateInteractionSize(limit uint64) Option {
 func WithEventCollectionSizeLimit(limit uint64) Option {
 	return func(ctx Context) Context {
 		ctx.EventCollectionByteSizeLimit = limit
-		return ctx
-	}
-}
-
-// WithEntropyProvider sets the entropy provider of a virtual machine context.
-//
-// The VM uses the input to provide entropy to the Cadence runtime randomness functions.
-func WithEntropyProvider(source environment.EntropyProvider) Option {
-	return func(ctx Context) Context {
-		ctx.EntropyProvider = source
 		return ctx
 	}
 }
@@ -385,19 +372,34 @@ func WithAllowProgramCacheWritesInScriptsEnabled(enabled bool) Option {
 	}
 }
 
-// WithEVMTracer will set the evm execution tracer
-func WithEVMTracer(tracer debug.EVMTracer) Option {
+// WithEntropyProvider sets the entropy provider of a virtual machine context.
+//
+// The VM uses the input to provide entropy to the Cadence runtime randomness functions.
+func WithEntropyProvider(source environment.EntropyProvider) Option {
 	return func(ctx Context) Context {
-		ctx.EVMTracer = tracer
+		ctx.EntropyProvider = source
 		return ctx
 	}
 }
 
-// WithReadVersionFromNodeVersionBeacon sets whether the version from the node version beacon should be read
-// this should only be disabled for testing
-func WithReadVersionFromNodeVersionBeacon(enabled bool) Option {
+// WithExecutionVersionProvider sets the execution version provider of a virtual machine context.
+//
+// this is used to provide the execution version to the Cadence runtime.
+func WithExecutionVersionProvider(provider environment.ExecutionVersionProvider) Option {
 	return func(ctx Context) Context {
-		ctx.ReadVersionFromNodeVersionBeacon = enabled
+		ctx.ExecutionVersionProvider = provider
+		return ctx
+	}
+}
+
+// WithProtocolStateSnapshot sets all the necessary components from a subset of the protocol state
+// to the virtual machine context.
+func WithProtocolStateSnapshot(snapshot protocol.SnapshotExecutionSubset) Option {
+	return func(ctx Context) Context {
+
+		ctx = WithEntropyProvider(snapshot)(ctx)
+
+		ctx = WithExecutionVersionProvider(environment.NewVersionBeaconExecutionVersionProvider(snapshot.VersionBeacon))(ctx)
 		return ctx
 	}
 }

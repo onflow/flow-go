@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	blockstore "github.com/ipfs/boxo/blockstore"
+	"github.com/ipfs/boxo/blockstore"
 	"github.com/ipfs/go-datastore"
 	dssync "github.com/ipfs/go-datastore/sync"
 	"github.com/onflow/cadence/runtime"

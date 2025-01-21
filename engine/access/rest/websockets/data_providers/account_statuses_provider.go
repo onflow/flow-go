@@ -3,7 +3,6 @@ package data_providers
 import (
 	"context"
 	"fmt"
-	"strconv"
 
 	"github.com/rs/zerolog"
 	"google.golang.org/grpc/codes"
@@ -42,6 +41,7 @@ func NewAccountStatusesDataProvider(
 	ctx context.Context,
 	logger zerolog.Logger,
 	stateStreamApi state_stream.API,
+	subscriptionID string,
 	topic string,
 	arguments models.Arguments,
 	send chan<- interface{},
@@ -64,6 +64,7 @@ func NewAccountStatusesDataProvider(
 	subCtx, cancel := context.WithCancel(ctx)
 
 	p.baseDataProvider = newBaseDataProvider(
+		subscriptionID,
 		topic,
 		cancel,
 		send,
@@ -116,12 +117,10 @@ func (p *AccountStatusesDataProvider) handleResponse() func(accountStatusesRespo
 			return status.Errorf(codes.Internal, "message index already incremented to %d", messageIndex.Value())
 		}
 
-		p.send <- &models.AccountStatusesResponse{
-			BlockID:       accountStatusesResponse.BlockID.String(),
-			Height:        strconv.FormatUint(accountStatusesResponse.Height, 10),
-			AccountEvents: accountStatusesResponse.AccountEvents,
-			MessageIndex:  index,
-		}
+		var response models.AccountStatusesResponse
+		response.Build(accountStatusesResponse, index)
+
+		p.send <- &response
 
 		return nil
 	}
