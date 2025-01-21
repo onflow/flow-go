@@ -676,7 +676,6 @@ func (s *WsControllerSuite) TestRateLimiter() {
 
 	// Step 2: Configure the WebSocket controller with a rate limit.
 	config := NewDefaultWebsocketConfig()
-	config.MaxResponsesPerSecond = 2 // 2 messages per second.
 	controller := NewWebSocketController(s.logger, config, conn, nil)
 
 	// Step 3: Simulate sending messages to the controller's `multiplexedStream`.

@@ -152,10 +152,7 @@ func NewWebSocketController(
 		dataProviders:       concurrentmap.New[SubscriptionID, dp.DataProvider](),
 		dataProviderFactory: dataProviderFactory,
 		dataProvidersGroup:  &sync.WaitGroup{},
-		limiter: rate.NewLimiter(
-			rate.Limit(config.MaxResponsesPerSecond*config.MaxSubscriptionsPerConnection),
-			1,
-		),
+		limiter:             rate.NewLimiter(rate.Limit(config.MaxResponsesPerSecond), 1),
 	}
 }
 

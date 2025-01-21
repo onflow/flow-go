@@ -32,11 +32,11 @@ const (
 
 	// DefaultMaxSubscriptionsPerConnection defines the default maximum number
 	// of WebSocket subscriptions allowed per connection.
-	DefaultMaxSubscriptionsPerConnection = 10
+	DefaultMaxSubscriptionsPerConnection = 20
 
 	// DefaultMaxResponsesPerSecond defines the default maximum number of responses
 	// that can be sent to a single client per second.
-	DefaultMaxResponsesPerSecond = 5
+	DefaultMaxResponsesPerSecond = 1.5 * DefaultMaxSubscriptionsPerConnection
 
 	// DefaultInactivityTimeout is the default duration a WebSocket connection can remain open without any active subscriptions
 	// before being automatically closed
