@@ -781,10 +781,12 @@ func (m *FollowerState) Finalize(ctx context.Context, blockID flow.Identifier) e
 	}
 
 	// update the cache
-	m.State.cachedLatestFinal.Store(&cachedHeader{blockID, header})
-	if len(block.Payload.Seals) > 0 {
-		m.State.cachedLatestSealed.Store(&cachedHeader{lastSeal.BlockID, sealed})
-	}
+	m.State.cachedLatest.Store(&cachedLatest{
+		finalizedID:     blockID,
+		finalizedHeader: header,
+		sealedID:        lastSeal.BlockID,
+		sealedHeader:    sealed,
+	})
 
 	// Emit protocol events after database transaction succeeds. Event delivery is guaranteed,
 	// _except_ in case of a crash. Hence, when recovering from a crash, consumers need to deduce
