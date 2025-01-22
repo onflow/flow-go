@@ -457,7 +457,7 @@ func (exeNode *ExecutionNode) LoadGCPBlockDataUploader(
 	retryableUploader := uploader.NewBadgerRetryableUploaderWrapper(
 		asyncUploader,
 		node.Storage.Blocks,
-		node.Storage.Commits,
+		exeNode.commits,
 		node.Storage.Collections,
 		exeNode.events,
 		exeNode.results,
@@ -764,6 +764,15 @@ func (exeNode *ExecutionNode) LoadExecutionState(
 
 	db := badgerimpl.ToDB(node.DB)
 
+	getLatestFinalized := func() (uint64, error) {
+		final, err := node.State.Final().Head()
+		if err != nil {
+			return 0, err
+		}
+
+		return final.Height, nil
+	}
+
 	exeNode.executionState = state.NewExecutionState(
 		exeNode.ledgerStorage,
 		exeNode.commits,
@@ -777,7 +786,7 @@ func (exeNode *ExecutionNode) LoadExecutionState(
 		exeNode.serviceEvents,
 		exeNode.txResults,
 		db,
-		node.State,
+		getLatestFinalized,
 		node.Tracer,
 		exeNode.registerStore,
 		exeNode.exeConf.enableStorehouse,
@@ -1372,7 +1381,8 @@ func (exeNode *ExecutionNode) LoadBootstrapper(node *NodeConfig) error {
 			return fmt.Errorf("could not load bootstrap state from checkpoint file: %w", err)
 		}
 
-		err = bootstrapper.BootstrapExecutionDatabase(node.DB, node.RootSeal)
+		db := badgerimpl.ToDB(node.DB)
+		err = bootstrapper.BootstrapExecutionDatabase(db, node.RootSeal)
 		if err != nil {
 			return fmt.Errorf("could not bootstrap execution database: %w", err)
 		}
