@@ -16,6 +16,8 @@ type ChunkDataPacks struct {
 	byChunkIDCache *Cache[flow.Identifier, *storage.StoredChunkDataPack]
 }
 
+var _ storage.ChunkDataPacks = (*ChunkDataPacks)(nil)
+
 func NewChunkDataPacks(collector module.CacheMetrics, db storage.DB, collections storage.Collections, byChunkIDCacheSize uint) *ChunkDataPacks {
 
 	store := func(rw storage.ReaderBatchWriter, key flow.Identifier, val *storage.StoredChunkDataPack) error {
