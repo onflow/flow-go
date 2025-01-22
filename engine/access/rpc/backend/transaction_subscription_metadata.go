@@ -128,28 +128,17 @@ func (tm *transactionSubscriptionMetadata) searchForTransactionInBlock(height ui
 }
 
 func (tm *transactionSubscriptionMetadata) initTransactionResult(ctx context.Context) error {
-	if tm.blockWithTx == nil {
-		var err error
-		tm.Status, err = tm.backendTransactions.DeriveUnknownTransactionStatus(tm.txReferenceBlockID)
-		if err != nil {
-			if !errors.Is(err, state.ErrUnknownSnapshotReference) {
-				irrecoverable.Throw(ctx, err)
-			}
+	txResult, err := tm.searchForTransactionResult(ctx)
+	if err != nil {
+		return err
+	}
+
+	if txResult == nil {
+		if err = tm.deriveTransactionResult(ctx); err != nil {
 			return err
 		}
 	} else {
-		txResult, err := tm.searchForTransactionResult(ctx)
-		if err != nil {
-			return err
-		}
-
-		if txResult == nil {
-			// If we've gotten here, but the block has not yet been executed, report it as only been finalized
-			tm.Status = flow.TransactionStatusFinalized
-		} else {
-			tm.TransactionResult = txResult
-		}
-
+		tm.TransactionResult = txResult
 	}
 	return nil
 }
@@ -160,6 +149,12 @@ func (tm *transactionSubscriptionMetadata) initTransactionResult(ctx context.Con
 //
 // No errors expected during normal operations.
 func (tm *transactionSubscriptionMetadata) searchForTransactionResult(ctx context.Context) (*access.TransactionResult, error) {
+	// If there is no transaction block found, it is impossible to search for transaction result
+	if tm.blockWithTx == nil {
+		return nil, nil
+	}
+
+	// Trying to get transaction result from local storage
 	txResult, err := tm.backendTransactions.GetTransactionResultFromStorage(ctx, tm.blockWithTx, tm.TransactionID, tm.eventEncodingVersion)
 	if err != nil {
 		// If any error occurs with local storage - request transaction result from EN
