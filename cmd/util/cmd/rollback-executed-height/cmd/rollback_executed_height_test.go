@@ -13,7 +13,6 @@ import (
 	"github.com/onflow/flow-go/engine/execution/testutil"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/module/trace"
-	statemock "github.com/onflow/flow-go/state/protocol/mock"
 	bstorage "github.com/onflow/flow-go/storage/badger"
 	"github.com/onflow/flow-go/storage/operation/badgerimpl"
 	"github.com/onflow/flow-go/storage/operation/pebbleimpl"
@@ -31,13 +30,13 @@ func TestReExecuteBlock(t *testing.T) {
 			bootstrapper := bootstrap.NewBootstrapper(unittest.Logger())
 			genesis := unittest.BlockHeaderFixture()
 			rootSeal := unittest.Seal.Fixture(unittest.Seal.WithBlock(genesis))
-			err := bootstrapper.BootstrapExecutionDatabase(bdb, rootSeal)
+			db := badgerimpl.ToDB(bdb)
+			err := bootstrapper.BootstrapExecutionDatabase(db, rootSeal)
 			require.NoError(t, err)
 
 			// create all modules
 			metrics := &metrics.NoopCollector{}
 
-			db := badgerimpl.ToDB(bdb)
 			headers := bstorage.NewHeaders(metrics, bdb)
 			txResults := store.NewTransactionResults(metrics, db, bstorage.DefaultCacheSize)
 			commits := store.NewCommits(metrics, db)
@@ -53,10 +52,9 @@ func TestReExecuteBlock(t *testing.T) {
 			err = headers.Store(genesis)
 			require.NoError(t, err)
 
-			snapshot := new(statemock.Snapshot)
-			snapshot.On("Header").Return(genesis, nil)
-			ps := new(statemock.State)
-			ps.On("Final").Return(snapshot)
+			getLatestFinalized := func() (uint64, error) {
+				return genesis.Height, nil
+			}
 
 			// create execution state module
 			es := state.NewExecutionState(
@@ -72,7 +70,7 @@ func TestReExecuteBlock(t *testing.T) {
 				serviceEvents,
 				txResults,
 				db,
-				ps,
+				getLatestFinalized,
 				trace.NewNoopTracer(),
 				nil,
 				false,
@@ -170,12 +168,12 @@ func TestReExecuteBlockWithDifferentResult(t *testing.T) {
 			rootSeal := unittest.Seal.Fixture()
 			unittest.Seal.WithBlock(genesis)(rootSeal)
 
-			err := bootstrapper.BootstrapExecutionDatabase(bdb, rootSeal)
+			db := badgerimpl.ToDB(bdb)
+			err := bootstrapper.BootstrapExecutionDatabase(db, rootSeal)
 			require.NoError(t, err)
 
 			// create all modules
 			metrics := &metrics.NoopCollector{}
-			db := badgerimpl.ToDB(bdb)
 
 			headers := bstorage.NewHeaders(metrics, bdb)
 			txResults := store.NewTransactionResults(metrics, db, bstorage.DefaultCacheSize)
@@ -192,10 +190,9 @@ func TestReExecuteBlockWithDifferentResult(t *testing.T) {
 			err = headers.Store(genesis)
 			require.NoError(t, err)
 
-			snapshot := new(statemock.Snapshot)
-			snapshot.On("Header").Return(genesis, nil)
-			ps := new(statemock.State)
-			ps.On("Final").Return(snapshot)
+			getLatestFinalized := func() (uint64, error) {
+				return genesis.Height, nil
+			}
 
 			// create execution state module
 			es := state.NewExecutionState(
@@ -211,7 +208,7 @@ func TestReExecuteBlockWithDifferentResult(t *testing.T) {
 				serviceEvents,
 				txResults,
 				db,
-				ps,
+				getLatestFinalized,
 				trace.NewNoopTracer(),
 				nil,
 				false,
