@@ -51,6 +51,10 @@ type BlockIterator interface {
 	// if the iteration is interrupted (e.g. by a restart), the iterator can be
 	// resumed from the last checkpoint, which might result in the same block being
 	// iterated again.
+	// TODO: once upgraded to go 1.23, consider using the Range iterator
+	//   Range() iter.Seq2[flow.Identifier, error]
+	//   so that the iterator can be used in a for loop:
+	//   for blockID, err := range heightIterator.Range()
 	Next() (blockID flow.Identifier, hasNext bool, exception error)
 
 	// Checkpoint saves the current state of the iterator

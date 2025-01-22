@@ -5,13 +5,12 @@ import (
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
-	"github.com/onflow/flow-go/storage"
 )
 
 type HeightIterator struct {
 	// dependencies
-	headers  storage.Headers
-	progress module.IterateProgressWriter // for saving the next height to be iterated for resuming the iteration
+	getBlockIDByHeight func(uint64) (flow.Identifier, error)
+	progress           module.IterateProgressWriter // for saving the next height to be iterated for resuming the iteration
 
 	// config
 	endHeight uint64
@@ -24,15 +23,15 @@ var _ module.BlockIterator = (*HeightIterator)(nil)
 
 // caller must ensure that both job.Start and job.End are finalized height
 func NewHeightIterator(
-	headers storage.Headers,
+	getBlockIDByHeight func(uint64) (flow.Identifier, error),
 	progress module.IterateProgressWriter,
 	job module.IterateRange,
 ) (module.BlockIterator, error) {
 	return &HeightIterator{
-		headers:    headers,
-		progress:   progress,
-		endHeight:  job.End,
-		nextHeight: job.Start,
+		getBlockIDByHeight: getBlockIDByHeight,
+		progress:           progress,
+		endHeight:          job.End,
+		nextHeight:         job.Start,
 	}, nil
 }
 
@@ -45,7 +44,7 @@ func (b *HeightIterator) Next() (flow.Identifier, bool, error) {
 	}
 
 	// TODO: use storage operation instead to avoid hitting cache
-	next, err := b.headers.BlockIDByHeight(b.nextHeight)
+	next, err := b.getBlockIDByHeight(b.nextHeight)
 	if err != nil {
 		return flow.ZeroID, false, fmt.Errorf("failed to fetch block at height %v: %w", b.nextHeight, err)
 	}
