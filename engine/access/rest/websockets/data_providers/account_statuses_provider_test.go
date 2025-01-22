@@ -269,13 +269,10 @@ func (s *AccountStatusesProviderSuite) TestMessageIndexAccountStatusesProviderRe
 	var responses []*models.AccountStatusesResponse
 	for i := 0; i < accountStatusesCount; i++ {
 		res := <-send
-		accountStatusesRes, ok := res.(*models.BaseDataProvidersResponse)
-		s.Require().True(ok, "Expected *models.BaseDataProvidersResponse, got %T", res)
 
-		accountStatusesResData, ok := accountStatusesRes.Payload.(*models.AccountStatusesResponse)
-		s.Require().True(ok, "Expected *models.AccountStatusesResponse, got %T", res)
+		_, accStatusesResponsePayload := extractPayload[*models.AccountStatusesResponse](s.T(), res)
 
-		responses = append(responses, accountStatusesResData)
+		responses = append(responses, accStatusesResponsePayload)
 	}
 
 	// Wait for the provider goroutine to finish

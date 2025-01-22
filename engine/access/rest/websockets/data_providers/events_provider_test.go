@@ -245,11 +245,8 @@ func (s *EventsProviderSuite) TestMessageIndexEventProviderResponse_HappyPath() 
 	var responses []*models.EventResponse
 	for i := 0; i < eventsCount; i++ {
 		res := <-send
-		eventRes, ok := res.(*models.BaseDataProvidersResponse)
-		s.Require().True(ok, "Expected *models.BaseDataProvidersResponse, got %T", res)
 
-		eventResData, ok := eventRes.Payload.(*models.EventResponse)
-		s.Require().True(ok, "Expected *models.EventResponse, got %T", res)
+		_, eventResData := extractPayload[*models.EventResponse](s.T(), res)
 
 		responses = append(responses, eventResData)
 	}
