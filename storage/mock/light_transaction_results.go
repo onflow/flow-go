@@ -32,6 +32,24 @@ func (_m *LightTransactionResults) BatchStore(blockID flow.Identifier, transacti
 	return r0
 }
 
+// BatchStoreBadger provides a mock function with given fields: blockID, transactionResults, batch
+func (_m *LightTransactionResults) BatchStoreBadger(blockID flow.Identifier, transactionResults []flow.LightTransactionResult, batch storage.BatchStorage) error {
+	ret := _m.Called(blockID, transactionResults, batch)
+
+	if len(ret) == 0 {
+		panic("no return value specified for BatchStoreBadger")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(flow.Identifier, []flow.LightTransactionResult, storage.BatchStorage) error); ok {
+		r0 = rf(blockID, transactionResults, batch)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
 // ByBlockID provides a mock function with given fields: id
 func (_m *LightTransactionResults) ByBlockID(id flow.Identifier) ([]flow.LightTransactionResult, error) {
 	ret := _m.Called(id)

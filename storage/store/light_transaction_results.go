@@ -113,6 +113,10 @@ func (tr *LightTransactionResults) BatchStore(blockID flow.Identifier, transacti
 	return nil
 }
 
+func (tr *LightTransactionResults) BatchStoreBadger(blockID flow.Identifier, transactionResults []flow.LightTransactionResult, batch storage.BatchStorage) error {
+	panic("LightTransactionResults BatchStoreBadger not implemented")
+}
+
 // ByBlockIDTransactionID returns the transaction result for the given block ID and transaction ID
 func (tr *LightTransactionResults) ByBlockIDTransactionID(blockID flow.Identifier, txID flow.Identifier) (*flow.LightTransactionResult, error) {
 	key := KeyFromBlockIDTransactionID(blockID, txID)

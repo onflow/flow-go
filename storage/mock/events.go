@@ -50,6 +50,24 @@ func (_m *Events) BatchStore(blockID flow.Identifier, events []flow.EventsList, 
 	return r0
 }
 
+// BatchStoreBadger provides a mock function with given fields: blockID, events, batch
+func (_m *Events) BatchStoreBadger(blockID flow.Identifier, events []flow.EventsList, batch storage.BatchStorage) error {
+	ret := _m.Called(blockID, events, batch)
+
+	if len(ret) == 0 {
+		panic("no return value specified for BatchStoreBadger")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(flow.Identifier, []flow.EventsList, storage.BatchStorage) error); ok {
+		r0 = rf(blockID, events, batch)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
 // ByBlockID provides a mock function with given fields: blockID
 func (_m *Events) ByBlockID(blockID flow.Identifier) ([]flow.Event, error) {
 	ret := _m.Called(blockID)

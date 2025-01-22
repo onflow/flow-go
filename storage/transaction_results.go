@@ -27,6 +27,9 @@ type LightTransactionResults interface {
 	// BatchStore inserts a batch of transaction result into a batch
 	BatchStore(blockID flow.Identifier, transactionResults []flow.LightTransactionResult, rw ReaderBatchWriter) error
 
+	// deprecated
+	BatchStoreBadger(blockID flow.Identifier, transactionResults []flow.LightTransactionResult, batch BatchStorage) error
+
 	// ByBlockIDTransactionID returns the transaction result for the given block ID and transaction ID
 	ByBlockIDTransactionID(blockID flow.Identifier, transactionID flow.Identifier) (*flow.LightTransactionResult, error)
 
