@@ -626,7 +626,10 @@ func main() {
 			notifier.AddFollowerConsumer(followerDistributor)
 
 			// initialize the persister
-			persist := persister.New(node.DB, node.RootChainID)
+			persist, err := persister.New(node.DB, node.RootChainID)
+			if err != nil {
+				return nil, err
+			}
 
 			finalizedBlock, err := node.State.Final().Head()
 			if err != nil {

@@ -550,7 +550,8 @@ func createNode(
 
 	signer := verification.NewCombinedSigner(me, beaconKeyStore)
 
-	persist := persister.New(db, rootHeader.ChainID)
+	persist, err := persister.New(db, rootHeader.ChainID)
+	require.NoError(t, err)
 
 	livenessData, err := persist.GetLivenessData()
 	require.NoError(t, err)

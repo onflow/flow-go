@@ -292,7 +292,10 @@ func (fnb *FlowNodeBuilder) EnqueuePingService() {
 		// only consensus roles will need to report hotstuff view
 		if fnb.BaseConfig.NodeRole == flow.RoleConsensus.String() {
 			// initialize the persister
-			persist := persister.New(node.DB, node.RootChainID)
+			persist, err := persister.New(node.DB, node.RootChainID)
+			if err != nil {
+				return nil, err
+			}
 
 			pingInfoProvider.HotstuffViewFun = func() (uint64, error) {
 				livenessData, err := persist.GetLivenessData()

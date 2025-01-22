@@ -21,5 +21,9 @@ type HotstuffReader interface {
 
 // NewHotstuffReader returns a new Persister, constrained to read-only operations.
 func NewHotstuffReader(db *badger.DB, chainID flow.ChainID) HotstuffReader {
-	return persister.New(db, chainID)
+	persist, err := persister.New(db, chainID)
+	if err != nil {
+		panic(err)
+	}
+	return persist
 }
