@@ -1,7 +1,11 @@
 package hotstuff
 
-// Persister is responsible for persisting state we need to bootstrap after a
-// restart or crash.
+// Persister is responsible for persisting minimal critical safety and liveness data for HotStuff:
+// specifically [hotstuff.LivenessData] and [hotstuff.SafetyData].
+//
+// Persister depends on protocol.State and cluster.State bootstrapping to set initial values for
+// SafetyData and LivenessData, for each distinct chain ID. This bootstrapping must be complete
+// before constructing a Persister instance with New (otherwise it will return an error).
 type Persister interface {
 	// GetSafetyData will retrieve last persisted safety data.
 	// During normal operations, no errors are expected.
