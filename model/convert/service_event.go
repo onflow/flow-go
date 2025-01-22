@@ -329,6 +329,32 @@ func convertServiceEventEpochCommitV1(event flow.Event) (*flow.ServiceEvent, err
 		commit.DKGIndexMap[nodeID] = index
 	}
 
+	// DKG Index Map describes the DKG committee 𝒟 of size |𝒟| = n.
+	// Formal specification:
+	//   - If n parties are authorized to participate in the DKG, DKGIndexMap must contain exactly n
+	//     elements, i.e. n = len(DKGIndexMap)
+	//   - The values in DKGIndexMap must form the set {0, 1, …, n-1}, as required by the low level cryptography
+	//     module (convention simplifying the implementation).
+	// Next we enforce these invariants, otherwise we are dealing with a malformed event.
+
+	// enforce invariant: len(DKGParticipantKeys) == len(DKGIndexMap)
+	n := len(commit.DKGIndexMap) // size of the DKG committee
+	if len(commit.DKGParticipantKeys) != n {
+		return nil, fmt.Errorf("number of %d Random Beacon key shares is inconsistent with number of DKG participatns (len=%d)", len(commit.DKGParticipantKeys), len(commit.DKGIndexMap))
+	}
+
+	// enforce invariant: DKGIndexMap values form the set {0, 1, ..., n-1} where n=len(DKGParticipantKeys)
+	encounteredIndex := make([]bool, n)
+	for _, index := range commit.DKGIndexMap {
+		if index < 0 || index >= n {
+			return nil, fmt.Errorf("index %d is outside allowed range [0,n-1] for a DKG committee of size n=%d", index, n)
+		}
+		if encounteredIndex[index] {
+			return nil, fmt.Errorf("duplicated DKG index %d", index)
+		}
+		encounteredIndex[index] = true
+	}
+
 	// create the service event
 	serviceEvent := &flow.ServiceEvent{
 		Type:  flow.ServiceEventCommit,
@@ -603,6 +629,32 @@ func convertServiceEventEpochRecover(event flow.Event) (*flow.ServiceEvent, erro
 		}
 		index := pair.Value.(cadence.Int).Int()
 		commit.DKGIndexMap[nodeID] = index
+	}
+
+	// DKG Index Map describes the DKG committee 𝒟 of size |𝒟| = n.
+	// Formal specification:
+	//   - If n parties are authorized to participate in the DKG, DKGIndexMap must contain exactly n
+	//     elements, i.e. n = len(DKGIndexMap)
+	//   - The values in DKGIndexMap must form the set {0, 1, …, n-1}, as required by the low level cryptography
+	//     module (convention simplifying the implementation).
+	// Next we enforce these invariants, otherwise we are dealing with a malformed event.
+
+	// enforce invariant: len(DKGParticipantKeys) == len(DKGIndexMap)
+	n := len(commit.DKGIndexMap) // size of the DKG committee
+	if len(commit.DKGParticipantKeys) != n {
+		return nil, fmt.Errorf("number of %d Random Beacon key shares is inconsistent with number of DKG participatns (len=%d)", len(commit.DKGParticipantKeys), len(commit.DKGIndexMap))
+	}
+
+	// enforce invariant: DKGIndexMap values form the set {0, 1, ..., n-1} where n=len(DKGParticipantKeys)
+	encounteredIndex := make([]bool, n)
+	for _, index := range commit.DKGIndexMap {
+		if index < 0 || index >= n {
+			return nil, fmt.Errorf("index %d is outside allowed range [0,n-1] for a DKG committee of size n=%d", index, n)
+		}
+		if encounteredIndex[index] {
+			return nil, fmt.Errorf("duplicated DKG index %d", index)
+		}
+		encounteredIndex[index] = true
 	}
 
 	// create the service event
