@@ -39,20 +39,18 @@ func TestIterateHeight(t *testing.T) {
 
 		// iterate through all blocks
 		visited := make(map[flow.Identifier]struct{})
-		count := 0
 		for {
 			id, ok, err := iter.Next()
 			require.NoError(t, err)
 			if !ok {
 				break
 			}
-			visited[id] = struct{}{}
 
-			// verify we don't iterate two many blocks
-			count++
-			if count > len(bs) {
-				t.Fatal("visited too many blocks")
-			}
+			// preventing duplicate visit
+			_, ok = visited[id]
+			require.False(t, ok, fmt.Sprintf("block %v is visited twice", id))
+
+			visited[id] = struct{}{}
 		}
 
 		// verify all blocks are visited
