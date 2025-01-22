@@ -7,7 +7,6 @@ import (
 	"github.com/onflow/flow-go/admin"
 	"github.com/onflow/flow-go/admin/commands"
 	"github.com/onflow/flow-go/engine/access/ingestion/tx_error_messages"
-	commonrpc "github.com/onflow/flow-go/engine/common/rpc"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/state/protocol"
@@ -177,7 +176,7 @@ func (b *BackfillTxErrorMessagesCommand) parseExecutionNodeIds(executionNodeIdsI
 		if len(executionNodeIds) == 0 {
 			return nil, admin.NewInvalidAdminReqParameterError("execution-node-ids", "must be a non empty list of strings", executionNodeIdsIn)
 		}
-		requestedENIdentifiers, err := commonrpc.IdentifierList(executionNodeIds)
+		requestedENIdentifiers, err := flow.IdentifierListFromHex(executionNodeIds)
 		if err != nil {
 			return nil, admin.NewInvalidAdminReqParameterError("execution-node-ids", err.Error(), executionNodeIdsIn)
 		}

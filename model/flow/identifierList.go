@@ -1,6 +1,7 @@
 package flow
 
 import (
+	"fmt"
 	"golang.org/x/exp/slices"
 )
 
@@ -113,4 +114,18 @@ func (il IdentifierList) Sort(less IdentifierOrder) IdentifierList {
 	dup := il.Copy()
 	slices.SortFunc(dup, less)
 	return dup
+}
+
+// IdentifierListFromHex builds an IdentifierList by parsing a list of hex strings.
+// It returns an error when a first string which is not a valid hex string or invalid identifier is encountered.
+func IdentifierListFromHex(ids []string) (IdentifierList, error) {
+	idList := make(IdentifierList, len(ids))
+	for i, idStr := range ids {
+		id, err := HexStringToIdentifier(idStr)
+		if err != nil {
+			return nil, fmt.Errorf("failed to convert node id string %s to Flow Identifier: %w", id, err)
+		}
+		idList[i] = id
+	}
+	return idList, nil
 }
