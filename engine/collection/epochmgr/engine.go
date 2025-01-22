@@ -454,7 +454,7 @@ func (e *Engine) prepareToStopEpochComponents(epochCounter, epochMaxHeight uint6
 // setup phase, or when the node is restarted during the epoch setup phase. It
 // kicks off setup tasks for the phase, in particular submitting a vote for the
 // next epoch's root cluster QC.
-func (e *Engine) onEpochSetupPhaseStarted(ctx irrecoverable.SignalerContext, nextEpoch protocol.Epoch) {
+func (e *Engine) onEpochSetupPhaseStarted(ctx irrecoverable.SignalerContext, nextEpoch protocol.TentativeEpoch) {
 	ctxWithCancel, cancel := context.WithCancel(ctx)
 	defer cancel()
 

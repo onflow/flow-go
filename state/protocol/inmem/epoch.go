@@ -30,17 +30,28 @@ func (eq Epochs) Current() protocol.Epoch {
 	return NewCommittedEpoch(eq.entry.CurrentEpochSetup, eq.entry.CurrentEpoch.EpochExtensions, eq.entry.CurrentEpochCommit)
 }
 
-func (eq Epochs) Next() protocol.Epoch {
+func (eq Epochs) Next() protocol.TentativeEpoch {
 	switch eq.entry.EpochPhase() {
 	case flow.EpochPhaseStaking, flow.EpochPhaseFallback:
 		return invalid.NewEpoch(protocol.ErrNextEpochNotSetup)
 	case flow.EpochPhaseSetup:
 		return NewSetupEpoch(eq.entry.NextEpochSetup, eq.entry.NextEpoch.EpochExtensions)
 	case flow.EpochPhaseCommitted:
+		return invalid.NewEpoch(protocol.ErrNextEpochAlreadyCommitted)
+	}
+	return invalid.NewEpochf("unexpected unknown phase in protocol state entry")
+}
+
+func (eq Epochs) NextCommitted() protocol.Epoch {
+	switch eq.entry.EpochPhase() {
+	case flow.EpochPhaseStaking, flow.EpochPhaseFallback, flow.EpochPhaseSetup:
+		return invalid.NewEpoch(protocol.ErrNextEpochNotCommitted)
+	case flow.EpochPhaseCommitted:
 		return NewCommittedEpoch(eq.entry.NextEpochSetup, eq.entry.NextEpoch.EpochExtensions, eq.entry.NextEpochCommit)
 	}
 	return invalid.NewEpochf("unexpected unknown phase in protocol state entry")
 }
+
 
 // setupEpoch is an implementation of protocol.Epoch backed by an EpochSetup service event.
 // Includes any extensions which have been included as of the reference block.

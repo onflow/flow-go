@@ -193,7 +193,7 @@ func createNodes(t *testing.T, participants *ConsensusParticipants, rootSnapshot
 	require.NoError(t, err)
 
 	epochViewLookup := buildEpochLookupList(rootSnapshot.Epochs().Current(),
-		rootSnapshot.Epochs().Next())
+		rootSnapshot.Epochs().NextCommitted())
 
 	epochLookup := &mockmodule.EpochLookup{}
 	epochLookup.On("EpochForView", mock.Anything).Return(

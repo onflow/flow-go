@@ -77,7 +77,7 @@ func NewRootQCVoter(
 // Error returns:
 //   - epochs.ClusterQCNoVoteError if we fail to vote for a benign reason
 //   - generic error in case of critical unexpected failure
-func (voter *RootQCVoter) Vote(ctx context.Context, epoch protocol.Epoch) error {
+func (voter *RootQCVoter) Vote(ctx context.Context, epoch protocol.TentativeEpoch) error {
 	counter, err := epoch.Counter()
 	if err != nil {
 		return fmt.Errorf("could not get epoch counter: %w", err)

@@ -17,7 +17,14 @@ type EpochQuery interface {
 	//
 	// Returns invalid.Epoch with ErrNextEpochNotSetup in the case that this method
 	// is queried w.r.t. a snapshot within the flow.EpochPhaseStaking phase.
-	Next() Epoch
+	Next() TentativeEpoch
+
+	// NextCommitted returns the next epoch as of this snapshot, only if it has
+	// been committed already (after flow.EpochPhaseCommitted)
+	//
+	// Returns invalid.Epoch with ErrNextEpochNotCommitted in the case that
+	// the current phase is flow.EpochPhaseStaking or flow.EpochPhaseSetup.
+	NextCommitted() Epoch
 
 	// Previous returns the previous epoch as of this snapshot. Valid snapshots
 	// must have a previous epoch for all epochs except that immediately after
@@ -198,4 +205,29 @@ type Epoch interface {
 	// * protocol.ErrUnknownEpochBoundary - if the first block of the next epoch is unknown.
 	// * state.ErrUnknownSnapshotReference - if the epoch is queried from an unresolvable snapshot.
 	FinalHeight() (uint64, error)
+}
+
+type TentativeEpoch interface {
+
+	// Counter returns the Epoch's counter.
+	// Error returns:
+	// * protocol.ErrNoPreviousEpoch - if the epoch represents a previous epoch which does not exist.
+	// * protocol.ErrNextEpochNotSetup - if the epoch represents a next epoch which has not been set up.
+	// * state.ErrUnknownSnapshotReference - if the epoch is queried from an unresolvable snapshot.
+	Counter() (uint64, error)
+
+	// InitialIdentities returns the identities for this epoch as they were
+	// specified in the EpochSetup service event.
+	// Error returns:
+	// * protocol.ErrNoPreviousEpoch - if the epoch represents a previous epoch which does not exist.
+	// * protocol.ErrNextEpochNotSetup - if the epoch represents a next epoch which has not been set up.
+	// * state.ErrUnknownSnapshotReference - if the epoch is queried from an unresolvable snapshot.
+	InitialIdentities() (flow.IdentitySkeletonList, error)
+
+	// Clustering returns the cluster assignment for this epoch.
+	// Error returns:
+	// * protocol.ErrNoPreviousEpoch - if the epoch represents a previous epoch which does not exist.
+	// * protocol.ErrNextEpochNotSetup - if the epoch represents a next epoch which has not been set up.
+	// * state.ErrUnknownSnapshotReference - if the epoch is queried from an unresolvable snapshot.
+	Clustering() (flow.ClusterList, error)
 }

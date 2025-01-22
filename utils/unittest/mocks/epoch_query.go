@@ -13,6 +13,7 @@ import (
 
 // EpochQuery implements protocol.EpochQuery for testing purposes.
 // Safe for concurrent use by multiple goroutines.
+// Only supports committed epochs.
 type EpochQuery struct {
 	t         *testing.T
 	mu        sync.RWMutex
@@ -40,7 +41,17 @@ func (mock *EpochQuery) Current() protocol.Epoch {
 	return mock.byCounter[mock.counter]
 }
 
-func (mock *EpochQuery) Next() protocol.Epoch {
+func (mock *EpochQuery) Next() protocol.TentativeEpoch {
+	mock.mu.RLock()
+	defer mock.mu.RUnlock()
+	epoch, exists := mock.byCounter[mock.counter+1]
+	if !exists {
+		return invalid.NewEpoch(protocol.ErrNextEpochNotSetup)
+	}
+	return epoch
+}
+
+func (mock *EpochQuery) NextCommitted() protocol.Epoch {
 	mock.mu.RLock()
 	defer mock.mu.RUnlock()
 	epoch, exists := mock.byCounter[mock.counter+1]

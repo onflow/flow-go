@@ -33,11 +33,31 @@ func (_m *EpochQuery) Current() protocol.Epoch {
 }
 
 // Next provides a mock function with given fields:
-func (_m *EpochQuery) Next() protocol.Epoch {
+func (_m *EpochQuery) Next() protocol.TentativeEpoch {
 	ret := _m.Called()
 
 	if len(ret) == 0 {
 		panic("no return value specified for Next")
+	}
+
+	var r0 protocol.TentativeEpoch
+	if rf, ok := ret.Get(0).(func() protocol.TentativeEpoch); ok {
+		r0 = rf()
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(protocol.TentativeEpoch)
+		}
+	}
+
+	return r0
+}
+
+// NextCommitted provides a mock function with given fields:
+func (_m *EpochQuery) NextCommitted() protocol.Epoch {
+	ret := _m.Called()
+
+	if len(ret) == 0 {
+		panic("no return value specified for NextCommitted")
 	}
 
 	var r0 protocol.Epoch

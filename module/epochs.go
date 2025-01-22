@@ -18,7 +18,7 @@ type ClusterRootQCVoter interface {
 	// Error returns:
 	//   - epochs.ClusterQCNoVoteError if we fail to vote for a benign reason
 	//   - generic error in case of critical unexpected failure
-	Vote(context.Context, protocol.Epoch) error
+	Vote(context.Context, protocol.TentativeEpoch) error
 }
 
 // QCContractClient enables interacting with the cluster QC aggregator smart
