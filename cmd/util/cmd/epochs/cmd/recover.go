@@ -51,6 +51,8 @@ This recovery process has some constraints:
 	flagRecoveryEpochTargetDuration uint64
 	flagUnsafeAllowOverWrite        bool
 	flagRootChainID                 string
+	flagExcludeNodeIDs              []string
+	flagIncludeNodeIDs              []string
 )
 
 func init() {
@@ -83,6 +85,8 @@ func addGenerateRecoverEpochTxArgsCmdFlags() error {
 	//   - the RecoveryEpoch service event (after sealing latency) was rejected by the Protocol State
 	generateRecoverEpochTxArgsCmd.Flags().BoolVar(&flagUnsafeAllowOverWrite, "unsafe-overwrite-epoch-data", false, "set to true if the resulting transaction is allowed to overwrite an already specified epoch in the smart contract.")
 	generateRecoverEpochTxArgsCmd.Flags().Uint64Var(&flagEpochCounter, "recovery-epoch-counter", 0, "the epoch counter for the recovery epoch")
+	generateRecoverEpochTxArgsCmd.Flags().StringArrayVar(&flagExcludeNodeIDs, "exclude-node-ids", nil, "list of node IDs to exclude from the recovery epoch")
+	generateRecoverEpochTxArgsCmd.Flags().StringArrayVar(&flagIncludeNodeIDs, "include-node-ids", nil, "list of node IDs to include in the recovery epoch")
 
 	err := generateRecoverEpochTxArgsCmd.MarkFlagRequired("access-address")
 	if err != nil {
@@ -138,6 +142,16 @@ func getSnapshot() *inmem.Snapshot {
 // generateRecoverEpochTxArgs generates recover epoch transaction arguments from a root protocol state snapshot and writes it to a JSON file
 func generateRecoverEpochTxArgs(getSnapshot func() *inmem.Snapshot) func(cmd *cobra.Command, args []string) {
 	return func(cmd *cobra.Command, args []string) {
+
+		excludeNodeIDs, err := flow.IdentifierListFromHex(flagExcludeNodeIDs)
+		if err != nil {
+			log.Fatal().Err(err).Msg("failed to parse exclude node IDs")
+		}
+		includeNodeIDs, err := flow.IdentifierListFromHex(flagIncludeNodeIDs)
+		if err != nil {
+			log.Fatal().Err(err).Msg("failed to parse include node IDs")
+		}
+
 		// generate transaction arguments
 		txArgs, err := run.GenerateRecoverEpochTxArgs(
 			log,
@@ -150,6 +164,8 @@ func generateRecoverEpochTxArgs(getSnapshot func() *inmem.Snapshot) func(cmd *co
 			flagNumViewsInEpoch,
 			flagRecoveryEpochTargetDuration,
 			flagUnsafeAllowOverWrite,
+			excludeNodeIDs,
+			includeNodeIDs,
 			getSnapshot(),
 		)
 		if err != nil {
