@@ -2168,12 +2168,12 @@ github.com/oklog/ulid v1.3.1/go.mod h1:CirwcVhetQ6Lv90oh/F+FBtV6XMibvdAFo93nm5qn
 github.com/olekukonko/tablewriter v0.0.0-20170122224234-a0225b3f23b5/go.mod h1:vsDQFd/mU46D+Z4whnwzcISnGGzXWMclvtLoiIKAKIo=
 github.com/olekukonko/tablewriter v0.0.5 h1:P2Ga83D34wi1o9J6Wh1mRuqd4mF/x/lgBS7N7AbDhec=
 github.com/olekukonko/tablewriter v0.0.5/go.mod h1:hPp6KlRPjbx+hW8ykQs1w3UBbZlj6HuIJcUGPhkA7kY=
-github.com/onflow/atree-internal v0.8.2-0.20250109185652-759a26eda3c3 h1:kwuIssnbosjsGnaxNXSIEzV8u1+Lhd9bDJTrkRB8x0w=
-github.com/onflow/atree-internal v0.8.2-0.20250109185652-759a26eda3c3/go.mod h1:FT6udJF9Q7VQTu3wknDhFX+VV4D44ZGdqtTAE5iztck=
+github.com/onflow/atree-internal v0.8.2-0.20250117221137-acdb0e04ab01 h1:UmPbGWshC0HvIrqwTiTlVZc8BqkxgFMyC8uHcDquMOE=
+github.com/onflow/atree-internal v0.8.2-0.20250117221137-acdb0e04ab01/go.mod h1:FT6udJF9Q7VQTu3wknDhFX+VV4D44ZGdqtTAE5iztck=
 github.com/onflow/boxo v0.0.0-20240201202436-f2477b92f483 h1:LpiQhTAfM9CAmNVEs0n//cBBgCg+vJSiIxTHYUklZ84=
 github.com/onflow/boxo v0.0.0-20240201202436-f2477b92f483/go.mod h1:pIZgTWdm3k3pLF9Uq6MB8JEcW07UDwNJjlXW1HELW80=
-github.com/onflow/cadence-internal v1.0.4-rc.1 h1:2QhDhA0AKE9IIMcwmjnVc2NlW/zVd66F6GDBzY8rVAY=
-github.com/onflow/cadence-internal v1.0.4-rc.1/go.mod h1:KXQ98p8mdQV7f0ccrX/vYonn7BZJuWlaGlb3VirM4TE=
+github.com/onflow/cadence-internal v1.0.4-rc.2 h1:oAIukoHBPwVvoBqW8tYYlrpehZBvD/4+mOUourJILA0=
+github.com/onflow/cadence-internal v1.0.4-rc.2/go.mod h1:bxzUiYXeVhV7A6qzEAtSVBZZSfcfauVW8DIoraKrOOE=
 github.com/onflow/crypto v0.25.0/go.mod h1:C8FbaX0x8y+FxWjbkHy0Q4EASCDR9bSPWZqlpCLYyVI=
 github.com/onflow/crypto v0.25.2 h1:GjHunqVt+vPcdqhxxhAXiMIF3YiLX7gTuTR5O+VG2ns=
 github.com/onflow/crypto v0.25.2/go.mod h1:fY7eLqUdMKV8EGOw301unP8h7PvLVy8/6gVR++/g0BY=
