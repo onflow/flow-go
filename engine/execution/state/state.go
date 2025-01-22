@@ -15,7 +15,6 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/trace"
-	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/storage/operation"
 )
@@ -102,7 +101,7 @@ type state struct {
 	serviceEvents      storage.ServiceEvents
 	transactionResults storage.TransactionResults
 	db                 storage.DB
-	protocolState      protocol.State
+	getLatestFinalized func() (uint64, error)
 
 	registerStore execution.RegisterStore
 	// when it is true, registers are stored in both register store and ledger
@@ -124,7 +123,7 @@ func NewExecutionState(
 	serviceEvents storage.ServiceEvents,
 	transactionResults storage.TransactionResults,
 	db storage.DB,
-	protocolState protocol.State,
+	getLatestFinalized func() (uint64, error),
 	tracer module.Tracer,
 	registerStore execution.RegisterStore,
 	enableRegisterStore bool,
@@ -143,7 +142,7 @@ func NewExecutionState(
 		serviceEvents:       serviceEvents,
 		transactionResults:  transactionResults,
 		db:                  db,
-		protocolState:       protocolState,
+		getLatestFinalized:  getLatestFinalized,
 		registerStore:       registerStore,
 		enableRegisterStore: enableRegisterStore,
 	}
@@ -509,7 +508,7 @@ func (s *state) GetHighestFinalizedExecuted() (uint64, error) {
 	}
 
 	// last finalized height
-	finalized, err := s.protocolState.Final().Head()
+	finalizedHeight, err := s.getLatestFinalized()
 	if err != nil {
 		return 0, fmt.Errorf("could not retrieve finalized: %w", err)
 	}
@@ -521,7 +520,7 @@ func (s *state) GetHighestFinalizedExecuted() (uint64, error) {
 	}
 
 	// the highest finalized and executed height is the min of the two
-	highest := uint64(math.Min(float64(finalized.Height), float64(executedHeight)))
+	highest := uint64(math.Min(float64(finalizedHeight), float64(executedHeight)))
 
 	// double check the higesht block is executed
 	blockID, err := s.headers.BlockIDByHeight(highest)
