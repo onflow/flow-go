@@ -7,6 +7,8 @@ import (
 	"github.com/onflow/flow-go/module"
 )
 
+// HeightIterator is a block iterator that iterates over blocks by height
+// it's not concurrent safe, so don't use it in multiple goroutines
 type HeightIterator struct {
 	// dependencies
 	getBlockIDByHeight func(uint64) (flow.Identifier, error)
@@ -38,6 +40,7 @@ func NewHeightIterator(
 // Next returns the next block ID in the iteration
 // it iterates from lower height to higher height.
 // when iterating a height, it iterates over all sibling blocks at that height
+// Note: this method is not concurrent-safe
 func (b *HeightIterator) Next() (flow.Identifier, bool, error) {
 	if b.nextHeight > b.endHeight {
 		return flow.ZeroID, false, nil
@@ -55,6 +58,8 @@ func (b *HeightIterator) Next() (flow.Identifier, bool, error) {
 }
 
 // Checkpoint saves the iteration progress to storage
+// make sure to call this after all the jobs for processing the block IDs returned by
+// Next() are completed.
 func (b *HeightIterator) Checkpoint() error {
 	err := b.progress.SaveState(b.nextHeight)
 	if err != nil {

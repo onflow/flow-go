@@ -47,6 +47,7 @@ type IterateProgressInitializer interface {
 // BlockIterator is an interface for iterating over blocks
 type BlockIterator interface {
 	// Next returns the next block in the iterator
+	// Note: this method is not concurrent-safe
 	// Note: a block will only be iterated once in a single iteration, however
 	// if the iteration is interrupted (e.g. by a restart), the iterator can be
 	// resumed from the last checkpoint, which might result in the same block being
@@ -61,6 +62,8 @@ type BlockIterator interface {
 	// so that it can be resumed later
 	// when Checkpoint is called, if SaveStateFunc is called with block A,
 	// then after restart, the iterator will resume from A.
+	// make sure to call this after all the jobs for processing the block IDs returned by
+	// Next() are completed.
 	Checkpoint() error
 }
 
