@@ -147,12 +147,12 @@ func (c *IndexerCore) IndexBlockData(data *execution_data.BlockExecutionDataEnti
 
 		batch := bstorage.NewBatch(c.batcher)
 
-		err := c.events.BatchStore(data.BlockID, []flow.EventsList{events}, batch)
+		err := c.events.BatchStoreBadger(data.BlockID, []flow.EventsList{events}, batch)
 		if err != nil {
 			return fmt.Errorf("could not index events at height %d: %w", header.Height, err)
 		}
 
-		err = c.results.BatchStore(data.BlockID, results, batch)
+		err = c.results.BatchStoreBadger(data.BlockID, results, batch)
 		if err != nil {
 			return fmt.Errorf("could not index transaction results at height %d: %w", header.Height, err)
 		}
