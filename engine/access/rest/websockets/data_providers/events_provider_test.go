@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"strconv"
 	"testing"
+	"time"
 
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/mock"
@@ -202,6 +203,7 @@ func (s *EventsProviderSuite) TestEventsDataProvider_InvalidArguments() {
 				ctx,
 				s.log,
 				s.api,
+				"dummy-id",
 				topic,
 				test.arguments,
 				send,
@@ -229,7 +231,7 @@ func (s *EventsProviderSuite) TestMessageIndexEventProviderResponse_HappyPath() 
 	// Create a mock subscription and mock the channel
 	sub := ssmock.NewSubscription(s.T())
 	sub.On("Channel").Return((<-chan interface{})(eventChan))
-	sub.On("Err").Return(nil)
+	sub.On("Err").Return(nil).Once()
 
 	s.api.On("SubscribeEventsFromStartBlockID", mock.Anything, mock.Anything, mock.Anything).Return(sub)
 
@@ -243,6 +245,7 @@ func (s *EventsProviderSuite) TestMessageIndexEventProviderResponse_HappyPath() 
 		ctx,
 		s.log,
 		s.api,
+		"dummy-id",
 		topic,
 		arguments,
 		send,
@@ -258,7 +261,9 @@ func (s *EventsProviderSuite) TestMessageIndexEventProviderResponse_HappyPath() 
 	defer provider.Close()
 
 	// Run the provider in a separate goroutine to simulate subscription processing
+	done := make(chan struct{})
 	go func() {
+		defer close(done)
 		err = provider.Run()
 		s.Require().NoError(err)
 	}()
@@ -282,6 +287,9 @@ func (s *EventsProviderSuite) TestMessageIndexEventProviderResponse_HappyPath() 
 		s.Require().True(ok, "Expected *models.EventResponse, got %T", res)
 		responses = append(responses, eventRes)
 	}
+
+	// Wait for the provider goroutine to finish
+	unittest.RequireCloseBefore(s.T(), done, time.Second, "provider failed to stop")
 
 	// Verifying that indices are starting from 1
 	s.Require().Equal(uint64(0), responses[0].MessageIndex, "Expected MessageIndex to start with 0")
