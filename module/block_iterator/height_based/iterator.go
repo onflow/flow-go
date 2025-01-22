@@ -26,7 +26,7 @@ var _ module.BlockIterator = (*HeightIterator)(nil)
 func NewHeightIterator(
 	headers storage.Headers,
 	progress module.IterateProgressWriter,
-	job module.IterateJob,
+	job module.IterateRange,
 ) (module.BlockIterator, error) {
 	return &HeightIterator{
 		headers:    headers,

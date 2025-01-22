@@ -6,20 +6,20 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
-// IterateJob defines the range of blocks to iterate over
+// IterateRange defines the range of blocks to iterate over
 // the range could be either view based range or height based range.
 // when specifying the range, the start and end are inclusive, and the end must be greater than or
 // equal to the start
-type IterateJob struct {
+type IterateRange struct {
 	Start uint64 // the start of the range
 	End   uint64 // the end of the range
 }
 
-// IterateJobCreator is an interface for creating iterate jobs
+// IterateRangeCreator is an interface for creating iterate jobs
 type IteratorJobCreator interface {
 	// CreateJob takes a progress reader which is used to read the progress of the iterator
 	// and returns an iterate job that specifies the range of blocks to iterate over
-	CreateJob(IterateProgressReader) (IterateJob, error)
+	CreateJob(IterateProgressReader) (IterateRange, error)
 }
 
 // IterateProgressReader reads the progress of the iterator, useful for resuming the iteration
@@ -71,7 +71,7 @@ type IteratorCreator interface {
 	// if the progress is only saved at the end of the iteration, then if the iteration
 	// was interrupted, then the iterator will start from the beginning of the range again,
 	// which means some blocks might be iterated multiple times.
-	CreateIterator(IterateJob, IterateProgressWriter) (BlockIterator, error)
+	CreateIterator(IterateRange, IterateProgressWriter) (BlockIterator, error)
 }
 
 type IteratorFactory struct {
