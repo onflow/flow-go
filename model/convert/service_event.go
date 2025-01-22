@@ -335,7 +335,7 @@ func convertServiceEventEpochCommitV1(event flow.Event) (*flow.ServiceEvent, err
 	//     elements, i.e. n = len(DKGIndexMap)
 	//   - The values in DKGIndexMap must form the set {0, 1, …, n-1}, as required by the low level cryptography
 	//     module (convention simplifying the implementation).
-	// Next we enforce these invariants, otherwise we are dealing with a malformed event.
+	// Next we enforce these invariants, otherwise we are dealing with a malformed event that has to be discarded as soon as it is detected.
 
 	// enforce invariant: len(DKGParticipantKeys) == len(DKGIndexMap)
 	n := len(commit.DKGIndexMap) // size of the DKG committee
@@ -637,7 +637,7 @@ func convertServiceEventEpochRecover(event flow.Event) (*flow.ServiceEvent, erro
 	//     elements, i.e. n = len(DKGIndexMap)
 	//   - The values in DKGIndexMap must form the set {0, 1, …, n-1}, as required by the low level cryptography
 	//     module (convention simplifying the implementation).
-	// Next we enforce these invariants, otherwise we are dealing with a malformed event.
+	// Next we enforce these invariants, otherwise we are dealing with a malformed event that has to be discarded as soon as it is detected.
 
 	// enforce invariant: len(DKGParticipantKeys) == len(DKGIndexMap)
 	n := len(commit.DKGIndexMap) // size of the DKG committee
