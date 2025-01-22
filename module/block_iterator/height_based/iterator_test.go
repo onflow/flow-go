@@ -1,7 +1,6 @@
 package height_based
 
 import (
-	"context"
 	"fmt"
 	"testing"
 
@@ -35,7 +34,7 @@ func TestIterateHeight(t *testing.T) {
 		// b0 is the root block, iterate from b1 to b3
 		job := module.IterateJob{Start: b1.Height, End: b3.Height}
 		headers := storagebadger.NewHeaders(&metrics.NoopCollector{}, db)
-		iter, err := NewHeightIterator(headers, progress, context.Background(), job)
+		iter, err := NewHeightIterator(headers, progress, job)
 		require.NoError(t, err)
 
 		// iterate through all blocks

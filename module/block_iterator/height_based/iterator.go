@@ -1,7 +1,6 @@
 package height_based
 
 import (
-	"context"
 	"fmt"
 
 	"github.com/onflow/flow-go/model/flow"
@@ -16,7 +15,6 @@ type HeightIterator struct {
 
 	// config
 	endHeight uint64
-	ctx       context.Context
 
 	// state
 	nextHeight uint64
@@ -28,14 +26,12 @@ var _ module.BlockIterator = (*HeightIterator)(nil)
 func NewHeightIterator(
 	headers storage.Headers,
 	progress module.IterateProgressWriter,
-	ctx context.Context,
 	job module.IterateJob,
 ) (module.BlockIterator, error) {
 	return &HeightIterator{
 		headers:    headers,
 		progress:   progress,
 		endHeight:  job.End,
-		ctx:        ctx,
 		nextHeight: job.Start,
 	}, nil
 }
@@ -44,13 +40,6 @@ func NewHeightIterator(
 // it iterates from lower height to higher height.
 // when iterating a height, it iterates over all sibling blocks at that height
 func (b *HeightIterator) Next() (flow.Identifier, bool, error) {
-	// exit when the context is done
-	select {
-	case <-b.ctx.Done():
-		return flow.ZeroID, false, nil
-	default:
-	}
-
 	if b.nextHeight > b.endHeight {
 		return flow.ZeroID, false, nil
 	}
