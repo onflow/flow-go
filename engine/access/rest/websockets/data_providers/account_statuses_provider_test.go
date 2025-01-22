@@ -139,17 +139,8 @@ func (s *AccountStatusesProviderSuite) subscribeAccountStatusesDataProviderTestC
 
 // requireAccountStatuses ensures that the received account statuses information matches the expected data.
 func (s *AccountStatusesProviderSuite) requireAccountStatuses(actual interface{}, expected interface{}) {
-	expectedResponse, ok := expected.(*models.BaseDataProvidersResponse)
-	require.True(s.T(), ok, "Expected *models.BaseDataProvidersResponse, got %T", expected)
-
-	expectedResponsePayload, ok := expectedResponse.Payload.(*models.AccountStatusesResponse)
-	require.True(s.T(), ok, "Unexpected response payload type: %T", expectedResponse.Payload)
-
-	actualResponse, ok := actual.(*models.BaseDataProvidersResponse)
-	require.True(s.T(), ok, "Expected *models.BaseDataProvidersResponse, got %T", actual)
-
-	actualResponsePayload, ok := actualResponse.Payload.(*models.AccountStatusesResponse)
-	require.True(s.T(), ok, "Unexpected response payload type: %T", actualResponse.Payload)
+	expectedResponse, expectedResponsePayload := extractPayload[*models.AccountStatusesResponse](s.T(), expected)
+	actualResponse, actualResponsePayload := extractPayload[*models.AccountStatusesResponse](s.T(), actual)
 
 	require.Equal(s.T(), expectedResponsePayload.BlockID, actualResponsePayload.BlockID)
 	require.Equal(s.T(), len(expectedResponsePayload.AccountEvents), len(actualResponsePayload.AccountEvents))

@@ -6,7 +6,6 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/mock"
-	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
 	commonmodels "github.com/onflow/flow-go/engine/access/rest/common/models"
@@ -114,17 +113,8 @@ func (s *BlockHeadersProviderSuite) validBlockHeadersArgumentsTestCases() []test
 
 // requireBlockHeaders ensures that the received block header information matches the expected data.
 func (s *BlockHeadersProviderSuite) requireBlockHeader(actual interface{}, expected interface{}) {
-	expectedResponse, ok := expected.(*models.BaseDataProvidersResponse)
-	require.True(s.T(), ok, "Expected *models.BaseDataProvidersResponse, got %T", expected)
-
-	expectedResponsePayload, ok := expectedResponse.Payload.(*commonmodels.BlockHeader)
-	require.True(s.T(), ok, "Unexpected response payload type: %T", expectedResponse.Payload)
-
-	actualResponse, ok := actual.(*models.BaseDataProvidersResponse)
-	require.True(s.T(), ok, "Expected *models.BaseDataProvidersResponse, got %T", actual)
-
-	actualResponsePayload, ok := actualResponse.Payload.(*commonmodels.BlockHeader)
-	require.True(s.T(), ok, "Unexpected response payload type: %T", actualResponse.Payload)
+	expectedResponse, expectedResponsePayload := extractPayload[*commonmodels.BlockHeader](s.T(), expected)
+	actualResponse, actualResponsePayload := extractPayload[*commonmodels.BlockHeader](s.T(), actual)
 
 	s.Require().Equal(expectedResponse.Topic, actualResponse.Topic)
 	s.Require().Equal(expectedResponsePayload, actualResponsePayload)

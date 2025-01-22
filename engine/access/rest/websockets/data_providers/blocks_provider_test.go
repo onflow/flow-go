@@ -9,7 +9,6 @@ import (
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
-	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
 	accessmock "github.com/onflow/flow-go/access/mock"
@@ -183,17 +182,8 @@ func (s *BlocksProviderSuite) validBlockArgumentsTestCases() []testType {
 
 // requireBlock ensures that the received block information matches the expected data.
 func (s *BlocksProviderSuite) requireBlock(actual interface{}, expected interface{}) {
-	expectedResponse, ok := expected.(*models.BaseDataProvidersResponse)
-	require.True(s.T(), ok, "Expected *models.BaseDataProvidersResponse, got %T", expected)
-
-	expectedResponsePayload, ok := expectedResponse.Payload.(*commonmodels.Block)
-	require.True(s.T(), ok, "unexpected response payload type: %T", expectedResponse.Payload)
-
-	actualResponse, ok := actual.(*models.BaseDataProvidersResponse)
-	require.True(s.T(), ok, "Expected *models.BaseDataProvidersResponse, got %T", actual)
-
-	actualResponsePayload, ok := actualResponse.Payload.(*commonmodels.Block)
-	require.True(s.T(), ok, "unexpected response payload type: %T", actualResponse.Payload)
+	expectedResponse, expectedResponsePayload := extractPayload[*commonmodels.Block](s.T(), expected)
+	actualResponse, actualResponsePayload := extractPayload[*commonmodels.Block](s.T(), actual)
 
 	s.Require().Equal(expectedResponse.Topic, actualResponse.Topic)
 	s.Require().Equal(expectedResponsePayload, actualResponsePayload)

@@ -6,7 +6,6 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/mock"
-	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
 	"github.com/onflow/flow-go/engine/access/rest/common/parser"
@@ -115,17 +114,8 @@ func (s *BlockDigestsProviderSuite) validBlockDigestsArgumentsTestCases() []test
 
 // requireBlockDigest ensures that the received block header information matches the expected data.
 func (s *BlocksProviderSuite) requireBlockDigest(actual interface{}, expected interface{}) {
-	expectedResponse, ok := expected.(*models.BaseDataProvidersResponse)
-	require.True(s.T(), ok, "Expected *models.BaseDataProvidersResponse, got %T", expected)
-
-	expectedResponsePayload, ok := expectedResponse.Payload.(*models.BlockDigest)
-	require.True(s.T(), ok, "Unexpected response payload type: %T", expectedResponse.Payload)
-
-	actualResponse, ok := actual.(*models.BaseDataProvidersResponse)
-	require.True(s.T(), ok, "Expected *models.BaseDataProvidersResponse, got %T", actual)
-
-	actualResponsePayload, ok := actualResponse.Payload.(*models.BlockDigest)
-	require.True(s.T(), ok, "Unexpected response payload type: %T", actualResponse.Payload)
+	expectedResponse, expectedResponsePayload := extractPayload[*models.BlockDigest](s.T(), expected)
+	actualResponse, actualResponsePayload := extractPayload[*models.BlockDigest](s.T(), actual)
 
 	s.Require().Equal(expectedResponse.Topic, actualResponse.Topic)
 	s.Require().Equal(expectedResponsePayload, actualResponsePayload)

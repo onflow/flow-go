@@ -9,7 +9,6 @@ import (
 
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/mock"
-	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
 	"github.com/onflow/flow-go/engine/access/rest/websockets/models"
@@ -139,20 +138,12 @@ func (s *EventsProviderSuite) subscribeEventsDataProviderTestCases(backendRespon
 
 // requireEvents ensures that the received event information matches the expected data.
 func (s *EventsProviderSuite) requireEvents(actual interface{}, expected interface{}) {
-	expectedResponse, ok := expected.(*models.BaseDataProvidersResponse)
-	require.True(s.T(), ok, "Expected *models.BaseDataProvidersResponse, got %T", expected)
+	expectedResponse, expectedResponsePayload := extractPayload[*models.EventResponse](s.T(), expected)
+	actualResponse, actualResponsePayload := extractPayload[*models.EventResponse](s.T(), actual)
 
-	expectedResponsePayload, ok := expectedResponse.Payload.(*models.EventResponse)
-	require.True(s.T(), ok, "Unexpected response payload type: %T", expectedResponse.Payload)
-
-	actualResponse, ok := actual.(*models.BaseDataProvidersResponse)
-	require.True(s.T(), ok, "Expected *models.BaseDataProvidersResponse, got %T", actual)
-
-	actualResponsePayload, ok := actualResponse.Payload.(*models.EventResponse)
-	require.True(s.T(), ok, "Unexpected response payload type: %T", actualResponse.Payload)
-
-	s.Require().ElementsMatch(expectedResponsePayload.Events, actualResponsePayload.Events)
+	s.Require().Equal(expectedResponse.Topic, actualResponse.Topic)
 	s.Require().Equal(expectedResponsePayload.MessageIndex, actualResponsePayload.MessageIndex)
+	s.Require().ElementsMatch(expectedResponsePayload.Events, actualResponsePayload.Events)
 }
 
 // backendEventsResponses creates backend events responses based on the provided events.
