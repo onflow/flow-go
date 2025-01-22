@@ -148,8 +148,8 @@ func (wsController *WebsocketController) writeEvents(sub subscription.Subscripti
 				if blocksSinceLastMessage < wsController.HeartbeatInterval {
 					continue
 				}
-				blocksSinceLastMessage = 0
 			}
+			blocksSinceLastMessage = 0
 
 			// EventsResponse contains CCF encoded events, and this API returns JSON-CDC events.
 			// convert event payload formats.

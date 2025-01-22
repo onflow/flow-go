@@ -28,6 +28,7 @@ func NewBlockDigestsDataProvider(
 	ctx context.Context,
 	logger zerolog.Logger,
 	api access.API,
+	subscriptionID string,
 	topic string,
 	arguments models.Arguments,
 	send chan<- interface{},
@@ -45,6 +46,7 @@ func NewBlockDigestsDataProvider(
 
 	subCtx, cancel := context.WithCancel(ctx)
 	p.baseDataProvider = newBaseDataProvider(
+		subscriptionID,
 		topic,
 		cancel,
 		send,
@@ -64,9 +66,14 @@ func (p *BlockDigestsDataProvider) Run() error {
 			var block models.BlockDigest
 			block.Build(b)
 
-			return &models.BlockDigestMessageResponse{
-				Block: &block,
-			}, nil
+			var response models.BaseDataProvidersResponse
+			response.Build(
+				p.ID(),
+				p.Topic(),
+				&block,
+			)
+
+			return &response, nil
 		}),
 	)
 }
