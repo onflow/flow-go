@@ -67,7 +67,7 @@ func TestIterateHeight(t *testing.T) {
 
 		require.NoError(t, iter.Checkpoint())
 
-		savedNextHeight, err := progress.ReadNext()
+		savedNextHeight, err := progress.LoadState()
 		require.NoError(t, err)
 
 		require.Equal(t, b3.Height+1, savedNextHeight,
@@ -83,11 +83,11 @@ type saveNextHeight struct {
 var _ module.IterateProgressWriter = (*saveNextHeight)(nil)
 var _ module.IterateProgressReader = (*saveNextHeight)(nil)
 
-func (s *saveNextHeight) SaveNext(height uint64) error {
+func (s *saveNextHeight) SaveState(height uint64) error {
 	s.savedNextHeight = height
 	return nil
 }
 
-func (s *saveNextHeight) ReadNext() (uint64, error) {
+func (s *saveNextHeight) LoadState() (uint64, error) {
 	return s.savedNextHeight, nil
 }

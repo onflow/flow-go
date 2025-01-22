@@ -57,7 +57,7 @@ func (b *HeightIterator) Next() (flow.Identifier, bool, error) {
 
 // Checkpoint saves the iteration progress to storage
 func (b *HeightIterator) Checkpoint() error {
-	err := b.progress.SaveNext(b.nextHeight)
+	err := b.progress.SaveState(b.nextHeight)
 	if err != nil {
 		return fmt.Errorf("failed to save progress at view %v: %w", b.nextHeight, err)
 	}

@@ -25,16 +25,16 @@ type IteratorJobCreator interface {
 // IterateProgressReader reads the progress of the iterator, useful for resuming the iteration
 // after restart
 type IterateProgressReader interface {
-	// ReadNext reads the next block to iterate
+	// LoadState reads the next block to iterate
 	// caller must ensure the reader is created by the IterateProgressInitializer,
-	// otherwise ReadNext would return exception.
-	ReadNext() (uint64, error)
+	// otherwise LoadState would return exception.
+	LoadState() (uint64, error)
 }
 
 // IterateProgressWriter saves the progress of the iterator
 type IterateProgressWriter interface {
-	// SaveNext persists the next block to be iterated
-	SaveNext(uint64) error
+	// SaveState persists the next block to be iterated
+	SaveState(uint64) error
 }
 
 // IterateProgressInitializer is an interface for initializing the progress of the iterator
@@ -55,7 +55,7 @@ type BlockIterator interface {
 
 	// Checkpoint saves the current state of the iterator
 	// so that it can be resumed later
-	// when Checkpoint is called, if SaveNextFunc is called with block A,
+	// when Checkpoint is called, if SaveStateFunc is called with block A,
 	// then after restart, the iterator will resume from A.
 	Checkpoint() error
 }
