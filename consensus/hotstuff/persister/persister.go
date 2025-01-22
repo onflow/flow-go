@@ -1,6 +1,7 @@
 package persister
 
 import (
+	"fmt"
 	"sync"
 
 	"github.com/dgraph-io/badger/v2"
@@ -30,7 +31,7 @@ var _ hotstuff.Persister = (*Persister)(nil)
 // Persister depends on protocol.State and cluster.State bootstrapping to set initial values for
 // SafetyData and LivenessData, for each distinct chain ID. This bootstrapping must be complete
 // before constructing a Persister instance with New (otherwise it will return an error).
-func New(db *badger.DB, chainID flow.ChainID) *Persister {
+func New(db *badger.DB, chainID flow.ChainID) (*Persister, error) {
 	var safetyData hotstuff.SafetyData
 	var livenessData hotstuff.LivenessData
 	err := db.View(func(txn *badger.Txn) error {
@@ -41,16 +42,14 @@ func New(db *badger.DB, chainID flow.ChainID) *Persister {
 		return err
 	})
 	if err != nil {
-		// TODO
-		//return nil, fmt.Errorf("failed to initialize hotstuff persisted for chain %s: %w", chainID, err)
-		panic(err)
+		return nil, fmt.Errorf("failed to initialize hotstuff persisted for chain %s: %w", chainID, err)
 	}
 
 	p := &Persister{
 		db:      db,
 		chainID: chainID,
 	}
-	return p
+	return p, nil
 }
 
 // GetSafetyData will retrieve last persisted safety data.
