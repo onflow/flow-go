@@ -363,6 +363,6 @@ replace github.com/onflow/flow-go/insecure => ../insecure
 // TODO: remove it when https://github.com/ipfs/go-ds-pebble/pull/36 merged
 replace github.com/ipfs/go-ds-pebble v0.3.1 => github.com/onflow/go-ds-pebble v0.0.0-20240731130313-f186539f382c
 
-replace github.com/onflow/cadence => github.com/onflow/cadence-internal v1.0.4-rc.1
+replace github.com/onflow/cadence => github.com/onflow/cadence-internal v1.0.4-rc.2
 
-replace github.com/onflow/atree => github.com/onflow/atree-internal v0.8.2-0.20250109185652-759a26eda3c3
+replace github.com/onflow/atree => github.com/onflow/atree-internal v0.8.2-0.20250117221137-acdb0e04ab01
