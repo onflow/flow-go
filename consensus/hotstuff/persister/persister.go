@@ -48,6 +48,7 @@ func New(db *badger.DB, chainID flow.ChainID) (*Persister, error) {
 	p := &Persister{
 		db:      db,
 		chainID: chainID,
+		mu:      &sync.Mutex{},
 	}
 	return p, nil
 }
