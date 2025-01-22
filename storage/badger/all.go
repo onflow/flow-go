@@ -42,10 +42,7 @@ func InitAll(metrics module.CacheMetrics, db *badger.DB) *storage.All {
 		VersionBeacons:            versionBeacons,
 		Results:                   results,
 		Receipts:                  receipts,
-		Commits:                   commits,
 		Transactions:              transactions,
 		Collections:               collections,
-		Results:                   results,
-		Receipts:                  receipts,
 	}
 }
