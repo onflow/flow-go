@@ -117,8 +117,11 @@ func (p *AccountStatusesDataProvider) handleResponse() func(accountStatusesRespo
 			return status.Errorf(codes.Internal, "message index already incremented to %d", messageIndex.Value())
 		}
 
-		var response models.AccountStatusesResponse
-		response.Build(accountStatusesResponse, index)
+		var accountStatusesPayload models.AccountStatusesResponse
+		accountStatusesPayload.Build(accountStatusesResponse, index)
+
+		var response models.BaseDataProvidersResponse
+		response.Build(p.ID(), p.Topic(), &accountStatusesPayload)
 
 		p.send <- &response
 

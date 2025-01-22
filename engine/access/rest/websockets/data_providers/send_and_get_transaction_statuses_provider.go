@@ -99,8 +99,11 @@ func (p *SendAndGetTransactionStatusesDataProvider) handleResponse() func(txResu
 				return status.Errorf(codes.Internal, "message index already incremented to %d", messageIndex.Value())
 			}
 
-			var response models.TransactionStatusesResponse
-			response.Build(p.linkGenerator, txResults[i], index)
+			var txStatusesPayload models.TransactionStatusesResponse
+			txStatusesPayload.Build(p.linkGenerator, txResults[i], index)
+
+			var response models.BaseDataProvidersResponse
+			response.Build(p.ID(), p.Topic(), &txStatusesPayload)
 
 			p.send <- &response
 		}
