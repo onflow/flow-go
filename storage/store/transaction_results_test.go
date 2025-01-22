@@ -1,4 +1,4 @@
-package st_test
+package store_test
 
 import (
 	"fmt"
@@ -14,8 +14,8 @@ import (
 	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/utils/unittest"
 
-	store "github.com/onflow/flow-go/storage/badger"
 	"github.com/onflow/flow-go/storage/operation/dbtest"
+	"github.com/onflow/flow-go/storage/store"
 )
 
 func TestBatchStoringTransactionResults(t *testing.T) {
@@ -33,11 +33,11 @@ func TestBatchStoringTransactionResults(t *testing.T) {
 			}
 			txResults = append(txResults, expected)
 		}
-		writeBatch := store.NewBatch(db)
-		err := st.Batchst(blockID, txResults, writeBatch)
+		writeBatch := db.NewBatch()
+		err := st.BatchStore(blockID, txResults, writeBatch)
 		require.NoError(t, err)
 
-		err = writeBatch.Flush()
+		err = writeBatch.Commit()
 		require.NoError(t, err)
 
 		for _, txResult := range txResults {
