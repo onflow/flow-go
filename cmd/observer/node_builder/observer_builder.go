@@ -299,6 +299,10 @@ type ObserverServiceBuilder struct {
 	EventsIndex         *index.EventsIndex
 	ScriptExecutor      *backend.ScriptExecutor
 
+	// storage
+	events                  storage.Events
+	lightTransactionResults storage.LightTransactionResults
+
 	// available until after the network has started. Hence, a factory function that needs to be called just before
 	// creating the sync engine
 	SyncEngineParticipantsProviderFactory func() module.IdentifierProvider
@@ -1326,7 +1330,7 @@ func (builder *ObserverServiceBuilder) BuildExecutionSyncComponents() *ObserverS
 			indexedBlockHeight = store.NewConsumerProgress(badgerimpl.ToDB(builder.DB), module.ConsumeProgressExecutionDataIndexerBlockHeight)
 			return nil
 		}).Module("transaction results storage", func(node *cmd.NodeConfig) error {
-			builder.Storage.LightTransactionResults = bstorage.NewLightTransactionResults(node.Metrics.Cache, node.DB, bstorage.DefaultCacheSize)
+			builder.lightTransactionResults = store.NewLightTransactionResults(node.Metrics.Cache, badgerimpl.ToDB(node.DB), bstorage.DefaultCacheSize)
 			return nil
 		}).DependableComponent("execution data indexer", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 			// Note: using a DependableComponent here to ensure that the indexer does not block
@@ -1418,10 +1422,10 @@ func (builder *ObserverServiceBuilder) BuildExecutionSyncComponents() *ObserverS
 				builder.DB,
 				builder.Storage.RegisterIndex,
 				builder.Storage.Headers,
-				builder.Storage.Events,
+				builder.events,
 				builder.Storage.Collections,
 				builder.Storage.Transactions,
-				builder.Storage.LightTransactionResults,
+				builder.lightTransactionResults,
 				builder.RootChainID.Chain(),
 				indexerDerivedChainData,
 				collectionExecutedMetric,
@@ -1769,7 +1773,7 @@ func (builder *ObserverServiceBuilder) enqueueRPCServer() {
 		return nil
 	})
 	builder.Module("events storage", func(node *cmd.NodeConfig) error {
-		builder.Storage.Events = bstorage.NewEvents(node.Metrics.Cache, node.DB)
+		builder.events = store.NewEvents(node.Metrics.Cache, badgerimpl.ToDB(node.DB))
 		return nil
 	})
 	builder.Module("reporter", func(node *cmd.NodeConfig) error {
@@ -1777,11 +1781,11 @@ func (builder *ObserverServiceBuilder) enqueueRPCServer() {
 		return nil
 	})
 	builder.Module("events index", func(node *cmd.NodeConfig) error {
-		builder.EventsIndex = index.NewEventsIndex(builder.Reporter, builder.Storage.Events)
+		builder.EventsIndex = index.NewEventsIndex(builder.Reporter, builder.events)
 		return nil
 	})
 	builder.Module("transaction result index", func(node *cmd.NodeConfig) error {
-		builder.TxResultsIndex = index.NewTransactionResultsIndex(builder.Reporter, builder.Storage.LightTransactionResults)
+		builder.TxResultsIndex = index.NewTransactionResultsIndex(builder.Reporter, builder.lightTransactionResults)
 		return nil
 	})
 	builder.Module("script executor", func(node *cmd.NodeConfig) error {
