@@ -45,34 +45,6 @@ type EventHandler struct {
 	committee     hotstuff.Replicas
 	safetyRules   hotstuff.SafetyRules
 	notifier      hotstuff.Consumer
-
-	// TODO docs
-	// myLastAcknowledgedView is the latest view that this node has created a proposal for
-	// CAUTION: in-memory only; information will be lost once the node reboots. This is fine for the following reason:
-	//  1. At the moment, the block construction logic persists its blocks in the database, _before_ returning the
-	//     reference to the EventHandler, which subsequently publishes the block (via the `OnOwnProposal` notification).
-	//     Therefore, for each view that this consensus participant published a block for, this block is also in the database.
-	//  2. Before constructing a proposal for view v, the node confirms that there is no block for view v already stored in
-	//     its local Forks, and skips the block production otherwise. When the node boots up, it populates Forks with all
-	//     unfinalized blocks. Hence, we conclude:
-	//     Let v be a view for which this node constructed a proposal _before_ rebooting. Then, after rebooting it will never
-	//     construct another proposal for view v.
-	//  3. What remains is to show that this node will not propose for views which it has previously proposed for without any
-	//     reboots. Conceptually, this is guaranteed by the SafetyRules, but only if voting and signing proposals is _both_
-	//     done by safety rules. Unfortunately, the current implementation signs its own proposals _independently_ of safety rules.
-	//     Hence, we add the following logic:
-	//      - `myLastAcknowledgedView` is zero in case this node has not generated any proposal since its last reboot. Then, argument
-	//         2. guarantees that the node will not double-propose.
-	//      - Whenever this node constructed a proposal for view v, it will set `myLastAcknowledgedView` to value `v`, _before_
-	//        publishing the proposal (via the `OnOwnProposal` notification).
-	//      - Only if `v < myLastAcknowledgedView`, this node will engage its block production logic for view `v`. Therefore, it is
-	//        guaranteed that this node has not generated any proposal for view v since its last reboot.
-	// In summary, argument 2. and 3. guarantee that this node will not double-propose (independently of whether the node
-	// restarted or not). Note that this holds, _without_ the node needing to store newly generated proposals right away in `Forks`.
-	// On the happy path (no restarts), updating `myLastAcknowledgedView` will suffice to prevent creating two proposals for the same view.
-	// The node's own proposal will be added to Forks _after_ the broadcast the same way as proposals from other nodes.
-	// On the unhappy path, the node's own proposals will be added to Forks along with unfinalized proposals from other nodes.
-	myLastAcknowledgedView uint64
 }
 
 var _ hotstuff.EventHandler = (*EventHandler)(nil)
@@ -290,15 +262,10 @@ func (e *EventHandler) OnPartialTcCreated(partialTC *hotstuff.PartialTcCreated) 
 // be executed by the same goroutine that also calls the other business logic
 // methods, or concurrency safety has to be implemented externally.
 func (e *EventHandler) Start(ctx context.Context) error {
-	safetyData, err := e.persist.GetSafetyData()
-	if err != nil {
-		return fmt.Errorf("could not get safety data: %w", err)
-	}
-	e.myLastAcknowledgedView = safetyData.HighestAcknowledgedView
 	e.notifier.OnStart(e.paceMaker.CurView())
 	defer e.notifier.OnEventProcessed()
 	e.paceMaker.Start(ctx)
-	err = e.proposeForNewViewIfPrimary()
+	err := e.proposeForNewViewIfPrimary()
 	if err != nil {
 		return fmt.Errorf("could not start new view: %w", err)
 	}
@@ -373,29 +340,17 @@ func (e *EventHandler) proposeForNewViewIfPrimary() error {
 		return nil
 	}
 
-	// CASE A: Preventing proposal equivocation on the happy path
-	// We will never produce two proposals for the same view, _since_ the last reboot. This is because without a reboot,
-	// we can only proceed once beyond the following lines.
-	if curView <= e.myLastAcknowledgedView {
+	// Preventing proposal equivocation:
+	//   - If I previously proposed for this view (V), I must have signed the proposal using SafetyRules
+	//   - Upon signing, SafetyRules persists a new SafetyData instance with the new HighestAcknowledgedView=V
+	//   - Therefore I will exit in the condition below and not propose again for this view
+	safetyData, err := e.persist.GetSafetyData()
+	if err != nil {
+		return err
+	}
+	if curView <= safetyData.HighestAcknowledgedView {
 		log.Debug().Msg("already proposed for current view")
 		return nil
-	}
-	e.myLastAcknowledgedView = curView
-
-	// TODO
-	// CASE B: Preventing proposal equivocation on the unhappy path
-	// We will never produce a proposal for view v, if we already constructed a proposal for the same view _before_ the
-	// most recent reboot. This is because during proposal construction (further below), (i) the block is saved in the database
-	// _before_ a reference is returned to the EventHandler and (ii) all unfinalized proposals are added to Forks during the reboot.
-	for _, b := range e.forks.GetBlocksForView(curView) { // on the happy path, this slice is empty
-		if b.ProposerID == e.committee.Self() {
-			log.Debug().Msg("already proposed for current view")
-			return nil
-		} else {
-			// sanity check: the following code should never be reached, as this node is the current leader, i.e.
-			// we should _not_ consider a proposal for this view from any other as valid and store it in forks.
-			return fmt.Errorf("this node (%v) is leader for the current view %d, but have a proposal from node %v for this view", currentLeader, curView, b.ProposerID)
-		}
 	}
 
 	// attempt to generate proposal:
