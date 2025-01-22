@@ -35,7 +35,7 @@ func (p *ChunkDataPackPruner) PruneByBlockID(blockID flow.Identifier, batchWrite
 	for _, chunk := range result.Chunks {
 		chunkID := chunk.ID()
 		// remove chunk data pack
-		err := p.chunkDataPacks.BatchDelete(chunkID, batchWriter)
+		err := p.chunkDataPacks.BatchRemove(chunkID, batchWriter)
 		if errors.Is(err, storage.ErrNotFound) {
 			continue
 		}
