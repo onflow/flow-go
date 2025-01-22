@@ -42,6 +42,7 @@ func NewTransactionStatusesDataProvider(
 	ctx context.Context,
 	logger zerolog.Logger,
 	api access.API,
+	subscriptionID string,
 	linkGenerator commonmodels.LinkGenerator,
 	topic string,
 	arguments models.Arguments,
@@ -62,6 +63,7 @@ func NewTransactionStatusesDataProvider(
 	subCtx, cancel := context.WithCancel(ctx)
 
 	p.baseDataProvider = newBaseDataProvider(
+		subscriptionID,
 		topic,
 		cancel,
 		send,

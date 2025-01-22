@@ -118,7 +118,7 @@ func TestCheckPassIfLastSealedIsNotExecutedAndLastExecutedMatch(t *testing.T) {
 	mockUnexecutedBlock(t, es, lastSealed)
 
 	// mock the last sealed and is also executed
-	es.On("GetHighestExecutedBlockID", mock.Anything).Return(lastExecuted.Height, lastExecuted.ID(), nil)
+	es.On("GetLastExecutedBlockID", mock.Anything).Return(lastExecuted.Height, lastExecuted.ID(), nil)
 	lastSealedResultAtExecutedHeight, _ := mockSealedBlockAtHeight(t, state, lastExecuted.Height, lastSealedExecuted)
 	mockAtBlockID(t, state, lastSealedExecuted)
 
@@ -143,7 +143,7 @@ func TestCheckFailIfLastSealedIsNotExecutedAndLastExecutedMismatch(t *testing.T)
 	mockUnexecutedBlock(t, es, lastSealed)
 
 	// mock the last sealed and is also executed
-	es.On("GetHighestExecutedBlockID", mock.Anything).Return(lastExecuted.Height, lastExecuted.ID(), nil)
+	es.On("GetLastExecutedBlockID", mock.Anything).Return(lastExecuted.Height, lastExecuted.ID(), nil)
 	mockSealedBlockAtHeight(t, state, lastExecuted.Height, lastSealedExecuted)
 	mockAtBlockID(t, state, lastSealedExecuted)
 

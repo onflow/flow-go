@@ -142,6 +142,7 @@ func (s *SendTransactionStatusesProviderSuite) TestSendTransactionStatusesDataPr
 				ctx,
 				s.log,
 				s.api,
+				"dummy-id",
 				s.linkGenerator,
 				topic,
 				test.arguments,

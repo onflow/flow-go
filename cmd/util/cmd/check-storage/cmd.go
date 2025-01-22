@@ -3,6 +3,7 @@ package check_storage
 import (
 	"context"
 
+	"github.com/onflow/cadence/interpreter"
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
 	"golang.org/x/sync/errgroup"
@@ -322,9 +323,28 @@ func checkAccountStorageHealth(accountRegisters *registers.AccountRegisters, nWo
 	// Check atree storage health
 
 	ledger := &registers.ReadOnlyLedger{Registers: accountRegisters}
-	storage := runtime.NewStorage(ledger, nil)
+	storage := runtime.NewStorage(ledger, nil, runtime.StorageConfig{})
 
-	err = util.CheckStorageHealth(address, storage, accountRegisters, util.StorageMapDomains, nWorkers)
+	inter, err := interpreter.NewInterpreter(
+		nil,
+		nil,
+		&interpreter.Config{
+			Storage: storage,
+		},
+	)
+	if err != nil {
+		issues = append(
+			issues,
+			accountStorageIssue{
+				Address: address.Hex(),
+				Kind:    storageErrorKindString[otherErrorKind],
+				Msg:     err.Error(),
+			},
+		)
+		return issues
+	}
+
+	err = util.CheckStorageHealth(inter, address, storage, accountRegisters, common.AllStorageDomains, nWorkers)
 	if err != nil {
 		issues = append(
 			issues,
@@ -332,7 +352,8 @@ func checkAccountStorageHealth(accountRegisters *registers.AccountRegisters, nWo
 				Address: address.Hex(),
 				Kind:    storageErrorKindString[cadenceAtreeStorageErrorKind],
 				Msg:     err.Error(),
-			})
+			},
+		)
 	}
 
 	// TODO: check health of non-atree registers

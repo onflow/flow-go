@@ -28,6 +28,7 @@ func NewBlockDigestsDataProvider(
 	ctx context.Context,
 	logger zerolog.Logger,
 	api access.API,
+	subscriptionID string,
 	topic string,
 	arguments models.Arguments,
 	send chan<- interface{},
@@ -45,6 +46,7 @@ func NewBlockDigestsDataProvider(
 
 	subCtx, cancel := context.WithCancel(ctx)
 	p.baseDataProvider = newBaseDataProvider(
+		subscriptionID,
 		topic,
 		cancel,
 		send,

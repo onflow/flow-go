@@ -4,6 +4,7 @@ import (
 	"context"
 	"strconv"
 	"testing"
+	"time"
 
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/mock"
@@ -200,6 +201,7 @@ func (s *AccountStatusesProviderSuite) TestAccountStatusesDataProvider_InvalidAr
 				ctx,
 				s.log,
 				s.api,
+				"dummy-id",
 				topic,
 				test.arguments,
 				send,
@@ -227,7 +229,7 @@ func (s *AccountStatusesProviderSuite) TestMessageIndexAccountStatusesProviderRe
 	// Create a mock subscription and mock the channel
 	sub := ssmock.NewSubscription(s.T())
 	sub.On("Channel").Return((<-chan interface{})(accountStatusesChan))
-	sub.On("Err").Return(nil)
+	sub.On("Err").Return(nil).Once()
 
 	s.api.On("SubscribeAccountStatusesFromStartBlockID", mock.Anything, mock.Anything, mock.Anything).Return(sub)
 
@@ -241,6 +243,7 @@ func (s *AccountStatusesProviderSuite) TestMessageIndexAccountStatusesProviderRe
 		ctx,
 		s.log,
 		s.api,
+		"dummy-id",
 		topic,
 		arguments,
 		send,
@@ -255,7 +258,9 @@ func (s *AccountStatusesProviderSuite) TestMessageIndexAccountStatusesProviderRe
 	defer provider.Close()
 
 	// Run the provider in a separate goroutine to simulate subscription processing
+	done := make(chan struct{})
 	go func() {
+		defer close(done)
 		err = provider.Run()
 		s.Require().NoError(err)
 	}()
@@ -281,6 +286,9 @@ func (s *AccountStatusesProviderSuite) TestMessageIndexAccountStatusesProviderRe
 
 		responses = append(responses, accountStatusesResData)
 	}
+
+	// Wait for the provider goroutine to finish
+	unittest.RequireCloseBefore(s.T(), done, time.Second, "provider failed to stop")
 
 	// Verifying that indices are starting from 0
 	s.Require().Equal(uint64(0), responses[0].MessageIndex, "Expected MessageIndex to start with 0")

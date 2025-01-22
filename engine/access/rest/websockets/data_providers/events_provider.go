@@ -40,6 +40,7 @@ func NewEventsDataProvider(
 	ctx context.Context,
 	logger zerolog.Logger,
 	stateStreamApi state_stream.API,
+	subscriptionID string,
 	topic string,
 	arguments models.Arguments,
 	send chan<- interface{},
@@ -62,6 +63,7 @@ func NewEventsDataProvider(
 	subCtx, cancel := context.WithCancel(ctx)
 
 	p.baseDataProvider = newBaseDataProvider(
+		subscriptionID,
 		topic,
 		cancel,
 		send,
@@ -93,8 +95,8 @@ func (p *EventsDataProvider) handleResponse() func(eventsResponse *backend.Event
 			if blocksSinceLastMessage < p.heartbeatInterval {
 				return nil
 			}
-			blocksSinceLastMessage = 0
 		}
+		blocksSinceLastMessage = 0
 
 		index := messageIndex.Value()
 		if ok := messageIndex.Set(messageIndex.Value() + 1); !ok {

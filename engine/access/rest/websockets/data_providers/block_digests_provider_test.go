@@ -146,7 +146,7 @@ func (s *BlockDigestsProviderSuite) TestBlockDigestsDataProvider_InvalidArgument
 
 	for _, test := range s.invalidArgumentsTestCases() {
 		s.Run(test.name, func() {
-			provider, err := NewBlockDigestsDataProvider(ctx, s.log, s.api, topic, test.arguments, send)
+			provider, err := NewBlockDigestsDataProvider(ctx, s.log, s.api, "dummy-id", topic, test.arguments, send)
 			s.Require().Nil(provider)
 			s.Require().Error(err)
 			s.Require().Contains(err.Error(), test.expectedErrorMsg)
