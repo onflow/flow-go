@@ -254,7 +254,6 @@ func New(params Params) (*Backend, error) {
 	b.backendSubscribeTransactions = backendSubscribeTransactions{
 		backendTransactions: &b.backendTransactions,
 		log:                 params.Log,
-		executionResults:    params.ExecutionResults,
 		subscriptionHandler: params.SubscriptionHandler,
 		blockTracker:        params.BlockTracker,
 		sendTransaction:     b.SendTransaction,

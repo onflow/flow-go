@@ -24,21 +24,22 @@ import (
 // sendTransaction defines a function type for sending a transaction.
 type sendTransaction func(ctx context.Context, tx *flow.TransactionBody) error
 
-// backendSubscribeTransactions handles transaction subscriptions.
+// backendSubscribeTransactions manages transaction subscriptions for monitoring transaction statuses.
+// It provides functionalities to send transactions, subscribe to transaction status updates,
+// and handle subscription lifecycles.
 type backendSubscribeTransactions struct {
-	backendTransactions *backendTransactions
-	executionResults    storage.ExecutionResults
 	log                 zerolog.Logger
-
+	backendTransactions *backendTransactions
 	subscriptionHandler *subscription.SubscriptionHandler
 	blockTracker        subscription.BlockTracker
 	sendTransaction     sendTransaction
 }
 
-// SendAndSubscribeTransactionStatuses sends a transaction to the execution node and subscribes to its status updates.
-// Monitoring begins from the reference block saved in the transaction itself and streams status updates until the transaction
-// reaches the final state ([flow.TransactionStatusSealed] or [flow.TransactionStatusExpired]). Once the final status has been reached, the subscription
-// automatically terminates.
+// SendAndSubscribeTransactionStatuses sends a transaction and subscribes to its status updates.
+//
+// The subscription begins monitoring from the reference block specified in the transaction itself and
+// streams updates until the transaction reaches a final state ([flow.TransactionStatusSealed] or [flow.TransactionStatusExpired]).
+// Upon reaching a final state, the subscription automatically terminates.
 //
 // Parameters:
 //   - ctx: The context to manage the transaction sending and subscription lifecycle, including cancellation.
@@ -59,10 +60,11 @@ func (b *backendSubscribeTransactions) SendAndSubscribeTransactionStatuses(
 	return b.createSubscription(ctx, tx.ID(), tx.ReferenceBlockID, tx.ReferenceBlockID, requiredEventEncodingVersion)
 }
 
-// SubscribeTransactionStatuses subscribes to transaction status updates for a given transaction ID. Monitoring begins
-// from the last block ID. The subscription streams status updates until the transaction reaches the final state
-// ([flow.TransactionStatusSealed] or [flow.TransactionStatusExpired]). When the transaction reaches one of these
-// final states, the subscription will automatically terminate.
+// SubscribeTransactionStatuses subscribes to status updates for a given transaction ID.
+//
+// The subscription starts monitoring from the last sealed block. Updates are streamed
+// until the transaction reaches a final state ([flow.TransactionStatusSealed] or [flow.TransactionStatusExpired]).
+// The subscription terminates automatically once the final state is reached.
 //
 // Parameters:
 //   - ctx: The context to manage the subscription's lifecycle, including cancellation.
@@ -83,7 +85,21 @@ func (b *backendSubscribeTransactions) SubscribeTransactionStatuses(
 	return b.createSubscription(ctx, txID, header.ID(), flow.ZeroID, requiredEventEncodingVersion)
 }
 
-// createSubscription initializes a subscription for monitoring a transaction's status.
+// createSubscription initializes a transaction subscription for monitoring status updates.
+//
+// The subscription monitors the transaction's progress starting from the specified block ID.
+// It streams updates until the transaction reaches a final state or an error occurs.
+//
+// Parameters:
+//   - ctx: Context to manage the subscription lifecycle.
+//   - txID: The unique identifier of the transaction to monitor.
+//   - startBlockID: The ID of the block to start monitoring from.
+//   - referenceBlockID: The ID of the transaction's reference block.
+//   - requiredEventEncodingVersion: The required version of event encoding.
+//
+// Returns:
+//   - subscription.Subscription: A subscription for monitoring transaction status updates.
+//
 // If the start height cannot be determined or current transaction state cannot be determined, a failed subscription is returned.
 func (b *backendSubscribeTransactions) createSubscription(
 	ctx context.Context,
@@ -92,51 +108,21 @@ func (b *backendSubscribeTransactions) createSubscription(
 	referenceBlockID flow.Identifier,
 	requiredEventEncodingVersion entities.EventEncodingVersion,
 ) subscription.Subscription {
-	// Get height to start subscription from
+	// Determine the height of the block to start the subscription from.
 	startHeight, err := b.blockTracker.GetStartHeightFromBlockID(startBlockID)
 	if err != nil {
 		b.log.Err(err).Str("block_id", startBlockID.String()).Msg("failed to get start height")
 		return subscription.NewFailedSubscription(err, "failed to get start height")
 	}
 
-	txInfo, err := b.createTransactionInfoWithCurrentState(
-		ctx,
-		txID,
-		referenceBlockID,
-		startHeight,
-		requiredEventEncodingVersion,
-	)
+	// Retrieve the current state of the transaction.
+	txInfo, err := newTransactionSubscriptionMetadata(ctx, b.backendTransactions, txID, referenceBlockID, startHeight, requiredEventEncodingVersion)
 	if err != nil {
 		b.log.Err(err).Str("tx_id", txID.String()).Msg("failed to get current transaction state")
 		return subscription.NewFailedSubscription(err, "failed to get tx reference block ID")
 	}
 
 	return b.subscriptionHandler.Subscribe(ctx, startHeight, b.getTransactionStatusResponse(txInfo))
-}
-
-// createTransactionInfoWithCurrentState creates transactionSubscriptionMetadata filled with the current state of a transaction
-func (b *backendSubscribeTransactions) createTransactionInfoWithCurrentState(
-	ctx context.Context,
-	txID flow.Identifier,
-	referenceBlockID flow.Identifier,
-	startHeight uint64,
-	requiredEventEncodingVersion entities.EventEncodingVersion,
-) (*transactionSubscriptionMetadata, error) {
-	txInfo := newTransactionSubscriptionMetadata(b.backendTransactions, txID, referenceBlockID, requiredEventEncodingVersion)
-
-	if err := txInfo.initTransactionReferenceBlockID(); err != nil {
-		return nil, err
-	}
-
-	if err := txInfo.initBlockInfoFromBlocksRange(startHeight); err != nil {
-		return nil, err
-	}
-
-	if err := txInfo.initTransactionResult(ctx); err != nil {
-		return nil, err
-	}
-
-	return txInfo, nil
 }
 
 // getTransactionStatusResponse returns a callback function that produces transaction status
@@ -161,37 +147,21 @@ func (b *backendSubscribeTransactions) getTransactionStatusResponse(
 		}
 
 		// If on this step transaction block not available, search for it.
-		if txInfo.blockWithTx == nil {
-			// Search for transaction`s block information.
-			err = txInfo.searchForTransactionInBlock(height)
-			if err != nil {
-				if errors.Is(err, storage.ErrNotFound) {
-					return nil, fmt.Errorf("could not find block %d in storage: %w", height, subscription.ErrBlockNotReady)
-				}
+		if err = txInfo.checkAndFillTransactionBlockData(height); err != nil {
+			if errors.Is(err, storage.ErrNotFound) {
+				return nil, fmt.Errorf("could not find block %d in storage: %w", height, subscription.ErrBlockNotReady)
+			}
 
-				if !errors.Is(err, ErrTransactionNotInBlock) {
-					return nil, status.Errorf(codes.Internal, "could not get block %d: %v", height, err)
-				}
+			if !errors.Is(err, ErrTransactionNotInBlock) {
+				return nil, status.Errorf(codes.Internal, "could not get block %d: %v", height, err)
 			}
 		}
 
 		// Get old status here, as it could be replaced by status from founded tx result
 		prevTxStatus := txInfo.Status
 
-		if !txInfo.IsExecuted() {
-			txResult, err := txInfo.searchForTransactionResult(ctx)
-			if err != nil {
-				return nil, status.Errorf(codes.Internal, "failed to get execution result for block %s: %v", txInfo.BlockID, err)
-			}
-
-			// If transaction result was found, fully replace it in metadata. New transaction status already included in result.
-			if txResult != nil {
-				txInfo.TransactionResult = txResult
-			}
-		}
-
-		if err = txInfo.deriveTransactionResult(ctx); err != nil {
-			return nil, err
+		if err := txInfo.initTransactionResult(ctx); err != nil {
+			return nil, status.Errorf(codes.Internal, "failed to get transaction result for block %s: %v", txInfo.BlockID, err)
 		}
 
 		return b.generateResultsStatuses(txInfo.TransactionResult, prevTxStatus)
