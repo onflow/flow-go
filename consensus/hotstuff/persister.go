@@ -9,6 +9,7 @@ package hotstuff
 type Persister interface {
 	// GetSafetyData will retrieve last persisted safety data.
 	// During normal operations, no errors are expected.
+	// TODO remove error return
 	GetSafetyData() (*SafetyData, error)
 
 	// PutSafetyData persists the last safety data.
@@ -18,6 +19,7 @@ type Persister interface {
 
 	// GetLivenessData will retrieve last persisted liveness data.
 	// During normal operations, no errors are expected.
+	// TODO remove error return
 	GetLivenessData() (*LivenessData, error)
 
 	// PutLivenessData persists the last liveness data.
