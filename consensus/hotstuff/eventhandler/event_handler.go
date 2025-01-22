@@ -46,6 +46,7 @@ type EventHandler struct {
 	safetyRules   hotstuff.SafetyRules
 	notifier      hotstuff.Consumer
 
+	// TODO docs
 	// myLastProposedView is the latest view that this node has created a proposal for
 	// CAUTION: in-memory only; information will be lost once the node reboots. This is fine for the following reason:
 	//  1. At the moment, the block construction logic persists its blocks in the database, _before_ returning the
@@ -71,8 +72,6 @@ type EventHandler struct {
 	// On the happy path (no restarts), updating `myLastProposedView` will suffice to prevent creating two proposals for the same view.
 	// The node's own proposal will be added to Forks _after_ the broadcast the same way as proposals from other nodes.
 	// On the unhappy path, the node's own proposals will be added to Forks along with unfinalized proposals from other nodes.
-	// TODO: use safety rules also for block signing, which produces the same guarantees of not double-proposing without this extra logic
-	//       For further details, see issue https://github.com/onflow/flow-go/issues/6389
 	myLastProposedView uint64
 }
 
@@ -291,10 +290,15 @@ func (e *EventHandler) OnPartialTcCreated(partialTC *hotstuff.PartialTcCreated) 
 // be executed by the same goroutine that also calls the other business logic
 // methods, or concurrency safety has to be implemented externally.
 func (e *EventHandler) Start(ctx context.Context) error {
+	safetyData, err := e.persist.GetSafetyData()
+	if err != nil {
+		return fmt.Errorf("could not get safety data: %w", err)
+	}
+	e.myLastProposedView = safetyData.HighestAcknowledgedView
 	e.notifier.OnStart(e.paceMaker.CurView())
 	defer e.notifier.OnEventProcessed()
 	e.paceMaker.Start(ctx)
-	err := e.proposeForNewViewIfPrimary()
+	err = e.proposeForNewViewIfPrimary()
 	if err != nil {
 		return fmt.Errorf("could not start new view: %w", err)
 	}
@@ -378,6 +382,7 @@ func (e *EventHandler) proposeForNewViewIfPrimary() error {
 	}
 	e.myLastProposedView = curView
 
+	// TODO
 	// CASE B: Preventing proposal equivocation on the unhappy path
 	// We will never produce a proposal for view v, if we already constructed a proposal for the same view _before_ the
 	// most recent reboot. This is because during proposal construction (further below), (i) the block is saved in the database
@@ -447,12 +452,12 @@ func (e *EventHandler) proposeForNewViewIfPrimary() error {
 	// except that we are skipping the ComplianceEngine (assuming that our own proposals are protocol-compliant).
 	//
 	// Context:
-	//  • On constraint (i): We want to support consensus committees only consisting of a *single* node. If the EvenHandler
+	//  • On constraint (i): We want to support consensus committees only consisting of a *single* node. If the EventHandler
 	//    internally processed the block right away via a direct message call, the call-stack would be ever-growing and
 	//    the node would crash eventually (we experienced this with a very early HotStuff implementation). Specifically,
 	//    if we wanted to process the block directly without taking a detour through the EventLoop's inbound queue,
 	//    we would call `OnReceiveProposal` here. The function `OnReceiveProposal` would then end up calling
-	//    then end up calling `proposeForNewViewIfPrimary` (this function) to generate the next proposal, which again
+	//    `proposeForNewViewIfPrimary` (this function) to generate the next proposal, which again
 	//    would result in calling `OnReceiveProposal` and so on so forth until the call stack or memory limit is reached
 	//    and the node crashes. This is only a problem for consensus committees of size 1.
 	//  • On constraint (ii): When adding a proposal to Forks, Forks emits a `BlockIncorporatedEvent` notification, which
