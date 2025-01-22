@@ -20,10 +20,10 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
-// Deprecated: There's a new WebsocketController type that doesn't require you to create a new connection
-// for every topic you want to subscribe for.
 // WebsocketController holds the necessary components and parameters for handling a WebSocket subscription.
 // It manages the communication between the server and the WebSocket client for subscribing.
+//
+// Deprecated: Use websockets.Controller which allows managing multiple subscriptions with a single connection.
 type WebsocketController struct {
 	logger            zerolog.Logger
 	conn              *websocket.Conn                // the WebSocket connection for communication with the client
