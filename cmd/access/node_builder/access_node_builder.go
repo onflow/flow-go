@@ -346,6 +346,11 @@ type FlowAccessNodeBuilder struct {
 	VersionControl               *version.VersionControl
 	StopControl                  *stop.StopControl
 
+	// storage
+	events                         storage.Events
+	lightTransactionResults        storage.LightTransactionResults
+	transactionResultErrorMessages storage.TransactionResultErrorMessages
+
 	// The sync engine participants provider is the libp2p peer store for the access node
 	// which is not available until after the network has started.
 	// Hence, a factory function that needs to be called just before creating the sync engine
@@ -872,7 +877,7 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 				return nil
 			}).
 			Module("transaction results storage", func(node *cmd.NodeConfig) error {
-				builder.Storage.LightTransactionResults = bstorage.NewLightTransactionResults(node.Metrics.Cache, node.DB, bstorage.DefaultCacheSize)
+				builder.lightTransactionResults = store.NewLightTransactionResults(node.Metrics.Cache, badgerimpl.ToDB(node.DB), bstorage.DefaultCacheSize)
 				return nil
 			}).
 			DependableComponent("execution data indexer", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
@@ -964,10 +969,10 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 					builder.DB,
 					builder.Storage.RegisterIndex,
 					builder.Storage.Headers,
-					builder.Storage.Events,
+					builder.events,
 					builder.Storage.Collections,
 					builder.Storage.Transactions,
-					builder.Storage.LightTransactionResults,
+					builder.lightTransactionResults,
 					builder.RootChainID.Chain(),
 					indexerDerivedChainData,
 					builder.collectionExecutedMetric,
@@ -1834,7 +1839,7 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 			return nil
 		}).
 		Module("events storage", func(node *cmd.NodeConfig) error {
-			builder.Storage.Events = bstorage.NewEvents(node.Metrics.Cache, node.DB)
+			builder.events = store.NewEvents(node.Metrics.Cache, badgerimpl.ToDB(node.DB))
 			return nil
 		}).
 		Module("reporter", func(node *cmd.NodeConfig) error {
@@ -1842,11 +1847,11 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 			return nil
 		}).
 		Module("events index", func(node *cmd.NodeConfig) error {
-			builder.EventsIndex = index.NewEventsIndex(builder.Reporter, builder.Storage.Events)
+			builder.EventsIndex = index.NewEventsIndex(builder.Reporter, builder.events)
 			return nil
 		}).
 		Module("transaction result index", func(node *cmd.NodeConfig) error {
-			builder.TxResultsIndex = index.NewTransactionResultsIndex(builder.Reporter, builder.Storage.LightTransactionResults)
+			builder.TxResultsIndex = index.NewTransactionResultsIndex(builder.Reporter, builder.lightTransactionResults)
 			return nil
 		}).
 		Module("processed finalized block height consumer progress", func(node *cmd.NodeConfig) error {
@@ -1870,7 +1875,7 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 		}).
 		Module("transaction result error messages storage", func(node *cmd.NodeConfig) error {
 			if builder.storeTxResultErrorMessages {
-				builder.Storage.TransactionResultErrorMessages = bstorage.NewTransactionResultErrorMessages(node.Metrics.Cache, node.DB, bstorage.DefaultCacheSize)
+				builder.transactionResultErrorMessages = store.NewTransactionResultErrorMessages(node.Metrics.Cache, badgerimpl.ToDB(node.DB), bstorage.DefaultCacheSize)
 			}
 
 			return nil
@@ -2030,7 +2035,7 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 				Transactions:          node.Storage.Transactions,
 				ExecutionReceipts:     node.Storage.Receipts,
 				ExecutionResults:      node.Storage.Results,
-				TxResultErrorMessages: node.Storage.TransactionResultErrorMessages,
+				TxResultErrorMessages: builder.transactionResultErrorMessages,
 				ChainID:               node.RootChainID,
 				AccessMetrics:         builder.AccessMetrics,
 				ConnFactory:           connFactory,
@@ -2116,7 +2121,7 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 				builder.TxResultErrorMessagesCore = tx_error_messages.NewTxErrorMessagesCore(
 					node.Logger,
 					builder.nodeBackend,
-					node.Storage.TransactionResultErrorMessages,
+					builder.transactionResultErrorMessages,
 					builder.ExecNodeIdentitiesProvider,
 				)
 			}
