@@ -104,8 +104,12 @@ func (p *EventsDataProvider) handleResponse() func(eventsResponse *backend.Event
 			return fmt.Errorf("message index already incremented to: %d", messageIndex.Value())
 		}
 
-		var response models.EventResponse
-		response.Build(eventsResponse, index)
+		var eventsPayload models.EventResponse
+		eventsPayload.Build(eventsResponse, index)
+
+		var response models.BaseDataProvidersResponse
+		response.Build(p.ID(), p.Topic(), &eventsPayload)
+
 		p.send <- &response
 
 		return nil

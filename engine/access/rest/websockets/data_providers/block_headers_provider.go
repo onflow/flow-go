@@ -68,9 +68,14 @@ func (p *BlockHeadersDataProvider) Run() error {
 			var header commonmodels.BlockHeader
 			header.Build(h)
 
-			return &models.BlockHeaderMessageResponse{
-				Header: &header,
-			}, nil
+			var response models.BaseDataProvidersResponse
+			response.Build(
+				p.ID(),
+				p.Topic(),
+				&header,
+			)
+
+			return &response, nil
 		}),
 	)
 }

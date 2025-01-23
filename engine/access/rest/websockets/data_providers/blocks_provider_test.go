@@ -9,7 +9,6 @@ import (
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
-	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
 	accessmock "github.com/onflow/flow-go/access/mock"
@@ -82,61 +81,34 @@ func (s *BlocksProviderSuite) SetupTest() {
 	s.Require().NotNil(s.factory)
 }
 
-// invalidArgumentsTestCases returns a list of test cases with invalid argument combinations
-// for testing the behavior of block, block headers, block digests data providers. Each test case includes a name,
-// a set of input arguments, and the expected error message that should be returned.
-//
-// The test cases cover scenarios such as:
-// 1. Missing the required 'block_status' argument.
-// 2. Providing an unknown or invalid 'block_status' value.
-// 3. Supplying both 'start_block_id' and 'start_block_height' simultaneously, which is not allowed.
-func (s *BlocksProviderSuite) invalidArgumentsTestCases() []testErrType {
-	return []testErrType{
-		{
-			name: "missing 'block_status' argument",
-			arguments: models.Arguments{
-				"start_block_id": s.rootBlock.ID().String(),
-			},
-			expectedErrorMsg: "'block_status' must be provided",
+// TestBlocksDataProvider_HappyPath tests the behavior of the block data provider
+// when it is configured correctly and operating under normal conditions. It
+// validates that blocks are correctly streamed to the channel and ensures
+// no unexpected errors occur.
+func (s *BlocksProviderSuite) TestBlocksDataProvider_HappyPath() {
+	s.linkGenerator.On("BlockLink", mock.AnythingOfType("flow.Identifier")).Return(
+		func(id flow.Identifier) (string, error) {
+			for _, block := range s.blocks {
+				if block.ID() == id {
+					return fmt.Sprintf("/v1/blocks/%s", id), nil
+				}
+			}
+			return "", assert.AnError
 		},
-		{
-			name: "unknown 'block_status' argument",
-			arguments: models.Arguments{
-				"block_status": unknownBlockStatus,
-			},
-			expectedErrorMsg: fmt.Sprintf("invalid 'block_status', must be '%s' or '%s'", parser.Finalized, parser.Sealed),
-		},
-		{
-			name: "provide both 'start_block_id' and 'start_block_height' arguments",
-			arguments: models.Arguments{
-				"block_status":       parser.Finalized,
-				"start_block_id":     s.rootBlock.ID().String(),
-				"start_block_height": fmt.Sprintf("%d", s.rootBlock.Header.Height),
-			},
-			expectedErrorMsg: "can only provide either 'start_block_id' or 'start_block_height'",
-		},
-	}
-}
+	)
 
-// TestBlocksDataProvider_InvalidArguments tests the behavior of the block data provider
-// when invalid arguments are provided. It verifies that appropriate errors are returned
-// for missing or conflicting arguments.
-// This test covers the test cases:
-// 1. Missing 'block_status' argument.
-// 2. Invalid 'block_status' argument.
-// 3. Providing both 'start_block_id' and 'start_block_height' simultaneously.
-func (s *BlocksProviderSuite) TestBlocksDataProvider_InvalidArguments() {
-	ctx := context.Background()
-	send := make(chan interface{})
-
-	for _, test := range s.invalidArgumentsTestCases() {
-		s.Run(test.name, func() {
-			provider, err := NewBlocksDataProvider(ctx, s.log, s.api, "dummy-id", nil, BlocksTopic, test.arguments, send)
-			s.Require().Nil(provider)
-			s.Require().Error(err)
-			s.Require().Contains(err.Error(), test.expectedErrorMsg)
-		})
-	}
+	testHappyPath(
+		s.T(),
+		BlocksTopic,
+		s.factory,
+		s.validBlockArgumentsTestCases(),
+		func(dataChan chan interface{}) {
+			for _, block := range s.blocks {
+				dataChan <- block
+			}
+		},
+		s.requireBlock,
+	)
 }
 
 // validBlockArgumentsTestCases defines test happy cases for block data providers.
@@ -208,45 +180,13 @@ func (s *BlocksProviderSuite) validBlockArgumentsTestCases() []testType {
 	}
 }
 
-// TestBlocksDataProvider_HappyPath tests the behavior of the block data provider
-// when it is configured correctly and operating under normal conditions. It
-// validates that blocks are correctly streamed to the channel and ensures
-// no unexpected errors occur.
-func (s *BlocksProviderSuite) TestBlocksDataProvider_HappyPath() {
-	s.linkGenerator.On("BlockLink", mock.AnythingOfType("flow.Identifier")).Return(
-		func(id flow.Identifier) (string, error) {
-			for _, block := range s.blocks {
-				if block.ID() == id {
-					return fmt.Sprintf("/v1/blocks/%s", id), nil
-				}
-			}
-			return "", assert.AnError
-		},
-	)
-
-	testHappyPath(
-		s.T(),
-		BlocksTopic,
-		s.factory,
-		s.validBlockArgumentsTestCases(),
-		func(dataChan chan interface{}) {
-			for _, block := range s.blocks {
-				dataChan <- block
-			}
-		},
-		s.requireBlock,
-	)
-}
-
-// requireBlocks ensures that the received block information matches the expected data.
+// requireBlock ensures that the received block information matches the expected data.
 func (s *BlocksProviderSuite) requireBlock(actual interface{}, expected interface{}) {
-	actualResponse, ok := actual.(*models.BlockMessageResponse)
-	require.True(s.T(), ok, "unexpected response type: %T", actual)
+	expectedResponse, expectedResponsePayload := extractPayload[*commonmodels.Block](s.T(), expected)
+	actualResponse, actualResponsePayload := extractPayload[*commonmodels.Block](s.T(), actual)
 
-	expectedResponse, ok := expected.(*models.BlockMessageResponse)
-	require.True(s.T(), ok, "unexpected response type: %T", expected)
-
-	s.Require().Equal(expectedResponse.Block, actualResponse.Block)
+	s.Require().Equal(expectedResponse.Topic, actualResponse.Topic)
+	s.Require().Equal(expectedResponsePayload, actualResponsePayload)
 }
 
 // expectedBlockResponses generates a list of expected block responses for the given blocks.
@@ -261,10 +201,68 @@ func (s *BlocksProviderSuite) expectedBlockResponses(
 		err := block.Build(b, nil, s.linkGenerator, status, expand)
 		s.Require().NoError(err)
 
-		responses[i] = &models.BlockMessageResponse{
-			Block: &block,
+		responses[i] = &models.BaseDataProvidersResponse{
+			Topic:   BlocksTopic,
+			Payload: &block,
 		}
 	}
 
 	return responses
+}
+
+// TestBlocksDataProvider_InvalidArguments tests the behavior of the block data provider
+// when invalid arguments are provided. It verifies that appropriate errors are returned
+// for missing or conflicting arguments.
+// This test covers the test cases:
+// 1. Missing 'block_status' argument.
+// 2. Invalid 'block_status' argument.
+// 3. Providing both 'start_block_id' and 'start_block_height' simultaneously.
+func (s *BlocksProviderSuite) TestBlocksDataProvider_InvalidArguments() {
+	ctx := context.Background()
+	send := make(chan interface{})
+
+	for _, test := range s.invalidArgumentsTestCases() {
+		s.Run(test.name, func() {
+			provider, err := NewBlocksDataProvider(ctx, s.log, s.api, "dummy-id", nil, BlocksTopic, test.arguments, send)
+			s.Require().Nil(provider)
+			s.Require().Error(err)
+			s.Require().Contains(err.Error(), test.expectedErrorMsg)
+		})
+	}
+}
+
+// invalidArgumentsTestCases returns a list of test cases with invalid argument combinations
+// for testing the behavior of block, block headers, block digests data providers. Each test case includes a name,
+// a set of input arguments, and the expected error message that should be returned.
+//
+// The test cases cover scenarios such as:
+// 1. Missing the required 'block_status' argument.
+// 2. Providing an unknown or invalid 'block_status' value.
+// 3. Supplying both 'start_block_id' and 'start_block_height' simultaneously, which is not allowed.
+func (s *BlocksProviderSuite) invalidArgumentsTestCases() []testErrType {
+	return []testErrType{
+		{
+			name: "missing 'block_status' argument",
+			arguments: models.Arguments{
+				"start_block_id": s.rootBlock.ID().String(),
+			},
+			expectedErrorMsg: "'block_status' must be provided",
+		},
+		{
+			name: "unknown 'block_status' argument",
+			arguments: models.Arguments{
+				"block_status": unknownBlockStatus,
+			},
+			expectedErrorMsg: fmt.Sprintf("invalid 'block_status', must be '%s' or '%s'", parser.Finalized, parser.Sealed),
+		},
+		{
+			name: "provide both 'start_block_id' and 'start_block_height' arguments",
+			arguments: models.Arguments{
+				"block_status":       parser.Finalized,
+				"start_block_id":     s.rootBlock.ID().String(),
+				"start_block_height": fmt.Sprintf("%d", s.rootBlock.Header.Height),
+			},
+			expectedErrorMsg: "can only provide either 'start_block_id' or 'start_block_height'",
+		},
+	}
 }
