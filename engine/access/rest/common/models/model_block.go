@@ -14,5 +14,5 @@ type Block struct {
 	ExecutionResult *ExecutionResult `json:"execution_result,omitempty"`
 	Expandable      *BlockExpandable `json:"_expandable,omitempty"`
 	Links           *Links           `json:"_links,omitempty"`
-	BlockStatus     string           `json:"block_status"`
+	BlockStatus     *BlockStatus     `json:"block_status"`
 }
