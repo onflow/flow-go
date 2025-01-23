@@ -8,6 +8,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/onflow/flow-go/engine/access/rest/common/parser"
+
 	"github.com/google/uuid"
 	"github.com/gorilla/websocket"
 	"github.com/rs/zerolog"
@@ -298,7 +300,6 @@ func (s *WsControllerSuite) TestUnsubscribeRequest() {
 				require.True(t, ok)
 				require.Empty(t, response.Error)
 				require.Equal(t, request.SubscriptionID, response.SubscriptionID)
-				require.Equal(t, request.SubscriptionID, response.SubscriptionID)
 
 				return websocket.ErrCloseSent
 			}).
@@ -470,7 +471,10 @@ func (s *WsControllerSuite) TestListSubscriptions() {
 		done := make(chan struct{})
 
 		topic := dp.BlocksTopic
-		arguments := models.Arguments{}
+		arguments := models.Arguments{
+			"start_block_id": unittest.IdentifierFixture().String(),
+			"block_status":   parser.Finalized,
+		}
 		dataProvider.On("Topic").Return(topic)
 		dataProvider.On("Arguments").Return(arguments)
 		// data provider might finish on its own or controller will close it via Close()
