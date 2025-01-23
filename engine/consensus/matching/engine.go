@@ -84,17 +84,17 @@ func NewEngine(
 		pendingIncorporatedBlocks:  pendingIncorporatedBlocks,
 	}
 
-	// register engine with the receipt provider
-	_, err = net.Register(channels.ReceiveReceipts, e)
-	if err != nil {
-		return nil, fmt.Errorf("could not register for results: %w", err)
-	}
-
 	e.Component = component.NewComponentManagerBuilder().
 		AddWorker(e.inboundEventsProcessingLoop).
 		AddWorker(e.finalizationProcessingLoop).
 		AddWorker(e.blockIncorporatedEventsProcessingLoop).
 		Build()
+
+	// register engine with the receipt provider
+	_, err = net.Register(channels.ReceiveReceipts, e)
+	if err != nil {
+		return nil, fmt.Errorf("could not register for results: %w", err)
+	}
 
 	return e, nil
 }
