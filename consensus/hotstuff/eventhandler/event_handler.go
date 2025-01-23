@@ -340,19 +340,6 @@ func (e *EventHandler) proposeForNewViewIfPrimary() error {
 		return nil
 	}
 
-	// Preventing proposal equivocation:
-	//   - If I previously proposed for this view (V), I must have signed the proposal using SafetyRules
-	//   - Upon signing, SafetyRules persists a new SafetyData instance with the new HighestAcknowledgedView=V
-	//   - Therefore I will exit in the condition below and not propose again for this view
-	safetyData, err := e.persist.GetSafetyData()
-	if err != nil {
-		return err
-	}
-	if curView <= safetyData.HighestAcknowledgedView {
-		log.Debug().Msg("already proposed for current view")
-		return nil
-	}
-
 	// attempt to generate proposal:
 	newestQC := e.paceMaker.NewestQC()
 	lastViewTC := e.paceMaker.LastViewTC()

@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/onflow/flow-go/consensus/hotstuff"
+	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 )
@@ -42,7 +43,10 @@ func New(safetyRules hotstuff.SafetyRules, committee hotstuff.Replicas, builder 
 
 // MakeBlockProposal builds a new HotStuff block proposal using the given view,
 // the given quorum certificate for its parent and [optionally] a timeout certificate for last view(could be nil).
-// No errors are expected during normal operation.
+// Error Returns:
+//   - model.NoVoteError if it is not safe for us to vote (our proposal includes our vote)
+//     for this view. This can happen if we have already proposed or timed out this view.
+//   - generic error in case of unexpected failure
 func (bp *BlockProducer) MakeBlockProposal(view uint64, qc *flow.QuorumCertificate, lastViewTC *flow.TimeoutCertificate) (*flow.Header, error) {
 	// the custom functions allows us to set some custom fields on the block;
 	// in hotstuff, we use this for view number and signature-related fields
@@ -57,8 +61,15 @@ func (bp *BlockProducer) MakeBlockProposal(view uint64, qc *flow.QuorumCertifica
 	}
 
 	signer := newSafetyRulesConcurrencyWrapper(bp.safetyRules)
-	header, err := bp.builder.BuildOn(qc.BlockID, setHotstuffFields, signer.Sign)
+	header, err := bp.builder.BuildOn(
+		qc.BlockID,
+		setHotstuffFields, // never returns an error
+		signer.Sign,       // may return model.NoVoteError, which we handle below
+	)
 	if err != nil {
+		if model.IsNoVoteError(err) {
+			return nil, fmt.Errorf("unsafe to vote for own proposal on top of %x: %w", qc.BlockID, err)
+		}
 		return nil, fmt.Errorf("could not build block proposal on top of %v: %w", qc.BlockID, err)
 	}
 	if !signer.IsSigningComplete() {

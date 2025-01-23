@@ -275,6 +275,9 @@ func (es *EventHandlerSuite) SetupTest() {
 		CurrentView: newestQC.View + 1,
 		NewestQC:    newestQC,
 	}
+	safetyData := &hotstuff.SafetyData{
+		HighestAcknowledgedView: newestQC.View,
+	}
 
 	es.ctx, es.stop = context.WithCancel(context.Background())
 
@@ -283,6 +286,7 @@ func (es *EventHandlerSuite) SetupTest() {
 	es.forks = NewForks(es.T(), finalized)
 	es.persist = mocks.NewPersister(es.T())
 	es.persist.On("PutStarted", mock.Anything).Return(nil).Maybe()
+	es.persist.On("GetSafetyData").Return(safetyData, nil).Maybe()
 	es.blockProducer = &BlockProducer{proposerID: es.committee.Self()}
 	es.safetyRules = NewSafetyRules(es.T())
 	es.notifier = mocks.NewConsumer(es.T())
