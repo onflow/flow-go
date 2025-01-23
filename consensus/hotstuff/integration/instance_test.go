@@ -517,7 +517,8 @@ func NewInstance(t *testing.T, options ...Option) *Instance {
 		LockedOneChainView:      rootBlock.View,
 		HighestAcknowledgedView: rootBlock.View,
 	}
-	in.persist.On("GetSafetyData", mock.Anything).Return(safetyData, nil).Once()
+	// TODO: just use a real persister
+	in.persist.On("GetSafetyData", mock.Anything).Return(safetyData, nil)
 
 	// initialize the safety rules
 	in.safetyRules, err = safetyrules.New(in.signer, in.persist, in.committee)
