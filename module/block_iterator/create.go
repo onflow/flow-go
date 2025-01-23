@@ -8,22 +8,37 @@ import (
 	"github.com/onflow/flow-go/storage"
 )
 
-// CreateIndexedBlockIterator creates a block iterator that iterates through blocks by index.
-func CreateIndexedBlockIterator(
+type Creator struct {
+	getBlockIDByIndex func(uint64) (flow.Identifier, bool, error)
+	progressReader    module.IterateProgressReader
+	progressWriter    module.IterateProgressWriter
+	latest            func() (uint64, error)
+}
+
+// NewCreator creates a block iterator that iterates through blocks by index.
+func NewCreator(
 	getBlockIDByIndex func(uint64) (blockID flow.Identifier, indexed bool, exception error),
 	progress storage.ConsumerProgress,
-	getRoot func() (uint64, error),
+	root uint64,
 	latest func() (uint64, error),
-) (module.BlockIterator, error) {
-
+) (*Creator, error) {
 	// initialize the progress in storage, saving the root block index in storage
-	progressReader, progressWriter, err := NewInitializer(progress, getRoot).Init()
+	progressReader, progressWriter, err := NewInitializer(progress, root).Init()
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize progress: %w", err)
 	}
 
+	return &Creator{
+		getBlockIDByIndex: getBlockIDByIndex,
+		progressReader:    progressReader,
+		progressWriter:    progressWriter,
+		latest:            latest,
+	}, nil
+}
+
+func (c *Creator) Create() (module.BlockIterator, error) {
 	// create a iteration range from the root block to the latest block
-	iterRange, err := NewIteratorRangeCreator(latest).CreateRange(progressReader)
+	iterRange, err := NewIteratorRangeCreator(c.latest).CreateRange(c.progressReader)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create range for block iteration: %w", err)
 	}
@@ -32,19 +47,19 @@ func CreateIndexedBlockIterator(
 	// the function to get block ID by index,
 	// the progress writer to update the progress in storage,
 	// and the iteration range
-	return NewIndexedBlockIterator(getBlockIDByIndex, progressWriter, iterRange), nil
+	return NewIndexedBlockIterator(c.getBlockIDByIndex, c.progressWriter, iterRange), nil
 }
 
-// CreateHeightBasedBlockIterator creates a block iterator that iterates through blocks
+// NewHeightBasedCreator creates a block iterator that iterates through blocks
 // from root to the latest (either finalized or sealed) by height.
-func CreateHeightBasedBlockIterator(
+func NewHeightBasedCreator(
 	getBlockIDByHeight func(height uint64) (flow.Identifier, error),
 	progress storage.ConsumerProgress,
-	getRoot func() (*flow.Header, error),
+	root *flow.Header,
 	latest func() (*flow.Header, error),
-) (module.BlockIterator, error) {
+) (*Creator, error) {
 
-	return CreateIndexedBlockIterator(
+	return NewCreator(
 		func(height uint64) (flow.Identifier, bool, error) {
 			blockID, err := getBlockIDByHeight(height)
 			if err != nil {
@@ -56,13 +71,7 @@ func CreateHeightBasedBlockIterator(
 			return blockID, alwaysIndexed, nil
 		},
 		progress,
-		func() (uint64, error) {
-			root, err := getRoot()
-			if err != nil {
-				return 0, fmt.Errorf("failed to get root block: %w", err)
-			}
-			return root.Height, nil
-		},
+		root.Height,
 		func() (uint64, error) {
 			latestBlock, err := latest()
 			if err != nil {
@@ -73,24 +82,19 @@ func CreateHeightBasedBlockIterator(
 	)
 }
 
-// CreateViewBasedBlockIterator creates a block iterator that iterates through blocks
+// NewViewBasedCreator creates a block iterator that iterates through blocks
 // from root to the latest (either finalized or sealed) by view.
-func CreateViewBasedBlockIterator(
+// since view has gaps, the iterator will skip views that have no blocks.
+func NewViewBasedCreator(
 	getBlockIDByView func(view uint64) (blockID flow.Identifier, viewIndexed bool, exception error),
 	progress storage.ConsumerProgress,
-	getRoot func() (*flow.Header, error),
+	root *flow.Header,
 	latest func() (*flow.Header, error),
-) (module.BlockIterator, error) {
-	return CreateIndexedBlockIterator(
+) (*Creator, error) {
+	return NewCreator(
 		getBlockIDByView,
 		progress,
-		func() (uint64, error) {
-			root, err := getRoot()
-			if err != nil {
-				return 0, fmt.Errorf("failed to get root block: %w", err)
-			}
-			return root.View, nil
-		},
+		root.View,
 		func() (uint64, error) {
 			latestBlock, err := latest()
 			if err != nil {
