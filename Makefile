@@ -603,6 +603,7 @@ PHONY: docker-build-bootstrap
 docker-build-bootstrap:
 	docker build -f cmd/Dockerfile  --build-arg TARGET=./cmd/bootstrap --build-arg GOARCH=$(GOARCH) --build-arg VERSION=$(IMAGE_TAG) --build-arg CGO_FLAG=$(CRYPTO_FLAG) --target production \
 		--label "git_commit=${COMMIT}" --label "git_tag=${IMAGE_TAG}" \
+		--secret id=cadence_deploy_key,env=CADENCE_DEPLOY_KEY \
 		-t "$(CONTAINER_REGISTRY)/bootstrap:latest" \
 		-t "$(CONTAINER_REGISTRY)/bootstrap:$(IMAGE_TAG)" .
 
@@ -614,6 +615,7 @@ tool-bootstrap: docker-build-bootstrap
 docker-build-bootstrap-transit:
 	docker build -f cmd/Dockerfile  --build-arg TARGET=./cmd/bootstrap/transit --build-arg COMMIT=$(COMMIT)  --build-arg VERSION=$(VERSION) --build-arg GOARCH=$(GOARCH) --build-arg CGO_FLAG=$(CRYPTO_FLAG) --no-cache \
 	    --target production  \
+		--secret id=cadence_deploy_key,env=CADENCE_DEPLOY_KEY \
 		-t "$(CONTAINER_REGISTRY)/bootstrap-transit:latest" \
 		-t "$(CONTAINER_REGISTRY)/bootstrap-transit:$(IMAGE_TAG)" .
 
