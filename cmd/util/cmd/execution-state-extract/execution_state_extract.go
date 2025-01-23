@@ -369,23 +369,15 @@ func newCadence1Migrations(
 
 	rwf := reporters.NewReportFileWriterFactory(outputDir, log)
 
-	namedMigrations := migrators.NewCadence1Migrations(
-		log,
-		outputDir,
-		rwf,
-		opts,
-	)
-
 	key, err := crypto.DecodePublicKeyHex(crypto.ECDSA_P256, "711d4cd9930d695ef5c79b668d321f92ba00ed8280fded52c0fa2b15501411d026fe6fb4be3ec894facd3a00f04e32e2db5f5696d3b2b3419e4fba89fb95dca8")
 	if err != nil {
 		panic("failed to decode key")
 	}
 
 	// At the end, fix up storage-used discrepancies
-	namedMigrations = append(
-		namedMigrations,
-		migrators.NamedMigration{
-			Name: "account-usage-migration",
+	namedMigrations := []migrators.NamedMigration{
+		{
+			Name: "add-keys-migration",
 			Migrate: migrators.NewAccountBasedMigration(
 				log,
 				opts.NWorker,
@@ -395,11 +387,10 @@ func newCadence1Migrations(
 						key,
 						rwf,
 					),
-					migrators.NewAccountUsageMigration(rwf),
 				},
 			),
 		},
-	)
+	}
 
 	log.Info().Msg("initialized migrations")
 
