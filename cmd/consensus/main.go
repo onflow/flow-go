@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -12,6 +13,7 @@ import (
 
 	client "github.com/onflow/flow-go-sdk/access/grpc"
 	"github.com/onflow/flow-go-sdk/crypto"
+
 	"github.com/onflow/flow-go/cmd"
 	"github.com/onflow/flow-go/cmd/util/cmd/common"
 	"github.com/onflow/flow-go/consensus"
@@ -203,7 +205,8 @@ func main() {
 		PostInit(func(nodeConfig *cmd.NodeConfig) error {
 			// TODO(EFM, #6794): This function is introduced to implement a backward-compatible upgrade from v1 to v2.
 			// Remove this once we complete the network upgrade.
-			if err := operation.RetryOnConflict(nodeBuilder.DB.Update, operation.MigrateDKGEndStateFromV1()); err != nil {
+			log := nodeConfig.Logger.With().Str("postinit", "dkg_end_state_migration").Logger()
+			if err := operation.RetryOnConflict(nodeBuilder.SecretsDB.Update, operation.MigrateDKGEndStateFromV1(log)); err != nil {
 				return fmt.Errorf("could not migrate DKG end state from v1 to v2: %w", err)
 			}
 			return nil
@@ -954,7 +957,7 @@ func main() {
 	if err != nil {
 		nodeBuilder.Logger.Fatal().Err(err).Send()
 	}
-	node.Run()
+	node.Run(context.Background())
 }
 
 func loadBeaconPrivateKey(dir string, myID flow.Identifier) (*encodable.RandomBeaconPrivKey, error) {

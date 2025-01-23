@@ -21,8 +21,10 @@ import (
 
 	accessmock "github.com/onflow/flow-go/engine/access/mock"
 	"github.com/onflow/flow-go/engine/access/rest"
-	"github.com/onflow/flow-go/engine/access/rest/request"
-	"github.com/onflow/flow-go/engine/access/rest/routes"
+	"github.com/onflow/flow-go/engine/access/rest/common"
+	"github.com/onflow/flow-go/engine/access/rest/common/parser"
+	"github.com/onflow/flow-go/engine/access/rest/router"
+	"github.com/onflow/flow-go/engine/access/rest/websockets"
 	"github.com/onflow/flow-go/engine/access/rpc"
 	"github.com/onflow/flow-go/engine/access/rpc/backend"
 	statestreambackend "github.com/onflow/flow-go/engine/access/state_stream/backend"
@@ -136,6 +138,7 @@ func (suite *RestAPITestSuite) SetupTest() {
 		RestConfig: rest.Config{
 			ListenAddress: unittest.DefaultAddress,
 		},
+		WebSocketConfig: websockets.NewDefaultWebsocketConfig(),
 	}
 
 	// generate a server certificate that will be served by the GRPC server
@@ -229,8 +232,8 @@ func TestRestAPI(t *testing.T) {
 
 func (suite *RestAPITestSuite) TestGetBlock() {
 
-	testBlockIDs := make([]string, request.MaxIDsLength)
-	testBlocks := make([]*flow.Block, request.MaxIDsLength)
+	testBlockIDs := make([]string, parser.MaxIDsLength)
+	testBlocks := make([]*flow.Block, parser.MaxIDsLength)
 	for i := range testBlockIDs {
 		collections := unittest.CollectionListFixture(1)
 		block := unittest.BlockWithGuaranteesFixture(
@@ -280,7 +283,7 @@ func (suite *RestAPITestSuite) TestGetBlock() {
 		actualBlocks, resp, err := client.BlocksApi.BlocksIdGet(ctx, blockIDSlice, optionsForBlockByID())
 		require.NoError(suite.T(), err)
 		assert.Equal(suite.T(), http.StatusOK, resp.StatusCode)
-		assert.Len(suite.T(), actualBlocks, request.MaxIDsLength)
+		assert.Len(suite.T(), actualBlocks, parser.MaxIDsLength)
 		for i, b := range testBlocks {
 			assert.Equal(suite.T(), b.ID().String(), actualBlocks[i].Header.Id)
 		}
@@ -378,13 +381,13 @@ func (suite *RestAPITestSuite) TestGetBlock() {
 		ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
 		defer cancel()
 
-		blockIDs := make([]string, request.MaxIDsLength+1)
+		blockIDs := make([]string, parser.MaxIDsLength+1)
 		copy(blockIDs, testBlockIDs)
-		blockIDs[request.MaxIDsLength] = unittest.IdentifierFixture().String()
+		blockIDs[parser.MaxIDsLength] = unittest.IdentifierFixture().String()
 
 		blockIDSlice := []string{strings.Join(blockIDs, ",")}
 		_, resp, err := client.BlocksApi.BlocksIdGet(ctx, blockIDSlice, optionsForBlockByID())
-		assertError(suite.T(), resp, err, http.StatusBadRequest, fmt.Sprintf("at most %d IDs can be requested at a time", request.MaxIDsLength))
+		assertError(suite.T(), resp, err, http.StatusBadRequest, fmt.Sprintf("at most %d IDs can be requested at a time", parser.MaxIDsLength))
 	})
 
 	suite.Run("GetBlockByID with one non-existing block ID", func() {
@@ -424,7 +427,7 @@ func (suite *RestAPITestSuite) TestRequestSizeRestriction() {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
 	defer cancel()
 	// make a request of size larger than the max permitted size
-	requestBytes := make([]byte, routes.MaxRequestSize+1)
+	requestBytes := make([]byte, common.DefaultMaxRequestSize+1)
 	script := restclient.ScriptsBody{
 		Script: string(requestBytes),
 	}
@@ -451,13 +454,13 @@ func assertError(t *testing.T, resp *http.Response, err error, expectedCode int,
 
 func optionsForBlockByID() *restclient.BlocksApiBlocksIdGetOpts {
 	return &restclient.BlocksApiBlocksIdGetOpts{
-		Expand:  optional.NewInterface([]string{routes.ExpandableFieldPayload}),
+		Expand:  optional.NewInterface([]string{router.ExpandableFieldPayload}),
 		Select_: optional.NewInterface([]string{"header.id"}),
 	}
 }
 func optionsForBlockByStartEndHeight(startHeight, endHeight uint64) *restclient.BlocksApiBlocksGetOpts {
 	return &restclient.BlocksApiBlocksGetOpts{
-		Expand:      optional.NewInterface([]string{routes.ExpandableFieldPayload}),
+		Expand:      optional.NewInterface([]string{router.ExpandableFieldPayload}),
 		Select_:     optional.NewInterface([]string{"header.id", "header.height"}),
 		StartHeight: optional.NewInterface(startHeight),
 		EndHeight:   optional.NewInterface(endHeight),
@@ -466,7 +469,7 @@ func optionsForBlockByStartEndHeight(startHeight, endHeight uint64) *restclient.
 
 func optionsForBlockByHeights(heights []uint64) *restclient.BlocksApiBlocksGetOpts {
 	return &restclient.BlocksApiBlocksGetOpts{
-		Expand:  optional.NewInterface([]string{routes.ExpandableFieldPayload}),
+		Expand:  optional.NewInterface([]string{router.ExpandableFieldPayload}),
 		Select_: optional.NewInterface([]string{"header.id", "header.height"}),
 		Height:  optional.NewInterface(heights),
 	}
@@ -474,7 +477,7 @@ func optionsForBlockByHeights(heights []uint64) *restclient.BlocksApiBlocksGetOp
 
 func optionsForFinalizedBlock(finalOrSealed string) *restclient.BlocksApiBlocksGetOpts {
 	return &restclient.BlocksApiBlocksGetOpts{
-		Expand:  optional.NewInterface([]string{routes.ExpandableFieldPayload}),
+		Expand:  optional.NewInterface([]string{router.ExpandableFieldPayload}),
 		Select_: optional.NewInterface([]string{"header.id", "header.height"}),
 		Height:  optional.NewInterface(finalOrSealed),
 	}

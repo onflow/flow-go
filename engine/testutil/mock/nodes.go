@@ -22,7 +22,7 @@ import (
 	"github.com/onflow/flow-go/engine/consensus/matching"
 	"github.com/onflow/flow-go/engine/consensus/sealing"
 	"github.com/onflow/flow-go/engine/execution/computation"
-	"github.com/onflow/flow-go/engine/execution/ingestion"
+	executionIngest "github.com/onflow/flow-go/engine/execution/ingestion"
 	executionprovider "github.com/onflow/flow-go/engine/execution/provider"
 	"github.com/onflow/flow-go/engine/execution/state"
 	"github.com/onflow/flow-go/engine/verification/assigner"
@@ -140,6 +140,7 @@ func (n CollectionNode) Start(t *testing.T) {
 	n.IngestionEngine.Start(n.Ctx)
 	n.EpochManagerEngine.Start(n.Ctx)
 	n.ProviderEngine.Start(n.Ctx)
+	n.PusherEngine.Start(n.Ctx)
 }
 
 func (n CollectionNode) Ready() <-chan struct{} {
@@ -192,7 +193,7 @@ func (cn ConsensusNode) Done() {
 type ExecutionNode struct {
 	GenericNode
 	FollowerState       protocol.FollowerState
-	IngestionEngine     *ingestion.Engine
+	IngestionEngine     *executionIngest.Core
 	ExecutionEngine     *computation.Manager
 	RequestEngine       *requester.Engine
 	ReceiptsEngine      *executionprovider.Engine
@@ -217,6 +218,7 @@ func (en ExecutionNode) Ready(ctx context.Context) {
 	// new interface.
 	irctx, _ := irrecoverable.WithSignaler(ctx)
 	en.ReceiptsEngine.Start(irctx)
+	en.IngestionEngine.Start(irctx)
 	en.FollowerCore.Start(irctx)
 	en.FollowerEngine.Start(irctx)
 	en.SyncEngine.Start(irctx)
@@ -238,7 +240,6 @@ func (en ExecutionNode) Done(cancelFunc context.CancelFunc) {
 
 	// to stop all (deprecated) ready-done-aware
 	<-util.AllDone(
-		en.IngestionEngine,
 		en.IngestionEngine,
 		en.ReceiptsEngine,
 		en.Ledger,

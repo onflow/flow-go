@@ -27,6 +27,7 @@ import (
 	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/credentials/insecure"
 
+	accessNode "github.com/onflow/flow-go/access"
 	"github.com/onflow/flow-go/admin/commands"
 	stateSyncCommands "github.com/onflow/flow-go/admin/commands/state_synchronization"
 	storageCommands "github.com/onflow/flow-go/admin/commands/storage"
@@ -44,9 +45,12 @@ import (
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/engine/access/index"
 	"github.com/onflow/flow-go/engine/access/ingestion"
+	"github.com/onflow/flow-go/engine/access/ingestion/tx_error_messages"
 	pingeng "github.com/onflow/flow-go/engine/access/ping"
 	"github.com/onflow/flow-go/engine/access/rest"
-	"github.com/onflow/flow-go/engine/access/rest/routes"
+	commonrest "github.com/onflow/flow-go/engine/access/rest/common"
+	"github.com/onflow/flow-go/engine/access/rest/router"
+	"github.com/onflow/flow-go/engine/access/rest/websockets"
 	"github.com/onflow/flow-go/engine/access/rpc"
 	"github.com/onflow/flow-go/engine/access/rpc/backend"
 	rpcConnection "github.com/onflow/flow-go/engine/access/rpc/connection"
@@ -55,6 +59,7 @@ import (
 	"github.com/onflow/flow-go/engine/access/subscription"
 	followereng "github.com/onflow/flow-go/engine/common/follower"
 	"github.com/onflow/flow-go/engine/common/requester"
+	commonrpc "github.com/onflow/flow-go/engine/common/rpc"
 	"github.com/onflow/flow-go/engine/common/stop"
 	synceng "github.com/onflow/flow-go/engine/common/synchronization"
 	"github.com/onflow/flow-go/engine/common/version"
@@ -149,6 +154,7 @@ type AccessNodeConfig struct {
 	logTxTimeToFinalized                 bool
 	logTxTimeToExecuted                  bool
 	logTxTimeToFinalizedExecuted         bool
+	logTxTimeToSealed                    bool
 	retryEnabled                         bool
 	rpcMetricsEnabled                    bool
 	executionDataSyncEnabled             bool
@@ -162,7 +168,6 @@ type AccessNodeConfig struct {
 	executionDataConfig                  edrequester.ExecutionDataConfig
 	PublicNetworkConfig                  PublicNetworkConfig
 	TxResultCacheSize                    uint
-	TxErrorMessagesCacheSize             uint
 	executionDataIndexingEnabled         bool
 	registersDBPath                      string
 	checkpointFile                       string
@@ -172,9 +177,11 @@ type AccessNodeConfig struct {
 	registerCacheType                    string
 	registerCacheSize                    uint
 	programCacheSize                     uint
-	checkPayerBalance                    bool
+	checkPayerBalanceMode                string
 	versionControlEnabled                bool
+	storeTxResultErrorMessages           bool
 	stopControlEnabled                   bool
+	registerDBPruneThreshold             uint64
 }
 
 type PublicNetworkConfig struct {
@@ -215,13 +222,15 @@ func DefaultAccessNodeConfig() *AccessNodeConfig {
 				TxResultQueryMode:   backend.IndexQueryModeExecutionNodesOnly.String(), // default to ENs only for now
 			},
 			RestConfig: rest.Config{
-				ListenAddress: "",
-				WriteTimeout:  rest.DefaultWriteTimeout,
-				ReadTimeout:   rest.DefaultReadTimeout,
-				IdleTimeout:   rest.DefaultIdleTimeout,
+				ListenAddress:  "",
+				WriteTimeout:   rest.DefaultWriteTimeout,
+				ReadTimeout:    rest.DefaultReadTimeout,
+				IdleTimeout:    rest.DefaultIdleTimeout,
+				MaxRequestSize: commonrest.DefaultMaxRequestSize,
 			},
-			MaxMsgSize:     grpcutils.DefaultMaxMsgSize,
-			CompressorName: grpcutils.NoCompressor,
+			MaxMsgSize:      grpcutils.DefaultMaxMsgSize,
+			CompressorName:  grpcutils.NoCompressor,
+			WebSocketConfig: websockets.NewDefaultWebsocketConfig(),
 		},
 		stateStreamConf: statestreambackend.Config{
 			MaxExecutionDataMsgSize: grpcutils.DefaultMaxMsgSize,
@@ -239,6 +248,7 @@ func DefaultAccessNodeConfig() *AccessNodeConfig {
 		logTxTimeToFinalized:         false,
 		logTxTimeToExecuted:          false,
 		logTxTimeToFinalizedExecuted: false,
+		logTxTimeToSealed:            false,
 		pingEnabled:                  false,
 		retryEnabled:                 false,
 		rpcMetricsEnabled:            false,
@@ -246,7 +256,6 @@ func DefaultAccessNodeConfig() *AccessNodeConfig {
 		apiRatelimits:                nil,
 		apiBurstlimits:               nil,
 		TxResultCacheSize:            0,
-		TxErrorMessagesCacheSize:     1000,
 		PublicNetworkConfig: PublicNetworkConfig{
 			BindAddress: cmd.NotSet,
 			Metrics:     metrics.NewNoopCollector(),
@@ -276,9 +285,11 @@ func DefaultAccessNodeConfig() *AccessNodeConfig {
 		registerCacheType:                    pstorage.CacheTypeTwoQueue.String(),
 		registerCacheSize:                    0,
 		programCacheSize:                     0,
-		checkPayerBalance:                    false,
+		checkPayerBalanceMode:                accessNode.Disabled.String(),
 		versionControlEnabled:                true,
+		storeTxResultErrorMessages:           false,
 		stopControlEnabled:                   false,
+		registerDBPruneThreshold:             pruner.DefaultThreshold,
 	}
 }
 
@@ -299,6 +310,7 @@ type FlowAccessNodeBuilder struct {
 	CollectionsToMarkFinalized   *stdmap.Times
 	CollectionsToMarkExecuted    *stdmap.Times
 	BlocksToMarkExecuted         *stdmap.Times
+	BlockTransactions            *stdmap.IdentifierMap
 	TransactionMetrics           *metrics.TransactionCollector
 	TransactionValidationMetrics *metrics.TransactionValidationCollector
 	RestMetrics                  *metrics.RestCollector
@@ -348,6 +360,10 @@ type FlowAccessNodeBuilder struct {
 	stateStreamGrpcServer *grpcserver.GrpcServer
 
 	stateStreamBackend *statestreambackend.StateStreamBackend
+	nodeBackend        *backend.Backend
+
+	ExecNodeIdentitiesProvider *commonrpc.ExecutionNodeIdentitiesProvider
+	TxResultErrorMessagesCore  *tx_error_messages.TxErrorMessagesCore
 }
 
 func (builder *FlowAccessNodeBuilder) buildFollowerState() *FlowAccessNodeBuilder {
@@ -904,7 +920,7 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 					}
 				}
 
-				registers, err := pstorage.NewRegisters(pdb)
+				registers, err := pstorage.NewRegisters(pdb, builder.registerDBPruneThreshold)
 				if err != nil {
 					return nil, fmt.Errorf("could not create registers storage: %w", err)
 				}
@@ -1178,6 +1194,10 @@ func (builder *FlowAccessNodeBuilder) extraFlags() {
 			defaultConfig.rpcConf.RestConfig.ReadTimeout,
 			"timeout to use when reading REST request headers")
 		flags.DurationVar(&builder.rpcConf.RestConfig.IdleTimeout, "rest-idle-timeout", defaultConfig.rpcConf.RestConfig.IdleTimeout, "idle timeout for REST connections")
+		flags.Int64Var(&builder.rpcConf.RestConfig.MaxRequestSize,
+			"rest-max-request-size",
+			defaultConfig.rpcConf.RestConfig.MaxRequestSize,
+			"the maximum request size in bytes for payload sent over REST server")
 		flags.StringVarP(&builder.rpcConf.CollectionAddr,
 			"static-collection-ingress-addr",
 			"",
@@ -1231,6 +1251,10 @@ func (builder *FlowAccessNodeBuilder) extraFlags() {
 			"log-tx-time-to-finalized-executed",
 			defaultConfig.logTxTimeToFinalizedExecuted,
 			"log transaction time to finalized and executed")
+		flags.BoolVar(&builder.logTxTimeToSealed,
+			"log-tx-time-to-sealed",
+			defaultConfig.logTxTimeToSealed,
+			"log transaction time to sealed")
 		flags.BoolVar(&builder.pingEnabled,
 			"ping-enabled",
 			defaultConfig.pingEnabled,
@@ -1238,7 +1262,6 @@ func (builder *FlowAccessNodeBuilder) extraFlags() {
 		flags.BoolVar(&builder.retryEnabled, "retry-enabled", defaultConfig.retryEnabled, "whether to enable the retry mechanism at the access node level")
 		flags.BoolVar(&builder.rpcMetricsEnabled, "rpc-metrics-enabled", defaultConfig.rpcMetricsEnabled, "whether to enable the rpc metrics")
 		flags.UintVar(&builder.TxResultCacheSize, "transaction-result-cache-size", defaultConfig.TxResultCacheSize, "transaction result cache size.(Disabled by default i.e 0)")
-		flags.UintVar(&builder.TxErrorMessagesCacheSize, "transaction-error-messages-cache-size", defaultConfig.TxErrorMessagesCacheSize, "transaction error messages cache size.(By default 1000)")
 		flags.StringVarP(&builder.nodeInfoFile,
 			"node-info-file",
 			"",
@@ -1372,7 +1395,10 @@ func (builder *FlowAccessNodeBuilder) extraFlags() {
 			"tx-result-query-mode",
 			defaultConfig.rpcConf.BackendConfig.TxResultQueryMode,
 			"mode to use when querying transaction results. one of [local-only, execution-nodes-only(default), failover]")
-
+		flags.BoolVar(&builder.storeTxResultErrorMessages,
+			"store-tx-result-error-messages",
+			defaultConfig.storeTxResultErrorMessages,
+			"whether to enable storing transaction error messages into the db")
 		// Script Execution
 		flags.StringVar(&builder.rpcConf.BackendConfig.ScriptExecutionMode,
 			"script-execution-mode",
@@ -1414,10 +1440,23 @@ func (builder *FlowAccessNodeBuilder) extraFlags() {
 			"program-cache-size",
 			defaultConfig.programCacheSize,
 			"[experimental] number of blocks to cache for cadence programs. use 0 to disable cache. default: 0. Note: this is an experimental feature and may cause nodes to become unstable under certain workloads. Use with caution.")
-		flags.BoolVar(&builder.checkPayerBalance,
-			"check-payer-balance",
-			defaultConfig.checkPayerBalance,
-			"checks that a transaction payer has sufficient balance to pay fees before submitting it to collection nodes")
+
+		// Payer Balance
+		flags.StringVar(&builder.checkPayerBalanceMode,
+			"check-payer-balance-mode",
+			defaultConfig.checkPayerBalanceMode,
+			"flag for payer balance validation that specifies whether or not to enforce the balance check. one of [disabled(default), warn, enforce]")
+
+		// Register DB Pruning
+		flags.Uint64Var(&builder.registerDBPruneThreshold,
+			"registerdb-pruning-threshold",
+			defaultConfig.registerDBPruneThreshold,
+			fmt.Sprintf("specifies the number of blocks below the latest stored block height to keep in register db. default: %d", defaultConfig.registerDBPruneThreshold))
+
+		flags.DurationVar(&builder.rpcConf.WebSocketConfig.InactivityTimeout,
+			"websocket-inactivity-timeout",
+			defaultConfig.rpcConf.WebSocketConfig.InactivityTimeout,
+			"specifies the duration a WebSocket connection can remain open without any active subscriptions before being automatically closed")
 	}).ValidateFlags(func() error {
 		if builder.supportsObserver && (builder.PublicNetworkConfig.BindAddress == cmd.NotSet || builder.PublicNetworkConfig.BindAddress == "") {
 			return errors.New("public-network-address must be set if supports-observer is true")
@@ -1477,12 +1516,13 @@ func (builder *FlowAccessNodeBuilder) extraFlags() {
 				return errors.New("circuit-breaker-restore-timeout must be greater than 0")
 			}
 		}
-		if builder.TxErrorMessagesCacheSize == 0 {
-			return errors.New("transaction-error-messages-cache-size must be greater than 0")
+
+		if builder.checkPayerBalanceMode != accessNode.Disabled.String() && !builder.executionDataIndexingEnabled {
+			return errors.New("execution-data-indexing-enabled must be set if check-payer-balance is enabled")
 		}
 
-		if builder.checkPayerBalance && !builder.executionDataIndexingEnabled {
-			return errors.New("execution-data-indexing-enabled must be set if check-payer-balance is enabled")
+		if builder.rpcConf.RestConfig.MaxRequestSize <= 0 {
+			return errors.New("rest-max-request-size must be greater than 0")
 		}
 
 		return nil
@@ -1592,7 +1632,8 @@ func (builder *FlowAccessNodeBuilder) enqueueRelayNetwork() {
 }
 
 func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
-	var processedBlockHeight storage.ConsumerProgress
+	var processedFinalizedBlockHeight storage.ConsumerProgress
+	var processedTxErrorMessagesBlockHeight storage.ConsumerProgress
 
 	if builder.executionDataSyncEnabled {
 		builder.BuildExecutionSyncComponents()
@@ -1666,6 +1707,11 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 				return err
 			}
 
+			builder.BlockTransactions, err = stdmap.NewIdentifierMap(10000)
+			if err != nil {
+				return err
+			}
+
 			builder.BlocksToMarkExecuted, err = stdmap.NewTimes(1 * 300) // assume 1 block per second * 300 seconds
 
 			return err
@@ -1677,6 +1723,7 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 				builder.logTxTimeToFinalized,
 				builder.logTxTimeToExecuted,
 				builder.logTxTimeToFinalizedExecuted,
+				builder.logTxTimeToSealed,
 			)
 			return nil
 		}).
@@ -1685,7 +1732,7 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 			return nil
 		}).
 		Module("rest metrics", func(node *cmd.NodeConfig) error {
-			m, err := metrics.NewRestCollector(routes.URLToRoute, node.MetricsRegisterer)
+			m, err := metrics.NewRestCollector(router.URLToRoute, node.MetricsRegisterer)
 			if err != nil {
 				return err
 			}
@@ -1711,6 +1758,7 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 				builder.BlocksToMarkExecuted,
 				builder.Storage.Collections,
 				builder.Storage.Blocks,
+				builder.BlockTransactions,
 			)
 			if err != nil {
 				return err
@@ -1788,8 +1836,8 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 			builder.TxResultsIndex = index.NewTransactionResultsIndex(builder.Reporter, builder.Storage.LightTransactionResults)
 			return nil
 		}).
-		Module("processed block height consumer progress", func(node *cmd.NodeConfig) error {
-			processedBlockHeight = bstorage.NewConsumerProgress(builder.DB, module.ConsumeProgressIngestionEngineBlockHeight)
+		Module("processed finalized block height consumer progress", func(node *cmd.NodeConfig) error {
+			processedFinalizedBlockHeight = bstorage.NewConsumerProgress(builder.DB, module.ConsumeProgressIngestionEngineBlockHeight)
 			return nil
 		}).
 		Module("processed last full block height monotonic consumer progress", func(node *cmd.NodeConfig) error {
@@ -1802,6 +1850,13 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 			)
 			if err != nil {
 				return fmt.Errorf("failed to initialize monotonic consumer progress: %w", err)
+			}
+
+			return nil
+		}).
+		Module("transaction result error messages storage", func(node *cmd.NodeConfig) error {
+			if builder.storeTxResultErrorMessages {
+				builder.Storage.TransactionResultErrorMessages = bstorage.NewTransactionResultErrorMessages(node.Metrics.Cache, node.DB, bstorage.DefaultCacheSize)
 			}
 
 			return nil
@@ -1921,33 +1976,61 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 				return nil, fmt.Errorf("transaction result query mode 'compare' is not supported")
 			}
 
-			nodeBackend, err := backend.New(backend.Params{
-				State:                     node.State,
-				CollectionRPC:             builder.CollectionRPC,
-				HistoricalAccessNodes:     builder.HistoricalAccessRPCs,
-				Blocks:                    node.Storage.Blocks,
-				Headers:                   node.Storage.Headers,
-				Collections:               node.Storage.Collections,
-				Transactions:              node.Storage.Transactions,
-				ExecutionReceipts:         node.Storage.Receipts,
-				ExecutionResults:          node.Storage.Results,
-				ChainID:                   node.RootChainID,
-				AccessMetrics:             builder.AccessMetrics,
-				ConnFactory:               connFactory,
-				RetryEnabled:              builder.retryEnabled,
-				MaxHeightRange:            backendConfig.MaxHeightRange,
-				PreferredExecutionNodeIDs: backendConfig.PreferredExecutionNodeIDs,
-				FixedExecutionNodeIDs:     backendConfig.FixedExecutionNodeIDs,
-				Log:                       node.Logger,
-				SnapshotHistoryLimit:      backend.DefaultSnapshotHistoryLimit,
-				Communicator:              backend.NewNodeCommunicator(backendConfig.CircuitBreakerConfig.Enabled),
-				TxResultCacheSize:         builder.TxResultCacheSize,
-				TxErrorMessagesCacheSize:  builder.TxErrorMessagesCacheSize,
-				ScriptExecutor:            builder.ScriptExecutor,
-				ScriptExecutionMode:       scriptExecMode,
-				CheckPayerBalance:         builder.checkPayerBalance,
-				EventQueryMode:            eventQueryMode,
-				BlockTracker:              blockTracker,
+			// If execution data syncing and indexing is disabled, pass nil indexReporter
+			var indexReporter state_synchronization.IndexReporter
+			if builder.executionDataSyncEnabled && builder.executionDataIndexingEnabled {
+				indexReporter = builder.Reporter
+			}
+
+			checkPayerBalanceMode, err := accessNode.ParsePayerBalanceMode(builder.checkPayerBalanceMode)
+			if err != nil {
+				return nil, fmt.Errorf("could not parse payer balance mode: %w", err)
+
+			}
+
+			preferredENIdentifiers, err := flow.IdentifierListFromHex(backendConfig.PreferredExecutionNodeIDs)
+			if err != nil {
+				return nil, fmt.Errorf("failed to convert node id string to Flow Identifier for preferred EN map: %w", err)
+			}
+
+			fixedENIdentifiers, err := flow.IdentifierListFromHex(backendConfig.FixedExecutionNodeIDs)
+			if err != nil {
+				return nil, fmt.Errorf("failed to convert node id string to Flow Identifier for fixed EN map: %w", err)
+			}
+
+			builder.ExecNodeIdentitiesProvider = commonrpc.NewExecutionNodeIdentitiesProvider(
+				node.Logger,
+				node.State,
+				node.Storage.Receipts,
+				preferredENIdentifiers,
+				fixedENIdentifiers,
+			)
+
+			builder.nodeBackend, err = backend.New(backend.Params{
+				State:                 node.State,
+				CollectionRPC:         builder.CollectionRPC,
+				HistoricalAccessNodes: builder.HistoricalAccessRPCs,
+				Blocks:                node.Storage.Blocks,
+				Headers:               node.Storage.Headers,
+				Collections:           node.Storage.Collections,
+				Transactions:          node.Storage.Transactions,
+				ExecutionReceipts:     node.Storage.Receipts,
+				ExecutionResults:      node.Storage.Results,
+				TxResultErrorMessages: node.Storage.TransactionResultErrorMessages,
+				ChainID:               node.RootChainID,
+				AccessMetrics:         builder.AccessMetrics,
+				ConnFactory:           connFactory,
+				RetryEnabled:          builder.retryEnabled,
+				MaxHeightRange:        backendConfig.MaxHeightRange,
+				Log:                   node.Logger,
+				SnapshotHistoryLimit:  backend.DefaultSnapshotHistoryLimit,
+				Communicator:          backend.NewNodeCommunicator(backendConfig.CircuitBreakerConfig.Enabled),
+				TxResultCacheSize:     builder.TxResultCacheSize,
+				ScriptExecutor:        builder.ScriptExecutor,
+				ScriptExecutionMode:   scriptExecMode,
+				CheckPayerBalanceMode: checkPayerBalanceMode,
+				EventQueryMode:        eventQueryMode,
+				BlockTracker:          blockTracker,
 				SubscriptionHandler: subscription.NewSubscriptionHandler(
 					builder.Logger,
 					broadcaster,
@@ -1955,20 +2038,16 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 					builder.stateStreamConf.ResponseLimit,
 					builder.stateStreamConf.ClientSendBufferSize,
 				),
-				EventsIndex:         builder.EventsIndex,
-				TxResultQueryMode:   txResultQueryMode,
-				TxResultsIndex:      builder.TxResultsIndex,
-				LastFullBlockHeight: lastFullBlockHeight,
-				VersionControl:      builder.VersionControl,
+				EventsIndex:                builder.EventsIndex,
+				TxResultQueryMode:          txResultQueryMode,
+				TxResultsIndex:             builder.TxResultsIndex,
+				LastFullBlockHeight:        lastFullBlockHeight,
+				IndexReporter:              indexReporter,
+				VersionControl:             builder.VersionControl,
+				ExecNodeIdentitiesProvider: builder.ExecNodeIdentitiesProvider,
 			})
 			if err != nil {
 				return nil, fmt.Errorf("could not initialize backend: %w", err)
-			}
-
-			// If execution data syncing and indexing is disabled, pass nil indexReporter
-			var indexReporter state_synchronization.IndexReporter
-			if builder.executionDataSyncEnabled && builder.executionDataIndexingEnabled {
-				indexReporter = builder.Reporter
 			}
 
 			engineBuilder, err := rpc.NewBuilder(
@@ -1979,8 +2058,8 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 				builder.AccessMetrics,
 				builder.rpcMetricsEnabled,
 				builder.Me,
-				nodeBackend,
-				nodeBackend,
+				builder.nodeBackend,
+				builder.nodeBackend,
 				builder.secureGrpcServer,
 				builder.unsecureGrpcServer,
 				builder.stateStreamBackend,
@@ -2019,6 +2098,15 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 				return nil, fmt.Errorf("could not create requester engine: %w", err)
 			}
 
+			if builder.storeTxResultErrorMessages {
+				builder.TxResultErrorMessagesCore = tx_error_messages.NewTxErrorMessagesCore(
+					node.Logger,
+					builder.nodeBackend,
+					node.Storage.TransactionResultErrorMessages,
+					builder.ExecNodeIdentitiesProvider,
+				)
+			}
+
 			builder.IngestEng, err = ingestion.New(
 				node.Logger,
 				node.EngineRegistry,
@@ -2032,8 +2120,9 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 				node.Storage.Results,
 				node.Storage.Receipts,
 				builder.collectionExecutedMetric,
-				processedBlockHeight,
+				processedFinalizedBlockHeight,
 				lastFullBlockHeight,
+				builder.TxResultErrorMessagesCore,
 			)
 			if err != nil {
 				return nil, err
@@ -2049,7 +2138,38 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 			// order for it to properly start and shut down, we should still return it as its own engine here, so it can
 			// be handled by the scaffold.
 			return builder.RequestEng, nil
+		}).
+		AdminCommand("backfill-tx-error-messages", func(config *cmd.NodeConfig) commands.AdminCommand {
+			return storageCommands.NewBackfillTxErrorMessagesCommand(
+				builder.State,
+				builder.TxResultErrorMessagesCore,
+			)
 		})
+
+	if builder.storeTxResultErrorMessages {
+		builder.Module("processed error messages block height consumer progress", func(node *cmd.NodeConfig) error {
+			processedTxErrorMessagesBlockHeight = bstorage.NewConsumerProgress(
+				builder.DB,
+				module.ConsumeProgressEngineTxErrorMessagesBlockHeight,
+			)
+			return nil
+		})
+		builder.Component("transaction result error messages engine", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
+			engine, err := tx_error_messages.New(
+				node.Logger,
+				node.State,
+				node.Storage.Headers,
+				processedTxErrorMessagesBlockHeight,
+				builder.TxResultErrorMessagesCore,
+			)
+			if err != nil {
+				return nil, err
+			}
+			builder.FollowerDistributor.AddOnBlockFinalizedConsumer(engine.OnFinalizedBlock)
+
+			return engine, nil
+		})
+	}
 
 	if builder.supportsObserver {
 		builder.Component("public sync request handler", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {

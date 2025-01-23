@@ -5,13 +5,12 @@ import (
 	"fmt"
 
 	"github.com/hashicorp/go-multierror"
+	"github.com/onflow/cadence/common"
 	"github.com/onflow/cadence/runtime"
-	"github.com/onflow/cadence/runtime/common"
 
 	"github.com/onflow/flow-go/fvm/environment"
 	"github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/fvm/evm"
-	"github.com/onflow/flow-go/fvm/evm/debug"
 	"github.com/onflow/flow-go/fvm/storage"
 	"github.com/onflow/flow-go/fvm/storage/logical"
 	"github.com/onflow/flow-go/model/flow"
@@ -173,7 +172,8 @@ func (executor *scriptExecutor) Execute() error {
 }
 
 func (executor *scriptExecutor) execute() error {
-	meterParams, _, err := getBodyMeterParameters(
+	executionParams, _, err := getExecutionParameters(
+		executor.env.Logger(),
 		executor.ctx,
 		executor.proc,
 		executor.txnState)
@@ -182,7 +182,7 @@ func (executor *scriptExecutor) execute() error {
 	}
 
 	txnId, err := executor.txnState.BeginNestedTransactionWithMeterParams(
-		meterParams)
+		executionParams)
 	if err != nil {
 		return err
 	}
@@ -206,7 +206,6 @@ func (executor *scriptExecutor) executeScript() error {
 			chain.ChainID(),
 			executor.env,
 			rt.ScriptRuntimeEnv,
-			debug.NopTracer, // we shouldn't trace during script execution
 		)
 		if err != nil {
 			return err

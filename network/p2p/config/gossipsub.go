@@ -1,6 +1,8 @@
 package p2pconfig
 
 import (
+	"strconv"
+	"strings"
 	"time"
 )
 
@@ -61,6 +63,9 @@ const (
 	PeerScoringEnabledKey   = "peer-scoring-enabled"
 	ScoreParamsKey          = "scoring-parameters"
 	SubscriptionProviderKey = "subscription-provider"
+	PeerGaterKey            = "peer-gater"
+	SourceDecayKey          = "source-decay"
+	TopicDeliveryWeightsKey = "topic-delivery-weights-override"
 )
 
 // GossipSubParameters is the configuration for the GossipSub pubsub implementation.
@@ -76,6 +81,15 @@ type GossipSubParameters struct {
 	PeerScoringEnabled   bool                           `mapstructure:"peer-scoring-enabled"`
 	SubscriptionProvider SubscriptionProviderParameters `mapstructure:"subscription-provider"`
 	ScoringParameters    ScoringParameters              `mapstructure:"scoring-parameters"`
+
+	// PeerGaterEnabled enables the peer gater.
+	PeerGaterEnabled bool `mapstructure:"peer-gater-enabled"`
+	// PeerGaterSourceDecay the per IP decay for all counters tracked by the peer gater for a peer.
+	PeerGaterSourceDecay time.Duration `mapstructure:"peer-gater-source-decay"`
+	// PeerGaterTopicDeliveryWeightsOverride topic delivery weights that will override the default value for the specified channel.
+	// This is a comma separated list "channel:weight, channel2:weight, channel3:weight".
+	// i.e: consensus-committee: 1.5, sync-committee: .75
+	PeerGaterTopicDeliveryWeightsOverride string `mapstructure:"peer-gater-topic-delivery-weights-override"`
 }
 
 const (
@@ -87,6 +101,22 @@ const (
 type ScoringParameters struct {
 	PeerScoring               PeerScoringParameters     `validate:"required" mapstructure:"peer-scoring"`
 	ScoringRegistryParameters ScoringRegistryParameters `validate:"required" mapstructure:"scoring-registry"`
+}
+
+// PeerGaterTopicDeliveryWeights returns the topic delivery weights configured on this struct as a map[string]float64 .
+// Note: When new topic delivery weights are added to the struct this func should be updated.
+func (g *GossipSubParameters) PeerGaterTopicDeliveryWeights() (map[string]float64, error) {
+	m := make(map[string]float64)
+	for _, weightConfig := range strings.Split(g.PeerGaterTopicDeliveryWeightsOverride, ",") {
+		wc := strings.Split(weightConfig, ":")
+		f, err := strconv.ParseFloat(strings.TrimSpace(wc[1]), 64)
+		if err != nil {
+			return nil, err
+		}
+		m[strings.TrimSpace(wc[0])] = f
+	}
+
+	return m, nil
 }
 
 // SubscriptionProviderParameters keys.

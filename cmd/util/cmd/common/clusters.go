@@ -8,7 +8,7 @@ import (
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/cadence"
-	cdcCommon "github.com/onflow/cadence/runtime/common"
+	cdcCommon "github.com/onflow/cadence/common"
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/assignment"

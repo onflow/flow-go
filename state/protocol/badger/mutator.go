@@ -308,7 +308,7 @@ func (m *FollowerState) headerExtend(ctx context.Context, candidate *flow.Block,
 
 	// STEP 1: Check that the payload is consistent with the payload hash in the header
 	if candidate.Payload.Hash() != header.PayloadHash {
-		return state.NewInvalidExtensionError("payload integrity check failed")
+		return state.NewInvalidExtensionErrorf("payload integrity check failed")
 	}
 
 	// STEP 2: check whether the candidate (i) connects to the known block tree and

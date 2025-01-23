@@ -30,6 +30,8 @@ func GenerateRecoverEpochTxArgs(log zerolog.Logger,
 	numViewsInEpoch uint64,
 	recoveryEpochTargetDuration uint64,
 	unsafeAllowOverWrite bool,
+	excludeNodeIDs []flow.Identifier,
+	includeNodeIDs []flow.Identifier,
 	snapshot *inmem.Snapshot,
 ) ([]cadence.Value, error) {
 	log.Info().Msg("collecting internal node network and staking keys")
@@ -57,6 +59,8 @@ func GenerateRecoverEpochTxArgs(log zerolog.Logger,
 		currentEpochCommit.DKGIndexMap,
 		currentEpochCommit.DKGParticipantKeys,
 		currentEpochCommit.DKGGroupKey,
+		excludeNodeIDs,
+		includeNodeIDs,
 		snapshot,
 	)
 }
@@ -75,6 +79,8 @@ func GenerateRecoverTxArgsWithDKG(log zerolog.Logger,
 	dkgIndexMap flow.DKGIndexMap,
 	dkgParticipantKeys []crypto.PublicKey,
 	dkgGroupKey crypto.PublicKey,
+	excludeNodeIDs []flow.Identifier,
+	includeNodeIDs []flow.Identifier,
 	snapshot *inmem.Snapshot,
 ) ([]cadence.Value, error) {
 	epoch := snapshot.Epochs().Current()
@@ -95,13 +101,17 @@ func GenerateRecoverTxArgsWithDKG(log zerolog.Logger,
 
 	// including only (conjunction):
 	//  * nodes authorized to actively participate in the current epoch (i.e. excluding ejected, joining or leaving nodes)
-	//  * and with _positive_ weight
-	currentEpochIdentities, err := snapshot.Identities(filter.And(filter.IsValidCurrentEpochParticipant, filter.HasWeightGreaterThanZero[flow.Identity]))
+	//  * with _positive_ weight,
+	//  * nodes that were not explicitly excluded
+	eligibleEpochIdentities, err := snapshot.Identities(filter.And(
+		filter.IsValidCurrentEpochParticipant,
+		filter.HasWeightGreaterThanZero[flow.Identity],
+		filter.Not(filter.HasNodeID[flow.Identity](excludeNodeIDs...))))
 	if err != nil {
 		return nil, fmt.Errorf("failed to get  valid protocol participants from snapshot: %w", err)
 	}
 	// We need canonical ordering here; sanity check to enforce this:
-	if !currentEpochIdentities.Sorted(flow.Canonical[flow.Identity]) {
+	if !eligibleEpochIdentities.Sorted(flow.Canonical[flow.Identity]) {
 		return nil, fmt.Errorf("identies from snapshot not in canonical order")
 	}
 
@@ -121,13 +131,13 @@ func GenerateRecoverTxArgsWithDKG(log zerolog.Logger,
 	// need a QC for each cluster's root block in order to initiate each cluster's consensus process.
 
 	// separate collector nodes by internal and partner nodes
-	collectors := currentEpochIdentities.Filter(filter.HasRole[flow.Identity](flow.RoleCollection))
+	collectors := eligibleEpochIdentities.Filter(filter.HasRole[flow.Identity](flow.RoleCollection))
 	internalCollectors := make(flow.IdentityList, 0)
 	partnerCollectors := make(flow.IdentityList, 0)
 
 	internalNodesMap := make(map[flow.Identifier]struct{})
 	for _, node := range internalNodes {
-		if !currentEpochIdentities.Exists(node.Identity()) {
+		if !eligibleEpochIdentities.Exists(node.Identity()) {
 			log.Warn().Msgf("this node (ID %s) is not part of the network according to the bootstrapping data; we might not get any data", node.NodeID)
 		}
 		internalNodesMap[node.NodeID] = struct{}{}
@@ -199,10 +209,10 @@ func GenerateRecoverTxArgsWithDKG(log zerolog.Logger,
 	}
 	// fill node IDs
 	nodeIds := make([]cadence.Value, 0)
-	for _, id := range currentEpochIdentities {
-		nodeIdCdc, err := cadence.NewString(id.GetNodeID().String())
+	for _, id := range append(eligibleEpochIdentities.NodeIDs(), includeNodeIDs...).Sort(flow.IdentifierCanonical) {
+		nodeIdCdc, err := cadence.NewString(id.String())
 		if err != nil {
-			return nil, fmt.Errorf("failed to convert node ID %s to cadence string: %w", id.GetNodeID(), err)
+			return nil, fmt.Errorf("failed to convert node ID %s to cadence string: %w", id, err)
 		}
 		nodeIds = append(nodeIds, nodeIdCdc)
 	}

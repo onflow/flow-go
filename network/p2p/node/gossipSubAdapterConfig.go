@@ -1,6 +1,8 @@
 package p2pnode
 
 import (
+	"time"
+
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	pb "github.com/libp2p/go-libp2p-pubsub/pb"
 	"github.com/libp2p/go-libp2p/core/peer"
@@ -95,6 +97,16 @@ func (g *GossipSubAdapterConfig) WithRpcInspector(inspector p2p.GossipSubRPCInsp
 func (g *GossipSubAdapterConfig) WithTracer(tracer p2p.PubSubTracer) {
 	g.pubsubTracer = tracer
 	g.options = append(g.options, pubsub.WithRawTracer(tracer))
+}
+
+// WithPeerGater adds a peer gater option to the config.
+// Args:
+// - params: the topic delivery weights to use
+// Returns:
+// -None
+func (g *GossipSubAdapterConfig) WithPeerGater(topicDeliveryWeights map[string]float64, sourceDecay time.Duration) {
+	peerGaterParams := pubsub.NewPeerGaterParams(pubsub.DefaultPeerGaterThreshold, pubsub.DefaultPeerGaterGlobalDecay, pubsub.ScoreParameterDecay(sourceDecay)).WithTopicDeliveryWeights(topicDeliveryWeights)
+	g.options = append(g.options, pubsub.WithPeerGater(peerGaterParams))
 }
 
 // ScoreTracer returns the tracer for the peer score.

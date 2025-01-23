@@ -31,6 +31,7 @@ import (
 	"github.com/onflow/cadence"
 
 	"github.com/onflow/flow-go-sdk/crypto"
+
 	"github.com/onflow/flow-go/cmd/bootstrap/dkg"
 	"github.com/onflow/flow-go/cmd/bootstrap/run"
 	"github.com/onflow/flow-go/cmd/bootstrap/utils"
@@ -118,6 +119,7 @@ const (
 	DefaultViewsInStakingAuction       uint64 = 5
 	DefaultViewsInDKGPhase             uint64 = 50
 	DefaultViewsInEpoch                uint64 = 200
+	DefaultViewsPerSecond              uint64 = 1
 	DefaultFinalizationSafetyThreshold uint64 = 20
 	DefaultEpochExtensionViewCount     uint64 = 50
 
@@ -429,6 +431,7 @@ type NetworkConfig struct {
 	ViewsInDKGPhase             uint64
 	ViewsInStakingAuction       uint64
 	ViewsInEpoch                uint64
+	ViewsPerSecond              uint64
 	FinalizationSafetyThreshold uint64
 	KVStoreFactory              func(epochStateID flow.Identifier) (protocol_state.KVStoreAPI, error)
 }
@@ -443,6 +446,7 @@ func NewNetworkConfig(name string, nodes NodeConfigs, opts ...NetworkConfigOpt) 
 		ViewsInStakingAuction:       DefaultViewsInStakingAuction,
 		ViewsInDKGPhase:             DefaultViewsInDKGPhase,
 		ViewsInEpoch:                DefaultViewsInEpoch,
+		ViewsPerSecond:              DefaultViewsPerSecond,
 		FinalizationSafetyThreshold: DefaultFinalizationSafetyThreshold,
 		KVStoreFactory: func(epochStateID flow.Identifier) (protocol_state.KVStoreAPI, error) {
 			return kvstore.NewDefaultKVStore(DefaultFinalizationSafetyThreshold, DefaultEpochExtensionViewCount, epochStateID)
@@ -479,6 +483,12 @@ func WithViewsInStakingAuction(views uint64) func(*NetworkConfig) {
 func WithViewsInEpoch(views uint64) func(*NetworkConfig) {
 	return func(config *NetworkConfig) {
 		config.ViewsInEpoch = views
+	}
+}
+
+func WithViewsPerSecond(views uint64) func(*NetworkConfig) {
+	return func(config *NetworkConfig) {
+		config.ViewsPerSecond = views
 	}
 }
 
@@ -756,8 +766,8 @@ func (net *FlowNetwork) AddObserver(t *testing.T, conf ObserverConfig) *Containe
 				fmt.Sprintf("--secretsdir=%s", DefaultFlowSecretsDBDir),
 				fmt.Sprintf("--profiler-dir=%s", DefaultProfilerDir),
 				fmt.Sprintf("--loglevel=%s", conf.LogLevel.String()),
-				fmt.Sprintf("--bootstrap-node-addresses=%s", accessNode.ContainerAddr(PublicNetworkPort)),
-				fmt.Sprintf("--bootstrap-node-public-keys=%s", accessPublicKey),
+				fmt.Sprintf("--observer-mode-bootstrap-node-addresses=%s", accessNode.ContainerAddr(PublicNetworkPort)),
+				fmt.Sprintf("--observer-mode-bootstrap-node-public-keys=%s", accessPublicKey),
 				fmt.Sprintf("--upstream-node-addresses=%s", accessNode.ContainerAddr(GRPCSecurePort)),
 				fmt.Sprintf("--upstream-node-public-keys=%s", accessPublicKey),
 				fmt.Sprintf("--observer-networking-key-path=%s/private-root-information/%s_key", DefaultBootstrapDir, conf.ContainerName),
@@ -1160,6 +1170,9 @@ func BootstrapNetwork(networkConf NetworkConfig, bootstrapDir string, chainID fl
 
 	dkgOffsetView := rootHeader.View + networkConf.ViewsInStakingAuction - 1
 
+	// target number of seconds in epoch
+	targetDuration := networkConf.ViewsInEpoch / networkConf.ViewsPerSecond
+
 	// generate epoch service events
 	epochSetup := &flow.EpochSetup{
 		Counter:            epochCounter,
@@ -1171,8 +1184,8 @@ func BootstrapNetwork(networkConf NetworkConfig, bootstrapDir string, chainID fl
 		Participants:       participants.ToSkeleton(),
 		Assignments:        clusterAssignments,
 		RandomSource:       randomSource,
-		TargetDuration:     networkConf.ViewsInEpoch, // 1view/s
-		TargetEndTime:      uint64(time.Now().Unix()) + networkConf.ViewsInEpoch,
+		TargetDuration:     targetDuration,
+		TargetEndTime:      uint64(time.Now().Unix()) + targetDuration,
 	}
 
 	epochCommit := &flow.EpochCommit{

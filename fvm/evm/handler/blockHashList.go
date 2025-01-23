@@ -3,6 +3,7 @@ package handler
 import (
 	"encoding/binary"
 	"fmt"
+	"strings"
 
 	gethCommon "github.com/onflow/go-ethereum/common"
 
@@ -26,13 +27,21 @@ const (
 		heightEncodingSize
 )
 
+func IsBlockHashListBucketKeyFormat(id flow.RegisterID) bool {
+	return strings.HasPrefix(id.Key, "BlockHashListBucket")
+}
+
+func IsBlockHashListMetaKey(id flow.RegisterID) bool {
+	return id.Key == blockHashListMetaKey
+}
+
 // BlockHashList stores the last `capacity` number of block hashes
 //
 // Under the hood it breaks the list of hashes into
 // smaller fixed size buckets to minimize the
 // number of bytes read and written during set/get operations.
 type BlockHashList struct {
-	backend     types.Backend
+	backend     types.BackendStorage
 	rootAddress flow.Address
 
 	// cached meta data
@@ -46,7 +55,7 @@ type BlockHashList struct {
 // It tries to load the metadata from the backend
 // and if not exist it creates one
 func NewBlockHashList(
-	backend types.Backend,
+	backend types.BackendStorage,
 	rootAddress flow.Address,
 	capacity int,
 ) (*BlockHashList, error) {
@@ -84,6 +93,7 @@ func (bhl *BlockHashList) Push(height uint64, bh gethCommon.Hash) error {
 	if !bhl.IsEmpty() && height != bhl.height+1 {
 		return fmt.Errorf("out of the order block hash, expected: %d, got: %d", bhl.height+1, height)
 	}
+
 	// updates the block hash stored at index
 	err := bhl.updateBlockHashAt(bhl.tail, bh)
 	if err != nil {
@@ -150,16 +160,20 @@ func (bhl *BlockHashList) updateBlockHashAt(idx int, bh gethCommon.Hash) error {
 	if err != nil {
 		return err
 	}
+
+	cpy := make([]byte, len(bucket))
+	copy(cpy, bucket)
+
 	// update the block hash
 	start := (idx % hashCountPerBucket) * hashEncodingSize
 	end := start + hashEncodingSize
-	copy(bucket[start:end], bh.Bytes())
+	copy(cpy[start:end], bh.Bytes())
 
 	// store bucket
 	return bhl.backend.SetValue(
 		bhl.rootAddress[:],
 		[]byte(fmt.Sprintf(blockHashListBucketKeyFormat, bucketNumber)),
-		bucket,
+		cpy,
 	)
 }
 

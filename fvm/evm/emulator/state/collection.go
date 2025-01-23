@@ -203,6 +203,39 @@ func (c *Collection) Size() uint64 {
 	return c.omap.Count()
 }
 
+// ReadOnlyIterator returns a collection iterator that
+// can be used to iterate over key value pairs in the collection
+//
+// Warning! iteration is a fairly expensive operation and
+// should only be used for testing or exporting data purposes
+// Also, Collection should not be mutated while iterating over key values
+func (c *Collection) ReadOnlyIterator() (*CollectionIterator, error) {
+	iterator, err := c.omap.ReadOnlyIterator()
+	if err != nil {
+		return nil, err
+	}
+	return &CollectionIterator{iter: iterator}, nil
+}
+
+// CollectionIterator allows iteration over the collection key value pairs
+type CollectionIterator struct {
+	iter atree.MapIterator
+}
+
+// Next returns the next key value pairs, when no more element it returns
+// nil as key and value (no error)
+func (ci *CollectionIterator) Next() (key []byte, value []byte, err error) {
+	k, v, err := ci.iter.Next()
+	if err != nil {
+		return nil, nil, fmt.Errorf("collection iteration failed: %w", err)
+	}
+	// no more keys
+	if k == nil {
+		return nil, nil, nil
+	}
+	return k.(ByteStringValue).Bytes(), v.(ByteStringValue).Bytes(), nil
+}
+
 type ByteStringValue struct {
 	data []byte
 	size uint32
