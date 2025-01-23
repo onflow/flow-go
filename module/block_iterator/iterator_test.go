@@ -69,8 +69,9 @@ func TestIterateHeight(t *testing.T) {
 		require.Empty(t, visited)
 
 		// save the next to iterate height and verify
-
-		require.NoError(t, iter.Checkpoint())
+		next, err := iter.Checkpoint()
+		require.NoError(t, err)
+		require.Equal(t, b3.Height+1, next)
 
 		savedNextHeight, err := progress.LoadState()
 		require.NoError(t, err)

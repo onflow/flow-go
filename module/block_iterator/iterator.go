@@ -57,7 +57,9 @@ func (b *IndexedBlockIterator) Next() (flow.Identifier, bool, error) {
 	// when we are iterating by height, it's not possible that a height is not indexed, so indexed should
 	// always be true
 	if !indexed {
-		return flow.ZeroID, true, fmt.Errorf("block at index (height or view) %v is not indexed", b.nextIndex)
+		// iterate next height
+		b.nextIndex++
+		return b.Next()
 	}
 
 	b.nextIndex++
@@ -68,10 +70,10 @@ func (b *IndexedBlockIterator) Next() (flow.Identifier, bool, error) {
 // Checkpoint saves the iteration progress to storage
 // make sure to call this after all the blocks for processing the block IDs returned by
 // Next() are completed.
-func (b *IndexedBlockIterator) Checkpoint() error {
+func (b *IndexedBlockIterator) Checkpoint() (uint64, error) {
 	err := b.progress.SaveState(b.nextIndex)
 	if err != nil {
-		return fmt.Errorf("failed to save progress at view %v: %w", b.nextIndex, err)
+		return 0, fmt.Errorf("failed to save progress at view %v: %w", b.nextIndex, err)
 	}
-	return nil
+	return b.nextIndex, nil
 }

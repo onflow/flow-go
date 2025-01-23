@@ -62,5 +62,5 @@ type BlockIterator interface {
 	// then after restart, the iterator will resume from A.
 	// make sure to call this after all the blocks for processing the block IDs returned by
 	// Next() are completed.
-	Checkpoint() error
+	Checkpoint() (uint64, error)
 }
