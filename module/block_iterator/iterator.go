@@ -11,7 +11,7 @@ import (
 // it's not concurrent safe, so don't use it in multiple goroutines
 type IndexedBlockIterator struct {
 	// dependencies
-	getBlockIDByIndex func(uint64) (flow.Identifier, error)
+	getBlockIDByIndex func(uint64) (blockID flow.Identifier, indexed bool, excpetion error)
 	progress          module.IterateProgressWriter // for saving the next height to be iterated for resuming the iteration
 
 	// config
@@ -25,7 +25,7 @@ var _ module.BlockIterator = (*IndexedBlockIterator)(nil)
 
 // caller must ensure that both iterRange.Start and iterRange.End are finalized height
 func NewIndexedBlockIterator(
-	getBlockIDByIndex func(uint64) (flow.Identifier, error),
+	getBlockIDByIndex func(uint64) (blockID flow.Identifier, indexed bool, excpetion error),
 	progress module.IterateProgressWriter,
 	iterRange module.IterateRange,
 ) module.BlockIterator {
@@ -46,9 +46,18 @@ func (b *IndexedBlockIterator) Next() (flow.Identifier, bool, error) {
 		return flow.ZeroID, false, nil
 	}
 
-	next, err := b.getBlockIDByIndex(b.nextIndex)
+	next, indexed, err := b.getBlockIDByIndex(b.nextIndex)
 	if err != nil {
 		return flow.ZeroID, false, fmt.Errorf("failed to fetch block at index (height or view) %v: %w", b.nextIndex, err)
+	}
+
+	// if the block is not indexed, skip it.
+	// when we are iterating by view, it's possible that there is no block for certain views, in
+	// that case, we skip and iterate the next view
+	// when we are iterating by height, it's not possible that a height is not indexed, so indexed should
+	// always be true
+	if !indexed {
+		return flow.ZeroID, true, fmt.Errorf("block at index (height or view) %v is not indexed", b.nextIndex)
 	}
 
 	b.nextIndex++
