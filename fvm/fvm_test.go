@@ -1083,7 +1083,11 @@ func TestTransactionFeeDeduction(t *testing.T) {
 
 func TestSettingExecutionWeights(t *testing.T) {
 
+	// change the chain so that the metering settings are read from the service account
+	chain := flow.Emulator.Chain()
+
 	t.Run("transaction should fail with high weights", newVMTest().withBootstrapProcedureOptions(
+
 		fvm.WithMinimumStorageReservation(fvm.DefaultMinimumStorageReservation),
 		fvm.WithAccountCreationFee(fvm.DefaultAccountCreationFee),
 		fvm.WithStorageMBPerFLOW(fvm.DefaultStorageMBPerFLOW),
@@ -1092,6 +1096,8 @@ func TestSettingExecutionWeights(t *testing.T) {
 				common.ComputationKindLoop: 100_000 << meter.MeterExecutionInternalPrecisionBytes,
 			},
 		),
+	).withContextOptions(
+		fvm.WithChain(chain),
 	).run(
 		func(t *testing.T, vm fvm.VM, chain flow.Chain, ctx fvm.Context, snapshotTree snapshot.SnapshotTree) {
 
@@ -1140,6 +1146,7 @@ func TestSettingExecutionWeights(t *testing.T) {
 		),
 	).withContextOptions(
 		fvm.WithMemoryLimit(10_000_000_000),
+		fvm.WithChain(chain),
 	).run(
 		func(t *testing.T, vm fvm.VM, chain flow.Chain, ctx fvm.Context, snapshotTree snapshot.SnapshotTree) {
 			// Create an account private key.
@@ -1190,6 +1197,7 @@ func TestSettingExecutionWeights(t *testing.T) {
 		),
 	).withContextOptions(
 		fvm.WithMemoryLimit(10_000_000_000),
+		fvm.WithChain(chain),
 	).run(
 		func(t *testing.T, vm fvm.VM, chain flow.Chain, ctx fvm.Context, snapshotTree snapshot.SnapshotTree) {
 
@@ -1234,6 +1242,8 @@ func TestSettingExecutionWeights(t *testing.T) {
 		fvm.WithExecutionMemoryWeights(
 			memoryWeights,
 		),
+	).withContextOptions(
+		fvm.WithChain(chain),
 	).run(
 		func(t *testing.T, vm fvm.VM, chain flow.Chain, ctx fvm.Context, snapshotTree snapshot.SnapshotTree) {
 			privateKeys, err := testutil.GenerateAccountPrivateKeys(1)
@@ -1301,6 +1311,8 @@ func TestSettingExecutionWeights(t *testing.T) {
 				environment.ComputationKindCreateAccount: (fvm.DefaultComputationLimit + 1) << meter.MeterExecutionInternalPrecisionBytes,
 			},
 		),
+	).withContextOptions(
+		fvm.WithChain(chain),
 	).run(
 		func(t *testing.T, vm fvm.VM, chain flow.Chain, ctx fvm.Context, snapshotTree snapshot.SnapshotTree) {
 			txBody := flow.NewTransactionBody().
@@ -1337,6 +1349,8 @@ func TestSettingExecutionWeights(t *testing.T) {
 				environment.ComputationKindCreateAccount: 100_000_000 << meter.MeterExecutionInternalPrecisionBytes,
 			},
 		),
+	).withContextOptions(
+		fvm.WithChain(chain),
 	).run(
 		func(t *testing.T, vm fvm.VM, chain flow.Chain, ctx fvm.Context, snapshotTree snapshot.SnapshotTree) {
 
@@ -1374,6 +1388,8 @@ func TestSettingExecutionWeights(t *testing.T) {
 				environment.ComputationKindCreateAccount: 100_000_000 << meter.MeterExecutionInternalPrecisionBytes,
 			},
 		),
+	).withContextOptions(
+		fvm.WithChain(chain),
 	).run(
 		func(t *testing.T, vm fvm.VM, chain flow.Chain, ctx fvm.Context, snapshotTree snapshot.SnapshotTree) {
 			txBody := flow.NewTransactionBody().
@@ -1417,6 +1433,7 @@ func TestSettingExecutionWeights(t *testing.T) {
 		fvm.WithAccountStorageLimit(true),
 		fvm.WithTransactionFeesEnabled(true),
 		fvm.WithMemoryLimit(math.MaxUint64),
+		fvm.WithChain(chain),
 	).run(
 		func(t *testing.T, vm fvm.VM, chain flow.Chain, ctx fvm.Context, snapshotTree snapshot.SnapshotTree) {
 			// Use the maximum amount of computation so that the transaction still passes.
@@ -1510,6 +1527,7 @@ func TestSettingExecutionWeights(t *testing.T) {
 		fvm.WithAccountStorageLimit(true),
 		fvm.WithTransactionFeesEnabled(true),
 		fvm.WithMemoryLimit(math.MaxUint64),
+		fvm.WithChain(chain),
 	).run(
 		func(t *testing.T, vm fvm.VM, chain flow.Chain, ctx fvm.Context, snapshotTree snapshot.SnapshotTree) {
 			// Create an account private key.
@@ -2165,6 +2183,8 @@ func TestScriptExecutionLimit(t *testing.T) {
 
 	t.Parallel()
 
+	chain := flow.Emulator.Chain()
+
 	script := fvm.Script([]byte(`
 		access(all) fun main() {
 			var s: Int256 = 1024102410241024
@@ -2206,6 +2226,7 @@ func TestScriptExecutionLimit(t *testing.T) {
 			fvm.WithTransactionFeesEnabled(true),
 			fvm.WithAccountStorageLimit(true),
 			fvm.WithComputationLimit(10000),
+			fvm.WithChain(chain),
 		).run(
 			func(t *testing.T, vm fvm.VM, chain flow.Chain, ctx fvm.Context, snapshotTree snapshot.SnapshotTree) {
 				scriptCtx := fvm.NewContextFromParent(ctx)
@@ -2228,6 +2249,7 @@ func TestScriptExecutionLimit(t *testing.T) {
 			fvm.WithTransactionFeesEnabled(true),
 			fvm.WithAccountStorageLimit(true),
 			fvm.WithComputationLimit(20000),
+			fvm.WithChain(chain),
 		).run(
 			func(t *testing.T, vm fvm.VM, chain flow.Chain, ctx fvm.Context, snapshotTree snapshot.SnapshotTree) {
 				scriptCtx := fvm.NewContextFromParent(ctx)

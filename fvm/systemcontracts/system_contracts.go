@@ -47,6 +47,10 @@ const (
 
 	// AccountNameEVMStorage is not a contract, but a special account that is used to store EVM state
 	AccountNameEVMStorage = "EVMStorageAccount"
+	// AccountNameExecutionParametersAccount is not a contract, but a special account that is used to store execution parameters
+	// This is generally just the service account. For mainnet and testnet, it is a separate account,
+	// in order to separate it away from the frequently changing data on the service account.
+	AccountNameExecutionParametersAccount = "ExecutionParametersAccount"
 
 	// Unqualified names of service events (not including address prefix or contract name)
 
@@ -100,6 +104,11 @@ var (
 	evmStorageAddressTestnet = flow.HexToAddress("1a54ed2be7552821")
 	// evmStorageAddressMainnet is the address of the EVM state storage contract on Mainnet
 	evmStorageAddressMainnet = flow.HexToAddress("d421a63faae318f9")
+
+	// executionParametersAddressTestnet is the address of the Execution Parameters contract on Testnet
+	executionParametersAddressTestnet = flow.HexToAddress("6997a2f2cf57b73a")
+	// executionParametersAddressMainnet is the address of the Execution Parameters contract on Mainnet
+	executionParametersAddressMainnet = flow.HexToAddress("f426ff57ee8f6110")
 )
 
 // SystemContract represents a system contract on a particular chain.
@@ -149,10 +158,11 @@ type SystemContracts struct {
 	DKG            SystemContract
 
 	// service account related contracts
-	FlowServiceAccount  SystemContract
-	NodeVersionBeacon   SystemContract
-	RandomBeaconHistory SystemContract
-	FlowStorageFees     SystemContract
+	FlowServiceAccount         SystemContract
+	NodeVersionBeacon          SystemContract
+	RandomBeaconHistory        SystemContract
+	FlowStorageFees            SystemContract
+	ExecutionParametersAccount SystemContract
 
 	// token related contracts
 	FlowFees                   SystemContract
@@ -344,16 +354,28 @@ func init() {
 		}
 	}
 
+	executionParametersAccountFunc := func(chain flow.ChainID) flow.Address {
+		switch chain {
+		case flow.Mainnet:
+			return executionParametersAddressMainnet
+		case flow.Testnet:
+			return executionParametersAddressTestnet
+		default:
+			return serviceAddressFunc(chain)
+		}
+	}
+
 	contractAddressFunc = map[string]func(id flow.ChainID) flow.Address{
 		ContractNameIDTableStaking: epochAddressFunc,
 		ContractNameEpoch:          epochAddressFunc,
 		ContractNameClusterQC:      epochAddressFunc,
 		ContractNameDKG:            epochAddressFunc,
 
-		ContractNameNodeVersionBeacon:   serviceAddressFunc,
-		ContractNameRandomBeaconHistory: serviceAddressFunc,
-		ContractNameServiceAccount:      serviceAddressFunc,
-		ContractNameStorageFees:         serviceAddressFunc,
+		ContractNameNodeVersionBeacon:         serviceAddressFunc,
+		ContractNameRandomBeaconHistory:       serviceAddressFunc,
+		ContractNameServiceAccount:            serviceAddressFunc,
+		ContractNameStorageFees:               serviceAddressFunc,
+		AccountNameExecutionParametersAccount: executionParametersAccountFunc,
 
 		ContractNameFlowFees:                   nthAddressFunc(FlowFeesAccountIndex),
 		ContractNameFungibleToken:              nthAddressFunc(FungibleTokenAccountIndex),
@@ -406,10 +428,11 @@ func init() {
 			ClusterQC:      addressOfContract(ContractNameClusterQC),
 			DKG:            addressOfContract(ContractNameDKG),
 
-			FlowServiceAccount:  addressOfContract(ContractNameServiceAccount),
-			NodeVersionBeacon:   addressOfContract(ContractNameNodeVersionBeacon),
-			RandomBeaconHistory: addressOfContract(ContractNameRandomBeaconHistory),
-			FlowStorageFees:     addressOfContract(ContractNameStorageFees),
+			FlowServiceAccount:         addressOfContract(ContractNameServiceAccount),
+			NodeVersionBeacon:          addressOfContract(ContractNameNodeVersionBeacon),
+			RandomBeaconHistory:        addressOfContract(ContractNameRandomBeaconHistory),
+			FlowStorageFees:            addressOfContract(ContractNameStorageFees),
+			ExecutionParametersAccount: addressOfContract(AccountNameExecutionParametersAccount),
 
 			FlowFees:                   addressOfContract(ContractNameFlowFees),
 			FlowToken:                  addressOfContract(ContractNameFlowToken),
