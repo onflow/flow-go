@@ -417,6 +417,10 @@ func (e *EventHandler) proposeForNewViewIfPrimary() error {
 	// EventHandler and instead need to put it into the EventLoop's inbound queue to support consensus committees of size 1.
 	flowProposal, err := e.blockProducer.MakeBlockProposal(curView, newestQC, lastViewTC)
 	if err != nil {
+		if model.IsNoVoteError(err) {
+			log.Info().Err(err).Msg("unsafe to vote for our own proposal, will not propose again for this view")
+			return nil
+		}
 		return fmt.Errorf("can not make block proposal for curView %v: %w", curView, err)
 	}
 	targetPublicationTime := e.paceMaker.TargetPublicationTime(flowProposal.View, start, flowProposal.ParentID) // determine target publication time
