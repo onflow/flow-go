@@ -3,24 +3,23 @@ package data_providers
 import (
 	"context"
 
-	"github.com/google/uuid"
-
 	"github.com/onflow/flow-go/engine/access/rest/websockets/models"
 	"github.com/onflow/flow-go/engine/access/subscription"
 )
 
 // baseDataProvider holds common objects for the provider
 type baseDataProvider struct {
-	id           uuid.UUID
-	topic        string
-	arguments    models.Arguments
-	cancel       context.CancelFunc
-	send         chan<- interface{}
-	subscription subscription.Subscription
+	subscriptionID string
+	topic          string
+	arguments      models.Arguments
+	cancel         context.CancelFunc
+	send           chan<- interface{}
+	subscription   subscription.Subscription
 }
 
 // newBaseDataProvider creates a new instance of baseDataProvider.
 func newBaseDataProvider(
+	subscriptionID string,
 	topic string,
 	arguments models.Arguments,
 	cancel context.CancelFunc,
@@ -28,18 +27,18 @@ func newBaseDataProvider(
 	subscription subscription.Subscription,
 ) *baseDataProvider {
 	return &baseDataProvider{
-		id:           uuid.New(),
-		topic:        topic,
-		arguments:    arguments,
-		cancel:       cancel,
-		send:         send,
-		subscription: subscription,
+		subscriptionID: subscriptionID,
+		topic:          topic,
+		arguments:      arguments,
+		cancel:         cancel,
+		send:           send,
+		subscription:   subscription,
 	}
 }
 
-// ID returns the unique identifier of the data provider.
-func (b *baseDataProvider) ID() uuid.UUID {
-	return b.id
+// ID returns the subscription ID associated with current data provider
+func (b *baseDataProvider) ID() string {
+	return b.subscriptionID
 }
 
 // Topic returns the topic associated with the data provider.
