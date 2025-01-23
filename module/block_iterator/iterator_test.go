@@ -1,4 +1,4 @@
-package height_based
+package block_iterator
 
 import (
 	"fmt"
@@ -32,10 +32,9 @@ func TestIterateHeight(t *testing.T) {
 
 		// create iterator
 		// b0 is the root block, iterate from b1 to b3
-		job := module.IterateRange{Start: b1.Height, End: b3.Height}
+		iterRange := module.IterateRange{Start: b1.Height, End: b3.Height}
 		headers := storagebadger.NewHeaders(&metrics.NoopCollector{}, db)
-		iter, err := NewHeightIterator(headers.BlockIDByHeight, progress, job)
-		require.NoError(t, err)
+		iter := NewIndexedBlockIterator(headers.BlockIDByHeight, progress, iterRange)
 
 		// iterate through all blocks
 		visited := make(map[flow.Identifier]struct{})

@@ -1,8 +1,6 @@
 package module
 
 import (
-	"fmt"
-
 	"github.com/onflow/flow-go/model/flow"
 )
 
@@ -15,11 +13,11 @@ type IterateRange struct {
 	End   uint64 // the end of the range
 }
 
-// IterateRangeCreator is an interface for creating iterate jobs
-type IteratorJobCreator interface {
-	// CreateJob takes a progress reader which is used to read the progress of the iterator
-	// and returns an iterate job that specifies the range of blocks to iterate over
-	CreateJob(IterateProgressReader) (IterateRange, error)
+// IterateRangeCreator is an interface for creating iterate ranges
+type IteratorRangeCreator interface {
+	// CreateRange takes a progress reader which is used to read the progress of the iterator
+	// and returns an iterate range that specifies the range of blocks to iterate over
+	CreateRange(IterateProgressReader) (IterateRange, error)
 }
 
 // IterateProgressReader reads the progress of the iterator, useful for resuming the iteration
@@ -62,60 +60,7 @@ type BlockIterator interface {
 	// so that it can be resumed later
 	// when Checkpoint is called, if SaveStateFunc is called with block A,
 	// then after restart, the iterator will resume from A.
-	// make sure to call this after all the jobs for processing the block IDs returned by
+	// make sure to call this after all the blocks for processing the block IDs returned by
 	// Next() are completed.
 	Checkpoint() error
-}
-
-// IteratorCreator is an interface for creating block iterators
-type IteratorCreator interface {
-	// CreateIterator takes iterate job which specifies the range of blocks to iterate over
-	// and a progress writer which is used to save the progress of the iterator,
-	// and returns a block iterator that can be used to iterate over the blocks
-	// Note: it's up to the implementation to decide how often the progress is saved,
-	// it is wise to consider the trade-off between the performance and the progress saving,
-	// if the progress is saved too often, it might impact the iteration performance, however,
-	// if the progress is only saved at the end of the iteration, then if the iteration
-	// was interrupted, then the iterator will start from the beginning of the range again,
-	// which means some blocks might be iterated multiple times.
-	CreateIterator(IterateRange, IterateProgressWriter) (BlockIterator, error)
-}
-
-type IteratorFactory struct {
-	progressReader IterateProgressReader
-	progressWriter IterateProgressWriter
-	creator        IteratorCreator
-	jobCreator     IteratorJobCreator
-}
-
-func NewIteratorFactory(
-	initializer IterateProgressInitializer,
-	creator IteratorCreator,
-	jobCreator IteratorJobCreator,
-) (*IteratorFactory, error) {
-	progressReader, progressWriter, err := initializer.Init()
-	if err != nil {
-		return nil, fmt.Errorf("failed to initialize progress: %w", err)
-	}
-
-	return &IteratorFactory{
-		progressReader: progressReader,
-		progressWriter: progressWriter,
-		creator:        creator,
-		jobCreator:     jobCreator,
-	}, nil
-}
-
-func (f *IteratorFactory) Create() (BlockIterator, error) {
-	job, err := f.jobCreator.CreateJob(f.progressReader)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create job for block iteration: %w", err)
-	}
-
-	iterator, err := f.creator.CreateIterator(job, f.progressWriter)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create block iterator: %w", err)
-	}
-
-	return iterator, nil
 }

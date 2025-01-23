@@ -1,4 +1,4 @@
-package common
+package block_iterator
 
 import (
 	"github.com/onflow/flow-go/module"
@@ -18,10 +18,10 @@ func NewNextProgress(store storage.ConsumerProgress) *NextProgress {
 	}
 }
 
-func (n *NextProgress) ReadNext() (uint64, error) {
+func (n *NextProgress) LoadState() (uint64, error) {
 	return n.store.ProcessedIndex()
 }
 
-func (n *NextProgress) SaveNext(next uint64) error {
+func (n *NextProgress) SaveState(next uint64) error {
 	return n.store.SetProcessedIndex(next)
 }
