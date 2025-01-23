@@ -73,7 +73,7 @@ func (s *TransactionStatusesProviderSuite) TestSendTransactionStatusesDataProvid
 	)
 
 	backendResponse := backendTransactionStatusesResponse(s.rootBlock)
-	expectedResponse := s.expectedTransactionStatusesResponses(backendResponse)
+	expectedResponse := s.expectedTransactionStatusesResponses(backendResponse, SendAndGetTransactionStatusesTopic)
 
 	sendTxStatutesTestCases := []testType{
 		{
@@ -108,16 +108,14 @@ func (s *TransactionStatusesProviderSuite) TestSendTransactionStatusesDataProvid
 
 // requireTransactionStatuses ensures that the received transaction statuses information matches the expected data.
 func (s *SendTransactionStatusesProviderSuite) requireTransactionStatuses(
-	v interface{},
-	expectedResponse interface{},
+	actual interface{},
+	expected interface{},
 ) {
-	expectedTxStatusesResponse, ok := expectedResponse.(*models.TransactionStatusesResponse)
-	require.True(s.T(), ok, "expected *models.TransactionStatusesResponse, got %T", expectedResponse)
+	expectedResponse, expectedResponsePayload := extractPayload[*models.TransactionStatusesResponse](s.T(), expected)
+	actualResponse, actualResponsePayload := extractPayload[*models.TransactionStatusesResponse](s.T(), actual)
 
-	actualResponse, ok := v.(*models.TransactionStatusesResponse)
-	require.True(s.T(), ok, "expected *models.TransactionStatusesResponse, got %T", v)
-
-	require.Equal(s.T(), expectedTxStatusesResponse.TransactionResult.BlockId, actualResponse.TransactionResult.BlockId)
+	require.Equal(s.T(), expectedResponse.Topic, actualResponse.Topic)
+	require.Equal(s.T(), expectedResponsePayload.TransactionResult.BlockId, actualResponsePayload.TransactionResult.BlockId)
 }
 
 // TestSendTransactionStatusesDataProvider_InvalidArguments tests the behavior of the send transaction statuses data provider
@@ -135,6 +133,7 @@ func (s *SendTransactionStatusesProviderSuite) TestSendTransactionStatusesDataPr
 				ctx,
 				s.log,
 				s.api,
+				"dummy-id",
 				s.linkGenerator,
 				topic,
 				test.arguments,

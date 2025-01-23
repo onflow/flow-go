@@ -40,6 +40,7 @@ func NewBlocksDataProvider(
 	ctx context.Context,
 	logger zerolog.Logger,
 	api access.API,
+	subscriptionID string,
 	linkGenerator commonmodels.LinkGenerator,
 	topic string,
 	arguments models.Arguments,
@@ -60,6 +61,7 @@ func NewBlocksDataProvider(
 
 	subCtx, cancel := context.WithCancel(ctx)
 	p.baseDataProvider = newBaseDataProvider(
+		subscriptionID,
 		topic,
 		cancel,
 		send,
@@ -84,9 +86,10 @@ func (p *BlocksDataProvider) Run() error {
 				return nil, fmt.Errorf("failed to build block response :%w", err)
 			}
 
-			return &models.BlockMessageResponse{
-				Block: &block,
-			}, nil
+			var response models.BaseDataProvidersResponse
+			response.Build(p.ID(), p.Topic(), &block)
+
+			return &response, nil
 		}),
 	)
 }

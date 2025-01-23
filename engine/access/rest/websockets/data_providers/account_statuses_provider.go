@@ -41,6 +41,7 @@ func NewAccountStatusesDataProvider(
 	ctx context.Context,
 	logger zerolog.Logger,
 	stateStreamApi state_stream.API,
+	subscriptionID string,
 	topic string,
 	arguments models.Arguments,
 	send chan<- interface{},
@@ -63,6 +64,7 @@ func NewAccountStatusesDataProvider(
 	subCtx, cancel := context.WithCancel(ctx)
 
 	p.baseDataProvider = newBaseDataProvider(
+		subscriptionID,
 		topic,
 		cancel,
 		send,
@@ -107,16 +109,19 @@ func (p *AccountStatusesDataProvider) handleResponse() func(accountStatusesRespo
 			if blocksSinceLastMessage < p.heartbeatInterval {
 				return nil
 			}
-			blocksSinceLastMessage = 0
 		}
+		blocksSinceLastMessage = 0
 
 		index := messageIndex.Value()
 		if ok := messageIndex.Set(messageIndex.Value() + 1); !ok {
 			return status.Errorf(codes.Internal, "message index already incremented to %d", messageIndex.Value())
 		}
 
-		var response models.AccountStatusesResponse
-		response.Build(accountStatusesResponse, index)
+		var accountStatusesPayload models.AccountStatusesResponse
+		accountStatusesPayload.Build(accountStatusesResponse, index)
+
+		var response models.BaseDataProvidersResponse
+		response.Build(p.ID(), p.Topic(), &accountStatusesPayload)
 
 		p.send <- &response
 
