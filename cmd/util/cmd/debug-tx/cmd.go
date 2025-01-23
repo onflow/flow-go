@@ -3,11 +3,15 @@ package debug_tx
 import (
 	"context"
 
+	"github.com/onflow/flow/protobuf/go/flow/execution"
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
 
 	sdk "github.com/onflow/flow-go-sdk"
 
+	"github.com/onflow/flow-go/fvm/storage/snapshot"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/grpcclient"
 	"github.com/onflow/flow-go/utils/debug"
@@ -17,13 +21,13 @@ import (
 // `gcloud compute ssh '--ssh-flag=-A' --no-user-output-enabled --tunnel-through-iap migrationmainnet1-execution-001 --project flow-multi-region -- -NL 9001:localhost:9000`
 
 var (
-	flagAccessAddress    string
-	flagExecutionAddress string
-	flagChain            string
-	flagTx               string
-	flagComputeLimit     uint64
-	flagAtLatestBlock    bool
-	flagProposalKeySeq   uint64
+	flagAccessAddress       string
+	flagExecutionAddress    string
+	flagChain               string
+	flagTx                  string
+	flagComputeLimit        uint64
+	flagProposalKeySeq      uint64
+	flagUseExecutionDataAPI bool
 )
 
 var Cmd = &cobra.Command{
@@ -53,9 +57,9 @@ func init() {
 
 	Cmd.Flags().Uint64Var(&flagComputeLimit, "compute-limit", 9999, "transaction compute limit")
 
-	Cmd.Flags().BoolVar(&flagAtLatestBlock, "at-latest-block", false, "run at latest block")
-
 	Cmd.Flags().Uint64Var(&flagProposalKeySeq, "proposal-key-seq", 0, "proposal key sequence number")
+
+	Cmd.Flags().BoolVar(&flagUseExecutionDataAPI, "use-execution-data-api", false, "use the execution data API")
 }
 
 func run(*cobra.Command, []string) {
@@ -94,15 +98,56 @@ func run(*cobra.Command, []string) {
 		log.Fatal().Err(err).Msg("failed to fetch transaction result")
 	}
 
-	log.Info().Msgf("Fetched transaction result: %s at block %s", txResult.Status, txResult.BlockID)
+	blockID := flow.Identifier(txResult.BlockID)
+	blockHeight := txResult.BlockHeight
+
+	log.Info().Msgf(
+		"Fetched transaction result: %s at block %s (height %d)",
+		txResult.Status,
+		blockID,
+		blockHeight,
+	)
+
+	log.Info().Msg("Fetching block header ...")
+
+	header, err := debug.GetAccessAPIBlockHeader(flowClient.RPCClient(), context.Background(), blockID)
+	if err != nil {
+		log.Fatal().Err(err).Msg("failed to fetch block header")
+	}
+
+	log.Info().Msgf(
+		"Fetched block header: %s (height %d)",
+		header.ID(),
+		header.Height,
+	)
+
+	var snap snapshot.StorageSnapshot
+
+	if flagUseExecutionDataAPI {
+		snap, err = debug.NewExecutionDataStorageSnapshot(flowClient.ExecutionDataRPCClient(), nil, blockHeight)
+		if err != nil {
+			log.Fatal().Err(err).Msg("failed to create storage snapshot")
+		}
+	} else {
+		executionConn, err := grpc.NewClient(
+			flagExecutionAddress,
+			grpc.WithTransportCredentials(insecure.NewCredentials()),
+		)
+		if err != nil {
+			log.Fatal().Err(err).Msg("failed to create execution connection")
+		}
+		defer executionConn.Close()
+
+		executionClient := execution.NewExecutionAPIClient(executionConn)
+		snap, err = debug.NewExecutionNodeStorageSnapshot(executionClient, nil, blockID)
+		if err != nil {
+			log.Fatal().Err(err).Msg("failed to create storage snapshot")
+		}
+	}
 
 	log.Info().Msg("Debugging transaction ...")
 
-	debugger := debug.NewRemoteDebugger(
-		flagExecutionAddress,
-		chain,
-		log.Logger,
-	)
+	debugger := debug.NewRemoteDebugger(chain, log.Logger)
 
 	txBody := flow.NewTransactionBody().
 		SetScript(tx.Script).
@@ -128,16 +173,7 @@ func run(*cobra.Command, []string) {
 		proposalKeySequenceNumber,
 	)
 
-	var txErr, processErr error
-	if flagAtLatestBlock {
-		txErr, processErr = debugger.RunTransaction(txBody)
-	} else {
-		txErr, processErr = debugger.RunTransactionAtBlockID(
-			txBody,
-			flow.Identifier(txResult.BlockID),
-			"",
-		)
-	}
+	txErr, processErr := debugger.RunTransaction(txBody, snap, header)
 	if txErr != nil {
 		log.Fatal().Err(txErr).Msg("transaction error")
 	}
