@@ -30,7 +30,6 @@ const defaultIncorporatedBlockQueueCapacity = 10
 // Engine is responsible for handling incoming messages, queueing for processing, broadcasting proposals.
 type Engine struct {
 	component.Component
-	cm                         *component.ComponentManager
 	log                        zerolog.Logger
 	me                         module.Local
 	core                       sealing.MatchingCore
@@ -91,12 +90,11 @@ func NewEngine(
 		return nil, fmt.Errorf("could not register for results: %w", err)
 	}
 
-	e.cm = component.NewComponentManagerBuilder().
+	e.Component = component.NewComponentManagerBuilder().
 		AddWorker(e.inboundEventsProcessingLoop).
 		AddWorker(e.finalizationProcessingLoop).
 		AddWorker(e.blockIncorporatedEventsProcessingLoop).
 		Build()
-	e.Component = e.cm
 
 	return e, nil
 }
@@ -147,7 +145,7 @@ func (e *Engine) OnBlockIncorporated(incorporatedBlock *model.Block) {
 }
 
 // processIncorporatedBlock selects receipts that were included into incorporated block and submits them
-// for further processing by matching core.
+// to the matching core for further processing.
 // Without the logic below, the sealing engine would produce IncorporatedResults
 // only from receipts received directly from ENs. sealing Core would not know about
 // Receipts that are incorporated by other nodes in their blocks (but never
@@ -169,7 +167,8 @@ func (e *Engine) processIncorporatedBlock(blockID flow.Identifier) error {
 	return nil
 }
 
-// finalizationProcessingLoop is a separate goroutine that performs processing of finalization events
+// finalizationProcessingLoop contains the logic for processing of finalization events.
+// This method is intended to be executed by a dedicated worker / goroutine.
 func (e *Engine) finalizationProcessingLoop(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
 	finalizationNotifier := e.finalizationEventsNotifier.Channel()
 	ready()
@@ -186,7 +185,8 @@ func (e *Engine) finalizationProcessingLoop(ctx irrecoverable.SignalerContext, r
 	}
 }
 
-// blockIncorporatedEventsProcessingLoop is a separate goroutine for processing block incorporated events.
+// blockIncorporatedEventsProcessingLoop contains the logic for processing block incorporated events.
+// This method is intended to be executed by a dedicated worker / goroutine.
 func (e *Engine) blockIncorporatedEventsProcessingLoop(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
 	c := e.blockIncorporatedNotifier.Channel()
 	ready()
@@ -203,8 +203,9 @@ func (e *Engine) blockIncorporatedEventsProcessingLoop(ctx irrecoverable.Signale
 	}
 }
 
-// inboundEventsProcessingLoop is a worker for processing execution receipts, received
+// inboundEventsProcessingLoop contains the logic for processing execution receipts, received
 // from the network via Process, from the Requester module via HandleReceipt, or from incorporated blocks.
+// This method is intended to be executed by a dedicated worker / goroutine.
 func (e *Engine) inboundEventsProcessingLoop(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
 	c := e.inboundEventsNotifier.Channel()
 	ready()
