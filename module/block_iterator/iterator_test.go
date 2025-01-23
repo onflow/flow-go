@@ -34,7 +34,15 @@ func TestIterateHeight(t *testing.T) {
 		// b0 is the root block, iterate from b1 to b3
 		iterRange := module.IterateRange{Start: b1.Height, End: b3.Height}
 		headers := storagebadger.NewHeaders(&metrics.NoopCollector{}, db)
-		iter := NewIndexedBlockIterator(headers.BlockIDByHeight, progress, iterRange)
+		getBlockIDByIndex := func(height uint64) (flow.Identifier, bool, error) {
+			blockID, err := headers.BlockIDByHeight(height)
+			if err != nil {
+				return flow.ZeroID, false, err
+			}
+
+			return blockID, true, nil
+		}
+		iter := NewIndexedBlockIterator(getBlockIDByIndex, progress, iterRange)
 
 		// iterate through all blocks
 		visited := make(map[flow.Identifier]struct{})

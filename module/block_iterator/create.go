@@ -16,18 +16,22 @@ func CreateIndexedBlockIterator(
 	latest func() (uint64, error),
 ) (module.BlockIterator, error) {
 
-	initializer := NewInitializer(progress, getRoot)
-	progressReader, progressWriter, err := initializer.Init()
+	// initialize the progress in storage, saving the root block index in storage
+	progressReader, progressWriter, err := NewInitializer(progress, getRoot).Init()
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize progress: %w", err)
 	}
 
-	rangeCreator := NewIteratorRangeCreator(latest)
-	iterRange, err := rangeCreator.CreateRange(progressReader)
+	// create a iteration range from the root block to the latest block
+	iterRange, err := NewIteratorRangeCreator(latest).CreateRange(progressReader)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create range for block iteration: %w", err)
 	}
 
+	// create a block iterator with
+	// the function to get block ID by index,
+	// the progress writer to update the progress in storage,
+	// and the iteration range
 	return NewIndexedBlockIterator(getBlockIDByIndex, progressWriter, iterRange), nil
 }
 
