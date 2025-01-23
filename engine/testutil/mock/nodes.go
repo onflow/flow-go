@@ -179,6 +179,12 @@ type ConsensusNode struct {
 	MatchingEngine  *matching.Engine
 }
 
+func (cn ConsensusNode) Start(t *testing.T) {
+	go unittest.FailOnIrrecoverableError(t, cn.Ctx.Done(), cn.Errs)
+	cn.IngestionEngine.Start(cn.Ctx)
+	cn.SealingEngine.Start(cn.Ctx)
+}
+
 func (cn ConsensusNode) Ready() {
 	<-cn.IngestionEngine.Ready()
 	<-cn.SealingEngine.Ready()

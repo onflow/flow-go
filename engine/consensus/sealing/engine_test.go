@@ -1,10 +1,12 @@
 package sealing
 
 import (
+	"context"
 	"sync"
 	"testing"
 	"time"
 
+	"github.com/gammazero/workerpool"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
@@ -13,6 +15,7 @@ import (
 	mockconsensus "github.com/onflow/flow-go/engine/consensus/mock"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/messages"
+	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/metrics"
 	mockmodule "github.com/onflow/flow-go/module/mock"
 	"github.com/onflow/flow-go/network/channels"
@@ -36,6 +39,7 @@ type SealingEngineSuite struct {
 
 	// Sealing Engine
 	engine *Engine
+	cancel context.CancelFunc
 }
 
 func (s *SealingEngineSuite) SetupTest() {
@@ -59,6 +63,7 @@ func (s *SealingEngineSuite) SetupTest() {
 	s.engine = &Engine{
 		log:           unittest.Logger(),
 		unit:          engine.NewUnit(),
+		workerPool:    workerpool.New(defaultAssignmentCollectorsWorkerPoolCapacity),
 		core:          s.core,
 		me:            me,
 		engineMetrics: metrics,
@@ -75,7 +80,19 @@ func (s *SealingEngineSuite) SetupTest() {
 	err = s.engine.setupMessageHandler(unittest.NewSealingConfigs(RequiredApprovalsForSealConstructionTestingValue))
 	require.NoError(s.T(), err)
 
-	<-s.engine.Ready()
+	// setup ComponentManager and start the engine
+	ctx, cancel := irrecoverable.NewMockSignalerContextWithCancel(s.T(), context.Background())
+	s.cancel = cancel
+	s.engine.Component = s.engine.buildComponentManager()
+	s.engine.Start(ctx)
+	unittest.AssertClosesBefore(s.T(), s.engine.Ready(), 10*time.Millisecond)
+}
+
+func (s *SealingEngineSuite) TearDownTest() {
+	if s.cancel != nil {
+		s.cancel()
+		unittest.AssertClosesBefore(s.T(), s.engine.Done(), 10*time.Millisecond)
+	}
 }
 
 // TestOnFinalizedBlock tests if finalized block gets processed when send through `Engine`.

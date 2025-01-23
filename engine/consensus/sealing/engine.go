@@ -13,6 +13,8 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/messages"
 	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/module/component"
+	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/mempool"
 	"github.com/onflow/flow-go/module/metrics"
 	msig "github.com/onflow/flow-go/module/signature"
@@ -63,6 +65,7 @@ type (
 // Purpose of this struct is to provide an efficient way how to consume messages from network layer and pass
 // them to `Core`. Engine runs 2 separate gorourtines that perform pre-processing and consuming messages by Core.
 type Engine struct {
+	component.Component
 	unit                       *engine.Unit
 	workerPool                 *workerpool.WorkerPool
 	core                       consensus.SealingCore
@@ -85,7 +88,7 @@ type Engine struct {
 	rootHeader                 *flow.Header
 }
 
-// NewEngine constructs new `Engine` which runs on it's own unit.
+// NewEngine constructs a new Sealing Engine which runs on its own component.
 func NewEngine(log zerolog.Logger,
 	tracer module.Tracer,
 	conMetrics module.ConsensusMetrics,
@@ -155,7 +158,33 @@ func NewEngine(log zerolog.Logger,
 	}
 	e.core = core
 
+	e.Component = e.buildComponentManager()
+
 	return e, nil
+}
+
+// buildComponentManager creates the component manager with the necessary workers.
+// It must only be called during initialization of the sealing engine, and the only
+// reason it is factored out from NewEngine is so that it can be used in tests.
+func (e *Engine) buildComponentManager() *component.ComponentManager {
+	builder := component.NewComponentManagerBuilder()
+	for i := 0; i < defaultSealingEngineWorkers; i++ {
+		builder.AddWorker(e.loop)
+	}
+	builder.AddWorker(e.finalizationProcessingLoop)
+	builder.AddWorker(e.blockIncorporatedEventsProcessingLoop)
+	builder.AddWorker(e.waitUntilWorkersFinish)
+	return builder.Build()
+}
+
+// waitUntilWorkersFinish ensures that the Sealing Engine only finishes shutting down
+// once the workerPool used by the Sealing Core has been shut down (after waiting
+// for any pending tasks to complete).
+func (e *Engine) waitUntilWorkersFinish(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
+	ready()
+	<-ctx.Done()
+	// After receiving shutdown signal, wait for the workerPool
+	<-e.unit.Done(e.workerPool.StopWait)
 }
 
 // setupTrustedInboundQueues initializes inbound queues for TRUSTED INPUTS (from other components within the
@@ -269,10 +298,10 @@ func (e *Engine) Process(channel channels.Channel, originID flow.Identifier, eve
 
 // processAvailableMessages is processor of pending events which drives events from networking layer to business logic in `Core`.
 // Effectively consumes messages from networking layer and dispatches them into corresponding sinks which are connected with `Core`.
-func (e *Engine) processAvailableMessages() error {
+func (e *Engine) processAvailableMessages(ctx irrecoverable.SignalerContext) error {
 	for {
 		select {
-		case <-e.unit.Quit():
+		case <-ctx.Done():
 			return nil
 		default:
 		}
@@ -311,11 +340,12 @@ func (e *Engine) processAvailableMessages() error {
 }
 
 // finalizationProcessingLoop is a separate goroutine that performs processing of finalization events
-func (e *Engine) finalizationProcessingLoop() {
+func (e *Engine) finalizationProcessingLoop(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
 	finalizationNotifier := e.finalizationEventsNotifier.Channel()
+	ready()
 	for {
 		select {
-		case <-e.unit.Quit():
+		case <-ctx.Done():
 			return
 		case <-finalizationNotifier:
 			finalized, err := e.state.Final().Head()
@@ -331,15 +361,15 @@ func (e *Engine) finalizationProcessingLoop() {
 }
 
 // blockIncorporatedEventsProcessingLoop is a separate goroutine for processing block incorporated events
-func (e *Engine) blockIncorporatedEventsProcessingLoop() {
+func (e *Engine) blockIncorporatedEventsProcessingLoop(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
 	c := e.blockIncorporatedNotifier.Channel()
-
+	ready()
 	for {
 		select {
-		case <-e.unit.Quit():
+		case <-ctx.Done():
 			return
 		case <-c:
-			err := e.processBlockIncorporatedEvents()
+			err := e.processBlockIncorporatedEvents(ctx)
 			if err != nil {
 				e.log.Fatal().Err(err).Msg("internal error processing block incorporated queued message")
 			}
@@ -347,14 +377,15 @@ func (e *Engine) blockIncorporatedEventsProcessingLoop() {
 	}
 }
 
-func (e *Engine) loop() {
+func (e *Engine) loop(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
 	notifier := e.inboundEventsNotifier.Channel()
+	ready()
 	for {
 		select {
-		case <-e.unit.Quit():
+		case <-ctx.Done():
 			return
 		case <-notifier:
-			err := e.processAvailableMessages()
+			err := e.processAvailableMessages(ctx)
 			if err != nil {
 				e.log.Fatal().Err(err).Msg("internal error processing queued message")
 			}
@@ -407,25 +438,6 @@ func (e *Engine) Submit(channel channels.Channel, originID flow.Identifier, even
 // ProcessLocal processes an event originating on the local node.
 func (e *Engine) ProcessLocal(event interface{}) error {
 	return e.messageHandler.Process(e.me.NodeID(), event)
-}
-
-// Ready returns a ready channel that is closed once the engine has fully
-// started. For the propagation engine, we consider the engine up and running
-// upon initialization.
-func (e *Engine) Ready() <-chan struct{} {
-	// launch as many workers as we need
-	for i := 0; i < defaultSealingEngineWorkers; i++ {
-		e.unit.Launch(e.loop)
-	}
-	e.unit.Launch(e.finalizationProcessingLoop)
-	e.unit.Launch(e.blockIncorporatedEventsProcessingLoop)
-	return e.unit.Ready()
-}
-
-func (e *Engine) Done() <-chan struct{} {
-	return e.unit.Done(func() {
-		e.workerPool.StopWait()
-	})
 }
 
 // OnFinalizedBlock implements the `OnFinalizedBlock` callback from the `hotstuff.FinalizationConsumer`
@@ -500,10 +512,10 @@ func (e *Engine) processIncorporatedBlock(incorporatedBlockID flow.Identifier) e
 
 // processBlockIncorporatedEvents performs processing of block incorporated hot stuff events
 // No errors expected during normal operations.
-func (e *Engine) processBlockIncorporatedEvents() error {
+func (e *Engine) processBlockIncorporatedEvents(ctx irrecoverable.SignalerContext) error {
 	for {
 		select {
-		case <-e.unit.Quit():
+		case <-ctx.Done():
 			return nil
 		default:
 		}
