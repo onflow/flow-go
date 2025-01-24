@@ -223,14 +223,8 @@ func NewInstance(t *testing.T, options ...Option) *Instance {
 	)
 
 	// check on stop condition, stop the tests as soon as entering a certain view
-	{
-		safetyData := new(hotstuff.SafetyData)
-		in.persist.On("PutSafetyData", mock.Anything).Run(func(args mock.Arguments) {
-			*safetyData = *args[0].(*hotstuff.SafetyData)
-		}).Return(nil)
-		in.persist.On("PutLivenessData", mock.Anything).Return(nil)
-		in.persist.On("GetSafetyData", mock.Anything).Return(safetyData, nil)
-	}
+	in.persist.On("PutSafetyData", mock.Anything).Return(nil)
+	in.persist.On("PutLivenessData", mock.Anything).Return(nil)
 
 	// program the hotstuff signer behaviour
 	in.signer.On("CreateVote", mock.Anything).Return(
@@ -518,6 +512,12 @@ func NewInstance(t *testing.T, options ...Option) *Instance {
 		timeoutCollectors,
 	)
 	require.NoError(t, err)
+
+	safetyData := &hotstuff.SafetyData{
+		LockedOneChainView:      rootBlock.View,
+		HighestAcknowledgedView: rootBlock.View,
+	}
+	in.persist.On("GetSafetyData", mock.Anything).Return(safetyData, nil).Once()
 
 	// initialize the safety rules
 	in.safetyRules, err = safetyrules.New(in.signer, in.persist, in.committee)
