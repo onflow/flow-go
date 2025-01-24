@@ -19,7 +19,7 @@ type Creator struct {
 	latest            func() (uint64, error)
 }
 
-var _ module.Creator = (*Creator)(nil)
+var _ module.IteratorCreator = (*Creator)(nil)
 
 // NewCreator creates a block iterator that iterates through blocks by index.
 func NewCreator(

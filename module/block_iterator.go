@@ -51,10 +51,10 @@ type BlockIterator interface {
 	Checkpoint() (uint64, error)
 }
 
-// Creator creates block iterators.
+// IteratorCreator creates block iterators.
 // a block iterator iterates through a saved index to the latest block.
 // after iterating through all the blocks in the range, the iterator can be discarded.
 // a new block iterator can be created to iterate through the next range.
-type Creator interface {
+type IteratorCreator interface {
 	Create() (BlockIterator, error)
 }
