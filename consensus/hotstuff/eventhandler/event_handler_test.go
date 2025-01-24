@@ -222,12 +222,25 @@ func NewForks(t *testing.T, finalized uint64) *Forks {
 	return f
 }
 
-// BlockProducer mock will always make a valid block
+// BlockProducer mock will always make a valid block, exactly once per view.
+// If it is requested to make a block twice for the same view, returns model.NoVoteError
 type BlockProducer struct {
-	proposerID flow.Identifier
+	proposerID           flow.Identifier
+	producedBlockForView map[uint64]bool
+}
+
+func NewBlockProducer(proposerID flow.Identifier) *BlockProducer {
+	return &BlockProducer{
+		proposerID:           proposerID,
+		producedBlockForView: make(map[uint64]bool),
+	}
 }
 
 func (b *BlockProducer) MakeBlockProposal(view uint64, qc *flow.QuorumCertificate, lastViewTC *flow.TimeoutCertificate) (*flow.Header, error) {
+	if b.producedBlockForView[view] {
+		return nil, model.NewNoVoteErrorf("block already produced")
+	}
+	b.producedBlockForView[view] = true
 	return helper.SignedProposalToFlow(helper.MakeSignedProposal(helper.WithProposal(
 		helper.MakeProposal(helper.WithBlock(helper.MakeBlock(
 			helper.WithBlockView(view),
@@ -275,9 +288,6 @@ func (es *EventHandlerSuite) SetupTest() {
 		CurrentView: newestQC.View + 1,
 		NewestQC:    newestQC,
 	}
-	safetyData := &hotstuff.SafetyData{
-		HighestAcknowledgedView: newestQC.View,
-	}
 
 	es.ctx, es.stop = context.WithCancel(context.Background())
 
@@ -286,8 +296,7 @@ func (es *EventHandlerSuite) SetupTest() {
 	es.forks = NewForks(es.T(), finalized)
 	es.persist = mocks.NewPersister(es.T())
 	es.persist.On("PutStarted", mock.Anything).Return(nil).Maybe()
-	es.persist.On("GetSafetyData").Return(safetyData, nil).Maybe()
-	es.blockProducer = &BlockProducer{proposerID: es.committee.Self()}
+	es.blockProducer = NewBlockProducer(es.committee.Self())
 	es.safetyRules = NewSafetyRules(es.T())
 	es.notifier = mocks.NewConsumer(es.T())
 	es.notifier.On("OnEventProcessed").Maybe()
