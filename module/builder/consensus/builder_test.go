@@ -1,6 +1,7 @@
 package consensus
 
 import (
+	"errors"
 	"math/rand"
 	"os"
 	"testing"
@@ -417,7 +418,7 @@ func (bs *BuilderSuite) SetupTest() {
 
 	// setup mock state mutator, we don't need a real once since we are using mocked participant state.
 	bs.stateMutator = protocol.NewMutableProtocolState(bs.T())
-	bs.stateMutator.On("EvolveState", mock.Anything, mock.Anything, mock.Anything).Return(unittest.IdentifierFixture(), transaction.NewDeferredBlockPersist(), nil)
+	bs.stateMutator.On("EvolveState", mock.Anything, mock.Anything, mock.Anything).Return(unittest.IdentifierFixture(), transaction.NewDeferredBlockPersist(), nil).Maybe()
 
 	// initialize the builder
 	bs.build, err = NewBuilder(
@@ -455,6 +456,26 @@ func (bs *BuilderSuite) TestPayloadEmptyValid() {
 	bs.Require().NoError(err)
 	bs.Assert().Empty(bs.assembled.Guarantees, "should have no guarantees in payload with empty mempool")
 	bs.Assert().Empty(bs.assembled.Seals, "should have no seals in payload with empty mempool")
+}
+
+// TestSetterErrorPassthrough validates that errors from the setter function are passed through to the caller.
+func (bs *BuilderSuite) TestSetterErrorPassthrough() {
+	sentinel := errors.New("sentinel")
+	setter := func(header *flow.Header) error {
+		return sentinel
+	}
+	_, err := bs.build.BuildOn(bs.parentID, setter, bs.sign)
+	bs.Assert().ErrorIs(err, sentinel)
+}
+
+// TestSignErrorPassthrough validates that errors from the sign function are passed through to the caller.
+func (bs *BuilderSuite) TestSignErrorPassthrough() {
+	sentinel := errors.New("sentinel")
+	sign := func(header *flow.Header) error {
+		return sentinel
+	}
+	_, err := bs.build.BuildOn(bs.parentID, bs.setter, sign)
+	bs.Assert().ErrorIs(err, sentinel)
 }
 
 func (bs *BuilderSuite) TestPayloadGuaranteeValid() {
