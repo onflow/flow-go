@@ -8,12 +8,18 @@ import (
 	"github.com/onflow/flow-go/storage"
 )
 
+// Creator creates block iterators.
+// a block iterator iterates through a saved index to the latest block.
+// after iterating through all the blocks in the range, the iterator can be discarded.
+// a new block iterator can be created to iterate through the next range.
 type Creator struct {
 	getBlockIDByIndex func(uint64) (flow.Identifier, bool, error)
 	progressReader    module.IterateProgressReader
 	progressWriter    module.IterateProgressWriter
 	latest            func() (uint64, error)
 }
+
+var _ module.Creator = (*Creator)(nil)
 
 // NewCreator creates a block iterator that iterates through blocks by index.
 func NewCreator(
