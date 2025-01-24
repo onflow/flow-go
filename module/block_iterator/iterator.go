@@ -39,7 +39,6 @@ func NewIndexedBlockIterator(
 
 // Next returns the next block ID in the iteration
 // it iterates from lower height to higher height.
-// when iterating a height, it iterates over all sibling blocks at that height
 // Note: this method is not concurrent-safe
 func (b *IndexedBlockIterator) Next() (flow.Identifier, bool, error) {
 	if b.nextIndex > b.endIndex {
