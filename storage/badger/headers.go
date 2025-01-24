@@ -18,6 +18,7 @@ type Headers struct {
 	db          *badger.DB
 	cache       *Cache[flow.Identifier, *flow.Header]
 	heightCache *Cache[uint64, flow.Identifier]
+	viewCache   *Cache[uint64, flow.Identifier]
 }
 
 func NewHeaders(collector module.CacheMetrics, db *badger.DB) *Headers {
@@ -48,6 +49,14 @@ func NewHeaders(collector module.CacheMetrics, db *badger.DB) *Headers {
 		}
 	}
 
+	retrieveView := func(view uint64) func(tx *badger.Txn) (flow.Identifier, error) {
+		return func(tx *badger.Txn) (flow.Identifier, error) {
+			var id flow.Identifier
+			err := operation.LookupBlockView(view, &id)(tx)
+			return id, err
+		}
+	}
+
 	h := &Headers{
 		db: db,
 		cache: newCache(collector, metrics.ResourceHeader,
@@ -59,6 +68,10 @@ func NewHeaders(collector module.CacheMetrics, db *badger.DB) *Headers {
 			withLimit[uint64, flow.Identifier](4*flow.DefaultTransactionExpiry),
 			withStore(storeHeight),
 			withRetrieve(retrieveHeight)),
+
+		viewCache: newCache(collector, metrics.ResourceCertifiedView,
+			withLimit[uint64, flow.Identifier](4*flow.DefaultTransactionExpiry),
+			withRetrieve(retrieveView)),
 	}
 
 	return h
@@ -110,6 +123,19 @@ func (h *Headers) ByHeight(height uint64) (*flow.Header, error) {
 	return h.retrieveTx(blockID)(tx)
 }
 
+// ByView returns block header for the given view. It is only available for certified blocks.
+// Note: this method is not available until next spork or a migration that builds the index.
+func (h *Headers) ByView(view uint64) (*flow.Header, error) {
+	tx := h.db.NewTransaction(false)
+	defer tx.Discard()
+
+	blockID, err := h.viewCache.Get(view)(tx)
+	if err != nil {
+		return nil, err
+	}
+	return h.retrieveTx(blockID)(tx)
+}
+
 // Exists returns true if a header with the given ID has been stored.
 // No errors are expected during normal operation.
 func (h *Headers) Exists(blockID flow.Identifier) (bool, error) {
@@ -136,6 +162,22 @@ func (h *Headers) BlockIDByHeight(height uint64) (flow.Identifier, error) {
 	blockID, err := h.retrieveIdByHeightTx(height)(tx)
 	if err != nil {
 		return flow.ZeroID, fmt.Errorf("could not lookup block id by height %d: %w", height, err)
+	}
+	return blockID, nil
+}
+
+// BlockIDByView returns the block ID that is certified at the given view. It is an optimized
+// version of `ByView` that skips retrieving the block. Expected errors during normal operations:
+//   - `storage.ErrNotFound` if no certified block is known at given view.
+//
+// NOTE: this method is not available until next spork (mainnet27) or a migration that builds the index.
+func (h *Headers) BlockIDByView(view uint64) (flow.Identifier, error) {
+	tx := h.db.NewTransaction(false)
+	defer tx.Discard()
+
+	blockID, err := h.viewCache.Get(view)(tx)
+	if err != nil {
+		return flow.ZeroID, fmt.Errorf("could not lookup block id by view %d: %w", view, err)
 	}
 	return blockID, nil
 }
