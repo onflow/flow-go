@@ -189,7 +189,7 @@ func run(*cobra.Command, []string) {
 
 	txErr, processErr := debugger.RunTransaction(txBody, snap, header)
 	if txErr != nil {
-		log.Fatal().Err(txErr).Msg("transaction error")
+		log.Err(txErr).Msg("transaction error")
 	}
 	if processErr != nil {
 		log.Fatal().Err(processErr).Msg("process error")
