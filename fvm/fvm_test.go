@@ -3356,7 +3356,7 @@ func Test_BlockHashListShouldWriteOnPush(t *testing.T) {
 		}))
 }
 
-func TestResourceLoss(t *testing.T) {
+func TestNestedOptionalValueMutation(t *testing.T) {
 
 	t.Parallel()
 
