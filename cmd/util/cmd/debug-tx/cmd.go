@@ -217,7 +217,7 @@ func run(*cobra.Command, []string) {
 		}
 	}
 	if txErr != nil {
-		log.Fatal().Err(txErr).Msg("transaction error")
+		log.Err(txErr).Msg("transaction error")
 	}
 
 }
