@@ -25,13 +25,13 @@ type IterateProgressReader interface {
 	// LoadState reads the next block to iterate
 	// caller must ensure the reader is created by the IterateProgressInitializer,
 	// otherwise LoadState would return exception.
-	LoadState() (uint64, error)
+	LoadState() (progress uint64, exception error)
 }
 
 // IterateProgressWriter saves the progress of the iterator
 type IterateProgressWriter interface {
 	// SaveState persists the next block to be iterated
-	SaveState(uint64) error
+	SaveState(uint64) (exception error)
 }
 
 // BlockIterator is an interface for iterating over blocks
@@ -48,13 +48,13 @@ type BlockIterator interface {
 	//   for blockID, err := range heightIterator.Range()
 	Next() (blockID flow.Identifier, hasNext bool, exception error)
 
-	// Checkpoint saves the current state of the iterator
-	// so that it can be resumed later
+	// Checkpoint saves the current state of the iterator so that it can be resumed later
 	// when Checkpoint is called, if SaveStateFunc is called with block A,
 	// then after restart, the iterator will resume from A.
 	// make sure to call this after all the blocks for processing the block IDs returned by
 	// Next() are completed.
-	Checkpoint() (uint64, error)
+	// It returns the saved index (next index to iterate), and error returned are exceptions
+	Checkpoint() (savedProgress uint64, exception error)
 }
 
 // IteratorCreator creates block iterators.
@@ -62,5 +62,5 @@ type BlockIterator interface {
 // after iterating through all the blocks in the range, the iterator can be discarded.
 // a new block iterator can be created to iterate through the next range.
 type IteratorCreator interface {
-	Create() (BlockIterator, error)
+	Create() (fromSavedIndexToLatest BlockIterator, exception error)
 }
