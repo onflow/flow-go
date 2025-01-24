@@ -59,25 +59,24 @@ func TestCanIterate(t *testing.T) {
 	require.NoError(t, err)
 
 	// Iterate through blocks
-	visitedBlocks := make(map[flow.Identifier]struct{})
+	visitedBlocks := make([]flow.Identifier, 0, len(blocks))
 	for {
 		blockID, ok, err := iterator.Next()
 		require.NoError(t, err)
 		if !ok {
 			break
 		}
-		visitedBlocks[blockID] = struct{}{}
+
+		visitedBlocks = append(visitedBlocks, blockID)
 	}
 
 	// Verify all blocks were visited exactly once
-	for _, block := range blocks {
-		_, ok := visitedBlocks[block.ID()]
-		require.True(t, ok, "Block %v was not visited", block.Height)
-		delete(visitedBlocks, block.ID())
+	for i, block := range blocks {
+		require.Equal(t, block.ID(), visitedBlocks[i], "Block %v was not visited", block.Height)
 	}
 
 	// Verify no extra blocks were visited
-	require.Empty(t, visitedBlocks, "Unexpected number of blocks visited")
+	require.Equal(t, len(blocks), len(visitedBlocks), "Unexpected number of blocks visited")
 
 	// Verify the final checkpoint
 	next, err := iterator.Checkpoint()
@@ -93,6 +92,7 @@ func TestCanIterate(t *testing.T) {
 		{Height: 7},
 		{Height: 8},
 	}
+	visitedBlocks = make([]flow.Identifier, 0, len(additionalBlocks))
 
 	// Update blocks so that the latest block is updated, and getBlockIDByHeight
 	// will return the new blocks
@@ -107,7 +107,7 @@ func TestCanIterate(t *testing.T) {
 		blockID, ok, err := iterator.Next()
 		require.NoError(t, err)
 		require.True(t, ok)
-		visitedBlocks[blockID] = struct{}{}
+		visitedBlocks = append(visitedBlocks, blockID)
 	}
 
 	// No more blocks to iterate
@@ -116,14 +116,12 @@ func TestCanIterate(t *testing.T) {
 	require.False(t, ok)
 
 	// Verify all additional blocks were visited exactly once
-	for _, block := range additionalBlocks {
-		_, ok := visitedBlocks[block.ID()]
-		require.True(t, ok, "Block %v was not visited", block.Height)
-		delete(visitedBlocks, block.ID())
+	for i, block := range additionalBlocks {
+		require.Equal(t, block.ID(), visitedBlocks[i], "Block %v was not visited", block.Height)
 	}
 
 	// Verify no extra blocks were visited
-	require.Empty(t, visitedBlocks, "Unexpected number of blocks visited")
+	require.Equal(t, len(additionalBlocks), len(visitedBlocks), "Unexpected number of blocks visited")
 
 	// Verify the final checkpoint
 	next, err = iterator.Checkpoint()
@@ -177,14 +175,14 @@ func TestCanResume(t *testing.T) {
 	require.NoError(t, err)
 
 	// Iterate through blocks
-	visitedBlocks := make(map[flow.Identifier]struct{})
+	visitedBlocks := make([]flow.Identifier, 0, len(blocks))
 	for i := 0; i < 3; i++ { // iterate up to Height 3
 		blockID, ok, err := iterator.Next()
 		require.NoError(t, err)
 		if !ok {
 			break
 		}
-		visitedBlocks[blockID] = struct{}{}
+		visitedBlocks = append(visitedBlocks, blockID)
 	}
 
 	// save the progress
@@ -222,18 +220,16 @@ func TestCanResume(t *testing.T) {
 			break
 		}
 
-		visitedBlocks[blockID] = struct{}{}
+		visitedBlocks = append(visitedBlocks, blockID)
 	}
 
 	// verify all blocks are visited
-	for _, block := range blocks {
-		_, ok := visitedBlocks[block.ID()]
-		require.True(t, ok, "Block %v was not visited", block.Height)
-		delete(visitedBlocks, block.ID())
+	for i, block := range blocks {
+		require.Equal(t, block.ID(), visitedBlocks[i], "Block %v was not visited", block.Height)
 	}
 
 	// Verify no extra blocks were visited
-	require.Empty(t, visitedBlocks, "Unexpected number of blocks visited")
+	require.Equal(t, len(blocks), len(visitedBlocks), "Unexpected number of blocks visited")
 }
 
 func TestCanSkipViewsIfNotIndexed(t *testing.T) {
