@@ -142,7 +142,9 @@ func run(*cobra.Command, []string) {
 
 		executionDataClient := executiondata.NewExecutionDataAPIClient(accessConn)
 
-		snap, err = debug.NewExecutionDataStorageSnapshot(executionDataClient, nil, blockHeight)
+		// The execution data API provides the *resulting* data,
+		// so fetch the data for the parent block for the *initial* data.
+		snap, err = debug.NewExecutionDataStorageSnapshot(executionDataClient, nil, blockHeight-1)
 		if err != nil {
 			log.Fatal().Err(err).Msg("failed to create storage snapshot")
 		}
