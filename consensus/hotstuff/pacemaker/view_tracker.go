@@ -26,10 +26,7 @@ type viewTracker struct {
 
 // newViewTracker instantiates a viewTracker.
 func newViewTracker(persist hotstuff.Persister) (viewTracker, error) {
-	livenessData, err := persist.GetLivenessData()
-	if err != nil {
-		return viewTracker{}, fmt.Errorf("could not load liveness data: %w", err)
-	}
+	livenessData := persist.GetLivenessData()
 
 	if livenessData.CurrentView < 1 {
 		return viewTracker{}, model.NewConfigurationErrorf("PaceMaker cannot start in view 0 (view zero is reserved for genesis block, which has no proposer)")

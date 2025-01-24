@@ -57,18 +57,18 @@ func New(db *badger.DB, chainID flow.ChainID) (*Persister, error) {
 
 // GetSafetyData will retrieve last persisted safety data.
 // During normal operations, no errors are expected.
-func (p *Persister) GetSafetyData() (*hotstuff.SafetyData, error) {
+func (p *Persister) GetSafetyData() *hotstuff.SafetyData {
 	p.mu.Lock()
 	defer p.mu.Unlock()
-	return p.safetyData, nil
+	return p.safetyData
 }
 
 // GetLivenessData will retrieve last persisted liveness data.
 // During normal operations, no errors are expected.
-func (p *Persister) GetLivenessData() (*hotstuff.LivenessData, error) {
+func (p *Persister) GetLivenessData() *hotstuff.LivenessData {
 	p.mu.Lock()
 	defer p.mu.Unlock()
-	return p.livenessData, nil
+	return p.livenessData
 }
 
 // PutSafetyData persists the last safety data.
