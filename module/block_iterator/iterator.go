@@ -7,12 +7,15 @@ import (
 	"github.com/onflow/flow-go/module"
 )
 
-// IndexedBlockIterator is a block iterator that iterates over blocks by height
+// IndexedBlockIterator is a block iterator that iterates over blocks by height or view
+// when index is height, it iterates from lower height to higher height
+// when index is view, it iterates from lower view to higher view
+// caller must ensure that the range is finalized, otherwise the iteration might miss some blocks
 // it's not concurrent safe, so don't use it in multiple goroutines
 type IndexedBlockIterator struct {
 	// dependencies
 	getBlockIDByIndex func(uint64) (blockID flow.Identifier, indexed bool, excpetion error)
-	progress          module.IterateProgressWriter // for saving the next height to be iterated for resuming the iteration
+	progress          module.IterateProgressWriter // for saving the next index to be iterated for resuming the iteration
 
 	// config
 	endIndex uint64
@@ -23,7 +26,7 @@ type IndexedBlockIterator struct {
 
 var _ module.BlockIterator = (*IndexedBlockIterator)(nil)
 
-// caller must ensure that both iterRange.Start and iterRange.End are finalized height
+// caller must ensure that both iterRange.Start and iterRange.End are finalized
 func NewIndexedBlockIterator(
 	getBlockIDByIndex func(uint64) (blockID flow.Identifier, indexed bool, excpetion error),
 	progress module.IterateProgressWriter,
@@ -38,7 +41,7 @@ func NewIndexedBlockIterator(
 }
 
 // Next returns the next block ID in the iteration
-// it iterates from lower height to higher height.
+// it iterates from lower index to higher index.
 // Note: this method is not concurrent-safe
 func (b *IndexedBlockIterator) Next() (flow.Identifier, bool, error) {
 	if b.nextIndex > b.endIndex {
@@ -50,13 +53,10 @@ func (b *IndexedBlockIterator) Next() (flow.Identifier, bool, error) {
 		return flow.ZeroID, false, fmt.Errorf("failed to fetch block at index (height or view) %v: %w", b.nextIndex, err)
 	}
 
-	// if the block is not indexed, skip it.
-	// when we are iterating by view, it's possible that there is no block for certain views, in
-	// that case, we skip and iterate the next view
-	// when we are iterating by height, it's not possible that a height is not indexed, so indexed should
-	// always be true
+	// if the block is not indexed, skip it. This is only possible when we are iterating by view.
+	// when iterating by height, all blocks should be indexed, so `indexed` should always be true.
 	if !indexed {
-		// iterate next height
+		// if the view is not indexed, then iterate next view
 		b.nextIndex++
 		return b.Next()
 	}
