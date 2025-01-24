@@ -14,8 +14,7 @@ import (
 // a new block iterator can be created to iterate through the next range.
 type Creator struct {
 	getBlockIDByIndex func(uint64) (flow.Identifier, bool, error)
-	progressReader    module.IterateProgressReader
-	progressWriter    module.IterateProgressWriter
+	progress          module.IterateProgress
 	latest            func() (uint64, error)
 }
 
@@ -24,27 +23,26 @@ var _ module.IteratorCreator = (*Creator)(nil)
 // NewCreator creates a block iterator that iterates through blocks by index.
 func NewCreator(
 	getBlockIDByIndex func(uint64) (blockID flow.Identifier, indexed bool, exception error),
-	progress storage.ConsumerProgress,
+	progressStorage storage.ConsumerProgress,
 	root uint64,
 	latest func() (uint64, error),
 ) (*Creator, error) {
 	// initialize the progress in storage, saving the root block index in storage
-	progressReader, progressWriter, err := InitializeProgress(progress, root)
+	progress, err := InitializeProgress(progressStorage, root)
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize progress: %w", err)
 	}
 
 	return &Creator{
 		getBlockIDByIndex: getBlockIDByIndex,
-		progressReader:    progressReader,
-		progressWriter:    progressWriter,
+		progress:          progress,
 		latest:            latest,
 	}, nil
 }
 
 func (c *Creator) Create() (module.BlockIterator, error) {
 	// create a iteration range from the root block to the latest block
-	iterRange, err := CreateRange(c.progressReader, c.latest)
+	iterRange, err := CreateRange(c.progress, c.latest)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create range for block iteration: %w", err)
 	}
@@ -53,7 +51,7 @@ func (c *Creator) Create() (module.BlockIterator, error) {
 	// the function to get block ID by index,
 	// the progress writer to update the progress in storage,
 	// and the iteration range
-	return NewIndexedBlockIterator(c.getBlockIDByIndex, c.progressWriter, iterRange), nil
+	return NewIndexedBlockIterator(c.getBlockIDByIndex, c.progress, iterRange), nil
 }
 
 // NewHeightBasedCreator creates a block iterator that iterates through blocks

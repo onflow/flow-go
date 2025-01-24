@@ -13,6 +13,12 @@ type IterateRange struct {
 	End   uint64 // the end of the range
 }
 
+// IterateProgress is an interface for reading and writing the progress of the iterator
+type IterateProgress interface {
+	IterateProgressReader
+	IterateProgressWriter
+}
+
 // IterateProgressReader reads the progress of the iterator, useful for resuming the iteration
 // after restart
 type IterateProgressReader interface {
