@@ -148,6 +148,15 @@ func TestExtendValid(t *testing.T) {
 			consumer.On("BlockProcessable", block1.Header, mock.Anything).Once()
 			err := fullState.Extend(context.Background(), block2)
 			require.NoError(t, err)
+
+			// verify that block1's view is indexed
+			var indexedID flow.Identifier
+			require.NoError(t, db.View(operation.LookupBlockView(block1.Header.View, &indexedID)))
+			require.Equal(t, block1.ID(), indexedID)
+
+			// verify that block2's view is not indexed
+			err = db.View(operation.LookupBlockView(block2.Header.View, &indexedID))
+			require.ErrorIs(t, err, stoerr.ErrNotFound)
 		})
 	})
 }

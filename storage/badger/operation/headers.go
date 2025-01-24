@@ -20,9 +20,20 @@ func IndexBlockHeight(height uint64, blockID flow.Identifier) func(*badger.Txn) 
 	return insert(makePrefix(codeHeightToBlock, height), blockID)
 }
 
+// IndexBlockView indexes the view of a block. It should only be called on block that
+// have received QC
+func IndexBlockView(view uint64, blockID flow.Identifier) func(*badger.Txn) error {
+	return insert(makePrefix(codeViewToBlock, view), blockID)
+}
+
 // LookupBlockHeight retrieves finalized blocks by height.
 func LookupBlockHeight(height uint64, blockID *flow.Identifier) func(*badger.Txn) error {
 	return retrieve(makePrefix(codeHeightToBlock, height), blockID)
+}
+
+// LookupBlockView retrieves certified blocks by view. (certified blocks are blocks that have received QC)
+func LookupBlockView(view uint64, blockID *flow.Identifier) func(*badger.Txn) error {
+	return retrieve(makePrefix(codeViewToBlock, view), blockID)
 }
 
 // BlockExists checks whether the block exists in the database.
