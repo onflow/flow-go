@@ -11,7 +11,6 @@ import (
 	"github.com/stretchr/testify/suite"
 
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
-	"github.com/onflow/flow-go/engine"
 	mockconsensus "github.com/onflow/flow-go/engine/consensus/mock"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/messages"
@@ -217,15 +216,11 @@ func (s *SealingEngineSuite) TestApprovalInvalidOrigin() {
 	s.core.AssertNumberOfCalls(s.T(), "ProcessApproval", 0)
 }
 
-// TestProcessUnsupportedMessageType tests that Process and ProcessLocal correctly handle a case where invalid message type
+// TestProcessUnsupportedMessageType tests that Process correctly handles a case where invalid message type
 // was submitted from network layer.
 func (s *SealingEngineSuite) TestProcessUnsupportedMessageType() {
 	invalidEvent := uint64(42)
 	err := s.engine.Process("ch", unittest.IdentifierFixture(), invalidEvent)
 	// shouldn't result in error since byzantine inputs are expected
 	require.NoError(s.T(), err)
-	// in case of local processing error cannot be consumed since all inputs are trusted
-	err = s.engine.ProcessLocal(invalidEvent)
-	require.Error(s.T(), err)
-	require.True(s.T(), engine.IsIncompatibleInputTypeError(err))
 }
