@@ -14,9 +14,9 @@ import (
 // the Hotstuff state machine.
 type HotstuffReader interface {
 	// GetLivenessData retrieves the latest persisted liveness data.
-	GetLivenessData() (*hotstuff.LivenessData, error)
+	GetLivenessData() *hotstuff.LivenessData
 	// GetSafetyData retrieves the latest persisted safety data.
-	GetSafetyData() (*hotstuff.SafetyData, error)
+	GetSafetyData() *hotstuff.SafetyData
 }
 
 // NewHotstuffReader returns a new Persister, constrained to read-only operations.

@@ -88,8 +88,8 @@ func NewBuilder(
 
 // BuildOn generates a new payload that is valid with respect to the parent
 // being built upon, with the view being provided by the consensus algorithm.
-// The builder stores the block and validates it against the protocol state
-// before returning it. The specified parent block must exist in the protocol state.
+// The builder stores the block and validates it against the cluster state
+// before returning it. The specified parent block must exist in the cluster state.
 //
 // NOTE: Since the block is stored within Builder, HotStuff MUST propose the
 // block once BuildOn successfully returns.
