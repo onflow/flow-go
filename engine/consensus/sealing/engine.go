@@ -347,11 +347,11 @@ func (e *Engine) finalizationProcessingLoop(ctx irrecoverable.SignalerContext, r
 		case <-finalizationNotifier:
 			finalized, err := e.state.Final().Head()
 			if err != nil {
-				e.log.Fatal().Err(err).Msg("could not retrieve last finalized block")
+				ctx.Throw(fmt.Errorf("could not retrieve last finalized block: %w", err))
 			}
 			err = e.core.ProcessFinalizedBlock(finalized.ID())
 			if err != nil {
-				e.log.Fatal().Err(err).Msgf("could not process finalized block %v", finalized.ID())
+				ctx.Throw(fmt.Errorf("could not process finalized block %v: %w", finalized.ID(), err))
 			}
 		}
 	}
@@ -368,7 +368,7 @@ func (e *Engine) blockIncorporatedEventsProcessingLoop(ctx irrecoverable.Signale
 		case <-c:
 			err := e.processBlockIncorporatedEvents(ctx)
 			if err != nil {
-				e.log.Fatal().Err(err).Msg("internal error processing block incorporated queued message")
+				ctx.Throw(fmt.Errorf("internal error processing block incorporated queued message: %w", err))
 			}
 		}
 	}
@@ -384,7 +384,7 @@ func (e *Engine) loop(ctx irrecoverable.SignalerContext, ready component.ReadyFu
 		case <-notifier:
 			err := e.processAvailableMessages(ctx)
 			if err != nil {
-				e.log.Fatal().Err(err).Msg("internal error processing queued message")
+				ctx.Throw(fmt.Errorf("internal error processing queued message: %w", err))
 			}
 		}
 	}
