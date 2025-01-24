@@ -13,7 +13,7 @@ type Persister struct {
 }
 
 // GetLivenessData provides a mock function with given fields:
-func (_m *Persister) GetLivenessData() (*hotstuff.LivenessData, error) {
+func (_m *Persister) GetLivenessData() *hotstuff.LivenessData {
 	ret := _m.Called()
 
 	if len(ret) == 0 {
@@ -21,10 +21,6 @@ func (_m *Persister) GetLivenessData() (*hotstuff.LivenessData, error) {
 	}
 
 	var r0 *hotstuff.LivenessData
-	var r1 error
-	if rf, ok := ret.Get(0).(func() (*hotstuff.LivenessData, error)); ok {
-		return rf()
-	}
 	if rf, ok := ret.Get(0).(func() *hotstuff.LivenessData); ok {
 		r0 = rf()
 	} else {
@@ -33,17 +29,11 @@ func (_m *Persister) GetLivenessData() (*hotstuff.LivenessData, error) {
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func() error); ok {
-		r1 = rf()
-	} else {
-		r1 = ret.Error(1)
-	}
-
-	return r0, r1
+	return r0
 }
 
 // GetSafetyData provides a mock function with given fields:
-func (_m *Persister) GetSafetyData() (*hotstuff.SafetyData, error) {
+func (_m *Persister) GetSafetyData() *hotstuff.SafetyData {
 	ret := _m.Called()
 
 	if len(ret) == 0 {
@@ -51,10 +41,6 @@ func (_m *Persister) GetSafetyData() (*hotstuff.SafetyData, error) {
 	}
 
 	var r0 *hotstuff.SafetyData
-	var r1 error
-	if rf, ok := ret.Get(0).(func() (*hotstuff.SafetyData, error)); ok {
-		return rf()
-	}
 	if rf, ok := ret.Get(0).(func() *hotstuff.SafetyData); ok {
 		r0 = rf()
 	} else {
@@ -63,13 +49,7 @@ func (_m *Persister) GetSafetyData() (*hotstuff.SafetyData, error) {
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func() error); ok {
-		r1 = rf()
-	} else {
-		r1 = ret.Error(1)
-	}
-
-	return r0, r1
+	return r0
 }
 
 // PutLivenessData provides a mock function with given fields: livenessData
