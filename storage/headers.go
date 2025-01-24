@@ -18,6 +18,12 @@ type Headers interface {
 	// ByHeight returns the block with the given number. It is only available for finalized blocks.
 	ByHeight(height uint64) (*flow.Header, error)
 
+	// ByView returns the block with the given view. It is only available for certified blocks.
+	// certified blocks are the blocks that have received QC.
+	//
+	// TODO: this method is not available until next spork (mainnet27) or a migration that builds the index.
+	// ByView(view uint64) (*flow.Header, error)
+
 	// Exists returns true if a header with the given ID has been stored.
 	// No errors are expected during normal operation.
 	Exists(blockID flow.Identifier) (bool, error)
