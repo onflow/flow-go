@@ -79,9 +79,9 @@ func (s *SealingEngineSuite) SetupTest() {
 	require.NoError(s.T(), err)
 
 	// setup ComponentManager and start the engine
+	s.engine.Component = s.engine.buildComponentManager()
 	ctx, cancel := irrecoverable.NewMockSignalerContextWithCancel(s.T(), context.Background())
 	s.cancel = cancel
-	s.engine.Component = s.engine.buildComponentManager()
 	s.engine.Start(ctx)
 	unittest.AssertClosesBefore(s.T(), s.engine.Ready(), 10*time.Millisecond)
 }
@@ -93,7 +93,7 @@ func (s *SealingEngineSuite) TearDownTest() {
 	}
 }
 
-// TestOnFinalizedBlock tests if finalized block gets processed when send through `Engine`.
+// TestOnFinalizedBlock tests if finalized block gets processed when sent through [Engine].
 // Tests the whole processing pipeline.
 func (s *SealingEngineSuite) TestOnFinalizedBlock() {
 
@@ -110,7 +110,7 @@ func (s *SealingEngineSuite) TestOnFinalizedBlock() {
 	s.core.AssertExpectations(s.T())
 }
 
-// TestOnBlockIncorporated tests if incorporated block gets processed when send through `Engine`.
+// TestOnBlockIncorporated tests if incorporated block gets processed when sent through [Engine].
 // Tests the whole processing pipeline.
 func (s *SealingEngineSuite) TestOnBlockIncorporated() {
 	parentBlock := unittest.BlockHeaderFixture()

@@ -62,8 +62,8 @@ type (
 
 // Engine is a wrapper for approval processing `Core` which implements logic for
 // queuing and filtering network messages which later will be processed by sealing engine.
-// Purpose of this struct is to provide an efficient way how to consume messages from network layer and pass
-// them to `Core`. Engine runs 2 separate gorourtines that perform pre-processing and consuming messages by Core.
+// Purpose of this struct is to provide an efficient way to consume messages from the network layer and pass
+// them to `Core`. Engine runs 2 separate goroutines that perform pre-processing and consuming messages by Core.
 type Engine struct {
 	component.Component
 	workerPool                 *workerpool.WorkerPool
@@ -131,6 +131,8 @@ func NewEngine(log zerolog.Logger,
 		return nil, fmt.Errorf("could not initialize message handler for untrusted inputs: %w", err)
 	}
 
+	e.Component = e.buildComponentManager()
+
 	// register engine with the approval provider
 	_, err = net.Register(channels.ReceiveApprovals, e)
 	if err != nil {
@@ -154,8 +156,6 @@ func NewEngine(log zerolog.Logger,
 		return nil, fmt.Errorf("could not repopulate assignment collectors tree: %w", err)
 	}
 	e.core = core
-
-	e.Component = e.buildComponentManager()
 
 	return e, nil
 }
