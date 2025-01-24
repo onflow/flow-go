@@ -223,8 +223,14 @@ func NewInstance(t *testing.T, options ...Option) *Instance {
 	)
 
 	// check on stop condition, stop the tests as soon as entering a certain view
-	in.persist.On("PutSafetyData", mock.Anything).Return(nil)
-	in.persist.On("PutLivenessData", mock.Anything).Return(nil)
+	{
+		safetyData := new(hotstuff.SafetyData)
+		in.persist.On("PutSafetyData", mock.Anything).Run(func(args mock.Arguments) {
+			*safetyData = *args[0].(*hotstuff.SafetyData)
+		}).Return(nil)
+		in.persist.On("PutLivenessData", mock.Anything).Return(nil)
+		in.persist.On("GetSafetyData", mock.Anything).Return(safetyData, nil)
+	}
 
 	// program the hotstuff signer behaviour
 	in.signer.On("CreateVote", mock.Anything).Return(
