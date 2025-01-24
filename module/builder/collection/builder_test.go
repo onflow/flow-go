@@ -2,6 +2,7 @@ package collection_test
 
 import (
 	"context"
+	"errors"
 	"math/rand"
 	"os"
 	"testing"
@@ -263,6 +264,26 @@ func (suite *BuilderSuite) TestBuildOn_Success() {
 	mempoolTransactions := suite.pool.All()
 	suite.Assert().Len(builtCollection.Transactions, 3)
 	suite.Assert().True(collectionContains(builtCollection, flow.GetIDs(mempoolTransactions)...))
+}
+
+// TestBuildOn_SetterErrorPassthrough validates that errors from the setter function are passed through to the caller.
+func (suite *BuilderSuite) TestBuildOn_SetterErrorPassthrough() {
+	sentinel := errors.New("sentinel")
+	setter := func(h *flow.Header) error {
+		return sentinel
+	}
+	_, err := suite.builder.BuildOn(suite.genesis.ID(), setter, noopSigner)
+	suite.Assert().ErrorIs(err, sentinel)
+}
+
+// TestBuildOn_SignerErrorPassthrough validates that errors from the sign function are passed through to the caller.
+func (suite *BuilderSuite) TestBuildOn_SignerErrorPassthrough() {
+	sentinel := errors.New("sentinel")
+	sign := func(h *flow.Header) error {
+		return sentinel
+	}
+	_, err := suite.builder.BuildOn(suite.genesis.ID(), noopSetter, sign)
+	suite.Assert().ErrorIs(err, sentinel)
 }
 
 // when there are transactions with an unknown reference block in the pool, we should not include them in collections
