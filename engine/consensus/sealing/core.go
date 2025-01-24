@@ -34,7 +34,6 @@ import (
 //   - pre-validating approvals (if they are outdated or non-verifiable)
 //   - pruning already processed collectorTree
 type Core struct {
-	unit                       *engine.Unit
 	workerPool                 *workerpool.WorkerPool             // worker pool used by collectors
 	log                        zerolog.Logger                     // used to log relevant actions with context
 	collectorTree              *approvals.AssignmentCollectorTree // levelled forest for assignment collectors
@@ -58,7 +57,6 @@ func NewCore(
 	tracer module.Tracer,
 	conMetrics module.ConsensusMetrics,
 	sealingTracker consensus.SealingTracker,
-	unit *engine.Unit,
 	headers storage.Headers,
 	state protocol.State,
 	sealsDB storage.Seals,
@@ -79,7 +77,6 @@ func NewCore(
 		tracer:                     tracer,
 		metrics:                    conMetrics,
 		sealingTracker:             sealingTracker,
-		unit:                       unit,
 		approvalsCache:             approvals.NewApprovalsLRUCache(1000),
 		counterLastSealedHeight:    counters.NewMonotonousCounter(lastSealed.Height),
 		counterLastFinalizedHeight: counters.NewMonotonousCounter(lastSealed.Height),
@@ -561,7 +558,9 @@ func (c *Core) ProcessFinalizedBlock(finalizedBlockID flow.Identifier) error {
 	//   observes the latest state of `sealingObservation`.
 	// * The `sealingObservation` lives in the scope of this function. Hence, when this goroutine exits
 	//   this function, `sealingObservation` lives solely in the scope of the newly-created goroutine.
-	c.unit.Launch(sealingObservation.Complete)
+	// We do this call asynchronously because we are in the hot path, and it is not required to progress,
+	// and the call may involve database transactions that would unnecessarily delay sealing.
+	go sealingObservation.Complete()
 
 	return nil
 }

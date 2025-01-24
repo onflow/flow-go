@@ -62,7 +62,6 @@ func (s *SealingEngineSuite) SetupTest() {
 
 	s.engine = &Engine{
 		log:           unittest.Logger(),
-		unit:          engine.NewUnit(),
 		workerPool:    workerpool.New(defaultAssignmentCollectorsWorkerPoolCapacity),
 		core:          s.core,
 		me:            me,

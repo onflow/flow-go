@@ -66,7 +66,6 @@ type (
 // them to `Core`. Engine runs 2 separate gorourtines that perform pre-processing and consuming messages by Core.
 type Engine struct {
 	component.Component
-	unit                       *engine.Unit
 	workerPool                 *workerpool.WorkerPool
 	core                       consensus.SealingCore
 	log                        zerolog.Logger
@@ -109,9 +108,7 @@ func NewEngine(log zerolog.Logger,
 ) (*Engine, error) {
 	rootHeader := state.Params().FinalizedRoot()
 
-	unit := engine.NewUnit()
 	e := &Engine{
-		unit:          unit,
 		workerPool:    workerpool.New(defaultAssignmentCollectorsWorkerPoolCapacity),
 		log:           log.With().Str("engine", "sealing.Engine").Logger(),
 		me:            me,
@@ -147,7 +144,7 @@ func NewEngine(log zerolog.Logger,
 	}
 
 	signatureHasher := msig.NewBLSHasher(msig.ResultApprovalTag)
-	core, err := NewCore(log, e.workerPool, tracer, conMetrics, sealingTracker, unit, headers, state, sealsDB, assigner, signatureHasher, sealsMempool, approvalConduit, requiredApprovalsForSealConstructionGetter)
+	core, err := NewCore(log, e.workerPool, tracer, conMetrics, sealingTracker, headers, state, sealsDB, assigner, signatureHasher, sealsMempool, approvalConduit, requiredApprovalsForSealConstructionGetter)
 	if err != nil {
 		return nil, fmt.Errorf("failed to init sealing engine: %w", err)
 	}
@@ -184,7 +181,7 @@ func (e *Engine) waitUntilWorkersFinish(ctx irrecoverable.SignalerContext, ready
 	ready()
 	<-ctx.Done()
 	// After receiving shutdown signal, wait for the workerPool
-	<-e.unit.Done(e.workerPool.StopWait)
+	e.workerPool.StopWait()
 }
 
 // setupTrustedInboundQueues initializes inbound queues for TRUSTED INPUTS (from other components within the
