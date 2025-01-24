@@ -5,6 +5,7 @@ import (
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/fvm"
+	"github.com/onflow/flow-go/fvm/storage/snapshot"
 	"github.com/onflow/flow-go/model/flow"
 )
 
@@ -44,6 +45,7 @@ func (d *RemoteDebugger) RunTransaction(
 	snapshot StorageSnapshot,
 	blockHeader *flow.Header,
 ) (
+	resultSnapshot *snapshot.ExecutionSnapshot,
 	txErr error,
 	processError error,
 ) {
@@ -53,11 +55,15 @@ func (d *RemoteDebugger) RunTransaction(
 
 	tx := fvm.Transaction(txBody, 0)
 
-	_, output, err := d.vm.Run(blockCtx, tx, snapshot)
+	var (
+		output fvm.ProcedureOutput
+		err    error
+	)
+	resultSnapshot, output, err = d.vm.Run(blockCtx, tx, snapshot)
 	if err != nil {
-		return nil, err
+		return resultSnapshot, nil, err
 	}
-	return output.Err, nil
+	return resultSnapshot, output.Err, nil
 }
 
 // RunScript runs the script using the given storage snapshot.

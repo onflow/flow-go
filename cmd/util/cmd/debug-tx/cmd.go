@@ -1,12 +1,15 @@
 package debug_tx
 
 import (
+	"cmp"
 	"context"
+	"encoding/hex"
 
 	"github.com/onflow/flow/protobuf/go/flow/execution"
 	"github.com/onflow/flow/protobuf/go/flow/executiondata"
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
+	"golang.org/x/exp/slices"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 
@@ -29,6 +32,7 @@ var (
 	flagComputeLimit        uint64
 	flagProposalKeySeq      uint64
 	flagUseExecutionDataAPI bool
+	flagDumpRegisters       bool
 )
 
 var Cmd = &cobra.Command{
@@ -61,6 +65,8 @@ func init() {
 	Cmd.Flags().Uint64Var(&flagProposalKeySeq, "proposal-key-seq", 0, "proposal key sequence number")
 
 	Cmd.Flags().BoolVar(&flagUseExecutionDataAPI, "use-execution-data-api", false, "use the execution data API")
+
+	Cmd.Flags().BoolVar(&flagDumpRegisters, "dump-registers", false, "dump registers")
 }
 
 func run(*cobra.Command, []string) {
@@ -186,11 +192,39 @@ func run(*cobra.Command, []string) {
 		proposalKeySequenceNumber,
 	)
 
-	txErr, processErr := debugger.RunTransaction(txBody, snap, header)
-	if txErr != nil {
-		log.Fatal().Err(txErr).Msg("transaction error")
-	}
+	resultSnapshot, txErr, processErr := debugger.RunTransaction(txBody, snap, header)
 	if processErr != nil {
 		log.Fatal().Err(processErr).Msg("process error")
 	}
+
+	if flagDumpRegisters {
+		log.Info().Msg("Read registers:")
+		readRegisterIDs := resultSnapshot.ReadRegisterIDs()
+		sortRegisters(readRegisterIDs)
+		for _, registerID := range readRegisterIDs {
+			log.Info().Msgf("\t%s", registerID)
+		}
+
+		log.Info().Msg("Written registers:")
+		for _, updatedRegister := range resultSnapshot.UpdatedRegisters() {
+			log.Info().Msgf(
+				"\t%s, %s",
+				updatedRegister.Key,
+				hex.EncodeToString(updatedRegister.Value),
+			)
+		}
+	}
+	if txErr != nil {
+		log.Fatal().Err(txErr).Msg("transaction error")
+	}
+
+}
+
+func sortRegisters(registerIDs []flow.RegisterID) {
+	slices.SortFunc(registerIDs, func(a, b flow.RegisterID) int {
+		return cmp.Or(
+			cmp.Compare(a.Owner, b.Owner),
+			cmp.Compare(a.Key, b.Key),
+		)
+	})
 }

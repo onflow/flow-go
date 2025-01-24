@@ -89,7 +89,7 @@ func TestDebugger_RunTransactionAgainstExecutionNodeAtBlockID(t *testing.T) {
 
 	txBody := getTransaction(chain)
 
-	txErr, err := debugger.RunTransaction(txBody, snapshot, header)
+	_, txErr, err := debugger.RunTransaction(txBody, snapshot, header)
 	require.NoError(t, txErr)
 	require.NoError(t, err)
 }
@@ -137,12 +137,12 @@ func TestDebugger_RunTransactionAgainstAccessNodeAtBlockIDWithFileCache(t *testi
 	txBody := getTransaction(chain)
 
 	// the first run will cache the results
-	txErr, err := debugger.RunTransaction(txBody, snapshot, header)
+	_, txErr, err := debugger.RunTransaction(txBody, snapshot, header)
 	require.NoError(t, txErr)
 	require.NoError(t, err)
 
 	// the second run should only use the cache.
-	txErr, err = debugger.RunTransaction(txBody, snapshot, header)
+	_, txErr, err = debugger.RunTransaction(txBody, snapshot, header)
 	require.NoError(t, txErr)
 	require.NoError(t, err)
 }
