@@ -23,7 +23,7 @@ func NewCreator(
 	latest func() (uint64, error),
 ) (*Creator, error) {
 	// initialize the progress in storage, saving the root block index in storage
-	progressReader, progressWriter, err := NewInitializer(progress, root).Init()
+	progressReader, progressWriter, err := InitializeProgress(progress, root)
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize progress: %w", err)
 	}
@@ -38,7 +38,7 @@ func NewCreator(
 
 func (c *Creator) Create() (module.BlockIterator, error) {
 	// create a iteration range from the root block to the latest block
-	iterRange, err := NewIteratorRangeCreator(c.latest).CreateRange(c.progressReader)
+	iterRange, err := CreateRange(c.progressReader, c.latest)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create range for block iteration: %w", err)
 	}

@@ -45,7 +45,7 @@ func TestIterateHeight(t *testing.T) {
 		iter := NewIndexedBlockIterator(getBlockIDByIndex, progress, iterRange)
 
 		// iterate through all blocks
-		visited := make(map[flow.Identifier]struct{})
+		visited := make([]flow.Identifier, 0, len(bs))
 		for {
 			id, ok, err := iter.Next()
 			require.NoError(t, err)
@@ -53,20 +53,15 @@ func TestIterateHeight(t *testing.T) {
 				break
 			}
 
-			// preventing duplicate visit
-			_, ok = visited[id]
-			require.False(t, ok, fmt.Sprintf("block %v is visited twice", id))
-
-			visited[id] = struct{}{}
+			visited = append(visited, id)
 		}
 
-		// verify all blocks are visited
-		for _, b := range bs {
-			_, ok := visited[b.ID()]
-			require.True(t, ok, fmt.Sprintf("block %v is not visited", b.ID()))
-			delete(visited, b.ID())
+		// verify all blocks are visited in the same order
+		for i, b := range bs {
+			require.Equal(t, b.ID(), visited[i])
 		}
-		require.Empty(t, visited)
+
+		require.Equal(t, len(bs), len(visited))
 
 		// save the next to iterate height and verify
 		next, err := iter.Checkpoint()

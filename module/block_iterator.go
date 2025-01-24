@@ -13,13 +13,6 @@ type IterateRange struct {
 	End   uint64 // the end of the range
 }
 
-// IterateRangeCreator is an interface for creating iterate ranges
-type IteratorRangeCreator interface {
-	// CreateRange takes a progress reader which is used to read the progress of the iterator
-	// and returns an iterate range that specifies the range of blocks to iterate over
-	CreateRange(IterateProgressReader) (IterateRange, error)
-}
-
 // IterateProgressReader reads the progress of the iterator, useful for resuming the iteration
 // after restart
 type IterateProgressReader interface {
@@ -33,13 +26,6 @@ type IterateProgressReader interface {
 type IterateProgressWriter interface {
 	// SaveState persists the next block to be iterated
 	SaveState(uint64) error
-}
-
-// IterateProgressInitializer is an interface for initializing the progress of the iterator
-// a initializer must be used to ensures the initial next block to be iterated is saved in
-// storage before creating the block iterator
-type IterateProgressInitializer interface {
-	Init() (IterateProgressReader, IterateProgressWriter, error)
 }
 
 // BlockIterator is an interface for iterating over blocks

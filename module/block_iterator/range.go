@@ -6,25 +6,13 @@ import (
 	"github.com/onflow/flow-go/module"
 )
 
-type IteratorRangeCreator struct {
-	latest func() (uint64, error)
-}
-
-var _ module.IteratorRangeCreator = (*IteratorRangeCreator)(nil)
-
-func NewIteratorRangeCreator(latest func() (uint64, error)) *IteratorRangeCreator {
-	return &IteratorRangeCreator{
-		latest: latest,
-	}
-}
-
-func (h *IteratorRangeCreator) CreateRange(reader module.IterateProgressReader) (module.IterateRange, error) {
+func CreateRange(reader module.IterateProgressReader, getLatest func() (uint64, error)) (module.IterateRange, error) {
 	next, err := reader.LoadState()
 	if err != nil {
 		return module.IterateRange{}, fmt.Errorf("failed to read next height: %w", err)
 	}
 
-	latest, err := h.latest()
+	latest, err := getLatest()
 	if err != nil {
 		return module.IterateRange{}, fmt.Errorf("failed to get latest block: %w", err)
 	}
