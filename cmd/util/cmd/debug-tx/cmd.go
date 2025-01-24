@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/onflow/flow/protobuf/go/flow/execution"
+	"github.com/onflow/flow/protobuf/go/flow/executiondata"
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
 	"google.golang.org/grpc"
@@ -124,7 +125,20 @@ func run(*cobra.Command, []string) {
 	var snap snapshot.StorageSnapshot
 
 	if flagUseExecutionDataAPI {
-		snap, err = debug.NewExecutionDataStorageSnapshot(flowClient.ExecutionDataRPCClient(), nil, blockHeight)
+		accessConn, err := grpc.NewClient(
+			flagAccessAddress,
+			grpc.WithTransportCredentials(insecure.NewCredentials()),
+		)
+		if err != nil {
+			log.Fatal().Err(err).Msg("failed to create access connection")
+		}
+		defer accessConn.Close()
+
+		executionDataClient := executiondata.NewExecutionDataAPIClient(accessConn)
+
+		// The execution data API provides the *resulting* data,
+		// so fetch the data for the parent block for the *initial* data.
+		snap, err = debug.NewExecutionDataStorageSnapshot(executionDataClient, nil, blockHeight-1)
 		if err != nil {
 			log.Fatal().Err(err).Msg("failed to create storage snapshot")
 		}
