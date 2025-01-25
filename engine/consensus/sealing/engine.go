@@ -295,6 +295,7 @@ func (e *Engine) Process(channel channels.Channel, originID flow.Identifier, eve
 
 // processAvailableMessages is processor of pending events which drives events from networking layer to business logic in `Core`.
 // Effectively consumes messages from networking layer and dispatches them into corresponding sinks which are connected with `Core`.
+// No errors expected during normal operations.
 func (e *Engine) processAvailableMessages(ctx irrecoverable.SignalerContext) error {
 	for {
 		select {
@@ -393,14 +394,17 @@ func (e *Engine) loop(ctx irrecoverable.SignalerContext, ready component.ReadyFu
 // processIncorporatedResult is a function that creates incorporated result and submits it for processing
 // to sealing core. In phase 2, incorporated result is incorporated at same block that is being executed.
 // This will be changed in phase 3.
+// No errors expected during normal operations.
 func (e *Engine) processIncorporatedResult(incorporatedResult *flow.IncorporatedResult) error {
 	err := e.core.ProcessIncorporatedResult(incorporatedResult)
 	e.engineMetrics.MessageHandled(metrics.EngineSealing, metrics.MessageExecutionReceipt)
 	return err
 }
 
+// onApproval checks that the result approval is valid before forwarding it to the Core for processing in a blocking way.
+// No errors expected during normal operations.
 func (e *Engine) onApproval(originID flow.Identifier, approval *flow.ResultApproval) error {
-	// don't process approval if originID is mismatched
+	// don't process (silently ignore) approval if originID is mismatched
 	if originID != approval.Body.ApproverID {
 		return nil
 	}
