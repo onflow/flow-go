@@ -1,8 +1,6 @@
 package data_providers
 
-import (
-	"github.com/onflow/flow-go/engine/access/rest/websockets/models"
-)
+import "github.com/onflow/flow-go/engine/access/rest/websockets/models"
 
 // The DataProvider is the interface abstracts of the actual data provider used by the WebSocketCollector.
 // It provides methods for retrieving the provider's unique SubscriptionID, topic, and a methods to close and run the provider.

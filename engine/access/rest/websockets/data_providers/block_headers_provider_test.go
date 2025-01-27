@@ -6,7 +6,6 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/mock"
-	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
 	commonmodels "github.com/onflow/flow-go/engine/access/rest/common/models"
@@ -29,27 +28,23 @@ func (s *BlockHeadersProviderSuite) SetupTest() {
 	s.BlocksProviderSuite.SetupTest()
 }
 
-// TestBlockHeadersDataProvider_InvalidArguments tests the behavior of the block headers data provider
-// when invalid arguments are provided. It verifies that appropriate errors are returned
-// for missing or conflicting arguments.
-// This test covers the test cases:
-// 1. Missing 'block_status' argument.
-// 2. Invalid 'block_status' argument.
-// 3. Providing both 'start_block_id' and 'start_block_height' simultaneously.
-func (s *BlockHeadersProviderSuite) TestBlockHeadersDataProvider_InvalidArguments() {
-	ctx := context.Background()
-	send := make(chan interface{})
-
-	topic := BlockHeadersTopic
-
-	for _, test := range s.invalidArgumentsTestCases() {
-		s.Run(test.name, func() {
-			provider, err := NewBlockHeadersDataProvider(ctx, s.log, s.api, "dummy-id", topic, test.arguments, send)
-			s.Require().Nil(provider)
-			s.Require().Error(err)
-			s.Require().Contains(err.Error(), test.expectedErrorMsg)
-		})
-	}
+// TestBlockHeadersDataProvider_HappyPath tests the behavior of the block headers data provider
+// when it is configured correctly and operating under normal conditions. It
+// validates that block headers are correctly streamed to the channel and ensures
+// no unexpected errors occur.
+func (s *BlockHeadersProviderSuite) TestBlockHeadersDataProvider_HappyPath() {
+	testHappyPath(
+		s.T(),
+		BlockHeadersTopic,
+		s.factory,
+		s.validBlockHeadersArgumentsTestCases(),
+		func(dataChan chan interface{}) {
+			for _, block := range s.blocks {
+				dataChan <- block.Header
+			}
+		},
+		s.requireBlockHeader,
+	)
 }
 
 // validBlockHeadersArgumentsTestCases defines test happy cases for block headers data providers.
@@ -116,39 +111,34 @@ func (s *BlockHeadersProviderSuite) validBlockHeadersArgumentsTestCases() []test
 	}
 }
 
-// TestBlockHeadersDataProvider_HappyPath tests the behavior of the block headers data provider
-// when it is configured correctly and operating under normal conditions. It
-// validates that block headers are correctly streamed to the channel and ensures
-// no unexpected errors occur.
-func (s *BlockHeadersProviderSuite) TestBlockHeadersDataProvider_HappyPath() {
-	testHappyPath(
-		s.T(),
-		BlockHeadersTopic,
-		s.factory,
-		s.validBlockHeadersArgumentsTestCases(),
-		func(dataChan chan interface{}) {
-			for _, block := range s.blocks {
-				dataChan <- block.Header
-			}
-		},
-		s.requireBlockHeader,
-	)
-}
-
 // requireBlockHeaders ensures that the received block header information matches the expected data.
 func (s *BlockHeadersProviderSuite) requireBlockHeader(actual interface{}, expected interface{}) {
-	expectedResponse, ok := expected.(*models.BaseDataProvidersResponse)
-	require.True(s.T(), ok, "Expected *models.BaseDataProvidersResponse, got %T", expected)
-
-	expectedResponsePayload, ok := expectedResponse.Payload.(*commonmodels.BlockHeader)
-	require.True(s.T(), ok, "Unexpected response payload type: %T", expectedResponse.Payload)
-
-	actualResponse, ok := actual.(*models.BaseDataProvidersResponse)
-	require.True(s.T(), ok, "Expected *models.BaseDataProvidersResponse, got %T", actual)
-
-	actualResponsePayload, ok := actualResponse.Payload.(*commonmodels.BlockHeader)
-	require.True(s.T(), ok, "Unexpected response payload type: %T", actualResponse.Payload)
+	expectedResponse, expectedResponsePayload := extractPayload[*commonmodels.BlockHeader](s.T(), expected)
+	actualResponse, actualResponsePayload := extractPayload[*commonmodels.BlockHeader](s.T(), actual)
 
 	s.Require().Equal(expectedResponse.Topic, actualResponse.Topic)
 	s.Require().Equal(expectedResponsePayload, actualResponsePayload)
+}
+
+// TestBlockHeadersDataProvider_InvalidArguments tests the behavior of the block headers data provider
+// when invalid arguments are provided. It verifies that appropriate errors are returned
+// for missing or conflicting arguments.
+// This test covers the test cases:
+// 1. Missing 'block_status' argument.
+// 2. Invalid 'block_status' argument.
+// 3. Providing both 'start_block_id' and 'start_block_height' simultaneously.
+func (s *BlockHeadersProviderSuite) TestBlockHeadersDataProvider_InvalidArguments() {
+	ctx := context.Background()
+	send := make(chan interface{})
+
+	topic := BlockHeadersTopic
+
+	for _, test := range s.invalidArgumentsTestCases() {
+		s.Run(test.name, func() {
+			provider, err := NewBlockHeadersDataProvider(ctx, s.log, s.api, "dummy-id", topic, test.arguments, send)
+			s.Require().Nil(provider)
+			s.Require().Error(err)
+			s.Require().Contains(err.Error(), test.expectedErrorMsg)
+		})
+	}
 }

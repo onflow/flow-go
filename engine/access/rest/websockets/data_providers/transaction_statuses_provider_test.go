@@ -113,17 +113,8 @@ func (s *TransactionStatusesProviderSuite) requireTransactionStatuses(
 	actual interface{},
 	expected interface{},
 ) {
-	expectedResponse, ok := expected.(*models.BaseDataProvidersResponse)
-	require.True(s.T(), ok, "Expected *models.BaseDataProvidersResponse, got %T", expected)
-
-	expectedResponsePayload, ok := expectedResponse.Payload.(*models.TransactionStatusesResponse)
-	require.True(s.T(), ok, "Unexpected response payload type: %T", expectedResponse.Payload)
-
-	actualResponse, ok := actual.(*models.BaseDataProvidersResponse)
-	require.True(s.T(), ok, "Expected *models.BaseDataProvidersResponse, got %T", actual)
-
-	actualResponsePayload, ok := actualResponse.Payload.(*models.TransactionStatusesResponse)
-	require.True(s.T(), ok, "Unexpected response payload type: %T", actualResponse.Payload)
+	expectedResponse, expectedResponsePayload := extractPayload[*models.TransactionStatusesResponse](s.T(), expected)
+	actualResponse, actualResponsePayload := extractPayload[*models.TransactionStatusesResponse](s.T(), actual)
 
 	require.Equal(s.T(), expectedResponse.Topic, actualResponse.Topic)
 	require.Equal(s.T(), expectedResponsePayload.TransactionResult.BlockId, actualResponsePayload.TransactionResult.BlockId)

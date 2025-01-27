@@ -98,8 +98,8 @@ func (p *EventsDataProvider) handleResponse() func(eventsResponse *backend.Event
 			if blocksSinceLastMessage < p.heartbeatInterval {
 				return nil
 			}
-			blocksSinceLastMessage = 0
 		}
+		blocksSinceLastMessage = 0
 
 		index := messageIndex.Value()
 		if ok := messageIndex.Set(messageIndex.Value() + 1); !ok {
@@ -111,6 +111,7 @@ func (p *EventsDataProvider) handleResponse() func(eventsResponse *backend.Event
 
 		var response models.BaseDataProvidersResponse
 		response.Build(p.ID(), p.Topic(), &eventsPayload)
+
 		p.send <- &response
 
 		return nil
