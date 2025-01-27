@@ -413,14 +413,15 @@ func (proc *procedure) withdrawFrom(
 	if !isValid {
 		return types.NewInvalidResult(
 			call.Transaction(),
-			types.ErrInvalidBalance), nil
+			types.ErrInvalidBalance,
+		), nil
 	}
 
-	// check balance is not prone to rounding error
-	if types.BalanceConversionToUFix64ProneToRoundingError(call.Value) {
+	if !types.AttoFlowBalanceValidForFlowVault(call.Value) {
 		return types.NewInvalidResult(
 			call.Transaction(),
-			types.ErrWithdrawBalanceRounding), nil
+			types.ErrWithdrawBalanceRounding,
+		), nil
 	}
 
 	// create bridge account if not exist
@@ -720,7 +721,7 @@ func convertAndCheckValue(input *big.Int) (isValid bool, converted *uint256.Int)
 	// convert value into uint256
 	value, overflow := uint256.FromBig(input)
 	if overflow {
-		return true, nil
+		return false, nil
 	}
 	return true, value
 }
