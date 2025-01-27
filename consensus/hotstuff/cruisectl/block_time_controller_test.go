@@ -232,8 +232,9 @@ func (bs *BlockTimeControllerSuite) TestOnEpochExtended() {
 		FirstView: setupFixture.FirstView,
 		FinalView: setupFixture.FinalView,
 	}
+	commitFixture := unittest.EpochCommitFixture()
 
-	epoch := inmem.NewSetupEpoch(setupFixture, []flow.EpochExtension{extension})
+	epoch := inmem.NewCommittedEpoch(setupFixture, []flow.EpochExtension{extension}, commitFixture)
 	bs.epochs.Add(epoch)
 	bs.epochs.Transition()
 

@@ -13,7 +13,8 @@ import (
 
 func TestToEpochSetup(t *testing.T) {
 	expected := unittest.EpochSetupFixture()
-	epoch := inmem.NewSetupEpoch(expected, nil)
+	commit := unittest.EpochCommitFixture()
+	epoch := inmem.NewCommittedEpoch(expected, nil, commit)
 
 	got, err := protocol.ToEpochSetup(epoch)
 	require.NoError(t, err)

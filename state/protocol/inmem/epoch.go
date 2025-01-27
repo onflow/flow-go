@@ -52,7 +52,7 @@ func (eq Epochs) NextCommitted() protocol.Epoch {
 	return invalid.NewEpochf("unexpected unknown phase in protocol state entry")
 }
 
-// setupEpoch is an implementation of protocol.Epoch backed by an EpochSetup service event.
+// setupEpoch is an implementation of protocol.TentativeEpoch backed by an EpochSetup service event.
 // Includes any extensions which have been included as of the reference block.
 // This is used for converting service events to inmem.Epoch.
 type setupEpoch struct {
@@ -272,7 +272,7 @@ func (e *heightBoundedEpoch) FinalHeight() (uint64, error) {
 // NewSetupEpoch returns a memory-backed epoch implementation based on an EpochSetup event.
 // Epoch information available after the setup phase will not be accessible in the resulting epoch instance.
 // No errors are expected during normal operations.
-func NewSetupEpoch(setupEvent *flow.EpochSetup, extensions []flow.EpochExtension) protocol.Epoch {
+func NewSetupEpoch(setupEvent *flow.EpochSetup, extensions []flow.EpochExtension) protocol.TentativeEpoch {
 	return &setupEpoch{
 		setupEvent: setupEvent,
 		extensions: extensions,
