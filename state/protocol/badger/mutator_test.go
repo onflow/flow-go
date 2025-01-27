@@ -1154,15 +1154,15 @@ func TestExtendConflictingEpochEvents(t *testing.T) {
 
 		rootSetup := result.ServiceEvents[0].Event.(*flow.EpochSetup)
 
-		// create two conflicting epoch setup events for the next epoch (final view differs)
+		// create two conflicting epoch setup events for the next epoch (participants differ)
 		nextEpochSetup1 := unittest.EpochSetupFixture(
-			unittest.WithParticipants(rootSetup.Participants),
+			unittest.WithParticipants(rootSetup.Participants[:len(rootSetup.Participants)]),
 			unittest.SetupWithCounter(rootSetup.Counter+1),
 			unittest.WithFinalView(rootSetup.FinalView+1000),
 			unittest.WithFirstView(rootSetup.FinalView+1),
 		)
 		nextEpochSetup2 := unittest.EpochSetupFixture(
-			unittest.WithParticipants(rootSetup.Participants),
+			unittest.WithParticipants(rootSetup.Participants[:len(rootSetup.Participants)-1]),
 			unittest.SetupWithCounter(rootSetup.Counter+1),
 			unittest.WithFinalView(rootSetup.FinalView+2000), // final view differs
 			unittest.WithFirstView(rootSetup.FinalView+1),
@@ -1192,7 +1192,7 @@ func TestExtendConflictingEpochEvents(t *testing.T) {
 		block4.SetPayload(flow.Payload{
 			Receipts:        []*flow.ExecutionReceiptMeta{block2Receipt.Meta()},
 			Results:         []*flow.ExecutionResult{&block2Receipt.ExecutionResult},
-			ProtocolStateID: block1.Payload.ProtocolStateID,
+			ProtocolStateID: block2.Payload.ProtocolStateID,
 		})
 		err = state.Extend(context.Background(), block4)
 		require.NoError(t, err)
@@ -1231,15 +1231,24 @@ func TestExtendConflictingEpochEvents(t *testing.T) {
 		err = state.Extend(context.Background(), block8)
 		require.NoError(t, err)
 
-		// should be able query each epoch from the appropriate reference block
-		// TODO improve this check now that FinalView is not part of TentativeEpoch API
-		setup1counter, err := state.AtBlockID(block7.ID()).Epochs().Next().Counter()
+		// should be able to query each epoch from the appropriate reference block
+		setup1identities, err := state.AtBlockID(block7.ID()).Epochs().Next().InitialIdentities()
 		assert.NoError(t, err)
-		require.Equal(t, nextEpochSetup1.Counter, setup1counter)
+		require.Equal(t, nextEpochSetup1.Participants, setup1identities)
 
-		setup2counter, err := state.AtBlockID(block8.ID()).Epochs().Next().Counter()
+		phase, err := state.AtBlockID(block8.ID()).EpochPhase()
 		assert.NoError(t, err)
-		require.Equal(t, nextEpochSetup2.Counter, setup2counter)
+		switch phase {
+		case flow.EpochPhaseSetup:
+			setup2identities, err := state.AtBlockID(block8.ID()).Epochs().Next().InitialIdentities()
+			assert.NoError(t, err)
+			require.Equal(t, nextEpochSetup2.Participants, setup2identities)
+		case flow.EpochPhaseFallback:
+			t.Fatal("reached epoch fallback phase instead of epoch setup phase")
+		default:
+			t.Fatal("unexpected epoch phase")
+		}
+
 	})
 }
 
@@ -1344,14 +1353,13 @@ func TestExtendDuplicateEpochEvents(t *testing.T) {
 		require.NoError(t, err)
 
 		// should be able to query each epoch from the appropriate reference block
-		// TODO improve this check now that FinalView is not part of TentativeEpoch API
-		counter, err := state.AtBlockID(block7.ID()).Epochs().Next().Counter()
+		identities, err := state.AtBlockID(block7.ID()).Epochs().Next().InitialIdentities()
 		assert.NoError(t, err)
-		require.Equal(t, nextEpochSetup.Counter, counter)
+		require.Equal(t, nextEpochSetup.Participants, identities)
 
-		counter, err = state.AtBlockID(block8.ID()).Epochs().Next().Counter()
+		identities, err = state.AtBlockID(block8.ID()).Epochs().Next().InitialIdentities()
 		assert.NoError(t, err)
-		require.Equal(t, nextEpochSetup.Counter, counter)
+		require.Equal(t, nextEpochSetup.Participants, identities)
 	})
 }
 
