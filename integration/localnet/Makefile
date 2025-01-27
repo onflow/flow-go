@@ -99,6 +99,7 @@ bootstrap-short-epochs:
 start: start-metrics start-flow
 
 # Starts the network, using the most recently built images.
+# Starts the network, using the most recently built images.
 # Useful for rapid iteration, when no code has changed or only one images needs to be re-built.
 .PHONY: start-cached
 start-cached: start-metrics start-flow-cached
@@ -122,7 +123,7 @@ start-flow-cached:
 
 .PHONY: build-flow
 build-flow:
-	DOCKER_BUILDKIT=1 COMPOSE_DOCKER_CLI_BUILD=1 docker compose -f docker-compose.nodes.yml build
+	DOCKER_BUILDKIT=1 COMPOSE_DOCKER_CLI_BUILD=1 docker compose -f docker-compose.nodes.yml build --no-cache
 
 .PHONY: stop
 stop:
