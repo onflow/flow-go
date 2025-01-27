@@ -30,7 +30,7 @@ func (eq Epochs) Current() protocol.Epoch {
 	return NewCommittedEpoch(eq.entry.CurrentEpochSetup, eq.entry.CurrentEpoch.EpochExtensions, eq.entry.CurrentEpochCommit)
 }
 
-func (eq Epochs) Next() protocol.TentativeEpoch {
+func (eq Epochs) NextUnsafe() protocol.TentativeEpoch {
 	switch eq.entry.EpochPhase() {
 	case flow.EpochPhaseStaking, flow.EpochPhaseFallback:
 		return invalid.NewEpoch(protocol.ErrNextEpochNotSetup)
@@ -51,7 +51,6 @@ func (eq Epochs) NextCommitted() protocol.Epoch {
 	}
 	return invalid.NewEpochf("unexpected unknown phase in protocol state entry")
 }
-
 
 // setupEpoch is an implementation of protocol.Epoch backed by an EpochSetup service event.
 // Includes any extensions which have been included as of the reference block.

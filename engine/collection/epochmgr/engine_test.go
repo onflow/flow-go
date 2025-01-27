@@ -280,7 +280,7 @@ func (suite *Suite) TestRestartInSetupPhase() {
 	suite.phase = flow.EpochPhaseSetup
 	// should call voter with next epoch
 	var called = make(chan struct{})
-	suite.voter.On("Vote", mock.Anything, suite.epochQuery.Next()).
+	suite.voter.On("Vote", mock.Anything, suite.epochQuery.NextUnsafe()).
 		Return(nil).
 		Run(func(args mock.Arguments) {
 			close(called)
@@ -418,7 +418,7 @@ func (suite *Suite) TestStartAsUnauthorizedNode() {
 	suite.phase = flow.EpochPhaseSetup
 	// should call voter with next epoch
 	var called = make(chan struct{})
-	suite.voter.On("Vote", mock.Anything, suite.epochQuery.Next()).
+	suite.voter.On("Vote", mock.Anything, suite.epochQuery.NextUnsafe()).
 		Return(nil).
 		Run(func(args mock.Arguments) {
 			close(called)
@@ -444,7 +444,7 @@ func (suite *Suite) TestRespondToPhaseChange() {
 	suite.phase = flow.EpochPhaseStaking
 	// should call voter with next epoch
 	var called = make(chan struct{})
-	suite.voter.On("Vote", mock.Anything, suite.epochQuery.Next()).
+	suite.voter.On("Vote", mock.Anything, suite.epochQuery.NextUnsafe()).
 		Return(nil).
 		Run(func(args mock.Arguments) {
 			close(called)
@@ -543,7 +543,7 @@ func (suite *Suite) TestStopQcVoting() {
 	suite.engineEventsDistributor.On("ActiveClustersChanged", mock.AnythingOfType("flow.ChainIDList")).Once()
 
 	receivedCancelSignal := make(chan struct{})
-	suite.voter.On("Vote", mock.Anything, suite.epochQuery.Next()).
+	suite.voter.On("Vote", mock.Anything, suite.epochQuery.NextUnsafe()).
 		Return(nil).
 		Run(func(args mock.Arguments) {
 			ctx := args.Get(0).(context.Context)

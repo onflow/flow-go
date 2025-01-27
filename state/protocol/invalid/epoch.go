@@ -118,7 +118,7 @@ func (u *Epochs) Current() protocol.Epoch {
 	return NewEpoch(u.err)
 }
 
-func (u *Epochs) Next() protocol.TentativeEpoch {
+func (u *Epochs) NextUnsafe() protocol.TentativeEpoch {
 	return NewEpoch(u.err)
 }
 

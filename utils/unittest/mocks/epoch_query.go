@@ -41,7 +41,7 @@ func (mock *EpochQuery) Current() protocol.Epoch {
 	return mock.byCounter[mock.counter]
 }
 
-func (mock *EpochQuery) Next() protocol.TentativeEpoch {
+func (mock *EpochQuery) NextUnsafe() protocol.TentativeEpoch {
 	mock.mu.RLock()
 	defer mock.mu.RUnlock()
 	epoch, exists := mock.byCounter[mock.counter+1]

@@ -957,16 +957,16 @@ func TestExtendEpochTransitionValid(t *testing.T) {
 
 		// we should NOT be able to query epoch 2 wrt blocks before 3
 		for _, blockID := range []flow.Identifier{block1.ID(), block2.ID()} {
-			_, err = state.AtBlockID(blockID).Epochs().Next().InitialIdentities()
+			_, err = state.AtBlockID(blockID).Epochs().NextUnsafe().InitialIdentities()
 			require.Error(t, err)
-			_, err = state.AtBlockID(blockID).Epochs().Next().Clustering()
+			_, err = state.AtBlockID(blockID).Epochs().NextUnsafe().Clustering()
 			require.Error(t, err)
 		}
 
 		// we should be able to query epoch 2 wrt block 3
-		_, err = state.AtBlockID(block3.ID()).Epochs().Next().InitialIdentities()
+		_, err = state.AtBlockID(block3.ID()).Epochs().NextUnsafe().InitialIdentities()
 		assert.NoError(t, err)
-		_, err = state.AtBlockID(block3.ID()).Epochs().Next().Clustering()
+		_, err = state.AtBlockID(block3.ID()).Epochs().NextUnsafe().Clustering()
 		assert.NoError(t, err)
 
 		// only setup event is finalized, not commit, so shouldn't be able to get certain info
@@ -1232,7 +1232,7 @@ func TestExtendConflictingEpochEvents(t *testing.T) {
 		require.NoError(t, err)
 
 		// should be able to query each epoch from the appropriate reference block
-		setup1identities, err := state.AtBlockID(block7.ID()).Epochs().Next().InitialIdentities()
+		setup1identities, err := state.AtBlockID(block7.ID()).Epochs().NextUnsafe().InitialIdentities()
 		assert.NoError(t, err)
 		require.Equal(t, nextEpochSetup1.Participants, setup1identities)
 
@@ -1240,7 +1240,7 @@ func TestExtendConflictingEpochEvents(t *testing.T) {
 		assert.NoError(t, err)
 		switch phase {
 		case flow.EpochPhaseSetup:
-			setup2identities, err := state.AtBlockID(block8.ID()).Epochs().Next().InitialIdentities()
+			setup2identities, err := state.AtBlockID(block8.ID()).Epochs().NextUnsafe().InitialIdentities()
 			assert.NoError(t, err)
 			require.Equal(t, nextEpochSetup2.Participants, setup2identities)
 		case flow.EpochPhaseFallback:
@@ -1353,11 +1353,11 @@ func TestExtendDuplicateEpochEvents(t *testing.T) {
 		require.NoError(t, err)
 
 		// should be able to query each epoch from the appropriate reference block
-		identities, err := state.AtBlockID(block7.ID()).Epochs().Next().InitialIdentities()
+		identities, err := state.AtBlockID(block7.ID()).Epochs().NextUnsafe().InitialIdentities()
 		assert.NoError(t, err)
 		require.Equal(t, nextEpochSetup.Participants, identities)
 
-		identities, err = state.AtBlockID(block8.ID()).Epochs().Next().InitialIdentities()
+		identities, err = state.AtBlockID(block8.ID()).Epochs().NextUnsafe().InitialIdentities()
 		assert.NoError(t, err)
 		require.Equal(t, nextEpochSetup.Participants, identities)
 	})

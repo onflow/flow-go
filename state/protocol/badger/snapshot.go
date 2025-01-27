@@ -402,8 +402,8 @@ func (q *EpochQuery) Current() protocol.Epoch {
 	return inmem.NewCommittedEpoch(setup, epochState.EpochExtensions(), commit)
 }
 
-// Next returns the next epoch, if it is available.
-func (q *EpochQuery) Next() protocol.TentativeEpoch {
+// NextUnsafe returns the next epoch, if it is has been setup but not yet committed.
+func (q *EpochQuery) NextUnsafe() protocol.TentativeEpoch {
 
 	epochState, err := q.snap.state.protocolState.EpochStateAtBlockID(q.snap.blockID)
 	if err != nil {
@@ -421,10 +421,9 @@ func (q *EpochQuery) Next() protocol.TentativeEpoch {
 	if phase == flow.EpochPhaseSetup {
 		return inmem.NewSetupEpoch(nextSetup, entry.NextEpoch.EpochExtensions)
 	}
-	// if we are in committed phase, return a CommittedEpoch
-	nextCommit := entry.NextEpochCommit
+	// if we are in committed phase, return an error
 	if phase == flow.EpochPhaseCommitted {
-		return inmem.NewCommittedEpoch(nextSetup, entry.NextEpoch.EpochExtensions, nextCommit)
+		return invalid.NewEpoch(protocol.ErrNextEpochAlreadyCommitted)
 	}
 	return invalid.NewEpochf("data corruption: unknown epoch phase implies malformed protocol state epoch data")
 }
@@ -444,9 +443,7 @@ func (q *EpochQuery) NextCommitted() protocol.Epoch {
 	if phase == flow.EpochPhaseSetup {
 		return invalid.NewEpoch(protocol.ErrNextEpochNotCommitted)
 	}
-	// if we are in setup phase, return a SetupEpoch
 	nextSetup := entry.NextEpochSetup
-	// if we are in committed phase, return a CommittedEpoch
 	nextCommit := entry.NextEpochCommit
 	if phase == flow.EpochPhaseCommitted {
 		return inmem.NewCommittedEpoch(nextSetup, entry.NextEpoch.EpochExtensions, nextCommit)

@@ -1231,7 +1231,7 @@ func TestSnapshot_EpochQuery(t *testing.T) {
 		t.Run("Next", func(t *testing.T) {
 			t.Run("epoch 1: before next epoch available", func(t *testing.T) {
 				for _, height := range epoch1.StakingRange() {
-					_, err := state.AtHeight(height).Epochs().Next().Counter()
+					_, err := state.AtHeight(height).Epochs().NextUnsafe().Counter()
 					assert.Error(t, err)
 					assert.True(t, errors.Is(err, protocol.ErrNextEpochNotSetup))
 				}
@@ -1239,7 +1239,7 @@ func TestSnapshot_EpochQuery(t *testing.T) {
 
 			t.Run("epoch 2: after next epoch available", func(t *testing.T) {
 				for _, height := range epoch1.SetupRange() {
-					counter, err := state.AtHeight(height).Epochs().Next().Counter()
+					counter, err := state.AtHeight(height).Epochs().NextUnsafe().Counter()
 					require.NoError(t, err)
 					assert.Equal(t, epoch2Counter, counter)
 				}

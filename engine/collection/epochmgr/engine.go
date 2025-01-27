@@ -343,7 +343,7 @@ func (e *Engine) handleEpochEvents(ctx irrecoverable.SignalerContext, ready comp
 				ctx.Throw(err)
 			}
 		case firstBlock := <-e.epochSetupPhaseStartedEvents:
-			nextEpoch := e.state.AtBlockID(firstBlock.ID()).Epochs().Next()
+			nextEpoch := e.state.AtBlockID(firstBlock.ID()).Epochs().NextUnsafe()
 			e.onEpochSetupPhaseStarted(ctx, nextEpoch)
 		case epochCounter := <-e.epochStopEvents:
 			err := e.stopEpochComponents(epochCounter)

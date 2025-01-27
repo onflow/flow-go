@@ -32,26 +32,6 @@ func (_m *EpochQuery) Current() protocol.Epoch {
 	return r0
 }
 
-// Next provides a mock function with given fields:
-func (_m *EpochQuery) Next() protocol.TentativeEpoch {
-	ret := _m.Called()
-
-	if len(ret) == 0 {
-		panic("no return value specified for Next")
-	}
-
-	var r0 protocol.TentativeEpoch
-	if rf, ok := ret.Get(0).(func() protocol.TentativeEpoch); ok {
-		r0 = rf()
-	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(protocol.TentativeEpoch)
-		}
-	}
-
-	return r0
-}
-
 // NextCommitted provides a mock function with given fields:
 func (_m *EpochQuery) NextCommitted() protocol.Epoch {
 	ret := _m.Called()
@@ -66,6 +46,26 @@ func (_m *EpochQuery) NextCommitted() protocol.Epoch {
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(protocol.Epoch)
+		}
+	}
+
+	return r0
+}
+
+// NextUnsafe provides a mock function with given fields:
+func (_m *EpochQuery) NextUnsafe() protocol.TentativeEpoch {
+	ret := _m.Called()
+
+	if len(ret) == 0 {
+		panic("no return value specified for NextUnsafe")
+	}
+
+	var r0 protocol.TentativeEpoch
+	if rf, ok := ret.Get(0).(func() protocol.TentativeEpoch); ok {
+		r0 = rf()
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(protocol.TentativeEpoch)
 		}
 	}
 

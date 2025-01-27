@@ -338,7 +338,7 @@ func (e *ReactorEngine) handleEpochCommittedPhaseStarted(currentEpochCounter uin
 // TODO document error returns
 func (e *ReactorEngine) getDKGInfo(firstBlockID flow.Identifier) (*dkgInfo, error) {
 	currEpoch := e.State.AtBlockID(firstBlockID).Epochs().Current()
-	nextEpoch := e.State.AtBlockID(firstBlockID).Epochs().Next()
+	nextEpoch := e.State.AtBlockID(firstBlockID).Epochs().NextUnsafe()
 
 	identities, err := nextEpoch.InitialIdentities()
 	if err != nil {

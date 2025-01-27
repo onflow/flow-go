@@ -12,12 +12,15 @@ type EpochQuery interface {
 	// have a current epoch.
 	Current() Epoch
 
-	// Next returns the next epoch as of this snapshot. Valid snapshots must
+	// NextUnsafe should only be used by components that actively advance the
+	// epoch from flow.EpochPhaseSetup to flow.EpochPhaseCommitted.
+	// NextUnsafe returns the next epoch as of this snapshot. Valid snapshots must
 	// have a next epoch available after the transition to epoch setup phase.
 	//
 	// Returns invalid.Epoch with ErrNextEpochNotSetup in the case that this method
-	// is queried w.r.t. a snapshot within the flow.EpochPhaseStaking phase.
-	Next() TentativeEpoch
+	// is queried w.r.t. a snapshot within the flow.EpochPhaseStaking phase, or
+	// ErrNextEpochAlreadyCommitted during the flow.EpochPhaseCommitted phase.
+	NextUnsafe() TentativeEpoch
 
 	// NextCommitted returns the next epoch as of this snapshot, only if it has
 	// been committed already (after flow.EpochPhaseCommitted)
