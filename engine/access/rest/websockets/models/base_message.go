@@ -25,3 +25,19 @@ type ErrorMessage struct {
 	Code    int    `json:"code"` // Code is an error code that categorizes an error
 	Message string `json:"message"`
 }
+
+// BaseDataProvidersResponse represents a base structure for responses from subscriptions.
+type BaseDataProvidersResponse struct {
+	SubscriptionID string      `json:"subscription_id"` // Unique subscriptionID
+	Topic          string      `json:"topic"`           // Topic of the subscription
+	Payload        interface{} `json:"payload"`         // Payload that's being returned within a subscription.
+}
+
+// Build creates BaseDataProvidersResponse instance for consistent responses of the data providers.
+func (b *BaseDataProvidersResponse) Build(subscriptionID string, topic string, payload interface{}) {
+	*b = BaseDataProvidersResponse{
+		SubscriptionID: subscriptionID,
+		Topic:          topic,
+		Payload:        payload,
+	}
+}

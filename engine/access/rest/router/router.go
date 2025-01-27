@@ -70,6 +70,9 @@ func (b *RouterBuilder) AddRestRoutes(
 }
 
 // AddLegacyWebsocketsRoutes adds WebSocket routes to the router.
+//
+// Deprecated: Use AddWebsocketsRoute instead, which allows managing multiple streams with
+// a single endpoint.
 func (b *RouterBuilder) AddLegacyWebsocketsRoutes(
 	stateStreamApi state_stream.API,
 	chain flow.Chain,

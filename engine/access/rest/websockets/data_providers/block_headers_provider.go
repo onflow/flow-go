@@ -49,6 +49,7 @@ func NewBlockHeadersDataProvider(
 	p.baseDataProvider = newBaseDataProvider(
 		subscriptionID,
 		topic,
+		arguments,
 		cancel,
 		send,
 		p.createSubscription(subCtx, blockArgs), // Set up a subscription to block headers based on arguments.
@@ -67,9 +68,14 @@ func (p *BlockHeadersDataProvider) Run() error {
 			var header commonmodels.BlockHeader
 			header.Build(h)
 
-			return &models.BlockHeaderMessageResponse{
-				Header: &header,
-			}, nil
+			var response models.BaseDataProvidersResponse
+			response.Build(
+				p.ID(),
+				p.Topic(),
+				&header,
+			)
+
+			return &response, nil
 		}),
 	)
 }

@@ -1,6 +1,6 @@
 module github.com/onflow/flow-go/insecure
 
-go 1.22
+go 1.23
 
 require (
 	github.com/btcsuite/btcd/chaincfg/chainhash v1.0.2

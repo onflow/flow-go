@@ -164,6 +164,7 @@ func (s *DataProviderFactorySuite) TestSupportedTopics() {
 			s.Require().NotNil(provider, "Expected provider for topic %s", test.topic)
 			s.Require().NoError(err, "Expected no error for topic %s", test.topic)
 			s.Require().Equal(test.topic, provider.Topic())
+			s.Require().Equal(test.arguments, provider.Arguments())
 
 			test.assertExpectations()
 		})

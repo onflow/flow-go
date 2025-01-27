@@ -100,3 +100,14 @@ func testHappyPath(
 		})
 	}
 }
+
+// extractPayload extracts the BaseDataProvidersResponse and its typed Payload.
+func extractPayload[T any](t *testing.T, v interface{}) (*models.BaseDataProvidersResponse, T) {
+	response, ok := v.(*models.BaseDataProvidersResponse)
+	require.True(t, ok, "Expected *models.BaseDataProvidersResponse, got %T", v)
+
+	payload, ok := response.Payload.(T)
+	require.True(t, ok, "Unexpected response payload type: %T", response.Payload)
+
+	return response, payload
+}

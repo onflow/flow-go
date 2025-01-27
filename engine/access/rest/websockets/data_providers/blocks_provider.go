@@ -63,6 +63,7 @@ func NewBlocksDataProvider(
 	p.baseDataProvider = newBaseDataProvider(
 		subscriptionID,
 		topic,
+		arguments,
 		cancel,
 		send,
 		p.createSubscription(subCtx, p.arguments), // Set up a subscription to blocks based on arguments.
@@ -86,9 +87,10 @@ func (p *BlocksDataProvider) Run() error {
 				return nil, fmt.Errorf("failed to build block response :%w", err)
 			}
 
-			return &models.BlockMessageResponse{
-				Block: &block,
-			}, nil
+			var response models.BaseDataProvidersResponse
+			response.Build(p.ID(), p.Topic(), &block)
+
+			return &response, nil
 		}),
 	)
 }

@@ -89,7 +89,7 @@ func (s *TransactionStatusesProviderSuite) TestTransactionStatusesDataProvider_H
 }
 
 func (s *TransactionStatusesProviderSuite) subscribeTransactionStatusesDataProviderTestCases(backendResponses []*access.TransactionResult) []testType {
-	expectedResponses := s.expectedTransactionStatusesResponses(backendResponses)
+	expectedResponses := s.expectedTransactionStatusesResponses(backendResponses, TransactionStatusesTopic)
 
 	return []testType{
 		{
@@ -113,26 +113,52 @@ func (s *TransactionStatusesProviderSuite) requireTransactionStatuses(
 	actual interface{},
 	expected interface{},
 ) {
-	expectedTxStatusesResponse, ok := expected.(*models.TransactionStatusesResponse)
-	require.True(s.T(), ok, "expected *models.TransactionStatusesResponse, got %T", expected)
+	expectedResponse, expectedResponsePayload := extractPayload[*models.TransactionStatusesResponse](s.T(), expected)
+	actualResponse, actualResponsePayload := extractPayload[*models.TransactionStatusesResponse](s.T(), actual)
 
-	actualResponse, ok := actual.(*models.TransactionStatusesResponse)
-	require.True(s.T(), ok, "expected *models.TransactionStatusesResponse, got %T", actual)
+	require.Equal(s.T(), expectedResponse.Topic, actualResponse.Topic)
+	require.Equal(s.T(), expectedResponsePayload.TransactionResult.BlockId, actualResponsePayload.TransactionResult.BlockId)
+}
 
-	require.Equal(s.T(), expectedTxStatusesResponse.TransactionResult.BlockId, actualResponse.TransactionResult.BlockId)
+func backendTransactionStatusesResponse(block flow.Block) []*access.TransactionResult {
+	id := unittest.IdentifierFixture()
+	cid := unittest.IdentifierFixture()
+	txr := access.TransactionResult{
+		Status:     flow.TransactionStatusSealed,
+		StatusCode: 10,
+		Events: []flow.Event{
+			unittest.EventFixture(flow.EventAccountCreated, 1, 0, id, 200),
+		},
+		ErrorMessage: "",
+		BlockID:      block.ID(),
+		CollectionID: cid,
+		BlockHeight:  block.Header.Height,
+	}
+
+	var expectedTxResultsResponses []*access.TransactionResult
+
+	for i := 0; i < 2; i++ {
+		expectedTxResultsResponses = append(expectedTxResultsResponses, &txr)
+	}
+
+	return expectedTxResultsResponses
 }
 
 // expectedTransactionStatusesResponses creates the expected responses for the provided backend responses.
 func (s *TransactionStatusesProviderSuite) expectedTransactionStatusesResponses(
 	backendResponses []*access.TransactionResult,
+	topic string,
 ) []interface{} {
 	expectedResponses := make([]interface{}, len(backendResponses))
 
 	for i, resp := range backendResponses {
-		var expectedResponse models.TransactionStatusesResponse
-		expectedResponse.Build(s.linkGenerator, resp, uint64(i))
+		var expectedResponsePayload models.TransactionStatusesResponse
+		expectedResponsePayload.Build(s.linkGenerator, resp, uint64(i))
 
-		expectedResponses[i] = &expectedResponse
+		expectedResponses[i] = &models.BaseDataProvidersResponse{
+			Topic:   topic,
+			Payload: &expectedResponsePayload,
+		}
 	}
 
 	return expectedResponses
@@ -226,7 +252,6 @@ func (s *TransactionStatusesProviderSuite) TestMessageIndexTransactionStatusesPr
 		s.linkGenerator,
 		topic,
 		arguments,
-
 		send,
 	)
 
@@ -262,9 +287,10 @@ func (s *TransactionStatusesProviderSuite) TestMessageIndexTransactionStatusesPr
 	var responses []*models.TransactionStatusesResponse
 	for i := 0; i < txStatusesCount; i++ {
 		res := <-send
-		txStatusesRes, ok := res.(*models.TransactionStatusesResponse)
-		s.Require().True(ok, "Expected *models.TransactionStatusesResponse, got %T", res)
-		responses = append(responses, txStatusesRes)
+
+		_, txStatusesResData := extractPayload[*models.TransactionStatusesResponse](s.T(), res)
+
+		responses = append(responses, txStatusesResData)
 	}
 
 	// Wait for the provider goroutine to finish
@@ -279,28 +305,4 @@ func (s *TransactionStatusesProviderSuite) TestMessageIndexTransactionStatusesPr
 		currentIndex := responses[i].MessageIndex
 		s.Require().Equal(prevIndex+1, currentIndex, "Expected MessageIndex to increment by 1")
 	}
-}
-
-func backendTransactionStatusesResponse(block flow.Block) []*access.TransactionResult {
-	id := unittest.IdentifierFixture()
-	cid := unittest.IdentifierFixture()
-	txr := access.TransactionResult{
-		Status:     flow.TransactionStatusSealed,
-		StatusCode: 10,
-		Events: []flow.Event{
-			unittest.EventFixture(flow.EventAccountCreated, 1, 0, id, 200),
-		},
-		ErrorMessage: "",
-		BlockID:      block.ID(),
-		CollectionID: cid,
-		BlockHeight:  block.Header.Height,
-	}
-
-	var expectedTxResultsResponses []*access.TransactionResult
-
-	for i := 0; i < 2; i++ {
-		expectedTxResultsResponses = append(expectedTxResultsResponses, &txr)
-	}
-
-	return expectedTxResultsResponses
 }
