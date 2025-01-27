@@ -40,7 +40,7 @@ type epochTiming struct {
 }
 
 // newEpochTiming queries the timing information from the given `epoch` and returns it as a new `epochTiming` instance.
-func newEpochTiming(epoch protocol.Epoch) (*epochTiming, error) {
+func newEpochTiming(epoch protocol.CommittedEpoch) (*epochTiming, error) {
 	firstView, err := epoch.FirstView()
 	if err != nil {
 		return nil, fmt.Errorf("could not retrieve epoch's first view: %w", err)

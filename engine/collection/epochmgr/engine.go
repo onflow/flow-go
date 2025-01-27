@@ -288,7 +288,7 @@ func (e *Engine) Done() <-chan struct{} {
 // the given epoch, using the configured factory.
 // Error returns:
 // - ErrNotAuthorizedForEpoch if this node is not authorized in the epoch.
-func (e *Engine) createEpochComponents(epoch protocol.Epoch) (*EpochComponents, error) {
+func (e *Engine) createEpochComponents(epoch protocol.CommittedEpoch) (*EpochComponents, error) {
 	counter, err := epoch.Counter()
 	if err != nil {
 		return nil, fmt.Errorf("could not get epoch counter: %w", err)

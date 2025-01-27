@@ -142,7 +142,7 @@ func extractResetEpochArgs(snapshot *inmem.Snapshot) []cadence.Value {
 //	          ^     ^     ^-dkgPhase2FinalView
 //	          |     `-dkgPhase1FinalView
 //	          `-stakingEndView
-func getStakingAuctionEndView(epoch protocol.Epoch) (uint64, error) {
+func getStakingAuctionEndView(epoch protocol.CommittedEpoch) (uint64, error) {
 	dkgPhase1FinalView, err := epoch.DKGPhase1FinalView()
 	if err != nil {
 		return 0, err

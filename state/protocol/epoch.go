@@ -10,7 +10,7 @@ type EpochQuery interface {
 
 	// Current returns the current epoch as of this snapshot. All valid snapshots
 	// have a current epoch.
-	Current() Epoch
+	Current() CommittedEpoch
 
 	// NextUnsafe should only be used by components that actively advance the
 	// epoch from flow.EpochPhaseSetup to flow.EpochPhaseCommitted.
@@ -27,7 +27,7 @@ type EpochQuery interface {
 	//
 	// Returns invalid.Epoch with ErrNextEpochNotCommitted in the case that
 	// the current phase is flow.EpochPhaseStaking or flow.EpochPhaseSetup.
-	NextCommitted() Epoch
+	NextCommitted() CommittedEpoch
 
 	// Previous returns the previous epoch as of this snapshot. Valid snapshots
 	// must have a previous epoch for all epochs except that immediately after
@@ -36,10 +36,10 @@ type EpochQuery interface {
 	//
 	// Returns invalid.Epoch with ErrNoPreviousEpoch in the case that this method
 	// is queried w.r.t. a snapshot from the first epoch after the root block.
-	Previous() Epoch
+	Previous() CommittedEpoch
 }
 
-// Epoch contains the information specific to a certain Epoch (defined
+// CommittedEpoch contains the information specific to a certain Epoch (defined
 // by the epoch Counter). Note that the Epoch preparation can differ along
 // different forks, since the emission of service events is fork-dependent.
 // Therefore, an epoch exists RELATIVE to the snapshot from which it was
@@ -48,7 +48,7 @@ type EpochQuery interface {
 // CAUTION: Clients must ensure to query epochs only for finalized blocks to
 // ensure they query finalized epoch information.
 //
-// An Epoch instance is constant and reports the identical information
+// A CommittedEpoch instance is constant and reports the identical information
 // even if progress is made later and more information becomes available in
 // subsequent blocks.
 //
@@ -66,7 +66,7 @@ type EpochQuery interface {
 //  2. The error caching pattern encourages potentially dangerous snapshot query patterns
 //
 // See https://github.com/dapperlabs/flow-go/issues/6368 for details and proposal
-type Epoch interface {
+type CommittedEpoch interface {
 
 	// Counter returns the Epoch's counter.
 	// Error returns:

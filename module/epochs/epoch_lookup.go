@@ -200,7 +200,7 @@ func NewEpochLookup(state protocol.State) (*EpochLookup, error) {
 
 // cacheEpoch caches the given epoch's view range. Must only be called with committed epochs.
 // No errors are expected during normal operation.
-func (lookup *EpochLookup) cacheEpoch(epoch protocol.Epoch) error {
+func (lookup *EpochLookup) cacheEpoch(epoch protocol.CommittedEpoch) error {
 	counter, err := epoch.Counter()
 	if err != nil {
 		return err

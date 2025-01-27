@@ -382,7 +382,7 @@ type EpochQuery struct {
 }
 
 // Current returns the current epoch.
-func (q *EpochQuery) Current() protocol.Epoch {
+func (q *EpochQuery) Current() protocol.CommittedEpoch {
 	// all errors returned from storage reads here are unexpected, because all
 	// snapshots reside within a current epoch, which must be queryable
 	epochState, err := q.snap.state.protocolState.EpochStateAtBlockID(q.snap.blockID)
@@ -428,7 +428,7 @@ func (q *EpochQuery) NextUnsafe() protocol.TentativeEpoch {
 	return invalid.NewEpochf("data corruption: unknown epoch phase implies malformed protocol state epoch data")
 }
 
-func (q *EpochQuery) NextCommitted() protocol.Epoch {
+func (q *EpochQuery) NextCommitted() protocol.CommittedEpoch {
 	epochState, err := q.snap.state.protocolState.EpochStateAtBlockID(q.snap.blockID)
 	if err != nil {
 		return invalid.NewEpochf("could not get protocol state snapshot at block %x: %w", q.snap.blockID, err)
@@ -454,7 +454,7 @@ func (q *EpochQuery) NextCommitted() protocol.Epoch {
 // Previous returns the previous epoch. During the first epoch after the root
 // block, this returns a sentinel error (since there is no previous epoch).
 // For all other epochs, returns the previous epoch.
-func (q *EpochQuery) Previous() protocol.Epoch {
+func (q *EpochQuery) Previous() protocol.CommittedEpoch {
 
 	epochState, err := q.snap.state.protocolState.EpochStateAtBlockID(q.snap.blockID)
 	if err != nil {

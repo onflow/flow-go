@@ -110,25 +110,35 @@ type Suite struct {
 func (suite *Suite) MockFactoryCreate(arg any) {
 	suite.factory.On("Create", arg).
 		Run(func(args mock.Arguments) {
-			epoch, ok := args.Get(0).(realprotocol.Epoch)
+			epoch, ok := args.Get(0).(realprotocol.CommittedEpoch)
 			suite.Require().Truef(ok, "invalid type %T", args.Get(0))
 			counter, err := epoch.Counter()
 			suite.Require().Nil(err)
 			suite.components[counter] = newMockComponents(suite.T())
 		}).
 		Return(
-			func(epoch realprotocol.Epoch) realcluster.State { return suite.ComponentsForEpoch(epoch).state },
-			func(epoch realprotocol.Epoch) component.Component { return suite.ComponentsForEpoch(epoch).prop },
-			func(epoch realprotocol.Epoch) realmodule.ReadyDoneAware { return suite.ComponentsForEpoch(epoch).sync },
-			func(epoch realprotocol.Epoch) realmodule.HotStuff { return suite.ComponentsForEpoch(epoch).hotstuff },
-			func(epoch realprotocol.Epoch) hotstuff.VoteAggregator {
+			func(epoch realprotocol.CommittedEpoch) realcluster.State {
+				return suite.ComponentsForEpoch(epoch).state
+			},
+			func(epoch realprotocol.CommittedEpoch) component.Component {
+				return suite.ComponentsForEpoch(epoch).prop
+			},
+			func(epoch realprotocol.CommittedEpoch) realmodule.ReadyDoneAware {
+				return suite.ComponentsForEpoch(epoch).sync
+			},
+			func(epoch realprotocol.CommittedEpoch) realmodule.HotStuff {
+				return suite.ComponentsForEpoch(epoch).hotstuff
+			},
+			func(epoch realprotocol.CommittedEpoch) hotstuff.VoteAggregator {
 				return suite.ComponentsForEpoch(epoch).voteAggregator
 			},
-			func(epoch realprotocol.Epoch) hotstuff.TimeoutAggregator {
+			func(epoch realprotocol.CommittedEpoch) hotstuff.TimeoutAggregator {
 				return suite.ComponentsForEpoch(epoch).timeoutAggregator
 			},
-			func(epoch realprotocol.Epoch) component.Component { return suite.ComponentsForEpoch(epoch).messageHub },
-			func(epoch realprotocol.Epoch) error { return nil },
+			func(epoch realprotocol.CommittedEpoch) component.Component {
+				return suite.ComponentsForEpoch(epoch).messageHub
+			},
+			func(epoch realprotocol.CommittedEpoch) error { return nil },
 		).Maybe()
 }
 
@@ -239,7 +249,7 @@ func (suite *Suite) AssertEpochStopped(counter uint64) {
 	components.sync.AssertCalled(suite.T(), "Done")
 }
 
-func (suite *Suite) ComponentsForEpoch(epoch realprotocol.Epoch) *mockComponents {
+func (suite *Suite) ComponentsForEpoch(epoch realprotocol.CommittedEpoch) *mockComponents {
 	counter, err := epoch.Counter()
 	suite.Require().Nil(err, "cannot get counter")
 	components, ok := suite.components[counter]
@@ -252,12 +262,12 @@ func (suite *Suite) ComponentsForEpoch(epoch realprotocol.Epoch) *mockComponents
 func (suite *Suite) MockAsUnauthorizedNode(forEpoch uint64) {
 
 	// mock as unauthorized for given epoch only
-	unauthorizedMatcher := func(epoch realprotocol.Epoch) bool {
+	unauthorizedMatcher := func(epoch realprotocol.CommittedEpoch) bool {
 		counter, err := epoch.Counter()
 		require.NoError(suite.T(), err)
 		return counter == forEpoch
 	}
-	authorizedMatcher := func(epoch realprotocol.Epoch) bool { return !unauthorizedMatcher(epoch) }
+	authorizedMatcher := func(epoch realprotocol.CommittedEpoch) bool { return !unauthorizedMatcher(epoch) }
 
 	suite.factory = epochmgr.NewEpochComponentsFactory(suite.T())
 	suite.factory.

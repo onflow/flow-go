@@ -160,7 +160,7 @@ type epochInfo struct {
 }
 
 // buildEpochLookupList is a helper function which builds an auxiliary structure of epochs sorted by counter
-func buildEpochLookupList(epochs ...protocol.Epoch) []epochInfo {
+func buildEpochLookupList(epochs ...protocol.CommittedEpoch) []epochInfo {
 	infos := make([]epochInfo, 0)
 	for _, epoch := range epochs {
 		finalView, err := epoch.FinalView()

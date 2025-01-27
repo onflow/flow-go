@@ -10,7 +10,7 @@ import (
 )
 
 // SelectionForConsensusFromEpoch is a ...
-func SelectionForConsensusFromEpoch(epoch protocol.Epoch) (*LeaderSelection, error) {
+func SelectionForConsensusFromEpoch(epoch protocol.CommittedEpoch) (*LeaderSelection, error) {
 
 	identities, err := epoch.InitialIdentities()
 	if err != nil {
