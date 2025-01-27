@@ -8,6 +8,9 @@ import (
 	"github.com/onflow/flow-core-contracts/lib/go/contracts"
 	"github.com/onflow/flow-core-contracts/lib/go/templates"
 
+	usdc "github.com/onflow/bridged-usdc/lib/go/contracts"
+	storefront "github.com/onflow/nft-storefront/lib/go/contracts"
+
 	"github.com/onflow/flow-go/fvm/blueprints"
 	"github.com/onflow/flow-go/fvm/environment"
 	"github.com/onflow/flow-go/fvm/errors"
@@ -370,6 +373,12 @@ func (b *bootstrapExecutor) Execute() error {
 	b.deployMetadataViews(fungibleToken, nonFungibleToken, &env)
 	b.deployFungibleTokenSwitchboard(fungibleToken, &env)
 
+	// deploys the USDCFlow smart contract
+	b.deployUSDCFlow(fungibleToken, &env)
+
+	// deploys the NFTStorefrontV2 contract
+	b.deployNFTStorefrontV2(nonFungibleToken, &env)
+
 	flowToken := b.deployFlowToken(service, &env)
 	err = expectAccounts(systemcontracts.FlowTokenAccountIndex)
 	if err != nil {
@@ -729,6 +738,45 @@ func (b *bootstrapExecutor) deployServiceAccount(deployTo flow.Address, env *tem
 			0),
 	)
 	panicOnMetaInvokeErrf("failed to deploy service account contract: %s", txError, err)
+}
+
+func (b *bootstrapExecutor) deployNFTStorefrontV2(deployTo flow.Address, env *templates.Environment) {
+
+	contract := storefront.NFTStorefrontV2(
+		env.FungibleTokenAddress,
+		env.NonFungibleTokenAddress)
+
+	txError, err := b.invokeMetaTransaction(
+		b.ctx,
+		Transaction(
+			blueprints.DeployContractTransaction(
+				deployTo,
+				contract,
+				"NFTStorefrontV2"),
+			0),
+	)
+	panicOnMetaInvokeErrf("failed to deploy NFTStorefrontV2 contract: %s", txError, err)
+}
+
+func (b *bootstrapExecutor) deployUSDCFlow(deployTo flow.Address, env *templates.Environment) {
+
+	contract := usdc.USDCFlowBasic(
+		env.FungibleTokenAddress,
+		env.MetadataViewsAddress,
+		env.FungibleTokenMetadataViewsAddress,
+		env.ViewResolverAddress,
+		env.BurnerAddress)
+
+	txError, err := b.invokeMetaTransaction(
+		b.ctx,
+		Transaction(
+			blueprints.DeployContractTransaction(
+				deployTo,
+				contract,
+				"USDCFlow"),
+			0),
+	)
+	panicOnMetaInvokeErrf("failed to deploy USDCFlow contract: %s", txError, err)
 }
 
 func (b *bootstrapExecutor) mintInitialTokens(
