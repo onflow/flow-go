@@ -258,7 +258,7 @@ func (s *Service) AddExposedPorts(containerPorts ...string) {
 // Build ...
 type Build struct {
 	Context    string
-	Host       string
+	Network    string
 	Dockerfile string
 	Args       map[string]string
 	Target     string
