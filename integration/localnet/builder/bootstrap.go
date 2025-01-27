@@ -258,6 +258,7 @@ func (s *Service) AddExposedPorts(containerPorts ...string) {
 // Build ...
 type Build struct {
 	Context    string
+	Host       string
 	Dockerfile string
 	Args       map[string]string
 	Target     string
@@ -535,6 +536,7 @@ func defaultService(name, role, dataDir, profilerDir string, i int) Service {
 		// only specify build config for first service of each role
 		service.Build = Build{
 			Context:    "../../",
+			Network:    "host",
 			Dockerfile: "cmd/Dockerfile",
 			Args: map[string]string{
 				"TARGET":  fmt.Sprintf("./cmd/%s", role),
