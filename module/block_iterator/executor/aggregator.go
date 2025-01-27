@@ -11,7 +11,7 @@ type AggregatedExecutor struct {
 
 var _ IterationExecutor = (*AggregatedExecutor)(nil)
 
-func NewAggregatedExecutor(executors []IterationExecutor) IterationExecutor {
+func NewAggregatedExecutor(executors []IterationExecutor) *AggregatedExecutor {
 	return &AggregatedExecutor{
 		executors: executors,
 	}
