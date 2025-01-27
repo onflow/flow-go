@@ -47,8 +47,8 @@ require (
 	github.com/multiformats/go-multiaddr v0.12.2
 	github.com/multiformats/go-multiaddr-dns v0.3.1
 	github.com/multiformats/go-multihash v0.2.3
-	github.com/onflow/atree v0.8.0-rc.6
-	github.com/onflow/cadence v1.0.3
+	github.com/onflow/atree v0.9.0
+	github.com/onflow/cadence v1.0.4
 	github.com/onflow/crypto v0.25.2
 	github.com/onflow/flow v0.3.4
 	github.com/onflow/flow-core-contracts/lib/go/contracts v1.3.1
@@ -334,7 +334,3 @@ replace github.com/ipfs/boxo => github.com/onflow/boxo v0.0.0-20240201202436-f24
 
 // TODO: remove it when https://github.com/ipfs/go-ds-pebble/pull/36 merged
 replace github.com/ipfs/go-ds-pebble v0.3.1 => github.com/onflow/go-ds-pebble v0.0.0-20240731130313-f186539f382c
-
-replace github.com/onflow/cadence => github.com/onflow/cadence-internal v1.0.4-rc.2
-
-replace github.com/onflow/atree => github.com/onflow/atree-internal v0.8.2-0.20250117221137-acdb0e04ab01
