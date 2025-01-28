@@ -38,6 +38,8 @@ import (
 	badgerState "github.com/onflow/flow-go/state/protocol/badger"
 	"github.com/onflow/flow-go/state/protocol/blocktimer"
 	"github.com/onflow/flow-go/storage/badger"
+	"github.com/onflow/flow-go/storage/operation/badgerimpl"
+	"github.com/onflow/flow-go/storage/store"
 )
 
 type VerificationConfig struct {
@@ -92,7 +94,7 @@ func (v *VerificationNodeBuilder) LoadComponentsAndModules() {
 		chunkRequests        *stdmap.ChunkRequests    // used in requester engine
 		processedChunkIndex  *badger.ConsumerProgress // used in chunk consumer
 		processedBlockHeight *badger.ConsumerProgress // used in block consumer
-		chunkQueue           *badger.ChunksQueue      // used in chunk consumer
+		chunkQueue           *store.ChunksQueue       // used in chunk consumer
 
 		syncCore            *chainsync.Core   // used in follower engine
 		assignerEngine      *assigner.Engine  // the assigner engine
@@ -163,7 +165,7 @@ func (v *VerificationNodeBuilder) LoadComponentsAndModules() {
 			return nil
 		}).
 		Module("chunks queue", func(node *NodeConfig) error {
-			chunkQueue = badger.NewChunkQueue(node.DB)
+			chunkQueue = store.NewChunkQueue(badgerimpl.ToDB(node.DB))
 			ok, err := chunkQueue.Init(chunkconsumer.DefaultJobIndex)
 			if err != nil {
 				return fmt.Errorf("could not initialize default index in chunks queue: %w", err)
