@@ -688,7 +688,10 @@ func main() {
 			return util.MergeReadyDone(voteAggregator, timeoutAggregator), nil
 		}).
 		Component("block rate cruise control", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
-			livenessData := hotstuffModules.Persist.GetLivenessData()
+			livenessData, err := hotstuffModules.Persist.GetLivenessData()
+			if err != nil {
+				return nil, fmt.Errorf("could not load liveness data: %w", err)
+			}
 			ctl, err := cruisectl.NewBlockTimeController(node.Logger, metrics.NewCruiseCtlMetrics(), cruiseCtlConfig, node.State, livenessData.CurrentView)
 			if err != nil {
 				return nil, err

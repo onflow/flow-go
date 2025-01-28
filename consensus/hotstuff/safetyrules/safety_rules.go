@@ -42,7 +42,10 @@ func New(
 	committee hotstuff.DynamicCommittee,
 ) (*SafetyRules, error) {
 	// get the last stored safety data
-	safetyData := persist.GetSafetyData()
+	safetyData, err := persist.GetSafetyData()
+	if err != nil {
+		return nil, fmt.Errorf("could not load safety data: %w", err)
+	}
 	return &SafetyRules{
 		signer:     signer,
 		persist:    persist,
