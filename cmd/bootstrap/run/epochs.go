@@ -30,8 +30,8 @@ func GenerateRecoverEpochTxArgs(log zerolog.Logger,
 	numViewsInEpoch uint64,
 	recoveryEpochTargetDuration uint64,
 	unsafeAllowOverWrite bool,
-	excludeNodeIDs []flow.Identifier,
-	includeNodeIDs []flow.Identifier,
+	excludeNodeIDs flow.IdentifierList, // applied as set-minus operation
+	includeNodeIDs flow.IdentifierList, // applied as set-union operation
 	snapshot *inmem.Snapshot,
 ) ([]cadence.Value, error) {
 	log.Info().Msg("collecting internal node network and staking keys")
@@ -79,8 +79,8 @@ func GenerateRecoverTxArgsWithDKG(log zerolog.Logger,
 	dkgIndexMap flow.DKGIndexMap,
 	dkgParticipantKeys []crypto.PublicKey,
 	dkgGroupKey crypto.PublicKey,
-	excludeNodeIDs []flow.Identifier,
-	includeNodeIDs []flow.Identifier,
+	excludeNodeIDs flow.IdentifierList, // applied as set-minus operation
+	includeNodeIDs flow.IdentifierList, // applied as set-union operation
 	snapshot *inmem.Snapshot,
 ) ([]cadence.Value, error) {
 	epoch := snapshot.Epochs().Current()
@@ -108,9 +108,11 @@ func GenerateRecoverTxArgsWithDKG(log zerolog.Logger,
 		filter.HasWeightGreaterThanZero[flow.Identity],
 		filter.Not(filter.HasNodeID[flow.Identity](excludeNodeIDs...))))
 	if err != nil {
-		return nil, fmt.Errorf("failed to get  valid protocol participants from snapshot: %w", err)
+		return nil, fmt.Errorf("failed to get valid protocol participants from snapshot: %w", err)
 	}
-	// We need canonical ordering here; sanity check to enforce this:
+	// We expect canonical ordering here, because the Identities are originating from a protocol state snapshot, 
+	// which by protocol convention maintains the Identities in canonical order. Removing elements from a 
+	// canonically-ordered list, still retains canonical ordering. Sanity check to enforce this:
 	if !eligibleEpochIdentities.Sorted(flow.Canonical[flow.Identity]) {
 		return nil, fmt.Errorf("identies from snapshot not in canonical order")
 	}
@@ -138,7 +140,7 @@ func GenerateRecoverTxArgsWithDKG(log zerolog.Logger,
 	internalNodesMap := make(map[flow.Identifier]struct{})
 	for _, node := range internalNodes {
 		if !eligibleEpochIdentities.Exists(node.Identity()) {
-			log.Warn().Msgf("this node (ID %s) is not part of the network according to the bootstrapping data; we might not get any data", node.NodeID)
+			log.Warn().Msgf("node with ID %s is not part of the network according to the bootstrapping data; we might not get any data", node.NodeID)
 		}
 		internalNodesMap[node.NodeID] = struct{}{}
 	}
@@ -207,7 +209,10 @@ func GenerateRecoverTxArgsWithDKG(log zerolog.Logger,
 		}
 		dkgPubKeys = append(dkgPubKeys, dkgPubKeyCdc)
 	}
-	// fill node IDs
+	// Compile list of NodeIDs that are allowed to participate in the recovery epoch:
+	//   (i) eligible node IDs from the Epoch that the input `snapshot` is from 
+	//  (ii) node IDs (manually) specified in `includeNodeIDs`
+	// We use the set union to combine (i) and (ii). Important: the resulting list of node IDs must be canonically ordered! 
 	nodeIds := make([]cadence.Value, 0)
 	for _, id := range append(eligibleEpochIdentities.NodeIDs(), includeNodeIDs...).Sort(flow.IdentifierCanonical) {
 		nodeIdCdc, err := cadence.NewString(id.String())

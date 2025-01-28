@@ -117,14 +117,14 @@ func (il IdentifierList) Sort(less IdentifierOrder) IdentifierList {
 	return dup
 }
 
-// IdentifierListFromHex builds an IdentifierList by parsing a list of hex strings.
+// IdentifierListFromHex builds an [IdentifierList] by parsing a list of hex strings.
 // It returns an error when a first string which is not a valid hex string or invalid identifier is encountered.
 func IdentifierListFromHex(ids []string) (IdentifierList, error) {
 	idList := make(IdentifierList, len(ids))
 	for i, idStr := range ids {
 		id, err := HexStringToIdentifier(idStr)
 		if err != nil {
-			return nil, fmt.Errorf("failed to convert node id string %s to Flow Identifier: %w", id, err)
+			return nil, fmt.Errorf("failed to convert string representation %s to Flow Identifier: %w", id, err)
 		}
 		idList[i] = id
 	}
