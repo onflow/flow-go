@@ -38,8 +38,6 @@ import (
 	badgerState "github.com/onflow/flow-go/state/protocol/badger"
 	"github.com/onflow/flow-go/state/protocol/blocktimer"
 	"github.com/onflow/flow-go/storage/badger"
-	"github.com/onflow/flow-go/storage/operation/badgerimpl"
-	"github.com/onflow/flow-go/storage/store"
 )
 
 type VerificationConfig struct {
@@ -203,7 +201,7 @@ func (v *VerificationNodeBuilder) LoadComponentsAndModules() {
 			vmCtx := fvm.NewContext(fvmOptions...)
 
 			chunkVerifier := chunks.NewChunkVerifier(vm, vmCtx, node.Logger)
-			approvalStorage := store.NewResultApprovals(node.Metrics.Cache, badgerimpl.ToDB(node.DB))
+			approvalStorage := badger.NewResultApprovals(node.Metrics.Cache, node.DB)
 			verifierEng, err = verifier.New(
 				node.Logger,
 				collector,
