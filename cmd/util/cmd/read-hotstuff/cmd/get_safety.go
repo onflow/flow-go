@@ -33,6 +33,11 @@ func runGetSafetyData(*cobra.Command, []string) {
 
 	log.Info().Msg("getting hotstuff safety data")
 
+	livenessData, err := reader.GetSafetyData()
+	if err != nil {
+		log.Fatal().Err(err).Msg("could not get hotstuff safety data")
+	}
+
 	log.Info().Msgf("successfully get hotstuff safety data")
-	common.PrettyPrint(reader.GetSafetyData())
+	common.PrettyPrint(livenessData)
 }

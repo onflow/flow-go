@@ -32,6 +32,11 @@ func runGetLivenessData(*cobra.Command, []string) {
 
 	log.Info().Msg("getting hotstuff liveness data")
 
+	livenessData, err := reader.GetLivenessData()
+	if err != nil {
+		log.Fatal().Err(err).Msg("could not get hotstuff liveness data")
+	}
+
 	log.Info().Msgf("successfully get hotstuff liveness data")
-	common.PrettyPrint(reader.GetLivenessData())
+	common.PrettyPrint(livenessData)
 }

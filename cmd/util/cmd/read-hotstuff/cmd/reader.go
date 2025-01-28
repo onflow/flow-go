@@ -14,16 +14,16 @@ import (
 // the Hotstuff state machine.
 type HotstuffReader interface {
 	// GetLivenessData retrieves the latest persisted liveness data.
-	GetLivenessData() *hotstuff.LivenessData
+	GetLivenessData() (*hotstuff.LivenessData, error)
 	// GetSafetyData retrieves the latest persisted safety data.
-	GetSafetyData() *hotstuff.SafetyData
+	GetSafetyData() (*hotstuff.SafetyData, error)
 }
 
 // NewHotstuffReader returns a new Persister, constrained to read-only operations.
 func NewHotstuffReader(db *badger.DB, chainID flow.ChainID) HotstuffReader {
-	persist, err := persister.New(db, chainID)
+	reader, err := persister.New(db, chainID)
 	if err != nil {
 		panic(err)
 	}
-	return persist
+	return reader
 }
