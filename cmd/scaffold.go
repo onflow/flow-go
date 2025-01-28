@@ -31,6 +31,7 @@ import (
 	"github.com/onflow/flow-go/admin/commands/common"
 	storageCommands "github.com/onflow/flow-go/admin/commands/storage"
 	"github.com/onflow/flow-go/cmd/build"
+	"github.com/onflow/flow-go/cmd/scaffold"
 	"github.com/onflow/flow-go/config"
 	"github.com/onflow/flow-go/consensus/hotstuff/persister"
 	"github.com/onflow/flow-go/fvm/initialize"
@@ -1058,7 +1059,7 @@ func (fnb *FlowNodeBuilder) initProfiler() error {
 	return nil
 }
 
-func (fnb *FlowNodeBuilder) initDB() error {
+func (fnb *FlowNodeBuilder) initBadgerDB() error {
 
 	// Pre-create DB path (Badger creates only one-level dirs)
 	err := os.MkdirAll(fnb.BaseConfig.datadir, 0700)
@@ -1103,6 +1104,17 @@ func (fnb *FlowNodeBuilder) initDB() error {
 		return bstorage.NewCleaner(node.Logger, node.DB, node.Metrics.CleanCollector, flow.DefaultValueLogGCWaitDuration), nil
 	})
 
+	return nil
+}
+
+func (fnb *FlowNodeBuilder) initPebbleDB() error {
+	db, closer, err := scaffold.InitPebbleDB(fnb.BaseConfig.pebbleDir)
+	if err != nil {
+		return err
+	}
+
+	fnb.PebbleDB = db
+	fnb.ShutdownFunc(closer.Close)
 	return nil
 }
 
@@ -2024,7 +2036,11 @@ func (fnb *FlowNodeBuilder) onStart() error {
 		return err
 	}
 
-	if err := fnb.initDB(); err != nil {
+	if err := fnb.initBadgerDB(); err != nil {
+		return err
+	}
+
+	if err := fnb.initPebbleDB(); err != nil {
 		return err
 	}
 
