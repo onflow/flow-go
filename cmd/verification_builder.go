@@ -230,7 +230,17 @@ func (v *VerificationNodeBuilder) LoadComponentsAndModules() {
 			vmCtx := fvm.NewContext(fvmOptions...)
 
 			chunkVerifier := chunks.NewChunkVerifier(vm, vmCtx, node.Logger)
-			approvalStorage := badger.NewResultApprovals(node.Metrics.Cache, node.DB)
+
+			var approvalStorage storage.ResultApprovals
+			switch dbops.DBOps(v.verConf.dbOps) {
+			case dbops.BadgerTransaction:
+				approvalStorage = badger.NewResultApprovals(node.Metrics.Cache, node.DB)
+			case dbops.BadgerBatch:
+				approvalStorage = store.NewResultApprovals(node.Metrics.Cache, badgerimpl.ToDB(node.DB))
+			case dbops.PebbleBatch:
+				return nil, fmt.Errorf("to be implemented")
+			}
+
 			verifierEng, err = verifier.New(
 				node.Logger,
 				collector,
