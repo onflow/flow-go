@@ -110,8 +110,8 @@ func GenerateRecoverTxArgsWithDKG(log zerolog.Logger,
 	if err != nil {
 		return nil, fmt.Errorf("failed to get valid protocol participants from snapshot: %w", err)
 	}
-	// We expect canonical ordering here, because the Identities are originating from a protocol state snapshot, 
-	// which by protocol convention maintains the Identities in canonical order. Removing elements from a 
+	// We expect canonical ordering here, because the Identities are originating from a protocol state snapshot,
+	// which by protocol convention maintains the Identities in canonical order. Removing elements from a
 	// canonically-ordered list, still retains canonical ordering. Sanity check to enforce this:
 	if !eligibleEpochIdentities.Sorted(flow.Canonical[flow.Identity]) {
 		return nil, fmt.Errorf("identies from snapshot not in canonical order")
@@ -210,11 +210,13 @@ func GenerateRecoverTxArgsWithDKG(log zerolog.Logger,
 		dkgPubKeys = append(dkgPubKeys, dkgPubKeyCdc)
 	}
 	// Compile list of NodeIDs that are allowed to participate in the recovery epoch:
-	//   (i) eligible node IDs from the Epoch that the input `snapshot` is from 
+	//   (i) eligible node IDs from the Epoch that the input `snapshot` is from
 	//  (ii) node IDs (manually) specified in `includeNodeIDs`
-	// We use the set union to combine (i) and (ii). Important: the resulting list of node IDs must be canonically ordered! 
+	// We use the set union to combine (i) and (ii). Important: the resulting list of node IDs must be canonically ordered!
 	nodeIds := make([]cadence.Value, 0)
-	for _, id := range append(eligibleEpochIdentities.NodeIDs(), includeNodeIDs...).Sort(flow.IdentifierCanonical) {
+	unionIds := eligibleEpochIdentities.NodeIDs().Union(includeNodeIDs)
+	// CAUTION: unionIDs may not be canonically ordered anymore, due to set union
+	for _, id := range unionIds.Sort(flow.IdentifierCanonical) {
 		nodeIdCdc, err := cadence.NewString(id.String())
 		if err != nil {
 			return nil, fmt.Errorf("failed to convert node ID %s to cadence string: %w", id, err)
