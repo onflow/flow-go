@@ -151,6 +151,7 @@ type BaseConfig struct {
 	DynamicStartupEpoch         string
 	DynamicStartupSleepInterval time.Duration
 	datadir                     string
+	pebbleDir                   string
 	secretsdir                  string
 	secretsDBEnabled            bool
 	InsecureSecretsDB           bool
@@ -164,7 +165,6 @@ type BaseConfig struct {
 	MetricsEnabled              bool
 	guaranteesCacheSize         uint
 	receiptsCacheSize           uint
-	db                          *badger.DB
 	HeroCacheMetricsEnable      bool
 	SyncCoreConfig              chainsync.Config
 	CodecFactory                func() network.Codec
@@ -253,6 +253,7 @@ type StateExcerptAtBoot struct {
 
 func DefaultBaseConfig() *BaseConfig {
 	datadir := "/data/protocol"
+	pebbleDir := "/data/protocol-pebble"
 
 	// NOTE: if the codec used in the network component is ever changed any code relying on
 	// the message format specific to the codec must be updated. i.e: the AuthorizedSenderValidator.
@@ -269,6 +270,7 @@ func DefaultBaseConfig() *BaseConfig {
 		ObserverMode:     false,
 		BootstrapDir:     "bootstrap",
 		datadir:          datadir,
+		pebbleDir:        pebbleDir,
 		secretsdir:       NotSet,
 		secretsDBEnabled: true,
 		level:            "info",
