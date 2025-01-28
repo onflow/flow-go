@@ -4,6 +4,7 @@ import (
 	"context"
 	"time"
 
+	"github.com/cockroachdb/pebble"
 	"github.com/dgraph-io/badger/v2"
 	madns "github.com/multiformats/go-multiaddr-dns"
 	"github.com/onflow/crypto"
@@ -198,6 +199,7 @@ type NodeConfig struct {
 	MetricsRegisterer prometheus.Registerer
 	Metrics           Metrics
 	DB                *badger.DB
+	PebbleDB          *pebble.DB
 	SecretsDB         *badger.DB
 	Storage           Storage
 	ProtocolEvents    *events.Distributor
