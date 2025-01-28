@@ -275,12 +275,12 @@ func (fnb *FlowNodeBuilder) EnqueuePingService() {
 		var hotstuffViewFunc func() (uint64, error)
 		// Setup consensus nodes to report their HotStuff view
 		if fnb.BaseConfig.NodeRole == flow.RoleConsensus.String() {
-			persist, err := persister.New(node.DB, node.RootChainID)
+			hotstuffReader, err := persister.NewReader(node.DB, node.RootChainID)
 			if err != nil {
 				return nil, err
 			}
 			hotstuffViewFunc = func() (uint64, error) {
-				livenessData, err := persist.GetLivenessData()
+				livenessData, err := hotstuffReader.GetLivenessData()
 				if err != nil {
 					return 0, fmt.Errorf("could not get liveness data: %w", err)
 				}
