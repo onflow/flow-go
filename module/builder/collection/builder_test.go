@@ -13,6 +13,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
+	hotstuffmodel "github.com/onflow/flow-go/consensus/hotstuff/model"
 	model "github.com/onflow/flow-go/model/cluster"
 	"github.com/onflow/flow-go/model/flow"
 	builder "github.com/onflow/flow-go/module/builder/collection"
@@ -278,12 +279,23 @@ func (suite *BuilderSuite) TestBuildOn_SetterErrorPassthrough() {
 
 // TestBuildOn_SignerErrorPassthrough validates that errors from the sign function are passed through to the caller.
 func (suite *BuilderSuite) TestBuildOn_SignerErrorPassthrough() {
-	sentinel := errors.New("sentinel")
-	sign := func(h *flow.Header) error {
-		return sentinel
-	}
-	_, err := suite.builder.BuildOn(suite.genesis.ID(), noopSetter, sign)
-	suite.Assert().ErrorIs(err, sentinel)
+	suite.T().Run("unexpected Exception", func(t *testing.T) {
+		exception := errors.New("exception")
+		sign := func(h *flow.Header) error {
+			return exception
+		}
+		_, err := suite.builder.BuildOn(suite.genesis.ID(), noopSetter, sign)
+		suite.Assert().ErrorIs(err, exception)
+	})
+	suite.T().Run("NoVoteError", func(t *testing.T) {
+		// the EventHandler relies on this sentinel in particular to be passed through
+		sentinel := hotstuffmodel.NewNoVoteErrorf("not voting")
+		sign := func(h *flow.Header) error {
+			return sentinel
+		}
+		_, err := suite.builder.BuildOn(suite.genesis.ID(), noopSetter, sign)
+		suite.Assert().ErrorIs(err, sentinel)
+	})
 }
 
 // when there are transactions with an unknown reference block in the pool, we should not include them in collections
