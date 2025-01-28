@@ -1,11 +1,14 @@
 package store
 
 import (
+	"sync"
 	"testing"
 
 	"github.com/stretchr/testify/require"
 
+	"github.com/onflow/flow-go/model/chunks"
 	"github.com/onflow/flow-go/storage"
+	"github.com/onflow/flow-go/storage/operation"
 	"github.com/onflow/flow-go/storage/operation/dbtest"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -108,14 +111,29 @@ func TestChunksQueue(t *testing.T) {
 
 			locators := unittest.ChunkLocatorListFixture(100)
 
+			var wg sync.WaitGroup
+			wg.Add(len(locators))
+
 			for _, locator := range locators {
-				_, err := q.StoreChunkLocator(locator)
-				require.NoError(t, err)
+				go func(loc *chunks.Locator) {
+					defer wg.Done()
+					_, err := q.StoreChunkLocator(loc)
+					require.NoError(t, err)
+				}(locator)
 			}
+
+			wg.Wait()
 
 			latest, err := q.LatestIndex()
 			require.NoError(t, err)
 			require.Equal(t, uint64(len(locators)), latest)
+
+			for _, locator := range locators {
+				var stored chunks.Locator
+				err := operation.RetrieveChunkLocator(db.Reader(), locator.ID(), &stored)
+				require.NoError(t, err)
+				require.Equal(t, *locator, stored)
+			}
 		})
 	})
 
