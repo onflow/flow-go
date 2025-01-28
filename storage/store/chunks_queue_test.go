@@ -23,6 +23,10 @@ func TestChunksQueue(t *testing.T) {
 	t.Run("store and read", func(t *testing.T) {
 		dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
 			q := NewChunkQueue(db)
+			initialized, err := q.Init(0)
+			require.NoError(t, err)
+			require.True(t, initialized)
+
 			locators := unittest.ChunkLocatorListFixture(1)
 			locator := locators[0]
 
@@ -41,10 +45,13 @@ func TestChunksQueue(t *testing.T) {
 	t.Run("latest index after store", func(t *testing.T) {
 		dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
 			q := NewChunkQueue(db)
+			_, err := q.Init(0)
+			require.NoError(t, err)
+
 			locators := unittest.ChunkLocatorListFixture(1)
 			locator := locators[0]
 
-			_, err := q.StoreChunkLocator(locator)
+			_, err = q.StoreChunkLocator(locator)
 			require.NoError(t, err)
 
 			latest, err := q.LatestIndex()
@@ -56,6 +63,9 @@ func TestChunksQueue(t *testing.T) {
 	t.Run("duplicate chunk storage", func(t *testing.T) {
 		dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
 			q := NewChunkQueue(db)
+			_, err := q.Init(0)
+			require.NoError(t, err)
+
 			locators := unittest.ChunkLocatorListFixture(1)
 			locator := locators[0]
 
@@ -72,10 +82,13 @@ func TestChunksQueue(t *testing.T) {
 	t.Run("increasing index", func(t *testing.T) {
 		dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
 			q := NewChunkQueue(db)
-			locators := unittest.ChunkLocatorListFixture(1)
+			_, err := q.Init(0)
+			require.NoError(t, err)
+
+			locators := unittest.ChunkLocatorListFixture(2)
 			locator1, locator2 := locators[0], locators[1]
 
-			_, err := q.StoreChunkLocator(locator1)
+			_, err = q.StoreChunkLocator(locator1)
 			require.NoError(t, err)
 
 			_, err = q.StoreChunkLocator(locator2)
@@ -90,6 +103,9 @@ func TestChunksQueue(t *testing.T) {
 	t.Run("concurrent storage", func(t *testing.T) {
 		dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
 			q := NewChunkQueue(db)
+			_, err := q.Init(0)
+			require.NoError(t, err)
+
 			locators := unittest.ChunkLocatorListFixture(100)
 
 			for _, locator := range locators {
