@@ -4,6 +4,7 @@ package hotstuff
 // specifically [hotstuff.LivenessData] and [hotstuff.SafetyData].
 type Persister interface {
 	// GetSafetyData will retrieve last persisted safety data.
+	// During normal operations, no errors are expected.
 	GetSafetyData() (*SafetyData, error)
 
 	// PutSafetyData persists the last safety data.
@@ -12,6 +13,7 @@ type Persister interface {
 	PutSafetyData(safetyData *SafetyData) error
 
 	// GetLivenessData will retrieve last persisted liveness data.
+	// During normal operations, no errors are expected.
 	GetLivenessData() (*LivenessData, error)
 
 	// PutLivenessData persists the last liveness data.
