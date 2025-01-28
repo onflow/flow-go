@@ -1885,9 +1885,7 @@ func WithBindAddress(bindAddress string) Option {
 
 func WithDataDir(dataDir string) Option {
 	return func(config *BaseConfig) {
-		if config.db == nil {
-			config.datadir = dataDir
-		}
+		config.datadir = dataDir
 	}
 }
 
@@ -1918,14 +1916,6 @@ func WithComplianceConfig(complianceConfig compliance.Config) Option {
 func WithLogLevel(level string) Option {
 	return func(config *BaseConfig) {
 		config.level = level
-	}
-}
-
-// WithDB takes precedence over WithDataDir and datadir will be set to empty if DB is set using this option
-func WithDB(db *badger.DB) Option {
-	return func(config *BaseConfig) {
-		config.db = db
-		config.datadir = ""
 	}
 }
 
