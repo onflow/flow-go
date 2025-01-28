@@ -27,7 +27,7 @@
 /ledger/** @ramtinms @AlexHentschel
 
 # FVM Stream
-/fvm/**  @ramtinms @janezpodhostnik
+/fvm/** @janezpodhostnik @zhangchiqing @fxamacker @turbolent
 
 # Networking Stream
 /network/** @yhassanzadeh13
