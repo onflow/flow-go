@@ -20,6 +20,7 @@ type Persister struct {
 }
 
 var _ hotstuff.Persister = (*Persister)(nil)
+var _ hotstuff.PersisterReader = (*Persister)(nil)
 
 // New creates a new Persister.
 //
@@ -32,6 +33,11 @@ func New(db *badger.DB, chainID flow.ChainID) (*Persister, error) {
 		chainID: chainID,
 	}
 	return p, nil
+}
+
+// NewReader returns a new Persister as a PersisterReader type (only read methods accessible).
+func NewReader(db *badger.DB, chainID flow.ChainID) (hotstuff.PersisterReader, error) {
+	return New(db, chainID)
 }
 
 // GetSafetyData will retrieve last persisted safety data.
@@ -53,19 +59,11 @@ func (p *Persister) GetLivenessData() (*hotstuff.LivenessData, error) {
 // PutSafetyData persists the last safety data.
 // During normal operations, no errors are expected.
 func (p *Persister) PutSafetyData(safetyData *hotstuff.SafetyData) error {
-	err := operation.RetryOnConflict(p.db.Update, operation.UpdateSafetyData(p.chainID, safetyData))
-	if err != nil {
-		return err
-	}
-	return nil
+	return operation.RetryOnConflict(p.db.Update, operation.UpdateSafetyData(p.chainID, safetyData))
 }
 
 // PutLivenessData persists the last liveness data.
 // During normal operations, no errors are expected.
 func (p *Persister) PutLivenessData(livenessData *hotstuff.LivenessData) error {
-	err := operation.RetryOnConflict(p.db.Update, operation.UpdateLivenessData(p.chainID, livenessData))
-	if err != nil {
-		return err
-	}
-	return nil
+	return operation.RetryOnConflict(p.db.Update, operation.UpdateLivenessData(p.chainID, livenessData))
 }

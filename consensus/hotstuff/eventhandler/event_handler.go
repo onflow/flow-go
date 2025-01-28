@@ -419,7 +419,6 @@ func (e *EventHandler) proposeForNewViewIfPrimary() error {
 	if err != nil {
 		if model.IsNoVoteError(err) {
 			log.Info().Err(err).Msg("aborting block proposal to prevent equivocation (likely re-entered proposal logic due to crash)")
-
 			return nil
 		}
 		return fmt.Errorf("can not make block proposal for curView %v: %w", curView, err)
