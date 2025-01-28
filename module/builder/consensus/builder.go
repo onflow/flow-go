@@ -104,9 +104,19 @@ func NewBuilder(
 	return b, nil
 }
 
-// BuildOn creates a new block header on top of the provided parent, using the
-// given view and applying the custom setter function to allow the caller to
-// make changes to the header before storing it.
+// BuildOn generates a new payload that is valid with respect to the parent
+// being built upon, with the view being provided by the consensus algorithm.
+// The builder stores the block and validates it against the protocol state
+// before returning it. The specified parent block must exist in the protocol state.
+//
+// NOTE: Since the block is stored within Builder, HotStuff MUST propose the
+// block once BuildOn successfully returns.
+//
+// # Errors
+// This function does not produce any expected errors.
+// However, it will pass through all errors returned by `setter` and `sign`.
+// Callers must be aware of possible error returns from the `setter` and `sign` arguments they provide,
+// and handle them accordingly when handling errors returned from BuildOn.
 func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header) error, sign func(*flow.Header) error) (*flow.Header, error) {
 
 	// since we don't know the blockID when building the block we track the
