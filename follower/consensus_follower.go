@@ -69,15 +69,6 @@ func WithLogLevel(level string) Option {
 	}
 }
 
-// WithDB sets the underlying database that will be used to store the chain state
-// WithDB takes precedence over WithDataDir and datadir will be set to empty if DB is set using this option
-func WithDB(db *badger.DB) Option {
-	return func(cf *Config) {
-		cf.db = db
-		cf.dataDir = ""
-	}
-}
-
 func WithExposeMetrics(expose bool) Option {
 	return func(c *Config) {
 		c.exposeMetrics = expose
@@ -141,9 +132,6 @@ func getBaseOptions(config *Config) []cmd.Option {
 	}
 	if config.logLevel != "" {
 		options = append(options, cmd.WithLogLevel(config.logLevel))
-	}
-	if config.db != nil {
-		options = append(options, cmd.WithDB(config.db))
 	}
 	if config.exposeMetrics {
 		options = append(options, cmd.WithMetricsEnabled(config.exposeMetrics))
