@@ -1131,7 +1131,11 @@ func TestExtendEpochTransitionValid(t *testing.T) {
 //	ROOT <--+
 //	         \--B2<--B4(R2)<--B6(S2)<--B8
 func TestExtendConflictingEpochEvents(t *testing.T) {
-	rootSnapshot := unittest.RootSnapshotFixture(participants)
+	// add more collectors so that we can have multiple distinct clustering assignments
+	extraCollectors := unittest.IdentityListFixture(2, func(identity *flow.Identity) {
+		identity.Role = flow.RoleCollection
+	})
+	rootSnapshot := unittest.RootSnapshotFixture(append(participants, extraCollectors...))
 	rootProtocolStateID := getRootProtocolStateID(t, rootSnapshot)
 	util.RunWithFullProtocolStateAndMutator(t, rootSnapshot, func(db *badger.DB, state *protocol.ParticipantState, mutableState realprotocol.MutableProtocolState) {
 		expectedStateIdCalculator := calculateExpectedStateId(t, mutableState)
@@ -1154,19 +1158,22 @@ func TestExtendConflictingEpochEvents(t *testing.T) {
 
 		rootSetup := result.ServiceEvents[0].Event.(*flow.EpochSetup)
 
-		// create two conflicting epoch setup events for the next epoch (participants differ)
+		// create two conflicting epoch setup events for the next epoch (clustering differs)
 		nextEpochSetup1 := unittest.EpochSetupFixture(
-			unittest.WithParticipants(rootSetup.Participants[:len(rootSetup.Participants)]),
+			unittest.WithParticipants(rootSetup.Participants),
 			unittest.SetupWithCounter(rootSetup.Counter+1),
 			unittest.WithFinalView(rootSetup.FinalView+1000),
 			unittest.WithFirstView(rootSetup.FinalView+1),
 		)
+		nextEpochSetup1.Assignments = unittest.ClusterAssignment(1, rootSetup.Participants)
 		nextEpochSetup2 := unittest.EpochSetupFixture(
-			unittest.WithParticipants(rootSetup.Participants[:len(rootSetup.Participants)-1]),
+			unittest.WithParticipants(rootSetup.Participants),
 			unittest.SetupWithCounter(rootSetup.Counter+1),
-			unittest.WithFinalView(rootSetup.FinalView+2000), // final view differs
+			unittest.WithFinalView(rootSetup.FinalView+1000),
 			unittest.WithFirstView(rootSetup.FinalView+1),
 		)
+		nextEpochSetup2.Assignments = unittest.ClusterAssignment(2, rootSetup.Participants)
+		assert.NotEqual(t, nextEpochSetup1.Assignments, nextEpochSetup2.Assignments)
 
 		// add blocks containing receipts for block1 and block2 (necessary for sealing)
 		// block 1 receipt contains nextEpochSetup1
@@ -1232,17 +1239,19 @@ func TestExtendConflictingEpochEvents(t *testing.T) {
 		require.NoError(t, err)
 
 		// should be able to query each epoch from the appropriate reference block
-		setup1identities, err := state.AtBlockID(block7.ID()).Epochs().NextUnsafe().InitialIdentities()
+		nextEpoch1 := state.AtBlockID(block7.ID()).Epochs().NextUnsafe()
+		setup1clustering, err := nextEpoch1.Clustering()
 		assert.NoError(t, err)
-		require.Equal(t, nextEpochSetup1.Participants, setup1identities)
+		require.Equal(t, nextEpochSetup1.Assignments, setup1clustering.Assignments())
 
 		phase, err := state.AtBlockID(block8.ID()).EpochPhase()
 		assert.NoError(t, err)
 		switch phase {
 		case flow.EpochPhaseSetup:
-			setup2identities, err := state.AtBlockID(block8.ID()).Epochs().NextUnsafe().InitialIdentities()
+			nextEpoch2 := state.AtBlockID(block8.ID()).Epochs().NextUnsafe()
+			setup2clustering, err := nextEpoch2.Clustering()
 			assert.NoError(t, err)
-			require.Equal(t, nextEpochSetup2.Participants, setup2identities)
+			require.Equal(t, nextEpochSetup2.Assignments, setup2clustering.Assignments())
 		case flow.EpochPhaseFallback:
 			t.Fatal("reached epoch fallback phase instead of epoch setup phase")
 		default:
