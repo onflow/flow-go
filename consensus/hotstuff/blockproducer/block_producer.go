@@ -70,7 +70,7 @@ func (bp *BlockProducer) MakeBlockProposal(view uint64, qc *flow.QuorumCertifica
 		if model.IsNoVoteError(err) {
 			return nil, fmt.Errorf("unsafe to vote for own proposal on top of %x: %w", qc.BlockID, err)
 		}
-		return nil, fmt.Errorf("could not build block proposal on top of %v: %w", qc.BlockID, err)
+		return nil, irrecoverable.NewExceptionf("could not build block proposal on top of %v: %w", qc.BlockID, err)
 	}
 	if !signer.IsSigningComplete() {
 		return nil, fmt.Errorf("signer has not yet completed signing")
