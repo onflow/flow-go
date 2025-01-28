@@ -12,6 +12,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
+	hotstuffmodel "github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/model/flow"
 	mempoolAPIs "github.com/onflow/flow-go/module/mempool"
 	mempoolImpl "github.com/onflow/flow-go/module/mempool/consensus"
@@ -470,12 +471,23 @@ func (bs *BuilderSuite) TestSetterErrorPassthrough() {
 
 // TestSignErrorPassthrough validates that errors from the sign function are passed through to the caller.
 func (bs *BuilderSuite) TestSignErrorPassthrough() {
-	sentinel := errors.New("sentinel")
-	sign := func(header *flow.Header) error {
-		return sentinel
-	}
-	_, err := bs.build.BuildOn(bs.parentID, bs.setter, sign)
-	bs.Assert().ErrorIs(err, sentinel)
+	bs.T().Run("unexpected Exception", func(t *testing.T) {
+		exception := errors.New("exception")
+		sign := func(header *flow.Header) error {
+			return exception
+		}
+		_, err := bs.build.BuildOn(bs.parentID, bs.setter, sign)
+		bs.Assert().ErrorIs(err, exception)
+	})
+	bs.T().Run("NoVoteError", func(t *testing.T) {
+		// the EventHandler relies on this sentinel in particular to be passed through
+		sentinel := hotstuffmodel.NewNoVoteErrorf("not voting")
+		sign := func(header *flow.Header) error {
+			return sentinel
+		}
+		_, err := bs.build.BuildOn(bs.parentID, bs.setter, sign)
+		bs.Assert().ErrorIs(err, sentinel)
+	})
 }
 
 func (bs *BuilderSuite) TestPayloadGuaranteeValid() {
