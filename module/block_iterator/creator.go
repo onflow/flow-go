@@ -20,6 +20,10 @@ type Creator struct {
 var _ module.IteratorCreator = (*Creator)(nil)
 
 // NewCreator creates a block iterator that iterates through blocks by index.
+// the root is the block index to start iterating from. (it could either root height or root view)
+// the latest is a function that returns the latest block index.
+// since latest is a function, the caller can reuse the creator to create block iterator one
+// after another to iterate from the root to the latest, and from last iterated to the new latest.
 func NewCreator(
 	getBlockIDByIndex func(uint64) (blockID flow.Identifier, indexed bool, exception error),
 	progressStorage storage.ConsumerProgress,
