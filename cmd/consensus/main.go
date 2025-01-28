@@ -626,7 +626,10 @@ func main() {
 			notifier.AddFollowerConsumer(followerDistributor)
 
 			// initialize the persister
-			persist := persister.New(node.DB, node.RootChainID)
+			persist, err := persister.New(node.DB, node.RootChainID)
+			if err != nil {
+				return nil, err
+			}
 
 			finalizedBlock, err := node.State.Final().Head()
 			if err != nil {
@@ -710,7 +713,7 @@ func main() {
 		Component("block rate cruise control", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 			livenessData, err := hotstuffModules.Persist.GetLivenessData()
 			if err != nil {
-				return nil, err
+				return nil, fmt.Errorf("could not load liveness data: %w", err)
 			}
 			ctl, err := cruisectl.NewBlockTimeController(node.Logger, metrics.NewCruiseCtlMetrics(), cruiseCtlConfig, node.State, livenessData.CurrentView)
 			if err != nil {
