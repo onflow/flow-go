@@ -24,7 +24,8 @@ const JobQueueChunksQueue = "JobQueueChunksQueue"
 // NewChunkQueue will initialize the underlying badger database of chunk locator queue.
 func NewChunkQueue(db storage.DB) *ChunksQueue {
 	return &ChunksQueue{
-		db: db,
+		db:      db,
+		storing: &sync.Mutex{},
 	}
 }
 
@@ -62,6 +63,17 @@ func (q *ChunksQueue) StoreChunkLocator(locator *chunks.Locator) (bool, error) {
 	err := operation.RetrieveJobLatestIndex(q.db.Reader(), JobQueueChunksQueue, &latest)
 	if err != nil {
 		return false, fmt.Errorf("failed to retrieve job index for chunk locator queue: %w", err)
+	}
+
+	// make sure the chunk locator is unique
+	exists, err := operation.ExistChunkLocator(q.db.Reader(), locator.ID())
+	if err != nil {
+		return false, fmt.Errorf("failed to check chunk locator existence: %w", err)
+	}
+
+	// if the locator already exists, return false
+	if exists {
+		return false, nil
 	}
 
 	// insert to the next index
