@@ -298,7 +298,10 @@ func (fnb *FlowNodeBuilder) EnqueuePingService() {
 			}
 
 			pingInfoProvider.HotstuffViewFun = func() (uint64, error) {
-				livenessData, _ := persist.GetLivenessData()
+				livenessData, err := persist.GetLivenessData()
+				if err != nil {
+					return 0, fmt.Errorf("could not get liveness data: %w", err)
+				}
 				return livenessData.CurrentView, nil
 			}
 		}
