@@ -552,7 +552,6 @@ func createNode(
 
 	persist, err := persister.New(db, rootHeader.ChainID)
 	require.NoError(t, err)
-
 	livenessData, _ := persist.GetLivenessData()
 
 	voteProcessorFactory := votecollector.NewCombinedVoteProcessorFactory(committee, voteAggregationDistributor.OnQcConstructedFromVotes)
