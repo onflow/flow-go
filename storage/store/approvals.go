@@ -32,10 +32,10 @@ func NewResultApprovals(collector module.CacheMetrics, db storage.DB) *ResultApp
 
 	res := &ResultApprovals{
 		db: db,
-		cache: newCache[flow.Identifier, *flow.ResultApproval](collector, metrics.ResourceResultApprovals,
+		cache: newCache(collector, metrics.ResourceResultApprovals,
 			withLimit[flow.Identifier, *flow.ResultApproval](flow.DefaultTransactionExpiry+100),
-			withStore[flow.Identifier, *flow.ResultApproval](store),
-			withRetrieve[flow.Identifier, *flow.ResultApproval](retrieve)),
+			withStore(store),
+			withRetrieve(retrieve)),
 		indexing: new(sync.Mutex),
 	}
 
