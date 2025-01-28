@@ -94,6 +94,7 @@ func NewBuilder(
 // NOTE: Since the block is stored within Builder, HotStuff MUST propose the
 // block once BuildOn successfully returns.
 //
+// # Errors
 // This function does not produce any expected errors.
 // However, it will pass through all errors returned by `setter` and `sign`.
 // Callers must be aware of possible error returns from the `setter` and `sign` arguments they provide,
