@@ -95,7 +95,7 @@ func (v *VerificationNodeBuilder) LoadComponentsAndModules() {
 		chunkRequests        *stdmap.ChunkRequests               // used in requester engine
 		processedChunkIndex  storage.ConsumerProgressInitializer // used in chunk consumer
 		processedBlockHeight storage.ConsumerProgressInitializer // used in block consumer
-		chunkQueue           *badger.ChunksQueue                 // used in chunk consumer
+		chunkQueue           *store.ChunksQueue                  // used in chunk consumer
 
 		syncCore            *chainsync.Core   // used in follower engine
 		assignerEngine      *assigner.Engine  // the assigner engine
@@ -166,7 +166,7 @@ func (v *VerificationNodeBuilder) LoadComponentsAndModules() {
 			return nil
 		}).
 		Module("chunks queue", func(node *NodeConfig) error {
-			chunkQueue = badger.NewChunkQueue(node.DB)
+			chunkQueue = store.NewChunkQueue(badgerimpl.ToDB(node.DB))
 			ok, err := chunkQueue.Init(chunkconsumer.DefaultJobIndex)
 			if err != nil {
 				return fmt.Errorf("could not initialize default index in chunks queue: %w", err)
