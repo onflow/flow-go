@@ -116,6 +116,15 @@ func GenerateRecoverTxArgsWithDKG(log zerolog.Logger,
 	if !eligibleEpochIdentities.Sorted(flow.Canonical[flow.Identity]) {
 		return nil, fmt.Errorf("identies from snapshot not in canonical order")
 	}
+	// It would be contradictory if both `excludeNodeIDs` and `includeNodeIDs` contained the same ID.
+	// Specifically, we expect the set intersection between `excludeNodeIDs` and `includeNodeIDs` to
+	// be empty. To prevent first removing a node and then adding it back, we sanity-check consistency:
+	includeIDsLookup := includeNodeIDs.Lookup()
+	for _, id := range excludeNodeIDs {
+		if _, found := includeIDsLookup[id]; found {
+			return nil, fmt.Errorf("contradictory input: node ID %s is listed in both includeNodeIDs and excludeNodeIDs", id)
+		}
+	}
 
 	// STEP I: compile Cluster Assignment, Cluster Root Blocks and QCs
 	//         which are needed to initiate each cluster's consensus process
