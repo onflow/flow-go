@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/hex"
 
+	client "github.com/onflow/flow-go-sdk/access/grpc"
 	"github.com/onflow/flow/protobuf/go/flow/execution"
 	"github.com/onflow/flow/protobuf/go/flow/executiondata"
 	"github.com/rs/zerolog/log"
@@ -86,17 +87,8 @@ func run(*cobra.Command, []string) {
 
 	flowClient, err := grpcclient.FlowClient(config)
 	if err != nil {
-		log.Fatal().Err(err).Msg("failed to create flow client")
+		log.Fatal().Err(err).Msg("failed to create client")
 	}
-
-	log.Info().Msg("Fetching transaction ...")
-
-	tx, err := flowClient.GetTransaction(context.Background(), sdk.Identifier(txID))
-	if err != nil {
-		log.Fatal().Err(err).Msg("failed to fetch transaction")
-	}
-
-	log.Info().Msgf("Fetched transaction: %s", tx.ID())
 
 	log.Info().Msg("Fetching transaction result ...")
 
@@ -115,6 +107,17 @@ func run(*cobra.Command, []string) {
 		blockHeight,
 	)
 
+	log.Info().Msg("Fetching transactions of block ...")
+
+	txsResult, err := flowClient.GetTransactionsByBlockID(context.Background(), sdk.Identifier(blockID))
+	if err != nil {
+		log.Fatal().Err(err).Msg("failed to fetch transactions of block")
+	}
+
+	for _, blockTx := range txsResult {
+		log.Info().Msgf("Block transaction: %s", blockTx.ID())
+	}
+
 	log.Info().Msg("Fetching block header ...")
 
 	header, err := debug.GetAccessAPIBlockHeader(flowClient.RPCClient(), context.Background(), blockID)
@@ -128,7 +131,7 @@ func run(*cobra.Command, []string) {
 		header.Height,
 	)
 
-	var snap snapshot.StorageSnapshot
+	var remoteSnapshot snapshot.StorageSnapshot
 
 	if flagUseExecutionDataAPI {
 		accessConn, err := grpc.NewClient(
@@ -144,7 +147,7 @@ func run(*cobra.Command, []string) {
 
 		// The execution data API provides the *resulting* data,
 		// so fetch the data for the parent block for the *initial* data.
-		snap, err = debug.NewExecutionDataStorageSnapshot(executionDataClient, nil, blockHeight-1)
+		remoteSnapshot, err = debug.NewExecutionDataStorageSnapshot(executionDataClient, nil, blockHeight-1)
 		if err != nil {
 			log.Fatal().Err(err).Msg("failed to create storage snapshot")
 		}
@@ -159,15 +162,58 @@ func run(*cobra.Command, []string) {
 		defer executionConn.Close()
 
 		executionClient := execution.NewExecutionAPIClient(executionConn)
-		snap, err = debug.NewExecutionNodeStorageSnapshot(executionClient, nil, blockID)
+
+		remoteSnapshot, err = debug.NewExecutionNodeStorageSnapshot(executionClient, nil, blockID)
 		if err != nil {
 			log.Fatal().Err(err).Msg("failed to create storage snapshot")
 		}
 	}
 
-	log.Info().Msg("Debugging transaction ...")
+	blockSnapshot := newBlockSnapshot(remoteSnapshot)
 
 	debugger := debug.NewRemoteDebugger(chain, log.Logger)
+
+	for _, blockTx := range txsResult {
+		blockTxID := flow.Identifier(blockTx.ID())
+
+		isDebuggedTx := blockTxID == txID
+
+		dumpRegisters := flagDumpRegisters && isDebuggedTx
+
+		runTransaction(
+			debugger,
+			blockTxID,
+			flowClient,
+			blockSnapshot,
+			header,
+			dumpRegisters,
+		)
+
+		if isDebuggedTx {
+			break
+		}
+	}
+}
+
+func runTransaction(
+	debugger *debug.RemoteDebugger,
+	txID flow.Identifier,
+	flowClient *client.Client,
+	blockSnapshot *blockSnapshot,
+	header *flow.Header,
+	dumpRegisters bool,
+) {
+
+	log.Info().Msgf("Fetching transaction %s ...", txID)
+
+	tx, err := flowClient.GetTransaction(context.Background(), sdk.Identifier(txID))
+	if err != nil {
+		log.Fatal().Err(err).Msg("Failed to fetch transaction")
+	}
+
+	log.Info().Msgf("Fetched transaction: %s", tx.ID())
+
+	log.Info().Msgf("Debugging transaction %s ...", tx.ID())
 
 	txBody := flow.NewTransactionBody().
 		SetScript(tx.Script).
@@ -193,12 +239,29 @@ func run(*cobra.Command, []string) {
 		proposalKeySequenceNumber,
 	)
 
-	resultSnapshot, txErr, processErr := debugger.RunTransaction(txBody, snap, header)
+	resultSnapshot, txErr, processErr := debugger.RunTransaction(
+		txBody,
+		blockSnapshot,
+		header,
+	)
 	if processErr != nil {
-		log.Fatal().Err(processErr).Msg("process error")
+		log.Fatal().Err(processErr).Msg("Failed to process transaction")
 	}
 
-	if flagDumpRegisters {
+	if txErr != nil {
+		log.Err(txErr).Msg("Transaction failed")
+	} else {
+		log.Info().Msg("Transaction succeeded")
+	}
+
+	for _, updatedRegister := range resultSnapshot.UpdatedRegisters() {
+		blockSnapshot.Set(
+			updatedRegister.Key,
+			updatedRegister.Value,
+		)
+	}
+
+	if dumpRegisters {
 		log.Info().Msg("Read registers:")
 		readRegisterIDs := resultSnapshot.ReadRegisterIDs()
 		sortRegisters(readRegisterIDs)
@@ -215,9 +278,6 @@ func run(*cobra.Command, []string) {
 			)
 		}
 	}
-	if txErr != nil {
-		log.Err(txErr).Msg("transaction error")
-	}
 }
 
 func sortRegisters(registerIDs []flow.RegisterID) {
@@ -227,4 +287,32 @@ func sortRegisters(registerIDs []flow.RegisterID) {
 			cmp.Compare(a.Key, b.Key),
 		)
 	})
+}
+
+type blockSnapshot struct {
+	cache   *debug.InMemoryRegisterCache
+	backing snapshot.StorageSnapshot
+}
+
+var _ snapshot.StorageSnapshot = (*blockSnapshot)(nil)
+
+func newBlockSnapshot(backing snapshot.StorageSnapshot) *blockSnapshot {
+	cache := debug.NewInMemoryRegisterCache()
+	return &blockSnapshot{
+		cache:   cache,
+		backing: backing,
+	}
+}
+
+func (s *blockSnapshot) Get(id flow.RegisterID) (flow.RegisterValue, error) {
+	data, found := s.cache.Get(id.Key, id.Owner)
+	if found {
+		return data, nil
+	}
+
+	return s.backing.Get(id)
+}
+
+func (s *blockSnapshot) Set(id flow.RegisterID, value flow.RegisterValue) {
+	s.cache.Set(id.Key, id.Owner, value)
 }
