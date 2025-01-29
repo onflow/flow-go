@@ -6,9 +6,9 @@ import (
 	"fmt"
 	"net"
 
-	none "github.com/ipfs/boxo/routing/none"
 	"github.com/libp2p/go-libp2p"
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
+	none "github.com/libp2p/go-libp2p-routing-helpers"
 	"github.com/libp2p/go-libp2p/config"
 	"github.com/libp2p/go-libp2p/core/connmgr"
 	"github.com/libp2p/go-libp2p/core/host"
@@ -487,7 +487,7 @@ func (b *LibP2PNodeBuilder) configureRoutingSystem(
 	} else {
 		// bitswap requires a content routing system. this returns a stub instead of a full DHT
 		b.SetRoutingSystem(func(ctx context.Context, host host.Host) (routing.Routing, error) {
-			return none.ConstructNilRouting(ctx, host, nil, nil)
+			return none.Null.(ctx, host, nil, nil)
 		})
 	}
 }
