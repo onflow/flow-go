@@ -996,6 +996,9 @@ func (exeNode *ExecutionNode) LoadExecutionDataPruner(
 }
 
 func (exeNode *ExecutionNode) LoadExecutionDBPruner(node *NodeConfig) (module.ReadyDoneAware, error) {
+	cfg := exepruner.DefaultConfig
+	cfg.SleepAfterEachIteration = exeNode.exeConf.pruningConfigSleepAfterIteration
+
 	return exepruner.NewChunkDataPackPruningEngine(
 		node.Logger,
 		node.State,
@@ -1004,7 +1007,7 @@ func (exeNode *ExecutionNode) LoadExecutionDBPruner(node *NodeConfig) (module.Re
 		exeNode.chunkDataPacks,
 		exeNode.results,
 		exeNode.chunkDataPackDB,
-		exepruner.DefaultConfig,
+		cfg,
 	), nil
 }
 
