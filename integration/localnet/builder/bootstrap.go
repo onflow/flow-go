@@ -259,6 +259,7 @@ func (s *Service) AddExposedPorts(containerPorts ...string) {
 type Build struct {
 	Context    string
 	Dockerfile string
+	Network    string
 	Args       map[string]string
 	Target     string
 }
@@ -536,6 +537,7 @@ func defaultService(name, role, dataDir, profilerDir string, i int) Service {
 		service.Build = Build{
 			Context:    "../../",
 			Dockerfile: "cmd/Dockerfile",
+			Network:    "host",
 			Args: map[string]string{
 				"TARGET":  fmt.Sprintf("./cmd/%s", role),
 				"VERSION": build.Version(),
