@@ -69,6 +69,8 @@ type ExecutionConfig struct {
 	enableStorehouse bool
 	enableChecker    bool
 	publicAccessID   string
+
+	pruningConfigSleepAfterIteration time.Duration
 }
 
 func (exeConf *ExecutionConfig) SetupFlags(flags *pflag.FlagSet) {
@@ -130,6 +132,7 @@ func (exeConf *ExecutionConfig) SetupFlags(flags *pflag.FlagSet) {
 	flags.BoolVar(&deprecatedEnableNewIngestionEngine, "enable-new-ingestion-engine", true, "enable new ingestion engine, default is true")
 	flags.StringVar(&exeConf.publicAccessID, "public-access-id", "", "public access ID for the node")
 
+	flags.DurationVar(&exeConf.pruningConfigSleepAfterIteration, "pruning-sleep-after-iteration", 500000*time.Hour, "sleep time after each iteration")
 }
 
 func (exeConf *ExecutionConfig) ValidateFlags() error {
