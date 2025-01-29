@@ -77,14 +77,16 @@ func makeBlockIteratorCreator(
 	config PruningConfig,
 ) (module.IteratorCreator, error) {
 	root := state.Params().SealedRoot()
-	sealed := latest.NewLatestSealedAndExecuted(
+	sealedAndExecuted := latest.NewLatestSealedAndExecuted(
 		root,
 		state,
 		badgerDB,
 	)
 
+	// retrieves the latest sealed and executed block height.
+	// the threshold ensures that a certain number of blocks are retained for querying instead of being pruned.
 	latest := &LatestPrunable{
-		LatestSealedAndExecuted: sealed,
+		LatestSealedAndExecuted: sealedAndExecuted,
 		threshold:               config.Threshold,
 	}
 
