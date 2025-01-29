@@ -27,12 +27,8 @@ func NewChunkDataPackPruningEngine(
 		AddWorker(func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
 			ready()
 
-			callback := func() {
-				log.Info().Msgf("Pruning iteration finished")
-			}
-
 			err := LoopPruneExecutionDataFromRootToLatestSealed(
-				ctx, state, badgerDB, headers, chunkDataPacks, results, chunkDataPacksDB, config, callback)
+				ctx, state, badgerDB, headers, chunkDataPacks, results, chunkDataPacksDB, config)
 			if err != nil {
 				ctx.Throw(err)
 			}
