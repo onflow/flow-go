@@ -29,7 +29,6 @@ func LoopPruneExecutionDataFromRootToLatestSealed(
 	results storage.ExecutionResults,
 	chunkDataPacksDB *pebble.DB,
 	config PruningConfig,
-	callbackWhenOneIterationFinished func(),
 ) error {
 	// the creator can be reused to create new block iterator that can iterate from the last
 	// checkpoint to the new latest (sealed) block.
@@ -53,6 +52,8 @@ func LoopPruneExecutionDataFromRootToLatestSealed(
 			return nil
 			// wait first so that we give the data pruning lower priority compare to other tasks.
 			// also we can disable this feature by setting the sleep time to a very large value.
+			// also allows the pruner to be more responsive to the context cancellation, meaning
+			// while the pruner is sleeping, it can be cancelled immediately.
 		case <-time.After(config.SleepAfterEachIteration):
 		}
 
@@ -65,9 +66,6 @@ func LoopPruneExecutionDataFromRootToLatestSealed(
 		if err != nil {
 			return fmt.Errorf("failed to iterate, execute, and commit in batch: %w", err)
 		}
-
-		// call the callback to report a completion of a pruning iteration
-		callbackWhenOneIterationFinished()
 	}
 }
 
