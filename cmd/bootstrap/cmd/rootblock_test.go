@@ -67,7 +67,6 @@ func TestRootBlock_HappyPath(t *testing.T) {
 		flagNumViewsInStakingAuction = 50_000
 		flagNumViewsInDKGPhase = 2_000
 		flagFinalizationSafetyThreshold = 1_000
-		deprecatedFlagProtocolVersion = 42
 		flagUseDefaultEpochTargetEndTime = true
 		flagEpochTimingRefCounter = 0
 		flagEpochTimingRefTimestamp = 0
