@@ -1,6 +1,7 @@
 package pruner
 
 import (
+	"github.com/cockroachdb/pebble"
 	"github.com/dgraph-io/badger/v2"
 	"github.com/rs/zerolog"
 
@@ -10,6 +11,8 @@ import (
 	"github.com/onflow/flow-go/storage"
 )
 
+// NewChunkDataPackPruningEngine creates a component that prunes chunk data packs
+// from root to the latest sealed block.
 func NewChunkDataPackPruningEngine(
 	log zerolog.Logger,
 	state protocol.State,
@@ -17,16 +20,19 @@ func NewChunkDataPackPruningEngine(
 	headers storage.Headers,
 	chunkDataPacks storage.ChunkDataPacks,
 	results storage.ExecutionResults,
-	db storage.DB,
+	chunkDataPacksDB *pebble.DB,
 	config PruningConfig,
-	callback func(),
 ) *component.ComponentManager {
 	return component.NewComponentManagerBuilder().
 		AddWorker(func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
 			ready()
 
+			callback := func() {
+				log.Info().Msgf("Pruning iteration finished")
+			}
+
 			err := LoopPruneExecutionDataFromRootToLatestSealed(
-				ctx, state, badgerDB, headers, chunkDataPacks, results, db, config, callback)
+				ctx, state, badgerDB, headers, chunkDataPacks, results, chunkDataPacksDB, config, callback)
 			if err != nil {
 				ctx.Throw(err)
 			}

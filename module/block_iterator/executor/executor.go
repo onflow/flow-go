@@ -1,6 +1,7 @@
 package executor
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/onflow/flow-go/model/flow"
@@ -30,6 +31,8 @@ type IsBatchFull func(iteratedCountInCurrentBatch int) bool
 // can be resumed after restart.
 // it sleeps after each batch is committed in order to minimizing the impact on the system.
 func IterateExecuteAndCommitInBatch(
+	// ctx is used for cancelling the iteration when the context is done
+	ctx context.Context,
 	// iterator decides how to iterate over blocks
 	iter module.BlockIterator,
 	// executor decides what data in the storage will be updated for a certain block
@@ -47,6 +50,20 @@ func IterateExecuteAndCommitInBatch(
 	iteratedCountInCurrentBatch := 0
 
 	for {
+		select {
+		// when the context is done, commit the last batch and return
+		case <-ctx.Done():
+			if iteratedCountInCurrentBatch > 0 {
+				// commit the last batch
+				err := commitAndCheckpoint(batch, iter)
+				if err != nil {
+					return err
+				}
+			}
+			return nil
+		default:
+		}
+
 		// iterate over each block until the end
 		blockID, hasNext, err := iter.Next()
 		if err != nil {
