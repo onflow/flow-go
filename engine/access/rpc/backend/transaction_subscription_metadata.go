@@ -3,8 +3,6 @@ package backend
 import (
 	"context"
 	"errors"
-	"fmt"
-
 	"github.com/onflow/flow-go/engine/access/subscription"
 
 	"google.golang.org/grpc/codes"
@@ -173,7 +171,7 @@ func (tm *transactionSubscriptionMetadata) Refresh(ctx context.Context, height u
 
 	if err := tm.refreshBlock(); err != nil {
 		if errors.Is(err, storage.ErrNotFound) {
-			return fmt.Errorf("could not find block %d in storage: %w", height, subscription.ErrBlockNotReady)
+			return subscription.ErrBlockNotReady
 		}
 	}
 
@@ -260,8 +258,14 @@ func (tm *transactionSubscriptionMetadata) refreshCollection(height uint64) erro
 	}
 
 	collectionID, err := tm.backendTransactions.LookupCollectionIDInBlock(block, tm.txResult.TransactionID)
-	if err != nil && !errors.Is(err, ErrTransactionNotInBlock) {
-		return err
+	if err != nil {
+		if errors.Is(err, storage.ErrNotFound) {
+			return subscription.ErrBlockNotReady
+		}
+
+		if !errors.Is(err, ErrTransactionNotInBlock) {
+			return err
+		}
 	}
 
 	if collectionID != flow.ZeroID {

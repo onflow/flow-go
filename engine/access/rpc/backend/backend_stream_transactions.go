@@ -2,6 +2,7 @@ package backend
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"go.uber.org/atomic"
@@ -147,7 +148,11 @@ func (b *backendSubscribeTransactions) getTransactionStatusResponse(
 		// Get old status here, as it could be replaced by status from founded tx result
 		prevTxStatus := txInfo.txResult.Status
 
-		if err := txInfo.Refresh(ctx, height); err != nil {
+		if err = txInfo.Refresh(ctx, height); err != nil {
+			if errors.Is(err, subscription.ErrBlockNotReady) {
+				return nil, err
+			}
+
 			return nil, status.Errorf(codes.Internal, "failed to refresh transaction information: %v", err)
 		}
 
