@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/dgraph-io/badger/v2"
 	"github.com/onflow/crypto"
 	"github.com/rs/zerolog"
 
@@ -36,7 +35,6 @@ type Config struct {
 	networkPrivKey   crypto.PrivateKey   // the network private key of this node
 	bootstrapNodes   []BootstrapNodeInfo // the bootstrap nodes to use
 	bindAddr         string              // address to bind on
-	db               *badger.DB          // the badger DB storage to use for the protocol state
 	dataDir          string              // directory to store the protocol state (if the badger storage is not provided)
 	bootstrapDir     string              // path to the bootstrap directory
 	logLevel         string              // log level
@@ -51,9 +49,7 @@ type Option func(c *Config)
 // If a database is supplied, then data directory will be set to empty string
 func WithDataDir(dataDir string) Option {
 	return func(cf *Config) {
-		if cf.db == nil {
-			cf.dataDir = dataDir
-		}
+		cf.dataDir = dataDir
 	}
 }
 
