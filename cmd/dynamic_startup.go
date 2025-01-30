@@ -3,6 +3,7 @@ package cmd
 import (
 	"context"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"path/filepath"
 	"strconv"
@@ -35,11 +36,11 @@ func ValidateDynamicStartupFlags(accessPublicKey, accessAddress string, startPha
 	}
 
 	if accessAddress == "" {
-		return fmt.Errorf("invalid flag --dynamic-startup-access-address can not be empty")
+		return errors.New("invalid flag --dynamic-startup-access-address can not be empty")
 	}
 
 	if startPhase <= flow.EpochPhaseUndefined {
-		return fmt.Errorf("invalid flag --dynamic-startup-startup-epoch-phase unknown epoch phase")
+		return errors.New("invalid flag --dynamic-startup-startup-epoch-phase unknown epoch phase")
 	}
 
 	return nil
