@@ -226,7 +226,7 @@ func (s *TransactionStatusSuite) backendParams() Params {
 func (s *TransactionStatusSuite) initializeMainMockInstructions() {
 	s.transactions.On("Store", mock.Anything).Return(nil).Maybe()
 
-	s.blocks.On("ByHeight", mock.AnythingOfType("uint64")).Return(mocks.StorageMapGetter(s.blockMap))
+	s.blocks.On("ByHeight", mock.AnythingOfType("uint64")).Return(mocks.StorageMapGetter(s.blockMap)).Maybe()
 	s.blocks.On("ByID", mock.Anything).Return(
 		func(blockID flow.Identifier) *flow.Block {
 			for _, block := range s.blockMap {
@@ -244,7 +244,7 @@ func (s *TransactionStatusSuite) initializeMainMockInstructions() {
 			}
 			return errors.New("block not found")
 		},
-	)
+	).Maybe()
 
 	s.state.On("Final").Return(s.finalSnapshot, nil).Maybe()
 	s.state.On("AtBlockID", mock.AnythingOfType("flow.Identifier")).Return(func(blockID flow.Identifier) protocolint.Snapshot {
@@ -270,27 +270,27 @@ func (s *TransactionStatusSuite) initializeMainMockInstructions() {
 	s.blockTracker.On("GetStartHeightFromBlockID", mock.Anything).Return(func(_ flow.Identifier) (uint64, error) {
 		finalizedHeader := s.finalizedBlock.Header
 		return finalizedHeader.Height, nil
-	}, nil)
+	}, nil).Maybe()
 
 	s.blockTracker.On("GetHighestHeight", flow.BlockStatusFinalized).Return(func(_ flow.BlockStatus) (uint64, error) {
 		finalizedHeader := s.finalizedBlock.Header
 		return finalizedHeader.Height, nil
-	}, nil)
+	}, nil).Maybe()
 }
 
 func (s *TransactionStatusSuite) initializeHappyCaseMockInstructions() {
 	s.initializeMainMockInstructions()
 
-	s.reporter.On("LowestIndexedHeight").Return(s.rootBlock.Header.Height, nil)
+	s.reporter.On("LowestIndexedHeight").Return(s.rootBlock.Header.Height, nil).Maybe()
 	s.reporter.On("HighestIndexedHeight").Return(func() (uint64, error) {
 		finalizedHeader := s.finalizedBlock.Header
 		return finalizedHeader.Height, nil
-	}, nil)
+	}, nil).Maybe()
 
 	s.sealedSnapshot.On("Head").Return(func() *flow.Header {
 		return s.sealedBlock.Header
-	}, nil)
-	s.state.On("Sealed").Return(s.sealedSnapshot, nil)
+	}, nil).Maybe()
+	s.state.On("Sealed").Return(s.sealedSnapshot, nil).Maybe()
 
 	eventsForTx := unittest.EventsFixture(1, flow.EventAccountCreated)
 	eventMessages := make([]*entities.Event, 1)
@@ -302,14 +302,14 @@ func (s *TransactionStatusSuite) initializeHappyCaseMockInstructions() {
 		"ByBlockIDTransactionID",
 		mock.AnythingOfType("flow.Identifier"),
 		mock.AnythingOfType("flow.Identifier"),
-	).Return(eventsForTx, nil)
+	).Return(eventsForTx, nil).Maybe()
 }
 
 // initializeTransaction generate sent transaction with ref block of the current finalized block
 func (s *TransactionStatusSuite) initializeTransaction() flow.Transaction {
 	transaction := unittest.TransactionFixture()
 	transaction.SetReferenceBlockID(s.finalizedBlock.ID())
-	s.transactions.On("ByID", mock.AnythingOfType("flow.Identifier")).Return(&transaction.TransactionBody, nil)
+	s.transactions.On("ByID", mock.AnythingOfType("flow.Identifier")).Return(&transaction.TransactionBody, nil).Maybe()
 	return transaction
 }
 
@@ -363,6 +363,7 @@ func (s *TransactionStatusSuite) TestSendAndSubscribeTransactionStatusHappyCase(
 
 	col := flow.CollectionFromTransactions([]*flow.Transaction{&transaction})
 	txId := transaction.ID()
+	s.collections.On("LightByTransactionID", mock.AnythingOfType("flow.Identifier")).Return(nil, storage.ErrNotFound).Once()
 
 	hasTransactionResultInStorage := false
 	s.transactionResults.On(
@@ -378,7 +379,7 @@ func (s *TransactionStatusSuite) TestSendAndSubscribeTransactionStatusHappyCase(
 			}, nil
 		}
 		return nil, storage.ErrNotFound
-	}).Twice()
+	}).Maybe()
 
 	// 1. Subscribe to transaction status and receive the first message with pending status
 	sub := s.backend.SendAndSubscribeTransactionStatuses(ctx, &transaction.TransactionBody, entities.EventEncodingVersion_CCF_V0)
@@ -391,6 +392,8 @@ func (s *TransactionStatusSuite) TestSendAndSubscribeTransactionStatusHappyCase(
 	s.addNewFinalizedBlock(s.sealedBlock.Header, true, func(block *flow.Block) {
 		block.SetPayload(unittest.PayloadFixture(unittest.WithGuarantees(&guarantee)))
 		s.collections.On("LightByID", mock.AnythingOfType("flow.Identifier")).Return(&light, nil).Maybe()
+		s.collections.On("LightByTransactionID", mock.AnythingOfType("flow.Identifier")).Return(&light, nil)
+		s.blocks.On("ByCollectionID", mock.AnythingOfType("flow.Identifier")).Return(block, nil)
 	})
 	s.checkNewSubscriptionMessage(sub, txId, []flow.TransactionStatus{flow.TransactionStatusFinalized})
 
@@ -427,10 +430,22 @@ func (s *TransactionStatusSuite) TestSendAndSubscribeTransactionStatusExpired() 
 	s.initializeBackend()
 	s.initializeMainMockInstructions()
 
+	s.reporter.On("LowestIndexedHeight").Return(s.rootBlock.Header.Height, nil).Maybe()
+	s.reporter.On("HighestIndexedHeight").Return(func() (uint64, error) {
+		finalizedHeader := s.finalizedBlock.Header
+		return finalizedHeader.Height, nil
+	}, nil).Maybe()
+	s.transactionResults.On(
+		"ByBlockIDTransactionID",
+		mock.AnythingOfType("flow.Identifier"),
+		mock.AnythingOfType("flow.Identifier"),
+	).Return(nil, storage.ErrNotFound).Maybe()
+
 	// Generate sent transaction with ref block of the current finalized block
 	transaction := unittest.TransactionFixture()
 	transaction.SetReferenceBlockID(s.finalizedBlock.ID())
 	txId := transaction.ID()
+	s.collections.On("LightByTransactionID", mock.AnythingOfType("flow.Identifier")).Return(nil, storage.ErrNotFound).Once()
 
 	// Subscribe to transaction status and receive the first message with pending status
 	sub := s.backend.SendAndSubscribeTransactionStatuses(ctx, &transaction.TransactionBody, entities.EventEncodingVersion_CCF_V0)
@@ -447,9 +462,9 @@ func (s *TransactionStatusSuite) TestSendAndSubscribeTransactionStatusExpired() 
 
 	// Generate final blocks and check transaction expired
 	s.sealedBlock = s.finalizedBlock
-	s.addNewFinalizedBlock(s.sealedBlock.Header, true)
 	err := s.lastFullBlockHeight.Set(s.sealedBlock.Header.Height)
 	s.Require().NoError(err)
+	s.addNewFinalizedBlock(s.sealedBlock.Header, true)
 
 	s.checkNewSubscriptionMessage(sub, txId, []flow.TransactionStatus{flow.TransactionStatusExpired})
 
@@ -471,6 +486,7 @@ func (s *TransactionStatusSuite) TestSubscribeTransactionStatusWithCurrentPendin
 
 	transaction := s.initializeTransaction()
 	txId := transaction.ID()
+	s.collections.On("LightByTransactionID", mock.AnythingOfType("flow.Identifier")).Return(nil, storage.ErrNotFound).Once()
 
 	hasTransactionResultInStorage := false
 	s.transactionResults.On(
@@ -486,7 +502,7 @@ func (s *TransactionStatusSuite) TestSubscribeTransactionStatusWithCurrentPendin
 			}, nil
 		}
 		return nil, storage.ErrNotFound
-	}).Twice()
+	})
 
 	sub := s.backend.SubscribeTransactionStatuses(ctx, txId, entities.EventEncodingVersion_CCF_V0)
 	s.checkNewSubscriptionMessage(sub, txId, []flow.TransactionStatus{flow.TransactionStatusPending})
@@ -500,6 +516,8 @@ func (s *TransactionStatusSuite) TestSubscribeTransactionStatusWithCurrentPendin
 	s.addNewFinalizedBlock(s.sealedBlock.Header, true, func(block *flow.Block) {
 		block.SetPayload(unittest.PayloadFixture(unittest.WithGuarantees(&guarantee)))
 		s.collections.On("LightByID", mock.AnythingOfType("flow.Identifier")).Return(&light, nil).Maybe()
+		s.collections.On("LightByTransactionID", mock.AnythingOfType("flow.Identifier")).Return(&light, nil)
+		s.blocks.On("ByCollectionID", mock.AnythingOfType("flow.Identifier")).Return(block, nil)
 	})
 	s.checkNewSubscriptionMessage(sub, txId, []flow.TransactionStatus{flow.TransactionStatusFinalized})
 
@@ -561,6 +579,8 @@ func (s *TransactionStatusSuite) TestSubscribeTransactionStatusWithCurrentFinali
 	s.addNewFinalizedBlock(s.sealedBlock.Header, true, func(block *flow.Block) {
 		block.SetPayload(unittest.PayloadFixture(unittest.WithGuarantees(&guarantee)))
 		s.collections.On("LightByID", mock.AnythingOfType("flow.Identifier")).Return(&light, nil).Maybe()
+		s.collections.On("LightByTransactionID", mock.AnythingOfType("flow.Identifier")).Return(&light, nil)
+		s.blocks.On("ByCollectionID", mock.AnythingOfType("flow.Identifier")).Return(block, nil)
 	})
 
 	sub := s.backend.SubscribeTransactionStatuses(ctx, txId, entities.EventEncodingVersion_CCF_V0)
@@ -623,6 +643,8 @@ func (s *TransactionStatusSuite) TestSubscribeTransactionStatusWithCurrentExecut
 	s.addNewFinalizedBlock(s.sealedBlock.Header, true, func(block *flow.Block) {
 		block.SetPayload(unittest.PayloadFixture(unittest.WithGuarantees(&guarantee)))
 		s.collections.On("LightByID", mock.AnythingOfType("flow.Identifier")).Return(&light, nil).Maybe()
+		s.collections.On("LightByTransactionID", mock.AnythingOfType("flow.Identifier")).Return(&light, nil)
+		s.blocks.On("ByCollectionID", mock.AnythingOfType("flow.Identifier")).Return(block, nil)
 	})
 
 	// 3. Add one more finalized block on top of the transaction block and add execution results to storage
@@ -683,6 +705,8 @@ func (s *TransactionStatusSuite) TestSubscribeTransactionStatusWithCurrentSealed
 	s.addNewFinalizedBlock(s.sealedBlock.Header, true, func(block *flow.Block) {
 		block.SetPayload(unittest.PayloadFixture(unittest.WithGuarantees(&guarantee)))
 		s.collections.On("LightByID", mock.AnythingOfType("flow.Identifier")).Return(&light, nil).Maybe()
+		s.collections.On("LightByTransactionID", mock.AnythingOfType("flow.Identifier")).Return(&light, nil)
+		s.blocks.On("ByCollectionID", mock.AnythingOfType("flow.Identifier")).Return(block, nil)
 	})
 	// init transaction result for storage
 	hasTransactionResultInStorage = true
@@ -762,23 +786,6 @@ func (s *TransactionStatusSuite) TestSubscribeTransactionStatusFailedSubscriptio
 		}, nil).Once()
 		expectedError := storage.ErrNotFound
 		s.transactions.On("ByID", txId).Return(nil, expectedError).Once()
-
-		sub := s.backend.SubscribeTransactionStatuses(ctx, txId, entities.EventEncodingVersion_CCF_V0)
-		s.Assert().ErrorContains(sub.Err(), expectedError.Error())
-	})
-
-	s.Run("if could not get transaction reference block by block ID", func() {
-		s.sealedSnapshot.On("Head").Return(func() *flow.Header {
-			return s.sealedBlock.Header
-		}, nil).Once()
-		s.state.On("Sealed").Return(s.sealedSnapshot, nil).Once()
-		s.blockTracker.On("GetStartHeightFromBlockID", mock.Anything).Return(func(_ flow.Identifier) (uint64, error) {
-			finalizedHeader := s.finalizedBlock.Header
-			return finalizedHeader.Height, nil
-		}, nil).Once()
-		s.transactions.On("ByID", txId).Return(&transaction.TransactionBody, nil).Once()
-		expectedError := storage.ErrNotFound
-		s.blocks.On("ByID", transaction.ReferenceBlockID).Return(nil, expectedError).Once()
 
 		sub := s.backend.SubscribeTransactionStatuses(ctx, txId, entities.EventEncodingVersion_CCF_V0)
 		s.Assert().ErrorContains(sub.Err(), expectedError.Error())

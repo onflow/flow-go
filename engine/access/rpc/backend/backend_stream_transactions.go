@@ -2,7 +2,6 @@ package backend
 
 import (
 	"context"
-	"errors"
 	"fmt"
 
 	"go.uber.org/atomic"
@@ -12,13 +11,12 @@ import (
 
 	"github.com/rs/zerolog"
 
+	"github.com/onflow/flow/protobuf/go/flow/entities"
+
 	"github.com/onflow/flow-go/access"
 	"github.com/onflow/flow-go/engine/access/subscription"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/irrecoverable"
-	"github.com/onflow/flow-go/storage"
-
-	"github.com/onflow/flow/protobuf/go/flow/entities"
 )
 
 // sendTransaction defines a function type for sending a transaction.
@@ -116,7 +114,7 @@ func (b *backendSubscribeTransactions) createSubscription(
 	}
 
 	// Retrieve the current state of the transaction.
-	txInfo, err := newTransactionSubscriptionMetadata(ctx, b.backendTransactions, txID, referenceBlockID, startHeight, requiredEventEncodingVersion)
+	txInfo, err := newTransactionSubscriptionMetadata(ctx, b.backendTransactions, txID, referenceBlockID, requiredEventEncodingVersion)
 	if err != nil {
 		b.log.Err(err).Str("tx_id", txID.String()).Msg("failed to get current transaction state")
 		return subscription.NewFailedSubscription(err, "failed to get tx reference block ID")
@@ -139,32 +137,21 @@ func (b *backendSubscribeTransactions) getTransactionStatusResponse(
 		}
 
 		if triggerMissingStatusesOnce.CompareAndSwap(false, true) {
-			return b.generateResultsStatuses(txInfo.TransactionResult, flow.TransactionStatusUnknown)
+			return b.generateResultsStatuses(txInfo.txResult, flow.TransactionStatusUnknown)
 		}
 
-		if txInfo.IsFinal() {
-			return nil, fmt.Errorf("transaction final status %s already reported: %w", txInfo.Status.String(), subscription.ErrEndOfData)
-		}
-
-		// If on this step transaction block not available, search for it.
-		if err = txInfo.checkAndFillTransactionBlockData(height); err != nil {
-			if errors.Is(err, storage.ErrNotFound) {
-				return nil, fmt.Errorf("could not find block %d in storage: %w", height, subscription.ErrBlockNotReady)
-			}
-
-			if !errors.Is(err, ErrTransactionNotInBlock) {
-				return nil, status.Errorf(codes.Internal, "could not get block %d: %v", height, err)
-			}
+		if txInfo.txResult.IsFinal() {
+			return nil, fmt.Errorf("transaction final status %s already reported: %w", txInfo.txResult.Status.String(), subscription.ErrEndOfData)
 		}
 
 		// Get old status here, as it could be replaced by status from founded tx result
-		prevTxStatus := txInfo.Status
+		prevTxStatus := txInfo.txResult.Status
 
-		if err := txInfo.initTransactionResult(ctx); err != nil {
-			return nil, status.Errorf(codes.Internal, "failed to get transaction result for block %s: %v", txInfo.BlockID, err)
+		if err := txInfo.Refresh(ctx, height); err != nil {
+			return nil, status.Errorf(codes.Internal, "failed to refresh transaction information: %v", err)
 		}
 
-		return b.generateResultsStatuses(txInfo.TransactionResult, prevTxStatus)
+		return b.generateResultsStatuses(txInfo.txResult, prevTxStatus)
 	}
 }
 
