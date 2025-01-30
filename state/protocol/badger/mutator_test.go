@@ -963,13 +963,13 @@ func TestExtendEpochTransitionValid(t *testing.T) {
 			require.Error(t, err)
 		}
 
-		// we should be able to query epoch 2 wrt block 3
+		// we should be able to query epoch 2 as a TentativeEpoch wrt block 3
 		_, err = state.AtBlockID(block3.ID()).Epochs().NextUnsafe().InitialIdentities()
 		assert.NoError(t, err)
 		_, err = state.AtBlockID(block3.ID()).Epochs().NextUnsafe().Clustering()
 		assert.NoError(t, err)
 
-		// only setup event is finalized, not commit, so shouldn't be able to get certain info
+		// only setup event is finalized, not commit, so shouldn't be able to read a CommittedEpoch
 		_, err = state.AtBlockID(block3.ID()).Epochs().NextCommitted().DKG()
 		require.Error(t, err)
 
@@ -1032,7 +1032,7 @@ func TestExtendEpochTransitionValid(t *testing.T) {
 			require.Error(t, err)
 		}
 
-		// now epoch 2 is fully ready, we can query anything we want about it wrt block 6 (or later)
+		// now epoch 2 is committed, we can query anything we want about it wrt block 6 (or later)
 		_, err = state.AtBlockID(block6.ID()).Epochs().NextCommitted().InitialIdentities()
 		require.NoError(t, err)
 		_, err = state.AtBlockID(block6.ID()).Epochs().NextCommitted().Clustering()

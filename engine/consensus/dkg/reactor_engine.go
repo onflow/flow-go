@@ -335,7 +335,9 @@ func (e *ReactorEngine) handleEpochCommittedPhaseStarted(currentEpochCounter uin
 	log.Info().Msgf("successfully ended DKG, my beacon pub key for epoch %d is %s", nextEpochCounter, localPubKey)
 }
 
-// TODO document error returns
+// getDKGInfo returns the information required to initiate the DKG for the current epoch.
+// firstBlockID must be the first block of the EpochSetup phase.
+// No errors are expected during normal operation.
 func (e *ReactorEngine) getDKGInfo(firstBlockID flow.Identifier) (*dkgInfo, error) {
 	currEpoch := e.State.AtBlockID(firstBlockID).Epochs().Current()
 	nextEpoch := e.State.AtBlockID(firstBlockID).Epochs().NextUnsafe()

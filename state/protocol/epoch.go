@@ -210,6 +210,12 @@ type CommittedEpoch interface {
 	FinalHeight() (uint64, error)
 }
 
+// TentativeEpoch returns the data associated with the "working next epoch",
+// the upcoming epoch which the protocol is in the process of committing.
+// Only the data that is strictly necessary for committing the epoch is exposed;
+// after commitment, all epoch data is accessible through the [CommittedEpoch] interface.
+// This should only be used by components that participate in committing the epoch
+// (transition from [flow.EpochPhaseSetup] to [flow.EpochPhaseCommitted]).
 type TentativeEpoch interface {
 
 	// Counter returns the Epoch's counter.
