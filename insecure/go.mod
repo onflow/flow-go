@@ -15,7 +15,6 @@ require (
 	github.com/rs/zerolog v1.29.0
 	github.com/spf13/pflag v1.0.5
 	github.com/stretchr/testify v1.10.0
-	github.com/yhassanzadeh13/go-libp2p-pubsub v0.6.11-flow-expose-msg.0.20240220190333-03695dea34a3 // libp2p v0.32.0
 	go.uber.org/atomic v1.11.0
 	google.golang.org/grpc v1.64.1
 	google.golang.org/protobuf v1.36.0

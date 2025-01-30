@@ -3,20 +3,19 @@ package corruptlibp2p
 import (
 	"time"
 
+	corrupt "github.com/libp2p/go-libp2p-pubsub"
 	pb "github.com/libp2p/go-libp2p-pubsub/pb"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/libp2p/go-libp2p/core/routing"
 	discoveryRouting "github.com/libp2p/go-libp2p/p2p/discovery/routing"
-	corrupt "github.com/yhassanzadeh13/go-libp2p-pubsub"
 
 	"github.com/onflow/flow-go/network/p2p"
 )
 
-// CorruptPubSubAdapterConfig is a wrapper around the forked pubsub topic from
-// github.com/yhassanzadeh13/go-libp2p-pubsub that implements the p2p.PubSubAdapterConfig.
+// CorruptPubSubAdapterConfig is a wrapper that implements the p2p.PubSubAdapterConfig.
 // This is needed because in order to use the forked pubsub module, we need to
 // use the entire dependency tree of the forked module which is resolved to
-// github.com/yhassanzadeh13/go-libp2p-pubsub. This means that we cannot use
+// github.com/libp2p/go-libp2p-pubsub. This means that we cannot use
 // the original libp2p pubsub module in the same package.
 // Note: we use the forked pubsub module for sake of BFT testing and attack vector
 // implementation, it is designed to be completely isolated in the "insecure" package, and
