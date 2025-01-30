@@ -11,7 +11,7 @@ import (
 // committee in the given epoch. A cluster containing nodes with zero `InitialWeight`
 // is an accepted input as long as there are nodes with positive weights. Zero-weight nodes
 // have zero probability of being selected as leaders in accordance with their weight.
-func SelectionForCluster(cluster protocol.Cluster, epoch protocol.Epoch) (*LeaderSelection, error) {
+func SelectionForCluster(cluster protocol.Cluster, epoch protocol.CommittedEpoch) (*LeaderSelection, error) {
 	// sanity check to ensure the cluster and epoch match
 	counter, err := epoch.Counter()
 	if err != nil {

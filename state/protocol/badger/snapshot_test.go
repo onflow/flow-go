@@ -1231,15 +1231,20 @@ func TestSnapshot_EpochQuery(t *testing.T) {
 		t.Run("Next", func(t *testing.T) {
 			t.Run("epoch 1: before next epoch available", func(t *testing.T) {
 				for _, height := range epoch1.StakingRange() {
-					_, err := state.AtHeight(height).Epochs().Next().Counter()
+					_, err := state.AtHeight(height).Epochs().NextUnsafe().Counter()
 					assert.Error(t, err)
 					assert.True(t, errors.Is(err, protocol.ErrNextEpochNotSetup))
 				}
 			})
 
 			t.Run("epoch 2: after next epoch available", func(t *testing.T) {
-				for _, height := range append(epoch1.SetupRange(), epoch1.CommittedRange()...) {
-					counter, err := state.AtHeight(height).Epochs().Next().Counter()
+				for _, height := range epoch1.SetupRange() {
+					counter, err := state.AtHeight(height).Epochs().NextUnsafe().Counter()
+					require.NoError(t, err)
+					assert.Equal(t, epoch2Counter, counter)
+				}
+				for _, height := range epoch1.CommittedRange() {
+					counter, err := state.AtHeight(height).Epochs().NextCommitted().Counter()
 					require.NoError(t, err)
 					assert.Equal(t, epoch2Counter, counter)
 				}
@@ -1329,8 +1334,8 @@ func TestSnapshot_EpochFirstView(t *testing.T) {
 
 			// test w.r.t. epoch 1 snapshot
 			t.Run("Next", func(t *testing.T) {
-				for _, height := range append(epoch1.SetupRange(), epoch1.CommittedRange()...) {
-					actualFirstView, err := state.AtHeight(height).Epochs().Next().FirstView()
+				for _, height := range epoch1.CommittedRange() {
+					actualFirstView, err := state.AtHeight(height).Epochs().NextCommitted().FirstView()
 					require.NoError(t, err)
 					assert.Equal(t, epoch2FirstView, actualFirstView)
 				}
@@ -1386,9 +1391,9 @@ func TestSnapshot_EpochHeightBoundaries(t *testing.T) {
 			_, err = state.Final().Epochs().Current().FinalHeight()
 			assert.ErrorIs(t, err, protocol.ErrUnknownEpochBoundary)
 			// first and final height of not started next epoch should be unknown
-			_, err = state.Final().Epochs().Next().FirstHeight()
+			_, err = state.Final().Epochs().NextCommitted().FirstHeight()
 			assert.ErrorIs(t, err, protocol.ErrUnknownEpochBoundary)
-			_, err = state.Final().Epochs().Next().FinalHeight()
+			_, err = state.Final().Epochs().NextCommitted().FinalHeight()
 			assert.ErrorIs(t, err, protocol.ErrUnknownEpochBoundary)
 		})
 

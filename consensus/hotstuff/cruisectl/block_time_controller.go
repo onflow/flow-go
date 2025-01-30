@@ -40,7 +40,7 @@ type epochTiming struct {
 }
 
 // newEpochTiming queries the timing information from the given `epoch` and returns it as a new `epochTiming` instance.
-func newEpochTiming(epoch protocol.Epoch) (*epochTiming, error) {
+func newEpochTiming(epoch protocol.CommittedEpoch) (*epochTiming, error) {
 	firstView, err := epoch.FirstView()
 	if err != nil {
 		return nil, fmt.Errorf("could not retrieve epoch's first view: %w", err)
@@ -191,7 +191,7 @@ func (ctl *BlockTimeController) initEpochTiming() error {
 		return fmt.Errorf("could not check snapshot phase: %w", err)
 	}
 	if phase == flow.EpochPhaseCommitted {
-		ctl.nextEpochTiming, err = newEpochTiming(finalSnapshot.Epochs().Next())
+		ctl.nextEpochTiming, err = newEpochTiming(finalSnapshot.Epochs().NextCommitted())
 		if err != nil {
 			return fmt.Errorf("failed to retrieve the next epoch's timing information: %w", err)
 		}
@@ -459,7 +459,7 @@ func (ctl *BlockTimeController) processEpochExtended(first *flow.Header) error {
 func (ctl *BlockTimeController) processEpochCommittedPhaseStarted(first *flow.Header) error {
 	var err error
 	snapshot := ctl.state.AtHeight(first.Height)
-	ctl.nextEpochTiming, err = newEpochTiming(snapshot.Epochs().Next())
+	ctl.nextEpochTiming, err = newEpochTiming(snapshot.Epochs().NextCommitted())
 	if err != nil {
 		return fmt.Errorf("failed to retrieve the next epoch's timing information: %w", err)
 	}

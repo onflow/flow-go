@@ -359,7 +359,7 @@ func (s *DynamicEpochTransitionSuite) AssertInEpochPhase(ctx context.Context, ex
 
 // AssertNodeNotParticipantInEpoch asserts that the given node ID does not exist
 // in the epoch's identity table.
-func (s *DynamicEpochTransitionSuite) AssertNodeNotParticipantInEpoch(epoch protocol.Epoch, nodeID flow.Identifier) {
+func (s *DynamicEpochTransitionSuite) AssertNodeNotParticipantInEpoch(epoch protocol.TentativeEpoch, nodeID flow.Identifier) {
 	identities, err := epoch.InitialIdentities()
 	require.NoError(s.T(), err)
 	require.NotContains(s.T(), identities.NodeIDs(), nodeID)
@@ -534,7 +534,7 @@ func (s *DynamicEpochTransitionSuite) RunTestEpochJoinAndLeave(role flow.Role, c
 	s.TimedLogf("observed finalized view %d -> pausing container", epoch1FinalView+1)
 
 	// make sure container to replace is not a member of epoch 2
-	s.AssertNodeNotParticipantInEpoch(rootSnapshot.Epochs().Next(), containerToReplace.Config.NodeID)
+	s.AssertNodeNotParticipantInEpoch(rootSnapshot.Epochs().NextUnsafe(), containerToReplace.Config.NodeID)
 
 	// assert transition to second epoch happened as expected
 	// if counter is still 0, epoch emergency fallback was triggered and we can fail early

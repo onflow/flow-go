@@ -9,8 +9,9 @@ import (
 	"github.com/onflow/flow-go/state/protocol/prg"
 )
 
-// SelectionForConsensusFromEpoch is a ...
-func SelectionForConsensusFromEpoch(epoch protocol.Epoch) (*LeaderSelection, error) {
+// SelectionForConsensusFromEpoch returns the leader selection for the input epoch.
+// See [SelectionForConsensus] for additional details.
+func SelectionForConsensusFromEpoch(epoch protocol.CommittedEpoch) (*LeaderSelection, error) {
 
 	identities, err := epoch.InitialIdentities()
 	if err != nil {

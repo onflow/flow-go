@@ -288,7 +288,7 @@ func (e *Engine) Done() <-chan struct{} {
 // the given epoch, using the configured factory.
 // Error returns:
 // - ErrNotAuthorizedForEpoch if this node is not authorized in the epoch.
-func (e *Engine) createEpochComponents(epoch protocol.Epoch) (*EpochComponents, error) {
+func (e *Engine) createEpochComponents(epoch protocol.CommittedEpoch) (*EpochComponents, error) {
 	counter, err := epoch.Counter()
 	if err != nil {
 		return nil, fmt.Errorf("could not get epoch counter: %w", err)
@@ -343,7 +343,7 @@ func (e *Engine) handleEpochEvents(ctx irrecoverable.SignalerContext, ready comp
 				ctx.Throw(err)
 			}
 		case firstBlock := <-e.epochSetupPhaseStartedEvents:
-			nextEpoch := e.state.AtBlockID(firstBlock.ID()).Epochs().Next()
+			nextEpoch := e.state.AtBlockID(firstBlock.ID()).Epochs().NextUnsafe()
 			e.onEpochSetupPhaseStarted(ctx, nextEpoch)
 		case epochCounter := <-e.epochStopEvents:
 			err := e.stopEpochComponents(epochCounter)
@@ -454,7 +454,7 @@ func (e *Engine) prepareToStopEpochComponents(epochCounter, epochMaxHeight uint6
 // setup phase, or when the node is restarted during the epoch setup phase. It
 // kicks off setup tasks for the phase, in particular submitting a vote for the
 // next epoch's root cluster QC.
-func (e *Engine) onEpochSetupPhaseStarted(ctx irrecoverable.SignalerContext, nextEpoch protocol.Epoch) {
+func (e *Engine) onEpochSetupPhaseStarted(ctx irrecoverable.SignalerContext, nextEpoch protocol.TentativeEpoch) {
 	ctxWithCancel, cancel := context.WithCancel(ctx)
 	defer cancel()
 

@@ -77,7 +77,8 @@ func snapshot(cmd *cobra.Command, args []string) {
 	}
 
 	// check if given NodeID is part of the current or next epoch
-	currentIdentities, err := snapshot.Epochs().Current().InitialIdentities()
+	currentEpoch := snapshot.Epochs().Current()
+	currentIdentities, err := currentEpoch.InitialIdentities()
 	if err != nil {
 		log.Fatal().Err(err).Msg("could not get initial identities from current epoch")
 	}
@@ -89,7 +90,8 @@ func snapshot(cmd *cobra.Command, args []string) {
 		return
 	}
 
-	nextIdentities, err := snapshot.Epochs().Next().InitialIdentities()
+	nextEpoch := snapshot.Epochs().NextCommitted()
+	nextIdentities, err := nextEpoch.InitialIdentities()
 	if err != nil {
 		log.Fatal().Err(err).Msg("could not get initial identities from next epoch")
 	}
