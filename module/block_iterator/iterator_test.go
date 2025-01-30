@@ -81,8 +81,8 @@ type saveNextHeight struct {
 	savedNextHeight uint64
 }
 
-var _ module.IterateProgressWriter = (*saveNextHeight)(nil)
-var _ module.IterateProgressReader = (*saveNextHeight)(nil)
+var _ module.IteratorStateWriter = (*saveNextHeight)(nil)
+var _ module.IteratorStateReader = (*saveNextHeight)(nil)
 
 func (s *saveNextHeight) SaveState(height uint64) error {
 	s.savedNextHeight = height

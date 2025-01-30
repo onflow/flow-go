@@ -15,9 +15,9 @@ import (
 type IndexedBlockIterator struct {
 	// dependencies
 	getBlockIDByIndex func(uint64) (blockID flow.Identifier, indexed bool, exception error)
-	progress          module.IterateProgressWriter // for saving the next index to be iterated for resuming the iteration
-	endIndex          uint64                       // the end index to iterate, this never change
-	nextIndex         uint64                       // the start index to iterate, this will be updated after each iteration
+	progress          module.IteratorStateWriter // for saving the next index to be iterated for resuming the iteration
+	endIndex          uint64                     // the end index to iterate, this never change
+	nextIndex         uint64                     // the start index to iterate, this will be updated after each iteration
 }
 
 var _ module.BlockIterator = (*IndexedBlockIterator)(nil)
@@ -25,7 +25,7 @@ var _ module.BlockIterator = (*IndexedBlockIterator)(nil)
 // caller must ensure that both iterRange.Start and iterRange.End are finalized
 func NewIndexedBlockIterator(
 	getBlockIDByIndex func(uint64) (blockID flow.Identifier, indexed bool, exception error),
-	progress module.IterateProgressWriter,
+	progress module.IteratorStateWriter,
 	iterRange module.IterateRange,
 ) module.BlockIterator {
 	return &IndexedBlockIterator{

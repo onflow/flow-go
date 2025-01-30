@@ -21,7 +21,7 @@ func TestProgress(t *testing.T) {
 
 		store := storagepebble.NewConsumerProgress(db, "test")
 
-		progress, err := NewNextProgress(store, root, getLatest)
+		progress, err := NewPersistentIteratorState(store, root, getLatest)
 		require.NoError(t, err)
 
 		// initial state should be the next of root

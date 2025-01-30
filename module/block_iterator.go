@@ -13,23 +13,22 @@ type IterateRange struct {
 	End   uint64 // the end of the range
 }
 
-// IterateProgress is an interface for reading and writing the progress of the iterator
-type IterateProgress interface {
-	IterateProgressReader
-	IterateProgressWriter
+// IteratorState is an interface for reading and writing the progress of the iterator
+type IteratorState interface {
+	IteratorStateReader
+	IteratorStateWriter
 }
 
-// IterateProgressReader reads the progress of the iterator, useful for resuming the iteration
+// IteratorStateReader reads the progress of the iterator, useful for resuming the iteration
 // after restart
-type IterateProgressReader interface {
+type IteratorStateReader interface {
 	// LoadState reads the next block to iterate
-	// caller must ensure the reader is created by the IterateProgressInitializer,
-	// otherwise LoadState would return exception.
+	// caller must ensure the state is initialized, otherwise LoadState would return exception.
 	LoadState() (progress uint64, exception error)
 }
 
-// IterateProgressWriter saves the progress of the iterator
-type IterateProgressWriter interface {
+// IteratorStateWriter saves the progress of the iterator
+type IteratorStateWriter interface {
 	// SaveState persists the next block to be iterated
 	SaveState(uint64) (exception error)
 }
