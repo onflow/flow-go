@@ -949,8 +949,7 @@ func (fnb *FlowNodeBuilder) initMetrics() error {
 		// metrics enabled, report node info metrics as post init event
 		fnb.PostInit(func(nodeConfig *NodeConfig) error {
 			nodeInfoMetrics := metrics.NewNodeInfoCollector()
-			protocolVersion := fnb.RootSnapshot.Params().ProtocolVersion()
-			nodeInfoMetrics.NodeInfo(build.Version(), build.Commit(), nodeConfig.SporkID.String(), protocolVersion)
+			nodeInfoMetrics.NodeInfo(build.Version(), build.Commit(), nodeConfig.SporkID.String())
 			return nil
 		})
 	}
