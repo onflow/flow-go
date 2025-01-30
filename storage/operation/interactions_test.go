@@ -1,19 +1,21 @@
-package operation
+package operation_test
 
 import (
 	"testing"
 
-	"github.com/dgraph-io/badger/v2"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/fvm/storage/snapshot"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/storage"
+	"github.com/onflow/flow-go/storage/operation"
+	"github.com/onflow/flow-go/storage/operation/dbtest"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
 func TestStateInteractionsInsertCheckRetrieve(t *testing.T) {
-	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
+	dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
 
 		id1 := flow.NewRegisterID(
 			flow.BytesToAddress([]byte("\x89krg\u007fBN\x1d\xf5\xfb\xb8r\xbc4\xbd\x98ռ\xf1\xd0twU\xbf\x16N\xb4?,\xa0&;")),
@@ -39,12 +41,14 @@ func TestStateInteractionsInsertCheckRetrieve(t *testing.T) {
 
 		blockID := unittest.IdentifierFixture()
 
-		err := db.Update(InsertExecutionStateInteractions(blockID, interactions))
+		err := db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+			return operation.InsertExecutionStateInteractions(rw.Writer(), blockID, interactions)
+		})
 		require.Nil(t, err)
 
 		var readInteractions []*snapshot.ExecutionSnapshot
 
-		err = db.View(RetrieveExecutionStateInteractions(blockID, &readInteractions))
+		err = operation.RetrieveExecutionStateInteractions(db.Reader(), blockID, &readInteractions)
 		require.NoError(t, err)
 
 		assert.Equal(t, interactions, readInteractions)

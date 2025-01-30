@@ -22,7 +22,8 @@ import (
 	"github.com/onflow/flow-go/ledger/complete/wal"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/metrics"
-	"github.com/onflow/flow-go/storage/badger"
+	"github.com/onflow/flow-go/storage/operation/badgerimpl"
+	"github.com/onflow/flow-go/storage/store"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -38,7 +39,7 @@ func TestExtractExecutionState(t *testing.T) {
 
 		withDirs(t, func(datadir, execdir, outdir string) {
 			db := common.InitStorage(datadir)
-			commits := badger.NewCommits(metr, db)
+			commits := store.NewCommits(metr, badgerimpl.ToDB(db))
 
 			_, err := commits.ByBlockID(unittest.IdentifierFixture())
 			require.Error(t, err)
@@ -49,7 +50,7 @@ func TestExtractExecutionState(t *testing.T) {
 
 		withDirs(t, func(datadir, execdir, outdir string) {
 			db := common.InitStorage(datadir)
-			commits := badger.NewCommits(metr, db)
+			commits := store.NewCommits(metr, badgerimpl.ToDB(db))
 
 			blockID := unittest.IdentifierFixture()
 			stateCommitment := unittest.StateCommitmentFixture()
@@ -84,7 +85,7 @@ func TestExtractExecutionState(t *testing.T) {
 			)
 
 			db := common.InitStorage(datadir)
-			commits := badger.NewCommits(metr, db)
+			commits := store.NewCommits(metr, badgerimpl.ToDB(db))
 
 			// generate some oldLedger data
 			size := 10

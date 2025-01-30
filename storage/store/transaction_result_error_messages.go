@@ -1,74 +1,63 @@
-package badger
+package store
 
 import (
 	"fmt"
-
-	"github.com/dgraph-io/badger/v2"
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/storage"
-	"github.com/onflow/flow-go/storage/badger/operation"
+	"github.com/onflow/flow-go/storage/operation"
 )
 
 var _ storage.TransactionResultErrorMessages = (*TransactionResultErrorMessages)(nil)
 
 type TransactionResultErrorMessages struct {
-	db         *badger.DB
+	db         storage.DB
 	cache      *Cache[string, flow.TransactionResultErrorMessage]
 	indexCache *Cache[string, flow.TransactionResultErrorMessage]
 	blockCache *Cache[string, []flow.TransactionResultErrorMessage]
 }
 
-func NewTransactionResultErrorMessages(collector module.CacheMetrics, db *badger.DB, transactionResultsCacheSize uint) *TransactionResultErrorMessages {
-	retrieve := func(key string) func(tx *badger.Txn) (flow.TransactionResultErrorMessage, error) {
+func NewTransactionResultErrorMessages(collector module.CacheMetrics, db storage.DB, transactionResultsCacheSize uint) *TransactionResultErrorMessages {
+	retrieve := func(r storage.Reader, key string) (flow.TransactionResultErrorMessage, error) {
 		var txResultErrMsg flow.TransactionResultErrorMessage
-		return func(tx *badger.Txn) (flow.TransactionResultErrorMessage, error) {
-
-			blockID, txID, err := KeyToBlockIDTransactionID(key)
-			if err != nil {
-				return flow.TransactionResultErrorMessage{}, fmt.Errorf("could not convert key: %w", err)
-			}
-
-			err = operation.RetrieveTransactionResultErrorMessage(blockID, txID, &txResultErrMsg)(tx)
-			if err != nil {
-				return flow.TransactionResultErrorMessage{}, handleError(err, flow.TransactionResultErrorMessage{})
-			}
-			return txResultErrMsg, nil
+		blockID, txID, err := KeyToBlockIDTransactionID(key)
+		if err != nil {
+			return flow.TransactionResultErrorMessage{}, fmt.Errorf("could not convert key: %w", err)
 		}
+
+		err = operation.RetrieveTransactionResultErrorMessage(r, blockID, txID, &txResultErrMsg)
+		if err != nil {
+			return flow.TransactionResultErrorMessage{}, err
+		}
+		return txResultErrMsg, nil
 	}
-	retrieveIndex := func(key string) func(tx *badger.Txn) (flow.TransactionResultErrorMessage, error) {
+	retrieveIndex := func(r storage.Reader, key string) (flow.TransactionResultErrorMessage, error) {
 		var txResultErrMsg flow.TransactionResultErrorMessage
-		return func(tx *badger.Txn) (flow.TransactionResultErrorMessage, error) {
-
-			blockID, txIndex, err := KeyToBlockIDIndex(key)
-			if err != nil {
-				return flow.TransactionResultErrorMessage{}, fmt.Errorf("could not convert index key: %w", err)
-			}
-
-			err = operation.RetrieveTransactionResultErrorMessageByIndex(blockID, txIndex, &txResultErrMsg)(tx)
-			if err != nil {
-				return flow.TransactionResultErrorMessage{}, handleError(err, flow.TransactionResultErrorMessage{})
-			}
-			return txResultErrMsg, nil
+		blockID, txIndex, err := KeyToBlockIDIndex(key)
+		if err != nil {
+			return flow.TransactionResultErrorMessage{}, fmt.Errorf("could not convert index key: %w", err)
 		}
+
+		err = operation.RetrieveTransactionResultErrorMessageByIndex(r, blockID, txIndex, &txResultErrMsg)
+		if err != nil {
+			return flow.TransactionResultErrorMessage{}, err
+		}
+		return txResultErrMsg, nil
 	}
-	retrieveForBlock := func(key string) func(tx *badger.Txn) ([]flow.TransactionResultErrorMessage, error) {
+	retrieveForBlock := func(r storage.Reader, key string) ([]flow.TransactionResultErrorMessage, error) {
 		var txResultErrMsg []flow.TransactionResultErrorMessage
-		return func(tx *badger.Txn) ([]flow.TransactionResultErrorMessage, error) {
-
-			blockID, err := KeyToBlockID(key)
-			if err != nil {
-				return nil, fmt.Errorf("could not convert index key: %w", err)
-			}
-
-			err = operation.LookupTransactionResultErrorMessagesByBlockIDUsingIndex(blockID, &txResultErrMsg)(tx)
-			if err != nil {
-				return nil, handleError(err, flow.TransactionResultErrorMessage{})
-			}
-			return txResultErrMsg, nil
+		blockID, err := KeyToBlockID(key)
+		if err != nil {
+			return nil, fmt.Errorf("could not convert index key: %w", err)
 		}
+
+		err = operation.LookupTransactionResultErrorMessagesByBlockIDUsingIndex(r, blockID, &txResultErrMsg)
+		if err != nil {
+			return nil, err
+		}
+		return txResultErrMsg, nil
 	}
 
 	return &TransactionResultErrorMessages{
@@ -95,19 +84,9 @@ func NewTransactionResultErrorMessages(collector module.CacheMetrics, db *badger
 //
 // No errors are expected during normal operation.
 func (t *TransactionResultErrorMessages) Store(blockID flow.Identifier, transactionResultErrorMessages []flow.TransactionResultErrorMessage) error {
-	batch := NewBatch(t.db)
-
-	err := t.batchStore(blockID, transactionResultErrorMessages, batch)
-	if err != nil {
-		return err
-	}
-
-	err = batch.Flush()
-	if err != nil {
-		return fmt.Errorf("cannot flush batch: %w", err)
-	}
-
-	return nil
+	return t.db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+		return t.batchStore(blockID, transactionResultErrorMessages, rw)
+	})
 }
 
 // Exists returns true if transaction result error messages for the given ID have been stored.
@@ -121,7 +100,7 @@ func (t *TransactionResultErrorMessages) Exists(blockID flow.Identifier) (bool, 
 	}
 	// otherwise, check badger store
 	var exists bool
-	err := t.db.View(operation.TransactionResultErrorMessagesExists(blockID, &exists))
+	err := operation.TransactionResultErrorMessagesExists(t.db.Reader(), blockID, &exists)
 	if err != nil {
 		return false, fmt.Errorf("could not check existence: %w", err)
 	}
@@ -134,23 +113,22 @@ func (t *TransactionResultErrorMessages) Exists(blockID flow.Identifier) (bool, 
 func (t *TransactionResultErrorMessages) batchStore(
 	blockID flow.Identifier,
 	transactionResultErrorMessages []flow.TransactionResultErrorMessage,
-	batch storage.BatchStorage,
+	batch storage.ReaderBatchWriter,
 ) error {
-	writeBatch := batch.GetWriter()
-
+	writer := batch.Writer()
 	for _, result := range transactionResultErrorMessages {
-		err := operation.BatchInsertTransactionResultErrorMessage(blockID, &result)(writeBatch)
+		err := operation.BatchInsertTransactionResultErrorMessage(writer, blockID, &result)
 		if err != nil {
 			return fmt.Errorf("cannot batch insert tx result error message: %w", err)
 		}
 
-		err = operation.BatchIndexTransactionResultErrorMessage(blockID, &result)(writeBatch)
+		err = operation.BatchIndexTransactionResultErrorMessage(writer, blockID, &result)
 		if err != nil {
 			return fmt.Errorf("cannot batch index tx result error message: %w", err)
 		}
 	}
 
-	batch.OnSucceed(func() {
+	storage.OnCommitSucceed(batch, func() {
 		for _, result := range transactionResultErrorMessages {
 			key := KeyFromBlockIDTransactionID(blockID, result.TransactionID)
 			// cache for each transaction, so that it's faster to retrieve
@@ -171,10 +149,8 @@ func (t *TransactionResultErrorMessages) batchStore(
 // Expected errors during normal operation:
 //   - `storage.ErrNotFound` if no transaction error message is known at given block and transaction id.
 func (t *TransactionResultErrorMessages) ByBlockIDTransactionID(blockID flow.Identifier, transactionID flow.Identifier) (*flow.TransactionResultErrorMessage, error) {
-	tx := t.db.NewTransaction(false)
-	defer tx.Discard()
 	key := KeyFromBlockIDTransactionID(blockID, transactionID)
-	transactionResultErrorMessage, err := t.cache.Get(key)(tx)
+	transactionResultErrorMessage, err := t.cache.Get(t.db.Reader(), key)
 	if err != nil {
 		return nil, err
 	}
@@ -186,10 +162,8 @@ func (t *TransactionResultErrorMessages) ByBlockIDTransactionID(blockID flow.Ide
 // Expected errors during normal operation:
 //   - `storage.ErrNotFound` if no transaction error message is known at given block and transaction index.
 func (t *TransactionResultErrorMessages) ByBlockIDTransactionIndex(blockID flow.Identifier, txIndex uint32) (*flow.TransactionResultErrorMessage, error) {
-	tx := t.db.NewTransaction(false)
-	defer tx.Discard()
 	key := KeyFromBlockIDIndex(blockID, txIndex)
-	transactionResultErrorMessage, err := t.indexCache.Get(key)(tx)
+	transactionResultErrorMessage, err := t.indexCache.Get(t.db.Reader(), key)
 	if err != nil {
 		return nil, err
 	}
@@ -201,10 +175,8 @@ func (t *TransactionResultErrorMessages) ByBlockIDTransactionIndex(blockID flow.
 //
 // No errors are expected during normal operation.
 func (t *TransactionResultErrorMessages) ByBlockID(blockID flow.Identifier) ([]flow.TransactionResultErrorMessage, error) {
-	tx := t.db.NewTransaction(false)
-	defer tx.Discard()
 	key := KeyFromBlockID(blockID)
-	transactionResultErrorMessages, err := t.blockCache.Get(key)(tx)
+	transactionResultErrorMessages, err := t.blockCache.Get(t.db.Reader(), key)
 	if err != nil {
 		return nil, err
 	}

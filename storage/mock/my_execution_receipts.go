@@ -15,7 +15,7 @@ type MyExecutionReceipts struct {
 }
 
 // BatchRemoveIndexByBlockID provides a mock function with given fields: blockID, batch
-func (_m *MyExecutionReceipts) BatchRemoveIndexByBlockID(blockID flow.Identifier, batch storage.BatchStorage) error {
+func (_m *MyExecutionReceipts) BatchRemoveIndexByBlockID(blockID flow.Identifier, batch storage.ReaderBatchWriter) error {
 	ret := _m.Called(blockID, batch)
 
 	if len(ret) == 0 {
@@ -23,7 +23,7 @@ func (_m *MyExecutionReceipts) BatchRemoveIndexByBlockID(blockID flow.Identifier
 	}
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(flow.Identifier, storage.BatchStorage) error); ok {
+	if rf, ok := ret.Get(0).(func(flow.Identifier, storage.ReaderBatchWriter) error); ok {
 		r0 = rf(blockID, batch)
 	} else {
 		r0 = ret.Error(0)
@@ -33,7 +33,7 @@ func (_m *MyExecutionReceipts) BatchRemoveIndexByBlockID(blockID flow.Identifier
 }
 
 // BatchStoreMyReceipt provides a mock function with given fields: receipt, batch
-func (_m *MyExecutionReceipts) BatchStoreMyReceipt(receipt *flow.ExecutionReceipt, batch storage.BatchStorage) error {
+func (_m *MyExecutionReceipts) BatchStoreMyReceipt(receipt *flow.ExecutionReceipt, batch storage.ReaderBatchWriter) error {
 	ret := _m.Called(receipt, batch)
 
 	if len(ret) == 0 {
@@ -41,7 +41,7 @@ func (_m *MyExecutionReceipts) BatchStoreMyReceipt(receipt *flow.ExecutionReceip
 	}
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(*flow.ExecutionReceipt, storage.BatchStorage) error); ok {
+	if rf, ok := ret.Get(0).(func(*flow.ExecutionReceipt, storage.ReaderBatchWriter) error); ok {
 		r0 = rf(receipt, batch)
 	} else {
 		r0 = ret.Error(0)
