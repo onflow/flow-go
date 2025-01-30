@@ -8,7 +8,7 @@ require (
 	github.com/hashicorp/go-multierror v1.1.1
 	github.com/ipfs/go-datastore v0.6.0
 	github.com/libp2p/go-libp2p v0.38.2
-	github.com/libp2p/go-libp2p-pubsub v0.12.0
+	github.com/libp2p/go-libp2p-pubsub v0.12.1-0.20241230202526-bf5b58384331
 	github.com/multiformats/go-multiaddr-dns v0.4.1
 	github.com/onflow/crypto v0.25.2
 	github.com/onflow/flow-go v0.36.2-0.20240717162253-d5d2e606ef53

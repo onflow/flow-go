@@ -42,7 +42,7 @@ require (
 	github.com/libp2p/go-libp2p v0.38.2
 	github.com/libp2p/go-libp2p-kad-dht v0.25.2
 	github.com/libp2p/go-libp2p-kbucket v0.6.3
-	github.com/libp2p/go-libp2p-pubsub v0.12.0
+	github.com/libp2p/go-libp2p-pubsub v0.12.1-0.20241230202526-bf5b58384331
 	github.com/montanaflynn/stats v0.7.0
 	github.com/multiformats/go-multiaddr v0.14.0
 	github.com/multiformats/go-multiaddr-dns v0.4.1
