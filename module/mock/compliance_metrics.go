@@ -62,6 +62,11 @@ func (_m *ComplianceMetrics) FinalizedHeight(height uint64) {
 	_m.Called(height)
 }
 
+// ProtocolKVStoreVersion provides a mock function with given fields: version
+func (_m *ComplianceMetrics) ProtocolKVStoreVersion(version uint64) {
+	_m.Called(version)
+}
+
 // SealedHeight provides a mock function with given fields: height
 func (_m *ComplianceMetrics) SealedHeight(height uint64) {
 	_m.Called(height)
