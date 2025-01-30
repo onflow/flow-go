@@ -127,6 +127,14 @@ func (bl *BlockView) DirectCall(call *types.DirectCall) (res *types.Result, err 
 				err == nil && res != nil {
 				proc.evm.Config.Tracer.OnTxEnd(res.Receipt(), res.ValidationError)
 			}
+
+			// call OnLog tracer hook, upon successful call result
+			if proc.evm.Config.Tracer.OnLog != nil &&
+				err == nil && res != nil {
+				for _, log := range res.Logs {
+					proc.evm.Config.Tracer.OnLog(log)
+				}
+			}
 		}()
 	}
 
@@ -191,6 +199,15 @@ func (bl *BlockView) RunTransaction(
 		proc.evm.Config.Tracer.OnTxEnd(res.Receipt(), res.ValidationError)
 	}
 
+	// call OnLog tracer hook, upon successful tx result
+	if proc.evm.Config.Tracer != nil &&
+		proc.evm.Config.Tracer.OnLog != nil &&
+		res != nil {
+		for _, log := range res.Logs {
+			proc.evm.Config.Tracer.OnLog(log)
+		}
+	}
+
 	return res, nil
 }
 
@@ -242,6 +259,15 @@ func (bl *BlockView) BatchRunTransactions(txs []*gethTypes.Transaction) ([]*type
 			proc.evm.Config.Tracer.OnTxEnd != nil &&
 			res != nil {
 			proc.evm.Config.Tracer.OnTxEnd(res.Receipt(), res.ValidationError)
+		}
+
+		// call OnLog tracer hook, upon successful tx result
+		if proc.evm.Config.Tracer != nil &&
+			proc.evm.Config.Tracer.OnLog != nil &&
+			res != nil {
+			for _, log := range res.Logs {
+				proc.evm.Config.Tracer.OnLog(log)
+			}
 		}
 	}
 
