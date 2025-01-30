@@ -37,7 +37,11 @@ import (
 	"github.com/onflow/flow-go/state/protocol"
 	badgerState "github.com/onflow/flow-go/state/protocol/badger"
 	"github.com/onflow/flow-go/state/protocol/blocktimer"
+	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/storage/badger"
+	"github.com/onflow/flow-go/storage/dbops"
+	"github.com/onflow/flow-go/storage/operation/badgerimpl"
+	"github.com/onflow/flow-go/storage/store"
 )
 
 type VerificationConfig struct {
@@ -54,6 +58,10 @@ type VerificationConfig struct {
 	chunkWorkers uint64 // number of chunks processed in parallel.
 
 	stopAtHeight uint64 // height to stop the node on
+
+	// database operations being used for updates, "badger-transaction" for using badger transactions,
+	// "badger-batch" for using badger batch updates, "pebble-batch" for using pebble batch updates.
+	dbOps string
 }
 
 type VerificationNodeBuilder struct {
@@ -81,6 +89,7 @@ func (v *VerificationNodeBuilder) LoadFlags() {
 			flags.Uint64Var(&v.verConf.blockWorkers, "block-workers", blockconsumer.DefaultBlockWorkers, "maximum number of blocks being processed in parallel")
 			flags.Uint64Var(&v.verConf.chunkWorkers, "chunk-workers", chunkconsumer.DefaultChunkWorkers, "maximum number of execution nodes a chunk data pack request is dispatched to")
 			flags.Uint64Var(&v.verConf.stopAtHeight, "stop-at-height", 0, "height to stop the node at (0 to disable)")
+			flags.StringVar(&v.verConf.dbOps, "db-ops", "badger-transaction", "database operations to use (badger-transaction, badger-batch, pebble-batch)")
 		})
 }
 
@@ -92,7 +101,7 @@ func (v *VerificationNodeBuilder) LoadComponentsAndModules() {
 		chunkRequests        *stdmap.ChunkRequests    // used in requester engine
 		processedChunkIndex  *badger.ConsumerProgress // used in chunk consumer
 		processedBlockHeight *badger.ConsumerProgress // used in block consumer
-		chunkQueue           *badger.ChunksQueue      // used in chunk consumer
+		chunkQueue           storage.ChunksQueue      // used in chunk consumer
 
 		syncCore            *chainsync.Core   // used in follower engine
 		assignerEngine      *assigner.Engine  // the assigner engine
@@ -163,10 +172,28 @@ func (v *VerificationNodeBuilder) LoadComponentsAndModules() {
 			return nil
 		}).
 		Module("chunks queue", func(node *NodeConfig) error {
-			chunkQueue = badger.NewChunkQueue(node.DB)
-			ok, err := chunkQueue.Init(chunkconsumer.DefaultJobIndex)
-			if err != nil {
-				return fmt.Errorf("could not initialize default index in chunks queue: %w", err)
+			var ok bool
+			var err error
+
+			switch dbops.DBOps(v.verConf.dbOps) {
+			case dbops.BadgerTransaction:
+				queue := badger.NewChunkQueue(node.DB)
+				ok, err = queue.Init(chunkconsumer.DefaultJobIndex)
+				if err != nil {
+					return fmt.Errorf("could not initialize default index in chunks queue: %w", err)
+				}
+
+				chunkQueue = queue
+			case dbops.BadgerBatch:
+				queue := store.NewChunkQueue(badgerimpl.ToDB(node.DB))
+				ok, err = queue.Init(chunkconsumer.DefaultJobIndex)
+				if err != nil {
+					return fmt.Errorf("could not initialize default index in chunks queue: %w", err)
+				}
+
+				chunkQueue = queue
+			case dbops.PebbleBatch:
+				return fmt.Errorf("to be implemented")
 			}
 
 			node.Logger.Info().
@@ -201,7 +228,17 @@ func (v *VerificationNodeBuilder) LoadComponentsAndModules() {
 			vmCtx := fvm.NewContext(fvmOptions...)
 
 			chunkVerifier := chunks.NewChunkVerifier(vm, vmCtx, node.Logger)
-			approvalStorage := badger.NewResultApprovals(node.Metrics.Cache, node.DB)
+
+			var approvalStorage storage.ResultApprovals
+			switch dbops.DBOps(v.verConf.dbOps) {
+			case dbops.BadgerTransaction:
+				approvalStorage = badger.NewResultApprovals(node.Metrics.Cache, node.DB)
+			case dbops.BadgerBatch:
+				approvalStorage = store.NewResultApprovals(node.Metrics.Cache, badgerimpl.ToDB(node.DB))
+			case dbops.PebbleBatch:
+				return nil, fmt.Errorf("to be implemented")
+			}
+
 			verifierEng, err = verifier.New(
 				node.Logger,
 				collector,
