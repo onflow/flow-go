@@ -394,7 +394,7 @@ func defaultLibP2POptions(address string, key fcrypto.PrivateKey) ([]config.Opti
 	// as the 1-k discovery process and the 1-1 messaging both sometimes attempt to open connection to the same target
 	// As of now there is no requirement of client sockets to be a well-known port, so disabling port reuse all together.
 	t := libp2p.Transport(func(u transport.Upgrader) (*tcp.TcpTransport, error) {
-		return tcp.NewTCPTransport(u, nil, tcp.DisableReuseport())
+		return tcp.NewTCPTransport(u, nil, nil, tcp.DisableReuseport())
 	})
 
 	// gather all the options for the libp2p node
