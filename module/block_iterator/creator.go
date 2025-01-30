@@ -14,8 +14,7 @@ import (
 // a new block iterator can be created to iterate through the next range.
 type Creator struct {
 	getBlockIDByIndex func(uint64) (flow.Identifier, bool, error)
-	progress          module.IterateProgress
-	latest            func() (uint64, error)
+	progress          *NextProgress
 }
 
 var _ module.IteratorCreator = (*Creator)(nil)
@@ -28,7 +27,7 @@ func NewCreator(
 	latest func() (uint64, error),
 ) (*Creator, error) {
 	// initialize the progress in storage, saving the root block index in storage
-	progress, err := InitializeProgress(progressStorage, root)
+	progress, err := NewNextProgress(progressStorage, root, latest)
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize progress: %w", err)
 	}
@@ -36,13 +35,12 @@ func NewCreator(
 	return &Creator{
 		getBlockIDByIndex: getBlockIDByIndex,
 		progress:          progress,
-		latest:            latest,
 	}, nil
 }
 
 func (c *Creator) Create() (module.BlockIterator, error) {
-	// create a iteration range from the root block to the latest block
-	iterRange, err := CreateRange(c.progress, c.latest)
+	// create a iteration range from the first un-iterated to the latest block
+	iterRange, err := c.progress.NextRange()
 	if err != nil {
 		return nil, fmt.Errorf("failed to create range for block iteration: %w", err)
 	}

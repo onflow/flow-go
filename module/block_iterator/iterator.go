@@ -14,21 +14,17 @@ import (
 // it's not concurrent safe, so don't use it in multiple goroutines
 type IndexedBlockIterator struct {
 	// dependencies
-	getBlockIDByIndex func(uint64) (blockID flow.Identifier, indexed bool, excpetion error)
+	getBlockIDByIndex func(uint64) (blockID flow.Identifier, indexed bool, exception error)
 	progress          module.IterateProgressWriter // for saving the next index to be iterated for resuming the iteration
-
-	// config
-	endIndex uint64
-
-	// state
-	nextIndex uint64
+	endIndex          uint64                       // the end index to iterate, this never change
+	nextIndex         uint64                       // the start index to iterate, this will be updated after each iteration
 }
 
 var _ module.BlockIterator = (*IndexedBlockIterator)(nil)
 
 // caller must ensure that both iterRange.Start and iterRange.End are finalized
 func NewIndexedBlockIterator(
-	getBlockIDByIndex func(uint64) (blockID flow.Identifier, indexed bool, excpetion error),
+	getBlockIDByIndex func(uint64) (blockID flow.Identifier, indexed bool, exception error),
 	progress module.IterateProgressWriter,
 	iterRange module.IterateRange,
 ) module.BlockIterator {
