@@ -2,6 +2,7 @@ package request
 
 import (
 	"github.com/onflow/flow-go/engine/access/rest/common"
+	"github.com/onflow/flow-go/engine/access/rest/common/parser"
 	"github.com/onflow/flow-go/model/flow"
 )
 
@@ -33,7 +34,7 @@ func (g *GetAccountBalance) Parse(
 	rawHeight string,
 	chain flow.Chain,
 ) error {
-	address, err := ParseAddress(rawAddress, chain)
+	address, err := parser.ParseAddress(rawAddress, chain)
 	if err != nil {
 		return err
 	}

@@ -220,6 +220,11 @@ func (c *Client) Account() *sdk.Account {
 	return c.account
 }
 
+// WaitForFinalized waits for the transaction to be finalized, then returns the result.
+func (c *Client) WaitForFinalized(ctx context.Context, id sdk.Identifier) (*sdk.TransactionResult, error) {
+	return c.waitForStatus(ctx, id, sdk.TransactionStatusFinalized)
+}
+
 // WaitForSealed waits for the transaction to be sealed, then returns the result.
 func (c *Client) WaitForSealed(ctx context.Context, id sdk.Identifier) (*sdk.TransactionResult, error) {
 	return c.waitForStatus(ctx, id, sdk.TransactionStatusSealed)
