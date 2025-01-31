@@ -282,7 +282,7 @@ Add this block to your Flow CLI configuration file `"contracts"` section:
 	}
 }
 ```
->Note: The actual address values can also be found in Flow Documentation for [Fungible Token Contract](https://docs.onflow.org/core-contracts/fungible-token/) and [Flow Token Contract](https://docs.onflow.org/core-contracts/flow-token/).
+>Note: The actual address values can also be found in Flow Documentation for [Fungible Token Contract](https://docs.onflow.org/core-contracts/fungible-token/) and [Flow Token Contract](https://docs.onflow.org/core-contracts/flow-token/) and use the same addresses as emulator.
 
 ### Using Flow CLI to send transaction to localnet
 
