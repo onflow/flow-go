@@ -136,10 +136,10 @@ func (exeConf *ExecutionConfig) SetupFlags(flags *pflag.FlagSet) {
 	flags.BoolVar(&deprecatedEnableNewIngestionEngine, "enable-new-ingestion-engine", true, "enable new ingestion engine, default is true")
 	flags.StringVar(&exeConf.publicAccessID, "public-access-id", "", "public access ID for the node")
 
-	flags.Uint64Var(&exeConf.pruningConfigThreshold, "pruning-threshold", exepruner.DefaultConfig.Threshold, "the number of blocks that we want to keep in the database, default 30 days")
-	flags.UintVar(&exeConf.pruningConfigBatchSize, "pruning-batch-size", exepruner.DefaultConfig.BatchSize, "the batch size is the number of blocks that we want to delete in one batch, default 1000")
-	flags.DurationVar(&exeConf.pruningConfigSleepAfterCommit, "pruning-sleep-after-commit", exepruner.DefaultConfig.SleepAfterEachBatchCommit, "sleep time after each batch commit, default 1s")
-	flags.DurationVar(&exeConf.pruningConfigSleepAfterIteration, "pruning-sleep-after-iteration", exepruner.DefaultConfig.SleepAfterEachIteration, "sleep time after each iteration, default 500000h")
+	flags.Uint64Var(&exeConf.pruningConfigThreshold, "pruning-config-threshold", exepruner.DefaultConfig.Threshold, "the number of blocks that we want to keep in the database, default 30 days")
+	flags.UintVar(&exeConf.pruningConfigBatchSize, "pruning-config-batch-size", exepruner.DefaultConfig.BatchSize, "the batch size is the number of blocks that we want to delete in one batch, default 1000")
+	flags.DurationVar(&exeConf.pruningConfigSleepAfterCommit, "pruning-config-sleep-after-commit", exepruner.DefaultConfig.SleepAfterEachBatchCommit, "sleep time after each batch commit, default 1s")
+	flags.DurationVar(&exeConf.pruningConfigSleepAfterIteration, "pruning-config-sleep-after-iteration", exepruner.DefaultConfig.SleepAfterEachIteration, "sleep time after each iteration, default 500000h")
 }
 
 func (exeConf *ExecutionConfig) ValidateFlags() error {

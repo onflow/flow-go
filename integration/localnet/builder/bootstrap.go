@@ -402,7 +402,8 @@ func prepareExecutionService(container testnet.ContainerConfig, i int, n int) Se
 		fmt.Sprintf("--extensive-tracing=%t", extesiveTracing),
 		"--execution-data-dir=/data/execution-data",
 		"--chunk-data-pack-dir=/data/chunk-data-pack",
-		"--pruning-sleep-after-iteration=30m",
+		"--pruning-config-threshold=20",
+		"--pruning-config-sleep-after-iteration=30m",
 	)
 
 	service.Volumes = append(service.Volumes,
