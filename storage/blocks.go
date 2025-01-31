@@ -23,6 +23,12 @@ type Blocks interface {
 	// for finalized blocks.
 	ByHeight(height uint64) (*flow.Block, error)
 
+	// ByView returns the block with the given view. It is only available for certified blocks.
+	// certified blocks are the blocks that have received QC.
+	//
+	// TODO: this method is not available until next spork (mainnet27) or a migration that builds the index.
+	// ByView(view uint64) (*flow.Header, error)
+
 	// ByCollectionID returns the block for the given collection ID.
 	ByCollectionID(collID flow.Identifier) (*flow.Block, error)
 
