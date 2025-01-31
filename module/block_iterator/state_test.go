@@ -38,6 +38,10 @@ func TestProgress(t *testing.T) {
 		err = progress.SaveState(latest + 1)
 		require.NoError(t, err)
 
+		next, err = progress.LoadState()
+		require.NoError(t, err)
+		require.Equal(t, latest+1, next)
+
 		// update latest
 		oldLatest := latest
 		latest = latest + 20
