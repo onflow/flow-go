@@ -1849,6 +1849,7 @@ func TestAccountV2Migration_migrate(t *testing.T) {
 			require.NoError(t, err)
 
 			batchSize := serviceAddressIndex + 1
+			maxAddressIndex := serviceAddressIndex + 1
 
 			tx := fvm.Transaction(
 				flow.NewTransactionBody().
@@ -1864,12 +1865,14 @@ func TestAccountV2Migration_migrate(t *testing.T) {
                                         )
                                         ?? panic("missing account V2 migration admin resource")
                                     admin.setBatchSize(%[2]d)
+                                    admin.setMaxAddressIndex(%[3]d)
                                     admin.migrateNextBatch()
                                 }
                             }
                         `,
 						serviceAddress.HexWithPrefix(),
 						batchSize,
+						maxAddressIndex,
 					))).
 					AddAuthorizer(chain.ServiceAddress()),
 				0,

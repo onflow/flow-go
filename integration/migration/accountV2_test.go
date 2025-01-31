@@ -66,8 +66,9 @@ func TestAccountV2Migration(t *testing.T) {
 	require.NoError(t, err)
 
 	batchSize := serviceAddressIndex + 1
+	maxAddressIndex := serviceAddressIndex + 1
 
-	setAccountV2MigrationBatchSize(t, blockchain, batchSize)
+	configureAccountV2MigrationParameters(t, blockchain, batchSize, maxAddressIndex)
 
 	block, results, err := blockchain.ExecuteAndCommitBlock()
 	require.NoError(t, err)
@@ -127,7 +128,12 @@ func sendTransaction(t *testing.T, blockchain *emulator.Blockchain, script strin
 	require.NoError(t, err)
 }
 
-func setAccountV2MigrationBatchSize(t *testing.T, blockchain *emulator.Blockchain, batchSize uint64) {
+func configureAccountV2MigrationParameters(
+	t *testing.T,
+	blockchain *emulator.Blockchain,
+	batchSize uint64,
+	maxAddressIndex uint64,
+) {
 	serviceAddress := blockchain.ServiceKey().Address
 
 	script := fmt.Sprintf(
@@ -143,11 +149,13 @@ func setAccountV2MigrationBatchSize(t *testing.T, blockchain *emulator.Blockchai
 	                    )
 	                    ?? panic("missing account V2 migration admin resource")
 	                admin.setBatchSize(%[2]d)
+                    admin.setMaxAddressIndex(%[3]d)
 	            }
 	        }
 	    `,
 		serviceAddress.HexWithPrefix(),
 		batchSize,
+		maxAddressIndex,
 	)
 	sendTransaction(t, blockchain, script)
 }

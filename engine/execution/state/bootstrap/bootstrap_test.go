@@ -53,7 +53,7 @@ func TestBootstrapLedger(t *testing.T) {
 }
 
 func TestBootstrapLedger_ZeroTokenSupply(t *testing.T) {
-	expectedStateCommitmentBytes, _ := hex.DecodeString("6e856f0122a014de495b30b41b262cf766fd650e6f54b0296cef88a6663fd4f2")
+	expectedStateCommitmentBytes, _ := hex.DecodeString("15a47ef3ed5d8382716b7393c7e0d82b10bbd9028fa30e097c374ec9b308250e")
 	expectedStateCommitment, err := flow.ToStateCommitment(expectedStateCommitmentBytes)
 	require.NoError(t, err)
 
