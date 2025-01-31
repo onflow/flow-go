@@ -5,6 +5,8 @@ import (
 	"github.com/onflow/flow-go/storage"
 )
 
+// AggregatedExecutor allows to aggregate multiple IterationExecutor instances into one
+// so that they can be executed in a single call within the same batch.
 type AggregatedExecutor struct {
 	executors []IterationExecutor
 }
