@@ -52,7 +52,8 @@ type BlockIterator interface {
 	// then after restart, the iterator will resume from A.
 	// make sure to call this after all the blocks for processing the block IDs returned by
 	// Next() are completed.
-	// It returns the saved index (next index to iterate), and error returned are exceptions
+	// It returns the saved index (next index to iterate)
+	// any error returned are exceptions
 	Checkpoint() (savedIndex uint64, exception error)
 }
 
@@ -60,6 +61,8 @@ type BlockIterator interface {
 // a block iterator iterates through a saved index to the latest block.
 // after iterating through all the blocks in the range, the iterator can be discarded.
 // a new block iterator can be created to iterate through the next range.
+// if there is no block to iterate, hasNext is false
+// any error returned are exception
 type IteratorCreator interface {
-	Create() (fromSavedIndexToLatest BlockIterator, exception error)
+	Create() (fromSavedIndexToLatest BlockIterator, hasNext bool, exception error)
 }

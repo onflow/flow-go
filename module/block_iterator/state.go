@@ -33,6 +33,7 @@ func NewPersistentIteratorState(store storage.ConsumerProgress, root uint64, lat
 }
 
 func (n *PersistentIteratorState) LoadState() (uint64, error) {
+	// TODO: adding cache
 	return n.store.ProcessedIndex()
 }
 
@@ -41,24 +42,31 @@ func (n *PersistentIteratorState) SaveState(next uint64) error {
 }
 
 // NextRange returns the next range of blocks to iterate over
-func (n *PersistentIteratorState) NextRange() (module.IteratorRange, error) {
+// the range is inclusive, and the end is the latest block
+// if there is no block to iterate, hasNext is false
+func (n *PersistentIteratorState) NextRange() (rg module.IteratorRange, hasNext bool, exception error) {
 	next, err := n.LoadState()
 	if err != nil {
-		return module.IteratorRange{}, fmt.Errorf("failed to read next height: %w", err)
+		return module.IteratorRange{}, false, fmt.Errorf("failed to read next height: %w", err)
 	}
 
 	latest, err := n.latest()
 	if err != nil {
-		return module.IteratorRange{}, fmt.Errorf("failed to get latest block: %w", err)
+		return module.IteratorRange{}, false, fmt.Errorf("failed to get latest block: %w", err)
+	}
+
+	// if the next is the next of the latest, then there is no block to iterate
+	if latest+1 == next {
+		return module.IteratorRange{}, false, nil
 	}
 
 	if latest < next {
-		return module.IteratorRange{}, fmt.Errorf("latest block is less than next block: %d < %d", latest, next)
+		return module.IteratorRange{}, false, fmt.Errorf("latest block is less than next block: %d < %d", latest, next)
 	}
 
 	// iterate from next to latest (inclusive)
 	return module.IteratorRange{
 		Start: next,
 		End:   latest,
-	}, nil
+	}, true, nil
 }

@@ -16,6 +16,7 @@ import (
 // TestCanResume: stop at a height, and take checkpoint, create a new iterator,
 // 			verify it will resume from the next height to the latest
 // TestCanSkipViewsIfNotIndexed: iterate through all views, and skip views that are not indexed
+// TestCanSkipIfThereIsNoBlockToIterate: skip iterationg if there is no block to iterate
 
 func TestCanIterate(t *testing.T) {
 	root := &flow.Header{Height: 0}
@@ -55,8 +56,9 @@ func TestCanIterate(t *testing.T) {
 	)
 	require.NoError(t, err)
 
-	iterator, err := creator.Create()
+	iterator, hasNext, err := creator.Create()
 	require.NoError(t, err)
+	require.True(t, hasNext)
 
 	// Iterate through blocks
 	visitedBlocks := make([]flow.Identifier, 0, len(blocks))
@@ -99,8 +101,9 @@ func TestCanIterate(t *testing.T) {
 	blocks = append(blocks, additionalBlocks...)
 
 	// Create another iterator
-	iterator, err = creator.Create()
+	iterator, hasNext, err = creator.Create()
 	require.NoError(t, err)
+	require.True(t, hasNext)
 
 	// Iterate through initial blocks
 	for i := 0; i < len(additionalBlocks); i++ {
@@ -171,8 +174,9 @@ func TestCanResume(t *testing.T) {
 	)
 	require.NoError(t, err)
 
-	iterator, err := creator.Create()
+	iterator, hasNext, err := creator.Create()
 	require.NoError(t, err)
+	require.True(t, hasNext)
 
 	// Iterate through blocks
 	visitedBlocks := make([]flow.Identifier, 0, len(blocks))
@@ -209,8 +213,9 @@ func TestCanResume(t *testing.T) {
 	)
 	require.NoError(t, err)
 
-	newIterator, err := newCreator.Create()
+	newIterator, hasNext, err := newCreator.Create()
 	require.NoError(t, err)
+	require.True(t, hasNext)
 
 	// iterate until the end
 	for {
@@ -271,8 +276,9 @@ func TestCanSkipViewsIfNotIndexed(t *testing.T) {
 	)
 	require.NoError(t, err)
 
-	iterator, err := creator.Create()
+	iterator, hasNext, err := creator.Create()
 	require.NoError(t, err)
+	require.True(t, hasNext)
 
 	// Iterate through blocks
 	visitedBlocks := make(map[flow.Identifier]struct{})
@@ -302,6 +308,42 @@ func TestCanSkipViewsIfNotIndexed(t *testing.T) {
 	savedView, err := progress.ProcessedIndex()
 	require.NoError(t, err)
 	require.Equal(t, uint64(8), savedView, "Expected next view to be 8 (last View + 1)")
+}
+
+func TestCanSkipIfThereIsNoBlockToIterate(t *testing.T) {
+	// Set up root block
+	root := &flow.Header{Height: 10}
+
+	// Mock getBlockIDByHeight function
+	getBlockIDByHeight := func(height uint64) (flow.Identifier, error) {
+		return flow.Identifier{}, fmt.Errorf("block not found at height %d", height)
+	}
+
+	// Mock progress tracker
+	progress := &mockProgress{}
+
+	// Mock latest function that returns the same height as root
+	latest := func() (*flow.Header, error) {
+		return root, nil
+	}
+
+	// Create iterator
+	creator, err := NewHeightBasedCreator(
+		getBlockIDByHeight,
+		progress,
+		root,
+		latest,
+	)
+	require.NoError(t, err)
+
+	// Create the iterator
+	_, hasNext, err := creator.Create()
+	require.NoError(t, err)
+	require.False(t, hasNext, "Expected no blocks to iterate")
+
+	savedHeight, err := progress.ProcessedIndex()
+	require.NoError(t, err)
+	require.Equal(t, root.Height+1, savedHeight, "Expected saved height to be root height + 1")
 }
 
 type mockProgress struct {

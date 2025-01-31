@@ -24,13 +24,14 @@ func TestProgress(t *testing.T) {
 		progress, err := NewPersistentIteratorState(store, root, getLatest)
 		require.NoError(t, err)
 
-		// initial state should be the next of root
+		// 1. verify initial state should be the next of root
 		next, err := progress.LoadState()
 		require.NoError(t, err)
 		require.Equal(t, root+1, next)
 
-		rg, err := progress.NextRange()
+		rg, hasNext, err := progress.NextRange()
 		require.NoError(t, err)
+		require.True(t, hasNext)
 		require.Equal(t, root+1, rg.Start)
 		require.Equal(t, latest, rg.End)
 
@@ -38,18 +39,32 @@ func TestProgress(t *testing.T) {
 		err = progress.SaveState(latest + 1)
 		require.NoError(t, err)
 
+		// 2. verify the saved state
 		next, err = progress.LoadState()
 		require.NoError(t, err)
 		require.Equal(t, latest+1, next)
 
-		// update latest
+		// 3. verify when latest is updated to a higher height
+		// 		the end height of the next range should be updated
 		oldLatest := latest
 		latest = latest + 20
-		rg, err = progress.NextRange()
+		rg, hasNext, err = progress.NextRange()
 		require.NoError(t, err)
+		require.True(t, hasNext)
 
 		// verify the new range
 		require.Equal(t, oldLatest+1, rg.Start)
 		require.Equal(t, latest, rg.End)
+
+		// 4. verify when state is up to date, and latest
+		// 		does not change, the next range should include no block
+		err = progress.SaveState(latest + 1)
+		require.NoError(t, err)
+
+		// verify that NextRange will return an error indicating that
+		// there is no block to iterate
+		rg, hasNext, err = progress.NextRange()
+		require.NoError(t, err)
+		require.False(t, hasNext)
 	})
 }

@@ -42,18 +42,23 @@ func NewCreator(
 	}, nil
 }
 
-func (c *Creator) Create() (module.BlockIterator, error) {
+func (c *Creator) Create() (iter module.BlockIterator, hasNext bool, exception error) {
 	// create a iteration range from the first un-iterated to the latest block
-	iterRange, err := c.progress.NextRange()
+	iterRange, hasNext, err := c.progress.NextRange()
 	if err != nil {
-		return nil, fmt.Errorf("failed to create range for block iteration: %w", err)
+		return nil, false, fmt.Errorf("failed to create range for block iteration: %w", err)
+	}
+
+	if !hasNext {
+		// no block to iterate
+		return nil, false, nil
 	}
 
 	// create a block iterator with
 	// the function to get block ID by index,
 	// the progress writer to update the progress in storage,
 	// and the iteration range
-	return NewIndexedBlockIterator(c.getBlockIDByIndex, c.progress, iterRange), nil
+	return NewIndexedBlockIterator(c.getBlockIDByIndex, c.progress, iterRange), true, nil
 }
 
 // NewHeightBasedCreator creates a block iterator that iterates through blocks
