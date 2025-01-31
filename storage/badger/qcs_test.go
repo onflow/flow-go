@@ -29,11 +29,6 @@ func TestQuorumCertificates_StoreTx(t *testing.T) {
 		require.NoError(t, err)
 
 		require.Equal(t, qc, actual)
-
-		// verify view index is also built
-		var indexedBlock flow.Identifier
-		require.NoError(t, db.View(operation.LookupBlockView(qc.View, &indexedBlock)))
-		require.Equal(t, qc.BlockID, indexedBlock)
 	})
 }
 
@@ -59,11 +54,6 @@ func TestQuorumCertificates_StoreTx_OtherQC(t *testing.T) {
 		require.NoError(t, err)
 
 		require.Equal(t, qc, actual)
-
-		// verify view index is also unchanged
-		var indexedBlock flow.Identifier
-		require.NoError(t, db.View(operation.LookupBlockView(qc.View, &indexedBlock)))
-		require.Equal(t, qc.BlockID, indexedBlock)
 	})
 }
 

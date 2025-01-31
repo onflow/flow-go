@@ -20,12 +20,12 @@ func IndexBlockHeight(height uint64, blockID flow.Identifier) func(*badger.Txn) 
 	return insert(makePrefix(codeHeightToBlock, height), blockID)
 }
 
-// IndexBlockView indexes the view of a block. 
+// IndexCertifiedBlockByView indexes the view of a block.
 // HotStuff guarantees that there is at most one certified block. Caution: this does not hold for
 // uncertified proposals, as byzantine actors might produce multiple proposals for the same block.
 // Hence, only certified blocks (i.e. blocks that have received a QC) can be indexed!
 func IndexCertifiedBlockByView(view uint64, blockID flow.Identifier) func(*badger.Txn) error {
-	return insert(makePrefix(codeViewToBlock, view), blockID)
+	return insert(makePrefix(codeCertifiedBlockByView, view), blockID)
 }
 
 // LookupBlockHeight retrieves finalized blocks by height.
@@ -33,10 +33,10 @@ func LookupBlockHeight(height uint64, blockID *flow.Identifier) func(*badger.Txn
 	return retrieve(makePrefix(codeHeightToBlock, height), blockID)
 }
 
-// LookupBlockView retrieves the certified block by view. (certified blocks are blocks that have received QC)
-// Returns `storage.ErrNotFound` if no certified block for the specified view is known. 
+// LookupCertifiedBlockByView retrieves the certified block by view. (certified blocks are blocks that have received QC)
+// Returns `storage.ErrNotFound` if no certified block for the specified view is known.
 func LookupCertifiedBlockByView(view uint64, blockID *flow.Identifier) func(*badger.Txn) error {
-	return retrieve(makePrefix(codeViewToBlock, view), blockID)
+	return retrieve(makePrefix(codeCertifiedBlockByView, view), blockID)
 }
 
 // BlockExists checks whether the block exists in the database.

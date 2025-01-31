@@ -68,7 +68,7 @@ func TestHeaderGetByView(t *testing.T) {
 		require.ErrorIs(t, err, storage.ErrNotFound)
 
 		// index block by view
-		require.NoError(t, db.Update(operation.IndexBlockView(block.Header.View, block.ID())))
+		require.NoError(t, db.Update(operation.IndexCertifiedBlockByView(block.Header.View, block.ID())))
 
 		// verify that the block ID can be retrieved by view
 		indexedID, err := headers.BlockIDByView(block.Header.View)
