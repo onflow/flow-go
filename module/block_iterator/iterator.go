@@ -26,7 +26,7 @@ var _ module.BlockIterator = (*IndexedBlockIterator)(nil)
 func NewIndexedBlockIterator(
 	getBlockIDByIndex func(uint64) (blockID flow.Identifier, indexed bool, exception error),
 	progress module.IteratorStateWriter,
-	iterRange module.IterateRange,
+	iterRange module.IteratorRange,
 ) module.BlockIterator {
 	return &IndexedBlockIterator{
 		getBlockIDByIndex: getBlockIDByIndex,

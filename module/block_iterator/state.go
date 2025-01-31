@@ -41,23 +41,23 @@ func (n *PersistentIteratorState) SaveState(next uint64) error {
 }
 
 // NextRange returns the next range of blocks to iterate over
-func (n *PersistentIteratorState) NextRange() (module.IterateRange, error) {
+func (n *PersistentIteratorState) NextRange() (module.IteratorRange, error) {
 	next, err := n.LoadState()
 	if err != nil {
-		return module.IterateRange{}, fmt.Errorf("failed to read next height: %w", err)
+		return module.IteratorRange{}, fmt.Errorf("failed to read next height: %w", err)
 	}
 
 	latest, err := n.latest()
 	if err != nil {
-		return module.IterateRange{}, fmt.Errorf("failed to get latest block: %w", err)
+		return module.IteratorRange{}, fmt.Errorf("failed to get latest block: %w", err)
 	}
 
 	if latest < next {
-		return module.IterateRange{}, fmt.Errorf("latest block is less than next block: %d < %d", latest, next)
+		return module.IteratorRange{}, fmt.Errorf("latest block is less than next block: %d < %d", latest, next)
 	}
 
 	// iterate from next to latest (inclusive)
-	return module.IterateRange{
+	return module.IteratorRange{
 		Start: next,
 		End:   latest,
 	}, nil
