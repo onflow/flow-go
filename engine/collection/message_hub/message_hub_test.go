@@ -88,7 +88,7 @@ func (s *MessageHubSuite) SetupTest() {
 	s.compliance = mockcollection.NewCompliance(s.T())
 
 	// set up proto state mock
-	protoEpoch := &protocol.Epoch{}
+	protoEpoch := &protocol.CommittedEpoch{}
 	clusters := flow.ClusterList{s.cluster.ToSkeleton()}
 	protoEpoch.On("Clustering").Return(clusters, nil)
 

@@ -60,11 +60,11 @@ func (n *node) Done() <-chan struct{} {
 	return util.AllDone(n.messagingEngine, n.reactorEngine)
 }
 
-// setEpochs configures the mock state snapthost at firstBlock to return the
+// setEpochs configures the mock state snapshot at firstBlock to return the
 // desired current and next epochs
 func (n *node) setEpochs(t *testing.T, currentSetup flow.EpochSetup, nextSetup flow.EpochSetup, firstBlock *flow.Header) {
 
-	currentEpoch := new(protocolmock.Epoch)
+	currentEpoch := new(protocolmock.CommittedEpoch)
 	currentEpoch.On("Counter").Return(currentSetup.Counter, nil)
 	currentEpoch.On("InitialIdentities").Return(currentSetup.Participants, nil)
 	currentEpoch.On("DKGPhase1FinalView").Return(currentSetup.DKGPhase1FinalView, nil)
@@ -74,7 +74,7 @@ func (n *node) setEpochs(t *testing.T, currentSetup flow.EpochSetup, nextSetup f
 	currentEpoch.On("FirstView").Return(currentSetup.FirstView, nil)
 	currentEpoch.On("RandomSource").Return(nextSetup.RandomSource, nil)
 
-	nextEpoch := new(protocolmock.Epoch)
+	nextEpoch := new(protocolmock.CommittedEpoch)
 	nextEpoch.On("Counter").Return(nextSetup.Counter, nil)
 	nextEpoch.On("InitialIdentities").Return(nextSetup.Participants, nil)
 	nextEpoch.On("RandomSource").Return(nextSetup.RandomSource, nil)

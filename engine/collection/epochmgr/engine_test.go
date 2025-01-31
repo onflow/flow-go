@@ -91,11 +91,11 @@ type Suite struct {
 	heights *events.Heights
 
 	epochQuery *mocks.EpochQuery
-	counter    uint64                     // reflects the counter of the current epoch
-	phase      flow.EpochPhase            // phase at mocked snapshot
-	header     *flow.Header               // header at mocked snapshot
-	epochs     map[uint64]*protocol.Epoch // track all epochs
-	components map[uint64]*mockComponents // track all epoch components
+	counter    uint64                              // reflects the counter of the current epoch
+	phase      flow.EpochPhase                     // phase at mocked snapshot
+	header     *flow.Header                        // header at mocked snapshot
+	epochs     map[uint64]*protocol.CommittedEpoch // track all epochs
+	components map[uint64]*mockComponents          // track all epoch components
 
 	ctx    irrecoverable.SignalerContext
 	cancel context.CancelFunc
@@ -148,7 +148,7 @@ func (suite *Suite) SetupTest() {
 	suite.state = protocol.NewState(suite.T())
 	suite.snap = protocol.NewSnapshot(suite.T())
 
-	suite.epochs = make(map[uint64]*protocol.Epoch)
+	suite.epochs = make(map[uint64]*protocol.CommittedEpoch)
 	suite.components = make(map[uint64]*mockComponents)
 
 	suite.signer = mockhotstuff.NewSigner(suite.T())
@@ -223,8 +223,8 @@ func (suite *Suite) TransitionEpoch() {
 }
 
 // AddEpoch adds an epoch with the given counter.
-func (suite *Suite) AddEpoch(counter uint64) *protocol.Epoch {
-	epoch := new(protocol.Epoch)
+func (suite *Suite) AddEpoch(counter uint64) *protocol.CommittedEpoch {
+	epoch := new(protocol.CommittedEpoch)
 	epoch.On("Counter").Return(counter, nil)
 	suite.epochs[counter] = epoch
 	suite.epochQuery.Add(epoch)

@@ -295,7 +295,7 @@ func (suite *Suite) TestSendTransactionToRandomCollectionNode() {
 		suite.Require().Nil(err)
 		collNode1 := clusters[0][0]
 		collNode2 := clusters[1][0]
-		epoch := new(protocol.Epoch)
+		epoch := new(protocol.CommittedEpoch)
 		suite.epochQuery.On("Current").Return(epoch)
 		epoch.On("Clustering").Return(clusters, nil)
 
@@ -1351,7 +1351,7 @@ func (suite *Suite) createChain() (*flow.Block, *flow.Collection) {
 
 	cluster := new(protocol.Cluster)
 	cluster.On("Members").Return(clusterCommittee.ToSkeleton(), nil)
-	epoch := new(protocol.Epoch)
+	epoch := new(protocol.CommittedEpoch)
 	epoch.On("ClusterByChainID", mock.Anything).Return(cluster, nil)
 	epochs := new(protocol.EpochQuery)
 	epochs.On("Current").Return(epoch)

@@ -92,9 +92,9 @@ func createNode(
 	dkgState, err := badger.NewDKGState(core.Metrics, core.SecretsDB)
 	require.NoError(t, err)
 
-	// configure the state snapthost at firstBlock to return the desired
+	// configure the state snapshot at firstBlock to return the desired
 	// Epochs
-	currentEpoch := new(protocolmock.Epoch)
+	currentEpoch := new(protocolmock.CommittedEpoch)
 	currentEpoch.On("Counter").Return(currentSetup.Counter, nil)
 	currentEpoch.On("InitialIdentities").Return(currentSetup.Participants, nil)
 	currentEpoch.On("DKGPhase1FinalView").Return(currentSetup.DKGPhase1FinalView, nil)
@@ -102,7 +102,7 @@ func createNode(
 	currentEpoch.On("DKGPhase3FinalView").Return(currentSetup.DKGPhase3FinalView, nil)
 	currentEpoch.On("RandomSource").Return(nextSetup.RandomSource, nil)
 
-	nextEpoch := new(protocolmock.Epoch)
+	nextEpoch := new(protocolmock.CommittedEpoch)
 	nextEpoch.On("Counter").Return(nextSetup.Counter, nil)
 	nextEpoch.On("InitialIdentities").Return(nextSetup.Participants, nil)
 	nextEpoch.On("RandomSource").Return(nextSetup.RandomSource, nil)
