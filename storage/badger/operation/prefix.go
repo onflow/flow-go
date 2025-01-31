@@ -54,7 +54,7 @@ const (
 	codeBlockIDToQuorumCertificate  = 45 // index of quorum certificates by block ID
 	codeEpochProtocolStateByBlockID = 46 // index of epoch protocol state entry by block ID
 	codeProtocolKVStoreByBlockID    = 47 // index of protocol KV store entry by block ID
-	codeViewToBlock                 = 48 // index mapping view to block ID
+	codeCertifiedBlockByView                 = 48 // index mapping view to ID of certified block (guaranteed by HotStuff that there is at most one per view)
 
 	// codes for indexing multiple identifiers by identifier
 	codeBlockChildren          = 50 // index mapping block ID to children blocks
