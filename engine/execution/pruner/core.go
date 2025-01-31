@@ -50,8 +50,8 @@ func LoopPruneExecutionDataFromRootToLatestSealed(
 	)
 
 	for {
-		log.Info().Msgf("execution data pruning will start in %s at %v",
-			config.SleepAfterEachIteration, time.Now().Add(config.SleepAfterEachIteration))
+		log.Info().Msgf("execution data pruning will start in %s at %s",
+			config.SleepAfterEachIteration, time.Now().Add(config.SleepAfterEachIteration).UTC())
 
 		select {
 		case <-ctx.Done():
