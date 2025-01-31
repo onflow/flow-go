@@ -3,6 +3,9 @@ package executor
 import (
 	"context"
 	"fmt"
+	"time"
+
+	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
@@ -31,6 +34,7 @@ type IsBatchFull func(iteratedCountInCurrentBatch int) bool
 // can be resumed after restart.
 // it sleeps after each batch is committed in order to minimizing the impact on the system.
 func IterateExecuteAndCommitInBatch(
+	log zerolog.Logger,
 	// ctx is used for cancelling the iteration when the context is done
 	ctx context.Context,
 	// iterator decides how to iterate over blocks
@@ -49,13 +53,21 @@ func IterateExecuteAndCommitInBatch(
 	batch := db.NewBatch()
 	iteratedCountInCurrentBatch := 0
 
+	startTime := time.Now()
+	total := 0
+	defer func() {
+		log.Info().Str("duration", time.Since(startTime).String()).
+			Int("total_block_pruned", total).
+			Msg("pruning completed")
+	}()
+
 	for {
 		select {
 		// when the context is done, commit the last batch and return
 		case <-ctx.Done():
 			if iteratedCountInCurrentBatch > 0 {
 				// commit the last batch
-				err := commitAndCheckpoint(batch, iter)
+				err := commitAndCheckpoint(log, batch, iter)
 				if err != nil {
 					return err
 				}
@@ -71,10 +83,12 @@ func IterateExecuteAndCommitInBatch(
 		}
 
 		if !hasNext {
-			// commit last batch
-			err := commitAndCheckpoint(batch, iter)
-			if err != nil {
-				return err
+			if iteratedCountInCurrentBatch > 0 {
+				// commit last batch
+				err := commitAndCheckpoint(log, batch, iter)
+				if err != nil {
+					return err
+				}
 			}
 
 			break
@@ -86,11 +100,12 @@ func IterateExecuteAndCommitInBatch(
 			return fmt.Errorf("failed to prune by block ID %v: %w", blockID, err)
 		}
 		iteratedCountInCurrentBatch++
+		total++
 
 		// if batch is full, commit and sleep
 		if isBatchFull(iteratedCountInCurrentBatch) {
 			// commit the batch and save the progress
-			err := commitAndCheckpoint(batch, iter)
+			err := commitAndCheckpoint(log, batch, iter)
 			if err != nil {
 				return err
 			}
@@ -109,7 +124,12 @@ func IterateExecuteAndCommitInBatch(
 
 // commitAndCheckpoint commits the batch and checkpoints the iterator
 // so that the iteration progress can be resumed after restart.
-func commitAndCheckpoint(batch storage.Batch, iter module.BlockIterator) error {
+func commitAndCheckpoint(log zerolog.Logger, batch storage.Batch, iter module.BlockIterator) error {
+	start := time.Now()
+	defer func() {
+		log.Info().Str("commit-duration", time.Since(start).String()).Msg("batch committed")
+	}()
+
 	err := batch.Commit()
 	if err != nil {
 		return fmt.Errorf("failed to commit batch: %w", err)
