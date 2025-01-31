@@ -366,7 +366,7 @@ func (m *FollowerState) headerExtend(ctx context.Context, candidate *flow.Block,
 			}
 		} else {
 			// parent is a block that has been received and certified by a QC.
-			err := transaction.WithTx(operation.IndexBlockView(parent.View, qc.BlockID))(tx)
+			err := transaction.WithTx(operation.IndexCertifiedBlockByView(parent.View, qc.BlockID))(tx)
 			if err != nil {
 				return fmt.Errorf("could not index certified block: %w", err)
 			}
@@ -397,7 +397,7 @@ func (m *FollowerState) headerExtend(ctx context.Context, candidate *flow.Block,
 			}
 
 			// candidate is a block that has been received and certified by a QC
-			err := transaction.WithTx(operation.IndexBlockView(candidate.Header.View, blockID))(tx)
+			err := transaction.WithTx(operation.IndexCertifiedBlockByView(candidate.Header.View, blockID))(tx)
 			if err != nil {
 				return fmt.Errorf("could not index certified block: %w", err)
 			}

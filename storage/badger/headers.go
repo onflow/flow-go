@@ -52,7 +52,7 @@ func NewHeaders(collector module.CacheMetrics, db *badger.DB) *Headers {
 	retrieveView := func(view uint64) func(tx *badger.Txn) (flow.Identifier, error) {
 		return func(tx *badger.Txn) (flow.Identifier, error) {
 			var id flow.Identifier
-			err := operation.LookupBlockView(view, &id)(tx)
+			err := operation.LookupCertifiedBlockByView(view, &id)(tx)
 			return id, err
 		}
 	}
