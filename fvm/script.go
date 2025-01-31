@@ -8,6 +8,7 @@ import (
 	"github.com/onflow/cadence/common"
 	"github.com/onflow/cadence/runtime"
 
+	"github.com/onflow/flow-go/fvm/accountV2Migration"
 	"github.com/onflow/flow-go/fvm/environment"
 	"github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/fvm/evm"
@@ -200,10 +201,11 @@ func (executor *scriptExecutor) executeScript() error {
 	rt := executor.env.BorrowCadenceRuntime()
 	defer executor.env.ReturnCadenceRuntime(rt)
 
+	chainID := executor.ctx.Chain.ChainID()
+
 	if executor.ctx.EVMEnabled {
-		chain := executor.ctx.Chain
 		err := evm.SetupEnvironment(
-			chain.ChainID(),
+			chainID,
 			executor.env,
 			rt.ScriptRuntimeEnv,
 		)
@@ -211,6 +213,11 @@ func (executor *scriptExecutor) executeScript() error {
 			return err
 		}
 	}
+
+	accountV2Migration.DeclareFunctions(
+		rt.ScriptRuntimeEnv,
+		chainID,
+	)
 
 	value, err := rt.ExecuteScript(
 		runtime.Script{

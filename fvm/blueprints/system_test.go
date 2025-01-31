@@ -18,10 +18,10 @@ func TestSystemChunkTransactionHash(t *testing.T) {
 
 	// this is formatted in a way that the resulting error message is easy to copy-paste into the test.
 	expectedHashes := []chainHash{
-		{chainId: "flow-mainnet", expectedHash: "0e56f890392ad3f2a0dcc7a0e859b6d41f3c17556aa85a0f8831ae25a6537e39"},
-		{chainId: "flow-testnet", expectedHash: "69c922177af520e8ecaf0ba97cb174a3ebbd03de6d5b5d1f6b6c043a9638dba3"},
-		{chainId: "flow-previewnet", expectedHash: "2ec3b6b7e7d70a651600eb80f775cb57613a0a168c847b70040c469f09066a55"},
-		{chainId: "flow-emulator", expectedHash: "7dcc0daaecebc7be33b068ed5c8da0620c89fd896abfc498fc0cc32a261aab1f"},
+		{chainId: "flow-mainnet", expectedHash: "3408f8b1aa1b33cfc3f78c3f15217272807b14cec4ef64168bcf313bc4174621"},
+		{chainId: "flow-testnet", expectedHash: "dadf3e1bf916f6cb2510cbea00ed9be78cc1b7d2b9ec29f0ef1d469ead2dda2d"},
+		{chainId: "flow-previewnet", expectedHash: "ecee9d431f3ab406c64bd31c2b574035a9971feabd872f5e8f31b55dd08978f3"},
+		{chainId: "flow-emulator", expectedHash: "d201f7b80ee8471754e2a1cad30f5ab888d4be3ba2c0a1cac5a3fcc0b34546a4"},
 	}
 
 	var actualHashes []chainHash

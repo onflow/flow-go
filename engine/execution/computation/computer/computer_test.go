@@ -598,7 +598,8 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 			// create a block with 2 collections with 2 transactions each
 			block := generateBlock(collectionCount, transactionsPerCollection, rag)
 
-			serviceEvents := systemcontracts.ServiceEventsForChain(execCtx.Chain.ChainID())
+			chainID := execCtx.Chain.ChainID()
+			serviceEvents := systemcontracts.ServiceEventsForChain(chainID)
 
 			randomSource := unittest.EpochSetupRandomSourceFixture()
 			payload, err := ccf.Decode(nil, unittest.EpochSetupFixtureCCF(randomSource))
@@ -746,7 +747,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 			// make sure event index sequence are valid
 			for i := 0; i < result.BlockExecutionResult.Size(); i++ {
 				collectionResult := result.CollectionExecutionResultAt(i)
-				unittest.EnsureEventsIndexSeq(t, collectionResult.Events(), execCtx.Chain.ChainID())
+				unittest.EnsureEventsIndexSeq(t, collectionResult.Events(), chainID)
 			}
 
 			sEvents := result.AllServiceEvents() // all events should have been collected

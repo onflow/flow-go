@@ -59,7 +59,7 @@ func TestReusableCadenceRuntimePoolSharing(t *testing.T) {
 	default:
 	}
 
-	var otherPool ReusableCadenceRuntimePool = pool
+	var otherPool = pool
 
 	entry := otherPool.Borrow(nil)
 	require.NotNil(t, entry)
