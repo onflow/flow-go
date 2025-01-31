@@ -34,7 +34,7 @@ func LoopPruneExecutionDataFromRootToLatestSealed(
 ) error {
 	// the creator can be reused to create new block iterator that can iterate from the last
 	// checkpoint to the new latest (sealed) block.
-	creator, getLatest, err := makeBlockIteratorCreator(state, badgerDB, headers, chunkDataPacksDB, config)
+	creator, getNextAndLatest, err := makeBlockIteratorCreator(state, badgerDB, headers, chunkDataPacksDB, config)
 	if err != nil {
 		return err
 	}
@@ -50,13 +50,14 @@ func LoopPruneExecutionDataFromRootToLatestSealed(
 	)
 
 	for {
-		latest, err := getLatest.Latest()
+		nextToPrune, latestToPrune, err := getNextAndLatest()
 		if err != nil {
-			return fmt.Errorf("failed to get latest sealed and executed block: %w", err)
+			return fmt.Errorf("failed to get next and latest to prune: %w", err)
 		}
 
 		log.Info().
-			Uint64("latest_height", latest.Height).
+			Uint64("nextToPrune", nextToPrune).
+			Uint64("latestToPrune", latestToPrune).
 			Msgf("execution data pruning will start in %s at %s",
 				config.SleepAfterEachIteration, time.Now().Add(config.SleepAfterEachIteration).UTC())
 
@@ -94,7 +95,7 @@ func makeBlockIteratorCreator(
 	headers storage.Headers,
 	chunkDataPacksDB *pebble.DB,
 	config PruningConfig,
-) (module.IteratorCreator, *LatestPrunable, error) {
+) (module.IteratorCreator, func() (nextToPrune uint64, latestToPrune uint64, err error), error) {
 	root := state.Params().SealedRoot()
 	sealedAndExecuted := latest.NewLatestSealedAndExecuted(
 		root,
@@ -122,7 +123,19 @@ func makeBlockIteratorCreator(
 		return nil, nil, fmt.Errorf("failed to create height based block iterator creator: %w", err)
 	}
 
-	return creator, latest, nil
+	return creator, func() (uint64, uint64, error) {
+		next, err := progress.ProcessedIndex()
+		if err != nil {
+			return 0, 0, fmt.Errorf("failed to get next height to prune: %w", err)
+		}
+
+		header, err := latest.Latest()
+		if err != nil {
+			return 0, 0, fmt.Errorf("failed to get latest prunable block: %w", err)
+		}
+
+		return next, header.Height, nil
+	}, nil
 }
 
 // makeIterateAndPruneAll takes config and chunk data packs db and pruner and returns a function that
