@@ -12,7 +12,7 @@ type Block struct {
 	Header          *BlockHeader     `json:"header"`
 	Payload         *BlockPayload    `json:"payload,omitempty"`
 	ExecutionResult *ExecutionResult `json:"execution_result,omitempty"`
-	Expandable      *BlockExpandable `json:"_expandable"`
+	Expandable      *BlockExpandable `json:"_expandable,omitempty"`
 	Links           *Links           `json:"_links,omitempty"`
-	BlockStatus     string           `json:"block_status"`
+	BlockStatus     *BlockStatus     `json:"block_status"`
 }
