@@ -74,6 +74,7 @@ func LoopPruneExecutionDataFromRootToLatestSealed(
 	}
 }
 
+// makeBlockIteratorCreator create the block iterator creator
 func makeBlockIteratorCreator(
 	state protocol.State,
 	badgerDB *badger.DB,
@@ -113,7 +114,9 @@ func makeBlockIteratorCreator(
 
 // makeIterateAndPruneAll takes config and chunk data packs db and pruner and returns a function that
 // takes a block iterator and iterates through all the blocks and decides how to prune the chunk data packs.
-func makeIterateAndPruneAll(ctx context.Context, config PruningConfig, chunkDataPacksDB *pebble.DB, prune *ChunkDataPackPruner) func(iter module.BlockIterator) error {
+func makeIterateAndPruneAll(
+	ctx context.Context, config PruningConfig, chunkDataPacksDB *pebble.DB, prune *ChunkDataPackPruner,
+) func(iter module.BlockIterator) error {
 	isBatchFull := func(counter int) bool {
 		return uint(counter) >= config.BatchSize
 	}
