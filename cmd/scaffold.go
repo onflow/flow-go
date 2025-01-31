@@ -31,6 +31,7 @@ import (
 	"github.com/onflow/flow-go/admin/commands/common"
 	storageCommands "github.com/onflow/flow-go/admin/commands/storage"
 	"github.com/onflow/flow-go/cmd/build"
+	"github.com/onflow/flow-go/cmd/scaffold"
 	"github.com/onflow/flow-go/config"
 	"github.com/onflow/flow-go/consensus/hotstuff/persister"
 	"github.com/onflow/flow-go/fvm/initialize"
@@ -164,6 +165,7 @@ func (fnb *FlowNodeBuilder) BaseFlags() {
 	fnb.flags.StringVar(&fnb.BaseConfig.BindAddr, "bind", defaultConfig.BindAddr, "address to bind on")
 	fnb.flags.StringVarP(&fnb.BaseConfig.BootstrapDir, "bootstrapdir", "b", defaultConfig.BootstrapDir, "path to the bootstrap directory")
 	fnb.flags.StringVarP(&fnb.BaseConfig.datadir, "datadir", "d", defaultConfig.datadir, "directory to store the public database (protocol state)")
+	fnb.flags.StringVar(&fnb.BaseConfig.pebbleDir, "pebble-dir", defaultConfig.pebbleDir, "directory to store the public pebble database (protocol state)")
 	fnb.flags.StringVar(&fnb.BaseConfig.secretsdir, "secretsdir", defaultConfig.secretsdir, "directory to store private database (secrets)")
 	fnb.flags.StringVarP(&fnb.BaseConfig.level, "loglevel", "l", defaultConfig.level, "level for logging output")
 	fnb.flags.Uint32Var(&fnb.BaseConfig.debugLogLimit, "debug-log-limit", defaultConfig.debugLogLimit, "max number of debug/trace log events per second")
@@ -1056,13 +1058,7 @@ func (fnb *FlowNodeBuilder) initProfiler() error {
 	return nil
 }
 
-func (fnb *FlowNodeBuilder) initDB() error {
-
-	// if a db has been passed in, use that instead of creating one
-	if fnb.BaseConfig.db != nil {
-		fnb.DB = fnb.BaseConfig.db
-		return nil
-	}
+func (fnb *FlowNodeBuilder) initBadgerDB() error {
 
 	// Pre-create DB path (Badger creates only one-level dirs)
 	err := os.MkdirAll(fnb.BaseConfig.datadir, 0700)
@@ -1107,6 +1103,17 @@ func (fnb *FlowNodeBuilder) initDB() error {
 		return bstorage.NewCleaner(node.Logger, node.DB, node.Metrics.CleanCollector, flow.DefaultValueLogGCWaitDuration), nil
 	})
 
+	return nil
+}
+
+func (fnb *FlowNodeBuilder) initPebbleDB() error {
+	db, closer, err := scaffold.InitPebbleDB(fnb.BaseConfig.pebbleDir)
+	if err != nil {
+		return err
+	}
+
+	fnb.PebbleDB = db
+	fnb.ShutdownFunc(closer.Close)
 	return nil
 }
 
@@ -1889,9 +1896,7 @@ func WithBindAddress(bindAddress string) Option {
 
 func WithDataDir(dataDir string) Option {
 	return func(config *BaseConfig) {
-		if config.db == nil {
-			config.datadir = dataDir
-		}
+		config.datadir = dataDir
 	}
 }
 
@@ -1922,14 +1927,6 @@ func WithComplianceConfig(complianceConfig compliance.Config) Option {
 func WithLogLevel(level string) Option {
 	return func(config *BaseConfig) {
 		config.level = level
-	}
-}
-
-// WithDB takes precedence over WithDataDir and datadir will be set to empty if DB is set using this option
-func WithDB(db *badger.DB) Option {
-	return func(config *BaseConfig) {
-		config.db = db
-		config.datadir = ""
 	}
 }
 
@@ -2038,7 +2035,11 @@ func (fnb *FlowNodeBuilder) onStart() error {
 		return err
 	}
 
-	if err := fnb.initDB(); err != nil {
+	if err := fnb.initBadgerDB(); err != nil {
+		return err
+	}
+
+	if err := fnb.initPebbleDB(); err != nil {
 		return err
 	}
 
