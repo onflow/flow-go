@@ -7,14 +7,14 @@ import (
 	"testing"
 	"time"
 
-	badgerdb "github.com/dgraph-io/badger/v2"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/storage"
-	"github.com/onflow/flow-go/storage/badger"
+	"github.com/onflow/flow-go/storage/operation/dbtest"
+	"github.com/onflow/flow-go/storage/store"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -157,22 +157,16 @@ func TestProcessableJobs(t *testing.T) {
 
 // Test after jobs have been processed, the job status are removed to prevent from memory-leak
 func TestProcessedIndexDeletion(t *testing.T) {
-	setup := func(t *testing.T, f func(c *Consumer, jobs *MockJobs)) {
-		unittest.RunWithBadgerDB(t, func(db *badgerdb.DB) {
-			log := unittest.Logger().With().Str("module", "consumer").Logger()
-			jobs := NewMockJobs()
-			progress := badger.NewConsumerProgress(db, "consumer")
-			worker := newMockWorker()
-			maxProcessing := uint64(3)
-			c, err := NewConsumer(log, jobs, progress, worker, maxProcessing, 0, 0)
-			require.NoError(t, err)
-			worker.WithConsumer(c)
+	dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
+		log := unittest.Logger().With().Str("module", "consumer").Logger()
+		jobs := NewMockJobs()
+		progressInitializer := store.NewConsumerProgress(db, "consumer")
+		worker := newMockWorker()
+		maxProcessing := uint64(3)
+		c, err := NewConsumer(log, jobs, progressInitializer, worker, maxProcessing, 0, 0)
+		require.NoError(t, err)
+		worker.WithConsumer(c)
 
-			f(c, jobs)
-		})
-	}
-
-	setup(t, func(c *Consumer, jobs *MockJobs) {
 		require.NoError(t, jobs.PushN(10))
 		require.NoError(t, c.Start())
 
@@ -193,22 +187,24 @@ func TestProcessedIndexDeletion(t *testing.T) {
 func TestCheckBeforeStartIsNoop(t *testing.T) {
 	t.Parallel()
 
-	unittest.RunWithBadgerDB(t, func(db *badgerdb.DB) {
+	dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
 		storedProcessedIndex := uint64(100)
 
 		worker := newMockWorker()
-		progress := badger.NewConsumerProgress(db, "consumer")
-		err := progress.InitProcessedIndex(storedProcessedIndex)
+		progressInitializer := store.NewConsumerProgress(db, "consumer")
+		progress, err := progressInitializer.Initialize(10)
 		require.NoError(t, err)
+		// set the processedIndex to a value
+		require.NoError(t, progress.SetProcessedIndex(storedProcessedIndex))
 
 		c, err := NewConsumer(
 			unittest.Logger(),
 			NewMockJobs(),
-			progress,
+			progressInitializer,
 			worker,
 			uint64(3),
 			0,
-			10,
+			10, // default index is before the stored processedIndex
 		)
 		require.NoError(t, err)
 		worker.WithConsumer(c)

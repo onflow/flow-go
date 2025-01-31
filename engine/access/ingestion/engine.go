@@ -125,7 +125,7 @@ func New(
 	executionResults storage.ExecutionResults,
 	executionReceipts storage.ExecutionReceipts,
 	collectionExecutedMetric module.CollectionExecutedMetric,
-	finalizedProcessedHeight storage.ConsumerProgress,
+	finalizedProcessedHeight storage.ConsumerProgressInitializer,
 	lastFullBlockHeight *counters.PersistentStrictMonotonicCounter,
 	txErrorMessagesCore *tx_error_messages.TxErrorMessagesCore,
 ) (*Engine, error) {

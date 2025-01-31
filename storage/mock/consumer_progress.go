@@ -9,24 +9,6 @@ type ConsumerProgress struct {
 	mock.Mock
 }
 
-// InitProcessedIndex provides a mock function with given fields: defaultIndex
-func (_m *ConsumerProgress) InitProcessedIndex(defaultIndex uint64) error {
-	ret := _m.Called(defaultIndex)
-
-	if len(ret) == 0 {
-		panic("no return value specified for InitProcessedIndex")
-	}
-
-	var r0 error
-	if rf, ok := ret.Get(0).(func(uint64) error); ok {
-		r0 = rf(defaultIndex)
-	} else {
-		r0 = ret.Error(0)
-	}
-
-	return r0
-}
-
 // ProcessedIndex provides a mock function with given fields:
 func (_m *ConsumerProgress) ProcessedIndex() (uint64, error) {
 	ret := _m.Called()

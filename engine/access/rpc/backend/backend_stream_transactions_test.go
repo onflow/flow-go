@@ -32,8 +32,9 @@ import (
 	syncmock "github.com/onflow/flow-go/module/state_synchronization/mock"
 	protocolint "github.com/onflow/flow-go/state/protocol"
 	protocol "github.com/onflow/flow-go/state/protocol/mock"
-	bstorage "github.com/onflow/flow-go/storage/badger"
 	storagemock "github.com/onflow/flow-go/storage/mock"
+	"github.com/onflow/flow-go/storage/operation/badgerimpl"
+	"github.com/onflow/flow-go/storage/store"
 	"github.com/onflow/flow-go/utils/unittest"
 	"github.com/onflow/flow-go/utils/unittest/mocks"
 
@@ -136,11 +137,9 @@ func (s *TransactionStatusSuite) SetupTest() {
 	rootResult := unittest.ExecutionResultFixture(unittest.WithBlock(&s.rootBlock))
 	s.resultsMap[s.rootBlock.ID()] = rootResult
 
-	var err error
-	s.lastFullBlockHeight, err = counters.NewPersistentStrictMonotonicCounter(
-		bstorage.NewConsumerProgress(s.db, module.ConsumeProgressLastFullBlockHeight),
-		s.rootBlock.Header.Height,
-	)
+	progress, err := store.NewConsumerProgress(badgerimpl.ToDB(s.db), module.ConsumeProgressLastFullBlockHeight).Initialize(s.rootBlock.Header.Height)
+	require.NoError(s.T(), err)
+	s.lastFullBlockHeight, err = counters.NewPersistentStrictMonotonicCounter(progress)
 	require.NoError(s.T(), err)
 
 	s.sealedBlock = &s.rootBlock

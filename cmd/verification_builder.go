@@ -37,7 +37,10 @@ import (
 	"github.com/onflow/flow-go/state/protocol"
 	badgerState "github.com/onflow/flow-go/state/protocol/badger"
 	"github.com/onflow/flow-go/state/protocol/blocktimer"
+	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/storage/badger"
+	"github.com/onflow/flow-go/storage/operation/badgerimpl"
+	"github.com/onflow/flow-go/storage/store"
 )
 
 type VerificationConfig struct {
@@ -88,11 +91,11 @@ func (v *VerificationNodeBuilder) LoadComponentsAndModules() {
 	var (
 		followerState protocol.FollowerState
 
-		chunkStatuses        *stdmap.ChunkStatuses    // used in fetcher engine
-		chunkRequests        *stdmap.ChunkRequests    // used in requester engine
-		processedChunkIndex  *badger.ConsumerProgress // used in chunk consumer
-		processedBlockHeight *badger.ConsumerProgress // used in block consumer
-		chunkQueue           *badger.ChunksQueue      // used in chunk consumer
+		chunkStatuses        *stdmap.ChunkStatuses               // used in fetcher engine
+		chunkRequests        *stdmap.ChunkRequests               // used in requester engine
+		processedChunkIndex  storage.ConsumerProgressInitializer // used in chunk consumer
+		processedBlockHeight storage.ConsumerProgressInitializer // used in block consumer
+		chunkQueue           *badger.ChunksQueue                 // used in chunk consumer
 
 		syncCore            *chainsync.Core   // used in follower engine
 		assignerEngine      *assigner.Engine  // the assigner engine
@@ -155,11 +158,11 @@ func (v *VerificationNodeBuilder) LoadComponentsAndModules() {
 			return nil
 		}).
 		Module("processed chunk index consumer progress", func(node *NodeConfig) error {
-			processedChunkIndex = badger.NewConsumerProgress(node.DB, module.ConsumeProgressVerificationChunkIndex)
+			processedChunkIndex = store.NewConsumerProgress(badgerimpl.ToDB(node.DB), module.ConsumeProgressVerificationChunkIndex)
 			return nil
 		}).
 		Module("processed block height consumer progress", func(node *NodeConfig) error {
-			processedBlockHeight = badger.NewConsumerProgress(node.DB, module.ConsumeProgressVerificationBlockHeight)
+			processedBlockHeight = store.NewConsumerProgress(badgerimpl.ToDB(node.DB), module.ConsumeProgressVerificationBlockHeight)
 			return nil
 		}).
 		Module("chunks queue", func(node *NodeConfig) error {
