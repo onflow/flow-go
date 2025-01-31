@@ -7,6 +7,7 @@ import (
 
 	"github.com/cockroachdb/pebble"
 	"github.com/dgraph-io/badger/v2"
+	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/block_iterator"
@@ -21,6 +22,7 @@ import (
 const NextHeightForUnprunedExecutionDataPackKey = "NextHeightForUnprunedExecutionDataPackKey"
 
 func LoopPruneExecutionDataFromRootToLatestSealed(
+	log zerolog.Logger,
 	ctx context.Context,
 	state protocol.State,
 	badgerDB *badger.DB,
@@ -40,6 +42,7 @@ func LoopPruneExecutionDataFromRootToLatestSealed(
 	// the returned iterateAndPruneAll takes a block iterator and iterates through all the blocks
 	// and decides how to prune the chunk data packs.
 	iterateAndPruneAll := makeIterateAndPruneAll(
+		log,
 		ctx, // for cancelling the iteration when the context is done
 		config,
 		chunkDataPacksDB,
@@ -47,6 +50,9 @@ func LoopPruneExecutionDataFromRootToLatestSealed(
 	)
 
 	for {
+		log.Info().Msgf("execution data pruning will start in %s at %v",
+			config.SleepAfterEachIteration, time.Now().Add(config.SleepAfterEachIteration))
+
 		select {
 		case <-ctx.Done():
 			return nil
@@ -115,7 +121,7 @@ func makeBlockIteratorCreator(
 // makeIterateAndPruneAll takes config and chunk data packs db and pruner and returns a function that
 // takes a block iterator and iterates through all the blocks and decides how to prune the chunk data packs.
 func makeIterateAndPruneAll(
-	ctx context.Context, config PruningConfig, chunkDataPacksDB *pebble.DB, prune *ChunkDataPackPruner,
+	log zerolog.Logger, ctx context.Context, config PruningConfig, chunkDataPacksDB *pebble.DB, prune *ChunkDataPackPruner,
 ) func(iter module.BlockIterator) error {
 	isBatchFull := func(counter int) bool {
 		return uint(counter) >= config.BatchSize
@@ -128,7 +134,7 @@ func makeIterateAndPruneAll(
 	db := pebbleimpl.ToDB(chunkDataPacksDB)
 
 	return func(iter module.BlockIterator) error {
-		err := executor.IterateExecuteAndCommitInBatch(ctx, iter, prune, db, isBatchFull, sleeper)
+		err := executor.IterateExecuteAndCommitInBatch(log, ctx, iter, prune, db, isBatchFull, sleeper)
 		if err != nil {
 			return fmt.Errorf("failed to iterate, execute, and commit in batch: %w", err)
 		}
