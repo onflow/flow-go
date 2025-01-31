@@ -1,8 +1,6 @@
 package badger
 
 import (
-	"fmt"
-
 	"github.com/dgraph-io/badger/v2"
 
 	"github.com/onflow/flow-go/model/flow"
@@ -31,12 +29,6 @@ func NewQuorumCertificates(collector module.CacheMetrics, db *badger.DB, cacheSi
 				return err
 			}
 
-			// qc are for certified block, which is unique by view
-			// while storing qc, we also index the block by view in the same transaction.
-			err = operation.SkipDuplicatesTx(transaction.WithTx(operation.IndexBlockView(qc.View, qc.BlockID)))(tx)
-			if err != nil {
-				return fmt.Errorf("could not index block by view (blockID: %v, view: %v): %w", qc.BlockID, qc.View, err)
-			}
 			return nil
 		}
 	}
@@ -51,7 +43,7 @@ func NewQuorumCertificates(collector module.CacheMetrics, db *badger.DB, cacheSi
 
 	return &QuorumCertificates{
 		db: db,
-		cache: newCache[flow.Identifier, *flow.QuorumCertificate](collector, metrics.ResourceQC,
+		cache: newCache(collector, metrics.ResourceQC,
 			withLimit[flow.Identifier, *flow.QuorumCertificate](cacheSize),
 			withStore(store),
 			withRetrieve(retrieve)),

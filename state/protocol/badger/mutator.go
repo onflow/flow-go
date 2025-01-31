@@ -365,6 +365,12 @@ func (m *FollowerState) headerExtend(ctx context.Context, candidate *flow.Block,
 				return fmt.Errorf("could not store incorporated qc: %w", err)
 			}
 		} else {
+			// parent is a block that has been received and certified by a QC.
+			err := transaction.WithTx(operation.IndexBlockView(parent.View, qc.BlockID))(tx)
+			if err != nil {
+				return fmt.Errorf("could not index certified block: %w", err)
+			}
+
 			// trigger BlockProcessable for parent block above root height
 			if parent.Height > m.finalizedRootHeight {
 				tx.OnSucceed(func() {
@@ -389,6 +395,13 @@ func (m *FollowerState) headerExtend(ctx context.Context, candidate *flow.Block,
 			if err != nil {
 				return fmt.Errorf("could not store certifying qc: %w", err)
 			}
+
+			// candidate is a block that has been received and certified by a QC
+			err := transaction.WithTx(operation.IndexBlockView(candidate.Header.View, blockID))(tx)
+			if err != nil {
+				return fmt.Errorf("could not index certified block: %w", err)
+			}
+
 			tx.OnSucceed(func() { // queue a BlockProcessable event for candidate block, since it is certified
 				m.consumer.BlockProcessable(candidate.Header, certifyingQC)
 			})
