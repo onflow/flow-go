@@ -65,6 +65,7 @@ func NewEventsDataProvider(
 	p.baseDataProvider = newBaseDataProvider(
 		subscriptionID,
 		topic,
+		arguments,
 		cancel,
 		send,
 		p.createSubscription(subCtx, eventArgs), // Set up a subscription to events based on arguments.
@@ -95,16 +96,20 @@ func (p *EventsDataProvider) handleResponse() func(eventsResponse *backend.Event
 			if blocksSinceLastMessage < p.heartbeatInterval {
 				return nil
 			}
-			blocksSinceLastMessage = 0
 		}
+		blocksSinceLastMessage = 0
 
 		index := messageIndex.Value()
 		if ok := messageIndex.Set(messageIndex.Value() + 1); !ok {
 			return fmt.Errorf("message index already incremented to: %d", messageIndex.Value())
 		}
 
-		var response models.EventResponse
-		response.Build(eventsResponse, index)
+		var eventsPayload models.EventResponse
+		eventsPayload.Build(eventsResponse, index)
+
+		var response models.BaseDataProvidersResponse
+		response.Build(p.ID(), p.Topic(), &eventsPayload)
+
 		p.send <- &response
 
 		return nil

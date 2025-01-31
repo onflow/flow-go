@@ -139,23 +139,38 @@ func (s *AccountStatusesProviderSuite) subscribeAccountStatusesDataProviderTestC
 
 // requireAccountStatuses ensures that the received account statuses information matches the expected data.
 func (s *AccountStatusesProviderSuite) requireAccountStatuses(actual interface{}, expected interface{}) {
-	expectedResponse, ok := expected.(*models.AccountStatusesResponse)
-	require.True(s.T(), ok, "Expected *models.AccountStatusesResponse, got %T", expected)
+	expectedResponse, expectedResponsePayload := extractPayload[*models.AccountStatusesResponse](s.T(), expected)
+	actualResponse, actualResponsePayload := extractPayload[*models.AccountStatusesResponse](s.T(), actual)
 
-	actualResponse, ok := actual.(*models.AccountStatusesResponse)
-	require.True(s.T(), ok, "Expected *models.AccountStatusesResponse, got %T", actual)
+	require.Equal(s.T(), expectedResponsePayload.BlockID, actualResponsePayload.BlockID)
+	require.Equal(s.T(), len(expectedResponsePayload.AccountEvents), len(actualResponsePayload.AccountEvents))
+	require.Equal(s.T(), expectedResponsePayload.MessageIndex, actualResponsePayload.MessageIndex)
+	require.Equal(s.T(), expectedResponsePayload.Height, actualResponsePayload.Height)
+	require.Equal(s.T(), expectedResponse.Topic, actualResponse.Topic)
 
-	require.Equal(s.T(), expectedResponse.BlockID, actualResponse.BlockID)
-	require.Equal(s.T(), len(expectedResponse.AccountEvents), len(actualResponse.AccountEvents))
-	require.Equal(s.T(), expectedResponse.MessageIndex, actualResponse.MessageIndex)
-	require.Equal(s.T(), expectedResponse.Height, actualResponse.Height)
-
-	for key, expectedEvents := range expectedResponse.AccountEvents {
-		actualEvents, ok := actualResponse.AccountEvents[key]
+	for key, expectedEvents := range expectedResponsePayload.AccountEvents {
+		actualEvents, ok := actualResponsePayload.AccountEvents[key]
 		require.True(s.T(), ok, "Missing key in actual AccountEvents: %s", key)
 
 		s.Require().Equal(expectedEvents, actualEvents, "Mismatch for key: %s", key)
 	}
+}
+
+// expectedAccountStatusesResponses creates the expected responses for the provided events and backend responses.
+func (s *AccountStatusesProviderSuite) expectedAccountStatusesResponses(backendResponses []*backend.AccountStatusesResponse) []interface{} {
+	expectedResponses := make([]interface{}, len(backendResponses))
+
+	for i, resp := range backendResponses {
+		var expectedResponsePayload models.AccountStatusesResponse
+		expectedResponsePayload.Build(resp, uint64(i))
+
+		expectedResponses[i] = &models.BaseDataProvidersResponse{
+			Topic:   AccountStatusesTopic,
+			Payload: &expectedResponsePayload,
+		}
+	}
+
+	return expectedResponses
 }
 
 // TestAccountStatusesDataProvider_InvalidArguments tests the behavior of the account statuses data provider
@@ -254,9 +269,10 @@ func (s *AccountStatusesProviderSuite) TestMessageIndexAccountStatusesProviderRe
 	var responses []*models.AccountStatusesResponse
 	for i := 0; i < accountStatusesCount; i++ {
 		res := <-send
-		accountStatusesRes, ok := res.(*models.AccountStatusesResponse)
-		s.Require().True(ok, "Expected *models.AccountStatusesResponse, got %T", res)
-		responses = append(responses, accountStatusesRes)
+
+		_, accStatusesResponsePayload := extractPayload[*models.AccountStatusesResponse](s.T(), res)
+
+		responses = append(responses, accStatusesResponsePayload)
 	}
 
 	// Wait for the provider goroutine to finish
@@ -288,18 +304,4 @@ func (s *AccountStatusesProviderSuite) backendAccountStatusesResponses(events []
 	}
 
 	return responses
-}
-
-// expectedAccountStatusesResponses creates the expected responses for the provided events and backend responses.
-func (s *AccountStatusesProviderSuite) expectedAccountStatusesResponses(backendResponses []*backend.AccountStatusesResponse) []interface{} {
-	expectedResponses := make([]interface{}, len(backendResponses))
-
-	for i, resp := range backendResponses {
-		var expectedResponse models.AccountStatusesResponse
-		expectedResponse.Build(resp, uint64(i))
-
-		expectedResponses[i] = &expectedResponse
-	}
-
-	return expectedResponses
 }

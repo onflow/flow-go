@@ -1,6 +1,6 @@
 module github.com/onflow/flow-go/insecure
 
-go 1.22
+go 1.23
 
 require (
 	github.com/btcsuite/btcd/chaincfg/chainhash v1.0.2
@@ -201,17 +201,19 @@ require (
 	github.com/multiformats/go-varint v0.0.7 // indirect
 	github.com/nxadm/tail v1.4.8 // indirect
 	github.com/olekukonko/tablewriter v0.0.5 // indirect
-	github.com/onflow/atree v0.8.1 // indirect
-	github.com/onflow/cadence v1.3.0 // indirect
+	github.com/onflow/atree v0.9.0 // indirect
+	github.com/onflow/bridged-usdc/lib/go/contracts v1.0.0 // indirect
+	github.com/onflow/cadence v1.3.1 // indirect
 	github.com/onflow/flow-core-contracts/lib/go/contracts v1.4.0 // indirect
 	github.com/onflow/flow-core-contracts/lib/go/templates v1.4.0 // indirect
 	github.com/onflow/flow-ft/lib/go/contracts v1.0.1 // indirect
 	github.com/onflow/flow-ft/lib/go/templates v1.0.1 // indirect
-	github.com/onflow/flow-go-sdk v1.3.0 // indirect
+	github.com/onflow/flow-go-sdk v1.3.1 // indirect
 	github.com/onflow/flow-nft/lib/go/contracts v1.2.2 // indirect
 	github.com/onflow/flow-nft/lib/go/templates v1.2.1 // indirect
 	github.com/onflow/flow/protobuf/go/flow v0.4.7 // indirect
 	github.com/onflow/go-ethereum v1.14.7 // indirect
+	github.com/onflow/nft-storefront/lib/go/contracts v1.0.0 // indirect
 	github.com/onflow/sdks v0.6.0-preview.1 // indirect
 	github.com/onflow/wal v1.0.2 // indirect
 	github.com/onsi/ginkgo/v2 v2.13.2 // indirect

@@ -166,7 +166,7 @@ func ValidateResult(
 	}
 
 	// check error msg
-	if errMsg := res.ErrorMsg(); errMsg != txEvent.ErrorMessage {
+	if errMsg := res.ErrorMessageWithRevertReason(); errMsg != txEvent.ErrorMessage {
 		return fmt.Errorf("error msg mismatch %s != %s", errMsg, txEvent.ErrorMessage)
 	}
 
