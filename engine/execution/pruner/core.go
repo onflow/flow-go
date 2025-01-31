@@ -34,7 +34,7 @@ func LoopPruneExecutionDataFromRootToLatestSealed(
 ) error {
 	// the creator can be reused to create new block iterator that can iterate from the last
 	// checkpoint to the new latest (sealed) block.
-	creator, err := makeBlockIteratorCreator(state, badgerDB, headers, chunkDataPacksDB, config)
+	creator, getLatest, err := makeBlockIteratorCreator(state, badgerDB, headers, chunkDataPacksDB, config)
 	if err != nil {
 		return err
 	}
@@ -50,8 +50,15 @@ func LoopPruneExecutionDataFromRootToLatestSealed(
 	)
 
 	for {
-		log.Info().Msgf("execution data pruning will start in %s at %s",
-			config.SleepAfterEachIteration, time.Now().Add(config.SleepAfterEachIteration).UTC())
+		latest, err := getLatest.Latest()
+		if err != nil {
+			return fmt.Errorf("failed to get latest sealed and executed block: %w", err)
+		}
+
+		log.Info().
+			Uint64("latest_height", latest.Height).
+			Msgf("execution data pruning will start in %s at %s",
+				config.SleepAfterEachIteration, time.Now().Add(config.SleepAfterEachIteration).UTC())
 
 		select {
 		case <-ctx.Done():
@@ -87,7 +94,7 @@ func makeBlockIteratorCreator(
 	headers storage.Headers,
 	chunkDataPacksDB *pebble.DB,
 	config PruningConfig,
-) (module.IteratorCreator, error) {
+) (module.IteratorCreator, *LatestPrunable, error) {
 	root := state.Params().SealedRoot()
 	sealedAndExecuted := latest.NewLatestSealedAndExecuted(
 		root,
@@ -112,10 +119,10 @@ func makeBlockIteratorCreator(
 	)
 
 	if err != nil {
-		return nil, fmt.Errorf("failed to create height based block iterator creator: %w", err)
+		return nil, nil, fmt.Errorf("failed to create height based block iterator creator: %w", err)
 	}
 
-	return creator, nil
+	return creator, latest, nil
 }
 
 // makeIterateAndPruneAll takes config and chunk data packs db and pruner and returns a function that
