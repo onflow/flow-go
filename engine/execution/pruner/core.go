@@ -57,9 +57,14 @@ func LoopPruneExecutionDataFromRootToLatestSealed(
 		case <-time.After(config.SleepAfterEachIteration):
 		}
 
-		iter, err := creator.Create()
+		iter, hasNext, err := creator.Create()
 		if err != nil {
 			return fmt.Errorf("failed to create block iterator: %w", err)
+		}
+
+		if !hasNext {
+			// no more blocks to iterate, we are done.
+			continue
 		}
 
 		err = iterateAndPruneAll(iter)
