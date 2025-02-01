@@ -199,7 +199,7 @@ func (suite *NetworkTestSuite) TestUpdateNodeAddresses() {
 
 	// create a new staked identity
 	ids, libP2PNodes := testutils.LibP2PNodeForNetworkFixture(suite.T(), suite.sporkId, 1)
-	idProvider := unittest.NewUpdatableIDProvider(ids)
+	idProvider := unittest.NewUpdatableIDProvider(append(suite.ids, ids...))
 	networkCfg := testutils.NetworkConfigFixture(
 		suite.T(),
 		*ids[0],
@@ -213,10 +213,10 @@ func (suite *NetworkTestSuite) TestUpdateNodeAddresses() {
 
 	// start up nodes and peer managers
 	testutils.StartNodes(irrecoverableCtx, suite.T(), libP2PNodes)
-	defer testutils.StopComponents(suite.T(), libP2PNodes, 1*time.Second)
+	defer testutils.StopComponents(suite.T(), libP2PNodes, 2*time.Second)
 
 	newNet.Start(irrecoverableCtx)
-	defer testutils.StopComponents(suite.T(), []network.EngineRegistry{newNet}, 1*time.Second)
+	defer testutils.StopComponents(suite.T(), []network.EngineRegistry{newNet}, 2*time.Second)
 	unittest.RequireComponentsReadyBefore(suite.T(), 1*time.Second, newNet)
 
 	idList := flow.IdentityList(append(suite.ids, newId))
@@ -224,25 +224,34 @@ func (suite *NetworkTestSuite) TestUpdateNodeAddresses() {
 	// needed to enable ID translation
 	suite.providers[0].SetIdentities(idList)
 
-	// unicast should fail to send because no address is known yet for the new identity
-	con, err := suite.networks[0].Register(channels.TestNetworkChannel, &mocknetwork.MessageProcessor{})
-	require.NoError(suite.T(), err)
-	err = con.Unicast(&libp2pmessage.TestMessage{
+	message := &libp2pmessage.TestMessage{
 		Text: "TestUpdateNodeAddresses",
-	}, newId.NodeID)
+	}
+
+	senderID := suite.ids[0].ID()
+	senderMessageProcessor := mocknetwork.NewMessageProcessor(suite.T())
+	receiverMessageProcessor := mocknetwork.NewMessageProcessor(suite.T())
+	receiverMessageProcessor.
+		On("Process", channels.TestNetworkChannel, senderID, message).
+		Return(nil)
+
+	con, err := suite.networks[0].Register(channels.TestNetworkChannel, senderMessageProcessor)
+	require.NoError(suite.T(), err)
+	_, err = newNet.Register(channels.TestNetworkChannel, receiverMessageProcessor)
+	require.NoError(suite.T(), err)
+
+	// unicast should fail to send because no address is known yet for the new identity
+	err = con.Unicast(message, newId.NodeID)
 	require.True(suite.T(), strings.Contains(err.Error(), swarm.ErrNoAddresses.Error()))
 
 	// update the addresses
 	suite.networks[0].UpdateNodeAddresses()
 
 	// now the message should send successfully
-	err = con.Unicast(&libp2pmessage.TestMessage{
-		Text: "TestUpdateNodeAddresses",
-	}, newId.NodeID)
+	err = con.Unicast(message, newId.NodeID)
 	require.NoError(suite.T(), err)
 
 	cancel()
-	unittest.RequireComponentsReadyBefore(suite.T(), 1*time.Second, newNet)
 }
 
 func (suite *NetworkTestSuite) TestUnicastRateLimit_Messages() {
