@@ -83,6 +83,17 @@ func (b *Blocks) ByHeight(height uint64) (*flow.Block, error) {
 	return b.retrieveTx(blockID)(tx)
 }
 
+func (b *Blocks) ByView(view uint64) (*flow.Block, error) {
+	header, err := b.headers.ByView(view)
+	if err != nil {
+		return nil, err
+	}
+
+	tx := b.db.NewTransaction(false)
+	defer tx.Discard()
+	return b.retrieveTx(header.ID())(tx)
+}
+
 // ByCollectionID ...
 func (b *Blocks) ByCollectionID(collID flow.Identifier) (*flow.Block, error) {
 	var blockID flow.Identifier
