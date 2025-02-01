@@ -4,11 +4,11 @@ import (
 	"context"
 	"fmt"
 
+	corrupt "github.com/libp2p/go-libp2p-pubsub"
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	"github.com/libp2p/go-libp2p/core/host"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/rs/zerolog"
-	corrupt "github.com/yhassanzadeh13/go-libp2p-pubsub"
 
 	"github.com/onflow/flow-go/insecure/internal"
 	"github.com/onflow/flow-go/model/flow"
@@ -20,15 +20,8 @@ import (
 	"github.com/onflow/flow-go/utils/logging"
 )
 
-// CorruptGossipSubAdapter is a wrapper around the forked pubsub topic from
-// github.com/yhassanzadeh13/go-libp2p-pubsub that implements the p2p.PubSubAdapter.
-// This is needed because in order to use the forked pubsub module, we need to
-// use the entire dependency tree of the forked module which is resolved to
-// github.com/yhassanzadeh13/go-libp2p-pubsub. This means that we cannot use
-// the original libp2p pubsub module in the same package.
-// Note: we use the forked pubsub module for sake of BFT testing and attack vector
-// implementation, it is designed to be completely isolated in the "insecure" package, and
-// totally separated from the rest of the codebase.
+// CorruptGossipSubAdapter is a wrapper that implements the p2p.PubSubAdapter and injects some additional
+// observability.
 type CorruptGossipSubAdapter struct {
 	component.Component
 	gossipSub             *corrupt.PubSub
