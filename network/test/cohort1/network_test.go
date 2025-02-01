@@ -478,10 +478,14 @@ func (suite *NetworkTestSuite) TestUnicastRateLimit_Bandwidth() {
 	unittest.RequireComponentsReadyBefore(suite.T(), 1*time.Second, newNet)
 
 	// registers an engine on the new network so that it can receive messages on the TestNetworkChannel
-	newEngine := &mocknetwork.MessageProcessor{}
+	newEngine := mocknetwork.NewMessageProcessor(suite.T())
 	_, err = newNet.Register(channels.TestNetworkChannel, newEngine)
 	require.NoError(suite.T(), err)
-	newEngine.On("Process", channels.TestNetworkChannel, suite.ids[0].NodeID, mockery.Anything).Return(nil)
+
+	callCount := 0
+	newEngine.On("Process", channels.TestNetworkChannel, suite.ids[0].NodeID, mockery.Anything).Run(func(args mockery.Arguments) {
+		callCount++
+	}).Return(nil)
 
 	idList := flow.IdentityList(append(suite.ids, newId))
 
@@ -498,23 +502,43 @@ func (suite *NetworkTestSuite) TestUnicastRateLimit_Bandwidth() {
 	p2ptest.LetNodesDiscoverEachOther(suite.T(), ctx, []p2p.LibP2PNode{libP2PNodes[0], suite.libP2PNodes[0]}, flow.IdentityList{ids[0], suite.ids[0]})
 
 	// create message with about 400bytes (300 random bytes + 100bytes message info)
-	b := make([]byte, 300)
-	for i := range b {
-		b[i] = byte('X')
+	generate := func(letter rune) string {
+		b := make([]byte, 300)
+		for i := range b {
+			b[i] = byte(letter)
+		}
+		return string(b)
 	}
+
 	// send 3 messages at once with a size of 400 bytes each. The third message will be rate limited
 	// as it is more than our allowed bandwidth of 1000 bytes.
-	con0, err := suite.networks[0].Register(channels.TestNetworkChannel, &mocknetwork.MessageProcessor{})
+	con0, err := suite.networks[0].Register(channels.TestNetworkChannel, mocknetwork.NewMessageProcessor(suite.T()))
 	require.NoError(suite.T(), err)
-	for i := 0; i < 3; i++ {
-		err = con0.Unicast(&libp2pmessage.TestMessage{
-			Text: string(b),
-		}, newId.NodeID)
-		require.NoError(suite.T(), err)
+
+	err = con0.Unicast(&libp2pmessage.TestMessage{
+		Text: generate('A'),
+	}, newId.NodeID)
+	require.NoError(suite.T(), err)
+
+	err = con0.Unicast(&libp2pmessage.TestMessage{
+		Text: generate('B'),
+	}, newId.NodeID)
+	require.NoError(suite.T(), err)
+
+	// this message will be rate limited. The remote node will reset the stream, so depending on how
+	// quickly the send happens, we may get an error from attempting to close a reset stream
+	err = con0.Unicast(&libp2pmessage.TestMessage{
+		Text: generate('C'),
+	}, newId.NodeID)
+	if err != nil {
+		require.Contains(suite.T(), err.Error(), "stream reset")
 	}
 
 	// wait for all rate limits before shutting down network
 	unittest.RequireCloseBefore(suite.T(), ch, 100*time.Millisecond, "could not stop on rate limit test ch on time")
+
+	// remote node should have received the first 2 messages
+	assert.Equal(suite.T(), 2, callCount)
 
 	// sleep for 1 seconds to allow connection pruner to prune connections
 	time.Sleep(1 * time.Second)
@@ -530,6 +554,9 @@ func (suite *NetworkTestSuite) TestUnicastRateLimit_Bandwidth() {
 		}, newId.NodeID)
 		return err == nil
 	}, 5*time.Second, 100*time.Millisecond)
+
+	time.Sleep(200 * time.Millisecond)
+	assert.Equal(suite.T(), 3, callCount)
 
 	// shutdown our network so that each message can be processed
 	cancel()
