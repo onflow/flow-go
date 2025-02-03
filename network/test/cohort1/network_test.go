@@ -233,7 +233,8 @@ func (suite *NetworkTestSuite) TestUpdateNodeAddresses() {
 	receiverMessageProcessor := mocknetwork.NewMessageProcessor(suite.T())
 	receiverMessageProcessor.
 		On("Process", channels.TestNetworkChannel, senderID, message).
-		Return(nil)
+		Return(nil).
+		Maybe() // we may not actually process this message depending on how fast runs
 
 	con, err := suite.networks[0].Register(channels.TestNetworkChannel, senderMessageProcessor)
 	require.NoError(suite.T(), err)
