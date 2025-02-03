@@ -1246,17 +1246,11 @@ func TestExtendConflictingEpochEvents(t *testing.T) {
 
 		phase, err := state.AtBlockID(block8.ID()).EpochPhase()
 		assert.NoError(t, err)
-		switch phase {
-		case flow.EpochPhaseSetup:
-			nextEpoch2 := state.AtBlockID(block8.ID()).Epochs().NextUnsafe()
-			setup2clustering, err := nextEpoch2.Clustering()
-			assert.NoError(t, err)
-			require.Equal(t, nextEpochSetup2.Assignments, setup2clustering.Assignments())
-		case flow.EpochPhaseFallback:
-			t.Fatal("reached epoch fallback phase instead of epoch setup phase")
-		default:
-			t.Fatal("unexpected epoch phase")
-		}
+		require.Equal(t, phase, flow.EpochPhaseSetup)
+		nextEpoch2 := state.AtBlockID(block8.ID()).Epochs().NextUnsafe()
+		setup2clustering, err := nextEpoch2.Clustering()
+		assert.NoError(t, err)
+		require.Equal(t, nextEpochSetup2.Assignments, setup2clustering.Assignments())
 
 	})
 }
