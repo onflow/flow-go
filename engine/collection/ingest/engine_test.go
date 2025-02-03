@@ -327,7 +327,9 @@ func (suite *Suite) TestRoutingLocalCluster() {
 	suite.Assert().NoError(err)
 
 	// should be added to local mempool for the current epoch
-	counter, err := suite.epochQuery.Current().Counter()
+	currentEpoch, err := suite.epochQuery.Current()
+	suite.Assert().NoError(err)
+	counter, err := currentEpoch.Counter()
 	suite.Assert().NoError(err)
 	suite.Assert().True(suite.pools.ForEpoch(counter).Has(tx.ID()))
 	suite.conduit.AssertExpectations(suite.T())
@@ -357,7 +359,9 @@ func (suite *Suite) TestRoutingRemoteCluster() {
 	suite.Assert().NoError(err)
 
 	// should not be added to local mempool
-	counter, err := suite.epochQuery.Current().Counter()
+	currentEpoch, err := suite.epochQuery.Current()
+	suite.Assert().NoError(err)
+	counter, err := currentEpoch.Counter()
 	suite.Assert().NoError(err)
 	suite.Assert().False(suite.pools.ForEpoch(counter).Has(tx.ID()))
 	suite.conduit.AssertExpectations(suite.T())
@@ -390,7 +394,9 @@ func (suite *Suite) TestRoutingToRemoteClusterWithNoNodes() {
 	suite.Assert().NoError(err)
 
 	// should not be added to local mempool
-	counter, err := suite.epochQuery.Current().Counter()
+	currentEpoch, err := suite.epochQuery.Current()
+	suite.Assert().NoError(err)
+	counter, err := currentEpoch.Counter()
 	suite.Assert().NoError(err)
 	suite.Assert().False(suite.pools.ForEpoch(counter).Has(tx.ID()))
 	suite.conduit.AssertExpectations(suite.T())
@@ -418,7 +424,9 @@ func (suite *Suite) TestRoutingLocalClusterFromOtherNode() {
 	suite.Assert().NoError(err)
 
 	// should be added to local mempool for current epoch
-	counter, err := suite.epochQuery.Current().Counter()
+	currentEpoch, err := suite.epochQuery.Current()
+	suite.Assert().NoError(err)
+	counter, err := currentEpoch.Counter()
 	suite.Assert().NoError(err)
 	suite.Assert().True(suite.pools.ForEpoch(counter).Has(tx.ID()))
 	suite.conduit.AssertExpectations(suite.T())
@@ -446,7 +454,9 @@ func (suite *Suite) TestRoutingInvalidTransaction() {
 	_ = suite.engine.ProcessTransaction(&tx)
 
 	// should not be added to local mempool
-	counter, err := suite.epochQuery.Current().Counter()
+	currentEpoch, err := suite.epochQuery.Current()
+	suite.Assert().NoError(err)
+	counter, err := currentEpoch.Counter()
 	suite.Assert().NoError(err)
 	suite.Assert().False(suite.pools.ForEpoch(counter).Has(tx.ID()))
 	suite.conduit.AssertExpectations(suite.T())

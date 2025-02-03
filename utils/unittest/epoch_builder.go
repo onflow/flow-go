@@ -162,7 +162,8 @@ func (builder *EpochBuilder) BuildEpoch() *EpochBuilder {
 	// prepare default values for the service events based on the current state
 	identities, err := state.Final().Identities(filter.Any)
 	require.NoError(builder.t, err)
-	epoch := state.Final().Epochs().Current()
+	epoch, err := state.Final().Epochs().Current()
+	require.NoError(builder.t, err)
 	counter, err := epoch.Counter()
 	require.NoError(builder.t, err)
 	finalView, err := epoch.FinalView()
@@ -320,7 +321,9 @@ func (builder *EpochBuilder) CompleteEpoch() *EpochBuilder {
 	phase, err := state.Final().EpochPhase()
 	require.Nil(builder.t, err)
 	require.Equal(builder.t, flow.EpochPhaseCommitted, phase)
-	finalView, err := state.Final().Epochs().Current().FinalView()
+	currentEpoch, err := state.Final().Epochs().Current()
+	require.Nil(builder.t, err)
+	finalView, err := currentEpoch.FinalView()
 	require.Nil(builder.t, err)
 
 	final, err := state.Final().Head()

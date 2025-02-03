@@ -10,7 +10,10 @@ type EpochQuery interface {
 
 	// Current returns the current epoch as of this snapshot. All valid snapshots
 	// have a current epoch.
-	Current() CommittedEpoch
+	// Error returns:
+	//   - state.ErrUnknownSnapshotReference - if the epoch is queried from an unresolvable snapshot.
+	//   - generic error in case of unexpected critical internal corruption or bugs
+	Current() (CommittedEpoch, error)
 
 	// NextUnsafe should only be used by components that actively advance the
 	// epoch from flow.EpochPhaseSetup to flow.EpochPhaseCommitted.
@@ -34,9 +37,12 @@ type EpochQuery interface {
 	// the root block - in other words, if a previous epoch exists, implementations
 	// must arrange to expose it here.
 	//
-	// Returns invalid.Epoch with ErrNoPreviousEpoch in the case that this method
-	// is queried w.r.t. a snapshot from the first epoch after the root block.
-	Previous() CommittedEpoch
+	// Error returns:
+	//   - protocol.ErrNoPreviousEpoch - if the epoch represents a previous epoch which does not exist.
+	//     This happens when the previous epoch is queried within the first epoch of a spork.
+	//   - state.ErrUnknownSnapshotReference - if the epoch is queried from an unresolvable snapshot.
+	//   - generic error in case of unexpected critical internal corruption or bugs
+	Previous() (CommittedEpoch, error)
 }
 
 // CommittedEpoch contains the information specific to a certain Epoch (defined

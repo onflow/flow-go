@@ -121,7 +121,10 @@ func deployRun(cmd *cobra.Command, args []string) {
 func getDeployEpochTransactionArguments(snapshot *inmem.Snapshot) []cadence.Value {
 
 	// current epoch
-	currentEpoch := snapshot.Epochs().Current()
+	currentEpoch, err := snapshot.Epochs().Current()
+	if err != nil {
+		log.Fatal().Err(err).Msgf("could not get current epoch")
+	}
 
 	head, err := snapshot.Head()
 	if err != nil {

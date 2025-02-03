@@ -249,7 +249,10 @@ func (e *Engine) onTransaction(originID flow.Identifier, tx *flow.TransactionBod
 
 	// using the transaction's reference block, determine which cluster we're in.
 	// if we don't know the reference block, we will fail when attempting to query the epoch.
-	refEpoch := refSnapshot.Epochs().Current()
+	refEpoch, err := refSnapshot.Epochs().Current()
+	if err != nil {
+		return fmt.Errorf("could not get current epoch for reference block: %w", err)
+	}
 
 	localCluster, err := e.getLocalCluster(refEpoch)
 	if err != nil {

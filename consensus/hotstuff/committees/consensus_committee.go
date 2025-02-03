@@ -156,11 +156,19 @@ func NewConsensusCommittee(state protocol.State, me flow.Identifier) (*Consensus
 		return nil, fmt.Errorf("could not check previous epoch exists: %w", err)
 	}
 	if exists {
-		epochs = append(epochs, final.Epochs().Previous())
+		prev, err := final.Epochs().Previous()
+		if err != nil {
+			return nil, fmt.Errorf("could not get previous epoch: %w", err)
+		}
+		epochs = append(epochs, prev)
 	}
 
 	// we always prepare the current epoch
-	epochs = append(epochs, final.Epochs().Current())
+	curr, err := final.Epochs().Current()
+	if err != nil {
+		return nil, fmt.Errorf("could not get current epoch: %w", err)
+	}
+	epochs = append(epochs, curr)
 
 	// we prepare the next epoch, if it is committed
 	phase, err := final.EpochPhase()

@@ -19,15 +19,15 @@ type Epochs struct {
 
 var _ protocol.EpochQuery = (*Epochs)(nil)
 
-func (eq Epochs) Previous() protocol.CommittedEpoch {
+func (eq Epochs) Previous() (protocol.CommittedEpoch, error) {
 	if eq.entry.PreviousEpoch == nil {
-		return invalid.NewEpoch(protocol.ErrNoPreviousEpoch)
+		return nil, protocol.ErrNoPreviousEpoch
 	}
-	return NewCommittedEpoch(eq.entry.PreviousEpochSetup, eq.entry.PreviousEpoch.EpochExtensions, eq.entry.PreviousEpochCommit)
+	return NewCommittedEpoch(eq.entry.PreviousEpochSetup, eq.entry.PreviousEpoch.EpochExtensions, eq.entry.PreviousEpochCommit), nil
 }
 
-func (eq Epochs) Current() protocol.CommittedEpoch {
-	return NewCommittedEpoch(eq.entry.CurrentEpochSetup, eq.entry.CurrentEpoch.EpochExtensions, eq.entry.CurrentEpochCommit)
+func (eq Epochs) Current() (protocol.CommittedEpoch, error) {
+	return NewCommittedEpoch(eq.entry.CurrentEpochSetup, eq.entry.CurrentEpoch.EpochExtensions, eq.entry.CurrentEpochCommit), nil
 }
 
 func (eq Epochs) NextUnsafe() protocol.TentativeEpoch {

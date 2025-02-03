@@ -91,7 +91,14 @@ func (e *ReactorEngine) Ready() <-chan struct{} {
 			e.log.Fatal().Err(err).Msg("failed to check epoch phase when starting DKG reactor engine")
 			return
 		}
-		currentCounter, err := snap.Epochs().Current().Counter()
+		epoch, err := snap.Epochs().Current()
+		if err != nil {
+			// unexpected storage-level error
+			// TODO use irrecoverable context
+			e.log.Fatal().Err(err).Msg("failed to retrieve current epoch when starting DKG reactor engine")
+			return
+		}
+		currentCounter, err := epoch.Counter()
 		if err != nil {
 			// unexpected storage-level error
 			// TODO use irrecoverable context
@@ -339,7 +346,10 @@ func (e *ReactorEngine) handleEpochCommittedPhaseStarted(currentEpochCounter uin
 // firstBlockID must be the first block of the EpochSetup phase.
 // No errors are expected during normal operation.
 func (e *ReactorEngine) getDKGInfo(firstBlockID flow.Identifier) (*dkgInfo, error) {
-	currEpoch := e.State.AtBlockID(firstBlockID).Epochs().Current()
+	currEpoch, err := e.State.AtBlockID(firstBlockID).Epochs().Current()
+	if err != nil {
+		return nil, fmt.Errorf("could not retrieve current epoch: %w", err)
+	}
 	nextEpoch := e.State.AtBlockID(firstBlockID).Epochs().NextUnsafe()
 
 	identities, err := nextEpoch.InitialIdentities()

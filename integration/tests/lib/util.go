@@ -240,7 +240,8 @@ func LogStatus(t *testing.T, ctx context.Context, log zerolog.Logger, client *te
 
 	phase, err := snapshot.EpochPhase()
 	require.NoError(t, err)
-	epoch := snapshot.Epochs().Current()
+	epoch, err := snapshot.Epochs().Current()
+	require.NoError(t, err)
 	counter, err := epoch.Counter()
 	require.NoError(t, err)
 

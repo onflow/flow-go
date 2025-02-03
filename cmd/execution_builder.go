@@ -622,13 +622,13 @@ func (exeNode *ExecutionNode) LoadProviderEngine(
 			blockID.String(), height, err)
 	}
 
-	// Get the epoch counter form the protocol state, at the same block.
-	protocolStateEpochCounter, err := node.State.
-		AtBlockID(blockID).
-		Epochs().
-		Current().
-		Counter()
-	// Failing to fetch the epoch counter from the protocol state is a fatal error.
+	// Get the epoch from the protocol state, at the same block.
+	currentEpoch, err := node.State.AtBlockID(blockID).Epochs().Current()
+	// Failing to fetch the epoch, or counter for the epoch, from the protocol state is a fatal error.
+	if err != nil {
+		return nil, fmt.Errorf("could not get current epoch at block %s: %w", blockID.String(), err)
+	}
+	protocolStateEpochCounter, err := currentEpoch.Counter()
 	if err != nil {
 		return nil, fmt.Errorf("cannot get epoch counter from the protocol state at block %s: %w", blockID.String(), err)
 	}

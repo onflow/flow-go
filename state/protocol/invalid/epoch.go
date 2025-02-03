@@ -114,8 +114,8 @@ func (u *Snapshot) Epochs() protocol.EpochQuery {
 	return &Epochs{err: u.err}
 }
 
-func (u *Epochs) Current() protocol.CommittedEpoch {
-	return NewEpoch(u.err)
+func (u *Epochs) Current() (protocol.CommittedEpoch, error) {
+	return nil, u.err
 }
 
 func (u *Epochs) NextUnsafe() protocol.TentativeEpoch {
@@ -124,6 +124,6 @@ func (u *Epochs) NextUnsafe() protocol.TentativeEpoch {
 
 func (u *Epochs) NextCommitted() protocol.CommittedEpoch { return NewEpoch(u.err) }
 
-func (u *Epochs) Previous() protocol.CommittedEpoch {
-	return NewEpoch(u.err)
+func (u *Epochs) Previous() (protocol.CommittedEpoch, error) {
+	return nil, u.err
 }

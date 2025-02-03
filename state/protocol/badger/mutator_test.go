@@ -832,7 +832,8 @@ func TestExtendEpochTransitionValid(t *testing.T) {
 		metrics.On("BlockFinalized", mock.Anything)
 
 		// expect epoch metric calls on bootstrap
-		initialCurrentEpoch := rootSnapshot.Epochs().Current()
+		initialCurrentEpoch, err := rootSnapshot.Epochs().Current()
+		require.NoError(t, err)
 		counter, err := initialCurrentEpoch.Counter()
 		require.NoError(t, err)
 		finalView, err := initialCurrentEpoch.FinalView()
@@ -1062,7 +1063,9 @@ func TestExtendEpochTransitionValid(t *testing.T) {
 		metrics.AssertCalled(t, "CurrentEpochPhase", flow.EpochPhaseCommitted)
 
 		// we should still be in epoch 1
-		epochCounter, err := state.AtBlockID(block4.ID()).Epochs().Current().Counter()
+		block4epoch, err := state.AtBlockID(block4.ID()).Epochs().Current()
+		require.NoError(t, err)
+		epochCounter, err := block4epoch.Counter()
 		require.NoError(t, err)
 		require.Equal(t, epoch1Setup.Counter, epochCounter)
 
@@ -1070,7 +1073,9 @@ func TestExtendEpochTransitionValid(t *testing.T) {
 		require.NoError(t, err)
 
 		// we should still be in epoch 1, since epochs are inclusive of final view
-		epochCounter, err = state.AtBlockID(block7.ID()).Epochs().Current().Counter()
+		block7epoch, err := state.AtBlockID(block7.ID()).Epochs().Current()
+		require.NoError(t, err)
+		epochCounter, err = block7epoch.Counter()
 		require.NoError(t, err)
 		require.Equal(t, epoch1Setup.Counter, epochCounter)
 
@@ -1087,7 +1092,9 @@ func TestExtendEpochTransitionValid(t *testing.T) {
 		require.NoError(t, err)
 
 		// now, at long last, we are in epoch 2
-		epochCounter, err = state.AtBlockID(block8.ID()).Epochs().Current().Counter()
+		block8epoch, err := state.AtBlockID(block8.ID()).Epochs().Current()
+		require.NoError(t, err)
+		epochCounter, err = block8epoch.Counter()
 		require.NoError(t, err)
 		require.Equal(t, epoch2Setup.Counter, epochCounter)
 
@@ -1106,19 +1113,23 @@ func TestExtendEpochTransitionValid(t *testing.T) {
 		metrics.On("CurrentDKGPhaseViews", epoch2Setup.DKGPhase1FinalView, epoch2Setup.DKGPhase2FinalView, epoch2Setup.DKGPhase3FinalView).Once()
 
 		// before block 9 is finalized, the epoch 1-2 boundary is unknown
-		_, err = state.AtBlockID(block8.ID()).Epochs().Current().FinalHeight()
+		_, err = block8epoch.FinalHeight()
 		assert.ErrorIs(t, err, realprotocol.ErrUnknownEpochBoundary)
-		_, err = state.AtBlockID(block8.ID()).Epochs().Current().FirstHeight()
+		_, err = block8epoch.FirstHeight()
 		assert.ErrorIs(t, err, realprotocol.ErrUnknownEpochBoundary)
 
 		err = state.Finalize(context.Background(), block8.ID())
 		require.NoError(t, err)
 
 		// once block 8 is finalized, epoch 2 has unambiguously begun - the epoch 1-2 boundary is known
-		epoch1FinalHeight, err := state.AtBlockID(block8.ID()).Epochs().Previous().FinalHeight()
+		block8previous, err := state.AtBlockID(block8.ID()).Epochs().Previous()
+		require.NoError(t, err)
+		epoch1FinalHeight, err := block8previous.FinalHeight()
 		require.NoError(t, err)
 		assert.Equal(t, block7.Header.Height, epoch1FinalHeight)
-		epoch2FirstHeight, err := state.AtBlockID(block8.ID()).Epochs().Current().FirstHeight()
+		block8epoch, err = state.AtBlockID(block8.ID()).Epochs().Current()
+		require.NoError(t, err)
+		epoch2FirstHeight, err := block8epoch.FirstHeight()
 		require.NoError(t, err)
 		assert.Equal(t, block8.Header.Height, epoch2FirstHeight)
 	})
@@ -2371,7 +2382,9 @@ func TestRecoveryFromEpochFallbackMode(t *testing.T) {
 			require.NoError(t, err)
 
 			// After epoch extension, FinalView must be updated accordingly
-			finalView, err := state.Final().Epochs().Current().FinalView()
+			epochAfterExtension, err := state.Final().Epochs().Current()
+			require.NoError(t, err)
+			finalView, err := epochAfterExtension.FinalView()
 			require.NoError(t, err)
 			assert.Equal(t, epochExtensions[0].FinalView, finalView)
 
@@ -2468,7 +2481,9 @@ func TestEpochTargetEndTime(t *testing.T) {
 		require.NoError(t, err)
 
 		epoch1Setup := rootResult.ServiceEvents[0].Event.(*flow.EpochSetup)
-		rootTargetEndTime, err := rootSnapshot.Epochs().Current().TargetEndTime()
+		currentEpoch, err := rootSnapshot.Epochs().Current()
+		require.NoError(t, err)
+		rootTargetEndTime, err := currentEpoch.TargetEndTime()
 		require.NoError(t, err)
 		require.Equal(t, epoch1Setup.TargetEndTime, rootTargetEndTime)
 
@@ -2488,7 +2503,9 @@ func TestEpochTargetEndTime(t *testing.T) {
 		firstExtension := epochState.EpochExtensions()[0]
 		targetViewDuration := float64(epoch1Setup.TargetDuration) / float64(epoch1Setup.FinalView-epoch1Setup.FirstView+1)
 		expectedTargetEndTime := rootTargetEndTime + uint64(float64(firstExtension.FinalView-epoch1Setup.FinalView)*targetViewDuration)
-		afterFirstExtensionTargetEndTime, err := state.Final().Epochs().Current().TargetEndTime()
+		afterFirstExtensionEpoch, err := state.Final().Epochs().Current()
+		require.NoError(t, err)
+		afterFirstExtensionTargetEndTime, err := afterFirstExtensionEpoch.TargetEndTime()
 		require.NoError(t, err)
 		require.Equal(t, expectedTargetEndTime, afterFirstExtensionTargetEndTime)
 
@@ -2502,7 +2519,9 @@ func TestEpochTargetEndTime(t *testing.T) {
 		require.NoError(t, err)
 		secondExtension := epochState.EpochExtensions()[1]
 		expectedTargetEndTime = rootTargetEndTime + uint64(float64(secondExtension.FinalView-epoch1Setup.FinalView)*targetViewDuration)
-		afterSecondExtensionTargetEndTime, err := state.Final().Epochs().Current().TargetEndTime()
+		afterSecondExtensionEpoch, err := state.Final().Epochs().Current()
+		require.NoError(t, err)
+		afterSecondExtensionTargetEndTime, err := afterSecondExtensionEpoch.TargetEndTime()
 		require.NoError(t, err)
 		require.Equal(t, expectedTargetEndTime, afterSecondExtensionTargetEndTime)
 	})
@@ -2521,7 +2540,9 @@ func TestEpochTargetDuration(t *testing.T) {
 		require.NoError(t, err)
 
 		epoch1Setup := rootResult.ServiceEvents[0].Event.(*flow.EpochSetup)
-		rootTargetDuration, err := rootSnapshot.Epochs().Current().TargetDuration()
+		currentEpoch, err := rootSnapshot.Epochs().Current()
+		require.NoError(t, err)
+		rootTargetDuration, err := currentEpoch.TargetDuration()
 		require.NoError(t, err)
 		require.Equal(t, epoch1Setup.TargetDuration, rootTargetDuration)
 
@@ -2540,7 +2561,9 @@ func TestEpochTargetDuration(t *testing.T) {
 		require.NoError(t, err)
 		firstExtension := epochState.EpochExtensions()[0]
 		targetViewDuration := float64(epoch1Setup.TargetDuration) / float64(epoch1Setup.FinalView-epoch1Setup.FirstView+1)
-		afterFirstExtensionTargetDuration, err := state.Final().Epochs().Current().TargetDuration()
+		afterFirstExtensionEpoch, err := state.Final().Epochs().Current()
+		require.NoError(t, err)
+		afterFirstExtensionTargetDuration, err := afterFirstExtensionEpoch.TargetDuration()
 		require.NoError(t, err)
 		expectedTargetDuration := rootTargetDuration + uint64(float64(firstExtension.FinalView-firstExtension.FirstView+1)*targetViewDuration)
 		require.Equal(t, expectedTargetDuration, afterFirstExtensionTargetDuration)
@@ -2554,7 +2577,9 @@ func TestEpochTargetDuration(t *testing.T) {
 		epochState, err = state.Final().EpochProtocolState()
 		require.NoError(t, err)
 		secondExtension := epochState.EpochExtensions()[1]
-		afterSecondExtensionTargetDuration, err := state.Final().Epochs().Current().TargetDuration()
+		afterSecondExtensionEpoch, err := state.Final().Epochs().Current()
+		require.NoError(t, err)
+		afterSecondExtensionTargetDuration, err := afterSecondExtensionEpoch.TargetDuration()
 		require.NoError(t, err)
 		expectedTargetDuration = rootTargetDuration + uint64(float64(secondExtension.FinalView-epoch1Setup.FinalView)*targetViewDuration)
 		require.Equal(t, expectedTargetDuration, afterSecondExtensionTargetDuration)

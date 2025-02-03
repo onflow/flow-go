@@ -248,11 +248,13 @@ func (bs *BlockTimeControllerSuite) TestOnEpochExtended() {
 		return len(bs.ctl.epochEvents) == 0
 	}, time.Second, time.Millisecond)
 
-	extensionTargetTime, err := bs.snapshot.Epochs().Current().TargetEndTime()
+	currentEpoch, err := bs.snapshot.Epochs().Current()
 	require.NoError(bs.T(), err)
-	extensionTargetDuration, err := bs.snapshot.Epochs().Current().TargetDuration()
+	extensionTargetTime, err := currentEpoch.TargetEndTime()
 	require.NoError(bs.T(), err)
-	extensionFinalView, err := bs.snapshot.Epochs().Current().FinalView()
+	extensionTargetDuration, err := currentEpoch.TargetDuration()
+	require.NoError(bs.T(), err)
+	extensionFinalView, err := currentEpoch.FinalView()
 	require.NoError(bs.T(), err)
 
 	assert.Equal(bs.T(), extensionTargetTime, bs.ctl.currentEpochTiming.targetEndTime)

@@ -171,14 +171,22 @@ func NewEpochLookup(state protocol.State) (*EpochLookup, error) {
 		return nil, fmt.Errorf("could not check previous epoch exists: %w", err)
 	}
 	if exists {
-		err := lookup.cacheEpoch(final.Epochs().Previous())
+		prev, err := final.Epochs().Previous()
+		if err != nil {
+			return nil, fmt.Errorf("could not get previous epoch: %w", err)
+		}
+		err = lookup.cacheEpoch(prev)
 		if err != nil {
 			return nil, fmt.Errorf("could not prepare previous epoch: %w", err)
 		}
 	}
 
 	// we always cache the current epoch
-	err = lookup.cacheEpoch(final.Epochs().Current())
+	curr, err := final.Epochs().Current()
+	if err != nil {
+		return nil, fmt.Errorf("could not get current epoch: %w", err)
+	}
+	err = lookup.cacheEpoch(curr)
 	if err != nil {
 		return nil, fmt.Errorf("could not prepare current epoch: %w", err)
 	}

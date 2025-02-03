@@ -6,9 +6,10 @@ import (
 
 	"github.com/stretchr/testify/require"
 
+	"github.com/onflow/flow-go/state/protocol/invalid"
+
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/state/protocol"
-	"github.com/onflow/flow-go/state/protocol/invalid"
 )
 
 // EpochQuery implements protocol.EpochQuery for testing purposes.
@@ -36,10 +37,10 @@ func NewEpochQuery(t *testing.T, counter uint64, epochs ...protocol.CommittedEpo
 	return mock
 }
 
-func (mock *EpochQuery) Current() protocol.CommittedEpoch {
+func (mock *EpochQuery) Current() (protocol.CommittedEpoch, error) {
 	mock.mu.RLock()
 	defer mock.mu.RUnlock()
-	return mock.byCounter[mock.counter]
+	return mock.byCounter[mock.counter], nil
 }
 
 func (mock *EpochQuery) NextUnsafe() protocol.TentativeEpoch {
@@ -66,14 +67,14 @@ func (mock *EpochQuery) NextCommitted() protocol.CommittedEpoch {
 	return epoch
 }
 
-func (mock *EpochQuery) Previous() protocol.CommittedEpoch {
+func (mock *EpochQuery) Previous() (protocol.CommittedEpoch, error) {
 	mock.mu.RLock()
 	defer mock.mu.RUnlock()
 	epoch, exists := mock.byCounter[mock.counter-1]
 	if !exists {
-		return invalid.NewEpoch(protocol.ErrNoPreviousEpoch)
+		return nil, protocol.ErrNoPreviousEpoch
 	}
-	return epoch
+	return epoch, nil
 }
 
 // Phase returns a phase consistent with the current epoch state.

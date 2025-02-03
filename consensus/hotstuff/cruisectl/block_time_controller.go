@@ -180,7 +180,11 @@ func NewBlockTimeController(log zerolog.Logger, metrics module.CruiseCtlMetrics,
 func (ctl *BlockTimeController) initEpochTiming() error {
 	finalSnapshot := ctl.state.Final()
 
-	currentEpochTiming, err := newEpochTiming(finalSnapshot.Epochs().Current())
+	currentEpoch, err := finalSnapshot.Epochs().Current()
+	if err != nil {
+		return fmt.Errorf("could not retrieve current epoch: %w", err)
+	}
+	currentEpochTiming, err := newEpochTiming(currentEpoch)
 	if err != nil {
 		return fmt.Errorf("failed to retrieve the current epoch's timing information: %w", err)
 	}
@@ -433,7 +437,11 @@ func (ctl *BlockTimeController) measureViewDuration(tb TimedBlock) error {
 // its end. Specifically, we memorize the updated timing information in the BlockTimeController.
 // No errors are expected during normal operation.
 func (ctl *BlockTimeController) processEpochExtended(first *flow.Header) error {
-	currEpochTimingWithExtension, err := newEpochTiming(ctl.state.AtHeight(first.Height).Epochs().Current())
+	currentEpoch, err := ctl.state.AtHeight(first.Height).Epochs().Current()
+	if err != nil {
+		return fmt.Errorf("could not get current epoch: %w", err)
+	}
+	currEpochTimingWithExtension, err := newEpochTiming(currentEpoch)
 	if err != nil {
 		return fmt.Errorf("failed to get new epoch timing: %w", err)
 	}
