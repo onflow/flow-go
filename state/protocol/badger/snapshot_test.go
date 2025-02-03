@@ -1253,7 +1253,9 @@ func TestSnapshot_EpochQuery(t *testing.T) {
 					assert.Equal(t, epoch2Counter, counter)
 				}
 				for _, height := range epoch1.CommittedRange() {
-					counter, err := state.AtHeight(height).Epochs().NextCommitted().Counter()
+					nextCommitted, err := state.AtHeight(height).Epochs().NextCommitted()
+					require.NoError(t, err)
+					counter, err := nextCommitted.Counter()
 					require.NoError(t, err)
 					assert.Equal(t, epoch2Counter, counter)
 				}
@@ -1350,7 +1352,9 @@ func TestSnapshot_EpochFirstView(t *testing.T) {
 			// test w.r.t. epoch 1 snapshot
 			t.Run("Next", func(t *testing.T) {
 				for _, height := range epoch1.CommittedRange() {
-					actualFirstView, err := state.AtHeight(height).Epochs().NextCommitted().FirstView()
+					nextCommitted, err := state.AtHeight(height).Epochs().NextCommitted()
+					require.NoError(t, err)
+					actualFirstView, err := nextCommitted.FirstView()
 					require.NoError(t, err)
 					assert.Equal(t, epoch2FirstView, actualFirstView)
 				}
@@ -1404,6 +1408,8 @@ func TestSnapshot_EpochHeightBoundaries(t *testing.T) {
 		t.Run("first epoch - EpochCommitted phase", func(t *testing.T) {
 			currentEpoch, err := state.Final().Epochs().Current()
 			require.NoError(t, err)
+			nextEpoch, err := state.Final().Epochs().NextCommitted()
+			require.NoError(t, err)
 			// first height of started current epoch should be known
 			firstHeight, err := currentEpoch.FirstHeight()
 			require.NoError(t, err)
@@ -1412,9 +1418,9 @@ func TestSnapshot_EpochHeightBoundaries(t *testing.T) {
 			_, err = currentEpoch.FinalHeight()
 			assert.ErrorIs(t, err, protocol.ErrUnknownEpochBoundary)
 			// first and final height of not started next epoch should be unknown
-			_, err = state.Final().Epochs().NextCommitted().FirstHeight()
+			_, err = nextEpoch.FirstHeight()
 			assert.ErrorIs(t, err, protocol.ErrUnknownEpochBoundary)
-			_, err = state.Final().Epochs().NextCommitted().FinalHeight()
+			_, err = nextEpoch.FinalHeight()
 			assert.ErrorIs(t, err, protocol.ErrUnknownEpochBoundary)
 		})
 

@@ -93,7 +93,10 @@ func snapshot(cmd *cobra.Command, args []string) {
 		return
 	}
 
-	nextEpoch := snapshot.Epochs().NextCommitted()
+	nextEpoch, err := snapshot.Epochs().NextCommitted()
+	if err != nil {
+		log.Fatal().Err(err).Msg("could not get next committed epoch")
+	}
 	nextIdentities, err := nextEpoch.InitialIdentities()
 	if err != nil {
 		log.Fatal().Err(err).Msg("could not get initial identities from next epoch")

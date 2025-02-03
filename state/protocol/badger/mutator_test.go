@@ -967,7 +967,7 @@ func TestExtendEpochTransitionValid(t *testing.T) {
 		assert.NoError(t, err)
 
 		// only setup event is finalized, not commit, so shouldn't be able to read a CommittedEpoch
-		_, err = state.AtBlockID(block3.ID()).Epochs().NextCommitted().DKG()
+		_, err = state.AtBlockID(block3.ID()).Epochs().NextCommitted()
 		require.Error(t, err)
 
 		// insert B4
@@ -1025,17 +1025,13 @@ func TestExtendEpochTransitionValid(t *testing.T) {
 
 		// we should NOT be able to query epoch 2 commit info wrt blocks before 6
 		for _, blockID := range []flow.Identifier{block4.ID(), block5.ID()} {
-			_, err = state.AtBlockID(blockID).Epochs().NextCommitted().DKG()
+			_, err = state.AtBlockID(blockID).Epochs().NextCommitted()
 			require.Error(t, err)
 		}
 
 		// now epoch 2 is committed, we can query anything we want about it wrt block 6 (or later)
-		_, err = state.AtBlockID(block6.ID()).Epochs().NextCommitted().InitialIdentities()
+		_, err = state.AtBlockID(block6.ID()).Epochs().NextCommitted()
 		require.NoError(t, err)
-		_, err = state.AtBlockID(block6.ID()).Epochs().NextCommitted().Clustering()
-		require.NoError(t, err)
-		_, err = state.AtBlockID(block6.ID()).Epochs().NextCommitted().DKG()
-		assert.NoError(t, err)
 
 		// now that the commit event has been emitted, we should be in the committed phase
 		phase, err = state.AtBlockID(block6.ID()).EpochPhase()
@@ -1998,7 +1994,8 @@ func TestRecoveryFromEpochFallbackMode(t *testing.T) {
 		epochPhase := epochState.EpochPhase()
 		require.Equal(t, flow.EpochPhaseCommitted, epochPhase, "next epoch has to be committed")
 
-		nextEpochQuery := state.Final().Epochs().NextCommitted()
+		nextEpochQuery, err := state.Final().Epochs().NextCommitted()
+		require.NoError(t, err)
 		nextEpochSetup, err := realprotocol.ToEpochSetup(nextEpochQuery)
 		require.NoError(t, err)
 		nextEpochCommit, err := realprotocol.ToEpochCommit(nextEpochQuery)

@@ -28,9 +28,9 @@ type EpochQuery interface {
 	// NextCommitted returns the next epoch as of this snapshot, only if it has
 	// been committed already (after flow.EpochPhaseCommitted)
 	//
-	// Returns invalid.Epoch with ErrNextEpochNotCommitted in the case that
-	// the current phase is flow.EpochPhaseStaking or flow.EpochPhaseSetup.
-	NextCommitted() CommittedEpoch
+	// Error returns:
+	//   - ErrNextEpochNotCommitted in the case that the current phase is flow.EpochPhaseStaking or flow.EpochPhaseSetup.
+	NextCommitted() (CommittedEpoch, error)
 
 	// Previous returns the previous epoch as of this snapshot. Valid snapshots
 	// must have a previous epoch for all epochs except that immediately after

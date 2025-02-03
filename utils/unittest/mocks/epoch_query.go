@@ -55,14 +55,14 @@ func (mock *EpochQuery) NextUnsafe() (protocol.TentativeEpoch, error) {
 	return epoch, nil
 }
 
-func (mock *EpochQuery) NextCommitted() protocol.CommittedEpoch {
+func (mock *EpochQuery) NextCommitted() (protocol.CommittedEpoch, error) {
 	mock.mu.RLock()
 	defer mock.mu.RUnlock()
 	epoch, exists := mock.byCounter[mock.counter+1]
 	if !exists {
-		return invalid.NewEpoch(protocol.ErrNextEpochNotSetup)
+		return nil, protocol.ErrNextEpochNotSetup
 	}
-	return epoch
+	return epoch, nil
 }
 
 func (mock *EpochQuery) Previous() (protocol.CommittedEpoch, error) {

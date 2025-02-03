@@ -142,7 +142,9 @@ func (bs *BlockTimeControllerSuite) AssertCorrectInitialization() {
 
 	// if next epoch is committed, final view should be set
 	if phase := bs.epochs.Phase(); phase == flow.EpochPhaseCommitted {
-		finalView, err := bs.epochs.NextCommitted().FinalView()
+		nextEpoch, err := bs.epochs.NextCommitted()
+		require.NoError(bs.T(), err)
+		finalView, err := nextEpoch.FinalView()
 		require.NoError(bs.T(), err)
 		require.NotNil(bs.T(), bs.ctl.nextEpochTiming)
 		assert.Equal(bs.T(), finalView, bs.ctl.nextEpochTiming.finalView)

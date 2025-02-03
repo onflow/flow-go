@@ -9,7 +9,6 @@ import (
 	"github.com/onflow/flow-go/module/signature"
 	"github.com/onflow/flow-go/state/cluster"
 	"github.com/onflow/flow-go/state/protocol"
-	"github.com/onflow/flow-go/state/protocol/invalid"
 )
 
 // Epochs provides access to epoch data, backed by a rich epoch protocol state entry.
@@ -42,14 +41,14 @@ func (eq Epochs) NextUnsafe() (protocol.TentativeEpoch, error) {
 	return nil, fmt.Errorf("unexpected unknown phase in protocol state entry")
 }
 
-func (eq Epochs) NextCommitted() protocol.CommittedEpoch {
+func (eq Epochs) NextCommitted() (protocol.CommittedEpoch, error) {
 	switch eq.entry.EpochPhase() {
 	case flow.EpochPhaseStaking, flow.EpochPhaseFallback, flow.EpochPhaseSetup:
-		return invalid.NewEpoch(protocol.ErrNextEpochNotCommitted)
+		return nil, protocol.ErrNextEpochNotCommitted
 	case flow.EpochPhaseCommitted:
-		return NewCommittedEpoch(eq.entry.NextEpochSetup, eq.entry.NextEpoch.EpochExtensions, eq.entry.NextEpochCommit)
+		return NewCommittedEpoch(eq.entry.NextEpochSetup, eq.entry.NextEpoch.EpochExtensions, eq.entry.NextEpochCommit), nil
 	}
-	return invalid.NewEpochf("unexpected unknown phase in protocol state entry")
+	return nil, fmt.Errorf("unexpected unknown phase in protocol state entry")
 }
 
 // setupEpoch is an implementation of protocol.TentativeEpoch backed by an EpochSetup service event.

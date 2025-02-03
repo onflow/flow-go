@@ -6,8 +6,6 @@ import (
 
 	"github.com/dgraph-io/badger/v2"
 
-	"github.com/onflow/flow-go/state/protocol/invalid"
-
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
@@ -429,27 +427,27 @@ func (q *EpochQuery) NextUnsafe() (protocol.TentativeEpoch, error) {
 	return nil, fmt.Errorf("data corruption: unknown epoch phase implies malformed protocol state epoch data")
 }
 
-func (q *EpochQuery) NextCommitted() protocol.CommittedEpoch {
+func (q *EpochQuery) NextCommitted() (protocol.CommittedEpoch, error) {
 	epochState, err := q.snap.state.protocolState.EpochStateAtBlockID(q.snap.blockID)
 	if err != nil {
-		return invalid.NewEpochf("could not get protocol state snapshot at block %x: %w", q.snap.blockID, err)
+		return nil, fmt.Errorf("could not get protocol state snapshot at block %x: %w", q.snap.blockID, err)
 	}
 	phase := epochState.EpochPhase()
 	entry := epochState.Entry()
 
 	// if we are in the staking or fallback phase, the next epoch is not setup yet
 	if phase == flow.EpochPhaseStaking || phase == flow.EpochPhaseFallback {
-		return invalid.NewEpoch(protocol.ErrNextEpochNotSetup)
+		return nil, protocol.ErrNextEpochNotSetup
 	}
 	if phase == flow.EpochPhaseSetup {
-		return invalid.NewEpoch(protocol.ErrNextEpochNotCommitted)
+		return nil, protocol.ErrNextEpochNotCommitted
 	}
 	nextSetup := entry.NextEpochSetup
 	nextCommit := entry.NextEpochCommit
 	if phase == flow.EpochPhaseCommitted {
-		return inmem.NewCommittedEpoch(nextSetup, entry.NextEpoch.EpochExtensions, nextCommit)
+		return inmem.NewCommittedEpoch(nextSetup, entry.NextEpoch.EpochExtensions, nextCommit), nil
 	}
-	return invalid.NewEpochf("data corruption: unknown epoch phase implies malformed protocol state epoch data")
+	return nil, fmt.Errorf("data corruption: unknown epoch phase implies malformed protocol state epoch data")
 }
 
 // Previous returns the previous epoch. During the first epoch after the root

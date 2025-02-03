@@ -176,7 +176,11 @@ func NewConsensusCommittee(state protocol.State, me flow.Identifier) (*Consensus
 		return nil, fmt.Errorf("could not check epoch phase: %w", err)
 	}
 	if phase == flow.EpochPhaseCommitted {
-		epochs = append(epochs, final.Epochs().NextCommitted())
+		next, err := final.Epochs().NextCommitted()
+		if err != nil {
+			return nil, fmt.Errorf("could not get next committed epoch: %w", err)
+		}
+		epochs = append(epochs, next)
 	}
 
 	for _, epoch := range epochs {
@@ -392,8 +396,11 @@ func (c *Consensus) handleEpochExtended(epochCounter uint64, extension flow.Epoc
 // When the next epoch is committed, we compute leader selection for the epoch and cache it.
 // No errors are expected during normal operation.
 func (c *Consensus) handleEpochCommittedPhaseStarted(refBlock *flow.Header) error {
-	epoch := c.state.AtHeight(refBlock.Height).Epochs().NextCommitted()
-	_, err := c.prepareEpoch(epoch)
+	epoch, err := c.state.AtHeight(refBlock.Height).Epochs().NextCommitted()
+	if err != nil {
+		return fmt.Errorf("could not get next committed epoch: %w", err)
+	}
+	_, err = c.prepareEpoch(epoch)
 	if err != nil {
 		return fmt.Errorf("could not cache data for committed next epoch: %w", err)
 	}

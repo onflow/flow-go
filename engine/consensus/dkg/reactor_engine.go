@@ -288,7 +288,13 @@ func (e *ReactorEngine) handleEpochCommittedPhaseStarted(currentEpochCounter uin
 	// phase is finalized, the block's snapshot is guaranteed to already be
 	// accessible in the protocol state at this point (even though the Badger
 	// transaction finalizing the block has not been committed yet).
-	nextDKG, err := e.State.AtBlockID(firstBlock.ID()).Epochs().NextCommitted().DKG()
+	nextEpoch, err := e.State.AtBlockID(firstBlock.ID()).Epochs().NextCommitted()
+	if err != nil {
+		// CAUTION: this should never happen, indicates a storage failure or corruption
+		// TODO use irrecoverable context
+		log.Fatal().Err(err).Msg("could not get next committed epoch")
+	}
+	nextDKG, err := nextEpoch.DKG()
 	if err != nil {
 		// CAUTION: this should never happen, indicates a storage failure or corruption
 		// TODO use irrecoverable context

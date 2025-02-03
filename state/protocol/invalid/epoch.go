@@ -122,7 +122,7 @@ func (u *Epochs) NextUnsafe() (protocol.TentativeEpoch, error) {
 	return nil, u.err
 }
 
-func (u *Epochs) NextCommitted() protocol.CommittedEpoch { return NewEpoch(u.err) }
+func (u *Epochs) NextCommitted() (protocol.CommittedEpoch, error) { return nil, u.err }
 
 func (u *Epochs) Previous() (protocol.CommittedEpoch, error) {
 	return nil, u.err
