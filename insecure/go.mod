@@ -329,6 +329,3 @@ require (
 )
 
 replace github.com/onflow/flow-go => ../
-
-// Using custom fork until https://github.com/onflow/flow-go/issues/5338 is resolved
-replace github.com/ipfs/boxo => github.com/onflow/boxo v0.0.0-20250203191755-5287e8c91340

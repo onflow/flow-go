@@ -40,8 +40,8 @@ require (
 	github.com/ipfs/go-log/v2 v2.5.1
 	github.com/libp2p/go-addr-util v0.1.0
 	github.com/libp2p/go-libp2p v0.38.2
-	github.com/libp2p/go-libp2p-kad-dht v0.28.2
-	github.com/libp2p/go-libp2p-kbucket v0.6.4
+	github.com/libp2p/go-libp2p-kad-dht v0.25.2
+	github.com/libp2p/go-libp2p-kbucket v0.6.3
 	github.com/libp2p/go-libp2p-pubsub v0.12.1-0.20241230202526-bf5b58384331
 	github.com/montanaflynn/stats v0.7.0
 	github.com/multiformats/go-multiaddr v0.14.0
@@ -104,7 +104,7 @@ require (
 	github.com/hashicorp/golang-lru/v2 v2.0.7
 	github.com/holiman/uint256 v1.3.0
 	github.com/huandu/go-clone/generic v1.7.2
-	github.com/ipfs/boxo v0.27.2
+	github.com/ipfs/boxo v0.17.1-0.20240131173518-89bceff34bf1
 	github.com/libp2p/go-libp2p-routing-helpers v0.7.4
 	github.com/mitchellh/mapstructure v1.5.0
 	github.com/onflow/bridged-usdc/lib/go/contracts v1.0.0
@@ -178,7 +178,6 @@ require (
 	github.com/fsnotify/fsnotify v1.6.0 // indirect
 	github.com/fxamacker/circlehash v0.3.0 // indirect
 	github.com/gabriel-vasile/mimetype v1.4.6 // indirect
-	github.com/gammazero/chanqueue v1.0.0 // indirect
 	github.com/gammazero/deque v1.0.0 // indirect
 	github.com/gballet/go-libpcsclite v0.0.0-20190607065134-2772fd86a8ff // indirect
 	github.com/getsentry/sentry-go v0.27.0 // indirect
@@ -343,4 +342,4 @@ require (
 )
 
 // Using custom fork until https://github.com/onflow/flow-go/issues/5338 is resolved
-replace github.com/ipfs/boxo => github.com/onflow/boxo v0.0.0-20250203191755-5287e8c91340
+replace github.com/ipfs/boxo => github.com/onflow/boxo v0.0.0-20240201202436-f2477b92f483

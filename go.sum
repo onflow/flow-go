@@ -343,8 +343,6 @@ github.com/fxamacker/circlehash v0.3.0 h1:XKdvTtIJV9t7DDUtsf0RIpC1OcxZtPbmgIH7ek
 github.com/fxamacker/circlehash v0.3.0/go.mod h1:3aq3OfVvsWtkWMb6A1owjOQFA+TLsD5FgJflnaQwtMM=
 github.com/gabriel-vasile/mimetype v1.4.6 h1:3+PzJTKLkvgjeTbts6msPJt4DixhT4YtFNf1gtGe3zc=
 github.com/gabriel-vasile/mimetype v1.4.6/go.mod h1:JX1qVKqZd40hUPpAfiNTe0Sne7hdfKSbOqqmkq8GCXc=
-github.com/gammazero/chanqueue v1.0.0 h1:FER/sMailGFA3DDvFooEkipAMU+3c9Bg3bheloPSz6o=
-github.com/gammazero/chanqueue v1.0.0/go.mod h1:fMwpwEiuUgpab0sH4VHiVcEoji1pSi+EIzeG4TPeKPc=
 github.com/gammazero/deque v0.1.0/go.mod h1:KQw7vFau1hHuM8xmI9RbgKFbAsQFWmBpqQ2KenFLk6M=
 github.com/gammazero/deque v1.0.0 h1:LTmimT8H7bXkkCy6gZX7zNLtkbz4NdS2z8LZuor3j34=
 github.com/gammazero/deque v1.0.0/go.mod h1:iflpYvtGfM3U8S8j+sZEKIak3SAKYpA5/SQewgfXDKo=
@@ -649,6 +647,8 @@ github.com/ipfs/go-ds-badger2 v0.1.3 h1:Zo9JicXJ1DmXTN4KOw7oPXkspZ0AWHcAFCP1tQKn
 github.com/ipfs/go-ds-badger2 v0.1.3/go.mod h1:TPhhljfrgewjbtuL/tczP8dNrBYwwk+SdPYbms/NO9w=
 github.com/ipfs/go-ds-pebble v0.3.1-0.20240828032824-d745b9d3200b h1:lby3w+96HfyjiFP4ODbcfr4j7pNza7g3XQywnNu+9Mc=
 github.com/ipfs/go-ds-pebble v0.3.1-0.20240828032824-d745b9d3200b/go.mod h1:q8icEwk8lSpbPAsa7l9SPm6yt9Z+c4QePFyfKHYmdJw=
+github.com/ipfs/go-ipfs-blocksutil v0.0.1 h1:Eh/H4pc1hsvhzsQoMEP3Bke/aW5P5rVM1IWFJMcGIPQ=
+github.com/ipfs/go-ipfs-blocksutil v0.0.1/go.mod h1:Yq4M86uIOmxmGPUHv/uI7uKqZNtLb449gwKqXjIsnRk=
 github.com/ipfs/go-ipfs-delay v0.0.0-20181109222059-70721b86a9a8/go.mod h1:8SP1YXK1M1kXuc4KJZINY3TQQ03J2rwBG9QfXmbRPrw=
 github.com/ipfs/go-ipfs-delay v0.0.1 h1:r/UXYyRcddO6thwOnhiznIAiSvxMECGgtv35Xs1IeRQ=
 github.com/ipfs/go-ipfs-delay v0.0.1/go.mod h1:8SP1YXK1M1kXuc4KJZINY3TQQ03J2rwBG9QfXmbRPrw=
@@ -669,8 +669,6 @@ github.com/ipfs/go-metrics-interface v0.0.1 h1:j+cpbjYvu4R8zbleSs36gvB7jR+wsL2fG
 github.com/ipfs/go-metrics-interface v0.0.1/go.mod h1:6s6euYU4zowdslK0GKHmqaIZ3j/b/tL7HTWtJ4VPgWY=
 github.com/ipfs/go-peertaskqueue v0.8.2 h1:PaHFRaVFdxQk1Qo3OKiHPYjmmusQy7gKQUaL8JDszAU=
 github.com/ipfs/go-peertaskqueue v0.8.2/go.mod h1:L6QPvou0346c2qPJNiJa6BvOibxDfaiPlqHInmzg0FA=
-github.com/ipfs/go-test v0.0.4 h1:DKT66T6GBB6PsDFLoO56QZPrOmzJkqU1FZH5C9ySkew=
-github.com/ipfs/go-test v0.0.4/go.mod h1:qhIM1EluEfElKKM6fnWxGn822/z9knUGM1+I/OAQNKI=
 github.com/ipld/go-ipld-prime v0.21.0 h1:n4JmcpOlPDIxBcY037SVfpd1G+Sj1nKZah0m6QH9C2E=
 github.com/ipld/go-ipld-prime v0.21.0/go.mod h1:3RLqy//ERg/y5oShXXdx5YIp50cFGOanyMctpPjsvxQ=
 github.com/jackpal/go-nat-pmp v1.0.2 h1:KzKSgb7qkJvOUTqYl9/Hg/me3pWgBmERKrTGD7BdWus=
@@ -755,10 +753,10 @@ github.com/libp2p/go-libp2p v0.38.2 h1:9SZQDOCi82A25An4kx30lEtr6kGTxrtoaDkbs5xrK
 github.com/libp2p/go-libp2p v0.38.2/go.mod h1:QWV4zGL3O9nXKdHirIC59DoRcZ446dfkjbOJ55NEWFo=
 github.com/libp2p/go-libp2p-asn-util v0.4.1 h1:xqL7++IKD9TBFMgnLPZR6/6iYhawHKHl950SO9L6n94=
 github.com/libp2p/go-libp2p-asn-util v0.4.1/go.mod h1:d/NI6XZ9qxw67b4e+NgpQexCIiFYJjErASrYW4PFDN8=
-github.com/libp2p/go-libp2p-kad-dht v0.28.2 h1:/VivUl/Ru0tVgkWNhDDBy8pK6q+gRdI+z8VfqmSUJWo=
-github.com/libp2p/go-libp2p-kad-dht v0.28.2/go.mod h1:sUR/qh4p/5+YFXBtwOiCmIBeBA2YD94ttmL+Xk8+pTE=
-github.com/libp2p/go-libp2p-kbucket v0.6.4 h1:OjfiYxU42TKQSB8t8WYd8MKhYhMJeO2If+NiuKfb6iQ=
-github.com/libp2p/go-libp2p-kbucket v0.6.4/go.mod h1:jp6w82sczYaBsAypt5ayACcRJi0lgsba7o4TzJKEfWA=
+github.com/libp2p/go-libp2p-kad-dht v0.25.2 h1:FOIk9gHoe4YRWXTu8SY9Z1d0RILol0TrtApsMDPjAVQ=
+github.com/libp2p/go-libp2p-kad-dht v0.25.2/go.mod h1:6za56ncRHYXX4Nc2vn8z7CZK0P4QiMcrn77acKLM2Oo=
+github.com/libp2p/go-libp2p-kbucket v0.6.3 h1:p507271wWzpy2f1XxPzCQG9NiN6R6lHL9GiSErbQQo0=
+github.com/libp2p/go-libp2p-kbucket v0.6.3/go.mod h1:RCseT7AH6eJWxxk2ol03xtP9pEHetYSPXOaJnOiD8i0=
 github.com/libp2p/go-libp2p-pubsub v0.12.1-0.20241230202526-bf5b58384331 h1:Z1fzkKuRAd+U1oxbTbWUtTTzAWaX21jqoLxVIStzp+Y=
 github.com/libp2p/go-libp2p-pubsub v0.12.1-0.20241230202526-bf5b58384331/go.mod h1:m0gpUOyrXKXdE7c8FNQ9/HLfWbxaEw7xku45w+PaqZo=
 github.com/libp2p/go-libp2p-record v0.2.0 h1:oiNUOCWno2BFuxt3my4i1frNrt7PerzB3queqa1NkQ0=
@@ -913,8 +911,8 @@ github.com/olekukonko/tablewriter v0.0.5 h1:P2Ga83D34wi1o9J6Wh1mRuqd4mF/x/lgBS7N
 github.com/olekukonko/tablewriter v0.0.5/go.mod h1:hPp6KlRPjbx+hW8ykQs1w3UBbZlj6HuIJcUGPhkA7kY=
 github.com/onflow/atree v0.9.0 h1:M+Z/UPwzv0/Yy7ChI5T1ZIHD3YN1cs/hxGEs/HWhzaY=
 github.com/onflow/atree v0.9.0/go.mod h1:FT6udJF9Q7VQTu3wknDhFX+VV4D44ZGdqtTAE5iztck=
-github.com/onflow/boxo v0.0.0-20250203191755-5287e8c91340 h1:N/V1Y+nyJaPuoVJkIOcRTKFPPdEZ7ZeoYqIDdRa9fE4=
-github.com/onflow/boxo v0.0.0-20250203191755-5287e8c91340/go.mod h1:qEIRrGNr0bitDedTCzyzBHxzNWqYmyuHgK8LG9Q83EM=
+github.com/onflow/boxo v0.0.0-20240201202436-f2477b92f483 h1:LpiQhTAfM9CAmNVEs0n//cBBgCg+vJSiIxTHYUklZ84=
+github.com/onflow/boxo v0.0.0-20240201202436-f2477b92f483/go.mod h1:pIZgTWdm3k3pLF9Uq6MB8JEcW07UDwNJjlXW1HELW80=
 github.com/onflow/bridged-usdc/lib/go/contracts v1.0.0 h1:ofdfKH8KgY6qVFnlngTontds/IBERANeWl0PBPCtPOA=
 github.com/onflow/bridged-usdc/lib/go/contracts v1.0.0/go.mod h1:K4/oaEhhnSuJ9q6fpq1w9WEWRGtkNskhmoyH8t+X9Mk=
 github.com/onflow/cadence v1.3.1 h1:bs9TFHQy8HHbwTtCtg5cLdyndWhmwq55RSwID1cb220=
