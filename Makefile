@@ -4,7 +4,7 @@ BRANCH_NAME:=$(shell git rev-parse --abbrev-ref HEAD | tr '/' '-')
 # The Git commit hash
 COMMIT := $(shell git rev-parse HEAD)
 # The tag of the current commit, otherwise empty
-VERSION := $(shell git describe --tags --abbrev=2 --match "v*" --match "secure-cadence*" 2>/dev/null)
+VERSION := $(shell git describe --tags --abbrev=2 --match "v*" 2>/dev/null)
 
 # By default, this will run all tests in all packages, but we have a way to override this in CI so that we can
 # dynamically split up CI jobs into smaller jobs that can be run in parallel
