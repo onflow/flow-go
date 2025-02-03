@@ -132,6 +132,7 @@ func SystemChunkContext(vmCtx fvm.Context, metrics module.ExecutionMetrics) fvm.
 		// only the system transaction is allowed to call the block entropy provider
 		fvm.WithRandomSourceHistoryCallAllowed(true),
 		fvm.WithMetricsReporter(metrics),
+		fvm.WithAccountStorageLimit(false),
 	)
 }
 
