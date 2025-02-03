@@ -46,6 +46,10 @@ func (u *Snapshot) EpochPhase() (flow.EpochPhase, error) {
 	return 0, u.err
 }
 
+func (u *Snapshot) Epochs() protocol.EpochQuery {
+	return EpochQuery{u.err}
+}
+
 func (u *Snapshot) Identities(_ flow.IdentityFilter[flow.Identity]) (flow.IdentityList, error) {
 	return nil, u.err
 }
@@ -88,4 +92,24 @@ func (u *Snapshot) ProtocolState() (protocol.KVStoreReader, error) {
 
 func (u *Snapshot) VersionBeacon() (*flow.SealedVersionBeacon, error) {
 	return nil, u.err
+}
+
+type EpochQuery struct {
+	err error
+}
+
+func (e EpochQuery) Current() (protocol.CommittedEpoch, error) {
+	return nil, e.err
+}
+
+func (e EpochQuery) NextUnsafe() (protocol.TentativeEpoch, error) {
+	return nil, e.err
+}
+
+func (e EpochQuery) NextCommitted() (protocol.CommittedEpoch, error) {
+	return nil, e.err
+}
+
+func (e EpochQuery) Previous() (protocol.CommittedEpoch, error) {
+	return nil, e.err
 }
