@@ -23,6 +23,7 @@ const NextHeightForUnprunedExecutionDataPackKey = "NextHeightForUnprunedExecutio
 
 func LoopPruneExecutionDataFromRootToLatestSealed(
 	log zerolog.Logger,
+	metrics module.ExecutionMetrics,
 	ctx context.Context,
 	state protocol.State,
 	badgerDB *badger.DB,
@@ -60,6 +61,10 @@ func LoopPruneExecutionDataFromRootToLatestSealed(
 			Uint64("latestToPrune", latestToPrune).
 			Msgf("execution data pruning will start in %s at %s",
 				config.SleepAfterEachIteration, time.Now().Add(config.SleepAfterEachIteration).UTC())
+
+			// last pruned is nextToPrune - 1.
+			// it won't underflow, because nextToPrune starts from root + 1
+		metrics.ExecutionLastChunkDataPackPrunedHeight(nextToPrune - 1)
 
 		select {
 		case <-ctx.Done():

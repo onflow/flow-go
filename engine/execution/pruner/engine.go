@@ -5,6 +5,7 @@ import (
 	"github.com/dgraph-io/badger/v2"
 	"github.com/rs/zerolog"
 
+	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/component"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/state/protocol"
@@ -15,6 +16,7 @@ import (
 // from root to the latest sealed block.
 func NewChunkDataPackPruningEngine(
 	log zerolog.Logger,
+	metrics module.ExecutionMetrics,
 	state protocol.State,
 	badgerDB *badger.DB,
 	headers storage.Headers,
@@ -28,7 +30,7 @@ func NewChunkDataPackPruningEngine(
 			ready()
 
 			err := LoopPruneExecutionDataFromRootToLatestSealed(
-				log.With().Str("component", "CDP-pruner").Logger(),
+				log.With().Str("component", "CDP-pruner").Logger(), metrics,
 				ctx, state, badgerDB, headers, chunkDataPacks, results, chunkDataPacksDB, config)
 			if err != nil {
 				ctx.Throw(err)

@@ -404,7 +404,7 @@ func prepareExecutionService(container testnet.ContainerConfig, i int, n int) Se
 		"--execution-data-dir=/data/execution-data",
 		"--chunk-data-pack-dir=/data/chunk-data-pack",
 		"--pruning-config-threshold=20",
-		"--pruning-config-sleep-after-iteration=30m",
+		"--pruning-config-sleep-after-iteration=1m",
 	)
 
 	service.Volumes = append(service.Volumes,
