@@ -424,11 +424,14 @@ docker-native-build-execution-debug:
 # build corrupt execution node for BFT testing
 .PHONY: docker-native-build-execution-corrupt
 docker-native-build-execution-corrupt:
+	# temporarily make insecure/ a non-module to allow Docker to use corrupt builders there
+	./insecure/cmd/mods_override.sh
 	docker build -f cmd/Dockerfile  --build-arg TARGET=./insecure/cmd/execution --build-arg COMMIT=$(COMMIT)  --build-arg VERSION=$(IMAGE_TAG) --build-arg GOARCH=$(GOARCH) --build-arg CGO_FLAG=$(CRYPTO_FLAG) --target production \
 		--label "git_commit=${COMMIT}" --label "git_tag=${IMAGE_TAG}" \
 		--secret id=cadence_deploy_key,env=CADENCE_DEPLOY_KEY --build-arg GOPRIVATE=$(GOPRIVATE) \
 		-t "$(CONTAINER_REGISTRY)/execution-corrupted:latest" \
 		-t "$(CONTAINER_REGISTRY)/execution-corrupted:$(IMAGE_TAG)" .
+	./insecure/cmd/mods_restore.sh
 
 .PHONY: docker-native-build-verification
 docker-native-build-verification:
@@ -475,11 +478,14 @@ docker-native-build-verification-debug:
 # build corrupt verification node for BFT testing
 .PHONY: docker-native-build-verification-corrupt
 docker-native-build-verification-corrupt:
+	# temporarily make insecure/ a non-module to allow Docker to use corrupt builders there
+	./insecure/cmd/mods_override.sh
 	docker build -f cmd/Dockerfile  --build-arg TARGET=./insecure/cmd/verification --build-arg COMMIT=$(COMMIT)  --build-arg VERSION=$(IMAGE_TAG) --build-arg GOARCH=$(GOARCH) --build-arg CGO_FLAG=$(CRYPTO_FLAG) --target production \
 		--label "git_commit=${COMMIT}" --label "git_tag=${IMAGE_TAG}" \
 		--secret id=cadence_deploy_key,env=CADENCE_DEPLOY_KEY --build-arg GOPRIVATE=$(GOPRIVATE) \
 		-t "$(CONTAINER_REGISTRY)/verification-corrupted:latest" \
 		-t "$(CONTAINER_REGISTRY)/verification-corrupted:$(IMAGE_TAG)" .
+	./insecure/cmd/mods_restore.sh
 
 .PHONY: docker-native-build-access
 docker-native-build-access:
@@ -528,11 +534,14 @@ docker-native-build-access-debug:
 # build corrupt access node for BFT testing
 .PHONY: docker-native-build-access-corrupt
 docker-native-build-access-corrupt:
+	#temporarily make insecure/ a non-module to allow Docker to use corrupt builders there
+	./insecure/cmd/mods_override.sh
 	docker build -f cmd/Dockerfile  --build-arg TARGET=./insecure/cmd/access --build-arg COMMIT=$(COMMIT)  --build-arg VERSION=$(IMAGE_TAG) --build-arg GOARCH=$(GOARCH) --build-arg CGO_FLAG=$(CRYPTO_FLAG) --target production \
 		--secret id=cadence_deploy_key,env=CADENCE_DEPLOY_KEY --build-arg GOPRIVATE=$(GOPRIVATE) \
 		--label "git_commit=${COMMIT}" --label "git_tag=${IMAGE_TAG}" \
 		-t "$(CONTAINER_REGISTRY)/access-corrupted:latest" \
 		-t "$(CONTAINER_REGISTRY)/access-corrupted:$(IMAGE_TAG)" .
+	./insecure/cmd/mods_restore.sh
 
 # build a binary to run on bare metal without using docker.
 # binary is written to file ./bin/app
