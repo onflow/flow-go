@@ -174,9 +174,10 @@ func (suite *Suite) SetupTest() {
 		func() flow.EpochPhase { return suite.phase },
 		func() error { return nil })
 
-	// add current and next epochs
+	// add current epoch
 	suite.AddEpoch(suite.counter)
-	suite.AddEpoch(suite.counter + 1)
+	// next epoch (with counter+1) is added later, as either setup/tentative (if we need to start QC)
+	// or committed (if we need to transition to it) depending on the testgi
 
 	suite.pools = epochs.NewTransactionPools(func(_ uint64) mempool.Transactions {
 		return herocache.NewTransactions(1000, suite.log, metrics.NewNoopCollector())
@@ -219,6 +220,7 @@ func TestEpochManager(t *testing.T) {
 // TransitionEpoch triggers an epoch transition in the suite's mocks.
 func (suite *Suite) TransitionEpoch() {
 	suite.counter++
+	require.Contains(suite.T(), suite.epochs, suite.counter)
 	suite.epochQuery.Transition()
 }
 
@@ -228,6 +230,13 @@ func (suite *Suite) AddEpoch(counter uint64) *protocol.CommittedEpoch {
 	epoch.On("Counter").Return(counter, nil)
 	suite.epochs[counter] = epoch
 	suite.epochQuery.Add(epoch)
+	return epoch
+}
+
+func (suite *Suite) AddTentativeEpoch(counter uint64) *protocol.TentativeEpoch {
+	epoch := new(protocol.TentativeEpoch)
+	epoch.On("Counter").Return(counter, nil)
+	suite.epochQuery.AddTentative(epoch)
 	return epoch
 }
 
@@ -287,6 +296,7 @@ func (suite *Suite) TestRestartInSetupPhase() {
 	suite.engineEventsDistributor.On("ActiveClustersChanged", mock.AnythingOfType("flow.ChainIDList")).Once()
 	defer suite.engineEventsDistributor.AssertExpectations(suite.T())
 	// we are in setup phase
+	suite.AddTentativeEpoch(suite.counter + 1)
 	suite.phase = flow.EpochPhaseSetup
 	// should call voter with next epoch
 	var called = make(chan struct{})
@@ -311,6 +321,7 @@ func (suite *Suite) TestStartAfterEpochBoundary_WithinTxExpiry() {
 	defer suite.engineEventsDistributor.AssertExpectations(suite.T())
 	suite.phase = flow.EpochPhaseStaking
 	// transition epochs, so that a Previous epoch is queryable
+	suite.AddEpoch(suite.counter + 1)
 	suite.TransitionEpoch()
 	prevEpoch := suite.epochs[suite.counter-1]
 	// the finalized height is within [1,tx_expiry] heights of previous epoch final height
@@ -334,6 +345,7 @@ func (suite *Suite) TestStartAfterEpochBoundary_BeyondTxExpiry() {
 	defer suite.engineEventsDistributor.AssertExpectations(suite.T())
 	suite.phase = flow.EpochPhaseStaking
 	// transition epochs, so that a Previous epoch is queryable
+	suite.AddEpoch(suite.counter + 1)
 	suite.TransitionEpoch()
 	prevEpoch := suite.epochs[suite.counter-1]
 	// the finalized height is more than tx_expiry above previous epoch final height
@@ -357,6 +369,7 @@ func (suite *Suite) TestStartAfterEpochBoundary_NotApprovedForPreviousEpoch() {
 	defer suite.engineEventsDistributor.AssertExpectations(suite.T())
 	suite.phase = flow.EpochPhaseStaking
 	// transition epochs, so that a Previous epoch is queryable
+	suite.AddEpoch(suite.counter + 1)
 	suite.TransitionEpoch()
 	prevEpoch := suite.epochs[suite.counter-1]
 	// the finalized height is within [1,tx_expiry] heights of previous epoch final height
@@ -381,6 +394,7 @@ func (suite *Suite) TestStartAfterEpochBoundary_NotApprovedForCurrentEpoch() {
 	defer suite.engineEventsDistributor.AssertExpectations(suite.T())
 	suite.phase = flow.EpochPhaseStaking
 	// transition epochs, so that a Previous epoch is queryable
+	suite.AddEpoch(suite.counter + 1)
 	suite.TransitionEpoch()
 	prevEpoch := suite.epochs[suite.counter-1]
 	// the finalized height is within [1,tx_expiry] heights of previous epoch final height
@@ -405,6 +419,7 @@ func (suite *Suite) TestStartAfterEpochBoundary_PreviousEpochTransitionBeforeRoo
 	defer suite.engineEventsDistributor.AssertExpectations(suite.T())
 	suite.phase = flow.EpochPhaseStaking
 	// transition epochs, so that a Previous epoch is queryable
+	suite.AddEpoch(suite.counter + 1)
 	suite.TransitionEpoch()
 	prevEpoch := suite.epochs[suite.counter-1]
 	// Previous epoch end boundary is unknown because it is before our root snapshot
@@ -425,6 +440,7 @@ func (suite *Suite) TestStartAfterEpochBoundary_PreviousEpochTransitionBeforeRoo
 func (suite *Suite) TestStartAsUnauthorizedNode() {
 	suite.MockAsUnauthorizedNode(suite.counter)
 	// we are in setup phase
+	suite.AddTentativeEpoch(suite.counter + 1)
 	suite.phase = flow.EpochPhaseSetup
 	// should call voter with next epoch
 	var called = make(chan struct{})
@@ -484,6 +500,7 @@ func (suite *Suite) TestRespondToEpochTransition() {
 	defer suite.engineEventsDistributor.AssertExpectations(suite.T())
 
 	// we are in committed phase
+	suite.AddEpoch(suite.counter + 1)
 	suite.phase = flow.EpochPhaseCommitted
 	suite.StartEngine()
 
@@ -552,6 +569,10 @@ func (suite *Suite) TestStopQcVoting() {
 	// we expect 1 ActiveClustersChanged events when the engine first starts and the first set of epoch components are started
 	suite.engineEventsDistributor.On("ActiveClustersChanged", mock.AnythingOfType("flow.ChainIDList")).Once()
 
+	// we are in setup phase, forces engine to start voting on startup
+	suite.AddTentativeEpoch(suite.counter + 1)
+	suite.phase = flow.EpochPhaseSetup
+
 	receivedCancelSignal := make(chan struct{})
 	suite.voter.On("Vote", mock.Anything, suite.epochQuery.NextUnsafe()).
 		Return(nil).
@@ -560,9 +581,6 @@ func (suite *Suite) TestStopQcVoting() {
 			<-ctx.Done()
 			close(receivedCancelSignal)
 		}).Once()
-
-	// we are in setup phase, forces engine to start voting on startup
-	suite.phase = flow.EpochPhaseSetup
 
 	// start up the engine
 	suite.StartEngine()
