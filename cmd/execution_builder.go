@@ -1005,6 +1005,7 @@ func (exeNode *ExecutionNode) LoadExecutionDBPruner(node *NodeConfig) (module.Re
 
 	return exepruner.NewChunkDataPackPruningEngine(
 		node.Logger,
+		exeNode.collector,
 		node.State,
 		node.DB,
 		node.Storage.Headers,
