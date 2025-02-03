@@ -177,11 +177,18 @@ func testGossipSubInvalidMessageDeliveryScoring(t *testing.T, spamMsgFactory fun
 	blkTopicSnapshot, ok := topicsSnapshot[blockTopic.String()]
 	require.True(t, ok)
 
-	// ensure that the topic snapshot of the spammer contains a record of at least (40%) of the spam messages sent. The 40% is to account for the messages that were
-	// delivered before the score was updated, after the spammer is PRUNED, as well as to account for decay.
-	require.True(t, blkTopicSnapshot.InvalidMessageDeliveries > 0.4*float64(totalSpamMessages),
-		"invalid message deliveries must be greater than %f. invalid message deliveries: %f", 0.4*float64(totalSpamMessages),
-		blkTopicSnapshot.InvalidMessageDeliveries)
+	// none of the messages should be accepted by the victim node.
+	require.Equalf(t, 0.0, blkTopicSnapshot.FirstMessageDeliveries,
+		"valid message deliveries must be 0. first message deliveries: %f",
+		blkTopicSnapshot.FirstMessageDeliveries)
+
+	// ensure that the topic snapshot of the spammer contains a reasonable number of the spam messages sent.
+	// note: 250 is an arbitrary number, that checks that a reasonable number of messages were actually received by the
+	// victim node.
+	require.Greaterf(t, blkTopicSnapshot.InvalidMessageDeliveries, 250.0,
+		"invalid message deliveries must be greater than 250. invalid message deliveries: %f",
+		blkTopicSnapshot.InvalidMessageDeliveries,
+	)
 
 	p2ptest.EnsureNoPubsubExchangeBetweenGroups(
 		t,
