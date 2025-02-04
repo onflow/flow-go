@@ -12,9 +12,13 @@ import (
 	"testing"
 )
 
+// TestGenerateRecoverEpochTxArgs_ExcludeIncludeParticipants tests that GenerateRecoverEpochTxArgs produces expected arguments
+// for the recover epoch transaction, when excluding and including participants recovery epoch participants.
+// This test uses fuzzy testing to generate random combinations of participants to exclude and include and checks that the
+// generated arguments match the expected output.
+// This test assumes that we include nodes that are not part of the protocol state and exclude nodes that are part of the protocol state.
+// This test also verifies that the DKG index map contains all consensus nodes despite the exclusion and inclusion filters.
 func TestGenerateRecoverEpochTxArgs_ExcludeIncludeParticipants(testifyT *testing.T) {
-	// tests that given the root snapshot, the command
-	// writes the expected arguments to stdout.
 	utils.RunWithSporkBootstrapDir(testifyT, func(bootDir, partnerDir, partnerWeights, internalPrivDir, configPath string) {
 		log := unittest.Logger()
 		internalNodes, err := common.ReadFullInternalNodeInfos(log, internalPrivDir, configPath)
@@ -34,24 +38,25 @@ func TestGenerateRecoverEpochTxArgs_ExcludeIncludeParticipants(testifyT *testing
 		rapid.Check(testifyT, func(t *rapid.T) {
 			numberOfNodesToInclude := rapid.IntRange(0, 3).Draw(t, "nodes-to-include")
 			numberOfNodesToExclude := rapid.UintRange(0, 3).Draw(t, "nodes-to-exclude")
-			includeNodeIds := unittest.IdentifierListFixture(numberOfNodesToInclude)
-			expectedNodeIds := make(map[cadence.String]struct{})
-			expectedDKGIndexMap := make(map[cadence.String]cadence.Int)
 
+			// we specifically omit collection nodes from the exclusion list since we have a specific
+			// check that there must be a valid cluster of collection nodes.
 			excludedNodes, err := allIdentities.Filter(
 				filter.Not(filter.HasRole[flow.Identity](flow.RoleCollection))).Sample(numberOfNodesToExclude)
 			require.NoError(t, err)
 			excludeNodeIds := excludedNodes.NodeIDs()
-
+			// an eligible participant is a current epoch participant with a weight greater than zero that has not been explicitly excluded
 			eligibleEpochIdentities := allIdentities.Filter(filter.And(
 				filter.IsValidCurrentEpochParticipant,
 				filter.HasWeightGreaterThanZero[flow.Identity],
 				filter.Not(filter.HasNodeID[flow.Identity](excludeNodeIds...))))
 
+			expectedNodeIds := make(map[cadence.String]struct{})
+			includeNodeIds := unittest.IdentifierListFixture(numberOfNodesToInclude)
 			for _, nodeID := range eligibleEpochIdentities.NodeIDs().Union(includeNodeIds) {
 				expectedNodeIds[cadence.String(nodeID.String())] = struct{}{}
 			}
-
+			expectedDKGIndexMap := make(map[cadence.String]cadence.Int)
 			for index, consensusNode := range allIdentities.Filter(filter.HasRole[flow.Identity](flow.RoleConsensus)) {
 				expectedDKGIndexMap[cadence.String(consensusNode.NodeID.String())] = cadence.NewInt(index)
 			}
