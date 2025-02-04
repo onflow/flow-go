@@ -9,7 +9,7 @@ import (
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/stretchr/testify/require"
 
-	corrupt "github.com/yhassanzadeh13/go-libp2p-pubsub"
+	corrupt "github.com/libp2p/go-libp2p-pubsub"
 
 	"github.com/onflow/flow-go/insecure/internal"
 	"github.com/onflow/flow-go/model/flow"
@@ -68,7 +68,7 @@ func NewGossipSubRouterSpammerWithRpcInspector(t *testing.T,
 // ctlMessages is the list of spam messages to send to the victim node.
 func (s *GossipSubRouterSpammer) SpamControlMessage(t *testing.T, victim p2p.LibP2PNode, ctlMessages []pb.ControlMessage, msgs ...*pb.Message) {
 	for _, ctlMessage := range ctlMessages {
-		require.True(t, s.router.Get().SendControl(victim.ID(), &ctlMessage, msgs...))
+		s.router.Get().SendControl(victim.ID(), &ctlMessage, msgs...)
 	}
 }
 

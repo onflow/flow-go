@@ -6,9 +6,9 @@ import (
 	"fmt"
 	"net"
 
-	none "github.com/ipfs/boxo/routing/none"
 	"github.com/libp2p/go-libp2p"
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
+	routinghelpers "github.com/libp2p/go-libp2p-routing-helpers"
 	"github.com/libp2p/go-libp2p/config"
 	"github.com/libp2p/go-libp2p/core/connmgr"
 	"github.com/libp2p/go-libp2p/core/host"
@@ -16,6 +16,7 @@ import (
 	"github.com/libp2p/go-libp2p/core/routing"
 	"github.com/libp2p/go-libp2p/core/transport"
 	rcmgr "github.com/libp2p/go-libp2p/p2p/host/resource-manager"
+	"github.com/libp2p/go-libp2p/p2p/net/swarm"
 	"github.com/libp2p/go-libp2p/p2p/transport/tcp"
 	"github.com/multiformats/go-multiaddr"
 	madns "github.com/multiformats/go-multiaddr-dns"
@@ -211,7 +212,7 @@ func (builder *LibP2PNodeBuilder) Build() (p2p.LibP2PNode, error) {
 			return nil, fmt.Errorf("could not create resolver: %w", err)
 		}
 
-		opts = append(opts, libp2p.MultiaddrResolver(resolver))
+		opts = append(opts, libp2p.MultiaddrResolver(swarm.ResolverFromMaDNS{Resolver: resolver}))
 	}
 
 	if builder.resourceManager != nil {
@@ -393,7 +394,7 @@ func defaultLibP2POptions(address string, key fcrypto.PrivateKey) ([]config.Opti
 	// as the 1-k discovery process and the 1-1 messaging both sometimes attempt to open connection to the same target
 	// As of now there is no requirement of client sockets to be a well-known port, so disabling port reuse all together.
 	t := libp2p.Transport(func(u transport.Upgrader) (*tcp.TcpTransport, error) {
-		return tcp.NewTCPTransport(u, nil, tcp.DisableReuseport())
+		return tcp.NewTCPTransport(u, nil, nil, tcp.DisableReuseport())
 	})
 
 	// gather all the options for the libp2p node
@@ -487,7 +488,7 @@ func (b *LibP2PNodeBuilder) configureRoutingSystem(
 	} else {
 		// bitswap requires a content routing system. this returns a stub instead of a full DHT
 		b.SetRoutingSystem(func(ctx context.Context, host host.Host) (routing.Routing, error) {
-			return none.ConstructNilRouting(ctx, host, nil, nil)
+			return routinghelpers.Null{}, nil
 		})
 	}
 }
