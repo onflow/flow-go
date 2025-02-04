@@ -6,6 +6,8 @@ import (
 	"time"
 
 	"github.com/onflow/flow-go-sdk/templates"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
@@ -39,7 +41,6 @@ type Client struct {
 // NewClientWithKey returns a new client to an Access API listening at the given
 // address, using the given account key for signing transactions.
 func NewClientWithKey(accessAddr string, accountAddr sdk.Address, key sdkcrypto.PrivateKey, chain flow.Chain) (*Client, error) {
-
 	flowClient, err := client.NewClient(
 		accessAddr,
 		client.WithGRPCDialOptions(
@@ -50,10 +51,10 @@ func NewClientWithKey(accessAddr string, accountAddr sdk.Address, key sdkcrypto.
 		return nil, fmt.Errorf("could not create new flow client: %w", err)
 	}
 
-	acc, err := flowClient.GetAccount(context.Background(), accountAddr)
-	if err != nil {
-		return nil, fmt.Errorf("could not get the account %v: %w", accountAddr, err)
-	}
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	acc, err := getAccount(ctx, flowClient, accountAddr)
 	accountKey := acc.Keys[0]
 
 	mySigner, err := crypto.NewInMemorySigner(key, accountKey.HashAlgo)
@@ -427,4 +428,28 @@ func (c *Client) GetEventsForBlockIDs(
 	}
 
 	return events, nil
+}
+
+func getAccount(ctx context.Context, client *client.Client, address sdk.Address) (*sdk.Account, error) {
+	header, err := client.GetLatestBlockHeader(ctx, true)
+	if err != nil {
+		return nil, fmt.Errorf("could not get latest block header: %w", err)
+	}
+
+	// when this is run against an Access node with indexing enabled, occasionally the indexed height
+	// lags behind the sealed height, especially after first starting up (like in a test).
+	// Retry using the same block until we get the account.
+	for {
+		acc, err := client.GetAccountAtBlockHeight(ctx, address, header.Height)
+		if err == nil {
+			return acc, nil
+		}
+
+		switch status.Code(err) {
+		case codes.OutOfRange, codes.ResourceExhausted:
+			time.Sleep(100 * time.Millisecond)
+			continue
+		}
+		return nil, fmt.Errorf("could not get the account %v: %w", address, err)
+	}
 }
