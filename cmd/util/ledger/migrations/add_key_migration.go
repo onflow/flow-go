@@ -4,19 +4,24 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/onflow/flow-go/cmd/util/ledger/reporters"
-
-	"github.com/onflow/cadence/runtime/common"
-	"github.com/onflow/crypto/hash"
 	"github.com/rs/zerolog"
 
-	"github.com/onflow/flow-go-sdk/crypto"
+	"github.com/onflow/cadence/common"
+	"github.com/onflow/crypto/hash"
 
+	"github.com/onflow/flow-go-sdk/crypto"
+	"github.com/onflow/flow-go/cmd/util/ledger/reporters"
 	"github.com/onflow/flow-go/cmd/util/ledger/util/registers"
 	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/fvm/systemcontracts"
 	"github.com/onflow/flow-go/model/flow"
 )
+
+// This migration is not safe to run on actual networks.
+// It is used for getting control over system accounts so that they can be tested
+// in a copied environment. When we need to do this it is best to create a branch
+// where this variable is set to true, and use that temporary branc to run migrations.
+const IAmSureIWantToRunThisMigration = false
 
 // AddKeyMigration adds a new key to the core contracts accounts
 type AddKeyMigration struct {
@@ -35,6 +40,9 @@ func NewAddKeyMigration(
 	key crypto.PublicKey,
 	rwf reporters.ReportWriterFactory,
 ) *AddKeyMigration {
+	if !IAmSureIWantToRunThisMigration {
+		panic("Cannot run AddKeyMigration migration")
+	}
 
 	addresses := make(map[common.Address]AddKeyMigrationAccountPublicKeyData)
 	sc := systemcontracts.SystemContractsForChain(chainID).All()
@@ -91,6 +99,9 @@ func (m *AddKeyMigration) MigrateAccount(
 	address common.Address,
 	accountRegisters *registers.AccountRegisters,
 ) error {
+	if !IAmSureIWantToRunThisMigration {
+		panic("Cannot run AddKeyMigration migration")
+	}
 
 	keyData, ok := m.accountsToAddKeyTo[address]
 	if !ok {
