@@ -14,13 +14,13 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
-// TestGenerateRecoverEpochTxArgs_ExcludeIncludeParticipants tests that GenerateRecoverEpochTxArgs produces expected arguments
+// TestGenerateRecoverTxArgsWithDKG_ExcludeIncludeParticipants tests that GenerateRecoverTxArgsWithDKG produces expected arguments
 // for the recover epoch transaction, when excluding and including participants recovery epoch participants.
 // This test uses fuzzy testing to generate random combinations of participants to exclude and include and checks that the
 // generated arguments match the expected output.
 // This test assumes that we include nodes that are not part of the protocol state and exclude nodes that are part of the protocol state.
 // This test also verifies that the DKG index map contains all consensus nodes despite the exclusion and inclusion filters.
-func TestGenerateRecoverEpochTxArgs_ExcludeIncludeParticipants(testifyT *testing.T) {
+func TestGenerateRecoverTxArgsWithDKG_ExcludeIncludeParticipants(testifyT *testing.T) {
 	utils.RunWithSporkBootstrapDir(testifyT, func(bootDir, partnerDir, partnerWeights, internalPrivDir, configPath string) {
 		log := unittest.Logger()
 		internalNodes, err := common.ReadFullInternalNodeInfos(log, internalPrivDir, configPath)
@@ -58,15 +58,18 @@ func TestGenerateRecoverEpochTxArgs_ExcludeIncludeParticipants(testifyT *testing
 			for _, nodeID := range eligibleEpochIdentities.NodeIDs().Union(includeNodeIds) {
 				expectedNodeIds[cadence.String(nodeID.String())] = struct{}{}
 			}
+
+			epochProtocolState, err := rootSnapshot.EpochProtocolState()
+			require.NoError(t, err)
+			currentEpochCommit := epochProtocolState.EpochCommit()
 			expectedDKGIndexMap := make(map[cadence.String]cadence.Int)
-			for index, consensusNode := range allIdentities.Filter(filter.HasRole[flow.Identity](flow.RoleConsensus)) {
-				expectedDKGIndexMap[cadence.String(consensusNode.NodeID.String())] = cadence.NewInt(index)
+			for nodeID, index := range currentEpochCommit.DKGIndexMap {
+				expectedDKGIndexMap[cadence.String(nodeID.String())] = cadence.NewInt(index)
 			}
 
-			args, err := GenerateRecoverEpochTxArgs(
+			args, err := GenerateRecoverTxArgsWithDKG(
 				log,
-				internalPrivDir,
-				configPath,
+				internalNodes,
 				2,
 				2,
 				flow.Localnet,
@@ -74,6 +77,9 @@ func TestGenerateRecoverEpochTxArgs_ExcludeIncludeParticipants(testifyT *testing
 				4000,
 				60*60,
 				false,
+				currentEpochCommit.DKGIndexMap,
+				currentEpochCommit.DKGParticipantKeys,
+				currentEpochCommit.DKGGroupKey,
 				excludeNodeIds,
 				includeNodeIds,
 				rootSnapshot,
