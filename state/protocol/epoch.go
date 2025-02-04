@@ -149,11 +149,7 @@ type CommittedEpoch interface {
 
 	// InitialIdentities returns the identities for this epoch as they were
 	// specified in the EpochSetup service event.
-	// Error returns:
-	// * protocol.ErrNoPreviousEpoch - if the epoch represents a previous epoch which does not exist.
-	// * protocol.ErrNextEpochNotSetup - if the epoch represents a next epoch which has not been set up.
-	// * state.ErrUnknownSnapshotReference - if the epoch is queried from an unresolvable snapshot.
-	InitialIdentities() (flow.IdentitySkeletonList, error)
+	InitialIdentities() flow.IdentitySkeletonList
 
 	// Clustering returns the cluster assignment for this epoch.
 	// Error returns:
@@ -227,11 +223,7 @@ type TentativeEpoch interface {
 
 	// InitialIdentities returns the identities for this epoch as they were
 	// specified in the EpochSetup service event.
-	// Error returns:
-	// * protocol.ErrNoPreviousEpoch - if the epoch represents a previous epoch which does not exist.
-	// * protocol.ErrNextEpochNotSetup - if the epoch represents a next epoch which has not been set up.
-	// * state.ErrUnknownSnapshotReference - if the epoch is queried from an unresolvable snapshot.
-	InitialIdentities() (flow.IdentitySkeletonList, error)
+	InitialIdentities() flow.IdentitySkeletonList
 
 	// Clustering returns the cluster assignment for this epoch.
 	// Error returns:

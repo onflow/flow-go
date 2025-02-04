@@ -13,10 +13,6 @@ import (
 // See [SelectionForConsensus] for additional details.
 func SelectionForConsensusFromEpoch(epoch protocol.CommittedEpoch) (*LeaderSelection, error) {
 
-	identities, err := epoch.InitialIdentities()
-	if err != nil {
-		return nil, fmt.Errorf("could not get epoch initial identities: %w", err)
-	}
 	// get the epoch source of randomness
 	randomSeed, err := epoch.RandomSource()
 	if err != nil {
@@ -32,7 +28,7 @@ func SelectionForConsensusFromEpoch(epoch protocol.CommittedEpoch) (*LeaderSelec
 	}
 
 	leaders, err := SelectionForConsensus(
-		identities,
+		epoch.InitialIdentities(),
 		randomSeed,
 		firstView,
 		finalView,

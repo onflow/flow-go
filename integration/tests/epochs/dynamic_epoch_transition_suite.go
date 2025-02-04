@@ -361,8 +361,7 @@ func (s *DynamicEpochTransitionSuite) AssertInEpochPhase(ctx context.Context, ex
 // AssertNodeNotParticipantInEpoch asserts that the given node ID does not exist
 // in the epoch's identity table.
 func (s *DynamicEpochTransitionSuite) AssertNodeNotParticipantInEpoch(epoch protocol.TentativeEpoch, nodeID flow.Identifier) {
-	identities, err := epoch.InitialIdentities()
-	require.NoError(s.T(), err)
+	identities := epoch.InitialIdentities()
 	require.NotContains(s.T(), identities.NodeIDs(), nodeID)
 }
 

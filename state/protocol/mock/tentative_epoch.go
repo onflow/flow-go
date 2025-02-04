@@ -61,7 +61,7 @@ func (_m *TentativeEpoch) Counter() uint64 {
 }
 
 // InitialIdentities provides a mock function with given fields:
-func (_m *TentativeEpoch) InitialIdentities() (flow.GenericIdentityList[flow.IdentitySkeleton], error) {
+func (_m *TentativeEpoch) InitialIdentities() flow.GenericIdentityList[flow.IdentitySkeleton] {
 	ret := _m.Called()
 
 	if len(ret) == 0 {
@@ -69,10 +69,6 @@ func (_m *TentativeEpoch) InitialIdentities() (flow.GenericIdentityList[flow.Ide
 	}
 
 	var r0 flow.GenericIdentityList[flow.IdentitySkeleton]
-	var r1 error
-	if rf, ok := ret.Get(0).(func() (flow.GenericIdentityList[flow.IdentitySkeleton], error)); ok {
-		return rf()
-	}
 	if rf, ok := ret.Get(0).(func() flow.GenericIdentityList[flow.IdentitySkeleton]); ok {
 		r0 = rf()
 	} else {
@@ -81,13 +77,7 @@ func (_m *TentativeEpoch) InitialIdentities() (flow.GenericIdentityList[flow.Ide
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func() error); ok {
-		r1 = rf()
-	} else {
-		r1 = ret.Error(1)
-	}
-
-	return r0, r1
+	return r0
 }
 
 // NewTentativeEpoch creates a new instance of TentativeEpoch. It also registers a testing interface on the mock and a cleanup function to assert the mocks expectations.

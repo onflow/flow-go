@@ -124,8 +124,8 @@ func (es *setupEpoch) RandomSource() ([]byte, error) {
 	return es.setupEvent.RandomSource, nil
 }
 
-func (es *setupEpoch) InitialIdentities() (flow.IdentitySkeletonList, error) {
-	return es.setupEvent.Participants, nil
+func (es *setupEpoch) InitialIdentities() flow.IdentitySkeletonList {
+	return es.setupEvent.Participants
 }
 
 func (es *setupEpoch) Clustering() (flow.ClusterList, error) {

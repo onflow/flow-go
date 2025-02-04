@@ -37,10 +37,6 @@ func ToEpochSetup(epoch CommittedEpoch) (*flow.EpochSetup, error) {
 	if err != nil {
 		return nil, fmt.Errorf("could not get target end time: %w", err)
 	}
-	participants, err := epoch.InitialIdentities()
-	if err != nil {
-		return nil, fmt.Errorf("could not get epoch participants: %w", err)
-	}
 	clustering, err := epoch.Clustering()
 	if err != nil {
 		return nil, fmt.Errorf("could not get epoch clustering: %w", err)
@@ -58,7 +54,7 @@ func ToEpochSetup(epoch CommittedEpoch) (*flow.EpochSetup, error) {
 		DKGPhase2FinalView: dkgPhase2FinalView,
 		DKGPhase3FinalView: dkgPhase3FinalView,
 		FinalView:          finalView,
-		Participants:       participants,
+		Participants:       epoch.InitialIdentities(),
 		Assignments:        assignments,
 		RandomSource:       randomSource,
 		TargetDuration:     targetDuration,
@@ -99,10 +95,7 @@ func ToEpochCommit(epoch CommittedEpoch) (*flow.EpochCommit, error) {
 		})
 	}
 
-	participants, err := epoch.InitialIdentities()
-	if err != nil {
-		return nil, fmt.Errorf("could not get epoch participants: %w", err)
-	}
+	participants := epoch.InitialIdentities()
 	dkg, err := epoch.DKG()
 	if err != nil {
 		return nil, fmt.Errorf("could not get epoch dkg: %w", err)

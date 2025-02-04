@@ -312,10 +312,7 @@ func (e *Engine) getLocalCluster(refEpoch protocol.CommittedEpoch) (flow.Identit
 	if !ok {
 		// if we aren't assigned to a cluster, check that we are a member of
 		// the reference epoch
-		refIdentities, err := refEpoch.InitialIdentities()
-		if err != nil {
-			return nil, fmt.Errorf("could not get initial identities for reference epoch: %w", err)
-		}
+		refIdentities := refEpoch.InitialIdentities()
 
 		if _, ok := refIdentities.ByNodeID(e.me.NodeID()); ok {
 			// CAUTION: we are a member of the epoch, but have no assigned cluster!

@@ -70,11 +70,7 @@ func (factory *EpochComponentsFactory) Create(
 	epochCounter := epoch.Counter()
 
 	// if we are not an authorized participant in this epoch, return a sentinel
-	identities, err := epoch.InitialIdentities()
-	if err != nil {
-		err = fmt.Errorf("could not get initial identities for epoch: %w", err)
-		return
-	}
+	identities := epoch.InitialIdentities()
 	_, exists := identities.ByNodeID(factory.me.NodeID())
 	if !exists {
 		err = fmt.Errorf("%w (node_id=%x, epoch=%d)", epochmgr.ErrNotAuthorizedForEpoch, factory.me.NodeID(), epochCounter)

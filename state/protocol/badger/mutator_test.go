@@ -1355,16 +1355,12 @@ func TestExtendDuplicateEpochEvents(t *testing.T) {
 
 		// should be able to query each epoch from the appropriate reference block
 		block7next, err := state.AtBlockID(block7.ID()).Epochs().NextUnsafe()
-		assert.NoError(t, err)
-		identities, err := block7next.InitialIdentities()
 		require.NoError(t, err)
-		require.Equal(t, nextEpochSetup.Participants, identities)
+		require.Equal(t, nextEpochSetup.Participants, block7next.InitialIdentities())
 
 		block8next, err := state.AtBlockID(block8.ID()).Epochs().NextUnsafe()
-		assert.NoError(t, err)
-		identities, err = block8next.InitialIdentities()
 		require.NoError(t, err)
-		require.Equal(t, nextEpochSetup.Participants, identities)
+		require.Equal(t, nextEpochSetup.Participants, block8next.InitialIdentities())
 	})
 }
 

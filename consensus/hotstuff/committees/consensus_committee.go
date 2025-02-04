@@ -82,10 +82,7 @@ func newEpochInfo(epoch protocol.CommittedEpoch) (*epochInfo, error) {
 	if err != nil {
 		return nil, fmt.Errorf("could not get epoch final view: %w", err)
 	}
-	initialIdentities, err := epoch.InitialIdentities()
-	if err != nil {
-		return nil, fmt.Errorf("could not initial identities: %w", err)
-	}
+	initialIdentities := epoch.InitialIdentities()
 	leaders, err := leader.SelectionForConsensus(initialIdentities, randomSeed, firstView, finalView)
 	if err != nil {
 		return nil, fmt.Errorf("could not get leader selection: %w", err)
