@@ -114,6 +114,7 @@ func newSpammerNodeWithRpcInspector(
 	var opts []p2ptest.NodeFixtureParameterOption
 	opts = append(opts,
 		p2ptest.WithRole(role),
+		p2ptest.WithValidateQueueSize(10_000),
 		internal.WithCorruptGossipSub(
 			CorruptGossipSubFactory(func(r *corrupt.GossipSubRouter) {
 				require.NotNil(t, r)

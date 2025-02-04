@@ -43,6 +43,7 @@ type Builder struct {
 	idProvider        module.IdentityProvider
 	routingSystem     routing.Routing
 	gossipSubCfg      *p2pconfig.GossipSubParameters
+	validateQueueSize int
 }
 
 var _ p2p.GossipSubBuilder = (*Builder)(nil)
@@ -136,6 +137,12 @@ func (g *Builder) SetRoutingSystem(routingSystem routing.Routing) {
 		return
 	}
 	g.routingSystem = routingSystem
+}
+
+// OverrideDefaultValidateQueueSize sets the validate queue size to use for the libp2p pubsub system.
+// CAUTION: Be careful setting this to a larger number as it will change the backpressure behavior of the system.
+func (g *Builder) OverrideDefaultValidateQueueSize(size int) {
+	g.validateQueueSize = size
 }
 
 // NewGossipSubBuilder returns a new gossipsub builder.
@@ -354,6 +361,10 @@ func (g *Builder) Build(ctx irrecoverable.SignalerContext) (p2p.PubSubAdapter, e
 
 	if g.gossipSubTracer != nil {
 		gossipSubConfigs.WithTracer(g.gossipSubTracer)
+	}
+
+	if g.validateQueueSize > 0 {
+		gossipSubConfigs.WithValidateQueueSize(g.validateQueueSize)
 	}
 
 	if g.h == nil {

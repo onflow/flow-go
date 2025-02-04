@@ -185,6 +185,10 @@ func NodeFixture(
 		builder.SetConnectionManager(parameters.ConnManager)
 	}
 
+	if parameters.ValidateQueueSize > 0 {
+		builder.OverrideDefaultValidateQueueSize(parameters.ValidateQueueSize)
+	}
+
 	n, err := builder.Build()
 	require.NoError(t, err)
 
@@ -250,6 +254,7 @@ type NodeFixtureParameters struct {
 	GossipSubRpcInspectorFactory  p2p.GossipSubRpcInspectorFactoryFunc
 	FlowConfig                    *config.FlowConfig
 	UnicastRateLimiterDistributor p2p.UnicastRateLimiterDistributor
+	ValidateQueueSize             int
 }
 
 func WithUnicastRateLimitDistributor(distributor p2p.UnicastRateLimiterDistributor) NodeFixtureParameterOption {
@@ -380,6 +385,14 @@ func WithResourceManager(resourceManager network.ResourceManager) NodeFixturePar
 func WithUnicastHandlerFunc(handler network.StreamHandler) NodeFixtureParameterOption {
 	return func(p *NodeFixtureParameters) {
 		p.HandlerFunc = handler
+	}
+}
+
+// WithValidateQueueSize sets the size of the validation queue for the node.
+// Use this to set a higher value to prevent message loss during tests
+func WithValidateQueueSize(size int) NodeFixtureParameterOption {
+	return func(p *NodeFixtureParameters) {
+		p.ValidateQueueSize = size
 	}
 }
 

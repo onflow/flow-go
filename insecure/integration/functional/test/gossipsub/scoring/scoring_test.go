@@ -118,6 +118,7 @@ func testGossipSubInvalidMessageDeliveryScoring(t *testing.T, spamMsgFactory fun
 		idProvider,
 		p2ptest.WithRole(role),
 		p2ptest.OverrideFlowConfig(cfg),
+		p2ptest.WithValidateQueueSize(3000), // prevent node from dropping messages on slow CI machines
 	)
 
 	ids := flow.IdentityList{&spammer.SpammerId, &victimIdentity}
