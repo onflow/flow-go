@@ -70,13 +70,13 @@ func TestGenerateRecoverTxArgsWithDKG_ExcludeIncludeParticipants(testifyT *testi
 			args, err := GenerateRecoverTxArgsWithDKG(
 				log,
 				internalNodes,
-				2,
-				2,
+				2, // number of collection clusters
+				currentEpochCommit.Counter+1,
 				flow.Localnet,
-				100,
-				4000,
-				60*60,
-				false,
+				100,   // staking function length, in views
+				4000,  // recovery epoch length, in views
+				60*60, // recovery epoch duration, in seconds
+				false, // unsafe overwrite
 				currentEpochCommit.DKGIndexMap,
 				currentEpochCommit.DKGParticipantKeys,
 				currentEpochCommit.DKGGroupKey,
