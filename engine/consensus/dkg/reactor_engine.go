@@ -350,7 +350,10 @@ func (e *ReactorEngine) getDKGInfo(firstBlockID flow.Identifier) (*dkgInfo, erro
 	if err != nil {
 		return nil, fmt.Errorf("could not retrieve current epoch: %w", err)
 	}
-	nextEpoch := e.State.AtBlockID(firstBlockID).Epochs().NextUnsafe()
+	nextEpoch, err := e.State.AtBlockID(firstBlockID).Epochs().NextUnsafe()
+	if err != nil {
+		return nil, fmt.Errorf("could not retrieve next epoch: %w", err)
+	}
 
 	identities, err := nextEpoch.InitialIdentities()
 	if err != nil {

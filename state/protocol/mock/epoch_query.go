@@ -63,7 +63,7 @@ func (_m *EpochQuery) NextCommitted() protocol.CommittedEpoch {
 }
 
 // NextUnsafe provides a mock function with given fields:
-func (_m *EpochQuery) NextUnsafe() protocol.TentativeEpoch {
+func (_m *EpochQuery) NextUnsafe() (protocol.TentativeEpoch, error) {
 	ret := _m.Called()
 
 	if len(ret) == 0 {
@@ -71,6 +71,10 @@ func (_m *EpochQuery) NextUnsafe() protocol.TentativeEpoch {
 	}
 
 	var r0 protocol.TentativeEpoch
+	var r1 error
+	if rf, ok := ret.Get(0).(func() (protocol.TentativeEpoch, error)); ok {
+		return rf()
+	}
 	if rf, ok := ret.Get(0).(func() protocol.TentativeEpoch); ok {
 		r0 = rf()
 	} else {
@@ -79,7 +83,13 @@ func (_m *EpochQuery) NextUnsafe() protocol.TentativeEpoch {
 		}
 	}
 
-	return r0
+	if rf, ok := ret.Get(1).(func() error); ok {
+		r1 = rf()
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
 }
 
 // Previous provides a mock function with given fields:

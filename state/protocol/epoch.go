@@ -20,10 +20,10 @@ type EpochQuery interface {
 	// NextUnsafe returns the next epoch as of this snapshot. Valid snapshots must
 	// have a next epoch available after the transition to epoch setup phase.
 	//
-	// Returns invalid.Epoch with ErrNextEpochNotSetup in the case that this method
-	// is queried w.r.t. a snapshot within the flow.EpochPhaseStaking phase, or
-	// ErrNextEpochAlreadyCommitted during the flow.EpochPhaseCommitted phase.
-	NextUnsafe() TentativeEpoch
+	// Error returns:
+	//   - ErrNextEpochNotSetup in the case that this method is queried w.r.t. a snapshot within the flow.EpochPhaseStaking phase
+	//   - ErrNextEpochAlreadyCommitted during the flow.EpochPhaseCommitted phase
+	NextUnsafe() (TentativeEpoch, error)
 
 	// NextCommitted returns the next epoch as of this snapshot, only if it has
 	// been committed already (after flow.EpochPhaseCommitted)

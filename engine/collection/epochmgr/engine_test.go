@@ -300,7 +300,9 @@ func (suite *Suite) TestRestartInSetupPhase() {
 	suite.phase = flow.EpochPhaseSetup
 	// should call voter with next epoch
 	var called = make(chan struct{})
-	suite.voter.On("Vote", mock.Anything, suite.epochQuery.NextUnsafe()).
+	nextEpochTentative, err := suite.epochQuery.NextUnsafe()
+	require.NoError(suite.T(), err, "cannot get next tentative epoch")
+	suite.voter.On("Vote", mock.Anything, nextEpochTentative).
 		Return(nil).
 		Run(func(args mock.Arguments) {
 			close(called)
@@ -444,7 +446,9 @@ func (suite *Suite) TestStartAsUnauthorizedNode() {
 	suite.phase = flow.EpochPhaseSetup
 	// should call voter with next epoch
 	var called = make(chan struct{})
-	suite.voter.On("Vote", mock.Anything, suite.epochQuery.NextUnsafe()).
+	nextEpochTentative, err := suite.epochQuery.NextUnsafe()
+	require.NoError(suite.T(), err, "cannot get next tentative epoch")
+	suite.voter.On("Vote", mock.Anything, nextEpochTentative).
 		Return(nil).
 		Run(func(args mock.Arguments) {
 			close(called)
@@ -468,9 +472,12 @@ func (suite *Suite) TestRespondToPhaseChange() {
 
 	// start in staking phase
 	suite.phase = flow.EpochPhaseStaking
+	suite.AddTentativeEpoch(suite.counter + 1)
 	// should call voter with next epoch
 	var called = make(chan struct{})
-	suite.voter.On("Vote", mock.Anything, suite.epochQuery.NextUnsafe()).
+	nextEpochTentative, err := suite.epochQuery.NextUnsafe()
+	require.NoError(suite.T(), err, "cannot get next tentative epoch")
+	suite.voter.On("Vote", mock.Anything, nextEpochTentative).
 		Return(nil).
 		Run(func(args mock.Arguments) {
 			close(called)
@@ -574,7 +581,9 @@ func (suite *Suite) TestStopQcVoting() {
 	suite.phase = flow.EpochPhaseSetup
 
 	receivedCancelSignal := make(chan struct{})
-	suite.voter.On("Vote", mock.Anything, suite.epochQuery.NextUnsafe()).
+	nextEpochTentative, err := suite.epochQuery.NextUnsafe()
+	require.NoError(suite.T(), err, "cannot get next tentative epoch")
+	suite.voter.On("Vote", mock.Anything, nextEpochTentative).
 		Return(nil).
 		Run(func(args mock.Arguments) {
 			ctx := args.Get(0).(context.Context)

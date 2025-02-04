@@ -404,29 +404,29 @@ func (q *EpochQuery) Current() (protocol.CommittedEpoch, error) {
 }
 
 // NextUnsafe returns the next epoch, if it has been setup but not yet committed.
-func (q *EpochQuery) NextUnsafe() protocol.TentativeEpoch {
+func (q *EpochQuery) NextUnsafe() (protocol.TentativeEpoch, error) {
 
 	epochState, err := q.snap.state.protocolState.EpochStateAtBlockID(q.snap.blockID)
 	if err != nil {
-		return invalid.NewEpochf("could not get protocol state snapshot at block %x: %w", q.snap.blockID, err)
+		return nil, fmt.Errorf("could not get protocol state snapshot at block %x: %w", q.snap.blockID, err)
 	}
 	phase := epochState.EpochPhase()
 	entry := epochState.Entry()
 
 	// if we are in the staking or fallback phase, the next epoch is not setup yet
 	if phase == flow.EpochPhaseStaking || phase == flow.EpochPhaseFallback {
-		return invalid.NewEpoch(protocol.ErrNextEpochNotSetup)
+		return nil, protocol.ErrNextEpochNotSetup
 	}
 	// if we are in setup phase, return a SetupEpoch
 	nextSetup := entry.NextEpochSetup
 	if phase == flow.EpochPhaseSetup {
-		return inmem.NewSetupEpoch(nextSetup, entry.NextEpoch.EpochExtensions)
+		return inmem.NewSetupEpoch(nextSetup, entry.NextEpoch.EpochExtensions), nil
 	}
 	// if we are in committed phase, return an error
 	if phase == flow.EpochPhaseCommitted {
-		return invalid.NewEpoch(protocol.ErrNextEpochAlreadyCommitted)
+		return nil, protocol.ErrNextEpochAlreadyCommitted
 	}
-	return invalid.NewEpochf("data corruption: unknown epoch phase implies malformed protocol state epoch data")
+	return nil, fmt.Errorf("data corruption: unknown epoch phase implies malformed protocol state epoch data")
 }
 
 func (q *EpochQuery) NextCommitted() protocol.CommittedEpoch {

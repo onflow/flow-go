@@ -538,7 +538,9 @@ func (s *DynamicEpochTransitionSuite) RunTestEpochJoinAndLeave(role flow.Role, c
 	s.TimedLogf("observed finalized view %d -> pausing container", epoch1FinalView+1)
 
 	// make sure container to replace is not a member of epoch 2
-	s.AssertNodeNotParticipantInEpoch(rootSnapshot.Epochs().NextUnsafe(), containerToReplace.Config.NodeID)
+	nextEpoch, err := rootSnapshot.Epochs().NextUnsafe()
+	require.NoError(s.T(), err)
+	s.AssertNodeNotParticipantInEpoch(nextEpoch, containerToReplace.Config.NodeID)
 
 	// assert transition to second epoch happened as expected
 	// if counter is still 0, epoch emergency fallback was triggered and we can fail early

@@ -6,8 +6,6 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/onflow/flow-go/state/protocol/invalid"
-
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/state/protocol"
 )
@@ -43,18 +41,18 @@ func (mock *EpochQuery) Current() (protocol.CommittedEpoch, error) {
 	return mock.byCounter[mock.counter], nil
 }
 
-func (mock *EpochQuery) NextUnsafe() protocol.TentativeEpoch {
+func (mock *EpochQuery) NextUnsafe() (protocol.TentativeEpoch, error) {
 	mock.mu.RLock()
 	defer mock.mu.RUnlock()
 	epoch, exists := mock.tentative[mock.counter+1]
 	if !exists {
-		return invalid.NewEpoch(protocol.ErrNextEpochNotSetup)
+		return nil, protocol.ErrNextEpochNotSetup
 	}
 	_, exists = mock.byCounter[mock.counter+1]
 	if exists {
-		return invalid.NewEpoch(protocol.ErrNextEpochAlreadyCommitted)
+		return nil, protocol.ErrNextEpochAlreadyCommitted
 	}
-	return epoch
+	return epoch, nil
 }
 
 func (mock *EpochQuery) NextCommitted() protocol.CommittedEpoch {

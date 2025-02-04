@@ -958,16 +958,12 @@ func TestExtendEpochTransitionValid(t *testing.T) {
 
 		// we should NOT be able to query epoch 2 wrt blocks before 3
 		for _, blockID := range []flow.Identifier{block1.ID(), block2.ID()} {
-			_, err = state.AtBlockID(blockID).Epochs().NextUnsafe().InitialIdentities()
-			require.Error(t, err)
-			_, err = state.AtBlockID(blockID).Epochs().NextUnsafe().Clustering()
+			_, err = state.AtBlockID(blockID).Epochs().NextUnsafe()
 			require.Error(t, err)
 		}
 
 		// we should be able to query epoch 2 as a TentativeEpoch wrt block 3
-		_, err = state.AtBlockID(block3.ID()).Epochs().NextUnsafe().InitialIdentities()
-		assert.NoError(t, err)
-		_, err = state.AtBlockID(block3.ID()).Epochs().NextUnsafe().Clustering()
+		_, err = state.AtBlockID(block3.ID()).Epochs().NextUnsafe()
 		assert.NoError(t, err)
 
 		// only setup event is finalized, not commit, so shouldn't be able to read a CommittedEpoch
@@ -1250,7 +1246,8 @@ func TestExtendConflictingEpochEvents(t *testing.T) {
 		require.NoError(t, err)
 
 		// should be able to query each epoch from the appropriate reference block
-		nextEpoch1 := state.AtBlockID(block7.ID()).Epochs().NextUnsafe()
+		nextEpoch1, err := state.AtBlockID(block7.ID()).Epochs().NextUnsafe()
+		require.NoError(t, err)
 		setup1clustering, err := nextEpoch1.Clustering()
 		assert.NoError(t, err)
 		require.Equal(t, nextEpochSetup1.Assignments, setup1clustering.Assignments())
@@ -1258,7 +1255,8 @@ func TestExtendConflictingEpochEvents(t *testing.T) {
 		phase, err := state.AtBlockID(block8.ID()).EpochPhase()
 		assert.NoError(t, err)
 		require.Equal(t, phase, flow.EpochPhaseSetup)
-		nextEpoch2 := state.AtBlockID(block8.ID()).Epochs().NextUnsafe()
+		nextEpoch2, err := state.AtBlockID(block8.ID()).Epochs().NextUnsafe()
+		require.NoError(t, err)
 		setup2clustering, err := nextEpoch2.Clustering()
 		assert.NoError(t, err)
 		require.Equal(t, nextEpochSetup2.Assignments, setup2clustering.Assignments())
@@ -1367,12 +1365,16 @@ func TestExtendDuplicateEpochEvents(t *testing.T) {
 		require.NoError(t, err)
 
 		// should be able to query each epoch from the appropriate reference block
-		identities, err := state.AtBlockID(block7.ID()).Epochs().NextUnsafe().InitialIdentities()
+		block7next, err := state.AtBlockID(block7.ID()).Epochs().NextUnsafe()
 		assert.NoError(t, err)
+		identities, err := block7next.InitialIdentities()
+		require.NoError(t, err)
 		require.Equal(t, nextEpochSetup.Participants, identities)
 
-		identities, err = state.AtBlockID(block8.ID()).Epochs().NextUnsafe().InitialIdentities()
+		block8next, err := state.AtBlockID(block8.ID()).Epochs().NextUnsafe()
 		assert.NoError(t, err)
+		identities, err = block8next.InitialIdentities()
+		require.NoError(t, err)
 		require.Equal(t, nextEpochSetup.Participants, identities)
 	})
 }

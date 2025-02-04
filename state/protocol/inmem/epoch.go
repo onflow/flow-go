@@ -30,16 +30,16 @@ func (eq Epochs) Current() (protocol.CommittedEpoch, error) {
 	return NewCommittedEpoch(eq.entry.CurrentEpochSetup, eq.entry.CurrentEpoch.EpochExtensions, eq.entry.CurrentEpochCommit), nil
 }
 
-func (eq Epochs) NextUnsafe() protocol.TentativeEpoch {
+func (eq Epochs) NextUnsafe() (protocol.TentativeEpoch, error) {
 	switch eq.entry.EpochPhase() {
 	case flow.EpochPhaseStaking, flow.EpochPhaseFallback:
-		return invalid.NewEpoch(protocol.ErrNextEpochNotSetup)
+		return nil, protocol.ErrNextEpochNotSetup
 	case flow.EpochPhaseSetup:
-		return NewSetupEpoch(eq.entry.NextEpochSetup, eq.entry.NextEpoch.EpochExtensions)
+		return NewSetupEpoch(eq.entry.NextEpochSetup, eq.entry.NextEpoch.EpochExtensions), nil
 	case flow.EpochPhaseCommitted:
-		return invalid.NewEpoch(protocol.ErrNextEpochAlreadyCommitted)
+		return nil, protocol.ErrNextEpochAlreadyCommitted
 	}
-	return invalid.NewEpochf("unexpected unknown phase in protocol state entry")
+	return nil, fmt.Errorf("unexpected unknown phase in protocol state entry")
 }
 
 func (eq Epochs) NextCommitted() protocol.CommittedEpoch {
