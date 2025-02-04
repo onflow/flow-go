@@ -55,6 +55,10 @@ func NewClientWithKey(accessAddr string, accountAddr sdk.Address, key sdkcrypto.
 	defer cancel()
 
 	acc, err := getAccount(ctx, flowClient, accountAddr)
+	if err != nil {
+		return nil, fmt.Errorf("could not get the account %v: %w", accountAddr, err)
+	}
+
 	accountKey := acc.Keys[0]
 
 	mySigner, err := crypto.NewInMemorySigner(key, accountKey.HashAlgo)
