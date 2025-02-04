@@ -151,12 +151,14 @@ func (g *Builder) SetRoutingSystem(routingSystem routing.Routing) {
 // Returns:
 // - a new gossipsub builder.
 // Note: the builder is not thread-safe. It should only be used in the main thread.
-func NewGossipSubBuilder(logger zerolog.Logger,
+func NewGossipSubBuilder(
+	logger zerolog.Logger,
 	metricsCfg *p2pbuilderconfig.MetricsConfig,
 	gossipSubCfg *p2pconfig.GossipSubParameters,
 	networkType network.NetworkingType,
 	sporkId flow.Identifier,
-	idProvider module.IdentityProvider) *Builder {
+	idProvider module.IdentityProvider,
+) *Builder {
 	lg := logger.With().
 		Str("component", "gossipsub").
 		Str("network-type", networkType.String()).

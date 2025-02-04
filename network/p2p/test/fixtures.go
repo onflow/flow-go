@@ -73,11 +73,13 @@ func NetworkingKeyFixtures(t *testing.T) crypto.PrivateKey {
 
 // NodeFixture is a test fixture that creates a single libp2p node with the given key, spork id, and options.
 // It returns the node and its identity.
-func NodeFixture(t *testing.T,
+func NodeFixture(
+	t *testing.T,
 	sporkID flow.Identifier,
 	dhtPrefix string,
 	idProvider module.IdentityProvider,
-	opts ...NodeFixtureParameterOption) (p2p.LibP2PNode, flow.Identity) {
+	opts ...NodeFixtureParameterOption,
+) (p2p.LibP2PNode, flow.Identity) {
 
 	defaultFlowConfig, err := config.DefaultConfig()
 	require.NoError(t, err)
