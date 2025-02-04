@@ -1541,7 +1541,7 @@ func RegisterIDFixture() flow.RegisterID {
 
 // VerifiableChunkDataFixture returns a complete verifiable chunk with an
 // execution receipt referencing the block/collections.
-func VerifiableChunkDataFixture(chunkIndex uint64) *verification.VerifiableChunkData {
+func VerifiableChunkDataFixture(chunkIndex uint64, opts ...func(*flow.Header)) (*verification.VerifiableChunkData, *flow.Block) {
 
 	guarantees := make([]*flow.CollectionGuarantee, 0)
 
@@ -1558,6 +1558,9 @@ func VerifiableChunkDataFixture(chunkIndex uint64) *verification.VerifiableChunk
 		Seals:      nil,
 	}
 	header := BlockHeaderFixture()
+	for _, opt := range opts {
+		opt(header)
+	}
 	header.PayloadHash = payload.Hash()
 
 	block := flow.Block{
@@ -1597,13 +1600,17 @@ func VerifiableChunkDataFixture(chunkIndex uint64) *verification.VerifiableChunk
 		endState = result.Chunks[index+1].StartState
 	}
 
+	chunkDataPack := ChunkDataPackFixture(chunk.ID(), func(c *flow.ChunkDataPack) {
+		c.Collection = &col
+	})
+
 	return &verification.VerifiableChunkData{
 		Chunk:         &chunk,
 		Header:        block.Header,
 		Result:        &result,
-		ChunkDataPack: ChunkDataPackFixture(result.ID()),
+		ChunkDataPack: chunkDataPack,
 		EndState:      endState,
-	}
+	}, &block
 }
 
 // ChunkDataResponseMsgFixture creates a chunk data response message with a single-transaction collection, and random chunk ID.
