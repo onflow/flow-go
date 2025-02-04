@@ -67,11 +67,7 @@ func (factory *EpochComponentsFactory) Create(
 	err error,
 ) {
 
-	epochCounter, err := epoch.Counter()
-	if err != nil {
-		err = fmt.Errorf("could not get epoch counter: %w", err)
-		return
-	}
+	epochCounter := epoch.Counter()
 
 	// if we are not an authorized participant in this epoch, return a sentinel
 	identities, err := epoch.InitialIdentities()

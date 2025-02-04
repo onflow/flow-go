@@ -134,10 +134,7 @@ func getDeployEpochTransactionArguments(snapshot *inmem.Snapshot) []cadence.Valu
 	epochContractName := systemcontracts.ContractNameEpoch
 
 	// current epoch counter
-	currentEpochCounter, err := currentEpoch.Counter()
-	if err != nil {
-		log.Fatal().Err(err).Msgf("could not get `currentEpochCounter` from snapshot")
-	}
+	currentEpochCounter := currentEpoch.Counter()
 
 	// get final view from snapshot
 	finalView, err := currentEpoch.FinalView()

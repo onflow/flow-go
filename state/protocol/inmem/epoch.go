@@ -60,8 +60,8 @@ type setupEpoch struct {
 	extensions []flow.EpochExtension
 }
 
-func (es *setupEpoch) Counter() (uint64, error) {
-	return es.setupEvent.Counter, nil
+func (es *setupEpoch) Counter() uint64 {
+	return es.setupEvent.Counter
 }
 
 func (es *setupEpoch) FirstView() (uint64, error) {

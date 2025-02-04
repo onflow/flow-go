@@ -164,8 +164,7 @@ func (builder *EpochBuilder) BuildEpoch() *EpochBuilder {
 	require.NoError(builder.t, err)
 	epoch, err := state.Final().Epochs().Current()
 	require.NoError(builder.t, err)
-	counter, err := epoch.Counter()
-	require.NoError(builder.t, err)
+	counter := epoch.Counter()
 	finalView, err := epoch.FinalView()
 	require.NoError(builder.t, err)
 

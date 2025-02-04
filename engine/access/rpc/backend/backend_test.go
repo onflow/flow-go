@@ -699,9 +699,7 @@ func (suite *Suite) TestGetProtocolStateSnapshotByBlockID_InvalidSegment() {
 			snap := state.Final()
 			currentEpoch, err := snap.Epochs().Current()
 			suite.Require().NoError(err)
-			epochCounter, err := currentEpoch.Counter()
-			suite.Require().NoError(err)
-			suite.Require().Equal(epoch1.Counter+1, epochCounter, "expect to be in next epoch")
+			suite.Require().Equal(epoch1.Counter+1, currentEpoch.Counter(), "expect to be in next epoch")
 			block, err := snap.Head()
 			suite.Require().NoError(err)
 

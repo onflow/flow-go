@@ -17,10 +17,6 @@ import (
 // * protocol.ErrNextEpochNotSetup - if the epoch represents a next epoch which has not been set up.
 // * state.ErrUnknownSnapshotReference - if the epoch is queried from an unresolvable snapshot.
 func ToEpochSetup(epoch CommittedEpoch) (*flow.EpochSetup, error) {
-	counter, err := epoch.Counter()
-	if err != nil {
-		return nil, fmt.Errorf("could not get epoch counter: %w", err)
-	}
 	firstView, err := epoch.FirstView()
 	if err != nil {
 		return nil, fmt.Errorf("could not get epoch first view: %w", err)
@@ -56,7 +52,7 @@ func ToEpochSetup(epoch CommittedEpoch) (*flow.EpochSetup, error) {
 	}
 
 	setup := &flow.EpochSetup{
-		Counter:            counter,
+		Counter:            epoch.Counter(),
 		FirstView:          firstView,
 		DKGPhase1FinalView: dkgPhase1FinalView,
 		DKGPhase2FinalView: dkgPhase2FinalView,
@@ -79,10 +75,6 @@ func ToEpochSetup(epoch CommittedEpoch) (*flow.EpochSetup, error) {
 // * protocol.ErrNextEpochNotCommitted - if the epoch has not been committed.
 // * state.ErrUnknownSnapshotReference - if the epoch is queried from an unresolvable snapshot.
 func ToEpochCommit(epoch CommittedEpoch) (*flow.EpochCommit, error) {
-	counter, err := epoch.Counter()
-	if err != nil {
-		return nil, fmt.Errorf("could not get epoch counter: %w", err)
-	}
 	clustering, err := epoch.Clustering()
 	if err != nil {
 		return nil, fmt.Errorf("could not get epoch clustering: %w", err)
@@ -121,7 +113,7 @@ func ToEpochCommit(epoch CommittedEpoch) (*flow.EpochCommit, error) {
 	}
 
 	commit := &flow.EpochCommit{
-		Counter:            counter,
+		Counter:            epoch.Counter(),
 		ClusterQCs:         flow.ClusterQCVoteDatasFromQCs(qcs),
 		DKGGroupKey:        dkg.GroupKey(),
 		DKGParticipantKeys: dkgParticipantKeys,

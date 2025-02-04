@@ -98,13 +98,7 @@ func (e *ReactorEngine) Ready() <-chan struct{} {
 			e.log.Fatal().Err(err).Msg("failed to retrieve current epoch when starting DKG reactor engine")
 			return
 		}
-		currentCounter, err := epoch.Counter()
-		if err != nil {
-			// unexpected storage-level error
-			// TODO use irrecoverable context
-			e.log.Fatal().Err(err).Msg("failed to retrieve current epoch counter when starting DKG reactor engine")
-			return
-		}
+		currentCounter := epoch.Counter()
 		first, err := snap.Head()
 		if err != nil {
 			// unexpected storage-level error

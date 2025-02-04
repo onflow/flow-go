@@ -167,13 +167,9 @@ func buildEpochLookupList(epochs ...protocol.CommittedEpoch) []epochInfo {
 		if err != nil {
 			continue
 		}
-		counter, err := epoch.Counter()
-		if err != nil {
-			continue
-		}
 		infos = append(infos, epochInfo{
 			finalView: finalView,
-			counter:   counter,
+			counter:   epoch.Counter(),
 		})
 	}
 	sort.Slice(infos, func(i, j int) bool {

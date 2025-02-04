@@ -850,11 +850,7 @@ func updateEpochMetrics(metrics module.ComplianceMetrics, snap protocol.Snapshot
 		return fmt.Errorf("could not get current epoch: %w", err)
 	}
 	// update epoch counter
-	counter, err := currentEpoch.Counter()
-	if err != nil {
-		return fmt.Errorf("could not get current epoch counter: %w", err)
-	}
-	metrics.CurrentEpochCounter(counter)
+	metrics.CurrentEpochCounter(currentEpoch.Counter())
 
 	// update epoch phase
 	phase, err := snap.EpochPhase()

@@ -23,6 +23,7 @@ type EpochQuery interface {
 	// Error returns:
 	//   - ErrNextEpochNotSetup in the case that this method is queried w.r.t. a snapshot within the flow.EpochPhaseStaking phase
 	//   - ErrNextEpochAlreadyCommitted during the flow.EpochPhaseCommitted phase
+	//   - generic error in case of unexpected critical internal corruption or bugs
 	NextUnsafe() (TentativeEpoch, error)
 
 	// NextCommitted returns the next epoch as of this snapshot, only if it has
@@ -30,6 +31,7 @@ type EpochQuery interface {
 	//
 	// Error returns:
 	//   - ErrNextEpochNotCommitted in the case that the current phase is flow.EpochPhaseStaking or flow.EpochPhaseSetup.
+	//   - generic error in case of unexpected critical internal corruption or bugs
 	NextCommitted() (CommittedEpoch, error)
 
 	// Previous returns the previous epoch as of this snapshot. Valid snapshots
@@ -75,11 +77,7 @@ type EpochQuery interface {
 type CommittedEpoch interface {
 
 	// Counter returns the Epoch's counter.
-	// Error returns:
-	// * protocol.ErrNoPreviousEpoch - if the epoch represents a previous epoch which does not exist.
-	// * protocol.ErrNextEpochNotSetup - if the epoch represents a next epoch which has not been set up.
-	// * state.ErrUnknownSnapshotReference - if the epoch is queried from an unresolvable snapshot.
-	Counter() (uint64, error)
+	Counter() uint64
 
 	// FirstView returns the first view of this epoch.
 	// Error returns:
@@ -225,11 +223,7 @@ type CommittedEpoch interface {
 type TentativeEpoch interface {
 
 	// Counter returns the Epoch's counter.
-	// Error returns:
-	// * protocol.ErrNoPreviousEpoch - if the epoch represents a previous epoch which does not exist.
-	// * protocol.ErrNextEpochNotSetup - if the epoch represents a next epoch which has not been set up.
-	// * state.ErrUnknownSnapshotReference - if the epoch is queried from an unresolvable snapshot.
-	Counter() (uint64, error)
+	Counter() uint64
 
 	// InitialIdentities returns the identities for this epoch as they were
 	// specified in the EpochSetup service event.

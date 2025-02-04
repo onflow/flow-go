@@ -628,10 +628,7 @@ func (exeNode *ExecutionNode) LoadProviderEngine(
 	if err != nil {
 		return nil, fmt.Errorf("could not get current epoch at block %s: %w", blockID.String(), err)
 	}
-	protocolStateEpochCounter, err := currentEpoch.Counter()
-	if err != nil {
-		return nil, fmt.Errorf("cannot get epoch counter from the protocol state at block %s: %w", blockID.String(), err)
-	}
+	protocolStateEpochCounter := currentEpoch.Counter()
 
 	l := node.Logger.With().
 		Str("component", "provider engine").

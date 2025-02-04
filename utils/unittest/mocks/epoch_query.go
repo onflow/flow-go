@@ -4,8 +4,6 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/stretchr/testify/require"
-
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/state/protocol"
 )
@@ -105,15 +103,11 @@ func (mock *EpochQuery) Transition() {
 func (mock *EpochQuery) Add(epoch protocol.CommittedEpoch) {
 	mock.mu.Lock()
 	defer mock.mu.Unlock()
-	counter, err := epoch.Counter()
-	require.NoError(mock.t, err, "cannot add epoch with invalid counter")
-	mock.byCounter[counter] = epoch
+	mock.byCounter[epoch.Counter()] = epoch
 }
 
 func (mock *EpochQuery) AddTentative(epoch protocol.TentativeEpoch) {
 	mock.mu.Lock()
 	defer mock.mu.Unlock()
-	counter, err := epoch.Counter()
-	require.NoError(mock.t, err, "cannot add epoch with invalid counter")
-	mock.tentative[counter] = epoch
+	mock.tentative[epoch.Counter()] = epoch
 }

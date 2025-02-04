@@ -13,10 +13,7 @@ import (
 // have zero probability of being selected as leaders in accordance with their weight.
 func SelectionForCluster(cluster protocol.Cluster, epoch protocol.CommittedEpoch) (*LeaderSelection, error) {
 	// sanity check to ensure the cluster and epoch match
-	counter, err := epoch.Counter()
-	if err != nil {
-		return nil, fmt.Errorf("could not get epoch counter: %w", err)
-	}
+	counter := epoch.Counter()
 	if counter != cluster.EpochCounter() {
 		return nil, fmt.Errorf("inconsistent counter between epoch (%d) and cluster (%d)", counter, cluster.EpochCounter())
 	}

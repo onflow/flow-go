@@ -433,10 +433,7 @@ func (c *Consensus) epochInfoByView(view uint64) (*epochInfo, error) {
 // Input must be a committed epoch.
 // No errors are expected during normal operation.
 func (c *Consensus) prepareEpoch(epoch protocol.CommittedEpoch) (*epochInfo, error) {
-	counter, err := epoch.Counter()
-	if err != nil {
-		return nil, fmt.Errorf("could not get counter for epoch to prepare: %w", err)
-	}
+	counter := epoch.Counter()
 
 	c.mu.Lock()
 	defer c.mu.Unlock()
@@ -447,7 +444,7 @@ func (c *Consensus) prepareEpoch(epoch protocol.CommittedEpoch) (*epochInfo, err
 		return epochInf, nil
 	}
 
-	epochInf, err = newEpochInfo(epoch)
+	epochInf, err := newEpochInfo(epoch)
 	if err != nil {
 		return nil, fmt.Errorf("could not create epoch info for epoch %d: %w", counter, err)
 	}

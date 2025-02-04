@@ -834,8 +834,7 @@ func TestExtendEpochTransitionValid(t *testing.T) {
 		// expect epoch metric calls on bootstrap
 		initialCurrentEpoch, err := rootSnapshot.Epochs().Current()
 		require.NoError(t, err)
-		counter, err := initialCurrentEpoch.Counter()
-		require.NoError(t, err)
+		counter := initialCurrentEpoch.Counter()
 		finalView, err := initialCurrentEpoch.FinalView()
 		require.NoError(t, err)
 		initialPhase, err := rootSnapshot.EpochPhase()
@@ -1057,9 +1056,7 @@ func TestExtendEpochTransitionValid(t *testing.T) {
 		// we should still be in epoch 1
 		block4epoch, err := state.AtBlockID(block4.ID()).Epochs().Current()
 		require.NoError(t, err)
-		epochCounter, err := block4epoch.Counter()
-		require.NoError(t, err)
-		require.Equal(t, epoch1Setup.Counter, epochCounter)
+		require.Equal(t, epoch1Setup.Counter, block4epoch.Counter())
 
 		err = state.Finalize(context.Background(), block7.ID())
 		require.NoError(t, err)
@@ -1067,9 +1064,7 @@ func TestExtendEpochTransitionValid(t *testing.T) {
 		// we should still be in epoch 1, since epochs are inclusive of final view
 		block7epoch, err := state.AtBlockID(block7.ID()).Epochs().Current()
 		require.NoError(t, err)
-		epochCounter, err = block7epoch.Counter()
-		require.NoError(t, err)
-		require.Equal(t, epoch1Setup.Counter, epochCounter)
+		require.Equal(t, epoch1Setup.Counter, block7epoch.Counter())
 
 		// block 8 has a view > final view of epoch 1, it will be considered the first block of epoch 2
 		block8 := unittest.BlockWithParentFixture(block7.Header)
@@ -1086,9 +1081,7 @@ func TestExtendEpochTransitionValid(t *testing.T) {
 		// now, at long last, we are in epoch 2
 		block8epoch, err := state.AtBlockID(block8.ID()).Epochs().Current()
 		require.NoError(t, err)
-		epochCounter, err = block8epoch.Counter()
-		require.NoError(t, err)
-		require.Equal(t, epoch2Setup.Counter, epochCounter)
+		require.Equal(t, epoch2Setup.Counter, block8epoch.Counter())
 
 		// we should begin epoch 2 in staking phase
 		// now that we have entered view range of epoch 2, should be in staking phase

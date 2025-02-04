@@ -41,8 +41,7 @@ func TestBootstrapAndOpen(t *testing.T) {
 		require.NoError(t, err)
 		finalView, err := epoch.FinalView()
 		require.NoError(t, err)
-		counter, err := epoch.Counter()
-		require.NoError(t, err)
+		counter := epoch.Counter()
 		phase, err := rootSnapshot.EpochPhase()
 		require.NoError(t, err)
 
@@ -119,8 +118,7 @@ func TestBootstrapAndOpen_EpochCommitted(t *testing.T) {
 		currentEpoch, err := committedPhaseSnapshot.Epochs().Current()
 		require.NoError(t, err)
 		// expect counter to be set to current epochs counter
-		counter, err := currentEpoch.Counter()
-		require.NoError(t, err)
+		counter := currentEpoch.Counter()
 		complianceMetrics.On("CurrentEpochCounter", counter).Once()
 
 		// expect epoch phase to be set to current phase
@@ -514,17 +512,14 @@ func TestBootstrapNonRoot(t *testing.T) {
 			// find a snapshot from epoch setup phase in epoch 2
 			epoch1, err := rootSnapshot.Epochs().Current()
 			require.NoError(t, err)
-			epoch1Counter, err := epoch1.Counter()
-			require.NoError(t, err)
+			epoch1Counter := epoch1.Counter()
 			for height := rootBlock.Height + 1; ; height++ {
 				snap := state.AtHeight(height)
 				epoch, err := snap.Epochs().Current()
 				require.NoError(t, err)
-				counter, err := epoch.Counter()
-				require.NoError(t, err)
 				phase, err := snap.EpochPhase()
 				require.NoError(t, err)
-				if phase == flow.EpochPhaseSetup && counter == epoch1Counter+1 {
+				if phase == flow.EpochPhaseSetup && epoch.Counter() == epoch1Counter+1 {
 					return snap
 				}
 			}

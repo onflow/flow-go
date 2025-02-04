@@ -302,10 +302,7 @@ func (e *Engine) onTransaction(originID flow.Identifier, tx *flow.TransactionBod
 //     should be discarded.
 //   - other error for any other, unexpected error condition.
 func (e *Engine) getLocalCluster(refEpoch protocol.CommittedEpoch) (flow.IdentitySkeletonList, error) {
-	epochCounter, err := refEpoch.Counter()
-	if err != nil {
-		return nil, fmt.Errorf("could not get counter for reference epoch: %w", err)
-	}
+	epochCounter := refEpoch.Counter()
 	clusters, err := refEpoch.Clustering()
 	if err != nil {
 		return nil, fmt.Errorf("could not get clusters for reference epoch: %w", err)
@@ -345,13 +342,8 @@ func (e *Engine) ingestTransaction(
 	localClusterFingerprint flow.Identifier,
 	txClusterFingerprint flow.Identifier,
 ) error {
-	epochCounter, err := refEpoch.Counter()
-	if err != nil {
-		return fmt.Errorf("could not get counter for reference epoch: %w", err)
-	}
-
 	// use the transaction pool for the epoch the reference block is part of
-	pool := e.pools.ForEpoch(epochCounter)
+	pool := e.pools.ForEpoch(refEpoch.Counter())
 
 	// short-circuit if we have already stored the transaction
 	if pool.Has(txID) {
@@ -360,7 +352,7 @@ func (e *Engine) ingestTransaction(
 	}
 
 	// we don't pass actual ctx as we don't execute any scripts inside for now
-	err = e.transactionValidator.Validate(context.Background(), tx)
+	err := e.transactionValidator.Validate(context.Background(), tx)
 	if err != nil {
 		return engine.NewInvalidInputErrorf("invalid transaction (%x): %w", txID, err)
 	}

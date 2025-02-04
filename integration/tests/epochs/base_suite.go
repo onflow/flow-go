@@ -154,8 +154,7 @@ func (s *BaseSuite) AwaitEpochPhase(ctx context.Context, expectedEpoch uint64, e
 		require.NoError(s.T(), err)
 		epoch, err := snapshot.Epochs().Current()
 		require.NoError(s.T(), err)
-		actualEpoch, err = epoch.Counter()
-		require.NoError(s.T(), err)
+		actualEpoch = epoch.Counter()
 		actualPhase, err = snapshot.EpochPhase()
 		require.NoError(s.T(), err)
 
@@ -201,9 +200,7 @@ func (s *BaseSuite) CurrentEpoch(ctx context.Context) uint64 {
 	snapshot := s.GetLatestProtocolSnapshot(ctx)
 	epoch, err := snapshot.Epochs().Current()
 	require.NoError(s.T(), err)
-	counter, err := epoch.Counter()
-	require.NoError(s.T(), err)
-	return counter
+	return epoch.Counter()
 }
 
 // GetLatestProtocolSnapshot returns the protocol snapshot as of the latest finalized block.

@@ -1216,9 +1216,7 @@ func TestSnapshot_EpochQuery(t *testing.T) {
 				for _, height := range epoch1.Range() {
 					currentEpoch, err := state.AtHeight(height).Epochs().Current()
 					require.NoError(t, err)
-					counter, err := currentEpoch.Counter()
-					require.NoError(t, err)
-					assert.Equal(t, epoch1Counter, counter)
+					assert.Equal(t, epoch1Counter, currentEpoch.Counter())
 				}
 			})
 
@@ -1226,9 +1224,7 @@ func TestSnapshot_EpochQuery(t *testing.T) {
 				for _, height := range epoch2.Range() {
 					currentEpoch, err := state.AtHeight(height).Epochs().Current()
 					require.NoError(t, err)
-					counter, err := currentEpoch.Counter()
-					require.NoError(t, err)
-					assert.Equal(t, epoch2Counter, counter)
+					assert.Equal(t, epoch2Counter, currentEpoch.Counter())
 				}
 			})
 		})
@@ -1248,16 +1244,12 @@ func TestSnapshot_EpochQuery(t *testing.T) {
 				for _, height := range epoch1.SetupRange() {
 					nextSetup, err := state.AtHeight(height).Epochs().NextUnsafe()
 					require.NoError(t, err)
-					counter, err := nextSetup.Counter()
-					require.NoError(t, err)
-					assert.Equal(t, epoch2Counter, counter)
+					assert.Equal(t, epoch2Counter, nextSetup.Counter())
 				}
 				for _, height := range epoch1.CommittedRange() {
 					nextCommitted, err := state.AtHeight(height).Epochs().NextCommitted()
 					require.NoError(t, err)
-					counter, err := nextCommitted.Counter()
-					require.NoError(t, err)
-					assert.Equal(t, epoch2Counter, counter)
+					assert.Equal(t, epoch2Counter, nextCommitted.Counter())
 				}
 			})
 		})
@@ -1278,9 +1270,7 @@ func TestSnapshot_EpochQuery(t *testing.T) {
 				for _, height := range epoch2.Range() {
 					previousEpoch, err := state.AtHeight(height).Epochs().Previous()
 					require.NoError(t, err)
-					counter, err := previousEpoch.Counter()
-					require.NoError(t, err)
-					assert.Equal(t, epoch1Counter, counter)
+					assert.Equal(t, epoch1Counter, previousEpoch.Counter())
 				}
 			})
 		})
