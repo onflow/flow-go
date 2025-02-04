@@ -1145,7 +1145,10 @@ func min(a, b int) int {
 
 func newReadonlyStorage(regs registers.Registers) *runtime.Storage {
 	ledger := &registers.ReadOnlyLedger{Registers: regs}
-	return runtime.NewStorage(ledger, nil, runtime.StorageConfig{})
+	config := runtime.StorageConfig{
+		StorageFormatV2Enabled: true,
+	}
+	return runtime.NewStorage(ledger, nil, config)
 }
 
 type readonlyStorageRuntime struct {
