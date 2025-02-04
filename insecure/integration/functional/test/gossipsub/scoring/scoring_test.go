@@ -2,6 +2,7 @@ package scoring
 
 import (
 	"context"
+	"fmt"
 	"testing"
 	"time"
 
@@ -144,31 +145,44 @@ func testGossipSubInvalidMessageDeliveryScoring(t *testing.T, spamMsgFactory fun
 	spammer.SpamControlMessage(t, victimNode,
 		spammer.GenerateCtlMessages(1), msgs...)
 
-	scoreParams := cfg.NetworkConfig.GossipSub.ScoringParameters
+	thresholds := cfg.NetworkConfig.GossipSub.ScoringParameters.PeerScoring.Internal.Thresholds
 
 	// wait for at most 3 seconds for the victim node to penalize the spammer node.
 	// Each heartbeat is 1 second, so 3 heartbeats should be enough to penalize the spammer node.
 	// Ideally, we should wait for 1 heartbeat, but the score may not be updated immediately after the heartbeat.
+	details := ""
 	require.Eventually(t, func() bool {
 		spammerScore, ok := victimNode.PeerScoreExposer().GetScore(spammer.SpammerNode.ID())
 		if !ok {
+			details = "failed to get spammer score"
 			return false
 		}
-		if spammerScore >= scoreParams.PeerScoring.Internal.Thresholds.Gossip {
+		details = fmt.Sprintf("spammer score: %f", spammerScore)
+		if spammerScore >= thresholds.Gossip {
 			// ensure the score is low enough so that no gossip is routed by victim node to spammer node.
 			return false
 		}
-		if spammerScore >= scoreParams.PeerScoring.Internal.Thresholds.Publish {
-			// ensure the score is low enough so that non of the published messages of the victim node are routed to the spammer node.
+		details = fmt.Sprintf("%s, gossip threshold: %f", details, thresholds.Gossip)
+		if spammerScore >= thresholds.Publish {
+			// ensure the score is low enough so that none of the published messages of the victim node are routed to the spammer node.
 			return false
 		}
-		if spammerScore >= scoreParams.PeerScoring.Internal.Thresholds.Graylist {
+		details = fmt.Sprintf("%s, publish threshold: %f", details, thresholds.Publish)
+		if spammerScore >= thresholds.Graylist {
 			// ensure the score is low enough so that the victim node does not accept RPC messages from the spammer node.
 			return false
 		}
+		details = fmt.Sprintf("%s, graylist threshold: %f", details, thresholds.Graylist)
 
 		return true
-	}, 5*time.Second, 100*time.Millisecond)
+	}, 5*time.Second, 100*time.Millisecond, details)
+
+	spammerScore, ok := victimNode.PeerScoreExposer().GetScore(spammer.SpammerNode.ID())
+	require.True(t, ok)
+	t.Logf("spammer score: %f", spammerScore)
+	t.Logf("gossip theshold: %f", thresholds.Gossip)
+	t.Logf("publish theshold: %f", thresholds.Publish)
+	t.Logf("graylist theshold: %f", thresholds.Graylist)
 
 	topicsSnapshot, ok := victimNode.PeerScoreExposer().GetTopicScores(spammer.SpammerNode.ID())
 	require.True(t, ok)
