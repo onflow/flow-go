@@ -2,9 +2,6 @@ package channels
 
 import (
 	"regexp"
-	"sort"
-
-	"github.com/onflow/flow-go/model/flow"
 )
 
 // Channel specifies a virtual and isolated communication medium.
@@ -34,13 +31,6 @@ func (cl ChannelList) Less(i, j int) bool {
 // It satisfies the sort.Interface making the ChannelList sortable.
 func (cl ChannelList) Swap(i, j int) {
 	cl[i], cl[j] = cl[j], cl[i]
-}
-
-// ID returns hash of the content of ChannelList. It first sorts the ChannelList and then takes its
-// hash value.
-func (cl ChannelList) ID() flow.Identifier {
-	sort.Sort(cl)
-	return flow.MakeID(cl)
 }
 
 // Contains returns true if the ChannelList contains the given channel.
