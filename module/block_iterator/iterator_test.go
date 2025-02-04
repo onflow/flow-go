@@ -1,7 +1,6 @@
-package height_based
+package block_iterator
 
 import (
-	"context"
 	"fmt"
 	"testing"
 
@@ -33,42 +32,43 @@ func TestIterateHeight(t *testing.T) {
 
 		// create iterator
 		// b0 is the root block, iterate from b1 to b3
-		job := module.IterateJob{Start: b1.Height, End: b3.Height}
+		iterRange := module.IteratorRange{Start: b1.Height, End: b3.Height}
 		headers := storagebadger.NewHeaders(&metrics.NoopCollector{}, db)
-		iter, err := NewHeightIterator(headers, progress, context.Background(), job)
-		require.NoError(t, err)
+		getBlockIDByIndex := func(height uint64) (flow.Identifier, bool, error) {
+			blockID, err := headers.BlockIDByHeight(height)
+			if err != nil {
+				return flow.ZeroID, false, err
+			}
+
+			return blockID, true, nil
+		}
+		iter := NewIndexedBlockIterator(getBlockIDByIndex, progress, iterRange)
 
 		// iterate through all blocks
-		visited := make(map[flow.Identifier]struct{})
-		count := 0
+		visited := make([]flow.Identifier, 0, len(bs))
 		for {
 			id, ok, err := iter.Next()
 			require.NoError(t, err)
 			if !ok {
 				break
 			}
-			visited[id] = struct{}{}
 
-			// verify we don't iterate two many blocks
-			count++
-			if count > len(bs) {
-				t.Fatal("visited too many blocks")
-			}
+			visited = append(visited, id)
 		}
 
-		// verify all blocks are visited
-		for _, b := range bs {
-			_, ok := visited[b.ID()]
-			require.True(t, ok, fmt.Sprintf("block %v is not visited", b.ID()))
-			delete(visited, b.ID())
+		// verify all blocks are visited in the same order
+		for i, b := range bs {
+			require.Equal(t, b.ID(), visited[i])
 		}
-		require.Empty(t, visited)
+
+		require.Equal(t, len(bs), len(visited))
 
 		// save the next to iterate height and verify
+		next, err := iter.Checkpoint()
+		require.NoError(t, err)
+		require.Equal(t, b3.Height+1, next)
 
-		require.NoError(t, iter.Checkpoint())
-
-		savedNextHeight, err := progress.ReadNext()
+		savedNextHeight, err := progress.LoadState()
 		require.NoError(t, err)
 
 		require.Equal(t, b3.Height+1, savedNextHeight,
@@ -81,14 +81,14 @@ type saveNextHeight struct {
 	savedNextHeight uint64
 }
 
-var _ module.IterateProgressWriter = (*saveNextHeight)(nil)
-var _ module.IterateProgressReader = (*saveNextHeight)(nil)
+var _ module.IteratorStateWriter = (*saveNextHeight)(nil)
+var _ module.IteratorStateReader = (*saveNextHeight)(nil)
 
-func (s *saveNextHeight) SaveNext(height uint64) error {
+func (s *saveNextHeight) SaveState(height uint64) error {
 	s.savedNextHeight = height
 	return nil
 }
 
-func (s *saveNextHeight) ReadNext() (uint64, error) {
+func (s *saveNextHeight) LoadState() (uint64, error) {
 	return s.savedNextHeight, nil
 }
