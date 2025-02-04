@@ -1,15 +1,17 @@
 package run
 
 import (
+	"testing"
+
 	"github.com/onflow/cadence"
+	"github.com/stretchr/testify/require"
+	"pgregory.net/rapid"
+
 	"github.com/onflow/flow-go/cmd/bootstrap/utils"
 	"github.com/onflow/flow-go/cmd/util/cmd/common"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/utils/unittest"
-	"github.com/stretchr/testify/require"
-	"pgregory.net/rapid"
-	"testing"
 )
 
 // TestGenerateRecoverEpochTxArgs_ExcludeIncludeParticipants tests that GenerateRecoverEpochTxArgs produces expected arguments
