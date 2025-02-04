@@ -30,7 +30,7 @@ import (
 // It assumes the latest sealed block has been executed, and the chunk data packs have not been
 // pruned.
 // Note, it returns nil if certain block is not executed, in this case warning will be logged
-func VerifyLastKHeight(k uint64, chainID flow.ChainID, protocolDataDir string, chunkDataPackDir string, nWorker uint) (err error) {
+func VerifyLastKHeight(k uint64, chainID flow.ChainID, protocolDataDir string, chunkDataPackDir string, nWorker uint, stopOnMismatch bool) (err error) {
 	closer, storages, chunkDataPacks, state, verifier, err := initStorages(chainID, protocolDataDir, chunkDataPackDir)
 	if err != nil {
 		return fmt.Errorf("could not init storages: %w", err)
@@ -67,7 +67,7 @@ func VerifyLastKHeight(k uint64, chainID flow.ChainID, protocolDataDir string, c
 
 	log.Info().Msgf("verifying blocks from %d to %d", from, to)
 
-	err = verifyConcurrently(from, to, nWorker, storages.Headers, chunkDataPacks, storages.Results, state, verifier, verifyHeight)
+	err = verifyConcurrently(from, to, nWorker, stopOnMismatch, storages.Headers, chunkDataPacks, storages.Results, state, verifier, verifyHeight)
 	if err != nil {
 		return err
 	}
@@ -82,6 +82,7 @@ func VerifyRange(
 	chainID flow.ChainID,
 	protocolDataDir string, chunkDataPackDir string,
 	nWorker uint,
+	stopOnMismatch bool,
 ) (err error) {
 	closer, storages, chunkDataPacks, state, verifier, err := initStorages(chainID, protocolDataDir, chunkDataPackDir)
 	if err != nil {
@@ -102,7 +103,7 @@ func VerifyRange(
 		return fmt.Errorf("cannot verify blocks before the root block, from: %d, root: %d", from, root)
 	}
 
-	err = verifyConcurrently(from, to, nWorker, storages.Headers, chunkDataPacks, storages.Results, state, verifier, verifyHeight)
+	err = verifyConcurrently(from, to, nWorker, stopOnMismatch, storages.Headers, chunkDataPacks, storages.Results, state, verifier, verifyHeight)
 	if err != nil {
 		return err
 	}
@@ -113,12 +114,13 @@ func VerifyRange(
 func verifyConcurrently(
 	from, to uint64,
 	nWorker uint,
+	stopOnMismatch bool,
 	headers storage.Headers,
 	chunkDataPacks storage.ChunkDataPacks,
 	results storage.ExecutionResults,
 	state protocol.State,
 	verifier module.ChunkVerifier,
-	verifyHeight func(uint64, storage.Headers, storage.ChunkDataPacks, storage.ExecutionResults, protocol.State, module.ChunkVerifier) error,
+	verifyHeight func(uint64, storage.Headers, storage.ChunkDataPacks, storage.ExecutionResults, protocol.State, module.ChunkVerifier, bool) error,
 ) error {
 	tasks := make(chan uint64, int(nWorker))
 	ctx, cancel := context.WithCancel(context.Background())
@@ -147,7 +149,7 @@ func verifyConcurrently(
 					return // Exit if the tasks channel is closed
 				}
 				log.Info().Uint64("height", height).Msg("verifying height")
-				err := verifyHeight(height, headers, chunkDataPacks, results, state, verifier)
+				err := verifyHeight(height, headers, chunkDataPacks, results, state, verifier, stopOnMismatch)
 				if err != nil {
 					log.Error().Uint64("height", height).Err(err).Msg("error encountered while verifying height")
 
@@ -254,6 +256,7 @@ func verifyHeight(
 	results storage.ExecutionResults,
 	state protocol.State,
 	verifier module.ChunkVerifier,
+	stopOnMismatch bool,
 ) error {
 	header, err := headers.ByHeight(height)
 	if err != nil {
@@ -286,7 +289,11 @@ func verifyHeight(
 
 		_, err = verifier.Verify(vcd)
 		if err != nil {
-			return fmt.Errorf("could not verify %d-th chunk: %w", i, err)
+			if stopOnMismatch {
+				return fmt.Errorf("could not verify chunk (index: %v) at block %v (%v): %w", i, height, blockID, err)
+			}
+
+			log.Error().Err(err).Msgf("could not verify chunk (index: %v) at block %v (%v)", i, height, blockID)
 		}
 	}
 	return nil
