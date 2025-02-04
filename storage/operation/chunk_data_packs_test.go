@@ -1,18 +1,19 @@
-package operation
+package operation_test
 
 import (
 	"testing"
 
-	"github.com/dgraph-io/badger/v2"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/storage"
+	"github.com/onflow/flow-go/storage/operation"
+	"github.com/onflow/flow-go/storage/operation/dbtest"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
 func TestChunkDataPack(t *testing.T) {
-	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
+	dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
 		collectionID := unittest.IdentifierFixture()
 		expected := &storage.StoredChunkDataPack{
 			ChunkID:      unittest.IdentifierFixture(),
@@ -23,27 +24,31 @@ func TestChunkDataPack(t *testing.T) {
 
 		t.Run("Retrieve non-existent", func(t *testing.T) {
 			var actual storage.StoredChunkDataPack
-			err := db.View(RetrieveChunkDataPack(expected.ChunkID, &actual))
+			err := operation.RetrieveChunkDataPack(db.Reader(), expected.ChunkID, &actual)
 			assert.Error(t, err)
 		})
 
 		t.Run("Save", func(t *testing.T) {
-			err := db.Update(InsertChunkDataPack(expected))
+			err := db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+				return operation.InsertChunkDataPack(rw.Writer(), expected)
+			})
 			require.NoError(t, err)
 
 			var actual storage.StoredChunkDataPack
-			err = db.View(RetrieveChunkDataPack(expected.ChunkID, &actual))
+			err = operation.RetrieveChunkDataPack(db.Reader(), expected.ChunkID, &actual)
 			assert.NoError(t, err)
 
 			assert.Equal(t, *expected, actual)
 		})
 
 		t.Run("Remove", func(t *testing.T) {
-			err := db.Update(RemoveChunkDataPack(expected.ChunkID))
+			err := db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+				return operation.RemoveChunkDataPack(rw.Writer(), expected.ChunkID)
+			})
 			require.NoError(t, err)
 
 			var actual storage.StoredChunkDataPack
-			err = db.View(RetrieveChunkDataPack(expected.ChunkID, &actual))
+			err = operation.RetrieveChunkDataPack(db.Reader(), expected.ChunkID, &actual)
 			assert.Error(t, err)
 		})
 	})

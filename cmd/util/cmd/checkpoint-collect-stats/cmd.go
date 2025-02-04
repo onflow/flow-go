@@ -8,6 +8,7 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/onflow/cadence/common"
 	"github.com/pkg/profile"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
@@ -369,7 +370,7 @@ func getPayloadStatsFromCheckpoint(payloadCallBack func(payload *ledger.Payload)
 }
 
 func getRegisterStats(valueSizesByType sizesByType) []RegisterStatsByTypes {
-	domainStats := make([]RegisterStatsByTypes, 0, len(util.StorageMapDomains))
+	domainStats := make([]RegisterStatsByTypes, 0, len(common.AllStorageDomains))
 	var allDomainSizes []float64
 
 	statsByTypes := make([]RegisterStatsByTypes, 0, len(valueSizesByType))
@@ -424,7 +425,12 @@ func isDomainType(typ string) bool {
 func isDomainRegister(key ledger.Key) bool {
 	k := key.KeyParts[1].Value
 	kstr := string(k)
-	return slices.Contains(util.StorageMapDomains, kstr)
+	for _, storageDomain := range common.AllStorageDomains {
+		if storageDomain.Identifier() == kstr {
+			return true
+		}
+	}
+	return false
 }
 
 func isAccountRegister(key ledger.Key) bool {
@@ -441,7 +447,7 @@ func getRegisterType(key ledger.Key) string {
 		return "atree slab"
 	}
 
-	isDomain := slices.Contains(util.StorageMapDomains, kstr)
+	_, isDomain := common.AllStorageDomainsByIdentifier[kstr]
 	if isDomain {
 		return domainTypePrefix + kstr
 	}

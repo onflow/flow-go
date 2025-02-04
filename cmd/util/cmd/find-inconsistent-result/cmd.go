@@ -180,7 +180,7 @@ func findLastExecutedAndSealedHeight(state protocol.State, db *badger.DB) (uint6
 
 	var blockID flow.Identifier
 	var lastExecuted uint64
-	err = db.View(procedure.GetHighestExecutedBlock(&lastExecuted, &blockID))
+	err = db.View(procedure.GetLastExecutedBlock(&lastExecuted, &blockID))
 	if err != nil {
 		return 0, err
 	}

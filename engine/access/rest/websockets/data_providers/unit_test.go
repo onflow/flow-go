@@ -63,7 +63,7 @@ func testHappyPath(
 			test.setupBackend(sub)
 
 			// Create the data provider instance
-			provider, err := factory.NewDataProvider(ctx, topic, test.arguments, send)
+			provider, err := factory.NewDataProvider(ctx, "dummy-id", topic, test.arguments, send)
 
 			require.NotNil(t, provider)
 			require.NoError(t, err)
@@ -72,7 +72,9 @@ func testHappyPath(
 			defer provider.Close()
 
 			// Run the provider in a separate goroutine
+			done := make(chan struct{})
 			go func() {
+				defer close(done)
 				err = provider.Run()
 				require.NoError(t, err)
 			}()
@@ -82,6 +84,9 @@ func testHappyPath(
 				defer close(dataChan)
 				sendData(dataChan)
 			}()
+
+			// Wait for the provider goroutine to finish
+			unittest.RequireCloseBefore(t, done, time.Second, "provider failed to stop")
 
 			// Collect responses
 			for i, expected := range test.expectedResponses {
@@ -94,4 +99,15 @@ func testHappyPath(
 			}
 		})
 	}
+}
+
+// extractPayload extracts the BaseDataProvidersResponse and its typed Payload.
+func extractPayload[T any](t *testing.T, v interface{}) (*models.BaseDataProvidersResponse, T) {
+	response, ok := v.(*models.BaseDataProvidersResponse)
+	require.True(t, ok, "Expected *models.BaseDataProvidersResponse, got %T", v)
+
+	payload, ok := response.Payload.(T)
+	require.True(t, ok, "Unexpected response payload type: %T", response.Payload)
+
+	return response, payload
 }

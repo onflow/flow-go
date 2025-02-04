@@ -10,8 +10,6 @@ import (
 
 	"github.com/onflow/atree"
 	"github.com/onflow/cadence/common"
-	"github.com/onflow/cadence/runtime"
-	"github.com/onflow/cadence/stdlib"
 
 	"github.com/onflow/flow-go/fvm/environment"
 	"github.com/onflow/flow-go/ledger"
@@ -246,16 +244,4 @@ func (p *PayloadsLedger) AllocateSlabIndex(owner []byte) (atree.SlabIndex, error
 	}
 
 	panic("AllocateSlabIndex not expected to be called")
-}
-
-var StorageMapDomains = []string{
-	common.PathDomainStorage.Identifier(),
-	common.PathDomainPrivate.Identifier(),
-	common.PathDomainPublic.Identifier(),
-	runtime.StorageDomainContract,
-	stdlib.InboxStorageDomain,
-	stdlib.CapabilityControllerStorageDomain,
-	stdlib.CapabilityControllerTagStorageDomain,
-	stdlib.PathCapabilityStorageDomain,
-	stdlib.AccountCapabilityStorageDomain,
 }
