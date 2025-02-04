@@ -26,19 +26,32 @@ func TestGenerateRecoverEpochTxArgs_ExcludeIncludeParticipants(testifyT *testing
 		for _, node := range append(internalNodes, partnerNodes...) {
 			allNodeIds = append(allNodeIds, node.Identity())
 		}
+
 		rootSnapshot := unittest.RootSnapshotFixture(allNodeIds)
 		allIdentities, err := rootSnapshot.Identities(filter.Any)
 		require.NoError(testifyT, err)
 
 		rapid.Check(testifyT, func(t *rapid.T) {
-			var excludeNodeIds []flow.Identifier
-			var includeNodeIds []flow.Identifier
+			numberOfNodesToInclude := rapid.IntRange(0, 3).Draw(t, "nodes-to-include")
+			numberOfNodesToExclude := rapid.UintRange(0, 3).Draw(t, "nodes-to-exclude")
+			includeNodeIds := unittest.IdentifierListFixture(numberOfNodesToInclude)
 			expectedNodeIds := make(map[cadence.String]struct{})
 			expectedDKGIndexMap := make(map[cadence.String]cadence.Int)
 
-			for _, identity := range allIdentities {
-				expectedNodeIds[cadence.String(identity.NodeID.String())] = struct{}{}
+			excludedNodes, err := allIdentities.Filter(
+				filter.Not(filter.HasRole[flow.Identity](flow.RoleCollection))).Sample(numberOfNodesToExclude)
+			require.NoError(t, err)
+			excludeNodeIds := excludedNodes.NodeIDs()
+
+			eligibleEpochIdentities := allIdentities.Filter(filter.And(
+				filter.IsValidCurrentEpochParticipant,
+				filter.HasWeightGreaterThanZero[flow.Identity],
+				filter.Not(filter.HasNodeID[flow.Identity](excludeNodeIds...))))
+
+			for _, nodeID := range eligibleEpochIdentities.NodeIDs().Union(includeNodeIds) {
+				expectedNodeIds[cadence.String(nodeID.String())] = struct{}{}
 			}
+
 			for index, consensusNode := range allIdentities.Filter(filter.HasRole[flow.Identity](flow.RoleConsensus)) {
 				expectedDKGIndexMap[cadence.String(consensusNode.NodeID.String())] = cadence.NewInt(index)
 			}
