@@ -162,6 +162,10 @@ func (c *CorruptPubSubAdapterConfig) WithPeerGater(_ map[string]float64, _ time.
 	// CorruptPubSub does not need peer gater. This is a no-op.
 }
 
+func (c *CorruptPubSubAdapterConfig) WithValidateQueueSize(size int) {
+	c.options = append(c.options, corrupt.WithValidateQueueSize(size))
+}
+
 func (c *CorruptPubSubAdapterConfig) Build() []corrupt.Option {
 	return c.options
 }

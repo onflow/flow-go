@@ -316,19 +316,9 @@ func createConcurrentStreams(t *testing.T, ctx context.Context, nodes []p2p.LibP
 	}
 
 	// pause until all streams are created
-	unittest.RequireReturnsBefore(t, func() {
-		for {
-			select {
-			case <-ctx.Done():
-				return
-			case <-time.After(10 * time.Millisecond):
-			}
-
-			if len(streams) >= expectedTotalNumOfStreams {
-				return
-			}
-		}
-	}, 3*time.Second, "could not create streams on time")
+	require.Eventually(t, func() bool {
+		return len(streams) >= expectedTotalNumOfStreams
+	}, 3*time.Second, 10*time.Millisecond, "could not create streams on time")
 
 	require.Len(t,
 		streams,

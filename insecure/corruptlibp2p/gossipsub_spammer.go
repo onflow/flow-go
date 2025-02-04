@@ -111,12 +111,17 @@ func newSpammerNodeWithRpcInspector(
 	inspector func(id peer.ID, rpc *corrupt.RPC) error) (p2p.LibP2PNode, flow.Identity, *atomicRouter) {
 	router := newAtomicRouter()
 	var opts []p2ptest.NodeFixtureParameterOption
-	opts = append(opts, p2ptest.WithRole(role),
-		internal.WithCorruptGossipSub(CorruptGossipSubFactory(func(r *corrupt.GossipSubRouter) {
-			require.NotNil(t, r)
-			router.set(r)
-		}),
-			CorruptGossipSubConfigFactoryWithInspector(inspector)))
+	opts = append(opts,
+		p2ptest.WithRole(role),
+		p2ptest.WithValidateQueueSize(10_000), // set a high limit to avoid dropping messages
+		internal.WithCorruptGossipSub(
+			CorruptGossipSubFactory(func(r *corrupt.GossipSubRouter) {
+				require.NotNil(t, r)
+				router.set(r)
+			}),
+			CorruptGossipSubConfigFactoryWithInspector(inspector),
+		),
+	)
 	spammerNode, spammerId := p2ptest.NodeFixture(
 		t,
 		sporkId,

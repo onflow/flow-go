@@ -148,6 +148,13 @@ func (builder *LibP2PNodeBuilder) SetRoutingSystem(f func(context.Context, host.
 	return builder
 }
 
+// OverrideDefaultValidateQueueSize sets the validate queue size to use for the libp2p pubsub system.
+// CAUTION: Be careful setting this to a larger number as it will change the backpressure behavior of the system.
+func (builder *LibP2PNodeBuilder) OverrideDefaultValidateQueueSize(size int) p2p.NodeBuilder {
+	builder.gossipSubBuilder.OverrideDefaultValidateQueueSize(size)
+	return builder
+}
+
 // OverrideGossipSubFactory overrides the default gossipsub factory for the GossipSub protocol.
 // The purpose of override is to allow the node to provide a custom gossipsub factory for sake of testing or experimentation.
 // Note: it is not recommended to override the default gossipsub factory in production unless you know what you are doing.
