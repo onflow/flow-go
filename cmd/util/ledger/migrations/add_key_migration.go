@@ -21,7 +21,7 @@ import (
 // It is used for getting control over system accounts so that they can be tested
 // in a copied environment. When we need to do this it is best to create a branch
 // where this variable is set to true, and use that temporary branc to run migrations.
-const IAmSureIWantToRunThisMigration = false
+const IAmSureIWantToRunThisMigration = true
 
 // AddKeyMigration adds a new key to the core contracts accounts
 type AddKeyMigration struct {
