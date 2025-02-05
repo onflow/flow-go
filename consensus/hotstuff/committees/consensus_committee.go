@@ -74,14 +74,8 @@ func newEpochInfo(epoch protocol.CommittedEpoch) (*epochInfo, error) {
 	if err != nil {
 		return nil, fmt.Errorf("could not get epoch random source: %w", err)
 	}
-	firstView, err := epoch.FirstView()
-	if err != nil {
-		return nil, fmt.Errorf("could not get epoch first view: %w", err)
-	}
-	finalView, err := epoch.FinalView()
-	if err != nil {
-		return nil, fmt.Errorf("could not get epoch final view: %w", err)
-	}
+	firstView := epoch.FirstView()
+	finalView := epoch.FinalView()
 	initialIdentities := epoch.InitialIdentities()
 	leaders, err := leader.SelectionForConsensus(initialIdentities, randomSeed, firstView, finalView)
 	if err != nil {

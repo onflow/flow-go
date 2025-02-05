@@ -65,22 +65,22 @@ func (n *node) Done() <-chan struct{} {
 func (n *node) setEpochs(t *testing.T, currentSetup flow.EpochSetup, nextSetup flow.EpochSetup, firstBlock *flow.Header) {
 
 	currentEpoch := new(protocolmock.CommittedEpoch)
-	currentEpoch.On("Counter").Return(currentSetup.Counter, nil)
-	currentEpoch.On("InitialIdentities").Return(currentSetup.Participants, nil)
-	currentEpoch.On("DKGPhase1FinalView").Return(currentSetup.DKGPhase1FinalView, nil)
-	currentEpoch.On("DKGPhase2FinalView").Return(currentSetup.DKGPhase2FinalView, nil)
-	currentEpoch.On("DKGPhase3FinalView").Return(currentSetup.DKGPhase3FinalView, nil)
-	currentEpoch.On("FinalView").Return(currentSetup.FinalView, nil)
-	currentEpoch.On("FirstView").Return(currentSetup.FirstView, nil)
+	currentEpoch.On("Counter").Return(currentSetup.Counter)
+	currentEpoch.On("InitialIdentities").Return(currentSetup.Participants)
+	currentEpoch.On("DKGPhase1FinalView").Return(currentSetup.DKGPhase1FinalView)
+	currentEpoch.On("DKGPhase2FinalView").Return(currentSetup.DKGPhase2FinalView)
+	currentEpoch.On("DKGPhase3FinalView").Return(currentSetup.DKGPhase3FinalView)
+	currentEpoch.On("FinalView").Return(currentSetup.FinalView)
+	currentEpoch.On("FirstView").Return(currentSetup.FirstView)
 	currentEpoch.On("RandomSource").Return(nextSetup.RandomSource, nil)
 
 	nextEpoch := new(protocolmock.CommittedEpoch)
-	nextEpoch.On("Counter").Return(nextSetup.Counter, nil)
-	nextEpoch.On("InitialIdentities").Return(nextSetup.Participants, nil)
+	nextEpoch.On("Counter").Return(nextSetup.Counter)
+	nextEpoch.On("InitialIdentities").Return(nextSetup.Participants)
 	nextEpoch.On("RandomSource").Return(nextSetup.RandomSource, nil)
 	nextEpoch.On("DKG").Return(nil, nil) // no error means didn't run into EFM
-	nextEpoch.On("FirstView").Return(nextSetup.FirstView, nil)
-	nextEpoch.On("FinalView").Return(nextSetup.FinalView, nil)
+	nextEpoch.On("FirstView").Return(nextSetup.FirstView)
+	nextEpoch.On("FinalView").Return(nextSetup.FinalView)
 
 	epochQuery := mocks.NewEpochQuery(t, currentSetup.Counter)
 	epochQuery.Add(currentEpoch)

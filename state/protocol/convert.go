@@ -17,18 +17,6 @@ import (
 // * protocol.ErrNextEpochNotSetup - if the epoch represents a next epoch which has not been set up.
 // * state.ErrUnknownSnapshotReference - if the epoch is queried from an unresolvable snapshot.
 func ToEpochSetup(epoch CommittedEpoch) (*flow.EpochSetup, error) {
-	firstView, err := epoch.FirstView()
-	if err != nil {
-		return nil, fmt.Errorf("could not get epoch first view: %w", err)
-	}
-	finalView, err := epoch.FinalView()
-	if err != nil {
-		return nil, fmt.Errorf("could not get epoch final view: %w", err)
-	}
-	dkgPhase1FinalView, dkgPhase2FinalView, dkgPhase3FinalView, err := DKGPhaseViews(epoch)
-	if err != nil {
-		return nil, fmt.Errorf("could not get epoch dkg final views: %w", err)
-	}
 	targetDuration, err := epoch.TargetDuration()
 	if err != nil {
 		return nil, fmt.Errorf("could not get target duration: %w", err)
@@ -49,11 +37,11 @@ func ToEpochSetup(epoch CommittedEpoch) (*flow.EpochSetup, error) {
 
 	setup := &flow.EpochSetup{
 		Counter:            epoch.Counter(),
-		FirstView:          firstView,
-		DKGPhase1FinalView: dkgPhase1FinalView,
-		DKGPhase2FinalView: dkgPhase2FinalView,
-		DKGPhase3FinalView: dkgPhase3FinalView,
-		FinalView:          finalView,
+		FirstView:          epoch.FirstView(),
+		DKGPhase1FinalView: epoch.DKGPhase1FinalView(),
+		DKGPhase2FinalView: epoch.DKGPhase2FinalView(),
+		DKGPhase3FinalView: epoch.DKGPhase3FinalView(),
+		FinalView:          epoch.FinalView(),
 		Participants:       epoch.InitialIdentities(),
 		Assignments:        assignments,
 		RandomSource:       randomSource,
@@ -142,23 +130,9 @@ func GetDKGParticipantKeys(dkg DKG, participants flow.IdentitySkeletonList) ([]c
 }
 
 // DKGPhaseViews returns the DKG final phase views for an epoch.
-// Error returns:
-// * protocol.ErrNoPreviousEpoch - if the epoch represents a previous epoch which does not exist.
-// * protocol.ErrNextEpochNotSetup - if the epoch represents a next epoch which has not been set up.
-// * protocol.ErrNextEpochNotCommitted - if the epoch has not been committed.
-// * state.ErrUnknownSnapshotReference - if the epoch is queried from an unresolvable snapshot.
-func DKGPhaseViews(epoch CommittedEpoch) (phase1FinalView uint64, phase2FinalView uint64, phase3FinalView uint64, err error) {
-	phase1FinalView, err = epoch.DKGPhase1FinalView()
-	if err != nil {
-		return
-	}
-	phase2FinalView, err = epoch.DKGPhase2FinalView()
-	if err != nil {
-		return
-	}
-	phase3FinalView, err = epoch.DKGPhase3FinalView()
-	if err != nil {
-		return
-	}
+func DKGPhaseViews(epoch CommittedEpoch) (phase1FinalView uint64, phase2FinalView uint64, phase3FinalView uint64) {
+	phase1FinalView = epoch.DKGPhase1FinalView()
+	phase2FinalView = epoch.DKGPhase2FinalView()
+	phase3FinalView = epoch.DKGPhase3FinalView()
 	return
 }

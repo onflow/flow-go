@@ -165,8 +165,7 @@ func (builder *EpochBuilder) BuildEpoch() *EpochBuilder {
 	epoch, err := state.Final().Epochs().Current()
 	require.NoError(builder.t, err)
 	counter := epoch.Counter()
-	finalView, err := epoch.FinalView()
-	require.NoError(builder.t, err)
+	finalView := epoch.FinalView()
 
 	// retrieve block A
 	A, err := state.Final().Head()
@@ -322,8 +321,7 @@ func (builder *EpochBuilder) CompleteEpoch() *EpochBuilder {
 	require.Equal(builder.t, flow.EpochPhaseCommitted, phase)
 	currentEpoch, err := state.Final().Epochs().Current()
 	require.Nil(builder.t, err)
-	finalView, err := currentEpoch.FinalView()
-	require.Nil(builder.t, err)
+	finalView := currentEpoch.FinalView()
 
 	final, err := state.Final().Head()
 	require.Nil(builder.t, err)

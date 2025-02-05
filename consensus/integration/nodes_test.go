@@ -163,12 +163,8 @@ type epochInfo struct {
 func buildEpochLookupList(epochs ...protocol.CommittedEpoch) []epochInfo {
 	infos := make([]epochInfo, 0)
 	for _, epoch := range epochs {
-		finalView, err := epoch.FinalView()
-		if err != nil {
-			continue
-		}
 		infos = append(infos, epochInfo{
-			finalView: finalView,
+			finalView: epoch.FinalView(),
 			counter:   epoch.Counter(),
 		})
 	}

@@ -78,8 +78,7 @@ func TestRecoverEpochHappyPath(t *testing.T) {
 		decodedValues := unittest.InterfafceToCdcValues(t, outputTxArgs)
 		currEpoch, err := rootSnapshot.Epochs().Current()
 		require.NoError(t, err)
-		finalView, err := currEpoch.FinalView()
-		require.NoError(t, err)
+		finalView := currEpoch.FinalView()
 
 		// epoch start view
 		require.Equal(t, decodedValues[0], cadence.NewUInt64(finalView+1))

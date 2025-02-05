@@ -80,32 +80,16 @@ type CommittedEpoch interface {
 	Counter() uint64
 
 	// FirstView returns the first view of this epoch.
-	// Error returns:
-	// * protocol.ErrNoPreviousEpoch - if the epoch represents a previous epoch which does not exist.
-	// * protocol.ErrNextEpochNotSetup - if the epoch represents a next epoch which has not been set up.
-	// * state.ErrUnknownSnapshotReference - if the epoch is queried from an unresolvable snapshot.
-	FirstView() (uint64, error)
+	FirstView() uint64
 
 	// DKGPhase1FinalView returns the final view of DKG phase 1
-	// Error returns:
-	// * protocol.ErrNoPreviousEpoch - if the epoch represents a previous epoch which does not exist.
-	// * protocol.ErrNextEpochNotSetup - if the epoch represents a next epoch which has not been set up.
-	// * state.ErrUnknownSnapshotReference - if the epoch is queried from an unresolvable snapshot.
-	DKGPhase1FinalView() (uint64, error)
+	DKGPhase1FinalView() uint64
 
 	// DKGPhase2FinalView returns the final view of DKG phase 2
-	// Error returns:
-	// * protocol.ErrNoPreviousEpoch - if the epoch represents a previous epoch which does not exist.
-	// * protocol.ErrNextEpochNotSetup - if the epoch represents a next epoch which has not been set up.
-	// * state.ErrUnknownSnapshotReference - if the epoch is queried from an unresolvable snapshot.
-	DKGPhase2FinalView() (uint64, error)
+	DKGPhase2FinalView() uint64
 
 	// DKGPhase3FinalView returns the final view of DKG phase 3
-	// Error returns:
-	// * protocol.ErrNoPreviousEpoch - if the epoch represents a previous epoch which does not exist.
-	// * protocol.ErrNextEpochNotSetup - if the epoch represents a next epoch which has not been set up.
-	// * state.ErrUnknownSnapshotReference - if the epoch is queried from an unresolvable snapshot.
-	DKGPhase3FinalView() (uint64, error)
+	DKGPhase3FinalView() uint64
 
 	// FinalView returns the largest view number which still belongs to this epoch.
 	// The largest view number is the greatest of:
@@ -114,11 +98,7 @@ type CommittedEpoch interface {
 	// If EFM is not triggered during this epoch, this value will be static.
 	// If EFM is triggered during this epoch, this value may increase with increasing
 	// reference block heights, as new epoch extensions are included.
-	// Error returns:
-	// * protocol.ErrNoPreviousEpoch - if the epoch represents a previous epoch which does not exist.
-	// * protocol.ErrNextEpochNotSetup - if the epoch represents a next epoch which has not been set up.
-	// * state.ErrUnknownSnapshotReference - if the epoch is queried from an unresolvable snapshot.
-	FinalView() (uint64, error)
+	FinalView() uint64
 
 	// TargetDuration returns the desired real-world duration for this epoch, in seconds.
 	// This target is specified by the FlowEpoch smart contract along the TargetEndTime in

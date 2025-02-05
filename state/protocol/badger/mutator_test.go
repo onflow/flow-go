@@ -835,8 +835,7 @@ func TestExtendEpochTransitionValid(t *testing.T) {
 		initialCurrentEpoch, err := rootSnapshot.Epochs().Current()
 		require.NoError(t, err)
 		counter := initialCurrentEpoch.Counter()
-		finalView, err := initialCurrentEpoch.FinalView()
-		require.NoError(t, err)
+		finalView := initialCurrentEpoch.FinalView()
 		initialPhase, err := rootSnapshot.EpochPhase()
 		require.NoError(t, err)
 		metrics.On("CurrentEpochCounter", counter).Once()
@@ -844,9 +843,10 @@ func TestExtendEpochTransitionValid(t *testing.T) {
 
 		metrics.On("CurrentEpochFinalView", finalView).Once()
 
-		dkgPhase1FinalView, dkgPhase2FinalView, dkgPhase3FinalView, err := realprotocol.DKGPhaseViews(initialCurrentEpoch)
-		require.NoError(t, err)
-		metrics.On("CurrentDKGPhaseViews", dkgPhase1FinalView, dkgPhase2FinalView, dkgPhase3FinalView).Once()
+		metrics.On("CurrentDKGPhaseViews",
+			initialCurrentEpoch.DKGPhase1FinalView(),
+			initialCurrentEpoch.DKGPhase2FinalView(),
+			initialCurrentEpoch.DKGPhase3FinalView()).Once()
 
 		tracer := trace.NewNoopTracer()
 		log := zerolog.Nop()
@@ -2372,7 +2372,7 @@ func TestRecoveryFromEpochFallbackMode(t *testing.T) {
 			// After epoch extension, FinalView must be updated accordingly
 			epochAfterExtension, err := state.Final().Epochs().Current()
 			require.NoError(t, err)
-			finalView, err := epochAfterExtension.FinalView()
+			finalView := epochAfterExtension.FinalView()
 			require.NoError(t, err)
 			assert.Equal(t, epochExtensions[0].FinalView, finalView)
 

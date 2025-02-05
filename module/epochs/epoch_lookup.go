@@ -214,23 +214,15 @@ func NewEpochLookup(state protocol.State) (*EpochLookup, error) {
 // No errors are expected during normal operation.
 func (lookup *EpochLookup) cacheEpoch(epoch protocol.CommittedEpoch) error {
 	counter := epoch.Counter()
-	firstView, err := epoch.FirstView()
-	if err != nil {
-		return err
-	}
-	finalView, err := epoch.FinalView()
-	if err != nil {
-		return err
-	}
 
 	cachedEpoch := epochRange{
 		counter:   counter,
-		firstView: firstView,
-		finalView: finalView,
+		firstView: epoch.FirstView(),
+		finalView: epoch.FinalView(),
 	}
 
 	lookup.mu.Lock()
-	err = lookup.epochs.add(cachedEpoch)
+	err := lookup.epochs.add(cachedEpoch)
 	lookup.mu.Unlock()
 	if err != nil {
 		return fmt.Errorf("could not add epoch %d: %w", counter, err)

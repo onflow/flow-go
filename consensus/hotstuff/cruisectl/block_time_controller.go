@@ -41,14 +41,6 @@ type epochTiming struct {
 
 // newEpochTiming queries the timing information from the given `epoch` and returns it as a new `epochTiming` instance.
 func newEpochTiming(epoch protocol.CommittedEpoch) (*epochTiming, error) {
-	firstView, err := epoch.FirstView()
-	if err != nil {
-		return nil, fmt.Errorf("could not retrieve epoch's first view: %w", err)
-	}
-	finalView, err := epoch.FinalView()
-	if err != nil {
-		return nil, fmt.Errorf("could not retrieve epoch's final view: %w", err)
-	}
 	targetDuration, err := epoch.TargetDuration()
 	if err != nil {
 		return nil, fmt.Errorf("could not retrieve epoch's target duration: %w", err)
@@ -59,8 +51,8 @@ func newEpochTiming(epoch protocol.CommittedEpoch) (*epochTiming, error) {
 	}
 
 	return &epochTiming{
-		firstView:      firstView,
-		finalView:      finalView,
+		firstView:      epoch.FirstView(),
+		finalView:      epoch.FinalView(),
 		targetDuration: targetDuration,
 		targetEndTime:  targetEndTime,
 	}, nil

@@ -137,19 +137,10 @@ func getDeployEpochTransactionArguments(snapshot *inmem.Snapshot) []cadence.Valu
 	currentEpochCounter := currentEpoch.Counter()
 
 	// get final view from snapshot
-	finalView, err := currentEpoch.FinalView()
-	if err != nil {
-		log.Fatal().Err(err).Msgf("could not get `finalView` for current epoch from snapshot")
-	}
+	finalView := currentEpoch.FinalView()
 
-	dkgPhase1FinalView, err := currentEpoch.DKGPhase1FinalView()
-	if err != nil {
-		log.Fatal().Err(err).Msgf("could not get `dkgPhase1FinalView` from snapshot")
-	}
-	dkgPhase2FinalView, err := currentEpoch.DKGPhase2FinalView()
-	if err != nil {
-		log.Fatal().Err(err).Msgf("could not get `dkgPhase2FinalView` from snapshot")
-	}
+	dkgPhase1FinalView := currentEpoch.DKGPhase1FinalView()
+	dkgPhase2FinalView := currentEpoch.DKGPhase2FinalView()
 
 	numViewsInEpoch := (finalView + 1) - head.View
 	numViewsInDKGPhase := dkgPhase2FinalView - dkgPhase1FinalView + 1

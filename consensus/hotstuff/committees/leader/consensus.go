@@ -18,14 +18,8 @@ func SelectionForConsensusFromEpoch(epoch protocol.CommittedEpoch) (*LeaderSelec
 	if err != nil {
 		return nil, fmt.Errorf("could not get epoch seed: %w", err)
 	}
-	firstView, err := epoch.FirstView()
-	if err != nil {
-		return nil, fmt.Errorf("could not get epoch first view: %w", err)
-	}
-	finalView, err := epoch.FinalView()
-	if err != nil {
-		return nil, fmt.Errorf("could not get epoch final view: %w", err)
-	}
+	firstView := epoch.FirstView()
+	finalView := epoch.FinalView()
 
 	leaders, err := SelectionForConsensus(
 		epoch.InitialIdentities(),

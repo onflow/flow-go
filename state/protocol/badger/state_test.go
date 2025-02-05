@@ -39,8 +39,6 @@ func TestBootstrapAndOpen(t *testing.T) {
 		// expect the final view metric to be set to current epoch's final view
 		epoch, err := rootSnapshot.Epochs().Current()
 		require.NoError(t, err)
-		finalView, err := epoch.FinalView()
-		require.NoError(t, err)
 		counter := epoch.Counter()
 		phase, err := rootSnapshot.EpochPhase()
 		require.NoError(t, err)
@@ -48,13 +46,12 @@ func TestBootstrapAndOpen(t *testing.T) {
 		complianceMetrics := new(mock.ComplianceMetrics)
 		complianceMetrics.On("CurrentEpochCounter", counter).Once()
 		complianceMetrics.On("CurrentEpochPhase", phase).Once()
-		complianceMetrics.On("CurrentEpochFinalView", finalView).Once()
+		complianceMetrics.On("CurrentEpochFinalView", epoch.FinalView()).Once()
 		complianceMetrics.On("FinalizedHeight", testmock.Anything).Once()
 		complianceMetrics.On("SealedHeight", testmock.Anything).Once()
 
-		dkgPhase1FinalView, dkgPhase2FinalView, dkgPhase3FinalView, err := protocol.DKGPhaseViews(epoch)
-		require.NoError(t, err)
-		complianceMetrics.On("CurrentDKGPhaseViews", dkgPhase1FinalView, dkgPhase2FinalView, dkgPhase3FinalView).Once()
+		complianceMetrics.On("CurrentDKGPhaseViews",
+			epoch.DKGPhase1FinalView(), epoch.DKGPhase2FinalView(), epoch.DKGPhase3FinalView()).Once()
 
 		noopMetrics := new(metrics.NoopCollector)
 		all := storagebadger.InitAll(noopMetrics, db)
@@ -126,13 +123,10 @@ func TestBootstrapAndOpen_EpochCommitted(t *testing.T) {
 		require.NoError(t, err)
 		complianceMetrics.On("CurrentEpochPhase", phase).Once()
 
-		currentEpochFinalView, err := currentEpoch.FinalView()
-		require.NoError(t, err)
-		complianceMetrics.On("CurrentEpochFinalView", currentEpochFinalView).Once()
+		complianceMetrics.On("CurrentEpochFinalView", currentEpoch.FinalView()).Once()
 
-		dkgPhase1FinalView, dkgPhase2FinalView, dkgPhase3FinalView, err := protocol.DKGPhaseViews(currentEpoch)
-		require.NoError(t, err)
-		complianceMetrics.On("CurrentDKGPhaseViews", dkgPhase1FinalView, dkgPhase2FinalView, dkgPhase3FinalView).Once()
+		complianceMetrics.On("CurrentDKGPhaseViews",
+			currentEpoch.DKGPhase1FinalView(), currentEpoch.DKGPhase2FinalView(), currentEpoch.DKGPhase3FinalView()).Once()
 		complianceMetrics.On("FinalizedHeight", testmock.Anything).Once()
 		complianceMetrics.On("SealedHeight", testmock.Anything).Once()
 

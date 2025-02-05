@@ -64,30 +64,30 @@ func (es *setupEpoch) Counter() uint64 {
 	return es.setupEvent.Counter
 }
 
-func (es *setupEpoch) FirstView() (uint64, error) {
-	return es.setupEvent.FirstView, nil
+func (es *setupEpoch) FirstView() uint64 {
+	return es.setupEvent.FirstView
 }
 
-func (es *setupEpoch) DKGPhase1FinalView() (uint64, error) {
-	return es.setupEvent.DKGPhase1FinalView, nil
+func (es *setupEpoch) DKGPhase1FinalView() uint64 {
+	return es.setupEvent.DKGPhase1FinalView
 }
 
-func (es *setupEpoch) DKGPhase2FinalView() (uint64, error) {
-	return es.setupEvent.DKGPhase2FinalView, nil
+func (es *setupEpoch) DKGPhase2FinalView() uint64 {
+	return es.setupEvent.DKGPhase2FinalView
 }
 
-func (es *setupEpoch) DKGPhase3FinalView() (uint64, error) {
-	return es.setupEvent.DKGPhase3FinalView, nil
+func (es *setupEpoch) DKGPhase3FinalView() uint64 {
+	return es.setupEvent.DKGPhase3FinalView
 }
 
 // FinalView returns the final view of the epoch, taking into account possible epoch extensions.
 // If there are no epoch extensions, the final view is the final view of the current epoch setup,
 // otherwise it is the final view of the last epoch extension.
-func (es *setupEpoch) FinalView() (uint64, error) {
+func (es *setupEpoch) FinalView() uint64 {
 	if len(es.extensions) > 0 {
-		return es.extensions[len(es.extensions)-1].FinalView, nil
+		return es.extensions[len(es.extensions)-1].FinalView
 	}
-	return es.setupEvent.FinalView, nil
+	return es.setupEvent.FinalView
 }
 
 // TargetDuration returns the desired real-world duration for this epoch, in seconds.

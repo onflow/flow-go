@@ -527,8 +527,7 @@ func (s *DynamicEpochTransitionSuite) RunTestEpochJoinAndLeave(role flow.Role, c
 
 	epoch1, err := rootSnapshot.Epochs().Current()
 	require.NoError(s.T(), err)
-	epoch1FinalView, err := epoch1.FinalView()
-	require.NoError(s.T(), err)
+	epoch1FinalView := epoch1.FinalView()
 
 	// wait for at least the first block of the next epoch to be sealed before we pause our container to replace
 	s.TimedLogf("waiting for epoch transition (finalized view %d) before pausing container", epoch1FinalView+1)

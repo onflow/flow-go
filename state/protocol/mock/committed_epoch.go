@@ -153,7 +153,7 @@ func (_m *CommittedEpoch) DKG() (protocol.DKG, error) {
 }
 
 // DKGPhase1FinalView provides a mock function with given fields:
-func (_m *CommittedEpoch) DKGPhase1FinalView() (uint64, error) {
+func (_m *CommittedEpoch) DKGPhase1FinalView() uint64 {
 	ret := _m.Called()
 
 	if len(ret) == 0 {
@@ -161,27 +161,17 @@ func (_m *CommittedEpoch) DKGPhase1FinalView() (uint64, error) {
 	}
 
 	var r0 uint64
-	var r1 error
-	if rf, ok := ret.Get(0).(func() (uint64, error)); ok {
-		return rf()
-	}
 	if rf, ok := ret.Get(0).(func() uint64); ok {
 		r0 = rf()
 	} else {
 		r0 = ret.Get(0).(uint64)
 	}
 
-	if rf, ok := ret.Get(1).(func() error); ok {
-		r1 = rf()
-	} else {
-		r1 = ret.Error(1)
-	}
-
-	return r0, r1
+	return r0
 }
 
 // DKGPhase2FinalView provides a mock function with given fields:
-func (_m *CommittedEpoch) DKGPhase2FinalView() (uint64, error) {
+func (_m *CommittedEpoch) DKGPhase2FinalView() uint64 {
 	ret := _m.Called()
 
 	if len(ret) == 0 {
@@ -189,27 +179,17 @@ func (_m *CommittedEpoch) DKGPhase2FinalView() (uint64, error) {
 	}
 
 	var r0 uint64
-	var r1 error
-	if rf, ok := ret.Get(0).(func() (uint64, error)); ok {
-		return rf()
-	}
 	if rf, ok := ret.Get(0).(func() uint64); ok {
 		r0 = rf()
 	} else {
 		r0 = ret.Get(0).(uint64)
 	}
 
-	if rf, ok := ret.Get(1).(func() error); ok {
-		r1 = rf()
-	} else {
-		r1 = ret.Error(1)
-	}
-
-	return r0, r1
+	return r0
 }
 
 // DKGPhase3FinalView provides a mock function with given fields:
-func (_m *CommittedEpoch) DKGPhase3FinalView() (uint64, error) {
+func (_m *CommittedEpoch) DKGPhase3FinalView() uint64 {
 	ret := _m.Called()
 
 	if len(ret) == 0 {
@@ -217,23 +197,13 @@ func (_m *CommittedEpoch) DKGPhase3FinalView() (uint64, error) {
 	}
 
 	var r0 uint64
-	var r1 error
-	if rf, ok := ret.Get(0).(func() (uint64, error)); ok {
-		return rf()
-	}
 	if rf, ok := ret.Get(0).(func() uint64); ok {
 		r0 = rf()
 	} else {
 		r0 = ret.Get(0).(uint64)
 	}
 
-	if rf, ok := ret.Get(1).(func() error); ok {
-		r1 = rf()
-	} else {
-		r1 = ret.Error(1)
-	}
-
-	return r0, r1
+	return r0
 }
 
 // FinalHeight provides a mock function with given fields:
@@ -265,7 +235,7 @@ func (_m *CommittedEpoch) FinalHeight() (uint64, error) {
 }
 
 // FinalView provides a mock function with given fields:
-func (_m *CommittedEpoch) FinalView() (uint64, error) {
+func (_m *CommittedEpoch) FinalView() uint64 {
 	ret := _m.Called()
 
 	if len(ret) == 0 {
@@ -273,23 +243,13 @@ func (_m *CommittedEpoch) FinalView() (uint64, error) {
 	}
 
 	var r0 uint64
-	var r1 error
-	if rf, ok := ret.Get(0).(func() (uint64, error)); ok {
-		return rf()
-	}
 	if rf, ok := ret.Get(0).(func() uint64); ok {
 		r0 = rf()
 	} else {
 		r0 = ret.Get(0).(uint64)
 	}
 
-	if rf, ok := ret.Get(1).(func() error); ok {
-		r1 = rf()
-	} else {
-		r1 = ret.Error(1)
-	}
-
-	return r0, r1
+	return r0
 }
 
 // FirstHeight provides a mock function with given fields:
@@ -321,7 +281,7 @@ func (_m *CommittedEpoch) FirstHeight() (uint64, error) {
 }
 
 // FirstView provides a mock function with given fields:
-func (_m *CommittedEpoch) FirstView() (uint64, error) {
+func (_m *CommittedEpoch) FirstView() uint64 {
 	ret := _m.Called()
 
 	if len(ret) == 0 {
@@ -329,23 +289,13 @@ func (_m *CommittedEpoch) FirstView() (uint64, error) {
 	}
 
 	var r0 uint64
-	var r1 error
-	if rf, ok := ret.Get(0).(func() (uint64, error)); ok {
-		return rf()
-	}
 	if rf, ok := ret.Get(0).(func() uint64); ok {
 		r0 = rf()
 	} else {
 		r0 = ret.Get(0).(uint64)
 	}
 
-	if rf, ok := ret.Get(1).(func() error); ok {
-		r1 = rf()
-	} else {
-		r1 = ret.Error(1)
-	}
-
-	return r0, r1
+	return r0
 }
 
 // InitialIdentities provides a mock function with given fields:

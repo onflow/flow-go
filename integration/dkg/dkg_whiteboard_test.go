@@ -95,16 +95,16 @@ func createNode(
 	// configure the state snapshot at firstBlock to return the desired
 	// Epochs
 	currentEpoch := new(protocolmock.CommittedEpoch)
-	currentEpoch.On("Counter").Return(currentSetup.Counter, nil)
-	currentEpoch.On("InitialIdentities").Return(currentSetup.Participants, nil)
-	currentEpoch.On("DKGPhase1FinalView").Return(currentSetup.DKGPhase1FinalView, nil)
-	currentEpoch.On("DKGPhase2FinalView").Return(currentSetup.DKGPhase2FinalView, nil)
-	currentEpoch.On("DKGPhase3FinalView").Return(currentSetup.DKGPhase3FinalView, nil)
+	currentEpoch.On("Counter").Return(currentSetup.Counter)
+	currentEpoch.On("InitialIdentities").Return(currentSetup.Participants)
+	currentEpoch.On("DKGPhase1FinalView").Return(currentSetup.DKGPhase1FinalView)
+	currentEpoch.On("DKGPhase2FinalView").Return(currentSetup.DKGPhase2FinalView)
+	currentEpoch.On("DKGPhase3FinalView").Return(currentSetup.DKGPhase3FinalView)
 	currentEpoch.On("RandomSource").Return(nextSetup.RandomSource, nil)
 
 	nextEpoch := new(protocolmock.CommittedEpoch)
-	nextEpoch.On("Counter").Return(nextSetup.Counter, nil)
-	nextEpoch.On("InitialIdentities").Return(nextSetup.Participants, nil)
+	nextEpoch.On("Counter").Return(nextSetup.Counter)
+	nextEpoch.On("InitialIdentities").Return(nextSetup.Participants)
 	nextEpoch.On("RandomSource").Return(nextSetup.RandomSource, nil)
 
 	epochQuery := mocks.NewEpochQuery(t, currentSetup.Counter)

@@ -355,10 +355,6 @@ func (e *ReactorEngine) getDKGInfo(firstBlockID flow.Identifier) (*dkgInfo, erro
 		return nil, fmt.Errorf("could not retrieve next epoch: %w", err)
 	}
 
-	phase1Final, phase2Final, phase3Final, err := protocol.DKGPhaseViews(currEpoch)
-	if err != nil {
-		return nil, fmt.Errorf("could not retrieve epoch dkg final views: %w", err)
-	}
 	seed := make([]byte, crypto.KeyGenSeedMinLen)
 	_, err = rand.Read(seed)
 	if err != nil {
@@ -367,9 +363,9 @@ func (e *ReactorEngine) getDKGInfo(firstBlockID flow.Identifier) (*dkgInfo, erro
 
 	info := &dkgInfo{
 		identities:      nextEpoch.InitialIdentities(),
-		phase1FinalView: phase1Final,
-		phase2FinalView: phase2Final,
-		phase3FinalView: phase3Final,
+		phase1FinalView: currEpoch.DKGPhase1FinalView(),
+		phase2FinalView: currEpoch.DKGPhase2FinalView(),
+		phase3FinalView: currEpoch.DKGPhase3FinalView(),
 		seed:            seed,
 	}
 	return info, nil
