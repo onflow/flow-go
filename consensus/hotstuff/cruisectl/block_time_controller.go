@@ -40,22 +40,13 @@ type epochTiming struct {
 }
 
 // newEpochTiming queries the timing information from the given `epoch` and returns it as a new `epochTiming` instance.
-func newEpochTiming(epoch protocol.CommittedEpoch) (*epochTiming, error) {
-	targetDuration, err := epoch.TargetDuration()
-	if err != nil {
-		return nil, fmt.Errorf("could not retrieve epoch's target duration: %w", err)
-	}
-	targetEndTime, err := epoch.TargetEndTime()
-	if err != nil {
-		return nil, fmt.Errorf("could not retrieve epoch's target end time: %w", err)
-	}
-
+func newEpochTiming(epoch protocol.CommittedEpoch) *epochTiming {
 	return &epochTiming{
 		firstView:      epoch.FirstView(),
 		finalView:      epoch.FinalView(),
-		targetDuration: targetDuration,
-		targetEndTime:  targetEndTime,
-	}, nil
+		targetDuration: epoch.TargetDuration(),
+		targetEndTime:  epoch.TargetEndTime(),
+	}
 }
 
 // targetViewTime returns τ[v], the ideal, steady-state view time for the current epoch.
@@ -176,10 +167,7 @@ func (ctl *BlockTimeController) initEpochTiming() error {
 	if err != nil {
 		return fmt.Errorf("could not retrieve current epoch: %w", err)
 	}
-	currentEpochTiming, err := newEpochTiming(currentEpoch)
-	if err != nil {
-		return fmt.Errorf("failed to retrieve the current epoch's timing information: %w", err)
-	}
+	currentEpochTiming := newEpochTiming(currentEpoch)
 	ctl.currentEpochTiming = *currentEpochTiming
 
 	phase, err := finalSnapshot.EpochPhase()
@@ -191,10 +179,7 @@ func (ctl *BlockTimeController) initEpochTiming() error {
 		if err != nil {
 			return fmt.Errorf("could not get next committed epoch: %w", err)
 		}
-		ctl.nextEpochTiming, err = newEpochTiming(nextEpoch)
-		if err != nil {
-			return fmt.Errorf("failed to retrieve the next epoch's timing information: %w", err)
-		}
+		ctl.nextEpochTiming = newEpochTiming(nextEpoch)
 		if !currentEpochTiming.isFollowedBy(ctl.nextEpochTiming) {
 			return fmt.Errorf("failed to retrieve the next epoch's timing information: %w", err)
 		}
@@ -437,10 +422,7 @@ func (ctl *BlockTimeController) processEpochExtended(first *flow.Header) error {
 	if err != nil {
 		return fmt.Errorf("could not get current epoch: %w", err)
 	}
-	currEpochTimingWithExtension, err := newEpochTiming(currentEpoch)
-	if err != nil {
-		return fmt.Errorf("failed to get new epoch timing: %w", err)
-	}
+	currEpochTimingWithExtension := newEpochTiming(currentEpoch)
 
 	// sanity check: ensure the final view of the current epoch monotonically increases
 	if currEpochTimingWithExtension.finalView < ctl.currentEpochTiming.finalView {
@@ -467,10 +449,7 @@ func (ctl *BlockTimeController) processEpochCommittedPhaseStarted(first *flow.He
 	if err != nil {
 		return fmt.Errorf("could not get next committed epoch: %w", err)
 	}
-	ctl.nextEpochTiming, err = newEpochTiming(nextEpoch)
-	if err != nil {
-		return fmt.Errorf("failed to retrieve the next epoch's timing information: %w", err)
-	}
+	ctl.nextEpochTiming = newEpochTiming(nextEpoch)
 	if !ctl.currentEpochTiming.isFollowedBy(ctl.nextEpochTiming) {
 		return fmt.Errorf("failed to retrieve the next epoch's timing information: %w", err)
 	}

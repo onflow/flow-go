@@ -2471,8 +2471,7 @@ func TestEpochTargetEndTime(t *testing.T) {
 		epoch1Setup := rootResult.ServiceEvents[0].Event.(*flow.EpochSetup)
 		currentEpoch, err := rootSnapshot.Epochs().Current()
 		require.NoError(t, err)
-		rootTargetEndTime, err := currentEpoch.TargetEndTime()
-		require.NoError(t, err)
+		rootTargetEndTime := currentEpoch.TargetEndTime()
 		require.Equal(t, epoch1Setup.TargetEndTime, rootTargetEndTime)
 
 		expectedStateIdCalculator := calculateExpectedStateId(t, mutableProtocolState)
@@ -2493,8 +2492,7 @@ func TestEpochTargetEndTime(t *testing.T) {
 		expectedTargetEndTime := rootTargetEndTime + uint64(float64(firstExtension.FinalView-epoch1Setup.FinalView)*targetViewDuration)
 		afterFirstExtensionEpoch, err := state.Final().Epochs().Current()
 		require.NoError(t, err)
-		afterFirstExtensionTargetEndTime, err := afterFirstExtensionEpoch.TargetEndTime()
-		require.NoError(t, err)
+		afterFirstExtensionTargetEndTime := afterFirstExtensionEpoch.TargetEndTime()
 		require.Equal(t, expectedTargetEndTime, afterFirstExtensionTargetEndTime)
 
 		// add a second block that exceeds the safety threshold and triggers another epoch extension
@@ -2509,8 +2507,7 @@ func TestEpochTargetEndTime(t *testing.T) {
 		expectedTargetEndTime = rootTargetEndTime + uint64(float64(secondExtension.FinalView-epoch1Setup.FinalView)*targetViewDuration)
 		afterSecondExtensionEpoch, err := state.Final().Epochs().Current()
 		require.NoError(t, err)
-		afterSecondExtensionTargetEndTime, err := afterSecondExtensionEpoch.TargetEndTime()
-		require.NoError(t, err)
+		afterSecondExtensionTargetEndTime := afterSecondExtensionEpoch.TargetEndTime()
 		require.Equal(t, expectedTargetEndTime, afterSecondExtensionTargetEndTime)
 	})
 }
@@ -2530,8 +2527,7 @@ func TestEpochTargetDuration(t *testing.T) {
 		epoch1Setup := rootResult.ServiceEvents[0].Event.(*flow.EpochSetup)
 		currentEpoch, err := rootSnapshot.Epochs().Current()
 		require.NoError(t, err)
-		rootTargetDuration, err := currentEpoch.TargetDuration()
-		require.NoError(t, err)
+		rootTargetDuration := currentEpoch.TargetDuration()
 		require.Equal(t, epoch1Setup.TargetDuration, rootTargetDuration)
 
 		expectedStateIdCalculator := calculateExpectedStateId(t, mutableProtocolState)
@@ -2551,8 +2547,7 @@ func TestEpochTargetDuration(t *testing.T) {
 		targetViewDuration := float64(epoch1Setup.TargetDuration) / float64(epoch1Setup.FinalView-epoch1Setup.FirstView+1)
 		afterFirstExtensionEpoch, err := state.Final().Epochs().Current()
 		require.NoError(t, err)
-		afterFirstExtensionTargetDuration, err := afterFirstExtensionEpoch.TargetDuration()
-		require.NoError(t, err)
+		afterFirstExtensionTargetDuration := afterFirstExtensionEpoch.TargetDuration()
 		expectedTargetDuration := rootTargetDuration + uint64(float64(firstExtension.FinalView-firstExtension.FirstView+1)*targetViewDuration)
 		require.Equal(t, expectedTargetDuration, afterFirstExtensionTargetDuration)
 
@@ -2567,8 +2562,7 @@ func TestEpochTargetDuration(t *testing.T) {
 		secondExtension := epochState.EpochExtensions()[1]
 		afterSecondExtensionEpoch, err := state.Final().Epochs().Current()
 		require.NoError(t, err)
-		afterSecondExtensionTargetDuration, err := afterSecondExtensionEpoch.TargetDuration()
-		require.NoError(t, err)
+		afterSecondExtensionTargetDuration := afterSecondExtensionEpoch.TargetDuration()
 		expectedTargetDuration = rootTargetDuration + uint64(float64(secondExtension.FinalView-epoch1Setup.FinalView)*targetViewDuration)
 		require.Equal(t, expectedTargetDuration, afterSecondExtensionTargetDuration)
 	})

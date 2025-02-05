@@ -95,13 +95,13 @@ func (es *setupEpoch) FinalView() uint64 {
 // and used by the Cruise Control system to moderate the block rate.
 // In case the epoch has extensions, the target duration is calculated based on the last extension, by calculating how many
 // views were added by the extension and adding the proportional time to the target duration.
-func (es *setupEpoch) TargetDuration() (uint64, error) {
+func (es *setupEpoch) TargetDuration() uint64 {
 	if len(es.extensions) == 0 {
-		return es.setupEvent.TargetDuration, nil
+		return es.setupEvent.TargetDuration
 	} else {
 		viewDuration := float64(es.setupEvent.TargetDuration) / float64(es.setupEvent.FinalView-es.setupEvent.FirstView+1)
 		lastExtension := es.extensions[len(es.extensions)-1]
-		return es.setupEvent.TargetDuration + uint64(float64(lastExtension.FinalView-es.setupEvent.FinalView)*viewDuration), nil
+		return es.setupEvent.TargetDuration + uint64(float64(lastExtension.FinalView-es.setupEvent.FinalView)*viewDuration)
 	}
 }
 
@@ -110,13 +110,13 @@ func (es *setupEpoch) TargetDuration() (uint64, error) {
 // the EpochSetup event and used by the Cruise Control system to moderate the block rate.
 // In case the epoch has extensions, the target end time is calculated based on the last extension, by calculating how many
 // views were added by the extension and adding the proportional time to the target end time.
-func (es *setupEpoch) TargetEndTime() (uint64, error) {
+func (es *setupEpoch) TargetEndTime() uint64 {
 	if len(es.extensions) == 0 {
-		return es.setupEvent.TargetEndTime, nil
+		return es.setupEvent.TargetEndTime
 	} else {
 		viewDuration := float64(es.setupEvent.TargetDuration) / float64(es.setupEvent.FinalView-es.setupEvent.FirstView+1)
 		lastExtension := es.extensions[len(es.extensions)-1]
-		return es.setupEvent.TargetEndTime + uint64(float64(lastExtension.FinalView-es.setupEvent.FinalView)*viewDuration), nil
+		return es.setupEvent.TargetEndTime + uint64(float64(lastExtension.FinalView-es.setupEvent.FinalView)*viewDuration)
 	}
 }
 

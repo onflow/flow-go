@@ -129,10 +129,7 @@ func GenerateRecoverEpochTxArgs(log zerolog.Logger,
 
 	currEpochFinalView := epoch.FinalView()
 
-	currEpochTargetEndTime, err := epoch.TargetEndTime()
-	if err != nil {
-		log.Fatal().Err(err).Msg("failed to get target end time of current epoch")
-	}
+	currEpochTargetEndTime := epoch.TargetEndTime()
 
 	args := []cadence.Value{
 		// epoch start view

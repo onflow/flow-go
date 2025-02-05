@@ -17,14 +17,6 @@ import (
 // * protocol.ErrNextEpochNotSetup - if the epoch represents a next epoch which has not been set up.
 // * state.ErrUnknownSnapshotReference - if the epoch is queried from an unresolvable snapshot.
 func ToEpochSetup(epoch CommittedEpoch) (*flow.EpochSetup, error) {
-	targetDuration, err := epoch.TargetDuration()
-	if err != nil {
-		return nil, fmt.Errorf("could not get target duration: %w", err)
-	}
-	targetEndTime, err := epoch.TargetEndTime()
-	if err != nil {
-		return nil, fmt.Errorf("could not get target end time: %w", err)
-	}
 	clustering, err := epoch.Clustering()
 	if err != nil {
 		return nil, fmt.Errorf("could not get epoch clustering: %w", err)
@@ -45,8 +37,8 @@ func ToEpochSetup(epoch CommittedEpoch) (*flow.EpochSetup, error) {
 		Participants:       epoch.InitialIdentities(),
 		Assignments:        assignments,
 		RandomSource:       randomSource,
-		TargetDuration:     targetDuration,
-		TargetEndTime:      targetEndTime,
+		TargetDuration:     epoch.TargetDuration(),
+		TargetEndTime:      epoch.TargetEndTime(),
 	}
 	return setup, nil
 }

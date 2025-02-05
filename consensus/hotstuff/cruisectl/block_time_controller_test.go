@@ -96,8 +96,8 @@ func setupMocks(bs *BlockTimeControllerSuite) {
 	bs.curEpoch.On("Counter").Return(bs.epochCounter)
 	bs.curEpoch.On("FirstView").Return(bs.curEpochFirstView)
 	bs.curEpoch.On("FinalView").Return(bs.curEpochFinalView)
-	bs.curEpoch.On("TargetDuration").Return(bs.curEpochTargetDuration, nil)
-	bs.curEpoch.On("TargetEndTime").Return(bs.curEpochTargetEndTime, nil)
+	bs.curEpoch.On("TargetDuration").Return(bs.curEpochTargetDuration)
+	bs.curEpoch.On("TargetEndTime").Return(bs.curEpochTargetEndTime)
 	bs.epochs.Add(&bs.curEpoch)
 
 	bs.ctx, bs.cancel = irrecoverable.NewMockSignalerContextWithCancel(bs.T(), context.Background())
@@ -209,8 +209,8 @@ func (bs *BlockTimeControllerSuite) TestInit_EpochSetupPhase() {
 	nextEpoch.On("Counter").Return(bs.epochCounter + 1)
 	nextEpoch.On("FirstView").Return(bs.curEpochFinalView + 1)
 	nextEpoch.On("FinalView").Return(bs.curEpochFinalView * 2)
-	nextEpoch.On("TargetDuration").Return(bs.EpochDurationSeconds(), nil)
-	nextEpoch.On("TargetEndTime").Return(bs.curEpochTargetEndTime+bs.EpochDurationSeconds(), nil)
+	nextEpoch.On("TargetDuration").Return(bs.EpochDurationSeconds())
+	nextEpoch.On("TargetEndTime").Return(bs.curEpochTargetEndTime + bs.EpochDurationSeconds())
 	bs.epochs.Add(nextEpoch)
 
 	bs.CreateAndStartController()
@@ -251,10 +251,8 @@ func (bs *BlockTimeControllerSuite) TestOnEpochExtended() {
 
 	currentEpoch, err := bs.snapshot.Epochs().Current()
 	require.NoError(bs.T(), err)
-	extensionTargetTime, err := currentEpoch.TargetEndTime()
-	require.NoError(bs.T(), err)
-	extensionTargetDuration, err := currentEpoch.TargetDuration()
-	require.NoError(bs.T(), err)
+	extensionTargetTime := currentEpoch.TargetEndTime()
+	extensionTargetDuration := currentEpoch.TargetDuration()
 	extensionFinalView := currentEpoch.FinalView()
 
 	assert.Equal(bs.T(), extensionTargetTime, bs.ctl.currentEpochTiming.targetEndTime)
@@ -280,8 +278,8 @@ func (bs *BlockTimeControllerSuite) TestOnEpochCommittedPhaseStarted() {
 	nextEpoch.On("Counter").Return(bs.epochCounter + 1)
 	nextEpoch.On("FinalView").Return(bs.curEpochFinalView * 2)
 	nextEpoch.On("FirstView").Return(bs.curEpochFinalView + 1)
-	nextEpoch.On("TargetDuration").Return(bs.EpochDurationSeconds(), nil)
-	nextEpoch.On("TargetEndTime").Return(bs.curEpochTargetEndTime+bs.EpochDurationSeconds(), nil)
+	nextEpoch.On("TargetDuration").Return(bs.EpochDurationSeconds())
+	nextEpoch.On("TargetEndTime").Return(bs.curEpochTargetEndTime + bs.EpochDurationSeconds())
 	bs.epochs.Add(nextEpoch)
 	bs.CreateAndStartController()
 	defer bs.StopController()
@@ -419,8 +417,8 @@ func (bs *BlockTimeControllerSuite) testOnBlockIncorporated_EpochTransition() {
 	nextEpoch.On("Counter").Return(bs.epochCounter + 1)
 	nextEpoch.On("FinalView").Return(bs.curEpochFinalView * 2)
 	nextEpoch.On("FirstView").Return(bs.curEpochFinalView + 1)
-	nextEpoch.On("TargetDuration").Return(bs.EpochDurationSeconds(), nil) // 1s/view
-	nextEpoch.On("TargetEndTime").Return(bs.curEpochTargetEndTime+bs.EpochDurationSeconds(), nil)
+	nextEpoch.On("TargetDuration").Return(bs.EpochDurationSeconds()) // 1s/view
+	nextEpoch.On("TargetEndTime").Return(bs.curEpochTargetEndTime + bs.EpochDurationSeconds())
 	bs.epochs.Add(nextEpoch)
 	bs.CreateAndStartController()
 	defer bs.StopController()
