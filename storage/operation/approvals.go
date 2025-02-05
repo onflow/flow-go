@@ -38,7 +38,7 @@ func UnsafeIndexResultApproval(w storage.Writer, resultID flow.Identifier, chunk
 
 // LookupResultApproval finds a ResultApproval by result ID and chunk index.
 // Returns `storage.ErrNotFound` if no Approval for  the given key (resultID, chunkIndex) has been stored.
-// 
+//
 // NOTE that the Flow protocol requires multiple approvals for the same chunk from different verification
 // nodes. In other words, there are multiple different approvals for the same chunk. Therefore, the index
 // Executed Chunk ➜ ResultApproval ID  (queried here) is *only safe* to be used by Verification Nodes
