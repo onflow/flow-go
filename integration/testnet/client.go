@@ -14,7 +14,6 @@ import (
 
 	sdk "github.com/onflow/flow-go-sdk"
 	client "github.com/onflow/flow-go-sdk/access/grpc"
-	"github.com/onflow/flow-go-sdk/crypto"
 	sdkcrypto "github.com/onflow/flow-go-sdk/crypto"
 
 	"github.com/onflow/flow-go/engine/common/rpc/convert"
@@ -51,7 +50,7 @@ func NewClientWithKey(accessAddr string, accountAddr sdk.Address, key sdkcrypto.
 	}
 	accountKey := acc.Keys[0]
 
-	mySigner, err := crypto.NewInMemorySigner(key, accountKey.HashAlgo)
+	mySigner, err := sdkcrypto.NewInMemorySigner(key, accountKey.HashAlgo)
 	if err != nil {
 		return nil, fmt.Errorf("could not create a signer: %w", err)
 	}
@@ -72,7 +71,7 @@ func NewClientWithKey(accessAddr string, accountAddr sdk.Address, key sdkcrypto.
 func NewClient(addr string, chain flow.Chain) (*Client, error) {
 	key := unittest.ServiceAccountPrivateKey
 	//TODO(illia): did i mess up with a merge? there's no Encode() method for this type `key.PrivateKey.Encode()`
-	privateKey, err := sdkcrypto.DecodePrivateKey(sdkcrypto.SignatureAlgorithm(key.SignAlgo), key.PrivateKey)
+	privateKey, err := sdkcrypto.DecodePrivateKey(sdkcrypto.SignatureAlgorithm(key.SignAlgo), key.PrivateKey.Encode())
 	if err != nil {
 		return nil, fmt.Errorf("could not decode private key: %w", err)
 	}

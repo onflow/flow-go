@@ -96,7 +96,7 @@ func (s *Suite) SetupTest() {
 	s.proto.params = new(protocol.Params)
 	s.finalizedBlock = unittest.BlockHeaderFixture(unittest.WithHeaderHeight(0))
 	s.proto.state.On("Identity").Return(obsIdentity, nil)
-	s.proto.state.On("Final").Return(s.proto.snapshot, nil) //TODO(illia): perhaps this should be removed
+	s.proto.state.On("Final").Return(s.proto.snapshot, nil)
 	s.proto.state.On("Params").Return(s.proto.params)
 	s.proto.snapshot.On("Head").Return(
 		func() *flow.Header {

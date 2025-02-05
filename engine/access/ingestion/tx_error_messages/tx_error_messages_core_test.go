@@ -292,8 +292,8 @@ func mockTransactionResultsByBlock(count int) []flow.LightTransactionResult {
 	resultsByBlockID := make([]flow.LightTransactionResult, 0)
 	for i := 0; i < count; i++ {
 		resultsByBlockID = append(resultsByBlockID, flow.LightTransactionResult{
-			TransactionID:   unittest.IdentifierFixture(), //TODO(illia): is this correct ?
-			Failed:          i%2 == 0,                     // create a mix of failed and non-failed transactions
+			TransactionID:   unittest.IdentifierFixture(),
+			Failed:          i%2 == 0, // create a mix of failed and non-failed transactions
 			ComputationUsed: 0,
 		})
 	}

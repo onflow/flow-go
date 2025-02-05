@@ -422,7 +422,6 @@ func (e *Engine) defaultProcessedIndex() (uint64, error) {
 	return final.Height, nil
 }
 
-// TODO(illia): this has `access memory violation` error
 // runFinalizedBlockConsumer runs the finalizedBlockConsumer component
 func (e *Engine) runFinalizedBlockConsumer(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
 	e.finalizedBlockConsumer.Start(ctx)
