@@ -31,9 +31,9 @@ type Block struct {
 	Payload *Payload
 }
 
-// ID returns the ID of the underlying block header.
+// ID returns unique identifier for the block.
 func (b Block) ID() flow.Identifier {
-	return b.Header.ID()
+	return flow.MakeID(b)
 }
 
 // SetPayload sets the payload and payload hash.
