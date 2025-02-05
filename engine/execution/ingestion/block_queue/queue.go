@@ -55,7 +55,7 @@ type MissingCollection struct {
 }
 
 func (m *MissingCollection) ID() flow.Identifier {
-	return m.Guarantee.ID()
+	return flow.MakeID(m)
 }
 
 // collectionInfo is an internal struct used to keep track of the state of a collection,
