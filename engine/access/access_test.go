@@ -964,7 +964,7 @@ func (suite *Suite) TestGetTransactionResult() {
 			}
 			resp, err := handler.GetTransactionResult(context.Background(), getReq)
 			require.Error(suite.T(), err)
-			require.Contains(suite.T(), err.Error(), "failed to find: transaction not in block")
+			require.Contains(suite.T(), err.Error(), "transaction not found in block")
 			require.Nil(suite.T(), resp)
 		})
 
