@@ -132,6 +132,8 @@ func (es *setupEpoch) Clustering() (flow.ClusterList, error) {
 	return ClusteringFromSetupEvent(es.setupEvent)
 }
 
+// ClusteringFromSetupEvent generates a new clustering list from Epoch setup data.
+// No errors expected during normal operation.
 func ClusteringFromSetupEvent(setupEvent *flow.EpochSetup) (flow.ClusterList, error) {
 	collectorFilter := filter.HasRole[flow.IdentitySkeleton](flow.RoleCollection)
 	clustering, err := factory.NewClusterList(setupEvent.Assignments, setupEvent.Participants.Filter(collectorFilter))
@@ -139,18 +141,6 @@ func ClusteringFromSetupEvent(setupEvent *flow.EpochSetup) (flow.ClusterList, er
 		return nil, fmt.Errorf("failed to generate ClusterList from collector identities: %w", err)
 	}
 	return clustering, nil
-}
-
-func (es *setupEpoch) Cluster(_ uint) (protocol.Cluster, error) {
-	return nil, protocol.ErrNextEpochNotCommitted
-}
-
-func (es *setupEpoch) ClusterByChainID(_ flow.ChainID) (protocol.Cluster, error) {
-	return nil, protocol.ErrNextEpochNotCommitted
-}
-
-func (es *setupEpoch) DKG() (protocol.DKG, error) {
-	return nil, protocol.ErrNextEpochNotCommitted
 }
 
 func (es *setupEpoch) FirstHeight() (uint64, error) {

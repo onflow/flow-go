@@ -120,37 +120,25 @@ type CommittedEpoch interface {
 	InitialIdentities() flow.IdentitySkeletonList
 
 	// Clustering returns the cluster assignment for this epoch.
-	// Error returns:
-	// * protocol.ErrNoPreviousEpoch - if the epoch represents a previous epoch which does not exist.
-	// * protocol.ErrNextEpochNotSetup - if the epoch represents a next epoch which has not been set up.
-	// * state.ErrUnknownSnapshotReference - if the epoch is queried from an unresolvable snapshot.
+	// No errors expected during normal operation.
 	Clustering() (flow.ClusterList, error)
 
 	// Cluster returns the detailed cluster information for the cluster with the
 	// given index, in this epoch.
 	// Error returns:
-	// * protocol.ErrNoPreviousEpoch - if the epoch represents a previous epoch which does not exist.
-	// * protocol.ErrNextEpochNotSetup - if the epoch represents a next epoch which has not been set up.
-	// * state.ErrUnknownSnapshotReference - if the epoch is queried from an unresolvable snapshot.
-	// * protocol.ErrClusterNotFound - if no cluster has the given index (index > len(clusters))
+	//   * protocol.ErrClusterNotFound - if no cluster has the given index (index > len(clusters))
+	//   * generic error in case of internal state corruption
 	Cluster(index uint) (Cluster, error)
 
 	// ClusterByChainID returns the detailed cluster information for the cluster with
 	// the given chain ID, in this epoch
 	// Error returns:
-	// * protocol.ErrNoPreviousEpoch - if the epoch represents a previous epoch which does not exist.
-	// * protocol.ErrNextEpochNotSetup - if the epoch represents a next epoch which has not been set up.
-	// * state.ErrUnknownSnapshotReference - if the epoch is queried from an unresolvable snapshot.
-	// * protocol.ErrNextEpochNotCommitted - if epoch has not been committed yet
-	// * protocol.ErrClusterNotFound - if cluster is not found by the given chainID
+	//   * protocol.ErrClusterNotFound - if cluster is not found by the given chainID
+	//   * generic error in case of internal state corruption
 	ClusterByChainID(chainID flow.ChainID) (Cluster, error)
 
 	// DKG returns the result of the distributed key generation procedure.
-	// Error returns:
-	// * protocol.ErrNoPreviousEpoch - if the epoch represents a previous epoch which does not exist.
-	// * protocol.ErrNextEpochNotSetup - if the epoch represents a next epoch which has not been set up.
-	// * protocol.ErrNextEpochNotCommitted if epoch has not been committed yet
-	// * state.ErrUnknownSnapshotReference - if the epoch is queried from an unresolvable snapshot.
+	// No errors expected during normal operation.
 	DKG() (DKG, error)
 
 	// FirstHeight returns the height of the first block of the epoch.
@@ -158,11 +146,7 @@ type CommittedEpoch interface {
 	// height so that: B.View >= E.FirstView
 	// The first block of an epoch is not defined until it is finalized.
 	// Error returns:
-	// * protocol.ErrNoPreviousEpoch - if the epoch represents a previous epoch which does not exist.
-	// * protocol.ErrNextEpochNotSetup - if the epoch represents a next epoch which has not been set up.
-	// * protocol.ErrNextEpochNotCommitted if epoch has not been committed yet
-	// * protocol.ErrUnknownEpochBoundary - if the first block of the epoch is unknown.
-	// * state.ErrUnknownSnapshotReference - if the epoch is queried from an unresolvable snapshot.
+	//   * protocol.ErrUnknownEpochBoundary - if the first block of the epoch is unknown.
 	FirstHeight() (uint64, error)
 
 	// FinalHeight returns the height of the final block of the epoch.
@@ -170,11 +154,7 @@ type CommittedEpoch interface {
 	// block in epoch E+1 (see definition from FirstHeight).
 	// The final block of an epoch is not defined until its child is finalized.
 	// Error returns:
-	// * protocol.ErrNoPreviousEpoch - if the epoch represents a previous epoch which does not exist.
-	// * protocol.ErrNextEpochNotSetup - if the epoch represents a next epoch which has not been set up.
-	// * protocol.ErrNextEpochNotCommitted - if epoch has not been committed yet
-	// * protocol.ErrUnknownEpochBoundary - if the first block of the next epoch is unknown.
-	// * state.ErrUnknownSnapshotReference - if the epoch is queried from an unresolvable snapshot.
+	//   * protocol.ErrUnknownEpochBoundary - if the first block of the next epoch is unknown.
 	FinalHeight() (uint64, error)
 }
 
@@ -194,9 +174,6 @@ type TentativeEpoch interface {
 	InitialIdentities() flow.IdentitySkeletonList
 
 	// Clustering returns the cluster assignment for this epoch.
-	// Error returns:
-	// * protocol.ErrNoPreviousEpoch - if the epoch represents a previous epoch which does not exist.
-	// * protocol.ErrNextEpochNotSetup - if the epoch represents a next epoch which has not been set up.
-	// * state.ErrUnknownSnapshotReference - if the epoch is queried from an unresolvable snapshot.
+	// No errors expected during normal operation.
 	Clustering() (flow.ClusterList, error)
 }
