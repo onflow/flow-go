@@ -338,14 +338,6 @@ func diffAccount(
 	acctsToSkip []string,
 ) (err error) {
 
-	if accountRegisters1.Count() != accountRegisters2.Count() {
-		rw.Write(countDiff{
-			Owner:  owner,
-			State1: accountRegisters1.Count(),
-			State2: accountRegisters2.Count(),
-		})
-	}
-
 	diffValues := flagAlwaysDiffValues
 
 	err = accountRegisters1.ForEach(func(owner, key string, value1 []byte) error {
