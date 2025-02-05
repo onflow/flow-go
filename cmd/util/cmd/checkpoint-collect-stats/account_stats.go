@@ -33,12 +33,11 @@ func (format accountFormat) MarshalJSON() ([]byte, error) {
 
 type AccountStats struct {
 	stats
-	FormatV1Count      int            `json:"account_format_v1_count"`
-	FormatV2Count      int            `json:"account_format_v2_count"`
-	AccountsInFormatV2 []string       `json:"accounts_in_format_v2,omitempty"`
-	ServiceAccount     *AccountInfo   `json:"service_account,omitempty"`
-	EVMAccount         *AccountInfo   `json:"evm_account,omitempty"`
-	TopN               []*AccountInfo `json:"largest_accounts"`
+	FormatV1Count  int            `json:"account_format_v1_count"`
+	FormatV2Count  int            `json:"account_format_v2_count"`
+	ServiceAccount *AccountInfo   `json:"service_account,omitempty"`
+	EVMAccount     *AccountInfo   `json:"evm_account,omitempty"`
+	TopN           []*AccountInfo `json:"largest_accounts"`
 }
 
 type AccountInfo struct {
@@ -55,7 +54,6 @@ func getAccountStatus(
 	accountsSlice := make([]*AccountInfo, 0, len(accounts))
 	accountSizesSlice := make([]float64, 0, len(accounts))
 
-	var accountsInFormatV2 []string
 	var accountFormatV1Count, accountFormatV2Count int
 
 	for _, acct := range accounts {
@@ -68,7 +66,6 @@ func getAccountStatus(
 
 		case accountFormatV2:
 			accountFormatV2Count++
-			accountsInFormatV2 = append(accountsInFormatV2, acct.Address)
 
 		default:
 			if acct.Address != "" {
@@ -82,9 +79,6 @@ func getAccountStatus(
 		return cmp.Compare(b.PayloadSize, a.PayloadSize)
 	})
 
-	// Sort accounts in format v2
-	slices.SortFunc(accountsInFormatV2, cmp.Compare)
-
 	stats := getValueStats(accountSizesSlice, percentiles)
 
 	evmAccountAddress := systemcontracts.SystemContractsForChain(chainID).EVMStorage.Address
@@ -92,13 +86,12 @@ func getAccountStatus(
 	serviceAccountAddress := serviceAccountAddressForChain(chainID)
 
 	return AccountStats{
-		stats:              stats,
-		FormatV1Count:      accountFormatV1Count,
-		FormatV2Count:      accountFormatV2Count,
-		AccountsInFormatV2: accountsInFormatV2,
-		ServiceAccount:     accounts[string(serviceAccountAddress[:])],
-		EVMAccount:         accounts[string(evmAccountAddress[:])],
-		TopN:               accountsSlice[:flagTopN],
+		stats:          stats,
+		FormatV1Count:  accountFormatV1Count,
+		FormatV2Count:  accountFormatV2Count,
+		ServiceAccount: accounts[string(serviceAccountAddress[:])],
+		EVMAccount:     accounts[string(evmAccountAddress[:])],
+		TopN:           accountsSlice[:flagTopN],
 	}
 }
 
