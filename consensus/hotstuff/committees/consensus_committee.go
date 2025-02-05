@@ -70,10 +70,7 @@ func (e *epochInfo) recomputeLeaderSelectionForExtendedViewRange(extension flow.
 // This can be cached and used for all by-view queries for this epoch.
 // No errors are expected during normal operation.
 func newEpochInfo(epoch protocol.CommittedEpoch) (*epochInfo, error) {
-	randomSeed, err := epoch.RandomSource()
-	if err != nil {
-		return nil, fmt.Errorf("could not get epoch random source: %w", err)
-	}
+	randomSeed := epoch.RandomSource()
 	firstView := epoch.FirstView()
 	finalView := epoch.FinalView()
 	initialIdentities := epoch.InitialIdentities()

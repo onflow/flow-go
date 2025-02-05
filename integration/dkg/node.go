@@ -72,12 +72,12 @@ func (n *node) setEpochs(t *testing.T, currentSetup flow.EpochSetup, nextSetup f
 	currentEpoch.On("DKGPhase3FinalView").Return(currentSetup.DKGPhase3FinalView)
 	currentEpoch.On("FinalView").Return(currentSetup.FinalView)
 	currentEpoch.On("FirstView").Return(currentSetup.FirstView)
-	currentEpoch.On("RandomSource").Return(nextSetup.RandomSource, nil)
+	currentEpoch.On("RandomSource").Return(nextSetup.RandomSource)
 
 	nextEpoch := new(protocolmock.CommittedEpoch)
 	nextEpoch.On("Counter").Return(nextSetup.Counter)
 	nextEpoch.On("InitialIdentities").Return(nextSetup.Participants)
-	nextEpoch.On("RandomSource").Return(nextSetup.RandomSource, nil)
+	nextEpoch.On("RandomSource").Return(nextSetup.RandomSource)
 	nextEpoch.On("DKG").Return(nil, nil) // no error means didn't run into EFM
 	nextEpoch.On("FirstView").Return(nextSetup.FirstView)
 	nextEpoch.On("FinalView").Return(nextSetup.FinalView)

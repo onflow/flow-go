@@ -154,10 +154,7 @@ func getDeployEpochTransactionArguments(snapshot *inmem.Snapshot) []cadence.Valu
 	numCollectorClusters := len(clustering)
 
 	// random source
-	randomSource, err := currentEpoch.RandomSource()
-	if err != nil {
-		log.Fatal().Err(err).Msgf("could not get `randomSource` for current epoch from snapshot")
-	}
+	randomSource := currentEpoch.RandomSource()
 
 	return convertDeployEpochTransactionArguments(
 		epochContractName,

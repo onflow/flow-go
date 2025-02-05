@@ -56,7 +56,7 @@ func (suite *ClusterSuite) SetupTest() {
 	suite.cluster.On("Members").Return(suite.members.ToSkeleton())
 	suite.cluster.On("RootBlock").Return(suite.root)
 	suite.epoch.On("Counter").Return(counter, nil)
-	suite.epoch.On("RandomSource").Return(unittest.SeedFixture(prg.RandomSourceLength), nil)
+	suite.epoch.On("RandomSource").Return(unittest.SeedFixture(prg.RandomSourceLength))
 
 	var err error
 	suite.com, err = NewClusterCommittee(

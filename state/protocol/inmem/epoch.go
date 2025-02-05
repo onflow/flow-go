@@ -120,8 +120,8 @@ func (es *setupEpoch) TargetEndTime() uint64 {
 	}
 }
 
-func (es *setupEpoch) RandomSource() ([]byte, error) {
-	return es.setupEvent.RandomSource, nil
+func (es *setupEpoch) RandomSource() []byte {
+	return es.setupEvent.RandomSource
 }
 
 func (es *setupEpoch) InitialIdentities() flow.IdentitySkeletonList {

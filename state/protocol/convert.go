@@ -22,10 +22,6 @@ func ToEpochSetup(epoch CommittedEpoch) (*flow.EpochSetup, error) {
 		return nil, fmt.Errorf("could not get epoch clustering: %w", err)
 	}
 	assignments := clustering.Assignments()
-	randomSource, err := epoch.RandomSource()
-	if err != nil {
-		return nil, fmt.Errorf("could not get epoch random source: %w", err)
-	}
 
 	setup := &flow.EpochSetup{
 		Counter:            epoch.Counter(),
@@ -36,7 +32,7 @@ func ToEpochSetup(epoch CommittedEpoch) (*flow.EpochSetup, error) {
 		FinalView:          epoch.FinalView(),
 		Participants:       epoch.InitialIdentities(),
 		Assignments:        assignments,
-		RandomSource:       randomSource,
+		RandomSource:       epoch.RandomSource(),
 		TargetDuration:     epoch.TargetDuration(),
 		TargetEndTime:      epoch.TargetEndTime(),
 	}

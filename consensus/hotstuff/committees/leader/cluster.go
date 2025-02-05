@@ -19,10 +19,7 @@ func SelectionForCluster(cluster protocol.Cluster, epoch protocol.CommittedEpoch
 	}
 
 	// get the random source of the current epoch
-	randomSeed, err := epoch.RandomSource()
-	if err != nil {
-		return nil, fmt.Errorf("could not get leader selection seed for cluster (index: %v) at epoch: %v: %w", cluster.Index(), counter, err)
-	}
+	randomSeed := epoch.RandomSource()
 	// create random number generator from the seed and customizer
 	rng, err := prg.New(randomSeed, prg.CollectorClusterLeaderSelection(cluster.Index()), nil)
 	if err != nil {
