@@ -13,11 +13,20 @@ import (
 )
 
 // ResultApprovals implements persistent storage for result approvals.
+//
+// CAUTION suitable only for _Verification Nodes_ for persisting their _own_ approvals!
+//   - In general, the Flow protocol requires multiple approvals for the same chunk from different
+//     verification nodes. In other words, there are multiple different approvals for the same chunk.
+//   - Internally, ResultApprovals populates an index from Executed Chunk ➜ ResultApproval. This is
+//     *only safe* for Verification Nodes when tracking their own approvals (for the same ExecutionResult,
+//     a Verifier will always produce the same approval)
 type ResultApprovals struct {
 	db       storage.DB
 	cache    *Cache[flow.Identifier, *flow.ResultApproval]
 	indexing *sync.Mutex // preventing concurrent indexing of approvals
 }
+
+var _ storage.ResultApprovals = (*ResultApprovals)(nil)
 
 func NewResultApprovals(collector module.CacheMetrics, db storage.DB) *ResultApprovals {
 	store := func(rw storage.ReaderBatchWriter, key flow.Identifier, val *flow.ResultApproval) error {
@@ -99,14 +108,20 @@ func (r *ResultApprovals) Store(approval *flow.ResultApproval) error {
 }
 
 // Index indexes a ResultApproval by chunk (ResultID + chunk index).
-// operation is idempotent (repeated calls with the same value are equivalent to
+// This operation is idempotent (repeated calls with the same value are equivalent to
 // just calling the method once; still the method succeeds on each call).
+//
+// CAUTION: the Flow protocol requires multiple approvals for the same chunk from different verification
+// nodes. In other words, there are multiple different approvals for the same chunk. Therefore, the index
+// Executed Chunk ➜ ResultApproval ID (populated here) is *only safe* to be used by Verification Nodes
+// for tracking their own approvals.
 func (r *ResultApprovals) Index(resultID flow.Identifier, chunkIndex uint64, approvalID flow.Identifier) error {
-	// acquring the lock to prevent dirty reads when checking conflicted approvals
-	// how it works:
-	// the lock can only be acquired after the index operation is committed to the database,
-	// since the index operation is the only operation that would affect the reads operation,
-	// no writes can go through util the lock is released, so locking here could prevent dirty reads.
+	// For the same ExecutionResult, a correct Verifier will always produce the same approval. In other words, 
+	// if we have already indexed an approval for the pair (resultID, chunkIndex) we should never overwrite it 
+	// with a _different_ approval. We explicitly enforce that here to prevent state corruption. 
+	// The lock guarantees that no other thread can concurrently update the index. Thereby confirming that no value
+	// is already stored for the given key (resultID, chunkIndex) and then updating the index (or aborting) is
+	// synchronized into one atomic operation.    
 	r.indexing.Lock()
 	defer r.indexing.Unlock()
 

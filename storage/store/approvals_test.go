@@ -81,8 +81,8 @@ func TestApprovalStoreTwoDifferentApprovalsShouldFail(t *testing.T) {
 	})
 }
 
-// verify that storing and indexing two conflicting approvals concurrently should fail
-// one of them is succeed, the other one should fail
+// verify that storing and indexing two conflicting approvals concurrently should be impossible;
+// we expect that one operations succeeds, the other one should fail
 func TestApprovalStoreTwoDifferentApprovalsConcurrently(t *testing.T) {
 	dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
 		metrics := metrics.NewNoopCollector()
