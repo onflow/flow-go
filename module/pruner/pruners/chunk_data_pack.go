@@ -36,6 +36,10 @@ func (p *ChunkDataPackPruner) PruneByBlockID(blockID flow.Identifier, batchWrite
 		chunkID := chunk.ID()
 		// remove chunk data pack
 		err := p.chunkDataPacks.BatchRemove(chunkID, batchWriter)
+		if errors.Is(err, storage.ErrNotFound) {
+			continue
+		}
+
 		if err != nil {
 			return fmt.Errorf("could not remove chunk id %v for block id %v: %w", chunkID, blockID, err)
 		}
