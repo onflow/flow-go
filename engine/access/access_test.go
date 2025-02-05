@@ -33,6 +33,7 @@ import (
 	"github.com/onflow/flow-go/model/flow/factory"
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/module/counters"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/mempool/stdmap"
 	"github.com/onflow/flow-go/module/metrics"
@@ -672,6 +673,14 @@ func (suite *Suite) TestGetSealedTransaction() {
 		require.NoError(suite.T(), err)
 
 		// create the ingest engine
+		lastFullBlockHeight, err := counters.NewPersistentStrictMonotonicCounter(
+			bstorage.NewConsumerProgress(db, module.ConsumeProgressLastFullBlockHeight),
+			suite.rootBlock.Height,
+		)
+		require.NoError(suite.T(), err)
+
+		processedHeight := bstorage.NewConsumerProgress(db, module.ConsumeProgressIngestionEngineBlockHeight)
+
 		ingestEng, err := ingestion.New(
 			suite.log,
 			suite.net,
@@ -685,7 +694,9 @@ func (suite *Suite) TestGetSealedTransaction() {
 			results,
 			receipts,
 			collectionExecutedMetric,
-			nil, //TODO(illia): do we want to set it up in tests?
+			processedHeight,
+			lastFullBlockHeight,
+			nil,
 		)
 		require.NoError(suite.T(), err)
 
@@ -837,6 +848,14 @@ func (suite *Suite) TestGetTransactionResult() {
 		require.NoError(suite.T(), err)
 
 		// create the ingest engine
+		lastFullBlockHeight, err := counters.NewPersistentStrictMonotonicCounter(
+			bstorage.NewConsumerProgress(db, module.ConsumeProgressLastFullBlockHeight),
+			suite.rootBlock.Height,
+		)
+		require.NoError(suite.T(), err)
+
+		processedHeight := bstorage.NewConsumerProgress(db, module.ConsumeProgressIngestionEngineBlockHeight)
+
 		ingestEng, err := ingestion.New(
 			suite.log,
 			suite.net,
@@ -850,7 +869,9 @@ func (suite *Suite) TestGetTransactionResult() {
 			results,
 			receipts,
 			collectionExecutedMetric,
-			nil, //TODO(illia): do we want to set it up in tests?
+			processedHeight,
+			lastFullBlockHeight,
+			nil,
 		)
 		require.NoError(suite.T(), err)
 
@@ -1066,7 +1087,16 @@ func (suite *Suite) TestExecuteScript() {
 		conduit := new(mocknetwork.Conduit)
 		suite.net.On("Register", channels.ReceiveReceipts, mock.Anything).Return(conduit, nil).
 			Once()
+
 		// create the ingest engine
+		lastFullBlockHeight, err := counters.NewPersistentStrictMonotonicCounter(
+			bstorage.NewConsumerProgress(db, module.ConsumeProgressLastFullBlockHeight),
+			suite.rootBlock.Height,
+		)
+		require.NoError(suite.T(), err)
+
+		processedHeight := bstorage.NewConsumerProgress(db, module.ConsumeProgressIngestionEngineBlockHeight)
+
 		ingestEng, err := ingestion.New(
 			suite.log,
 			suite.net,
@@ -1080,7 +1110,9 @@ func (suite *Suite) TestExecuteScript() {
 			results,
 			receipts,
 			collectionExecutedMetric,
-			nil, //TODO(illia): do we want to set it up in tests?
+			processedHeight,
+			lastFullBlockHeight,
+			nil,
 		)
 		require.NoError(suite.T(), err)
 
