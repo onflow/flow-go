@@ -135,12 +135,6 @@ func (s *TxErrorMessagesCoreSuite) TestHandleTransactionResultErrorMessages() {
 		Return(grpcResponse, nil).
 		Once()
 
-	for _, tx := range expectedStoreTxErrorMessages {
-		s.log.Log().Msgf("tx id: %s", tx.TransactionID.String())
-		s.log.Log().Msgf("expected error message: %s", tx.ErrorMessage)
-		s.log.Log().Msgf("index: %d", tx.Index)
-	}
-
 	// Mock the storage of the fetched error messages into the protocol database.
 	s.txErrorMessages.On("Store", blockId, expectedStoreTxErrorMessages).
 		Return(nil).Once()
@@ -328,7 +322,6 @@ func setupReceiptsForBlock(receipts *storage.ExecutionReceipts, block *flow.Bloc
 // createTransactionErrorMessagesResponse create TransactionErrorMessagesResponse from execution node based on results.
 func createTransactionErrorMessagesResponse(resultsByBlockID []flow.LightTransactionResult) *execproto.GetTransactionErrorMessagesResponse {
 	exeErrMessagesResp := &execproto.GetTransactionErrorMessagesResponse{}
-	j := 0
 
 	for i := range resultsByBlockID {
 		result := resultsByBlockID[i]
@@ -339,13 +332,6 @@ func createTransactionErrorMessagesResponse(resultsByBlockID []flow.LightTransac
 				ErrorMessage:  errMsg,
 				Index:         uint32(i),
 			})
-
-			id1 := result.TransactionID
-			id2 := result.TransactionID[:]
-			id3 := exeErrMessagesResp.Results[j].TransactionId
-
-			println(len(id1), len(id2), len(id3))
-			j += 1
 		}
 	}
 
