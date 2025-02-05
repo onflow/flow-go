@@ -398,6 +398,8 @@ func (b *bootstrapExecutor) Execute() error {
 		b.mintInitialTokens(service, fungibleToken, flowToken, b.initialTokenSupply)
 	}
 
+	b.deployExecutionParameters(fungibleToken, &env)
+	b.setupExecutionWeights(fungibleToken)
 	b.deployServiceAccount(service, &env)
 
 	b.setupParameters(
@@ -417,8 +419,6 @@ func (b *bootstrapExecutor) Execute() error {
 	)
 
 	b.setContractDeploymentRestrictions(service, b.restrictedContractDeployment)
-
-	b.setupExecutionWeights(service)
 
 	b.setupStorageForServiceAccounts(service, fungibleToken, flowToken, feeContract)
 
@@ -726,6 +726,19 @@ func (b *bootstrapExecutor) deployEpoch(deployTo flow.Address, env *templates.En
 	)
 	env.EpochAddress = deployTo.String()
 	panicOnMetaInvokeErrf("failed to deploy Epoch contract: %s", txError, err)
+}
+
+func (b *bootstrapExecutor) deployExecutionParameters(deployTo flow.Address, env *templates.Environment) {
+	contract := contracts.FlowExecutionParameters(*env)
+	txError, err := b.invokeMetaTransaction(
+		b.ctx,
+		Transaction(
+			blueprints.DeployContractTransaction(deployTo, contract, "FlowExecutionParameters"),
+			0,
+		),
+	)
+	env.FlowExecutionParametersAddress = deployTo.String()
+	panicOnMetaInvokeErrf("failed to deploy FlowExecutionParameters contract: %s", txError, err)
 }
 
 func (b *bootstrapExecutor) deployServiceAccount(deployTo flow.Address, env *templates.Environment) {
