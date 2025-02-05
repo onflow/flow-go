@@ -279,7 +279,7 @@ require (
 	golang.org/x/term v0.27.0 // indirect
 	golang.org/x/text v0.21.0 // indirect
 	golang.org/x/time v0.3.0 // indirect
-	golang.org/x/tools v0.28.0 // indirect
+	golang.org/x/tools v0.27.0 // indirect
 	golang.org/x/xerrors v0.0.0-20231012003039-104605ab7028 // indirect
 	gonum.org/v1/gonum v0.14.0 // indirect
 	google.golang.org/api v0.149.0 // indirect
@@ -296,5 +296,3 @@ require (
 )
 
 replace github.com/onflow/flow-go => ../
-
-replace golang.org/x/tools => golang.org/x/tools v0.27.0
