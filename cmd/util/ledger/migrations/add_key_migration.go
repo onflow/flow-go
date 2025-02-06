@@ -21,10 +21,11 @@ import (
 // This migration is not safe to run on actual networks.
 // It is used for getting control over system accounts so that they can be tested
 // in a copied environment. When we need to do this it is best to create a branch
+// where this variable is set to true, and use that temporary branch to run migrations.
 const IAmSureIWantToRunThisMigration = true
 
 // The list of mainnet node addresses might need updating. Please check it and then set this to true.
-const IHaveCheckedTheMainnetNodeAddressesForCorrectness = false
+const IHaveCheckedTheMainnetNodeAddressesForCorrectness = true
 
 // AddKeyMigration adds a new key to the core contracts accounts
 type AddKeyMigration struct {
