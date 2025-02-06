@@ -242,7 +242,7 @@ func (b *Blockchain) ServiceKey() ServiceKey {
 
 // PendingBlockID returns the ID of the pending block.
 func (b *Blockchain) PendingBlockID() flowgo.Identifier {
-	return b.pendingBlock.ID()
+	return b.pendingBlock.BlockID
 }
 
 // PendingBlockView returns the view of the pending block.
@@ -569,7 +569,7 @@ func (b *Blockchain) addTransaction(tx flowgo.TransactionBody) error {
 
 	// If index > 0, pending block has begun execution (cannot add more transactions)
 	if b.pendingBlock.ExecutionStarted() {
-		return &PendingBlockMidExecutionError{BlockID: b.pendingBlock.ID()}
+		return &PendingBlockMidExecutionError{BlockID: b.pendingBlock.BlockID}
 	}
 
 	if b.pendingBlock.ContainsTransaction(tx.ID()) {
@@ -618,7 +618,7 @@ func (b *Blockchain) executeBlock() ([]*TransactionResult, error) {
 	// cannot execute a block that has already executed
 	if b.pendingBlock.ExecutionComplete() {
 		return results, &PendingBlockTransactionsExhaustedError{
-			BlockID: b.pendingBlock.ID(),
+			BlockID: b.pendingBlock.BlockID,
 		}
 	}
 
@@ -651,7 +651,7 @@ func (b *Blockchain) executeNextTransaction(ctx fvm.Context) (*TransactionResult
 	// check if there are remaining txs to be executed
 	if b.pendingBlock.ExecutionComplete() {
 		return nil, &PendingBlockTransactionsExhaustedError{
-			BlockID: b.pendingBlock.ID(),
+			BlockID: b.pendingBlock.BlockID,
 		}
 	}
 
@@ -692,18 +692,18 @@ func (b *Blockchain) CommitBlock() (*flowgo.Block, error) {
 func (b *Blockchain) commitBlock() (*flowgo.Block, error) {
 	// pending block cannot be committed before execution starts (unless empty)
 	if !b.pendingBlock.ExecutionStarted() && !b.pendingBlock.Empty() {
-		return nil, &PendingBlockCommitBeforeExecutionError{BlockID: b.pendingBlock.ID()}
+		return nil, &PendingBlockCommitBeforeExecutionError{BlockID: b.pendingBlock.BlockID}
 	}
 
 	// pending block cannot be committed before execution completes
 	if b.pendingBlock.ExecutionStarted() && !b.pendingBlock.ExecutionComplete() {
-		return nil, &PendingBlockMidExecutionError{BlockID: b.pendingBlock.ID()}
+		return nil, &PendingBlockMidExecutionError{BlockID: b.pendingBlock.BlockID}
 	}
 
 	block := b.pendingBlock.Block()
 	collections := b.pendingBlock.Collections()
 	transactions := b.pendingBlock.Transactions()
-	transactionResults, err := convertToSealedResults(b.pendingBlock.TransactionResults(), b.pendingBlock.ID(), b.pendingBlock.height)
+	transactionResults, err := convertToSealedResults(b.pendingBlock.TransactionResults(), b.pendingBlock.BlockID, b.pendingBlock.height)
 	if err != nil {
 		return nil, err
 	}
