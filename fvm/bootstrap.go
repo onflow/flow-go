@@ -855,21 +855,21 @@ func (b *bootstrapExecutor) setupFees(
 	panicOnMetaInvokeErrf("failed to setup fees: %s", txError, err)
 }
 
-func (b *bootstrapExecutor) setupExecutionWeights(service flow.Address) {
+func (b *bootstrapExecutor) setupExecutionWeights(parametersAccount flow.Address) {
 	// if executionEffortWeights were not set skip this part and just use the defaults.
 	if b.executionEffortWeights != nil {
-		b.setupExecutionEffortWeights(service)
+		b.setupExecutionEffortWeights(parametersAccount)
 	}
 	// if executionMemoryWeights were not set skip this part and just use the defaults.
 	if b.executionMemoryWeights != nil {
-		b.setupExecutionMemoryWeights(service)
+		b.setupExecutionMemoryWeights(parametersAccount)
 	}
 	if b.executionMemoryLimit != 0 {
-		b.setExecutionMemoryLimitTransaction(service)
+		b.setExecutionMemoryLimitTransaction(parametersAccount)
 	}
 }
 
-func (b *bootstrapExecutor) setupExecutionEffortWeights(service flow.Address) {
+func (b *bootstrapExecutor) setupExecutionEffortWeights(parametersAccount flow.Address) {
 	weights := b.executionEffortWeights
 
 	uintWeights := make(map[uint]uint64, len(weights))
@@ -877,7 +877,7 @@ func (b *bootstrapExecutor) setupExecutionEffortWeights(service flow.Address) {
 		uintWeights[uint(i)] = weight
 	}
 
-	tb, err := blueprints.SetExecutionEffortWeightsTransaction(service, uintWeights)
+	tb, err := blueprints.SetExecutionEffortWeightsTransaction(parametersAccount, uintWeights)
 	if err != nil {
 		panic(fmt.Sprintf("failed to setup execution effort weights %s", err.Error()))
 	}
@@ -891,7 +891,7 @@ func (b *bootstrapExecutor) setupExecutionEffortWeights(service flow.Address) {
 	panicOnMetaInvokeErrf("failed to setup execution effort weights: %s", txError, err)
 }
 
-func (b *bootstrapExecutor) setupExecutionMemoryWeights(service flow.Address) {
+func (b *bootstrapExecutor) setupExecutionMemoryWeights(parametersAccount flow.Address) {
 	weights := b.executionMemoryWeights
 
 	uintWeights := make(map[uint]uint64, len(weights))
@@ -899,7 +899,7 @@ func (b *bootstrapExecutor) setupExecutionMemoryWeights(service flow.Address) {
 		uintWeights[uint(i)] = weight
 	}
 
-	tb, err := blueprints.SetExecutionMemoryWeightsTransaction(service, uintWeights)
+	tb, err := blueprints.SetExecutionMemoryWeightsTransaction(parametersAccount, uintWeights)
 	if err != nil {
 		panic(fmt.Sprintf("failed to setup execution memory weights %s", err.Error()))
 	}
@@ -913,9 +913,9 @@ func (b *bootstrapExecutor) setupExecutionMemoryWeights(service flow.Address) {
 	panicOnMetaInvokeErrf("failed to setup execution memory weights: %s", txError, err)
 }
 
-func (b *bootstrapExecutor) setExecutionMemoryLimitTransaction(service flow.Address) {
+func (b *bootstrapExecutor) setExecutionMemoryLimitTransaction(parametersAccount flow.Address) {
 
-	tb, err := blueprints.SetExecutionMemoryLimitTransaction(service, b.executionMemoryLimit)
+	tb, err := blueprints.SetExecutionMemoryLimitTransaction(parametersAccount, b.executionMemoryLimit)
 	if err != nil {
 		panic(fmt.Sprintf("failed to setup execution memory limit %s", err.Error()))
 	}
