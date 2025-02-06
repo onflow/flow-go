@@ -307,7 +307,7 @@ func run(*cobra.Command, []string) {
 	}
 
 	// Validate chain ID
-	_ = flow.ChainID(flagChain).Chain()
+	chain := flow.ChainID(flagChain).Chain()
 
 	if flagNoReport {
 		log.Warn().Msgf("--no-report flag is deprecated")
@@ -404,6 +404,8 @@ func run(*cobra.Command, []string) {
 		var migs []migrations.NamedMigration
 
 		switch flagMigration {
+		case "add-migrationmainnet-keys":
+			migs = append(migs, addMigrationMainnetKeysMigration(log.Logger, flagOutputDir, flagNWorker, chain.ChainID())...)
 		default:
 			log.Fatal().Msgf("unknown migration: %s", flagMigration)
 		}
