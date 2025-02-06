@@ -48,7 +48,7 @@ func NewAddKeyMigration(
 		panic("Cannot run AddKeyMigration migration")
 	}
 
-	// this is a mainnet only migration
+	// this is a migration mainnet only migration
 	if chainID != flow.Mainnet {
 		panic("AddKeyMigration migration only works on mainnet")
 	}
