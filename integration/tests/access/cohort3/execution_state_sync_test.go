@@ -12,7 +12,6 @@ import (
 	pebbleds "github.com/ipfs/go-ds-pebble"
 	sdk "github.com/onflow/flow-go-sdk"
 	sdkclient "github.com/onflow/flow-go-sdk/access/grpc"
-	"github.com/onflow/flow-go/engine/common/rpc/convert"
 	"github.com/onflow/flow/protobuf/go/flow/entities"
 	"github.com/onflow/flow/protobuf/go/flow/executiondata"
 	"github.com/rs/zerolog"
@@ -22,6 +21,7 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
+	"github.com/onflow/flow-go/engine/common/rpc/convert"
 	"github.com/onflow/flow-go/engine/ghost/client"
 	"github.com/onflow/flow-go/integration/testnet"
 	"github.com/onflow/flow-go/integration/tests/lib"
