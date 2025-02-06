@@ -225,9 +225,6 @@ func (e *Manager) QueryExecutor() query.Executor {
 }
 
 func DefaultFVMOptions(chainID flow.ChainID, cadenceTracing bool, extensiveTracing bool) []fvm.Option {
-	// enable storageFormatV2 for all networks besides mainnet
-	storageFormatV2Enabled := chainID != flow.Mainnet
-
 	options := []fvm.Option{
 		fvm.WithChain(chainID.Chain()),
 		fvm.WithReusableCadenceRuntimePool(
@@ -235,7 +232,7 @@ func DefaultFVMOptions(chainID flow.ChainID, cadenceTracing bool, extensiveTraci
 				ReusableCadenceRuntimePoolSize,
 				runtime.Config{
 					TracingEnabled:         cadenceTracing,
-					StorageFormatV2Enabled: storageFormatV2Enabled,
+					StorageFormatV2Enabled: true,
 				},
 			)),
 		fvm.WithEVMEnabled(true),
