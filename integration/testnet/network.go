@@ -101,7 +101,7 @@ const (
 	// AdminPort is the admin server port
 	AdminPort = "9002"
 	// ExecutionStatePort is the execution state server port
-	ExecutionStatePort = "9003"
+	ExecutionStatePort = GRPCPort
 	// PublicNetworkPort is the access node network port accessible from outside any docker container
 	PublicNetworkPort = "9876"
 	// DebuggerPort is the go debugger port
