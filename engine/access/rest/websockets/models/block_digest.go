@@ -7,7 +7,7 @@ import (
 
 // Build creates a BlockDigest instance with data from the provided flow.BlockDigest.
 func (b *BlockDigest) Build(block *flow.BlockDigest) {
-	b.BlockId = block.ID().String()
+	b.BlockId = block.BlockID.String()
 	b.Height = util.FromUint(block.Height)
 	b.Timestamp = block.Timestamp
 }
