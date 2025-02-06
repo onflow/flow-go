@@ -206,10 +206,13 @@ func (suite *BackfillTxErrorMessagesSuite) TestValidateInvalidFormat() {
 
 	// invalid execution-node-ids param
 	suite.Run("invalid execution-node-ids field", func() {
+		executorIDsList, err := commands.ConvertToInterfaceList([]int{1, 2, 3})
+		suite.Require().NoError(err)
+
 		// invalid type
-		err := suite.command.Validator(&admin.CommandRequest{
+		err = suite.command.Validator(&admin.CommandRequest{
 			Data: map[string]interface{}{
-				"execution-node-ids": []int{1, 2, 3},
+				"execution-node-ids": executorIDsList,
 			},
 		})
 		suite.Error(err)
@@ -228,16 +231,20 @@ func (suite *BackfillTxErrorMessagesSuite) TestValidateInvalidFormat() {
 
 		// invalid execution node id
 		invalidENID := unittest.IdentifierFixture()
+
+		executorIDsList, err = commands.ConvertToInterfaceList([]string{invalidENID.String()})
+		suite.Require().NoError(err)
+
 		err = suite.command.Validator(&admin.CommandRequest{
 			Data: map[string]interface{}{
 				"start-height":       float64(1),  // raw json parses to float64
 				"end-height":         float64(10), // raw json parses to float64
-				"execution-node-ids": []string{invalidENID.String()},
+				"execution-node-ids": executorIDsList,
 			},
 		})
 		suite.Error(err)
 		suite.Equal(err, admin.NewInvalidAdminReqParameterError(
-			"execution-node-ids", "could not found execution nodes by provided ids", []string{invalidENID.String()}))
+			"execution-node-ids", "could not found execution nodes by provided ids", invalidENID))
 	})
 }
 
@@ -258,17 +265,21 @@ func (suite *BackfillTxErrorMessagesSuite) TestValidateValidFormat() {
 		suite.NoError(err)
 	})
 
+	executorIDsList, err := commands.ConvertToInterfaceList([]string{suite.allENIDs[0].ID().String()})
+	suite.Require().NoError(err)
+
 	// all parameters are provided
 	// start-height is less than root block, the root  block
 	// will be used as the start-height.
 	suite.Run("happy case, start-height is less than root block", func() {
 		suite.params.On("SealedRoot").Return(suite.blockHeadersMap[1].Height, nil)
 		suite.state.On("Params").Return(suite.params, nil).Maybe()
-		err := suite.command.Validator(&admin.CommandRequest{
+
+		err = suite.command.Validator(&admin.CommandRequest{
 			Data: map[string]interface{}{
 				"start-height":       float64(2), // raw json parses to float64
 				"end-height":         float64(5), // raw json parses to float64
-				"execution-node-ids": []string{suite.allENIDs[0].ID().String()},
+				"execution-node-ids": executorIDsList,
 			},
 		})
 		suite.NoError(err)
@@ -278,11 +289,11 @@ func (suite *BackfillTxErrorMessagesSuite) TestValidateValidFormat() {
 	// end-height is bigger than latest sealed block, the latest sealed block
 	// will be used as the end-height.
 	suite.Run("happy case, end-height is bigger than latest sealed block", func() {
-		err := suite.command.Validator(&admin.CommandRequest{
+		err = suite.command.Validator(&admin.CommandRequest{
 			Data: map[string]interface{}{
 				"start-height":       float64(1),   // raw json parses to float64
 				"end-height":         float64(100), // raw json parses to float64
-				"execution-node-ids": []string{suite.allENIDs[0].ID().String()},
+				"execution-node-ids": executorIDsList,
 			},
 		})
 		suite.NoError(err)
@@ -290,11 +301,11 @@ func (suite *BackfillTxErrorMessagesSuite) TestValidateValidFormat() {
 
 	// all parameters are provided
 	suite.Run("happy case, all parameters are provided", func() {
-		err := suite.command.Validator(&admin.CommandRequest{
+		err = suite.command.Validator(&admin.CommandRequest{
 			Data: map[string]interface{}{
 				"start-height":       float64(1), // raw json parses to float64
 				"end-height":         float64(3), // raw json parses to float64
-				"execution-node-ids": []string{suite.allENIDs[0].ID().String()},
+				"execution-node-ids": executorIDsList,
 			},
 		})
 		suite.NoError(err)
@@ -365,11 +376,14 @@ func (suite *BackfillTxErrorMessagesSuite) TestHandleBackfillTxErrorMessages() {
 		suite.allENIDs = unittest.IdentityListFixture(3, unittest.WithRole(flow.RoleExecution))
 
 		executorID := suite.allENIDs[1].ID()
+		executorIDsList, err := commands.ConvertToInterfaceList([]string{executorID.String()})
+		suite.Require().NoError(err)
+
 		req = &admin.CommandRequest{
 			Data: map[string]interface{}{
 				"start-height":       float64(startHeight), // raw json parses to float64
 				"end-height":         float64(endHeight),   // raw json parses to float64
-				"execution-node-ids": []string{executorID.String()},
+				"execution-node-ids": executorIDsList,
 			},
 		}
 		suite.Require().NoError(suite.command.Validator(req))
@@ -399,7 +413,7 @@ func (suite *BackfillTxErrorMessagesSuite) TestHandleBackfillTxErrorMessages() {
 			suite.mockStoreTxErrorMessages(blockId, results, executorID)
 		}
 
-		_, err := suite.command.Handler(ctx, req)
+		_, err = suite.command.Handler(ctx, req)
 		suite.Require().NoError(err)
 		suite.assertAllExpectations()
 	})

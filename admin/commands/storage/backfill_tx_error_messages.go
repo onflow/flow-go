@@ -179,6 +179,30 @@ func (b *BackfillTxErrorMessagesCommand) Handler(ctx context.Context, request *a
 	return nil, nil
 }
 
+// convertToExecutionStringList converts a given input to a slice of strings containing execution node IDs.
+// Returns an error if the input is not a slice of strings or if the slice is empty.
+func convertToExecutionStringList(executionNodeIdsIn interface{}) ([]string, error) {
+	var executionNodeIds []string
+	switch executionNodeIdsConverted := executionNodeIdsIn.(type) {
+	case []interface{}:
+		for _, executionNodeIdIn := range executionNodeIdsConverted {
+			executionNodeId, ok := executionNodeIdIn.(string)
+			if !ok {
+				return nil, admin.NewInvalidAdminReqParameterError("execution-node-ids", "must be a list of string", executionNodeIdsIn)
+			}
+			executionNodeIds = append(executionNodeIds, executionNodeId)
+		}
+	default:
+		return nil, admin.NewInvalidAdminReqParameterError("execution-node-ids", "must be a list of string", executionNodeIdsIn)
+	}
+
+	if len(executionNodeIds) == 0 {
+		return nil, admin.NewInvalidAdminReqParameterError("execution-node-ids", "must be a non empty list of strings", executionNodeIdsIn)
+	}
+
+	return executionNodeIds, nil
+}
+
 // parseExecutionNodeIds converts a list of node IDs from input to flow.IdentityList.
 // Returns an error if the IDs are invalid or empty.
 //
@@ -187,25 +211,22 @@ func (b *BackfillTxErrorMessagesCommand) Handler(ctx context.Context, request *a
 func (b *BackfillTxErrorMessagesCommand) parseExecutionNodeIds(executionNodeIdsIn interface{}, allIdentities flow.IdentityList) (flow.IdentityList, error) {
 	var ids flow.IdentityList
 
-	switch executionNodeIds := executionNodeIdsIn.(type) {
-	case []string:
-		if len(executionNodeIds) == 0 {
-			return nil, admin.NewInvalidAdminReqParameterError("execution-node-ids", "must be a non empty list of string", executionNodeIdsIn)
-		}
-		requestedENIdentifiers, err := commonrpc.IdentifierList(executionNodeIds)
-		if err != nil {
-			return nil, admin.NewInvalidAdminReqParameterError("execution-node-ids", err.Error(), executionNodeIdsIn)
-		}
+	executionNodeIds, err := convertToExecutionStringList(executionNodeIdsIn)
+	if err != nil {
+		return nil, err
+	}
 
-		for _, en := range requestedENIdentifiers {
-			id, exists := allIdentities.ByNodeID(en)
-			if !exists {
-				return nil, admin.NewInvalidAdminReqParameterError("execution-node-ids", "could not found execution nodes by provided ids", executionNodeIdsIn)
-			}
-			ids = append(ids, id)
+	requestedENIdentifiers, err := commonrpc.IdentifierList(executionNodeIds)
+	if err != nil {
+		return nil, admin.NewInvalidAdminReqParameterError("execution-node-ids", err.Error(), executionNodeIdsIn)
+	}
+
+	for _, en := range requestedENIdentifiers {
+		id, exists := allIdentities.ByNodeID(en)
+		if !exists {
+			return nil, admin.NewInvalidAdminReqParameterError("execution-node-ids", "could not found execution nodes by provided ids", en)
 		}
-	default:
-		return nil, admin.NewInvalidAdminReqParameterError("execution-node-ids", "must be a list of string", executionNodeIdsIn)
+		ids = append(ids, id)
 	}
 
 	return ids, nil
