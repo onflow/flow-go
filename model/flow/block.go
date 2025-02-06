@@ -113,7 +113,7 @@ func (b *CertifiedBlock) Height() uint64 {
 	return b.Block.Header.Height
 }
 
-// BlockDigest holds lightweight block information which includes only block id, block height and block timestamp
+// BlockDigest holds lightweight block information which includes only the block's id, height and timestamp
 type BlockDigest struct {
 	BlockID   Identifier
 	Height    uint64
