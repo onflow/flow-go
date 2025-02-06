@@ -14,6 +14,7 @@ import (
 
 	"github.com/onflow/flow-go/engine/access/rpc/connection"
 	"github.com/onflow/flow-go/engine/common/rpc"
+	commonrpc "github.com/onflow/flow-go/engine/common/rpc"
 	"github.com/onflow/flow-go/engine/common/rpc/convert"
 	fvmerrors "github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/model/flow"
@@ -24,14 +25,14 @@ import (
 )
 
 type backendAccounts struct {
-	log               zerolog.Logger
-	state             protocol.State
-	headers           storage.Headers
-	executionReceipts storage.ExecutionReceipts
-	connFactory       connection.ConnectionFactory
-	nodeCommunicator  Communicator
-	scriptExecutor    execution.ScriptExecutor
-	scriptExecMode    IndexQueryMode
+	log                        zerolog.Logger
+	state                      protocol.State
+	headers                    storage.Headers
+	connFactory                connection.ConnectionFactory
+	nodeCommunicator           Communicator
+	scriptExecutor             execution.ScriptExecutor
+	scriptExecMode             IndexQueryMode
+	execNodeIdentitiesProvider *commonrpc.ExecutionNodeIdentitiesProvider
 }
 
 // GetAccount returns the account details at the latest sealed block.
@@ -419,7 +420,10 @@ func (b *backendAccounts) getAccountFromAnyExeNode(
 		BlockId: blockID[:],
 	}
 
-	execNodes, err := executionNodesForBlockID(ctx, blockID, b.executionReceipts, b.state, b.log)
+	execNodes, err := b.execNodeIdentitiesProvider.ExecutionNodesForBlockID(
+		ctx,
+		blockID,
+	)
 	if err != nil {
 		return nil, rpc.ConvertError(err, "failed to find execution node to query", codes.Internal)
 	}

@@ -16,7 +16,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
-const MaxRequestSize = 2 << 20 // 2MB
+const DefaultMaxRequestSize = 2 << 20 // 2MB
 
 // HttpHandler is custom http handler implementing custom handler function.
 // HttpHandler function allows easier handling of errors and responses as it
@@ -24,15 +24,19 @@ const MaxRequestSize = 2 << 20 // 2MB
 type HttpHandler struct {
 	Logger zerolog.Logger
 	Chain  flow.Chain
+
+	MaxRequestSize int64
 }
 
 func NewHttpHandler(
 	logger zerolog.Logger,
 	chain flow.Chain,
+	maxRequestSize int64,
 ) *HttpHandler {
 	return &HttpHandler{
-		Logger: logger,
-		Chain:  chain,
+		Logger:         logger,
+		Chain:          chain,
+		MaxRequestSize: maxRequestSize,
 	}
 }
 
@@ -43,7 +47,7 @@ func (h *HttpHandler) VerifyRequest(w http.ResponseWriter, r *http.Request) erro
 	errLog := h.Logger.With().Str("request_url", r.URL.String()).Logger()
 
 	// limit requested body size
-	r.Body = http.MaxBytesReader(w, r.Body, MaxRequestSize)
+	r.Body = http.MaxBytesReader(w, r.Body, h.MaxRequestSize)
 	err := r.ParseForm()
 	if err != nil {
 		h.errorHandler(w, err, errLog)
