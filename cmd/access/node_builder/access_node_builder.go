@@ -611,10 +611,14 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 			// Note: progress is stored in the datastore's DB since that is where the jobqueue
 			// writes execution data to.
 			var db storage.DB
-			if executionDataDBMode == execution_data.ExecutionDataDBModeBadger {
-				db = badgerimpl.ToDB(builder.ExecutionDatastoreManager.DB().(*badger.DB))
+			edmdb := builder.ExecutionDatastoreManager.DB()
+
+			if bdb, ok := edmdb.(*badger.DB); ok {
+				db = badgerimpl.ToDB(bdb)
+			} else if pdb, ok := edmdb.(*pebble.DB); ok {
+				db = pebbleimpl.ToDB(pdb)
 			} else {
-				db = pebbleimpl.ToDB(builder.ExecutionDatastoreManager.DB().(*pebble.DB))
+				return fmt.Errorf("unsupported execution data DB type: %T", edmdb)
 			}
 
 			processedBlockHeight = store.NewConsumerProgress(db, module.ConsumeProgressExecutionDataRequesterBlockHeight)
