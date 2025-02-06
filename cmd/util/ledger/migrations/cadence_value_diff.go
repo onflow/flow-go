@@ -2,12 +2,10 @@ package migrations
 
 import (
 	"fmt"
-	"time"
 
 	"github.com/onflow/cadence/common"
 	"github.com/onflow/cadence/interpreter"
 	"github.com/onflow/cadence/runtime"
-	"github.com/rs/zerolog/log"
 	"golang.org/x/sync/errgroup"
 
 	"github.com/onflow/flow-go/cmd/util/ledger/reporters"
@@ -76,8 +74,6 @@ type difference struct {
 	NewValueStaticType string `json:",omitempty"`
 }
 
-const minLargeAccountRegisterCount = 1_000_000
-
 type CadenceValueDiffReporter struct {
 	address        common.Address
 	chainID        flow.ChainID
@@ -102,7 +98,13 @@ func NewCadenceValueDiffReporter(
 	}
 }
 
-func (dr *CadenceValueDiffReporter) DiffStates(oldRegs, newRegs registers.Registers, domains []common.StorageDomain) {
+type isValueIncludedFunc func(address common.Address, domain common.StorageDomain, key any) bool
+
+func (dr *CadenceValueDiffReporter) DiffStates(
+	oldRegs, newRegs registers.Registers,
+	domains []common.StorageDomain,
+	isValueIncluded isValueIncludedFunc,
+) {
 
 	oldStorage := newReadonlyStorage(oldRegs)
 
@@ -160,7 +162,7 @@ func (dr *CadenceValueDiffReporter) DiffStates(oldRegs, newRegs registers.Regist
 	}
 
 	for _, domain := range domains {
-		dr.diffDomain(oldRuntime, newRuntime, domain)
+		dr.diffDomain(oldRuntime, newRuntime, domain, isValueIncluded)
 	}
 }
 
@@ -168,6 +170,7 @@ func (dr *CadenceValueDiffReporter) diffDomain(
 	oldRuntime *readonlyStorageRuntime,
 	newRuntime *readonlyStorageRuntime,
 	domain common.StorageDomain,
+	isValueIncluded isValueIncludedFunc,
 ) {
 	defer func() {
 		if r := recover(); r != nil {
@@ -340,38 +343,12 @@ func (dr *CadenceValueDiffReporter) diffDomain(
 		}
 	}
 
-	// Skip goroutine overhead for non-storage domain and small accounts.
-	if domain != common.StorageDomainPathStorage ||
-		oldRuntime.PayloadCount < minLargeAccountRegisterCount ||
-		len(sharedKeys) == 1 {
-
-		for _, key := range sharedKeys {
-			oldValue, newValue, trace, canDiff := getValues(key)
-			if canDiff {
-				diffValues(
-					oldRuntime.Interpreter,
-					oldValue,
-					newRuntime.Interpreter,
-					newValue,
-					trace,
-				)
-			}
-		}
-		return
-	}
-
-	startTime := time.Now()
-
-	log.Info().Msgf(
-		"Diffing %x storage domain containing %d elements (%d payloads) ...",
-		dr.address[:],
-		len(sharedKeys),
-		oldRuntime.PayloadCount,
-	)
-
 	// Diffing storage domain
 
 	for _, key := range sharedKeys {
+		if !isValueIncluded(dr.address, domain, key) {
+			continue
+		}
 		oldValue, newValue, trace, canDiff := getValues(key)
 		if canDiff {
 			diffValues(
@@ -383,15 +360,6 @@ func (dr *CadenceValueDiffReporter) diffDomain(
 			)
 		}
 	}
-
-	log.Info().
-		Msgf(
-			"Finished diffing %x storage domain containing %d elements (%d payloads) in %s",
-			dr.address[:],
-			len(sharedKeys),
-			oldRuntime.PayloadCount,
-			time.Since(startTime),
-		)
 }
 
 func (dr *CadenceValueDiffReporter) diffValues(
