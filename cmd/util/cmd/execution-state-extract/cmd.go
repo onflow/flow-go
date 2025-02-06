@@ -405,7 +405,7 @@ func run(*cobra.Command, []string) {
 
 		switch flagMigration {
 		case "add-migrationmainnet-keys":
-			migs = append(migs, addKeysMigration(log.Logger, flagOutputDir, flagNWorker, chain.ChainID())...)
+			migs = append(migs, addMigrationMainnetKeysMigration(log.Logger, flagOutputDir, flagNWorker, chain.ChainID())...)
 		default:
 			log.Fatal().Msgf("unknown migration: %s", flagMigration)
 		}

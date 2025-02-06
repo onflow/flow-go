@@ -360,14 +360,14 @@ func createTrieFromPayloads(logger zerolog.Logger, payloads []*ledger.Payload) (
 	return newTrie, nil
 }
 
-func addKeysMigration(
+func addMigrationMainnetKeysMigration(
 	log zerolog.Logger,
 	outputDir string,
 	workerCount int,
 	chainID flow.ChainID,
 ) []migrators.NamedMigration {
 
-	log.Info().Msg("initializing add-keys migrations ...")
+	log.Info().Msg("initializing add-migrationmainnet-keys migrations ...")
 
 	rwf := reporters.NewReportFileWriterFactory(outputDir, log)
 
@@ -378,7 +378,7 @@ func addKeysMigration(
 
 	namedMigrations := []migrators.NamedMigration{
 		{
-			Name: "account-usage-migration",
+			Name: "add-migrationmainnet-keys",
 			Migrate: migrators.NewAccountBasedMigration(
 				log,
 				workerCount,
