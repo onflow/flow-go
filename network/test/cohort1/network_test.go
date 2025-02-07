@@ -12,6 +12,7 @@ import (
 
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/libp2p/go-libp2p/p2p/net/swarm"
+	"github.com/onflow/flow-go/module/counters"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	mockery "github.com/stretchr/testify/mock"
@@ -483,9 +484,9 @@ func (suite *NetworkTestSuite) TestUnicastRateLimit_Bandwidth() {
 	_, err = newNet.Register(channels.TestNetworkChannel, newEngine)
 	require.NoError(suite.T(), err)
 
-	callCount := 0
+	callCount := counters.NewMonotonousCounter(0)
 	newEngine.On("Process", channels.TestNetworkChannel, suite.ids[0].NodeID, mockery.Anything).Run(func(args mockery.Arguments) {
-		callCount++
+		_ = callCount.Increment()
 	}).Return(nil)
 
 	idList := flow.IdentityList(append(suite.ids, newId))
@@ -539,7 +540,7 @@ func (suite *NetworkTestSuite) TestUnicastRateLimit_Bandwidth() {
 	unittest.RequireCloseBefore(suite.T(), ch, 100*time.Millisecond, "could not stop on rate limit test ch on time")
 
 	// remote node should have received the first 2 messages
-	assert.Equal(suite.T(), 2, callCount)
+	assert.Equal(suite.T(), 2, callCount.Value())
 
 	// sleep for 1 seconds to allow connection pruner to prune connections
 	time.Sleep(1 * time.Second)
@@ -557,7 +558,7 @@ func (suite *NetworkTestSuite) TestUnicastRateLimit_Bandwidth() {
 	}, 5*time.Second, 100*time.Millisecond)
 
 	require.Eventually(suite.T(), func() bool {
-		return callCount == 3
+		return callCount.Value() == 3
 	}, 1*time.Second, 100*time.Millisecond)
 
 	// shutdown our network so that each message can be processed
