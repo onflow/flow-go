@@ -72,6 +72,10 @@ type GossipSubBuilder interface {
 	// It is NOT recommended to override the default RPC inspector suite factory in production unless you know what you are doing.
 	OverrideDefaultRpcInspectorFactory(GossipSubRpcInspectorFactoryFunc)
 
+	// OverrideDefaultValidateQueueSize overrides the default validate queue size of libp2p nodes.
+	// CAUTION: Be careful setting this to a larger number as it will change the backpressure behavior of the system.
+	OverrideDefaultValidateQueueSize(int)
+
 	// Build creates a new GossipSub pubsub system.
 	// It returns the newly created GossipSub pubsub system and any errors encountered during its creation.
 	//
@@ -159,6 +163,10 @@ type NodeBuilder interface {
 	// Returns:
 	// - NodeBuilder: the node builder
 	OverrideDefaultRpcInspectorFactory(GossipSubRpcInspectorFactoryFunc) NodeBuilder
+
+	// OverrideDefaultValidateQueueSize overrides the default validate queue size of libp2p nodes.
+	// CAUTION: Be careful setting this to a larger number as it will change the backpressure behavior of the system.
+	OverrideDefaultValidateQueueSize(int) NodeBuilder
 
 	// Build creates a new libp2p node. It returns the newly created libp2p node and any errors encountered during its creation.
 	// Args:
