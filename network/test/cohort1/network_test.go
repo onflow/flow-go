@@ -540,7 +540,7 @@ func (suite *NetworkTestSuite) TestUnicastRateLimit_Bandwidth() {
 	unittest.RequireCloseBefore(suite.T(), ch, 100*time.Millisecond, "could not stop on rate limit test ch on time")
 
 	// remote node should have received the first 2 messages
-	assert.Equal(suite.T(), 2, callCount.Value())
+	assert.Equal(suite.T(), uint64(2), callCount.Value())
 
 	// sleep for 1 seconds to allow connection pruner to prune connections
 	time.Sleep(1 * time.Second)
