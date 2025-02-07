@@ -6,7 +6,8 @@ import (
 	"github.com/cockroachdb/pebble"
 	"github.com/stretchr/testify/require"
 
-	storagepebble "github.com/onflow/flow-go/storage/pebble"
+	"github.com/onflow/flow-go/storage/operation/pebbleimpl"
+	"github.com/onflow/flow-go/storage/store"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -19,9 +20,9 @@ func TestProgress(t *testing.T) {
 			return latest, nil
 		}
 
-		store := storagepebble.NewConsumerProgress(db, "test")
+		initializer := store.NewConsumerProgress(pebbleimpl.ToDB(db), "test")
 
-		progress, err := NewPersistentIteratorState(store, root, getLatest)
+		progress, err := NewPersistentIteratorState(initializer, root, getLatest)
 		require.NoError(t, err)
 
 		// 1. verify initial state should be the next of root

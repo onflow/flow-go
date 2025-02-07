@@ -25,6 +25,7 @@ import (
 	"github.com/onflow/flow-go/model/flow/filter"
 	libp2pmessage "github.com/onflow/flow-go/model/libp2p/message"
 	"github.com/onflow/flow-go/model/messages"
+	"github.com/onflow/flow-go/module/counters"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/module/observable"
@@ -483,9 +484,9 @@ func (suite *NetworkTestSuite) TestUnicastRateLimit_Bandwidth() {
 	_, err = newNet.Register(channels.TestNetworkChannel, newEngine)
 	require.NoError(suite.T(), err)
 
-	callCount := 0
+	callCount := counters.NewMonotonousCounter(0)
 	newEngine.On("Process", channels.TestNetworkChannel, suite.ids[0].NodeID, mockery.Anything).Run(func(args mockery.Arguments) {
-		callCount++
+		_ = callCount.Increment()
 	}).Return(nil)
 
 	idList := flow.IdentityList(append(suite.ids, newId))
@@ -539,7 +540,7 @@ func (suite *NetworkTestSuite) TestUnicastRateLimit_Bandwidth() {
 	unittest.RequireCloseBefore(suite.T(), ch, 100*time.Millisecond, "could not stop on rate limit test ch on time")
 
 	// remote node should have received the first 2 messages
-	assert.Equal(suite.T(), 2, callCount)
+	assert.Equal(suite.T(), uint64(2), callCount.Value())
 
 	// sleep for 1 seconds to allow connection pruner to prune connections
 	time.Sleep(1 * time.Second)
@@ -556,8 +557,9 @@ func (suite *NetworkTestSuite) TestUnicastRateLimit_Bandwidth() {
 		return err == nil
 	}, 5*time.Second, 100*time.Millisecond)
 
-	time.Sleep(200 * time.Millisecond)
-	assert.Equal(suite.T(), 3, callCount)
+	require.Eventually(suite.T(), func() bool {
+		return callCount.Value() == 3
+	}, 1*time.Second, 100*time.Millisecond)
 
 	// shutdown our network so that each message can be processed
 	cancel()
