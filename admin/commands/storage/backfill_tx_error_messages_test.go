@@ -19,7 +19,6 @@ import (
 	accessmock "github.com/onflow/flow-go/engine/access/mock"
 	"github.com/onflow/flow-go/engine/access/rpc/backend"
 	connectionmock "github.com/onflow/flow-go/engine/access/rpc/connection/mock"
-	commonrpc "github.com/onflow/flow-go/engine/common/rpc"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/state/protocol/invalid"
@@ -98,6 +97,9 @@ func (suite *BackfillTxErrorMessagesSuite) SetupTest() {
 		func() *flow.Header {
 			return suite.nodeRootBlock.Header
 		}, nil)
+	suite.params.On("SporkID").Return(unittest.IdentifierFixture(), nil)
+	suite.params.On("ProtocolVersion").Return(uint(1), nil)
+	suite.params.On("SporkRootBlockHeight").Return(uint64(0), nil)
 	suite.state.On("Params").Return(suite.params, nil).Maybe()
 
 	suite.snapshot = createSnapshot(suite.T(), suite.sealedBlock.Header)
@@ -117,42 +119,36 @@ func (suite *BackfillTxErrorMessagesSuite) SetupTest() {
 	// Mock the protocol snapshot to return fixed execution node IDs.
 	suite.allENIDs = unittest.IdentityListFixture(1, unittest.WithRole(flow.RoleExecution))
 	suite.snapshot.On("Identities", mock.Anything).Return(
-		func(flow.IdentityFilter[flow.Identity]) (flow.IdentityList, error) {
+		func(flow.IdentityFilter) (flow.IdentityList, error) {
 			return suite.allENIDs, nil
 		}, nil).Maybe()
 
 	// create a mock connection factory
 	suite.connFactory = connectionmock.NewConnectionFactory(suite.T())
 
-	executionNodeIdentitiesProvider := commonrpc.NewExecutionNodeIdentitiesProvider(
-		suite.log,
-		suite.state,
-		suite.receipts,
-		nil,
-		nil,
-	)
-
 	var err error
 	suite.backend, err = backend.New(backend.Params{
-		State:                      suite.state,
-		ExecutionReceipts:          suite.receipts,
-		ConnFactory:                suite.connFactory,
-		MaxHeightRange:             backend.DefaultMaxHeightRange,
-		Log:                        suite.log,
-		SnapshotHistoryLimit:       backend.DefaultSnapshotHistoryLimit,
-		Communicator:               backend.NewNodeCommunicator(false),
-		ScriptExecutionMode:        backend.IndexQueryModeExecutionNodesOnly,
-		TxResultQueryMode:          backend.IndexQueryModeExecutionNodesOnly,
-		ChainID:                    flow.Testnet,
-		ExecNodeIdentitiesProvider: executionNodeIdentitiesProvider,
+		State:                suite.state,
+		ExecutionReceipts:    suite.receipts,
+		ConnFactory:          suite.connFactory,
+		MaxHeightRange:       backend.DefaultMaxHeightRange,
+		Log:                  suite.log,
+		SnapshotHistoryLimit: backend.DefaultSnapshotHistoryLimit,
+		Communicator:         backend.NewNodeCommunicator(false),
+		ScriptExecutionMode:  backend.IndexQueryModeExecutionNodesOnly,
+		TxResultQueryMode:    backend.IndexQueryModeExecutionNodesOnly,
+		ChainID:              flow.Testnet,
 	})
 	require.NoError(suite.T(), err)
 
 	suite.txResultErrorMessagesCore = tx_error_messages.NewTxErrorMessagesCore(
 		suite.log,
+		suite.state,
 		suite.backend,
+		suite.receipts,
 		suite.txErrorMessages,
-		executionNodeIdentitiesProvider,
+		nil,
+		nil,
 	)
 
 	suite.command = NewBackfillTxErrorMessagesCommand(

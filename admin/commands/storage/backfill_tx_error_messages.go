@@ -18,9 +18,9 @@ var _ commands.AdminCommand = (*BackfillTxErrorMessagesCommand)(nil)
 // backfillTxErrorMessagesRequest represents the input parameters for
 // backfilling transaction error messages.
 type backfillTxErrorMessagesRequest struct {
-	startHeight      uint64                    // Start height from which to begin backfilling.
-	endHeight        uint64                    // End height up to which backfilling is performed.
-	executionNodeIds flow.IdentitySkeletonList // List of execution node IDs to be used for backfilling.
+	startHeight      uint64            // Start height from which to begin backfilling.
+	endHeight        uint64            // End height up to which backfilling is performed.
+	executionNodeIds flow.IdentityList // List of execution node IDs to be used for backfilling.
 }
 
 // BackfillTxErrorMessagesCommand executes a command to backfill
@@ -55,8 +55,11 @@ func (b *BackfillTxErrorMessagesCommand) Validator(request *admin.CommandRequest
 
 	data := &backfillTxErrorMessagesRequest{}
 
-	rootHeight := b.state.Params().SealedRoot().Height
-	data.startHeight = rootHeight // Default value
+	root, err := b.state.Params().SealedRoot()
+	if err != nil {
+		return fmt.Errorf("could not get sealed root: %w", err)
+	}
+	data.startHeight = root.Height // Default value
 
 	sealed, err := b.state.Sealed().Head()
 	if err != nil {
@@ -78,11 +81,11 @@ func (b *BackfillTxErrorMessagesCommand) Validator(request *admin.CommandRequest
 			)
 		}
 
-		if startHeight < rootHeight {
+		if startHeight < root.Height {
 			return admin.NewInvalidAdminReqErrorf(
 				"'start-height' %d must not be less than root block %d",
 				startHeight,
-				rootHeight,
+				root.Height,
 			)
 		}
 
@@ -115,7 +118,7 @@ func (b *BackfillTxErrorMessagesCommand) Validator(request *admin.CommandRequest
 		)
 	}
 
-	identities, err := b.state.Final().Identities(filter.HasRole[flow.Identity](flow.RoleExecution))
+	identities, err := b.state.Final().Identities(filter.HasRole(flow.RoleExecution))
 	if err != nil {
 		return fmt.Errorf("failed to retreive execution IDs: %w", err)
 	}
@@ -128,7 +131,7 @@ func (b *BackfillTxErrorMessagesCommand) Validator(request *admin.CommandRequest
 		data.executionNodeIds = executionNodeIds
 	} else {
 		// in case no execution node ids provided, the command will use any valid execution node
-		data.executionNodeIds = identities.ToSkeleton()
+		data.executionNodeIds = identities
 	}
 
 	request.ValidatorData = data
@@ -169,7 +172,7 @@ func (b *BackfillTxErrorMessagesCommand) Handler(ctx context.Context, request *a
 //
 // Expected errors during normal operation:
 // - admin.InvalidAdminReqParameterError - if execution-node-ids is empty or has an invalid format.
-func (b *BackfillTxErrorMessagesCommand) parseExecutionNodeIds(executionNodeIdsIn interface{}, allIdentities flow.IdentityList) (flow.IdentitySkeletonList, error) {
+func (b *BackfillTxErrorMessagesCommand) parseExecutionNodeIds(executionNodeIdsIn interface{}, allIdentities flow.IdentityList) (flow.IdentityList, error) {
 	var ids flow.IdentityList
 
 	switch executionNodeIds := executionNodeIdsIn.(type) {
@@ -193,5 +196,5 @@ func (b *BackfillTxErrorMessagesCommand) parseExecutionNodeIds(executionNodeIdsI
 		return nil, admin.NewInvalidAdminReqParameterError("execution-node-ids", "must be a list of strings", executionNodeIdsIn)
 	}
 
-	return ids.ToSkeleton(), nil
+	return ids, nil
 }
