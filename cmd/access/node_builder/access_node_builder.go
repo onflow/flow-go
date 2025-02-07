@@ -28,7 +28,6 @@ import (
 	stateSyncCommands "github.com/onflow/flow-go/admin/commands/state_synchronization"
 	storageCommands "github.com/onflow/flow-go/admin/commands/storage"
 	"github.com/onflow/flow-go/cmd"
-	"github.com/onflow/flow-go/cmd/access/index"
 	"github.com/onflow/flow-go/consensus"
 	"github.com/onflow/flow-go/consensus/hotstuff"
 	"github.com/onflow/flow-go/consensus/hotstuff/committees"
@@ -296,7 +295,6 @@ type FlowAccessNodeBuilder struct {
 	ScriptExecutor             *backend.ScriptExecutor
 	RegistersAsyncStore        *execution.RegistersAsyncStore
 	EventsIndex                *backend.EventsIndex
-	Reporter                   *index.Reporter
 	TxResultsIndex             *backend.TransactionResultsIndex
 	IndexerDependencies        *cmd.DependencyList
 	collectionExecutedMetric   module.CollectionExecutedMetric
@@ -873,11 +871,6 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 					queryDerivedChainData,
 					builder.programCacheSize > 0,
 				)
-
-				err = builder.Reporter.Initialize(builder.ExecutionIndexer)
-				if err != nil {
-					return nil, err
-				}
 
 				err = builder.ScriptExecutor.Initialize(builder.ExecutionIndexer, scripts)
 				if err != nil {
@@ -1651,7 +1644,11 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 		}).
 		Module("transaction result error messages storage", func(node *cmd.NodeConfig) error {
 			if builder.storeTxResultErrorMessages {
-				builder.Storage.TransactionResultErrorMessages = bstorage.NewTransactionResultErrorMessages(node.Metrics.Cache, node.DB, bstorage.DefaultCacheSize)
+				builder.Storage.TransactionResultErrorMessages = bstorage.NewTransactionResultErrorMessages(
+					node.Metrics.Cache,
+					node.DB,
+					bstorage.DefaultCacheSize,
+				)
 			}
 
 			return nil
@@ -1709,12 +1706,6 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 				return nil, fmt.Errorf("transaction result query mode 'compare' is not supported")
 			}
 
-			// If execution data syncing and indexing is disabled, pass nil indexReporter
-			var indexReporter state_synchronization.IndexReporter
-			if builder.executionDataSyncEnabled && builder.executionDataIndexingEnabled {
-				indexReporter = builder.Reporter
-			}
-
 			preferredENIdentifiers, err := commonrpc.IdentifierList(backendConfig.PreferredExecutionNodeIDs)
 			if err != nil {
 				return nil, fmt.Errorf("failed to convert node id string to Flow Identifier for preferred EN map: %w", err)
@@ -1760,7 +1751,6 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 				TxResultQueryMode:          txResultQueryMode,
 				TxResultsIndex:             builder.TxResultsIndex,
 				LastFullBlockHeight:        lastFullBlockHeight,
-				IndexReporter:              indexReporter,
 				ExecNodeIdentitiesProvider: builder.ExecNodeIdentitiesProvider,
 			})
 			if err != nil {

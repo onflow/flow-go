@@ -30,7 +30,6 @@ import (
 	"github.com/onflow/flow-go/admin/commands"
 	stateSyncCommands "github.com/onflow/flow-go/admin/commands/state_synchronization"
 	"github.com/onflow/flow-go/cmd"
-	"github.com/onflow/flow-go/cmd/access/index"
 	"github.com/onflow/flow-go/consensus"
 	"github.com/onflow/flow-go/consensus/hotstuff"
 	"github.com/onflow/flow-go/consensus/hotstuff/committees"
@@ -245,7 +244,6 @@ type ObserverServiceBuilder struct {
 	ExecutionDataStore      execution_data.ExecutionDataStore
 
 	RegistersAsyncStore *execution.RegistersAsyncStore
-	Reporter            *index.Reporter
 	EventsIndex         *backend.EventsIndex
 
 	// available until after the network has started. Hence, a factory function that needs to be called just before
@@ -1564,12 +1562,6 @@ func (builder *ObserverServiceBuilder) enqueueRPCServer() {
 			),
 		}
 
-		// If execution data syncing and indexing is disabled, pass nil indexReporter
-		var indexReporter state_synchronization.IndexReporter
-		if builder.executionDataSyncEnabled && builder.executionDataIndexingEnabled {
-			indexReporter = builder.Reporter
-		}
-
 		preferredENIdentifiers, err := commonrpc.IdentifierList(backendConfig.PreferredExecutionNodeIDs)
 		if err != nil {
 			return nil, fmt.Errorf("failed to convert node id string to Flow Identifier for preferred EN map: %w", err)
@@ -1604,7 +1596,6 @@ func (builder *ObserverServiceBuilder) enqueueRPCServer() {
 			Log:                        node.Logger,
 			SnapshotHistoryLimit:       backend.DefaultSnapshotHistoryLimit,
 			Communicator:               backend.NewNodeCommunicator(backendConfig.CircuitBreakerConfig.Enabled),
-			IndexReporter:              indexReporter,
 			ExecNodeIdentitiesProvider: execNodeIdentitiesProvider,
 		})
 		if err != nil {
