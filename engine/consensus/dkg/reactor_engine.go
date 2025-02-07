@@ -336,7 +336,9 @@ func (e *ReactorEngine) handleEpochCommittedPhaseStarted(currentEpochCounter uin
 }
 
 // getDKGInfo returns the information required to initiate the DKG for the current epoch.
-// firstBlockID must be the first block of the EpochSetup phase.
+// firstBlockID must be the first block of the EpochSetup phase. This is one of the few places
+// where we have to use the configuration for a future epoch that has not yet been committed.
+// CAUTION: the epoch transition might not happen as described here!
 // No errors are expected during normal operation.
 func (e *ReactorEngine) getDKGInfo(firstBlockID flow.Identifier) (*dkgInfo, error) {
 	currEpoch := e.State.AtBlockID(firstBlockID).Epochs().Current()

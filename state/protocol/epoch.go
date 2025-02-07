@@ -13,9 +13,11 @@ type EpochQuery interface {
 	Current() CommittedEpoch
 
 	// NextUnsafe should only be used by components that actively advance the
-	// epoch from flow.EpochPhaseSetup to flow.EpochPhaseCommitted.
-	// NextUnsafe returns the next epoch as of this snapshot. Valid snapshots must
-	// have a next epoch available after the transition to epoch setup phase.
+	// epoch from [flow.EpochPhaseSetup] to [flow.EpochPhaseCommitted].
+	// NextUnsafe returns the tentative configuration for the next epoch as of this snapshot.
+	// Valid snapshots make such configuration available during the Epoch Setup Phase, which
+	// generally is the case only after an `EpochSetupPhaseStarted` notification has been emitted.
+	// CAUTION: epoch transition might not happen as described by the tentative configuration!
 	//
 	// Returns invalid.Epoch with ErrNextEpochNotSetup in the case that this method
 	// is queried w.r.t. a snapshot within the flow.EpochPhaseStaking phase, or
@@ -23,7 +25,8 @@ type EpochQuery interface {
 	NextUnsafe() TentativeEpoch
 
 	// NextCommitted returns the next epoch as of this snapshot, only if it has
-	// been committed already (after flow.EpochPhaseCommitted)
+	// been committed already - generally that is the case only after an
+	// `EpochCommittedPhaseStarted` notification has been emitted.
 	//
 	// Returns invalid.Epoch with ErrNextEpochNotCommitted in the case that
 	// the current phase is flow.EpochPhaseStaking or flow.EpochPhaseSetup.
@@ -210,12 +213,14 @@ type CommittedEpoch interface {
 	FinalHeight() (uint64, error)
 }
 
-// TentativeEpoch returns the data associated with the "working next epoch",
-// the upcoming epoch which the protocol is in the process of committing.
+// TentativeEpoch returns the tentative information about the upcoming epoch,
+// which the protocol is in the process of configuring.
 // Only the data that is strictly necessary for committing the epoch is exposed;
 // after commitment, all epoch data is accessible through the [CommittedEpoch] interface.
-// This should only be used by components that participate in committing the epoch
-// (transition from [flow.EpochPhaseSetup] to [flow.EpochPhaseCommitted]).
+// This should only be used during the Epoch Setup Phase by components that actively
+// contribute to configuring the upcoming epoch.
+//
+// CAUTION: the epoch transition might not happen as described by the tentative configuration!
 type TentativeEpoch interface {
 
 	// Counter returns the Epoch's counter.
