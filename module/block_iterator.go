@@ -65,4 +65,5 @@ type BlockIterator interface {
 // any error returned are exception
 type IteratorCreator interface {
 	Create() (fromSavedIndexToLatest BlockIterator, hasNext bool, exception error)
+	IteratorState() IteratorStateReader
 }
