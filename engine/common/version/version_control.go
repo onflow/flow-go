@@ -66,7 +66,7 @@ type VersionControl struct {
 	// Notifier for new finalized block height
 	finalizedHeightNotifier engine.Notifier
 
-	finalizedHeight counters.StrictMonotonousCounter
+	finalizedHeight counters.StrictMonotonicCounter
 
 	// lastProcessedHeight the last handled block height
 	lastProcessedHeight *atomic.Uint64
@@ -107,7 +107,7 @@ func NewVersionControl(
 		versionBeacons:          versionBeacons,
 		sealedRootBlockHeight:   atomic.NewUint64(sealedRootBlockHeight),
 		lastProcessedHeight:     atomic.NewUint64(latestFinalizedBlockHeight),
-		finalizedHeight:         counters.NewMonotonousCounter(latestFinalizedBlockHeight),
+		finalizedHeight:         counters.NewMonotonicCounter(latestFinalizedBlockHeight),
 		finalizedHeightNotifier: engine.NewNotifier(),
 		startHeight:             atomic.NewUint64(NoHeight),
 		endHeight:               atomic.NewUint64(NoHeight),
