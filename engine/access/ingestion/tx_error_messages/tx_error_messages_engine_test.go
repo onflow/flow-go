@@ -18,7 +18,6 @@ import (
 	accessmock "github.com/onflow/flow-go/engine/access/mock"
 	"github.com/onflow/flow-go/engine/access/rpc/backend"
 	connectionmock "github.com/onflow/flow-go/engine/access/rpc/connection/mock"
-	commonrpc "github.com/onflow/flow-go/engine/common/rpc"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/irrecoverable"
@@ -139,36 +138,31 @@ func (s *TxErrorMessagesEngineSuite) initEngine(ctx irrecoverable.SignalerContex
 		module.ConsumeProgressEngineTxErrorMessagesBlockHeight,
 	)
 
-	execNodeIdentitiesProvider := commonrpc.NewExecutionNodeIdentitiesProvider(
-		s.log,
-		s.proto.state,
-		s.receipts,
-		s.enNodeIDs.NodeIDs(),
-		flow.IdentifierList{},
-	)
-
 	// Initialize the backend with the mocked state, blocks, headers, transactions, etc.
 	backend, err := backend.New(backend.Params{
-		State:                      s.proto.state,
-		Headers:                    s.headers,
-		ExecutionReceipts:          s.receipts,
-		ConnFactory:                s.connFactory,
-		MaxHeightRange:             backend.DefaultMaxHeightRange,
-		Log:                        s.log,
-		SnapshotHistoryLimit:       backend.DefaultSnapshotHistoryLimit,
-		Communicator:               backend.NewNodeCommunicator(false),
-		ScriptExecutionMode:        backend.IndexQueryModeExecutionNodesOnly,
-		TxResultQueryMode:          backend.IndexQueryModeExecutionNodesOnly,
-		ChainID:                    flow.Testnet,
-		ExecNodeIdentitiesProvider: execNodeIdentitiesProvider,
+		State:                 s.proto.state,
+		Headers:               s.headers,
+		ExecutionReceipts:     s.receipts,
+		ConnFactory:           s.connFactory,
+		MaxHeightRange:        backend.DefaultMaxHeightRange,
+		FixedExecutionNodeIDs: s.enNodeIDs.NodeIDs().Strings(),
+		Log:                   s.log,
+		SnapshotHistoryLimit:  backend.DefaultSnapshotHistoryLimit,
+		Communicator:          backend.NewNodeCommunicator(false),
+		ScriptExecutionMode:   backend.IndexQueryModeExecutionNodesOnly,
+		TxResultQueryMode:     backend.IndexQueryModeExecutionNodesOnly,
+		ChainID:               flow.Testnet,
 	})
 	require.NoError(s.T(), err)
 
 	txResultErrorMessagesCore := NewTxErrorMessagesCore(
 		s.log,
+		s.proto.state,
 		backend,
+		s.receipts,
 		s.txErrorMessages,
-		execNodeIdentitiesProvider,
+		s.enNodeIDs.NodeIDs(),
+		nil,
 	)
 
 	eng, err := New(

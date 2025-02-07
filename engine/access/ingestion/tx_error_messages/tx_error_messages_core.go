@@ -4,40 +4,51 @@ import (
 	"context"
 	"fmt"
 
+	execproto "github.com/onflow/flow/protobuf/go/flow/execution"
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/engine/access/rpc/backend"
 	commonrpc "github.com/onflow/flow-go/engine/common/rpc"
 	"github.com/onflow/flow-go/engine/common/rpc/convert"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/storage"
-
-	execproto "github.com/onflow/flow/protobuf/go/flow/execution"
 )
 
 // TxErrorMessagesCore is responsible for managing transaction result error messages
 // It handles both storage and retrieval of error messages
 // from execution nodes.
 type TxErrorMessagesCore struct {
-	log zerolog.Logger // used to log relevant actions with context
+	log   zerolog.Logger // used to log relevant actions with context
+	state protocol.State // used to access the  protocol state
 
-	backend                        *backend.Backend
+	backend *backend.Backend
+
+	executionReceipts              storage.ExecutionReceipts
 	transactionResultErrorMessages storage.TransactionResultErrorMessages
-	execNodeIdentitiesProvider     *commonrpc.ExecutionNodeIdentitiesProvider
+
+	preferredExecutionNodeIDs flow.IdentifierList
+	fixedExecutionNodeIDs     flow.IdentifierList
 }
 
 // NewTxErrorMessagesCore creates a new instance of TxErrorMessagesCore.
 func NewTxErrorMessagesCore(
 	log zerolog.Logger,
+	state protocol.State,
 	backend *backend.Backend,
+	executionReceipts storage.ExecutionReceipts,
 	transactionResultErrorMessages storage.TransactionResultErrorMessages,
-	execNodeIdentitiesProvider *commonrpc.ExecutionNodeIdentitiesProvider,
+	preferredExecutionNodeIDs flow.IdentifierList,
+	fixedExecutionNodeIDs flow.IdentifierList,
 ) *TxErrorMessagesCore {
 	return &TxErrorMessagesCore{
 		log:                            log.With().Str("module", "tx_error_messages_core").Logger(),
+		state:                          state,
 		backend:                        backend,
+		executionReceipts:              executionReceipts,
 		transactionResultErrorMessages: transactionResultErrorMessages,
-		execNodeIdentitiesProvider:     execNodeIdentitiesProvider,
+		preferredExecutionNodeIDs:      preferredExecutionNodeIDs,
+		fixedExecutionNodeIDs:          fixedExecutionNodeIDs,
 	}
 }
 
@@ -63,7 +74,15 @@ func (c *TxErrorMessagesCore) HandleTransactionResultErrorMessages(ctx context.C
 	}
 
 	// retrieves error messages from the backend if they do not already exist in storage
-	execNodes, err := c.execNodeIdentitiesProvider.ExecutionNodesForBlockID(ctx, blockID)
+	execNodes, err := commonrpc.ExecutionNodesForBlockID(
+		ctx,
+		blockID,
+		c.executionReceipts,
+		c.state,
+		c.log,
+		c.preferredExecutionNodeIDs,
+		c.fixedExecutionNodeIDs,
+	)
 	if err != nil {
 		c.log.Error().Err(err).Msg(fmt.Sprintf("failed to find execution nodes for block id: %s", blockID))
 		return fmt.Errorf("could not find execution nodes for block: %w", err)
