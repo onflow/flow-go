@@ -16,7 +16,7 @@ import (
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/storage/operation/pebbleimpl"
-	pebblestorage "github.com/onflow/flow-go/storage/pebble"
+	"github.com/onflow/flow-go/storage/store"
 )
 
 const NextHeightForUnprunedExecutionDataPackKey = "NextHeightForUnprunedExecutionDataPackKey"
@@ -33,9 +33,11 @@ func LoopPruneExecutionDataFromRootToLatestSealed(
 	chunkDataPacksDB *pebble.DB,
 	config PruningConfig,
 ) error {
+
+	chunksDB := pebbleimpl.ToDB(chunkDataPacksDB)
 	// the creator can be reused to create new block iterator that can iterate from the last
 	// checkpoint to the new latest (sealed) block.
-	creator, getNextAndLatest, err := makeBlockIteratorCreator(state, badgerDB, headers, chunkDataPacksDB, config)
+	creator, getNextAndLatest, err := makeBlockIteratorCreator(state, badgerDB, headers, chunksDB, config)
 	if err != nil {
 		return err
 	}
@@ -46,7 +48,7 @@ func LoopPruneExecutionDataFromRootToLatestSealed(
 		log,
 		ctx, // for cancelling the iteration when the context is done
 		config,
-		chunkDataPacksDB,
+		chunksDB,
 		NewChunKDataPackPruner(chunkDataPacks, results),
 	)
 
@@ -98,7 +100,7 @@ func makeBlockIteratorCreator(
 	state protocol.State,
 	badgerDB *badger.DB,
 	headers storage.Headers,
-	chunkDataPacksDB *pebble.DB,
+	chunkDataPacksDB storage.DB,
 	config PruningConfig,
 ) (module.IteratorCreator, func() (nextToPrune uint64, latestToPrune uint64, err error), error) {
 	root := state.Params().SealedRoot()
@@ -115,11 +117,11 @@ func makeBlockIteratorCreator(
 		threshold:               config.Threshold,
 	}
 
-	progress := pebblestorage.NewConsumerProgress(chunkDataPacksDB, NextHeightForUnprunedExecutionDataPackKey)
+	initializer := store.NewConsumerProgress(chunkDataPacksDB, NextHeightForUnprunedExecutionDataPackKey)
 
 	creator, err := block_iterator.NewHeightBasedCreator(
 		headers.BlockIDByHeight,
-		progress,
+		initializer,
 		root,
 		latest.Latest,
 	)
@@ -128,8 +130,10 @@ func makeBlockIteratorCreator(
 		return nil, nil, fmt.Errorf("failed to create height based block iterator creator: %w", err)
 	}
 
-	return creator, func() (uint64, uint64, error) {
-		next, err := progress.ProcessedIndex()
+	stateReader := creator.IteratorState()
+
+	return creator, func() (nextToPrune uint64, latestToPrune uint64, err error) {
+		next, err := stateReader.LoadState()
 		if err != nil {
 			return 0, 0, fmt.Errorf("failed to get next height to prune: %w", err)
 		}
@@ -146,7 +150,7 @@ func makeBlockIteratorCreator(
 // makeIterateAndPruneAll takes config and chunk data packs db and pruner and returns a function that
 // takes a block iterator and iterates through all the blocks and decides how to prune the chunk data packs.
 func makeIterateAndPruneAll(
-	log zerolog.Logger, ctx context.Context, config PruningConfig, chunkDataPacksDB *pebble.DB, prune *ChunkDataPackPruner,
+	log zerolog.Logger, ctx context.Context, config PruningConfig, chunkDataPacksDB storage.DB, prune *ChunkDataPackPruner,
 ) func(iter module.BlockIterator) error {
 	isBatchFull := func(counter int) bool {
 		return uint(counter) >= config.BatchSize
@@ -156,10 +160,8 @@ func makeIterateAndPruneAll(
 		time.Sleep(config.SleepAfterEachBatchCommit)
 	}
 
-	db := pebbleimpl.ToDB(chunkDataPacksDB)
-
 	return func(iter module.BlockIterator) error {
-		err := executor.IterateExecuteAndCommitInBatch(log, ctx, iter, prune, db, isBatchFull, sleeper)
+		err := executor.IterateExecuteAndCommitInBatch(log, ctx, iter, prune, chunkDataPacksDB, isBatchFull, sleeper)
 		if err != nil {
 			return fmt.Errorf("failed to iterate, execute, and commit in batch: %w", err)
 		}
