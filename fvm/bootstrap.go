@@ -11,11 +11,13 @@ import (
 	usdc "github.com/onflow/bridged-usdc/lib/go/contracts"
 	storefront "github.com/onflow/nft-storefront/lib/go/contracts"
 
+	"github.com/onflow/flow-go/fvm/accountV2Migration"
 	"github.com/onflow/flow-go/fvm/blueprints"
 	"github.com/onflow/flow-go/fvm/environment"
 	"github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/fvm/evm/stdlib"
 	"github.com/onflow/flow-go/fvm/meter"
+	"github.com/onflow/flow-go/fvm/migration"
 	"github.com/onflow/flow-go/fvm/storage"
 	"github.com/onflow/flow-go/fvm/storage/logical"
 	"github.com/onflow/flow-go/fvm/systemcontracts"
@@ -455,6 +457,9 @@ func (b *bootstrapExecutor) Execute() error {
 
 	// set the list of nodes which are allowed to stake in this network
 	b.setStakingAllowlist(service, b.identities.NodeIDs())
+
+	b.deployAccountV2MigrationContract(service)
+	b.deployMigrationContract(service)
 
 	return nil
 }
@@ -1113,6 +1118,32 @@ func (b *bootstrapExecutor) deployStakingCollection(
 	)
 	env.StakingCollectionAddress = deployTo.String()
 	panicOnMetaInvokeErrf("failed to deploy FlowStakingCollection contract: %s", txError, err)
+}
+
+func (b *bootstrapExecutor) deployAccountV2MigrationContract(deployTo flow.Address) {
+	tx := blueprints.DeployContractTransaction(
+		deployTo,
+		accountV2Migration.ContractCode,
+		accountV2Migration.ContractName,
+	)
+	txError, err := b.invokeMetaTransaction(
+		b.ctx,
+		Transaction(tx, 0),
+	)
+	panicOnMetaInvokeErrf("failed to deploy AccountV2Migration contract: %s", txError, err)
+}
+
+func (b *bootstrapExecutor) deployMigrationContract(deployTo flow.Address) {
+	tx := blueprints.DeployContractTransaction(
+		deployTo,
+		migration.ContractCode(deployTo),
+		migration.ContractName,
+	)
+	txError, err := b.invokeMetaTransaction(
+		b.ctx,
+		Transaction(tx, 0),
+	)
+	panicOnMetaInvokeErrf("failed to deploy Migration contract: %s", txError, err)
 }
 
 func (b *bootstrapExecutor) setContractDeploymentRestrictions(
