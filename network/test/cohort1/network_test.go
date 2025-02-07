@@ -556,8 +556,9 @@ func (suite *NetworkTestSuite) TestUnicastRateLimit_Bandwidth() {
 		return err == nil
 	}, 5*time.Second, 100*time.Millisecond)
 
-	time.Sleep(200 * time.Millisecond)
-	assert.Equal(suite.T(), 3, callCount)
+	require.Eventually(suite.T(), func() bool {
+		return callCount == 3
+	}, 1*time.Second, 100*time.Millisecond)
 
 	// shutdown our network so that each message can be processed
 	cancel()
