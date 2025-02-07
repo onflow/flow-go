@@ -363,7 +363,7 @@ func (m *mockProgress) ProcessedIndex() (uint64, error) {
 
 func (m *mockProgress) Initialize(defaultIndex uint64) (storage.ConsumerProgress, error) {
 	if m.initialized {
-		return nil, fmt.Errorf("processed index already initialized")
+		return m, nil
 	}
 	m.index = defaultIndex
 	m.initialized = true
