@@ -1016,7 +1016,7 @@ func VerificationNode(t testing.TB,
 
 		chunkVerifier := chunks.NewChunkVerifier(vm, vmCtx, node.Log)
 
-		approvalStorage := storage.NewResultApprovals(node.Metrics, node.PublicDB)
+		approvalStorage := store.NewResultApprovals(node.Metrics, badgerimpl.ToDB(node.PublicDB))
 
 		node.VerifierEngine, err = verifier.New(node.Log,
 			collector,
