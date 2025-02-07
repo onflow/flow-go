@@ -14,7 +14,6 @@ import (
 
 	sdk "github.com/onflow/flow-go-sdk"
 	client "github.com/onflow/flow-go-sdk/access/grpc"
-	"github.com/onflow/flow-go-sdk/crypto"
 	sdkcrypto "github.com/onflow/flow-go-sdk/crypto"
 
 	"github.com/onflow/flow-go/engine/common/rpc/convert"
@@ -51,7 +50,7 @@ func NewClientWithKey(accessAddr string, accountAddr sdk.Address, key sdkcrypto.
 	}
 	accountKey := acc.Keys[0]
 
-	mySigner, err := crypto.NewInMemorySigner(key, accountKey.HashAlgo)
+	mySigner, err := sdkcrypto.NewInMemorySigner(key, accountKey.HashAlgo)
 	if err != nil {
 		return nil, fmt.Errorf("could not create a signer: %w", err)
 	}
@@ -99,6 +98,12 @@ func (c *Client) AccountKeyPriv() sdkcrypto.PrivateKey {
 }
 
 func (c *Client) GetSeqNumber() uint64 {
+	n := c.accountKey.SequenceNumber
+	c.accountKey.SequenceNumber++
+	return n
+}
+
+func (c *Client) GetAndIncrementSeqNumber() uint64 {
 	n := c.accountKey.SequenceNumber
 	c.accountKey.SequenceNumber++
 	return n

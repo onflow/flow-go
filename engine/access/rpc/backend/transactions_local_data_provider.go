@@ -26,18 +26,16 @@ type TransactionErrorMessage interface {
 	// Expected errors during normal operation:
 	//   - InsufficientExecutionReceipts - found insufficient receipts for given block ID.
 	//   - status.Error - remote GRPC call to EN has failed.
-	LookupErrorMessageByTransactionID(ctx context.Context, blockID flow.Identifier, transactionID flow.Identifier) (string, error)
+	LookupErrorMessageByTransactionID(ctx context.Context, blockID flow.Identifier, height uint64, transactionID flow.Identifier) (string, error)
 
 	// LookupErrorMessageByIndex is a function type for getting transaction error message by index.
 	// Expected errors during normal operation:
-	//   - status.Error[codes.NotFound] - transaction result for given block ID and tx index is not available.
 	//   - InsufficientExecutionReceipts - found insufficient receipts for given block ID.
 	//   - status.Error - remote GRPC call to EN has failed.
 	LookupErrorMessageByIndex(ctx context.Context, blockID flow.Identifier, height uint64, index uint32) (string, error)
 
 	// LookupErrorMessagesByBlockID is a function type for getting transaction error messages by block ID.
 	// Expected errors during normal operation:
-	//   - status.Error[codes.NotFound] - transaction results for given block ID are not available.
 	//   - InsufficientExecutionReceipts - found insufficient receipts for given block ID.
 	//   - status.Error - remote GRPC call to EN has failed.
 	LookupErrorMessagesByBlockID(ctx context.Context, blockID flow.Identifier, height uint64) (map[flow.Identifier]string, error)
@@ -78,7 +76,7 @@ func (t *TransactionsLocalDataProvider) GetTransactionResultFromStorage(
 	var txErrorMessage string
 	var txStatusCode uint = 0
 	if txResult.Failed {
-		txErrorMessage, err = t.txErrorMessages.LookupErrorMessageByTransactionID(ctx, blockID, transactionID)
+		txErrorMessage, err = t.txErrorMessages.LookupErrorMessageByTransactionID(ctx, blockID, block.Header.Height, transactionID)
 		if err != nil {
 			return nil, err
 		}

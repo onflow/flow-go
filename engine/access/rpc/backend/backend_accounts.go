@@ -14,6 +14,7 @@ import (
 
 	"github.com/onflow/flow-go/engine/access/rpc/connection"
 	"github.com/onflow/flow-go/engine/common/rpc"
+	commonrpc "github.com/onflow/flow-go/engine/common/rpc"
 	"github.com/onflow/flow-go/engine/common/rpc/convert"
 	fvmerrors "github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/model/flow"
@@ -154,7 +155,15 @@ func (b *backendAccounts) getAccountFromAnyExeNode(
 		BlockId: blockID[:],
 	}
 
-	execNodes, err := executionNodesForBlockID(ctx, blockID, b.executionReceipts, b.state, b.log)
+	execNodes, err := commonrpc.ExecutionNodesForBlockID(
+		ctx,
+		blockID,
+		b.executionReceipts,
+		b.state,
+		b.log,
+		preferredENIdentifiers,
+		fixedENIdentifiers,
+	)
 	if err != nil {
 		return nil, rpc.ConvertError(err, "failed to find execution node to query", codes.Internal)
 	}

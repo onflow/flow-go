@@ -86,20 +86,22 @@ const (
 	codeJobQueuePointer      = 72
 
 	// legacy codes (should be cleaned up)
-	codeChunkDataPack                = 100
-	codeCommit                       = 101
-	codeEvent                        = 102
-	codeExecutionStateInteractions   = 103
-	codeTransactionResult            = 104
-	codeFinalizedCluster             = 105
-	codeServiceEvent                 = 106
-	codeTransactionResultIndex       = 107
-	codeLightTransactionResult       = 108
-	codeLightTransactionResultIndex  = 109
-	codeIndexCollection              = 200
-	codeIndexExecutionResultByBlock  = 202
-	codeIndexCollectionByTransaction = 203
-	codeIndexResultApprovalByChunk   = 204
+	codeChunkDataPack                      = 100
+	codeCommit                             = 101
+	codeEvent                              = 102
+	codeExecutionStateInteractions         = 103
+	codeTransactionResult                  = 104
+	codeFinalizedCluster                   = 105
+	codeServiceEvent                       = 106
+	codeTransactionResultIndex             = 107
+	codeLightTransactionResult             = 108
+	codeLightTransactionResultIndex        = 109
+	codeTransactionResultErrorMessage      = 110
+	codeTransactionResultErrorMessageIndex = 111
+	codeIndexCollection                    = 200
+	codeIndexExecutionResultByBlock        = 202
+	codeIndexCollectionByTransaction       = 203
+	codeIndexResultApprovalByChunk         = 204
 
 	// TEMPORARY codes
 	blockedNodeIDs = 205 // manual override for adding node IDs to list of ejected nodes, applies to networking layer only

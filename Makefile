@@ -86,7 +86,7 @@ install-tools: check-go-version install-mock-generators
 	go install github.com/golang/protobuf/protoc-gen-go@v1.3.2; \
 	go install github.com/uber/prototool/cmd/prototool@v1.9.0; \
 	go install github.com/gogo/protobuf/protoc-gen-gofast@latest; \
-	go install golang.org/x/tools/cmd/stringer@master;
+	go install golang.org/x/tools/cmd/stringer@v0.20.0;
 
 .PHONY: verify-mocks
 verify-mocks: tidy generate-mocks
