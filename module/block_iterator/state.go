@@ -1,7 +1,6 @@
 package block_iterator
 
 import (
-	"errors"
 	"fmt"
 
 	"github.com/onflow/flow-go/module"
@@ -16,14 +15,10 @@ type PersistentIteratorState struct {
 
 var _ module.IteratorState = (*PersistentIteratorState)(nil)
 
-func NewPersistentIteratorState(store storage.ConsumerProgress, root uint64, latest func() (uint64, error)) (*PersistentIteratorState, error) {
-	_, err := store.ProcessedIndex()
-	if errors.Is(err, storage.ErrNotFound) {
-		next := root + 1
-		err = store.InitProcessedIndex(next)
-		if err != nil {
-			return nil, fmt.Errorf("failed to init processed index: %w", err)
-		}
+func NewPersistentIteratorState(initializer storage.ConsumerProgressInitializer, root uint64, latest func() (uint64, error)) (*PersistentIteratorState, error) {
+	store, err := initializer.Initialize(root + 1)
+	if err != nil {
+		return nil, fmt.Errorf("failed to init processed index: %w", err)
 	}
 
 	return &PersistentIteratorState{
