@@ -49,6 +49,26 @@ func (_m *IteratorCreator) Create() (module.BlockIterator, bool, error) {
 	return r0, r1, r2
 }
 
+// IteratorState provides a mock function with given fields:
+func (_m *IteratorCreator) IteratorState() module.IteratorStateReader {
+	ret := _m.Called()
+
+	if len(ret) == 0 {
+		panic("no return value specified for IteratorState")
+	}
+
+	var r0 module.IteratorStateReader
+	if rf, ok := ret.Get(0).(func() module.IteratorStateReader); ok {
+		r0 = rf()
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(module.IteratorStateReader)
+		}
+	}
+
+	return r0
+}
+
 // NewIteratorCreator creates a new instance of IteratorCreator. It also registers a testing interface on the mock and a cleanup function to assert the mocks expectations.
 // The first argument is typically a *testing.T value.
 func NewIteratorCreator(t interface {
