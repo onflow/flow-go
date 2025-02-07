@@ -351,6 +351,9 @@ type mockProgress struct {
 	initialized bool
 }
 
+var _ storage.ConsumerProgress = (*mockProgress)(nil)
+var _ storage.ConsumerProgressInitializer = (*mockProgress)(nil)
+
 func (m *mockProgress) ProcessedIndex() (uint64, error) {
 	if !m.initialized {
 		return 0, fmt.Errorf("processed index not initialized: %w", storage.ErrNotFound)
@@ -358,13 +361,13 @@ func (m *mockProgress) ProcessedIndex() (uint64, error) {
 	return m.index, nil
 }
 
-func (m *mockProgress) InitProcessedIndex(defaultIndex uint64) error {
+func (m *mockProgress) Initialize(defaultIndex uint64) (storage.ConsumerProgress, error) {
 	if m.initialized {
-		return fmt.Errorf("processed index already initialized")
+		return nil, fmt.Errorf("processed index already initialized")
 	}
 	m.index = defaultIndex
 	m.initialized = true
-	return nil
+	return m, nil
 }
 
 func (m *mockProgress) SetProcessedIndex(processed uint64) error {
