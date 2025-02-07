@@ -41,11 +41,13 @@ type GossipSubAdapter struct {
 
 var _ p2p.PubSubAdapter = (*GossipSubAdapter)(nil)
 
-func NewGossipSubAdapter(ctx context.Context,
+func NewGossipSubAdapter(
+	ctx context.Context,
 	logger zerolog.Logger,
 	h host.Host,
 	cfg p2p.PubSubAdapterConfig,
-	clusterChangeConsumer p2p.CollectionClusterChangesConsumer) (p2p.PubSubAdapter, error) {
+	clusterChangeConsumer p2p.CollectionClusterChangesConsumer,
+) (p2p.PubSubAdapter, error) {
 	gossipSubConfig, ok := cfg.(*GossipSubAdapterConfig)
 	if !ok {
 		return nil, fmt.Errorf("invalid gossipsub config type: %T", cfg)
