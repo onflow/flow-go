@@ -465,13 +465,6 @@ func ApprovalFor(result *flow.ExecutionResult, chunkIdx uint64, approverID flow.
 	)
 }
 
-func EntityWithID(expectedID flow.Identifier) interface{} {
-	return mock.MatchedBy(
-		func(entity flow.Entity) bool {
-			return expectedID == entity.ID()
-		})
-}
-
 // subgraphFixture represents a subgraph of the blockchain:
 //
 //	Result   -----------------------------------> Block
