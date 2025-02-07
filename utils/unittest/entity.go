@@ -90,22 +90,8 @@ func generateRandomReflectValue(t *testing.T, field reflect.Value) {
 			generateRandomReflectValue(t, val)
 			field.SetMapIndex(key, val)
 		}
-	case reflect.Ptr:
-		if field.IsNil() {
-			field.Set(reflect.New(field.Type().Elem())) // Initialize if nil
-		}
-		generateRandomReflectValue(t, field.Elem()) // Modify underlying value
-	case reflect.Struct:
-		// Modify a single random field in the struct
-		numFields := field.NumField()
-		if numFields > 0 {
-			randomField := field.Field(rand.Intn(numFields))
-			if randomField.CanSet() {
-				generateRandomReflectValue(t, randomField)
-			}
-		}
 	default:
-		require.FailNowf(t, "unsupported type: %s", field.Kind().String())
+		require.FailNowf(t, "cannot generate random value", "unsupported type: %s", field.Kind().String())
 	}
 }
 
@@ -116,70 +102,40 @@ func generateRandomReflectValue(t *testing.T, field reflect.Value) {
 // prevent any tampering with the content of the entity.
 // This function consumes the entity and modifies its fields randomly to ensure that the ID changes after each modification.
 // Generally speaking each type that implements [flow.IDEntity] method should be tested with this function.
+// ATTENTION: We put only one requirement for data types, that is all fields have to be exported so we can modify them.
 func RequireEntityNotMalleable(t *testing.T, entity flow.IDEntity) {
 	v := reflect.ValueOf(entity)
-	if v.Kind() == reflect.Ptr {
-		v = v.Elem()
-	}
-
-	if v.Kind() == reflect.Struct {
-		// in case of a struct we would like to ensure that implementation of ID() method covers all fields
-		// to do this we will generate random value for each field and check if ID has changed at each step
-		tType := v.Type()
-		origID := entity.ID()
-		for i := 0; i < v.NumField(); i++ {
-			field := v.Field(i)
-			require.Truef(t, field.CanSet(), "field %s is not settable", tType.Field(i).Name)
-
-			// modify only this field
-			generateRandomReflectValue(t, field)
-			newID := entity.ID()
-
-			// ensure ID has changed
-			require.NotEqualf(t, origID, newID, "ID did not change after modifying field: %s", tType.Field(i).Name)
-			origID = newID
-		}
-	} else {
-		// if we are dealing with not composite type then we can just generate random value for inner type
-		// and check if ID has changed
-		origID := entity.ID()
-		generateRandomReflectValue(t, v)
-
-		// Ensure ID has changed
-		require.NotEqual(t, origID, entity.ID(), "ID did not change after modifying value")
-	}
+	isMalleable := isEntityMalleable(t, v, entity.ID)
+	require.False(t, isMalleable, "entity is malleable")
 }
 
-func requireEntityNotMalleableHelper(t *testing.T, entity reflect.Value, idFunc func() flow.Identifier) {
-	v := reflect.ValueOf(entity)
+// isEntityMalleable is a helper function to recursively check fields of the entity. Every time we change a field we check if ID of the entity has changed.
+// If ID has not changed then entity is malleable.
+// This function returns boolean value so we can add extra traces to the test output in case of recursive calls to structure fields.
+func isEntityMalleable(t *testing.T, v reflect.Value, idFunc func() flow.Identifier) bool {
 	if v.Kind() == reflect.Ptr {
+		if v.IsNil() {
+			// if pointer is nil we need to initialize it, it will get zero values
+			// but later on we will generate random values for it.
+			v.Set(reflect.New(v.Type().Elem()))
+		}
 		v = v.Elem()
 	}
 
 	if v.Kind() == reflect.Struct {
-		// in case of a struct we would like to ensure that implementation of ID() method covers all fields
-		// to do this we will generate random value for each field and check if ID has changed at each step
+		// in case of a struct we would like to ensure that changing any field will change the ID of the entity.
+		// we will recursively check all fields of the struct and if any of the fields is malleable then the whole entity is malleable.
 		tType := v.Type()
-		origID := idFunc()
 		for i := 0; i < v.NumField(); i++ {
 			field := v.Field(i)
 			require.Truef(t, field.CanSet(), "field %s is not settable", tType.Field(i).Name)
-
-			// modify only this field
-			generateRandomReflectValue(t, field)
-			newID := idFunc()
-
-			// ensure ID has changed
-			require.NotEqualf(t, origID, newID, "ID did not change after modifying field: %s", tType.Field(i).Name)
-			origID = newID
+			require.False(t, isEntityMalleable(t, field, idFunc), "field %s is malleable", tType.Field(i).Name)
 		}
+		return false
 	} else {
-		// if we are dealing with not composite type then we can just generate random value for inner type
-		// and check if ID has changed
+		// when dealing with non-composite type we can generate random values for it and check if ID has changed.
 		origID := idFunc()
 		generateRandomReflectValue(t, v)
-
-		// Ensure ID has changed
-		require.NotEqual(t, origID, idFunc(), "ID did not change after modifying value")
+		return origID == idFunc()
 	}
 }
