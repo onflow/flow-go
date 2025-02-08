@@ -381,8 +381,10 @@ type EpochQuery struct {
 	snap *Snapshot
 }
 
+var _ protocol.EpochQuery = (*EpochQuery)(nil)
+
 // Current returns the current epoch.
-func (q *EpochQuery) Current() protocol.Epoch {
+func (q *EpochQuery) Current() protocol.CommittedEpoch {
 	// all errors returned from storage reads here are unexpected, because all
 	// snapshots reside within a current epoch, which must be queryable
 	epochState, err := q.snap.state.protocolState.EpochStateAtBlockID(q.snap.blockID)
@@ -402,8 +404,8 @@ func (q *EpochQuery) Current() protocol.Epoch {
 	return inmem.NewCommittedEpoch(setup, epochState.EpochExtensions(), commit)
 }
 
-// Next returns the next epoch, if it is available.
-func (q *EpochQuery) Next() protocol.Epoch {
+// NextUnsafe returns the next epoch, if it is has been setup but not yet committed.
+func (q *EpochQuery) NextUnsafe() protocol.TentativeEpoch {
 
 	epochState, err := q.snap.state.protocolState.EpochStateAtBlockID(q.snap.blockID)
 	if err != nil {
@@ -421,7 +423,30 @@ func (q *EpochQuery) Next() protocol.Epoch {
 	if phase == flow.EpochPhaseSetup {
 		return inmem.NewSetupEpoch(nextSetup, entry.NextEpoch.EpochExtensions)
 	}
-	// if we are in committed phase, return a CommittedEpoch
+	// if we are in committed phase, return an error
+	if phase == flow.EpochPhaseCommitted {
+		return invalid.NewEpoch(protocol.ErrNextEpochAlreadyCommitted)
+	}
+	return invalid.NewEpochf("data corruption: unknown epoch phase implies malformed protocol state epoch data")
+}
+
+// NextCommitted returns the next epoch as of this snapshot, only if it has been committed already.
+func (q *EpochQuery) NextCommitted() protocol.CommittedEpoch {
+	epochState, err := q.snap.state.protocolState.EpochStateAtBlockID(q.snap.blockID)
+	if err != nil {
+		return invalid.NewEpochf("could not get protocol state snapshot at block %x: %w", q.snap.blockID, err)
+	}
+	phase := epochState.EpochPhase()
+	entry := epochState.Entry()
+
+	// if we are in the staking or fallback phase, the next epoch is not setup yet
+	if phase == flow.EpochPhaseStaking || phase == flow.EpochPhaseFallback {
+		return invalid.NewEpoch(protocol.ErrNextEpochNotSetup)
+	}
+	if phase == flow.EpochPhaseSetup {
+		return invalid.NewEpoch(protocol.ErrNextEpochNotCommitted)
+	}
+	nextSetup := entry.NextEpochSetup
 	nextCommit := entry.NextEpochCommit
 	if phase == flow.EpochPhaseCommitted {
 		return inmem.NewCommittedEpoch(nextSetup, entry.NextEpoch.EpochExtensions, nextCommit)
@@ -432,7 +457,7 @@ func (q *EpochQuery) Next() protocol.Epoch {
 // Previous returns the previous epoch. During the first epoch after the root
 // block, this returns a sentinel error (since there is no previous epoch).
 // For all other epochs, returns the previous epoch.
-func (q *EpochQuery) Previous() protocol.Epoch {
+func (q *EpochQuery) Previous() protocol.CommittedEpoch {
 
 	epochState, err := q.snap.state.protocolState.EpochStateAtBlockID(q.snap.blockID)
 	if err != nil {

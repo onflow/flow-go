@@ -55,7 +55,7 @@ func NewEpochComponentsFactory(
 }
 
 func (factory *EpochComponentsFactory) Create(
-	epoch protocol.Epoch,
+	epoch protocol.CommittedEpoch,
 ) (
 	state cluster.State,
 	compliance component.Component,

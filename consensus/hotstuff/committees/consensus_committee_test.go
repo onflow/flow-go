@@ -85,7 +85,7 @@ func (suite *ConsensusSuite) CreateAndStartCommittee() {
 
 // CommitEpoch adds the epoch to the protocol state and mimics the protocol state
 // behaviour when committing an epoch, by sending the protocol event to the committee.
-func (suite *ConsensusSuite) CommitEpoch(epoch protocol.Epoch) {
+func (suite *ConsensusSuite) CommitEpoch(epoch protocol.CommittedEpoch) {
 	firstBlockOfCommittedPhase := unittest.BlockHeaderFixture()
 	suite.state.On("AtHeight", firstBlockOfCommittedPhase.Height).Return(suite.snapshot)
 	suite.epochs.Add(epoch)

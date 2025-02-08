@@ -13,39 +13,59 @@ type EpochQuery struct {
 }
 
 // Current provides a mock function with given fields:
-func (_m *EpochQuery) Current() protocol.Epoch {
+func (_m *EpochQuery) Current() protocol.CommittedEpoch {
 	ret := _m.Called()
 
 	if len(ret) == 0 {
 		panic("no return value specified for Current")
 	}
 
-	var r0 protocol.Epoch
-	if rf, ok := ret.Get(0).(func() protocol.Epoch); ok {
+	var r0 protocol.CommittedEpoch
+	if rf, ok := ret.Get(0).(func() protocol.CommittedEpoch); ok {
 		r0 = rf()
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(protocol.Epoch)
+			r0 = ret.Get(0).(protocol.CommittedEpoch)
 		}
 	}
 
 	return r0
 }
 
-// Next provides a mock function with given fields:
-func (_m *EpochQuery) Next() protocol.Epoch {
+// NextCommitted provides a mock function with given fields:
+func (_m *EpochQuery) NextCommitted() protocol.CommittedEpoch {
 	ret := _m.Called()
 
 	if len(ret) == 0 {
-		panic("no return value specified for Next")
+		panic("no return value specified for NextCommitted")
 	}
 
-	var r0 protocol.Epoch
-	if rf, ok := ret.Get(0).(func() protocol.Epoch); ok {
+	var r0 protocol.CommittedEpoch
+	if rf, ok := ret.Get(0).(func() protocol.CommittedEpoch); ok {
 		r0 = rf()
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(protocol.Epoch)
+			r0 = ret.Get(0).(protocol.CommittedEpoch)
+		}
+	}
+
+	return r0
+}
+
+// NextUnsafe provides a mock function with given fields:
+func (_m *EpochQuery) NextUnsafe() protocol.TentativeEpoch {
+	ret := _m.Called()
+
+	if len(ret) == 0 {
+		panic("no return value specified for NextUnsafe")
+	}
+
+	var r0 protocol.TentativeEpoch
+	if rf, ok := ret.Get(0).(func() protocol.TentativeEpoch); ok {
+		r0 = rf()
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(protocol.TentativeEpoch)
 		}
 	}
 
@@ -53,19 +73,19 @@ func (_m *EpochQuery) Next() protocol.Epoch {
 }
 
 // Previous provides a mock function with given fields:
-func (_m *EpochQuery) Previous() protocol.Epoch {
+func (_m *EpochQuery) Previous() protocol.CommittedEpoch {
 	ret := _m.Called()
 
 	if len(ret) == 0 {
 		panic("no return value specified for Previous")
 	}
 
-	var r0 protocol.Epoch
-	if rf, ok := ret.Get(0).(func() protocol.Epoch); ok {
+	var r0 protocol.CommittedEpoch
+	if rf, ok := ret.Get(0).(func() protocol.CommittedEpoch); ok {
 		r0 = rf()
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(protocol.Epoch)
+			r0 = ret.Get(0).(protocol.CommittedEpoch)
 		}
 	}
 
