@@ -177,7 +177,7 @@ func (suite *Suite) SetupTest() {
 	// add current epoch
 	suite.AddEpoch(suite.counter)
 	// next epoch (with counter+1) is added later, as either setup/tentative (if we need to start QC)
-	// or committed (if we need to transition to it) depending on the testgi
+	// or committed (if we need to transition to it) depending on the test
 
 	suite.pools = epochs.NewTransactionPools(func(_ uint64) mempool.Transactions {
 		return herocache.NewTransactions(1000, suite.log, metrics.NewNoopCollector())
