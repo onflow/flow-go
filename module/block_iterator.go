@@ -64,6 +64,10 @@ type BlockIterator interface {
 // if there is no block to iterate, hasNext is false
 // any error returned are exception
 type IteratorCreator interface {
+	// Create return the next block iterator
 	Create() (fromSavedIndexToLatest BlockIterator, hasNext bool, exception error)
+
+	// IteratorState returns the iterate state, useful to know the progress of the iterator
+	// after each round of iteration
 	IteratorState() IteratorStateReader
 }

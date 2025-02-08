@@ -102,7 +102,13 @@ func makeBlockIteratorCreator(
 	headers storage.Headers,
 	chunkDataPacksDB storage.DB,
 	config PruningConfig,
-) (module.IteratorCreator, func() (nextToPrune uint64, latestToPrune uint64, err error), error) {
+) (
+	module.IteratorCreator,
+	// this is for logging purpose, so that after each round of pruning,
+	// we can log and report metrics about the next and latest to prune
+	func() (nextToPrune uint64, latestToPrune uint64, err error),
+	error, // any error are exception
+) {
 	root := state.Params().SealedRoot()
 	sealedAndExecuted := latest.NewLatestSealedAndExecuted(
 		root,
