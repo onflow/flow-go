@@ -22,9 +22,9 @@ import (
 const NextHeightForUnprunedExecutionDataPackKey = "NextHeightForUnprunedExecutionDataPackKey"
 
 func LoopPruneExecutionDataFromRootToLatestSealed(
+	ctx context.Context,
 	log zerolog.Logger,
 	metrics module.ExecutionMetrics,
-	ctx context.Context,
 	state protocol.State,
 	badgerDB *badger.DB,
 	headers storage.Headers,
@@ -49,7 +49,7 @@ func LoopPruneExecutionDataFromRootToLatestSealed(
 		ctx, // for cancelling the iteration when the context is done
 		config,
 		chunksDB,
-		NewChunKDataPackPruner(chunkDataPacks, results),
+		NewChunkDataPackPruner(chunkDataPacks, results),
 	)
 
 	for {

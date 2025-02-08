@@ -13,7 +13,7 @@ type ChunkDataPackPruner struct {
 
 var _ executor.IterationExecutor = (*ChunkDataPackPruner)(nil)
 
-func NewChunKDataPackPruner(chunkDataPacks storage.ChunkDataPacks, results storage.ExecutionResults) *ChunkDataPackPruner {
+func NewChunkDataPackPruner(chunkDataPacks storage.ChunkDataPacks, results storage.ExecutionResults) *ChunkDataPackPruner {
 	return &ChunkDataPackPruner{
 		ChunkDataPackPruner: pruners.NewChunkDataPackPruner(chunkDataPacks, results),
 	}
