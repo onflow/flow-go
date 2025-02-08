@@ -96,7 +96,7 @@ func TestLoopPruneExecutionDataFromRootToLatestSealed(t *testing.T) {
 			})(cancel)
 
 			require.NoError(t, LoopPruneExecutionDataFromRootToLatestSealed(
-				unittest.Logger(), metrics, ctx, ps, bdb, headers, chunkDataPacks, results, pdb, cfg,
+				ctx, unittest.Logger(), metrics, ps, bdb, headers, chunkDataPacks, results, pdb, cfg,
 			))
 
 			// verify the chunk data packs beyond the threshold are pruned

@@ -57,8 +57,8 @@ func IterateExecuteAndCommitInBatch(
 	total := 0
 	defer func() {
 		log.Info().Str("duration", time.Since(startTime).String()).
-			Int("total_block_pruned", total).
-			Msg("pruning completed")
+			Int("total_block_executed", total).
+			Msg("block iteration and execution completed")
 	}()
 
 	for {
@@ -94,10 +94,10 @@ func IterateExecuteAndCommitInBatch(
 			break
 		}
 
-		// prune all the data indexed by the block
+		// execute all the data indexed by the block
 		err = executor.ExecuteByBlockID(blockID, batch)
 		if err != nil {
-			return fmt.Errorf("failed to prune by block ID %v: %w", blockID, err)
+			return fmt.Errorf("failed to execute by block ID %v: %w", blockID, err)
 		}
 		iteratedCountInCurrentBatch++
 		total++

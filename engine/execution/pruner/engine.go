@@ -30,8 +30,8 @@ func NewChunkDataPackPruningEngine(
 			ready()
 
 			err := LoopPruneExecutionDataFromRootToLatestSealed(
-				log.With().Str("component", "CDP-pruner").Logger(), metrics,
-				ctx, state, badgerDB, headers, chunkDataPacks, results, chunkDataPacksDB, config)
+				ctx, log.With().Str("component", "CDP-pruner").Logger(), metrics,
+				state, badgerDB, headers, chunkDataPacks, results, chunkDataPacksDB, config)
 			if err != nil {
 				ctx.Throw(err)
 			}
