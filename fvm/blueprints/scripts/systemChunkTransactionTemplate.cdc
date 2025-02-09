@@ -2,7 +2,6 @@ import FlowEpoch from "FlowEpoch"
 import NodeVersionBeacon from "NodeVersionBeacon"
 import RandomBeaconHistory from "RandomBeaconHistory"
 import EVM from "EVM"
-import Migration from "Migration"
 
 transaction {
     prepare(serviceAccount: auth(BorrowValue) &Account) {
@@ -23,9 +22,5 @@ transaction {
         let evmHeartbeat = serviceAccount.storage
             .borrow<&EVM.Heartbeat>(from: /storage/EVMHeartbeat)
         evmHeartbeat?.heartbeat()
-
-        let migrationAdmin = serviceAccount.storage
-            .borrow<&Migration.Admin>(from: Migration.adminStoragePath)
-        migrationAdmin?.migrate()
     }
 }
