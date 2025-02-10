@@ -89,6 +89,7 @@ const (
 	DefaultProfilerDir = "/data/profiler"
 
 	// GRPCPort is the GRPC API port.
+	// Use this same port for the ExecutionDataAPI
 	GRPCPort = "9000"
 	// GRPCSecurePort is the secure GRPC API port.
 	GRPCSecurePort = "9001"
@@ -100,8 +101,6 @@ const (
 	MetricsPort = "8080"
 	// AdminPort is the admin server port
 	AdminPort = "9002"
-	// ExecutionStatePort is the execution state server port
-	ExecutionStatePort = "9003"
 	// PublicNetworkPort is the access node network port accessible from outside any docker container
 	PublicNetworkPort = "9876"
 	// DebuggerPort is the go debugger port
@@ -797,6 +796,7 @@ func (net *FlowNetwork) AddObserver(t *testing.T, conf ObserverConfig) *Containe
 
 	nodeContainer.exposePort(GRPCPort, testingdock.RandomPort(t))
 	nodeContainer.AddFlag("rpc-addr", nodeContainer.ContainerAddr(GRPCPort))
+	nodeContainer.AddFlag("state-stream-addr", nodeContainer.ContainerAddr(GRPCPort))
 
 	nodeContainer.exposePort(GRPCSecurePort, testingdock.RandomPort(t))
 	nodeContainer.AddFlag("secure-rpc-addr", nodeContainer.ContainerAddr(GRPCSecurePort))
@@ -809,9 +809,6 @@ func (net *FlowNetwork) AddObserver(t *testing.T, conf ObserverConfig) *Containe
 
 	nodeContainer.exposePort(RESTPort, testingdock.RandomPort(t))
 	nodeContainer.AddFlag("rest-addr", nodeContainer.ContainerAddr(RESTPort))
-
-	nodeContainer.exposePort(ExecutionStatePort, testingdock.RandomPort(t))
-	nodeContainer.AddFlag("state-stream-addr", nodeContainer.ContainerAddr(ExecutionStatePort))
 
 	nodeContainer.opts.HealthCheck = testingdock.HealthCheckCustom(nodeContainer.HealthcheckCallback())
 
@@ -910,6 +907,7 @@ func (net *FlowNetwork) AddNode(t *testing.T, bootstrapDir string, nodeConf Cont
 		case flow.RoleAccess:
 			nodeContainer.exposePort(GRPCPort, testingdock.RandomPort(t))
 			nodeContainer.AddFlag("rpc-addr", nodeContainer.ContainerAddr(GRPCPort))
+			nodeContainer.AddFlag("state-stream-addr", nodeContainer.ContainerAddr(GRPCPort))
 
 			nodeContainer.exposePort(GRPCSecurePort, testingdock.RandomPort(t))
 			nodeContainer.AddFlag("secure-rpc-addr", nodeContainer.ContainerAddr(GRPCSecurePort))
@@ -919,9 +917,6 @@ func (net *FlowNetwork) AddNode(t *testing.T, bootstrapDir string, nodeConf Cont
 
 			nodeContainer.exposePort(RESTPort, testingdock.RandomPort(t))
 			nodeContainer.AddFlag("rest-addr", nodeContainer.ContainerAddr(RESTPort))
-
-			nodeContainer.exposePort(ExecutionStatePort, testingdock.RandomPort(t))
-			nodeContainer.AddFlag("state-stream-addr", nodeContainer.ContainerAddr(ExecutionStatePort))
 
 			// uncomment line below to point the access node exclusively to a single collection node
 			// nodeContainer.AddFlag("static-collection-ingress-addr", "collection_1:9000")
