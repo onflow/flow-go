@@ -116,5 +116,6 @@ func (mock *EpochQuery) AddTentative(epoch protocol.TentativeEpoch) {
 	defer mock.mu.Unlock()
 	counter, err := epoch.Counter()
 	require.NoError(mock.t, err, "cannot add epoch with invalid counter")
+	require.Equal(mock.t, mock.counter+1, counter, "may only add tentative next epoch with current counter + 1")
 	mock.tentative[counter] = epoch
 }

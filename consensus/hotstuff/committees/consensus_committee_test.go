@@ -754,7 +754,6 @@ func newMockCommittedEpoch(counter uint64, identities flow.IdentityList, firstVi
 	epoch.On("InitialIdentities").Return(identities.ToSkeleton(), nil)
 	epoch.On("FirstView").Return(firstView, nil)
 	epoch.On("FinalView").Return(finalView, nil)
-	// return nil error to indicate the epoch is committed
 	epoch.On("DKG").Return(nil, nil)
 
 	return epoch
