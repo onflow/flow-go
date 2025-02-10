@@ -10,6 +10,12 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
+func TestMalleability(t *testing.T) {
+	//unittest.RequireEntityNotMalleable(t, unittest.EpochSetupFixture())
+	//unittest.RequireEntityNotMalleable(t, unittest.EpochCommitFixture())
+	unittest.RequireEntityNotMalleable(t, unittest.EpochRecoverFixture())
+}
+
 func TestClusterQCVoteData_Equality(t *testing.T) {
 
 	pks := unittest.PublicKeysFixture(2, crypto.BLSBLS12381)

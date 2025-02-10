@@ -2,6 +2,7 @@ package unittest
 
 import (
 	"fmt"
+	"github.com/onflow/crypto"
 	"math/rand"
 	"reflect"
 	"testing"
@@ -50,7 +51,8 @@ func MockEntityListFixture(count int) []*MockEntity {
 }
 
 // generateRandomReflectValue uses reflection to switch on the field type and generate a random value for it.
-func generateRandomReflectValue(t *testing.T, field reflect.Value) {
+func generateRandomReflectValue(t *testing.T, field reflect.Value) bool {
+	generated := true
 	switch field.Kind() {
 	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
 		field.SetUint(field.Uint() + uint64(rand.Intn(100)+1))
@@ -67,16 +69,14 @@ func generateRandomReflectValue(t *testing.T, field reflect.Value) {
 			index := rand.Intn(field.Len())
 			generateRandomReflectValue(t, field.Index(index))
 		} else {
-			newElem := reflect.New(field.Type().Elem()).Elem()
-			generateRandomReflectValue(t, newElem)
-			field.Set(reflect.Append(field, newElem))
+			generated = false
 		}
 	case reflect.Array:
 		index := rand.Intn(field.Len())
 		generateRandomReflectValue(t, field.Index(index))
 	case reflect.Map:
-		if field.Len() > 0 {
-			for _, key := range field.MapKeys() {
+		if mapKeys := field.MapKeys(); len(mapKeys) > 0 {
+			for _, key := range mapKeys {
 				oldVal := field.MapIndex(key)
 				newVal := reflect.New(oldVal.Type()).Elem()
 				generateRandomReflectValue(t, newVal)
@@ -84,15 +84,40 @@ func generateRandomReflectValue(t *testing.T, field reflect.Value) {
 				break
 			}
 		} else {
-			key := reflect.New(field.Type().Key()).Elem()
-			generateRandomReflectValue(t, key)
-			val := reflect.New(field.Type().Elem()).Elem()
-			generateRandomReflectValue(t, val)
-			field.SetMapIndex(key, val)
+			generated = false
 		}
+	case reflect.Ptr:
+		require.False(t, field.IsNil(), "expect non-nil pointer")
+		generateRandomReflectValue(t, field.Elem()) // modify underlying value
+	case reflect.Struct:
+		generatedValue := generateCustomFlowValue(field)
+		require.Truef(t, generatedValue.IsValid(), "cannot generate random value for struct: %s", field.Type().String())
+		field.Set(generatedValue)
+	case reflect.Interface:
+		generatedValue := generateInterfaceFlowValue(field) // it's always a pointer
+		require.Truef(t, generatedValue.IsValid(), "cannot generate random value for interface: %s", field.Type().String())
+		field.Set(generatedValue)
 	default:
 		require.FailNowf(t, "cannot generate random value", "unsupported type: %s", field.Kind().String())
 	}
+	return generated
+}
+
+func generateCustomFlowValue(field reflect.Value) reflect.Value {
+	switch field.Type() {
+	case reflect.TypeOf(flow.IdentitySkeleton{}):
+		return reflect.ValueOf(IdentityFixture().IdentitySkeleton)
+	case reflect.TypeOf(flow.ClusterQCVoteData{}):
+		return reflect.ValueOf(flow.ClusterQCVoteDataFromQC(QuorumCertificateWithSignerIDsFixture()))
+	}
+	return reflect.Value{}
+}
+
+func generateInterfaceFlowValue(field reflect.Value) reflect.Value {
+	if field.Type().Implements(reflect.TypeOf((*crypto.PublicKey)(nil)).Elem()) {
+		return reflect.ValueOf(KeyFixture(crypto.ECDSAP256).PublicKey())
+	}
+	return reflect.Value{}
 }
 
 // RequireEntityNotMalleable ensures that the entity is not malleable, i.e. changing any field should change the ID.
@@ -135,7 +160,7 @@ func isEntityMalleable(t *testing.T, v reflect.Value, idFunc func() flow.Identif
 	} else {
 		// when dealing with non-composite type we can generate random values for it and check if ID has changed.
 		origID := idFunc()
-		generateRandomReflectValue(t, v)
-		return origID == idFunc()
+		expectChange := generateRandomReflectValue(t, v)
+		return expectChange && origID == idFunc()
 	}
 }
