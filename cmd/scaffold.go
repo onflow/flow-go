@@ -568,6 +568,7 @@ func (fnb *FlowNodeBuilder) BuildPublicLibp2pNode(address string, bootstrapIdent
 		&p2pbuilderconfig.UnicastConfig{
 			Unicast: fnb.FlowConfig.NetworkConfig.Unicast,
 		}).
+		SetProtocolPeerCacheList(protocols.FlowProtocolID(fnb.SporkID)).
 		SetSubscriptionFilter(
 			subscription.NewRoleBasedFilter(
 				subscription.UnstakedRole, fnb.IdentityProvider,

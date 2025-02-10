@@ -82,7 +82,7 @@ func NewNode(cfg *p2p.NodeConfig) (*Node, error) {
 		return nil, fmt.Errorf("invalid config: %w", err)
 	}
 
-	pCache, err := nodeinternal.NewProtocolPeerCache(cfg.Logger, cfg.Host)
+	pCache, err := nodeinternal.NewProtocolPeerCache(cfg.Logger, cfg.Host, cfg.ProtocolPeerCacheList)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create protocol peer cache: %w", err)
 	}
@@ -182,12 +182,7 @@ func (n *Node) RemovePeer(peerID peer.ID) error {
 
 // GetPeersForProtocol returns slice peer IDs for the specified protocol ID.
 func (n *Node) GetPeersForProtocol(pid protocol.ID) peer.IDSlice {
-	pMap := n.pCache.GetPeers(pid)
-	peers := make(peer.IDSlice, 0, len(pMap))
-	for p := range pMap {
-		peers = append(peers, p)
-	}
-	return peers
+	return n.pCache.GetPeers(pid)
 }
 
 // OpenAndWriteOnStream opens a new stream to a peer. The stream is opened to the given peerID

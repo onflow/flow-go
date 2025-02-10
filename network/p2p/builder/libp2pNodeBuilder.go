@@ -13,6 +13,7 @@ import (
 	"github.com/libp2p/go-libp2p/core/connmgr"
 	"github.com/libp2p/go-libp2p/core/host"
 	"github.com/libp2p/go-libp2p/core/network"
+	"github.com/libp2p/go-libp2p/core/protocol"
 	"github.com/libp2p/go-libp2p/core/routing"
 	"github.com/libp2p/go-libp2p/core/transport"
 	rcmgr "github.com/libp2p/go-libp2p/p2p/host/resource-manager"
@@ -63,16 +64,17 @@ type LibP2PNodeBuilder struct {
 	metricsConfig    *p2pbuilderconfig.MetricsConfig
 	basicResolver    madns.BasicResolver
 
-	resourceManager      network.ResourceManager
-	resourceManagerCfg   *p2pconfig.ResourceManagerConfig
-	connManager          connmgr.ConnManager
-	connGater            p2p.ConnectionGater
-	routingFactory       func(context.Context, host.Host) (routing.Routing, error)
-	peerManagerConfig    *p2pbuilderconfig.PeerManagerConfig
-	createNode           p2p.NodeConstructor
-	disallowListCacheCfg *p2p.DisallowListCacheConfig
-	unicastConfig        *p2pbuilderconfig.UnicastConfig
-	networkingType       flownet.NetworkingType // whether the node is running in private (staked) or public (unstaked) network
+	resourceManager       network.ResourceManager
+	resourceManagerCfg    *p2pconfig.ResourceManagerConfig
+	connManager           connmgr.ConnManager
+	connGater             p2p.ConnectionGater
+	routingFactory        func(context.Context, host.Host) (routing.Routing, error)
+	peerManagerConfig     *p2pbuilderconfig.PeerManagerConfig
+	createNode            p2p.NodeConstructor
+	disallowListCacheCfg  *p2p.DisallowListCacheConfig
+	unicastConfig         *p2pbuilderconfig.UnicastConfig
+	networkingType        flownet.NetworkingType // whether the node is running in private (staked) or public (unstaked) network
+	protocolPeerCacheList []protocol.ID
 }
 
 func NewNodeBuilder(
@@ -152,6 +154,12 @@ func (builder *LibP2PNodeBuilder) SetRoutingSystem(f func(context.Context, host.
 // CAUTION: Be careful setting this to a larger number as it will change the backpressure behavior of the system.
 func (builder *LibP2PNodeBuilder) OverrideDefaultValidateQueueSize(size int) p2p.NodeBuilder {
 	builder.gossipSubBuilder.OverrideDefaultValidateQueueSize(size)
+	return builder
+}
+
+// SetProtocolPeerCacheList sets the protocols to track in the protocol peer cache.
+func (builder *LibP2PNodeBuilder) SetProtocolPeerCacheList(protocols ...protocol.ID) p2p.NodeBuilder {
+	builder.protocolPeerCacheList = protocols
 	return builder
 }
 
@@ -284,10 +292,11 @@ func (builder *LibP2PNodeBuilder) Build() (p2p.LibP2PNode, error) {
 		Parameters: &p2p.NodeParameters{
 			EnableProtectedStreams: builder.unicastConfig.EnableStreamProtection,
 		},
-		Logger:               builder.logger,
-		Host:                 h,
-		PeerManager:          peerManager,
-		DisallowListCacheCfg: builder.disallowListCacheCfg,
+		Logger:                builder.logger,
+		Host:                  h,
+		PeerManager:           peerManager,
+		DisallowListCacheCfg:  builder.disallowListCacheCfg,
+		ProtocolPeerCacheList: builder.protocolPeerCacheList,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("could not create libp2p node: %w", err)

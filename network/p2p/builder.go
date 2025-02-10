@@ -8,6 +8,7 @@ import (
 	"github.com/libp2p/go-libp2p/core/host"
 	"github.com/libp2p/go-libp2p/core/network"
 	"github.com/libp2p/go-libp2p/core/peer"
+	"github.com/libp2p/go-libp2p/core/protocol"
 	"github.com/libp2p/go-libp2p/core/routing"
 	madns "github.com/multiformats/go-multiaddr-dns"
 	"github.com/rs/zerolog"
@@ -206,7 +207,8 @@ type NodeConfig struct {
 	// logger used to provide logging
 	Logger zerolog.Logger `validate:"required"`
 	// reference to the libp2p host (https://godoc.org/github.com/libp2p/go-libp2p/core/host)
-	Host                 host.Host `validate:"required"`
-	PeerManager          PeerManager
-	DisallowListCacheCfg *DisallowListCacheConfig `validate:"required"`
+	Host                  host.Host `validate:"required"`
+	PeerManager           PeerManager
+	DisallowListCacheCfg  *DisallowListCacheConfig `validate:"required"`
+	ProtocolPeerCacheList []protocol.ID
 }
