@@ -7,6 +7,7 @@ import (
 
 	"github.com/onflow/flow-go/model/chunks"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/storage/operation"
 )
@@ -15,26 +16,68 @@ import (
 // Job consumers can read the locators as job from the queue by index.
 // Chunk locators stored in this queue are unique.
 type ChunksQueue struct {
-	db      storage.DB
-	storing *sync.Mutex
+	db                storage.DB
+	chunkLocatorCache *Cache[uint64, *chunks.Locator]
+	storing           *sync.Mutex
 }
 
 const JobQueueChunksQueue = "JobQueueChunksQueue"
 
+func newChunkLocatorCache() *Cache[uint64, *chunks.Locator] {
+	store := func(rw storage.ReaderBatchWriter, index uint64, locator *chunks.Locator) error {
+		// make sure the chunk locator is unique
+		err := operation.InsertChunkLocator(rw.Writer(), locator)
+		if err != nil {
+			return fmt.Errorf("failed to insert chunk locator: %w", err)
+		}
+
+		err = operation.InsertJobAtIndex(rw.Writer(), JobQueueChunksQueue, index, locator.ID())
+		if err != nil {
+			return fmt.Errorf("failed to set job index for chunk locator queue at index %v: %w", index, err)
+		}
+
+		return nil
+	}
+
+	retrieve := func(r storage.Reader, index uint64) (*chunks.Locator, error) {
+		var locatorID flow.Identifier
+		err := operation.RetrieveJobAtIndex(r, JobQueueChunksQueue, index, &locatorID)
+		if err != nil {
+			return nil, fmt.Errorf("could not retrieve chunk locator in queue: %w", err)
+		}
+
+		var locator chunks.Locator
+		err = operation.RetrieveChunkLocator(r, locatorID, &locator)
+		if err != nil {
+			return nil, fmt.Errorf("could not retrieve locator for chunk id %v: %w", locatorID, err)
+		}
+
+		return &locator, nil
+	}
+	return newCache(metrics.NewNoopCollector(), "",
+		withLimit[uint64, *chunks.Locator](DefaultCacheSize),
+		withStore(store),
+		withRetrieve(retrieve))
+}
+
 // NewChunkQueue will initialize the underlying badger database of chunk locator queue.
 func NewChunkQueue(db storage.DB) *ChunksQueue {
 	return &ChunksQueue{
-		db:      db,
-		storing: &sync.Mutex{},
+		db:                db,
+		chunkLocatorCache: newChunkLocatorCache(),
+		storing:           &sync.Mutex{},
 	}
 }
 
 // Init initializes chunk queue's latest index with the given default index.
 func (q *ChunksQueue) Init(defaultIndex uint64) (bool, error) {
+	q.storing.Lock()
+	defer q.storing.Unlock()
+
 	_, err := q.LatestIndex()
 	if errors.Is(err, storage.ErrNotFound) {
 		err = q.db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-			return operation.InitJobLatestIndex(rw.Writer(), JobQueueChunksQueue, defaultIndex)
+			return operation.SetJobLatestIndex(rw.Writer(), JobQueueChunksQueue, defaultIndex)
 		})
 
 		if err != nil {
@@ -59,10 +102,9 @@ func (q *ChunksQueue) StoreChunkLocator(locator *chunks.Locator) (bool, error) {
 	defer q.storing.Unlock()
 
 	// read the latest index
-	var latest uint64
-	err := operation.RetrieveJobLatestIndex(q.db.Reader(), JobQueueChunksQueue, &latest)
+	latest, err := q.LatestIndex()
 	if err != nil {
-		return false, fmt.Errorf("failed to retrieve job index for chunk locator queue: %w", err)
+		return false, err
 	}
 
 	// make sure the chunk locator is unique
@@ -80,15 +122,10 @@ func (q *ChunksQueue) StoreChunkLocator(locator *chunks.Locator) (bool, error) {
 	next := latest + 1
 
 	err = q.db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-		// make sure the chunk locator is unique
-		err := operation.InsertChunkLocator(rw.Writer(), locator)
+		// store and cache the chunk locator
+		err := q.chunkLocatorCache.PutTx(rw, next, locator)
 		if err != nil {
-			return fmt.Errorf("failed to insert chunk locator: %w", err)
-		}
-
-		err = operation.InsertJobAtIndex(rw.Writer(), JobQueueChunksQueue, next, locator.ID())
-		if err != nil {
-			return fmt.Errorf("failed to set job index for chunk locator queue at index %v: %w", next, err)
+			return fmt.Errorf("failed to store and cache chunk locator: %w", err)
 		}
 
 		// update the next index as the latest index
@@ -118,17 +155,5 @@ func (q *ChunksQueue) LatestIndex() (uint64, error) {
 
 // AtIndex returns the chunk locator stored at the given index in the queue.
 func (q *ChunksQueue) AtIndex(index uint64) (*chunks.Locator, error) {
-	var locatorID flow.Identifier
-	err := operation.RetrieveJobAtIndex(q.db.Reader(), JobQueueChunksQueue, index, &locatorID)
-	if err != nil {
-		return nil, fmt.Errorf("could not retrieve chunk locator in queue: %w", err)
-	}
-
-	var locator chunks.Locator
-	err = operation.RetrieveChunkLocator(q.db.Reader(), locatorID, &locator)
-	if err != nil {
-		return nil, fmt.Errorf("could not retrieve locator for chunk id %v: %w", locatorID, err)
-	}
-
-	return &locator, nil
+	return q.chunkLocatorCache.Get(q.db.Reader(), index)
 }

@@ -9,10 +9,6 @@ func RetrieveJobLatestIndex(r storage.Reader, queue string, index *uint64) error
 	return RetrieveByKey(r, MakePrefix(codeJobQueuePointer, queue), index)
 }
 
-func InitJobLatestIndex(w storage.Writer, queue string, index uint64) error {
-	return UpsertByKey(w, MakePrefix(codeJobQueuePointer, queue), index)
-}
-
 func SetJobLatestIndex(w storage.Writer, queue string, index uint64) error {
 	return UpsertByKey(w, MakePrefix(codeJobQueuePointer, queue), index)
 }
