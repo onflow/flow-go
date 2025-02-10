@@ -11,9 +11,24 @@ import (
 )
 
 func TestMalleability(t *testing.T) {
-	//unittest.RequireEntityNotMalleable(t, unittest.EpochSetupFixture())
-	//unittest.RequireEntityNotMalleable(t, unittest.EpochCommitFixture())
-	unittest.RequireEntityNotMalleable(t, unittest.EpochRecoverFixture())
+	t.Run("EpochSetup", func(t *testing.T) {
+		unittest.RequireEntityNotMalleable(t, unittest.EpochSetupFixture())
+	})
+	t.Run("EpochCommit-v1", func(t *testing.T) {
+		unittest.RequireEntityNotMalleable(t, unittest.EpochCommitFixture())
+	})
+
+	checker := unittest.NewMalleabilityChecker(t, unittest.WithCustomType(flow.DKGIndexMap{}, func() any {
+		return flow.DKGIndexMap{unittest.IdentifierFixture(): 0, unittest.IdentifierFixture(): 1}
+	}))
+	t.Run("EpochCommit-v2", func(t *testing.T) {
+		checker.Check(unittest.EpochCommitFixture(func(commit *flow.EpochCommit) {
+			commit.DKGIndexMap = flow.DKGIndexMap{unittest.IdentifierFixture(): 0, unittest.IdentifierFixture(): 1}
+		}))
+	})
+	t.Run("EpochRecover", func(t *testing.T) {
+		checker.Check(unittest.EpochRecoverFixture())
+	})
 }
 
 func TestClusterQCVoteData_Equality(t *testing.T) {

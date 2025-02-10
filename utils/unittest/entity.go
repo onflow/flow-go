@@ -109,6 +109,16 @@ func generateCustomFlowValue(field reflect.Value) reflect.Value {
 		return reflect.ValueOf(IdentityFixture().IdentitySkeleton)
 	case reflect.TypeOf(flow.ClusterQCVoteData{}):
 		return reflect.ValueOf(flow.ClusterQCVoteDataFromQC(QuorumCertificateWithSignerIDsFixture()))
+	case reflect.TypeOf(flow.QuorumCertificate{}):
+		return reflect.ValueOf(*QuorumCertificateFixture())
+	case reflect.TypeOf(flow.TimeoutCertificate{}):
+		return reflect.ValueOf(flow.TimeoutCertificate{
+			View:          rand.Uint64(),
+			NewestQCViews: []uint64{rand.Uint64()},
+			NewestQC:      QuorumCertificateFixture(),
+			SignerIndices: SignerIndicesFixture(2),
+			SigData:       SignatureFixture(),
+		})
 	}
 	return reflect.Value{}
 }
@@ -129,38 +139,73 @@ func generateInterfaceFlowValue(field reflect.Value) reflect.Value {
 // Generally speaking each type that implements [flow.IDEntity] method should be tested with this function.
 // ATTENTION: We put only one requirement for data types, that is all fields have to be exported so we can modify them.
 func RequireEntityNotMalleable(t *testing.T, entity flow.IDEntity) {
+	NewMalleabilityChecker(t).Check(entity)
+}
+
+type MalleabilityChecker struct {
+	*testing.T
+	customTypes map[reflect.Type]func() any
+}
+
+type MalleabilityCheckerOpt func(*MalleabilityChecker)
+
+func WithCustomType(tType any, generator func() any) MalleabilityCheckerOpt {
+	return func(t *MalleabilityChecker) {
+		t.customTypes[reflect.TypeOf(tType)] = generator
+	}
+}
+
+func NewMalleabilityChecker(t *testing.T, ops ...MalleabilityCheckerOpt) *MalleabilityChecker {
+	checker := &MalleabilityChecker{
+		T:           t,
+		customTypes: make(map[reflect.Type]func() any),
+	}
+	for _, op := range ops {
+		op(checker)
+	}
+	return checker
+}
+
+func (t *MalleabilityChecker) Check(entity flow.IDEntity) {
 	v := reflect.ValueOf(entity)
-	isMalleable := isEntityMalleable(t, v, entity.ID)
+	if v.Kind() == reflect.Ptr {
+		require.False(t, v.IsNil(), "entity is nil, nothing to check")
+		v = v.Elem()
+	}
+	isMalleable := t.isEntityMalleable(v, entity.ID)
 	require.False(t, isMalleable, "entity is malleable")
 }
 
 // isEntityMalleable is a helper function to recursively check fields of the entity. Every time we change a field we check if ID of the entity has changed.
 // If ID has not changed then entity is malleable.
 // This function returns boolean value so we can add extra traces to the test output in case of recursive calls to structure fields.
-func isEntityMalleable(t *testing.T, v reflect.Value, idFunc func() flow.Identifier) bool {
-	if v.Kind() == reflect.Ptr {
-		if v.IsNil() {
-			// if pointer is nil we need to initialize it, it will get zero values
-			// but later on we will generate random values for it.
-			v.Set(reflect.New(v.Type().Elem()))
-		}
-		v = v.Elem()
+func (t *MalleabilityChecker) isEntityMalleable(v reflect.Value, idFunc func() flow.Identifier) bool {
+	if v.Kind() == reflect.Ptr && v.IsNil() {
+		return false // there is nothing to check for this field if it's nil
+	}
+
+	tType := v.Type()
+	// if we have a custom type function we should use it to generate a random value for the field.
+	customTypeGenerator, hasCustomTypeOverride := t.customTypes[tType]
+	if hasCustomTypeOverride {
+		origID := idFunc()
+		v.Set(reflect.ValueOf(customTypeGenerator()))
+		return origID == idFunc()
 	}
 
 	if v.Kind() == reflect.Struct {
 		// in case of a struct we would like to ensure that changing any field will change the ID of the entity.
 		// we will recursively check all fields of the struct and if any of the fields is malleable then the whole entity is malleable.
-		tType := v.Type()
 		for i := 0; i < v.NumField(); i++ {
 			field := v.Field(i)
 			require.Truef(t, field.CanSet(), "field %s is not settable", tType.Field(i).Name)
-			require.False(t, isEntityMalleable(t, field, idFunc), "field %s is malleable", tType.Field(i).Name)
+			require.False(t, t.isEntityMalleable(field, idFunc), "field %s is malleable", tType.Field(i).Name)
 		}
 		return false
 	} else {
 		// when dealing with non-composite type we can generate random values for it and check if ID has changed.
 		origID := idFunc()
-		expectChange := generateRandomReflectValue(t, v)
+		expectChange := generateRandomReflectValue(t.T, v)
 		return expectChange && origID == idFunc()
 	}
 }
