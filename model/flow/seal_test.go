@@ -20,7 +20,7 @@ func Test_SealID(t *testing.T) {
 	// Change signatures of first chunk
 	seal.AggregatedApprovalSigs[0] = unittest.Seal.AggregatedSignatureFixture()
 
-	// They should not have changed
+	// The ID of the seal should now be different
 	assert.NotEqual(t, id, seal.ID())
 	assert.NotEqual(t, cs, seal.Checksum())
 }
