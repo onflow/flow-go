@@ -39,8 +39,8 @@ type Core struct {
 	log                        zerolog.Logger                     // used to log relevant actions with context
 	collectorTree              *approvals.AssignmentCollectorTree // levelled forest for assignment collectors
 	approvalsCache             *approvals.LruCache                // in-memory cache of approvals that weren't verified
-	counterLastSealedHeight    counters.StrictMonotonousCounter   // monotonous counter for last sealed block height
-	counterLastFinalizedHeight counters.StrictMonotonousCounter   // monotonous counter for last finalized block height
+	counterLastSealedHeight    counters.StrictMonotonicCounter    // monotonic counter for last sealed block height
+	counterLastFinalizedHeight counters.StrictMonotonicCounter    // monotonic counter for last finalized block height
 	headers                    storage.Headers                    // used to access block headers in storage
 	state                      protocol.State                     // used to access protocol state
 	seals                      storage.Seals                      // used to get last sealed block
@@ -81,8 +81,8 @@ func NewCore(
 		sealingTracker:             sealingTracker,
 		unit:                       unit,
 		approvalsCache:             approvals.NewApprovalsLRUCache(1000),
-		counterLastSealedHeight:    counters.NewMonotonousCounter(lastSealed.Height),
-		counterLastFinalizedHeight: counters.NewMonotonousCounter(lastSealed.Height),
+		counterLastSealedHeight:    counters.NewMonotonicCounter(lastSealed.Height),
+		counterLastFinalizedHeight: counters.NewMonotonicCounter(lastSealed.Height),
 		headers:                    headers,
 		state:                      state,
 		seals:                      sealsDB,

@@ -51,7 +51,7 @@ type AccessCollector struct {
 	maxReceiptHeight      prometheus.Gauge
 
 	// used to skip heights that are lower than the current max height
-	maxReceiptHeightValue counters.StrictMonotonousCounter
+	maxReceiptHeightValue counters.StrictMonotonicCounter
 }
 
 var _ module.AccessMetrics = (*AccessCollector)(nil)
@@ -112,7 +112,7 @@ func NewAccessCollector(opts ...AccessCollectorOpts) *AccessCollector {
 			Subsystem: subsystemIngestion,
 			Help:      "gauge to track the maximum block height of execution receipts received",
 		}),
-		maxReceiptHeightValue: counters.NewMonotonousCounter(0),
+		maxReceiptHeightValue: counters.NewMonotonicCounter(0),
 	}
 
 	for _, opt := range opts {
