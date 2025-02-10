@@ -17,7 +17,7 @@ import (
 // Chunk locators stored in this queue are unique.
 type ChunksQueue struct {
 	db                storage.DB
-	chunkLocatorCache *Cache[uint64, *chunks.Locator]
+	chunkLocatorCache *Cache[uint64, *chunks.Locator] // cache for chunk locators, indexed by job index
 	storing           *sync.Mutex
 }
 
@@ -70,11 +70,15 @@ func NewChunkQueue(db storage.DB) *ChunksQueue {
 }
 
 // Init initializes chunk queue's latest index with the given default index.
+// It returns (false, nil) if the chunk queue is already initialized.
+// It returns (true, nil) if the chunk queue is successfully initialized.
 func (q *ChunksQueue) Init(defaultIndex uint64) (bool, error) {
 	q.storing.Lock()
 	defer q.storing.Unlock()
 
 	_, err := q.LatestIndex()
+	// the latest index should not exist,
+	// if the latest index is not found, initialize it with the default index
 	if errors.Is(err, storage.ErrNotFound) {
 		err = q.db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 			return operation.SetJobLatestIndex(rw.Writer(), JobQueueChunksQueue, defaultIndex)
@@ -89,6 +93,7 @@ func (q *ChunksQueue) Init(defaultIndex uint64) (bool, error) {
 		return false, fmt.Errorf("could not get latest index: %w", err)
 	}
 
+	// the chunk queue is already initialized
 	return false, nil
 }
 
