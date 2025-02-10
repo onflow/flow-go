@@ -2362,6 +2362,7 @@ func (builder *FlowAccessNodeBuilder) initPublicLibp2pNode(networkKey crypto.Pri
 		&p2pbuilderconfig.UnicastConfig{
 			Unicast: builder.FlowConfig.NetworkConfig.Unicast,
 		}).
+		SetProtocolPeerCacheList(protocols.FlowProtocolID(builder.SporkID)).
 		SetBasicResolver(builder.Resolver).
 		SetSubscriptionFilter(networkingsubscription.NewRoleBasedFilter(flow.RoleAccess, builder.IdentityProvider)).
 		SetConnectionManager(connManager).
