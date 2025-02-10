@@ -11,6 +11,7 @@ import (
 	"github.com/rs/zerolog"
 	"go.opentelemetry.io/otel/attribute"
 	otelTrace "go.opentelemetry.io/otel/trace"
+	"go.uber.org/atomic"
 
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/engine/consensus"
@@ -34,7 +35,6 @@ import (
 //   - pre-validating approvals (if they are outdated or non-verifiable)
 //   - pruning already processed collectorTree
 type Core struct {
-	unit                       *engine.Unit
 	workerPool                 *workerpool.WorkerPool             // worker pool used by collectors
 	log                        zerolog.Logger                     // used to log relevant actions with context
 	collectorTree              *approvals.AssignmentCollectorTree // levelled forest for assignment collectors
@@ -50,6 +50,7 @@ type Core struct {
 	sealingTracker             consensus.SealingTracker           // logic-aware component for tracking sealing progress.
 	tracer                     module.Tracer                      // used to trace execution
 	sealingConfigsGetter       module.SealingConfigsGetter        // used to access configs for sealing conditions
+	reporter                   *gatedSealingObservationReporter   // used to avoid excess resource usage by sealing observation completions
 }
 
 func NewCore(
@@ -58,7 +59,6 @@ func NewCore(
 	tracer module.Tracer,
 	conMetrics module.ConsensusMetrics,
 	sealingTracker consensus.SealingTracker,
-	unit *engine.Unit,
 	headers storage.Headers,
 	state protocol.State,
 	sealsDB storage.Seals,
@@ -79,7 +79,6 @@ func NewCore(
 		tracer:                     tracer,
 		metrics:                    conMetrics,
 		sealingTracker:             sealingTracker,
-		unit:                       unit,
 		approvalsCache:             approvals.NewApprovalsLRUCache(1000),
 		counterLastSealedHeight:    counters.NewMonotonicCounter(lastSealed.Height),
 		counterLastFinalizedHeight: counters.NewMonotonicCounter(lastSealed.Height),
@@ -89,6 +88,7 @@ func NewCore(
 		sealsMempool:               sealsMempool,
 		requestTracker:             approvals.NewRequestTracker(headers, 10, 30),
 		sealingConfigsGetter:       sealingConfigsGetter,
+		reporter:                   newGatedSealingObservationReporter(),
 	}
 
 	factoryMethod := func(result *flow.ExecutionResult) (approvals.AssignmentCollector, error) {
@@ -561,7 +561,9 @@ func (c *Core) ProcessFinalizedBlock(finalizedBlockID flow.Identifier) error {
 	//   observes the latest state of `sealingObservation`.
 	// * The `sealingObservation` lives in the scope of this function. Hence, when this goroutine exits
 	//   this function, `sealingObservation` lives solely in the scope of the newly-created goroutine.
-	c.unit.Launch(sealingObservation.Complete)
+	// We do this call asynchronously because we are in the hot path, and it is not required to progress,
+	// and the call may involve database transactions that would unnecessarily delay sealing.
+	c.reporter.reportAsync(sealingObservation)
 
 	return nil
 }
@@ -654,7 +656,7 @@ func (c *Core) getOutdatedBlockIDsFromRootSealingSegment(rootHeader *flow.Header
 	}
 
 	knownBlockIDs := make(map[flow.Identifier]struct{}) // track block IDs in the sealing segment
-	var outdatedBlockIDs flow.IdentifierList
+	outdatedBlockIDs := make(flow.IdentifierList, 0)
 	for _, block := range rootSealingSegment.Blocks {
 		knownBlockIDs[block.ID()] = struct{}{}
 		for _, result := range block.Payload.Results {
@@ -665,4 +667,26 @@ func (c *Core) getOutdatedBlockIDsFromRootSealingSegment(rootHeader *flow.Header
 		}
 	}
 	return outdatedBlockIDs.Lookup(), nil
+}
+
+// gatedSealingObservationReporter is a utility for gating asynchronous completion of sealing observations.
+type gatedSealingObservationReporter struct {
+	reporting *atomic.Bool // true when a sealing observation is actively being asynchronously completed
+}
+
+func newGatedSealingObservationReporter() *gatedSealingObservationReporter {
+	return &gatedSealingObservationReporter{
+		reporting: atomic.NewBool(false),
+	}
+}
+
+// reportAsync only allows one in-flight observation completion at a time.
+// Any extra observations are dropped.
+func (reporter *gatedSealingObservationReporter) reportAsync(observation consensus.SealingObservation) {
+	if reporter.reporting.CompareAndSwap(false, true) {
+		go func() {
+			observation.Complete()
+			reporter.reporting.Store(false)
+		}()
+	}
 }
