@@ -80,6 +80,17 @@ func (q *ChunksQueue) Init(defaultIndex uint64) (bool, error) {
 	// the latest index should not exist,
 	// if the latest index is not found, initialize it with the default index
 	if errors.Is(err, storage.ErrNotFound) {
+		// if the latest index is not found, double check that no chunk locator exist at the default index
+		_, err := q.AtIndex(defaultIndex)
+		if !errors.Is(err, storage.ErrNotFound) {
+			if err == nil {
+				return false, fmt.Errorf("chunk locator already exists at default index %v", defaultIndex)
+			}
+
+			return false, fmt.Errorf("could not check chunk locator at default index %v: %w", defaultIndex, err)
+		}
+
+		// set the default index as the latest index
 		err = q.db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 			return operation.SetJobLatestIndex(rw.Writer(), JobQueueChunksQueue, defaultIndex)
 		})
