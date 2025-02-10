@@ -26,7 +26,7 @@ var _ module.IteratorCreator = (*Creator)(nil)
 // after another to iterate from the root to the latest, and from last iterated to the new latest.
 func NewCreator(
 	getBlockIDByIndex func(uint64) (blockID flow.Identifier, indexed bool, exception error),
-	progressStorage storage.ConsumerProgress,
+	progressStorage storage.ConsumerProgressInitializer,
 	root uint64,
 	latest func() (uint64, error),
 ) (*Creator, error) {
@@ -65,7 +65,7 @@ func (c *Creator) Create() (iter module.BlockIterator, hasNext bool, exception e
 // from root to the latest (either finalized or sealed) by height.
 func NewHeightBasedCreator(
 	getBlockIDByHeight func(height uint64) (flow.Identifier, error),
-	progress storage.ConsumerProgress,
+	progress storage.ConsumerProgressInitializer,
 	root *flow.Header,
 	latest func() (*flow.Header, error),
 ) (*Creator, error) {
@@ -98,7 +98,7 @@ func NewHeightBasedCreator(
 // since view has gaps, the iterator will skip views that have no blocks.
 func NewViewBasedCreator(
 	getBlockIDByView func(view uint64) (blockID flow.Identifier, viewIndexed bool, exception error),
-	progress storage.ConsumerProgress,
+	progress storage.ConsumerProgressInitializer,
 	root *flow.Header,
 	latest func() (*flow.Header, error),
 ) (*Creator, error) {
