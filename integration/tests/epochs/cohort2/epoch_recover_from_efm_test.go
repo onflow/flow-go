@@ -91,6 +91,8 @@ func (s *RecoverEpochSuite) executeEFMRecoverTXArgsCMD(
 		numViewsInEpoch,
 		recoveryEpochTargetDuration,
 		unsafeAllowOverWrite,
+		nil,
+		nil,
 		snapshot,
 	)
 	require.NoError(s.T(), err)
@@ -260,6 +262,8 @@ func (s *RecoverEpochSuite) TestRecoverEpochNodeEjected() {
 		s.EpochLen,
 		3000,
 		false,
+		nil,
+		nil,
 		snapshot,
 	)
 	require.NoError(s.T(), err)
@@ -389,6 +393,8 @@ func (s *RecoverEpochSuite) TestRecoverEpochEjectNodeDifferentDKG() {
 		recoveryDkgIndexMap,
 		recoveryThresholdKeyShares,
 		recoveryThresholdGroupKey,
+		nil,
+		nil,
 		snapshot,
 	)
 	require.NoError(s.T(), err)
