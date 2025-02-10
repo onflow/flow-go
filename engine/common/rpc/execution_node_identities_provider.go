@@ -22,18 +22,6 @@ const maxAttemptsForExecutionReceipt = 3
 // MaxNodesCnt is the maximum number of nodes that will be contacted to complete an API request.
 const MaxNodesCnt = 3
 
-func IdentifierList(ids []string) (flow.IdentifierList, error) {
-	idList := make(flow.IdentifierList, len(ids))
-	for i, idStr := range ids {
-		id, err := flow.HexStringToIdentifier(idStr)
-		if err != nil {
-			return nil, fmt.Errorf("failed to convert node id string %s to Flow Identifier: %w", id, err)
-		}
-		idList[i] = id
-	}
-	return idList, nil
-}
-
 // ExecutionNodeIdentitiesProvider is a container for elements required to retrieve
 // execution node identities for a given block ID.
 type ExecutionNodeIdentitiesProvider struct {
