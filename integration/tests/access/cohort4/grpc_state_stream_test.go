@@ -9,14 +9,11 @@ import (
 	"sync"
 	"testing"
 
+	jsoncdc "github.com/onflow/cadence/encoding/json"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
-	"google.golang.org/grpc"
-	"google.golang.org/grpc/credentials/insecure"
-
-	jsoncdc "github.com/onflow/cadence/encoding/json"
 
 	"github.com/onflow/flow-go-sdk/test"
 
@@ -168,17 +165,14 @@ func (s *GrpcStateStreamSuite) Ghost() *client.GhostClient {
 // TestRestEventStreaming tests gRPC event streaming
 func (s *GrpcStateStreamSuite) TestHappyPath() {
 	unittest.SkipUnless(s.T(), unittest.TEST_FLAKY, "flaky tests: https://github.com/onflow/flow-go/issues/5825")
-	testANURL := fmt.Sprintf("localhost:%s", s.net.ContainerByName(testnet.PrimaryAN).Port(testnet.ExecutionStatePort))
-	sdkClientTestAN, err := getClient(testANURL)
-	s.Require().NoError(err)
+	testAN := s.net.ContainerByName(testnet.PrimaryAN)
+	sdkClientTestAN := getClient(s.T(), testAN)
 
-	controlANURL := fmt.Sprintf("localhost:%s", s.net.ContainerByName("access_2").Port(testnet.ExecutionStatePort))
-	sdkClientControlAN, err := getClient(controlANURL)
-	s.Require().NoError(err)
+	controlAN := s.net.ContainerByName("access_2")
+	sdkClientControlAN := getClient(s.T(), controlAN)
 
-	testONURL := fmt.Sprintf("localhost:%s", s.net.ContainerByName(testnet.PrimaryON).Port(testnet.ExecutionStatePort))
-	sdkClientTestON, err := getClient(testONURL)
-	s.Require().NoError(err)
+	testON := s.net.ContainerByName(testnet.PrimaryON)
+	sdkClientTestON := getClient(s.T(), testON)
 
 	// get the first block height
 	currentFinalized := s.BlockState.HighestFinalizedHeight()
@@ -471,15 +465,10 @@ func compareEvents(t *testing.T, controlData, testData *SubscribeEventsResponse)
 	}
 }
 
-// TODO: switch to SDK versions once crypto library is fixed to support the latest SDK version
-
-func getClient(address string) (executiondata.ExecutionDataAPIClient, error) {
-	conn, err := grpc.Dial(address, grpc.WithTransportCredentials(insecure.NewCredentials()))
-	if err != nil {
-		return nil, err
-	}
-
-	return executiondata.NewExecutionDataAPIClient(conn), nil
+func getClient(t *testing.T, node *testnet.Container) executiondata.ExecutionDataAPIClient {
+	accessClient, err := node.SDKClient()
+	require.NoError(t, err, "could not get access client")
+	return accessClient.ExecutionDataRPCClient()
 }
 
 func SubscribeHandler[T any, V any](

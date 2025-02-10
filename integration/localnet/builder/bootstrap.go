@@ -421,7 +421,7 @@ func prepareAccessService(container testnet.ContainerConfig, i int, n int) Servi
 		fmt.Sprintf("--secure-rpc-addr=%s:%s", container.ContainerName, testnet.GRPCSecurePort),
 		fmt.Sprintf("--http-addr=%s:%s", container.ContainerName, testnet.GRPCWebPort),
 		fmt.Sprintf("--rest-addr=%s:%s", container.ContainerName, testnet.RESTPort),
-		fmt.Sprintf("--state-stream-addr=%s:%s", container.ContainerName, testnet.ExecutionStatePort),
+		fmt.Sprintf("--state-stream-addr=%s:%s", container.ContainerName, testnet.GRPCPort),
 		fmt.Sprintf("--collection-ingress-port=%s", testnet.GRPCPort),
 		"--supports-observer=true",
 		fmt.Sprintf("--public-network-address=%s:%s", container.ContainerName, testnet.PublicNetworkPort),
@@ -443,7 +443,6 @@ func prepareAccessService(container testnet.ContainerConfig, i int, n int) Servi
 		testnet.GRPCSecurePort,
 		testnet.GRPCWebPort,
 		testnet.RESTPort,
-		testnet.ExecutionStatePort,
 		testnet.PublicNetworkPort,
 	)
 
@@ -466,7 +465,7 @@ func prepareObserverService(i int, observerName string, agPublicKey string) Serv
 		fmt.Sprintf("--secure-rpc-addr=%s:%s", observerName, testnet.GRPCSecurePort),
 		fmt.Sprintf("--http-addr=%s:%s", observerName, testnet.GRPCWebPort),
 		fmt.Sprintf("--rest-addr=%s:%s", observerName, testnet.RESTPort),
-		fmt.Sprintf("--state-stream-addr=%s:%s", observerName, testnet.ExecutionStatePort),
+		fmt.Sprintf("--state-stream-addr=%s:%s", observerName, testnet.GRPCPort),
 		"--execution-data-dir=/data/execution-data",
 		"--execution-data-sync-enabled=true",
 		"--execution-data-indexing-enabled=true",
@@ -479,7 +478,6 @@ func prepareObserverService(i int, observerName string, agPublicKey string) Serv
 		testnet.GRPCSecurePort,
 		testnet.GRPCWebPort,
 		testnet.RESTPort,
-		testnet.ExecutionStatePort,
 	)
 
 	// observer services rely on the access gateway

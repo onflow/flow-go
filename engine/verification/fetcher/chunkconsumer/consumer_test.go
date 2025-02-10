@@ -15,6 +15,8 @@ import (
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/metrics"
 	storage "github.com/onflow/flow-go/storage/badger"
+	"github.com/onflow/flow-go/storage/operation/badgerimpl"
+	"github.com/onflow/flow-go/storage/store"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -144,7 +146,7 @@ func WithConsumer(
 	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
 		maxProcessing := uint64(3)
 
-		processedIndex := storage.NewConsumerProgress(db, module.ConsumeProgressVerificationChunkIndex)
+		processedIndex := store.NewConsumerProgress(badgerimpl.ToDB(db), module.ConsumeProgressVerificationChunkIndex)
 		chunksQueue := storage.NewChunkQueue(db)
 		ok, err := chunksQueue.Init(chunkconsumer.DefaultJobIndex)
 		require.NoError(t, err)
