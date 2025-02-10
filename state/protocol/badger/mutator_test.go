@@ -830,7 +830,7 @@ func TestExtendEpochTransitionValid(t *testing.T) {
 		metrics.On("SealedHeight", mock.Anything)
 		metrics.On("FinalizedHeight", mock.Anything)
 		metrics.On("BlockFinalized", mock.Anything)
-		metrics.On("ProtocolKVStoreVersion", mock.Anything)
+		metrics.On("ProtocolStateVersion", mock.Anything)
 
 		// expect epoch metric calls on bootstrap
 		initialCurrentEpoch := rootSnapshot.Epochs().Current()
@@ -3223,7 +3223,7 @@ func mockMetricsForRootSnapshot(metricsMock *mockmodule.ComplianceMetrics, rootS
 	metricsMock.On("CurrentDKGPhaseViews", epochSetup.DKGPhase1FinalView, epochSetup.DKGPhase2FinalView, epochSetup.DKGPhase3FinalView)
 	metricsMock.On("BlockSealed", mock.Anything)
 	metricsMock.On("BlockFinalized", mock.Anything)
-	metricsMock.On("ProtocolKVStoreVersion", mock.Anything)
+	metricsMock.On("ProtocolStateVersion", mock.Anything)
 	metricsMock.On("FinalizedHeight", mock.Anything)
 	metricsMock.On("SealedHeight", mock.Anything)
 }

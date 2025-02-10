@@ -99,7 +99,7 @@ func (nc *NoopCollector) CurrentDKGPhaseViews(phase1FinalView, phase2FinalView, 
 }
 func (nc *NoopCollector) EpochFallbackModeTriggered()                                    {}
 func (nc *NoopCollector) EpochFallbackModeExited()                                       {}
-func (nc *NoopCollector) ProtocolKVStoreVersion(version uint64)                          {}
+func (nc *NoopCollector) ProtocolStateVersion(version uint64)                            {}
 func (nc *NoopCollector) CacheEntries(resource string, entries uint)                     {}
 func (nc *NoopCollector) CacheHit(resource string)                                       {}
 func (nc *NoopCollector) CacheNotFound(resource string)                                  {}

@@ -498,8 +498,8 @@ type ComplianceMetrics interface {
 	EpochFallbackModeTriggered()
 	// EpochFallbackModeExited reports that EFM is no longer triggered.
 	EpochFallbackModeExited()
-	// ProtocolKVStoreVersion reports the latest finalized protocol state KVStore version.
-	ProtocolKVStoreVersion(version uint64)
+	// ProtocolStateVersion reports the version of the latest finalized protocol state.
+	ProtocolStateVersion(version uint64)
 }
 
 type CleanerMetrics interface {

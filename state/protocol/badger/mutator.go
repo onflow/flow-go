@@ -809,7 +809,7 @@ func (m *FollowerState) Finalize(ctx context.Context, blockID flow.Identifier) e
 	if err != nil {
 		return fmt.Errorf("could not retrieve protocol snapshot for block (%x): %w", blockID, err)
 	}
-	m.metrics.ProtocolKVStoreVersion(protocolSnapshot.Version)
+	m.metrics.ProtocolStateVersion(protocolSnapshot.Version)
 
 	// apply all queued metrics
 	for _, updateMetric := range metrics {

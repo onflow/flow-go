@@ -27,7 +27,7 @@ type ComplianceCollector struct {
 	currentDKGPhase2FinalView  prometheus.Gauge
 	currentDKGPhase3FinalView  prometheus.Gauge
 	epochFallbackModeTriggered prometheus.Gauge
-	protocolKVStoreVersion     prometheus.Gauge
+	protocolStateVersion       prometheus.Gauge
 }
 
 var _ module.ComplianceMetrics = (*ComplianceCollector)(nil)
@@ -150,8 +150,8 @@ func NewComplianceCollector() *ComplianceCollector {
 			Help:      "indicates whether epoch fallback mode is triggered; if >0, the fallback is triggered",
 		}),
 
-		protocolKVStoreVersion: promauto.NewGauge(prometheus.GaugeOpts{
-			Name:      "protocol_kv_store_version",
+		protocolStateVersion: promauto.NewGauge(prometheus.GaugeOpts{
+			Name:      "protocol_state_version",
 			Namespace: namespaceConsensus,
 			Subsystem: subsystemCompliance,
 			Help:      "reports the protocol state version of the latest finalized block",
@@ -223,6 +223,6 @@ func (cc *ComplianceCollector) EpochFallbackModeExited() {
 	cc.epochFallbackModeTriggered.Set(float64(0))
 }
 
-func (cc *ComplianceCollector) ProtocolKVStoreVersion(version uint64) {
-	cc.protocolKVStoreVersion.Set(float64(version))
+func (cc *ComplianceCollector) ProtocolStateVersion(version uint64) {
+	cc.protocolStateVersion.Set(float64(version))
 }
