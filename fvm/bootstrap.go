@@ -9,6 +9,7 @@ import (
 	"github.com/onflow/flow-core-contracts/lib/go/templates"
 
 	usdc "github.com/onflow/bridged-usdc/lib/go/contracts"
+	bridge "github.com/onflow/flow-evm-bridge"
 	storefront "github.com/onflow/nft-storefront/lib/go/contracts"
 
 	"github.com/onflow/flow-go/fvm/accountV2Migration"
@@ -446,7 +447,8 @@ func (b *bootstrapExecutor) Execute() error {
 	b.deployStakingCollection(service, &env)
 
 	// sets up the EVM environment
-	b.setupEVM(service, nonFungibleToken, fungibleToken, flowToken)
+	b.setupEVM(service, nonFungibleToken, fungibleToken, flowToken, &env)
+	b.setupVMBridge(service, &env)
 
 	err = expectAccounts(systemcontracts.EVMStorageAccountIndex)
 	if err != nil {
@@ -978,7 +980,7 @@ func (b *bootstrapExecutor) setStakingAllowlist(
 	panicOnMetaInvokeErrf("failed to set staking allow-list: %s", txError, err)
 }
 
-func (b *bootstrapExecutor) setupEVM(serviceAddress, nonFungibleTokenAddress, fungibleTokenAddress, flowTokenAddress flow.Address) {
+func (b *bootstrapExecutor) setupEVM(serviceAddress, nonFungibleTokenAddress, fungibleTokenAddress, flowTokenAddress flow.Address, env *templates.Environment) {
 	if b.setupEVMEnabled {
 		// account for storage
 		// we dont need to deploy anything to this account, but it needs to exist
@@ -998,6 +1000,38 @@ func (b *bootstrapExecutor) setupEVM(serviceAddress, nonFungibleTokenAddress, fu
 			Transaction(tx, 0),
 		)
 		panicOnMetaInvokeErrf("failed to deploy EVM contract: %s", txError, err)
+
+		env.EVMAddress = env.ServiceAccountAddress
+	}
+}
+
+func (b *bootstrapExecutor) setupVMBridge(serviceAddress flow.Address, env *templates.Environment) {
+	if b.setupEVMEnabled {
+
+		bridgeEnv := bridge.Environment{}
+
+		// Create a COA in the bridge account
+		tx := blueprints.CreateCOATransaction(serviceAddress, bridgeEnv, *env)
+		txError, err := b.invokeMetaTransaction(
+			NewContextFromParent(b.ctx, WithEVMEnabled(true)),
+			Transaction(tx, 0),
+		)
+		panicOnMetaInvokeErrf("failed to create COA in Service Account: %s", txError, err)
+
+		gasLimit := 15000000
+		deploymentValue := 0.0
+
+		// Retrieve the factory bytecode from the JSON args
+		factoryBytecode := bridge.GetBytecodeFromArgsJSON("cadence/args/deploy-factory-args.json")
+
+		// deploy the Solidity Factory contract to the service account's COA
+		tx = blueprints.DeployEVMContractTransaction(serviceAddress, factoryBytecode, gasLimit, deploymentValue, bridgeEnv, *env)
+
+		txError, err = b.invokeMetaTransaction(
+			NewContextFromParent(b.ctx, WithEVMEnabled(true)),
+			Transaction(tx, 0),
+		)
+		panicOnMetaInvokeErrf("failed to deploy the Factory in the Service Account COA: %s", txError, err)
 	}
 }
 
