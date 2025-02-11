@@ -1130,14 +1130,6 @@ func (fnb *FlowNodeBuilder) initPebbleDB() error {
 		return nil
 	}
 
-	// if the pebble DB is not set, we skip initialization
-	// the pebble DB must be provided to initialize
-	// since we've set an default directory for the pebble DB, this check
-	// is not necessary, but rather a sanity check
-	if fnb.BaseConfig.pebbleDir == NotSet {
-		return fmt.Errorf("missing required flag '--pebble-dir'")
-	}
-
 	db, closer, err := scaffold.InitPebbleDB(fnb.BaseConfig.pebbleDir)
 	if err != nil {
 		return err
