@@ -101,6 +101,44 @@ type KVStoreReader interface {
 	//    enough that the network is overwhelming likely to finalize at least one
 	//    block with a view in this range
 	GetFinalizationSafetyThreshold() uint64
+
+	// v2
+
+	// GetCadenceComponentVersion returns the Cadence component version.
+	// Returns kvstore.ErrKeyNotSupported if invoked on a KVStore instance before v2.
+	GetCadenceComponentVersion() (MagnitudeOfChangeVersion, error)
+	// GetCadenceComponentVersionUpgrade returns the most recent upgrade for the Cadence Component Version,
+	// if one exists (otherwise returns nil). The upgrade will be returned even if it has already been applied.
+	// Returns nil if invoked on a KVStore instance before v2.
+	GetCadenceComponentVersionUpgrade() *ViewBasedActivator[MagnitudeOfChangeVersion]
+
+	// GetExecutionComponentVersion returns the Execution component version.
+	// Returns kvstore.ErrKeyNotSupported if invoked on a KVStore instance before v2.
+	GetExecutionComponentVersion() (MagnitudeOfChangeVersion, error)
+	// GetExecutionComponentVersionUpgrade returns the most recent upgrade for the Execution Component Version,
+	// if one exists (otherwise returns nil). The upgrade will be returned even if it has already been applied.
+	// Returns nil if invoked on a KVStore instance before v2.
+	GetExecutionComponentVersionUpgrade() *ViewBasedActivator[MagnitudeOfChangeVersion]
+
+	// GetExecutionMeteringParameters returns the Execution metering parameters.
+	// Returns kvstore.ErrKeyNotSupported if invoked on a KVStore instance before v2.
+	GetExecutionMeteringParameters() (ExecutionMeteringParameters, error)
+	// GetExecutionMeteringParametersUpgrade returns the most recent upgrade for the Execution Metering Parameters,
+	// if one exists (otherwise returns nil). The upgrade will be returned even if it has already been applied.
+	// Returns nil if invoked on a KVStore instance before v2.
+	GetExecutionMeteringParametersUpgrade() *ViewBasedActivator[ExecutionMeteringParameters]
+}
+
+// ExecutionMeteringParameters are used to measure resource usage of transactions,
+// which affects fee calculations and transaction/script stopping conditions.
+// TODO should this live in fvm package?
+type ExecutionMeteringParameters struct {
+	// TODO docs
+	ExecutionEffortParameters map[uint]uint64
+	// TODO docs
+	ExecutionMemoryParameters map[uint]uint64
+	// TODO docs
+	ExecutionMemoryLimit uint64
 }
 
 // VersionedEncodable defines the interface for a versioned key-value store independent
@@ -135,4 +173,39 @@ type UpdatableField[T any] struct {
 	// directive is received, even if the value update has already happened.
 	// The update should be applied when reaching or exceeding the ActivationView.
 	Update *ViewBasedActivator[T]
+}
+
+// MagnitudeOfChangeVersion is intended as an intuitive representation of the “magnitude of change”.
+//
+// # CAUTION: Don't confuse this with semver!
+//
+// This versioning representation DEVIATES from established Semantic Versioning.
+// Any two different versions of the Execution Stack are considered incompatible.
+// In particular, two versions only differing in their minor, might be entirely downwards-INCOMPATIBLE.
+//
+// We generally recommend to use Integer Versioning for components. The MagnitudeOfChangeVersion scheme should
+// be only used when there is a clear advantage Integer Versioning which outweighs the risk of falsely
+// making compatibility assumptions by confusing this scheme with Semantic Versioning!
+//
+// MagnitudeOfChangeVersion helps with an intuitive representation of the “magnitude of change”.
+// For example, for the execution stack, bug fixes closing unexploited edge-cases will be a relatively
+// frequent cause of upgrades. Those bug fixes could be reflected by minor version bumps, whose
+// imperfect downwards compatibility might frequently suffice to warrant Access Nodes using the same
+// version (higher minor) across version boundaries. In comparison, major version change would generally
+// indicate broader non-compatibility (or larger feature additions) where it is very unlikely that the Access
+// Node can use one implementation for versions with different major.
+//
+// We emphasize again that this differentiation of “imperfect but good-enough downwards compatibility”
+// is in no way reflected by the versioning scheme. Any automated decisions of compatibility for different
+// versions are to be avoided (including versions where only the minor is different).
+//
+// Engineering teams using this scheme must be aware that the MagnitudeOfChangeVersion is easily
+// misleading wrt to incorrect assumptions about downwards compatibility. Avoiding problems (up to and
+// including the possibility of mainnet outages) requires continued awareness of all engineers in the
+// teams working with this version. The engineers in those teams must commit to diligently documenting
+// all relevant changes, details regarding magnitude of changes and if applicable “imperfect but
+// good-enough downwards compatibility”.
+type MagnitudeOfChangeVersion struct {
+	Major uint
+	Minor uint
 }

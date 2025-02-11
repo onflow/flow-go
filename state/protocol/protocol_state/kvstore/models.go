@@ -149,6 +149,36 @@ func (model *Modelv0) GetFinalizationSafetyThreshold() uint64 {
 	return model.FinalizationSafetyThreshold
 }
 
+// GetCadenceComponentVersion always returns ErrUnsupportedVersion because this field is unsupported for Modelv0.
+func (model *Modelv0) GetCadenceComponentVersion() (protocol.MagnitudeOfChangeVersion, error) {
+	return protocol.MagnitudeOfChangeVersion{}, ErrUnsupportedVersion
+}
+
+// GetCadenceComponentVersionUpgrade always returns nil because this field is unsupported for Modelv0.
+func (model *Modelv0) GetCadenceComponentVersionUpgrade() *protocol.ViewBasedActivator[protocol.MagnitudeOfChangeVersion] {
+	return nil
+}
+
+// GetExecutionComponentVersion always returns ErrUnsupportedVersion because this field is unsupported for Modelv0.
+func (model *Modelv0) GetExecutionComponentVersion() (protocol.MagnitudeOfChangeVersion, error) {
+	return protocol.MagnitudeOfChangeVersion{}, ErrUnsupportedVersion
+}
+
+// GetExecutionComponentVersionUpgrade always returns nil because this field is unsupported for Modelv0.
+func (model *Modelv0) GetExecutionComponentVersionUpgrade() *protocol.ViewBasedActivator[protocol.MagnitudeOfChangeVersion] {
+	return nil
+}
+
+// GetExecutionMeteringParameters always returns ErrUnsupportedVersion because this field is unsupported for Modelv0.
+func (model *Modelv0) GetExecutionMeteringParameters() (protocol.ExecutionMeteringParameters, error) {
+	return protocol.ExecutionMeteringParameters{}, ErrUnsupportedVersion
+}
+
+// GetExecutionMeteringParametersUpgrade always returns nil because this field is unsupported for Modelv0.
+func (model *Modelv0) GetExecutionMeteringParametersUpgrade() *protocol.ViewBasedActivator[protocol.ExecutionMeteringParameters] {
+	return nil
+}
+
 // Modelv1 is v1 of the Protocol State key-value store.
 // This represents the first model version which will be considered "latest" by any
 // deployed software version.
@@ -184,6 +214,7 @@ func (model *Modelv1) Replicate(protocolVersion uint64) (protocol_state.KVStoreM
 	}
 
 	// perform actual replication to the next version
+	// TODO do we want default initial values for the execution version?
 	v2 := &Modelv2{
 		Modelv1: clone.Clone(*model),
 	}
@@ -209,13 +240,17 @@ func (model *Modelv1) GetProtocolStateVersion() uint64 {
 	return 1
 }
 
-// Modelv2 reflects a behavioural change of the protocol (compared to Modelv1). Despite there being no change of the
-// actual data model, we increment the version to coordinate switching between the old and the new protocol behaviour.
+// Modelv2 adds fields for execution versioning and metering, and reflects a behavioural
+// change for EFM Recovery.
 // This version adds the following changes:
+//   - Adds execution versioning and metering fields
 //   - Non-system-chunk service event validation support (adds ChunkBody.ServiceEventCount field)
 //   - EFM Recovery (adds EpochCommit.DKGIndexMap field)
 type Modelv2 struct {
 	Modelv1
+	ExecutionMeteringParameters protocol.UpdatableField[protocol.ExecutionMeteringParameters]
+	ExecutionComponentVersion   protocol.UpdatableField[protocol.MagnitudeOfChangeVersion]
+	CadenceComponentVersion     protocol.UpdatableField[protocol.MagnitudeOfChangeVersion]
 }
 
 // ID returns an identifier for this key-value store snapshot by hashing internal fields and version number.
@@ -253,6 +288,42 @@ func (model *Modelv2) VersionedEncode() (uint64, []byte, error) {
 // and which model is used for serialization.
 func (model *Modelv2) GetProtocolStateVersion() uint64 {
 	return 2
+}
+
+// GetCadenceComponentVersion returns the current Cadence component version from Modelv2.
+// No errors are expected during normal operation.
+func (model *Modelv2) GetCadenceComponentVersion() (protocol.MagnitudeOfChangeVersion, error) {
+	return model.CadenceComponentVersion.CurrentValue, nil
+}
+
+// GetCadenceComponentVersionUpgrade returns the most recent upgrade for the Cadence component version,
+// if one exists (otherwise returns nil).
+func (model *Modelv2) GetCadenceComponentVersionUpgrade() *protocol.ViewBasedActivator[protocol.MagnitudeOfChangeVersion] {
+	return model.CadenceComponentVersion.Update
+}
+
+// GetExecutionComponentVersion returns the current Execution component version from Modelv2.
+// No errors are expected during normal operation.
+func (model *Modelv2) GetExecutionComponentVersion() (protocol.MagnitudeOfChangeVersion, error) {
+	return model.ExecutionComponentVersion.CurrentValue, nil
+}
+
+// GetExecutionComponentVersionUpgrade returns the most recent upgrade for the Execution component version,
+// if one exists (otherwise returns nil).
+func (model *Modelv2) GetExecutionComponentVersionUpgrade() *protocol.ViewBasedActivator[protocol.MagnitudeOfChangeVersion] {
+	return model.ExecutionComponentVersion.Update
+}
+
+// GetExecutionMeteringParameters returns the current Execution metering parameters from Modelv2.
+// No errors are expected during normal operation.
+func (model *Modelv2) GetExecutionMeteringParameters() (protocol.ExecutionMeteringParameters, error) {
+	return model.ExecutionMeteringParameters.CurrentValue, nil
+}
+
+// GetExecutionMeteringParametersUpgrade returns the most recent upgrade for the Execution metering parameters,
+// if one exists (otherwise returns nil).
+func (model *Modelv2) GetExecutionMeteringParametersUpgrade() *protocol.ViewBasedActivator[protocol.ExecutionMeteringParameters] {
+	return model.ExecutionMeteringParameters.Update
 }
 
 // NewDefaultKVStore constructs a default Key-Value Store of the *latest* protocol version for bootstrapping.
