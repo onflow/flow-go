@@ -113,8 +113,26 @@ type VersionedEncodable interface {
 	VersionedEncode() (uint64, []byte, error)
 }
 
-// ViewBasedActivator allows setting value that will be active from specific view.
+// ViewBasedActivator represents a scheduled update to some protocol parameter P.
+// (The relationship between a ViewBasedActivator and P is managed outside this model.)
+// Once the ViewBasedActivator A is persisted to the protocol state, P is updated
+// to value A.Data in the first block on or after view A.ActivationView.
 type ViewBasedActivator[T any] struct {
-	Data           T
-	ActivationView uint64 // first view at which Data will take effect
+	// Data is the pending new value, to be applied when reaching or exceeding ActivationView.
+	Data T
+	// ActivationView is the view at which the new value should be applied.
+	ActivationView uint64
+}
+
+// UpdatableField represents a protocol parameter which can be updated using a ViewBasedActivator.
+type UpdatableField[T any] struct {
+	// CurrentValue is the value that is active after constructing the block
+	// that this Protocol State pertains to.
+	CurrentValue T
+
+	// Update is optional and is nil if no value update has been scheduled yet.
+	// This field will hold the last scheduled update until a newer update
+	// directive is received, even if the value update has already happened.
+	// The update should be applied when reaching or exceeding the ActivationView.
+	Update *ViewBasedActivator[T]
 }
