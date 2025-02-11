@@ -451,7 +451,7 @@ func NewInstance(t *testing.T, options ...Option) *Instance {
 			// mock signature aggregator which doesn't perform any crypto operations and just tracks total weight
 			aggregator := &mocks.TimeoutSignatureAggregator{}
 			totalWeight := atomic.NewUint64(0)
-			newestView := counters.NewMonotonousCounter(0)
+			newestView := counters.NewMonotonicCounter(0)
 			aggregator.On("View").Return(view).Maybe()
 			aggregator.On("TotalWeight").Return(func() uint64 {
 				return totalWeight.Load()
