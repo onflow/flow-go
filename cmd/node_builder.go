@@ -153,6 +153,8 @@ type BaseConfig struct {
 	DynamicStartupSleepInterval time.Duration
 	datadir                     string
 	pebbleDir                   string
+	badgerDB                    *badger.DB
+	pebbleDB                    *pebble.DB
 	secretsdir                  string
 	secretsDBEnabled            bool
 	InsecureSecretsDB           bool

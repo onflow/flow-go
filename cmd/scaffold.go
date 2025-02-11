@@ -12,6 +12,7 @@ import (
 	"time"
 
 	gcemd "cloud.google.com/go/compute/metadata"
+	"github.com/cockroachdb/pebble"
 	"github.com/dgraph-io/badger/v2"
 	"github.com/hashicorp/go-multierror"
 	dht "github.com/libp2p/go-libp2p-kad-dht"
@@ -1060,6 +1061,20 @@ func (fnb *FlowNodeBuilder) initProfiler() error {
 }
 
 func (fnb *FlowNodeBuilder) initBadgerDB() error {
+	// if the badger DB is already set, use it.
+	// the badger DB might be set by the follower engine
+	if fnb.BaseConfig.badgerDB != nil {
+		fnb.DB = fnb.BaseConfig.badgerDB
+		return nil
+	}
+
+	// if the badger DB is not set, then the datadir must be provided to initialize
+	// the badger DB
+	// since we've set an default directory for the badger DB, this check
+	// is not necessary, but rather a sanity check
+	if fnb.BaseConfig.datadir == NotSet {
+		return fmt.Errorf("missing required flag '--datadir'")
+	}
 
 	// Pre-create DB path (Badger creates only one-level dirs)
 	err := os.MkdirAll(fnb.BaseConfig.datadir, 0700)
@@ -1108,6 +1123,21 @@ func (fnb *FlowNodeBuilder) initBadgerDB() error {
 }
 
 func (fnb *FlowNodeBuilder) initPebbleDB() error {
+	// if the pebble DB is already set, use it
+	// the pebble DB might be set by the follower engine
+	if fnb.BaseConfig.pebbleDB != nil {
+		fnb.PebbleDB = fnb.BaseConfig.pebbleDB
+		return nil
+	}
+
+	// if the pebble DB is not set, we skip initialization
+	// the pebble DB must be provided to initialize
+	// since we've set an default directory for the pebble DB, this check
+	// is not necessary, but rather a sanity check
+	if fnb.BaseConfig.pebbleDir == NotSet {
+		return fmt.Errorf("missing required flag '--pebble-dir'")
+	}
+
 	db, closer, err := scaffold.InitPebbleDB(fnb.BaseConfig.pebbleDir)
 	if err != nil {
 		return err
@@ -1901,6 +1931,18 @@ func WithDataDir(dataDir string) Option {
 	}
 }
 
+func WithBadgerDB(db *badger.DB) Option {
+	return func(config *BaseConfig) {
+		config.badgerDB = db
+	}
+}
+
+func WithPebbleDB(db *pebble.DB) Option {
+	return func(config *BaseConfig) {
+		config.pebbleDB = db
+	}
+}
+
 func WithSecretsDBEnabled(enabled bool) Option {
 	return func(config *BaseConfig) {
 		config.secretsDBEnabled = enabled
@@ -2036,6 +2078,8 @@ func (fnb *FlowNodeBuilder) onStart() error {
 		return err
 	}
 
+	// we always initialize both badger and pebble databases
+	// even if we only use one of them, this simplify the code and checks
 	if err := fnb.initBadgerDB(); err != nil {
 		return err
 	}
