@@ -85,6 +85,29 @@ func (s *AccountStatusesProviderSuite) TestAccountStatusesDataProvider_HappyPath
 	)
 }
 
+func (s *AccountStatusesProviderSuite) TestAccountStatusesDataProvider_StateStreamNotConfigured() {
+	ctx := context.Background()
+	send := make(chan interface{})
+
+	topic := AccountStatusesTopic
+
+	provider, err := NewAccountStatusesDataProvider(
+		ctx,
+		s.log,
+		nil,
+		"dummy-id",
+		topic,
+		models.Arguments{},
+		send,
+		s.chain,
+		state_stream.DefaultEventFilterConfig,
+		subscription.DefaultHeartbeatInterval,
+	)
+	s.Require().Nil(provider)
+	s.Require().Error(err)
+	s.Require().Contains(err.Error(), "cannot stream account statuses")
+}
+
 func (s *AccountStatusesProviderSuite) subscribeAccountStatusesDataProviderTestCases(
 	backendResponses []*backend.AccountStatusesResponse,
 ) []testType {

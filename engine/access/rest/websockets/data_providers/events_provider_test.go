@@ -299,6 +299,29 @@ func (s *EventsProviderSuite) TestEventsDataProvider_InvalidArguments() {
 	}
 }
 
+func (s *EventsProviderSuite) TestEventsDataProvider_StateStreamNotConfigured() {
+	ctx := context.Background()
+	send := make(chan interface{})
+
+	topic := EventsTopic
+
+	provider, err := NewEventsDataProvider(
+		ctx,
+		s.log,
+		nil,
+		"dummy-id",
+		topic,
+		models.Arguments{},
+		send,
+		s.chain,
+		state_stream.DefaultEventFilterConfig,
+		subscription.DefaultHeartbeatInterval,
+	)
+	s.Require().Nil(provider)
+	s.Require().Error(err)
+	s.Require().Contains(err.Error(), "cannot stream events")
+}
+
 // invalidArgumentsTestCases returns a list of test cases with invalid argument combinations
 // for testing the behavior of events data providers. Each test case includes a name,
 // a set of input arguments, and the expected error message that should be returned.
