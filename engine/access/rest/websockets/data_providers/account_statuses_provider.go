@@ -55,6 +55,12 @@ func NewAccountStatusesDataProvider(
 		heartbeatInterval: heartbeatInterval,
 	}
 
+	if p.stateStreamApi == nil {
+		logger.Debug().Msg("state stream api is nil. cannot stream account statuses")
+		return nil, fmt.Errorf("this acess node is configured with no state stream api. " +
+			"cannot stream account statuses")
+	}
+
 	// Initialize arguments passed to the provider.
 	accountStatusesArgs, err := parseAccountStatusesArguments(arguments, chain, eventFilterConfig)
 	if err != nil {

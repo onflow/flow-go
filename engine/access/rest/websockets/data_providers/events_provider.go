@@ -54,6 +54,11 @@ func NewEventsDataProvider(
 		heartbeatInterval: heartbeatInterval,
 	}
 
+	if p.stateStreamApi == nil {
+		logger.Debug().Msg("state stream api is nil. cannot stream events")
+		return nil, fmt.Errorf("this acess node is configured with no state stream api. cannot stream events")
+	}
+
 	// Initialize arguments passed to the provider.
 	eventArgs, err := parseEventsArguments(arguments, chain, eventFilterConfig)
 	if err != nil {
