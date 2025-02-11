@@ -275,6 +275,8 @@ func DefaultBaseConfig() *BaseConfig {
 		BootstrapDir:     "bootstrap",
 		datadir:          datadir,
 		pebbleDir:        pebbleDir,
+		badgerDB:         nil,
+		pebbleDB:         nil,
 		secretsdir:       NotSet,
 		secretsDBEnabled: true,
 		level:            "info",

@@ -1925,18 +1925,32 @@ func WithBindAddress(bindAddress string) Option {
 	}
 }
 
+// WithDataDir set the data directory for the badger database
+// It will be ignored if WithBadgerDB is used
 func WithDataDir(dataDir string) Option {
 	return func(config *BaseConfig) {
 		config.datadir = dataDir
 	}
 }
 
+// WithBadgerDB sets the badger database instance
+// If used, then WithDataDir method will be ignored
 func WithBadgerDB(db *badger.DB) Option {
 	return func(config *BaseConfig) {
 		config.badgerDB = db
 	}
 }
 
+// WithPebbleDir set the data directory for the pebble database
+// It will be ignored if WithPebbleDB is used
+func WithPebbleDir(dataDir string) Option {
+	return func(config *BaseConfig) {
+		config.pebbleDir = dataDir
+	}
+}
+
+// WithPebbleDB sets the pebble database instance
+// If used, then WithPebbleDir method will be ignored
 func WithPebbleDB(db *pebble.DB) Option {
 	return func(config *BaseConfig) {
 		config.pebbleDB = db
