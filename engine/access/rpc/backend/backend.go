@@ -3,6 +3,7 @@ package backend
 import (
 	"context"
 	"crypto/md5" //nolint:gosec
+	"errors"
 	"fmt"
 	"time"
 
