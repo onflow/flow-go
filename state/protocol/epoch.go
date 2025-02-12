@@ -11,19 +11,20 @@ type EpochQuery interface {
 	// Current returns the current epoch as of this snapshot. All valid snapshots
 	// have a current epoch.
 	// Error returns:
-	//   - state.ErrUnknownSnapshotReference - if the epoch is queried from an unresolvable snapshot.
+	//   - [state.ErrUnknownSnapshotReference] - if the epoch is queried from an unresolvable snapshot.
 	//   - generic error in case of unexpected critical internal corruption or bugs
 	Current() (CommittedEpoch, error)
 
-	// NextUnsafe should only be used by components that actively advance the
-	// epoch from [flow.EpochPhaseSetup] to [flow.EpochPhaseCommitted].
+	// NextUnsafe should only be used by components that are actively involved in advancing
+	// the epoch from [flow.EpochPhaseSetup] to [flow.EpochPhaseCommitted].
 	// NextUnsafe returns the tentative configuration for the next epoch as of this snapshot.
 	// Valid snapshots make such configuration available during the Epoch Setup Phase, which
 	// generally is the case only after an `EpochSetupPhaseStarted` notification has been emitted.
 	// CAUTION: epoch transition might not happen as described by the tentative configuration!
 	//
 	// Error returns:
-	//   - [ErrNextEpochNotSetup] in the case that this method is queried w.r.t. a snapshot within the [flow.EpochPhaseStaking] phase
+	//   - [ErrNextEpochNotSetup] in the case that this method is queried w.r.t. a snapshot
+	//     within the [flow.EpochPhaseStaking] phase or when we are in Epoch Fallback Mode.
 	//   - [ErrNextEpochAlreadyCommitted] if the tentative epoch is requested from
 	//     a snapshot within the [flow.EpochPhaseCommitted] phase.
 	//   - [state.ErrUnknownSnapshotReference] if the epoch is queried from an unresolvable snapshot.

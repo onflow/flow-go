@@ -18,6 +18,11 @@ type Epochs struct {
 
 var _ protocol.EpochQuery = (*Epochs)(nil)
 
+// Previous returns the previous epoch as of this snapshot. Valid snapshots
+// must have a previous epoch for all epochs except that immediately after the root block.
+// Error returns:
+//   - [protocol.ErrNoPreviousEpoch] - if the previous epoch does not exist.
+//     This happens when the previous epoch is queried within the first epoch of a spork.
 func (eq Epochs) Previous() (protocol.CommittedEpoch, error) {
 	if eq.entry.PreviousEpoch == nil {
 		return nil, protocol.ErrNoPreviousEpoch
@@ -25,10 +30,24 @@ func (eq Epochs) Previous() (protocol.CommittedEpoch, error) {
 	return NewCommittedEpoch(eq.entry.PreviousEpochSetup, eq.entry.PreviousEpoch.EpochExtensions, eq.entry.PreviousEpochCommit), nil
 }
 
+// Current returns the current epoch as of this snapshot. All valid snapshots have a current epoch.
 func (eq Epochs) Current() (protocol.CommittedEpoch, error) {
 	return NewCommittedEpoch(eq.entry.CurrentEpochSetup, eq.entry.CurrentEpoch.EpochExtensions, eq.entry.CurrentEpochCommit), nil
 }
 
+// NextUnsafe should only be used by components that are actively involved in advancing
+// the epoch from [flow.EpochPhaseSetup] to [flow.EpochPhaseCommitted].
+// NextUnsafe returns the tentative configuration for the next epoch as of this snapshot.
+// Valid snapshots make such configuration available during the Epoch Setup Phase, which
+// generally is the case only after an `EpochSetupPhaseStarted` notification has been emitted.
+// CAUTION: epoch transition might not happen as described by the tentative configuration!
+//
+// Error returns:
+//   - [ErrNextEpochNotSetup] in the case that this method is queried w.r.t. a snapshot
+//     within the [flow.EpochPhaseStaking] phase or when we are in Epoch Fallback Mode.
+//   - [ErrNextEpochAlreadyCommitted] if the tentative epoch is requested from
+//     a snapshot within the [flow.EpochPhaseCommitted] phase.
+//   - generic error in case of unexpected critical internal corruption or bugs
 func (eq Epochs) NextUnsafe() (protocol.TentativeEpoch, error) {
 	switch eq.entry.EpochPhase() {
 	case flow.EpochPhaseStaking, flow.EpochPhaseFallback:
@@ -41,6 +60,14 @@ func (eq Epochs) NextUnsafe() (protocol.TentativeEpoch, error) {
 	return nil, fmt.Errorf("unexpected unknown phase in protocol state entry")
 }
 
+// NextCommitted returns the next epoch as of this snapshot, only if it has
+// been committed already - generally that is the case only after an
+// `EpochCommittedPhaseStarted` notification has been emitted.
+//
+// Error returns:
+//   - [ErrNextEpochNotCommitted] - in the case that committed epoch has been requested w.r.t a snapshot within
+//     the [flow.EpochPhaseStaking] or [flow.EpochPhaseSetup] phases.
+//   - generic error in case of unexpected critical internal corruption or bugs
 func (eq Epochs) NextCommitted() (protocol.CommittedEpoch, error) {
 	switch eq.entry.EpochPhase() {
 	case flow.EpochPhaseStaking, flow.EpochPhaseFallback, flow.EpochPhaseSetup:
