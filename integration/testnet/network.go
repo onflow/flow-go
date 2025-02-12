@@ -15,6 +15,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/onflow/flow-go/follower/database"
 	"github.com/onflow/flow-go/state/protocol/protocol_state"
 
 	"github.com/dapperlabs/testingdock"
@@ -75,6 +76,8 @@ const (
 	DefaultFlowDataDir = "/data"
 	// DefaultFlowDBDir is the default directory for the node database.
 	DefaultFlowDBDir = "/data/protocol"
+	// DefaultFlowPebbleDBDir is the default directory for the pebble database.
+	DefaultFlowPebbleDBDir = "/data/protocol-pebble"
 	// DefaultFlowSecretsDBDir is the default directory for secrets database.
 	DefaultFlowSecretsDBDir = "/data/secrets"
 	// DefaultExecutionRootDir is the default directory for the execution node state database.
@@ -675,6 +678,10 @@ func (net *FlowNetwork) addConsensusFollower(t *testing.T, rootProtocolSnapshotP
 
 	// create a directory for the follower database
 	dataDir := makeDir(t, tmpdir, DefaultFlowDBDir)
+	pebbleDir := makeDir(t, tmpdir, DefaultFlowPebbleDBDir)
+
+	pebbleDB, _, err := database.InitPebbleDB(pebbleDir)
+	require.NoError(t, err)
 
 	// create a follower-specific directory for the bootstrap files
 	followerBootstrapDir := makeDir(t, tmpdir, DefaultBootstrapDir)
@@ -682,7 +689,7 @@ func (net *FlowNetwork) addConsensusFollower(t *testing.T, rootProtocolSnapshotP
 
 	// copy root protocol snapshot to the follower-specific folder
 	// bootstrap/public-root-information directory
-	err := io.Copy(rootProtocolSnapshotPath, filepath.Join(followerBootstrapDir, bootstrap.PathRootProtocolStateSnapshot))
+	err = io.Copy(rootProtocolSnapshotPath, filepath.Join(followerBootstrapDir, bootstrap.PathRootProtocolStateSnapshot))
 	require.NoError(t, err)
 
 	// consensus follower
@@ -698,6 +705,10 @@ func (net *FlowNetwork) addConsensusFollower(t *testing.T, rootProtocolSnapshotP
 	opts := append(
 		followerConf.Opts,
 		consensus_follower.WithDB(badgerDB),
+		// this is required, otherwise consensus follower will create a pebble db at the default
+		// path /data/protocol-pebble, which is outside of the tmpdir, and will run into permission
+		// denied error.
+		consensus_follower.WithPebbleDB(pebbleDB),
 		consensus_follower.WithBootstrapDir(followerBootstrapDir),
 	)
 
