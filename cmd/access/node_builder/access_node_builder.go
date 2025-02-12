@@ -186,7 +186,6 @@ type AccessNodeConfig struct {
 	storeTxResultErrorMessages           bool
 	stopControlEnabled                   bool
 	registerDBPruneThreshold             uint64
-	enableWebSocketsStreamAPI            bool
 }
 
 type PublicNetworkConfig struct {
