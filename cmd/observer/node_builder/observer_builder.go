@@ -1330,7 +1330,7 @@ func (builder *ObserverServiceBuilder) BuildExecutionSyncComponents() *ObserverS
 			indexedBlockHeight = store.NewConsumerProgress(badgerimpl.ToDB(builder.DB), module.ConsumeProgressExecutionDataIndexerBlockHeight)
 			return nil
 		}).Module("transaction results storage", func(node *cmd.NodeConfig) error {
-			builder.lightTransactionResults = store.NewLightTransactionResults(node.Metrics.Cache, badgerimpl.ToDB(node.DB), bstorage.DefaultCacheSize)
+			builder.lightTransactionResults = store.NewLightTransactionResults(node.Metrics.Cache, node.ProtocolDB, bstorage.DefaultCacheSize)
 			return nil
 		}).DependableComponent("execution data indexer", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 			// Note: using a DependableComponent here to ensure that the indexer does not block
@@ -1773,7 +1773,7 @@ func (builder *ObserverServiceBuilder) enqueueRPCServer() {
 		return nil
 	})
 	builder.Module("events storage", func(node *cmd.NodeConfig) error {
-		builder.events = store.NewEvents(node.Metrics.Cache, badgerimpl.ToDB(node.DB))
+		builder.events = store.NewEvents(node.Metrics.Cache, node.ProtocolDB)
 		return nil
 	})
 	builder.Module("reporter", func(node *cmd.NodeConfig) error {

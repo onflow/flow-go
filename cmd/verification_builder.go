@@ -39,7 +39,6 @@ import (
 	"github.com/onflow/flow-go/state/protocol/blocktimer"
 	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/storage/badger"
-	"github.com/onflow/flow-go/storage/operation/badgerimpl"
 	"github.com/onflow/flow-go/storage/store"
 )
 
@@ -158,11 +157,11 @@ func (v *VerificationNodeBuilder) LoadComponentsAndModules() {
 			return nil
 		}).
 		Module("processed chunk index consumer progress", func(node *NodeConfig) error {
-			processedChunkIndex = store.NewConsumerProgress(badgerimpl.ToDB(node.DB), module.ConsumeProgressVerificationChunkIndex)
+			processedChunkIndex = store.NewConsumerProgress(node.ProtocolDB, module.ConsumeProgressVerificationChunkIndex)
 			return nil
 		}).
 		Module("processed block height consumer progress", func(node *NodeConfig) error {
-			processedBlockHeight = store.NewConsumerProgress(badgerimpl.ToDB(node.DB), module.ConsumeProgressVerificationBlockHeight)
+			processedBlockHeight = store.NewConsumerProgress(node.ProtocolDB, module.ConsumeProgressVerificationBlockHeight)
 			return nil
 		}).
 		Module("chunks queue", func(node *NodeConfig) error {

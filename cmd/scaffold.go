@@ -83,6 +83,7 @@ import (
 	"github.com/onflow/flow-go/storage"
 	bstorage "github.com/onflow/flow-go/storage/badger"
 	"github.com/onflow/flow-go/storage/badger/operation"
+	"github.com/onflow/flow-go/storage/operation/badgerimpl"
 	sutil "github.com/onflow/flow-go/storage/util"
 	"github.com/onflow/flow-go/utils/logging"
 )
@@ -1108,9 +1109,12 @@ func (fnb *FlowNodeBuilder) initBadgerDB() error {
 		return fmt.Errorf("could not open public db: %w", err)
 	}
 	fnb.DB = publicDB
+	// set badger db as protocol db
+	// TODO: making it dynamic to switch between badger and pebble
+	fnb.ProtocolDB = badgerimpl.ToDB(publicDB)
 
 	fnb.ShutdownFunc(func() error {
-		if err := fnb.DB.Close(); err != nil {
+		if err := publicDB.Close(); err != nil {
 			return fmt.Errorf("error closing protocol database: %w", err)
 		}
 		return nil

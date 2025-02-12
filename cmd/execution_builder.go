@@ -92,7 +92,6 @@ import (
 	storageerr "github.com/onflow/flow-go/storage"
 	storage "github.com/onflow/flow-go/storage/badger"
 	"github.com/onflow/flow-go/storage/operation"
-	"github.com/onflow/flow-go/storage/operation/badgerimpl"
 	"github.com/onflow/flow-go/storage/operation/pebbleimpl"
 	storagepebble "github.com/onflow/flow-go/storage/pebble"
 	"github.com/onflow/flow-go/storage/store"
@@ -286,7 +285,7 @@ func (exeNode *ExecutionNode) LoadExecutionMetrics(node *NodeConfig) error {
 	// this is guaranteed to exist because LoadBootstrapper has inserted
 	// the root block as executed block
 	var blockID flow.Identifier
-	reader := badgerimpl.ToDB(node.DB).Reader()
+	reader := node.ProtocolDB.Reader()
 	err := operation.RetrieveExecutedBlock(reader, &blockID)
 	if err != nil {
 		// database has not been bootstrapped yet
@@ -314,7 +313,7 @@ func (exeNode *ExecutionNode) LoadSyncCore(node *NodeConfig) error {
 func (exeNode *ExecutionNode) LoadExecutionStorage(
 	node *NodeConfig,
 ) error {
-	db := badgerimpl.ToDB(node.DB)
+	db := node.ProtocolDB
 	exeNode.commits = store.NewCommits(node.Metrics.Cache, db)
 	exeNode.results = store.NewExecutionResults(node.Metrics.Cache, db)
 	exeNode.receipts = store.NewExecutionReceipts(node.Metrics.Cache, db, exeNode.results, storage.DefaultCacheSize)
@@ -762,8 +761,6 @@ func (exeNode *ExecutionNode) LoadExecutionState(
 	chunkDataPacks := store.NewChunkDataPacks(node.Metrics.Cache,
 		pebbleimpl.ToDB(chunkDataPackDB), node.Storage.Collections, exeNode.exeConf.chunkDataPackCacheSize)
 
-	db := badgerimpl.ToDB(node.DB)
-
 	getLatestFinalized := func() (uint64, error) {
 		final, err := node.State.Final().Head()
 		if err != nil {
@@ -785,7 +782,7 @@ func (exeNode *ExecutionNode) LoadExecutionState(
 		exeNode.events,
 		exeNode.serviceEvents,
 		exeNode.txResults,
-		db,
+		node.ProtocolDB,
 		getLatestFinalized,
 		node.Tracer,
 		exeNode.registerStore,
@@ -1356,7 +1353,7 @@ func (exeNode *ExecutionNode) LoadBootstrapper(node *NodeConfig) error {
 	// check if the execution database already exists
 	bootstrapper := bootstrap.NewBootstrapper(node.Logger)
 
-	commit, bootstrapped, err := bootstrapper.IsBootstrapped(badgerimpl.ToDB(node.DB))
+	commit, bootstrapped, err := bootstrapper.IsBootstrapped(node.ProtocolDB)
 	if err != nil {
 		return fmt.Errorf("could not query database to know whether database has been bootstrapped: %w", err)
 	}
@@ -1381,8 +1378,7 @@ func (exeNode *ExecutionNode) LoadBootstrapper(node *NodeConfig) error {
 			return fmt.Errorf("could not load bootstrap state from checkpoint file: %w", err)
 		}
 
-		db := badgerimpl.ToDB(node.DB)
-		err = bootstrapper.BootstrapExecutionDatabase(db, node.RootSeal)
+		err = bootstrapper.BootstrapExecutionDatabase(node.ProtocolDB, node.RootSeal)
 		if err != nil {
 			return fmt.Errorf("could not bootstrap execution database: %w", err)
 		}

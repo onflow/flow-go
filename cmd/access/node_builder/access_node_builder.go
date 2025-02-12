@@ -877,7 +877,7 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 				return nil
 			}).
 			Module("transaction results storage", func(node *cmd.NodeConfig) error {
-				builder.lightTransactionResults = store.NewLightTransactionResults(node.Metrics.Cache, badgerimpl.ToDB(node.DB), bstorage.DefaultCacheSize)
+				builder.lightTransactionResults = store.NewLightTransactionResults(node.Metrics.Cache, node.ProtocolDB, bstorage.DefaultCacheSize)
 				return nil
 			}).
 			DependableComponent("execution data indexer", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
@@ -1839,7 +1839,7 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 			return nil
 		}).
 		Module("events storage", func(node *cmd.NodeConfig) error {
-			builder.events = store.NewEvents(node.Metrics.Cache, badgerimpl.ToDB(node.DB))
+			builder.events = store.NewEvents(node.Metrics.Cache, node.ProtocolDB)
 			return nil
 		}).
 		Module("reporter", func(node *cmd.NodeConfig) error {
@@ -1875,7 +1875,7 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 		}).
 		Module("transaction result error messages storage", func(node *cmd.NodeConfig) error {
 			if builder.storeTxResultErrorMessages {
-				builder.transactionResultErrorMessages = store.NewTransactionResultErrorMessages(node.Metrics.Cache, badgerimpl.ToDB(node.DB), bstorage.DefaultCacheSize)
+				builder.transactionResultErrorMessages = store.NewTransactionResultErrorMessages(node.Metrics.Cache, node.ProtocolDB, bstorage.DefaultCacheSize)
 			}
 
 			return nil
