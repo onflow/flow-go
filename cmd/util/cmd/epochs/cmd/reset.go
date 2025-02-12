@@ -94,7 +94,6 @@ func resetRun(cmd *cobra.Command, args []string) {
 
 // extractResetEpochArgs extracts the required transaction arguments for the `resetEpoch` transaction
 func extractResetEpochArgs(snapshot *inmem.Snapshot) []cadence.Value {
-
 	// get current epoch
 	epoch, err := snapshot.Epochs().Current()
 	if err != nil {

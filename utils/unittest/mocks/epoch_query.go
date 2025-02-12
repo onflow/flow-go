@@ -1,6 +1,7 @@
 package mocks
 
 import (
+	"fmt"
 	"sync"
 	"testing"
 
@@ -38,7 +39,11 @@ func NewEpochQuery(t *testing.T, counter uint64, epochs ...protocol.CommittedEpo
 func (mock *EpochQuery) Current() (protocol.CommittedEpoch, error) {
 	mock.mu.RLock()
 	defer mock.mu.RUnlock()
-	return mock.byCounter[mock.counter], nil
+	epoch, exists := mock.byCounter[mock.counter]
+	if !exists {
+		return nil, fmt.Errorf("EpochQuery mock has no entry for current epoch - likely a test is not properly set up")
+	}
+	return epoch, nil
 }
 
 func (mock *EpochQuery) NextUnsafe() (protocol.TentativeEpoch, error) {
