@@ -102,14 +102,13 @@ func createNode(
 	currentEpoch.On("DKGPhase3FinalView").Return(currentSetup.DKGPhase3FinalView)
 	currentEpoch.On("RandomSource").Return(nextSetup.RandomSource)
 
-	nextEpoch := new(protocolmock.CommittedEpoch)
+	nextEpoch := new(protocolmock.TentativeEpoch)
 	nextEpoch.On("Counter").Return(nextSetup.Counter)
 	nextEpoch.On("InitialIdentities").Return(nextSetup.Participants)
-	nextEpoch.On("RandomSource").Return(nextSetup.RandomSource)
 
 	epochQuery := mocks.NewEpochQuery(t, currentSetup.Counter)
 	epochQuery.Add(currentEpoch)
-	epochQuery.Add(nextEpoch)
+	epochQuery.AddTentative(nextEpoch)
 	snapshot := new(protocolmock.Snapshot)
 	snapshot.On("Epochs").Return(epochQuery)
 	snapshot.On("EpochPhase").Return(flow.EpochPhaseStaking, nil)

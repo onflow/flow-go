@@ -4,11 +4,13 @@ import (
 	"sync"
 	"testing"
 
+	"github.com/stretchr/testify/require"
+
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/state/protocol"
 )
 
-// EpochQuery implements protocol.EpochQuery for testing purposes.
+// EpochQuery implements [protocol.EpochQuery] for testing purposes.
 // Safe for concurrent use by multiple goroutines.
 type EpochQuery struct {
 	t         *testing.T
@@ -94,20 +96,29 @@ func (mock *EpochQuery) ByCounter(counter uint64) protocol.CommittedEpoch {
 	return mock.byCounter[counter]
 }
 
+// Transition increments the counter indicating which epoch is the "current epoch".
+// It is assumed that an epoch corresponding to the current epoch counter exists;
+// otherwise this mock is in a state that is illegal according to protocol rules.
 func (mock *EpochQuery) Transition() {
 	mock.mu.Lock()
 	defer mock.mu.Unlock()
 	mock.counter++
 }
 
+// Add adds the given Committed Epoch to this EpochQuery implementation, so its
+// information can be retrieved by the business logic via the [protocol.EpochQuery] API.
 func (mock *EpochQuery) Add(epoch protocol.CommittedEpoch) {
 	mock.mu.Lock()
 	defer mock.mu.Unlock()
 	mock.byCounter[epoch.Counter()] = epoch
 }
 
+// AddTentative adds the given Tentative Epoch to this EpochQuery implementation, so its
+// information can be retrieved by the business logic via the [protocol.EpochQuery] API.
 func (mock *EpochQuery) AddTentative(epoch protocol.TentativeEpoch) {
 	mock.mu.Lock()
 	defer mock.mu.Unlock()
-	mock.tentative[epoch.Counter()] = epoch
+	counter := epoch.Counter()
+	require.Equal(mock.t, mock.counter+1, counter, "may only add tentative next epoch with current counter + 1")
+	mock.tentative[counter] = epoch
 }

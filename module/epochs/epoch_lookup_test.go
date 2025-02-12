@@ -358,7 +358,7 @@ func testEpochForView(t *testing.T, lookup *EpochLookup, epochs ...epochRange) {
 	})
 }
 
-// newMockCommittedEpoch returns a mock epoch with the given fields set.
+// newMockCommittedEpoch returns a mock epoch with the given properties
 func newMockCommittedEpoch(counter, firstView, finalView uint64) *mockprotocol.CommittedEpoch {
 	epoch := new(mockprotocol.CommittedEpoch)
 	epoch.On("FirstView").Return(firstView)

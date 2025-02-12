@@ -380,6 +380,8 @@ type EpochQuery struct {
 	snap *Snapshot
 }
 
+var _ protocol.EpochQuery = (*EpochQuery)(nil)
+
 // Current returns the current epoch.
 func (q *EpochQuery) Current() (protocol.CommittedEpoch, error) {
 	// all errors returned from storage reads here are unexpected, because all
@@ -427,6 +429,7 @@ func (q *EpochQuery) NextUnsafe() (protocol.TentativeEpoch, error) {
 	return nil, fmt.Errorf("data corruption: unknown epoch phase implies malformed protocol state epoch data")
 }
 
+// NextCommitted returns the next epoch as of this snapshot, only if it has been committed already.
 func (q *EpochQuery) NextCommitted() (protocol.CommittedEpoch, error) {
 	epochState, err := q.snap.state.protocolState.EpochStateAtBlockID(q.snap.blockID)
 	if err != nil {

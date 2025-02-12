@@ -1127,7 +1127,7 @@ func TestExtendEpochTransitionValid(t *testing.T) {
 //	ROOT <--+
 //	         \--B2<--B4(R2)<--B6(S2)<--B8
 func TestExtendConflictingEpochEvents(t *testing.T) {
-	// add more collectors so that we can have multiple distinct clustering assignments
+	// add more collectors so that we can have multiple distinct cluster assignments
 	extraCollectors := unittest.IdentityListFixture(2, func(identity *flow.Identity) {
 		identity.Role = flow.RoleCollection
 	})

@@ -24,7 +24,7 @@ var (
 
 	// ErrNextEpochAlreadyCommitted is a sentinel error returned when code tries
 	// to retrieve an uncommitted TentativeEpoch during the EpochCommitted phase
-	ErrNextEpochAlreadyCommitted = fmt.Errorf("retrieving tentative data when epoch is already committed")
+	ErrNextEpochAlreadyCommitted = fmt.Errorf("retrieving tentative epoch data when epoch is already committed")
 
 	// ErrUnknownEpochBoundary is a sentinel returned when a query is made for an
 	// epoch boundary which is unknown to this node.
