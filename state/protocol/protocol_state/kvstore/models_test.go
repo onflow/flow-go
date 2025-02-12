@@ -187,13 +187,31 @@ func TestKVStoreAPI_Replicate(t *testing.T) {
 				},
 			},
 		}
-		newVersion, err := model.Replicate(2)
+		upgradedKVStore, err := model.Replicate(2)
 		require.NoError(t, err)
-		require.Equal(t, uint64(2), newVersion.GetProtocolStateVersion())
-		require.NotEqual(t, newVersion.ID(), model.ID(), "two models with the same data but different version must have different ID")
-		_, ok := newVersion.(*kvstore.Modelv2)
+		require.Equal(t, uint64(2), upgradedKVStore.GetProtocolStateVersion())
+		require.NotEqual(t, upgradedKVStore.ID(), model.ID(), "two models with the same data but different version must have different ID")
+		_, ok := upgradedKVStore.(*kvstore.Modelv2)
 		require.True(t, ok, "expected Modelv2")
-		require.Equal(t, newVersion.GetVersionUpgrade(), model.GetVersionUpgrade())
+		require.Equal(t, upgradedKVStore.GetVersionUpgrade(), model.GetVersionUpgrade())
+
+		t.Run("v2-only fields should be uninitialized", func(t *testing.T) {
+			_, err := upgradedKVStore.GetCadenceComponentVersion()
+			assert.ErrorIs(t, err, kvstore.ErrKeyNotSet)
+
+			assert.Nil(t, upgradedKVStore.GetCadenceComponentVersionUpgrade())
+
+			_, err = upgradedKVStore.GetExecutionComponentVersion()
+			assert.ErrorIs(t, err, kvstore.ErrKeyNotSet)
+
+			assert.Nil(t, upgradedKVStore.GetExecutionComponentVersionUpgrade())
+
+			_, err = upgradedKVStore.GetExecutionMeteringParameters()
+			assert.ErrorIs(t, err, kvstore.ErrKeyNotSet)
+
+			assert.Nil(t, upgradedKVStore.GetExecutionMeteringParametersUpgrade())
+
+		})
 	})
 	t.Run("v2-invalid-upgrade", func(t *testing.T) {
 		model := &kvstore.Modelv2{}

@@ -214,9 +214,18 @@ func (model *Modelv1) Replicate(protocolVersion uint64) (protocol_state.KVStoreM
 	}
 
 	// perform actual replication to the next version
-	// TODO do we want default initial values for the execution version?
 	v2 := &Modelv2{
 		Modelv1: clone.Clone(*model),
+		// Execution component versions and metering parameters are explicitly undefined when upgrading to v2
+		CadenceComponentVersion: protocol.UpdatableField[protocol.MagnitudeOfChangeVersion]{
+			CurrentValue: protocol.UndefinedMagnitudeOfChangeVersion,
+		},
+		ExecutionComponentVersion: protocol.UpdatableField[protocol.MagnitudeOfChangeVersion]{
+			CurrentValue: protocol.UndefinedMagnitudeOfChangeVersion,
+		},
+		ExecutionMeteringParameters: protocol.UpdatableField[protocol.ExecutionMeteringParameters]{
+			CurrentValue: protocol.UndefinedExecutionMeteringParameters,
+		},
 	}
 	if v2.GetProtocolStateVersion() != protocolVersion {
 		return nil, fmt.Errorf("sanity check: replicate resulted in unexpected version (%d != %d)", v2.GetProtocolStateVersion(), protocolVersion)
@@ -291,8 +300,11 @@ func (model *Modelv2) GetProtocolStateVersion() uint64 {
 }
 
 // GetCadenceComponentVersion returns the current Cadence component version from Modelv2.
-// No errors are expected during normal operation.
+// Returns kvstore.ErrKeyNotSet if the key has no value
 func (model *Modelv2) GetCadenceComponentVersion() (protocol.MagnitudeOfChangeVersion, error) {
+	if model.CadenceComponentVersion.CurrentValue == protocol.UndefinedMagnitudeOfChangeVersion {
+		return protocol.UndefinedMagnitudeOfChangeVersion, ErrKeyNotSet
+	}
 	return model.CadenceComponentVersion.CurrentValue, nil
 }
 
@@ -303,8 +315,11 @@ func (model *Modelv2) GetCadenceComponentVersionUpgrade() *protocol.ViewBasedAct
 }
 
 // GetExecutionComponentVersion returns the current Execution component version from Modelv2.
-// No errors are expected during normal operation.
+// Returns kvstore.ErrKeyNotSet if the key has no value
 func (model *Modelv2) GetExecutionComponentVersion() (protocol.MagnitudeOfChangeVersion, error) {
+	if model.ExecutionComponentVersion.CurrentValue == protocol.UndefinedMagnitudeOfChangeVersion {
+		return protocol.UndefinedMagnitudeOfChangeVersion, ErrKeyNotSet
+	}
 	return model.ExecutionComponentVersion.CurrentValue, nil
 }
 
@@ -315,8 +330,11 @@ func (model *Modelv2) GetExecutionComponentVersionUpgrade() *protocol.ViewBasedA
 }
 
 // GetExecutionMeteringParameters returns the current Execution metering parameters from Modelv2.
-// No errors are expected during normal operation.
+// Returns kvstore.ErrKeyNotSet if the key has no value
 func (model *Modelv2) GetExecutionMeteringParameters() (protocol.ExecutionMeteringParameters, error) {
+	if model.ExecutionMeteringParameters.CurrentValue.IsUndefined() {
+		return protocol.UndefinedExecutionMeteringParameters, ErrKeyNotSet
+	}
 	return model.ExecutionMeteringParameters.CurrentValue, nil
 }
 

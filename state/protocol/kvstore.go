@@ -1,6 +1,13 @@
 package protocol
 
-import "github.com/onflow/flow-go/model/flow"
+import (
+	"io"
+	"slices"
+
+	"github.com/ethereum/go-ethereum/rlp"
+
+	"github.com/onflow/flow-go/model/flow"
+)
 
 // This file contains versioned read interface to the Protocol State's
 // key-value store and are used by the Protocol State Machine.
@@ -105,7 +112,9 @@ type KVStoreReader interface {
 	// v2
 
 	// GetCadenceComponentVersion returns the Cadence component version.
-	// Returns kvstore.ErrKeyNotSupported if invoked on a KVStore instance before v2.
+	// Error Returns:
+	//   - kvstore.ErrKeyNotSupported if invoked on a KVStore instance before v2.
+	//   - kvstore.ErrKeyNotSet if the key has no value
 	GetCadenceComponentVersion() (MagnitudeOfChangeVersion, error)
 	// GetCadenceComponentVersionUpgrade returns the most recent upgrade for the Cadence Component Version,
 	// if one exists (otherwise returns nil). The upgrade will be returned even if it has already been applied.
@@ -113,7 +122,9 @@ type KVStoreReader interface {
 	GetCadenceComponentVersionUpgrade() *ViewBasedActivator[MagnitudeOfChangeVersion]
 
 	// GetExecutionComponentVersion returns the Execution component version.
-	// Returns kvstore.ErrKeyNotSupported if invoked on a KVStore instance before v2.
+	// Error Returns:
+	//   - kvstore.ErrKeyNotSupported if invoked on a KVStore instance before v2.
+	//   - kvstore.ErrKeyNotSet if the key has no value
 	GetExecutionComponentVersion() (MagnitudeOfChangeVersion, error)
 	// GetExecutionComponentVersionUpgrade returns the most recent upgrade for the Execution Component Version,
 	// if one exists (otherwise returns nil). The upgrade will be returned even if it has already been applied.
@@ -121,7 +132,9 @@ type KVStoreReader interface {
 	GetExecutionComponentVersionUpgrade() *ViewBasedActivator[MagnitudeOfChangeVersion]
 
 	// GetExecutionMeteringParameters returns the Execution metering parameters.
-	// Returns kvstore.ErrKeyNotSupported if invoked on a KVStore instance before v2.
+	// Error Returns:
+	//   - kvstore.ErrKeyNotSupported if invoked on a KVStore instance before v2.
+	//   - kvstore.ErrKeyNotSet if the key has no value
 	GetExecutionMeteringParameters() (ExecutionMeteringParameters, error)
 	// GetExecutionMeteringParametersUpgrade returns the most recent upgrade for the Execution Metering Parameters,
 	// if one exists (otherwise returns nil). The upgrade will be returned even if it has already been applied.
@@ -140,6 +153,53 @@ type ExecutionMeteringParameters struct {
 	// TODO docs
 	ExecutionMemoryLimit uint64
 }
+
+// EncodeRLP defines RLP encoding behaviour for ExecutionMeteringParameters, overriding the default behaviour.
+// We convert maps to ordered slices of key-pairs before encoding, because RLP does not directly support maps.
+// We require this KVStore field type to be RLP-encodable so we can compute the hash/ID of a kvstore model instance.
+func (params *ExecutionMeteringParameters) EncodeRLP(w io.Writer) error {
+	type pair struct {
+		key   uint
+		value uint64
+	}
+	pairOrdering := func(a, b pair) int {
+		if a.key < b.key {
+			return -1
+		}
+		if a.key > b.key {
+			return 1
+		}
+		return 0
+	}
+
+	orderedEffortParams := make([]pair, 0, len(params.ExecutionEffortParameters))
+	for k, v := range params.ExecutionEffortParameters {
+		orderedEffortParams = append(orderedEffortParams, pair{k, v})
+	}
+	orderedMemoryParams := make([]pair, 0, len(params.ExecutionMemoryParameters))
+	for k, v := range params.ExecutionMemoryParameters {
+		orderedMemoryParams = append(orderedMemoryParams, pair{k, v})
+	}
+	slices.SortFunc(orderedEffortParams, pairOrdering)
+	slices.SortFunc(orderedMemoryParams, pairOrdering)
+
+	return rlp.Encode(w, struct {
+		ExecutionEffortParameters []pair
+		ExecutionMemoryParameters []pair
+		ExecutionMemoryLimit      uint64
+	}{
+		ExecutionEffortParameters: orderedEffortParams,
+		ExecutionMemoryParameters: orderedMemoryParams,
+		ExecutionMemoryLimit:      params.ExecutionMemoryLimit,
+	})
+}
+
+func (params *ExecutionMeteringParameters) IsUndefined() bool {
+	return params.ExecutionEffortParameters == nil && params.ExecutionMemoryParameters == nil && params.ExecutionMemoryLimit == 0
+}
+
+// UndefinedExecutionMeteringParameters represents the zero or unset value for ExecutionMeteringParameters.
+var UndefinedExecutionMeteringParameters = ExecutionMeteringParameters{}
 
 // VersionedEncodable defines the interface for a versioned key-value store independent
 // of the set of keys which are supported. This allows the storage layer to support
@@ -209,3 +269,6 @@ type MagnitudeOfChangeVersion struct {
 	Major uint
 	Minor uint
 }
+
+// UndefinedMagnitudeOfChangeVersion represents the zero or unset value for a MagnitudeOfChangeVersion.
+var UndefinedMagnitudeOfChangeVersion = MagnitudeOfChangeVersion{}
