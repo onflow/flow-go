@@ -1,6 +1,7 @@
 package kvstore_test
 
 import (
+	"math/rand"
 	"reflect"
 	"testing"
 
@@ -289,5 +290,46 @@ func TestKVStoreMutator_SetEpochExtensionViewCount(t *testing.T) {
 		err = mutator.SetEpochExtensionViewCount(newValue)
 		require.ErrorIs(t, err, kvstore.ErrInvalidValue)
 		require.Equal(t, mutator.GetEpochExtensionViewCount(), oldValue, "value should be unchanged")
+	})
+}
+
+// TestMalleability verifies that the entities which implements the [flow.IDEntity] interface are not malleable.
+func TestMalleability(t *testing.T) {
+	checker := unittest.NewMalleabilityChecker(
+		t,
+		unittest.WithCustomType(&protocol.ViewBasedActivator[uint64]{}, func() any {
+			return &protocol.ViewBasedActivator[uint64]{
+				Data:           rand.Uint64(),
+				ActivationView: rand.Uint64(),
+			}
+		}),
+	)
+
+	t.Run("Modelv0", func(t *testing.T) {
+		checker.Check(
+			&kvstore.Modelv0{
+				UpgradableModel: kvstore.UpgradableModel{
+					VersionUpgrade: &protocol.ViewBasedActivator[uint64]{
+						Data:           13,
+						ActivationView: 1000,
+					},
+				},
+				EpochStateID: unittest.IdentifierFixture(),
+			})
+	})
+
+	t.Run("Modelv1", func(t *testing.T) {
+		checker.Check(
+			&kvstore.Modelv1{
+				Modelv0: kvstore.Modelv0{
+					UpgradableModel: kvstore.UpgradableModel{
+						VersionUpgrade: &protocol.ViewBasedActivator[uint64]{
+							Data:           13,
+							ActivationView: 1000,
+						},
+					},
+					EpochStateID: unittest.IdentifierFixture(),
+				},
+			})
 	})
 }
