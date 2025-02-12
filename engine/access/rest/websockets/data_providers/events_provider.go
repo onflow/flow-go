@@ -88,7 +88,7 @@ func (p *EventsDataProvider) Run() error {
 // No errors are expected during normal operations.
 func (p *EventsDataProvider) handleResponse() func(eventsResponse *backend.EventsResponse) error {
 	blocksSinceLastMessage := uint64(0)
-	messageIndex := counters.NewMonotonousCounter(0)
+	messageIndex := counters.NewMonotonicCounter(0)
 
 	return func(eventsResponse *backend.EventsResponse) error {
 		// check if there are any events in the response. if not, do not send a message unless the last
