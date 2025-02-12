@@ -293,7 +293,7 @@ func DefaultAccessNodeConfig() *AccessNodeConfig {
 		versionControlEnabled:                true,
 		storeTxResultErrorMessages:           false,
 		stopControlEnabled:                   false,
-		registerDBPruneThreshold:             pruner.DefaultThreshold,
+		registerDBPruneThreshold:             0,
 	}
 }
 
