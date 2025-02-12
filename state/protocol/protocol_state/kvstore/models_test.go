@@ -256,6 +256,35 @@ func TestNewDefaultKVStore(t *testing.T) {
 		require.Error(t, err)
 		require.Nil(t, store)
 	})
+	t.Run("unsupported-key", func(t *testing.T) {
+		safetyParams, err := protocol.DefaultEpochSafetyParams(flow.Localnet)
+		require.NoError(t, err)
+		epochStateID := unittest.IdentifierFixture()
+		store, err := kvstore.NewDefaultKVStore(safetyParams.FinalizationSafetyThreshold, safetyParams.EpochExtensionViewCount, epochStateID)
+		require.NoError(t, err)
+
+		// Check GetCadenceComponentVersion
+		_, err = store.GetCadenceComponentVersion()
+		assert.ErrorIs(t, err, kvstore.ErrKeyNotSupported)
+
+		// Check GetCadenceComponentVersionUpgrade
+		assert.Nil(t, store.GetCadenceComponentVersionUpgrade())
+
+		// Check GetExecutionComponentVersion
+		_, err = store.GetExecutionComponentVersion()
+		assert.ErrorIs(t, err, kvstore.ErrKeyNotSupported)
+
+		// Check GetExecutionComponentVersionUpgrade
+		assert.Nil(t, store.GetExecutionComponentVersionUpgrade())
+
+		// Check GetExecutionMeteringParameters
+		_, err = store.GetExecutionMeteringParameters()
+		assert.ErrorIs(t, err, kvstore.ErrKeyNotSupported)
+
+		// Check GetExecutionMeteringParametersUpgrade
+		assert.Nil(t, store.GetExecutionMeteringParametersUpgrade())
+	})
+
 }
 
 // TestKVStoreMutator_SetEpochExtensionViewCount tests that setter performs an input validation and doesn't allow setting

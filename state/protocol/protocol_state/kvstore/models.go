@@ -149,9 +149,9 @@ func (model *Modelv0) GetFinalizationSafetyThreshold() uint64 {
 	return model.FinalizationSafetyThreshold
 }
 
-// GetCadenceComponentVersion always returns ErrUnsupportedVersion because this field is unsupported for Modelv0.
+// GetCadenceComponentVersion always returns ErrKeyNotSupported because this field is unsupported for Modelv0.
 func (model *Modelv0) GetCadenceComponentVersion() (protocol.MagnitudeOfChangeVersion, error) {
-	return protocol.MagnitudeOfChangeVersion{}, ErrUnsupportedVersion
+	return protocol.MagnitudeOfChangeVersion{}, ErrKeyNotSupported
 }
 
 // GetCadenceComponentVersionUpgrade always returns nil because this field is unsupported for Modelv0.
@@ -159,9 +159,9 @@ func (model *Modelv0) GetCadenceComponentVersionUpgrade() *protocol.ViewBasedAct
 	return nil
 }
 
-// GetExecutionComponentVersion always returns ErrUnsupportedVersion because this field is unsupported for Modelv0.
+// GetExecutionComponentVersion always returns ErrKeyNotSupported because this field is unsupported for Modelv0.
 func (model *Modelv0) GetExecutionComponentVersion() (protocol.MagnitudeOfChangeVersion, error) {
-	return protocol.MagnitudeOfChangeVersion{}, ErrUnsupportedVersion
+	return protocol.MagnitudeOfChangeVersion{}, ErrKeyNotSupported
 }
 
 // GetExecutionComponentVersionUpgrade always returns nil because this field is unsupported for Modelv0.
@@ -169,9 +169,9 @@ func (model *Modelv0) GetExecutionComponentVersionUpgrade() *protocol.ViewBasedA
 	return nil
 }
 
-// GetExecutionMeteringParameters always returns ErrUnsupportedVersion because this field is unsupported for Modelv0.
+// GetExecutionMeteringParameters always returns ErrKeyNotSupported because this field is unsupported for Modelv0.
 func (model *Modelv0) GetExecutionMeteringParameters() (protocol.ExecutionMeteringParameters, error) {
-	return protocol.ExecutionMeteringParameters{}, ErrUnsupportedVersion
+	return protocol.ExecutionMeteringParameters{}, ErrKeyNotSupported
 }
 
 // GetExecutionMeteringParametersUpgrade always returns nil because this field is unsupported for Modelv0.
