@@ -400,6 +400,7 @@ func (c *Controller) handleSubscribe(ctx context.Context, msg models.SubscribeMe
 	responseOk := models.SubscribeMessageResponse{
 		BaseMessageResponse: models.BaseMessageResponse{
 			SubscriptionID: subscriptionID.String(),
+			Action:         models.SubscribeAction,
 		},
 	}
 	c.writeResponse(ctx, responseOk)
@@ -451,6 +452,7 @@ func (c *Controller) handleUnsubscribe(ctx context.Context, msg models.Unsubscri
 	responseOk := models.UnsubscribeMessageResponse{
 		BaseMessageResponse: models.BaseMessageResponse{
 			SubscriptionID: subscriptionID.String(),
+			Action:         models.UnsubscribeAction,
 		},
 	}
 	c.writeResponse(ctx, responseOk)
