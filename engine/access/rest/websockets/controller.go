@@ -338,21 +338,22 @@ func (c *Controller) readMessages(ctx context.Context) error {
 				if errors.As(err, &closeErr) {
 					return err
 				}
-
+				err = wrapErr("error reading message", err)
 				c.writeErrorResponse(
 					ctx,
 					err,
-					wrapErrorMessage(http.StatusBadRequest, "error reading message", "", ""),
+					wrapErrorMessage(http.StatusBadRequest, err.Error(), "", ""),
 				)
 				continue
 			}
 
 			err := c.handleMessage(ctx, message)
 			if err != nil {
+				err = wrapErr("error parsing message", err)
 				c.writeErrorResponse(
 					ctx,
 					err,
-					wrapErrorMessage(http.StatusBadRequest, "error parsing message", "", ""),
+					wrapErrorMessage(http.StatusBadRequest, err.Error(), "", ""),
 				)
 				continue
 			}
@@ -416,11 +417,11 @@ func (c *Controller) handleSubscribe(ctx context.Context, msg models.SubscribeMe
 
 	subscriptionID, err := c.parseOrCreateSubscriptionID(msg.SubscriptionID)
 	if err != nil {
+		err = wrapErr("error parsing subscription id", err)
 		c.writeErrorResponse(
 			ctx,
 			err,
-			wrapErrorMessage(http.StatusBadRequest, fmt.Sprintf("error parsing subscription id: %s", err.Error()),
-				models.SubscribeAction, msg.SubscriptionID),
+			wrapErrorMessage(http.StatusBadRequest, err.Error(), models.SubscribeAction, msg.SubscriptionID),
 		)
 		return
 	}
@@ -428,11 +429,11 @@ func (c *Controller) handleSubscribe(ctx context.Context, msg models.SubscribeMe
 	// register new provider
 	provider, err := c.dataProviderFactory.NewDataProvider(ctx, subscriptionID.String(), msg.Topic, msg.Arguments, c.multiplexedStream)
 	if err != nil {
+		err = wrapErr("error creating data provider", err)
 		c.writeErrorResponse(
 			ctx,
 			err,
-			wrapErrorMessage(http.StatusBadRequest, "error creating data provider",
-				models.SubscribeAction, subscriptionID.String()),
+			wrapErrorMessage(http.StatusBadRequest, err.Error(), models.SubscribeAction, subscriptionID.String()),
 		)
 		return
 	}
@@ -455,6 +456,7 @@ func (c *Controller) handleSubscribe(ctx context.Context, msg models.SubscribeMe
 		// during the unsubscribe action. Without this check, the base error context.Canceled
 		// will always be sent, even when simply unsubscribing from a topic.
 		if err != nil && !errors.Is(err, context.Canceled) {
+			err = wrapErr("internal error", err)
 			c.writeErrorResponse(
 				ctx,
 				err,
@@ -471,11 +473,11 @@ func (c *Controller) handleSubscribe(ctx context.Context, msg models.SubscribeMe
 func (c *Controller) handleUnsubscribe(ctx context.Context, msg models.UnsubscribeMessageRequest) {
 	subscriptionID, err := ParseClientSubscriptionID(msg.SubscriptionID)
 	if err != nil {
+		err = wrapErr("error parsing subscription id", err)
 		c.writeErrorResponse(
 			ctx,
 			err,
-			wrapErrorMessage(http.StatusBadRequest, fmt.Sprintf("error parsing subscription id: %s", err.Error()),
-				models.UnsubscribeAction, msg.SubscriptionID),
+			wrapErrorMessage(http.StatusBadRequest, err.Error(), models.UnsubscribeAction, msg.SubscriptionID),
 		)
 		return
 	}
@@ -559,6 +561,10 @@ func wrapErrorMessage(code int, message string, action string, subscriptionID st
 		},
 		Action: action,
 	}
+}
+
+func wrapErr(msg string, err error) error {
+	return errors.Join(fmt.Errorf("%s", msg), err)
 }
 
 func (c *Controller) parseOrCreateSubscriptionID(id string) (SubscriptionID, error) {
