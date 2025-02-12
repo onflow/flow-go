@@ -40,7 +40,7 @@ type BlockTimeControllerSuite struct {
 	params             mockprotocol.Params
 	snapshot           mockprotocol.Snapshot
 	epochs             mocks.EpochQuery
-	curEpoch           mockprotocol.Epoch
+	curEpoch           mockprotocol.CommittedEpoch
 	epochProtocolState mockprotocol.EpochProtocolState
 
 	config *Config
@@ -82,7 +82,7 @@ func setupMocks(bs *BlockTimeControllerSuite) {
 	bs.params = *mockprotocol.NewParams(bs.T())
 	bs.snapshot = *mockprotocol.NewSnapshot(bs.T())
 	bs.epochs = *mocks.NewEpochQuery(bs.T(), bs.epochCounter)
-	bs.curEpoch = *mockprotocol.NewEpoch(bs.T())
+	bs.curEpoch = *mockprotocol.NewCommittedEpoch(bs.T())
 	bs.state.On("Final").Return(&bs.snapshot)
 	bs.state.On("AtHeight", mock.Anything).Return(&bs.snapshot).Maybe()
 	bs.state.On("Params").Return(&bs.params)
@@ -204,7 +204,7 @@ func (bs *BlockTimeControllerSuite) TestInit_EpochStakingPhase() {
 // TestInit_EpochStakingPhase tests initializing the component in the EpochSetup phase.
 // Measurement and epoch info should be initialized, next epoch final view should be set.
 func (bs *BlockTimeControllerSuite) TestInit_EpochSetupPhase() {
-	nextEpoch := mockprotocol.NewEpoch(bs.T())
+	nextEpoch := mockprotocol.NewCommittedEpoch(bs.T())
 	nextEpoch.On("Counter").Return(bs.epochCounter+1, nil)
 	nextEpoch.On("FirstView").Return(bs.curEpochFinalView+1, nil)
 	nextEpoch.On("FinalView").Return(bs.curEpochFinalView*2, nil)
@@ -274,7 +274,7 @@ func (bs *BlockTimeControllerSuite) TestOnEpochExtended() {
 
 // TestOnEpochCommittedPhaseStarted ensures that the epoch info is updated when the next epoch is committed.
 func (bs *BlockTimeControllerSuite) TestOnEpochCommittedPhaseStarted() {
-	nextEpoch := mockprotocol.NewEpoch(bs.T())
+	nextEpoch := mockprotocol.NewCommittedEpoch(bs.T())
 	nextEpoch.On("Counter").Return(bs.epochCounter+1, nil)
 	nextEpoch.On("FinalView").Return(bs.curEpochFinalView*2, nil)
 	nextEpoch.On("FirstView").Return(bs.curEpochFinalView+1, nil)
@@ -413,7 +413,7 @@ func (bs *BlockTimeControllerSuite) TestOnBlockIncorporated_EpochTransition_Disa
 // testOnBlockIncorporated_EpochTransition tests that a view change into the next epoch
 // updates the local state to reflect the new epoch.
 func (bs *BlockTimeControllerSuite) testOnBlockIncorporated_EpochTransition() {
-	nextEpoch := mockprotocol.NewEpoch(bs.T())
+	nextEpoch := mockprotocol.NewCommittedEpoch(bs.T())
 	nextEpoch.On("Counter").Return(bs.epochCounter+1, nil)
 	nextEpoch.On("FinalView").Return(bs.curEpochFinalView*2, nil)
 	nextEpoch.On("FirstView").Return(bs.curEpochFinalView+1, nil)
