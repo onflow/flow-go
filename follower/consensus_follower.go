@@ -37,8 +37,8 @@ type Config struct {
 	networkPrivKey   crypto.PrivateKey   // the network private key of this node
 	bootstrapNodes   []BootstrapNodeInfo // the bootstrap nodes to use
 	bindAddr         string              // address to bind on
-	badgerDB         *badger.DB          // directory to store the badger instance
-	pebbleDB         *pebble.DB          // directory to store the pebble instance
+	badgerDB         *badger.DB          // badger instance
+	pebbleDB         *pebble.DB          // pebble instance
 	bootstrapDir     string              // path to the bootstrap directory
 	logLevel         string              // log level
 	exposeMetrics    bool                // whether to expose metrics
