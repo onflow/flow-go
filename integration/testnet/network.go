@@ -18,6 +18,7 @@ import (
 	"github.com/onflow/flow-go/state/protocol/protocol_state"
 
 	"github.com/dapperlabs/testingdock"
+	badgerv2 "github.com/dgraph-io/badger/v2"
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
 	dockercontainer "github.com/docker/docker/api/types/container"
@@ -53,6 +54,7 @@ import (
 	"github.com/onflow/flow-go/state/protocol/badger"
 	"github.com/onflow/flow-go/state/protocol/inmem"
 	"github.com/onflow/flow-go/state/protocol/protocol_state/kvstore"
+	badgerstorage "github.com/onflow/flow-go/storage/badger"
 	"github.com/onflow/flow-go/utils/io"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -684,10 +686,18 @@ func (net *FlowNetwork) addConsensusFollower(t *testing.T, rootProtocolSnapshotP
 	require.NoError(t, err)
 
 	// consensus follower
+	dbOpts := badgerv2.
+		DefaultOptions(dataDir).
+		WithKeepL0InMemory(true).
+		WithValueLogFileSize(128 << 23).
+		WithValueLogMaxEntries(100000) // Default is 1000000
+	badgerDB, err := badgerstorage.InitPublic(dbOpts)
+	require.NoError(t, err)
+
 	bindAddr := gonet.JoinHostPort("localhost", testingdock.RandomPort(t))
 	opts := append(
 		followerConf.Opts,
-		consensus_follower.WithDataDir(dataDir),
+		consensus_follower.WithDB(badgerDB),
 		consensus_follower.WithBootstrapDir(followerBootstrapDir),
 	)
 
