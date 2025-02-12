@@ -21,6 +21,7 @@ import (
 	"github.com/libp2p/go-libp2p/core/routing"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/rs/zerolog"
+	"github.com/rs/zerolog/log"
 	"github.com/spf13/pflag"
 	"golang.org/x/time/rate"
 	"google.golang.org/api/option"
@@ -1921,6 +1922,11 @@ func WithBindAddress(bindAddress string) Option {
 // It will be ignored if WithBadgerDB is used
 func WithDataDir(dataDir string) Option {
 	return func(config *BaseConfig) {
+		if config.badgerDB != nil {
+			log.Warn().Msgf("ignoring data directory %s as badger database is already set", dataDir)
+			return
+		}
+
 		config.datadir = dataDir
 	}
 }
@@ -1929,6 +1935,11 @@ func WithDataDir(dataDir string) Option {
 // If used, then WithDataDir method will be ignored
 func WithBadgerDB(db *badger.DB) Option {
 	return func(config *BaseConfig) {
+		if config.datadir != "" && config.datadir != NotSet {
+			log.Warn().Msgf("ignoring data directory is already set for badger %v", config.datadir)
+			config.datadir = ""
+		}
+
 		config.badgerDB = db
 	}
 }
@@ -1937,6 +1948,11 @@ func WithBadgerDB(db *badger.DB) Option {
 // It will be ignored if WithPebbleDB is used
 func WithPebbleDir(dataDir string) Option {
 	return func(config *BaseConfig) {
+		if config.pebbleDB != nil {
+			log.Warn().Msgf("ignoring data directory %s as pebble database is already set", dataDir)
+			return
+		}
+
 		config.pebbleDir = dataDir
 	}
 }
@@ -1945,6 +1961,11 @@ func WithPebbleDir(dataDir string) Option {
 // If used, then WithPebbleDir method will be ignored
 func WithPebbleDB(db *pebble.DB) Option {
 	return func(config *BaseConfig) {
+		if config.pebbleDir != "" && config.pebbleDir != NotSet {
+			log.Warn().Msgf("ignoring data directory is already set for pebble %v", config.pebbleDir)
+			config.pebbleDir = ""
+		}
+
 		config.pebbleDB = db
 	}
 }
