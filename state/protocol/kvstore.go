@@ -159,28 +159,32 @@ type ExecutionMeteringParameters struct {
 // We require this KVStore field type to be RLP-encodable so we can compute the hash/ID of a kvstore model instance.
 func (params *ExecutionMeteringParameters) EncodeRLP(w io.Writer) error {
 	type pair struct {
-		key   uint
-		value uint64
+		Key   uint
+		Value uint64
 	}
 	pairOrdering := func(a, b pair) int {
-		if a.key < b.key {
+		if a.Key < b.Key {
 			return -1
 		}
-		if a.key > b.key {
+		if a.Key > b.Key {
 			return 1
 		}
-		return 0
+		// Since we are ordering by key taken directly from a single Go map type, it is not possible to
+		// observe two identical keys while ordering. If we do, some invariant has been violated.
+		// Also, since the sort used is non-stable, this could result in non-deterministic hashes.
+		panic("critical invariant violated: map with duplicate keys")
 	}
 
 	orderedEffortParams := make([]pair, 0, len(params.ExecutionEffortParameters))
 	for k, v := range params.ExecutionEffortParameters {
 		orderedEffortParams = append(orderedEffortParams, pair{k, v})
 	}
+	slices.SortFunc(orderedEffortParams, pairOrdering)
+
 	orderedMemoryParams := make([]pair, 0, len(params.ExecutionMemoryParameters))
 	for k, v := range params.ExecutionMemoryParameters {
 		orderedMemoryParams = append(orderedMemoryParams, pair{k, v})
 	}
-	slices.SortFunc(orderedEffortParams, pairOrdering)
 	slices.SortFunc(orderedMemoryParams, pairOrdering)
 
 	return rlp.Encode(w, struct {
@@ -194,6 +198,7 @@ func (params *ExecutionMeteringParameters) EncodeRLP(w io.Writer) error {
 	})
 }
 
+// IsUndefined returns true if params is semantically undefined.
 func (params *ExecutionMeteringParameters) IsUndefined() bool {
 	return params.ExecutionEffortParameters == nil && params.ExecutionMemoryParameters == nil && params.ExecutionMemoryLimit == 0
 }
