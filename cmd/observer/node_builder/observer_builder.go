@@ -1419,7 +1419,7 @@ func (builder *ObserverServiceBuilder) BuildExecutionSyncComponents() *ObserverS
 			indexerCore, err := indexer.New(
 				builder.Logger,
 				metrics.NewExecutionStateIndexerCollector(),
-				builder.DB,
+				builder.ProtocolDB,
 				builder.Storage.RegisterIndex,
 				builder.Storage.Headers,
 				builder.events,

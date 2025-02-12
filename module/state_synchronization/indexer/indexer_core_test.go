@@ -134,7 +134,7 @@ func (i *indexCoreTest) setStoreRegisters(f func(t *testing.T, entries flow.Regi
 func (i *indexCoreTest) setStoreEvents(f func(*testing.T, flow.Identifier, []flow.EventsList) error) *indexCoreTest {
 	i.events.
 		On("BatchStore", mock.AnythingOfType("flow.Identifier"), mock.AnythingOfType("[]flow.EventsList"), mock.Anything).
-		Return(func(blockID flow.Identifier, events []flow.EventsList, batch storage.BatchStorage) error {
+		Return(func(blockID flow.Identifier, events []flow.EventsList, batch storage.ReaderBatchWriter) error {
 			require.NotNil(i.t, batch)
 			return f(i.t, blockID, events)
 		})
@@ -144,7 +144,7 @@ func (i *indexCoreTest) setStoreEvents(f func(*testing.T, flow.Identifier, []flo
 func (i *indexCoreTest) setStoreTransactionResults(f func(*testing.T, flow.Identifier, []flow.LightTransactionResult) error) *indexCoreTest {
 	i.results.
 		On("BatchStore", mock.AnythingOfType("flow.Identifier"), mock.AnythingOfType("[]flow.LightTransactionResult"), mock.Anything).
-		Return(func(blockID flow.Identifier, results []flow.LightTransactionResult, batch storage.BatchStorage) error {
+		Return(func(blockID flow.Identifier, results []flow.LightTransactionResult, batch storage.ReaderBatchWriter) error {
 			require.NotNil(i.t, batch)
 			return f(i.t, blockID, results)
 		})

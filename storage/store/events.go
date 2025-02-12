@@ -66,10 +66,6 @@ func (e *Events) BatchStore(blockID flow.Identifier, blockEvents []flow.EventsLi
 	return nil
 }
 
-func (e *Events) BatchStoreBadger(blockID flow.Identifier, blockEvents []flow.EventsList, batch storage.BatchStorage) error {
-	panic("events BatchStoreBadger not implemented")
-}
-
 // Store will store events for the given block ID
 func (e *Events) Store(blockID flow.Identifier, blockEvents []flow.EventsList) error {
 	return e.db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
