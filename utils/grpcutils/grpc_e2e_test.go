@@ -33,9 +33,7 @@ func TestTLSConnection(t *testing.T) {
 	healthClient := grpc_health_v1.NewHealthClient(conn)
 
 	resp, err := healthClient.Check(ctx, &grpc_health_v1.HealthCheckRequest{})
-	if err != nil {
-		t.Fatalf("HealthCheck RPC failed: %v", err)
-	}
+	require.NoError(t, err)
 
 	require.Equal(t, grpc_health_v1.HealthCheckResponse_SERVING, resp.GetStatus())
 
@@ -73,7 +71,7 @@ func runServer(t *testing.T, ctx context.Context, creds credentials.TransportCre
 	done := make(chan struct{})
 	go func() {
 		defer close(done)
-		grpcServer.Serve(lis)
+		err := grpcServer.Serve(lis)
 		require.NoError(t, err)
 	}()
 
