@@ -26,6 +26,7 @@ import (
 	synctest "github.com/onflow/flow-go/module/state_synchronization/requester/unittest"
 	"github.com/onflow/flow-go/storage"
 	storagemock "github.com/onflow/flow-go/storage/mock"
+	"github.com/onflow/flow-go/storage/operation/badgerimpl"
 	pebbleStorage "github.com/onflow/flow-go/storage/pebble"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -221,7 +222,7 @@ func (i *indexCoreTest) initIndexer() *indexCoreTest {
 	indexer, err := New(
 		log,
 		metrics.NewNoopCollector(),
-		db,
+		badgerimpl.ToDB(db),
 		i.registers,
 		i.headers,
 		i.events,
@@ -699,7 +700,7 @@ func TestIndexerIntegration_StoreAndGet(t *testing.T) {
 			index, err := New(
 				logger,
 				metrics,
-				db,
+				badgerimpl.ToDB(db),
 				registers,
 				nil,
 				nil,
@@ -733,7 +734,7 @@ func TestIndexerIntegration_StoreAndGet(t *testing.T) {
 			index, err := New(
 				logger,
 				metrics,
-				db,
+				badgerimpl.ToDB(db),
 				registers,
 				nil,
 				nil,
@@ -760,7 +761,7 @@ func TestIndexerIntegration_StoreAndGet(t *testing.T) {
 			index, err := New(
 				logger,
 				metrics,
-				db,
+				badgerimpl.ToDB(db),
 				registers,
 				nil,
 				nil,
@@ -804,7 +805,7 @@ func TestIndexerIntegration_StoreAndGet(t *testing.T) {
 			index, err := New(
 				logger,
 				metrics,
-				db,
+				badgerimpl.ToDB(db),
 				registers,
 				nil,
 				nil,
