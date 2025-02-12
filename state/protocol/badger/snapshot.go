@@ -410,6 +410,7 @@ func (q *EpochQuery) Current() (protocol.CommittedEpoch, error) {
 //     (the reference block resides in the EpochStaking phase)
 //   - protocol.ErrNextEpochAlreadyCommitted if the next epoch has already been committed at the snapshot's reference block
 //     (the reference block resides in the EpochCommitted phase)
+//   - generic error in case of unexpected critical internal corruption or bugs
 func (q *EpochQuery) NextUnsafe() (protocol.TentativeEpoch, error) {
 	epochState, err := q.snap.state.protocolState.EpochStateAtBlockID(q.snap.blockID)
 	if err != nil {
@@ -438,6 +439,7 @@ func (q *EpochQuery) NextUnsafe() (protocol.TentativeEpoch, error) {
 // Error returns:
 //   - protocol.ErrNextEpochNotCommitted if the next epoch has not yet been committed at the snapshot's reference block
 //     (the reference block does not reside in the EpochCommitted phase)
+//   - generic error in case of unexpected critical internal corruption or bugs
 func (q *EpochQuery) NextCommitted() (protocol.CommittedEpoch, error) {
 	epochState, err := q.snap.state.protocolState.EpochStateAtBlockID(q.snap.blockID)
 	if err != nil {

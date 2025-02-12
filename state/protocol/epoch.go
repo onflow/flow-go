@@ -23,8 +23,11 @@ type EpochQuery interface {
 	// CAUTION: epoch transition might not happen as described by the tentative configuration!
 	//
 	// Error returns:
-	//   - ErrNextEpochNotSetup in the case that this method is queried w.r.t. a snapshot within the flow.EpochPhaseStaking phase
-	//   - ErrNextEpochAlreadyCommitted during the flow.EpochPhaseCommitted phase
+	//   - [ErrNextEpochNotSetup] in the case that this method is queried w.r.t. a snapshot within the [flow.EpochPhaseStaking] phase
+	//   - [ErrNextEpochAlreadyCommitted] if the tentative epoch is requested from
+	//     a snapshot within the [flow.EpochPhaseCommitted] phase.
+	//   - [state.ErrUnknownSnapshotReference] if the epoch is queried from an unresolvable snapshot.
+	//   - generic error in case of unexpected critical internal corruption or bugs
 	NextUnsafe() (TentativeEpoch, error)
 
 	// NextCommitted returns the next epoch as of this snapshot, only if it has
@@ -32,7 +35,10 @@ type EpochQuery interface {
 	// `EpochCommittedPhaseStarted` notification has been emitted.
 	//
 	// Error returns:
-	//   - ErrNextEpochNotCommitted in the case that the current phase is flow.EpochPhaseStaking or flow.EpochPhaseSetup.
+	//   - [ErrNextEpochNotCommitted] - in the case that committed epoch has been requested w.r.t a snapshot within
+	//     the [flow.EpochPhaseStaking] or [flow.EpochPhaseSetup] phases.
+	//   - [state.ErrUnknownSnapshotReference] - if the epoch is queried from an unresolvable snapshot.
+	//   - generic error in case of unexpected critical internal corruption or bugs
 	NextCommitted() (CommittedEpoch, error)
 
 	// Previous returns the previous epoch as of this snapshot. Valid snapshots
@@ -41,9 +47,9 @@ type EpochQuery interface {
 	// must arrange to expose it here.
 	//
 	// Error returns:
-	//   - protocol.ErrNoPreviousEpoch - if the epoch represents a previous epoch which does not exist.
+	//   - [protocol.ErrNoPreviousEpoch] - if the epoch represents a previous epoch which does not exist.
 	//     This happens when the previous epoch is queried within the first epoch of a spork.
-	//   - state.ErrUnknownSnapshotReference - if the epoch is queried from an unresolvable snapshot.
+	//   - [state.ErrUnknownSnapshotReference] - if the epoch is queried from an unresolvable snapshot.
 	//   - generic error in case of unexpected critical internal corruption or bugs
 	Previous() (CommittedEpoch, error)
 }
