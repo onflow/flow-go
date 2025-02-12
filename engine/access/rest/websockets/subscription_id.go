@@ -17,12 +17,12 @@ type SubscriptionID struct {
 }
 
 // NewSubscriptionID creates a new SubscriptionID based on the provided input.
-// - If the input `id` is empty, a new UUID is generated and returned.
+// - If the input `id` is empty, a random ID is generated and returned.
 // - If the input `id` is non-empty, it is validated and returned if no errors.
 func NewSubscriptionID(id string) (SubscriptionID, error) {
 	if len(id) == 0 {
 		return SubscriptionID{
-			id: uuid.New().String(),
+			id: uuid.New().String()[:maxLen],
 		}, nil
 	}
 
