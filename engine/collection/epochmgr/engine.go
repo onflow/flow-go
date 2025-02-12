@@ -352,6 +352,8 @@ func (e *Engine) handleEpochEvents(ctx irrecoverable.SignalerContext, ready comp
 				ctx.Throw(err)
 			}
 		case firstBlock := <-e.epochSetupPhaseStartedEvents:
+			// This is one of the few places where we have to use the configuration for a future epoch that
+			// has not yet been committed. CAUTION: the epoch transition might not happen as described here!
 			nextEpoch, err := e.state.AtBlockID(firstBlock.ID()).Epochs().NextUnsafe()
 			if err != nil {
 				ctx.Throw(err)
@@ -469,6 +471,9 @@ func (e *Engine) prepareToStopEpochComponents(epochCounter, epochMaxHeight uint6
 // setup phase, or when the node is restarted during the epoch setup phase. It
 // kicks off setup tasks for the phase, in particular submitting a vote for the
 // next epoch's root cluster QC.
+// This is one of the few places where we have to use the configuration for a
+// future epoch that has not yet been committed.
+// CAUTION: the epoch transition might not happen as described by `nextEpoch`!
 func (e *Engine) onEpochSetupPhaseStarted(ctx irrecoverable.SignalerContext, nextEpoch protocol.TentativeEpoch) {
 	ctxWithCancel, cancel := context.WithCancel(ctx)
 	defer cancel()

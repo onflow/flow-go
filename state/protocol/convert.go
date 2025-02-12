@@ -12,6 +12,7 @@ import (
 
 // ToEpochSetup converts a CommittedEpoch interface instance to the underlying concrete
 // epoch setup service event. The input must be a valid, set up epoch.
+// CAUTION: this conversion only works for Epochs that have NO epoch-fallback EXTENSIONS
 // Error returns:
 // * protocol.ErrNoPreviousEpoch - if the epoch represents a previous epoch which does not exist.
 // * protocol.ErrNextEpochNotSetup - if the epoch represents a next epoch which has not been set up.

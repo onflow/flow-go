@@ -177,7 +177,7 @@ func (suite *Suite) SetupTest() {
 	// add current epoch
 	suite.AddEpoch(suite.counter)
 	// next epoch (with counter+1) is added later, as either setup/tentative (if we need to start QC)
-	// or committed (if we need to transition to it) depending on the testgi
+	// or committed (if we need to transition to it) depending on the test
 
 	suite.pools = epochs.NewTransactionPools(func(_ uint64) mempool.Transactions {
 		return herocache.NewTransactions(1000, suite.log, metrics.NewNoopCollector())
@@ -213,10 +213,6 @@ func (suite *Suite) TearDownTest() {
 	}
 }
 
-func TestEpochManager(t *testing.T) {
-	suite.Run(t, new(Suite))
-}
-
 // TransitionEpoch triggers an epoch transition in the suite's mocks.
 func (suite *Suite) TransitionEpoch() {
 	suite.counter++
@@ -233,6 +229,8 @@ func (suite *Suite) AddEpoch(counter uint64) *protocol.CommittedEpoch {
 	return epoch
 }
 
+// AddTentativeEpoch adds a Tentative Epoch with the given counter to the test suite,
+// so the epoch information can be retrieved by the business logic.
 func (suite *Suite) AddTentativeEpoch(counter uint64) *protocol.TentativeEpoch {
 	epoch := new(protocol.TentativeEpoch)
 	epoch.On("Counter").Return(counter, nil)
@@ -287,6 +285,10 @@ func (suite *Suite) MockAsUnauthorizedNode(forEpoch uint64) {
 	var err error
 	suite.engine, err = New(suite.log, suite.me, suite.state, suite.pools, suite.voter, suite.factory, suite.heights, suite.engineEventsDistributor)
 	suite.Require().Nil(err)
+}
+
+func TestEpochManager(t *testing.T) {
+	suite.Run(t, new(Suite))
 }
 
 // TestRestartInSetupPhase tests that, if we start up during the setup phase,

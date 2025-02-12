@@ -70,9 +70,12 @@ func NewRootQCVoter(
 	return voter
 }
 
-// Vote handles the full procedure of generating a vote, submitting it to the
-// epoch smart contract, and verifying submission.
-// It is safe to run multiple times within a single setup phase.
+// Vote handles the full procedure of generating a vote, submitting it to the epoch
+// smart contract, and verifying submission. This logic should run as part of the Epoch
+// Setup Phase, i.e. at a time when the next epoch has not yet been committed. Hence,
+// this function takes the [protocol.TentativeEpoch] information as input.
+// It is safe to run `Vote` multiple times within a single Epoch Setup Phase.
+// CAUTION: epoch transition might not happen as described by [protocol.TentativeEpoch].
 //
 // Error returns:
 //   - epochs.ClusterQCNoVoteError if we fail to vote for a benign reason

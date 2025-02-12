@@ -745,21 +745,20 @@ func addExtension(epoch *protocolmock.CommittedEpoch, ext flow.EpochExtension) {
 	epoch.On("FinalView").Return(ext.FinalView, nil)
 }
 
-// newMockCommittedEpoch returns a new mocked epoch with the given fields
+// newMockCommittedEpoch returns a new mocked committed epoch with the given fields
 func newMockCommittedEpoch(counter uint64, identities flow.IdentityList, firstView uint64, finalView uint64) *protocolmock.CommittedEpoch {
-
 	epoch := new(protocolmock.CommittedEpoch)
 	epoch.On("Counter").Return(counter, nil)
 	epoch.On("RandomSource").Return(unittest.RandomBytes(32), nil)
 	epoch.On("InitialIdentities").Return(identities.ToSkeleton(), nil)
 	epoch.On("FirstView").Return(firstView, nil)
 	epoch.On("FinalView").Return(finalView, nil)
-	// return nil error to indicate the epoch is committed
 	epoch.On("DKG").Return(nil, nil)
 
 	return epoch
 }
 
+// newMockTentativeEpoch returns a new mocked tentative epoch with the given fields
 func newMockTentativeEpoch(counter uint64, identities flow.IdentityList) *protocolmock.TentativeEpoch {
 	epoch := new(protocolmock.TentativeEpoch)
 	epoch.On("Counter").Return(counter, nil)
