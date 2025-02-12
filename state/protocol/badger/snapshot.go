@@ -443,22 +443,17 @@ func (q *EpochQuery) NextCommitted() (protocol.CommittedEpoch, error) {
 	if err != nil {
 		return nil, fmt.Errorf("could not get protocol state snapshot at block %x: %w", q.snap.blockID, err)
 	}
-	phase := epochState.EpochPhase()
 	entry := epochState.Entry()
 
-	// if we are in the staking or fallback phase, the next epoch is not setup yet
-	if phase == flow.EpochPhaseStaking || phase == flow.EpochPhaseFallback {
-		return nil, protocol.ErrNextEpochNotSetup
-	}
-	if phase == flow.EpochPhaseSetup {
+	switch epochState.EpochPhase() {
+	// if we are in the staking or fallback phase, the next epoch is neither setup nor committed yet
+	case flow.EpochPhaseStaking, flow.EpochPhaseFallback, flow.EpochPhaseSetup:
 		return nil, protocol.ErrNextEpochNotCommitted
+	case flow.EpochPhaseCommitted:
+		return inmem.NewCommittedEpoch(entry.NextEpochSetup, entry.NextEpoch.EpochExtensions, entry.NextEpochCommit), nil
+	default:
+		return nil, fmt.Errorf("data corruption: unknown epoch phase implies malformed protocol state epoch data")
 	}
-	nextSetup := entry.NextEpochSetup
-	nextCommit := entry.NextEpochCommit
-	if phase == flow.EpochPhaseCommitted {
-		return inmem.NewCommittedEpoch(nextSetup, entry.NextEpoch.EpochExtensions, nextCommit), nil
-	}
-	return nil, fmt.Errorf("data corruption: unknown epoch phase implies malformed protocol state epoch data")
 }
 
 // Previous returns the previous epoch. During the first epoch after the root

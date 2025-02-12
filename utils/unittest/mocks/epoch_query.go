@@ -60,7 +60,7 @@ func (mock *EpochQuery) NextCommitted() (protocol.CommittedEpoch, error) {
 	defer mock.mu.RUnlock()
 	epoch, exists := mock.byCounter[mock.counter+1]
 	if !exists {
-		return nil, protocol.ErrNextEpochNotSetup
+		return nil, protocol.ErrNextEpochNotCommitted
 	}
 	return epoch, nil
 }
