@@ -4,6 +4,7 @@ import (
 	"context"
 	"net"
 	"testing"
+	"time"
 
 	"github.com/onflow/crypto"
 	"github.com/stretchr/testify/require"
@@ -39,7 +40,7 @@ func TestTLSConnection(t *testing.T) {
 	require.Equal(t, grpc_health_v1.HealthCheckResponse_SERVING, resp.GetStatus())
 
 	cancel()
-	<-serverDone
+	unittest.RequireCloseBefore(t, serverDone, time.Second, "server did not stop on time")
 }
 
 func generateServerCredentials(t *testing.T) (credentials.TransportCredentials, crypto.PublicKey) {
