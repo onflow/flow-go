@@ -32,11 +32,11 @@ jobs:
       with:
         project_id: flow
     - name: Setup Go
-      uses: actions/setup-go@v4
+      uses: actions/setup-go@v5
       with:
         go-version: ${{ env.GO_VERSION }}
     - name: Checkout repo
-      uses: actions/checkout@v3
+      uses: actions/checkout@v4
       with:
         # to accurately get the version tag
         fetch-depth: 0
