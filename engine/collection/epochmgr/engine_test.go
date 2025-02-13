@@ -225,7 +225,7 @@ func (suite *Suite) AddEpoch(counter uint64) *protocol.CommittedEpoch {
 	epoch := new(protocol.CommittedEpoch)
 	epoch.On("Counter").Return(counter, nil)
 	suite.epochs[counter] = epoch
-	suite.epochQuery.Add(epoch)
+	suite.epochQuery.AddCommitted(epoch)
 	return epoch
 }
 

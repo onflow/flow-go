@@ -80,7 +80,7 @@ func (n *node) setEpochs(t *testing.T, currentSetup flow.EpochSetup, nextSetup f
 	nextEpoch.On("InitialIdentities").Return(nextSetup.Participants, nil)
 
 	epochQuery := mocks.NewEpochQuery(t, currentSetup.Counter)
-	epochQuery.Add(currentEpoch)
+	epochQuery.AddCommitted(currentEpoch)
 	epochQuery.AddTentative(nextEpoch)
 	snapshot := new(protocolmock.Snapshot)
 	snapshot.On("Epochs").Return(epochQuery)

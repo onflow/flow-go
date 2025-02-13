@@ -30,7 +30,7 @@ func NewEpochQuery(t *testing.T, counter uint64, epochs ...protocol.CommittedEpo
 	}
 
 	for _, epoch := range epochs {
-		mock.Add(epoch)
+		mock.AddCommitted(epoch)
 	}
 
 	return mock
@@ -110,9 +110,9 @@ func (mock *EpochQuery) Transition() {
 	mock.counter++
 }
 
-// Add adds the given Committed Epoch to this EpochQuery implementation, so its
+// AddCommitted adds the given Committed Epoch to this EpochQuery implementation, so its
 // information can be retrieved by the business logic via the [protocol.EpochQuery] API.
-func (mock *EpochQuery) Add(epoch protocol.CommittedEpoch) {
+func (mock *EpochQuery) AddCommitted(epoch protocol.CommittedEpoch) {
 	mock.mu.Lock()
 	defer mock.mu.Unlock()
 	counter, err := epoch.Counter()
