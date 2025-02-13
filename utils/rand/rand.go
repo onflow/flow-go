@@ -13,6 +13,7 @@ package rand
 
 import (
 	"crypto/rand"
+	"encoding/base64"
 	"encoding/binary"
 	"fmt"
 )
@@ -166,4 +167,19 @@ func Samples(n uint, m uint, swap func(i, j uint)) error {
 		swap(i, i+j)
 	}
 	return nil
+}
+
+func GenerateRandomString(length int) (string, error) {
+	if length < 1 {
+		return "", fmt.Errorf("length should greater than 0, got %d", length)
+	}
+
+	byteSlice := make([]byte, (length+3)/4*3)
+	_, err := rand.Read(byteSlice)
+	if err != nil {
+		return "", fmt.Errorf("failed to generate random string: %w", err)
+	}
+
+	encodedString := base64.URLEncoding.EncodeToString(byteSlice)
+	return encodedString[:length], nil
 }
