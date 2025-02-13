@@ -231,7 +231,7 @@ func (s *GrpcStateStreamSuite) TestHappyPath() {
 			foundANTxControlCount := 0
 			foundONTxCount := 0
 
-			messageIndex := counters.NewMonotonousCounter(0)
+			messageIndex := counters.NewMonotonicCounter(0)
 
 			r := NewResponseTracker(compareEventsResponse, 3)
 

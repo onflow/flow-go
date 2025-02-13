@@ -100,7 +100,7 @@ func (p *AccountStatusesDataProvider) createSubscription(ctx context.Context, ar
 // No errors are expected during normal operations.
 func (p *AccountStatusesDataProvider) handleResponse() func(accountStatusesResponse *backend.AccountStatusesResponse) error {
 	blocksSinceLastMessage := uint64(0)
-	messageIndex := counters.NewMonotonousCounter(0)
+	messageIndex := counters.NewMonotonicCounter(0)
 
 	return func(accountStatusesResponse *backend.AccountStatusesResponse) error {
 		// check if there are any events in the response. if not, do not send a message unless the last

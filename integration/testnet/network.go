@@ -15,9 +15,11 @@ import (
 	"testing"
 	"time"
 
+	"github.com/onflow/flow-go/follower/database"
 	"github.com/onflow/flow-go/state/protocol/protocol_state"
 
 	"github.com/dapperlabs/testingdock"
+	badgerv2 "github.com/dgraph-io/badger/v2"
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
 	dockercontainer "github.com/docker/docker/api/types/container"
@@ -53,6 +55,7 @@ import (
 	"github.com/onflow/flow-go/state/protocol/badger"
 	"github.com/onflow/flow-go/state/protocol/inmem"
 	"github.com/onflow/flow-go/state/protocol/protocol_state/kvstore"
+	badgerstorage "github.com/onflow/flow-go/storage/badger"
 	"github.com/onflow/flow-go/utils/io"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -73,6 +76,8 @@ const (
 	DefaultFlowDataDir = "/data"
 	// DefaultFlowDBDir is the default directory for the node database.
 	DefaultFlowDBDir = "/data/protocol"
+	// DefaultFlowPebbleDBDir is the default directory for the pebble database.
+	DefaultFlowPebbleDBDir = "/data/protocol-pebble"
 	// DefaultFlowSecretsDBDir is the default directory for secrets database.
 	DefaultFlowSecretsDBDir = "/data/secrets"
 	// DefaultExecutionRootDir is the default directory for the execution node state database.
@@ -673,6 +678,10 @@ func (net *FlowNetwork) addConsensusFollower(t *testing.T, rootProtocolSnapshotP
 
 	// create a directory for the follower database
 	dataDir := makeDir(t, tmpdir, DefaultFlowDBDir)
+	pebbleDir := makeDir(t, tmpdir, DefaultFlowPebbleDBDir)
+
+	pebbleDB, _, err := database.InitPebbleDB(pebbleDir)
+	require.NoError(t, err)
 
 	// create a follower-specific directory for the bootstrap files
 	followerBootstrapDir := makeDir(t, tmpdir, DefaultBootstrapDir)
@@ -680,14 +689,26 @@ func (net *FlowNetwork) addConsensusFollower(t *testing.T, rootProtocolSnapshotP
 
 	// copy root protocol snapshot to the follower-specific folder
 	// bootstrap/public-root-information directory
-	err := io.Copy(rootProtocolSnapshotPath, filepath.Join(followerBootstrapDir, bootstrap.PathRootProtocolStateSnapshot))
+	err = io.Copy(rootProtocolSnapshotPath, filepath.Join(followerBootstrapDir, bootstrap.PathRootProtocolStateSnapshot))
 	require.NoError(t, err)
 
 	// consensus follower
+	dbOpts := badgerv2.
+		DefaultOptions(dataDir).
+		WithKeepL0InMemory(true).
+		WithValueLogFileSize(128 << 23).
+		WithValueLogMaxEntries(100000) // Default is 1000000
+	badgerDB, err := badgerstorage.InitPublic(dbOpts)
+	require.NoError(t, err)
+
 	bindAddr := gonet.JoinHostPort("localhost", testingdock.RandomPort(t))
 	opts := append(
 		followerConf.Opts,
-		consensus_follower.WithDataDir(dataDir),
+		consensus_follower.WithDB(badgerDB),
+		// this is required, otherwise consensus follower will create a pebble db at the default
+		// path /data/protocol-pebble, which is outside of the tmpdir, and will run into permission
+		// denied error.
+		consensus_follower.WithPebbleDB(pebbleDB),
 		consensus_follower.WithBootstrapDir(followerBootstrapDir),
 	)
 
