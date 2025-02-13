@@ -2,10 +2,11 @@ package unittest
 
 import (
 	"fmt"
-	"github.com/onflow/crypto"
 	"math/rand"
 	"reflect"
 	"testing"
+
+	"github.com/onflow/crypto"
 
 	"github.com/stretchr/testify/require"
 
@@ -107,6 +108,17 @@ func generateCustomFlowValue(field reflect.Value) reflect.Value {
 	switch field.Type() {
 	case reflect.TypeOf(flow.IdentitySkeleton{}):
 		return reflect.ValueOf(IdentityFixture().IdentitySkeleton)
+	case reflect.TypeOf(flow.DynamicIdentityEntry{}):
+		return reflect.ValueOf(flow.DynamicIdentityEntry{
+			NodeID:  IdentifierFixture(),
+			Ejected: rand.Intn(2) == 1,
+		})
+	case reflect.TypeOf(flow.EpochExtension{}):
+		firstView := rand.Uint64() % 100
+		return reflect.ValueOf(flow.EpochExtension{
+			FirstView: firstView,
+			FinalView: firstView + 10,
+		})
 	case reflect.TypeOf(flow.ClusterQCVoteData{}):
 		return reflect.ValueOf(flow.ClusterQCVoteDataFromQC(QuorumCertificateWithSignerIDsFixture()))
 	case reflect.TypeOf(flow.QuorumCertificate{}):

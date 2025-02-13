@@ -1,6 +1,7 @@
 package chunks_test
 
 import (
+	"math/rand"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -21,4 +22,9 @@ func TestChunkLocatorConvert(t *testing.T) {
 
 	convertedList := locatorMap.ToList()
 	require.ElementsMatch(t, originalList, convertedList)
+}
+
+// TestChunkLocatorMalleability verifies that the chunk locator which implements the [flow.IDEntity] interface is not malleable.
+func TestChunkLocatorMalleability(t *testing.T) {
+	unittest.RequireEntityNotMalleable(t, unittest.ChunkLocatorFixture(unittest.IdentifierFixture(), rand.Uint64()))
 }

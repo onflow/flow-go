@@ -1,6 +1,7 @@
 package flow_test
 
 import (
+	"math/rand"
 	"testing"
 
 	"github.com/onflow/crypto"
@@ -10,6 +11,7 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
+// TestMalleability verifies that the entities which implements the [flow.IDEntity] interface are not malleable.
 func TestMalleability(t *testing.T) {
 	t.Run("EpochSetup", func(t *testing.T) {
 		unittest.RequireEntityNotMalleable(t, unittest.EpochSetupFixture())
@@ -28,6 +30,34 @@ func TestMalleability(t *testing.T) {
 	})
 	t.Run("EpochRecover", func(t *testing.T) {
 		checker.Check(unittest.EpochRecoverFixture())
+	})
+
+	epochStateContainerFixture := func() *flow.EpochStateContainer {
+		return &flow.EpochStateContainer{
+			SetupID:          unittest.EpochSetupFixture().ID(),
+			CommitID:         unittest.EpochCommitFixture().ID(),
+			ActiveIdentities: unittest.DynamicIdentityEntryListFixture(5),
+			EpochExtensions: []flow.EpochExtension{
+				{
+					FirstView: uint64(0),
+					FinalView: uint64(rand.Uint32() + 1000),
+				},
+			},
+		}
+	}
+
+	t.Run("EpochStateContainer", func(t *testing.T) {
+		unittest.RequireEntityNotMalleable(t, epochStateContainerFixture())
+	})
+
+	checker = unittest.NewMalleabilityChecker(
+		t,
+		unittest.WithCustomType(&flow.EpochStateContainer{}, func() any {
+			return epochStateContainerFixture()
+		}),
+	)
+	t.Run("MinEpochStateEntry", func(t *testing.T) {
+		checker.Check(unittest.EpochStateFixture(unittest.WithNextEpochProtocolState()).MinEpochStateEntry)
 	})
 }
 
