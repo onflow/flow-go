@@ -1415,9 +1415,10 @@ func TestSnapshot_EpochHeightBoundaries(t *testing.T) {
 		epochBuilder.BuildEpoch()
 
 		t.Run("first epoch - EpochCommitted phase", func(t *testing.T) {
-			currentEpoch, err := state.Final().Epochs().Current()
+			finalSnap := state.Final()
+			currentEpoch, err := finalSnap.Epochs().Current()
 			require.NoError(t, err)
-			nextEpoch, err := state.Final().Epochs().NextCommitted()
+			nextEpoch, err := finalSnap.Epochs().NextCommitted()
 			require.NoError(t, err)
 			// first height of started current epoch should be known
 			firstHeight, err := currentEpoch.FirstHeight()
@@ -1441,7 +1442,8 @@ func TestSnapshot_EpochHeightBoundaries(t *testing.T) {
 		epoch2FirstHeight := epoch1FinalHeight + 1
 
 		t.Run("second epoch - EpochStaking phase", func(t *testing.T) {
-			previousEpoch, err := state.Final().Epochs().Previous()
+			finalSnap := state.Final()
+			previousEpoch, err := finalSnap.Epochs().Previous()
 			require.NoError(t, err)
 			// first and final height of completed previous epoch should be known
 			firstHeight, err := previousEpoch.FirstHeight()
@@ -1451,7 +1453,7 @@ func TestSnapshot_EpochHeightBoundaries(t *testing.T) {
 			require.NoError(t, err)
 			assert.Equal(t, epoch1FinalHeight, finalHeight)
 
-			currentEpoch, err := state.Final().Epochs().Current()
+			currentEpoch, err := finalSnap.Epochs().Current()
 			require.NoError(t, err)
 			// first height of started current epoch should be known
 			firstHeight, err = currentEpoch.FirstHeight()

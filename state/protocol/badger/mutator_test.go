@@ -1989,12 +1989,13 @@ func TestRecoveryFromEpochFallbackMode(t *testing.T) {
 	// According to the specification, the current epoch after processing an EpochRecover event must be in committed phase,
 	// since it contains EpochSetup and EpochCommit events.
 	assertCorrectRecovery := func(state *protocol.ParticipantState, epochRecover *flow.EpochRecover) {
-		epochState, err := state.Final().EpochProtocolState()
+		finalSnap := state.Final()
+		epochState, err := finalSnap.EpochProtocolState()
 		require.NoError(t, err)
 		epochPhase := epochState.EpochPhase()
 		require.Equal(t, flow.EpochPhaseCommitted, epochPhase, "next epoch has to be committed")
 
-		nextEpochQuery, err := state.Final().Epochs().NextCommitted()
+		nextEpochQuery, err := finalSnap.Epochs().NextCommitted()
 		require.NoError(t, err)
 		nextEpochSetup, err := realprotocol.ToEpochSetup(nextEpochQuery)
 		require.NoError(t, err)

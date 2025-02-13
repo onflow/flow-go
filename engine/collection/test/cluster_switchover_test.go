@@ -448,9 +448,10 @@ func RunTestCase(tc *ClusterSwitchoverTestCase) {
 	// build halfway through the grace period for the epoch 1 cluster
 	tc.builder.AddBlocksWithSeals(flow.DefaultTransactionExpiry/2, 1)
 
-	epoch1, err := tc.State().Final().Epochs().Previous()
+	finalSnap := tc.State().Final()
+	epoch1, err := finalSnap.Epochs().Previous()
 	require.NoError(tc.T(), err)
-	epoch2, err := tc.State().Final().Epochs().Current()
+	epoch2, err := finalSnap.Epochs().Current()
 	require.NoError(tc.T(), err)
 
 	epoch1Clusters := tc.Clusters(epoch1)
