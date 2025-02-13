@@ -315,7 +315,7 @@ func (c *Controller) readMessages(ctx context.Context) error {
 				return err
 			}
 
-			err = wrapErr("error reading message", err)
+			err = fmt.Errorf("error reading message: %w", err)
 			c.writeErrorResponse(
 				ctx,
 				err,
@@ -326,7 +326,7 @@ func (c *Controller) readMessages(ctx context.Context) error {
 
 		err := c.handleMessage(ctx, message)
 		if err != nil {
-			err = wrapErr("error parsing message", err)
+			err = fmt.Errorf("error parsing message: %w", err)
 			c.writeErrorResponse(
 				ctx,
 				err,
@@ -376,7 +376,7 @@ func (c *Controller) handleMessage(ctx context.Context, message json.RawMessage)
 func (c *Controller) handleSubscribe(ctx context.Context, msg models.SubscribeMessageRequest) {
 	subscriptionID, err := c.parseOrCreateSubscriptionID(msg.SubscriptionID)
 	if err != nil {
-		err = wrapErr("error parsing subscription id", err)
+		err = fmt.Errorf("error parsing subscription id: %w", err)
 		c.writeErrorResponse(
 			ctx,
 			err,
@@ -388,7 +388,7 @@ func (c *Controller) handleSubscribe(ctx context.Context, msg models.SubscribeMe
 	// register new provider
 	provider, err := c.dataProviderFactory.NewDataProvider(ctx, subscriptionID.String(), msg.Topic, msg.Arguments, c.multiplexedStream)
 	if err != nil {
-		err = wrapErr("error creating data provider", err)
+		err = fmt.Errorf("error creating data provider: %w", err)
 		c.writeErrorResponse(
 			ctx,
 			err,
@@ -411,7 +411,7 @@ func (c *Controller) handleSubscribe(ctx context.Context, msg models.SubscribeMe
 	go func() {
 		err = provider.Run()
 		if err != nil {
-			err = wrapErr("internal error", err)
+			err = fmt.Errorf("internal error: %w", err)
 			c.writeErrorResponse(
 				ctx,
 				err,
@@ -428,7 +428,7 @@ func (c *Controller) handleSubscribe(ctx context.Context, msg models.SubscribeMe
 func (c *Controller) handleUnsubscribe(ctx context.Context, msg models.UnsubscribeMessageRequest) {
 	subscriptionID, err := ParseClientSubscriptionID(msg.SubscriptionID)
 	if err != nil {
-		err = wrapErr("error parsing subscription id", err)
+		err = fmt.Errorf("error parsing subscription id: %w", err)
 		c.writeErrorResponse(
 			ctx,
 			err,
@@ -515,10 +515,6 @@ func wrapErrorMessage(code int, message string, action string, subscriptionID st
 		},
 		Action: action,
 	}
-}
-
-func wrapErr(msg string, err error) error {
-	return errors.Join(fmt.Errorf("%s", msg), err)
 }
 
 func (c *Controller) parseOrCreateSubscriptionID(id string) (SubscriptionID, error) {
