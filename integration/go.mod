@@ -372,3 +372,5 @@ replace github.com/onflow/flow-go/insecure => ../insecure
 
 // Using custom fork until https://github.com/onflow/flow-go/issues/5338 is resolved
 replace github.com/ipfs/boxo => github.com/onflow/boxo v0.0.0-20240201202436-f2477b92f483
+
+replace github.com/onflow/cadence => github.com/onflow/cadence-internal v1.3.2-rc.1
