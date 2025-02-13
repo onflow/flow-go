@@ -253,7 +253,6 @@ func (e *Engine) onTransaction(originID flow.Identifier, tx *flow.TransactionBod
 	if err != nil {
 		return fmt.Errorf("could not get current epoch for reference block: %w", err)
 	}
-
 	localCluster, err := e.getLocalCluster(refEpoch)
 	if err != nil {
 		return fmt.Errorf("could not get local cluster: %w", err)

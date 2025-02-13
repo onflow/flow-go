@@ -355,7 +355,7 @@ func (e *Engine) handleEpochEvents(ctx irrecoverable.SignalerContext, ready comp
 			// This is one of the few places where we have to use the configuration for a future epoch that
 			// has not yet been committed. CAUTION: the epoch transition might not happen as described here!
 			nextEpoch, err := e.state.AtBlockID(firstBlock.ID()).Epochs().NextUnsafe()
-			if err != nil {
+			if err != nil { // since the Epoch Setup Phase just started, this call should never error
 				ctx.Throw(err)
 			}
 			e.onEpochSetupPhaseStarted(ctx, nextEpoch)
