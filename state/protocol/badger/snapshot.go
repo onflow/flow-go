@@ -383,6 +383,7 @@ type EpochQuery struct {
 var _ protocol.EpochQuery = (*EpochQuery)(nil)
 
 // Current returns the current epoch.
+// No errors are expected during normal operation.
 func (q *EpochQuery) Current() (protocol.CommittedEpoch, error) {
 	// all errors returned from storage reads here are unexpected, because all
 	// snapshots reside within a current epoch, which must be queryable
@@ -403,9 +404,14 @@ func (q *EpochQuery) Current() (protocol.CommittedEpoch, error) {
 	return inmem.NewCommittedEpoch(setup, epochState.EpochExtensions(), commit), nil
 }
 
-// NextUnsafe returns the next epoch, if it has been setup but not yet committed.
+// NextUnsafe returns the next epoch, if it has been set up but not yet committed.
+// Error returns:
+//   - protocol.ErrNextEpochNotSetup if the next epoch has not yet been set up as of the snapshot's reference block
+//     (the reference block resides in the EpochStaking phase)
+//   - protocol.ErrNextEpochAlreadyCommitted if the next epoch has already been committed at the snapshot's reference block
+//     (the reference block resides in the EpochCommitted phase)
+//   - generic error in case of unexpected critical internal corruption or bugs
 func (q *EpochQuery) NextUnsafe() (protocol.TentativeEpoch, error) {
-
 	epochState, err := q.snap.state.protocolState.EpochStateAtBlockID(q.snap.blockID)
 	if err != nil {
 		return nil, fmt.Errorf("could not get protocol state snapshot at block %x: %w", q.snap.blockID, err)
@@ -430,34 +436,32 @@ func (q *EpochQuery) NextUnsafe() (protocol.TentativeEpoch, error) {
 }
 
 // NextCommitted returns the next epoch as of this snapshot, only if it has been committed already.
+// Error returns:
+//   - protocol.ErrNextEpochNotCommitted if the next epoch has not yet been committed at the snapshot's reference block
+//     (the reference block does not reside in the EpochCommitted phase)
+//   - generic error in case of unexpected critical internal corruption or bugs
 func (q *EpochQuery) NextCommitted() (protocol.CommittedEpoch, error) {
 	epochState, err := q.snap.state.protocolState.EpochStateAtBlockID(q.snap.blockID)
 	if err != nil {
 		return nil, fmt.Errorf("could not get protocol state snapshot at block %x: %w", q.snap.blockID, err)
 	}
-	phase := epochState.EpochPhase()
 	entry := epochState.Entry()
 
-	// if we are in the staking or fallback phase, the next epoch is not setup yet
-	if phase == flow.EpochPhaseStaking || phase == flow.EpochPhaseFallback {
-		return nil, protocol.ErrNextEpochNotSetup
-	}
-	if phase == flow.EpochPhaseSetup {
+	switch epochState.EpochPhase() {
+	// if we are in the staking or fallback phase, the next epoch is neither setup nor committed yet
+	case flow.EpochPhaseStaking, flow.EpochPhaseFallback, flow.EpochPhaseSetup:
 		return nil, protocol.ErrNextEpochNotCommitted
+	case flow.EpochPhaseCommitted:
+		return inmem.NewCommittedEpoch(entry.NextEpochSetup, entry.NextEpoch.EpochExtensions, entry.NextEpochCommit), nil
+	default:
+		return nil, fmt.Errorf("data corruption: unknown epoch phase implies malformed protocol state epoch data")
 	}
-	nextSetup := entry.NextEpochSetup
-	nextCommit := entry.NextEpochCommit
-	if phase == flow.EpochPhaseCommitted {
-		return inmem.NewCommittedEpoch(nextSetup, entry.NextEpoch.EpochExtensions, nextCommit), nil
-	}
-	return nil, fmt.Errorf("data corruption: unknown epoch phase implies malformed protocol state epoch data")
 }
 
 // Previous returns the previous epoch. During the first epoch after the root
-// block, this returns a sentinel error (since there is no previous epoch).
+// block, this returns protocol.ErrNoPreviousEpoch (since there is no previous epoch).
 // For all other epochs, returns the previous epoch.
 func (q *EpochQuery) Previous() (protocol.CommittedEpoch, error) {
-
 	epochState, err := q.snap.state.protocolState.EpochStateAtBlockID(q.snap.blockID)
 	if err != nil {
 		return nil, fmt.Errorf("could not get protocol state snapshot at block %x: %w", q.snap.blockID, err)

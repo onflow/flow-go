@@ -173,7 +173,7 @@ func (suite *Suite) SetupTest() {
 		func() error { return nil })
 
 	// add current epoch
-	suite.AddEpoch(suite.counter)
+	suite.AddCommittedEpoch(suite.counter)
 	// next epoch (with counter+1) is added later, as either setup/tentative (if we need to start QC)
 	// or committed (if we need to transition to it) depending on the test
 
@@ -218,12 +218,13 @@ func (suite *Suite) TransitionEpoch() {
 	suite.epochQuery.Transition()
 }
 
-// AddEpoch adds an epoch with the given counter.
-func (suite *Suite) AddEpoch(counter uint64) *protocol.CommittedEpoch {
+// AddCommittedEpoch adds a Committed Epoch with the given counter to the test suite,
+// so the epoch information can be retrieved by the business logic.
+func (suite *Suite) AddCommittedEpoch(counter uint64) *protocol.CommittedEpoch {
 	epoch := new(protocol.CommittedEpoch)
 	epoch.On("Counter").Return(counter, nil)
 	suite.epochs[counter] = epoch
-	suite.epochQuery.Add(epoch)
+	suite.epochQuery.AddCommitted(epoch)
 	return epoch
 }
 
@@ -320,7 +321,7 @@ func (suite *Suite) TestStartAfterEpochBoundary_WithinTxExpiry() {
 	defer suite.engineEventsDistributor.AssertExpectations(suite.T())
 	suite.phase = flow.EpochPhaseStaking
 	// transition epochs, so that a Previous epoch is queryable
-	suite.AddEpoch(suite.counter + 1)
+	suite.AddCommittedEpoch(suite.counter + 1)
 	suite.TransitionEpoch()
 	prevEpoch := suite.epochs[suite.counter-1]
 	// the finalized height is within [1,tx_expiry] heights of previous epoch final height
@@ -344,7 +345,7 @@ func (suite *Suite) TestStartAfterEpochBoundary_BeyondTxExpiry() {
 	defer suite.engineEventsDistributor.AssertExpectations(suite.T())
 	suite.phase = flow.EpochPhaseStaking
 	// transition epochs, so that a Previous epoch is queryable
-	suite.AddEpoch(suite.counter + 1)
+	suite.AddCommittedEpoch(suite.counter + 1)
 	suite.TransitionEpoch()
 	prevEpoch := suite.epochs[suite.counter-1]
 	// the finalized height is more than tx_expiry above previous epoch final height
@@ -368,7 +369,7 @@ func (suite *Suite) TestStartAfterEpochBoundary_NotApprovedForPreviousEpoch() {
 	defer suite.engineEventsDistributor.AssertExpectations(suite.T())
 	suite.phase = flow.EpochPhaseStaking
 	// transition epochs, so that a Previous epoch is queryable
-	suite.AddEpoch(suite.counter + 1)
+	suite.AddCommittedEpoch(suite.counter + 1)
 	suite.TransitionEpoch()
 	prevEpoch := suite.epochs[suite.counter-1]
 	// the finalized height is within [1,tx_expiry] heights of previous epoch final height
@@ -393,7 +394,7 @@ func (suite *Suite) TestStartAfterEpochBoundary_NotApprovedForCurrentEpoch() {
 	defer suite.engineEventsDistributor.AssertExpectations(suite.T())
 	suite.phase = flow.EpochPhaseStaking
 	// transition epochs, so that a Previous epoch is queryable
-	suite.AddEpoch(suite.counter + 1)
+	suite.AddCommittedEpoch(suite.counter + 1)
 	suite.TransitionEpoch()
 	prevEpoch := suite.epochs[suite.counter-1]
 	// the finalized height is within [1,tx_expiry] heights of previous epoch final height
@@ -418,7 +419,7 @@ func (suite *Suite) TestStartAfterEpochBoundary_PreviousEpochTransitionBeforeRoo
 	defer suite.engineEventsDistributor.AssertExpectations(suite.T())
 	suite.phase = flow.EpochPhaseStaking
 	// transition epochs, so that a Previous epoch is queryable
-	suite.AddEpoch(suite.counter + 1)
+	suite.AddCommittedEpoch(suite.counter + 1)
 	suite.TransitionEpoch()
 	prevEpoch := suite.epochs[suite.counter-1]
 	// Previous epoch end boundary is unknown because it is before our root snapshot
@@ -504,7 +505,7 @@ func (suite *Suite) TestRespondToEpochTransition() {
 	defer suite.engineEventsDistributor.AssertExpectations(suite.T())
 
 	// we are in committed phase
-	suite.AddEpoch(suite.counter + 1)
+	suite.AddCommittedEpoch(suite.counter + 1)
 	suite.phase = flow.EpochPhaseCommitted
 	suite.StartEngine()
 

@@ -94,6 +94,7 @@ func (u *Snapshot) VersionBeacon() (*flow.SealedVersionBeacon, error) {
 	return nil, u.err
 }
 
+// EpochQuery represents the epoch information for an invalid state snapshot query.
 type EpochQuery struct {
 	err error
 }

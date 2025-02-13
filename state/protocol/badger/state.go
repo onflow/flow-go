@@ -844,20 +844,12 @@ func IsBootstrapped(db *badger.DB) (bool, error) {
 // updateEpochMetrics update the `consensus_compliance_current_epoch_counter` and the
 // `consensus_compliance_current_epoch_phase` metric
 func updateEpochMetrics(metrics module.ComplianceMetrics, snap protocol.Snapshot) error {
-
 	currentEpoch, err := snap.Epochs().Current()
 	if err != nil {
 		return fmt.Errorf("could not get current epoch: %w", err)
 	}
 	// update epoch counter
 	metrics.CurrentEpochCounter(currentEpoch.Counter())
-
-	// update epoch phase
-	phase, err := snap.EpochPhase()
-	if err != nil {
-		return fmt.Errorf("could not get current epoch counter: %w", err)
-	}
-	metrics.CurrentEpochPhase(phase)
 
 	metrics.CurrentEpochFinalView(currentEpoch.FinalView())
 
@@ -867,6 +859,7 @@ func updateEpochMetrics(metrics module.ComplianceMetrics, snap protocol.Snapshot
 	if err != nil {
 		return fmt.Errorf("could not get epoch protocol state: %w", err)
 	}
+	metrics.CurrentEpochPhase(epochProtocolState.EpochPhase()) // update epoch phase
 	// notify whether epoch fallback mode is active
 	if epochProtocolState.EpochFallbackTriggered() {
 		metrics.EpochFallbackModeTriggered()

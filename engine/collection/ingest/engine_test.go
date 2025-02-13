@@ -466,7 +466,7 @@ func (suite *Suite) TestRouting_ClusterAssignmentChanged() {
 	epoch2.On("Counter").Return(uint64(2), nil)
 	epoch2.On("Clustering").Return(epoch2Clusters, nil)
 	// update the mocks to behave as though we have transitioned to epoch 2
-	suite.epochQuery.Add(epoch2)
+	suite.epochQuery.AddCommitted(epoch2)
 	suite.epochQuery.Transition()
 
 	// get the local cluster in epoch 2
@@ -506,7 +506,7 @@ func (suite *Suite) TestRouting_ClusterAssignmentRemoved() {
 	epoch2.On("InitialIdentities").Return(withoutMe, nil)
 	epoch2.On("Clustering").Return(epoch2Clusters, nil)
 	// update the mocks to behave as though we have transitioned to epoch 2
-	suite.epochQuery.Add(epoch2)
+	suite.epochQuery.AddCommitted(epoch2)
 	suite.epochQuery.Transition()
 
 	// any transaction is OK here, since we're not in any cluster
@@ -545,7 +545,7 @@ func (suite *Suite) TestRouting_ClusterAssignmentAdded() {
 	epoch2.On("InitialIdentities").Return(withoutMe, nil)
 	epoch2.On("Clustering").Return(epoch2Clusters, nil)
 	// update the mocks to behave as though we have transitioned to epoch 2
-	suite.epochQuery.Add(epoch2)
+	suite.epochQuery.AddCommitted(epoch2)
 	suite.epochQuery.Transition()
 
 	// any transaction is OK here, since we're not in any cluster
@@ -573,7 +573,7 @@ func (suite *Suite) TestRouting_ClusterAssignmentAdded() {
 	epoch3.On("Counter").Return(uint64(3), nil)
 	epoch3.On("Clustering").Return(epoch3Clusters, nil)
 	// transition to epoch 3
-	suite.epochQuery.Add(epoch3)
+	suite.epochQuery.AddCommitted(epoch3)
 	suite.epochQuery.Transition()
 
 	// get the local cluster in epoch 2

@@ -107,7 +107,7 @@ func createNode(
 	nextEpoch.On("InitialIdentities").Return(nextSetup.Participants)
 
 	epochQuery := mocks.NewEpochQuery(t, currentSetup.Counter)
-	epochQuery.Add(currentEpoch)
+	epochQuery.AddCommitted(currentEpoch)
 	epochQuery.AddTentative(nextEpoch)
 	snapshot := new(protocolmock.Snapshot)
 	snapshot.On("Epochs").Return(epochQuery)

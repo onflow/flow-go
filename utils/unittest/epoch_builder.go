@@ -158,21 +158,22 @@ func (builder *EpochBuilder) EpochHeights(counter uint64) (*EpochHeights, bool) 
 func (builder *EpochBuilder) BuildEpoch() *EpochBuilder {
 
 	state := builder.states[0]
+	finalSnap := state.Final()
 
 	// prepare default values for the service events based on the current state
-	identities, err := state.Final().Identities(filter.Any)
+	identities, err := finalSnap.Identities(filter.Any)
 	require.NoError(builder.t, err)
-	epoch, err := state.Final().Epochs().Current()
+	epoch, err := finalSnap.Epochs().Current()
 	require.NoError(builder.t, err)
 	counter := epoch.Counter()
 	finalView := epoch.FinalView()
 
 	// retrieve block A
-	A, err := state.Final().Head()
+	A, err := finalSnap.Head()
 	require.NoError(builder.t, err)
 
 	// check that block A satisfies initial condition
-	phase, err := state.Final().EpochPhase()
+	phase, err := finalSnap.EpochPhase()
 	require.NoError(builder.t, err)
 	require.Equal(builder.t, flow.EpochPhaseStaking, phase)
 
@@ -315,15 +316,16 @@ func (builder *EpochBuilder) BuildEpoch() *EpochBuilder {
 func (builder *EpochBuilder) CompleteEpoch() *EpochBuilder {
 
 	state := builder.states[0]
+	finalSnap := state.Final()
 
-	phase, err := state.Final().EpochPhase()
+	phase, err := finalSnap.EpochPhase()
 	require.Nil(builder.t, err)
 	require.Equal(builder.t, flow.EpochPhaseCommitted, phase)
-	currentEpoch, err := state.Final().Epochs().Current()
+	currentEpoch, err := finalSnap.Epochs().Current()
 	require.Nil(builder.t, err)
 	finalView := currentEpoch.FinalView()
 
-	final, err := state.Final().Head()
+	final, err := finalSnap.Head()
 	require.Nil(builder.t, err)
 
 	finalBlock, ok := builder.blocksByID[final.ID()]

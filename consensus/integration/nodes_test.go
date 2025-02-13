@@ -189,7 +189,8 @@ func createNodes(t *testing.T, participants *ConsensusParticipants, rootSnapshot
 	require.NoError(t, err)
 	// Whether there is a next committed epoch depends on the test.
 	nextEpoch, err := rootSnapshot.Epochs().NextCommitted()
-	if err != nil {
+	if err != nil { // the only acceptable error here is `protocol.ErrNextEpochNotCommitted`
+		require.ErrorIs(t, err, protocol.ErrNextEpochNotCommitted)
 		epochViewLookup = buildEpochLookupList(currentEpoch)
 	} else {
 		epochViewLookup = buildEpochLookupList(currentEpoch, nextEpoch)

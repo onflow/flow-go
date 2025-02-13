@@ -443,7 +443,6 @@ func (ctl *BlockTimeController) processEpochExtended(first *flow.Header) error {
 // Specifically, we memorize the next epoch's timing information in the BlockTimeController.
 // No errors are expected during normal operation.
 func (ctl *BlockTimeController) processEpochCommittedPhaseStarted(first *flow.Header) error {
-	var err error
 	snapshot := ctl.state.AtHeight(first.Height)
 	nextEpoch, err := snapshot.Epochs().NextCommitted()
 	if err != nil {

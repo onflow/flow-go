@@ -1,6 +1,7 @@
 package mocks
 
 import (
+	"fmt"
 	"sync"
 	"testing"
 
@@ -16,20 +17,22 @@ type EpochQuery struct {
 	t         *testing.T
 	mu        sync.RWMutex
 	counter   uint64                             // represents the current epoch
-	byCounter map[uint64]protocol.CommittedEpoch // all committed epochs
+	committed map[uint64]protocol.CommittedEpoch // all committed epochs, by their respective epoch counter
 	tentative map[uint64]protocol.TentativeEpoch // only for the next epoch (counter+1) if uncommitted
 }
+
+var _ protocol.EpochQuery = (*EpochQuery)(nil)
 
 func NewEpochQuery(t *testing.T, counter uint64, epochs ...protocol.CommittedEpoch) *EpochQuery {
 	mock := &EpochQuery{
 		t:         t,
 		counter:   counter,
-		byCounter: make(map[uint64]protocol.CommittedEpoch),
+		committed: make(map[uint64]protocol.CommittedEpoch),
 		tentative: make(map[uint64]protocol.TentativeEpoch),
 	}
 
 	for _, epoch := range epochs {
-		mock.Add(epoch)
+		mock.AddCommitted(epoch)
 	}
 
 	return mock
@@ -38,19 +41,26 @@ func NewEpochQuery(t *testing.T, counter uint64, epochs ...protocol.CommittedEpo
 func (mock *EpochQuery) Current() (protocol.CommittedEpoch, error) {
 	mock.mu.RLock()
 	defer mock.mu.RUnlock()
-	return mock.byCounter[mock.counter], nil
+	epoch, exists := mock.committed[mock.counter]
+	if !exists {
+		return nil, fmt.Errorf("EpochQuery mock has no entry for current epoch - likely a test is not properly set up")
+	}
+	return epoch, nil
 }
 
 func (mock *EpochQuery) NextUnsafe() (protocol.TentativeEpoch, error) {
 	mock.mu.RLock()
 	defer mock.mu.RUnlock()
+	// NextUnsafe should only return a tentative epoch when we have no committed epoch for the next counter.
+	// If we have a committed epoch (are implicitly in EpochPhaseCommitted) or no tentative epoch, return an error.
+	// Note that in tests we do not require that a committed epoch be added as a tentative epoch first.
+	_, exists := mock.committed[mock.counter+1]
+	if exists {
+		return nil, protocol.ErrNextEpochAlreadyCommitted
+	}
 	epoch, exists := mock.tentative[mock.counter+1]
 	if !exists {
 		return nil, protocol.ErrNextEpochNotSetup
-	}
-	_, exists = mock.byCounter[mock.counter+1]
-	if exists {
-		return nil, protocol.ErrNextEpochAlreadyCommitted
 	}
 	return epoch, nil
 }
@@ -58,9 +68,9 @@ func (mock *EpochQuery) NextUnsafe() (protocol.TentativeEpoch, error) {
 func (mock *EpochQuery) NextCommitted() (protocol.CommittedEpoch, error) {
 	mock.mu.RLock()
 	defer mock.mu.RUnlock()
-	epoch, exists := mock.byCounter[mock.counter+1]
+	epoch, exists := mock.committed[mock.counter+1]
 	if !exists {
-		return nil, protocol.ErrNextEpochNotSetup
+		return nil, protocol.ErrNextEpochNotCommitted
 	}
 	return epoch, nil
 }
@@ -68,7 +78,7 @@ func (mock *EpochQuery) NextCommitted() (protocol.CommittedEpoch, error) {
 func (mock *EpochQuery) Previous() (protocol.CommittedEpoch, error) {
 	mock.mu.RLock()
 	defer mock.mu.RUnlock()
-	epoch, exists := mock.byCounter[mock.counter-1]
+	epoch, exists := mock.committed[mock.counter-1]
 	if !exists {
 		return nil, protocol.ErrNoPreviousEpoch
 	}
@@ -79,7 +89,7 @@ func (mock *EpochQuery) Previous() (protocol.CommittedEpoch, error) {
 func (mock *EpochQuery) Phase() flow.EpochPhase {
 	mock.mu.RLock()
 	defer mock.mu.RUnlock()
-	_, exists := mock.byCounter[mock.counter+1]
+	_, exists := mock.committed[mock.counter+1]
 	if exists {
 		return flow.EpochPhaseCommitted
 	}
@@ -93,7 +103,7 @@ func (mock *EpochQuery) Phase() flow.EpochPhase {
 func (mock *EpochQuery) ByCounter(counter uint64) protocol.CommittedEpoch {
 	mock.mu.RLock()
 	defer mock.mu.RUnlock()
-	return mock.byCounter[counter]
+	return mock.committed[counter]
 }
 
 // Transition increments the counter indicating which epoch is the "current epoch".
@@ -105,12 +115,12 @@ func (mock *EpochQuery) Transition() {
 	mock.counter++
 }
 
-// Add adds the given Committed Epoch to this EpochQuery implementation, so its
+// AddCommitted adds the given Committed Epoch to this EpochQuery implementation, so its
 // information can be retrieved by the business logic via the [protocol.EpochQuery] API.
-func (mock *EpochQuery) Add(epoch protocol.CommittedEpoch) {
+func (mock *EpochQuery) AddCommitted(epoch protocol.CommittedEpoch) {
 	mock.mu.Lock()
 	defer mock.mu.Unlock()
-	mock.byCounter[epoch.Counter()] = epoch
+	mock.committed[epoch.Counter()] = epoch
 }
 
 // AddTentative adds the given Tentative Epoch to this EpochQuery implementation, so its

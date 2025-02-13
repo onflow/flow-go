@@ -1978,12 +1978,13 @@ func TestRecoveryFromEpochFallbackMode(t *testing.T) {
 	// According to the specification, the current epoch after processing an EpochRecover event must be in committed phase,
 	// since it contains EpochSetup and EpochCommit events.
 	assertCorrectRecovery := func(state *protocol.ParticipantState, epochRecover *flow.EpochRecover) {
-		epochState, err := state.Final().EpochProtocolState()
+		finalSnap := state.Final()
+		epochState, err := finalSnap.EpochProtocolState()
 		require.NoError(t, err)
 		epochPhase := epochState.EpochPhase()
 		require.Equal(t, flow.EpochPhaseCommitted, epochPhase, "next epoch has to be committed")
 
-		nextEpochQuery, err := state.Final().Epochs().NextCommitted()
+		nextEpochQuery, err := finalSnap.Epochs().NextCommitted()
 		require.NoError(t, err)
 		nextEpochSetup, err := realprotocol.ToEpochSetup(nextEpochQuery)
 		require.NoError(t, err)
@@ -2482,15 +2483,16 @@ func TestEpochTargetEndTime(t *testing.T) {
 		block1.SetPayload(unittest.PayloadFixture(unittest.WithProtocolStateID(expectedStateIdCalculator(block1.Header, nil))))
 		unittest.InsertAndFinalize(t, state, block1)
 
-		assertEpochFallbackTriggered(t, state.Final(), true)
-		assertInPhase(t, state.Final(), flow.EpochPhaseFallback)
+		block1snap := state.Final()
+		assertEpochFallbackTriggered(t, block1snap, true)
+		assertInPhase(t, block1snap, flow.EpochPhaseFallback)
 
-		epochState, err := state.Final().EpochProtocolState()
+		epochState, err := block1snap.EpochProtocolState()
 		require.NoError(t, err)
 		firstExtension := epochState.EpochExtensions()[0]
 		targetViewDuration := float64(epoch1Setup.TargetDuration) / float64(epoch1Setup.FinalView-epoch1Setup.FirstView+1)
 		expectedTargetEndTime := rootTargetEndTime + uint64(float64(firstExtension.FinalView-epoch1Setup.FinalView)*targetViewDuration)
-		afterFirstExtensionEpoch, err := state.Final().Epochs().Current()
+		afterFirstExtensionEpoch, err := block1snap.Epochs().Current()
 		require.NoError(t, err)
 		afterFirstExtensionTargetEndTime := afterFirstExtensionEpoch.TargetEndTime()
 		require.Equal(t, expectedTargetEndTime, afterFirstExtensionTargetEndTime)
@@ -2501,11 +2503,12 @@ func TestEpochTargetEndTime(t *testing.T) {
 		block2.SetPayload(unittest.PayloadFixture(unittest.WithProtocolStateID(expectedStateIdCalculator(block2.Header, nil))))
 		unittest.InsertAndFinalize(t, state, block2)
 
-		epochState, err = state.Final().EpochProtocolState()
+		block2snap := state.Final()
+		epochState, err = block2snap.EpochProtocolState()
 		require.NoError(t, err)
 		secondExtension := epochState.EpochExtensions()[1]
 		expectedTargetEndTime = rootTargetEndTime + uint64(float64(secondExtension.FinalView-epoch1Setup.FinalView)*targetViewDuration)
-		afterSecondExtensionEpoch, err := state.Final().Epochs().Current()
+		afterSecondExtensionEpoch, err := block2snap.Epochs().Current()
 		require.NoError(t, err)
 		afterSecondExtensionTargetEndTime := afterSecondExtensionEpoch.TargetEndTime()
 		require.Equal(t, expectedTargetEndTime, afterSecondExtensionTargetEndTime)

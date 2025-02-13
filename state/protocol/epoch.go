@@ -11,20 +11,23 @@ type EpochQuery interface {
 	// Current returns the current epoch as of this snapshot. All valid snapshots
 	// have a current epoch.
 	// Error returns:
-	//   - state.ErrUnknownSnapshotReference - if the epoch is queried from an unresolvable snapshot.
+	//   - [state.ErrUnknownSnapshotReference] - if the epoch is queried from an unresolvable snapshot.
 	//   - generic error in case of unexpected critical internal corruption or bugs
 	Current() (CommittedEpoch, error)
 
-	// NextUnsafe should only be used by components that actively advance the
-	// epoch from [flow.EpochPhaseSetup] to [flow.EpochPhaseCommitted].
+	// NextUnsafe should only be used by components that are actively involved in advancing
+	// the epoch from [flow.EpochPhaseSetup] to [flow.EpochPhaseCommitted].
 	// NextUnsafe returns the tentative configuration for the next epoch as of this snapshot.
 	// Valid snapshots make such configuration available during the Epoch Setup Phase, which
 	// generally is the case only after an `EpochSetupPhaseStarted` notification has been emitted.
 	// CAUTION: epoch transition might not happen as described by the tentative configuration!
 	//
 	// Error returns:
-	//   - ErrNextEpochNotSetup in the case that this method is queried w.r.t. a snapshot within the flow.EpochPhaseStaking phase
-	//   - ErrNextEpochAlreadyCommitted during the flow.EpochPhaseCommitted phase
+	//   - [ErrNextEpochNotSetup] in the case that this method is queried w.r.t. a snapshot
+	//     within the [flow.EpochPhaseStaking] phase or when we are in Epoch Fallback Mode.
+	//   - [ErrNextEpochAlreadyCommitted] if the tentative epoch is requested from
+	//     a snapshot within the [flow.EpochPhaseCommitted] phase.
+	//   - [state.ErrUnknownSnapshotReference] if the epoch is queried from an unresolvable snapshot.
 	//   - generic error in case of unexpected critical internal corruption or bugs
 	NextUnsafe() (TentativeEpoch, error)
 
@@ -33,7 +36,9 @@ type EpochQuery interface {
 	// `EpochCommittedPhaseStarted` notification has been emitted.
 	//
 	// Error returns:
-	//   - ErrNextEpochNotCommitted in the case that the current phase is flow.EpochPhaseStaking or flow.EpochPhaseSetup.
+	//   - [ErrNextEpochNotCommitted] - in the case that committed epoch has been requested w.r.t a snapshot within
+	//     the [flow.EpochPhaseStaking] or [flow.EpochPhaseSetup] phases.
+	//   - [state.ErrUnknownSnapshotReference] - if the epoch is queried from an unresolvable snapshot.
 	//   - generic error in case of unexpected critical internal corruption or bugs
 	NextCommitted() (CommittedEpoch, error)
 
@@ -43,9 +48,9 @@ type EpochQuery interface {
 	// must arrange to expose it here.
 	//
 	// Error returns:
-	//   - protocol.ErrNoPreviousEpoch - if the epoch represents a previous epoch which does not exist.
+	//   - [protocol.ErrNoPreviousEpoch] - if the epoch represents a previous epoch which does not exist.
 	//     This happens when the previous epoch is queried within the first epoch of a spork.
-	//   - state.ErrUnknownSnapshotReference - if the epoch is queried from an unresolvable snapshot.
+	//   - [state.ErrUnknownSnapshotReference] - if the epoch is queried from an unresolvable snapshot.
 	//   - generic error in case of unexpected critical internal corruption or bugs
 	Previous() (CommittedEpoch, error)
 }
