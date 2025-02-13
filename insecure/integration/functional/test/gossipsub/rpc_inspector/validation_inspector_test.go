@@ -7,13 +7,13 @@ import (
 	"testing"
 	"time"
 
+	corrupt "github.com/libp2p/go-libp2p-pubsub"
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	pb "github.com/libp2p/go-libp2p-pubsub/pb"
 	pubsub_pb "github.com/libp2p/go-libp2p-pubsub/pb"
 	"github.com/libp2p/go-libp2p/core/peer"
 	mockery "github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
-	corrupt "github.com/yhassanzadeh13/go-libp2p-pubsub"
 	"go.uber.org/atomic"
 
 	"github.com/onflow/flow-go/config"

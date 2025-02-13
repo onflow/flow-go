@@ -35,9 +35,9 @@ type BlockTrackerImpl struct {
 	broadcaster *engine.Broadcaster
 
 	// finalizedHighestHeight contains the highest consecutive block height for which we have received a new notification.
-	finalizedHighestHeight counters.StrictMonotonousCounter
+	finalizedHighestHeight counters.StrictMonotonicCounter
 	// sealedHighestHeight contains the highest consecutive block height for which we have received a new notification.
-	sealedHighestHeight counters.StrictMonotonousCounter
+	sealedHighestHeight counters.StrictMonotonicCounter
 }
 
 // NewBlockTracker creates a new BlockTrackerImpl instance.
@@ -70,8 +70,8 @@ func NewBlockTracker(
 	return &BlockTrackerImpl{
 		BaseTracker:            NewBaseTrackerImpl(rootHeight, state, headers),
 		state:                  state,
-		finalizedHighestHeight: counters.NewMonotonousCounter(lastFinalized.Height),
-		sealedHighestHeight:    counters.NewMonotonousCounter(lastSealed.Height),
+		finalizedHighestHeight: counters.NewMonotonicCounter(lastFinalized.Height),
+		sealedHighestHeight:    counters.NewMonotonicCounter(lastSealed.Height),
 		broadcaster:            broadcaster,
 	}, nil
 }

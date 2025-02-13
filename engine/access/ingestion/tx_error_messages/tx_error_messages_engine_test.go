@@ -23,8 +23,9 @@ import (
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	protocol "github.com/onflow/flow-go/state/protocol/mock"
-	bstorage "github.com/onflow/flow-go/storage/badger"
 	storage "github.com/onflow/flow-go/storage/mock"
+	"github.com/onflow/flow-go/storage/operation/badgerimpl"
+	"github.com/onflow/flow-go/storage/store"
 	"github.com/onflow/flow-go/utils/unittest"
 	"github.com/onflow/flow-go/utils/unittest/mocks"
 )
@@ -131,8 +132,8 @@ func (s *TxErrorMessagesEngineSuite) SetupTest() {
 // initEngine creates a new instance of the transaction error messages engine
 // and waits for it to start. It initializes the engine with mocked components and state.
 func (s *TxErrorMessagesEngineSuite) initEngine(ctx irrecoverable.SignalerContext) *Engine {
-	processedTxErrorMessagesBlockHeight := bstorage.NewConsumerProgress(
-		s.db,
+	processedTxErrorMessagesBlockHeight := store.NewConsumerProgress(
+		badgerimpl.ToDB(s.db),
 		module.ConsumeProgressEngineTxErrorMessagesBlockHeight,
 	)
 
