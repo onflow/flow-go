@@ -37,7 +37,7 @@ func TestFinalizer(t *testing.T) {
 		cleanup := func() {
 			// wipe the DB
 			err := db.DropAll()
-			require.Nil(t, err)
+			require.NoError(t, err)
 			// clear the mempool
 			for _, tx := range pool.All() {
 				pool.Remove(tx.ID())

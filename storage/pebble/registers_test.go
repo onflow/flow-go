@@ -355,7 +355,7 @@ func Benchmark_PayloadStorage(b *testing.B) {
 		// verify that the rest of the batches either do not exist or have a previous height
 		for j := batchSize; j < maxBatchSize+1; j++ {
 			value, err := s.Get(keyForBatchSize(j), uint64(i))
-			require.Nil(b, err)
+			require.NoError(b, err)
 
 			if len(value) > 0 {
 				ij := bytes.Split(value, []byte("-"))
