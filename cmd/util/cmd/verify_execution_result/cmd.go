@@ -19,6 +19,7 @@ var (
 	flagChain            string
 	flagFromTo           string
 	flagWorkerCount      uint // number of workers to verify the blocks concurrently
+	flagStopOnMismatch   bool
 )
 
 // # verify the last 100 sealed blocks
@@ -52,6 +53,7 @@ func init() {
 	Cmd.Flags().UintVar(&flagWorkerCount, "worker_count", 1,
 		"number of workers to use for verification, default is 1")
 
+	Cmd.Flags().BoolVar(&flagStopOnMismatch, "stop_on_mismatch", false, "stop verification on first mismatch")
 }
 
 func run(*cobra.Command, []string) {
@@ -66,6 +68,10 @@ func run(*cobra.Command, []string) {
 		Str("chain", string(chainID)).
 		Str("datadir", flagDatadir).
 		Str("chunk_data_pack_dir", flagChunkDataPackDir).
+		Uint64("lastk", flagLastK).
+		Str("from_to", flagFromTo).
+		Uint("worker_count", flagWorkerCount).
+		Bool("stop_on_mismatch", flagStopOnMismatch).
 		Logger()
 
 	if flagFromTo != "" {
@@ -75,7 +81,7 @@ func run(*cobra.Command, []string) {
 		}
 
 		lg.Info().Msgf("verifying range from %d to %d", from, to)
-		err = verifier.VerifyRange(from, to, chainID, flagDatadir, flagChunkDataPackDir, flagWorkerCount)
+		err = verifier.VerifyRange(from, to, chainID, flagDatadir, flagChunkDataPackDir, flagWorkerCount, flagStopOnMismatch)
 		if err != nil {
 			lg.Fatal().Err(err).Msgf("could not verify range from %d to %d", from, to)
 		}
@@ -83,7 +89,7 @@ func run(*cobra.Command, []string) {
 
 	} else {
 		lg.Info().Msgf("verifying last %d sealed blocks", flagLastK)
-		err := verifier.VerifyLastKHeight(flagLastK, chainID, flagDatadir, flagChunkDataPackDir, flagWorkerCount)
+		err := verifier.VerifyLastKHeight(flagLastK, chainID, flagDatadir, flagChunkDataPackDir, flagWorkerCount, flagStopOnMismatch)
 		if err != nil {
 			lg.Fatal().Err(err).Msg("could not verify last k height")
 		}

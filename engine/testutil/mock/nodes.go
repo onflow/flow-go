@@ -179,14 +179,31 @@ type ConsensusNode struct {
 	MatchingEngine  *matching.Engine
 }
 
-func (cn ConsensusNode) Ready() {
-	<-cn.IngestionEngine.Ready()
-	<-cn.SealingEngine.Ready()
+func (cn ConsensusNode) Start(t *testing.T) {
+	go unittest.FailOnIrrecoverableError(t, cn.Ctx.Done(), cn.Errs)
+	cn.IngestionEngine.Start(cn.Ctx)
+	cn.SealingEngine.Start(cn.Ctx)
 }
 
-func (cn ConsensusNode) Done() {
-	<-cn.IngestionEngine.Done()
-	<-cn.SealingEngine.Done()
+func (cn ConsensusNode) Ready() <-chan struct{} {
+	return util.AllReady(
+		cn.IngestionEngine,
+		cn.SealingEngine,
+	)
+}
+
+func (cn ConsensusNode) Done() <-chan struct{} {
+	done := make(chan struct{})
+	go func() {
+		cn.GenericNode.Cancel()
+		<-util.AllDone(
+			cn.IngestionEngine,
+			cn.SealingEngine,
+		)
+		cn.GenericNode.Done()
+		close(done)
+	}()
+	return done
 }
 
 // ExecutionNode implements a mocked execution node for tests.
@@ -282,12 +299,12 @@ type VerificationNode struct {
 	Receipts      storage.ExecutionReceipts
 
 	// chunk consumer and processor for fetcher engine
-	ProcessedChunkIndex storage.ConsumerProgress
+	ProcessedChunkIndex storage.ConsumerProgressInitializer
 	ChunksQueue         *bstorage.ChunksQueue
 	ChunkConsumer       *chunkconsumer.ChunkConsumer
 
 	// block consumer for chunk consumer
-	ProcessedBlockHeight storage.ConsumerProgress
+	ProcessedBlockHeight storage.ConsumerProgressInitializer
 	BlockConsumer        *blockconsumer.BlockConsumer
 
 	VerifierEngine  *verifier.Engine

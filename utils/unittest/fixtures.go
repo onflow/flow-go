@@ -1759,6 +1759,15 @@ func ChunkDataPacksFixture(
 	return chunkDataPacks
 }
 
+func ChunkDataPacksFixtureAndResult() ([]*flow.ChunkDataPack, *flow.ExecutionResult) {
+	result := ExecutionResultFixture()
+	cdps := make([]*flow.ChunkDataPack, 0, len(result.Chunks))
+	for _, c := range result.Chunks {
+		cdps = append(cdps, ChunkDataPackFixture(c.ID()))
+	}
+	return cdps, result
+}
+
 // SeedFixture returns a random []byte with length n
 func SeedFixture(n int) []byte {
 	var seed = make([]byte, n)

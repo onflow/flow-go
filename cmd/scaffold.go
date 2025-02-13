@@ -12,6 +12,7 @@ import (
 	"time"
 
 	gcemd "cloud.google.com/go/compute/metadata"
+	"github.com/cockroachdb/pebble"
 	"github.com/dgraph-io/badger/v2"
 	"github.com/hashicorp/go-multierror"
 	dht "github.com/libp2p/go-libp2p-kad-dht"
@@ -20,6 +21,7 @@ import (
 	"github.com/libp2p/go-libp2p/core/routing"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/rs/zerolog"
+	"github.com/rs/zerolog/log"
 	"github.com/spf13/pflag"
 	"golang.org/x/time/rate"
 	"google.golang.org/api/option"
@@ -31,6 +33,7 @@ import (
 	"github.com/onflow/flow-go/admin/commands/common"
 	storageCommands "github.com/onflow/flow-go/admin/commands/storage"
 	"github.com/onflow/flow-go/cmd/build"
+	"github.com/onflow/flow-go/cmd/scaffold"
 	"github.com/onflow/flow-go/config"
 	"github.com/onflow/flow-go/consensus/hotstuff/persister"
 	"github.com/onflow/flow-go/fvm/initialize"
@@ -164,6 +167,7 @@ func (fnb *FlowNodeBuilder) BaseFlags() {
 	fnb.flags.StringVar(&fnb.BaseConfig.BindAddr, "bind", defaultConfig.BindAddr, "address to bind on")
 	fnb.flags.StringVarP(&fnb.BaseConfig.BootstrapDir, "bootstrapdir", "b", defaultConfig.BootstrapDir, "path to the bootstrap directory")
 	fnb.flags.StringVarP(&fnb.BaseConfig.datadir, "datadir", "d", defaultConfig.datadir, "directory to store the public database (protocol state)")
+	fnb.flags.StringVar(&fnb.BaseConfig.pebbleDir, "pebble-dir", defaultConfig.pebbleDir, "directory to store the public pebble database (protocol state)")
 	fnb.flags.StringVar(&fnb.BaseConfig.secretsdir, "secretsdir", defaultConfig.secretsdir, "directory to store private database (secrets)")
 	fnb.flags.StringVarP(&fnb.BaseConfig.level, "loglevel", "l", defaultConfig.level, "level for logging output")
 	fnb.flags.Uint32Var(&fnb.BaseConfig.debugLogLimit, "debug-log-limit", defaultConfig.debugLogLimit, "max number of debug/trace log events per second")
@@ -568,6 +572,7 @@ func (fnb *FlowNodeBuilder) BuildPublicLibp2pNode(address string, bootstrapIdent
 		&p2pbuilderconfig.UnicastConfig{
 			Unicast: fnb.FlowConfig.NetworkConfig.Unicast,
 		}).
+		SetProtocolPeerCacheList(protocols.FlowProtocolID(fnb.SporkID)).
 		SetSubscriptionFilter(
 			subscription.NewRoleBasedFilter(
 				subscription.UnstakedRole, fnb.IdentityProvider,
@@ -1056,12 +1061,20 @@ func (fnb *FlowNodeBuilder) initProfiler() error {
 	return nil
 }
 
-func (fnb *FlowNodeBuilder) initDB() error {
-
-	// if a db has been passed in, use that instead of creating one
-	if fnb.BaseConfig.db != nil {
-		fnb.DB = fnb.BaseConfig.db
+func (fnb *FlowNodeBuilder) initBadgerDB() error {
+	// if the badger DB is already set, use it.
+	// the badger DB might be set by the follower engine
+	if fnb.BaseConfig.badgerDB != nil {
+		fnb.DB = fnb.BaseConfig.badgerDB
 		return nil
+	}
+
+	// if the badger DB is not set, then the datadir must be provided to initialize
+	// the badger DB
+	// since we've set an default directory for the badger DB, this check
+	// is not necessary, but rather a sanity check
+	if fnb.BaseConfig.datadir == NotSet {
+		return fmt.Errorf("missing required flag '--datadir'")
 	}
 
 	// Pre-create DB path (Badger creates only one-level dirs)
@@ -1107,6 +1120,24 @@ func (fnb *FlowNodeBuilder) initDB() error {
 		return bstorage.NewCleaner(node.Logger, node.DB, node.Metrics.CleanCollector, flow.DefaultValueLogGCWaitDuration), nil
 	})
 
+	return nil
+}
+
+func (fnb *FlowNodeBuilder) initPebbleDB() error {
+	// if the pebble DB is already set, use it
+	// the pebble DB might be set by the follower engine
+	if fnb.BaseConfig.pebbleDB != nil {
+		fnb.PebbleDB = fnb.BaseConfig.pebbleDB
+		return nil
+	}
+
+	db, closer, err := scaffold.InitPebbleDB(fnb.BaseConfig.pebbleDir)
+	if err != nil {
+		return err
+	}
+
+	fnb.PebbleDB = db
+	fnb.ShutdownFunc(closer.Close)
 	return nil
 }
 
@@ -1887,11 +1918,55 @@ func WithBindAddress(bindAddress string) Option {
 	}
 }
 
+// WithDataDir set the data directory for the badger database
+// It will be ignored if WithBadgerDB is used
 func WithDataDir(dataDir string) Option {
 	return func(config *BaseConfig) {
-		if config.db == nil {
-			config.datadir = dataDir
+		if config.badgerDB != nil {
+			log.Warn().Msgf("ignoring data directory %s as badger database is already set", dataDir)
+			return
 		}
+
+		config.datadir = dataDir
+	}
+}
+
+// WithBadgerDB sets the badger database instance
+// If used, then WithDataDir method will be ignored
+func WithBadgerDB(db *badger.DB) Option {
+	return func(config *BaseConfig) {
+		if config.datadir != "" && config.datadir != NotSet {
+			log.Warn().Msgf("ignoring data directory is already set for badger %v", config.datadir)
+			config.datadir = ""
+		}
+
+		config.badgerDB = db
+	}
+}
+
+// WithPebbleDir set the data directory for the pebble database
+// It will be ignored if WithPebbleDB is used
+func WithPebbleDir(dataDir string) Option {
+	return func(config *BaseConfig) {
+		if config.pebbleDB != nil {
+			log.Warn().Msgf("ignoring data directory %s as pebble database is already set", dataDir)
+			return
+		}
+
+		config.pebbleDir = dataDir
+	}
+}
+
+// WithPebbleDB sets the pebble database instance
+// If used, then WithPebbleDir method will be ignored
+func WithPebbleDB(db *pebble.DB) Option {
+	return func(config *BaseConfig) {
+		if config.pebbleDir != "" && config.pebbleDir != NotSet {
+			log.Warn().Msgf("ignoring data directory is already set for pebble %v", config.pebbleDir)
+			config.pebbleDir = ""
+		}
+
+		config.pebbleDB = db
 	}
 }
 
@@ -1922,14 +1997,6 @@ func WithComplianceConfig(complianceConfig compliance.Config) Option {
 func WithLogLevel(level string) Option {
 	return func(config *BaseConfig) {
 		config.level = level
-	}
-}
-
-// WithDB takes precedence over WithDataDir and datadir will be set to empty if DB is set using this option
-func WithDB(db *badger.DB) Option {
-	return func(config *BaseConfig) {
-		config.db = db
-		config.datadir = ""
 	}
 }
 
@@ -2038,7 +2105,13 @@ func (fnb *FlowNodeBuilder) onStart() error {
 		return err
 	}
 
-	if err := fnb.initDB(); err != nil {
+	// we always initialize both badger and pebble databases
+	// even if we only use one of them, this simplify the code and checks
+	if err := fnb.initBadgerDB(); err != nil {
+		return err
+	}
+
+	if err := fnb.initPebbleDB(); err != nil {
 		return err
 	}
 

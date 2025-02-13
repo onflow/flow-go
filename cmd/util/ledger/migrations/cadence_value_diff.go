@@ -2,12 +2,10 @@ package migrations
 
 import (
 	"fmt"
-	"time"
 
 	"github.com/onflow/cadence/common"
 	"github.com/onflow/cadence/interpreter"
 	"github.com/onflow/cadence/runtime"
-	"github.com/rs/zerolog/log"
 	"golang.org/x/sync/errgroup"
 
 	"github.com/onflow/flow-go/cmd/util/ledger/reporters"
@@ -76,8 +74,6 @@ type difference struct {
 	NewValueStaticType string `json:",omitempty"`
 }
 
-const minLargeAccountRegisterCount = 1_000_000
-
 type CadenceValueDiffReporter struct {
 	address        common.Address
 	chainID        flow.ChainID
@@ -102,7 +98,13 @@ func NewCadenceValueDiffReporter(
 	}
 }
 
-func (dr *CadenceValueDiffReporter) DiffStates(oldRegs, newRegs registers.Registers, domains []common.StorageDomain) {
+type isValueIncludedFunc func(address common.Address, domain common.StorageDomain, key any) bool
+
+func (dr *CadenceValueDiffReporter) DiffStates(
+	oldRegs, newRegs registers.Registers,
+	domains []common.StorageDomain,
+	isValueIncluded isValueIncludedFunc,
+) {
 
 	oldStorage := newReadonlyStorage(oldRegs)
 
@@ -136,101 +138,6 @@ func (dr *CadenceValueDiffReporter) DiffStates(oldRegs, newRegs registers.Regist
 		return
 	}
 
-	oldInter, err := interpreter.NewInterpreter(
-		nil,
-		nil,
-		&interpreter.Config{
-			Storage: oldStorage,
-		},
-	)
-	if err != nil {
-		dr.reportWriter.Write(
-			diffError{
-				Address: dr.address.Hex(),
-				Kind:    diffErrorKindString[abortErrorKind],
-				Msg:     fmt.Sprintf("failed to create interpreter for old registers: %s", err),
-			},
-		)
-		return
-	}
-
-	newInter, err := interpreter.NewInterpreter(
-		nil,
-		nil,
-		&interpreter.Config{
-			Storage: newStorage,
-		},
-	)
-	if err != nil {
-		dr.reportWriter.Write(
-			diffError{
-				Address: dr.address.Hex(),
-				Kind:    diffErrorKindString[abortErrorKind],
-				Msg:     fmt.Sprintf("failed to create interpreter for new registers: %s", err),
-			},
-		)
-		return
-	}
-
-	if oldRegs.Count() > minLargeAccountRegisterCount {
-		// Add concurrency to diff domains
-		var g errgroup.Group
-
-		// NOTE: preload storage map in the same goroutine
-		for _, domain := range domains {
-			_ = oldStorage.GetDomainStorageMap(oldInter, dr.address, domain, false)
-			_ = newStorage.GetDomainStorageMap(newInter, dr.address, domain, false)
-		}
-
-		// Create goroutine to diff storage domain
-		g.Go(func() (err error) {
-			oldRuntime, err := newReadonlyStorageRuntimeWithStorage(oldStorage, oldRegs.Count())
-			if err != nil {
-				return fmt.Errorf("failed to create runtime for old registers: %s", err)
-			}
-
-			newRuntime, err := newReadonlyStorageRuntimeWithStorage(newStorage, newRegs.Count())
-			if err != nil {
-				return fmt.Errorf("failed to create runtime for new registers: %s", err)
-			}
-
-			dr.diffDomain(oldRuntime, newRuntime, common.StorageDomainPathStorage)
-			return nil
-		})
-
-		// Create goroutine to diff other domains
-		g.Go(func() (err error) {
-			oldRuntime, err := newReadonlyStorageRuntimeWithStorage(oldStorage, oldRegs.Count())
-			if err != nil {
-				return fmt.Errorf("failed to create runtime for old registers: %s", err)
-			}
-
-			newRuntime, err := newReadonlyStorageRuntimeWithStorage(newStorage, oldRegs.Count())
-			if err != nil {
-				return fmt.Errorf("failed to create runtime for new registers: %s", err)
-			}
-
-			for _, domain := range domains {
-				if domain != common.StorageDomainPathStorage {
-					dr.diffDomain(oldRuntime, newRuntime, domain)
-				}
-			}
-			return nil
-		})
-
-		err = g.Wait()
-		if err != nil {
-			dr.reportWriter.Write(
-				diffError{
-					Address: dr.address.Hex(),
-					Kind:    diffErrorKindString[abortErrorKind],
-					Msg:     err.Error(),
-				})
-		}
-
-		return
-	}
-
 	// Skip goroutine overhead for smaller accounts
 	oldRuntime, err := newReadonlyStorageRuntimeWithStorage(oldStorage, oldRegs.Count())
 	if err != nil {
@@ -255,7 +162,7 @@ func (dr *CadenceValueDiffReporter) DiffStates(oldRegs, newRegs registers.Regist
 	}
 
 	for _, domain := range domains {
-		dr.diffDomain(oldRuntime, newRuntime, domain)
+		dr.diffDomain(oldRuntime, newRuntime, domain, isValueIncluded)
 	}
 }
 
@@ -263,6 +170,7 @@ func (dr *CadenceValueDiffReporter) diffDomain(
 	oldRuntime *readonlyStorageRuntime,
 	newRuntime *readonlyStorageRuntime,
 	domain common.StorageDomain,
+	isValueIncluded isValueIncludedFunc,
 ) {
 	defer func() {
 		if r := recover(); r != nil {
@@ -435,104 +343,23 @@ func (dr *CadenceValueDiffReporter) diffDomain(
 		}
 	}
 
-	// Skip goroutine overhead for non-storage domain and small accounts.
-	if domain != common.StorageDomainPathStorage ||
-		oldRuntime.PayloadCount < minLargeAccountRegisterCount ||
-		len(sharedKeys) == 1 {
+	// Diffing storage domain
 
-		for _, key := range sharedKeys {
-			oldValue, newValue, trace, canDiff := getValues(key)
-			if canDiff {
-				diffValues(
-					oldRuntime.Interpreter,
-					oldValue,
-					newRuntime.Interpreter,
-					newValue,
-					trace,
-				)
-			}
+	for _, key := range sharedKeys {
+		if !isValueIncluded(dr.address, domain, key) {
+			continue
 		}
-		return
-	}
-
-	startTime := time.Now()
-
-	log.Info().Msgf(
-		"Diffing %x storage domain containing %d elements (%d payloads) ...",
-		dr.address[:],
-		len(sharedKeys),
-		oldRuntime.PayloadCount,
-	)
-
-	// Diffing storage domain in large account
-
-	type job struct {
-		oldValue interpreter.Value
-		newValue interpreter.Value
-		trace    *util.Trace
-	}
-
-	nWorkers := dr.nWorkers
-	if len(sharedKeys) < nWorkers {
-		nWorkers = len(sharedKeys)
-	}
-
-	jobs := make(chan job, nWorkers)
-
-	var g errgroup.Group
-
-	for i := 0; i < nWorkers; i++ {
-
-		g.Go(func() error {
-			for job := range jobs {
-				diffValues(
-					oldRuntime.Interpreter,
-					job.oldValue,
-					newRuntime.Interpreter,
-					job.newValue,
-					job.trace,
-				)
-			}
-
-			return nil
-		})
-	}
-
-	// Launch goroutine to send account registers to jobs channel
-	go func() {
-		defer close(jobs)
-
-		for _, key := range sharedKeys {
-			oldValue, newValue, trace, canDiff := getValues(key)
-			if canDiff {
-				jobs <- job{
-					oldValue: oldValue,
-					newValue: newValue,
-					trace:    trace,
-				}
-			}
+		oldValue, newValue, trace, canDiff := getValues(key)
+		if canDiff {
+			diffValues(
+				oldRuntime.Interpreter,
+				oldValue,
+				newRuntime.Interpreter,
+				newValue,
+				trace,
+			)
 		}
-	}()
-
-	// Wait for workers
-	err := g.Wait()
-	if err != nil {
-		dr.reportWriter.Write(
-			diffError{
-				Address: dr.address.Hex(),
-				Kind:    diffErrorKindString[abortErrorKind],
-				Msg:     fmt.Sprintf("failed to diff domain %s: %s", domain.Identifier(), err),
-			})
 	}
-
-	log.Info().
-		Msgf(
-			"Finished diffing %x storage domain containing %d elements (%d payloads) in %s",
-			dr.address[:],
-			len(sharedKeys),
-			oldRuntime.PayloadCount,
-			time.Since(startTime),
-		)
 }
 
 func (dr *CadenceValueDiffReporter) diffValues(
@@ -1145,7 +972,10 @@ func min(a, b int) int {
 
 func newReadonlyStorage(regs registers.Registers) *runtime.Storage {
 	ledger := &registers.ReadOnlyLedger{Registers: regs}
-	return runtime.NewStorage(ledger, nil, runtime.StorageConfig{})
+	config := runtime.StorageConfig{
+		StorageFormatV2Enabled: true,
+	}
+	return runtime.NewStorage(ledger, nil, config)
 }
 
 type readonlyStorageRuntime struct {

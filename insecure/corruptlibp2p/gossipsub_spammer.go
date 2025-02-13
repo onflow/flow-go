@@ -5,11 +5,10 @@ import (
 	"testing"
 	"time"
 
+	corrupt "github.com/libp2p/go-libp2p-pubsub"
 	pb "github.com/libp2p/go-libp2p-pubsub/pb"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/stretchr/testify/require"
-
-	corrupt "github.com/yhassanzadeh13/go-libp2p-pubsub"
 
 	"github.com/onflow/flow-go/insecure/internal"
 	"github.com/onflow/flow-go/model/flow"
@@ -68,7 +67,7 @@ func NewGossipSubRouterSpammerWithRpcInspector(t *testing.T,
 // ctlMessages is the list of spam messages to send to the victim node.
 func (s *GossipSubRouterSpammer) SpamControlMessage(t *testing.T, victim p2p.LibP2PNode, ctlMessages []pb.ControlMessage, msgs ...*pb.Message) {
 	for _, ctlMessage := range ctlMessages {
-		require.True(t, s.router.Get().SendControl(victim.ID(), &ctlMessage, msgs...))
+		s.router.Get().SendControl(victim.ID(), &ctlMessage, msgs...)
 	}
 }
 
@@ -112,12 +111,17 @@ func newSpammerNodeWithRpcInspector(
 	inspector func(id peer.ID, rpc *corrupt.RPC) error) (p2p.LibP2PNode, flow.Identity, *atomicRouter) {
 	router := newAtomicRouter()
 	var opts []p2ptest.NodeFixtureParameterOption
-	opts = append(opts, p2ptest.WithRole(role),
-		internal.WithCorruptGossipSub(CorruptGossipSubFactory(func(r *corrupt.GossipSubRouter) {
-			require.NotNil(t, r)
-			router.set(r)
-		}),
-			CorruptGossipSubConfigFactoryWithInspector(inspector)))
+	opts = append(opts,
+		p2ptest.WithRole(role),
+		p2ptest.WithValidateQueueSize(10_000), // set a high limit to avoid dropping messages
+		internal.WithCorruptGossipSub(
+			CorruptGossipSubFactory(func(r *corrupt.GossipSubRouter) {
+				require.NotNil(t, r)
+				router.set(r)
+			}),
+			CorruptGossipSubConfigFactoryWithInspector(inspector),
+		),
+	)
 	spammerNode, spammerId := p2ptest.NodeFixture(
 		t,
 		sporkId,
