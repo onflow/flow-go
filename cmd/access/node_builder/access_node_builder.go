@@ -1474,9 +1474,9 @@ func (builder *FlowAccessNodeBuilder) extraFlags() {
 
 		flags.BoolVar(
 			&builder.rpcConf.EnableWebSocketsStreamAPI,
-			"enable-websockets-stream-api",
+			"experimental-enable-websockets-stream-api",
 			defaultConfig.rpcConf.EnableWebSocketsStreamAPI,
-			"enables WebSockets Stream API that operates under /ws endpoint. (it is experimental feature for now)",
+			"[experimental] enables WebSockets Stream API that operates under /ws endpoint. this flag may change in a future release.",
 		)
 	}).ValidateFlags(func() error {
 		if builder.supportsObserver && (builder.PublicNetworkConfig.BindAddress == cmd.NotSet || builder.PublicNetworkConfig.BindAddress == "") {
