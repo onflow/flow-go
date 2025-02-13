@@ -105,7 +105,7 @@ func (s *AccountStatusesProviderSuite) TestAccountStatusesDataProvider_StateStre
 	)
 	s.Require().Nil(provider)
 	s.Require().Error(err)
-	s.Require().Contains(err.Error(), "cannot stream account statuses")
+	s.Require().Contains(err.Error(), "does not support streaming account statuses")
 }
 
 func (s *AccountStatusesProviderSuite) subscribeAccountStatusesDataProviderTestCases(
