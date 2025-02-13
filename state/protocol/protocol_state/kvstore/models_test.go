@@ -293,7 +293,7 @@ func TestKVStoreMutator_SetEpochExtensionViewCount(t *testing.T) {
 	})
 }
 
-// TestMalleability verifies that the entities which implements the [flow.IDEntity] interface are not malleable.
+// TestMalleability verifies that the entities which implements the ID are not malleable.
 func TestMalleability(t *testing.T) {
 	checker := unittest.NewMalleabilityChecker(
 		t,
