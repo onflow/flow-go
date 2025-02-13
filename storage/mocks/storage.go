@@ -542,20 +542,6 @@ func (mr *MockEventsMockRecorder) BatchStore(arg0, arg1, arg2 interface{}) *gomo
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "BatchStore", reflect.TypeOf((*MockEvents)(nil).BatchStore), arg0, arg1, arg2)
 }
 
-// BatchStoreBadger mocks base method.
-func (m *MockEvents) BatchStoreBadger(arg0 flow.Identifier, arg1 []flow.EventsList, arg2 storage.BatchStorage) error {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "BatchStoreBadger", arg0, arg1, arg2)
-	ret0, _ := ret[0].(error)
-	return ret0
-}
-
-// BatchStoreBadger indicates an expected call of BatchStoreBadger.
-func (mr *MockEventsMockRecorder) BatchStoreBadger(arg0, arg1, arg2 interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "BatchStoreBadger", reflect.TypeOf((*MockEvents)(nil).BatchStoreBadger), arg0, arg1, arg2)
-}
-
 // ByBlockID mocks base method.
 func (m *MockEvents) ByBlockID(arg0 flow.Identifier) ([]flow.Event, error) {
 	m.ctrl.T.Helper()
