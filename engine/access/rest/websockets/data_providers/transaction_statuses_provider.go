@@ -90,7 +90,7 @@ func (p *TransactionStatusesDataProvider) createSubscription(
 //
 // No errors are expected during normal operations.
 func (p *TransactionStatusesDataProvider) handleResponse() func(txResults []*access.TransactionResult) error {
-	messageIndex := counters.NewMonotonousCounter(0)
+	messageIndex := counters.NewMonotonicCounter(0)
 
 	return func(txResults []*access.TransactionResult) error {
 
