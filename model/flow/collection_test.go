@@ -21,3 +21,17 @@ func TestLightCollectionFingerprint(t *testing.T) {
 	assert.Equal(t, colID, decodedID)
 	assert.Equal(t, col.Light(), decoded)
 }
+
+// TestLightCollectionID_Malleability confirms that the LightCollection struct, which implements
+// the [flow.IDEntity] interface, is resistant to tampering.
+func TestLightCollectionID_Malleability(t *testing.T) {
+	lightCollectionFixture := func() *flow.LightCollection {
+		return &flow.LightCollection{
+			Transactions: unittest.IdentifierListFixture(5),
+		}
+	}
+
+	t.Run("LightCollection", func(t *testing.T) {
+		unittest.RequireEntityNotMalleable(t, lightCollectionFixture())
+	})
+}
