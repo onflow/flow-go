@@ -21,6 +21,8 @@ type EpochQuery struct {
 	tentative map[uint64]protocol.TentativeEpoch // only for the next epoch (counter+1) if uncommitted
 }
 
+var _ protocol.EpochQuery = (*EpochQuery)(nil)
+
 func NewEpochQuery(t *testing.T, counter uint64, epochs ...protocol.CommittedEpoch) *EpochQuery {
 	mock := &EpochQuery{
 		t:         t,
@@ -49,13 +51,16 @@ func (mock *EpochQuery) Current() (protocol.CommittedEpoch, error) {
 func (mock *EpochQuery) NextUnsafe() (protocol.TentativeEpoch, error) {
 	mock.mu.RLock()
 	defer mock.mu.RUnlock()
+	// NextUnsafe should only return a tentative epoch when we have no committed epoch for the next counter.
+	// If we have a committed epoch (are implicitly in EpochPhaseCommitted) or no tentative epoch, return an error.
+	// Note that in tests we do not require that a committed epoch be added as a tentative epoch first.
+	_, exists := mock.committed[mock.counter+1]
+	if exists {
+		return nil, protocol.ErrNextEpochAlreadyCommitted
+	}
 	epoch, exists := mock.tentative[mock.counter+1]
 	if !exists {
 		return nil, protocol.ErrNextEpochNotSetup
-	}
-	_, exists = mock.committed[mock.counter+1]
-	if exists {
-		return nil, protocol.ErrNextEpochAlreadyCommitted
 	}
 	return epoch, nil
 }
