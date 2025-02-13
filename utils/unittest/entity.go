@@ -114,9 +114,10 @@ func generateCustomFlowValue(field reflect.Value) reflect.Value {
 			Ejected: rand.Intn(2) == 1,
 		})
 	case reflect.TypeOf(flow.EpochExtension{}):
+		firstView := rand.Uint64() % 100
 		return reflect.ValueOf(flow.EpochExtension{
-			FirstView: uint64(0),
-			FinalView: uint64(rand.Uint32() + 1000),
+			FirstView: firstView,
+			FinalView: firstView + 10,
 		})
 	case reflect.TypeOf(flow.ClusterQCVoteData{}):
 		return reflect.ValueOf(flow.ClusterQCVoteDataFromQC(QuorumCertificateWithSignerIDsFixture()))
