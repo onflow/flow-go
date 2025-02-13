@@ -169,11 +169,27 @@ func Samples(n uint, m uint, swap func(i, j uint)) error {
 	return nil
 }
 
+// GenerateRandomString generates a cryptographically secure random string of size n.
+// n must be > 0
 func GenerateRandomString(length int) (string, error) {
-	if length < 1 {
+	if length <= 0 {
 		return "", fmt.Errorf("length should greater than 0, got %d", length)
 	}
 
+	// The base64 encoding uses 64 different characters to represent data in
+	// strings, which makes it possible to represent 6 bits of data with each
+	// character (as 2^6 is 64). This means that every 3 bytes (24 bits) of
+	// input data will be represented by 4 characters (4 * 6 bits) in the
+	// base64 encoding. Consequently, base64 encoding increases the size of
+	// the data by approximately 1/3 compared to the original input data.
+	//
+	// 1. (n+3) / 4 - This calculates how many groups of 4 characters are needed
+	//    in the base64 encoded output to represent at least 'n' characters.
+	//    The +3 ensures rounding up, as integer division truncates the result.
+	//
+	// 2. ... * 3 - Each group of 4 base64 characters represents 3 bytes
+	//    of input data. This multiplication calculates the number of bytes
+	//    needed to produce the required length of the base64 string.
 	byteSlice := make([]byte, (length+3)/4*3)
 	_, err := rand.Read(byteSlice)
 	if err != nil {
