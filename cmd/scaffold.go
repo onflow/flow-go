@@ -1247,6 +1247,9 @@ func (fnb *FlowNodeBuilder) initStorage() error {
 		VersionBeacons:            versionBeacons,
 		EpochProtocolStateEntries: protocolState,
 		ProtocolKVStore:           protocolKVStores,
+
+		Results:  results,
+		Receipts: receipts,
 	}
 
 	return nil

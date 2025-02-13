@@ -19,6 +19,9 @@ type All struct {
 	VersionBeacons            VersionBeacons
 	RegisterIndex             RegisterIndex
 
+	// These results are for reading and storing the result data from block payload
+	// EN uses a different results module to store their own results
+	// and receipts (see the Execution struct below)
 	Results  ExecutionResults
 	Receipts ExecutionReceipts
 }
