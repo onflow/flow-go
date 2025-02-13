@@ -2495,15 +2495,16 @@ func TestEpochTargetEndTime(t *testing.T) {
 		block1.SetPayload(unittest.PayloadFixture(unittest.WithProtocolStateID(expectedStateIdCalculator(block1.Header, nil))))
 		unittest.InsertAndFinalize(t, state, block1)
 
-		assertEpochFallbackTriggered(t, state.Final(), true)
-		assertInPhase(t, state.Final(), flow.EpochPhaseFallback)
+		block1snap := state.Final()
+		assertEpochFallbackTriggered(t, block1snap, true)
+		assertInPhase(t, block1snap, flow.EpochPhaseFallback)
 
-		epochState, err := state.Final().EpochProtocolState()
+		epochState, err := block1snap.EpochProtocolState()
 		require.NoError(t, err)
 		firstExtension := epochState.EpochExtensions()[0]
 		targetViewDuration := float64(epoch1Setup.TargetDuration) / float64(epoch1Setup.FinalView-epoch1Setup.FirstView+1)
 		expectedTargetEndTime := rootTargetEndTime + uint64(float64(firstExtension.FinalView-epoch1Setup.FinalView)*targetViewDuration)
-		afterFirstExtensionEpoch, err := state.Final().Epochs().Current()
+		afterFirstExtensionEpoch, err := block1snap.Epochs().Current()
 		require.NoError(t, err)
 		afterFirstExtensionTargetEndTime, err := afterFirstExtensionEpoch.TargetEndTime()
 		require.NoError(t, err)
@@ -2515,11 +2516,12 @@ func TestEpochTargetEndTime(t *testing.T) {
 		block2.SetPayload(unittest.PayloadFixture(unittest.WithProtocolStateID(expectedStateIdCalculator(block2.Header, nil))))
 		unittest.InsertAndFinalize(t, state, block2)
 
-		epochState, err = state.Final().EpochProtocolState()
+		block2snap := state.Final()
+		epochState, err = block2snap.EpochProtocolState()
 		require.NoError(t, err)
 		secondExtension := epochState.EpochExtensions()[1]
 		expectedTargetEndTime = rootTargetEndTime + uint64(float64(secondExtension.FinalView-epoch1Setup.FinalView)*targetViewDuration)
-		afterSecondExtensionEpoch, err := state.Final().Epochs().Current()
+		afterSecondExtensionEpoch, err := block2snap.Epochs().Current()
 		require.NoError(t, err)
 		afterSecondExtensionTargetEndTime, err := afterSecondExtensionEpoch.TargetEndTime()
 		require.NoError(t, err)
