@@ -493,13 +493,17 @@ func (s *state) GetLastExecutedBlockID(ctx context.Context) (uint64, flow.Identi
 	}
 
 	var blockID flow.Identifier
-	var height uint64
 	err := operation.RetrieveExecutedBlock(s.db.Reader(), &blockID)
 	if err != nil {
 		return 0, flow.ZeroID, err
 	}
 
-	return height, blockID, nil
+	lastExecuted, err := s.headers.ByBlockID(blockID)
+	if err != nil {
+		return 0, flow.ZeroID, fmt.Errorf("could not retrieve executed header %v: %w", blockID, err)
+	}
+
+	return lastExecuted.Height, blockID, nil
 }
 
 func (s *state) GetHighestFinalizedExecuted() (uint64, error) {

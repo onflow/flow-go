@@ -5,10 +5,6 @@ import (
 	"github.com/onflow/flow-go/storage"
 )
 
-func InsertExecutedBlock(w storage.Writer, blockID flow.Identifier) error {
-	return UpsertByKey(w, MakePrefix(codeExecutedBlock), blockID)
-}
-
 func UpdateExecutedBlock(w storage.Writer, blockID flow.Identifier) error {
 	return UpsertByKey(w, MakePrefix(codeExecutedBlock), blockID)
 }

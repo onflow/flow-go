@@ -99,7 +99,7 @@ func (b *Bootstrapper) BootstrapExecutionDatabase(
 	commit := rootSeal.FinalState
 	err := db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 		w := rw.Writer()
-		err := operation.InsertExecutedBlock(w, rootSeal.BlockID)
+		err := operation.UpdateExecutedBlock(w, rootSeal.BlockID)
 		if err != nil {
 			return fmt.Errorf("could not index initial genesis execution block: %w", err)
 		}

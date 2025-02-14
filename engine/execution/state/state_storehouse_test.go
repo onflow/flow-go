@@ -81,7 +81,7 @@ func prepareStorehouseTest(f func(t *testing.T, es state.ExecutionState, l *ledg
 				rootID, err := finalized.FinalizedBlockIDAtHeight(10)
 				require.NoError(t, err)
 				require.NoError(t,
-					badgerDB.Update(operation.InsertExecutedBlock(rootID)),
+					badgerDB.Update(operation.UpdateExecutedBlock(rootID)),
 				)
 
 				metrics := metrics.NewNoopCollector()
