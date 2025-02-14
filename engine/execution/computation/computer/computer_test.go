@@ -144,14 +144,14 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 
 		exemetrics := new(modulemock.ExecutionMetrics)
 		exemetrics.On("ExecutionBlockExecuted",
-			mock.Anything, // duration
-			mock.Anything). // stats
+			mock.Anything,
+			mock.Anything).
 			Return(nil).
 			Times(1)
 
 		exemetrics.On("ExecutionCollectionExecuted",
-			mock.Anything, // duration
-			mock.Anything). // stats
+			mock.Anything,
+			mock.Anything).
 			Return(nil).
 			Times(2) // 1 collection + system collection
 
@@ -1255,14 +1255,14 @@ func Test_ExecutingSystemCollection(t *testing.T) {
 
 	metrics := new(modulemock.ExecutionMetrics)
 	metrics.On("ExecutionBlockExecuted",
-		mock.Anything, // duration
-		mock.Anything). // stats
+		mock.Anything,
+		mock.Anything).
 		Return(nil).
 		Times(1)
 
 	metrics.On("ExecutionCollectionExecuted",
-		mock.Anything, // duration
-		mock.Anything). // stats
+		mock.Anything,
+		mock.Anything).
 		Return(nil).
 		Times(1) // system collection
 
