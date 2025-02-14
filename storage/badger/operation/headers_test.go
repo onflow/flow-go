@@ -28,11 +28,11 @@ func TestHeaderInsertCheckRetrieve(t *testing.T) {
 		blockID := expected.ID()
 
 		err := db.Update(InsertHeader(expected.ID(), expected))
-		require.Nil(t, err)
+		require.NoError(t, err)
 
 		var actual flow.Header
 		err = db.View(RetrieveHeader(blockID, &actual))
-		require.Nil(t, err)
+		require.NoError(t, err)
 
 		assert.Equal(t, *expected, actual)
 	})
@@ -45,11 +45,11 @@ func TestHeaderIDIndexByCollectionID(t *testing.T) {
 		collectionID := unittest.IdentifierFixture()
 
 		err := db.Update(IndexCollectionBlock(collectionID, headerID))
-		require.Nil(t, err)
+		require.NoError(t, err)
 
 		actualID := &flow.Identifier{}
 		err = db.View(LookupCollectionBlock(collectionID, actualID))
-		require.Nil(t, err)
+		require.NoError(t, err)
 		assert.Equal(t, headerID, *actualID)
 	})
 }
@@ -61,11 +61,11 @@ func TestBlockHeightIndexLookup(t *testing.T) {
 		expected := flow.Identifier{0x01, 0x02, 0x03}
 
 		err := db.Update(IndexBlockHeight(height, expected))
-		require.Nil(t, err)
+		require.NoError(t, err)
 
 		var actual flow.Identifier
 		err = db.View(LookupBlockHeight(height, &actual))
-		require.Nil(t, err)
+		require.NoError(t, err)
 
 		assert.Equal(t, expected, actual)
 	})

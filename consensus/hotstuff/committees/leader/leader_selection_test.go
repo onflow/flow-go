@@ -183,7 +183,7 @@ func TestViewOutOfRange(t *testing.T) {
 
 	identities := unittest.IdentityListFixture(4).ToSkeleton()
 	leaders, err := ComputeLeaderSelection(firstView, rng, int(finalView-firstView+1), identities)
-	require.Nil(t, err)
+	require.NoError(t, err)
 
 	// confirm the selection has first/final view we expect
 	assert.Equal(t, firstView, leaders.FirstView())

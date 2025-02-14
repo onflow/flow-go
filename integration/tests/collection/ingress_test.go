@@ -47,7 +47,7 @@ func (suite *IngressSuite) TestTransactionIngress_InvalidTransaction() {
 	col1 := suite.Collector(0, 0)
 
 	client, err := col1.SDKClient()
-	require.Nil(t, err)
+	require.NoError(t, err)
 
 	t.Run("missing reference block id", logStartFinish(func(t *testing.T) {
 		malformed := suite.NextTransaction(func(tx *sdk.Transaction) {
@@ -112,10 +112,9 @@ func (suite *IngressSuite) TestTxIngress_SingleCluster() {
 	col1 := suite.Collector(0, 0)
 
 	client, err := col1.SDKClient()
-	require.Nil(t, err)
+	require.NoError(t, err)
 
 	tx := suite.NextTransaction()
-	require.Nil(t, err)
 
 	t.Log("sending transaction: ", tx.ID())
 
@@ -170,7 +169,7 @@ func (suite *IngressSuite) TestTxIngressMultiCluster_CorrectCluster() {
 
 	// get a client pointing to the cluster member
 	client, err := targetNode.SDKClient()
-	require.Nil(t, err)
+	require.NoError(t, err)
 
 	tx := suite.TxForCluster(targetCluster)
 
@@ -246,7 +245,7 @@ func (suite *IngressSuite) TestTxIngressMultiCluster_OtherCluster() {
 
 	// create clients pointing to each other node
 	client, err := otherNode.SDKClient()
-	require.Nil(t, err)
+	require.NoError(t, err)
 
 	// create a transaction that will be routed to the target cluster
 	tx := suite.TxForCluster(targetCluster)

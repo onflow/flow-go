@@ -319,14 +319,14 @@ func (builder *EpochBuilder) CompleteEpoch() *EpochBuilder {
 	finalSnap := state.Final()
 
 	phase, err := finalSnap.EpochPhase()
-	require.Nil(builder.t, err)
+	require.NoError(builder.t, err)
 	require.Equal(builder.t, flow.EpochPhaseCommitted, phase)
 	currentEpoch, err := finalSnap.Epochs().Current()
-	require.Nil(builder.t, err)
+	require.NoError(builder.t, err)
 	finalView := currentEpoch.FinalView()
 
 	final, err := finalSnap.Head()
-	require.Nil(builder.t, err)
+	require.NoError(builder.t, err)
 
 	finalBlock, ok := builder.blocksByID[final.ID()]
 	require.True(builder.t, ok)

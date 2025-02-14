@@ -1,7 +1,6 @@
 package badger_test
 
 import (
-	"errors"
 	"testing"
 
 	"github.com/dgraph-io/badger/v2"
@@ -103,8 +102,7 @@ func TestResultStoreTwoDifferentResultsShouldFail(t *testing.T) {
 		require.NoError(t, err)
 
 		err = store.Index(blockID, result2.ID())
-		require.Error(t, err)
-		require.True(t, errors.Is(err, storage.ErrDataMismatch))
+		require.ErrorIs(t, err, storage.ErrDataMismatch)
 	})
 }
 

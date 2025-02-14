@@ -1,7 +1,6 @@
 package badger_test
 
 import (
-	"errors"
 	"testing"
 
 	"github.com/dgraph-io/badger/v2"
@@ -34,7 +33,7 @@ func TestStoreRetrieveClusterPayload(t *testing.T) {
 
 		// storing again should error with key already exists
 		err = store.Store(blockID, expected)
-		require.True(t, errors.Is(err, storage.ErrAlreadyExists))
+		require.ErrorIs(t, err, storage.ErrAlreadyExists)
 	})
 }
 
@@ -46,6 +45,6 @@ func TestClusterPayloadRetrieveWithoutStore(t *testing.T) {
 		blockID := unittest.IdentifierFixture()
 
 		_, err := store.ByBlockID(blockID)
-		assert.True(t, errors.Is(err, storage.ErrNotFound))
+		assert.ErrorIs(t, err, storage.ErrNotFound)
 	})
 }

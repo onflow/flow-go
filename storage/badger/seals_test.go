@@ -1,7 +1,6 @@
 package badger_test
 
 import (
-	"errors"
 	"testing"
 
 	"github.com/dgraph-io/badger/v2"
@@ -21,10 +20,10 @@ func TestRetrieveWithoutStore(t *testing.T) {
 		store := badgerstorage.NewSeals(metrics, db)
 
 		_, err := store.ByID(unittest.IdentifierFixture())
-		require.True(t, errors.Is(err, storage.ErrNotFound))
+		require.ErrorIs(t, err, storage.ErrNotFound)
 
 		_, err = store.HighestInFork(unittest.IdentifierFixture())
-		require.True(t, errors.Is(err, storage.ErrNotFound))
+		require.ErrorIs(t, err, storage.ErrNotFound)
 	})
 }
 

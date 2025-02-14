@@ -37,8 +37,7 @@ func TestBindPFlags(t *testing.T) {
 		flags := testFlagSet(c)
 		configFileUsed, err := BindPFlags(&FlowConfig{}, flags)
 		require.False(t, configFileUsed)
-		require.Error(t, err)
-		require.True(t, errors.Is(err, errPflagsNotParsed))
+		require.ErrorIs(t, err, errPflagsNotParsed)
 	})
 }
 

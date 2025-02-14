@@ -40,7 +40,7 @@ func TestStateInteractionsInsertCheckRetrieve(t *testing.T) {
 		blockID := unittest.IdentifierFixture()
 
 		err := db.Update(InsertExecutionStateInteractions(blockID, interactions))
-		require.Nil(t, err)
+		require.NoError(t, err)
 
 		var readInteractions []*snapshot.ExecutionSnapshot
 

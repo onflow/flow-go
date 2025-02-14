@@ -2,7 +2,6 @@ package complete_test
 
 import (
 	"bytes"
-	"errors"
 	"fmt"
 	"math"
 	"math/rand"
@@ -747,8 +746,7 @@ func TestWALUpdateFailuresBubbleUp(t *testing.T) {
 		require.NoError(t, err)
 
 		_, _, err = led.Set(update)
-		require.Error(t, err)
-		require.True(t, errors.Is(err, theError))
+		require.ErrorIs(t, err, theError)
 	})
 }
 
