@@ -11,7 +11,8 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
-	"github.com/onflow/flow-go/engine/access/rest/websockets/models"
+	"github.com/onflow/flow-go/engine/access/rest/websockets/data_providers/models"
+	wsmodels "github.com/onflow/flow-go/engine/access/rest/websockets/models"
 	"github.com/onflow/flow-go/engine/access/state_stream"
 	"github.com/onflow/flow-go/engine/access/state_stream/backend"
 	ssmock "github.com/onflow/flow-go/engine/access/state_stream/mock"
@@ -97,7 +98,7 @@ func (s *AccountStatusesProviderSuite) TestAccountStatusesDataProvider_StateStre
 		nil,
 		"dummy-id",
 		topic,
-		models.Arguments{},
+		wsmodels.Arguments{},
 		send,
 		s.chain,
 		state_stream.DefaultEventFilterConfig,
@@ -116,7 +117,7 @@ func (s *AccountStatusesProviderSuite) subscribeAccountStatusesDataProviderTestC
 	return []testType{
 		{
 			name: "SubscribeAccountStatusesFromStartBlockID happy path",
-			arguments: models.Arguments{
+			arguments: wsmodels.Arguments{
 				"start_block_id": s.rootBlock.ID().String(),
 				"event_types":    []string{"flow.AccountCreated", "flow.AccountKeyAdded"},
 			},
@@ -132,7 +133,7 @@ func (s *AccountStatusesProviderSuite) subscribeAccountStatusesDataProviderTestC
 		},
 		{
 			name: "SubscribeAccountStatusesFromStartHeight happy path",
-			arguments: models.Arguments{
+			arguments: wsmodels.Arguments{
 				"start_block_height": strconv.FormatUint(s.rootBlock.Header.Height, 10),
 			},
 			setupBackend: func(sub *ssmock.Subscription) {
@@ -147,7 +148,7 @@ func (s *AccountStatusesProviderSuite) subscribeAccountStatusesDataProviderTestC
 		},
 		{
 			name:      "SubscribeAccountStatusesFromLatestBlock happy path",
-			arguments: models.Arguments{},
+			arguments: wsmodels.Arguments{},
 			setupBackend: func(sub *ssmock.Subscription) {
 				s.api.On(
 					"SubscribeAccountStatusesFromLatestBlock",
@@ -184,9 +185,7 @@ func (s *AccountStatusesProviderSuite) expectedAccountStatusesResponses(backendR
 	expectedResponses := make([]interface{}, len(backendResponses))
 
 	for i, resp := range backendResponses {
-		var expectedResponsePayload models.AccountStatusesResponse
-		expectedResponsePayload.Build(resp, uint64(i))
-
+		expectedResponsePayload := models.NewAccountStatusesResponse(resp, uint64(i))
 		expectedResponses[i] = &models.BaseDataProvidersResponse{
 			Topic:   AccountStatusesTopic,
 			Payload: &expectedResponsePayload,

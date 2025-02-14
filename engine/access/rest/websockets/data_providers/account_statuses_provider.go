@@ -11,7 +11,8 @@ import (
 	"github.com/onflow/flow-go/engine/access/rest/common"
 	"github.com/onflow/flow-go/engine/access/rest/common/parser"
 	"github.com/onflow/flow-go/engine/access/rest/http/request"
-	"github.com/onflow/flow-go/engine/access/rest/websockets/models"
+	"github.com/onflow/flow-go/engine/access/rest/websockets/data_providers/models"
+	wsmodels "github.com/onflow/flow-go/engine/access/rest/websockets/models"
 	"github.com/onflow/flow-go/engine/access/state_stream"
 	"github.com/onflow/flow-go/engine/access/state_stream/backend"
 	"github.com/onflow/flow-go/engine/access/subscription"
@@ -44,7 +45,7 @@ func NewAccountStatusesDataProvider(
 	stateStreamApi state_stream.API,
 	subscriptionID string,
 	topic string,
-	arguments models.Arguments,
+	arguments wsmodels.Arguments,
 	send chan<- interface{},
 	chain flow.Chain,
 	eventFilterConfig state_stream.EventFilterConfig,
@@ -126,11 +127,12 @@ func (p *AccountStatusesDataProvider) handleResponse() func(accountStatusesRespo
 			return status.Errorf(codes.Internal, "message index already incremented to %d", messageIndex.Value())
 		}
 
-		var accountStatusesPayload models.AccountStatusesResponse
-		accountStatusesPayload.Build(accountStatusesResponse, index)
-
-		var response models.BaseDataProvidersResponse
-		response.Build(p.ID(), p.Topic(), &accountStatusesPayload)
+		accountStatusesPayload := models.NewAccountStatusesResponse(accountStatusesResponse, index)
+		response := models.BaseDataProvidersResponse{
+			SubscriptionID: p.ID(),
+			Topic:          p.Topic(),
+			Payload:        &accountStatusesPayload,
+		}
 
 		p.send <- &response
 
@@ -140,7 +142,7 @@ func (p *AccountStatusesDataProvider) handleResponse() func(accountStatusesRespo
 
 // parseAccountStatusesArguments validates and initializes the account statuses arguments.
 func parseAccountStatusesArguments(
-	arguments models.Arguments,
+	arguments wsmodels.Arguments,
 	chain flow.Chain,
 	eventFilterConfig state_stream.EventFilterConfig,
 ) (accountStatusesArguments, error) {

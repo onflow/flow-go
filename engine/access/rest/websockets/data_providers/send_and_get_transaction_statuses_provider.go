@@ -13,7 +13,8 @@ import (
 	"github.com/onflow/flow-go/access"
 	commonmodels "github.com/onflow/flow-go/engine/access/rest/common/models"
 	commonparser "github.com/onflow/flow-go/engine/access/rest/common/parser"
-	"github.com/onflow/flow-go/engine/access/rest/websockets/models"
+	"github.com/onflow/flow-go/engine/access/rest/websockets/data_providers/models"
+	wsmodels "github.com/onflow/flow-go/engine/access/rest/websockets/models"
 	"github.com/onflow/flow-go/engine/access/subscription"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/counters"
@@ -43,7 +44,7 @@ func NewSendAndGetTransactionStatusesDataProvider(
 	subscriptionID string,
 	linkGenerator commonmodels.LinkGenerator,
 	topic string,
-	arguments models.Arguments,
+	arguments wsmodels.Arguments,
 	send chan<- interface{},
 	chain flow.Chain,
 ) (*SendAndGetTransactionStatusesDataProvider, error) {
@@ -103,11 +104,12 @@ func (p *SendAndGetTransactionStatusesDataProvider) handleResponse() func(txResu
 				return status.Errorf(codes.Internal, "message index already incremented to %d", messageIndex.Value())
 			}
 
-			var txStatusesPayload models.TransactionStatusesResponse
-			txStatusesPayload.Build(p.linkGenerator, txResults[i], index)
-
-			var response models.BaseDataProvidersResponse
-			response.Build(p.ID(), p.Topic(), &txStatusesPayload)
+			txStatusesPayload := models.NewTransactionStatusesResponse(p.linkGenerator, txResults[i], index)
+			response := models.BaseDataProvidersResponse{
+				SubscriptionID: p.ID(),
+				Topic:          p.Topic(),
+				Payload:        &txStatusesPayload,
+			}
 
 			p.send <- &response
 		}
@@ -118,7 +120,7 @@ func (p *SendAndGetTransactionStatusesDataProvider) handleResponse() func(txResu
 
 // parseSendAndGetTransactionStatusesArguments validates and initializes the account statuses arguments.
 func parseSendAndGetTransactionStatusesArguments(
-	arguments models.Arguments,
+	arguments wsmodels.Arguments,
 	chain flow.Chain,
 ) (sendAndGetTransactionStatusesArguments, error) {
 	var args sendAndGetTransactionStatusesArguments

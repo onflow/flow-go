@@ -11,7 +11,8 @@ import (
 	"github.com/onflow/flow-go/engine/access/rest/common/parser"
 	"github.com/onflow/flow-go/engine/access/rest/http/request"
 	"github.com/onflow/flow-go/engine/access/rest/util"
-	"github.com/onflow/flow-go/engine/access/rest/websockets/models"
+	"github.com/onflow/flow-go/engine/access/rest/websockets/data_providers/models"
+	wsmodels "github.com/onflow/flow-go/engine/access/rest/websockets/models"
 	"github.com/onflow/flow-go/engine/access/subscription"
 	"github.com/onflow/flow-go/model/flow"
 )
@@ -43,7 +44,7 @@ func NewBlocksDataProvider(
 	subscriptionID string,
 	linkGenerator commonmodels.LinkGenerator,
 	topic string,
-	arguments models.Arguments,
+	arguments wsmodels.Arguments,
 	send chan<- interface{},
 ) (*BlocksDataProvider, error) {
 	p := &BlocksDataProvider{
@@ -88,8 +89,11 @@ func (p *BlocksDataProvider) Run() error {
 				return nil, fmt.Errorf("failed to build block response :%w", err)
 			}
 
-			var response models.BaseDataProvidersResponse
-			response.Build(p.ID(), p.Topic(), &block)
+			response := models.BaseDataProvidersResponse{
+				SubscriptionID: p.ID(),
+				Topic:          p.Topic(),
+				Payload:        &block,
+			}
 
 			return &response, nil
 		}),
@@ -110,7 +114,7 @@ func (p *BlocksDataProvider) createSubscription(ctx context.Context, args blocks
 }
 
 // ParseBlocksArguments validates and initializes the blocks arguments.
-func ParseBlocksArguments(arguments models.Arguments) (blocksArguments, error) {
+func ParseBlocksArguments(arguments wsmodels.Arguments) (blocksArguments, error) {
 	var args blocksArguments
 
 	// Parse 'block_status'
@@ -139,7 +143,7 @@ func ParseBlocksArguments(arguments models.Arguments) (blocksArguments, error) {
 	return args, nil
 }
 
-func ParseStartBlock(arguments models.Arguments) (flow.Identifier, uint64, error) {
+func ParseStartBlock(arguments wsmodels.Arguments) (flow.Identifier, uint64, error) {
 	startBlockIDIn, hasStartBlockID := arguments["start_block_id"]
 	startBlockHeightIn, hasStartBlockHeight := arguments["start_block_height"]
 

@@ -13,7 +13,8 @@ import (
 	"github.com/onflow/flow-go/access"
 	accessmock "github.com/onflow/flow-go/access/mock"
 	mockcommonmodels "github.com/onflow/flow-go/engine/access/rest/common/models/mock"
-	"github.com/onflow/flow-go/engine/access/rest/websockets/models"
+	"github.com/onflow/flow-go/engine/access/rest/websockets/data_providers/models"
+	wsmodels "github.com/onflow/flow-go/engine/access/rest/websockets/models"
 	"github.com/onflow/flow-go/engine/access/state_stream"
 	ssmock "github.com/onflow/flow-go/engine/access/state_stream/mock"
 	"github.com/onflow/flow-go/engine/access/subscription"
@@ -94,7 +95,7 @@ func (s *TransactionStatusesProviderSuite) subscribeTransactionStatusesDataProvi
 	return []testType{
 		{
 			name:      "SubscribeTransactionStatuses happy path",
-			arguments: models.Arguments{},
+			arguments: wsmodels.Arguments{},
 			setupBackend: func(sub *ssmock.Subscription) {
 				s.api.On(
 					"SubscribeTransactionStatuses",
@@ -152,9 +153,7 @@ func (s *TransactionStatusesProviderSuite) expectedTransactionStatusesResponses(
 	expectedResponses := make([]interface{}, len(backendResponses))
 
 	for i, resp := range backendResponses {
-		var expectedResponsePayload models.TransactionStatusesResponse
-		expectedResponsePayload.Build(s.linkGenerator, resp, uint64(i))
-
+		expectedResponsePayload := models.NewTransactionStatusesResponse(s.linkGenerator, resp, uint64(i))
 		expectedResponses[i] = &models.BaseDataProvidersResponse{
 			Topic:   topic,
 			Payload: &expectedResponsePayload,

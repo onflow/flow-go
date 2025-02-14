@@ -8,7 +8,8 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/onflow/flow-go/engine/access/rest/websockets/models"
+	"github.com/onflow/flow-go/engine/access/rest/websockets/data_providers/models"
+	wsmodels "github.com/onflow/flow-go/engine/access/rest/websockets/models"
 	statestreamsmock "github.com/onflow/flow-go/engine/access/state_stream/mock"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -16,7 +17,7 @@ import (
 // testType represents a valid test scenario for subscribing
 type testType struct {
 	name              string
-	arguments         models.Arguments
+	arguments         wsmodels.Arguments
 	setupBackend      func(sub *statestreamsmock.Subscription)
 	expectedResponses []interface{}
 }
@@ -24,7 +25,7 @@ type testType struct {
 // testErrType represents an error cases for subscribing
 type testErrType struct {
 	name             string
-	arguments        models.Arguments
+	arguments        wsmodels.Arguments
 	expectedErrorMsg string
 }
 
