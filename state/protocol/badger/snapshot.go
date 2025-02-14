@@ -399,9 +399,9 @@ func (q *EpochQuery) Current() (protocol.CommittedEpoch, error) {
 		return nil, fmt.Errorf("could not get current epoch height bounds: %s", err.Error())
 	}
 	if isFirstHeightKnown {
-		return inmem.NewEpochWithStartBoundary(setup, epochState.EpochExtensions(), commit, firstHeight), nil
+		return inmem.NewEpochWithStartBoundary(setup, commit, epochState.EpochExtensions(), firstHeight), nil
 	}
-	return inmem.NewCommittedEpoch(setup, epochState.EpochExtensions(), commit), nil
+	return inmem.NewCommittedEpoch(setup, commit, epochState.EpochExtensions()), nil
 }
 
 // NextUnsafe returns the next epoch, if it has been set up but not yet committed.
@@ -452,7 +452,8 @@ func (q *EpochQuery) NextCommitted() (protocol.CommittedEpoch, error) {
 	case flow.EpochPhaseStaking, flow.EpochPhaseFallback, flow.EpochPhaseSetup:
 		return nil, protocol.ErrNextEpochNotCommitted
 	case flow.EpochPhaseCommitted:
-		return inmem.NewCommittedEpoch(entry.NextEpochSetup, entry.NextEpoch.EpochExtensions, entry.NextEpochCommit), nil
+		// TODO check there are no epoch extensions for future epoch
+		return inmem.NewCommittedEpoch(entry.NextEpochSetup, entry.NextEpochCommit, entry.NextEpoch.EpochExtensions), nil
 	default:
 		return nil, fmt.Errorf("data corruption: unknown epoch phase implies malformed protocol state epoch data")
 	}
@@ -486,22 +487,22 @@ func (q *EpochQuery) Previous() (protocol.CommittedEpoch, error) {
 	}
 	if firstHeightKnown && finalHeightKnown {
 		// typical case - we usually know both boundaries for a past epoch
-		return inmem.NewEpochWithStartAndEndBoundaries(setup, extensions, commit, firstHeight, finalHeight), nil
+		return inmem.NewEpochWithStartAndEndBoundaries(setup, commit, extensions, firstHeight, finalHeight), nil
 	}
 	if firstHeightKnown && !finalHeightKnown {
 		// this case is possible when the snapshot reference block is un-finalized
 		// and is past an un-finalized epoch boundary
-		return inmem.NewEpochWithStartBoundary(setup, extensions, commit, firstHeight), nil
+		return inmem.NewEpochWithStartBoundary(setup, commit, extensions, firstHeight), nil
 	}
 	if !firstHeightKnown && finalHeightKnown {
 		// this case is possible when this node's lowest known block is after
 		// the queried epoch's start boundary
-		return inmem.NewEpochWithEndBoundary(setup, extensions, commit, finalHeight), nil
+		return inmem.NewEpochWithEndBoundary(setup, commit, extensions, finalHeight), nil
 	}
 	if !firstHeightKnown && !finalHeightKnown {
 		// this case is possible when this node's lowest known block is after
 		// the queried epoch's end boundary
-		return inmem.NewCommittedEpoch(setup, extensions, commit), nil
+		return inmem.NewCommittedEpoch(setup, commit, extensions), nil
 	}
 	return nil, fmt.Errorf("sanity check failed: impossible combination of boundaries for previous epoch")
 }
