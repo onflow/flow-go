@@ -14,7 +14,7 @@ import (
 func TestToEpochSetup(t *testing.T) {
 	expected := unittest.EpochSetupFixture()
 	commit := unittest.EpochCommitFixture()
-	epoch := inmem.NewCommittedEpoch(expected, nil, commit)
+	epoch := inmem.NewCommittedEpoch(expected, commit, nil)
 
 	got, err := protocol.ToEpochSetup(epoch)
 	require.NoError(t, err)
@@ -27,7 +27,7 @@ func TestToEpochCommit(t *testing.T) {
 		unittest.CommitWithCounter(setup.Counter),
 		unittest.WithDKGFromParticipants(setup.Participants),
 		unittest.WithClusterQCsFromAssignments(setup.Assignments))
-	epoch := inmem.NewCommittedEpoch(setup, nil, expected)
+	epoch := inmem.NewCommittedEpoch(setup, expected, nil)
 
 	got, err := protocol.ToEpochCommit(epoch)
 	require.NoError(t, err)
