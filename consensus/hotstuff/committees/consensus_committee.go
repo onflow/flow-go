@@ -1,6 +1,7 @@
 package committees
 
 import (
+	"errors"
 	"fmt"
 	"sync"
 
@@ -151,15 +152,14 @@ func NewConsensusCommittee(state protocol.State, me flow.Identifier) (*Consensus
 	epochs := make([]protocol.CommittedEpoch, 0, 3)
 
 	// we prepare the previous epoch, if one exists
-	exists, err := protocol.PreviousEpochExists(final)
+	prev, err := final.Epochs().Previous()
 	if err != nil {
-		return nil, fmt.Errorf("could not check previous epoch exists: %w", err)
-	}
-	if exists {
-		prev, err := final.Epochs().Previous()
-		if err != nil {
-			return nil, fmt.Errorf("could not get previous epoch: %w", err)
+		if !errors.Is(err, protocol.ErrNoPreviousEpoch) {
+			return nil, irrecoverable.NewExceptionf("unexpected error while retrieving previous epoch: %w", err)
 		}
+		// `ErrNoPreviousEpoch` is an expected edge case during normal operations (e.g. we are in first epoch after spork)
+		// continue without the previous epoch
+	} else { // previous epoch was successfully retrieved
 		epochs = append(epochs, prev)
 	}
 
@@ -171,15 +171,13 @@ func NewConsensusCommittee(state protocol.State, me flow.Identifier) (*Consensus
 	epochs = append(epochs, curr)
 
 	// we prepare the next epoch, if it is committed
-	phase, err := final.EpochPhase()
+	next, err := final.Epochs().NextCommitted()
 	if err != nil {
-		return nil, fmt.Errorf("could not check epoch phase: %w", err)
-	}
-	if phase == flow.EpochPhaseCommitted {
-		next, err := final.Epochs().NextCommitted()
-		if err != nil {
-			return nil, fmt.Errorf("could not get next committed epoch: %w", err)
+		if !errors.Is(err, protocol.ErrNextEpochNotCommitted) {
+			return nil, irrecoverable.NewExceptionf("unexpected error retrieving next epoch: %w", err)
 		}
+		// receiving a `ErrNextEpochNotCommitted` is expected during the happy path
+	} else { // next epoch was successfully retrieved
 		epochs = append(epochs, next)
 	}
 

@@ -9,6 +9,7 @@
 package cruisectl
 
 import (
+	"errors"
 	"fmt"
 	"time"
 
@@ -190,21 +191,19 @@ func (ctl *BlockTimeController) initEpochTiming() error {
 	}
 	ctl.currentEpochTiming = *currentEpochTiming
 
-	phase, err := finalSnapshot.EpochPhase()
+	nextEpoch, err := finalSnapshot.Epochs().NextCommitted()
 	if err != nil {
-		return fmt.Errorf("could not check snapshot phase: %w", err)
-	}
-	if phase == flow.EpochPhaseCommitted {
-		nextEpoch, err := finalSnapshot.Epochs().NextCommitted()
-		if err != nil {
-			return fmt.Errorf("could not get next committed epoch: %w", err)
+		if !errors.Is(err, protocol.ErrNextEpochNotCommitted) {
+			return irrecoverable.NewExceptionf("unexpected error retrieving next epoch: %w", err)
 		}
+		// receiving a `ErrNextEpochNotCommitted` is expected during the happy path
+	} else { // next epoch was successfully retrieved
 		ctl.nextEpochTiming, err = newEpochTiming(nextEpoch)
 		if err != nil {
 			return fmt.Errorf("failed to retrieve the next epoch's timing information: %w", err)
 		}
 		if !currentEpochTiming.isFollowedBy(ctl.nextEpochTiming) {
-			return fmt.Errorf("failed to retrieve the next epoch's timing information: %w", err)
+			return fmt.Errorf("next epoch does not directly follow current epoch based on epoch timing")
 		}
 	}
 
