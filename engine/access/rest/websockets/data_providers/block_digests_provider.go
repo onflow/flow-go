@@ -66,11 +66,11 @@ func (p *BlockDigestsDataProvider) Run() error {
 	return subscription.HandleSubscription(
 		p.subscription,
 		subscription.HandleResponse(p.send, func(b *flow.BlockDigest) (interface{}, error) {
-			block := models.NewBlockDigest(b)
+			blockDigest := models.NewBlockDigest(b)
 			response := models.BaseDataProvidersResponse{
 				SubscriptionID: p.ID(),
 				Topic:          p.Topic(),
-				Payload:        block,
+				Payload:        &blockDigest,
 			}
 
 			return &response, nil
