@@ -220,6 +220,12 @@ func (c *Controller) configureKeepalive() error {
 // keepalive sends a ping message periodically to keep the WebSocket connection alive
 // and avoid timeouts.
 func (c *Controller) keepalive(ctx context.Context) error {
+	defer func() {
+		if r := recover(); r != nil {
+			c.logger.Warn().Interface("recovered_context", r).Msg("keepalive routine recovered from panic")
+		}
+	}()
+
 	pingTicker := time.NewTicker(PingPeriod)
 	defer pingTicker.Stop()
 
@@ -246,10 +252,11 @@ func (c *Controller) keepalive(ctx context.Context) error {
 // If no messages are sent within InactivityTimeout and no active data providers exist,
 // the connection will be closed.
 func (c *Controller) writeMessages(ctx context.Context) error {
-	inactivityTicker := time.NewTicker(c.inactivityTickerPeriod())
-	defer inactivityTicker.Stop()
-
-	lastMessageSentAt := time.Now()
+	defer func() {
+		if r := recover(); r != nil {
+			c.logger.Warn().Interface("recovered_context", r).Msg("writer routine recovered from panic")
+		}
+	}()
 
 	defer func() {
 		// drain the channel as some providers may still send data to it after this routine shutdowns
@@ -259,6 +266,11 @@ func (c *Controller) writeMessages(ctx context.Context) error {
 			}
 		}()
 	}()
+
+	inactivityTicker := time.NewTicker(c.inactivityTickerPeriod())
+	defer inactivityTicker.Stop()
+
+	lastMessageSentAt := time.Now()
 
 	for {
 		select {
@@ -310,7 +322,7 @@ func (c *Controller) inactivityTickerPeriod() time.Duration {
 func (c *Controller) readMessages(ctx context.Context) error {
 	defer func() {
 		if r := recover(); r != nil {
-			c.logger.Warn().Msgf("reader routine recovered from panic: %v", r)
+			c.logger.Warn().Interface("recovered_context", r).Msg("reader routine recovered from panic")
 		}
 	}()
 
