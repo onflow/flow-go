@@ -117,11 +117,3 @@ func GetDKGParticipantKeys(dkg DKG, participants flow.IdentitySkeletonList) ([]c
 
 	return keys, nil
 }
-
-// DKGPhaseViews returns the DKG final phase views for an epoch.
-func DKGPhaseViews(epoch CommittedEpoch) (phase1FinalView uint64, phase2FinalView uint64, phase3FinalView uint64) {
-	phase1FinalView = epoch.DKGPhase1FinalView()
-	phase2FinalView = epoch.DKGPhase2FinalView()
-	phase3FinalView = epoch.DKGPhase3FinalView()
-	return
-}
