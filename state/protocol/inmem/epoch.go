@@ -53,7 +53,7 @@ func (eq Epochs) NextUnsafe() (protocol.TentativeEpoch, error) {
 	case flow.EpochPhaseStaking, flow.EpochPhaseFallback:
 		return nil, protocol.ErrNextEpochNotSetup
 	case flow.EpochPhaseSetup:
-		return NewSetupEpoch(eq.entry.NextEpochSetup, eq.entry.NextEpoch.EpochExtensions), nil
+		return NewSetupEpoch(eq.entry.NextEpochSetup), nil
 	case flow.EpochPhaseCommitted:
 		return nil, protocol.ErrNextEpochAlreadyCommitted
 	}
@@ -80,11 +80,9 @@ func (eq Epochs) NextCommitted() (protocol.CommittedEpoch, error) {
 }
 
 // setupEpoch is an implementation of protocol.TentativeEpoch backed by an EpochSetup service event.
-// Includes any extensions which have been included as of the reference block.
 type setupEpoch struct {
 	// EpochSetup service event
 	setupEvent *flow.EpochSetup
-	extensions []flow.EpochExtension
 }
 
 var _ protocol.TentativeEpoch = (*setupEpoch)(nil)
@@ -93,26 +91,26 @@ func (es *setupEpoch) Counter() uint64 {
 	return es.setupEvent.Counter
 }
 
-func (es *setupEpoch) FirstView() uint64 {
+func (es *committedEpoch) FirstView() uint64 {
 	return es.setupEvent.FirstView
 }
 
-func (es *setupEpoch) DKGPhase1FinalView() uint64 {
+func (es *committedEpoch) DKGPhase1FinalView() uint64 {
 	return es.setupEvent.DKGPhase1FinalView
 }
 
-func (es *setupEpoch) DKGPhase2FinalView() uint64 {
+func (es *committedEpoch) DKGPhase2FinalView() uint64 {
 	return es.setupEvent.DKGPhase2FinalView
 }
 
-func (es *setupEpoch) DKGPhase3FinalView() uint64 {
+func (es *committedEpoch) DKGPhase3FinalView() uint64 {
 	return es.setupEvent.DKGPhase3FinalView
 }
 
 // FinalView returns the final view of the epoch, taking into account possible epoch extensions.
 // If there are no epoch extensions, the final view is the final view of the current epoch setup,
 // otherwise it is the final view of the last epoch extension.
-func (es *setupEpoch) FinalView() uint64 {
+func (es *committedEpoch) FinalView() uint64 {
 	if len(es.extensions) > 0 {
 		return es.extensions[len(es.extensions)-1].FinalView
 	}
@@ -124,7 +122,7 @@ func (es *setupEpoch) FinalView() uint64 {
 // and used by the Cruise Control system to moderate the block rate.
 // In case the epoch has extensions, the target duration is calculated based on the last extension, by calculating how many
 // views were added by the extension and adding the proportional time to the target duration.
-func (es *setupEpoch) TargetDuration() uint64 {
+func (es *committedEpoch) TargetDuration() uint64 {
 	if len(es.extensions) == 0 {
 		return es.setupEvent.TargetDuration
 	} else {
@@ -139,7 +137,7 @@ func (es *setupEpoch) TargetDuration() uint64 {
 // the EpochSetup event and used by the Cruise Control system to moderate the block rate.
 // In case the epoch has extensions, the target end time is calculated based on the last extension, by calculating how many
 // views were added by the extension and adding the proportional time to the target end time.
-func (es *setupEpoch) TargetEndTime() uint64 {
+func (es *committedEpoch) TargetEndTime() uint64 {
 	if len(es.extensions) == 0 {
 		return es.setupEvent.TargetEndTime
 	} else {
@@ -149,7 +147,7 @@ func (es *setupEpoch) TargetEndTime() uint64 {
 	}
 }
 
-func (es *setupEpoch) RandomSource() []byte {
+func (es *committedEpoch) RandomSource() []byte {
 	return es.setupEvent.RandomSource
 }
 
@@ -172,19 +170,21 @@ func ClusteringFromSetupEvent(setupEvent *flow.EpochSetup) (flow.ClusterList, er
 	return clustering, nil
 }
 
-func (es *setupEpoch) FirstHeight() (uint64, error) {
+func (es *committedEpoch) FirstHeight() (uint64, error) {
 	return 0, protocol.ErrUnknownEpochBoundary
 }
 
-func (es *setupEpoch) FinalHeight() (uint64, error) {
+func (es *committedEpoch) FinalHeight() (uint64, error) {
 	return 0, protocol.ErrUnknownEpochBoundary
 }
 
 // committedEpoch is an implementation of protocol.CommittedEpoch backed by an EpochSetup
 // and EpochCommit service event.
+// Includes any extensions which have been included as of the reference block.
 type committedEpoch struct {
 	setupEpoch
 	commitEvent *flow.EpochCommit
+	extensions  []flow.EpochExtension
 }
 
 var _ protocol.CommittedEpoch = (*committedEpoch)(nil)
@@ -291,10 +291,9 @@ func (e *heightBoundedEpoch) FinalHeight() (uint64, error) {
 // NewSetupEpoch returns a memory-backed epoch implementation based on an EpochSetup event.
 // Epoch information available after the setup phase will not be accessible in the resulting epoch instance.
 // No errors are expected during normal operations.
-func NewSetupEpoch(setupEvent *flow.EpochSetup, extensions []flow.EpochExtension) protocol.TentativeEpoch {
+func NewSetupEpoch(setupEvent *flow.EpochSetup) protocol.TentativeEpoch {
 	return &setupEpoch{
 		setupEvent: setupEvent,
-		extensions: extensions,
 	}
 }
 
@@ -305,9 +304,9 @@ func NewCommittedEpoch(setupEvent *flow.EpochSetup, commitEvent *flow.EpochCommi
 	return &committedEpoch{
 		setupEpoch: setupEpoch{
 			setupEvent: setupEvent,
-			extensions: extensions,
 		},
 		commitEvent: commitEvent,
+		extensions:  extensions,
 	}
 }
 
@@ -319,9 +318,9 @@ func NewEpochWithStartBoundary(setupEvent *flow.EpochSetup, commitEvent *flow.Ep
 		committedEpoch: committedEpoch{
 			setupEpoch: setupEpoch{
 				setupEvent: setupEvent,
-				extensions: extensions,
 			},
 			commitEvent: commitEvent,
+			extensions:  extensions,
 		},
 		firstHeight: &firstHeight,
 		finalHeight: nil,
@@ -336,9 +335,9 @@ func NewEpochWithEndBoundary(setupEvent *flow.EpochSetup, commitEvent *flow.Epoc
 		committedEpoch: committedEpoch{
 			setupEpoch: setupEpoch{
 				setupEvent: setupEvent,
-				extensions: extensions,
 			},
 			commitEvent: commitEvent,
+			extensions:  extensions,
 		},
 		firstHeight: nil,
 		finalHeight: &finalHeight,
@@ -353,9 +352,9 @@ func NewEpochWithStartAndEndBoundaries(setupEvent *flow.EpochSetup, commitEvent 
 		committedEpoch: committedEpoch{
 			setupEpoch: setupEpoch{
 				setupEvent: setupEvent,
-				extensions: extensions,
 			},
 			commitEvent: commitEvent,
+			extensions:  extensions,
 		},
 		firstHeight: &firstHeight,
 		finalHeight: &finalHeight,

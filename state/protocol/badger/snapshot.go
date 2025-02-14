@@ -426,7 +426,7 @@ func (q *EpochQuery) NextUnsafe() (protocol.TentativeEpoch, error) {
 	// if we are in setup phase, return a SetupEpoch
 	nextSetup := entry.NextEpochSetup
 	if phase == flow.EpochPhaseSetup {
-		return inmem.NewSetupEpoch(nextSetup, entry.NextEpoch.EpochExtensions), nil
+		return inmem.NewSetupEpoch(nextSetup), nil
 	}
 	// if we are in committed phase, return an error
 	if phase == flow.EpochPhaseCommitted {
