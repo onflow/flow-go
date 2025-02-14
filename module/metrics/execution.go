@@ -20,6 +20,7 @@ type ExecutionCollector struct {
 	totalFailedTransactionsCounter          prometheus.Counter
 	lastExecutedBlockHeightGauge            prometheus.Gauge
 	lastFinalizedExecutedBlockHeightGauge   prometheus.Gauge
+	lastChunkDataPackPrunedHeightGauge      prometheus.Gauge
 	stateStorageDiskTotal                   prometheus.Gauge
 	storageStateCommitment                  prometheus.Gauge
 	checkpointSize                          prometheus.Gauge
@@ -653,6 +654,13 @@ func NewExecutionCollector(tracer module.Tracer) *ExecutionCollector {
 			Help:      "the last height that was finalized and executed",
 		}),
 
+		lastChunkDataPackPrunedHeightGauge: promauto.NewGauge(prometheus.GaugeOpts{
+			Namespace: namespaceExecution,
+			Subsystem: subsystemRuntime,
+			Name:      "last_chunk_data_pack_pruned_height",
+			Help:      "the last height that was pruned for chunk data pack",
+		}),
+
 		stateStorageDiskTotal: promauto.NewGauge(prometheus.GaugeOpts{
 			Namespace: namespaceExecution,
 			Subsystem: subsystemStateStorage,
@@ -890,6 +898,11 @@ func (ec *ExecutionCollector) ExecutionLastExecutedBlockHeight(height uint64) {
 // ExecutionLastFinalizedExecutedBlockHeight reports last finalized executed block height
 func (ec *ExecutionCollector) ExecutionLastFinalizedExecutedBlockHeight(height uint64) {
 	ec.lastFinalizedExecutedBlockHeightGauge.Set(float64(height))
+}
+
+// ExecutionLastChunkDataPackPrunedHeight reports last chunk data pack pruned height
+func (ec *ExecutionCollector) ExecutionLastChunkDataPackPrunedHeight(height uint64) {
+	ec.lastChunkDataPackPrunedHeightGauge.Set(float64(height))
 }
 
 // ForestApproxMemorySize records approximate memory usage of forest (all in-memory trees)
