@@ -172,6 +172,7 @@ func run(*cobra.Command, []string) {
 			metrics.NewNoopCollector(),
 			nil,
 			backend.Config{},
+			false,
 			websockets.NewDefaultWebsocketConfig(),
 		)
 		if err != nil {
