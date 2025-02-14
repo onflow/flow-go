@@ -15,3 +15,9 @@ const (
 	SUCCESS_RESULT = SUCCESS_TransactionExecution
 	FAILURE_RESULT = FAILURE_TransactionExecution
 )
+
+const (
+	BLOCK_UNKNOWN   = UNKNOWN_BlockStatus
+	BLOCK_FINALIZED = FINALIZED_BlockStatus
+	BLOCK_SEALED    = SEALED_BlockStatus
+)

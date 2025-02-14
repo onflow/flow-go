@@ -56,6 +56,11 @@ func (_m *PubSubAdapterConfig) WithTracer(t p2p.PubSubTracer) {
 	_m.Called(t)
 }
 
+// WithValidateQueueSize provides a mock function with given fields: _a0
+func (_m *PubSubAdapterConfig) WithValidateQueueSize(_a0 int) {
+	_m.Called(_a0)
+}
+
 // NewPubSubAdapterConfig creates a new instance of PubSubAdapterConfig. It also registers a testing interface on the mock and a cleanup function to assert the mocks expectations.
 // The first argument is typically a *testing.T value.
 func NewPubSubAdapterConfig(t interface {

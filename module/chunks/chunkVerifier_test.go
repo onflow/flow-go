@@ -724,5 +724,18 @@ func (m *testMetadata) RefreshChunkData(t *testing.T) *verification.VerifiableCh
 		Result:        result,
 		ChunkDataPack: chunkDataPack,
 		EndState:      flow.StateCommitment(endState),
+		Snapshot:      mockSnapshotSubset{},
 	}
+}
+
+type mockSnapshotSubset struct{}
+
+func (m mockSnapshotSubset) RandomSource() ([]byte, error) {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (m mockSnapshotSubset) VersionBeacon() (*flow.SealedVersionBeacon, error) {
+	//TODO implement me
+	panic("implement me")
 }
