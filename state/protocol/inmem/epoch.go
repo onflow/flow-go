@@ -80,12 +80,13 @@ func (eq Epochs) NextCommitted() (protocol.CommittedEpoch, error) {
 
 // setupEpoch is an implementation of protocol.TentativeEpoch backed by an EpochSetup service event.
 // Includes any extensions which have been included as of the reference block.
-// This is used for converting service events to inmem.Epoch.
 type setupEpoch struct {
 	// EpochSetup service event
 	setupEvent *flow.EpochSetup
 	extensions []flow.EpochExtension
 }
+
+var _ protocol.TentativeEpoch = (*setupEpoch)(nil)
 
 func (es *setupEpoch) Counter() uint64 {
 	return es.setupEvent.Counter
@@ -179,12 +180,13 @@ func (es *setupEpoch) FinalHeight() (uint64, error) {
 }
 
 // committedEpoch is an implementation of protocol.CommittedEpoch backed by an EpochSetup
-// and EpochCommit service event. This is used for converting service events to
-// inmem.Epoch.
+// and EpochCommit service event.
 type committedEpoch struct {
 	setupEpoch
 	commitEvent *flow.EpochCommit
 }
+
+var _ protocol.CommittedEpoch = (*committedEpoch)(nil)
 
 func (es *committedEpoch) Cluster(index uint) (protocol.Cluster, error) {
 

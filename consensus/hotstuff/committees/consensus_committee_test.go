@@ -676,7 +676,7 @@ func TestRemoveOldEpochs(t *testing.T) {
 	snapshot.On("EpochPhase").Return(
 		func() flow.EpochPhase { return currentEpochPhase },
 		func() error { return nil },
-	)
+	).Maybe()
 
 	com, err := NewConsensusCommittee(state, me)
 	require.Nil(t, err)

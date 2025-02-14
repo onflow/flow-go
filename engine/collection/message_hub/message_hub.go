@@ -113,7 +113,6 @@ func NewMessageHub(log zerolog.Logger,
 	payloads storage.ClusterPayloads,
 ) (*MessageHub, error) {
 	// find my cluster for the current epoch
-	// TODO this should flow from cluster state as source of truth
 	epoch, err := state.Final().Epochs().Current()
 	if err != nil {
 		return nil, fmt.Errorf("could not get current epoch: %w", err)
