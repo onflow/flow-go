@@ -1,7 +1,6 @@
 package badger_test
 
 import (
-	"errors"
 	"math/rand"
 	"testing"
 
@@ -57,7 +56,7 @@ func TestDKGState_BeaconKeys(t *testing.T) {
 		// attempt to get a non-existent key
 		t.Run("should error if retrieving non-existent key", func(t *testing.T) {
 			_, err = store.RetrieveMyBeaconPrivateKey(epochCounter)
-			assert.True(t, errors.Is(err, storage.ErrNotFound))
+			assert.ErrorIs(t, err, storage.ErrNotFound)
 		})
 
 		// attempt to store a nil key should fail  - use DKGState.SetEndState(flow.DKGEndStateNoKey)
@@ -83,7 +82,7 @@ func TestDKGState_BeaconKeys(t *testing.T) {
 		// test storing same key
 		t.Run("should fail to store a key twice", func(t *testing.T) {
 			err = store.InsertMyBeaconPrivateKey(epochCounter, expected)
-			require.True(t, errors.Is(err, storage.ErrAlreadyExists))
+			require.ErrorIs(t, err, storage.ErrAlreadyExists)
 		})
 	})
 }

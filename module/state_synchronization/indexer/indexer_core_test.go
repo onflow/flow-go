@@ -3,7 +3,6 @@ package indexer
 import (
 	"context"
 	"crypto/rand"
-	"errors"
 	"fmt"
 	"os"
 	"testing"
@@ -568,7 +567,7 @@ func TestExecutionState_IndexBlockData(t *testing.T) {
 
 		err := newIndexCoreTest(t, blocks, execData).runIndexBlockData()
 
-		assert.True(t, errors.Is(err, storage.ErrNotFound))
+		assert.ErrorIs(t, err, storage.ErrNotFound)
 	})
 
 }
