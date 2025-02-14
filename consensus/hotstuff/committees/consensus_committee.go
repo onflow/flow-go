@@ -397,7 +397,7 @@ func (c *Consensus) handleEpochExtended(epochCounter uint64, extension flow.Epoc
 // No errors are expected during normal operation.
 func (c *Consensus) handleEpochCommittedPhaseStarted(refBlock *flow.Header) error {
 	epoch, err := c.state.AtHeight(refBlock.Height).Epochs().NextCommitted()
-	if err != nil {
+	if err != nil { // no expected errors since reference block is in EpochCommit phase
 		return fmt.Errorf("could not get next committed epoch: %w", err)
 	}
 	_, err = c.prepareEpoch(epoch)
