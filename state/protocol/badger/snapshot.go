@@ -9,6 +9,7 @@ import (
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
+	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/state/fork"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/state/protocol/inmem"
@@ -452,7 +453,13 @@ func (q *EpochQuery) NextCommitted() (protocol.CommittedEpoch, error) {
 	case flow.EpochPhaseStaking, flow.EpochPhaseFallback, flow.EpochPhaseSetup:
 		return nil, protocol.ErrNextEpochNotCommitted
 	case flow.EpochPhaseCommitted:
-		// TODO check there are no epoch extensions for future epoch
+		// A protocol state snapshot is immutable and only represents the state as of the corresponding block. The
+		// flow protocol implies that future epochs cannot have extensions, because in order to add extensions to
+		// an epoch, we have to enter that epoch. Hence, `entry.NextEpoch.EpochExtensions` must be empty:
+		if len(entry.NextEpoch.EpochExtensions) > 0 {
+			return nil, irrecoverable.NewExceptionf("state with current epoch %d corrupted, because future epoch %d already has %d extensions",
+				entry.CurrentEpochCommit.Counter, entry.NextEpochSetup.Counter, len(entry.NextEpoch.EpochExtensions))
+		}
 		return inmem.NewCommittedEpoch(entry.NextEpochSetup, entry.NextEpochCommit, entry.NextEpoch.EpochExtensions), nil
 	default:
 		return nil, fmt.Errorf("data corruption: unknown epoch phase implies malformed protocol state epoch data")

@@ -6,6 +6,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/factory"
 	"github.com/onflow/flow-go/model/flow/filter"
+	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/signature"
 	"github.com/onflow/flow-go/state/cluster"
 	"github.com/onflow/flow-go/state/protocol"
@@ -56,8 +57,9 @@ func (eq Epochs) NextUnsafe() (protocol.TentativeEpoch, error) {
 		return NewSetupEpoch(eq.entry.NextEpochSetup), nil
 	case flow.EpochPhaseCommitted:
 		return nil, protocol.ErrNextEpochAlreadyCommitted
+	default:
+		return nil, fmt.Errorf("unexpected unknown phase in protocol state entry")
 	}
-	return nil, fmt.Errorf("unexpected unknown phase in protocol state entry")
 }
 
 // NextCommitted returns the next epoch as of this snapshot, only if it has
@@ -73,10 +75,17 @@ func (eq Epochs) NextCommitted() (protocol.CommittedEpoch, error) {
 	case flow.EpochPhaseStaking, flow.EpochPhaseFallback, flow.EpochPhaseSetup:
 		return nil, protocol.ErrNextEpochNotCommitted
 	case flow.EpochPhaseCommitted:
-		// TODO check there are no epoch extensions for future epoch
+		// A protocol state snapshot is immutable and only represents the state as of the corresponding block. The
+		// flow protocol implies that future epochs cannot have extensions, because in order to add extensions to
+		// an epoch, we have to enter that epoch. Hence, `eq.entry.NextEpoch.EpochExtensions` must be empty:
+		if len(eq.entry.NextEpoch.EpochExtensions) > 0 {
+			return nil, irrecoverable.NewExceptionf("state with current epoch %d corrupted, because future epoch %d already has %d extensions",
+				eq.entry.CurrentEpochCommit.Counter, eq.entry.NextEpochSetup.Counter, len(eq.entry.NextEpoch.EpochExtensions))
+		}
 		return NewCommittedEpoch(eq.entry.NextEpochSetup, eq.entry.NextEpochCommit, eq.entry.NextEpoch.EpochExtensions), nil
+	default:
+		return nil, fmt.Errorf("unexpected unknown phase in protocol state entry")
 	}
-	return nil, fmt.Errorf("unexpected unknown phase in protocol state entry")
 }
 
 // setupEpoch is an implementation of protocol.TentativeEpoch backed by an EpochSetup service event.
