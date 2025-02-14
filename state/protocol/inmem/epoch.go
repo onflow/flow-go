@@ -91,6 +91,36 @@ func (es *setupEpoch) Counter() uint64 {
 	return es.setupEvent.Counter
 }
 
+func (es *setupEpoch) InitialIdentities() flow.IdentitySkeletonList {
+	return es.setupEvent.Participants
+}
+
+func (es *setupEpoch) Clustering() (flow.ClusterList, error) {
+	return ClusteringFromSetupEvent(es.setupEvent)
+}
+
+// ClusteringFromSetupEvent generates a new clustering list from Epoch setup data.
+// No errors expected during normal operation.
+func ClusteringFromSetupEvent(setupEvent *flow.EpochSetup) (flow.ClusterList, error) {
+	collectorFilter := filter.HasRole[flow.IdentitySkeleton](flow.RoleCollection)
+	clustering, err := factory.NewClusterList(setupEvent.Assignments, setupEvent.Participants.Filter(collectorFilter))
+	if err != nil {
+		return nil, fmt.Errorf("failed to generate ClusterList from collector identities: %w", err)
+	}
+	return clustering, nil
+}
+
+// committedEpoch is an implementation of protocol.CommittedEpoch backed by an EpochSetup
+// and EpochCommit service event.
+// Includes any extensions which have been included as of the reference block.
+type committedEpoch struct {
+	setupEpoch
+	commitEvent *flow.EpochCommit
+	extensions  []flow.EpochExtension
+}
+
+var _ protocol.CommittedEpoch = (*committedEpoch)(nil)
+
 func (es *committedEpoch) FirstView() uint64 {
 	return es.setupEvent.FirstView
 }
@@ -151,25 +181,6 @@ func (es *committedEpoch) RandomSource() []byte {
 	return es.setupEvent.RandomSource
 }
 
-func (es *setupEpoch) InitialIdentities() flow.IdentitySkeletonList {
-	return es.setupEvent.Participants
-}
-
-func (es *setupEpoch) Clustering() (flow.ClusterList, error) {
-	return ClusteringFromSetupEvent(es.setupEvent)
-}
-
-// ClusteringFromSetupEvent generates a new clustering list from Epoch setup data.
-// No errors expected during normal operation.
-func ClusteringFromSetupEvent(setupEvent *flow.EpochSetup) (flow.ClusterList, error) {
-	collectorFilter := filter.HasRole[flow.IdentitySkeleton](flow.RoleCollection)
-	clustering, err := factory.NewClusterList(setupEvent.Assignments, setupEvent.Participants.Filter(collectorFilter))
-	if err != nil {
-		return nil, fmt.Errorf("failed to generate ClusterList from collector identities: %w", err)
-	}
-	return clustering, nil
-}
-
 func (es *committedEpoch) FirstHeight() (uint64, error) {
 	return 0, protocol.ErrUnknownEpochBoundary
 }
@@ -177,17 +188,6 @@ func (es *committedEpoch) FirstHeight() (uint64, error) {
 func (es *committedEpoch) FinalHeight() (uint64, error) {
 	return 0, protocol.ErrUnknownEpochBoundary
 }
-
-// committedEpoch is an implementation of protocol.CommittedEpoch backed by an EpochSetup
-// and EpochCommit service event.
-// Includes any extensions which have been included as of the reference block.
-type committedEpoch struct {
-	setupEpoch
-	commitEvent *flow.EpochCommit
-	extensions  []flow.EpochExtension
-}
-
-var _ protocol.CommittedEpoch = (*committedEpoch)(nil)
 
 func (es *committedEpoch) Cluster(index uint) (protocol.Cluster, error) {
 
