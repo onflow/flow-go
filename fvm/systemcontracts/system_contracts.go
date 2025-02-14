@@ -204,6 +204,7 @@ func (c SystemContracts) AsTemplateEnv() templates.Environment {
 		NodeVersionBeaconAddress:   c.NodeVersionBeacon.Address.Hex(),
 		RandomBeaconHistoryAddress: c.RandomBeaconHistory.Address.Hex(),
 		StorageFeesAddress:         c.FlowStorageFees.Address.Hex(),
+		EVMAddress:                 c.EVMContract.Address.Hex(),
 
 		FlowFeesAddress:                   c.FlowFees.Address.Hex(),
 		FlowTokenAddress:                  c.FlowToken.Address.Hex(),
