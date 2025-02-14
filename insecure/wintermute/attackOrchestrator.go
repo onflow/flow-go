@@ -153,7 +153,7 @@ func (o *Orchestrator) corruptExecutionResult(receipt *flow.ExecutionReceipt) *f
 	}
 
 	if chunksNum > 1 {
-		result.Chunks = append(result.Chunks, unittest.ChunkListFixture(uint(chunksNum-1), receipt.ExecutionResult.BlockID, result.Chunks[0].EndState
+		result.Chunks = append(result.Chunks, unittest.ChunkListFixture(uint(chunksNum-1), receipt.ExecutionResult.BlockID, result.Chunks[0].EndState,
 			unittest.WithServiceEventCount(nil))...) // TODO(mainnet27, #6773): remove this line
 	}
 

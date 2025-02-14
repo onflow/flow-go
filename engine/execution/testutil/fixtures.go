@@ -657,15 +657,23 @@ func EntropyProviderFixture(source []byte) environment.EntropyProvider {
 // ProtocolStateWithVersionFixture is the same as ProtocolStateWithSourceFixture,
 // but it allows specifying the desired protocol version, rather than random source.
 // TODO(mainnet27, #6773): remove, because this is only temporarily needed in the execution node to produce different chunk Data Packs depending on the protocol version
-func ProtocolStateWithVersionFixture(protocolVersion uint64) *protocolMock.State {
-	snapshot := &protocolMock.Snapshot{}
+func ProtocolStateWithVersionFixture(protocolVersion uint64) protocol.SnapshotExecutionSubsetProvider {
 	kvstore := &protocolMock.KVStoreReader{}
 	kvstore.On("GetProtocolStateVersion").Return(protocolVersion)
-	snapshot.On("RandomSource").Return(unittest.SignatureFixture(), nil)
-	snapshot.On("ProtocolState").Return(kvstore, nil)
-	state := protocolMock.State{}
-	state.On("AtBlockID", mock.Anything).Return(snapshot)
-	return &state
+	snapshot := mockSnapshotSubset{
+		randomSourceFunc: func() ([]byte, error) {
+			return unittest.SignatureFixture(), nil
+		},
+		kvStoreFunc: func() (protocol.KVStoreReader, error) {
+			return kvstore, nil
+		},
+	}
+	provider := mockProtocolStateSnapshotProvider{
+		snapshotFunc: func(blockID flow.Identifier) protocol.SnapshotExecutionSubset {
+			return snapshot
+		},
+	}
+	return provider
 }
 
 // ProtocolStateWithSourceFixture returns a protocol state mock that only
@@ -676,12 +684,18 @@ func ProtocolStateWithSourceFixture(source []byte) protocol.SnapshotExecutionSub
 	if source == nil {
 		source = unittest.SignatureFixture()
 	}
+	// For tests not explicitly testing version compatibility, always return latest protocol version
+	kvstore := &protocolMock.KVStoreReader{}
+	kvstore.On("GetProtocolStateVersion").Return(uint64(2))
 	snapshot := mockSnapshotSubset{
 		randomSourceFunc: func() ([]byte, error) {
 			return source, nil
 		},
 		versionBeaconFunc: func() (*flow.SealedVersionBeacon, error) {
 			return &flow.SealedVersionBeacon{VersionBeacon: unittest.VersionBeaconFixture()}, nil
+		},
+		kvStoreFunc: func() (protocol.KVStoreReader, error) {
+			return kvstore, nil
 		},
 	}
 
@@ -704,6 +718,7 @@ func (m mockProtocolStateSnapshotProvider) AtBlockID(blockID flow.Identifier) pr
 type mockSnapshotSubset struct {
 	randomSourceFunc  func() ([]byte, error)
 	versionBeaconFunc func() (*flow.SealedVersionBeacon, error)
+	kvStoreFunc       func() (protocol.KVStoreReader, error)
 }
 
 func (m mockSnapshotSubset) RandomSource() ([]byte, error) {
@@ -718,6 +733,10 @@ func (m mockSnapshotSubset) VersionBeacon() (*flow.SealedVersionBeacon, error) {
 		return nil, errors.New("version beacon not implemented")
 	}
 	return m.versionBeaconFunc()
+}
+
+func (m mockSnapshotSubset) ProtocolState() (protocol.KVStoreReader, error) {
+	return m.kvStoreFunc()
 }
 
 var _ protocol.SnapshotExecutionSubset = (*mockSnapshotSubset)(nil)
