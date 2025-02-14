@@ -170,7 +170,7 @@ func TestChunkTotalComputationUsedIsSet(t *testing.T) {
 // not conflated with 0) by the encoding schemes we use, because this difference is meaningful and
 // important for backward compatibility (see [ChunkBody.ServiceEventCount] for details).
 func TestChunkEncodeDecode(t *testing.T) {
-	chunk := unittest.ChunkFixture(unittest.IdentifierFixture(), 0)
+	chunk := unittest.ChunkFixture(unittest.IdentifierFixture(), 0, unittest.StateCommitmentFixture())
 
 	t.Run("encode/decode preserves nil ServiceEventCount", func(t *testing.T) {
 		chunk.ServiceEventCount = nil
@@ -237,7 +237,7 @@ func TestChunkEncodeDecode(t *testing.T) {
 // TestChunk_ModelVersions_EncodeDecode tests that encoding and decoding between
 // supported versions works as expected.
 func TestChunk_ModelVersions_EncodeDecode(t *testing.T) {
-	chunkFixture := unittest.ChunkFixture(unittest.IdentifierFixture(), 1)
+	chunkFixture := unittest.ChunkFixture(unittest.IdentifierFixture(), 1, unittest.StateCommitmentFixture())
 	chunkFixture.ServiceEventCount = unittest.PtrTo[uint16](0) // non-nil extra field
 
 	t.Run("encoding v0 and decoding it into v1 should yield nil for ServiceEventCount", func(t *testing.T) {
@@ -368,7 +368,7 @@ func TestChunk_ModelVersions_EncodeDecode(t *testing.T) {
 //
 // Backward compatibility is implemented by providing a custom EncodeRLP method.
 func TestChunk_FingerprintBackwardCompatibility(t *testing.T) {
-	chunk := unittest.ChunkFixture(unittest.IdentifierFixture(), 1)
+	chunk := unittest.ChunkFixture(unittest.IdentifierFixture(), 1, unittest.StateCommitmentFixture())
 	chunk.ServiceEventCount = nil
 	chunkBody := chunk.ChunkBody
 	var chunkBodyV0 flow.ChunkBodyV0
