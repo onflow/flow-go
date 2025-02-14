@@ -96,7 +96,7 @@ func (suite *EpochLookupSuite) Phase() flow.EpochPhase {
 func (suite *EpochLookupSuite) CommitEpochs(epochs ...epochRange) {
 	for _, epoch := range epochs {
 		mockEpoch := newMockCommittedEpoch(epoch.counter, epoch.firstView, epoch.finalView)
-		suite.epochQuery.Add(mockEpoch)
+		suite.epochQuery.AddCommitted(mockEpoch)
 		// if we add a next epoch (counter 1 greater than current), then set phase to committed
 		if epoch.counter == suite.currentEpochCounter+1 {
 			suite.WithLock(func() {

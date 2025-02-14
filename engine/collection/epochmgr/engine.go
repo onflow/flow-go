@@ -142,7 +142,10 @@ func (e *Engine) Start(ctx irrecoverable.SignalerContext) {
 // authorized participant in the current epoch.
 // No errors are expected during normal operation.
 func (e *Engine) checkShouldStartCurrentEpochComponentsOnStartup(ctx irrecoverable.SignalerContext, finalSnapshot protocol.Snapshot) error {
-	currentEpoch := finalSnapshot.Epochs().Current()
+	currentEpoch, err := finalSnapshot.Epochs().Current()
+	if err != nil {
+		return fmt.Errorf("could not get current epoch: %w", err)
+	}
 	currentEpochCounter, err := currentEpoch.Counter()
 	if err != nil {
 		return fmt.Errorf("could not get epoch counter: %w", err)
@@ -179,7 +182,13 @@ func (e *Engine) checkShouldStartPreviousEpochComponentsOnStartup(engineCtx irre
 	}
 	finalizedHeight := finalHeader.Height
 
-	prevEpoch := finalSnapshot.Epochs().Previous()
+	prevEpoch, err := finalSnapshot.Epochs().Previous()
+	if err != nil {
+		if errors.Is(err, protocol.ErrNoPreviousEpoch) {
+			return nil
+		}
+		return fmt.Errorf("[unexpected] could not get previous epoch: %w", err)
+	}
 	prevEpochCounter, err := prevEpoch.Counter()
 	if err != nil {
 		if errors.Is(err, protocol.ErrNoPreviousEpoch) {
@@ -345,7 +354,10 @@ func (e *Engine) handleEpochEvents(ctx irrecoverable.SignalerContext, ready comp
 		case firstBlock := <-e.epochSetupPhaseStartedEvents:
 			// This is one of the few places where we have to use the configuration for a future epoch that
 			// has not yet been committed. CAUTION: the epoch transition might not happen as described here!
-			nextEpoch := e.state.AtBlockID(firstBlock.ID()).Epochs().NextUnsafe()
+			nextEpoch, err := e.state.AtBlockID(firstBlock.ID()).Epochs().NextUnsafe()
+			if err != nil { // since the Epoch Setup Phase just started, this call should never error
+				ctx.Throw(err)
+			}
 			e.onEpochSetupPhaseStarted(ctx, nextEpoch)
 		case epochCounter := <-e.epochStopEvents:
 			err := e.stopEpochComponents(epochCounter)
@@ -377,7 +389,10 @@ func (e *Engine) handleEpochErrors(ctx irrecoverable.SignalerContext, errCh <-ch
 //
 // No errors are expected during normal operation.
 func (e *Engine) onEpochTransition(ctx irrecoverable.SignalerContext, first *flow.Header) error {
-	epoch := e.state.AtBlockID(first.ID()).Epochs().Current()
+	epoch, err := e.state.AtBlockID(first.ID()).Epochs().Current()
+	if err != nil {
+		return fmt.Errorf("could not get current epoch: %w", err)
+	}
 	counter, err := epoch.Counter()
 	if err != nil {
 		return fmt.Errorf("could not get epoch counter: %w", err)

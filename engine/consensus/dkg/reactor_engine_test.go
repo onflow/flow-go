@@ -127,7 +127,7 @@ func (suite *ReactorEngineSuite_SetupPhase) SetupTest() {
 	suite.nextEpoch.On("InitialIdentities").Return(suite.committee.ToSkeleton(), nil)
 
 	suite.epochQuery = mocks.NewEpochQuery(suite.T(), suite.epochCounter)
-	suite.epochQuery.Add(suite.currentEpoch)
+	suite.epochQuery.AddCommitted(suite.currentEpoch)
 	suite.epochQuery.AddTentative(suite.nextEpoch)
 	suite.snapshot = new(protocol.Snapshot)
 	suite.snapshot.On("Epochs").Return(suite.epochQuery)
@@ -341,8 +341,8 @@ func (suite *ReactorEngineSuite_CommittedPhase) SetupTest() {
 	nextEpoch.On("DKG").Return(nextDKG, nil)
 
 	epochQuery := mocks.NewEpochQuery(suite.T(), suite.epochCounter)
-	epochQuery.Add(currentEpoch)
-	epochQuery.Add(nextEpoch)
+	epochQuery.AddCommitted(currentEpoch)
+	epochQuery.AddCommitted(nextEpoch)
 
 	firstBlock := unittest.BlockHeaderFixture(unittest.HeaderWithView(100))
 	suite.firstBlock = firstBlock

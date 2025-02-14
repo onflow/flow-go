@@ -64,7 +64,9 @@ func TestStaticEpochTransition(t *testing.T) {
 	rootSnapshot := createRootSnapshot(t, participantsData)
 	consensusParticipants := NewConsensusParticipants(participantsData)
 
-	firstEpochCounter, err := rootSnapshot.Epochs().Current().Counter()
+	firstEpoch, err := rootSnapshot.Epochs().Current()
+	require.NoError(t, err)
+	firstEpochCounter, err := firstEpoch.Counter()
 	require.NoError(t, err)
 
 	// set up next epoch beginning in 4 views, with same identities as first epoch
@@ -85,7 +87,9 @@ func TestStaticEpochTransition(t *testing.T) {
 
 	// confirm that we have transitioned to the new epoch
 	pstate := nodes[0].state
-	afterCounter, err := pstate.Final().Epochs().Current().Counter()
+	secondEpoch, err := pstate.Final().Epochs().Current()
+	require.NoError(t, err)
+	afterCounter, err := secondEpoch.Counter()
 	require.NoError(t, err)
 	assert.Equal(t, firstEpochCounter+1, afterCounter)
 
@@ -102,7 +106,9 @@ func TestEpochTransition_IdentitiesOverlap(t *testing.T) {
 	rootSnapshot := createRootSnapshot(t, firstEpochConsensusParticipants)
 	consensusParticipants := NewConsensusParticipants(firstEpochConsensusParticipants)
 
-	firstEpochCounter, err := rootSnapshot.Epochs().Current().Counter()
+	firstEpoch, err := rootSnapshot.Epochs().Current()
+	require.NoError(t, err)
+	firstEpochCounter, err := firstEpoch.Counter()
 	require.NoError(t, err)
 
 	// set up next epoch with 1 new consensus nodes and 2 consensus nodes from first epoch
@@ -134,7 +140,9 @@ func TestEpochTransition_IdentitiesOverlap(t *testing.T) {
 
 	// confirm that we have transitioned to the new epoch
 	pstate := nodes[0].state
-	afterCounter, err := pstate.Final().Epochs().Current().Counter()
+	secondEpoch, err := pstate.Final().Epochs().Current()
+	require.NoError(t, err)
+	afterCounter, err := secondEpoch.Counter()
 	require.NoError(t, err)
 	assert.Equal(t, firstEpochCounter+1, afterCounter)
 
@@ -150,7 +158,9 @@ func TestEpochTransition_IdentitiesDisjoint(t *testing.T) {
 	rootSnapshot := createRootSnapshot(t, firstEpochConsensusParticipants)
 	consensusParticipants := NewConsensusParticipants(firstEpochConsensusParticipants)
 
-	firstEpochCounter, err := rootSnapshot.Epochs().Current().Counter()
+	firstEpoch, err := rootSnapshot.Epochs().Current()
+	require.NoError(t, err)
+	firstEpochCounter, err := firstEpoch.Counter()
 	require.NoError(t, err)
 
 	// prepare a next epoch with a completely different consensus committee
@@ -179,7 +189,9 @@ func TestEpochTransition_IdentitiesDisjoint(t *testing.T) {
 
 	// confirm that we have transitioned to the new epoch
 	pstate := nodes[0].state
-	afterCounter, err := pstate.Final().Epochs().Current().Counter()
+	secondEpoch, err := pstate.Final().Epochs().Current()
+	require.NoError(t, err)
+	afterCounter, err := secondEpoch.Counter()
 	require.NoError(t, err)
 	assert.Equal(t, firstEpochCounter+1, afterCounter)
 

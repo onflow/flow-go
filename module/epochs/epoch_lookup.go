@@ -1,6 +1,7 @@
 package epochs
 
 import (
+	"errors"
 	"fmt"
 	"sync"
 
@@ -163,35 +164,42 @@ func NewEpochLookup(state protocol.State) (*EpochLookup, error) {
 		AddWorker(lookup.handleProtocolEvents).
 		Build()
 
-	final := state.Final()
-
-	// we cache the previous epoch, if one exists
-	exists, err := protocol.PreviousEpochExists(final)
+	epochs := state.Final().Epochs()
+	prev, err := epochs.Previous()
 	if err != nil {
-		return nil, fmt.Errorf("could not check previous epoch exists: %w", err)
-	}
-	if exists {
-		err := lookup.cacheEpoch(final.Epochs().Previous())
+		if !errors.Is(err, protocol.ErrNoPreviousEpoch) {
+			return nil, irrecoverable.NewExceptionf("unexpected error while retrieving previous epoch: %w", err)
+		}
+		// `ErrNoPreviousEpoch` is an expected edge case during normal operations (e.g. we are in first epoch after spork)
+		// continue without caching the previous epoch
+	} else { // previous epoch was successfully retrieved
+		err = lookup.cacheEpoch(prev)
 		if err != nil {
 			return nil, fmt.Errorf("could not prepare previous epoch: %w", err)
 		}
 	}
 
 	// we always cache the current epoch
-	err = lookup.cacheEpoch(final.Epochs().Current())
+	curr, err := epochs.Current()
+	if err != nil {
+		return nil, fmt.Errorf("could not get current epoch: %w", err)
+	}
+	err = lookup.cacheEpoch(curr)
 	if err != nil {
 		return nil, fmt.Errorf("could not prepare current epoch: %w", err)
 	}
 
 	// we cache the next epoch, if it is committed
-	phase, err := final.EpochPhase()
+	nextEpoch, err := epochs.NextCommitted()
 	if err != nil {
-		return nil, fmt.Errorf("could not check epoch phase: %w", err)
-	}
-	if phase == flow.EpochPhaseCommitted {
-		err := lookup.cacheEpoch(final.Epochs().NextCommitted())
+		if !errors.Is(err, protocol.ErrNextEpochNotCommitted) {
+			return nil, irrecoverable.NewExceptionf("unexpected error retrieving next epoch: %w", err)
+		}
+		// receiving a `ErrNextEpochNotCommitted` is expected during the happy path
+	} else { // next epoch was successfully retrieved
+		err = lookup.cacheEpoch(nextEpoch)
 		if err != nil {
-			return nil, fmt.Errorf("could not prepare previous epoch: %w", err)
+			return nil, fmt.Errorf("could not cache next committed epoch: %w", err)
 		}
 	}
 
@@ -317,8 +325,11 @@ func (lookup *EpochLookup) EpochExtended(epochCounter uint64, _ *flow.Header, ex
 // No errors are expected to be returned by the process callback during normal operation.
 func (lookup *EpochLookup) EpochCommittedPhaseStarted(_ uint64, first *flow.Header) {
 	lookup.epochEvents <- func() error {
-		epoch := lookup.state.AtBlockID(first.ID()).Epochs().NextCommitted()
-		err := lookup.cacheEpoch(epoch)
+		epoch, err := lookup.state.AtBlockID(first.ID()).Epochs().NextCommitted()
+		if err != nil {
+			return fmt.Errorf("could not get next committed epoch: %w", err)
+		}
+		err = lookup.cacheEpoch(epoch)
 		if err != nil {
 			return fmt.Errorf("failed to cache next epoch: %w", err)
 		}

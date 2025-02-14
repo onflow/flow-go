@@ -263,7 +263,7 @@ func (s *Suite) TestOnFinalizedBlockSingle() {
 	snap := new(protocol.Snapshot)
 
 	epoch.On("ClusterByChainID", mock.Anything).Return(cluster, nil)
-	epochs.On("Current").Return(epoch)
+	epochs.On("Current").Return(epoch, nil)
 	snap.On("Epochs").Return(epochs)
 
 	// prepare cluster committee members
@@ -319,7 +319,7 @@ func (s *Suite) TestOnFinalizedBlockSeveralBlocksAhead() {
 	snap := new(protocol.Snapshot)
 
 	epoch.On("ClusterByChainID", mock.Anything).Return(cluster, nil)
-	epochs.On("Current").Return(epoch)
+	epochs.On("Current").Return(epoch, nil)
 	snap.On("Epochs").Return(epochs)
 
 	// prepare cluster committee members
@@ -583,7 +583,7 @@ func (s *Suite) TestRequestMissingCollections() {
 	epoch := new(protocol.CommittedEpoch)
 	epoch.On("ClusterByChainID", mock.Anything).Return(cluster, nil)
 	epochs := new(protocol.EpochQuery)
-	epochs.On("Current").Return(epoch)
+	epochs.On("Current").Return(epoch, nil)
 	snap := new(protocol.Snapshot)
 	snap.On("Epochs").Return(epochs)
 	s.proto.state.On("AtBlockID", refBlockID).Return(snap)
@@ -682,7 +682,7 @@ func (s *Suite) TestProcessBackgroundCalls() {
 	epoch := new(protocol.CommittedEpoch)
 	epoch.On("ClusterByChainID", mock.Anything).Return(cluster, nil)
 	epochs := new(protocol.EpochQuery)
-	epochs.On("Current").Return(epoch)
+	epochs.On("Current").Return(epoch, nil)
 	snap := new(protocol.Snapshot)
 	snap.On("Epochs").Return(epochs)
 	s.proto.state.On("AtBlockID", refBlockID).Return(snap)

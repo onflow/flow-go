@@ -93,7 +93,10 @@ func registerConduits(net network.EngineRegistry, state protocol.State, eng netw
 
 	// add channels that are dependent on protocol state and change over time
 	// TODO need to update to register dynamic channels that are created on later epoch transitions
-	epoch := state.Final().Epochs().Current()
+	epoch, err := state.Final().Epochs().Current()
+	if err != nil {
+		return nil, fmt.Errorf("could not get current epoch: %w", err)
+	}
 
 	clusters, err := epoch.Clustering()
 	if err != nil {

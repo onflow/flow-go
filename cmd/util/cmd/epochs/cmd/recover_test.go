@@ -39,7 +39,9 @@ func TestRecoverEpochHappyPath(t *testing.T) {
 		snapshotFn := func() *inmem.Snapshot { return rootSnapshot }
 
 		// get expected dkg information
-		currentEpochDKG, err := rootSnapshot.Epochs().Current().DKG()
+		currentEpoch, err := rootSnapshot.Epochs().Current()
+		require.NoError(t, err)
+		currentEpochDKG, err := currentEpoch.DKG()
 		require.NoError(t, err)
 		expectedDKGPubKeys := make(map[cadence.String]struct{})
 		expectedDKGGroupKey := cadence.String(currentEpochDKG.GroupKey().String())
@@ -74,7 +76,8 @@ func TestRecoverEpochHappyPath(t *testing.T) {
 
 		// verify each argument
 		decodedValues := unittest.InterfafceToCdcValues(t, outputTxArgs)
-		currEpoch := rootSnapshot.Epochs().Current()
+		currEpoch, err := rootSnapshot.Epochs().Current()
+		require.NoError(t, err)
 		finalView, err := currEpoch.FinalView()
 		require.NoError(t, err)
 
@@ -87,7 +90,7 @@ func TestRecoverEpochHappyPath(t *testing.T) {
 		// target duration
 		require.Equal(t, decodedValues[3], cadence.NewUInt64(flagTargetDuration))
 		// target end time
-		expectedTargetEndTime, err := rootSnapshot.Epochs().Current().TargetEndTime()
+		expectedTargetEndTime, err := currEpoch.TargetEndTime()
 		require.NoError(t, err)
 		require.Equal(t, decodedValues[4], cadence.NewUInt64(expectedTargetEndTime))
 		// clusters: we cannot guarantee order of the cluster when we generate the test fixtures

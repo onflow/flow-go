@@ -40,7 +40,9 @@ func (s *RecoverEpochSuite) TestRecoverEpoch() {
 	require.NoError(s.T(), ln.Start())
 
 	// get final view form the latest snapshot
-	epoch1FinalView, err := s.Net.BootstrapSnapshot.Epochs().Current().FinalView()
+	epoch1, err := s.Net.BootstrapSnapshot.Epochs().Current()
+	require.NoError(s.T(), err)
+	epoch1FinalView, err := epoch1.FinalView()
 	require.NoError(s.T(), err)
 
 	// wait for at least the first block of the next epoch to be sealed so that we can

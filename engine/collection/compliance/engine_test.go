@@ -66,7 +66,7 @@ func (cs *EngineSuite) SetupTest() {
 	protoEpoch.On("Clustering").Return(clusters, nil)
 
 	protoQuery := &protocol.EpochQuery{}
-	protoQuery.On("Current").Return(protoEpoch)
+	protoQuery.On("Current").Return(protoEpoch, nil)
 
 	protoSnapshot := &protocol.Snapshot{}
 	protoSnapshot.On("Epochs").Return(protoQuery)
