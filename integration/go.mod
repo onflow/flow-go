@@ -22,8 +22,8 @@ require (
 	github.com/libp2p/go-libp2p v0.38.2
 	github.com/onflow/cadence v1.3.1
 	github.com/onflow/crypto v0.25.2
-	github.com/onflow/flow-core-contracts/lib/go/contracts v1.5.1-0.20250212170709-7a44024730ac
-	github.com/onflow/flow-core-contracts/lib/go/templates v1.5.1-0.20250211212523-f6bd4c3d8d32
+	github.com/onflow/flow-core-contracts/lib/go/contracts v1.5.1-preview
+	github.com/onflow/flow-core-contracts/lib/go/templates v1.5.1-preview
 	github.com/onflow/flow-go v0.38.0-preview.0.0.20241021221952-af9cd6e99de1
 	github.com/onflow/flow-go-sdk v1.3.1
 	github.com/onflow/flow-go/insecure v0.0.0-00010101000000-000000000000
@@ -247,7 +247,7 @@ require (
 	github.com/onflow/bridged-usdc/lib/go/contracts v1.0.0 // indirect
 	github.com/onflow/flow-ft/lib/go/contracts v1.0.1 // indirect
 	github.com/onflow/flow-ft/lib/go/templates v1.0.1 // indirect
-	github.com/onflow/flow-nft/lib/go/contracts v1.2.3-0.20250212001645-6970cef66408 // indirect
+	github.com/onflow/flow-nft/lib/go/contracts v1.2.3 // indirect
 	github.com/onflow/flow-nft/lib/go/templates v1.2.1 // indirect
 	github.com/onflow/nft-storefront/lib/go/contracts v1.0.0 // indirect
 	github.com/onflow/sdks v0.6.0-preview.1 // indirect
