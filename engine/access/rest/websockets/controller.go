@@ -308,6 +308,12 @@ func (c *Controller) inactivityTickerPeriod() time.Duration {
 // readMessages continuously reads messages from a client WebSocket connection,
 // validates each message, and processes it based on the message type.
 func (c *Controller) readMessages(ctx context.Context) error {
+	defer func() {
+		if r := recover(); r != nil {
+			c.logger.Warn().Msgf("reader routine recovered from panic: %v", r)
+		}
+	}()
+
 	for {
 		var message json.RawMessage
 		if err := c.conn.ReadJSON(&message); err != nil {
