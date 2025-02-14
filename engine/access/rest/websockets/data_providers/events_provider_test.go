@@ -318,7 +318,7 @@ func (s *EventsProviderSuite) TestEventsDataProvider_StateStreamNotConfigured() 
 	)
 	s.Require().Nil(provider)
 	s.Require().Error(err)
-	s.Require().Contains(err.Error(), "cannot stream events")
+	s.Require().Contains(err.Error(), "does not support streaming events")
 }
 
 // invalidArgumentsTestCases returns a list of test cases with invalid argument combinations

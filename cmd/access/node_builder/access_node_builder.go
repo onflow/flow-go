@@ -232,9 +232,10 @@ func DefaultAccessNodeConfig() *AccessNodeConfig {
 				IdleTimeout:    rest.DefaultIdleTimeout,
 				MaxRequestSize: commonrest.DefaultMaxRequestSize,
 			},
-			MaxMsgSize:      grpcutils.DefaultMaxMsgSize,
-			CompressorName:  grpcutils.NoCompressor,
-			WebSocketConfig: websockets.NewDefaultWebsocketConfig(),
+			MaxMsgSize:                grpcutils.DefaultMaxMsgSize,
+			CompressorName:            grpcutils.NoCompressor,
+			WebSocketConfig:           websockets.NewDefaultWebsocketConfig(),
+			EnableWebSocketsStreamAPI: false,
 		},
 		stateStreamConf: statestreambackend.Config{
 			MaxExecutionDataMsgSize: grpcutils.DefaultMaxMsgSize,
@@ -1467,18 +1468,30 @@ func (builder *FlowAccessNodeBuilder) extraFlags() {
 			fmt.Sprintf("specifies the number of blocks below the latest stored block height to keep in register db. default: %d", defaultConfig.registerDBPruneThreshold))
 
 		// websockets config
-		flags.DurationVar(&builder.rpcConf.WebSocketConfig.InactivityTimeout,
+		flags.DurationVar(
+			&builder.rpcConf.WebSocketConfig.InactivityTimeout,
 			"websocket-inactivity-timeout",
 			defaultConfig.rpcConf.WebSocketConfig.InactivityTimeout,
-			"the duration a WebSocket connection can remain open without any active subscriptions before being automatically closed")
-		flags.Uint64Var(&builder.rpcConf.WebSocketConfig.MaxSubscriptionsPerConnection,
+			"the duration a WebSocket connection can remain open without any active subscriptions before being automatically closed",
+		)
+		flags.Uint64Var(
+			&builder.rpcConf.WebSocketConfig.MaxSubscriptionsPerConnection,
 			"websocket-max-subscriptions-per-connection",
 			defaultConfig.rpcConf.WebSocketConfig.MaxSubscriptionsPerConnection,
-			"the maximum number of active WebSocket subscriptions allowed per connection")
-		flags.Uint64Var(&builder.rpcConf.WebSocketConfig.MaxResponsesPerSecond,
+			"the maximum number of active WebSocket subscriptions allowed per connection",
+		)
+		flags.Uint64Var(
+			&builder.rpcConf.WebSocketConfig.MaxResponsesPerSecond,
 			"websocket-max-responses-per-second",
 			defaultConfig.rpcConf.WebSocketConfig.MaxResponsesPerSecond,
-			"the maximum number of responses that can be sent to a single client per second")
+			"the maximum number of responses that can be sent to a single client per second",
+		)
+		flags.BoolVar(
+			&builder.rpcConf.EnableWebSocketsStreamAPI,
+			"experimental-enable-websockets-stream-api",
+			defaultConfig.rpcConf.EnableWebSocketsStreamAPI,
+			"[experimental] enables WebSockets Stream API that operates under /ws endpoint. this flag may change in a future release.",
+		)
 	}).ValidateFlags(func() error {
 		if builder.supportsObserver && (builder.PublicNetworkConfig.BindAddress == cmd.NotSet || builder.PublicNetworkConfig.BindAddress == "") {
 			return errors.New("public-network-address must be set if supports-observer is true")
