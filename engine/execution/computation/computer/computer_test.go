@@ -144,13 +144,13 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 
 		exemetrics := new(modulemock.ExecutionMetrics)
 		exemetrics.On("ExecutionBlockExecuted",
-			mock.Anything,  // duration
+			mock.Anything, // duration
 			mock.Anything). // stats
 			Return(nil).
 			Times(1)
 
 		exemetrics.On("ExecutionCollectionExecuted",
-			mock.Anything,  // duration
+			mock.Anything, // duration
 			mock.Anything). // stats
 			Return(nil).
 			Times(2) // 1 collection + system collection
@@ -1253,18 +1253,15 @@ func Test_ExecutingSystemCollection(t *testing.T) {
 	expectedNumberOfEvents := 4
 	expectedMinEventSize := 1000
 
-	// bootstrapping does not cache programs
-	expectedCachedPrograms := 0
-
 	metrics := new(modulemock.ExecutionMetrics)
 	metrics.On("ExecutionBlockExecuted",
-		mock.Anything,  // duration
+		mock.Anything, // duration
 		mock.Anything). // stats
 		Return(nil).
 		Times(1)
 
 	metrics.On("ExecutionCollectionExecuted",
-		mock.Anything,  // duration
+		mock.Anything, // duration
 		mock.Anything). // stats
 		Return(nil).
 		Times(1) // system collection
@@ -1289,7 +1286,12 @@ func Test_ExecutingSystemCollection(t *testing.T) {
 
 	metrics.On(
 		"ExecutionBlockCachedPrograms",
-		expectedCachedPrograms).
+		mock.Anything).
+		Run(func(args mock.Arguments) {
+			actual := args[0].(int)
+			// bootstrapping already caches some programs
+			require.Greater(t, actual, 0)
+		}).
 		Return(nil).
 		Times(1) // block
 
