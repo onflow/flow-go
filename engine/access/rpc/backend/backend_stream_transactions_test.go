@@ -459,7 +459,7 @@ func (s *TransactionStatusSuite) TestSendAndSubscribeTransactionStatusExpired() 
 	// Generate sent transaction with ref block of the current finalized block
 	transaction := s.initializeTransaction()
 	txId := transaction.ID()
-	s.collections.On("LightByTransactionID", txId).Return(nil, storage.ErrNotFound).Once()
+	s.collections.On("LightByTransactionID", txId).Return(nil, storage.ErrNotFound)
 
 	// Subscribe to transaction status and receive the first message with pending status
 	sub := s.backend.SendAndSubscribeTransactionStatuses(ctx, &transaction.TransactionBody, entities.EventEncodingVersion_CCF_V0)
@@ -644,7 +644,7 @@ func (s *TransactionStatusSuite) TestSubscribeTransactionStatusFailedSubscriptio
 		s.sealedSnapshot.On("Head").Return(nil, expectedError).Once()
 
 		signalerCtx := irrecoverable.WithSignalerContext(ctx,
-			irrecoverable.NewMockSignalerContextExpectError(s.T(), ctx, expectedError))
+			irrecoverable.NewMockSignalerContextExpectError(s.T(), ctx, fmt.Errorf("failed to lookup sealed block: %w", expectedError)))
 
 		sub := s.backend.SubscribeTransactionStatuses(signalerCtx, txId, entities.EventEncodingVersion_CCF_V0)
 		s.Assert().ErrorContains(sub.Err(), expectedError.Error())
