@@ -88,34 +88,34 @@ type setupEpoch struct {
 
 var _ protocol.TentativeEpoch = (*setupEpoch)(nil)
 
-func (es *setupEpoch) Counter() (uint64, error) {
-	return es.setupEvent.Counter, nil
+func (es *setupEpoch) Counter() uint64 {
+	return es.setupEvent.Counter
 }
 
-func (es *setupEpoch) FirstView() (uint64, error) {
-	return es.setupEvent.FirstView, nil
+func (es *setupEpoch) FirstView() uint64 {
+	return es.setupEvent.FirstView
 }
 
-func (es *setupEpoch) DKGPhase1FinalView() (uint64, error) {
-	return es.setupEvent.DKGPhase1FinalView, nil
+func (es *setupEpoch) DKGPhase1FinalView() uint64 {
+	return es.setupEvent.DKGPhase1FinalView
 }
 
-func (es *setupEpoch) DKGPhase2FinalView() (uint64, error) {
-	return es.setupEvent.DKGPhase2FinalView, nil
+func (es *setupEpoch) DKGPhase2FinalView() uint64 {
+	return es.setupEvent.DKGPhase2FinalView
 }
 
-func (es *setupEpoch) DKGPhase3FinalView() (uint64, error) {
-	return es.setupEvent.DKGPhase3FinalView, nil
+func (es *setupEpoch) DKGPhase3FinalView() uint64 {
+	return es.setupEvent.DKGPhase3FinalView
 }
 
 // FinalView returns the final view of the epoch, taking into account possible epoch extensions.
 // If there are no epoch extensions, the final view is the final view of the current epoch setup,
 // otherwise it is the final view of the last epoch extension.
-func (es *setupEpoch) FinalView() (uint64, error) {
+func (es *setupEpoch) FinalView() uint64 {
 	if len(es.extensions) > 0 {
-		return es.extensions[len(es.extensions)-1].FinalView, nil
+		return es.extensions[len(es.extensions)-1].FinalView
 	}
-	return es.setupEvent.FinalView, nil
+	return es.setupEvent.FinalView
 }
 
 // TargetDuration returns the desired real-world duration for this epoch, in seconds.
@@ -123,13 +123,13 @@ func (es *setupEpoch) FinalView() (uint64, error) {
 // and used by the Cruise Control system to moderate the block rate.
 // In case the epoch has extensions, the target duration is calculated based on the last extension, by calculating how many
 // views were added by the extension and adding the proportional time to the target duration.
-func (es *setupEpoch) TargetDuration() (uint64, error) {
+func (es *setupEpoch) TargetDuration() uint64 {
 	if len(es.extensions) == 0 {
-		return es.setupEvent.TargetDuration, nil
+		return es.setupEvent.TargetDuration
 	} else {
 		viewDuration := float64(es.setupEvent.TargetDuration) / float64(es.setupEvent.FinalView-es.setupEvent.FirstView+1)
 		lastExtension := es.extensions[len(es.extensions)-1]
-		return es.setupEvent.TargetDuration + uint64(float64(lastExtension.FinalView-es.setupEvent.FinalView)*viewDuration), nil
+		return es.setupEvent.TargetDuration + uint64(float64(lastExtension.FinalView-es.setupEvent.FinalView)*viewDuration)
 	}
 }
 
@@ -138,28 +138,30 @@ func (es *setupEpoch) TargetDuration() (uint64, error) {
 // the EpochSetup event and used by the Cruise Control system to moderate the block rate.
 // In case the epoch has extensions, the target end time is calculated based on the last extension, by calculating how many
 // views were added by the extension and adding the proportional time to the target end time.
-func (es *setupEpoch) TargetEndTime() (uint64, error) {
+func (es *setupEpoch) TargetEndTime() uint64 {
 	if len(es.extensions) == 0 {
-		return es.setupEvent.TargetEndTime, nil
+		return es.setupEvent.TargetEndTime
 	} else {
 		viewDuration := float64(es.setupEvent.TargetDuration) / float64(es.setupEvent.FinalView-es.setupEvent.FirstView+1)
 		lastExtension := es.extensions[len(es.extensions)-1]
-		return es.setupEvent.TargetEndTime + uint64(float64(lastExtension.FinalView-es.setupEvent.FinalView)*viewDuration), nil
+		return es.setupEvent.TargetEndTime + uint64(float64(lastExtension.FinalView-es.setupEvent.FinalView)*viewDuration)
 	}
 }
 
-func (es *setupEpoch) RandomSource() ([]byte, error) {
-	return es.setupEvent.RandomSource, nil
+func (es *setupEpoch) RandomSource() []byte {
+	return es.setupEvent.RandomSource
 }
 
-func (es *setupEpoch) InitialIdentities() (flow.IdentitySkeletonList, error) {
-	return es.setupEvent.Participants, nil
+func (es *setupEpoch) InitialIdentities() flow.IdentitySkeletonList {
+	return es.setupEvent.Participants
 }
 
 func (es *setupEpoch) Clustering() (flow.ClusterList, error) {
 	return ClusteringFromSetupEvent(es.setupEvent)
 }
 
+// ClusteringFromSetupEvent generates a new clustering list from Epoch setup data.
+// No errors expected during normal operation.
 func ClusteringFromSetupEvent(setupEvent *flow.EpochSetup) (flow.ClusterList, error) {
 	collectorFilter := filter.HasRole[flow.IdentitySkeleton](flow.RoleCollection)
 	clustering, err := factory.NewClusterList(setupEvent.Assignments, setupEvent.Participants.Filter(collectorFilter))
@@ -167,18 +169,6 @@ func ClusteringFromSetupEvent(setupEvent *flow.EpochSetup) (flow.ClusterList, er
 		return nil, fmt.Errorf("failed to generate ClusterList from collector identities: %w", err)
 	}
 	return clustering, nil
-}
-
-func (es *setupEpoch) Cluster(_ uint) (protocol.Cluster, error) {
-	return nil, protocol.ErrNextEpochNotCommitted
-}
-
-func (es *setupEpoch) ClusterByChainID(_ flow.ChainID) (protocol.Cluster, error) {
-	return nil, protocol.ErrNextEpochNotCommitted
-}
-
-func (es *setupEpoch) DKG() (protocol.DKG, error) {
-	return nil, protocol.ErrNextEpochNotCommitted
 }
 
 func (es *setupEpoch) FirstHeight() (uint64, error) {

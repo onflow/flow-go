@@ -329,9 +329,7 @@ func (suite *Suite) TestRoutingLocalCluster() {
 	// should be added to local mempool for the current epoch
 	currentEpoch, err := suite.epochQuery.Current()
 	suite.Assert().NoError(err)
-	counter, err := currentEpoch.Counter()
-	suite.Assert().NoError(err)
-	suite.Assert().True(suite.pools.ForEpoch(counter).Has(tx.ID()))
+	suite.Assert().True(suite.pools.ForEpoch(currentEpoch.Counter()).Has(tx.ID()))
 	suite.conduit.AssertExpectations(suite.T())
 }
 
@@ -361,9 +359,7 @@ func (suite *Suite) TestRoutingRemoteCluster() {
 	// should not be added to local mempool
 	currentEpoch, err := suite.epochQuery.Current()
 	suite.Assert().NoError(err)
-	counter, err := currentEpoch.Counter()
-	suite.Assert().NoError(err)
-	suite.Assert().False(suite.pools.ForEpoch(counter).Has(tx.ID()))
+	suite.Assert().False(suite.pools.ForEpoch(currentEpoch.Counter()).Has(tx.ID()))
 	suite.conduit.AssertExpectations(suite.T())
 }
 
@@ -396,9 +392,7 @@ func (suite *Suite) TestRoutingToRemoteClusterWithNoNodes() {
 	// should not be added to local mempool
 	currentEpoch, err := suite.epochQuery.Current()
 	suite.Assert().NoError(err)
-	counter, err := currentEpoch.Counter()
-	suite.Assert().NoError(err)
-	suite.Assert().False(suite.pools.ForEpoch(counter).Has(tx.ID()))
+	suite.Assert().False(suite.pools.ForEpoch(currentEpoch.Counter()).Has(tx.ID()))
 	suite.conduit.AssertExpectations(suite.T())
 }
 
@@ -426,9 +420,7 @@ func (suite *Suite) TestRoutingLocalClusterFromOtherNode() {
 	// should be added to local mempool for current epoch
 	currentEpoch, err := suite.epochQuery.Current()
 	suite.Assert().NoError(err)
-	counter, err := currentEpoch.Counter()
-	suite.Assert().NoError(err)
-	suite.Assert().True(suite.pools.ForEpoch(counter).Has(tx.ID()))
+	suite.Assert().True(suite.pools.ForEpoch(currentEpoch.Counter()).Has(tx.ID()))
 	suite.conduit.AssertExpectations(suite.T())
 }
 
@@ -456,9 +448,7 @@ func (suite *Suite) TestRoutingInvalidTransaction() {
 	// should not be added to local mempool
 	currentEpoch, err := suite.epochQuery.Current()
 	suite.Assert().NoError(err)
-	counter, err := currentEpoch.Counter()
-	suite.Assert().NoError(err)
-	suite.Assert().False(suite.pools.ForEpoch(counter).Has(tx.ID()))
+	suite.Assert().False(suite.pools.ForEpoch(currentEpoch.Counter()).Has(tx.ID()))
 	suite.conduit.AssertExpectations(suite.T())
 }
 

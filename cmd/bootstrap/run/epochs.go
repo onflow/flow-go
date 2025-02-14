@@ -127,15 +127,9 @@ func GenerateRecoverEpochTxArgs(log zerolog.Logger,
 		log.Fatal().Err(err).Msg("failed to convert cluster qcs to cadence type")
 	}
 
-	currEpochFinalView, err := epoch.FinalView()
-	if err != nil {
-		log.Fatal().Err(err).Msg("failed to get final view of current epoch")
-	}
+	currEpochFinalView := epoch.FinalView()
 
-	currEpochTargetEndTime, err := epoch.TargetEndTime()
-	if err != nil {
-		log.Fatal().Err(err).Msg("failed to get target end time of current epoch")
-	}
+	currEpochTargetEndTime := epoch.TargetEndTime()
 
 	args := []cadence.Value{
 		// epoch start view

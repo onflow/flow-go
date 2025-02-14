@@ -66,8 +66,7 @@ func TestStaticEpochTransition(t *testing.T) {
 
 	firstEpoch, err := rootSnapshot.Epochs().Current()
 	require.NoError(t, err)
-	firstEpochCounter, err := firstEpoch.Counter()
-	require.NoError(t, err)
+	firstEpochCounter := firstEpoch.Counter()
 
 	// set up next epoch beginning in 4 views, with same identities as first epoch
 	nextEpochIdentities, err := rootSnapshot.Identities(filter.Any)
@@ -89,9 +88,7 @@ func TestStaticEpochTransition(t *testing.T) {
 	pstate := nodes[0].state
 	secondEpoch, err := pstate.Final().Epochs().Current()
 	require.NoError(t, err)
-	afterCounter, err := secondEpoch.Counter()
-	require.NoError(t, err)
-	assert.Equal(t, firstEpochCounter+1, afterCounter)
+	assert.Equal(t, firstEpochCounter+1, secondEpoch.Counter())
 
 	cleanupNodes(nodes)
 }
@@ -108,8 +105,7 @@ func TestEpochTransition_IdentitiesOverlap(t *testing.T) {
 
 	firstEpoch, err := rootSnapshot.Epochs().Current()
 	require.NoError(t, err)
-	firstEpochCounter, err := firstEpoch.Counter()
-	require.NoError(t, err)
+	firstEpochCounter := firstEpoch.Counter()
 
 	// set up next epoch with 1 new consensus nodes and 2 consensus nodes from first epoch
 	// 1 consensus node is removed after the first epoch
@@ -142,9 +138,7 @@ func TestEpochTransition_IdentitiesOverlap(t *testing.T) {
 	pstate := nodes[0].state
 	secondEpoch, err := pstate.Final().Epochs().Current()
 	require.NoError(t, err)
-	afterCounter, err := secondEpoch.Counter()
-	require.NoError(t, err)
-	assert.Equal(t, firstEpochCounter+1, afterCounter)
+	assert.Equal(t, firstEpochCounter+1, secondEpoch.Counter())
 
 	cleanupNodes(nodes)
 }
@@ -160,8 +154,7 @@ func TestEpochTransition_IdentitiesDisjoint(t *testing.T) {
 
 	firstEpoch, err := rootSnapshot.Epochs().Current()
 	require.NoError(t, err)
-	firstEpochCounter, err := firstEpoch.Counter()
-	require.NoError(t, err)
+	firstEpochCounter := firstEpoch.Counter()
 
 	// prepare a next epoch with a completely different consensus committee
 	// (no overlapping consensus nodes)
@@ -191,9 +184,7 @@ func TestEpochTransition_IdentitiesDisjoint(t *testing.T) {
 	pstate := nodes[0].state
 	secondEpoch, err := pstate.Final().Epochs().Current()
 	require.NoError(t, err)
-	afterCounter, err := secondEpoch.Counter()
-	require.NoError(t, err)
-	assert.Equal(t, firstEpochCounter+1, afterCounter)
+	assert.Equal(t, firstEpochCounter+1, secondEpoch.Counter())
 
 	cleanupNodes(nodes)
 }

@@ -347,8 +347,7 @@ func (s *DynamicEpochTransitionSuite) AssertInEpochPhase(ctx context.Context, ex
 	require.NoError(s.T(), err)
 	epoch, err := snapshot.Epochs().Current()
 	require.NoError(s.T(), err)
-	actualEpoch, err := epoch.Counter()
-	require.NoError(s.T(), err)
+	actualEpoch := epoch.Counter()
 	actualPhase, err := snapshot.EpochPhase()
 	require.NoError(s.T(), err)
 	require.Equal(s.T(), expectedPhase, actualPhase, "not in correct phase")
@@ -362,8 +361,7 @@ func (s *DynamicEpochTransitionSuite) AssertInEpochPhase(ctx context.Context, ex
 // AssertNodeNotParticipantInEpoch asserts that the given node ID does not exist
 // in the epoch's identity table.
 func (s *DynamicEpochTransitionSuite) AssertNodeNotParticipantInEpoch(epoch protocol.TentativeEpoch, nodeID flow.Identifier) {
-	identities, err := epoch.InitialIdentities()
-	require.NoError(s.T(), err)
+	identities := epoch.InitialIdentities()
 	require.NotContains(s.T(), identities.NodeIDs(), nodeID)
 }
 
@@ -529,8 +527,7 @@ func (s *DynamicEpochTransitionSuite) RunTestEpochJoinAndLeave(role flow.Role, c
 
 	epoch1, err := rootSnapshot.Epochs().Current()
 	require.NoError(s.T(), err)
-	epoch1FinalView, err := epoch1.FinalView()
-	require.NoError(s.T(), err)
+	epoch1FinalView := epoch1.FinalView()
 
 	// wait for at least the first block of the next epoch to be sealed before we pause our container to replace
 	s.TimedLogf("waiting for epoch transition (finalized view %d) before pausing container", epoch1FinalView+1)

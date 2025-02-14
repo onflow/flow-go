@@ -12,32 +12,12 @@ import (
 // SelectionForConsensusFromEpoch returns the leader selection for the input epoch.
 // See [SelectionForConsensus] for additional details.
 func SelectionForConsensusFromEpoch(epoch protocol.CommittedEpoch) (*LeaderSelection, error) {
-
-	identities, err := epoch.InitialIdentities()
-	if err != nil {
-		return nil, fmt.Errorf("could not get epoch initial identities: %w", err)
-	}
-	// get the epoch source of randomness
-	randomSeed, err := epoch.RandomSource()
-	if err != nil {
-		return nil, fmt.Errorf("could not get epoch seed: %w", err)
-	}
-	firstView, err := epoch.FirstView()
-	if err != nil {
-		return nil, fmt.Errorf("could not get epoch first view: %w", err)
-	}
-	finalView, err := epoch.FinalView()
-	if err != nil {
-		return nil, fmt.Errorf("could not get epoch final view: %w", err)
-	}
-
-	leaders, err := SelectionForConsensus(
-		identities,
-		randomSeed,
-		firstView,
-		finalView,
+	return SelectionForConsensus(
+		epoch.InitialIdentities(),
+		epoch.RandomSource(),
+		epoch.FirstView(),
+		epoch.FinalView(),
 	)
-	return leaders, err
 }
 
 // SelectionForConsensus pre-computes and returns leaders for the consensus committee

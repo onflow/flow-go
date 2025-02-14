@@ -165,10 +165,8 @@ func (builder *EpochBuilder) BuildEpoch() *EpochBuilder {
 	require.NoError(builder.t, err)
 	epoch, err := finalSnap.Epochs().Current()
 	require.NoError(builder.t, err)
-	counter, err := epoch.Counter()
-	require.NoError(builder.t, err)
-	finalView, err := epoch.FinalView()
-	require.NoError(builder.t, err)
+	counter := epoch.Counter()
+	finalView := epoch.FinalView()
 
 	// retrieve block A
 	A, err := finalSnap.Head()
@@ -325,8 +323,7 @@ func (builder *EpochBuilder) CompleteEpoch() *EpochBuilder {
 	require.Equal(builder.t, flow.EpochPhaseCommitted, phase)
 	currentEpoch, err := finalSnap.Epochs().Current()
 	require.Nil(builder.t, err)
-	finalView, err := currentEpoch.FinalView()
-	require.Nil(builder.t, err)
+	finalView := currentEpoch.FinalView()
 
 	final, err := finalSnap.Head()
 	require.Nil(builder.t, err)

@@ -328,10 +328,7 @@ func main() {
 			if err != nil {
 				return fmt.Errorf("could not get root epoch: %w", err)
 			}
-			epochCounter, err := rootEpoch.Counter()
-			if err != nil {
-				return fmt.Errorf("could not get root epoch counter: %w", err)
-			}
+			epochCounter := rootEpoch.Counter()
 
 			// confirm the beacon key file matches the canonical public keys
 			rootDKG, err := rootEpoch.DKG()

@@ -102,23 +102,13 @@ func extractResetEpochArgs(snapshot *inmem.Snapshot) []cadence.Value {
 
 	// Note: The epochCounter value expected by the smart contract is the epoch being
 	// replaced, which is one less than the epoch beginning after the spork.
-	epochCounter, err := epoch.Counter()
-	if err != nil {
-		log.Fatal().Err(err).Msg("could not get epoch counter")
-	}
-	epochCounter = epochCounter - 1
+	epochCounter := epoch.Counter() - 1
 
 	// read random source from epoch
-	randomSource, err := epoch.RandomSource()
-	if err != nil {
-		log.Fatal().Err(err).Msg("could not get random source from epoch")
-	}
+	randomSource := epoch.RandomSource()
 
 	// read first view
-	firstView, err := epoch.FirstView()
-	if err != nil {
-		log.Fatal().Err(err).Msg("could not get first view from epoch")
-	}
+	firstView := epoch.FirstView()
 
 	// determine staking auction end view based on dkg timing
 	stakingEndView, err := getStakingAuctionEndView(epoch)
@@ -127,10 +117,7 @@ func extractResetEpochArgs(snapshot *inmem.Snapshot) []cadence.Value {
 	}
 
 	// read final view
-	finalView, err := epoch.FinalView()
-	if err != nil {
-		log.Fatal().Err(err).Msg("could not get final view from epoch")
-	}
+	finalView := epoch.FinalView()
 
 	return convertResetEpochArgs(epochCounter, randomSource, firstView, stakingEndView, finalView)
 }
@@ -145,14 +132,8 @@ func extractResetEpochArgs(snapshot *inmem.Snapshot) []cadence.Value {
 //	          |     `-dkgPhase1FinalView
 //	          `-stakingEndView
 func getStakingAuctionEndView(epoch protocol.CommittedEpoch) (uint64, error) {
-	dkgPhase1FinalView, err := epoch.DKGPhase1FinalView()
-	if err != nil {
-		return 0, err
-	}
-	dkgPhase2FinalView, err := epoch.DKGPhase2FinalView()
-	if err != nil {
-		return 0, err
-	}
+	dkgPhase1FinalView := epoch.DKGPhase1FinalView()
+	dkgPhase2FinalView := epoch.DKGPhase2FinalView()
 
 	// sanity check
 	if dkgPhase1FinalView >= dkgPhase2FinalView {

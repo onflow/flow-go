@@ -346,8 +346,7 @@ func (tc *ClusterSwitchoverTestCase) BlockInEpoch(epochCounter uint64) *flow.Hea
 		next := tc.State().AtHeight(height + 1)
 		currentEpoch, err := curr.Epochs().Current()
 		require.NoError(tc.T(), err)
-		curCounter, err := currentEpoch.Counter()
-		require.NoError(tc.T(), err)
+		curCounter := currentEpoch.Counter()
 		nextEpoch, err := next.Epochs().Current()
 		// if we reach a point where the next block doesn't exist, but the
 		// current block has the correct counter, return the current block
@@ -356,8 +355,7 @@ func (tc *ClusterSwitchoverTestCase) BlockInEpoch(epochCounter uint64) *flow.Hea
 			require.NoError(tc.T(), err)
 			return head
 		}
-		nextCounter, err := nextEpoch.Counter()
-		require.NoError(tc.T(), err)
+		nextCounter := nextEpoch.Counter()
 
 		// otherwise, wait until we reach the block where the next block is in
 		// the next epoch - this is the highest block in the requested epoch

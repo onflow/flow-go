@@ -146,10 +146,6 @@ func (e *Engine) checkShouldStartCurrentEpochComponentsOnStartup(ctx irrecoverab
 	if err != nil {
 		return fmt.Errorf("could not get current epoch: %w", err)
 	}
-	currentEpochCounter, err := currentEpoch.Counter()
-	if err != nil {
-		return fmt.Errorf("could not get epoch counter: %w", err)
-	}
 
 	components, err := e.createEpochComponents(currentEpoch)
 	if err != nil {
@@ -160,7 +156,7 @@ func (e *Engine) checkShouldStartCurrentEpochComponentsOnStartup(ctx irrecoverab
 		}
 		return fmt.Errorf("could not create epoch components: %w", err)
 	}
-	err = e.startEpochComponents(ctx, currentEpochCounter, components)
+	err = e.startEpochComponents(ctx, currentEpoch.Counter(), components)
 	if err != nil {
 		// all failures to start epoch components are critical
 		return fmt.Errorf("could not start epoch components: %w", err)
@@ -189,13 +185,7 @@ func (e *Engine) checkShouldStartPreviousEpochComponentsOnStartup(engineCtx irre
 		}
 		return fmt.Errorf("[unexpected] could not get previous epoch: %w", err)
 	}
-	prevEpochCounter, err := prevEpoch.Counter()
-	if err != nil {
-		if errors.Is(err, protocol.ErrNoPreviousEpoch) {
-			return nil
-		}
-		return fmt.Errorf("[unexpected] could not get previous epoch counter: %w", err)
-	}
+	prevEpochCounter := prevEpoch.Counter()
 	prevEpochFinalHeight, err := prevEpoch.FinalHeight()
 	if err != nil {
 		// If we don't know the end boundary of the previous epoch, then our root snapshot
@@ -298,13 +288,9 @@ func (e *Engine) Done() <-chan struct{} {
 // Error returns:
 // - ErrNotAuthorizedForEpoch if this node is not authorized in the epoch.
 func (e *Engine) createEpochComponents(epoch protocol.CommittedEpoch) (*EpochComponents, error) {
-	counter, err := epoch.Counter()
-	if err != nil {
-		return nil, fmt.Errorf("could not get epoch counter: %w", err)
-	}
 	state, prop, sync, hot, voteAggregator, timeoutAggregator, messageHub, err := e.factory.Create(epoch)
 	if err != nil {
-		return nil, fmt.Errorf("could not setup requirements for epoch (%d): %w", counter, err)
+		return nil, fmt.Errorf("could not setup requirements for epoch (%d): %w", epoch.Counter(), err)
 	}
 
 	components := NewEpochComponents(state, prop, sync, hot, voteAggregator, timeoutAggregator, messageHub)
@@ -393,10 +379,7 @@ func (e *Engine) onEpochTransition(ctx irrecoverable.SignalerContext, first *flo
 	if err != nil {
 		return fmt.Errorf("could not get current epoch: %w", err)
 	}
-	counter, err := epoch.Counter()
-	if err != nil {
-		return fmt.Errorf("could not get epoch counter: %w", err)
-	}
+	counter := epoch.Counter()
 
 	// greatest block height in the previous epoch is one less than the first
 	// block in current epoch

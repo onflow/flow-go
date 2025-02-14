@@ -849,24 +849,11 @@ func updateEpochMetrics(metrics module.ComplianceMetrics, snap protocol.Snapshot
 		return fmt.Errorf("could not get current epoch: %w", err)
 	}
 	// update epoch counter
-	counter, err := currentEpoch.Counter()
-	if err != nil {
-		return fmt.Errorf("could not get current epoch counter: %w", err)
-	}
-	metrics.CurrentEpochCounter(counter)
+	metrics.CurrentEpochCounter(currentEpoch.Counter())
 
-	currentEpochFinalView, err := currentEpoch.FinalView()
-	if err != nil {
-		return fmt.Errorf("could not update current epoch final view: %w", err)
-	}
-	metrics.CurrentEpochFinalView(currentEpochFinalView)
+	metrics.CurrentEpochFinalView(currentEpoch.FinalView())
 
-	dkgPhase1FinalView, dkgPhase2FinalView, dkgPhase3FinalView, err := protocol.DKGPhaseViews(currentEpoch)
-	if err != nil {
-		return fmt.Errorf("could not get dkg phase final view: %w", err)
-	}
-
-	metrics.CurrentDKGPhaseViews(dkgPhase1FinalView, dkgPhase2FinalView, dkgPhase3FinalView)
+	metrics.CurrentDKGPhaseViews(currentEpoch.DKGPhase1FinalView(), currentEpoch.DKGPhase2FinalView(), currentEpoch.DKGPhase3FinalView())
 
 	epochProtocolState, err := snap.EpochProtocolState()
 	if err != nil {

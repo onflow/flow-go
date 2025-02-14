@@ -83,10 +83,7 @@ func GetSnapshotAtEpochAndPhase(ctx context.Context, log zerolog.Logger, startup
 		if err != nil {
 			return fmt.Errorf("failed to get current epoch: %w", err)
 		}
-		currEpochCounter, err := currEpoch.Counter()
-		if err != nil {
-			return fmt.Errorf("failed to get the current epoch counter: %w", err)
-		}
+		currEpochCounter := currEpoch.Counter()
 
 		currEpochPhase, err := snapshot.EpochPhase()
 		if err != nil {
