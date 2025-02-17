@@ -61,7 +61,7 @@ func NewBlockDigestsDataProvider(
 //
 // No errors are expected during normal operations.
 func (p *BlockDigestsDataProvider) Run() error {
-	return subscription.HandleSubscription(
+	err := subscription.HandleSubscription(
 		p.subscription,
 		subscription.HandleResponse(p.send, func(b *flow.BlockDigest) (interface{}, error) {
 			var block models.BlockDigest
@@ -77,6 +77,8 @@ func (p *BlockDigestsDataProvider) Run() error {
 			return &response, nil
 		}),
 	)
+
+	return p.handleSubscriptionError(err)
 }
 
 // createSubscription creates a new subscription using the specified input arguments.

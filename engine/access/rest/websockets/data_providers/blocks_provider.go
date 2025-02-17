@@ -76,7 +76,7 @@ func NewBlocksDataProvider(
 //
 // No errors are expected during normal operations.
 func (p *BlocksDataProvider) Run() error {
-	return subscription.HandleSubscription(
+	err := subscription.HandleSubscription(
 		p.subscription,
 		subscription.HandleResponse(p.send, func(b *flow.Block) (interface{}, error) {
 			var block commonmodels.Block
@@ -93,6 +93,8 @@ func (p *BlocksDataProvider) Run() error {
 			return &response, nil
 		}),
 	)
+
+	return p.handleSubscriptionError(err)
 }
 
 // createSubscription creates a new subscription using the specified input arguments.

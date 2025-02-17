@@ -62,7 +62,7 @@ func NewBlockHeadersDataProvider(
 //
 // No errors are expected during normal operations.
 func (p *BlockHeadersDataProvider) Run() error {
-	return subscription.HandleSubscription(
+	err := subscription.HandleSubscription(
 		p.subscription,
 		subscription.HandleResponse(p.send, func(h *flow.Header) (interface{}, error) {
 			var header commonmodels.BlockHeader
@@ -78,6 +78,8 @@ func (p *BlockHeadersDataProvider) Run() error {
 			return &response, nil
 		}),
 	)
+
+	return p.handleSubscriptionError(err)
 }
 
 // createSubscription creates a new subscription using the specified input arguments.

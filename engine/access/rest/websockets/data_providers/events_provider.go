@@ -82,7 +82,8 @@ func NewEventsDataProvider(
 //
 // No errors are expected during normal operations.
 func (p *EventsDataProvider) Run() error {
-	return subscription.HandleSubscription(p.subscription, p.handleResponse())
+	err := subscription.HandleSubscription(p.subscription, p.handleResponse())
+	return p.handleSubscriptionError(err)
 }
 
 // handleResponse processes events and sends the formatted response.

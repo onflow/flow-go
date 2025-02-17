@@ -83,7 +83,8 @@ func NewAccountStatusesDataProvider(
 //
 // No errors are expected during normal operations.
 func (p *AccountStatusesDataProvider) Run() error {
-	return subscription.HandleSubscription(p.subscription, p.handleResponse())
+	err := subscription.HandleSubscription(p.subscription, p.handleResponse())
+	return p.handleSubscriptionError(err)
 }
 
 // createSubscription creates a new subscription using the specified input arguments.
