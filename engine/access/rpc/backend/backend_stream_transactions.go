@@ -79,8 +79,8 @@ func (b *backendSubscribeTransactions) SubscribeTransactionStatuses(
 	header, err := b.backendTransactions.state.Sealed().Head()
 	if err != nil {
 		// throw the exception as the node must have the current sealed block in storage
-		irrecoverable.Throw(ctx, fmt.Errorf("c: %w", err))
-		return subscription.NewFailedSubscription(err, "failed to subscribe to transaction")
+		irrecoverable.Throw(ctx, fmt.Errorf("failed to lookup sealed block: %w", err))
+		return subscription.NewFailedSubscription(err, "failed to lookup sealed block")
 	}
 
 	return b.createSubscription(ctx, txID, header.ID(), flow.ZeroID, requiredEventEncodingVersion)
@@ -158,7 +158,7 @@ func (b *backendSubscribeTransactions) getTransactionStatusResponse(
 		// Get old status here, as it could be replaced by status from founded tx result
 		prevTxStatus := txInfo.txResult.Status
 
-		if err = txInfo.Refresh(ctx, height); err != nil {
+		if err = txInfo.Refresh(ctx); err != nil {
 			if errors.Is(err, subscription.ErrBlockNotReady) {
 				return nil, err
 			}

@@ -69,66 +69,11 @@ func newTransactionSubscriptionMetadata(
 		txReferenceBlockID:   txReferenceBlockID,
 	}
 
-	if err := txMetadata.initBlockInfo(); err != nil {
-		return nil, err
-	}
-
-	if err := txMetadata.initTransactionResult(ctx); err != nil {
+	if err := txMetadata.Refresh(ctx); err != nil {
 		return nil, err
 	}
 
 	return txMetadata, nil
-}
-
-// initBlockInfo determines the block that contains the transaction and updates metadata accordingly.
-//
-// This function searches the transaction’s collection and its corresponding block, updating
-// relevant fields in the metadata object.
-//
-// Expected errors during normal operation:
-//   - `storage.ErrNotFound` if the collection or block cannot be retrieved.
-func (tm *transactionSubscriptionMetadata) initBlockInfo() error {
-	if err := tm.refreshCollection(); err != nil {
-		if errors.Is(err, subscription.ErrBlockNotReady) {
-			return nil
-		}
-
-		return fmt.Errorf("failed to lookup collection containing tx: %w", err)
-	}
-
-	block, err := tm.blocks.ByCollectionID(tm.txResult.CollectionID)
-	if err != nil {
-		if errors.Is(err, storage.ErrNotFound) {
-			return nil
-		}
-
-		return fmt.Errorf("failed to lookup block containing collection: %w", err)
-	}
-
-	tm.blockWithTx = block.Header
-	tm.txResult.BlockID = block.ID()
-	tm.txResult.BlockHeight = block.Header.Height
-
-	return nil
-}
-
-// initTransactionResult initializes the transaction result.
-//
-// Parameters:
-//   - ctx: Context for managing the operation lifecycle.
-//
-// No errors expected during normal operations.
-func (tm *transactionSubscriptionMetadata) initTransactionResult(ctx context.Context) error {
-	if err := tm.refreshTransactionResult(ctx); err != nil {
-		return err
-	}
-
-	// It is possible to receive a new transaction status while searching for the transaction result or do not find the
-	// transaction result at all, that is why transaction status must be filled after searching the transaction result
-	if err := tm.refreshStatus(ctx); err != nil {
-		return err
-	}
-	return nil
 }
 
 // Refresh updates the transaction subscription metadata to reflect the latest state.
@@ -139,7 +84,7 @@ func (tm *transactionSubscriptionMetadata) initTransactionResult(ctx context.Con
 //
 // Expected errors during normal operation:
 //   - `ErrBlockNotReady` if the block at the given height is not found.
-func (tm *transactionSubscriptionMetadata) Refresh(ctx context.Context, height uint64) error {
+func (tm *transactionSubscriptionMetadata) Refresh(ctx context.Context) error {
 	if err := tm.refreshCollection(); err != nil {
 		return err
 	}
@@ -260,7 +205,7 @@ func (tm *transactionSubscriptionMetadata) refreshCollection() error {
 	collection, err := tm.collections.LightByTransactionID(tm.txResult.TransactionID)
 	if err != nil {
 		if errors.Is(err, storage.ErrNotFound) {
-			return subscription.ErrBlockNotReady
+			return nil
 		}
 
 		return fmt.Errorf("failed to lookup collection containing tx: %w", err)

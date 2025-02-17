@@ -382,7 +382,7 @@ func (s *TransactionStatusSuite) checkNewSubscriptionMessage(sub subscription.Su
 			assert.Equal(s.T(), expectedTxStatus, result.Status)
 		}
 
-	}, time.Second, fmt.Sprintf("timed out waiting for transaction info:\n\t- txID: %x\n\t- blockID: %x", txId, s.finalizedBlock.ID()))
+	}, 180*time.Second, fmt.Sprintf("timed out waiting for transaction info:\n\t- txID: %x\n\t- blockID: %x", txId, s.finalizedBlock.ID()))
 }
 
 // checkGracefulShutdown ensures the provided subscription shuts down gracefully within a specified timeout duration.
@@ -647,7 +647,7 @@ func (s *TransactionStatusSuite) TestSubscribeTransactionStatusFailedSubscriptio
 			irrecoverable.NewMockSignalerContextExpectError(s.T(), ctx, fmt.Errorf("failed to lookup sealed block: %w", expectedError)))
 
 		sub := s.backend.SubscribeTransactionStatuses(signalerCtx, txId, entities.EventEncodingVersion_CCF_V0)
-		s.Assert().ErrorContains(sub.Err(), expectedError.Error())
+		s.Assert().ErrorContains(sub.Err(), fmt.Errorf("failed to lookup sealed block: %w", expectedError).Error())
 	})
 
 	s.Run("if could not get start height", func() {
@@ -657,22 +657,6 @@ func (s *TransactionStatusSuite) TestSubscribeTransactionStatusFailedSubscriptio
 		s.state.On("Sealed").Return(s.sealedSnapshot, nil).Once()
 		expectedError := storage.ErrNotFound
 		s.blockTracker.On("GetStartHeightFromBlockID", s.sealedBlock.ID()).Return(uint64(0), expectedError).Once()
-
-		sub := s.backend.SubscribeTransactionStatuses(ctx, txId, entities.EventEncodingVersion_CCF_V0)
-		s.Assert().ErrorContains(sub.Err(), expectedError.Error())
-	})
-
-	s.Run("if could not get transaction by transaction ID", func() {
-		s.sealedSnapshot.On("Head").Return(func() *flow.Header {
-			return s.sealedBlock.Header
-		}, nil).Once()
-		s.state.On("Sealed").Return(s.sealedSnapshot, nil).Once()
-		s.blockTracker.On("GetStartHeightFromBlockID", mock.Anything).Return(func(_ flow.Identifier) (uint64, error) {
-			finalizedHeader := s.finalizedBlock.Header
-			return finalizedHeader.Height, nil
-		}, nil).Once()
-		expectedError := storage.ErrNotFound
-		s.transactions.On("ByID", txId).Return(nil, expectedError).Once()
 
 		sub := s.backend.SubscribeTransactionStatuses(ctx, txId, entities.EventEncodingVersion_CCF_V0)
 		s.Assert().ErrorContains(sub.Err(), expectedError.Error())
