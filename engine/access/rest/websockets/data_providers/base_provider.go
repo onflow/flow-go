@@ -83,9 +83,9 @@ func (b *baseDataProvider) wasClosedByClient() bool {
 //
 // To distinguish between these cases, we use the `wasClosedByClient()` method.
 // If the provider was intentionally closed, we suppress the error; otherwise, we propagate it.
-func (p *baseDataProvider) handleSubscriptionError(err error) error {
+func (b *baseDataProvider) handleSubscriptionError(err error) error {
 	if err != nil {
-		if p.wasClosedByClient() {
+		if b.wasClosedByClient() {
 			return nil
 		}
 
