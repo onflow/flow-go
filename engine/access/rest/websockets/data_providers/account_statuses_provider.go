@@ -155,7 +155,7 @@ func parseAccountStatusesArguments(
 	// Parse 'event_types' as a JSON array
 	var eventTypes parser.EventTypes
 	if eventTypesIn, ok := arguments["event_types"]; ok && eventTypesIn != "" {
-		result, err := common.ParseInterfaceToString(eventTypesIn)
+		result, err := common.ParseInterfaceToStrings(eventTypesIn)
 		if err != nil {
 			return args, fmt.Errorf("'event_types' must be an array of string")
 		}
@@ -169,7 +169,7 @@ func parseAccountStatusesArguments(
 	// Parse 'accountAddresses' as []string{}
 	var accountAddresses []string
 	if accountAddressesIn, ok := arguments["account_addresses"]; ok && accountAddressesIn != "" {
-		accountAddresses, err = common.ParseInterfaceToString(accountAddressesIn)
+		accountAddresses, err = common.ParseInterfaceToStrings(accountAddressesIn)
 		if err != nil {
 			return args, fmt.Errorf("'account_addresses' must be an array of string")
 		}
