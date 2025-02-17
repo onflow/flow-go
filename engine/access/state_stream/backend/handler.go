@@ -360,7 +360,7 @@ func (h *Handler) handleEventsResponse(send sendSubscribeEventsResponseFunc, hea
 	}
 
 	blocksSinceLastMessage := uint64(0)
-	messageIndex := counters.NewMonotonousCounter(0)
+	messageIndex := counters.NewMonotonicCounter(0)
 
 	return func(resp *EventsResponse) error {
 		// check if there are any events in the response. if not, do not send a message unless the last
@@ -480,7 +480,7 @@ func (h *Handler) handleAccountStatusesResponse(
 	}
 
 	blocksSinceLastMessage := uint64(0)
-	messageIndex := counters.NewMonotonousCounter(0)
+	messageIndex := counters.NewMonotonicCounter(0)
 
 	return func(resp *AccountStatusesResponse) error {
 		// check if there are any events in the response. if not, do not send a message unless the last

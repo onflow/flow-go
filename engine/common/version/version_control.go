@@ -42,6 +42,7 @@ var defaultCompatibilityOverrides = map[string]struct{}{
 	"0.37.18": {},
 	"0.37.22": {},
 	"0.37.26": {},
+	"0.38.0":  {},
 }
 
 // VersionControl manages the version control system for the node.
@@ -66,7 +67,7 @@ type VersionControl struct {
 	// Notifier for new finalized block height
 	finalizedHeightNotifier engine.Notifier
 
-	finalizedHeight counters.StrictMonotonousCounter
+	finalizedHeight counters.StrictMonotonicCounter
 
 	// lastProcessedHeight the last handled block height
 	lastProcessedHeight *atomic.Uint64
@@ -107,7 +108,7 @@ func NewVersionControl(
 		versionBeacons:          versionBeacons,
 		sealedRootBlockHeight:   atomic.NewUint64(sealedRootBlockHeight),
 		lastProcessedHeight:     atomic.NewUint64(latestFinalizedBlockHeight),
-		finalizedHeight:         counters.NewMonotonousCounter(latestFinalizedBlockHeight),
+		finalizedHeight:         counters.NewMonotonicCounter(latestFinalizedBlockHeight),
 		finalizedHeightNotifier: engine.NewNotifier(),
 		startHeight:             atomic.NewUint64(NoHeight),
 		endHeight:               atomic.NewUint64(NoHeight),
