@@ -31,7 +31,5 @@ func TestLightCollectionID_Malleability(t *testing.T) {
 		}
 	}
 
-	t.Run("LightCollection", func(t *testing.T) {
-		unittest.RequireEntityNotMalleable(t, lightCollectionFixture())
-	})
+	unittest.RequireEntityNotMalleable(t, lightCollectionFixture())
 }

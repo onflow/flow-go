@@ -111,6 +111,8 @@ func generateCustomFlowValue(field reflect.Value) reflect.Value {
 		return reflect.ValueOf(flow.ClusterQCVoteDataFromQC(QuorumCertificateWithSignerIDsFixture()))
 	case reflect.TypeOf(flow.QuorumCertificate{}):
 		return reflect.ValueOf(*QuorumCertificateFixture())
+	case reflect.TypeOf(flow.CollectionGuarantee{}):
+		return reflect.ValueOf(*CollectionGuaranteeFixture())
 	case reflect.TypeOf(flow.TimeoutCertificate{}):
 		return reflect.ValueOf(flow.TimeoutCertificate{
 			View:          rand.Uint64(),
@@ -120,6 +122,7 @@ func generateCustomFlowValue(field reflect.Value) reflect.Value {
 			SigData:       SignatureFixture(),
 		})
 	}
+
 	return reflect.Value{}
 }
 
