@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/onflow/cadence"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"pgregory.net/rapid"
 
@@ -97,7 +98,7 @@ func TestGenerateRecoverTxArgsWithDKG_ExcludeIncludeParticipants(testifyT *testi
 			// node ids
 			nodeIDsArgValues := args[11].(cadence.Array).Values
 			assert.Equal(t, len(nodeIDsArgValues), len(expectedNodeIds))
-			for _, nodeId := range  {
+			for _, nodeId := range nodeIDsArgValues {
 				_, ok := expectedNodeIds[nodeId.(cadence.String)]
 				require.True(t, ok)
 			}
