@@ -3,6 +3,7 @@ package backend
 import (
 	"context"
 	"errors"
+	"fmt"
 
 	"github.com/onflow/flow-go/engine/access/subscription"
 
@@ -26,6 +27,7 @@ import (
 type transactionSubscriptionMetadata struct {
 	blocks               storage.Blocks
 	collections          storage.Collections
+	transactions         storage.Transactions
 	txResult             *access.TransactionResult
 	txReferenceBlockID   flow.Identifier
 	blockWithTx          *flow.Header
@@ -63,98 +65,15 @@ func newTransactionSubscriptionMetadata(
 		eventEncodingVersion: eventEncodingVersion,
 		blocks:               backendTransactions.blocks,
 		collections:          backendTransactions.collections,
+		transactions:         backendTransactions.transactions,
+		txReferenceBlockID:   txReferenceBlockID,
 	}
 
-	if err := txMetadata.initTransactionReferenceBlockID(txReferenceBlockID); err != nil {
-		return nil, err
-	}
-
-	if err := txMetadata.initBlockInfo(); err != nil {
-		return nil, err
-	}
-
-	if err := txMetadata.initTransactionResult(ctx); err != nil {
+	if err := txMetadata.Refresh(ctx); err != nil {
 		return nil, err
 	}
 
 	return txMetadata, nil
-}
-
-// initTransactionReferenceBlockID sets the reference block ID for the transaction.
-//
-// If the reference block ID is unset, it attempts to retrieve it from storage.
-//
-// Parameters:
-//   - txReferenceBlockID: The reference block ID of the transaction.
-//
-// No errors expected during normal operations.
-func (tm *transactionSubscriptionMetadata) initTransactionReferenceBlockID(txReferenceBlockID flow.Identifier) error {
-	// Get referenceBlockID if it is not set
-	if txReferenceBlockID == flow.ZeroID {
-		tx, err := tm.backendTransactions.transactions.ByID(tm.txResult.TransactionID)
-		if err != nil {
-			return err
-		}
-		txReferenceBlockID = tx.ReferenceBlockID
-	}
-
-	tm.txReferenceBlockID = txReferenceBlockID
-
-	return nil
-}
-
-// initBlockInfo determines the block that contains the transaction and updates metadata accordingly.
-//
-// This function searches the transaction’s collection and its corresponding block, updating
-// relevant fields in the metadata object.
-//
-// Expected errors during normal operation:
-//   - `storage.ErrNotFound` if the collection or block cannot be retrieved.
-func (tm *transactionSubscriptionMetadata) initBlockInfo() error {
-	collection, err := tm.collections.LightByTransactionID(tm.txResult.TransactionID)
-	if err != nil {
-		if errors.Is(err, storage.ErrNotFound) {
-			return nil
-		}
-
-		return err
-	}
-
-	tm.txResult.CollectionID = collection.ID()
-
-	block, err := tm.blocks.ByCollectionID(tm.txResult.CollectionID)
-	if err != nil {
-		if errors.Is(err, storage.ErrNotFound) {
-			return nil
-		}
-
-		return err
-	}
-
-	tm.blockWithTx = block.Header
-	tm.txResult.BlockID = block.ID()
-	tm.txResult.BlockHeight = block.Header.Height
-
-	return nil
-}
-
-// initTransactionResult initializes the transaction result.
-//
-// Parameters:
-//   - ctx: Context for managing the operation lifecycle.
-//
-// No errors expected during normal operations.
-func (tm *transactionSubscriptionMetadata) initTransactionResult(ctx context.Context) error {
-	if err := tm.refreshTransactionResult(ctx); err != nil {
-		return err
-	}
-
-	// It is possible to receive a new transaction status while searching for the transaction result or do not find the
-	// transaction result at all, that is why transaction status must be filled after searching the transaction result
-	if err := tm.refreshStatus(ctx); err != nil {
-		return err
-	}
-	return nil
 }
 
 // Refresh updates the transaction subscription metadata to reflect the latest state.
@@ -165,15 +84,13 @@ func (tm *transactionSubscriptionMetadata) initTransactionResult(ctx context.Con
 //
 // Expected errors during normal operation:
 //   - `ErrBlockNotReady` if the block at the given height is not found.
-func (tm *transactionSubscriptionMetadata) Refresh(ctx context.Context, height uint64) error {
-	if err := tm.refreshCollection(height); err != nil {
+func (tm *transactionSubscriptionMetadata) Refresh(ctx context.Context) error {
+	if err := tm.refreshCollection(); err != nil {
 		return err
 	}
 
 	if err := tm.refreshBlock(); err != nil {
-		if errors.Is(err, storage.ErrNotFound) {
-			return subscription.ErrBlockNotReady
-		}
+		return err
 	}
 
 	if err := tm.refreshTransactionResult(ctx); err != nil {
@@ -183,6 +100,30 @@ func (tm *transactionSubscriptionMetadata) Refresh(ctx context.Context, height u
 	if err := tm.refreshStatus(ctx); err != nil {
 		return err
 	}
+
+	return nil
+}
+
+// refreshTransactionReferenceBlockID sets the reference block ID for the transaction.
+//
+// If the reference block ID is unset, it attempts to retrieve it from storage.
+//
+// Parameters:
+//   - txReferenceBlockID: The reference block ID of the transaction.
+//
+// No errors expected during normal operations.
+func (tm *transactionSubscriptionMetadata) refreshTransactionReferenceBlockID() error {
+	// Get referenceBlockID if it is not set
+	if tm.txReferenceBlockID != flow.ZeroID {
+		return nil
+	}
+
+	tx, err := tm.transactions.ByID(tm.txResult.TransactionID)
+	if err != nil {
+		return fmt.Errorf("failed to lookup transaction by transaction ID: %w", err)
+	}
+
+	tm.txReferenceBlockID = tx.ReferenceBlockID
 
 	return nil
 }
@@ -196,8 +137,15 @@ func (tm *transactionSubscriptionMetadata) Refresh(ctx context.Context, height u
 func (tm *transactionSubscriptionMetadata) refreshStatus(ctx context.Context) error {
 	var err error
 
-	// Check, if transaction executed and transaction result already available
 	if tm.blockWithTx == nil {
+		if err = tm.refreshTransactionReferenceBlockID(); err != nil {
+			if errors.Is(err, storage.ErrNotFound) && tm.txReferenceBlockID == flow.ZeroID {
+				tm.txResult.Status = flow.TransactionStatusUnknown
+				return nil
+			}
+			return err
+		}
+
 		tm.txResult.Status, err = tm.backendTransactions.DeriveUnknownTransactionStatus(tm.txReferenceBlockID)
 		if err != nil {
 			if !errors.Is(err, state.ErrUnknownSnapshotReference) {
@@ -231,7 +179,11 @@ func (tm *transactionSubscriptionMetadata) refreshBlock() error {
 
 	block, err := tm.blocks.ByCollectionID(tm.txResult.CollectionID)
 	if err != nil {
-		return err
+		if errors.Is(err, storage.ErrNotFound) {
+			return subscription.ErrBlockNotReady
+		}
+
+		return fmt.Errorf("failed to lookup block containing collection: %w", err)
 	}
 
 	tm.blockWithTx = block.Header
@@ -243,35 +195,23 @@ func (tm *transactionSubscriptionMetadata) refreshBlock() error {
 
 // refreshCollection updates the collection metadata if the transaction is included in a block.
 //
-// Parameters:
-//   - height: The block height at which the transaction is expected.
-//
 // Expected errors during normal operation:
 //   - `ErrTransactionNotInBlock` if the transaction is not found in the block.
-func (tm *transactionSubscriptionMetadata) refreshCollection(height uint64) error {
+func (tm *transactionSubscriptionMetadata) refreshCollection() error {
 	if tm.txResult.CollectionID != flow.ZeroID {
 		return nil
 	}
 
-	block, err := tm.blocks.ByHeight(height)
-	if err != nil {
-		return err
-	}
-
-	collectionID, err := tm.backendTransactions.LookupCollectionIDInBlock(block, tm.txResult.TransactionID)
+	collection, err := tm.collections.LightByTransactionID(tm.txResult.TransactionID)
 	if err != nil {
 		if errors.Is(err, storage.ErrNotFound) {
-			return subscription.ErrBlockNotReady
+			return nil
 		}
 
-		if !errors.Is(err, ErrTransactionNotInBlock) {
-			return err
-		}
+		return fmt.Errorf("failed to lookup collection containing tx: %w", err)
 	}
 
-	if collectionID != flow.ZeroID {
-		tm.txResult.CollectionID = collectionID
-	}
+	tm.txResult.CollectionID = collection.ID()
 
 	return nil
 }
@@ -302,7 +242,7 @@ func (tm *transactionSubscriptionMetadata) refreshTransactionResult(ctx context.
 				return nil
 			}
 
-			return err
+			return fmt.Errorf("failed to get transaction result from execution node: %w", err)
 		}
 	}
 
