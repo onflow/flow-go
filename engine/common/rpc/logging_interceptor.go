@@ -24,12 +24,11 @@ func customClientCodeToLevel(c codes.Code) logging.Level {
 }
 
 // LoggingInterceptor creates the logging interceptors to log incoming GRPC request and response (minus the payload body)
-func LoggingInterceptor(log zerolog.Logger) []grpc.UnaryServerInterceptor {
-	loggingInterceptor := logging.UnaryServerInterceptor(
+func LoggingInterceptor(log zerolog.Logger) grpc.UnaryServerInterceptor {
+	return logging.UnaryServerInterceptor(
 		InterceptorLogger(log),
 		logging.WithLevels(customClientCodeToLevel),
 	)
-	return []grpc.UnaryServerInterceptor{loggingInterceptor}
 }
 
 // InterceptorLogger adapts zerolog logger to interceptor logger.
