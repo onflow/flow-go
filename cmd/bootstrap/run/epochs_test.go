@@ -73,7 +73,7 @@ func TestGenerateRecoverTxArgsWithDKG_ExcludeIncludeParticipants(testifyT *testi
 				2, // number of collection clusters
 				currentEpochCommit.Counter+1,
 				flow.Localnet,
-				100,   // staking function length, in views
+				100,   // staking auction length, in views
 				4000,  // recovery epoch length, in views
 				60*60, // recovery epoch duration, in seconds
 				false, // unsafe overwrite
@@ -87,13 +87,17 @@ func TestGenerateRecoverTxArgsWithDKG_ExcludeIncludeParticipants(testifyT *testi
 			require.NoError(t, err)
 
 			// dkg index map
-			for _, pair := range args[10].(cadence.Dictionary).Pairs {
+			dkgIndexMapArgPairs := args[10].(cadence.Dictionary).Pairs
+			assert.Equal(t, len(dkgIndexMapArgPairs), len(expectedDKGIndexMap))
+			for _, pair := range dkgIndexMapArgPairs {
 				expectedIndex, ok := expectedDKGIndexMap[pair.Key.(cadence.String)]
 				require.True(t, ok)
 				require.Equal(t, expectedIndex, pair.Value.(cadence.Int))
 			}
 			// node ids
-			for _, nodeId := range args[11].(cadence.Array).Values {
+			nodeIDsArgValues := args[11].(cadence.Array).Values
+			assert.Equal(t, len(nodeIDsArgValues), len(expectedNodeIds))
+			for _, nodeId := range  {
 				_, ok := expectedNodeIds[nodeId.(cadence.String)]
 				require.True(t, ok)
 			}
