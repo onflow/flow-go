@@ -322,7 +322,7 @@ func (tc *ClusterSwitchoverTestCase) Collector(id flow.Identifier) testmock.Coll
 }
 
 // Clusters returns the clusters for the current epoch.
-func (tc *ClusterSwitchoverTestCase) Clusters(epoch protocol.Epoch) []protocol.Cluster {
+func (tc *ClusterSwitchoverTestCase) Clusters(epoch protocol.CommittedEpoch) []protocol.Cluster {
 	clustering, err := epoch.Clustering()
 	require.NoError(tc.T(), err)
 

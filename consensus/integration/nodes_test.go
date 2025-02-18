@@ -160,7 +160,7 @@ type epochInfo struct {
 }
 
 // buildEpochLookupList is a helper function which builds an auxiliary structure of epochs sorted by counter
-func buildEpochLookupList(epochs ...protocol.Epoch) []epochInfo {
+func buildEpochLookupList(epochs ...protocol.CommittedEpoch) []epochInfo {
 	infos := make([]epochInfo, 0)
 	for _, epoch := range epochs {
 		finalView, err := epoch.FinalView()
@@ -193,7 +193,7 @@ func createNodes(t *testing.T, participants *ConsensusParticipants, rootSnapshot
 	require.NoError(t, err)
 
 	epochViewLookup := buildEpochLookupList(rootSnapshot.Epochs().Current(),
-		rootSnapshot.Epochs().Next())
+		rootSnapshot.Epochs().NextCommitted())
 
 	epochLookup := &mockmodule.EpochLookup{}
 	epochLookup.On("EpochForView", mock.Anything).Return(

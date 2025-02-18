@@ -10,14 +10,27 @@ type EpochQuery interface {
 
 	// Current returns the current epoch as of this snapshot. All valid snapshots
 	// have a current epoch.
-	Current() Epoch
+	Current() CommittedEpoch
 
-	// Next returns the next epoch as of this snapshot. Valid snapshots must
-	// have a next epoch available after the transition to epoch setup phase.
+	// NextUnsafe should only be used by components that actively advance the
+	// epoch from [flow.EpochPhaseSetup] to [flow.EpochPhaseCommitted].
+	// NextUnsafe returns the tentative configuration for the next epoch as of this snapshot.
+	// Valid snapshots make such configuration available during the Epoch Setup Phase, which
+	// generally is the case only after an `EpochSetupPhaseStarted` notification has been emitted.
+	// CAUTION: epoch transition might not happen as described by the tentative configuration!
 	//
 	// Returns invalid.Epoch with ErrNextEpochNotSetup in the case that this method
-	// is queried w.r.t. a snapshot within the flow.EpochPhaseStaking phase.
-	Next() Epoch
+	// is queried w.r.t. a snapshot within the flow.EpochPhaseStaking phase, or
+	// ErrNextEpochAlreadyCommitted during the flow.EpochPhaseCommitted phase.
+	NextUnsafe() TentativeEpoch
+
+	// NextCommitted returns the next epoch as of this snapshot, only if it has
+	// been committed already - generally that is the case only after an
+	// `EpochCommittedPhaseStarted` notification has been emitted.
+	//
+	// Returns invalid.Epoch with ErrNextEpochNotCommitted in the case that
+	// the current phase is flow.EpochPhaseStaking or flow.EpochPhaseSetup.
+	NextCommitted() CommittedEpoch
 
 	// Previous returns the previous epoch as of this snapshot. Valid snapshots
 	// must have a previous epoch for all epochs except that immediately after
@@ -26,10 +39,10 @@ type EpochQuery interface {
 	//
 	// Returns invalid.Epoch with ErrNoPreviousEpoch in the case that this method
 	// is queried w.r.t. a snapshot from the first epoch after the root block.
-	Previous() Epoch
+	Previous() CommittedEpoch
 }
 
-// Epoch contains the information specific to a certain Epoch (defined
+// CommittedEpoch contains the information specific to a certain Epoch (defined
 // by the epoch Counter). Note that the Epoch preparation can differ along
 // different forks, since the emission of service events is fork-dependent.
 // Therefore, an epoch exists RELATIVE to the snapshot from which it was
@@ -38,7 +51,7 @@ type EpochQuery interface {
 // CAUTION: Clients must ensure to query epochs only for finalized blocks to
 // ensure they query finalized epoch information.
 //
-// An Epoch instance is constant and reports the identical information
+// A CommittedEpoch instance is constant and reports the identical information
 // even if progress is made later and more information becomes available in
 // subsequent blocks.
 //
@@ -56,7 +69,7 @@ type EpochQuery interface {
 //  2. The error caching pattern encourages potentially dangerous snapshot query patterns
 //
 // See https://github.com/dapperlabs/flow-go/issues/6368 for details and proposal
-type Epoch interface {
+type CommittedEpoch interface {
 
 	// Counter returns the Epoch's counter.
 	// Error returns:
@@ -198,4 +211,37 @@ type Epoch interface {
 	// * protocol.ErrUnknownEpochBoundary - if the first block of the next epoch is unknown.
 	// * state.ErrUnknownSnapshotReference - if the epoch is queried from an unresolvable snapshot.
 	FinalHeight() (uint64, error)
+}
+
+// TentativeEpoch returns the tentative information about the upcoming epoch,
+// which the protocol is in the process of configuring.
+// Only the data that is strictly necessary for committing the epoch is exposed;
+// after commitment, all epoch data is accessible through the [CommittedEpoch] interface.
+// This should only be used during the Epoch Setup Phase by components that actively
+// contribute to configuring the upcoming epoch.
+//
+// CAUTION: the epoch transition might not happen as described by the tentative configuration!
+type TentativeEpoch interface {
+
+	// Counter returns the Epoch's counter.
+	// Error returns:
+	// * protocol.ErrNoPreviousEpoch - if the epoch represents a previous epoch which does not exist.
+	// * protocol.ErrNextEpochNotSetup - if the epoch represents a next epoch which has not been set up.
+	// * state.ErrUnknownSnapshotReference - if the epoch is queried from an unresolvable snapshot.
+	Counter() (uint64, error)
+
+	// InitialIdentities returns the identities for this epoch as they were
+	// specified in the EpochSetup service event.
+	// Error returns:
+	// * protocol.ErrNoPreviousEpoch - if the epoch represents a previous epoch which does not exist.
+	// * protocol.ErrNextEpochNotSetup - if the epoch represents a next epoch which has not been set up.
+	// * state.ErrUnknownSnapshotReference - if the epoch is queried from an unresolvable snapshot.
+	InitialIdentities() (flow.IdentitySkeletonList, error)
+
+	// Clustering returns the cluster assignment for this epoch.
+	// Error returns:
+	// * protocol.ErrNoPreviousEpoch - if the epoch represents a previous epoch which does not exist.
+	// * protocol.ErrNextEpochNotSetup - if the epoch represents a next epoch which has not been set up.
+	// * state.ErrUnknownSnapshotReference - if the epoch is queried from an unresolvable snapshot.
+	Clustering() (flow.ClusterList, error)
 }

@@ -216,9 +216,9 @@ func TestBootstrap_EpochHeightBoundaries(t *testing.T) {
 			_, err = state.Final().Epochs().Current().FinalHeight()
 			assert.ErrorIs(t, err, protocol.ErrUnknownEpochBoundary)
 			// first and final height of not started next epoch should be unknown
-			_, err = state.Final().Epochs().Next().FirstHeight()
+			_, err = state.Final().Epochs().NextCommitted().FirstHeight()
 			assert.ErrorIs(t, err, protocol.ErrUnknownEpochBoundary)
-			_, err = state.Final().Epochs().Next().FinalHeight()
+			_, err = state.Final().Epochs().NextCommitted().FinalHeight()
 			assert.ErrorIs(t, err, protocol.ErrUnknownEpochBoundary)
 			// first and final height of nonexistent previous epoch should be unknown
 			_, err = state.Final().Epochs().Previous().FirstHeight()

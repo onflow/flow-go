@@ -119,7 +119,7 @@ func (suite *Suite) SetupTest() {
 		})
 
 	// set up the current epoch by default, with counter=1
-	epoch := new(protocol.Epoch)
+	epoch := new(protocol.CommittedEpoch)
 	epoch.On("Counter").Return(uint64(1), nil)
 	epoch.On("Clustering").Return(suite.clusters, nil)
 	suite.epochQuery = mocks.NewEpochQuery(suite.T(), 1, epoch)
@@ -462,7 +462,7 @@ func (suite *Suite) TestRouting_ClusterAssignmentChanged() {
 		suite.clusters[1],
 		suite.clusters[0],
 	}
-	epoch2 := new(protocol.Epoch)
+	epoch2 := new(protocol.CommittedEpoch)
 	epoch2.On("Counter").Return(uint64(2), nil)
 	epoch2.On("Clustering").Return(epoch2Clusters, nil)
 	// update the mocks to behave as though we have transitioned to epoch 2
@@ -501,7 +501,7 @@ func (suite *Suite) TestRouting_ClusterAssignmentRemoved() {
 	epoch2Clusters, err := factory.NewClusterList(epoch2Assignment, withoutMe)
 	suite.Require().NoError(err)
 
-	epoch2 := new(protocol.Epoch)
+	epoch2 := new(protocol.CommittedEpoch)
 	epoch2.On("Counter").Return(uint64(2), nil)
 	epoch2.On("InitialIdentities").Return(withoutMe, nil)
 	epoch2.On("Clustering").Return(epoch2Clusters, nil)
@@ -540,7 +540,7 @@ func (suite *Suite) TestRouting_ClusterAssignmentAdded() {
 	epoch2Clusters, err := factory.NewClusterList(epoch2Assignment, withoutMe)
 	suite.Require().NoError(err)
 
-	epoch2 := new(protocol.Epoch)
+	epoch2 := new(protocol.CommittedEpoch)
 	epoch2.On("Counter").Return(uint64(2), nil)
 	epoch2.On("InitialIdentities").Return(withoutMe, nil)
 	epoch2.On("Clustering").Return(epoch2Clusters, nil)
@@ -569,7 +569,7 @@ func (suite *Suite) TestRouting_ClusterAssignmentAdded() {
 	epoch3Clusters, err := factory.NewClusterList(epoch3Assignment, withMe)
 	suite.Require().NoError(err)
 
-	epoch3 := new(protocol.Epoch)
+	epoch3 := new(protocol.CommittedEpoch)
 	epoch3.On("Counter").Return(uint64(3), nil)
 	epoch3.On("Clustering").Return(epoch3Clusters, nil)
 	// transition to epoch 3

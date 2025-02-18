@@ -281,7 +281,7 @@ func (e *ReactorEngine) handleEpochCommittedPhaseStarted(currentEpochCounter uin
 	// phase is finalized, the block's snapshot is guaranteed to already be
 	// accessible in the protocol state at this point (even though the Badger
 	// transaction finalizing the block has not been committed yet).
-	nextDKG, err := e.State.AtBlockID(firstBlock.ID()).Epochs().Next().DKG()
+	nextDKG, err := e.State.AtBlockID(firstBlock.ID()).Epochs().NextCommitted().DKG()
 	if err != nil {
 		// CAUTION: this should never happen, indicates a storage failure or corruption
 		// TODO use irrecoverable context
@@ -335,10 +335,14 @@ func (e *ReactorEngine) handleEpochCommittedPhaseStarted(currentEpochCounter uin
 	log.Info().Msgf("successfully ended DKG, my beacon pub key for epoch %d is %s", nextEpochCounter, localPubKey)
 }
 
-// TODO document error returns
+// getDKGInfo returns the information required to initiate the DKG for the current epoch.
+// firstBlockID must be the first block of the EpochSetup phase. This is one of the few places
+// where we have to use the configuration for a future epoch that has not yet been committed.
+// CAUTION: the epoch transition might not happen as described here!
+// No errors are expected during normal operation.
 func (e *ReactorEngine) getDKGInfo(firstBlockID flow.Identifier) (*dkgInfo, error) {
 	currEpoch := e.State.AtBlockID(firstBlockID).Epochs().Current()
-	nextEpoch := e.State.AtBlockID(firstBlockID).Epochs().Next()
+	nextEpoch := e.State.AtBlockID(firstBlockID).Epochs().NextUnsafe()
 
 	identities, err := nextEpoch.InitialIdentities()
 	if err != nil {
