@@ -1291,7 +1291,6 @@ func BootstrapNetwork(networkConf NetworkConfig, bootstrapDir string, chainID fl
 		result,
 		seal,
 		qc,
-		flow.DefaultProtocolVersion,
 		networkConf.KVStoreFactory,
 	)
 	if err != nil {

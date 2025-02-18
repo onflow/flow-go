@@ -311,10 +311,12 @@ func (b *Backend) Ping(ctx context.Context) error {
 // GetNodeVersionInfo returns node version information such as semver, commit, sporkID, protocolVersion, etc
 func (b *Backend) GetNodeVersionInfo(_ context.Context) (*access.NodeVersionInfo, error) {
 	sporkID := b.stateParams.SporkID()
-	protocolVersion := b.stateParams.ProtocolVersion()
 	sporkRootBlockHeight := b.stateParams.SporkRootBlockHeight()
-
 	nodeRootBlockHeader := b.stateParams.SealedRoot()
+	protocolSnapshot, err := b.state.Final().ProtocolState()
+	if err != nil {
+		return nil, fmt.Errorf("could not read finalized protocol kvstore: %w", err)
+	}
 
 	var compatibleRange *access.CompatibleRange
 
@@ -330,7 +332,7 @@ func (b *Backend) GetNodeVersionInfo(_ context.Context) (*access.NodeVersionInfo
 		Semver:               build.Version(),
 		Commit:               build.Commit(),
 		SporkId:              sporkID,
-		ProtocolVersion:      uint64(protocolVersion),
+		ProtocolVersion:      protocolSnapshot.GetProtocolStateVersion(),
 		SporkRootBlockHeight: sporkRootBlockHeight,
 		NodeRootBlockHeight:  nodeRootBlockHeader.Height,
 		CompatibleRange:      compatibleRange,
