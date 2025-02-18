@@ -391,11 +391,11 @@ func createNode(
 	versionBeaconDB := storage.NewVersionBeacons(db)
 	protocolStateEvents := events.NewDistributor()
 
-	localID := identity.ID()
+	localNodeID := identity.NodeID
 
 	log := unittest.Logger().With().
 		Int("index", index).
-		Hex("node_id", localID[:]).
+		Hex("node_id", localNodeID[:]).
 		Logger()
 
 	state, err := bprotocol.Bootstrap(
@@ -442,7 +442,7 @@ func createNode(
 
 	counterConsumer := &CounterConsumer{
 		finalized: func(total uint) {
-			stopper.onFinalizedTotal(node.id.ID(), total)
+			stopper.onFinalizedTotal(node.id.NodeID, total)
 		},
 	}
 
@@ -452,7 +452,7 @@ func createNode(
 	hotstuffDistributor.AddConsumer(counterConsumer)
 	hotstuffDistributor.AddConsumer(logConsumer)
 
-	require.Equal(t, participant.nodeInfo.NodeID, localID)
+	require.Equal(t, participant.nodeInfo.NodeID, localNodeID)
 	privateKeys, err := participant.nodeInfo.PrivateKeys()
 	require.NoError(t, err)
 
@@ -461,7 +461,7 @@ func createNode(
 	require.NoError(t, err)
 
 	// add a network for this node to the hub
-	net := hub.AddNetwork(localID, node)
+	net := hub.AddNetwork(localNodeID, node)
 
 	guaranteeLimit, sealLimit := uint(1000), uint(1000)
 	guarantees, err := stdmap.NewGuarantees(guaranteeLimit)
@@ -510,7 +510,7 @@ func createNode(
 	rootQC, err := rootSnapshot.QuorumCertificate()
 	require.NoError(t, err)
 
-	committee, err := committees.NewConsensusCommittee(state, localID)
+	committee, err := committees.NewConsensusCommittee(state, localNodeID)
 	require.NoError(t, err)
 	protocolStateEvents.AddConsumer(committee)
 

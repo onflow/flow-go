@@ -46,7 +46,7 @@ func (p *UpdatableIDProvider) ByNodeID(flowID flow.Identifier) (*flow.Identity, 
 	defer p.mu.RUnlock()
 
 	for _, v := range p.identities {
-		if v.ID() == flowID {
+		if v.NodeID == flowID {
 			return v, true
 		}
 	}

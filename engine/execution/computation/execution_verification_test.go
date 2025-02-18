@@ -772,7 +772,7 @@ func executeBlockAndVerifyWithParameters(t *testing.T,
 	sk, err := crypto.GeneratePrivateKey(crypto.BLSBLS12381, seed)
 	require.NoError(t, err)
 	myIdentity.StakingPubKey = sk.PublicKey()
-	me := mocklocal.NewMockLocal(sk, myIdentity.ID(), t)
+	me := mocklocal.NewMockLocal(sk, myIdentity.NodeID, t)
 
 	// used by computer to generate the prng used in the service tx
 	stateForRandomSource := testutil.ProtocolStateWithSourceFixture(nil)
