@@ -11,17 +11,24 @@ import (
 )
 
 func customClientCodeToLevel(c codes.Code) logging.Level {
-	if c == codes.OK {
+	switch c {
+	case codes.OK:
 		// log successful returns as Debug to avoid excessive logging in info mode
 		return logging.LevelDebug
+	case codes.DeadlineExceeded, codes.ResourceExhausted, codes.OutOfRange:
+		// these are common, map to info
+		return logging.LevelInfo
+	default:
+		return logging.DefaultServerCodeToLevel(c)
 	}
-	return logging.DefaultServerCodeToLevel(c)
 }
 
 // LoggingInterceptor creates the logging interceptors to log incoming GRPC request and response (minus the payload body)
-func LoggingInterceptor(log zerolog.Logger) []grpc.UnaryServerInterceptor {
-	loggingInterceptor := logging.UnaryServerInterceptor(InterceptorLogger(log), logging.WithLevels(customClientCodeToLevel))
-	return []grpc.UnaryServerInterceptor{loggingInterceptor}
+func LoggingInterceptor(log zerolog.Logger) grpc.UnaryServerInterceptor {
+	return logging.UnaryServerInterceptor(
+		InterceptorLogger(log),
+		logging.WithLevels(customClientCodeToLevel),
+	)
 }
 
 // InterceptorLogger adapts zerolog logger to interceptor logger.
