@@ -34,14 +34,13 @@ func NewViewProvider(
 }
 
 // GetBlockView returns the block view for the given height (at the end of a block!)
+// The `GetSnapshotAt` function of `storageProvider`, will return
+// the block state at its start, before any transaction executions.
+// This is the indented functionality, when replaying & verifying blocks.
+// However, when reading the state from a block, we are interested
+// in its end state, after all transaction executions.
+// That is why we fetch the block snapshot at the next height.
 func (evp *ViewProvider) GetBlockView(height uint64) (*View, error) {
-	// The `GetSnapshotAt` function of `storageProvider`, will return
-	// the block state at its start, before transaction executions.
-	// This is the indented functionality, for replaying block
-	// transactions.
-	// However, when reading the state from a block, we are interested
-	// in its end state, after transaction executions.
-	// That is why we fetch the block snapshot at the next height.
 	readOnly, err := evp.storageProvider.GetSnapshotAt(height + 1)
 	if err != nil {
 		return nil, err
