@@ -4,6 +4,7 @@ import (
 	"io"
 
 	"github.com/onflow/flow-go/engine/access/rest/common"
+	"github.com/onflow/flow-go/engine/access/rest/common/parser"
 	"github.com/onflow/flow-go/model/flow"
 )
 
@@ -22,7 +23,7 @@ func (c *CreateTransaction) Build(r *common.Request) error {
 }
 
 func (c *CreateTransaction) Parse(rawTransaction io.Reader, chain flow.Chain) error {
-	var tx Transaction
+	var tx parser.Transaction
 	err := tx.Parse(rawTransaction, chain)
 	if err != nil {
 		return err

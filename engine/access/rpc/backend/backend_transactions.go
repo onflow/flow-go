@@ -285,7 +285,7 @@ func (b *backendTransactions) GetTransactionResult(
 	var txResult *access.TransactionResult
 	// access node may not have the block if it hasn't yet been finalized, hence block can be nil at this point
 	if block != nil {
-		txResult, err = b.lookupTransactionResult(ctx, txID, block, requiredEventEncodingVersion)
+		txResult, err = b.lookupTransactionResult(ctx, txID, block.Header, requiredEventEncodingVersion)
 		if err != nil {
 			return nil, rpc.ConvertError(err, "failed to retrieve result", codes.Internal)
 		}
@@ -621,7 +621,7 @@ func (b *backendTransactions) GetSystemTransactionResult(ctx context.Context, bl
 		return nil, rpc.ConvertStorageError(err)
 	}
 
-	return b.lookupTransactionResult(ctx, b.systemTxID, block, requiredEventEncodingVersion)
+	return b.lookupTransactionResult(ctx, b.systemTxID, block.Header, requiredEventEncodingVersion)
 }
 
 // Error returns:
@@ -644,21 +644,21 @@ func (b *backendTransactions) lookupBlock(txID flow.Identifier) (*flow.Block, er
 func (b *backendTransactions) lookupTransactionResult(
 	ctx context.Context,
 	txID flow.Identifier,
-	block *flow.Block,
+	block *flow.Header,
 	requiredEventEncodingVersion entities.EventEncodingVersion,
 ) (*access.TransactionResult, error) {
 	var txResult *access.TransactionResult
 	var err error
 	switch b.txResultQueryMode {
 	case IndexQueryModeExecutionNodesOnly:
-		txResult, err = b.getTransactionResultFromExecutionNode(ctx, block, txID, requiredEventEncodingVersion)
+		txResult, err = b.GetTransactionResultFromExecutionNode(ctx, block, txID, requiredEventEncodingVersion)
 	case IndexQueryModeLocalOnly:
 		txResult, err = b.GetTransactionResultFromStorage(ctx, block, txID, requiredEventEncodingVersion)
 	case IndexQueryModeFailover:
 		txResult, err = b.GetTransactionResultFromStorage(ctx, block, txID, requiredEventEncodingVersion)
 		if err != nil {
 			// If any error occurs with local storage - request transaction result from EN
-			txResult, err = b.getTransactionResultFromExecutionNode(ctx, block, txID, requiredEventEncodingVersion)
+			txResult, err = b.GetTransactionResultFromExecutionNode(ctx, block, txID, requiredEventEncodingVersion)
 		}
 	default:
 		return nil, status.Errorf(codes.Internal, "unknown transaction result query mode: %v", b.txResultQueryMode)
@@ -742,9 +742,9 @@ func (b *backendTransactions) registerTransactionForRetry(tx *flow.TransactionBo
 	b.retry.RegisterTransaction(referenceBlock.Height, tx)
 }
 
-func (b *backendTransactions) getTransactionResultFromExecutionNode(
+func (b *backendTransactions) GetTransactionResultFromExecutionNode(
 	ctx context.Context,
-	block *flow.Block,
+	block *flow.Header,
 	transactionID flow.Identifier,
 	requiredEventEncodingVersion entities.EventEncodingVersion,
 ) (*access.TransactionResult, error) {
@@ -773,7 +773,7 @@ func (b *backendTransactions) getTransactionResultFromExecutionNode(
 	}
 
 	// tx body is irrelevant to status if it's in an executed block
-	txStatus, err := b.DeriveTransactionStatus(block.Header.Height, true)
+	txStatus, err := b.DeriveTransactionStatus(block.Height, true)
 	if err != nil {
 		if !errors.Is(err, state.ErrUnknownSnapshotReference) {
 			irrecoverable.Throw(ctx, err)
@@ -793,7 +793,7 @@ func (b *backendTransactions) getTransactionResultFromExecutionNode(
 		Events:        events,
 		ErrorMessage:  resp.GetErrorMessage(),
 		BlockID:       blockID,
-		BlockHeight:   block.Header.Height,
+		BlockHeight:   block.Height,
 	}, nil
 }
 
