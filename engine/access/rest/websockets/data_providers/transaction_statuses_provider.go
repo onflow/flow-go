@@ -5,8 +5,6 @@ import (
 	"fmt"
 
 	"github.com/rs/zerolog"
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 
 	"github.com/onflow/flow-go/access"
 	commonmodels "github.com/onflow/flow-go/engine/access/rest/common/models"
@@ -78,8 +76,34 @@ func NewTransactionStatusesDataProvider(
 //
 // No errors are expected during normal operations.
 func (p *TransactionStatusesDataProvider) Run() error {
-	err := subscription.HandleSubscription(p.subscription, p.handleResponse())
-	return p.handleSubscriptionError(err)
+	messageIndex := counters.NewMonotonicCounter(0)
+
+	return run(
+		p.closedChan,
+		p.subscription,
+		func(response []*access.TransactionResult) error {
+			return p.sendResponse(response, &messageIndex)
+		},
+	)
+}
+
+func (p *TransactionStatusesDataProvider) sendResponse(
+	txResults []*access.TransactionResult,
+	messageIndex *counters.StrictMonotonicCounter,
+) error {
+	for i := range txResults {
+		prevIndex := messageIndex.Value()
+		messageIndex.Increment()
+
+		var txStatusesPayload models.TransactionStatusesResponse
+		txStatusesPayload.Build(p.linkGenerator, txResults[i], prevIndex)
+
+		var response models.BaseDataProvidersResponse
+		response.Build(p.ID(), p.Topic(), &txStatusesPayload)
+		p.send <- &response
+	}
+
+	return nil
 }
 
 // createSubscription creates a new subscription using the specified input arguments.
@@ -96,33 +120,6 @@ func (p *TransactionStatusesDataProvider) createSubscription(
 	}
 
 	return p.api.SubscribeTransactionStatusesFromLatest(ctx, args.TxID, entities.EventEncodingVersion_JSON_CDC_V0)
-}
-
-// handleResponse processes a tx statuses and sends the formatted response.
-//
-// No errors are expected during normal operations.
-func (p *TransactionStatusesDataProvider) handleResponse() func(txResults []*access.TransactionResult) error {
-	messageIndex := counters.NewMonotonicCounter(0)
-
-	return func(txResults []*access.TransactionResult) error {
-
-		for i := range txResults {
-			index := messageIndex.Value()
-			if ok := messageIndex.Set(messageIndex.Value() + 1); !ok {
-				return status.Errorf(codes.Internal, "message index already incremented to %d", messageIndex.Value())
-			}
-
-			var txStatusesPayload models.TransactionStatusesResponse
-			txStatusesPayload.Build(p.linkGenerator, txResults[i], index)
-
-			var response models.BaseDataProvidersResponse
-			response.Build(p.ID(), p.Topic(), &txStatusesPayload)
-
-			p.send <- &response
-		}
-
-		return nil
-	}
 }
 
 // parseAccountStatusesArguments validates and initializes the account statuses arguments.

@@ -82,8 +82,48 @@ func NewEventsDataProvider(
 //
 // No errors are expected during normal operations.
 func (p *EventsDataProvider) Run() error {
-	err := subscription.HandleSubscription(p.subscription, p.handleResponse())
-	return p.handleSubscriptionError(err)
+	messageIndex := counters.NewMonotonicCounter(0)
+	blocksSinceLastMessage := uint64(0)
+
+	return run(
+		p.closedChan,
+		p.subscription,
+		func(response *backend.EventsResponse) error {
+			return p.sendResponse(response, &messageIndex, &blocksSinceLastMessage)
+		},
+	)
+}
+
+func (p *EventsDataProvider) sendResponse(
+	eventsResponse *backend.EventsResponse,
+	messageIndex *counters.StrictMonotonicCounter,
+	blocksSinceLastMessage *uint64,
+) error {
+	// Reset the block counter after sending a message
+	defer func() {
+		*blocksSinceLastMessage = 0
+	}()
+
+	// Only send a response if there's meaningful data to send.
+	// The block counter increments until either:
+	// 1. The contract emits events
+	// 2. The heartbeat interval is reached
+	*blocksSinceLastMessage += 1
+	contractEmittedEvents := len(eventsResponse.Events) != 0
+	reachedHeartbeatLimit := *blocksSinceLastMessage >= p.heartbeatInterval
+	if !contractEmittedEvents && !reachedHeartbeatLimit {
+		return nil
+	}
+
+	var eventsPayload models.EventResponse
+	defer messageIndex.Increment()
+	eventsPayload.Build(eventsResponse, messageIndex.Value())
+
+	var response models.BaseDataProvidersResponse
+	response.Build(p.ID(), p.Topic(), &eventsPayload)
+	p.send <- &response
+
+	return nil
 }
 
 // handleResponse processes events and sends the formatted response.
