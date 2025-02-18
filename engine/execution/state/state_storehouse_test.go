@@ -53,7 +53,6 @@ func prepareStorehouseTest(f func(t *testing.T, es state.ExecutionState, l *ledg
 			stateCommitments.On("BatchStore", mock.Anything, mock.Anything, mock.Anything).Return(nil)
 			headers := storage.NewHeaders(t)
 			blocks := storage.NewBlocks(t)
-			collections := storage.NewCollections(t)
 			events := storage.NewEvents(t)
 			events.On("BatchStore", mock.Anything, mock.Anything, mock.Anything).Return(nil)
 			serviceEvents := storage.NewServiceEvents(t)
@@ -88,7 +87,7 @@ func prepareStorehouseTest(f func(t *testing.T, es state.ExecutionState, l *ledg
 				require.NoError(t, headersDB.Store(finalizedHeaders[10]))
 
 				es := state.NewExecutionState(
-					ls, stateCommitments, blocks, headers, collections, chunkDataPacks, results, myReceipts, events, serviceEvents, txResults, badgerDB, trace.NewNoopTracer(),
+					ls, stateCommitments, blocks, headers, chunkDataPacks, results, myReceipts, events, serviceEvents, txResults, badgerDB, trace.NewNoopTracer(),
 					rs,
 					true,
 				)

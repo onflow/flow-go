@@ -94,6 +94,7 @@ import (
 	storageerr "github.com/onflow/flow-go/storage"
 	storage "github.com/onflow/flow-go/storage/badger"
 	"github.com/onflow/flow-go/storage/badger/procedure"
+	"github.com/onflow/flow-go/storage/operation/badgerimpl"
 	"github.com/onflow/flow-go/storage/operation/pebbleimpl"
 	storagepebble "github.com/onflow/flow-go/storage/pebble"
 	"github.com/onflow/flow-go/storage/store"
@@ -143,6 +144,7 @@ type ExecutionNode struct {
 	myReceipts             *storage.MyExecutionReceipts
 	chunkDataPackDB        *pebble.DB
 	chunkDataPacks         storageerr.ChunkDataPacks
+	collections            storageerr.Collections
 	providerEngine         exeprovider.ProviderEngine
 	checkerEng             *checker.Engine
 	syncCore               *chainsync.Core
@@ -190,9 +192,6 @@ func (builder *ExecutionNodeBuilder) LoadComponentsAndModules() {
 		AdminCommand("set-uploader-enabled", func(config *NodeConfig) commands.AdminCommand {
 			return uploaderCommands.NewToggleUploaderCommand(exeNode.blockDataUploader)
 		}).
-		AdminCommand("get-transactions", func(conf *NodeConfig) commands.AdminCommand {
-			return storageCommands.NewGetTransactionsCommand(conf.State, conf.Storage.Payloads, conf.Storage.Collections)
-		}).
 		AdminCommand("protocol-snapshot", func(conf *NodeConfig) commands.AdminCommand {
 			return storageCommands.NewProtocolSnapshotCommand(
 				conf.Logger,
@@ -202,6 +201,7 @@ func (builder *ExecutionNodeBuilder) LoadComponentsAndModules() {
 				exeNode.exeConf.triedir,
 			)
 		}).
+		Module("load collections", exeNode.LoadCollections).
 		Module("mutable follower state", exeNode.LoadMutableFollowerState).
 		Module("system specs", exeNode.LoadSystemSpecs).
 		Module("execution metrics", exeNode.LoadExecutionMetrics).
@@ -214,6 +214,9 @@ func (builder *ExecutionNodeBuilder) LoadComponentsAndModules() {
 		Module("blobservice peer manager dependencies", exeNode.LoadBlobservicePeerManagerDependencies).
 		Module("bootstrap", exeNode.LoadBootstrapper).
 		Module("register store", exeNode.LoadRegisterStore).
+		AdminCommand("get-transactions", func(conf *NodeConfig) commands.AdminCommand {
+			return storageCommands.NewGetTransactionsCommand(conf.State, conf.Storage.Payloads, exeNode.collections)
+		}).
 		Component("execution state ledger", exeNode.LoadExecutionStateLedger).
 
 		// TODO: Modules should be able to depends on components
@@ -253,6 +256,13 @@ func (builder *ExecutionNodeBuilder) LoadComponentsAndModules() {
 		Component("receipt provider engine", exeNode.LoadReceiptProviderEngine).
 		Component("synchronization engine", exeNode.LoadSynchronizationEngine).
 		Component("grpc server", exeNode.LoadGrpcServer)
+}
+
+func (exeNode *ExecutionNode) LoadCollections(node *NodeConfig) error {
+	db := badgerimpl.ToDB(node.DB)
+	transactions := store.NewTransactions(node.Metrics.Cache, db)
+	exeNode.collections = store.NewCollections(db, transactions)
+	return nil
 }
 
 func (exeNode *ExecutionNode) LoadMutableFollowerState(node *NodeConfig) error {
@@ -450,7 +460,7 @@ func (exeNode *ExecutionNode) LoadGCPBlockDataUploader(
 		asyncUploader,
 		node.Storage.Blocks,
 		node.Storage.Commits,
-		node.Storage.Collections,
+		exeNode.collections,
 		exeNode.events,
 		exeNode.results,
 		exeNode.txResults,
@@ -749,7 +759,7 @@ func (exeNode *ExecutionNode) LoadExecutionState(
 		return nil
 	})
 	chunkDataPacks := store.NewChunkDataPacks(node.Metrics.Cache,
-		pebbleimpl.ToDB(chunkDataPackDB), node.Storage.Collections, exeNode.exeConf.chunkDataPackCacheSize)
+		pebbleimpl.ToDB(chunkDataPackDB), exeNode.collections, exeNode.exeConf.chunkDataPackCacheSize)
 
 	exeNode.chunkDataPackDB = chunkDataPackDB
 	exeNode.chunkDataPacks = chunkDataPacks
@@ -764,7 +774,6 @@ func (exeNode *ExecutionNode) LoadExecutionState(
 		node.Storage.Commits,
 		node.Storage.Blocks,
 		node.Storage.Headers,
-		node.Storage.Collections,
 		chunkDataPacks,
 		exeNode.results,
 		exeNode.myReceipts,
@@ -1105,7 +1114,7 @@ func (exeNode *ExecutionNode) LoadIngestionEngine(
 		colFetcher,
 		node.Storage.Headers,
 		node.Storage.Blocks,
-		node.Storage.Collections,
+		exeNode.collections,
 		exeNode.executionState,
 		node.State,
 		exeNode.collector,
