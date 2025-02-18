@@ -1,10 +1,10 @@
 package corruptlibp2p
 
 import (
+	corrupt "github.com/libp2p/go-libp2p-pubsub"
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	pubsubpb "github.com/libp2p/go-libp2p-pubsub/pb"
 	"github.com/libp2p/go-libp2p/core/peer"
-	corrupt "github.com/yhassanzadeh13/go-libp2p-pubsub"
 
 	"github.com/onflow/flow-go/network/p2p"
 )
