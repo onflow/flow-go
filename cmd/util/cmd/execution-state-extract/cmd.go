@@ -33,7 +33,6 @@ var (
 	flagNWorker                            int
 	flagNoMigration                        bool
 	flagMigration                          string
-	flagAuthorizationFixes                 string
 	flagNoReport                           bool
 	flagValidateMigration                  bool
 	flagAllowPartialStateFromPayloads      bool
@@ -89,11 +88,7 @@ func init() {
 	Cmd.Flags().BoolVar(&flagNoMigration, "no-migration", false,
 		"don't migrate the state")
 
-	Cmd.Flags().StringVar(&flagMigration, "migration", "cadence-1.0",
-		"migration name. 'cadence-1.0' (default) or 'fix-authorizations'")
-
-	Cmd.Flags().StringVar(&flagAuthorizationFixes, "authorization-fixes", "",
-		"authorization fixes to apply. requires '--migration=fix-authorizations'")
+	Cmd.Flags().StringVar(&flagMigration, "migration", "", "migration name")
 
 	Cmd.Flags().BoolVar(&flagNoReport, "no-report", false,
 		"don't report the state")
@@ -230,19 +225,6 @@ func run(*cobra.Command, []string) {
 		log.Fatal().Msg("Both --validate and --diff are enabled, please specify only one (or none) of these")
 	}
 
-	switch flagMigration {
-	case "cadence-1.0":
-		// valid, no-op
-
-	case "fix-authorizations":
-		if flagAuthorizationFixes == "" {
-			log.Fatal().Msg("--migration=fix-authorizations requires --authorization-fixes")
-		}
-
-	default:
-		log.Fatal().Msg("Invalid --migration: got %s, expected 'cadence-1.0' or 'fix-authorizations'")
-	}
-
 	var stateCommitment flow.StateCommitment
 
 	if len(flagBlockHash) > 0 {
@@ -325,7 +307,7 @@ func run(*cobra.Command, []string) {
 	}
 
 	// Validate chain ID
-	_ = flow.ChainID(flagChain).Chain()
+	chain := flow.ChainID(flagChain).Chain()
 
 	if flagNoReport {
 		log.Warn().Msgf("--no-report flag is deprecated")
@@ -422,6 +404,8 @@ func run(*cobra.Command, []string) {
 		var migs []migrations.NamedMigration
 
 		switch flagMigration {
+		case "add-migrationmainnet-keys":
+			migs = append(migs, addMigrationMainnetKeysMigration(log.Logger, flagOutputDir, flagNWorker, chain.ChainID())...)
 		default:
 			log.Fatal().Msgf("unknown migration: %s", flagMigration)
 		}

@@ -46,8 +46,8 @@ type Core struct {
 	payloads                  storage.Payloads
 	state                     protocol.ParticipantState
 	// track latest finalized view/height - used to efficiently drop outdated or too-far-ahead blocks
-	finalizedView     counters.StrictMonotonousCounter
-	finalizedHeight   counters.StrictMonotonousCounter
+	finalizedView     counters.StrictMonotonicCounter
+	finalizedHeight   counters.StrictMonotonicCounter
 	pending           module.PendingBlockBuffer // pending block cache
 	sync              module.BlockRequester
 	hotstuff          module.HotStuff
