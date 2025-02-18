@@ -33,7 +33,7 @@ func NewViewProvider(
 	}
 }
 
-// GetBlockView returns the block view for the given height
+// GetBlockView returns the block view for the given height (at the end of a block!)
 func (evp *ViewProvider) GetBlockView(height uint64) (*View, error) {
 	// The `GetSnapshotAt` function of `storageProvider`, will return
 	// the block state at its start, before transaction executions.
