@@ -41,6 +41,7 @@ func NewAccountStatusesDataProvider(
 	ctx context.Context,
 	logger zerolog.Logger,
 	stateStreamApi state_stream.API,
+	subscriptionID string,
 	topic string,
 	arguments models.Arguments,
 	send chan<- interface{},
@@ -48,6 +49,10 @@ func NewAccountStatusesDataProvider(
 	eventFilterConfig state_stream.EventFilterConfig,
 	heartbeatInterval uint64,
 ) (*AccountStatusesDataProvider, error) {
+	if stateStreamApi == nil {
+		return nil, fmt.Errorf("this access node does not support streaming account statuses")
+	}
+
 	p := &AccountStatusesDataProvider{
 		logger:            logger.With().Str("component", "account-statuses-data-provider").Logger(),
 		stateStreamApi:    stateStreamApi,
@@ -63,7 +68,9 @@ func NewAccountStatusesDataProvider(
 	subCtx, cancel := context.WithCancel(ctx)
 
 	p.baseDataProvider = newBaseDataProvider(
+		subscriptionID,
 		topic,
+		arguments,
 		cancel,
 		send,
 		p.createSubscription(subCtx, accountStatusesArgs), // Set up a subscription to account statuses based on arguments.
@@ -97,7 +104,7 @@ func (p *AccountStatusesDataProvider) createSubscription(ctx context.Context, ar
 // No errors are expected during normal operations.
 func (p *AccountStatusesDataProvider) handleResponse() func(accountStatusesResponse *backend.AccountStatusesResponse) error {
 	blocksSinceLastMessage := uint64(0)
-	messageIndex := counters.NewMonotonousCounter(0)
+	messageIndex := counters.NewMonotonicCounter(0)
 
 	return func(accountStatusesResponse *backend.AccountStatusesResponse) error {
 		// check if there are any events in the response. if not, do not send a message unless the last
@@ -107,16 +114,19 @@ func (p *AccountStatusesDataProvider) handleResponse() func(accountStatusesRespo
 			if blocksSinceLastMessage < p.heartbeatInterval {
 				return nil
 			}
-			blocksSinceLastMessage = 0
 		}
+		blocksSinceLastMessage = 0
 
 		index := messageIndex.Value()
 		if ok := messageIndex.Set(messageIndex.Value() + 1); !ok {
 			return status.Errorf(codes.Internal, "message index already incremented to %d", messageIndex.Value())
 		}
 
-		var response models.AccountStatusesResponse
-		response.Build(accountStatusesResponse, index)
+		var accountStatusesPayload models.AccountStatusesResponse
+		accountStatusesPayload.Build(accountStatusesResponse, index)
+
+		var response models.BaseDataProvidersResponse
+		response.Build(p.ID(), p.Topic(), &accountStatusesPayload)
 
 		p.send <- &response
 
