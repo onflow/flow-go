@@ -11,12 +11,10 @@ import (
 	jsoncdc "github.com/onflow/cadence/encoding/json"
 	"github.com/onflow/cadence/stdlib"
 	"github.com/rs/zerolog"
-	mocks "github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
 	"github.com/onflow/flow-go/engine/execution/computation/query"
-	"github.com/onflow/flow-go/engine/execution/computation/query/mock"
 	"github.com/onflow/flow-go/engine/execution/testutil"
 	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/fvm/errors"
@@ -156,7 +154,7 @@ func (s *scriptTestSuite) TestGetAccountKeys() {
 
 func (s *scriptTestSuite) SetupTest() {
 	logger := unittest.LoggerForTest(s.Suite.T(), zerolog.InfoLevel)
-	entropyProvider := testutil.EntropyProviderFixture(nil)
+	entropyProvider := testutil.ProtocolStateWithSourceFixture(nil)
 	blockchain := unittest.BlockchainFixture(10)
 	headers := newBlockHeadersStorage(blockchain)
 
@@ -169,12 +167,6 @@ func (s *scriptTestSuite) SetupTest() {
 		fvm.WithSequenceNumberCheckAndIncrementEnabled(false),
 	)
 	s.height = blockchain[0].Header.Height
-
-	entropyBlock := mock.NewEntropyProviderPerBlock(s.T())
-	entropyBlock.
-		On("AtBlockID", mocks.AnythingOfType("flow.Identifier")).
-		Return(entropyProvider).
-		Maybe()
 
 	s.dbDir = unittest.TempDir(s.T())
 	db := pebbleStorage.NewBootstrappedRegistersWithPathForTest(s.T(), s.dbDir, s.height, s.height)
@@ -205,7 +197,7 @@ func (s *scriptTestSuite) SetupTest() {
 		logger,
 		metrics.NewNoopCollector(),
 		s.chain.ChainID(),
-		entropyBlock,
+		entropyProvider,
 		headers,
 		index.RegisterValue,
 		query.NewDefaultConfig(),

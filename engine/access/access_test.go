@@ -45,6 +45,8 @@ import (
 	"github.com/onflow/flow-go/storage"
 	bstorage "github.com/onflow/flow-go/storage/badger"
 	"github.com/onflow/flow-go/storage/badger/operation"
+	"github.com/onflow/flow-go/storage/operation/badgerimpl"
+	"github.com/onflow/flow-go/storage/store"
 	"github.com/onflow/flow-go/storage/util"
 	"github.com/onflow/flow-go/utils/unittest"
 	"github.com/onflow/flow-go/utils/unittest/mocks"
@@ -684,14 +686,13 @@ func (suite *Suite) TestGetSealedTransaction() {
 		)
 		require.NoError(suite.T(), err)
 
-		lastFullBlockHeight, err := counters.NewPersistentStrictMonotonicCounter(
-			bstorage.NewConsumerProgress(db, module.ConsumeProgressLastFullBlockHeight),
-			suite.rootBlock.Height,
-		)
+		progress, err := store.NewConsumerProgress(badgerimpl.ToDB(db), module.ConsumeProgressLastFullBlockHeight).Initialize(suite.rootBlock.Height)
+		require.NoError(suite.T(), err)
+		lastFullBlockHeight, err := counters.NewPersistentStrictMonotonicCounter(progress)
 		require.NoError(suite.T(), err)
 
 		// create the ingest engine
-		processedHeight := bstorage.NewConsumerProgress(db, module.ConsumeProgressIngestionEngineBlockHeight)
+		processedHeight := store.NewConsumerProgress(badgerimpl.ToDB(db), module.ConsumeProgressIngestionEngineBlockHeight)
 
 		ingestEng, err := ingestion.New(
 			suite.log,
@@ -874,12 +875,13 @@ func (suite *Suite) TestGetTransactionResult() {
 		)
 		require.NoError(suite.T(), err)
 
-		processedHeight := bstorage.NewConsumerProgress(db, module.ConsumeProgressIngestionEngineBlockHeight)
+		processedHeightInitializer := store.NewConsumerProgress(badgerimpl.ToDB(db), module.ConsumeProgressIngestionEngineBlockHeight)
 
-		lastFullBlockHeight, err := counters.NewPersistentStrictMonotonicCounter(
-			bstorage.NewConsumerProgress(db, module.ConsumeProgressLastFullBlockHeight),
-			suite.rootBlock.Height,
-		)
+		lastFullBlockHeightProgress, err := store.NewConsumerProgress(badgerimpl.ToDB(db), module.ConsumeProgressLastFullBlockHeight).
+			Initialize(suite.rootBlock.Height)
+		require.NoError(suite.T(), err)
+
+		lastFullBlockHeight, err := counters.NewPersistentStrictMonotonicCounter(lastFullBlockHeightProgress)
 		require.NoError(suite.T(), err)
 
 		// create the ingest engine
@@ -896,7 +898,7 @@ func (suite *Suite) TestGetTransactionResult() {
 			results,
 			receipts,
 			collectionExecutedMetric,
-			processedHeight,
+			processedHeightInitializer,
 			lastFullBlockHeight,
 			nil,
 		)
@@ -1130,12 +1132,13 @@ func (suite *Suite) TestExecuteScript() {
 		suite.net.On("Register", channels.ReceiveReceipts, mock.Anything).Return(conduit, nil).
 			Once()
 
-		processedHeight := bstorage.NewConsumerProgress(db, module.ConsumeProgressIngestionEngineBlockHeight)
+		processedHeightInitializer := store.NewConsumerProgress(badgerimpl.ToDB(db), module.ConsumeProgressIngestionEngineBlockHeight)
 
-		lastFullBlockHeight, err := counters.NewPersistentStrictMonotonicCounter(
-			bstorage.NewConsumerProgress(db, module.ConsumeProgressLastFullBlockHeight),
-			suite.rootBlock.Height,
-		)
+		lastFullBlockHeightInitializer := store.NewConsumerProgress(badgerimpl.ToDB(db), module.ConsumeProgressLastFullBlockHeight)
+		lastFullBlockHeightProgress, err := lastFullBlockHeightInitializer.Initialize(suite.rootBlock.Height)
+		require.NoError(suite.T(), err)
+
+		lastFullBlockHeight, err := counters.NewPersistentStrictMonotonicCounter(lastFullBlockHeightProgress)
 		require.NoError(suite.T(), err)
 
 		// create the ingest engine
@@ -1152,7 +1155,7 @@ func (suite *Suite) TestExecuteScript() {
 			results,
 			receipts,
 			collectionExecutedMetric,
-			processedHeight,
+			processedHeightInitializer,
 			lastFullBlockHeight,
 			nil,
 		)
