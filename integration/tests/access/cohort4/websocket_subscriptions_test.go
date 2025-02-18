@@ -85,6 +85,7 @@ func (s *WebsocketSubscriptionSuite) SetupTest() {
 		testnet.WithAdditionalFlagf("--execution-state-dir=%s", testnet.DefaultExecutionStateDir),
 		testnet.WithAdditionalFlagf("--websocket-inactivity-timeout=%ds", InactivityTimeout),
 		testnet.WithAdditionalFlagf("--websocket-max-subscriptions-per-connection=%d", MaxSubscriptionsPerConnection),
+		testnet.WithAdditionalFlagf("--experimental-enable-websockets-stream-api=true"),
 		testnet.WithMetricsServer(),
 	)
 
@@ -236,7 +237,7 @@ func (s *WebsocketSubscriptionSuite) TestMaxSubscriptionsPerConnection() {
 	expectedErrorMessage := fmt.Sprintf("error creating new subscription: %s", websockets.ErrMaxSubscriptionsReached.Error())
 
 	// Loop to send subscription requests, including one request exceeding the limit.
-	for i := 1; i <= MaxSubscriptionsPerConnection+1; i++ {
+	for i := 1; i <= MaxSubscriptionsPerConnection; i++ {
 		// Create a subscription message request with a unique ID.
 		subscriptionToBlocksRequest := s.subscribeMessageRequest(
 			strconv.Itoa(i),

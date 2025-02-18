@@ -156,7 +156,7 @@ func parseEventsArguments(
 	// Parse 'event_types' as a JSON array
 	var eventTypes parser.EventTypes
 	if eventTypesIn, ok := arguments["event_types"]; ok && eventTypesIn != "" {
-		result, err := common.ParseInterfaceToString(eventTypesIn)
+		result, err := common.ParseInterfaceToStrings(eventTypesIn)
 		if err != nil {
 			return args, fmt.Errorf("'event_types' must be an array of string")
 		}
@@ -170,7 +170,7 @@ func parseEventsArguments(
 	// Parse 'addresses' as []string{}
 	var addresses []string
 	if addressesIn, ok := arguments["addresses"]; ok && addressesIn != "" {
-		addresses, err = common.ParseInterfaceToString(addressesIn)
+		addresses, err = common.ParseInterfaceToStrings(addressesIn)
 		if err != nil {
 			return args, fmt.Errorf("'addresses' must be an array of string")
 		}
@@ -179,7 +179,7 @@ func parseEventsArguments(
 	// Parse 'contracts' as []string{}
 	var contracts []string
 	if contractsIn, ok := arguments["contracts"]; ok && contractsIn != "" {
-		contracts, err = common.ParseInterfaceToString(contractsIn)
+		contracts, err = common.ParseInterfaceToStrings(contractsIn)
 		if err != nil {
 			return args, fmt.Errorf("'contracts' must be an array of string")
 		}
