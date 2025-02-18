@@ -483,8 +483,6 @@ func main() {
 				node.Metrics.Engine,
 				node.Metrics.Mempool,
 				node.Me,
-				node.Storage.Collections,
-				node.Storage.Transactions,
 			)
 			return push, err
 		}).
@@ -531,7 +529,6 @@ func main() {
 				node.Metrics.Engine,
 				node.Metrics.Mempool,
 				node.State,
-				node.Storage.Transactions,
 				clusterComplianceConfig,
 			)
 			if err != nil {
