@@ -2,6 +2,8 @@ package data_providers
 
 import (
 	"context"
+	"fmt"
+	"sync"
 
 	"github.com/onflow/flow-go/engine/access/rest/websockets/models"
 	"github.com/onflow/flow-go/engine/access/subscription"
@@ -15,6 +17,9 @@ type baseDataProvider struct {
 	cancel         context.CancelFunc
 	send           chan<- interface{}
 	subscription   subscription.Subscription
+	// Ensures the closedChan has been closed once.
+	closedFlag sync.Once
+	closedChan chan struct{}
 }
 
 // newBaseDataProvider creates a new instance of baseDataProvider.
@@ -33,6 +38,8 @@ func newBaseDataProvider(
 		cancel:         cancel,
 		send:           send,
 		subscription:   subscription,
+		closedFlag:     sync.Once{},
+		closedChan:     make(chan struct{}, 1),
 	}
 }
 
@@ -56,4 +63,39 @@ func (b *baseDataProvider) Arguments() models.Arguments {
 // No errors are expected during normal operations.
 func (b *baseDataProvider) Close() {
 	b.cancel()
+	b.closedFlag.Do(func() {
+		close(b.closedChan)
+	})
+}
+
+type sendResponseCallback[T any] func(T) error
+
+func run[T any](
+	closedChan <-chan struct{},
+	subscription subscription.Subscription,
+	sendResponse sendResponseCallback[T],
+) error {
+	for {
+		select {
+		case <-closedChan:
+			return nil
+		case value, ok := <-subscription.Channel():
+			if !ok {
+				if subscription.Err() != nil {
+					return fmt.Errorf("subscription finished with error: %w", subscription.Err())
+				}
+				return nil
+			}
+
+			response, ok := value.(T)
+			if !ok {
+				return fmt.Errorf("unexpected response type: %T", value)
+			}
+
+			err := sendResponse(response)
+			if err != nil {
+				return fmt.Errorf("error sending response: %w", err)
+			}
+		}
+	}
 }

@@ -62,9 +62,10 @@ func NewBlockHeadersDataProvider(
 //
 // No errors are expected during normal operations.
 func (p *BlockHeadersDataProvider) Run() error {
-	return subscription.HandleSubscription(
+	return run(
+		p.closedChan,
 		p.subscription,
-		subscription.HandleResponse(p.send, func(h *flow.Header) (interface{}, error) {
+		func(h *flow.Header) error {
 			var header commonmodels.BlockHeader
 			header.Build(h)
 
@@ -74,9 +75,10 @@ func (p *BlockHeadersDataProvider) Run() error {
 				p.Topic(),
 				&header,
 			)
+			p.send <- &response
 
-			return &response, nil
-		}),
+			return nil
+		},
 	)
 }
 
