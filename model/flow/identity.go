@@ -132,12 +132,6 @@ func (iy IdentitySkeleton) String() string {
 	return fmt.Sprintf("%s-%s@%s", iy.Role, iy.NodeID.String(), iy.Address)
 }
 
-// ID returns a unique, persistent identifier for the identity.
-// CAUTION: the ID may be chosen by a node operator, so long as it is unique.
-func (iy Identity) ID() Identifier {
-	return iy.NodeID
-}
-
 // Checksum returns a checksum for the identity including mutable attributes.
 func (iy Identity) Checksum() Identifier {
 	return MakeID(iy)
