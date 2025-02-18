@@ -187,13 +187,31 @@ func TestKVStoreAPI_Replicate(t *testing.T) {
 				},
 			},
 		}
-		newVersion, err := model.Replicate(2)
+		upgradedKVStore, err := model.Replicate(2)
 		require.NoError(t, err)
-		require.Equal(t, uint64(2), newVersion.GetProtocolStateVersion())
-		require.NotEqual(t, newVersion.ID(), model.ID(), "two models with the same data but different version must have different ID")
-		_, ok := newVersion.(*kvstore.Modelv2)
+		require.Equal(t, uint64(2), upgradedKVStore.GetProtocolStateVersion())
+		require.NotEqual(t, upgradedKVStore.ID(), model.ID(), "two models with the same data but different version must have different ID")
+		_, ok := upgradedKVStore.(*kvstore.Modelv2)
 		require.True(t, ok, "expected Modelv2")
-		require.Equal(t, newVersion.GetVersionUpgrade(), model.GetVersionUpgrade())
+		require.Equal(t, upgradedKVStore.GetVersionUpgrade(), model.GetVersionUpgrade())
+
+		t.Run("v2-only fields should be uninitialized", func(t *testing.T) {
+			_, err := upgradedKVStore.GetCadenceComponentVersion()
+			assert.ErrorIs(t, err, kvstore.ErrKeyNotSet)
+
+			assert.Nil(t, upgradedKVStore.GetCadenceComponentVersionUpgrade())
+
+			_, err = upgradedKVStore.GetExecutionComponentVersion()
+			assert.ErrorIs(t, err, kvstore.ErrKeyNotSet)
+
+			assert.Nil(t, upgradedKVStore.GetExecutionComponentVersionUpgrade())
+
+			_, err = upgradedKVStore.GetExecutionMeteringParameters()
+			assert.ErrorIs(t, err, kvstore.ErrKeyNotSet)
+
+			assert.Nil(t, upgradedKVStore.GetExecutionMeteringParametersUpgrade())
+
+		})
 	})
 	t.Run("v2-invalid-upgrade", func(t *testing.T) {
 		model := &kvstore.Modelv2{}
@@ -256,6 +274,35 @@ func TestNewDefaultKVStore(t *testing.T) {
 		require.Error(t, err)
 		require.Nil(t, store)
 	})
+	t.Run("unsupported-key", func(t *testing.T) {
+		safetyParams, err := protocol.DefaultEpochSafetyParams(flow.Localnet)
+		require.NoError(t, err)
+		epochStateID := unittest.IdentifierFixture()
+		store, err := kvstore.NewDefaultKVStore(safetyParams.FinalizationSafetyThreshold, safetyParams.EpochExtensionViewCount, epochStateID)
+		require.NoError(t, err)
+
+		// Check GetCadenceComponentVersion
+		_, err = store.GetCadenceComponentVersion()
+		assert.ErrorIs(t, err, kvstore.ErrKeyNotSupported)
+
+		// Check GetCadenceComponentVersionUpgrade
+		assert.Nil(t, store.GetCadenceComponentVersionUpgrade())
+
+		// Check GetExecutionComponentVersion
+		_, err = store.GetExecutionComponentVersion()
+		assert.ErrorIs(t, err, kvstore.ErrKeyNotSupported)
+
+		// Check GetExecutionComponentVersionUpgrade
+		assert.Nil(t, store.GetExecutionComponentVersionUpgrade())
+
+		// Check GetExecutionMeteringParameters
+		_, err = store.GetExecutionMeteringParameters()
+		assert.ErrorIs(t, err, kvstore.ErrKeyNotSupported)
+
+		// Check GetExecutionMeteringParametersUpgrade
+		assert.Nil(t, store.GetExecutionMeteringParametersUpgrade())
+	})
+
 }
 
 // TestKVStoreMutator_SetEpochExtensionViewCount tests that setter performs an input validation and doesn't allow setting
