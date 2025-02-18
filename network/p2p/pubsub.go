@@ -85,6 +85,7 @@ type PubSubAdapterConfig interface {
 	WithScoreTracer(tracer PeerScoreTracer)
 	WithRpcInspector(GossipSubRPCInspector)
 	WithPeerGater(topicDeliveryWeights map[string]float64, sourceDecay time.Duration)
+	WithValidateQueueSize(int)
 }
 
 // GossipSubRPCInspector abstracts the general behavior of an app specific RPC inspector specifically

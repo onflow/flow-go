@@ -11,11 +11,13 @@ import (
 	usdc "github.com/onflow/bridged-usdc/lib/go/contracts"
 	storefront "github.com/onflow/nft-storefront/lib/go/contracts"
 
+	"github.com/onflow/flow-go/fvm/accountV2Migration"
 	"github.com/onflow/flow-go/fvm/blueprints"
 	"github.com/onflow/flow-go/fvm/environment"
 	"github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/fvm/evm/stdlib"
 	"github.com/onflow/flow-go/fvm/meter"
+	"github.com/onflow/flow-go/fvm/migration"
 	"github.com/onflow/flow-go/fvm/storage"
 	"github.com/onflow/flow-go/fvm/storage/logical"
 	"github.com/onflow/flow-go/fvm/systemcontracts"
@@ -396,6 +398,8 @@ func (b *bootstrapExecutor) Execute() error {
 		b.mintInitialTokens(service, fungibleToken, flowToken, b.initialTokenSupply)
 	}
 
+	b.deployExecutionParameters(fungibleToken, &env)
+	b.setupExecutionWeights(fungibleToken)
 	b.deployServiceAccount(service, &env)
 
 	b.setupParameters(
@@ -415,8 +419,6 @@ func (b *bootstrapExecutor) Execute() error {
 	)
 
 	b.setContractDeploymentRestrictions(service, b.restrictedContractDeployment)
-
-	b.setupExecutionWeights(service)
 
 	b.setupStorageForServiceAccounts(service, fungibleToken, flowToken, feeContract)
 
@@ -455,6 +457,9 @@ func (b *bootstrapExecutor) Execute() error {
 
 	// set the list of nodes which are allowed to stake in this network
 	b.setStakingAllowlist(service, b.identities.NodeIDs())
+
+	b.deployAccountV2MigrationContract(service)
+	b.deployMigrationContract(service)
 
 	return nil
 }
@@ -723,6 +728,19 @@ func (b *bootstrapExecutor) deployEpoch(deployTo flow.Address, env *templates.En
 	panicOnMetaInvokeErrf("failed to deploy Epoch contract: %s", txError, err)
 }
 
+func (b *bootstrapExecutor) deployExecutionParameters(deployTo flow.Address, env *templates.Environment) {
+	contract := contracts.FlowExecutionParameters(*env)
+	txError, err := b.invokeMetaTransaction(
+		b.ctx,
+		Transaction(
+			blueprints.DeployContractTransaction(deployTo, contract, "FlowExecutionParameters"),
+			0,
+		),
+	)
+	env.FlowExecutionParametersAddress = deployTo.String()
+	panicOnMetaInvokeErrf("failed to deploy FlowExecutionParameters contract: %s", txError, err)
+}
+
 func (b *bootstrapExecutor) deployServiceAccount(deployTo flow.Address, env *templates.Environment) {
 	contract := contracts.FlowServiceAccount(
 		*env,
@@ -837,21 +855,21 @@ func (b *bootstrapExecutor) setupFees(
 	panicOnMetaInvokeErrf("failed to setup fees: %s", txError, err)
 }
 
-func (b *bootstrapExecutor) setupExecutionWeights(service flow.Address) {
+func (b *bootstrapExecutor) setupExecutionWeights(parametersAccount flow.Address) {
 	// if executionEffortWeights were not set skip this part and just use the defaults.
 	if b.executionEffortWeights != nil {
-		b.setupExecutionEffortWeights(service)
+		b.setupExecutionEffortWeights(parametersAccount)
 	}
 	// if executionMemoryWeights were not set skip this part and just use the defaults.
 	if b.executionMemoryWeights != nil {
-		b.setupExecutionMemoryWeights(service)
+		b.setupExecutionMemoryWeights(parametersAccount)
 	}
 	if b.executionMemoryLimit != 0 {
-		b.setExecutionMemoryLimitTransaction(service)
+		b.setExecutionMemoryLimitTransaction(parametersAccount)
 	}
 }
 
-func (b *bootstrapExecutor) setupExecutionEffortWeights(service flow.Address) {
+func (b *bootstrapExecutor) setupExecutionEffortWeights(parametersAccount flow.Address) {
 	weights := b.executionEffortWeights
 
 	uintWeights := make(map[uint]uint64, len(weights))
@@ -859,7 +877,7 @@ func (b *bootstrapExecutor) setupExecutionEffortWeights(service flow.Address) {
 		uintWeights[uint(i)] = weight
 	}
 
-	tb, err := blueprints.SetExecutionEffortWeightsTransaction(service, uintWeights)
+	tb, err := blueprints.SetExecutionEffortWeightsTransaction(parametersAccount, uintWeights)
 	if err != nil {
 		panic(fmt.Sprintf("failed to setup execution effort weights %s", err.Error()))
 	}
@@ -873,7 +891,7 @@ func (b *bootstrapExecutor) setupExecutionEffortWeights(service flow.Address) {
 	panicOnMetaInvokeErrf("failed to setup execution effort weights: %s", txError, err)
 }
 
-func (b *bootstrapExecutor) setupExecutionMemoryWeights(service flow.Address) {
+func (b *bootstrapExecutor) setupExecutionMemoryWeights(parametersAccount flow.Address) {
 	weights := b.executionMemoryWeights
 
 	uintWeights := make(map[uint]uint64, len(weights))
@@ -881,7 +899,7 @@ func (b *bootstrapExecutor) setupExecutionMemoryWeights(service flow.Address) {
 		uintWeights[uint(i)] = weight
 	}
 
-	tb, err := blueprints.SetExecutionMemoryWeightsTransaction(service, uintWeights)
+	tb, err := blueprints.SetExecutionMemoryWeightsTransaction(parametersAccount, uintWeights)
 	if err != nil {
 		panic(fmt.Sprintf("failed to setup execution memory weights %s", err.Error()))
 	}
@@ -895,9 +913,9 @@ func (b *bootstrapExecutor) setupExecutionMemoryWeights(service flow.Address) {
 	panicOnMetaInvokeErrf("failed to setup execution memory weights: %s", txError, err)
 }
 
-func (b *bootstrapExecutor) setExecutionMemoryLimitTransaction(service flow.Address) {
+func (b *bootstrapExecutor) setExecutionMemoryLimitTransaction(parametersAccount flow.Address) {
 
-	tb, err := blueprints.SetExecutionMemoryLimitTransaction(service, b.executionMemoryLimit)
+	tb, err := blueprints.SetExecutionMemoryLimitTransaction(parametersAccount, b.executionMemoryLimit)
 	if err != nil {
 		panic(fmt.Sprintf("failed to setup execution memory limit %s", err.Error()))
 	}
@@ -1113,6 +1131,32 @@ func (b *bootstrapExecutor) deployStakingCollection(
 	)
 	env.StakingCollectionAddress = deployTo.String()
 	panicOnMetaInvokeErrf("failed to deploy FlowStakingCollection contract: %s", txError, err)
+}
+
+func (b *bootstrapExecutor) deployAccountV2MigrationContract(deployTo flow.Address) {
+	tx := blueprints.DeployContractTransaction(
+		deployTo,
+		accountV2Migration.ContractCode,
+		accountV2Migration.ContractName,
+	)
+	txError, err := b.invokeMetaTransaction(
+		b.ctx,
+		Transaction(tx, 0),
+	)
+	panicOnMetaInvokeErrf("failed to deploy AccountV2Migration contract: %s", txError, err)
+}
+
+func (b *bootstrapExecutor) deployMigrationContract(deployTo flow.Address) {
+	tx := blueprints.DeployContractTransaction(
+		deployTo,
+		migration.ContractCode(deployTo),
+		migration.ContractName,
+	)
+	txError, err := b.invokeMetaTransaction(
+		b.ctx,
+		Transaction(tx, 0),
+	)
+	panicOnMetaInvokeErrf("failed to deploy Migration contract: %s", txError, err)
 }
 
 func (b *bootstrapExecutor) setContractDeploymentRestrictions(

@@ -97,7 +97,7 @@ func pull(cmd *cobra.Command, args []string) {
 			fullOutpath := filepath.Join(flagBootDir, "public-root-information", filepath.Base(file.Name))
 			fmd5 := utils.CalcMd5(fullOutpath)
 			// only skip files that have an MD5 hash
-			if file.MD5 != nil && bytes.Equal(fmd5, file.MD5) {
+			if len(file.MD5) > 0 && bytes.Equal(fmd5, file.MD5) {
 				log.Info().Str("source", file.Name).Str("dest", fullOutpath).Msgf("skipping existing file from transit servers")
 				return
 			}

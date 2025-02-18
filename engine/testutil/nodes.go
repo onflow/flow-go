@@ -989,7 +989,7 @@ func VerificationNode(t testing.TB,
 	}
 
 	if node.ProcessedChunkIndex == nil {
-		node.ProcessedChunkIndex = storage.NewConsumerProgress(node.PublicDB, module.ConsumeProgressVerificationChunkIndex)
+		node.ProcessedChunkIndex = store.NewConsumerProgress(badgerimpl.ToDB(node.PublicDB), module.ConsumeProgressVerificationChunkIndex)
 	}
 
 	if node.ChunksQueue == nil {
@@ -1000,7 +1000,7 @@ func VerificationNode(t testing.TB,
 	}
 
 	if node.ProcessedBlockHeight == nil {
-		node.ProcessedBlockHeight = storage.NewConsumerProgress(node.PublicDB, module.ConsumeProgressVerificationBlockHeight)
+		node.ProcessedBlockHeight = store.NewConsumerProgress(badgerimpl.ToDB(node.PublicDB), module.ConsumeProgressVerificationBlockHeight)
 	}
 
 	if node.VerifierEngine == nil {
@@ -1016,7 +1016,7 @@ func VerificationNode(t testing.TB,
 
 		chunkVerifier := chunks.NewChunkVerifier(vm, vmCtx, node.Log)
 
-		approvalStorage := storage.NewResultApprovals(node.Metrics, node.PublicDB)
+		approvalStorage := store.NewResultApprovals(node.Metrics, badgerimpl.ToDB(node.PublicDB))
 
 		node.VerifierEngine, err = verifier.New(node.Log,
 			collector,

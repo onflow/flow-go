@@ -117,7 +117,10 @@ import (
 	"github.com/onflow/flow-go/state/protocol/blocktimer"
 	"github.com/onflow/flow-go/storage"
 	bstorage "github.com/onflow/flow-go/storage/badger"
+	"github.com/onflow/flow-go/storage/operation/badgerimpl"
+	"github.com/onflow/flow-go/storage/operation/pebbleimpl"
 	pstorage "github.com/onflow/flow-go/storage/pebble"
+	"github.com/onflow/flow-go/storage/store"
 	"github.com/onflow/flow-go/utils/grpcutils"
 )
 
@@ -229,9 +232,10 @@ func DefaultAccessNodeConfig() *AccessNodeConfig {
 				IdleTimeout:    rest.DefaultIdleTimeout,
 				MaxRequestSize: commonrest.DefaultMaxRequestSize,
 			},
-			MaxMsgSize:      grpcutils.DefaultMaxMsgSize,
-			CompressorName:  grpcutils.NoCompressor,
-			WebSocketConfig: websockets.NewDefaultWebsocketConfig(),
+			MaxMsgSize:                grpcutils.DefaultMaxMsgSize,
+			CompressorName:            grpcutils.NoCompressor,
+			WebSocketConfig:           websockets.NewDefaultWebsocketConfig(),
+			EnableWebSocketsStreamAPI: false,
 		},
 		stateStreamConf: statestreambackend.Config{
 			MaxExecutionDataMsgSize: grpcutils.DefaultMaxMsgSize,
@@ -290,7 +294,7 @@ func DefaultAccessNodeConfig() *AccessNodeConfig {
 		versionControlEnabled:                true,
 		storeTxResultErrorMessages:           false,
 		stopControlEnabled:                   false,
-		registerDBPruneThreshold:             pruner.DefaultThreshold,
+		registerDBPruneThreshold:             0,
 	}
 }
 
@@ -552,8 +556,8 @@ func (builder *FlowAccessNodeBuilder) BuildConsensusFollower() *FlowAccessNodeBu
 func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccessNodeBuilder {
 	var ds datastore.Batching
 	var bs network.BlobService
-	var processedBlockHeight storage.ConsumerProgress
-	var processedNotifications storage.ConsumerProgress
+	var processedBlockHeight storage.ConsumerProgressInitializer
+	var processedNotifications storage.ConsumerProgressInitializer
 	var bsDependable *module.ProxiedReadyDoneAware
 	var execDataDistributor *edrequester.ExecutionDataDistributor
 	var execDataCacheBackend *herocache.BlockExecutionData
@@ -607,21 +611,30 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 		Module("processed block height consumer progress", func(node *cmd.NodeConfig) error {
 			// Note: progress is stored in the datastore's DB since that is where the jobqueue
 			// writes execution data to.
-			if executionDataDBMode == execution_data.ExecutionDataDBModeBadger {
-				processedBlockHeight = bstorage.NewConsumerProgress(builder.ExecutionDatastoreManager.DB().(*badger.DB), module.ConsumeProgressExecutionDataRequesterBlockHeight)
+			var db storage.DB
+			edmdb := builder.ExecutionDatastoreManager.DB()
+
+			if bdb, ok := edmdb.(*badger.DB); ok {
+				db = badgerimpl.ToDB(bdb)
+			} else if pdb, ok := edmdb.(*pebble.DB); ok {
+				db = pebbleimpl.ToDB(pdb)
 			} else {
-				processedBlockHeight = pstorage.NewConsumerProgress(builder.ExecutionDatastoreManager.DB().(*pebble.DB), module.ConsumeProgressExecutionDataRequesterBlockHeight)
+				return fmt.Errorf("unsupported execution data DB type: %T", edmdb)
 			}
+
+			processedBlockHeight = store.NewConsumerProgress(db, module.ConsumeProgressExecutionDataRequesterBlockHeight)
 			return nil
 		}).
 		Module("processed notifications consumer progress", func(node *cmd.NodeConfig) error {
 			// Note: progress is stored in the datastore's DB since that is where the jobqueue
 			// writes execution data to.
+			var db storage.DB
 			if executionDataDBMode == execution_data.ExecutionDataDBModeBadger {
-				processedNotifications = bstorage.NewConsumerProgress(builder.ExecutionDatastoreManager.DB().(*badger.DB), module.ConsumeProgressExecutionDataRequesterNotification)
+				db = badgerimpl.ToDB(builder.ExecutionDatastoreManager.DB().(*badger.DB))
 			} else {
-				processedNotifications = pstorage.NewConsumerProgress(builder.ExecutionDatastoreManager.DB().(*pebble.DB), module.ConsumeProgressExecutionDataRequesterNotification)
+				db = pebbleimpl.ToDB(builder.ExecutionDatastoreManager.DB().(*pebble.DB))
 			}
+			processedNotifications = store.NewConsumerProgress(db, module.ConsumeProgressExecutionDataRequesterNotification)
 			return nil
 		}).
 		Module("blobservice peer manager dependencies", func(node *cmd.NodeConfig) error {
@@ -848,7 +861,7 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 	}
 
 	if builder.executionDataIndexingEnabled {
-		var indexedBlockHeight storage.ConsumerProgress
+		var indexedBlockHeight storage.ConsumerProgressInitializer
 
 		builder.
 			AdminCommand("execute-script", func(config *cmd.NodeConfig) commands.AdminCommand {
@@ -856,7 +869,7 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 			}).
 			Module("indexed block height consumer progress", func(node *cmd.NodeConfig) error {
 				// Note: progress is stored in the MAIN db since that is where indexed execution data is stored.
-				indexedBlockHeight = bstorage.NewConsumerProgress(builder.DB, module.ConsumeProgressExecutionDataIndexerBlockHeight)
+				indexedBlockHeight = store.NewConsumerProgress(badgerimpl.ToDB(builder.DB), module.ConsumeProgressExecutionDataIndexerBlockHeight)
 				return nil
 			}).
 			Module("transaction results storage", func(node *cmd.NodeConfig) error {
@@ -1458,6 +1471,13 @@ func (builder *FlowAccessNodeBuilder) extraFlags() {
 			"websocket-inactivity-timeout",
 			defaultConfig.rpcConf.WebSocketConfig.InactivityTimeout,
 			"specifies the duration a WebSocket connection can remain open without any active subscriptions before being automatically closed")
+
+		flags.BoolVar(
+			&builder.rpcConf.EnableWebSocketsStreamAPI,
+			"experimental-enable-websockets-stream-api",
+			defaultConfig.rpcConf.EnableWebSocketsStreamAPI,
+			"[experimental] enables WebSockets Stream API that operates under /ws endpoint. this flag may change in a future release.",
+		)
 	}).ValidateFlags(func() error {
 		if builder.supportsObserver && (builder.PublicNetworkConfig.BindAddress == cmd.NotSet || builder.PublicNetworkConfig.BindAddress == "") {
 			return errors.New("public-network-address must be set if supports-observer is true")
@@ -1633,8 +1653,8 @@ func (builder *FlowAccessNodeBuilder) enqueueRelayNetwork() {
 }
 
 func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
-	var processedFinalizedBlockHeight storage.ConsumerProgress
-	var processedTxErrorMessagesBlockHeight storage.ConsumerProgress
+	var processedFinalizedBlockHeight storage.ConsumerProgressInitializer
+	var processedTxErrorMessagesBlockHeight storage.ConsumerProgressInitializer
 
 	if builder.executionDataSyncEnabled {
 		builder.BuildExecutionSyncComponents()
@@ -1838,17 +1858,18 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 			return nil
 		}).
 		Module("processed finalized block height consumer progress", func(node *cmd.NodeConfig) error {
-			processedFinalizedBlockHeight = bstorage.NewConsumerProgress(builder.DB, module.ConsumeProgressIngestionEngineBlockHeight)
+			processedFinalizedBlockHeight = store.NewConsumerProgress(badgerimpl.ToDB(builder.DB), module.ConsumeProgressIngestionEngineBlockHeight)
 			return nil
 		}).
 		Module("processed last full block height monotonic consumer progress", func(node *cmd.NodeConfig) error {
 			rootBlockHeight := node.State.Params().FinalizedRoot().Height
 
-			var err error
-			lastFullBlockHeight, err = counters.NewPersistentStrictMonotonicCounter(
-				bstorage.NewConsumerProgress(builder.DB, module.ConsumeProgressLastFullBlockHeight),
-				rootBlockHeight,
-			)
+			progress, err := store.NewConsumerProgress(badgerimpl.ToDB(builder.DB), module.ConsumeProgressLastFullBlockHeight).Initialize(rootBlockHeight)
+			if err != nil {
+				return err
+			}
+
+			lastFullBlockHeight, err = counters.NewPersistentStrictMonotonicCounter(progress)
 			if err != nil {
 				return fmt.Errorf("failed to initialize monotonic consumer progress: %w", err)
 			}
@@ -2149,8 +2170,8 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 
 	if builder.storeTxResultErrorMessages {
 		builder.Module("processed error messages block height consumer progress", func(node *cmd.NodeConfig) error {
-			processedTxErrorMessagesBlockHeight = bstorage.NewConsumerProgress(
-				builder.DB,
+			processedTxErrorMessagesBlockHeight = store.NewConsumerProgress(
+				badgerimpl.ToDB(builder.DB),
 				module.ConsumeProgressEngineTxErrorMessagesBlockHeight,
 			)
 			return nil
@@ -2349,6 +2370,7 @@ func (builder *FlowAccessNodeBuilder) initPublicLibp2pNode(networkKey crypto.Pri
 		&p2pbuilderconfig.UnicastConfig{
 			Unicast: builder.FlowConfig.NetworkConfig.Unicast,
 		}).
+		SetProtocolPeerCacheList(protocols.FlowProtocolID(builder.SporkID)).
 		SetBasicResolver(builder.Resolver).
 		SetSubscriptionFilter(networkingsubscription.NewRoleBasedFilter(flow.RoleAccess, builder.IdentityProvider)).
 		SetConnectionManager(connManager).

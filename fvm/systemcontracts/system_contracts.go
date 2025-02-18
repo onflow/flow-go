@@ -44,12 +44,14 @@ const (
 	ContractNameEVM                        = "EVM"
 	ContractNameBurner                     = "Burner"
 	ContractNameCrypto                     = "Crypto"
+	ContractNameMigration                  = "Migration"
+	ContractNameAccountV2Migration         = "AccountV2Migration"
 
 	// AccountNameEVMStorage is not a contract, but a special account that is used to store EVM state
 	AccountNameEVMStorage = "EVMStorageAccount"
 	// AccountNameExecutionParametersAccount is not a contract, but a special account that is used to store execution parameters
-	// This is generally just the service account. For mainnet and testnet, it is a separate account,
-	// in order to separate it away from the frequently changing data on the service account.
+	// It is a separate account on all networks in order to separate it away
+	// from the frequently changing data on the service account.
 	AccountNameExecutionParametersAccount = "ExecutionParametersAccount"
 
 	// Unqualified names of service events (not including address prefix or contract name)
@@ -183,6 +185,10 @@ type SystemContracts struct {
 	// Utility contracts
 	Burner SystemContract
 	Crypto SystemContract
+
+	// Migration contracts
+	Migration          SystemContract
+	AccountV2Migration SystemContract
 }
 
 // AsTemplateEnv returns a template environment with all system contracts filled in.
@@ -198,6 +204,7 @@ func (c SystemContracts) AsTemplateEnv() templates.Environment {
 		NodeVersionBeaconAddress:   c.NodeVersionBeacon.Address.Hex(),
 		RandomBeaconHistoryAddress: c.RandomBeaconHistory.Address.Hex(),
 		StorageFeesAddress:         c.FlowStorageFees.Address.Hex(),
+		EVMAddress:                 c.EVMContract.Address.Hex(),
 
 		FlowFeesAddress:                   c.FlowFees.Address.Hex(),
 		FlowTokenAddress:                  c.FlowToken.Address.Hex(),
@@ -242,6 +249,9 @@ func (c SystemContracts) All() []SystemContract {
 
 		c.Burner,
 		c.Crypto,
+
+		c.Migration,
+		c.AccountV2Migration,
 	}
 }
 
@@ -361,7 +371,7 @@ func init() {
 		case flow.Testnet:
 			return executionParametersAddressTestnet
 		default:
-			return serviceAddressFunc(chain)
+			return nthAddressFunc(FungibleTokenAccountIndex)(chain)
 		}
 	}
 
@@ -392,6 +402,9 @@ func init() {
 
 		ContractNameBurner: burnerAddressFunc,
 		ContractNameCrypto: serviceAddressFunc,
+
+		ContractNameMigration:          serviceAddressFunc,
+		ContractNameAccountV2Migration: serviceAddressFunc,
 	}
 
 	getSystemContractsForChain := func(chainID flow.ChainID) *SystemContracts {
@@ -449,6 +462,9 @@ func init() {
 
 			Burner: addressOfContract(ContractNameBurner),
 			Crypto: addressOfContract(ContractNameCrypto),
+
+			Migration:          addressOfContract(ContractNameMigration),
+			AccountV2Migration: addressOfContract(ContractNameAccountV2Migration),
 		}
 
 		return contracts
