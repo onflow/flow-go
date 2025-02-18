@@ -124,7 +124,7 @@ func NewGrpcServerBuilder(log zerolog.Logger,
 		interceptors = append(interceptors, rateLimitInterceptor)
 	}
 	// add the logging interceptor, ensure it is innermost wrapper
-	interceptors = append(interceptors, rpc.LoggingInterceptor(log)...)
+	interceptors = append(interceptors, rpc.LoggingInterceptor(log))
 	// create a chained unary interceptor
 	// create an unsecured grpc server
 	grpcOpts = append(grpcOpts, grpc.ChainUnaryInterceptor(interceptors...))
