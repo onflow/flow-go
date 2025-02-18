@@ -315,7 +315,7 @@ func CollectionNode(t *testing.T, hub *stub.Hub, identity bootstrap.NodeInfo, ro
 		retrieve)
 	require.NoError(t, err)
 
-	pusherEngine, err := pusher.New(node.Log, node.Net, node.State, node.Metrics, node.Metrics, node.Me, collections, transactions)
+	pusherEngine, err := pusher.New(node.Log, node.Net, node.State, node.Metrics, node.Metrics, node.Me)
 	require.NoError(t, err)
 
 	clusterStateFactory, err := factories.NewClusterStateFactory(
