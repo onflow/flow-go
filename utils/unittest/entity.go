@@ -113,6 +113,8 @@ func generateCustomFlowValue(field reflect.Value) reflect.Value {
 		return reflect.ValueOf(*QuorumCertificateFixture())
 	case reflect.TypeOf(flow.CollectionGuarantee{}):
 		return reflect.ValueOf(*CollectionGuaranteeFixture())
+	case reflect.TypeOf(flow.Chunk{}):
+		return reflect.ValueOf(*ChunkFixture(IdentifierFixture(), uint(rand.Uint32())))
 	case reflect.TypeOf(flow.TimeoutCertificate{}):
 		return reflect.ValueOf(flow.TimeoutCertificate{
 			View:          rand.Uint64(),
