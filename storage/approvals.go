@@ -16,6 +16,7 @@ import (
 type ResultApprovals interface {
 
 	// Store stores a ResultApproval by its ID.
+	// No errors are expected during normal operations.
 	Store(result *flow.ResultApproval) error
 
 	// Index indexes a ResultApproval by result ID and chunk index.
@@ -30,13 +31,14 @@ type ResultApprovals interface {
 	// still the method succeeds on each call. However, when attempting to index *different* ResultApproval IDs
 	// for the same key (resultID, chunkIndex) this method returns an exception, as this should never happen for
 	// a correct Verification Node indexing its own approvals.
+	// No errors are expected during normal operations.
 	Index(resultID flow.Identifier, chunkIndex uint64, approvalID flow.Identifier) error
 
 	// ByID retrieves a ResultApproval by its ID.
-	// Returns `storage.ErrNotFound` if no Approval with the given ID has been stored.
+	// Returns [storage.ErrNotFound] if no Approval with the given ID has been stored.
 	ByID(approvalID flow.Identifier) (*flow.ResultApproval, error)
 
 	// ByChunk retrieves a ResultApproval by result ID and chunk index.
-	// Returns `storage.ErrNotFound` if no Approval for  the given key (resultID, chunkIndex) has been stored.
+	// Returns [storage.ErrNotFound] if no Approval for  the given key (resultID, chunkIndex) has been stored.
 	ByChunk(resultID flow.Identifier, chunkIndex uint64) (*flow.ResultApproval, error)
 }
