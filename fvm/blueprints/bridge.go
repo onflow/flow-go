@@ -2,7 +2,6 @@ package blueprints
 
 import (
 	_ "embed"
-	"fmt"
 
 	"github.com/onflow/cadence"
 	jsoncdc "github.com/onflow/cadence/encoding/json"
@@ -16,12 +15,12 @@ import (
 // CreateCOATransaction returns the transaction body for the create COA transaction
 func CreateCOATransaction(service flow.Address, bridgeEnv bridge.Environment, env templates.Environment) *flow.TransactionBody {
 	txScript, _ := bridge.GetCadenceTransactionCode("cadence/transactions/evm/create_account.cdc", bridgeEnv, env)
-	fmt.Println(string(txScript))
 	return flow.NewTransactionBody().
 		SetScript([]byte(
 			txScript,
 		),
 		).
+		AddArgument(jsoncdc.MustEncode(cadence.UFix64(0.0))).
 		AddAuthorizer(service)
 }
 
