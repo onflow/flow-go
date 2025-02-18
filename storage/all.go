@@ -2,27 +2,34 @@ package storage
 
 // All includes all the storage modules
 type All struct {
-	Headers                        Headers
-	Guarantees                     Guarantees
-	Seals                          Seals
-	Index                          Index
-	Payloads                       Payloads
-	Blocks                         Blocks
-	QuorumCertificates             QuorumCertificates
-	Setups                         EpochSetups
-	EpochCommits                   EpochCommits
-	Results                        ExecutionResults
-	Receipts                       ExecutionReceipts
-	ChunkDataPacks                 ChunkDataPacks
-	Commits                        Commits
-	Transactions                   Transactions
-	LightTransactionResults        LightTransactionResults
-	TransactionResults             TransactionResults
-	TransactionResultErrorMessages TransactionResultErrorMessages
-	Collections                    Collections
-	Events                         Events
-	EpochProtocolStateEntries      EpochProtocolStateEntries
-	ProtocolKVStore                ProtocolKVStore
-	VersionBeacons                 VersionBeacons
-	RegisterIndex                  RegisterIndex
+	Headers                   Headers
+	Guarantees                Guarantees
+	Seals                     Seals
+	Index                     Index
+	Payloads                  Payloads
+	Blocks                    Blocks
+	QuorumCertificates        QuorumCertificates
+	Setups                    EpochSetups
+	EpochCommits              EpochCommits
+	ChunkDataPacks            ChunkDataPacks
+	Transactions              Transactions
+	Collections               Collections
+	EpochProtocolStateEntries EpochProtocolStateEntries
+	ProtocolKVStore           ProtocolKVStore
+	VersionBeacons            VersionBeacons
+	RegisterIndex             RegisterIndex
+
+	// These results are for reading and storing the result data from block payload
+	// EN uses a different results module to store their own results
+	// and receipts (see the Execution struct below)
+	Results  ExecutionResults
+	Receipts ExecutionReceipts
+}
+
+type Execution struct {
+	Results            ExecutionResults
+	Receipts           ExecutionReceipts
+	Commits            Commits
+	TransactionResults TransactionResults
+	Events             Events
 }

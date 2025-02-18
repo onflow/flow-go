@@ -10,6 +10,7 @@ import (
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
 
+	"github.com/onflow/flow-go/cmd/util/cmd/common"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/storage"
 )
@@ -123,10 +124,12 @@ func run(*cobra.Command, []string) {
 		}
 	}()
 
+	en := common.InitExecutionStorages(db)
+
 	_, err = FindBlockIDByCommits(
 		log.Logger,
 		storage.Headers,
-		storage.Commits,
+		en.Commits,
 		stateCommitments,
 		flagStartHeight,
 		flagEndHeight,

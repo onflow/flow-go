@@ -14,7 +14,7 @@ type ExecutionReceipts interface {
 	Store(receipt *flow.ExecutionReceipt) error
 
 	// BatchStore stores an execution receipt inside given batch
-	BatchStore(receipt *flow.ExecutionReceipt, batch BatchStorage) error
+	BatchStore(receipt *flow.ExecutionReceipt, batch ReaderBatchWriter) error
 
 	// ByID retrieves an execution receipt by its ID.
 	ByID(receiptID flow.Identifier) (*flow.ExecutionReceipt, error)
@@ -38,7 +38,7 @@ type MyExecutionReceipts interface {
 	// No errors are expected during normal operation
 	// If entity fails marshalling, the error is wrapped in a generic error and returned.
 	// If Badger unexpectedly fails to process the request, the error is wrapped in a generic error and returned.
-	BatchStoreMyReceipt(receipt *flow.ExecutionReceipt, batch BatchStorage) error
+	BatchStoreMyReceipt(receipt *flow.ExecutionReceipt, batch ReaderBatchWriter) error
 
 	// MyReceipt retrieves my receipt for the given block.
 	MyReceipt(blockID flow.Identifier) (*flow.ExecutionReceipt, error)
@@ -46,5 +46,5 @@ type MyExecutionReceipts interface {
 	// BatchRemoveIndexByBlockID removes blockID-to-my-execution-receipt index entry keyed by a blockID in a provided batch
 	// No errors are expected during normal operation, even if no entries are matched.
 	// If Badger unexpectedly fails to process the request, the error is wrapped in a generic error and returned.
-	BatchRemoveIndexByBlockID(blockID flow.Identifier, batch BatchStorage) error
+	BatchRemoveIndexByBlockID(blockID flow.Identifier, batch ReaderBatchWriter) error
 }
