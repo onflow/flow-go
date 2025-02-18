@@ -893,15 +893,14 @@ func WithBlock(block *flow.Block) func(*flow.ExecutionResult) {
 	return func(result *flow.ExecutionResult) {
 		startState := result.Chunks[0].StartState // retain previous start state in case it was user-defined
 		result.BlockID = blockID
-		result.Chunks = ChunkListFixture(uint(chunks), blockID)
-		result.Chunks[0].StartState = startState // set start state to value before update
+		result.Chunks = ChunkListFixture(uint(chunks), blockID, startState)
 		result.PreviousResultID = previousResultID
 	}
 }
 
 func WithChunks(n uint) func(*flow.ExecutionResult) {
 	return func(result *flow.ExecutionResult) {
-		result.Chunks = ChunkListFixture(n, result.BlockID)
+		result.Chunks = ChunkListFixture(n, result.BlockID, StateCommitmentFixture())
 	}
 }
 
@@ -971,7 +970,7 @@ func ExecutionResultFixture(opts ...func(*flow.ExecutionResult)) *flow.Execution
 	result := &flow.ExecutionResult{
 		PreviousResultID: IdentifierFixture(),
 		BlockID:          executedBlockID,
-		Chunks:           ChunkListFixture(2, executedBlockID),
+		Chunks:           ChunkListFixture(2, executedBlockID, StateCommitmentFixture()),
 		ExecutionDataID:  IdentifierFixture(),
 	}
 
@@ -1333,12 +1332,13 @@ func WithServiceEventCount(count *uint16) func(*flow.Chunk) {
 func ChunkFixture(
 	blockID flow.Identifier,
 	collectionIndex uint,
+	startState flow.StateCommitment,
 	opts ...func(*flow.Chunk),
 ) *flow.Chunk {
 	chunk := &flow.Chunk{
 		ChunkBody: flow.ChunkBody{
 			CollectionIndex:      collectionIndex,
-			StartState:           StateCommitmentFixture(),
+			StartState:           startState,
 			EventCollection:      IdentifierFixture(),
 			ServiceEventCount:    PtrTo[uint16](0),
 			TotalComputationUsed: 4200,
@@ -1356,12 +1356,13 @@ func ChunkFixture(
 	return chunk
 }
 
-func ChunkListFixture(n uint, blockID flow.Identifier, opts ...func(*flow.Chunk)) flow.ChunkList {
+func ChunkListFixture(n uint, blockID flow.Identifier, startState flow.StateCommitment, opts ...func(*flow.Chunk)) flow.ChunkList {
 	chunks := make([]*flow.Chunk, 0, n)
 	for i := uint64(0); i < uint64(n); i++ {
-		chunk := ChunkFixture(blockID, uint(i), opts...)
+		chunk := ChunkFixture(blockID, uint(i), startState, opts...)
 		chunk.Index = i
 		chunks = append(chunks, chunk)
+		startState = chunk.EndState
 	}
 	return chunks
 }
@@ -1768,6 +1769,15 @@ func ChunkDataPacksFixture(
 	}
 
 	return chunkDataPacks
+}
+
+func ChunkDataPacksFixtureAndResult() ([]*flow.ChunkDataPack, *flow.ExecutionResult) {
+	result := ExecutionResultFixture()
+	cdps := make([]*flow.ChunkDataPack, 0, len(result.Chunks))
+	for _, c := range result.Chunks {
+		cdps = append(cdps, ChunkDataPackFixture(c.ID()))
+	}
+	return cdps, result
 }
 
 // SeedFixture returns a random []byte with length n

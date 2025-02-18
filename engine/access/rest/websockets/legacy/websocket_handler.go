@@ -22,6 +22,8 @@ import (
 
 // WebsocketController holds the necessary components and parameters for handling a WebSocket subscription.
 // It manages the communication between the server and the WebSocket client for subscribing.
+//
+// Deprecated: Use websockets.Controller which allows managing multiple subscriptions with a single connection.
 type WebsocketController struct {
 	logger            zerolog.Logger
 	conn              *websocket.Conn                // the WebSocket connection for communication with the client
@@ -146,8 +148,8 @@ func (wsController *WebsocketController) writeEvents(sub subscription.Subscripti
 				if blocksSinceLastMessage < wsController.HeartbeatInterval {
 					continue
 				}
-				blocksSinceLastMessage = 0
 			}
+			blocksSinceLastMessage = 0
 
 			// EventsResponse contains CCF encoded events, and this API returns JSON-CDC events.
 			// convert event payload formats.

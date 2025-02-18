@@ -9,9 +9,11 @@ import (
 	"math"
 	"strings"
 	"testing"
-	"time"
 
-	"github.com/coreos/go-semver/semver"
+	"github.com/stretchr/testify/assert"
+	mockery "github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
+
 	"github.com/onflow/cadence"
 	"github.com/onflow/cadence/common"
 	"github.com/onflow/cadence/encoding/ccf"
@@ -23,13 +25,8 @@ import (
 	cadenceStdlib "github.com/onflow/cadence/stdlib"
 	"github.com/onflow/cadence/test_utils/runtime_utils"
 	"github.com/onflow/crypto"
-	"github.com/onflow/flow-core-contracts/lib/go/templates"
 	flowsdk "github.com/onflow/flow-go-sdk"
 	"github.com/onflow/flow-go-sdk/test"
-	"github.com/rs/zerolog"
-	"github.com/stretchr/testify/assert"
-	mockery "github.com/stretchr/testify/mock"
-	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/engine/execution/testutil"
 	exeUtils "github.com/onflow/flow-go/engine/execution/utils"
@@ -44,7 +41,6 @@ import (
 	"github.com/onflow/flow-go/fvm/evm/types"
 	"github.com/onflow/flow-go/fvm/meter"
 	reusableRuntime "github.com/onflow/flow-go/fvm/runtime"
-	"github.com/onflow/flow-go/fvm/storage"
 	"github.com/onflow/flow-go/fvm/storage/snapshot"
 	"github.com/onflow/flow-go/fvm/storage/snapshot/mock"
 	"github.com/onflow/flow-go/fvm/storage/state"
@@ -1087,7 +1083,11 @@ func TestTransactionFeeDeduction(t *testing.T) {
 
 func TestSettingExecutionWeights(t *testing.T) {
 
+	// change the chain so that the metering settings are read from the service account
+	chain := flow.Emulator.Chain()
+
 	t.Run("transaction should fail with high weights", newVMTest().withBootstrapProcedureOptions(
+
 		fvm.WithMinimumStorageReservation(fvm.DefaultMinimumStorageReservation),
 		fvm.WithAccountCreationFee(fvm.DefaultAccountCreationFee),
 		fvm.WithStorageMBPerFLOW(fvm.DefaultStorageMBPerFLOW),
@@ -1096,6 +1096,8 @@ func TestSettingExecutionWeights(t *testing.T) {
 				common.ComputationKindLoop: 100_000 << meter.MeterExecutionInternalPrecisionBytes,
 			},
 		),
+	).withContextOptions(
+		fvm.WithChain(chain),
 	).run(
 		func(t *testing.T, vm fvm.VM, chain flow.Chain, ctx fvm.Context, snapshotTree snapshot.SnapshotTree) {
 
@@ -1144,6 +1146,7 @@ func TestSettingExecutionWeights(t *testing.T) {
 		),
 	).withContextOptions(
 		fvm.WithMemoryLimit(10_000_000_000),
+		fvm.WithChain(chain),
 	).run(
 		func(t *testing.T, vm fvm.VM, chain flow.Chain, ctx fvm.Context, snapshotTree snapshot.SnapshotTree) {
 			// Create an account private key.
@@ -1194,6 +1197,7 @@ func TestSettingExecutionWeights(t *testing.T) {
 		),
 	).withContextOptions(
 		fvm.WithMemoryLimit(10_000_000_000),
+		fvm.WithChain(chain),
 	).run(
 		func(t *testing.T, vm fvm.VM, chain flow.Chain, ctx fvm.Context, snapshotTree snapshot.SnapshotTree) {
 
@@ -1238,6 +1242,8 @@ func TestSettingExecutionWeights(t *testing.T) {
 		fvm.WithExecutionMemoryWeights(
 			memoryWeights,
 		),
+	).withContextOptions(
+		fvm.WithChain(chain),
 	).run(
 		func(t *testing.T, vm fvm.VM, chain flow.Chain, ctx fvm.Context, snapshotTree snapshot.SnapshotTree) {
 			privateKeys, err := testutil.GenerateAccountPrivateKeys(1)
@@ -1305,6 +1311,8 @@ func TestSettingExecutionWeights(t *testing.T) {
 				environment.ComputationKindCreateAccount: (fvm.DefaultComputationLimit + 1) << meter.MeterExecutionInternalPrecisionBytes,
 			},
 		),
+	).withContextOptions(
+		fvm.WithChain(chain),
 	).run(
 		func(t *testing.T, vm fvm.VM, chain flow.Chain, ctx fvm.Context, snapshotTree snapshot.SnapshotTree) {
 			txBody := flow.NewTransactionBody().
@@ -1341,6 +1349,8 @@ func TestSettingExecutionWeights(t *testing.T) {
 				environment.ComputationKindCreateAccount: 100_000_000 << meter.MeterExecutionInternalPrecisionBytes,
 			},
 		),
+	).withContextOptions(
+		fvm.WithChain(chain),
 	).run(
 		func(t *testing.T, vm fvm.VM, chain flow.Chain, ctx fvm.Context, snapshotTree snapshot.SnapshotTree) {
 
@@ -1378,6 +1388,8 @@ func TestSettingExecutionWeights(t *testing.T) {
 				environment.ComputationKindCreateAccount: 100_000_000 << meter.MeterExecutionInternalPrecisionBytes,
 			},
 		),
+	).withContextOptions(
+		fvm.WithChain(chain),
 	).run(
 		func(t *testing.T, vm fvm.VM, chain flow.Chain, ctx fvm.Context, snapshotTree snapshot.SnapshotTree) {
 			txBody := flow.NewTransactionBody().
@@ -1421,6 +1433,7 @@ func TestSettingExecutionWeights(t *testing.T) {
 		fvm.WithAccountStorageLimit(true),
 		fvm.WithTransactionFeesEnabled(true),
 		fvm.WithMemoryLimit(math.MaxUint64),
+		fvm.WithChain(chain),
 	).run(
 		func(t *testing.T, vm fvm.VM, chain flow.Chain, ctx fvm.Context, snapshotTree snapshot.SnapshotTree) {
 			// Use the maximum amount of computation so that the transaction still passes.
@@ -1514,6 +1527,7 @@ func TestSettingExecutionWeights(t *testing.T) {
 		fvm.WithAccountStorageLimit(true),
 		fvm.WithTransactionFeesEnabled(true),
 		fvm.WithMemoryLimit(math.MaxUint64),
+		fvm.WithChain(chain),
 	).run(
 		func(t *testing.T, vm fvm.VM, chain flow.Chain, ctx fvm.Context, snapshotTree snapshot.SnapshotTree) {
 			// Create an account private key.
@@ -2169,6 +2183,8 @@ func TestScriptExecutionLimit(t *testing.T) {
 
 	t.Parallel()
 
+	chain := flow.Emulator.Chain()
+
 	script := fvm.Script([]byte(`
 		access(all) fun main() {
 			var s: Int256 = 1024102410241024
@@ -2210,6 +2226,7 @@ func TestScriptExecutionLimit(t *testing.T) {
 			fvm.WithTransactionFeesEnabled(true),
 			fvm.WithAccountStorageLimit(true),
 			fvm.WithComputationLimit(10000),
+			fvm.WithChain(chain),
 		).run(
 			func(t *testing.T, vm fvm.VM, chain flow.Chain, ctx fvm.Context, snapshotTree snapshot.SnapshotTree) {
 				scriptCtx := fvm.NewContextFromParent(ctx)
@@ -2232,6 +2249,7 @@ func TestScriptExecutionLimit(t *testing.T) {
 			fvm.WithTransactionFeesEnabled(true),
 			fvm.WithAccountStorageLimit(true),
 			fvm.WithComputationLimit(20000),
+			fvm.WithChain(chain),
 		).run(
 			func(t *testing.T, vm fvm.VM, chain flow.Chain, ctx fvm.Context, snapshotTree snapshot.SnapshotTree) {
 				scriptCtx := fvm.NewContextFromParent(ctx)
@@ -3398,196 +3416,6 @@ func TestCrypto(t *testing.T) {
 
 		test(t, fmt.Sprintf("import Crypto from %s", cryptoContractAddress))
 	})
-}
-
-func Test_MinimumRequiredVersion(t *testing.T) {
-
-	chain := flow.Emulator.Chain()
-	sc := systemcontracts.SystemContractsForChain(chain.ChainID())
-	log := zerolog.New(zerolog.NewTestWriter(t))
-
-	getVersion := func(ctx fvm.Context, snapshotTree snapshot.SnapshotTree) string {
-		blockDatabase := storage.NewBlockDatabase(
-			snapshotTree,
-			0,
-			nil)
-
-		txnState, err := blockDatabase.NewTransaction(0, state.DefaultParameters())
-		require.NoError(t, err)
-
-		executionParams, _, err := txnState.GetStateExecutionParameters(
-			txnState,
-			fvm.NewExecutionParametersComputer(log, ctx, txnState))
-		require.NoError(t, err)
-
-		// this will set the parameters to the txnState.
-		// this is done at the beginning of a transaction/script
-		txnId, err := txnState.BeginNestedTransactionWithMeterParams(
-			state.ExecutionParameters{
-				ExecutionVersion: executionParams.ExecutionVersion,
-			})
-		require.NoError(t, err)
-
-		mrv := environment.NewMinimumCadenceRequiredVersion(txnState)
-
-		v, err := mrv.MinimumRequiredVersion()
-
-		require.NoError(t, err)
-		_, err = txnState.CommitNestedTransaction(txnId)
-		require.NoError(t, err)
-
-		return v
-	}
-
-	insertVersionBoundary := func(newVersion semver.Version, currentHeight, insertHeight uint64, ctx fvm.Context, snapshotTree snapshot.SnapshotTree, vm fvm.VM, txIndex uint32) snapshot.SnapshotTree {
-		setVersionBoundaryScript := templates.GenerateSetVersionBoundaryScript(sc.AsTemplateEnv())
-		tx := flow.NewTransactionBody().
-			SetScript(setVersionBoundaryScript).
-			SetProposalKey(sc.FlowServiceAccount.Address, 0, 0).
-			AddAuthorizer(sc.FlowServiceAccount.Address).
-			SetPayer(sc.FlowServiceAccount.Address)
-
-		tx.
-			AddArgument(jsoncdc.MustEncode(cadence.UInt8(newVersion.Major))).
-			AddArgument(jsoncdc.MustEncode(cadence.UInt8(newVersion.Minor))).
-			AddArgument(jsoncdc.MustEncode(cadence.UInt8(newVersion.Patch))).
-			AddArgument(jsoncdc.MustEncode(cadence.String(newVersion.PreRelease)))
-
-		tx.AddArgument(jsoncdc.MustEncode(cadence.UInt64(insertHeight)))
-
-		startHeader := flow.Header{
-			Height:    currentHeight,
-			ChainID:   chain.ChainID(),
-			Timestamp: time.Now().UTC(),
-		}
-
-		blocks := new(envMock.Blocks)
-		ctxWithBlock := fvm.NewContextFromParent(
-			ctx,
-			fvm.WithBlockHeader(&startHeader),
-			fvm.WithBlocks(blocks),
-		)
-
-		executionSnapshot, output, err := vm.Run(
-			ctxWithBlock,
-			fvm.Transaction(tx, txIndex),
-			snapshotTree)
-
-		require.NoError(t, err)
-		require.NoError(t, output.Err)
-		return snapshotTree.Append(executionSnapshot)
-	}
-
-	runSystemTxToUpdateNodeVersionBeaconContract := func(atHeight uint64, ctx fvm.Context, snapshotTree snapshot.SnapshotTree, vm fvm.VM, txIndex uint32) snapshot.SnapshotTree {
-		txBody := flow.NewTransactionBody().
-			SetScript([]byte(fmt.Sprintf(`
-					import NodeVersionBeacon from %s
-					
-					transaction {
-						prepare(serviceAccount: auth(BorrowValue) &Account) {
-
-							let versionBeaconHeartbeat = serviceAccount.storage
-								.borrow<&NodeVersionBeacon.Heartbeat>(from: NodeVersionBeacon.HeartbeatStoragePath)
-								?? panic("Couldn't borrow NodeVersionBeacon.Heartbeat Resource")
-							versionBeaconHeartbeat.heartbeat()
-						}
-					}
-					`,
-				sc.NodeVersionBeacon.Address.HexWithPrefix()))).
-			SetProposalKey(sc.FlowServiceAccount.Address, 0, 0).
-			AddAuthorizer(sc.FlowServiceAccount.Address).
-			SetPayer(sc.FlowServiceAccount.Address)
-
-		endHeader := flow.Header{
-			Height:    atHeight,
-			ChainID:   chain.ChainID(),
-			Timestamp: time.Now().UTC(),
-		}
-
-		blocks := new(envMock.Blocks)
-		ctxWithBlock := fvm.NewContextFromParent(ctx,
-			fvm.WithBlockHeader(&endHeader),
-			fvm.WithBlocks(blocks),
-		)
-
-		executionSnapshot, output, err := vm.Run(
-			ctxWithBlock,
-			fvm.Transaction(txBody, txIndex),
-			snapshotTree)
-
-		require.NoError(t, err)
-		require.NoError(t, output.Err)
-
-		return snapshotTree.Append(executionSnapshot)
-	}
-
-	t.Run("minimum required version", newVMTest().
-		withContextOptions(
-			fvm.WithChain(chain),
-			fvm.WithAuthorizationChecksEnabled(false),
-			fvm.WithSequenceNumberCheckAndIncrementEnabled(false),
-		).
-		run(func(
-			t *testing.T,
-			vm fvm.VM,
-			chain flow.Chain,
-			ctx fvm.Context,
-			snapshotTree snapshot.SnapshotTree,
-		) {
-			// default version is empty
-			require.Equal(t, semver.Version{}.String(), getVersion(ctx, snapshotTree))
-
-			// define mapping for flow go version to cadence version
-			flowVersion1 := semver.Version{
-				Major:      1,
-				Minor:      2,
-				Patch:      3,
-				PreRelease: "rc.1",
-			}
-			cadenceVersion1 := semver.Version{
-				Major:      2,
-				Minor:      1,
-				Patch:      3,
-				PreRelease: "rc.2",
-			}
-			environment.SetFVMToCadenceVersionMappingForTestingOnly(
-				environment.FlowGoToCadenceVersionMapping{
-					FlowGoVersion:  flowVersion1,
-					CadenceVersion: cadenceVersion1,
-				})
-
-			h0 := uint64(100)   // starting height
-			hv1 := uint64(2000) // version boundary height
-
-			txIndex := uint32(0)
-
-			// insert version boundary 1
-			snapshotTree = insertVersionBoundary(flowVersion1, h0, hv1, ctx, snapshotTree, vm, txIndex)
-			txIndex += 1
-
-			// so far no change:
-			require.Equal(t, semver.Version{}.String(), getVersion(ctx, snapshotTree))
-
-			// system transaction needs to run to update the flowVersion on chain
-			snapshotTree = runSystemTxToUpdateNodeVersionBeaconContract(hv1-1, ctx, snapshotTree, vm, txIndex)
-			txIndex += 1
-
-			// no change:
-			require.Equal(t, semver.Version{}.String(), getVersion(ctx, snapshotTree))
-
-			// system transaction needs to run to update the flowVersion on chain
-			snapshotTree = runSystemTxToUpdateNodeVersionBeaconContract(hv1, ctx, snapshotTree, vm, txIndex)
-			txIndex += 1
-
-			// switch to cadence version 1
-			require.Equal(t, cadenceVersion1.String(), getVersion(ctx, snapshotTree))
-
-			// system transaction needs to run to update the flowVersion on chain
-			snapshotTree = runSystemTxToUpdateNodeVersionBeaconContract(hv1+1, ctx, snapshotTree, vm, txIndex)
-
-			// still cadence version 1
-			require.Equal(t, cadenceVersion1.String(), getVersion(ctx, snapshotTree))
-		}))
 }
 
 func Test_BlockHashListShouldWriteOnPush(t *testing.T) {
