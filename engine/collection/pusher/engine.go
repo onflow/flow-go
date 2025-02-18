@@ -20,7 +20,6 @@ import (
 	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/state/protocol"
-	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/utils/logging"
 )
 
@@ -28,13 +27,11 @@ import (
 // ("collection guarantees") that the cluster generates to Consensus Nodes
 // for inclusion in blocks.
 type Engine struct {
-	log          zerolog.Logger
-	engMetrics   module.EngineMetrics
-	conduit      network.Conduit
-	me           module.Local
-	state        protocol.State
-	collections  storage.Collections
-	transactions storage.Transactions
+	log        zerolog.Logger
+	engMetrics module.EngineMetrics
+	conduit    network.Conduit
+	me         module.Local
+	state      protocol.State
 
 	notifier engine.Notifier
 	queue    *fifoqueue.FifoQueue
@@ -54,8 +51,6 @@ func New(
 	engMetrics module.EngineMetrics,
 	mempoolMetrics module.MempoolMetrics,
 	me module.Local,
-	collections storage.Collections,
-	transactions storage.Transactions,
 ) (*Engine, error) {
 	queue, err := fifoqueue.NewFifoQueue(
 		200, // roughly 1 minute of collections, at 3BPS
@@ -68,12 +63,10 @@ func New(
 	}
 
 	e := &Engine{
-		log:          log.With().Str("engine", "pusher").Logger(),
-		engMetrics:   engMetrics,
-		me:           me,
-		state:        state,
-		collections:  collections,
-		transactions: transactions,
+		log:        log.With().Str("engine", "pusher").Logger(),
+		engMetrics: engMetrics,
+		me:         me,
+		state:      state,
 
 		notifier: engine.NewNotifier(),
 		queue:    queue,
