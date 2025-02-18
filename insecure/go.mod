@@ -205,9 +205,9 @@ require (
 	github.com/onflow/atree v0.9.0 // indirect
 	github.com/onflow/bridged-usdc/lib/go/contracts v1.0.0 // indirect
 	github.com/onflow/cadence v1.3.1 // indirect
-	github.com/onflow/flow-core-contracts/lib/go/contracts v1.5.1-preview // indirect
-	github.com/onflow/flow-core-contracts/lib/go/templates v1.5.1-preview // indirect
-	github.com/onflow/flow-evm-bridge v0.0.0-20250211192700-061a964fb304 // indirect
+	github.com/onflow/flow-core-contracts/lib/go/contracts v1.6.0 // indirect
+	github.com/onflow/flow-core-contracts/lib/go/templates v1.6.0 // indirect
+	github.com/onflow/flow-evm-bridge v0.0.0-20250218172042-26b9284449c7 // indirect
 	github.com/onflow/flow-ft/lib/go/contracts v1.0.1 // indirect
 	github.com/onflow/flow-ft/lib/go/templates v1.0.1 // indirect
 	github.com/onflow/flow-go-sdk v1.3.1 // indirect
