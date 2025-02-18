@@ -74,7 +74,7 @@ func TestFinalize_HappyPath(t *testing.T) {
 		flagNumViewsInEpoch = 100_000
 		flagNumViewsInStakingAuction = 50_000
 		flagNumViewsInDKGPhase = 2_000
-		flagEpochCommitSafetyThreshold = 1_000
+		flagFinalizationSafetyThreshold = 1_000
 		flagEpochExtensionViewCount = 100_000
 		flagUseDefaultEpochTargetEndTime = true
 		flagEpochTimingRefCounter = 0

@@ -627,7 +627,7 @@ func (m *FollowerState) lastSealed(candidate *flow.Block, deferredDbOps *transac
 }
 
 // evolveProtocolState
-//   - instantiates a Protocol State Mutator from the parent block's state
+//   - instantiates a Protocol State EvolvingState from the parent block's state
 //   - applies any state-changing service events sealed by this block
 //   - verifies that the resulting protocol state is consistent with the commitment in the block
 //
@@ -807,6 +807,11 @@ func (m *FollowerState) Finalize(ctx context.Context, blockID flow.Identifier) e
 		}
 		m.metrics.BlockSealed(sealedBlock)
 	}
+	protocolSnapshot, err := m.protocolKVStoreSnapshotsDB.ByID(block.Payload.ProtocolStateID)
+	if err != nil {
+		return fmt.Errorf("could not retrieve protocol snapshot for block (%x): %w", blockID, err)
+	}
+	m.metrics.ProtocolStateVersion(protocolSnapshot.Version)
 
 	// apply all queued metrics
 	for _, updateMetric := range metrics {

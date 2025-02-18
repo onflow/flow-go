@@ -8,11 +8,6 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
-// CAUTION Tech Debt: The current implementation does not use SafetyRules, when a leader signs their own proposal.
-// This strongly complicates the safety argument, where enforcing the safety-critical property of only ever voting
-// once per view is distributed across different layers in the software stack.
-// For further details, see issue https://github.com/onflow/flow-go/issues/6389
-
 // SafetyRules is a dedicated module that enforces consensus safety. This component has the sole authority to generate
 // votes and timeouts. It follows voting and timeout rules for creating votes and timeouts respectively.
 // Caller can be sure that created vote or timeout doesn't break safety and can be used in consensus process.
@@ -49,9 +44,8 @@ func New(
 	// get the last stored safety data
 	safetyData, err := persist.GetSafetyData()
 	if err != nil {
-		return nil, fmt.Errorf("could not recover safety data: %w", err)
+		return nil, fmt.Errorf("could not load safety data: %w", err)
 	}
-
 	return &SafetyRules{
 		signer:     signer,
 		persist:    persist,

@@ -6,6 +6,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/factory"
 	"github.com/onflow/flow-go/model/flow/filter"
+	"github.com/onflow/flow-go/module/signature"
 )
 
 // IsValidExtendingEpochSetup checks whether an EpochSetup service event being added to the state is valid.
@@ -148,12 +149,96 @@ func IsValidExtendingEpochCommit(extendingCommit *flow.EpochCommit, epochState *
 	return nil
 }
 
+// IsValidEpochCommit implements a wrapper around the actual validation function to allow for backward-compatible validation
+// depending on the version of the [flow.EpochCommit] event. The version of the [flow.EpochCommit] is determined by the presence
+// of the [flow.DKGIndexMap] field.
+// TODO(EFM, #6794): Replace this with the body of `isValidEpochCommit` once we complete the network upgrade.
+func IsValidEpochCommit(commit *flow.EpochCommit, setup *flow.EpochSetup) error {
+	if commit.DKGIndexMap == nil {
+		return isValidEpochCommitV0(commit, setup)
+	} else {
+		return isValidEpochCommit(commit, setup)
+	}
+}
+
 // IsValidEpochCommit checks whether an epoch commit service event is intrinsically valid.
 // Assumes the input flow.EpochSetup event has already been validated.
 // Expected errors during normal operations:
 // * protocol.InvalidServiceEventError if the EpochCommit is invalid.
 // This is a side-effect-free function. This function only returns protocol.InvalidServiceEventError as errors.
-func IsValidEpochCommit(commit *flow.EpochCommit, setup *flow.EpochSetup) error {
+func isValidEpochCommit(commit *flow.EpochCommit, setup *flow.EpochSetup) error {
+	if len(setup.Assignments) != len(commit.ClusterQCs) {
+		return NewInvalidServiceEventErrorf("number of clusters (%d) does not number of QCs (%d)", len(setup.Assignments), len(commit.ClusterQCs))
+	}
+
+	if commit.Counter != setup.Counter {
+		return NewInvalidServiceEventErrorf("inconsistent epoch counter between commit (%d) and setup (%d) events in same epoch", commit.Counter, setup.Counter)
+	}
+
+	// make sure we have a Random Beacon group key:
+	if commit.DKGGroupKey == nil {
+		return NewInvalidServiceEventErrorf("missing DKG public group key")
+	}
+
+	// enforce invariant: len(DKGParticipantKeys) == len(DKGIndexMap)
+	n := len(commit.DKGIndexMap) // size of the DKG committee
+	if len(commit.DKGParticipantKeys) != n {
+		return NewInvalidServiceEventErrorf("number of %d Random Beacon key shares is inconsistent with number of DKG participatns (len=%d)", len(commit.DKGParticipantKeys), len(commit.DKGIndexMap))
+	}
+
+	// enforce invariant: DKGIndexMap values form the set {0, 1, ..., n-1} where n=len(DKGParticipantKeys)
+	encounteredIndex := make([]bool, n)
+	for _, index := range commit.DKGIndexMap {
+		if index < 0 || index >= n {
+			return NewInvalidServiceEventErrorf("index %d is outside allowed range [0,n-1] for a DKG committee of size n=%d", index, n)
+		}
+		if encounteredIndex[index] {
+			return NewInvalidServiceEventErrorf("duplicated DKG index %d", index)
+		}
+		encounteredIndex[index] = true
+	}
+	// conclusion: there are n unique values in `DKGIndexMap`, each in the interval [0,n-1]. Hence, the values in DKGIndexMap form set {0, 1, ..., n-1}.
+	numberOfRandomBeaconParticipants := uint(0)
+	for _, identity := range setup.Participants.Filter(filter.IsConsensusCommitteeMember) {
+		if _, found := commit.DKGIndexMap[identity.NodeID]; found {
+			numberOfRandomBeaconParticipants++
+		}
+	}
+	// Important SANITY CHECK: reject configurations where too few consensus nodes have valid random beacon key shares to
+	// reliably reach the required threshold of signers. Specifically, we enforce RandomBeaconSafetyThreshold ≤ |𝒞 ∩ 𝒟|.
+	// - 𝒞 is the set of all consensus committee members
+	// - 𝒟 is the set of all DKG participants
+	// - ℛ is the subset of the consensus committee (ℛ ⊆ 𝒞): it contains consensus nodes (and only those) with a
+	//   private Random Beacon key share matching the respective public key share in the `EpochCommit` event.
+	//
+	// This is only a sanity check: on the protocol level, we only know which nodes (set 𝒟) could participate in the DKG,
+	// but not which consensus nodes obtained a *valid* random beacon key share. In other words, we only have access to the
+	// superset 𝒟 ∩ 𝒞 ⊇ ℛ here. If 𝒟 ∩ 𝒞 is already too small, we are certain that too few consensus nodes have valid random
+	// beacon keys (RandomBeaconSafetyThreshold > |𝒞 ∩ 𝒟| entails RandomBeaconSafetyThreshold > |ℛ|) and we reject the
+	// Epoch configuration. However, enough nodes in the superset |𝒞 ∩ 𝒟| does not guarantee that |ℛ| is above the critical
+	// threshold (e.g. too many nodes |𝒞 ∩ 𝒟| could have failed the DKG and therefore not be in ℛ).
+	//
+	// This is different than the check in the DKG smart contract, where the value of |ℛ| is known and compared
+	// to the threshold. Unlike the DKG contract, the protocol state does not have access to the value of |ℛ| from a past
+	// key generation (decentralized or not).
+	//
+	// [2] https://www.notion.so/flowfoundation/DKG-contract-success-threshold-86c6bf2b92034855b3c185d7616eb6f1?pvs=4
+	if RandomBeaconSafetyThreshold(uint(n)) > numberOfRandomBeaconParticipants {
+		return NewInvalidServiceEventErrorf("not enough random beacon participants required %d, got %d",
+			signature.RandomBeaconThreshold(n), numberOfRandomBeaconParticipants)
+	}
+
+	return nil
+}
+
+// isValidEpochCommitV0 checks whether an epoch commit service event is intrinsically valid.
+// Assumes the input flow.EpochSetup event has already been validated.
+// Expected errors during normal operations:
+// * protocol.InvalidServiceEventError if the EpochCommit is invalid.
+// This is a side-effect-free function. This function only returns protocol.InvalidServiceEventError as errors.
+// TODO(EFM, #6794): This function is introduced to implement a backward-compatible validation of [flow.EpochCommit].
+// Remove this once we complete the network upgrade.
+func isValidEpochCommitV0(commit *flow.EpochCommit, setup *flow.EpochSetup) error {
 	if len(setup.Assignments) != len(commit.ClusterQCs) {
 		return NewInvalidServiceEventErrorf("number of clusters (%d) does not number of QCs (%d)", len(setup.Assignments), len(commit.ClusterQCs))
 	}
@@ -167,7 +252,7 @@ func IsValidEpochCommit(commit *flow.EpochCommit, setup *flow.EpochSetup) error 
 		return NewInvalidServiceEventErrorf("missing DKG public group key")
 	}
 
-	participants := setup.Participants.Filter(filter.IsValidDKGParticipant)
+	participants := setup.Participants.Filter(filter.IsConsensusCommitteeMember)
 	if len(participants) != len(commit.DKGParticipantKeys) {
 		return NewInvalidServiceEventErrorf("participant list (len=%d) does not match dkg key list (len=%d)", len(participants), len(commit.DKGParticipantKeys))
 	}

@@ -120,12 +120,12 @@ const (
 	// PrimaryON is the container name for the primary observer node to use for API requests
 	PrimaryON = "observer_1"
 
-	DefaultViewsInStakingAuction      uint64 = 5
-	DefaultViewsInDKGPhase            uint64 = 50
-	DefaultViewsInEpoch               uint64 = 200
-	DefaultViewsPerSecond             uint64 = 1
-	DefaultEpochCommitSafetyThreshold uint64 = 20
-	DefaultEpochExtensionViewCount    uint64 = 50
+	DefaultViewsInStakingAuction       uint64 = 5
+	DefaultViewsInDKGPhase             uint64 = 50
+	DefaultViewsInEpoch                uint64 = 200
+	DefaultViewsPerSecond              uint64 = 1
+	DefaultFinalizationSafetyThreshold uint64 = 20
+	DefaultEpochExtensionViewCount     uint64 = 50
 
 	// DefaultMinimumNumOfAccessNodeIDS at-least 1 AN ID must be configured for LN & SN
 	DefaultMinimumNumOfAccessNodeIDS = 1
@@ -427,33 +427,33 @@ func NewConsensusFollowerConfig(t *testing.T, networkingPrivKey crypto.PrivateKe
 
 // NetworkConfig is the config for the network.
 type NetworkConfig struct {
-	Nodes                      NodeConfigs
-	ConsensusFollowers         []ConsensusFollowerConfig
-	Observers                  []ObserverConfig
-	Name                       string
-	NClusters                  uint
-	ViewsInDKGPhase            uint64
-	ViewsInStakingAuction      uint64
-	ViewsInEpoch               uint64
-	ViewsPerSecond             uint64
-	EpochCommitSafetyThreshold uint64
-	KVStoreFactory             func(epochStateID flow.Identifier) (protocol_state.KVStoreAPI, error)
+	Nodes                       NodeConfigs
+	ConsensusFollowers          []ConsensusFollowerConfig
+	Observers                   []ObserverConfig
+	Name                        string
+	NClusters                   uint
+	ViewsInDKGPhase             uint64
+	ViewsInStakingAuction       uint64
+	ViewsInEpoch                uint64
+	ViewsPerSecond              uint64
+	FinalizationSafetyThreshold uint64
+	KVStoreFactory              func(epochStateID flow.Identifier) (protocol_state.KVStoreAPI, error)
 }
 
 type NetworkConfigOpt func(*NetworkConfig)
 
 func NewNetworkConfig(name string, nodes NodeConfigs, opts ...NetworkConfigOpt) NetworkConfig {
 	c := NetworkConfig{
-		Nodes:                      nodes,
-		Name:                       name,
-		NClusters:                  1, // default to 1 cluster
-		ViewsInStakingAuction:      DefaultViewsInStakingAuction,
-		ViewsInDKGPhase:            DefaultViewsInDKGPhase,
-		ViewsInEpoch:               DefaultViewsInEpoch,
-		ViewsPerSecond:             DefaultViewsPerSecond,
-		EpochCommitSafetyThreshold: DefaultEpochCommitSafetyThreshold,
+		Nodes:                       nodes,
+		Name:                        name,
+		NClusters:                   1, // default to 1 cluster
+		ViewsInStakingAuction:       DefaultViewsInStakingAuction,
+		ViewsInDKGPhase:             DefaultViewsInDKGPhase,
+		ViewsInEpoch:                DefaultViewsInEpoch,
+		ViewsPerSecond:              DefaultViewsPerSecond,
+		FinalizationSafetyThreshold: DefaultFinalizationSafetyThreshold,
 		KVStoreFactory: func(epochStateID flow.Identifier) (protocol_state.KVStoreAPI, error) {
-			return kvstore.NewDefaultKVStore(DefaultEpochCommitSafetyThreshold, DefaultEpochExtensionViewCount, epochStateID)
+			return kvstore.NewDefaultKVStore(DefaultFinalizationSafetyThreshold, DefaultEpochExtensionViewCount, epochStateID)
 		},
 	}
 
@@ -469,7 +469,7 @@ func NewNetworkConfigWithEpochConfig(name string, nodes NodeConfigs, viewsInStak
 		WithViewsInStakingAuction(viewsInStakingAuction),
 		WithViewsInDKGPhase(viewsInDKGPhase),
 		WithViewsInEpoch(viewsInEpoch),
-		WithEpochCommitSafetyThreshold(safetyThreshold))
+		WithFinalizationSafetyThreshold(safetyThreshold))
 
 	for _, apply := range opts {
 		apply(&c)
@@ -502,9 +502,9 @@ func WithViewsInDKGPhase(views uint64) func(*NetworkConfig) {
 	}
 }
 
-func WithEpochCommitSafetyThreshold(threshold uint64) func(*NetworkConfig) {
+func WithFinalizationSafetyThreshold(threshold uint64) func(*NetworkConfig) {
 	return func(config *NetworkConfig) {
-		config.EpochCommitSafetyThreshold = threshold
+		config.FinalizationSafetyThreshold = threshold
 	}
 }
 
@@ -1098,11 +1098,11 @@ func BootstrapNetwork(networkConf NetworkConfig, bootstrapDir string, chainID fl
 
 	allNodeInfos := append(toNodeInfos(stakedConfs), followerInfos...)
 
-	// IMPORTANT: we must use this ordering when writing the DKG keys as
-	//            this ordering defines the DKG participant's indices
+	// IMPORTANT: we must use this ordering when writing the Random Beacon keys as
+	//            this ordering defines the DKG participants' indices
 	stakedNodeInfos := bootstrap.Sort(toNodeInfos(stakedConfs), flow.Canonical[flow.Identity])
 
-	dkg, err := runBeaconKG(stakedConfs)
+	dkg, dkgIndexMap, err := runBeaconKG(stakedConfs)
 	if err != nil {
 		return nil, fmt.Errorf("failed to run DKG: %w", err)
 	}
@@ -1209,6 +1209,7 @@ func BootstrapNetwork(networkConf NetworkConfig, bootstrapDir string, chainID fl
 		ClusterQCs:         flow.ClusterQCVoteDatasFromQCs(qcsWithSignerIDs),
 		DKGGroupKey:        dkg.PubGroupKey,
 		DKGParticipantKeys: dkg.PubKeyShares,
+		DKGIndexMap:        dkgIndexMap,
 	}
 	root := &flow.Block{
 		Header: rootHeader,
@@ -1372,23 +1373,28 @@ func setupKeys(networkConf NetworkConfig) ([]ContainerConfig, error) {
 // and returns all DKG data. This includes the group private key, node indices,
 // and per-node public and private key-shares.
 // Only consensus nodes participate in the DKG.
-func runBeaconKG(confs []ContainerConfig) (dkgmod.DKGData, error) {
+func runBeaconKG(confs []ContainerConfig) (dkgmod.ThresholdKeySet, flow.DKGIndexMap, error) {
 
 	// filter by consensus nodes
-	consensusNodes := bootstrap.FilterByRole(toNodeInfos(confs), flow.RoleConsensus)
+	consensusNodes := bootstrap.Sort(bootstrap.FilterByRole(toNodeInfos(confs), flow.RoleConsensus), flow.Canonical[flow.Identity])
 	nConsensusNodes := len(consensusNodes)
 
 	dkgSeed, err := getSeed()
 	if err != nil {
-		return dkgmod.DKGData{}, err
+		return dkgmod.ThresholdKeySet{}, nil, err
 	}
 
-	dkg, err := dkg.RandomBeaconKG(nConsensusNodes, dkgSeed)
+	randomBeaconData, err := dkg.RandomBeaconKG(nConsensusNodes, dkgSeed)
 	if err != nil {
-		return dkgmod.DKGData{}, err
+		return dkgmod.ThresholdKeySet{}, nil, err
 	}
 
-	return dkg, nil
+	indexMap := make(flow.DKGIndexMap, nConsensusNodes)
+	for i, node := range consensusNodes {
+		indexMap[node.NodeID] = i
+	}
+
+	return randomBeaconData, indexMap, nil
 }
 
 // setupClusterGenesisBlockQCs generates bootstrapping resources necessary for each collector cluster:
