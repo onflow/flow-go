@@ -63,13 +63,9 @@ func (b *baseDataProvider) Arguments() models.Arguments {
 // No errors are expected during normal operations.
 func (b *baseDataProvider) Close() {
 	b.cancel()
-
-	//TODO: explain why we run it in a separate routine
-	go func() {
-		b.closedFlag.Do(func() {
-			close(b.closedChan)
-		})
-	}()
+	b.closedFlag.Do(func() {
+		close(b.closedChan)
+	})
 }
 
 type sendResponseCallback[T any] func(T) error
