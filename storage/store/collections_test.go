@@ -83,6 +83,6 @@ func TestCollections_IndexDuplicateTx(t *testing.T) {
 		// col2 (not col1) should be indexed by the shared transaction (since col1 was overwritten by col2)
 		gotLightByDupTxID, err := collections.LightByTransactionID(dupTx.ID())
 		require.NoError(t, err)
-		assert.Equal(t, &col2Light, gotLightByDupTxID)
+		assert.Equal(t, &col1Light, gotLightByDupTxID)
 	})
 }

@@ -1,7 +1,9 @@
 package store
 
 import (
+	"errors"
 	"fmt"
+	"sync"
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/storage"
@@ -11,12 +13,14 @@ import (
 type Collections struct {
 	db           storage.DB
 	transactions *Transactions
+	indexingByTx sync.Mutex
 }
 
 func NewCollections(db storage.DB, transactions *Transactions) *Collections {
 	c := &Collections{
 		db:           db,
 		transactions: transactions,
+		indexingByTx: sync.Mutex{},
 	}
 	return c
 }
@@ -105,6 +109,21 @@ func (c *Collections) Remove(colID flow.Identifier) error {
 }
 
 func (c *Collections) StoreLightAndIndexByTransaction(collection *flow.LightCollection) error {
+	// - This lock is to ensure there is no race condition when indexing collection by transaction ID
+	// - The access node uses this index to report the transaction status. It's done by first
+	//   find the collection for a given transaction ID, and then find the block by the collection,
+	//   and then find the status of the block.
+	// - since a transaction can belong to multiple collections, when indexing collection by transaction ID,
+	//   if we overwrite the previous collection ID that was indexed by the same transaction ID, the access node
+	//   will return different collection for the same transaction, and the transaction result status will be
+	//   inconsistent.
+	// - therefore, we need to check if the transaction is already indexed by a collection, and to
+	//   make sure there is no dirty read, we need to use a lock to protect the indexing operation.
+	// - Note, this approach works because this is the only place where UnsafeIndexCollectionByTransaction
+	//   is used in the code base to index collection by transaction.
+	c.indexingByTx.Lock()
+	defer c.indexingByTx.Unlock()
+
 	return c.db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 		err := operation.InsertCollection(rw.Writer(), collection)
 		if err != nil {
@@ -112,10 +131,25 @@ func (c *Collections) StoreLightAndIndexByTransaction(collection *flow.LightColl
 		}
 
 		for _, txID := range collection.Transactions {
-			err = operation.IndexCollectionByTransaction(rw.Writer(), txID, collection.ID())
-			if err != nil {
-				return fmt.Errorf("could not insert transaction ID: %w", err)
+			var differentColTxIsIn flow.Identifier
+			err := operation.RetrieveCollectionID(rw.GlobalReader(), txID, &differentColTxIsIn)
+			if err == nil {
+				// transaction is already indexed by a different collection, we should not index it again
+				// so that the access node will always return the same collection for a given transaction
+				// and return a consistent transaction result status.
+				continue
 			}
+
+			if errors.Is(err, storage.ErrNotFound) {
+				// no other collection has this transaction, index this collection by this tx
+				err = operation.UnsafeIndexCollectionByTransaction(rw.Writer(), txID, collection.ID())
+				if err != nil {
+					return fmt.Errorf("could not insert transaction ID: %w", err)
+				}
+				continue
+			}
+
+			return fmt.Errorf("could not retrieve collection by transaction id %v: %w", txID, err)
 		}
 
 		return nil
