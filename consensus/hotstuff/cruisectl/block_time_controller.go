@@ -9,6 +9,7 @@
 package cruisectl
 
 import (
+	"errors"
 	"fmt"
 	"time"
 
@@ -180,23 +181,29 @@ func NewBlockTimeController(log zerolog.Logger, metrics module.CruiseCtlMetrics,
 func (ctl *BlockTimeController) initEpochTiming() error {
 	finalSnapshot := ctl.state.Final()
 
-	currentEpochTiming, err := newEpochTiming(finalSnapshot.Epochs().Current())
+	currentEpoch, err := finalSnapshot.Epochs().Current()
+	if err != nil {
+		return fmt.Errorf("could not retrieve current epoch: %w", err)
+	}
+	currentEpochTiming, err := newEpochTiming(currentEpoch)
 	if err != nil {
 		return fmt.Errorf("failed to retrieve the current epoch's timing information: %w", err)
 	}
 	ctl.currentEpochTiming = *currentEpochTiming
 
-	phase, err := finalSnapshot.EpochPhase()
+	nextEpoch, err := finalSnapshot.Epochs().NextCommitted()
 	if err != nil {
-		return fmt.Errorf("could not check snapshot phase: %w", err)
-	}
-	if phase == flow.EpochPhaseCommitted {
-		ctl.nextEpochTiming, err = newEpochTiming(finalSnapshot.Epochs().NextCommitted())
+		if !errors.Is(err, protocol.ErrNextEpochNotCommitted) {
+			return irrecoverable.NewExceptionf("unexpected error retrieving next epoch: %w", err)
+		}
+		// receiving a `ErrNextEpochNotCommitted` is expected during the happy path
+	} else { // next epoch was successfully retrieved
+		ctl.nextEpochTiming, err = newEpochTiming(nextEpoch)
 		if err != nil {
 			return fmt.Errorf("failed to retrieve the next epoch's timing information: %w", err)
 		}
 		if !currentEpochTiming.isFollowedBy(ctl.nextEpochTiming) {
-			return fmt.Errorf("failed to retrieve the next epoch's timing information: %w", err)
+			return fmt.Errorf("next epoch does not directly follow current epoch based on epoch timing")
 		}
 	}
 
@@ -433,7 +440,11 @@ func (ctl *BlockTimeController) measureViewDuration(tb TimedBlock) error {
 // its end. Specifically, we memorize the updated timing information in the BlockTimeController.
 // No errors are expected during normal operation.
 func (ctl *BlockTimeController) processEpochExtended(first *flow.Header) error {
-	currEpochTimingWithExtension, err := newEpochTiming(ctl.state.AtHeight(first.Height).Epochs().Current())
+	currentEpoch, err := ctl.state.AtHeight(first.Height).Epochs().Current()
+	if err != nil {
+		return fmt.Errorf("could not get current epoch: %w", err)
+	}
+	currEpochTimingWithExtension, err := newEpochTiming(currentEpoch)
 	if err != nil {
 		return fmt.Errorf("failed to get new epoch timing: %w", err)
 	}
@@ -457,9 +468,12 @@ func (ctl *BlockTimeController) processEpochExtended(first *flow.Header) error {
 // Specifically, we memorize the next epoch's timing information in the BlockTimeController.
 // No errors are expected during normal operation.
 func (ctl *BlockTimeController) processEpochCommittedPhaseStarted(first *flow.Header) error {
-	var err error
 	snapshot := ctl.state.AtHeight(first.Height)
-	ctl.nextEpochTiming, err = newEpochTiming(snapshot.Epochs().NextCommitted())
+	nextEpoch, err := snapshot.Epochs().NextCommitted()
+	if err != nil {
+		return fmt.Errorf("could not get next committed epoch: %w", err)
+	}
+	ctl.nextEpochTiming, err = newEpochTiming(nextEpoch)
 	if err != nil {
 		return fmt.Errorf("failed to retrieve the next epoch's timing information: %w", err)
 	}

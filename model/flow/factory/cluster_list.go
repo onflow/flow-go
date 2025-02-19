@@ -44,7 +44,7 @@ func NewClusterList(assignments flow.AssignmentList, collectors flow.IdentitySke
 	for i, participants := range assignments {
 		cluster := make(flow.IdentitySkeletonList, 0, len(participants))
 		if len(participants) == 0 { // enforce (d): each cluster contains at least one collector (i.e. is not empty)
-			return nil, fmt.Errorf("particpants in assignment list is empty, cluster index %v", i)
+			return nil, fmt.Errorf("participants in assignment list is empty, cluster index %v", i)
 		}
 
 		prev := participants[0] // for checking that cluster participants are listed in canonical order

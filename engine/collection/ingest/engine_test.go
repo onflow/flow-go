@@ -327,7 +327,9 @@ func (suite *Suite) TestRoutingLocalCluster() {
 	suite.Assert().NoError(err)
 
 	// should be added to local mempool for the current epoch
-	counter, err := suite.epochQuery.Current().Counter()
+	currentEpoch, err := suite.epochQuery.Current()
+	suite.Assert().NoError(err)
+	counter, err := currentEpoch.Counter()
 	suite.Assert().NoError(err)
 	suite.Assert().True(suite.pools.ForEpoch(counter).Has(tx.ID()))
 	suite.conduit.AssertExpectations(suite.T())
@@ -357,7 +359,9 @@ func (suite *Suite) TestRoutingRemoteCluster() {
 	suite.Assert().NoError(err)
 
 	// should not be added to local mempool
-	counter, err := suite.epochQuery.Current().Counter()
+	currentEpoch, err := suite.epochQuery.Current()
+	suite.Assert().NoError(err)
+	counter, err := currentEpoch.Counter()
 	suite.Assert().NoError(err)
 	suite.Assert().False(suite.pools.ForEpoch(counter).Has(tx.ID()))
 	suite.conduit.AssertExpectations(suite.T())
@@ -390,7 +394,9 @@ func (suite *Suite) TestRoutingToRemoteClusterWithNoNodes() {
 	suite.Assert().NoError(err)
 
 	// should not be added to local mempool
-	counter, err := suite.epochQuery.Current().Counter()
+	currentEpoch, err := suite.epochQuery.Current()
+	suite.Assert().NoError(err)
+	counter, err := currentEpoch.Counter()
 	suite.Assert().NoError(err)
 	suite.Assert().False(suite.pools.ForEpoch(counter).Has(tx.ID()))
 	suite.conduit.AssertExpectations(suite.T())
@@ -418,7 +424,9 @@ func (suite *Suite) TestRoutingLocalClusterFromOtherNode() {
 	suite.Assert().NoError(err)
 
 	// should be added to local mempool for current epoch
-	counter, err := suite.epochQuery.Current().Counter()
+	currentEpoch, err := suite.epochQuery.Current()
+	suite.Assert().NoError(err)
+	counter, err := currentEpoch.Counter()
 	suite.Assert().NoError(err)
 	suite.Assert().True(suite.pools.ForEpoch(counter).Has(tx.ID()))
 	suite.conduit.AssertExpectations(suite.T())
@@ -446,7 +454,9 @@ func (suite *Suite) TestRoutingInvalidTransaction() {
 	_ = suite.engine.ProcessTransaction(&tx)
 
 	// should not be added to local mempool
-	counter, err := suite.epochQuery.Current().Counter()
+	currentEpoch, err := suite.epochQuery.Current()
+	suite.Assert().NoError(err)
+	counter, err := currentEpoch.Counter()
 	suite.Assert().NoError(err)
 	suite.Assert().False(suite.pools.ForEpoch(counter).Has(tx.ID()))
 	suite.conduit.AssertExpectations(suite.T())
@@ -466,7 +476,7 @@ func (suite *Suite) TestRouting_ClusterAssignmentChanged() {
 	epoch2.On("Counter").Return(uint64(2), nil)
 	epoch2.On("Clustering").Return(epoch2Clusters, nil)
 	// update the mocks to behave as though we have transitioned to epoch 2
-	suite.epochQuery.Add(epoch2)
+	suite.epochQuery.AddCommitted(epoch2)
 	suite.epochQuery.Transition()
 
 	// get the local cluster in epoch 2
@@ -506,7 +516,7 @@ func (suite *Suite) TestRouting_ClusterAssignmentRemoved() {
 	epoch2.On("InitialIdentities").Return(withoutMe, nil)
 	epoch2.On("Clustering").Return(epoch2Clusters, nil)
 	// update the mocks to behave as though we have transitioned to epoch 2
-	suite.epochQuery.Add(epoch2)
+	suite.epochQuery.AddCommitted(epoch2)
 	suite.epochQuery.Transition()
 
 	// any transaction is OK here, since we're not in any cluster
@@ -545,7 +555,7 @@ func (suite *Suite) TestRouting_ClusterAssignmentAdded() {
 	epoch2.On("InitialIdentities").Return(withoutMe, nil)
 	epoch2.On("Clustering").Return(epoch2Clusters, nil)
 	// update the mocks to behave as though we have transitioned to epoch 2
-	suite.epochQuery.Add(epoch2)
+	suite.epochQuery.AddCommitted(epoch2)
 	suite.epochQuery.Transition()
 
 	// any transaction is OK here, since we're not in any cluster
@@ -573,7 +583,7 @@ func (suite *Suite) TestRouting_ClusterAssignmentAdded() {
 	epoch3.On("Counter").Return(uint64(3), nil)
 	epoch3.On("Clustering").Return(epoch3Clusters, nil)
 	// transition to epoch 3
-	suite.epochQuery.Add(epoch3)
+	suite.epochQuery.AddCommitted(epoch3)
 	suite.epochQuery.Transition()
 
 	// get the local cluster in epoch 2

@@ -160,8 +160,9 @@ func (s *BaseSuite) AwaitEpochPhase(ctx context.Context, expectedEpoch uint64, e
 	condition := func() bool {
 		snapshot, err := s.Client.GetLatestProtocolSnapshot(ctx)
 		require.NoError(s.T(), err)
-
-		actualEpoch, err = snapshot.Epochs().Current().Counter()
+		epoch, err := snapshot.Epochs().Current()
+		require.NoError(s.T(), err)
+		actualEpoch, err = epoch.Counter()
 		require.NoError(s.T(), err)
 		actualPhase, err = snapshot.EpochPhase()
 		require.NoError(s.T(), err)
@@ -206,7 +207,9 @@ func (s *BaseSuite) AssertInEpoch(ctx context.Context, expectedEpoch uint64) {
 // CurrentEpoch returns the current epoch counter (as of the latest finalized block).
 func (s *BaseSuite) CurrentEpoch(ctx context.Context) uint64 {
 	snapshot := s.GetLatestProtocolSnapshot(ctx)
-	counter, err := snapshot.Epochs().Current().Counter()
+	epoch, err := snapshot.Epochs().Current()
+	require.NoError(s.T(), err)
+	counter, err := epoch.Counter()
 	require.NoError(s.T(), err)
 	return counter
 }

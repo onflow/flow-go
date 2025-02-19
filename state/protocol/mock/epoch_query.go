@@ -13,7 +13,7 @@ type EpochQuery struct {
 }
 
 // Current provides a mock function with given fields:
-func (_m *EpochQuery) Current() protocol.CommittedEpoch {
+func (_m *EpochQuery) Current() (protocol.CommittedEpoch, error) {
 	ret := _m.Called()
 
 	if len(ret) == 0 {
@@ -21,6 +21,10 @@ func (_m *EpochQuery) Current() protocol.CommittedEpoch {
 	}
 
 	var r0 protocol.CommittedEpoch
+	var r1 error
+	if rf, ok := ret.Get(0).(func() (protocol.CommittedEpoch, error)); ok {
+		return rf()
+	}
 	if rf, ok := ret.Get(0).(func() protocol.CommittedEpoch); ok {
 		r0 = rf()
 	} else {
@@ -29,11 +33,17 @@ func (_m *EpochQuery) Current() protocol.CommittedEpoch {
 		}
 	}
 
-	return r0
+	if rf, ok := ret.Get(1).(func() error); ok {
+		r1 = rf()
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
 }
 
 // NextCommitted provides a mock function with given fields:
-func (_m *EpochQuery) NextCommitted() protocol.CommittedEpoch {
+func (_m *EpochQuery) NextCommitted() (protocol.CommittedEpoch, error) {
 	ret := _m.Called()
 
 	if len(ret) == 0 {
@@ -41,6 +51,10 @@ func (_m *EpochQuery) NextCommitted() protocol.CommittedEpoch {
 	}
 
 	var r0 protocol.CommittedEpoch
+	var r1 error
+	if rf, ok := ret.Get(0).(func() (protocol.CommittedEpoch, error)); ok {
+		return rf()
+	}
 	if rf, ok := ret.Get(0).(func() protocol.CommittedEpoch); ok {
 		r0 = rf()
 	} else {
@@ -49,11 +63,17 @@ func (_m *EpochQuery) NextCommitted() protocol.CommittedEpoch {
 		}
 	}
 
-	return r0
+	if rf, ok := ret.Get(1).(func() error); ok {
+		r1 = rf()
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
 }
 
 // NextUnsafe provides a mock function with given fields:
-func (_m *EpochQuery) NextUnsafe() protocol.TentativeEpoch {
+func (_m *EpochQuery) NextUnsafe() (protocol.TentativeEpoch, error) {
 	ret := _m.Called()
 
 	if len(ret) == 0 {
@@ -61,6 +81,10 @@ func (_m *EpochQuery) NextUnsafe() protocol.TentativeEpoch {
 	}
 
 	var r0 protocol.TentativeEpoch
+	var r1 error
+	if rf, ok := ret.Get(0).(func() (protocol.TentativeEpoch, error)); ok {
+		return rf()
+	}
 	if rf, ok := ret.Get(0).(func() protocol.TentativeEpoch); ok {
 		r0 = rf()
 	} else {
@@ -69,11 +93,17 @@ func (_m *EpochQuery) NextUnsafe() protocol.TentativeEpoch {
 		}
 	}
 
-	return r0
+	if rf, ok := ret.Get(1).(func() error); ok {
+		r1 = rf()
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
 }
 
 // Previous provides a mock function with given fields:
-func (_m *EpochQuery) Previous() protocol.CommittedEpoch {
+func (_m *EpochQuery) Previous() (protocol.CommittedEpoch, error) {
 	ret := _m.Called()
 
 	if len(ret) == 0 {
@@ -81,6 +111,10 @@ func (_m *EpochQuery) Previous() protocol.CommittedEpoch {
 	}
 
 	var r0 protocol.CommittedEpoch
+	var r1 error
+	if rf, ok := ret.Get(0).(func() (protocol.CommittedEpoch, error)); ok {
+		return rf()
+	}
 	if rf, ok := ret.Get(0).(func() protocol.CommittedEpoch); ok {
 		r0 = rf()
 	} else {
@@ -89,7 +123,13 @@ func (_m *EpochQuery) Previous() protocol.CommittedEpoch {
 		}
 	}
 
-	return r0
+	if rf, ok := ret.Get(1).(func() error); ok {
+		r1 = rf()
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
 }
 
 // NewEpochQuery creates a new instance of EpochQuery. It also registers a testing interface on the mock and a cleanup function to assert the mocks expectations.

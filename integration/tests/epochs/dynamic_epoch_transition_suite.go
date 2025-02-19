@@ -345,7 +345,9 @@ func (s *DynamicEpochTransitionSuite) StakeNewNode(ctx context.Context, env temp
 func (s *DynamicEpochTransitionSuite) AssertInEpochPhase(ctx context.Context, expectedEpoch uint64, expectedPhase flow.EpochPhase) {
 	snapshot, err := s.Client.GetLatestProtocolSnapshot(ctx)
 	require.NoError(s.T(), err)
-	actualEpoch, err := snapshot.Epochs().Current().Counter()
+	epoch, err := snapshot.Epochs().Current()
+	require.NoError(s.T(), err)
+	actualEpoch, err := epoch.Counter()
 	require.NoError(s.T(), err)
 	actualPhase, err := snapshot.EpochPhase()
 	require.NoError(s.T(), err)
@@ -525,7 +527,9 @@ func (s *DynamicEpochTransitionSuite) RunTestEpochJoinAndLeave(role flow.Role, c
 	testContainer.WriteRootSnapshot(rootSnapshot)
 	testContainer.Container.Start(s.Ctx)
 
-	epoch1FinalView, err := rootSnapshot.Epochs().Current().FinalView()
+	epoch1, err := rootSnapshot.Epochs().Current()
+	require.NoError(s.T(), err)
+	epoch1FinalView, err := epoch1.FinalView()
 	require.NoError(s.T(), err)
 
 	// wait for at least the first block of the next epoch to be sealed before we pause our container to replace
@@ -534,7 +538,9 @@ func (s *DynamicEpochTransitionSuite) RunTestEpochJoinAndLeave(role flow.Role, c
 	s.TimedLogf("observed finalized view %d -> pausing container", epoch1FinalView+1)
 
 	// make sure container to replace is not a member of epoch 2
-	s.AssertNodeNotParticipantInEpoch(rootSnapshot.Epochs().NextUnsafe(), containerToReplace.Config.NodeID)
+	nextEpoch, err := rootSnapshot.Epochs().NextUnsafe()
+	require.NoError(s.T(), err)
+	s.AssertNodeNotParticipantInEpoch(nextEpoch, containerToReplace.Config.NodeID)
 
 	// assert transition to second epoch happened as expected
 	// if counter is still 0, epoch emergency fallback was triggered and we can fail early

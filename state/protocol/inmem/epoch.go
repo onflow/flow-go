@@ -9,7 +9,6 @@ import (
 	"github.com/onflow/flow-go/module/signature"
 	"github.com/onflow/flow-go/state/cluster"
 	"github.com/onflow/flow-go/state/protocol"
-	"github.com/onflow/flow-go/state/protocol/invalid"
 )
 
 // Epochs provides access to epoch data, backed by a rich epoch protocol state entry.
@@ -19,47 +18,75 @@ type Epochs struct {
 
 var _ protocol.EpochQuery = (*Epochs)(nil)
 
-func (eq Epochs) Previous() protocol.CommittedEpoch {
+// Previous returns the previous epoch as of this snapshot. Valid snapshots
+// must have a previous epoch for all epochs except that immediately after the root block.
+// Error returns:
+//   - [protocol.ErrNoPreviousEpoch] - if the previous epoch does not exist.
+//     This happens when the previous epoch is queried within the first epoch of a spork.
+func (eq Epochs) Previous() (protocol.CommittedEpoch, error) {
 	if eq.entry.PreviousEpoch == nil {
-		return invalid.NewEpoch(protocol.ErrNoPreviousEpoch)
+		return nil, protocol.ErrNoPreviousEpoch
 	}
-	return NewCommittedEpoch(eq.entry.PreviousEpochSetup, eq.entry.PreviousEpoch.EpochExtensions, eq.entry.PreviousEpochCommit)
+	return NewCommittedEpoch(eq.entry.PreviousEpochSetup, eq.entry.PreviousEpoch.EpochExtensions, eq.entry.PreviousEpochCommit), nil
 }
 
-func (eq Epochs) Current() protocol.CommittedEpoch {
-	return NewCommittedEpoch(eq.entry.CurrentEpochSetup, eq.entry.CurrentEpoch.EpochExtensions, eq.entry.CurrentEpochCommit)
+// Current returns the current epoch as of this snapshot. All valid snapshots have a current epoch.
+func (eq Epochs) Current() (protocol.CommittedEpoch, error) {
+	return NewCommittedEpoch(eq.entry.CurrentEpochSetup, eq.entry.CurrentEpoch.EpochExtensions, eq.entry.CurrentEpochCommit), nil
 }
 
-func (eq Epochs) NextUnsafe() protocol.TentativeEpoch {
+// NextUnsafe should only be used by components that are actively involved in advancing
+// the epoch from [flow.EpochPhaseSetup] to [flow.EpochPhaseCommitted].
+// NextUnsafe returns the tentative configuration for the next epoch as of this snapshot.
+// Valid snapshots make such configuration available during the Epoch Setup Phase, which
+// generally is the case only after an `EpochSetupPhaseStarted` notification has been emitted.
+// CAUTION: epoch transition might not happen as described by the tentative configuration!
+//
+// Error returns:
+//   - [ErrNextEpochNotSetup] in the case that this method is queried w.r.t. a snapshot
+//     within the [flow.EpochPhaseStaking] phase or when we are in Epoch Fallback Mode.
+//   - [ErrNextEpochAlreadyCommitted] if the tentative epoch is requested from
+//     a snapshot within the [flow.EpochPhaseCommitted] phase.
+//   - generic error in case of unexpected critical internal corruption or bugs
+func (eq Epochs) NextUnsafe() (protocol.TentativeEpoch, error) {
 	switch eq.entry.EpochPhase() {
 	case flow.EpochPhaseStaking, flow.EpochPhaseFallback:
-		return invalid.NewEpoch(protocol.ErrNextEpochNotSetup)
+		return nil, protocol.ErrNextEpochNotSetup
 	case flow.EpochPhaseSetup:
-		return NewSetupEpoch(eq.entry.NextEpochSetup, eq.entry.NextEpoch.EpochExtensions)
+		return NewSetupEpoch(eq.entry.NextEpochSetup, eq.entry.NextEpoch.EpochExtensions), nil
 	case flow.EpochPhaseCommitted:
-		return invalid.NewEpoch(protocol.ErrNextEpochAlreadyCommitted)
+		return nil, protocol.ErrNextEpochAlreadyCommitted
 	}
-	return invalid.NewEpochf("unexpected unknown phase in protocol state entry")
+	return nil, fmt.Errorf("unexpected unknown phase in protocol state entry")
 }
 
-func (eq Epochs) NextCommitted() protocol.CommittedEpoch {
+// NextCommitted returns the next epoch as of this snapshot, only if it has
+// been committed already - generally that is the case only after an
+// `EpochCommittedPhaseStarted` notification has been emitted.
+//
+// Error returns:
+//   - [ErrNextEpochNotCommitted] - in the case that committed epoch has been requested w.r.t a snapshot within
+//     the [flow.EpochPhaseStaking] or [flow.EpochPhaseSetup] phases.
+//   - generic error in case of unexpected critical internal corruption or bugs
+func (eq Epochs) NextCommitted() (protocol.CommittedEpoch, error) {
 	switch eq.entry.EpochPhase() {
 	case flow.EpochPhaseStaking, flow.EpochPhaseFallback, flow.EpochPhaseSetup:
-		return invalid.NewEpoch(protocol.ErrNextEpochNotCommitted)
+		return nil, protocol.ErrNextEpochNotCommitted
 	case flow.EpochPhaseCommitted:
-		return NewCommittedEpoch(eq.entry.NextEpochSetup, eq.entry.NextEpoch.EpochExtensions, eq.entry.NextEpochCommit)
+		return NewCommittedEpoch(eq.entry.NextEpochSetup, eq.entry.NextEpoch.EpochExtensions, eq.entry.NextEpochCommit), nil
 	}
-	return invalid.NewEpochf("unexpected unknown phase in protocol state entry")
+	return nil, fmt.Errorf("unexpected unknown phase in protocol state entry")
 }
 
 // setupEpoch is an implementation of protocol.TentativeEpoch backed by an EpochSetup service event.
 // Includes any extensions which have been included as of the reference block.
-// This is used for converting service events to inmem.Epoch.
 type setupEpoch struct {
 	// EpochSetup service event
 	setupEvent *flow.EpochSetup
 	extensions []flow.EpochExtension
 }
+
+var _ protocol.TentativeEpoch = (*setupEpoch)(nil)
 
 func (es *setupEpoch) Counter() (uint64, error) {
 	return es.setupEvent.Counter, nil
@@ -163,15 +190,15 @@ func (es *setupEpoch) FinalHeight() (uint64, error) {
 }
 
 // committedEpoch is an implementation of protocol.CommittedEpoch backed by an EpochSetup
-// and EpochCommit service event. This is used for converting service events to
-// inmem.Epoch.
+// and EpochCommit service event.
 type committedEpoch struct {
 	setupEpoch
 	commitEvent *flow.EpochCommit
 }
 
-func (es *committedEpoch) Cluster(index uint) (protocol.Cluster, error) {
+var _ protocol.CommittedEpoch = (*committedEpoch)(nil)
 
+func (es *committedEpoch) Cluster(index uint) (protocol.Cluster, error) {
 	epochCounter := es.setupEvent.Counter
 
 	clustering, err := es.Clustering()

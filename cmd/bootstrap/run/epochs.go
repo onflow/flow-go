@@ -30,7 +30,10 @@ func GenerateRecoverEpochTxArgs(log zerolog.Logger,
 	initNewEpoch bool,
 	snapshot *inmem.Snapshot,
 ) ([]cadence.Value, error) {
-	epoch := snapshot.Epochs().Current()
+	epoch, err := snapshot.Epochs().Current()
+	if err != nil {
+		return nil, fmt.Errorf("could not retrieve current epoch: %w", err)
+	}
 
 	currentEpochIdentities, err := snapshot.Identities(filter.IsValidProtocolParticipant)
 	if err != nil {

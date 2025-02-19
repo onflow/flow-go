@@ -192,8 +192,17 @@ func createNodes(t *testing.T, participants *ConsensusParticipants, rootSnapshot
 	consensus, err := rootSnapshot.Identities(filter.HasRole[flow.Identity](flow.RoleConsensus))
 	require.NoError(t, err)
 
-	epochViewLookup := buildEpochLookupList(rootSnapshot.Epochs().Current(),
-		rootSnapshot.Epochs().NextCommitted())
+	var epochViewLookup []epochInfo
+	currentEpoch, err := rootSnapshot.Epochs().Current()
+	require.NoError(t, err)
+	// Whether there is a next committed epoch depends on the test.
+	nextEpoch, err := rootSnapshot.Epochs().NextCommitted()
+	if err != nil { // the only acceptable error here is `protocol.ErrNextEpochNotCommitted`
+		require.ErrorIs(t, err, protocol.ErrNextEpochNotCommitted)
+		epochViewLookup = buildEpochLookupList(currentEpoch)
+	} else {
+		epochViewLookup = buildEpochLookupList(currentEpoch, nextEpoch)
+	}
 
 	epochLookup := &mockmodule.EpochLookup{}
 	epochLookup.On("EpochForView", mock.Anything).Return(

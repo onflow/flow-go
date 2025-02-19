@@ -24,7 +24,7 @@ func getMockSnapshot(t *testing.T, epochCounter uint64, phase flow.EpochPhase) *
 	currentEpoch.On("Counter").Return(epochCounter, nil)
 
 	epochQuery := mocks.NewEpochQuery(t, epochCounter)
-	epochQuery.Add(currentEpoch)
+	epochQuery.AddCommitted(currentEpoch)
 
 	snapshot := new(protocolmock.Snapshot)
 	snapshot.On("Epochs").Return(epochQuery)
