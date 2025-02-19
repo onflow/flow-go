@@ -32,7 +32,6 @@ func CanonicalRootBlock(epoch uint64, participants flow.IdentitySkeletonList) *c
 		ParentVoterIndices: nil,
 		ParentVoterSigData: nil,
 		ProposerID:         flow.ZeroID,
-		ProposerSigData:    nil,
 	}
 
 	return &cluster.Block{
