@@ -51,9 +51,11 @@ func (s *StaticEpochTransitionSuite) TestStaticEpochTransition() {
 	require.NoError(s.T(), err)
 	s.TimedLogf("retrieved header after entering EpochSetup phase: height=%d, view=%d", header.Height, header.View)
 
-	epoch1FinalView, err := snapshot.Epochs().Current().FinalView()
+	epoch1, err := snapshot.Epochs().Current()
 	require.NoError(s.T(), err)
-	epoch1Counter, err := snapshot.Epochs().Current().Counter()
+	epoch1FinalView, err := epoch1.FinalView()
+	require.NoError(s.T(), err)
+	epoch1Counter, err := epoch1.Counter()
 	require.NoError(s.T(), err)
 
 	// wait for the first view of the second epoch

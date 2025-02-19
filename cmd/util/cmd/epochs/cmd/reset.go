@@ -94,9 +94,11 @@ func resetRun(cmd *cobra.Command, args []string) {
 
 // extractResetEpochArgs extracts the required transaction arguments for the `resetEpoch` transaction
 func extractResetEpochArgs(snapshot *inmem.Snapshot) []cadence.Value {
-
 	// get current epoch
-	epoch := snapshot.Epochs().Current()
+	epoch, err := snapshot.Epochs().Current()
+	if err != nil {
+		log.Fatal().Err(err).Msg("could not get current epoch")
+	}
 
 	// Note: The epochCounter value expected by the smart contract is the epoch being
 	// replaced, which is one less than the epoch beginning after the spork.
@@ -142,7 +144,7 @@ func extractResetEpochArgs(snapshot *inmem.Snapshot) []cadence.Value {
 //	          ^     ^     ^-dkgPhase2FinalView
 //	          |     `-dkgPhase1FinalView
 //	          `-stakingEndView
-func getStakingAuctionEndView(epoch protocol.Epoch) (uint64, error) {
+func getStakingAuctionEndView(epoch protocol.CommittedEpoch) (uint64, error) {
 	dkgPhase1FinalView, err := epoch.DKGPhase1FinalView()
 	if err != nil {
 		return 0, err

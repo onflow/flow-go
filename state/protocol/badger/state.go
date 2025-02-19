@@ -844,28 +844,24 @@ func IsBootstrapped(db *badger.DB) (bool, error) {
 // updateEpochMetrics update the `consensus_compliance_current_epoch_counter` and the
 // `consensus_compliance_current_epoch_phase` metric
 func updateEpochMetrics(metrics module.ComplianceMetrics, snap protocol.Snapshot) error {
-
+	currentEpoch, err := snap.Epochs().Current()
+	if err != nil {
+		return fmt.Errorf("could not get current epoch: %w", err)
+	}
 	// update epoch counter
-	counter, err := snap.Epochs().Current().Counter()
+	counter, err := currentEpoch.Counter()
 	if err != nil {
 		return fmt.Errorf("could not get current epoch counter: %w", err)
 	}
 	metrics.CurrentEpochCounter(counter)
 
-	// update epoch phase
-	phase, err := snap.EpochPhase()
-	if err != nil {
-		return fmt.Errorf("could not get current epoch counter: %w", err)
-	}
-	metrics.CurrentEpochPhase(phase)
-
-	currentEpochFinalView, err := snap.Epochs().Current().FinalView()
+	currentEpochFinalView, err := currentEpoch.FinalView()
 	if err != nil {
 		return fmt.Errorf("could not update current epoch final view: %w", err)
 	}
 	metrics.CurrentEpochFinalView(currentEpochFinalView)
 
-	dkgPhase1FinalView, dkgPhase2FinalView, dkgPhase3FinalView, err := protocol.DKGPhaseViews(snap.Epochs().Current())
+	dkgPhase1FinalView, dkgPhase2FinalView, dkgPhase3FinalView, err := protocol.DKGPhaseViews(currentEpoch)
 	if err != nil {
 		return fmt.Errorf("could not get dkg phase final view: %w", err)
 	}
@@ -876,6 +872,7 @@ func updateEpochMetrics(metrics module.ComplianceMetrics, snap protocol.Snapshot
 	if err != nil {
 		return fmt.Errorf("could not get epoch protocol state: %w", err)
 	}
+	metrics.CurrentEpochPhase(epochProtocolState.EpochPhase()) // update epoch phase
 	// notify whether epoch fallback mode is active
 	if epochProtocolState.EpochFallbackTriggered() {
 		metrics.EpochFallbackModeTriggered()

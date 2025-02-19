@@ -61,12 +61,12 @@ func (cs *EngineSuite) SetupTest() {
 	)
 	cs.myID = cs.cluster[0].NodeID
 
-	protoEpoch := &protocol.Epoch{}
+	protoEpoch := &protocol.CommittedEpoch{}
 	clusters := flow.ClusterList{cs.cluster.ToSkeleton()}
 	protoEpoch.On("Clustering").Return(clusters, nil)
 
 	protoQuery := &protocol.EpochQuery{}
-	protoQuery.On("Current").Return(protoEpoch)
+	protoQuery.On("Current").Return(protoEpoch, nil)
 
 	protoSnapshot := &protocol.Snapshot{}
 	protoSnapshot.On("Epochs").Return(protoQuery)

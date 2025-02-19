@@ -832,7 +832,8 @@ func TestExtendEpochTransitionValid(t *testing.T) {
 		metrics.On("BlockFinalized", mock.Anything)
 
 		// expect epoch metric calls on bootstrap
-		initialCurrentEpoch := rootSnapshot.Epochs().Current()
+		initialCurrentEpoch, err := rootSnapshot.Epochs().Current()
+		require.NoError(t, err)
 		counter, err := initialCurrentEpoch.Counter()
 		require.NoError(t, err)
 		finalView, err := initialCurrentEpoch.FinalView()
@@ -957,20 +958,16 @@ func TestExtendEpochTransitionValid(t *testing.T) {
 
 		// we should NOT be able to query epoch 2 wrt blocks before 3
 		for _, blockID := range []flow.Identifier{block1.ID(), block2.ID()} {
-			_, err = state.AtBlockID(blockID).Epochs().Next().InitialIdentities()
-			require.Error(t, err)
-			_, err = state.AtBlockID(blockID).Epochs().Next().Clustering()
+			_, err = state.AtBlockID(blockID).Epochs().NextUnsafe()
 			require.Error(t, err)
 		}
 
-		// we should be able to query epoch 2 wrt block 3
-		_, err = state.AtBlockID(block3.ID()).Epochs().Next().InitialIdentities()
-		assert.NoError(t, err)
-		_, err = state.AtBlockID(block3.ID()).Epochs().Next().Clustering()
+		// we should be able to query epoch 2 as a TentativeEpoch wrt block 3
+		_, err = state.AtBlockID(block3.ID()).Epochs().NextUnsafe()
 		assert.NoError(t, err)
 
-		// only setup event is finalized, not commit, so shouldn't be able to get certain info
-		_, err = state.AtBlockID(block3.ID()).Epochs().Next().DKG()
+		// only setup event is finalized, not commit, so shouldn't be able to read a CommittedEpoch
+		_, err = state.AtBlockID(block3.ID()).Epochs().NextCommitted()
 		require.Error(t, err)
 
 		// insert B4
@@ -1028,17 +1025,13 @@ func TestExtendEpochTransitionValid(t *testing.T) {
 
 		// we should NOT be able to query epoch 2 commit info wrt blocks before 6
 		for _, blockID := range []flow.Identifier{block4.ID(), block5.ID()} {
-			_, err = state.AtBlockID(blockID).Epochs().Next().DKG()
+			_, err = state.AtBlockID(blockID).Epochs().NextCommitted()
 			require.Error(t, err)
 		}
 
-		// now epoch 2 is fully ready, we can query anything we want about it wrt block 6 (or later)
-		_, err = state.AtBlockID(block6.ID()).Epochs().Next().InitialIdentities()
+		// now epoch 2 is committed, we can query anything we want about it wrt block 6 (or later)
+		_, err = state.AtBlockID(block6.ID()).Epochs().NextCommitted()
 		require.NoError(t, err)
-		_, err = state.AtBlockID(block6.ID()).Epochs().Next().Clustering()
-		require.NoError(t, err)
-		_, err = state.AtBlockID(block6.ID()).Epochs().Next().DKG()
-		assert.NoError(t, err)
 
 		// now that the commit event has been emitted, we should be in the committed phase
 		phase, err = state.AtBlockID(block6.ID()).EpochPhase()
@@ -1062,7 +1055,9 @@ func TestExtendEpochTransitionValid(t *testing.T) {
 		metrics.AssertCalled(t, "CurrentEpochPhase", flow.EpochPhaseCommitted)
 
 		// we should still be in epoch 1
-		epochCounter, err := state.AtBlockID(block4.ID()).Epochs().Current().Counter()
+		block4epoch, err := state.AtBlockID(block4.ID()).Epochs().Current()
+		require.NoError(t, err)
+		epochCounter, err := block4epoch.Counter()
 		require.NoError(t, err)
 		require.Equal(t, epoch1Setup.Counter, epochCounter)
 
@@ -1070,7 +1065,9 @@ func TestExtendEpochTransitionValid(t *testing.T) {
 		require.NoError(t, err)
 
 		// we should still be in epoch 1, since epochs are inclusive of final view
-		epochCounter, err = state.AtBlockID(block7.ID()).Epochs().Current().Counter()
+		block7epoch, err := state.AtBlockID(block7.ID()).Epochs().Current()
+		require.NoError(t, err)
+		epochCounter, err = block7epoch.Counter()
 		require.NoError(t, err)
 		require.Equal(t, epoch1Setup.Counter, epochCounter)
 
@@ -1087,7 +1084,9 @@ func TestExtendEpochTransitionValid(t *testing.T) {
 		require.NoError(t, err)
 
 		// now, at long last, we are in epoch 2
-		epochCounter, err = state.AtBlockID(block8.ID()).Epochs().Current().Counter()
+		block8epoch, err := state.AtBlockID(block8.ID()).Epochs().Current()
+		require.NoError(t, err)
+		epochCounter, err = block8epoch.Counter()
 		require.NoError(t, err)
 		require.Equal(t, epoch2Setup.Counter, epochCounter)
 
@@ -1106,19 +1105,23 @@ func TestExtendEpochTransitionValid(t *testing.T) {
 		metrics.On("CurrentDKGPhaseViews", epoch2Setup.DKGPhase1FinalView, epoch2Setup.DKGPhase2FinalView, epoch2Setup.DKGPhase3FinalView).Once()
 
 		// before block 9 is finalized, the epoch 1-2 boundary is unknown
-		_, err = state.AtBlockID(block8.ID()).Epochs().Current().FinalHeight()
+		_, err = block8epoch.FinalHeight()
 		assert.ErrorIs(t, err, realprotocol.ErrUnknownEpochBoundary)
-		_, err = state.AtBlockID(block8.ID()).Epochs().Current().FirstHeight()
+		_, err = block8epoch.FirstHeight()
 		assert.ErrorIs(t, err, realprotocol.ErrUnknownEpochBoundary)
 
 		err = state.Finalize(context.Background(), block8.ID())
 		require.NoError(t, err)
 
 		// once block 8 is finalized, epoch 2 has unambiguously begun - the epoch 1-2 boundary is known
-		epoch1FinalHeight, err := state.AtBlockID(block8.ID()).Epochs().Previous().FinalHeight()
+		block8previous, err := state.AtBlockID(block8.ID()).Epochs().Previous()
+		require.NoError(t, err)
+		epoch1FinalHeight, err := block8previous.FinalHeight()
 		require.NoError(t, err)
 		assert.Equal(t, block7.Header.Height, epoch1FinalHeight)
-		epoch2FirstHeight, err := state.AtBlockID(block8.ID()).Epochs().Current().FirstHeight()
+		block8epoch, err = state.AtBlockID(block8.ID()).Epochs().Current()
+		require.NoError(t, err)
+		epoch2FirstHeight, err := block8epoch.FirstHeight()
 		require.NoError(t, err)
 		assert.Equal(t, block8.Header.Height, epoch2FirstHeight)
 	})
@@ -1131,7 +1134,11 @@ func TestExtendEpochTransitionValid(t *testing.T) {
 //	ROOT <--+
 //	         \--B2<--B4(R2)<--B6(S2)<--B8
 func TestExtendConflictingEpochEvents(t *testing.T) {
-	rootSnapshot := unittest.RootSnapshotFixture(participants)
+	// add more collectors so that we can have multiple distinct cluster assignments
+	extraCollectors := unittest.IdentityListFixture(2, func(identity *flow.Identity) {
+		identity.Role = flow.RoleCollection
+	})
+	rootSnapshot := unittest.RootSnapshotFixture(append(participants, extraCollectors...))
 	rootProtocolStateID := getRootProtocolStateID(t, rootSnapshot)
 	util.RunWithFullProtocolStateAndMutator(t, rootSnapshot, func(db *badger.DB, state *protocol.ParticipantState, mutableState realprotocol.MutableProtocolState) {
 		expectedStateIdCalculator := calculateExpectedStateId(t, mutableState)
@@ -1154,19 +1161,22 @@ func TestExtendConflictingEpochEvents(t *testing.T) {
 
 		rootSetup := result.ServiceEvents[0].Event.(*flow.EpochSetup)
 
-		// create two conflicting epoch setup events for the next epoch (final view differs)
+		// create two conflicting epoch setup events for the next epoch (clustering differs)
 		nextEpochSetup1 := unittest.EpochSetupFixture(
 			unittest.WithParticipants(rootSetup.Participants),
 			unittest.SetupWithCounter(rootSetup.Counter+1),
 			unittest.WithFinalView(rootSetup.FinalView+1000),
 			unittest.WithFirstView(rootSetup.FinalView+1),
 		)
+		nextEpochSetup1.Assignments = unittest.ClusterAssignment(1, rootSetup.Participants)
 		nextEpochSetup2 := unittest.EpochSetupFixture(
 			unittest.WithParticipants(rootSetup.Participants),
 			unittest.SetupWithCounter(rootSetup.Counter+1),
-			unittest.WithFinalView(rootSetup.FinalView+2000), // final view differs
+			unittest.WithFinalView(rootSetup.FinalView+1000),
 			unittest.WithFirstView(rootSetup.FinalView+1),
 		)
+		nextEpochSetup2.Assignments = unittest.ClusterAssignment(2, rootSetup.Participants)
+		assert.NotEqual(t, nextEpochSetup1.Assignments, nextEpochSetup2.Assignments)
 
 		// add blocks containing receipts for block1 and block2 (necessary for sealing)
 		// block 1 receipt contains nextEpochSetup1
@@ -1192,7 +1202,7 @@ func TestExtendConflictingEpochEvents(t *testing.T) {
 		block4.SetPayload(flow.Payload{
 			Receipts:        []*flow.ExecutionReceiptMeta{block2Receipt.Meta()},
 			Results:         []*flow.ExecutionResult{&block2Receipt.ExecutionResult},
-			ProtocolStateID: block1.Payload.ProtocolStateID,
+			ProtocolStateID: block2.Payload.ProtocolStateID,
 		})
 		err = state.Extend(context.Background(), block4)
 		require.NoError(t, err)
@@ -1221,7 +1231,7 @@ func TestExtendConflictingEpochEvents(t *testing.T) {
 		err = state.Extend(context.Background(), block6)
 		require.NoError(t, err)
 
-		// block 7 builds on block 5, contains QC for block 7
+		// block 7 builds on block 5, contains QC for block 5
 		block7 := unittest.BlockWithParentProtocolState(block5)
 		err = state.Extend(context.Background(), block7)
 		require.NoError(t, err)
@@ -1231,14 +1241,22 @@ func TestExtendConflictingEpochEvents(t *testing.T) {
 		err = state.Extend(context.Background(), block8)
 		require.NoError(t, err)
 
-		// should be able query each epoch from the appropriate reference block
-		setup1FinalView, err := state.AtBlockID(block7.ID()).Epochs().Next().FinalView()
+		// should be able to query each epoch from the appropriate reference block
+		nextEpoch1, err := state.AtBlockID(block7.ID()).Epochs().NextUnsafe()
+		require.NoError(t, err)
+		setup1clustering, err := nextEpoch1.Clustering()
 		assert.NoError(t, err)
-		require.Equal(t, nextEpochSetup1.FinalView, setup1FinalView)
+		require.Equal(t, nextEpochSetup1.Assignments, setup1clustering.Assignments())
 
-		setup2FinalView, err := state.AtBlockID(block8.ID()).Epochs().Next().FinalView()
+		phase, err := state.AtBlockID(block8.ID()).EpochPhase()
 		assert.NoError(t, err)
-		require.Equal(t, nextEpochSetup2.FinalView, setup2FinalView)
+		require.Equal(t, phase, flow.EpochPhaseSetup)
+		nextEpoch2, err := state.AtBlockID(block8.ID()).Epochs().NextUnsafe()
+		require.NoError(t, err)
+		setup2clustering, err := nextEpoch2.Clustering()
+		assert.NoError(t, err)
+		require.Equal(t, nextEpochSetup2.Assignments, setup2clustering.Assignments())
+
 	})
 }
 
@@ -1331,7 +1349,7 @@ func TestExtendDuplicateEpochEvents(t *testing.T) {
 		err = state.Extend(context.Background(), block6)
 		require.NoError(t, err)
 
-		// block 7 builds on block 5, contains QC for block 7
+		// block 7 builds on block 5, contains QC for block 5
 		block7 := unittest.BlockWithParentProtocolState(block5)
 		err = state.Extend(context.Background(), block7)
 		require.NoError(t, err)
@@ -1342,14 +1360,18 @@ func TestExtendDuplicateEpochEvents(t *testing.T) {
 		err = state.Extend(context.Background(), block8)
 		require.NoError(t, err)
 
-		// should be able query each epoch from the appropriate reference block
-		finalView, err := state.AtBlockID(block7.ID()).Epochs().Next().FinalView()
+		// should be able to query each epoch from the appropriate reference block
+		block7next, err := state.AtBlockID(block7.ID()).Epochs().NextUnsafe()
 		assert.NoError(t, err)
-		require.Equal(t, nextEpochSetup.FinalView, finalView)
+		identities, err := block7next.InitialIdentities()
+		require.NoError(t, err)
+		require.Equal(t, nextEpochSetup.Participants, identities)
 
-		finalView, err = state.AtBlockID(block8.ID()).Epochs().Next().FinalView()
+		block8next, err := state.AtBlockID(block8.ID()).Epochs().NextUnsafe()
 		assert.NoError(t, err)
-		require.Equal(t, nextEpochSetup.FinalView, finalView)
+		identities, err = block8next.InitialIdentities()
+		require.NoError(t, err)
+		require.Equal(t, nextEpochSetup.Participants, identities)
 	})
 }
 
@@ -1967,19 +1989,21 @@ func TestRecoveryFromEpochFallbackMode(t *testing.T) {
 	// According to the specification, the current epoch after processing an EpochRecover event must be in committed phase,
 	// since it contains EpochSetup and EpochCommit events.
 	assertCorrectRecovery := func(state *protocol.ParticipantState, epochRecover *flow.EpochRecover) {
-		epochState, err := state.Final().EpochProtocolState()
+		finalSnap := state.Final()
+		epochState, err := finalSnap.EpochProtocolState()
 		require.NoError(t, err)
 		epochPhase := epochState.EpochPhase()
+		require.Equal(t, flow.EpochPhaseCommitted, epochPhase, "next epoch has to be committed")
 
-		nextEpochQuery := state.Final().Epochs().Next()
-		nextEpochSetup, err := realprotocol.ToEpochSetup(nextEpochQuery)
+		nextEpoch, err := finalSnap.Epochs().NextCommitted()
 		require.NoError(t, err)
-		nextEpochCommit, err := realprotocol.ToEpochCommit(nextEpochQuery)
+		nextEpochSetup, err := realprotocol.ToEpochSetup(nextEpoch)
+		require.NoError(t, err)
+		nextEpochCommit, err := realprotocol.ToEpochCommit(nextEpoch)
 		require.NoError(t, err)
 
 		require.Equal(t, &epochRecover.EpochSetup, nextEpochSetup, "next epoch has to be setup according to EpochRecover")
 		require.Equal(t, &epochRecover.EpochCommit, nextEpochCommit, "next epoch has to be committed according to EpochRecover")
-		require.Equal(t, flow.EpochPhaseCommitted, epochPhase, "next epoch has to be committed")
 	}
 
 	// if we enter EFM in the EpochStaking phase, we should be able to recover by incorporating a valid EpochRecover event
@@ -2358,7 +2382,9 @@ func TestRecoveryFromEpochFallbackMode(t *testing.T) {
 			require.NoError(t, err)
 
 			// After epoch extension, FinalView must be updated accordingly
-			finalView, err := state.Final().Epochs().Current().FinalView()
+			epochAfterExtension, err := state.Final().Epochs().Current()
+			require.NoError(t, err)
+			finalView, err := epochAfterExtension.FinalView()
 			require.NoError(t, err)
 			assert.Equal(t, epochExtensions[0].FinalView, finalView)
 
@@ -2455,7 +2481,9 @@ func TestEpochTargetEndTime(t *testing.T) {
 		require.NoError(t, err)
 
 		epoch1Setup := rootResult.ServiceEvents[0].Event.(*flow.EpochSetup)
-		rootTargetEndTime, err := rootSnapshot.Epochs().Current().TargetEndTime()
+		currentEpoch, err := rootSnapshot.Epochs().Current()
+		require.NoError(t, err)
+		rootTargetEndTime, err := currentEpoch.TargetEndTime()
 		require.NoError(t, err)
 		require.Equal(t, epoch1Setup.TargetEndTime, rootTargetEndTime)
 
@@ -2467,15 +2495,18 @@ func TestEpochTargetEndTime(t *testing.T) {
 		block1.SetPayload(unittest.PayloadFixture(unittest.WithProtocolStateID(expectedStateIdCalculator(block1.Header, nil))))
 		unittest.InsertAndFinalize(t, state, block1)
 
-		assertEpochFallbackTriggered(t, state.Final(), true)
-		assertInPhase(t, state.Final(), flow.EpochPhaseFallback)
+		block1snap := state.Final()
+		assertEpochFallbackTriggered(t, block1snap, true)
+		assertInPhase(t, block1snap, flow.EpochPhaseFallback)
 
-		epochState, err := state.Final().EpochProtocolState()
+		epochState, err := block1snap.EpochProtocolState()
 		require.NoError(t, err)
 		firstExtension := epochState.EpochExtensions()[0]
 		targetViewDuration := float64(epoch1Setup.TargetDuration) / float64(epoch1Setup.FinalView-epoch1Setup.FirstView+1)
 		expectedTargetEndTime := rootTargetEndTime + uint64(float64(firstExtension.FinalView-epoch1Setup.FinalView)*targetViewDuration)
-		afterFirstExtensionTargetEndTime, err := state.Final().Epochs().Current().TargetEndTime()
+		afterFirstExtensionEpoch, err := block1snap.Epochs().Current()
+		require.NoError(t, err)
+		afterFirstExtensionTargetEndTime, err := afterFirstExtensionEpoch.TargetEndTime()
 		require.NoError(t, err)
 		require.Equal(t, expectedTargetEndTime, afterFirstExtensionTargetEndTime)
 
@@ -2485,11 +2516,14 @@ func TestEpochTargetEndTime(t *testing.T) {
 		block2.SetPayload(unittest.PayloadFixture(unittest.WithProtocolStateID(expectedStateIdCalculator(block2.Header, nil))))
 		unittest.InsertAndFinalize(t, state, block2)
 
-		epochState, err = state.Final().EpochProtocolState()
+		block2snap := state.Final()
+		epochState, err = block2snap.EpochProtocolState()
 		require.NoError(t, err)
 		secondExtension := epochState.EpochExtensions()[1]
 		expectedTargetEndTime = rootTargetEndTime + uint64(float64(secondExtension.FinalView-epoch1Setup.FinalView)*targetViewDuration)
-		afterSecondExtensionTargetEndTime, err := state.Final().Epochs().Current().TargetEndTime()
+		afterSecondExtensionEpoch, err := block2snap.Epochs().Current()
+		require.NoError(t, err)
+		afterSecondExtensionTargetEndTime, err := afterSecondExtensionEpoch.TargetEndTime()
 		require.NoError(t, err)
 		require.Equal(t, expectedTargetEndTime, afterSecondExtensionTargetEndTime)
 	})
@@ -2508,7 +2542,9 @@ func TestEpochTargetDuration(t *testing.T) {
 		require.NoError(t, err)
 
 		epoch1Setup := rootResult.ServiceEvents[0].Event.(*flow.EpochSetup)
-		rootTargetDuration, err := rootSnapshot.Epochs().Current().TargetDuration()
+		currentEpoch, err := rootSnapshot.Epochs().Current()
+		require.NoError(t, err)
+		rootTargetDuration, err := currentEpoch.TargetDuration()
 		require.NoError(t, err)
 		require.Equal(t, epoch1Setup.TargetDuration, rootTargetDuration)
 
@@ -2527,7 +2563,9 @@ func TestEpochTargetDuration(t *testing.T) {
 		require.NoError(t, err)
 		firstExtension := epochState.EpochExtensions()[0]
 		targetViewDuration := float64(epoch1Setup.TargetDuration) / float64(epoch1Setup.FinalView-epoch1Setup.FirstView+1)
-		afterFirstExtensionTargetDuration, err := state.Final().Epochs().Current().TargetDuration()
+		afterFirstExtensionEpoch, err := state.Final().Epochs().Current()
+		require.NoError(t, err)
+		afterFirstExtensionTargetDuration, err := afterFirstExtensionEpoch.TargetDuration()
 		require.NoError(t, err)
 		expectedTargetDuration := rootTargetDuration + uint64(float64(firstExtension.FinalView-firstExtension.FirstView+1)*targetViewDuration)
 		require.Equal(t, expectedTargetDuration, afterFirstExtensionTargetDuration)
@@ -2541,7 +2579,9 @@ func TestEpochTargetDuration(t *testing.T) {
 		epochState, err = state.Final().EpochProtocolState()
 		require.NoError(t, err)
 		secondExtension := epochState.EpochExtensions()[1]
-		afterSecondExtensionTargetDuration, err := state.Final().Epochs().Current().TargetDuration()
+		afterSecondExtensionEpoch, err := state.Final().Epochs().Current()
+		require.NoError(t, err)
+		afterSecondExtensionTargetDuration, err := afterSecondExtensionEpoch.TargetDuration()
 		require.NoError(t, err)
 		expectedTargetDuration = rootTargetDuration + uint64(float64(secondExtension.FinalView-epoch1Setup.FinalView)*targetViewDuration)
 		require.Equal(t, expectedTargetDuration, afterSecondExtensionTargetDuration)

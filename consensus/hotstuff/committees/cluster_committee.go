@@ -41,7 +41,7 @@ func NewClusterCommittee(
 	state protocol.State,
 	payloads storage.ClusterPayloads,
 	cluster protocol.Cluster,
-	epoch protocol.Epoch,
+	epoch protocol.CommittedEpoch,
 	me flow.Identifier,
 ) (*Cluster, error) {
 	selection, err := leader.SelectionForCluster(cluster, epoch)

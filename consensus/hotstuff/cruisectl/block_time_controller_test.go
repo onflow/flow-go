@@ -40,7 +40,7 @@ type BlockTimeControllerSuite struct {
 	params             mockprotocol.Params
 	snapshot           mockprotocol.Snapshot
 	epochs             mocks.EpochQuery
-	curEpoch           mockprotocol.Epoch
+	curEpoch           mockprotocol.CommittedEpoch
 	epochProtocolState mockprotocol.EpochProtocolState
 
 	config *Config
@@ -82,7 +82,7 @@ func setupMocks(bs *BlockTimeControllerSuite) {
 	bs.params = *mockprotocol.NewParams(bs.T())
 	bs.snapshot = *mockprotocol.NewSnapshot(bs.T())
 	bs.epochs = *mocks.NewEpochQuery(bs.T(), bs.epochCounter)
-	bs.curEpoch = *mockprotocol.NewEpoch(bs.T())
+	bs.curEpoch = *mockprotocol.NewCommittedEpoch(bs.T())
 	bs.state.On("Final").Return(&bs.snapshot)
 	bs.state.On("AtHeight", mock.Anything).Return(&bs.snapshot).Maybe()
 	bs.state.On("Params").Return(&bs.params)
@@ -98,7 +98,7 @@ func setupMocks(bs *BlockTimeControllerSuite) {
 	bs.curEpoch.On("FinalView").Return(bs.curEpochFinalView, nil)
 	bs.curEpoch.On("TargetDuration").Return(bs.curEpochTargetDuration, nil)
 	bs.curEpoch.On("TargetEndTime").Return(bs.curEpochTargetEndTime, nil)
-	bs.epochs.Add(&bs.curEpoch)
+	bs.epochs.AddCommitted(&bs.curEpoch)
 
 	bs.ctx, bs.cancel = irrecoverable.NewMockSignalerContextWithCancel(bs.T(), context.Background())
 }
@@ -142,7 +142,9 @@ func (bs *BlockTimeControllerSuite) AssertCorrectInitialization() {
 
 	// if next epoch is committed, final view should be set
 	if phase := bs.epochs.Phase(); phase == flow.EpochPhaseCommitted {
-		finalView, err := bs.epochs.Next().FinalView()
+		nextEpoch, err := bs.epochs.NextCommitted()
+		require.NoError(bs.T(), err)
+		finalView, err := nextEpoch.FinalView()
 		require.NoError(bs.T(), err)
 		require.NotNil(bs.T(), bs.ctl.nextEpochTiming)
 		assert.Equal(bs.T(), finalView, bs.ctl.nextEpochTiming.finalView)
@@ -204,13 +206,13 @@ func (bs *BlockTimeControllerSuite) TestInit_EpochStakingPhase() {
 // TestInit_EpochStakingPhase tests initializing the component in the EpochSetup phase.
 // Measurement and epoch info should be initialized, next epoch final view should be set.
 func (bs *BlockTimeControllerSuite) TestInit_EpochSetupPhase() {
-	nextEpoch := mockprotocol.NewEpoch(bs.T())
+	nextEpoch := mockprotocol.NewCommittedEpoch(bs.T())
 	nextEpoch.On("Counter").Return(bs.epochCounter+1, nil)
 	nextEpoch.On("FirstView").Return(bs.curEpochFinalView+1, nil)
 	nextEpoch.On("FinalView").Return(bs.curEpochFinalView*2, nil)
 	nextEpoch.On("TargetDuration").Return(bs.EpochDurationSeconds(), nil)
 	nextEpoch.On("TargetEndTime").Return(bs.curEpochTargetEndTime+bs.EpochDurationSeconds(), nil)
-	bs.epochs.Add(nextEpoch)
+	bs.epochs.AddCommitted(nextEpoch)
 
 	bs.CreateAndStartController()
 	defer bs.StopController()
@@ -232,9 +234,10 @@ func (bs *BlockTimeControllerSuite) TestOnEpochExtended() {
 		FirstView: setupFixture.FirstView,
 		FinalView: setupFixture.FinalView,
 	}
+	commitFixture := unittest.EpochCommitFixture()
 
-	epoch := inmem.NewSetupEpoch(setupFixture, []flow.EpochExtension{extension})
-	bs.epochs.Add(epoch)
+	epoch := inmem.NewCommittedEpoch(setupFixture, []flow.EpochExtension{extension}, commitFixture)
+	bs.epochs.AddCommitted(epoch)
 	bs.epochs.Transition()
 
 	header := unittest.BlockHeaderFixture()
@@ -247,11 +250,13 @@ func (bs *BlockTimeControllerSuite) TestOnEpochExtended() {
 		return len(bs.ctl.epochEvents) == 0
 	}, time.Second, time.Millisecond)
 
-	extensionTargetTime, err := bs.snapshot.Epochs().Current().TargetEndTime()
+	currentEpoch, err := bs.snapshot.Epochs().Current()
 	require.NoError(bs.T(), err)
-	extensionTargetDuration, err := bs.snapshot.Epochs().Current().TargetDuration()
+	extensionTargetTime, err := currentEpoch.TargetEndTime()
 	require.NoError(bs.T(), err)
-	extensionFinalView, err := bs.snapshot.Epochs().Current().FinalView()
+	extensionTargetDuration, err := currentEpoch.TargetDuration()
+	require.NoError(bs.T(), err)
+	extensionFinalView, err := currentEpoch.FinalView()
 	require.NoError(bs.T(), err)
 
 	assert.Equal(bs.T(), extensionTargetTime, bs.ctl.currentEpochTiming.targetEndTime)
@@ -273,13 +278,13 @@ func (bs *BlockTimeControllerSuite) TestOnEpochExtended() {
 
 // TestOnEpochCommittedPhaseStarted ensures that the epoch info is updated when the next epoch is committed.
 func (bs *BlockTimeControllerSuite) TestOnEpochCommittedPhaseStarted() {
-	nextEpoch := mockprotocol.NewEpoch(bs.T())
+	nextEpoch := mockprotocol.NewCommittedEpoch(bs.T())
 	nextEpoch.On("Counter").Return(bs.epochCounter+1, nil)
 	nextEpoch.On("FinalView").Return(bs.curEpochFinalView*2, nil)
 	nextEpoch.On("FirstView").Return(bs.curEpochFinalView+1, nil)
 	nextEpoch.On("TargetDuration").Return(bs.EpochDurationSeconds(), nil)
 	nextEpoch.On("TargetEndTime").Return(bs.curEpochTargetEndTime+bs.EpochDurationSeconds(), nil)
-	bs.epochs.Add(nextEpoch)
+	bs.epochs.AddCommitted(nextEpoch)
 	bs.CreateAndStartController()
 	defer bs.StopController()
 	header := unittest.BlockHeaderFixture()
@@ -412,13 +417,13 @@ func (bs *BlockTimeControllerSuite) TestOnBlockIncorporated_EpochTransition_Disa
 // testOnBlockIncorporated_EpochTransition tests that a view change into the next epoch
 // updates the local state to reflect the new epoch.
 func (bs *BlockTimeControllerSuite) testOnBlockIncorporated_EpochTransition() {
-	nextEpoch := mockprotocol.NewEpoch(bs.T())
+	nextEpoch := mockprotocol.NewCommittedEpoch(bs.T())
 	nextEpoch.On("Counter").Return(bs.epochCounter+1, nil)
 	nextEpoch.On("FinalView").Return(bs.curEpochFinalView*2, nil)
 	nextEpoch.On("FirstView").Return(bs.curEpochFinalView+1, nil)
 	nextEpoch.On("TargetDuration").Return(bs.EpochDurationSeconds(), nil) // 1s/view
 	nextEpoch.On("TargetEndTime").Return(bs.curEpochTargetEndTime+bs.EpochDurationSeconds(), nil)
-	bs.epochs.Add(nextEpoch)
+	bs.epochs.AddCommitted(nextEpoch)
 	bs.CreateAndStartController()
 	defer bs.StopController()
 

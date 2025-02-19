@@ -10,13 +10,14 @@ import (
 	"github.com/onflow/flow-go/module/signature"
 )
 
-// ToEpochSetup converts an Epoch interface instance to the underlying concrete
+// ToEpochSetup converts a CommittedEpoch interface instance to the underlying concrete
 // epoch setup service event. The input must be a valid, set up epoch.
+// CAUTION: this conversion only works for Epochs that have NO epoch-fallback EXTENSIONS
 // Error returns:
 // * protocol.ErrNoPreviousEpoch - if the epoch represents a previous epoch which does not exist.
 // * protocol.ErrNextEpochNotSetup - if the epoch represents a next epoch which has not been set up.
 // * state.ErrUnknownSnapshotReference - if the epoch is queried from an unresolvable snapshot.
-func ToEpochSetup(epoch Epoch) (*flow.EpochSetup, error) {
+func ToEpochSetup(epoch CommittedEpoch) (*flow.EpochSetup, error) {
 	counter, err := epoch.Counter()
 	if err != nil {
 		return nil, fmt.Errorf("could not get epoch counter: %w", err)
@@ -71,14 +72,14 @@ func ToEpochSetup(epoch Epoch) (*flow.EpochSetup, error) {
 	return setup, nil
 }
 
-// ToEpochCommit converts an Epoch interface instance to the underlying
+// ToEpochCommit converts a CommittedEpoch interface instance to the underlying
 // concrete epoch commit service event. The epoch must have been committed.
 // Error returns:
 // * protocol.ErrNoPreviousEpoch - if the epoch represents a previous epoch which does not exist.
 // * protocol.ErrNextEpochNotSetup - if the epoch represents a next epoch which has not been set up.
 // * protocol.ErrNextEpochNotCommitted - if the epoch has not been committed.
 // * state.ErrUnknownSnapshotReference - if the epoch is queried from an unresolvable snapshot.
-func ToEpochCommit(epoch Epoch) (*flow.EpochCommit, error) {
+func ToEpochCommit(epoch CommittedEpoch) (*flow.EpochCommit, error) {
 	counter, err := epoch.Counter()
 	if err != nil {
 		return nil, fmt.Errorf("could not get epoch counter: %w", err)
@@ -162,7 +163,7 @@ func GetDKGParticipantKeys(dkg DKG, participants flow.IdentitySkeletonList) ([]c
 // * protocol.ErrNextEpochNotSetup - if the epoch represents a next epoch which has not been set up.
 // * protocol.ErrNextEpochNotCommitted - if the epoch has not been committed.
 // * state.ErrUnknownSnapshotReference - if the epoch is queried from an unresolvable snapshot.
-func DKGPhaseViews(epoch Epoch) (phase1FinalView uint64, phase2FinalView uint64, phase3FinalView uint64, err error) {
+func DKGPhaseViews(epoch CommittedEpoch) (phase1FinalView uint64, phase2FinalView uint64, phase3FinalView uint64, err error) {
 	phase1FinalView, err = epoch.DKGPhase1FinalView()
 	if err != nil {
 		return
