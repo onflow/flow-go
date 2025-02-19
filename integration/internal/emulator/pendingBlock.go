@@ -97,12 +97,12 @@ func (b *pendingBlock) Block() *flowgo.Block {
 	}
 
 	return &flowgo.Block{
-		Header: &flowgo.Header{
+		Header: &flowgo.Header{UnsignedHeader: flowgo.UnsignedHeader{
 			Height:    b.height,
 			View:      b.view,
 			ParentID:  b.parentID,
 			Timestamp: b.timestamp,
-		},
+		}},
 		Payload: &flowgo.Payload{
 			Guarantees: guarantees,
 		},

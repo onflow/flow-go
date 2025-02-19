@@ -15,6 +15,30 @@ import (
 // the combined payload of the entire block. It is what consensus nodes agree
 // on after validating the contents against the payload hash.
 type Header struct {
+	UnsignedHeader
+	// ProposerSigData is a signature of the proposer over the new block. Not a single cryptographic
+	// signature since the data represents cryptographic signatures serialized in some way (concatenation or other)
+	ProposerSigData []byte
+}
+
+// ID returns a unique ID to singularly identify the header and its block
+// within the flow system.
+func (h Header) ID() Identifier {
+	// TODO make non-malleable:
+	//return MakeID(struct {
+	//	UnsignedHeaderID Identifier
+	//	ProposerSigData  []byte
+	//}{
+	//	h.UnsignedHeader.ID(),
+	//	h.ProposerSigData,
+	//})
+	return h.UnsignedHeader.ID()
+}
+
+// UnsignedHeader is the portion of the header that is cryptographically signed by the block proposer.
+// UnsignedHeader contains all meta-data for a block. It is what consensus nodes agree
+// on after validating the contents against the payload hash.
+type UnsignedHeader struct {
 	// ChainID is a chain-specific value to prevent replay attacks.
 	ChainID ChainID
 	// ParentID is the ID of this block's parent.
@@ -39,29 +63,31 @@ type Header struct {
 	ParentVoterSigData []byte
 	// ProposerID is a proposer identifier for the block
 	ProposerID Identifier
-	// ProposerSigData is a signature of the proposer over the new block. Not a single cryptographic
-	// signature since the data represents cryptographic signatures serialized in some way (concatenation or other)
-	ProposerSigData []byte
 	// LastViewTC is a timeout certificate for previous view, it can be nil
 	// it has to be present if previous round ended with timeout.
 	LastViewTC *TimeoutCertificate
 }
 
-// Body returns the immutable part of the block header.
-func (h Header) Body() interface{} {
-	return struct {
-		ChainID            ChainID
-		ParentID           Identifier
-		Height             uint64
-		PayloadHash        Identifier
-		Timestamp          uint64
-		View               uint64
-		ParentView         uint64
-		ParentVoterIndices []byte
-		ParentVoterSigData []byte
-		ProposerID         Identifier
-		LastViewTCID       Identifier
-	}{
+// UnsignedHeaderBody is a type only used to calculate ID of an UnsignedHeader, by converting
+// Timestamp from time.Time to unix time (uint64) and LastViewTC to its identifier LastViewTCID.
+// This is necessary because time.Time is not RLP-encodable or decodable (due to having private fields).
+type UnsignedHeaderBody struct {
+	ChainID            ChainID
+	ParentID           Identifier
+	Height             uint64
+	PayloadHash        Identifier
+	Timestamp          uint64
+	View               uint64
+	ParentView         uint64
+	ParentVoterIndices []byte
+	ParentVoterSigData []byte
+	ProposerID         Identifier
+	LastViewTCID       Identifier
+}
+
+// Body returns an RLP-encodable representation of the block header.
+func (h UnsignedHeader) Body() *UnsignedHeaderBody {
+	return &UnsignedHeaderBody{
 		ChainID:            h.ChainID,
 		ParentID:           h.ParentID,
 		Height:             h.Height,
@@ -77,7 +103,7 @@ func (h Header) Body() interface{} {
 }
 
 // QuorumCertificate returns quorum certificate that is incorporated in the block header.
-func (h Header) QuorumCertificate() *QuorumCertificate {
+func (h UnsignedHeader) QuorumCertificate() *QuorumCertificate {
 	return &QuorumCertificate{
 		BlockID:       h.ParentID,
 		View:          h.ParentView,
@@ -86,13 +112,13 @@ func (h Header) QuorumCertificate() *QuorumCertificate {
 	}
 }
 
-func (h Header) Fingerprint() []byte {
+func (h UnsignedHeader) Fingerprint() []byte {
 	return fingerprint.Fingerprint(h.Body())
 }
 
 // ID returns a unique ID to singularly identify the header and its block
 // within the flow system.
-func (h Header) ID() Identifier {
+func (h UnsignedHeader) ID() Identifier {
 	return MakeID(h)
 }
 

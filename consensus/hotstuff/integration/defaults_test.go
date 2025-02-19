@@ -8,12 +8,12 @@ import (
 )
 
 func DefaultRoot() *flow.Header {
-	header := &flow.Header{
+	header := &flow.Header{UnsignedHeader: flow.UnsignedHeader{
 		ChainID:     "chain",
 		ParentID:    flow.ZeroID,
 		Height:      0,
 		PayloadHash: unittest.IdentifierFixture(),
 		Timestamp:   time.Now().UTC(),
-	}
+	}}
 	return header
 }

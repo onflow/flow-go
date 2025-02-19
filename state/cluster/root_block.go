@@ -23,16 +23,18 @@ func CanonicalRootBlock(epoch uint64, participants flow.IdentitySkeletonList) *c
 	chainID := CanonicalClusterID(epoch, participants.NodeIDs())
 
 	header := &flow.Header{
-		ChainID:            chainID,
-		ParentID:           flow.ZeroID,
-		Height:             0,
-		PayloadHash:        rootBlockPayloadHash,
-		Timestamp:          flow.GenesisTime,
-		View:               0,
-		ParentVoterIndices: nil,
-		ParentVoterSigData: nil,
-		ProposerID:         flow.ZeroID,
-		ProposerSigData:    nil,
+		UnsignedHeader: flow.UnsignedHeader{
+			ChainID:            chainID,
+			ParentID:           flow.ZeroID,
+			Height:             0,
+			PayloadHash:        rootBlockPayloadHash,
+			Timestamp:          flow.GenesisTime,
+			View:               0,
+			ParentVoterIndices: nil,
+			ParentVoterSigData: nil,
+			ProposerID:         flow.ZeroID,
+		},
+		ProposerSigData: nil,
 	}
 
 	return &cluster.Block{
