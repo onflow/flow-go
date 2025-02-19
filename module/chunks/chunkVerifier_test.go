@@ -28,6 +28,7 @@ import (
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
 	"github.com/onflow/flow-go/module/executiondatasync/provider"
 	"github.com/onflow/flow-go/module/metrics"
+	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -724,5 +725,20 @@ func (m *testMetadata) RefreshChunkData(t *testing.T) *verification.VerifiableCh
 		Result:        result,
 		ChunkDataPack: chunkDataPack,
 		EndState:      flow.StateCommitment(endState),
+		Snapshot:      mockSnapshotSubset{},
 	}
 }
+
+type mockSnapshotSubset struct{}
+
+func (m mockSnapshotSubset) RandomSource() ([]byte, error) {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (m mockSnapshotSubset) VersionBeacon() (*flow.SealedVersionBeacon, error) {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (m mockSnapshotSubset) ProtocolState() (protocol.KVStoreReader, error) { panic("implement me") }

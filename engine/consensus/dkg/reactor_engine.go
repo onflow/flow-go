@@ -299,8 +299,7 @@ func (e *ReactorEngine) handleEpochCommittedPhaseStarted(currentEpochCounter uin
 
 	// Since epoch phase transitions are emitted when the first block of the new
 	// phase is finalized, the block's snapshot is guaranteed to already be
-	// accessible in the protocol state at this point (even though the Badger
-	// transaction finalizing the block has not been committed yet).
+	// accessible in the protocol state at this point
 	snapshot := e.State.AtBlockID(firstBlock.ID())
 	nextDKG, err := snapshot.Epochs().Next().DKG()
 	if err != nil {
