@@ -2,11 +2,11 @@ package unittest
 
 import (
 	"fmt"
-	"github.com/onflow/crypto"
 	"math/rand"
 	"reflect"
 	"testing"
 
+	"github.com/onflow/crypto"
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/model/flow"

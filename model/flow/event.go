@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/onflow/flow-go/model/encoding/json"
 	"github.com/onflow/flow-go/model/fingerprint"
 	"github.com/onflow/flow-go/storage/merkle"
 )
@@ -39,42 +38,27 @@ func (e Event) String() string {
 
 // ID returns a canonical identifier that is guaranteed to be unique.
 func (e Event) ID() Identifier {
-	return MakeID(wrapEventID(e))
+	return MakeID(e)
 }
 
 func (e Event) Checksum() Identifier {
 	return MakeID(e)
 }
 
-// Encode returns the canonical encoding of this event, containing only the fields necessary to uniquely identify it.
-func (e Event) Encode() []byte {
-	w := wrapEventID(e)
-	return json.NewMarshaler().MustMarshal(w)
-}
-
 func (e Event) Fingerprint() []byte {
-	return fingerprint.Fingerprint(wrapEvent(e))
-}
-
-// Defines only the fields needed to uniquely identify an event.
-type eventIDWrapper struct {
-	TxID  []byte
-	Index uint32
-}
-
-type eventWrapper struct {
-	TxID             []byte
-	Index            uint32
-	Type             string
-	TransactionIndex uint32
-	Payload          []byte
-}
-
-func wrapEventID(e Event) eventIDWrapper {
-	return eventIDWrapper{
-		TxID:  e.TransactionID[:],
-		Index: e.EventIndex,
-	}
+	return fingerprint.Fingerprint(struct {
+		Type             EventType
+		TransactionID    Identifier
+		TransactionIndex uint32
+		EventIndex       uint32
+		Payload          []byte
+	}{
+		TransactionID:    e.TransactionID,
+		EventIndex:       e.EventIndex,
+		Type:             e.Type,
+		TransactionIndex: e.TransactionIndex,
+		Payload:          e.Payload,
+	})
 }
 
 // byteSize returns the number of bytes needed to store the wrapped version of the event.
@@ -87,16 +71,6 @@ func (e Event) byteSize() int {
 		len(e.Payload) // Payload
 }
 
-func wrapEvent(e Event) eventWrapper {
-	return eventWrapper{
-		TxID:             e.TransactionID[:],
-		Index:            e.EventIndex,
-		Type:             string(e.Type),
-		TransactionIndex: e.TransactionIndex,
-		Payload:          e.Payload[:],
-	}
-}
-
 // BlockEvents contains events emitted in a single block.
 type BlockEvents struct {
 	BlockID        Identifier
@@ -107,7 +81,7 @@ type BlockEvents struct {
 
 type EventsList []Event
 
-// byteSize returns an approximate number of bytes needed to store the wrapped version of the event.
+// ByteSize returns an approximate number of bytes needed to store the wrapped version of the event.
 func (el EventsList) ByteSize() int {
 	size := 0
 	for _, event := range el {
@@ -125,10 +99,10 @@ func EventsMerkleRootHash(el EventsList) (Identifier, error) {
 	}
 
 	for _, event := range el {
-		// event fingerprint is the rlp encoding of the wrapperevent
+		// event fingerprint is the rlp encoding of the event
 		// eventID is the standard sha3 hash of the event fingerprint
 		fingerPrint := event.Fingerprint()
-		// computing enityID from the fingerprint
+		// computing entityID from the fingerprint
 		eventID := MakeIDFromFingerPrint(fingerPrint)
 		_, err = tree.Put(eventID[:], fingerPrint)
 		if err != nil {
