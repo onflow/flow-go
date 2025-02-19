@@ -72,7 +72,7 @@ func TestCollections(t *testing.T) {
 			actual := flow.Identifier{}
 
 			_ = db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-				err := operation.IndexCollectionByTransaction(rw.Writer(), transactionID, expected)
+				err := operation.UnsafeIndexCollectionByTransaction(rw.Writer(), transactionID, expected)
 				assert.Nil(t, err)
 				return nil
 			})
