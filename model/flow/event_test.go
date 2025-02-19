@@ -39,24 +39,13 @@ func TestEventFingerprint(t *testing.T) {
 	assert.Equal(t, wrapEvent(evt), decoded)
 }
 
-func TestEventID(t *testing.T) {
-
-	// EventID was historically calculated from just TxID and eventIndex which are enough to uniquely identify it in a system
-	// This test ensures we don't break this promise while introducing proper fingerprinting (which accounts for all the fields)
-
+// TestEventMalleability checks that Event is not malleable: any change in its data
+// should result in a different ID.
+func TestSealMalleability(t *testing.T) {
 	txID := unittest.IdentifierFixture()
-	evtA := unittest.EventFixture(flow.EventAccountUpdated, 21, 37, txID, 2)
-	evtB := unittest.EventFixture(flow.EventAccountCreated, 0, 37, txID, 22)
+	event := unittest.EventFixture(flow.EventAccountUpdated, 21, 37, txID, 2)
 
-	evtC := unittest.EventFixture(evtA.Type, evtA.TransactionIndex, evtA.EventIndex+1, txID, 2)
-	evtC.Payload = evtA.Payload
-
-	a := evtA.ID()
-	b := evtB.ID()
-	c := evtC.ID()
-
-	assert.Equal(t, a, b)
-	assert.NotEqual(t, a, c)
+	unittest.RequireEntityNonMalleable(t, &event)
 }
 
 func TestEventsList(t *testing.T) {
