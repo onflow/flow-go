@@ -153,7 +153,8 @@ func (t *MalleabilityChecker) isEntityMalleable(v reflect.Value, idFunc func() f
 		// when dealing with non-composite type we can generate random values for it and check if ID has changed.
 		origID := idFunc()
 		expectChange := generateRandomReflectValue(t.T, v)
-		return expectChange && origID == idFunc()
+		newID := idFunc()
+		return expectChange && origID == newID
 	}
 }
 
@@ -214,6 +215,8 @@ func generateRandomReflectValue(t *testing.T, field reflect.Value) bool {
 // This can be extended for types that are broadly used in the code base.
 func generateCustomFlowValue(field reflect.Value) any {
 	switch field.Type() {
+	case reflect.TypeOf(flow.Identity{}):
+		return *IdentityFixture()
 	case reflect.TypeOf(flow.IdentitySkeleton{}):
 		return IdentityFixture().IdentitySkeleton
 	case reflect.TypeOf(flow.ClusterQCVoteData{}):
