@@ -177,8 +177,8 @@ type encodableIdentitySkeleton struct {
 }
 
 type encodableIdentity struct {
-	encodableIdentitySkeleton
-	ParticipationStatus string
+	EncodableIdentitySkeleton encodableIdentitySkeleton
+	ParticipationStatus       string
 }
 
 func encodableSkeletonFromIdentity(iy IdentitySkeleton) encodableIdentitySkeleton {
@@ -199,7 +199,7 @@ func encodableSkeletonFromIdentity(iy IdentitySkeleton) encodableIdentitySkeleto
 
 func encodableFromIdentity(iy Identity) encodableIdentity {
 	return encodableIdentity{
-		encodableIdentitySkeleton: encodableSkeletonFromIdentity(iy.IdentitySkeleton),
+		EncodableIdentitySkeleton: encodableSkeletonFromIdentity(iy.IdentitySkeleton),
 		ParticipationStatus:       iy.EpochParticipationStatus.String(),
 	}
 }
@@ -296,7 +296,7 @@ func identitySkeletonFromEncodable(ie encodableIdentitySkeleton, identity *Ident
 }
 
 func identityFromEncodable(ie encodableIdentity, identity *Identity) error {
-	err := identitySkeletonFromEncodable(ie.encodableIdentitySkeleton, &identity.IdentitySkeleton)
+	err := identitySkeletonFromEncodable(ie.EncodableIdentitySkeleton, &identity.IdentitySkeleton)
 	if err != nil {
 		return fmt.Errorf("could not decode identity skeleton: %w", err)
 	}
