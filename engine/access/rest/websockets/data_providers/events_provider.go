@@ -99,11 +99,6 @@ func (p *EventsDataProvider) sendResponse(
 	messageIndex *counters.StrictMonotonicCounter,
 	blocksSinceLastMessage *uint64,
 ) error {
-	// Reset the block counter after sending a message
-	defer func() {
-		*blocksSinceLastMessage = 0
-	}()
-
 	// Only send a response if there's meaningful data to send.
 	// The block counter increments until either:
 	// 1. The contract emits events
@@ -121,7 +116,9 @@ func (p *EventsDataProvider) sendResponse(
 
 	var response models.BaseDataProvidersResponse
 	response.Build(p.ID(), p.Topic(), &eventsPayload)
+
 	p.send <- &response
+	*blocksSinceLastMessage = 0
 
 	return nil
 }

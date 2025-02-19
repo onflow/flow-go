@@ -101,11 +101,6 @@ func (p *AccountStatusesDataProvider) sendResponse(
 	messageIndex *counters.StrictMonotonicCounter,
 	blocksSinceLastMessage *uint64,
 ) error {
-	// Reset the block counter after sending a message
-	defer func() {
-		*blocksSinceLastMessage = 0
-	}()
-
 	// Only send a response if there's meaningful data to send.
 	// The block counter increments until either:
 	// 1. The account emits events
@@ -123,7 +118,9 @@ func (p *AccountStatusesDataProvider) sendResponse(
 
 	var resp models.BaseDataProvidersResponse
 	resp.Build(p.ID(), p.Topic(), &accountStatusesPayload)
+
 	p.send <- &resp
+	*blocksSinceLastMessage = 0
 
 	return nil
 }
