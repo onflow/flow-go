@@ -459,7 +459,7 @@ func (q *EpochQuery) NextCommitted() (protocol.CommittedEpoch, error) {
 }
 
 // Previous returns the previous epoch. During the first epoch after the root
-// block, this returns protocol.ErrNoPreviousEpoch (since there is no previous epoch).
+// block, this returns [protocol.ErrNoPreviousEpoch] (since there is no previous epoch).
 // For all other epochs, returns the previous epoch.
 func (q *EpochQuery) Previous() (protocol.CommittedEpoch, error) {
 	epochState, err := q.snap.state.protocolState.EpochStateAtBlockID(q.snap.blockID)

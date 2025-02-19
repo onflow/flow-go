@@ -199,7 +199,6 @@ type committedEpoch struct {
 var _ protocol.CommittedEpoch = (*committedEpoch)(nil)
 
 func (es *committedEpoch) Cluster(index uint) (protocol.Cluster, error) {
-
 	epochCounter := es.setupEvent.Counter
 
 	clustering, err := es.Clustering()
