@@ -35,8 +35,8 @@ func (s *Suite) SetupSuite() {
 	stakingAuctionLen := uint64(10)
 	dkgPhaseLen := uint64(50)
 	epochLen := uint64(300)
-	epochCommitSafetyThreshold := uint64(50)
-	netConfig := testnet.NewNetworkConfigWithEpochConfig(name, s.NodeConfigs, stakingAuctionLen, dkgPhaseLen, epochLen, epochCommitSafetyThreshold)
+	finalizationSafetyThreshold := uint64(50)
+	netConfig := testnet.NewNetworkConfigWithEpochConfig(name, s.NodeConfigs, stakingAuctionLen, dkgPhaseLen, epochLen, finalizationSafetyThreshold)
 	s.Net = testnet.PrepareFlowNetwork(s.T(), netConfig, flow.BftTestnet)
 
 	s.Ctx, s.Cancel = context.WithCancel(context.Background())
