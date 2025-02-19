@@ -64,7 +64,7 @@ type ExecutionDataTrackerImpl struct {
 	useIndex      bool
 
 	// highestHeight contains the highest consecutive block height that we have consecutive execution data for
-	highestHeight counters.StrictMonotonousCounter
+	highestHeight counters.StrictMonotonicCounter
 }
 
 // NewExecutionDataTracker creates a new ExecutionDataTrackerImpl instance.
@@ -96,7 +96,7 @@ func NewExecutionDataTracker(
 		log:           log,
 		headers:       headers,
 		broadcaster:   broadcaster,
-		highestHeight: counters.NewMonotonousCounter(highestAvailableFinalizedHeight),
+		highestHeight: counters.NewMonotonicCounter(highestAvailableFinalizedHeight),
 		indexReporter: indexReporter,
 		useIndex:      useIndex,
 	}
