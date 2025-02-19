@@ -260,6 +260,7 @@ func (s *WebsocketSubscriptionSuite) TestMaxSubscriptionsPerConnection() {
 		} else {
 			// Validate error response for exceeding the subscription limit.
 			//s.Require().Equal(models.SubscribeAction, subscribeResponse.Action)
+			s.Require().NotNil(subscribeResponse.Error)
 			s.Require().Equal(expectedErrorMessage, subscribeResponse.Error.Message)
 		}
 	}
@@ -339,6 +340,7 @@ func (s *WebsocketSubscriptionSuite) TestSubscriptionErrorCases() {
 
 			// Validate response
 			s.Require().Equal(models.SubscribeAction, response.Action)
+			s.Require().NotNil(response.Error)
 			s.Contains(response.Error.Message, tt.expectedErrMsg)
 			s.Require().Equal(tt.expectedErrCode, response.Error.Code)
 		})
@@ -390,6 +392,7 @@ func (s *WebsocketSubscriptionSuite) TestUnsubscriptionErrorCases() {
 
 			// Validate response
 			s.Require().Equal(models.UnsubscribeAction, response.Action)
+			s.Require().NotNil(response.Error)
 			s.Contains(response.Error.Message, tt.expectedErrMsg)
 			s.Require().Equal(tt.expectedErrCode, response.Error.Code)
 		})
@@ -1028,7 +1031,7 @@ func (s *WebsocketSubscriptionSuite) validateBaseMessageResponse(
 	actualResponse models.BaseMessageResponse,
 ) {
 	s.Require().Equal(0, actualResponse.Error.Code)
-	s.Require().Empty(actualResponse.Error.Message)
+	s.Require().Nil(actualResponse.Error)
 }
 
 // createAndSendTx creates a new account transaction.
