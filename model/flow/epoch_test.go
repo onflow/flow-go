@@ -12,10 +12,10 @@ import (
 
 func TestMalleability(t *testing.T) {
 	t.Run("EpochSetup", func(t *testing.T) {
-		unittest.RequireEntityNotMalleable(t, unittest.EpochSetupFixture())
+		unittest.RequireEntityNonMalleable(t, unittest.EpochSetupFixture())
 	})
 	t.Run("EpochCommit-v1", func(t *testing.T) {
-		unittest.RequireEntityNotMalleable(t, unittest.EpochCommitFixture())
+		unittest.RequireEntityNonMalleable(t, unittest.EpochCommitFixture())
 	})
 
 	checker := unittest.NewMalleabilityChecker(t, unittest.WithCustomType(flow.DKGIndexMap{}, func() any {
