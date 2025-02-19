@@ -126,41 +126,6 @@ func (p *EventsDataProvider) sendResponse(
 	return nil
 }
 
-// handleResponse processes events and sends the formatted response.
-//
-// No errors are expected during normal operations.
-func (p *EventsDataProvider) handleResponse() func(eventsResponse *backend.EventsResponse) error {
-	blocksSinceLastMessage := uint64(0)
-	messageIndex := counters.NewMonotonicCounter(0)
-
-	return func(eventsResponse *backend.EventsResponse) error {
-		// check if there are any events in the response. if not, do not send a message unless the last
-		// response was more than HeartbeatInterval blocks ago
-		if len(eventsResponse.Events) == 0 {
-			blocksSinceLastMessage++
-			if blocksSinceLastMessage < p.heartbeatInterval {
-				return nil
-			}
-		}
-		blocksSinceLastMessage = 0
-
-		index := messageIndex.Value()
-		if ok := messageIndex.Set(messageIndex.Value() + 1); !ok {
-			return fmt.Errorf("message index already incremented to: %d", messageIndex.Value())
-		}
-
-		var eventsPayload models.EventResponse
-		eventsPayload.Build(eventsResponse, index)
-
-		var response models.BaseDataProvidersResponse
-		response.Build(p.ID(), p.Topic(), &eventsPayload)
-
-		p.send <- &response
-
-		return nil
-	}
-}
-
 // createSubscription creates a new subscription using the specified input arguments.
 func (p *EventsDataProvider) createSubscription(ctx context.Context, args eventsArguments) subscription.Subscription {
 	if args.StartBlockID != flow.ZeroID {
