@@ -56,10 +56,7 @@ import (
 	badgerState "github.com/onflow/flow-go/state/protocol/badger"
 	"github.com/onflow/flow-go/state/protocol/blocktimer"
 	"github.com/onflow/flow-go/state/protocol/events/gadgets"
-	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/storage/badger"
-	"github.com/onflow/flow-go/storage/operation/badgerimpl"
-	"github.com/onflow/flow-go/storage/store"
 	"github.com/onflow/flow-go/utils/grpcutils"
 )
 
@@ -82,9 +79,6 @@ func main() {
 		hotstuffProposalDuration          time.Duration
 		startupTimeString                 string
 		startupTime                       time.Time
-
-		// storage
-		collections storage.Collections
 
 		mainConsensusCommittee  *committees.Consensus
 		followerState           protocol.FollowerState
@@ -208,12 +202,6 @@ func main() {
 
 	nodeBuilder.
 		PreInit(cmd.DynamicStartPreInit).
-		Module("load collection storage", func(node *cmd.NodeConfig) error {
-			db := badgerimpl.ToDB(node.DB)
-			transactions := store.NewTransactions(node.Metrics.Cache, db)
-			collections = store.NewCollections(db, transactions)
-			return nil
-		}).
 		Module("transaction rate limiter", func(node *cmd.NodeConfig) error {
 			// To be managed by admin tool, and used by ingestion engine
 			addressRateLimiter = ingest.NewAddressRateLimiter(rate.Limit(txRatelimits), txBurstlimits)
@@ -461,7 +449,7 @@ func main() {
 		}).
 		Component("collection provider engine", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 			retrieve := func(collID flow.Identifier) (flow.Entity, error) {
-				coll, err := collections.ByID(collID)
+				coll, err := node.Storage.Collections.ByID(collID)
 				return coll, err
 			}
 
