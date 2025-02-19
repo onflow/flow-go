@@ -156,7 +156,6 @@ func (builder *EpochBuilder) EpochHeights(counter uint64) (*EpochHeights, bool) 
 // about the heights of blocks in the BUILT epoch (epoch N). These can be
 // queried with EpochHeights.
 func (builder *EpochBuilder) BuildEpoch() *EpochBuilder {
-
 	state := builder.states[0]
 	finalSnap := state.Final()
 
@@ -314,7 +313,6 @@ func (builder *EpochBuilder) BuildEpoch() *EpochBuilder {
 // epoch. We must be in the Committed phase to call CompleteEpoch. Once the epoch
 // has been capped off, we can build the next epoch with BuildEpoch.
 func (builder *EpochBuilder) CompleteEpoch() *EpochBuilder {
-
 	state := builder.states[0]
 	finalSnap := state.Final()
 
