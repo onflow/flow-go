@@ -1,6 +1,7 @@
 package store_test
 
 import (
+	"sync"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -84,5 +85,55 @@ func TestCollections_IndexDuplicateTx(t *testing.T) {
 		gotLightByDupTxID, err := collections.LightByTransactionID(dupTx.ID())
 		require.NoError(t, err)
 		assert.Equal(t, &col1Light, gotLightByDupTxID)
+	})
+}
+
+// verify that when StoreLightAndIndexByTransaction is concurrently called with same tx and
+// different collection both will succeed, and one of the collection will be indexed by the tx
+func TestCollections_ConcurrentIndexByTx(t *testing.T) {
+	dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
+		metrics := metrics.NewNoopCollector()
+		transactions := store.NewTransactions(metrics, db)
+		collections := store.NewCollections(db, transactions)
+
+		// Create two collections sharing the same transaction
+		col1 := unittest.CollectionFixture(1)
+		col2 := unittest.CollectionFixture(1)
+		sharedTx := col1.Transactions[0] // The shared transaction
+		col2.Transactions[0] = sharedTx
+
+		var wg sync.WaitGroup
+		wg.Add(2)
+
+		errChan := make(chan error, 2)
+
+		// Concurrently insert col1
+		go func() {
+			defer wg.Done()
+			col1Light := col1.Light()
+			err := collections.StoreLightAndIndexByTransaction(&col1Light)
+			errChan <- err
+		}()
+
+		// Concurrently insert col2
+		go func() {
+			defer wg.Done()
+			col2Light := col2.Light()
+			err := collections.StoreLightAndIndexByTransaction(&col2Light)
+			errChan <- err
+		}()
+
+		wg.Wait()
+		close(errChan)
+
+		// Ensure both operations succeeded
+		for err := range errChan {
+			require.NoError(t, err)
+		}
+
+		// Verify that one of the collections is indexed by the shared transaction
+		indexedCollection, err := collections.LightByTransactionID(sharedTx.ID())
+		require.NoError(t, err)
+		assert.True(t, indexedCollection.ID() == col1.ID() || indexedCollection.ID() == col2.ID(), "Expected one of the collections to be indexed")
 	})
 }
