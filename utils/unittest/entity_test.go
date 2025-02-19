@@ -1,9 +1,11 @@
 package unittest
 
 import (
-	"github.com/onflow/flow-go/model/flow"
-	"github.com/stretchr/testify/require"
 	"testing"
+
+	"github.com/stretchr/testify/require"
+
+	"github.com/onflow/flow-go/model/flow"
 )
 
 type IntList []uint32
