@@ -2,9 +2,12 @@ package fvm
 
 import (
 	"fmt"
+	"log"
 	"math"
+	"strings"
 
 	"github.com/onflow/cadence"
+	"github.com/onflow/cadence/encoding/ccf"
 	"github.com/onflow/flow-core-contracts/lib/go/contracts"
 	"github.com/onflow/flow-core-contracts/lib/go/templates"
 
@@ -1008,7 +1011,32 @@ func (b *bootstrapExecutor) setupEVM(serviceAddress, nonFungibleTokenAddress, fu
 func (b *bootstrapExecutor) setupVMBridge(serviceAddress flow.Address, env *templates.Environment) {
 	if b.setupEVMEnabled {
 
-		bridgeEnv := bridge.Environment{}
+		bridgeEnv := bridge.Environment{
+			CrossVMNFTAddress:                     env.ServiceAccountAddress,
+			CrossVMTokenAddress:                   env.ServiceAccountAddress,
+			FlowEVMBridgeHandlerInterfacesAddress: env.ServiceAccountAddress,
+			IBridgePermissionsAddress:             env.ServiceAccountAddress,
+			ICrossVMAddress:                       env.ServiceAccountAddress,
+			ICrossVMAssetAddress:                  env.ServiceAccountAddress,
+			IEVMBridgeNFTMinterAddress:            env.ServiceAccountAddress,
+			IEVMBridgeTokenMinterAddress:          env.ServiceAccountAddress,
+			IFlowEVMNFTBridgeAddress:              env.ServiceAccountAddress,
+			IFlowEVMTokenBridgeAddress:            env.ServiceAccountAddress,
+			FlowEVMBridgeAddress:                  env.ServiceAccountAddress,
+			FlowEVMBridgeAccessorAddress:          env.ServiceAccountAddress,
+			FlowEVMBridgeConfigAddress:            env.ServiceAccountAddress,
+			FlowEVMBridgeHandlersAddress:          env.ServiceAccountAddress,
+			FlowEVMBridgeNFTEscrowAddress:         env.ServiceAccountAddress,
+			FlowEVMBridgeResolverAddress:          env.ServiceAccountAddress,
+			FlowEVMBridgeTemplatesAddress:         env.ServiceAccountAddress,
+			FlowEVMBridgeTokenEscrowAddress:       env.ServiceAccountAddress,
+			FlowEVMBridgeUtilsAddress:             env.ServiceAccountAddress,
+			ArrayUtilsAddress:                     env.ServiceAccountAddress,
+			ScopedFTProvidersAddress:              env.ServiceAccountAddress,
+			SerializeAddress:                      env.ServiceAccountAddress,
+			SerializeMetadataAddress:              env.ServiceAccountAddress,
+			StringUtilsAddress:                    env.ServiceAccountAddress,
+		}
 
 		// Create a COA in the bridge account
 		tx := blueprints.CreateCOATransaction(serviceAddress, bridgeEnv, *env)
@@ -1027,11 +1055,13 @@ func (b *bootstrapExecutor) setupVMBridge(serviceAddress flow.Address, env *temp
 		// // deploy the Solidity Factory contract to the service account's COA
 		// tx = blueprints.DeployEVMContractTransaction(serviceAddress, factoryBytecode, gasLimit, deploymentValue, bridgeEnv, *env)
 
-		// txError, err = b.invokeMetaTransaction(
+		// txOutput, err := b.runMetaTransaction(
 		// 	NewContextFromParent(b.ctx, WithEVMEnabled(true)),
 		// 	Transaction(tx, 0),
 		// )
-		// panicOnMetaInvokeErrf("failed to deploy the Factory in the Service Account COA: %s", txError, err)
+		// panicOnMetaInvokeErrf("failed to deploy the Factory in the Service Account COA: %s", txOutput.Err, err)
+
+		// factoryAddress := getContractAddressFromEVMEvent(txOutput)
 
 		// // Retrieve the factory bytecode from the JSON args
 		// registryBytecode := bridge.GetBytecodeFromArgsJSON("cadence/args/deploy-registry-args.json")
@@ -1068,7 +1098,63 @@ func (b *bootstrapExecutor) setupVMBridge(serviceAddress flow.Address, env *temp
 		// )
 		// panicOnMetaInvokeErrf("failed to deploy the ERC721 Deployer in the Service Account COA: %s", txError, err)
 
+		// for _, path := range blueprints.BridgeContracts {
+
+		// 	contract, _ := bridge.GetCadenceContractCode(path, bridgeEnv, *env)
+
+		// 	slashSplit := strings.Split(path, "/")
+		// 	nameWithCDC := slashSplit[len(slashSplit)-1]
+		// 	name := nameWithCDC[:len(nameWithCDC)-3]
+
+		// 	if name == "FlowEVMBridgeUtils" {
+		// 		txError, err := b.invokeMetaTransaction(
+		// 			b.ctx,
+		// 			Transaction(
+		// 				blueprints.DeployFlowEVMBridgeUtilsContractTransaction(serviceAddress, &bridgeEnv, *env, contract, name, factoryAddress),
+		// 				0),
+		// 		)
+		// 		panicOnMetaInvokeErrf("failed to deploy FlowEVMBridgeUtils contract: %s", txError, err)
+		// 	} else {
+		// 		txError, err := b.invokeMetaTransaction(
+		// 			b.ctx,
+		// 			Transaction(
+		// 				blueprints.DeployContractTransaction(serviceAddress, contract, name),
+		// 				0),
+		// 		)
+		// 		panicOnMetaInvokeErrf("failed to deploy "+name+" contract: %s", txError, err)
+		// 	}
+		// }
+
+		// // Pause the bridge for setup
+		// txError, err = b.invokeMetaTransaction(
+		// 	b.ctx,
+		// 	Transaction(
+		// 		blueprints.PauseBridgeTransaction(serviceAddress, bridgeEnv, *env, true),
+		// 		0),
+		// )
+		// panicOnMetaInvokeErrf("failed to pause the bridge contracts: %s", txError, err)
 	}
+}
+
+// getContractAddressFromEVMEvent gets the deployment address from a evm deployment transaction
+func getContractAddressFromEVMEvent(output ProcedureOutput) string {
+	for _, event := range output.Events {
+		if strings.Contains(string(event.Type), "TransactionExecuted") {
+			// decode the event payload
+			data, _ := ccf.Decode(nil, event.Payload)
+			// get the contractAddress field from the event
+			contractAddr := cadence.SearchFieldByName(
+				data.(cadence.Event),
+				"contractAddress",
+			).(cadence.String)
+
+			if contractAddr.String() == "" {
+				log.Fatal("Contract address not found in event")
+			}
+			return strings.ToLower(strings.Split(contractAddr.String(), "x")[1])
+		}
+	}
+	return ""
 }
 
 func (b *bootstrapExecutor) registerNodes(service, fungibleToken, flowToken flow.Address) {
@@ -1289,4 +1375,29 @@ func (b *bootstrapExecutor) invokeMetaTransaction(
 	err := Run(executor)
 
 	return executor.Output().Err, err
+}
+
+func (b *bootstrapExecutor) runMetaTransaction(
+	parentCtx Context,
+	tx *TransactionProcedure,
+) (
+	ProcedureOutput,
+	error,
+) {
+	// do not deduct fees or check storage in meta transactions
+	ctx := NewContextFromParent(parentCtx,
+		WithAccountStorageLimit(false),
+		WithTransactionFeesEnabled(false),
+		WithAuthorizationChecksEnabled(false),
+		WithSequenceNumberCheckAndIncrementEnabled(false),
+
+		// disable interaction and computation limits for bootstrapping
+		WithMemoryAndInteractionLimitsDisabled(),
+		WithComputationLimit(math.MaxUint64),
+	)
+
+	executor := tx.NewExecutor(ctx, b.txnState)
+	err := Run(executor)
+
+	return executor.Output(), err
 }
