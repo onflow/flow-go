@@ -35,7 +35,7 @@ func (e *StructWithUnsupportedFlowField) ID() flow.Identifier {
 // it correctly handles the supported types and panics when the entity is not supported.
 func TestRequireEntityNonMalleable(t *testing.T) {
 	t.Run("type alias", func(t *testing.T) {
-		list := IntList{1, 2, 3}
+		list := &IntList{1, 2, 3}
 		RequireEntityNonMalleable(t, list)
 	})
 	t.Run("embedded-struct", func(t *testing.T) {
