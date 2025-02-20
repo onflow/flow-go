@@ -50,11 +50,11 @@ func MockEntityListFixture(count int) []*MockEntity {
 	return entities
 }
 
-// RequireEntityNonMalleable ensures that the entity is not malleable, i.e. changing any field should change the ID.
+// RequireEntityNonMalleable is a sanity check that the entity is not malleable with regards to the ID() function. 
+// Non-malleability in this sense means that it is computationally hard to build a different entity with the same ID. This implies that in a non-malleable entity, changing any field should change the ID, which is checked by this function. Note that this is sanity check of non-malleability and that passing this test does not guarantee non-malleability. 
 // Non-malleability is a required property for any entity that implements the [flow.IDEntity] interface. This is especially
 // important for entities that contain signatures and are transmitted over the network.
-// We would like to ensure that we can create a cryptographic commitment to the content of the entity that covers all fields and
-// prevent any tampering with the content of the entity.
+// ID is used by the protocol to insure entity integrity when transmitted over the network. ID must therefore be a binding cryptographic commitment to an entity. 
 // This function consumes the entity and modifies its fields randomly to ensure that the ID changes after each modification.
 // Generally speaking each type that implements [flow.IDEntity] method should be tested with this function.
 // ATTENTION: We put only one requirement for data types, that is all fields have to be exported so we can modify them.
