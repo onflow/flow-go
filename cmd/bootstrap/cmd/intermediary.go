@@ -18,9 +18,9 @@ type IntermediaryBootstrappingData struct {
 // like the root block).
 // This is used to pass data between the rootblock command and the finalize command.
 type IntermediaryParamsData struct {
-	ProtocolVersion            uint
-	EpochCommitSafetyThreshold uint64
-	EpochExtensionViewCount    uint64
+	ProtocolVersion             uint
+	FinalizationSafetyThreshold uint64
+	EpochExtensionViewCount     uint64
 }
 
 // IntermediaryEpochData stores the root epoch and the epoch config for the execution state

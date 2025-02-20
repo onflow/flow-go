@@ -46,6 +46,7 @@ type QCContractClient interface {
 }
 
 // EpochLookup enables looking up epochs by view.
+// Only Epochs that are fully committed can be retrieved.
 // CAUTION: EpochLookup should only be used for querying the previous, current, or next epoch.
 type EpochLookup interface {
 
