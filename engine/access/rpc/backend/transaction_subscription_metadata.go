@@ -139,6 +139,7 @@ func (tm *transactionSubscriptionMetadata) refreshStatus(ctx context.Context) er
 
 	if tm.blockWithTx == nil {
 		if err = tm.refreshTransactionReferenceBlockID(); err != nil {
+			// transaction was not sent from this node, and it has not been indexed yet.
 			if errors.Is(err, storage.ErrNotFound) && tm.txReferenceBlockID == flow.ZeroID {
 				tm.txResult.Status = flow.TransactionStatusUnknown
 				return nil

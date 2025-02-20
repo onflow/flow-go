@@ -54,7 +54,7 @@ func (b *backendSubscribeTransactions) SendAndSubscribeTransactionStatuses(
 	requiredEventEncodingVersion entities.EventEncodingVersion,
 ) subscription.Subscription {
 	if err := b.sendTransaction(ctx, tx); err != nil {
-		b.log.Err(err).Str("tx_id", tx.ID().String()).Msg("failed to send transaction")
+		b.log.Debug().Err(err).Str("tx_id", tx.ID().String()).Msg("failed to send transaction")
 		return subscription.NewFailedSubscription(err, "failed to send transaction")
 	}
 
@@ -112,15 +112,15 @@ func (b *backendSubscribeTransactions) createSubscription(
 	// Determine the height of the block to start the subscription from.
 	startHeight, err := b.blockTracker.GetStartHeightFromBlockID(startBlockID)
 	if err != nil {
-		b.log.Err(err).Str("block_id", startBlockID.String()).Msg("failed to get start height")
+		b.log.Debug().Err(err).Str("block_id", startBlockID.String()).Msg("failed to get start height")
 		return subscription.NewFailedSubscription(err, "failed to get start height")
 	}
 
 	// Retrieve the current state of the transaction.
 	txInfo, err := newTransactionSubscriptionMetadata(ctx, b.backendTransactions, txID, referenceBlockID, requiredEventEncodingVersion)
 	if err != nil {
-		b.log.Err(err).Str("tx_id", txID.String()).Msg("failed to get current transaction state")
-		return subscription.NewFailedSubscription(err, "failed to get tx reference block ID")
+		b.log.Debug().Err(err).Str("tx_id", txID.String()).Msg("failed to get current transaction state")
+		return subscription.NewFailedSubscription(err, "failed to start stream")
 	}
 
 	return b.subscriptionHandler.Subscribe(ctx, startHeight, b.getTransactionStatusResponse(txInfo, startHeight))
@@ -128,6 +128,7 @@ func (b *backendSubscribeTransactions) createSubscription(
 
 // getTransactionStatusResponse returns a callback function that produces transaction status
 // subscription responses based on new blocks.
+// The returned callback is not concurrency-safe
 func (b *backendSubscribeTransactions) getTransactionStatusResponse(
 	txInfo *transactionSubscriptionMetadata,
 	startHeight uint64,
@@ -148,6 +149,7 @@ func (b *backendSubscribeTransactions) getTransactionStatusResponse(
 			return nil, fmt.Errorf("transaction final status %s already reported: %w", txInfo.txResult.Status.String(), subscription.ErrEndOfData)
 		}
 
+		// timeout waiting for unknown tx that are never indexed
 		heightDiff := height - startHeight
 		hasReachedUnknownStatusLimit := txInfo.txResult.Status == flow.TransactionStatusUnknown && heightDiff >= TransactionExpiryForUnknownStatus
 		if hasReachedUnknownStatusLimit {
