@@ -69,10 +69,6 @@ func newTransactionSubscriptionMetadata(
 		txReferenceBlockID:   txReferenceBlockID,
 	}
 
-	if err := txMetadata.Refresh(ctx); err != nil {
-		return nil, err
-	}
-
 	return txMetadata, nil
 }
 
@@ -249,6 +245,8 @@ func (tm *transactionSubscriptionMetadata) refreshTransactionResult(ctx context.
 
 	// If transaction result was found, fully replace it in metadata. New transaction status already included in result.
 	if txResult != nil {
+		// Preserve the CollectionID to ensure it is not lost during the transaction result assignment.
+		txResult.CollectionID = tm.txResult.CollectionID
 		tm.txResult = txResult
 	}
 

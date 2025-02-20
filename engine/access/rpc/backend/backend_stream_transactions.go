@@ -5,8 +5,6 @@ import (
 	"errors"
 	"fmt"
 
-	"go.uber.org/atomic"
-
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
@@ -133,16 +131,10 @@ func (b *backendSubscribeTransactions) getTransactionStatusResponse(
 	txInfo *transactionSubscriptionMetadata,
 	startHeight uint64,
 ) func(context.Context, uint64) (interface{}, error) {
-	triggerMissingStatusesOnce := atomic.NewBool(false)
-
 	return func(ctx context.Context, height uint64) (interface{}, error) {
 		err := b.checkBlockReady(height)
 		if err != nil {
 			return nil, err
-		}
-
-		if triggerMissingStatusesOnce.CompareAndSwap(false, true) {
-			return b.generateResultsStatuses(txInfo.txResult, flow.TransactionStatusUnknown)
 		}
 
 		if txInfo.txResult.IsFinal() {
@@ -150,9 +142,7 @@ func (b *backendSubscribeTransactions) getTransactionStatusResponse(
 		}
 
 		// timeout waiting for unknown tx that are never indexed
-		heightDiff := height - startHeight
-		hasReachedUnknownStatusLimit := txInfo.txResult.Status == flow.TransactionStatusUnknown && heightDiff >= TransactionExpiryForUnknownStatus
-		if hasReachedUnknownStatusLimit {
+		if hasReachedUnknownStatusLimit(height, startHeight, txInfo.txResult.Status) {
 			txInfo.txResult.Status = flow.TransactionStatusExpired
 			return b.generateResultsStatuses(txInfo.txResult, flow.TransactionStatusUnknown)
 		}
@@ -170,6 +160,16 @@ func (b *backendSubscribeTransactions) getTransactionStatusResponse(
 
 		return b.generateResultsStatuses(txInfo.txResult, prevTxStatus)
 	}
+}
+
+// hasReachedUnknownStatusLimit checks if a transaction's status is still unknown
+// after the expiry limit has been reached.
+func hasReachedUnknownStatusLimit(height, startHeight uint64, status flow.TransactionStatus) bool {
+	if status != flow.TransactionStatusUnknown {
+		return false
+	}
+
+	return height-startHeight >= TransactionExpiryForUnknownStatus
 }
 
 // checkBlockReady checks if the given block height is valid and available based on the expected block status.
