@@ -14,15 +14,11 @@ import (
 // TestMissingCollectionID_Malleability confirms that the MissingCollection struct, which implements
 // the [flow.IDEntity] interface, is resistant to tampering.
 func TestMissingCollectionID_Malleability(t *testing.T) {
-	missingCollectionFixture := func() *MissingCollection {
-		return &MissingCollection{
-			BlockID:   unittest.IdentifierFixture(),
-			Height:    unittest.BlockHeaderFixture().Height,
-			Guarantee: unittest.CollectionGuaranteeFixture(),
-		}
-	}
-
-	unittest.RequireEntityNotMalleable(t, missingCollectionFixture())
+	unittest.RequireEntityNotMalleable(t, &MissingCollection{
+		BlockID:   unittest.IdentifierFixture(),
+		Height:    unittest.BlockHeaderFixture().Height,
+		Guarantee: unittest.CollectionGuaranteeFixture(),
+	})
 }
 
 func TestSingleBlockBecomeReady(t *testing.T) {
