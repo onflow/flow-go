@@ -108,7 +108,7 @@ require (
 	github.com/libp2p/go-libp2p-routing-helpers v0.7.4
 	github.com/mitchellh/mapstructure v1.5.0
 	github.com/onflow/bridged-usdc/lib/go/contracts v1.0.0
-	github.com/onflow/flow-evm-bridge v0.0.0-20250219214738-eb4d7d301bbf
+	github.com/onflow/flow-evm-bridge v0.0.0-20250220164953-ef710abe88ca
 	github.com/onflow/go-ethereum v1.14.7
 	github.com/onflow/nft-storefront/lib/go/contracts v1.0.0
 	github.com/onflow/wal v1.0.2
