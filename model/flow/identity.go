@@ -132,11 +132,6 @@ func (iy IdentitySkeleton) String() string {
 	return fmt.Sprintf("%s-%s@%s", iy.Role, iy.NodeID.String(), iy.Address)
 }
 
-// Checksum returns a checksum for the identity including mutable attributes.
-func (iy Identity) Checksum() Identifier {
-	return MakeID(iy)
-}
-
 // GetNodeID returns node ID for the identity. It is needed to satisfy GenericIdentity constraint.
 func (iy IdentitySkeleton) GetNodeID() Identifier {
 	return iy.NodeID
