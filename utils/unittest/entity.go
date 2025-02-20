@@ -5,6 +5,7 @@ import (
 	"math/rand"
 	"reflect"
 	"testing"
+	"time"
 
 	"github.com/onflow/crypto"
 	"github.com/stretchr/testify/require"
@@ -118,6 +119,9 @@ func (t *MalleabilityChecker) Check(entity flow.IDEntity) {
 	if v.Kind() == reflect.Ptr {
 		require.False(t, v.IsNil(), "entity is nil, nothing to check")
 		v = v.Elem()
+	} else {
+		// If it is not a pointer type, we may not be able to set fields to test malleability, since the entity may not be addressable
+		require.Failf(t, "entity is not a pointer type (try taking a reference to it)", "entity: %v %v", v.Kind(), v.Type())
 	}
 	isMalleable := t.isEntityMalleable(v, entity.ID)
 	require.False(t, isMalleable, "entity is malleable")
@@ -137,18 +141,27 @@ func (t *MalleabilityChecker) isEntityMalleable(v reflect.Value, idFunc func() f
 	if hasCustomTypeOverride {
 		origID := idFunc()
 		v.Set(customTypeGenerator())
-		return origID == idFunc()
+		newID := idFunc()
+		return origID == newID
 	}
 
 	if v.Kind() == reflect.Struct {
-		// in case of a struct we would like to ensure that changing any field will change the ID of the entity.
-		// we will recursively check all fields of the struct and if any of the fields is malleable then the whole entity is malleable.
-		for i := 0; i < v.NumField(); i++ {
-			field := v.Field(i)
-			require.Truef(t, field.CanSet(), "field %s is not settable", tType.Field(i).Name)
-			require.False(t, t.isEntityMalleable(field, idFunc), "field %s is malleable", tType.Field(i).Name)
+		// in case we are dealing with struct we have two options:
+		// 1) if it's a known type where we know how to generate a random value we generate it and replace the whole field with it
+		// 2) if we don't anticipate the type we check if the field is malleable by checking all fields of the struct recursively
+		if generatedValue := reflect.ValueOf(generateCustomFlowValue(v)); generatedValue.IsValid() {
+			origID := idFunc()
+			v.Set(generatedValue)
+			newID := idFunc()
+			return origID == newID
+		} else {
+			for i := 0; i < v.NumField(); i++ {
+				field := v.Field(i)
+				require.Truef(t, field.CanSet(), "field %s is not settable", tType.Field(i).Name)
+				require.False(t, t.isEntityMalleable(field, idFunc), "field %s is malleable", tType.Field(i).Name)
+			}
+			return false
 		}
-		return false
 	} else {
 		// when dealing with non-composite type we can generate random values for it and check if ID has changed.
 		origID := idFunc()
@@ -231,6 +244,8 @@ func generateCustomFlowValue(field reflect.Value) any {
 			SignerIndices: SignerIndicesFixture(2),
 			SigData:       SignatureFixture(),
 		}
+	case reflect.TypeOf(time.Time{}):
+		return time.Now()
 	}
 	return nil
 }
