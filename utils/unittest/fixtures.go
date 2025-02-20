@@ -934,6 +934,11 @@ func WithFinalState(commit flow.StateCommitment) func(*flow.ExecutionResult) {
 func WithServiceEvents(n int) func(result *flow.ExecutionResult) {
 	return func(result *flow.ExecutionResult) {
 		result.ServiceEvents = ServiceEventsFixture(n)
+		// randomly assign service events to chunks
+		for i := 0; i < n; i++ {
+			chunkIndex := rand.Intn(result.Chunks.Len())
+			*result.Chunks[chunkIndex].ServiceEventCount++
+		}
 	}
 }
 
@@ -1318,6 +1323,12 @@ func WithChunkStartState(startState flow.StateCommitment) func(chunk *flow.Chunk
 	}
 }
 
+func WithServiceEventCount(count *uint16) func(*flow.Chunk) {
+	return func(chunk *flow.Chunk) {
+		chunk.ServiceEventCount = count
+	}
+}
+
 func ChunkFixture(
 	blockID flow.Identifier,
 	collectionIndex uint,
@@ -1329,6 +1340,7 @@ func ChunkFixture(
 			CollectionIndex:      collectionIndex,
 			StartState:           startState,
 			EventCollection:      IdentifierFixture(),
+			ServiceEventCount:    PtrTo[uint16](0),
 			TotalComputationUsed: 4200,
 			NumberOfTransactions: 42,
 			BlockID:              blockID,
@@ -1344,10 +1356,10 @@ func ChunkFixture(
 	return chunk
 }
 
-func ChunkListFixture(n uint, blockID flow.Identifier, startState flow.StateCommitment) flow.ChunkList {
+func ChunkListFixture(n uint, blockID flow.Identifier, startState flow.StateCommitment, opts ...func(*flow.Chunk)) flow.ChunkList {
 	chunks := make([]*flow.Chunk, 0, n)
 	for i := uint64(0); i < uint64(n); i++ {
-		chunk := ChunkFixture(blockID, uint(i), startState)
+		chunk := ChunkFixture(blockID, uint(i), startState, opts...)
 		chunk.Index = i
 		chunks = append(chunks, chunk)
 		startState = chunk.EndState
@@ -2156,9 +2168,14 @@ func IndexFixture() *flow.Index {
 }
 
 func WithDKGFromParticipants(participants flow.IdentitySkeletonList) func(*flow.EpochCommit) {
-	count := len(participants.Filter(filter.IsValidDKGParticipant))
+	dkgParticipants := participants.Filter(filter.IsConsensusCommitteeMember).Sort(flow.Canonical[flow.IdentitySkeleton])
 	return func(commit *flow.EpochCommit) {
-		commit.DKGParticipantKeys = PublicKeysFixture(count, crypto.BLSBLS12381)
+		commit.DKGParticipantKeys = nil
+		commit.DKGIndexMap = make(flow.DKGIndexMap)
+		for index, nodeID := range dkgParticipants.NodeIDs() {
+			commit.DKGParticipantKeys = append(commit.DKGParticipantKeys, KeyFixture(crypto.BLSBLS12381).PublicKey())
+			commit.DKGIndexMap[nodeID] = index
+		}
 	}
 }
 
@@ -2172,17 +2189,6 @@ func WithClusterQCsFromAssignments(assignments flow.AssignmentList) func(*flow.E
 	return func(commit *flow.EpochCommit) {
 		commit.ClusterQCs = flow.ClusterQCVoteDatasFromQCs(qcs)
 	}
-}
-
-func DKGParticipantLookup(participants flow.IdentitySkeletonList) map[flow.Identifier]flow.DKGParticipant {
-	lookup := make(map[flow.Identifier]flow.DKGParticipant)
-	for i, node := range participants.Filter(filter.HasRole[flow.IdentitySkeleton](flow.RoleConsensus)) {
-		lookup[node.NodeID] = flow.DKGParticipant{
-			Index:    uint(i),
-			KeyShare: KeyFixture(crypto.BLSBLS12381).PublicKey(),
-		}
-	}
-	return lookup
 }
 
 func CommitWithCounter(counter uint64) func(*flow.EpochCommit) {
@@ -2872,11 +2878,12 @@ func WithNextEpochProtocolState() func(entry *flow.RichEpochStateEntry) {
 func WithValidDKG() func(*flow.RichEpochStateEntry) {
 	return func(entry *flow.RichEpochStateEntry) {
 		commit := entry.CurrentEpochCommit
-		dkgParticipants := entry.CurrentEpochSetup.Participants.Filter(filter.IsValidDKGParticipant)
-		lookup := DKGParticipantLookup(dkgParticipants)
-		commit.DKGParticipantKeys = make([]crypto.PublicKey, len(lookup))
-		for _, participant := range lookup {
-			commit.DKGParticipantKeys[participant.Index] = participant.KeyShare
+		dkgParticipants := entry.CurrentEpochSetup.Participants.Filter(filter.IsConsensusCommitteeMember).Sort(flow.Canonical[flow.IdentitySkeleton])
+		commit.DKGParticipantKeys = nil
+		commit.DKGIndexMap = make(flow.DKGIndexMap)
+		for index, nodeID := range dkgParticipants.NodeIDs() {
+			commit.DKGParticipantKeys = append(commit.DKGParticipantKeys, KeyFixture(crypto.BLSBLS12381).PublicKey())
+			commit.DKGIndexMap[nodeID] = index
 		}
 	}
 }
