@@ -11,5 +11,5 @@ import (
 // to correctly retrieve the block payload!
 func TestSealMalleability(t *testing.T) {
 	seal := unittest.Seal.Fixture()
-	unittest.RequireEntityNotMalleable(t, seal)
+	unittest.RequireEntityNonMalleable(t, seal)
 }

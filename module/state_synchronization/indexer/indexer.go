@@ -70,7 +70,7 @@ func NewIndexer(
 	indexer *IndexerCore,
 	executionCache *cache.ExecutionDataCache,
 	executionDataLatestHeight func() (uint64, error),
-	processedHeight storage.ConsumerProgress,
+	processedHeightInitializer storage.ConsumerProgressInitializer,
 ) (*Indexer, error) {
 	r := &Indexer{
 		log:                     log.With().Str("module", "execution_indexer").Logger(),
@@ -89,7 +89,7 @@ func NewIndexer(
 	jobConsumer, err := jobqueue.NewComponentConsumer(
 		r.log,
 		r.exeDataNotifier.Channel(),
-		processedHeight,
+		processedHeightInitializer,
 		r.exeDataReader,
 		initHeight,
 		r.processExecutionData,

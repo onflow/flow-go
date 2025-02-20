@@ -115,12 +115,12 @@ func (_m *ReadOnlyExecutionState) GetExecutionResultID(_a0 context.Context, _a1 
 	return r0, r1
 }
 
-// GetHighestExecutedBlockID provides a mock function with given fields: _a0
-func (_m *ReadOnlyExecutionState) GetHighestExecutedBlockID(_a0 context.Context) (uint64, flow.Identifier, error) {
+// GetLastExecutedBlockID provides a mock function with given fields: _a0
+func (_m *ReadOnlyExecutionState) GetLastExecutedBlockID(_a0 context.Context) (uint64, flow.Identifier, error) {
 	ret := _m.Called(_a0)
 
 	if len(ret) == 0 {
-		panic("no return value specified for GetHighestExecutedBlockID")
+		panic("no return value specified for GetLastExecutedBlockID")
 	}
 
 	var r0 uint64
