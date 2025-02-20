@@ -12,6 +12,8 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
+// eventWrapper is a helper structure that arranges Event fields in a specific order
+// to verify the usage of an Event's Fingerprint outside the protocol.
 type eventWrapper struct {
 	TxID             []byte
 	Index            uint32
@@ -30,6 +32,9 @@ func wrapEvent(e flow.Event) eventWrapper {
 	}
 }
 
+// TestEventFingerprint verifies that the Fingerprint function produces
+// a consistent RLP-encoded representation of an Event. It ensures that
+// decoding the fingerprint results in a correctly ordered structure.
 func TestEventFingerprint(t *testing.T) {
 	evt := unittest.EventFixture(flow.EventAccountCreated, 13, 12, unittest.IdentifierFixture(), 32)
 

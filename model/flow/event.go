@@ -45,12 +45,15 @@ func (e Event) Checksum() Identifier {
 	return MakeID(e)
 }
 
+// Fingerprint returns the RLP-encoded representation of the Event type.
+// It defines a canonical encoding with a specific field order that differs from the Event struct.
+// The fingerprint is used in the construction of EventsMerkleRootHash.
 func (e Event) Fingerprint() []byte {
 	return fingerprint.Fingerprint(struct {
-		Type             EventType
 		TransactionID    Identifier
-		TransactionIndex uint32
 		EventIndex       uint32
+		Type             EventType
+		TransactionIndex uint32
 		Payload          []byte
 	}{
 		TransactionID:    e.TransactionID,
