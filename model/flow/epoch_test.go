@@ -10,6 +10,7 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
+// TestMalleability performs sanity checks to ensure that epoch related entities are not malleable.
 func TestMalleability(t *testing.T) {
 	t.Run("EpochSetup", func(t *testing.T) {
 		unittest.RequireEntityNonMalleable(t, unittest.EpochSetupFixture())
