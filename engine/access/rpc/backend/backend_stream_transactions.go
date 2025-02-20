@@ -5,8 +5,6 @@ import (
 	"errors"
 	"fmt"
 
-	"go.uber.org/atomic"
-
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
@@ -54,7 +52,7 @@ func (b *backendSubscribeTransactions) SendAndSubscribeTransactionStatuses(
 	requiredEventEncodingVersion entities.EventEncodingVersion,
 ) subscription.Subscription {
 	if err := b.sendTransaction(ctx, tx); err != nil {
-		b.log.Err(err).Str("tx_id", tx.ID().String()).Msg("failed to send transaction")
+		b.log.Debug().Err(err).Str("tx_id", tx.ID().String()).Msg("failed to send transaction")
 		return subscription.NewFailedSubscription(err, "failed to send transaction")
 	}
 
@@ -112,15 +110,15 @@ func (b *backendSubscribeTransactions) createSubscription(
 	// Determine the height of the block to start the subscription from.
 	startHeight, err := b.blockTracker.GetStartHeightFromBlockID(startBlockID)
 	if err != nil {
-		b.log.Err(err).Str("block_id", startBlockID.String()).Msg("failed to get start height")
+		b.log.Debug().Err(err).Str("block_id", startBlockID.String()).Msg("failed to get start height")
 		return subscription.NewFailedSubscription(err, "failed to get start height")
 	}
 
 	// Retrieve the current state of the transaction.
 	txInfo, err := newTransactionSubscriptionMetadata(ctx, b.backendTransactions, txID, referenceBlockID, requiredEventEncodingVersion)
 	if err != nil {
-		b.log.Err(err).Str("tx_id", txID.String()).Msg("failed to get current transaction state")
-		return subscription.NewFailedSubscription(err, "failed to get tx reference block ID")
+		b.log.Debug().Err(err).Str("tx_id", txID.String()).Msg("failed to get current transaction state")
+		return subscription.NewFailedSubscription(err, "failed to start stream")
 	}
 
 	return b.subscriptionHandler.Subscribe(ctx, startHeight, b.getTransactionStatusResponse(txInfo, startHeight))
@@ -128,29 +126,23 @@ func (b *backendSubscribeTransactions) createSubscription(
 
 // getTransactionStatusResponse returns a callback function that produces transaction status
 // subscription responses based on new blocks.
+// The returned callback is not concurrency-safe
 func (b *backendSubscribeTransactions) getTransactionStatusResponse(
 	txInfo *transactionSubscriptionMetadata,
 	startHeight uint64,
 ) func(context.Context, uint64) (interface{}, error) {
-	triggerMissingStatusesOnce := atomic.NewBool(false)
-
 	return func(ctx context.Context, height uint64) (interface{}, error) {
 		err := b.checkBlockReady(height)
 		if err != nil {
 			return nil, err
 		}
 
-		if triggerMissingStatusesOnce.CompareAndSwap(false, true) {
-			return b.generateResultsStatuses(txInfo.txResult, flow.TransactionStatusUnknown)
-		}
-
 		if txInfo.txResult.IsFinal() {
 			return nil, fmt.Errorf("transaction final status %s already reported: %w", txInfo.txResult.Status.String(), subscription.ErrEndOfData)
 		}
 
-		heightDiff := height - startHeight
-		hasReachedUnknownStatusLimit := txInfo.txResult.Status == flow.TransactionStatusUnknown && heightDiff >= TransactionExpiryForUnknownStatus
-		if hasReachedUnknownStatusLimit {
+		// timeout waiting for unknown tx that are never indexed
+		if hasReachedUnknownStatusLimit(height, startHeight, txInfo.txResult.Status) {
 			txInfo.txResult.Status = flow.TransactionStatusExpired
 			return b.generateResultsStatuses(txInfo.txResult, flow.TransactionStatusUnknown)
 		}
@@ -168,6 +160,16 @@ func (b *backendSubscribeTransactions) getTransactionStatusResponse(
 
 		return b.generateResultsStatuses(txInfo.txResult, prevTxStatus)
 	}
+}
+
+// hasReachedUnknownStatusLimit checks if a transaction's status is still unknown
+// after the expiry limit has been reached.
+func hasReachedUnknownStatusLimit(height, startHeight uint64, status flow.TransactionStatus) bool {
+	if status != flow.TransactionStatusUnknown {
+		return false
+	}
+
+	return height-startHeight >= TransactionExpiryForUnknownStatus
 }
 
 // checkBlockReady checks if the given block height is valid and available based on the expected block status.
