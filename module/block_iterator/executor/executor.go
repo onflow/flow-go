@@ -34,9 +34,9 @@ type IsBatchFull func(iteratedCountInCurrentBatch int) bool
 // can be resumed after restart.
 // it sleeps after each batch is committed in order to minimizing the impact on the system.
 func IterateExecuteAndCommitInBatch(
-	log zerolog.Logger,
 	// ctx is used for cancelling the iteration when the context is done
 	ctx context.Context,
+	log zerolog.Logger,
 	// iterator decides how to iterate over blocks
 	iter module.BlockIterator,
 	// executor decides what data in the storage will be updated for a certain block

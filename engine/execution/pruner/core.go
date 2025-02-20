@@ -175,7 +175,7 @@ func makeIterateAndPruneAll(
 	}
 
 	return func(iter module.BlockIterator) error {
-		err := executor.IterateExecuteAndCommitInBatch(log, ctx, iter, prune, chunkDataPacksDB, isBatchFull, sleeper)
+		err := executor.IterateExecuteAndCommitInBatch(ctx, log, iter, prune, chunkDataPacksDB, isBatchFull, sleeper)
 		if err != nil {
 			return fmt.Errorf("failed to iterate, execute, and commit in batch: %w", err)
 		}

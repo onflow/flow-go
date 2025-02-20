@@ -56,8 +56,7 @@ func TestExecute(t *testing.T) {
 		// prune blocks
 		batchSize := 3
 		require.NoError(t, executor.IterateExecuteAndCommitInBatch(
-			unittest.Logger(),
-			context.Background(), iter, pr, pdb, func(count int) bool { return count >= batchSize }, sleeper.Sleep))
+			context.Background(), unittest.Logger(), iter, pr, pdb, func(count int) bool { return count >= batchSize }, sleeper.Sleep))
 
 		// expect all blocks are pruned
 		for _, b := range bs {
@@ -117,8 +116,7 @@ func TestExecuteCanBeResumed(t *testing.T) {
 		// prune blocks until interrupted at block 5
 		batchSize := 3
 		err := executor.IterateExecuteAndCommitInBatch(
-			unittest.Logger(),
-			context.Background(), iter, pruneUntilInterrupted, pdb, func(count int) bool { return count >= batchSize }, sleeper.Sleep)
+			context.Background(), unittest.Logger(), iter, pruneUntilInterrupted, pdb, func(count int) bool { return count >= batchSize }, sleeper.Sleep)
 		require.True(t, errors.Is(err, interrupted), fmt.Errorf("expected %v but got %v", interrupted, err))
 
 		// expect all blocks are pruned
@@ -150,8 +148,7 @@ func TestExecuteCanBeResumed(t *testing.T) {
 		}
 
 		require.NoError(t, executor.IterateExecuteAndCommitInBatch(
-			unittest.Logger(),
-			context.Background(), iterToAll, pr, pdb, func(count int) bool { return count >= batchSize }, sleeper.Sleep))
+			context.Background(), unittest.Logger(), iterToAll, pr, pdb, func(count int) bool { return count >= batchSize }, sleeper.Sleep))
 
 		// verify all blocks are pruned
 		for _, b := range bs {
