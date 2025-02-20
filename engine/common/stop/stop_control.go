@@ -36,7 +36,7 @@ type StopControl struct {
 	doneProcessingEvents chan struct{}
 
 	// Stores latest processed block height
-	lastProcessedHeight counters.StrictMonotonousCounter
+	lastProcessedHeight counters.StrictMonotonicCounter
 }
 
 // NewStopControl creates a new StopControl instance.
@@ -53,7 +53,7 @@ func NewStopControl(
 		log: log.With().
 			Str("component", "stop_control").
 			Logger(),
-		lastProcessedHeight:    counters.NewMonotonousCounter(0),
+		lastProcessedHeight:    counters.NewMonotonicCounter(0),
 		versionData:            atomic.NewPointer[VersionMetadata](nil),
 		processedHeightChannel: make(chan uint64),
 		doneProcessingEvents:   make(chan struct{}),

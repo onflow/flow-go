@@ -10,5 +10,5 @@ import (
 // TestTimeoutCertificateID_Malleability confirms that the TimeoutCertificate struct, which implements
 // the [flow.IDEntity] interface, is resistant to tampering.
 func TestTimeoutCertificateID_Malleability(t *testing.T) {
-	unittest.RequireEntityNotMalleable(t, helper.MakeTC())
+	unittest.RequireEntityNonMalleable(t, helper.MakeTC())
 }

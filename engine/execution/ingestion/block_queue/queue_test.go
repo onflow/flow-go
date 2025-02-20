@@ -14,7 +14,7 @@ import (
 // TestMissingCollectionID_Malleability confirms that the MissingCollection struct, which implements
 // the [flow.IDEntity] interface, is resistant to tampering.
 func TestMissingCollectionID_Malleability(t *testing.T) {
-	unittest.RequireEntityNotMalleable(t, &MissingCollection{
+	unittest.RequireEntityNonMalleable(t, &MissingCollection{
 		BlockID:   unittest.IdentifierFixture(),
 		Height:    unittest.BlockHeaderFixture().Height,
 		Guarantee: unittest.CollectionGuaranteeFixture(),

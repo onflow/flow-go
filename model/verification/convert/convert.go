@@ -12,7 +12,7 @@ func FromChunkDataPack(
 	chunk *flow.Chunk,
 	chunkDataPack *flow.ChunkDataPack,
 	header *flow.Header,
-	snapshot protocol.Snapshot,
+	snapshot protocol.SnapshotExecutionSubset,
 	result *flow.ExecutionResult,
 ) (*verification.VerifiableChunkData, error) {
 

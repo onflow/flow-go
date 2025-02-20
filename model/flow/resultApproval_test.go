@@ -18,5 +18,5 @@ func TestResultApprovalEncode(t *testing.T) {
 // TestAttestationID_Malleability confirms that the Attestation struct, which implements
 // the [flow.IDEntity] interface, is resistant to tampering.
 func TestAttestationID_Malleability(t *testing.T) {
-	unittest.RequireEntityNotMalleable(t, unittest.AttestationFixture())
+	unittest.RequireEntityNonMalleable(t, unittest.AttestationFixture())
 }
