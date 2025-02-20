@@ -1015,7 +1015,9 @@ func (stubEntropyProvider) RandomSource() ([]byte, error) {
 }
 
 func (b *bootstrapExecutor) setupVMBridge(serviceAddress flow.Address, env *templates.Environment) {
-	if b.setupEVMEnabled {
+	// only setup VM bridge for transient networks
+	// this is because the evm storage account for testnet and mainnet do not exist yet after boostrapping
+	if bool(b.setupEVMEnabled) && b.ctx.Chain.ChainID().Transient() {
 
 		bridgeEnv := bridge.Environment{
 			CrossVMNFTAddress:                     env.ServiceAccountAddress,
