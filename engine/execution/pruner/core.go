@@ -42,15 +42,18 @@ func LoopPruneExecutionDataFromRootToLatestSealed(
 		return err
 	}
 
-	// the returned iterateAndPruneAll takes a block iterator and iterates through all the blocks
+	pruner := NewChunkDataPackPruner(chunkDataPacks, results)
+
+	// iterateAndPruneAll takes a block iterator and iterates through all the blocks
 	// and decides how to prune the chunk data packs.
-	iterateAndPruneAll := makeIterateAndPruneAll(
-		ctx, // for cancelling the iteration when the context is done
-		log,
-		config,
-		chunksDB,
-		NewChunkDataPackPruner(chunkDataPacks, results),
-	)
+	iterateAndPruneAll := func(iter module.BlockIterator) error {
+		err := executor.IterateExecuteAndCommitInBatch(
+			ctx, log, iter, pruner, chunksDB, config.BatchSize, config.SleepAfterEachBatchCommit)
+		if err != nil {
+			return fmt.Errorf("failed to iterate, execute, and commit in batch: %w", err)
+		}
+		return nil
+	}
 
 	for {
 		nextToPrune, latestToPrune, err := getNextAndLatest()
@@ -151,19 +154,4 @@ func makeBlockIteratorCreator(
 
 		return next, header.Height, nil
 	}, nil
-}
-
-// makeIterateAndPruneAll takes config and chunk data packs db and pruner and returns a function that
-// takes a block iterator and iterates through all the blocks and decides how to prune the chunk data packs.
-func makeIterateAndPruneAll(
-	ctx context.Context, log zerolog.Logger, config PruningConfig, chunkDataPacksDB storage.DB, prune *ChunkDataPackPruner,
-) func(iter module.BlockIterator) error {
-	return func(iter module.BlockIterator) error {
-		err := executor.IterateExecuteAndCommitInBatch(
-			ctx, log, iter, prune, chunkDataPacksDB, config.BatchSize, config.SleepAfterEachBatchCommit)
-		if err != nil {
-			return fmt.Errorf("failed to iterate, execute, and commit in batch: %w", err)
-		}
-		return nil
-	}
 }
