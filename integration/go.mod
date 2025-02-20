@@ -245,7 +245,7 @@ require (
 	github.com/olekukonko/tablewriter v0.0.5 // indirect
 	github.com/onflow/atree v0.10.0 // indirect
 	github.com/onflow/bridged-usdc/lib/go/contracts v1.0.0 // indirect
-	github.com/onflow/flow-evm-bridge v0.0.0-20250219214738-eb4d7d301bbf // indirect
+	github.com/onflow/flow-evm-bridge v0.0.0-20250220164953-ef710abe88ca // indirect
 	github.com/onflow/flow-ft/lib/go/contracts v1.0.1 // indirect
 	github.com/onflow/flow-ft/lib/go/templates v1.0.1 // indirect
 	github.com/onflow/flow-nft/lib/go/contracts v1.2.3 // indirect

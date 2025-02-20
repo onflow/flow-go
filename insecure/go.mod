@@ -207,7 +207,7 @@ require (
 	github.com/onflow/cadence v1.3.4 // indirect
 	github.com/onflow/flow-core-contracts/lib/go/contracts v1.6.0 // indirect
 	github.com/onflow/flow-core-contracts/lib/go/templates v1.6.0 // indirect
-	github.com/onflow/flow-evm-bridge v0.0.0-20250219214738-eb4d7d301bbf // indirect
+	github.com/onflow/flow-evm-bridge v0.0.0-20250220164953-ef710abe88ca // indirect
 	github.com/onflow/flow-ft/lib/go/contracts v1.0.1 // indirect
 	github.com/onflow/flow-ft/lib/go/templates v1.0.1 // indirect
 	github.com/onflow/flow-go-sdk v1.3.3 // indirect
