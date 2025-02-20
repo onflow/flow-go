@@ -210,7 +210,6 @@ func NewEpochLookup(state protocol.State) (*EpochLookup, error) {
 // No errors are expected during normal operation.
 func (lookup *EpochLookup) cacheEpoch(epoch protocol.CommittedEpoch) error {
 	counter := epoch.Counter()
-
 	cachedEpoch := epochRange{
 		counter:   counter,
 		firstView: epoch.FirstView(),

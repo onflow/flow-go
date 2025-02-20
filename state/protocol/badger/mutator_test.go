@@ -2374,7 +2374,6 @@ func TestRecoveryFromEpochFallbackMode(t *testing.T) {
 			epochAfterExtension, err := state.Final().Epochs().Current()
 			require.NoError(t, err)
 			finalView := epochAfterExtension.FinalView()
-			require.NoError(t, err)
 			assert.Equal(t, epochExtensions[0].FinalView, finalView)
 
 			// Constructing blocks
