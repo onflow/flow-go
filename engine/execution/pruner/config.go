@@ -1,6 +1,9 @@
 package pruner
 
-import "time"
+import (
+	"math"
+	"time"
+)
 
 type PruningConfig struct {
 	Threshold                 uint64        // The threshold is the number of blocks that we want to keep in the database.
@@ -19,5 +22,5 @@ var DefaultConfig = PruningConfig{
 	//   the sleep time should be smaller than 1000 seconds, otherwise,
 	//   the pruner is not able to keep up with the block generation.
 	SleepAfterEachBatchCommit: 12 * time.Second,
-	SleepAfterEachIteration:   500000 * time.Hour, // by default it's disabled so that we can slowly roll this feature out.
+	SleepAfterEachIteration:   math.MaxInt64, // by default it's disabled so that we can slowly roll this feature out.
 }

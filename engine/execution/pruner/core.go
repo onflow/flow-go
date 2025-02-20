@@ -163,7 +163,15 @@ func makeIterateAndPruneAll(
 	}
 
 	sleeper := func() {
-		time.Sleep(config.SleepAfterEachBatchCommit)
+		// if the context is done, return immediately
+		// otherwise sleep for the configured time
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-time.After(config.SleepAfterEachBatchCommit):
+			}
+		}
 	}
 
 	return func(iter module.BlockIterator) error {
