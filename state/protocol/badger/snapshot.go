@@ -417,23 +417,21 @@ func (q *EpochQuery) NextUnsafe() (protocol.TentativeEpoch, error) {
 	if err != nil {
 		return nil, fmt.Errorf("could not get protocol state snapshot at block %x: %w", q.snap.blockID, err)
 	}
-	phase := epochState.EpochPhase()
 	entry := epochState.Entry()
 
+	switch epochState.EpochPhase() {
 	// if we are in the staking or fallback phase, the next epoch is not setup yet
-	if phase == flow.EpochPhaseStaking || phase == flow.EpochPhaseFallback {
+	case flow.EpochPhaseStaking, flow.EpochPhaseFallback:
 		return nil, protocol.ErrNextEpochNotSetup
-	}
 	// if we are in setup phase, return a SetupEpoch
-	nextSetup := entry.NextEpochSetup
-	if phase == flow.EpochPhaseSetup {
-		return inmem.NewSetupEpoch(nextSetup), nil
-	}
+	case flow.EpochPhaseSetup:
+		return inmem.NewSetupEpoch(entry.NextEpochSetup), nil
 	// if we are in committed phase, return an error
-	if phase == flow.EpochPhaseCommitted {
+	case flow.EpochPhaseCommitted:
 		return nil, protocol.ErrNextEpochAlreadyCommitted
+	default:
+		return nil, fmt.Errorf("data corruption: unknown epoch phase implies malformed protocol state epoch data")
 	}
-	return nil, fmt.Errorf("data corruption: unknown epoch phase implies malformed protocol state epoch data")
 }
 
 // NextCommitted returns the next epoch as of this snapshot, only if it has been committed already.
