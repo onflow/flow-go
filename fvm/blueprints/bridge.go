@@ -88,12 +88,64 @@ func DeployFlowEVMBridgeUtilsContractTransaction(
 
 // PauseBridgeTransaction returns the transaction body for the transaction to pause or unpause the VM bridge
 func PauseBridgeTransaction(service flow.Address, bridgeEnv bridge.Environment, env templates.Environment, pause bool) *flow.TransactionBody {
-	txScript, _ := bridge.GetCadenceTransactionCode("cadence/transactions/bridge/admin/pause/update_bridge_pause_status", bridgeEnv, env)
+	txScript, _ := bridge.GetCadenceTransactionCode("cadence/transactions/bridge/admin/pause/update_bridge_pause_status.cdc", bridgeEnv, env)
 	return flow.NewTransactionBody().
 		SetScript([]byte(
 			txScript,
 		),
 		).
 		AddArgument(jsoncdc.MustEncode(cadence.Bool(pause))).
+		AddAuthorizer(service)
+}
+
+// SetRegistrarTransaction returns the transaction body for the transaction to set the factory as registrar
+func SetRegistrarTransaction(service flow.Address, bridgeEnv bridge.Environment, env templates.Environment, registryAddress string) *flow.TransactionBody {
+	txScript, _ := bridge.GetCadenceTransactionCode("cadence/transactions/bridge/admin/evm/set_registrar.cdc", bridgeEnv, env)
+	return flow.NewTransactionBody().
+		SetScript([]byte(
+			txScript,
+		),
+		).
+		AddArgument(jsoncdc.MustEncode(cadence.String(registryAddress))).
+		AddAuthorizer(service)
+}
+
+// SetDeploymentRegistryTransaction returns the transaction body for the transaction to add the registry to the factory
+func SetDeploymentRegistryTransaction(service flow.Address, bridgeEnv bridge.Environment, env templates.Environment, registryAddress string) *flow.TransactionBody {
+	txScript, _ := bridge.GetCadenceTransactionCode("cadence/transactions/bridge/admin/evm/set_deployment_registry.cdc", bridgeEnv, env)
+	return flow.NewTransactionBody().
+		SetScript([]byte(
+			txScript,
+		),
+		).
+		AddArgument(jsoncdc.MustEncode(cadence.String(registryAddress))).
+		AddAuthorizer(service)
+}
+
+// SetDelegatedDeployerTransaction returns the transaction body for the transaction
+// to set a delegated deployer for a particular token type
+func SetDelegatedDeployerTransaction(service flow.Address, bridgeEnv bridge.Environment, env templates.Environment, deployerTag, deployerAddress string) *flow.TransactionBody {
+	txScript, _ := bridge.GetCadenceTransactionCode("cadence/transactions/bridge/admin/evm/set_delegated_deployer.cdc", bridgeEnv, env)
+	return flow.NewTransactionBody().
+		SetScript([]byte(
+			txScript,
+		),
+		).
+		AddArgument(jsoncdc.MustEncode(cadence.String(deployerTag))).
+		AddArgument(jsoncdc.MustEncode(cadence.String(deployerAddress))).
+		AddAuthorizer(service)
+}
+
+// AddDeployerTransaction returns the transaction body for the transaction
+// to add a deployer for a particular token type
+func AddDeployerTransaction(service flow.Address, bridgeEnv bridge.Environment, env templates.Environment, deployerTag, deployerAddress string) *flow.TransactionBody {
+	txScript, _ := bridge.GetCadenceTransactionCode("cadence/transactions/bridge/admin/evm/add_deployer.cdc", bridgeEnv, env)
+	return flow.NewTransactionBody().
+		SetScript([]byte(
+			txScript,
+		),
+		).
+		AddArgument(jsoncdc.MustEncode(cadence.String(deployerTag))).
+		AddArgument(jsoncdc.MustEncode(cadence.String(deployerAddress))).
 		AddAuthorizer(service)
 }
