@@ -1,8 +1,9 @@
 package flow_test
 
 import (
-	"github.com/onflow/flow-go/utils/unittest"
 	"testing"
+
+	"github.com/onflow/flow-go/utils/unittest"
 )
 
 // TestQuorumCertificateID_Malleability confirms that the QuorumCertificate struct, which implements
