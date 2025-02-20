@@ -50,11 +50,11 @@ func MockEntityListFixture(count int) []*MockEntity {
 	return entities
 }
 
-// RequireEntityNonMalleable is a sanity check that the entity is not malleable with regards to the ID() function. 
-// Non-malleability in this sense means that it is computationally hard to build a different entity with the same ID. This implies that in a non-malleable entity, changing any field should change the ID, which is checked by this function. Note that this is sanity check of non-malleability and that passing this test does not guarantee non-malleability. 
+// RequireEntityNonMalleable is a sanity check that the entity is not malleable with regards to the ID() function.
+// Non-malleability in this sense means that it is computationally hard to build a different entity with the same ID. This implies that in a non-malleable entity, changing any field should change the ID, which is checked by this function. Note that this is sanity check of non-malleability and that passing this test does not guarantee non-malleability.
 // Non-malleability is a required property for any entity that implements the [flow.IDEntity] interface. This is especially
 // important for entities that contain signatures and are transmitted over the network.
-// ID is used by the protocol to insure entity integrity when transmitted over the network. ID must therefore be a binding cryptographic commitment to an entity. 
+// ID is used by the protocol to insure entity integrity when transmitted over the network. ID must therefore be a binding cryptographic commitment to an entity.
 // This function consumes the entity and modifies its fields randomly to ensure that the ID changes after each modification.
 // Generally speaking each type that implements [flow.IDEntity] method should be tested with this function.
 // ATTENTION: We put only one requirement for data types, that is all fields have to be exported so we can modify them.
@@ -163,9 +163,9 @@ func generateRandomReflectValue(t *testing.T, field reflect.Value) bool {
 	generated := true
 	switch field.Kind() {
 	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
-		field.SetUint(field.Uint() + uint64(rand.Intn(100)+1))
+		field.SetUint(^field.Uint())
 	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
-		field.SetInt(field.Int() + int64(rand.Intn(100)+1))
+		field.SetInt(^field.Int())
 	case reflect.String:
 		field.SetString(fmt.Sprintf("random_%d", rand.Intn(100000)))
 	case reflect.Float64, reflect.Float32:
