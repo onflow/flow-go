@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"testing"
+	"time"
 
 	"github.com/cockroachdb/pebble"
 	"github.com/stretchr/testify/require"
@@ -51,12 +52,11 @@ func TestExecute(t *testing.T) {
 			},
 		}
 
-		sleeper := &sleeper{}
-
 		// prune blocks
-		batchSize := 3
+		batchSize := uint(3)
+		nosleep := time.Duration(0)
 		require.NoError(t, executor.IterateExecuteAndCommitInBatch(
-			context.Background(), unittest.Logger(), iter, pr, pdb, func(count int) bool { return count >= batchSize }, sleeper.Sleep))
+			context.Background(), unittest.Logger(), iter, pr, pdb, batchSize, nosleep))
 
 		// expect all blocks are pruned
 		for _, b := range bs {
@@ -65,9 +65,6 @@ func TestExecute(t *testing.T) {
 			err := operation.RetrieveChunkDataPack(pdb.Reader(), b, &c)
 			require.True(t, errors.Is(err, storage.ErrNotFound), "expected ErrNotFound but got %v", err)
 		}
-
-		// the sleeper should be called 3 times, because blockCount blocks will be pruned in 3 batchs.
-		require.Equal(t, blockCount/batchSize, sleeper.count)
 	})
 }
 
@@ -111,12 +108,11 @@ func TestExecuteCanBeResumed(t *testing.T) {
 			},
 		}
 
-		sleeper := &sleeper{}
-
 		// prune blocks until interrupted at block 5
-		batchSize := 3
+		batchSize := uint(3)
+		nosleep := time.Duration(0)
 		err := executor.IterateExecuteAndCommitInBatch(
-			context.Background(), unittest.Logger(), iter, pruneUntilInterrupted, pdb, func(count int) bool { return count >= batchSize }, sleeper.Sleep)
+			context.Background(), unittest.Logger(), iter, pruneUntilInterrupted, pdb, batchSize, nosleep)
 		require.True(t, errors.Is(err, interrupted), fmt.Errorf("expected %v but got %v", interrupted, err))
 
 		// expect all blocks are pruned
@@ -135,9 +131,6 @@ func TestExecuteCanBeResumed(t *testing.T) {
 			require.NoError(t, operation.RetrieveChunkDataPack(pdb.Reader(), b, &c))
 		}
 
-		// the sleeper should be called once
-		require.Equal(t, 5/batchSize, sleeper.count)
-
 		// now resume the pruning
 		iterToAll := restoreBlockIterator(iter.blocks, iter.stored)
 
@@ -148,7 +141,7 @@ func TestExecuteCanBeResumed(t *testing.T) {
 		}
 
 		require.NoError(t, executor.IterateExecuteAndCommitInBatch(
-			context.Background(), unittest.Logger(), iterToAll, pr, pdb, func(count int) bool { return count >= batchSize }, sleeper.Sleep))
+			context.Background(), unittest.Logger(), iterToAll, pr, pdb, batchSize, nosleep))
 
 		// verify all blocks are pruned
 		for _, b := range bs {
@@ -189,14 +182,6 @@ func restoreBlockIterator(blocks []flow.Identifier, stored int) *iterator {
 		cur:    stored,
 		stored: stored,
 	}
-}
-
-type sleeper struct {
-	count int
-}
-
-func (s *sleeper) Sleep() {
-	s.count++
 }
 
 type testExecutor struct {

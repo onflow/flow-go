@@ -20,14 +20,6 @@ type IterationExecutor interface {
 	ExecuteByBlockID(blockID flow.Identifier, batch storage.ReaderBatchWriter) (exception error)
 }
 
-// Sleeper allows the caller to slow down the iteration after each batch is committed
-type Sleeper func()
-
-// IsBatchFull decides the batch size for each commit.
-// it takes the number of blocks iterated in the current batch,
-// and returns whether the batch is full.
-type IsBatchFull func(iteratedCountInCurrentBatch int) bool
-
 // IterateExecuteAndCommitInBatch iterates over blocks and execute tasks with data that was indexed by the block.
 // the update to the storage database is done in batch, and the batch is committed when it's full.
 // the iteration progress is saved after batch is committed, so that the iteration progress
@@ -44,14 +36,14 @@ func IterateExecuteAndCommitInBatch(
 	// db creates a new batch for each block, and passed to the executor for adding updates,
 	// the batch is commited when it's full
 	db storage.DB,
-	// isBatchFull decides the batch size for each commit.
-	isBatchFull IsBatchFull,
-	// sleeper allows the caller to slow down the iteration after each batch is committed
+	// batchSize decides the batch size for each commit.
+	batchSize uint,
+	// sleepAfterEachBatchCommit allows the caller to slow down the iteration after each batch is committed
 	// in order to minimize the impact on the system
-	sleeper Sleeper,
+	sleepAfterEachBatchCommit time.Duration,
 ) error {
 	batch := db.NewBatch()
-	iteratedCountInCurrentBatch := 0
+	iteratedCountInCurrentBatch := uint(0)
 
 	startTime := time.Now()
 	total := 0
@@ -103,7 +95,7 @@ func IterateExecuteAndCommitInBatch(
 		total++
 
 		// if batch is full, commit and sleep
-		if isBatchFull(iteratedCountInCurrentBatch) {
+		if iteratedCountInCurrentBatch >= batchSize {
 			// commit the batch and save the progress
 			err := commitAndCheckpoint(log, batch, iter)
 			if err != nil {
@@ -111,7 +103,11 @@ func IterateExecuteAndCommitInBatch(
 			}
 
 			// wait a bit to minimize the impact on the system
-			sleeper()
+			select {
+			case <-ctx.Done():
+				return nil
+			case <-time.After(sleepAfterEachBatchCommit):
+			}
 
 			// create a new batch, and reset iteratedCountInCurrentBatch
 			batch = db.NewBatch()

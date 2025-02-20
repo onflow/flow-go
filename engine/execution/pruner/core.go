@@ -45,8 +45,8 @@ func LoopPruneExecutionDataFromRootToLatestSealed(
 	// the returned iterateAndPruneAll takes a block iterator and iterates through all the blocks
 	// and decides how to prune the chunk data packs.
 	iterateAndPruneAll := makeIterateAndPruneAll(
-		log,
 		ctx, // for cancelling the iteration when the context is done
+		log,
 		config,
 		chunksDB,
 		NewChunkDataPackPruner(chunkDataPacks, results),
@@ -64,8 +64,8 @@ func LoopPruneExecutionDataFromRootToLatestSealed(
 			Msgf("execution data pruning will start in %s at %s",
 				config.SleepAfterEachIteration, time.Now().Add(config.SleepAfterEachIteration).UTC())
 
-			// last pruned is nextToPrune - 1.
-			// it won't underflow, because nextToPrune starts from root + 1
+		// last pruned is nextToPrune - 1.
+		// it won't underflow, because nextToPrune starts from root + 1
 		metrics.ExecutionLastChunkDataPackPrunedHeight(nextToPrune - 1)
 
 		select {
@@ -156,26 +156,11 @@ func makeBlockIteratorCreator(
 // makeIterateAndPruneAll takes config and chunk data packs db and pruner and returns a function that
 // takes a block iterator and iterates through all the blocks and decides how to prune the chunk data packs.
 func makeIterateAndPruneAll(
-	log zerolog.Logger, ctx context.Context, config PruningConfig, chunkDataPacksDB storage.DB, prune *ChunkDataPackPruner,
+	ctx context.Context, log zerolog.Logger, config PruningConfig, chunkDataPacksDB storage.DB, prune *ChunkDataPackPruner,
 ) func(iter module.BlockIterator) error {
-	isBatchFull := func(counter int) bool {
-		return uint(counter) >= config.BatchSize
-	}
-
-	sleeper := func() {
-		// if the context is done, return immediately
-		// otherwise sleep for the configured time
-		for {
-			select {
-			case <-ctx.Done():
-				return
-			case <-time.After(config.SleepAfterEachBatchCommit):
-			}
-		}
-	}
-
 	return func(iter module.BlockIterator) error {
-		err := executor.IterateExecuteAndCommitInBatch(ctx, log, iter, prune, chunkDataPacksDB, isBatchFull, sleeper)
+		err := executor.IterateExecuteAndCommitInBatch(
+			ctx, log, iter, prune, chunkDataPacksDB, config.BatchSize, config.SleepAfterEachBatchCommit)
 		if err != nil {
 			return fmt.Errorf("failed to iterate, execute, and commit in batch: %w", err)
 		}
