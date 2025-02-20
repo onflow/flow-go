@@ -1008,6 +1008,12 @@ func (b *bootstrapExecutor) setupEVM(serviceAddress, nonFungibleTokenAddress, fu
 	}
 }
 
+type stubEntropyProvider struct{}
+
+func (stubEntropyProvider) RandomSource() ([]byte, error) {
+	return []byte{0}, nil
+}
+
 func (b *bootstrapExecutor) setupVMBridge(serviceAddress flow.Address, env *templates.Environment) {
 	if b.setupEVMEnabled {
 
@@ -1038,10 +1044,16 @@ func (b *bootstrapExecutor) setupVMBridge(serviceAddress flow.Address, env *temp
 			StringUtilsAddress:                    env.ServiceAccountAddress,
 		}
 
+		ctx := NewContextFromParent(b.ctx,
+			WithBlockHeader(b.rootBlock),
+			WithEntropyProvider(stubEntropyProvider{}),
+			WithEVMEnabled(true),
+		)
+
 		// Create a COA in the bridge account
 		tx := blueprints.CreateCOATransaction(serviceAddress, bridgeEnv, *env)
 		txError, err := b.invokeMetaTransaction(
-			NewContextFromParent(b.ctx, WithEVMEnabled(true)),
+			ctx,
 			Transaction(tx, 0),
 		)
 		panicOnMetaInvokeErrf("failed to create COA in Service Account: %s", txError, err)
@@ -1056,7 +1068,7 @@ func (b *bootstrapExecutor) setupVMBridge(serviceAddress flow.Address, env *temp
 		tx = blueprints.DeployEVMContractTransaction(serviceAddress, factoryBytecode, gasLimit, deploymentValue, bridgeEnv, *env)
 
 		txOutput, err := b.runMetaTransaction(
-			NewContextFromParent(b.ctx, WithEVMEnabled(true)),
+			ctx,
 			Transaction(tx, 0),
 		)
 		panicOnMetaInvokeErrf("failed to deploy the Factory in the Service Account COA: %s", txOutput.Err, err)
@@ -1069,13 +1081,11 @@ func (b *bootstrapExecutor) setupVMBridge(serviceAddress flow.Address, env *temp
 		// deploy the Solidity Registry contract to the service account's COA
 		tx = blueprints.DeployEVMContractTransaction(serviceAddress, registryBytecode, gasLimit, deploymentValue, bridgeEnv, *env)
 
-		txOutput, err = b.runMetaTransaction(
-			NewContextFromParent(b.ctx, WithEVMEnabled(true)),
+		txError, err = b.invokeMetaTransaction(
+			ctx,
 			Transaction(tx, 0),
 		)
-		panicOnMetaInvokeErrf("failed to deploy the Registry in the Service Account COA: %s", txOutput.Err, err)
-
-		registryAddress := getContractAddressFromEVMEvent(txOutput)
+		panicOnMetaInvokeErrf("failed to deploy the Registry in the Service Account COA: %s", txError, err)
 
 		// Retrieve the erc20Deployer bytecode from the JSON args
 		erc20DeployerBytecode := bridge.GetBytecodeFromArgsJSON("cadence/args/deploy-erc20-deployer-args.json")
@@ -1083,26 +1093,22 @@ func (b *bootstrapExecutor) setupVMBridge(serviceAddress flow.Address, env *temp
 		// deploy the Solidity ERC20 Deployer contract to the service account's COA
 		tx = blueprints.DeployEVMContractTransaction(serviceAddress, erc20DeployerBytecode, gasLimit, deploymentValue, bridgeEnv, *env)
 
-		txOutput, err = b.runMetaTransaction(
-			NewContextFromParent(b.ctx, WithEVMEnabled(true)),
+		txError, err = b.invokeMetaTransaction(
+			ctx,
 			Transaction(tx, 0),
 		)
-		panicOnMetaInvokeErrf("failed to deploy the ERC20 Deployer in the Service Account COA: %s", txOutput.Err, err)
-
-		erc20DeployerAddress := getContractAddressFromEVMEvent(txOutput)
+		panicOnMetaInvokeErrf("failed to deploy the ERC20 Deployer in the Service Account COA: %s", txError, err)
 
 		erc721DeployerBytecode := bridge.GetBytecodeFromArgsJSON("cadence/args/deploy-erc721-deployer-args.json")
 
 		// deploy the Solidity Registry contract to the service account's COA
 		tx = blueprints.DeployEVMContractTransaction(serviceAddress, erc721DeployerBytecode, gasLimit, deploymentValue, bridgeEnv, *env)
 
-		txOutput, err = b.runMetaTransaction(
-			NewContextFromParent(b.ctx, WithEVMEnabled(true)),
+		txError, err = b.invokeMetaTransaction(
+			ctx,
 			Transaction(tx, 0),
 		)
-		panicOnMetaInvokeErrf("failed to deploy the ERC721 Deployer in the Service Account COA: %s", txOutput.Err, err)
-
-		erc721DeployerAddress := getContractAddressFromEVMEvent(txOutput)
+		panicOnMetaInvokeErrf("failed to deploy the ERC721 Deployer in the Service Account COA: %s", txError, err)
 
 		for _, path := range blueprints.BridgeContracts {
 
@@ -1114,7 +1120,7 @@ func (b *bootstrapExecutor) setupVMBridge(serviceAddress flow.Address, env *temp
 
 			if name == "FlowEVMBridgeUtils" {
 				txError, err := b.invokeMetaTransaction(
-					b.ctx,
+					ctx,
 					Transaction(
 						blueprints.DeployFlowEVMBridgeUtilsContractTransaction(serviceAddress, &bridgeEnv, *env, contract, name, factoryAddress),
 						0),
@@ -1122,7 +1128,7 @@ func (b *bootstrapExecutor) setupVMBridge(serviceAddress flow.Address, env *temp
 				panicOnMetaInvokeErrf("failed to deploy FlowEVMBridgeUtils contract: %s", txError, err)
 			} else {
 				txError, err := b.invokeMetaTransaction(
-					b.ctx,
+					ctx,
 					Transaction(
 						blueprints.DeployContractTransaction(serviceAddress, contract, name),
 						0),
@@ -1133,66 +1139,12 @@ func (b *bootstrapExecutor) setupVMBridge(serviceAddress flow.Address, env *temp
 
 		// Pause the bridge for setup
 		txError, err = b.invokeMetaTransaction(
-			b.ctx,
+			ctx,
 			Transaction(
 				blueprints.PauseBridgeTransaction(serviceAddress, bridgeEnv, *env, true),
 				0),
 		)
 		panicOnMetaInvokeErrf("failed to pause the bridge contracts: %s", txError, err)
-
-		// Set the factory as registrar in the registry
-		txError, err = b.invokeMetaTransaction(
-			b.ctx,
-			Transaction(
-				blueprints.SetRegistrarTransaction(serviceAddress, bridgeEnv, *env, registryAddress),
-				0),
-		)
-		panicOnMetaInvokeErrf("failed to set the factory as registrar: %s", txError, err)
-
-		// Add the registry to the factory
-		txError, err = b.invokeMetaTransaction(
-			b.ctx,
-			Transaction(
-				blueprints.SetDeploymentRegistryTransaction(serviceAddress, bridgeEnv, *env, registryAddress),
-				0),
-		)
-		panicOnMetaInvokeErrf("failed to add the registry to the factory: %s", txError, err)
-
-		// Set the factory as delegated deployer in the ERC20 deployer
-		txError, err = b.invokeMetaTransaction(
-			b.ctx,
-			Transaction(
-				blueprints.SetDelegatedDeployerTransaction(serviceAddress, bridgeEnv, *env, "ERC20", erc20DeployerAddress),
-				0),
-		)
-		panicOnMetaInvokeErrf("failed to set the erc20 deployer as delegated deployer: %s", txError, err)
-
-		// Set the factory as delegated deployer in the ERC721 deployer
-		txError, err = b.invokeMetaTransaction(
-			b.ctx,
-			Transaction(
-				blueprints.SetDelegatedDeployerTransaction(serviceAddress, bridgeEnv, *env, "ERC721", erc721DeployerAddress),
-				0),
-		)
-		panicOnMetaInvokeErrf("failed to set the erc721 deployer as delegated deployer: %s", txError, err)
-
-		// Add the ERC20 Deployer as a deployer in the factory
-		txError, err = b.invokeMetaTransaction(
-			b.ctx,
-			Transaction(
-				blueprints.AddDeployerTransaction(serviceAddress, bridgeEnv, *env, "ERC20", erc20DeployerAddress),
-				0),
-		)
-		panicOnMetaInvokeErrf("failed to add the erc20 deployer in the factory: %s", txError, err)
-
-		// Add the ERC721 Deployer as a deployer in the factory
-		txError, err = b.invokeMetaTransaction(
-			b.ctx,
-			Transaction(
-				blueprints.AddDeployerTransaction(serviceAddress, bridgeEnv, *env, "ERC721", erc721DeployerAddress),
-				0),
-		)
-		panicOnMetaInvokeErrf("failed to add the erc721 deployer in the factory: %s", txError, err)
 	}
 }
 
