@@ -10,6 +10,7 @@ import (
 
 	"github.com/onflow/flow-go/engine/access/rest/common/parser"
 	"github.com/onflow/flow-go/engine/access/rest/http/request"
+	"github.com/onflow/flow-go/engine/access/rest/util"
 	"github.com/onflow/flow-go/engine/access/rest/websockets/models"
 	"github.com/onflow/flow-go/engine/access/state_stream"
 	"github.com/onflow/flow-go/engine/access/state_stream/backend"
@@ -20,9 +21,10 @@ import (
 
 // accountStatusesArguments contains the arguments required for subscribing to account statuses
 type accountStatusesArguments struct {
-	StartBlockID     flow.Identifier                  // ID of the block to start subscription from
-	StartBlockHeight uint64                           // Height of the block to start subscription from
-	Filter           state_stream.AccountStatusFilter // Filter applied to events for a given subscription
+	StartBlockID      flow.Identifier                  // ID of the block to start subscription from
+	StartBlockHeight  uint64                           // Height of the block to start subscription from
+	Filter            state_stream.AccountStatusFilter // Filter applied to events for a given subscription
+	HeartbeatInterval *uint64                          // Maximum number of blocks message won't be sent. Nil if not set
 }
 
 type AccountStatusesDataProvider struct {
@@ -63,6 +65,9 @@ func NewAccountStatusesDataProvider(
 	accountStatusesArgs, err := parseAccountStatusesArguments(arguments, chain, eventFilterConfig)
 	if err != nil {
 		return nil, fmt.Errorf("invalid arguments for account statuses data provider: %w", err)
+	}
+	if accountStatusesArgs.HeartbeatInterval != nil {
+		heartbeatInterval = *accountStatusesArgs.HeartbeatInterval
 	}
 
 	subCtx, cancel := context.WithCancel(ctx)
@@ -145,7 +150,7 @@ func parseAccountStatusesArguments(
 		"start_block_height",
 		"event_types",
 		"account_addresses",
-		"heartbeat_interval", //TODO: is this used?
+		"heartbeat_interval",
 	}
 	err := ensureAllowedFields(arguments, allowedFields)
 	if err != nil {
@@ -183,6 +188,21 @@ func parseAccountStatusesArguments(
 		if !ok {
 			return accountStatusesArguments{}, fmt.Errorf("'account_addresses' must be an array of string")
 		}
+	}
+
+	var heartbeatInterval uint64
+	if heartbeatIntervalIn, ok := arguments["heartbeat_interval"]; ok && heartbeatIntervalIn != "" {
+		result, ok := heartbeatIntervalIn.(string)
+		if !ok {
+			return accountStatusesArguments{}, fmt.Errorf("'heartbeat_interval' must be a string")
+		}
+
+		heartbeatInterval, err = util.ToUint64(result)
+		if err != nil {
+			return accountStatusesArguments{}, fmt.Errorf("invalid 'heartbeat_interval': %w", err)
+		}
+
+		args.HeartbeatInterval = &heartbeatInterval
 	}
 
 	// Initialize the event filter with the parsed arguments

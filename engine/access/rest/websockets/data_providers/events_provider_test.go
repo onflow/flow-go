@@ -330,7 +330,8 @@ func (s *EventsProviderSuite) TestEventsDataProvider_StateStreamNotConfigured() 
 // 1. Supplying both 'start_block_id' and 'start_block_height' simultaneously, which is not allowed.
 // 2. Providing invalid 'start_block_id' value.
 // 3. Providing invalid 'start_block_height' value.
-// 4. Providing unexpected argument.
+// 4. Providing invalid 'heartbeat_interval' value.
+// 5. Providing unexpected argument.
 func invalidArgumentsTestCases() []testErrType {
 	return []testErrType{
 		{
@@ -352,6 +353,13 @@ func invalidArgumentsTestCases() []testErrType {
 			name: "invalid 'start_block_height' argument",
 			arguments: map[string]interface{}{
 				"start_block_height": "-1",
+			},
+			expectedErrorMsg: "value must be an unsigned 64 bit integer",
+		},
+		{
+			name: "invalid 'heartbeat_interval' argument",
+			arguments: map[string]interface{}{
+				"heartbeat_interval": "-1",
 			},
 			expectedErrorMsg: "value must be an unsigned 64 bit integer",
 		},

@@ -104,7 +104,6 @@ func (p *TransactionStatusesDataProvider) handleResponse() func(txResults []*acc
 	messageIndex := counters.NewMonotonicCounter(0)
 
 	return func(txResults []*access.TransactionResult) error {
-
 		for i := range txResults {
 			index := messageIndex.Value()
 			if ok := messageIndex.Set(messageIndex.Value() + 1); !ok {
