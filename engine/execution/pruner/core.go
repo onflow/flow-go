@@ -48,7 +48,7 @@ func LoopPruneExecutionDataFromRootToLatestSealed(
 	// and decides how to prune the chunk data packs.
 	iterateAndPruneAll := func(iter module.BlockIterator) error {
 		err := executor.IterateExecuteAndCommitInBatch(
-			ctx, log, iter, pruner, chunksDB, config.BatchSize, config.SleepAfterEachBatchCommit)
+			ctx, log, metrics, iter, pruner, chunksDB, config.BatchSize, config.SleepAfterEachBatchCommit)
 		if err != nil {
 			return fmt.Errorf("failed to iterate, execute, and commit in batch: %w", err)
 		}
@@ -61,15 +61,24 @@ func LoopPruneExecutionDataFromRootToLatestSealed(
 			return fmt.Errorf("failed to get next and latest to prune: %w", err)
 		}
 
+		commitDuration := 2 * time.Millisecond // with default batch size 1200, the avg commit duration is 2ms
+		batchCount, totalDuration := EstimateBatchProcessing(
+			nextToPrune, latestToPrune,
+			config.BatchSize, config.SleepAfterEachBatchCommit, commitDuration)
+
 		log.Info().
 			Uint64("nextToPrune", nextToPrune).
 			Uint64("latestToPrune", latestToPrune).
-			Msgf("execution data pruning will start in %s at %s",
-				config.SleepAfterEachIteration, time.Now().Add(config.SleepAfterEachIteration).UTC())
+			Uint64("batchCount", batchCount).
+			Uint64("totalDuration", uint64(totalDuration.Seconds())).
+			Msgf("execution data pruning will start in %s at %s, complete at %s",
+				config.SleepAfterEachIteration,
+				time.Now().Add(config.SleepAfterEachIteration).UTC(),
+				time.Now().Add(config.SleepAfterEachIteration).Add(totalDuration).UTC(),
+			)
 
-		// last pruned is nextToPrune - 1.
-		// it won't underflow, because nextToPrune starts from root + 1
-		metrics.ExecutionLastChunkDataPackPrunedHeight(nextToPrune - 1)
+		// report the target pruned height
+		metrics.ExecutionTargetChunkDataPackPrunedHeight(latestToPrune)
 
 		select {
 		case <-ctx.Done():
@@ -154,4 +163,19 @@ func makeBlockIteratorCreator(
 
 		return next, header.Height, nil
 	}, nil
+}
+
+// estimateBatchProcessing estimates the number of batches and the total duration
+func EstimateBatchProcessing(
+	start, end uint64, batchSize uint, sleepAfterEachBatchCommit time.Duration, commitDuration time.Duration) (
+	batchCount uint64, totalDuration time.Duration) {
+	if batchSize == 0 || start >= end {
+		return 0, 0
+	}
+
+	batchCount = (end - start + uint64(batchSize) - 1) / uint64(batchSize)
+
+	totalDuration = time.Duration(batchCount-1)*sleepAfterEachBatchCommit + time.Duration(batchCount)*commitDuration
+
+	return batchCount, totalDuration
 }
