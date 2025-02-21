@@ -106,7 +106,7 @@ func (r *ExecutionResults) Store(result *flow.ExecutionResult) error {
 }
 
 func (r *ExecutionResults) BatchStore(result *flow.ExecutionResult, batch storage.ReaderBatchWriter) error {
-	return operation.InsertExecutionResult(batch.Writer(), result)
+	return r.store(batch, result)
 }
 
 func (r *ExecutionResults) BatchIndex(blockID flow.Identifier, resultID flow.Identifier, batch storage.ReaderBatchWriter) error {
