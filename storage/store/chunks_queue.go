@@ -22,6 +22,7 @@ type ChunksQueue struct {
 }
 
 const JobQueueChunksQueue = "JobQueueChunksQueue"
+const DefaultChunkQueuesCacheSize = uint(1000)
 
 func newChunkLocatorCache() *Cache[uint64, *chunks.Locator] {
 	store := func(rw storage.ReaderBatchWriter, index uint64, locator *chunks.Locator) error {
@@ -55,7 +56,7 @@ func newChunkLocatorCache() *Cache[uint64, *chunks.Locator] {
 		return &locator, nil
 	}
 	return newCache(metrics.NewNoopCollector(), "",
-		withLimit[uint64, *chunks.Locator](DefaultCacheSize),
+		withLimit[uint64, *chunks.Locator](DefaultChunkQueuesCacheSize),
 		withStore(store),
 		withRetrieve(retrieve))
 }
@@ -77,35 +78,37 @@ func (q *ChunksQueue) Init(defaultIndex uint64) (bool, error) {
 	defer q.storing.Unlock()
 
 	_, err := q.LatestIndex()
-	// the latest index should not exist,
-	// if the latest index is not found, initialize it with the default index
-	if errors.Is(err, storage.ErrNotFound) {
-		// if the latest index is not found, double check that no chunk locator exist at the default index
-		_, err := q.AtIndex(defaultIndex)
-		if !errors.Is(err, storage.ErrNotFound) {
-			if err == nil {
-				return false, fmt.Errorf("chunk locator already exists at default index %v", defaultIndex)
-			}
-
-			return false, fmt.Errorf("could not check chunk locator at default index %v: %w", defaultIndex, err)
-		}
-
-		// set the default index as the latest index
-		err = q.db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-			return operation.SetJobLatestIndex(rw.Writer(), JobQueueChunksQueue, defaultIndex)
-		})
-
-		if err != nil {
-			return false, fmt.Errorf("could not init chunk locator queue with default index %v: %w", defaultIndex, err)
-		}
-		return true, nil
+	if err == nil {
+		// the chunk queue is already initialized
+		return false, nil
 	}
-	if err != nil {
+
+	if !errors.Is(err, storage.ErrNotFound) {
 		return false, fmt.Errorf("could not get latest index: %w", err)
 	}
 
-	// the chunk queue is already initialized
-	return false, nil
+	// the latest index does not exist,
+	// if the latest index is not found, initialize it with the default index
+	// in this case, double check that no chunk locator exist at the default index
+	_, err = q.AtIndex(defaultIndex)
+	if !errors.Is(err, storage.ErrNotFound) {
+		if err == nil {
+			return false, fmt.Errorf("chunk locator already exists at default index %v", defaultIndex)
+		}
+
+		return false, fmt.Errorf("could not check chunk locator at default index %v: %w", defaultIndex, err)
+	}
+
+	// set the default index as the latest index
+	err = q.db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+		return operation.SetJobLatestIndex(rw.Writer(), JobQueueChunksQueue, defaultIndex)
+	})
+
+	if err != nil {
+		return false, fmt.Errorf("could not init chunk locator queue with default index %v: %w", defaultIndex, err)
+	}
+
+	return true, nil
 }
 
 // StoreChunkLocator stores a new chunk locator that assigned to me to the job queue.
