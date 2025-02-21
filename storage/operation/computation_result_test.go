@@ -1,10 +1,9 @@
-package operation
+package operation_test
 
 import (
 	"reflect"
 	"testing"
 
-	"github.com/dgraph-io/badger/v2"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -12,11 +11,12 @@ import (
 	"github.com/onflow/flow-go/engine/execution/testutil"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/storage"
-	"github.com/onflow/flow-go/utils/unittest"
+	"github.com/onflow/flow-go/storage/operation"
+	"github.com/onflow/flow-go/storage/operation/dbtest"
 )
 
 func TestInsertAndUpdateAndRetrieveComputationResultUpdateStatus(t *testing.T) {
-	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
+	dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
 		expected := testutil.ComputationResultFixture(t)
 		expectedId := expected.ExecutableBlock.ID()
 
@@ -24,22 +24,26 @@ func TestInsertAndUpdateAndRetrieveComputationResultUpdateStatus(t *testing.T) {
 			// insert as False
 			testUploadStatusVal := false
 
-			err := db.Update(InsertComputationResultUploadStatus(expectedId, testUploadStatusVal))
+			err := db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+				return operation.InsertComputationResultUploadStatus(rw.Writer(), expectedId, testUploadStatusVal)
+			})
 			require.NoError(t, err)
 
 			var actualUploadStatus bool
-			err = db.View(GetComputationResultUploadStatus(expectedId, &actualUploadStatus))
+			err = operation.GetComputationResultUploadStatus(db.Reader(), expectedId, &actualUploadStatus)
 			require.NoError(t, err)
 
 			assert.Equal(t, testUploadStatusVal, actualUploadStatus)
 
 			// update to True
 			testUploadStatusVal = true
-			err = db.Update(UpdateComputationResultUploadStatus(expectedId, testUploadStatusVal))
+			err = db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+				return operation.UpdateComputationResultUploadStatus(rw.Writer(), expectedId, testUploadStatusVal)
+			})
 			require.NoError(t, err)
 
 			// check if value is updated
-			err = db.View(GetComputationResultUploadStatus(expectedId, &actualUploadStatus))
+			err = operation.GetComputationResultUploadStatus(db.Reader(), expectedId, &actualUploadStatus)
 			require.NoError(t, err)
 
 			assert.Equal(t, testUploadStatusVal, actualUploadStatus)
@@ -48,7 +52,9 @@ func TestInsertAndUpdateAndRetrieveComputationResultUpdateStatus(t *testing.T) {
 		t.Run("Update non-existed ComputationResult", func(t *testing.T) {
 			testUploadStatusVal := true
 			randomFlowID := flow.Identifier{}
-			err := db.Update(UpdateComputationResultUploadStatus(randomFlowID, testUploadStatusVal))
+			err := db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+				return operation.UpdateComputationResultUploadStatus(rw.Writer(), randomFlowID, testUploadStatusVal)
+			})
 			require.Error(t, err)
 			require.Equal(t, err, storage.ErrNotFound)
 		})
@@ -56,7 +62,7 @@ func TestInsertAndUpdateAndRetrieveComputationResultUpdateStatus(t *testing.T) {
 }
 
 func TestUpsertAndRetrieveComputationResultUpdateStatus(t *testing.T) {
-	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
+	dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
 		expected := testutil.ComputationResultFixture(t)
 		expectedId := expected.ExecutableBlock.ID()
 
@@ -64,22 +70,26 @@ func TestUpsertAndRetrieveComputationResultUpdateStatus(t *testing.T) {
 			// first upsert as false
 			testUploadStatusVal := false
 
-			err := db.Update(UpsertComputationResultUploadStatus(expectedId, testUploadStatusVal))
+			err := db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+				return operation.UpsertComputationResultUploadStatus(rw.Writer(), expectedId, testUploadStatusVal)
+			})
 			require.NoError(t, err)
 
 			var actualUploadStatus bool
-			err = db.View(GetComputationResultUploadStatus(expectedId, &actualUploadStatus))
+			err = operation.GetComputationResultUploadStatus(db.Reader(), expectedId, &actualUploadStatus)
 			require.NoError(t, err)
 
 			assert.Equal(t, testUploadStatusVal, actualUploadStatus)
 
 			// upsert to true
 			testUploadStatusVal = true
-			err = db.Update(UpsertComputationResultUploadStatus(expectedId, testUploadStatusVal))
+			err = db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+				return operation.UpsertComputationResultUploadStatus(rw.Writer(), expectedId, testUploadStatusVal)
+			})
 			require.NoError(t, err)
 
 			// check if value is updated
-			err = db.View(GetComputationResultUploadStatus(expectedId, &actualUploadStatus))
+			err = operation.GetComputationResultUploadStatus(db.Reader(), expectedId, &actualUploadStatus)
 			require.NoError(t, err)
 
 			assert.Equal(t, testUploadStatusVal, actualUploadStatus)
@@ -88,33 +98,37 @@ func TestUpsertAndRetrieveComputationResultUpdateStatus(t *testing.T) {
 }
 
 func TestRemoveComputationResultUploadStatus(t *testing.T) {
-	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
+	dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
 		expected := testutil.ComputationResultFixture(t)
 		expectedId := expected.ExecutableBlock.ID()
 
 		t.Run("Remove ComputationResult", func(t *testing.T) {
 			testUploadStatusVal := true
 
-			err := db.Update(InsertComputationResultUploadStatus(expectedId, testUploadStatusVal))
+			err := db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+				return operation.InsertComputationResultUploadStatus(rw.Writer(), expectedId, testUploadStatusVal)
+			})
 			require.NoError(t, err)
 
 			var actualUploadStatus bool
-			err = db.View(GetComputationResultUploadStatus(expectedId, &actualUploadStatus))
+			err = operation.GetComputationResultUploadStatus(db.Reader(), expectedId, &actualUploadStatus)
 			require.NoError(t, err)
 
 			assert.Equal(t, testUploadStatusVal, actualUploadStatus)
 
-			err = db.Update(RemoveComputationResultUploadStatus(expectedId))
+			err = db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+				return operation.RemoveComputationResultUploadStatus(rw.Writer(), expectedId)
+			})
 			require.NoError(t, err)
 
-			err = db.View(GetComputationResultUploadStatus(expectedId, &actualUploadStatus))
+			err = operation.GetComputationResultUploadStatus(db.Reader(), expectedId, &actualUploadStatus)
 			assert.NotNil(t, err)
 		})
 	})
 }
 
 func TestListComputationResults(t *testing.T) {
-	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
+	dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
 		expected := [...]*execution.ComputationResult{
 			testutil.ComputationResultFixture(t),
 			testutil.ComputationResultFixture(t),
@@ -125,13 +139,15 @@ func TestListComputationResults(t *testing.T) {
 			for _, cr := range expected {
 				expectedId := cr.ExecutableBlock.ID()
 				expectedIDs[expectedId.String()] = true
-				err := db.Update(InsertComputationResultUploadStatus(expectedId, true))
+				err := db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+					return operation.InsertComputationResultUploadStatus(rw.Writer(), expectedId, true)
+				})
 				require.NoError(t, err)
 			}
 
 			// Get the list of IDs of stored ComputationResult
 			crIDs := make([]flow.Identifier, 0)
-			err := db.View(GetBlockIDsByStatus(&crIDs, true))
+			err := operation.GetBlockIDsByStatus(db.Reader(), &crIDs, true)
 			require.NoError(t, err)
 			crIDsStrMap := make(map[string]bool, 0)
 			for _, crID := range crIDs {
