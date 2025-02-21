@@ -1,4 +1,4 @@
-package badger_test
+package store_test
 
 import (
 	"reflect"
@@ -7,18 +7,17 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/dgraph-io/badger/v2"
-
 	"github.com/onflow/flow-go/engine/execution"
 	"github.com/onflow/flow-go/engine/execution/testutil"
-	bstorage "github.com/onflow/flow-go/storage/badger"
-	"github.com/onflow/flow-go/utils/unittest"
+	"github.com/onflow/flow-go/storage"
+	"github.com/onflow/flow-go/storage/operation/dbtest"
+	"github.com/onflow/flow-go/storage/store"
 )
 
 func TestUpsertAndRetrieveComputationResult(t *testing.T) {
-	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
+	dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
 		expected := testutil.ComputationResultFixture(t)
-		crStorage := bstorage.NewComputationResultUploadStatus(db)
+		crStorage := store.NewComputationResultUploadStatus(db)
 		crId := expected.ExecutableBlock.ID()
 
 		// True case - upsert
@@ -44,11 +43,11 @@ func TestUpsertAndRetrieveComputationResult(t *testing.T) {
 }
 
 func TestRemoveComputationResults(t *testing.T) {
-	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
+	dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
 		t.Run("Remove ComputationResult", func(t *testing.T) {
 			expected := testutil.ComputationResultFixture(t)
 			crId := expected.ExecutableBlock.ID()
-			crStorage := bstorage.NewComputationResultUploadStatus(db)
+			crStorage := store.NewComputationResultUploadStatus(db)
 
 			testUploadStatus := true
 			err := crStorage.Upsert(crId, testUploadStatus)
@@ -67,13 +66,13 @@ func TestRemoveComputationResults(t *testing.T) {
 }
 
 func TestListComputationResults(t *testing.T) {
-	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
+	dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
 		t.Run("List all ComputationResult with given status", func(t *testing.T) {
 			expected := [...]*execution.ComputationResult{
 				testutil.ComputationResultFixture(t),
 				testutil.ComputationResultFixture(t),
 			}
-			crStorage := bstorage.NewComputationResultUploadStatus(db)
+			crStorage := store.NewComputationResultUploadStatus(db)
 
 			// Store a list of ComputationResult instances first
 			expectedIDs := make(map[string]bool, 0)
