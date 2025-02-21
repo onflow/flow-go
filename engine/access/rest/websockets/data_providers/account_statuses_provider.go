@@ -67,7 +67,7 @@ func NewAccountStatusesDataProvider(
 		return nil, fmt.Errorf("invalid arguments for account statuses data provider: %w", err)
 	}
 	if accountStatusesArgs.HeartbeatInterval != nil {
-		heartbeatInterval = *accountStatusesArgs.HeartbeatInterval
+		p.heartbeatInterval = *accountStatusesArgs.HeartbeatInterval
 	}
 
 	subCtx, cancel := context.WithCancel(ctx)

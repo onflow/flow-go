@@ -66,7 +66,7 @@ func NewEventsDataProvider(
 		return nil, fmt.Errorf("invalid arguments for events data provider: %w", err)
 	}
 	if eventArgs.HeartbeatInterval != nil {
-		heartbeatInterval = *eventArgs.HeartbeatInterval
+		p.heartbeatInterval = *eventArgs.HeartbeatInterval
 	}
 
 	subCtx, cancel := context.WithCancel(ctx)
