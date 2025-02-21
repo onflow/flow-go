@@ -85,8 +85,8 @@ func createSignerData(t *testing.T, n int) *ParticipantData {
 
 	participantData := &ParticipantData{
 		Participants: participants,
-		Lookup:       participantLookup,
-		GroupKey:     groupKey,
+		DKGCommittee: participantLookup,
+		DKGGroupKey:  groupKey,
 	}
 
 	return participantData

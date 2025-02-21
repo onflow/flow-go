@@ -27,7 +27,7 @@ func (s *StaticEpochTransitionSuite) SetupTest() {
 	s.StakingAuctionLen = 10
 	s.DKGPhaseLen = 50
 	s.EpochLen = 300
-	s.EpochCommitSafetyThreshold = 50
+	s.FinalizationSafetyThreshold = 50
 
 	// run the generic setup, which starts up the network
 	s.BaseSuite.SetupTest()

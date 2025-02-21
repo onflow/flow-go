@@ -276,6 +276,27 @@ func (fnb *FlowNodeBuilder) EnqueuePingService() {
 	fnb.Component("ping service", func(node *NodeConfig) (module.ReadyDoneAware, error) {
 		pingLibP2PProtocolID := protocols.PingProtocolId(node.SporkID)
 
+		var hotstuffViewFunc func() (uint64, error)
+		// Setup consensus nodes to report their HotStuff view
+		if fnb.BaseConfig.NodeRole == flow.RoleConsensus.String() {
+			hotstuffReader, err := persister.NewReader(node.DB, node.RootChainID)
+			if err != nil {
+				return nil, err
+			}
+			hotstuffViewFunc = func() (uint64, error) {
+				livenessData, err := hotstuffReader.GetLivenessData()
+				if err != nil {
+					return 0, fmt.Errorf("could not get liveness data: %w", err)
+				}
+				return livenessData.CurrentView, nil
+			}
+		} else {
+			// All other node roles do not report their hotstuff view
+			hotstuffViewFunc = func() (uint64, error) {
+				return 0, fmt.Errorf("hotstuff view reporting disabled")
+			}
+		}
+
 		// setup the Ping provider to return the software version and the sealed block height
 		pingInfoProvider := &ping.InfoProvider{
 			SoftwareVersionFun: func() string {
@@ -288,28 +309,13 @@ func (fnb *FlowNodeBuilder) EnqueuePingService() {
 				}
 				return head.Height, nil
 			},
-			HotstuffViewFun: func() (uint64, error) {
-				return 0, fmt.Errorf("hotstuff view reporting disabled")
-			},
-		}
-
-		// only consensus roles will need to report hotstuff view
-		if fnb.BaseConfig.NodeRole == flow.RoleConsensus.String() {
-			// initialize the persister
-			persist := persister.New(node.DB, node.RootChainID)
-
-			pingInfoProvider.HotstuffViewFun = func() (uint64, error) {
-				livenessData, err := persist.GetLivenessData()
-				if err != nil {
-					return 0, err
-				}
-
-				return livenessData.CurrentView, nil
-			}
+			HotstuffViewFun: hotstuffViewFunc,
 		}
 
 		pingService, err := node.EngineRegistry.RegisterPingService(pingLibP2PProtocolID, pingInfoProvider)
-
+		if err != nil {
+			return nil, fmt.Errorf("could not register ping service: %w", err)
+		}
 		node.PingService = pingService
 
 		return &module.NoopReadyDoneAware{}, err

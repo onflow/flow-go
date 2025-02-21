@@ -14,9 +14,10 @@ type ComputationResult struct {
 
 func NewEmptyComputationResult(
 	block *entity.ExecutableBlock,
+	versionAwareChunkConstructor flow.ChunkConstructor,
 ) *ComputationResult {
 	ber := NewPopulatedBlockExecutionResult(block)
-	aer := NewEmptyBlockAttestationResult(ber)
+	aer := NewEmptyBlockAttestationResult(ber, versionAwareChunkConstructor)
 	return &ComputationResult{
 		BlockExecutionResult:   ber,
 		BlockAttestationResult: aer,
