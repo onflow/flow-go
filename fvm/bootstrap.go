@@ -1078,7 +1078,7 @@ func (b *bootstrapExecutor) setupVMBridge(serviceAddress flow.Address, env *temp
 		factoryAddress := getContractAddressFromEVMEvent(txOutput)
 
 		// Retrieve the factory bytecode from the JSON args
-		registryBytecode := bridge.GetBytecodeFromArgsJSON("cadence/args/deploy-registry-args.json")
+		registryBytecode := bridge.GetBytecodeFromArgsJSON("cadence/args/deploy-deployment-registry-args.json")
 
 		// deploy the Solidity Registry contract to the service account's COA
 		tx = blueprints.DeployEVMContractTransaction(serviceAddress, registryBytecode, gasLimit, deploymentValue, bridgeEnv, *env)
@@ -1118,7 +1118,7 @@ func (b *bootstrapExecutor) setupVMBridge(serviceAddress flow.Address, env *temp
 
 			slashSplit := strings.Split(path, "/")
 			nameWithCDC := slashSplit[len(slashSplit)-1]
-			name := nameWithCDC[:len(nameWithCDC)-3]
+			name := nameWithCDC[:len(nameWithCDC)-4]
 
 			if name == "FlowEVMBridgeUtils" {
 				txError, err := b.invokeMetaTransaction(
@@ -1147,6 +1147,128 @@ func (b *bootstrapExecutor) setupVMBridge(serviceAddress flow.Address, env *temp
 				0),
 		)
 		panicOnMetaInvokeErrf("failed to pause the bridge contracts: %s", txError, err)
+
+		// Set the factory as registrar in the registry
+		txError, err = b.invokeMetaTransaction(
+			ctx,
+			Transaction(
+				blueprints.SetRegistrarTransaction(serviceAddress, bridgeEnv, *env, registryAddress),
+				0),
+		)
+		panicOnMetaInvokeErrf("failed to set the factory as registrar: %s", txError, err)
+
+		// Add the registry to the factory
+		txError, err = b.invokeMetaTransaction(
+			ctx,
+			Transaction(
+				blueprints.SetDeploymentRegistryTransaction(serviceAddress, bridgeEnv, *env, registryAddress),
+				0),
+		)
+		panicOnMetaInvokeErrf("failed to add the registry to the factory: %s", txError, err)
+
+		// Set the factory as delegated deployer in the ERC20 deployer
+		txError, err = b.invokeMetaTransaction(
+			ctx,
+			Transaction(
+				blueprints.SetDelegatedDeployerTransaction(serviceAddress, bridgeEnv, *env, erc20DeployerAddress),
+				0),
+		)
+		panicOnMetaInvokeErrf("failed to set the erc20 deployer as delegated deployer: %s", txError, err)
+
+		// Set the factory as delegated deployer in the ERC721 deployer
+		txError, err = b.invokeMetaTransaction(
+			ctx,
+			Transaction(
+				blueprints.SetDelegatedDeployerTransaction(serviceAddress, bridgeEnv, *env, erc721DeployerAddress),
+				0),
+		)
+		panicOnMetaInvokeErrf("failed to set the erc721 deployer as delegated deployer: %s", txError, err)
+
+		// Add the ERC20 Deployer as a deployer in the factory
+		txError, err = b.invokeMetaTransaction(
+			ctx,
+			Transaction(
+				blueprints.AddDeployerTransaction(serviceAddress, bridgeEnv, *env, "ERC20", erc20DeployerAddress),
+				0),
+		)
+		panicOnMetaInvokeErrf("failed to add the erc20 deployer in the factory: %s", txError, err)
+
+		// Add the ERC721 Deployer as a deployer in the factory
+		txError, err = b.invokeMetaTransaction(
+			ctx,
+			Transaction(
+				blueprints.AddDeployerTransaction(serviceAddress, bridgeEnv, *env, "ERC721", erc721DeployerAddress),
+				0),
+		)
+		panicOnMetaInvokeErrf("failed to add the erc721 deployer in the factory: %s", txError, err)
+
+		// 	/* --- EVM Contract Integration --- */
+
+		// Deploy FlowEVMBridgeAccessor, providing EVM contract host (network service account) as argument
+		txError, err = b.invokeMetaTransaction(
+			ctx,
+			Transaction(
+				blueprints.DeployFlowEVMBridgeAccessorContractTransaction(serviceAddress, bridgeEnv, *env),
+				0),
+		)
+		panicOnMetaInvokeErrf("failed to deploy FlowEVMBridgeAccessor contract: %s", txError, err)
+
+		// Integrate the EVM contract with the BridgeAccessor
+		txError, err = b.invokeMetaTransaction(
+			ctx,
+			Transaction(
+				blueprints.IntegrateEVMWithBridgeAccessorTransaction(serviceAddress, bridgeEnv, *env),
+				0),
+		)
+		panicOnMetaInvokeErrf("failed to integrate the EVM contract with the BridgeAccessor: %s", txError, err)
+
+		// Set the bridge onboarding fees
+		txError, err = b.invokeMetaTransaction(
+			ctx,
+			Transaction(
+				blueprints.UpdateOnboardFeeTransaction(serviceAddress, bridgeEnv, *env, 1.0),
+				0),
+		)
+		panicOnMetaInvokeErrf("failed to update the bridge onboarding fees: %s", txError, err)
+
+		// Set the bridge base fee
+		txError, err = b.invokeMetaTransaction(
+			ctx,
+			Transaction(
+				blueprints.UpdateBaseFeeTransaction(serviceAddress, bridgeEnv, *env, 0.001),
+				0),
+		)
+		panicOnMetaInvokeErrf("failed to update the bridge base fees: %s", txError, err)
+
+		tokenChunks := bridge.GetCadenceTokenChunkedJSONArguments(false)
+		nftChunks := bridge.GetCadenceTokenChunkedJSONArguments(true)
+
+		// Add the FT Template Cadence Code Chunks
+		txError, err = b.invokeMetaTransaction(
+			ctx,
+			Transaction(
+				blueprints.UpsertContractCodeChunksTransaction(serviceAddress, bridgeEnv, *env, "bridgedToken", tokenChunks),
+				0),
+		)
+		panicOnMetaInvokeErrf("failed to add the FT template code chunks: %s", txError, err)
+
+		// Add the NFT Template Cadence Code Chunks
+		txError, err = b.invokeMetaTransaction(
+			ctx,
+			Transaction(
+				blueprints.UpsertContractCodeChunksTransaction(serviceAddress, bridgeEnv, *env, "bridgedNFT", nftChunks),
+				0),
+		)
+		panicOnMetaInvokeErrf("failed to add the NFT template code chunks: %s", txError, err)
+
+		// Unpause the bridge
+		txError, err = b.invokeMetaTransaction(
+			ctx,
+			Transaction(
+				blueprints.PauseBridgeTransaction(serviceAddress, bridgeEnv, *env, false),
+				0),
+		)
+		panicOnMetaInvokeErrf("failed to un-pause the bridge contracts: %s", txError, err)
 	}
 }
 
@@ -1165,7 +1287,8 @@ func getContractAddressFromEVMEvent(output ProcedureOutput) string {
 			if contractAddr.String() == "" {
 				log.Fatal("Contract address not found in event")
 			}
-			return strings.ToLower(strings.Split(contractAddr.String(), "x")[1])
+			address := strings.ToLower(strings.Split(contractAddr.String(), "x")[1])
+			return address[:len(address)-1]
 		}
 	}
 	return ""
