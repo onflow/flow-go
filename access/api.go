@@ -314,9 +314,10 @@ type CompatibleRange struct {
 
 // NodeVersionInfo contains information about node, such as semver, commit, sporkID, protocolVersion, etc
 type NodeVersionInfo struct {
-	Semver               string
-	Commit               string
-	SporkId              flow.Identifier
+	Semver  string
+	Commit  string
+	SporkId flow.Identifier
+	// TODO: should we replicate protocol state version here, or just remove this field?
 	ProtocolVersion      uint64
 	SporkRootBlockHeight uint64
 	NodeRootBlockHeight  uint64

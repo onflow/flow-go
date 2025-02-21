@@ -588,12 +588,6 @@ func bootstrapSporkInfo(root protocol.Snapshot) func(*transaction.Tx) error {
 			return fmt.Errorf("could not insert spork root block height: %w", err)
 		}
 
-		version := params.ProtocolVersion()
-		err = operation.InsertProtocolVersion(version)(bdtx)
-		if err != nil {
-			return fmt.Errorf("could not insert protocol version: %w", err)
-		}
-
 		return nil
 	}
 }

@@ -18,7 +18,6 @@ type IntermediaryBootstrappingData struct {
 // like the root block).
 // This is used to pass data between the rootblock command and the finalize command.
 type IntermediaryParamsData struct {
-	ProtocolVersion             uint
 	FinalizationSafetyThreshold uint64
 	EpochExtensionViewCount     uint64
 }

@@ -119,5 +119,4 @@ type EncodableParams struct {
 	ChainID              flow.ChainID
 	SporkID              flow.Identifier
 	SporkRootBlockHeight uint64
-	ProtocolVersion      uint
 }
