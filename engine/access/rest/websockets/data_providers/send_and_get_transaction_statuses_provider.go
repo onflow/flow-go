@@ -89,11 +89,9 @@ func (p *SendAndGetTransactionStatusesDataProvider) sendResponse(
 	messageIndex *counters.StrictMonotonicCounter,
 ) error {
 	for i := range txResults {
-		prevIndex := messageIndex.Value()
-		messageIndex.Increment()
-
 		var txStatusesPayload models.TransactionStatusesResponse
-		txStatusesPayload.Build(p.linkGenerator, txResults[i], prevIndex)
+		txStatusesPayload.Build(p.linkGenerator, txResults[i], messageIndex.Value())
+		messageIndex.Increment()
 
 		var response models.BaseDataProvidersResponse
 		response.Build(p.ID(), p.Topic(), &txStatusesPayload)
