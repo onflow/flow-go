@@ -1,23 +1,24 @@
-package badger_test
+package store_test
 
 import (
 	"math/rand"
 	"testing"
 
-	"github.com/dgraph-io/badger/v2"
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/fvm/systemcontracts"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/metrics"
-	badgerstorage "github.com/onflow/flow-go/storage/badger"
+	"github.com/onflow/flow-go/storage"
+	"github.com/onflow/flow-go/storage/operation/dbtest"
+	"github.com/onflow/flow-go/storage/store"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
 func TestEventStoreRetrieve(t *testing.T) {
-	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
+	dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
 		metrics := metrics.NewNoopCollector()
-		store := badgerstorage.NewEvents(metrics, db)
+		events := store.NewEvents(metrics, db)
 
 		blockID := unittest.IdentifierFixture()
 		tx1ID := unittest.IdentifierFixture()
@@ -32,16 +33,13 @@ func TestEventStoreRetrieve(t *testing.T) {
 			{evt2_1},
 		}
 
-		batch := badgerstorage.NewBatch(db)
-		// store event
-		err := store.BatchStore(blockID, expected, batch)
-		require.NoError(t, err)
-
-		err = batch.Flush()
-		require.NoError(t, err)
+		require.NoError(t, db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+			// store event
+			return events.BatchStore(blockID, expected, rw)
+		}))
 
 		// retrieve by blockID
-		actual, err := store.ByBlockID(blockID)
+		actual, err := events.ByBlockID(blockID)
 		require.NoError(t, err)
 		require.Len(t, actual, 3)
 		require.Contains(t, actual, evt1_1)
@@ -49,38 +47,38 @@ func TestEventStoreRetrieve(t *testing.T) {
 		require.Contains(t, actual, evt2_1)
 
 		// retrieve by blockID and event type
-		actual, err = store.ByBlockIDEventType(blockID, flow.EventAccountCreated)
+		actual, err = events.ByBlockIDEventType(blockID, flow.EventAccountCreated)
 		require.NoError(t, err)
 		require.Len(t, actual, 2)
 		require.Contains(t, actual, evt1_1)
 		require.Contains(t, actual, evt1_2)
 
-		actual, err = store.ByBlockIDEventType(blockID, flow.EventAccountUpdated)
+		actual, err = events.ByBlockIDEventType(blockID, flow.EventAccountUpdated)
 		require.NoError(t, err)
 		require.Len(t, actual, 1)
 		require.Contains(t, actual, evt2_1)
 
-		events := systemcontracts.ServiceEventsForChain(flow.Emulator)
+		evts := systemcontracts.ServiceEventsForChain(flow.Emulator)
 
-		actual, err = store.ByBlockIDEventType(blockID, events.EpochSetup.EventType())
+		actual, err = events.ByBlockIDEventType(blockID, evts.EpochSetup.EventType())
 		require.NoError(t, err)
 		require.Len(t, actual, 0)
 
 		// retrieve by blockID and transaction id
-		actual, err = store.ByBlockIDTransactionID(blockID, tx1ID)
+		actual, err = events.ByBlockIDTransactionID(blockID, tx1ID)
 		require.NoError(t, err)
 		require.Len(t, actual, 1)
 		require.Contains(t, actual, evt1_1)
 
 		// retrieve by blockID and transaction index
-		actual, err = store.ByBlockIDTransactionIndex(blockID, 1)
+		actual, err = events.ByBlockIDTransactionIndex(blockID, 1)
 		require.NoError(t, err)
 		require.Len(t, actual, 1)
 		require.Contains(t, actual, evt1_2)
 
 		// test loading from database
 
-		newStore := badgerstorage.NewEvents(metrics, db)
+		newStore := store.NewEvents(metrics, db)
 		actual, err = newStore.ByBlockID(blockID)
 		require.NoError(t, err)
 		require.Len(t, actual, 3)
@@ -91,33 +89,33 @@ func TestEventStoreRetrieve(t *testing.T) {
 }
 
 func TestEventRetrieveWithoutStore(t *testing.T) {
-	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
+	dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
 		metrics := metrics.NewNoopCollector()
-		store := badgerstorage.NewEvents(metrics, db)
+		events := store.NewEvents(metrics, db)
 
 		blockID := unittest.IdentifierFixture()
 		txID := unittest.IdentifierFixture()
 		txIndex := rand.Uint32()
 
 		// retrieve by blockID
-		events, err := store.ByBlockID(blockID)
+		evts, err := events.ByBlockID(blockID)
 		require.NoError(t, err)
-		require.True(t, len(events) == 0)
+		require.True(t, len(evts) == 0)
 
 		// retrieve by blockID and event type
-		events, err = store.ByBlockIDEventType(blockID, flow.EventAccountCreated)
+		evts, err = events.ByBlockIDEventType(blockID, flow.EventAccountCreated)
 		require.NoError(t, err)
-		require.True(t, len(events) == 0)
+		require.True(t, len(evts) == 0)
 
 		// retrieve by blockID and transaction id
-		events, err = store.ByBlockIDTransactionID(blockID, txID)
+		evts, err = events.ByBlockIDTransactionID(blockID, txID)
 		require.NoError(t, err)
-		require.True(t, len(events) == 0)
+		require.True(t, len(evts) == 0)
 
 		// retrieve by blockID and transaction id
-		events, err = store.ByBlockIDTransactionIndex(blockID, txIndex)
+		evts, err = events.ByBlockIDTransactionIndex(blockID, txIndex)
 		require.NoError(t, err)
-		require.True(t, len(events) == 0)
+		require.True(t, len(evts) == 0)
 
 	})
 }
