@@ -151,7 +151,7 @@ type KeyValueStoreStateMachine = OrthogonalStoreStateMachine[protocol.KVStoreRea
 
 // KeyValueStoreStateMachineFactory is an abstract factory interface for creating KeyValueStoreStateMachine instances.
 // It is used separate creation of state machines from their usage, which allows less coupling and superior testability.
-// For each concrete type injected in State Mutator a dedicated abstract factory has to be created.
+// For each concrete type injected in State EvolvingState a dedicated abstract factory has to be created.
 type KeyValueStoreStateMachineFactory interface {
 	// Create creates a new instance of an underlying type that operates on KV Store and is created for a specific candidate block.
 	// No errors are expected during normal operations.
