@@ -58,7 +58,7 @@ func (eq Epochs) NextUnsafe() (protocol.TentativeEpoch, error) {
 	case flow.EpochPhaseCommitted:
 		return nil, protocol.ErrNextEpochAlreadyCommitted
 	default:
-		return nil, fmt.Errorf("unexpected unknown phase in protocol state entry")
+		return nil, fmt.Errorf("unexpected epoch phase '%s' in protocol state entry", eq.entry.EpochPhase().String())
 	}
 }
 
@@ -88,10 +88,9 @@ func (eq Epochs) NextCommitted() (protocol.CommittedEpoch, error) {
 	}
 }
 
-// setupEpoch is an implementation of protocol.TentativeEpoch backed by an EpochSetup service event.
+// setupEpoch is an implementation of [protocol.TentativeEpoch] backed by a [flow.EpochSetup] service event.
 type setupEpoch struct {
-	// EpochSetup service event
-	setupEvent *flow.EpochSetup
+	setupEvent *flow.EpochSetup // EpochSetup service event
 }
 
 var _ protocol.TentativeEpoch = (*setupEpoch)(nil)
@@ -119,9 +118,9 @@ func ClusteringFromSetupEvent(setupEvent *flow.EpochSetup) (flow.ClusterList, er
 	return clustering, nil
 }
 
-// committedEpoch is an implementation of protocol.CommittedEpoch backed by an EpochSetup
-// and EpochCommit service event.
-// Includes any extensions which have been included as of the reference block.
+// committedEpoch is an implementation of [protocol.CommittedEpoch] backed by a [flow.EpochSetup]
+// and [flow.EpochCommit] service events.
+// Includes all epoch extensions which have been added as of the reference block.
 type committedEpoch struct {
 	setupEpoch
 	commitEvent *flow.EpochCommit

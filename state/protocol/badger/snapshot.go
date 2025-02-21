@@ -423,10 +423,10 @@ func (q *EpochQuery) NextUnsafe() (protocol.TentativeEpoch, error) {
 	// if we are in the staking or fallback phase, the next epoch is not setup yet
 	case flow.EpochPhaseStaking, flow.EpochPhaseFallback:
 		return nil, protocol.ErrNextEpochNotSetup
-	// if we are in setup phase, return a SetupEpoch
+	// if we are in setup phase, return a [protocol.TentativeEpoch] backed by the [flow.SetupEpoch] event
 	case flow.EpochPhaseSetup:
 		return inmem.NewSetupEpoch(entry.NextEpochSetup), nil
-	// if we are in committed phase, return an error
+	// if we are in committed phase, the caller should use the `NextCommitted` method instead, which we indicate by a sentinel error
 	case flow.EpochPhaseCommitted:
 		return nil, protocol.ErrNextEpochAlreadyCommitted
 	default:
