@@ -19,6 +19,8 @@ func withLimit[K comparable, V any](limit uint) func(*Cache[K, V]) {
 
 type storeFunc[K comparable, V any] func(rw storage.ReaderBatchWriter, key K, val V) error
 
+const DefaultCacheSize = uint(1000)
+
 // nolint:unused
 func withStore[K comparable, V any](store storeFunc[K, V]) func(*Cache[K, V]) {
 	return func(c *Cache[K, V]) {
