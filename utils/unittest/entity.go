@@ -114,6 +114,7 @@ func NewMalleabilityChecker(ops ...MalleabilityCheckerOpt) *MalleabilityChecker 
 }
 
 // Check is a method that performs the malleability check on the entity.
+// It returns an error if the entity is malleable, otherwise it returns nil.
 func (t *MalleabilityChecker) Check(entity flow.IDEntity) error {
 	v := reflect.ValueOf(entity)
 	if v.IsValid() {
@@ -132,9 +133,9 @@ func (t *MalleabilityChecker) Check(entity flow.IDEntity) error {
 	return t.isEntityMalleable(v, entity.ID)
 }
 
-// isEntityMalleable is a helper function to recursively check fields of the entity. Every time we change a field we check if ID of the entity has changed.
-// If ID has not changed then entity is malleable.
-// This function returns boolean value so we can add extra traces to the test output in case of recursive calls to structure fields.
+// isEntityMalleable is a helper function to recursively check fields of the entity.
+// Every time we change a field we check if ID of the entity has changed. If the ID has not changed then entity is malleable.
+// This function returns error if the entity is malleable, otherwise it returns nil.
 func (t *MalleabilityChecker) isEntityMalleable(v reflect.Value, idFunc func() flow.Identifier) error {
 	if v.Kind() == reflect.Ptr && v.IsNil() {
 		return nil // there is nothing to check for this field if it's nil
@@ -193,6 +194,8 @@ func (t *MalleabilityChecker) isEntityMalleable(v reflect.Value, idFunc func() f
 }
 
 // generateRandomReflectValue uses reflection to switch on the field type and generate a random value for it.
+// Returned values indicate if the field was generated and if there was an error during the generation.
+// No errors are expected during normal operations.
 func generateRandomReflectValue(field reflect.Value) (generated bool, err error) {
 	generated = true
 	switch field.Kind() {
