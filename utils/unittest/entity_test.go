@@ -1,6 +1,7 @@
 package unittest
 
 import (
+	"github.com/onflow/crypto"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -31,6 +32,24 @@ func (e *StructWithUnsupportedFlowField) ID() flow.Identifier {
 	return flow.MakeID(e)
 }
 
+// MalleableEntityStruct is a struct that is malleable because its ID method does not cover all of its fields.
+type MalleableEntityStruct struct {
+	Identities flow.IdentitySkeletonList
+	QC         *flow.QuorumCertificate
+	Signature  crypto.Signature
+}
+
+// ID returns the hash of the entity in a way that does not cover all of its fields.
+func (e *MalleableEntityStruct) ID() flow.Identifier {
+	return flow.MakeID(struct {
+		Identities flow.IdentitySkeletonList
+		QcID       flow.Identifier
+	}{
+		Identities: e.Identities,
+		QcID:       e.QC.ID(),
+	})
+}
+
 // TestRequireEntityNonMalleable tests the RequireEntityNonMalleable function with different types of entities ensuring
 // it correctly handles the supported types and panics when the entity is not supported.
 func TestRequireEntityNonMalleable(t *testing.T) {
@@ -59,6 +78,15 @@ func TestRequireEntityNonMalleable(t *testing.T) {
 		require.Panics(t, func() {
 			RequireEntityNonMalleable(t, &StructWithUnsupportedFlowField{
 				Field: make(chan struct{}),
+			})
+		})
+	})
+	t.Run("malleable-entity", func(t *testing.T) {
+		require.Panics(t, func() {
+			RequireEntityNonMalleable(t, &MalleableEntityStruct{
+				Identities: IdentityListFixture(2).ToSkeleton(),
+				QC:         QuorumCertificateFixture(),
+				Signature:  SignatureFixture(),
 			})
 		})
 	})
