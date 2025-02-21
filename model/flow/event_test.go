@@ -12,26 +12,6 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
-// eventWrapper is a helper structure that arranges Event fields in a specific order
-// to verify the usage of an Event's Fingerprint outside the protocol.
-type eventWrapper struct {
-	TxID             []byte
-	Index            uint32
-	Type             string
-	TransactionIndex uint32
-	Payload          []byte
-}
-
-func wrapEvent(e flow.Event) eventWrapper {
-	return eventWrapper{
-		TxID:             e.TransactionID[:],
-		Index:            e.EventIndex,
-		Type:             string(e.Type),
-		TransactionIndex: e.TransactionIndex,
-		Payload:          e.Payload,
-	}
-}
-
 // TestEventFingerprint verifies that the Fingerprint function produces
 // a consistent RLP-encoded representation of an Event. It ensures that
 // decoding the fingerprint results in a correctly ordered structure.
@@ -39,9 +19,9 @@ func TestEventFingerprint(t *testing.T) {
 	evt := unittest.EventFixture(flow.EventAccountCreated, 13, 12, unittest.IdentifierFixture(), 32)
 
 	data := fingerprint.Fingerprint(evt)
-	var decoded eventWrapper
+	var decoded flow.Event
 	rlp.NewMarshaler().MustUnmarshal(data, &decoded)
-	assert.Equal(t, wrapEvent(evt), decoded)
+	assert.Equal(t, evt, decoded)
 }
 
 // TestEventMalleability checks that Event is not malleable: any change in its data
@@ -107,7 +87,7 @@ func TestEventsMerkleRootHash(t *testing.T) {
 		TransactionID:    [flow.IdentifierLen]byte{1, 2, 3},
 	}
 
-	expectedRootHashHex := "355446d7b2b9653403abe28ccc405f46c059d2059cb7863f4964c401ee1aa83b"
+	expectedRootHashHex := "c53a6592de573a24547b616172abd9131651d6b7d829e5694a25fa183db7ae01"
 
 	ABHash, err := flow.EventsMerkleRootHash([]flow.Event{eventA, eventB})
 	assert.NoError(t, err)
