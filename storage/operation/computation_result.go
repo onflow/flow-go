@@ -5,18 +5,6 @@ import (
 	"github.com/onflow/flow-go/storage"
 )
 
-// InsertComputationResult addes given instance of ComputationResult into local BadgerDB.
-func InsertComputationResultUploadStatus(w storage.Writer, blockID flow.Identifier,
-	wasUploadCompleted bool) error {
-	return UpsertByKey(w, MakePrefix(codeComputationResults, blockID), wasUploadCompleted)
-}
-
-// UpdateComputationResult updates given existing instance of ComputationResult in local BadgerDB.
-func UpdateComputationResultUploadStatus(w storage.Writer, blockID flow.Identifier,
-	wasUploadCompleted bool) error {
-	return UpsertByKey(w, MakePrefix(codeComputationResults, blockID), wasUploadCompleted)
-}
-
 // UpsertComputationResult upserts given existing instance of ComputationResult in local BadgerDB.
 func UpsertComputationResultUploadStatus(w storage.Writer, blockID flow.Identifier,
 	wasUploadCompleted bool) error {
