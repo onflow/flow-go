@@ -60,6 +60,8 @@ import (
 	"github.com/onflow/flow-go/state/protocol/util"
 	storage "github.com/onflow/flow-go/storage/badger"
 	storagemock "github.com/onflow/flow-go/storage/mock"
+	"github.com/onflow/flow-go/storage/operation/badgerimpl"
+	"github.com/onflow/flow-go/storage/store"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -388,7 +390,7 @@ func createNode(
 		storage.DefaultEpochProtocolStateCacheSize, storage.DefaultProtocolStateIndexCacheSize)
 	protocokKVStoreDB := storage.NewProtocolKVStore(metricsCollector, db,
 		storage.DefaultProtocolKVStoreCacheSize, storage.DefaultProtocolKVStoreByBlockIDCacheSize)
-	versionBeaconDB := storage.NewVersionBeacons(db)
+	versionBeaconDB := store.NewVersionBeacons(badgerimpl.ToDB(db))
 	protocolStateEvents := events.NewDistributor()
 
 	localID := identity.ID()
