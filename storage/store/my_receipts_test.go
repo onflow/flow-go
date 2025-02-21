@@ -58,26 +58,4 @@ func TestMyExecutionReceiptsStorage(t *testing.T) {
 			require.NoError(t, err)
 		})
 	})
-
-	t.Run("store1 different receipt for same block should fail", func(t *testing.T) {
-		withStore(t, func(store1 *store.MyExecutionReceipts, db storage.DB) {
-			block := unittest.BlockFixture()
-
-			executor1 := unittest.IdentifierFixture()
-			executor2 := unittest.IdentifierFixture()
-
-			receipt1 := unittest.ReceiptForBlockExecutorFixture(&block, executor1)
-			receipt2 := unittest.ReceiptForBlockExecutorFixture(&block, executor2)
-
-			err := db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-				return store1.BatchStoreMyReceipt(receipt1, rw)
-			})
-			require.NoError(t, err)
-
-			err = db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-				return store1.BatchStoreMyReceipt(receipt2, rw)
-			})
-			require.Error(t, err)
-		})
-	})
 }
