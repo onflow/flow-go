@@ -28,12 +28,6 @@ type ExecutionReceipts interface {
 // them. Instead, it includes the "My" in the method name in order to highlight the notion
 // of "MY execution receipt", from the viewpoint of an individual Execution Node.
 type MyExecutionReceipts interface {
-	// StoreMyReceipt stores the receipt and marks it as mine (trusted). My
-	// receipts are indexed by the block whose result they compute. Currently,
-	// we only support indexing a _single_ receipt per block. Attempting to
-	// store conflicting receipts for the same block will error.
-	StoreMyReceipt(receipt *flow.ExecutionReceipt) error
-
 	// BatchStoreMyReceipt stores blockID-to-my-receipt index entry keyed by blockID in a provided batch.
 	// No errors are expected during normal operation
 	// If entity fails marshalling, the error is wrapped in a generic error and returned.

@@ -124,6 +124,10 @@ func (r *ExecutionResults) ByIDTx(resultID flow.Identifier) func(tx *transaction
 	}
 }
 
+// Index indexes an execution result by block ID.
+// Note: this method call is not concurrent safe, because it checks if the different result is already indexed
+// by the same blockID, and if it is, it returns an error.
+// The caller needs to ensure that there is no concurrent call to this method with the same blockID.
 func (r *ExecutionResults) Index(blockID flow.Identifier, resultID flow.Identifier) error {
 	err := r.db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 		return r.index(rw.Writer(), blockID, resultID, false)

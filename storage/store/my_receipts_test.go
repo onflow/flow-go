@@ -14,23 +14,25 @@ import (
 )
 
 func TestMyExecutionReceiptsStorage(t *testing.T) {
-	withStore := func(t *testing.T, f func(store1 *store.MyExecutionReceipts)) {
+	withStore := func(t *testing.T, f func(store1 *store.MyExecutionReceipts, db storage.DB)) {
 		dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
 			metrics := metrics.NewNoopCollector()
 			results := store.NewExecutionResults(metrics, db)
 			receipts := store.NewExecutionReceipts(metrics, db, results, 100)
 			store1 := store.NewMyExecutionReceipts(metrics, db, receipts)
 
-			f(store1)
+			f(store1, db)
 		})
 	}
 
 	t.Run("store1 one get one", func(t *testing.T) {
-		withStore(t, func(store1 *store.MyExecutionReceipts) {
+		withStore(t, func(store1 *store.MyExecutionReceipts, db storage.DB) {
 			block := unittest.BlockFixture()
 			receipt1 := unittest.ReceiptForBlockFixture(&block)
 
-			err := store1.StoreMyReceipt(receipt1)
+			err := db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+				return store1.BatchStoreMyReceipt(receipt1, rw)
+			})
 			require.NoError(t, err)
 
 			actual, err := store1.MyReceipt(block.ID())
@@ -41,21 +43,25 @@ func TestMyExecutionReceiptsStorage(t *testing.T) {
 	})
 
 	t.Run("store1 same for the same block", func(t *testing.T) {
-		withStore(t, func(store1 *store.MyExecutionReceipts) {
+		withStore(t, func(store1 *store.MyExecutionReceipts, db storage.DB) {
 			block := unittest.BlockFixture()
 
 			receipt1 := unittest.ReceiptForBlockFixture(&block)
 
-			err := store1.StoreMyReceipt(receipt1)
+			err := db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+				return store1.BatchStoreMyReceipt(receipt1, rw)
+			})
 			require.NoError(t, err)
 
-			err = store1.StoreMyReceipt(receipt1)
+			err = db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+				return store1.BatchStoreMyReceipt(receipt1, rw)
+			})
 			require.NoError(t, err)
 		})
 	})
 
 	t.Run("store1 different receipt for same block should fail", func(t *testing.T) {
-		withStore(t, func(store1 *store.MyExecutionReceipts) {
+		withStore(t, func(store1 *store.MyExecutionReceipts, db storage.DB) {
 			block := unittest.BlockFixture()
 
 			executor1 := unittest.IdentifierFixture()
@@ -64,16 +70,20 @@ func TestMyExecutionReceiptsStorage(t *testing.T) {
 			receipt1 := unittest.ReceiptForBlockExecutorFixture(&block, executor1)
 			receipt2 := unittest.ReceiptForBlockExecutorFixture(&block, executor2)
 
-			err := store1.StoreMyReceipt(receipt1)
+			err := db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+				return store1.BatchStoreMyReceipt(receipt1, rw)
+			})
 			require.NoError(t, err)
 
-			err = store1.StoreMyReceipt(receipt2)
+			err = db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+				return store1.BatchStoreMyReceipt(receipt2, rw)
+			})
 			require.Error(t, err)
 		})
 	})
 
 	t.Run("store1 different receipt concurrent for same block should fail", func(t *testing.T) {
-		withStore(t, func(store1 *store.MyExecutionReceipts) {
+		withStore(t, func(store1 *store.MyExecutionReceipts, db storage.DB) {
 			block := unittest.BlockFixture()
 
 			executor1 := unittest.IdentifierFixture()
@@ -88,13 +98,17 @@ func TestMyExecutionReceiptsStorage(t *testing.T) {
 			wg.Add(2)
 			go func() {
 				defer wg.Done()
-				err := store1.StoreMyReceipt(receipt1)
+				err := db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+					return store1.BatchStoreMyReceipt(receipt1, rw)
+				})
 				errCh <- err
 			}()
 
 			go func() {
 				defer wg.Done()
-				err := store1.StoreMyReceipt(receipt2)
+				err := db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+					return store1.BatchStoreMyReceipt(receipt2, rw)
+				})
 				errCh <- err
 			}()
 
