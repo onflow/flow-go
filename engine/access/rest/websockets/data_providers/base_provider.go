@@ -3,6 +3,7 @@ package data_providers
 import (
 	"context"
 
+	"github.com/onflow/flow-go/engine/access/rest/websockets/models"
 	"github.com/onflow/flow-go/engine/access/subscription"
 )
 
@@ -10,6 +11,7 @@ import (
 type baseDataProvider struct {
 	subscriptionID string
 	topic          string
+	arguments      models.Arguments
 	cancel         context.CancelFunc
 	send           chan<- interface{}
 	subscription   subscription.Subscription
@@ -19,6 +21,7 @@ type baseDataProvider struct {
 func newBaseDataProvider(
 	subscriptionID string,
 	topic string,
+	arguments models.Arguments,
 	cancel context.CancelFunc,
 	send chan<- interface{},
 	subscription subscription.Subscription,
@@ -26,6 +29,7 @@ func newBaseDataProvider(
 	return &baseDataProvider{
 		subscriptionID: subscriptionID,
 		topic:          topic,
+		arguments:      arguments,
 		cancel:         cancel,
 		send:           send,
 		subscription:   subscription,
@@ -40,6 +44,11 @@ func (b *baseDataProvider) ID() string {
 // Topic returns the topic associated with the data provider.
 func (b *baseDataProvider) Topic() string {
 	return b.topic
+}
+
+// Arguments returns the arguments associated with the data provider.
+func (b *baseDataProvider) Arguments() models.Arguments {
+	return b.arguments
 }
 
 // Close terminates the data provider.

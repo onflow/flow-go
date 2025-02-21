@@ -23,7 +23,6 @@ import (
 	"github.com/onflow/flow-go/fvm/environment"
 	envMock "github.com/onflow/flow-go/fvm/environment/mock"
 	"github.com/onflow/flow-go/fvm/evm"
-	"github.com/onflow/flow-go/fvm/evm/emulator"
 	"github.com/onflow/flow-go/fvm/evm/events"
 	"github.com/onflow/flow-go/fvm/evm/impl"
 	"github.com/onflow/flow-go/fvm/evm/stdlib"
@@ -1681,11 +1680,13 @@ func TestDryRun(t *testing.T) {
 					evmAddress,
 				))
 
+				// Use the gas estimation from Evm.dryRun with some buffer
+				gasLimit := dryRunResult.GasConsumed + gethParams.SstoreSentryGasEIP2200
 				innerTxBytes := testAccount.PrepareSignAndEncodeTx(t,
 					testContract.DeployedAt.ToCommon(),
 					data,
 					big.NewInt(0),
-					dryRunResult.GasConsumed, // use the gas estimation from Evm.dryRun
+					gasLimit,
 					big.NewInt(0),
 				)
 
@@ -1705,7 +1706,8 @@ func TestDryRun(t *testing.T) {
 				_, output, err := vm.Run(
 					ctx,
 					script,
-					snapshot)
+					snapshot,
+				)
 				require.NoError(t, err)
 				require.NoError(t, output.Err)
 
@@ -1713,15 +1715,7 @@ func TestDryRun(t *testing.T) {
 				require.NoError(t, err)
 				require.Equal(t, types.StatusSuccessful, res.Status)
 				require.Equal(t, types.ErrCodeNoError, res.ErrorCode)
-				// Make sure that gas consumed from `EVM.dryRun` is bigger
-				// than the actual gas consumption of the equivalent
-				// `EVM.run`.
-				totalGas := emulator.AddOne64th(res.GasConsumed) + gethParams.SstoreSentryGasEIP2200
-				require.Equal(
-					t,
-					totalGas,
-					dryRunResult.GasConsumed,
-				)
+				require.Equal(t, res.GasConsumed, dryRunResult.GasConsumed)
 			})
 	})
 
@@ -1847,15 +1841,7 @@ func TestDryRun(t *testing.T) {
 				require.NoError(t, err)
 				require.Equal(t, types.StatusSuccessful, res.Status)
 				require.Equal(t, types.ErrCodeNoError, res.ErrorCode)
-				// Make sure that gas consumed from `EVM.dryRun` is bigger
-				// than the actual gas consumption of the equivalent
-				// `EVM.run`.
-				totalGas := emulator.AddOne64th(res.GasConsumed) + gethParams.SstoreSentryGasEIP2200
-				require.Equal(
-					t,
-					totalGas,
-					dryRunResult.GasConsumed,
-				)
+				require.Equal(t, res.GasConsumed, dryRunResult.GasConsumed)
 			})
 	})
 
@@ -1947,11 +1933,13 @@ func TestDryRun(t *testing.T) {
 					evmAddress,
 				))
 
+				// use the gas estimation from Evm.dryRun with the necessary buffer gas
+				gasLimit := dryRunResult.GasConsumed + gethParams.SstoreClearsScheduleRefundEIP3529
 				innerTxBytes = testAccount.PrepareSignAndEncodeTx(t,
 					testContract.DeployedAt.ToCommon(),
 					data,
 					big.NewInt(0),
-					dryRunResult.GasConsumed, // use the gas estimation from Evm.dryRun
+					gasLimit,
 					big.NewInt(0),
 				)
 
@@ -1971,23 +1959,16 @@ func TestDryRun(t *testing.T) {
 				_, output, err = vm.Run(
 					ctx,
 					script,
-					snapshot)
+					snapshot,
+				)
 				require.NoError(t, err)
 				require.NoError(t, output.Err)
 
 				res, err := impl.ResultSummaryFromEVMResultValue(output.Value)
 				require.NoError(t, err)
-				//require.Equal(t, types.StatusSuccessful, res.Status)
+				require.Equal(t, types.StatusSuccessful, res.Status)
 				require.Equal(t, types.ErrCodeNoError, res.ErrorCode)
-				// Make sure that gas consumed from `EVM.dryRun` is bigger
-				// than the actual gas consumption of the equivalent
-				// `EVM.run`.
-				totalGas := emulator.AddOne64th(res.GasConsumed) + gethParams.SstoreSentryGasEIP2200 + gethParams.SstoreClearsScheduleRefundEIP3529
-				require.Equal(
-					t,
-					totalGas,
-					dryRunResult.GasConsumed,
-				)
+				require.Equal(t, res.GasConsumed, dryRunResult.GasConsumed)
 			})
 	})
 

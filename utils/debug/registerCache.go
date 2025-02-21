@@ -11,40 +11,44 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
-type registerCache interface {
+type RegisterCache interface {
 	Get(owner, key string) (value []byte, found bool)
 	Set(owner, key string, value []byte)
 	Persist() error
 }
 
-type memRegisterCache struct {
+type InMemoryRegisterCache struct {
 	data map[string]flow.RegisterValue
 }
 
-func newMemRegisterCache() *memRegisterCache {
-	return &memRegisterCache{data: make(map[string]flow.RegisterValue)}
+var _ RegisterCache = &InMemoryRegisterCache{}
+
+func NewInMemoryRegisterCache() *InMemoryRegisterCache {
+	return &InMemoryRegisterCache{data: make(map[string]flow.RegisterValue)}
 
 }
-func (c *memRegisterCache) Get(owner, key string) ([]byte, bool) {
+func (c *InMemoryRegisterCache) Get(owner, key string) ([]byte, bool) {
 	v, found := c.data[owner+"~"+key]
 	return v, found
 }
 
-func (c *memRegisterCache) Set(owner, key string, value []byte) {
+func (c *InMemoryRegisterCache) Set(owner, key string, value []byte) {
 	c.data[owner+"~"+key] = value
 }
-func (c *memRegisterCache) Persist() error {
+func (c *InMemoryRegisterCache) Persist() error {
 	// No-op
 	return nil
 }
 
-type fileRegisterCache struct {
+type FileRegisterCache struct {
 	filePath string
 	data     map[string]flow.RegisterEntry
 }
 
-func newFileRegisterCache(filePath string) *fileRegisterCache {
-	cache := &fileRegisterCache{filePath: filePath}
+var _ RegisterCache = &FileRegisterCache{}
+
+func NewFileRegisterCache(filePath string) *FileRegisterCache {
+	cache := &FileRegisterCache{filePath: filePath}
 	data := make(map[string]flow.RegisterEntry)
 
 	if _, err := os.Stat(filePath); err == nil {
@@ -86,7 +90,7 @@ func newFileRegisterCache(filePath string) *fileRegisterCache {
 	return cache
 }
 
-func (f *fileRegisterCache) Get(owner, key string) ([]byte, bool) {
+func (f *FileRegisterCache) Get(owner, key string) ([]byte, bool) {
 	v, found := f.data[owner+"~"+key]
 	if found {
 		return v.Value, found
@@ -94,7 +98,7 @@ func (f *fileRegisterCache) Get(owner, key string) ([]byte, bool) {
 	return nil, found
 }
 
-func (f *fileRegisterCache) Set(owner, key string, value []byte) {
+func (f *FileRegisterCache) Set(owner, key string, value []byte) {
 	valueCopy := make([]byte, len(value))
 	copy(valueCopy, value)
 	ownerAddr := flow.BytesToAddress([]byte(owner))
@@ -105,7 +109,7 @@ func (f *fileRegisterCache) Set(owner, key string, value []byte) {
 	}
 }
 
-func (c *fileRegisterCache) Persist() error {
+func (c *FileRegisterCache) Persist() error {
 	f, err := os.OpenFile(c.filePath, os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0755)
 	if err != nil {
 		return err

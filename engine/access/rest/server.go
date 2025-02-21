@@ -44,6 +44,7 @@ func NewServer(serverAPI access.API,
 	restCollector module.RestMetrics,
 	stateStreamApi state_stream.API,
 	stateStreamConfig backend.Config,
+	enableNewWebsocketsStreamAPI bool,
 	wsConfig websockets.Config,
 ) (*http.Server, error) {
 	builder := router.NewRouterBuilder(logger, restCollector).AddRestRoutes(serverAPI, chain, config.MaxRequestSize)
@@ -60,7 +61,10 @@ func NewServer(serverAPI access.API,
 		stateStreamConfig.HeartbeatInterval,
 		builder.LinkGenerator,
 	)
-	builder.AddWebsocketsRoute(chain, wsConfig, config.MaxRequestSize, dataProviderFactory)
+
+	if enableNewWebsocketsStreamAPI {
+		builder.AddWebsocketsRoute(chain, wsConfig, config.MaxRequestSize, dataProviderFactory)
+	}
 
 	c := cors.New(cors.Options{
 		AllowedOrigins: []string{"*"},

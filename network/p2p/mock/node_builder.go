@@ -77,6 +77,26 @@ func (_m *NodeBuilder) OverrideDefaultRpcInspectorFactory(_a0 p2p.GossipSubRpcIn
 	return r0
 }
 
+// OverrideDefaultValidateQueueSize provides a mock function with given fields: _a0
+func (_m *NodeBuilder) OverrideDefaultValidateQueueSize(_a0 int) p2p.NodeBuilder {
+	ret := _m.Called(_a0)
+
+	if len(ret) == 0 {
+		panic("no return value specified for OverrideDefaultValidateQueueSize")
+	}
+
+	var r0 p2p.NodeBuilder
+	if rf, ok := ret.Get(0).(func(int) p2p.NodeBuilder); ok {
+		r0 = rf(_a0)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(p2p.NodeBuilder)
+		}
+	}
+
+	return r0
+}
+
 // OverrideGossipSubFactory provides a mock function with given fields: _a0, _a1
 func (_m *NodeBuilder) OverrideGossipSubFactory(_a0 p2p.GossipSubFactoryFunc, _a1 p2p.GossipSubAdapterConfigFunc) p2p.NodeBuilder {
 	ret := _m.Called(_a0, _a1)

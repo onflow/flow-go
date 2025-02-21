@@ -37,7 +37,13 @@ var NoHeight = uint64(0)
 //
 // IMPORTANT: only add versions to this list if you are certain that the cadence and fvm changes
 // deployed during the HCU are backwards compatible for scripts.
-var defaultCompatibilityOverrides = map[string]struct{}{}
+var defaultCompatibilityOverrides = map[string]struct{}{
+	"0.37.17": {},
+	"0.37.18": {},
+	"0.37.22": {},
+	"0.37.26": {},
+	"0.38.0":  {},
+}
 
 // VersionControl manages the version control system for the node.
 // It consumes BlockFinalized events and updates the node's version control based on the latest version beacon.
@@ -61,7 +67,7 @@ type VersionControl struct {
 	// Notifier for new finalized block height
 	finalizedHeightNotifier engine.Notifier
 
-	finalizedHeight counters.StrictMonotonousCounter
+	finalizedHeight counters.StrictMonotonicCounter
 
 	// lastProcessedHeight the last handled block height
 	lastProcessedHeight *atomic.Uint64
@@ -102,7 +108,7 @@ func NewVersionControl(
 		versionBeacons:          versionBeacons,
 		sealedRootBlockHeight:   atomic.NewUint64(sealedRootBlockHeight),
 		lastProcessedHeight:     atomic.NewUint64(latestFinalizedBlockHeight),
-		finalizedHeight:         counters.NewMonotonousCounter(latestFinalizedBlockHeight),
+		finalizedHeight:         counters.NewMonotonicCounter(latestFinalizedBlockHeight),
 		finalizedHeightNotifier: engine.NewNotifier(),
 		startHeight:             atomic.NewUint64(NoHeight),
 		endHeight:               atomic.NewUint64(NoHeight),

@@ -2,7 +2,9 @@ package check_storage
 
 import (
 	"context"
+	"fmt"
 
+	"github.com/onflow/atree"
 	"github.com/onflow/cadence/interpreter"
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
@@ -22,12 +24,14 @@ import (
 )
 
 var (
-	flagPayloads        string
-	flagState           string
-	flagStateCommitment string
-	flagOutputDirectory string
-	flagChain           string
-	flagNWorker         int
+	flagPayloads           string
+	flagState              string
+	flagStateCommitment    string
+	flagOutputDirectory    string
+	flagChain              string
+	flagNWorker            int
+	flagHasAccountFormatV1 bool
+	flagHasAccountFormatV2 bool
 )
 
 var (
@@ -94,6 +98,20 @@ func init() {
 		"Chain name",
 	)
 	_ = Cmd.MarkFlagRequired("chain")
+
+	Cmd.Flags().BoolVar(
+		&flagHasAccountFormatV1,
+		"account-format-v1",
+		false,
+		"State contains accounts in v1 format",
+	)
+
+	Cmd.Flags().BoolVar(
+		&flagHasAccountFormatV2,
+		"account-format-v2",
+		false,
+		"State contains accounts in v2 format",
+	)
 }
 
 func run(*cobra.Command, []string) {
@@ -109,6 +127,9 @@ func run(*cobra.Command, []string) {
 	}
 	if flagState != "" && flagStateCommitment == "" {
 		log.Fatal().Msg("--state-commitment must be provided when --state is provided")
+	}
+	if !flagHasAccountFormatV1 && !flagHasAccountFormatV2 {
+		log.Fatal().Msg("both of or one of --account-format-v1 and --account-format-v2 must be true")
 	}
 
 	// Get EVM account by chain
@@ -323,7 +344,30 @@ func checkAccountStorageHealth(accountRegisters *registers.AccountRegisters, nWo
 	// Check atree storage health
 
 	ledger := &registers.ReadOnlyLedger{Registers: accountRegisters}
-	storage := runtime.NewStorage(ledger, nil, runtime.StorageConfig{})
+	var config runtime.StorageConfig
+	if flagHasAccountFormatV2 {
+		config.StorageFormatV2Enabled = true
+	}
+	storage := runtime.NewStorage(ledger, nil, config)
+
+	// Check account format against specified flags.
+	err = checkAccountFormat(
+		ledger,
+		address,
+		flagHasAccountFormatV1,
+		flagHasAccountFormatV2,
+	)
+	if err != nil {
+		issues = append(
+			issues,
+			accountStorageIssue{
+				Address: address.Hex(),
+				Kind:    storageErrorKindString[storageFormatErrorKind],
+				Msg:     err.Error(),
+			},
+		)
+		return issues
+	}
 
 	inter, err := interpreter.NewInterpreter(
 		nil,
@@ -367,6 +411,7 @@ const (
 	otherErrorKind storageErrorKind = iota
 	cadenceAtreeStorageErrorKind
 	evmAtreeStorageErrorKind
+	storageFormatErrorKind
 )
 
 var storageErrorKindString = map[storageErrorKind]string{
@@ -379,4 +424,66 @@ type accountStorageIssue struct {
 	Address string
 	Kind    string
 	Msg     string
+}
+
+func hasDomainRegister(ledger atree.Ledger, address common.Address) (bool, error) {
+	for _, domain := range common.AllStorageDomains {
+		value, err := ledger.GetValue(address[:], []byte(domain.Identifier()))
+		if err != nil {
+			return false, err
+		}
+		if len(value) > 0 {
+			return true, nil
+		}
+	}
+
+	return false, nil
+}
+
+func hasAccountRegister(ledger atree.Ledger, address common.Address) (bool, error) {
+	value, err := ledger.GetValue(address[:], []byte(runtime.AccountStorageKey))
+	if err != nil {
+		return false, err
+	}
+	return len(value) > 0, nil
+}
+
+func checkAccountFormat(
+	ledger atree.Ledger,
+	address common.Address,
+	expectV1 bool,
+	expectV2 bool,
+) error {
+	// Skip empty address because it doesn't have any account or domain registers.
+	if len(address) == 0 || address == common.ZeroAddress {
+		return nil
+	}
+
+	foundDomainRegister, err := hasDomainRegister(ledger, address)
+	if err != nil {
+		return err
+	}
+
+	foundAccountRegister, err := hasAccountRegister(ledger, address)
+	if err != nil {
+		return err
+	}
+
+	if !foundAccountRegister && !foundDomainRegister {
+		return fmt.Errorf("found neither domain nor account registers")
+	}
+
+	if foundAccountRegister && foundDomainRegister {
+		return fmt.Errorf("found both domain and account registers")
+	}
+
+	if foundAccountRegister && !expectV2 {
+		return fmt.Errorf("found account in format v2 while only expect account in format v1")
+	}
+
+	if foundDomainRegister && !expectV1 {
+		return fmt.Errorf("found account in format v1 while only expect account in format v2")
+	}
+
+	return nil
 }

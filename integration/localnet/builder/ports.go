@@ -144,7 +144,6 @@ func (a *PortAllocator) Print() {
 			testnet.GRPCSecurePort,
 			testnet.GRPCWebPort,
 			testnet.RESTPort,
-			testnet.ExecutionStatePort,
 			testnet.PublicNetworkPort,
 		} {
 			if hostPort, ok := a.exposedPorts[node][containerPort]; ok {
@@ -165,8 +164,6 @@ func portName(containerPort string) string {
 		return "GRPC-Web"
 	case testnet.RESTPort:
 		return "REST"
-	case testnet.ExecutionStatePort:
-		return "Execution Data"
 	case testnet.AdminPort:
 		return "Admin"
 	case testnet.PublicNetworkPort:

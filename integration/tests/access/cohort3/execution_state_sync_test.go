@@ -5,23 +5,29 @@ import (
 	"fmt"
 	"path/filepath"
 	"testing"
+	"time"
 
 	"github.com/ipfs/go-datastore"
 	badgerds "github.com/ipfs/go-ds-badger2"
 	pebbleds "github.com/ipfs/go-ds-pebble"
+	sdk "github.com/onflow/flow-go-sdk"
+	sdkclient "github.com/onflow/flow-go-sdk/access/grpc"
+	"github.com/onflow/flow/protobuf/go/flow/entities"
+	"github.com/onflow/flow/protobuf/go/flow/executiondata"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 
+	"github.com/onflow/flow-go/engine/common/rpc/convert"
 	"github.com/onflow/flow-go/engine/ghost/client"
 	"github.com/onflow/flow-go/integration/testnet"
 	"github.com/onflow/flow-go/integration/tests/lib"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/blobs"
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
-	"github.com/onflow/flow-go/module/metrics"
-	storage "github.com/onflow/flow-go/storage/badger"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -158,62 +164,75 @@ func (s *ExecutionStateSyncSuite) executionStateSyncTest() {
 	blockA := s.BlockState.WaitForHighestFinalizedProgress(s.T(), currentFinalized)
 	s.T().Logf("got block height %v ID %v", blockA.Header.Height, blockA.Header.ID())
 
-	// wait for the requested number of sealed blocks, then pause the network so we can inspect the dbs
-	s.BlockState.WaitForSealedHeight(s.T(), blockA.Header.Height+runBlocks)
-	s.net.StopContainers()
-
-	metrics := metrics.NewNoopCollector()
-
-	// start an execution data service using the Access Node's execution data db
-	an := s.net.ContainerByID(s.bridgeID)
-	anEds := s.nodeExecutionDataStore(an)
-
-	// setup storage objects needed to get the execution data id
-	anDB, err := an.DB()
-	require.NoError(s.T(), err, "could not open db")
-
-	anHeaders := storage.NewHeaders(metrics, anDB)
-	anResults := storage.NewExecutionResults(metrics, anDB)
-
-	// start an execution data service using the Observer Node's execution data db
-	on := s.net.ContainerByName(s.observerName)
-	onEds := s.nodeExecutionDataStore(on)
-
-	// setup storage objects needed to get the execution data id
-	onDB, err := on.DB()
-	require.NoError(s.T(), err, "could not open db")
-
-	onHeaders := storage.NewHeaders(metrics, onDB)
-	onResults := storage.NewExecutionResults(metrics, onDB)
-
 	// Loop through checkBlocks and verify the execution data was downloaded correctly
+	an := s.net.ContainerByName(testnet.PrimaryAN)
+	anClient, err := an.SDKClient()
+	require.NoError(s.T(), err, "could not get access node testnet client")
+
+	on := s.net.ContainerByName(s.observerName)
+	onClient, err := on.SDKClient()
+	require.NoError(s.T(), err, "could not get observer testnet client")
+
+	ctx, cancel := context.WithTimeout(s.ctx, 5*time.Minute)
+	defer cancel()
+
 	for i := blockA.Header.Height; i <= blockA.Header.Height+checkBlocks; i++ {
-		// access node
-		header, err := anHeaders.ByHeight(i)
-		require.NoError(s.T(), err, "%s: could not get header", testnet.PrimaryAN)
+		anBED, err := s.executionDataForHeight(ctx, anClient, i)
+		require.NoError(s.T(), err, "could not get execution data from AN for height %v", i)
 
-		result, err := anResults.ByBlockID(header.ID())
-		require.NoError(s.T(), err, "%s: could not get sealed result", testnet.PrimaryAN)
+		onBED, err := s.executionDataForHeight(ctx, onClient, i)
+		require.NoError(s.T(), err, "could not get execution data from ON for height %v", i)
 
-		ed, err := anEds.Get(s.ctx, result.ExecutionDataID)
-		if assert.NoError(s.T(), err, "%s: could not get execution data for height %v", testnet.PrimaryAN, i) {
-			s.T().Logf("%s: got execution data for height %d", testnet.PrimaryAN, i)
-			assert.Equal(s.T(), header.ID(), ed.BlockID)
-		}
-
-		// observer node
-		header, err = onHeaders.ByHeight(i)
-		require.NoError(s.T(), err, "%s: could not get header", testnet.PrimaryON)
-
-		result, err = onResults.ByID(result.ID())
-		require.NoError(s.T(), err, "%s: could not get sealed result from ON`s storage", testnet.PrimaryON)
-
-		ed, err = onEds.Get(s.ctx, result.ExecutionDataID)
-		if assert.NoError(s.T(), err, "%s: could not get execution data for height %v", testnet.PrimaryON, i) {
-			s.T().Logf("%s: got execution data for height %d", testnet.PrimaryON, i)
-			assert.Equal(s.T(), header.ID(), ed.BlockID)
-		}
+		assert.Equal(s.T(), anBED.BlockID, onBED.BlockID)
 	}
+}
+
+// executionDataForHeight returns the execution data for the given height from the given node
+// It retries the request until the data is available or the context is canceled
+func (s *ExecutionStateSyncSuite) executionDataForHeight(ctx context.Context, nodeClient *sdkclient.Client, height uint64) (*execution_data.BlockExecutionData, error) {
+	execDataClient := nodeClient.ExecutionDataRPCClient()
+
+	var header *sdk.BlockHeader
+	s.Require().NoError(retryNotFound(ctx, 200*time.Millisecond, func() error {
+		var err error
+		header, err = nodeClient.GetBlockHeaderByHeight(s.ctx, height)
+		return err
+	}), "could not get block header for block %d", height)
+
+	var blockED *execution_data.BlockExecutionData
+	s.Require().NoError(retryNotFound(ctx, 200*time.Millisecond, func() error {
+		ed, err := execDataClient.GetExecutionDataByBlockID(s.ctx, &executiondata.GetExecutionDataByBlockIDRequest{
+			BlockId:              header.ID[:],
+			EventEncodingVersion: entities.EventEncodingVersion_CCF_V0,
+		})
+		if err != nil {
+			return err
+		}
+
+		blockED, err = convert.MessageToBlockExecutionData(ed.GetBlockExecutionData(), flow.Localnet.Chain())
+		s.Require().NoError(err, "could not convert execution data")
+
+		return err
+	}), "could not get execution data for block %d", height)
+
+	return blockED, nil
+}
+
+// retryNotFound retries the given function until it returns an error that is not NotFound or the context is canceled
+func retryNotFound(ctx context.Context, delay time.Duration, f func() error) error {
+	for ctx.Err() == nil {
+		err := f()
+		if status.Code(err) == codes.NotFound {
+			select {
+			case <-ctx.Done():
+				return ctx.Err()
+			case <-time.After(delay):
+			}
+			continue
+		}
+		return err
+	}
+	return ctx.Err()
 }
 
 func (s *ExecutionStateSyncSuite) nodeExecutionDataStore(node *testnet.Container) execution_data.ExecutionDataStore {

@@ -5,7 +5,9 @@ import (
 
 	pb "github.com/libp2p/go-libp2p-pubsub/pb"
 	"github.com/libp2p/go-libp2p/core/peer"
+	"github.com/stretchr/testify/require"
 
+	"github.com/onflow/flow-go/utils/rand"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -47,7 +49,8 @@ func WithoutSignerId() func(*pb.Message) {
 // Returns:
 // *pb.Message: pubsub message
 func PubsubMessageFixture(t *testing.T, opts ...func(*pb.Message)) *pb.Message {
-	topic := unittest.RandomStringFixture(t, 10)
+	topic, err := rand.GenerateRandomString(10)
+	require.NoError(t, err)
 
 	m := &pb.Message{
 		Data:      unittest.RandomByteSlice(t, 100),

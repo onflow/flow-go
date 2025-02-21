@@ -26,6 +26,10 @@ func TestDiffCadenceValues(t *testing.T) {
 
 	const domain = common.StorageDomainPathStorage
 
+	alwaysDiff := func(address common.Address, domain common.StorageDomain, key any) bool {
+		return true
+	}
+
 	t.Run("no diff", func(t *testing.T) {
 		t.Parallel()
 
@@ -37,6 +41,7 @@ func TestDiffCadenceValues(t *testing.T) {
 			createTestRegisters(t, address, domain),
 			createTestRegisters(t, address, domain),
 			[]common.StorageDomain{domain},
+			alwaysDiff,
 		)
 		require.NoError(t, err)
 		require.Equal(t, 0, len(writer.entries))
@@ -53,6 +58,7 @@ func TestDiffCadenceValues(t *testing.T) {
 			createTestRegisters(t, address, domain),
 			registers.NewByAccount(),
 			[]common.StorageDomain{domain},
+			alwaysDiff,
 		)
 		require.NoError(t, err)
 		require.Equal(t, 1, len(writer.entries))
@@ -74,6 +80,7 @@ func TestDiffCadenceValues(t *testing.T) {
 			createTestRegisters(t, address, domain),
 			createStorageMapRegisters(t, address, domain, []string{"unique_key"}, []interpreter.Value{interpreter.UInt64Value(0)}),
 			[]common.StorageDomain{domain},
+			alwaysDiff,
 		)
 		require.NoError(t, err)
 
@@ -101,6 +108,7 @@ func TestDiffCadenceValues(t *testing.T) {
 			createStorageMapRegisters(t, address, domain, []string{"0", "1"}, []interpreter.Value{interpreter.UInt64Value(0), interpreter.UInt64Value(0)}),
 			createStorageMapRegisters(t, address, domain, []string{"2", "0"}, []interpreter.Value{interpreter.UInt64Value(0), interpreter.UInt64Value(0)}),
 			[]common.StorageDomain{domain},
+			alwaysDiff,
 		)
 		require.NoError(t, err)
 
@@ -128,6 +136,7 @@ func TestDiffCadenceValues(t *testing.T) {
 			createStorageMapRegisters(t, address, domain, []string{"0", "1"}, []interpreter.Value{interpreter.UInt64Value(100), interpreter.UInt64Value(101)}),
 			createStorageMapRegisters(t, address, domain, []string{"0", "1"}, []interpreter.Value{interpreter.UInt64Value(111), interpreter.UInt64Value(101)}),
 			[]common.StorageDomain{domain},
+			alwaysDiff,
 		)
 		require.NoError(t, err)
 
@@ -155,6 +164,7 @@ func TestDiffCadenceValues(t *testing.T) {
 			createStorageMapRegisters(t, address, domain, []string{"0", "1"}, []interpreter.Value{interpreter.UInt64Value(100), interpreter.UInt64Value(101)}),
 			createStorageMapRegisters(t, address, domain, []string{"0", "1"}, []interpreter.Value{interpreter.UInt64Value(111), interpreter.UInt64Value(102)}),
 			[]common.StorageDomain{domain},
+			alwaysDiff,
 		)
 		require.NoError(t, err)
 
@@ -261,6 +271,7 @@ func TestDiffCadenceValues(t *testing.T) {
 				interpreter.UInt64Value(5),
 			}),
 			[]common.StorageDomain{domain},
+			alwaysDiff,
 		)
 		require.NoError(t, err)
 
@@ -385,6 +396,7 @@ func TestDiffCadenceValues(t *testing.T) {
 					interpreter.UInt64Value(3),
 				}),
 			[]common.StorageDomain{domain},
+			alwaysDiff,
 		)
 		require.NoError(t, err)
 
@@ -516,6 +528,7 @@ func TestDiffCadenceValues(t *testing.T) {
 					interpreter.UInt64Value(3),
 				}),
 			[]common.StorageDomain{domain},
+			alwaysDiff,
 		)
 		require.NoError(t, err)
 
@@ -647,6 +660,7 @@ func TestDiffCadenceValues(t *testing.T) {
 					interpreter.UInt64Value(3),
 				}),
 			[]common.StorageDomain{domain},
+			alwaysDiff,
 		)
 		require.NoError(t, err)
 

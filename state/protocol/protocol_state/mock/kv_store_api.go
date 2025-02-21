@@ -16,24 +16,6 @@ type KVStoreAPI struct {
 	mock.Mock
 }
 
-// GetEpochCommitSafetyThreshold provides a mock function with given fields:
-func (_m *KVStoreAPI) GetEpochCommitSafetyThreshold() uint64 {
-	ret := _m.Called()
-
-	if len(ret) == 0 {
-		panic("no return value specified for GetEpochCommitSafetyThreshold")
-	}
-
-	var r0 uint64
-	if rf, ok := ret.Get(0).(func() uint64); ok {
-		r0 = rf()
-	} else {
-		r0 = ret.Get(0).(uint64)
-	}
-
-	return r0
-}
-
 // GetEpochExtensionViewCount provides a mock function with given fields:
 func (_m *KVStoreAPI) GetEpochExtensionViewCount() uint64 {
 	ret := _m.Called()
@@ -67,6 +49,24 @@ func (_m *KVStoreAPI) GetEpochStateID() flow.Identifier {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(flow.Identifier)
 		}
+	}
+
+	return r0
+}
+
+// GetFinalizationSafetyThreshold provides a mock function with given fields:
+func (_m *KVStoreAPI) GetFinalizationSafetyThreshold() uint64 {
+	ret := _m.Called()
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetFinalizationSafetyThreshold")
+	}
+
+	var r0 uint64
+	if rf, ok := ret.Get(0).(func() uint64); ok {
+		r0 = rf()
+	} else {
+		r0 = ret.Get(0).(uint64)
 	}
 
 	return r0

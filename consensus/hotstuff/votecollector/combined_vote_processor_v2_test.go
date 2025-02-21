@@ -11,6 +11,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 	"go.uber.org/atomic"
+	"golang.org/x/exp/slices"
 	"pgregory.net/rapid"
 
 	bootstrapDKG "github.com/onflow/flow-go/cmd/bootstrap/dkg"
@@ -782,8 +783,8 @@ func TestCombinedVoteProcessorV2_PropertyCreatingQCLiveness(testifyT *testing.T)
 func TestCombinedVoteProcessorV2_BuildVerifyQC(t *testing.T) {
 	epochCounter := uint64(3)
 	epochLookup := &modulemock.EpochLookup{}
-	proposerView := uint64(20)
-	epochLookup.On("EpochForView", proposerView).Return(epochCounter, nil)
+	view := uint64(20)
+	epochLookup.On("EpochForView", view).Return(epochCounter, nil)
 
 	// all committee members run DKG
 	dkgData, err := bootstrapDKG.RandomBeaconKG(11, unittest.RandomBytes(32))
@@ -797,6 +798,7 @@ func TestCombinedVoteProcessorV2_BuildVerifyQC(t *testing.T) {
 	stakingSigners := unittest.IdentityListFixture(3)
 	beaconSigners := unittest.IdentityListFixture(8)
 	allIdentities := append(stakingSigners, beaconSigners...)
+	slices.SortFunc(allIdentities, flow.Canonical[flow.Identity]) // sort in place to avoid taking a copy.
 	require.Equal(t, len(dkgData.PubKeyShares), len(allIdentities))
 	dkgParticipants := make(map[flow.Identifier]flow.DKGParticipant)
 	// fill dkg participants data
@@ -812,7 +814,7 @@ func TestCombinedVoteProcessorV2_BuildVerifyQC(t *testing.T) {
 		identity.StakingPubKey = stakingPriv.PublicKey()
 
 		keys := &storagemock.SafeBeaconKeys{}
-		// there is no DKG key for this epoch
+		// there is no Random Beacon key for this epoch
 		keys.On("RetrieveMyBeaconPrivateKey", epochCounter).Return(nil, false, nil)
 
 		beaconSignerStore := hsig.NewEpochAwareRandomBeaconKeyStore(epochLookup, keys)
@@ -823,18 +825,19 @@ func TestCombinedVoteProcessorV2_BuildVerifyQC(t *testing.T) {
 		signers[identity.NodeID] = verification.NewCombinedSigner(me, beaconSignerStore)
 	}
 
+	dkgIndexMap := make(flow.DKGIndexMap)
 	for _, identity := range beaconSigners {
 		stakingPriv := unittest.StakingPrivKeyFixture()
 		identity.StakingPubKey = stakingPriv.PublicKey()
 
 		participantData := dkgParticipants[identity.NodeID]
-
 		dkgKey := encodable.RandomBeaconPrivKey{
 			PrivateKey: dkgData.PrivKeyShares[participantData.Index],
 		}
+		dkgIndexMap[identity.NodeID] = int(participantData.Index)
 
 		keys := &storagemock.SafeBeaconKeys{}
-		// there is DKG key for this epoch
+		// there is Random Beacon key for this epoch
 		keys.On("RetrieveMyBeaconPrivateKey", epochCounter).Return(dkgKey, true, nil)
 
 		beaconSignerStore := hsig.NewEpochAwareRandomBeaconKeyStore(epochLookup, keys)
@@ -845,23 +848,18 @@ func TestCombinedVoteProcessorV2_BuildVerifyQC(t *testing.T) {
 		signers[identity.NodeID] = verification.NewCombinedSigner(me, beaconSignerStore)
 	}
 
-	leader := stakingSigners[0]
-	parentBlock := helper.MakeBlock(helper.WithBlockView(proposerView - 1))
-	proposal := helper.MakeProposal(
-		helper.WithBlock(
-			helper.MakeBlock(
-				helper.WithBlockView(proposerView),
-				helper.WithParentBlock(parentBlock),
-				helper.WithBlockProposer(leader.NodeID))))
-	block := proposal.Block
+	leader := allIdentities[0]
 
-	inmemDKG, err := inmem.DKGFromEncodable(inmem.EncodableDKG{
-		GroupKey: encodable.RandomBeaconPubKey{
-			PublicKey: dkgData.PubGroupKey,
-		},
-		Participants: dkgParticipants,
+	block := helper.MakeBlock(helper.WithBlockView(view),
+		helper.WithBlockProposer(leader.NodeID),
+		helper.WithBlockQC(helper.MakeQC(helper.WithQCView(view-1))))
+	proposal := helper.MakeProposal(helper.WithBlock(block))
+
+	inmemDKG := inmem.NewDKG(nil, &flow.EpochCommit{
+		DKGGroupKey:        dkgData.PubGroupKey,
+		DKGParticipantKeys: dkgData.PubKeyShares,
+		DKGIndexMap:        dkgIndexMap,
 	})
-	require.NoError(t, err)
 
 	committee := &mockhotstuff.DynamicCommittee{}
 	committee.On("LeaderForView", block.View).Return(leader.NodeID, nil).Maybe()
@@ -885,8 +883,8 @@ func TestCombinedVoteProcessorV2_BuildVerifyQC(t *testing.T) {
 	// create and sign proposal
 	persist := mockhotstuff.NewPersister(t)
 	safetyData := &hotstuff.SafetyData{
-		LockedOneChainView:      parentBlock.View,
-		HighestAcknowledgedView: parentBlock.View,
+		LockedOneChainView:      block.View - 1,
+		HighestAcknowledgedView: block.View - 1,
 	}
 	persist.On("GetSafetyData", mock.Anything).Return(safetyData, nil).Once()
 	persist.On("PutSafetyData", mock.Anything).Return(nil)
@@ -895,6 +893,8 @@ func TestCombinedVoteProcessorV2_BuildVerifyQC(t *testing.T) {
 	vote, err := safetyRules.SignOwnProposal(proposal)
 	require.NoError(t, err)
 	signedProposal := helper.MakeSignedProposal(helper.WithProposal(proposal), helper.WithSigData(vote.SigData))
+
+	require.NoError(t, err)
 
 	qcCreated := false
 	onQCCreated := func(qc *flow.QuorumCertificate) {

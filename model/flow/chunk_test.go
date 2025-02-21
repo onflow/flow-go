@@ -1,11 +1,14 @@
 package flow_test
 
 import (
+	"encoding/json"
 	"testing"
 
+	"github.com/fxamacker/cbor/v2"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	cborcodec "github.com/onflow/flow-go/model/encoding/cbor"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/utils/rand"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -117,6 +120,7 @@ func TestChunkIndexIsSet(t *testing.T) {
 		unittest.StateCommitmentFixture(),
 		21,
 		unittest.IdentifierFixture(),
+		0,
 		unittest.StateCommitmentFixture(),
 		17995,
 	)
@@ -135,6 +139,7 @@ func TestChunkNumberOfTxsIsSet(t *testing.T) {
 		unittest.StateCommitmentFixture(),
 		int(i),
 		unittest.IdentifierFixture(),
+		0,
 		unittest.StateCommitmentFixture(),
 		17995,
 	)
@@ -152,9 +157,236 @@ func TestChunkTotalComputationUsedIsSet(t *testing.T) {
 		unittest.StateCommitmentFixture(),
 		21,
 		unittest.IdentifierFixture(),
+		0,
 		unittest.StateCommitmentFixture(),
 		i,
 	)
 
 	assert.Equal(t, i, chunk.TotalComputationUsed)
+}
+
+// TestChunkEncodeDecode test encoding and decoding properties.
+// In particular, we confirm that `nil` values of the ServiceEventCount field are preserved (and
+// not conflated with 0) by the encoding schemes we use, because this difference is meaningful and
+// important for backward compatibility (see [ChunkBody.ServiceEventCount] for details).
+func TestChunkEncodeDecode(t *testing.T) {
+	chunk := unittest.ChunkFixture(unittest.IdentifierFixture(), 0, unittest.StateCommitmentFixture())
+
+	t.Run("encode/decode preserves nil ServiceEventCount", func(t *testing.T) {
+		chunk.ServiceEventCount = nil
+		t.Run("json", func(t *testing.T) {
+			bz, err := json.Marshal(chunk)
+			require.NoError(t, err)
+			unmarshaled := new(flow.Chunk)
+			err = json.Unmarshal(bz, unmarshaled)
+			require.NoError(t, err)
+			assert.Equal(t, chunk, unmarshaled)
+			assert.Nil(t, unmarshaled.ServiceEventCount)
+		})
+		t.Run("lax non-BFT cbor decoding", func(t *testing.T) {
+			bz, err := cborcodec.EncMode.Marshal(chunk)
+			require.NoError(t, err)
+			unmarshaled := new(flow.Chunk)
+			err = cborcodec.UnsafeDecMode.Unmarshal(bz, unmarshaled)
+			require.NoError(t, err)
+			assert.Equal(t, chunk, unmarshaled)
+			assert.Nil(t, unmarshaled.ServiceEventCount)
+		})
+		t.Run("default strict cbor decoding", func(t *testing.T) {
+			bz, err := cborcodec.EncMode.Marshal(chunk)
+			require.NoError(t, err)
+			unmarshaled := new(flow.Chunk)
+			err = cborcodec.DefaultDecMode.Unmarshal(bz, unmarshaled)
+			require.NoError(t, err)
+			assert.Equal(t, chunk, unmarshaled)
+			assert.Nil(t, unmarshaled.ServiceEventCount)
+		})
+	})
+	t.Run("encode/decode preserves empty but non-nil ServiceEventCount", func(t *testing.T) {
+		chunk.ServiceEventCount = unittest.PtrTo[uint16](0)
+		t.Run("json", func(t *testing.T) {
+			bz, err := json.Marshal(chunk)
+			require.NoError(t, err)
+			unmarshaled := new(flow.Chunk)
+			err = json.Unmarshal(bz, unmarshaled)
+			require.NoError(t, err)
+			assert.Equal(t, chunk, unmarshaled)
+			assert.NotNil(t, unmarshaled.ServiceEventCount)
+		})
+		t.Run("lax non-BFT cbor decoding", func(t *testing.T) {
+			bz, err := cborcodec.EncMode.Marshal(chunk)
+			require.NoError(t, err)
+			unmarshaled := new(flow.Chunk)
+			err = cborcodec.UnsafeDecMode.Unmarshal(bz, unmarshaled)
+			require.NoError(t, err)
+			assert.Equal(t, chunk, unmarshaled)
+			assert.NotNil(t, unmarshaled.ServiceEventCount)
+		})
+		t.Run("default strict cbor decoding", func(t *testing.T) {
+			bz, err := cborcodec.EncMode.Marshal(chunk)
+			require.NoError(t, err)
+			unmarshaled := new(flow.Chunk)
+			err = cborcodec.DefaultDecMode.Unmarshal(bz, unmarshaled)
+			require.NoError(t, err)
+			assert.Equal(t, chunk, unmarshaled)
+			assert.NotNil(t, unmarshaled.ServiceEventCount)
+		})
+	})
+}
+
+// TestChunk_ModelVersions_EncodeDecode tests that encoding and decoding between
+// supported versions works as expected.
+func TestChunk_ModelVersions_EncodeDecode(t *testing.T) {
+	chunkFixture := unittest.ChunkFixture(unittest.IdentifierFixture(), 1, unittest.StateCommitmentFixture())
+	chunkFixture.ServiceEventCount = unittest.PtrTo[uint16](0) // non-nil extra field
+
+	t.Run("encoding v0 and decoding it into v1 should yield nil for ServiceEventCount", func(t *testing.T) {
+		var chunkv0 flow.ChunkBodyV0
+		unittest.EncodeDecodeDifferentVersions(t, chunkFixture.ChunkBody, &chunkv0)
+
+		t.Run("json", func(t *testing.T) {
+			bz, err := json.Marshal(chunkv0)
+			require.NoError(t, err)
+
+			var unmarshaled flow.ChunkBody
+			err = json.Unmarshal(bz, &unmarshaled)
+			require.NoError(t, err)
+			assert.Equal(t, chunkv0.EventCollection, unmarshaled.EventCollection)
+			assert.Equal(t, chunkv0.BlockID, unmarshaled.BlockID)
+			assert.Nil(t, unmarshaled.ServiceEventCount)
+		})
+
+		t.Run("lax non-BFT cbor decoding", func(t *testing.T) {
+			bz, err := cborcodec.EncMode.Marshal(chunkv0)
+			require.NoError(t, err)
+
+			var unmarshaled flow.ChunkBody
+			err = cborcodec.UnsafeDecMode.Unmarshal(bz, &unmarshaled)
+			require.NoError(t, err)
+			assert.Equal(t, chunkv0.EventCollection, unmarshaled.EventCollection)
+			assert.Equal(t, chunkv0.BlockID, unmarshaled.BlockID)
+			assert.Nil(t, unmarshaled.ServiceEventCount)
+		})
+
+		t.Run("default strict cbor decoding", func(t *testing.T) {
+			bz, err := cborcodec.EncMode.Marshal(chunkv0)
+			require.NoError(t, err)
+
+			var unmarshaled flow.ChunkBody
+			err = cborcodec.DefaultDecMode.Unmarshal(bz, &unmarshaled)
+			require.NoError(t, err)
+			assert.Equal(t, chunkv0.EventCollection, unmarshaled.EventCollection)
+			assert.Equal(t, chunkv0.BlockID, unmarshaled.BlockID)
+			assert.Nil(t, unmarshaled.ServiceEventCount)
+		})
+	})
+	t.Run("encoding v1 and decoding it into v0", func(t *testing.T) {
+		t.Run("non-nil ServiceEventCount field", func(t *testing.T) {
+			chunkv1 := chunkFixture.ChunkBody
+			chunkv1.ServiceEventCount = unittest.PtrTo[uint16](0) // ensure non-nil ServiceEventCount field
+
+			t.Run("json - should not error", func(t *testing.T) {
+				bz, err := json.Marshal(chunkv1)
+				require.NoError(t, err)
+
+				var unmarshaled flow.ChunkBodyV0
+				err = json.Unmarshal(bz, &unmarshaled)
+				require.NoError(t, err)
+				assert.Equal(t, chunkv1.EventCollection, unmarshaled.EventCollection)
+				assert.Equal(t, chunkv1.BlockID, unmarshaled.BlockID)
+			})
+			t.Run("lax non-BFT cbor decoding - should not error", func(t *testing.T) {
+				// CAUTION: using the lax decoding is not safe for data structures that are exchanged between nodes!
+				bz, err := cborcodec.EncMode.Marshal(chunkv1)
+				require.NoError(t, err)
+
+				var unmarshaled flow.ChunkBodyV0
+				err = cborcodec.UnsafeDecMode.Unmarshal(bz, &unmarshaled)
+				require.NoError(t, err)
+				assert.Equal(t, chunkv1.EventCollection, unmarshaled.EventCollection)
+				assert.Equal(t, chunkv1.BlockID, unmarshaled.BlockID)
+			})
+			// In the stricter mode (default), which we use for decoding on the networking layer, an error is expected
+			// because the message includes a field not present in the v0 target,
+			// when the new ServiceEventCount field is non-nil
+			t.Run("cbor strict - error expected", func(t *testing.T) {
+				bz, err := cborcodec.EncMode.Marshal(chunkv1)
+				require.NoError(t, err)
+
+				var unmarshaled flow.ChunkBodyV0
+				err = cborcodec.DefaultDecMode.Unmarshal(bz, &unmarshaled)
+				assert.Error(t, err)
+				target := &cbor.UnknownFieldError{}
+				assert.ErrorAs(t, err, &target)
+			})
+		})
+		t.Run("nil ServiceEventCount field should not error", func(t *testing.T) {
+			chunkv1 := chunkFixture.ChunkBody
+			chunkv1.ServiceEventCount = nil // ensure non-nil ServiceEventCount field
+
+			t.Run("json", func(t *testing.T) {
+				bz, err := json.Marshal(chunkv1)
+				require.NoError(t, err)
+
+				var unmarshaled flow.ChunkBodyV0
+				err = json.Unmarshal(bz, &unmarshaled)
+				require.NoError(t, err)
+				assert.Equal(t, chunkv1.EventCollection, unmarshaled.EventCollection)
+				assert.Equal(t, chunkv1.BlockID, unmarshaled.BlockID)
+			})
+			t.Run("lax non-BFT cbor decoding", func(t *testing.T) {
+				bz, err := cborcodec.EncMode.Marshal(chunkv1)
+				require.NoError(t, err)
+
+				var unmarshaled flow.ChunkBodyV0
+				err = cborcodec.UnsafeDecMode.Unmarshal(bz, &unmarshaled)
+				require.NoError(t, err)
+				assert.Equal(t, chunkv1.EventCollection, unmarshaled.EventCollection)
+				assert.Equal(t, chunkv1.BlockID, unmarshaled.BlockID)
+			})
+			// When the new ServiceEventCount field is nil, we expect even strict
+			// cbor decoding to pass, because the new field will be omitted.
+			t.Run("cbor strict", func(t *testing.T) {
+				bz, err := cborcodec.EncMode.Marshal(chunkv1)
+				require.NoError(t, err)
+
+				var unmarshaled flow.ChunkBodyV0
+				err = cborcodec.DefaultDecMode.Unmarshal(bz, &unmarshaled)
+				require.NoError(t, err)
+				assert.Equal(t, chunkv1.EventCollection, unmarshaled.EventCollection)
+				assert.Equal(t, chunkv1.BlockID, unmarshaled.BlockID)
+			})
+		})
+	})
+}
+
+// FingerprintBackwardCompatibility ensures that the Fingerprint and ID functions
+// are backward compatible with old data model versions. We emulate the
+// case where a peer running an older software version receives a `ChunkBody` that
+// was encoded in the new version. Specifically, if the new ServiceEventCount field
+// is nil, then the new model should produce IDs consistent with the old model.
+//
+// Backward compatibility is implemented by providing a custom EncodeRLP method.
+func TestChunk_FingerprintBackwardCompatibility(t *testing.T) {
+	chunk := unittest.ChunkFixture(unittest.IdentifierFixture(), 1, unittest.StateCommitmentFixture())
+	chunk.ServiceEventCount = nil
+	chunkBody := chunk.ChunkBody
+	var chunkBodyV0 flow.ChunkBodyV0
+	unittest.EncodeDecodeDifferentVersions(t, chunkBody, &chunkBodyV0)
+
+	// A nil ServiceEventCount fields indicates a prior model version.
+	// The ID calculation for the old and new model version should be the same.
+	t.Run("nil ServiceEventCount fields", func(t *testing.T) {
+		chunk.ServiceEventCount = nil
+		assert.Equal(t, flow.MakeID(chunkBodyV0), chunk.ID())
+		assert.Equal(t, flow.MakeID(chunkBodyV0), flow.MakeID(chunk.ChunkBody))
+	})
+	// A non-nil ServiceEventCount fields indicates an up-to-date model version.
+	// The ID calculation for the old and new model version should be different,
+	// because the new model should include the ServiceEventCount field value.
+	t.Run("non-nil ServiceEventCount fields", func(t *testing.T) {
+		chunk.ServiceEventCount = unittest.PtrTo[uint16](0)
+		assert.NotEqual(t, flow.MakeID(chunkBodyV0), chunk.ID())
+		assert.NotEqual(t, flow.MakeID(chunkBodyV0), flow.MakeID(chunk.ChunkBody))
+	})
 }

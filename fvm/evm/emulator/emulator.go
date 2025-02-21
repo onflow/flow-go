@@ -127,6 +127,14 @@ func (bl *BlockView) DirectCall(call *types.DirectCall) (res *types.Result, err 
 				err == nil && res != nil {
 				proc.evm.Config.Tracer.OnTxEnd(res.Receipt(), res.ValidationError)
 			}
+
+			// call OnLog tracer hook, upon successful call result
+			if proc.evm.Config.Tracer.OnLog != nil &&
+				err == nil && res != nil {
+				for _, log := range res.Logs {
+					proc.evm.Config.Tracer.OnLog(log)
+				}
+			}
 		}()
 	}
 
@@ -191,6 +199,15 @@ func (bl *BlockView) RunTransaction(
 		proc.evm.Config.Tracer.OnTxEnd(res.Receipt(), res.ValidationError)
 	}
 
+	// call OnLog tracer hook, upon successful tx result
+	if proc.evm.Config.Tracer != nil &&
+		proc.evm.Config.Tracer.OnLog != nil &&
+		res != nil {
+		for _, log := range res.Logs {
+			proc.evm.Config.Tracer.OnLog(log)
+		}
+	}
+
 	return res, nil
 }
 
@@ -243,6 +260,15 @@ func (bl *BlockView) BatchRunTransactions(txs []*gethTypes.Transaction) ([]*type
 			res != nil {
 			proc.evm.Config.Tracer.OnTxEnd(res.Receipt(), res.ValidationError)
 		}
+
+		// call OnLog tracer hook, upon successful tx result
+		if proc.evm.Config.Tracer != nil &&
+			proc.evm.Config.Tracer.OnLog != nil &&
+			res != nil {
+			for _, log := range res.Logs {
+				proc.evm.Config.Tracer.OnLog(log)
+			}
+		}
 	}
 
 	// finalize after all the batch transactions are executed to save resources
@@ -258,8 +284,6 @@ func (bl *BlockView) DryRunTransaction(
 	tx *gethTypes.Transaction,
 	from gethCommon.Address,
 ) (*types.Result, error) {
-	var txResult *types.Result
-
 	// create a new procedure
 	proc, err := bl.newProcedure()
 	if err != nil {
@@ -283,42 +307,8 @@ func (bl *BlockView) DryRunTransaction(
 	// we need to skip nonce check for dry run
 	msg.SkipAccountChecks = true
 
-	// call tracer
-	if proc.evm.Config.Tracer != nil && proc.evm.Config.Tracer.OnTxStart != nil {
-		proc.evm.Config.Tracer.OnTxStart(proc.evm.GetVMContext(), tx, msg.From)
-	}
-
-	// return without committing the state
-	txResult, err = proc.run(msg, tx.Hash(), tx.Type())
-	if txResult.Successful() {
-		// As mentioned in https://github.com/ethereum/EIPs/blob/master/EIPS/eip-150.md#specification
-		// Define "all but one 64th" of N as N - floor(N / 64).
-		// If a call asks for more gas than the maximum allowed amount
-		// (i.e. the total amount of gas remaining in the parent after subtracting
-		// the gas cost of the call and memory expansion), do not return an OOG error;
-		// instead, if a call asks for more gas than all but one 64th of the maximum
-		// allowed amount, call with all but one 64th of the maximum allowed amount of
-		// gas (this is equivalent to a version of EIP-901 plus EIP-1142).
-		// CREATE only provides all but one 64th of the parent gas to the child call.
-		txResult.GasConsumed = AddOne64th(txResult.GasConsumed)
-
-		// Adding `gethParams.SstoreSentryGasEIP2200` is needed for this condition:
-		// https://github.com/onflow/go-ethereum/blob/master/core/vm/operations_acl.go#L29-L32
-		txResult.GasConsumed += gethParams.SstoreSentryGasEIP2200
-
-		// Take into account any gas refunds, which are calculated only after
-		// transaction execution.
-		txResult.GasConsumed += txResult.GasRefund
-	}
-
-	// call tracer on tx end
-	if proc.evm.Config.Tracer != nil &&
-		proc.evm.Config.Tracer.OnTxEnd != nil &&
-		txResult != nil {
-		proc.evm.Config.Tracer.OnTxEnd(txResult.Receipt(), txResult.ValidationError)
-	}
-
-	return txResult, err
+	// run and return without committing the state changes
+	return proc.run(msg, tx.Hash(), tx.Type())
 }
 
 func (bl *BlockView) newProcedure() (*procedure, error) {
@@ -705,11 +695,6 @@ func (proc *procedure) run(
 		}
 	}
 	return &res, nil
-}
-
-func AddOne64th(n uint64) uint64 {
-	// NOTE: Go's integer division floors, but that is desirable here
-	return n + (n / 64)
 }
 
 func convertAndCheckValue(input *big.Int) (isValid bool, converted *uint256.Int) {

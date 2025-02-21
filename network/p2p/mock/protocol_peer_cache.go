@@ -21,19 +21,19 @@ func (_m *ProtocolPeerCache) AddProtocols(peerID peer.ID, protocols []protocol.I
 }
 
 // GetPeers provides a mock function with given fields: pid
-func (_m *ProtocolPeerCache) GetPeers(pid protocol.ID) map[peer.ID]struct{} {
+func (_m *ProtocolPeerCache) GetPeers(pid protocol.ID) peer.IDSlice {
 	ret := _m.Called(pid)
 
 	if len(ret) == 0 {
 		panic("no return value specified for GetPeers")
 	}
 
-	var r0 map[peer.ID]struct{}
-	if rf, ok := ret.Get(0).(func(protocol.ID) map[peer.ID]struct{}); ok {
+	var r0 peer.IDSlice
+	if rf, ok := ret.Get(0).(func(protocol.ID) peer.IDSlice); ok {
 		r0 = rf(pid)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(map[peer.ID]struct{})
+			r0 = ret.Get(0).(peer.IDSlice)
 		}
 	}
 

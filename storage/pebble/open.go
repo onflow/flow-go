@@ -82,6 +82,8 @@ func MustOpenDefaultPebbleDB(dir string) (*pebble.DB, error) {
 }
 
 // IsPebbleInitialized checks if the given folder contains a valid Pebble DB.
+// return error if the folder does not exist, is not a directory, or is missing required files
+// return nil if the folder contains a valid Pebble DB
 func IsPebbleInitialized(folderPath string) error {
 	// Check if the folder exists
 	info, err := os.Stat(folderPath)

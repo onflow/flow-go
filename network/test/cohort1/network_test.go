@@ -25,6 +25,7 @@ import (
 	"github.com/onflow/flow-go/model/flow/filter"
 	libp2pmessage "github.com/onflow/flow-go/model/libp2p/message"
 	"github.com/onflow/flow-go/model/messages"
+	"github.com/onflow/flow-go/module/counters"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/module/observable"
@@ -199,7 +200,7 @@ func (suite *NetworkTestSuite) TestUpdateNodeAddresses() {
 
 	// create a new staked identity
 	ids, libP2PNodes := testutils.LibP2PNodeForNetworkFixture(suite.T(), suite.sporkId, 1)
-	idProvider := unittest.NewUpdatableIDProvider(ids)
+	idProvider := unittest.NewUpdatableIDProvider(append(suite.ids, ids...))
 	networkCfg := testutils.NetworkConfigFixture(
 		suite.T(),
 		*ids[0],
@@ -213,10 +214,10 @@ func (suite *NetworkTestSuite) TestUpdateNodeAddresses() {
 
 	// start up nodes and peer managers
 	testutils.StartNodes(irrecoverableCtx, suite.T(), libP2PNodes)
-	defer testutils.StopComponents(suite.T(), libP2PNodes, 1*time.Second)
+	defer testutils.StopComponents(suite.T(), libP2PNodes, 2*time.Second)
 
 	newNet.Start(irrecoverableCtx)
-	defer testutils.StopComponents(suite.T(), []network.EngineRegistry{newNet}, 1*time.Second)
+	defer testutils.StopComponents(suite.T(), []network.EngineRegistry{newNet}, 2*time.Second)
 	unittest.RequireComponentsReadyBefore(suite.T(), 1*time.Second, newNet)
 
 	idList := flow.IdentityList(append(suite.ids, newId))
@@ -224,25 +225,35 @@ func (suite *NetworkTestSuite) TestUpdateNodeAddresses() {
 	// needed to enable ID translation
 	suite.providers[0].SetIdentities(idList)
 
-	// unicast should fail to send because no address is known yet for the new identity
-	con, err := suite.networks[0].Register(channels.TestNetworkChannel, &mocknetwork.MessageProcessor{})
-	require.NoError(suite.T(), err)
-	err = con.Unicast(&libp2pmessage.TestMessage{
+	message := &libp2pmessage.TestMessage{
 		Text: "TestUpdateNodeAddresses",
-	}, newId.NodeID)
+	}
+
+	senderID := suite.ids[0].ID()
+	senderMessageProcessor := mocknetwork.NewMessageProcessor(suite.T())
+	receiverMessageProcessor := mocknetwork.NewMessageProcessor(suite.T())
+	receiverMessageProcessor.
+		On("Process", channels.TestNetworkChannel, senderID, message).
+		Return(nil).
+		Maybe() // we may not actually process this message depending on how fast runs
+
+	con, err := suite.networks[0].Register(channels.TestNetworkChannel, senderMessageProcessor)
+	require.NoError(suite.T(), err)
+	_, err = newNet.Register(channels.TestNetworkChannel, receiverMessageProcessor)
+	require.NoError(suite.T(), err)
+
+	// unicast should fail to send because no address is known yet for the new identity
+	err = con.Unicast(message, newId.NodeID)
 	require.True(suite.T(), strings.Contains(err.Error(), swarm.ErrNoAddresses.Error()))
 
 	// update the addresses
 	suite.networks[0].UpdateNodeAddresses()
 
 	// now the message should send successfully
-	err = con.Unicast(&libp2pmessage.TestMessage{
-		Text: "TestUpdateNodeAddresses",
-	}, newId.NodeID)
+	err = con.Unicast(message, newId.NodeID)
 	require.NoError(suite.T(), err)
 
 	cancel()
-	unittest.RequireComponentsReadyBefore(suite.T(), 1*time.Second, newNet)
 }
 
 func (suite *NetworkTestSuite) TestUnicastRateLimit_Messages() {
@@ -469,10 +480,14 @@ func (suite *NetworkTestSuite) TestUnicastRateLimit_Bandwidth() {
 	unittest.RequireComponentsReadyBefore(suite.T(), 1*time.Second, newNet)
 
 	// registers an engine on the new network so that it can receive messages on the TestNetworkChannel
-	newEngine := &mocknetwork.MessageProcessor{}
+	newEngine := mocknetwork.NewMessageProcessor(suite.T())
 	_, err = newNet.Register(channels.TestNetworkChannel, newEngine)
 	require.NoError(suite.T(), err)
-	newEngine.On("Process", channels.TestNetworkChannel, suite.ids[0].NodeID, mockery.Anything).Return(nil)
+
+	callCount := counters.NewMonotonicCounter(0)
+	newEngine.On("Process", channels.TestNetworkChannel, suite.ids[0].NodeID, mockery.Anything).Run(func(args mockery.Arguments) {
+		_ = callCount.Increment()
+	}).Return(nil)
 
 	idList := flow.IdentityList(append(suite.ids, newId))
 
@@ -489,23 +504,43 @@ func (suite *NetworkTestSuite) TestUnicastRateLimit_Bandwidth() {
 	p2ptest.LetNodesDiscoverEachOther(suite.T(), ctx, []p2p.LibP2PNode{libP2PNodes[0], suite.libP2PNodes[0]}, flow.IdentityList{ids[0], suite.ids[0]})
 
 	// create message with about 400bytes (300 random bytes + 100bytes message info)
-	b := make([]byte, 300)
-	for i := range b {
-		b[i] = byte('X')
+	generate := func(letter rune) string {
+		b := make([]byte, 300)
+		for i := range b {
+			b[i] = byte(letter)
+		}
+		return string(b)
 	}
+
 	// send 3 messages at once with a size of 400 bytes each. The third message will be rate limited
 	// as it is more than our allowed bandwidth of 1000 bytes.
-	con0, err := suite.networks[0].Register(channels.TestNetworkChannel, &mocknetwork.MessageProcessor{})
+	con0, err := suite.networks[0].Register(channels.TestNetworkChannel, mocknetwork.NewMessageProcessor(suite.T()))
 	require.NoError(suite.T(), err)
-	for i := 0; i < 3; i++ {
-		err = con0.Unicast(&libp2pmessage.TestMessage{
-			Text: string(b),
-		}, newId.NodeID)
-		require.NoError(suite.T(), err)
+
+	err = con0.Unicast(&libp2pmessage.TestMessage{
+		Text: generate('A'),
+	}, newId.NodeID)
+	require.NoError(suite.T(), err)
+
+	err = con0.Unicast(&libp2pmessage.TestMessage{
+		Text: generate('B'),
+	}, newId.NodeID)
+	require.NoError(suite.T(), err)
+
+	// this message will be rate limited. The remote node will reset the stream, so depending on how
+	// quickly the send happens, we may get an error from attempting to close a reset stream
+	err = con0.Unicast(&libp2pmessage.TestMessage{
+		Text: generate('C'),
+	}, newId.NodeID)
+	if err != nil {
+		require.Contains(suite.T(), err.Error(), "stream reset")
 	}
 
 	// wait for all rate limits before shutting down network
 	unittest.RequireCloseBefore(suite.T(), ch, 100*time.Millisecond, "could not stop on rate limit test ch on time")
+
+	// remote node should have received the first 2 messages
+	assert.Equal(suite.T(), uint64(2), callCount.Value())
 
 	// sleep for 1 seconds to allow connection pruner to prune connections
 	time.Sleep(1 * time.Second)
@@ -521,6 +556,10 @@ func (suite *NetworkTestSuite) TestUnicastRateLimit_Bandwidth() {
 		}, newId.NodeID)
 		return err == nil
 	}, 5*time.Second, 100*time.Millisecond)
+
+	require.Eventually(suite.T(), func() bool {
+		return callCount.Value() == 3
+	}, 1*time.Second, 100*time.Millisecond)
 
 	// shutdown our network so that each message can be processed
 	cancel()

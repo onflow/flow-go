@@ -277,7 +277,7 @@ func TestCompleteRequestingUnsealedChunkLifeCycle(t *testing.T) {
 	unittest.RequireReturnsBefore(t, requestHistoryWG.Wait, time.Duration(2)*s.retryInterval, "could not check chunk requests qualification on time")
 	unittest.RequireReturnsBefore(t, updateHistoryWG.Wait, s.retryInterval, "could not update chunk request history on time")
 	unittest.RequireReturnsBefore(t, conduitWG.Wait, time.Duration(2)*s.retryInterval, "could not request chunks from network")
-	unittest.RequireReturnsBefore(t, handlerWG.Wait, 100*time.Second, "could not handle chunk data responses on time")
+	unittest.RequireReturnsBefore(t, handlerWG.Wait, time.Second, "could not handle chunk data responses on time")
 
 	unittest.RequireCloseBefore(t, e.Done(), time.Second, "could not stop engine on time")
 	testifymock.AssertExpectationsForObjects(t, s.metrics)

@@ -13,6 +13,8 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/messages"
 	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/module/component"
+	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/mempool"
 	"github.com/onflow/flow-go/module/metrics"
 	msig "github.com/onflow/flow-go/module/signature"
@@ -20,6 +22,7 @@ import (
 	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/storage"
+	"github.com/onflow/flow-go/utils/logging"
 )
 
 type Event struct {
@@ -60,10 +63,10 @@ type (
 
 // Engine is a wrapper for approval processing `Core` which implements logic for
 // queuing and filtering network messages which later will be processed by sealing engine.
-// Purpose of this struct is to provide an efficient way how to consume messages from network layer and pass
-// them to `Core`. Engine runs 2 separate gorourtines that perform pre-processing and consuming messages by Core.
+// Purpose of this struct is to provide an efficient way to consume messages from the network layer and pass
+// them to `Core`. Engine runs multiple workers for pre-processing messages and executing `sealing.Core` business logic.
 type Engine struct {
-	unit                       *engine.Unit
+	component.Component
 	workerPool                 *workerpool.WorkerPool
 	core                       consensus.SealingCore
 	log                        zerolog.Logger
@@ -85,7 +88,7 @@ type Engine struct {
 	rootHeader                 *flow.Header
 }
 
-// NewEngine constructs new `Engine` which runs on it's own unit.
+// NewEngine constructs a new Sealing Engine which runs on its own component.
 func NewEngine(log zerolog.Logger,
 	tracer module.Tracer,
 	conMetrics module.ConsensusMetrics,
@@ -106,9 +109,7 @@ func NewEngine(log zerolog.Logger,
 ) (*Engine, error) {
 	rootHeader := state.Params().FinalizedRoot()
 
-	unit := engine.NewUnit()
 	e := &Engine{
-		unit:          unit,
 		workerPool:    workerpool.New(defaultAssignmentCollectorsWorkerPoolCapacity),
 		log:           log.With().Str("engine", "sealing.Engine").Logger(),
 		me:            me,
@@ -131,6 +132,8 @@ func NewEngine(log zerolog.Logger,
 		return nil, fmt.Errorf("could not initialize message handler for untrusted inputs: %w", err)
 	}
 
+	e.Component = e.buildComponentManager()
+
 	// register engine with the approval provider
 	_, err = net.Register(channels.ReceiveApprovals, e)
 	if err != nil {
@@ -144,7 +147,7 @@ func NewEngine(log zerolog.Logger,
 	}
 
 	signatureHasher := msig.NewBLSHasher(msig.ResultApprovalTag)
-	core, err := NewCore(log, e.workerPool, tracer, conMetrics, sealingTracker, unit, headers, state, sealsDB, assigner, signatureHasher, sealsMempool, approvalConduit, requiredApprovalsForSealConstructionGetter)
+	core, err := NewCore(log, e.workerPool, tracer, conMetrics, sealingTracker, headers, state, sealsDB, assigner, signatureHasher, sealsMempool, approvalConduit, requiredApprovalsForSealConstructionGetter)
 	if err != nil {
 		return nil, fmt.Errorf("failed to init sealing engine: %w", err)
 	}
@@ -156,6 +159,30 @@ func NewEngine(log zerolog.Logger,
 	e.core = core
 
 	return e, nil
+}
+
+// buildComponentManager creates the component manager with the necessary workers.
+// It must only be called during initialization of the sealing engine, and the only
+// reason it is factored out from NewEngine is so that it can be used in tests.
+func (e *Engine) buildComponentManager() *component.ComponentManager {
+	builder := component.NewComponentManagerBuilder()
+	for i := 0; i < defaultSealingEngineWorkers; i++ {
+		builder.AddWorker(e.loop)
+	}
+	builder.AddWorker(e.finalizationProcessingLoop)
+	builder.AddWorker(e.blockIncorporatedEventsProcessingLoop)
+	builder.AddWorker(e.waitUntilWorkersFinish)
+	return builder.Build()
+}
+
+// waitUntilWorkersFinish ensures that the Sealing Engine only finishes shutting down
+// once the workerPool used by the Sealing Core has been shut down (after waiting
+// for any pending tasks to complete).
+func (e *Engine) waitUntilWorkersFinish(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
+	ready()
+	<-ctx.Done()
+	// After receiving shutdown signal, wait for the workerPool
+	e.workerPool.StopWait()
 }
 
 // setupTrustedInboundQueues initializes inbound queues for TRUSTED INPUTS (from other components within the
@@ -262,17 +289,22 @@ func (e *Engine) Process(channel channels.Channel, originID flow.Identifier, eve
 			e.log.Warn().Msgf("%v delivered unsupported message %T through %v", originID, event, channel)
 			return nil
 		}
-		return fmt.Errorf("unexpected error while processing engine message: %w", err)
+		// An unexpected exception should never happen here, because the `messageHandler` only puts the events into the
+		// respective queues depending on their type or returns an `IncompatibleInputTypeError` for events with unknown type.
+		// We cannot return the error here, because the networking layer calling `Process`  will just log that error and
+		// continue on a best-effort basis, which is not safe in case of an unexpected exception.
+		e.log.Fatal().Err(err).Msg("unexpected error while processing engine message")
 	}
 	return nil
 }
 
 // processAvailableMessages is processor of pending events which drives events from networking layer to business logic in `Core`.
 // Effectively consumes messages from networking layer and dispatches them into corresponding sinks which are connected with `Core`.
-func (e *Engine) processAvailableMessages() error {
+// No errors expected during normal operations.
+func (e *Engine) processAvailableMessages(ctx irrecoverable.SignalerContext) error {
 	for {
 		select {
-		case <-e.unit.Quit():
+		case <-ctx.Done():
 			return nil
 		default:
 		}
@@ -310,53 +342,59 @@ func (e *Engine) processAvailableMessages() error {
 	}
 }
 
-// finalizationProcessingLoop is a separate goroutine that performs processing of finalization events
-func (e *Engine) finalizationProcessingLoop() {
+// finalizationProcessingLoop contains the logic for processing of block finalization events.
+// This method is intended to be executed by a single worker goroutine.
+func (e *Engine) finalizationProcessingLoop(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
 	finalizationNotifier := e.finalizationEventsNotifier.Channel()
+	ready()
 	for {
 		select {
-		case <-e.unit.Quit():
+		case <-ctx.Done():
 			return
 		case <-finalizationNotifier:
 			finalized, err := e.state.Final().Head()
 			if err != nil {
-				e.log.Fatal().Err(err).Msg("could not retrieve last finalized block")
+				ctx.Throw(fmt.Errorf("could not retrieve last finalized block: %w", err))
 			}
 			err = e.core.ProcessFinalizedBlock(finalized.ID())
 			if err != nil {
-				e.log.Fatal().Err(err).Msgf("could not process finalized block %v", finalized.ID())
+				ctx.Throw(fmt.Errorf("could not process finalized block %v: %w", finalized.ID(), err))
 			}
 		}
 	}
 }
 
-// blockIncorporatedEventsProcessingLoop is a separate goroutine for processing block incorporated events
-func (e *Engine) blockIncorporatedEventsProcessingLoop() {
+// blockIncorporatedEventsProcessingLoop contains the logic for processing block incorporated events.
+// This method is intended to be executed by a single worker goroutine.
+func (e *Engine) blockIncorporatedEventsProcessingLoop(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
 	c := e.blockIncorporatedNotifier.Channel()
-
+	ready()
 	for {
 		select {
-		case <-e.unit.Quit():
+		case <-ctx.Done():
 			return
 		case <-c:
-			err := e.processBlockIncorporatedEvents()
+			err := e.processBlockIncorporatedEvents(ctx)
 			if err != nil {
-				e.log.Fatal().Err(err).Msg("internal error processing block incorporated queued message")
+				ctx.Throw(fmt.Errorf("internal error processing block incorporated queued message: %w", err))
 			}
 		}
 	}
 }
 
-func (e *Engine) loop() {
+// loop contains the logic for processing incorporated results and result approvals via sealing.Core's
+// business logic. This method is intended to be executed by multiple loop worker goroutines concurrently.
+func (e *Engine) loop(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
 	notifier := e.inboundEventsNotifier.Channel()
+	ready()
 	for {
 		select {
-		case <-e.unit.Quit():
+		case <-ctx.Done():
 			return
 		case <-notifier:
-			err := e.processAvailableMessages()
+			err := e.processAvailableMessages(ctx)
 			if err != nil {
-				e.log.Fatal().Err(err).Msg("internal error processing queued message")
+				ctx.Throw(fmt.Errorf("internal error processing queued message: %w", err))
 			}
 		}
 	}
@@ -365,67 +403,29 @@ func (e *Engine) loop() {
 // processIncorporatedResult is a function that creates incorporated result and submits it for processing
 // to sealing core. In phase 2, incorporated result is incorporated at same block that is being executed.
 // This will be changed in phase 3.
+// No errors expected during normal operations.
 func (e *Engine) processIncorporatedResult(incorporatedResult *flow.IncorporatedResult) error {
 	err := e.core.ProcessIncorporatedResult(incorporatedResult)
 	e.engineMetrics.MessageHandled(metrics.EngineSealing, metrics.MessageExecutionReceipt)
 	return err
 }
 
+// onApproval checks that the result approval is valid before forwarding it to the Core for processing in a blocking way.
+// No errors expected during normal operations.
 func (e *Engine) onApproval(originID flow.Identifier, approval *flow.ResultApproval) error {
-	// don't process approval if originID is mismatched
+	// don't process (silently ignore) approval if originID is mismatched
 	if originID != approval.Body.ApproverID {
+		e.log.Warn().Bool(logging.KeyProtocolViolation, true).
+			Msgf("result approval generated by node %v received from different originID %v", approval.Body.ApproverID, originID)
 		return nil
 	}
 
 	err := e.core.ProcessApproval(approval)
 	e.engineMetrics.MessageHandled(metrics.EngineSealing, metrics.MessageResultApproval)
 	if err != nil {
-		return fmt.Errorf("fatal internal error in sealing core logic")
+		return irrecoverable.NewExceptionf("fatal internal error in sealing core logic: %w", err)
 	}
 	return nil
-}
-
-// SubmitLocal submits an event originating on the local node.
-func (e *Engine) SubmitLocal(event interface{}) {
-	err := e.ProcessLocal(event)
-	if err != nil {
-		// receiving an input of incompatible type from a trusted internal component is fatal
-		e.log.Fatal().Err(err).Msg("internal error processing event")
-	}
-}
-
-// Submit submits the given event from the node with the given origin ID
-// for processing in a non-blocking manner. It returns instantly and logs
-// a potential processing error internally when done.
-func (e *Engine) Submit(channel channels.Channel, originID flow.Identifier, event interface{}) {
-	err := e.Process(channel, originID, event)
-	if err != nil {
-		e.log.Fatal().Err(err).Msg("internal error processing event")
-	}
-}
-
-// ProcessLocal processes an event originating on the local node.
-func (e *Engine) ProcessLocal(event interface{}) error {
-	return e.messageHandler.Process(e.me.NodeID(), event)
-}
-
-// Ready returns a ready channel that is closed once the engine has fully
-// started. For the propagation engine, we consider the engine up and running
-// upon initialization.
-func (e *Engine) Ready() <-chan struct{} {
-	// launch as many workers as we need
-	for i := 0; i < defaultSealingEngineWorkers; i++ {
-		e.unit.Launch(e.loop)
-	}
-	e.unit.Launch(e.finalizationProcessingLoop)
-	e.unit.Launch(e.blockIncorporatedEventsProcessingLoop)
-	return e.unit.Ready()
-}
-
-func (e *Engine) Done() <-chan struct{} {
-	return e.unit.Done(func() {
-		e.workerPool.StopWait()
-	})
 }
 
 // OnFinalizedBlock implements the `OnFinalizedBlock` callback from the `hotstuff.FinalizationConsumer`
@@ -500,10 +500,10 @@ func (e *Engine) processIncorporatedBlock(incorporatedBlockID flow.Identifier) e
 
 // processBlockIncorporatedEvents performs processing of block incorporated hot stuff events
 // No errors expected during normal operations.
-func (e *Engine) processBlockIncorporatedEvents() error {
+func (e *Engine) processBlockIncorporatedEvents(ctx irrecoverable.SignalerContext) error {
 	for {
 		select {
-		case <-e.unit.Quit():
+		case <-ctx.Done():
 			return nil
 		default:
 		}

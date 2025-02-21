@@ -671,7 +671,7 @@ func TestExtendInvalidChainID(t *testing.T) {
 
 // TestExtendReceiptsNotSorted tests the case where receipts are included in a block payload
 // not sorted by height. Previously, this constraint was required (unordered receipts resulted
-// in an error). Now, any ordering of receipts should be accepted by the Mutator.
+// in an error). Now, any ordering of receipts should be accepted by the EvolvingState.
 func TestExtendReceiptsNotSorted(t *testing.T) {
 	rootSnapshot := unittest.RootSnapshotFixture(participants)
 	rootProtocolStateID := getRootProtocolStateID(t, rootSnapshot)
@@ -839,6 +839,7 @@ func TestExtendEpochTransitionValid(t *testing.T) {
 		metrics.On("SealedHeight", mock.Anything)
 		metrics.On("FinalizedHeight", mock.Anything)
 		metrics.On("BlockFinalized", mock.Anything)
+		metrics.On("ProtocolStateVersion", mock.Anything)
 
 		// expect epoch metric calls on bootstrap
 		initialCurrentEpoch := rootSnapshot.Epochs().Current()
@@ -1662,7 +1663,7 @@ func TestExtendEpochCommitInvalid(t *testing.T) {
 			unittest.InsertAndFinalize(t, state, block3)
 
 			_, receipt, seal := createCommit(block3, func(commit *flow.EpochCommit) {
-				// add an extra dkg key
+				// add an extra Random Beacon key
 				commit.DKGParticipantKeys = append(commit.DKGParticipantKeys, unittest.KeyFixture(crypto.BLSBLS12381).PublicKey())
 			})
 
@@ -1710,7 +1711,7 @@ func TestEpochFallbackMode(t *testing.T) {
 			rootProtocolState, err := rootSnapshot.ProtocolState()
 			require.NoError(t, err)
 			epochExtensionViewCount := rootProtocolState.GetEpochExtensionViewCount()
-			safetyThreshold := rootProtocolState.GetEpochCommitSafetyThreshold()
+			safetyThreshold := rootProtocolState.GetFinalizationSafetyThreshold()
 			require.GreaterOrEqual(t, epochExtensionViewCount, safetyThreshold, "epoch extension view count must be at least as large as safety threshold")
 
 			expectedStateIdCalculator := calculateExpectedStateId(t, mutableProtocolState)
@@ -1780,7 +1781,7 @@ func TestEpochFallbackMode(t *testing.T) {
 			rootProtocolState, err := rootSnapshot.ProtocolState()
 			require.NoError(t, err)
 			epochExtensionViewCount := rootProtocolState.GetEpochExtensionViewCount()
-			safetyThreshold := rootProtocolState.GetEpochCommitSafetyThreshold()
+			safetyThreshold := rootProtocolState.GetFinalizationSafetyThreshold()
 			require.GreaterOrEqual(t, epochExtensionViewCount, safetyThreshold, "epoch extension view count must be at least as large as safety threshold")
 
 			// add a block for the first seal to reference
@@ -1979,15 +1980,8 @@ func TestRecoveryFromEpochFallbackMode(t *testing.T) {
 		epochState, err := state.Final().EpochProtocolState()
 		require.NoError(t, err)
 		epochPhase := epochState.EpochPhase()
-
-		nextEpochQuery := state.Final().Epochs().Next()
-		nextEpochSetup, err := realprotocol.ToEpochSetup(nextEpochQuery)
-		require.NoError(t, err)
-		nextEpochCommit, err := realprotocol.ToEpochCommit(nextEpochQuery)
-		require.NoError(t, err)
-
-		require.Equal(t, &epochRecover.EpochSetup, nextEpochSetup, "next epoch has to be setup according to EpochRecover")
-		require.Equal(t, &epochRecover.EpochCommit, nextEpochCommit, "next epoch has to be committed according to EpochRecover")
+		require.Equal(t, &epochRecover.EpochSetup, epochState.Entry().NextEpochSetup, "next epoch has to be setup according to EpochRecover")
+		require.Equal(t, &epochRecover.EpochCommit, epochState.Entry().NextEpochCommit, "next epoch has to be committed according to EpochRecover")
 		require.Equal(t, flow.EpochPhaseCommitted, epochPhase, "next epoch has to be committed")
 	}
 
@@ -2230,7 +2224,7 @@ func TestRecoveryFromEpochFallbackMode(t *testing.T) {
 			rootProtocolState, err := rootSnapshot.ProtocolState()
 			require.NoError(t, err)
 			epochExtensionViewCount := rootProtocolState.GetEpochExtensionViewCount()
-			safetyThreshold := rootProtocolState.GetEpochCommitSafetyThreshold()
+			safetyThreshold := rootProtocolState.GetFinalizationSafetyThreshold()
 			require.GreaterOrEqual(t, epochExtensionViewCount, safetyThreshold, "epoch extension view count must be at least as large as safety threshold")
 
 			expectedStateIdCalculator := calculateExpectedStateId(t, mutableProtocolState)
@@ -3238,6 +3232,7 @@ func mockMetricsForRootSnapshot(metricsMock *mockmodule.ComplianceMetrics, rootS
 	metricsMock.On("CurrentDKGPhaseViews", epochSetup.DKGPhase1FinalView, epochSetup.DKGPhase2FinalView, epochSetup.DKGPhase3FinalView)
 	metricsMock.On("BlockSealed", mock.Anything)
 	metricsMock.On("BlockFinalized", mock.Anything)
+	metricsMock.On("ProtocolStateVersion", mock.Anything)
 	metricsMock.On("FinalizedHeight", mock.Anything)
 	metricsMock.On("SealedHeight", mock.Anything)
 }

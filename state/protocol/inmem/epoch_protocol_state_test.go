@@ -44,7 +44,7 @@ func TestEpochProtocolStateAdapter(t *testing.T) {
 		require.NoError(t, err)
 		assert.Equal(t, entry.CurrentEpochCommit.DKGGroupKey, dkg.GroupKey())
 		assert.Equal(t, len(entry.CurrentEpochCommit.DKGParticipantKeys), int(dkg.Size()))
-		dkgParticipants := entry.CurrentEpochSetup.Participants.Filter(filter.IsValidDKGParticipant)
+		dkgParticipants := entry.CurrentEpochSetup.Participants.Filter(filter.IsConsensusCommitteeMember)
 		for _, identity := range dkgParticipants {
 			keyShare, err := dkg.KeyShare(identity.NodeID)
 			require.NoError(t, err)

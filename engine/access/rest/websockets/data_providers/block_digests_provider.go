@@ -48,6 +48,7 @@ func NewBlockDigestsDataProvider(
 	p.baseDataProvider = newBaseDataProvider(
 		subscriptionID,
 		topic,
+		arguments,
 		cancel,
 		send,
 		p.createSubscription(subCtx, blockArgs), // Set up a subscription to block digests based on arguments.

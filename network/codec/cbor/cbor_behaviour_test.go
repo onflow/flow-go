@@ -32,7 +32,7 @@ func TestBehaviour_DecodeExtraField(t *testing.T) {
 		assert.NoError(t, err)
 
 		var m1 model1
-		err = defaultDecMode.Unmarshal(bz, &m1)
+		err = cborcodec.DefaultDecMode.Unmarshal(bz, &m1)
 		assert.Error(t, err)
 		target := &cbor.UnknownFieldError{}
 		assert.ErrorAs(t, err, &target)
@@ -56,7 +56,7 @@ func TestBehaviour_DecodeExtraField(t *testing.T) {
 		assert.NoError(t, err)
 
 		var m1 model1
-		err = defaultDecMode.Unmarshal(bz, &m1)
+		err = cborcodec.DefaultDecMode.Unmarshal(bz, &m1)
 		assert.Error(t, err)
 		target := &cbor.UnknownFieldError{}
 		assert.ErrorAs(t, err, &target)
@@ -96,7 +96,7 @@ func TestBehaviour_DecodeOmittedField(t *testing.T) {
 	assert.NoError(t, err)
 
 	var m2 model2
-	err = defaultDecMode.Unmarshal(bz, &m2)
+	err = cborcodec.DefaultDecMode.Unmarshal(bz, &m2)
 	assert.NoError(t, err)
 	assert.Equal(t, m2.A, m1.A)
 	assert.Equal(t, m2.B, int(0))
@@ -134,6 +134,6 @@ func TestBehaviour_OmittingNewFieldForDownwardsCompatibility(t *testing.T) {
 	assert.NoError(t, err)
 
 	var m1 model1
-	err = defaultDecMode.Unmarshal(bz, &m1)
+	err = cborcodec.DefaultDecMode.Unmarshal(bz, &m1)
 	assert.NoError(t, err)
 }

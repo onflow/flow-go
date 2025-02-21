@@ -14,51 +14,41 @@ type DKGState struct {
 	mock.Mock
 }
 
-// GetDKGEndState provides a mock function with given fields: epochCounter
-func (_m *DKGState) GetDKGEndState(epochCounter uint64) (flow.DKGEndState, error) {
-	ret := _m.Called(epochCounter)
+// CommitMyBeaconPrivateKey provides a mock function with given fields: epochCounter, commit
+func (_m *DKGState) CommitMyBeaconPrivateKey(epochCounter uint64, commit *flow.EpochCommit) error {
+	ret := _m.Called(epochCounter, commit)
 
 	if len(ret) == 0 {
-		panic("no return value specified for GetDKGEndState")
+		panic("no return value specified for CommitMyBeaconPrivateKey")
 	}
 
-	var r0 flow.DKGEndState
-	var r1 error
-	if rf, ok := ret.Get(0).(func(uint64) (flow.DKGEndState, error)); ok {
-		return rf(epochCounter)
-	}
-	if rf, ok := ret.Get(0).(func(uint64) flow.DKGEndState); ok {
-		r0 = rf(epochCounter)
+	var r0 error
+	if rf, ok := ret.Get(0).(func(uint64, *flow.EpochCommit) error); ok {
+		r0 = rf(epochCounter, commit)
 	} else {
-		r0 = ret.Get(0).(flow.DKGEndState)
+		r0 = ret.Error(0)
 	}
 
-	if rf, ok := ret.Get(1).(func(uint64) error); ok {
-		r1 = rf(epochCounter)
-	} else {
-		r1 = ret.Error(1)
-	}
-
-	return r0, r1
+	return r0
 }
 
-// GetDKGStarted provides a mock function with given fields: epochCounter
-func (_m *DKGState) GetDKGStarted(epochCounter uint64) (bool, error) {
+// GetDKGState provides a mock function with given fields: epochCounter
+func (_m *DKGState) GetDKGState(epochCounter uint64) (flow.DKGState, error) {
 	ret := _m.Called(epochCounter)
 
 	if len(ret) == 0 {
-		panic("no return value specified for GetDKGStarted")
+		panic("no return value specified for GetDKGState")
 	}
 
-	var r0 bool
+	var r0 flow.DKGState
 	var r1 error
-	if rf, ok := ret.Get(0).(func(uint64) (bool, error)); ok {
+	if rf, ok := ret.Get(0).(func(uint64) (flow.DKGState, error)); ok {
 		return rf(epochCounter)
 	}
-	if rf, ok := ret.Get(0).(func(uint64) bool); ok {
+	if rf, ok := ret.Get(0).(func(uint64) flow.DKGState); ok {
 		r0 = rf(epochCounter)
 	} else {
-		r0 = ret.Get(0).(bool)
+		r0 = ret.Get(0).(flow.DKGState)
 	}
 
 	if rf, ok := ret.Get(1).(func(uint64) error); ok {
@@ -88,12 +78,95 @@ func (_m *DKGState) InsertMyBeaconPrivateKey(epochCounter uint64, key crypto.Pri
 	return r0
 }
 
+// IsDKGStarted provides a mock function with given fields: epochCounter
+func (_m *DKGState) IsDKGStarted(epochCounter uint64) (bool, error) {
+	ret := _m.Called(epochCounter)
+
+	if len(ret) == 0 {
+		panic("no return value specified for IsDKGStarted")
+	}
+
+	var r0 bool
+	var r1 error
+	if rf, ok := ret.Get(0).(func(uint64) (bool, error)); ok {
+		return rf(epochCounter)
+	}
+	if rf, ok := ret.Get(0).(func(uint64) bool); ok {
+		r0 = rf(epochCounter)
+	} else {
+		r0 = ret.Get(0).(bool)
+	}
+
+	if rf, ok := ret.Get(1).(func(uint64) error); ok {
+		r1 = rf(epochCounter)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
 // RetrieveMyBeaconPrivateKey provides a mock function with given fields: epochCounter
-func (_m *DKGState) RetrieveMyBeaconPrivateKey(epochCounter uint64) (crypto.PrivateKey, error) {
+func (_m *DKGState) RetrieveMyBeaconPrivateKey(epochCounter uint64) (crypto.PrivateKey, bool, error) {
 	ret := _m.Called(epochCounter)
 
 	if len(ret) == 0 {
 		panic("no return value specified for RetrieveMyBeaconPrivateKey")
+	}
+
+	var r0 crypto.PrivateKey
+	var r1 bool
+	var r2 error
+	if rf, ok := ret.Get(0).(func(uint64) (crypto.PrivateKey, bool, error)); ok {
+		return rf(epochCounter)
+	}
+	if rf, ok := ret.Get(0).(func(uint64) crypto.PrivateKey); ok {
+		r0 = rf(epochCounter)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(crypto.PrivateKey)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(uint64) bool); ok {
+		r1 = rf(epochCounter)
+	} else {
+		r1 = ret.Get(1).(bool)
+	}
+
+	if rf, ok := ret.Get(2).(func(uint64) error); ok {
+		r2 = rf(epochCounter)
+	} else {
+		r2 = ret.Error(2)
+	}
+
+	return r0, r1, r2
+}
+
+// SetDKGState provides a mock function with given fields: epochCounter, newState
+func (_m *DKGState) SetDKGState(epochCounter uint64, newState flow.DKGState) error {
+	ret := _m.Called(epochCounter, newState)
+
+	if len(ret) == 0 {
+		panic("no return value specified for SetDKGState")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(uint64, flow.DKGState) error); ok {
+		r0 = rf(epochCounter, newState)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// UnsafeRetrieveMyBeaconPrivateKey provides a mock function with given fields: epochCounter
+func (_m *DKGState) UnsafeRetrieveMyBeaconPrivateKey(epochCounter uint64) (crypto.PrivateKey, error) {
+	ret := _m.Called(epochCounter)
+
+	if len(ret) == 0 {
+		panic("no return value specified for UnsafeRetrieveMyBeaconPrivateKey")
 	}
 
 	var r0 crypto.PrivateKey
@@ -116,42 +189,6 @@ func (_m *DKGState) RetrieveMyBeaconPrivateKey(epochCounter uint64) (crypto.Priv
 	}
 
 	return r0, r1
-}
-
-// SetDKGEndState provides a mock function with given fields: epochCounter, endState
-func (_m *DKGState) SetDKGEndState(epochCounter uint64, endState flow.DKGEndState) error {
-	ret := _m.Called(epochCounter, endState)
-
-	if len(ret) == 0 {
-		panic("no return value specified for SetDKGEndState")
-	}
-
-	var r0 error
-	if rf, ok := ret.Get(0).(func(uint64, flow.DKGEndState) error); ok {
-		r0 = rf(epochCounter, endState)
-	} else {
-		r0 = ret.Error(0)
-	}
-
-	return r0
-}
-
-// SetDKGStarted provides a mock function with given fields: epochCounter
-func (_m *DKGState) SetDKGStarted(epochCounter uint64) error {
-	ret := _m.Called(epochCounter)
-
-	if len(ret) == 0 {
-		panic("no return value specified for SetDKGStarted")
-	}
-
-	var r0 error
-	if rf, ok := ret.Get(0).(func(uint64) error); ok {
-		r0 = rf(epochCounter)
-	} else {
-		r0 = ret.Error(0)
-	}
-
-	return r0
 }
 
 // NewDKGState creates a new instance of DKGState. It also registers a testing interface on the mock and a cleanup function to assert the mocks expectations.

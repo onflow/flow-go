@@ -48,6 +48,10 @@ func NewEventsDataProvider(
 	eventFilterConfig state_stream.EventFilterConfig,
 	heartbeatInterval uint64,
 ) (*EventsDataProvider, error) {
+	if stateStreamApi == nil {
+		return nil, fmt.Errorf("this access node does not support streaming events")
+	}
+
 	p := &EventsDataProvider{
 		logger:            logger.With().Str("component", "events-data-provider").Logger(),
 		stateStreamApi:    stateStreamApi,
@@ -65,6 +69,7 @@ func NewEventsDataProvider(
 	p.baseDataProvider = newBaseDataProvider(
 		subscriptionID,
 		topic,
+		arguments,
 		cancel,
 		send,
 		p.createSubscription(subCtx, eventArgs), // Set up a subscription to events based on arguments.
@@ -85,7 +90,7 @@ func (p *EventsDataProvider) Run() error {
 // No errors are expected during normal operations.
 func (p *EventsDataProvider) handleResponse() func(eventsResponse *backend.EventsResponse) error {
 	blocksSinceLastMessage := uint64(0)
-	messageIndex := counters.NewMonotonousCounter(0)
+	messageIndex := counters.NewMonotonicCounter(0)
 
 	return func(eventsResponse *backend.EventsResponse) error {
 		// check if there are any events in the response. if not, do not send a message unless the last

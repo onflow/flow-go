@@ -156,13 +156,18 @@ func (f *HotStuffFactory) CreateModules(
 		return nil, nil, err
 	}
 
+	persist, err := persister.New(f.db, cluster.ChainID())
+	if err != nil {
+		return nil, nil, err
+	}
+
 	return &consensus.HotstuffModules{
 		Forks:                       forks,
 		Validator:                   validator,
 		Notifier:                    notifier,
 		Committee:                   committee,
 		Signer:                      signer,
-		Persist:                     persister.New(f.db, cluster.ChainID()),
+		Persist:                     persist,
 		VoteAggregator:              voteAggregator,
 		TimeoutAggregator:           timeoutAggregator,
 		VoteCollectorDistributor:    voteAggregationDistributor.VoteCollectorDistributor,

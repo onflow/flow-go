@@ -1427,7 +1427,7 @@ func (h *Handler) SendAndSubscribeTransactionStatuses(
 
 	sub := h.api.SendAndSubscribeTransactionStatuses(ctx, &tx, request.GetEventEncodingVersion())
 
-	messageIndex := counters.NewMonotonousCounter(0)
+	messageIndex := counters.NewMonotonicCounter(0)
 	return subscription.HandleRPCSubscription(sub, func(txResults []*TransactionResult) error {
 		for i := range txResults {
 			index := messageIndex.Value()

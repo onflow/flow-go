@@ -1,8 +1,8 @@
 import Crypto
-import FungibleToken from "FungibleToken"
-import FlowToken from "FlowToken"
-import FlowIDTableStaking from "FlowIDTableStaking"
-import FlowStakingCollection from "FlowStakingCollection"
+import "FungibleToken"
+import "FlowToken"
+import "FlowIDTableStaking"
+import "FlowStakingCollection"
 
 transaction(
     stakingAcctKey: Crypto.KeyListEntry,

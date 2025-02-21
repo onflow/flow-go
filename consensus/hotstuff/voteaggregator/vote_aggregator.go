@@ -38,11 +38,11 @@ type VoteAggregator struct {
 	hotstuffMetrics            module.HotstuffMetrics
 	engineMetrics              module.EngineMetrics
 	notifier                   hotstuff.VoteAggregationViolationConsumer
-	lowestRetainedView         counters.StrictMonotonousCounter // lowest view, for which we still process votes
+	lowestRetainedView         counters.StrictMonotonicCounter // lowest view, for which we still process votes
 	collectors                 hotstuff.VoteCollectors
 	queuedMessagesNotifier     engine.Notifier
 	finalizationEventsNotifier engine.Notifier
-	finalizedView              counters.StrictMonotonousCounter // cache the last finalized view to queue up the pruning work, and unblock the caller who's delivering the finalization event.
+	finalizedView              counters.StrictMonotonicCounter // cache the last finalized view to queue up the pruning work, and unblock the caller who's delivering the finalization event.
 	queuedVotes                *fifoqueue.FifoQueue
 	queuedBlocks               *fifoqueue.FifoQueue
 }
@@ -79,8 +79,8 @@ func NewVoteAggregator(
 		hotstuffMetrics:            hotstuffMetrics,
 		engineMetrics:              engineMetrics,
 		notifier:                   notifier,
-		lowestRetainedView:         counters.NewMonotonousCounter(lowestRetainedView),
-		finalizedView:              counters.NewMonotonousCounter(lowestRetainedView),
+		lowestRetainedView:         counters.NewMonotonicCounter(lowestRetainedView),
+		finalizedView:              counters.NewMonotonicCounter(lowestRetainedView),
 		collectors:                 collectors,
 		queuedVotes:                queuedVotes,
 		queuedBlocks:               queuedBlocks,

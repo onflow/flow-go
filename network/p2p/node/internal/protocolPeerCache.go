@@ -10,6 +10,7 @@ import (
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/libp2p/go-libp2p/core/protocol"
 	"github.com/rs/zerolog"
+	"golang.org/x/exp/maps"
 
 	p2plogging "github.com/onflow/flow-go/network/p2p/logging"
 )
@@ -20,13 +21,26 @@ type ProtocolPeerCache struct {
 	sync.RWMutex
 }
 
-func NewProtocolPeerCache(logger zerolog.Logger, h host.Host) (*ProtocolPeerCache, error) {
+// NewProtocolPeerCache creates a new ProtocolPeerCache instance using the given host and supported protocols
+// Only protocols passed in the protocols list will be tracked
+func NewProtocolPeerCache(logger zerolog.Logger, h host.Host, protocols []protocol.ID) (*ProtocolPeerCache, error) {
+	protocolPeers := make(map[protocol.ID]map[peer.ID]struct{})
+	for _, pid := range protocols {
+		protocolPeers[pid] = make(map[peer.ID]struct{})
+	}
+	p := &ProtocolPeerCache{protocolPeers: protocolPeers}
+
+	// If no protocols are passed, this is a noop cache
+	if len(protocols) == 0 {
+		return p, nil
+	}
+
 	sub, err := h.EventBus().
 		Subscribe([]interface{}{new(event.EvtPeerIdentificationCompleted), new(event.EvtPeerProtocolsUpdated)})
 	if err != nil {
 		return nil, fmt.Errorf("could not subscribe to peer protocol update events: %w", err)
 	}
-	p := &ProtocolPeerCache{protocolPeers: make(map[protocol.ID]map[peer.ID]struct{})}
+
 	h.Network().Notify(&libp2pnet.NotifyBundle{
 		DisconnectedF: func(n libp2pnet.Network, c libp2pnet.Conn) {
 			peer := c.RemotePeer()
@@ -43,11 +57,8 @@ func NewProtocolPeerCache(logger zerolog.Logger, h host.Host) (*ProtocolPeerCach
 func (p *ProtocolPeerCache) RemovePeer(peerID peer.ID) {
 	p.Lock()
 	defer p.Unlock()
-	for pid, peers := range p.protocolPeers {
+	for _, peers := range p.protocolPeers {
 		delete(peers, peerID)
-		if len(peers) == 0 {
-			delete(p.protocolPeers, pid)
-		}
 	}
 }
 
@@ -55,12 +66,9 @@ func (p *ProtocolPeerCache) AddProtocols(peerID peer.ID, protocols []protocol.ID
 	p.Lock()
 	defer p.Unlock()
 	for _, pid := range protocols {
-		peers, ok := p.protocolPeers[pid]
-		if !ok {
-			peers = make(map[peer.ID]struct{})
-			p.protocolPeers[pid] = peers
+		if peers, ok := p.protocolPeers[pid]; ok {
+			peers[peerID] = struct{}{}
 		}
-		peers[peerID] = struct{}{}
 	}
 }
 
@@ -68,24 +76,22 @@ func (p *ProtocolPeerCache) RemoveProtocols(peerID peer.ID, protocols []protocol
 	p.Lock()
 	defer p.Unlock()
 	for _, pid := range protocols {
-		peers := p.protocolPeers[pid]
-		delete(peers, peerID)
-		if len(peers) == 0 {
-			delete(p.protocolPeers, pid)
+		if peers, ok := p.protocolPeers[pid]; ok {
+			delete(peers, peerID)
 		}
 	}
 }
 
-func (p *ProtocolPeerCache) GetPeers(pid protocol.ID) map[peer.ID]struct{} {
+func (p *ProtocolPeerCache) GetPeers(pid protocol.ID) peer.IDSlice {
 	p.RLock()
 	defer p.RUnlock()
 
-	// it is not safe to return a reference to the map, so we make a copy
-	peersCopy := make(map[peer.ID]struct{}, len(p.protocolPeers[pid]))
-	for peerID := range p.protocolPeers[pid] {
-		peersCopy[peerID] = struct{}{}
+	peers, ok := p.protocolPeers[pid]
+	if !ok {
+		return peer.IDSlice{}
 	}
-	return peersCopy
+
+	return maps.Keys(peers)
 }
 
 func (p *ProtocolPeerCache) consumeSubscription(logger zerolog.Logger, h host.Host, sub event.Subscription) {

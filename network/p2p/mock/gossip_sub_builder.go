@@ -60,6 +60,11 @@ func (_m *GossipSubBuilder) OverrideDefaultRpcInspectorFactory(_a0 p2p.GossipSub
 	_m.Called(_a0)
 }
 
+// OverrideDefaultValidateQueueSize provides a mock function with given fields: _a0
+func (_m *GossipSubBuilder) OverrideDefaultValidateQueueSize(_a0 int) {
+	_m.Called(_a0)
+}
+
 // SetGossipSubConfigFunc provides a mock function with given fields: _a0
 func (_m *GossipSubBuilder) SetGossipSubConfigFunc(_a0 p2p.GossipSubAdapterConfigFunc) {
 	_m.Called(_a0)

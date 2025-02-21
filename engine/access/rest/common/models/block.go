@@ -63,8 +63,25 @@ func (b *Block) Build(
 	}
 
 	b.Links = self
-	b.BlockStatus = blockStatus.String()
+
+	var status BlockStatus
+	status.Build(blockStatus)
+	b.BlockStatus = &status
+
 	return nil
+}
+
+func (b *BlockStatus) Build(status flow.BlockStatus) {
+	switch status {
+	case flow.BlockStatusUnknown:
+		*b = BLOCK_UNKNOWN
+	case flow.BlockStatusFinalized:
+		*b = BLOCK_FINALIZED
+	case flow.BlockStatusSealed:
+		*b = BLOCK_SEALED
+	default:
+		*b = ""
+	}
 }
 
 func (b *BlockPayload) Build(payload *flow.Payload) error {

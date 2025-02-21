@@ -4,11 +4,11 @@ import (
 	"context"
 	"fmt"
 
+	corrupt "github.com/libp2p/go-libp2p-pubsub"
 	"github.com/libp2p/go-libp2p/core/host"
 	"github.com/libp2p/go-libp2p/core/peer"
 	madns "github.com/multiformats/go-multiaddr-dns"
 	"github.com/rs/zerolog"
-	corrupt "github.com/yhassanzadeh13/go-libp2p-pubsub"
 
 	fcrypto "github.com/onflow/crypto"
 
@@ -128,8 +128,8 @@ func InitCorruptLibp2pNode(
 	return builder.Build()
 }
 
-// CorruptGossipSubFactory returns a factory function that creates a new instance of the forked gossipsub module from
-// github.com/yhassanzadeh13/go-libp2p-pubsub for the purpose of BFT testing and attack vector implementation.
+// CorruptGossipSubFactory returns a factory function that creates a new instance of the corrupt
+// gossipsub adapter for the purpose of BFT testing and attack vector implementation.
 func CorruptGossipSubFactory(routerOpts ...func(*corrupt.GossipSubRouter)) p2p.GossipSubFactoryFunc {
 	factory := func(
 		ctx context.Context,
@@ -146,16 +146,16 @@ func CorruptGossipSubFactory(routerOpts ...func(*corrupt.GossipSubRouter)) p2p.G
 	return factory
 }
 
-// CorruptGossipSubConfigFactory returns a factory function that creates a new instance of the forked gossipsub config
-// from github.com/yhassanzadeh13/go-libp2p-pubsub for the purpose of BFT testing and attack vector implementation.
+// CorruptGossipSubConfigFactory returns a factory function that creates a new instance of the corrupt
+// gossipsub config for the purpose of BFT testing and attack vector implementation.
 func CorruptGossipSubConfigFactory(opts ...CorruptPubSubAdapterConfigOption) p2p.GossipSubAdapterConfigFunc {
 	return func(base *p2p.BasePubSubAdapterConfig) p2p.PubSubAdapterConfig {
 		return NewCorruptPubSubAdapterConfig(base, opts...)
 	}
 }
 
-// CorruptGossipSubConfigFactoryWithInspector returns a factory function that creates a new instance of the forked gossipsub config
-// from github.com/yhassanzadeh13/go-libp2p-pubsub for the purpose of BFT testing and attack vector implementation.
+// CorruptGossipSubConfigFactoryWithInspector returns a factory function that creates a new instance
+// of the corrupt gossipsub config for the purpose of BFT testing and attack vector implementation.
 func CorruptGossipSubConfigFactoryWithInspector(inspector func(peer.ID, *corrupt.RPC) error) p2p.GossipSubAdapterConfigFunc {
 	return func(base *p2p.BasePubSubAdapterConfig) p2p.PubSubAdapterConfig {
 		return NewCorruptPubSubAdapterConfig(base, WithInspector(inspector))

@@ -8,13 +8,10 @@ import (
 	"time"
 
 	badgerds "github.com/ipfs/go-ds-badger2"
+	sdk "github.com/onflow/flow-go-sdk"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
-	"google.golang.org/grpc"
-	"google.golang.org/grpc/credentials/insecure"
-
-	sdk "github.com/onflow/flow-go-sdk"
 
 	"github.com/onflow/flow-go/integration/testnet"
 	"github.com/onflow/flow-go/model/flow"
@@ -137,17 +134,6 @@ func (s *ExecutionDataPruningSuite) SetupTest() {
 	s.net.Start(s.ctx)
 }
 
-// getGRPCClient is the helper func to create an access api client
-func (s *ExecutionDataPruningSuite) getGRPCClient(address string) (accessproto.AccessAPIClient, error) {
-	conn, err := grpc.Dial(address, grpc.WithTransportCredentials(insecure.NewCredentials()))
-	if err != nil {
-		return nil, err
-	}
-
-	client := accessproto.NewAccessAPIClient(conn)
-	return client, nil
-}
-
 // TestHappyPath tests the execution data pruning process in a happy path scenario.
 // The test follows these steps:
 //
@@ -197,17 +183,17 @@ func (s *ExecutionDataPruningSuite) TestHappyPath() {
 func (s *ExecutionDataPruningSuite) waitUntilExecutionDataForBlockIndexed(waitingBlockHeight uint64) {
 	observerNode := s.net.ContainerByName(s.observerNodeName)
 
-	grpcClient, err := s.getGRPCClient(observerNode.Addr(testnet.GRPCPort))
+	sdkClient, err := observerNode.SDKClient()
 	s.Require().NoError(err)
 
 	// creating execution data api client
-	client, err := getClient(fmt.Sprintf("localhost:%s", observerNode.Port(testnet.ExecutionStatePort)))
-	s.Require().NoError(err)
+	accessClient := sdkClient.RPCClient()
+	execClient := sdkClient.ExecutionDataRPCClient()
 
 	// pause until the observer node start indexing blocks,
 	// getting events from 1-nd block to make sure that 1-st block already indexed, and we can start subscribing
 	s.Require().Eventually(func() bool {
-		_, err := grpcClient.GetEventsForHeightRange(s.ctx, &accessproto.GetEventsForHeightRangeRequest{
+		_, err := accessClient.GetEventsForHeightRange(s.ctx, &accessproto.GetEventsForHeightRangeRequest{
 			Type:                 sdk.EventAccountCreated,
 			StartHeight:          1,
 			EndHeight:            1,
@@ -220,7 +206,7 @@ func (s *ExecutionDataPruningSuite) waitUntilExecutionDataForBlockIndexed(waitin
 	// subscribe on events till waitingBlockHeight to make sure that execution data for block indexed till waitingBlockHeight and pruner
 	// pruned execution data at least once
 	// SubscribeEventsFromStartHeight used as subscription here because we need to make sure that execution data are already indexed
-	stream, err := client.SubscribeEventsFromStartHeight(s.ctx, &executiondata.SubscribeEventsFromStartHeightRequest{
+	stream, err := execClient.SubscribeEventsFromStartHeight(s.ctx, &executiondata.SubscribeEventsFromStartHeightRequest{
 		EventEncodingVersion: entities.EventEncodingVersion_CCF_V0,
 		Filter:               &executiondata.EventFilter{},
 		HeartbeatInterval:    1,
