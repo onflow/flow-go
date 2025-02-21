@@ -80,24 +80,6 @@ func (_m *MyExecutionReceipts) MyReceipt(blockID flow.Identifier) (*flow.Executi
 	return r0, r1
 }
 
-// StoreMyReceipt provides a mock function with given fields: receipt
-func (_m *MyExecutionReceipts) StoreMyReceipt(receipt *flow.ExecutionReceipt) error {
-	ret := _m.Called(receipt)
-
-	if len(ret) == 0 {
-		panic("no return value specified for StoreMyReceipt")
-	}
-
-	var r0 error
-	if rf, ok := ret.Get(0).(func(*flow.ExecutionReceipt) error); ok {
-		r0 = rf(receipt)
-	} else {
-		r0 = ret.Error(0)
-	}
-
-	return r0
-}
-
 // NewMyExecutionReceipts creates a new instance of MyExecutionReceipts. It also registers a testing interface on the mock and a cleanup function to assert the mocks expectations.
 // The first argument is typically a *testing.T value.
 func NewMyExecutionReceipts(t interface {
