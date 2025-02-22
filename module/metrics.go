@@ -1000,6 +1000,9 @@ type ExecutionMetrics interface {
 	// ExecutionLastChunkDataPackPrunedHeight reports last chunk data pack pruned height
 	ExecutionLastChunkDataPackPrunedHeight(height uint64)
 
+	// ExecutionTargetChunkDataPackPrunedHeight reports the target height for chunk data pack to be pruned
+	ExecutionTargetChunkDataPackPrunedHeight(height uint64)
+
 	// ExecutionBlockExecuted reports the total time and computation spent on executing a block
 	ExecutionBlockExecuted(dur time.Duration, stats BlockExecutionResultStats)
 

@@ -55,6 +55,9 @@ type BlockIterator interface {
 	// It returns the saved index (next index to iterate)
 	// any error returned are exceptions
 	Checkpoint() (savedIndex uint64, exception error)
+
+	// Progress returns the progress of the iterator
+	Progress() (start, end, next uint64)
 }
 
 // IteratorCreator creates block iterators.
