@@ -19,6 +19,7 @@ import (
 	"github.com/onflow/flow-go/engine/access/state_stream/backend"
 	"github.com/onflow/flow-go/engine/common/rpc/convert"
 	"github.com/onflow/flow-go/integration/testnet"
+	"github.com/onflow/flow-go/integration/tests/access/common"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/utils/unittest"
 
@@ -111,7 +112,7 @@ func (s *RestStateStreamSuite) TestRestEventStreaming() {
 		startHeight := uint64(0)
 		url := getSubscribeEventsRequest(restAddr, startBlockId, startHeight, nil, nil, nil)
 
-		client, err := getWSClient(s.ctx, url)
+		client, err := common.GetWSClient(s.ctx, url)
 		require.NoError(t, err)
 
 		var receivedEventsResponse []*backend.EventsResponse
@@ -206,16 +207,6 @@ func (s *RestStateStreamSuite) requireEvents(receivedEventsResponse []*backend.E
 	}
 	// Ensure that at least one response had non-empty events
 	require.GreaterOrEqual(s.T(), nonEmptyResponseCount, 1, "expect at least one response with non-empty events")
-}
-
-// getWSClient is a helper function that creates a websocket client
-func getWSClient(ctx context.Context, address string) (*websocket.Conn, error) {
-	// helper func to create WebSocket client
-	client, _, err := websocket.DefaultDialer.DialContext(ctx, strings.Replace(address, "http", "ws", 1), nil)
-	if err != nil {
-		return nil, err
-	}
-	return client, nil
 }
 
 // getSubscribeEventsRequest is a helper function that creates SubscribeEventsRequest

@@ -11,8 +11,8 @@ import (
 	"github.com/onflow/flow-go/access"
 	commonmodels "github.com/onflow/flow-go/engine/access/rest/common/models"
 	"github.com/onflow/flow-go/engine/access/rest/common/parser"
-	"github.com/onflow/flow-go/engine/access/rest/http/request"
-	"github.com/onflow/flow-go/engine/access/rest/websockets/models"
+	"github.com/onflow/flow-go/engine/access/rest/websockets/data_providers/models"
+	wsmodels "github.com/onflow/flow-go/engine/access/rest/websockets/models"
 	"github.com/onflow/flow-go/engine/access/subscription"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/counters"
@@ -22,9 +22,7 @@ import (
 
 // transactionStatusesArguments contains the arguments required for subscribing to transaction statuses
 type transactionStatusesArguments struct {
-	TxID             flow.Identifier // ID of the transaction to monitor.
-	StartBlockID     flow.Identifier // ID of the block to start subscription from
-	StartBlockHeight uint64          // Height of the block to start subscription from
+	TxID flow.Identifier // ID of the transaction to monitor.
 }
 
 // TransactionStatusesDataProvider is responsible for providing tx statuses
@@ -45,7 +43,7 @@ func NewTransactionStatusesDataProvider(
 	subscriptionID string,
 	linkGenerator commonmodels.LinkGenerator,
 	topic string,
-	arguments models.Arguments,
+	arguments wsmodels.Arguments,
 	send chan<- interface{},
 ) (*TransactionStatusesDataProvider, error) {
 	p := &TransactionStatusesDataProvider{
@@ -76,7 +74,8 @@ func NewTransactionStatusesDataProvider(
 
 // Run starts processing the subscription for events and handles responses.
 //
-// No errors are expected during normal operations.
+// Expected errors during normal operations:
+//   - context.Canceled: if the operation is canceled, during an unsubscribe action.
 func (p *TransactionStatusesDataProvider) Run() error {
 	return subscription.HandleSubscription(p.subscription, p.handleResponse())
 }
@@ -86,15 +85,7 @@ func (p *TransactionStatusesDataProvider) createSubscription(
 	ctx context.Context,
 	args transactionStatusesArguments,
 ) subscription.Subscription {
-	if args.StartBlockID != flow.ZeroID {
-		return p.api.SubscribeTransactionStatusesFromStartBlockID(ctx, args.TxID, args.StartBlockID, entities.EventEncodingVersion_JSON_CDC_V0)
-	}
-
-	if args.StartBlockHeight != request.EmptyHeight {
-		return p.api.SubscribeTransactionStatusesFromStartHeight(ctx, args.TxID, args.StartBlockHeight, entities.EventEncodingVersion_JSON_CDC_V0)
-	}
-
-	return p.api.SubscribeTransactionStatusesFromLatest(ctx, args.TxID, entities.EventEncodingVersion_JSON_CDC_V0)
+	return p.api.SubscribeTransactionStatuses(ctx, args.TxID, entities.EventEncodingVersion_JSON_CDC_V0)
 }
 
 // handleResponse processes a tx statuses and sends the formatted response.
@@ -111,11 +102,12 @@ func (p *TransactionStatusesDataProvider) handleResponse() func(txResults []*acc
 				return status.Errorf(codes.Internal, "message index already incremented to %d", messageIndex.Value())
 			}
 
-			var txStatusesPayload models.TransactionStatusesResponse
-			txStatusesPayload.Build(p.linkGenerator, txResults[i], index)
-
-			var response models.BaseDataProvidersResponse
-			response.Build(p.ID(), p.Topic(), &txStatusesPayload)
+			txStatusesPayload := models.NewTransactionStatusesResponse(p.linkGenerator, txResults[i], index)
+			response := models.BaseDataProvidersResponse{
+				SubscriptionID: p.ID(),
+				Topic:          p.Topic(),
+				Payload:        &txStatusesPayload,
+			}
 
 			p.send <- &response
 		}
@@ -126,17 +118,9 @@ func (p *TransactionStatusesDataProvider) handleResponse() func(txResults []*acc
 
 // parseAccountStatusesArguments validates and initializes the account statuses arguments.
 func parseTransactionStatusesArguments(
-	arguments models.Arguments,
+	arguments wsmodels.Arguments,
 ) (transactionStatusesArguments, error) {
 	var args transactionStatusesArguments
-
-	// Parse block arguments
-	startBlockID, startBlockHeight, err := ParseStartBlock(arguments)
-	if err != nil {
-		return args, err
-	}
-	args.StartBlockID = startBlockID
-	args.StartBlockHeight = startBlockHeight
 
 	if txIDIn, ok := arguments["tx_id"]; ok && txIDIn != "" {
 		result, ok := txIDIn.(string)

@@ -2,8 +2,6 @@ package data_providers
 
 import (
 	"context"
-	"fmt"
-	"strconv"
 	"testing"
 	"time"
 
@@ -15,7 +13,8 @@ import (
 	"github.com/onflow/flow-go/access"
 	accessmock "github.com/onflow/flow-go/access/mock"
 	mockcommonmodels "github.com/onflow/flow-go/engine/access/rest/common/models/mock"
-	"github.com/onflow/flow-go/engine/access/rest/websockets/models"
+	"github.com/onflow/flow-go/engine/access/rest/websockets/data_providers/models"
+	wsmodels "github.com/onflow/flow-go/engine/access/rest/websockets/models"
 	"github.com/onflow/flow-go/engine/access/state_stream"
 	ssmock "github.com/onflow/flow-go/engine/access/state_stream/mock"
 	"github.com/onflow/flow-go/engine/access/subscription"
@@ -95,43 +94,11 @@ func (s *TransactionStatusesProviderSuite) subscribeTransactionStatusesDataProvi
 
 	return []testType{
 		{
-			name: "SubscribeTransactionStatusesFromStartBlockID happy path",
-			arguments: models.Arguments{
-				"start_block_id": s.rootBlock.ID().String(),
-			},
+			name:      "SubscribeTransactionStatuses happy path",
+			arguments: wsmodels.Arguments{},
 			setupBackend: func(sub *ssmock.Subscription) {
 				s.api.On(
-					"SubscribeTransactionStatusesFromStartBlockID",
-					mock.Anything,
-					mock.Anything,
-					s.rootBlock.ID(),
-					entities.EventEncodingVersion_JSON_CDC_V0,
-				).Return(sub).Once()
-			},
-			expectedResponses: expectedResponses,
-		},
-		{
-			name: "SubscribeTransactionStatusesFromStartHeight happy path",
-			arguments: models.Arguments{
-				"start_block_height": strconv.FormatUint(s.rootBlock.Header.Height, 10),
-			},
-			setupBackend: func(sub *ssmock.Subscription) {
-				s.api.On(
-					"SubscribeTransactionStatusesFromStartHeight",
-					mock.Anything,
-					mock.Anything,
-					s.rootBlock.Header.Height,
-					entities.EventEncodingVersion_JSON_CDC_V0,
-				).Return(sub).Once()
-			},
-			expectedResponses: expectedResponses,
-		},
-		{
-			name:      "SubscribeTransactionStatusesFromLatest happy path",
-			arguments: models.Arguments{},
-			setupBackend: func(sub *ssmock.Subscription) {
-				s.api.On(
-					"SubscribeTransactionStatusesFromLatest",
+					"SubscribeTransactionStatuses",
 					mock.Anything,
 					mock.Anything,
 					entities.EventEncodingVersion_JSON_CDC_V0,
@@ -186,9 +153,7 @@ func (s *TransactionStatusesProviderSuite) expectedTransactionStatusesResponses(
 	expectedResponses := make([]interface{}, len(backendResponses))
 
 	for i, resp := range backendResponses {
-		var expectedResponsePayload models.TransactionStatusesResponse
-		expectedResponsePayload.Build(s.linkGenerator, resp, uint64(i))
-
+		expectedResponsePayload := models.NewTransactionStatusesResponse(s.linkGenerator, resp, uint64(i))
 		expectedResponses[i] = &models.BaseDataProvidersResponse{
 			Topic:   topic,
 			Payload: &expectedResponsePayload,
@@ -214,8 +179,7 @@ func (s *TransactionStatusesProviderSuite) TestMessageIndexTransactionStatusesPr
 	sub.On("Err").Return(nil).Once()
 
 	s.api.On(
-		"SubscribeTransactionStatusesFromStartBlockID",
-		mock.Anything,
+		"SubscribeTransactionStatuses",
 		mock.Anything,
 		mock.Anything,
 		entities.EventEncodingVersion_JSON_CDC_V0,
@@ -277,7 +241,11 @@ func (s *TransactionStatusesProviderSuite) TestMessageIndexTransactionStatusesPr
 	for i := 0; i < txStatusesCount; i++ {
 		res := <-send
 
-		_, txStatusesResData := extractPayload[*models.TransactionStatusesResponse](s.T(), res)
+		txStatusesRes, ok := res.(*models.BaseDataProvidersResponse)
+		s.Require().True(ok, "Expected *models.BaseDataProvidersResponse, got %T", res)
+
+		txStatusesResData, ok := txStatusesRes.Payload.(*models.TransactionStatusesResponse)
+		s.Require().True(ok, "Expected *models.TransactionStatusesResponse, got %T", res)
 
 		responses = append(responses, txStatusesResData)
 	}
@@ -293,76 +261,5 @@ func (s *TransactionStatusesProviderSuite) TestMessageIndexTransactionStatusesPr
 		prevIndex := responses[i-1].MessageIndex
 		currentIndex := responses[i].MessageIndex
 		s.Require().Equal(prevIndex+1, currentIndex, "Expected MessageIndex to increment by 1")
-	}
-}
-
-// TestTransactionStatusesDataProvider_InvalidArguments tests the behavior of the transaction statuses data provider
-// when invalid arguments are provided. It verifies that appropriate errors are returned
-// for missing or conflicting arguments.
-func (s *TransactionStatusesProviderSuite) TestTransactionStatusesDataProvider_InvalidArguments() {
-	ctx := context.Background()
-	send := make(chan interface{})
-
-	topic := TransactionStatusesTopic
-
-	for _, test := range invalidTransactionStatusesArgumentsTestCases() {
-		s.Run(test.name, func() {
-			provider, err := NewTransactionStatusesDataProvider(
-				ctx,
-				s.log,
-				s.api,
-				"dummy-id",
-				s.linkGenerator,
-				topic,
-				test.arguments,
-				send,
-			)
-			s.Require().Nil(provider)
-			s.Require().Error(err)
-			s.Require().Contains(err.Error(), test.expectedErrorMsg)
-		})
-	}
-}
-
-// invalidTransactionStatusesArgumentsTestCases returns a list of test cases with invalid argument combinations
-// for testing the behavior of transaction statuses data providers. Each test case includes a name,
-// a set of input arguments, and the expected error message that should be returned.
-//
-// The test cases cover scenarios such as:
-// 1. Providing both 'start_block_id' and 'start_block_height' simultaneously.
-// 2. Providing invalid 'tx_id' value.
-// 3. Providing invalid 'start_block_id'  value.
-// 4. Invalid 'start_block_id' argument.
-func invalidTransactionStatusesArgumentsTestCases() []testErrType {
-	return []testErrType{
-		{
-			name: "provide both 'start_block_id' and 'start_block_height' arguments",
-			arguments: models.Arguments{
-				"start_block_id":     unittest.BlockFixture().ID().String(),
-				"start_block_height": fmt.Sprintf("%d", unittest.BlockFixture().Header.Height),
-			},
-			expectedErrorMsg: "can only provide either 'start_block_id' or 'start_block_height'",
-		},
-		{
-			name: "invalid 'tx_id' argument",
-			arguments: map[string]interface{}{
-				"tx_id": "invalid_tx_id",
-			},
-			expectedErrorMsg: "invalid ID format",
-		},
-		{
-			name: "invalid 'start_block_id' argument",
-			arguments: map[string]interface{}{
-				"start_block_id": "invalid_block_id",
-			},
-			expectedErrorMsg: "invalid ID format",
-		},
-		{
-			name: "invalid 'start_block_height' argument",
-			arguments: map[string]interface{}{
-				"start_block_height": "-1",
-			},
-			expectedErrorMsg: "value must be an unsigned 64 bit integer",
-		},
 	}
 }

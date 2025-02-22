@@ -11,7 +11,8 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/suite"
 
-	"github.com/onflow/flow-go/engine/access/rest/websockets/models"
+	"github.com/onflow/flow-go/engine/access/rest/websockets/data_providers/models"
+	wsmodels "github.com/onflow/flow-go/engine/access/rest/websockets/models"
 	"github.com/onflow/flow-go/engine/access/state_stream"
 	"github.com/onflow/flow-go/engine/access/state_stream/backend"
 	ssmock "github.com/onflow/flow-go/engine/access/state_stream/mock"
@@ -92,7 +93,7 @@ func (s *EventsProviderSuite) subscribeEventsDataProviderTestCases(backendRespon
 	return []testType{
 		{
 			name: "SubscribeBlocksFromStartBlockID happy path",
-			arguments: models.Arguments{
+			arguments: wsmodels.Arguments{
 				"start_block_id": s.rootBlock.ID().String(),
 				"event_types":    []string{"flow.AccountCreated", "flow.AccountUpdated"},
 			},
@@ -108,7 +109,7 @@ func (s *EventsProviderSuite) subscribeEventsDataProviderTestCases(backendRespon
 		},
 		{
 			name: "SubscribeEventsFromStartHeight happy path",
-			arguments: models.Arguments{
+			arguments: wsmodels.Arguments{
 				"start_block_height": strconv.FormatUint(s.rootBlock.Header.Height, 10),
 			},
 			setupBackend: func(sub *ssmock.Subscription) {
@@ -123,7 +124,7 @@ func (s *EventsProviderSuite) subscribeEventsDataProviderTestCases(backendRespon
 		},
 		{
 			name:      "SubscribeEventsFromLatest happy path",
-			arguments: models.Arguments{},
+			arguments: wsmodels.Arguments{},
 			setupBackend: func(sub *ssmock.Subscription) {
 				s.api.On(
 					"SubscribeEventsFromLatest",
@@ -169,9 +170,7 @@ func (s *EventsProviderSuite) expectedEventsResponses(
 	expectedResponses := make([]interface{}, len(backendResponses))
 
 	for i, resp := range backendResponses {
-		var expectedResponsePayload models.EventResponse
-		expectedResponsePayload.Build(resp, uint64(i))
-
+		expectedResponsePayload := models.NewEventResponse(resp, uint64(i))
 		expectedResponses[i] = &models.BaseDataProvidersResponse{
 			Topic:   EventsTopic,
 			Payload: &expectedResponsePayload,
@@ -311,7 +310,7 @@ func (s *EventsProviderSuite) TestEventsDataProvider_StateStreamNotConfigured() 
 		nil,
 		"dummy-id",
 		topic,
-		models.Arguments{},
+		wsmodels.Arguments{},
 		send,
 		s.chain,
 		state_stream.DefaultEventFilterConfig,
@@ -334,7 +333,7 @@ func invalidArgumentsTestCases() []testErrType {
 	return []testErrType{
 		{
 			name: "provide both 'start_block_id' and 'start_block_height' arguments",
-			arguments: models.Arguments{
+			arguments: wsmodels.Arguments{
 				"start_block_id":     unittest.BlockFixture().ID().String(),
 				"start_block_height": fmt.Sprintf("%d", unittest.BlockFixture().Header.Height),
 			},

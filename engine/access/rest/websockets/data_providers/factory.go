@@ -8,7 +8,7 @@ import (
 
 	"github.com/onflow/flow-go/access"
 	commonmodels "github.com/onflow/flow-go/engine/access/rest/common/models"
-	"github.com/onflow/flow-go/engine/access/rest/websockets/models"
+	wsmodels "github.com/onflow/flow-go/engine/access/rest/websockets/models"
 	"github.com/onflow/flow-go/engine/access/state_stream"
 	"github.com/onflow/flow-go/model/flow"
 )
@@ -37,7 +37,7 @@ type DataProviderFactory interface {
 		ctx context.Context,
 		subscriptionID string,
 		topic string,
-		args models.Arguments,
+		args wsmodels.Arguments,
 		ch chan<- interface{},
 	) (DataProvider, error)
 }
@@ -97,7 +97,13 @@ func NewDataProviderFactory(
 // - ch: Channel to which the data provider sends data.
 //
 // No errors are expected during normal operations.
-func (s *DataProviderFactoryImpl) NewDataProvider(ctx context.Context, subscriptionID string, topic string, arguments models.Arguments, ch chan<- interface{}) (DataProvider, error) {
+func (s *DataProviderFactoryImpl) NewDataProvider(
+	ctx context.Context,
+	subscriptionID string,
+	topic string,
+	arguments wsmodels.Arguments,
+	ch chan<- interface{},
+) (DataProvider, error) {
 	switch topic {
 	case BlocksTopic:
 		return NewBlocksDataProvider(ctx, s.logger, s.accessApi, subscriptionID, s.linkGenerator, topic, arguments, ch)
@@ -112,7 +118,7 @@ func (s *DataProviderFactoryImpl) NewDataProvider(ctx context.Context, subscript
 	case TransactionStatusesTopic:
 		return NewTransactionStatusesDataProvider(ctx, s.logger, s.accessApi, subscriptionID, s.linkGenerator, topic, arguments, ch)
 	case SendAndGetTransactionStatusesTopic:
-		return NewSendAndGetTransactionStatusesDataProvider(ctx, s.logger, s.accessApi, subscriptionID, s.linkGenerator, topic, arguments, ch)
+		return NewSendAndGetTransactionStatusesDataProvider(ctx, s.logger, s.accessApi, subscriptionID, s.linkGenerator, topic, arguments, ch, s.chain)
 	default:
 		return nil, fmt.Errorf("unsupported topic \"%s\"", topic)
 	}
