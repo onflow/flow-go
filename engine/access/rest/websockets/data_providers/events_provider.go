@@ -139,10 +139,23 @@ func parseEventsArguments(
 	chain flow.Chain,
 	eventFilterConfig state_stream.EventFilterConfig,
 ) (eventsArguments, error) {
+	allowedFields := []string{
+		"start_block_id",
+		"start_block_height",
+		"event_types",
+		"addresses",
+		"contracts",
+		"heartbeat_interval", //TODO: is this used?
+	}
+	err := ensureAllowedFields(arguments, allowedFields)
+	if err != nil {
+		return eventsArguments{}, err
+	}
+
 	var args eventsArguments
 
 	// Parse block arguments
-	startBlockID, startBlockHeight, err := ParseStartBlock(arguments)
+	startBlockID, startBlockHeight, err := parseStartBlock(arguments)
 	if err != nil {
 		return args, err
 	}
@@ -154,12 +167,12 @@ func parseEventsArguments(
 	if eventTypesIn, ok := arguments["event_types"]; ok && eventTypesIn != "" {
 		result, ok := eventTypesIn.([]string)
 		if !ok {
-			return args, fmt.Errorf("'event_types' must be an array of string")
+			return eventsArguments{}, fmt.Errorf("'event_types' must be an array of string")
 		}
 
 		err := eventTypes.Parse(result)
 		if err != nil {
-			return args, fmt.Errorf("invalid 'event_types': %w", err)
+			return eventsArguments{}, fmt.Errorf("invalid 'event_types': %w", err)
 		}
 	}
 
@@ -168,7 +181,7 @@ func parseEventsArguments(
 	if addressesIn, ok := arguments["addresses"]; ok && addressesIn != "" {
 		addresses, ok = addressesIn.([]string)
 		if !ok {
-			return args, fmt.Errorf("'addresses' must be an array of string")
+			return eventsArguments{}, fmt.Errorf("'addresses' must be an array of string")
 		}
 	}
 
@@ -177,14 +190,14 @@ func parseEventsArguments(
 	if contractsIn, ok := arguments["contracts"]; ok && contractsIn != "" {
 		contracts, ok = contractsIn.([]string)
 		if !ok {
-			return args, fmt.Errorf("'contracts' must be an array of string")
+			return eventsArguments{}, fmt.Errorf("'contracts' must be an array of string")
 		}
 	}
 
 	// Initialize the event filter with the parsed arguments
 	args.Filter, err = state_stream.NewEventFilter(eventFilterConfig, chain, eventTypes.Flow(), addresses, contracts)
 	if err != nil {
-		return args, fmt.Errorf("failed to create event filter: %w", err)
+		return eventsArguments{}, fmt.Errorf("failed to create event filter: %w", err)
 	}
 
 	return args, nil

@@ -330,6 +330,7 @@ func (s *EventsProviderSuite) TestEventsDataProvider_StateStreamNotConfigured() 
 // 1. Supplying both 'start_block_id' and 'start_block_height' simultaneously, which is not allowed.
 // 2. Providing invalid 'start_block_id' value.
 // 3. Providing invalid 'start_block_height' value.
+// 4. Providing unexpected argument.
 func invalidArgumentsTestCases() []testErrType {
 	return []testErrType{
 		{
@@ -353,6 +354,14 @@ func invalidArgumentsTestCases() []testErrType {
 				"start_block_height": "-1",
 			},
 			expectedErrorMsg: "value must be an unsigned 64 bit integer",
+		},
+		{
+			name: "unexpected argument",
+			arguments: map[string]interface{}{
+				"start_block_id":      unittest.BlockFixture().ID().String(),
+				"unexpected_argument": "dummy",
+			},
+			expectedErrorMsg: "unexpected field: 'unexpected_argument'",
 		},
 	}
 }

@@ -140,10 +140,22 @@ func parseAccountStatusesArguments(
 	chain flow.Chain,
 	eventFilterConfig state_stream.EventFilterConfig,
 ) (accountStatusesArguments, error) {
+	allowedFields := []string{
+		"start_block_id",
+		"start_block_height",
+		"event_types",
+		"account_addresses",
+		"heartbeat_interval", //TODO: is this used?
+	}
+	err := ensureAllowedFields(arguments, allowedFields)
+	if err != nil {
+		return accountStatusesArguments{}, err
+	}
+
 	var args accountStatusesArguments
 
 	// Parse block arguments
-	startBlockID, startBlockHeight, err := ParseStartBlock(arguments)
+	startBlockID, startBlockHeight, err := parseStartBlock(arguments)
 	if err != nil {
 		return args, err
 	}
@@ -155,12 +167,12 @@ func parseAccountStatusesArguments(
 	if eventTypesIn, ok := arguments["event_types"]; ok && eventTypesIn != "" {
 		result, ok := eventTypesIn.([]string)
 		if !ok {
-			return args, fmt.Errorf("'event_types' must be an array of string")
+			return accountStatusesArguments{}, fmt.Errorf("'event_types' must be an array of string")
 		}
 
 		err := eventTypes.Parse(result)
 		if err != nil {
-			return args, fmt.Errorf("invalid 'event_types': %w", err)
+			return accountStatusesArguments{}, fmt.Errorf("invalid 'event_types': %w", err)
 		}
 	}
 
@@ -169,14 +181,14 @@ func parseAccountStatusesArguments(
 	if accountAddressesIn, ok := arguments["account_addresses"]; ok && accountAddressesIn != "" {
 		accountAddresses, ok = accountAddressesIn.([]string)
 		if !ok {
-			return args, fmt.Errorf("'account_addresses' must be an array of string")
+			return accountStatusesArguments{}, fmt.Errorf("'account_addresses' must be an array of string")
 		}
 	}
 
 	// Initialize the event filter with the parsed arguments
 	args.Filter, err = state_stream.NewAccountStatusFilter(eventFilterConfig, chain, eventTypes.Flow(), accountAddresses)
 	if err != nil {
-		return args, fmt.Errorf("failed to create event filter: %w", err)
+		return accountStatusesArguments{}, fmt.Errorf("failed to create event filter: %w", err)
 	}
 
 	return args, nil
