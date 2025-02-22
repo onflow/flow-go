@@ -1,4 +1,4 @@
-package request
+package parser
 
 import (
 	"fmt"
@@ -7,6 +7,7 @@ import (
 )
 
 const maxArgumentsLength = 100
+const MaxAllowedScriptArguments = 100
 
 type Arguments [][]byte
 
@@ -25,7 +26,7 @@ func (a *Arguments) Parse(raw []string) error {
 	}
 
 	if len(args) > maxArgumentsLength {
-		return fmt.Errorf("too many arguments. Maximum arguments allowed: %d", maxAllowedScriptArguments)
+		return fmt.Errorf("too many arguments. Maximum arguments allowed: %d", MaxAllowedScriptArguments)
 	}
 
 	*a = args
