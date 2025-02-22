@@ -104,7 +104,6 @@ func (p *TransactionStatusesDataProvider) handleResponse() func(txResults []*acc
 	messageIndex := counters.NewMonotonicCounter(0)
 
 	return func(txResults []*access.TransactionResult) error {
-
 		for i := range txResults {
 			index := messageIndex.Value()
 			if ok := messageIndex.Set(messageIndex.Value() + 1); !ok {
@@ -128,12 +127,22 @@ func (p *TransactionStatusesDataProvider) handleResponse() func(txResults []*acc
 func parseTransactionStatusesArguments(
 	arguments models.Arguments,
 ) (transactionStatusesArguments, error) {
+	allowedFields := []string{
+		"start_block_id",
+		"start_block_height",
+		"tx_id",
+	}
+	err := ensureAllowedFields(arguments, allowedFields)
+	if err != nil {
+		return transactionStatusesArguments{}, err
+	}
+
 	var args transactionStatusesArguments
 
 	// Parse block arguments
-	startBlockID, startBlockHeight, err := ParseStartBlock(arguments)
+	startBlockID, startBlockHeight, err := parseStartBlock(arguments)
 	if err != nil {
-		return args, err
+		return transactionStatusesArguments{}, err
 	}
 	args.StartBlockID = startBlockID
 	args.StartBlockHeight = startBlockHeight
@@ -141,12 +150,12 @@ func parseTransactionStatusesArguments(
 	if txIDIn, ok := arguments["tx_id"]; ok && txIDIn != "" {
 		result, ok := txIDIn.(string)
 		if !ok {
-			return args, fmt.Errorf("'tx_id' must be a string")
+			return transactionStatusesArguments{}, fmt.Errorf("'tx_id' must be a string")
 		}
 		var txID parser.ID
 		err := txID.Parse(result)
 		if err != nil {
-			return args, fmt.Errorf("invalid 'tx_id': %w", err)
+			return transactionStatusesArguments{}, fmt.Errorf("invalid 'tx_id': %w", err)
 		}
 		args.TxID = txID.Flow()
 	}
