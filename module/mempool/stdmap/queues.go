@@ -52,7 +52,7 @@ func (b *Queues) Add(queue *queue.Queue) bool {
 }
 
 func (b *Queues) Get(queueID flow.Identifier) (*queue.Queue, bool) {
-	backdata := &QueuesBackdata{b.backData}
+	backdata := &QueuesBackdata{b.mutableBackData}
 	return backdata.ByID(queueID)
 }
 
@@ -63,7 +63,7 @@ func (b *Queues) Run(f func(backdata *QueuesBackdata) error) error {
 
 	//bs2 := binstat.EnterTime(binstat.BinStdmap + ".inlock.(Queues)Run")
 	defer b.Unlock()
-	err := f(&QueuesBackdata{b.backData})
+	err := f(&QueuesBackdata{b.mutableBackData})
 	//binstat.Leave(bs2)
 
 	if err != nil {

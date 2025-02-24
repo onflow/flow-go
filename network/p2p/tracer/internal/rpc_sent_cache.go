@@ -38,7 +38,7 @@ func newRPCSentCache(config *rpcCtrlMsgSentCacheConfig) *rpcSentCache {
 		config.logger.With().Str("mempool", "gossipsub-rpc-control-messages-sent").Logger(),
 		config.collector)
 	return &rpcSentCache{
-		c: stdmap.NewBackend(stdmap.WithBackData(backData)),
+		c: stdmap.NewBackend(stdmap.WithMutableBackData(backData)),
 	}
 }
 

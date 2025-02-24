@@ -29,7 +29,7 @@ func BenchmarkBaselineLRU(b *testing.B) {
 
 	limit := uint(50)
 	backData := stdmap.NewBackend(
-		stdmap.WithBackData(newBaselineLRU(int(limit))),
+		stdmap.WithMutableBackData(newBaselineLRU(int(limit))),
 		stdmap.WithLimit(limit))
 
 	entities := unittest.EntityListFixture(uint(100_000))
@@ -48,7 +48,7 @@ func BenchmarkArrayBackDataLRU(b *testing.B) {
 	limit := uint(50_000)
 
 	backData := stdmap.NewBackend(
-		stdmap.WithBackData(
+		stdmap.WithMutableBackData(
 			herocache.NewCache(
 				uint32(limit),
 				8,

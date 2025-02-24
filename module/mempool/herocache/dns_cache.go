@@ -23,7 +23,7 @@ func NewDNSCache(sizeLimit uint32, logger zerolog.Logger, ipCollector module.Her
 ) *DNSCache {
 	return &DNSCache{
 		txtCache: stdmap.NewBackend(
-			stdmap.WithBackData(
+			stdmap.WithMutableBackData(
 				herocache.NewCache(
 					sizeLimit,
 					herocache.DefaultOversizeFactor,
@@ -31,7 +31,7 @@ func NewDNSCache(sizeLimit uint32, logger zerolog.Logger, ipCollector module.Her
 					logger.With().Str("mempool", "dns-txt-cache").Logger(),
 					txtCollector))),
 		ipCache: stdmap.NewBackend(
-			stdmap.WithBackData(
+			stdmap.WithMutableBackData(
 				herocache.NewCache(
 					sizeLimit,
 					herocache.DefaultOversizeFactor,

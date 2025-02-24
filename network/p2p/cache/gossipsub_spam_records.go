@@ -74,7 +74,7 @@ func NewGossipSubSpamRecordCache(sizeLimit uint32,
 		logger.With().Str("mempool", "gossipsub-app-Penalty-cache").Logger(),
 		collector)
 	return &GossipSubSpamRecordCache{
-		c:             stdmap.NewBackend(stdmap.WithBackData(backData)),
+		c:             stdmap.NewBackend(stdmap.WithMutableBackData(backData)),
 		preprocessFns: prFns,
 		initFn:        initFn,
 	}

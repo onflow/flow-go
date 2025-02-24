@@ -10,10 +10,10 @@ import (
 	_ "github.com/onflow/flow-go/utils/binstat"
 )
 
-// Backend is a wrapper around the backdata that provides concurrency-safe operations.
+// Backend is a wrapper around the mutable backdata that provides concurrency-safe operations.
 type Backend struct {
 	sync.RWMutex
-	backData           mempool.BackData
+	mutableBackData    mempool.MutableBackData
 	guaranteedCapacity uint
 	batchEject         BatchEjectFunc
 	eject              EjectFunc
@@ -24,7 +24,7 @@ type Backend struct {
 // This is using EjectRandomFast()
 func NewBackend(options ...OptionFunc) *Backend {
 	b := Backend{
-		backData:           backdata.NewMapBackData(),
+		mutableBackData:    backdata.NewMapBackData(),
 		guaranteedCapacity: uint(math.MaxUint32),
 		batchEject:         EjectRandomFast,
 		eject:              nil,
@@ -45,7 +45,7 @@ func (b *Backend) Has(entityID flow.Identifier) bool {
 	// bs2 := binstat.EnterTime(binstat.BinStdmap + ".inlock.(Backend)Has")
 	// defer binstat.Leave(bs2)
 	defer b.RUnlock()
-	has := b.backData.Has(entityID)
+	has := b.mutableBackData.Has(entityID)
 	return has
 }
 
@@ -62,7 +62,7 @@ func (b *Backend) Add(entity flow.Entity) bool {
 	// bs2 := binstat.EnterTime(binstat.BinStdmap + ".inlock.(Backend)Add")
 	// defer binstat.Leave(bs2)
 	defer b.Unlock()
-	added := b.backData.Add(entityID, entity)
+	added := b.mutableBackData.Add(entityID, entity)
 	b.reduce()
 	return added
 }
@@ -76,7 +76,7 @@ func (b *Backend) Remove(entityID flow.Identifier) bool {
 	// bs2 := binstat.EnterTime(binstat.BinStdmap + ".inlock.(Backend)Remove")
 	// defer binstat.Leave(bs2)
 	defer b.Unlock()
-	_, removed := b.backData.Remove(entityID)
+	_, removed := b.mutableBackData.Remove(entityID)
 	return removed
 }
 
@@ -90,7 +90,7 @@ func (b *Backend) Adjust(entityID flow.Identifier, f func(flow.Entity) flow.Enti
 	// bs2 := binstat.EnterTime(binstat.BinStdmap + ".inlock.(Backend)Adjust")
 	// defer binstat.Leave(bs2)
 	defer b.Unlock()
-	entity, wasUpdated := b.backData.Adjust(entityID, f)
+	entity, wasUpdated := b.mutableBackData.Adjust(entityID, f)
 	return entity, wasUpdated
 }
 
@@ -107,7 +107,7 @@ func (b *Backend) GetWithInit(entityID flow.Identifier, init func() flow.Entity)
 	b.Lock()
 	defer b.Unlock()
 
-	return b.backData.GetWithInit(entityID, init)
+	return b.mutableBackData.GetWithInit(entityID, init)
 }
 
 // AdjustWithInit adjusts the entity using the given function if the given identifier can be found. When the
@@ -124,7 +124,7 @@ func (b *Backend) AdjustWithInit(entityID flow.Identifier, adjust func(flow.Enti
 	b.Lock()
 	defer b.Unlock()
 
-	return b.backData.AdjustWithInit(entityID, adjust, init)
+	return b.mutableBackData.AdjustWithInit(entityID, adjust, init)
 }
 
 // ByID returns the given item from the pool.
@@ -136,7 +136,7 @@ func (b *Backend) ByID(entityID flow.Identifier) (flow.Entity, bool) {
 	// bs2 := binstat.EnterTime(binstat.BinStdmap + ".inlock.(Backend)ByID")
 	// defer binstat.Leave(bs2)
 	defer b.RUnlock()
-	entity, exists := b.backData.ByID(entityID)
+	entity, exists := b.mutableBackData.ByID(entityID)
 	return entity, exists
 }
 
@@ -149,7 +149,7 @@ func (b *Backend) Run(f func(backdata mempool.BackData) error) error {
 	// bs2 := binstat.EnterTime(binstat.BinStdmap + ".inlock.(Backend)Run")
 	// defer binstat.Leave(bs2)
 	defer b.Unlock()
-	err := f(b.backData)
+	err := f(b.mutableBackData)
 	b.reduce()
 	return err
 }
@@ -163,7 +163,7 @@ func (b *Backend) Size() uint {
 	// bs2 := binstat.EnterTime(binstat.BinStdmap + ".inlock.(Backend)Size")
 	// defer binstat.Leave(bs2)
 	defer b.RUnlock()
-	size := b.backData.Size()
+	size := b.mutableBackData.Size()
 	return size
 }
 
@@ -182,7 +182,7 @@ func (b *Backend) All() []flow.Entity {
 	// defer binstat.Leave(bs2)
 	defer b.RUnlock()
 
-	return b.backData.Entities()
+	return b.mutableBackData.Entities()
 }
 
 // Clear removes all entities from the pool.
@@ -194,7 +194,7 @@ func (b *Backend) Clear() {
 	// bs2 := binstat.EnterTime(binstat.BinStdmap + ".inlock.(Backend)Clear")
 	// defer binstat.Leave(bs2)
 	defer b.Unlock()
-	b.backData.Clear()
+	b.mutableBackData.Clear()
 }
 
 // RegisterEjectionCallbacks adds the provided OnEjection callbacks
@@ -219,7 +219,7 @@ func (b *Backend) reduce() {
 	// this was a loop, but the loop is now in EjectRandomFast()
 	// the ejections are batched, so this call to eject() may not actually
 	// do anything until the batch threshold is reached (currently 128)
-	if b.backData.Size() > b.guaranteedCapacity {
+	if b.mutableBackData.Size() > b.guaranteedCapacity {
 		// get the key from the eject function
 		// we don't do anything if there is an error
 		if b.batchEject != nil {

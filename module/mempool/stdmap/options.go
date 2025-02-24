@@ -27,11 +27,12 @@ func WithEject(eject EjectFunc) OptionFunc {
 	}
 }
 
-// WithBackData sets the underlying backdata of the backend.
-// BackData represents the underlying data structure that is utilized by mempool.Backend, as the
+// WithMutableBackData sets the underlying mutable BackData for the backend.
+//
+// MutableBackData represents the mutable data structure used by mempool.Backend
 // core structure of maintaining data on memory-pools.
-func WithBackData(backdata mempool.BackData) OptionFunc {
+func WithMutableBackData(mutableBackData mempool.MutableBackData) OptionFunc {
 	return func(be *Backend) {
-		be.backData = backdata
+		be.mutableBackData = mutableBackData
 	}
 }
