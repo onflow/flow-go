@@ -203,13 +203,14 @@ type API interface {
 	//
 	// If invalid parameters will be supplied SubscribeBlockDigestsFromLatest will return a failed subscription.
 	SubscribeBlockDigestsFromLatest(ctx context.Context, blockStatus flow.BlockStatus) subscription.Subscription
-	// SubscribeTransactionStatuses subscribes to transaction status updates for a given transaction ID. Monitoring begins
-	// from the last block ID. The subscription streams status updates until the transaction reaches the final state
-	// ([flow.TransactionStatusSealed] or [flow.TransactionStatusExpired]). When the transaction reaches one of these
-	// final states, the subscription will automatically terminate.
+	// SubscribeTransactionStatuses subscribes to transaction status updates for a given transaction ID. Monitoring starts
+	// from the latest block to obtain the current transaction status. If the transaction is already in a final state
+	// ([flow.TransactionStatusSealed] or [flow.TransactionStatusExpired]), all statuses will be prepared and sent to the client
+	// sequentially. If the transaction is not in a final state, the subscription will stream status updates until the transaction
+	// reaches a final state. Once a final state is reached, the subscription will automatically terminate.
 	//
 	// Parameters:
-	//   - ctx: The context to manage the subscription's lifecycle, including cancellation.
+	//   - ctx: Context to manage the subscription's lifecycle, including cancellation.
 	//   - txID: The unique identifier of the transaction to monitor.
 	//   - requiredEventEncodingVersion: The version of event encoding required for the subscription.
 	SubscribeTransactionStatuses(ctx context.Context, txID flow.Identifier, requiredEventEncodingVersion entities.EventEncodingVersion) subscription.Subscription

@@ -25,15 +25,15 @@ import (
 // This struct contains metadata for tracking a transaction's progress, including
 // references to relevant blocks, collections, and transaction results.
 type transactionSubscriptionMetadata struct {
-	blocks               storage.Blocks
-	collections          storage.Collections
-	transactions         storage.Transactions
+	blocks       storage.Blocks
+	collections  storage.Collections
+	transactions storage.Transactions
+
 	txResult             *access.TransactionResult
 	txReferenceBlockID   flow.Identifier
 	blockWithTx          *flow.Header
 	eventEncodingVersion entities.EventEncodingVersion
-
-	backendTransactions *backendTransactions
+	backendTransactions  *backendTransactions
 }
 
 // newTransactionSubscriptionMetadata initializes a new metadata object for a transaction subscription.
@@ -73,10 +73,13 @@ func newTransactionSubscriptionMetadata(
 //
 // Parameters:
 //   - ctx: Context for managing the operation lifecycle.
-//   - height: The block height used for searching transaction data.
 //
 // Expected errors during normal operation:
 //   - [ErrBlockNotReady] if the block at the given height is not found.
+//   - codes.Internal if impossible to get transaction result due to event payload conversion failed
+//
+// All other errors are considered as state corruption (fatal) or internal errors in the refreshing transaction result
+// or when refreshing transaction status.
 func (tm *transactionSubscriptionMetadata) Refresh(ctx context.Context) error {
 	if err := tm.refreshCollection(); err != nil {
 		return err
@@ -159,7 +162,8 @@ func (tm *transactionSubscriptionMetadata) refreshStatus(ctx context.Context) er
 
 // refreshBlock updates the block metadata if the transaction has been included in a block.
 //
-// No errors expected during normal operations.
+// Expected errors during normal operation:
+//   - [ErrBlockNotReady] if the block for collection ID is not found.
 func (tm *transactionSubscriptionMetadata) refreshBlock() error {
 	if tm.txResult.CollectionID == flow.ZeroID || tm.blockWithTx != nil {
 		return nil
