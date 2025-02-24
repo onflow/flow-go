@@ -38,7 +38,7 @@ func BenchmarkWithDeflateCompression(b *testing.B) {
 // runBenchmark is a helper function that performs the benchmarking for different compressors.
 func runBenchmark(b *testing.B, compressorName string) {
 	// create an execution node
-	en := new(executionNode)
+	en := newExecutionNode(b)
 	en.start(b)
 	defer en.stop(b)
 

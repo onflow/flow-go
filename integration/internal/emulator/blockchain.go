@@ -129,7 +129,9 @@ func (b *Blockchain) ReloadBlockchain() (*Blockchain, error) {
 		fvm.WithReusableCadenceRuntimePool(
 			reusableRuntime.NewReusableCadenceRuntimePool(
 				0,
-				runtime.Config{}),
+				runtime.Config{
+					StorageFormatV2Enabled: b.conf.AccountStorageFormatV2Enabled,
+				}),
 		),
 		fvm.WithEntropyProvider(b.entropyProvider),
 		fvm.WithEVMEnabled(true),
@@ -999,15 +1001,15 @@ func (b *Blockchain) systemChunkTransaction() (*flowgo.TransactionBody, error) {
 		systemChunkTransactionTemplate,
 		templates.Environment{
 			RandomBeaconHistoryAddress: serviceAddress.Hex(),
+			EVMAddress:                 serviceAddress.Hex(),
 		},
 	)
 
-	// TODO: move this to `templates.Environment` struct
 	script = strings.ReplaceAll(
 		script,
-		`import EVM from "EVM"`,
+		`import Migration from "Migration"`,
 		fmt.Sprintf(
-			"import EVM from %s",
+			`import Migration from %s`,
 			serviceAddress.HexWithPrefix(),
 		),
 	)
@@ -1034,6 +1036,7 @@ func (b *Blockchain) executeSystemChunkTransaction() error {
 		fvm.WithSequenceNumberCheckAndIncrementEnabled(false),
 		fvm.WithRandomSourceHistoryCallAllowed(true),
 		fvm.WithBlockHeader(b.pendingBlock.Block().Header),
+		fvm.WithAccountStorageLimit(false),
 	)
 
 	executionSnapshot, output, err := b.vm.Run(

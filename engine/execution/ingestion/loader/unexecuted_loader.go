@@ -47,7 +47,7 @@ func (e *UnexecutedLoader) LoadUnexecuted(ctx context.Context) ([]flow.Identifie
 	// a root block will fail, because the root block doesn't have a parent block, and could not
 	// get the result of it.
 	// TODO: remove this, when saving a executed block is transactional
-	lastExecutedHeight, lastExecutedID, err := e.execState.GetHighestExecutedBlockID(ctx)
+	lastExecutedHeight, lastExecutedID, err := e.execState.GetLastExecutedBlockID(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("could not get last executed: %w", err)
 	}

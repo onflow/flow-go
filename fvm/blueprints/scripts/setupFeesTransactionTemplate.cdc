@@ -1,4 +1,4 @@
-import FlowFees from "FlowFees"
+import "FlowFees"
 
 transaction(surgeFactor: UFix64, inclusionEffortCost: UFix64, executionEffortCost: UFix64) {
     prepare(service: auth(BorrowValue) &Account) {

@@ -486,6 +486,9 @@ func main() {
 				seals,
 				getSealingConfigs,
 			)
+			if err != nil {
+				return nil, fmt.Errorf("could not initialize sealing engine: %w", err)
+			}
 
 			// subscribe for finalization events from hotstuff
 			followerDistributor.AddOnBlockFinalizedConsumer(e.OnFinalizedBlock)

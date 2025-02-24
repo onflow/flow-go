@@ -19,12 +19,13 @@ var (
 	flagChain            string
 	flagFromTo           string
 	flagWorkerCount      uint // number of workers to verify the blocks concurrently
+	flagStopOnMismatch   bool
 )
 
 // # verify the last 100 sealed blocks
 // ./util verify_execution_result --chain flow-testnet --datadir /var/flow/data/protocol --chunk_data_pack_dir /var/flow/data/chunk_data_pack --lastk 100
 // # verify the blocks from height 2000 to 3000
-// ./util verify_execution_result --chain flow-testnet --datadir /var/flow/data/protocol --chunk_data_pack_dir /var/flow/data/chunk_data_pack --from_to 2000-3000
+// ./util verify_execution_result --chain flow-testnet --datadir /var/flow/data/protocol --chunk_data_pack_dir /var/flow/data/chunk_data_pack --from_to 2000_3000
 var Cmd = &cobra.Command{
 	Use:   "verify-execution-result",
 	Short: "verify block execution by verifying all chunks in the result",
@@ -47,11 +48,12 @@ func init() {
 		"last k sealed blocks to verify")
 
 	Cmd.Flags().StringVar(&flagFromTo, "from_to", "",
-		"the height range to verify blocks (inclusive), i.e, 1-1000, 1000-2000, 2000-3000, etc.")
+		"the height range to verify blocks (inclusive), i.e, 1_1000, 1000_2000, 2000_3000, etc.")
 
 	Cmd.Flags().UintVar(&flagWorkerCount, "worker_count", 1,
 		"number of workers to use for verification, default is 1")
 
+	Cmd.Flags().BoolVar(&flagStopOnMismatch, "stop_on_mismatch", false, "stop verification on first mismatch")
 }
 
 func run(*cobra.Command, []string) {
@@ -66,6 +68,10 @@ func run(*cobra.Command, []string) {
 		Str("chain", string(chainID)).
 		Str("datadir", flagDatadir).
 		Str("chunk_data_pack_dir", flagChunkDataPackDir).
+		Uint64("lastk", flagLastK).
+		Str("from_to", flagFromTo).
+		Uint("worker_count", flagWorkerCount).
+		Bool("stop_on_mismatch", flagStopOnMismatch).
 		Logger()
 
 	if flagFromTo != "" {
@@ -75,7 +81,7 @@ func run(*cobra.Command, []string) {
 		}
 
 		lg.Info().Msgf("verifying range from %d to %d", from, to)
-		err = verifier.VerifyRange(from, to, chainID, flagDatadir, flagChunkDataPackDir, flagWorkerCount)
+		err = verifier.VerifyRange(from, to, chainID, flagDatadir, flagChunkDataPackDir, flagWorkerCount, flagStopOnMismatch)
 		if err != nil {
 			lg.Fatal().Err(err).Msgf("could not verify range from %d to %d", from, to)
 		}
@@ -83,7 +89,7 @@ func run(*cobra.Command, []string) {
 
 	} else {
 		lg.Info().Msgf("verifying last %d sealed blocks", flagLastK)
-		err := verifier.VerifyLastKHeight(flagLastK, chainID, flagDatadir, flagChunkDataPackDir, flagWorkerCount)
+		err := verifier.VerifyLastKHeight(flagLastK, chainID, flagDatadir, flagChunkDataPackDir, flagWorkerCount, flagStopOnMismatch)
 		if err != nil {
 			lg.Fatal().Err(err).Msg("could not verify last k height")
 		}
@@ -93,9 +99,9 @@ func run(*cobra.Command, []string) {
 }
 
 func parseFromTo(fromTo string) (from, to uint64, err error) {
-	parts := strings.Split(fromTo, "-")
+	parts := strings.Split(fromTo, "_")
 	if len(parts) != 2 {
-		return 0, 0, fmt.Errorf("invalid format: expected 'from-to', got '%s'", fromTo)
+		return 0, 0, fmt.Errorf("invalid format: expected 'from_to', got '%s'", fromTo)
 	}
 
 	from, err = strconv.ParseUint(strings.TrimSpace(parts[0]), 10, 64)

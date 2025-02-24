@@ -376,14 +376,14 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 
 		exemetrics := new(modulemock.ExecutionMetrics)
 		exemetrics.On("ExecutionBlockExecuted",
-			mock.Anything,  // duration
-			mock.Anything). // stats
+			mock.Anything,
+			mock.Anything).
 			Return(nil).
 			Times(1)
 
 		exemetrics.On("ExecutionCollectionExecuted",
-			mock.Anything,  // duration
-			mock.Anything). // stats
+			mock.Anything,
+			mock.Anything).
 			Return(nil).
 			Times(2) // 1 collection + system collection
 
@@ -830,7 +830,8 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 			// create a block with 2 collections with 2 transactions each
 			block := generateBlock(collectionCount, transactionsPerCollection, rag)
 
-			serviceEvents := systemcontracts.ServiceEventsForChain(execCtx.Chain.ChainID())
+			chainID := execCtx.Chain.ChainID()
+			serviceEvents := systemcontracts.ServiceEventsForChain(chainID)
 
 			randomSource := unittest.EpochSetupRandomSourceFixture()
 			payload, err := ccf.Decode(nil, unittest.EpochSetupFixtureCCF(randomSource))
@@ -937,7 +938,6 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 						},
 					),
 				),
-				fvm.WithReadVersionFromNodeVersionBeacon(false),
 			)
 
 			vm := fvm.NewVirtualMachine()
@@ -979,7 +979,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 			// make sure event index sequence are valid
 			for i := 0; i < result.BlockExecutionResult.Size(); i++ {
 				collectionResult := result.CollectionExecutionResultAt(i)
-				unittest.EnsureEventsIndexSeq(t, collectionResult.Events(), execCtx.Chain.ChainID())
+				unittest.EnsureEventsIndexSeq(t, collectionResult.Events(), chainID)
 			}
 
 			sEvents := result.AllServiceEvents() // all events should have been collected
@@ -1050,7 +1050,6 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 					func(_ runtime.Config) runtime.Runtime {
 						return rt
 					})),
-			fvm.WithReadVersionFromNodeVersionBeacon(false),
 		)
 
 		vm := fvm.NewVirtualMachine()
@@ -1165,7 +1164,6 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 					func(_ runtime.Config) runtime.Runtime {
 						return rt
 					})),
-			fvm.WithReadVersionFromNodeVersionBeacon(false),
 		)
 
 		vm := fvm.NewVirtualMachine()
@@ -1487,19 +1485,16 @@ func Test_ExecutingSystemCollection(t *testing.T) {
 	expectedNumberOfEvents := 4
 	expectedMinEventSize := 1000
 
-	// bootstrapping does not cache programs
-	expectedCachedPrograms := 0
-
 	metrics := new(modulemock.ExecutionMetrics)
 	metrics.On("ExecutionBlockExecuted",
-		mock.Anything,  // duration
-		mock.Anything). // stats
+		mock.Anything,
+		mock.Anything).
 		Return(nil).
 		Times(1)
 
 	metrics.On("ExecutionCollectionExecuted",
-		mock.Anything,  // duration
-		mock.Anything). // stats
+		mock.Anything,
+		mock.Anything).
 		Return(nil).
 		Times(1) // system collection
 
@@ -1523,7 +1518,12 @@ func Test_ExecutingSystemCollection(t *testing.T) {
 
 	metrics.On(
 		"ExecutionBlockCachedPrograms",
-		expectedCachedPrograms).
+		mock.Anything).
+		Run(func(args mock.Arguments) {
+			actual := args[0].(int)
+			// bootstrapping already caches some programs
+			require.Greater(t, actual, 0)
+		}).
 		Return(nil).
 		Times(1) // block
 
