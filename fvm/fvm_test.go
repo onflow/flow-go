@@ -25,12 +25,15 @@ import (
 	cadenceStdlib "github.com/onflow/cadence/stdlib"
 	"github.com/onflow/cadence/test_utils/runtime_utils"
 	"github.com/onflow/crypto"
+	"github.com/onflow/flow-core-contracts/lib/go/templates"
+	bridge "github.com/onflow/flow-evm-bridge"
 	flowsdk "github.com/onflow/flow-go-sdk"
 	"github.com/onflow/flow-go-sdk/test"
 
 	"github.com/onflow/flow-go/engine/execution/testutil"
 	exeUtils "github.com/onflow/flow-go/engine/execution/utils"
 	"github.com/onflow/flow-go/fvm"
+	"github.com/onflow/flow-go/fvm/blueprints"
 	fvmCrypto "github.com/onflow/flow-go/fvm/crypto"
 	"github.com/onflow/flow-go/fvm/environment"
 	envMock "github.com/onflow/flow-go/fvm/environment/mock"
@@ -2987,7 +2990,7 @@ func TestEVM(t *testing.T) {
 				errStorage.
 					On("Get", mockery.AnythingOfType("flow.RegisterID")).
 					Return(func(id flow.RegisterID) (flow.RegisterValue, error) {
-						if id.Key == "LatestBlock" {
+						if id.Key == "LatestBlock" || id.Key == "LatestBlockProposal" {
 							return nil, e.err
 						}
 						return snapshotTree.Get(id)
@@ -3103,6 +3106,104 @@ func TestEVM(t *testing.T) {
 				},
 				eventTypeIDs,
 			)
+		}),
+	)
+}
+
+func TestVMBridge(t *testing.T) {
+	blocks := new(envMock.Blocks)
+	block1 := unittest.BlockFixture()
+	blocks.On("ByHeightFrom",
+		block1.Header.Height,
+		block1.Header,
+	).Return(block1.Header, nil)
+
+	ctxOpts := []fvm.Option{
+		// default is testnet, but testnet has a special EVM storage contract location
+		// so we have to use emulator here so that the EVM storage contract is deployed
+		// to the 5th address
+		fvm.WithChain(flow.Emulator.Chain()),
+		fvm.WithEVMEnabled(true),
+		fvm.WithBlocks(blocks),
+		fvm.WithBlockHeader(block1.Header),
+		fvm.WithCadenceLogging(true),
+	}
+
+	t.Run("successful FT Type Onboarding", newVMTest().
+		withBootstrapProcedureOptions(fvm.WithSetupEVMEnabled(true)).
+		withContextOptions(ctxOpts...).
+		run(func(
+			t *testing.T,
+			vm fvm.VM,
+			chain flow.Chain,
+			ctx fvm.Context,
+			snapshotTree snapshot.SnapshotTree,
+		) {
+
+			sc := systemcontracts.SystemContractsForChain(chain.ChainID())
+
+			env := templates.Environment{
+				ServiceAccountAddress: chain.ServiceAddress().String(),
+				FungibleTokenAddress:  sc.FungibleToken.Address.Hex(),
+				FlowTokenAddress:      sc.FlowToken.Address.Hex(),
+				EVMAddress:            sc.EVMContract.Address.Hex(),
+			}
+
+			bridgeEnv := bridge.Environment{
+				CrossVMNFTAddress:                     env.ServiceAccountAddress,
+				CrossVMTokenAddress:                   env.ServiceAccountAddress,
+				FlowEVMBridgeHandlerInterfacesAddress: env.ServiceAccountAddress,
+				IBridgePermissionsAddress:             env.ServiceAccountAddress,
+				ICrossVMAddress:                       env.ServiceAccountAddress,
+				ICrossVMAssetAddress:                  env.ServiceAccountAddress,
+				IEVMBridgeNFTMinterAddress:            env.ServiceAccountAddress,
+				IEVMBridgeTokenMinterAddress:          env.ServiceAccountAddress,
+				IFlowEVMNFTBridgeAddress:              env.ServiceAccountAddress,
+				IFlowEVMTokenBridgeAddress:            env.ServiceAccountAddress,
+				FlowEVMBridgeAddress:                  env.ServiceAccountAddress,
+				FlowEVMBridgeAccessorAddress:          env.ServiceAccountAddress,
+				FlowEVMBridgeConfigAddress:            env.ServiceAccountAddress,
+				FlowEVMBridgeHandlersAddress:          env.ServiceAccountAddress,
+				FlowEVMBridgeNFTEscrowAddress:         env.ServiceAccountAddress,
+				FlowEVMBridgeResolverAddress:          env.ServiceAccountAddress,
+				FlowEVMBridgeTemplatesAddress:         env.ServiceAccountAddress,
+				FlowEVMBridgeTokenEscrowAddress:       env.ServiceAccountAddress,
+				FlowEVMBridgeUtilsAddress:             env.ServiceAccountAddress,
+				ArrayUtilsAddress:                     env.ServiceAccountAddress,
+				ScopedFTProvidersAddress:              env.ServiceAccountAddress,
+				SerializeAddress:                      env.ServiceAccountAddress,
+				SerializeMetadataAddress:              env.ServiceAccountAddress,
+				StringUtilsAddress:                    env.ServiceAccountAddress,
+			}
+
+			typeToOnboard := "A." + env.FungibleTokenAddress + ".USDCFlow.Vault"
+
+			txBody := blueprints.OnboardToBridgeByTypeIDTransaction(chain.ServiceAddress(), bridgeEnv, env, typeToOnboard)
+
+			err := testutil.SignTransactionAsServiceAccount(txBody, 0, chain)
+			require.NoError(t, err)
+
+			_, output, err := vm.Run(
+				ctx,
+				fvm.Transaction(txBody, 0),
+				snapshotTree)
+
+			require.NoError(t, err)
+			require.NoError(t, output.Err)
+			require.Len(t, output.Events, 6)
+			for _, event := range output.Events {
+				if strings.Contains(string(event.Type), "Onboarded") {
+					// decode the event payload
+					data, _ := ccf.Decode(nil, event.Payload)
+					// get the contractAddress field from the event
+					typeOnboarded := cadence.SearchFieldByName(
+						data.(cadence.Event),
+						"type",
+					).(cadence.String)
+
+					require.Equal(t, typeToOnboard, typeOnboarded.String()[1:len(typeOnboarded)+1])
+				}
+			}
 		}),
 	)
 }
