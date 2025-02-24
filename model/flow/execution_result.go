@@ -35,7 +35,17 @@ func NewExecutionResult(
 
 // ID returns the hash of the execution result body
 func (er ExecutionResult) ID() Identifier {
-	return MakeID(er)
+	return MakeID(struct {
+		PreviousResultID Identifier // commit of the previous ER
+		BlockID          Identifier // commit of the current block
+		Chunks           ChunkList
+		ExecutionDataID  Identifier // hash commitment to flow.BlockExecutionDataRoot
+	}{
+		PreviousResultID: er.PreviousResultID,
+		BlockID:          er.BlockID,
+		Chunks:           er.Chunks,
+		ExecutionDataID:  er.ExecutionDataID,
+	})
 }
 
 // Checksum ...

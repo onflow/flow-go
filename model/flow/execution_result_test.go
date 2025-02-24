@@ -14,7 +14,12 @@ import (
 // TestExecutionResultID_Malleability confirms that the ExecutionResult struct, which implements
 // the [flow.IDEntity] interface, is resistant to tampering.
 func TestExecutionResultID_Malleability(t *testing.T) {
+	// If we pass in the default fixture with an empty ServiceEVents field, the test erroneously passes even though
+	// the field is malleable
 	unittest.RequireEntityNonMalleable(t, unittest.ExecutionResultFixture())
+	// We need to manually set the field to make sure the malleability checking succeeds
+	er := unittest.ExecutionResultFixture(unittest.WithServiceEvents(1))
+	unittest.RequireEntityNonMalleable(t, er)
 }
 
 // TestExecutionResultGroupBy tests the GroupBy method of ExecutionResultList:
