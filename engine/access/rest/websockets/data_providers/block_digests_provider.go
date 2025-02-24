@@ -59,7 +59,8 @@ func NewBlockDigestsDataProvider(
 
 // Run starts processing the subscription for block digests and handles responses.
 //
-// No errors are expected during normal operations.
+// Expected errors during normal operations:
+//   - context.Canceled: if the operation is canceled, during an unsubscribe action.
 func (p *BlockDigestsDataProvider) Run() error {
 	return subscription.HandleSubscription(
 		p.subscription,
