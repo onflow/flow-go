@@ -25,7 +25,7 @@ func (e *EmbeddedStruct) ID() flow.Identifier {
 }
 
 type StructWithUnsupportedFlowField struct {
-	Field chan struct{}
+	field flow.IdentitySkeleton
 }
 
 func (e *StructWithUnsupportedFlowField) ID() flow.Identifier {
@@ -50,8 +50,8 @@ func (e *MalleableEntityStruct) ID() flow.Identifier {
 	})
 }
 
-// TestRequireEntityNonMalleable tests the RequireEntityNonMalleable function with different types of entities ensuring
-// it correctly handles the supported types and panics when the entity is not supported.
+// TestRequireEntityNonMalleable tests the behavior of MalleabilityChecker with different types of entities ensuring
+// it correctly handles the supported types and returns an error when the entity is malleable, or it cannot perform the check.
 func TestRequireEntityNonMalleable(t *testing.T) {
 	t.Run("type alias", func(t *testing.T) {
 		list := &IntList{1, 2, 3}
@@ -69,16 +69,23 @@ func TestRequireEntityNonMalleable(t *testing.T) {
 			QC:         QuorumCertificateFixture(),
 		})
 	})
-	t.Run("nil-entity", func(t *testing.T) {
+	t.Run("invalid-entity", func(t *testing.T) {
 		err := NewMalleabilityChecker().Check(nil)
 		require.Error(t, err)
+		require.ErrorContains(t, err, "tested entity is not valid")
+	})
+	t.Run("nil-entity", func(t *testing.T) {
+		var e *flow.ExecutionReceipt = nil
+		err := NewMalleabilityChecker().Check(e)
+		require.Error(t, err)
+		require.ErrorContains(t, err, "entity is nil")
 	})
 	t.Run("unsupported-field", func(t *testing.T) {
-		require.Panics(t, func() {
-			RequireEntityNonMalleable(t, &StructWithUnsupportedFlowField{
-				Field: make(chan struct{}),
-			})
+		err := NewMalleabilityChecker().Check(&StructWithUnsupportedFlowField{
+			field: IdentityFixture().IdentitySkeleton,
 		})
+		require.Error(t, err)
+		require.ErrorContains(t, err, "not settable")
 	})
 	t.Run("malleable-entity", func(t *testing.T) {
 		err := NewMalleabilityChecker().Check(&MalleableEntityStruct{
@@ -87,5 +94,6 @@ func TestRequireEntityNonMalleable(t *testing.T) {
 			Signature:  SignatureFixture(),
 		})
 		require.Error(t, err)
+		require.ErrorContains(t, err, "Signature is malleable")
 	})
 }
