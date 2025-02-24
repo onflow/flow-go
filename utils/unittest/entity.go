@@ -127,12 +127,8 @@ func (t *MalleabilityChecker) Check(entity flow.IDEntity) error {
 // Every time we change a field we check if ID of the entity has changed. If the ID has not changed then entity is malleable.
 // This function returns error if the entity is malleable, otherwise it returns nil.
 func (t *MalleabilityChecker) isEntityMalleable(v reflect.Value, idFunc func() flow.Identifier) error {
-	if v.Kind() == reflect.Ptr && v.IsNil() {
-		return fmt.Errorf("invalid entity, field is nil")
-	} else if v.Kind() == reflect.Map || v.Kind() == reflect.Slice {
-		if v.Len() == 0 {
-			return fmt.Errorf("invalid entity, map/slice is empty")
-		}
+	if err := ensureFieldNotEmpty(v); err != nil {
+		return err
 	}
 
 	tType := v.Type()
@@ -166,6 +162,14 @@ func (t *MalleabilityChecker) isEntityMalleable(v reflect.Value, idFunc func() f
 				if !field.CanSet() {
 					return fmt.Errorf("field %s is not settable", tType.Field(i).Name)
 				}
+				if err := ensureFieldNotEmpty(field); err != nil {
+					// if the field is empty and has a tag malleability:"optional" we can omit it from the check
+					// and consider it as non-malleable.
+					if tType.Field(i).Tag.Get("malleability") == "optional" {
+						continue
+					}
+					return err
+				}
 				if err := t.isEntityMalleable(field, idFunc); err != nil {
 					return fmt.Errorf("field %s is malleable: %w", tType.Field(i).Name, err)
 				}
@@ -185,6 +189,19 @@ func (t *MalleabilityChecker) isEntityMalleable(v reflect.Value, idFunc func() f
 		}
 		return fmt.Errorf("ID did not change after changing field %s", tType.String())
 	}
+}
+
+// ensureFieldNotEmpty is a helper function to ensure that the field is not empty.
+// An empty field is considered a nil or an empty map/slice.
+func ensureFieldNotEmpty(v reflect.Value) error {
+	if v.Kind() == reflect.Ptr && v.IsNil() {
+		return fmt.Errorf("invalid entity, field is nil")
+	} else if v.Kind() == reflect.Map || v.Kind() == reflect.Slice {
+		if v.Len() == 0 {
+			return fmt.Errorf("invalid entity, map/slice is empty")
+		}
+	}
+	return nil
 }
 
 // generateRandomReflectValue uses reflection to switch on the field type and generate a random value for it.
