@@ -12,7 +12,12 @@ import (
 	"github.com/onflow/flow-go/state/protocol"
 )
 
-// Epochs provides access to epoch data, backed by a rich epoch protocol state entry.
+// Epochs is a wrapper around [flow.RichEpochStateEntry] implementing the [protocol.EpochQuery] interface.
+// It is intended for bootstrapping nodes. For ease of transferring the bootstrapping data from node to node,
+// Epochs is backed by easily serializable data and does not have access to a proper protocol-data-base that
+// would be part of a staked node. Therefore, it can _not_ return values for the `FirstHeight()` and
+// `FinalHeight()` methods, which are part of the [protocol.CommittedEpoch] API.
+// CAUTION: use [badger.Snapshot] for protocol logic except when bootstrapping a node.
 type Epochs struct {
 	entry flow.RichEpochStateEntry
 }
