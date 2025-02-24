@@ -29,24 +29,14 @@ func (m MockEntity) Checksum() flow.Identifier {
 
 func EntityListFixture(n uint) []*MockEntity {
 	list := make([]*MockEntity, 0, n)
-
 	for range n {
 		list = append(list, MockEntityFixture())
 	}
-
 	return list
 }
 
 func MockEntityFixture() *MockEntity {
 	return &MockEntity{Identifier: IdentifierFixture()}
-}
-
-func MockEntityListFixture(count int) []*MockEntity {
-	entities := make([]*MockEntity, 0, count)
-	for i := 0; i < count; i++ {
-		entities = append(entities, MockEntityFixture())
-	}
-	return entities
 }
 
 // RequireEntityNonMalleable is a sanity check that the entity is not malleable with regards to the ID() function.
