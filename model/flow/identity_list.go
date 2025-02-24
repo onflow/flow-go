@@ -170,19 +170,13 @@ func (il GenericIdentityList[T]) PublicStakingKeys() []crypto.PublicKey {
 	return pks
 }
 
-// ID uniquely identifies a list of identities, by node ID. This can be used
-// to perpetually identify a group of nodes, even if mutable fields of some nodes
-// are changed, as node IDs are immutable.
+// ID generates a cryptographic commitment to the full IdentityList, including mutable fields.
 // CAUTION:
-//   - An IdentityList's ID is a cryptographic commitment to only node IDs. A node operator
-//     can freely choose the ID for their node. There is no relationship whatsoever between
-//     a node's ID and keys.
-//   - To generate a cryptographic commitment for the full IdentityList, use method `Checksum()`.
 //   - The outputs of `IdentityList.ID()` and `IdentityList.Checksum()` are both order-sensitive.
 //     Therefore, the `IdentityList` must be in canonical order, unless explicitly specified
 //     otherwise by the protocol.
 func (il GenericIdentityList[T]) ID() Identifier {
-	return il.NodeIDs().ID()
+	return MakeID(il)
 }
 
 // Checksum generates a cryptographic commitment to the full IdentityList, including mutable fields.
