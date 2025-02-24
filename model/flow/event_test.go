@@ -26,7 +26,7 @@ func TestEventFingerprint(t *testing.T) {
 
 // TestEventMalleability checks that Event is not malleable: any change in its data
 // should result in a different ID.
-func TestSealMalleability(t *testing.T) {
+func TestEventMalleability(t *testing.T) {
 	txID := unittest.IdentifierFixture()
 	event := unittest.EventFixture(flow.EventAccountUpdated, 21, 37, txID, 2)
 

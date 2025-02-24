@@ -264,7 +264,7 @@ func (fcv *ChunkVerifier) verifyTransactionsInContext(
 		for i, event := range events {
 			fcv.logger.Warn().Int("list_index", i).
 				Str("event_id", event.ID().String()).
-				Hex("event_fingerptint", fingerprint.Fingerprint(event)).
+				Hex("event_fingerprint", fingerprint.Fingerprint(event)).
 				Str("event_type", string(event.Type)).
 				Str("event_tx_id", event.TransactionID.String()).
 				Uint32("event_tx_index", event.TransactionIndex).

@@ -86,7 +86,7 @@ func EventsMerkleRootHash(el EventsList) (Identifier, error) {
 		// event fingerprint is the rlp encoding of the event
 		// eventID is the standard sha3 hash of the event fingerprint
 		fingerPrint := fingerprint.Fingerprint(event)
-		// computing entityID from the fingerprint
+		// computing entityID from the fingerprint (this is equivalent to `event.ID()`)
 		eventID := MakeIDFromFingerPrint(fingerPrint)
 		_, err = tree.Put(eventID[:], fingerPrint)
 		if err != nil {
