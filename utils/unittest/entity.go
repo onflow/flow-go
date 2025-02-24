@@ -30,10 +30,8 @@ func (m MockEntity) Checksum() flow.Identifier {
 func EntityListFixture(n uint) []*MockEntity {
 	list := make([]*MockEntity, 0, n)
 
-	for i := uint(0); i < n; i++ {
-		list = append(list, &MockEntity{
-			Identifier: IdentifierFixture(),
-		})
+	for range n {
+		list = append(list, MockEntityFixture())
 	}
 
 	return list
@@ -52,7 +50,9 @@ func MockEntityListFixture(count int) []*MockEntity {
 }
 
 // RequireEntityNonMalleable is a sanity check that the entity is not malleable with regards to the ID() function.
-// Non-malleability in this sense means that it is computationally hard to build a different entity with the same ID. This implies that in a non-malleable entity, changing any field should change the ID, which is checked by this function. Note that this is sanity check of non-malleability and that passing this test does not guarantee non-malleability.
+// Non-malleability in this sense means that it is computationally hard to build a different entity with the same ID.
+// This implies that in a non-malleable entity, changing any field should change the ID, which is checked by this function.
+// Note that this is sanity check of non-malleability and that passing this test does not guarantee non-malleability.
 // Non-malleability is a required property for any entity that implements the [flow.IDEntity] interface. This is especially
 // important for entities that contain signatures and are transmitted over the network.
 // ID is used by the protocol to insure entity integrity when transmitted over the network. ID must therefore be a binding cryptographic commitment to an entity.
