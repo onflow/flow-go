@@ -1,9 +1,9 @@
 package unittest
 
 import (
-	"github.com/onflow/crypto"
 	"testing"
 
+	"github.com/onflow/crypto"
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/model/flow"
@@ -70,9 +70,8 @@ func TestRequireEntityNonMalleable(t *testing.T) {
 		})
 	})
 	t.Run("nil-entity", func(t *testing.T) {
-		require.Panics(t, func() {
-			RequireEntityNonMalleable(t, nil)
-		})
+		err := NewMalleabilityChecker().Check(nil)
+		require.Error(t, err)
 	})
 	t.Run("unsupported-field", func(t *testing.T) {
 		require.Panics(t, func() {
@@ -82,12 +81,11 @@ func TestRequireEntityNonMalleable(t *testing.T) {
 		})
 	})
 	t.Run("malleable-entity", func(t *testing.T) {
-		require.Panics(t, func() {
-			RequireEntityNonMalleable(t, &MalleableEntityStruct{
-				Identities: IdentityListFixture(2).ToSkeleton(),
-				QC:         QuorumCertificateFixture(),
-				Signature:  SignatureFixture(),
-			})
+		err := NewMalleabilityChecker().Check(&MalleableEntityStruct{
+			Identities: IdentityListFixture(2).ToSkeleton(),
+			QC:         QuorumCertificateFixture(),
+			Signature:  SignatureFixture(),
 		})
+		require.Error(t, err)
 	})
 }
