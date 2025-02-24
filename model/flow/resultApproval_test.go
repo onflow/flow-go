@@ -14,3 +14,9 @@ func TestResultApprovalEncode(t *testing.T) {
 	id := ra.ID()
 	assert.NotEqual(t, flow.ZeroID, id)
 }
+
+// TestAttestationID_Malleability confirms that the Attestation struct, which implements
+// the [flow.IDEntity] interface, is resistant to tampering.
+func TestAttestationID_Malleability(t *testing.T) {
+	unittest.RequireEntityNonMalleable(t, unittest.AttestationFixture())
+}

@@ -256,6 +256,10 @@ func generateCustomFlowValue(field reflect.Value) any {
 		return flow.ClusterQCVoteDataFromQC(QuorumCertificateWithSignerIDsFixture())
 	case reflect.TypeOf(flow.QuorumCertificate{}):
 		return *QuorumCertificateFixture()
+	case reflect.TypeOf(flow.CollectionGuarantee{}):
+		return reflect.ValueOf(*CollectionGuaranteeFixture())
+	case reflect.TypeOf(flow.Chunk{}):
+		return reflect.ValueOf(*ChunkFixture(IdentifierFixture(), uint(rand.Uint32()), StateCommitmentFixture()))
 	case reflect.TypeOf(flow.TimeoutCertificate{}):
 		return flow.TimeoutCertificate{
 			View:          rand.Uint64(),
