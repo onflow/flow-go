@@ -39,7 +39,7 @@ func newBaseDataProvider(
 		send:           send,
 		subscription:   subscription,
 		closedFlag:     sync.Once{},
-		closedChan:     make(chan struct{}, 1),
+		closedChan:     make(chan struct{}),
 	}
 }
 
@@ -70,6 +70,30 @@ func (b *baseDataProvider) Close() {
 
 type sendResponseCallback[T any] func(T) error
 
+// run reads data from a subscription and sends it to clients using the provided
+// sendResponse callback. It continuously listens to the subscription's data
+// channel and forwards the received values until the closedChan is closed or
+// the subscription ends. It is used as a helper function for each data provider's
+// Run() function.
+//
+// Parameters:
+//   - closedChan: A channel to signal the termination of the function. When closed,
+//     the function stops reading from the subscription and exits gracefully.
+//   - subscription: An instance of the Subscription interface, which provides a
+//     data stream through its Channel() method and an optional error through Err().
+//   - sendResponse: A callback function that processes and forwards the received
+//     data to the clients (e.g. a WebSocket controller). If the callback
+//     returns an error, the function terminates with that error.
+//
+// Returns:
+//   - error: If any error occurs while reading from the subscription or sending
+//     responses, it returns an error wrapped with additional context. If the
+//     closedChan is closed or the subscription ends without errors, it returns nil.
+//
+// Errors:
+//   - If the subscription ends with an error, it is wrapped and returned.
+//   - If a received value is not of the expected type (T), an error is returned.
+//   - If the sendResponse callback encounters an error, it is wrapped and returned.
 func run[T any](
 	closedChan <-chan struct{},
 	subscription subscription.Subscription,

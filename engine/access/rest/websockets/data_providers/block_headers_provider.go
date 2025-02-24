@@ -70,11 +70,7 @@ func (p *BlockHeadersDataProvider) Run() error {
 			header.Build(h)
 
 			var response models.BaseDataProvidersResponse
-			response.Build(
-				p.ID(),
-				p.Topic(),
-				&header,
-			)
+			response.Build(p.ID(), p.Topic(), &header)
 			p.send <- &response
 
 			return nil

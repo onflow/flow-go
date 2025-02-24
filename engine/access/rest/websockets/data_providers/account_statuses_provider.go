@@ -101,10 +101,8 @@ func (p *AccountStatusesDataProvider) sendResponse(
 	messageIndex *counters.StrictMonotonicCounter,
 	blocksSinceLastMessage *uint64,
 ) error {
-	// Only send a response if there's meaningful data to send.
-	// The block counter increments until either:
-	// 1. The account emits events
-	// 2. The heartbeat interval is reached
+	// Only send a response if there's meaningful data to send
+	// or the heartbeat interval limit is reached
 	*blocksSinceLastMessage += 1
 	accountEmittedEvents := len(response.AccountEvents) != 0
 	reachedHeartbeatLimit := *blocksSinceLastMessage >= p.heartbeatInterval
@@ -113,8 +111,8 @@ func (p *AccountStatusesDataProvider) sendResponse(
 	}
 
 	var accountStatusesPayload models.AccountStatusesResponse
-	defer messageIndex.Increment()
 	accountStatusesPayload.Build(response, messageIndex.Value())
+	messageIndex.Increment()
 
 	var resp models.BaseDataProvidersResponse
 	resp.Build(p.ID(), p.Topic(), &accountStatusesPayload)

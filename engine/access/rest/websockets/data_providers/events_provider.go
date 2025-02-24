@@ -99,10 +99,8 @@ func (p *EventsDataProvider) sendResponse(
 	messageIndex *counters.StrictMonotonicCounter,
 	blocksSinceLastMessage *uint64,
 ) error {
-	// Only send a response if there's meaningful data to send.
-	// The block counter increments until either:
-	// 1. The contract emits events
-	// 2. The heartbeat interval is reached
+	// Only send a response if there's meaningful data to send
+	// or the heartbeat interval limit is reached
 	*blocksSinceLastMessage += 1
 	contractEmittedEvents := len(eventsResponse.Events) != 0
 	reachedHeartbeatLimit := *blocksSinceLastMessage >= p.heartbeatInterval
@@ -111,8 +109,8 @@ func (p *EventsDataProvider) sendResponse(
 	}
 
 	var eventsPayload models.EventResponse
-	defer messageIndex.Increment()
 	eventsPayload.Build(eventsResponse, messageIndex.Value())
+	messageIndex.Increment()
 
 	var response models.BaseDataProvidersResponse
 	response.Build(p.ID(), p.Topic(), &eventsPayload)

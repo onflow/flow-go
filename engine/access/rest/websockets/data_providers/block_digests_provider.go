@@ -69,11 +69,7 @@ func (p *BlockDigestsDataProvider) Run() error {
 			blockDigest.Build(b)
 
 			var response models.BaseDataProvidersResponse
-			response.Build(
-				p.ID(),
-				p.Topic(),
-				&blockDigest,
-			)
+			response.Build(p.ID(), p.Topic(), &blockDigest)
 			p.send <- &response
 
 			return nil
