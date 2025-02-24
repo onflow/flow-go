@@ -144,6 +144,11 @@ func NewWebSocketController(
 	conn WebsocketConnection,
 	dataProviderFactory dp.DataProviderFactory,
 ) *Controller {
+	var limiter *rate.Limiter
+	if config.MaxResponsesPerSecond > 0 {
+		limiter = rate.NewLimiter(rate.Limit(config.MaxResponsesPerSecond), 1)
+	}
+
 	return &Controller{
 		logger:              logger.With().Str("component", "websocket-controller").Logger(),
 		config:              config,
@@ -152,7 +157,7 @@ func NewWebSocketController(
 		dataProviders:       concurrentmap.New[SubscriptionID, dp.DataProvider](),
 		dataProviderFactory: dataProviderFactory,
 		dataProvidersGroup:  &sync.WaitGroup{},
-		limiter:             rate.NewLimiter(rate.Limit(config.MaxResponsesPerSecond), 1),
+		limiter:             limiter,
 	}
 }
 
@@ -272,7 +277,7 @@ func (c *Controller) writeMessages(ctx context.Context) error {
 				return nil
 			}
 
-			if err := c.limiter.WaitN(ctx, 1); err != nil {
+			if err := c.checkRateLimit(ctx); err != nil {
 				return fmt.Errorf("rate limiter wait failed: %w", err)
 			}
 
@@ -576,4 +581,15 @@ func (c *Controller) parseOrCreateSubscriptionID(id string) (SubscriptionID, err
 	}
 
 	return newId, nil
+}
+
+// checkRateLimit checks the controller rate limit and blocks until there is room to send a response.
+// An error is returned if the context is canceled or the expected wait time exceeds the context's
+// deadline.
+func (c *Controller) checkRateLimit(ctx context.Context) error {
+	if c.limiter == nil {
+		return nil
+	}
+
+	return c.limiter.WaitN(ctx, 1)
 }

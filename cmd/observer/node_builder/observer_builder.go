@@ -832,7 +832,7 @@ func (builder *ObserverServiceBuilder) extraFlags() {
 			defaultConfig.rpcConf.WebSocketConfig.MaxSubscriptionsPerConnection,
 			"the maximum number of active WebSocket subscriptions allowed per connection",
 		)
-		flags.Uint64Var(
+		flags.Float64Var(
 			&builder.rpcConf.WebSocketConfig.MaxResponsesPerSecond,
 			"websocket-max-responses-per-second",
 			defaultConfig.rpcConf.WebSocketConfig.MaxResponsesPerSecond,
