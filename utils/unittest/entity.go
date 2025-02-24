@@ -128,7 +128,11 @@ func (t *MalleabilityChecker) Check(entity flow.IDEntity) error {
 // This function returns error if the entity is malleable, otherwise it returns nil.
 func (t *MalleabilityChecker) isEntityMalleable(v reflect.Value, idFunc func() flow.Identifier) error {
 	if v.Kind() == reflect.Ptr && v.IsNil() {
-		return nil // there is nothing to check for this field if it's nil
+		return fmt.Errorf("invalid entity, field is nil")
+	} else if v.Kind() == reflect.Map || v.Kind() == reflect.Slice {
+		if v.Len() == 0 {
+			return fmt.Errorf("invalid entity, map/slice is empty")
+		}
 	}
 
 	tType := v.Type()
@@ -163,7 +167,7 @@ func (t *MalleabilityChecker) isEntityMalleable(v reflect.Value, idFunc func() f
 					return fmt.Errorf("field %s is not settable", tType.Field(i).Name)
 				}
 				if err := t.isEntityMalleable(field, idFunc); err != nil {
-					return fmt.Errorf("field %s is malleable", tType.Field(i).Name)
+					return fmt.Errorf("field %s is malleable: %w", tType.Field(i).Name, err)
 				}
 			}
 			return nil
