@@ -92,8 +92,7 @@ func (suite *ConsensusSuite) CommitEpoch(epoch protocol.CommittedEpoch) {
 	suite.committee.EpochCommittedPhaseStarted(1, firstBlockOfCommittedPhase)
 
 	// get the first view, to test when the epoch has been processed
-	firstView, err := epoch.FirstView()
-	require.NoError(suite.T(), err)
+	firstView := epoch.FirstView()
 
 	// wait for the protocol event to be processed (async)
 	assert.Eventually(suite.T(), func() bool {
@@ -284,8 +283,7 @@ func (suite *ConsensusSuite) TestProtocolEvents_EpochExtendedMultiple() {
 
 	// Add several extensions in series
 	for i := 0; i < 10; i++ {
-		finalView, err := curEpoch.FinalView()
-		require.NoError(suite.T(), err)
+		finalView := curEpoch.FinalView()
 		extension := flow.EpochExtension{
 			FirstView: finalView + 1,
 			FinalView: finalView + 100,
@@ -742,17 +740,17 @@ func TestRemoveOldEpochs(t *testing.T) {
 // addExtension adds the extension to the mocked epoch, by updating its final view.
 func addExtension(epoch *protocolmock.CommittedEpoch, ext flow.EpochExtension) {
 	epoch.On("FinalView").Unset()
-	epoch.On("FinalView").Return(ext.FinalView, nil)
+	epoch.On("FinalView").Return(ext.FinalView)
 }
 
 // newMockCommittedEpoch returns a new mocked committed epoch with the given fields
 func newMockCommittedEpoch(counter uint64, identities flow.IdentityList, firstView uint64, finalView uint64) *protocolmock.CommittedEpoch {
 	epoch := new(protocolmock.CommittedEpoch)
-	epoch.On("Counter").Return(counter, nil)
-	epoch.On("RandomSource").Return(unittest.RandomBytes(32), nil)
-	epoch.On("InitialIdentities").Return(identities.ToSkeleton(), nil)
-	epoch.On("FirstView").Return(firstView, nil)
-	epoch.On("FinalView").Return(finalView, nil)
+	epoch.On("Counter").Return(counter)
+	epoch.On("RandomSource").Return(unittest.RandomBytes(32))
+	epoch.On("InitialIdentities").Return(identities.ToSkeleton())
+	epoch.On("FirstView").Return(firstView)
+	epoch.On("FinalView").Return(finalView)
 	epoch.On("DKG").Return(nil, nil)
 
 	return epoch
@@ -761,7 +759,7 @@ func newMockCommittedEpoch(counter uint64, identities flow.IdentityList, firstVi
 // newMockTentativeEpoch returns a new mocked tentative epoch with the given fields
 func newMockTentativeEpoch(counter uint64, identities flow.IdentityList) *protocolmock.TentativeEpoch {
 	epoch := new(protocolmock.TentativeEpoch)
-	epoch.On("Counter").Return(counter, nil)
-	epoch.On("InitialIdentities").Return(identities.ToSkeleton(), nil)
+	epoch.On("Counter").Return(counter)
+	epoch.On("InitialIdentities").Return(identities.ToSkeleton())
 	return epoch
 }

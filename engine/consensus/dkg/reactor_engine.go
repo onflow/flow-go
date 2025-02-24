@@ -98,13 +98,7 @@ func (e *ReactorEngine) Ready() <-chan struct{} {
 			e.log.Fatal().Err(err).Msg("failed to retrieve current epoch when starting DKG reactor engine")
 			return
 		}
-		currentCounter, err := epoch.Counter()
-		if err != nil {
-			// unexpected storage-level error
-			// TODO use irrecoverable context
-			e.log.Fatal().Err(err).Msg("failed to retrieve current epoch counter when starting DKG reactor engine")
-			return
-		}
+		currentCounter := epoch.Counter()
 		first, err := snap.Head()
 		if err != nil {
 			// unexpected storage-level error
@@ -364,14 +358,6 @@ func (e *ReactorEngine) getDKGInfo(firstBlockID flow.Identifier) (*dkgInfo, erro
 		return nil, fmt.Errorf("could not retrieve next epoch: %w", err)
 	}
 
-	identities, err := nextEpoch.InitialIdentities()
-	if err != nil {
-		return nil, fmt.Errorf("could not retrieve epoch identities: %w", err)
-	}
-	phase1Final, phase2Final, phase3Final, err := protocol.DKGPhaseViews(currEpoch)
-	if err != nil {
-		return nil, fmt.Errorf("could not retrieve epoch dkg final views: %w", err)
-	}
 	seed := make([]byte, crypto.KeyGenSeedMinLen)
 	_, err = rand.Read(seed)
 	if err != nil {
@@ -379,10 +365,10 @@ func (e *ReactorEngine) getDKGInfo(firstBlockID flow.Identifier) (*dkgInfo, erro
 	}
 
 	info := &dkgInfo{
-		identities:      identities,
-		phase1FinalView: phase1Final,
-		phase2FinalView: phase2Final,
-		phase3FinalView: phase3Final,
+		identities:      nextEpoch.InitialIdentities(),
+		phase1FinalView: currEpoch.DKGPhase1FinalView(),
+		phase2FinalView: currEpoch.DKGPhase2FinalView(),
+		phase3FinalView: currEpoch.DKGPhase3FinalView(),
 		seed:            seed,
 	}
 	return info, nil

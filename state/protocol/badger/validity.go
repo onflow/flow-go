@@ -71,14 +71,8 @@ func IsValidRootSnapshot(snap protocol.Snapshot, verifyResultID bool) error {
 	if err != nil {
 		return fmt.Errorf("could not get current epoch: %w", err)
 	}
-	firstView, err := currentEpoch.FirstView()
-	if err != nil {
-		return fmt.Errorf("could not get first view: %w", err)
-	}
-	finalView, err := currentEpoch.FinalView()
-	if err != nil {
-		return fmt.Errorf("could not get final view: %w", err)
-	}
+	firstView := currentEpoch.FirstView()
+	finalView := currentEpoch.FinalView()
 
 	// the segment must be fully within the current epoch
 	if firstView > lowest.Header.View {

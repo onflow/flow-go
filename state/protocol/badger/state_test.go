@@ -38,23 +38,19 @@ func TestBootstrapAndOpen(t *testing.T) {
 		// expect the final view metric to be set to current epoch's final view
 		epoch, err := rootSnapshot.Epochs().Current()
 		require.NoError(t, err)
-		finalView, err := epoch.FinalView()
-		require.NoError(t, err)
-		counter, err := epoch.Counter()
-		require.NoError(t, err)
+		counter := epoch.Counter()
 		phase, err := rootSnapshot.EpochPhase()
 		require.NoError(t, err)
 
 		complianceMetrics := new(mock.ComplianceMetrics)
 		complianceMetrics.On("CurrentEpochCounter", counter).Once()
 		complianceMetrics.On("CurrentEpochPhase", phase).Once()
-		complianceMetrics.On("CurrentEpochFinalView", finalView).Once()
+		complianceMetrics.On("CurrentEpochFinalView", epoch.FinalView()).Once()
 		complianceMetrics.On("FinalizedHeight", testmock.Anything).Once()
 		complianceMetrics.On("SealedHeight", testmock.Anything).Once()
 
-		dkgPhase1FinalView, dkgPhase2FinalView, dkgPhase3FinalView, err := protocol.DKGPhaseViews(epoch)
-		require.NoError(t, err)
-		complianceMetrics.On("CurrentDKGPhaseViews", dkgPhase1FinalView, dkgPhase2FinalView, dkgPhase3FinalView).Once()
+		complianceMetrics.On("CurrentDKGPhaseViews",
+			epoch.DKGPhase1FinalView(), epoch.DKGPhase2FinalView(), epoch.DKGPhase3FinalView()).Once()
 
 		noopMetrics := new(metrics.NoopCollector)
 		all := storagebadger.InitAll(noopMetrics, db)
@@ -118,8 +114,7 @@ func TestBootstrapAndOpen_EpochCommitted(t *testing.T) {
 		currentEpoch, err := committedPhaseSnapshot.Epochs().Current()
 		require.NoError(t, err)
 		// expect counter to be set to current epochs counter
-		counter, err := currentEpoch.Counter()
-		require.NoError(t, err)
+		counter := currentEpoch.Counter()
 		complianceMetrics.On("CurrentEpochCounter", counter).Once()
 
 		// expect epoch phase to be set to current phase
@@ -127,13 +122,10 @@ func TestBootstrapAndOpen_EpochCommitted(t *testing.T) {
 		require.NoError(t, err)
 		complianceMetrics.On("CurrentEpochPhase", phase).Once()
 
-		currentEpochFinalView, err := currentEpoch.FinalView()
-		require.NoError(t, err)
-		complianceMetrics.On("CurrentEpochFinalView", currentEpochFinalView).Once()
+		complianceMetrics.On("CurrentEpochFinalView", currentEpoch.FinalView()).Once()
 
-		dkgPhase1FinalView, dkgPhase2FinalView, dkgPhase3FinalView, err := protocol.DKGPhaseViews(currentEpoch)
-		require.NoError(t, err)
-		complianceMetrics.On("CurrentDKGPhaseViews", dkgPhase1FinalView, dkgPhase2FinalView, dkgPhase3FinalView).Once()
+		complianceMetrics.On("CurrentDKGPhaseViews",
+			currentEpoch.DKGPhase1FinalView(), currentEpoch.DKGPhase2FinalView(), currentEpoch.DKGPhase3FinalView()).Once()
 		complianceMetrics.On("FinalizedHeight", testmock.Anything).Once()
 		complianceMetrics.On("SealedHeight", testmock.Anything).Once()
 
@@ -520,17 +512,14 @@ func TestBootstrapNonRoot(t *testing.T) {
 			// find a snapshot from epoch setup phase in epoch 2
 			epoch1, err := rootSnapshot.Epochs().Current()
 			require.NoError(t, err)
-			epoch1Counter, err := epoch1.Counter()
-			require.NoError(t, err)
+			epoch1Counter := epoch1.Counter()
 			for height := rootBlock.Height + 1; ; height++ {
 				snap := state.AtHeight(height)
 				epoch, err := snap.Epochs().Current()
 				require.NoError(t, err)
-				counter, err := epoch.Counter()
-				require.NoError(t, err)
 				phase, err := snap.EpochPhase()
 				require.NoError(t, err)
-				if phase == flow.EpochPhaseSetup && counter == epoch1Counter+1 {
+				if phase == flow.EpochPhaseSetup && epoch.Counter() == epoch1Counter+1 {
 					return snap
 				}
 			}

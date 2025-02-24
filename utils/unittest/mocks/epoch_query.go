@@ -120,9 +120,7 @@ func (mock *EpochQuery) Transition() {
 func (mock *EpochQuery) AddCommitted(epoch protocol.CommittedEpoch) {
 	mock.mu.Lock()
 	defer mock.mu.Unlock()
-	counter, err := epoch.Counter()
-	require.NoError(mock.t, err, "cannot add epoch with invalid counter")
-	mock.committed[counter] = epoch
+	mock.committed[epoch.Counter()] = epoch
 }
 
 // AddTentative adds the given Tentative Epoch to this EpochQuery implementation, so its
@@ -130,8 +128,7 @@ func (mock *EpochQuery) AddCommitted(epoch protocol.CommittedEpoch) {
 func (mock *EpochQuery) AddTentative(epoch protocol.TentativeEpoch) {
 	mock.mu.Lock()
 	defer mock.mu.Unlock()
-	counter, err := epoch.Counter()
-	require.NoError(mock.t, err, "cannot add epoch with invalid counter")
+	counter := epoch.Counter()
 	require.Equal(mock.t, mock.counter+1, counter, "may only add tentative next epoch with current counter + 1")
 	mock.tentative[counter] = epoch
 }

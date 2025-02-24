@@ -1216,9 +1216,7 @@ func TestSnapshot_EpochQuery(t *testing.T) {
 				for _, height := range epoch1.Range() {
 					currentEpoch, err := state.AtHeight(height).Epochs().Current()
 					require.NoError(t, err)
-					counter, err := currentEpoch.Counter()
-					require.NoError(t, err)
-					assert.Equal(t, epoch1Counter, counter)
+					assert.Equal(t, epoch1Counter, currentEpoch.Counter())
 				}
 			})
 
@@ -1226,9 +1224,7 @@ func TestSnapshot_EpochQuery(t *testing.T) {
 				for _, height := range epoch2.Range() {
 					currentEpoch, err := state.AtHeight(height).Epochs().Current()
 					require.NoError(t, err)
-					counter, err := currentEpoch.Counter()
-					require.NoError(t, err)
-					assert.Equal(t, epoch2Counter, counter)
+					assert.Equal(t, epoch2Counter, currentEpoch.Counter())
 				}
 			})
 		})
@@ -1250,9 +1246,7 @@ func TestSnapshot_EpochQuery(t *testing.T) {
 					// Tentative epoch is available
 					nextSetup, err := state.AtHeight(height).Epochs().NextUnsafe()
 					require.NoError(t, err)
-					counter, err := nextSetup.Counter()
-					require.NoError(t, err)
-					assert.Equal(t, epoch2Counter, counter)
+					assert.Equal(t, epoch2Counter, nextSetup.Counter())
 					// Committed epoch is not available
 					_, err = state.AtHeight(height).Epochs().NextCommitted()
 					require.ErrorIs(t, err, protocol.ErrNextEpochNotCommitted)
@@ -1264,9 +1258,7 @@ func TestSnapshot_EpochQuery(t *testing.T) {
 					// Committed epoch is available
 					nextCommitted, err := state.AtHeight(height).Epochs().NextCommitted()
 					require.NoError(t, err)
-					counter, err := nextCommitted.Counter()
-					require.NoError(t, err)
-					assert.Equal(t, epoch2Counter, counter)
+					assert.Equal(t, epoch2Counter, nextCommitted.Counter())
 				}
 			})
 		})
@@ -1287,9 +1279,7 @@ func TestSnapshot_EpochQuery(t *testing.T) {
 				for _, height := range epoch2.Range() {
 					previousEpoch, err := state.AtHeight(height).Epochs().Previous()
 					require.NoError(t, err)
-					counter, err := previousEpoch.Counter()
-					require.NoError(t, err)
-					assert.Equal(t, epoch1Counter, counter)
+					assert.Equal(t, epoch1Counter, previousEpoch.Counter())
 				}
 			})
 		})
@@ -1336,9 +1326,7 @@ func TestSnapshot_EpochFirstView(t *testing.T) {
 				for _, height := range epoch1.Range() {
 					currentEpoch, err := state.AtHeight(height).Epochs().Current()
 					require.NoError(t, err)
-					actualFirstView, err := currentEpoch.FirstView()
-					require.NoError(t, err)
-					assert.Equal(t, epoch1FirstView, actualFirstView)
+					assert.Equal(t, epoch1FirstView, currentEpoch.FirstView())
 				}
 			})
 
@@ -1347,9 +1335,7 @@ func TestSnapshot_EpochFirstView(t *testing.T) {
 				for _, height := range epoch2.Range() {
 					previousEpoch, err := state.AtHeight(height).Epochs().Previous()
 					require.NoError(t, err)
-					actualFirstView, err := previousEpoch.FirstView()
-					require.NoError(t, err)
-					assert.Equal(t, epoch1FirstView, actualFirstView)
+					assert.Equal(t, epoch1FirstView, previousEpoch.FirstView())
 				}
 			})
 		})
@@ -1363,9 +1349,7 @@ func TestSnapshot_EpochFirstView(t *testing.T) {
 				for _, height := range epoch1.CommittedRange() {
 					nextCommitted, err := state.AtHeight(height).Epochs().NextCommitted()
 					require.NoError(t, err)
-					actualFirstView, err := nextCommitted.FirstView()
-					require.NoError(t, err)
-					assert.Equal(t, epoch2FirstView, actualFirstView)
+					assert.Equal(t, epoch2FirstView, nextCommitted.FirstView())
 				}
 			})
 
@@ -1374,9 +1358,7 @@ func TestSnapshot_EpochFirstView(t *testing.T) {
 				for _, height := range epoch2.Range() {
 					currentEpoch, err := state.AtHeight(height).Epochs().Current()
 					require.NoError(t, err)
-					actualFirstView, err := currentEpoch.FirstView()
-					require.NoError(t, err)
-					assert.Equal(t, epoch2FirstView, actualFirstView)
+					assert.Equal(t, epoch2FirstView, currentEpoch.FirstView())
 				}
 			})
 		})

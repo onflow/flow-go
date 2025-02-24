@@ -71,22 +71,10 @@ func (e *epochInfo) recomputeLeaderSelectionForExtendedViewRange(extension flow.
 // This can be cached and used for all by-view queries for this epoch.
 // No errors are expected during normal operation.
 func newEpochInfo(epoch protocol.CommittedEpoch) (*epochInfo, error) {
-	randomSeed, err := epoch.RandomSource()
-	if err != nil {
-		return nil, fmt.Errorf("could not get epoch random source: %w", err)
-	}
-	firstView, err := epoch.FirstView()
-	if err != nil {
-		return nil, fmt.Errorf("could not get epoch first view: %w", err)
-	}
-	finalView, err := epoch.FinalView()
-	if err != nil {
-		return nil, fmt.Errorf("could not get epoch final view: %w", err)
-	}
-	initialIdentities, err := epoch.InitialIdentities()
-	if err != nil {
-		return nil, fmt.Errorf("could not initial identities: %w", err)
-	}
+	randomSeed := epoch.RandomSource()
+	firstView := epoch.FirstView()
+	finalView := epoch.FinalView()
+	initialIdentities := epoch.InitialIdentities()
 	leaders, err := leader.SelectionForConsensus(initialIdentities, randomSeed, firstView, finalView)
 	if err != nil {
 		return nil, fmt.Errorf("could not get leader selection: %w", err)
@@ -431,10 +419,7 @@ func (c *Consensus) epochInfoByView(view uint64) (*epochInfo, error) {
 // Input must be a committed epoch.
 // No errors are expected during normal operation.
 func (c *Consensus) prepareEpoch(epoch protocol.CommittedEpoch) (*epochInfo, error) {
-	counter, err := epoch.Counter()
-	if err != nil {
-		return nil, fmt.Errorf("could not get counter for epoch to prepare: %w", err)
-	}
+	counter := epoch.Counter()
 
 	c.mu.Lock()
 	defer c.mu.Unlock()
@@ -445,7 +430,7 @@ func (c *Consensus) prepareEpoch(epoch protocol.CommittedEpoch) (*epochInfo, err
 		return epochInf, nil
 	}
 
-	epochInf, err = newEpochInfo(epoch)
+	epochInf, err := newEpochInfo(epoch)
 	if err != nil {
 		return nil, fmt.Errorf("could not create epoch info for epoch %d: %w", counter, err)
 	}

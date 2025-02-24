@@ -112,9 +112,7 @@ func (suite *Suite) MockFactoryCreate(arg any) {
 		Run(func(args mock.Arguments) {
 			epoch, ok := args.Get(0).(realprotocol.CommittedEpoch)
 			suite.Require().Truef(ok, "invalid type %T", args.Get(0))
-			counter, err := epoch.Counter()
-			suite.Require().Nil(err)
-			suite.components[counter] = newMockComponents(suite.T())
+			suite.components[epoch.Counter()] = newMockComponents(suite.T())
 		}).
 		Return(
 			func(epoch realprotocol.CommittedEpoch) realcluster.State {
@@ -258,8 +256,7 @@ func (suite *Suite) AssertEpochStopped(counter uint64) {
 }
 
 func (suite *Suite) ComponentsForEpoch(epoch realprotocol.CommittedEpoch) *mockComponents {
-	counter, err := epoch.Counter()
-	suite.Require().Nil(err, "cannot get counter")
+	counter := epoch.Counter()
 	components, ok := suite.components[counter]
 	suite.Require().True(ok, "missing component for counter", counter)
 	return components
@@ -271,9 +268,7 @@ func (suite *Suite) MockAsUnauthorizedNode(forEpoch uint64) {
 
 	// mock as unauthorized for given epoch only
 	unauthorizedMatcher := func(epoch realprotocol.CommittedEpoch) bool {
-		counter, err := epoch.Counter()
-		require.NoError(suite.T(), err)
-		return counter == forEpoch
+		return epoch.Counter() == forEpoch
 	}
 	authorizedMatcher := func(epoch realprotocol.CommittedEpoch) bool { return !unauthorizedMatcher(epoch) }
 

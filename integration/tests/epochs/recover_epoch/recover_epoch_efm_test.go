@@ -42,8 +42,7 @@ func (s *RecoverEpochSuite) TestRecoverEpoch() {
 	// get final view form the latest snapshot
 	epoch1, err := s.Net.BootstrapSnapshot.Epochs().Current()
 	require.NoError(s.T(), err)
-	epoch1FinalView, err := epoch1.FinalView()
-	require.NoError(s.T(), err)
+	epoch1FinalView := epoch1.FinalView()
 
 	// wait for at least the first block of the next epoch to be sealed so that we can
 	// ensure that we are still in the same epoch after the final view of that epoch indicating we are in EFM

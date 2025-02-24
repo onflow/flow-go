@@ -118,13 +118,13 @@ func (suite *ReactorEngineSuite_SetupPhase) SetupTest() {
 
 	// mock protocol state
 	suite.currentEpoch = new(protocol.CommittedEpoch)
-	suite.currentEpoch.On("Counter").Return(suite.epochCounter, nil)
-	suite.currentEpoch.On("DKGPhase1FinalView").Return(suite.dkgPhase1FinalView, nil)
-	suite.currentEpoch.On("DKGPhase2FinalView").Return(suite.dkgPhase2FinalView, nil)
-	suite.currentEpoch.On("DKGPhase3FinalView").Return(suite.dkgPhase3FinalView, nil)
+	suite.currentEpoch.On("Counter").Return(suite.epochCounter)
+	suite.currentEpoch.On("DKGPhase1FinalView").Return(suite.dkgPhase1FinalView)
+	suite.currentEpoch.On("DKGPhase2FinalView").Return(suite.dkgPhase2FinalView)
+	suite.currentEpoch.On("DKGPhase3FinalView").Return(suite.dkgPhase3FinalView)
 	suite.nextEpoch = new(protocol.TentativeEpoch)
-	suite.nextEpoch.On("Counter").Return(suite.NextEpochCounter(), nil)
-	suite.nextEpoch.On("InitialIdentities").Return(suite.committee.ToSkeleton(), nil)
+	suite.nextEpoch.On("Counter").Return(suite.NextEpochCounter())
+	suite.nextEpoch.On("InitialIdentities").Return(suite.committee.ToSkeleton())
 
 	suite.epochQuery = mocks.NewEpochQuery(suite.T(), suite.epochCounter)
 	suite.epochQuery.AddCommitted(suite.currentEpoch)

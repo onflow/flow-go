@@ -78,8 +78,7 @@ func TestRecoverEpochHappyPath(t *testing.T) {
 		decodedValues := unittest.InterfafceToCdcValues(t, outputTxArgs)
 		currEpoch, err := rootSnapshot.Epochs().Current()
 		require.NoError(t, err)
-		finalView, err := currEpoch.FinalView()
-		require.NoError(t, err)
+		finalView := currEpoch.FinalView()
 
 		// epoch start view
 		require.Equal(t, decodedValues[0], cadence.NewUInt64(finalView+1))
@@ -90,8 +89,7 @@ func TestRecoverEpochHappyPath(t *testing.T) {
 		// target duration
 		require.Equal(t, decodedValues[3], cadence.NewUInt64(flagTargetDuration))
 		// target end time
-		expectedTargetEndTime, err := currEpoch.TargetEndTime()
-		require.NoError(t, err)
+		expectedTargetEndTime := currEpoch.TargetEndTime()
 		require.Equal(t, decodedValues[4], cadence.NewUInt64(expectedTargetEndTime))
 		// clusters: we cannot guarantee order of the cluster when we generate the test fixtures
 		// so, we ensure each cluster member is part of the full set of node ids

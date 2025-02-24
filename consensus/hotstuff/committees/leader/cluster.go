@@ -13,19 +13,13 @@ import (
 // have zero probability of being selected as leaders in accordance with their weight.
 func SelectionForCluster(cluster protocol.Cluster, epoch protocol.CommittedEpoch) (*LeaderSelection, error) {
 	// sanity check to ensure the cluster and epoch match
-	counter, err := epoch.Counter()
-	if err != nil {
-		return nil, fmt.Errorf("could not get epoch counter: %w", err)
-	}
+	counter := epoch.Counter()
 	if counter != cluster.EpochCounter() {
 		return nil, fmt.Errorf("inconsistent counter between epoch (%d) and cluster (%d)", counter, cluster.EpochCounter())
 	}
 
 	// get the random source of the current epoch
-	randomSeed, err := epoch.RandomSource()
-	if err != nil {
-		return nil, fmt.Errorf("could not get leader selection seed for cluster (index: %v) at epoch: %v: %w", cluster.Index(), counter, err)
-	}
+	randomSeed := epoch.RandomSource()
 	// create random number generator from the seed and customizer
 	rng, err := prg.New(randomSeed, prg.CollectorClusterLeaderSelection(cluster.Index()), nil)
 	if err != nil {

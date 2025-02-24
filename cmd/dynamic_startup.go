@@ -168,10 +168,5 @@ func validateDynamicStartEpochFlags(ctx context.Context, getSnapshot common.GetP
 	if err != nil {
 		return 0, fmt.Errorf("failed to get current epoch: %w", err)
 	}
-	epochCounter, err := epoch.Counter()
-	if err != nil {
-		return 0, fmt.Errorf("failed to get current epoch counter: %w", err)
-	}
-
-	return epochCounter, nil
+	return epoch.Counter(), nil
 }
