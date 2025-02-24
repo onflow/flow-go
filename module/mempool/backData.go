@@ -1,65 +1,64 @@
 package mempool
 
-import (
-	"github.com/onflow/flow-go/model/flow"
-)
-
-// BackData represents the underlying data structure that is utilized by mempool.Backend, as the
+// BackData is a generic key-value storage interface utilized by the mempool.Backend, as the
 // core structure of maintaining data on memory-pools.
 // NOTE: BackData by default is not expected to provide concurrency-safe operations. As it is just the
 // model layer of the mempool, the safety against concurrent operations are guaranteed by the Backend that
 // is the control layer.
-type BackData interface {
+type BackData[K comparable, V any] interface {
 	// Has checks if backdata already contains the entity with the given identifier.
-	Has(entityID flow.Identifier) bool
+	Has(key K) bool
 
-	// Add adds the given entity to the backdata.
-	Add(entityID flow.Identifier, entity flow.Entity) bool
+	// Add adds the value associated with key.
+	Add(key K, value V) error
 
-	// Remove removes the entity with the given identifier.
-	Remove(entityID flow.Identifier) (flow.Entity, bool)
+	// Remove removes the value with the given key.
+	// Returns the removed value and true if found.
+	Remove(key K) (V, bool)
 
-	// Adjust adjusts the entity using the given function if the given identifier can be found.
-	// Returns a bool which indicates whether the entity was updated as well as the updated entity.
-	Adjust(entityID flow.Identifier, f func(flow.Entity) flow.Entity) (flow.Entity, bool)
+	// Adjust adjusts the value using the provided function if the key is found.
+	// It returns the updated value along with a boolean indicating whether an update occurred.
+	Adjust(key K, f func(value V) V) (V, bool)
 
-	// AdjustWithInit adjusts the entity using the given function if the given identifier can be found. When the
-	// entity is not found, it initializes the entity using the given init function and then applies the adjust function.
-	// Args:
-	// - entityID: the identifier of the entity to adjust.
-	// - adjust: the function that adjusts the entity.
-	// - init: the function that initializes the entity when it is not found.
-	// Returns:
-	//   - the adjusted entity.
+	// AdjustWithInit adjusts the value using the provided function if the key is found.
+	// If the key is not found, it initializes the value using the init function and then applies the adjustment.
 	//
-	// - a bool which indicates whether the entity was adjusted.
-	AdjustWithInit(entityID flow.Identifier, adjust func(flow.Entity) flow.Entity, init func() flow.Entity) (flow.Entity, bool)
-
-	// GetWithInit returns the given entity from the backdata. If the entity does not exist, it creates a new entity
-	// using the factory function and stores it in the backdata.
 	// Args:
-	// - entityID: the identifier of the entity to get.
-	// - init: the function that initializes the entity when it is not found.
+	//   key: The key for which the value should be adjusted.
+	//   adjust: A function that takes the current value and returns the adjusted value.
+	//   init: A function that returns an initial value if the key is not present.
+	//
 	// Returns:
-	//  - the entity.
-	// - a bool which indicates whether the entity was found (or created).
-	GetWithInit(entityID flow.Identifier, init func() flow.Entity) (flow.Entity, bool)
+	//   The adjusted value, and a boolean indicating whether the value was adjusted.
+	AdjustWithInit(key K, adjust func(value V) V, init func() V) (V, bool)
 
-	// ByID returns the given entity from the backdata.
-	ByID(entityID flow.Identifier) (flow.Entity, bool)
+	// GetWithInit returns the value for the given key.
+	// If the key does not exist, it creates a new value using the init function, stores it, and returns it.
+	//
+	// Args:
+	//   key: The key for which the value should be retrieved.
+	//   init: A function that returns an initial value if the key is not present.
+	//
+	// Returns:
+	//   The value associated with the key (either existing or newly initialized), and a boolean indicating
+	//   whether the value was found (true) or was newly created (false).
+	GetWithInit(key K, init func() V) (V, bool)
 
-	// Size returns the size of the backdata, i.e., total number of stored (entityId, entity) pairs.
+	// ByID returns the value for the given key.
+	ByID(key K) (V, bool)
+
+	// Size returns the number of stored key-value pairs.
 	Size() uint
 
-	// All returns all entities stored in the backdata.
-	All() map[flow.Identifier]flow.Entity
+	// All returns all stored key-value pairs as a map.
+	All() map[K]V
 
-	// Identifiers returns the list of identifiers of entities stored in the backdata.
-	Identifiers() flow.IdentifierList
+	// Identifiers returns the list of keys stored in the backdata.
+	Identifiers() []K
 
-	// Entities returns the list of entities stored in the backdata.
-	Entities() []flow.Entity
+	// Entities returns the list of stored values.
+	Entities() []V
 
-	// Clear removes all entities from the backdata.
+	// Clear removes all key-value pairs from the backdata.
 	Clear()
 }
