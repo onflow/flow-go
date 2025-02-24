@@ -148,6 +148,15 @@ func TestExtendValid(t *testing.T) {
 			consumer.On("BlockProcessable", block1.Header, mock.Anything).Once()
 			err := fullState.Extend(context.Background(), block2)
 			require.NoError(t, err)
+
+			// verify that block1's view is indexed
+			var indexedID flow.Identifier
+			require.NoError(t, db.View(operation.LookupCertifiedBlockByView(block1.Header.View, &indexedID)))
+			require.Equal(t, block1.ID(), indexedID)
+
+			// verify that block2's view is not indexed
+			err = db.View(operation.LookupCertifiedBlockByView(block2.Header.View, &indexedID))
+			require.ErrorIs(t, err, stoerr.ErrNotFound)
 		})
 	})
 }
@@ -1519,7 +1528,7 @@ func TestExtendEpochCommitInvalid(t *testing.T) {
 		// swap consensus node for a new one for epoch 2
 		epoch2NewParticipant := unittest.IdentityFixture(unittest.WithRole(flow.RoleConsensus))
 		epoch2Participants := append(
-			participants.Filter(filter.Not[flow.Identity](filter.HasRole[flow.Identity](flow.RoleConsensus))),
+			participants.Filter(filter.Not(filter.HasRole[flow.Identity](flow.RoleConsensus))),
 			epoch2NewParticipant,
 		).Sort(flow.Canonical[flow.Identity]).ToSkeleton()
 
