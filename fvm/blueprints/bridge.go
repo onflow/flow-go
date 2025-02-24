@@ -288,3 +288,24 @@ func UpsertContractCodeChunksTransaction(
 		AddArgument(jsoncdc.MustEncode(cadence.NewArray(chunks))).
 		AddAuthorizer(service)
 }
+
+// OnboardToBridgeByTypeIDTransaction returns the transaction body for the transaction
+// that onboards a FT or NFT type to the bridge
+func OnboardToBridgeByTypeIDTransaction(
+	service flow.Address,
+	bridgeEnv bridge.Environment,
+	env templates.Environment,
+	forType string,
+) *flow.TransactionBody {
+	txScript, _ := bridge.GetCadenceTransactionCode("cadence/transactions/bridge/onboarding/onboard_by_type_identifier.cdc", bridgeEnv, env)
+
+	return flow.NewTransactionBody().
+		SetScript([]byte(
+			txScript,
+		),
+		).
+		AddArgument(jsoncdc.MustEncode(cadence.String(forType))).
+		SetProposalKey(service, 0, 0).
+		SetPayer(service).
+		AddAuthorizer(service)
+}
