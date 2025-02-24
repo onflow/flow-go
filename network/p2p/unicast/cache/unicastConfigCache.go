@@ -40,7 +40,7 @@ func NewUnicastConfigCache(
 	cfgFactory func() unicast.Config,
 ) *UnicastConfigCache {
 	return &UnicastConfigCache{
-		peerCache: stdmap.NewBackend(stdmap.WithBackData(herocache.NewCache(size,
+		peerCache: stdmap.NewBackend(stdmap.WithMutableBackData(herocache.NewCache(size,
 			herocache.DefaultOversizeFactor,
 			heropool.LRUEjection,
 			logger.With().Str("module", "unicast-config-cache").Logger(),
