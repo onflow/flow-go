@@ -21,27 +21,29 @@ type BackData[K comparable, V any] interface {
 	Adjust(key K, f func(value V) V) (V, bool)
 
 	// AdjustWithInit adjusts the value using the provided function if the key is found.
-	// If the key is not found, it initializes the value using the init function and then applies the adjustment.
+	// If the key is not found, it initializes the value using the given init function and then applies the adjustment.
 	//
 	// Args:
-	//   key: The key for which the value should be adjusted.
-	//   adjust: A function that takes the current value and returns the adjusted value.
-	//   init: A function that returns an initial value if the key is not present.
+	// - key: The key for which the value should be adjusted.
+	// - adjust: the function that adjusts the value.
+	// - init: A function that initializes the value if the key is not present.
 	//
 	// Returns:
-	//   The adjusted value, and a boolean indicating whether the value was adjusted.
+	// - the adjusted value.
+	//
+	// - a bool which indicates whether the value was adjusted.
 	AdjustWithInit(key K, adjust func(value V) V, init func() V) (V, bool)
 
 	// GetWithInit returns the value for the given key.
 	// If the key does not exist, it creates a new value using the init function, stores it, and returns it.
 	//
 	// Args:
-	//   key: The key for which the value should be retrieved.
-	//   init: A function that returns an initial value if the key is not present.
+	// - key: The key for which the value should be retrieved.
+	// - init: A function that initializes the value if the key is not present.
 	//
 	// Returns:
-	//   The value associated with the key (either existing or newly initialized), and a boolean indicating
-	//   whether the value was found (true) or was newly created (false).
+	// - the value.
+	// - a bool which indicates whether the value was found (or created).
 	GetWithInit(key K, init func() V) (V, bool)
 
 	// ByID returns the value for the given key.
