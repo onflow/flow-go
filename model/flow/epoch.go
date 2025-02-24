@@ -3,7 +3,6 @@ package flow
 import (
 	"bytes"
 	"encoding/json"
-	"fmt"
 	"io"
 
 	"github.com/ethereum/go-ethereum/rlp"
@@ -33,7 +32,7 @@ import (
 //	║    Notification            Notification               Notification
 //
 // However, if the Protocol State encounters any unexpected epoch service events, or the subsequent epoch
-// fails to be committed by the `EpochCommitSafetyThreshold`, then we enter Epoch Fallback Mode [EFM].
+// fails to be committed by the `FinalizationSafetyThreshold`, then we enter Epoch Fallback Mode [EFM].
 // Depending on whether the subsequent epoch has already been committed, the EFM progress differs slightly.
 // In a nutshell, we always enter the _latest_ epoch already committed on the happy path (if there is any)
 // and then follow the fallback protocol.
@@ -62,7 +61,7 @@ import (
 //	║                         Epoch N
 //	║ ···────────────────────────┴───────────────────────────────────────────────────────────────╮
 //	║              invalid service event or                         EpochRecover
-//	║         EpochCommitSafetyThreshold reached                    service event
+//	║         FinalizationSafetyThreshold reached                   service event
 //	║                           ⇣                      ┊            ⇣
 //	║  ┌────────────────────┐   ┌──────────────────────┊──────┐     ┌───────────────────────────┐
 //	║  │ EpochPhaseStaking  │   │     EpochPhaseFallback      │     │   EpochPhaseCommitted     │
@@ -130,7 +129,7 @@ const EpochSetupRandomSourceLength = 16
 // EpochSetup is a service event emitted when the preparation process for the next epoch begins.
 // EpochSetup events must:
 //   - be emitted exactly once per epoch before the corresponding EpochCommit event
-//   - be emitted prior to the epoch commitment deadline (defined by EpochCommitSafetyThreshold)
+//   - be emitted prior to the epoch commitment deadline (defined by FinalizationSafetyThreshold)
 //
 // If either of the above constraints are not met, the service event will be rejected and Epoch Fallback Mode [EFM] will be triggered.
 //
@@ -201,8 +200,8 @@ func (setup *EpochSetup) EqualTo(other *EpochSetup) bool {
 // It contains data from EpochSetup, and EpochCommit events to so replicas can create a committed epoch from which they
 // can continue operating on the happy path.
 type EpochRecover struct {
-	EpochSetup
-	EpochCommit
+	EpochSetup  EpochSetup
+	EpochCommit EpochCommit
 }
 
 func (er *EpochRecover) ServiceEvent() ServiceEvent {
@@ -230,7 +229,7 @@ func (er *EpochRecover) EqualTo(other *EpochRecover) bool {
 // EpochCommit is a service event emitted when the preparation process for the next epoch is complete.
 // EpochCommit events must:
 //   - be emitted exactly once per epoch after the corresponding EpochSetup event
-//   - be emitted prior to the epoch commitment deadline (defined by EpochCommitSafetyThreshold)
+//   - be emitted prior to the epoch commitment deadline (defined by FinalizationSafetyThreshold)
 //
 // If either of the above constraints are not met, the service event will be rejected and Epoch Fallback Mode [EFM] will be triggered.
 //
@@ -257,12 +256,7 @@ type EpochCommit struct {
 	// CAUTION: This list may include keys for nodes which do not exist in the consensus committee
 	//          and may NOT include keys for all nodes in the consensus committee.
 	DKGParticipantKeys []crypto.PublicKey
-	// DKGIndexMap is always nil and is not used. This field exists to avoid data-model changes in a future version.
-	// Deprecated: This field is always nil and should not be used (it isn't really deprecated -- "pre-un-deprecated", maybe --
-	// but marking it as such makes Go tooling flag it in a way that is useful for this circumstance)
-	//
-	// TODO(EFM, #6214): Parse this field from service event and make use of it.
-	//                   Here is what the godoc should look like once we do that:
+
 	// DKGIndexMap is a mapping from node identifier to Random Beacon index.
 	// It has the following invariants:
 	//   - len(DKGParticipantKeys) == len(DKGIndexMap)
@@ -270,7 +264,7 @@ type EpochCommit struct {
 	// CAUTION: This mapping may include identifiers for nodes which do not exist in the consensus committee
 	//          and may NOT include identifiers for all nodes in the consensus committee.
 	//
-	DKGIndexMap map[Identifier]int
+	DKGIndexMap DKGIndexMap
 }
 
 // ClusterQCVoteData represents the votes for a cluster quorum certificate, as
@@ -326,6 +320,7 @@ type encodableCommit struct {
 	ClusterQCs         []ClusterQCVoteData
 	DKGGroupKey        encodable.RandomBeaconPubKey
 	DKGParticipantKeys []encodable.RandomBeaconPubKey
+	DKGIndexMap        DKGIndexMap
 }
 
 func encodableFromCommit(commit *EpochCommit) encodableCommit {
@@ -338,6 +333,7 @@ func encodableFromCommit(commit *EpochCommit) encodableCommit {
 		ClusterQCs:         commit.ClusterQCs,
 		DKGGroupKey:        encodable.RandomBeaconPubKey{PublicKey: commit.DKGGroupKey},
 		DKGParticipantKeys: encKeys,
+		DKGIndexMap:        commit.DKGIndexMap,
 	}
 }
 
@@ -351,6 +347,7 @@ func commitFromEncodable(enc encodableCommit) EpochCommit {
 		ClusterQCs:         enc.ClusterQCs,
 		DKGGroupKey:        enc.DKGGroupKey.PublicKey,
 		DKGParticipantKeys: dkgKeys,
+		DKGIndexMap:        enc.DKGIndexMap,
 	}
 }
 
@@ -402,23 +399,50 @@ func (commit *EpochCommit) UnmarshalMsgpack(b []byte) error {
 // differently from JSON/msgpack, because it does not handle custom encoders
 // within map types.
 // NOTE: DecodeRLP is not needed, as this is only used for hashing.
+// TODO(EFM, #6794): Currently we implement RLP encoding based on availability of DKGIndexMap
+// this is needed to support backward compatibility, to guarantee that we will produce same hash
+// for the same event. This should be removed once we complete the network upgrade.
 func (commit *EpochCommit) EncodeRLP(w io.Writer) error {
-	rlpEncodable := struct {
-		Counter            uint64
-		ClusterQCs         []ClusterQCVoteData
-		DKGGroupKey        []byte
-		DKGParticipantKeys [][]byte
-	}{
-		Counter:            commit.Counter,
-		ClusterQCs:         commit.ClusterQCs,
-		DKGGroupKey:        commit.DKGGroupKey.Encode(),
-		DKGParticipantKeys: make([][]byte, 0, len(commit.DKGParticipantKeys)),
-	}
-	for _, key := range commit.DKGParticipantKeys {
-		rlpEncodable.DKGParticipantKeys = append(rlpEncodable.DKGParticipantKeys, key.Encode())
-	}
+	if commit.DKGIndexMap == nil {
+		rlpEncodable := struct {
+			Counter            uint64
+			ClusterQCs         []ClusterQCVoteData
+			DKGGroupKey        []byte
+			DKGParticipantKeys [][]byte
+		}{
+			Counter:            commit.Counter,
+			ClusterQCs:         commit.ClusterQCs,
+			DKGGroupKey:        commit.DKGGroupKey.Encode(),
+			DKGParticipantKeys: make([][]byte, 0, len(commit.DKGParticipantKeys)),
+		}
+		for _, key := range commit.DKGParticipantKeys {
+			rlpEncodable.DKGParticipantKeys = append(rlpEncodable.DKGParticipantKeys, key.Encode())
+		}
 
-	return rlp.Encode(w, rlpEncodable)
+		return rlp.Encode(w, rlpEncodable)
+	} else {
+		rlpEncodable := struct {
+			Counter            uint64
+			ClusterQCs         []ClusterQCVoteData
+			DKGGroupKey        []byte
+			DKGParticipantKeys [][]byte
+			DKGIndexMap        IdentifierList
+		}{
+			Counter:            commit.Counter,
+			ClusterQCs:         commit.ClusterQCs,
+			DKGGroupKey:        commit.DKGGroupKey.Encode(),
+			DKGParticipantKeys: make([][]byte, 0, len(commit.DKGParticipantKeys)),
+			DKGIndexMap:        make(IdentifierList, len(commit.DKGIndexMap)),
+		}
+		for _, key := range commit.DKGParticipantKeys {
+			rlpEncodable.DKGParticipantKeys = append(rlpEncodable.DKGParticipantKeys, key.Encode())
+		}
+		for id, index := range commit.DKGIndexMap {
+			rlpEncodable.DKGIndexMap[index] = id
+		}
+
+		return rlp.Encode(w, rlpEncodable)
+	}
 }
 
 // ID returns the hash of the event contents.
@@ -458,25 +482,24 @@ func (commit *EpochCommit) EqualTo(other *EpochCommit) bool {
 	return true
 }
 
-// ToDKGParticipantLookup constructs a DKG participant lookup from an identity
-// list and a key list. The identity list must be EXACTLY the same (order and
-// contents) as that used when initializing the corresponding DKG instance.
-// TODO(EFM, #6214): Once DKGIndexMap is populated we can remove this and use EpochCommit directly
-func ToDKGParticipantLookup(participants IdentitySkeletonList, keys []crypto.PublicKey) (map[Identifier]DKGParticipant, error) {
-	if len(participants) != len(keys) {
-		return nil, fmt.Errorf("participant list (len=%d) does not match key list (len=%d)", len(participants), len(keys))
-	}
+// EjectNode is a service event emitted when a node has to be ejected from the network.
+// The Dynamic Protocol State observes these events and updates the identity table accordingly.
+// It contains a single field which is the identifier of the node being ejected.
+type EjectNode struct {
+	NodeID Identifier
+}
 
-	lookup := make(map[Identifier]DKGParticipant, len(participants))
-	for i := 0; i < len(participants); i++ {
-		part := participants[i]
-		key := keys[i]
-		lookup[part.NodeID] = DKGParticipant{
-			Index:    uint(i),
-			KeyShare: key,
-		}
+// EqualTo returns true if the two events are equivalent.
+func (e *EjectNode) EqualTo(other *EjectNode) bool {
+	return e.NodeID == other.NodeID
+}
+
+// ServiceEvent returns the event as a generic ServiceEvent type.
+func (e *EjectNode) ServiceEvent() ServiceEvent {
+	return ServiceEvent{
+		Type:  ServiceEventEjectNode,
+		Event: e,
 	}
-	return lookup, nil
 }
 
 type DKGParticipant struct {

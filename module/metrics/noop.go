@@ -99,6 +99,7 @@ func (nc *NoopCollector) CurrentDKGPhaseViews(phase1FinalView, phase2FinalView, 
 }
 func (nc *NoopCollector) EpochFallbackModeTriggered()                                    {}
 func (nc *NoopCollector) EpochFallbackModeExited()                                       {}
+func (nc *NoopCollector) ProtocolStateVersion(version uint64)                            {}
 func (nc *NoopCollector) CacheEntries(resource string, entries uint)                     {}
 func (nc *NoopCollector) CacheHit(resource string)                                       {}
 func (nc *NoopCollector) CacheNotFound(resource string)                                  {}
@@ -167,6 +168,8 @@ func (nc *NoopCollector) ExecutionLastExecutedBlockHeight(height uint64)        
 func (nc *NoopCollector) ExecutionLastFinalizedExecutedBlockHeight(height uint64)              {}
 func (nc *NoopCollector) ExecutionBlockExecuted(_ time.Duration, _ module.BlockExecutionResultStats) {
 }
+func (nc *NoopCollector) ExecutionLastChunkDataPackPrunedHeight(height uint64) {}
+
 func (nc *NoopCollector) ExecutionCollectionExecuted(_ time.Duration, _ module.CollectionExecutionResultStats) {
 }
 func (nc *NoopCollector) ExecutionBlockExecutionEffortVectorComponent(_ string, _ uint) {}
