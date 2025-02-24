@@ -1,9 +1,9 @@
 package unittest
 
 import (
-	"github.com/onflow/crypto"
 	"testing"
 
+	"github.com/onflow/crypto"
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/model/flow"
