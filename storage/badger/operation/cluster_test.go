@@ -1,7 +1,6 @@
 package operation_test
 
 import (
-	"errors"
 	"fmt"
 	"math/rand"
 	"testing"
@@ -29,7 +28,7 @@ func TestClusterHeights(t *testing.T) {
 			var actual flow.Identifier
 			err = db.View(operation.LookupClusterBlockHeight(clusterID, height, &actual))
 			t.Log(err)
-			assert.True(t, errors.Is(err, storage.ErrNotFound))
+			assert.ErrorIs(t, err, storage.ErrNotFound)
 		})
 
 		t.Run("insert/retrieve", func(t *testing.T) {
@@ -50,7 +49,7 @@ func TestClusterHeights(t *testing.T) {
 
 				var actual flow.Identifier
 				err = db.View(operation.LookupClusterBlockHeight(clusterID, height, &actual))
-				assert.True(t, errors.Is(err, storage.ErrNotFound))
+				assert.ErrorIs(t, err, storage.ErrNotFound)
 
 				err = db.Update(operation.IndexClusterBlockHeight(clusterID, height, expected))
 				assert.Nil(t, err)
@@ -75,7 +74,7 @@ func TestClusterBoundaries(t *testing.T) {
 			var actual uint64
 			err = db.View(operation.RetrieveClusterFinalizedHeight(clusterID, &actual))
 			t.Log(err)
-			assert.True(t, errors.Is(err, storage.ErrNotFound))
+			assert.ErrorIs(t, err, storage.ErrNotFound)
 		})
 
 		t.Run("insert/retrieve", func(t *testing.T) {
@@ -99,7 +98,7 @@ func TestClusterBoundaries(t *testing.T) {
 
 				var actual uint64
 				err = db.View(operation.RetrieveClusterFinalizedHeight(clusterID, &actual))
-				assert.True(t, errors.Is(err, storage.ErrNotFound))
+				assert.ErrorIs(t, err, storage.ErrNotFound)
 
 				err = db.Update(operation.InsertClusterFinalizedHeight(clusterID, expected))
 				assert.Nil(t, err)

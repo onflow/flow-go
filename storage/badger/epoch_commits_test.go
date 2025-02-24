@@ -1,7 +1,6 @@
 package badger_test
 
 import (
-	"errors"
 	"testing"
 
 	"github.com/dgraph-io/badger/v2"
@@ -23,7 +22,7 @@ func TestEpochCommitStoreAndRetrieve(t *testing.T) {
 
 		// attempt to get a invalid commit
 		_, err := store.ByID(unittest.IdentifierFixture())
-		assert.True(t, errors.Is(err, storage.ErrNotFound))
+		assert.ErrorIs(t, err, storage.ErrNotFound)
 
 		// store a commit in db
 		expected := unittest.EpochCommitFixture()

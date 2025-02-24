@@ -10,7 +10,6 @@ import (
 	"testing"
 
 	"github.com/cockroachdb/pebble"
-	"github.com/pkg/errors"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -28,7 +27,7 @@ func TestRegisters_Initialize(t *testing.T) {
 	_, err := NewRegisters(p, PruningDisabled)
 	require.Error(t, err)
 	// verify the error type
-	require.True(t, errors.Is(err, storage.ErrNotBootstrapped))
+	require.ErrorIs(t, err, storage.ErrNotBootstrapped)
 	err = os.RemoveAll(dir)
 	require.NoError(t, err)
 }
@@ -355,7 +354,7 @@ func Benchmark_PayloadStorage(b *testing.B) {
 		// verify that the rest of the batches either do not exist or have a previous height
 		for j := batchSize; j < maxBatchSize+1; j++ {
 			value, err := s.Get(keyForBatchSize(j), uint64(i))
-			require.Nil(b, err)
+			require.NoError(b, err)
 
 			if len(value) > 0 {
 				ij := bytes.Split(value, []byte("-"))

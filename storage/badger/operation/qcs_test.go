@@ -16,11 +16,11 @@ func TestInsertQuorumCertificate(t *testing.T) {
 		expected := unittest.QuorumCertificateFixture()
 
 		err := db.Update(InsertQuorumCertificate(expected))
-		require.Nil(t, err)
+		require.NoError(t, err)
 
 		var actual flow.QuorumCertificate
 		err = db.View(RetrieveQuorumCertificate(expected.BlockID, &actual))
-		require.Nil(t, err)
+		require.NoError(t, err)
 
 		assert.Equal(t, expected, &actual)
 	})

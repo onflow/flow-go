@@ -16,11 +16,11 @@ func TestStateCommitments(t *testing.T) {
 		expected := unittest.StateCommitmentFixture()
 		id := unittest.IdentifierFixture()
 		err := db.Update(IndexStateCommitment(id, expected))
-		require.Nil(t, err)
+		require.NoError(t, err)
 
 		var actual flow.StateCommitment
 		err = db.View(LookupStateCommitment(id, &actual))
-		require.Nil(t, err)
+		require.NoError(t, err)
 		assert.Equal(t, expected, actual)
 	})
 }

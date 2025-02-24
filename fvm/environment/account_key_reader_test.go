@@ -90,7 +90,7 @@ func TestAccountKeyReader_get_out_of_range(t *testing.T) {
 
 	res, err := newDummyAccountKeyReader(t, 0).GetAccountKey(address, 1000)
 	// GetAccountKey should distinguish between an invalid index, and issues like failing to fetch a key from storage
-	require.Nil(t, err)
+	require.NoError(t, err)
 	require.Nil(t, res)
 }
 

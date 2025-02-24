@@ -137,7 +137,7 @@ func TestHandleChunkDataPack_HappyPath(t *testing.T) {
 	s.metrics.On("OnChunkDataPackSentToFetcher").Return().Once()
 
 	err := e.Process(channels.RequestChunks, originID, response)
-	require.Nil(t, err)
+	require.NoError(t, err)
 
 	testifymock.AssertExpectationsForObjects(t, s.con, s.handler, s.pendingRequests, s.metrics)
 }
@@ -166,7 +166,7 @@ func TestHandleChunkDataPack_HappyPath_Multiple(t *testing.T) {
 
 	for _, response := range responses {
 		err := e.Process(channels.RequestChunks, originID, response)
-		require.Nil(t, err)
+		require.NoError(t, err)
 	}
 
 	unittest.RequireReturnsBefore(t, handlerWG.Wait, 100*time.Millisecond, "could not handle chunk data responses on time")
@@ -192,7 +192,7 @@ func TestHandleChunkDataPack_FailedRequestRemoval(t *testing.T) {
 	s.metrics.On("OnChunkDataPackResponseReceivedFromNetworkByRequester").Return().Once()
 
 	err := e.Process(channels.RequestChunks, originID, response)
-	require.Nil(t, err)
+	require.NoError(t, err)
 
 	testifymock.AssertExpectationsForObjects(t, s.pendingRequests, s.con, s.metrics)
 	s.handler.AssertNotCalled(t, "HandleChunkDataPack")
@@ -366,7 +366,7 @@ func TestReceivingChunkDataResponseForDuplicateChunkRequests(t *testing.T) {
 	s.metrics.On("OnChunkDataPackSentToFetcher").Return().Twice()
 
 	err := e.Process(channels.RequestChunks, originID, responseA)
-	require.Nil(t, err)
+	require.NoError(t, err)
 
 	unittest.RequireReturnsBefore(t, handlerWG.Wait, time.Second, "could not handle chunk data responses on time")
 	testifymock.AssertExpectationsForObjects(t, s.con, s.metrics)
