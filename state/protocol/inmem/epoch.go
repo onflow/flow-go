@@ -115,7 +115,14 @@ func (es *setupEpoch) Clustering() (flow.ClusterList, error) {
 // ClusteringFromSetupEvent generates a new clustering list from Epoch setup data.
 // No errors expected during normal operation.
 func ClusteringFromSetupEvent(setupEvent *flow.EpochSetup) (flow.ClusterList, error) {
-	collectorFilter := filter.HasRole[flow.IdentitySkeleton](flow.RoleCollection)
+	// By convention, the Flow protocol accepts nodes with zero initial weight: those nodes are admitted into the network as spectators,
+	// but they can't actively contribute to any of the network functions. Specifically, collectors with zero weight cannot propose
+	// collections and neither would their votes count towards certifying collections. Consequently, zero-weighted collectors are not
+	// assigned to any cluster, and `factory.NewClusterList` function rejects inputs including such collectors. Instead, zero-weighted
+	// collectors should be dropped, before we call `factory.NewClusterList`.
+	collectorFilter := filter.And[flow.IdentitySkeleton](
+		filter.HasRole[flow.IdentitySkeleton](flow.RoleCollection),
+		filter.HasInitialWeight[flow.IdentitySkeleton](true))
 	clustering, err := factory.NewClusterList(setupEvent.Assignments, setupEvent.Participants.Filter(collectorFilter))
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate ClusterList from collector identities: %w", err)
