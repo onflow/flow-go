@@ -10,6 +10,7 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
+// TestMalleability performs sanity checks to ensure that epoch related entities are not malleable.
 func TestMalleability(t *testing.T) {
 	t.Run("EpochSetup", func(t *testing.T) {
 		unittest.RequireEntityNonMalleable(t, unittest.EpochSetupFixture())
@@ -18,16 +19,18 @@ func TestMalleability(t *testing.T) {
 		unittest.RequireEntityNonMalleable(t, unittest.EpochCommitFixture())
 	})
 
-	checker := unittest.NewMalleabilityChecker(t, unittest.WithCustomType(flow.DKGIndexMap{}, func() any {
+	checker := unittest.NewMalleabilityChecker(unittest.WithCustomType(flow.DKGIndexMap{}, func() any {
 		return flow.DKGIndexMap{unittest.IdentifierFixture(): 0, unittest.IdentifierFixture(): 1}
 	}))
 	t.Run("EpochCommit-v2", func(t *testing.T) {
-		checker.Check(unittest.EpochCommitFixture(func(commit *flow.EpochCommit) {
+		err := checker.Check(unittest.EpochCommitFixture(func(commit *flow.EpochCommit) {
 			commit.DKGIndexMap = flow.DKGIndexMap{unittest.IdentifierFixture(): 0, unittest.IdentifierFixture(): 1}
 		}))
+		require.NoError(t, err)
 	})
 	t.Run("EpochRecover", func(t *testing.T) {
-		checker.Check(unittest.EpochRecoverFixture())
+		err := checker.Check(unittest.EpochRecoverFixture())
+		require.NoError(t, err)
 	})
 }
 
