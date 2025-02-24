@@ -48,6 +48,10 @@ func NewEventsDataProvider(
 	eventFilterConfig state_stream.EventFilterConfig,
 	heartbeatInterval uint64,
 ) (*EventsDataProvider, error) {
+	if stateStreamApi == nil {
+		return nil, fmt.Errorf("this access node does not support streaming events")
+	}
+
 	p := &EventsDataProvider{
 		logger:            logger.With().Str("component", "events-data-provider").Logger(),
 		stateStreamApi:    stateStreamApi,

@@ -1001,17 +1001,8 @@ func (b *Blockchain) systemChunkTransaction() (*flowgo.TransactionBody, error) {
 		systemChunkTransactionTemplate,
 		templates.Environment{
 			RandomBeaconHistoryAddress: serviceAddress.Hex(),
+			EVMAddress:                 serviceAddress.Hex(),
 		},
-	)
-
-	// TODO: move this to `templates.Environment` struct
-	script = strings.ReplaceAll(
-		script,
-		`import EVM from "EVM"`,
-		fmt.Sprintf(
-			"import EVM from %s",
-			serviceAddress.HexWithPrefix(),
-		),
 	)
 
 	script = strings.ReplaceAll(

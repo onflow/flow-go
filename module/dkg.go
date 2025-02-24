@@ -32,12 +32,30 @@ type DKGContractClient interface {
 	// messages for that phase.
 	ReadBroadcast(fromIndex uint, referenceBlock flow.Identifier) ([]messages.BroadcastDKGMessage, error)
 
-	// SubmitResult submits the final public result of the DKG protocol. This
-	// represents the group public key and the node's local computation of the
-	// public keys for each DKG participant.
-	//
-	// SubmitResult must be called strictly after the final phase has ended.
-	SubmitResult(crypto.PublicKey, []crypto.PublicKey) error
+	// SubmitParametersAndResult posts the DKG setup parameters (`flow.DKGIndexMap`) and the node's locally-computed DKG result to
+	// the DKG white-board smart contract. The DKG results are the node's local computation of the group public key and the public
+	// key shares. Serialized public keys are encoded as lower-case hex strings.
+	// Conceptually the flow.DKGIndexMap is not an output of the DKG protocol. Rather, it is part of the configuration/initialization
+	// information of the DKG. Before an epoch transition on the happy path (using the data in the EpochSetup event), each consensus
+	// participant locally fixes the DKG committee 𝒟 including the respective nodes' order to be identical to the consensus
+	// committee 𝒞. However, in case of a failed epoch transition, we desire the ability to manually provide the result of a successful
+	// DKG for the immediately next epoch (so-called recovery epoch). The DKG committee 𝒟 must have a sufficiently large overlap with
+	// the recovery epoch's consensus committee 𝒞 -- though for flexibility, we do *not* want to require that both committees are identical.
+	// Therefore, we need to explicitly specify the DKG committee 𝒟 on the fallback path. For uniformity of implementation, we do the
+	// same also on the happy path.
+	SubmitParametersAndResult(indexMap flow.DKGIndexMap, groupPublicKey crypto.PublicKey, publicKeys []crypto.PublicKey) error
+
+	// SubmitEmptyResult submits an empty result of the DKG protocol.
+	// The empty result is obtained by a node when it realizes locally that its DKG participation
+	// was unsuccessful (possible reasons include: node received too many byzantine inputs;
+	// node has networking issues; locally computed key is invalid…). However, a node obtaining an
+	// empty result can happen in both cases of the DKG succeeding or failing globally.
+	// For further details, please see:
+	// https://flowfoundation.notion.site/Random-Beacon-2d61f3b3ad6e40ee9f29a1a38a93c99c
+	// Honest nodes would call `SubmitEmptyResult` strictly after the final phase has ended if DKG has ended.
+	// However, `SubmitEmptyResult` also supports implementing byzantine participants for testing that submit an
+	// empty result too early (intentional protocol violation), *before* the final DKG phase concluded.
+	SubmitEmptyResult() error
 }
 
 // DKGController controls the execution of a Joint Feldman DKG instance.

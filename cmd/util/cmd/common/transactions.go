@@ -11,7 +11,7 @@ import (
 
 const (
 	getInfoForProposedNodesScript = `
-		import FlowIDTableStaking from "FlowIDTableStaking"
+		import "FlowIDTableStaking"
 		access(all) fun main(): [FlowIDTableStaking.NodeInfo] {
 			let nodeIDs = FlowIDTableStaking.getProposedNodeIDs()
 		

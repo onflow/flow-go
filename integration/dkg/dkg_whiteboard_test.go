@@ -6,6 +6,8 @@ import (
 	"testing"
 	"time"
 
+	"golang.org/x/exp/slices"
+
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -89,7 +91,7 @@ func createNode(
 
 	// keyKeys is used to store the private key resulting from the node's
 	// participation in the DKG run
-	dkgState, err := badger.NewDKGState(core.Metrics, core.SecretsDB)
+	dkgState, err := badger.NewRecoverableRandomBeaconStateMachine(core.Metrics, core.SecretsDB, core.Me.NodeID())
 	require.NoError(t, err)
 
 	// configure the state snapshot at firstBlock to return the desired
@@ -162,13 +164,10 @@ func createNode(
 	// reactorEngine consumes the EpochSetupPhaseStarted event
 	core.ProtocolEvents.AddConsumer(reactorEngine)
 
-	safeBeaconKeys := badger.NewSafeBeaconPrivateKeys(dkgState)
-
 	node := node{
 		t:               t,
 		GenericNode:     core,
 		dkgState:        dkgState,
-		safeBeaconKeys:  safeBeaconKeys,
 		messagingEngine: messagingEngine,
 		reactorEngine:   reactorEngine,
 	}
@@ -193,6 +192,9 @@ func TestWithWhiteboard(t *testing.T) {
 	// we run the DKG protocol with N consensus nodes
 	N := 10
 	bootstrapNodesInfo := unittest.PrivateNodeInfosFixture(N, unittest.WithRole(flow.RoleConsensus))
+	slices.SortFunc(bootstrapNodesInfo, func(lhs, rhs bootstrap.NodeInfo) int {
+		return flow.IdentifierCanonical(lhs.NodeID, rhs.NodeID)
+	})
 	conIdentities := make(flow.IdentitySkeletonList, 0, len(bootstrapNodesInfo))
 	for _, identity := range bootstrapNodesInfo {
 		conIdentities = append(conIdentities, &identity.Identity().IdentitySkeleton)
@@ -292,9 +294,7 @@ func TestWithWhiteboard(t *testing.T) {
 	signatures := []crypto.Signature{}
 	indices := []int{}
 	for i, n := range nodes {
-
-		// TODO: to replace with safeBeaconKeys
-		beaconKey, err := n.dkgState.RetrieveMyBeaconPrivateKey(nextEpochSetup.Counter)
+		beaconKey, err := n.dkgState.UnsafeRetrieveMyBeaconPrivateKey(nextEpochSetup.Counter)
 		require.NoError(t, err)
 
 		signature, err := beaconKey.Sign(sigData, hasher)

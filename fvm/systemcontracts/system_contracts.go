@@ -50,8 +50,8 @@ const (
 	// AccountNameEVMStorage is not a contract, but a special account that is used to store EVM state
 	AccountNameEVMStorage = "EVMStorageAccount"
 	// AccountNameExecutionParametersAccount is not a contract, but a special account that is used to store execution parameters
-	// This is generally just the service account. For mainnet and testnet, it is a separate account,
-	// in order to separate it away from the frequently changing data on the service account.
+	// It is a separate account on all networks in order to separate it away
+	// from the frequently changing data on the service account.
 	AccountNameExecutionParametersAccount = "ExecutionParametersAccount"
 
 	// Unqualified names of service events (not including address prefix or contract name)
@@ -204,6 +204,7 @@ func (c SystemContracts) AsTemplateEnv() templates.Environment {
 		NodeVersionBeaconAddress:   c.NodeVersionBeacon.Address.Hex(),
 		RandomBeaconHistoryAddress: c.RandomBeaconHistory.Address.Hex(),
 		StorageFeesAddress:         c.FlowStorageFees.Address.Hex(),
+		EVMAddress:                 c.EVMContract.Address.Hex(),
 
 		FlowFeesAddress:                   c.FlowFees.Address.Hex(),
 		FlowTokenAddress:                  c.FlowToken.Address.Hex(),
@@ -370,7 +371,7 @@ func init() {
 		case flow.Testnet:
 			return executionParametersAddressTestnet
 		default:
-			return serviceAddressFunc(chain)
+			return nthAddressFunc(FungibleTokenAccountIndex)(chain)
 		}
 	}
 

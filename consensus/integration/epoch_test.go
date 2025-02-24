@@ -119,7 +119,7 @@ func TestEpochTransition_IdentitiesOverlap(t *testing.T) {
 		newIdentity,
 	)
 
-	// generate new identities for next epoch, it will generate new DKG keys for random beacon participants
+	// generate new identities for next epoch, it will generate new Random Beacon keys for random beacon participants
 	nextEpochParticipantData := completeConsensusIdentities(t, privateNodeInfos[1:])
 	rootSnapshot = withNextEpoch(t, rootSnapshot, nextEpochIdentities, nextEpochParticipantData, consensusParticipants, 4, func(block *flow.Block) *flow.QuorumCertificate {
 		return createRootQC(t, block, firstEpochConsensusParticipants)
@@ -229,11 +229,13 @@ func withNextEpoch(
 		Participants: nextEpochIdentities.ToSkeleton(),
 		Assignments:  unittest.ClusterAssignment(1, nextEpochIdentities.ToSkeleton()),
 	}
+	dkgIndexMap, dkgParticipantKeys := nextEpochParticipantData.DKGData()
 	nextEpochCommit := &flow.EpochCommit{
 		Counter:            nextEpochSetup.Counter,
 		ClusterQCs:         currEpochCommit.ClusterQCs,
-		DKGParticipantKeys: nextEpochParticipantData.PublicBeaconKeys(),
-		DKGGroupKey:        nextEpochParticipantData.GroupKey,
+		DKGParticipantKeys: dkgParticipantKeys,
+		DKGGroupKey:        nextEpochParticipantData.DKGGroupKey,
+		DKGIndexMap:        dkgIndexMap,
 	}
 
 	// Construct the new min epoch state entry
@@ -270,7 +272,7 @@ func withNextEpoch(
 
 	// Store the modified epoch protocol state entry and corresponding KV store entry
 	rootKVStore, err := kvstore.NewDefaultKVStore(
-		originalRootKVStore.GetEpochCommitSafetyThreshold(),
+		originalRootKVStore.GetFinalizationSafetyThreshold(),
 		originalRootKVStore.GetEpochExtensionViewCount(),
 		epochRichProtocolState.ID())
 	require.NoError(t, err)

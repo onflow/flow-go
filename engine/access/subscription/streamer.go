@@ -75,12 +75,15 @@ func (s *Streamer) Stream(ctx context.Context) {
 		err := s.sendAllAvailable(ctx)
 
 		if err != nil {
-			//TODO: The functionality to graceful shutdown on demand should be improved with https://github.com/onflow/flow-go/issues/5561
+			// TODO: The functionality to graceful shutdown on demand should be improved with https://github.com/onflow/flow-go/issues/5561
 			if errors.Is(err, ErrEndOfData) {
 				s.sub.Close()
 				return
 			}
-
+			if errors.Is(err, context.Canceled) {
+				s.sub.Fail(fmt.Errorf("client disconnected: %w", ctx.Err()))
+				return
+			}
 			s.log.Err(err).Msg("error sending response")
 			s.sub.Fail(err)
 			return

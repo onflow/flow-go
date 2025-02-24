@@ -3,7 +3,7 @@ package websockets
 import (
 	"fmt"
 
-	"github.com/google/uuid"
+	randutils "github.com/onflow/flow-go/utils/rand"
 )
 
 const maxLen = 20
@@ -17,12 +17,17 @@ type SubscriptionID struct {
 }
 
 // NewSubscriptionID creates a new SubscriptionID based on the provided input.
-// - If the input `id` is empty, a new UUID is generated and returned.
+// - If the input `id` is empty, a random ID is generated and returned.
 // - If the input `id` is non-empty, it is validated and returned if no errors.
 func NewSubscriptionID(id string) (SubscriptionID, error) {
 	if len(id) == 0 {
+		randomString, err := randutils.GenerateRandomString(maxLen)
+		if err != nil {
+			return SubscriptionID{}, fmt.Errorf("could not generate subscription ID: %w", err)
+		}
+
 		return SubscriptionID{
-			id: uuid.New().String(),
+			id: randomString,
 		}, nil
 	}
 

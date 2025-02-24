@@ -1,5 +1,5 @@
-import RandomBeaconHistory from "RandomBeaconHistory"
-import EVM from "EVM"
+import "RandomBeaconHistory"
+import "EVM"
 import Migration from "Migration"
 
 transaction {

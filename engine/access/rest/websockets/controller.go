@@ -315,20 +315,22 @@ func (c *Controller) readMessages(ctx context.Context) error {
 				return err
 			}
 
+			err = fmt.Errorf("error reading message: %w", err)
 			c.writeErrorResponse(
 				ctx,
 				err,
-				wrapErrorMessage(http.StatusBadRequest, "error reading message", "", ""),
+				wrapErrorMessage(http.StatusBadRequest, err.Error(), "", ""),
 			)
 			continue
 		}
 
 		err := c.handleMessage(ctx, message)
 		if err != nil {
+			err = fmt.Errorf("error parsing message: %w", err)
 			c.writeErrorResponse(
 				ctx,
 				err,
-				wrapErrorMessage(http.StatusBadRequest, "error parsing message", "", ""),
+				wrapErrorMessage(http.StatusBadRequest, err.Error(), "", ""),
 			)
 			continue
 		}
@@ -374,11 +376,11 @@ func (c *Controller) handleMessage(ctx context.Context, message json.RawMessage)
 func (c *Controller) handleSubscribe(ctx context.Context, msg models.SubscribeMessageRequest) {
 	subscriptionID, err := c.parseOrCreateSubscriptionID(msg.SubscriptionID)
 	if err != nil {
+		err = fmt.Errorf("error parsing subscription id: %w", err)
 		c.writeErrorResponse(
 			ctx,
 			err,
-			wrapErrorMessage(http.StatusBadRequest, "error parsing subscription id",
-				models.SubscribeAction, msg.SubscriptionID),
+			wrapErrorMessage(http.StatusBadRequest, err.Error(), models.SubscribeAction, msg.SubscriptionID),
 		)
 		return
 	}
@@ -386,11 +388,11 @@ func (c *Controller) handleSubscribe(ctx context.Context, msg models.SubscribeMe
 	// register new provider
 	provider, err := c.dataProviderFactory.NewDataProvider(ctx, subscriptionID.String(), msg.Topic, msg.Arguments, c.multiplexedStream)
 	if err != nil {
+		err = fmt.Errorf("error creating data provider: %w", err)
 		c.writeErrorResponse(
 			ctx,
 			err,
-			wrapErrorMessage(http.StatusBadRequest, "error creating data provider",
-				models.SubscribeAction, subscriptionID.String()),
+			wrapErrorMessage(http.StatusBadRequest, err.Error(), models.SubscribeAction, subscriptionID.String()),
 		)
 		return
 	}
@@ -400,6 +402,7 @@ func (c *Controller) handleSubscribe(ctx context.Context, msg models.SubscribeMe
 	responseOk := models.SubscribeMessageResponse{
 		BaseMessageResponse: models.BaseMessageResponse{
 			SubscriptionID: subscriptionID.String(),
+			Action:         models.SubscribeAction,
 		},
 	}
 	c.writeResponse(ctx, responseOk)
@@ -409,10 +412,11 @@ func (c *Controller) handleSubscribe(ctx context.Context, msg models.SubscribeMe
 	go func() {
 		err = provider.Run()
 		if err != nil {
+			err = fmt.Errorf("internal error: %w", err)
 			c.writeErrorResponse(
 				ctx,
 				err,
-				wrapErrorMessage(http.StatusInternalServerError, "internal error",
+				wrapErrorMessage(http.StatusInternalServerError, err.Error(),
 					models.SubscribeAction, subscriptionID.String()),
 			)
 		}
@@ -425,11 +429,11 @@ func (c *Controller) handleSubscribe(ctx context.Context, msg models.SubscribeMe
 func (c *Controller) handleUnsubscribe(ctx context.Context, msg models.UnsubscribeMessageRequest) {
 	subscriptionID, err := ParseClientSubscriptionID(msg.SubscriptionID)
 	if err != nil {
+		err = fmt.Errorf("error parsing subscription id: %w", err)
 		c.writeErrorResponse(
 			ctx,
 			err,
-			wrapErrorMessage(http.StatusBadRequest, "error parsing subscription id",
-				models.UnsubscribeAction, msg.SubscriptionID),
+			wrapErrorMessage(http.StatusBadRequest, err.Error(), models.UnsubscribeAction, msg.SubscriptionID),
 		)
 		return
 	}
@@ -451,6 +455,7 @@ func (c *Controller) handleUnsubscribe(ctx context.Context, msg models.Unsubscri
 	responseOk := models.UnsubscribeMessageResponse{
 		BaseMessageResponse: models.BaseMessageResponse{
 			SubscriptionID: subscriptionID.String(),
+			Action:         models.UnsubscribeAction,
 		},
 	}
 	c.writeResponse(ctx, responseOk)

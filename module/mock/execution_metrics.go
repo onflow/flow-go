@@ -86,6 +86,11 @@ func (_m *ExecutionMetrics) ExecutionComputationResultUploaded() {
 	_m.Called()
 }
 
+// ExecutionLastChunkDataPackPrunedHeight provides a mock function with given fields: height
+func (_m *ExecutionMetrics) ExecutionLastChunkDataPackPrunedHeight(height uint64) {
+	_m.Called(height)
+}
+
 // ExecutionLastExecutedBlockHeight provides a mock function with given fields: height
 func (_m *ExecutionMetrics) ExecutionLastExecutedBlockHeight(height uint64) {
 	_m.Called(height)

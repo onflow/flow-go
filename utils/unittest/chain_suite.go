@@ -42,6 +42,9 @@ type BaseChainSuite struct {
 	SealedSnapshot *protocol.Snapshot
 	FinalSnapshot  *protocol.Snapshot
 
+	KVStoreReader        *protocol.KVStoreReader
+	ProtocolStateVersion uint64
+
 	// MEMPOOLS and STORAGE which are injected into Matching Engine
 	// mock storage.ExecutionReceipts: backed by in-memory map PersistedReceipts
 	ReceiptsDB *storage.ExecutionReceipts
@@ -73,7 +76,7 @@ func (bc *BaseChainSuite) SetupChain() {
 
 	// ~~~~~~~~~~~~~~~~~~~~~~~~~~ SETUP IDENTITIES ~~~~~~~~~~~~~~~~~~~~~~~~~~ //
 
-	// asign node Identities
+	// assign node Identities
 	con := IdentityFixture(WithRole(flow.RoleConsensus))
 	exe := IdentityFixture(WithRole(flow.RoleExecution))
 	ver := IdentityFixture(WithRole(flow.RoleVerification))
@@ -110,6 +113,10 @@ func (bc *BaseChainSuite) SetupChain() {
 	// ~~~~~~~~~~~~~~~~~~~~~~~~ SETUP PROTOCOL STATE ~~~~~~~~~~~~~~~~~~~~~~~~ //
 	bc.State = &protocol.State{}
 
+	bc.KVStoreReader = &protocol.KVStoreReader{}
+	bc.ProtocolStateVersion = 2 // default to latest version
+	bc.KVStoreReader.On("GetProtocolStateVersion").Return(func() uint64 { return bc.ProtocolStateVersion })
+
 	// define the protocol state snapshot of the latest finalized block
 	bc.State.On("Final").Return(
 		func() realproto.Snapshot {
@@ -124,6 +131,7 @@ func (bc *BaseChainSuite) SetupChain() {
 		},
 		nil,
 	)
+	bc.FinalSnapshot.On("ProtocolState").Return(bc.KVStoreReader, nil)
 	bc.FinalSnapshot.On("SealedResult").Return(
 		func() *flow.ExecutionResult {
 			blockID := bc.LatestFinalizedBlock.ID()
@@ -167,6 +175,7 @@ func (bc *BaseChainSuite) SetupChain() {
 		nil,
 	)
 	bc.SealedSnapshot = &protocol.Snapshot{}
+	bc.SealedSnapshot.On("ProtocolState").Return(bc.KVStoreReader, nil)
 	bc.SealedSnapshot.On("Head").Return(
 		func() *flow.Header {
 			return bc.LatestSealedBlock.Header
@@ -190,7 +199,9 @@ func (bc *BaseChainSuite) SetupChain() {
 			if !found {
 				return StateSnapshotForUnknownBlock()
 			}
-			return StateSnapshotForKnownBlock(block.Header, bc.Identities)
+			snapshot := StateSnapshotForKnownBlock(block.Header, bc.Identities)
+			snapshot.On("ProtocolState").Return(bc.KVStoreReader, nil)
+			return snapshot
 		},
 	)
 
@@ -205,6 +216,7 @@ func (bc *BaseChainSuite) SetupChain() {
 					},
 					nil,
 				)
+				snapshot.On("ProtocolState").Return(bc.KVStoreReader, nil)
 				return snapshot
 			}
 			panic(fmt.Sprintf("unknown height: %v, final: %v, sealed: %v", height, bc.LatestFinalizedBlock.Header.Height, bc.LatestSealedBlock.Header.Height))
@@ -581,4 +593,11 @@ func (bc *BaseChainSuite) AddSubgraphFixtureToMempools(subgraph subgraphFixture)
 	bc.PersistedResults[subgraph.PreviousResult.ID()] = subgraph.PreviousResult
 	bc.PersistedResults[subgraph.Result.ID()] = subgraph.Result
 	bc.Assigner.On("Assign", subgraph.IncorporatedResult.Result, subgraph.IncorporatedResult.IncorporatedBlockID).Return(subgraph.Assignment, nil).Maybe()
+}
+
+// MockProtocolStateVersion mocks the given protocol state version on the snapshot.
+func MockProtocolStateVersion(snapshot *protocol.Snapshot, version uint64) {
+	kvstore := &protocol.KVStoreReader{}
+	kvstore.On("GetProtocolStateVersion").Return(version)
+	snapshot.On("ProtocolState").Return(kvstore, nil)
 }

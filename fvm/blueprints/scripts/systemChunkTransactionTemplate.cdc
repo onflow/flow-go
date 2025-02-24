@@ -1,7 +1,7 @@
-import FlowEpoch from "FlowEpoch"
-import NodeVersionBeacon from "NodeVersionBeacon"
-import RandomBeaconHistory from "RandomBeaconHistory"
-import EVM from "EVM"
+import "FlowEpoch"
+import "NodeVersionBeacon"
+import "RandomBeaconHistory"
+import "EVM"
 import Migration from "Migration"
 
 transaction {

@@ -141,11 +141,6 @@ var IsVotingConsensusCommitteeMember = And[flow.Identity](
 	Adapt(IsConsensusCommitteeMember), // enforces 2.
 )
 
-// IsValidDKGParticipant is an identity filter for all DKG participants. It is
-// equivalent to the filter for consensus committee members, as these are
-// the same group for now.
-var IsValidDKGParticipant = IsConsensusCommitteeMember
-
 // NotEjectedFilter is an identity filter for peers that are not ejected.
 var NotEjectedFilter = Not(HasParticipationStatus(flow.EpochParticipationStatusEjected))
 
