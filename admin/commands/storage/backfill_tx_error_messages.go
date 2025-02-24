@@ -155,7 +155,7 @@ func (b *BackfillTxErrorMessagesCommand) Handler(ctx context.Context, request *a
 		}
 
 		blockID := header.ID()
-		err = b.txErrorMessagesCore.HandleTransactionResultErrorMessagesByENs(ctx, blockID, data.executionNodeIds)
+		err = b.txErrorMessagesCore.HandleTransactionResultErrorMessages(ctx, blockID)
 		if err != nil {
 			return nil, fmt.Errorf("error encountered while processing transaction result error message for block: %d, %w", height, err)
 		}

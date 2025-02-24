@@ -19,7 +19,6 @@ import (
 	accessmock "github.com/onflow/flow-go/engine/access/mock"
 	"github.com/onflow/flow-go/engine/access/rpc/backend"
 	connectionmock "github.com/onflow/flow-go/engine/access/rpc/connection/mock"
-	commonrpc "github.com/onflow/flow-go/engine/common/rpc"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/state/protocol/invalid"
@@ -124,35 +123,29 @@ func (suite *BackfillTxErrorMessagesSuite) SetupTest() {
 	// create a mock connection factory
 	suite.connFactory = connectionmock.NewConnectionFactory(suite.T())
 
-	executionNodeIdentitiesProvider := commonrpc.NewExecutionNodeIdentitiesProvider(
-		suite.log,
-		suite.state,
-		suite.receipts,
-		nil,
-		nil,
-	)
-
 	var err error
 	suite.backend, err = backend.New(backend.Params{
-		State:                      suite.state,
-		ExecutionReceipts:          suite.receipts,
-		ConnFactory:                suite.connFactory,
-		MaxHeightRange:             backend.DefaultMaxHeightRange,
-		Log:                        suite.log,
-		SnapshotHistoryLimit:       backend.DefaultSnapshotHistoryLimit,
-		Communicator:               backend.NewNodeCommunicator(false),
-		ScriptExecutionMode:        backend.IndexQueryModeExecutionNodesOnly,
-		TxResultQueryMode:          backend.IndexQueryModeExecutionNodesOnly,
-		ChainID:                    flow.Testnet,
-		ExecNodeIdentitiesProvider: executionNodeIdentitiesProvider,
+		State:                suite.state,
+		ExecutionReceipts:    suite.receipts,
+		ConnFactory:          suite.connFactory,
+		MaxHeightRange:       backend.DefaultMaxHeightRange,
+		Log:                  suite.log,
+		SnapshotHistoryLimit: backend.DefaultSnapshotHistoryLimit,
+		Communicator:         backend.NewNodeCommunicator(false),
+		ScriptExecutionMode:  backend.IndexQueryModeExecutionNodesOnly,
+		TxResultQueryMode:    backend.IndexQueryModeExecutionNodesOnly,
+		ChainID:              flow.Testnet,
 	})
 	require.NoError(suite.T(), err)
 
 	suite.txResultErrorMessagesCore = tx_error_messages.NewTxErrorMessagesCore(
 		suite.log,
+		suite.state,
 		suite.backend,
+		suite.receipts,
 		suite.txErrorMessages,
-		executionNodeIdentitiesProvider,
+		nil,
+		nil,
 	)
 
 	suite.command = NewBackfillTxErrorMessagesCommand(

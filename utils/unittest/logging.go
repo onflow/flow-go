@@ -41,7 +41,6 @@ func LoggerWithWriterAndLevel(writer io.Writer, level zerolog.Level) zerolog.Log
 	return log
 }
 
-// go:noinline
 func LoggerForTest(t *testing.T, level zerolog.Level) zerolog.Logger {
 	_, file, _, ok := runtime.Caller(1)
 	if !ok {
