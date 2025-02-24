@@ -221,6 +221,7 @@ func (c *Controller) configureKeepalive() error {
 // and avoid timeouts.
 func (c *Controller) keepalive(ctx context.Context) error {
 	defer func() {
+		// gracefully handle panics from github.com/gorilla/websocket
 		if r := recover(); r != nil {
 			c.logger.Warn().Interface("recovered_context", r).Msg("keepalive routine recovered from panic")
 		}
@@ -253,6 +254,7 @@ func (c *Controller) keepalive(ctx context.Context) error {
 // the connection will be closed.
 func (c *Controller) writeMessages(ctx context.Context) error {
 	defer func() {
+		// gracefully handle panics from github.com/gorilla/websocket
 		if r := recover(); r != nil {
 			c.logger.Warn().Interface("recovered_context", r).Msg("writer routine recovered from panic")
 		}
@@ -321,6 +323,7 @@ func (c *Controller) inactivityTickerPeriod() time.Duration {
 // validates each message, and processes it based on the message type.
 func (c *Controller) readMessages(ctx context.Context) error {
 	defer func() {
+		// gracefully handle panics from github.com/gorilla/websocket
 		if r := recover(); r != nil {
 			c.logger.Warn().Interface("recovered_context", r).Msg("reader routine recovered from panic")
 		}
