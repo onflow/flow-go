@@ -53,13 +53,12 @@ type transactionSubscriptionMetadata struct {
 //
 // No errors expected during normal operations.
 func newTransactionSubscriptionMetadata(
-	ctx context.Context,
 	backendTransactions *backendTransactions,
 	txID flow.Identifier,
 	txReferenceBlockID flow.Identifier,
 	eventEncodingVersion entities.EventEncodingVersion,
-) (*transactionSubscriptionMetadata, error) {
-	txMetadata := &transactionSubscriptionMetadata{
+) *transactionSubscriptionMetadata {
+	return &transactionSubscriptionMetadata{
 		backendTransactions:  backendTransactions,
 		txResult:             &access.TransactionResult{TransactionID: txID},
 		eventEncodingVersion: eventEncodingVersion,
@@ -68,8 +67,6 @@ func newTransactionSubscriptionMetadata(
 		transactions:         backendTransactions.transactions,
 		txReferenceBlockID:   txReferenceBlockID,
 	}
-
-	return txMetadata, nil
 }
 
 // Refresh updates the transaction subscription metadata to reflect the latest state.
@@ -79,24 +76,20 @@ func newTransactionSubscriptionMetadata(
 //   - height: The block height used for searching transaction data.
 //
 // Expected errors during normal operation:
-//   - `ErrBlockNotReady` if the block at the given height is not found.
+//   - [ErrBlockNotReady] if the block at the given height is not found.
 func (tm *transactionSubscriptionMetadata) Refresh(ctx context.Context) error {
 	if err := tm.refreshCollection(); err != nil {
 		return err
 	}
-
 	if err := tm.refreshBlock(); err != nil {
 		return err
 	}
-
 	if err := tm.refreshTransactionResult(ctx); err != nil {
 		return err
 	}
-
 	if err := tm.refreshStatus(ctx); err != nil {
 		return err
 	}
-
 	return nil
 }
 
@@ -118,9 +111,7 @@ func (tm *transactionSubscriptionMetadata) refreshTransactionReferenceBlockID() 
 	if err != nil {
 		return fmt.Errorf("failed to lookup transaction by transaction ID: %w", err)
 	}
-
 	tm.txReferenceBlockID = tx.ReferenceBlockID
-
 	return nil
 }
 
@@ -186,14 +177,13 @@ func (tm *transactionSubscriptionMetadata) refreshBlock() error {
 	tm.blockWithTx = block.Header
 	tm.txResult.BlockID = block.ID()
 	tm.txResult.BlockHeight = block.Header.Height
-
 	return nil
 }
 
 // refreshCollection updates the collection metadata if the transaction is included in a block.
 //
 // Expected errors during normal operation:
-//   - `ErrTransactionNotInBlock` if the transaction is not found in the block.
+//   - [ErrTransactionNotInBlock] if the transaction is not found in the block.
 func (tm *transactionSubscriptionMetadata) refreshCollection() error {
 	if tm.txResult.CollectionID != flow.ZeroID {
 		return nil
@@ -204,12 +194,9 @@ func (tm *transactionSubscriptionMetadata) refreshCollection() error {
 		if errors.Is(err, storage.ErrNotFound) {
 			return nil
 		}
-
 		return fmt.Errorf("failed to lookup collection containing tx: %w", err)
 	}
-
 	tm.txResult.CollectionID = collection.ID()
-
 	return nil
 }
 
@@ -219,7 +206,7 @@ func (tm *transactionSubscriptionMetadata) refreshCollection() error {
 //   - ctx: Context for managing the operation lifecycle.
 //
 // Expected errors during normal operation:
-//   - `codes.NotFound` if the transaction result is unavailable.
+//   - [codes.NotFound] if the transaction result is unavailable.
 func (tm *transactionSubscriptionMetadata) refreshTransactionResult(ctx context.Context) error {
 	// skip check if we already have the result, or if we don't know which block it is in yet
 	if tm.blockWithTx == nil || tm.txResult.IsExecuted() {
@@ -231,14 +218,12 @@ func (tm *transactionSubscriptionMetadata) refreshTransactionResult(ctx context.
 	if err != nil {
 		// If any error occurs with local storage - request transaction result from EN
 		txResult, err = tm.backendTransactions.GetTransactionResultFromExecutionNode(ctx, tm.blockWithTx, tm.txResult.TransactionID, tm.eventEncodingVersion)
-
 		if err != nil {
 			// if either the execution node reported no results
 			if status.Code(err) == codes.NotFound {
 				// No result yet, indicate that it has not been executed
 				return nil
 			}
-
 			return fmt.Errorf("failed to get transaction result from execution node: %w", err)
 		}
 	}
