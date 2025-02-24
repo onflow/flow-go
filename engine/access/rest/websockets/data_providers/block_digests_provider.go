@@ -61,21 +61,19 @@ func NewBlockDigestsDataProvider(
 //
 // No errors are expected during normal operations.
 func (p *BlockDigestsDataProvider) Run() error {
-	return subscription.HandleSubscription(
+	return run(
+		p.closedChan,
 		p.subscription,
-		subscription.HandleResponse(p.send, func(b *flow.BlockDigest) (interface{}, error) {
-			var block models.BlockDigest
-			block.Build(b)
+		func(b *flow.BlockDigest) error {
+			var blockDigest models.BlockDigest
+			blockDigest.Build(b)
 
 			var response models.BaseDataProvidersResponse
-			response.Build(
-				p.ID(),
-				p.Topic(),
-				&block,
-			)
+			response.Build(p.ID(), p.Topic(), &blockDigest)
+			p.send <- &response
 
-			return &response, nil
-		}),
+			return nil
+		},
 	)
 }
 
