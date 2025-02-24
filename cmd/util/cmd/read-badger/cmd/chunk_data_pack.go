@@ -21,12 +21,12 @@ var flagChunkID string
 func init() {
 	rootCmd.AddCommand(chunkDataPackCmd)
 
-	chunkDataPackCmd.Flags().StringVarP(&flagChunkID, "chunk-id", "c", "", "the id of the chunk")
-	_ = chunkDataPackCmd.MarkFlagRequired("chunk-id")
+	chunkDataPackCmd.Flags().StringVarP(&flagChunkID, "id", "c", "", "the id of the chunk")
+	_ = chunkDataPackCmd.MarkFlagRequired("id")
 }
 
 var chunkDataPackCmd = &cobra.Command{
-	Use:   "chunk-data",
+	Use:   "chunk-data-packs",
 	Short: "get chunk data pack by chunk ID",
 	Run: func(cmd *cobra.Command, args []string) {
 		err := WithBadgerAndPebble(func(bdb *badger.DB, pdb *pebble.DB) error {
@@ -39,7 +39,7 @@ var chunkDataPackCmd = &cobra.Command{
 			metrics := metrics.NewNoopCollector()
 			collections := badgerstorage.NewCollections(bdb, badgerstorage.NewTransactions(metrics, bdb))
 			chunkDataPacks := store.NewChunkDataPacks(metrics,
-				pebbleimpl.ToDB(pdb), collections, 0)
+				pebbleimpl.ToDB(pdb), collections, 1)
 
 			log.Info().Msgf("getting chunk data pack by chunk id: %v", chunkID)
 			chunkDataPack, err := chunkDataPacks.ByChunkID(chunkID)
