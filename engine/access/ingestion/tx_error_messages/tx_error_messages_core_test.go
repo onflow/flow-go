@@ -149,6 +149,7 @@ func (s *TxErrorMessagesCoreSuite) TestHandleTransactionResultErrorMessages() {
 	// Mock the txErrorMessages storage to confirm that error messages exist.
 	s.txErrorMessages.On("Exists", blockId).
 		Return(true, nil).Once()
+	s.proto.state.On("AtBlockID", blockId).Return(s.proto.snapshot).Once()
 	err = core.HandleTransactionResultErrorMessages(irrecoverableCtx, blockId)
 	require.NoError(s.T(), err)
 

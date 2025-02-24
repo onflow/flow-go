@@ -64,15 +64,6 @@ func NewTxErrorMessagesCore(
 //
 // No errors are expected during normal operation.
 func (c *TxErrorMessagesCore) HandleTransactionResultErrorMessages(ctx context.Context, blockID flow.Identifier) error {
-	exists, err := c.transactionResultErrorMessages.Exists(blockID)
-	if err != nil {
-		return fmt.Errorf("could not check existance of transaction result error messages: %w", err)
-	}
-
-	if exists {
-		return nil
-	}
-
 	// retrieves error messages from the backend if they do not already exist in storage
 	execNodes, err := commonrpc.ExecutionNodesForBlockID(
 		ctx,
@@ -88,6 +79,24 @@ func (c *TxErrorMessagesCore) HandleTransactionResultErrorMessages(ctx context.C
 		return fmt.Errorf("could not find execution nodes for block: %w", err)
 	}
 
+	return c.HandleTransactionResultErrorMessagesByENs(ctx, blockID, execNodes)
+}
+
+func (c *TxErrorMessagesCore) HandleTransactionResultErrorMessagesByENs(
+	ctx context.Context,
+	blockID flow.Identifier,
+	execNodes flow.IdentitySkeletonList,
+) error {
+	exists, err := c.transactionResultErrorMessages.Exists(blockID)
+	if err != nil {
+		return fmt.Errorf("could not check existance of transaction result error messages: %w", err)
+	}
+
+	if exists {
+		return nil
+	}
+
+	// retrieves error messages from the backend if they do not already exist in storage
 	req := &execproto.GetTransactionErrorMessagesByBlockIDRequest{
 		BlockId: convert.IdentifierToMessage(blockID),
 	}
