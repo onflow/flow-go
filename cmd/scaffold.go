@@ -83,6 +83,7 @@ import (
 	"github.com/onflow/flow-go/storage"
 	bstorage "github.com/onflow/flow-go/storage/badger"
 	"github.com/onflow/flow-go/storage/badger/operation"
+	"github.com/onflow/flow-go/storage/operation/badgerimpl"
 	sutil "github.com/onflow/flow-go/storage/util"
 	"github.com/onflow/flow-go/utils/logging"
 )
@@ -167,7 +168,8 @@ func (fnb *FlowNodeBuilder) BaseFlags() {
 	fnb.flags.StringVar(&fnb.BaseConfig.BindAddr, "bind", defaultConfig.BindAddr, "address to bind on")
 	fnb.flags.StringVarP(&fnb.BaseConfig.BootstrapDir, "bootstrapdir", "b", defaultConfig.BootstrapDir, "path to the bootstrap directory")
 	fnb.flags.StringVarP(&fnb.BaseConfig.datadir, "datadir", "d", defaultConfig.datadir, "directory to store the public database (protocol state)")
-	fnb.flags.StringVar(&fnb.BaseConfig.pebbleDir, "pebble-dir", defaultConfig.pebbleDir, "directory to store the public pebble database (protocol state)")
+	fnb.flags.StringVar(&fnb.BaseConfig.pebbleDir, "pebbledir", defaultConfig.pebbleDir, "directory to store the public pebble database (protocol state)")
+	fnb.flags.StringVar(&fnb.BaseConfig.protocolDBType, "protocoldb-type", defaultConfig.protocolDBType, "the database to store protocol state (badger/pebble)")
 	fnb.flags.StringVar(&fnb.BaseConfig.secretsdir, "secretsdir", defaultConfig.secretsdir, "directory to store private database (secrets)")
 	fnb.flags.StringVarP(&fnb.BaseConfig.level, "loglevel", "l", defaultConfig.level, "level for logging output")
 	fnb.flags.Uint32Var(&fnb.BaseConfig.debugLogLimit, "debug-log-limit", defaultConfig.debugLogLimit, "max number of debug/trace log events per second")
@@ -1119,7 +1121,7 @@ func (fnb *FlowNodeBuilder) initBadgerDB() error {
 	fnb.DB = publicDB
 
 	fnb.ShutdownFunc(func() error {
-		if err := fnb.DB.Close(); err != nil {
+		if err := publicDB.Close(); err != nil {
 			return fmt.Errorf("error closing protocol database: %w", err)
 		}
 		return nil
@@ -1147,6 +1149,11 @@ func (fnb *FlowNodeBuilder) initPebbleDB() error {
 
 	fnb.PebbleDB = db
 	fnb.ShutdownFunc(closer.Close)
+	return nil
+}
+
+func (fnb *FlowNodeBuilder) initProtocolDB(bdb *badger.DB, pdb *pebble.DB) error {
+	fnb.ProtocolDB = badgerimpl.ToDB(bdb)
 	return nil
 }
 
@@ -2121,6 +2128,10 @@ func (fnb *FlowNodeBuilder) onStart() error {
 	}
 
 	if err := fnb.initPebbleDB(); err != nil {
+		return err
+	}
+
+	if err := fnb.initProtocolDB(fnb.DB, fnb.PebbleDB); err != nil {
 		return err
 	}
 
