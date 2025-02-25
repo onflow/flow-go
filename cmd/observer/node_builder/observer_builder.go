@@ -836,7 +836,7 @@ func (builder *ObserverServiceBuilder) extraFlags() {
 			&builder.rpcConf.WebSocketConfig.MaxResponsesPerSecond,
 			"websocket-max-responses-per-second",
 			defaultConfig.rpcConf.WebSocketConfig.MaxResponsesPerSecond,
-			"the maximum number of responses that can be sent to a single client per second",
+			fmt.Sprintf("the maximum number of responses that can be sent to a single client per second. Default: %f. if set to 0, no limit is applied to the number of responses per second.", defaultConfig.rpcConf.WebSocketConfig.MaxResponsesPerSecond),
 		)
 		flags.BoolVar(
 			&builder.rpcConf.EnableWebSocketsStreamAPI,
