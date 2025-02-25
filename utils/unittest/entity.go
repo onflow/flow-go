@@ -290,6 +290,8 @@ func generateCustomFlowValue(field reflect.Value) any {
 		return *CollectionGuaranteeFixture()
 	case reflect.TypeOf(flow.Chunk{}):
 		return *ChunkFixture(IdentifierFixture(), uint(rand.Uint32()), StateCommitmentFixture())
+	case reflect.TypeOf(flow.ServiceEvent{}):
+		return EpochCommitFixture().ServiceEvent()
 	case reflect.TypeOf(flow.TimeoutCertificate{}):
 		return flow.TimeoutCertificate{
 			View:          rand.Uint64(),
