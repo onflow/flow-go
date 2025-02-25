@@ -1029,7 +1029,7 @@ func (exeNode *ExecutionNode) LoadExecutionDBPruner(node *NodeConfig) (module.Re
 		node.Logger,
 		exeNode.collector,
 		node.State,
-		node.DB,
+		node.ProtocolDB,
 		node.Storage.Headers,
 		exeNode.chunkDataPacks,
 		exeNode.results,
