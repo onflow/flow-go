@@ -8,6 +8,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/model/chunks"
+	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/storage/operation"
 	"github.com/onflow/flow-go/storage/operation/dbtest"
@@ -26,7 +27,7 @@ import (
 func TestChunksQueue(t *testing.T) {
 	t.Run("store and read", func(t *testing.T) {
 		dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
-			q := NewChunkQueue(db)
+			q := NewChunkQueue(metrics.NewNoopCollector(), db)
 			initialized, err := q.Init(0)
 			require.NoError(t, err)
 			require.True(t, initialized)
@@ -48,7 +49,7 @@ func TestChunksQueue(t *testing.T) {
 
 	t.Run("latest index after store", func(t *testing.T) {
 		dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
-			q := NewChunkQueue(db)
+			q := NewChunkQueue(metrics.NewNoopCollector(), db)
 			_, err := q.Init(0)
 			require.NoError(t, err)
 
@@ -66,7 +67,7 @@ func TestChunksQueue(t *testing.T) {
 
 	t.Run("duplicate chunk storage", func(t *testing.T) {
 		dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
-			q := NewChunkQueue(db)
+			q := NewChunkQueue(metrics.NewNoopCollector(), db)
 			_, err := q.Init(0)
 			require.NoError(t, err)
 
@@ -85,7 +86,7 @@ func TestChunksQueue(t *testing.T) {
 
 	t.Run("increasing index", func(t *testing.T) {
 		dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
-			q := NewChunkQueue(db)
+			q := NewChunkQueue(metrics.NewNoopCollector(), db)
 			_, err := q.Init(0)
 			require.NoError(t, err)
 
@@ -106,7 +107,7 @@ func TestChunksQueue(t *testing.T) {
 
 	t.Run("concurrent storage", func(t *testing.T) {
 		dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
-			q := NewChunkQueue(db)
+			q := NewChunkQueue(metrics.NewNoopCollector(), db)
 			_, err := q.Init(0)
 			require.NoError(t, err)
 
@@ -140,7 +141,7 @@ func TestChunksQueue(t *testing.T) {
 
 	t.Run("read with wrong index", func(t *testing.T) {
 		dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
-			q := NewChunkQueue(db)
+			q := NewChunkQueue(metrics.NewNoopCollector(), db)
 
 			_, err := q.AtIndex(1)
 			require.Error(t, err)
@@ -150,7 +151,7 @@ func TestChunksQueue(t *testing.T) {
 
 	t.Run("init index", func(t *testing.T) {
 		dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
-			q := NewChunkQueue(db)
+			q := NewChunkQueue(metrics.NewNoopCollector(), db)
 			defaultIndex := uint64(10)
 
 			initialized, err := q.Init(defaultIndex)

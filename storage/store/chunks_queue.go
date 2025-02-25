@@ -7,6 +7,7 @@ import (
 
 	"github.com/onflow/flow-go/model/chunks"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/storage/operation"
@@ -24,7 +25,7 @@ type ChunksQueue struct {
 const JobQueueChunksQueue = "JobQueueChunksQueue"
 const DefaultChunkQueuesCacheSize = uint(1000)
 
-func newChunkLocatorCache() *Cache[uint64, *chunks.Locator] {
+func newChunkLocatorCache(collector module.CacheMetrics) *Cache[uint64, *chunks.Locator] {
 	store := func(rw storage.ReaderBatchWriter, index uint64, locator *chunks.Locator) error {
 		// make sure the chunk locator is unique
 		err := operation.InsertChunkLocator(rw.Writer(), locator)
@@ -55,17 +56,17 @@ func newChunkLocatorCache() *Cache[uint64, *chunks.Locator] {
 
 		return &locator, nil
 	}
-	return newCache(metrics.NewNoopCollector(), "",
+	return newCache(collector, metrics.ResourceChunkLocators,
 		withLimit[uint64, *chunks.Locator](DefaultChunkQueuesCacheSize),
 		withStore(store),
 		withRetrieve(retrieve))
 }
 
 // NewChunkQueue will initialize the underlying badger database of chunk locator queue.
-func NewChunkQueue(db storage.DB) *ChunksQueue {
+func NewChunkQueue(collector module.CacheMetrics, db storage.DB) *ChunksQueue {
 	return &ChunksQueue{
 		db:                db,
-		chunkLocatorCache: newChunkLocatorCache(),
+		chunkLocatorCache: newChunkLocatorCache(collector),
 		storing:           &sync.Mutex{},
 	}
 }

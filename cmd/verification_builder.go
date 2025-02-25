@@ -185,7 +185,7 @@ func (v *VerificationNodeBuilder) LoadComponentsAndModules() {
 
 				chunkQueue = queue
 			case dbops.BadgerBatch:
-				queue := store.NewChunkQueue(badgerimpl.ToDB(node.DB))
+				queue := store.NewChunkQueue(node.Metrics.Cache, badgerimpl.ToDB(node.DB))
 				ok, err = queue.Init(chunkconsumer.DefaultJobIndex)
 				if err != nil {
 					return fmt.Errorf("could not initialize default index in chunks queue: %w", err)
