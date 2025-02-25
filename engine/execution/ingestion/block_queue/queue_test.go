@@ -2,6 +2,7 @@ package block_queue
 
 import (
 	"errors"
+	"math/rand"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -16,7 +17,7 @@ import (
 func TestMissingCollectionID_Malleability(t *testing.T) {
 	unittest.RequireEntityNonMalleable(t, &MissingCollection{
 		BlockID:   unittest.IdentifierFixture(),
-		Height:    unittest.BlockHeaderFixture().Height,
+		Height:    rand.Uint64(),
 		Guarantee: unittest.CollectionGuaranteeFixture(),
 	})
 }
