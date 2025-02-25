@@ -220,6 +220,13 @@ func (c *Controller) configureKeepalive() error {
 // keepalive sends a ping message periodically to keep the WebSocket connection alive
 // and avoid timeouts.
 func (c *Controller) keepalive(ctx context.Context) error {
+	defer func() {
+		// gracefully handle panics from github.com/gorilla/websocket
+		if r := recover(); r != nil {
+			c.logger.Warn().Interface("recovered_context", r).Msg("keepalive routine recovered from panic")
+		}
+	}()
+
 	pingTicker := time.NewTicker(PingPeriod)
 	defer pingTicker.Stop()
 
@@ -246,10 +253,12 @@ func (c *Controller) keepalive(ctx context.Context) error {
 // If no messages are sent within InactivityTimeout and no active data providers exist,
 // the connection will be closed.
 func (c *Controller) writeMessages(ctx context.Context) error {
-	inactivityTicker := time.NewTicker(c.inactivityTickerPeriod())
-	defer inactivityTicker.Stop()
-
-	lastMessageSentAt := time.Now()
+	defer func() {
+		// gracefully handle panics from github.com/gorilla/websocket
+		if r := recover(); r != nil {
+			c.logger.Warn().Interface("recovered_context", r).Msg("writer routine recovered from panic")
+		}
+	}()
 
 	defer func() {
 		// drain the channel as some providers may still send data to it after this routine shutdowns
@@ -259,6 +268,11 @@ func (c *Controller) writeMessages(ctx context.Context) error {
 			}
 		}()
 	}()
+
+	inactivityTicker := time.NewTicker(c.inactivityTickerPeriod())
+	defer inactivityTicker.Stop()
+
+	lastMessageSentAt := time.Now()
 
 	for {
 		select {
@@ -308,6 +322,13 @@ func (c *Controller) inactivityTickerPeriod() time.Duration {
 // readMessages continuously reads messages from a client WebSocket connection,
 // validates each message, and processes it based on the message type.
 func (c *Controller) readMessages(ctx context.Context) error {
+	defer func() {
+		// gracefully handle panics from github.com/gorilla/websocket
+		if r := recover(); r != nil {
+			c.logger.Warn().Interface("recovered_context", r).Msg("reader routine recovered from panic")
+		}
+	}()
+
 	for {
 		var message json.RawMessage
 		if err := c.conn.ReadJSON(&message); err != nil {
@@ -315,20 +336,22 @@ func (c *Controller) readMessages(ctx context.Context) error {
 				return err
 			}
 
+			err = fmt.Errorf("error reading message: %w", err)
 			c.writeErrorResponse(
 				ctx,
 				err,
-				wrapErrorMessage(http.StatusBadRequest, "error reading message", "", ""),
+				wrapErrorMessage(http.StatusBadRequest, err.Error(), "", ""),
 			)
 			continue
 		}
 
 		err := c.handleMessage(ctx, message)
 		if err != nil {
+			err = fmt.Errorf("error parsing message: %w", err)
 			c.writeErrorResponse(
 				ctx,
 				err,
-				wrapErrorMessage(http.StatusBadRequest, "error parsing message", "", ""),
+				wrapErrorMessage(http.StatusBadRequest, err.Error(), "", ""),
 			)
 			continue
 		}
@@ -374,11 +397,11 @@ func (c *Controller) handleMessage(ctx context.Context, message json.RawMessage)
 func (c *Controller) handleSubscribe(ctx context.Context, msg models.SubscribeMessageRequest) {
 	subscriptionID, err := c.parseOrCreateSubscriptionID(msg.SubscriptionID)
 	if err != nil {
+		err = fmt.Errorf("error parsing subscription id: %w", err)
 		c.writeErrorResponse(
 			ctx,
 			err,
-			wrapErrorMessage(http.StatusBadRequest, "error parsing subscription id",
-				models.SubscribeAction, msg.SubscriptionID),
+			wrapErrorMessage(http.StatusBadRequest, err.Error(), models.SubscribeAction, msg.SubscriptionID),
 		)
 		return
 	}
@@ -386,11 +409,11 @@ func (c *Controller) handleSubscribe(ctx context.Context, msg models.SubscribeMe
 	// register new provider
 	provider, err := c.dataProviderFactory.NewDataProvider(ctx, subscriptionID.String(), msg.Topic, msg.Arguments, c.multiplexedStream)
 	if err != nil {
+		err = fmt.Errorf("error creating data provider: %w", err)
 		c.writeErrorResponse(
 			ctx,
 			err,
-			wrapErrorMessage(http.StatusBadRequest, "error creating data provider",
-				models.SubscribeAction, subscriptionID.String()),
+			wrapErrorMessage(http.StatusBadRequest, err.Error(), models.SubscribeAction, subscriptionID.String()),
 		)
 		return
 	}
@@ -400,6 +423,7 @@ func (c *Controller) handleSubscribe(ctx context.Context, msg models.SubscribeMe
 	responseOk := models.SubscribeMessageResponse{
 		BaseMessageResponse: models.BaseMessageResponse{
 			SubscriptionID: subscriptionID.String(),
+			Action:         models.SubscribeAction,
 		},
 	}
 	c.writeResponse(ctx, responseOk)
@@ -409,10 +433,11 @@ func (c *Controller) handleSubscribe(ctx context.Context, msg models.SubscribeMe
 	go func() {
 		err = provider.Run()
 		if err != nil {
+			err = fmt.Errorf("internal error: %w", err)
 			c.writeErrorResponse(
 				ctx,
 				err,
-				wrapErrorMessage(http.StatusInternalServerError, "internal error",
+				wrapErrorMessage(http.StatusInternalServerError, err.Error(),
 					models.SubscribeAction, subscriptionID.String()),
 			)
 		}
@@ -425,11 +450,11 @@ func (c *Controller) handleSubscribe(ctx context.Context, msg models.SubscribeMe
 func (c *Controller) handleUnsubscribe(ctx context.Context, msg models.UnsubscribeMessageRequest) {
 	subscriptionID, err := ParseClientSubscriptionID(msg.SubscriptionID)
 	if err != nil {
+		err = fmt.Errorf("error parsing subscription id: %w", err)
 		c.writeErrorResponse(
 			ctx,
 			err,
-			wrapErrorMessage(http.StatusBadRequest, "error parsing subscription id",
-				models.UnsubscribeAction, msg.SubscriptionID),
+			wrapErrorMessage(http.StatusBadRequest, err.Error(), models.UnsubscribeAction, msg.SubscriptionID),
 		)
 		return
 	}
@@ -451,6 +476,7 @@ func (c *Controller) handleUnsubscribe(ctx context.Context, msg models.Unsubscri
 	responseOk := models.UnsubscribeMessageResponse{
 		BaseMessageResponse: models.BaseMessageResponse{
 			SubscriptionID: subscriptionID.String(),
+			Action:         models.UnsubscribeAction,
 		},
 	}
 	c.writeResponse(ctx, responseOk)

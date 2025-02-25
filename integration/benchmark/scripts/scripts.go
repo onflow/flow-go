@@ -55,8 +55,8 @@ var tokenTransferMultiTransactionTemplate string
 // TokenTransferTransaction returns a transaction script for transferring `amount` flow tokens to `toAddr` address
 func TokenTransferTransaction(ftAddr, flowToken, toAddr flow.Address, amount cadence.UFix64) (*flowsdk.Transaction, error) {
 
-	withFTAddr := strings.Replace(tokenTransferTransactionTemplate, "\"FungibleToken\"", "0x"+ftAddr.Hex(), 1)
-	withFlowTokenAddr := strings.Replace(withFTAddr, "\"FlowToken\"", "0x"+flowToken.Hex(), 1)
+	withFTAddr := strings.Replace(tokenTransferTransactionTemplate, "\"FungibleToken\"", "FungibleToken from 0x"+ftAddr.Hex(), 1)
+	withFlowTokenAddr := strings.Replace(withFTAddr, "\"FlowToken\"", "FlowToken from 0x"+flowToken.Hex(), 1)
 
 	tx := flowsdk.NewTransaction().
 		SetScript([]byte(withFlowTokenAddr))
@@ -75,8 +75,8 @@ func TokenTransferTransaction(ftAddr, flowToken, toAddr flow.Address, amount cad
 
 // TokenTransferMultiTransaction returns a transaction script for transferring `amount` flow tokens to all `toAddrs` addresses
 func TokenTransferMultiTransaction(ftAddr, flowToken flow.Address, toAddrs []flow.Address, amount cadence.UFix64) (*flowsdk.Transaction, error) {
-	withFTAddr := strings.Replace(tokenTransferMultiTransactionTemplate, "0xFUNGIBLETOKENADDRESS", "0x"+ftAddr.Hex(), 1)
-	withFlowTokenAddr := strings.Replace(withFTAddr, "0xTOKENADDRESS", "0x"+flowToken.Hex(), 1)
+	withFTAddr := strings.Replace(tokenTransferMultiTransactionTemplate, "\"FungibleToken\"", "FungibleToken from 0x"+ftAddr.Hex(), 1)
+	withFlowTokenAddr := strings.Replace(withFTAddr, "\"FlowToken\"", "FlowToken from 0x"+flowToken.Hex(), 1)
 
 	tx := flowsdk.NewTransaction().
 		SetScript([]byte(withFlowTokenAddr))

@@ -34,9 +34,9 @@ type EpochLookupSuite struct {
 
 	// config for each epoch
 	currentEpochCounter uint64
-	prevEpoch           epochRange
-	currEpoch           epochRange
-	nextEpoch           epochRange
+	prevEpoch           viewRange
+	currEpoch           viewRange
+	nextEpoch           viewRange
 
 	lookup *EpochLookup
 	cancel context.CancelFunc
@@ -50,9 +50,9 @@ func (suite *EpochLookupSuite) SetupTest() {
 	suite.currentEpochCounter = uint64(1)
 	suite.phase = flow.EpochPhaseStaking
 
-	suite.prevEpoch = epochRange{counter: suite.currentEpochCounter - 1, firstView: 100, finalView: 199}
-	suite.currEpoch = epochRange{counter: suite.currentEpochCounter, firstView: 200, finalView: 299}
-	suite.nextEpoch = epochRange{counter: suite.currentEpochCounter + 1, firstView: 300, finalView: 399}
+	suite.prevEpoch = viewRange{epochCounter: suite.currentEpochCounter - 1, firstView: 100, finalView: 199}
+	suite.currEpoch = viewRange{epochCounter: suite.currentEpochCounter, firstView: 200, finalView: 299}
+	suite.nextEpoch = viewRange{epochCounter: suite.currentEpochCounter + 1, firstView: 300, finalView: 399}
 
 	suite.state = new(mockprotocol.State)
 	suite.snapshot = new(mockprotocol.Snapshot)
@@ -93,12 +93,12 @@ func (suite *EpochLookupSuite) Phase() flow.EpochPhase {
 }
 
 // CommitEpochs adds the new epochs to the state.
-func (suite *EpochLookupSuite) CommitEpochs(epochs ...epochRange) {
+func (suite *EpochLookupSuite) CommitEpochs(epochs ...viewRange) {
 	for _, epoch := range epochs {
-		mockEpoch := newMockEpoch(epoch.counter, epoch.firstView, epoch.finalView)
+		mockEpoch := newMockEpoch(epoch.epochCounter, epoch.firstView, epoch.finalView)
 		suite.epochQuery.Add(mockEpoch)
 		// if we add a next epoch (counter 1 greater than current), then set phase to committed
-		if epoch.counter == suite.currentEpochCounter+1 {
+		if epoch.epochCounter == suite.currentEpochCounter+1 {
 			suite.WithLock(func() {
 				suite.phase = flow.EpochPhaseCommitted
 			})
@@ -123,7 +123,7 @@ func (suite *EpochLookupSuite) CreateAndStartEpochLookup() {
 // TestEpochForView_Curr tests constructing and subsequently querying
 // EpochLookup with an initial state of a current epoch.
 func (suite *EpochLookupSuite) TestEpochForView_Curr() {
-	epochs := []epochRange{suite.currEpoch}
+	epochs := []viewRange{suite.currEpoch}
 	suite.CommitEpochs(epochs...)
 	suite.CreateAndStartEpochLookup()
 	testEpochForView(suite.T(), suite.lookup, epochs...)
@@ -132,7 +132,7 @@ func (suite *EpochLookupSuite) TestEpochForView_Curr() {
 // TestEpochForView_PrevCurr tests constructing and subsequently querying
 // EpochLookup with an initial state of a previous and current epoch.
 func (suite *EpochLookupSuite) TestEpochForView_PrevCurr() {
-	epochs := []epochRange{suite.prevEpoch, suite.currEpoch}
+	epochs := []viewRange{suite.prevEpoch, suite.currEpoch}
 	suite.CommitEpochs(epochs...)
 	suite.CreateAndStartEpochLookup()
 	testEpochForView(suite.T(), suite.lookup, epochs...)
@@ -141,7 +141,7 @@ func (suite *EpochLookupSuite) TestEpochForView_PrevCurr() {
 // TestEpochForView_CurrNext tests constructing and subsequently querying
 // EpochLookup with an initial state of a current and next epoch.
 func (suite *EpochLookupSuite) TestEpochForView_CurrNext() {
-	epochs := []epochRange{suite.currEpoch, suite.nextEpoch}
+	epochs := []viewRange{suite.currEpoch, suite.nextEpoch}
 	suite.CommitEpochs(epochs...)
 	suite.CreateAndStartEpochLookup()
 	testEpochForView(suite.T(), suite.lookup, epochs...)
@@ -150,7 +150,7 @@ func (suite *EpochLookupSuite) TestEpochForView_CurrNext() {
 // TestEpochForView_CurrNextPrev tests constructing and subsequently querying
 // EpochLookup with an initial state of a previous, current, and next epoch.
 func (suite *EpochLookupSuite) TestEpochForView_CurrNextPrev() {
-	epochs := []epochRange{suite.prevEpoch, suite.currEpoch, suite.nextEpoch}
+	epochs := []viewRange{suite.prevEpoch, suite.currEpoch, suite.nextEpoch}
 	suite.CommitEpochs(epochs...)
 	suite.CreateAndStartEpochLookup()
 	testEpochForView(suite.T(), suite.lookup, epochs...)
@@ -162,7 +162,7 @@ func (suite *EpochLookupSuite) TestEpochForView_CurrNextPrev() {
 // in the protocol state.
 func (suite *EpochLookupSuite) TestProtocolEvents_EpochExtended() {
 	// previous and current epochs will be committed
-	epochs := []epochRange{suite.prevEpoch, suite.currEpoch}
+	epochs := []viewRange{suite.prevEpoch, suite.currEpoch}
 	suite.CommitEpochs(suite.prevEpoch, suite.currEpoch)
 
 	suite.CreateAndStartEpochLookup()
@@ -171,7 +171,7 @@ func (suite *EpochLookupSuite) TestProtocolEvents_EpochExtended() {
 		FirstView: suite.currEpoch.finalView + 1,
 		FinalView: suite.currEpoch.finalView + 100,
 	}
-	suite.lookup.EpochExtended(suite.currEpoch.counter, nil, extension)
+	suite.lookup.EpochExtended(suite.currEpoch.epochCounter, nil, extension)
 
 	// wait for the protocol event to be processed (async)
 	assert.Eventually(suite.T(), func() bool {
@@ -184,9 +184,9 @@ func (suite *EpochLookupSuite) TestProtocolEvents_EpochExtended() {
 	testEpochForView(suite.T(), suite.lookup, epochs...)
 
 	// should handle multiple deliveries of the protocol event
-	suite.lookup.EpochExtended(suite.currEpoch.counter, nil, extension)
-	suite.lookup.EpochExtended(suite.currEpoch.counter, nil, extension)
-	suite.lookup.EpochExtended(suite.currEpoch.counter, nil, extension)
+	suite.lookup.EpochExtended(suite.currEpoch.epochCounter, nil, extension)
+	suite.lookup.EpochExtended(suite.currEpoch.epochCounter, nil, extension)
+	suite.lookup.EpochExtended(suite.currEpoch.epochCounter, nil, extension)
 
 	assert.Eventually(suite.T(), func() bool {
 		return len(suite.lookup.epochEvents) == 0
@@ -228,7 +228,7 @@ func (suite *EpochLookupSuite) TestProtocolEvents_EpochExtended_SanityChecks() {
 			assert.Contains(suite.T(), err.Error(), fmt.Sprintf(invalidExtensionFinalView, suite.currEpoch.finalView, extension.FinalView))
 		})
 
-		suite.lookup.EpochExtended(suite.currEpoch.counter, nil, extension)
+		suite.lookup.EpochExtended(suite.currEpoch.epochCounter, nil, extension)
 
 		// wait for the protocol event to be processed (async)
 		assert.Eventually(suite.T(), func() bool {
@@ -244,7 +244,7 @@ func (suite *EpochLookupSuite) TestProtocolEvents_EpochExtended_SanityChecks() {
 		ctx.On("Throw", mock.AnythingOfType("*errors.errorString")).Run(func(args mock.Arguments) {
 			err, ok := args.Get(0).(error)
 			assert.True(suite.T(), ok)
-			assert.Contains(suite.T(), err.Error(), fmt.Sprintf(mismatchEpochCounter, suite.currEpoch.counter, unknownCounter))
+			assert.Contains(suite.T(), err.Error(), fmt.Sprintf(mismatchEpochCounter, suite.currEpoch.epochCounter, unknownCounter))
 		})
 
 		suite.lookup.EpochExtended(unknownCounter, nil, flow.EpochExtension{
@@ -274,7 +274,7 @@ func (suite *EpochLookupSuite) TestProtocolEvents_EpochExtended_SanityChecks() {
 			assert.Contains(suite.T(), err.Error(), fmt.Sprintf(invalidEpochViewSequence, extension.FirstView, suite.currEpoch.finalView))
 		})
 
-		suite.lookup.EpochExtended(suite.currEpoch.counter, nil, extension)
+		suite.lookup.EpochExtended(suite.currEpoch.epochCounter, nil, extension)
 
 		// wait for the protocol event to be processed (async)
 		assert.Eventually(suite.T(), func() bool {
@@ -316,23 +316,23 @@ func (suite *EpochLookupSuite) TestProtocolEvents_CommittedEpoch() {
 // testEpochForView accepts a constructed EpochLookup and state, and
 // validates correctness by issuing various queries, using the input state and
 // epochs as source of truth.
-func testEpochForView(t *testing.T, lookup *EpochLookup, epochs ...epochRange) {
+func testEpochForView(t *testing.T, lookup *EpochLookup, epochs ...viewRange) {
 	t.Run("should be able to query within any committed epoch", func(t *testing.T) {
 		for _, epoch := range epochs {
 			t.Run("first view", func(t *testing.T) {
 				counter, err := lookup.EpochForView(epoch.firstView)
 				assert.NoError(t, err)
-				assert.Equal(t, epoch.counter, counter)
+				assert.Equal(t, epoch.epochCounter, counter)
 			})
 			t.Run("final view", func(t *testing.T) {
 				counter, err := lookup.EpochForView(epoch.finalView)
 				assert.NoError(t, err)
-				assert.Equal(t, epoch.counter, counter)
+				assert.Equal(t, epoch.epochCounter, counter)
 			})
 			t.Run("random view in range", func(t *testing.T) {
 				counter, err := lookup.EpochForView(unittest.Uint64InRange(epoch.firstView, epoch.finalView))
 				assert.NoError(t, err)
-				assert.Equal(t, epoch.counter, counter)
+				assert.Equal(t, epoch.epochCounter, counter)
 			})
 		}
 	})
@@ -353,7 +353,9 @@ func testEpochForView(t *testing.T, lookup *EpochLookup, epochs ...epochRange) {
 	})
 
 	t.Run("should return ErrViewForUnknownEpoch for queries above latest epoch final view", func(t *testing.T) {
-		_, err := lookup.EpochForView(lookup.epochs.latest().finalView + 1)
+		latest, exists := lookup.epochs.latest()
+		assert.True(t, exists)
+		_, err := lookup.EpochForView(latest.finalView + 1)
 		assert.ErrorIs(t, err, model.ErrViewForUnknownEpoch)
 	})
 }
