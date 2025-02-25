@@ -20,7 +20,7 @@ import (
 func blockNodesFirstMessages(n uint64, denyList ...*Node) BlockOrDelayFunc {
 	blackList := make(map[flow.Identifier]uint64, len(denyList))
 	for _, node := range denyList {
-		blackList[node.id.ID()] = n
+		blackList[node.id.NodeID] = n
 	}
 	lock := new(sync.Mutex)
 	return func(channel channels.Channel, event interface{}, sender, receiver *Node) (bool, time.Duration) {
@@ -35,9 +35,9 @@ func blockNodesFirstMessages(n uint64, denyList ...*Node) BlockOrDelayFunc {
 		}
 		lock.Lock()
 		defer lock.Unlock()
-		count, ok := blackList[receiver.id.ID()]
+		count, ok := blackList[receiver.id.NodeID]
 		if ok && count > 0 {
-			blackList[receiver.id.ID()] = count - 1
+			blackList[receiver.id.NodeID] = count - 1
 			return true, 0
 		}
 		return false, 0

@@ -29,7 +29,7 @@ func FinalizedProtocolStateWithParticipants(participants flow.IdentityList) (
 	)
 	snapshot.On("Identity", mock.Anything).Return(func(id flow.Identifier) *flow.Identity {
 		for _, n := range participants {
-			if n.ID() == id {
+			if n.NodeID == id {
 				return n
 			}
 		}
