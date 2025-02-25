@@ -11,25 +11,27 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
-// TestMalleability verifies that the entities which implements the [flow.IDEntity] interface are not malleable.
+// TestMalleability performs sanity checks to ensure that epoch related entities are not malleable.
 func TestMalleability(t *testing.T) {
 	t.Run("EpochSetup", func(t *testing.T) {
-		unittest.RequireEntityNotMalleable(t, unittest.EpochSetupFixture())
+		unittest.RequireEntityNonMalleable(t, unittest.EpochSetupFixture())
 	})
 	t.Run("EpochCommit-v1", func(t *testing.T) {
-		unittest.RequireEntityNotMalleable(t, unittest.EpochCommitFixture())
+		unittest.RequireEntityNonMalleable(t, unittest.EpochCommitFixture())
 	})
 
-	checker := unittest.NewMalleabilityChecker(t, unittest.WithCustomType(flow.DKGIndexMap{}, func() any {
+	checker := unittest.NewMalleabilityChecker(unittest.WithCustomType(flow.DKGIndexMap{}, func() any {
 		return flow.DKGIndexMap{unittest.IdentifierFixture(): 0, unittest.IdentifierFixture(): 1}
 	}))
 	t.Run("EpochCommit-v2", func(t *testing.T) {
-		checker.Check(unittest.EpochCommitFixture(func(commit *flow.EpochCommit) {
+		err := checker.Check(unittest.EpochCommitFixture(func(commit *flow.EpochCommit) {
 			commit.DKGIndexMap = flow.DKGIndexMap{unittest.IdentifierFixture(): 0, unittest.IdentifierFixture(): 1}
 		}))
+		require.NoError(t, err)
 	})
 	t.Run("EpochRecover", func(t *testing.T) {
-		checker.Check(unittest.EpochRecoverFixture())
+		err := checker.Check(unittest.EpochRecoverFixture())
+		require.NoError(t, err)
 	})
 
 	epochStateContainerFixture := func() *flow.EpochStateContainer {
@@ -47,17 +49,16 @@ func TestMalleability(t *testing.T) {
 	}
 
 	t.Run("EpochStateContainer", func(t *testing.T) {
-		unittest.RequireEntityNotMalleable(t, epochStateContainerFixture())
+		unittest.RequireEntityNonMalleable(t, epochStateContainerFixture())
 	})
 
-	checker = unittest.NewMalleabilityChecker(
-		t,
-		unittest.WithCustomType(&flow.EpochStateContainer{}, func() any {
-			return epochStateContainerFixture()
-		}),
+	checker = unittest.NewMalleabilityChecker(unittest.WithCustomType(flow.EpochStateContainer{}, func() any {
+		return epochStateContainerFixture()
+	}),
 	)
 	t.Run("MinEpochStateEntry", func(t *testing.T) {
-		checker.Check(unittest.EpochStateFixture(unittest.WithNextEpochProtocolState()).MinEpochStateEntry)
+		err := checker.Check(unittest.EpochStateFixture(unittest.WithNextEpochProtocolState()).MinEpochStateEntry)
+		require.NoError(t, err)
 	})
 }
 

@@ -13,6 +13,7 @@ import (
 	"github.com/onflow/flow-go/fvm/tracing"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/state/protocol"
 )
 
 const (
@@ -91,8 +92,8 @@ func WithChain(chain flow.Chain) Option {
 	}
 }
 
-// WithGasLimit sets the computation limit for a virtual machine context.
-// @depricated, please use WithComputationLimit instead.
+// Deprecated: WithGasLimit sets the computation limit for a virtual machine context.
+// Use WithComputationLimit instead.
 func WithGasLimit(limit uint64) Option {
 	return func(ctx Context) Context {
 		ctx.ComputationLimit = limit
@@ -162,16 +163,6 @@ func WithMaxStateInteractionSize(limit uint64) Option {
 func WithEventCollectionSizeLimit(limit uint64) Option {
 	return func(ctx Context) Context {
 		ctx.EventCollectionByteSizeLimit = limit
-		return ctx
-	}
-}
-
-// WithEntropyProvider sets the entropy provider of a virtual machine context.
-//
-// The VM uses the input to provide entropy to the Cadence runtime randomness functions.
-func WithEntropyProvider(source environment.EntropyProvider) Option {
-	return func(ctx Context) Context {
-		ctx.EntropyProvider = source
 		return ctx
 	}
 }
@@ -381,11 +372,34 @@ func WithAllowProgramCacheWritesInScriptsEnabled(enabled bool) Option {
 	}
 }
 
-// WithReadVersionFromNodeVersionBeacon sets whether the version from the node version beacon should be read
-// this should only be disabled for testing
-func WithReadVersionFromNodeVersionBeacon(enabled bool) Option {
+// WithEntropyProvider sets the entropy provider of a virtual machine context.
+//
+// The VM uses the input to provide entropy to the Cadence runtime randomness functions.
+func WithEntropyProvider(source environment.EntropyProvider) Option {
 	return func(ctx Context) Context {
-		ctx.ReadVersionFromNodeVersionBeacon = enabled
+		ctx.EntropyProvider = source
+		return ctx
+	}
+}
+
+// WithExecutionVersionProvider sets the execution version provider of a virtual machine context.
+//
+// this is used to provide the execution version to the Cadence runtime.
+func WithExecutionVersionProvider(provider environment.ExecutionVersionProvider) Option {
+	return func(ctx Context) Context {
+		ctx.ExecutionVersionProvider = provider
+		return ctx
+	}
+}
+
+// WithProtocolStateSnapshot sets all the necessary components from a subset of the protocol state
+// to the virtual machine context.
+func WithProtocolStateSnapshot(snapshot protocol.SnapshotExecutionSubset) Option {
+	return func(ctx Context) Context {
+
+		ctx = WithEntropyProvider(snapshot)(ctx)
+
+		ctx = WithExecutionVersionProvider(environment.NewVersionBeaconExecutionVersionProvider(snapshot.VersionBeacon))(ctx)
 		return ctx
 	}
 }

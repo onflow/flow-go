@@ -81,5 +81,5 @@ func TestRoleList_ID(t *testing.T) {
 
 // TestRoleListMalleability verifies that the RoleList which implements the [flow.IDEntity] interface is not malleable.
 func TestRoleListMalleability(t *testing.T) {
-	unittest.RequireEntityNotMalleable(t, flow.RoleList{flow.RoleConsensus, flow.RoleVerification})
+	unittest.RequireEntityNonMalleable(t, &flow.RoleList{flow.RoleConsensus, flow.RoleVerification})
 }
