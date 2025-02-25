@@ -7,7 +7,6 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
 
-	"github.com/onflow/flow-go/engine/common/rpc"
 	"github.com/onflow/flow-go/module/irrecoverable"
 )
 
@@ -57,7 +56,7 @@ func NewGrpcServerBuilder(log zerolog.Logger,
 	gRPCListenAddr string,
 	maxMsgSize uint,
 	rpcMetricsEnabled bool,
-	apiRateLimits map[string]int,  // the api rate limit (max calls per second) for each of the Access API e.g. Ping->100, GetTransaction->300
+	apiRateLimits map[string]int, // the api rate limit (max calls per second) for each of the Access API e.g. Ping->100, GetTransaction->300
 	apiBurstLimits map[string]int, // the api burst limit (max calls at the same time) for each of the Access API e.g. Ping->50, GetTransaction->10
 	opts ...Option,
 ) *GrpcServerBuilder {
@@ -86,7 +85,7 @@ func NewGrpcServerBuilder(log zerolog.Logger,
 	var unaryInterceptors []grpc.UnaryServerInterceptor
 	var streamInterceptors []grpc.StreamServerInterceptor
 
-	unaryInterceptors = append(unaryInterceptors, irrecoverableCtxInjector(signalerCtx))
+	unaryInterceptors = append(unaryInterceptors, IrrecoverableCtxInjector(signalerCtx))
 	if rpcMetricsEnabled {
 		unaryInterceptors = append(unaryInterceptors, grpc_prometheus.UnaryServerInterceptor)
 
@@ -96,11 +95,11 @@ func NewGrpcServerBuilder(log zerolog.Logger,
 	}
 
 	if len(apiRateLimits) > 0 {
-		unaryInterceptors = append(unaryInterceptors, rpc.NewRateLimiterInterceptor(log, apiRateLimits, apiBurstLimits).UnaryServerInterceptor)
+		unaryInterceptors = append(unaryInterceptors, NewRateLimiterInterceptor(log, apiRateLimits, apiBurstLimits).UnaryServerInterceptor)
 	}
 
 	// Note: make sure logging interceptor is innermost wrapper to capture all messages
-	unaryInterceptors = append(unaryInterceptors, rpc.LoggingInterceptor(log))
+	unaryInterceptors = append(unaryInterceptors, LoggingInterceptor(log))
 
 	grpcOpts = append(grpcOpts, grpc.ChainUnaryInterceptor(unaryInterceptors...))
 	if len(streamInterceptors) > 0 {
