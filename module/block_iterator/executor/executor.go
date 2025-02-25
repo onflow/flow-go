@@ -153,10 +153,13 @@ func commitAndCheckpoint(
 
 // CalculateProgress calculates the progress of the iteration, it returns a percentage
 // of the progress. [0, 100]
+// start, end are both inclusive
 func CalculateProgress(start, end, current uint64) float64 {
-	if end <= start {
-		return 100.0 // If start == end, assume full completion
+	if end < start {
+		return 100.0
 	}
+	// If start == end, there is one more to process
+
 	if current < start {
 		return 0.0 // If current is below start, assume 0%
 	}

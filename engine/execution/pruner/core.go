@@ -70,7 +70,7 @@ func LoopPruneExecutionDataFromRootToLatestSealed(
 			Uint64("nextToPrune", nextToPrune).
 			Uint64("latestToPrune", latestToPrune).
 			Uint64("batchCount", batchCount).
-			Uint64("totalDuration", uint64(totalDuration.Seconds())).
+			Str("totalDuration", totalDuration.String()).
 			Msgf("execution data pruning will start in %s at %s, complete at %s",
 				config.SleepAfterEachIteration,
 				time.Now().Add(config.SleepAfterEachIteration).UTC(),
@@ -166,14 +166,19 @@ func makeBlockIteratorCreator(
 }
 
 // estimateBatchProcessing estimates the number of batches and the total duration
+// start, end are both inclusive
 func EstimateBatchProcessing(
-	start, end uint64, batchSize uint, sleepAfterEachBatchCommit time.Duration, commitDuration time.Duration) (
+	start, end uint64,
+	batchSize uint,
+	sleepAfterEachBatchCommit time.Duration,
+	commitDuration time.Duration,
+) (
 	batchCount uint64, totalDuration time.Duration) {
-	if batchSize == 0 || start >= end {
+	if batchSize == 0 || start > end {
 		return 0, 0
 	}
-
-	batchCount = (end - start + uint64(batchSize) - 1) / uint64(batchSize)
+	count := end - start + 1
+	batchCount = (count + uint64(batchSize) - 1) / uint64(batchSize)
 
 	totalDuration = time.Duration(batchCount-1)*sleepAfterEachBatchCommit + time.Duration(batchCount)*commitDuration
 

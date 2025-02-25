@@ -139,8 +139,8 @@ func TestEstimateBatchProcessing(t *testing.T) {
 			batchSize:                 10,
 			sleepAfterEachBatchCommit: time.Second,
 			commitDuration:            500 * time.Millisecond,
-			expectedBatchCount:        10,
-			expectedTotalDuration:     9*time.Second + 10*500*time.Millisecond,
+			expectedBatchCount:        11,
+			expectedTotalDuration:     10*time.Second + 11*500*time.Millisecond,
 		},
 		{
 			name:                      "Single batch",
@@ -179,8 +179,8 @@ func TestEstimateBatchProcessing(t *testing.T) {
 			batchSize:                 10,
 			sleepAfterEachBatchCommit: time.Second,
 			commitDuration:            500 * time.Millisecond,
-			expectedBatchCount:        0,
-			expectedTotalDuration:     0,
+			expectedBatchCount:        1,
+			expectedTotalDuration:     500 * time.Millisecond,
 		},
 	}
 

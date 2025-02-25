@@ -211,8 +211,8 @@ func TestCalculateProgress(t *testing.T) {
 		{1, 100, 100, 100.0}, // Completed
 		{1, 100, 150, 100.0}, // Exceeds end
 		{1, 100, 0, 0.0},     // Below start
-		{1, 1, 1, 100.0},     // Start = End
-		{1, 1, 0, 100.0},     // Start = End, but below
+		{1, 1, 1, 0.0},       // Start = End
+		{1, 1, 0, 0.0},       // Start = End, but below
 		{1, 100, 10, 9.09},   // Early progress
 		{1, 100, 99, 98.99},  // Near completion
 	}
