@@ -43,7 +43,7 @@ func (c *ChunksCheckpointCommand) Handler(ctx context.Context, req *admin.Comman
 
 	log.Info().Msgf("admintool: successfully created chunkDataPacks database checkpoint at: %v", targetDir)
 
-	return fmt.Sprintf("successfully created checkpoint db checkpoint at %v", targetDir), nil
+	return fmt.Sprintf("successfully created chunkDataPacks db checkpoint at %v", targetDir), nil
 }
 
 func (c *ChunksCheckpointCommand) Validator(req *admin.CommandRequest) error {
