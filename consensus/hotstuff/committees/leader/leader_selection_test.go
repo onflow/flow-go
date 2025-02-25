@@ -192,9 +192,9 @@ func TestViewOutOfRange(t *testing.T) {
 	// boundary views should not return error
 	t.Run("boundary views", func(t *testing.T) {
 		_, err = leaders.LeaderForView(firstView)
-		assert.Nil(t, err)
+		assert.NoError(t, err)
 		_, err = leaders.LeaderForView(finalView)
-		assert.Nil(t, err)
+		assert.NoError(t, err)
 	})
 
 	// views before first view should return error

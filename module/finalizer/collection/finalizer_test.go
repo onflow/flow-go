@@ -57,7 +57,7 @@ func TestFinalizer(t *testing.T) {
 		// a helper function to insert a block
 		insert := func(block model.Block) {
 			err := db.Update(procedure.InsertClusterBlock(&block))
-			assert.Nil(t, err)
+			assert.NoError(t, err)
 		}
 
 		t.Run("non-existent block", func(t *testing.T) {
@@ -91,11 +91,11 @@ func TestFinalizer(t *testing.T) {
 
 			// finalize the block
 			err := finalizer.MakeFinal(block.ID())
-			assert.Nil(t, err)
+			assert.NoError(t, err)
 
 			// finalize the block again - this should be a no-op
 			err = finalizer.MakeFinal(block.ID())
-			assert.Nil(t, err)
+			assert.NoError(t, err)
 		})
 
 		t.Run("unconnected block", func(t *testing.T) {
@@ -130,11 +130,11 @@ func TestFinalizer(t *testing.T) {
 
 			// finalize the block
 			err := finalizer.MakeFinal(block.ID())
-			assert.Nil(t, err)
+			assert.NoError(t, err)
 
 			// check finalized boundary using cluster state
 			final, err := state.Final().Head()
-			assert.Nil(t, err)
+			assert.NoError(t, err)
 			assert.Equal(t, block.ID(), final.ID())
 
 			// collection should not have been propagated
@@ -171,7 +171,7 @@ func TestFinalizer(t *testing.T) {
 
 			// finalize the block
 			err := finalizer.MakeFinal(block.ID())
-			assert.Nil(t, err)
+			assert.NoError(t, err)
 
 			// tx1 should have been removed from mempool
 			assert.False(t, pool.Has(tx1.ID()))
@@ -180,7 +180,7 @@ func TestFinalizer(t *testing.T) {
 
 			// check finalized boundary using cluster state
 			final, err := state.Final().Head()
-			assert.Nil(t, err)
+			assert.NoError(t, err)
 			assert.Equal(t, block.ID(), final.ID())
 			assertClusterBlocksIndexedByReferenceHeight(t, db, refBlock.Height, final.ID())
 		})
@@ -228,7 +228,7 @@ func TestFinalizer(t *testing.T) {
 
 			// finalize block2 (should indirectly finalize block1 as well)
 			err := finalizer.MakeFinal(block2.ID())
-			assert.Nil(t, err)
+			assert.NoError(t, err)
 
 			// tx1 and tx2 should have been removed from mempool
 			assert.False(t, pool.Has(tx1.ID()))
@@ -236,7 +236,7 @@ func TestFinalizer(t *testing.T) {
 
 			// check finalized boundary using cluster state
 			final, err := state.Final().Head()
-			assert.Nil(t, err)
+			assert.NoError(t, err)
 			assert.Equal(t, block2.ID(), final.ID())
 			assertClusterBlocksIndexedByReferenceHeight(t, db, refBlock.Height, block1.ID(), block2.ID())
 		})
@@ -276,7 +276,7 @@ func TestFinalizer(t *testing.T) {
 
 			// finalize block1 (should NOT finalize block2)
 			err := finalizer.MakeFinal(block1.ID())
-			assert.Nil(t, err)
+			assert.NoError(t, err)
 
 			// tx1 should have been removed from mempool
 			assert.False(t, pool.Has(tx1.ID()))
@@ -285,7 +285,7 @@ func TestFinalizer(t *testing.T) {
 
 			// check finalized boundary using cluster state
 			final, err := state.Final().Head()
-			assert.Nil(t, err)
+			assert.NoError(t, err)
 			assert.Equal(t, block1.ID(), final.ID())
 			assertClusterBlocksIndexedByReferenceHeight(t, db, refBlock.Height, block1.ID())
 		})
@@ -326,7 +326,7 @@ func TestFinalizer(t *testing.T) {
 
 			// finalize block1
 			err := finalizer.MakeFinal(block1.ID())
-			assert.Nil(t, err)
+			assert.NoError(t, err)
 
 			// tx1 should have been removed from mempool
 			assert.False(t, pool.Has(tx1.ID()))
@@ -335,7 +335,7 @@ func TestFinalizer(t *testing.T) {
 
 			// check finalized boundary using cluster state
 			final, err := state.Final().Head()
-			assert.Nil(t, err)
+			assert.NoError(t, err)
 			assert.Equal(t, block1.ID(), final.ID())
 			assertClusterBlocksIndexedByReferenceHeight(t, db, refBlock.Height, block1.ID())
 		})

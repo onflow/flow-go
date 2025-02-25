@@ -121,7 +121,7 @@ func (suite *IngressSuite) TestTxIngress_SingleCluster() {
 	ctx, cancel := context.WithTimeout(suite.ctx, defaultTimeout)
 	err = client.SendTransaction(ctx, *tx)
 	cancel()
-	assert.Nil(t, err)
+	assert.NoError(t, err)
 	t.Log("sent transaction: ", tx.ID())
 
 	// wait for the transaction to be included in a collection
