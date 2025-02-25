@@ -60,23 +60,20 @@ func ParseBody(raw io.Reader, dst interface{}) error {
 //
 // No errors are expected during normal operations.
 func ParseInterfaceToStrings(value interface{}) ([]string, error) {
-	// Check if value is []string directly
 	if strSlice, ok := value.([]string); ok {
 		return strSlice, nil
 	}
 
-	// Check if value is []interface{}
 	interfaceSlice, ok := value.([]interface{})
 	if !ok {
-		return nil, fmt.Errorf("'%s' must be an array", value)
+		return nil, fmt.Errorf("value must be an array. got %T", value)
 	}
 
-	// Convert []interface{} to []string
 	result := make([]string, len(interfaceSlice))
 	for i, v := range interfaceSlice {
 		str, ok := v.(string)
 		if !ok {
-			return nil, fmt.Errorf("'%s' must be an array of strings", value)
+			return nil, fmt.Errorf("value must be an array of strings. got %T", v)
 		}
 		result[i] = str
 	}

@@ -412,7 +412,7 @@ func (c *Controller) handleMessage(ctx context.Context, message json.RawMessage)
 func (c *Controller) handleSubscribe(ctx context.Context, msg models.SubscribeMessageRequest) {
 	// Check if the maximum number of active subscriptions per connection has been reached.
 	// If the limit is exceeded, an error is returned, and the subscription request is rejected.
-	if uint64(c.dataProviders.Size()) > c.config.MaxSubscriptionsPerConnection {
+	if uint64(c.dataProviders.Size()) >= c.config.MaxSubscriptionsPerConnection {
 		err := fmt.Errorf("error creating new subscription: %w", ErrMaxSubscriptionsReached)
 		c.writeErrorResponse(
 			ctx,
