@@ -74,6 +74,40 @@ func (e *MalleableEntityStruct) ID() flow.Identifier {
 	})
 }
 
+// StructWithOptionalField is a struct that has an optional field. This is a rare case but it happens that we need to include
+// a field that is optional for backward compatibility reasons. In such cases the ID method might behave differently depending
+// on the presence of the optional field. Checker should be able to handle a case where the optional field is nil and when it is not.
+// To accomplish this, we are using a special struct tag otherwise the checker would fail to detect the optional field as it requires
+// that all fields are non-empty/non-nil.
+type StructWithOptionalField struct {
+	Identifier    flow.Identifier
+	RequiredField uint32
+	OptionalField *uint32 `malleability:"optional"`
+}
+
+// ID returns the hash of the entity depending on the presence of the optional field.
+func (e *StructWithOptionalField) ID() flow.Identifier {
+	if e.OptionalField == nil {
+		return flow.MakeID(struct {
+			Identifier    flow.Identifier
+			RequiredField uint32
+		}{
+			Identifier:    e.Identifier,
+			RequiredField: e.RequiredField,
+		})
+	} else {
+		return flow.MakeID(struct {
+			RequiredField uint32
+			OptionalField uint32
+			Identifier    flow.Identifier
+		}{
+			Identifier:    e.Identifier,
+			OptionalField: *e.OptionalField,
+			RequiredField: e.RequiredField,
+		})
+	}
+}
+
 // TestRequireEntityNonMalleable tests the behavior of MalleabilityChecker with different types of entities ensuring
 // it correctly handles the supported types and returns an error when the entity is malleable, or it cannot perform the check.
 func TestRequireEntityNonMalleable(t *testing.T) {
@@ -161,5 +195,25 @@ func TestRequireEntityNonMalleable(t *testing.T) {
 		})
 		require.Error(t, err)
 		require.ErrorContains(t, err, "Signature is malleable")
+	})
+	t.Run("struct-with-optional-field", func(t *testing.T) {
+		t.Run("without-optional-field", func(t *testing.T) {
+			err := NewMalleabilityChecker().Check(&StructWithOptionalField{
+				Identifier:    IdentifierFixture(),
+				RequiredField: 42,
+				OptionalField: nil,
+			})
+			require.NoError(t, err)
+		})
+		t.Run("with-optional-field", func(t *testing.T) {
+			v := &StructWithOptionalField{
+				Identifier:    IdentifierFixture(),
+				RequiredField: 42,
+				OptionalField: new(uint32),
+			}
+			*v.OptionalField = 13
+			err := NewMalleabilityChecker().Check(v)
+			require.NoError(t, err)
+		})
 	})
 }
