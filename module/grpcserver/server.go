@@ -57,6 +57,12 @@ func NewGrpcServer(log zerolog.Logger,
 	return server
 }
 
+// RegisterService calls the provided function with the grpc server as an argument to register
+// the server with an external service.
+func (g *GrpcServer) RegisterService(fn func(*grpc.Server)) {
+	fn(g.server)
+}
+
 // serveGRPCWorker is a worker routine which starts the gRPC server.
 // The ready callback is called after the server address is bound and set.
 func (g *GrpcServer) serveGRPCWorker(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
