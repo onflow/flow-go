@@ -1,6 +1,7 @@
 package store
 
 import (
+	"errors"
 	"sync"
 	"testing"
 
@@ -143,6 +144,7 @@ func TestChunksQueue(t *testing.T) {
 
 			_, err := q.AtIndex(1)
 			require.Error(t, err)
+			require.True(t, errors.Is(err, storage.ErrNotFound))
 		})
 	})
 
