@@ -9,7 +9,7 @@ import (
 	"github.com/rs/zerolog"
 
 	"google.golang.org/grpc"
-	_ "google.golang.org/grpc/encoding/gzip" //required for gRPC compression
+	_ "google.golang.org/grpc/encoding/gzip" // required for gRPC compression
 
 	_ "github.com/onflow/flow-go/engine/common/grpc/compressor/deflate" // required for gRPC compression
 	_ "github.com/onflow/flow-go/engine/common/grpc/compressor/snappy"  // required for gRPC compression
@@ -22,8 +22,12 @@ import (
 // into different engines making it possible to use single grpc server for multiple services which live in different modules.
 type GrpcServer struct {
 	component.Component
-	log             zerolog.Logger
-	Server          *grpc.Server
+	log    zerolog.Logger
+	server *grpc.Server
+
+	// grpcSignalerCtx shares the irrecoverable context passed to the GrpcServer on startup with an
+	// interceptor that's responsible for injecting the context into requests so that it's available
+	// within handler code.
 	grpcSignalerCtx *atomic.Pointer[irrecoverable.SignalerContext]
 
 	grpcListenAddr string // the GRPC server address as ip:port
@@ -42,7 +46,7 @@ func NewGrpcServer(log zerolog.Logger,
 ) *GrpcServer {
 	server := &GrpcServer{
 		log:             log,
-		Server:          grpcServer,
+		server:          grpcServer,
 		grpcListenAddr:  grpcListenAddr,
 		grpcSignalerCtx: grpcSignalerCtx,
 	}
@@ -76,7 +80,7 @@ func (g *GrpcServer) serveGRPCWorker(ctx irrecoverable.SignalerContext, ready co
 	g.log.Debug().Msg("listening on port")
 	ready()
 
-	err = g.Server.Serve(l) // blocking call
+	err = g.server.Serve(l) // blocking call
 	if err != nil {
 		g.log.Err(err).Msg("fatal error in grpc server")
 		ctx.Throw(err)
@@ -95,5 +99,5 @@ func (g *GrpcServer) GRPCAddress() net.Addr {
 func (g *GrpcServer) shutdownWorker(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
 	ready()
 	<-ctx.Done()
-	g.Server.GracefulStop()
+	g.server.GracefulStop()
 }
