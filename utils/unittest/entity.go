@@ -88,8 +88,8 @@ type MalleabilityCheckerOpt func(*MalleabilityChecker)
 // WithCustomType allows to override the default behavior of the checker for the given type, meaning if a field of the given type is encountered
 // it will use generator instead of generating a random value.
 func WithCustomType[T any](tType any, generator func() T) MalleabilityCheckerOpt {
-	return func(t *MalleabilityChecker) {
-		t.customTypes[reflect.TypeOf(tType)] = func() reflect.Value {
+	return func(mc *MalleabilityChecker) {
+		mc.customTypes[reflect.TypeOf(tType)] = func() reflect.Value {
 			return reflect.ValueOf(generator())
 		}
 	}
@@ -112,7 +112,7 @@ func NewMalleabilityChecker(ops ...MalleabilityCheckerOpt) *MalleabilityChecker 
 // In rare cases, a type may have a different ID computation depending on whether a field is nil.
 // In such cases, we can use the `malleability:"optional"` struct tag to skip malleability checks when the field is nil.
 // It returns an error if the entity is malleable, otherwise it returns nil.
-func (t *MalleabilityChecker) Check(entity flow.IDEntity) error {
+func (mc *MalleabilityChecker) Check(entity flow.IDEntity) error {
 	v := reflect.ValueOf(entity)
 	if v.IsValid() {
 		if v.Kind() == reflect.Ptr {
@@ -127,20 +127,20 @@ func (t *MalleabilityChecker) Check(entity flow.IDEntity) error {
 	} else {
 		return fmt.Errorf("tested entity is not valid")
 	}
-	return t.isEntityMalleable(v, entity.ID)
+	return mc.isEntityMalleable(v, entity.ID)
 }
 
 // isEntityMalleable is a helper function to recursively check fields of the entity.
 // Every time we change a field we check if ID of the entity has changed. If the ID has not changed then entity is malleable.
 // This function returns error if the entity is malleable, otherwise it returns nil.
-func (t *MalleabilityChecker) isEntityMalleable(v reflect.Value, idFunc func() flow.Identifier) error {
+func (mc *MalleabilityChecker) isEntityMalleable(v reflect.Value, idFunc func() flow.Identifier) error {
 	if err := ensureFieldNotEmpty(v); err != nil {
 		return err
 	}
 
 	tType := v.Type()
 	// if we have a custom type function we should use it to generate a random value for the field.
-	customTypeGenerator, hasCustomTypeOverride := t.customTypes[tType]
+	customTypeGenerator, hasCustomTypeOverride := mc.customTypes[tType]
 	if hasCustomTypeOverride {
 		origID := idFunc()
 		v.Set(customTypeGenerator())
@@ -177,7 +177,7 @@ func (t *MalleabilityChecker) isEntityMalleable(v reflect.Value, idFunc func() f
 					}
 					return err
 				}
-				if err := t.isEntityMalleable(field, idFunc); err != nil {
+				if err := mc.isEntityMalleable(field, idFunc); err != nil {
 					return fmt.Errorf("field %s is malleable: %w", tType.Field(i).Name, err)
 				}
 			}
