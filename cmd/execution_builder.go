@@ -224,8 +224,9 @@ func (builder *ExecutionNodeBuilder) LoadComponentsAndModules() {
 		// so it will be easier to follow and refactor later
 		Component("execution state", exeNode.LoadExecutionState).
 		// Load the admin tool when chunk data packs db are initialized in execution state
-		AdminCommand("chunk-data-packs-checkpoint", func(config *NodeConfig) commands.AdminCommand {
-			return storageCommands.NewChunksCheckpointCommand(exeNode.chunkDataPackDB)
+		AdminCommand("create-chunk-data-packs-checkpoint", func(config *NodeConfig) commands.AdminCommand {
+			// checkpoints will be created under "/data/chunk_data_packs_checkpoints"
+			return storageCommands.NewChunksCheckpointCommand("/data/chunk_data_packs_checkpoints", exeNode.chunkDataPackDB)
 		}).
 		Component("stop control", exeNode.LoadStopControl).
 		Component("execution state ledger WAL compactor", exeNode.LoadExecutionStateLedgerWALCompactor).
