@@ -222,11 +222,14 @@ func (suite *BackfillTxErrorMessagesSuite) TestValidateInvalidFormat() {
 	// end-height is greater than latest sealed block
 	suite.Run("invalid end-height is greater than latest sealed block", func() {
 		endHeight := 100
-		err := suite.command.Validator(&admin.CommandRequest{
+		executorIDsList, err := commands.ConvertToInterfaceList([]string{suite.allENIDs[0].ID().String()})
+		suite.Require().NoError(err)
+
+		err = suite.command.Validator(&admin.CommandRequest{
 			Data: map[string]interface{}{
 				"start-height":       float64(1),         // raw json parses to float64
 				"end-height":         float64(endHeight), // raw json parses to float64
-				"execution-node-ids": []string{suite.allENIDs[0].ID().String()},
+				"execution-node-ids": executorIDsList,
 			},
 		})
 		suite.Error(err)
@@ -253,10 +256,13 @@ func (suite *BackfillTxErrorMessagesSuite) TestValidateInvalidFormat() {
 
 	// invalid execution-node-ids param
 	suite.Run("invalid execution-node-ids field", func() {
+		executorIDsList, err := commands.ConvertToInterfaceList([]int{1, 2, 3})
+		suite.Require().NoError(err)
+
 		// invalid type
-		err := suite.command.Validator(&admin.CommandRequest{
+		err = suite.command.Validator(&admin.CommandRequest{
 			Data: map[string]interface{}{
-				"execution-node-ids": []int{1, 2, 3},
+				"execution-node-ids": executorIDsList,
 			},
 		})
 		suite.Error(err)
@@ -275,16 +281,24 @@ func (suite *BackfillTxErrorMessagesSuite) TestValidateInvalidFormat() {
 
 		// invalid execution node id
 		invalidENID := unittest.IdentifierFixture()
+		executorIDsList, err = commands.ConvertToInterfaceList([]string{invalidENID.String()})
+		suite.Require().NoError(err)
+
 		err = suite.command.Validator(&admin.CommandRequest{
 			Data: map[string]interface{}{
 				"start-height":       float64(1), // raw json parses to float64
 				"end-height":         float64(4), // raw json parses to float64
-				"execution-node-ids": []string{invalidENID.String()},
+				"execution-node-ids": executorIDsList,
 			},
 		})
 		suite.Error(err)
-		suite.Equal(err, admin.NewInvalidAdminReqParameterError(
-			"execution-node-ids", "could not find execution node by provided id", invalidENID.String()))
+		suite.Equal(
+			err,
+			admin.NewInvalidAdminReqParameterError(
+				"execution-node-ids",
+				"could not find execution node by provided id", invalidENID,
+			),
+		)
 	})
 }
 
@@ -304,13 +318,16 @@ func (suite *BackfillTxErrorMessagesSuite) TestValidateValidFormat() {
 		suite.NoError(err)
 	})
 
+	executorIDsList, err := commands.ConvertToInterfaceList([]string{suite.allENIDs[0].ID().String()})
+	suite.Require().NoError(err)
+
 	// all parameters are provided
 	suite.Run("happy case, all parameters are provided", func() {
-		err := suite.command.Validator(&admin.CommandRequest{
+		err = suite.command.Validator(&admin.CommandRequest{
 			Data: map[string]interface{}{
 				"start-height":       float64(1), // raw json parses to float64
 				"end-height":         float64(3), // raw json parses to float64
-				"execution-node-ids": []string{suite.allENIDs[0].ID().String()},
+				"execution-node-ids": executorIDsList,
 			},
 		})
 		suite.NoError(err)
@@ -374,11 +391,14 @@ func (suite *BackfillTxErrorMessagesSuite) TestHandleBackfillTxErrorMessages() {
 		suite.allENIDs = unittest.IdentityListFixture(3, unittest.WithRole(flow.RoleExecution))
 
 		executorID := suite.allENIDs[1].ID()
+		executorIDsList, err := commands.ConvertToInterfaceList([]string{executorID.String()})
+		suite.Require().NoError(err)
+
 		req = &admin.CommandRequest{
 			Data: map[string]interface{}{
 				"start-height":       float64(startHeight), // raw json parses to float64
 				"end-height":         float64(endHeight),   // raw json parses to float64
-				"execution-node-ids": []string{executorID.String()},
+				"execution-node-ids": executorIDsList,
 			},
 		}
 		suite.Require().NoError(suite.command.Validator(req))
@@ -401,7 +421,7 @@ func (suite *BackfillTxErrorMessagesSuite) TestHandleBackfillTxErrorMessages() {
 			suite.mockStoreTxErrorMessages(blockId, results, executorID)
 		}
 
-		_, err := suite.command.Handler(ctx, req)
+		_, err = suite.command.Handler(ctx, req)
 		suite.Require().NoError(err)
 		suite.assertAllExpectations()
 	})
