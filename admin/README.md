@@ -122,4 +122,6 @@ curl localhost:9002/admin/run_command -H 'Content-Type: application/json' -d '{"
 ```
 
 ### Trigger chunk data pack pebble database checkpoint
+```
 curl localhost:9002/admin/run_command -H 'Content-Type: application/json' -d '{"commandName": "create-chunk-data-packs-checkpoint" }'
+```
