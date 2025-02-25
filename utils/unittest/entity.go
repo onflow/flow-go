@@ -246,7 +246,7 @@ func generateRandomReflectValue(field reflect.Value) error {
 					return err
 				}
 				field.SetMapIndex(key, newVal)
-				break
+				return nil
 			}
 		} else {
 			return fmt.Errorf("cannot generate random value for empty map")
