@@ -35,7 +35,6 @@ func TestBootstrapAndOpen(t *testing.T) {
 	})
 
 	protoutil.RunWithBootstrapState(t, rootSnapshot, func(db *badger.DB, _ *bprotocol.State) {
-
 		// expect the final view metric to be set to current epoch's final view
 		epoch, err := rootSnapshot.Epochs().Current()
 		require.NoError(t, err)
@@ -71,7 +70,6 @@ func TestBootstrapAndOpen(t *testing.T) {
 			all.VersionBeacons,
 		)
 		require.NoError(t, err)
-
 		complianceMetrics.AssertExpectations(t)
 
 		finalSnap := state.Final()

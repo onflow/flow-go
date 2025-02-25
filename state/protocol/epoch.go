@@ -83,9 +83,7 @@ type EpochQuery interface {
 //
 // See https://github.com/dapperlabs/flow-go/issues/6368 for details and proposal
 type CommittedEpoch interface {
-
-	// Counter returns the Epoch's counter.
-	Counter() uint64
+	TentativeEpoch
 
 	// FirstView returns the first view of this epoch.
 	FirstView() uint64
@@ -123,18 +121,10 @@ type CommittedEpoch interface {
 	// UnsafeRandom() Cadence function.
 	RandomSource() []byte
 
-	// InitialIdentities returns the identities for this epoch as they were
-	// specified in the EpochSetup service event.
-	InitialIdentities() flow.IdentitySkeletonList
-
-	// Clustering returns the cluster assignment for this epoch.
-	// No errors expected during normal operation.
-	Clustering() (flow.ClusterList, error)
-
 	// Cluster returns the detailed cluster information for the cluster with the
 	// given index, in this epoch.
 	// Error returns:
-	//   * protocol.ErrClusterNotFound - if no cluster has the given index (index > len(clusters))
+	//   * protocol.ErrClusterNotFound - if no cluster has the given index (index >= len(clusters))
 	//   * generic error in case of internal state corruption
 	Cluster(index uint) (Cluster, error)
 
@@ -154,7 +144,7 @@ type CommittedEpoch interface {
 	// height so that: B.View >= E.FirstView
 	// The first block of an epoch is not defined until it is finalized.
 	// Error returns:
-	//   * protocol.ErrUnknownEpochBoundary - if the first block of the epoch is unknown.
+	//   * protocol.ErrUnknownEpochBoundary - if the first block of the epoch is unknown or unfinalized.
 	FirstHeight() (uint64, error)
 
 	// FinalHeight returns the height of the final block of the epoch.
@@ -162,7 +152,7 @@ type CommittedEpoch interface {
 	// block in epoch E+1 (see definition from FirstHeight).
 	// The final block of an epoch is not defined until its child is finalized.
 	// Error returns:
-	//   * protocol.ErrUnknownEpochBoundary - if the first block of the next epoch is unknown.
+	//   * protocol.ErrUnknownEpochBoundary - if the first block of the next epoch is unknown or unfinalized.
 	FinalHeight() (uint64, error)
 }
 

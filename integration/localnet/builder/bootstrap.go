@@ -16,8 +16,9 @@ import (
 	"github.com/go-yaml/yaml"
 
 	"github.com/onflow/flow-go/cmd/build"
-	"github.com/onflow/flow-go/integration/testnet"
 	"github.com/onflow/flow-go/model/flow"
+
+	"github.com/onflow/flow-go/integration/testnet"
 )
 
 const (
@@ -51,27 +52,27 @@ const (
 )
 
 var (
-	collectionCount            int
-	consensusCount             int
-	executionCount             int
-	verificationCount          int
-	accessCount                int
-	observerCount              int
-	testExecutionCount         int
-	nClusters                  uint
-	numViewsInStakingPhase     uint64
-	numViewsInDKGPhase         uint64
-	numViewsEpoch              uint64
-	numViewsPerSecond          uint64
-	epochCommitSafetyThreshold uint64
-	profiler                   bool
-	profileUploader            bool
-	tracing                    bool
-	cadenceTracing             bool
-	extesiveTracing            bool
-	consensusDelay             time.Duration
-	collectionDelay            time.Duration
-	logLevel                   string
+	collectionCount             int
+	consensusCount              int
+	executionCount              int
+	verificationCount           int
+	accessCount                 int
+	observerCount               int
+	testExecutionCount          int
+	nClusters                   uint
+	numViewsInStakingPhase      uint64
+	numViewsInDKGPhase          uint64
+	numViewsEpoch               uint64
+	numViewsPerSecond           uint64
+	finalizationSafetyThreshold uint64
+	profiler                    bool
+	profileUploader             bool
+	tracing                     bool
+	cadenceTracing              bool
+	extesiveTracing             bool
+	consensusDelay              time.Duration
+	collectionDelay             time.Duration
+	logLevel                    string
 
 	ports *PortAllocator
 )
@@ -88,7 +89,7 @@ func init() {
 	flag.Uint64Var(&numViewsEpoch, "epoch-length", 10000, "number of views in epoch")
 	flag.Uint64Var(&numViewsInStakingPhase, "epoch-staking-phase-length", 2000, "number of views in epoch staking phase")
 	flag.Uint64Var(&numViewsInDKGPhase, "epoch-dkg-phase-length", 2000, "number of views in epoch dkg phase")
-	flag.Uint64Var(&epochCommitSafetyThreshold, "epoch-commit-safety-threshold", 1000, "number of views for safety threshold T (assume: one finalization occurs within T blocks)")
+	flag.Uint64Var(&finalizationSafetyThreshold, "finalization-safety-threshold", 1000, "number of views for safety threshold T (assume: one finalization occurs within T blocks)")
 	flag.Uint64Var(&numViewsPerSecond, "target-view-rate", 1, "target number of views per second")
 	flag.BoolVar(&profiler, "profiler", DefaultProfiler, "whether to enable the auto-profiler")
 	flag.BoolVar(&profileUploader, "profile-uploader", DefaultProfileUploader, "whether to upload profiles to the cloud")
@@ -138,8 +139,8 @@ func main() {
 	if numViewsInDKGPhase != 0 {
 		flowNetworkOpts = append(flowNetworkOpts, testnet.WithViewsInDKGPhase(numViewsInDKGPhase))
 	}
-	if epochCommitSafetyThreshold != 0 {
-		flowNetworkOpts = append(flowNetworkOpts, testnet.WithEpochCommitSafetyThreshold(epochCommitSafetyThreshold))
+	if finalizationSafetyThreshold != 0 {
+		flowNetworkOpts = append(flowNetworkOpts, testnet.WithFinalizationSafetyThreshold(finalizationSafetyThreshold))
 	}
 	flowNetworkConf := testnet.NewNetworkConfig("localnet", flowNodes, flowNetworkOpts...)
 	displayFlowNetworkConf(flowNetworkConf)
@@ -402,6 +403,8 @@ func prepareExecutionService(container testnet.ContainerConfig, i int, n int) Se
 		fmt.Sprintf("--extensive-tracing=%t", extesiveTracing),
 		"--execution-data-dir=/data/execution-data",
 		"--chunk-data-pack-dir=/data/chunk-data-pack",
+		"--pruning-config-threshold=20",
+		"--pruning-config-sleep-after-iteration=1m",
 	)
 
 	service.Volumes = append(service.Volumes,

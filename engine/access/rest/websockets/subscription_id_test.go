@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -14,7 +13,7 @@ func TestNewSubscriptionID(t *testing.T) {
 
 		assert.NoError(t, err)
 		assert.NotEmpty(t, subscriptionID.id)
-		assert.NoError(t, uuid.Validate(subscriptionID.id), "Generated ID should be a valid UUID")
+		assert.Len(t, subscriptionID.id, maxLen)
 	})
 
 	t.Run("should return valid SubscriptionID when input ID is valid", func(t *testing.T) {

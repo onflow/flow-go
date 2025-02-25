@@ -539,7 +539,7 @@ func bootstrapEpochForProtocolStateEntry(
 
 			if commit != nil {
 				if err := protocol.IsValidEpochCommit(commit, setup); err != nil {
-					return fmt.Errorf("invalid EpochCommit for next epoch")
+					return fmt.Errorf("invalid EpochCommit for next epoch: %w", err)
 				}
 				commits = append(commits, commit)
 			}
@@ -848,11 +848,8 @@ func updateEpochMetrics(metrics module.ComplianceMetrics, snap protocol.Snapshot
 	if err != nil {
 		return fmt.Errorf("could not get current epoch: %w", err)
 	}
-	// update epoch counter
 	metrics.CurrentEpochCounter(currentEpoch.Counter())
-
 	metrics.CurrentEpochFinalView(currentEpoch.FinalView())
-
 	metrics.CurrentDKGPhaseViews(currentEpoch.DKGPhase1FinalView(), currentEpoch.DKGPhase2FinalView(), currentEpoch.DKGPhase3FinalView())
 
 	epochProtocolState, err := snap.EpochProtocolState()
