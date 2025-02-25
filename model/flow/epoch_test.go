@@ -54,8 +54,7 @@ func TestMalleability(t *testing.T) {
 
 	checker = unittest.NewMalleabilityChecker(unittest.WithCustomType(flow.EpochStateContainer{}, func() any {
 		return epochStateContainerFixture()
-	}),
-	)
+	}))
 	t.Run("MinEpochStateEntry", func(t *testing.T) {
 		err := checker.Check(unittest.EpochStateFixture(unittest.WithNextEpochProtocolState()).MinEpochStateEntry)
 		require.NoError(t, err)
