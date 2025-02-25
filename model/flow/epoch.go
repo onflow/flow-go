@@ -264,7 +264,7 @@ type EpochCommit struct {
 	// CAUTION: This mapping may include identifiers for nodes which do not exist in the consensus committee
 	//          and may NOT include identifiers for all nodes in the consensus committee.
 	//
-	DKGIndexMap DKGIndexMap
+	DKGIndexMap DKGIndexMap `malleability:"optional"`
 }
 
 // ClusterQCVoteData represents the votes for a cluster quorum certificate, as
@@ -582,9 +582,4 @@ type EventIDs struct {
 	SetupID Identifier
 	// CommitID is the ID of the EpochCommit event for the respective Epoch
 	CommitID Identifier
-}
-
-// ID returns hash of the event IDs.
-func (e *EventIDs) ID() Identifier {
-	return MakeID(e)
 }
