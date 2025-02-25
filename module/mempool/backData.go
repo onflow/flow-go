@@ -6,7 +6,7 @@ package mempool
 // model layer of the mempool, the safety against concurrent operations are guaranteed by the Backend that
 // is the control layer.
 type BackData[K comparable, V any] interface {
-	// Has checks if backdata already contains the entity with the given identifier.
+	// Has checks if backdata already contains the value with the given key.
 	Has(key K) bool
 
 	// Add adds the value associated with key.
