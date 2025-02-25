@@ -223,6 +223,10 @@ func (builder *ExecutionNodeBuilder) LoadComponentsAndModules() {
 		// I prefer to use dummy component now and keep the bootstrapping steps properly separated,
 		// so it will be easier to follow and refactor later
 		Component("execution state", exeNode.LoadExecutionState).
+		// Load the admin tool when chunk data packs db are initialized in execution state
+		AdminCommand("chunk-data-packs-checkpoint", func(config *NodeConfig) commands.AdminCommand {
+			return storageCommands.NewChunksCheckpointCommand(exeNode.chunkDataPackDB)
+		}).
 		Component("stop control", exeNode.LoadStopControl).
 		Component("execution state ledger WAL compactor", exeNode.LoadExecutionStateLedgerWALCompactor).
 		// disable execution data pruner for now, since storehouse is going to need the execution data
