@@ -60,22 +60,25 @@ func RequireEntityNonMalleable(t *testing.T, entity flow.IDEntity, ops ...Mallea
 // This structure is used to check if the entity is malleable. Strictly speaking if a structure implements [flow.IDEntity] interface
 // any change to the data structure has to change the ID of the entity as well.
 // This structure performs a recursive check of all fields of the entity and ensures that changing any field will change the ID of the entity.
-// The idea behind implementation is that user provides a structure which serves a layout(scheme) for the entity and
-// the checker will generate random values for the fields that are not empty or nil. This way it supports structures where some fields
-// are omitted in some scenarios but the structure has to be non-malleable.
+// The idea behind implementation is that user provides a structure which serves a layout (schema) for the entity.
+// Inputs must have all non-nil and non-empty slice/map fields, otherwise Check will return an error.
+// In rare cases, a type may have a different ID computation depending on whether a field is nil.
+// In such cases, we can use the `malleability:"optional"` struct tag to skip malleability checks when the field is nil.
+//
 // This checker heavily relies on generation of random values for the fields based on their type. All types are split into three categories:
-// 1) structures (generateCustomFlowValue)
-// 2) interfaces (generateInterfaceFlowValue)
-// 3) primitives, slices, arrays, maps (generateRandomReflectValue)
+//  1. structures (generateCustomFlowValue)
+//  2. interfaces (generateInterfaceFlowValue)
+//  3. primitives, slices, arrays, maps (generateRandomReflectValue)
+//
 // Checker knows how to deal with each of the categories and generate random values for them but not for all types.
 // If the type is not recognized there are two ways:
-// 1) User can provide a custom type generator for the type using WithCustomType option.
-// 2) User can extend the checker with new type handling.
+//  1. User can provide a custom type generator for the type using WithCustomType option.
+//  2. User can extend the checker with new type handling.
+//
 // It is recommended to use the second option if type is used in multiple places and general enough. For other cases
 // it is better to use the first option. Mind that the first option overrides any type handling that is embedded in the checker.
 // This is very useful for cases where the field is context-sensitive, and we cannot generate a completely random value.
 type MalleabilityChecker struct {
-	*testing.T
 	customTypes map[reflect.Type]func() reflect.Value
 }
 
@@ -104,6 +107,10 @@ func NewMalleabilityChecker(ops ...MalleabilityCheckerOpt) *MalleabilityChecker 
 }
 
 // Check is a method that performs the malleability check on the entity.
+// The malleability check is recursively applied to all fields of the entity.
+// Inputs must have all non-nil and non-empty slice/map fields, otherwise Check will return an error.
+// In rare cases, a type may have a different ID computation depending on whether a field is nil.
+// In such cases, we can use the `malleability:"optional"` struct tag to skip malleability checks when the field is nil.
 // It returns an error if the entity is malleable, otherwise it returns nil.
 func (t *MalleabilityChecker) Check(entity flow.IDEntity) error {
 	v := reflect.ValueOf(entity)
@@ -205,8 +212,9 @@ func ensureFieldNotEmpty(v reflect.Value) error {
 }
 
 // generateRandomReflectValue uses reflection to switch on the field type and generate a random value for it.
-// Returned values indicate if the field was generated and if there was an error during the generation.
-// No errors are expected during normal operations.
+// This function mutates the input [reflect.Value]. If it cannot mutate the input, an error is returned and the malleability check should be considered failed.
+// In rare cases, a type may have a different ID computation depending on whether a field is nil.
+// In such cases, we can use the `malleability:"optional"` struct tag to skip malleability checks when the field is nil.
 func generateRandomReflectValue(field reflect.Value) (generated bool, err error) {
 	generated = true
 	switch field.Kind() {
