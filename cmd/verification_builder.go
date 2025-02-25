@@ -194,6 +194,8 @@ func (v *VerificationNodeBuilder) LoadComponentsAndModules() {
 				chunkQueue = queue
 			case dbops.PebbleBatch:
 				return fmt.Errorf("to be implemented")
+			default:
+				return fmt.Errorf("invalid db opts type: %v", v.verConf.dbOps)
 			}
 
 			node.Logger.Info().
