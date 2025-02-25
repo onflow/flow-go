@@ -77,6 +77,41 @@ func (_m *BlockIterator) Next() (flow.Identifier, bool, error) {
 	return r0, r1, r2
 }
 
+// Progress provides a mock function with given fields:
+func (_m *BlockIterator) Progress() (uint64, uint64, uint64) {
+	ret := _m.Called()
+
+	if len(ret) == 0 {
+		panic("no return value specified for Progress")
+	}
+
+	var r0 uint64
+	var r1 uint64
+	var r2 uint64
+	if rf, ok := ret.Get(0).(func() (uint64, uint64, uint64)); ok {
+		return rf()
+	}
+	if rf, ok := ret.Get(0).(func() uint64); ok {
+		r0 = rf()
+	} else {
+		r0 = ret.Get(0).(uint64)
+	}
+
+	if rf, ok := ret.Get(1).(func() uint64); ok {
+		r1 = rf()
+	} else {
+		r1 = ret.Get(1).(uint64)
+	}
+
+	if rf, ok := ret.Get(2).(func() uint64); ok {
+		r2 = rf()
+	} else {
+		r2 = ret.Get(2).(uint64)
+	}
+
+	return r0, r1, r2
+}
+
 // NewBlockIterator creates a new instance of BlockIterator. It also registers a testing interface on the mock and a cleanup function to assert the mocks expectations.
 // The first argument is typically a *testing.T value.
 func NewBlockIterator(t interface {
