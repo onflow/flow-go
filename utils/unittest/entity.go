@@ -228,29 +228,28 @@ func generateRandomReflectValue(field reflect.Value) error {
 	case reflect.Bool:
 		field.SetBool(!field.Bool())
 	case reflect.Slice:
-		if field.Len() > 0 {
-			index := rand.Intn(field.Len())
-			return generateRandomReflectValue(field.Index(index))
-		} else {
+		sliceLen := field.Len()
+		if sliceLen <= 0 {
 			return fmt.Errorf("cannot generate random value for empty slice")
 		}
+		index := rand.Intn(sliceLen)
+		return generateRandomReflectValue(field.Index(index))
 	case reflect.Array:
 		index := rand.Intn(field.Len())
 		return generateRandomReflectValue(field.Index(index))
 	case reflect.Map:
-		if mapKeys := field.MapKeys(); len(mapKeys) > 0 {
-			for _, key := range mapKeys {
-				oldVal := field.MapIndex(key)
-				newVal := reflect.New(oldVal.Type()).Elem()
-				if err := generateRandomReflectValue(newVal); err != nil {
-					return err
-				}
-				field.SetMapIndex(key, newVal)
-				return nil
-			}
-		} else {
+		mapKeys := field.MapKeys()
+		if len(mapKeys) == 0 {
 			return fmt.Errorf("cannot generate random value for empty map")
 		}
+		index := rand.Intn(len(mapKeys))
+		key := mapKeys[index]
+		oldVal := field.MapIndex(key)
+		newVal := reflect.New(oldVal.Type()).Elem()
+		if err := generateRandomReflectValue(newVal); err != nil {
+			return err
+		}
+		field.SetMapIndex(key, newVal)
 	case reflect.Ptr:
 		if field.IsNil() {
 			return fmt.Errorf("cannot generate random value for nil pointer")
