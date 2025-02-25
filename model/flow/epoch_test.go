@@ -35,9 +35,7 @@ func TestMalleability(t *testing.T) {
 }
 
 func TestClusterQCVoteData_Equality(t *testing.T) {
-
 	pks := unittest.PublicKeysFixture(2, crypto.BLSBLS12381)
-
 	_ = len(pks)
 
 	t.Run("empty structures are equal", func(t *testing.T) {

@@ -186,12 +186,12 @@ func (mc *MalleabilityChecker) isEntityMalleable(v reflect.Value, idFunc func() 
 	} else {
 		// when dealing with non-composite type we can generate random values for it and check if ID has changed.
 		origID := idFunc()
-		expectChange, err := generateRandomReflectValue(v)
+		err := generateRandomReflectValue(v)
 		if err != nil {
 			return fmt.Errorf("failed to generate random value for field %s: %w", tType.String(), err)
 		}
 		newID := idFunc()
-		if !expectChange || origID != newID {
+		if origID != newID {
 			return nil
 		}
 		return fmt.Errorf("ID did not change after changing field %s", tType.String())
@@ -215,8 +215,7 @@ func ensureFieldNotEmpty(v reflect.Value) error {
 // This function mutates the input [reflect.Value]. If it cannot mutate the input, an error is returned and the malleability check should be considered failed.
 // In rare cases, a type may have a different ID computation depending on whether a field is nil.
 // In such cases, we can use the `malleability:"optional"` struct tag to skip malleability checks when the field is nil.
-func generateRandomReflectValue(field reflect.Value) (generated bool, err error) {
-	generated = true
+func generateRandomReflectValue(field reflect.Value) error {
 	switch field.Kind() {
 	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
 		field.SetUint(^field.Uint())
@@ -231,46 +230,48 @@ func generateRandomReflectValue(field reflect.Value) (generated bool, err error)
 	case reflect.Slice:
 		if field.Len() > 0 {
 			index := rand.Intn(field.Len())
-			generated, err = generateRandomReflectValue(field.Index(index))
+			return generateRandomReflectValue(field.Index(index))
 		} else {
-			generated = false // empty slice is ignored
+			return fmt.Errorf("cannot generate random value for empty slice")
 		}
 	case reflect.Array:
 		index := rand.Intn(field.Len())
-		generated, err = generateRandomReflectValue(field.Index(index))
+		return generateRandomReflectValue(field.Index(index))
 	case reflect.Map:
 		if mapKeys := field.MapKeys(); len(mapKeys) > 0 {
 			for _, key := range mapKeys {
 				oldVal := field.MapIndex(key)
 				newVal := reflect.New(oldVal.Type()).Elem()
-				generated, err = generateRandomReflectValue(newVal)
+				if err := generateRandomReflectValue(newVal); err != nil {
+					return err
+				}
 				field.SetMapIndex(key, newVal)
 				break
 			}
 		} else {
-			generated = false // empty map is ignored
+			return fmt.Errorf("cannot generate random value for empty map")
 		}
 	case reflect.Ptr:
 		if field.IsNil() {
-			return false, fmt.Errorf("cannot generate random value for nil pointer")
+			return fmt.Errorf("cannot generate random value for nil pointer")
 		}
-		generated, err = generateRandomReflectValue(field.Elem()) // modify underlying value
+		return generateRandomReflectValue(field.Elem()) // modify underlying value
 	case reflect.Struct:
 		generatedValue := reflect.ValueOf(generateCustomFlowValue(field))
 		if !generatedValue.IsValid() {
-			return false, fmt.Errorf("cannot generate random value for struct: %s", field.Type().String())
+			return fmt.Errorf("cannot generate random value for struct: %s", field.Type().String())
 		}
 		field.Set(generatedValue)
 	case reflect.Interface:
 		generatedValue := reflect.ValueOf(generateInterfaceFlowValue(field)) // it's always a pointer
 		if !generatedValue.IsValid() {
-			return false, fmt.Errorf("cannot generate random value for interface: %s", field.Type().String())
+			return fmt.Errorf("cannot generate random value for interface: %s", field.Type().String())
 		}
 		field.Set(generatedValue)
 	default:
-		return false, fmt.Errorf("cannot generate random value, unsupported type: %s", field.Kind().String())
+		return fmt.Errorf("cannot generate random value, unsupported type: %s", field.Kind().String())
 	}
-	return
+	return nil
 }
 
 // generateCustomFlowValue generates a random value for the field of the struct that is not a primitive type.
