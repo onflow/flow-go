@@ -1,12 +1,16 @@
 package cmd
 
 import (
+	"fmt"
+
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
 
-	"github.com/onflow/flow-go/cmd/util/cmd/common"
 	findBlockByCommits "github.com/onflow/flow-go/cmd/util/cmd/read-badger/cmd/find-block-by-commits"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module/metrics"
+	"github.com/onflow/flow-go/storage"
+	"github.com/onflow/flow-go/storage/store"
 )
 
 func init() {
@@ -22,25 +26,28 @@ var commitsCmd = &cobra.Command{
 	Use:   "commits",
 	Short: "get commit by block ID",
 	Run: func(cmd *cobra.Command, args []string) {
-		_, db := InitStorages()
-		defer db.Close()
+		err := WithStorage(func(db storage.DB) error {
 
-		commits := common.InitExecutionStorages(db).Commits
+			commits := store.NewCommits(metrics.NewNoopCollector(), db)
 
-		log.Info().Msgf("got flag block id: %s", flagBlockID)
-		blockID, err := flow.HexStringToIdentifier(flagBlockID)
+			log.Info().Msgf("got flag block id: %s", flagBlockID)
+			blockID, err := flow.HexStringToIdentifier(flagBlockID)
+			if err != nil {
+				return fmt.Errorf("malformed block id: %w", err)
+			}
+
+			log.Info().Msgf("getting commit by block id: %v", blockID)
+			commit, err := commits.ByBlockID(blockID)
+			if err != nil {
+				return fmt.Errorf("could not get commit for block id: %v: %w", blockID, err)
+			}
+
+			log.Info().Msgf("commit: %x", commit)
+			return nil
+		})
+
 		if err != nil {
-			log.Error().Err(err).Msg("malformed block id")
-			return
+			log.Error().Err(err).Msg("could not get events")
 		}
-
-		log.Info().Msgf("getting commit by block id: %v", blockID)
-		commit, err := commits.ByBlockID(blockID)
-		if err != nil {
-			log.Error().Err(err).Msgf("could not get commit for block id: %v", blockID)
-			return
-		}
-
-		log.Info().Msgf("commit: %x", commit)
 	},
 }
