@@ -29,6 +29,7 @@ func IterateExecuteAndCommitInBatch(
 	// ctx is used for cancelling the iteration when the context is done
 	ctx context.Context,
 	log zerolog.Logger,
+	metrics module.ExecutionMetrics,
 	// iterator decides how to iterate over blocks
 	iter module.BlockIterator,
 	// executor decides what data in the storage will be updated for a certain block
@@ -59,7 +60,7 @@ func IterateExecuteAndCommitInBatch(
 		case <-ctx.Done():
 			if iteratedCountInCurrentBatch > 0 {
 				// commit the last batch
-				err := commitAndCheckpoint(log, batch, iter)
+				err := commitAndCheckpoint(log, metrics, batch, iter)
 				if err != nil {
 					return err
 				}
@@ -77,7 +78,7 @@ func IterateExecuteAndCommitInBatch(
 		if !hasNext {
 			if iteratedCountInCurrentBatch > 0 {
 				// commit last batch
-				err := commitAndCheckpoint(log, batch, iter)
+				err := commitAndCheckpoint(log, metrics, batch, iter)
 				if err != nil {
 					return err
 				}
@@ -97,7 +98,7 @@ func IterateExecuteAndCommitInBatch(
 		// if batch is full, commit and sleep
 		if iteratedCountInCurrentBatch >= batchSize {
 			// commit the batch and save the progress
-			err := commitAndCheckpoint(log, batch, iter)
+			err := commitAndCheckpoint(log, metrics, batch, iter)
 			if err != nil {
 				return err
 			}
@@ -120,11 +121,9 @@ func IterateExecuteAndCommitInBatch(
 
 // commitAndCheckpoint commits the batch and checkpoints the iterator
 // so that the iteration progress can be resumed after restart.
-func commitAndCheckpoint(log zerolog.Logger, batch storage.Batch, iter module.BlockIterator) error {
+func commitAndCheckpoint(
+	log zerolog.Logger, metrics module.ExecutionMetrics, batch storage.Batch, iter module.BlockIterator) error {
 	start := time.Now()
-	defer func() {
-		log.Info().Str("commit-duration", time.Since(start).String()).Msg("batch committed")
-	}()
 
 	err := batch.Commit()
 	if err != nil {
@@ -136,5 +135,40 @@ func commitAndCheckpoint(log zerolog.Logger, batch storage.Batch, iter module.Bl
 		return fmt.Errorf("failed to checkpoint iterator: %w", err)
 	}
 
+	startIndex, endIndex, nextIndex := iter.Progress()
+	progress := CalculateProgress(startIndex, endIndex, nextIndex)
+
+	log.Info().
+		Str("commit-dur", time.Since(start).String()).
+		Uint64("start-index", startIndex).
+		Uint64("end-index", endIndex).
+		Uint64("next-index", nextIndex).
+		Str("progress", fmt.Sprintf("%.2f%%", progress)).
+		Msg("batch committed")
+
+	metrics.ExecutionLastChunkDataPackPrunedHeight(nextIndex - 1)
+
 	return nil
+}
+
+// CalculateProgress calculates the progress of the iteration, it returns a percentage
+// of the progress. [0, 100]
+// start, end are both inclusive
+func CalculateProgress(start, end, current uint64) float64 {
+	if end < start {
+		return 100.0
+	}
+	// If start == end, there is one more to process
+
+	if current < start {
+		return 0.0 // If current is below start, assume 0%
+	}
+	if current > end {
+		return 100.0 // If current is above end, assume 100%
+	}
+	progress := float64(current-start) / float64(end-start) * 100.0
+	if progress > 100.0 {
+		return 100.0 // Cap at 100%
+	}
+	return progress
 }

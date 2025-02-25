@@ -116,6 +116,11 @@ func (_m *ExecutionMetrics) ExecutionSync(syncing bool) {
 	_m.Called(syncing)
 }
 
+// ExecutionTargetChunkDataPackPrunedHeight provides a mock function with given fields: height
+func (_m *ExecutionMetrics) ExecutionTargetChunkDataPackPrunedHeight(height uint64) {
+	_m.Called(height)
+}
+
 // ExecutionTransactionExecuted provides a mock function with given fields: dur, stats, info
 func (_m *ExecutionMetrics) ExecutionTransactionExecuted(dur time.Duration, stats module.TransactionExecutionResultStats, info module.TransactionExecutionResultInfo) {
 	_m.Called(dur, stats, info)
