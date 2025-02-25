@@ -111,6 +111,9 @@ func (s *TxErrorMessagesEngineSuite) SetupTest() {
 
 	// Mock the finalized and sealed root block header with height 0.
 	s.proto.params.On("FinalizedRoot").Return(s.rootBlock.Header, nil)
+	s.proto.params.On("SporkID").Return(unittest.IdentifierFixture(), nil)
+	s.proto.params.On("ProtocolVersion").Return(uint(1), nil)
+	s.proto.params.On("SporkRootBlockHeight").Return(uint64(0), nil)
 	s.proto.params.On("SealedRoot").Return(s.rootBlock.Header, nil)
 
 	s.proto.snapshot.On("Head").Return(
