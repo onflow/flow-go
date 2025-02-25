@@ -12,6 +12,7 @@ EPOCHLEN=10000                  # 0 means use default
 STAKINGLEN=2000                 # 0 means use default
 DKGLEN=2000                     # 0 means use default
 FINALIZATIONSAFETYTHRESHOLD=1000 # 0 means use default
+CONSENSUS_DELAY=800ms
 COLLECTION_DELAY=950ms
 
 PROFILER=false
@@ -70,6 +71,7 @@ else
 		-tracing=$(TRACING) \
 		-cadence-tracing=$(CADENCE_TRACING) \
 		-extensive-tracing=$(EXTENSIVE_TRACING) \
+		-consensus-delay=$(CONSENSUS_DELAY) \
 		-collection-delay=$(COLLECTION_DELAY)
 endif
 

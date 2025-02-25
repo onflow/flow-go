@@ -47,6 +47,7 @@ const (
 	DefaultTracing            = true
 	DefaultCadenceTracing     = false
 	DefaultExtensiveTracing   = false
+	DefaultConsensusDelay     = 800 * time.Millisecond
 	DefaultCollectionDelay    = 950 * time.Millisecond
 )
 
@@ -69,6 +70,7 @@ var (
 	tracing                     bool
 	cadenceTracing              bool
 	extensiveTracing            bool
+	consensusDelay              time.Duration
 	collectionDelay             time.Duration
 	logLevel                    string
 
@@ -94,6 +96,7 @@ func init() {
 	flag.BoolVar(&tracing, "tracing", DefaultTracing, "whether to enable low-overhead tracing in flow")
 	flag.BoolVar(&cadenceTracing, "cadence-tracing", DefaultCadenceTracing, "whether to enable the tracing in cadance")
 	flag.BoolVar(&extensiveTracing, "extensive-tracing", DefaultExtensiveTracing, "enables high-overhead tracing in fvm")
+	flag.DurationVar(&consensusDelay, "consensus-delay", DefaultConsensusDelay, "delay on consensus node block proposals")
 	flag.DurationVar(&collectionDelay, "collection-delay", DefaultCollectionDelay, "delay on collection node block proposals")
 	flag.StringVar(&logLevel, "loglevel", DefaultLogLevel, "log level for all nodes")
 }
@@ -345,7 +348,10 @@ func prepareService(container testnet.ContainerConfig, i int, n int) Service {
 func prepareConsensusService(container testnet.ContainerConfig, i int, n int) Service {
 	service := prepareService(container, i, n)
 
+	timeout := 1200*time.Millisecond + consensusDelay
 	service.Command = append(service.Command,
+		fmt.Sprintf("--cruise-ctl-fallback-proposal-duration=%s", consensusDelay),
+		fmt.Sprintf("--hotstuff-min-timeout=%s", timeout),
 		"--cruise-ctl-max-view-duration=2s",
 		"--chunk-alpha=1",
 		"--emergency-sealing-active=false",
