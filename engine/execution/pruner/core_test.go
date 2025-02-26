@@ -121,3 +121,79 @@ func TestLoopPruneExecutionDataFromRootToLatestSealed(t *testing.T) {
 		})
 	})
 }
+
+func TestEstimateBatchProcessing(t *testing.T) {
+	tests := []struct {
+		name                      string
+		start, end                uint64
+		batchSize                 uint
+		sleepAfterEachBatchCommit time.Duration
+		commitDuration            time.Duration
+		expectedBatchCount        uint64
+		expectedTotalDuration     time.Duration
+	}{
+		{
+			name:                      "Normal case with multiple batches",
+			start:                     0,
+			end:                       100,
+			batchSize:                 10,
+			sleepAfterEachBatchCommit: time.Second,
+			commitDuration:            500 * time.Millisecond,
+			expectedBatchCount:        11,
+			expectedTotalDuration:     10*time.Second + 11*500*time.Millisecond,
+		},
+		{
+			name:                      "Single batch",
+			start:                     0,
+			end:                       5,
+			batchSize:                 10,
+			sleepAfterEachBatchCommit: time.Second,
+			commitDuration:            500 * time.Millisecond,
+			expectedBatchCount:        1,
+			expectedTotalDuration:     500 * time.Millisecond,
+		},
+		{
+			name:                      "Zero batch size",
+			start:                     0,
+			end:                       100,
+			batchSize:                 0,
+			sleepAfterEachBatchCommit: time.Second,
+			commitDuration:            500 * time.Millisecond,
+			expectedBatchCount:        0,
+			expectedTotalDuration:     0,
+		},
+		{
+			name:                      "Start greater than end",
+			start:                     100,
+			end:                       50,
+			batchSize:                 10,
+			sleepAfterEachBatchCommit: time.Second,
+			commitDuration:            500 * time.Millisecond,
+			expectedBatchCount:        0,
+			expectedTotalDuration:     0,
+		},
+		{
+			name:                      "Start equal to end",
+			start:                     50,
+			end:                       50,
+			batchSize:                 10,
+			sleepAfterEachBatchCommit: time.Second,
+			commitDuration:            500 * time.Millisecond,
+			expectedBatchCount:        1,
+			expectedTotalDuration:     500 * time.Millisecond,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			batchCount, totalDuration := EstimateBatchProcessing(tt.start, tt.end, tt.batchSize, tt.sleepAfterEachBatchCommit, tt.commitDuration)
+
+			if batchCount != tt.expectedBatchCount {
+				t.Errorf("expected batchCount %d, got %d", tt.expectedBatchCount, batchCount)
+			}
+			if totalDuration != tt.expectedTotalDuration {
+				t.Errorf("expected totalDuration %v, got %v", tt.expectedTotalDuration, totalDuration)
+			}
+		})
+	}
+}
