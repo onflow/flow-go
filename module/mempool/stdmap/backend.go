@@ -49,10 +49,6 @@ func (b *Backend[K, V]) Has(key K) bool {
 
 // Add adds the given item to the pool.
 func (b *Backend[K, V]) Add(key K, value V) bool {
-	// bs0 := binstat.EnterTime(binstat.BinStdmap + ".<<lock.(Backend)Add")
-	entityID := entity.ID() // this expensive operation done OUTSIDE of lock :-)
-	// binstat.Leave(bs0)
-
 	// bs1 := binstat.EnterTime(binstat.BinStdmap + ".w_lock.(Backend)Add")
 	b.Lock()
 	// binstat.Leave(bs1)
