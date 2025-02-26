@@ -954,7 +954,11 @@ func (fnb *FlowNodeBuilder) initMetrics() error {
 		// metrics enabled, report node info metrics as post init event
 		fnb.PostInit(func(nodeConfig *NodeConfig) error {
 			nodeInfoMetrics := metrics.NewNodeInfoCollector()
-			nodeInfoMetrics.NodeInfo(build.Version(), build.Commit(), nodeConfig.SporkID.String())
+			pstate, err := nodeConfig.State.Final().ProtocolState()
+			if err != nil {
+				return fmt.Errorf("could not get protocol state: %w", err)
+			}
+			nodeInfoMetrics.NodeInfo(build.Version(), build.Commit(), nodeConfig.SporkID.String(), pstate.GetProtocolStateVersion())
 			return nil
 		})
 	}

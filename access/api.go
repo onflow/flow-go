@@ -317,7 +317,7 @@ type NodeVersionInfo struct {
 	Semver  string
 	Commit  string
 	SporkId flow.Identifier
-	// TODO: should we replicate protocol state version here, or just remove this field?
+	// ProtocolVersion is the version number of this node's Protocol State
 	ProtocolVersion      uint64
 	SporkRootBlockHeight uint64
 	NodeRootBlockHeight  uint64

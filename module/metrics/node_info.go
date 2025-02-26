@@ -1,6 +1,8 @@
 package metrics
 
 import (
+	"strconv"
+
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
 )
@@ -12,9 +14,10 @@ type NodeInfoCollector struct {
 }
 
 const (
-	sporkIDLabel = "spork_id"
-	versionLabel = "version"
-	commitLabel  = "commit"
+	sporkIDLabel              = "spork_id"
+	versionLabel              = "version"
+	commitLabel               = "commit"
+	protocolStateVersionLabel = "protocol_state_version"
 )
 
 func NewNodeInfoCollector() *NodeInfoCollector {
@@ -29,8 +32,9 @@ func NewNodeInfoCollector() *NodeInfoCollector {
 	return collector
 }
 
-func (sc *NodeInfoCollector) NodeInfo(version, commit, sporkID string) {
+func (sc *NodeInfoCollector) NodeInfo(version, commit, sporkID string, protocolStateVersion uint64) {
 	sc.nodeInfo.WithLabelValues(versionLabel, version)
 	sc.nodeInfo.WithLabelValues(commitLabel, commit)
 	sc.nodeInfo.WithLabelValues(sporkIDLabel, sporkID)
+	sc.nodeInfo.WithLabelValues(protocolStateVersionLabel, strconv.FormatUint(protocolStateVersion, 10))
 }
