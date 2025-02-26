@@ -8,10 +8,6 @@
  */
 package models
 
-import (
-	"github.com/onflow/flow-go/engine/access/rest/common/models"
-)
-
 type Account struct {
 	Address string `json:"address"`
 	// Flow balance of the account.
@@ -19,5 +15,5 @@ type Account struct {
 	Keys       []AccountPublicKey `json:"keys,omitempty"`
 	Contracts  map[string]string  `json:"contracts,omitempty"`
 	Expandable *AccountExpandable `json:"_expandable"`
-	Links      *models.Links      `json:"_links,omitempty"`
+	Links      *Links             `json:"_links,omitempty"`
 }
