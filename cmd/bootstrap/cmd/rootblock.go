@@ -27,7 +27,7 @@ var (
 	flagRootParent    string
 	flagRootHeight    uint64
 	flagRootTimestamp string
-	// Deprecated: Replaced by ProtocolState KVStore version
+	// Deprecated: Replaced by ProtocolStateVersion
 	// Historically, this flag set a spork-scoped version number, by convention equal to the major software version.
 	// Now that we have HCUs which change the major software version mid-spork, this is no longer useful.
 	deprecatedFlagProtocolVersion   uint
