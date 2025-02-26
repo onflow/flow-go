@@ -15,7 +15,7 @@ type BackData[K comparable, V any] interface {
 	Has(key K) bool
 
 	// Add adds the value associated with key.
-	Add(key K, value V) error
+	Add(key K, value V) bool
 
 	// Remove removes the value with the given key.
 	// Returns the removed value and true if found.
