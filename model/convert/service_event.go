@@ -319,14 +319,46 @@ func convertServiceEventEpochCommitV1(event flow.Event) (*flow.ServiceEvent, err
 	}
 
 	// parse DKG Index Map
-	commit.DKGIndexMap = make(flow.DKGIndexMap, len(cdcDKGIndexMap.Pairs))
+	//
+	// CAUTION: When the Execution or Verification Node serializes the EpochCommit to compute its ID, the DKGIndexMap
+	// is converted from a map to a slice. This is necessary because maps don't have a deterministic order. For *valid*
+	// EpochCommit events, the following convention holds (see DKGIndexMap type declaration for details):
+	//   - For the DKG committee 𝒟, its size is n = |𝒟| = len(DKGIndexMap).
+	//   - The values in DKGIndexMap must form the set {0, 1, …, n-1}, as required by the low level cryptography
+	//     module (convention simplifying the implementation).
+	// Therefore, a valid `DKGIndexMap` can always be represented as an `IdentifierList` slice `s` such that
+	// nodeID := s[i] for i ∈ {0, …, n-1} corresponds to a key value pair (nodeID, i) in DKGIndexMap. The
+	// `EpochCommit.EncodeRLP` method performs this conversion (and panics when the convention is violated).
+	//    Generally, execution should be permissive and forward all system events to the Protocol State, which then
+	// performs comprehensive validity checks and decides whether events are accepted or rejected. However, we can
+	// only compute the ID of an EpochCommit whose DKGIndexMap satisfies the convention above. Furthermore, we do
+	// not want to depend on the System Smart Contracts to _always_ emit valid DKGIndexMap - especially for Epoch
+	// Recovery, where humans provide some of the parameters in the EpochCommit event.
+	//    Therefore, we check here that DKGIndexMap satisfies the convention required by `EncodeRLP` and error
+	// otherwise. When we error here, the corresponding event will just be omitted from `ExecutionResult.ServiceEvents`.
+	// (In contrast, erroring during the ID computation will result in an irrecoverable execution halt, because the
+	// ExecutionResult has already been fully constructed, but can't be broadcast).
+	//    We will only drop service events whose DKGIndexMap is invalid. As the Protocol State will anyway discard
+	// such events, it is fine to not relay them in the first place.
+	n := len(cdcDKGIndexMap.Pairs)
+	encounteredIndices := make([]bool, n) // tracks which indices we have already seed, to detect duplicates
+	commit.DKGIndexMap = make(flow.DKGIndexMap, n)
 	for _, pair := range cdcDKGIndexMap.Pairs {
 		nodeID, err := flow.HexStringToIdentifier(string(pair.Key.(cadence.String)))
 		if err != nil {
-			return nil, fmt.Errorf("could not convert hex string to flow.Identifer: %w", err)
+			return nil, fmt.Errorf("failed to decode flow.Identifer in DKGIndexMap entry from EpochRecover event: %w", err)
 		}
 		index := pair.Value.(cadence.Int).Int()
 		commit.DKGIndexMap[nodeID] = index
+
+		// enforce invariant needed for ID computation: DKGIndexMap values form the set {0, 1, ..., n-1}
+		if index < 0 || index >= n {
+			return nil, fmt.Errorf("index %d is outside allowed range [0,n-1] for a DKG committee of size n=%d", index, n)
+		}
+		if encounteredIndices[index] {
+			return nil, fmt.Errorf("duplicated DKG index %d", index)
+		}
+		encounteredIndices[index] = true
 	}
 
 	// create the service event
@@ -595,7 +627,30 @@ func convertServiceEventEpochRecover(event flow.Event) (*flow.ServiceEvent, erro
 	}
 
 	// parse DKG Index Map
-	commit.DKGIndexMap = make(flow.DKGIndexMap, len(cdcDKGIndexMap.Pairs))
+	//
+	// CAUTION: When the Execution or Verification Node serializes the EpochCommit to compute its ID, the DKGIndexMap
+	// is converted from a map to a slice. This is necessary because maps don't have a deterministic order. For *valid*
+	// EpochCommit events, the following convention holds (see DKGIndexMap type declaration for details):
+	//   - For the DKG committee 𝒟, its size is n = |𝒟| = len(DKGIndexMap).
+	//   - The values in DKGIndexMap must form the set {0, 1, …, n-1}, as required by the low level cryptography
+	//     module (convention simplifying the implementation).
+	// Therefore, a valid `DKGIndexMap` can always be represented as an `IdentifierList` slice `s` such that
+	// nodeID := s[i] for i ∈ {0, …, n-1} corresponds to a key value pair (nodeID, i) in DKGIndexMap. The
+	// `EpochCommit.EncodeRLP` method performs this conversion (and panics when the convention is violated).
+	//    Generally, execution should be permissive and forward all system events to the Protocol State, which then
+	// performs comprehensive validity checks and decides whether events are accepted or rejected. However, we can
+	// only compute the ID of an EpochCommit whose DKGIndexMap satisfies the convention above. Furthermore, we do
+	// not want to depend on the System Smart Contracts to _always_ emit valid DKGIndexMap - especially for Epoch
+	// Recovery, where humans provide some of the parameters in the EpochCommit event.
+	//    Therefore, we check here that DKGIndexMap satisfies the convention required by `EncodeRLP` and error
+	// otherwise. When we error here, the corresponding event will just be omitted from `ExecutionResult.ServiceEvents`.
+	// (In contrast, erroring during the ID computation will result in an irrecoverable execution halt, because the
+	// ExecutionResult has already been fully constructed, but can't be broadcast).
+	//    We will only drop service events whose DKGIndexMap is invalid. As the Protocol State will anyway discard
+	// such events, it is fine to not relay them in the first place.
+	n := len(cdcDKGIndexMap.Pairs)
+	encounteredIndices := make([]bool, n) // tracks which indices we have already seed, to detect duplicates
+	commit.DKGIndexMap = make(flow.DKGIndexMap, n)
 	for _, pair := range cdcDKGIndexMap.Pairs {
 		nodeID, err := flow.HexStringToIdentifier(string(pair.Key.(cadence.String)))
 		if err != nil {
@@ -603,6 +658,15 @@ func convertServiceEventEpochRecover(event flow.Event) (*flow.ServiceEvent, erro
 		}
 		index := pair.Value.(cadence.Int).Int()
 		commit.DKGIndexMap[nodeID] = index
+
+		// enforce invariant needed for ID computation: DKGIndexMap values form the set {0, 1, ..., n-1}
+		if index < 0 || index >= n {
+			return nil, fmt.Errorf("index %d is outside allowed range [0,n-1] for a DKG committee of size n=%d", index, n)
+		}
+		if encounteredIndices[index] {
+			return nil, fmt.Errorf("duplicated DKG index %d", index)
+		}
+		encounteredIndices[index] = true
 	}
 
 	// create the service event

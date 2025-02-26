@@ -104,7 +104,9 @@ import (
 	"github.com/onflow/flow-go/state/protocol/events/gadgets"
 	"github.com/onflow/flow-go/state/protocol/util"
 	storage "github.com/onflow/flow-go/storage/badger"
+	"github.com/onflow/flow-go/storage/operation/badgerimpl"
 	storagepebble "github.com/onflow/flow-go/storage/pebble"
+	"github.com/onflow/flow-go/storage/store"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -313,7 +315,7 @@ func CollectionNode(t *testing.T, hub *stub.Hub, identity bootstrap.NodeInfo, ro
 		retrieve)
 	require.NoError(t, err)
 
-	pusherEngine, err := pusher.New(node.Log, node.Net, node.State, node.Metrics, node.Metrics, node.Me, collections, transactions)
+	pusherEngine, err := pusher.New(node.Log, node.Net, node.State, node.Metrics, node.Metrics, node.Me)
 	require.NoError(t, err)
 
 	clusterStateFactory, err := factories.NewClusterStateFactory(
@@ -340,7 +342,6 @@ func CollectionNode(t *testing.T, hub *stub.Hub, identity bootstrap.NodeInfo, ro
 		node.Me,
 		node.Metrics, node.Metrics, node.Metrics,
 		node.State,
-		transactions,
 		compliance.DefaultConfig(),
 	)
 	require.NoError(t, err)
@@ -534,7 +535,7 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity bootstrap.NodeInfo, ide
 	serviceEventsStorage := storage.NewServiceEvents(node.Metrics, node.PublicDB)
 	txResultStorage := storage.NewTransactionResults(node.Metrics, node.PublicDB, storage.DefaultCacheSize)
 	commitsStorage := storage.NewCommits(node.Metrics, node.PublicDB)
-	chunkDataPackStorage := storage.NewChunkDataPacks(node.Metrics, node.PublicDB, collectionsStorage, 100)
+	chunkDataPackStorage := store.NewChunkDataPacks(node.Metrics, badgerimpl.ToDB(node.PublicDB), collectionsStorage, 100)
 	results := storage.NewExecutionResults(node.Metrics, node.PublicDB)
 	receipts := storage.NewExecutionReceipts(node.Metrics, node.PublicDB, results, storage.DefaultCacheSize)
 	myReceipts := storage.NewMyExecutionReceipts(node.Metrics, node.PublicDB, receipts)
@@ -684,7 +685,7 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity bootstrap.NodeInfo, ide
 		node.Metrics,
 		node.Tracer,
 		node.Me,
-		node.State,
+		computation.NewProtocolStateWrapper(node.State),
 		vmCtx,
 		committer,
 		prov,
@@ -987,18 +988,19 @@ func VerificationNode(t testing.TB,
 	}
 
 	if node.ProcessedChunkIndex == nil {
-		node.ProcessedChunkIndex = storage.NewConsumerProgress(node.PublicDB, module.ConsumeProgressVerificationChunkIndex)
+		node.ProcessedChunkIndex = store.NewConsumerProgress(badgerimpl.ToDB(node.PublicDB), module.ConsumeProgressVerificationChunkIndex)
 	}
 
 	if node.ChunksQueue == nil {
-		node.ChunksQueue = storage.NewChunkQueue(node.PublicDB)
-		ok, err := node.ChunksQueue.Init(chunkconsumer.DefaultJobIndex)
+		cq := store.NewChunkQueue(node.Metrics, badgerimpl.ToDB(node.PublicDB))
+		ok, err := cq.Init(chunkconsumer.DefaultJobIndex)
 		require.NoError(t, err)
 		require.True(t, ok)
+		node.ChunksQueue = cq
 	}
 
 	if node.ProcessedBlockHeight == nil {
-		node.ProcessedBlockHeight = storage.NewConsumerProgress(node.PublicDB, module.ConsumeProgressVerificationBlockHeight)
+		node.ProcessedBlockHeight = store.NewConsumerProgress(badgerimpl.ToDB(node.PublicDB), module.ConsumeProgressVerificationBlockHeight)
 	}
 
 	if node.VerifierEngine == nil {
@@ -1014,7 +1016,7 @@ func VerificationNode(t testing.TB,
 
 		chunkVerifier := chunks.NewChunkVerifier(vm, vmCtx, node.Log)
 
-		approvalStorage := storage.NewResultApprovals(node.Metrics, node.PublicDB)
+		approvalStorage := store.NewResultApprovals(node.Metrics, badgerimpl.ToDB(node.PublicDB))
 
 		node.VerifierEngine, err = verifier.New(node.Log,
 			collector,

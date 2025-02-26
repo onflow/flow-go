@@ -5,10 +5,10 @@ import (
 	"fmt"
 	"strconv"
 	"testing"
+	"time"
 
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/mock"
-	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
 	"github.com/onflow/flow-go/engine/access/rest/websockets/models"
@@ -138,14 +138,188 @@ func (s *EventsProviderSuite) subscribeEventsDataProviderTestCases(backendRespon
 
 // requireEvents ensures that the received event information matches the expected data.
 func (s *EventsProviderSuite) requireEvents(actual interface{}, expected interface{}) {
-	expectedResponse, ok := expected.(*models.EventResponse)
-	require.True(s.T(), ok, "Expected *models.EventResponse, got %T", expected)
+	expectedResponse, expectedResponsePayload := extractPayload[*models.EventResponse](s.T(), expected)
+	actualResponse, actualResponsePayload := extractPayload[*models.EventResponse](s.T(), actual)
 
-	actualResponse, ok := actual.(*models.EventResponse)
-	require.True(s.T(), ok, "Expected *models.EventResponse, got %T", actual)
+	s.Require().Equal(expectedResponse.Topic, actualResponse.Topic)
+	s.Require().Equal(expectedResponsePayload.MessageIndex, actualResponsePayload.MessageIndex)
+	s.Require().ElementsMatch(expectedResponsePayload.Events, actualResponsePayload.Events)
+}
 
-	s.Require().ElementsMatch(expectedResponse.Events, actualResponse.Events)
-	s.Require().Equal(expectedResponse.MessageIndex, actualResponse.MessageIndex)
+// backendEventsResponses creates backend events responses based on the provided events.
+func (s *EventsProviderSuite) backendEventsResponses(events []flow.Event) []*backend.EventsResponse {
+	responses := make([]*backend.EventsResponse, len(events))
+
+	for i := range events {
+		responses[i] = &backend.EventsResponse{
+			Height:         s.rootBlock.Header.Height,
+			BlockID:        s.rootBlock.ID(),
+			Events:         events,
+			BlockTimestamp: s.rootBlock.Header.Timestamp,
+		}
+	}
+
+	return responses
+}
+
+// expectedEventsResponses creates the expected responses for the provided backend responses.
+func (s *EventsProviderSuite) expectedEventsResponses(
+	backendResponses []*backend.EventsResponse,
+) []interface{} {
+	expectedResponses := make([]interface{}, len(backendResponses))
+
+	for i, resp := range backendResponses {
+		var expectedResponsePayload models.EventResponse
+		expectedResponsePayload.Build(resp, uint64(i))
+
+		expectedResponses[i] = &models.BaseDataProvidersResponse{
+			Topic:   EventsTopic,
+			Payload: &expectedResponsePayload,
+		}
+	}
+	return expectedResponses
+}
+
+// TestMessageIndexEventProviderResponse_HappyPath tests that MessageIndex values in response are strictly increasing.
+func (s *EventsProviderSuite) TestMessageIndexEventProviderResponse_HappyPath() {
+	ctx := context.Background()
+	send := make(chan interface{}, 10)
+	topic := EventsTopic
+	eventsCount := 4
+
+	// Create a channel to simulate the subscription's event channel
+	eventChan := make(chan interface{})
+
+	// Create a mock subscription and mock the channel
+	sub := ssmock.NewSubscription(s.T())
+	sub.On("Channel").Return((<-chan interface{})(eventChan))
+	sub.On("Err").Return(nil).Once()
+
+	s.api.On("SubscribeEventsFromStartBlockID", mock.Anything, mock.Anything, mock.Anything).Return(sub)
+
+	arguments :=
+		map[string]interface{}{
+			"start_block_id": s.rootBlock.ID().String(),
+		}
+
+	// Create the EventsDataProvider instance
+	provider, err := NewEventsDataProvider(
+		ctx,
+		s.log,
+		s.api,
+		"dummy-id",
+		topic,
+		arguments,
+		send,
+		s.chain,
+		state_stream.DefaultEventFilterConfig,
+		subscription.DefaultHeartbeatInterval,
+	)
+
+	s.Require().NotNil(provider)
+	s.Require().NoError(err)
+
+	// Ensure the provider is properly closed after the test
+	defer provider.Close()
+
+	// Run the provider in a separate goroutine to simulate subscription processing
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		err = provider.Run()
+		s.Require().NoError(err)
+	}()
+
+	// Simulate emitting events to the event channel
+	go func() {
+		defer close(eventChan) // Close the channel when done
+
+		for i := 0; i < eventsCount; i++ {
+			eventChan <- &backend.EventsResponse{
+				Height: s.rootBlock.Header.Height,
+			}
+		}
+	}()
+
+	// Collect responses
+	var responses []*models.EventResponse
+	for i := 0; i < eventsCount; i++ {
+		res := <-send
+
+		_, eventResData := extractPayload[*models.EventResponse](s.T(), res)
+
+		responses = append(responses, eventResData)
+	}
+
+	// Wait for the provider goroutine to finish
+	unittest.RequireCloseBefore(s.T(), done, time.Second, "provider failed to stop")
+
+	// Verifying that indices are starting from 0
+	s.Require().Equal(uint64(0), responses[0].MessageIndex, "Expected MessageIndex to start with 0")
+
+	// Verifying that indices are strictly increasing
+	for i := 1; i < len(responses); i++ {
+		prevIndex := responses[i-1].MessageIndex
+		currentIndex := responses[i].MessageIndex
+		s.Require().Equal(prevIndex+1, currentIndex, "Expected MessageIndex to increment by 1")
+	}
+}
+
+// TestEventsDataProvider_InvalidArguments tests the behavior of the event data provider
+// when invalid arguments are provided. It verifies that appropriate errors are returned
+// for missing or conflicting arguments.
+// This test covers the test cases:
+// 1. Providing both 'start_block_id' and 'start_block_height' simultaneously.
+// 2. Invalid 'start_block_id' argument.
+// 3. Invalid 'start_block_height' argument.
+func (s *EventsProviderSuite) TestEventsDataProvider_InvalidArguments() {
+	ctx := context.Background()
+	send := make(chan interface{})
+
+	topic := EventsTopic
+
+	for _, test := range invalidArgumentsTestCases() {
+		s.Run(test.name, func() {
+			provider, err := NewEventsDataProvider(
+				ctx,
+				s.log,
+				s.api,
+				"dummy-id",
+				topic,
+				test.arguments,
+				send,
+				s.chain,
+				state_stream.DefaultEventFilterConfig,
+				subscription.DefaultHeartbeatInterval,
+			)
+			s.Require().Nil(provider)
+			s.Require().Error(err)
+			s.Require().Contains(err.Error(), test.expectedErrorMsg)
+		})
+	}
+}
+
+func (s *EventsProviderSuite) TestEventsDataProvider_StateStreamNotConfigured() {
+	ctx := context.Background()
+	send := make(chan interface{})
+
+	topic := EventsTopic
+
+	provider, err := NewEventsDataProvider(
+		ctx,
+		s.log,
+		nil,
+		"dummy-id",
+		topic,
+		models.Arguments{},
+		send,
+		s.chain,
+		state_stream.DefaultEventFilterConfig,
+		subscription.DefaultHeartbeatInterval,
+	)
+	s.Require().Nil(provider)
+	s.Require().Error(err)
+	s.Require().Contains(err.Error(), "does not support streaming events")
 }
 
 // invalidArgumentsTestCases returns a list of test cases with invalid argument combinations
@@ -181,146 +355,4 @@ func invalidArgumentsTestCases() []testErrType {
 			expectedErrorMsg: "value must be an unsigned 64 bit integer",
 		},
 	}
-}
-
-// TestEventsDataProvider_InvalidArguments tests the behavior of the event data provider
-// when invalid arguments are provided. It verifies that appropriate errors are returned
-// for missing or conflicting arguments.
-// This test covers the test cases:
-// 1. Providing both 'start_block_id' and 'start_block_height' simultaneously.
-// 2. Invalid 'start_block_id' argument.
-// 3. Invalid 'start_block_height' argument.
-func (s *EventsProviderSuite) TestEventsDataProvider_InvalidArguments() {
-	ctx := context.Background()
-	send := make(chan interface{})
-
-	topic := EventsTopic
-
-	for _, test := range invalidArgumentsTestCases() {
-		s.Run(test.name, func() {
-			provider, err := NewEventsDataProvider(
-				ctx,
-				s.log,
-				s.api,
-				topic,
-				test.arguments,
-				send,
-				s.chain,
-				state_stream.DefaultEventFilterConfig,
-				subscription.DefaultHeartbeatInterval,
-			)
-			s.Require().Nil(provider)
-			s.Require().Error(err)
-			s.Require().Contains(err.Error(), test.expectedErrorMsg)
-		})
-	}
-}
-
-// TestMessageIndexEventProviderResponse_HappyPath tests that MessageIndex values in response are strictly increasing.
-func (s *EventsProviderSuite) TestMessageIndexEventProviderResponse_HappyPath() {
-	ctx := context.Background()
-	send := make(chan interface{}, 10)
-	topic := EventsTopic
-	eventsCount := 4
-
-	// Create a channel to simulate the subscription's event channel
-	eventChan := make(chan interface{})
-
-	// Create a mock subscription and mock the channel
-	sub := ssmock.NewSubscription(s.T())
-	sub.On("Channel").Return((<-chan interface{})(eventChan))
-	sub.On("Err").Return(nil)
-
-	s.api.On("SubscribeEventsFromStartBlockID", mock.Anything, mock.Anything, mock.Anything).Return(sub)
-
-	arguments :=
-		map[string]interface{}{
-			"start_block_id": s.rootBlock.ID().String(),
-		}
-
-	// Create the EventsDataProvider instance
-	provider, err := NewEventsDataProvider(
-		ctx,
-		s.log,
-		s.api,
-		topic,
-		arguments,
-		send,
-		s.chain,
-		state_stream.DefaultEventFilterConfig,
-		subscription.DefaultHeartbeatInterval,
-	)
-
-	s.Require().NotNil(provider)
-	s.Require().NoError(err)
-
-	// Ensure the provider is properly closed after the test
-	defer provider.Close()
-
-	// Run the provider in a separate goroutine to simulate subscription processing
-	go func() {
-		err = provider.Run()
-		s.Require().NoError(err)
-	}()
-
-	// Simulate emitting events to the event channel
-	go func() {
-		defer close(eventChan) // Close the channel when done
-
-		for i := 0; i < eventsCount; i++ {
-			eventChan <- &backend.EventsResponse{
-				Height: s.rootBlock.Header.Height,
-			}
-		}
-	}()
-
-	// Collect responses
-	var responses []*models.EventResponse
-	for i := 0; i < eventsCount; i++ {
-		res := <-send
-		eventRes, ok := res.(*models.EventResponse)
-		s.Require().True(ok, "Expected *models.EventResponse, got %T", res)
-		responses = append(responses, eventRes)
-	}
-
-	// Verifying that indices are starting from 1
-	s.Require().Equal(uint64(0), responses[0].MessageIndex, "Expected MessageIndex to start with 0")
-
-	// Verifying that indices are strictly increasing
-	for i := 1; i < len(responses); i++ {
-		prevIndex := responses[i-1].MessageIndex
-		currentIndex := responses[i].MessageIndex
-		s.Require().Equal(prevIndex+1, currentIndex, "Expected MessageIndex to increment by 1")
-	}
-}
-
-// backendEventsResponses creates backend events responses based on the provided events.
-func (s *EventsProviderSuite) backendEventsResponses(events []flow.Event) []*backend.EventsResponse {
-	responses := make([]*backend.EventsResponse, len(events))
-
-	for i := range events {
-		responses[i] = &backend.EventsResponse{
-			Height:         s.rootBlock.Header.Height,
-			BlockID:        s.rootBlock.ID(),
-			Events:         events,
-			BlockTimestamp: s.rootBlock.Header.Timestamp,
-		}
-	}
-
-	return responses
-}
-
-// expectedEventsResponses creates the expected responses for the provided backend responses.
-func (s *EventsProviderSuite) expectedEventsResponses(
-	backendResponses []*backend.EventsResponse,
-) []interface{} {
-	expectedResponses := make([]interface{}, len(backendResponses))
-
-	for i, resp := range backendResponses {
-		var expectedResponse models.EventResponse
-		expectedResponse.Build(resp, uint64(i))
-
-		expectedResponses[i] = &expectedResponse
-	}
-	return expectedResponses
 }

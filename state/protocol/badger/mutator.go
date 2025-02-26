@@ -781,10 +781,12 @@ func (m *FollowerState) Finalize(ctx context.Context, blockID flow.Identifier) e
 	}
 
 	// update the cache
-	m.State.cachedLatestFinal.Store(&cachedHeader{blockID, header})
-	if len(block.Payload.Seals) > 0 {
-		m.State.cachedLatestSealed.Store(&cachedHeader{lastSeal.BlockID, sealed})
-	}
+	m.State.cachedLatest.Store(&cachedLatest{
+		finalizedID:     blockID,
+		finalizedHeader: header,
+		sealedID:        lastSeal.BlockID,
+		sealedHeader:    sealed,
+	})
 
 	// Emit protocol events after database transaction succeeds. Event delivery is guaranteed,
 	// _except_ in case of a crash. Hence, when recovering from a crash, consumers need to deduce
@@ -805,6 +807,11 @@ func (m *FollowerState) Finalize(ctx context.Context, blockID flow.Identifier) e
 		}
 		m.metrics.BlockSealed(sealedBlock)
 	}
+	protocolSnapshot, err := m.protocolKVStoreSnapshotsDB.ByID(block.Payload.ProtocolStateID)
+	if err != nil {
+		return fmt.Errorf("could not retrieve protocol snapshot for block (%x): %w", blockID, err)
+	}
+	m.metrics.ProtocolStateVersion(protocolSnapshot.Version)
 
 	// apply all queued metrics
 	for _, updateMetric := range metrics {

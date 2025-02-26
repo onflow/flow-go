@@ -42,6 +42,7 @@ func NewTransactionStatusesDataProvider(
 	ctx context.Context,
 	logger zerolog.Logger,
 	api access.API,
+	subscriptionID string,
 	linkGenerator commonmodels.LinkGenerator,
 	topic string,
 	arguments models.Arguments,
@@ -62,7 +63,9 @@ func NewTransactionStatusesDataProvider(
 	subCtx, cancel := context.WithCancel(ctx)
 
 	p.baseDataProvider = newBaseDataProvider(
+		subscriptionID,
 		topic,
+		arguments,
 		cancel,
 		send,
 		p.createSubscription(subCtx, txStatusesArgs), // Set up a subscription to tx statuses based on arguments.
@@ -98,7 +101,7 @@ func (p *TransactionStatusesDataProvider) createSubscription(
 //
 // No errors are expected during normal operations.
 func (p *TransactionStatusesDataProvider) handleResponse() func(txResults []*access.TransactionResult) error {
-	messageIndex := counters.NewMonotonousCounter(0)
+	messageIndex := counters.NewMonotonicCounter(0)
 
 	return func(txResults []*access.TransactionResult) error {
 
@@ -108,8 +111,11 @@ func (p *TransactionStatusesDataProvider) handleResponse() func(txResults []*acc
 				return status.Errorf(codes.Internal, "message index already incremented to %d", messageIndex.Value())
 			}
 
-			var response models.TransactionStatusesResponse
-			response.Build(p.linkGenerator, txResults[i], index)
+			var txStatusesPayload models.TransactionStatusesResponse
+			txStatusesPayload.Build(p.linkGenerator, txResults[i], index)
+
+			var response models.BaseDataProvidersResponse
+			response.Build(p.ID(), p.Topic(), &txStatusesPayload)
 
 			p.send <- &response
 		}

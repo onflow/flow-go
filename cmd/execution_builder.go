@@ -13,6 +13,7 @@ import (
 
 	awsconfig "github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
+	"github.com/cockroachdb/pebble"
 	"github.com/dgraph-io/badger/v2"
 	"github.com/ipfs/boxo/bitswap"
 	"github.com/ipfs/go-cid"
@@ -55,6 +56,7 @@ import (
 	"github.com/onflow/flow-go/engine/execution/ingestion/stop"
 	"github.com/onflow/flow-go/engine/execution/ingestion/uploader"
 	exeprovider "github.com/onflow/flow-go/engine/execution/provider"
+	exepruner "github.com/onflow/flow-go/engine/execution/pruner"
 	"github.com/onflow/flow-go/engine/execution/rpc"
 	"github.com/onflow/flow-go/engine/execution/scripts"
 	"github.com/onflow/flow-go/engine/execution/state"
@@ -92,7 +94,9 @@ import (
 	storageerr "github.com/onflow/flow-go/storage"
 	storage "github.com/onflow/flow-go/storage/badger"
 	"github.com/onflow/flow-go/storage/badger/procedure"
+	"github.com/onflow/flow-go/storage/operation/pebbleimpl"
 	storagepebble "github.com/onflow/flow-go/storage/pebble"
+	"github.com/onflow/flow-go/storage/store"
 	sutil "github.com/onflow/flow-go/storage/util"
 )
 
@@ -137,6 +141,8 @@ type ExecutionNode struct {
 	txResults              *storage.TransactionResults
 	results                *storage.ExecutionResults
 	myReceipts             *storage.MyExecutionReceipts
+	chunkDataPackDB        *pebble.DB
+	chunkDataPacks         storageerr.ChunkDataPacks
 	providerEngine         exeprovider.ProviderEngine
 	checkerEng             *checker.Engine
 	syncCore               *chainsync.Core
@@ -224,6 +230,7 @@ func (builder *ExecutionNodeBuilder) LoadComponentsAndModules() {
 		// TODO: will re-visit this once storehouse has implemented new WAL for checkpoint file of
 		// payloadless trie.
 		// Component("execution data pruner", exeNode.LoadExecutionDataPruner).
+		Component("execution db pruner", exeNode.LoadExecutionDBPruner).
 		Component("blob service", exeNode.LoadBlobService).
 		Component("block data upload manager", exeNode.LoadBlockUploaderManager).
 		Component("GCP block data uploader", exeNode.LoadGCPBlockDataUploader).
@@ -279,7 +286,7 @@ func (exeNode *ExecutionNode) LoadExecutionMetrics(node *NodeConfig) error {
 	// the root block as executed block
 	var height uint64
 	var blockID flow.Identifier
-	err := node.DB.View(procedure.GetHighestExecutedBlock(&height, &blockID))
+	err := node.DB.View(procedure.GetLastExecutedBlock(&height, &blockID))
 	if err != nil {
 		// database has not been bootstrapped yet
 		if errors.Is(err, storageerr.ErrNotFound) {
@@ -526,6 +533,10 @@ func (exeNode *ExecutionNode) LoadProviderEngine(
 		node.FvmOptions...,
 	)
 
+	opts = append(opts, computation.DefaultFVMOptions(
+		node.RootChainID,
+		exeNode.exeConf.computationConfig.CadenceTracing,
+		exeNode.exeConf.computationConfig.ExtensiveTracing)...)
 	vmCtx := fvm.NewContext(opts...)
 
 	var collector module.ExecutionMetrics
@@ -551,7 +562,7 @@ func (exeNode *ExecutionNode) LoadProviderEngine(
 		collector,
 		node.Tracer,
 		node.Me,
-		node.State,
+		computation.NewProtocolStateWrapper(node.State),
 		vmCtx,
 		ledgerViewCommitter,
 		executionDataProvider,
@@ -590,7 +601,7 @@ func (exeNode *ExecutionNode) LoadProviderEngine(
 
 	// Get latest executed block and a view at that block
 	ctx := context.Background()
-	height, blockID, err := exeNode.executionState.GetHighestExecutedBlockID(ctx)
+	height, blockID, err := exeNode.executionState.GetLastExecutedBlockID(ctx)
 	if err != nil {
 		return nil, fmt.Errorf(
 			"cannot get the latest executed block id at height %v: %w",
@@ -734,10 +745,11 @@ func (exeNode *ExecutionNode) LoadExecutionState(
 		}
 		return nil
 	})
-	// chunkDataPacks := storage.NewChunkDataPacks(node.Metrics.Cache,
-	// chunkDataPackDB, node.Storage.Collections, exeNode.exeConf.chunkDataPackCacheSize)
-	chunkDataPacks := storagepebble.NewChunkDataPacks(node.Metrics.Cache,
-		chunkDataPackDB, node.Storage.Collections, exeNode.exeConf.chunkDataPackCacheSize)
+	chunkDataPacks := store.NewChunkDataPacks(node.Metrics.Cache,
+		pebbleimpl.ToDB(chunkDataPackDB), node.Storage.Collections, exeNode.exeConf.chunkDataPackCacheSize)
+
+	exeNode.chunkDataPackDB = chunkDataPackDB
+	exeNode.chunkDataPacks = chunkDataPacks
 
 	// Needed for gRPC server, make sure to assign to main scoped vars
 	exeNode.events = storage.NewEvents(node.Metrics.Cache, node.DB)
@@ -762,12 +774,12 @@ func (exeNode *ExecutionNode) LoadExecutionState(
 		exeNode.exeConf.enableStorehouse,
 	)
 
-	height, _, err := exeNode.executionState.GetHighestExecutedBlockID(context.Background())
+	height, _, err := exeNode.executionState.GetLastExecutedBlockID(context.Background())
 	if err != nil {
-		return nil, fmt.Errorf("could not get highest executed block: %w", err)
+		return nil, fmt.Errorf("could not get last executed block: %w", err)
 	}
 
-	log.Info().Msgf("execution state highest executed block height: %v", height)
+	log.Info().Msgf("execution state last executed block height: %v", height)
 	exeNode.collector.ExecutionLastExecutedBlockHeight(height)
 
 	return &module.NoopReadyDoneAware{}, nil
@@ -981,6 +993,27 @@ func (exeNode *ExecutionNode) LoadExecutionDataPruner(
 		pruner.WithThreshold(exeNode.exeConf.executionDataPrunerThreshold),
 	)
 	return exeNode.executionDataPruner, err
+}
+
+func (exeNode *ExecutionNode) LoadExecutionDBPruner(node *NodeConfig) (module.ReadyDoneAware, error) {
+	cfg := exepruner.PruningConfig{
+		Threshold:                 exeNode.exeConf.pruningConfigThreshold,
+		BatchSize:                 exeNode.exeConf.pruningConfigBatchSize,
+		SleepAfterEachBatchCommit: exeNode.exeConf.pruningConfigSleepAfterCommit,
+		SleepAfterEachIteration:   exeNode.exeConf.pruningConfigSleepAfterIteration,
+	}
+
+	return exepruner.NewChunkDataPackPruningEngine(
+		node.Logger,
+		exeNode.collector,
+		node.State,
+		node.DB,
+		node.Storage.Headers,
+		exeNode.chunkDataPacks,
+		exeNode.results,
+		exeNode.chunkDataPackDB,
+		cfg,
+	), nil
 }
 
 func (exeNode *ExecutionNode) LoadCheckerEngine(

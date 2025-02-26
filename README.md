@@ -54,7 +54,7 @@ The following table lists all work streams and links to their home directory and
 ## Installation
 
 - Clone this repository
-- Install [Go](https://golang.org/doc/install) (Flow requires Go 1.22 and later)
+- Install [Go](https://golang.org/doc/install) (Flow requires Go 1.23 and later)
 - Install [Docker](https://docs.docker.com/get-docker/), which is used for running a local network and integration tests
 - Make sure the [`GOPATH`](https://golang.org/cmd/go/#hdr-GOPATH_environment_variable) and `GOBIN` environment variables
   are set, and `GOBIN` is added to your path:

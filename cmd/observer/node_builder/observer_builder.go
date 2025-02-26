@@ -57,6 +57,7 @@ import (
 	"github.com/onflow/flow-go/engine/common/stop"
 	synceng "github.com/onflow/flow-go/engine/common/synchronization"
 	"github.com/onflow/flow-go/engine/common/version"
+	"github.com/onflow/flow-go/engine/execution/computation"
 	"github.com/onflow/flow-go/engine/execution/computation/query"
 	"github.com/onflow/flow-go/fvm/storage/derived"
 	"github.com/onflow/flow-go/ledger"
@@ -107,7 +108,10 @@ import (
 	"github.com/onflow/flow-go/state/protocol/events/gadgets"
 	"github.com/onflow/flow-go/storage"
 	bstorage "github.com/onflow/flow-go/storage/badger"
+	"github.com/onflow/flow-go/storage/operation/badgerimpl"
+	"github.com/onflow/flow-go/storage/operation/pebbleimpl"
 	pstorage "github.com/onflow/flow-go/storage/pebble"
+	"github.com/onflow/flow-go/storage/store"
 	"github.com/onflow/flow-go/utils/grpcutils"
 	"github.com/onflow/flow-go/utils/io"
 )
@@ -199,9 +203,10 @@ func DefaultObserverServiceConfig() *ObserverServiceConfig {
 				IdleTimeout:    rest.DefaultIdleTimeout,
 				MaxRequestSize: commonrest.DefaultMaxRequestSize,
 			},
-			MaxMsgSize:      grpcutils.DefaultMaxMsgSize,
-			CompressorName:  grpcutils.NoCompressor,
-			WebSocketConfig: websockets.NewDefaultWebsocketConfig(),
+			MaxMsgSize:                grpcutils.DefaultMaxMsgSize,
+			CompressorName:            grpcutils.NoCompressor,
+			WebSocketConfig:           websockets.NewDefaultWebsocketConfig(),
+			EnableWebSocketsStreamAPI: false,
 		},
 		stateStreamConf: statestreambackend.Config{
 			MaxExecutionDataMsgSize: grpcutils.DefaultMaxMsgSize,
@@ -818,6 +823,13 @@ func (builder *ObserverServiceBuilder) extraFlags() {
 			"websocket-inactivity-timeout",
 			defaultConfig.rpcConf.WebSocketConfig.InactivityTimeout,
 			"specifies the duration a WebSocket connection can remain open without any active subscriptions before being automatically closed")
+
+		flags.BoolVar(
+			&builder.rpcConf.EnableWebSocketsStreamAPI,
+			"experimental-enable-websockets-stream-api",
+			defaultConfig.rpcConf.EnableWebSocketsStreamAPI,
+			"[experimental] enables WebSockets Stream API that operates under /ws endpoint. this flag may change in a future release.",
+		)
 	}).ValidateFlags(func() error {
 		if builder.executionDataSyncEnabled {
 			if builder.executionDataConfig.FetchTimeout <= 0 {
@@ -1056,8 +1068,8 @@ func (builder *ObserverServiceBuilder) Build() (cmd.Node, error) {
 func (builder *ObserverServiceBuilder) BuildExecutionSyncComponents() *ObserverServiceBuilder {
 	var ds datastore.Batching
 	var bs network.BlobService
-	var processedBlockHeight storage.ConsumerProgress
-	var processedNotifications storage.ConsumerProgress
+	var processedBlockHeight storage.ConsumerProgressInitializer
+	var processedNotifications storage.ConsumerProgressInitializer
 	var publicBsDependable *module.ProxiedReadyDoneAware
 	var execDataDistributor *edrequester.ExecutionDataDistributor
 	var execDataCacheBackend *herocache.BlockExecutionData
@@ -1111,21 +1123,26 @@ func (builder *ObserverServiceBuilder) BuildExecutionSyncComponents() *ObserverS
 		Module("processed block height consumer progress", func(node *cmd.NodeConfig) error {
 			// Note: progress is stored in the datastore's DB since that is where the jobqueue
 			// writes execution data to.
+			var db storage.DB
 			if executionDataDBMode == execution_data.ExecutionDataDBModeBadger {
-				processedBlockHeight = bstorage.NewConsumerProgress(builder.ExecutionDatastoreManager.DB().(*badger.DB), module.ConsumeProgressExecutionDataRequesterBlockHeight)
+				db = badgerimpl.ToDB(builder.ExecutionDatastoreManager.DB().(*badger.DB))
 			} else {
-				processedBlockHeight = pstorage.NewConsumerProgress(builder.ExecutionDatastoreManager.DB().(*pebble.DB), module.ConsumeProgressExecutionDataRequesterBlockHeight)
+				db = pebbleimpl.ToDB(builder.ExecutionDatastoreManager.DB().(*pebble.DB))
 			}
+
+			processedBlockHeight = store.NewConsumerProgress(db, module.ConsumeProgressExecutionDataRequesterBlockHeight)
 			return nil
 		}).
 		Module("processed notifications consumer progress", func(node *cmd.NodeConfig) error {
 			// Note: progress is stored in the datastore's DB since that is where the jobqueue
 			// writes execution data to.
+			var db storage.DB
 			if executionDataDBMode == execution_data.ExecutionDataDBModeBadger {
-				processedNotifications = bstorage.NewConsumerProgress(builder.ExecutionDatastoreManager.DB().(*badger.DB), module.ConsumeProgressExecutionDataRequesterNotification)
+				db = badgerimpl.ToDB(builder.ExecutionDatastoreManager.DB().(*badger.DB))
 			} else {
-				processedNotifications = pstorage.NewConsumerProgress(builder.ExecutionDatastoreManager.DB().(*pebble.DB), module.ConsumeProgressExecutionDataRequesterNotification)
+				db = pebbleimpl.ToDB(builder.ExecutionDatastoreManager.DB().(*pebble.DB))
 			}
+			processedNotifications = store.NewConsumerProgress(db, module.ConsumeProgressExecutionDataRequesterNotification)
 			return nil
 		}).
 		Module("blobservice peer manager dependencies", func(node *cmd.NodeConfig) error {
@@ -1310,11 +1327,11 @@ func (builder *ObserverServiceBuilder) BuildExecutionSyncComponents() *ObserverS
 			return builder.ExecutionDataPruner, nil
 		})
 	if builder.executionDataIndexingEnabled {
-		var indexedBlockHeight storage.ConsumerProgress
+		var indexedBlockHeight storage.ConsumerProgressInitializer
 
 		builder.Module("indexed block height consumer progress", func(node *cmd.NodeConfig) error {
 			// Note: progress is stored in the MAIN db since that is where indexed execution data is stored.
-			indexedBlockHeight = bstorage.NewConsumerProgress(builder.DB, module.ConsumeProgressExecutionDataIndexerBlockHeight)
+			indexedBlockHeight = store.NewConsumerProgress(badgerimpl.ToDB(builder.DB), module.ConsumeProgressExecutionDataIndexerBlockHeight)
 			return nil
 		}).Module("transaction results storage", func(node *cmd.NodeConfig) error {
 			builder.Storage.LightTransactionResults = bstorage.NewLightTransactionResults(node.Metrics.Cache, node.DB, bstorage.DefaultCacheSize)
@@ -1454,7 +1471,7 @@ func (builder *ObserverServiceBuilder) BuildExecutionSyncComponents() *ObserverS
 				builder.Logger,
 				metrics.NewExecutionCollector(builder.Tracer),
 				builder.RootChainID,
-				query.NewProtocolStateWrapper(builder.State),
+				computation.NewProtocolStateWrapper(builder.State),
 				builder.Storage.Headers,
 				builder.ExecutionIndexerCore.RegisterValue,
 				builder.scriptExecutorConfig,
@@ -1887,12 +1904,12 @@ func (builder *ObserverServiceBuilder) enqueueRPCServer() {
 			indexReporter = builder.Reporter
 		}
 
-		preferredENIdentifiers, err := commonrpc.IdentifierList(backendConfig.PreferredExecutionNodeIDs)
+		preferredENIdentifiers, err := flow.IdentifierListFromHex(backendConfig.PreferredExecutionNodeIDs)
 		if err != nil {
 			return nil, fmt.Errorf("failed to convert node id string to Flow Identifier for preferred EN map: %w", err)
 		}
 
-		fixedENIdentifiers, err := commonrpc.IdentifierList(backendConfig.FixedExecutionNodeIDs)
+		fixedENIdentifiers, err := flow.IdentifierListFromHex(backendConfig.FixedExecutionNodeIDs)
 		if err != nil {
 			return nil, fmt.Errorf("failed to convert node id string to Flow Identifier for fixed EN map: %w", err)
 		}

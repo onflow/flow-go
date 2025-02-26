@@ -91,7 +91,7 @@ func New(
 	metrics module.ExecutionMetrics,
 	tracer module.Tracer,
 	me module.Local,
-	protoState protocol.State,
+	protoState protocol.SnapshotExecutionSubsetProvider,
 	vmCtx fvm.Context,
 	committer computer.ViewCommitter,
 	executionDataProvider provider.Provider,
@@ -140,7 +140,7 @@ func New(
 		vm,
 		vmCtx,
 		derivedChainData,
-		query.NewProtocolStateWrapper(protoState),
+		protoState,
 	)
 
 	e := Manager{
@@ -231,7 +231,8 @@ func DefaultFVMOptions(chainID flow.ChainID, cadenceTracing bool, extensiveTraci
 			reusableRuntime.NewReusableCadenceRuntimePool(
 				ReusableCadenceRuntimePoolSize,
 				runtime.Config{
-					TracingEnabled: cadenceTracing,
+					TracingEnabled:         cadenceTracing,
+					StorageFormatV2Enabled: true,
 				},
 			)),
 		fvm.WithEVMEnabled(true),
