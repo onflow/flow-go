@@ -118,10 +118,13 @@ func (suite *Suite) SetupTest() {
 		nil,
 	).Maybe()
 
+	pstate := protocol.NewKVStoreReader(suite.T())
+	pstate.On("GetProtocolStateVersion").Return(uint64(suite.protocolVersion), nil).Maybe()
+	suite.finalSnapshot.On("ProtocolState").Return(pstate, nil).Maybe()
+
 	suite.params = new(protocol.Params)
 	suite.params.On("FinalizedRoot").Return(suite.rootBlock, nil)
 	suite.params.On("SporkID").Return(suite.sporkID, nil)
-	suite.params.On("ProtocolVersion").Return(suite.protocolVersion, nil)
 	suite.params.On("SporkRootBlockHeight").Return(suite.rootBlock.Height, nil)
 	suite.params.On("SealedRoot").Return(suite.rootBlock, nil)
 	suite.state.On("Params").Return(suite.params).Maybe()
