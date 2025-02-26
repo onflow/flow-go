@@ -18,21 +18,21 @@ type BackData[K comparable, V any] interface {
 
 	// Adjust adjusts the value using the provided function if the key is found.
 	// It returns the updated value along with a boolean indicating whether an update occurred.
-	Adjust(key K, f func(value V) V) (V, bool)
+	Adjust(key K, f func(value V) (K, V)) (V, bool)
 
 	// AdjustWithInit adjusts the value using the provided function if the key is found.
 	// If the key is not found, it initializes the value using the given init function and then applies the adjustment.
 	//
 	// Args:
 	// - key: The key for which the value should be adjusted.
-	// - adjust: the function that adjusts the value.
+	// - adjust: the function that adjusts the value and returns the updated key and value.
 	// - init: A function that initializes the value if the key is not present.
 	//
 	// Returns:
 	// - the adjusted value.
 	//
 	// - a bool which indicates whether the value was adjusted.
-	AdjustWithInit(key K, adjust func(value V) V, init func() V) (V, bool)
+	AdjustWithInit(key K, adjust func(value V) (K, V), init func() V) (V, bool)
 
 	// GetWithInit returns the value for the given key.
 	// If the key does not exist, it creates a new value using the init function, stores it, and returns it.
