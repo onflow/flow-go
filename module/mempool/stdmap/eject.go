@@ -98,14 +98,14 @@ func EjectPanic[K comparable, V any](b *Backend[K, V]) (K, V, bool) {
 }
 
 // LRUEjector provides a swift FIFO ejection functionality
-type LRUEjector[K comparable, V any] struct {
+type LRUEjector[K comparable] struct {
 	sync.Mutex
 	table  map[K]uint64 // keeps sequence number of values it tracks
 	seqNum uint64       // keeps the most recent sequence number
 }
 
-func NewLRUEjector[K comparable, V any]() *LRUEjector[K, V] {
-	return &LRUEjector[K, V]{
+func NewLRUEjector[K comparable]() *LRUEjector[K] {
+	return &LRUEjector[K]{
 		table:  make(map[K]uint64),
 		seqNum: 0,
 	}
@@ -113,7 +113,7 @@ func NewLRUEjector[K comparable, V any]() *LRUEjector[K, V] {
 
 // Track should be called every time a new entity is added to the mempool.
 // It tracks the entity for later ejection.
-func (q *LRUEjector[K, V]) Track(key K) {
+func (q *LRUEjector[K]) Track(key K) {
 	q.Lock()
 	defer q.Unlock()
 
@@ -132,7 +132,7 @@ func (q *LRUEjector[K, V]) Track(key K) {
 }
 
 // Untrack simply removes the tracker of the ejector off the entityID
-func (q *LRUEjector[K, V]) Untrack(key K) {
+func (q *LRUEjector[K]) Untrack(key K) {
 	q.Lock()
 	defer q.Unlock()
 
@@ -141,7 +141,7 @@ func (q *LRUEjector[K, V]) Untrack(key K) {
 
 // Eject implements EjectFunc for LRUEjector. It finds the value with the lowest sequence number (i.e.,
 // the oldest entity). It also untracks. This is using a linear search.
-func (q *LRUEjector[K, V]) Eject(b *Backend[K, V]) K {
+func Eject[K comparable, V any](q *LRUEjector[K], b *Backend[K, V]) K {
 	q.Lock()
 	defer q.Unlock()
 
