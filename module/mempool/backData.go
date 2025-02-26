@@ -8,7 +8,7 @@ import (
 // as the core structure of maintaining data on memory pools.
 //
 // This interface provides fundamental operations for storing, retrieving, and removing data structures,
-// but it does not support modifying mutating already stored data. If modifications to the stored data is required,
+// but it does not support mutating already stored data. If modifications to the stored data is required,
 // use [MutableBackData] instead.
 //
 // NOTE: BackData by default is not expected to provide concurrency-safe operations. As it is just the
