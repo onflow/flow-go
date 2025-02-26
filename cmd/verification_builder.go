@@ -40,7 +40,6 @@ import (
 	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/storage/badger"
 	"github.com/onflow/flow-go/storage/dbops"
-	"github.com/onflow/flow-go/storage/operation/badgerimpl"
 	"github.com/onflow/flow-go/storage/store"
 )
 
@@ -89,7 +88,6 @@ func (v *VerificationNodeBuilder) LoadFlags() {
 			flags.Uint64Var(&v.verConf.blockWorkers, "block-workers", blockconsumer.DefaultBlockWorkers, "maximum number of blocks being processed in parallel")
 			flags.Uint64Var(&v.verConf.chunkWorkers, "chunk-workers", chunkconsumer.DefaultChunkWorkers, "maximum number of execution nodes a chunk data pack request is dispatched to")
 			flags.Uint64Var(&v.verConf.stopAtHeight, "stop-at-height", 0, "height to stop the node at (0 to disable)")
-			flags.StringVar(&v.verConf.dbOps, "db-ops", "badger-transaction", "database operations to use (badger-transaction, badger-batch, pebble-batch)")
 		})
 }
 
@@ -164,19 +162,18 @@ func (v *VerificationNodeBuilder) LoadComponentsAndModules() {
 			return nil
 		}).
 		Module("processed chunk index consumer progress", func(node *NodeConfig) error {
-			processedChunkIndex = store.NewConsumerProgress(badgerimpl.ToDB(node.DB), module.ConsumeProgressVerificationChunkIndex)
+			processedChunkIndex = store.NewConsumerProgress(node.ProtocolDB, module.ConsumeProgressVerificationChunkIndex)
 			return nil
 		}).
 		Module("processed block height consumer progress", func(node *NodeConfig) error {
-			processedBlockHeight = store.NewConsumerProgress(badgerimpl.ToDB(node.DB), module.ConsumeProgressVerificationBlockHeight)
+			processedBlockHeight = store.NewConsumerProgress(node.ProtocolDB, module.ConsumeProgressVerificationBlockHeight)
 			return nil
 		}).
 		Module("chunks queue", func(node *NodeConfig) error {
 			var ok bool
 			var err error
 
-			switch dbops.DBOps(v.verConf.dbOps) {
-			case dbops.BadgerTransaction:
+			if dbops.IsBadgerTransaction(v.verConf.dbOps) {
 				queue := badger.NewChunkQueue(node.DB)
 				ok, err = queue.Init(chunkconsumer.DefaultJobIndex)
 				if err != nil {
@@ -184,17 +181,17 @@ func (v *VerificationNodeBuilder) LoadComponentsAndModules() {
 				}
 
 				chunkQueue = queue
-			case dbops.BadgerBatch:
-				queue := store.NewChunkQueue(node.Metrics.Cache, badgerimpl.ToDB(node.DB))
+				node.Logger.Info().Msgf("chunks queue index has been initialized with badger db transaction updates")
+			} else if dbops.IsBatchUpdate(v.verConf.dbOps) {
+				queue := store.NewChunkQueue(node.Metrics.Cache, node.ProtocolDB)
 				ok, err = queue.Init(chunkconsumer.DefaultJobIndex)
 				if err != nil {
 					return fmt.Errorf("could not initialize default index in chunks queue: %w", err)
 				}
 
 				chunkQueue = queue
-			case dbops.PebbleBatch:
-				return fmt.Errorf("to be implemented")
-			default:
+				node.Logger.Info().Msgf("chunks queue index has been initialized with protocol db batch updates")
+			} else {
 				return fmt.Errorf("invalid db opts type: %v", v.verConf.dbOps)
 			}
 
@@ -232,13 +229,12 @@ func (v *VerificationNodeBuilder) LoadComponentsAndModules() {
 			chunkVerifier := chunks.NewChunkVerifier(vm, vmCtx, node.Logger)
 
 			var approvalStorage storage.ResultApprovals
-			switch dbops.DBOps(v.verConf.dbOps) {
-			case dbops.BadgerTransaction:
+			if dbops.IsBadgerTransaction(v.verConf.dbOps) {
 				approvalStorage = badger.NewResultApprovals(node.Metrics.Cache, node.DB)
-			case dbops.BadgerBatch:
-				approvalStorage = store.NewResultApprovals(node.Metrics.Cache, badgerimpl.ToDB(node.DB))
-			case dbops.PebbleBatch:
-				return nil, fmt.Errorf("to be implemented")
+			} else if dbops.IsBatchUpdate(v.verConf.dbOps) {
+				approvalStorage = store.NewResultApprovals(node.Metrics.Cache, node.ProtocolDB)
+			} else {
+				return nil, fmt.Errorf("invalid db opts type: %v", v.verConf.dbOps)
 			}
 
 			verifierEng, err = verifier.New(

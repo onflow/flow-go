@@ -29,6 +29,7 @@ import (
 	"github.com/onflow/flow-go/state/protocol/events"
 	"github.com/onflow/flow-go/storage"
 	bstorage "github.com/onflow/flow-go/storage/badger"
+	"github.com/onflow/flow-go/storage/dbops"
 	"github.com/onflow/flow-go/utils/grpcutils"
 )
 
@@ -155,6 +156,7 @@ type BaseConfig struct {
 	datadir                     string
 	pebbleDir                   string
 	protocolDBType              string
+	dbops                       string
 	badgerDB                    *badger.DB
 	pebbleDB                    *pebble.DB
 	secretsdir                  string
@@ -278,7 +280,8 @@ func DefaultBaseConfig() *BaseConfig {
 		BootstrapDir:     "bootstrap",
 		datadir:          datadir,
 		pebbleDir:        pebbleDir,
-		protocolDBType:   "badger",
+		protocolDBType:   "badger",                        // "badger" (default) or "pebble"
+		dbops:            string(dbops.BadgerTransaction), // "badger-transaction" (default) or "batch-update"
 		badgerDB:         nil,
 		pebbleDB:         nil,
 		secretsdir:       NotSet,
