@@ -11,7 +11,7 @@ type MutableBackData[K comparable, V any] interface {
 
 	// Adjust adjusts the value using the given function if the given key can be found.
 	// Returns a bool which indicates whether the value was updated as well as the updated value.
-	Adjust(key K, f func(value V) V) (V, bool)
+	Adjust(key K, f func(value V) (K, V)) (V, bool)
 
 	// AdjustWithInit adjusts the value using the given function if the given key can be found. When the
 	// value is not found, it initializes the value using the given init function and then applies the adjust function.
@@ -23,5 +23,5 @@ type MutableBackData[K comparable, V any] interface {
 	//   - the adjusted value.
 	//
 	// - a bool which indicates whether the value was adjusted.
-	AdjustWithInit(key K, adjust func(value V) V, init func() V) (V, bool)
+	AdjustWithInit(key K, adjust func(value V) (K, V), init func() V) (V, bool)
 }

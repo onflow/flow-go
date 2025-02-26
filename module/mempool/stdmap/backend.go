@@ -13,7 +13,7 @@ import (
 // Backend is a wrapper around the mutable backdata that provides concurrency-safe operations.
 type Backend struct {
 	sync.RWMutex
-	mutableBackData    mempool.MutableBackData
+	mutableBackData    mempool.MutableBackData[flow.Identifier, flow.Entity]
 	guaranteedCapacity uint
 	batchEject         BatchEjectFunc
 	eject              EjectFunc
@@ -24,7 +24,7 @@ type Backend struct {
 // This is using EjectRandomFast()
 func NewBackend(options ...OptionFunc) *Backend {
 	b := Backend{
-		mutableBackData:    backdata.NewMapBackData(),
+		mutableBackData:    backdata.NewMapBackData[flow.Identifier, flow.Entity](),
 		guaranteedCapacity: uint(math.MaxUint32),
 		batchEject:         EjectRandomFast,
 		eject:              nil,
@@ -82,7 +82,7 @@ func (b *Backend) Remove(entityID flow.Identifier) bool {
 
 // Adjust will adjust the value item using the given function if the given key can be found.
 // Returns a bool which indicates whether the value was updated.
-func (b *Backend) Adjust(entityID flow.Identifier, f func(flow.Entity) flow.Entity) (flow.Entity, bool) {
+func (b *Backend) Adjust(entityID flow.Identifier, f func(flow.Entity) (flow.Identifier, flow.Entity)) (flow.Entity, bool) {
 	// bs1 := binstat.EnterTime(binstat.BinStdmap + ".w_lock.(Backend)Adjust")
 	b.Lock()
 	// binstat.Leave(bs1)
@@ -120,7 +120,7 @@ func (b *Backend) GetWithInit(entityID flow.Identifier, init func() flow.Entity)
 //   - the adjusted entity.
 //
 // - a bool which indicates whether the entity was adjusted.
-func (b *Backend) AdjustWithInit(entityID flow.Identifier, adjust func(flow.Entity) flow.Entity, init func() flow.Entity) (flow.Entity, bool) {
+func (b *Backend) AdjustWithInit(entityID flow.Identifier, adjust func(flow.Entity) (flow.Identifier, flow.Entity), init func() flow.Entity) (flow.Entity, bool) {
 	b.Lock()
 	defer b.Unlock()
 
@@ -141,7 +141,7 @@ func (b *Backend) ByID(entityID flow.Identifier) (flow.Entity, bool) {
 }
 
 // Run executes a function giving it exclusive access to the backdata
-func (b *Backend) Run(f func(backdata mempool.BackData) error) error {
+func (b *Backend) Run(f func(backdata mempool.BackData[flow.Identifier, flow.Entity]) error) error {
 	// bs1 := binstat.EnterTime(binstat.BinStdmap + ".w_lock.(Backend)Run")
 	b.Lock()
 	// binstat.Leave(bs1)
