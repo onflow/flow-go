@@ -37,7 +37,7 @@ type EjectFunc func(b *Backend) (flow.Identifier, flow.Entity, bool)
 // threshold size, and will iterate through them and eject unneeded
 // entries if that is the case.  Return values are unused
 func EjectRandomFast(b *Backend) (bool, error) {
-	currentSize := b.backData.Size()
+	currentSize := b.mutableBackData.Size()
 
 	if b.guaranteedCapacity >= currentSize {
 		return false, nil
@@ -66,9 +66,9 @@ func EjectRandomFast(b *Backend) (bool, error) {
 	idx := 0                     // index into mapIndices
 	next2Remove := mapIndices[0] // index of the element to be removed next
 	i := 0                       // index into the entities map
-	for entityID, entity := range b.backData.All() {
+	for entityID, entity := range b.mutableBackData.All() {
 		if i == next2Remove {
-			b.backData.Remove(entityID) // remove entity
+			b.mutableBackData.Remove(entityID) // remove entity
 			for _, callback := range b.ejectionCallbacks {
 				callback(entity) // notify callback
 			}
@@ -148,7 +148,7 @@ func (q *LRUEjector) Eject(b *Backend) flow.Identifier {
 	// finds the oldest entity
 	oldestSQ := uint64(math.MaxUint64)
 	var oldestID flow.Identifier
-	for _, id := range b.backData.Identifiers() {
+	for _, id := range b.mutableBackData.Identifiers() {
 		if sq, ok := q.table[id]; ok {
 			if sq < oldestSQ {
 				oldestID = id

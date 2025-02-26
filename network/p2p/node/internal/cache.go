@@ -39,7 +39,7 @@ func NewDisallowListCache(sizeLimit uint32, logger zerolog.Logger, collector mod
 		collector)
 
 	return &DisallowListCache{
-		c: stdmap.NewBackend(stdmap.WithBackData(backData)),
+		c: stdmap.NewBackend(stdmap.WithMutableBackData(backData)),
 	}
 }
 

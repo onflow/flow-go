@@ -22,7 +22,7 @@ type BlockExecutionData struct {
 func NewBlockExecutionData(limit uint32, logger zerolog.Logger, collector module.HeroCacheMetrics) *BlockExecutionData {
 	return &BlockExecutionData{
 		c: stdmap.NewBackend(
-			stdmap.WithBackData(
+			stdmap.WithMutableBackData(
 				herocache.NewCache(limit,
 					herocache.DefaultOversizeFactor,
 					heropool.LRUEjection,
