@@ -1597,7 +1597,7 @@ func (suite *Suite) TestGetNodeVersionInfo() {
 			Semver:               build.Version(),
 			Commit:               build.Commit(),
 			SporkId:              sporkID,
-			ProtocolVersion:      uint64(protocolStateVersion),
+			ProtocolStateVersion: protocolStateVersion,
 			SporkRootBlockHeight: sporkRootBlock.Height,
 			NodeRootBlockHeight:  nodeRootBlock.Height,
 			CompatibleRange:      nil,
@@ -1683,7 +1683,7 @@ func (suite *Suite) TestGetNodeVersionInfo() {
 			Semver:               build.Version(),
 			Commit:               build.Commit(),
 			SporkId:              sporkID,
-			ProtocolVersion:      uint64(protocolStateVersion),
+			ProtocolStateVersion: protocolStateVersion,
 			SporkRootBlockHeight: sporkRootBlock.Height,
 			NodeRootBlockHeight:  nodeRootBlock.Height,
 			CompatibleRange: &access.CompatibleRange{

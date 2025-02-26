@@ -332,7 +332,7 @@ func (b *Backend) GetNodeVersionInfo(_ context.Context) (*access.NodeVersionInfo
 		Semver:               build.Version(),
 		Commit:               build.Commit(),
 		SporkId:              sporkID,
-		ProtocolVersion:      protocolSnapshot.GetProtocolStateVersion(),
+		ProtocolStateVersion: protocolSnapshot.GetProtocolStateVersion(),
 		SporkRootBlockHeight: sporkRootBlockHeight,
 		NodeRootBlockHeight:  nodeRootBlockHeader.Height,
 		CompatibleRange:      compatibleRange,
