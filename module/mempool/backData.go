@@ -4,12 +4,12 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
-// BackData represents the underlying immutable data structure used by mempool.Backend
+// BackData represents the underlying data structure used by mempool.Backend
 // as the core structure of maintaining data on memory pools.
 //
 // This interface provides fundamental operations for storing, retrieving, and removing data structures,
-// but it does not support modifying existing data structures to ensure immutability. If modification is required,
-// use MutableBackData instead.
+// but it does not support modifying mutating already stored data. If modifications to the stored data is required,
+// use [MutableBackData] instead.
 //
 // NOTE: BackData by default is not expected to provide concurrency-safe operations. As it is just the
 // model layer of the mempool, the safety against concurrent operations are guaranteed by the Backend that
