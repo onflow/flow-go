@@ -17,7 +17,7 @@ func (l IntList) ID() flow.Identifier {
 }
 
 // StructWithNilFields allows testing all cases of nil-able fields: struct pointer, slice, map.
-// The default behaviour is if any nilable fields is nil or size 0, the malleability checker fails.
+// The default behaviour is if any nil-able fields is nil or size 0, the malleability checker fails.
 type StructWithNilFields struct {
 	Identities flow.IdentitySkeletonList
 	Index      map[flow.Identifier]uint32

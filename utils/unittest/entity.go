@@ -41,7 +41,7 @@ func MockEntityFixture() *MockEntity {
 
 // RequireEntityNonMalleable is a sanity check that the entity is not malleable with regards to the ID() function.
 // Non-malleability in this sense means that it is computationally hard to build a different entity with the same ID.
-// This implies that in a non-malleable entity, changing any field should change the ID, which is checked by this function.
+// Hence, changing *any* field of a non-malleable entity should change the ID, which we check here.
 // Note that this is sanity check of non-malleability and that passing this test does not guarantee non-malleability.
 // Non-malleability is a required property for any entity that implements the [flow.IDEntity] interface. This is especially
 // important for entities that contain signatures and are transmitted over the network.
@@ -54,14 +54,15 @@ func RequireEntityNonMalleable(t *testing.T, entity flow.IDEntity, ops ...Mallea
 	require.NoError(t, err)
 }
 
-// MalleabilityChecker is a structure that holds additional information about the context of malleability check.
-// It allows to customize the behavior of the check by providing custom types and their generators.
-// All underlying checks are implemented as methods of this structure.
-// This structure is used to check if the entity is malleable. Strictly speaking if a structure implements [flow.IDEntity] interface
-// any change to the data structure has to change the ID of the entity as well.
-// This structure performs a recursive check of all fields of the entity and ensures that changing any field will change the ID of the entity.
-// The idea behind implementation is that user provides a structure which serves a layout (schema) for the entity.
-// Inputs must have all non-nil and non-empty slice/map fields, otherwise Check will return an error.
+// MalleabilityChecker is a customizable checker to test whether an entity is malleable. If a structure implements [flow.IDEntity]
+// interface, *any* change to the data structure has to change the ID of the entity as well.
+// The MalleabilityChecker performs a recursive check of all fields of the entity and ensures that changing any field will change
+// the ID of the entity. By default, the MalleabilityChecker uses pre-defined generators for each basic golang type, which return
+// a random value, to modify the entity's field values. However, the MalleabilityChecker can be customized, by providing custom
+// types and their generators.
+//
+// The caller must provide a properly instantiated entity struct, which serves a template for further modification.  
+// Input entities must have all non-nil and non-empty slice/map fields, otherwise `Check` will return an error.
 // In rare cases, a type may have a different ID computation depending on whether a field is nil.
 // In such cases, we can use the `malleability:"optional"` struct tag to skip malleability checks when the field is nil.
 //
@@ -70,8 +71,8 @@ func RequireEntityNonMalleable(t *testing.T, entity flow.IDEntity, ops ...Mallea
 //  2. interfaces (generateInterfaceFlowValue)
 //  3. primitives, slices, arrays, maps (generateRandomReflectValue)
 //
-// Checker knows how to deal with each of the categories and generate random values for them but not for all types.
-// If the type is not recognized there are two ways:
+// Checker knows how to deal with each of the categories and generate random values for them. 
+// There are two ways to handle types not natively recognized byt he MalleabilityChecker: 
 //  1. User can provide a custom type generator for the type using WithCustomType option.
 //  2. User can extend the checker with new type handling.
 //
@@ -85,8 +86,8 @@ type MalleabilityChecker struct {
 // MalleabilityCheckerOpt is a functional option for the MalleabilityChecker which allows to modify behavior of the checker.
 type MalleabilityCheckerOpt func(*MalleabilityChecker)
 
-// WithCustomType allows to override the default behavior of the checker for the given type, meaning if a field of the given type is encountered
-// it will use generator instead of generating a random value.
+// WithCustomType allows to override the default behavior of the checker for the given type, meaning if a field of the given type
+//  is encountered, the MalleabilityChecker will use the provided generator instead of a random value.
 func WithCustomType[T any](tType any, generator func() T) MalleabilityCheckerOpt {
 	return func(mc *MalleabilityChecker) {
 		mc.customTypes[reflect.TypeOf(tType)] = func() reflect.Value {
@@ -122,7 +123,7 @@ func (mc *MalleabilityChecker) Check(entity flow.IDEntity) error {
 			v = v.Elem()
 		} else {
 			// If it is not a pointer type, we may not be able to set fields to test malleability, since the entity may not be addressable
-			return fmt.Errorf("entity is not a pointer type (try taking a reference to it), entity: %v %v", v.Kind(), v.Type())
+			return fmt.Errorf("entity is not a pointer type (try checking a reference to it), entity: %v %v", v.Kind(), v.Type())
 		}
 	} else {
 		return fmt.Errorf("tested entity is not valid")
@@ -153,8 +154,8 @@ func (mc *MalleabilityChecker) isEntityMalleable(v reflect.Value, idFunc func() 
 
 	if v.Kind() == reflect.Struct {
 		// in case we are dealing with struct we have two options:
-		// 1) if it's a known type where we know how to generate a random value we generate it and replace the whole field with it
-		// 2) if we don't anticipate the type we check if the field is malleable by checking all fields of the struct recursively
+		// 1) if it's a type that we know how to generate a random value for, we replace the whole field with such random value
+		// 2) if it's an unknown struct type, we check if the field is malleable by checking all of its fields recursively
 		if generatedValue := reflect.ValueOf(generateCustomFlowValue(v)); generatedValue.IsValid() {
 			origID := idFunc()
 			v.Set(generatedValue)
@@ -170,7 +171,7 @@ func (mc *MalleabilityChecker) isEntityMalleable(v reflect.Value, idFunc func() 
 					return fmt.Errorf("field %s is not settable", tType.Field(i).Name)
 				}
 				if err := ensureFieldNotEmpty(field); err != nil {
-					// if the field is empty and has a tag malleability:"optional" we can omit it from the check
+					// if the field is empty and has a tag malleability:"optional" we omit it from the check
 					// and consider it as non-malleable.
 					if tType.Field(i).Tag.Get("malleability") == "optional" {
 						continue
