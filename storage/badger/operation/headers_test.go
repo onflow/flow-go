@@ -60,7 +60,7 @@ func TestBlockHeightIndexLookup(t *testing.T) {
 		height := uint64(1337)
 		expected := flow.Identifier{0x01, 0x02, 0x03}
 
-		err := db.Update(IndexBlockHeight(height, expected))
+		err := db.Update(IndexFinalizedBlockByHeight(height, expected))
 		require.Nil(t, err)
 
 		var actual flow.Identifier

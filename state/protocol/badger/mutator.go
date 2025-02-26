@@ -748,7 +748,7 @@ func (m *FollowerState) Finalize(ctx context.Context, blockID flow.Identifier) e
 	//   its payload, in which case the parent's seal is the same.
 	// * set the epoch fallback flag, if it is triggered
 	err = operation.RetryOnConflict(m.db.Update, func(tx *badger.Txn) error {
-		err = operation.IndexBlockHeight(header.Height, blockID)(tx)
+		err = operation.IndexFinalizedBlockByHeight(header.Height, blockID)(tx)
 		if err != nil {
 			return fmt.Errorf("could not insert number mapping: %w", err)
 		}

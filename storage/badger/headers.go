@@ -30,7 +30,7 @@ func NewHeaders(collector module.CacheMetrics, db *badger.DB) *Headers {
 	// CAUTION: should only be used to index FINALIZED blocks by their
 	// respective height
 	storeHeight := func(height uint64, id flow.Identifier) func(*transaction.Tx) error {
-		return transaction.WithTx(operation.IndexBlockHeight(height, id))
+		return transaction.WithTx(operation.IndexFinalizedBlockByHeight(height, id))
 	}
 
 	retrieve := func(blockID flow.Identifier) func(tx *badger.Txn) (*flow.Header, error) {

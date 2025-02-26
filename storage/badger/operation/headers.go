@@ -14,9 +14,9 @@ func RetrieveHeader(blockID flow.Identifier, header *flow.Header) func(*badger.T
 	return retrieve(makePrefix(codeHeader, blockID), header)
 }
 
-// IndexBlockHeight indexes the height of a block. It should only be called on
+// IndexFinalizedBlockByHeight indexes the height of a block. It should only be called on
 // finalized blocks.
-func IndexBlockHeight(height uint64, blockID flow.Identifier) func(*badger.Txn) error {
+func IndexFinalizedBlockByHeight(height uint64, blockID flow.Identifier) func(*badger.Txn) error {
 	return insert(makePrefix(codeHeightToBlock, height), blockID)
 }
 
