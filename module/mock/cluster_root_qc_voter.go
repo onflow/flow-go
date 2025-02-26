@@ -16,7 +16,7 @@ type ClusterRootQCVoter struct {
 }
 
 // Vote provides a mock function with given fields: _a0, _a1
-func (_m *ClusterRootQCVoter) Vote(_a0 context.Context, _a1 protocol.Epoch) error {
+func (_m *ClusterRootQCVoter) Vote(_a0 context.Context, _a1 protocol.TentativeEpoch) error {
 	ret := _m.Called(_a0, _a1)
 
 	if len(ret) == 0 {
@@ -24,7 +24,7 @@ func (_m *ClusterRootQCVoter) Vote(_a0 context.Context, _a1 protocol.Epoch) erro
 	}
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(context.Context, protocol.Epoch) error); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, protocol.TentativeEpoch) error); ok {
 		r0 = rf(_a0, _a1)
 	} else {
 		r0 = ret.Error(0)
