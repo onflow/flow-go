@@ -43,7 +43,7 @@ func NewSpamRecordCache(sizeLimit uint32, logger zerolog.Logger, collector modul
 
 	return &SpamRecordCache{
 		recordFactory: recordFactory,
-		c:             stdmap.NewBackend(stdmap.WithBackData(backData)),
+		c:             stdmap.NewBackend(stdmap.WithMutableBackData(backData)),
 	}
 }
 

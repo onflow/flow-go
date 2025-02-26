@@ -41,7 +41,7 @@ func NewAppSpecificScoreCache(sizeLimit uint32, logger zerolog.Logger, collector
 		collector)
 
 	return &AppSpecificScoreCache{
-		c: stdmap.NewBackend(stdmap.WithBackData(backData)),
+		c: stdmap.NewBackend(stdmap.WithMutableBackData(backData)),
 	}
 }
 
