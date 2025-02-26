@@ -115,19 +115,17 @@ func NewMalleabilityChecker(ops ...MalleabilityCheckerOpt) *MalleabilityChecker 
 // It returns an error if the entity is malleable, otherwise it returns nil.
 func (mc *MalleabilityChecker) Check(entity flow.IDEntity) error {
 	v := reflect.ValueOf(entity)
-	if v.IsValid() {
-		if v.Kind() == reflect.Ptr {
-			if v.IsNil() {
-				return fmt.Errorf("entity is nil, nothing to check")
-			}
-			v = v.Elem()
-		} else {
-			// If it is not a pointer type, we may not be able to set fields to test malleability, since the entity may not be addressable
-			return fmt.Errorf("entity is not a pointer type (try checking a reference to it), entity: %v %v", v.Kind(), v.Type())
-		}
-	} else {
-		return fmt.Errorf("tested entity is not valid")
+	if !v.IsValid() {
+		return fmt.Errorf("input is not a valid entity")
 	}
+	if v.Kind() != reflect.Ptr {
+		// If it is not a pointer type, we may not be able to set fields to test malleability, since the entity may not be addressable
+		return fmt.Errorf("entity is not a pointer type (try checking a reference to it), entity: %v %v", v.Kind(), v.Type())
+	}
+	if v.IsNil() {
+		return fmt.Errorf("entity is nil, nothing to check")
+	}
+	v = v.Elem()
 	return mc.isEntityMalleable(v, entity.ID)
 }
 
@@ -149,7 +147,7 @@ func (mc *MalleabilityChecker) isEntityMalleable(v reflect.Value, idFunc func() 
 		if origID != newID {
 			return nil
 		}
-		return fmt.Errorf("ID did not change after changing field %s", tType.String())
+		return fmt.Errorf("ID did not change after changing %s value", tType.String())
 	}
 
 	if v.Kind() == reflect.Struct {
@@ -163,7 +161,7 @@ func (mc *MalleabilityChecker) isEntityMalleable(v reflect.Value, idFunc func() 
 			if origID != newID {
 				return nil
 			}
-			return fmt.Errorf("ID did not change after changing field %s", tType.String())
+			return fmt.Errorf("ID did not change after changing %s value", tType.String())
 		} else {
 			for i := 0; i < v.NumField(); i++ {
 				field := v.Field(i)
@@ -189,13 +187,13 @@ func (mc *MalleabilityChecker) isEntityMalleable(v reflect.Value, idFunc func() 
 		origID := idFunc()
 		err := generateRandomReflectValue(v)
 		if err != nil {
-			return fmt.Errorf("failed to generate random value for field %s: %w", tType.String(), err)
+			return fmt.Errorf("failed to generate random value for %s: %w", tType.String(), err)
 		}
 		newID := idFunc()
 		if origID != newID {
 			return nil
 		}
-		return fmt.Errorf("ID did not change after changing field %s", tType.String())
+		return fmt.Errorf("ID did not change after changing %s value", tType.String())
 	}
 }
 

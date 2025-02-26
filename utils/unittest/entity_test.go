@@ -172,7 +172,7 @@ func TestRequireEntityNonMalleable(t *testing.T) {
 	t.Run("invalid-entity", func(t *testing.T) {
 		err := NewMalleabilityChecker().Check(nil)
 		require.Error(t, err)
-		require.ErrorContains(t, err, "tested entity is not valid")
+		require.ErrorContains(t, err, "input is not a valid entity")
 	})
 	t.Run("nil-entity", func(t *testing.T) {
 		var e *flow.ExecutionReceipt = nil
