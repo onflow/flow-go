@@ -13,7 +13,7 @@ import (
 
 // TestLRUEjector_Track evaluates that tracking a new item adds the item to the ejector table.
 func TestLRUEjector_Track(t *testing.T) {
-	ejector := NewLRUEjector()
+	ejector := NewLRUEjector[flow.Identifier]()
 	// ejector's table should be empty
 	assert.Len(t, ejector.table, 0)
 
@@ -39,7 +39,7 @@ func TestLRUEjector_Track(t *testing.T) {
 // TestLRUEjector_Track_Duplicate evaluates that tracking a duplicate item
 // does not change the internal state of the ejector.
 func TestLRUEjector_Track_Duplicate(t *testing.T) {
-	ejector := NewLRUEjector()
+	ejector := NewLRUEjector[flow.Identifier]()
 
 	// creates adds an item to the ejector
 	item := flow.Identifier{0x00}
@@ -70,7 +70,7 @@ func TestLRUEjector_Track_Duplicate(t *testing.T) {
 // changes the state of ejector properly, i.e., items reside on the
 // memory, and sequence number changed accordingly.
 func TestLRUEjector_Track_Many(t *testing.T) {
-	ejector := NewLRUEjector()
+	ejector := NewLRUEjector[flow.Identifier]()
 
 	// creates and tracks 100 items
 	size := 100
@@ -98,7 +98,7 @@ func TestLRUEjector_Track_Many(t *testing.T) {
 // TestLRUEjector_Untrack_One evaluates that untracking an existing item
 // removes it from the ejector state and changes the state accordingly.
 func TestLRUEjector_Untrack_One(t *testing.T) {
-	ejector := NewLRUEjector()
+	ejector := NewLRUEjector[flow.Identifier]()
 
 	// creates adds an item to the ejector
 	item := flow.Identifier{0x00}
@@ -132,7 +132,7 @@ func TestLRUEjector_Untrack_One(t *testing.T) {
 // TestLRUEjector_Untrack_Duplicate evaluates that untracking an item twice
 // removes it from the ejector state only once and changes the state safely.
 func TestLRUEjector_Untrack_Duplicate(t *testing.T) {
-	ejector := NewLRUEjector()
+	ejector := NewLRUEjector[flow.Identifier]()
 
 	// creates and adds two items to the ejector
 	item1 := flow.Identifier{0x00}
@@ -175,11 +175,11 @@ func TestLRUEjector_Untrack_Duplicate(t *testing.T) {
 // TestLRUEjector_UntrackEject evaluates that untracking the next ejectable item
 // properly changes the next ejectable item in the ejector.
 func TestLRUEjector_UntrackEject(t *testing.T) {
-	ejector := NewLRUEjector()
+	ejector := NewLRUEjector[flow.Identifier]()
 
 	// creates and tracks 100 items
 	size := 100
-	backEnd := NewBackend()
+	backEnd := NewBackend[flow.Identifier, *unittest.MockEntity]()
 
 	items := make([]flow.Identifier, size)
 
@@ -196,18 +196,18 @@ func TestLRUEjector_UntrackEject(t *testing.T) {
 	ejector.Untrack(items[0])
 
 	// next ejectable item should be the second oldest item
-	id := ejector.Eject(backEnd)
+	id := Eject(ejector, backEnd)
 	assert.Equal(t, id, items[1])
 }
 
 // TestLRUEjector_EjectAll adds many item to the ejector and then ejects them
 // all one by one and evaluates an LRU ejection behavior.
 func TestLRUEjector_EjectAll(t *testing.T) {
-	ejector := NewLRUEjector()
+	ejector := NewLRUEjector[flow.Identifier]()
 
 	// creates and tracks 100 items
 	size := 100
-	backEnd := NewBackend()
+	backEnd := NewBackend[flow.Identifier, *unittest.MockEntity]()
 
 	items := make([]flow.Identifier, size)
 
@@ -224,7 +224,7 @@ func TestLRUEjector_EjectAll(t *testing.T) {
 
 	// ejects one by one
 	for i := 0; i < size; i++ {
-		id := ejector.Eject(backEnd)
+		id := Eject(ejector, backEnd)
 		require.Equal(t, id, items[i])
 	}
 }
