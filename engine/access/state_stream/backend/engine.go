@@ -58,7 +58,7 @@ func NewEng(
 		}).
 		Build()
 
-	server.RegisterAPIServer(func(s *grpc.Server) {
+	server.RegisterService(func(s *grpc.Server) {
 		executiondata.RegisterExecutionDataAPIServer(s, e.handler)
 	})
 
