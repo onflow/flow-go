@@ -25,10 +25,13 @@ type ProtocolState struct {
 	children  map[flow.Identifier][]flow.Identifier
 	heights   map[uint64]*flow.Block
 	finalized uint64
+	sealed    uint64
 	root      *flow.Block
 	result    *flow.ExecutionResult
 	seal      *flow.Seal
 }
+
+var _ protocol.State = (*ProtocolState)(nil)
 
 func NewProtocolState() *ProtocolState {
 	return &ProtocolState{
@@ -136,6 +139,20 @@ func (ps *ProtocolState) Final() protocol.Snapshot {
 	return snapshot
 }
 
+func (ps *ProtocolState) Sealed() protocol.Snapshot {
+	ps.Lock()
+	defer ps.Unlock()
+
+	sealed, ok := ps.heights[ps.sealed]
+	if !ok {
+		return nil
+	}
+
+	snapshot := new(protocolmock.Snapshot)
+	snapshot.On("Head").Return(sealed.Header, nil)
+	return snapshot
+}
+
 func pending(ps *ProtocolState, blockID flow.Identifier) []flow.Identifier {
 	var pendingIDs []flow.Identifier
 	pendingIDs, ok := ps.children[blockID]
@@ -179,7 +196,7 @@ func (m *ProtocolState) Extend(block *flow.Block) error {
 	}
 
 	if _, ok := m.blocks[block.Header.ParentID]; !ok {
-		return fmt.Errorf("could not retrieve parent")
+		return fmt.Errorf("could not retrieve parent %v", block.Header.ParentID)
 	}
 
 	m.blocks[id] = block
@@ -222,5 +239,26 @@ func (m *ProtocolState) Finalize(blockID flow.Identifier) error {
 
 	m.finalized = block.Header.Height
 
+	return nil
+}
+
+func (m *ProtocolState) MakeSeal(blockID flow.Identifier) error {
+	m.Lock()
+	defer m.Unlock()
+
+	block, ok := m.blocks[blockID]
+	if !ok {
+		return fmt.Errorf("could not retrieve final header")
+	}
+
+	if block.Header.Height <= m.sealed {
+		return fmt.Errorf("could not seal old blocks")
+	}
+
+	if block.Header.Height >= m.finalized {
+		return fmt.Errorf("incorrect sealed height sealed %v, finalized %v", block.Header.Height, m.finalized)
+	}
+
+	m.sealed = block.Header.Height
 	return nil
 }

@@ -2,6 +2,7 @@ package collection_test
 
 import (
 	"context"
+	"errors"
 	"math/rand"
 	"os"
 	"testing"
@@ -12,6 +13,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
+	hotstuffmodel "github.com/onflow/flow-go/consensus/hotstuff/model"
 	model "github.com/onflow/flow-go/model/cluster"
 	"github.com/onflow/flow-go/model/flow"
 	builder "github.com/onflow/flow-go/module/builder/collection"
@@ -263,6 +265,37 @@ func (suite *BuilderSuite) TestBuildOn_Success() {
 	mempoolTransactions := suite.pool.All()
 	suite.Assert().Len(builtCollection.Transactions, 3)
 	suite.Assert().True(collectionContains(builtCollection, flow.GetIDs(mempoolTransactions)...))
+}
+
+// TestBuildOn_SetterErrorPassthrough validates that errors from the setter function are passed through to the caller.
+func (suite *BuilderSuite) TestBuildOn_SetterErrorPassthrough() {
+	sentinel := errors.New("sentinel")
+	setter := func(h *flow.Header) error {
+		return sentinel
+	}
+	_, err := suite.builder.BuildOn(suite.genesis.ID(), setter, noopSigner)
+	suite.Assert().ErrorIs(err, sentinel)
+}
+
+// TestBuildOn_SignerErrorPassthrough validates that errors from the sign function are passed through to the caller.
+func (suite *BuilderSuite) TestBuildOn_SignerErrorPassthrough() {
+	suite.T().Run("unexpected Exception", func(t *testing.T) {
+		exception := errors.New("exception")
+		sign := func(h *flow.Header) error {
+			return exception
+		}
+		_, err := suite.builder.BuildOn(suite.genesis.ID(), noopSetter, sign)
+		suite.Assert().ErrorIs(err, exception)
+	})
+	suite.T().Run("NoVoteError", func(t *testing.T) {
+		// the EventHandler relies on this sentinel in particular to be passed through
+		sentinel := hotstuffmodel.NewNoVoteErrorf("not voting")
+		sign := func(h *flow.Header) error {
+			return sentinel
+		}
+		_, err := suite.builder.BuildOn(suite.genesis.ID(), noopSetter, sign)
+		suite.Assert().ErrorIs(err, sentinel)
+	})
 }
 
 // when there are transactions with an unknown reference block in the pool, we should not include them in collections

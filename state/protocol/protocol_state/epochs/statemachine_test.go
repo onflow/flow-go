@@ -50,7 +50,7 @@ func (s *EpochStateMachineSuite) SetupTest() {
 	s.setupsDB = storagemock.NewEpochSetups(s.T())
 	s.commitsDB = storagemock.NewEpochCommits(s.T())
 	s.parentState = protocolmock.NewKVStoreReader(s.T())
-	s.parentState.On("GetEpochCommitSafetyThreshold").Return(uint64(1_000))
+	s.parentState.On("GetFinalizationSafetyThreshold").Return(uint64(1_000))
 	s.parentEpochState = unittest.EpochStateFixture()
 	s.mutator = protocol_statemock.NewKVStoreMutator(s.T())
 	s.candidate = unittest.BlockHeaderFixture(unittest.HeaderWithView(s.parentEpochState.CurrentEpochSetup.FirstView + 1))
@@ -159,7 +159,7 @@ func (s *EpochStateMachineSuite) TestBuild_HappyPath() {
 
 // TestEpochStateMachine_Constructor tests the behavior of the EpochStateMachine constructor.
 // Specifically, we test the scenario, where the EpochCommit Service Event is still missing
-// by the time we cross the `EpochCommitSafetyThreshold`. We expect the constructor to select the
+// by the time we cross the `FinalizationSafetyThreshold`. We expect the constructor to select the
 // appropriate internal state machine constructor (HappyPathStateMachine before the threshold
 // and FallbackStateMachine when reaching or exceeding the view threshold).
 // Any exceptions encountered when constructing the internal state machines should be passed up.
