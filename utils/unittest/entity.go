@@ -88,6 +88,7 @@ type MalleabilityCheckerOpt func(*MalleabilityChecker)
 
 // WithCustomType allows to override the default behavior of the checker for the given type, meaning if a field of the given type
 // is encountered, the MalleabilityChecker will use the provided generator instead of a random value.
+// ATTENTION: In order for the MalleabilityChecker to work properly, two calls of the generator should produce two different values.
 func WithCustomType[T any](generator func() T) MalleabilityCheckerOpt {
 	return func(mc *MalleabilityChecker) {
 		mc.customTypes[reflect.TypeOf((*T)(nil)).Elem()] = func() reflect.Value {
