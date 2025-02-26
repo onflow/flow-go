@@ -25,7 +25,7 @@ func TestHeroQueue_Sequential(t *testing.T) {
 	require.False(t, ok)
 	require.Nil(t, entity)
 
-	entities := unittest.MockEntityListFixture(sizeLimit)
+	entities := unittest.EntityListFixture(uint(sizeLimit))
 	// pushing entities sequentially.
 	for i, e := range entities {
 		require.True(t, q.Push(*e))
@@ -69,7 +69,7 @@ func TestHeroQueue_Concurrent(t *testing.T) {
 	pushWG := &sync.WaitGroup{}
 	pushWG.Add(sizeLimit)
 
-	entities := unittest.MockEntityListFixture(sizeLimit)
+	entities := unittest.EntityListFixture(uint(sizeLimit))
 	// pushing entities concurrently.
 	for _, e := range entities {
 		e := e // suppress loop variable
