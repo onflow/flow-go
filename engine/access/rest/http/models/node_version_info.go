@@ -9,7 +9,7 @@ func (t *NodeVersionInfo) Build(params *access.NodeVersionInfo) {
 	t.Semver = params.Semver
 	t.Commit = params.Commit
 	t.SporkId = params.SporkId.String()
-	t.ProtocolStateVersion = util.FromUint(params.ProtocolVersion)
+	t.ProtocolStateVersion = util.FromUint(params.ProtocolStateVersion)
 	t.SporkRootBlockHeight = util.FromUint(params.SporkRootBlockHeight)
 	t.NodeRootBlockHeight = util.FromUint(params.NodeRootBlockHeight)
 
