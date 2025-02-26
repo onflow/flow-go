@@ -16,11 +16,11 @@ func TestMalleability(t *testing.T) {
 		unittest.RequireEntityNonMalleable(t, unittest.EpochSetupFixture())
 	})
 	t.Run("EpochCommit with nil DKGIndexMap", func(t *testing.T) {
-	// Due to `DKGIndexMap` being nil, `MalleabilityChecker` will skip mutating this field. 
+		// Due to `DKGIndexMap` being nil, `MalleabilityChecker` will skip mutating this field.
 		unittest.RequireEntityNonMalleable(t, unittest.EpochCommitFixture())
 	})
 
-	checker := unittest.NewMalleabilityChecker(unittest.WithCustomType(flow.DKGIndexMap{}, func() any {
+	checker := unittest.NewMalleabilityChecker(unittest.WithCustomType(func() flow.DKGIndexMap {
 		return flow.DKGIndexMap{unittest.IdentifierFixture(): 0, unittest.IdentifierFixture(): 1}
 	}))
 	t.Run("EpochCommit with proper DKGIndexMap", func(t *testing.T) {

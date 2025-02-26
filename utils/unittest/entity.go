@@ -61,7 +61,7 @@ func RequireEntityNonMalleable(t *testing.T, entity flow.IDEntity, ops ...Mallea
 // a random value, to modify the entity's field values. However, the MalleabilityChecker can be customized, by providing custom
 // types and their generators.
 //
-// The caller must provide a properly instantiated entity struct, which serves a template for further modification.  
+// The caller must provide a properly instantiated entity struct, which serves a template for further modification.
 // Input entities must have all non-nil and non-empty slice/map fields, otherwise `Check` will return an error.
 // In rare cases, a type may have a different ID computation depending on whether a field is nil.
 // In such cases, we can use the `malleability:"optional"` struct tag to skip malleability checks when the field is nil.
@@ -71,8 +71,8 @@ func RequireEntityNonMalleable(t *testing.T, entity flow.IDEntity, ops ...Mallea
 //  2. interfaces (generateInterfaceFlowValue)
 //  3. primitives, slices, arrays, maps (generateRandomReflectValue)
 //
-// Checker knows how to deal with each of the categories and generate random values for them. 
-// There are two ways to handle types not natively recognized byt he MalleabilityChecker: 
+// Checker knows how to deal with each of the categories and generate random values for them.
+// There are two ways to handle types not natively recognized byt he MalleabilityChecker:
 //  1. User can provide a custom type generator for the type using WithCustomType option.
 //  2. User can extend the checker with new type handling.
 //
@@ -87,10 +87,10 @@ type MalleabilityChecker struct {
 type MalleabilityCheckerOpt func(*MalleabilityChecker)
 
 // WithCustomType allows to override the default behavior of the checker for the given type, meaning if a field of the given type
-//  is encountered, the MalleabilityChecker will use the provided generator instead of a random value.
-func WithCustomType[T any](tType any, generator func() T) MalleabilityCheckerOpt {
+// is encountered, the MalleabilityChecker will use the provided generator instead of a random value.
+func WithCustomType[T any](generator func() T) MalleabilityCheckerOpt {
 	return func(mc *MalleabilityChecker) {
-		mc.customTypes[reflect.TypeOf(tType)] = func() reflect.Value {
+		mc.customTypes[reflect.TypeOf((*T)(nil)).Elem()] = func() reflect.Value {
 			return reflect.ValueOf(generator())
 		}
 	}
