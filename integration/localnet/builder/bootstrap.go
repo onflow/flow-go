@@ -69,7 +69,7 @@ var (
 	profileUploader             bool
 	tracing                     bool
 	cadenceTracing              bool
-	extesiveTracing             bool
+	extensiveTracing            bool
 	consensusDelay              time.Duration
 	collectionDelay             time.Duration
 	logLevel                    string
@@ -95,7 +95,7 @@ func init() {
 	flag.BoolVar(&profileUploader, "profile-uploader", DefaultProfileUploader, "whether to upload profiles to the cloud")
 	flag.BoolVar(&tracing, "tracing", DefaultTracing, "whether to enable low-overhead tracing in flow")
 	flag.BoolVar(&cadenceTracing, "cadence-tracing", DefaultCadenceTracing, "whether to enable the tracing in cadance")
-	flag.BoolVar(&extesiveTracing, "extensive-tracing", DefaultExtensiveTracing, "enables high-overhead tracing in fvm")
+	flag.BoolVar(&extensiveTracing, "extensive-tracing", DefaultExtensiveTracing, "enables high-overhead tracing in fvm")
 	flag.DurationVar(&consensusDelay, "consensus-delay", DefaultConsensusDelay, "delay on consensus node block proposals")
 	flag.DurationVar(&collectionDelay, "collection-delay", DefaultCollectionDelay, "delay on collection node block proposals")
 	flag.StringVar(&logLevel, "loglevel", DefaultLogLevel, "log level for all nodes")
@@ -352,6 +352,7 @@ func prepareConsensusService(container testnet.ContainerConfig, i int, n int) Se
 	service.Command = append(service.Command,
 		fmt.Sprintf("--cruise-ctl-fallback-proposal-duration=%s", consensusDelay),
 		fmt.Sprintf("--hotstuff-min-timeout=%s", timeout),
+		"--cruise-ctl-max-view-duration=2s",
 		"--chunk-alpha=1",
 		"--emergency-sealing-active=false",
 		"--insecure-access-api=false",
@@ -400,7 +401,7 @@ func prepareExecutionService(container testnet.ContainerConfig, i int, n int) Se
 		"--triedir=/trie",
 		fmt.Sprintf("--rpc-addr=%s:%s", container.ContainerName, testnet.GRPCPort),
 		fmt.Sprintf("--cadence-tracing=%t", cadenceTracing),
-		fmt.Sprintf("--extensive-tracing=%t", extesiveTracing),
+		fmt.Sprintf("--extensive-tracing=%t", extensiveTracing),
 		"--execution-data-dir=/data/execution-data",
 		"--chunk-data-pack-dir=/data/chunk-data-pack",
 		"--pruning-config-threshold=20",

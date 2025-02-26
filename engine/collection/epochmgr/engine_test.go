@@ -91,11 +91,11 @@ type Suite struct {
 	heights *events.Heights
 
 	epochQuery *mocks.EpochQuery
-	counter    uint64                     // reflects the counter of the current epoch
-	phase      flow.EpochPhase            // phase at mocked snapshot
-	header     *flow.Header               // header at mocked snapshot
-	epochs     map[uint64]*protocol.Epoch // track all epochs
-	components map[uint64]*mockComponents // track all epoch components
+	counter    uint64                              // reflects the counter of the current epoch
+	phase      flow.EpochPhase                     // phase at mocked snapshot
+	header     *flow.Header                        // header at mocked snapshot
+	epochs     map[uint64]*protocol.CommittedEpoch // track all epochs
+	components map[uint64]*mockComponents          // track all epoch components
 
 	ctx    irrecoverable.SignalerContext
 	cancel context.CancelFunc
@@ -110,25 +110,33 @@ type Suite struct {
 func (suite *Suite) MockFactoryCreate(arg any) {
 	suite.factory.On("Create", arg).
 		Run(func(args mock.Arguments) {
-			epoch, ok := args.Get(0).(realprotocol.Epoch)
+			epoch, ok := args.Get(0).(realprotocol.CommittedEpoch)
 			suite.Require().Truef(ok, "invalid type %T", args.Get(0))
-			counter, err := epoch.Counter()
-			suite.Require().Nil(err)
-			suite.components[counter] = newMockComponents(suite.T())
+			suite.components[epoch.Counter()] = newMockComponents(suite.T())
 		}).
 		Return(
-			func(epoch realprotocol.Epoch) realcluster.State { return suite.ComponentsForEpoch(epoch).state },
-			func(epoch realprotocol.Epoch) component.Component { return suite.ComponentsForEpoch(epoch).prop },
-			func(epoch realprotocol.Epoch) realmodule.ReadyDoneAware { return suite.ComponentsForEpoch(epoch).sync },
-			func(epoch realprotocol.Epoch) realmodule.HotStuff { return suite.ComponentsForEpoch(epoch).hotstuff },
-			func(epoch realprotocol.Epoch) hotstuff.VoteAggregator {
+			func(epoch realprotocol.CommittedEpoch) realcluster.State {
+				return suite.ComponentsForEpoch(epoch).state
+			},
+			func(epoch realprotocol.CommittedEpoch) component.Component {
+				return suite.ComponentsForEpoch(epoch).prop
+			},
+			func(epoch realprotocol.CommittedEpoch) realmodule.ReadyDoneAware {
+				return suite.ComponentsForEpoch(epoch).sync
+			},
+			func(epoch realprotocol.CommittedEpoch) realmodule.HotStuff {
+				return suite.ComponentsForEpoch(epoch).hotstuff
+			},
+			func(epoch realprotocol.CommittedEpoch) hotstuff.VoteAggregator {
 				return suite.ComponentsForEpoch(epoch).voteAggregator
 			},
-			func(epoch realprotocol.Epoch) hotstuff.TimeoutAggregator {
+			func(epoch realprotocol.CommittedEpoch) hotstuff.TimeoutAggregator {
 				return suite.ComponentsForEpoch(epoch).timeoutAggregator
 			},
-			func(epoch realprotocol.Epoch) component.Component { return suite.ComponentsForEpoch(epoch).messageHub },
-			func(epoch realprotocol.Epoch) error { return nil },
+			func(epoch realprotocol.CommittedEpoch) component.Component {
+				return suite.ComponentsForEpoch(epoch).messageHub
+			},
+			func(epoch realprotocol.CommittedEpoch) error { return nil },
 		).Maybe()
 }
 
@@ -138,7 +146,7 @@ func (suite *Suite) SetupTest() {
 	suite.state = protocol.NewState(suite.T())
 	suite.snap = protocol.NewSnapshot(suite.T())
 
-	suite.epochs = make(map[uint64]*protocol.Epoch)
+	suite.epochs = make(map[uint64]*protocol.CommittedEpoch)
 	suite.components = make(map[uint64]*mockComponents)
 
 	suite.signer = mockhotstuff.NewSigner(suite.T())
@@ -164,9 +172,10 @@ func (suite *Suite) SetupTest() {
 		func() flow.EpochPhase { return suite.phase },
 		func() error { return nil })
 
-	// add current and next epochs
-	suite.AddEpoch(suite.counter)
-	suite.AddEpoch(suite.counter + 1)
+	// add current epoch
+	suite.AddCommittedEpoch(suite.counter)
+	// next epoch (with counter+1) is added later, as either setup/tentative (if we need to start QC)
+	// or committed (if we need to transition to it) depending on the test
 
 	suite.pools = epochs.NewTransactionPools(func(_ uint64) mempool.Transactions {
 		return herocache.NewTransactions(1000, suite.log, metrics.NewNoopCollector())
@@ -202,22 +211,29 @@ func (suite *Suite) TearDownTest() {
 	}
 }
 
-func TestEpochManager(t *testing.T) {
-	suite.Run(t, new(Suite))
-}
-
 // TransitionEpoch triggers an epoch transition in the suite's mocks.
 func (suite *Suite) TransitionEpoch() {
 	suite.counter++
+	require.Contains(suite.T(), suite.epochs, suite.counter)
 	suite.epochQuery.Transition()
 }
 
-// AddEpoch adds an epoch with the given counter.
-func (suite *Suite) AddEpoch(counter uint64) *protocol.Epoch {
-	epoch := new(protocol.Epoch)
+// AddCommittedEpoch adds a Committed Epoch with the given counter to the test suite,
+// so the epoch information can be retrieved by the business logic.
+func (suite *Suite) AddCommittedEpoch(counter uint64) *protocol.CommittedEpoch {
+	epoch := new(protocol.CommittedEpoch)
 	epoch.On("Counter").Return(counter, nil)
 	suite.epochs[counter] = epoch
-	suite.epochQuery.Add(epoch)
+	suite.epochQuery.AddCommitted(epoch)
+	return epoch
+}
+
+// AddTentativeEpoch adds a Tentative Epoch with the given counter to the test suite,
+// so the epoch information can be retrieved by the business logic.
+func (suite *Suite) AddTentativeEpoch(counter uint64) *protocol.TentativeEpoch {
+	epoch := new(protocol.TentativeEpoch)
+	epoch.On("Counter").Return(counter, nil)
+	suite.epochQuery.AddTentative(epoch)
 	return epoch
 }
 
@@ -239,9 +255,8 @@ func (suite *Suite) AssertEpochStopped(counter uint64) {
 	components.sync.AssertCalled(suite.T(), "Done")
 }
 
-func (suite *Suite) ComponentsForEpoch(epoch realprotocol.Epoch) *mockComponents {
-	counter, err := epoch.Counter()
-	suite.Require().Nil(err, "cannot get counter")
+func (suite *Suite) ComponentsForEpoch(epoch realprotocol.CommittedEpoch) *mockComponents {
+	counter := epoch.Counter()
 	components, ok := suite.components[counter]
 	suite.Require().True(ok, "missing component for counter", counter)
 	return components
@@ -252,12 +267,10 @@ func (suite *Suite) ComponentsForEpoch(epoch realprotocol.Epoch) *mockComponents
 func (suite *Suite) MockAsUnauthorizedNode(forEpoch uint64) {
 
 	// mock as unauthorized for given epoch only
-	unauthorizedMatcher := func(epoch realprotocol.Epoch) bool {
-		counter, err := epoch.Counter()
-		require.NoError(suite.T(), err)
-		return counter == forEpoch
+	unauthorizedMatcher := func(epoch realprotocol.CommittedEpoch) bool {
+		return epoch.Counter() == forEpoch
 	}
-	authorizedMatcher := func(epoch realprotocol.Epoch) bool { return !unauthorizedMatcher(epoch) }
+	authorizedMatcher := func(epoch realprotocol.CommittedEpoch) bool { return !unauthorizedMatcher(epoch) }
 
 	suite.factory = epochmgr.NewEpochComponentsFactory(suite.T())
 	suite.factory.
@@ -270,6 +283,10 @@ func (suite *Suite) MockAsUnauthorizedNode(forEpoch uint64) {
 	suite.Require().Nil(err)
 }
 
+func TestEpochManager(t *testing.T) {
+	suite.Run(t, new(Suite))
+}
+
 // TestRestartInSetupPhase tests that, if we start up during the setup phase,
 // we should kick off the root QC voter
 func (suite *Suite) TestRestartInSetupPhase() {
@@ -277,10 +294,13 @@ func (suite *Suite) TestRestartInSetupPhase() {
 	suite.engineEventsDistributor.On("ActiveClustersChanged", mock.AnythingOfType("flow.ChainIDList")).Once()
 	defer suite.engineEventsDistributor.AssertExpectations(suite.T())
 	// we are in setup phase
+	suite.AddTentativeEpoch(suite.counter + 1)
 	suite.phase = flow.EpochPhaseSetup
 	// should call voter with next epoch
 	var called = make(chan struct{})
-	suite.voter.On("Vote", mock.Anything, suite.epochQuery.Next()).
+	nextEpochTentative, err := suite.epochQuery.NextUnsafe()
+	require.NoError(suite.T(), err, "cannot get next tentative epoch")
+	suite.voter.On("Vote", mock.Anything, nextEpochTentative).
 		Return(nil).
 		Run(func(args mock.Arguments) {
 			close(called)
@@ -301,6 +321,7 @@ func (suite *Suite) TestStartAfterEpochBoundary_WithinTxExpiry() {
 	defer suite.engineEventsDistributor.AssertExpectations(suite.T())
 	suite.phase = flow.EpochPhaseStaking
 	// transition epochs, so that a Previous epoch is queryable
+	suite.AddCommittedEpoch(suite.counter + 1)
 	suite.TransitionEpoch()
 	prevEpoch := suite.epochs[suite.counter-1]
 	// the finalized height is within [1,tx_expiry] heights of previous epoch final height
@@ -324,6 +345,7 @@ func (suite *Suite) TestStartAfterEpochBoundary_BeyondTxExpiry() {
 	defer suite.engineEventsDistributor.AssertExpectations(suite.T())
 	suite.phase = flow.EpochPhaseStaking
 	// transition epochs, so that a Previous epoch is queryable
+	suite.AddCommittedEpoch(suite.counter + 1)
 	suite.TransitionEpoch()
 	prevEpoch := suite.epochs[suite.counter-1]
 	// the finalized height is more than tx_expiry above previous epoch final height
@@ -347,6 +369,7 @@ func (suite *Suite) TestStartAfterEpochBoundary_NotApprovedForPreviousEpoch() {
 	defer suite.engineEventsDistributor.AssertExpectations(suite.T())
 	suite.phase = flow.EpochPhaseStaking
 	// transition epochs, so that a Previous epoch is queryable
+	suite.AddCommittedEpoch(suite.counter + 1)
 	suite.TransitionEpoch()
 	prevEpoch := suite.epochs[suite.counter-1]
 	// the finalized height is within [1,tx_expiry] heights of previous epoch final height
@@ -371,6 +394,7 @@ func (suite *Suite) TestStartAfterEpochBoundary_NotApprovedForCurrentEpoch() {
 	defer suite.engineEventsDistributor.AssertExpectations(suite.T())
 	suite.phase = flow.EpochPhaseStaking
 	// transition epochs, so that a Previous epoch is queryable
+	suite.AddCommittedEpoch(suite.counter + 1)
 	suite.TransitionEpoch()
 	prevEpoch := suite.epochs[suite.counter-1]
 	// the finalized height is within [1,tx_expiry] heights of previous epoch final height
@@ -395,6 +419,7 @@ func (suite *Suite) TestStartAfterEpochBoundary_PreviousEpochTransitionBeforeRoo
 	defer suite.engineEventsDistributor.AssertExpectations(suite.T())
 	suite.phase = flow.EpochPhaseStaking
 	// transition epochs, so that a Previous epoch is queryable
+	suite.AddCommittedEpoch(suite.counter + 1)
 	suite.TransitionEpoch()
 	prevEpoch := suite.epochs[suite.counter-1]
 	// Previous epoch end boundary is unknown because it is before our root snapshot
@@ -415,10 +440,13 @@ func (suite *Suite) TestStartAfterEpochBoundary_PreviousEpochTransitionBeforeRoo
 func (suite *Suite) TestStartAsUnauthorizedNode() {
 	suite.MockAsUnauthorizedNode(suite.counter)
 	// we are in setup phase
+	suite.AddTentativeEpoch(suite.counter + 1)
 	suite.phase = flow.EpochPhaseSetup
 	// should call voter with next epoch
 	var called = make(chan struct{})
-	suite.voter.On("Vote", mock.Anything, suite.epochQuery.Next()).
+	nextEpochTentative, err := suite.epochQuery.NextUnsafe()
+	require.NoError(suite.T(), err, "cannot get next tentative epoch")
+	suite.voter.On("Vote", mock.Anything, nextEpochTentative).
 		Return(nil).
 		Run(func(args mock.Arguments) {
 			close(called)
@@ -442,9 +470,12 @@ func (suite *Suite) TestRespondToPhaseChange() {
 
 	// start in staking phase
 	suite.phase = flow.EpochPhaseStaking
+	suite.AddTentativeEpoch(suite.counter + 1)
 	// should call voter with next epoch
 	var called = make(chan struct{})
-	suite.voter.On("Vote", mock.Anything, suite.epochQuery.Next()).
+	nextEpochTentative, err := suite.epochQuery.NextUnsafe()
+	require.NoError(suite.T(), err, "cannot get next tentative epoch")
+	suite.voter.On("Vote", mock.Anything, nextEpochTentative).
 		Return(nil).
 		Run(func(args mock.Arguments) {
 			close(called)
@@ -474,6 +505,7 @@ func (suite *Suite) TestRespondToEpochTransition() {
 	defer suite.engineEventsDistributor.AssertExpectations(suite.T())
 
 	// we are in committed phase
+	suite.AddCommittedEpoch(suite.counter + 1)
 	suite.phase = flow.EpochPhaseCommitted
 	suite.StartEngine()
 
@@ -542,17 +574,20 @@ func (suite *Suite) TestStopQcVoting() {
 	// we expect 1 ActiveClustersChanged events when the engine first starts and the first set of epoch components are started
 	suite.engineEventsDistributor.On("ActiveClustersChanged", mock.AnythingOfType("flow.ChainIDList")).Once()
 
+	// we are in setup phase, forces engine to start voting on startup
+	suite.AddTentativeEpoch(suite.counter + 1)
+	suite.phase = flow.EpochPhaseSetup
+
 	receivedCancelSignal := make(chan struct{})
-	suite.voter.On("Vote", mock.Anything, suite.epochQuery.Next()).
+	nextEpochTentative, err := suite.epochQuery.NextUnsafe()
+	require.NoError(suite.T(), err, "cannot get next tentative epoch")
+	suite.voter.On("Vote", mock.Anything, nextEpochTentative).
 		Return(nil).
 		Run(func(args mock.Arguments) {
 			ctx := args.Get(0).(context.Context)
 			<-ctx.Done()
 			close(receivedCancelSignal)
 		}).Once()
-
-	// we are in setup phase, forces engine to start voting on startup
-	suite.phase = flow.EpochPhaseSetup
 
 	// start up the engine
 	suite.StartEngine()

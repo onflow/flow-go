@@ -354,7 +354,7 @@ func diffAccount(
 	rw reporters.ReportWriter,
 	mode mode,
 	acctsToSkip []string,
-	serviceAccountAddress common.Address,
+	isValueIncludedFunc migrations.IsValueIncludedFunc,
 ) (err error) {
 
 	diffValues := flagAlwaysDiffValues
@@ -417,15 +417,7 @@ func diffAccount(
 			accountRegisters1,
 			accountRegisters2,
 			common.AllStorageDomains,
-			func(address common.Address, domain common.StorageDomain, key any) bool {
-				if flagExcludeRandomBeaconHistory {
-					if isRandomBeaconHistory(serviceAccountAddress, address, domain, key) {
-						log.Info().Msgf("excluding random beacon history in account %s, domain %s, key %v", address, domain.Identifier(), key)
-						return false
-					}
-				}
-				return true
-			},
+			isValueIncludedFunc,
 		)
 	}
 
@@ -443,7 +435,7 @@ func diff(
 ) error {
 	log.Info().Msgf("Diffing %d accounts", registers1.AccountCount())
 
-	serviceAccountAddress := serviceAccountAddressForChain(chainID)
+	randomBeaconHistoryAddress := randomBeaconHistoryAddressForChain(chainID)
 
 	if registers1.AccountCount() < nWorkers {
 		nWorkers = registers1.AccountCount()
@@ -456,6 +448,11 @@ func diff(
 			registers1.AccountCount(),
 		),
 	)
+
+	isValueIncludedFunc := alwaysIncludeValue
+	if flagExcludeRandomBeaconHistory {
+		isValueIncludedFunc = excludeRandomBeaconHistory(randomBeaconHistoryAddress)
+	}
 
 	if nWorkers <= 1 {
 		foundAccountCountInRegisters2 := 0
@@ -484,7 +481,7 @@ func diff(
 				rw,
 				mode,
 				acctsToSkip,
-				common.Address(serviceAccountAddress),
+				isValueIncludedFunc,
 			)
 			if err != nil {
 				log.Warn().Err(err).Msgf("failed to diff account %x", []byte(owner))
@@ -540,7 +537,7 @@ func diff(
 					rw,
 					mode,
 					acctsToSkip,
-					common.Address(serviceAccountAddress),
+					isValueIncludedFunc,
 				)
 
 				select {
@@ -702,8 +699,8 @@ func (e countDiff) MarshalJSON() ([]byte, error) {
 	})
 }
 
-func isRandomBeaconHistory(serviceAccountAddress, address common.Address, domain common.StorageDomain, key any) bool {
-	if serviceAccountAddress.Compare(address) != 0 {
+func isRandomBeaconHistory(randomBeaconHistoryAddress, address common.Address, domain common.StorageDomain, key any) bool {
+	if randomBeaconHistoryAddress.Compare(address) != 0 {
 		return false
 	}
 
@@ -723,7 +720,23 @@ func isRandomBeaconHistory(serviceAccountAddress, address common.Address, domain
 	}
 }
 
-func serviceAccountAddressForChain(chainID flow.ChainID) flow.Address {
+func randomBeaconHistoryAddressForChain(chainID flow.ChainID) common.Address {
 	sc := systemcontracts.SystemContractsForChain(chainID)
-	return sc.FlowServiceAccount.Address
+	return common.Address(sc.RandomBeaconHistory.Address)
+}
+
+func excludeRandomBeaconHistory(randomBeaconHistoryAddress common.Address) migrations.IsValueIncludedFunc {
+	return func(address common.Address, domain common.StorageDomain, key any) bool {
+		foundRandomBeaconHistory := isRandomBeaconHistory(randomBeaconHistoryAddress, address, domain, key)
+
+		if foundRandomBeaconHistory {
+			log.Info().Msgf("excluding random beacon history in account %s, domain %s, key %v", address, domain.Identifier(), key)
+		}
+
+		return !foundRandomBeaconHistory
+	}
+}
+
+func alwaysIncludeValue(common.Address, common.StorageDomain, any) bool {
+	return true
 }
