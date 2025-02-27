@@ -77,10 +77,11 @@ func snapshot(cmd *cobra.Command, args []string) {
 	}
 
 	// check if given NodeID is part of the current or next epoch
-	currentIdentities, err := snapshot.Epochs().Current().InitialIdentities()
+	currentEpoch, err := snapshot.Epochs().Current()
 	if err != nil {
-		log.Fatal().Err(err).Msg("could not get initial identities from current epoch")
+		log.Fatal().Err(err).Msg("could not get current epoch")
 	}
+	currentIdentities := currentEpoch.InitialIdentities()
 	if _, exists := currentIdentities.ByNodeID(nodeID); exists {
 		err := ioutils.WriteFile(filepath.Join(flagBootDir, bootstrap.PathRootProtocolStateSnapshot), bytes)
 		if err != nil {
@@ -89,10 +90,11 @@ func snapshot(cmd *cobra.Command, args []string) {
 		return
 	}
 
-	nextIdentities, err := snapshot.Epochs().Next().InitialIdentities()
+	nextEpoch, err := snapshot.Epochs().NextCommitted()
 	if err != nil {
-		log.Fatal().Err(err).Msg("could not get initial identities from next epoch")
+		log.Fatal().Err(err).Msg("could not get next committed epoch")
 	}
+	nextIdentities := nextEpoch.InitialIdentities()
 	if _, exists := nextIdentities.ByNodeID(nodeID); exists {
 		err := ioutils.WriteFile(filepath.Join(flagBootDir, bootstrap.PathRootProtocolStateSnapshot), bytes)
 		if err != nil {

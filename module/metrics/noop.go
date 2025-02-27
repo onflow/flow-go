@@ -168,7 +168,8 @@ func (nc *NoopCollector) ExecutionLastExecutedBlockHeight(height uint64)        
 func (nc *NoopCollector) ExecutionLastFinalizedExecutedBlockHeight(height uint64)              {}
 func (nc *NoopCollector) ExecutionBlockExecuted(_ time.Duration, _ module.BlockExecutionResultStats) {
 }
-func (nc *NoopCollector) ExecutionLastChunkDataPackPrunedHeight(height uint64) {}
+func (nc *NoopCollector) ExecutionLastChunkDataPackPrunedHeight(height uint64)   {}
+func (nc *NoopCollector) ExecutionTargetChunkDataPackPrunedHeight(height uint64) {}
 
 func (nc *NoopCollector) ExecutionCollectionExecuted(_ time.Duration, _ module.CollectionExecutionResultStats) {
 }

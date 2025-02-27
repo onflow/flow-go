@@ -992,10 +992,11 @@ func VerificationNode(t testing.TB,
 	}
 
 	if node.ChunksQueue == nil {
-		node.ChunksQueue = storage.NewChunkQueue(node.PublicDB)
-		ok, err := node.ChunksQueue.Init(chunkconsumer.DefaultJobIndex)
+		cq := store.NewChunkQueue(node.Metrics, badgerimpl.ToDB(node.PublicDB))
+		ok, err := cq.Init(chunkconsumer.DefaultJobIndex)
 		require.NoError(t, err)
 		require.True(t, ok)
+		node.ChunksQueue = cq
 	}
 
 	if node.ProcessedBlockHeight == nil {

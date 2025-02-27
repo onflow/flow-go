@@ -697,9 +697,9 @@ func (suite *Suite) TestGetProtocolStateSnapshotByBlockID_InvalidSegment() {
 		suite.T().Run("sealing segment between epochs", func(t *testing.T) {
 			// Take snapshot at height of latest finalized block
 			snap := state.Final()
-			epochCounter, err := snap.Epochs().Current().Counter()
+			currentEpoch, err := snap.Epochs().Current()
 			suite.Require().NoError(err)
-			suite.Require().Equal(epoch1.Counter+1, epochCounter, "expect to be in next epoch")
+			suite.Require().Equal(epoch1.Counter+1, currentEpoch.Counter(), "expect to be in next epoch")
 			block, err := snap.Head()
 			suite.Require().NoError(err)
 
