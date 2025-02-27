@@ -651,6 +651,7 @@ func newInternalEVMTypeWithdrawFunction(
 				panic(types.ErrWithdrawBalanceRounding)
 			}
 
+// this is where rounding from Atto scale to UFix scale happens.
 			value := new(big.Int).Div(amountValue.BigInt, types.UFixToAttoConversionMultiplier)
 			amount := types.NewBalanceFromUFix64(cadence.UFix64(value.Uint64()))
 
