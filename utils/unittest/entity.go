@@ -286,12 +286,6 @@ func generateCustomFlowValue(field reflect.Value) any {
 			NodeID:  IdentifierFixture(),
 			Ejected: rand.Intn(2) == 1,
 		}
-	case reflect.TypeOf(flow.EpochExtension{}):
-		firstView := rand.Uint64()
-		return flow.EpochExtension{
-			FirstView: firstView,
-			FinalView: firstView + 10,
-		}
 	case reflect.TypeOf(flow.ClusterQCVoteData{}):
 		return flow.ClusterQCVoteDataFromQC(QuorumCertificateWithSignerIDsFixture())
 	case reflect.TypeOf(flow.QuorumCertificate{}):

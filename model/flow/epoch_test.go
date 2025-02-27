@@ -35,27 +35,36 @@ func TestMalleability(t *testing.T) {
 		require.NoError(t, err)
 	})
 
+	epochExtensionFixture := func() flow.EpochExtension {
+		firstView := rand.Uint64()
+		return flow.EpochExtension{
+			FirstView: firstView,
+			FinalView: firstView + 10,
+		}
+	}
+
 	epochStateContainerFixture := func() *flow.EpochStateContainer {
 		return &flow.EpochStateContainer{
 			SetupID:          unittest.EpochSetupFixture().ID(),
 			CommitID:         unittest.EpochCommitFixture().ID(),
 			ActiveIdentities: unittest.DynamicIdentityEntryListFixture(5),
-			EpochExtensions: []flow.EpochExtension{
-				{
-					FirstView: uint64(0),
-					FinalView: uint64(rand.Uint32() + 1000),
-				},
-			},
+			EpochExtensions:  []flow.EpochExtension{epochExtensionFixture()},
 		}
 	}
 
+	checker = unittest.NewMalleabilityChecker(unittest.WithCustomType(func() []flow.EpochExtension {
+		return []flow.EpochExtension{epochExtensionFixture()}
+	}))
 	t.Run("EpochStateContainer", func(t *testing.T) {
-		unittest.RequireEntityNonMalleable(t, epochStateContainerFixture())
+		err := checker.Check(epochStateContainerFixture())
+		require.NoError(t, err)
 	})
 
-	checker = unittest.NewMalleabilityChecker(unittest.WithCustomType(flow.EpochStateContainer{}, func() any {
-		return epochStateContainerFixture()
-	}))
+	checker = unittest.NewMalleabilityChecker(
+		unittest.WithCustomType(func() *flow.EpochStateContainer { return epochStateContainerFixture() }),
+		unittest.WithCustomType(func() flow.EpochStateContainer { return *epochStateContainerFixture() }),
+	)
+
 	t.Run("MinEpochStateEntry", func(t *testing.T) {
 		err := checker.Check(unittest.EpochStateFixture(unittest.WithNextEpochProtocolState()).MinEpochStateEntry)
 		require.NoError(t, err)
