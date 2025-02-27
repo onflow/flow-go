@@ -79,7 +79,7 @@ type Suite struct {
 	finalizedHeaderCache module.FinalizedHeaderCache
 	backend              *backend.Backend
 	sporkID              flow.Identifier
-	protocolVersion      uint
+	protocolStateVersion uint64
 }
 
 // TestAccess tests scenarios which exercise multiple API calls using both the RPC handler and the ingest engine
@@ -95,7 +95,7 @@ func (suite *Suite) SetupTest() {
 	suite.finalSnapshot = new(protocol.Snapshot)
 	suite.sealedSnapshot = new(protocol.Snapshot)
 	suite.sporkID = unittest.IdentifierFixture()
-	suite.protocolVersion = uint(unittest.Uint64InRange(10, 30))
+	suite.protocolStateVersion = unittest.Uint64InRange(10, 30)
 
 	suite.rootBlock = unittest.BlockHeaderFixture(unittest.WithHeaderHeight(0))
 	suite.sealedBlock = suite.rootBlock
@@ -118,10 +118,13 @@ func (suite *Suite) SetupTest() {
 		nil,
 	).Maybe()
 
+	pstate := protocol.NewKVStoreReader(suite.T())
+	pstate.On("GetProtocolStateVersion").Return(suite.protocolStateVersion, nil).Maybe()
+	suite.finalSnapshot.On("ProtocolState").Return(pstate, nil).Maybe()
+
 	suite.params = new(protocol.Params)
 	suite.params.On("FinalizedRoot").Return(suite.rootBlock, nil)
 	suite.params.On("SporkID").Return(suite.sporkID, nil)
-	suite.params.On("ProtocolVersion").Return(suite.protocolVersion, nil)
 	suite.params.On("SporkRootBlockHeight").Return(suite.rootBlock.Height, nil)
 	suite.params.On("SealedRoot").Return(suite.rootBlock, nil)
 	suite.state.On("Params").Return(suite.params).Maybe()
@@ -1286,10 +1289,11 @@ func (suite *Suite) TestAPICallNodeVersionInfo() {
 
 		respNodeVersionInfo := resp.Info
 		suite.Require().Equal(respNodeVersionInfo, &entitiesproto.NodeVersionInfo{
-			Semver:          build.Version(),
-			Commit:          build.Commit(),
-			SporkId:         suite.sporkID[:],
-			ProtocolVersion: uint64(suite.protocolVersion),
+			Semver:               build.Version(),
+			Commit:               build.Commit(),
+			SporkId:              suite.sporkID[:],
+			ProtocolVersion:      0,
+			ProtocolStateVersion: uint64(suite.protocolStateVersion),
 		})
 	})
 }
