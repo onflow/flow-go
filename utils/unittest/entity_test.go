@@ -82,7 +82,7 @@ func (e *MalleableEntityStruct) ID() flow.Identifier {
 type StructWithOptionalField struct {
 	Identifier    flow.Identifier
 	RequiredField uint32
-	OptionalField *uint32 `malleability:"optional"`
+	OptionalField *uint32
 }
 
 // ID returns the hash of the entity depending on the presence of the optional field.
