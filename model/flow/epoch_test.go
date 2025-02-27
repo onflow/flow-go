@@ -52,9 +52,17 @@ func TestMalleability(t *testing.T) {
 		}
 	}
 
-	checker = unittest.NewMalleabilityChecker(unittest.WithCustomType(func() []flow.EpochExtension {
-		return []flow.EpochExtension{epochExtensionFixture()}
-	}))
+	checker = unittest.NewMalleabilityChecker(
+		unittest.WithCustomType(func() []flow.EpochExtension { return []flow.EpochExtension{epochExtensionFixture()} }),
+		unittest.WithCustomType(func() flow.DynamicIdentityEntryList {
+			return flow.DynamicIdentityEntryList{
+				{
+					NodeID:  unittest.IdentifierFixture(),
+					Ejected: rand.Intn(2) == 1,
+				},
+			}
+		}),
+	)
 	t.Run("EpochStateContainer", func(t *testing.T) {
 		err := checker.Check(epochStateContainerFixture())
 		require.NoError(t, err)

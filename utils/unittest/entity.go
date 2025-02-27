@@ -281,11 +281,6 @@ func generateCustomFlowValue(field reflect.Value) any {
 		return *IdentityFixture()
 	case reflect.TypeOf(flow.IdentitySkeleton{}):
 		return IdentityFixture().IdentitySkeleton
-	case reflect.TypeOf(flow.DynamicIdentityEntry{}):
-		return flow.DynamicIdentityEntry{
-			NodeID:  IdentifierFixture(),
-			Ejected: rand.Intn(2) == 1,
-		}
 	case reflect.TypeOf(flow.ClusterQCVoteData{}):
 		return flow.ClusterQCVoteDataFromQC(QuorumCertificateWithSignerIDsFixture())
 	case reflect.TypeOf(flow.QuorumCertificate{}):
