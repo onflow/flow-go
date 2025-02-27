@@ -97,6 +97,7 @@ func (h *Handler) GetNodeVersionInfo(
 			Semver:               nodeVersionInfo.Semver,
 			Commit:               nodeVersionInfo.Commit,
 			SporkId:              nodeVersionInfo.SporkId[:],
+			ProtocolVersion:      nodeVersionInfo.ProtocolVersion,
 			ProtocolStateVersion: nodeVersionInfo.ProtocolStateVersion,
 			SporkRootBlockHeight: nodeVersionInfo.SporkRootBlockHeight,
 			NodeRootBlockHeight:  nodeVersionInfo.NodeRootBlockHeight,
