@@ -14,3 +14,8 @@ func TestResultApprovalEncode(t *testing.T) {
 	id := ra.ID()
 	assert.NotEqual(t, flow.ZeroID, id)
 }
+
+func TestResultApprovalBodyNonMalleable(t *testing.T) {
+	ra := unittest.ResultApprovalFixture()
+	unittest.RequireEntityNonMalleable(t, &ra.Body)
+}
