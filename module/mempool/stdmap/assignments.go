@@ -7,13 +7,13 @@ import (
 
 // Assignments implements the chunk assignment memory pool.
 type Assignments struct {
-	*Backend
+	*Backend[flow.Identifier, *chunkmodels.Assignment]
 }
 
 // NewAssignments creates a new memory pool for Assignments.
 func NewAssignments(limit uint) (*Assignments, error) {
 	a := &Assignments{
-		Backend: NewBackend(WithLimit(limit)),
+		Backend: NewBackend[flow.Identifier, *chunkmodels.Assignment](WithLimit[flow.Identifier, *chunkmodels.Assignment](limit)),
 	}
 	return a, nil
 }
@@ -27,17 +27,16 @@ func (a *Assignments) Has(assignmentID flow.Identifier) bool {
 
 // ByID retrieves the chunk assignment from mempool based on provided ID
 func (a *Assignments) ByID(assignmentID flow.Identifier) (*chunkmodels.Assignment, bool) {
-	entity, exists := a.Backend.ByID(assignmentID)
+	assignment, exists := a.Backend.ByID(assignmentID)
 	if !exists {
 		return nil, false
 	}
-	adp := entity.(*chunkmodels.AssignmentDataPack)
-	return adp.Assignment(), true
+	return assignment, true
 }
 
 // Add adds an Assignment to the mempool.
-func (a *Assignments) Add(fingerprint flow.Identifier, assignment *chunkmodels.Assignment) bool {
-	return a.Backend.Add(chunkmodels.NewAssignmentDataPack(fingerprint, assignment))
+func (a *Assignments) Add(assignmentID flow.Identifier, assignment *chunkmodels.Assignment) bool {
+	return a.Backend.Add(assignmentID, assignment)
 }
 
 // Remove will remove the given Assignment from the memory pool; it will
@@ -55,8 +54,9 @@ func (a *Assignments) Size() uint {
 func (a *Assignments) All() []*chunkmodels.Assignment {
 	entities := a.Backend.All()
 	assignments := make([]*chunkmodels.Assignment, 0, len(entities))
-	for _, entity := range entities {
-		assignments = append(assignments, entity.(*chunkmodels.AssignmentDataPack).Assignment())
+	for _, assignment := range entities {
+		assignments = append(assignments, assignment)
 	}
+
 	return assignments
 }
