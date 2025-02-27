@@ -16,6 +16,8 @@ func (l IntList) ID() flow.Identifier {
 	return flow.MakeID(l)
 }
 
+// StructWithNilFields allows testing all cases of nil-able fields: struct pointer, slice, map.
+// The default behaviour is if any nil-able fields is nil or size 0, the malleability checker fails.
 type StructWithNilFields struct {
 	Identities flow.IdentitySkeletonList
 	Index      map[flow.Identifier]uint32
@@ -45,6 +47,7 @@ func (e *StructWithNilFields) ID() flow.Identifier {
 	})
 }
 
+// StructWithUnsupportedFlowField will always fail malleability checking because it contains a private (non-settable) field
 type StructWithUnsupportedFlowField struct {
 	field flow.IdentitySkeleton
 }
@@ -69,6 +72,40 @@ func (e *MalleableEntityStruct) ID() flow.Identifier {
 		Identities: e.Identities,
 		QcID:       e.QC.ID(),
 	})
+}
+
+// StructWithOptionalField is a struct that has an optional field. This is a rare case but it happens that we need to include
+// a field that is optional for backward compatibility reasons. In such cases the ID method might behave differently depending
+// on the presence of the optional field. Checker should be able to handle a case where the optional field is nil and when it is not.
+// To accomplish this, we are using a special struct tag otherwise the checker would fail to detect the optional field as it requires
+// that all fields are non-empty/non-nil.
+type StructWithOptionalField struct {
+	Identifier    flow.Identifier
+	RequiredField uint32
+	OptionalField *uint32 `malleability:"optional"`
+}
+
+// ID returns the hash of the entity depending on the presence of the optional field.
+func (e *StructWithOptionalField) ID() flow.Identifier {
+	if e.OptionalField == nil {
+		return flow.MakeID(struct {
+			Identifier    flow.Identifier
+			RequiredField uint32
+		}{
+			Identifier:    e.Identifier,
+			RequiredField: e.RequiredField,
+		})
+	} else {
+		return flow.MakeID(struct {
+			RequiredField uint32
+			OptionalField uint32
+			Identifier    flow.Identifier
+		}{
+			Identifier:    e.Identifier,
+			OptionalField: *e.OptionalField,
+			RequiredField: e.RequiredField,
+		})
+	}
 }
 
 // TestRequireEntityNonMalleable tests the behavior of MalleabilityChecker with different types of entities ensuring
@@ -135,7 +172,7 @@ func TestRequireEntityNonMalleable(t *testing.T) {
 	t.Run("invalid-entity", func(t *testing.T) {
 		err := NewMalleabilityChecker().Check(nil)
 		require.Error(t, err)
-		require.ErrorContains(t, err, "tested entity is not valid")
+		require.ErrorContains(t, err, "input is not a valid entity")
 	})
 	t.Run("nil-entity", func(t *testing.T) {
 		var e *flow.ExecutionReceipt = nil
@@ -158,5 +195,25 @@ func TestRequireEntityNonMalleable(t *testing.T) {
 		})
 		require.Error(t, err)
 		require.ErrorContains(t, err, "Signature is malleable")
+	})
+	t.Run("struct-with-optional-field", func(t *testing.T) {
+		t.Run("without-optional-field", func(t *testing.T) {
+			err := NewMalleabilityChecker().Check(&StructWithOptionalField{
+				Identifier:    IdentifierFixture(),
+				RequiredField: 42,
+				OptionalField: nil,
+			})
+			require.NoError(t, err)
+		})
+		t.Run("with-optional-field", func(t *testing.T) {
+			v := &StructWithOptionalField{
+				Identifier:    IdentifierFixture(),
+				RequiredField: 42,
+				OptionalField: new(uint32),
+			}
+			*v.OptionalField = 13
+			err := NewMalleabilityChecker().Check(v)
+			require.NoError(t, err)
+		})
 	})
 }
