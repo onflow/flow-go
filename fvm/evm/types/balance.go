@@ -100,7 +100,7 @@ func BalanceConversionToUFix64ProneToRoundingError(bal Balance) bool {
 // Warning! The smallest unit of Flow token that a Flow Vault (Cadence)
 // can store, is 1e-8 .
 // That means the minimum balance, in atto Flow, that can be stored in a Flow Vault,
-// is 1e10^10 .
+// is 1e10 .
 func AttoFlowBalanceValidForFlowVault(bal *big.Int) bool {
 	return bal.Cmp(UFixToAttoConversionMultiplier) >= 0
 }
