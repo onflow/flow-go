@@ -1,4 +1,4 @@
-package request
+package parser
 
 import (
 	"fmt"
@@ -21,13 +21,13 @@ func TestArguments_InvalidParse(t *testing.T) {
 		assert.EqualError(t, err, "invalid argument encoding: illegal base64 data at input byte 0", a)
 	}
 
-	tooLong := make([]string, maxAllowedScriptArguments+1)
+	tooLong := make([]string, MaxAllowedScriptArguments+1)
 	for i := range tooLong {
 		tooLong[i] = "dGVzdA=="
 	}
 
 	err := arguments.Parse(tooLong)
-	assert.EqualError(t, err, fmt.Sprintf("too many arguments. Maximum arguments allowed: %d", maxAllowedScriptArguments))
+	assert.EqualError(t, err, fmt.Sprintf("too many arguments. Maximum arguments allowed: %d", MaxAllowedScriptArguments))
 }
 
 func TestArguments_ValidParse(t *testing.T) {
