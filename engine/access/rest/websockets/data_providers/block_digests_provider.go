@@ -8,7 +8,8 @@ import (
 
 	"github.com/onflow/flow-go/access"
 	"github.com/onflow/flow-go/engine/access/rest/http/request"
-	"github.com/onflow/flow-go/engine/access/rest/websockets/models"
+	"github.com/onflow/flow-go/engine/access/rest/websockets/data_providers/models"
+	wsmodels "github.com/onflow/flow-go/engine/access/rest/websockets/models"
 	"github.com/onflow/flow-go/engine/access/subscription"
 	"github.com/onflow/flow-go/model/flow"
 )
@@ -30,7 +31,7 @@ func NewBlockDigestsDataProvider(
 	api access.API,
 	subscriptionID string,
 	topic string,
-	arguments models.Arguments,
+	arguments wsmodels.Arguments,
 	send chan<- interface{},
 ) (*BlockDigestsDataProvider, error) {
 	p := &BlockDigestsDataProvider{
@@ -59,20 +60,18 @@ func NewBlockDigestsDataProvider(
 
 // Run starts processing the subscription for block digests and handles responses.
 //
-// No errors are expected during normal operations.
+// Expected errors during normal operations:
+//   - context.Canceled: if the operation is canceled, during an unsubscribe action.
 func (p *BlockDigestsDataProvider) Run() error {
 	return subscription.HandleSubscription(
 		p.subscription,
 		subscription.HandleResponse(p.send, func(b *flow.BlockDigest) (interface{}, error) {
-			var block models.BlockDigest
-			block.Build(b)
-
-			var response models.BaseDataProvidersResponse
-			response.Build(
-				p.ID(),
-				p.Topic(),
-				&block,
-			)
+			blockDigest := models.NewBlockDigest(b)
+			response := models.BaseDataProvidersResponse{
+				SubscriptionID: p.ID(),
+				Topic:          p.Topic(),
+				Payload:        &blockDigest,
+			}
 
 			return &response, nil
 		}),

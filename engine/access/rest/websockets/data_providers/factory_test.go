@@ -10,7 +10,7 @@ import (
 
 	accessmock "github.com/onflow/flow-go/access/mock"
 	"github.com/onflow/flow-go/engine/access/rest/common/parser"
-	"github.com/onflow/flow-go/engine/access/rest/websockets/models"
+	wsmodels "github.com/onflow/flow-go/engine/access/rest/websockets/models"
 	"github.com/onflow/flow-go/engine/access/state_stream"
 	statestreammock "github.com/onflow/flow-go/engine/access/state_stream/mock"
 	"github.com/onflow/flow-go/engine/access/subscription"
@@ -69,17 +69,21 @@ func (s *DataProviderFactorySuite) setupSubscription(apiCall *mock.Call) {
 // Each test case includes a topic and arguments for which a data provider should be created.
 func (s *DataProviderFactorySuite) TestSupportedTopics() {
 	// Define supported topics and check if each returns the correct provider without errors
+	tx := unittest.TransactionBodyFixture()
+	tx.PayloadSignatures = []flow.TransactionSignature{unittest.TransactionSignatureFixture()}
+	tx.Arguments = [][]uint8{}
+
 	testCases := []struct {
 		name               string
 		topic              string
-		arguments          models.Arguments
+		arguments          wsmodels.Arguments
 		setupSubscription  func()
 		assertExpectations func()
 	}{
 		{
 			name:      "block topic",
 			topic:     BlocksTopic,
-			arguments: models.Arguments{"block_status": parser.Finalized},
+			arguments: wsmodels.Arguments{"block_status": parser.Finalized},
 			setupSubscription: func() {
 				s.setupSubscription(s.accessApi.On("SubscribeBlocksFromLatest", mock.Anything, flow.BlockStatusFinalized))
 			},
@@ -90,7 +94,7 @@ func (s *DataProviderFactorySuite) TestSupportedTopics() {
 		{
 			name:      "block headers topic",
 			topic:     BlockHeadersTopic,
-			arguments: models.Arguments{"block_status": parser.Finalized},
+			arguments: wsmodels.Arguments{"block_status": parser.Finalized},
 			setupSubscription: func() {
 				s.setupSubscription(s.accessApi.On("SubscribeBlockHeadersFromLatest", mock.Anything, flow.BlockStatusFinalized))
 			},
@@ -101,7 +105,7 @@ func (s *DataProviderFactorySuite) TestSupportedTopics() {
 		{
 			name:      "block digests topic",
 			topic:     BlockDigestsTopic,
-			arguments: models.Arguments{"block_status": parser.Finalized},
+			arguments: wsmodels.Arguments{"block_status": parser.Finalized},
 			setupSubscription: func() {
 				s.setupSubscription(s.accessApi.On("SubscribeBlockDigestsFromLatest", mock.Anything, flow.BlockStatusFinalized))
 			},
@@ -112,7 +116,7 @@ func (s *DataProviderFactorySuite) TestSupportedTopics() {
 		{
 			name:      "events topic",
 			topic:     EventsTopic,
-			arguments: models.Arguments{},
+			arguments: wsmodels.Arguments{},
 			setupSubscription: func() {
 				s.setupSubscription(s.stateStreamApi.On("SubscribeEventsFromLatest", mock.Anything, mock.Anything))
 			},
@@ -123,7 +127,7 @@ func (s *DataProviderFactorySuite) TestSupportedTopics() {
 		{
 			name:      "account statuses topic",
 			topic:     AccountStatusesTopic,
-			arguments: models.Arguments{},
+			arguments: wsmodels.Arguments{},
 			setupSubscription: func() {
 				s.setupSubscription(s.stateStreamApi.On("SubscribeAccountStatusesFromLatestBlock", mock.Anything, mock.Anything))
 			},
@@ -134,9 +138,9 @@ func (s *DataProviderFactorySuite) TestSupportedTopics() {
 		{
 			name:      "transaction statuses topic",
 			topic:     TransactionStatusesTopic,
-			arguments: models.Arguments{},
+			arguments: wsmodels.Arguments{},
 			setupSubscription: func() {
-				s.setupSubscription(s.accessApi.On("SubscribeTransactionStatusesFromLatest", mock.Anything, mock.Anything, mock.Anything))
+				s.setupSubscription(s.accessApi.On("SubscribeTransactionStatuses", mock.Anything, mock.Anything, mock.Anything))
 			},
 			assertExpectations: func() {
 				s.stateStreamApi.AssertExpectations(s.T())
@@ -145,7 +149,7 @@ func (s *DataProviderFactorySuite) TestSupportedTopics() {
 		{
 			name:      "send transaction statuses topic",
 			topic:     SendAndGetTransactionStatusesTopic,
-			arguments: models.Arguments{},
+			arguments: wsmodels.Arguments(unittest.CreateSendTxHttpPayload(tx)),
 			setupSubscription: func() {
 				s.setupSubscription(s.accessApi.On("SendAndSubscribeTransactionStatuses", mock.Anything, mock.Anything, mock.Anything))
 			},

@@ -15,7 +15,8 @@ import (
 	commonmodels "github.com/onflow/flow-go/engine/access/rest/common/models"
 	mockcommonmodels "github.com/onflow/flow-go/engine/access/rest/common/models/mock"
 	"github.com/onflow/flow-go/engine/access/rest/common/parser"
-	"github.com/onflow/flow-go/engine/access/rest/websockets/models"
+	"github.com/onflow/flow-go/engine/access/rest/websockets/data_providers/models"
+	wsmodels "github.com/onflow/flow-go/engine/access/rest/websockets/models"
 	"github.com/onflow/flow-go/engine/access/state_stream"
 	statestreamsmock "github.com/onflow/flow-go/engine/access/state_stream/mock"
 	"github.com/onflow/flow-go/engine/access/subscription"
@@ -119,7 +120,7 @@ func (s *BlocksProviderSuite) validBlockArgumentsTestCases() []testType {
 	return []testType{
 		{
 			name: "happy path with start_block_id argument",
-			arguments: models.Arguments{
+			arguments: wsmodels.Arguments{
 				"start_block_id": s.rootBlock.ID().String(),
 				"block_status":   parser.Finalized,
 			},
@@ -135,7 +136,7 @@ func (s *BlocksProviderSuite) validBlockArgumentsTestCases() []testType {
 		},
 		{
 			name: "happy path with start_block_height argument",
-			arguments: models.Arguments{
+			arguments: wsmodels.Arguments{
 				"start_block_height": strconv.FormatUint(s.rootBlock.Header.Height, 10),
 				"block_status":       parser.Finalized,
 			},
@@ -151,7 +152,7 @@ func (s *BlocksProviderSuite) validBlockArgumentsTestCases() []testType {
 		},
 		{
 			name: "happy path without any start argument",
-			arguments: models.Arguments{
+			arguments: wsmodels.Arguments{
 				"block_status": parser.Finalized,
 			},
 			setupBackend: func(sub *statestreamsmock.Subscription) {
@@ -165,7 +166,7 @@ func (s *BlocksProviderSuite) validBlockArgumentsTestCases() []testType {
 		},
 		{
 			name: "happy path without any start argument",
-			arguments: models.Arguments{
+			arguments: wsmodels.Arguments{
 				"block_status": parser.Finalized,
 			},
 			setupBackend: func(sub *statestreamsmock.Subscription) {
@@ -243,21 +244,21 @@ func (s *BlocksProviderSuite) invalidArgumentsTestCases() []testErrType {
 	return []testErrType{
 		{
 			name: "missing 'block_status' argument",
-			arguments: models.Arguments{
+			arguments: wsmodels.Arguments{
 				"start_block_id": s.rootBlock.ID().String(),
 			},
 			expectedErrorMsg: "'block_status' must be provided",
 		},
 		{
 			name: "unknown 'block_status' argument",
-			arguments: models.Arguments{
+			arguments: wsmodels.Arguments{
 				"block_status": unknownBlockStatus,
 			},
 			expectedErrorMsg: fmt.Sprintf("invalid 'block_status', must be '%s' or '%s'", parser.Finalized, parser.Sealed),
 		},
 		{
 			name: "provide both 'start_block_id' and 'start_block_height' arguments",
-			arguments: models.Arguments{
+			arguments: wsmodels.Arguments{
 				"block_status":       parser.Finalized,
 				"start_block_id":     s.rootBlock.ID().String(),
 				"start_block_height": fmt.Sprintf("%d", s.rootBlock.Header.Height),
