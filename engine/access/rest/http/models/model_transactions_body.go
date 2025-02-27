@@ -8,6 +8,8 @@
  */
 package models
 
+import "github.com/onflow/flow-go/engine/access/rest/common/models"
+
 type TransactionsBody struct {
 	// Base64 encoded content of the Cadence script.
 	Script string `json:"script"`
@@ -15,12 +17,10 @@ type TransactionsBody struct {
 	Arguments        []string `json:"arguments"`
 	ReferenceBlockId string   `json:"reference_block_id"`
 	// The limit on the amount of computation a transaction is allowed to preform.
-	GasLimit    string       `json:"gas_limit"`
-	Payer       string       `json:"payer"`
-	ProposalKey *ProposalKey `json:"proposal_key"`
-	Authorizers []string     `json:"authorizers"`
-	// A list of Base64 encoded signatures.
-	PayloadSignatures []TransactionSignature `json:"payload_signatures"`
-	// A list of Base64 encoded signatures.
-	EnvelopeSignatures []TransactionSignature `json:"envelope_signatures"`
+	GasLimit           string                        `json:"gas_limit"`
+	Payer              string                        `json:"payer"`
+	ProposalKey        *models.ProposalKey           `json:"proposal_key"`
+	Authorizers        []string                      `json:"authorizers"`
+	PayloadSignatures  []models.TransactionSignature `json:"payload_signatures"`
+	EnvelopeSignatures []models.TransactionSignature `json:"envelope_signatures"`
 }
