@@ -668,11 +668,14 @@ func newInternalEVMTypeWithdrawFunction(
 			account := handler.AccountByAddress(fromAddress, isAuthorized)
 			vault := account.Withdraw(amount)
 
-			// We have already truncated the remainder above, so we do not
-			// care about rounding loss here.
-			ufix, _, err := types.ConvertBalanceToUFix64(vault.Balance())
+			ufix, roundedOff, err := types.ConvertBalanceToUFix64(vault.Balance())
 			if err != nil {
 				panic(err)
+			}
+			// We have already truncated the remainder above, but we still leave
+			// the rounding check in as a redundancy.
+			if roundedOff {
+				panic(types.ErrWithdrawBalanceRounding)
 			}
 
 			// TODO: improve: maybe call actual constructor
