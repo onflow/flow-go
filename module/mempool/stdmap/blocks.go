@@ -6,30 +6,29 @@ import (
 
 // Blocks implements the blocks memory pool.
 type Blocks struct {
-	*Backend
+	*Backend[flow.Identifier, *flow.Block]
 }
 
 // NewBlocks creates a new memory pool for blocks.
 func NewBlocks(limit uint) (*Blocks, error) {
 	a := &Blocks{
-		Backend: NewBackend(WithLimit(limit)),
+		Backend: NewBackend[flow.Identifier, *flow.Block](WithLimit[flow.Identifier, *flow.Block](limit)),
 	}
 
 	return a, nil
 }
 
-// Add adds an block to the mempool.
+// Add adds a block to the mempool.
 func (a *Blocks) Add(block *flow.Block) bool {
-	return a.Backend.Add(block)
+	return a.Backend.Add(block.ID(), block)
 }
 
 // ByID returns the block with the given ID from the mempool.
 func (a *Blocks) ByID(blockID flow.Identifier) (*flow.Block, bool) {
-	entity, exists := a.Backend.ByID(blockID)
+	block, exists := a.Backend.ByID(blockID)
 	if !exists {
 		return nil, false
 	}
-	block := entity.(*flow.Block)
 	return block, true
 }
 
@@ -37,8 +36,9 @@ func (a *Blocks) ByID(blockID flow.Identifier) (*flow.Block, bool) {
 func (a *Blocks) All() []*flow.Block {
 	entities := a.Backend.All()
 	blocks := make([]*flow.Block, 0, len(entities))
-	for _, entity := range entities {
-		blocks = append(blocks, entity.(*flow.Block))
+	for _, block := range entities {
+		blocks = append(blocks, block)
 	}
+
 	return blocks
 }
