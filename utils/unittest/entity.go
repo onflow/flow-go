@@ -271,17 +271,22 @@ func generateRandomReflectValue(field reflect.Value) error {
 		return generateRandomReflectValue(field.Index(index))
 	case reflect.Map:
 		mapKeys := field.MapKeys()
+		var key reflect.Value
 		if len(mapKeys) == 0 {
-			return fmt.Errorf("cannot generate random value for empty map")
+			field.Set(reflect.MakeMap(field.Type()))
+			key = reflect.New(field.Type().Key()).Elem()
+			if err := generateRandomReflectValue(key); err != nil {
+				return err
+			}
+		} else {
+			index := rand.Intn(len(mapKeys))
+			key = mapKeys[index]
 		}
-		index := rand.Intn(len(mapKeys))
-		key := mapKeys[index]
-		oldVal := field.MapIndex(key)
-		newVal := reflect.New(oldVal.Type()).Elem()
-		if err := generateRandomReflectValue(newVal); err != nil {
+		val := reflect.New(field.Type().Elem()).Elem()
+		if err := generateRandomReflectValue(val); err != nil {
 			return err
 		}
-		field.SetMapIndex(key, newVal)
+		field.SetMapIndex(key, val)
 	case reflect.Ptr:
 		if field.IsNil() {
 			field.Set(reflect.New(field.Type().Elem()))
