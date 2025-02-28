@@ -135,6 +135,9 @@ func NewFullConsensusState(
 // CAUTION:
 //   - This function expects that `certifyingQC ` has been validated. (otherwise, the state will be corrupted)
 //   - The parent block must already have been ingested.
+//   - Attempts to extend the state with the _same block concurrently_ are not allowed.
+//     (will not corrupt the state, but may lead to an exception)
+// Orphaned blocks are excepted.
 //
 // Per convention, the protocol state requires that the candidate's parent has already been ingested.
 // Other than that, all valid extensions are accepted. Even if we have enough information to determine that
@@ -146,6 +149,13 @@ func NewFullConsensusState(
 // have enough information to reject blocks Y, Z later if we receive them. We would re-request X, then
 // determine it is orphaned and drop it, attempt to ingest Y re-request the unknown parent X and repeat
 // potentially very often.
+//
+// To ensure that all ancestors of a candidate block are correct and known to the FollowerState, some external
+// ordering and queuing of incoming blocks is generally necessary (responsibility of Compliance Layer). Once a block
+// is successfully ingested, repeated extension requests with this block are no-ops. This is convenient for the
+// Compliance Layer after a crash, so it doesn't have to worry about which blocks have already been ingested before
+// the crash. However, while running it is very easy for the Compliance Layer to avoid concurrent extension requests
+// with the same block. Hence, for simplicity, the FollowerState may reject such requests with an exception.
 //
 // No errors are expected during normal operations.
 func (m *FollowerState) ExtendCertified(ctx context.Context, candidate *flow.Block, certifyingQC *flow.QuorumCertificate) error {
@@ -190,6 +200,9 @@ func (m *FollowerState) ExtendCertified(ctx context.Context, candidate *flow.Blo
 
 	// Execute the deferred database operations as one atomic transaction and emit scheduled notifications on success.
 	// The `candidate` block _must be valid_ (otherwise, the state will be corrupted)!
+	// Therefore, they should be identified
+	// additional are just a no-op if they are identified as such early enough by the `checkBlockAlreadyProcessed` - though if the same extension is added concurrently, we might return a
+	// [storage.ErrAlreadyExists] error.
 	err = operation.RetryOnConflictTx(m.db, transaction.Update, deferredDbOps.Pending()) // No errors are expected during normal operations
 	if err != nil {
 		return fmt.Errorf("failed to persist candidate block %v and its dependencies: %w", blockID, err)
@@ -201,8 +214,12 @@ func (m *FollowerState) ExtendCertified(ctx context.Context, candidate *flow.Blo
 // Extend extends the protocol state of a CONSENSUS PARTICIPANT. It checks
 // the validity of the _entire block_ (header and full payload).
 //
-// CAUTION: per convention, the protocol state requires that the candidate's
-// parent has already been ingested. Otherwise, an exception is returned.
+// CAUTION:
+//   - per convention, the protocol state requires that the candidate's
+//     parent has already been ingested. Otherwise, an exception is returned.
+//   - Attempts to extend the state with the _same block concurrently_ are not allowed.
+//     (will not corrupt the state, but may lead to an exception)
+// Orphaned blocks are excepted.
 //
 // Per convention, the protocol state requires that the candidate's parent has already been ingested.
 // Other than that, all valid extensions are accepted. Even if we have enough information to determine that
@@ -214,6 +231,13 @@ func (m *FollowerState) ExtendCertified(ctx context.Context, candidate *flow.Blo
 // have enough information to reject blocks Y, Z later if we receive them. We would re-request X, then
 // determine it is orphaned and drop it, attempt to ingest Y re-request the unknown parent X and repeat
 // potentially very often.
+//
+// To ensure that all ancestors of a candidate block are correct and known to the Protocol State, some external
+// ordering and queuing of incoming blocks is generally necessary (responsibility of Compliance Layer). Once a block
+// is successfully ingested, repeated extension requests with this block are no-ops. This is convenient for the
+// Compliance Layer after a crash, so it doesn't have to worry about which blocks have already been ingested before
+// the crash. However, while running it is very easy for the Compliance Layer to avoid concurrent extension requests
+// with the same block. Hence, for simplicity, the Protocol State may reject such requests with an exception.
 //
 // Expected errors during normal operations:
 //   - state.OutdatedExtensionError if the candidate block is outdated (e.g. orphaned)
@@ -290,16 +314,26 @@ func (m *ParticipantState) Extend(ctx context.Context, candidate *flow.Block) er
 // If all checks pass, this method queues the following operations to persist the candidate block and
 // schedules `BlockProcessable` notification to be emitted in order of increasing height:
 //
-//	5a. store QC embedded into the candidate block and emit `BlockProcessable` notification for the parent
+//	5a. if and only if the candidate block's parent has not been certified yet:
+//	  - store QC embedded into the candidate block
+//	  - add the parent to the index of certified blocks (index: view → parent block's ID)
+//	  - queue a `BlockProcessable` notification for the parent
 //	5b. store candidate block and index it as a child of its parent (needed for recovery to traverse unfinalized blocks)
-//	5c. if we are given a certifyingQC, store it and queue a `BlockProcessable` notification for the candidate block
+//	5c. if and only if we are given a `certifyingQC`
+//	  - store this QC certifying the candidate block
+//	  - add candidate to the index of certified blocks (index: view → candidate block's ID)
+//	  - queue a `BlockProcessable` notification for the candidate block
 //
 // If `headerExtend` is called by `ParticipantState.Extend` (full consensus participant) then `certifyingQC` will be nil,
 // but the block payload will be validated. If `headerExtend` is called by `FollowerState.Extend` (consensus follower),
 // then `certifyingQC` must be not nil which proves payload validity.
 //
+// If the candidate block has already been ingested, the deferred database operations returned by this function call
+// will errors with the benign sentinel [storage.ErrAlreadyExists], aborting the database transaction (without corrupting
+// the protocol state).
+//
 // Expected errors during normal operations:
-//   - state.InvalidExtensionError if the candidate block is invalid
+//   - [state.InvalidExtensionError] if the candidate block is invalid
 func (m *FollowerState) headerExtend(ctx context.Context, candidate *flow.Block, certifyingQC *flow.QuorumCertificate, deferredDbOps *transaction.DeferredDbOps) error {
 	span, _ := m.tracer.StartSpanFromContext(ctx, trace.ProtoStateMutatorExtendCheckHeader)
 	defer span.End()
@@ -355,18 +389,22 @@ func (m *FollowerState) headerExtend(ctx context.Context, candidate *flow.Block,
 	// STEP 5:
 	qc := candidate.Header.QuorumCertificate()
 	deferredDbOps.AddDbOp(func(tx *transaction.Tx) error {
-		// STEP 5a: Store QC for parent block and emit `BlockProcessable` notification if and only if
-		//  - the QC for the parent has not been stored before (otherwise, we already emitted the notification) and
-		//  - the parent block's height is larger than the finalized root height (the root block is already considered processed)
-		// Thereby, we reduce duplicated `BlockProcessable` notifications.
+		// STEP 5a: Deciding whether the candidate's parent has already been certified or not.
+		// Here, we populate the [storage.QuorumCertificates] index: certified block ID → QC. Except for bootstrapping, this is the
+		// only place where this index is updated. Therefore, the parent is certified if and only if [storage.QuorumCertificates]
+		// contains an entry for `qc.BlockID`. We optimistically attempt to add a new element to the index. We receive a
+		// [storage.ErrAlreadyExists] sentinel if and only if step 5a has already been executed for the parent.
+		// CAUTION: This approach only works for database backends that support reads and writes as part of the same atomic transaction!
+		// For Pebble, where only batch writes with asynchronous reads are supported, the following logic has to be reworked.
 		err := m.qcs.StoreTx(qc)(tx)
 		if err != nil {
+			// storage.ErrAlreadyExists guarantees that 5a has already been executed for the parent.
 			if !errors.Is(err, storage.ErrAlreadyExists) {
 				return fmt.Errorf("could not store incorporated qc: %w", err)
 			}
-		} else {
-			// parent is a block that has been received and certified by a QC.
-			err := transaction.WithTx(operation.SkipDuplicates(operation.IndexCertifiedBlockByView(parent.View, qc.BlockID)))(tx)
+		} else { // no error entails that 5a has never been executed for the parent block
+			// add parent to index of certified blocks:
+			err := transaction.WithTx(operation.IndexCertifiedBlockByView(parent.View, qc.BlockID))(tx)
 			if err != nil {
 				return fmt.Errorf("could not index certified block: %w", err)
 			}
@@ -396,8 +434,8 @@ func (m *FollowerState) headerExtend(ctx context.Context, candidate *flow.Block,
 				return fmt.Errorf("could not store certifying qc: %w", err)
 			}
 
-			// candidate is a block that has been received and certified by a QC
-			err := transaction.WithTx(operation.SkipDuplicates(operation.IndexCertifiedBlockByView(candidate.Header.View, blockID)))(tx)
+			// add candidate to index of certified blocks:
+			err := transaction.WithTx(operation.IndexCertifiedBlockByView(candidate.Header.View, blockID))(tx)
 			if err != nil {
 				return fmt.Errorf("could not index certified block: %w", err)
 			}
