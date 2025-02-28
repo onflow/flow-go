@@ -295,7 +295,7 @@ func TestKVStoreMutator_SetEpochExtensionViewCount(t *testing.T) {
 
 // TestMalleability verifies that the entities which implements the ID are not malleable.
 func TestMalleability(t *testing.T) {
-	checker := unittest.NewMalleabilityChecker(unittest.WithCustomType(protocol.ViewBasedActivator[uint64]{}, func() any {
+	checker := unittest.NewMalleabilityChecker(unittest.WithFieldGenerator("UpgradableModel.VersionUpgrade", func() protocol.ViewBasedActivator[uint64] {
 		return protocol.ViewBasedActivator[uint64]{
 			Data:           rand.Uint64(),
 			ActivationView: rand.Uint64(),
