@@ -154,10 +154,10 @@ func (mc *MalleabilityChecker) Check(entity flow.IDEntity) error {
 }
 
 func (mc *MalleabilityChecker) checkExpectations() error {
-	for field, _ := range mc.pinnedFields {
+	for field := range mc.pinnedFields {
 		return fmt.Errorf("field %s is pinned, but wasn't used, checker misconfigured", field)
 	}
-	for field, _ := range mc.fieldGenerator {
+	for field := range mc.fieldGenerator {
 		return fmt.Errorf("field %s has a generator, but wasn't used, checker misconfigured", field)
 	}
 	return nil

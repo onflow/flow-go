@@ -1,11 +1,13 @@
 package unittest
 
 import (
+	"testing"
+
 	"github.com/onflow/crypto"
-	"github.com/onflow/flow-go/model/flow"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/exp/slices"
-	"testing"
+
+	"github.com/onflow/flow-go/model/flow"
 )
 
 type IntList []uint32
