@@ -101,10 +101,6 @@ type state struct {
 	serviceEvents      storage.ServiceEvents
 	transactionResults storage.TransactionResults
 	db                 storage.DB
-	// make sure only one saving operation is running at a time, this is to prevent
-	// the reads within the saving operation to be dirty. such as ensuring no other own receipts
-	// is indexed for the same block.
-	savingResults      sync.Mutex
 	getLatestFinalized func() (uint64, error)
 
 	registerStore execution.RegisterStore
@@ -146,7 +142,6 @@ func NewExecutionState(
 		serviceEvents:       serviceEvents,
 		transactionResults:  transactionResults,
 		db:                  db,
-		savingResults:       sync.Mutex{},
 		getLatestFinalized:  getLatestFinalized,
 		registerStore:       registerStore,
 		enableRegisterStore: enableRegisterStore,
@@ -400,15 +395,6 @@ func (s *state) saveExecutionResults(
 	ctx context.Context,
 	result *execution.ComputationResult,
 ) (err error) {
-	// make sure only one saving operation is running at a time
-	// this is to prevent the reads within the saving operation to be dirty
-	// such as:
-	// - ensuring no other own receipts is indexed for the same block
-	// - ensuring no other receipts is indexed for the same block
-	// - ensuring no other results is indexed for the same block
-	s.savingResults.Lock()
-	defer s.savingResults.Unlock()
-
 	blockID := result.ExecutableBlock.ID()
 
 	err = s.chunkDataPacks.Store(result.AllChunkDataPacks())
