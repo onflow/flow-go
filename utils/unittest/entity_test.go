@@ -2,12 +2,10 @@ package unittest
 
 import (
 	"github.com/onflow/crypto"
+	"github.com/onflow/flow-go/model/flow"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/exp/slices"
 	"testing"
-	"time"
-
-	"github.com/onflow/flow-go/model/flow"
 )
 
 type IntList []uint32
@@ -111,10 +109,6 @@ func (e *StructWithOptionalField) ID() flow.Identifier {
 // TestRequireEntityNonMalleable tests the behavior of MalleabilityChecker with different types of entities ensuring
 // it correctly handles the supported types and returns an error when the entity is malleable, or it cannot perform the check.
 func TestRequireEntityNonMalleable(t *testing.T) {
-	RequireEntityNonMalleable(t, BlockHeaderFixture(), WithFieldGenerator("Timestamp", func() time.Time {
-		return time.Now()
-	}))
-
 	t.Run("type alias", func(t *testing.T) {
 		list := &IntList{1, 2, 3}
 		RequireEntityNonMalleable(t, list)

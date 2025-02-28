@@ -157,6 +157,9 @@ func (mc *MalleabilityChecker) checkExpectations() error {
 	for field, _ := range mc.pinnedFields {
 		return fmt.Errorf("field %s is pinned, but wasn't used, checker misconfigured", field)
 	}
+	for field, _ := range mc.fieldGenerator {
+		return fmt.Errorf("field %s has a generator, but wasn't used, checker misconfigured", field)
+	}
 	return nil
 }
 
@@ -182,6 +185,7 @@ func (mc *MalleabilityChecker) isEntityMalleable(v reflect.Value, structField *r
 	tType := v.Type()
 
 	if generator, ok := mc.fieldGenerator[fullFieldPath]; ok {
+		delete(mc.fieldGenerator, fullFieldPath)
 		origID := idFunc()
 		v.Set(generator())
 		newID := idFunc()
