@@ -6,6 +6,9 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
+// InsertHeader indexes the block header by the provided `headerID`.
+// Expected errors during normal operation
+//   - storage.ErrAlreadyExists if the key already exists in the database.
 func InsertHeader(headerID flow.Identifier, header *flow.Header) func(*badger.Txn) error {
 	return insert(makePrefix(codeHeader, headerID), header)
 }

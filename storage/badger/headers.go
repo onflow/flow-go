@@ -8,6 +8,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/metrics"
+	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/storage/badger/operation"
 	"github.com/onflow/flow-go/storage/badger/procedure"
 	"github.com/onflow/flow-go/storage/badger/transaction"
@@ -21,8 +22,9 @@ type Headers struct {
 	viewCache   *Cache[uint64, flow.Identifier]
 }
 
-func NewHeaders(collector module.CacheMetrics, db *badger.DB) *Headers {
+var _ storage.Headers = (*Headers)(nil)
 
+func NewHeaders(collector module.CacheMetrics, db *badger.DB) *Headers {
 	store := func(blockID flow.Identifier, header *flow.Header) func(*transaction.Tx) error {
 		return transaction.WithTx(operation.InsertHeader(blockID, header))
 	}
@@ -77,6 +79,10 @@ func NewHeaders(collector module.CacheMetrics, db *badger.DB) *Headers {
 	return h
 }
 
+// StoreTx allows us to store a new header, as part of a DB transaction, while still going through
+// the caching layer.
+// Expected errors during normal operation
+//   - storage.ErrAlreadyExists if the header has already been persisted
 func (h *Headers) storeTx(header *flow.Header) func(*transaction.Tx) error {
 	return h.cache.PutTx(header.ID(), header)
 }
@@ -102,6 +108,9 @@ func (h *Headers) retrieveIdByHeightTx(height uint64) func(*badger.Txn) (flow.Id
 	}
 }
 
+// Store stores and caches a new header.
+// Expected errors during normal operation
+//   - storage.ErrAlreadyExists if the header has already been persisted
 func (h *Headers) Store(header *flow.Header) error {
 	return operation.RetryOnConflictTx(h.db, transaction.Update, h.storeTx(header))
 }
