@@ -22,7 +22,7 @@ import (
 	backendmock "github.com/onflow/flow-go/engine/access/rpc/backend/mock"
 	connectionmock "github.com/onflow/flow-go/engine/access/rpc/connection/mock"
 	"github.com/onflow/flow-go/engine/access/subscription"
-	subscriptionmock "github.com/onflow/flow-go/engine/access/subscription/mock"
+	trackermock "github.com/onflow/flow-go/engine/access/subscription/tracker/mock"
 	"github.com/onflow/flow-go/engine/common/rpc/convert"
 	accessmodel "github.com/onflow/flow-go/model/access"
 	"github.com/onflow/flow-go/model/flow"
@@ -67,7 +67,7 @@ type TransactionStatusSuite struct {
 
 	connectionFactory *connectionmock.ConnectionFactory
 	communicator      *backendmock.Communicator
-	blockTracker      *subscriptionmock.BlockTracker
+	blockTracker      *trackermock.BlockTracker
 	reporter          *syncmock.IndexReporter
 	indexReporter     *index.Reporter
 
@@ -121,7 +121,7 @@ func (s *TransactionStatusSuite) SetupTest() {
 	s.connectionFactory = connectionmock.NewConnectionFactory(s.T())
 	s.communicator = backendmock.NewCommunicator(s.T())
 	s.broadcaster = engine.NewBroadcaster()
-	s.blockTracker = subscriptionmock.NewBlockTracker(s.T())
+	s.blockTracker = trackermock.NewBlockTracker(s.T())
 	s.resultsMap = map[flow.Identifier]*flow.ExecutionResult{}
 
 	s.colClient.On(

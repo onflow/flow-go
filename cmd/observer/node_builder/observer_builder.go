@@ -52,6 +52,7 @@ import (
 	"github.com/onflow/flow-go/engine/access/state_stream"
 	statestreambackend "github.com/onflow/flow-go/engine/access/state_stream/backend"
 	"github.com/onflow/flow-go/engine/access/subscription"
+	subscriptiontracker "github.com/onflow/flow-go/engine/access/subscription/tracker"
 	"github.com/onflow/flow-go/engine/common/follower"
 	commonrpc "github.com/onflow/flow-go/engine/common/rpc"
 	"github.com/onflow/flow-go/engine/common/stop"
@@ -1529,7 +1530,7 @@ func (builder *ObserverServiceBuilder) BuildExecutionSyncComponents() *ObserverS
 			useIndex := builder.executionDataIndexingEnabled &&
 				eventQueryMode != backend.IndexQueryModeExecutionNodesOnly
 
-			executionDataTracker := subscription.NewExecutionDataTracker(
+			executionDataTracker := subscriptiontracker.NewExecutionDataTracker(
 				builder.Logger,
 				node.State,
 				builder.executionDataConfig.InitialBlockHeight,
@@ -1888,7 +1889,7 @@ func (builder *ObserverServiceBuilder) enqueueRPCServer() {
 		broadcaster := engine.NewBroadcaster()
 		// create BlockTracker that will track for new blocks (finalized and sealed) and
 		// handles block-related operations.
-		blockTracker, err := subscription.NewBlockTracker(
+		blockTracker, err := subscriptiontracker.NewBlockTracker(
 			node.State,
 			builder.FinalizedRootBlock.Header.Height,
 			node.Storage.Headers,

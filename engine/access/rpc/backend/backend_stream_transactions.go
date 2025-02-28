@@ -11,6 +11,7 @@ import (
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/engine/access/subscription"
+	"github.com/onflow/flow-go/engine/access/subscription/tracker"
 	"github.com/onflow/flow-go/engine/common/rpc"
 	accessmodel "github.com/onflow/flow-go/model/access"
 	"github.com/onflow/flow-go/model/flow"
@@ -32,7 +33,7 @@ type backendSubscribeTransactions struct {
 	log                 zerolog.Logger
 
 	subscriptionHandler *subscription.SubscriptionHandler
-	blockTracker        subscription.BlockTracker
+	blockTracker        tracker.BlockTracker
 	sendTransaction     sendTransaction
 }
 

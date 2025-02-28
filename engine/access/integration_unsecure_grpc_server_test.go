@@ -27,6 +27,7 @@ import (
 	"github.com/onflow/flow-go/engine/access/state_stream"
 	statestreambackend "github.com/onflow/flow-go/engine/access/state_stream/backend"
 	"github.com/onflow/flow-go/engine/access/subscription"
+	"github.com/onflow/flow-go/engine/access/subscription/tracker"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/blobs"
 	"github.com/onflow/flow-go/module/execution"
@@ -62,7 +63,7 @@ type SameGRPCPortTestSuite struct {
 	metrics              *metrics.NoopCollector
 	rpcEng               *rpc.Engine
 	stateStreamEng       *statestreambackend.Engine
-	executionDataTracker subscription.ExecutionDataTracker
+	executionDataTracker tracker.ExecutionDataTracker
 
 	// storage
 	blocks       *storagemock.Blocks
@@ -253,7 +254,7 @@ func (suite *SameGRPCPortTestSuite) SetupTest() {
 
 	eventIndexer := index.NewEventsIndex(index.NewReporter(), suite.events)
 
-	suite.executionDataTracker = subscription.NewExecutionDataTracker(
+	suite.executionDataTracker = tracker.NewExecutionDataTracker(
 		suite.log,
 		suite.state,
 		rootBlock.Header.Height,
