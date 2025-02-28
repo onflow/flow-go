@@ -57,10 +57,6 @@ type VerificationConfig struct {
 	chunkWorkers uint64 // number of chunks processed in parallel.
 
 	stopAtHeight uint64 // height to stop the node on
-
-	// database operations being used for updates, "badger-transaction" for using badger transactions,
-	// "badger-batch" for using badger batch updates, "pebble-batch" for using pebble batch updates.
-	dbOps string
 }
 
 type VerificationNodeBuilder struct {
@@ -173,7 +169,7 @@ func (v *VerificationNodeBuilder) LoadComponentsAndModules() {
 			var ok bool
 			var err error
 
-			if dbops.IsBadgerTransaction(v.verConf.dbOps) {
+			if dbops.IsBadgerTransaction(node.dbops) {
 				queue := badger.NewChunkQueue(node.DB)
 				ok, err = queue.Init(chunkconsumer.DefaultJobIndex)
 				if err != nil {
@@ -182,7 +178,7 @@ func (v *VerificationNodeBuilder) LoadComponentsAndModules() {
 
 				chunkQueue = queue
 				node.Logger.Info().Msgf("chunks queue index has been initialized with badger db transaction updates")
-			} else if dbops.IsBatchUpdate(v.verConf.dbOps) {
+			} else if dbops.IsBatchUpdate(node.dbops) {
 				queue := store.NewChunkQueue(node.Metrics.Cache, node.ProtocolDB)
 				ok, err = queue.Init(chunkconsumer.DefaultJobIndex)
 				if err != nil {
@@ -192,7 +188,7 @@ func (v *VerificationNodeBuilder) LoadComponentsAndModules() {
 				chunkQueue = queue
 				node.Logger.Info().Msgf("chunks queue index has been initialized with protocol db batch updates")
 			} else {
-				return fmt.Errorf("invalid db opts type: %v", v.verConf.dbOps)
+				return fmt.Errorf("invalid db opts type: %v", v.dbops)
 			}
 
 			node.Logger.Info().
@@ -229,12 +225,12 @@ func (v *VerificationNodeBuilder) LoadComponentsAndModules() {
 			chunkVerifier := chunks.NewChunkVerifier(vm, vmCtx, node.Logger)
 
 			var approvalStorage storage.ResultApprovals
-			if dbops.IsBadgerTransaction(v.verConf.dbOps) {
+			if dbops.IsBadgerTransaction(v.dbops) {
 				approvalStorage = badger.NewResultApprovals(node.Metrics.Cache, node.DB)
-			} else if dbops.IsBatchUpdate(v.verConf.dbOps) {
+			} else if dbops.IsBatchUpdate(v.dbops) {
 				approvalStorage = store.NewResultApprovals(node.Metrics.Cache, node.ProtocolDB)
 			} else {
-				return nil, fmt.Errorf("invalid db opts type: %v", v.verConf.dbOps)
+				return nil, fmt.Errorf("invalid db opts type: %v", v.dbops)
 			}
 
 			verifierEng, err = verifier.New(
