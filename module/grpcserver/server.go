@@ -69,6 +69,8 @@ func (g *GrpcServer) serveGRPCWorker(ctx irrecoverable.SignalerContext, ready co
 	g.log = g.log.With().Str("grpc_address", g.grpcListenAddr).Logger()
 	g.log.Info().Msg("starting grpc server on address")
 
+	// add the signaler context before starting the server so that it's available to the interceptor
+	// for the first request.
 	g.grpcSignalerCtx.Store(&ctx)
 
 	l, err := net.Listen("tcp", g.grpcListenAddr)

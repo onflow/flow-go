@@ -17,11 +17,16 @@ import (
 // finished initializing), the original context is passed unchanged.
 func IrrecoverableCtxInjector(signalerCtx *atomic.Pointer[irrecoverable.SignalerContext]) grpc.UnaryServerInterceptor {
 	return func(ctx context.Context, req any, _ *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (resp any, err error) {
+		// signalerCtx is set by the server initialization logic. in practice, the context should
+		// always be set by the time the first request is received since it is added before starting
+		// the server.
 		if sigCtx := signalerCtx.Load(); sigCtx != nil {
-			resp, err = handler(irrecoverable.WithSignalerContext(ctx, *sigCtx), req)
-		} else {
-			resp, err = handler(ctx, req)
+			return handler(irrecoverable.WithSignalerContext(ctx, *sigCtx), req)
 		}
-		return
+
+		// If signalerCtx is not available yet, just pass through the original context.
+		// This is OK since the `irrecoverable.Throw` function will still cause the node to crash
+		// even if it is passed a regular context.
+		return handler(ctx, req)
 	}
 }
