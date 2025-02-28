@@ -5,15 +5,15 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/onflow/flow-go/engine/access/subscription"
-
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
 	"github.com/onflow/flow-go/access"
+	"github.com/onflow/flow-go/engine/access/subscription"
 	"github.com/onflow/flow-go/engine/common/rpc"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/irrecoverable"
+	"github.com/onflow/flow-go/module/state_synchronization/indexer"
 	"github.com/onflow/flow-go/state"
 	"github.com/onflow/flow-go/storage"
 
@@ -220,6 +220,12 @@ func (tm *transactionSubscriptionMetadata) refreshTransactionResult(ctx context.
 	// Trying to get transaction result from local storage
 	txResult, err := tm.backendTransactions.GetTransactionResultFromStorage(ctx, tm.blockWithTx, tm.txResult.TransactionID, tm.eventEncodingVersion)
 	if err != nil {
+		if !errors.Is(err, indexer.ErrIndexNotInitialized) &&
+			!errors.Is(err, storage.ErrHeightNotIndexed) &&
+			status.Code(err) != codes.NotFound {
+			return fmt.Errorf("unexpected error while getting transaction result from storage: %w", err)
+		}
+
 		// If any error occurs with local storage - request transaction result from EN
 		txResult, err = tm.backendTransactions.GetTransactionResultFromExecutionNode(ctx, tm.blockWithTx, tm.txResult.TransactionID, tm.eventEncodingVersion)
 		if err != nil {
