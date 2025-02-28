@@ -10,9 +10,9 @@ import (
 
 	"github.com/rs/zerolog"
 
-	"github.com/onflow/flow-go/access"
 	"github.com/onflow/flow-go/engine/access/subscription"
 	"github.com/onflow/flow-go/engine/common/rpc"
+	accessmodel "github.com/onflow/flow-go/model/access"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/state"
@@ -38,7 +38,7 @@ type backendSubscribeTransactions struct {
 
 // transactionSubscriptionMetadata holds data representing the status state for each transaction subscription.
 type transactionSubscriptionMetadata struct {
-	*access.TransactionResult
+	*accessmodel.TransactionResult
 	txReferenceBlockID   flow.Identifier
 	blockWithTx          *flow.Header
 	txExecuted           bool
@@ -139,7 +139,7 @@ func (b *backendSubscribeTransactions) createSubscription(
 	}
 
 	txInfo := transactionSubscriptionMetadata{
-		TransactionResult: &access.TransactionResult{
+		TransactionResult: &accessmodel.TransactionResult{
 			TransactionID: txID,
 			BlockID:       flow.ZeroID,
 			Status:        initialStatus,
@@ -203,7 +203,7 @@ func (b *backendSubscribeTransactions) getTransactionStatusResponse(txInfo *tran
 			// If transaction result was found, fully replace it in metadata. New transaction status already included in result.
 			if txResult != nil {
 				txInfo.TransactionResult = txResult
-				//Fill in execution status for future usages
+				// Fill in execution status for future usages
 				txInfo.txExecuted = true
 			}
 		}
@@ -272,12 +272,12 @@ func (b *backendSubscribeTransactions) getTransactionStatus(ctx context.Context,
 func (b *backendSubscribeTransactions) generateResultsWithMissingStatuses(
 	txInfo *transactionSubscriptionMetadata,
 	prevTxStatus flow.TransactionStatus,
-) ([]*access.TransactionResult, error) {
+) ([]*accessmodel.TransactionResult, error) {
 	// If the previous status is pending and the new status is expired, which is the last status, return its result.
 	// If the previous status is anything other than pending, return an error, as this transition is unexpected.
 	if txInfo.Status == flow.TransactionStatusExpired {
 		if prevTxStatus == flow.TransactionStatusPending {
-			return []*access.TransactionResult{
+			return []*accessmodel.TransactionResult{
 				txInfo.TransactionResult,
 			}, nil
 		} else {
@@ -285,19 +285,19 @@ func (b *backendSubscribeTransactions) generateResultsWithMissingStatuses(
 		}
 	}
 
-	var results []*access.TransactionResult
+	var results []*accessmodel.TransactionResult
 
 	// If the difference between statuses' values is more than one step, fill in the missing results.
 	if (txInfo.Status - prevTxStatus) > 1 {
 		for missingStatus := prevTxStatus + 1; missingStatus < txInfo.Status; missingStatus++ {
 			switch missingStatus {
 			case flow.TransactionStatusPending:
-				results = append(results, &access.TransactionResult{
+				results = append(results, &accessmodel.TransactionResult{
 					Status:        missingStatus,
 					TransactionID: txInfo.TransactionID,
 				})
 			case flow.TransactionStatusFinalized:
-				results = append(results, &access.TransactionResult{
+				results = append(results, &accessmodel.TransactionResult{
 					Status:        missingStatus,
 					TransactionID: txInfo.TransactionID,
 					BlockID:       txInfo.BlockID,
@@ -370,7 +370,7 @@ func (b *backendSubscribeTransactions) searchForTransactionBlockInfo(
 func (b *backendSubscribeTransactions) searchForTransactionResult(
 	ctx context.Context,
 	txInfo *transactionSubscriptionMetadata,
-) (*access.TransactionResult, error) {
+) (*accessmodel.TransactionResult, error) {
 	_, err := b.executionResults.ByBlockID(txInfo.BlockID)
 	if err != nil {
 		if errors.Is(err, storage.ErrNotFound) {

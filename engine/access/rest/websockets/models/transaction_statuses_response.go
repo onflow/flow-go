@@ -1,14 +1,14 @@
 package models
 
 import (
-	"github.com/onflow/flow-go/access"
 	commonmodels "github.com/onflow/flow-go/engine/access/rest/common/models"
+	accessmodel "github.com/onflow/flow-go/model/access"
 )
 
 // Build creates TransactionStatusesResponse instance.
 func (t *TransactionStatusesResponse) Build(
 	linkGenerator commonmodels.LinkGenerator,
-	txResult *access.TransactionResult,
+	txResult *accessmodel.TransactionResult,
 	index uint64,
 ) {
 	var transactionResult commonmodels.TransactionResult

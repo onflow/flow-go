@@ -12,13 +12,13 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
-	"github.com/onflow/flow-go/access"
 	accessmock "github.com/onflow/flow-go/access/mock"
 	mockcommonmodels "github.com/onflow/flow-go/engine/access/rest/common/models/mock"
 	"github.com/onflow/flow-go/engine/access/rest/websockets/models"
 	"github.com/onflow/flow-go/engine/access/state_stream"
 	ssmock "github.com/onflow/flow-go/engine/access/state_stream/mock"
 	"github.com/onflow/flow-go/engine/access/subscription"
+	accessmodel "github.com/onflow/flow-go/model/access"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/utils/unittest"
 
@@ -90,7 +90,7 @@ func (s *TransactionStatusesProviderSuite) TestTransactionStatusesDataProvider_H
 	)
 }
 
-func (s *TransactionStatusesProviderSuite) subscribeTransactionStatusesDataProviderTestCases(backendResponses []*access.TransactionResult) []testType {
+func (s *TransactionStatusesProviderSuite) subscribeTransactionStatusesDataProviderTestCases(backendResponses []*accessmodel.TransactionResult) []testType {
 	expectedResponses := s.expectedTransactionStatusesResponses(backendResponses, TransactionStatusesTopic)
 
 	return []testType{
@@ -154,10 +154,10 @@ func (s *TransactionStatusesProviderSuite) requireTransactionStatuses(
 	require.Equal(s.T(), expectedResponsePayload.TransactionResult.BlockId, actualResponsePayload.TransactionResult.BlockId)
 }
 
-func backendTransactionStatusesResponse(block flow.Block) []*access.TransactionResult {
+func backendTransactionStatusesResponse(block flow.Block) []*accessmodel.TransactionResult {
 	id := unittest.IdentifierFixture()
 	cid := unittest.IdentifierFixture()
-	txr := access.TransactionResult{
+	txr := accessmodel.TransactionResult{
 		Status:     flow.TransactionStatusSealed,
 		StatusCode: 10,
 		Events: []flow.Event{
@@ -169,7 +169,7 @@ func backendTransactionStatusesResponse(block flow.Block) []*access.TransactionR
 		BlockHeight:  block.Header.Height,
 	}
 
-	var expectedTxResultsResponses []*access.TransactionResult
+	var expectedTxResultsResponses []*accessmodel.TransactionResult
 
 	for i := 0; i < 2; i++ {
 		expectedTxResultsResponses = append(expectedTxResultsResponses, &txr)
@@ -180,7 +180,7 @@ func backendTransactionStatusesResponse(block flow.Block) []*access.TransactionR
 
 // expectedTransactionStatusesResponses creates the expected responses for the provided backend responses.
 func (s *TransactionStatusesProviderSuite) expectedTransactionStatusesResponses(
-	backendResponses []*access.TransactionResult,
+	backendResponses []*accessmodel.TransactionResult,
 	topic string,
 ) []interface{} {
 	expectedResponses := make([]interface{}, len(backendResponses))
@@ -259,9 +259,9 @@ func (s *TransactionStatusesProviderSuite) TestMessageIndexTransactionStatusesPr
 	}()
 
 	// Simulate emitting data to the tx statuses channel
-	var txResults []*access.TransactionResult
+	var txResults []*accessmodel.TransactionResult
 	for i := 0; i < txStatusesCount; i++ {
-		txResults = append(txResults, &access.TransactionResult{
+		txResults = append(txResults, &accessmodel.TransactionResult{
 			BlockHeight: s.rootBlock.Header.Height,
 		})
 	}
