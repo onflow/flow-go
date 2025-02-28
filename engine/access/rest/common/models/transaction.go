@@ -1,12 +1,12 @@
 package models
 
 import (
-	"github.com/onflow/flow-go/access"
 	"github.com/onflow/flow-go/engine/access/rest/util"
+	accessmodel "github.com/onflow/flow-go/model/access"
 	"github.com/onflow/flow-go/model/flow"
 )
 
-func (t *Transaction) Build(tx *flow.TransactionBody, txr *access.TransactionResult, link LinkGenerator) {
+func (t *Transaction) Build(tx *flow.TransactionBody, txr *accessmodel.TransactionResult, link LinkGenerator) {
 	args := make([]string, len(tx.Arguments))
 	for i, arg := range tx.Arguments {
 		args[i] = util.ToBase64(arg)
@@ -84,7 +84,7 @@ func (t *TransactionSignature) Build(sig flow.TransactionSignature) {
 	t.Signature = util.ToBase64(sig.Signature)
 }
 
-func (t *TransactionResult) Build(txr *access.TransactionResult, txID flow.Identifier, link LinkGenerator) {
+func (t *TransactionResult) Build(txr *accessmodel.TransactionResult, txID flow.Identifier, link LinkGenerator) {
 	var status TransactionStatus
 	status.Build(txr.Status)
 
@@ -130,7 +130,7 @@ func (t *TransactionStatus) Build(status flow.TransactionStatus) {
 	}
 }
 
-func (t *TransactionExecution) Build(result *access.TransactionResult) {
+func (t *TransactionExecution) Build(result *accessmodel.TransactionResult) {
 	*t = PENDING_RESULT
 
 	if result.Status == flow.TransactionStatusSealed && result.ErrorMessage == "" {

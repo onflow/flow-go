@@ -14,6 +14,7 @@ import (
 	"github.com/onflow/flow-go/engine/access/rest/util"
 	"github.com/onflow/flow-go/engine/access/rest/websockets/models"
 	"github.com/onflow/flow-go/engine/access/subscription"
+	accessmodel "github.com/onflow/flow-go/model/access"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/counters"
 
@@ -89,10 +90,10 @@ func (p *SendAndGetTransactionStatusesDataProvider) createSubscription(
 // handleResponse processes a tx statuses and sends the formatted response.
 //
 // No errors are expected during normal operations.
-func (p *SendAndGetTransactionStatusesDataProvider) handleResponse() func(txResults []*access.TransactionResult) error {
+func (p *SendAndGetTransactionStatusesDataProvider) handleResponse() func(txResults []*accessmodel.TransactionResult) error {
 	messageIndex := counters.NewMonotonicCounter(0)
 
-	return func(txResults []*access.TransactionResult) error {
+	return func(txResults []*accessmodel.TransactionResult) error {
 		for i := range txResults {
 			index := messageIndex.Value()
 			if ok := messageIndex.Set(messageIndex.Value() + 1); !ok {

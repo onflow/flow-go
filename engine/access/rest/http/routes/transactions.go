@@ -7,6 +7,7 @@ import (
 	"github.com/onflow/flow-go/engine/access/rest/common"
 	commonmodels "github.com/onflow/flow-go/engine/access/rest/common/models"
 	"github.com/onflow/flow-go/engine/access/rest/http/request"
+	accessmodel "github.com/onflow/flow-go/model/access"
 )
 
 // GetTransactionByID gets a transaction by requested ID.
@@ -21,7 +22,7 @@ func GetTransactionByID(r *common.Request, backend access.API, link commonmodels
 		return nil, err
 	}
 
-	var txr *access.TransactionResult
+	var txr *accessmodel.TransactionResult
 	// only lookup result if transaction result is to be expanded
 	if req.ExpandsResult {
 		txr, err = backend.GetTransactionResult(

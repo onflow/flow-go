@@ -17,6 +17,7 @@ import (
 	"github.com/onflow/flow-go/engine/access/subscription"
 	"github.com/onflow/flow-go/engine/common/rpc"
 	"github.com/onflow/flow-go/engine/common/rpc/convert"
+	accessmodel "github.com/onflow/flow-go/model/access"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/counters"
@@ -102,7 +103,7 @@ func (h *Handler) GetNodeVersionInfo(
 			ProtocolStateVersion: nodeVersionInfo.ProtocolStateVersion,
 			SporkRootBlockHeight: nodeVersionInfo.SporkRootBlockHeight,
 			NodeRootBlockHeight:  nodeVersionInfo.NodeRootBlockHeight,
-			CompatibleRange:      access.CompatibleRangeToMessage(nodeVersionInfo.CompatibleRange),
+			CompatibleRange:      convert.CompatibleRangeToMessage(nodeVersionInfo.CompatibleRange),
 		},
 	}, nil
 }
@@ -354,7 +355,7 @@ func (h *Handler) GetTransactionResult(
 		return nil, err
 	}
 
-	message := access.TransactionResultToMessage(result)
+	message := convert.TransactionResultToMessage(result)
 	message.Metadata = metadata
 
 	return message, nil
@@ -381,7 +382,7 @@ func (h *Handler) GetTransactionResultsByBlockID(
 		return nil, err
 	}
 
-	message := access.TransactionResultsToMessage(results)
+	message := convert.TransactionResultsToMessage(results)
 	message.Metadata = metadata
 
 	return message, nil
@@ -431,7 +432,7 @@ func (h *Handler) GetSystemTransactionResult(
 		return nil, err
 	}
 
-	message := access.TransactionResultToMessage(result)
+	message := convert.TransactionResultToMessage(result)
 	message.Metadata = metadata
 
 	return message, nil
@@ -485,7 +486,7 @@ func (h *Handler) GetTransactionResultByIndex(
 		return nil, err
 	}
 
-	message := access.TransactionResultToMessage(result)
+	message := convert.TransactionResultToMessage(result)
 	message.Metadata = metadata
 
 	return message, nil
@@ -1430,7 +1431,7 @@ func (h *Handler) SendAndSubscribeTransactionStatuses(
 	sub := h.api.SendAndSubscribeTransactionStatuses(ctx, &tx, request.GetEventEncodingVersion())
 
 	messageIndex := counters.NewMonotonicCounter(0)
-	return subscription.HandleRPCSubscription(sub, func(txResults []*access.TransactionResult) error {
+	return subscription.HandleRPCSubscription(sub, func(txResults []*accessmodel.TransactionResult) error {
 		for i := range txResults {
 			index := messageIndex.Value()
 			if ok := messageIndex.Set(index + 1); !ok {
@@ -1438,7 +1439,7 @@ func (h *Handler) SendAndSubscribeTransactionStatuses(
 			}
 
 			err = stream.Send(&accessproto.SendAndSubscribeTransactionStatusesResponse{
-				TransactionResults: access.TransactionResultToMessage(txResults[i]),
+				TransactionResults: convert.TransactionResultToMessage(txResults[i]),
 				MessageIndex:       index,
 			})
 			if err != nil {

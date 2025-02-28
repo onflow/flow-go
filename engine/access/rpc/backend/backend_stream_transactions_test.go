@@ -16,7 +16,6 @@ import (
 
 	accessproto "github.com/onflow/flow/protobuf/go/flow/access"
 
-	accessapi "github.com/onflow/flow-go/access"
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/engine/access/index"
 	access "github.com/onflow/flow-go/engine/access/mock"
@@ -25,6 +24,7 @@ import (
 	"github.com/onflow/flow-go/engine/access/subscription"
 	subscriptionmock "github.com/onflow/flow-go/engine/access/subscription/mock"
 	"github.com/onflow/flow-go/engine/common/rpc/convert"
+	accessmodel "github.com/onflow/flow-go/model/access"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/counters"
@@ -312,7 +312,7 @@ func (s *TransactionStatusSuite) TestSubscribeTransactionStatusHappyCase() {
 				"channel closed while waiting for transaction info:\n\t- txID %x\n\t- blockID: %x \n\t- err: %v",
 				txId, s.finalizedBlock.ID(), sub.Err())
 
-			txResults, ok := v.([]*accessapi.TransactionResult)
+			txResults, ok := v.([]*accessmodel.TransactionResult)
 			require.True(s.T(), ok, "unexpected response type: %T", v)
 			require.Len(s.T(), txResults, 1)
 
@@ -345,7 +345,7 @@ func (s *TransactionStatusSuite) TestSubscribeTransactionStatusHappyCase() {
 	s.addNewFinalizedBlock(s.sealedBlock.Header, true)
 	checkNewSubscriptionMessage(sub, flow.TransactionStatusSealed)
 
-	//// 5. Stop subscription
+	// // 5. Stop subscription
 	s.sealedBlock = s.finalizedBlock
 	s.addNewFinalizedBlock(s.sealedBlock.Header, true)
 
@@ -378,7 +378,7 @@ func (s *TransactionStatusSuite) TestSubscribeTransactionStatusExpired() {
 				"channel closed while waiting for transaction info:\n\t- txID %x\n\t- blockID: %x \n\t- err: %v",
 				txId, s.finalizedBlock.ID(), sub.Err())
 
-			txResults, ok := v.([]*accessapi.TransactionResult)
+			txResults, ok := v.([]*accessmodel.TransactionResult)
 			require.True(s.T(), ok, "unexpected response type: %T", v)
 			require.Len(s.T(), txResults, 1)
 

@@ -10,10 +10,10 @@ import (
 	"github.com/onflow/flow/protobuf/go/flow/entities"
 	"google.golang.org/grpc/codes"
 
-	"github.com/onflow/flow-go/access"
 	"github.com/onflow/flow-go/engine/access/index"
 	"github.com/onflow/flow-go/engine/common/rpc"
 	"github.com/onflow/flow-go/engine/common/rpc/convert"
+	accessmodel "github.com/onflow/flow-go/model/access"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/counters"
 	"github.com/onflow/flow-go/module/irrecoverable"
@@ -72,7 +72,7 @@ func (t *TransactionsLocalDataProvider) GetTransactionResultFromStorage(
 	block *flow.Block,
 	transactionID flow.Identifier,
 	requiredEventEncodingVersion entities.EventEncodingVersion,
-) (*access.TransactionResult, error) {
+) (*accessmodel.TransactionResult, error) {
 	blockID := block.ID()
 	txResult, err := t.txResultsIndex.ByBlockIDTransactionID(blockID, block.Header.Height, transactionID)
 	if err != nil {
@@ -115,7 +115,7 @@ func (t *TransactionsLocalDataProvider) GetTransactionResultFromStorage(
 		}
 	}
 
-	return &access.TransactionResult{
+	return &accessmodel.TransactionResult{
 		TransactionID: txResult.TransactionID,
 		Status:        txStatus,
 		StatusCode:    txStatusCode,
@@ -139,7 +139,7 @@ func (t *TransactionsLocalDataProvider) GetTransactionResultsByBlockIDFromStorag
 	ctx context.Context,
 	block *flow.Block,
 	requiredEventEncodingVersion entities.EventEncodingVersion,
-) ([]*access.TransactionResult, error) {
+) ([]*accessmodel.TransactionResult, error) {
 	blockID := block.ID()
 	txResults, err := t.txResultsIndex.ByBlockID(blockID, block.Header.Height)
 	if err != nil {
@@ -152,7 +152,7 @@ func (t *TransactionsLocalDataProvider) GetTransactionResultsByBlockIDFromStorag
 	}
 
 	numberOfTxResults := len(txResults)
-	results := make([]*access.TransactionResult, 0, numberOfTxResults)
+	results := make([]*accessmodel.TransactionResult, 0, numberOfTxResults)
 
 	// cache the tx to collectionID mapping to avoid repeated lookups
 	txToCollectionID, err := t.buildTxIDToCollectionIDMapping(block)
@@ -204,7 +204,7 @@ func (t *TransactionsLocalDataProvider) GetTransactionResultsByBlockIDFromStorag
 			return nil, status.Errorf(codes.Internal, "transaction %s not found in block %s", txID, blockID)
 		}
 
-		results = append(results, &access.TransactionResult{
+		results = append(results, &accessmodel.TransactionResult{
 			Status:        txStatus,
 			StatusCode:    txStatusCode,
 			Events:        events,
@@ -233,7 +233,7 @@ func (t *TransactionsLocalDataProvider) GetTransactionResultByIndexFromStorage(
 	block *flow.Block,
 	index uint32,
 	requiredEventEncodingVersion entities.EventEncodingVersion,
-) (*access.TransactionResult, error) {
+) (*accessmodel.TransactionResult, error) {
 	blockID := block.ID()
 	txResult, err := t.txResultsIndex.ByBlockIDTransactionIndex(blockID, block.Header.Height, index)
 	if err != nil {
@@ -281,7 +281,7 @@ func (t *TransactionsLocalDataProvider) GetTransactionResultByIndexFromStorage(
 		return nil, err
 	}
 
-	return &access.TransactionResult{
+	return &accessmodel.TransactionResult{
 		TransactionID: txResult.TransactionID,
 		Status:        txStatus,
 		StatusCode:    txStatusCode,

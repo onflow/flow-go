@@ -23,6 +23,7 @@ import (
 	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/fvm/storage/snapshot"
 	"github.com/onflow/flow-go/ledger"
+	accessmodel "github.com/onflow/flow-go/model/access"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/metrics"
 )
@@ -242,13 +243,13 @@ func (*api) Ping(_ context.Context) error {
 	return nil
 }
 
-func (a *api) GetNetworkParameters(_ context.Context) access.NetworkParameters {
-	return access.NetworkParameters{
+func (a *api) GetNetworkParameters(_ context.Context) accessmodel.NetworkParameters {
+	return accessmodel.NetworkParameters{
 		ChainID: a.chainID,
 	}
 }
 
-func (*api) GetNodeVersionInfo(_ context.Context) (*access.NodeVersionInfo, error) {
+func (*api) GetNodeVersionInfo(_ context.Context) (*accessmodel.NodeVersionInfo, error) {
 	return nil, errors.New("unimplemented")
 }
 
@@ -302,7 +303,7 @@ func (*api) GetTransactionResult(
 	_ flow.Identifier,
 	_ flow.Identifier,
 	_ entities.EventEncodingVersion,
-) (*access.TransactionResult, error) {
+) (*accessmodel.TransactionResult, error) {
 	return nil, errors.New("unimplemented")
 }
 
@@ -311,7 +312,7 @@ func (*api) GetTransactionResultByIndex(
 	_ flow.Identifier,
 	_ uint32,
 	_ entities.EventEncodingVersion,
-) (*access.TransactionResult, error) {
+) (*accessmodel.TransactionResult, error) {
 	return nil, errors.New("unimplemented")
 }
 
@@ -319,7 +320,7 @@ func (*api) GetTransactionResultsByBlockID(
 	_ context.Context,
 	_ flow.Identifier,
 	_ entities.EventEncodingVersion,
-) ([]*access.TransactionResult, error) {
+) ([]*accessmodel.TransactionResult, error) {
 	return nil, errors.New("unimplemented")
 }
 
@@ -334,7 +335,7 @@ func (*api) GetSystemTransactionResult(
 	_ context.Context,
 	_ flow.Identifier,
 	_ entities.EventEncodingVersion,
-) (*access.TransactionResult, error) {
+) (*accessmodel.TransactionResult, error) {
 	return nil, errors.New("unimplemented")
 }
 
