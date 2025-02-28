@@ -79,7 +79,7 @@ func NewHeaders(collector module.CacheMetrics, db *badger.DB) *Headers {
 	return h
 }
 
-// StoreTx allows us to store a new header, as part of a DB transaction, while still going through
+// storeTx allows us to store a new header, as part of a DB transaction, while still going through
 // the caching layer.
 // Expected errors during normal operation
 //   - storage.ErrAlreadyExists if the header has already been persisted
