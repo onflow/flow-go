@@ -1,23 +1,24 @@
 package latest
 
 import (
-	"github.com/dgraph-io/badger/v2"
+	"fmt"
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/state/protocol"
-	"github.com/onflow/flow-go/storage/badger/procedure"
+	"github.com/onflow/flow-go/storage"
+	"github.com/onflow/flow-go/storage/operation"
 )
 
 type LatestSealedAndExecuted struct {
 	root            *flow.Header
 	state           protocol.State
-	executedBlockDB *badger.DB
+	executedBlockDB storage.DB
 }
 
 func NewLatestSealedAndExecuted(
 	root *flow.Header,
 	state protocol.State,
-	executedBlockDB *badger.DB,
+	executedBlockDB storage.DB,
 ) *LatestSealedAndExecuted {
 	return &LatestSealedAndExecuted{
 		root:            root,
@@ -59,22 +60,26 @@ func (l *LatestSealedAndExecuted) Latest() (*flow.Header, error) {
 }
 
 // LatestSealedAndExecutedHeight returns the height of the latest sealed and executed block.
-func LatestSealedAndExecutedHeight(state protocol.State, db *badger.DB) (uint64, error) {
+func LatestSealedAndExecutedHeight(state protocol.State, db storage.DB) (uint64, error) {
 	lastSealed, err := state.Sealed().Head()
 	if err != nil {
 		return 0, err
 	}
 
 	var blockID flow.Identifier
-	var lastExecuted uint64
-	err = db.View(procedure.GetLastExecutedBlock(&lastExecuted, &blockID))
+	err = operation.RetrieveExecutedBlock(db.Reader(), &blockID)
 	if err != nil {
 		return 0, err
 	}
 
+	lastExecuted, err := state.AtBlockID(blockID).Head()
+	if err != nil {
+		return 0, fmt.Errorf("failed to get executed block: %w", err)
+	}
+
 	// the last sealed executed is min(last_sealed, last_executed)
-	if lastExecuted < lastSealed.Height {
-		return lastExecuted, nil
+	if lastExecuted.Height < lastSealed.Height {
+		return lastExecuted.Height, nil
 	}
 	return lastSealed.Height, nil
 }

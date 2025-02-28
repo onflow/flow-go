@@ -20,7 +20,8 @@ import (
 	"github.com/onflow/flow-go/model/bootstrap"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/metrics"
-	"github.com/onflow/flow-go/storage/badger"
+	"github.com/onflow/flow-go/storage/operation/badgerimpl"
+	"github.com/onflow/flow-go/storage/store"
 )
 
 var (
@@ -239,7 +240,7 @@ func run(*cobra.Command, []string) {
 		defer db.Close()
 
 		cache := &metrics.NoopCollector{}
-		commits := badger.NewCommits(cache, db)
+		commits := store.NewCommits(cache, badgerimpl.ToDB(db))
 
 		stateCommitment, err = commits.ByBlockID(blockID)
 		if err != nil {

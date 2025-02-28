@@ -4,6 +4,7 @@ import (
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
 
+	"github.com/onflow/flow-go/cmd/util/cmd/common"
 	findBlockByCommits "github.com/onflow/flow-go/cmd/util/cmd/read-badger/cmd/find-block-by-commits"
 	"github.com/onflow/flow-go/model/flow"
 )
@@ -21,8 +22,10 @@ var commitsCmd = &cobra.Command{
 	Use:   "commits",
 	Short: "get commit by block ID",
 	Run: func(cmd *cobra.Command, args []string) {
-		storages, db := InitStorages()
+		_, db := InitStorages()
 		defer db.Close()
+
+		commits := common.InitExecutionStorages(db).Commits
 
 		log.Info().Msgf("got flag block id: %s", flagBlockID)
 		blockID, err := flow.HexStringToIdentifier(flagBlockID)
@@ -32,7 +35,7 @@ var commitsCmd = &cobra.Command{
 		}
 
 		log.Info().Msgf("getting commit by block id: %v", blockID)
-		commit, err := storages.Commits.ByBlockID(blockID)
+		commit, err := commits.ByBlockID(blockID)
 		if err != nil {
 			log.Error().Err(err).Msgf("could not get commit for block id: %v", blockID)
 			return
