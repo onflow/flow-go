@@ -13,8 +13,8 @@ import (
 
 	jsoncdc "github.com/onflow/cadence/encoding/json"
 
-	accessmock "github.com/onflow/flow-go/access/mock"
 	"github.com/onflow/flow-go/access/validator"
+	validatormock "github.com/onflow/flow-go/access/validator/mock"
 	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
@@ -29,7 +29,7 @@ func TestTransactionValidatorSuite(t *testing.T) {
 
 type TransactionValidatorSuite struct {
 	suite.Suite
-	blocks           *accessmock.Blocks
+	blocks           *validatormock.Blocks
 	header           *flow.Header
 	chain            flow.Chain
 	validatorOptions validator.TransactionValidationOptions
@@ -38,7 +38,7 @@ type TransactionValidatorSuite struct {
 
 func (s *TransactionValidatorSuite) SetupTest() {
 	s.metrics = metrics.NewNoopCollector()
-	s.blocks = accessmock.NewBlocks(s.T())
+	s.blocks = validatormock.NewBlocks(s.T())
 	assert.NotNil(s.T(), s.blocks)
 
 	s.header = unittest.BlockHeaderFixture()
