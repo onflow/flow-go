@@ -16,6 +16,7 @@ import (
 	"github.com/onflow/flow-go/engine/access/index"
 	"github.com/onflow/flow-go/engine/access/rpc/connection"
 	"github.com/onflow/flow-go/engine/access/subscription"
+	"github.com/onflow/flow-go/engine/access/subscription/tracker"
 	"github.com/onflow/flow-go/engine/common/rpc"
 	commonrpc "github.com/onflow/flow-go/engine/common/rpc"
 	"github.com/onflow/flow-go/engine/common/version"
@@ -74,7 +75,7 @@ type Backend struct {
 	executionReceipts storage.ExecutionReceipts
 	connFactory       connection.ConnectionFactory
 
-	BlockTracker   subscription.BlockTracker
+	BlockTracker   tracker.BlockTracker
 	stateParams    protocol.Params
 	versionControl *version.VersionControl
 }
@@ -103,7 +104,7 @@ type Params struct {
 	ScriptExecutionMode   IndexQueryMode
 	CheckPayerBalanceMode validator.PayerBalanceMode
 	EventQueryMode        IndexQueryMode
-	BlockTracker          subscription.BlockTracker
+	BlockTracker          tracker.BlockTracker
 	SubscriptionHandler   *subscription.SubscriptionHandler
 
 	EventsIndex                *index.EventsIndex

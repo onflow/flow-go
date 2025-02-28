@@ -1,4 +1,4 @@
-package subscription
+package tracker
 
 import (
 	"context"
@@ -25,6 +25,7 @@ import (
 // new Execution Data notification
 type ExecutionDataTracker interface {
 	BaseTracker
+
 	// GetStartHeight returns the start height to use when searching.
 	// Only one of startBlockID and startHeight may be set. Otherwise, an InvalidArgument error is returned.
 	// If a block is provided and does not exist, a NotFound error is returned.
@@ -46,8 +47,10 @@ type ExecutionDataTracker interface {
 	// - codes.NotFound   - if a block is provided and does not exist.
 	// - codes.Internal        - if there is an internal error.
 	GetStartHeight(context.Context, flow.Identifier, uint64) (uint64, error)
+
 	// GetHighestHeight returns the highest height that we have consecutive execution data for.
 	GetHighestHeight() uint64
+
 	// OnExecutionData is used to notify the tracker when a new execution data is received.
 	OnExecutionData(*execution_data.BlockExecutionDataEntity)
 }

@@ -1,9 +1,8 @@
-package subscription
+package tracker
 
 import (
 	"context"
 	"fmt"
-	"sync/atomic"
 
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -15,19 +14,6 @@ import (
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/storage"
 )
-
-// StreamingData represents common streaming data configuration for access and state_stream handlers.
-type StreamingData struct {
-	MaxStreams  int32
-	StreamCount atomic.Int32
-}
-
-func NewStreamingData(maxStreams uint32) StreamingData {
-	return StreamingData{
-		MaxStreams:  int32(maxStreams),
-		StreamCount: atomic.Int32{},
-	}
-}
 
 // BaseTracker is an interface for a tracker that provides base GetStartHeight method related to both blocks and execution data tracking.
 type BaseTracker interface {
@@ -45,6 +31,7 @@ type BaseTracker interface {
 	// - codes.NotFound - if the block was not found in storage
 	// - codes.Internal - for any other error
 	GetStartHeightFromBlockID(flow.Identifier) (uint64, error)
+
 	// GetStartHeightFromHeight returns the start height based on the provided starting block height.
 	// If the start block is the root block, skip it and begin from the next block.
 	//
@@ -59,6 +46,7 @@ type BaseTracker interface {
 	// - codes.InvalidArgument   - if the start height is less than the root block height.
 	// - codes.NotFound  - if the header was not found in storage.
 	GetStartHeightFromHeight(uint64) (uint64, error)
+
 	// GetStartHeightFromLatest returns the start height based on the latest sealed block.
 	// If the start block is the root block, skip it and begin from the next block.
 	//

@@ -11,6 +11,7 @@ import (
 	"google.golang.org/grpc/status"
 
 	"github.com/onflow/flow-go/engine/access/subscription"
+	"github.com/onflow/flow-go/engine/access/subscription/tracker"
 	"github.com/onflow/flow-go/engine/common/rpc"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
@@ -30,7 +31,7 @@ type ExecutionDataBackend struct {
 	getExecutionData GetExecutionDataFunc
 
 	subscriptionHandler  *subscription.SubscriptionHandler
-	executionDataTracker subscription.ExecutionDataTracker
+	executionDataTracker tracker.ExecutionDataTracker
 }
 
 func (b *ExecutionDataBackend) GetExecutionDataByBlockID(ctx context.Context, blockID flow.Identifier) (*execution_data.BlockExecutionData, error) {
