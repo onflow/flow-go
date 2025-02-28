@@ -1,4 +1,4 @@
-package access_test
+package validator_test
 
 import (
 	"context"
@@ -13,8 +13,8 @@ import (
 
 	jsoncdc "github.com/onflow/cadence/encoding/json"
 
-	"github.com/onflow/flow-go/access"
 	accessmock "github.com/onflow/flow-go/access/mock"
+	"github.com/onflow/flow-go/access/validator"
 	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
@@ -32,7 +32,7 @@ type TransactionValidatorSuite struct {
 	blocks           *accessmock.Blocks
 	header           *flow.Header
 	chain            flow.Chain
-	validatorOptions access.TransactionValidationOptions
+	validatorOptions validator.TransactionValidationOptions
 	metrics          module.TransactionValidationMetrics
 }
 
@@ -57,8 +57,8 @@ func (s *TransactionValidatorSuite) SetupTest() {
 		Return(s.header, nil)
 
 	s.chain = flow.Testnet.Chain()
-	s.validatorOptions = access.TransactionValidationOptions{
-		CheckPayerBalanceMode:  access.EnforceCheck,
+	s.validatorOptions = validator.TransactionValidationOptions{
+		CheckPayerBalanceMode:  validator.EnforceCheck,
 		MaxTransactionByteSize: flow.DefaultMaxTransactionByteSize,
 		MaxCollectionByteSize:  flow.DefaultMaxCollectionByteSize,
 	}
@@ -97,7 +97,7 @@ func (s *TransactionValidatorSuite) TestTransactionValidator_ScriptExecutorInter
 		Return(nil, errors.New("script executor internal error")).
 		Once()
 
-	validator, err := access.NewTransactionValidator(s.blocks, s.chain, s.metrics, s.validatorOptions, scriptExecutor)
+	validator, err := validator.NewTransactionValidator(s.blocks, s.chain, s.metrics, s.validatorOptions, scriptExecutor)
 	assert.NoError(s.T(), err)
 	assert.NotNil(s.T(), validator)
 
@@ -128,7 +128,7 @@ func (s *TransactionValidatorSuite) TestTransactionValidator_SufficientBalance()
 		Return(actualResponse, nil).
 		Once()
 
-	validator, err := access.NewTransactionValidator(s.blocks, s.chain, s.metrics, s.validatorOptions, scriptExecutor)
+	validator, err := validator.NewTransactionValidator(s.blocks, s.chain, s.metrics, s.validatorOptions, scriptExecutor)
 	assert.NoError(s.T(), err)
 	assert.NotNil(s.T(), validator)
 
@@ -164,7 +164,7 @@ func (s *TransactionValidatorSuite) TestTransactionValidator_InsufficientBalance
 
 	validateTx := func() error {
 		txBody := unittest.TransactionBodyFixture()
-		validator, err := access.NewTransactionValidator(s.blocks, s.chain, s.metrics, s.validatorOptions, scriptExecutor)
+		validator, err := validator.NewTransactionValidator(s.blocks, s.chain, s.metrics, s.validatorOptions, scriptExecutor)
 		assert.NoError(s.T(), err)
 		assert.NotNil(s.T(), validator)
 
@@ -174,7 +174,7 @@ func (s *TransactionValidatorSuite) TestTransactionValidator_InsufficientBalance
 	s.Run("with enforce check", func() {
 		err := validateTx()
 
-		expectedError := access.InsufficientBalanceError{
+		expectedError := validator.InsufficientBalanceError{
 			Payer:           unittest.AddressFixture(),
 			RequiredBalance: requiredBalance,
 		}
@@ -182,7 +182,7 @@ func (s *TransactionValidatorSuite) TestTransactionValidator_InsufficientBalance
 	})
 
 	s.Run("with warn check", func() {
-		s.validatorOptions.CheckPayerBalanceMode = access.WarnCheck
+		s.validatorOptions.CheckPayerBalanceMode = validator.WarnCheck
 		err := validateTx()
 		assert.NoError(s.T(), err)
 	})
@@ -198,7 +198,7 @@ func (s *TransactionValidatorSuite) TestTransactionValidator_SealedIndexedHeight
 		On("IndexedHeight").
 		Return(indexedHeight, nil)
 
-	validator, err := access.NewTransactionValidator(s.blocks, s.chain, s.metrics, s.validatorOptions, scriptExecutor)
+	validator, err := validator.NewTransactionValidator(s.blocks, s.chain, s.metrics, s.validatorOptions, scriptExecutor)
 	assert.NoError(s.T(), err)
 	assert.NotNil(s.T(), validator)
 

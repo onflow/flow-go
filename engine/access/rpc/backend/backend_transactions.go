@@ -15,6 +15,7 @@ import (
 	"google.golang.org/grpc/status"
 
 	"github.com/onflow/flow-go/access"
+	"github.com/onflow/flow-go/access/validator"
 	"github.com/onflow/flow-go/engine/access/rpc/connection"
 	"github.com/onflow/flow-go/engine/common/rpc"
 	commonrpc "github.com/onflow/flow-go/engine/common/rpc"
@@ -38,7 +39,7 @@ type backendTransactions struct {
 	txResultErrorMessages storage.TransactionResultErrorMessages
 	chainID               flow.ChainID
 	transactionMetrics    module.TransactionMetrics
-	transactionValidator  *access.TransactionValidator
+	transactionValidator  *validator.TransactionValidator
 	retry                 *Retry
 	connFactory           connection.ConnectionFactory
 
@@ -352,8 +353,8 @@ func (b *backendTransactions) GetTransactionResult(
 // retrieveBlock function returns a block based on the input argument. The block ID lookup has the highest priority,
 // followed by the collection ID lookup. If both are missing, the default lookup by transaction ID is performed.
 func (b *backendTransactions) retrieveBlock(
-	// the requested block or collection was not found. If looking up the block based solely on the txID returns
-	// not found, then no error is returned.
+// the requested block or collection was not found. If looking up the block based solely on the txID returns
+// not found, then no error is returned.
 	blockID flow.Identifier,
 	collectionID flow.Identifier,
 	txID flow.Identifier,
