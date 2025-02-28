@@ -53,7 +53,7 @@ func NewPendingReceipts(headers storage.Headers, limit uint) *PendingReceipts {
 	// if the mempool fills up, we want to eject the receipts for the highest blocks
 	// See https://github.com/onflow/flow-go/pull/387/files#r574228078
 	r.RegisterEjectionCallbacks(func(receipt *flow.ExecutionReceipt) {
-		removeReceipt(receipt, r.backData, r.byPreviousResultID)
+		removeReceipt(receipt, r.mutableBackData, r.byPreviousResultID)
 	})
 	return r
 }
@@ -129,7 +129,7 @@ func (r *PendingReceipts) Remove(receiptID flow.Identifier) bool {
 	err := r.Backend.Run(func(backData mempool.BackData[flow.Identifier, *flow.ExecutionReceipt]) error {
 		receipt, ok := backData.ByID(receiptID)
 		if ok {
-			removeReceipt(receipt, r.backData, r.byPreviousResultID)
+			removeReceipt(receipt, r.mutableBackData, r.byPreviousResultID)
 			removed = true
 		}
 		return nil
@@ -211,7 +211,7 @@ func (r *PendingReceipts) removeByHeight(height uint64, backData mempool.BackDat
 	for receiptID := range r.byHeight[height] {
 		receipt, ok := backData.ByID(receiptID)
 		if ok {
-			removeReceipt(receipt, r.backData, r.byPreviousResultID)
+			removeReceipt(receipt, r.mutableBackData, r.byPreviousResultID)
 		}
 	}
 	delete(r.byHeight, height)

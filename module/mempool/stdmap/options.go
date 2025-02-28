@@ -27,11 +27,12 @@ func WithEject[K comparable, V any](eject EjectFunc[K, V]) OptionFunc[K, V] {
 	}
 }
 
-// WithBackData sets the underlying backdata of the backend.
-// BackData represents the underlying data structure that is utilized by mempool.Backend, as the
+// WithMutableBackData sets the underlying mutable BackData for the backend.
+//
+// MutableBackData represents the mutable data structure used by mempool.Backend
 // core structure of maintaining data on memory-pools.
-func WithBackData[K comparable, V any](backdata mempool.BackData[K, V]) OptionFunc[K, V] {
+func WithMutableBackData[K comparable, V any](mutableBackData mempool.MutableBackData[K, V]) OptionFunc[K, V] {
 	return func(be *Backend[K, V]) {
-		be.backData = backdata
+		be.mutableBackData = mutableBackData
 	}
 }

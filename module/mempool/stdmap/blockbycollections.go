@@ -30,7 +30,7 @@ func (b *BlockByCollections) Add(block *entity.BlocksByCollection) bool {
 }
 
 func (b *BlockByCollections) Get(collID flow.Identifier) (*entity.BlocksByCollection, bool) {
-	backdata := &BlockByCollectionBackdata{b.backData}
+	backdata := &BlockByCollectionBackdata{b.mutableBackData}
 	return backdata.ByID(collID)
 }
 
@@ -41,7 +41,7 @@ func (b *BlockByCollections) Run(f func(backdata *BlockByCollectionBackdata) err
 
 	//bs2 := binstat.EnterTime(binstat.BinStdmap + ".inlock.(BlockByCollections).Run)")
 	defer b.Unlock()
-	err := f(&BlockByCollectionBackdata{b.backData})
+	err := f(&BlockByCollectionBackdata{b.mutableBackData})
 	//binstat.Leave(bs2)
 
 	if err != nil {

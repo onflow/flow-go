@@ -36,7 +36,7 @@ func NewHeroReceiveCache(sizeLimit uint32, logger zerolog.Logger, collector modu
 		heropool.LRUEjection, // receive cache must be LRU.
 		logger.With().Str("mempool", "receive-cache").Logger(),
 		collector)
-	backend := stdmap.NewBackend(stdmap.WithBackData(backData))
+	backend := stdmap.NewBackend(stdmap.WithMutableBackData(backData))
 	return NewReceiveCache(uint(sizeLimit), func(cache *ReceiveCache) {
 		cache.c = backend
 	})
