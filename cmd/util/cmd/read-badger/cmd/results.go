@@ -40,6 +40,8 @@ var resultsCmd = &cobra.Command{
 			}
 
 			common.PrettyPrintEntity(result)
+
+			// the result does not include the chunk ID, so we need to print it separately
 			printChunkID(result)
 			return
 		}
@@ -60,6 +62,8 @@ var resultsCmd = &cobra.Command{
 			}
 
 			common.PrettyPrintEntity(result)
+
+			// the result does not include the chunk ID, so we need to print it separately
 			printChunkID(result)
 			return
 		}
