@@ -14,7 +14,9 @@ type MutableBackData interface {
 	BackData
 
 	// Adjust adjusts the entity using the given function if the given identifier can be found.
-	// Returns a bool which indicates whether the entity was updated as well as the updated entity.
+	// Returns: 
+	//    - Entity, true if the entity with the given ID was found. The returned Entity is the version after the update is applied.
+	//    - nil, false if no entity with the given ID was found
 	Adjust(entityID flow.Identifier, f func(flow.Entity) flow.Entity) (flow.Entity, bool)
 
 	// AdjustWithInit adjusts the entity using the given function if the given identifier can be found. When the
@@ -25,7 +27,6 @@ type MutableBackData interface {
 	// - init: the function that initializes the entity when it is not found.
 	// Returns:
 	//   - the adjusted entity.
-	//
-	// - a bool which indicates whether the entity was adjusted.
+	//   - a bool which indicates whether the entity was either added or adjusted.
 	AdjustWithInit(entityID flow.Identifier, adjust func(flow.Entity) flow.Entity, init func() flow.Entity) (flow.Entity, bool)
 }
