@@ -63,9 +63,9 @@ func (e *Error) Error() string {
 	return e.err.Error()
 }
 
-// ErrorToResponseCode converts an Access API error into a grpc status error. The input may either
+// ErrorToStatusError converts an Access API error into a grpc status error. The input may either
 // be a status.Error already, or an access sentinel error.
-func ErrorToResponseCode(err error) StatusError {
+func ErrorToStatusError(err error) StatusError {
 	if err == nil {
 		return nil
 	}
