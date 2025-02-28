@@ -86,7 +86,7 @@ func TestMalleability(t *testing.T) {
 		require.NoError(t, err)
 	})
 
-	t.Run("EpochStateContainer", func(t *testing.T) {
+	t.Run("EpochStateContainer with proper EpochExtensions and ActiveIdentities", func(t *testing.T) {
 		checker := unittest.NewMalleabilityChecker(
 			unittest.WithFieldGenerator("EpochExtensions", func() []flow.EpochExtension { return []flow.EpochExtension{epochExtensionFixture()} }),
 			unittest.WithFieldGenerator("ActiveIdentities", func() flow.DynamicIdentityEntryList {
