@@ -188,7 +188,7 @@ func (v *VerificationNodeBuilder) LoadComponentsAndModules() {
 				chunkQueue = queue
 				node.Logger.Info().Msgf("chunks queue index has been initialized with protocol db batch updates")
 			} else {
-				return fmt.Errorf("invalid db opts type: %v", v.dbops)
+				return fmt.Errorf(dbops.UsageErrMsg, v.dbops)
 			}
 
 			node.Logger.Info().

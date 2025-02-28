@@ -1163,8 +1163,7 @@ func (fnb *FlowNodeBuilder) initProtocolDB(bdb *badger.DB, pdb *pebble.DB) error
 		fnb.ProtocolDB = pebbleimpl.ToDB(pdb)
 		fnb.Logger.Info().Msgf("initProtocolDB: using pebble protocol db")
 	} else {
-		return fmt.Errorf("invalid --protocoldb-type flag, expect badger/pebble, but got: %v",
-			fnb.dbops)
+		return fmt.Errorf(dbops.UsageErrMsg, fnb.dbops)
 	}
 	return nil
 }
