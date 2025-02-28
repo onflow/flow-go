@@ -11,7 +11,7 @@ import (
 
 	sdk "github.com/onflow/flow-go-sdk"
 
-	"github.com/onflow/flow-go/access"
+	"github.com/onflow/flow-go/access/validator"
 	"github.com/onflow/flow-go/integration/convert"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -65,7 +65,7 @@ func (suite *IngressSuite) TestTransactionIngress_InvalidTransaction() {
 			tx.SetScript(nil)
 		})
 
-		expected := access.IncompleteTransactionError{
+		expected := validator.IncompleteTransactionError{
 			MissingFields: []string{flow.TransactionFieldScript.String()},
 		}
 

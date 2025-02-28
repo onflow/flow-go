@@ -12,6 +12,7 @@ import (
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/access"
+	"github.com/onflow/flow-go/access/validator"
 	"github.com/onflow/flow-go/cmd/build"
 	"github.com/onflow/flow-go/engine/access/index"
 	"github.com/onflow/flow-go/engine/access/rpc/connection"
@@ -100,7 +101,7 @@ type Params struct {
 	TxResultCacheSize     uint
 	ScriptExecutor        execution.ScriptExecutor
 	ScriptExecutionMode   IndexQueryMode
-	CheckPayerBalanceMode access.PayerBalanceMode
+	CheckPayerBalanceMode validator.PayerBalanceMode
 	EventQueryMode        IndexQueryMode
 	BlockTracker          subscription.BlockTracker
 	SubscriptionHandler   *subscription.SubscriptionHandler
@@ -274,13 +275,13 @@ func configureTransactionValidator(
 	indexReporter state_synchronization.IndexReporter,
 	transactionMetrics module.TransactionValidationMetrics,
 	executor execution.ScriptExecutor,
-	checkPayerBalanceMode access.PayerBalanceMode,
-) (*access.TransactionValidator, error) {
-	return access.NewTransactionValidator(
-		access.NewProtocolStateBlocks(state, indexReporter),
+	checkPayerBalanceMode validator.PayerBalanceMode,
+) (*validator.TransactionValidator, error) {
+	return validator.NewTransactionValidator(
+		validator.NewProtocolStateBlocks(state, indexReporter),
 		chainID.Chain(),
 		transactionMetrics,
-		access.TransactionValidationOptions{
+		validator.TransactionValidationOptions{
 			Expiry:                       flow.DefaultTransactionExpiry,
 			ExpiryBuffer:                 flow.DefaultTransactionExpiryBuffer,
 			AllowEmptyReferenceBlockID:   false,
