@@ -113,8 +113,6 @@ func parseTransactionID(
 ) (flow.Identifier, error) {
 	var txID flow.Identifier
 	allowedFields := []string{
-		"start_block_id",
-		"start_block_height",
 		"tx_id",
 	}
 	err := ensureAllowedFields(arguments, allowedFields)
