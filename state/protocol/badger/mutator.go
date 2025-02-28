@@ -137,6 +137,7 @@ func NewFullConsensusState(
 //   - The parent block must already have been ingested.
 //   - Attempts to extend the state with the _same block concurrently_ are not allowed.
 //     (will not corrupt the state, but may lead to an exception)
+//
 // Orphaned blocks are excepted.
 //
 // Per convention, the protocol state requires that the candidate's parent has already been ingested.
@@ -219,6 +220,7 @@ func (m *FollowerState) ExtendCertified(ctx context.Context, candidate *flow.Blo
 //     parent has already been ingested. Otherwise, an exception is returned.
 //   - Attempts to extend the state with the _same block concurrently_ are not allowed.
 //     (will not corrupt the state, but may lead to an exception)
+//
 // Orphaned blocks are excepted.
 //
 // Per convention, the protocol state requires that the candidate's parent has already been ingested.
