@@ -58,7 +58,7 @@ func NewRecordCache(config *RecordCacheConfig, recordEntityFactory recordEntityF
 	return &RecordCache{
 		recordEntityFactory: recordEntityFactory,
 		decayFunc:           defaultDecayFunction(config.recordDecay),
-		c:                   stdmap.NewBackend(stdmap.WithBackData(backData)),
+		c:                   stdmap.NewBackend(stdmap.WithMutableBackData(backData)),
 	}, nil
 }
 

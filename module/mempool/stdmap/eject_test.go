@@ -185,7 +185,7 @@ func TestLRUEjector_UntrackEject(t *testing.T) {
 
 	for i := 0; i < size; i++ {
 		mockEntity := unittest.MockEntityFixture()
-		require.True(t, backEnd.Add(mockEntity))
+		require.True(t, backEnd.Add(mockEntity.ID(), mockEntity))
 
 		id := mockEntity.ID()
 		ejector.Track(id)
@@ -213,7 +213,7 @@ func TestLRUEjector_EjectAll(t *testing.T) {
 
 	for i := 0; i < size; i++ {
 		mockEntity := unittest.MockEntityFixture()
-		require.True(t, backEnd.Add(mockEntity))
+		require.True(t, backEnd.Add(mockEntity.ID(), mockEntity))
 
 		id := mockEntity.ID()
 		ejector.Track(id)

@@ -37,7 +37,7 @@ type EjectFunc[K comparable, V any] func(b *Backend[K, V]) (flow.Identifier, flo
 // threshold size, and will iterate through them and eject unneeded
 // entries if that is the case.  Return values are unused
 func EjectRandomFast[K comparable, V any](b *Backend[K, V]) (bool, error) {
-	currentSize := b.backData.Size()
+	currentSize := b.mutableBackData.Size()
 
 	if b.guaranteedCapacity >= currentSize {
 		return false, nil
@@ -65,10 +65,10 @@ func EjectRandomFast[K comparable, V any](b *Backend[K, V]) (bool, error) {
 	// ejection calls will make up for it).
 	idx := 0                     // index into mapIndices
 	next2Remove := mapIndices[0] // index of the element to be removed next
-	i := 0                       // index into the values map
-	for key, value := range b.backData.All() {
+	i := 0                       // index into the entities map
+	for key, value := range b.mutableBackData.All() {
 		if i == next2Remove {
-			b.backData.Remove(key) // remove the entry
+			b.mutableBackData.Remove(key) // remove entity
 			for _, callback := range b.ejectionCallbacks {
 				callback(value) // notify callback
 			}
@@ -148,7 +148,7 @@ func Eject[K comparable, V any](q *LRUEjector[K], b *Backend[K, V]) K {
 	// finds the oldest entity
 	oldestSQ := uint64(math.MaxUint64)
 	var oldestID K
-	for _, id := range b.backData.Identifiers() {
+	for _, id := range b.mutableBackData.Identifiers() {
 		if sq, ok := q.table[id]; ok {
 			if sq < oldestSQ {
 				oldestID = id

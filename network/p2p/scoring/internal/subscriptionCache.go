@@ -48,7 +48,7 @@ func NewSubscriptionRecordCache(sizeLimit uint32,
 		collector)
 
 	return &SubscriptionRecordCache{
-		c:            stdmap.NewBackend(stdmap.WithBackData(backData)),
+		c:            stdmap.NewBackend(stdmap.WithMutableBackData(backData)),
 		currentCycle: *atomic.NewUint64(0),
 	}
 }

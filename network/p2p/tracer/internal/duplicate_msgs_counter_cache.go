@@ -46,7 +46,7 @@ func NewDuplicateMessageTrackerCache(sizeLimit uint32, decay, skipDecayThreshold
 	return &DuplicateMessageTrackerCache{
 		decay:              decay,
 		skipDecayThreshold: skipDecayThreshold,
-		c:                  stdmap.NewBackend(stdmap.WithBackData(backData)),
+		c:                  stdmap.NewBackend(stdmap.WithMutableBackData(backData)),
 	}
 }
 

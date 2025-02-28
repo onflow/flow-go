@@ -24,10 +24,10 @@ func TestAddRemove(t *testing.T) {
 	item2 := unittest.MockEntityFixture()
 
 	t.Run("should be able to add and rem", func(t *testing.T) {
-		pool := stdmap.NewBackend()
-		added := pool.Add(item1)
+		pool := stdmap.NewBackend[flow.Identifier, *unittest.MockEntity]()
+		added := pool.Add(item1.ID(), item1)
 		require.True(t, added)
-		added = pool.Add(item2)
+		added = pool.Add(item2.ID(), item2)
 		require.True(t, added)
 
 		t.Run("should be able to get size", func(t *testing.T) {
@@ -61,12 +61,12 @@ func TestAdjust(t *testing.T) {
 	item2 := unittest.MockEntityFixture()
 
 	t.Run("should not adjust if not exist", func(t *testing.T) {
-		pool := stdmap.NewBackend()
-		_ = pool.Add(item1)
+		pool := stdmap.NewBackend[flow.Identifier, *unittest.MockEntity]()
+		_ = pool.Add(item1.ID(), item1)
 
 		// item2 doesn't exist
-		updatedItem, updated := pool.Adjust(item2.ID(), func(old flow.Entity) flow.Entity {
-			return item2
+		updatedItem, updated := pool.Adjust(item2.ID(), func(old *unittest.MockEntity) (flow.Identifier, *unittest.MockEntity) {
+			return item2.ID(), item2
 		})
 
 		assert.False(t, updated)
@@ -77,12 +77,12 @@ func TestAdjust(t *testing.T) {
 	})
 
 	t.Run("should adjust if exists", func(t *testing.T) {
-		pool := stdmap.NewBackend()
-		_ = pool.Add(item1)
+		pool := stdmap.NewBackend[flow.Identifier, *unittest.MockEntity]()
+		_ = pool.Add(item1.ID(), item1)
 
-		updatedItem, ok := pool.Adjust(item1.ID(), func(old flow.Entity) flow.Entity {
+		updatedItem, ok := pool.Adjust(item1.ID(), func(old *unittest.MockEntity) (flow.Identifier, *unittest.MockEntity) {
 			// item 1 exist, got replaced with item2, the value was updated
-			return item2
+			return item2.ID(), item2
 		})
 
 		assert.True(t, ok)
@@ -100,9 +100,9 @@ func Test_DeduplicationByID(t *testing.T) {
 	item2 := unittest.MockEntity{Identifier: item1.Identifier} // duplicate
 	assert.True(t, item1.ID() == item2.ID())
 
-	pool := stdmap.NewBackend()
-	pool.Add(item1)
-	pool.Add(item2)
+	pool := stdmap.NewBackend[flow.Identifier, *unittest.MockEntity]()
+	pool.Add(item1.ID(), item1)
+	pool.Add(item2.ID(), item1)
 	assert.Equal(t, uint(1), pool.Size())
 }
 
@@ -115,7 +115,7 @@ func TestBackend_RunLimitChecking(t *testing.T) {
 		limit = 150
 		swarm = 150
 	)
-	pool := stdmap.NewBackend(stdmap.WithLimit(limit))
+	pool := stdmap.NewBackend[flow.Identifier, *unittest.MockEntity](stdmap.WithLimit[flow.Identifier, *unittest.MockEntity](limit))
 
 	wg := sync.WaitGroup{}
 	wg.Add(swarm)
@@ -228,7 +228,7 @@ func TestBackend_AdjustWithInit_Concurrent_HeroCache(t *testing.T) {
 		unittest.Logger(),
 		metrics.NewNoopCollector())
 
-	backend := stdmap.NewBackend(stdmap.WithBackData(backData))
+	backend := stdmap.NewBackend(stdmap.WithMutableBackData(backData))
 	entities := unittest.EntityListFixture(100)
 	adjustDone := sync.WaitGroup{}
 	for _, e := range entities {
@@ -265,7 +265,7 @@ func TestBackend_GetWithInit_Concurrent_HeroCache(t *testing.T) {
 	sizeLimit := uint32(100)
 	backData := herocache.NewCache(sizeLimit, herocache.DefaultOversizeFactor, heropool.LRUEjection, unittest.Logger(), metrics.NewNoopCollector())
 
-	backend := stdmap.NewBackend(stdmap.WithBackData(backData))
+	backend := stdmap.NewBackend(stdmap.WithMutableBackData(backData))
 	entities := unittest.EntityListFixture(100)
 	adjustDone := sync.WaitGroup{}
 	for _, e := range entities {

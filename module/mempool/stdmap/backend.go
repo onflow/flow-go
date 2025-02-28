@@ -8,21 +8,21 @@ import (
 	"github.com/onflow/flow-go/module/mempool/stdmap/backdata"
 )
 
-// Backend is a wrapper around the backdata that provides concurrency-safe operations.
+// Backend is a wrapper around the mutable backdata that provides concurrency-safe operations.
 type Backend[K comparable, V any] struct {
 	sync.RWMutex
-	// The generic key-value storage.
-	backData mempool.BackData[K, V]
-
+	mutableBackData    mempool.MutableBackData[K, V]
 	guaranteedCapacity uint
 	batchEject         BatchEjectFunc[K, V]
 	eject              EjectFunc[K, V]
 	ejectionCallbacks  []mempool.OnEjection[V]
 }
 
+// NewBackend creates a new memory pool backend.
+// This is using EjectRandomFast()
 func NewBackend[K comparable, V any](options ...OptionFunc[K, V]) *Backend[K, V] {
 	b := Backend[K, V]{
-		backData:           backdata.NewMapBackData[K, V](),
+		mutableBackData:    backdata.NewMapBackData[K, V](),
 		guaranteedCapacity: uint(math.MaxUint32),
 		batchEject:         EjectRandomFast[K, V],
 		eject:              nil,
@@ -43,7 +43,7 @@ func (b *Backend[K, V]) Has(key K) bool {
 	// bs2 := binstat.EnterTime(binstat.BinStdmap + ".inlock.(Backend)Has")
 	// defer binstat.Leave(bs2)
 	defer b.RUnlock()
-	has := b.backData.Has(key)
+	has := b.mutableBackData.Has(key)
 	return has
 }
 
@@ -56,7 +56,7 @@ func (b *Backend[K, V]) Add(key K, value V) bool {
 	// bs2 := binstat.EnterTime(binstat.BinStdmap + ".inlock.(Backend)Add")
 	// defer binstat.Leave(bs2)
 	defer b.Unlock()
-	added := b.backData.Add(key, value)
+	added := b.mutableBackData.Add(key, value)
 	b.reduce()
 	return added
 }
@@ -70,13 +70,13 @@ func (b *Backend[K, V]) Remove(key K) bool {
 	// bs2 := binstat.EnterTime(binstat.BinStdmap + ".inlock.(Backend)Remove")
 	// defer binstat.Leave(bs2)
 	defer b.Unlock()
-	_, removed := b.backData.Remove(key)
+	_, removed := b.mutableBackData.Remove(key)
 	return removed
 }
 
 // Adjust will adjust the value item using the given function if the given key can be found.
 // Returns a bool which indicates whether the value was updated.
-func (b *Backend[K, V]) Adjust(key K, f func(V) V) (V, bool) {
+func (b *Backend[K, V]) Adjust(key K, f func(V) (K, V)) (V, bool) {
 	// bs1 := binstat.EnterTime(binstat.BinStdmap + ".w_lock.(Backend)Adjust")
 	b.Lock()
 	// binstat.Leave(bs1)
@@ -84,7 +84,7 @@ func (b *Backend[K, V]) Adjust(key K, f func(V) V) (V, bool) {
 	// bs2 := binstat.EnterTime(binstat.BinStdmap + ".inlock.(Backend)Adjust")
 	// defer binstat.Leave(bs2)
 	defer b.Unlock()
-	value, wasUpdated := b.backData.Adjust(key, f)
+	value, wasUpdated := b.mutableBackData.Adjust(key, f)
 	return value, wasUpdated
 }
 
@@ -98,11 +98,11 @@ func (b *Backend[K, V]) Adjust(key K, f func(V) V) (V, bool) {
 //   - the adjusted value.
 //
 // - a bool which indicates whether the value was adjusted.
-func (b *Backend[K, V]) AdjustWithInit(key K, adjust func(V) V, init func() V) (V, bool) {
+func (b *Backend[K, V]) AdjustWithInit(key K, adjust func(V) (K, V), init func() V) (V, bool) {
 	b.Lock()
 	defer b.Unlock()
 
-	return b.backData.AdjustWithInit(key, adjust, init)
+	return b.mutableBackData.AdjustWithInit(key, adjust, init)
 }
 
 // GetWithInit returns the given value from the backdata. If the value does not exist, it creates a new value
@@ -118,7 +118,7 @@ func (b *Backend[K, V]) GetWithInit(key K, init func() V) (V, bool) {
 	b.Lock()
 	defer b.Unlock()
 
-	return b.backData.GetWithInit(key, init)
+	return b.mutableBackData.GetWithInit(key, init)
 }
 
 // ByID returns the given item from the pool.
@@ -130,8 +130,8 @@ func (b *Backend[K, V]) ByID(key K) (V, bool) {
 	// bs2 := binstat.EnterTime(binstat.BinStdmap + ".inlock.(Backend)ByID")
 	// defer binstat.Leave(bs2)
 	defer b.RUnlock()
-	entity, exists := b.backData.ByID(key)
-	return entity, exists
+	value, exists := b.mutableBackData.ByID(key)
+	return value, exists
 }
 
 // Run executes a function giving it exclusive access to the backdata
@@ -143,7 +143,7 @@ func (b *Backend[K, V]) Run(f func(backdata mempool.BackData[K, V]) error) error
 	// bs2 := binstat.EnterTime(binstat.BinStdmap + ".inlock.(Backend)Run")
 	// defer binstat.Leave(bs2)
 	defer b.Unlock()
-	err := f(b.backData)
+	err := f(b.mutableBackData)
 	b.reduce()
 	return err
 }
@@ -157,7 +157,7 @@ func (b *Backend[K, V]) Size() uint {
 	// bs2 := binstat.EnterTime(binstat.BinStdmap + ".inlock.(Backend)Size")
 	// defer binstat.Leave(bs2)
 	defer b.RUnlock()
-	size := b.backData.Size()
+	size := b.mutableBackData.Size()
 	return size
 }
 
@@ -176,7 +176,7 @@ func (b *Backend[K, V]) All() []V {
 	// defer binstat.Leave(bs2)
 	defer b.RUnlock()
 
-	return b.backData.Entities()
+	return b.mutableBackData.Entities()
 }
 
 // Clear removes all entities from the pool.
@@ -188,7 +188,7 @@ func (b *Backend[K, V]) Clear() {
 	// bs2 := binstat.EnterTime(binstat.BinStdmap + ".inlock.(Backend)Clear")
 	// defer binstat.Leave(bs2)
 	defer b.Unlock()
-	b.backData.Clear()
+	b.mutableBackData.Clear()
 }
 
 // RegisterEjectionCallbacks adds the provided OnEjection callbacks
@@ -213,7 +213,7 @@ func (b *Backend[K, V]) reduce() {
 	// this was a loop, but the loop is now in EjectRandomFast()
 	// the ejections are batched, so this call to eject() may not actually
 	// do anything until the batch threshold is reached (currently 128)
-	if b.backData.Size() > b.guaranteedCapacity {
+	if b.mutableBackData.Size() > b.guaranteedCapacity {
 		// get the key from the eject function
 		// we don't do anything if there is an error
 		if b.batchEject != nil {
