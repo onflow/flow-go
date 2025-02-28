@@ -228,7 +228,7 @@ func TestBackend_AdjustWithInit_Concurrent_HeroCache(t *testing.T) {
 		unittest.Logger(),
 		metrics.NewNoopCollector())
 
-	backend := stdmap.NewBackend(stdmap.WithBackData(backData))
+	backend := stdmap.NewBackend(stdmap.WithMutableBackData(backData))
 	entities := unittest.EntityListFixture(100)
 	adjustDone := sync.WaitGroup{}
 	for _, e := range entities {
@@ -265,7 +265,7 @@ func TestBackend_GetWithInit_Concurrent_HeroCache(t *testing.T) {
 	sizeLimit := uint32(100)
 	backData := herocache.NewCache(sizeLimit, herocache.DefaultOversizeFactor, heropool.LRUEjection, unittest.Logger(), metrics.NewNoopCollector())
 
-	backend := stdmap.NewBackend(stdmap.WithBackData(backData))
+	backend := stdmap.NewBackend(stdmap.WithMutableBackData(backData))
 	entities := unittest.EntityListFixture(100)
 	adjustDone := sync.WaitGroup{}
 	for _, e := range entities {
