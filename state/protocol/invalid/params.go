@@ -20,7 +20,3 @@ func (p Params) SporkID() flow.Identifier {
 func (p Params) SporkRootBlockHeight() uint64 {
 	return 0
 }
-
-func (p Params) ProtocolVersion() uint {
-	return 0
-}

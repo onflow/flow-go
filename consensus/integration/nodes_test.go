@@ -160,20 +160,12 @@ type epochInfo struct {
 }
 
 // buildEpochLookupList is a helper function which builds an auxiliary structure of epochs sorted by counter
-func buildEpochLookupList(epochs ...protocol.Epoch) []epochInfo {
+func buildEpochLookupList(epochs ...protocol.CommittedEpoch) []epochInfo {
 	infos := make([]epochInfo, 0)
 	for _, epoch := range epochs {
-		finalView, err := epoch.FinalView()
-		if err != nil {
-			continue
-		}
-		counter, err := epoch.Counter()
-		if err != nil {
-			continue
-		}
 		infos = append(infos, epochInfo{
-			finalView: finalView,
-			counter:   counter,
+			finalView: epoch.FinalView(),
+			counter:   epoch.Counter(),
 		})
 	}
 	sort.Slice(infos, func(i, j int) bool {
@@ -192,8 +184,17 @@ func createNodes(t *testing.T, participants *ConsensusParticipants, rootSnapshot
 	consensus, err := rootSnapshot.Identities(filter.HasRole[flow.Identity](flow.RoleConsensus))
 	require.NoError(t, err)
 
-	epochViewLookup := buildEpochLookupList(rootSnapshot.Epochs().Current(),
-		rootSnapshot.Epochs().Next())
+	var epochViewLookup []epochInfo
+	currentEpoch, err := rootSnapshot.Epochs().Current()
+	require.NoError(t, err)
+	// Whether there is a next committed epoch depends on the test.
+	nextEpoch, err := rootSnapshot.Epochs().NextCommitted()
+	if err != nil { // the only acceptable error here is `protocol.ErrNextEpochNotCommitted`
+		require.ErrorIs(t, err, protocol.ErrNextEpochNotCommitted)
+		epochViewLookup = buildEpochLookupList(currentEpoch)
+	} else {
+		epochViewLookup = buildEpochLookupList(currentEpoch, nextEpoch)
+	}
 
 	epochLookup := &mockmodule.EpochLookup{}
 	epochLookup.On("EpochForView", mock.Anything).Return(

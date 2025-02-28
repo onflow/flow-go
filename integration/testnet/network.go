@@ -650,6 +650,11 @@ func PrepareFlowNetwork(t *testing.T, networkConf NetworkConfig, chainID flow.Ch
 			nodeContainer.AddFlag("insecure-access-api", "false")
 			nodeContainer.AddFlag("access-node-ids", strings.Join(accessNodeIDS, ","))
 		}
+		// Increase the maximum view duration to accommodate the default Localnet block rate of 1bps
+		if nodeConf.Role == flow.RoleConsensus {
+			nodeContainer := flowNetwork.Containers[nodeConf.ContainerName]
+			nodeContainer.AddFlag("cruise-ctl-max-view-duration", "2s")
+		}
 	}
 
 	for i, observerConf := range networkConf.Observers {
@@ -1291,7 +1296,6 @@ func BootstrapNetwork(networkConf NetworkConfig, bootstrapDir string, chainID fl
 		result,
 		seal,
 		qc,
-		flow.DefaultProtocolVersion,
 		networkConf.KVStoreFactory,
 	)
 	if err != nil {
