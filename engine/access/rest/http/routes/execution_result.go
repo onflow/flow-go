@@ -21,7 +21,7 @@ func GetExecutionResultsByBlockIDs(r *common.Request, backend access.API, link c
 	for i, id := range req.BlockIDs {
 		res, err := backend.GetExecutionResultForBlockID(r.Context(), id)
 		if err != nil {
-			return nil, err
+			return nil, common.ErrorToResponseCode(err)
 		}
 
 		var response commonmodels.ExecutionResult
@@ -44,7 +44,7 @@ func GetExecutionResultByID(r *common.Request, backend access.API, link commonmo
 
 	res, err := backend.GetExecutionResultByID(r.Context(), req.ID)
 	if err != nil {
-		return nil, err
+		return nil, common.ErrorToResponseCode(err)
 	}
 
 	if res == nil {

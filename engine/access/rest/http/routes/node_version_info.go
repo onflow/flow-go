@@ -11,7 +11,7 @@ import (
 func GetNodeVersionInfo(r *common.Request, backend access.API, _ commonmodels.LinkGenerator) (interface{}, error) {
 	params, err := backend.GetNodeVersionInfo(r.Context())
 	if err != nil {
-		return nil, err
+		return nil, common.ErrorToResponseCode(err)
 	}
 
 	var response models.NodeVersionInfo

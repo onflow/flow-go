@@ -1,6 +1,12 @@
 package common
 
-import "net/http"
+import (
+	"context"
+	"errors"
+	"net/http"
+
+	"github.com/onflow/flow-go/access"
+)
 
 // StatusError provides custom error with http status.
 type StatusError interface {
@@ -55,4 +61,38 @@ func (e *Error) Status() int {
 
 func (e *Error) Error() string {
 	return e.err.Error()
+}
+
+// ErrorToResponseCode converts an Access API error into a grpc status error. The input may either
+// be a status.Error already, or an access sentinel error.
+func ErrorToResponseCode(err error) StatusError {
+	if err == nil {
+		return nil
+	}
+
+	var converted StatusError
+	if errors.As(err, &converted) {
+		return converted
+	}
+
+	switch {
+	case access.IsInvalidRequest(err):
+		return NewBadRequestError(err)
+	case access.IsDataNotFound(err):
+		return NewNotFoundError(err.Error(), err)
+	case access.IsPreconditionFailed(err):
+		return NewRestError(http.StatusPreconditionFailed, err.Error(), err)
+	case access.IsOutOfRangeError(err):
+		return NewNotFoundError(err.Error(), err)
+	case access.IsInternalError(err):
+		return NewRestError(http.StatusInternalServerError, err.Error(), err)
+	case errors.Is(err, context.Canceled):
+		return NewRestError(http.StatusRequestTimeout, "Request canceled", err)
+	case errors.Is(err, context.DeadlineExceeded):
+		return NewRestError(http.StatusRequestTimeout, "Request deadline exceeded", err)
+	default:
+		// TODO: ideally we would throw an exception in this case. For now, report it as Unknown so we
+		// can more easily identify any missed code paths and fix them while transitioning to this pattern.
+		return NewRestError(http.StatusInternalServerError, err.Error(), err)
+	}
 }

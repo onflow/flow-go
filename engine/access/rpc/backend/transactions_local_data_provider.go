@@ -29,19 +29,16 @@ var ErrTransactionNotInBlock = errors.New("transaction not in block")
 type TransactionErrorMessage interface {
 	// LookupErrorMessageByTransactionID is a function type for getting transaction error message by block ID and transaction ID.
 	// Expected errors during normal operation:
-	//   - InsufficientExecutionReceipts - found insufficient receipts for given block ID.
 	//   - status.Error - remote GRPC call to EN has failed.
 	LookupErrorMessageByTransactionID(ctx context.Context, blockID flow.Identifier, height uint64, transactionID flow.Identifier) (string, error)
 
 	// LookupErrorMessageByIndex is a function type for getting transaction error message by index.
 	// Expected errors during normal operation:
-	//   - InsufficientExecutionReceipts - found insufficient receipts for given block ID.
 	//   - status.Error - remote GRPC call to EN has failed.
 	LookupErrorMessageByIndex(ctx context.Context, blockID flow.Identifier, height uint64, index uint32) (string, error)
 
 	// LookupErrorMessagesByBlockID is a function type for getting transaction error messages by block ID.
 	// Expected errors during normal operation:
-	//   - InsufficientExecutionReceipts - found insufficient receipts for given block ID.
 	//   - status.Error - remote GRPC call to EN has failed.
 	LookupErrorMessagesByBlockID(ctx context.Context, blockID flow.Identifier, height uint64) (map[flow.Identifier]string, error)
 }

@@ -10,14 +10,15 @@ import (
 	lru "github.com/hashicorp/golang-lru/v2"
 	accessproto "github.com/onflow/flow/protobuf/go/flow/access"
 	"github.com/rs/zerolog"
+	"google.golang.org/grpc/status"
 
+	"github.com/onflow/flow-go/access"
 	"github.com/onflow/flow-go/access/validator"
 	"github.com/onflow/flow-go/cmd/build"
 	"github.com/onflow/flow-go/engine/access/index"
 	"github.com/onflow/flow-go/engine/access/rpc/connection"
 	"github.com/onflow/flow-go/engine/access/subscription"
 	"github.com/onflow/flow-go/engine/access/subscription/tracker"
-	"github.com/onflow/flow-go/engine/common/rpc"
 	commonrpc "github.com/onflow/flow-go/engine/common/rpc"
 	"github.com/onflow/flow-go/engine/common/version"
 	"github.com/onflow/flow-go/fvm/blueprints"
@@ -298,12 +299,13 @@ func configureTransactionValidator(
 }
 
 // Ping responds to requests when the server is up.
+//
+// No errors are expected during normal operation.
 func (b *Backend) Ping(ctx context.Context) error {
 	// staticCollectionRPC is only set if a collection node address was provided at startup
 	if b.staticCollectionRPC != nil {
-		_, err := b.staticCollectionRPC.Ping(ctx, &accessproto.PingRequest{})
-		if err != nil {
-			return fmt.Errorf("could not ping collection node: %w", err)
+		if _, err := b.staticCollectionRPC.Ping(ctx, &accessproto.PingRequest{}); err != nil {
+			return status.Errorf(status.Code(err), "could not ping collection node: %v", err)
 		}
 	}
 
@@ -311,13 +313,15 @@ func (b *Backend) Ping(ctx context.Context) error {
 }
 
 // GetNodeVersionInfo returns node version information such as semver, commit, sporkID, protocolVersion, etc
-func (b *Backend) GetNodeVersionInfo(_ context.Context) (*accessmodel.NodeVersionInfo, error) {
+//
+// No errors are expected during normal operation.
+func (b *Backend) GetNodeVersionInfo(ctx context.Context) (*accessmodel.NodeVersionInfo, error) {
 	sporkID := b.stateParams.SporkID()
 	sporkRootBlockHeight := b.stateParams.SporkRootBlockHeight()
 	nodeRootBlockHeader := b.stateParams.SealedRoot()
 	protocolSnapshot, err := b.state.Final().ProtocolState()
 	if err != nil {
-		return nil, fmt.Errorf("could not read finalized protocol kvstore: %w", err)
+		return nil, access.RequireNoError(ctx, fmt.Errorf("could not read finalized protocol kvstore: %w", err))
 	}
 
 	var compatibleRange *accessmodel.CompatibleRange
@@ -344,61 +348,54 @@ func (b *Backend) GetNodeVersionInfo(_ context.Context) (*accessmodel.NodeVersio
 	return nodeInfo, nil
 }
 
-func (b *Backend) GetCollectionByID(_ context.Context, colID flow.Identifier) (*flow.LightCollection, error) {
-	// retrieve the collection from the collection storage
+// GetCollectionByID returns a light collection by its ID.
+//
+// Expected errors:
+// - access.DataNotFound if the collection is not found.
+func (b *Backend) GetCollectionByID(ctx context.Context, colID flow.Identifier) (*flow.LightCollection, error) {
 	col, err := b.collections.LightByID(colID)
 	if err != nil {
-		// Collections are retrieved asynchronously as we finalize blocks, so
-		// it is possible for a client to request a finalized block from us
-		// containing some collection, then get a not found error when requesting
-		// that collection. These clients should retry.
-		err = rpc.ConvertStorageError(fmt.Errorf("please retry for collection in finalized block: %w", err))
-		return nil, err
+		// Collections are retrieved asynchronously as we finalize blocks, so it is possible to get
+		// a storage.ErrNotFound for a collection within a finalized block. Clients should retry.
+		err = access.RequireErrorIs(ctx, err, storage.ErrNotFound)
+		return nil, access.NewDataNotFound("collection", fmt.Errorf("please retry for collection in finalized block: %w", err))
 	}
 
 	return col, nil
 }
 
-func (b *Backend) GetFullCollectionByID(_ context.Context, colID flow.Identifier) (*flow.Collection, error) {
-	// retrieve the collection from the collection storage
+// GetFullCollectionByID returns a full collection by its ID.
+//
+// Expected errors:
+// - access.DataNotFound if the collection is not found.
+func (b *Backend) GetFullCollectionByID(ctx context.Context, colID flow.Identifier) (*flow.Collection, error) {
 	col, err := b.collections.ByID(colID)
 	if err != nil {
-		// Collections are retrieved asynchronously as we finalize blocks, so
-		// it is possible for a client to request a finalized block from us
-		// containing some collection, then get a not found error when requesting
-		// that collection. These clients should retry.
-		err = rpc.ConvertStorageError(fmt.Errorf("please retry for collection in finalized block: %w", err))
-		return nil, err
+		// Collections are retrieved asynchronously as we finalize blocks, so it is possible to get
+		// a storage.ErrNotFound for a collection within a finalized block. Clients should retry.
+		err = access.RequireErrorIs(ctx, err, storage.ErrNotFound)
+		return nil, access.NewDataNotFound("collection", fmt.Errorf("please retry for collection in finalized block: %w", err))
 	}
 
 	return col, nil
 }
 
-func (b *Backend) GetNetworkParameters(_ context.Context) accessmodel.NetworkParameters {
-	return accessmodel.NetworkParameters{
-		ChainID: b.chainID,
-	}
-}
-
-// resolveHeightError processes errors returned during height-based queries.
-// If the error is due to a block not being found, this function determines whether the queried
-// height falls outside the node's accessible range and provides context-sensitive error messages
-// based on spork and node root block heights.
+// resolveHeightError wraps storage.ErrNotFound errors returned during height-based queries with
+// additional context about why the data was not found.
+//
+// Specifically, this function determines whether the queried height falls outside the node's
+// accessible range and provides context-sensitive error messages based on spork and node root block
+// heights.
 //
 // Parameters:
 // - stateParams: Protocol parameters that contain spork root and node root block heights.
 // - height: The queried block height.
-// - genericErr: The initial error returned when the block is not found.
+// - err: The original error.
 //
-// Expected errors during normal operation:
-// - storage.ErrNotFound - Indicates that the queried block does not exist in the local database.
-func resolveHeightError(
-	stateParams protocol.Params,
-	height uint64,
-	genericErr error,
-) error {
-	if !errors.Is(genericErr, storage.ErrNotFound) {
-		return genericErr
+// Will return the original error, possibly wrapped with additional context.
+func resolveHeightError(stateParams protocol.Params, height uint64, err error) error {
+	if !errors.Is(err, storage.ErrNotFound) {
+		return err
 	}
 
 	sporkRootBlockHeight := stateParams.SporkRootBlockHeight()
@@ -408,15 +405,17 @@ func resolveHeightError(
 		return fmt.Errorf("block height %d is less than the spork root block height %d. Try to use a historic node: %w",
 			height,
 			sporkRootBlockHeight,
-			genericErr,
+			err,
 		)
-	} else if height < nodeRootBlockHeader {
+	}
+
+	if height < nodeRootBlockHeader {
 		return fmt.Errorf("block height %d is less than the node's root block height %d. Try to use a different Access node: %w",
 			height,
 			nodeRootBlockHeader,
-			genericErr,
+			err,
 		)
-	} else {
-		return genericErr
 	}
+
+	return err
 }

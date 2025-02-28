@@ -8,9 +8,44 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
+	"github.com/onflow/flow-go/access"
 	"github.com/onflow/flow-go/module/state_synchronization/indexer"
 	"github.com/onflow/flow-go/storage"
 )
+
+// ErrorToStatus converts an Access API error into a grpc status error. The input may either
+// be a status.Error already, or an access sentinel error.
+func ErrorToStatus(err error) error {
+	if err == nil {
+		return nil
+	}
+
+	// Already converted
+	if status.Code(err) != codes.Unknown {
+		return err
+	}
+
+	switch {
+	case access.IsInvalidRequest(err):
+		return status.Error(codes.InvalidArgument, err.Error())
+	case access.IsDataNotFound(err):
+		return status.Error(codes.NotFound, err.Error())
+	case access.IsPreconditionFailed(err):
+		return status.Error(codes.FailedPrecondition, err.Error())
+	case access.IsOutOfRangeError(err):
+		return status.Error(codes.OutOfRange, err.Error())
+	case access.IsInternalError(err):
+		return status.Error(codes.Internal, err.Error())
+	case errors.Is(err, context.Canceled):
+		return status.Error(codes.Canceled, err.Error())
+	case errors.Is(err, context.DeadlineExceeded):
+		return status.Error(codes.DeadlineExceeded, err.Error())
+	default:
+		// TODO: ideally we would throw an exception in this case. For now, report it as Unknown so we
+		// can more easily identify any missed code paths and fix them while transitioning to this pattern.
+		return status.Error(codes.Unknown, err.Error())
+	}
+}
 
 // ConvertError converts a generic error into a grpc status error. The input may either
 // be a status.Error already, or standard error type. Any error that matches on of the

@@ -425,6 +425,8 @@ func (b *backendTransactions) getTransactionResultsByBlockIDFromExecutionNode(
 		blockID,
 	)
 	if err != nil {
+		// Note: currently execNodeIdentitiesProvider do not return InsufficientExecutionReceipts
+		// this will change as we add local soft-finality, so leaving the check in place
 		if IsInsufficientExecutionReceipts(err) {
 			return nil, status.Error(codes.NotFound, err.Error())
 		}
@@ -582,6 +584,8 @@ func (b *backendTransactions) getTransactionResultByIndexFromExecutionNode(
 		blockID,
 	)
 	if err != nil {
+		// Note: currently execNodeIdentitiesProvider do not return InsufficientExecutionReceipts
+		// this will change as we add local soft-finality, so leaving the check in place
 		if IsInsufficientExecutionReceipts(err) {
 			return nil, status.Error(codes.NotFound, err.Error())
 		}
@@ -769,7 +773,8 @@ func (b *backendTransactions) getTransactionResultFromExecutionNode(
 		blockID,
 	)
 	if err != nil {
-		// if no execution receipt were found, return a NotFound GRPC error
+		// Note: currently execNodeIdentitiesProvider do not return InsufficientExecutionReceipts
+		// this will change as we add local soft-finality, so leaving the check in place
 		if IsInsufficientExecutionReceipts(err) {
 			return nil, status.Error(codes.NotFound, err.Error())
 		}
@@ -990,7 +995,6 @@ func (b *backendTransactions) tryGetTransactionResultByIndex(
 // If error messages are not stored locally, an RPC call will be made to the EN to fetch message.
 //
 // Expected errors during normal operation:
-//   - InsufficientExecutionReceipts - found insufficient receipts for the given block ID.
 //   - status.Error - remote GRPC call to EN has failed.
 func (b *backendTransactions) LookupErrorMessageByTransactionID(
 	ctx context.Context,
@@ -1010,6 +1014,8 @@ func (b *backendTransactions) LookupErrorMessageByTransactionID(
 		blockID,
 	)
 	if err != nil {
+		// Note: currently execNodeIdentitiesProvider do not return InsufficientExecutionReceipts
+		// this will change as we add local soft-finality, so leaving the check in place
 		if IsInsufficientExecutionReceipts(err) {
 			return "", status.Error(codes.NotFound, err.Error())
 		}
@@ -1045,7 +1051,6 @@ func (b *backendTransactions) LookupErrorMessageByTransactionID(
 // If error messages are not stored locally, an RPC call will be made to the EN to fetch message.
 //
 // Expected errors during normal operation:
-//   - InsufficientExecutionReceipts - found insufficient receipts for the given block ID.
 //   - status.Error - remote GRPC call to EN has failed.
 func (b *backendTransactions) LookupErrorMessageByIndex(
 	ctx context.Context,
@@ -1065,6 +1070,8 @@ func (b *backendTransactions) LookupErrorMessageByIndex(
 		blockID,
 	)
 	if err != nil {
+		// Note: currently execNodeIdentitiesProvider do not return InsufficientExecutionReceipts
+		// this will change as we add local soft-finality, so leaving the check in place
 		if IsInsufficientExecutionReceipts(err) {
 			return "", status.Error(codes.NotFound, err.Error())
 		}
@@ -1100,7 +1107,6 @@ func (b *backendTransactions) LookupErrorMessageByIndex(
 // If error messages are not stored locally, an RPC call will be made to the EN to fetch messages.
 //
 // Expected errors during normal operation:
-//   - InsufficientExecutionReceipts - found insufficient receipts for the given block ID.
 //   - status.Error - remote GRPC call to EN has failed.
 func (b *backendTransactions) LookupErrorMessagesByBlockID(
 	ctx context.Context,
@@ -1125,6 +1131,8 @@ func (b *backendTransactions) LookupErrorMessagesByBlockID(
 		blockID,
 	)
 	if err != nil {
+		// Note: currently execNodeIdentitiesProvider do not return InsufficientExecutionReceipts
+		// this will change as we add local soft-finality, so leaving the check in place
 		if IsInsufficientExecutionReceipts(err) {
 			return nil, status.Error(codes.NotFound, err.Error())
 		}
