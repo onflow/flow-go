@@ -7,7 +7,7 @@ import (
 // Results implements the execution results memory pool of the consensus node,
 // used to store execution results and to generate block seals.
 type Results struct {
-	*Backend
+	*Backend[flow.Identifier, *flow.ExecutionResult]
 }
 
 // NewResults creates a new memory pool for execution results.
@@ -15,7 +15,7 @@ func NewResults(limit uint) (*Results, error) {
 
 	// create the results memory pool with the lookup maps
 	r := &Results{
-		Backend: NewBackend(WithLimit(limit)),
+		Backend: NewBackend[flow.Identifier, *flow.ExecutionResult](WithLimit[flow.Identifier, *flow.ExecutionResult](limit)),
 	}
 
 	return r, nil
@@ -23,7 +23,7 @@ func NewResults(limit uint) (*Results, error) {
 
 // Add adds an execution result to the mempool.
 func (r *Results) Add(result *flow.ExecutionResult) bool {
-	added := r.Backend.Add(result)
+	added := r.Backend.Add(result.ID(), result)
 	return added
 }
 
@@ -35,11 +35,10 @@ func (r *Results) Remove(resultID flow.Identifier) bool {
 
 // ByID will retrieve an approval by ID.
 func (r *Results) ByID(resultID flow.Identifier) (*flow.ExecutionResult, bool) {
-	entity, exists := r.Backend.ByID(resultID)
+	result, exists := r.Backend.ByID(resultID)
 	if !exists {
 		return nil, false
 	}
-	result := entity.(*flow.ExecutionResult)
 	return result, true
 }
 
@@ -47,8 +46,8 @@ func (r *Results) ByID(resultID flow.Identifier) (*flow.ExecutionResult, bool) {
 func (r *Results) All() []*flow.ExecutionResult {
 	entities := r.Backend.All()
 	results := make([]*flow.ExecutionResult, 0, len(entities))
-	for _, entity := range entities {
-		results = append(results, entity.(*flow.ExecutionResult))
+	for _, result := range entities {
+		results = append(results, result)
 	}
 	return results
 }
