@@ -80,7 +80,8 @@ func RequireEntityNonMalleable(t *testing.T, entity flow.IDEntity, ops ...Mallea
 // it is better to use the first option. Mind that the first option overrides any type handling that is embedded in the checker.
 // This is very useful for cases where the field is context-sensitive, and we cannot generate a completely random value.
 type MalleabilityChecker struct {
-	customTypes map[reflect.Type]func() reflect.Value
+	customTypes  map[reflect.Type]func() reflect.Value
+	pinnedFields map[string]struct{}
 }
 
 // MalleabilityCheckerOpt is a functional option for the MalleabilityChecker which allows to modify behavior of the checker.
@@ -94,6 +95,15 @@ func WithCustomType[T any](generator func() T) MalleabilityCheckerOpt {
 		mc.customTypes[reflect.TypeOf((*T)(nil)).Elem()] = func() reflect.Value {
 			return reflect.ValueOf(generator())
 		}
+	}
+}
+
+func WithPinnedField(field string) MalleabilityCheckerOpt {
+	return func(mc *MalleabilityChecker) {
+		if mc.pinnedFields == nil {
+			mc.pinnedFields = make(map[string]struct{})
+		}
+		mc.pinnedFields[field] = struct{}{}
 	}
 }
 
@@ -127,13 +137,13 @@ func (mc *MalleabilityChecker) Check(entity flow.IDEntity) error {
 		return fmt.Errorf("entity is nil, nothing to check")
 	}
 	v = v.Elem()
-	return mc.isEntityMalleable(v, entity.ID)
+	return mc.isEntityMalleable(v, "", entity.ID)
 }
 
 // isEntityMalleable is a helper function to recursively check fields of the entity.
 // Every time we change a field we check if ID of the entity has changed. If the ID has not changed then entity is malleable.
 // This function returns error if the entity is malleable, otherwise it returns nil.
-func (mc *MalleabilityChecker) isEntityMalleable(v reflect.Value, idFunc func() flow.Identifier) error {
+func (mc *MalleabilityChecker) isEntityMalleable(v reflect.Value, structTrace string, idFunc func() flow.Identifier) error {
 	tType := v.Type()
 	// if we have a custom type function we should use it to generate a random value for the field.
 	customTypeGenerator, hasCustomTypeOverride := mc.customTypes[tType]
@@ -146,6 +156,12 @@ func (mc *MalleabilityChecker) isEntityMalleable(v reflect.Value, idFunc func() 
 		}
 		return fmt.Errorf("ID did not change after changing %s value", tType.String())
 	}
+
+	if v.Kind() == reflect.Ptr {
+		v = v.Elem()
+	}
+
+	tType = v.Type()
 
 	if v.Kind() == reflect.Struct {
 		// we encounter a field, if it's a slice/map or pointer we need to perform next logic:
@@ -160,13 +176,21 @@ func (mc *MalleabilityChecker) isEntityMalleable(v reflect.Value, idFunc func() 
 				return fmt.Errorf("field %s is not settable", tType.Field(i).Name)
 			}
 
+			fmt.Printf("Field: %s, Kind: %s\n", extendTrace(structTrace, tType.Field(i).Name), field.Kind())
+
 			if field.Kind() == reflect.Ptr || field.Kind() == reflect.Slice || field.Kind() == reflect.Map {
 				if !field.IsNil() {
 					origID := idFunc()
+					// 1. set field value to nil
 					field.Set(reflect.Zero(field.Type()))
 					newID := idFunc()
+					// 2. check if ID has changed
 					if origID == newID {
 						return fmt.Errorf("field %s is malleable for value %s", tType.Field(i).Name, tType.String())
+					}
+
+					if field.Kind() == reflect.Ptr {
+						field.Set(reflect.New(field.Type().Elem()))
 					}
 				}
 			}
@@ -179,7 +203,7 @@ func (mc *MalleabilityChecker) isEntityMalleable(v reflect.Value, idFunc func() 
 				if origID == newID {
 					return fmt.Errorf("ID did not change after changing %s value", tType.String())
 				}
-			} else if err := mc.isEntityMalleable(field, idFunc); err != nil {
+			} else if err := mc.isEntityMalleable(field, extendTrace(structTrace, tType.Field(i).Name), idFunc); err != nil {
 				return fmt.Errorf("field %s is malleable: %w", tType.Field(i).Name, err)
 			}
 		}
@@ -230,6 +254,13 @@ func (mc *MalleabilityChecker) isEntityMalleable(v reflect.Value, idFunc func() 
 		}
 		return fmt.Errorf("ID did not change after changing %s value", tType.String())
 	}
+}
+
+func extendTrace(trace string, field string) string {
+	if trace == "" {
+		return field
+	}
+	return trace + "." + field
 }
 
 // ensureFieldNotEmpty is a helper function to ensure that the field is not empty.
@@ -320,8 +351,8 @@ func generateCustomFlowValue(field reflect.Value) any {
 		return IdentityFixture().IdentitySkeleton
 	case reflect.TypeOf(flow.ClusterQCVoteData{}):
 		return flow.ClusterQCVoteDataFromQC(QuorumCertificateWithSignerIDsFixture())
-	case reflect.TypeOf(flow.QuorumCertificate{}):
-		return *QuorumCertificateFixture()
+	//case reflect.TypeOf(flow.QuorumCertificate{}):
+	//	return *QuorumCertificateFixture()
 	case reflect.TypeOf(flow.TimeoutCertificate{}):
 		return flow.TimeoutCertificate{
 			View:          rand.Uint64(),
