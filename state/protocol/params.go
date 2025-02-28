@@ -50,8 +50,4 @@ type GlobalParams interface {
 	// If node uses a sealing segment for bootstrapping then this value will be carried over
 	// as part of snapshot.
 	SporkRootBlockHeight() uint64
-
-	// ProtocolVersion returns the protocol version, the major software version
-	// of the protocol software.
-	ProtocolVersion() uint
 }

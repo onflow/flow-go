@@ -79,7 +79,7 @@ func (s *TransactionStatusesProviderSuite) TestSendTransactionStatusesDataProvid
 		{
 			name: "SubscribeTransactionStatusesFromStartBlockID happy path",
 			arguments: models.Arguments{
-				"start_block_id": s.rootBlock.ID().String(),
+				"reference_block_id": s.rootBlock.ID().String(),
 			},
 			setupBackend: func(sub *ssmock.Subscription) {
 				s.api.On(
@@ -162,6 +162,7 @@ func (s *SendTransactionStatusesProviderSuite) TestSendTransactionStatusesDataPr
 // 9. Providing invalid 'authorizers' value.
 // 10. Providing invalid 'payload_signatures' value.
 // 11. Providing invalid 'envelope_signatures' value.
+// 12. Providing unexpected argument.
 func invalidSendTransactionStatusesArgumentsTestCases() []testErrType {
 	return []testErrType{
 		{
@@ -240,6 +241,13 @@ func invalidSendTransactionStatusesArgumentsTestCases() []testErrType {
 				"envelope_signatures": "invalid TransactionSignature array",
 			},
 			expectedErrorMsg: "'envelope_signatures' must be an array of objects (TransactionSignature)",
+		},
+		{
+			name: "unexpected argument",
+			arguments: map[string]interface{}{
+				"unexpected_argument": "dummy",
+			},
+			expectedErrorMsg: "unexpected field: 'unexpected_argument'",
 		},
 	}
 }

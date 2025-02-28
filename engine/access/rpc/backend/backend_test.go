@@ -108,7 +108,6 @@ func (suite *Suite) SetupTest() {
 	params := new(protocol.Params)
 	params.On("FinalizedRoot").Return(header, nil)
 	params.On("SporkID").Return(unittest.IdentifierFixture(), nil)
-	params.On("ProtocolVersion").Return(uint(unittest.Uint64InRange(10, 30)), nil)
 	params.On("SporkRootBlockHeight").Return(header.Height, nil)
 	params.On("SealedRoot").Return(header, nil)
 	suite.state.On("Params").Return(params)
@@ -1578,23 +1577,27 @@ func (suite *Suite) TestGetNodeVersionInfo() {
 	sporkRootBlock := unittest.BlockHeaderFixture()
 	nodeRootBlock := unittest.BlockHeaderFixture(unittest.WithHeaderHeight(sporkRootBlock.Height + 100))
 	sporkID := unittest.IdentifierFixture()
-	protocolVersion := uint(1234)
+	protocolStateVersion := uint64(1234)
+
+	stateParams := protocol.NewParams(suite.T())
+	stateParams.On("SporkID").Return(sporkID, nil)
+	stateParams.On("SporkRootBlockHeight").Return(sporkRootBlock.Height, nil)
+	stateParams.On("SealedRoot").Return(nodeRootBlock, nil)
+
+	state := protocol.NewState(suite.T())
+	snap := protocol.NewSnapshot(suite.T())
+	kvstore := protocol.NewKVStoreReader(suite.T())
+	state.On("Params").Return(stateParams, nil).Maybe()
+	state.On("Final").Return(snap).Maybe()
+	snap.On("ProtocolState").Return(kvstore, nil).Maybe()
+	kvstore.On("GetProtocolStateVersion").Return(protocolStateVersion).Maybe()
 
 	suite.Run("happy path", func() {
-		stateParams := protocol.NewParams(suite.T())
-		stateParams.On("SporkID").Return(sporkID, nil)
-		stateParams.On("ProtocolVersion").Return(protocolVersion, nil)
-		stateParams.On("SporkRootBlockHeight").Return(sporkRootBlock.Height, nil)
-		stateParams.On("SealedRoot").Return(nodeRootBlock, nil)
-
-		state := protocol.NewState(suite.T())
-		state.On("Params").Return(stateParams, nil).Maybe()
-
 		expected := &access.NodeVersionInfo{
 			Semver:               build.Version(),
 			Commit:               build.Commit(),
 			SporkId:              sporkID,
-			ProtocolVersion:      uint64(protocolVersion),
+			ProtocolStateVersion: protocolStateVersion,
 			SporkRootBlockHeight: sporkRootBlock.Height,
 			NodeRootBlockHeight:  nodeRootBlock.Height,
 			CompatibleRange:      nil,
@@ -1676,20 +1679,11 @@ func (suite *Suite) TestGetNodeVersionInfo() {
 		suite.versionControl.Start(irrecoverable.NewMockSignalerContext(suite.T(), ctx))
 		unittest.RequireComponentsReadyBefore(suite.T(), 2*time.Second, suite.versionControl)
 
-		stateParams := protocol.NewParams(suite.T())
-		stateParams.On("SporkID").Return(sporkID, nil)
-		stateParams.On("ProtocolVersion").Return(protocolVersion, nil)
-		stateParams.On("SporkRootBlockHeight").Return(sporkRootBlock.Height, nil)
-		stateParams.On("SealedRoot").Return(nodeRootBlock, nil)
-
-		state := protocol.NewState(suite.T())
-		state.On("Params").Return(stateParams, nil).Maybe()
-
 		expected := &access.NodeVersionInfo{
 			Semver:               build.Version(),
 			Commit:               build.Commit(),
 			SporkId:              sporkID,
-			ProtocolVersion:      uint64(protocolVersion),
+			ProtocolStateVersion: protocolStateVersion,
 			SporkRootBlockHeight: sporkRootBlock.Height,
 			NodeRootBlockHeight:  nodeRootBlock.Height,
 			CompatibleRange: &access.CompatibleRange{
