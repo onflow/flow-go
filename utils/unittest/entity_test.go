@@ -47,12 +47,12 @@ func (e *StructWithNilFields) ID() flow.Identifier {
 	})
 }
 
-// StructWithUnsupportedFlowField will always fail malleability checking because it contains a private (non-settable) field
-type StructWithUnsupportedFlowField struct {
+// StructWithNotSettableFlowField will always fail malleability checking because it contains a private (non-settable) field
+type StructWithNotSettableFlowField struct {
 	field flow.IdentitySkeleton
 }
 
-func (e *StructWithUnsupportedFlowField) ID() flow.Identifier {
+func (e *StructWithNotSettableFlowField) ID() flow.Identifier {
 	return flow.MakeID(e)
 }
 
@@ -111,7 +111,7 @@ func (e *StructWithOptionalField) ID() flow.Identifier {
 // TestRequireEntityNonMalleable tests the behavior of MalleabilityChecker with different types of entities ensuring
 // it correctly handles the supported types and returns an error when the entity is malleable, or it cannot perform the check.
 func TestRequireEntityNonMalleable(t *testing.T) {
-	RequireEntityNonMalleable(t, BlockHeaderFixture(), WithGenerator("Timestamp", func() time.Time {
+	RequireEntityNonMalleable(t, BlockHeaderFixture(), WithFieldGenerator("Timestamp", func() time.Time {
 		return time.Now()
 	}))
 
@@ -175,7 +175,7 @@ func TestRequireEntityNonMalleable(t *testing.T) {
 		require.ErrorContains(t, err, "entity is nil")
 	})
 	t.Run("unsupported-field", func(t *testing.T) {
-		err := NewMalleabilityChecker().Check(&StructWithUnsupportedFlowField{
+		err := NewMalleabilityChecker().Check(&StructWithNotSettableFlowField{
 			field: IdentityFixture().IdentitySkeleton,
 		})
 		require.Error(t, err)
@@ -280,5 +280,41 @@ func TestMalleabilityChecker_PinField(t *testing.T) {
 			},
 		})
 		require.NoError(t, err)
+	})
+}
+
+type StructWithUnsupportedType struct {
+	Version   uint32
+	Evidences []*EnterViewEvidence
+}
+
+func (e *StructWithUnsupportedType) ID() flow.Identifier {
+	return flow.MakeID(e)
+}
+
+func TestMalleabilityChecker_Generators(t *testing.T) {
+	t.Run("field-generator", func(t *testing.T) {
+		RequireEntityNonMalleable(t, &StructWithUnsupportedType{
+			Version:   0,
+			Evidences: nil,
+		}, WithFieldGenerator("Evidences", func() []*EnterViewEvidence {
+			return []*EnterViewEvidence{
+				{
+					QC: QuorumCertificateFixture(),
+					TC: nil,
+				},
+			}
+		}))
+	})
+	t.Run("type-generator", func(t *testing.T) {
+		RequireEntityNonMalleable(t, &StructWithUnsupportedType{
+			Version:   0,
+			Evidences: nil,
+		}, WithTypeGenerator(func() EnterViewEvidence {
+			return EnterViewEvidence{
+				QC: QuorumCertificateFixture(),
+				TC: nil,
+			}
+		}))
 	})
 }

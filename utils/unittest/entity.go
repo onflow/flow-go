@@ -73,14 +73,14 @@ func RequireEntityNonMalleable(t *testing.T, entity flow.IDEntity, ops ...Mallea
 //
 // Checker knows how to deal with each of the categories and generate random values for them.
 // There are two ways to handle types not natively recognized byt he MalleabilityChecker:
-//  1. User can provide a custom type generator for the type using WithCustomType option.
+//  1. User can provide a custom type generator for the type using WithTypeGenerator option.
 //  2. User can extend the checker with new type handling.
 //
 // It is recommended to use the second option if type is used in multiple places and general enough. For other cases
 // it is better to use the first option. Mind that the first option overrides any type handling that is embedded in the checker.
 // This is very useful for cases where the field is context-sensitive, and we cannot generate a completely random value.
 type MalleabilityChecker struct {
-	customTypes    map[reflect.Type]func() reflect.Value
+	typeGenerator  map[reflect.Type]func() reflect.Value
 	fieldGenerator map[string]func() reflect.Value
 	pinnedFields   map[string]struct{}
 }
@@ -88,12 +88,12 @@ type MalleabilityChecker struct {
 // MalleabilityCheckerOpt is a functional option for the MalleabilityChecker which allows to modify behavior of the checker.
 type MalleabilityCheckerOpt func(*MalleabilityChecker)
 
-// WithCustomType allows to override the default behavior of the checker for the given type, meaning if a field of the given type
+// WithTypeGenerator allows to override the default behavior of the checker for the given type, meaning if a field of the given type
 // is encountered, the MalleabilityChecker will use the provided generator instead of a random value.
 // ATTENTION: In order for the MalleabilityChecker to work properly, two calls of the generator should produce two different values.
-func WithCustomType[T any](generator func() T) MalleabilityCheckerOpt {
+func WithTypeGenerator[T any](generator func() T) MalleabilityCheckerOpt {
 	return func(mc *MalleabilityChecker) {
-		mc.customTypes[reflect.TypeOf((*T)(nil)).Elem()] = func() reflect.Value {
+		mc.typeGenerator[reflect.TypeOf((*T)(nil)).Elem()] = func() reflect.Value {
 			return reflect.ValueOf(generator())
 		}
 	}
@@ -105,7 +105,7 @@ func WithPinnedField(field string) MalleabilityCheckerOpt {
 	}
 }
 
-func WithGenerator[T any](field string, generator func() T) MalleabilityCheckerOpt {
+func WithFieldGenerator[T any](field string, generator func() T) MalleabilityCheckerOpt {
 	return func(mc *MalleabilityChecker) {
 		mc.fieldGenerator[field] = func() reflect.Value {
 			return reflect.ValueOf(generator())
@@ -117,12 +117,14 @@ func WithGenerator[T any](field string, generator func() T) MalleabilityCheckerO
 func NewMalleabilityChecker(ops ...MalleabilityCheckerOpt) *MalleabilityChecker {
 	checker := &MalleabilityChecker{
 		pinnedFields:   make(map[string]struct{}),
-		customTypes:    make(map[reflect.Type]func() reflect.Value),
+		typeGenerator:  make(map[reflect.Type]func() reflect.Value),
 		fieldGenerator: make(map[string]func() reflect.Value),
 	}
+
 	for _, op := range ops {
 		op(checker)
 	}
+
 	return checker
 }
 
@@ -145,7 +147,17 @@ func (mc *MalleabilityChecker) Check(entity flow.IDEntity) error {
 		return fmt.Errorf("entity is nil, nothing to check")
 	}
 	v = v.Elem()
-	return mc.isEntityMalleable(v, nil, "", entity.ID)
+	if err := mc.isEntityMalleable(v, nil, "", entity.ID); err != nil {
+		return err
+	}
+	return mc.checkExpectations()
+}
+
+func (mc *MalleabilityChecker) checkExpectations() error {
+	for field, _ := range mc.pinnedFields {
+		return fmt.Errorf("field %s is pinned, but wasn't used, checker misconfigured", field)
+	}
+	return nil
 }
 
 // isEntityMalleable is a helper function to recursively check fields of the entity.
@@ -156,6 +168,7 @@ func (mc *MalleabilityChecker) isEntityMalleable(v reflect.Value, structField *r
 	if structField != nil {
 		fullFieldPath = buildFieldPath(parentFieldPath, structField.Name)
 		if _, ok := mc.pinnedFields[fullFieldPath]; ok {
+			delete(mc.pinnedFields, fullFieldPath)
 			return nil
 		}
 	}
@@ -218,7 +231,7 @@ func buildFieldPath(fieldPath string, fieldName string) string {
 // In rare cases, a type may have a different ID computation depending on whether a field is nil.
 // In such cases, we can use the `malleability:"optional"` struct tag to skip malleability checks when the field is nil.
 func (mc *MalleabilityChecker) generateRandomReflectValue(field reflect.Value) error {
-	if generator, ok := mc.customTypes[field.Type()]; ok {
+	if generator, ok := mc.typeGenerator[field.Type()]; ok {
 		field.Set(generator())
 		return nil
 	}

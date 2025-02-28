@@ -23,7 +23,7 @@ func TestMalleability(t *testing.T) {
 	})
 
 	t.Run("EpochCommit with proper DKGIndexMap", func(t *testing.T) {
-		checker := unittest.NewMalleabilityChecker(unittest.WithGenerator("DKGIndexMap", func() flow.DKGIndexMap {
+		checker := unittest.NewMalleabilityChecker(unittest.WithFieldGenerator("DKGIndexMap", func() flow.DKGIndexMap {
 			return flow.DKGIndexMap{unittest.IdentifierFixture(): 0, unittest.IdentifierFixture(): 1}
 		}))
 		err := checker.Check(unittest.EpochCommitFixture(func(commit *flow.EpochCommit) {
@@ -32,7 +32,7 @@ func TestMalleability(t *testing.T) {
 		require.NoError(t, err)
 	})
 	t.Run("EpochRecover", func(t *testing.T) {
-		checker := unittest.NewMalleabilityChecker(unittest.WithGenerator("EpochCommit.DKGIndexMap", func() flow.DKGIndexMap {
+		checker := unittest.NewMalleabilityChecker(unittest.WithFieldGenerator("EpochCommit.DKGIndexMap", func() flow.DKGIndexMap {
 			return flow.DKGIndexMap{unittest.IdentifierFixture(): 0, unittest.IdentifierFixture(): 1}
 		}))
 		err := checker.Check(unittest.EpochRecoverFixture())
