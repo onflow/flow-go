@@ -155,7 +155,6 @@ type BaseConfig struct {
 	DynamicStartupSleepInterval time.Duration
 	datadir                     string
 	pebbleDir                   string
-	protocolDBType              string
 	dbops                       string
 	badgerDB                    *badger.DB
 	pebbleDB                    *pebble.DB
@@ -269,26 +268,17 @@ func DefaultBaseConfig() *BaseConfig {
 	codecFactory := func() network.Codec { return cbor.NewCodec() }
 
 	return &BaseConfig{
-		nodeIDHex:       NotSet,
-		AdminAddr:       NotSet,
-		AdminCert:       NotSet,
-		AdminKey:        NotSet,
-		AdminClientCAs:  NotSet,
-		AdminMaxMsgSize: grpcutils.DefaultMaxMsgSize,
-		BindAddr:        NotSet,
-		ObserverMode:    false,
-		BootstrapDir:    "bootstrap",
-		datadir:         datadir,
-		pebbleDir:       pebbleDir,
-		// the protocolDBType and dbops are the feature flags to transit from badger to pebble
-		// there are three phases:
-		// 1. badger transactions (original implementation)
-		//		in this phase, dbops is "badger-transaction", and protocolDBType is "badger"
-		// 2. badger batch updates (intermediate phase)
-		// 		in this phase, dbops is "batch-update", and protocolDBType is "badger"
-		// 3. pebble batch updates (final phase)
-		//    in this phase, dbops is "batch-update", and protocolDBType is "pebble"
-		protocolDBType:   "badger",                        // "badger" (default) or "pebble"
+		nodeIDHex:        NotSet,
+		AdminAddr:        NotSet,
+		AdminCert:        NotSet,
+		AdminKey:         NotSet,
+		AdminClientCAs:   NotSet,
+		AdminMaxMsgSize:  grpcutils.DefaultMaxMsgSize,
+		BindAddr:         NotSet,
+		ObserverMode:     false,
+		BootstrapDir:     "bootstrap",
+		datadir:          datadir,
+		pebbleDir:        pebbleDir,
 		dbops:            string(dbops.BadgerTransaction), // "badger-transaction" (default) or "batch-update"
 		badgerDB:         nil,
 		pebbleDB:         nil,

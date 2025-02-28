@@ -83,6 +83,7 @@ import (
 	"github.com/onflow/flow-go/storage"
 	bstorage "github.com/onflow/flow-go/storage/badger"
 	"github.com/onflow/flow-go/storage/badger/operation"
+	"github.com/onflow/flow-go/storage/dbops"
 	"github.com/onflow/flow-go/storage/operation/badgerimpl"
 	"github.com/onflow/flow-go/storage/operation/pebbleimpl"
 	sutil "github.com/onflow/flow-go/storage/util"
@@ -170,9 +171,8 @@ func (fnb *FlowNodeBuilder) BaseFlags() {
 	fnb.flags.StringVarP(&fnb.BaseConfig.BootstrapDir, "bootstrapdir", "b", defaultConfig.BootstrapDir, "path to the bootstrap directory")
 	fnb.flags.StringVarP(&fnb.BaseConfig.datadir, "datadir", "d", defaultConfig.datadir, "directory to store the public database (protocol state)")
 	fnb.flags.StringVar(&fnb.BaseConfig.pebbleDir, "pebbledir", defaultConfig.pebbleDir, "directory to store the public pebble database (protocol state)")
-	fnb.flags.StringVar(&fnb.BaseConfig.protocolDBType, "protocoldb-type", defaultConfig.protocolDBType, "the database to store protocol state (badger/pebble)")
 	fnb.flags.StringVar(&fnb.BaseConfig.secretsdir, "secretsdir", defaultConfig.secretsdir, "directory to store private database (secrets)")
-	fnb.flags.StringVar(&fnb.BaseConfig.dbops, "db-ops", defaultConfig.dbops, "database operations to use (badger-transaction, batch-update)")
+	fnb.flags.StringVar(&fnb.BaseConfig.dbops, "dbops", defaultConfig.dbops, "database operations to use (badger-transaction, batch-update, pebble-update)")
 	fnb.flags.StringVarP(&fnb.BaseConfig.level, "loglevel", "l", defaultConfig.level, "level for logging output")
 	fnb.flags.Uint32Var(&fnb.BaseConfig.debugLogLimit, "debug-log-limit", defaultConfig.debugLogLimit, "max number of debug/trace log events per second")
 	fnb.flags.UintVarP(&fnb.BaseConfig.metricsPort, "metricport", "m", defaultConfig.metricsPort, "port for /metrics endpoint")
@@ -1156,15 +1156,15 @@ func (fnb *FlowNodeBuilder) initPebbleDB() error {
 
 // create protocol db according to the badger or pebble db
 func (fnb *FlowNodeBuilder) initProtocolDB(bdb *badger.DB, pdb *pebble.DB) error {
-	if fnb.BaseConfig.protocolDBType == "badger" {
+	if dbops.IsBadgerBased(fnb.dbops) {
 		fnb.ProtocolDB = badgerimpl.ToDB(bdb)
 		fnb.Logger.Info().Msg("initProtocolDB: using badger protocol db")
-	} else if fnb.BaseConfig.protocolDBType == "pebble" {
+	} else if dbops.IsPebbleBatch(fnb.dbops) {
 		fnb.ProtocolDB = pebbleimpl.ToDB(pdb)
 		fnb.Logger.Info().Msgf("initProtocolDB: using pebble protocol db")
 	} else {
 		return fmt.Errorf("invalid --protocoldb-type flag, expect badger/pebble, but got: %v",
-			fnb.BaseConfig.protocolDBType)
+			fnb.dbops)
 	}
 	return nil
 }

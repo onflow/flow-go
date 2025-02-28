@@ -18,3 +18,23 @@ const (
 	// PebbleBatch uses pebble batch updates
 	PebbleBatch DBOps = "pebble-batch"
 )
+
+func IsBadgerBased(ops string) bool {
+	return ops == string(BadgerTransaction) || ops == string(BadgerBatch)
+}
+
+func IsBadgerTransaction(ops string) bool {
+	return ops == string(BadgerTransaction)
+}
+
+func IsBadgerBatch(ops string) bool {
+	return ops == string(BadgerBatch)
+}
+
+func IsPebbleBatch(ops string) bool {
+	return ops == string(PebbleBatch)
+}
+
+func IsBatchUpdate(ops string) bool {
+	return ops == string(BadgerBatch) || ops == string(PebbleBatch)
+}
