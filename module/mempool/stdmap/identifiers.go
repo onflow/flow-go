@@ -2,18 +2,17 @@ package stdmap
 
 import (
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/module/mempool/model"
 )
 
 // Identifiers represents a concurrency-safe memory pool for IDs.
 type Identifiers struct {
-	*Backend
+	*Backend[flow.Identifier, struct{}]
 }
 
 // NewIdentifiers creates a new memory pool for identifiers.
 func NewIdentifiers(limit uint) (*Identifiers, error) {
 	i := &Identifiers{
-		Backend: NewBackend(WithLimit(limit)),
+		Backend: NewBackend[flow.Identifier, struct{}](WithLimit[flow.Identifier, struct{}](limit)),
 	}
 	return i, nil
 }
@@ -21,11 +20,7 @@ func NewIdentifiers(limit uint) (*Identifiers, error) {
 // Add will add the given identifier to the memory pool or it will error if
 // the identifier is already in the memory pool.
 func (i *Identifiers) Add(id flow.Identifier) bool {
-	// wraps ID around an ID entity to be stored in the mempool
-	idEntity := &model.IdEntity{
-		Id: id,
-	}
-	return i.Backend.Add(idEntity)
+	return i.Backend.Add(id, struct{}{})
 }
 
 // Has checks whether the mempool has the identifier
@@ -43,9 +38,8 @@ func (i *Identifiers) Remove(id flow.Identifier) bool {
 func (i *Identifiers) All() flow.IdentifierList {
 	entities := i.Backend.All()
 	idEntities := make([]flow.Identifier, 0, len(entities))
-	for _, entity := range entities {
-		idEntity := entity.(*model.IdEntity)
-		idEntities = append(idEntities, idEntity.Id)
+	for key, _ := range entities {
+		idEntities = append(idEntities, key)
 	}
 	return idEntities
 }

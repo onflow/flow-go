@@ -5,39 +5,34 @@ import (
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/mempool"
-	"github.com/onflow/flow-go/module/mempool/model"
 )
 
-// IdentifierMap represents a concurrency-safe memory pool for IdMapEntity.
+// IdentifierMap represents a concurrency-safe memory pool for a list of other identifiers.
 type IdentifierMap struct {
-	*Backend
+	*Backend[flow.Identifier, map[flow.Identifier]struct{}]
 }
 
-// NewIdentifierMap creates a new memory pool for IdMapEntity.
+// NewIdentifierMap creates a new memory pool for a list of identifiers.
 func NewIdentifierMap(limit uint) (*IdentifierMap, error) {
 	i := &IdentifierMap{
-		Backend: NewBackend(WithLimit(limit)),
+		Backend: NewBackend[flow.Identifier, map[flow.Identifier]struct{}](
+			WithLimit[flow.Identifier, map[flow.Identifier]struct{}](limit),
+		),
 	}
 	return i, nil
 }
 
 // Append will append the id to the list of identifiers associated with key.
 func (i *IdentifierMap) Append(key, id flow.Identifier) error {
-	return i.Backend.Run(func(backdata mempool.BackData) error {
+	return i.Backend.Run(func(backdata mempool.BackData[flow.Identifier, map[flow.Identifier]struct{}]) error {
 		var ids map[flow.Identifier]struct{}
-		entity, ok := backdata.ByID(key)
+		idsMap, ok := backdata.ByID(key)
 		if !ok {
 			// no record with key is available in the mempool,
 			// initializes ids.
-			ids = make(map[flow.Identifier]struct{})
+			idsMap = make(map[flow.Identifier]struct{})
 		} else {
-			idMapEntity, ok := entity.(model.IdMapEntity)
-			if !ok {
-				return fmt.Errorf("could not assert entity to IdMapEntity")
-			}
-
-			ids = idMapEntity.IDs
-			if _, ok := ids[id]; ok {
+			if _, ok := idsMap[id]; ok {
 				// id is already associated with the key
 				// no need to append
 				return nil
@@ -52,13 +47,7 @@ func (i *IdentifierMap) Append(key, id flow.Identifier) error {
 		// appends id to the ids list
 		ids[id] = struct{}{}
 
-		// adds the new ids list associated with key to mempool
-		idMapEntity := model.IdMapEntity{
-			Key: key,
-			IDs: ids,
-		}
-
-		if added := backdata.Add(key, idMapEntity); !added {
+		if added := backdata.Add(key, ids); !added {
 			return fmt.Errorf("potential race condition on adding to identifier map")
 		}
 
@@ -70,18 +59,13 @@ func (i *IdentifierMap) Append(key, id flow.Identifier) error {
 // Otherwise it returns nil and false.
 func (i *IdentifierMap) Get(key flow.Identifier) ([]flow.Identifier, bool) {
 	ids := make([]flow.Identifier, 0)
-	err := i.Run(func(backdata mempool.BackData) error {
-		entity, ok := backdata.ByID(key)
+	err := i.Run(func(backdata mempool.BackData[flow.Identifier, map[flow.Identifier]struct{}]) error {
+		idsMap, ok := backdata.ByID(key)
 		if !ok {
 			return fmt.Errorf("could not retrieve key from backend")
 		}
 
-		mapEntity, ok := entity.(model.IdMapEntity)
-		if !ok {
-			return fmt.Errorf("could not assert entity as IdMapEntity")
-		}
-
-		for id := range mapEntity.IDs {
+		for id, _ := range idsMap {
 			ids = append(ids, id)
 		}
 
@@ -108,20 +92,15 @@ func (i *IdentifierMap) Remove(key flow.Identifier) bool {
 // RemoveIdFromKey removes the id from the list of identifiers associated with key.
 // If the list becomes empty, it also removes the key from the map.
 func (i *IdentifierMap) RemoveIdFromKey(key, id flow.Identifier) error {
-	err := i.Backend.Run(func(backdata mempool.BackData) error {
+	err := i.Backend.Run(func(backdata mempool.BackData[flow.Identifier, map[flow.Identifier]struct{}]) error {
 		// var ids map[flow.Identifier]struct{}
-		entity, ok := backdata.ByID(key)
+		idsMap, ok := backdata.ByID(key)
 		if !ok {
 			// entity key has already been removed
 			return nil
 		}
 
-		idMapEntity, ok := entity.(model.IdMapEntity)
-		if !ok {
-			return fmt.Errorf("could not assert entity to IdMapEntity")
-		}
-
-		if _, ok := idMapEntity.IDs[id]; !ok {
+		if _, ok := idsMap[id]; !ok {
 			// id has already been removed from the key map
 			return nil
 		}
@@ -132,21 +111,15 @@ func (i *IdentifierMap) RemoveIdFromKey(key, id flow.Identifier) error {
 		}
 
 		// removes id from the secondary map of the key
-		delete(idMapEntity.IDs, id)
+		delete(idsMap, id)
 
-		if len(idMapEntity.IDs) == 0 {
+		if len(idsMap) == 0 {
 			// all ids related to key are removed, so there is no need
 			// to add key back to the idMapEntity
 			return nil
 		}
 
-		// adds the new ids list associated with key to mempool
-		idMapEntity = model.IdMapEntity{
-			Key: key,
-			IDs: idMapEntity.IDs,
-		}
-
-		if added := backdata.Add(key, idMapEntity); !added {
+		if added := backdata.Add(key, idsMap); !added {
 			return fmt.Errorf("potential race condition on adding to identifier map")
 		}
 
@@ -156,7 +129,7 @@ func (i *IdentifierMap) RemoveIdFromKey(key, id flow.Identifier) error {
 	return err
 }
 
-// Size returns number of IdMapEntities in mempool
+// Size returns number of a lists of identifiers in mempool
 func (i *IdentifierMap) Size() uint {
 	return i.Backend.Size()
 }
@@ -165,12 +138,8 @@ func (i *IdentifierMap) Size() uint {
 func (i *IdentifierMap) Keys() ([]flow.Identifier, bool) {
 	entities := i.Backend.All()
 	keys := make([]flow.Identifier, 0)
-	for _, entity := range entities {
-		idMapEntity, ok := entity.(model.IdMapEntity)
-		if !ok {
-			return nil, false
-		}
-		keys = append(keys, idMapEntity.Key)
+	for key, _ := range entities {
+		keys = append(keys, key)
 	}
 	return keys, true
 }
