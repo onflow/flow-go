@@ -48,9 +48,5 @@ func (t *Transactions) storeTx(rw storage.ReaderBatchWriter, flowTx *flow.Transa
 }
 
 func (t *Transactions) ByID(txID flow.Identifier) (*flow.TransactionBody, error) {
-	val, err := t.cache.Get(t.db.Reader(), txID)
-	if err != nil {
-		return nil, err
-	}
-	return val, err
+	return t.cache.Get(t.db.Reader(), txID)
 }

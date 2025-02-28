@@ -26,11 +26,11 @@ func TestCollections(t *testing.T) {
 
 		// store the light collection and the transaction index
 		err := collections.StoreLightAndIndexByTransaction(&expected)
-		require.Nil(t, err)
+		require.NoError(t, err)
 
 		// retrieve the light collection by collection id
 		actual, err := collections.LightByID(expected.ID())
-		require.Nil(t, err)
+		require.NoError(t, err)
 
 		// check if the light collection was indeed persisted
 		assert.Equal(t, &expected, actual)
@@ -42,7 +42,7 @@ func TestCollections(t *testing.T) {
 			collLight, err := collections.LightByTransactionID(txID)
 			actualID := collLight.ID()
 			// check that the collection id can indeed be retrieved by transaction id
-			require.Nil(t, err)
+			require.NoError(t, err)
 			assert.Equal(t, expectedID, actualID)
 		}
 

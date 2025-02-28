@@ -1,6 +1,7 @@
 package operation_test
 
 import (
+	"errors"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -21,6 +22,7 @@ func TestCollections(t *testing.T) {
 			var actual flow.LightCollection
 			err := operation.RetrieveCollection(db.Reader(), expected.ID(), &actual)
 			assert.Error(t, err)
+			assert.True(t, errors.Is(err, storage.ErrNotFound))
 		})
 
 		t.Run("Save", func(t *testing.T) {
@@ -45,6 +47,13 @@ func TestCollections(t *testing.T) {
 			var actual flow.LightCollection
 			err = operation.RetrieveCollection(db.Reader(), expected.ID(), &actual)
 			assert.Error(t, err)
+			assert.True(t, errors.Is(err, storage.ErrNotFound))
+
+			// Remove again should not error
+			err = db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+				return operation.RemoveCollection(rw.Writer(), expected.ID())
+			})
+			require.NoError(t, err)
 		})
 
 		t.Run("Index and lookup", func(t *testing.T) {
@@ -53,15 +62,15 @@ func TestCollections(t *testing.T) {
 
 			_ = db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 				err := operation.InsertCollection(rw.Writer(), &expected)
-				assert.Nil(t, err)
+				assert.NoError(t, err)
 				err = operation.IndexCollectionPayload(rw.Writer(), blockID, expected.Transactions)
-				assert.Nil(t, err)
+				assert.NoError(t, err)
 				return nil
 			})
 
 			var actual flow.LightCollection
 			err := operation.LookupCollectionPayload(db.Reader(), blockID, &actual.Transactions)
-			assert.Nil(t, err)
+			assert.NoError(t, err)
 
 			assert.Equal(t, expected, actual)
 		})
@@ -73,12 +82,12 @@ func TestCollections(t *testing.T) {
 
 			_ = db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 				err := operation.UnsafeIndexCollectionByTransaction(rw.Writer(), transactionID, expected)
-				assert.Nil(t, err)
+				assert.NoError(t, err)
 				return nil
 			})
 
 			err := operation.RetrieveCollectionID(db.Reader(), transactionID, &actual)
-			assert.Nil(t, err)
+			assert.NoError(t, err)
 
 			assert.Equal(t, expected, actual)
 		})

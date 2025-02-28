@@ -25,6 +25,8 @@ func NewCollections(db storage.DB, transactions *Transactions) *Collections {
 	return c
 }
 
+// StoreLight stores a light collection in the database.
+// any error returned are exceptions
 func (c *Collections) StoreLight(collection *flow.LightCollection) error {
 	err := c.db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 		return operation.InsertCollection(rw.Writer(), collection)
@@ -37,6 +39,8 @@ func (c *Collections) StoreLight(collection *flow.LightCollection) error {
 	return nil
 }
 
+// Store stores a collection in the database.
+// any error returned are exceptions
 func (c *Collections) Store(collection *flow.Collection) error {
 	return c.db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 		light := collection.Light()
@@ -56,6 +60,7 @@ func (c *Collections) Store(collection *flow.Collection) error {
 	})
 }
 
+// ByID retrieves a collection by its ID.
 func (c *Collections) ByID(colID flow.Identifier) (*flow.Collection, error) {
 	var (
 		light      flow.LightCollection
@@ -70,7 +75,7 @@ func (c *Collections) ByID(colID flow.Identifier) (*flow.Collection, error) {
 	for _, txID := range light.Transactions {
 		tx, err := c.transactions.ByID(txID)
 		if err != nil {
-			return nil, fmt.Errorf("could not retrieve transaction: %w", err)
+			return nil, fmt.Errorf("could not retrieve transaction %v: %w", txID, err)
 		}
 
 		collection.Transactions = append(collection.Transactions, tx)
@@ -83,6 +88,7 @@ func (c *Collections) ByID(colID flow.Identifier) (*flow.Collection, error) {
 	return &collection, nil
 }
 
+// LightByID retrieves a light collection by its ID.
 func (c *Collections) LightByID(colID flow.Identifier) (*flow.LightCollection, error) {
 	var collection flow.LightCollection
 
@@ -98,6 +104,9 @@ func (c *Collections) LightByID(colID flow.Identifier) (*flow.LightCollection, e
 	return &collection, nil
 }
 
+// Remove removes a collection from the database.
+// if the collection does not exist, it returns nil
+// any error returned are exceptions
 func (c *Collections) Remove(colID flow.Identifier) error {
 	err := c.db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 		return operation.RemoveCollection(rw.Writer(), colID)
@@ -108,6 +117,9 @@ func (c *Collections) Remove(colID flow.Identifier) error {
 	return nil
 }
 
+// StoreLightAndIndexByTransaction stores a light collection and indexes it by transaction ID.
+// It's concurrent-safe.
+// any error returned are exceptions
 func (c *Collections) StoreLightAndIndexByTransaction(collection *flow.LightCollection) error {
 	// - This lock is to ensure there is no race condition when indexing collection by transaction ID
 	// - The access node uses this index to report the transaction status. It's done by first
@@ -156,6 +168,7 @@ func (c *Collections) StoreLightAndIndexByTransaction(collection *flow.LightColl
 	})
 }
 
+// LightByTransactionID retrieves a light collection by a transaction ID.
 func (c *Collections) LightByTransactionID(txID flow.Identifier) (*flow.LightCollection, error) {
 	collID := &flow.Identifier{}
 	err := operation.RetrieveCollectionID(c.db.Reader(), txID, collID)
