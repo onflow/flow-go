@@ -194,7 +194,7 @@ func (s *TransactionStatusesProviderSuite) TestMessageIndexTransactionStatusesPr
 
 	arguments :=
 		map[string]interface{}{
-			"start_block_id": s.rootBlock.ID().String(),
+			"tx_id": unittest.IdentifierFixture().String(),
 		}
 
 	// Create the TransactionStatusesDataProvider instance
@@ -294,11 +294,8 @@ func (s *TransactionStatusesProviderSuite) TestTransactionStatusesDataProvider_I
 // a set of input arguments, and the expected error message that should be returned.
 //
 // The test cases cover scenarios such as:
-// 1. Providing both 'start_block_id' and 'start_block_height' simultaneously.
-// 2. Providing invalid 'tx_id' value.
-// 3. Providing invalid 'start_block_id'  value.
-// 4. Invalid 'start_block_id' argument.
-// 5. Providing unexpected argument.
+// 1. Providing invalid 'tx_id' value.
+// 2. Providing unexpected argument.
 func invalidTransactionStatusesArgumentsTestCases() []testErrType {
 	return []testErrType{
 		{
@@ -311,7 +308,7 @@ func invalidTransactionStatusesArgumentsTestCases() []testErrType {
 		{
 			name: "unexpected argument",
 			arguments: map[string]interface{}{
-				"start_block_id":      unittest.IdentifierFixture().String(),
+				"tx_id":               unittest.IdentifierFixture().String(),
 				"unexpected_argument": "dummy",
 			},
 			expectedErrorMsg: "unexpected field: 'unexpected_argument'",
