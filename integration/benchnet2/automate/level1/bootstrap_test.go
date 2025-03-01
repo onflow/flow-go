@@ -41,7 +41,7 @@ func TestGenerateBootstrap_DataTable(t *testing.T) {
 			expectedDataBytes, err := os.ReadFile(testData.expectedOutput)
 			require.NoError(t, err)
 			err = json.Unmarshal(expectedDataBytes, &expectedNodeData)
-			require.Nil(t, err)
+			require.NoError(t, err)
 
 			// check generated template data file is correct
 			require.Equal(t, len(expectedNodeData), len(actualNodeData))

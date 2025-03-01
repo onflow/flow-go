@@ -163,7 +163,7 @@ func (suite *CollectorSuite) NextTransaction(opts ...func(*sdk.Transaction)) *sd
 	}
 
 	err := tx.SignEnvelope(acct.addr, acct.key.Index, acct.signer)
-	require.Nil(suite.T(), err)
+	require.NoError(suite.T(), err)
 
 	suite.acct.key.SequenceNumber++
 
@@ -184,7 +184,7 @@ func (suite *CollectorSuite) TxForCluster(target flow.IdentitySkeletonList) *sdk
 		suite.serviceAccountIdx++
 		tx.SetScript(append(tx.Script, '/', '/'))
 		err = tx.SignEnvelope(sdk.Address(serviceAccountAddr), acct.key.Index, acct.signer)
-		require.Nil(suite.T(), err)
+		require.NoError(suite.T(), err)
 		routed, ok := clusters.ByTxID(convert.IDFromSDK(tx.ID()))
 		require.True(suite.T(), ok)
 		if routed.ID() == target.ID() {

@@ -104,11 +104,11 @@ const actualExceptionMessagesPath = "./exceptions"
 func deleteMessagesDir(t *testing.T) {
 	// delete failure test dir that stores failure messages
 	err := os.RemoveAll(actualFailureMessagesPath)
-	require.Nil(t, err)
+	require.NoError(t, err)
 
 	// delete exceptions test dir that stores exception messages
 	err = os.RemoveAll(actualExceptionMessagesPath)
-	require.Nil(t, err)
+	require.NoError(t, err)
 }
 
 func checkLevel2Summary(t *testing.T, actualLevel2Summary common.Level2Summary, testData testdata.Level2TestData) {
@@ -119,10 +119,10 @@ func checkLevel2Summary(t *testing.T, actualLevel2Summary common.Level2Summary, 
 	// read in expected summary level 2
 	var expectedLevel2Summary common.Level2Summary
 	expectedLevel2SummaryJsonBytes, err := os.ReadFile(expectedOutputTestDataPath)
-	require.Nil(t, err)
+	require.NoError(t, err)
 	require.NotEmpty(t, expectedLevel2SummaryJsonBytes)
 	err = json.Unmarshal(expectedLevel2SummaryJsonBytes, &expectedLevel2Summary)
-	require.Nil(t, err)
+	require.NoError(t, err)
 
 	require.Equal(t, len(expectedLevel2Summary.TestResultsMap), len(actualLevel2Summary.TestResultsMap))
 
@@ -180,11 +180,11 @@ func checkMessagesHelper(t *testing.T, expectedMessagesPath string, actualMessag
 
 	// count expected failure / exception directories (1 directory/test)
 	expectedMessageDirs, err := os.ReadDir(expectedMessagesPath)
-	require.Nil(t, err)
+	require.NoError(t, err)
 
 	// count actual failure / exception directories
 	actualMessageDirs, err := os.ReadDir(actualMessagesPath)
-	require.Nil(t, err)
+	require.NoError(t, err)
 
 	// expected test summary has at least 1 failure / exception
 	require.Equal(t, len(expectedMessageDirs), len(actualMessageDirs))
@@ -198,10 +198,10 @@ func checkMessagesHelper(t *testing.T, expectedMessagesPath string, actualMessag
 		// under each sub-directory, there should be 1 or more text files (failure1.txt/exception1.txt, failure2.txt/exception2.txt, etc)
 		// that holds the raw failure / exception message for that test
 		expectedMessagesDirFiles, err := os.ReadDir(filepath.Join(expectedMessagesPath, expectedMessageDir.Name()))
-		require.Nil(t, err)
+		require.NoError(t, err)
 
 		actualMessageDirFiles, err := os.ReadDir(filepath.Join(actualMessagesPath, actualMessageDirs[expectedMessageDirIndex].Name()))
-		require.Nil(t, err)
+		require.NoError(t, err)
 
 		// make sure there are the expected number of failed / exception text files in the sub-directory
 		require.Equal(t, len(expectedMessagesDirFiles), len(actualMessageDirFiles))
@@ -215,11 +215,11 @@ func checkMessagesHelper(t *testing.T, expectedMessagesPath string, actualMessag
 		for expectedMessageFileIndex, expectedMessageFileDirEntry := range expectedMessagesDirFiles {
 			expectedMessageFilePath := filepath.Join(expectedMessagesPath, expectedMessageDir.Name(), expectedMessageFileDirEntry.Name())
 			expectedMessageFileBytes, err := os.ReadFile(expectedMessageFilePath)
-			require.Nil(t, err)
+			require.NoError(t, err)
 
 			actualMessageFilePath := filepath.Join(actualMessagesPath, actualMessageDirs[expectedMessageDirIndex].Name(), actualMessageDirFiles[expectedMessageFileIndex].Name())
 			actualMessageFileBytes, err := os.ReadFile(actualMessageFilePath)
-			require.Nil(t, err)
+			require.NoError(t, err)
 
 			// read expected and actual text files as bytes and compare them all at once
 			require.Equal(t, expectedMessageFileBytes, actualMessageFileBytes)

@@ -1,7 +1,6 @@
 package badger_test
 
 import (
-	"errors"
 	"testing"
 
 	"github.com/dgraph-io/badger/v2"
@@ -53,6 +52,6 @@ func TestPayloadRetreiveWithoutStore(t *testing.T) {
 		blockID := unittest.IdentifierFixture()
 
 		_, err := store.ByBlockID(blockID)
-		require.True(t, errors.Is(err, storage.ErrNotFound))
+		require.ErrorIs(t, err, storage.ErrNotFound)
 	})
 }

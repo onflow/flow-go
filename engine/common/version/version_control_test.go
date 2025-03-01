@@ -2,7 +2,6 @@ package version
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"math"
 	"sort"
@@ -308,7 +307,7 @@ func TestVersionControlInitializationWithErrors(t *testing.T) {
 
 		compatible, err := vc.CompatibleAtBlock(height)
 
-		assert.True(t, errors.Is(err, ErrOutOfRange))
+		assert.ErrorIs(t, err, ErrOutOfRange)
 		assert.False(t, compatible)
 	}
 

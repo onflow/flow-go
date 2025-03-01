@@ -1,7 +1,6 @@
 package pebble
 
 import (
-	"errors"
 	"fmt"
 	"testing"
 
@@ -54,8 +53,7 @@ func TestNewBootstrappedRegistersWithPath(t *testing.T) {
 	t.Parallel()
 	unittest.RunWithTempDir(t, func(dir string) {
 		_, db, err := NewBootstrappedRegistersWithPath(dir)
-		require.Error(t, err)
-		require.True(t, errors.Is(err, storage.ErrNotBootstrapped))
+		require.ErrorIs(t, err, storage.ErrNotBootstrapped)
 
 		// verify the db is closed
 		require.True(t, db == nil)

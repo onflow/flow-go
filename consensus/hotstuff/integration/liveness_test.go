@@ -74,7 +74,7 @@ func Test2TimeoutOutof7Instances(t *testing.T) {
 		wg.Add(1)
 		go func(in *Instance) {
 			err := in.Run()
-			require.True(t, errors.Is(err, errStopCondition))
+			require.ErrorIs(t, err, errStopCondition)
 			wg.Done()
 		}(in)
 	}
@@ -210,7 +210,7 @@ func Test1TimeoutOutof5Instances(t *testing.T) {
 		wg.Add(1)
 		go func(in *Instance) {
 			err := in.Run()
-			require.True(t, errors.Is(err, errStopCondition))
+			require.ErrorIs(t, err, errStopCondition)
 			wg.Done()
 		}(in)
 	}
@@ -307,7 +307,7 @@ func TestBlockDelayIsHigherThanTimeout(t *testing.T) {
 		wg.Add(1)
 		go func(in *Instance) {
 			err := in.Run()
-			require.True(t, errors.Is(err, errStopCondition))
+			require.ErrorIs(t, err, errStopCondition)
 			wg.Done()
 		}(in)
 	}
@@ -389,7 +389,7 @@ func TestAsyncClusterStartup(t *testing.T) {
 		wg.Add(1)
 		go func(in *Instance) {
 			err := in.Run()
-			require.True(t, errors.Is(err, errStopCondition))
+			require.ErrorIs(t, err, errStopCondition)
 			wg.Done()
 		}(in)
 	}
