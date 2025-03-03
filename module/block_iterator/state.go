@@ -55,8 +55,11 @@ func (n *PersistentIteratorState) NextRange() (rg module.IteratorRange, hasNext 
 		return module.IteratorRange{}, false, nil
 	}
 
+	// latest could be less than next, if the pruning-threshold was increased, which means
+	// we would like to keep more data than before.
+	// in this case, we should not iterate any block.
 	if latest < next {
-		return module.IteratorRange{}, false, fmt.Errorf("latest block is less than next block: %d < %d", latest, next)
+		return module.IteratorRange{}, false, nil
 	}
 
 	// iterate from next to latest (inclusive)
