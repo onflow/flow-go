@@ -1993,14 +1993,6 @@ func (suite *Suite) setupConnectionFactory() connection.ConnectionFactory {
 	return connFactory
 }
 
-func getEvents(n int) []flow.Event {
-	events := make([]flow.Event, n)
-	for i := range events {
-		events[i] = flow.Event{Type: flow.EventAccountCreated}
-	}
-	return events
-}
-
 func generateEncodedEvents(t *testing.T, n int) ([]flow.Event, []flow.Event) {
 	ccfEvents := generator.GetEventsWithEncoding(n, entities.EventEncodingVersion_CCF_V0)
 	jsonEvents := make([]flow.Event, n)
