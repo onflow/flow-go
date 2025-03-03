@@ -13,8 +13,9 @@ import (
 	"github.com/onflow/flow-go/storage"
 )
 
-// ErrorToStatus converts an Access API error into a grpc status error. The input may either
-// be a status.Error already, or an access sentinel error.
+// ErrorToStatus converts an Access API error into a grpc status error.
+// The input may either be a status.Error already, or an access sentinel error.
+// All generic errors are classified as `codes.Unknown`
 func ErrorToStatus(err error) error {
 	if err == nil {
 		return nil
