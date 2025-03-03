@@ -16,7 +16,7 @@ func InitPebbleDB(dir string) (*pebble.DB, io.Closer, error) {
 	// since we've set an default directory for the pebble DB, this check
 	// is not necessary, but rather a sanity check
 	if dir == "not set" {
-		return nil, nil, fmt.Errorf("missing required flag '--pebble-dir'")
+		return nil, nil, fmt.Errorf("missing required flag '--pebbledir'")
 	}
 
 	// Pre-create DB path
