@@ -326,6 +326,8 @@ func generateCustomFlowValue(field reflect.Value) any {
 			SignerIndices: SignerIndicesFixture(2),
 			SigData:       SignatureFixture(),
 		}
+	case reflect.TypeOf(flow.AggregatedSignature{}):
+		return Seal.AggregatedSignatureFixture()
 	case reflect.TypeOf(time.Time{}):
 		return time.Now()
 	}
