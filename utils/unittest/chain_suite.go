@@ -93,7 +93,7 @@ func (bc *BaseChainSuite) SetupChain() {
 	// assign 4 nodes to the verification role
 	bc.Approvers = IdentityListFixture(4, WithRole(flow.RoleVerification))
 	for _, verifier := range bc.Approvers {
-		bc.Identities[verifier.ID()] = verifier
+		bc.Identities[verifier.NodeID] = verifier
 	}
 
 	// ~~~~~~~~~~~~~~~~~~~~~~~~~~~~ SETUP BLOCKS ~~~~~~~~~~~~~~~~~~~~~~~~~~~~ //
