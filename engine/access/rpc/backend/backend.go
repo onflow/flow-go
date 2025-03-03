@@ -301,6 +301,8 @@ func configureTransactionValidator(
 // Ping responds to requests when the server is up.
 //
 // No errors are expected during normal operation.
+// All errors can be considered benign. Exceptions are handled explicitly within the backend and are
+// not propagated.
 func (b *Backend) Ping(ctx context.Context) error {
 	// staticCollectionRPC is only set if a collection node address was provided at startup
 	if b.staticCollectionRPC != nil {
@@ -315,6 +317,8 @@ func (b *Backend) Ping(ctx context.Context) error {
 // GetNodeVersionInfo returns node version information such as semver, commit, sporkID, protocolVersion, etc
 //
 // No errors are expected during normal operation.
+// All errors can be considered benign. Exceptions are handled explicitly within the backend and are
+// not propagated.
 func (b *Backend) GetNodeVersionInfo(ctx context.Context) (*accessmodel.NodeVersionInfo, error) {
 	sporkID := b.stateParams.SporkID()
 	sporkRootBlockHeight := b.stateParams.SporkRootBlockHeight()
@@ -352,6 +356,9 @@ func (b *Backend) GetNodeVersionInfo(ctx context.Context) (*accessmodel.NodeVers
 //
 // Expected errors:
 // - access.DataNotFound if the collection is not found.
+//
+// All errors can be considered benign. Exceptions are handled explicitly within the backend and are
+// not propagated.
 func (b *Backend) GetCollectionByID(ctx context.Context, colID flow.Identifier) (*flow.LightCollection, error) {
 	col, err := b.collections.LightByID(colID)
 	if err != nil {
@@ -368,6 +375,9 @@ func (b *Backend) GetCollectionByID(ctx context.Context, colID flow.Identifier) 
 //
 // Expected errors:
 // - access.DataNotFound if the collection is not found.
+//
+// All errors can be considered benign. Exceptions are handled explicitly within the backend and are
+// not propagated.
 func (b *Backend) GetFullCollectionByID(ctx context.Context, colID flow.Identifier) (*flow.Collection, error) {
 	col, err := b.collections.ByID(colID)
 	if err != nil {

@@ -31,6 +31,9 @@ func (b *backendNetwork) GetNetworkParameters(_ context.Context) accessmodel.Net
 //
 // Expected errors during normal operation:
 //   - access.InternalError - Failed to convert snapshot to bytes.
+//
+// All errors can be considered benign. Exceptions are handled explicitly within the backend and are
+// not propagated.
 func (b *backendNetwork) GetLatestProtocolStateSnapshot(_ context.Context) ([]byte, error) {
 	snapshot := b.state.Final()
 	data, err := convert.SnapshotToBytes(snapshot)
@@ -49,6 +52,9 @@ func (b *backendNetwork) GetLatestProtocolStateSnapshot(_ context.Context) ([]by
 //   - access.InvalidRequest - Block ID is for an orphaned block and will never have a valid snapshot
 //   - access.FailedPrecondition - A block was found, but it is not finalized and is above the finalized height.
 //   - access.InternalError - Failed to convert snapshot to bytes.
+//
+// All errors can be considered benign. Exceptions are handled explicitly within the backend and are
+// not propagated.
 //
 // The block may or may not be finalized in the future; the client can retry later.
 func (b *backendNetwork) GetProtocolStateSnapshotByBlockID(ctx context.Context, blockID flow.Identifier) ([]byte, error) {
@@ -94,6 +100,9 @@ func (b *backendNetwork) GetProtocolStateSnapshotByBlockID(ctx context.Context, 
 // Expected errors during normal operation:
 //   - access.DataNotFound - No finalized block with the given height was found.
 //   - access.InternalError - Failed to convert snapshot to bytes.
+//
+// All errors can be considered benign. Exceptions are handled explicitly within the backend and are
+// not propagated.
 //
 // The block height may or may not be finalized in the future; the client can retry later.
 func (b *backendNetwork) GetProtocolStateSnapshotByHeight(ctx context.Context, blockHeight uint64) ([]byte, error) {
