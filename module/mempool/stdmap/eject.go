@@ -6,7 +6,6 @@ import (
 	"sort"
 	"sync"
 
-	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/utils/rand"
 )
 
@@ -31,7 +30,7 @@ const overCapacityThreshold = 128
 //   - The implementation should be non-blocking (though, it is allowed to
 //     take a bit of time; the mempool will just be locked during this time).
 type BatchEjectFunc[K comparable, V any] func(b *Backend[K, V]) (bool, error)
-type EjectFunc[K comparable, V any] func(b *Backend[K, V]) (flow.Identifier, flow.Entity, bool)
+type EjectFunc[K comparable, V any] func(b *Backend[K, V]) (K, V, bool)
 
 // EjectRandomFast checks if the map size is beyond the
 // threshold size, and will iterate through them and eject unneeded
