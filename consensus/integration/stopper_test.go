@@ -48,7 +48,7 @@ func NewStopper(finalizedCount uint, tolerate int) *Stopper {
 func (s *Stopper) AddNode(n *Node) {
 	s.Lock()
 	defer s.Unlock()
-	s.running[n.id.ID()] = struct{}{}
+	s.running[n.id.NodeID] = struct{}{}
 }
 
 // WithStopFunc adds a function to use to stop all nodes (typically the cancel function of the context used to start them).

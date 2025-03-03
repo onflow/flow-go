@@ -80,7 +80,7 @@ func (suite *ProtocolStateProviderTestSuite) triggerUpdate() {
 	)
 	snapshot.On("Identity", mock.Anything).Return(func(id flow.Identifier) *flow.Identity {
 		for _, n := range suite.participants {
-			if n.ID() == id {
+			if n.NodeID == id {
 				return n
 			}
 		}
