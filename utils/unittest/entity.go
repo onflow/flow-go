@@ -154,10 +154,10 @@ func (mc *MalleabilityChecker) Check(entity flow.IDEntity) error {
 }
 
 func (mc *MalleabilityChecker) checkExpectations() error {
-	for field, _ := range mc.pinnedFields {
+	for field := range mc.pinnedFields {
 		return fmt.Errorf("field %s is pinned, but wasn't used, checker misconfigured", field)
 	}
-	for field, _ := range mc.fieldGenerator {
+	for field := range mc.fieldGenerator {
 		return fmt.Errorf("field %s has a generator, but wasn't used, checker misconfigured", field)
 	}
 	return nil
@@ -311,7 +311,13 @@ func generateCustomFlowValue(field reflect.Value) any {
 	case reflect.TypeOf(flow.ClusterQCVoteData{}):
 		return flow.ClusterQCVoteDataFromQC(QuorumCertificateWithSignerIDsFixture())
 	case reflect.TypeOf(flow.QuorumCertificate{}):
-		return QuorumCertificateFixture()
+		return *QuorumCertificateFixture()
+	case reflect.TypeOf(flow.CollectionGuarantee{}):
+		return *CollectionGuaranteeFixture()
+	case reflect.TypeOf(flow.Chunk{}):
+		return *ChunkFixture(IdentifierFixture(), uint(rand.Uint32()), StateCommitmentFixture())
+	case reflect.TypeOf(flow.ServiceEvent{}):
+		return EpochCommitFixture().ServiceEvent()
 	case reflect.TypeOf(flow.TimeoutCertificate{}):
 		return flow.TimeoutCertificate{
 			View:          rand.Uint64(),
