@@ -61,6 +61,10 @@ func LoopPruneExecutionDataFromRootToLatestSealed(
 			return fmt.Errorf("failed to get next and latest to prune: %w", err)
 		}
 
+		// report the target pruned height and pruned height
+		metrics.ExecutionTargetChunkDataPackPrunedHeight(latestToPrune)
+		metrics.ExecutionLastChunkDataPackPrunedHeight(nextToPrune - 1)
+
 		commitDuration := 2 * time.Millisecond // with default batch size 1200, the avg commit duration is 2ms
 		batchCount, totalDuration := EstimateBatchProcessing(
 			nextToPrune, latestToPrune,
@@ -76,9 +80,6 @@ func LoopPruneExecutionDataFromRootToLatestSealed(
 				time.Now().Add(config.SleepAfterEachIteration).UTC(),
 				time.Now().Add(config.SleepAfterEachIteration).Add(totalDuration).UTC(),
 			)
-
-		// report the target pruned height
-		metrics.ExecutionTargetChunkDataPackPrunedHeight(latestToPrune)
 
 		select {
 		case <-ctx.Done():
