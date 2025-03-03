@@ -124,7 +124,7 @@ func TestBackend_RunLimitChecking(t *testing.T) {
 		go func(x int) {
 			// creates and adds a fake item to the mempool
 			item := unittest.MockEntityFixture()
-			_ = pool.Run(func(backdata mempool.BackData) error {
+			_ = pool.Run(func(backdata mempool.BackData[flow.Identifier, *unittest.MockEntity]) error {
 				added := backdata.Add(item.ID(), item)
 				if !added {
 					return fmt.Errorf("potential race condition on adding to back data")
@@ -150,10 +150,10 @@ func TestBackend_RegisterEjectionCallback(t *testing.T) {
 		limit = 20
 		swarm = 20
 	)
-	pool := stdmap.NewBackend(stdmap.WithLimit(limit))
+	pool := stdmap.NewBackend[flow.Identifier, *unittest.MockEntity](stdmap.WithLimit[flow.Identifier, *unittest.MockEntity](limit))
 
 	// on ejection callback: test whether ejected identity is no longer part of the mempool
-	ensureEntityNotInMempool := func(entity flow.Entity) {
+	ensureEntityNotInMempool := func(entity *unittest.MockEntity) {
 		id := entity.ID()
 		go func() {
 			e, found := pool.ByID(id)
@@ -172,7 +172,7 @@ func TestBackend_RegisterEjectionCallback(t *testing.T) {
 		go func(x int) {
 			// creates and adds a fake item to the mempool
 			item := unittest.MockEntityFixture()
-			pool.Add(item)
+			pool.Add(item.ID(), item)
 			wg.Done()
 		}(i)
 	}
@@ -186,7 +186,7 @@ func TestBackend_RegisterEjectionCallback(t *testing.T) {
 func TestBackend_Multiple_OnEjectionCallbacks(t *testing.T) {
 	// ejection callback counts number of calls
 	calls := uint64(0)
-	callback := func(entity flow.Entity) {
+	callback := func(entity *unittest.MockEntity) {
 		atomic.AddUint64(&calls, 1)
 	}
 
@@ -194,7 +194,7 @@ func TestBackend_Multiple_OnEjectionCallbacks(t *testing.T) {
 	const (
 		limit = 30
 	)
-	pool := stdmap.NewBackend(stdmap.WithLimit(limit))
+	pool := stdmap.NewBackend[flow.Identifier, *unittest.MockEntity](stdmap.WithLimit[flow.Identifier, *unittest.MockEntity](limit))
 	pool.RegisterEjectionCallbacks(callback, callback)
 
 	t.Run("fill mempool up to limit", func(t *testing.T) {
@@ -228,7 +228,7 @@ func TestBackend_AdjustWithInit_Concurrent_HeroCache(t *testing.T) {
 		unittest.Logger(),
 		metrics.NewNoopCollector())
 
-	backend := stdmap.NewBackend(stdmap.WithMutableBackData(backData))
+	backend := stdmap.NewBackend(stdmap.WithMutableBackData[flow.Identifier, *unittest.MockEntity](backData))
 	entities := unittest.EntityListFixture(100)
 	adjustDone := sync.WaitGroup{}
 	for _, e := range entities {
@@ -237,13 +237,11 @@ func TestBackend_AdjustWithInit_Concurrent_HeroCache(t *testing.T) {
 		go func() {
 			defer adjustDone.Done()
 
-			backend.AdjustWithInit(e.ID(), func(entity flow.Entity) flow.Entity {
+			backend.AdjustWithInit(e.ID(), func(entity *unittest.MockEntity) (flow.Identifier, *unittest.MockEntity) {
 				// increment nonce of the entity
-				mockEntity, ok := entity.(*unittest.MockEntity)
-				require.True(t, ok)
-				mockEntity.Nonce++
-				return entity
-			}, func() flow.Entity {
+				entity.Nonce++
+				return entity.ID(), entity
+			}, func() *unittest.MockEntity {
 				return e
 			})
 		}()
@@ -255,7 +253,7 @@ func TestBackend_AdjustWithInit_Concurrent_HeroCache(t *testing.T) {
 		actual, ok := backend.ByID(e.ID())
 		require.True(t, ok)
 		require.Equal(t, e.ID(), actual.ID())
-		require.Equal(t, uint64(1), actual.(*unittest.MockEntity).Nonce)
+		require.Equal(t, uint64(1), actual.Nonce)
 	}
 }
 
@@ -265,7 +263,7 @@ func TestBackend_GetWithInit_Concurrent_HeroCache(t *testing.T) {
 	sizeLimit := uint32(100)
 	backData := herocache.NewCache(sizeLimit, herocache.DefaultOversizeFactor, heropool.LRUEjection, unittest.Logger(), metrics.NewNoopCollector())
 
-	backend := stdmap.NewBackend(stdmap.WithMutableBackData(backData))
+	backend := stdmap.NewBackend[flow.Identifier, *unittest.MockEntity](stdmap.WithMutableBackData[flow.Identifier, *unittest.MockEntity](backData))
 	entities := unittest.EntityListFixture(100)
 	adjustDone := sync.WaitGroup{}
 	for _, e := range entities {
@@ -274,7 +272,7 @@ func TestBackend_GetWithInit_Concurrent_HeroCache(t *testing.T) {
 		go func() {
 			defer adjustDone.Done()
 
-			entity, ok := backend.GetWithInit(e.ID(), func() flow.Entity {
+			entity, ok := backend.GetWithInit(e.ID(), func() *unittest.MockEntity {
 				return e
 			})
 			require.True(t, ok)
@@ -295,7 +293,7 @@ func TestBackend_GetWithInit_Concurrent_HeroCache(t *testing.T) {
 // It concurrently attempts on adjusting non-existent entities, and verifies that the entities are initialized and adjusted correctly.
 func TestBackend_AdjustWithInit_Concurrent_MapBased(t *testing.T) {
 	sizeLimit := uint(100)
-	backend := stdmap.NewBackend(stdmap.WithLimit(sizeLimit))
+	backend := stdmap.NewBackend[flow.Identifier, *unittest.MockEntity](stdmap.WithLimit[flow.Identifier, *unittest.MockEntity](sizeLimit))
 	entities := unittest.EntityListFixture(sizeLimit)
 
 	adjustDone := sync.WaitGroup{}
@@ -305,13 +303,11 @@ func TestBackend_AdjustWithInit_Concurrent_MapBased(t *testing.T) {
 		go func() {
 			defer adjustDone.Done()
 
-			backend.AdjustWithInit(e.ID(), func(entity flow.Entity) flow.Entity {
+			backend.AdjustWithInit(e.ID(), func(entity *unittest.MockEntity) (flow.Identifier, *unittest.MockEntity) {
 				// increment nonce of the entity
-				mockEntity, ok := entity.(*unittest.MockEntity)
-				require.True(t, ok)
-				mockEntity.Nonce++
-				return entity
-			}, func() flow.Entity {
+				entity.Nonce++
+				return entity.ID(), entity
+			}, func() *unittest.MockEntity {
 				return e
 			})
 		}()
@@ -323,7 +319,7 @@ func TestBackend_AdjustWithInit_Concurrent_MapBased(t *testing.T) {
 		actual, ok := backend.ByID(e.ID())
 		require.True(t, ok)
 		require.Equal(t, e.ID(), actual.ID())
-		require.Equal(t, uint64(1), actual.(*unittest.MockEntity).Nonce)
+		require.Equal(t, uint64(1), actual.Nonce)
 	}
 }
 
@@ -331,7 +327,7 @@ func TestBackend_AdjustWithInit_Concurrent_MapBased(t *testing.T) {
 // It concurrently attempts on adjusting non-existent entities, and verifies that the entities are initialized and retrieved correctly.
 func TestBackend_GetWithInit_Concurrent_MapBased(t *testing.T) {
 	sizeLimit := uint(100)
-	backend := stdmap.NewBackend(stdmap.WithLimit(sizeLimit))
+	backend := stdmap.NewBackend[flow.Identifier, *unittest.MockEntity](stdmap.WithLimit[flow.Identifier, *unittest.MockEntity](sizeLimit))
 	entities := unittest.EntityListFixture(100)
 	adjustDone := sync.WaitGroup{}
 	for _, e := range entities {
@@ -340,7 +336,7 @@ func TestBackend_GetWithInit_Concurrent_MapBased(t *testing.T) {
 		go func() {
 			defer adjustDone.Done()
 
-			entity, ok := backend.GetWithInit(e.ID(), func() flow.Entity {
+			entity, ok := backend.GetWithInit(e.ID(), func() *unittest.MockEntity {
 				return e
 			})
 			require.True(t, ok)
@@ -357,27 +353,27 @@ func TestBackend_GetWithInit_Concurrent_MapBased(t *testing.T) {
 	}
 }
 
-func addRandomEntities(t *testing.T, backend *stdmap.Backend, num int) {
+func addRandomEntities(t *testing.T, backend *stdmap.Backend[flow.Identifier, *unittest.MockEntity], num int) {
 	// add swarm-number of items to backend
 	wg := sync.WaitGroup{}
 	wg.Add(num)
 	for ; num > 0; num-- {
 		go func() {
 			defer wg.Done()
-			backend.Add(unittest.MockEntityFixture()) // creates and adds a fake item to the mempool
+			backend.Add(unittest.IdentifierFixture(), unittest.MockEntityFixture()) // creates and adds a fake item to the mempool
 		}()
 	}
 	unittest.RequireReturnsBefore(t, wg.Wait, 1*time.Second, "failed to add elements in time")
 }
 
 func TestBackend_All(t *testing.T) {
-	backend := stdmap.NewBackend()
+	backend := stdmap.NewBackend[flow.Identifier, *unittest.MockEntity]()
 	entities := unittest.EntityListFixture(100)
 
 	// Add
 	for _, e := range entities {
 		// all entities must be stored successfully
-		require.True(t, backend.Add(e))
+		require.True(t, backend.Add(e.ID(), e))
 	}
 
 	// All
