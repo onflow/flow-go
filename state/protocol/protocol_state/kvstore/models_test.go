@@ -295,24 +295,28 @@ func TestKVStoreMutator_SetEpochExtensionViewCount(t *testing.T) {
 
 // TestMalleability verifies that the entities which implements the ID are not malleable.
 func TestMalleability(t *testing.T) {
-	checker := unittest.NewMalleabilityChecker(unittest.WithFieldGenerator("UpgradableModel.VersionUpgrade", func() protocol.ViewBasedActivator[uint64] {
-		return protocol.ViewBasedActivator[uint64]{
+	viewBasedActivatorFixture := func() *protocol.ViewBasedActivator[uint64] {
+		return &protocol.ViewBasedActivator[uint64]{
 			Data:           rand.Uint64(),
 			ActivationView: rand.Uint64(),
 		}
-	}))
+	}
+
+	checker := unittest.NewMalleabilityChecker(
+		unittest.WithFieldGenerator("UpgradableModel.VersionUpgrade", func() protocol.ViewBasedActivator[uint64] {
+			return *viewBasedActivatorFixture()
+		}),
+	)
 
 	t.Run("Modelv0", func(t *testing.T) {
 		err := checker.Check(
 			&kvstore.Modelv0{
 				UpgradableModel: kvstore.UpgradableModel{
-					VersionUpgrade: &protocol.ViewBasedActivator[uint64]{
-						Data:           13,
-						ActivationView: 1000,
-					},
+					VersionUpgrade: viewBasedActivatorFixture(),
 				},
 				EpochStateID: unittest.IdentifierFixture(),
-			})
+			},
+		)
 		require.NoError(t, err)
 	})
 
@@ -321,14 +325,12 @@ func TestMalleability(t *testing.T) {
 			&kvstore.Modelv1{
 				Modelv0: kvstore.Modelv0{
 					UpgradableModel: kvstore.UpgradableModel{
-						VersionUpgrade: &protocol.ViewBasedActivator[uint64]{
-							Data:           13,
-							ActivationView: 1000,
-						},
+						VersionUpgrade: viewBasedActivatorFixture(),
 					},
 					EpochStateID: unittest.IdentifierFixture(),
 				},
-			})
+			},
+		)
 		require.NoError(t, err)
 	})
 }
