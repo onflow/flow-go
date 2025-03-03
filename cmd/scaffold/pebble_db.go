@@ -10,7 +10,7 @@ import (
 	pebblestorage "github.com/onflow/flow-go/storage/pebble"
 )
 
-func InitPebbleDB(dir string) (*pebble.DB, io.Closer, error) {
+func InitPebbleDB(logger pebble.Logger, dir string) (*pebble.DB, io.Closer, error) {
 	// if the pebble DB is not set, we skip initialization
 	// the pebble DB must be provided to initialize
 	// since we've set an default directory for the pebble DB, this check
@@ -25,7 +25,7 @@ func InitPebbleDB(dir string) (*pebble.DB, io.Closer, error) {
 		return nil, nil, fmt.Errorf("could not create pebble db (path: %s): %w", dir, err)
 	}
 
-	db, err := pebblestorage.OpenDefaultPebbleDB(dir)
+	db, err := pebblestorage.OpenDefaultPebbleDB(logger, dir)
 	if err != nil {
 		return nil, nil, fmt.Errorf("could not open newly created pebble db (path: %s): %w", dir, err)
 	}

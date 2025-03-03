@@ -29,11 +29,11 @@ type PebbleDatastoreManager struct {
 //     options are applied.
 //
 // No errors are expected during normal operations.
-func NewPebbleDatastoreManager(path string, options *pebble.Options) (*PebbleDatastoreManager, error) {
+func NewPebbleDatastoreManager(logger pebble.Logger, path string, options *pebble.Options) (*PebbleDatastoreManager, error) {
 	if options == nil {
 		cache := pebble.NewCache(pstorage.DefaultPebbleCacheSize)
 		defer cache.Unref()
-		options = pstorage.DefaultPebbleOptions(cache, pebble.DefaultComparer)
+		options = pstorage.DefaultPebbleOptions(logger, cache, pebble.DefaultComparer)
 	}
 
 	db, err := pebble.Open(path, options)

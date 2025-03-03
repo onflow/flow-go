@@ -12,6 +12,7 @@ import (
 	"github.com/onflow/flow-go/storage/operation/badgerimpl"
 	"github.com/onflow/flow-go/storage/operation/pebbleimpl"
 	pebblestorage "github.com/onflow/flow-go/storage/pebble"
+	"github.com/onflow/flow-go/storage/util"
 )
 
 // InitStorages initializes the badger storages
@@ -29,7 +30,7 @@ func WithStorage(f func(storage.DB) error) error {
 			log.Warn().Msg("both --datadir and --pebbledir are set, using --pebbledir")
 		}
 
-		db, err := pebblestorage.MustOpenDefaultPebbleDB(flagPebbleDir)
+		db, err := pebblestorage.MustOpenDefaultPebbleDB(util.NewLogger(log.Logger, "db"), flagPebbleDir)
 		if err != nil {
 			return err
 		}
@@ -56,7 +57,7 @@ func InitBadgerAndPebble() (bdb *badger.DB, pdb *pebble.DB, err error) {
 	if flagPebbleDir == "" {
 		return nil, nil, fmt.Errorf("must specify --pebbledir")
 	}
-	pdb, err = pebblestorage.MustOpenDefaultPebbleDB(flagPebbleDir)
+	pdb, err = pebblestorage.MustOpenDefaultPebbleDB(util.NewLogger(log.Logger, "pebbledb"), flagPebbleDir)
 	if err != nil {
 		return nil, nil, err
 	}

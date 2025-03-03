@@ -21,6 +21,7 @@ import (
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/metrics"
+	mmetrics "github.com/onflow/flow-go/module/metrics"
 	mockmodule "github.com/onflow/flow-go/module/mock"
 	"github.com/onflow/flow-go/module/signature"
 	"github.com/onflow/flow-go/module/trace"
@@ -36,7 +37,6 @@ import (
 	stoerr "github.com/onflow/flow-go/storage"
 	bstorage "github.com/onflow/flow-go/storage/badger"
 	"github.com/onflow/flow-go/storage/badger/operation"
-	storeutil "github.com/onflow/flow-go/storage/util"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -88,7 +88,7 @@ func TestExtendValid(t *testing.T) {
 		metrics := metrics.NewNoopCollector()
 		tracer := trace.NewNoopTracer()
 		log := zerolog.Nop()
-		all := storeutil.StorageLayer(t, db)
+		all := bstorage.InitAll(metrics, db)
 
 		distributor := events.NewDistributor()
 		consumer := mockprotocol.NewConsumer(t)
@@ -851,7 +851,7 @@ func TestExtendEpochTransitionValid(t *testing.T) {
 
 		tracer := trace.NewNoopTracer()
 		log := zerolog.Nop()
-		all := storeutil.StorageLayer(t, db)
+		all := bstorage.InitAll(mmetrics.NewNoopCollector(), db)
 		protoState, err := protocol.Bootstrap(
 			metrics,
 			db,
@@ -2568,7 +2568,7 @@ func TestExtendInvalidSealsInBlock(t *testing.T) {
 		metrics := metrics.NewNoopCollector()
 		tracer := trace.NewNoopTracer()
 		log := zerolog.Nop()
-		all := storeutil.StorageLayer(t, db)
+		all := bstorage.InitAll(metrics, db)
 
 		// create a event consumer to test epoch transition events
 		distributor := events.NewDistributor()
@@ -3128,7 +3128,7 @@ func TestHeaderInvalidTimestamp(t *testing.T) {
 		metrics := metrics.NewNoopCollector()
 		tracer := trace.NewNoopTracer()
 		log := zerolog.Nop()
-		all := storeutil.StorageLayer(t, db)
+		all := bstorage.InitAll(metrics, db)
 
 		// create a event consumer to test epoch transition events
 		distributor := events.NewDistributor()

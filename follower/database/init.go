@@ -9,6 +9,6 @@ import (
 )
 
 // InitPebbleDB is an alias for scaffold.InitPebbleDB.
-func InitPebbleDB(dir string) (*pebble.DB, io.Closer, error) {
-	return scaffold.InitPebbleDB(dir)
+func InitPebbleDB(logger pebble.Logger, dir string) (*pebble.DB, io.Closer, error) {
+	return scaffold.InitPebbleDB(logger, dir)
 }

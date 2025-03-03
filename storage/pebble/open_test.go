@@ -8,13 +8,15 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/storage"
+	"github.com/onflow/flow-go/storage/util"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
 func TestIsBootstrapped(t *testing.T) {
 	t.Parallel()
 	unittest.RunWithTempDir(t, func(dir string) {
-		db, err := OpenRegisterPebbleDB(dir)
+		logger := util.NewLogger(unittest.Logger(), "test")
+		db, err := OpenRegisterPebbleDB(logger, dir)
 		require.NoError(t, err)
 		bootstrapped, err := IsBootstrapped(db)
 		require.NoError(t, err)
@@ -26,7 +28,8 @@ func TestIsBootstrapped(t *testing.T) {
 func TestReadHeightsFromBootstrappedDB(t *testing.T) {
 	t.Parallel()
 	unittest.RunWithTempDir(t, func(dir string) {
-		db, err := OpenRegisterPebbleDB(dir)
+		logger := util.NewLogger(unittest.Logger(), "test")
+		db, err := OpenRegisterPebbleDB(logger, dir)
 		require.NoError(t, err)
 
 		// init with first height
@@ -40,7 +43,7 @@ func TestReadHeightsFromBootstrappedDB(t *testing.T) {
 		require.NoError(t, db.Close())
 
 		// reopen the db
-		registers, db, err := NewBootstrappedRegistersWithPath(dir)
+		registers, db, err := NewBootstrappedRegistersWithPath(logger, dir)
 		require.NoError(t, err)
 
 		require.Equal(t, firstHeight, registers.FirstHeight())
@@ -53,7 +56,8 @@ func TestReadHeightsFromBootstrappedDB(t *testing.T) {
 func TestNewBootstrappedRegistersWithPath(t *testing.T) {
 	t.Parallel()
 	unittest.RunWithTempDir(t, func(dir string) {
-		_, db, err := NewBootstrappedRegistersWithPath(dir)
+		logger := util.NewLogger(unittest.Logger(), "test")
+		_, db, err := NewBootstrappedRegistersWithPath(logger, dir)
 		require.Error(t, err)
 		require.True(t, errors.Is(err, storage.ErrNotBootstrapped))
 
@@ -62,7 +66,7 @@ func TestNewBootstrappedRegistersWithPath(t *testing.T) {
 
 		// bootstrap the db
 		// init with first height
-		db2, err := OpenRegisterPebbleDB(dir)
+		db2, err := OpenRegisterPebbleDB(logger, dir)
 		require.NoError(t, err)
 		firstHeight := uint64(10)
 		require.NoError(t, initHeights(db2, firstHeight))
@@ -79,20 +83,21 @@ func TestNewBootstrappedRegistersWithPath(t *testing.T) {
 func TestMustOpenDefaultPebbleDB(t *testing.T) {
 	t.Parallel()
 	unittest.RunWithTempDir(t, func(dir string) {
+		logger := util.NewLogger(unittest.Logger(), "test")
 		// verify error is returned when the db is not bootstrapped
-		_, err := MustOpenDefaultPebbleDB(dir)
+		_, err := MustOpenDefaultPebbleDB(logger, dir)
 		require.Error(t, err)
 		require.Contains(t, err.Error(), "not initialized")
 
 		// bootstrap the db
-		db, err := OpenDefaultPebbleDB(dir)
+		db, err := OpenDefaultPebbleDB(logger, dir)
 		require.NoError(t, err)
 		require.NoError(t, initHeights(db, uint64(10)))
 		require.NoError(t, db.Close())
 		fmt.Println(dir)
 
 		// verify no error is returned when the db is bootstrapped
-		db, err = MustOpenDefaultPebbleDB(dir)
+		db, err = MustOpenDefaultPebbleDB(logger, dir)
 		require.NoError(t, err)
 
 		h, err := latestStoredHeight(db)

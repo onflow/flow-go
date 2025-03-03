@@ -56,6 +56,7 @@ import (
 	"github.com/onflow/flow-go/state/protocol/inmem"
 	"github.com/onflow/flow-go/state/protocol/protocol_state/kvstore"
 	badgerstorage "github.com/onflow/flow-go/storage/badger"
+	"github.com/onflow/flow-go/storage/util"
 	"github.com/onflow/flow-go/utils/io"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -685,7 +686,7 @@ func (net *FlowNetwork) addConsensusFollower(t *testing.T, rootProtocolSnapshotP
 	dataDir := makeDir(t, tmpdir, DefaultFlowDBDir)
 	pebbleDir := makeDir(t, tmpdir, DefaultFlowPebbleDBDir)
 
-	pebbleDB, _, err := database.InitPebbleDB(pebbleDir)
+	pebbleDB, _, err := database.InitPebbleDB(util.NewLogger(net.log, "pebbledb-protocol"), pebbleDir)
 	require.NoError(t, err)
 
 	// create a follower-specific directory for the bootstrap files

@@ -1092,7 +1092,7 @@ func (fnb *FlowNodeBuilder) initBadgerDB() error {
 		return fmt.Errorf("could not create datadir (path: %s): %w", fnb.BaseConfig.datadir, err)
 	}
 
-	log := sutil.NewLogger(fnb.Logger)
+	log := sutil.NewLogger(fnb.Logger, "badgerdb-protocol")
 
 	// we initialize the database with options that allow us to keep the maximum
 	// item size in the trie itself (up to 1MB) and where we keep all level zero
@@ -1140,7 +1140,7 @@ func (fnb *FlowNodeBuilder) initPebbleDB() error {
 		return nil
 	}
 
-	db, closer, err := scaffold.InitPebbleDB(fnb.BaseConfig.pebbleDir)
+	db, closer, err := scaffold.InitPebbleDB(sutil.NewLogger(fnb.Logger, "pebbledb-protocol"), fnb.BaseConfig.pebbleDir)
 	if err != nil {
 		return err
 	}
@@ -1167,7 +1167,7 @@ func (fnb *FlowNodeBuilder) initSecretsDB() error {
 		return fmt.Errorf("could not create secrets db dir (path: %s): %w", fnb.BaseConfig.secretsdir, err)
 	}
 
-	log := sutil.NewLogger(fnb.Logger)
+	log := sutil.NewLogger(fnb.Logger, "badgerdb-secret")
 
 	opts := badger.DefaultOptions(fnb.BaseConfig.secretsdir).WithLogger(log)
 

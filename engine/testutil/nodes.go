@@ -107,6 +107,7 @@ import (
 	"github.com/onflow/flow-go/storage/operation/badgerimpl"
 	storagepebble "github.com/onflow/flow-go/storage/pebble"
 	"github.com/onflow/flow-go/storage/store"
+	sutil "github.com/onflow/flow-go/storage/util"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -610,7 +611,7 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity bootstrap.NodeInfo, ide
 	require.NoError(t, err)
 
 	registerDir := unittest.TempPebblePath(t)
-	pebbledb, err := storagepebble.OpenRegisterPebbleDB(registerDir)
+	pebbledb, err := storagepebble.OpenRegisterPebbleDB(sutil.NewLogger(node.Log, "pebbledb-registers"), registerDir)
 	require.NoError(t, err)
 
 	checkpointHeight := uint64(0)

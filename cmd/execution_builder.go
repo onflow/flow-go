@@ -14,7 +14,6 @@ import (
 	awsconfig "github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/cockroachdb/pebble"
-	"github.com/dgraph-io/badger/v2"
 	"github.com/ipfs/boxo/bitswap"
 	"github.com/ipfs/go-cid"
 	badgerds "github.com/ipfs/go-ds-badger2"
@@ -97,7 +96,7 @@ import (
 	"github.com/onflow/flow-go/storage/operation/pebbleimpl"
 	storagepebble "github.com/onflow/flow-go/storage/pebble"
 	"github.com/onflow/flow-go/storage/store"
-	sutil "github.com/onflow/flow-go/storage/util"
+	"github.com/onflow/flow-go/storage/util"
 )
 
 const (
@@ -706,30 +705,6 @@ func (exeNode *ExecutionNode) LoadExecutionDataGetter(node *NodeConfig) error {
 	return nil
 }
 
-func OpenChunkDataPackDB(dbPath string, logger zerolog.Logger) (*badger.DB, error) {
-	log := sutil.NewLogger(logger)
-
-	opts := badger.
-		DefaultOptions(dbPath).
-		WithKeepL0InMemory(true).
-		WithLogger(log).
-
-		// the ValueLogFileSize option specifies how big the value of a
-		// key-value pair is allowed to be saved into badger.
-		// exceeding this limit, will fail with an error like this:
-		// could not store data: Value with size <xxxx> exceeded 1073741824 limit
-		// Maximum value size is 10G, needed by execution node
-		// TODO: finding a better max value for each node type
-		WithValueLogFileSize(256 << 23).
-		WithValueLogMaxEntries(100000) // Default is 1000000
-
-	db, err := badger.Open(opts)
-	if err != nil {
-		return nil, fmt.Errorf("could not open chunk data pack badger db at path %v: %w", dbPath, err)
-	}
-	return db, nil
-}
-
 func (exeNode *ExecutionNode) LoadExecutionState(
 	node *NodeConfig,
 ) (
@@ -737,7 +712,10 @@ func (exeNode *ExecutionNode) LoadExecutionState(
 	error,
 ) {
 
-	chunkDataPackDB, err := storagepebble.OpenDefaultPebbleDB(exeNode.exeConf.chunkDataPackDir)
+	chunkDataPackDB, err := storagepebble.OpenDefaultPebbleDB(
+		util.NewLogger(node.Logger, "pebbledb-cdp"),
+		exeNode.exeConf.chunkDataPackDir,
+	)
 	if err != nil {
 		return nil, fmt.Errorf("could not open chunk data pack database: %w", err)
 	}
@@ -845,7 +823,9 @@ func (exeNode *ExecutionNode) LoadRegisterStore(
 	node.Logger.Info().
 		Str("pebble_db_path", exeNode.exeConf.registerDir).
 		Msg("register store enabled")
-	pebbledb, err := storagepebble.OpenRegisterPebbleDB(exeNode.exeConf.registerDir)
+	pebbledb, err := storagepebble.OpenRegisterPebbleDB(
+		util.NewLogger(node.Logger, "pebbledb-registers"),
+		exeNode.exeConf.registerDir)
 
 	if err != nil {
 		return fmt.Errorf("could not create disk register store: %w", err)

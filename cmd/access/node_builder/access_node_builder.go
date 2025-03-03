@@ -121,6 +121,7 @@ import (
 	"github.com/onflow/flow-go/storage/operation/pebbleimpl"
 	pstorage "github.com/onflow/flow-go/storage/pebble"
 	"github.com/onflow/flow-go/storage/store"
+	"github.com/onflow/flow-go/storage/util"
 	"github.com/onflow/flow-go/utils/grpcutils"
 )
 
@@ -587,7 +588,9 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 			}
 
 			if executionDataDBMode == execution_data.ExecutionDataDBModePebble {
-				builder.ExecutionDatastoreManager, err = edstorage.NewPebbleDatastoreManager(datastoreDir, nil)
+				builder.ExecutionDatastoreManager, err = edstorage.NewPebbleDatastoreManager(
+					util.NewLogger(node.Logger, "pebbledb-endata"),
+					datastoreDir, nil)
 				if err != nil {
 					return fmt.Errorf("could not create PebbleDatastoreManager for execution data: %w", err)
 				}
@@ -881,7 +884,9 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 				// other components from starting while bootstrapping the register db since it may
 				// take hours to complete.
 
-				pdb, err := pstorage.OpenRegisterPebbleDB(builder.registersDBPath)
+				pdb, err := pstorage.OpenRegisterPebbleDB(
+					util.NewLogger(node.Logger, "pebbledb-registers"),
+					builder.registersDBPath)
 				if err != nil {
 					return nil, fmt.Errorf("could not open registers db: %w", err)
 				}

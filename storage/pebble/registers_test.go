@@ -17,6 +17,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/storage/pebble/registers"
+	"github.com/onflow/flow-go/storage/util"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -291,7 +292,7 @@ func TestRegisters_GetAndStoreEmptyOwner(t *testing.T) {
 func Benchmark_PayloadStorage(b *testing.B) {
 	cache := pebble.NewCache(32 << 20)
 	defer cache.Unref()
-	opts := DefaultPebbleOptions(cache, registers.NewMVCCComparer())
+	opts := DefaultPebbleOptions(util.NewLogger(unittest.Logger(), "test"), cache, registers.NewMVCCComparer())
 
 	dbpath := path.Join(b.TempDir(), "benchmark1.db")
 	db, err := pebble.Open(dbpath, opts)
