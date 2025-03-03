@@ -36,6 +36,18 @@ func ToUint32(uint32Str string) (uint32, error) {
 	return uint32(val), nil
 }
 
+// ToInt converts an input string to an int.
+func ToInt(intStr string) (int, error) {
+	val, err := strconv.ParseInt(intStr, 10, 0) // "0" automatically adapts to the native int size
+	if err != nil {
+		if errors.Is(err, strconv.ErrRange) {
+			return 0, fmt.Errorf("value overflows int range")
+		}
+		return 0, fmt.Errorf("value must be a valid integer") // hide detailed error from user
+	}
+	return int(val), nil
+}
+
 // ToBase64 converts byte input to string base64 encoded output
 func ToBase64(byteValue []byte) string {
 	return base64.StdEncoding.EncodeToString(byteValue)
