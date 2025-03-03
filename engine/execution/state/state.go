@@ -417,6 +417,7 @@ func (s *state) saveExecutionResults(
 			chunks := result.AllChunkDataPacks()
 			chunkIDs := make([]flow.Identifier, 0, len(chunks))
 			for _, chunk := range chunks {
+				// TODO: ID
 				chunkIDs = append(chunkIDs, chunk.ID())
 			}
 			_ = s.chunkDataPacks.Remove(chunkIDs)
