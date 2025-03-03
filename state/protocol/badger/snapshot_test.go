@@ -159,10 +159,11 @@ func TestSnapshot_Descendants(t *testing.T) {
 	require.NoError(t, err)
 	util.RunWithFullProtocolState(t, rootSnapshot, func(db *badger.DB, state *bprotocol.ParticipantState) {
 		var expectedBlocks []flow.Identifier
+		viewIndex := make(map[uint64]struct{})
 		for i := 5; i > 3; i-- {
 			parent := head
 			for n := 0; n < i; n++ {
-				block := unittest.BlockWithParentFixture(parent)
+				block := unittest.BlockWithParentFixtureAndUniqueView(parent, viewIndex)
 				block.SetPayload(unittest.PayloadFixture(unittest.WithProtocolStateID(rootProtocolStateID)))
 				err := state.Extend(context.Background(), block)
 				require.NoError(t, err)
@@ -421,12 +422,13 @@ func TestSealingSegment(t *testing.T) {
 	t.Run("overlapping sealing segment", func(t *testing.T) {
 		util.RunWithFollowerProtocolState(t, rootSnapshot, func(db *badger.DB, state *bprotocol.FollowerState) {
 
-			block1 := unittest.BlockWithParentFixture(head)
+			viewIndex := make(map[uint64]struct{})
+			block1 := unittest.BlockWithParentFixtureAndUniqueView(head, viewIndex)
 			block1.SetPayload(unittest.PayloadFixture(unittest.WithProtocolStateID(rootProtocolStateID)))
 			buildFinalizedBlock(t, state, block1)
 			receipt1, seal1 := unittest.ReceiptAndSealForBlock(block1)
 
-			block2 := unittest.BlockWithParentFixture(block1.Header)
+			block2 := unittest.BlockWithParentFixtureAndUniqueView(block1.Header, viewIndex)
 			block2.SetPayload(unittest.PayloadFixture(
 				unittest.WithReceipts(receipt1),
 				unittest.WithProtocolStateID(rootProtocolStateID),
@@ -438,7 +440,7 @@ func TestSealingSegment(t *testing.T) {
 			block3 := unittest.BlockWithParentProtocolState(block2)
 			buildFinalizedBlock(t, state, block3)
 
-			block4 := unittest.BlockWithParentFixture(block3.Header)
+			block4 := unittest.BlockWithParentFixtureAndUniqueView(block3.Header, viewIndex)
 			block4.SetPayload(unittest.PayloadFixture(
 				unittest.WithReceipts(receipt2),
 				unittest.WithSeals(seal1),
@@ -449,7 +451,7 @@ func TestSealingSegment(t *testing.T) {
 			block5 := unittest.BlockWithParentProtocolState(block4)
 			buildFinalizedBlock(t, state, block5)
 
-			block6 := unittest.BlockWithParentFixture(block5.Header)
+			block6 := unittest.BlockWithParentFixtureAndUniqueView(block5.Header, viewIndex)
 			block6.SetPayload(unittest.PayloadFixture(
 				unittest.WithSeals(seal2),
 				unittest.WithProtocolStateID(rootProtocolStateID),
@@ -488,13 +490,14 @@ func TestSealingSegment(t *testing.T) {
 			// receipt b also contains result b
 			receiptB := unittest.ExecutionReceiptFixture()
 
-			block1 := unittest.BlockWithParentFixture(head)
+			viewIndex := make(map[uint64]struct{})
+			block1 := unittest.BlockWithParentFixtureAndUniqueView(head, viewIndex)
 			block1.SetPayload(unittest.PayloadFixture(
 				unittest.WithReceipts(receiptA1),
 				unittest.WithProtocolStateID(rootProtocolStateID),
 			))
 
-			block2 := unittest.BlockWithParentFixture(block1.Header)
+			block2 := unittest.BlockWithParentFixtureAndUniqueView(block1.Header, viewIndex)
 			block2.SetPayload(unittest.PayloadFixture(
 				unittest.WithReceipts(receiptB),
 				unittest.WithReceiptsAndNoResults(receiptA2),
@@ -502,7 +505,7 @@ func TestSealingSegment(t *testing.T) {
 			))
 			receiptC, sealC := unittest.ReceiptAndSealForBlock(block2)
 
-			block3 := unittest.BlockWithParentFixture(block2.Header)
+			block3 := unittest.BlockWithParentFixtureAndUniqueView(block2.Header, viewIndex)
 			block3.SetPayload(unittest.PayloadFixture(
 				unittest.WithReceipts(receiptC),
 				unittest.WithProtocolStateID(rootProtocolStateID),
@@ -510,7 +513,7 @@ func TestSealingSegment(t *testing.T) {
 
 			block4 := unittest.BlockWithParentProtocolState(block3)
 
-			block5 := unittest.BlockWithParentFixture(block4.Header)
+			block5 := unittest.BlockWithParentFixtureAndUniqueView(block4.Header, viewIndex)
 			block5.SetPayload(unittest.PayloadFixture(
 				unittest.WithSeals(sealC),
 				unittest.WithProtocolStateID(rootProtocolStateID),
@@ -664,15 +667,15 @@ func TestSealingSegment(t *testing.T) {
 	// where DefaultTransactionExpiry = 600
 	t.Run("test extra blocks contain exactly DefaultTransactionExpiry number of blocks below the sealed block", func(t *testing.T) {
 		util.RunWithFollowerProtocolState(t, rootSnapshot, func(db *badger.DB, state *bprotocol.FollowerState) {
-			root := unittest.BlockWithParentFixture(head)
+			viewIndex := make(map[uint64]struct{})
+			root := unittest.BlockWithParentFixtureAndUniqueView(head, viewIndex)
 			root.SetPayload(unittest.PayloadFixture(unittest.WithProtocolStateID(rootProtocolStateID)))
 			buildFinalizedBlock(t, state, root)
 
 			blocks := make([]*flow.Block, 0, flow.DefaultTransactionExpiry+3)
 			parent := root
 			for i := 0; i < flow.DefaultTransactionExpiry+1; i++ {
-				next := unittest.BlockWithParentProtocolState(parent)
-				next.Header.View = next.Header.Height + 1 // set view so we are still in the same epoch
+				next := unittest.BlockWithParentProtocolStateAndUniqueView(parent, viewIndex)
 				buildFinalizedBlock(t, state, next)
 				blocks = append(blocks, next)
 				parent = next
@@ -681,7 +684,7 @@ func TestSealingSegment(t *testing.T) {
 			// last sealed block
 			lastSealedBlock := parent
 			lastReceipt, lastSeal := unittest.ReceiptAndSealForBlock(lastSealedBlock)
-			prevLastBlock := unittest.BlockWithParentFixture(lastSealedBlock.Header)
+			prevLastBlock := unittest.BlockWithParentFixtureAndUniqueView(lastSealedBlock.Header, viewIndex)
 			prevLastBlock.SetPayload(unittest.PayloadFixture(
 				unittest.WithReceipts(lastReceipt),
 				unittest.WithProtocolStateID(rootProtocolStateID),
@@ -689,7 +692,7 @@ func TestSealingSegment(t *testing.T) {
 			buildFinalizedBlock(t, state, prevLastBlock)
 
 			// last finalized block
-			lastBlock := unittest.BlockWithParentFixture(prevLastBlock.Header)
+			lastBlock := unittest.BlockWithParentFixtureAndUniqueView(prevLastBlock.Header, viewIndex)
 			lastBlock.SetPayload(unittest.PayloadFixture(
 				unittest.WithSeals(lastSeal),
 				unittest.WithProtocolStateID(rootProtocolStateID),
@@ -697,7 +700,7 @@ func TestSealingSegment(t *testing.T) {
 			buildFinalizedBlock(t, state, lastBlock)
 
 			// build a valid child to ensure we have a QC
-			buildFinalizedBlock(t, state, unittest.BlockWithParentProtocolState(lastBlock))
+			buildFinalizedBlock(t, state, unittest.BlockWithParentProtocolStateAndUniqueView(lastBlock, viewIndex))
 
 			snapshot := state.AtBlockID(lastBlock.ID())
 			segment, err := snapshot.SealingSegment()
@@ -720,13 +723,14 @@ func TestSealingSegment(t *testing.T) {
 	// Expected sealing segment: [B4, ..., B5], Extra blocks: [Root, B1, B2, B3]
 	t.Run("highest block seals outside segment", func(t *testing.T) {
 		util.RunWithFollowerProtocolState(t, rootSnapshot, func(db *badger.DB, state *bprotocol.FollowerState) {
+			viewIndex := make(map[uint64]struct{})
 			// build a block to seal
-			block1 := unittest.BlockWithParentFixture(head)
+			block1 := unittest.BlockWithParentFixtureAndUniqueView(head, viewIndex)
 			block1.SetPayload(unittest.PayloadFixture(unittest.WithProtocolStateID(rootProtocolStateID)))
 			buildFinalizedBlock(t, state, block1)
 
 			// build a block sealing block1
-			block2 := unittest.BlockWithParentFixture(block1.Header)
+			block2 := unittest.BlockWithParentFixtureAndUniqueView(block1.Header, viewIndex)
 			receipt1, seal1 := unittest.ReceiptAndSealForBlock(block1)
 			block2.SetPayload(unittest.PayloadFixture(
 				unittest.WithReceipts(receipt1),
@@ -735,7 +739,7 @@ func TestSealingSegment(t *testing.T) {
 			buildFinalizedBlock(t, state, block2)
 
 			receipt2, seal2 := unittest.ReceiptAndSealForBlock(block2)
-			block3 := unittest.BlockWithParentFixture(block2.Header)
+			block3 := unittest.BlockWithParentFixtureAndUniqueView(block2.Header, viewIndex)
 			block3.SetPayload(unittest.PayloadFixture(
 				unittest.WithSeals(seal1),
 				unittest.WithReceipts(receipt2),
@@ -744,7 +748,7 @@ func TestSealingSegment(t *testing.T) {
 			buildFinalizedBlock(t, state, block3)
 
 			receipt3, seal3 := unittest.ReceiptAndSealForBlock(block3)
-			block4 := unittest.BlockWithParentFixture(block3.Header)
+			block4 := unittest.BlockWithParentFixtureAndUniqueView(block3.Header, viewIndex)
 			block4.SetPayload(unittest.PayloadFixture(
 				unittest.WithReceipts(receipt3),
 				unittest.WithProtocolStateID(rootProtocolStateID),
@@ -754,14 +758,13 @@ func TestSealingSegment(t *testing.T) {
 			// build chain, so it's long enough to not target blocks as inside of flow.DefaultTransactionExpiry window.
 			parent := block4
 			for i := 0; i < 1.5*flow.DefaultTransactionExpiry; i++ {
-				next := unittest.BlockWithParentProtocolState(parent)
-				next.Header.View = next.Header.Height + 1 // set view so we are still in the same epoch
+				next := unittest.BlockWithParentProtocolStateAndUniqueView(parent, viewIndex)
 				buildFinalizedBlock(t, state, next)
 				parent = next
 			}
 
 			receipt4, seal4 := unittest.ReceiptAndSealForBlock(block4)
-			prevLastBlock := unittest.BlockWithParentFixture(parent.Header)
+			prevLastBlock := unittest.BlockWithParentFixtureAndUniqueView(parent.Header, viewIndex)
 			prevLastBlock.SetPayload(unittest.PayloadFixture(
 				unittest.WithReceipts(receipt4),
 				unittest.WithProtocolStateID(rootProtocolStateID),
@@ -769,7 +772,7 @@ func TestSealingSegment(t *testing.T) {
 			buildFinalizedBlock(t, state, prevLastBlock)
 
 			// since result and seal cannot be part of the same block, we need to build another block
-			lastBlock := unittest.BlockWithParentFixture(prevLastBlock.Header)
+			lastBlock := unittest.BlockWithParentFixtureAndUniqueView(prevLastBlock.Header, viewIndex)
 			lastBlock.SetPayload(unittest.PayloadFixture(
 				unittest.WithSeals(seal2, seal3, seal4),
 				unittest.WithProtocolStateID(rootProtocolStateID),
@@ -779,7 +782,7 @@ func TestSealingSegment(t *testing.T) {
 			snapshot := state.AtBlockID(lastBlock.ID())
 
 			// build a valid child to ensure we have a QC
-			buildFinalizedBlock(t, state, unittest.BlockWithParentProtocolState(lastBlock))
+			buildFinalizedBlock(t, state, unittest.BlockWithParentProtocolStateAndUniqueView(lastBlock, viewIndex))
 
 			segment, err := snapshot.SealingSegment()
 			require.NoError(t, err)
