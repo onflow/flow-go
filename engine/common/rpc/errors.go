@@ -41,8 +41,7 @@ func ErrorToStatus(err error) error {
 	case errors.Is(err, context.DeadlineExceeded):
 		return status.Error(codes.DeadlineExceeded, err.Error())
 	default:
-		// TODO: ideally we would throw an exception in this case. For now, report it as Unknown so we
-		// can more easily identify any missed code paths and fix them while transitioning to this pattern.
+		// all errors should have explicit sentinels. reporting them as `Unknown` will make them easier to find and fix.
 		return status.Error(codes.Unknown, err.Error())
 	}
 }

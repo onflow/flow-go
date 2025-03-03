@@ -91,8 +91,6 @@ func ErrorToStatusError(err error) StatusError {
 	case errors.Is(err, context.DeadlineExceeded):
 		return NewRestError(http.StatusRequestTimeout, "Request deadline exceeded", err)
 	default:
-		// TODO: ideally we would throw an exception in this case. For now, report it as Unknown so we
-		// can more easily identify any missed code paths and fix them while transitioning to this pattern.
 		return NewRestError(http.StatusInternalServerError, err.Error(), err)
 	}
 }
