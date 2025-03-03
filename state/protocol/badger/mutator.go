@@ -408,7 +408,7 @@ func (m *FollowerState) headerExtend(ctx context.Context, candidate *flow.Block,
 			// add parent to index of certified blocks:
 			err := transaction.WithTx(operation.IndexCertifiedBlockByView(parent.View, qc.BlockID))(tx)
 			if err != nil {
-				return fmt.Errorf("could not index certified block: %w", err)
+				return fmt.Errorf("could not index certified block by view %v: %w", parent.View, err)
 			}
 
 			// trigger BlockProcessable for parent block above root height
@@ -439,7 +439,7 @@ func (m *FollowerState) headerExtend(ctx context.Context, candidate *flow.Block,
 			// add candidate to index of certified blocks:
 			err := transaction.WithTx(operation.IndexCertifiedBlockByView(candidate.Header.View, blockID))(tx)
 			if err != nil {
-				return fmt.Errorf("could not index certified block: %w", err)
+				return fmt.Errorf("could not index certified block at step 5c at view %v: %w", candidate.Header.View, err)
 			}
 
 			tx.OnSucceed(func() { // queue a BlockProcessable event for candidate block, since it is certified
