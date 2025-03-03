@@ -44,14 +44,14 @@ func TestMalleability(t *testing.T) {
 		firstView := rand.Uint64()
 		return flow.EpochExtension{
 			FirstView: firstView,
-			FinalView: firstView + 10,
+			FinalView: firstView + 10 + rand.Int(10),
 		}
 	}
 
 	epochStateContainerFixture := func() *flow.EpochStateContainer {
 		return &flow.EpochStateContainer{
-			SetupID:          unittest.EpochSetupFixture().ID(),
-			CommitID:         unittest.EpochCommitFixture().ID(),
+			SetupID:          unittest.IdentifierFixture(),
+			CommitID:         unittest.IdentifierFixture(),
 			ActiveIdentities: unittest.DynamicIdentityEntryListFixture(5),
 			EpochExtensions:  []flow.EpochExtension{epochExtensionFixture()},
 		}
@@ -105,9 +105,15 @@ func TestMalleability(t *testing.T) {
 
 	t.Run("MinEpochStateEntry", func(t *testing.T) {
 		checker := unittest.NewMalleabilityChecker(
-			unittest.WithFieldGenerator("PreviousEpoch", func() flow.EpochStateContainer { return *epochStateContainerFixture() }),
-			unittest.WithFieldGenerator("CurrentEpoch", func() flow.EpochStateContainer { return *epochStateContainerFixture() }),
-			unittest.WithFieldGenerator("NextEpoch", func() flow.EpochStateContainer { return *epochStateContainerFixture() }),
+			unittest.WithTypeGenerator(func() flow.DynamicIdentityEntry {
+				return flow.DynamicIdentityEntry{
+					NodeID:  unittest.IdentifierFixture(),
+					Ejected: rand.Uint32()%2 == 0,
+				}
+			}),
+			unittest.WithTypeGenerator(func() flow.EpochExtension {
+				return epochExtensionFixture()
+			}),
 		)
 
 		err := checker.Check(unittest.EpochStateFixture(unittest.WithNextEpochProtocolState()).MinEpochStateEntry)
