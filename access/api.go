@@ -203,13 +203,14 @@ type API interface {
 	//
 	// If invalid parameters will be supplied SubscribeBlockDigestsFromLatest will return a failed subscription.
 	SubscribeBlockDigestsFromLatest(ctx context.Context, blockStatus flow.BlockStatus) subscription.Subscription
-	// SubscribeTransactionStatuses subscribes to transaction status updates for a given transaction ID. Monitoring begins
-	// from the last block ID. The subscription streams status updates until the transaction reaches the final state
-	// ([flow.TransactionStatusSealed] or [flow.TransactionStatusExpired]). When the transaction reaches one of these
-	// final states, the subscription will automatically terminate.
+	// SubscribeTransactionStatuses subscribes to transaction status updates for a given transaction ID. Monitoring starts
+	// from the latest block to obtain the current transaction status. If the transaction is already in a final state
+	// ([flow.TransactionStatusSealed] or [flow.TransactionStatusExpired]), all statuses will be prepared and sent to the client
+	// sequentially. If the transaction is not in a final state, the subscription will stream status updates until the transaction
+	// reaches a final state. Once a final state is reached, the subscription will automatically terminate.
 	//
 	// Parameters:
-	//   - ctx: The context to manage the subscription's lifecycle, including cancellation.
+	//   - ctx: Context to manage the subscription's lifecycle, including cancellation.
 	//   - txID: The unique identifier of the transaction to monitor.
 	//   - requiredEventEncodingVersion: The version of event encoding required for the subscription.
 	SubscribeTransactionStatuses(ctx context.Context, txID flow.Identifier, requiredEventEncodingVersion entities.EventEncodingVersion) subscription.Subscription
@@ -300,10 +301,17 @@ type CompatibleRange struct {
 
 // NodeVersionInfo contains information about node, such as semver, commit, sporkID, protocolVersion, etc
 type NodeVersionInfo struct {
-	Semver               string
-	Commit               string
-	SporkId              flow.Identifier
-	ProtocolVersion      uint64
+	Semver  string
+	Commit  string
+	SporkId flow.Identifier
+	// ProtocolVersion is the deprecated protocol version number.
+	// Deprecated: Previously this referred to the major software version as of the most recent spork.
+	// Replaced by protocol_state_version.
+	ProtocolVersion uint64
+	// ProtocolStateVersion is the Protocol State version as of the latest finalized block.
+	// This tracks the schema version of the Protocol State and is used to coordinate breaking changes in the Protocol.
+	// Version numbers are monotonically increasing.
+	ProtocolStateVersion uint64
 	SporkRootBlockHeight uint64
 	NodeRootBlockHeight  uint64
 	CompatibleRange      *CompatibleRange

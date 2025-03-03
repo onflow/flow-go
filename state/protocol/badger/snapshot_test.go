@@ -111,7 +111,6 @@ func TestSnapshot_Params(t *testing.T) {
 
 	expectedChainID := rootSnapshot.Params().ChainID()
 	expectedSporkID := rootSnapshot.Params().SporkID()
-	expectedProtocolVersion := rootSnapshot.Params().ProtocolVersion()
 
 	rootHeader, err := rootSnapshot.Head()
 	require.NoError(t, err)
@@ -141,10 +140,6 @@ func TestSnapshot_Params(t *testing.T) {
 			t.Run("should be able to get spork ID from snapshot", func(t *testing.T) {
 				sporkID := snapshot.Params().SporkID()
 				assert.Equal(t, expectedSporkID, sporkID)
-			})
-			t.Run("should be able to get protocol version from snapshot", func(t *testing.T) {
-				protocolVersion := snapshot.Params().ProtocolVersion()
-				assert.Equal(t, expectedProtocolVersion, protocolVersion)
 			})
 		}
 	})

@@ -114,12 +114,7 @@ func (b *backendSubscribeTransactions) createSubscription(
 		return subscription.NewFailedSubscription(err, "failed to get start height")
 	}
 
-	// Retrieve the current state of the transaction.
-	txInfo, err := newTransactionSubscriptionMetadata(ctx, b.backendTransactions, txID, referenceBlockID, requiredEventEncodingVersion)
-	if err != nil {
-		b.log.Debug().Err(err).Str("tx_id", txID.String()).Msg("failed to get current transaction state")
-		return subscription.NewFailedSubscription(err, "failed to start stream")
-	}
+	txInfo := newTransactionSubscriptionMetadata(b.backendTransactions, txID, referenceBlockID, requiredEventEncodingVersion)
 
 	return b.subscriptionHandler.Subscribe(ctx, startHeight, b.getTransactionStatusResponse(txInfo, startHeight))
 }
@@ -144,7 +139,7 @@ func (b *backendSubscribeTransactions) getTransactionStatusResponse(
 		// timeout waiting for unknown tx that are never indexed
 		if hasReachedUnknownStatusLimit(height, startHeight, txInfo.txResult.Status) {
 			txInfo.txResult.Status = flow.TransactionStatusExpired
-			return b.generateResultsStatuses(txInfo.txResult, flow.TransactionStatusUnknown)
+			return generateResultsStatuses(txInfo.txResult, flow.TransactionStatusUnknown)
 		}
 
 		// Get old status here, as it could be replaced by status from founded tx result
@@ -158,7 +153,7 @@ func (b *backendSubscribeTransactions) getTransactionStatusResponse(
 			return nil, status.Errorf(codes.Internal, "failed to refresh transaction information: %v", err)
 		}
 
-		return b.generateResultsStatuses(txInfo.txResult, prevTxStatus)
+		return generateResultsStatuses(txInfo.txResult, prevTxStatus)
 	}
 }
 
@@ -199,7 +194,7 @@ func (b *backendSubscribeTransactions) checkBlockReady(height uint64) error {
 // 1. pending(1) -> finalized(2) -> executed(3) -> sealed(4)
 // 2. pending(1) -> expired(5)
 // No errors expected during normal operations.
-func (b *backendSubscribeTransactions) generateResultsStatuses(
+func generateResultsStatuses(
 	txResult *access.TransactionResult,
 	prevTxStatus flow.TransactionStatus,
 ) ([]*access.TransactionResult, error) {

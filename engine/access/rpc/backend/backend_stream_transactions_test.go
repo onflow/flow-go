@@ -8,11 +8,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/onflow/flow-go/module/irrecoverable"
-	protocolint "github.com/onflow/flow-go/state/protocol"
-
-	"github.com/onflow/flow-go/storage"
-
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
@@ -24,6 +19,7 @@ import (
 	"github.com/stretchr/testify/suite"
 
 	accessproto "github.com/onflow/flow/protobuf/go/flow/access"
+	"github.com/onflow/flow/protobuf/go/flow/entities"
 
 	accessapi "github.com/onflow/flow-go/access"
 	"github.com/onflow/flow-go/engine"
@@ -38,16 +34,17 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/counters"
+	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/metrics"
 	syncmock "github.com/onflow/flow-go/module/state_synchronization/mock"
+	protocolint "github.com/onflow/flow-go/state/protocol"
 	protocol "github.com/onflow/flow-go/state/protocol/mock"
+	"github.com/onflow/flow-go/storage"
 	storagemock "github.com/onflow/flow-go/storage/mock"
 	"github.com/onflow/flow-go/storage/operation/badgerimpl"
 	"github.com/onflow/flow-go/storage/store"
 	"github.com/onflow/flow-go/utils/unittest"
 	"github.com/onflow/flow-go/utils/unittest/mocks"
-
-	"github.com/onflow/flow/protobuf/go/flow/entities"
 )
 
 // TransactionStatusSuite represents a suite for testing transaction status-related functionality in the Flow blockchain.
