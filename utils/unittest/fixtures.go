@@ -3146,3 +3146,11 @@ func MakeOwnerReg(key string, value string) flow.RegisterEntry {
 		Value: []byte(value),
 	}
 }
+
+// ViewBasedActivatorFixture returns a ViewBasedActivator with randomly generated Data and ActivationView.
+func ViewBasedActivatorFixture() *protocol.ViewBasedActivator[uint64] {
+	return &protocol.ViewBasedActivator[uint64]{
+		Data:           rand.Uint64(),
+		ActivationView: rand.Uint64(),
+	}
+}
