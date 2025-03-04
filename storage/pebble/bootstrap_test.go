@@ -30,7 +30,7 @@ func TestRegisterBootstrap_NewBootstrap(t *testing.T) {
 		rootHeight := uint64(1)
 		rootHash := ledger.RootHash(unittest.StateCommitmentFixture())
 		log := zerolog.New(io.Discard)
-		p, err := OpenRegisterPebbleDB(dir)
+		p, err := OpenRegisterPebbleDB(log, dir)
 		require.NoError(t, err)
 		// set heights
 		require.NoError(t, initHeights(p, rootHeight))
@@ -253,7 +253,7 @@ func randomRegisterPaths(n uint16) []ledger.Path {
 
 func createPebbleForTest(t *testing.T) (*pebble.DB, string) {
 	dbDir := unittest.TempPebblePath(t)
-	pb, err := OpenRegisterPebbleDB(dbDir)
+	pb, err := OpenRegisterPebbleDB(unittest.Logger(), dbDir)
 	require.NoError(t, err)
 	return pb, dbDir
 }

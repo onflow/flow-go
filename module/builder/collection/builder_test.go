@@ -33,7 +33,6 @@ import (
 	bstorage "github.com/onflow/flow-go/storage/badger"
 	"github.com/onflow/flow-go/storage/badger/operation"
 	"github.com/onflow/flow-go/storage/badger/procedure"
-	sutil "github.com/onflow/flow-go/storage/util"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -77,7 +76,8 @@ func (suite *BuilderSuite) SetupTest() {
 	metrics := metrics.NewNoopCollector()
 	tracer := trace.NewNoopTracer()
 	log := zerolog.Nop()
-	all := sutil.StorageLayer(suite.T(), suite.db)
+
+	all := bstorage.InitAll(metrics, suite.db)
 	consumer := events.NewNoop()
 
 	suite.headers = all.Headers
@@ -1063,7 +1063,7 @@ func benchmarkBuildOn(b *testing.B, size int) {
 
 		metrics := metrics.NewNoopCollector()
 		tracer := trace.NewNoopTracer()
-		all := sutil.StorageLayer(suite.T(), suite.db)
+		all := bstorage.InitAll(metrics, suite.db)
 		suite.headers = all.Headers
 		suite.blocks = all.Blocks
 		suite.payloads = bstorage.NewClusterPayloads(metrics, suite.db)

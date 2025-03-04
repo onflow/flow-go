@@ -610,7 +610,7 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity bootstrap.NodeInfo, ide
 	require.NoError(t, err)
 
 	registerDir := unittest.TempPebblePath(t)
-	pebbledb, err := storagepebble.OpenRegisterPebbleDB(registerDir)
+	pebbledb, err := storagepebble.OpenRegisterPebbleDB(node.Log.With().Str("pebbledb", "registers").Logger(), registerDir)
 	require.NoError(t, err)
 
 	checkpointHeight := uint64(0)
