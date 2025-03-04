@@ -3,7 +3,7 @@
   "includeOthers": false,
   "packages": [{
       "name": "integration",
-      "runner": "buildjet-4vcpu-ubuntu-2204",
+      "runner": "buildjet-4vcpu-ubuntu-2004",
       "exclude": ["integration/tests"]
     }]
 }
