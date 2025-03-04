@@ -88,35 +88,3 @@ func (lc LightCollection) Has(txID Identifier) bool {
 	}
 	return false
 }
-
-// Note that this is the basic version of the List, we need to substitute it with something like Merkle tree at some point
-type CollectionList struct {
-	collections []*Collection
-}
-
-func (cl *CollectionList) Fingerprint() Identifier {
-	return MerkleRoot(GetIDs(cl.collections)...)
-}
-
-func (cl *CollectionList) Insert(ch *Collection) {
-	cl.collections = append(cl.collections, ch)
-}
-
-func (cl *CollectionList) Items() []*Collection {
-	return cl.collections
-}
-
-// ByChecksum returns an entity from the list by entity fingerprint
-func (cl *CollectionList) ByChecksum(cs Identifier) (*Collection, bool) {
-	for _, coll := range cl.collections {
-		if coll.Checksum() == cs {
-			return coll, true
-		}
-	}
-	return nil, false
-}
-
-// ByIndex returns an entity from the list by index
-func (cl *CollectionList) ByIndex(i uint64) *Collection {
-	return cl.collections[i]
-}
