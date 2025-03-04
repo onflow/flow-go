@@ -126,7 +126,7 @@ func (b *Backend[K, V]) GetWithInit(key K, init func() V) (V, bool) {
 }
 
 // ByID returns the given item from the pool.
-func (b *Backend[K, V]) ByID(key K) (V, bool) {
+func (b *Backend[K, V]) Get(key K) (V, bool) {
 	// bs1 := binstat.EnterTime(binstat.BinStdmap + ".r_lock.(Backend)ByID")
 	b.RLock()
 	// binstat.Leave(bs1)
