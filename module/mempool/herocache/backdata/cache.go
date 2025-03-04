@@ -224,25 +224,6 @@ func (c *Cache) AdjustWithInit(entityID flow.Identifier, adjust func(flow.Entity
 	return c.Adjust(entityID, adjust)
 }
 
-// GetWithInit returns the given entity from the backdata. If the entity does not exist, it creates a new entity
-// using the factory function and stores it in the backdata.
-// Args:
-// - entityID: the identifier of the entity to get.
-// - init: the function that initializes the entity when it is not found.
-// Returns:
-//   - the entity.
-//
-// - a bool which indicates whether the entity was found (or created).
-func (c *Cache) GetWithInit(entityID flow.Identifier, init func() flow.Entity) (flow.Entity, bool) {
-	defer c.logTelemetry()
-
-	if c.Has(entityID) {
-		return c.ByID(entityID)
-	}
-	c.put(entityID, init())
-	return c.ByID(entityID)
-}
-
 // ByID returns the given entity from the backdata.
 func (c *Cache) ByID(entityID flow.Identifier) (flow.Entity, bool) {
 	defer c.logTelemetry()
