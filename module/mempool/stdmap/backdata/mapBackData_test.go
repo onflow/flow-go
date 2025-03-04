@@ -15,13 +15,13 @@ func TestMapBackData_StoreAnd(t *testing.T) {
 
 	// Add
 	for _, e := range entities {
-		// all values must be stored successfully
+		// all entities must be stored successfully
 		require.True(t, backData.Add(e.ID(), e))
 	}
 
 	// Get
 	for _, expected := range entities {
-		// all values must be retrievable successfully
+		// all entities must be retrievable successfully
 		actual, ok := backData.Get(expected.ID())
 		require.True(t, ok)
 		require.Equal(t, expected, actual)
@@ -58,7 +58,7 @@ func TestMapBackData_AdjustWithInit(t *testing.T) {
 
 	// AdjustWithInit
 	for _, e := range entities {
-		// all values must be adjusted successfully
+		// all entities must be adjusted successfully
 		actual, ok := backData.AdjustWithInit(e.ID(), func(entity *unittest.MockEntity) *unittest.MockEntity {
 			// increment nonce of the entity
 			entity.Nonce++
@@ -84,8 +84,8 @@ func TestMapBackData_AdjustWithInit(t *testing.T) {
 	retriedIds := backData.Keys()
 	require.Equal(t, len(entities), len(retriedIds))
 	require.ElementsMatch(t, ids, retriedIds)
-	for _, key := range retriedIds {
-		require.True(t, backData.Has(key))
+	for _, id := range retriedIds {
+		require.True(t, backData.Has(id))
 	}
 
 	// Values
@@ -95,7 +95,7 @@ func TestMapBackData_AdjustWithInit(t *testing.T) {
 
 	// Get
 	for _, e := range entities {
-		// all values must be retrieved successfully
+		// all entities must be retrieved successfully
 		actual, ok := backData.Get(e.ID())
 		require.True(t, ok)
 		require.Equal(t, e.ID(), actual.ID())
@@ -104,9 +104,9 @@ func TestMapBackData_AdjustWithInit(t *testing.T) {
 
 	// GetWithInit
 	for _, e := range entities {
-		// all values must be retrieved successfully
+		// all entities must be retrieved successfully
 		actual, ok := backData.GetWithInit(e.ID(), func() *unittest.MockEntity {
-			require.Fail(t, "should not be called") // value has already been initialized
+			require.Fail(t, "should not be called") // entity has already been initialized
 			return e
 		})
 		require.True(t, ok)
@@ -123,9 +123,9 @@ func TestMapBackData_GetWithInit(t *testing.T) {
 
 	// GetWithInit
 	for _, e := range entities {
-		// all values must be initialized retrieved successfully
+		// all entities must be initialized retrieved successfully
 		actual, ok := backData.GetWithInit(e.ID(), func() *unittest.MockEntity {
-			return e // initialize with the value
+			return e // initialize with the entity
 		})
 		require.True(t, ok)
 		require.Equal(t, e, actual)
@@ -153,20 +153,20 @@ func TestMapBackData_GetWithInit(t *testing.T) {
 	require.ElementsMatch(t, entities, actualKeys)
 
 	// Adjust
-	for _, v := range entities {
-		// all values must be adjusted successfully
-		actual, ok := backData.Adjust(v.ID(), func(entity *unittest.MockEntity) *unittest.MockEntity {
+	for _, e := range entities {
+		// all entities must be adjusted successfully
+		actual, ok := backData.Adjust(e.ID(), func(entity *unittest.MockEntity) *unittest.MockEntity {
 			// increment nonce of the entity
 			entity.Nonce++
 			return entity
 		})
 		require.True(t, ok)
-		require.Equal(t, v, actual)
+		require.Equal(t, e, actual)
 	}
 
 	// Get; should return the latest version of the entity
 	for _, e := range entities {
-		// all values must be retrieved successfully
+		// all entities must be retrieved successfully
 		actual, ok := backData.Get(e.ID())
 		require.True(t, ok)
 		require.Equal(t, e.ID(), actual.ID())
@@ -175,7 +175,7 @@ func TestMapBackData_GetWithInit(t *testing.T) {
 
 	// GetWithInit; should return the latest version of the entity, than increment the nonce
 	for _, e := range entities {
-		// all values must be retrieved successfully
+		// all entities must be retrieved successfully
 		actual, ok := backData.GetWithInit(e.ID(), func() *unittest.MockEntity {
 			require.Fail(t, "should not be called") // entity has already been initialized
 			return e
