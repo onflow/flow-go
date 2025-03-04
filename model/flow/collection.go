@@ -2,13 +2,14 @@ package flow
 
 import "github.com/onflow/flow-go/model/fingerprint"
 
-// Collection is set of transactions.
+// Collection is an ordered list of transactions.
+// Collections form a part of the payload of cluster blocks, produced by Collection Nodes.
+// Every Collection maps 1-1 to a Chunk, which is used for transaction execution.
 type Collection struct {
 	Transactions []*TransactionBody
 }
 
-// CollectionFromTransactions creates a new collection from the list of
-// transactions.
+// CollectionFromTransactions creates a new collection from the list of transactions.
 func CollectionFromTransactions(transactions []*Transaction) Collection {
 	coll := Collection{Transactions: make([]*TransactionBody, 0, len(transactions))}
 	for _, tx := range transactions {
@@ -33,6 +34,8 @@ func (c *Collection) Guarantee() CollectionGuarantee {
 	}
 }
 
+// ID returns a cryptographic commitment to the receiver Collection.
+// The ID of a Collection is equivalent to the ID of its corresponding LightCollection.
 func (c Collection) ID() Identifier {
 	return c.Light().ID()
 }
@@ -45,6 +48,7 @@ func (c Collection) Checksum() Identifier {
 	return c.Light().Checksum()
 }
 
+// TODO: why is this necessary?
 func (c Collection) Fingerprint() []byte {
 	var txs []byte
 	for _, tx := range c.Transactions {
@@ -58,9 +62,8 @@ func (c Collection) Fingerprint() []byte {
 	})
 }
 
-// LightCollection is a collection containing references to the constituent
-// transactions rather than full transaction bodies. It is used for indexing
-// transactions by collection and for computing the collection fingerprint.
+// LightCollection contains cryptographic commitments to the constituent transactions instead of transaction bodies.
+// It is used for indexing transactions by collection and for computing the collection fingerprint.
 type LightCollection struct {
 	Transactions []Identifier
 }

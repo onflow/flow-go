@@ -11,6 +11,7 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
+// TODO remove?
 func TestLightCollectionFingerprint(t *testing.T) {
 	col := unittest.CollectionFixture(2)
 	colID := col.ID()

@@ -59,6 +59,7 @@ func (p Payload) Hash() flow.Identifier {
 	return flow.MakeID(p)
 }
 
+// TODO: is this necessary?
 func (p Payload) Fingerprint() []byte {
 	return fingerprint.Fingerprint(struct {
 		Collection       []byte
