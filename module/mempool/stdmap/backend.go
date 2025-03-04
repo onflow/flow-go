@@ -63,7 +63,9 @@ func (b *Backend[K, V]) Add(key K, value V) bool {
 	return added
 }
 
-// Remove will remove the item with the given hash.
+// Remove removes the value with the given key.
+// If the key-value pair exists, returns the value and true.
+// Otherwise returns the zero value for type V and false.
 func (b *Backend[K, V]) Remove(key K) bool {
 	// bs1 := binstat.EnterTime(binstat.BinStdmap + ".w_lock.(Backend)Remove")
 	b.Lock()
