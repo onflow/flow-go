@@ -79,24 +79,6 @@ func (b *MapBackData[K, V]) AdjustWithInit(key K, adjust func(V) V, init func() 
 	return b.Adjust(key, adjust)
 }
 
-// GetWithInit returns the value for the given key.
-// If the key does not exist, it creates a new value using the init function, stores it, and returns it.
-//
-// Args:
-// - key: The key for which the value should be retrieved.
-// - init: A function that initializes the value if the key is not present.
-//
-// Returns:
-//   - the value.
-//   - a bool which indicates whether the value was found (or created).
-func (b *MapBackData[K, V]) GetWithInit(key K, init func() V) (V, bool) {
-	if b.Has(key) {
-		return b.Get(key)
-	}
-	b.Add(key, init())
-	return b.Get(key)
-}
-
 // Get returns the value for the given key.
 // Returns true if the key-value pair exists, and false otherwise.
 func (b *MapBackData[K, V]) Get(key K) (V, bool) {

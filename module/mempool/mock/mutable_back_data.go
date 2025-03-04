@@ -136,34 +136,6 @@ func (_m *MutableBackData[K, V]) Get(key K) (V, bool) {
 	return r0, r1
 }
 
-// GetWithInit provides a mock function with given fields: key, init
-func (_m *MutableBackData[K, V]) GetWithInit(key K, init func() V) (V, bool) {
-	ret := _m.Called(key, init)
-
-	if len(ret) == 0 {
-		panic("no return value specified for GetWithInit")
-	}
-
-	var r0 V
-	var r1 bool
-	if rf, ok := ret.Get(0).(func(K, func() V) (V, bool)); ok {
-		return rf(key, init)
-	}
-	if rf, ok := ret.Get(0).(func(K, func() V) V); ok {
-		r0 = rf(key, init)
-	} else {
-		r0 = ret.Get(0).(V)
-	}
-
-	if rf, ok := ret.Get(1).(func(K, func() V) bool); ok {
-		r1 = rf(key, init)
-	} else {
-		r1 = ret.Get(1).(bool)
-	}
-
-	return r0, r1
-}
-
 // Has provides a mock function with given fields: key
 func (_m *MutableBackData[K, V]) Has(key K) bool {
 	ret := _m.Called(key)
