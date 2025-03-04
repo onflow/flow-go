@@ -138,7 +138,9 @@ func (b *Backend[K, V]) Get(key K) (V, bool) {
 	return value, exists
 }
 
-// Run executes a function giving it exclusive access to the backdata
+// Run executes a function giving it exclusive access to the backdata.
+// All errors returned from the input functor f are considered exceptions.
+// No errors are expected during normal operation.
 func (b *Backend[K, V]) Run(f func(backdata mempool.BackData[K, V]) error) error {
 	// bs1 := binstat.EnterTime(binstat.BinStdmap + ".w_lock.(Backend)Run")
 	b.Lock()
