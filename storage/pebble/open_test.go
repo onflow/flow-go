@@ -8,14 +8,13 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/storage"
-	"github.com/onflow/flow-go/storage/util"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
 func TestIsBootstrapped(t *testing.T) {
 	t.Parallel()
 	unittest.RunWithTempDir(t, func(dir string) {
-		logger := util.NewLogger(unittest.Logger(), "test")
+		logger := unittest.Logger()
 		db, err := OpenRegisterPebbleDB(logger, dir)
 		require.NoError(t, err)
 		bootstrapped, err := IsBootstrapped(db)
@@ -28,7 +27,7 @@ func TestIsBootstrapped(t *testing.T) {
 func TestReadHeightsFromBootstrappedDB(t *testing.T) {
 	t.Parallel()
 	unittest.RunWithTempDir(t, func(dir string) {
-		logger := util.NewLogger(unittest.Logger(), "test")
+		logger := unittest.Logger()
 		db, err := OpenRegisterPebbleDB(logger, dir)
 		require.NoError(t, err)
 
@@ -56,7 +55,7 @@ func TestReadHeightsFromBootstrappedDB(t *testing.T) {
 func TestNewBootstrappedRegistersWithPath(t *testing.T) {
 	t.Parallel()
 	unittest.RunWithTempDir(t, func(dir string) {
-		logger := util.NewLogger(unittest.Logger(), "test")
+		logger := unittest.Logger()
 		_, db, err := NewBootstrappedRegistersWithPath(logger, dir)
 		require.Error(t, err)
 		require.True(t, errors.Is(err, storage.ErrNotBootstrapped))
@@ -83,7 +82,7 @@ func TestNewBootstrappedRegistersWithPath(t *testing.T) {
 func TestMustOpenDefaultPebbleDB(t *testing.T) {
 	t.Parallel()
 	unittest.RunWithTempDir(t, func(dir string) {
-		logger := util.NewLogger(unittest.Logger(), "test")
+		logger := unittest.Logger()
 		// verify error is returned when the db is not bootstrapped
 		_, err := MustOpenDefaultPebbleDB(logger, dir)
 		require.Error(t, err)

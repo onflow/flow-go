@@ -3,11 +3,14 @@ package pebble
 import (
 	"github.com/cockroachdb/pebble"
 	"github.com/cockroachdb/pebble/bloom"
+	"github.com/rs/zerolog"
+
+	"github.com/onflow/flow-go/storage/util"
 )
 
 // DefaultPebbleOptions returns an optimized set of pebble options.
 // This is mostly copied form pebble's nightly performance benchmark.
-func DefaultPebbleOptions(logger pebble.Logger, cache *pebble.Cache, comparer *pebble.Comparer) *pebble.Options {
+func DefaultPebbleOptions(logger zerolog.Logger, cache *pebble.Cache, comparer *pebble.Comparer) *pebble.Options {
 	opts := &pebble.Options{
 		Cache:              cache,
 		Comparer:           comparer,
@@ -28,7 +31,7 @@ func DefaultPebbleOptions(logger pebble.Logger, cache *pebble.Cache, comparer *p
 
 		// The default is 1.
 		MaxConcurrentCompactions: func() int { return 4 },
-		Logger:                   logger,
+		Logger:                   util.NewLogger(logger),
 	}
 
 	for i := 0; i < len(opts.Levels); i++ {

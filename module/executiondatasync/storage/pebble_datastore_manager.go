@@ -7,6 +7,7 @@ import (
 	"github.com/cockroachdb/pebble"
 	ds "github.com/ipfs/go-datastore"
 	pebbleds "github.com/ipfs/go-ds-pebble"
+	"github.com/rs/zerolog"
 
 	pstorage "github.com/onflow/flow-go/storage/pebble"
 )
@@ -29,7 +30,7 @@ type PebbleDatastoreManager struct {
 //     options are applied.
 //
 // No errors are expected during normal operations.
-func NewPebbleDatastoreManager(logger pebble.Logger, path string, options *pebble.Options) (*PebbleDatastoreManager, error) {
+func NewPebbleDatastoreManager(logger zerolog.Logger, path string, options *pebble.Options) (*PebbleDatastoreManager, error) {
 	if options == nil {
 		cache := pebble.NewCache(pstorage.DefaultPebbleCacheSize)
 		defer cache.Unref()

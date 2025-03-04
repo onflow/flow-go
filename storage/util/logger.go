@@ -14,9 +14,9 @@ type Logger struct {
 var _ pebble.Logger = (*Logger)(nil)
 var _ badger.Logger = (*Logger)(nil)
 
-func NewLogger(logger zerolog.Logger, comp string) *Logger {
+func NewLogger(logger zerolog.Logger) *Logger {
 	return &Logger{
-		log: logger.With().Str("component", comp).Logger(),
+		log: logger,
 	}
 }
 

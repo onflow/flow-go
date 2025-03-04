@@ -7,20 +7,19 @@ import (
 
 	"github.com/onflow/flow-go/cmd"
 	"github.com/onflow/flow-go/cmd/scaffold"
-	"github.com/onflow/flow-go/storage/util"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
 func TestInitPebbleDB(t *testing.T) {
 	unittest.RunWithTempDir(t, func(dir string) {
-		_, closer, err := scaffold.InitPebbleDB(util.NewLogger(unittest.Logger(), "test"), dir)
+		_, closer, err := scaffold.InitPebbleDB(unittest.Logger(), dir)
 		require.NoError(t, err)
 		require.NoError(t, closer.Close())
 	})
 }
 
 func TestInitPebbleDBDirNotSet(t *testing.T) {
-	_, _, err := scaffold.InitPebbleDB(util.NewLogger(unittest.Logger(), "test"), cmd.NotSet)
+	_, _, err := scaffold.InitPebbleDB(unittest.Logger(), cmd.NotSet)
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "missing required flag")
 }

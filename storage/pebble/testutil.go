@@ -6,7 +6,6 @@ import (
 	"github.com/cockroachdb/pebble"
 	"github.com/stretchr/testify/require"
 
-	"github.com/onflow/flow-go/storage/util"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -23,7 +22,7 @@ func RunWithRegistersStorageAtInitialHeights(tb testing.TB, first uint64, latest
 }
 
 func NewBootstrappedRegistersWithPathForTest(tb testing.TB, dir string, first, latest uint64) *pebble.DB {
-	db, err := OpenRegisterPebbleDB(util.NewLogger(unittest.Logger(), "pebbledb-registers"), dir)
+	db, err := OpenRegisterPebbleDB(unittest.Logger(), dir)
 	require.NoError(tb, err)
 
 	// insert initial heights to pebble

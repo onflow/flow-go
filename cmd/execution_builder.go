@@ -96,7 +96,6 @@ import (
 	"github.com/onflow/flow-go/storage/operation/pebbleimpl"
 	storagepebble "github.com/onflow/flow-go/storage/pebble"
 	"github.com/onflow/flow-go/storage/store"
-	"github.com/onflow/flow-go/storage/util"
 )
 
 const (
@@ -713,7 +712,7 @@ func (exeNode *ExecutionNode) LoadExecutionState(
 ) {
 
 	chunkDataPackDB, err := storagepebble.OpenDefaultPebbleDB(
-		util.NewLogger(node.Logger, "pebbledb-cdp"),
+		node.Logger.With().Str("pebbledb", "cdp").Logger(),
 		exeNode.exeConf.chunkDataPackDir,
 	)
 	if err != nil {
@@ -824,7 +823,7 @@ func (exeNode *ExecutionNode) LoadRegisterStore(
 		Str("pebble_db_path", exeNode.exeConf.registerDir).
 		Msg("register store enabled")
 	pebbledb, err := storagepebble.OpenRegisterPebbleDB(
-		util.NewLogger(node.Logger, "pebbledb-registers"),
+		node.Logger.With().Str("pebbledb", "registers").Logger(),
 		exeNode.exeConf.registerDir)
 
 	if err != nil {

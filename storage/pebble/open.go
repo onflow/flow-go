@@ -8,6 +8,7 @@ import (
 
 	"github.com/cockroachdb/pebble"
 	"github.com/hashicorp/go-multierror"
+	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/storage/pebble/registers"
@@ -17,7 +18,7 @@ const DefaultPebbleCacheSize = 1 << 20
 
 // NewBootstrappedRegistersWithPath initializes a new Registers instance with a pebble db
 // if the database is not initialized, it close the database and return storage.ErrNotBootstrapped
-func NewBootstrappedRegistersWithPath(logger pebble.Logger, dir string) (*Registers, *pebble.DB, error) {
+func NewBootstrappedRegistersWithPath(logger zerolog.Logger, dir string) (*Registers, *pebble.DB, error) {
 	db, err := OpenRegisterPebbleDB(logger, dir)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to initialize pebble db: %w", err)
@@ -41,7 +42,7 @@ func NewBootstrappedRegistersWithPath(logger pebble.Logger, dir string) (*Regist
 // a customized comparer (NewMVCCComparer) which is needed to
 // implement finding register values at any given height using
 // pebble's SeekPrefixGE function
-func OpenRegisterPebbleDB(logger pebble.Logger, dir string) (*pebble.DB, error) {
+func OpenRegisterPebbleDB(logger zerolog.Logger, dir string) (*pebble.DB, error) {
 	cache := pebble.NewCache(DefaultPebbleCacheSize)
 	defer cache.Unref()
 	// currently pebble is only used for registers
@@ -58,7 +59,7 @@ func OpenRegisterPebbleDB(logger pebble.Logger, dir string) (*pebble.DB, error) 
 // such as cache size and comparer
 // If the pebbleDB is not bootstrapped at this folder, it will auto-bootstrap it,
 // use MustOpenDefaultPebbleDB if you want to return error instead
-func OpenDefaultPebbleDB(logger pebble.Logger, dir string) (*pebble.DB, error) {
+func OpenDefaultPebbleDB(logger zerolog.Logger, dir string) (*pebble.DB, error) {
 	cache := pebble.NewCache(DefaultPebbleCacheSize)
 	defer cache.Unref()
 	opts := DefaultPebbleOptions(logger, cache, pebble.DefaultComparer)
@@ -72,7 +73,7 @@ func OpenDefaultPebbleDB(logger pebble.Logger, dir string) (*pebble.DB, error) {
 
 // MustOpenDefaultPebbleDB returns error if the pebbleDB is not bootstrapped at this folder
 // if bootstrapped, then open the pebbleDB
-func MustOpenDefaultPebbleDB(logger pebble.Logger, dir string) (*pebble.DB, error) {
+func MustOpenDefaultPebbleDB(logger zerolog.Logger, dir string) (*pebble.DB, error) {
 	err := IsPebbleInitialized(dir)
 	if err != nil {
 		return nil, fmt.Errorf("pebble db is not initialized: %w", err)
