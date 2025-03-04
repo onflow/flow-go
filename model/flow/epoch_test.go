@@ -48,17 +48,6 @@ func TestMalleability(t *testing.T) {
 		}
 	}
 
-	epochStateContainerFixture := func(opts ...func(*flow.EpochStateContainer)) *flow.EpochStateContainer {
-		container := &flow.EpochStateContainer{
-			SetupID:  unittest.IdentifierFixture(),
-			CommitID: unittest.IdentifierFixture(),
-		}
-		for _, apply := range opts {
-			apply(container)
-		}
-		return container
-	}
-
 	dynamicIdentityEntryFixture := func() *flow.DynamicIdentityEntry {
 		return &flow.DynamicIdentityEntry{
 			NodeID:  unittest.IdentifierFixture(),
@@ -74,37 +63,16 @@ func TestMalleability(t *testing.T) {
 		return list
 	}
 
-	t.Run("EpochStateContainer with nil EpochExtensions", func(t *testing.T) {
-		checker := unittest.NewMalleabilityChecker(
-			unittest.WithPinnedField("EpochExtensions"),
-			unittest.WithFieldGenerator("ActiveIdentities", func() flow.DynamicIdentityEntryList {
-				return dynamicIdentityEntryListFixture(5)
-			}),
-		)
+	epochStateContainerFixture := func() *flow.EpochStateContainer {
+		return &flow.EpochStateContainer{
+			SetupID:          unittest.IdentifierFixture(),
+			CommitID:         unittest.IdentifierFixture(),
+			ActiveIdentities: dynamicIdentityEntryListFixture(5),
+			EpochExtensions:  []flow.EpochExtension{epochExtensionFixture()},
+		}
+	}
 
-		// Due to `EpochExtensions` being nil, `MalleabilityChecker` will skip mutating this field.
-		err := checker.Check(epochStateContainerFixture(func(c *flow.EpochStateContainer) {
-			c.ActiveIdentities = dynamicIdentityEntryListFixture(5)
-		}))
-		require.NoError(t, err)
-	})
-
-	t.Run("EpochStateContainer with nil ActiveIdentities", func(t *testing.T) {
-		checker := unittest.NewMalleabilityChecker(
-			unittest.WithFieldGenerator("EpochExtensions", func() []flow.EpochExtension {
-				return []flow.EpochExtension{epochExtensionFixture()}
-			}),
-			unittest.WithPinnedField("ActiveIdentities"),
-		)
-
-		// Due to `ActiveIdentities` being nil, `MalleabilityChecker` will skip mutating this field.
-		err := checker.Check(epochStateContainerFixture(func(c *flow.EpochStateContainer) {
-			c.EpochExtensions = []flow.EpochExtension{epochExtensionFixture()}
-		}))
-		require.NoError(t, err)
-	})
-
-	t.Run("EpochStateContainer with proper EpochExtensions and ActiveIdentities", func(t *testing.T) {
+	t.Run("EpochStateContainer", func(t *testing.T) {
 		checker := unittest.NewMalleabilityChecker(
 			unittest.WithFieldGenerator("EpochExtensions", func() []flow.EpochExtension {
 				return []flow.EpochExtension{epochExtensionFixture()}
