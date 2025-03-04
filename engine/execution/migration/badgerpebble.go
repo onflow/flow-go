@@ -6,6 +6,7 @@ import (
 
 	"github.com/cockroachdb/pebble"
 	"github.com/dgraph-io/badger/v2"
+	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/block_iterator/latest"
@@ -20,9 +21,10 @@ import (
 
 // MigrateLastSealedExecutedResultToPebble copy the execution data, such events, transaction results etc
 // for the last executed and sealed block from badger to pebble
-func MigrateLastSealedExecutedResultToPebble(badgerDB *badger.DB, pebbleDB *pebble.DB, ps protocol.State) error {
+func MigrateLastSealedExecutedResultToPebble(logger zerolog.Logger, badgerDB *badger.DB, pebbleDB *pebble.DB, ps protocol.State) error {
 	bdb := badgerimpl.ToDB(badgerDB)
 	pdb := pebbleimpl.ToDB(pebbleDB)
+	lg := logger.With().Str("module", "badger-pebble-migration").Logger()
 
 	// get last sealed and executed block in badger
 	lastExecutedSealedHeightInBadger, err := latest.LatestSealedAndExecutedHeight(ps, bdb)
@@ -37,6 +39,10 @@ func MigrateLastSealedExecutedResultToPebble(badgerDB *badger.DB, pebbleDB *pebb
 	}
 
 	blockID := header.ID()
+
+	lg.Info().Msgf(
+		"migrating last executed and sealed block %v (%v) from badger to pebble",
+		header.Height, blockID)
 
 	// create badger storage modules
 	badgerEvents, badgerServiceEvents, badgerTransactionResults, badgerMyReceipts, badgerCommits := createStores(bdb)
@@ -106,10 +112,16 @@ func MigrateLastSealedExecutedResultToPebble(badgerDB *badger.DB, pebbleDB *pebb
 
 			if header.Height > lastExecutedSealedHeightInBadger {
 				// existing executed in pebble is higher than badger, no need to update
+
+				lg.Info().Msgf("existing executed block %v in pebble is newer than %v in badger, skip update",
+					header.Height, lastExecutedSealedHeightInBadger)
 				return nil
 			}
 
-			// otherwise continue to pebble in pebble
+			// otherwise continue to update last executed block in pebble
+			lg.Info().Msgf("existing executed block %v in pebble is older than %v in badger, update executed block",
+				header.Height, lastExecutedSealedHeightInBadger,
+			)
 		}
 
 		if !errors.Is(err, storage.ErrNotFound) {
@@ -130,6 +142,9 @@ func MigrateLastSealedExecutedResultToPebble(badgerDB *badger.DB, pebbleDB *pebb
 	if err != nil {
 		return fmt.Errorf("failed to write data to pebble: %w", err)
 	}
+
+	lg.Info().Msgf("migrated last executed and sealed block %v (%v) from badger to pebble",
+		header.Height, blockID)
 
 	return nil
 }
