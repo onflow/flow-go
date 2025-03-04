@@ -14,7 +14,7 @@ import (
 func LoggingInterceptor(log zerolog.Logger) grpc.UnaryServerInterceptor {
 	return logging.UnaryServerInterceptor(
 		InterceptorLogger(log),
-		logging.WithLevels(customClientCodeToLevel),
+		logging.WithLevels(statusCodeToLogLevel),
 	)
 }
 
@@ -39,7 +39,8 @@ func InterceptorLogger(l zerolog.Logger) logging.Logger {
 	})
 }
 
-func customClientCodeToLevel(c codes.Code) logging.Level {
+// statusCodeToLogLevel converts a grpc status.Code to the appropriate logging.Level
+func statusCodeToLogLevel(c codes.Code) logging.Level {
 	switch c {
 	case codes.OK:
 		// log successful returns as Debug to avoid excessive logging in info mode
