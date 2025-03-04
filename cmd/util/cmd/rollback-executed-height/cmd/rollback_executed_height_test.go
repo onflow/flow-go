@@ -44,8 +44,6 @@ func TestReExecuteBlock(t *testing.T) {
 			myReceipts := bstorage.NewMyExecutionReceipts(metrics, db, receipts)
 			events := bstorage.NewEvents(metrics, db)
 			serviceEvents := bstorage.NewServiceEvents(metrics, db)
-			transactions := bstorage.NewTransactions(metrics, db)
-			collections := bstorage.NewCollections(db, transactions)
 
 			err = headers.Store(genesis)
 			require.NoError(t, err)
@@ -56,7 +54,6 @@ func TestReExecuteBlock(t *testing.T) {
 				commits,
 				nil,
 				headers,
-				collections,
 				chunkDataPacks,
 				results,
 				myReceipts,
@@ -178,8 +175,6 @@ func TestReExecuteBlockWithDifferentResult(t *testing.T) {
 			myReceipts := bstorage.NewMyExecutionReceipts(metrics, db, receipts)
 			events := bstorage.NewEvents(metrics, db)
 			serviceEvents := bstorage.NewServiceEvents(metrics, db)
-			transactions := bstorage.NewTransactions(metrics, db)
-			collections := bstorage.NewCollections(db, transactions)
 
 			err = headers.Store(genesis)
 			require.NoError(t, err)
@@ -190,7 +185,6 @@ func TestReExecuteBlockWithDifferentResult(t *testing.T) {
 				commits,
 				nil,
 				headers,
-				collections,
 				chunkDataPacks,
 				results,
 				myReceipts,
