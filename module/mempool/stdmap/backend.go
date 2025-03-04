@@ -136,7 +136,7 @@ func (b *Backend) ByID(entityID flow.Identifier) (flow.Entity, bool) {
 	// bs2 := binstat.EnterTime(binstat.BinStdmap + ".inlock.(Backend)ByID")
 	// defer binstat.Leave(bs2)
 	defer b.RUnlock()
-	entity, exists := b.mutableBackData.ByID(entityID)
+	entity, exists := b.mutableBackData.Get(entityID)
 	return entity, exists
 }
 
@@ -182,7 +182,7 @@ func (b *Backend) All() []flow.Entity {
 	// defer binstat.Leave(bs2)
 	defer b.RUnlock()
 
-	return b.mutableBackData.Entities()
+	return b.mutableBackData.Values()
 }
 
 // Clear removes all entities from the pool.
