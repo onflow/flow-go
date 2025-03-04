@@ -10,93 +10,93 @@ import (
 )
 
 func TestMapBackData_StoreAnd(t *testing.T) {
-	backData := NewMapBackData[flow.Identifier, unittest.MockEntity]()
+	backData := NewMapBackData[flow.Identifier, *unittest.MockEntity]()
 	entities := unittest.EntityListFixture(100)
 
 	// Add
 	for _, e := range entities {
-		// all entities must be stored successfully
-		require.True(t, backData.Add(e.ID(), *e))
+		// all values must be stored successfully
+		require.True(t, backData.Add(e.ID(), e))
 	}
 
-	// ByID
+	// Get
 	for _, expected := range entities {
-		// all entities must be retrievable successfully
-		actual, ok := backData.ByID(expected.ID())
+		// all values must be retrievable successfully
+		actual, ok := backData.Get(expected.ID())
 		require.True(t, ok)
-		require.Equal(t, expected, &actual)
+		require.Equal(t, expected, actual)
 	}
 
 	// All
 	all := backData.All()
 	require.Equal(t, len(entities), len(all))
 	for _, expected := range entities {
-		actual, ok := backData.ByID(expected.ID())
+		actual, ok := backData.Get(expected.ID())
 		require.True(t, ok)
-		require.Equal(t, expected, &actual)
+		require.Equal(t, expected, actual)
 	}
 
-	// Identifiers
-	ids := backData.Identifiers()
+	// Keys
+	ids := backData.Keys()
 	require.Equal(t, len(entities), len(ids))
 	for _, id := range ids {
 		require.True(t, backData.Has(id))
 	}
 
-	// Entities
-	requireEntitiesMatch(t, entities, backData.Entities())
+	// Values
+	actualValues := backData.Values()
+	require.Equal(t, len(entities), len(actualValues))
+	require.ElementsMatch(t, entities, actualValues)
 }
 
 // TestMapBackData_AdjustWithInit tests the AdjustWithInit method of the MapBackData.
 // Note that as the backdata is not inherently thread-safe, this test is not concurrent.
 func TestMapBackData_AdjustWithInit(t *testing.T) {
-	backData := NewMapBackData[flow.Identifier, unittest.MockEntity]()
+	backData := NewMapBackData[flow.Identifier, *unittest.MockEntity]()
 	entities := unittest.EntityListFixture(100)
 	ids := flow.GetIDs(entities)
 
 	// AdjustWithInit
 	for _, e := range entities {
-		// all entities must be adjusted successfully
-		actual, ok := backData.AdjustWithInit(e.ID(), func(entity unittest.MockEntity) (flow.Identifier, unittest.MockEntity) {
+		// all values must be adjusted successfully
+		actual, ok := backData.AdjustWithInit(e.ID(), func(entity *unittest.MockEntity) *unittest.MockEntity {
 			// increment nonce of the entity
 			entity.Nonce++
-			return entity.ID(), entity
-		}, func() unittest.MockEntity {
-			return *e
+			return entity
+		}, func() *unittest.MockEntity {
+			return e
 		})
 		require.True(t, ok)
-
-		// Manually update e to reflect the expected change
-		e.Nonce++
-
-		require.Equal(t, e, &actual)
+		require.Equal(t, e, actual)
 	}
 
 	// All
 	all := backData.All()
 	require.Equal(t, len(entities), len(all))
 	for _, expected := range entities {
-		actual, ok := backData.ByID(expected.ID())
+		actual, ok := backData.Get(expected.ID())
 		require.True(t, ok)
 		require.Equal(t, expected.ID(), actual.ID())
 		require.Equal(t, uint64(1), actual.Nonce)
 	}
 
-	// Identifiers
-	retriedIds := backData.Identifiers()
+	// Keys
+	retriedIds := backData.Keys()
 	require.Equal(t, len(entities), len(retriedIds))
 	require.ElementsMatch(t, ids, retriedIds)
-	for _, id := range retriedIds {
-		require.True(t, backData.Has(id))
+	for _, key := range retriedIds {
+		require.True(t, backData.Has(key))
 	}
 
-	// Entities
-	requireEntitiesMatch(t, entities, backData.Entities())
+	// Values
+	actualValues := backData.Values()
+	require.Equal(t, len(entities), len(actualValues))
+	require.ElementsMatch(t, entities, actualValues)
 
-	// ByID
+	// Get
 	for _, e := range entities {
-		// all entities must be retrieved successfully
-		actual, ok := backData.ByID(e.ID())
+		// all values must be retrieved successfully
+		actual, ok := backData.Get(e.ID())
 		require.True(t, ok)
 		require.Equal(t, e.ID(), actual.ID())
 		require.Equal(t, uint64(1), actual.Nonce)
@@ -104,10 +104,10 @@ func TestMapBackData_AdjustWithInit(t *testing.T) {
 
 	// GetWithInit
 	for _, e := range entities {
-		// all entities must be retrieved successfully
-		actual, ok := backData.GetWithInit(e.ID(), func() unittest.MockEntity {
-			require.Fail(t, "should not be called") // entity has already been initialized
-			return *e
+		// all values must be retrieved successfully
+		actual, ok := backData.GetWithInit(e.ID(), func() *unittest.MockEntity {
+			require.Fail(t, "should not be called") // value has already been initialized
+			return e
 		})
 		require.True(t, ok)
 		require.Equal(t, e.ID(), actual.ID())
@@ -118,58 +118,56 @@ func TestMapBackData_AdjustWithInit(t *testing.T) {
 // TestMapBackData_GetWithInit tests the GetWithInit method of the MapBackData.
 // Note that as the backdata is not inherently thread-safe, this test is not concurrent.
 func TestMapBackData_GetWithInit(t *testing.T) {
-	backData := NewMapBackData[flow.Identifier, unittest.MockEntity]()
+	backData := NewMapBackData[flow.Identifier, *unittest.MockEntity]()
 	entities := unittest.EntityListFixture(100)
 
 	// GetWithInit
 	for _, e := range entities {
-		// all entities must be initialized retrieved successfully
-		actual, ok := backData.GetWithInit(e.ID(), func() unittest.MockEntity {
-			return *e // initialize with the entity
+		// all values must be initialized retrieved successfully
+		actual, ok := backData.GetWithInit(e.ID(), func() *unittest.MockEntity {
+			return e // initialize with the value
 		})
 		require.True(t, ok)
-		require.Equal(t, e, &actual)
+		require.Equal(t, e, actual)
 	}
 
 	// All
 	all := backData.All()
 	require.Equal(t, len(entities), len(all))
 	for _, expected := range entities {
-		actual, ok := backData.ByID(expected.ID())
+		actual, ok := backData.Get(expected.ID())
 		require.True(t, ok)
-		require.Equal(t, expected, &actual)
+		require.Equal(t, expected, actual)
 	}
 
-	// Identifiers
-	ids := backData.Identifiers()
+	// Keys
+	ids := backData.Keys()
 	require.Equal(t, len(entities), len(ids))
 	for _, id := range ids {
 		require.True(t, backData.Has(id))
 	}
 
-	// Entities
-	requireEntitiesMatch(t, entities, backData.Entities())
+	// Values
+	actualKeys := backData.Values()
+	require.Equal(t, len(entities), len(actualKeys))
+	require.ElementsMatch(t, entities, actualKeys)
 
 	// Adjust
-	for _, e := range entities {
-		// all entities must be adjusted successfully
-		actual, ok := backData.Adjust(e.ID(), func(entity unittest.MockEntity) (flow.Identifier, unittest.MockEntity) {
+	for _, v := range entities {
+		// all values must be adjusted successfully
+		actual, ok := backData.Adjust(v.ID(), func(entity *unittest.MockEntity) *unittest.MockEntity {
 			// increment nonce of the entity
 			entity.Nonce++
-			return entity.ID(), entity
+			return entity
 		})
 		require.True(t, ok)
-
-		// Manually update e to reflect the expected change
-		e.Nonce++
-
-		require.Equal(t, e, &actual)
+		require.Equal(t, v, actual)
 	}
 
-	// ByID; should return the latest version of the entity
+	// Get; should return the latest version of the entity
 	for _, e := range entities {
-		// all entities must be retrieved successfully
-		actual, ok := backData.ByID(e.ID())
+		// all values must be retrieved successfully
+		actual, ok := backData.Get(e.ID())
 		require.True(t, ok)
 		require.Equal(t, e.ID(), actual.ID())
 		require.Equal(t, uint64(1), actual.Nonce)
@@ -177,24 +175,13 @@ func TestMapBackData_GetWithInit(t *testing.T) {
 
 	// GetWithInit; should return the latest version of the entity, than increment the nonce
 	for _, e := range entities {
-		// all entities must be retrieved successfully
-		actual, ok := backData.GetWithInit(e.ID(), func() unittest.MockEntity {
+		// all values must be retrieved successfully
+		actual, ok := backData.GetWithInit(e.ID(), func() *unittest.MockEntity {
 			require.Fail(t, "should not be called") // entity has already been initialized
-			return *e
+			return e
 		})
 		require.True(t, ok)
 		require.Equal(t, e.ID(), actual.ID())
 		require.Equal(t, uint64(1), actual.Nonce)
 	}
-}
-
-// requireEntitiesMatch is a helper function to validate entity lists
-func requireEntitiesMatch(t *testing.T, expected []*unittest.MockEntity, actualEntities []unittest.MockEntity) {
-	require.Equal(t, len(expected), len(actualEntities))
-
-	expectedEntities := make([]unittest.MockEntity, len(expected))
-	for i, e := range expected {
-		expectedEntities[i] = *e
-	}
-	require.ElementsMatch(t, expectedEntities, actualEntities)
 }
