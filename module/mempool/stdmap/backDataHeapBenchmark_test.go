@@ -96,7 +96,7 @@ func testAddEntities(t testing.TB, limit uint, b *stdmap.Backend[flow.Identifier
 		}
 
 		// entity should be immediately retrievable
-		actual, ok := b.ByID(e.ID())
+		actual, ok := b.Get(e.ID())
 		require.True(t, ok)
 		require.Equal(t, *e, actual)
 	}
@@ -131,7 +131,7 @@ func newBaselineLRU[K comparable, V any](limit int) *baselineLRU[K, V] {
 	}
 }
 
-// Has checks if we already contain the item with the given hash.
+// Has checks if backdata already stores a value under the given key.
 func (b *baselineLRU[K, V]) Has(key K) bool {
 	_, ok := b.c.Get(key)
 	return ok
@@ -206,7 +206,7 @@ func (b *baselineLRU[K, V]) GetWithInit(key K, init func() V) (V, bool) {
 }
 
 // ByID returns the given item from the pool.
-func (b *baselineLRU[K, V]) ByID(key K) (V, bool) {
+func (b *baselineLRU[K, V]) Get(key K) (V, bool) {
 	value, ok := b.c.Get(key)
 	if !ok {
 		var zero V
@@ -226,7 +226,7 @@ func (b *baselineLRU[K, V]) All() map[K]V {
 	all := make(map[K]V)
 	for _, key := range b.c.Keys() {
 
-		entity, ok := b.ByID(key)
+		entity, ok := b.Get(key)
 		if !ok {
 			panic("could not retrieve value from mempool")
 		}
@@ -236,7 +236,7 @@ func (b *baselineLRU[K, V]) All() map[K]V {
 	return all
 }
 
-func (b *baselineLRU[K, V]) Identifiers() []K {
+func (b *baselineLRU[K, V]) Keys() []K {
 	keys := make([]K, b.c.Len())
 	valueKeys := b.c.Keys()
 	total := len(valueKeys)
@@ -246,12 +246,12 @@ func (b *baselineLRU[K, V]) Identifiers() []K {
 	return keys
 }
 
-func (b *baselineLRU[K, V]) Entities() []V {
+func (b *baselineLRU[K, V]) Values() []V {
 	values := make([]V, b.c.Len())
 	valuesIds := b.c.Keys()
 	total := len(valuesIds)
 	for i := 0; i < total; i++ {
-		entity, ok := b.ByID(valuesIds[i])
+		entity, ok := b.Get(valuesIds[i])
 		if !ok {
 			panic("could not retrieve entity from mempool")
 		}

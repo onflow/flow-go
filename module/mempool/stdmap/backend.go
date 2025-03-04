@@ -65,7 +65,7 @@ func (b *Backend[K, V]) Add(key K, value V) bool {
 
 // Remove removes the value with the given key.
 // If the key-value pair exists, returns the value and true.
-// Otherwise returns the zero value for type V and false.
+// Otherwise, returns the zero value for type V and false.
 func (b *Backend[K, V]) Remove(key K) bool {
 	// bs1 := binstat.EnterTime(binstat.BinStdmap + ".w_lock.(Backend)Remove")
 	b.Lock()
@@ -79,7 +79,9 @@ func (b *Backend[K, V]) Remove(key K) bool {
 }
 
 // Adjust will adjust the value item using the given function if the given key can be found.
-// Returns a bool which indicates whether the value was updated.
+// Returns:
+//   - value, true if the value with the given key was found. The returned value is the version after the update is applied.
+//   - nil, false if no value with the given key was found
 func (b *Backend[K, V]) Adjust(key K, f func(V) (K, V)) (V, bool) {
 	// bs1 := binstat.EnterTime(binstat.BinStdmap + ".w_lock.(Backend)Adjust")
 	b.Lock()
@@ -125,7 +127,8 @@ func (b *Backend[K, V]) GetWithInit(key K, init func() V) (V, bool) {
 	return b.mutableBackData.GetWithInit(key, init)
 }
 
-// ByID returns the given item from the pool.
+// Get returns the value for the given key.
+// Returns true if the key-value pair exists, and false otherwise.
 func (b *Backend[K, V]) Get(key K) (V, bool) {
 	// bs1 := binstat.EnterTime(binstat.BinStdmap + ".r_lock.(Backend)ByID")
 	b.RLock()
@@ -134,7 +137,7 @@ func (b *Backend[K, V]) Get(key K) (V, bool) {
 	// bs2 := binstat.EnterTime(binstat.BinStdmap + ".inlock.(Backend)ByID")
 	// defer binstat.Leave(bs2)
 	defer b.RUnlock()
-	value, exists := b.mutableBackData.ByID(key)
+	value, exists := b.mutableBackData.Get(key)
 	return value, exists
 }
 
@@ -172,7 +175,7 @@ func (b *Backend[K, V]) Limit() uint {
 	return b.guaranteedCapacity
 }
 
-// All returns all entities from the pool.
+// All returns an unordered list of all values from the pool.
 func (b *Backend[K, V]) All() []V {
 	// bs1 := binstat.EnterTime(binstat.BinStdmap + ".r_lock.(Backend)All")
 	b.RLock()
@@ -182,7 +185,7 @@ func (b *Backend[K, V]) All() []V {
 	// defer binstat.Leave(bs2)
 	defer b.RUnlock()
 
-	return b.mutableBackData.Entities()
+	return b.mutableBackData.Values()
 }
 
 // Clear removes all entities from the pool.
