@@ -92,9 +92,9 @@ func TestPrograms_TestContractUpdates(t *testing.T) {
 	}
 
 	block := flow.Block{
-		Header: &flow.Header{
+		Header: &flow.Header{UnsignedHeader: flow.UnsignedHeader{
 			View: 26,
-		},
+		}},
 		Payload: &flow.Payload{
 			Guarantees: []*flow.CollectionGuarantee{&guarantee},
 		},
@@ -275,9 +275,9 @@ func TestPrograms_TestBlockForks(t *testing.T) {
 
 	t.Run("executing block1 (no collection)", func(t *testing.T) {
 		block1 = &flow.Block{
-			Header: &flow.Header{
+			Header: &flow.Header{UnsignedHeader: flow.UnsignedHeader{
 				View: 1,
-			},
+			}},
 			Payload: &flow.Payload{
 				Guarantees: []*flow.CollectionGuarantee{},
 			},
@@ -499,11 +499,11 @@ func createTestBlockAndRun(
 	}
 
 	block := &flow.Block{
-		Header: &flow.Header{
+		Header: &flow.Header{UnsignedHeader: flow.UnsignedHeader{
 			ParentID:  parentBlock.ID(),
 			View:      parentBlock.Header.Height + 1,
 			Timestamp: time.Now(),
-		},
+		}},
 		Payload: &flow.Payload{
 			Guarantees: []*flow.CollectionGuarantee{&guarantee},
 		},

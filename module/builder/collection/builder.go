@@ -499,7 +499,7 @@ func (b *Builder) buildHeader(
 	sign func(*flow.Header) error,
 ) (*flow.Header, error) {
 
-	header := &flow.Header{
+	header := &flow.Header{UnsignedHeader: flow.UnsignedHeader{
 		ChainID:     ctx.parent.ChainID,
 		ParentID:    ctx.parentID,
 		Height:      ctx.parent.Height + 1,
@@ -508,7 +508,7 @@ func (b *Builder) buildHeader(
 
 		// NOTE: we rely on the HotStuff-provided setter to set the other
 		// fields, which are related to signatures and HotStuff internals
-	}
+	}}
 
 	// set fields specific to the consensus algorithm
 	err := setter(header)

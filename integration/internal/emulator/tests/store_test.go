@@ -43,14 +43,14 @@ func TestBlocks(t *testing.T) {
 	store := setupStore(t)
 
 	block1 := &flowgo.Block{
-		Header: &flowgo.Header{
+		Header: &flowgo.Header{UnsignedHeader: flowgo.UnsignedHeader{
 			Height: 1,
-		},
+		}},
 	}
 	block2 := &flowgo.Block{
-		Header: &flowgo.Header{
+		Header: &flowgo.Header{UnsignedHeader: flowgo.UnsignedHeader{
 			Height: 2,
-		},
+		}},
 	}
 
 	t.Run("should return error for not found", func(t *testing.T) {

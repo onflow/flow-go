@@ -11,14 +11,14 @@ func Genesis(chainID ChainID) *Block {
 	payload := Payload{}
 
 	// create the header
-	header := Header{
+	header := Header{UnsignedHeader: UnsignedHeader{
 		ChainID:     chainID,
 		ParentID:    ZeroID,
 		Height:      0,
 		PayloadHash: payload.Hash(),
 		Timestamp:   GenesisTime,
 		View:        0,
-	}
+	}}
 
 	// combine to block
 	genesis := Block{

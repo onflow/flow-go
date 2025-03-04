@@ -630,13 +630,13 @@ func (b *Builder) createProposal(parentID flow.Identifier,
 	timestamp := b.cfg.blockTimer.Build(parent.Timestamp)
 
 	// construct default block on top of the provided parent
-	header := &flow.Header{
+	header := &flow.Header{UnsignedHeader: flow.UnsignedHeader{
 		ChainID:     parent.ChainID,
 		ParentID:    parentID,
 		Height:      parent.Height + 1,
 		Timestamp:   timestamp,
 		PayloadHash: flow.ZeroID,
-	}
+	}}
 
 	// apply the custom fields setter of the consensus algorithm, we must do this before applying service events
 	// since we need to know the correct view of the block.
