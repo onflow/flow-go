@@ -1,7 +1,6 @@
 package approvals
 
 import (
-	"errors"
 	"sync"
 	"testing"
 	"time"
@@ -129,6 +128,5 @@ func (s *AssignmentCollectorStateMachineTestSuite) TestChangeProcessingStatus_In
 	require.Equal(s.T(), Orphaned, s.collector.ProcessingStatus())
 	// then try to perform transition from caching to verifying
 	err = s.collector.ChangeProcessingStatus(CachingApprovals, VerifyingApprovals)
-	require.Error(s.T(), err)
-	require.True(s.T(), errors.Is(err, ErrDifferentCollectorState))
+	require.ErrorIs(s.T(), err, ErrDifferentCollectorState)
 }
