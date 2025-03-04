@@ -34,7 +34,7 @@ func NewBackend[K comparable, V any](options ...OptionFunc[K, V]) *Backend[K, V]
 	return &b
 }
 
-// Has checks if we already contain the item with the given hash.
+// Has checks if a value is stored under the given key.
 func (b *Backend[K, V]) Has(key K) bool {
 	// bs1 := binstat.EnterTime(binstat.BinStdmap + ".r_lock.(Backend)Has")
 	b.RLock()
