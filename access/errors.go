@@ -35,6 +35,31 @@ func RequireErrorIs(ctx context.Context, err error, targetErrs ...error) error {
 	return irrecoverable.NewException(err)
 }
 
+// RequireAccessError returns the error if it is an Access sentinel error
+// Otherwise, it throws an irrecoverable exception
+// Note: this method will not unwrap the error. the passed error must be an instance of a sentinel
+// error.
+func RequireAccessError(ctx context.Context, err error) error {
+	if err == nil {
+		return nil
+	}
+
+	if _, ok := err.(accessSentinel); ok {
+		return err
+	}
+
+	irrecoverable.Throw(ctx, err)
+	return irrecoverable.NewException(err)
+}
+
+// accessSentinel is a marker interface for errors returned by the Access API
+// This is used to differentiate unexpected errors returned by endpoints
+// Implement this for all new Access sentinel errors. Any that do not will be considered unexpected
+// exceptions.
+type accessSentinel interface {
+	accessSentinel()
+}
+
 // InvalidRequest indicates that the client's request was malformed or invalid
 type InvalidRequest struct {
 	err error
@@ -51,6 +76,8 @@ func (e InvalidRequest) Error() string {
 func (e InvalidRequest) Unwrap() error {
 	return e.err
 }
+
+func (e InvalidRequest) accessSentinel() {}
 
 func IsInvalidRequest(err error) bool {
 	var errInvalidRequest InvalidRequest
@@ -75,6 +102,8 @@ func (e DataNotFound) Unwrap() error {
 	return e.err
 }
 
+func (e DataNotFound) accessSentinel() {}
+
 func IsDataNotFound(err error) bool {
 	var errDataNotFound DataNotFound
 	return errors.As(err, &errDataNotFound)
@@ -98,6 +127,8 @@ func (e InternalError) Error() string {
 func (e InternalError) Unwrap() error {
 	return e.err
 }
+
+func (e InternalError) accessSentinel() {}
 
 func IsInternalError(err error) bool {
 	var errInternalError InternalError
@@ -124,6 +155,8 @@ func (e OutOfRangeError) Unwrap() error {
 	return e.err
 }
 
+func (e OutOfRangeError) accessSentinel() {}
+
 func IsOutOfRangeError(err error) bool {
 	var errOutOfRangeError OutOfRangeError
 	return errors.As(err, &errOutOfRangeError)
@@ -147,6 +180,8 @@ func (e FailedPrecondition) Error() string {
 func (e FailedPrecondition) Unwrap() error {
 	return e.err
 }
+
+func (e FailedPrecondition) accessSentinel() {}
 
 func IsPreconditionFailed(err error) bool {
 	var errPreconditionFailed FailedPrecondition
