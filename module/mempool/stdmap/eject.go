@@ -147,7 +147,7 @@ func Eject[K comparable, V any](q *LRUEjector[K], b *Backend[K, V]) K {
 	// finds the oldest entity
 	oldestSQ := uint64(math.MaxUint64)
 	var oldestID K
-	for _, id := range b.mutableBackData.Identifiers() {
+	for _, id := range b.mutableBackData.Keys() {
 		if sq, ok := q.table[id]; ok {
 			if sq < oldestSQ {
 				oldestID = id

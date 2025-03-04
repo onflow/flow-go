@@ -36,7 +36,7 @@ func TestAddRemove(t *testing.T) {
 		})
 
 		t.Run("should be able to get first", func(t *testing.T) {
-			gotItem, exists := pool.ByID(item1.ID())
+			gotItem, exists := pool.Get(item1.ID())
 			assert.True(t, exists)
 			assert.Equal(t, item1, gotItem)
 		})
@@ -72,7 +72,7 @@ func TestAdjust(t *testing.T) {
 		assert.False(t, updated)
 		assert.Nil(t, updatedItem)
 
-		_, found := pool.ByID(item2.ID())
+		_, found := pool.Get(item2.ID())
 		assert.False(t, found)
 	})
 
@@ -88,7 +88,7 @@ func TestAdjust(t *testing.T) {
 		assert.True(t, ok)
 		assert.Equal(t, updatedItem, item2)
 
-		value2, found := pool.ByID(item2.ID())
+		value2, found := pool.Get(item2.ID())
 		assert.True(t, found)
 		assert.Equal(t, value2, item2)
 	})
@@ -156,7 +156,7 @@ func TestBackend_RegisterEjectionCallback(t *testing.T) {
 	ensureEntityNotInMempool := func(entity *unittest.MockEntity) {
 		id := entity.ID()
 		go func() {
-			e, found := pool.ByID(id)
+			e, found := pool.Get(id)
 			require.False(t, found)
 			require.Nil(t, e)
 		}()
@@ -250,7 +250,7 @@ func TestBackend_AdjustWithInit_Concurrent_HeroCache(t *testing.T) {
 	unittest.RequireReturnsBefore(t, adjustDone.Wait, 1*time.Second, "failed to adjust elements in time")
 
 	for _, e := range entities {
-		actual, ok := backend.ByID(e.ID())
+		actual, ok := backend.Get(e.ID())
 		require.True(t, ok)
 		require.Equal(t, e.ID(), actual.ID())
 		require.Equal(t, uint64(1), actual.Nonce)
@@ -283,7 +283,7 @@ func TestBackend_GetWithInit_Concurrent_HeroCache(t *testing.T) {
 	unittest.RequireReturnsBefore(t, adjustDone.Wait, 1*time.Second, "failed to get-with-init elements in time")
 
 	for _, e := range entities {
-		actual, ok := backend.ByID(e.ID())
+		actual, ok := backend.Get(e.ID())
 		require.True(t, ok)
 		require.Equal(t, e.ID(), actual.ID())
 	}
@@ -316,7 +316,7 @@ func TestBackend_AdjustWithInit_Concurrent_MapBased(t *testing.T) {
 	unittest.RequireReturnsBefore(t, adjustDone.Wait, 1*time.Second, "failed to adjust elements in time")
 
 	for _, e := range entities {
-		actual, ok := backend.ByID(e.ID())
+		actual, ok := backend.Get(e.ID())
 		require.True(t, ok)
 		require.Equal(t, e.ID(), actual.ID())
 		require.Equal(t, uint64(1), actual.Nonce)
@@ -347,7 +347,7 @@ func TestBackend_GetWithInit_Concurrent_MapBased(t *testing.T) {
 	unittest.RequireReturnsBefore(t, adjustDone.Wait, 1*time.Second, "failed to get-with-init elements in time")
 
 	for _, e := range entities {
-		actual, ok := backend.ByID(e.ID())
+		actual, ok := backend.Get(e.ID())
 		require.True(t, ok)
 		require.Equal(t, e.ID(), actual.ID())
 	}
@@ -380,7 +380,7 @@ func TestBackend_All(t *testing.T) {
 	all := backend.All()
 	require.Equal(t, len(entities), len(all))
 	for _, expected := range entities {
-		actual, ok := backend.ByID(expected.ID())
+		actual, ok := backend.Get(expected.ID())
 		require.True(t, ok)
 		require.Equal(t, expected, actual)
 	}
