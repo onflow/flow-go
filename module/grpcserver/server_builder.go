@@ -1,15 +1,12 @@
 package grpcserver
 
 import (
-	"context"
-
 	grpc_prometheus "github.com/grpc-ecosystem/go-grpc-prometheus"
 	"github.com/rs/zerolog"
 	"go.uber.org/atomic"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
 
-	"github.com/onflow/flow-go/engine/common/rpc"
 	"github.com/onflow/flow-go/module/irrecoverable"
 )
 
@@ -84,58 +81,38 @@ func NewGrpcServerBuilder(log zerolog.Logger,
 		grpc.MaxRecvMsgSize(int(maxMsgSize)),
 		grpc.MaxSendMsgSize(int(maxMsgSize)),
 	}
-	var interceptors []grpc.UnaryServerInterceptor // ordered list of interceptors
-	// This interceptor is responsible for ensuring that irrecoverable errors are properly propagated using
-	// the irrecoverable.SignalerContext. It replaces the original gRPC context with a new one that includes
-	// the irrecoverable.SignalerContextKey if available, allowing the server to handle error conditions indicating
-	// an inconsistent or corrupted node state. If no irrecoverable.SignalerContext is present, the original context
-	// is used to process the gRPC request.
-	//
-	// The interceptor follows the grpc.UnaryServerInterceptor signature, where it takes the incoming gRPC context,
-	// request, unary server information, and handler function. It returns the response and error after handling
-	// the request. This mechanism ensures consistent error handling for gRPC requests across the server.
-	interceptors = append(interceptors, func(ctx context.Context, req any, _ *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (resp any, err error) {
-		if sigCtx := signalerCtx.Load(); sigCtx != nil {
-			resp, err = handler(irrecoverable.WithSignalerContext(ctx, *sigCtx), req)
-		} else {
-			resp, err = handler(ctx, req)
-		}
-		return
-	})
 
-	// if rpc metrics is enabled, first create the grpc metrics interceptor
+	var unaryInterceptors []grpc.UnaryServerInterceptor
+	var streamInterceptors []grpc.StreamServerInterceptor
+
+	unaryInterceptors = append(unaryInterceptors, IrrecoverableCtxInjector(signalerCtx))
 	if rpcMetricsEnabled {
-		interceptors = append(interceptors, grpc_prometheus.UnaryServerInterceptor)
+		unaryInterceptors = append(unaryInterceptors, grpc_prometheus.UnaryServerInterceptor)
 
 		if grpcServerBuilder.stateStreamInterceptorEnable {
-			// note: intentionally not adding logging or rate limit interceptors for streams.
-			// rate limiting is done in the handler, and we don't need log events for every message as
-			// that would be too noisy.
-			log.Info().Msg("stateStreamInterceptorEnable true")
-			grpcOpts = append(grpcOpts, grpc.StreamInterceptor(grpc_prometheus.StreamServerInterceptor))
-		} else {
-			log.Info().Msg("stateStreamInterceptorEnable false")
+			streamInterceptors = append(streamInterceptors, grpc_prometheus.StreamServerInterceptor)
 		}
 	}
+
 	if len(apiRateLimits) > 0 {
-		// create a rate limit interceptor
-		rateLimitInterceptor := rpc.NewRateLimiterInterceptor(log, apiRateLimits, apiBurstLimits).UnaryServerInterceptor
-		// append the rate limit interceptor to the list of interceptors
-		interceptors = append(interceptors, rateLimitInterceptor)
+		unaryInterceptors = append(unaryInterceptors, NewRateLimiterInterceptor(log, apiRateLimits, apiBurstLimits).UnaryServerInterceptor)
 	}
-	// add the logging interceptor, ensure it is innermost wrapper
-	interceptors = append(interceptors, rpc.LoggingInterceptor(log))
-	// create a chained unary interceptor
-	// create an unsecured grpc server
-	grpcOpts = append(grpcOpts, grpc.ChainUnaryInterceptor(interceptors...))
+
+	// Note: make sure logging interceptor is innermost wrapper to capture all messages
+	unaryInterceptors = append(unaryInterceptors, LoggingInterceptor(log))
+
+	grpcOpts = append(grpcOpts, grpc.ChainUnaryInterceptor(unaryInterceptors...))
+	if len(streamInterceptors) > 0 {
+		grpcOpts = append(grpcOpts, grpc.ChainStreamInterceptor(streamInterceptors...))
+	}
 
 	if grpcServerBuilder.transportCredentials != nil {
 		log = log.With().Str("endpoint", "secure").Logger()
-		// create a secure server by using the secure grpc credentials that are passed in as part of config
 		grpcOpts = append(grpcOpts, grpc.Creds(grpcServerBuilder.transportCredentials))
 	} else {
 		log = log.With().Str("endpoint", "unsecure").Logger()
 	}
+
 	grpcServerBuilder.log = log
 	grpcServerBuilder.server = grpc.NewServer(grpcOpts...)
 	grpcServerBuilder.signalerCtx = signalerCtx

@@ -1,4 +1,4 @@
-package rpc
+package grpcserver
 
 import (
 	"context"
@@ -14,8 +14,8 @@ import (
 const defaultRateLimit = 1000 // aggregate default rate limit for all unspecified API calls
 const defaultBurst = 100      // default burst limit (calls made at the same time) for an API
 
-// rateLimiterInterceptor rate limits the
-type rateLimiterInterceptor struct {
+// RateLimiterInterceptor is a gRPC interceptor that applies rate limits to incoming requests.
+type RateLimiterInterceptor struct {
 	log zerolog.Logger
 
 	// a shared default rate limiter for APIs whose rate limit is not explicitly defined
@@ -25,10 +25,9 @@ type rateLimiterInterceptor struct {
 	methodLimiterMap map[string]*rate.Limiter
 }
 
-// NewRateLimiterInterceptor creates a new rate limiter interceptor with the defined per second rate limits and the
-// optional burst limit for each API.
-func NewRateLimiterInterceptor(log zerolog.Logger, apiRateLimits map[string]int, apiBurstLimits map[string]int) *rateLimiterInterceptor {
-
+// NewRateLimiterInterceptor creates a new rate limiter interceptor with the defined per second rate
+// limits and the optional burst limit for each API.
+func NewRateLimiterInterceptor(log zerolog.Logger, apiRateLimits map[string]int, apiBurstLimits map[string]int) *RateLimiterInterceptor {
 	defaultLimiter := rate.NewLimiter(rate.Limit(defaultRateLimit), defaultBurst)
 	methodLimiterMap := make(map[string]*rate.Limiter, len(apiRateLimits))
 
@@ -46,50 +45,40 @@ func NewRateLimiterInterceptor(log zerolog.Logger, apiRateLimits map[string]int,
 		log.Info().Int("default_rate_limit", defaultRateLimit).Msg("no rate limits specified, using the default limit")
 	}
 
-	return &rateLimiterInterceptor{
+	return &RateLimiterInterceptor{
 		defaultLimiter:   defaultLimiter,
 		methodLimiterMap: methodLimiterMap,
 		log:              log,
 	}
 }
 
-// UnaryServerInterceptor rate limits the given request based on the limits defined when creating the rateLimiterInterceptor
-func (interceptor *rateLimiterInterceptor) UnaryServerInterceptor(ctx context.Context,
+// UnaryServerInterceptor returns a grpc.UnaryServerInterceptor that applies rate limits to request
+// based on the limits defined when creating the RateLimiterInterceptor
+func (interceptor *RateLimiterInterceptor) UnaryServerInterceptor(
+	ctx context.Context,
 	req interface{},
 	info *grpc.UnaryServerInfo,
-	handler grpc.UnaryHandler) (resp interface{}, err error) {
-
+	handler grpc.UnaryHandler,
+) (resp interface{}, err error) {
 	// remove the package name (e.g. "/flow.access.AccessAPI/Ping" to "Ping")
 	methodName := filepath.Base(info.FullMethod)
 
-	// look up the limiter
-	limiter := interceptor.methodLimiterMap[methodName]
-
-	// if not found, use the default limiter
-	if limiter == nil {
-
+	limiter, ok := interceptor.methodLimiterMap[methodName]
+	if !ok {
 		interceptor.log.Trace().Str("method", methodName).Msg("rate limit not defined, using default limit")
-
 		limiter = interceptor.defaultLimiter
 	}
 
-	// check if request within limit
 	if !limiter.Allow() {
-
-		// log the limit violation
 		interceptor.log.Trace().
 			Str("method", methodName).
 			Interface("request", req).
 			Float64("limit", float64(limiter.Limit())).
 			Msg("rate limit exceeded")
 
-		// reject the request
 		return nil, status.Errorf(codes.ResourceExhausted, "%s rate limit reached, please retry later.",
 			info.FullMethod)
 	}
 
-	// call the handler
-	h, err := handler(ctx, req)
-
-	return h, err
+	return handler(ctx, req)
 }

@@ -1,4 +1,4 @@
-package rpc
+package grpcserver
 
 import (
 	"context"
@@ -10,28 +10,15 @@ import (
 	"google.golang.org/grpc/codes"
 )
 
-func customClientCodeToLevel(c codes.Code) logging.Level {
-	switch c {
-	case codes.OK:
-		// log successful returns as Debug to avoid excessive logging in info mode
-		return logging.LevelDebug
-	case codes.DeadlineExceeded, codes.ResourceExhausted, codes.OutOfRange:
-		// these are common, map to info
-		return logging.LevelInfo
-	default:
-		return logging.DefaultServerCodeToLevel(c)
-	}
-}
-
-// LoggingInterceptor creates the logging interceptors to log incoming GRPC request and response (minus the payload body)
+// LoggingInterceptor returns a grpc.UnaryServerInterceptor that logs incoming GRPC request and response
 func LoggingInterceptor(log zerolog.Logger) grpc.UnaryServerInterceptor {
 	return logging.UnaryServerInterceptor(
 		InterceptorLogger(log),
-		logging.WithLevels(customClientCodeToLevel),
+		logging.WithLevels(statusCodeToLogLevel),
 	)
 }
 
-// InterceptorLogger adapts zerolog logger to interceptor logger.
+// InterceptorLogger adapts a zerolog.Logger to interceptor's logging.Logger
 // This code is simple enough to be copied and not imported.
 func InterceptorLogger(l zerolog.Logger) logging.Logger {
 	return logging.LoggerFunc(func(_ context.Context, lvl logging.Level, msg string, fields ...any) {
@@ -50,4 +37,18 @@ func InterceptorLogger(l zerolog.Logger) logging.Logger {
 			panic(fmt.Sprintf("unknown level %v", lvl))
 		}
 	})
+}
+
+// statusCodeToLogLevel converts a grpc status.Code to the appropriate logging.Level
+func statusCodeToLogLevel(c codes.Code) logging.Level {
+	switch c {
+	case codes.OK:
+		// log successful returns as Debug to avoid excessive logging in info mode
+		return logging.LevelDebug
+	case codes.DeadlineExceeded, codes.ResourceExhausted, codes.OutOfRange:
+		// these are common, map to info
+		return logging.LevelInfo
+	default:
+		return logging.DefaultServerCodeToLevel(c)
+	}
 }
