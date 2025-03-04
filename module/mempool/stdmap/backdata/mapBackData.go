@@ -36,11 +36,9 @@ func (b *MapBackData[K, V]) Add(key K, value V) bool {
 // Remove removes the value with the given key.
 // If the key-value pair exists, returns the value and true.
 // Otherwise, returns the zero value for type V and false.
-func (b *MapBackData[K, V]) Remove(key K) (V, bool) {
-	value, exists := b.dataMap[key]
-	if !exists {
-		var zero V
-		return zero, false
+func (b *MapBackData[K, V]) Remove(key K) (value V, ok bool) {
+	if !ok {
+		return value, false
 	}
 	delete(b.dataMap, key)
 	return value, true
@@ -48,11 +46,10 @@ func (b *MapBackData[K, V]) Remove(key K) (V, bool) {
 
 // Adjust adjusts the value using the given function if the given key can be found.
 // It returns the updated value along with a boolean indicating whether an update occurred.
-func (b *MapBackData[K, V]) Adjust(key K, f func(V) V) (V, bool) {
-	value, ok := b.dataMap[key]
+func (b *MapBackData[K, V]) Adjust(key K, f func(V) V) (value V, ok bool) {
+	value, ok = b.dataMap[key]
 	if !ok {
-		var zero V
-		return zero, false
+		return value, false
 	}
 	newValue := f(value)
 	b.dataMap[key] = newValue
@@ -81,11 +78,10 @@ func (b *MapBackData[K, V]) AdjustWithInit(key K, adjust func(V) V, init func() 
 
 // Get returns the value for the given key.
 // Returns true if the key-value pair exists, and false otherwise.
-func (b *MapBackData[K, V]) Get(key K) (V, bool) {
-	value, exists := b.dataMap[key]
-	if !exists {
-		var zero V
-		return zero, false
+func (b *MapBackData[K, V]) Get(key K) (value V, ok bool) {
+	value, ok = b.dataMap[key]
+	if !ok {
+		return value, false
 	}
 	return value, true
 }
