@@ -29,3 +29,12 @@ func TestLightCollectionID_Malleability(t *testing.T) {
 		Transactions: unittest.IdentifierListFixture(5),
 	})
 }
+
+// TestCollectionID_Malleability confirms that the Collection struct, which implements
+// the [flow.IDEntity] interface, is resistant to tampering.
+func TestCollectionID_Malleability(t *testing.T) {
+	collection := unittest.CollectionFixture(5)
+	unittest.RequireEntityNonMalleable(t, &collection, unittest.WithTypeGenerator[flow.TransactionBody](func() flow.TransactionBody {
+		return unittest.TransactionBodyFixture()
+	}))
+}

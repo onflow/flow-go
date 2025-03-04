@@ -59,12 +59,10 @@ func TestTransaction_Status(t *testing.T) {
 	}
 }
 
-// TestTransactionBodyMalleability provides basic validation that [flow.TransactionBody] is not malleable.
-func TestTransactionBodyMalleability(t *testing.T) {
-	checker := unittest.NewMalleabilityChecker(unittest.WithTypeGenerator[flow.TransactionSignature](func() flow.TransactionSignature {
+// TestTransactionBodyID_Malleability provides basic validation that [flow.TransactionBody] is not malleable.
+func TestTransactionBodyID_Malleability(t *testing.T) {
+	txbody := unittest.TransactionBodyFixture()
+	unittest.RequireEntityNonMalleable(t, &txbody, unittest.WithTypeGenerator[flow.TransactionSignature](func() flow.TransactionSignature {
 		return unittest.TransactionSignatureFixture()
 	}))
-	txbody := unittest.TransactionBodyFixture()
-	err := checker.Check(&txbody)
-	require.NoError(t, err)
 }
