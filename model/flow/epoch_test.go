@@ -40,59 +40,31 @@ func TestMalleability(t *testing.T) {
 		require.NoError(t, err)
 	})
 
-	epochExtensionFixture := func() flow.EpochExtension {
-		firstView := rand.Uint64()
-		return flow.EpochExtension{
-			FirstView: firstView,
-			FinalView: firstView + uint64(rand.Intn(10)+1),
-		}
-	}
-
-	dynamicIdentityEntryFixture := func() *flow.DynamicIdentityEntry {
-		return &flow.DynamicIdentityEntry{
-			NodeID:  unittest.IdentifierFixture(),
-			Ejected: rand.Intn(2) == 1,
-		}
-	}
-
-	dynamicIdentityEntryListFixture := func(n int) flow.DynamicIdentityEntryList {
-		list := make(flow.DynamicIdentityEntryList, n)
-		for i := 0; i < n; i++ {
-			list[i] = dynamicIdentityEntryFixture()
-		}
-		return list
-	}
-
-	epochStateContainerFixture := func() *flow.EpochStateContainer {
-		return &flow.EpochStateContainer{
-			SetupID:          unittest.IdentifierFixture(),
-			CommitID:         unittest.IdentifierFixture(),
-			ActiveIdentities: dynamicIdentityEntryListFixture(5),
-			EpochExtensions:  []flow.EpochExtension{epochExtensionFixture()},
-		}
-	}
-
 	t.Run("EpochStateContainer", func(t *testing.T) {
 		checker := unittest.NewMalleabilityChecker(
 			unittest.WithFieldGenerator("EpochExtensions", func() []flow.EpochExtension {
-				return []flow.EpochExtension{epochExtensionFixture()}
+				return []flow.EpochExtension{unittest.EpochExtensionFixture()}
 			}),
 			unittest.WithFieldGenerator("ActiveIdentities", func() flow.DynamicIdentityEntryList {
-				return dynamicIdentityEntryListFixture(5)
+				return unittest.DynamicIdentityEntryListFixture(5, func(dynamicIdentityEntry *flow.DynamicIdentityEntry) {
+					dynamicIdentityEntry.Ejected = rand.Intn(2) == 1
+				})
 			}),
 		)
 
-		err := checker.Check(epochStateContainerFixture())
+		err := checker.Check(unittest.EpochStateContainerFixture())
 		require.NoError(t, err)
 	})
 
 	t.Run("MinEpochStateEntry", func(t *testing.T) {
 		checker := unittest.NewMalleabilityChecker(
 			unittest.WithTypeGenerator(func() flow.DynamicIdentityEntry {
-				return *dynamicIdentityEntryFixture()
+				return *unittest.DynamicIdentityEntryFixture(func(dynamicIdentityEntry *flow.DynamicIdentityEntry) {
+					dynamicIdentityEntry.Ejected = rand.Intn(2) == 1
+				})
 			}),
 			unittest.WithTypeGenerator(func() flow.EpochExtension {
-				return epochExtensionFixture()
+				return unittest.EpochExtensionFixture()
 			}),
 		)
 

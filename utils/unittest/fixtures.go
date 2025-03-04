@@ -1306,13 +1306,26 @@ func IdentityListFixture(n int, opts ...func(*flow.Identity)) flow.IdentityList 
 	return identities
 }
 
-func DynamicIdentityEntryListFixture(n int) flow.DynamicIdentityEntryList {
+// DynamicIdentityEntryFixture returns the DynamicIdentityEntry object. The dynamic identity entry
+// can be customized (ie. set Ejected).
+func DynamicIdentityEntryFixture(opts ...func(*flow.DynamicIdentityEntry)) *flow.DynamicIdentityEntry {
+	dynamicIdentityEntry := &flow.DynamicIdentityEntry{
+		NodeID:  IdentifierFixture(),
+		Ejected: false,
+	}
+
+	for _, opt := range opts {
+		opt(dynamicIdentityEntry)
+	}
+
+	return dynamicIdentityEntry
+}
+
+// DynamicIdentityEntryListFixture returns a list of DynamicIdentityEntry objects.
+func DynamicIdentityEntryListFixture(n int, opts ...func(*flow.DynamicIdentityEntry)) flow.DynamicIdentityEntryList {
 	list := make(flow.DynamicIdentityEntryList, n)
 	for i := 0; i < n; i++ {
-		list[i] = &flow.DynamicIdentityEntry{
-			NodeID:  IdentifierFixture(),
-			Ejected: false,
-		}
+		list[i] = DynamicIdentityEntryFixture(opts...)
 	}
 	return list
 }
@@ -3152,5 +3165,25 @@ func ViewBasedActivatorFixture() *protocol.ViewBasedActivator[uint64] {
 	return &protocol.ViewBasedActivator[uint64]{
 		Data:           rand.Uint64(),
 		ActivationView: rand.Uint64(),
+	}
+}
+
+// EpochExtensionFixture returns a randomly generated EpochExtensionFixture object.
+func EpochExtensionFixture() flow.EpochExtension {
+	firstView := rand.Uint64()
+
+	return flow.EpochExtension{
+		FirstView: firstView,
+		FinalView: firstView + uint64(rand.Intn(10)+1),
+	}
+}
+
+// EpochStateContainerFixture returns a randomly generated EpochStateContainer object.
+func EpochStateContainerFixture() *flow.EpochStateContainer {
+	return &flow.EpochStateContainer{
+		SetupID:          IdentifierFixture(),
+		CommitID:         IdentifierFixture(),
+		ActiveIdentities: DynamicIdentityEntryListFixture(5),
+		EpochExtensions:  []flow.EpochExtension{EpochExtensionFixture()},
 	}
 }
