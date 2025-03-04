@@ -82,7 +82,7 @@ func (b *Backend) Remove(entityID flow.Identifier) bool {
 
 // Adjust will adjust the value item using the given function if the given key can be found.
 // Returns a bool which indicates whether the value was updated.
-func (b *Backend) Adjust(entityID flow.Identifier, f func(flow.Entity) (flow.Identifier, flow.Entity)) (flow.Entity, bool) {
+func (b *Backend) Adjust(entityID flow.Identifier, f func(flow.Entity) flow.Entity) (flow.Entity, bool) {
 	// bs1 := binstat.EnterTime(binstat.BinStdmap + ".w_lock.(Backend)Adjust")
 	b.Lock()
 	// binstat.Leave(bs1)
@@ -120,7 +120,7 @@ func (b *Backend) GetWithInit(entityID flow.Identifier, init func() flow.Entity)
 //   - the adjusted entity.
 //
 // - a bool which indicates whether the entity was adjusted.
-func (b *Backend) AdjustWithInit(entityID flow.Identifier, adjust func(flow.Entity) (flow.Identifier, flow.Entity), init func() flow.Entity) (flow.Entity, bool) {
+func (b *Backend) AdjustWithInit(entityID flow.Identifier, adjust func(flow.Entity) flow.Entity, init func() flow.Entity) (flow.Entity, bool) {
 	b.Lock()
 	defer b.Unlock()
 
