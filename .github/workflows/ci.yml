@@ -225,7 +225,7 @@ jobs:
 
   docker-build:
     name: Docker Build
-    runs-on: buildjet-16vcpu-ubuntu-2204
+    runs-on: buildjet-16vcpu-ubuntu-2404
     env:
       CADENCE_DEPLOY_KEY: ${{ secrets.CADENCE_DEPLOY_KEY }}
     steps:
@@ -327,7 +327,7 @@ jobs:
         include:
           - name: Access Cohort1 Integration Tests
             make: make -C integration access-cohort1-tests
-            runner: buildjet-4vcpu-ubuntu-2204
+            runner: buildjet-4vcpu-ubuntu-2404
           - name: Access Cohort2 Integration Tests
             make: make -C integration access-cohort2-tests
             runner: ubuntu-latest
@@ -343,7 +343,7 @@ jobs:
 #            runner: ubuntu-latest
           - name: BFT (Protocol) Integration Tests
             make: make -C integration bft-protocol-tests
-            runner: buildjet-8vcpu-ubuntu-2204
+            runner: buildjet-8vcpu-ubuntu-2404
           - name: BFT (Gossipsub) Integration Tests
             make: make -C integration bft-gossipsub-tests
             runner: ubuntu-latest
@@ -355,10 +355,10 @@ jobs:
             runner: ubuntu-latest
           - name: Epoch Cohort1 Integration Tests
             make: make -C integration epochs-cohort1-tests
-            runner: buildjet-8vcpu-ubuntu-2204
+            runner: buildjet-8vcpu-ubuntu-2404
           - name: Epoch Cohort2 Integration Tests
             make: make -C integration epochs-cohort2-tests
-            runner: buildjet-4vcpu-ubuntu-2204
+            runner: buildjet-4vcpu-ubuntu-2404
           - name: Execution Integration Tests
             make: make -C integration execution-tests
             runner: ubuntu-latest

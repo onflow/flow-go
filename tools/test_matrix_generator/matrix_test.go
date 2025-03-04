@@ -42,7 +42,7 @@ func TestBuildMatrices(t *testing.T) {
 	})
 	t.Run("top level package only override runner", func(t *testing.T) {
 		name := "counter"
-		runner := "buildjet-4vcpu-ubuntu-2204"
+		runner := "buildjet-4vcpu-ubuntu-2404"
 		configFile := fmt.Sprintf(`{"packagesPath": ".", "packages": [{"name": "%s", "runner":  "%s"}]}`, name, runner)
 		allPackges := goPackageFixture("counter/count", "counter/print/int", "counter/log")
 		cfg := loadPackagesConfig(configFile)
@@ -59,7 +59,7 @@ func TestBuildMatrices(t *testing.T) {
 		subPkg2 := "module/chunks"
 		subPkg3 := "crypto/hash"
 		subPkg4 := "model/bootstrap"
-		subPkg1Runner := "buildjet-4vcpu-ubuntu-2204"
+		subPkg1Runner := "buildjet-4vcpu-ubuntu-2404"
 		configFile := fmt.Sprintf(`
 			{"packagesPath": ".", "includeOthers": true, "packages": [{"name": "%s", "subpackages": [{"name": "%s", "runner": "%s"}, {"name": "%s"}, {"name": "%s"}, {"name": "%s"}]}]}`,
 			topLevelPkgName, subPkg1, subPkg1Runner, subPkg2, subPkg3, subPkg4)
@@ -112,7 +112,7 @@ func TestBuildMatrices(t *testing.T) {
 	t.Run("top level package with sub packages and exclude", func(t *testing.T) {
 		topLevelPkgName := "network"
 		subPkg1 := "network/p2p/node"
-		subPkg1Runner := "buildjet-4vcpu-ubuntu-2204"
+		subPkg1Runner := "buildjet-4vcpu-ubuntu-2404"
 		configFile := fmt.Sprintf(`
 			{"packagesPath": ".", "packages": [{"name": "%s", "exclude": ["network/alsp"], "subpackages": [{"name": "%s", "runner": "%s"}]}]}`,
 			topLevelPkgName, subPkg1, subPkg1Runner)
