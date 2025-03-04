@@ -61,9 +61,19 @@ func LoopPruneExecutionDataFromRootToLatestSealed(
 			return fmt.Errorf("failed to get next and latest to prune: %w", err)
 		}
 
-		// report the target pruned height and pruned height
+		// report the target pruned height and last pruned height
+		lastPruned := nextToPrune - 1
+		metrics.ExecutionLastChunkDataPackPrunedHeight(lastPruned)
 		metrics.ExecutionTargetChunkDataPackPrunedHeight(latestToPrune)
-		metrics.ExecutionLastChunkDataPackPrunedHeight(nextToPrune - 1)
+
+		if lastPruned > latestToPrune {
+			// this might happen if the threshold is increased after restart in order to retain more data,
+			// which will make the latest block to go backwards.
+
+			log.Warn().
+				Uint64("threshold", config.Threshold).
+				Msgf("last pruned height %d is greater than latest to prune %d", lastPruned, latestToPrune)
+		}
 
 		commitDuration := 2 * time.Millisecond // with default batch size 1200, the avg commit duration is 2ms
 		batchCount, totalDuration := EstimateBatchProcessing(
@@ -73,6 +83,10 @@ func LoopPruneExecutionDataFromRootToLatestSealed(
 		log.Info().
 			Uint64("nextToPrune", nextToPrune).
 			Uint64("latestToPrune", latestToPrune).
+			Uint64("threshold", config.Threshold).
+			Uint("batchsize", config.BatchSize).
+			Dur("sleepAfterEachBatchCommit", config.SleepAfterEachBatchCommit).
+			Dur("sleepAfterEachIteration", config.SleepAfterEachIteration).
 			Uint64("batchCount", batchCount).
 			Str("totalDuration", totalDuration.String()).
 			Msgf("execution data pruning will start in %s at %s, complete at %s",
