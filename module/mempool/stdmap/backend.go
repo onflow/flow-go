@@ -47,7 +47,9 @@ func (b *Backend[K, V]) Has(key K) bool {
 	return has
 }
 
-// Add adds the given item to the pool.
+// Add attempts to add the given value, without overwriting existing data.
+// If a value is already stored under the input key, Add is a no-op and returns false.
+// If no value is stored under the input key, Add adds the value and returns true.
 func (b *Backend[K, V]) Add(key K, value V) bool {
 	// bs1 := binstat.EnterTime(binstat.BinStdmap + ".w_lock.(Backend)Add")
 	b.Lock()
