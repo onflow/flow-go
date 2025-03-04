@@ -291,3 +291,38 @@ func TestKVStoreMutator_SetEpochExtensionViewCount(t *testing.T) {
 		require.Equal(t, mutator.GetEpochExtensionViewCount(), oldValue, "value should be unchanged")
 	})
 }
+
+// TestMalleability verifies that the entities which implements the ID are not malleable.
+func TestMalleability(t *testing.T) {
+	checker := unittest.NewMalleabilityChecker(
+		unittest.WithFieldGenerator("UpgradableModel.VersionUpgrade", func() protocol.ViewBasedActivator[uint64] {
+			return *unittest.ViewBasedActivatorFixture()
+		}),
+	)
+
+	t.Run("Modelv0", func(t *testing.T) {
+		err := checker.Check(
+			&kvstore.Modelv0{
+				UpgradableModel: kvstore.UpgradableModel{
+					VersionUpgrade: unittest.ViewBasedActivatorFixture(),
+				},
+				EpochStateID: unittest.IdentifierFixture(),
+			},
+		)
+		require.NoError(t, err)
+	})
+
+	t.Run("Modelv1", func(t *testing.T) {
+		err := checker.Check(
+			&kvstore.Modelv1{
+				Modelv0: kvstore.Modelv0{
+					UpgradableModel: kvstore.UpgradableModel{
+						VersionUpgrade: unittest.ViewBasedActivatorFixture(),
+					},
+					EpochStateID: unittest.IdentifierFixture(),
+				},
+			},
+		)
+		require.NoError(t, err)
+	})
+}

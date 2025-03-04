@@ -180,6 +180,20 @@ func TestIdentityList_Union(t *testing.T) {
 	})
 }
 
+// TestGenericIdentityList_Malleability verifies that the GenericIdentityList which implements the [flow.IDEntity]
+// interface is not malleable.
+func TestGenericIdentityList_Malleability(t *testing.T) {
+	t.Run("IdentityList", func(t *testing.T) {
+		identityList := unittest.IdentityListFixture(10)
+		unittest.RequireEntityNonMalleable(t, &identityList)
+	})
+
+	t.Run("IdentitySkeletonList", func(t *testing.T) {
+		identitySkeletonList := unittest.IdentityListFixture(10).ToSkeleton()
+		unittest.RequireEntityNonMalleable(t, &identitySkeletonList)
+	})
+}
+
 func TestSample(t *testing.T) {
 	t.Run("Sample max", func(t *testing.T) {
 		il := unittest.IdentityListFixture(10)

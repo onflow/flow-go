@@ -61,3 +61,9 @@ func TestIdentifierListContains(t *testing.T) {
 	nonExistent := unittest.IdentifierFixture()
 	require.False(t, ids.Contains(nonExistent))
 }
+
+// TestIdentifierListMalleability verifies that the IdentifierList which implements the [flow.IDEntity] interface is not malleable.
+func TestIdentifierListMalleability(t *testing.T) {
+	identifierList := unittest.IdentifierListFixture(5)
+	unittest.RequireEntityNonMalleable(t, &identifierList)
+}
