@@ -58,3 +58,11 @@ func TestTransaction_Status(t *testing.T) {
 		assert.Equal(t, status.String(), value)
 	}
 }
+
+// TestTransactionBodyID_Malleability provides basic validation that [flow.TransactionBody] is not malleable.
+func TestTransactionBodyID_Malleability(t *testing.T) {
+	txbody := unittest.TransactionBodyFixture()
+	unittest.RequireEntityNonMalleable(t, &txbody, unittest.WithTypeGenerator[flow.TransactionSignature](func() flow.TransactionSignature {
+		return unittest.TransactionSignatureFixture()
+	}))
+}

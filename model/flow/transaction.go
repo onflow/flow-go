@@ -53,6 +53,7 @@ func NewTransactionBody() *TransactionBody {
 	return &TransactionBody{}
 }
 
+// TODO: should we also over-ride RLP encoding?
 func (tb TransactionBody) Fingerprint() []byte {
 	return fingerprint.Fingerprint(struct {
 		Payload            interface{}
