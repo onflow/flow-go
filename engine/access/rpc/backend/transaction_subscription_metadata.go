@@ -163,6 +163,7 @@ func (tm *transactionSubscriptionMetadata) refreshStatus(ctx context.Context) er
 //
 // Expected errors during normal operation:
 //   - [ErrBlockNotReady] if the block for collection ID is not found.
+//
 // All other errors should be treated as exceptions.
 func (tm *transactionSubscriptionMetadata) refreshBlock() error {
 	if tm.txResult.CollectionID == flow.ZeroID || tm.blockWithTx != nil {
@@ -188,6 +189,7 @@ func (tm *transactionSubscriptionMetadata) refreshBlock() error {
 //
 // Expected errors during normal operation:
 //   - [ErrTransactionNotInBlock] if the transaction is not found in the block.
+//
 // All other errors should be treated as exceptions.
 func (tm *transactionSubscriptionMetadata) refreshCollection() error {
 	if tm.txResult.CollectionID != flow.ZeroID {
@@ -212,6 +214,7 @@ func (tm *transactionSubscriptionMetadata) refreshCollection() error {
 //
 // Expected errors during normal operation:
 //   - [codes.NotFound] if the transaction result is unavailable.
+//
 // All other errors should be treated as exceptions.
 func (tm *transactionSubscriptionMetadata) refreshTransactionResult(ctx context.Context) error {
 	// skip check if we already have the result, or if we don't know which block it is in yet

@@ -306,7 +306,7 @@ func (s *TransactionStatusSuite) initializeHappyCaseMockInstructions() {
 	).Return(eventsForTx, nil).Maybe()
 }
 
-// initializeTransaction generate sent transaction with ref block of the current finalized block
+// createSendTransaction generate sent transaction with ref block of the current finalized block
 func (s *TransactionStatusSuite) createSendTransaction() flow.Transaction {
 	transaction := unittest.TransactionFixture()
 	transaction.SetReferenceBlockID(s.finalizedBlock.ID())
@@ -399,7 +399,7 @@ func (s *TransactionStatusSuite) TestSendAndSubscribeTransactionStatusHappyCase(
 	s.initializeHappyCaseMockInstructions()
 
 	// Generate sent transaction with ref block of the current finalized block
-	transaction := s.initializeTransaction()
+	transaction := s.createSendTransaction()
 	txId := transaction.ID()
 
 	s.collections.On("LightByTransactionID", txId).Return(nil, storage.ErrNotFound).Once()
@@ -453,7 +453,7 @@ func (s *TransactionStatusSuite) TestSendAndSubscribeTransactionStatusExpired() 
 	).Return(nil, storage.ErrNotFound).Maybe()
 
 	// Generate sent transaction with ref block of the current finalized block
-	transaction := s.initializeTransaction()
+	transaction := s.createSendTransaction()
 	txId := transaction.ID()
 	s.collections.On("LightByTransactionID", txId).Return(nil, storage.ErrNotFound)
 
@@ -488,7 +488,7 @@ func (s *TransactionStatusSuite) TestSubscribeTransactionStatusWithCurrentPendin
 
 	s.initializeHappyCaseMockInstructions()
 
-	transaction := s.initializeTransaction()
+	transaction := s.createSendTransaction()
 	txId := transaction.ID()
 	s.collections.On("LightByTransactionID", txId).Return(nil, storage.ErrNotFound).Once()
 
@@ -522,7 +522,7 @@ func (s *TransactionStatusSuite) TestSubscribeTransactionStatusWithCurrentFinali
 
 	s.initializeHappyCaseMockInstructions()
 
-	transaction := s.initializeTransaction()
+	transaction := s.createSendTransaction()
 	txId := transaction.ID()
 
 	hasTransactionResultInStorage := false
@@ -554,7 +554,7 @@ func (s *TransactionStatusSuite) TestSubscribeTransactionStatusWithCurrentExecut
 
 	s.initializeHappyCaseMockInstructions()
 
-	transaction := s.initializeTransaction()
+	transaction := s.createSendTransaction()
 	txId := transaction.ID()
 
 	hasTransactionResultInStorage := false
@@ -588,7 +588,7 @@ func (s *TransactionStatusSuite) TestSubscribeTransactionStatusWithCurrentSealed
 
 	s.initializeHappyCaseMockInstructions()
 
-	transaction := s.initializeTransaction()
+	transaction := s.createSendTransaction()
 	txId := transaction.ID()
 
 	hasTransactionResultInStorage := false

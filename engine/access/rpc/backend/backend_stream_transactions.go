@@ -18,6 +18,11 @@ import (
 	"github.com/onflow/flow-go/module/irrecoverable"
 )
 
+// TransactionExpiryForUnknownStatus defines the number of blocks after which
+// a transaction with an unknown status is considered expired.
+// This includes the default transaction expiry time (flow.DefaultTransactionExpiry)
+// plus an additional buffer of 10 blocks to account for potential network delays
+// or reorganization effects.
 const TransactionExpiryForUnknownStatus = flow.DefaultTransactionExpiry + 10
 
 // sendTransaction defines a function type for sending a transaction.
@@ -149,8 +154,10 @@ func (b *backendSubscribeTransactions) getTransactionStatusResponse(
 			if errors.Is(err, subscription.ErrBlockNotReady) {
 				return nil, err
 			}
-
-			return nil, status.Errorf(codes.Internal, "failed to refresh transaction information: %v", err)
+			if statusErr, ok := status.FromError(err); ok {
+				return nil, status.Errorf(codes.Internal, "failed to refresh transaction information: %v", statusErr)
+			}
+			return nil, fmt.Errorf("unexpected error refreshing transaction information: %w", err)
 		}
 
 		return generateResultsStatuses(txInfo.txResult, prevTxStatus)
