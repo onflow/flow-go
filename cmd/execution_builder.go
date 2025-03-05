@@ -464,7 +464,7 @@ func (exeNode *ExecutionNode) LoadGCPBlockDataUploader(
 		exeNode.events,
 		exeNode.results,
 		exeNode.txResults,
-		storage.NewComputationResultUploadStatus(node.DB),
+		store.NewComputationResultUploadStatus(badgerimpl.ToDB(node.DB)),
 		execution_data.NewDownloader(exeNode.blobService),
 		exeNode.collector)
 	if retryableUploader == nil {

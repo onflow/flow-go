@@ -83,6 +83,10 @@ import (
 	"github.com/onflow/flow-go/storage"
 	bstorage "github.com/onflow/flow-go/storage/badger"
 	"github.com/onflow/flow-go/storage/badger/operation"
+	"github.com/onflow/flow-go/storage/dbops"
+	"github.com/onflow/flow-go/storage/operation/badgerimpl"
+	"github.com/onflow/flow-go/storage/operation/pebbleimpl"
+	"github.com/onflow/flow-go/storage/store"
 	sutil "github.com/onflow/flow-go/storage/util"
 	"github.com/onflow/flow-go/utils/logging"
 )
@@ -167,8 +171,9 @@ func (fnb *FlowNodeBuilder) BaseFlags() {
 	fnb.flags.StringVar(&fnb.BaseConfig.BindAddr, "bind", defaultConfig.BindAddr, "address to bind on")
 	fnb.flags.StringVarP(&fnb.BaseConfig.BootstrapDir, "bootstrapdir", "b", defaultConfig.BootstrapDir, "path to the bootstrap directory")
 	fnb.flags.StringVarP(&fnb.BaseConfig.datadir, "datadir", "d", defaultConfig.datadir, "directory to store the public database (protocol state)")
-	fnb.flags.StringVar(&fnb.BaseConfig.pebbleDir, "pebble-dir", defaultConfig.pebbleDir, "directory to store the public pebble database (protocol state)")
+	fnb.flags.StringVar(&fnb.BaseConfig.pebbleDir, "pebbledir", defaultConfig.pebbleDir, "directory to store the public pebble database (protocol state)")
 	fnb.flags.StringVar(&fnb.BaseConfig.secretsdir, "secretsdir", defaultConfig.secretsdir, "directory to store private database (secrets)")
+	fnb.flags.StringVar(&fnb.BaseConfig.dbops, "dbops", defaultConfig.dbops, "database operations to use (badger-transaction, batch-update, pebble-update)")
 	fnb.flags.StringVarP(&fnb.BaseConfig.level, "loglevel", "l", defaultConfig.level, "level for logging output")
 	fnb.flags.Uint32Var(&fnb.BaseConfig.debugLogLimit, "debug-log-limit", defaultConfig.debugLogLimit, "max number of debug/trace log events per second")
 	fnb.flags.UintVarP(&fnb.BaseConfig.metricsPort, "metricport", "m", defaultConfig.metricsPort, "port for /metrics endpoint")
@@ -1119,7 +1124,7 @@ func (fnb *FlowNodeBuilder) initBadgerDB() error {
 	fnb.DB = publicDB
 
 	fnb.ShutdownFunc(func() error {
-		if err := fnb.DB.Close(); err != nil {
+		if err := publicDB.Close(); err != nil {
 			return fmt.Errorf("error closing protocol database: %w", err)
 		}
 		return nil
@@ -1147,6 +1152,20 @@ func (fnb *FlowNodeBuilder) initPebbleDB() error {
 
 	fnb.PebbleDB = db
 	fnb.ShutdownFunc(closer.Close)
+	return nil
+}
+
+// create protocol db according to the badger or pebble db
+func (fnb *FlowNodeBuilder) initProtocolDB(bdb *badger.DB, pdb *pebble.DB) error {
+	if dbops.IsBadgerBased(fnb.dbops) {
+		fnb.ProtocolDB = badgerimpl.ToDB(bdb)
+		fnb.Logger.Info().Msg("initProtocolDB: using badger protocol db")
+	} else if dbops.IsPebbleBatch(fnb.dbops) {
+		fnb.ProtocolDB = pebbleimpl.ToDB(pdb)
+		fnb.Logger.Info().Msgf("initProtocolDB: using pebble protocol db")
+	} else {
+		return fmt.Errorf(dbops.UsageErrMsg, fnb.dbops)
+	}
 	return nil
 }
 
@@ -1236,7 +1255,7 @@ func (fnb *FlowNodeBuilder) initStorage() error {
 		bstorage.DefaultEpochProtocolStateCacheSize, bstorage.DefaultProtocolStateIndexCacheSize)
 	protocolKVStores := bstorage.NewProtocolKVStore(fnb.Metrics.Cache, fnb.DB,
 		bstorage.DefaultProtocolKVStoreCacheSize, bstorage.DefaultProtocolKVStoreByBlockIDCacheSize)
-	versionBeacons := bstorage.NewVersionBeacons(fnb.DB)
+	versionBeacons := store.NewVersionBeacons(badgerimpl.ToDB(fnb.DB))
 
 	fnb.Storage = Storage{
 		Headers:                   headers,
@@ -2121,6 +2140,10 @@ func (fnb *FlowNodeBuilder) onStart() error {
 	}
 
 	if err := fnb.initPebbleDB(); err != nil {
+		return err
+	}
+
+	if err := fnb.initProtocolDB(fnb.DB, fnb.PebbleDB); err != nil {
 		return err
 	}
 
