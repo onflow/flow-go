@@ -17,6 +17,9 @@ func RetrieveCollection(r storage.Reader, collID flow.Identifier, collection *fl
 	return RetrieveByKey(r, MakePrefix(codeCollection, collID), collection)
 }
 
+// RemoveCollection removes a collection from the storage.
+// It returns nil if the collection does not exist.
+// any error returned are exceptions
 func RemoveCollection(w storage.Writer, collID flow.Identifier) error {
 	return RemoveByKey(w, MakePrefix(codeCollection, collID))
 }
