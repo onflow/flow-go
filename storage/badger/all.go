@@ -26,11 +26,8 @@ func InitAll(metrics module.CacheMetrics, db *badger.DB) *storage.All {
 	protocolKVStore := NewProtocolKVStore(metrics, db, DefaultProtocolKVStoreCacheSize, DefaultProtocolKVStoreByBlockIDCacheSize)
 	versionBeacons := store.NewVersionBeacons(badgerimpl.ToDB(db))
 
-	commits := NewCommits(metrics, db)
 	transactions := NewTransactions(metrics, db)
-	transactionResults := NewTransactionResults(metrics, db, 10000)
 	collections := NewCollections(db, transactions)
-	events := NewEvents(metrics, db)
 
 	return &storage.All{
 		Headers:                   headers,
@@ -47,10 +44,7 @@ func InitAll(metrics module.CacheMetrics, db *badger.DB) *storage.All {
 		VersionBeacons:            versionBeacons,
 		Results:                   results,
 		Receipts:                  receipts,
-		Commits:                   commits,
 		Transactions:              transactions,
-		TransactionResults:        transactionResults,
 		Collections:               collections,
-		Events:                    events,
 	}
 }

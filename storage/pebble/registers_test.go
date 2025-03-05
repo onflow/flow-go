@@ -290,7 +290,7 @@ func TestRegisters_GetAndStoreEmptyOwner(t *testing.T) {
 func Benchmark_PayloadStorage(b *testing.B) {
 	cache := pebble.NewCache(32 << 20)
 	defer cache.Unref()
-	opts := DefaultPebbleOptions(cache, registers.NewMVCCComparer())
+	opts := DefaultPebbleOptions(unittest.Logger(), cache, registers.NewMVCCComparer())
 
 	dbpath := path.Join(b.TempDir(), "benchmark1.db")
 	db, err := pebble.Open(dbpath, opts)

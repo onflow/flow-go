@@ -428,8 +428,9 @@ func ConsensusNode(t *testing.T, hub *stub.Hub, identity bootstrap.NodeInfo, ide
 
 	node := GenericNodeFromParticipants(t, hub, identity, identities, chainID)
 
-	resultsDB := storage.NewExecutionResults(node.Metrics, node.PublicDB)
-	receiptsDB := storage.NewExecutionReceipts(node.Metrics, node.PublicDB, resultsDB, storage.DefaultCacheSize)
+	db := badgerimpl.ToDB(node.PublicDB)
+	resultsDB := store.NewExecutionResults(node.Metrics, db)
+	receiptsDB := store.NewExecutionReceipts(node.Metrics, db, resultsDB, storage.DefaultCacheSize)
 
 	guarantees, err := stdmap.NewGuarantees(1000)
 	require.NoError(t, err)
@@ -529,17 +530,18 @@ type CheckerMock struct {
 func ExecutionNode(t *testing.T, hub *stub.Hub, identity bootstrap.NodeInfo, identities []*flow.Identity, syncThreshold int, chainID flow.ChainID) testmock.ExecutionNode {
 	node := GenericNodeFromParticipants(t, hub, identity, identities, chainID)
 
+	db := badgerimpl.ToDB(node.PublicDB)
 	transactionsStorage := storage.NewTransactions(node.Metrics, node.PublicDB)
 	collectionsStorage := storage.NewCollections(node.PublicDB, transactionsStorage)
-	eventsStorage := storage.NewEvents(node.Metrics, node.PublicDB)
-	serviceEventsStorage := storage.NewServiceEvents(node.Metrics, node.PublicDB)
-	txResultStorage := storage.NewTransactionResults(node.Metrics, node.PublicDB, storage.DefaultCacheSize)
-	commitsStorage := storage.NewCommits(node.Metrics, node.PublicDB)
-	chunkDataPackStorage := store.NewChunkDataPacks(node.Metrics, badgerimpl.ToDB(node.PublicDB), collectionsStorage, 100)
-	results := storage.NewExecutionResults(node.Metrics, node.PublicDB)
-	receipts := storage.NewExecutionReceipts(node.Metrics, node.PublicDB, results, storage.DefaultCacheSize)
-	myReceipts := storage.NewMyExecutionReceipts(node.Metrics, node.PublicDB, receipts)
-	versionBeacons := store.NewVersionBeacons(badgerimpl.ToDB(node.PublicDB))
+	eventsStorage := store.NewEvents(node.Metrics, db)
+	serviceEventsStorage := store.NewServiceEvents(node.Metrics, db)
+	txResultStorage := store.NewTransactionResults(node.Metrics, db, storage.DefaultCacheSize)
+	commitsStorage := store.NewCommits(node.Metrics, db)
+	chunkDataPackStorage := store.NewChunkDataPacks(node.Metrics, db, collectionsStorage, 100)
+	results := store.NewExecutionResults(node.Metrics, db)
+	receipts := store.NewExecutionReceipts(node.Metrics, db, results, storage.DefaultCacheSize)
+	myReceipts := store.NewMyExecutionReceipts(node.Metrics, db, receipts)
+	versionBeacons := store.NewVersionBeacons(db)
 	headersStorage := storage.NewHeaders(node.Metrics, node.PublicDB)
 
 	checkAuthorizedAtBlock := func(blockID flow.Identifier) (bool, error) {
@@ -606,11 +608,11 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity bootstrap.NodeInfo, ide
 	require.Equal(t, fmt.Sprintf("%x", rootSeal.FinalState), fmt.Sprintf("%x", commit))
 	require.Equal(t, rootSeal.ResultID, rootResult.ID())
 
-	err = bootstrapper.BootstrapExecutionDatabase(node.PublicDB, rootSeal)
+	err = bootstrapper.BootstrapExecutionDatabase(db, rootSeal)
 	require.NoError(t, err)
 
 	registerDir := unittest.TempPebblePath(t)
-	pebbledb, err := storagepebble.OpenRegisterPebbleDB(registerDir)
+	pebbledb, err := storagepebble.OpenRegisterPebbleDB(node.Log.With().Str("pebbledb", "registers").Logger(), registerDir)
 	require.NoError(t, err)
 
 	checkpointHeight := uint64(0)
@@ -630,8 +632,15 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity bootstrap.NodeInfo, ide
 	require.NoError(t, err)
 
 	storehouseEnabled := true
+	getLatestFinalized := func() (uint64, error) {
+		final, err := protoState.Final().Head()
+		if err != nil {
+			return 0, err
+		}
+		return final.Height, nil
+	}
 	execState := executionState.NewExecutionState(
-		ls, commitsStorage, node.Blocks, node.Headers, chunkDataPackStorage, results, myReceipts, eventsStorage, serviceEventsStorage, txResultStorage, node.PublicDB, node.Tracer,
+		ls, commitsStorage, node.Blocks, node.Headers, chunkDataPackStorage, results, myReceipts, eventsStorage, serviceEventsStorage, txResultStorage, db, getLatestFinalized, node.Tracer,
 		// TODO: test with register store
 		registerStore,
 		storehouseEnabled,
@@ -982,9 +991,10 @@ func VerificationNode(t testing.TB,
 	}
 
 	if node.Results == nil {
-		results := storage.NewExecutionResults(node.Metrics, node.PublicDB)
+		db := badgerimpl.ToDB(node.PublicDB)
+		results := store.NewExecutionResults(node.Metrics, db)
 		node.Results = results
-		node.Receipts = storage.NewExecutionReceipts(node.Metrics, node.PublicDB, results, storage.DefaultCacheSize)
+		node.Receipts = store.NewExecutionReceipts(node.Metrics, db, results, storage.DefaultCacheSize)
 	}
 
 	if node.ProcessedChunkIndex == nil {
