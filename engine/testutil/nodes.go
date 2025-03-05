@@ -443,14 +443,14 @@ func ConsensusNode(t *testing.T, hub *stub.Hub, identity bootstrap.NodeInfo, ide
 		node.Headers, guarantees)
 	// receive collections
 	ingestionEngine, err := consensusingest.New(node.Log, node.Metrics, node.Net, node.Me, ingestionCore)
-	require.Nil(t, err)
+	require.NoError(t, err)
 
 	// request receipts from execution nodes
 	receiptRequester, err := requester.New(node.Log, node.Metrics, node.Net, node.Me, node.State, channels.RequestReceiptsByBlockID, filter.Any, func() flow.Entity { return &flow.ExecutionReceipt{} })
-	require.Nil(t, err)
+	require.NoError(t, err)
 
 	assigner, err := chunks.NewChunkAssigner(flow.DefaultChunkAssignmentAlpha, node.State)
-	require.Nil(t, err)
+	require.NoError(t, err)
 
 	receiptValidator := validation.NewReceiptValidator(
 		node.State,
@@ -972,7 +972,7 @@ func VerificationNode(t testing.TB,
 	if node.ChunkStatuses == nil {
 		node.ChunkStatuses = stdmap.NewChunkStatuses(chunksLimit)
 		err = mempoolCollector.Register(metrics.ResourceChunkStatus, node.ChunkStatuses.Size)
-		require.Nil(t, err)
+		require.NoError(t, err)
 	}
 
 	if node.ChunkRequests == nil {
@@ -1026,7 +1026,7 @@ func VerificationNode(t testing.TB,
 			node.Me,
 			chunkVerifier,
 			approvalStorage)
-		require.Nil(t, err)
+		require.NoError(t, err)
 	}
 
 	if node.RequesterEngine == nil {
