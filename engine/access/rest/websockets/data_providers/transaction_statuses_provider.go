@@ -111,7 +111,6 @@ func (p *TransactionStatusesDataProvider) handleResponse() func(txResults []*acc
 func parseTransactionID(
 	arguments models.Arguments,
 ) (flow.Identifier, error) {
-	var txID flow.Identifier
 	allowedFields := []string{
 		"tx_id",
 	}
@@ -123,14 +122,14 @@ func parseTransactionID(
 	if txIDIn, ok := arguments["tx_id"]; ok && txIDIn != "" {
 		result, ok := txIDIn.(string)
 		if !ok {
-			return txID, fmt.Errorf("'tx_id' must be a string")
+			return flow.ZeroID, fmt.Errorf("'tx_id' must be a string")
 		}
 		var txIDParsed parser.ID
 		err := txIDParsed.Parse(result)
 		if err != nil {
 			return txID, fmt.Errorf("invalid 'tx_id': %w", err)
 		}
-		txID = txIDParsed.Flow()
+		return txIDParsed.Flow(), nil
 	}
 
 	return txID, nil
