@@ -4,27 +4,29 @@ import (
 	"math"
 	"sync"
 
+	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/mempool"
 	"github.com/onflow/flow-go/module/mempool/stdmap/backdata"
+	_ "github.com/onflow/flow-go/utils/binstat"
 )
 
 // Backend is a wrapper around the mutable backdata that provides concurrency-safe operations.
-type Backend[K comparable, V any] struct {
+type Backend struct {
 	sync.RWMutex
-	mutableBackData    mempool.MutableBackData[K, V]
+	mutableBackData    mempool.MutableBackData[flow.Identifier, flow.Entity]
 	guaranteedCapacity uint
-	batchEject         BatchEjectFunc[K, V]
-	eject              EjectFunc[K, V]
-	ejectionCallbacks  []mempool.OnEjection[V]
+	batchEject         BatchEjectFunc
+	eject              EjectFunc
+	ejectionCallbacks  []mempool.OnEjection
 }
 
 // NewBackend creates a new memory pool backend.
 // This is using EjectRandomFast()
-func NewBackend[K comparable, V any](options ...OptionFunc[K, V]) *Backend[K, V] {
-	b := Backend[K, V]{
-		mutableBackData:    backdata.NewMapBackData[K, V](),
+func NewBackend(options ...OptionFunc) *Backend {
+	b := Backend{
+		mutableBackData:    backdata.NewMapBackData[flow.Identifier, flow.Entity](),
 		guaranteedCapacity: uint(math.MaxUint32),
-		batchEject:         EjectRandomFast[K, V],
+		batchEject:         EjectRandomFast,
 		eject:              nil,
 		ejectionCallbacks:  nil,
 	}
@@ -34,8 +36,8 @@ func NewBackend[K comparable, V any](options ...OptionFunc[K, V]) *Backend[K, V]
 	return &b
 }
 
-// Has checks if a value is stored under the given key.
-func (b *Backend[K, V]) Has(key K) bool {
+// Has checks if we already contain the item with the given hash.
+func (b *Backend) Has(entityID flow.Identifier) bool {
 	// bs1 := binstat.EnterTime(binstat.BinStdmap + ".r_lock.(Backend)Has")
 	b.RLock()
 	// binstat.Leave(bs1)
@@ -43,14 +45,16 @@ func (b *Backend[K, V]) Has(key K) bool {
 	// bs2 := binstat.EnterTime(binstat.BinStdmap + ".inlock.(Backend)Has")
 	// defer binstat.Leave(bs2)
 	defer b.RUnlock()
-	has := b.mutableBackData.Has(key)
+	has := b.mutableBackData.Has(entityID)
 	return has
 }
 
-// Add attempts to add the given value, without overwriting existing data.
-// If a value is already stored under the input key, Add is a no-op and returns false.
-// If no value is stored under the input key, Add adds the value and returns true.
-func (b *Backend[K, V]) Add(key K, value V) bool {
+// Add adds the given item to the pool.
+func (b *Backend) Add(entity flow.Entity) bool {
+	// bs0 := binstat.EnterTime(binstat.BinStdmap + ".<<lock.(Backend)Add")
+	entityID := entity.ID() // this expensive operation done OUTSIDE of lock :-)
+	// binstat.Leave(bs0)
+
 	// bs1 := binstat.EnterTime(binstat.BinStdmap + ".w_lock.(Backend)Add")
 	b.Lock()
 	// binstat.Leave(bs1)
@@ -58,15 +62,13 @@ func (b *Backend[K, V]) Add(key K, value V) bool {
 	// bs2 := binstat.EnterTime(binstat.BinStdmap + ".inlock.(Backend)Add")
 	// defer binstat.Leave(bs2)
 	defer b.Unlock()
-	added := b.mutableBackData.Add(key, value)
+	added := b.mutableBackData.Add(entityID, entity)
 	b.reduce()
 	return added
 }
 
-// Remove removes the value with the given key.
-// If the key-value pair exists, returns the value and true.
-// Otherwise, returns the zero value for type V and false.
-func (b *Backend[K, V]) Remove(key K) bool {
+// Remove will remove the item with the given hash.
+func (b *Backend) Remove(entityID flow.Identifier) bool {
 	// bs1 := binstat.EnterTime(binstat.BinStdmap + ".w_lock.(Backend)Remove")
 	b.Lock()
 	// binstat.Leave(bs1)
@@ -74,15 +76,13 @@ func (b *Backend[K, V]) Remove(key K) bool {
 	// bs2 := binstat.EnterTime(binstat.BinStdmap + ".inlock.(Backend)Remove")
 	// defer binstat.Leave(bs2)
 	defer b.Unlock()
-	_, removed := b.mutableBackData.Remove(key)
+	_, removed := b.mutableBackData.Remove(entityID)
 	return removed
 }
 
 // Adjust will adjust the value item using the given function if the given key can be found.
-// Returns:
-//   - value, true if the value with the given key was found. The returned value is the version after the update is applied.
-//   - nil, false if no value with the given key was found
-func (b *Backend[K, V]) Adjust(key K, f func(V) V) (V, bool) {
+// Returns a bool which indicates whether the value was updated.
+func (b *Backend) Adjust(entityID flow.Identifier, f func(flow.Entity) flow.Entity) (flow.Entity, bool) {
 	// bs1 := binstat.EnterTime(binstat.BinStdmap + ".w_lock.(Backend)Adjust")
 	b.Lock()
 	// binstat.Leave(bs1)
@@ -90,29 +90,29 @@ func (b *Backend[K, V]) Adjust(key K, f func(V) V) (V, bool) {
 	// bs2 := binstat.EnterTime(binstat.BinStdmap + ".inlock.(Backend)Adjust")
 	// defer binstat.Leave(bs2)
 	defer b.Unlock()
-	value, wasUpdated := b.mutableBackData.Adjust(key, f)
-	return value, wasUpdated
+	entity, wasUpdated := b.mutableBackData.Adjust(entityID, f)
+	return entity, wasUpdated
 }
 
-// AdjustWithInit adjusts the value using the given function if the given identifier can be found. When the
-// value is not found, it initializes the value using the given init function and then applies the adjust function.
+// AdjustWithInit adjusts the entity using the given function if the given identifier can be found. When the
+// entity is not found, it initializes the entity using the given init function and then applies the adjust function.
 // Args:
-// - key: the identifier of the value to adjust.
-// - adjust: the function that adjusts the value.
-// - init: the function that initializes the value when it is not found.
+// - entityID: the identifier of the entity to adjust.
+// - adjust: the function that adjusts the entity.
+// - init: the function that initializes the entity when it is not found.
 // Returns:
-// - the adjusted value.
-// - a bool which indicates whether the value was adjusted.
-func (b *Backend[K, V]) AdjustWithInit(key K, adjust func(V) V, init func() V) (V, bool) {
+//   - the adjusted entity.
+//
+// - a bool which indicates whether the entity was adjusted.
+func (b *Backend) AdjustWithInit(entityID flow.Identifier, adjust func(flow.Entity) flow.Entity, init func() flow.Entity) (flow.Entity, bool) {
 	b.Lock()
 	defer b.Unlock()
 
-	return b.mutableBackData.AdjustWithInit(key, adjust, init)
+	return b.mutableBackData.AdjustWithInit(entityID, adjust, init)
 }
 
-// Get returns the value for the given key.
-// Returns true if the key-value pair exists, and false otherwise.
-func (b *Backend[K, V]) Get(key K) (V, bool) {
+// ByID returns the given item from the pool.
+func (b *Backend) ByID(entityID flow.Identifier) (flow.Entity, bool) {
 	// bs1 := binstat.EnterTime(binstat.BinStdmap + ".r_lock.(Backend)ByID")
 	b.RLock()
 	// binstat.Leave(bs1)
@@ -120,14 +120,12 @@ func (b *Backend[K, V]) Get(key K) (V, bool) {
 	// bs2 := binstat.EnterTime(binstat.BinStdmap + ".inlock.(Backend)ByID")
 	// defer binstat.Leave(bs2)
 	defer b.RUnlock()
-	value, exists := b.mutableBackData.Get(key)
-	return value, exists
+	entity, exists := b.mutableBackData.Get(entityID)
+	return entity, exists
 }
 
-// Run executes a function giving it exclusive access to the backdata.
-// All errors returned from the input functor f are considered exceptions.
-// No errors are expected during normal operation.
-func (b *Backend[K, V]) Run(f func(backdata mempool.BackData[K, V]) error) error {
+// Run executes a function giving it exclusive access to the backdata
+func (b *Backend) Run(f func(backdata mempool.BackData[flow.Identifier, flow.Entity]) error) error {
 	// bs1 := binstat.EnterTime(binstat.BinStdmap + ".w_lock.(Backend)Run")
 	b.Lock()
 	// binstat.Leave(bs1)
@@ -141,7 +139,7 @@ func (b *Backend[K, V]) Run(f func(backdata mempool.BackData[K, V]) error) error
 }
 
 // Size will return the size of the backend.
-func (b *Backend[K, V]) Size() uint {
+func (b *Backend) Size() uint {
 	// bs1 := binstat.EnterTime(binstat.BinStdmap + ".r_lock.(Backend)Size")
 	b.RLock()
 	// binstat.Leave(bs1)
@@ -154,12 +152,12 @@ func (b *Backend[K, V]) Size() uint {
 }
 
 // Limit returns the maximum number of items allowed in the backend.
-func (b *Backend[K, V]) Limit() uint {
+func (b *Backend) Limit() uint {
 	return b.guaranteedCapacity
 }
 
-// All returns an unordered list of all values from the pool.
-func (b *Backend[K, V]) All() []V {
+// All returns all entities from the pool.
+func (b *Backend) All() []flow.Entity {
 	// bs1 := binstat.EnterTime(binstat.BinStdmap + ".r_lock.(Backend)All")
 	b.RLock()
 	// binstat.Leave(bs1)
@@ -172,7 +170,7 @@ func (b *Backend[K, V]) All() []V {
 }
 
 // Clear removes all entities from the pool.
-func (b *Backend[K, V]) Clear() {
+func (b *Backend) Clear() {
 	// bs1 := binstat.EnterTime(binstat.BinStdmap + ".w_lock.(Backend)Clear")
 	b.Lock()
 	// binstat.Leave(bs1)
@@ -184,7 +182,7 @@ func (b *Backend[K, V]) Clear() {
 }
 
 // RegisterEjectionCallbacks adds the provided OnEjection callbacks
-func (b *Backend[K, V]) RegisterEjectionCallbacks(callbacks ...mempool.OnEjection[V]) {
+func (b *Backend) RegisterEjectionCallbacks(callbacks ...mempool.OnEjection) {
 	// bs1 := binstat.EnterTime(binstat.BinStdmap + ".r_lock.(Backend)RegisterEjectionCallbacks")
 	b.Lock()
 	// binstat.Leave(bs1)
@@ -197,7 +195,7 @@ func (b *Backend[K, V]) RegisterEjectionCallbacks(callbacks ...mempool.OnEjectio
 
 // reduce will reduce the size of the kept entities until we are within the
 // configured memory pool size limit.
-func (b *Backend[K, V]) reduce() {
+func (b *Backend) reduce() {
 	// bs := binstat.EnterTime(binstat.BinStdmap + ".??lock.(Backend)reduce")
 	// defer binstat.Leave(bs)
 
