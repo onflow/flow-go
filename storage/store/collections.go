@@ -81,10 +81,6 @@ func (c *Collections) ByID(colID flow.Identifier) (*flow.Collection, error) {
 		collection.Transactions = append(collection.Transactions, tx)
 	}
 
-	if err != nil {
-		return nil, err
-	}
-
 	return &collection, nil
 }
 
@@ -95,10 +91,6 @@ func (c *Collections) LightByID(colID flow.Identifier) (*flow.LightCollection, e
 	err := operation.RetrieveCollection(c.db.Reader(), colID, &collection)
 	if err != nil {
 		return nil, fmt.Errorf("could not retrieve collection: %w", err)
-	}
-
-	if err != nil {
-		return nil, err
 	}
 
 	return &collection, nil
