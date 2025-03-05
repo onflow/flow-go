@@ -7,8 +7,6 @@ import (
 	"math"
 	"sync"
 
-	"github.com/dgraph-io/badger/v2"
-
 	"github.com/onflow/flow-go/engine/execution"
 	"github.com/onflow/flow-go/engine/execution/storehouse"
 	"github.com/onflow/flow-go/fvm/storage/snapshot"
@@ -18,9 +16,7 @@ import (
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/trace"
 	"github.com/onflow/flow-go/storage"
-	badgerstorage "github.com/onflow/flow-go/storage/badger"
-	"github.com/onflow/flow-go/storage/badger/operation"
-	"github.com/onflow/flow-go/storage/badger/procedure"
+	"github.com/onflow/flow-go/storage/operation"
 )
 
 var ErrExecutionStatePruned = fmt.Errorf("execution state is pruned")
@@ -79,7 +75,7 @@ type FinalizedExecutionState interface {
 type ExecutionState interface {
 	ReadOnlyExecutionState
 
-	UpdateLastExecutedBlock(context.Context, *flow.Header) error
+	UpdateLastExecutedBlock(context.Context, flow.Identifier) error
 
 	SaveExecutionResults(
 		ctx context.Context,
@@ -104,7 +100,12 @@ type state struct {
 	events             storage.Events
 	serviceEvents      storage.ServiceEvents
 	transactionResults storage.TransactionResults
-	db                 *badger.DB
+	db                 storage.DB
+	// make sure only one saving operation is running at a time, this is to prevent
+	// the reads within the saving operation to be dirty. such as ensuring no other own receipts
+	// is indexed for the same block.
+	savingResults      sync.Mutex
+	getLatestFinalized func() (uint64, error)
 
 	registerStore execution.RegisterStore
 	// when it is true, registers are stored in both register store and ledger
@@ -125,7 +126,8 @@ func NewExecutionState(
 	events storage.Events,
 	serviceEvents storage.ServiceEvents,
 	transactionResults storage.TransactionResults,
-	db *badger.DB,
+	db storage.DB,
+	getLatestFinalized func() (uint64, error),
 	tracer module.Tracer,
 	registerStore execution.RegisterStore,
 	enableRegisterStore bool,
@@ -144,6 +146,8 @@ func NewExecutionState(
 		serviceEvents:       serviceEvents,
 		transactionResults:  transactionResults,
 		db:                  db,
+		savingResults:       sync.Mutex{},
+		getLatestFinalized:  getLatestFinalized,
 		registerStore:       registerStore,
 		enableRegisterStore: enableRegisterStore,
 	}
@@ -385,7 +389,7 @@ func (s *state) SaveExecutionResults(
 	}
 
 	//outside batch because it requires read access
-	err = s.UpdateLastExecutedBlock(childCtx, result.ExecutableBlock.Block.Header)
+	err = s.UpdateLastExecutedBlock(childCtx, result.ExecutableBlock.ID())
 	if err != nil {
 		return fmt.Errorf("cannot update highest executed block: %w", err)
 	}
@@ -396,8 +400,16 @@ func (s *state) saveExecutionResults(
 	ctx context.Context,
 	result *execution.ComputationResult,
 ) (err error) {
-	header := result.ExecutableBlock.Block.Header
-	blockID := header.ID()
+	// make sure only one saving operation is running at a time
+	// this is to prevent the reads within the saving operation to be dirty
+	// such as:
+	// - ensuring no other own receipts is indexed for the same block
+	// - ensuring no other receipts is indexed for the same block
+	// - ensuring no other results is indexed for the same block
+	s.savingResults.Lock()
+	defer s.savingResults.Unlock()
+
+	blockID := result.ExecutableBlock.ID()
 
 	err = s.chunkDataPacks.Store(result.AllChunkDataPacks())
 	if err != nil {
@@ -409,72 +421,71 @@ func (s *state) saveExecutionResults(
 	// as tightly as possible to let Badger manage it.
 	// Note, that it does not guarantee atomicity as transactions has size limit,
 	// but it's the closest thing to atomicity we could have
-	batch := badgerstorage.NewBatch(s.db)
+	return s.db.WithReaderBatchWriter(func(batch storage.ReaderBatchWriter) error {
 
-	defer func() {
-		// Rollback if an error occurs during batch operations
-		if err != nil {
-			chunks := result.AllChunkDataPacks()
-			chunkIDs := make([]flow.Identifier, 0, len(chunks))
-			for _, chunk := range chunks {
-				chunkIDs = append(chunkIDs, chunk.ID())
+		batch.AddCallback(func(err error) {
+			// Rollback if an error occurs during batch operations
+			if err != nil {
+				chunks := result.AllChunkDataPacks()
+				chunkIDs := make([]flow.Identifier, 0, len(chunks))
+				for _, chunk := range chunks {
+					chunkIDs = append(chunkIDs, chunk.ID())
+				}
+				_ = s.chunkDataPacks.Remove(chunkIDs)
 			}
-			_ = s.chunkDataPacks.Remove(chunkIDs)
+		})
+
+		err = s.events.BatchStore(blockID, []flow.EventsList{result.AllEvents()}, batch)
+		if err != nil {
+			return fmt.Errorf("cannot store events: %w", err)
 		}
-	}()
 
-	err = s.events.BatchStore(blockID, []flow.EventsList{result.AllEvents()}, batch)
-	if err != nil {
-		return fmt.Errorf("cannot store events: %w", err)
-	}
+		err = s.serviceEvents.BatchStore(blockID, result.AllServiceEvents(), batch)
+		if err != nil {
+			return fmt.Errorf("cannot store service events: %w", err)
+		}
 
-	err = s.serviceEvents.BatchStore(blockID, result.AllServiceEvents(), batch)
-	if err != nil {
-		return fmt.Errorf("cannot store service events: %w", err)
-	}
+		err = s.transactionResults.BatchStore(
+			blockID,
+			result.AllTransactionResults(),
+			batch)
+		if err != nil {
+			return fmt.Errorf("cannot store transaction result: %w", err)
+		}
 
-	err = s.transactionResults.BatchStore(
-		blockID,
-		result.AllTransactionResults(),
-		batch)
-	if err != nil {
-		return fmt.Errorf("cannot store transaction result: %w", err)
-	}
+		executionResult := &result.ExecutionReceipt.ExecutionResult
+		err = s.results.BatchStore(executionResult, batch)
+		if err != nil {
+			return fmt.Errorf("cannot store execution result: %w", err)
+		}
 
-	executionResult := &result.ExecutionReceipt.ExecutionResult
-	err = s.results.BatchStore(executionResult, batch)
-	if err != nil {
-		return fmt.Errorf("cannot store execution result: %w", err)
-	}
+		err = s.results.BatchIndex(blockID, executionResult.ID(), batch)
+		if err != nil {
+			return fmt.Errorf("cannot index execution result: %w", err)
+		}
 
-	err = s.results.BatchIndex(blockID, executionResult.ID(), batch)
-	if err != nil {
-		return fmt.Errorf("cannot index execution result: %w", err)
-	}
+		err = s.myReceipts.BatchStoreMyReceipt(result.ExecutionReceipt, batch)
+		if err != nil {
+			return fmt.Errorf("could not persist execution result: %w", err)
+		}
 
-	err = s.myReceipts.BatchStoreMyReceipt(result.ExecutionReceipt, batch)
-	if err != nil {
-		return fmt.Errorf("could not persist execution result: %w", err)
-	}
+		// the state commitment is the last data item to be stored, so that
+		// IsBlockExecuted can be implemented by checking whether state commitment exists
+		// in the database
+		err = s.commits.BatchStore(blockID, result.CurrentEndState(), batch)
+		if err != nil {
+			return fmt.Errorf("cannot store state commitment: %w", err)
+		}
 
-	// the state commitment is the last data item to be stored, so that
-	// IsBlockExecuted can be implemented by checking whether state commitment exists
-	// in the database
-	err = s.commits.BatchStore(blockID, result.CurrentEndState(), batch)
-	if err != nil {
-		return fmt.Errorf("cannot store state commitment: %w", err)
-	}
+		return nil
+	})
 
-	err = batch.Flush()
-	if err != nil {
-		return fmt.Errorf("batch flush error: %w", err)
-	}
-
-	return nil
 }
 
-func (s *state) UpdateLastExecutedBlock(ctx context.Context, header *flow.Header) error {
-	return operation.RetryOnConflict(s.db.Update, procedure.UpdateLastExecutedBlock(header))
+func (s *state) UpdateLastExecutedBlock(ctx context.Context, executedID flow.Identifier) error {
+	return s.db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+		return operation.UpdateExecutedBlock(rw.Writer(), executedID)
+	})
 }
 
 // deprecated by storehouse's GetHighestFinalizedExecuted
@@ -495,13 +506,17 @@ func (s *state) GetLastExecutedBlockID(ctx context.Context) (uint64, flow.Identi
 	}
 
 	var blockID flow.Identifier
-	var height uint64
-	err := s.db.View(procedure.GetLastExecutedBlock(&height, &blockID))
+	err := operation.RetrieveExecutedBlock(s.db.Reader(), &blockID)
 	if err != nil {
 		return 0, flow.ZeroID, err
 	}
 
-	return height, blockID, nil
+	lastExecuted, err := s.headers.ByBlockID(blockID)
+	if err != nil {
+		return 0, flow.ZeroID, fmt.Errorf("could not retrieve executed header %v: %w", blockID, err)
+	}
+
+	return lastExecuted.Height, blockID, nil
 }
 
 func (s *state) GetHighestFinalizedExecuted() (uint64, error) {
@@ -510,10 +525,9 @@ func (s *state) GetHighestFinalizedExecuted() (uint64, error) {
 	}
 
 	// last finalized height
-	var finalizedHeight uint64
-	err := s.db.View(operation.RetrieveFinalizedHeight(&finalizedHeight))
+	finalizedHeight, err := s.getLatestFinalized()
 	if err != nil {
-		return 0, fmt.Errorf("could not retrieve finalized height: %w", err)
+		return 0, fmt.Errorf("could not retrieve finalized: %w", err)
 	}
 
 	// last executed height

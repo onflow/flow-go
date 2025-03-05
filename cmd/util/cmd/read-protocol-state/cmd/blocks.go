@@ -52,11 +52,11 @@ type Reader struct {
 	commits storage.Commits
 }
 
-func NewReader(state protocol.State, storages *storage.All) *Reader {
+func NewReader(state protocol.State, blocks storage.Blocks, commits storage.Commits) *Reader {
 	return &Reader{
 		state:   state,
-		blocks:  storages.Blocks,
-		commits: storages.Commits,
+		blocks:  blocks,
+		commits: commits,
 	}
 }
 
@@ -153,11 +153,13 @@ func run(*cobra.Command, []string) {
 
 	storages := common.InitStorages(db)
 	state, err := common.InitProtocolState(db, storages)
+	en := common.InitExecutionStorages(db)
+
 	if err != nil {
 		log.Fatal().Err(err).Msg("could not init protocol state")
 	}
 
-	reader := NewReader(state, storages)
+	reader := NewReader(state, storages.Blocks, en.Commits)
 
 	// making sure only one flag is being used
 	err = checkOnlyOneFlagIsUsed(flagHeight, flagBlockID, flagFinal, flagSealed, flagExecuted)
