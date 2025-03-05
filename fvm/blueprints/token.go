@@ -41,6 +41,15 @@ func DeployMetadataViewsContractTransaction(nonFungibleToken flow.Address, contr
 	)
 }
 
+func DeployCrossVMMetadataViewsContractTransaction(nonFungibleToken flow.Address, contract []byte) *flow.TransactionBody {
+	contractName := "CrossVMMetadataViews"
+	return DeployContractTransaction(
+		nonFungibleToken,
+		contract,
+		contractName,
+	)
+}
+
 func DeployViewResolverContractTransaction(nonFungibleToken flow.Address) *flow.TransactionBody {
 	contract := contracts.ViewResolver()
 	contractName := "ViewResolver"

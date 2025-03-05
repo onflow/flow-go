@@ -289,6 +289,48 @@ func UpsertContractCodeChunksTransaction(
 		AddAuthorizer(service)
 }
 
+// CreateWFLOWTokenHandlerTransaction returns the transaction body for the transaction
+// that creates a token handler for the WFLOW Solidity contract
+func CreateWFLOWTokenHandlerTransaction(
+	service flow.Address,
+	bridgeEnv bridge.Environment,
+	env templates.Environment,
+	wflowEVMAddress string,
+) *flow.TransactionBody {
+	txScript, _ := bridge.GetCadenceTransactionCode("cadence/transactions/bridge/admin/token-handler/create_wflow_token_handler.cdc", bridgeEnv, env)
+
+	return flow.NewTransactionBody().
+		SetScript([]byte(
+			txScript,
+		),
+		).
+		AddArgument(jsoncdc.MustEncode(cadence.String(wflowEVMAddress))).
+		SetProposalKey(service, 0, 0).
+		SetPayer(service).
+		AddAuthorizer(service)
+}
+
+// EnableWFLOWTokenHandlerTransaction returns the transaction body for the transaction
+// that enables the token handler for the WFLOW Solidity contract
+func EnableWFLOWTokenHandlerTransaction(
+	service flow.Address,
+	bridgeEnv bridge.Environment,
+	env templates.Environment,
+	flowTokenType string,
+) *flow.TransactionBody {
+	txScript, _ := bridge.GetCadenceTransactionCode("cadence/transactions/bridge/admin/token-handler/enable_token_handler.cdc", bridgeEnv, env)
+
+	return flow.NewTransactionBody().
+		SetScript([]byte(
+			txScript,
+		),
+		).
+		AddArgument(jsoncdc.MustEncode(cadence.String(flowTokenType))).
+		SetProposalKey(service, 0, 0).
+		SetPayer(service).
+		AddAuthorizer(service)
+}
+
 // OnboardToBridgeByTypeIDTransaction returns the transaction body for the transaction
 // that onboards a FT or NFT type to the bridge
 func OnboardToBridgeByTypeIDTransaction(
@@ -308,4 +350,118 @@ func OnboardToBridgeByTypeIDTransaction(
 		SetProposalKey(service, 0, 0).
 		SetPayer(service).
 		AddAuthorizer(service)
+}
+
+// BridgeFTToEVMTransaction returns the transaction body for the transaction
+// that bridges a fungible token from Cadence to EVM
+func BridgeFTToEVMTransaction(
+	service flow.Address,
+	bridgeEnv bridge.Environment,
+	env templates.Environment,
+	forType string,
+	amount string,
+) *flow.TransactionBody {
+	txScript, _ := bridge.GetCadenceTransactionCode("cadence/transactions/bridge/tokens/bridge_tokens_to_evm.cdc", bridgeEnv, env)
+	bridgeAmount, _ := cadence.NewUFix64(amount)
+	return flow.NewTransactionBody().
+		SetScript([]byte(
+			txScript,
+		),
+		).
+		AddArgument(jsoncdc.MustEncode(cadence.String(forType))).
+		AddArgument(jsoncdc.MustEncode(bridgeAmount)).
+		SetProposalKey(service, 0, 0).
+		SetPayer(service).
+		AddAuthorizer(service)
+}
+
+// BridgeFTFromEVMTransaction returns the transaction body for the transaction
+// that bridges a fungible token from EVM to Cadence
+func BridgeFTFromEVMTransaction(
+	service flow.Address,
+	bridgeEnv bridge.Environment,
+	env templates.Environment,
+	forType string,
+	amount uint,
+) *flow.TransactionBody {
+	txScript, _ := bridge.GetCadenceTransactionCode("cadence/transactions/bridge/tokens/bridge_tokens_from_evm.cdc", bridgeEnv, env)
+
+	return flow.NewTransactionBody().
+		SetScript([]byte(
+			txScript,
+		),
+		).
+		AddArgument(jsoncdc.MustEncode(cadence.String(forType))).
+		AddArgument(jsoncdc.MustEncode(cadence.NewUInt256(amount))).
+		SetProposalKey(service, 0, 0).
+		SetPayer(service).
+		AddAuthorizer(service)
+}
+
+// GetEscrowedTokenBalanceScript returns the script body for the script
+// that gets the balance of an escrowed fungible token in the Cadence side of the VM bridge
+func GetEscrowedTokenBalanceScript(
+	bridgeEnv bridge.Environment,
+	env templates.Environment,
+) []byte {
+	script, _ := bridge.GetCadenceTransactionCode("cadence/scripts/escrow/get_locked_token_balance.cdc", bridgeEnv, env)
+
+	return script
+}
+
+// BridgeNFTToEVMTransaction returns the transaction body for the transaction
+// that bridges a non-fungible token from Cadence to EVM
+func BridgeNFTToEVMTransaction(
+	service flow.Address,
+	bridgeEnv bridge.Environment,
+	env templates.Environment,
+	forType string,
+	id cadence.UInt64,
+) *flow.TransactionBody {
+	txScript, _ := bridge.GetCadenceTransactionCode("cadence/transactions/bridge/nft/bridge_nft_to_evm.cdc", bridgeEnv, env)
+
+	return flow.NewTransactionBody().
+		SetScript([]byte(
+			txScript,
+		),
+		).
+		AddArgument(jsoncdc.MustEncode(cadence.String(forType))).
+		AddArgument(jsoncdc.MustEncode(id)).
+		SetProposalKey(service, 0, 0).
+		SetPayer(service).
+		AddAuthorizer(service)
+}
+
+// BridgeNFTFromEVMTransaction returns the transaction body for the transaction
+// that bridges a non-fungible token from EVM to Cadence
+func BridgeNFTFromEVMTransaction(
+	service flow.Address,
+	bridgeEnv bridge.Environment,
+	env templates.Environment,
+	forType string,
+	id cadence.UInt256,
+) *flow.TransactionBody {
+	txScript, _ := bridge.GetCadenceTransactionCode("cadence/transactions/bridge/nft/bridge_nft_from_evm.cdc", bridgeEnv, env)
+
+	return flow.NewTransactionBody().
+		SetScript([]byte(
+			txScript,
+		),
+		).
+		AddArgument(jsoncdc.MustEncode(cadence.String(forType))).
+		AddArgument(jsoncdc.MustEncode(id)).
+		SetProposalKey(service, 0, 0).
+		SetPayer(service).
+		AddAuthorizer(service)
+}
+
+// GetIsNFTInEscrowScript returns the script body for the script
+// that gets if an NFT is escrowed in the Cadence side of the VM bridge
+func GetIsNFTInEscrowScript(
+	bridgeEnv bridge.Environment,
+	env templates.Environment,
+) []byte {
+	script, _ := bridge.GetCadenceTransactionCode("cadence/scripts/escrow/is_nft_locked.cdc", bridgeEnv, env)
+
+	return script
 }
