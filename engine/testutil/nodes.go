@@ -315,7 +315,7 @@ func CollectionNode(t *testing.T, hub *stub.Hub, identity bootstrap.NodeInfo, ro
 		retrieve)
 	require.NoError(t, err)
 
-	pusherEngine, err := pusher.New(node.Log, node.Net, node.State, node.Metrics, node.Metrics, node.Me, collections, transactions)
+	pusherEngine, err := pusher.New(node.Log, node.Net, node.State, node.Metrics, node.Metrics, node.Me)
 	require.NoError(t, err)
 
 	clusterStateFactory, err := factories.NewClusterStateFactory(
@@ -342,7 +342,6 @@ func CollectionNode(t *testing.T, hub *stub.Hub, identity bootstrap.NodeInfo, ro
 		node.Me,
 		node.Metrics, node.Metrics, node.Metrics,
 		node.State,
-		transactions,
 		compliance.DefaultConfig(),
 	)
 	require.NoError(t, err)
@@ -444,14 +443,14 @@ func ConsensusNode(t *testing.T, hub *stub.Hub, identity bootstrap.NodeInfo, ide
 		node.Headers, guarantees)
 	// receive collections
 	ingestionEngine, err := consensusingest.New(node.Log, node.Metrics, node.Net, node.Me, ingestionCore)
-	require.Nil(t, err)
+	require.NoError(t, err)
 
 	// request receipts from execution nodes
 	receiptRequester, err := requester.New(node.Log, node.Metrics, node.Net, node.Me, node.State, channels.RequestReceiptsByBlockID, filter.Any, func() flow.Entity { return &flow.ExecutionReceipt{} })
-	require.Nil(t, err)
+	require.NoError(t, err)
 
 	assigner, err := chunks.NewChunkAssigner(flow.DefaultChunkAssignmentAlpha, node.State)
-	require.Nil(t, err)
+	require.NoError(t, err)
 
 	receiptValidator := validation.NewReceiptValidator(
 		node.State,
@@ -540,7 +539,7 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity bootstrap.NodeInfo, ide
 	results := storage.NewExecutionResults(node.Metrics, node.PublicDB)
 	receipts := storage.NewExecutionReceipts(node.Metrics, node.PublicDB, results, storage.DefaultCacheSize)
 	myReceipts := storage.NewMyExecutionReceipts(node.Metrics, node.PublicDB, receipts)
-	versionBeacons := storage.NewVersionBeacons(node.PublicDB)
+	versionBeacons := store.NewVersionBeacons(badgerimpl.ToDB(node.PublicDB))
 	headersStorage := storage.NewHeaders(node.Metrics, node.PublicDB)
 
 	checkAuthorizedAtBlock := func(blockID flow.Identifier) (bool, error) {
@@ -973,7 +972,7 @@ func VerificationNode(t testing.TB,
 	if node.ChunkStatuses == nil {
 		node.ChunkStatuses = stdmap.NewChunkStatuses(chunksLimit)
 		err = mempoolCollector.Register(metrics.ResourceChunkStatus, node.ChunkStatuses.Size)
-		require.Nil(t, err)
+		require.NoError(t, err)
 	}
 
 	if node.ChunkRequests == nil {
@@ -993,10 +992,11 @@ func VerificationNode(t testing.TB,
 	}
 
 	if node.ChunksQueue == nil {
-		node.ChunksQueue = storage.NewChunkQueue(node.PublicDB)
-		ok, err := node.ChunksQueue.Init(chunkconsumer.DefaultJobIndex)
+		cq := store.NewChunkQueue(node.Metrics, badgerimpl.ToDB(node.PublicDB))
+		ok, err := cq.Init(chunkconsumer.DefaultJobIndex)
 		require.NoError(t, err)
 		require.True(t, ok)
+		node.ChunksQueue = cq
 	}
 
 	if node.ProcessedBlockHeight == nil {
@@ -1026,7 +1026,7 @@ func VerificationNode(t testing.TB,
 			node.Me,
 			chunkVerifier,
 			approvalStorage)
-		require.Nil(t, err)
+		require.NoError(t, err)
 	}
 
 	if node.RequesterEngine == nil {

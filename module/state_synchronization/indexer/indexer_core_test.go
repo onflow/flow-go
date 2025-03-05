@@ -3,7 +3,6 @@ package indexer
 import (
 	"context"
 	"crypto/rand"
-	"errors"
 	"fmt"
 	"os"
 	"testing"
@@ -568,7 +567,7 @@ func TestExecutionState_IndexBlockData(t *testing.T) {
 
 		err := newIndexCoreTest(t, blocks, execData).runIndexBlockData()
 
-		assert.True(t, errors.Is(err, storage.ErrNotFound))
+		assert.ErrorIs(t, err, storage.ErrNotFound)
 	})
 
 }
@@ -780,7 +779,7 @@ func TestIndexerIntegration_StoreAndGet(t *testing.T) {
 			require.NoError(t, index.indexRegisters(nil, 2))
 
 			value, err := index.RegisterValue(registerID, uint64(2))
-			require.Nil(t, err)
+			require.NoError(t, err)
 			assert.Equal(t, storeValues[0], value)
 
 			require.NoError(t, index.indexRegisters(nil, 3))
@@ -789,11 +788,11 @@ func TestIndexerIntegration_StoreAndGet(t *testing.T) {
 			require.NoError(t, err)
 
 			value, err = index.RegisterValue(registerID, uint64(4))
-			require.Nil(t, err)
+			require.NoError(t, err)
 			assert.Equal(t, storeValues[1], value)
 
 			value, err = index.RegisterValue(registerID, uint64(3))
-			require.Nil(t, err)
+			require.NoError(t, err)
 			assert.Equal(t, storeValues[0], value)
 		})
 	})
