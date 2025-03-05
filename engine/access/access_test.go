@@ -47,7 +47,6 @@ import (
 	"github.com/onflow/flow-go/storage/badger/operation"
 	"github.com/onflow/flow-go/storage/operation/badgerimpl"
 	"github.com/onflow/flow-go/storage/store"
-	"github.com/onflow/flow-go/storage/util"
 	"github.com/onflow/flow-go/utils/unittest"
 	"github.com/onflow/flow-go/utils/unittest/mocks"
 
@@ -154,7 +153,7 @@ func (suite *Suite) RunTest(
 	f func(handler *access.Handler, db *badger.DB, all *storage.All),
 ) {
 	unittest.RunWithBadgerDB(suite.T(), func(db *badger.DB) {
-		all := util.StorageLayer(suite.T(), db)
+		all := bstorage.InitAll(metrics.NewNoopCollector(), db)
 
 		var err error
 		suite.backend, err = backend.New(backend.Params{
@@ -599,7 +598,7 @@ func (suite *Suite) TestGetExecutionResultByBlockID() {
 // is reported as sealed
 func (suite *Suite) TestGetSealedTransaction() {
 	unittest.RunWithBadgerDB(suite.T(), func(db *badger.DB) {
-		all := util.StorageLayer(suite.T(), db)
+		all := bstorage.InitAll(metrics.NewNoopCollector(), db)
 		results := bstorage.NewExecutionResults(suite.metrics, db)
 		receipts := bstorage.NewExecutionReceipts(suite.metrics, db, results, bstorage.DefaultCacheSize)
 		enIdentities := unittest.IdentityListFixture(2, unittest.WithRole(flow.RoleExecution))
@@ -767,7 +766,7 @@ func (suite *Suite) TestGetSealedTransaction() {
 // transaction ID, block ID, and collection ID.
 func (suite *Suite) TestGetTransactionResult() {
 	unittest.RunWithBadgerDB(suite.T(), func(db *badger.DB) {
-		all := util.StorageLayer(suite.T(), db)
+		all := bstorage.InitAll(metrics.NewNoopCollector(), db)
 		results := bstorage.NewExecutionResults(suite.metrics, db)
 		receipts := bstorage.NewExecutionReceipts(suite.metrics, db, results, bstorage.DefaultCacheSize)
 		originID := unittest.IdentifierFixture()
@@ -1062,7 +1061,7 @@ func (suite *Suite) TestGetTransactionResult() {
 // the correct block id
 func (suite *Suite) TestExecuteScript() {
 	unittest.RunWithBadgerDB(suite.T(), func(db *badger.DB) {
-		all := util.StorageLayer(suite.T(), db)
+		all := bstorage.InitAll(metrics.NewNoopCollector(), db)
 		transactions := bstorage.NewTransactions(suite.metrics, db)
 		collections := bstorage.NewCollections(db, transactions)
 		results := bstorage.NewExecutionResults(suite.metrics, db)

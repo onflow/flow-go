@@ -78,7 +78,8 @@ func run(*cobra.Command, []string) {
 	serviceEvents := badger.NewServiceEvents(metrics, db)
 
 	// require the chunk data pack data must exist before returning the storage module
-	chunkDataPacksPebbleDB, err := storagepebble.MustOpenDefaultPebbleDB(flagChunkDataPackDir)
+	chunkDataPacksPebbleDB, err := storagepebble.MustOpenDefaultPebbleDB(
+		log.Logger.With().Str("pebbledb", "cdp").Logger(), flagChunkDataPackDir)
 	if err != nil {
 		log.Fatal().Err(err).Msgf("could not open chunk data pack DB at %v", flagChunkDataPackDir)
 	}
