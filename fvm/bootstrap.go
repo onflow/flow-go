@@ -11,7 +11,6 @@ import (
 	"github.com/onflow/flow-core-contracts/lib/go/contracts"
 	"github.com/onflow/flow-core-contracts/lib/go/templates"
 
-	usdc "github.com/onflow/bridged-usdc/lib/go/contracts"
 	bridge "github.com/onflow/flow-evm-bridge"
 	storefront "github.com/onflow/nft-storefront/lib/go/contracts"
 
@@ -379,9 +378,6 @@ func (b *bootstrapExecutor) Execute() error {
 	b.deployMetadataViews(fungibleToken, nonFungibleToken, &env)
 	b.deployFungibleTokenSwitchboard(fungibleToken, &env)
 
-	// deploys the USDCFlow smart contract
-	b.deployUSDCFlow(fungibleToken, &env)
-
 	// deploys the NFTStorefrontV2 contract
 	b.deployNFTStorefrontV2(nonFungibleToken, &env)
 
@@ -452,6 +448,8 @@ func (b *bootstrapExecutor) Execute() error {
 	// sets up the EVM environment
 	b.setupEVM(service, nonFungibleToken, fungibleToken, flowToken, &env)
 	b.setupVMBridge(service, &env)
+
+	b.deployCrossVMMetadataViews(nonFungibleToken, &env)
 
 	err = expectAccounts(systemcontracts.EVMStorageAccountIndex)
 	if err != nil {
@@ -582,6 +580,21 @@ func (b *bootstrapExecutor) deployMetadataViews(fungibleToken, nonFungibleToken 
 	)
 	env.FungibleTokenMetadataViewsAddress = fungibleToken.String()
 	panicOnMetaInvokeErrf("failed to deploy fungible token metadata views contract: %s", txError, err)
+}
+
+func (b *bootstrapExecutor) deployCrossVMMetadataViews(nonFungibleToken flow.Address, env *templates.Environment) {
+	if bool(b.setupEVMEnabled) && b.ctx.Chain.ChainID().Transient() {
+		crossVMMVContract := contracts.CrossVMMetadataViews(*env)
+
+		txError, err := b.invokeMetaTransaction(
+			b.ctx,
+			Transaction(
+				blueprints.DeployCrossVMMetadataViewsContractTransaction(nonFungibleToken, crossVMMVContract),
+				0),
+		)
+		env.CrossVMMetadataViewsAddress = nonFungibleToken.String()
+		panicOnMetaInvokeErrf("failed to deploy cross VM metadata views contract: %s", txError, err)
+	}
 }
 
 func (b *bootstrapExecutor) deployFungibleTokenSwitchboard(deployTo flow.Address, env *templates.Environment) {
@@ -779,27 +792,6 @@ func (b *bootstrapExecutor) deployNFTStorefrontV2(deployTo flow.Address, env *te
 			0),
 	)
 	panicOnMetaInvokeErrf("failed to deploy NFTStorefrontV2 contract: %s", txError, err)
-}
-
-func (b *bootstrapExecutor) deployUSDCFlow(deployTo flow.Address, env *templates.Environment) {
-
-	contract := usdc.USDCFlowBasic(
-		env.FungibleTokenAddress,
-		env.MetadataViewsAddress,
-		env.FungibleTokenMetadataViewsAddress,
-		env.ViewResolverAddress,
-		env.BurnerAddress)
-
-	txError, err := b.invokeMetaTransaction(
-		b.ctx,
-		Transaction(
-			blueprints.DeployContractTransaction(
-				deployTo,
-				contract,
-				"USDCFlow"),
-			0),
-	)
-	panicOnMetaInvokeErrf("failed to deploy USDCFlow contract: %s", txError, err)
 }
 
 func (b *bootstrapExecutor) mintInitialTokens(
@@ -1266,6 +1258,43 @@ func (b *bootstrapExecutor) setupVMBridge(serviceAddress flow.Address, env *temp
 				0),
 		)
 		panicOnMetaInvokeErrf("failed to add the NFT template code chunks: %s", txError, err)
+
+		// Retrieve the WFLOW bytecode from the JSON args
+		wflowBytecode, err := bridge.GetSolidityContractCode("WFLOW")
+		if err != nil {
+			panic(fmt.Sprintf("failed to get WFLOW bytecode: %s", err))
+		}
+
+		// deploy the WFLOW contract to the service account's COA
+		tx = blueprints.DeployEVMContractTransaction(serviceAddress, wflowBytecode, gasLimit, deploymentValue, bridgeEnv, *env)
+
+		txOutput, err = b.runMetaTransaction(
+			ctx,
+			Transaction(tx, 0),
+		)
+		panicOnMetaInvokeErrf("failed to deploy the WFLOW contract in the Service Account COA: %s", txOutput.Err, err)
+
+		wflowAddress := getContractAddressFromEVMEvent(txOutput)
+
+		// Create WFLOW Token Handler, supplying the WFLOW EVM address
+		txError, err = b.invokeMetaTransaction(
+			ctx,
+			Transaction(
+				blueprints.CreateWFLOWTokenHandlerTransaction(serviceAddress, bridgeEnv, *env, wflowAddress),
+				0),
+		)
+		panicOnMetaInvokeErrf("failed to create the WFLOW token handler: %s", txError, err)
+
+		// Enable WFLOW Token Handler, supplying the Cadence FlowToken.Vault type
+		flowVaultType := "A." + env.FlowTokenAddress + ".FlowToken.Vault"
+
+		txError, err = b.invokeMetaTransaction(
+			ctx,
+			Transaction(
+				blueprints.EnableWFLOWTokenHandlerTransaction(serviceAddress, bridgeEnv, *env, flowVaultType),
+				0),
+		)
+		panicOnMetaInvokeErrf("failed to enable the WFLOW token handler: %s", txError, err)
 
 		// Unpause the bridge
 		txError, err = b.invokeMetaTransaction(
