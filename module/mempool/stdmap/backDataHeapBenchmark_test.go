@@ -144,11 +144,10 @@ func (b *baselineLRU[K, V]) Add(key K, value V) bool {
 }
 
 // Remove will remove the item with the given hash.
-func (b *baselineLRU[K, V]) Remove(key K) (V, bool) {
+func (b *baselineLRU[K, V]) Remove(key K) (value V, removed bool) {
 	value, ok := b.c.Get(key)
 	if !ok {
-		var zero V
-		return zero, false
+		return value, false
 	}
 
 	return value, b.c.Remove(key)
@@ -156,11 +155,10 @@ func (b *baselineLRU[K, V]) Remove(key K) (V, bool) {
 
 // Adjust will adjust the value item using the given function if the given key can be found.
 // Returns a bool which indicates whether the value was updated as well as the updated value
-func (b *baselineLRU[K, V]) Adjust(key K, f func(V) V) (V, bool) {
+func (b *baselineLRU[K, V]) Adjust(key K, f func(V) V) (value V, ok bool) {
 	value, removed := b.Remove(key)
 	if !removed {
-		var zero V
-		return zero, false
+		return value, false
 	}
 
 	newValue := f(value)
@@ -176,7 +174,7 @@ func (b *baselineLRU[K, V]) Adjust(key K, f func(V) V) (V, bool) {
 // a bool indicating whether the value was initialized.
 // Note: this is a benchmark helper, hence, the adjust-with-init provides serializability w.r.t other concurrent adjust-with-init or get-with-init operations,
 // and does not provide serializability w.r.t concurrent add, adjust or get operations.
-func (b *baselineLRU[K, V]) AdjustWithInit(key K, adjust func(V) V, init func() V) (V, bool) {
+func (b *baselineLRU[K, V]) AdjustWithInit(key K, adjust func(V) V, init func() V) (value V, ok bool) {
 	b.atomicAdjustMutex.Lock()
 	defer b.atomicAdjustMutex.Unlock()
 
@@ -185,32 +183,16 @@ func (b *baselineLRU[K, V]) AdjustWithInit(key K, adjust func(V) V, init func() 
 	}
 	added := b.Add(key, init())
 	if !added {
-		var zero V
-		return zero, false
+		return value, false
 	}
 	return b.Adjust(key, adjust)
 }
 
-// GetWithInit will retrieve the value item if the given key can be found.
-// If the key is not found, the init function will be called to create a new value.
-// Returns a bool which indicates whether the entity was found (or created).
-func (b *baselineLRU[K, V]) GetWithInit(key K, init func() V) (V, bool) {
-	newE := init()
-	value, ok, _ := b.c.PeekOrAdd(key, newE)
+// Get returns the given item from the pool.
+func (b *baselineLRU[K, V]) Get(key K) (value V, ok bool) {
+	value, ok = b.c.Get(key)
 	if !ok {
-		// if the entity was not found, it means that the new entity was added to the cache.
-		return newE, true
-	}
-	// if the entity was found, it means that the new entity was not added to the cache.
-	return value, true
-}
-
-// ByID returns the given item from the pool.
-func (b *baselineLRU[K, V]) Get(key K) (V, bool) {
-	value, ok := b.c.Get(key)
-	if !ok {
-		var zero V
-		return zero, false
+		return value, false
 	}
 
 	return value, ok
