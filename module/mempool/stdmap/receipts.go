@@ -34,7 +34,7 @@ func (r *Receipts) Remove(receiptID flow.Identifier) bool {
 
 // ByID will retrieve an approval by ID.
 func (r *Receipts) ByID(receiptID flow.Identifier) (*flow.ExecutionReceipt, bool) {
-	receipt, exists := r.Backend.ByID(receiptID)
+	receipt, exists := r.Backend.Get(receiptID)
 	if !exists {
 		return nil, false
 	}
@@ -43,9 +43,9 @@ func (r *Receipts) ByID(receiptID flow.Identifier) (*flow.ExecutionReceipt, bool
 
 // All will return all execution receipts in the memory pool.
 func (r *Receipts) All() []*flow.ExecutionReceipt {
-	entities := r.Backend.All()
-	receipts := make([]*flow.ExecutionReceipt, 0, len(entities))
-	for _, receipt := range entities {
+	all := r.Backend.All()
+	receipts := make([]*flow.ExecutionReceipt, 0, len(all))
+	for _, receipt := range all {
 		receipts = append(receipts, receipt)
 	}
 	return receipts

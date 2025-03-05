@@ -21,7 +21,7 @@ func NewQueues() *Queues {
 }
 
 func (b *QueuesBackdata) ByID(queueID flow.Identifier) (*queue.Queue, bool) {
-	queue, exists := b.BackData.ByID(queueID)
+	queue, exists := b.BackData.Get(queueID)
 	if !exists {
 		return nil, false
 	}

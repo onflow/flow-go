@@ -99,9 +99,9 @@ func (ir *IncorporatedResultSeals) Size() uint {
 
 // All returns all the items in the mempool
 func (ir *IncorporatedResultSeals) All() []*flow.IncorporatedResultSeal {
-	entities := ir.Backend.All()
+	all := ir.Backend.All()
 	results := make([]*flow.IncorporatedResultSeal, 0, ir.mutableBackData.Size())
-	for _, result := range entities {
+	for _, result := range all {
 		results = append(results, result)
 	}
 	return results
@@ -109,7 +109,7 @@ func (ir *IncorporatedResultSeals) All() []*flow.IncorporatedResultSeal {
 
 // ByID gets an IncorporatedResultSeal by IncorporatedResult ID
 func (ir *IncorporatedResultSeals) ByID(id flow.Identifier) (*flow.IncorporatedResultSeal, bool) {
-	result, ok := ir.Backend.ByID(id)
+	result, ok := ir.Backend.Get(id)
 	if !ok {
 		return nil, false
 	}
@@ -120,12 +120,11 @@ func (ir *IncorporatedResultSeals) ByID(id flow.Identifier) (*flow.IncorporatedR
 func (ir *IncorporatedResultSeals) Remove(id flow.Identifier) bool {
 	removed := false
 	err := ir.Backend.Run(func(_ mempool.BackData[flow.Identifier, *flow.IncorporatedResultSeal]) error {
-		var entity flow.Entity
-		entity, removed = ir.mutableBackData.Remove(id)
+		var seal *flow.IncorporatedResultSeal
+		seal, removed = ir.mutableBackData.Remove(id)
 		if !removed {
 			return nil
 		}
-		seal := entity.(*flow.IncorporatedResultSeal)
 		ir.removeFromIndex(id, seal.Header.Height)
 		return nil
 	})

@@ -25,7 +25,7 @@ func (a *Blocks) Add(block *flow.Block) bool {
 
 // ByID returns the block with the given ID from the mempool.
 func (a *Blocks) ByID(blockID flow.Identifier) (*flow.Block, bool) {
-	block, exists := a.Backend.ByID(blockID)
+	block, exists := a.Backend.Get(blockID)
 	if !exists {
 		return nil, false
 	}
@@ -34,9 +34,9 @@ func (a *Blocks) ByID(blockID flow.Identifier) (*flow.Block, bool) {
 
 // All returns all blocks from the pool.
 func (a *Blocks) All() []*flow.Block {
-	entities := a.Backend.All()
-	blocks := make([]*flow.Block, 0, len(entities))
-	for _, block := range entities {
+	all := a.Backend.All()
+	blocks := make([]*flow.Block, 0, len(all))
+	for _, block := range all {
 		blocks = append(blocks, block)
 	}
 

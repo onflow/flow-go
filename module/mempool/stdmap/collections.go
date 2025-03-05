@@ -31,7 +31,7 @@ func (c *Collections) Remove(collID flow.Identifier) bool {
 
 // ByID returns the collection with the given ID from the mempool.
 func (c *Collections) ByID(collID flow.Identifier) (*flow.Collection, bool) {
-	coll, exists := c.Backend.ByID(collID)
+	coll, exists := c.Backend.Get(collID)
 	if !exists {
 		return nil, false
 	}
@@ -40,9 +40,9 @@ func (c *Collections) ByID(collID flow.Identifier) (*flow.Collection, bool) {
 
 // All returns all collections from the mempool.
 func (c *Collections) All() []*flow.Collection {
-	entities := c.Backend.All()
-	colls := make([]*flow.Collection, 0, len(entities))
-	for _, coll := range entities {
+	all := c.Backend.All()
+	colls := make([]*flow.Collection, 0, len(all))
+	for _, coll := range all {
 		colls = append(colls, coll)
 	}
 	return colls

@@ -35,7 +35,7 @@ func (r *Results) Remove(resultID flow.Identifier) bool {
 
 // ByID will retrieve an approval by ID.
 func (r *Results) ByID(resultID flow.Identifier) (*flow.ExecutionResult, bool) {
-	result, exists := r.Backend.ByID(resultID)
+	result, exists := r.Backend.Get(resultID)
 	if !exists {
 		return nil, false
 	}
@@ -44,9 +44,9 @@ func (r *Results) ByID(resultID flow.Identifier) (*flow.ExecutionResult, bool) {
 
 // All will return all execution results in the memory pool.
 func (r *Results) All() []*flow.ExecutionResult {
-	entities := r.Backend.All()
-	results := make([]*flow.ExecutionResult, 0, len(entities))
-	for _, result := range entities {
+	all := r.Backend.All()
+	results := make([]*flow.ExecutionResult, 0, len(all))
+	for _, result := range all {
 		results = append(results, result)
 	}
 	return results

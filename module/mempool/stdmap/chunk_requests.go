@@ -37,7 +37,7 @@ func (cs *ChunkRequests) RequestHistory(chunkID flow.Identifier) (uint64, time.T
 	var attempts uint64
 
 	err := cs.Backend.Run(func(backdata mempool.BackData[flow.Identifier, *chunkRequestStatus]) error {
-		status, ok := backdata.ByID(chunkID)
+		status, ok := backdata.Get(chunkID)
 		if !ok {
 			return fmt.Errorf("request does not exist for chunk %x", chunkID)
 		}
@@ -56,7 +56,7 @@ func (cs *ChunkRequests) RequestHistory(chunkID flow.Identifier) (uint64, time.T
 // tuple of (chunkID, resultID, chunkIndex).
 func (cs *ChunkRequests) Add(request *verification.ChunkDataPackRequest) bool {
 	err := cs.Backend.Run(func(backdata mempool.BackData[flow.Identifier, *chunkRequestStatus]) error {
-		status, exists := backdata.ByID(request.ChunkID)
+		status, exists := backdata.Get(request.ChunkID)
 		chunkLocatorID := request.Locator.ID()
 
 		if !exists {
@@ -106,7 +106,7 @@ func (cs *ChunkRequests) PopAll(chunkID flow.Identifier) (chunks.LocatorMap, boo
 	var locators map[flow.Identifier]*chunks.Locator
 
 	err := cs.Backend.Run(func(backdata mempool.BackData[flow.Identifier, *chunkRequestStatus]) error {
-		status, exists := backdata.ByID(chunkID)
+		status, exists := backdata.Get(chunkID)
 		if !exists {
 			return fmt.Errorf("not exist")
 		}
@@ -134,7 +134,7 @@ func (cs *ChunkRequests) PopAll(chunkID flow.Identifier) (chunks.LocatorMap, boo
 // The increments are done atomically, thread-safe, and in isolation.
 func (cs *ChunkRequests) IncrementAttempt(chunkID flow.Identifier) bool {
 	err := cs.Backend.Run(func(backdata mempool.BackData[flow.Identifier, *chunkRequestStatus]) error {
-		status, exists := backdata.ByID(chunkID)
+		status, exists := backdata.Get(chunkID)
 		if !exists {
 			return fmt.Errorf("not exist")
 		}
@@ -170,7 +170,7 @@ func (cs *ChunkRequests) UpdateRequestHistory(chunkID flow.Identifier, updater m
 	var attempts uint64
 
 	err := cs.Backend.Run(func(backdata mempool.BackData[flow.Identifier, *chunkRequestStatus]) error {
-		status, exists := backdata.ByID(chunkID)
+		status, exists := backdata.Get(chunkID)
 		if !exists {
 			return fmt.Errorf("not exist")
 		}

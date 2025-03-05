@@ -26,7 +26,7 @@ func (t *TransactionTimings) Add(tx *flow.TransactionTiming) bool {
 
 // ByID returns the transaction timing with the given ID from the mempool.
 func (t *TransactionTimings) ByID(txID flow.Identifier) (*flow.TransactionTiming, bool) {
-	tt, exists := t.Backend.ByID(txID)
+	tt, exists := t.Backend.Get(txID)
 	if !exists {
 		return nil, false
 	}
@@ -35,9 +35,9 @@ func (t *TransactionTimings) ByID(txID flow.Identifier) (*flow.TransactionTiming
 
 // Adjust will adjust the transaction timing using the given function if the given key can be found.
 // Returns a bool which indicates whether the value was updated as well as the updated value.
-func (t *TransactionTimings) Adjust(txID flow.Identifier, f func(*flow.TransactionTiming) (flow.Identifier, *flow.TransactionTiming)) (
+func (t *TransactionTimings) Adjust(txID flow.Identifier, f func(*flow.TransactionTiming) *flow.TransactionTiming) (
 	*flow.TransactionTiming, bool) {
-	tt, updated := t.Backend.Adjust(txID, func(tt *flow.TransactionTiming) (flow.Identifier, *flow.TransactionTiming) {
+	tt, updated := t.Backend.Adjust(txID, func(tt *flow.TransactionTiming) *flow.TransactionTiming {
 		return f(tt)
 	})
 	if !updated {
@@ -48,9 +48,9 @@ func (t *TransactionTimings) Adjust(txID flow.Identifier, f func(*flow.Transacti
 
 // All returns all transaction timings from the mempool.
 func (t *TransactionTimings) All() []*flow.TransactionTiming {
-	entities := t.Backend.All()
-	txs := make([]*flow.TransactionTiming, 0, len(entities))
-	for _, tx := range entities {
+	all := t.Backend.All()
+	txs := make([]*flow.TransactionTiming, 0, len(all))
+	for _, tx := range all {
 		txs = append(txs, tx)
 	}
 	return txs

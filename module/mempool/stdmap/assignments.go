@@ -25,9 +25,9 @@ func (a *Assignments) Has(assignmentID flow.Identifier) bool {
 
 }
 
-// ByID retrieves the chunk assignment from mempool based on provided ID
+// ByID retrieves the chunk assignment from the mempool based on provided ID.
 func (a *Assignments) ByID(assignmentID flow.Identifier) (*chunkmodels.Assignment, bool) {
-	assignment, exists := a.Backend.ByID(assignmentID)
+	assignment, exists := a.Backend.Get(assignmentID)
 	if !exists {
 		return nil, false
 	}
@@ -50,11 +50,11 @@ func (a *Assignments) Size() uint {
 	return a.Backend.Size()
 }
 
-// All returns all chunk data packs from the pool.
+// All returns all Assignments from the memory pool.
 func (a *Assignments) All() []*chunkmodels.Assignment {
-	entities := a.Backend.All()
-	assignments := make([]*chunkmodels.Assignment, 0, len(entities))
-	for _, assignment := range entities {
+	all := a.Backend.All()
+	assignments := make([]*chunkmodels.Assignment, 0, len(all))
+	for _, assignment := range all {
 		assignments = append(assignments, assignment)
 	}
 

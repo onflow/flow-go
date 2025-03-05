@@ -77,7 +77,7 @@ func (r *PendingReceipts) Add(receipt *flow.ExecutionReceipt) bool {
 	added := false
 	err := r.Backend.Run(func(backData mempool.BackData[flow.Identifier, *flow.ExecutionReceipt]) error {
 		receiptID := receipt.ID()
-		_, exists := backData.ByID(receiptID)
+		_, exists := backData.Get(receiptID)
 		if exists {
 			// duplication
 			return nil
@@ -125,7 +125,7 @@ func (r *PendingReceipts) Add(receipt *flow.ExecutionReceipt) bool {
 func (r *PendingReceipts) Remove(receiptID flow.Identifier) bool {
 	removed := false
 	err := r.Backend.Run(func(backData mempool.BackData[flow.Identifier, *flow.ExecutionReceipt]) error {
-		receipt, ok := backData.ByID(receiptID)
+		receipt, ok := backData.Get(receiptID)
 		if ok {
 			removeReceipt(receipt, r.mutableBackData, r.byPreviousResultID)
 			removed = true
@@ -147,7 +147,7 @@ func (r *PendingReceipts) ByPreviousResultID(previousResultID flow.Identifier) [
 			return nil
 		}
 		for receiptID := range siblings {
-			receipt, ok := backData.ByID(receiptID)
+			receipt, ok := backData.Get(receiptID)
 			if !ok {
 				return fmt.Errorf("inconsistent index. can not find entity by id: %v", receiptID)
 			}
@@ -207,7 +207,7 @@ func (r *PendingReceipts) PruneUpToHeight(height uint64) error {
 
 func (r *PendingReceipts) removeByHeight(height uint64, backData mempool.BackData[flow.Identifier, *flow.ExecutionReceipt]) {
 	for receiptID := range r.byHeight[height] {
-		receipt, ok := backData.ByID(receiptID)
+		receipt, ok := backData.Get(receiptID)
 		if ok {
 			removeReceipt(receipt, r.mutableBackData, r.byPreviousResultID)
 		}

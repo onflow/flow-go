@@ -33,7 +33,7 @@ func (b *BlockByCollections) Add(block *entity.BlocksByCollection) bool {
 
 func (b *BlockByCollections) Get(collID flow.Identifier) (*entity.BlocksByCollection, bool) {
 	backdata := &BlockByCollectionBackdata{b.mutableBackData}
-	return backdata.ByID(collID)
+	return backdata.Get(collID)
 }
 
 func (b *BlockByCollections) Run(f func(backdata *BlockByCollectionBackdata) error) error {
@@ -53,7 +53,7 @@ func (b *BlockByCollections) Run(f func(backdata *BlockByCollectionBackdata) err
 }
 
 func (b *BlockByCollectionBackdata) ByID(id flow.Identifier) (*entity.BlocksByCollection, bool) {
-	block, exists := b.BackData.ByID(id)
+	block, exists := b.BackData.Get(id)
 	if !exists {
 		return nil, false
 	}

@@ -37,9 +37,9 @@ func TestTransactionTimingsPool(t *testing.T) {
 
 	t.Run("should be able to adjust the first", func(t *testing.T) {
 		finalized := time.Now()
-		entity, updated := pool.Adjust(item1.ID(), func(t *flow.TransactionTiming) (flow.Identifier, *flow.TransactionTiming) {
+		entity, updated := pool.Adjust(item1.ID(), func(t *flow.TransactionTiming) *flow.TransactionTiming {
 			t.Finalized = finalized
-			return t.ID(), t
+			return t
 		})
 		assert.True(t, updated)
 		assert.Equal(t, finalized, entity.Finalized)
@@ -63,9 +63,9 @@ func TestTransactionTimingsPool(t *testing.T) {
 	})
 
 	t.Run("should not panic if item does not exist yet", func(t *testing.T) {
-		entity, updated := pool.Adjust(unittest.IdentifierFixture(), func(tt *flow.TransactionTiming) (flow.Identifier, *flow.TransactionTiming) {
+		entity, updated := pool.Adjust(unittest.IdentifierFixture(), func(tt *flow.TransactionTiming) *flow.TransactionTiming {
 			assert.Fail(t, "should not have found this item")
-			return tt.ID(), tt
+			return tt
 		})
 		assert.False(t, updated)
 		assert.Nil(t, entity)

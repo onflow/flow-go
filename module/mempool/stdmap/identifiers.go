@@ -37,9 +37,9 @@ func (i *Identifiers) Remove(id flow.Identifier) bool {
 
 // All returns all identifiers stored in the mempool
 func (i *Identifiers) All() flow.IdentifierList {
-	entities := i.Backend.All()
-	idEntities := make([]flow.Identifier, 0, len(entities))
-	for key, _ := range entities {
+	all := i.Backend.All()
+	idEntities := make([]flow.Identifier, 0, len(all))
+	for key, _ := range all {
 		idEntities = append(idEntities, key)
 	}
 	return idEntities

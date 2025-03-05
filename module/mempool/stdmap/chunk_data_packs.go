@@ -37,7 +37,7 @@ func (c *ChunkDataPacks) Remove(chunkID flow.Identifier) bool {
 
 // ByChunkID returns the chunk data pack with the given chunkID from the mempool.
 func (c *ChunkDataPacks) ByChunkID(chunkID flow.Identifier) (*flow.ChunkDataPack, bool) {
-	chunkDataPack, exists := c.Backend.ByID(chunkID)
+	chunkDataPack, exists := c.Backend.Get(chunkID)
 	if !exists {
 		return nil, false
 	}
@@ -51,9 +51,9 @@ func (c *ChunkDataPacks) Size() uint {
 
 // All returns all chunk data packs from the pool.
 func (c *ChunkDataPacks) All() []*flow.ChunkDataPack {
-	entities := c.Backend.All()
-	chunkDataPacks := make([]*flow.ChunkDataPack, 0, len(entities))
-	for _, chunkDataPack := range entities {
+	all := c.Backend.All()
+	chunkDataPacks := make([]*flow.ChunkDataPack, 0, len(all))
+	for _, chunkDataPack := range all {
 		chunkDataPacks = append(chunkDataPacks, chunkDataPack)
 	}
 	return chunkDataPacks

@@ -21,7 +21,7 @@ func NewChunkStatuses(limit uint) *ChunkStatuses {
 // There is a one-to-one correspondence between the chunk statuses in memory, and
 // their pair of chunk index and result id.
 func (cs ChunkStatuses) Get(chunkIndex uint64, resultID flow.Identifier) (*verification.ChunkStatus, bool) {
-	status, exists := cs.Backend.ByID(chunks.ChunkLocatorID(resultID, chunkIndex))
+	status, exists := cs.Backend.Get(chunks.ChunkLocatorID(resultID, chunkIndex))
 	if !exists {
 		return nil, false
 	}

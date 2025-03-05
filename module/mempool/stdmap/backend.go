@@ -34,7 +34,7 @@ func NewBackend[K comparable, V any](options ...OptionFunc[K, V]) *Backend[K, V]
 	return &b
 }
 
-// Has checks if we already contain the item with the given hash.
+// Has checks if a value is stored under the given key.
 func (b *Backend[K, V]) Has(key K) bool {
 	// bs1 := binstat.EnterTime(binstat.BinStdmap + ".r_lock.(Backend)Has")
 	b.RLock()
@@ -47,7 +47,9 @@ func (b *Backend[K, V]) Has(key K) bool {
 	return has
 }
 
-// Add adds the given item to the pool.
+// Add attempts to add the given value, without overwriting existing data.
+// If a value is already stored under the input key, Add is a no-op and returns false.
+// If no value is stored under the input key, Add adds the value and returns true.
 func (b *Backend[K, V]) Add(key K, value V) bool {
 	// bs1 := binstat.EnterTime(binstat.BinStdmap + ".w_lock.(Backend)Add")
 	b.Lock()
@@ -61,7 +63,9 @@ func (b *Backend[K, V]) Add(key K, value V) bool {
 	return added
 }
 
-// Remove will remove the item with the given hash.
+// Remove removes the value with the given key.
+// If the key-value pair exists, returns the value and true.
+// Otherwise, returns the zero value for type V and false.
 func (b *Backend[K, V]) Remove(key K) bool {
 	// bs1 := binstat.EnterTime(binstat.BinStdmap + ".w_lock.(Backend)Remove")
 	b.Lock()
@@ -75,8 +79,10 @@ func (b *Backend[K, V]) Remove(key K) bool {
 }
 
 // Adjust will adjust the value item using the given function if the given key can be found.
-// Returns a bool which indicates whether the value was updated.
-func (b *Backend[K, V]) Adjust(key K, f func(V) (K, V)) (V, bool) {
+// Returns:
+//   - value, true if the value with the given key was found. The returned value is the version after the update is applied.
+//   - nil, false if no value with the given key was found
+func (b *Backend[K, V]) Adjust(key K, f func(V) V) (V, bool) {
 	// bs1 := binstat.EnterTime(binstat.BinStdmap + ".w_lock.(Backend)Adjust")
 	b.Lock()
 	// binstat.Leave(bs1)
@@ -95,34 +101,18 @@ func (b *Backend[K, V]) Adjust(key K, f func(V) (K, V)) (V, bool) {
 // - adjust: the function that adjusts the value.
 // - init: the function that initializes the value when it is not found.
 // Returns:
-//   - the adjusted value.
-//
+// - the adjusted value.
 // - a bool which indicates whether the value was adjusted.
-func (b *Backend[K, V]) AdjustWithInit(key K, adjust func(V) (K, V), init func() V) (V, bool) {
+func (b *Backend[K, V]) AdjustWithInit(key K, adjust func(V) V, init func() V) (V, bool) {
 	b.Lock()
 	defer b.Unlock()
 
 	return b.mutableBackData.AdjustWithInit(key, adjust, init)
 }
 
-// GetWithInit returns the given value from the backdata. If the value does not exist, it creates a new value
-// using the factory function and stores it in the backdata.
-// Args:
-// - key: the identifier of the value to get.
-// - init: the function that initializes the value when it is not found.
-// Returns:
-//   - the value.
-//
-// - a bool which indicates whether the value was found (or created).
-func (b *Backend[K, V]) GetWithInit(key K, init func() V) (V, bool) {
-	b.Lock()
-	defer b.Unlock()
-
-	return b.mutableBackData.GetWithInit(key, init)
-}
-
-// ByID returns the given item from the pool.
-func (b *Backend[K, V]) ByID(key K) (V, bool) {
+// Get returns the value for the given key.
+// Returns true if the key-value pair exists, and false otherwise.
+func (b *Backend[K, V]) Get(key K) (V, bool) {
 	// bs1 := binstat.EnterTime(binstat.BinStdmap + ".r_lock.(Backend)ByID")
 	b.RLock()
 	// binstat.Leave(bs1)
@@ -130,11 +120,13 @@ func (b *Backend[K, V]) ByID(key K) (V, bool) {
 	// bs2 := binstat.EnterTime(binstat.BinStdmap + ".inlock.(Backend)ByID")
 	// defer binstat.Leave(bs2)
 	defer b.RUnlock()
-	value, exists := b.mutableBackData.ByID(key)
+	value, exists := b.mutableBackData.Get(key)
 	return value, exists
 }
 
-// Run executes a function giving it exclusive access to the backdata
+// Run executes a function giving it exclusive access to the backdata.
+// All errors returned from the input functor f are considered exceptions.
+// No errors are expected during normal operation.
 func (b *Backend[K, V]) Run(f func(backdata mempool.BackData[K, V]) error) error {
 	// bs1 := binstat.EnterTime(binstat.BinStdmap + ".w_lock.(Backend)Run")
 	b.Lock()

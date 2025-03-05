@@ -28,7 +28,7 @@ func (t *Times) Add(id flow.Identifier, ti time.Time) bool {
 
 // ByID returns the time with the given ID from the mempool.
 func (t *Times) ByID(id flow.Identifier) (time.Time, bool) {
-	ti, exists := t.Backend.ByID(id)
+	ti, exists := t.Backend.Get(id)
 	if !exists {
 		return time.Time{}, false
 	}

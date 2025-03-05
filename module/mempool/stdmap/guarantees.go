@@ -26,7 +26,7 @@ func (g *Guarantees) Add(guarantee *flow.CollectionGuarantee) bool {
 
 // ByID returns the collection guarantee with the given ID from the mempool.
 func (g *Guarantees) ByID(collID flow.Identifier) (*flow.CollectionGuarantee, bool) {
-	guarantee, exists := g.Backend.ByID(collID)
+	guarantee, exists := g.Backend.Get(collID)
 	if !exists {
 		return nil, false
 	}
@@ -35,9 +35,9 @@ func (g *Guarantees) ByID(collID flow.Identifier) (*flow.CollectionGuarantee, bo
 
 // All returns all collection guarantees from the mempool.
 func (g *Guarantees) All() []*flow.CollectionGuarantee {
-	entities := g.Backend.All()
-	guarantees := make([]*flow.CollectionGuarantee, 0, len(entities))
-	for _, guarantee := range entities {
+	all := g.Backend.All()
+	guarantees := make([]*flow.CollectionGuarantee, 0, len(all))
+	for _, guarantee := range all {
 		guarantees = append(guarantees, guarantee)
 	}
 	return guarantees

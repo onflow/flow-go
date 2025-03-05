@@ -25,7 +25,7 @@ func NewIdentifierMap(limit uint) (*IdentifierMap, error) {
 // Append will append the id to the list of identifiers associated with key.
 func (i *IdentifierMap) Append(key, id flow.Identifier) error {
 	return i.Backend.Run(func(backdata mempool.BackData[flow.Identifier, map[flow.Identifier]struct{}]) error {
-		idsMap, ok := backdata.ByID(key)
+		idsMap, ok := backdata.Get(key)
 		if !ok {
 			// no record with key is available in the mempool,
 			// initializes ids.
@@ -59,7 +59,7 @@ func (i *IdentifierMap) Append(key, id flow.Identifier) error {
 func (i *IdentifierMap) Get(key flow.Identifier) ([]flow.Identifier, bool) {
 	ids := make([]flow.Identifier, 0)
 	err := i.Run(func(backdata mempool.BackData[flow.Identifier, map[flow.Identifier]struct{}]) error {
-		idsMap, ok := backdata.ByID(key)
+		idsMap, ok := backdata.Get(key)
 		if !ok {
 			return fmt.Errorf("could not retrieve key from backend")
 		}
@@ -92,8 +92,7 @@ func (i *IdentifierMap) Remove(key flow.Identifier) bool {
 // If the list becomes empty, it also removes the key from the map.
 func (i *IdentifierMap) RemoveIdFromKey(key, id flow.Identifier) error {
 	err := i.Backend.Run(func(backdata mempool.BackData[flow.Identifier, map[flow.Identifier]struct{}]) error {
-		// var ids map[flow.Identifier]struct{}
-		idsMap, ok := backdata.ByID(key)
+		idsMap, ok := backdata.Get(key)
 		if !ok {
 			// entity key has already been removed
 			return nil
@@ -128,16 +127,16 @@ func (i *IdentifierMap) RemoveIdFromKey(key, id flow.Identifier) error {
 	return err
 }
 
-// Size returns number of a lists of identifiers in mempool
+// Size returns number of a lists of identifiers in the mempool
 func (i *IdentifierMap) Size() uint {
 	return i.Backend.Size()
 }
 
 // Keys returns a list of all keys in the mempool
 func (i *IdentifierMap) Keys() ([]flow.Identifier, bool) {
-	entities := i.Backend.All()
+	all := i.Backend.All()
 	keys := make([]flow.Identifier, 0)
-	for key, _ := range entities {
+	for key, _ := range all {
 		keys = append(keys, key)
 	}
 	return keys, true
