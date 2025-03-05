@@ -1,7 +1,6 @@
 package flow_test
 
 import (
-	"math/rand"
 	"testing"
 
 	"github.com/onflow/crypto"
@@ -41,35 +40,11 @@ func TestMalleability(t *testing.T) {
 	})
 
 	t.Run("EpochStateContainer", func(t *testing.T) {
-		checker := unittest.NewMalleabilityChecker(
-			unittest.WithFieldGenerator("EpochExtensions", func() []flow.EpochExtension {
-				return []flow.EpochExtension{unittest.EpochExtensionFixture()}
-			}),
-			unittest.WithFieldGenerator("ActiveIdentities", func() flow.DynamicIdentityEntryList {
-				return unittest.DynamicIdentityEntryListFixture(5, func(dynamicIdentityEntry *flow.DynamicIdentityEntry) {
-					dynamicIdentityEntry.Ejected = rand.Intn(2) == 1
-				})
-			}),
-		)
-
-		err := checker.Check(unittest.EpochStateContainerFixture())
-		require.NoError(t, err)
+		unittest.RequireEntityNonMalleable(t, unittest.EpochStateContainerFixture())
 	})
 
 	t.Run("MinEpochStateEntry", func(t *testing.T) {
-		checker := unittest.NewMalleabilityChecker(
-			unittest.WithTypeGenerator(func() flow.DynamicIdentityEntry {
-				return *unittest.DynamicIdentityEntryFixture(func(dynamicIdentityEntry *flow.DynamicIdentityEntry) {
-					dynamicIdentityEntry.Ejected = rand.Intn(2) == 1
-				})
-			}),
-			unittest.WithTypeGenerator(func() flow.EpochExtension {
-				return unittest.EpochExtensionFixture()
-			}),
-		)
-
-		err := checker.Check(unittest.EpochStateFixture(unittest.WithNextEpochProtocolState()).MinEpochStateEntry)
-		require.NoError(t, err)
+		unittest.RequireEntityNonMalleable(t, unittest.EpochStateFixture(unittest.WithNextEpochProtocolState()).MinEpochStateEntry)
 	})
 }
 

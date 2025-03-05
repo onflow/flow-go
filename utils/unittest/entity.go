@@ -2,13 +2,11 @@ package unittest
 
 import (
 	"fmt"
+	"github.com/onflow/crypto"
+	"github.com/stretchr/testify/require"
 	"math/rand"
 	"reflect"
 	"testing"
-	"time"
-
-	"github.com/onflow/crypto"
-	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/model/flow"
 )
@@ -300,40 +298,6 @@ func (mc *MalleabilityChecker) generateRandomReflectValue(field reflect.Value) e
 		field.Set(generatedValue)
 	default:
 		return fmt.Errorf("cannot generate random value, unsupported type: %s", field.Kind().String())
-	}
-	return nil
-}
-
-// generateCustomFlowValue generates a random value for the field of the struct that is not a primitive type.
-// This can be extended for types that are broadly used in the code base.
-func generateCustomFlowValue(field reflect.Value) any {
-	switch field.Type() {
-	case reflect.TypeOf(flow.Identity{}):
-		return *IdentityFixture()
-	case reflect.TypeOf(flow.IdentitySkeleton{}):
-		return IdentityFixture().IdentitySkeleton
-	case reflect.TypeOf(flow.ClusterQCVoteData{}):
-		return flow.ClusterQCVoteDataFromQC(QuorumCertificateWithSignerIDsFixture())
-	case reflect.TypeOf(flow.QuorumCertificate{}):
-		return *QuorumCertificateFixture()
-	case reflect.TypeOf(flow.CollectionGuarantee{}):
-		return *CollectionGuaranteeFixture()
-	case reflect.TypeOf(flow.Chunk{}):
-		return *ChunkFixture(IdentifierFixture(), uint(rand.Uint32()), StateCommitmentFixture())
-	case reflect.TypeOf(flow.ServiceEvent{}):
-		return EpochCommitFixture().ServiceEvent()
-	case reflect.TypeOf(flow.TimeoutCertificate{}):
-		return flow.TimeoutCertificate{
-			View:          rand.Uint64(),
-			NewestQCViews: []uint64{rand.Uint64()},
-			NewestQC:      QuorumCertificateFixture(),
-			SignerIndices: SignerIndicesFixture(2),
-			SigData:       SignatureFixture(),
-		}
-	case reflect.TypeOf(flow.AggregatedSignature{}):
-		return Seal.AggregatedSignatureFixture()
-	case reflect.TypeOf(time.Time{}):
-		return time.Now()
 	}
 	return nil
 }
