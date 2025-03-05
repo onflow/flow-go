@@ -15,12 +15,6 @@ import (
 	"github.com/onflow/flow-go/storage/store"
 )
 
-func StorageLayer(_ testing.TB, db *badger.DB) *storage.All {
-	metrics := metrics.NewNoopCollector()
-	all := bstorage.InitAll(metrics, db)
-	return all
-}
-
 func ExecutionStorageLayer(_ testing.TB, bdb *badger.DB) *storage.Execution {
 	metrics := metrics.NewNoopCollector()
 

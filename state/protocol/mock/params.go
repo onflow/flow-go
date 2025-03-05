@@ -50,24 +50,6 @@ func (_m *Params) FinalizedRoot() *flow.Header {
 	return r0
 }
 
-// ProtocolVersion provides a mock function with given fields:
-func (_m *Params) ProtocolVersion() uint {
-	ret := _m.Called()
-
-	if len(ret) == 0 {
-		panic("no return value specified for ProtocolVersion")
-	}
-
-	var r0 uint
-	if rf, ok := ret.Get(0).(func() uint); ok {
-		r0 = rf()
-	} else {
-		r0 = ret.Get(0).(uint)
-	}
-
-	return r0
-}
-
 // Seal provides a mock function with given fields:
 func (_m *Params) Seal() *flow.Seal {
 	ret := _m.Called()

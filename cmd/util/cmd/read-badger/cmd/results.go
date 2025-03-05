@@ -40,6 +40,9 @@ var resultsCmd = &cobra.Command{
 			}
 
 			common.PrettyPrintEntity(result)
+
+			// the result does not include the chunk ID, so we need to print it separately
+			printChunkID(result)
 			return
 		}
 
@@ -59,9 +62,18 @@ var resultsCmd = &cobra.Command{
 			}
 
 			common.PrettyPrintEntity(result)
+
+			// the result does not include the chunk ID, so we need to print it separately
+			printChunkID(result)
 			return
 		}
 
 		log.Error().Msg("missing flags: --block-id or --result-id")
 	},
+}
+
+func printChunkID(result *flow.ExecutionResult) {
+	for i, chunk := range result.Chunks {
+		log.Info().Msgf("chunk index %d, id: %v", i, chunk.ID())
+	}
 }

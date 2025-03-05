@@ -27,7 +27,7 @@ var (
 const (
 	flowPackagePrefix = "github.com/onflow/flow-go/"
 	ciMatrixName      = "dynamicMatrix"
-	defaultCIRunner   = "ubuntu-20.04"
+	defaultCIRunner   = "ubuntu-latest"
 )
 
 // flowGoPackage configuration for a package to be tested.

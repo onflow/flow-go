@@ -14,7 +14,6 @@ import (
 	awsconfig "github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/cockroachdb/pebble"
-	"github.com/dgraph-io/badger/v2"
 	"github.com/ipfs/boxo/bitswap"
 	"github.com/ipfs/go-cid"
 	badgerds "github.com/ipfs/go-ds-badger2"
@@ -94,10 +93,10 @@ import (
 	storageerr "github.com/onflow/flow-go/storage"
 	storage "github.com/onflow/flow-go/storage/badger"
 	"github.com/onflow/flow-go/storage/operation"
+	"github.com/onflow/flow-go/storage/operation/badgerimpl"
 	"github.com/onflow/flow-go/storage/operation/pebbleimpl"
 	storagepebble "github.com/onflow/flow-go/storage/pebble"
 	"github.com/onflow/flow-go/storage/store"
-	sutil "github.com/onflow/flow-go/storage/util"
 )
 
 const (
@@ -228,6 +227,12 @@ func (builder *ExecutionNodeBuilder) LoadComponentsAndModules() {
 		// I prefer to use dummy component now and keep the bootstrapping steps properly separated,
 		// so it will be easier to follow and refactor later
 		Component("execution state", exeNode.LoadExecutionState).
+		// Load the admin tool when chunk data packs db are initialized in execution state
+		AdminCommand("create-chunk-data-packs-checkpoint", func(config *NodeConfig) commands.AdminCommand {
+			// by default checkpoints will be created under "/data/chunk_data_packs_checkpoints_dir"
+			return storageCommands.NewChunksCheckpointCommand(exeNode.exeConf.chunkDataPackCheckpointsDir,
+				exeNode.chunkDataPackDB)
+		}).
 		Component("stop control", exeNode.LoadStopControl).
 		Component("execution state ledger WAL compactor", exeNode.LoadExecutionStateLedgerWALCompactor).
 		// disable execution data pruner for now, since storehouse is going to need the execution data
@@ -466,7 +471,7 @@ func (exeNode *ExecutionNode) LoadGCPBlockDataUploader(
 		exeNode.events,
 		exeNode.results,
 		exeNode.txResults,
-		storage.NewComputationResultUploadStatus(node.DB),
+		store.NewComputationResultUploadStatus(badgerimpl.ToDB(node.DB)),
 		execution_data.NewDownloader(exeNode.blobService),
 		exeNode.collector)
 	if retryableUploader == nil {
@@ -649,16 +654,13 @@ func (exeNode *ExecutionNode) LoadProviderEngine(
 			blockID.String(), height, err)
 	}
 
-	// Get the epoch counter form the protocol state, at the same block.
-	protocolStateEpochCounter, err := node.State.
-		AtBlockID(blockID).
-		Epochs().
-		Current().
-		Counter()
-	// Failing to fetch the epoch counter from the protocol state is a fatal error.
+	// Get the epoch counter from the protocol state, at the same block.
+	// Failing to fetch the epoch, or counter for the epoch, from the protocol state is a fatal error.
+	currentEpoch, err := node.State.AtBlockID(blockID).Epochs().Current()
 	if err != nil {
-		return nil, fmt.Errorf("cannot get epoch counter from the protocol state at block %s: %w", blockID.String(), err)
+		return nil, fmt.Errorf("could not get current epoch at block %s: %w", blockID.String(), err)
 	}
+	protocolStateEpochCounter := currentEpoch.Counter()
 
 	l := node.Logger.With().
 		Str("component", "provider engine").
@@ -721,30 +723,6 @@ func (exeNode *ExecutionNode) LoadExecutionDataGetter(node *NodeConfig) error {
 	return nil
 }
 
-func OpenChunkDataPackDB(dbPath string, logger zerolog.Logger) (*badger.DB, error) {
-	log := sutil.NewLogger(logger)
-
-	opts := badger.
-		DefaultOptions(dbPath).
-		WithKeepL0InMemory(true).
-		WithLogger(log).
-
-		// the ValueLogFileSize option specifies how big the value of a
-		// key-value pair is allowed to be saved into badger.
-		// exceeding this limit, will fail with an error like this:
-		// could not store data: Value with size <xxxx> exceeded 1073741824 limit
-		// Maximum value size is 10G, needed by execution node
-		// TODO: finding a better max value for each node type
-		WithValueLogFileSize(256 << 23).
-		WithValueLogMaxEntries(100000) // Default is 1000000
-
-	db, err := badger.Open(opts)
-	if err != nil {
-		return nil, fmt.Errorf("could not open chunk data pack badger db at path %v: %w", dbPath, err)
-	}
-	return db, nil
-}
-
 func (exeNode *ExecutionNode) LoadExecutionState(
 	node *NodeConfig,
 ) (
@@ -752,7 +730,10 @@ func (exeNode *ExecutionNode) LoadExecutionState(
 	error,
 ) {
 
-	chunkDataPackDB, err := storagepebble.OpenDefaultPebbleDB(exeNode.exeConf.chunkDataPackDir)
+	chunkDataPackDB, err := storagepebble.OpenDefaultPebbleDB(
+		node.Logger.With().Str("pebbledb", "cdp").Logger(),
+		exeNode.exeConf.chunkDataPackDir,
+	)
 	if err != nil {
 		return nil, fmt.Errorf("could not open chunk data pack database: %w", err)
 	}
@@ -864,7 +845,9 @@ func (exeNode *ExecutionNode) LoadRegisterStore(
 	node.Logger.Info().
 		Str("pebble_db_path", exeNode.exeConf.registerDir).
 		Msg("register store enabled")
-	pebbledb, err := storagepebble.OpenRegisterPebbleDB(exeNode.exeConf.registerDir)
+	pebbledb, err := storagepebble.OpenRegisterPebbleDB(
+		node.Logger.With().Str("pebbledb", "registers").Logger(),
+		exeNode.exeConf.registerDir)
 
 	if err != nil {
 		return fmt.Errorf("could not create disk register store: %w", err)
