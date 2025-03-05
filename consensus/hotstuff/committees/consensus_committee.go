@@ -1,6 +1,7 @@
 package committees
 
 import (
+	"errors"
 	"fmt"
 	"sync"
 
@@ -69,23 +70,11 @@ func (e *epochInfo) recomputeLeaderSelectionForExtendedViewRange(extension flow.
 // newEpochInfo retrieves the committee information and computes leader selection.
 // This can be cached and used for all by-view queries for this epoch.
 // No errors are expected during normal operation.
-func newEpochInfo(epoch protocol.Epoch) (*epochInfo, error) {
-	randomSeed, err := epoch.RandomSource()
-	if err != nil {
-		return nil, fmt.Errorf("could not get epoch random source: %w", err)
-	}
-	firstView, err := epoch.FirstView()
-	if err != nil {
-		return nil, fmt.Errorf("could not get epoch first view: %w", err)
-	}
-	finalView, err := epoch.FinalView()
-	if err != nil {
-		return nil, fmt.Errorf("could not get epoch final view: %w", err)
-	}
-	initialIdentities, err := epoch.InitialIdentities()
-	if err != nil {
-		return nil, fmt.Errorf("could not initial identities: %w", err)
-	}
+func newEpochInfo(epoch protocol.CommittedEpoch) (*epochInfo, error) {
+	randomSeed := epoch.RandomSource()
+	firstView := epoch.FirstView()
+	finalView := epoch.FinalView()
+	initialIdentities := epoch.InitialIdentities()
 	leaders, err := leader.SelectionForConsensus(initialIdentities, randomSeed, firstView, finalView)
 	if err != nil {
 		return nil, fmt.Errorf("could not get leader selection: %w", err)
@@ -148,27 +137,36 @@ func NewConsensusCommittee(state protocol.State, me flow.Identifier) (*Consensus
 	final := state.Final()
 
 	// pre-compute leader selection for all presently relevant committed epochs
-	epochs := make([]protocol.Epoch, 0, 3)
+	epochs := make([]protocol.CommittedEpoch, 0, 3)
 
 	// we prepare the previous epoch, if one exists
-	exists, err := protocol.PreviousEpochExists(final)
+	prev, err := final.Epochs().Previous()
 	if err != nil {
-		return nil, fmt.Errorf("could not check previous epoch exists: %w", err)
-	}
-	if exists {
-		epochs = append(epochs, final.Epochs().Previous())
+		if !errors.Is(err, protocol.ErrNoPreviousEpoch) {
+			return nil, irrecoverable.NewExceptionf("unexpected error while retrieving previous epoch: %w", err)
+		}
+		// `ErrNoPreviousEpoch` is an expected edge case during normal operations (e.g. we are in first epoch after spork)
+		// continue without the previous epoch
+	} else { // previous epoch was successfully retrieved
+		epochs = append(epochs, prev)
 	}
 
 	// we always prepare the current epoch
-	epochs = append(epochs, final.Epochs().Current())
+	curr, err := final.Epochs().Current()
+	if err != nil {
+		return nil, fmt.Errorf("could not get current epoch: %w", err)
+	}
+	epochs = append(epochs, curr)
 
 	// we prepare the next epoch, if it is committed
-	phase, err := final.EpochPhase()
+	next, err := final.Epochs().NextCommitted()
 	if err != nil {
-		return nil, fmt.Errorf("could not check epoch phase: %w", err)
-	}
-	if phase == flow.EpochPhaseCommitted {
-		epochs = append(epochs, final.Epochs().Next())
+		if !errors.Is(err, protocol.ErrNextEpochNotCommitted) {
+			return nil, irrecoverable.NewExceptionf("unexpected error retrieving next epoch: %w", err)
+		}
+		// receiving a `ErrNextEpochNotCommitted` is expected during the happy path
+	} else { // next epoch was successfully retrieved
+		epochs = append(epochs, next)
 	}
 
 	for _, epoch := range epochs {
@@ -384,8 +382,11 @@ func (c *Consensus) handleEpochExtended(epochCounter uint64, extension flow.Epoc
 // When the next epoch is committed, we compute leader selection for the epoch and cache it.
 // No errors are expected during normal operation.
 func (c *Consensus) handleEpochCommittedPhaseStarted(refBlock *flow.Header) error {
-	epoch := c.state.AtHeight(refBlock.Height).Epochs().Next()
-	_, err := c.prepareEpoch(epoch)
+	epoch, err := c.state.AtHeight(refBlock.Height).Epochs().NextCommitted()
+	if err != nil { // no expected errors since reference block is in EpochCommit phase
+		return fmt.Errorf("could not get next committed epoch: %w", err)
+	}
+	_, err = c.prepareEpoch(epoch)
 	if err != nil {
 		return fmt.Errorf("could not cache data for committed next epoch: %w", err)
 	}
@@ -417,11 +418,8 @@ func (c *Consensus) epochInfoByView(view uint64) (*epochInfo, error) {
 // Calling prepareEpoch multiple times for the same epoch returns cached epoch information.
 // Input must be a committed epoch.
 // No errors are expected during normal operation.
-func (c *Consensus) prepareEpoch(epoch protocol.Epoch) (*epochInfo, error) {
-	counter, err := epoch.Counter()
-	if err != nil {
-		return nil, fmt.Errorf("could not get counter for epoch to prepare: %w", err)
-	}
+func (c *Consensus) prepareEpoch(epoch protocol.CommittedEpoch) (*epochInfo, error) {
+	counter := epoch.Counter()
 
 	c.mu.Lock()
 	defer c.mu.Unlock()
@@ -432,7 +430,7 @@ func (c *Consensus) prepareEpoch(epoch protocol.Epoch) (*epochInfo, error) {
 		return epochInf, nil
 	}
 
-	epochInf, err = newEpochInfo(epoch)
+	epochInf, err := newEpochInfo(epoch)
 	if err != nil {
 		return nil, fmt.Errorf("could not create epoch info for epoch %d: %w", counter, err)
 	}

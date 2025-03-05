@@ -1242,14 +1242,14 @@ func WithRandomPublicKeys() func(*flow.Identity) {
 	}
 }
 
-// WithAllRoles can be used used to ensure an IdentityList fixtures contains
+// WithAllRoles can be used to ensure an IdentityList fixtures contains
 // all the roles required for a valid genesis block.
 func WithAllRoles() func(*flow.Identity) {
 	return WithAllRolesExcept()
 }
 
-// Same as above, but omitting a certain role for cases where we are manually
-// setting up nodes or a particular role.
+// WithAllRolesExcept is used to ensure an IdentityList fixture contains all roles
+// except omitting a certain role, for cases where we are manually setting up nodes.
 func WithAllRolesExcept(except ...flow.Role) func(*flow.Identity) {
 	i := 0
 	roles := flow.Roles()
@@ -2338,7 +2338,10 @@ func SnapshotClusterByIndex(
 	clusterIndex uint,
 ) (protocol.Cluster, error) {
 	epochs := snapshot.Epochs()
-	epoch := epochs.Current()
+	epoch, err := epochs.Current()
+	if err != nil {
+		return nil, err
+	}
 	cluster, err := epoch.Cluster(clusterIndex)
 	if err != nil {
 		return nil, err

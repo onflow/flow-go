@@ -34,7 +34,8 @@ type BeaconKeyRecoverySuite struct {
 	epochProtocolState *mockprotocol.EpochProtocolState
 	dkgState           *mockstorage.EpochRecoveryMyBeaconKey
 	finalSnapshot      *mockprotocol.Snapshot
-	nextEpoch          *mockprotocol.Epoch
+	epochs             *mockprotocol.EpochQuery
+	nextEpoch          *mockprotocol.CommittedEpoch
 
 	currentEpochCounter uint64
 	nextEpochCounter    uint64
@@ -48,7 +49,7 @@ func (s *BeaconKeyRecoverySuite) SetupTest() {
 	s.dkgState = mockstorage.NewEpochRecoveryMyBeaconKey(s.T())
 	s.epochProtocolState = mockprotocol.NewEpochProtocolState(s.T())
 	s.finalSnapshot = mockprotocol.NewSnapshot(s.T())
-	s.nextEpoch = mockprotocol.NewEpoch(s.T())
+	s.nextEpoch = mockprotocol.NewCommittedEpoch(s.T())
 
 	s.head = unittest.BlockHeaderFixture()
 	s.currentEpochPhase = flow.EpochPhaseCommitted
@@ -66,12 +67,12 @@ func (s *BeaconKeyRecoverySuite) SetupTest() {
 	s.epochProtocolState.On("Entry").Return(entry, nil).Maybe()
 	s.nextEpoch.On("Counter").Return(s.nextEpochCounter, nil).Maybe()
 
-	epochs := mockprotocol.NewEpochQuery(s.T())
-	epochs.On("Next").Return(s.nextEpoch, nil).Maybe()
+	s.epochs = mockprotocol.NewEpochQuery(s.T())
+	s.epochs.On("NextCommitted").Return(s.nextEpoch, nil).Maybe()
 
 	s.finalSnapshot.On("Head").Return(s.head, nil)
 	s.finalSnapshot.On("EpochProtocolState").Return(s.epochProtocolState, nil).Maybe()
-	s.finalSnapshot.On("Epochs").Return(epochs).Maybe()
+	s.finalSnapshot.On("Epochs").Return(s.epochs).Maybe()
 
 	s.state.On("Final").Return(s.finalSnapshot)
 }
@@ -119,14 +120,14 @@ func (s *BeaconKeyRecoverySuite) TestNewBeaconKeyRecovery_EpochProtocolStateExce
 	require.Nil(s.T(), recovery)
 }
 
-// TestNewBeaconKeyRecovery_NextEpochCounterException tests a scenario:
+// TestNewBeaconKeyRecovery_NextEpochException tests a scenario:
 // - node is in epoch committed phase
-// - exception is thrown when trying to get counter of the next epoch
+// - exception is thrown when trying to retrieve the next epoch
 // This is an unexpected error and should be propagated to the caller.
-func (s *BeaconKeyRecoverySuite) TestNewBeaconKeyRecovery_NextEpochCounterException() {
+func (s *BeaconKeyRecoverySuite) TestNewBeaconKeyRecovery_NextEpochException() {
 	exception := errors.New("exception")
-	s.nextEpoch.On("Counter").Unset()
-	s.nextEpoch.On("Counter").Return(uint64(0), exception).Once()
+	s.epochs.On("NextCommitted").Unset()
+	s.epochs.On("NextCommitted").Return(nil, exception).Once()
 
 	recovery, err := NewBeaconKeyRecovery(unittest.Logger(), s.local, s.state, s.dkgState)
 	require.ErrorIs(s.T(), err, exception)
