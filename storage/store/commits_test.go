@@ -1,7 +1,6 @@
 package store_test
 
 import (
-	"errors"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -23,7 +22,7 @@ func TestCommitsStoreAndRetrieve(t *testing.T) {
 
 		// attempt to get a invalid commit
 		_, err := store1.ByBlockID(unittest.IdentifierFixture())
-		assert.True(t, errors.Is(err, storage.ErrNotFound))
+		assert.ErrorIs(t, err, storage.ErrNotFound)
 
 		// store1 a commit in db
 		blockID := unittest.IdentifierFixture()

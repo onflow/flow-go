@@ -183,7 +183,7 @@ func TestViewOutOfRange(t *testing.T) {
 
 	identities := unittest.IdentityListFixture(4).ToSkeleton()
 	leaders, err := ComputeLeaderSelection(firstView, rng, int(finalView-firstView+1), identities)
-	require.Nil(t, err)
+	require.NoError(t, err)
 
 	// confirm the selection has first/final view we expect
 	assert.Equal(t, firstView, leaders.FirstView())
@@ -192,9 +192,9 @@ func TestViewOutOfRange(t *testing.T) {
 	// boundary views should not return error
 	t.Run("boundary views", func(t *testing.T) {
 		_, err = leaders.LeaderForView(firstView)
-		assert.Nil(t, err)
+		assert.NoError(t, err)
 		_, err = leaders.LeaderForView(finalView)
-		assert.Nil(t, err)
+		assert.NoError(t, err)
 	})
 
 	// views before first view should return error

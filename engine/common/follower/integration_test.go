@@ -28,7 +28,7 @@ import (
 	pbadger "github.com/onflow/flow-go/state/protocol/badger"
 	"github.com/onflow/flow-go/state/protocol/events"
 	"github.com/onflow/flow-go/state/protocol/util"
-	storageutil "github.com/onflow/flow-go/storage/util"
+	bstorage "github.com/onflow/flow-go/storage/badger"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -49,7 +49,7 @@ func TestFollowerHappyPath(t *testing.T) {
 		tracer := trace.NewNoopTracer()
 		log := unittest.Logger()
 		consumer := events.NewNoop()
-		all := storageutil.StorageLayer(t, db)
+		all := bstorage.InitAll(metrics, db)
 
 		// bootstrap root snapshot
 		state, err := pbadger.Bootstrap(

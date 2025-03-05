@@ -30,24 +30,6 @@ func (_m *GlobalParams) ChainID() flow.ChainID {
 	return r0
 }
 
-// ProtocolVersion provides a mock function with given fields:
-func (_m *GlobalParams) ProtocolVersion() uint {
-	ret := _m.Called()
-
-	if len(ret) == 0 {
-		panic("no return value specified for ProtocolVersion")
-	}
-
-	var r0 uint
-	if rf, ok := ret.Get(0).(func() uint); ok {
-		r0 = rf()
-	} else {
-		r0 = ret.Get(0).(uint)
-	}
-
-	return r0
-}
-
 // SporkID provides a mock function with given fields:
 func (_m *GlobalParams) SporkID() flow.Identifier {
 	ret := _m.Called()

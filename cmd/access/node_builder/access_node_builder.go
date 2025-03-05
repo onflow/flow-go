@@ -592,7 +592,9 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 			}
 
 			if executionDataDBMode == execution_data.ExecutionDataDBModePebble {
-				builder.ExecutionDatastoreManager, err = edstorage.NewPebbleDatastoreManager(datastoreDir, nil)
+				builder.ExecutionDatastoreManager, err = edstorage.NewPebbleDatastoreManager(
+					node.Logger.With().Str("pebbledb", "endata").Logger(),
+					datastoreDir, nil)
 				if err != nil {
 					return fmt.Errorf("could not create PebbleDatastoreManager for execution data: %w", err)
 				}
@@ -886,7 +888,9 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 				// other components from starting while bootstrapping the register db since it may
 				// take hours to complete.
 
-				pdb, err := pstorage.OpenRegisterPebbleDB(builder.registersDBPath)
+				pdb, err := pstorage.OpenRegisterPebbleDB(
+					node.Logger.With().Str("pebbledb", "registers").Logger(),
+					builder.registersDBPath)
 				if err != nil {
 					return nil, fmt.Errorf("could not open registers db: %w", err)
 				}
