@@ -29,16 +29,14 @@ func (b *backendNetwork) GetNetworkParameters(_ context.Context) accessmodel.Net
 
 // GetLatestProtocolStateSnapshot returns the latest finalized snapshot.
 //
-// Expected errors during normal operation:
-//   - access.InternalError - Failed to convert snapshot to bytes.
-//
+// No errors are expected during normal operation.
 // All errors can be considered benign. Exceptions are handled explicitly within the backend and are
 // not propagated.
-func (b *backendNetwork) GetLatestProtocolStateSnapshot(_ context.Context) ([]byte, error) {
+func (b *backendNetwork) GetLatestProtocolStateSnapshot(ctx context.Context) ([]byte, error) {
 	snapshot := b.state.Final()
 	data, err := convert.SnapshotToBytes(snapshot)
 	if err != nil {
-		return nil, access.NewInternalError(fmt.Errorf("failed to convert snapshot to bytes: %w", err))
+		return nil, access.RequireNoError(ctx, fmt.Errorf("failed to convert snapshot to bytes: %w", err))
 	}
 
 	return data, nil
@@ -51,7 +49,6 @@ func (b *backendNetwork) GetLatestProtocolStateSnapshot(_ context.Context) ([]by
 //   - access.DataNotFound - No block with the given ID was found
 //   - access.InvalidRequest - Block ID is for an orphaned block and will never have a valid snapshot
 //   - access.FailedPrecondition - A block was found, but it is not finalized and is above the finalized height.
-//   - access.InternalError - Failed to convert snapshot to bytes.
 //
 // All errors can be considered benign. Exceptions are handled explicitly within the backend and are
 // not propagated.
@@ -89,7 +86,7 @@ func (b *backendNetwork) GetProtocolStateSnapshotByBlockID(ctx context.Context, 
 
 	data, err := convert.SnapshotToBytes(snapshot)
 	if err != nil {
-		return nil, access.NewInternalError(fmt.Errorf("failed to convert snapshot to bytes: %w", err))
+		return nil, access.RequireNoError(ctx, fmt.Errorf("failed to convert snapshot to bytes: %w", err))
 	}
 	return data, nil
 }
@@ -99,7 +96,6 @@ func (b *backendNetwork) GetProtocolStateSnapshotByBlockID(ctx context.Context, 
 //
 // Expected errors during normal operation:
 //   - access.DataNotFound - No finalized block with the given height was found.
-//   - access.InternalError - Failed to convert snapshot to bytes.
 //
 // All errors can be considered benign. Exceptions are handled explicitly within the backend and are
 // not propagated.
@@ -117,7 +113,7 @@ func (b *backendNetwork) GetProtocolStateSnapshotByHeight(ctx context.Context, b
 
 	data, err := convert.SnapshotToBytes(snapshot)
 	if err != nil {
-		return nil, access.NewInternalError(fmt.Errorf("failed to convert snapshot to bytes: %w", err))
+		return nil, access.RequireNoError(ctx, fmt.Errorf("failed to convert snapshot to bytes: %w", err))
 	}
 	return data, nil
 }
