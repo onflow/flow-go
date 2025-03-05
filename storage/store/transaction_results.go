@@ -1,23 +1,21 @@
-package badger
+package store
 
 import (
 	"encoding/binary"
 	"encoding/hex"
 	"fmt"
 
-	"github.com/dgraph-io/badger/v2"
-
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/storage"
-	"github.com/onflow/flow-go/storage/badger/operation"
+	"github.com/onflow/flow-go/storage/operation"
 )
 
 var _ storage.TransactionResults = (*TransactionResults)(nil)
 
 type TransactionResults struct {
-	db         *badger.DB
+	db         storage.DB
 	cache      *Cache[string, flow.TransactionResult]
 	indexCache *Cache[string, flow.TransactionResult]
 	blockCache *Cache[string, []flow.TransactionResult]
@@ -84,68 +82,59 @@ func KeyToBlockID(key string) (flow.Identifier, error) {
 	return blockID, err
 }
 
-func NewTransactionResults(collector module.CacheMetrics, db *badger.DB, transactionResultsCacheSize uint) *TransactionResults {
-	retrieve := func(key string) func(tx *badger.Txn) (flow.TransactionResult, error) {
+func NewTransactionResults(collector module.CacheMetrics, db storage.DB, transactionResultsCacheSize uint) *TransactionResults {
+	retrieve := func(r storage.Reader, key string) (flow.TransactionResult, error) {
 		var txResult flow.TransactionResult
-		return func(tx *badger.Txn) (flow.TransactionResult, error) {
-
-			blockID, txID, err := KeyToBlockIDTransactionID(key)
-			if err != nil {
-				return flow.TransactionResult{}, fmt.Errorf("could not convert key: %w", err)
-			}
-
-			err = operation.RetrieveTransactionResult(blockID, txID, &txResult)(tx)
-			if err != nil {
-				return flow.TransactionResult{}, handleError(err, flow.TransactionResult{})
-			}
-			return txResult, nil
+		blockID, txID, err := KeyToBlockIDTransactionID(key)
+		if err != nil {
+			return flow.TransactionResult{}, fmt.Errorf("could not convert key: %w", err)
 		}
+
+		err = operation.RetrieveTransactionResult(r, blockID, txID, &txResult)
+		if err != nil {
+			return flow.TransactionResult{}, err
+		}
+		return txResult, nil
 	}
-	retrieveIndex := func(key string) func(tx *badger.Txn) (flow.TransactionResult, error) {
+	retrieveIndex := func(r storage.Reader, key string) (flow.TransactionResult, error) {
 		var txResult flow.TransactionResult
-		return func(tx *badger.Txn) (flow.TransactionResult, error) {
-
-			blockID, txIndex, err := KeyToBlockIDIndex(key)
-			if err != nil {
-				return flow.TransactionResult{}, fmt.Errorf("could not convert index key: %w", err)
-			}
-
-			err = operation.RetrieveTransactionResultByIndex(blockID, txIndex, &txResult)(tx)
-			if err != nil {
-				return flow.TransactionResult{}, handleError(err, flow.TransactionResult{})
-			}
-			return txResult, nil
+		blockID, txIndex, err := KeyToBlockIDIndex(key)
+		if err != nil {
+			return flow.TransactionResult{}, fmt.Errorf("could not convert index key: %w", err)
 		}
+
+		err = operation.RetrieveTransactionResultByIndex(r, blockID, txIndex, &txResult)
+		if err != nil {
+			return flow.TransactionResult{}, err
+		}
+		return txResult, nil
 	}
-	retrieveForBlock := func(key string) func(tx *badger.Txn) ([]flow.TransactionResult, error) {
+	retrieveForBlock := func(r storage.Reader, key string) ([]flow.TransactionResult, error) {
 		var txResults []flow.TransactionResult
-		return func(tx *badger.Txn) ([]flow.TransactionResult, error) {
-
-			blockID, err := KeyToBlockID(key)
-			if err != nil {
-				return nil, fmt.Errorf("could not convert index key: %w", err)
-			}
-
-			err = operation.LookupTransactionResultsByBlockIDUsingIndex(blockID, &txResults)(tx)
-			if err != nil {
-				return nil, handleError(err, flow.TransactionResult{})
-			}
-			return txResults, nil
+		blockID, err := KeyToBlockID(key)
+		if err != nil {
+			return nil, fmt.Errorf("could not convert index key: %w", err)
 		}
+
+		err = operation.LookupTransactionResultsByBlockIDUsingIndex(r, blockID, &txResults)
+		if err != nil {
+			return nil, err
+		}
+		return txResults, nil
 	}
 	return &TransactionResults{
 		db: db,
-		cache: newCache[string, flow.TransactionResult](collector, metrics.ResourceTransactionResults,
+		cache: newCache(collector, metrics.ResourceTransactionResults,
 			withLimit[string, flow.TransactionResult](transactionResultsCacheSize),
 			withStore(noopStore[string, flow.TransactionResult]),
 			withRetrieve(retrieve),
 		),
-		indexCache: newCache[string, flow.TransactionResult](collector, metrics.ResourceTransactionResultIndices,
+		indexCache: newCache(collector, metrics.ResourceTransactionResultIndices,
 			withLimit[string, flow.TransactionResult](transactionResultsCacheSize),
 			withStore(noopStore[string, flow.TransactionResult]),
 			withRetrieve(retrieveIndex),
 		),
-		blockCache: newCache[string, []flow.TransactionResult](collector, metrics.ResourceTransactionResultIndices,
+		blockCache: newCache(collector, metrics.ResourceTransactionResultIndices,
 			withLimit[string, []flow.TransactionResult](transactionResultsCacheSize),
 			withStore(noopStore[string, []flow.TransactionResult]),
 			withRetrieve(retrieveForBlock),
@@ -154,22 +143,22 @@ func NewTransactionResults(collector module.CacheMetrics, db *badger.DB, transac
 }
 
 // BatchStore will store the transaction results for the given block ID in a batch
-func (tr *TransactionResults) BatchStore(blockID flow.Identifier, transactionResults []flow.TransactionResult, batch storage.BatchStorage) error {
-	writeBatch := batch.GetWriter()
+func (tr *TransactionResults) BatchStore(blockID flow.Identifier, transactionResults []flow.TransactionResult, batch storage.ReaderBatchWriter) error {
+	w := batch.Writer()
 
 	for i, result := range transactionResults {
-		err := operation.BatchInsertTransactionResult(blockID, &result)(writeBatch)
+		err := operation.InsertTransactionResult(w, blockID, &result)
 		if err != nil {
 			return fmt.Errorf("cannot batch insert tx result: %w", err)
 		}
 
-		err = operation.BatchIndexTransactionResult(blockID, uint32(i), &result)(writeBatch)
+		err = operation.IndexTransactionResult(w, blockID, uint32(i), &result)
 		if err != nil {
 			return fmt.Errorf("cannot batch index tx result: %w", err)
 		}
 	}
 
-	batch.OnSucceed(func() {
+	storage.OnCommitSucceed(batch, func() {
 		for i, result := range transactionResults {
 			key := KeyFromBlockIDTransactionID(blockID, result.TransactionID)
 			// cache for each transaction, so that it's faster to retrieve
@@ -189,10 +178,8 @@ func (tr *TransactionResults) BatchStore(blockID flow.Identifier, transactionRes
 
 // ByBlockIDTransactionID returns the runtime transaction result for the given block ID and transaction ID
 func (tr *TransactionResults) ByBlockIDTransactionID(blockID flow.Identifier, txID flow.Identifier) (*flow.TransactionResult, error) {
-	tx := tr.db.NewTransaction(false)
-	defer tx.Discard()
 	key := KeyFromBlockIDTransactionID(blockID, txID)
-	transactionResult, err := tr.cache.Get(key)(tx)
+	transactionResult, err := tr.cache.Get(tr.db.Reader(), key)
 	if err != nil {
 		return nil, err
 	}
@@ -201,10 +188,8 @@ func (tr *TransactionResults) ByBlockIDTransactionID(blockID flow.Identifier, tx
 
 // ByBlockIDTransactionIndex returns the runtime transaction result for the given block ID and transaction index
 func (tr *TransactionResults) ByBlockIDTransactionIndex(blockID flow.Identifier, txIndex uint32) (*flow.TransactionResult, error) {
-	tx := tr.db.NewTransaction(false)
-	defer tx.Discard()
 	key := KeyFromBlockIDIndex(blockID, txIndex)
-	transactionResult, err := tr.indexCache.Get(key)(tx)
+	transactionResult, err := tr.indexCache.Get(tr.db.Reader(), key)
 	if err != nil {
 		return nil, err
 	}
@@ -213,10 +198,8 @@ func (tr *TransactionResults) ByBlockIDTransactionIndex(blockID flow.Identifier,
 
 // ByBlockID gets all transaction results for a block, ordered by transaction index
 func (tr *TransactionResults) ByBlockID(blockID flow.Identifier) ([]flow.TransactionResult, error) {
-	tx := tr.db.NewTransaction(false)
-	defer tx.Discard()
 	key := KeyFromBlockID(blockID)
-	transactionResults, err := tr.blockCache.Get(key)(tx)
+	transactionResults, err := tr.blockCache.Get(tr.db.Reader(), key)
 	if err != nil {
 		return nil, err
 	}
@@ -225,11 +208,12 @@ func (tr *TransactionResults) ByBlockID(blockID flow.Identifier) ([]flow.Transac
 
 // RemoveByBlockID removes transaction results by block ID
 func (tr *TransactionResults) RemoveByBlockID(blockID flow.Identifier) error {
-	return tr.db.Update(operation.RemoveTransactionResultsByBlockID(blockID))
+	return tr.db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+		return operation.RemoveTransactionResultsByBlockID(rw.GlobalReader(), rw.Writer(), blockID)
+	})
 }
 
 // BatchRemoveByBlockID batch removes transaction results by block ID
-func (tr *TransactionResults) BatchRemoveByBlockID(blockID flow.Identifier, batch storage.BatchStorage) error {
-	writeBatch := batch.GetWriter()
-	return tr.db.View(operation.BatchRemoveTransactionResultsByBlockID(blockID, writeBatch))
+func (tr *TransactionResults) BatchRemoveByBlockID(blockID flow.Identifier, batch storage.ReaderBatchWriter) error {
+	return operation.BatchRemoveTransactionResultsByBlockID(blockID, batch)
 }

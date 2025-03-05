@@ -22,6 +22,8 @@ var transactionResultsCmd = &cobra.Command{
 		storages, db := InitStorages()
 		defer db.Close()
 
+		transactionResults := common.InitExecutionStorages(db).TransactionResults
+
 		log.Info().Msgf("got flag block id: %s", flagBlockID)
 		blockID, err := flow.HexStringToIdentifier(flagBlockID)
 		if err != nil {
@@ -50,7 +52,7 @@ var transactionResultsCmd = &cobra.Command{
 		}
 
 		for _, txID := range txIDs {
-			transactionResult, err := storages.TransactionResults.ByBlockIDTransactionID(blockID, txID)
+			transactionResult, err := transactionResults.ByBlockIDTransactionID(blockID, txID)
 			if err != nil {
 				log.Error().Err(err).Msgf("could not get transaction result for block id and transaction id: %v", txID)
 				return

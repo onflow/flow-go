@@ -1,4 +1,4 @@
-package operation
+package operation_test
 
 import (
 	"bytes"
@@ -6,17 +6,19 @@ import (
 
 	"golang.org/x/exp/slices"
 
-	"github.com/dgraph-io/badger/v2"
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/storage"
+	"github.com/onflow/flow-go/storage/operation"
+	"github.com/onflow/flow-go/storage/operation/dbtest"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
 // TestRetrieveEventByBlockIDTxID tests event insertion, event retrieval by block id, block id and transaction id,
 // and block id and event type
 func TestRetrieveEventByBlockIDTxID(t *testing.T) {
-	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
+	dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
 
 		// create block ids, transaction ids and event types slices
 		blockIDs := []flow.Identifier{flow.HashToID([]byte{0x01}), flow.HashToID([]byte{0x02})}
@@ -46,8 +48,10 @@ func TestRetrieveEventByBlockIDTxID(t *testing.T) {
 					event := unittest.EventFixture(etype, uint32(i), uint32(j), tx, 0)
 
 					// insert event into the db
-					err := db.Update(InsertEvent(b, event))
-					require.NoError(t, err)
+					err := db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+						return operation.InsertEvent(rw.Writer(), b, event)
+					})
+					require.Nil(t, err)
 
 					// update event arrays in the maps
 					bEvents = append(bEvents, event)
@@ -78,7 +82,7 @@ func TestRetrieveEventByBlockIDTxID(t *testing.T) {
 				var actualEvents = make([]flow.Event, 0)
 
 				// lookup events by block id
-				err := db.View(LookupEventsByBlockID(b, &actualEvents))
+				err := operation.LookupEventsByBlockID(db.Reader(), b, &actualEvents)
 
 				expectedEvents := blockMap[b.String()]
 				assertFunc(err, expectedEvents, actualEvents)
@@ -91,7 +95,7 @@ func TestRetrieveEventByBlockIDTxID(t *testing.T) {
 					var actualEvents = make([]flow.Event, 0)
 
 					//lookup events by block id and transaction id
-					err := db.View(RetrieveEvents(b, t, &actualEvents))
+					err := operation.RetrieveEvents(db.Reader(), b, t, &actualEvents)
 
 					expectedEvents := txMap[b.String()+"_"+t.String()]
 					assertFunc(err, expectedEvents, actualEvents)
@@ -105,7 +109,7 @@ func TestRetrieveEventByBlockIDTxID(t *testing.T) {
 					var actualEvents = make([]flow.Event, 0)
 
 					//lookup events by block id and transaction id
-					err := db.View(LookupEventsByBlockIDEventType(b, et, &actualEvents))
+					err := operation.LookupEventsByBlockIDEventType(db.Reader(), b, et, &actualEvents)
 
 					expectedEvents := typeMap[b.String()+"_"+string(et)]
 					assertFunc(err, expectedEvents, actualEvents)

@@ -1120,6 +1120,9 @@ func (fnb *FlowNodeBuilder) initBadgerDB() error {
 		return fmt.Errorf("could not open public db: %w", err)
 	}
 	fnb.DB = publicDB
+	// set badger db as protocol db
+	// TODO: making it dynamic to switch between badger and pebble
+	fnb.ProtocolDB = badgerimpl.ToDB(publicDB)
 
 	fnb.ShutdownFunc(func() error {
 		if err := publicDB.Close(); err != nil {
@@ -1248,7 +1251,6 @@ func (fnb *FlowNodeBuilder) initStorage() error {
 	collections := bstorage.NewCollections(fnb.DB, transactions)
 	setups := bstorage.NewEpochSetups(fnb.Metrics.Cache, fnb.DB)
 	epochCommits := bstorage.NewEpochCommits(fnb.Metrics.Cache, fnb.DB)
-	commits := bstorage.NewCommits(fnb.Metrics.Cache, fnb.DB)
 	protocolState := bstorage.NewEpochProtocolStateEntries(fnb.Metrics.Cache, setups, epochCommits, fnb.DB,
 		bstorage.DefaultEpochProtocolStateCacheSize, bstorage.DefaultProtocolStateIndexCacheSize)
 	protocolKVStores := bstorage.NewProtocolKVStore(fnb.Metrics.Cache, fnb.DB,
@@ -1258,8 +1260,6 @@ func (fnb *FlowNodeBuilder) initStorage() error {
 	fnb.Storage = Storage{
 		Headers:                   headers,
 		Guarantees:                guarantees,
-		Receipts:                  receipts,
-		Results:                   results,
 		Seals:                     seals,
 		Index:                     index,
 		Payloads:                  payloads,
@@ -1272,7 +1272,9 @@ func (fnb *FlowNodeBuilder) initStorage() error {
 		VersionBeacons:            versionBeacons,
 		EpochProtocolStateEntries: protocolState,
 		ProtocolKVStore:           protocolKVStores,
-		Commits:                   commits,
+
+		Results:  results,
+		Receipts: receipts,
 	}
 
 	return nil
