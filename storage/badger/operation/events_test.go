@@ -47,7 +47,7 @@ func TestRetrieveEventByBlockIDTxID(t *testing.T) {
 
 					// insert event into the db
 					err := db.Update(InsertEvent(b, event))
-					require.Nil(t, err)
+					require.NoError(t, err)
 
 					// update event arrays in the maps
 					bEvents = append(bEvents, event)

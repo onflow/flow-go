@@ -1,7 +1,6 @@
 package signature_test
 
 import (
-	"errors"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -68,13 +67,13 @@ func Test_InvalidCheckSum(t *testing.T) {
 	t.Run("checksum too short", func(t *testing.T) {
 		for i := 0; i < 4; i++ {
 			_, _, err := msig.SplitCheckSum(unittest.RandomBytes(i))
-			require.True(t, errors.Is(err, msig.ErrInvalidChecksum))
+			require.ErrorIs(t, err, msig.ErrInvalidChecksum)
 		}
 	})
 
 	t.Run("mismatching checksum", func(t *testing.T) {
 		committee := unittest.IdentifierListFixture(20)
 		_, err := msig.CompareAndExtract(committee, unittest.RandomBytes(112))
-		require.True(t, errors.Is(err, msig.ErrInvalidChecksum))
+		require.ErrorIs(t, err, msig.ErrInvalidChecksum)
 	})
 }

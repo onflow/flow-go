@@ -17,4 +17,26 @@ const (
 	BadgerBatch DBOps = "badger-batch"
 	// PebbleBatch uses pebble batch updates
 	PebbleBatch DBOps = "pebble-batch"
+
+	UsageErrMsg string = "invalid --dbops flag, expect badger-transaction/badger-batch/pebble-batch, but got: %v"
 )
+
+func IsBadgerBased(ops string) bool {
+	return ops == string(BadgerTransaction) || ops == string(BadgerBatch)
+}
+
+func IsBadgerTransaction(ops string) bool {
+	return ops == string(BadgerTransaction)
+}
+
+func IsBadgerBatch(ops string) bool {
+	return ops == string(BadgerBatch)
+}
+
+func IsPebbleBatch(ops string) bool {
+	return ops == string(PebbleBatch)
+}
+
+func IsBatchUpdate(ops string) bool {
+	return ops == string(BadgerBatch) || ops == string(PebbleBatch)
+}

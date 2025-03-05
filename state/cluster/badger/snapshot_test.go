@@ -166,12 +166,12 @@ func (suite *SnapshotSuite) TestAtBlockID() {
 
 	// ensure collection is correct
 	coll, err := snapshot.Collection()
-	assert.Nil(t, err)
+	assert.NoError(t, err)
 	assert.Equal(t, &suite.genesis.Payload.Collection, coll)
 
 	// ensure head is correct
 	head, err := snapshot.Head()
-	assert.Nil(t, err)
+	assert.NoError(t, err)
 	assert.Equal(t, suite.genesis.ID(), head.ID())
 }
 
@@ -187,7 +187,7 @@ func (suite *SnapshotSuite) TestEmptyCollection() {
 
 	// ensure collection is correct
 	coll, err := snapshot.Collection()
-	assert.Nil(t, err)
+	assert.NoError(t, err)
 	assert.Equal(t, &block.Payload.Collection, coll)
 }
 
@@ -197,33 +197,33 @@ func (suite *SnapshotSuite) TestFinalizedBlock() {
 	// create a new finalized block on genesis (height=1)
 	finalizedBlock1 := suite.Block()
 	err := suite.state.Extend(&finalizedBlock1)
-	assert.Nil(t, err)
+	assert.NoError(t, err)
 
 	// create an un-finalized block on genesis (height=1)
 	unFinalizedBlock1 := suite.Block()
 	err = suite.state.Extend(&unFinalizedBlock1)
-	assert.Nil(t, err)
+	assert.NoError(t, err)
 
 	// create a second un-finalized on top of the finalized block (height=2)
 	unFinalizedBlock2 := suite.BlockWithParent(&finalizedBlock1)
 	err = suite.state.Extend(&unFinalizedBlock2)
-	assert.Nil(t, err)
+	assert.NoError(t, err)
 
 	// finalize the block
 	err = suite.db.Update(procedure.FinalizeClusterBlock(finalizedBlock1.ID()))
-	assert.Nil(t, err)
+	assert.NoError(t, err)
 
 	// get the final snapshot, should map to finalizedBlock1
 	snapshot := suite.state.Final()
 
 	// ensure collection is correct
 	coll, err := snapshot.Collection()
-	assert.Nil(t, err)
+	assert.NoError(t, err)
 	assert.Equal(t, &finalizedBlock1.Payload.Collection, coll)
 
 	// ensure head is correct
 	head, err := snapshot.Head()
-	assert.Nil(t, err)
+	assert.NoError(t, err)
 	assert.Equal(t, finalizedBlock1.ID(), head.ID())
 }
 

@@ -37,6 +37,8 @@ import (
 	stoerr "github.com/onflow/flow-go/storage"
 	bstorage "github.com/onflow/flow-go/storage/badger"
 	"github.com/onflow/flow-go/storage/badger/operation"
+	"github.com/onflow/flow-go/storage/operation/badgerimpl"
+	"github.com/onflow/flow-go/storage/store"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -394,7 +396,7 @@ func TestVersionBeaconIndex(t *testing.T) {
 		err = state.Extend(context.Background(), b6)
 		require.NoError(t, err)
 
-		versionBeacons := bstorage.NewVersionBeacons(db)
+		versionBeacons := store.NewVersionBeacons(badgerimpl.ToDB(db))
 
 		// No VB can be found before finalizing anything
 		vb, err := versionBeacons.Highest(b6.Header.Height)

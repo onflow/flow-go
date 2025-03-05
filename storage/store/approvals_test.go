@@ -77,7 +77,7 @@ func TestApprovalStoreTwoDifferentApprovalsShouldFail(t *testing.T) {
 
 		err = store.Index(approval1.Body.ExecutionResultID, approval1.Body.ChunkIndex, approval2.ID())
 		require.Error(t, err)
-		require.True(t, errors.Is(err, storage.ErrDataMismatch))
+		require.ErrorIs(t, err, storage.ErrDataMismatch)
 	})
 }
 
