@@ -37,6 +37,7 @@ func (b *MapBackData[K, V]) Add(key K, value V) bool {
 // If the key-value pair exists, returns the value and true.
 // Otherwise, returns the zero value for type V and false.
 func (b *MapBackData[K, V]) Remove(key K) (value V, ok bool) {
+	value, ok = b.dataMap[key]
 	if !ok {
 		return value, false
 	}
