@@ -1,10 +1,9 @@
-package badger_test
+package store_test
 
 import (
 	"fmt"
 	"testing"
 
-	"github.com/dgraph-io/badger/v2"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/exp/rand"
@@ -14,23 +13,24 @@ import (
 	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/utils/unittest"
 
-	bstorage "github.com/onflow/flow-go/storage/badger"
+	"github.com/onflow/flow-go/storage/operation/dbtest"
+	"github.com/onflow/flow-go/storage/store"
 )
 
 func TestStoringTransactionResultErrorMessages(t *testing.T) {
-	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
+	dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
 		metrics := metrics.NewNoopCollector()
-		store := bstorage.NewTransactionResultErrorMessages(metrics, db, 1000)
+		store1 := store.NewTransactionResultErrorMessages(metrics, db, 1000)
 
 		blockID := unittest.IdentifierFixture()
 
 		// test db Exists by block id
-		exists, err := store.Exists(blockID)
+		exists, err := store1.Exists(blockID)
 		require.NoError(t, err)
 		require.False(t, exists)
 
 		// check retrieving by ByBlockID
-		messages, err := store.ByBlockID(blockID)
+		messages, err := store1.ByBlockID(blockID)
 		require.NoError(t, err)
 		require.Nil(t, messages)
 
@@ -44,35 +44,35 @@ func TestStoringTransactionResultErrorMessages(t *testing.T) {
 			}
 			txErrorMessages = append(txErrorMessages, expected)
 		}
-		err = store.Store(blockID, txErrorMessages)
+		err = store1.Store(blockID, txErrorMessages)
 		require.NoError(t, err)
 
 		// test db Exists by block id
-		exists, err = store.Exists(blockID)
+		exists, err = store1.Exists(blockID)
 		require.NoError(t, err)
 		require.True(t, exists)
 
 		// check retrieving by ByBlockIDTransactionID
 		for _, txErrorMessage := range txErrorMessages {
-			actual, err := store.ByBlockIDTransactionID(blockID, txErrorMessage.TransactionID)
+			actual, err := store1.ByBlockIDTransactionID(blockID, txErrorMessage.TransactionID)
 			require.NoError(t, err)
 			assert.Equal(t, txErrorMessage, *actual)
 		}
 
 		// check retrieving by ByBlockIDTransactionIndex
 		for _, txErrorMessage := range txErrorMessages {
-			actual, err := store.ByBlockIDTransactionIndex(blockID, txErrorMessage.Index)
+			actual, err := store1.ByBlockIDTransactionIndex(blockID, txErrorMessage.Index)
 			require.NoError(t, err)
 			assert.Equal(t, txErrorMessage, *actual)
 		}
 
 		// check retrieving by ByBlockID
-		actual, err := store.ByBlockID(blockID)
+		actual, err := store1.ByBlockID(blockID)
 		require.NoError(t, err)
 		assert.Equal(t, txErrorMessages, actual)
 
 		// test loading from database
-		newStore := bstorage.NewTransactionResultErrorMessages(metrics, db, 1000)
+		newStore := store.NewTransactionResultErrorMessages(metrics, db, 1000)
 		for _, txErrorMessage := range txErrorMessages {
 			actual, err := newStore.ByBlockIDTransactionID(blockID, txErrorMessage.TransactionID)
 			require.NoError(t, err)
@@ -81,7 +81,7 @@ func TestStoringTransactionResultErrorMessages(t *testing.T) {
 
 		// check retrieving by index from both cache and db
 		for i, txErrorMessage := range txErrorMessages {
-			actual, err := store.ByBlockIDTransactionIndex(blockID, txErrorMessage.Index)
+			actual, err := store1.ByBlockIDTransactionIndex(blockID, txErrorMessage.Index)
 			require.NoError(t, err)
 			assert.Equal(t, txErrorMessages[i], *actual)
 
@@ -93,18 +93,18 @@ func TestStoringTransactionResultErrorMessages(t *testing.T) {
 }
 
 func TestReadingNotStoreTransactionResultErrorMessage(t *testing.T) {
-	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
+	dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
 		metrics := metrics.NewNoopCollector()
-		store := bstorage.NewTransactionResultErrorMessages(metrics, db, 1000)
+		store1 := store.NewTransactionResultErrorMessages(metrics, db, 1000)
 
 		blockID := unittest.IdentifierFixture()
 		txID := unittest.IdentifierFixture()
 		txIndex := rand.Uint32()
 
-		_, err := store.ByBlockIDTransactionID(blockID, txID)
+		_, err := store1.ByBlockIDTransactionID(blockID, txID)
 		assert.ErrorIs(t, err, storage.ErrNotFound)
 
-		_, err = store.ByBlockIDTransactionIndex(blockID, txIndex)
+		_, err = store1.ByBlockIDTransactionIndex(blockID, txIndex)
 		assert.ErrorIs(t, err, storage.ErrNotFound)
 	})
 }

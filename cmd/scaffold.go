@@ -1097,8 +1097,6 @@ func (fnb *FlowNodeBuilder) initBadgerDB() error {
 		return fmt.Errorf("could not create datadir (path: %s): %w", fnb.BaseConfig.datadir, err)
 	}
 
-	log := sutil.NewLogger(fnb.Logger)
-
 	// we initialize the database with options that allow us to keep the maximum
 	// item size in the trie itself (up to 1MB) and where we keep all level zero
 	// tables in-memory as well; this slows down compaction and increases memory
@@ -1106,7 +1104,7 @@ func (fnb *FlowNodeBuilder) initBadgerDB() error {
 	opts := badger.
 		DefaultOptions(fnb.BaseConfig.datadir).
 		WithKeepL0InMemory(true).
-		WithLogger(log).
+		WithLogger(sutil.NewLogger(fnb.Logger.With().Str("badgerdb", "protocol").Logger())).
 
 		// the ValueLogFileSize option specifies how big the value of a
 		// key-value pair is allowed to be saved into badger.
@@ -1122,6 +1120,9 @@ func (fnb *FlowNodeBuilder) initBadgerDB() error {
 		return fmt.Errorf("could not open public db: %w", err)
 	}
 	fnb.DB = publicDB
+	// set badger db as protocol db
+	// TODO: making it dynamic to switch between badger and pebble
+	fnb.ProtocolDB = badgerimpl.ToDB(publicDB)
 
 	fnb.ShutdownFunc(func() error {
 		if err := publicDB.Close(); err != nil {
@@ -1145,7 +1146,7 @@ func (fnb *FlowNodeBuilder) initPebbleDB() error {
 		return nil
 	}
 
-	db, closer, err := scaffold.InitPebbleDB(fnb.BaseConfig.pebbleDir)
+	db, closer, err := scaffold.InitPebbleDB(fnb.Logger.With().Str("pebbledb", "protocol").Logger(), fnb.BaseConfig.pebbleDir)
 	if err != nil {
 		return err
 	}
@@ -1186,9 +1187,9 @@ func (fnb *FlowNodeBuilder) initSecretsDB() error {
 		return fmt.Errorf("could not create secrets db dir (path: %s): %w", fnb.BaseConfig.secretsdir, err)
 	}
 
-	log := sutil.NewLogger(fnb.Logger)
-
-	opts := badger.DefaultOptions(fnb.BaseConfig.secretsdir).WithLogger(log)
+	opts := badger.DefaultOptions(fnb.BaseConfig.secretsdir).
+		WithLogger(sutil.NewLogger(
+			fnb.Logger.With().Str("badgerdb", "secret").Logger()))
 
 	// NOTE: SN nodes need to explicitly set --insecure-secrets-db to true in order to
 	// disable secrets database encryption
@@ -1250,7 +1251,6 @@ func (fnb *FlowNodeBuilder) initStorage() error {
 	collections := bstorage.NewCollections(fnb.DB, transactions)
 	setups := bstorage.NewEpochSetups(fnb.Metrics.Cache, fnb.DB)
 	epochCommits := bstorage.NewEpochCommits(fnb.Metrics.Cache, fnb.DB)
-	commits := bstorage.NewCommits(fnb.Metrics.Cache, fnb.DB)
 	protocolState := bstorage.NewEpochProtocolStateEntries(fnb.Metrics.Cache, setups, epochCommits, fnb.DB,
 		bstorage.DefaultEpochProtocolStateCacheSize, bstorage.DefaultProtocolStateIndexCacheSize)
 	protocolKVStores := bstorage.NewProtocolKVStore(fnb.Metrics.Cache, fnb.DB,
@@ -1260,8 +1260,6 @@ func (fnb *FlowNodeBuilder) initStorage() error {
 	fnb.Storage = Storage{
 		Headers:                   headers,
 		Guarantees:                guarantees,
-		Receipts:                  receipts,
-		Results:                   results,
 		Seals:                     seals,
 		Index:                     index,
 		Payloads:                  payloads,
@@ -1274,7 +1272,9 @@ func (fnb *FlowNodeBuilder) initStorage() error {
 		VersionBeacons:            versionBeacons,
 		EpochProtocolStateEntries: protocolState,
 		ProtocolKVStore:           protocolKVStores,
-		Commits:                   commits,
+
+		Results:  results,
+		Receipts: receipts,
 	}
 
 	return nil

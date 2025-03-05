@@ -25,6 +25,7 @@ import (
 	synctest "github.com/onflow/flow-go/module/state_synchronization/requester/unittest"
 	"github.com/onflow/flow-go/storage"
 	storagemock "github.com/onflow/flow-go/storage/mock"
+	"github.com/onflow/flow-go/storage/operation/badgerimpl"
 	pebbleStorage "github.com/onflow/flow-go/storage/pebble"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -133,7 +134,7 @@ func (i *indexCoreTest) setStoreRegisters(f func(t *testing.T, entries flow.Regi
 func (i *indexCoreTest) setStoreEvents(f func(*testing.T, flow.Identifier, []flow.EventsList) error) *indexCoreTest {
 	i.events.
 		On("BatchStore", mock.AnythingOfType("flow.Identifier"), mock.AnythingOfType("[]flow.EventsList"), mock.Anything).
-		Return(func(blockID flow.Identifier, events []flow.EventsList, batch storage.BatchStorage) error {
+		Return(func(blockID flow.Identifier, events []flow.EventsList, batch storage.ReaderBatchWriter) error {
 			require.NotNil(i.t, batch)
 			return f(i.t, blockID, events)
 		})
@@ -143,7 +144,7 @@ func (i *indexCoreTest) setStoreEvents(f func(*testing.T, flow.Identifier, []flo
 func (i *indexCoreTest) setStoreTransactionResults(f func(*testing.T, flow.Identifier, []flow.LightTransactionResult) error) *indexCoreTest {
 	i.results.
 		On("BatchStore", mock.AnythingOfType("flow.Identifier"), mock.AnythingOfType("[]flow.LightTransactionResult"), mock.Anything).
-		Return(func(blockID flow.Identifier, results []flow.LightTransactionResult, batch storage.BatchStorage) error {
+		Return(func(blockID flow.Identifier, results []flow.LightTransactionResult, batch storage.ReaderBatchWriter) error {
 			require.NotNil(i.t, batch)
 			return f(i.t, blockID, results)
 		})
@@ -220,7 +221,7 @@ func (i *indexCoreTest) initIndexer() *indexCoreTest {
 	indexer, err := New(
 		log,
 		metrics.NewNoopCollector(),
-		db,
+		badgerimpl.ToDB(db),
 		i.registers,
 		i.headers,
 		i.events,
@@ -698,7 +699,7 @@ func TestIndexerIntegration_StoreAndGet(t *testing.T) {
 			index, err := New(
 				logger,
 				metrics,
-				db,
+				badgerimpl.ToDB(db),
 				registers,
 				nil,
 				nil,
@@ -732,7 +733,7 @@ func TestIndexerIntegration_StoreAndGet(t *testing.T) {
 			index, err := New(
 				logger,
 				metrics,
-				db,
+				badgerimpl.ToDB(db),
 				registers,
 				nil,
 				nil,
@@ -759,7 +760,7 @@ func TestIndexerIntegration_StoreAndGet(t *testing.T) {
 			index, err := New(
 				logger,
 				metrics,
-				db,
+				badgerimpl.ToDB(db),
 				registers,
 				nil,
 				nil,
@@ -803,7 +804,7 @@ func TestIndexerIntegration_StoreAndGet(t *testing.T) {
 			index, err := New(
 				logger,
 				metrics,
-				db,
+				badgerimpl.ToDB(db),
 				registers,
 				nil,
 				nil,

@@ -21,6 +21,8 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/storage/badger"
+	"github.com/onflow/flow-go/storage/operation/badgerimpl"
+	"github.com/onflow/flow-go/storage/store"
 )
 
 const maxReceiptHeightMetric = "access_ingestion_max_receipt_height"
@@ -218,7 +220,7 @@ func (s *AccessStoreTxErrorMessagesSuite) fetchTxErrorMessages(txResults []*sdk.
 	require.NoError(s.T(), err, "could not open db")
 
 	metrics := metrics.NewNoopCollector()
-	anTxErrorMessages := badger.NewTransactionResultErrorMessages(metrics, anDB, badger.DefaultCacheSize)
+	anTxErrorMessages := store.NewTransactionResultErrorMessages(metrics, badgerimpl.ToDB(anDB), badger.DefaultCacheSize)
 
 	txResultErrorMessages := make([]*flow.TransactionResultErrorMessage, len(txResults))
 	for i, txResult := range txResults {

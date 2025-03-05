@@ -3,23 +3,24 @@ package operation
 import (
 	"github.com/onflow/flow-go/fvm/storage/snapshot"
 	"github.com/onflow/flow-go/model/flow"
-
-	"github.com/dgraph-io/badger/v2"
+	"github.com/onflow/flow-go/storage"
 )
 
 func InsertExecutionStateInteractions(
+	w storage.Writer,
 	blockID flow.Identifier,
 	executionSnapshots []*snapshot.ExecutionSnapshot,
-) func(*badger.Txn) error {
-	return insert(
-		makePrefix(codeExecutionStateInteractions, blockID),
+) error {
+	return UpsertByKey(w,
+		MakePrefix(codeExecutionStateInteractions, blockID),
 		executionSnapshots)
 }
 
 func RetrieveExecutionStateInteractions(
+	r storage.Reader,
 	blockID flow.Identifier,
 	executionSnapshots *[]*snapshot.ExecutionSnapshot,
-) func(*badger.Txn) error {
-	return retrieve(
-		makePrefix(codeExecutionStateInteractions, blockID), executionSnapshots)
+) error {
+	return RetrieveByKey(r,
+		MakePrefix(codeExecutionStateInteractions, blockID), executionSnapshots)
 }
