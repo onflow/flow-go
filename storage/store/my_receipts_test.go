@@ -13,19 +13,19 @@ import (
 )
 
 func TestMyExecutionReceiptsStorage(t *testing.T) {
-	withStore := func(t *testing.T, f func(store1 *store.MyExecutionReceipts, db storage.DB)) {
+	withStore := func(t *testing.T, f func(storage.MyExecutionReceipts, storage.ExecutionResults, storage.ExecutionReceipts, storage.DB)) {
 		dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
 			metrics := metrics.NewNoopCollector()
 			results := store.NewExecutionResults(metrics, db)
 			receipts := store.NewExecutionReceipts(metrics, db, results, 100)
 			store1 := store.NewMyExecutionReceipts(metrics, db, receipts)
 
-			f(store1, db)
+			f(store1, results, receipts, db)
 		})
 	}
 
 	t.Run("store1 one get one", func(t *testing.T) {
-		withStore(t, func(store1 *store.MyExecutionReceipts, db storage.DB) {
+		withStore(t, func(store1 storage.MyExecutionReceipts, results storage.ExecutionResults, receipts storage.ExecutionReceipts, db storage.DB) {
 			block := unittest.BlockFixture()
 			receipt1 := unittest.ReceiptForBlockFixture(&block)
 
@@ -38,11 +38,20 @@ func TestMyExecutionReceiptsStorage(t *testing.T) {
 			require.NoError(t, err)
 
 			require.Equal(t, receipt1, actual)
+
+			// Check after storing my receipts, the result and receipt are stored
+			actualReceipt, err := receipts.ByID(receipt1.ID())
+			require.NoError(t, err)
+			require.Equal(t, receipt1, actualReceipt)
+
+			actualResult, err := results.ByID(receipt1.ExecutionResult.ID())
+			require.NoError(t, err)
+			require.Equal(t, receipt1.ExecutionResult, *actualResult)
 		})
 	})
 
 	t.Run("store1 same for the same block", func(t *testing.T) {
-		withStore(t, func(store1 *store.MyExecutionReceipts, db storage.DB) {
+		withStore(t, func(store1 storage.MyExecutionReceipts, _ storage.ExecutionResults, _ storage.ExecutionReceipts, db storage.DB) {
 			block := unittest.BlockFixture()
 
 			receipt1 := unittest.ReceiptForBlockFixture(&block)
