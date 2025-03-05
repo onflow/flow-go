@@ -169,7 +169,7 @@ func hasReachedUnknownStatusLimit(height, startHeight uint64, status flow.Transa
 
 // checkBlockReady checks if the given block height is valid and available based on the expected block status.
 // Expected errors during normal operation:
-// - subscription.ErrBlockNotReady: block for the given block height is not available.
+// - [subscription.ErrBlockNotReady]: block for the given block height is not available.
 func (b *backendSubscribeTransactions) checkBlockReady(height uint64) error {
 	// Get the highest available finalized block height
 	highestHeight, err := b.blockTracker.GetHighestHeight(flow.BlockStatusFinalized)

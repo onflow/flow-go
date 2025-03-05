@@ -159,9 +159,8 @@ func (s *TransactionStatusSuite) initializeBackend() {
 	params.On("FinalizedRoot").Return(s.rootBlock.Header).Maybe()
 	s.state.On("Params").Return(params).Maybe()
 
-	var receipts flow.ExecutionReceiptList
 	executionNodes := unittest.IdentityListFixture(2, unittest.WithRole(flow.RoleExecution))
-	receipts = unittest.ReceiptsForBlockFixture(&s.rootBlock, executionNodes.NodeIDs())
+	receipts := unittest.ReceiptsForBlockFixture(&s.rootBlock, executionNodes.NodeIDs())
 	s.receipts.On("ByBlockID", mock.AnythingOfType("flow.Identifier")).Return(receipts, nil).Maybe()
 	s.finalSnapshot.On("Identities", mock.Anything).Return(executionNodes, nil).Maybe()
 
@@ -308,7 +307,7 @@ func (s *TransactionStatusSuite) initializeHappyCaseMockInstructions() {
 }
 
 // initializeTransaction generate sent transaction with ref block of the current finalized block
-func (s *TransactionStatusSuite) initializeTransaction() flow.Transaction {
+func (s *TransactionStatusSuite) createSendTransaction() flow.Transaction {
 	transaction := unittest.TransactionFixture()
 	transaction.SetReferenceBlockID(s.finalizedBlock.ID())
 	s.transactions.On("ByID", mock.AnythingOfType("flow.Identifier")).Return(&transaction.TransactionBody, nil).Maybe()
