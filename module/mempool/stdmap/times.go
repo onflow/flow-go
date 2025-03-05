@@ -15,7 +15,7 @@ type Times struct {
 // NewTimes creates a new memory pool for times
 func NewTimes(limit uint) (*Times, error) {
 	t := &Times{
-		Backend: NewBackend[flow.Identifier, time.Time](WithLimit[flow.Identifier, time.Time](limit)),
+		Backend: NewBackend(WithLimit[flow.Identifier, time.Time](limit)),
 	}
 
 	return t, nil

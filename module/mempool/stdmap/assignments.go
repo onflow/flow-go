@@ -13,7 +13,7 @@ type Assignments struct {
 // NewAssignments creates a new memory pool for Assignments.
 func NewAssignments(limit uint) (*Assignments, error) {
 	a := &Assignments{
-		Backend: NewBackend[flow.Identifier, *chunkmodels.Assignment](WithLimit[flow.Identifier, *chunkmodels.Assignment](limit)),
+		Backend: NewBackend(WithLimit[flow.Identifier, *chunkmodels.Assignment](limit)),
 	}
 	return a, nil
 }
@@ -35,8 +35,8 @@ func (a *Assignments) ByID(assignmentID flow.Identifier) (*chunkmodels.Assignmen
 }
 
 // Add adds an Assignment to the mempool.
-func (a *Assignments) Add(assignmentID flow.Identifier, assignment *chunkmodels.Assignment) bool {
-	return a.Backend.Add(assignmentID, assignment)
+func (a *Assignments) Add(fingerprint flow.Identifier, assignment *chunkmodels.Assignment) bool {
+	return a.Backend.Add(fingerprint, assignment)
 }
 
 // Remove will remove the given Assignment from the memory pool; it will

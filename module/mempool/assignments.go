@@ -14,7 +14,7 @@ type Assignments interface {
 
 	// Add will add the given assignment to the memory pool. It will return
 	// false if it was already in the mempool.
-	Add(assignmentID flow.Identifier, assignment *chunkmodels.Assignment) bool
+	Add(fingerprint flow.Identifier, assignment *chunkmodels.Assignment) bool
 
 	// Remove will remove the given Assignment from the memory pool; it will
 	// return true if the Assignment was known and removed.

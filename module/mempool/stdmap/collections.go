@@ -12,7 +12,7 @@ type Collections struct {
 // NewCollections creates a new memory pool for collection.
 func NewCollections(limit uint) (*Collections, error) {
 	c := &Collections{
-		Backend: NewBackend[flow.Identifier, *flow.Collection](WithLimit[flow.Identifier, *flow.Collection](limit)),
+		Backend: NewBackend(WithLimit[flow.Identifier, *flow.Collection](limit)),
 	}
 	return c, nil
 }

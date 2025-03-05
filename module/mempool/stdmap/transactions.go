@@ -14,7 +14,7 @@ type Transactions struct {
 // Deprecated: use herocache.Transactions instead.
 func NewTransactions(limit uint) *Transactions {
 	t := &Transactions{
-		Backend: NewBackend[flow.Identifier, *flow.TransactionBody](WithLimit[flow.Identifier, *flow.TransactionBody](limit)),
+		Backend: NewBackend(WithLimit[flow.Identifier, *flow.TransactionBody](limit)),
 	}
 
 	return t

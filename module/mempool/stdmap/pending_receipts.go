@@ -42,9 +42,7 @@ func (r *PendingReceipts) indexByHeight(receipt *flow.ExecutionReceipt) (uint64,
 func NewPendingReceipts(headers storage.Headers, limit uint) *PendingReceipts {
 	// create the receipts memory pool with the lookup maps
 	r := &PendingReceipts{
-		Backend: NewBackend[flow.Identifier, *flow.ExecutionReceipt](
-			WithLimit[flow.Identifier, *flow.ExecutionReceipt](limit),
-		),
+		Backend:            NewBackend(WithLimit[flow.Identifier, *flow.ExecutionReceipt](limit)),
 		headers:            headers,
 		byPreviousResultID: make(map[flow.Identifier]receiptsSet),
 		byHeight:           make(map[uint64]receiptsSet),

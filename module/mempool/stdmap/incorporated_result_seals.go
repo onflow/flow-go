@@ -39,7 +39,7 @@ func NewIncorporatedResultSeals(limit uint) *IncorporatedResultSeals {
 	}
 
 	r := &IncorporatedResultSeals{
-		Backend: NewBackend[flow.Identifier, *flow.IncorporatedResultSeal](
+		Backend: NewBackend(
 			WithLimit[flow.Identifier, *flow.IncorporatedResultSeal](limit),
 			WithEject(ejector),
 		),

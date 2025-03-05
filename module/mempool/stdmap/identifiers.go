@@ -12,8 +12,9 @@ type Identifiers struct {
 // NewIdentifiers creates a new memory pool for identifiers.
 func NewIdentifiers(limit uint) (*Identifiers, error) {
 	i := &Identifiers{
-		Backend: NewBackend[flow.Identifier, struct{}](WithLimit[flow.Identifier, struct{}](limit)),
+		Backend: NewBackend(WithLimit[flow.Identifier, struct{}](limit)),
 	}
+
 	return i, nil
 }
 

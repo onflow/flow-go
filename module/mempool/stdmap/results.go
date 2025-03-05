@@ -15,7 +15,7 @@ func NewResults(limit uint) (*Results, error) {
 
 	// create the results memory pool with the lookup maps
 	r := &Results{
-		Backend: NewBackend[flow.Identifier, *flow.ExecutionResult](WithLimit[flow.Identifier, *flow.ExecutionResult](limit)),
+		Backend: NewBackend(WithLimit[flow.Identifier, *flow.ExecutionResult](limit)),
 	}
 
 	return r, nil

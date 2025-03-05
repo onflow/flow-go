@@ -13,7 +13,7 @@ type Guarantees struct {
 // NewGuarantees creates a new memory pool for collection guarantees.
 func NewGuarantees(limit uint) (*Guarantees, error) {
 	g := &Guarantees{
-		Backend: NewBackend[flow.Identifier, *flow.CollectionGuarantee](WithLimit[flow.Identifier, *flow.CollectionGuarantee](limit)),
+		Backend: NewBackend(WithLimit[flow.Identifier, *flow.CollectionGuarantee](limit)),
 	}
 
 	return g, nil

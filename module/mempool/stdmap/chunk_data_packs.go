@@ -12,7 +12,7 @@ type ChunkDataPacks struct {
 // NewChunkDataPacks creates a new memory pool for ChunkDataPacks.
 func NewChunkDataPacks(limit uint) (*ChunkDataPacks, error) {
 	a := &ChunkDataPacks{
-		Backend: NewBackend[flow.Identifier, *flow.ChunkDataPack](WithLimit[flow.Identifier, *flow.ChunkDataPack](limit)),
+		Backend: NewBackend(WithLimit[flow.Identifier, *flow.ChunkDataPack](limit)),
 	}
 	return a, nil
 }

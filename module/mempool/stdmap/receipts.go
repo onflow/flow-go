@@ -14,8 +14,9 @@ type Receipts struct {
 func NewReceipts(limit uint) (*Receipts, error) {
 	// create the receipts memory pool with the lookup maps
 	r := &Receipts{
-		Backend: NewBackend[flow.Identifier, *flow.ExecutionReceipt](WithLimit[flow.Identifier, *flow.ExecutionReceipt](limit)),
+		Backend: NewBackend(WithLimit[flow.Identifier, *flow.ExecutionReceipt](limit)),
 	}
+
 	return r, nil
 }
 

@@ -12,7 +12,7 @@ type Blocks struct {
 // NewBlocks creates a new memory pool for blocks.
 func NewBlocks(limit uint) (*Blocks, error) {
 	a := &Blocks{
-		Backend: NewBackend[flow.Identifier, *flow.Block](WithLimit[flow.Identifier, *flow.Block](limit)),
+		Backend: NewBackend(WithLimit[flow.Identifier, *flow.Block](limit)),
 	}
 
 	return a, nil

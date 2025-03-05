@@ -22,9 +22,9 @@ type BlockByCollectionBackdata struct {
 }
 
 func NewBlockByCollections() *BlockByCollections {
-	return &BlockByCollections{NewBackend[flow.Identifier, *entity.BlocksByCollection](
-		WithEject[flow.Identifier, *entity.BlocksByCollection](EjectPanic[flow.Identifier, *entity.BlocksByCollection]),
-	)}
+	return &BlockByCollections{
+		Backend: NewBackend(WithEject(EjectPanic[flow.Identifier, *entity.BlocksByCollection])),
+	}
 }
 
 func (b *BlockByCollections) Add(block *entity.BlocksByCollection) bool {
