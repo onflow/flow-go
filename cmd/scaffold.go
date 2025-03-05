@@ -86,6 +86,7 @@ import (
 	"github.com/onflow/flow-go/storage/dbops"
 	"github.com/onflow/flow-go/storage/operation/badgerimpl"
 	"github.com/onflow/flow-go/storage/operation/pebbleimpl"
+	"github.com/onflow/flow-go/storage/store"
 	sutil "github.com/onflow/flow-go/storage/util"
 	"github.com/onflow/flow-go/utils/logging"
 )
@@ -1254,7 +1255,7 @@ func (fnb *FlowNodeBuilder) initStorage() error {
 		bstorage.DefaultEpochProtocolStateCacheSize, bstorage.DefaultProtocolStateIndexCacheSize)
 	protocolKVStores := bstorage.NewProtocolKVStore(fnb.Metrics.Cache, fnb.DB,
 		bstorage.DefaultProtocolKVStoreCacheSize, bstorage.DefaultProtocolKVStoreByBlockIDCacheSize)
-	versionBeacons := bstorage.NewVersionBeacons(fnb.DB)
+	versionBeacons := store.NewVersionBeacons(badgerimpl.ToDB(fnb.DB))
 
 	fnb.Storage = Storage{
 		Headers:                   headers,

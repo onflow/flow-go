@@ -1001,7 +1001,7 @@ func TestDerivedDataTableGetOrCompute(t *testing.T) {
 
 		// Commit to setup the next test.
 		err = txnDerivedData.Commit()
-		assert.Nil(t, err)
+		assert.NoError(t, err)
 	})
 
 	t.Run("get value", func(t *testing.T) {

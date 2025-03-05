@@ -95,7 +95,7 @@ func IsPebbleInitialized(folderPath string) error {
 	}
 
 	// Look for Pebble-specific files
-	requiredFiles := []string{"CURRENT", "MANIFEST-*"}
+	requiredFiles := []string{"MANIFEST-*"}
 	for _, pattern := range requiredFiles {
 		matches, err := filepath.Glob(filepath.Join(folderPath, pattern))
 		if err != nil {
@@ -104,20 +104,6 @@ func IsPebbleInitialized(folderPath string) error {
 		if len(matches) == 0 {
 			return fmt.Errorf("missing required file: %s", pattern)
 		}
-	}
-
-	// Optionally, validate the CURRENT file references a MANIFEST file
-	currentPath := filepath.Join(folderPath, "CURRENT")
-	currentFile, err := os.Open(currentPath)
-	if err != nil {
-		return fmt.Errorf("error reading CURRENT file: %v", err)
-	}
-	defer currentFile.Close()
-
-	// Basic validation by ensuring the CURRENT file is non-empty
-	stat, err := currentFile.Stat()
-	if err != nil || stat.Size() == 0 {
-		return fmt.Errorf("CURRENT file is invalid")
 	}
 
 	return nil

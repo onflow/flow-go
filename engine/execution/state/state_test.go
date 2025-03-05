@@ -1,7 +1,6 @@
 package state_test
 
 import (
-	"errors"
 	"fmt"
 	"testing"
 
@@ -275,16 +274,14 @@ func TestExecutionStateWithTrieStorage(t *testing.T) {
 		unknown := unittest.BlockHeaderFixture()
 		headers.On("ByBlockID", unknown.ID()).Return(nil, fmt.Errorf("unknown: %w", storageerr.ErrNotFound))
 		_, _, err = es.CreateStorageSnapshot(unknown.ID())
-		require.Error(t, err)
-		require.True(t, errors.Is(err, storageerr.ErrNotFound))
+		require.ErrorIs(t, err, storageerr.ErrNotFound)
 
 		// test CreateStorageSnapshot for known and unexecuted block
 		unexecuted := unittest.BlockHeaderFixture()
 		headers.On("ByBlockID", unexecuted.ID()).Return(unexecuted, nil)
 		stateCommitments.On("ByBlockID", unexecuted.ID()).Return(nil, fmt.Errorf("not found: %w", storageerr.ErrNotFound))
 		_, _, err = es.CreateStorageSnapshot(unexecuted.ID())
-		require.Error(t, err)
-		require.True(t, errors.Is(err, state.ErrNotExecuted))
+		require.ErrorIs(t, err, state.ErrNotExecuted)
 
 		// test CreateStorageSnapshot for pruned block
 		pruned := unittest.BlockHeaderFixture()
@@ -292,8 +289,7 @@ func TestExecutionStateWithTrieStorage(t *testing.T) {
 		headers.On("ByBlockID", pruned.ID()).Return(pruned, nil)
 		stateCommitments.On("ByBlockID", pruned.ID()).Return(prunedState, nil)
 		_, _, err = es.CreateStorageSnapshot(pruned.ID())
-		require.Error(t, err)
-		require.True(t, errors.Is(err, state.ErrExecutionStatePruned))
+		require.ErrorIs(t, err, state.ErrExecutionStatePruned)
 	}))
 
 }
