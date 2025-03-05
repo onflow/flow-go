@@ -232,9 +232,10 @@ func DefaultAccessNodeConfig() *AccessNodeConfig {
 				IdleTimeout:    rest.DefaultIdleTimeout,
 				MaxRequestSize: commonrest.DefaultMaxRequestSize,
 			},
-			MaxMsgSize:      grpcutils.DefaultMaxMsgSize,
-			CompressorName:  grpcutils.NoCompressor,
-			WebSocketConfig: websockets.NewDefaultWebsocketConfig(),
+			MaxMsgSize:                grpcutils.DefaultMaxMsgSize,
+			CompressorName:            grpcutils.NoCompressor,
+			WebSocketConfig:           websockets.NewDefaultWebsocketConfig(),
+			EnableWebSocketsStreamAPI: false,
 		},
 		stateStreamConf: statestreambackend.Config{
 			MaxExecutionDataMsgSize: grpcutils.DefaultMaxMsgSize,
@@ -591,7 +592,9 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 			}
 
 			if executionDataDBMode == execution_data.ExecutionDataDBModePebble {
-				builder.ExecutionDatastoreManager, err = edstorage.NewPebbleDatastoreManager(datastoreDir, nil)
+				builder.ExecutionDatastoreManager, err = edstorage.NewPebbleDatastoreManager(
+					node.Logger.With().Str("pebbledb", "endata").Logger(),
+					datastoreDir, nil)
 				if err != nil {
 					return fmt.Errorf("could not create PebbleDatastoreManager for execution data: %w", err)
 				}
@@ -885,7 +888,9 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 				// other components from starting while bootstrapping the register db since it may
 				// take hours to complete.
 
-				pdb, err := pstorage.OpenRegisterPebbleDB(builder.registersDBPath)
+				pdb, err := pstorage.OpenRegisterPebbleDB(
+					node.Logger.With().Str("pebbledb", "registers").Logger(),
+					builder.registersDBPath)
 				if err != nil {
 					return nil, fmt.Errorf("could not open registers db: %w", err)
 				}
@@ -1475,6 +1480,13 @@ func (builder *FlowAccessNodeBuilder) extraFlags() {
 			"websocket-inactivity-timeout",
 			defaultConfig.rpcConf.WebSocketConfig.InactivityTimeout,
 			"specifies the duration a WebSocket connection can remain open without any active subscriptions before being automatically closed")
+
+		flags.BoolVar(
+			&builder.rpcConf.EnableWebSocketsStreamAPI,
+			"experimental-enable-websockets-stream-api",
+			defaultConfig.rpcConf.EnableWebSocketsStreamAPI,
+			"[experimental] enables WebSockets Stream API that operates under /ws endpoint. this flag may change in a future release.",
+		)
 	}).ValidateFlags(func() error {
 		if builder.supportsObserver && (builder.PublicNetworkConfig.BindAddress == cmd.NotSet || builder.PublicNetworkConfig.BindAddress == "") {
 			return errors.New("public-network-address must be set if supports-observer is true")
@@ -2007,12 +2019,12 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 
 			}
 
-			preferredENIdentifiers, err := commonrpc.IdentifierList(backendConfig.PreferredExecutionNodeIDs)
+			preferredENIdentifiers, err := flow.IdentifierListFromHex(backendConfig.PreferredExecutionNodeIDs)
 			if err != nil {
 				return nil, fmt.Errorf("failed to convert node id string to Flow Identifier for preferred EN map: %w", err)
 			}
 
-			fixedENIdentifiers, err := commonrpc.IdentifierList(backendConfig.FixedExecutionNodeIDs)
+			fixedENIdentifiers, err := flow.IdentifierListFromHex(backendConfig.FixedExecutionNodeIDs)
 			if err != nil {
 				return nil, fmt.Errorf("failed to convert node id string to Flow Identifier for fixed EN map: %w", err)
 			}

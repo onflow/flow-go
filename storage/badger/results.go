@@ -38,7 +38,7 @@ func NewExecutionResults(collector module.CacheMetrics, db *badger.DB) *Executio
 
 	res := &ExecutionResults{
 		db: db,
-		cache: newCache[flow.Identifier, *flow.ExecutionResult](collector, metrics.ResourceResult,
+		cache: newCache(collector, metrics.ResourceResult,
 			withLimit[flow.Identifier, *flow.ExecutionResult](flow.DefaultTransactionExpiry+100),
 			withStore(store),
 			withRetrieve(retrieve)),

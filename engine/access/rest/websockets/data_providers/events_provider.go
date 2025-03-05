@@ -8,6 +8,7 @@ import (
 
 	"github.com/onflow/flow-go/engine/access/rest/common/parser"
 	"github.com/onflow/flow-go/engine/access/rest/http/request"
+	"github.com/onflow/flow-go/engine/access/rest/util"
 	"github.com/onflow/flow-go/engine/access/rest/websockets/models"
 	"github.com/onflow/flow-go/engine/access/state_stream"
 	"github.com/onflow/flow-go/engine/access/state_stream/backend"
@@ -16,11 +17,12 @@ import (
 	"github.com/onflow/flow-go/module/counters"
 )
 
-// eventsArguments contains the arguments required for subscribing to events
+// eventsArguments contains the arguments a user passes to subscribe to events
 type eventsArguments struct {
-	StartBlockID     flow.Identifier          // ID of the block to start subscription from
-	StartBlockHeight uint64                   // Height of the block to start subscription from
-	Filter           state_stream.EventFilter // Filter applied to events for a given subscription
+	StartBlockID      flow.Identifier          // ID of the block to start subscription from
+	StartBlockHeight  uint64                   // Height of the block to start subscription from
+	Filter            state_stream.EventFilter // Filter applied to events for a given subscription
+	HeartbeatInterval *uint64                  // Maximum number of blocks message won't be sent. Nil if not set
 }
 
 // EventsDataProvider is responsible for providing events
@@ -48,6 +50,10 @@ func NewEventsDataProvider(
 	eventFilterConfig state_stream.EventFilterConfig,
 	heartbeatInterval uint64,
 ) (*EventsDataProvider, error) {
+	if stateStreamApi == nil {
+		return nil, fmt.Errorf("this access node does not support streaming events")
+	}
+
 	p := &EventsDataProvider{
 		logger:            logger.With().Str("component", "events-data-provider").Logger(),
 		stateStreamApi:    stateStreamApi,
@@ -58,6 +64,9 @@ func NewEventsDataProvider(
 	eventArgs, err := parseEventsArguments(arguments, chain, eventFilterConfig)
 	if err != nil {
 		return nil, fmt.Errorf("invalid arguments for events data provider: %w", err)
+	}
+	if eventArgs.HeartbeatInterval != nil {
+		p.heartbeatInterval = *eventArgs.HeartbeatInterval
 	}
 
 	subCtx, cancel := context.WithCancel(ctx)
@@ -135,10 +144,23 @@ func parseEventsArguments(
 	chain flow.Chain,
 	eventFilterConfig state_stream.EventFilterConfig,
 ) (eventsArguments, error) {
+	allowedFields := []string{
+		"start_block_id",
+		"start_block_height",
+		"event_types",
+		"addresses",
+		"contracts",
+		"heartbeat_interval",
+	}
+	err := ensureAllowedFields(arguments, allowedFields)
+	if err != nil {
+		return eventsArguments{}, err
+	}
+
 	var args eventsArguments
 
 	// Parse block arguments
-	startBlockID, startBlockHeight, err := ParseStartBlock(arguments)
+	startBlockID, startBlockHeight, err := parseStartBlock(arguments)
 	if err != nil {
 		return args, err
 	}
@@ -150,12 +172,12 @@ func parseEventsArguments(
 	if eventTypesIn, ok := arguments["event_types"]; ok && eventTypesIn != "" {
 		result, ok := eventTypesIn.([]string)
 		if !ok {
-			return args, fmt.Errorf("'event_types' must be an array of string")
+			return eventsArguments{}, fmt.Errorf("'event_types' must be an array of string")
 		}
 
 		err := eventTypes.Parse(result)
 		if err != nil {
-			return args, fmt.Errorf("invalid 'event_types': %w", err)
+			return eventsArguments{}, fmt.Errorf("invalid 'event_types': %w", err)
 		}
 	}
 
@@ -164,7 +186,7 @@ func parseEventsArguments(
 	if addressesIn, ok := arguments["addresses"]; ok && addressesIn != "" {
 		addresses, ok = addressesIn.([]string)
 		if !ok {
-			return args, fmt.Errorf("'addresses' must be an array of string")
+			return eventsArguments{}, fmt.Errorf("'addresses' must be an array of string")
 		}
 	}
 
@@ -173,14 +195,29 @@ func parseEventsArguments(
 	if contractsIn, ok := arguments["contracts"]; ok && contractsIn != "" {
 		contracts, ok = contractsIn.([]string)
 		if !ok {
-			return args, fmt.Errorf("'contracts' must be an array of string")
+			return eventsArguments{}, fmt.Errorf("'contracts' must be an array of string")
 		}
+	}
+
+	var heartbeatInterval uint64
+	if heartbeatIntervalIn, ok := arguments["heartbeat_interval"]; ok && heartbeatIntervalIn != "" {
+		result, ok := heartbeatIntervalIn.(string)
+		if !ok {
+			return eventsArguments{}, fmt.Errorf("'heartbeat_interval' must be a string")
+		}
+
+		heartbeatInterval, err = util.ToUint64(result)
+		if err != nil {
+			return eventsArguments{}, fmt.Errorf("invalid 'heartbeat_interval': %w", err)
+		}
+
+		args.HeartbeatInterval = &heartbeatInterval
 	}
 
 	// Initialize the event filter with the parsed arguments
 	args.Filter, err = state_stream.NewEventFilter(eventFilterConfig, chain, eventTypes.Flow(), addresses, contracts)
 	if err != nil {
-		return args, fmt.Errorf("failed to create event filter: %w", err)
+		return eventsArguments{}, fmt.Errorf("failed to create event filter: %w", err)
 	}
 
 	return args, nil

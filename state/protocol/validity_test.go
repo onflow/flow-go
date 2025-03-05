@@ -125,12 +125,124 @@ func TestBootstrapInvalidEpochCommit(t *testing.T) {
 		_, result, _ := unittest.BootstrapFixture(participants)
 		setup := result.ServiceEvents[0].Event.(*flow.EpochSetup)
 		commit := result.ServiceEvents[1].Event.(*flow.EpochCommit)
-		// add an extra DKG participant key
+		// remove a DKG participant key, this will lead to a case where we have more DKG participants than resulting keys.
+		commit.DKGParticipantKeys = commit.DKGParticipantKeys[1:]
+		for nodeID, index := range commit.DKGIndexMap {
+			if index == 0 {
+				delete(commit.DKGIndexMap, nodeID)
+				break
+			}
+		}
+
+		err := protocol.IsValidEpochCommit(commit, setup)
+		require.Error(t, err)
+	})
+
+	t.Run("inconsistent DKG index map", func(t *testing.T) {
+		_, result, _ := unittest.BootstrapFixture(participants)
+		setup := result.ServiceEvents[0].Event.(*flow.EpochSetup)
+		commit := result.ServiceEvents[1].Event.(*flow.EpochCommit)
+		// add an extra DKG participant key, this will lead to a case where size of index map is different from the number of keys.
 		commit.DKGParticipantKeys = append(commit.DKGParticipantKeys, unittest.KeyFixture(crypto.BLSBLS12381).PublicKey())
 
 		err := protocol.IsValidEpochCommit(commit, setup)
 		require.Error(t, err)
 	})
+
+	t.Run("DKG index map contains negative index", func(t *testing.T) {
+		_, result, _ := unittest.BootstrapFixture(participants)
+		setup := result.ServiceEvents[0].Event.(*flow.EpochSetup)
+		commit := result.ServiceEvents[1].Event.(*flow.EpochCommit)
+		// replace entity in the index map so the size matches but with negative index.
+		nodeID := setup.Participants.Filter(filter.IsConsensusCommitteeMember)[0].NodeID
+		commit.DKGIndexMap[nodeID] = -1
+
+		err := protocol.IsValidEpochCommit(commit, setup)
+		require.Error(t, err)
+	})
+
+	t.Run("DKG indexes are not consecutive", func(t *testing.T) {
+		_, result, _ := unittest.BootstrapFixture(participants)
+		setup := result.ServiceEvents[0].Event.(*flow.EpochSetup)
+		commit := result.ServiceEvents[1].Event.(*flow.EpochCommit)
+		nodeID := setup.Participants.Filter(filter.IsConsensusCommitteeMember)[0].NodeID
+		commit.DKGIndexMap[nodeID] = len(commit.DKGParticipantKeys) // change index so it's out of bound and not consecutive
+
+		err := protocol.IsValidEpochCommit(commit, setup)
+		require.Error(t, err)
+	})
+
+	t.Run("DKG indexes are duplicated", func(t *testing.T) {
+		_, result, _ := unittest.BootstrapFixture(participants)
+		setup := result.ServiceEvents[0].Event.(*flow.EpochSetup)
+		commit := result.ServiceEvents[1].Event.(*flow.EpochCommit)
+		// replace entity in the index map so the size matches but with negative index.
+		nodeID := setup.Participants.Filter(filter.IsConsensusCommitteeMember)[0].NodeID
+		otherNodeID := setup.Participants.Filter(filter.IsConsensusCommitteeMember)[1].NodeID
+		commit.DKGIndexMap[nodeID] = commit.DKGIndexMap[otherNodeID] // change index so it's out of bound and not consecutive
+
+		err := protocol.IsValidEpochCommit(commit, setup)
+		require.Error(t, err)
+	})
+
+	t.Run("random beacon safety threshold not met", func(t *testing.T) {
+		_, result, _ := unittest.BootstrapFixture(participants)
+		setup := result.ServiceEvents[0].Event.(*flow.EpochSetup)
+		commit := result.ServiceEvents[1].Event.(*flow.EpochCommit)
+		requiredThreshold := protocol.RandomBeaconSafetyThreshold(uint(len(commit.DKGIndexMap)))
+		require.Greater(t, requiredThreshold, uint(0), "threshold has to be at least 1, otherwise the test is invalid")
+		// sample one less than the required threshold, so the threshold is not met
+		sampled, err := setup.Participants.Filter(filter.IsConsensusCommitteeMember).Sample(requiredThreshold - 1)
+		require.NoError(t, err)
+		setup.Participants = sampled
+
+		err = protocol.IsValidEpochCommit(commit, setup)
+		require.Error(t, err)
+	})
+}
+
+// TestIsValidEpochCommitBackwardCompatible tests that the implementation is backward compatible with the previous version of EpochCommit.
+// The main difference in validation logic is that the old version requires that number of consensus participants is
+// equal to the number of keys(random beacon participants) for new version of the [flow.EpochCommit] this is not required rather
+// we rely on a threshold for random beacon participants.
+// TODO(EFM, #6794): Remove this once we complete the network upgrade
+func TestIsValidEpochCommitBackwardCompatible(t *testing.T) {
+	_, result, _ := unittest.BootstrapFixture(participants)
+	setup := result.ServiceEvents[0].Event.(*flow.EpochSetup)
+	commit := result.ServiceEvents[1].Event.(*flow.EpochCommit)
+	requiredThreshold := protocol.RandomBeaconSafetyThreshold(uint(len(commit.DKGIndexMap)))
+	require.Less(t, int(requiredThreshold), len(commit.DKGParticipantKeys),
+		"threshold has to be at lower than the number of keys, otherwise the test is invalid")
+	// preserve the DKGIndexMap since we will be removing it later
+	dkgIndexMap := commit.DKGIndexMap
+
+	// since we are passing the new version validation result should be successful
+	err := protocol.IsValidEpochCommit(commit, setup)
+	require.NoError(t, err)
+
+	commit.DKGIndexMap = nil
+
+	// since we are passing the v0 version(because we have removed DKGIndexMap) validation result should be successful
+	// because number of participant keys is equal to the number of consensus participants.
+	err = protocol.IsValidEpochCommit(commit, setup)
+	require.NoError(t, err)
+
+	// now we are going to sample participants so the number of keys is not equal to the number of consensus participants
+	// but the threshold for random beacon participants is still met. This is valid for the new version of the [flow.EpochCommit]
+	// since it requires the [flow.DKGIndexMap] to be present, but it's invalid for the v0 version.
+	sampled, err := setup.Participants.Filter(filter.IsConsensusCommitteeMember).Sample(requiredThreshold)
+	require.NoError(t, err)
+	setup.Participants = sampled
+	commit.DKGIndexMap = dkgIndexMap
+	err = protocol.IsValidEpochCommit(commit, setup)
+	require.NoError(t, err)
+
+	commit.DKGIndexMap = nil
+
+	// since we are passing the v0 version(because we have removed DKGIndexMap) validation result should be an error
+	// because number of participant keys is not equal to the number of consensus participants and this is not valid for the v0 version.
+	err = protocol.IsValidEpochCommit(commit, setup)
+	require.Error(t, err)
 }
 
 // TestIsValidExtendingEpochSetup tests that implementation enforces the following protocol rules in case they are violated:

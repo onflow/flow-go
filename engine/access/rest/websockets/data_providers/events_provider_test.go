@@ -299,6 +299,29 @@ func (s *EventsProviderSuite) TestEventsDataProvider_InvalidArguments() {
 	}
 }
 
+func (s *EventsProviderSuite) TestEventsDataProvider_StateStreamNotConfigured() {
+	ctx := context.Background()
+	send := make(chan interface{})
+
+	topic := EventsTopic
+
+	provider, err := NewEventsDataProvider(
+		ctx,
+		s.log,
+		nil,
+		"dummy-id",
+		topic,
+		models.Arguments{},
+		send,
+		s.chain,
+		state_stream.DefaultEventFilterConfig,
+		subscription.DefaultHeartbeatInterval,
+	)
+	s.Require().Nil(provider)
+	s.Require().Error(err)
+	s.Require().Contains(err.Error(), "does not support streaming events")
+}
+
 // invalidArgumentsTestCases returns a list of test cases with invalid argument combinations
 // for testing the behavior of events data providers. Each test case includes a name,
 // a set of input arguments, and the expected error message that should be returned.
@@ -307,6 +330,8 @@ func (s *EventsProviderSuite) TestEventsDataProvider_InvalidArguments() {
 // 1. Supplying both 'start_block_id' and 'start_block_height' simultaneously, which is not allowed.
 // 2. Providing invalid 'start_block_id' value.
 // 3. Providing invalid 'start_block_height' value.
+// 4. Providing invalid 'heartbeat_interval' value.
+// 5. Providing unexpected argument.
 func invalidArgumentsTestCases() []testErrType {
 	return []testErrType{
 		{
@@ -330,6 +355,21 @@ func invalidArgumentsTestCases() []testErrType {
 				"start_block_height": "-1",
 			},
 			expectedErrorMsg: "value must be an unsigned 64 bit integer",
+		},
+		{
+			name: "invalid 'heartbeat_interval' argument",
+			arguments: map[string]interface{}{
+				"heartbeat_interval": "-1",
+			},
+			expectedErrorMsg: "value must be an unsigned 64 bit integer",
+		},
+		{
+			name: "unexpected argument",
+			arguments: map[string]interface{}{
+				"start_block_id":      unittest.BlockFixture().ID().String(),
+				"unexpected_argument": "dummy",
+			},
+			expectedErrorMsg: "unexpected field: 'unexpected_argument'",
 		},
 	}
 }

@@ -100,22 +100,7 @@ func (r *ExecutionReceipts) Store(receipt *flow.ExecutionReceipt) error {
 }
 
 func (r *ExecutionReceipts) BatchStore(receipt *flow.ExecutionReceipt, rw storage.ReaderBatchWriter) error {
-	err := r.results.BatchStore(&receipt.ExecutionResult, rw)
-	if err != nil {
-		return fmt.Errorf("cannot batch store execution result inside execution receipt batch store: %w", err)
-	}
-
-	err = operation.InsertExecutionReceiptMeta(rw.Writer(), receipt.ID(), receipt.Meta())
-	if err != nil {
-		return fmt.Errorf("cannot batch store execution meta inside execution receipt batch store: %w", err)
-	}
-
-	err = operation.IndexExecutionReceipts(rw.Writer(), receipt.ExecutionResult.BlockID, receipt.ID())
-	if err != nil {
-		return fmt.Errorf("cannot batch index execution receipt inside execution receipt batch store: %w", err)
-	}
-
-	return nil
+	return r.storeTx(rw, receipt)
 }
 
 func (r *ExecutionReceipts) ByID(receiptID flow.Identifier) (*flow.ExecutionReceipt, error) {

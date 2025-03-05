@@ -83,7 +83,10 @@ import (
 	"github.com/onflow/flow-go/storage"
 	bstorage "github.com/onflow/flow-go/storage/badger"
 	"github.com/onflow/flow-go/storage/badger/operation"
+	"github.com/onflow/flow-go/storage/dbops"
 	"github.com/onflow/flow-go/storage/operation/badgerimpl"
+	"github.com/onflow/flow-go/storage/operation/pebbleimpl"
+	"github.com/onflow/flow-go/storage/store"
 	sutil "github.com/onflow/flow-go/storage/util"
 	"github.com/onflow/flow-go/utils/logging"
 )
@@ -168,8 +171,9 @@ func (fnb *FlowNodeBuilder) BaseFlags() {
 	fnb.flags.StringVar(&fnb.BaseConfig.BindAddr, "bind", defaultConfig.BindAddr, "address to bind on")
 	fnb.flags.StringVarP(&fnb.BaseConfig.BootstrapDir, "bootstrapdir", "b", defaultConfig.BootstrapDir, "path to the bootstrap directory")
 	fnb.flags.StringVarP(&fnb.BaseConfig.datadir, "datadir", "d", defaultConfig.datadir, "directory to store the public database (protocol state)")
-	fnb.flags.StringVar(&fnb.BaseConfig.pebbleDir, "pebble-dir", defaultConfig.pebbleDir, "directory to store the public pebble database (protocol state)")
+	fnb.flags.StringVar(&fnb.BaseConfig.pebbleDir, "pebbledir", defaultConfig.pebbleDir, "directory to store the public pebble database (protocol state)")
 	fnb.flags.StringVar(&fnb.BaseConfig.secretsdir, "secretsdir", defaultConfig.secretsdir, "directory to store private database (secrets)")
+	fnb.flags.StringVar(&fnb.BaseConfig.dbops, "dbops", defaultConfig.dbops, "database operations to use (badger-transaction, batch-update, pebble-update)")
 	fnb.flags.StringVarP(&fnb.BaseConfig.level, "loglevel", "l", defaultConfig.level, "level for logging output")
 	fnb.flags.Uint32Var(&fnb.BaseConfig.debugLogLimit, "debug-log-limit", defaultConfig.debugLogLimit, "max number of debug/trace log events per second")
 	fnb.flags.UintVarP(&fnb.BaseConfig.metricsPort, "metricport", "m", defaultConfig.metricsPort, "port for /metrics endpoint")
@@ -277,6 +281,27 @@ func (fnb *FlowNodeBuilder) EnqueuePingService() {
 	fnb.Component("ping service", func(node *NodeConfig) (module.ReadyDoneAware, error) {
 		pingLibP2PProtocolID := protocols.PingProtocolId(node.SporkID)
 
+		var hotstuffViewFunc func() (uint64, error)
+		// Setup consensus nodes to report their HotStuff view
+		if fnb.BaseConfig.NodeRole == flow.RoleConsensus.String() {
+			hotstuffReader, err := persister.NewReader(node.DB, node.RootChainID)
+			if err != nil {
+				return nil, err
+			}
+			hotstuffViewFunc = func() (uint64, error) {
+				livenessData, err := hotstuffReader.GetLivenessData()
+				if err != nil {
+					return 0, fmt.Errorf("could not get liveness data: %w", err)
+				}
+				return livenessData.CurrentView, nil
+			}
+		} else {
+			// All other node roles do not report their hotstuff view
+			hotstuffViewFunc = func() (uint64, error) {
+				return 0, fmt.Errorf("hotstuff view reporting disabled")
+			}
+		}
+
 		// setup the Ping provider to return the software version and the sealed block height
 		pingInfoProvider := &ping.InfoProvider{
 			SoftwareVersionFun: func() string {
@@ -289,28 +314,13 @@ func (fnb *FlowNodeBuilder) EnqueuePingService() {
 				}
 				return head.Height, nil
 			},
-			HotstuffViewFun: func() (uint64, error) {
-				return 0, fmt.Errorf("hotstuff view reporting disabled")
-			},
-		}
-
-		// only consensus roles will need to report hotstuff view
-		if fnb.BaseConfig.NodeRole == flow.RoleConsensus.String() {
-			// initialize the persister
-			persist := persister.New(node.DB, node.RootChainID)
-
-			pingInfoProvider.HotstuffViewFun = func() (uint64, error) {
-				livenessData, err := persist.GetLivenessData()
-				if err != nil {
-					return 0, err
-				}
-
-				return livenessData.CurrentView, nil
-			}
+			HotstuffViewFun: hotstuffViewFunc,
 		}
 
 		pingService, err := node.EngineRegistry.RegisterPingService(pingLibP2PProtocolID, pingInfoProvider)
-
+		if err != nil {
+			return nil, fmt.Errorf("could not register ping service: %w", err)
+		}
 		node.PingService = pingService
 
 		return &module.NoopReadyDoneAware{}, err
@@ -949,8 +959,11 @@ func (fnb *FlowNodeBuilder) initMetrics() error {
 		// metrics enabled, report node info metrics as post init event
 		fnb.PostInit(func(nodeConfig *NodeConfig) error {
 			nodeInfoMetrics := metrics.NewNodeInfoCollector()
-			protocolVersion := fnb.RootSnapshot.Params().ProtocolVersion()
-			nodeInfoMetrics.NodeInfo(build.Version(), build.Commit(), nodeConfig.SporkID.String(), protocolVersion)
+			pstate, err := nodeConfig.State.Final().ProtocolState()
+			if err != nil {
+				return fmt.Errorf("could not get protocol state: %w", err)
+			}
+			nodeInfoMetrics.NodeInfo(build.Version(), build.Commit(), nodeConfig.SporkID.String(), pstate.GetProtocolStateVersion())
 			return nil
 		})
 	}
@@ -1084,8 +1097,6 @@ func (fnb *FlowNodeBuilder) initBadgerDB() error {
 		return fmt.Errorf("could not create datadir (path: %s): %w", fnb.BaseConfig.datadir, err)
 	}
 
-	log := sutil.NewLogger(fnb.Logger)
-
 	// we initialize the database with options that allow us to keep the maximum
 	// item size in the trie itself (up to 1MB) and where we keep all level zero
 	// tables in-memory as well; this slows down compaction and increases memory
@@ -1093,7 +1104,7 @@ func (fnb *FlowNodeBuilder) initBadgerDB() error {
 	opts := badger.
 		DefaultOptions(fnb.BaseConfig.datadir).
 		WithKeepL0InMemory(true).
-		WithLogger(log).
+		WithLogger(sutil.NewLogger(fnb.Logger.With().Str("badgerdb", "protocol").Logger())).
 
 		// the ValueLogFileSize option specifies how big the value of a
 		// key-value pair is allowed to be saved into badger.
@@ -1135,13 +1146,27 @@ func (fnb *FlowNodeBuilder) initPebbleDB() error {
 		return nil
 	}
 
-	db, closer, err := scaffold.InitPebbleDB(fnb.BaseConfig.pebbleDir)
+	db, closer, err := scaffold.InitPebbleDB(fnb.Logger.With().Str("pebbledb", "protocol").Logger(), fnb.BaseConfig.pebbleDir)
 	if err != nil {
 		return err
 	}
 
 	fnb.PebbleDB = db
 	fnb.ShutdownFunc(closer.Close)
+	return nil
+}
+
+// create protocol db according to the badger or pebble db
+func (fnb *FlowNodeBuilder) initProtocolDB(bdb *badger.DB, pdb *pebble.DB) error {
+	if dbops.IsBadgerBased(fnb.dbops) {
+		fnb.ProtocolDB = badgerimpl.ToDB(bdb)
+		fnb.Logger.Info().Msg("initProtocolDB: using badger protocol db")
+	} else if dbops.IsPebbleBatch(fnb.dbops) {
+		fnb.ProtocolDB = pebbleimpl.ToDB(pdb)
+		fnb.Logger.Info().Msgf("initProtocolDB: using pebble protocol db")
+	} else {
+		return fmt.Errorf(dbops.UsageErrMsg, fnb.dbops)
+	}
 	return nil
 }
 
@@ -1162,9 +1187,9 @@ func (fnb *FlowNodeBuilder) initSecretsDB() error {
 		return fmt.Errorf("could not create secrets db dir (path: %s): %w", fnb.BaseConfig.secretsdir, err)
 	}
 
-	log := sutil.NewLogger(fnb.Logger)
-
-	opts := badger.DefaultOptions(fnb.BaseConfig.secretsdir).WithLogger(log)
+	opts := badger.DefaultOptions(fnb.BaseConfig.secretsdir).
+		WithLogger(sutil.NewLogger(
+			fnb.Logger.With().Str("badgerdb", "secret").Logger()))
 
 	// NOTE: SN nodes need to explicitly set --insecure-secrets-db to true in order to
 	// disable secrets database encryption
@@ -1230,7 +1255,7 @@ func (fnb *FlowNodeBuilder) initStorage() error {
 		bstorage.DefaultEpochProtocolStateCacheSize, bstorage.DefaultProtocolStateIndexCacheSize)
 	protocolKVStores := bstorage.NewProtocolKVStore(fnb.Metrics.Cache, fnb.DB,
 		bstorage.DefaultProtocolKVStoreCacheSize, bstorage.DefaultProtocolKVStoreByBlockIDCacheSize)
-	versionBeacons := bstorage.NewVersionBeacons(fnb.DB)
+	versionBeacons := store.NewVersionBeacons(badgerimpl.ToDB(fnb.DB))
 
 	fnb.Storage = Storage{
 		Headers:                   headers,
@@ -2115,6 +2140,10 @@ func (fnb *FlowNodeBuilder) onStart() error {
 	}
 
 	if err := fnb.initPebbleDB(); err != nil {
+		return err
+	}
+
+	if err := fnb.initProtocolDB(fnb.DB, fnb.PebbleDB); err != nil {
 		return err
 	}
 

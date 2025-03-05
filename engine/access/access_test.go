@@ -79,7 +79,7 @@ type Suite struct {
 	finalizedHeaderCache module.FinalizedHeaderCache
 	backend              *backend.Backend
 	sporkID              flow.Identifier
-	protocolVersion      uint
+	protocolStateVersion uint64
 }
 
 // TestAccess tests scenarios which exercise multiple API calls using both the RPC handler and the ingest engine
@@ -95,7 +95,7 @@ func (suite *Suite) SetupTest() {
 	suite.finalSnapshot = new(protocol.Snapshot)
 	suite.sealedSnapshot = new(protocol.Snapshot)
 	suite.sporkID = unittest.IdentifierFixture()
-	suite.protocolVersion = uint(unittest.Uint64InRange(10, 30))
+	suite.protocolStateVersion = unittest.Uint64InRange(10, 30)
 
 	suite.rootBlock = unittest.BlockHeaderFixture(unittest.WithHeaderHeight(0))
 	suite.sealedBlock = suite.rootBlock
@@ -118,10 +118,13 @@ func (suite *Suite) SetupTest() {
 		nil,
 	).Maybe()
 
+	pstate := protocol.NewKVStoreReader(suite.T())
+	pstate.On("GetProtocolStateVersion").Return(suite.protocolStateVersion, nil).Maybe()
+	suite.finalSnapshot.On("ProtocolState").Return(pstate, nil).Maybe()
+
 	suite.params = new(protocol.Params)
 	suite.params.On("FinalizedRoot").Return(suite.rootBlock, nil)
 	suite.params.On("SporkID").Return(suite.sporkID, nil)
-	suite.params.On("ProtocolVersion").Return(suite.protocolVersion, nil)
 	suite.params.On("SporkRootBlockHeight").Return(suite.rootBlock.Height, nil)
 	suite.params.On("SealedRoot").Return(suite.rootBlock, nil)
 	suite.state.On("Params").Return(suite.params).Maybe()
@@ -151,7 +154,7 @@ func (suite *Suite) RunTest(
 	f func(handler *access.Handler, db *badger.DB, all *storage.All, en *storage.Execution),
 ) {
 	unittest.RunWithBadgerDB(suite.T(), func(db *badger.DB) {
-		all := util.StorageLayer(suite.T(), db)
+		all := bstorage.InitAll(metrics.NewNoopCollector(), db)
 		en := util.ExecutionStorageLayer(suite.T(), db)
 
 		var err error
@@ -298,8 +301,8 @@ func (suite *Suite) TestSendTransactionToRandomCollectionNode() {
 		suite.Require().Nil(err)
 		collNode1 := clusters[0][0]
 		collNode2 := clusters[1][0]
-		epoch := new(protocol.Epoch)
-		suite.epochQuery.On("Current").Return(epoch)
+		epoch := new(protocol.CommittedEpoch)
+		suite.epochQuery.On("Current").Return(epoch, nil)
 		epoch.On("Clustering").Return(clusters, nil)
 
 		// create two transactions bound for each of the cluster
@@ -597,7 +600,7 @@ func (suite *Suite) TestGetExecutionResultByBlockID() {
 // is reported as sealed
 func (suite *Suite) TestGetSealedTransaction() {
 	unittest.RunWithBadgerDB(suite.T(), func(db *badger.DB) {
-		all := util.StorageLayer(suite.T(), db)
+		all := bstorage.InitAll(metrics.NewNoopCollector(), db)
 		en := util.ExecutionStorageLayer(suite.T(), db)
 		enIdentities := unittest.IdentityListFixture(2, unittest.WithRole(flow.RoleExecution))
 		enNodeIDs := enIdentities.NodeIDs()
@@ -764,7 +767,7 @@ func (suite *Suite) TestGetSealedTransaction() {
 // transaction ID, block ID, and collection ID.
 func (suite *Suite) TestGetTransactionResult() {
 	unittest.RunWithBadgerDB(suite.T(), func(db *badger.DB) {
-		all := util.StorageLayer(suite.T(), db)
+		all := bstorage.InitAll(metrics.NewNoopCollector(), db)
 		en := util.ExecutionStorageLayer(suite.T(), db)
 		originID := unittest.IdentifierFixture()
 
@@ -1058,7 +1061,7 @@ func (suite *Suite) TestGetTransactionResult() {
 // the correct block id
 func (suite *Suite) TestExecuteScript() {
 	unittest.RunWithBadgerDB(suite.T(), func(db *badger.DB) {
-		all := util.StorageLayer(suite.T(), db)
+		all := bstorage.InitAll(metrics.NewNoopCollector(), db)
 		en := util.ExecutionStorageLayer(suite.T(), db)
 		identities := unittest.IdentityListFixture(2, unittest.WithRole(flow.RoleExecution))
 		suite.sealedSnapshot.On("Identities", mock.Anything).Return(identities, nil)
@@ -1282,10 +1285,11 @@ func (suite *Suite) TestAPICallNodeVersionInfo() {
 
 		respNodeVersionInfo := resp.Info
 		suite.Require().Equal(respNodeVersionInfo, &entitiesproto.NodeVersionInfo{
-			Semver:          build.Version(),
-			Commit:          build.Commit(),
-			SporkId:         suite.sporkID[:],
-			ProtocolVersion: uint64(suite.protocolVersion),
+			Semver:               build.Version(),
+			Commit:               build.Commit(),
+			SporkId:              suite.sporkID[:],
+			ProtocolVersion:      0,
+			ProtocolStateVersion: uint64(suite.protocolStateVersion),
 		})
 	})
 }
@@ -1350,10 +1354,10 @@ func (suite *Suite) createChain() (*flow.Block, *flow.Collection) {
 
 	cluster := new(protocol.Cluster)
 	cluster.On("Members").Return(clusterCommittee.ToSkeleton(), nil)
-	epoch := new(protocol.Epoch)
+	epoch := new(protocol.CommittedEpoch)
 	epoch.On("ClusterByChainID", mock.Anything).Return(cluster, nil)
 	epochs := new(protocol.EpochQuery)
-	epochs.On("Current").Return(epoch)
+	epochs.On("Current").Return(epoch, nil)
 	snap := new(protocol.Snapshot)
 	snap.On("Epochs").Return(epochs).Maybe()
 	snap.On("Params").Return(suite.params).Maybe()

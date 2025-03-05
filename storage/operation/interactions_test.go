@@ -44,7 +44,7 @@ func TestStateInteractionsInsertCheckRetrieve(t *testing.T) {
 		err := db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 			return operation.InsertExecutionStateInteractions(rw.Writer(), blockID, interactions)
 		})
-		require.Nil(t, err)
+		require.NoError(t, err)
 
 		var readInteractions []*snapshot.ExecutionSnapshot
 

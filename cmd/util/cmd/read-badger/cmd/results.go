@@ -42,6 +42,8 @@ var resultsCmd = &cobra.Command{
 				}
 
 				common.PrettyPrintEntity(result)
+				// the result does not include the chunk ID, so we need to print it separately
+				printChunkID(result)
 				return nil
 			}
 
@@ -59,6 +61,8 @@ var resultsCmd = &cobra.Command{
 				}
 
 				common.PrettyPrintEntity(result)
+				// the result does not include the chunk ID, so we need to print it separately
+				printChunkID(result)
 				return nil
 			}
 
@@ -69,4 +73,10 @@ var resultsCmd = &cobra.Command{
 			log.Error().Err(err).Msg("could not get results")
 		}
 	},
+}
+
+func printChunkID(result *flow.ExecutionResult) {
+	for i, chunk := range result.Chunks {
+		log.Info().Msgf("chunk index %d, id: %v", i, chunk.ID())
+	}
 }

@@ -934,6 +934,11 @@ func WithFinalState(commit flow.StateCommitment) func(*flow.ExecutionResult) {
 func WithServiceEvents(n int) func(result *flow.ExecutionResult) {
 	return func(result *flow.ExecutionResult) {
 		result.ServiceEvents = ServiceEventsFixture(n)
+		// randomly assign service events to chunks
+		for i := 0; i < n; i++ {
+			chunkIndex := rand.Intn(result.Chunks.Len())
+			*result.Chunks[chunkIndex].ServiceEventCount++
+		}
 	}
 }
 
@@ -1237,14 +1242,14 @@ func WithRandomPublicKeys() func(*flow.Identity) {
 	}
 }
 
-// WithAllRoles can be used used to ensure an IdentityList fixtures contains
+// WithAllRoles can be used to ensure an IdentityList fixtures contains
 // all the roles required for a valid genesis block.
 func WithAllRoles() func(*flow.Identity) {
 	return WithAllRolesExcept()
 }
 
-// Same as above, but omitting a certain role for cases where we are manually
-// setting up nodes or a particular role.
+// WithAllRolesExcept is used to ensure an IdentityList fixture contains all roles
+// except omitting a certain role, for cases where we are manually setting up nodes.
 func WithAllRolesExcept(except ...flow.Role) func(*flow.Identity) {
 	i := 0
 	roles := flow.Roles()
@@ -1318,6 +1323,12 @@ func WithChunkStartState(startState flow.StateCommitment) func(chunk *flow.Chunk
 	}
 }
 
+func WithServiceEventCount(count *uint16) func(*flow.Chunk) {
+	return func(chunk *flow.Chunk) {
+		chunk.ServiceEventCount = count
+	}
+}
+
 func ChunkFixture(
 	blockID flow.Identifier,
 	collectionIndex uint,
@@ -1329,6 +1340,7 @@ func ChunkFixture(
 			CollectionIndex:      collectionIndex,
 			StartState:           startState,
 			EventCollection:      IdentifierFixture(),
+			ServiceEventCount:    PtrTo[uint16](0),
 			TotalComputationUsed: 4200,
 			NumberOfTransactions: 42,
 			BlockID:              blockID,
@@ -1344,10 +1356,10 @@ func ChunkFixture(
 	return chunk
 }
 
-func ChunkListFixture(n uint, blockID flow.Identifier, startState flow.StateCommitment) flow.ChunkList {
+func ChunkListFixture(n uint, blockID flow.Identifier, startState flow.StateCommitment, opts ...func(*flow.Chunk)) flow.ChunkList {
 	chunks := make([]*flow.Chunk, 0, n)
 	for i := uint64(0); i < uint64(n); i++ {
-		chunk := ChunkFixture(blockID, uint(i), startState)
+		chunk := ChunkFixture(blockID, uint(i), startState, opts...)
 		chunk.Index = i
 		chunks = append(chunks, chunk)
 		startState = chunk.EndState
@@ -1529,7 +1541,7 @@ func RegisterIDFixture() flow.RegisterID {
 
 // VerifiableChunkDataFixture returns a complete verifiable chunk with an
 // execution receipt referencing the block/collections.
-func VerifiableChunkDataFixture(chunkIndex uint64) *verification.VerifiableChunkData {
+func VerifiableChunkDataFixture(chunkIndex uint64, opts ...func(*flow.Header)) (*verification.VerifiableChunkData, *flow.Block) {
 
 	guarantees := make([]*flow.CollectionGuarantee, 0)
 
@@ -1546,6 +1558,9 @@ func VerifiableChunkDataFixture(chunkIndex uint64) *verification.VerifiableChunk
 		Seals:      nil,
 	}
 	header := BlockHeaderFixture()
+	for _, opt := range opts {
+		opt(header)
+	}
 	header.PayloadHash = payload.Hash()
 
 	block := flow.Block{
@@ -1585,13 +1600,17 @@ func VerifiableChunkDataFixture(chunkIndex uint64) *verification.VerifiableChunk
 		endState = result.Chunks[index+1].StartState
 	}
 
+	chunkDataPack := ChunkDataPackFixture(chunk.ID(), func(c *flow.ChunkDataPack) {
+		c.Collection = &col
+	})
+
 	return &verification.VerifiableChunkData{
 		Chunk:         &chunk,
 		Header:        block.Header,
 		Result:        &result,
-		ChunkDataPack: ChunkDataPackFixture(result.ID()),
+		ChunkDataPack: chunkDataPack,
 		EndState:      endState,
-	}
+	}, &block
 }
 
 // ChunkDataResponseMsgFixture creates a chunk data response message with a single-transaction collection, and random chunk ID.
@@ -2156,9 +2175,14 @@ func IndexFixture() *flow.Index {
 }
 
 func WithDKGFromParticipants(participants flow.IdentitySkeletonList) func(*flow.EpochCommit) {
-	count := len(participants.Filter(filter.IsValidDKGParticipant))
+	dkgParticipants := participants.Filter(filter.IsConsensusCommitteeMember).Sort(flow.Canonical[flow.IdentitySkeleton])
 	return func(commit *flow.EpochCommit) {
-		commit.DKGParticipantKeys = PublicKeysFixture(count, crypto.BLSBLS12381)
+		commit.DKGParticipantKeys = nil
+		commit.DKGIndexMap = make(flow.DKGIndexMap)
+		for index, nodeID := range dkgParticipants.NodeIDs() {
+			commit.DKGParticipantKeys = append(commit.DKGParticipantKeys, KeyFixture(crypto.BLSBLS12381).PublicKey())
+			commit.DKGIndexMap[nodeID] = index
+		}
 	}
 }
 
@@ -2172,17 +2196,6 @@ func WithClusterQCsFromAssignments(assignments flow.AssignmentList) func(*flow.E
 	return func(commit *flow.EpochCommit) {
 		commit.ClusterQCs = flow.ClusterQCVoteDatasFromQCs(qcs)
 	}
-}
-
-func DKGParticipantLookup(participants flow.IdentitySkeletonList) map[flow.Identifier]flow.DKGParticipant {
-	lookup := make(map[flow.Identifier]flow.DKGParticipant)
-	for i, node := range participants.Filter(filter.HasRole[flow.IdentitySkeleton](flow.RoleConsensus)) {
-		lookup[node.NodeID] = flow.DKGParticipant{
-			Index:    uint(i),
-			KeyShare: KeyFixture(crypto.BLSBLS12381).PublicKey(),
-		}
-	}
-	return lookup
 }
 
 func CommitWithCounter(counter uint64) func(*flow.EpochCommit) {
@@ -2325,7 +2338,10 @@ func SnapshotClusterByIndex(
 	clusterIndex uint,
 ) (protocol.Cluster, error) {
 	epochs := snapshot.Epochs()
-	epoch := epochs.Current()
+	epoch, err := epochs.Current()
+	if err != nil {
+		return nil, err
+	}
 	cluster, err := epoch.Cluster(clusterIndex)
 	if err != nil {
 		return nil, err
@@ -2872,11 +2888,12 @@ func WithNextEpochProtocolState() func(entry *flow.RichEpochStateEntry) {
 func WithValidDKG() func(*flow.RichEpochStateEntry) {
 	return func(entry *flow.RichEpochStateEntry) {
 		commit := entry.CurrentEpochCommit
-		dkgParticipants := entry.CurrentEpochSetup.Participants.Filter(filter.IsValidDKGParticipant)
-		lookup := DKGParticipantLookup(dkgParticipants)
-		commit.DKGParticipantKeys = make([]crypto.PublicKey, len(lookup))
-		for _, participant := range lookup {
-			commit.DKGParticipantKeys[participant.Index] = participant.KeyShare
+		dkgParticipants := entry.CurrentEpochSetup.Participants.Filter(filter.IsConsensusCommitteeMember).Sort(flow.Canonical[flow.IdentitySkeleton])
+		commit.DKGParticipantKeys = nil
+		commit.DKGIndexMap = make(flow.DKGIndexMap)
+		for index, nodeID := range dkgParticipants.NodeIDs() {
+			commit.DKGParticipantKeys = append(commit.DKGParticipantKeys, KeyFixture(crypto.BLSBLS12381).PublicKey())
+			commit.DKGIndexMap[nodeID] = index
 		}
 	}
 }

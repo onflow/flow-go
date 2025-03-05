@@ -40,6 +40,7 @@ import (
 	"github.com/onflow/flow-go/network/p2p/utils"
 	validator "github.com/onflow/flow-go/network/validator/pubsub"
 	"github.com/onflow/flow-go/utils/logging"
+	randutils "github.com/onflow/flow-go/utils/rand"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -863,7 +864,8 @@ func GossipSubRpcFixture(t *testing.T, msgCnt int, opts ...GossipSubCtrlOption) 
 	subscriptions := make([]*pb.RPC_SubOpts, numSubscriptions)
 	for i := 0; i < numSubscriptions; i++ {
 		subscribe := rand.Intn(2) == 1
-		topicID := unittest.RandomStringFixture(t, topicIdSize)
+		topicID, err := randutils.GenerateRandomString(topicIdSize)
+		require.NoError(t, err)
 		subscriptions[i] = &pb.RPC_SubOpts{
 			Subscribe: &subscribe,
 			Topicid:   &topicID,
@@ -1030,7 +1032,8 @@ func GossipSubMessageIdsFixture(count int) []string {
 // Note: the message is not signed.
 func GossipSubMessageFixture(t *testing.T) *pb.Message {
 	byteSize := 100
-	topic := unittest.RandomStringFixture(t, byteSize)
+	topic, err := randutils.GenerateRandomString(byteSize)
+	require.NoError(t, err)
 	return &pb.Message{
 		From:      unittest.RandomBytes(byteSize),
 		Data:      unittest.RandomBytes(byteSize),
