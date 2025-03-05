@@ -6,13 +6,13 @@ import (
 
 // OptionFunc is a function that can be provided to the backend on creation in
 // order to set a certain custom option.
-type OptionFunc[K comparable, V any] func(backend *Backend[K, V])
+type OptionFunc func(*Backend)
 
 // WithLimit can be provided to the backend on creation in order to set a point
 // where it's time to check for ejection conditions.  The actual size may continue
 // to rise by the threshold for batch ejection (currently 128)
-func WithLimit[K comparable, V any](limit uint) OptionFunc[K, V] {
-	return func(be *Backend[K, V]) {
+func WithLimit(limit uint) OptionFunc {
+	return func(be *Backend) {
 		be.guaranteedCapacity = limit
 	}
 }
@@ -20,8 +20,8 @@ func WithLimit[K comparable, V any](limit uint) OptionFunc[K, V] {
 // WithEject can be provided to the backend on creation in order to set a custom
 // eject function to pick the entity to be evicted upon overflow, as well as
 // hooking into it for additional cleanup work.
-func WithEject[K comparable, V any](eject EjectFunc[K, V]) OptionFunc[K, V] {
-	return func(be *Backend[K, V]) {
+func WithEject(eject EjectFunc) OptionFunc {
+	return func(be *Backend) {
 		be.eject = eject
 		be.batchEject = nil
 	}
@@ -31,8 +31,8 @@ func WithEject[K comparable, V any](eject EjectFunc[K, V]) OptionFunc[K, V] {
 //
 // MutableBackData represents the mutable data structure used by mempool.Backend
 // core structure of maintaining data on memory-pools.
-func WithMutableBackData[K comparable, V any](mutableBackData mempool.MutableBackData[K, V]) OptionFunc[K, V] {
-	return func(be *Backend[K, V]) {
+func WithMutableBackData(mutableBackData mempool.MutableBackData) OptionFunc {
+	return func(be *Backend) {
 		be.mutableBackData = mutableBackData
 	}
 }

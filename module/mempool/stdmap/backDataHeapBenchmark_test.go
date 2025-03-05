@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	lru "github.com/hashicorp/golang-lru/v2"
+	lru "github.com/hashicorp/golang-lru"
 	zlog "github.com/rs/zerolog/log"
 	"github.com/stretchr/testify/require"
 
@@ -28,9 +28,9 @@ func BenchmarkBaselineLRU(b *testing.B) {
 	defer debug.SetGCPercent(debug.SetGCPercent(-1)) // disable GC
 
 	limit := uint(50)
-	backData := stdmap.NewBackend[flow.Identifier, *unittest.MockEntity](
-		stdmap.WithMutableBackData[flow.Identifier, *unittest.MockEntity](newBaselineLRU[flow.Identifier, *unittest.MockEntity](int(limit))),
-		stdmap.WithLimit[flow.Identifier, *unittest.MockEntity](limit))
+	backData := stdmap.NewBackend(
+		stdmap.WithMutableBackData(newBaselineLRU(int(limit))),
+		stdmap.WithLimit(limit))
 
 	entities := unittest.EntityListFixture(uint(100_000))
 	testAddEntities(b, limit, backData, entities)
@@ -47,15 +47,15 @@ func BenchmarkArrayBackDataLRU(b *testing.B) {
 	defer debug.SetGCPercent(debug.SetGCPercent(-1)) // disable GC
 	limit := uint(50_000)
 
-	backData := stdmap.NewBackend[flow.Identifier, *unittest.MockEntity](
-		stdmap.WithMutableBackData[flow.Identifier, *unittest.MockEntity](
+	backData := stdmap.NewBackend(
+		stdmap.WithMutableBackData(
 			herocache.NewCache(
 				uint32(limit),
 				8,
 				heropool.LRUEjection,
 				unittest.Logger(),
 				metrics.NewNoopCollector())),
-		stdmap.WithLimit[flow.Identifier, *unittest.MockEntity](limit))
+		stdmap.WithLimit(limit))
 
 	entities := unittest.EntityListFixture(uint(100_000_000))
 	testAddEntities(b, limit, backData, entities)
@@ -77,13 +77,13 @@ func gcAndWriteHeapProfile() {
 
 // testAddEntities is a test helper that checks entities are added successfully to the backdata.
 // and each entity is retrievable right after it is written to backdata.
-func testAddEntities(t testing.TB, limit uint, b *stdmap.Backend[flow.Identifier, *unittest.MockEntity], entities []*unittest.MockEntity) {
+func testAddEntities(t testing.TB, limit uint, b *stdmap.Backend, entities []*unittest.MockEntity) {
 	// adding elements
 	t1 := time.Now()
 	for i, e := range entities {
 		require.False(t, b.Has(e.ID()))
 		// adding each element must be successful.
-		require.True(t, b.Add(e.ID(), e))
+		require.True(t, b.Add(*e))
 
 		if uint(i) < limit {
 			// when we are below limit the total of
@@ -96,7 +96,7 @@ func testAddEntities(t testing.TB, limit uint, b *stdmap.Backend[flow.Identifier
 		}
 
 		// entity should be immediately retrievable
-		actual, ok := b.Get(e.ID())
+		actual, ok := b.ByID(e.ID())
 		require.True(t, ok)
 		require.Equal(t, *e, actual)
 	}
@@ -108,8 +108,8 @@ func testAddEntities(t testing.TB, limit uint, b *stdmap.Backend[flow.Identifier
 // it compliant to be used as BackData component in mempool.Backend. Note that
 // this is used only as an experimental baseline, and so it's not exported for
 // production.
-type baselineLRU[K comparable, V any] struct {
-	c     *lru.Cache[K, V] // used to incorporate an LRU cache
+type baselineLRU struct {
+	c     *lru.Cache // used to incorporate an LRU cache
 	limit int
 
 	// atomicAdjustMutex is used to synchronize concurrent access to the
@@ -118,54 +118,59 @@ type baselineLRU[K comparable, V any] struct {
 	atomicAdjustMutex sync.Mutex
 }
 
-func newBaselineLRU[K comparable, V any](limit int) *baselineLRU[K, V] {
+func newBaselineLRU(limit int) *baselineLRU {
 	var err error
-	c, err := lru.New[K, V](limit)
+	c, err := lru.New(limit)
 	if err != nil {
 		panic(err)
 	}
 
-	return &baselineLRU[K, V]{
+	return &baselineLRU{
 		c:     c,
 		limit: limit,
 	}
 }
 
-// Has checks if backdata already stores a value under the given key.
-func (b *baselineLRU[K, V]) Has(key K) bool {
-	_, ok := b.c.Get(key)
+// Has checks if we already contain the item with the given hash.
+func (b *baselineLRU) Has(entityID flow.Identifier) bool {
+	_, ok := b.c.Get(entityID)
 	return ok
 }
 
 // Add adds the given item to the pool.
-func (b *baselineLRU[K, V]) Add(key K, value V) bool {
-	b.c.Add(key, value)
+func (b *baselineLRU) Add(entityID flow.Identifier, entity flow.Entity) bool {
+	b.c.Add(entityID, entity)
 	return true
 }
 
 // Remove will remove the item with the given hash.
-func (b *baselineLRU[K, V]) Remove(key K) (value V, removed bool) {
-	value, ok := b.c.Get(key)
+func (b *baselineLRU) Remove(entityID flow.Identifier) (flow.Entity, bool) {
+	e, ok := b.c.Get(entityID)
 	if !ok {
-		return value, false
+		return nil, false
+	}
+	entity, ok := e.(flow.Entity)
+	if !ok {
+		return nil, false
 	}
 
-	return value, b.c.Remove(key)
+	return entity, b.c.Remove(entityID)
 }
 
 // Adjust will adjust the value item using the given function if the given key can be found.
 // Returns a bool which indicates whether the value was updated as well as the updated value
-func (b *baselineLRU[K, V]) Adjust(key K, f func(V) V) (value V, ok bool) {
-	value, removed := b.Remove(key)
+func (b *baselineLRU) Adjust(entityID flow.Identifier, f func(flow.Entity) flow.Entity) (flow.Entity, bool) {
+	entity, removed := b.Remove(entityID)
 	if !removed {
-		return value, false
+		return nil, false
 	}
 
-	newValue := f(value)
+	newEntity := f(entity)
+	newEntityID := newEntity.ID()
 
-	b.Add(key, newValue)
+	b.Add(newEntityID, newEntity)
 
-	return newValue, true
+	return newEntity, true
 }
 
 // AdjustWithInit will adjust the value item using the given function if the given key can be found.
@@ -174,78 +179,109 @@ func (b *baselineLRU[K, V]) Adjust(key K, f func(V) V) (value V, ok bool) {
 // a bool indicating whether the value was initialized.
 // Note: this is a benchmark helper, hence, the adjust-with-init provides serializability w.r.t other concurrent adjust-with-init or get-with-init operations,
 // and does not provide serializability w.r.t concurrent add, adjust or get operations.
-func (b *baselineLRU[K, V]) AdjustWithInit(key K, adjust func(V) V, init func() V) (value V, ok bool) {
+func (b *baselineLRU) AdjustWithInit(entityID flow.Identifier, adjust func(flow.Entity) flow.Entity, init func() flow.Entity) (flow.Entity, bool) {
 	b.atomicAdjustMutex.Lock()
 	defer b.atomicAdjustMutex.Unlock()
 
-	if b.Has(key) {
-		return b.Adjust(key, adjust)
+	if b.Has(entityID) {
+		return b.Adjust(entityID, adjust)
 	}
-	added := b.Add(key, init())
+	added := b.Add(entityID, init())
 	if !added {
-		return value, false
+		return nil, false
 	}
-	return b.Adjust(key, adjust)
+	return b.Adjust(entityID, adjust)
 }
 
-// Get returns the given item from the pool.
-func (b *baselineLRU[K, V]) Get(key K) (value V, ok bool) {
-	value, ok = b.c.Get(key)
+// GetWithInit will retrieve the value item if the given key can be found.
+// If the key is not found, the init function will be called to create a new value.
+// Returns a bool which indicates whether the entity was found (or created).
+func (b *baselineLRU) GetWithInit(entityID flow.Identifier, init func() flow.Entity) (flow.Entity, bool) {
+	newE := init()
+	e, ok, _ := b.c.PeekOrAdd(entityID, newE)
 	if !ok {
-		return value, false
+		// if the entity was not found, it means that the new entity was added to the cache.
+		return newE, true
+	}
+	// if the entity was found, it means that the new entity was not added to the cache.
+	return e.(flow.Entity), true
+}
+
+// ByID returns the given item from the pool.
+func (b *baselineLRU) ByID(entityID flow.Identifier) (flow.Entity, bool) {
+	e, ok := b.c.Get(entityID)
+	if !ok {
+		return nil, false
 	}
 
-	return value, ok
+	entity, ok := e.(flow.Entity)
+	if !ok {
+		return nil, false
+	}
+	return entity, ok
 }
 
 // Size will return the total of the backend.
-func (b *baselineLRU[K, V]) Size() uint {
+func (b *baselineLRU) Size() uint {
 	return uint(b.c.Len())
 }
 
 // All returns all entities from the pool.
-func (b *baselineLRU[K, V]) All() map[K]V {
-	all := make(map[K]V)
-	for _, key := range b.c.Keys() {
-
-		entity, ok := b.Get(key)
+func (b *baselineLRU) All() map[flow.Identifier]flow.Entity {
+	all := make(map[flow.Identifier]flow.Entity)
+	for _, entityID := range b.c.Keys() {
+		id, ok := entityID.(flow.Identifier)
 		if !ok {
-			panic("could not retrieve value from mempool")
+			panic("could not assert to entity id")
 		}
-		all[key] = entity
+
+		entity, ok := b.ByID(id)
+		if !ok {
+			panic("could not retrieve entity from mempool")
+		}
+		all[id] = entity
 	}
 
 	return all
 }
 
-func (b *baselineLRU[K, V]) Keys() []K {
-	keys := make([]K, b.c.Len())
-	valueKeys := b.c.Keys()
-	total := len(valueKeys)
+func (b *baselineLRU) Identifiers() flow.IdentifierList {
+	ids := make(flow.IdentifierList, b.c.Len())
+	entityIds := b.c.Keys()
+	total := len(entityIds)
 	for i := 0; i < total; i++ {
-		keys[i] = valueKeys[i]
+		id, ok := entityIds[i].(flow.Identifier)
+		if !ok {
+			panic("could not assert to entity id")
+		}
+		ids[i] = id
 	}
-	return keys
+	return ids
 }
 
-func (b *baselineLRU[K, V]) Values() []V {
-	values := make([]V, b.c.Len())
-	valuesIds := b.c.Keys()
-	total := len(valuesIds)
+func (b *baselineLRU) Entities() []flow.Entity {
+	entities := make([]flow.Entity, b.c.Len())
+	entityIds := b.c.Keys()
+	total := len(entityIds)
 	for i := 0; i < total; i++ {
-		entity, ok := b.Get(valuesIds[i])
+		id, ok := entityIds[i].(flow.Identifier)
+		if !ok {
+			panic("could not assert to entity id")
+		}
+
+		entity, ok := b.ByID(id)
 		if !ok {
 			panic("could not retrieve entity from mempool")
 		}
-		values[i] = entity
+		entities[i] = entity
 	}
-	return values
+	return entities
 }
 
 // Clear removes all entities from the pool.
-func (b *baselineLRU[K, V]) Clear() {
+func (b *baselineLRU) Clear() {
 	var err error
-	b.c, err = lru.New[K, V](b.limit)
+	b.c, err = lru.New(b.limit)
 	if err != nil {
 		panic(err)
 	}
