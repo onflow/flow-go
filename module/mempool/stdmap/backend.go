@@ -82,7 +82,7 @@ func (b *Backend[K, V]) Remove(key K) bool {
 // Returns:
 //   - value, true if the value with the given key was found. The returned value is the version after the update is applied.
 //   - nil, false if no value with the given key was found
-func (b *Backend[K, V]) Adjust(key K, f func(V) (K, V)) (V, bool) {
+func (b *Backend[K, V]) Adjust(key K, f func(V) V) (V, bool) {
 	// bs1 := binstat.EnterTime(binstat.BinStdmap + ".w_lock.(Backend)Adjust")
 	b.Lock()
 	// binstat.Leave(bs1)
@@ -101,30 +101,13 @@ func (b *Backend[K, V]) Adjust(key K, f func(V) (K, V)) (V, bool) {
 // - adjust: the function that adjusts the value.
 // - init: the function that initializes the value when it is not found.
 // Returns:
-//   - the adjusted value.
-//
+// - the adjusted value.
 // - a bool which indicates whether the value was adjusted.
-func (b *Backend[K, V]) AdjustWithInit(key K, adjust func(V) (K, V), init func() V) (V, bool) {
+func (b *Backend[K, V]) AdjustWithInit(key K, adjust func(V) V, init func() V) (V, bool) {
 	b.Lock()
 	defer b.Unlock()
 
 	return b.mutableBackData.AdjustWithInit(key, adjust, init)
-}
-
-// GetWithInit returns the given value from the backdata. If the value does not exist, it creates a new value
-// using the factory function and stores it in the backdata.
-// Args:
-// - key: the identifier of the value to get.
-// - init: the function that initializes the value when it is not found.
-// Returns:
-//   - the value.
-//
-// - a bool which indicates whether the value was found (or created).
-func (b *Backend[K, V]) GetWithInit(key K, init func() V) (V, bool) {
-	b.Lock()
-	defer b.Unlock()
-
-	return b.mutableBackData.GetWithInit(key, init)
 }
 
 // Get returns the value for the given key.

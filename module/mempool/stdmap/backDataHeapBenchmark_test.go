@@ -156,16 +156,16 @@ func (b *baselineLRU[K, V]) Remove(key K) (V, bool) {
 
 // Adjust will adjust the value item using the given function if the given key can be found.
 // Returns a bool which indicates whether the value was updated as well as the updated value
-func (b *baselineLRU[K, V]) Adjust(key K, f func(V) (K, V)) (V, bool) {
+func (b *baselineLRU[K, V]) Adjust(key K, f func(V) V) (V, bool) {
 	value, removed := b.Remove(key)
 	if !removed {
 		var zero V
 		return zero, false
 	}
 
-	newKey, newValue := f(value)
+	newValue := f(value)
 
-	b.Add(newKey, newValue)
+	b.Add(key, newValue)
 
 	return newValue, true
 }
@@ -176,7 +176,7 @@ func (b *baselineLRU[K, V]) Adjust(key K, f func(V) (K, V)) (V, bool) {
 // a bool indicating whether the value was initialized.
 // Note: this is a benchmark helper, hence, the adjust-with-init provides serializability w.r.t other concurrent adjust-with-init or get-with-init operations,
 // and does not provide serializability w.r.t concurrent add, adjust or get operations.
-func (b *baselineLRU[K, V]) AdjustWithInit(key K, adjust func(V) (K, V), init func() V) (V, bool) {
+func (b *baselineLRU[K, V]) AdjustWithInit(key K, adjust func(V) V, init func() V) (V, bool) {
 	b.atomicAdjustMutex.Lock()
 	defer b.atomicAdjustMutex.Unlock()
 

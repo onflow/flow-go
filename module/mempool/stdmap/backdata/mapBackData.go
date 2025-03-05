@@ -15,13 +15,15 @@ func NewMapBackData[K comparable, V any]() *MapBackData[K, V] {
 	return bd
 }
 
-// Has checks if backdata already contains the value with the given key.
+// Has checks if a value is stored under the given key.
 func (b *MapBackData[K, V]) Has(key K) bool {
 	_, exists := b.dataMap[key]
 	return exists
 }
 
-// Add adds the given value to the backdata.
+// Add attempts to add the given value to the backdata, without overwriting existing data.
+// If a value is already stored under the input key, Add is a no-op and returns false.
+// If no value is stored under the input key, Add adds the value and returns true.
 func (b *MapBackData[K, V]) Add(key K, value V) bool {
 	_, exists := b.dataMap[key]
 	if exists {
@@ -32,11 +34,11 @@ func (b *MapBackData[K, V]) Add(key K, value V) bool {
 }
 
 // Remove removes the value with the given key.
-func (b *MapBackData[K, V]) Remove(key K) (V, bool) {
-	value, exists := b.dataMap[key]
-	if !exists {
-		var zero V
-		return zero, false
+// If the key-value pair exists, returns the value and true.
+// Otherwise, returns the zero value for type V and false.
+func (b *MapBackData[K, V]) Remove(key K) (value V, ok bool) {
+	if !ok {
+		return value, false
 	}
 	delete(b.dataMap, key)
 	return value, true
@@ -44,16 +46,13 @@ func (b *MapBackData[K, V]) Remove(key K) (V, bool) {
 
 // Adjust adjusts the value using the given function if the given key can be found.
 // It returns the updated value along with a boolean indicating whether an update occurred.
-func (b *MapBackData[K, V]) Adjust(key K, f func(V) (K, V)) (V, bool) {
-	value, ok := b.dataMap[key]
+func (b *MapBackData[K, V]) Adjust(key K, f func(V) V) (value V, ok bool) {
+	value, ok = b.dataMap[key]
 	if !ok {
-		var zero V
-		return zero, false
+		return value, false
 	}
-	newKey, newValue := f(value)
-
-	delete(b.dataMap, key)
-	b.dataMap[newKey] = newValue
+	newValue := f(value)
+	b.dataMap[key] = newValue
 	return newValue, true
 }
 
@@ -69,7 +68,7 @@ func (b *MapBackData[K, V]) Adjust(key K, f func(V) (K, V)) (V, bool) {
 // - the adjusted value.
 //
 // - a bool which indicates whether the value was adjusted.
-func (b *MapBackData[K, V]) AdjustWithInit(key K, adjust func(V) (K, V), init func() V) (V, bool) {
+func (b *MapBackData[K, V]) AdjustWithInit(key K, adjust func(V) V, init func() V) (V, bool) {
 	if b.Has(key) {
 		return b.Adjust(key, adjust)
 	}
@@ -77,30 +76,12 @@ func (b *MapBackData[K, V]) AdjustWithInit(key K, adjust func(V) (K, V), init fu
 	return b.Adjust(key, adjust)
 }
 
-// GetWithInit returns the value for the given key.
-// If the key does not exist, it creates a new value using the init function, stores it, and returns it.
-//
-// Args:
-// - key: The key for which the value should be retrieved.
-// - init: A function that initializes the value if the key is not present.
-//
-// Returns:
-//   - the value.
-//   - a bool which indicates whether the value was found (or created).
-func (b *MapBackData[K, V]) GetWithInit(key K, init func() V) (V, bool) {
-	if b.Has(key) {
-		return b.ByID(key)
-	}
-	b.Add(key, init())
-	return b.ByID(key)
-}
-
-// ByID returns the value for the given key.
-func (b *MapBackData[K, V]) ByID(key K) (V, bool) {
-	value, exists := b.dataMap[key]
-	if !exists {
-		var zero V
-		return zero, false
+// Get returns the value for the given key.
+// Returns true if the key-value pair exists, and false otherwise.
+func (b *MapBackData[K, V]) Get(key K) (value V, ok bool) {
+	value, ok = b.dataMap[key]
+	if !ok {
+		return value, false
 	}
 	return value, true
 }
@@ -119,8 +100,8 @@ func (b *MapBackData[K, V]) All() map[K]V {
 	return values
 }
 
-// Identifiers returns the list of keys of values stored in the backdata.
-func (b *MapBackData[K, V]) Identifiers() []K {
+// Keys returns an unordered list of keys stored in the backdata.
+func (b *MapBackData[K, V]) Keys() []K {
 	keys := make([]K, len(b.dataMap))
 	i := 0
 	for key := range b.dataMap {
@@ -130,8 +111,8 @@ func (b *MapBackData[K, V]) Identifiers() []K {
 	return keys
 }
 
-// Entities returns the list of values stored in the backdata.
-func (b *MapBackData[K, V]) Entities() []V {
+// Values returns an unordered list of values stored in the backdata.
+func (b *MapBackData[K, V]) Values() []V {
 	values := make([]V, len(b.dataMap))
 	i := 0
 	for _, value := range b.dataMap {

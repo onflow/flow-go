@@ -195,7 +195,7 @@ func TestLRUEjector_UntrackEject(t *testing.T) {
 	// untracks the oldest item
 	ejector.Untrack(items[0])
 
-	// next ejectable item should be the second oldest item
+	// next ejectable item should be the second-oldest item
 	id := Eject(ejector, backEnd)
 	assert.Equal(t, id, items[1])
 }
