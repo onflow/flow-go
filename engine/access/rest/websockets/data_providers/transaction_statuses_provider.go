@@ -127,10 +127,10 @@ func parseTransactionID(
 		var txIDParsed parser.ID
 		err := txIDParsed.Parse(result)
 		if err != nil {
-			return txID, fmt.Errorf("invalid 'tx_id': %w", err)
+			return flow.ZeroID, fmt.Errorf("invalid 'tx_id': %w", err)
 		}
 		return txIDParsed.Flow(), nil
 	}
 
-	return txID, nil
+	return flow.ZeroID, fmt.Errorf("arguments are invalid")
 }
