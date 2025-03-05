@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	lru "github.com/hashicorp/golang-lru"
+	lru "github.com/hashicorp/golang-lru/v2"
 	zlog "github.com/rs/zerolog/log"
 	"github.com/stretchr/testify/require"
 
@@ -109,7 +109,7 @@ func testAddEntities(t testing.TB, limit uint, b *stdmap.Backend[flow.Identifier
 // this is used only as an experimental baseline, and so it's not exported for
 // production.
 type baselineLRU[K comparable, V any] struct {
-	c     *lru.Cache // used to incorporate an LRU cache
+	c     *lru.Cache[K, V] // used to incorporate an LRU cache
 	limit int
 
 	// atomicAdjustMutex is used to synchronize concurrent access to the
@@ -120,7 +120,7 @@ type baselineLRU[K comparable, V any] struct {
 
 func newBaselineLRU[K comparable, V any](limit int) *baselineLRU[K, V] {
 	var err error
-	c, err := lru.New(limit)
+	c, err := lru.New[K, V](limit)
 	if err != nil {
 		panic(err)
 	}
@@ -245,7 +245,7 @@ func (b *baselineLRU[K, V]) Values() []V {
 // Clear removes all entities from the pool.
 func (b *baselineLRU[K, V]) Clear() {
 	var err error
-	b.c, err = lru.New(b.limit)
+	b.c, err = lru.New[K, V](b.limit)
 	if err != nil {
 		panic(err)
 	}
