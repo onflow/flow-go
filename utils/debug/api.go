@@ -26,12 +26,12 @@ func GetExecutionAPIBlockHeader(
 		return nil, err
 	}
 
-	return &flow.Header{
+	return &flow.Header{UnsignedHeader: flow.UnsignedHeader{
 		ChainID:   flow.ChainID(resp.Block.ChainId),
 		ParentID:  flow.Identifier(resp.Block.ParentId),
 		Height:    resp.Block.Height,
 		Timestamp: resp.Block.Timestamp.AsTime(),
-	}, nil
+	}}, nil
 }
 
 func GetAccessAPIBlockHeader(
@@ -51,10 +51,10 @@ func GetAccessAPIBlockHeader(
 		return nil, err
 	}
 
-	return &flow.Header{
+	return &flow.Header{UnsignedHeader: flow.UnsignedHeader{
 		ChainID:   flow.ChainID(resp.Block.ChainId),
 		ParentID:  flow.Identifier(resp.Block.ParentId),
 		Height:    resp.Block.Height,
 		Timestamp: resp.Block.Timestamp.AsTime(),
-	}, nil
+	}}, nil
 }

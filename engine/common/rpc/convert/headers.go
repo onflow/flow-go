@@ -81,17 +81,19 @@ func MessageToBlockHeader(m *entities.BlockHeader) (*flow.Header, error) {
 	}
 
 	return &flow.Header{
-		ParentID:           MessageToIdentifier(m.ParentId),
-		Height:             m.Height,
-		PayloadHash:        MessageToIdentifier(m.PayloadHash),
-		Timestamp:          m.Timestamp.AsTime(),
-		View:               m.View,
-		ParentView:         m.ParentView,
-		ParentVoterIndices: m.ParentVoterIndices,
-		ParentVoterSigData: m.ParentVoterSigData,
-		ProposerID:         MessageToIdentifier(m.ProposerId),
-		ProposerSigData:    m.ProposerSigData,
-		ChainID:            *chainId,
-		LastViewTC:         lastViewTC,
+		UnsignedHeader: flow.UnsignedHeader{
+			ParentID:           MessageToIdentifier(m.ParentId),
+			Height:             m.Height,
+			PayloadHash:        MessageToIdentifier(m.PayloadHash),
+			Timestamp:          m.Timestamp.AsTime(),
+			View:               m.View,
+			ParentView:         m.ParentView,
+			ParentVoterIndices: m.ParentVoterIndices,
+			ParentVoterSigData: m.ParentVoterSigData,
+			ProposerID:         MessageToIdentifier(m.ProposerId),
+			ChainID:            *chainId,
+			LastViewTC:         lastViewTC,
+		},
+		ProposerSigData: m.ProposerSigData,
 	}, nil
 }

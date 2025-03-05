@@ -113,16 +113,18 @@ func SignedProposalToFlow(proposal *model.SignedProposal) *flow.Header {
 
 	block := proposal.Block
 	header := &flow.Header{
-		ParentID:           block.QC.BlockID,
-		PayloadHash:        block.PayloadHash,
-		Timestamp:          block.Timestamp,
-		View:               block.View,
-		ParentView:         block.QC.View,
-		ParentVoterIndices: block.QC.SignerIndices,
-		ParentVoterSigData: block.QC.SigData,
-		ProposerID:         block.ProposerID,
-		ProposerSigData:    proposal.SigData,
-		LastViewTC:         proposal.LastViewTC,
+		UnsignedHeader: flow.UnsignedHeader{
+			ParentID:           block.QC.BlockID,
+			PayloadHash:        block.PayloadHash,
+			Timestamp:          block.Timestamp,
+			View:               block.View,
+			ParentView:         block.QC.View,
+			ParentVoterIndices: block.QC.SignerIndices,
+			ParentVoterSigData: block.QC.SigData,
+			ProposerID:         block.ProposerID,
+			LastViewTC:         proposal.LastViewTC,
+		},
+		ProposerSigData: proposal.SigData,
 	}
 
 	return header

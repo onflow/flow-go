@@ -64,7 +64,7 @@ func (s *EmulatorSuite) runTest(goodNodes int, emulatorProblems bool) {
 		FinalView:    600,
 	}
 
-	firstBlock := &flow.Header{View: 100}
+	firstBlock := &flow.Header{UnsignedHeader: flow.UnsignedHeader{View: 100}}
 
 	for _, node := range nodes {
 		node.setEpochs(s.T(), currentEpochSetup, nextEpochSetup, firstBlock)

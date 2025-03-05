@@ -18,9 +18,9 @@ import (
 func TestIterateHeight(t *testing.T) {
 	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
 		// create blocks with siblings
-		b1 := &flow.Header{Height: 1}
-		b2 := &flow.Header{Height: 2}
-		b3 := &flow.Header{Height: 3}
+		b1 := &flow.Header{UnsignedHeader: flow.UnsignedHeader{Height: 1}}
+		b2 := &flow.Header{UnsignedHeader: flow.UnsignedHeader{Height: 2}}
+		b3 := &flow.Header{UnsignedHeader: flow.UnsignedHeader{Height: 3}}
 		bs := []*flow.Header{b1, b2, b3}
 
 		// index height

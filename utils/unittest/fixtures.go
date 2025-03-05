@@ -469,12 +469,12 @@ func HeaderWithView(view uint64) func(*flow.Header) {
 func BlockHeaderFixture(opts ...func(header *flow.Header)) *flow.Header {
 	height := 1 + uint64(rand.Uint32()) // avoiding edge case of height = 0 (genesis block)
 	view := height + uint64(rand.Intn(1000))
-	header := BlockHeaderWithParentFixture(&flow.Header{
+	header := BlockHeaderWithParentFixture(&flow.Header{UnsignedHeader: flow.UnsignedHeader{
 		ChainID:  flow.Emulator,
 		ParentID: IdentifierFixture(),
 		Height:   height,
 		View:     view,
-	})
+	}})
 
 	for _, opt := range opts {
 		opt(header)
@@ -489,12 +489,12 @@ func BlockHeaderFixtureOnChain(
 ) *flow.Header {
 	height := 1 + uint64(rand.Uint32()) // avoiding edge case of height = 0 (genesis block)
 	view := height + uint64(rand.Intn(1000))
-	header := BlockHeaderWithParentFixture(&flow.Header{
+	header := BlockHeaderWithParentFixture(&flow.Header{UnsignedHeader: flow.UnsignedHeader{
 		ChainID:  chainID,
 		ParentID: IdentifierFixture(),
 		Height:   height,
 		View:     view,
-	})
+	}})
 
 	for _, opt := range opts {
 		opt(header)
@@ -520,18 +520,20 @@ func BlockHeaderWithParentFixture(parent *flow.Header) *flow.Header {
 		}
 	}
 	return &flow.Header{
-		ChainID:            parent.ChainID,
-		ParentID:           parent.ID(),
-		Height:             height,
-		PayloadHash:        IdentifierFixture(),
-		Timestamp:          time.Now().UTC(),
-		View:               view,
-		ParentView:         parent.View,
-		ParentVoterIndices: SignerIndicesFixture(4),
-		ParentVoterSigData: QCSigDataFixture(),
-		ProposerID:         IdentifierFixture(),
-		ProposerSigData:    SignatureFixture(),
-		LastViewTC:         lastViewTC,
+		UnsignedHeader: flow.UnsignedHeader{
+			ChainID:            parent.ChainID,
+			ParentID:           parent.ID(),
+			Height:             height,
+			PayloadHash:        IdentifierFixture(),
+			Timestamp:          time.Now().UTC(),
+			View:               view,
+			ParentView:         parent.View,
+			ParentVoterIndices: SignerIndicesFixture(4),
+			ParentVoterSigData: QCSigDataFixture(),
+			ProposerID:         IdentifierFixture(),
+			LastViewTC:         lastViewTC,
+		},
+		ProposerSigData: SignatureFixture(),
 	}
 }
 
@@ -556,18 +558,20 @@ func BlockHeaderWithParentWithSoRFixture(parent *flow.Header, source []byte) *fl
 		}
 	}
 	return &flow.Header{
-		ChainID:            parent.ChainID,
-		ParentID:           parent.ID(),
-		Height:             height,
-		PayloadHash:        IdentifierFixture(),
-		Timestamp:          time.Now().UTC(),
-		View:               view,
-		ParentView:         parent.View,
-		ParentVoterIndices: SignerIndicesFixture(4),
-		ParentVoterSigData: QCSigDataWithSoRFixture(source),
-		ProposerID:         IdentifierFixture(),
-		ProposerSigData:    SignatureFixture(),
-		LastViewTC:         lastViewTC,
+		UnsignedHeader: flow.UnsignedHeader{
+			ChainID:            parent.ChainID,
+			ParentID:           parent.ID(),
+			Height:             height,
+			PayloadHash:        IdentifierFixture(),
+			Timestamp:          time.Now().UTC(),
+			View:               view,
+			ParentView:         parent.View,
+			ParentVoterIndices: SignerIndicesFixture(4),
+			ParentVoterSigData: QCSigDataWithSoRFixture(source),
+			ProposerID:         IdentifierFixture(),
+			LastViewTC:         lastViewTC,
+		},
+		ProposerSigData: SignatureFixture(),
 	}
 }
 

@@ -15,7 +15,7 @@ import (
 
 func TestHeaderInsertCheckRetrieve(t *testing.T) {
 	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
-		expected := &flow.Header{
+		expected := &flow.Header{UnsignedHeader: flow.UnsignedHeader{
 			View:               1337,
 			Timestamp:          time.Now().UTC(),
 			ParentID:           flow.Identifier{0x11},
@@ -23,7 +23,8 @@ func TestHeaderInsertCheckRetrieve(t *testing.T) {
 			ParentVoterIndices: []byte{0x44},
 			ParentVoterSigData: []byte{0x88},
 			ProposerID:         flow.Identifier{0x33},
-			ProposerSigData:    crypto.Signature{0x77},
+		},
+			ProposerSigData: crypto.Signature{0x77},
 		}
 		blockID := expected.ID()
 

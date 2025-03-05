@@ -90,13 +90,13 @@ func (s *HotStuffFollowerSuite) SetupTest() {
 	// root block and QC
 	parentID, err := flow.HexStringToIdentifier("aa7693d498e9a087b1cadf5bfe9a1ff07829badc1915c210e482f369f9a00a70")
 	require.NoError(s.T(), err)
-	s.rootHeader = &flow.Header{
+	s.rootHeader = &flow.Header{UnsignedHeader: flow.UnsignedHeader{
 		ParentID:   parentID,
 		Timestamp:  time.Now().UTC(),
 		Height:     21053,
 		View:       52078,
 		ParentView: 52077,
-	}
+	}}
 
 	signerIndices, err := signature.EncodeSignersToIndices(identities.NodeIDs(), identities.NodeIDs()[:3])
 	require.NoError(s.T(), err)

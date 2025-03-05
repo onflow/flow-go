@@ -24,10 +24,10 @@ func TestGenerateClusterRootQC(t *testing.T) {
 	block.Header.PayloadHash = block.Payload.Hash()
 
 	clusterBlock := cluster.Block{
-		Header: &flow.Header{
+		Header: &flow.Header{UnsignedHeader: flow.UnsignedHeader{
 			ParentID: flow.ZeroID,
 			View:     42,
-		},
+		}},
 	}
 	payload := cluster.EmptyPayload(flow.ZeroID)
 	clusterBlock.SetPayload(payload)
