@@ -60,52 +60,52 @@ type accessSentinel interface {
 	accessSentinel()
 }
 
-// InvalidRequest indicates that the client's request was malformed or invalid
-type InvalidRequest struct {
+// InvalidRequestError indicates that the client's request was malformed or invalid
+type InvalidRequestError struct {
 	err error
 }
 
-func NewInvalidRequest(err error) InvalidRequest {
-	return InvalidRequest{err: err}
+func NewInvalidRequestError(err error) InvalidRequestError {
+	return InvalidRequestError{err: err}
 }
 
-func (e InvalidRequest) Error() string {
+func (e InvalidRequestError) Error() string {
 	return fmt.Sprintf("invalid argument: %v", e.err)
 }
 
-func (e InvalidRequest) Unwrap() error {
+func (e InvalidRequestError) Unwrap() error {
 	return e.err
 }
 
-func (e InvalidRequest) accessSentinel() {}
+func (e InvalidRequestError) accessSentinel() {}
 
-func IsInvalidRequest(err error) bool {
-	var errInvalidRequest InvalidRequest
+func IsInvalidRequestError(err error) bool {
+	var errInvalidRequest InvalidRequestError
 	return errors.As(err, &errInvalidRequest)
 }
 
-// DataNotFound indicates that the requested data was not found on the system
-type DataNotFound struct {
+// DataNotFoundError indicates that the requested data was not found on the system
+type DataNotFoundError struct {
 	dataType string
 	err      error
 }
 
-func NewDataNotFound(dataType string, err error) DataNotFound {
-	return DataNotFound{dataType: dataType, err: err}
+func NewDataNotFoundError(dataType string, err error) DataNotFoundError {
+	return DataNotFoundError{dataType: dataType, err: err}
 }
 
-func (e DataNotFound) Error() string {
+func (e DataNotFoundError) Error() string {
 	return fmt.Sprintf("data not found for %s: %v", e.dataType, e.err)
 }
 
-func (e DataNotFound) Unwrap() error {
+func (e DataNotFoundError) Unwrap() error {
 	return e.err
 }
 
-func (e DataNotFound) accessSentinel() {}
+func (e DataNotFoundError) accessSentinel() {}
 
-func IsDataNotFound(err error) bool {
-	var errDataNotFound DataNotFound
+func IsDataNotFoundError(err error) bool {
+	var errDataNotFound DataNotFoundError
 	return errors.As(err, &errDataNotFound)
 }
 
@@ -136,7 +136,7 @@ func IsInternalError(err error) bool {
 }
 
 // OutOfRangeError indicates that the request was for data that is outside of the available range.
-// This is a more specific version of DataNotFound, where the data is known to eventually exist, but
+// This is a more specific version of DataNotFoundError, where the data is known to eventually exist, but
 // currently is not known.
 // For example, querying data for a height above the current finalized height.
 type OutOfRangeError struct {
@@ -162,28 +162,76 @@ func IsOutOfRangeError(err error) bool {
 	return errors.As(err, &errOutOfRangeError)
 }
 
-// FailedPrecondition indicates that a precondition for the operation was not met
-// This is a more specific version of InvalidRequest, where the request is valid, but the system
+// PreconditionFailedError indicates that a precondition for the operation was not met
+// This is a more specific version of InvalidRequestError, where the request is valid, but the system
 // is not currently in a state to fulfill the request (but may be in the future).
-type FailedPrecondition struct {
+type PreconditionFailedError struct {
 	err error
 }
 
-func NewFailedPrecondition(err error) FailedPrecondition {
-	return FailedPrecondition{err: err}
+func NewPreconditionFailedError(err error) PreconditionFailedError {
+	return PreconditionFailedError{err: err}
 }
 
-func (e FailedPrecondition) Error() string {
+func (e PreconditionFailedError) Error() string {
 	return fmt.Sprintf("precondition failed: %v", e.err)
 }
 
-func (e FailedPrecondition) Unwrap() error {
+func (e PreconditionFailedError) Unwrap() error {
 	return e.err
 }
 
-func (e FailedPrecondition) accessSentinel() {}
+func (e PreconditionFailedError) accessSentinel() {}
 
-func IsPreconditionFailed(err error) bool {
-	var errPreconditionFailed FailedPrecondition
+func IsPreconditionFailedError(err error) bool {
+	var errPreconditionFailed PreconditionFailedError
 	return errors.As(err, &errPreconditionFailed)
+}
+
+// RequestCanceledError indicates that the request was canceled before the server finished processing it
+type RequestCanceledError struct {
+	err error
+}
+
+func NewRequestCanceledError(err error) RequestCanceledError {
+	return RequestCanceledError{err: err}
+}
+
+func (e RequestCanceledError) Error() string {
+	return fmt.Sprintf("request canceled: %v", e.err)
+}
+
+func (e RequestCanceledError) Unwrap() error {
+	return e.err
+}
+
+func (e RequestCanceledError) accessSentinel() {}
+
+func IsRequestCanceledError(err error) bool {
+	var requestCanceledError RequestCanceledError
+	return errors.As(err, &requestCanceledError)
+}
+
+// RequestTimedOutError indicates that the request timed out before the server finished processing it
+type RequestTimedOutError struct {
+	err error
+}
+
+func NewRequestTimedOutError(err error) RequestTimedOutError {
+	return RequestTimedOutError{err: err}
+}
+
+func (e RequestTimedOutError) Error() string {
+	return fmt.Sprintf("request timedout: %v", e.err)
+}
+
+func (e RequestTimedOutError) Unwrap() error {
+	return e.err
+}
+
+func (e RequestTimedOutError) accessSentinel() {}
+
+func IsRequestTimedOutError(err error) bool {
+	var requestTimedOutError RequestTimedOutError
+	return errors.As(err, &requestTimedOutError)
 }

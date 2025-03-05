@@ -1,7 +1,6 @@
 package common
 
 import (
-	"context"
 	"errors"
 	"net/http"
 
@@ -77,19 +76,19 @@ func ErrorToStatusError(err error) StatusError {
 	}
 
 	switch {
-	case access.IsInvalidRequest(err):
+	case access.IsInvalidRequestError(err):
 		return NewBadRequestError(err)
-	case access.IsDataNotFound(err):
+	case access.IsDataNotFoundError(err):
 		return NewNotFoundError(err.Error(), err)
-	case access.IsPreconditionFailed(err):
+	case access.IsPreconditionFailedError(err):
 		return NewRestError(http.StatusPreconditionFailed, err.Error(), err)
 	case access.IsOutOfRangeError(err):
 		return NewNotFoundError(err.Error(), err)
 	case access.IsInternalError(err):
 		return NewRestError(http.StatusInternalServerError, err.Error(), err)
-	case errors.Is(err, context.Canceled):
+	case access.IsRequestCanceledError(err):
 		return NewRestError(http.StatusRequestTimeout, "Request canceled", err)
-	case errors.Is(err, context.DeadlineExceeded):
+	case access.IsRequestTimedOutError(err):
 		return NewRestError(http.StatusRequestTimeout, "Request deadline exceeded", err)
 	default:
 		return NewRestError(http.StatusInternalServerError, err.Error(), err)

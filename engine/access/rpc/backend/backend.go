@@ -355,7 +355,7 @@ func (b *Backend) GetNodeVersionInfo(ctx context.Context) (*accessmodel.NodeVers
 // GetCollectionByID returns a light collection by its ID.
 //
 // Expected errors:
-// - access.DataNotFound if the collection is not found.
+// - access.DataNotFoundError if the collection is not found.
 //
 // All errors can be considered benign. Exceptions are handled explicitly within the backend and are
 // not propagated.
@@ -365,7 +365,7 @@ func (b *Backend) GetCollectionByID(ctx context.Context, colID flow.Identifier) 
 		// Collections are retrieved asynchronously as we finalize blocks, so it is possible to get
 		// a storage.ErrNotFound for a collection within a finalized block. Clients should retry.
 		err = access.RequireErrorIs(ctx, err, storage.ErrNotFound)
-		return nil, access.NewDataNotFound("collection", fmt.Errorf("please retry for collection in finalized block: %w", err))
+		return nil, access.NewDataNotFoundError("collection", fmt.Errorf("please retry for collection in finalized block: %w", err))
 	}
 
 	return col, nil
@@ -374,7 +374,7 @@ func (b *Backend) GetCollectionByID(ctx context.Context, colID flow.Identifier) 
 // GetFullCollectionByID returns a full collection by its ID.
 //
 // Expected errors:
-// - access.DataNotFound if the collection is not found.
+// - access.DataNotFoundError if the collection is not found.
 //
 // All errors can be considered benign. Exceptions are handled explicitly within the backend and are
 // not propagated.
@@ -384,7 +384,7 @@ func (b *Backend) GetFullCollectionByID(ctx context.Context, colID flow.Identifi
 		// Collections are retrieved asynchronously as we finalize blocks, so it is possible to get
 		// a storage.ErrNotFound for a collection within a finalized block. Clients should retry.
 		err = access.RequireErrorIs(ctx, err, storage.ErrNotFound)
-		return nil, access.NewDataNotFound("collection", fmt.Errorf("please retry for collection in finalized block: %w", err))
+		return nil, access.NewDataNotFoundError("collection", fmt.Errorf("please retry for collection in finalized block: %w", err))
 	}
 
 	return col, nil

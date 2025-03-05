@@ -46,9 +46,9 @@ func (b *backendNetwork) GetLatestProtocolStateSnapshot(ctx context.Context) ([]
 // The requested block must be finalized, otherwise an error is returned.
 //
 // Expected errors during normal operation:
-//   - access.DataNotFound - No block with the given ID was found
-//   - access.InvalidRequest - Block ID is for an orphaned block and will never have a valid snapshot
-//   - access.FailedPrecondition - A block was found, but it is not finalized and is above the finalized height.
+//   - access.DataNotFoundError - No block with the given ID was found
+//   - access.InvalidRequestError - Block ID is for an orphaned block and will never have a valid snapshot
+//   - access.PreconditionFailedError - A block was found, but it is not finalized and is above the finalized height.
 //
 // All errors can be considered benign. Exceptions are handled explicitly within the backend and are
 // not propagated.
@@ -61,7 +61,7 @@ func (b *backendNetwork) GetProtocolStateSnapshotByBlockID(ctx context.Context, 
 		// storage.ErrNotFound is specifically NOT allowed since the snapshot's reference block must exist
 		// within the snapshot.
 		err = access.RequireErrorIs(ctx, err, state.ErrUnknownSnapshotReference)
-		return nil, access.NewDataNotFound("snapshot", fmt.Errorf("failed to retrieve a valid snapshot: block not found"))
+		return nil, access.NewDataNotFoundError("snapshot", fmt.Errorf("failed to retrieve a valid snapshot: block not found"))
 	}
 
 	// Because there is no index from block ID to finalized height, we separately look up the finalized
@@ -73,7 +73,7 @@ func (b *backendNetwork) GetProtocolStateSnapshotByBlockID(ctx context.Context, 
 
 		// The block exists, but no block has been finalized at its height. Therefore, this block
 		// may be finalized in the future, and the client can retry.
-		return nil, access.NewFailedPrecondition(
+		return nil, access.NewPreconditionFailedError(
 			fmt.Errorf("failed to retrieve snapshot for block with height %d: block not finalized and is above finalized height",
 				snapshotHeadByBlockId.Height))
 	}
@@ -81,7 +81,7 @@ func (b *backendNetwork) GetProtocolStateSnapshotByBlockID(ctx context.Context, 
 	if blockIDFinalizedAtHeight != blockID {
 		// A different block than what was queried has been finalized at this height.
 		// Therefore, the queried block will never be finalized.
-		return nil, access.NewInvalidRequest(fmt.Errorf("failed to retrieve snapshot for block: block not finalized and is below finalized height"))
+		return nil, access.NewInvalidRequestError(fmt.Errorf("failed to retrieve snapshot for block: block not finalized and is below finalized height"))
 	}
 
 	data, err := convert.SnapshotToBytes(snapshot)
@@ -95,7 +95,7 @@ func (b *backendNetwork) GetProtocolStateSnapshotByBlockID(ctx context.Context, 
 // The block must be finalized (otherwise the by-height query is ambiguous).
 //
 // Expected errors during normal operation:
-//   - access.DataNotFound - No finalized block with the given height was found.
+//   - access.DataNotFoundError - No finalized block with the given height was found.
 //
 // All errors can be considered benign. Exceptions are handled explicitly within the backend and are
 // not propagated.
@@ -108,7 +108,7 @@ func (b *backendNetwork) GetProtocolStateSnapshotByHeight(ctx context.Context, b
 		// storage.ErrNotFound is specifically NOT allowed since the snapshot's reference block must exist
 		// within the snapshot.
 		err = access.RequireErrorIs(ctx, err, state.ErrUnknownSnapshotReference)
-		return nil, access.NewDataNotFound("snapshot", fmt.Errorf("failed to retrieve a valid snapshot: block not found"))
+		return nil, access.NewDataNotFoundError("snapshot", fmt.Errorf("failed to retrieve a valid snapshot: block not found"))
 	}
 
 	data, err := convert.SnapshotToBytes(snapshot)

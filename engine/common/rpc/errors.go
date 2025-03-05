@@ -27,19 +27,19 @@ func ErrorToStatus(err error) error {
 	}
 
 	switch {
-	case access.IsInvalidRequest(err):
+	case access.IsInvalidRequestError(err):
 		return status.Error(codes.InvalidArgument, err.Error())
-	case access.IsDataNotFound(err):
+	case access.IsDataNotFoundError(err):
 		return status.Error(codes.NotFound, err.Error())
-	case access.IsPreconditionFailed(err):
+	case access.IsPreconditionFailedError(err):
 		return status.Error(codes.FailedPrecondition, err.Error())
 	case access.IsOutOfRangeError(err):
 		return status.Error(codes.OutOfRange, err.Error())
 	case access.IsInternalError(err):
 		return status.Error(codes.Internal, err.Error())
-	case errors.Is(err, context.Canceled):
+	case access.IsRequestCanceledError(err):
 		return status.Error(codes.Canceled, err.Error())
-	case errors.Is(err, context.DeadlineExceeded):
+	case access.IsRequestTimedOutError(err):
 		return status.Error(codes.DeadlineExceeded, err.Error())
 	default:
 		// all errors should have explicit sentinels. reporting them as `Unknown` will make them easier to find and fix.

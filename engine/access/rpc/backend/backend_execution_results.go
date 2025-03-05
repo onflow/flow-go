@@ -16,7 +16,7 @@ func (b *backendExecutionResults) GetExecutionResultForBlockID(ctx context.Conte
 	result, err := b.executionResults.ByBlockID(blockID)
 	if err != nil {
 		err = access.RequireErrorIs(ctx, err, storage.ErrNotFound)
-		return nil, access.NewDataNotFound("execution result", err)
+		return nil, access.NewDataNotFoundError("execution result", err)
 	}
 
 	return result, nil
@@ -27,7 +27,7 @@ func (b *backendExecutionResults) GetExecutionResultByID(ctx context.Context, id
 	result, err := b.executionResults.ByID(id)
 	if err != nil {
 		err = access.RequireErrorIs(ctx, err, storage.ErrNotFound)
-		return nil, access.NewDataNotFound("execution result", err)
+		return nil, access.NewDataNotFoundError("execution result", err)
 	}
 
 	return result, nil
