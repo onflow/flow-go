@@ -283,11 +283,15 @@ func (mc *MalleabilityChecker) generateRandomReflectValue(field reflect.Value) e
 		}
 		return mc.generateRandomReflectValue(field.Elem()) // modify underlying value
 	case reflect.Struct:
-		generatedValue := reflect.ValueOf(generateCustomFlowValue(field))
-		if !generatedValue.IsValid() {
-			return fmt.Errorf("cannot generate random value for struct: %s", field.Type().String())
+		// if we are dealing with a struct, we need to go through all fields and generate random values for them
+		// if the field is another struct, we will deal with it recursively.
+		for i := 0; i < field.NumField(); i++ {
+			structField := field.Field(i)
+			err := mc.generateRandomReflectValue(structField)
+			if err != nil {
+				return fmt.Errorf("cannot generate random value for struct field: %s", field.Type().String())
+			}
 		}
-		field.Set(generatedValue)
 	case reflect.Interface:
 		generatedValue := reflect.ValueOf(generateInterfaceFlowValue(field)) // it's always a pointer
 		if !generatedValue.IsValid() {
