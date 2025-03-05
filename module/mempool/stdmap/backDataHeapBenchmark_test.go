@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	lru "github.com/hashicorp/golang-lru"
+	lru "github.com/hashicorp/golang-lru/v2"
 	zlog "github.com/rs/zerolog/log"
 	"github.com/stretchr/testify/require"
 
@@ -96,7 +96,7 @@ func testAddEntities(t testing.TB, limit uint, b *stdmap.Backend[flow.Identifier
 		}
 
 		// entity should be immediately retrievable
-		actual, ok := b.ByID(e.ID())
+		actual, ok := b.Get(e.ID())
 		require.True(t, ok)
 		require.Equal(t, *e, actual)
 	}
@@ -109,7 +109,7 @@ func testAddEntities(t testing.TB, limit uint, b *stdmap.Backend[flow.Identifier
 // this is used only as an experimental baseline, and so it's not exported for
 // production.
 type baselineLRU[K comparable, V any] struct {
-	c     *lru.Cache // used to incorporate an LRU cache
+	c     *lru.Cache[K, V] // used to incorporate an LRU cache
 	limit int
 
 	// atomicAdjustMutex is used to synchronize concurrent access to the
@@ -120,7 +120,7 @@ type baselineLRU[K comparable, V any] struct {
 
 func newBaselineLRU[K comparable, V any](limit int) *baselineLRU[K, V] {
 	var err error
-	c, err := lru.New(limit)
+	c, err := lru.New[K, V](limit)
 	if err != nil {
 		panic(err)
 	}
@@ -131,7 +131,7 @@ func newBaselineLRU[K comparable, V any](limit int) *baselineLRU[K, V] {
 	}
 }
 
-// Has checks if we already contain the item with the given hash.
+// Has checks if backdata already stores a value under the given key.
 func (b *baselineLRU[K, V]) Has(key K) bool {
 	_, ok := b.c.Get(key)
 	return ok
@@ -144,11 +144,10 @@ func (b *baselineLRU[K, V]) Add(key K, value V) bool {
 }
 
 // Remove will remove the item with the given hash.
-func (b *baselineLRU[K, V]) Remove(key K) (V, bool) {
+func (b *baselineLRU[K, V]) Remove(key K) (value V, removed bool) {
 	value, ok := b.c.Get(key)
 	if !ok {
-		var zero V
-		return zero, false
+		return value, false
 	}
 
 	return value, b.c.Remove(key)
@@ -156,16 +155,15 @@ func (b *baselineLRU[K, V]) Remove(key K) (V, bool) {
 
 // Adjust will adjust the value item using the given function if the given key can be found.
 // Returns a bool which indicates whether the value was updated as well as the updated value
-func (b *baselineLRU[K, V]) Adjust(key K, f func(V) (K, V)) (V, bool) {
+func (b *baselineLRU[K, V]) Adjust(key K, f func(V) V) (value V, ok bool) {
 	value, removed := b.Remove(key)
 	if !removed {
-		var zero V
-		return zero, false
+		return value, false
 	}
 
-	newKey, newValue := f(value)
+	newValue := f(value)
 
-	b.Add(newKey, newValue)
+	b.Add(key, newValue)
 
 	return newValue, true
 }
@@ -176,7 +174,7 @@ func (b *baselineLRU[K, V]) Adjust(key K, f func(V) (K, V)) (V, bool) {
 // a bool indicating whether the value was initialized.
 // Note: this is a benchmark helper, hence, the adjust-with-init provides serializability w.r.t other concurrent adjust-with-init or get-with-init operations,
 // and does not provide serializability w.r.t concurrent add, adjust or get operations.
-func (b *baselineLRU[K, V]) AdjustWithInit(key K, adjust func(V) (K, V), init func() V) (V, bool) {
+func (b *baselineLRU[K, V]) AdjustWithInit(key K, adjust func(V) V, init func() V) (value V, ok bool) {
 	b.atomicAdjustMutex.Lock()
 	defer b.atomicAdjustMutex.Unlock()
 
@@ -185,32 +183,16 @@ func (b *baselineLRU[K, V]) AdjustWithInit(key K, adjust func(V) (K, V), init fu
 	}
 	added := b.Add(key, init())
 	if !added {
-		var zero V
-		return zero, false
+		return value, false
 	}
 	return b.Adjust(key, adjust)
 }
 
-// GetWithInit will retrieve the value item if the given key can be found.
-// If the key is not found, the init function will be called to create a new value.
-// Returns a bool which indicates whether the entity was found (or created).
-func (b *baselineLRU[K, V]) GetWithInit(key K, init func() V) (V, bool) {
-	newE := init()
-	value, ok, _ := b.c.PeekOrAdd(key, newE)
+// Get returns the given item from the pool.
+func (b *baselineLRU[K, V]) Get(key K) (value V, ok bool) {
+	value, ok = b.c.Get(key)
 	if !ok {
-		// if the entity was not found, it means that the new entity was added to the cache.
-		return newE, true
-	}
-	// if the entity was found, it means that the new entity was not added to the cache.
-	return value, true
-}
-
-// ByID returns the given item from the pool.
-func (b *baselineLRU[K, V]) ByID(key K) (V, bool) {
-	value, ok := b.c.Get(key)
-	if !ok {
-		var zero V
-		return zero, false
+		return value, false
 	}
 
 	return value, ok
@@ -226,7 +208,7 @@ func (b *baselineLRU[K, V]) All() map[K]V {
 	all := make(map[K]V)
 	for _, key := range b.c.Keys() {
 
-		entity, ok := b.ByID(key)
+		entity, ok := b.Get(key)
 		if !ok {
 			panic("could not retrieve value from mempool")
 		}
@@ -236,7 +218,7 @@ func (b *baselineLRU[K, V]) All() map[K]V {
 	return all
 }
 
-func (b *baselineLRU[K, V]) Identifiers() []K {
+func (b *baselineLRU[K, V]) Keys() []K {
 	keys := make([]K, b.c.Len())
 	valueKeys := b.c.Keys()
 	total := len(valueKeys)
@@ -246,12 +228,12 @@ func (b *baselineLRU[K, V]) Identifiers() []K {
 	return keys
 }
 
-func (b *baselineLRU[K, V]) Entities() []V {
+func (b *baselineLRU[K, V]) Values() []V {
 	values := make([]V, b.c.Len())
 	valuesIds := b.c.Keys()
 	total := len(valuesIds)
 	for i := 0; i < total; i++ {
-		entity, ok := b.ByID(valuesIds[i])
+		entity, ok := b.Get(valuesIds[i])
 		if !ok {
 			panic("could not retrieve entity from mempool")
 		}
@@ -263,7 +245,7 @@ func (b *baselineLRU[K, V]) Entities() []V {
 // Clear removes all entities from the pool.
 func (b *baselineLRU[K, V]) Clear() {
 	var err error
-	b.c, err = lru.New(b.limit)
+	b.c, err = lru.New[K, V](b.limit)
 	if err != nil {
 		panic(err)
 	}

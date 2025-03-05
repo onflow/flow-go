@@ -36,7 +36,7 @@ func TestAddRemove(t *testing.T) {
 		})
 
 		t.Run("should be able to get first", func(t *testing.T) {
-			gotItem, exists := pool.ByID(item1.ID())
+			gotItem, exists := pool.Get(item1.ID())
 			assert.True(t, exists)
 			assert.Equal(t, item1, gotItem)
 		})
@@ -51,7 +51,9 @@ func TestAddRemove(t *testing.T) {
 		t.Run("should be able to retrieve all", func(t *testing.T) {
 			items := pool.All()
 			require.Len(t, items, 1)
-			assert.Equal(t, item2, items[0])
+			val, exists := items[item2.ID()]
+			require.True(t, exists)
+			assert.Equal(t, item2, val)
 		})
 	})
 }
@@ -65,14 +67,14 @@ func TestAdjust(t *testing.T) {
 		_ = pool.Add(item1.ID(), item1)
 
 		// item2 doesn't exist
-		updatedItem, updated := pool.Adjust(item2.ID(), func(old *unittest.MockEntity) (flow.Identifier, *unittest.MockEntity) {
-			return item2.ID(), item2
+		updatedItem, updated := pool.Adjust(item2.ID(), func(old *unittest.MockEntity) *unittest.MockEntity {
+			return item2
 		})
 
 		assert.False(t, updated)
 		assert.Nil(t, updatedItem)
 
-		_, found := pool.ByID(item2.ID())
+		_, found := pool.Get(item2.ID())
 		assert.False(t, found)
 	})
 
@@ -80,15 +82,15 @@ func TestAdjust(t *testing.T) {
 		pool := stdmap.NewBackend[flow.Identifier, *unittest.MockEntity]()
 		_ = pool.Add(item1.ID(), item1)
 
-		updatedItem, ok := pool.Adjust(item1.ID(), func(old *unittest.MockEntity) (flow.Identifier, *unittest.MockEntity) {
+		updatedItem, ok := pool.Adjust(item1.ID(), func(old *unittest.MockEntity) *unittest.MockEntity {
 			// item 1 exist, got replaced with item2, the value was updated
-			return item2.ID(), item2
+			return item2
 		})
 
 		assert.True(t, ok)
 		assert.Equal(t, updatedItem, item2)
 
-		value2, found := pool.ByID(item2.ID())
+		value2, found := pool.Get(item2.ID())
 		assert.True(t, found)
 		assert.Equal(t, value2, item2)
 	})
@@ -156,7 +158,7 @@ func TestBackend_RegisterEjectionCallback(t *testing.T) {
 	ensureEntityNotInMempool := func(entity *unittest.MockEntity) {
 		id := entity.ID()
 		go func() {
-			e, found := pool.ByID(id)
+			e, found := pool.Get(id)
 			require.False(t, found)
 			require.Nil(t, e)
 		}()
@@ -237,10 +239,10 @@ func TestBackend_AdjustWithInit_Concurrent_HeroCache(t *testing.T) {
 		go func() {
 			defer adjustDone.Done()
 
-			backend.AdjustWithInit(e.ID(), func(entity *unittest.MockEntity) (flow.Identifier, *unittest.MockEntity) {
+			backend.AdjustWithInit(e.ID(), func(entity *unittest.MockEntity) *unittest.MockEntity {
 				// increment nonce of the entity
 				entity.Nonce++
-				return entity.ID(), entity
+				return entity
 			}, func() *unittest.MockEntity {
 				return e
 			})
@@ -250,42 +252,10 @@ func TestBackend_AdjustWithInit_Concurrent_HeroCache(t *testing.T) {
 	unittest.RequireReturnsBefore(t, adjustDone.Wait, 1*time.Second, "failed to adjust elements in time")
 
 	for _, e := range entities {
-		actual, ok := backend.ByID(e.ID())
+		actual, ok := backend.Get(e.ID())
 		require.True(t, ok)
 		require.Equal(t, e.ID(), actual.ID())
 		require.Equal(t, uint64(1), actual.Nonce)
-	}
-}
-
-// TestBackend_GetWithInit_Concurrent tests the GetWithInit method of the Backend with HeroCache as the backdata.
-// It concurrently attempts on adjusting non-existent entities, and verifies that the entities are initialized and retrieved correctly.
-func TestBackend_GetWithInit_Concurrent_HeroCache(t *testing.T) {
-	sizeLimit := uint32(100)
-	backData := herocache.NewCache(sizeLimit, herocache.DefaultOversizeFactor, heropool.LRUEjection, unittest.Logger(), metrics.NewNoopCollector())
-
-	backend := stdmap.NewBackend[flow.Identifier, *unittest.MockEntity](stdmap.WithMutableBackData[flow.Identifier, *unittest.MockEntity](backData))
-	entities := unittest.EntityListFixture(100)
-	adjustDone := sync.WaitGroup{}
-	for _, e := range entities {
-		adjustDone.Add(1)
-		e := e // capture range variable
-		go func() {
-			defer adjustDone.Done()
-
-			entity, ok := backend.GetWithInit(e.ID(), func() *unittest.MockEntity {
-				return e
-			})
-			require.True(t, ok)
-			require.Equal(t, e.ID(), entity.ID())
-		}()
-	}
-
-	unittest.RequireReturnsBefore(t, adjustDone.Wait, 1*time.Second, "failed to get-with-init elements in time")
-
-	for _, e := range entities {
-		actual, ok := backend.ByID(e.ID())
-		require.True(t, ok)
-		require.Equal(t, e.ID(), actual.ID())
 	}
 }
 
@@ -303,10 +273,10 @@ func TestBackend_AdjustWithInit_Concurrent_MapBased(t *testing.T) {
 		go func() {
 			defer adjustDone.Done()
 
-			backend.AdjustWithInit(e.ID(), func(entity *unittest.MockEntity) (flow.Identifier, *unittest.MockEntity) {
+			backend.AdjustWithInit(e.ID(), func(entity *unittest.MockEntity) *unittest.MockEntity {
 				// increment nonce of the entity
 				entity.Nonce++
-				return entity.ID(), entity
+				return entity
 			}, func() *unittest.MockEntity {
 				return e
 			})
@@ -316,44 +286,15 @@ func TestBackend_AdjustWithInit_Concurrent_MapBased(t *testing.T) {
 	unittest.RequireReturnsBefore(t, adjustDone.Wait, 1*time.Second, "failed to adjust elements in time")
 
 	for _, e := range entities {
-		actual, ok := backend.ByID(e.ID())
+		actual, ok := backend.Get(e.ID())
 		require.True(t, ok)
 		require.Equal(t, e.ID(), actual.ID())
 		require.Equal(t, uint64(1), actual.Nonce)
 	}
 }
 
-// TestBackend_GetWithInit_Concurrentt_MapBased tests the GetWithInit method of the Backend with golang map as the backdata.
-// It concurrently attempts on adjusting non-existent entities, and verifies that the entities are initialized and retrieved correctly.
-func TestBackend_GetWithInit_Concurrent_MapBased(t *testing.T) {
-	sizeLimit := uint(100)
-	backend := stdmap.NewBackend[flow.Identifier, *unittest.MockEntity](stdmap.WithLimit[flow.Identifier, *unittest.MockEntity](sizeLimit))
-	entities := unittest.EntityListFixture(100)
-	adjustDone := sync.WaitGroup{}
-	for _, e := range entities {
-		adjustDone.Add(1)
-		e := e // capture range variable
-		go func() {
-			defer adjustDone.Done()
-
-			entity, ok := backend.GetWithInit(e.ID(), func() *unittest.MockEntity {
-				return e
-			})
-			require.True(t, ok)
-			require.Equal(t, e.ID(), entity.ID())
-		}()
-	}
-
-	unittest.RequireReturnsBefore(t, adjustDone.Wait, 1*time.Second, "failed to get-with-init elements in time")
-
-	for _, e := range entities {
-		actual, ok := backend.ByID(e.ID())
-		require.True(t, ok)
-		require.Equal(t, e.ID(), actual.ID())
-	}
-}
-
 func addRandomEntities(t *testing.T, backend *stdmap.Backend[flow.Identifier, *unittest.MockEntity], num int) {
+
 	// add swarm-number of items to backend
 	wg := sync.WaitGroup{}
 	wg.Add(num)
@@ -380,7 +321,7 @@ func TestBackend_All(t *testing.T) {
 	all := backend.All()
 	require.Equal(t, len(entities), len(all))
 	for _, expected := range entities {
-		actual, ok := backend.ByID(expected.ID())
+		actual, ok := backend.Get(expected.ID())
 		require.True(t, ok)
 		require.Equal(t, expected, actual)
 	}
