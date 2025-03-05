@@ -60,7 +60,7 @@ type slotBucket struct {
 
 // Cache implements an array-based generic memory pool backed by a fixed total array.
 // Note that this implementation is NOT thread-safe, and the higher-level Backend is responsible for concurrency management.
-type Cache struct {
+type Cache[K comparable, V any] struct {
 	logger    zerolog.Logger
 	collector module.HeroCacheMetrics
 	// NOTE: as a BackData implementation, Cache must be non-blocking.
@@ -72,7 +72,7 @@ type Cache struct {
 	// buckets keeps the slots (i.e., entityId) of the (entityId, entity) pairs that are maintained in this BackData.
 	buckets []slotBucket
 	// entities keeps the values (i.e., entity) of the (entityId, entity) pairs that are maintained in this BackData.
-	entities *heropool.Pool
+	entities *heropool.Pool[K, V]
 	// telemetry
 	//
 	// availableSlotHistogram[i] represents number of buckets with i
