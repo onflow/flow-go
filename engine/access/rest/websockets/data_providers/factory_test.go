@@ -134,7 +134,7 @@ func (s *DataProviderFactorySuite) TestSupportedTopics() {
 		{
 			name:      "transaction statuses topic",
 			topic:     TransactionStatusesTopic,
-			arguments: models.Arguments{},
+			arguments: models.Arguments{"tx_id": unittest.IdentifierFixture().String()},
 			setupSubscription: func() {
 				s.setupSubscription(s.accessApi.On("SubscribeTransactionStatuses", mock.Anything, mock.Anything, mock.Anything))
 			},
