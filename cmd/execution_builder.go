@@ -54,6 +54,7 @@ import (
 	"github.com/onflow/flow-go/engine/execution/ingestion/fetcher"
 	"github.com/onflow/flow-go/engine/execution/ingestion/stop"
 	"github.com/onflow/flow-go/engine/execution/ingestion/uploader"
+	"github.com/onflow/flow-go/engine/execution/migration"
 	exeprovider "github.com/onflow/flow-go/engine/execution/provider"
 	exepruner "github.com/onflow/flow-go/engine/execution/pruner"
 	"github.com/onflow/flow-go/engine/execution/rpc"
@@ -217,8 +218,8 @@ func (builder *ExecutionNodeBuilder) LoadComponentsAndModules() {
 		Module("blobservice peer manager dependencies", exeNode.LoadBlobservicePeerManagerDependencies).
 		Module("bootstrap", exeNode.LoadBootstrapper).
 		Module("register store", exeNode.LoadRegisterStore).
+		Module("migrate last executed block", exeNode.MigrateLastSealedExecutedResultToPebble).
 		Component("execution state ledger", exeNode.LoadExecutionStateLedger).
-
 		// TODO: Modules should be able to depends on components
 		// Because all modules are always bootstrapped first, before components,
 		// its not possible to have a module depending on a Component.
@@ -722,6 +723,16 @@ func (exeNode *ExecutionNode) LoadExecutionDataGetter(node *NodeConfig) error {
 	return nil
 }
 
+func (exeNode *ExecutionNode) MigrateLastSealedExecutedResultToPebble(node *NodeConfig) error {
+	// Migrate the last sealed executed
+	err := migration.MigrateLastSealedExecutedResultToPebble(node.Logger, node.DB, node.PebbleDB, node.State)
+	if err != nil {
+		return fmt.Errorf("could not migrate last sealed executed result to pebble: %w", err)
+	}
+
+	return nil
+}
+
 func (exeNode *ExecutionNode) LoadExecutionState(
 	node *NodeConfig,
 ) (
@@ -756,6 +767,8 @@ func (exeNode *ExecutionNode) LoadExecutionState(
 	}
 	exeNode.chunkDataPackDB = chunkDataPackDB
 	exeNode.chunkDataPacks = chunkDataPacks
+
+	// migrate execution data for last sealed and executed block
 
 	exeNode.executionState = state.NewExecutionState(
 		exeNode.ledgerStorage,
