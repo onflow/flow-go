@@ -19,9 +19,12 @@ import (
 	"github.com/onflow/flow-go/storage/store"
 )
 
-// MigrateLastSealedExecutedResultToPebble copy the execution data, such events, transaction results etc
-// for the last executed and sealed block from badger to pebble
+// MigrateLastSealedExecutedResultToPebble copy execution data of the last sealed and executed block from badger to pebble.
+// the execution data includes the execution result and statecommitment, which is the minimum data needed from the database
+// to be able to continue executing the next block
 func MigrateLastSealedExecutedResultToPebble(logger zerolog.Logger, badgerDB *badger.DB, pebbleDB *pebble.DB, ps protocol.State) error {
+	// TODO: skip migration in the next spork
+
 	bdb := badgerimpl.ToDB(badgerDB)
 	pdb := pebbleimpl.ToDB(pebbleDB)
 	lg := logger.With().Str("module", "badger-pebble-migration").Logger()
@@ -45,30 +48,25 @@ func MigrateLastSealedExecutedResultToPebble(logger zerolog.Logger, badgerDB *ba
 		header.Height, blockID)
 
 	// create badger storage modules
-	badgerEvents, badgerServiceEvents, badgerTransactionResults, badgerMyReceipts, badgerCommits := createStores(bdb)
+	badgerResults, badgerCommits := createStores(bdb)
 	// read data from badger
-	events, serviceEvents, transactionResults, receipt, commit, err := readResultsForBlock(
-		blockID, badgerEvents, badgerServiceEvents, badgerTransactionResults, badgerMyReceipts, badgerCommits)
+	result, commit, err := readResultsForBlock(blockID, badgerResults, badgerCommits)
+
+	if err != nil {
+		return fmt.Errorf("failed to read data from badger: %w", err)
+	}
 
 	// create pebble storage modules
-	pebbleEvents, pebbleServiceEvents, pebbleTransactionResults, pebbleReceipts, pebbleCommits := createStores(pdb)
+	pebbleResults, pebbleCommits := createStores(pdb)
 
 	// store data to pebble in a batch update
 	err = pdb.WithReaderBatchWriter(func(batch storage.ReaderBatchWriter) error {
-		if err := pebbleEvents.BatchStore(blockID, []flow.EventsList{events}, batch); err != nil {
-			return fmt.Errorf("failed to store events for block %s: %w", blockID, err)
-		}
-
-		if err := pebbleServiceEvents.BatchStore(blockID, serviceEvents, batch); err != nil {
-			return fmt.Errorf("failed to store service events for block %s: %w", blockID, err)
-		}
-
-		if err := pebbleTransactionResults.BatchStore(blockID, transactionResults, batch); err != nil {
-			return fmt.Errorf("failed to store transaction results for block %s: %w", blockID, err)
-		}
-
-		if err := pebbleReceipts.BatchStoreMyReceipt(receipt, batch); err != nil {
+		if err := pebbleResults.BatchStore(result, batch); err != nil {
 			return fmt.Errorf("failed to store receipt for block %s: %w", blockID, err)
+		}
+
+		if err := pebbleResults.BatchIndex(blockID, result.ID(), batch); err != nil {
+			return fmt.Errorf("failed to index result for block %s: %w", blockID, err)
 		}
 
 		if err := pebbleCommits.BatchStore(blockID, commit, batch); err != nil {
@@ -127,64 +125,23 @@ func MigrateLastSealedExecutedResultToPebble(logger zerolog.Logger, badgerDB *ba
 }
 
 func readResultsForBlock(
-	blockID flow.Identifier,
-	eventsStore storage.Events,
-	serviceEventsStore storage.ServiceEvents,
-	transactionResultsStore storage.TransactionResults,
-	myReceiptsStore storage.MyExecutionReceipts,
-	commitsStore storage.Commits,
-) (
-	[]flow.Event,
-	[]flow.Event,
-	[]flow.TransactionResult,
-	*flow.ExecutionReceipt,
-	flow.StateCommitment,
-	error,
-) {
-
-	// read data from badger
-	events, err := eventsStore.ByBlockID(blockID)
+	blockID flow.Identifier, resultsStore storage.ExecutionResults, commitsStore storage.Commits) (
+	*flow.ExecutionResult, flow.StateCommitment, error) {
+	result, err := resultsStore.ByBlockID(blockID)
 	if err != nil {
-		return nil, nil, nil, nil, flow.DummyStateCommitment, fmt.Errorf("failed to get events for block %s: %w", blockID, err)
-	}
-
-	serviceEvents, err := serviceEventsStore.ByBlockID(blockID)
-	if err != nil {
-		return nil, nil, nil, nil, flow.DummyStateCommitment, fmt.Errorf("failed to get service events for block %s: %w", blockID, err)
-	}
-
-	transactionResults, err := transactionResultsStore.ByBlockID(blockID)
-	if err != nil {
-		return nil, nil, nil, nil, flow.DummyStateCommitment, fmt.Errorf("failed to get transaction results for block %s: %w", blockID, err)
-	}
-
-	receipt, err := myReceiptsStore.MyReceipt(blockID)
-	if err != nil {
-		return nil, nil, nil, nil, flow.DummyStateCommitment, fmt.Errorf("failed to get receipt for block %s: %w", blockID, err)
+		return nil, flow.DummyStateCommitment, fmt.Errorf("failed to get receipt for block %s: %w", blockID, err)
 	}
 
 	commit, err := commitsStore.ByBlockID(blockID)
 	if err != nil {
-		return nil, nil, nil, nil, flow.DummyStateCommitment, fmt.Errorf("failed to get commit for block %s: %w", blockID, err)
+		return nil, flow.DummyStateCommitment, fmt.Errorf("failed to get commit for block %s: %w", blockID, err)
 	}
-	return events, serviceEvents, transactionResults, receipt, commit, nil
+	return result, commit, nil
 }
 
-func createStores(db storage.DB) (
-	storage.Events,
-	storage.ServiceEvents,
-	storage.TransactionResults,
-	storage.MyExecutionReceipts,
-	storage.Commits,
-) {
-
+func createStores(db storage.DB) (storage.ExecutionResults, storage.Commits) {
 	noop := metrics.NewNoopCollector()
-	events := store.NewEvents(noop, db)
-	serviceEvents := store.NewServiceEvents(noop, db)
-	transactionResults := store.NewTransactionResults(noop, db, 1)
 	results := store.NewExecutionResults(noop, db)
-	receipts := store.NewExecutionReceipts(noop, db, results, 1)
-	myReceipts := store.NewMyExecutionReceipts(noop, db, receipts)
 	commits := store.NewCommits(noop, db)
-	return events, serviceEvents, transactionResults, myReceipts, commits
+	return results, commits
 }

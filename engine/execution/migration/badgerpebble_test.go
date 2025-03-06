@@ -100,9 +100,9 @@ func TestMigrateLastSealedExecutedResultToPebble(t *testing.T) {
 			require.NoError(t, err)
 
 			// read the saved results before migration
-			badgerEvents, badgerServiceEvents, badgerTransactionResults, badgerMyReceipts, badgerCommits := createStores(badgerimpl.ToDB(bdb))
-			bevents, bserviceEvents, btransactionResults, breceipt, bcommit, err := readResultsForBlock(
-				header.ID(), badgerEvents, badgerServiceEvents, badgerTransactionResults, badgerMyReceipts, badgerCommits)
+			badgerResults, badgerCommits := createStores(badgerimpl.ToDB(bdb))
+			bresult, bcommit, err := readResultsForBlock(
+				header.ID(), badgerResults, badgerCommits)
 			require.NoError(t, err)
 
 			// mock that the executed block is the last executed and sealed block
@@ -128,17 +128,13 @@ func TestMigrateLastSealedExecutedResultToPebble(t *testing.T) {
 			require.NoError(t, MigrateLastSealedExecutedResultToPebble(unittest.Logger(), bdb, pdb, ps))
 
 			// read the migrated results after migration
-			pebbleEvents, pebbleServiceEvents, pebbleTransactionResults, pebbleReceipts, pebbleCommits :=
-				createStores(pebbleimpl.ToDB(pdb))
-			pevents, pserviceEvents, ptransactionResults, preceipt, pcommit, err := readResultsForBlock(
-				header.ID(), pebbleEvents, pebbleServiceEvents, pebbleTransactionResults, pebbleReceipts, pebbleCommits)
+			pebbleResults, pebbleCommits := createStores(pebbleimpl.ToDB(pdb))
+			presult, pcommit, err := readResultsForBlock(
+				header.ID(), pebbleResults, pebbleCommits)
 			require.NoError(t, err)
 
 			// compare the migrated results
-			require.Equal(t, bevents, pevents)
-			require.Equal(t, bserviceEvents, pserviceEvents)
-			require.Equal(t, btransactionResults, ptransactionResults)
-			require.Equal(t, breceipt, preceipt)
+			require.Equal(t, bresult, presult)
 			require.Equal(t, bcommit, pcommit)
 		})
 	})

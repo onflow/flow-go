@@ -726,7 +726,7 @@ func (exeNode *ExecutionNode) LoadExecutionDataGetter(node *NodeConfig) error {
 
 func (exeNode *ExecutionNode) MigrateLastSealedExecutedResultToPebble(node *NodeConfig) error {
 	// Migrate the last sealed executed
-	err := migration.MigrateLastSealedExecutedResultToPebble(node.Logger, node.badgerDB, node.pebbleDB, node.State)
+	err := migration.MigrateLastSealedExecutedResultToPebble(node.Logger, node.DB, node.PebbleDB, node.State)
 	if err != nil {
 		return fmt.Errorf("could not migrate last sealed executed result to pebble: %w", err)
 	}
