@@ -28,7 +28,7 @@ func init() {
 
 var eventsCmd = &cobra.Command{
 	Use:   "events",
-	Short: "Read events from badger",
+	Short: "Read events",
 	Run: func(cmd *cobra.Command, args []string) {
 		err := WithStorage(func(db storage.DB) error {
 			events := store.NewEvents(metrics.NewNoopCollector(), db)
