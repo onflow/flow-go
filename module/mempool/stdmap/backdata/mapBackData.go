@@ -103,22 +103,18 @@ func (b *MapBackData[K, V]) All() map[K]V {
 
 // Keys returns an unordered list of keys stored in the backdata.
 func (b *MapBackData[K, V]) Keys() []K {
-	keys := make([]K, len(b.dataMap))
-	i := 0
+	keys := make([]K, 0, len(b.dataMap))
 	for key := range b.dataMap {
-		keys[i] = key
-		i++
+		keys = append(keys, key)
 	}
 	return keys
 }
 
 // Values returns an unordered list of values stored in the backdata.
 func (b *MapBackData[K, V]) Values() []V {
-	values := make([]V, len(b.dataMap))
-	i := 0
+	values := make([]V, 0, len(b.dataMap))
 	for _, value := range b.dataMap {
-		values[i] = value
-		i++
+		values = append(values, value)
 	}
 	return values
 }
