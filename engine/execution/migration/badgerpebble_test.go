@@ -119,13 +119,15 @@ func TestMigrateLastSealedExecutedResultToPebble(t *testing.T) {
 				func(blockID flow.Identifier) protocol.Snapshot {
 					if blockID == header.ID() {
 						return mockSnapshot
+					} else if blockID == genesis.ID() {
+						return createSnapshot(genesis)
 					}
 					return invalid.NewSnapshot(fmt.Errorf("invalid block: %v", blockID))
 				})
 			ps.On("Sealed", mock.Anything).Return(mockSnapshot)
 
 			// run the migration
-			require.NoError(t, MigrateLastSealedExecutedResultToPebble(unittest.Logger(), bdb, pdb, ps))
+			require.NoError(t, MigrateLastSealedExecutedResultToPebble(unittest.Logger(), bdb, pdb, ps, rootSeal))
 
 			// read the migrated results after migration
 			pebbleResults, pebbleCommits := createStores(pebbleimpl.ToDB(pdb))
