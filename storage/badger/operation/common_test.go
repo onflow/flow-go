@@ -365,7 +365,7 @@ func TestIterate(t *testing.T) {
 		}
 
 		err := db.View(iterate(keys[0], keys[2], iterationFunc))
-		require.Nil(t, err)
+		require.NoError(t, err)
 
 		assert.Equal(t, expected, actual)
 	})
@@ -404,7 +404,7 @@ func TestTraverse(t *testing.T) {
 		}
 
 		err := db.View(traverse([]byte{0x42}, iterationFunc))
-		require.Nil(t, err)
+		require.NoError(t, err)
 
 		assert.Equal(t, expected, actual)
 	})

@@ -253,7 +253,7 @@ func TestEncodableRandomBeaconPrivKeyMsgPack(t *testing.T) {
 func generateRandomSeed(t *testing.T) []byte {
 	seed := make([]byte, 48)
 	n, err := rand.Read(seed)
-	require.Nil(t, err)
+	require.NoError(t, err)
 	require.Equal(t, n, 48)
 	return seed
 }

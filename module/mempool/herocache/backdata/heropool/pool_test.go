@@ -278,7 +278,7 @@ func testAddRemoveEntities(t *testing.T, limit uint32, entityCount uint32, eject
 	// generate ownerId to index in the entities array.
 	for i := 0; i < int(entityCount); i++ {
 		randomOwnerId, err := rand.Uint64()
-		require.Nil(t, err)
+		require.NoError(t, err)
 		ownerIds[i] = randomOwnerId
 	}
 	// this map maintains entities currently stored in the pool.

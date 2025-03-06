@@ -18,21 +18,21 @@ func TestInsertEpochProtocolState(t *testing.T) {
 
 		epochProtocolStateEntryID := expected.ID()
 		err := db.Update(InsertEpochProtocolState(epochProtocolStateEntryID, expected))
-		require.Nil(t, err)
+		require.NoError(t, err)
 
 		var actual flow.MinEpochStateEntry
 		err = db.View(RetrieveEpochProtocolState(epochProtocolStateEntryID, &actual))
-		require.Nil(t, err)
+		require.NoError(t, err)
 
 		assert.Equal(t, expected, &actual)
 
 		blockID := unittest.IdentifierFixture()
 		err = db.Update(IndexEpochProtocolState(blockID, epochProtocolStateEntryID))
-		require.Nil(t, err)
+		require.NoError(t, err)
 
 		var actualProtocolStateID flow.Identifier
 		err = db.View(LookupEpochProtocolState(blockID, &actualProtocolStateID))
-		require.Nil(t, err)
+		require.NoError(t, err)
 
 		assert.Equal(t, epochProtocolStateEntryID, actualProtocolStateID)
 	})

@@ -1,7 +1,9 @@
 package store
 
 import (
+	"errors"
 	"fmt"
+	"sync"
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
@@ -18,11 +20,59 @@ type MyExecutionReceipts struct {
 	genericReceipts storage.ExecutionReceipts
 	db              storage.DB
 	cache           *Cache[flow.Identifier, *flow.ExecutionReceipt]
+	// preventing dirty reads when checking if a different my receipt has been
+	// indexed for the same block
+	indexingMyReceipt *sync.Mutex
 }
 
 // NewMyExecutionReceipts creates instance of MyExecutionReceipts which is a wrapper wrapper around badger.ExecutionReceipts
 // It's useful for execution nodes to keep track of produced execution receipts.
 func NewMyExecutionReceipts(collector module.CacheMetrics, db storage.DB, receipts storage.ExecutionReceipts) *MyExecutionReceipts {
+	indexingMyReceipt := new(sync.Mutex)
+
+	store := func(rw storage.ReaderBatchWriter, blockID flow.Identifier, receipt *flow.ExecutionReceipt) error {
+		// the lock guarantees that no other thread can concurrently update the index.
+		// Note, we should not unlock the lock after this function returns, because the data is not yet persisted, the result
+		// of whether there was a different own receipt for the same block might be stale, therefore, we should not unlock
+		// the lock until the batch is committed.
+
+		// the lock would not cause any deadlock, if
+		// 1) there is no other lock in the batch operation.
+		// 2) or there is other lock in the batch operation, but the locks are acquired and released in the same order.
+		indexingMyReceipt.Lock()
+		rw.AddCallback(func(error) {
+			indexingMyReceipt.Unlock()
+		})
+
+		// assemble DB operations to store receipt (no execution)
+		err := receipts.BatchStore(receipt, rw)
+		if err != nil {
+			return err
+		}
+
+		// assemble DB operations to index receipt as one of my own (no execution)
+		receiptID := receipt.ID()
+
+		var savedReceiptID flow.Identifier
+		err = operation.LookupOwnExecutionReceipt(rw.GlobalReader(), blockID, &savedReceiptID)
+		if err == nil {
+			if savedReceiptID == receiptID {
+				// if we are storing same receipt we shouldn't error
+				return nil
+			}
+
+			return fmt.Errorf("indexing my receipt %v failed: different receipt %v for the same block %v is already indexed", receiptID,
+				savedReceiptID, blockID)
+		}
+
+		// exception
+		if !errors.Is(err, storage.ErrNotFound) {
+			return err
+		}
+
+		return operation.IndexOwnExecutionReceipt(rw.Writer(), blockID, receiptID)
+	}
+
 	retrieve := func(r storage.Reader, blockID flow.Identifier) (*flow.ExecutionReceipt, error) {
 		var receiptID flow.Identifier
 		err := operation.LookupOwnExecutionReceipt(r, blockID, &receiptID)
@@ -41,7 +91,9 @@ func NewMyExecutionReceipts(collector module.CacheMetrics, db storage.DB, receip
 		db:              db,
 		cache: newCache(collector, metrics.ResourceMyReceipt,
 			withLimit[flow.Identifier, *flow.ExecutionReceipt](flow.DefaultTransactionExpiry+100),
+			withStore(store),
 			withRetrieve(retrieve)),
+		indexingMyReceipt: indexingMyReceipt,
 	}
 }
 
@@ -54,19 +106,9 @@ func (m *MyExecutionReceipts) myReceipt(blockID flow.Identifier) (*flow.Executio
 // No errors are expected during normal operation
 // If entity fails marshalling, the error is wrapped in a generic error and returned.
 // If Badger unexpectedly fails to process the request, the error is wrapped in a generic error and returned.
+// If a different my receipt has been indexed for the same block, the error is wrapped in a generic error and returned.
 func (m *MyExecutionReceipts) BatchStoreMyReceipt(receipt *flow.ExecutionReceipt, rw storage.ReaderBatchWriter) error {
-
-	err := m.genericReceipts.BatchStore(receipt, rw)
-	if err != nil {
-		return fmt.Errorf("cannot batch store generic execution receipt inside my execution receipt batch store: %w", err)
-	}
-
-	err = operation.IndexOwnExecutionReceipt(rw.Writer(), receipt.ExecutionResult.BlockID, receipt.ID())
-	if err != nil {
-		return fmt.Errorf("cannot batch index own execution receipt inside my execution receipt batch store: %w", err)
-	}
-
-	return nil
+	return m.cache.PutTx(rw, receipt.ExecutionResult.BlockID, receipt)
 }
 
 // MyReceipt retrieves my receipt for the given block.

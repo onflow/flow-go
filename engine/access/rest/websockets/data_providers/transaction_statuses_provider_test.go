@@ -333,6 +333,7 @@ func (s *TransactionStatusesProviderSuite) TestTransactionStatusesDataProvider_I
 // 2. Providing invalid 'tx_id' value.
 // 3. Providing invalid 'start_block_id'  value.
 // 4. Invalid 'start_block_id' argument.
+// 5. Providing unexpected argument.
 func invalidTransactionStatusesArgumentsTestCases() []testErrType {
 	return []testErrType{
 		{
@@ -363,6 +364,14 @@ func invalidTransactionStatusesArgumentsTestCases() []testErrType {
 				"start_block_height": "-1",
 			},
 			expectedErrorMsg: "value must be an unsigned 64 bit integer",
+		},
+		{
+			name: "unexpected argument",
+			arguments: map[string]interface{}{
+				"start_block_id":      unittest.BlockFixture().ID().String(),
+				"unexpected_argument": "dummy",
+			},
+			expectedErrorMsg: "unexpected field: 'unexpected_argument'",
 		},
 	}
 }

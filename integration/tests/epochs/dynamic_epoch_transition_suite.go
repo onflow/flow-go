@@ -345,8 +345,9 @@ func (s *DynamicEpochTransitionSuite) StakeNewNode(ctx context.Context, env temp
 func (s *DynamicEpochTransitionSuite) AssertInEpochPhase(ctx context.Context, expectedEpoch uint64, expectedPhase flow.EpochPhase) {
 	snapshot, err := s.Client.GetLatestProtocolSnapshot(ctx)
 	require.NoError(s.T(), err)
-	actualEpoch, err := snapshot.Epochs().Current().Counter()
+	epoch, err := snapshot.Epochs().Current()
 	require.NoError(s.T(), err)
+	actualEpoch := epoch.Counter()
 	actualPhase, err := snapshot.EpochPhase()
 	require.NoError(s.T(), err)
 	require.Equal(s.T(), expectedPhase, actualPhase, "not in correct phase")
@@ -359,9 +360,8 @@ func (s *DynamicEpochTransitionSuite) AssertInEpochPhase(ctx context.Context, ex
 
 // AssertNodeNotParticipantInEpoch asserts that the given node ID does not exist
 // in the epoch's identity table.
-func (s *DynamicEpochTransitionSuite) AssertNodeNotParticipantInEpoch(epoch protocol.Epoch, nodeID flow.Identifier) {
-	identities, err := epoch.InitialIdentities()
-	require.NoError(s.T(), err)
+func (s *DynamicEpochTransitionSuite) AssertNodeNotParticipantInEpoch(epoch protocol.TentativeEpoch, nodeID flow.Identifier) {
+	identities := epoch.InitialIdentities()
 	require.NotContains(s.T(), identities.NodeIDs(), nodeID)
 }
 
@@ -525,8 +525,9 @@ func (s *DynamicEpochTransitionSuite) RunTestEpochJoinAndLeave(role flow.Role, c
 	testContainer.WriteRootSnapshot(rootSnapshot)
 	testContainer.Container.Start(s.Ctx)
 
-	epoch1FinalView, err := rootSnapshot.Epochs().Current().FinalView()
+	epoch1, err := rootSnapshot.Epochs().Current()
 	require.NoError(s.T(), err)
+	epoch1FinalView := epoch1.FinalView()
 
 	// wait for at least the first block of the next epoch to be sealed before we pause our container to replace
 	s.TimedLogf("waiting for epoch transition (finalized view %d) before pausing container", epoch1FinalView+1)
@@ -534,7 +535,9 @@ func (s *DynamicEpochTransitionSuite) RunTestEpochJoinAndLeave(role flow.Role, c
 	s.TimedLogf("observed finalized view %d -> pausing container", epoch1FinalView+1)
 
 	// make sure container to replace is not a member of epoch 2
-	s.AssertNodeNotParticipantInEpoch(rootSnapshot.Epochs().Next(), containerToReplace.Config.NodeID)
+	nextEpoch, err := rootSnapshot.Epochs().NextUnsafe()
+	require.NoError(s.T(), err)
+	s.AssertNodeNotParticipantInEpoch(nextEpoch, containerToReplace.Config.NodeID)
 
 	// assert transition to second epoch happened as expected
 	// if counter is still 0, epoch emergency fallback was triggered and we can fail early
