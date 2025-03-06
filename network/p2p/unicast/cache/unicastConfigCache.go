@@ -124,8 +124,7 @@ func (d *UnicastConfigCache) GetWithInit(peerID peer.ID) (*unicast.Config, error
 		}
 	}
 
-	// TODO: UnicastConfigCache implementation will be updated according to new usages in issue https://github.com/onflow/flow-go/issues/7076,
-	// after herocache and Backend implementation will be updated
+	// TODO(malleability, #7076): UnicastConfigCache implementation will be updated according to new usages.
 	var entity flow.Entity
 	err := d.peerCache.Run(func(backData mempool.BackData[flow.Identifier, flow.Entity]) error {
 		val, ok := backData.Get(entityId)
