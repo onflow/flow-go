@@ -64,7 +64,6 @@ func prepareStorehouseTest(f func(t *testing.T, es state.ExecutionState, l *ledg
 			chunkDataPacks := storage.NewChunkDataPacks(t)
 			chunkDataPacks.On("Store", mock.Anything).Return(nil)
 			results := storage.NewExecutionResults(t)
-			results.On("BatchStore", mock.Anything, mock.Anything).Return(nil)
 			results.On("BatchIndex", mock.Anything, mock.Anything, mock.Anything).Return(nil)
 			myReceipts := storage.NewMyExecutionReceipts(t)
 			myReceipts.On("BatchStoreMyReceipt", mock.Anything, mock.Anything).Return(nil)
