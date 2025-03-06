@@ -5,8 +5,9 @@ import (
 	"github.com/onflow/flow-go/storage"
 )
 
-// InsertTransaction inserts a transaction keyed by transaction fingerprint.
-func InsertTransaction(w storage.Writer, txID flow.Identifier, tx *flow.TransactionBody) error {
+// UpsertTransaction inserts a transaction keyed by transaction fingerprint.
+// It overwrites any existing transaction, which is ok because tx is unique by its ID
+func UpsertTransaction(w storage.Writer, txID flow.Identifier, tx *flow.TransactionBody) error {
 	return UpsertByKey(w, MakePrefix(codeTransaction, txID), tx)
 }
 

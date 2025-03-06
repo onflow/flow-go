@@ -27,7 +27,7 @@ func TestCollections(t *testing.T) {
 
 		t.Run("Save", func(t *testing.T) {
 			err := db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-				return operation.InsertCollection(rw.Writer(), &expected)
+				return operation.UpsertCollection(rw.Writer(), &expected)
 			})
 			require.NoError(t, err)
 
@@ -61,7 +61,7 @@ func TestCollections(t *testing.T) {
 			blockID := unittest.IdentifierFixture()
 
 			_ = db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-				err := operation.InsertCollection(rw.Writer(), &expected)
+				err := operation.UpsertCollection(rw.Writer(), &expected)
 				assert.NoError(t, err)
 				err = operation.IndexCollectionPayload(rw.Writer(), blockID, expected.Transactions)
 				assert.NoError(t, err)
