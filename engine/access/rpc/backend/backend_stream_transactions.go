@@ -20,10 +20,7 @@ import (
 
 // TransactionExpiryForUnknownStatus defines the number of blocks after which
 // a transaction with an unknown status is considered expired.
-// This includes the default transaction expiry time (flow.DefaultTransactionExpiry)
-// plus an additional buffer of 10 blocks to account for potential network delays
-// or reorganization effects.
-const TransactionExpiryForUnknownStatus = flow.DefaultTransactionExpiry + 10
+const TransactionExpiryForUnknownStatus = flow.DefaultTransactionExpiry
 
 // sendTransaction defines a function type for sending a transaction.
 type sendTransaction func(ctx context.Context, tx *flow.TransactionBody) error
@@ -211,8 +208,8 @@ func generateResultsStatuses(
 		return nil, nil
 	}
 
-	// If the previous status is pending or unknown and the new status is expired, which is the last status, return its result.
-	// If the previous status is anything other than pending, return an error, as this transition is unexpected.
+	// return immediately if the new status is expired, since it's the last status
+	// If the previous status is anything other than pending or unknown, return an error since this transition is unexpected.
 	if txResult.Status == flow.TransactionStatusExpired {
 		if prevTxStatus == flow.TransactionStatusPending || prevTxStatus == flow.TransactionStatusUnknown {
 			return []*access.TransactionResult{
