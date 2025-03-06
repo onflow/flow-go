@@ -440,19 +440,15 @@ func (s *state) saveExecutionResults(
 		}
 
 		executionResult := &result.ExecutionReceipt.ExecutionResult
-		err = s.results.BatchStore(executionResult, batch)
+		// saving my receipts will also save the execution result
+		err = s.myReceipts.BatchStoreMyReceipt(result.ExecutionReceipt, batch)
 		if err != nil {
-			return fmt.Errorf("cannot store execution result: %w", err)
+			return fmt.Errorf("could not persist execution result: %w", err)
 		}
 
 		err = s.results.BatchIndex(blockID, executionResult.ID(), batch)
 		if err != nil {
 			return fmt.Errorf("cannot index execution result: %w", err)
-		}
-
-		err = s.myReceipts.BatchStoreMyReceipt(result.ExecutionReceipt, batch)
-		if err != nil {
-			return fmt.Errorf("could not persist execution result: %w", err)
 		}
 
 		// the state commitment is the last data item to be stored, so that
