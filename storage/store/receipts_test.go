@@ -144,4 +144,5 @@ func TestExecutionReceiptsStorage(t *testing.T) {
 			require.ElementsMatch(t, []*flow.ExecutionReceipt{receipt1, receipt2}, receipts)
 		})
 	})
+
 }
