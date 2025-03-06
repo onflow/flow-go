@@ -429,7 +429,6 @@ func (c *Controller) handleMessage(ctx context.Context, message json.RawMessage)
 //
 // Expected error returns during normal operations:
 //   - ErrMaxSubscriptionsReached: if the maximum number of active subscriptions per connection is exceeded.
-//   - context.Canceled: if the operation is canceled, during an unsubscribe action.
 func (c *Controller) handleSubscribe(ctx context.Context, msg models.SubscribeMessageRequest) {
 	// Check if the maximum number of active subscriptions per connection has been reached.
 	// If the limit is exceeded, an error is returned, and the subscription request is rejected.
