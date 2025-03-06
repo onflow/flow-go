@@ -60,26 +60,26 @@ func RequireEntityNonMalleable(t *testing.T, entity flow.IDEntity, ops ...Mallea
 // The MalleabilityChecker performs a recursive check of all fields of the entity and ensures that changing any field will change
 // the ID of the entity. By default, the MalleabilityChecker uses pre-defined generators for each basic golang type, which return
 // a random value, to modify the entity's field values. However, the MalleabilityChecker can be customized, by providing custom
-// types and their generators.
+// generators for specific types or specific fields.
 //
-// The caller must provide a properly instantiated entity struct, which serves a template for further modification.
-// Input entities must have all non-nil and non-empty slice/map fields, otherwise `Check` will return an error.
+// The caller can provide a loosely instantiated entity struct, which serves a template for further modification.
+// If checker encounters a field that is nil, it will create a new instance of the field and continue the check.
+// If checker encounters a nil/empty slice or map, it will create a new instance of the slice/map, insert a value and continue the check.
 // In rare cases, a type may have a different ID computation depending on whether a field is nil.
-// In such cases, we can use the `malleability:"optional"` struct tag to skip malleability checks when the field is nil.
+// In such cases, we can use the WithPinnedField to skip malleability checks on this field.
 //
 // This checker heavily relies on generation of random values for the fields based on their type. All types are split into three categories:
-//  1. structures (generateCustomFlowValue)
+//  1. structures, primitives, slices, arrays, maps (generateRandomReflectValue)
 //  2. interfaces (generateInterfaceFlowValue)
-//  3. primitives, slices, arrays, maps (generateRandomReflectValue)
 //
 // Checker knows how to deal with each of the categories and generate random values for them.
 // There are two ways to handle types not natively recognized byt he MalleabilityChecker:
 //  1. User can provide a custom type generator for the type using WithTypeGenerator option.
-//  2. User can extend the checker with new type handling.
+//  2. User can provide a custom generator for the field using WithFieldGenerator option.
 //
-// It is recommended to use the second option if type is used in multiple places and general enough. For other cases
-// it is better to use the first option. Mind that the first option overrides any type handling that is embedded in the checker.
-// This is very useful for cases where the field is context-sensitive, and we cannot generate a completely random value.
+// It is recommended to use the first option if type is used in multiple places and general enough. For other cases
+// it is better to use the second option.
+// Field generator is very useful for cases where the field is context-sensitive, and we cannot generate a completely random value.
 type MalleabilityChecker struct {
 	typeGenerator  map[reflect.Type]func() reflect.Value
 	fieldGenerator map[string]func() reflect.Value
@@ -91,6 +91,19 @@ type MalleabilityCheckerOpt func(*MalleabilityChecker)
 
 // WithTypeGenerator allows to override the default behavior of the checker for the given type, meaning if a field of the given type
 // is encountered, the MalleabilityChecker will use the provided generator instead of a random value.
+// An example usage would be:
+//
+//	type BarType struct {
+//		Baz string
+//	}
+//	type FooType struct {
+//		Bar []BarType
+//	}
+//
+//	...
+//
+//	WithTypeGenerator(func() BarType { return randomBar()})
+//
 // ATTENTION: In order for the MalleabilityChecker to work properly, two calls of the generator should produce two different values.
 func WithTypeGenerator[T any](generator func() T) MalleabilityCheckerOpt {
 	return func(mc *MalleabilityChecker) {
@@ -100,12 +113,41 @@ func WithTypeGenerator[T any](generator func() T) MalleabilityCheckerOpt {
 	}
 }
 
+// WithPinnedField allows to skip malleability checks for the given field. If a field with given path is encountered, the MalleabilityChecker
+// will skip the check for this field. Pinning is mutually exclusive with field generators, meaning if a field is pinned, the checker will not
+// the generator and vice versa.
+// An example usage would be:
+//
+//	type BarType struct {
+//		Baz string
+//	}
+//	type FooType struct {
+//		Bar BarType
+//	}
+//
+//	...
+//
+//	WithPinnedField("Bar.Baz")
 func WithPinnedField(field string) MalleabilityCheckerOpt {
 	return func(mc *MalleabilityChecker) {
 		mc.pinnedFields[field] = struct{}{}
 	}
 }
 
+// WithFieldGenerator allows to override the default behavior of the checker for the given field, meaning if a field with given path
+// is encountered, the MalleabilityChecker will use the provided generator instead of a random value.
+// An example usage would be:
+//
+//	type BarType struct {
+//		Baz string
+//	}
+//	type FooType struct {
+//		Bar BarType
+//	}
+//
+//	...
+//
+//	WithFieldGenerator("Bar.Baz", func() string { return randomString()})
 func WithFieldGenerator[T any](field string, generator func() T) MalleabilityCheckerOpt {
 	return func(mc *MalleabilityChecker) {
 		mc.fieldGenerator[field] = func() reflect.Value {
@@ -131,10 +173,11 @@ func NewMalleabilityChecker(ops ...MalleabilityCheckerOpt) *MalleabilityChecker 
 
 // Check is a method that performs the malleability check on the entity.
 // The malleability check is recursively applied to all fields of the entity.
-// Inputs must have all non-nil and non-empty slice/map fields, otherwise Check will return an error.
-// In rare cases, a type may have a different ID computation depending on whether a field is nil.
-// In such cases, we can use the `malleability:"optional"` struct tag to skip malleability checks when the field is nil.
+// If one of the fields is nil or empty slice/map, the checker will create a new instance of the field and continue the check.
+// In rare cases, a type may have a different ID computation depending on whether a field is nil, in such case, we can use field pinning to
+// prevent the checker from changing the field.
 // It returns an error if the entity is malleable, otherwise it returns nil.
+// No errors are expected during normal operations.
 func (mc *MalleabilityChecker) Check(entity flow.IDEntity) error {
 	v := reflect.ValueOf(entity)
 	if !v.IsValid() {
@@ -154,6 +197,10 @@ func (mc *MalleabilityChecker) Check(entity flow.IDEntity) error {
 	return mc.checkExpectations()
 }
 
+// checkExpectations checks if all pre-configured options were used during the check.
+// This includes checking if all pinned fields were used and if all field generators were used.
+// Pins and field generators are mutually exclusive, and consumed once per field.
+// An error is returned in case checker has been misconfigured.
 func (mc *MalleabilityChecker) checkExpectations() error {
 	for field := range mc.pinnedFields {
 		return fmt.Errorf("field %s is pinned, but wasn't used, checker misconfigured", field)
@@ -165,13 +212,24 @@ func (mc *MalleabilityChecker) checkExpectations() error {
 }
 
 // isEntityMalleable is a helper function to recursively check fields of the entity.
-// Every time we change a field we check if ID of the entity has changed. If the ID has not changed then entity is malleable.
+// This function is called recursively for each field of the entity and checks if the entity is malleable by comparing ID
+// before and after changing the field value.
+// Arguments:
+//   - v: field value to check.
+//   - structField: optional metadata about the field, it is present only for values which are fields of a struct.
+//   - parentFieldPath: previously accumulated field path which leads to the current field.
+//   - idFunc:  function to get the ID of the whole entity.
+//
 // This function returns error if the entity is malleable, otherwise it returns nil.
 func (mc *MalleabilityChecker) isEntityMalleable(v reflect.Value, structField *reflect.StructField, parentFieldPath string, idFunc func() flow.Identifier) error {
 	var fullFieldPath string
+	// if we are dealing with a field of a struct, we need to build a full field path and use that for custom options lookup.
 	if structField != nil {
 		fullFieldPath = buildFieldPath(parentFieldPath, structField.Name)
+		// pinning has priority over field generators, if the field is pinned, we skip the check for this field.
+		// if we have both pin and field generator, we will never use the field generator but will fail to meet the expectations, after running the check.
 		if _, ok := mc.pinnedFields[fullFieldPath]; ok {
+			// make sure we consume the pin so we can check if all pins were used.
 			delete(mc.pinnedFields, fullFieldPath)
 			return nil
 		}
@@ -185,7 +243,9 @@ func (mc *MalleabilityChecker) isEntityMalleable(v reflect.Value, structField *r
 	}
 	tType := v.Type()
 
+	// if we have a field generator for the field, we use it to generate a random value for the field instead of using the default flow.
 	if generator, ok := mc.fieldGenerator[fullFieldPath]; ok {
+		// make sure we consume the field generator so we can check if all field generators were used.
 		delete(mc.fieldGenerator, fullFieldPath)
 		origID := idFunc()
 		v.Set(generator())
@@ -197,6 +257,7 @@ func (mc *MalleabilityChecker) isEntityMalleable(v reflect.Value, structField *r
 	}
 
 	if v.Kind() == reflect.Struct {
+		// any time we encounter a structure we need to go through all fields and check if the entity is malleable in recursive manner.
 		for i := 0; i < v.NumField(); i++ {
 			field := v.Field(i)
 			if !field.CanSet() {
@@ -224,6 +285,7 @@ func (mc *MalleabilityChecker) isEntityMalleable(v reflect.Value, structField *r
 	}
 }
 
+// buildFieldPath is a helper function to build a full field path.
 func buildFieldPath(fieldPath string, fieldName string) string {
 	if fieldPath == "" {
 		return fieldName
@@ -233,8 +295,8 @@ func buildFieldPath(fieldPath string, fieldName string) string {
 
 // generateRandomReflectValue uses reflection to switch on the field type and generate a random value for it.
 // This function mutates the input [reflect.Value]. If it cannot mutate the input, an error is returned and the malleability check should be considered failed.
-// In rare cases, a type may have a different ID computation depending on whether a field is nil.
-// In such cases, we can use the `malleability:"optional"` struct tag to skip malleability checks when the field is nil.
+// If a type generator is provided for the field type, it will be used to generate a random value for the field.
+// No errors are expected during normal operations.
 func (mc *MalleabilityChecker) generateRandomReflectValue(field reflect.Value) error {
 	if generator, ok := mc.typeGenerator[field.Type()]; ok {
 		field.Set(generator())
@@ -286,6 +348,7 @@ func (mc *MalleabilityChecker) generateRandomReflectValue(field reflect.Value) e
 	case reflect.Struct:
 		// if we are dealing with a struct, we need to go through all fields and generate random values for them
 		// if the field is another struct, we will deal with it recursively.
+		// at the end of the recursion, we must encounter a primitive type, which we can generate a random value for, otherwise an error is returned.
 		for i := 0; i < field.NumField(); i++ {
 			structField := field.Field(i)
 			err := mc.generateRandomReflectValue(structField)
