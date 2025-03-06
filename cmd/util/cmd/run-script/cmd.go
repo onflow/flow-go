@@ -27,6 +27,8 @@ import (
 	"github.com/onflow/flow-go/module/metrics"
 )
 
+var ErrNotImplemented = errors.New("not implemented")
+
 var (
 	flagPayloads        string
 	flagState           string
@@ -533,35 +535,18 @@ func (*api) SubscribeBlockDigestsFromLatest(
 	return nil
 }
 
-func (a *api) SubscribeTransactionStatusesFromStartBlockID(
+func (a *api) SubscribeTransactionStatuses(
 	_ context.Context,
-	_ flow.Identifier,
 	_ flow.Identifier,
 	_ entities.EventEncodingVersion,
 ) subscription.Subscription {
-	return nil
+	return subscription.NewFailedSubscription(ErrNotImplemented, "failed to call SubscribeTransactionStatuses")
 }
 
-func (a *api) SubscribeTransactionStatusesFromStartHeight(
-	_ context.Context,
-	_ flow.Identifier,
-	_ uint64,
-	_ entities.EventEncodingVersion,
-) subscription.Subscription {
-	return nil
-}
-
-func (a *api) SubscribeTransactionStatusesFromLatest(
-	_ context.Context,
-	_ flow.Identifier,
-	_ entities.EventEncodingVersion,
-) subscription.Subscription {
-	return nil
-}
 func (a *api) SendAndSubscribeTransactionStatuses(
 	_ context.Context,
 	_ *flow.TransactionBody,
 	_ entities.EventEncodingVersion,
 ) subscription.Subscription {
-	return nil
+	return subscription.NewFailedSubscription(ErrNotImplemented, "failed to call SendAndSubscribeTransactionStatuses")
 }
