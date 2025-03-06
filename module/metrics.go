@@ -498,6 +498,8 @@ type ComplianceMetrics interface {
 	EpochFallbackModeTriggered()
 	// EpochFallbackModeExited reports that EFM is no longer triggered.
 	EpochFallbackModeExited()
+	// ProtocolStateVersion reports the version of the latest finalized protocol state.
+	ProtocolStateVersion(version uint64)
 }
 
 type CleanerMetrics interface {
@@ -994,6 +996,12 @@ type ExecutionMetrics interface {
 
 	// ExecutionLastFinalizedExecutedBlockHeight reports last finalized and executed block height
 	ExecutionLastFinalizedExecutedBlockHeight(height uint64)
+
+	// ExecutionLastChunkDataPackPrunedHeight reports last chunk data pack pruned height
+	ExecutionLastChunkDataPackPrunedHeight(height uint64)
+
+	// ExecutionTargetChunkDataPackPrunedHeight reports the target height for chunk data pack to be pruned
+	ExecutionTargetChunkDataPackPrunedHeight(height uint64)
 
 	// ExecutionBlockExecuted reports the total time and computation spent on executing a block
 	ExecutionBlockExecuted(dur time.Duration, stats BlockExecutionResultStats)

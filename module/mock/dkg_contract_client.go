@@ -64,17 +64,35 @@ func (_m *DKGContractClient) ReadBroadcast(fromIndex uint, referenceBlock flow.I
 	return r0, r1
 }
 
-// SubmitResult provides a mock function with given fields: _a0, _a1
-func (_m *DKGContractClient) SubmitResult(_a0 crypto.PublicKey, _a1 []crypto.PublicKey) error {
-	ret := _m.Called(_a0, _a1)
+// SubmitEmptyResult provides a mock function with given fields:
+func (_m *DKGContractClient) SubmitEmptyResult() error {
+	ret := _m.Called()
 
 	if len(ret) == 0 {
-		panic("no return value specified for SubmitResult")
+		panic("no return value specified for SubmitEmptyResult")
 	}
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(crypto.PublicKey, []crypto.PublicKey) error); ok {
-		r0 = rf(_a0, _a1)
+	if rf, ok := ret.Get(0).(func() error); ok {
+		r0 = rf()
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// SubmitParametersAndResult provides a mock function with given fields: indexMap, groupPublicKey, publicKeys
+func (_m *DKGContractClient) SubmitParametersAndResult(indexMap flow.DKGIndexMap, groupPublicKey crypto.PublicKey, publicKeys []crypto.PublicKey) error {
+	ret := _m.Called(indexMap, groupPublicKey, publicKeys)
+
+	if len(ret) == 0 {
+		panic("no return value specified for SubmitParametersAndResult")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(flow.DKGIndexMap, crypto.PublicKey, []crypto.PublicKey) error); ok {
+		r0 = rf(indexMap, groupPublicKey, publicKeys)
 	} else {
 		r0 = ret.Error(0)
 	}

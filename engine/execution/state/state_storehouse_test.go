@@ -31,6 +31,7 @@ import (
 	badgerstorage "github.com/onflow/flow-go/storage/badger"
 	"github.com/onflow/flow-go/storage/badger/operation"
 	storage "github.com/onflow/flow-go/storage/mock"
+	"github.com/onflow/flow-go/storage/operation/badgerimpl"
 	"github.com/onflow/flow-go/storage/pebble"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -86,8 +87,14 @@ func prepareStorehouseTest(f func(t *testing.T, es state.ExecutionState, l *ledg
 				headersDB := badgerstorage.NewHeaders(metrics, badgerDB)
 				require.NoError(t, headersDB.Store(finalizedHeaders[10]))
 
+				getLatestFinalized := func() (uint64, error) {
+					return rootHeight, nil
+				}
+
 				es := state.NewExecutionState(
-					ls, stateCommitments, blocks, headers, chunkDataPacks, results, myReceipts, events, serviceEvents, txResults, badgerDB, trace.NewNoopTracer(),
+					ls, stateCommitments, blocks, headers, chunkDataPacks, results, myReceipts, events, serviceEvents, txResults, badgerimpl.ToDB(badgerDB),
+					getLatestFinalized,
+					trace.NewNoopTracer(),
 					rs,
 					true,
 				)
@@ -207,7 +214,7 @@ func makeComputationResult(
 	commit flow.StateCommitment,
 ) *execution.ComputationResult {
 
-	computationResult := execution.NewEmptyComputationResult(completeBlock)
+	computationResult := execution.NewEmptyComputationResult(completeBlock, flow.NewChunk)
 	numberOfChunks := 1
 	ceds := make([]*execution_data.ChunkExecutionData, numberOfChunks)
 	ceds[0] = unittest.ChunkExecutionDataFixture(t, 1024)

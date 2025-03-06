@@ -349,6 +349,11 @@ type FlowAccessNodeBuilder struct {
 	Transactions                 storage.Transactions
 	Collections                  storage.Collections
 
+	// storage
+	events                         storage.Events
+	lightTransactionResults        storage.LightTransactionResults
+	transactionResultErrorMessages storage.TransactionResultErrorMessages
+
 	// The sync engine participants provider is the libp2p peer store for the access node
 	// which is not available until after the network has started.
 	// Hence, a factory function that needs to be called just before creating the sync engine
@@ -597,7 +602,9 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 			}
 
 			if executionDataDBMode == execution_data.ExecutionDataDBModePebble {
-				builder.ExecutionDatastoreManager, err = edstorage.NewPebbleDatastoreManager(datastoreDir, nil)
+				builder.ExecutionDatastoreManager, err = edstorage.NewPebbleDatastoreManager(
+					node.Logger.With().Str("pebbledb", "endata").Logger(),
+					datastoreDir, nil)
 				if err != nil {
 					return fmt.Errorf("could not create PebbleDatastoreManager for execution data: %w", err)
 				}
@@ -883,7 +890,7 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 				return nil
 			}).
 			Module("transaction results storage", func(node *cmd.NodeConfig) error {
-				builder.Storage.LightTransactionResults = bstorage.NewLightTransactionResults(node.Metrics.Cache, node.DB, bstorage.DefaultCacheSize)
+				builder.lightTransactionResults = store.NewLightTransactionResults(node.Metrics.Cache, node.ProtocolDB, bstorage.DefaultCacheSize)
 				return nil
 			}).
 			DependableComponent("execution data indexer", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
@@ -891,7 +898,9 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 				// other components from starting while bootstrapping the register db since it may
 				// take hours to complete.
 
-				pdb, err := pstorage.OpenRegisterPebbleDB(builder.registersDBPath)
+				pdb, err := pstorage.OpenRegisterPebbleDB(
+					node.Logger.With().Str("pebbledb", "registers").Logger(),
+					builder.registersDBPath)
 				if err != nil {
 					return nil, fmt.Errorf("could not open registers db: %w", err)
 				}
@@ -972,13 +981,13 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 				indexerCore, err := indexer.New(
 					builder.Logger,
 					metrics.NewExecutionStateIndexerCollector(),
-					builder.DB,
+					builder.ProtocolDB,
 					builder.Storage.RegisterIndex,
 					builder.Storage.Headers,
-					builder.Storage.Events,
+					notNil(builder.events),
 					notNil(builder.Collections),
 					notNil(builder.Transactions),
-					builder.Storage.LightTransactionResults,
+					notNil(builder.lightTransactionResults),
 					builder.RootChainID.Chain(),
 					indexerDerivedChainData,
 					builder.collectionExecutedMetric,
@@ -1852,7 +1861,7 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 			return nil
 		}).
 		Module("events storage", func(node *cmd.NodeConfig) error {
-			builder.Storage.Events = bstorage.NewEvents(node.Metrics.Cache, node.DB)
+			builder.events = store.NewEvents(node.Metrics.Cache, node.ProtocolDB)
 			return nil
 		}).
 		Module("reporter", func(node *cmd.NodeConfig) error {
@@ -1860,11 +1869,11 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 			return nil
 		}).
 		Module("events index", func(node *cmd.NodeConfig) error {
-			builder.EventsIndex = index.NewEventsIndex(builder.Reporter, builder.Storage.Events)
+			builder.EventsIndex = index.NewEventsIndex(builder.Reporter, builder.events)
 			return nil
 		}).
 		Module("transaction result index", func(node *cmd.NodeConfig) error {
-			builder.TxResultsIndex = index.NewTransactionResultsIndex(builder.Reporter, builder.Storage.LightTransactionResults)
+			builder.TxResultsIndex = index.NewTransactionResultsIndex(builder.Reporter, builder.lightTransactionResults)
 			return nil
 		}).
 		Module("processed finalized block height consumer progress", func(node *cmd.NodeConfig) error {
@@ -1888,7 +1897,7 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 		}).
 		Module("transaction result error messages storage", func(node *cmd.NodeConfig) error {
 			if builder.storeTxResultErrorMessages {
-				builder.Storage.TransactionResultErrorMessages = bstorage.NewTransactionResultErrorMessages(node.Metrics.Cache, node.DB, bstorage.DefaultCacheSize)
+				builder.transactionResultErrorMessages = store.NewTransactionResultErrorMessages(node.Metrics.Cache, node.ProtocolDB, bstorage.DefaultCacheSize)
 			}
 
 			return nil
@@ -2020,12 +2029,12 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 
 			}
 
-			preferredENIdentifiers, err := commonrpc.IdentifierList(backendConfig.PreferredExecutionNodeIDs)
+			preferredENIdentifiers, err := flow.IdentifierListFromHex(backendConfig.PreferredExecutionNodeIDs)
 			if err != nil {
 				return nil, fmt.Errorf("failed to convert node id string to Flow Identifier for preferred EN map: %w", err)
 			}
 
-			fixedENIdentifiers, err := commonrpc.IdentifierList(backendConfig.FixedExecutionNodeIDs)
+			fixedENIdentifiers, err := flow.IdentifierListFromHex(backendConfig.FixedExecutionNodeIDs)
 			if err != nil {
 				return nil, fmt.Errorf("failed to convert node id string to Flow Identifier for fixed EN map: %w", err)
 			}
@@ -2048,7 +2057,7 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 				Transactions:          notNil(builder.Transactions),
 				ExecutionReceipts:     node.Storage.Receipts,
 				ExecutionResults:      node.Storage.Results,
-				TxResultErrorMessages: node.Storage.TransactionResultErrorMessages,
+				TxResultErrorMessages: builder.transactionResultErrorMessages,
 				ChainID:               node.RootChainID,
 				AccessMetrics:         builder.AccessMetrics,
 				ConnFactory:           connFactory,
@@ -2134,7 +2143,7 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 				builder.TxResultErrorMessagesCore = tx_error_messages.NewTxErrorMessagesCore(
 					node.Logger,
 					builder.nodeBackend,
-					node.Storage.TransactionResultErrorMessages,
+					builder.transactionResultErrorMessages,
 					builder.ExecNodeIdentitiesProvider,
 				)
 			}

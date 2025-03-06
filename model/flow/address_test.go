@@ -70,13 +70,13 @@ func TestHexToAddress(t *testing.T) {
 func TestAddressJSON(t *testing.T) {
 	addr := Mainnet.Chain().ServiceAddress()
 	data, err := json.Marshal(addressWrapper{Address: addr})
-	require.Nil(t, err)
+	require.NoError(t, err)
 
 	t.Log(string(data))
 
 	var out addressWrapper
 	err = json.Unmarshal(data, &out)
-	require.Nil(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, addr, out.Address)
 }
 

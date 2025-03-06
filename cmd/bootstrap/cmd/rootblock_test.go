@@ -24,7 +24,6 @@ const rootBlockHappyPathLogs = "collecting partner network and staking keys" +
 	`remove internal partner nodes` +
 	`removed 0 internal partner nodes` +
 	`checking constraints on consensus nodes` +
-
 	`assembling network and staking keys` +
 	`wrote file \S+/node-infos.pub.json` +
 	`running DKG for consensus nodes` +
@@ -67,8 +66,7 @@ func TestRootBlock_HappyPath(t *testing.T) {
 		flagNumViewsInEpoch = 100_000
 		flagNumViewsInStakingAuction = 50_000
 		flagNumViewsInDKGPhase = 2_000
-		flagEpochCommitSafetyThreshold = 1_000
-		flagProtocolVersion = 42
+		flagFinalizationSafetyThreshold = 1_000
 		flagUseDefaultEpochTargetEndTime = true
 		flagEpochTimingRefCounter = 0
 		flagEpochTimingRefTimestamp = 0
