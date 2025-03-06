@@ -8,6 +8,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/metrics"
+	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/storage/badger/operation"
 	"github.com/onflow/flow-go/storage/badger/procedure"
 	"github.com/onflow/flow-go/storage/badger/transaction"
@@ -18,10 +19,12 @@ type Headers struct {
 	db          *badger.DB
 	cache       *Cache[flow.Identifier, *flow.Header]
 	heightCache *Cache[uint64, flow.Identifier]
+	viewCache   *Cache[uint64, flow.Identifier]
 }
 
-func NewHeaders(collector module.CacheMetrics, db *badger.DB) *Headers {
+var _ storage.Headers = (*Headers)(nil)
 
+func NewHeaders(collector module.CacheMetrics, db *badger.DB) *Headers {
 	store := func(blockID flow.Identifier, header *flow.Header) func(*transaction.Tx) error {
 		return transaction.WithTx(operation.InsertHeader(blockID, header))
 	}
@@ -29,7 +32,7 @@ func NewHeaders(collector module.CacheMetrics, db *badger.DB) *Headers {
 	// CAUTION: should only be used to index FINALIZED blocks by their
 	// respective height
 	storeHeight := func(height uint64, id flow.Identifier) func(*transaction.Tx) error {
-		return transaction.WithTx(operation.IndexBlockHeight(height, id))
+		return transaction.WithTx(operation.IndexFinalizedBlockByHeight(height, id))
 	}
 
 	retrieve := func(blockID flow.Identifier) func(tx *badger.Txn) (*flow.Header, error) {
@@ -48,6 +51,14 @@ func NewHeaders(collector module.CacheMetrics, db *badger.DB) *Headers {
 		}
 	}
 
+	retrieveView := func(view uint64) func(tx *badger.Txn) (flow.Identifier, error) {
+		return func(tx *badger.Txn) (flow.Identifier, error) {
+			var id flow.Identifier
+			err := operation.LookupCertifiedBlockByView(view, &id)(tx)
+			return id, err
+		}
+	}
+
 	h := &Headers{
 		db: db,
 		cache: newCache(collector, metrics.ResourceHeader,
@@ -59,11 +70,19 @@ func NewHeaders(collector module.CacheMetrics, db *badger.DB) *Headers {
 			withLimit[uint64, flow.Identifier](4*flow.DefaultTransactionExpiry),
 			withStore(storeHeight),
 			withRetrieve(retrieveHeight)),
+
+		viewCache: newCache(collector, metrics.ResourceCertifiedView,
+			withLimit[uint64, flow.Identifier](4*flow.DefaultTransactionExpiry),
+			withRetrieve(retrieveView)),
 	}
 
 	return h
 }
 
+// storeTx allows us to store a new header, as part of a DB transaction, while still going through
+// the caching layer.
+// Expected errors during normal operation
+//   - storage.ErrAlreadyExists if the header has already been persisted
 func (h *Headers) storeTx(header *flow.Header) func(*transaction.Tx) error {
 	return h.cache.PutTx(header.ID(), header)
 }
@@ -89,6 +108,9 @@ func (h *Headers) retrieveIdByHeightTx(height uint64) func(*badger.Txn) (flow.Id
 	}
 }
 
+// Store stores and caches a new header.
+// Expected errors during normal operation
+//   - storage.ErrAlreadyExists if the header has already been persisted
 func (h *Headers) Store(header *flow.Header) error {
 	return operation.RetryOnConflictTx(h.db, transaction.Update, h.storeTx(header))
 }
@@ -104,6 +126,19 @@ func (h *Headers) ByHeight(height uint64) (*flow.Header, error) {
 	defer tx.Discard()
 
 	blockID, err := h.retrieveIdByHeightTx(height)(tx)
+	if err != nil {
+		return nil, err
+	}
+	return h.retrieveTx(blockID)(tx)
+}
+
+// ByView returns block header for the given view. It is only available for certified blocks.
+// Note: this method is not available until next spork or a migration that builds the index.
+func (h *Headers) ByView(view uint64) (*flow.Header, error) {
+	tx := h.db.NewTransaction(false)
+	defer tx.Discard()
+
+	blockID, err := h.viewCache.Get(view)(tx)
 	if err != nil {
 		return nil, err
 	}
@@ -136,6 +171,22 @@ func (h *Headers) BlockIDByHeight(height uint64) (flow.Identifier, error) {
 	blockID, err := h.retrieveIdByHeightTx(height)(tx)
 	if err != nil {
 		return flow.ZeroID, fmt.Errorf("could not lookup block id by height %d: %w", height, err)
+	}
+	return blockID, nil
+}
+
+// BlockIDByView returns the block ID that is certified at the given view. It is an optimized
+// version of `ByView` that skips retrieving the block. Expected errors during normal operations:
+//   - `storage.ErrNotFound` if no certified block is known at given view.
+//
+// NOTE: this method is not available until next spork (mainnet27) or a migration that builds the index.
+func (h *Headers) BlockIDByView(view uint64) (flow.Identifier, error) {
+	tx := h.db.NewTransaction(false)
+	defer tx.Discard()
+
+	blockID, err := h.viewCache.Get(view)(tx)
+	if err != nil {
+		return flow.ZeroID, fmt.Errorf("could not lookup block id by view %d: %w", view, err)
 	}
 	return blockID, nil
 }
