@@ -13,6 +13,8 @@ import (
 )
 
 // MockEntity implements a bare minimum entity for sake of test.
+// TODO(malleability, #7076): This is a leftover from previous design, it is used to test mempools that are working with entity.
+// As soon as that work stream is finished, this entity should be removed.
 type MockEntity struct {
 	Identifier flow.Identifier
 	Nonce      uint64
