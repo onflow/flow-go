@@ -35,8 +35,8 @@ func (a *Assignments) ByID(assignmentID flow.Identifier) (*chunkmodels.Assignmen
 }
 
 // Add adds an Assignment to the mempool.
-func (a *Assignments) Add(fingerprint flow.Identifier, assignment *chunkmodels.Assignment) bool {
-	return a.Backend.Add(fingerprint, assignment)
+func (a *Assignments) Add(assignmentFingerprint flow.Identifier, assignment *chunkmodels.Assignment) bool {
+	return a.Backend.Add(assignmentFingerprint, assignment)
 }
 
 // Remove will remove the given Assignment from the memory pool; it will

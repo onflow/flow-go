@@ -14,9 +14,9 @@ type Assignments struct {
 	mock.Mock
 }
 
-// Add provides a mock function with given fields: fingerprint, assignment
-func (_m *Assignments) Add(fingerprint flow.Identifier, assignment *chunks.Assignment) bool {
-	ret := _m.Called(fingerprint, assignment)
+// Add provides a mock function with given fields: assignmentFingerprint, assignment
+func (_m *Assignments) Add(assignmentFingerprint flow.Identifier, assignment *chunks.Assignment) bool {
+	ret := _m.Called(assignmentFingerprint, assignment)
 
 	if len(ret) == 0 {
 		panic("no return value specified for Add")
@@ -24,7 +24,7 @@ func (_m *Assignments) Add(fingerprint flow.Identifier, assignment *chunks.Assig
 
 	var r0 bool
 	if rf, ok := ret.Get(0).(func(flow.Identifier, *chunks.Assignment) bool); ok {
-		r0 = rf(fingerprint, assignment)
+		r0 = rf(assignmentFingerprint, assignment)
 	} else {
 		r0 = ret.Get(0).(bool)
 	}
