@@ -49,8 +49,6 @@ type transactionSubscriptionMetadata struct {
 //
 // Returns:
 //   - *transactionSubscriptionMetadata: The initialized transaction metadata object.
-//
-// No errors expected during normal operations.
 func newTransactionSubscriptionMetadata(
 	backendTransactions *backendTransactions,
 	txID flow.Identifier,
@@ -129,7 +127,7 @@ func (tm *transactionSubscriptionMetadata) refreshStatus(ctx context.Context) er
 	if tm.blockWithTx == nil {
 		if err = tm.refreshTransactionReferenceBlockID(); err != nil {
 			// transaction was not sent from this node, and it has not been indexed yet.
-			if errors.Is(err, storage.ErrNotFound) && tm.txReferenceBlockID == flow.ZeroID {
+			if errors.Is(err, storage.ErrNotFound) {
 				tm.txResult.Status = flow.TransactionStatusUnknown
 				return nil
 			}
@@ -146,9 +144,8 @@ func (tm *transactionSubscriptionMetadata) refreshStatus(ctx context.Context) er
 		return nil
 	}
 
-	// When a block with the transaction is available, it is possible to receive a new transaction status while
-	// searching for the transaction result. Otherwise, it remains unchanged. So, if the old and new transaction
-	// statuses are the same, the current transaction status should be retrieved.
+	// When the transaction is included in an executed block, the `txResult` may be updated during `Refresh`
+	// Recheck the status to ensure it's accurate.
 	tm.txResult.Status, err = tm.backendTransactions.DeriveTransactionStatus(tm.blockWithTx.Height, tm.txResult.IsExecuted())
 	if err != nil {
 		if !errors.Is(err, state.ErrUnknownSnapshotReference) {
@@ -163,6 +160,8 @@ func (tm *transactionSubscriptionMetadata) refreshStatus(ctx context.Context) er
 //
 // Expected errors during normal operation:
 //   - [ErrBlockNotReady] if the block for collection ID is not found.
+//
+// All other errors should be treated as exceptions.
 func (tm *transactionSubscriptionMetadata) refreshBlock() error {
 	if tm.txResult.CollectionID == flow.ZeroID || tm.blockWithTx != nil {
 		return nil
@@ -187,6 +186,8 @@ func (tm *transactionSubscriptionMetadata) refreshBlock() error {
 //
 // Expected errors during normal operation:
 //   - [ErrTransactionNotInBlock] if the transaction is not found in the block.
+//
+// All other errors should be treated as exceptions.
 func (tm *transactionSubscriptionMetadata) refreshCollection() error {
 	if tm.txResult.CollectionID != flow.ZeroID {
 		return nil
@@ -210,6 +211,8 @@ func (tm *transactionSubscriptionMetadata) refreshCollection() error {
 //
 // Expected errors during normal operation:
 //   - [codes.NotFound] if the transaction result is unavailable.
+//
+// All other errors should be treated as exceptions.
 func (tm *transactionSubscriptionMetadata) refreshTransactionResult(ctx context.Context) error {
 	// skip check if we already have the result, or if we don't know which block it is in yet
 	if tm.blockWithTx == nil || tm.txResult.IsExecuted() {

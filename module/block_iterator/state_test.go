@@ -67,5 +67,14 @@ func TestProgress(t *testing.T) {
 		rg, hasNext, err = progress.NextRange()
 		require.NoError(t, err)
 		require.False(t, hasNext)
+
+		// now initialize again with a different latest that which cause latest < next
+		// verify there will be no block to iterate
+		initializer = store.NewConsumerProgress(pebbleimpl.ToDB(db), "test")
+		progress, err = NewPersistentIteratorState(initializer, root, getLatest)
+		require.NoError(t, err)
+		_, hasNext, err = progress.NextRange()
+		require.NoError(t, err)
+		require.False(t, hasNext) // has no block to iterate
 	})
 }

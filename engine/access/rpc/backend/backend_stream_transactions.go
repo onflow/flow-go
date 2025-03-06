@@ -18,7 +18,9 @@ import (
 	"github.com/onflow/flow-go/module/irrecoverable"
 )
 
-const TransactionExpiryForUnknownStatus = flow.DefaultTransactionExpiry + 10
+// TransactionExpiryForUnknownStatus defines the number of blocks after which
+// a transaction with an unknown status is considered expired.
+const TransactionExpiryForUnknownStatus = flow.DefaultTransactionExpiry
 
 // sendTransaction defines a function type for sending a transaction.
 type sendTransaction func(ctx context.Context, tx *flow.TransactionBody) error
@@ -149,8 +151,10 @@ func (b *backendSubscribeTransactions) getTransactionStatusResponse(
 			if errors.Is(err, subscription.ErrBlockNotReady) {
 				return nil, err
 			}
-
-			return nil, status.Errorf(codes.Internal, "failed to refresh transaction information: %v", err)
+			if statusErr, ok := status.FromError(err); ok {
+				return nil, status.Errorf(codes.Internal, "failed to refresh transaction information: %v", statusErr)
+			}
+			return nil, fmt.Errorf("unexpected error refreshing transaction information: %w", err)
 		}
 
 		return generateResultsStatuses(txInfo.txResult, prevTxStatus)
@@ -169,7 +173,7 @@ func hasReachedUnknownStatusLimit(height, startHeight uint64, status flow.Transa
 
 // checkBlockReady checks if the given block height is valid and available based on the expected block status.
 // Expected errors during normal operation:
-// - subscription.ErrBlockNotReady: block for the given block height is not available.
+// - [subscription.ErrBlockNotReady]: block for the given block height is not available.
 func (b *backendSubscribeTransactions) checkBlockReady(height uint64) error {
 	// Get the highest available finalized block height
 	highestHeight, err := b.blockTracker.GetHighestHeight(flow.BlockStatusFinalized)
@@ -204,8 +208,8 @@ func generateResultsStatuses(
 		return nil, nil
 	}
 
-	// If the previous status is pending or unknown and the new status is expired, which is the last status, return its result.
-	// If the previous status is anything other than pending, return an error, as this transition is unexpected.
+	// return immediately if the new status is expired, since it's the last status
+	// If the previous status is anything other than pending or unknown, return an error since this transition is unexpected.
 	if txResult.Status == flow.TransactionStatusExpired {
 		if prevTxStatus == flow.TransactionStatusPending || prevTxStatus == flow.TransactionStatusUnknown {
 			return []*access.TransactionResult{

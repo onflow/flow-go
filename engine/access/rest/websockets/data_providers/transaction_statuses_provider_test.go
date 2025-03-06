@@ -93,8 +93,10 @@ func (s *TransactionStatusesProviderSuite) subscribeTransactionStatusesDataProvi
 
 	return []testType{
 		{
-			name:      "SubscribeTransactionStatuses happy path",
-			arguments: models.Arguments{},
+			name: "SubscribeTransactionStatuses happy path",
+			arguments: models.Arguments{
+				"tx_id": unittest.IdentifierFixture().String(),
+			},
 			setupBackend: func(sub *ssmock.Subscription) {
 				s.api.On(
 					"SubscribeTransactionStatuses",

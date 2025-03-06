@@ -159,7 +159,9 @@ func (s *TransactionStatusSuite) initializeBackend() {
 	params.On("FinalizedRoot").Return(s.rootBlock.Header).Maybe()
 	s.state.On("Params").Return(params).Maybe()
 
-	var receipts flow.ExecutionReceiptList
+	// this line causes a S1021 lint error because receipts is explicitly declared. this is required
+	// to ensure the mock library handles the response type correctly
+	var receipts flow.ExecutionReceiptList //nolint:gosimple
 	executionNodes := unittest.IdentityListFixture(2, unittest.WithRole(flow.RoleExecution))
 	receipts = unittest.ReceiptsForBlockFixture(&s.rootBlock, executionNodes.NodeIDs())
 	s.receipts.On("ByBlockID", mock.AnythingOfType("flow.Identifier")).Return(receipts, nil).Maybe()
@@ -307,8 +309,8 @@ func (s *TransactionStatusSuite) initializeHappyCaseMockInstructions() {
 	).Return(eventsForTx, nil).Maybe()
 }
 
-// initializeTransaction generate sent transaction with ref block of the current finalized block
-func (s *TransactionStatusSuite) initializeTransaction() flow.Transaction {
+// createSendTransaction generate sent transaction with ref block of the current finalized block
+func (s *TransactionStatusSuite) createSendTransaction() flow.Transaction {
 	transaction := unittest.TransactionFixture()
 	transaction.SetReferenceBlockID(s.finalizedBlock.ID())
 	s.transactions.On("ByID", mock.AnythingOfType("flow.Identifier")).Return(&transaction.TransactionBody, nil).Maybe()
@@ -400,7 +402,7 @@ func (s *TransactionStatusSuite) TestSendAndSubscribeTransactionStatusHappyCase(
 	s.initializeHappyCaseMockInstructions()
 
 	// Generate sent transaction with ref block of the current finalized block
-	transaction := s.initializeTransaction()
+	transaction := s.createSendTransaction()
 	txId := transaction.ID()
 
 	s.collections.On("LightByTransactionID", txId).Return(nil, storage.ErrNotFound).Once()
@@ -454,7 +456,7 @@ func (s *TransactionStatusSuite) TestSendAndSubscribeTransactionStatusExpired() 
 	).Return(nil, storage.ErrNotFound).Maybe()
 
 	// Generate sent transaction with ref block of the current finalized block
-	transaction := s.initializeTransaction()
+	transaction := s.createSendTransaction()
 	txId := transaction.ID()
 	s.collections.On("LightByTransactionID", txId).Return(nil, storage.ErrNotFound)
 
@@ -489,7 +491,7 @@ func (s *TransactionStatusSuite) TestSubscribeTransactionStatusWithCurrentPendin
 
 	s.initializeHappyCaseMockInstructions()
 
-	transaction := s.initializeTransaction()
+	transaction := s.createSendTransaction()
 	txId := transaction.ID()
 	s.collections.On("LightByTransactionID", txId).Return(nil, storage.ErrNotFound).Once()
 
@@ -523,7 +525,7 @@ func (s *TransactionStatusSuite) TestSubscribeTransactionStatusWithCurrentFinali
 
 	s.initializeHappyCaseMockInstructions()
 
-	transaction := s.initializeTransaction()
+	transaction := s.createSendTransaction()
 	txId := transaction.ID()
 
 	hasTransactionResultInStorage := false
@@ -555,7 +557,7 @@ func (s *TransactionStatusSuite) TestSubscribeTransactionStatusWithCurrentExecut
 
 	s.initializeHappyCaseMockInstructions()
 
-	transaction := s.initializeTransaction()
+	transaction := s.createSendTransaction()
 	txId := transaction.ID()
 
 	hasTransactionResultInStorage := false
@@ -589,7 +591,7 @@ func (s *TransactionStatusSuite) TestSubscribeTransactionStatusWithCurrentSealed
 
 	s.initializeHappyCaseMockInstructions()
 
-	transaction := s.initializeTransaction()
+	transaction := s.createSendTransaction()
 	txId := transaction.ID()
 
 	hasTransactionResultInStorage := false

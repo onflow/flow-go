@@ -21,21 +21,21 @@ func TestInsertProtocolKVStore(t *testing.T) {
 
 		kvStoreStateID := unittest.IdentifierFixture()
 		err := db.Update(InsertProtocolKVStore(kvStoreStateID, expected))
-		require.Nil(t, err)
+		require.NoError(t, err)
 
 		var actual flow.PSKeyValueStoreData
 		err = db.View(RetrieveProtocolKVStore(kvStoreStateID, &actual))
-		require.Nil(t, err)
+		require.NoError(t, err)
 
 		assert.Equal(t, expected, &actual)
 
 		blockID := unittest.IdentifierFixture()
 		err = db.Update(IndexProtocolKVStore(blockID, kvStoreStateID))
-		require.Nil(t, err)
+		require.NoError(t, err)
 
 		var actualProtocolKVStoreID flow.Identifier
 		err = db.View(LookupProtocolKVStore(blockID, &actualProtocolKVStoreID))
-		require.Nil(t, err)
+		require.NoError(t, err)
 
 		assert.Equal(t, kvStoreStateID, actualProtocolKVStoreID)
 	})
