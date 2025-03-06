@@ -12,14 +12,14 @@ import (
 
 func TestInitPebbleDB(t *testing.T) {
 	unittest.RunWithTempDir(t, func(dir string) {
-		_, closer, err := scaffold.InitPebbleDB(dir)
+		_, closer, err := scaffold.InitPebbleDB(unittest.Logger(), dir)
 		require.NoError(t, err)
 		require.NoError(t, closer.Close())
 	})
 }
 
 func TestInitPebbleDBDirNotSet(t *testing.T) {
-	_, _, err := scaffold.InitPebbleDB(cmd.NotSet)
+	_, _, err := scaffold.InitPebbleDB(unittest.Logger(), cmd.NotSet)
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "missing required flag")
 }

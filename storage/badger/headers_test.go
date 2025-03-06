@@ -1,7 +1,6 @@
 package badger_test
 
 import (
-	"errors"
 	"testing"
 
 	"github.com/onflow/flow-go/storage/badger/operation"
@@ -47,7 +46,7 @@ func TestHeaderRetrieveWithoutStore(t *testing.T) {
 
 		// retrieve header by height, should err as not store before height
 		_, err := headers.ByHeight(header.Height)
-		require.True(t, errors.Is(err, storage.ErrNotFound))
+		require.ErrorIs(t, err, storage.ErrNotFound)
 	})
 }
 

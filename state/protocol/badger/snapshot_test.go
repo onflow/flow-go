@@ -2,7 +2,6 @@ package badger_test
 
 import (
 	"context"
-	"errors"
 	"math/rand"
 	"testing"
 
@@ -1268,8 +1267,7 @@ func TestSnapshot_EpochQuery(t *testing.T) {
 			t.Run("epoch 1", func(t *testing.T) {
 				for _, height := range epoch1.Range() {
 					_, err := state.AtHeight(height).Epochs().Previous()
-					assert.Error(t, err)
-					assert.True(t, errors.Is(err, protocol.ErrNoPreviousEpoch))
+					assert.ErrorIs(t, err, protocol.ErrNoPreviousEpoch)
 				}
 			})
 

@@ -83,7 +83,7 @@ const (
 	// code for ComputationResult upload status storage
 	// NOTE: for now only GCP uploader is supported. When other uploader (AWS e.g.) needs to
 	//		 be supported, we will need to define new code.
-	codeComputationResults = 66
+	_ = 66 // used by ComputationResults in storage/operation
 
 	// job queue consumers and producers
 	codeJobConsumerProcessed = 70

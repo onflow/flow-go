@@ -16,6 +16,7 @@ import (
 	"github.com/onflow/flow-go/storage"
 	badgerstorage "github.com/onflow/flow-go/storage/badger"
 	"github.com/onflow/flow-go/storage/badger/operation"
+	"github.com/onflow/flow-go/storage/operation/badgerimpl"
 	"github.com/onflow/flow-go/storage/operation/pebbleimpl"
 	"github.com/onflow/flow-go/storage/store"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -96,7 +97,7 @@ func TestLoopPruneExecutionDataFromRootToLatestSealed(t *testing.T) {
 			})(cancel)
 
 			require.NoError(t, LoopPruneExecutionDataFromRootToLatestSealed(
-				ctx, unittest.Logger(), metrics, ps, bdb, headers, chunkDataPacks, results, pdb, cfg,
+				ctx, unittest.Logger(), metrics, ps, badgerimpl.ToDB(bdb), headers, chunkDataPacks, results, pdb, cfg,
 			))
 
 			// verify the chunk data packs beyond the threshold are pruned
