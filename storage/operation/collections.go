@@ -9,7 +9,9 @@ import (
 // to the constituent transactions. They do not modify transactions contained
 // by the collections.
 
-func InsertCollection(w storage.Writer, collection *flow.LightCollection) error {
+// UpsertCollection inserts a light collection into the storage.
+// If the collection already exists, it will be overwritten.
+func UpsertCollection(w storage.Writer, collection *flow.LightCollection) error {
 	return UpsertByKey(w, MakePrefix(codeCollection, collection.ID()), collection)
 }
 
@@ -26,6 +28,8 @@ func RemoveCollection(w storage.Writer, collID flow.Identifier) error {
 
 // IndexCollectionPayload indexes the transactions within the collection payload
 // of a cluster block.
+// IndexCollectionPayload will overwrite any existing index, which is acceptable
+// because the blockID is derived from txIDs within the payload, ensuring its uniqueness.
 func IndexCollectionPayload(w storage.Writer, blockID flow.Identifier, txIDs []flow.Identifier) error {
 	return UpsertByKey(w, MakePrefix(codeIndexCollection, blockID), txIDs)
 }

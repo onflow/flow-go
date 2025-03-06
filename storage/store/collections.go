@@ -29,7 +29,7 @@ func NewCollections(db storage.DB, transactions *Transactions) *Collections {
 // any error returned are exceptions
 func (c *Collections) StoreLight(collection *flow.LightCollection) error {
 	err := c.db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-		return operation.InsertCollection(rw.Writer(), collection)
+		return operation.UpsertCollection(rw.Writer(), collection)
 	})
 
 	if err != nil {
@@ -44,7 +44,7 @@ func (c *Collections) StoreLight(collection *flow.LightCollection) error {
 func (c *Collections) Store(collection *flow.Collection) error {
 	return c.db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 		light := collection.Light()
-		err := operation.InsertCollection(rw.Writer(), &light)
+		err := operation.UpsertCollection(rw.Writer(), &light)
 		if err != nil {
 			return fmt.Errorf("could not insert collection: %w", err)
 		}
@@ -129,7 +129,7 @@ func (c *Collections) StoreLightAndIndexByTransaction(collection *flow.LightColl
 	defer c.indexingByTx.Unlock()
 
 	return c.db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-		err := operation.InsertCollection(rw.Writer(), collection)
+		err := operation.UpsertCollection(rw.Writer(), collection)
 		if err != nil {
 			return fmt.Errorf("could not insert collection: %w", err)
 		}
