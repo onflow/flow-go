@@ -13,7 +13,7 @@ import (
 // Backend is a wrapper around the mutable backdata that provides concurrency-safe operations.
 type Backend struct {
 	sync.RWMutex
-	mutableBackData    mempool.MutableBackData
+	mutableBackData    mempool.MutableBackData[flow.Identifier, flow.Entity]
 	guaranteedCapacity uint
 	batchEject         BatchEjectFunc
 	eject              EjectFunc
@@ -24,7 +24,7 @@ type Backend struct {
 // This is using EjectRandomFast()
 func NewBackend(options ...OptionFunc) *Backend {
 	b := Backend{
-		mutableBackData:    backdata.NewMapBackData(),
+		mutableBackData:    backdata.NewMapBackData[flow.Identifier, flow.Entity](),
 		guaranteedCapacity: uint(math.MaxUint32),
 		batchEject:         EjectRandomFast,
 		eject:              nil,
@@ -94,22 +94,6 @@ func (b *Backend) Adjust(entityID flow.Identifier, f func(flow.Entity) flow.Enti
 	return entity, wasUpdated
 }
 
-// GetWithInit returns the given entity from the backdata. If the entity does not exist, it creates a new entity
-// using the factory function and stores it in the backdata.
-// Args:
-// - entityID: the identifier of the entity to get.
-// - init: the function that initializes the entity when it is not found.
-// Returns:
-//   - the entity.
-//
-// - a bool which indicates whether the entity was found (or created).
-func (b *Backend) GetWithInit(entityID flow.Identifier, init func() flow.Entity) (flow.Entity, bool) {
-	b.Lock()
-	defer b.Unlock()
-
-	return b.mutableBackData.GetWithInit(entityID, init)
-}
-
 // AdjustWithInit adjusts the entity using the given function if the given identifier can be found. When the
 // entity is not found, it initializes the entity using the given init function and then applies the adjust function.
 // Args:
@@ -136,12 +120,12 @@ func (b *Backend) ByID(entityID flow.Identifier) (flow.Entity, bool) {
 	// bs2 := binstat.EnterTime(binstat.BinStdmap + ".inlock.(Backend)ByID")
 	// defer binstat.Leave(bs2)
 	defer b.RUnlock()
-	entity, exists := b.mutableBackData.ByID(entityID)
+	entity, exists := b.mutableBackData.Get(entityID)
 	return entity, exists
 }
 
 // Run executes a function giving it exclusive access to the backdata
-func (b *Backend) Run(f func(backdata mempool.BackData) error) error {
+func (b *Backend) Run(f func(backdata mempool.BackData[flow.Identifier, flow.Entity]) error) error {
 	// bs1 := binstat.EnterTime(binstat.BinStdmap + ".w_lock.(Backend)Run")
 	b.Lock()
 	// binstat.Leave(bs1)
@@ -182,7 +166,7 @@ func (b *Backend) All() []flow.Entity {
 	// defer binstat.Leave(bs2)
 	defer b.RUnlock()
 
-	return b.mutableBackData.Entities()
+	return b.mutableBackData.Values()
 }
 
 // Clear removes all entities from the pool.

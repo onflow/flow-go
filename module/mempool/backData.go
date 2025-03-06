@@ -24,17 +24,6 @@ type BackData[K comparable, V any] interface {
 	// Otherwise, returns the zero value for type V and false.
 	Remove(key K) (V, bool)
 
-	// GetWithInit returns the given value from the backdata. If the value does not exist, it creates a new value
-	// using the factory function and stores it in the backdata.
-	// Args:
-	// - key: The key for which the value should be retrieved.
-	// - init: A function that initializes the value if the key is not present.
-	//
-	// Returns:
-	// - the value.
-	// - a bool which indicates whether the value was found (or created).
-	GetWithInit(key K, init func() V) (V, bool)
-
 	// Get returns the value for the given key.
 	// Returns true if the key-value pair exists, and false otherwise.
 	Get(key K) (V, bool)
