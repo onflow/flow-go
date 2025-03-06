@@ -70,7 +70,7 @@ func TestMyExecutionReceiptsStorage(t *testing.T) {
 	})
 
 	t.Run("store different receipt for same block should fail", func(t *testing.T) {
-		withStore(t, func(store *store.MyExecutionReceipts, db storage.DB) {
+		withStore(t, func(store1 storage.MyExecutionReceipts, results storage.ExecutionResults, receipts storage.ExecutionReceipts, db storage.DB) {
 			block := unittest.BlockFixture()
 
 			executor1 := unittest.IdentifierFixture()
@@ -80,12 +80,12 @@ func TestMyExecutionReceiptsStorage(t *testing.T) {
 			receipt2 := unittest.ReceiptForBlockExecutorFixture(&block, executor2)
 
 			err := db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-				return store.BatchStoreMyReceipt(receipt1, rw)
+				return store1.BatchStoreMyReceipt(receipt1, rw)
 			})
 			require.NoError(t, err)
 
 			err = db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-				return store.BatchStoreMyReceipt(receipt2, rw)
+				return store1.BatchStoreMyReceipt(receipt2, rw)
 			})
 
 			require.Error(t, err)
@@ -94,7 +94,7 @@ func TestMyExecutionReceiptsStorage(t *testing.T) {
 	})
 
 	t.Run("concurrent store different receipt for same block should fail", func(t *testing.T) {
-		withStore(t, func(store *store.MyExecutionReceipts, db storage.DB) {
+		withStore(t, func(store1 storage.MyExecutionReceipts, results storage.ExecutionResults, receipts storage.ExecutionReceipts, db storage.DB) {
 			block := unittest.BlockFixture()
 
 			executor1 := unittest.IdentifierFixture()
@@ -111,7 +111,7 @@ func TestMyExecutionReceiptsStorage(t *testing.T) {
 			go func() {
 				defer wg.Done()
 				err := db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-					return store.BatchStoreMyReceipt(receipt1, rw)
+					return store1.BatchStoreMyReceipt(receipt1, rw)
 				})
 				errChan <- err
 			}()
@@ -119,7 +119,7 @@ func TestMyExecutionReceiptsStorage(t *testing.T) {
 			go func() {
 				defer wg.Done()
 				err := db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-					return store.BatchStoreMyReceipt(receipt2, rw)
+					return store1.BatchStoreMyReceipt(receipt2, rw)
 				})
 				errChan <- err
 			}()
@@ -140,7 +140,7 @@ func TestMyExecutionReceiptsStorage(t *testing.T) {
 	})
 
 	t.Run("concurrent store of 10 different receipts for different blocks should succeed", func(t *testing.T) {
-		withStore(t, func(store *store.MyExecutionReceipts, db storage.DB) {
+		withStore(t, func(store1 storage.MyExecutionReceipts, results storage.ExecutionResults, receipts storage.ExecutionReceipts, db storage.DB) {
 			var wg sync.WaitGroup
 			errChan := make(chan error, 10)
 
@@ -155,7 +155,7 @@ func TestMyExecutionReceiptsStorage(t *testing.T) {
 					receipt := unittest.ReceiptForBlockExecutorFixture(&block, executor)
 
 					err := db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-						return store.BatchStoreMyReceipt(receipt, rw)
+						return store1.BatchStoreMyReceipt(receipt, rw)
 					})
 
 					errChan <- err
