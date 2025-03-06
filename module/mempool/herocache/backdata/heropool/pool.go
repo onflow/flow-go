@@ -274,7 +274,7 @@ func (p *Pool[K, V]) invalidateEntityAtIndex(sliceIndex EIndex) V {
 // a valid entity.
 func (p *Pool[K, V]) isInvalidated(sliceIndex EIndex) bool {
 	var zeroKey K
-	//var zeroValue V
+	var zeroValue V
 
 	if p.poolEntities[sliceIndex].key != zeroKey {
 		return false

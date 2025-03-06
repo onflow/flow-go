@@ -8,7 +8,6 @@ import (
 	"github.com/rs/zerolog"
 	"go.uber.org/atomic"
 
-	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/mempool/herocache/backdata/heropool"
 	"github.com/onflow/flow-go/utils/logging"
@@ -115,7 +114,7 @@ func NewCache[K comparable, V any](
 	ejectionMode heropool.EjectionMode,
 	logger zerolog.Logger,
 	collector module.HeroCacheMetrics,
-	opts ...CacheOpt,
+	opts ...CacheOpt[K, V],
 ) *Cache[K, V] {
 
 	// total buckets.
@@ -162,19 +161,19 @@ func (c *Cache[K, V]) Has(key K) bool {
 
 // Add adds the given entity to the backdata and returns true if the entity was added or false if
 // a valid entity already exists for the provided ID.
-func (c *Cache) Add(entityID flow.Identifier, entity flow.Entity) bool {
+func (c *Cache[K, V]) Add(entityID K, entity V) bool {
 	defer c.logTelemetry()
 	return c.put(entityID, entity)
 }
 
 // Remove removes the entity with the given identifier and returns the removed entity and true if
 // the entity was removed or false if the entity was not found.
-func (c *Cache) Remove(entityID flow.Identifier) (flow.Entity, bool) {
+func (c *Cache[K, V]) Remove(entityID K) (value V, ok bool) {
 	defer c.logTelemetry()
 
 	entity, bucketIndex, sliceIndex, exists := c.get(entityID)
 	if !exists {
-		return nil, false
+		return value, false
 	}
 	// removes value from underlying entities list.
 	c.invalidateEntity(bucketIndex, sliceIndex)
@@ -188,12 +187,12 @@ func (c *Cache) Remove(entityID flow.Identifier) (flow.Entity, bool) {
 
 // Adjust adjusts the entity using the given function if the given identifier can be found.
 // Returns a bool which indicates whether the entity was updated as well as the updated entity.
-func (c *Cache) Adjust(entityID flow.Identifier, f func(flow.Entity) flow.Entity) (flow.Entity, bool) {
+func (c *Cache[K, V]) Adjust(entityID K, f func(V) V) (value V, ok bool) {
 	defer c.logTelemetry()
 
 	entity, removed := c.Remove(entityID)
 	if !removed {
-		return nil, false
+		return value, false
 	}
 
 	newEntity := f(entity)
@@ -214,7 +213,7 @@ func (c *Cache) Adjust(entityID flow.Identifier, f func(flow.Entity) flow.Entity
 //   - the adjusted entity.
 //
 // - a bool which indicates whether the entity was adjusted.
-func (c *Cache) AdjustWithInit(entityID flow.Identifier, adjust func(flow.Entity) flow.Entity, init func() flow.Entity) (flow.Entity, bool) {
+func (c *Cache[K, V]) AdjustWithInit(entityID K, adjust func(V) V, init func() V) (V, bool) {
 	defer c.logTelemetry()
 
 	if c.Has(entityID) {
@@ -224,8 +223,8 @@ func (c *Cache) AdjustWithInit(entityID flow.Identifier, adjust func(flow.Entity
 	return c.Adjust(entityID, adjust)
 }
 
-// ByID returns the given entity from the backdata.
-func (c *Cache) ByID(entityID flow.Identifier) (flow.Entity, bool) {
+// Get returns the given entity from the backdata.
+func (c *Cache[K, V]) Get(entityID K) (V, bool) {
 	defer c.logTelemetry()
 
 	entity, _, _, ok := c.get(entityID)
@@ -233,7 +232,7 @@ func (c *Cache) ByID(entityID flow.Identifier) (flow.Entity, bool) {
 }
 
 // Size returns the size of the backdata, i.e., total number of stored (entityId, entity) pairs.
-func (c *Cache) Size() uint {
+func (c *Cache[K, V]) Size() uint {
 	defer c.logTelemetry()
 
 	return uint(c.entities.Size())
@@ -241,16 +240,16 @@ func (c *Cache) Size() uint {
 
 // Head returns the head of queue.
 // Boolean return value determines whether there is a head available.
-func (c *Cache) Head() (flow.Entity, bool) {
+func (c *Cache[K, V]) Head() (V, bool) {
 	return c.entities.Head()
 }
 
 // All returns all entities stored in the backdata.
-func (c *Cache) All() map[flow.Identifier]flow.Entity {
+func (c *Cache[K, V]) All() map[K]V {
 	defer c.logTelemetry()
 
 	entitiesList := c.entities.All()
-	all := make(map[flow.Identifier]flow.Entity, len(c.entities.All()))
+	all := make(map[K]V, len(c.entities.All()))
 
 	total := len(entitiesList)
 	for i := 0; i < total; i++ {
@@ -261,11 +260,11 @@ func (c *Cache) All() map[flow.Identifier]flow.Entity {
 	return all
 }
 
-// Identifiers returns the list of identifiers of entities stored in the backdata.
-func (c *Cache) Identifiers() flow.IdentifierList {
+// Keys returns the list of identifiers of entities stored in the backdata.
+func (c *Cache[K, V]) Keys() []K {
 	defer c.logTelemetry()
 
-	ids := make(flow.IdentifierList, c.entities.Size())
+	ids := make([]K, c.entities.Size())
 	for i, p := range c.entities.All() {
 		ids[i] = p.Id()
 	}
@@ -273,11 +272,11 @@ func (c *Cache) Identifiers() flow.IdentifierList {
 	return ids
 }
 
-// Entities returns the list of entities stored in the backdata.
-func (c *Cache) Entities() []flow.Entity {
+// Values returns the list of entities stored in the backdata.
+func (c *Cache[K, V]) Values() []V {
 	defer c.logTelemetry()
 
-	entities := make([]flow.Entity, c.entities.Size())
+	entities := make([]V, c.entities.Size())
 	for i, p := range c.entities.All() {
 		entities[i] = p.Entity()
 	}
@@ -286,11 +285,11 @@ func (c *Cache) Entities() []flow.Entity {
 }
 
 // Clear removes all entities from the backdata.
-func (c *Cache) Clear() {
+func (c *Cache[K, V]) Clear() {
 	defer c.logTelemetry()
 
 	c.buckets = make([]slotBucket, c.bucketNum)
-	c.entities = heropool.NewHeroPool(c.sizeLimit, c.ejectionMode, c.logger)
+	c.entities = heropool.NewHeroPool[K, V](c.sizeLimit, c.ejectionMode, c.logger)
 	c.availableSlotHistogram = make([]uint64, slotsPerBucket+1)
 	c.interactionCounter = atomic.NewUint64(0)
 	c.lastTelemetryDump = atomic.NewInt64(0)
