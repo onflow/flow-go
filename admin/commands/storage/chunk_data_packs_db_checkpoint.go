@@ -3,8 +3,6 @@ package storage
 import (
 	"context"
 	"fmt"
-	"path"
-	"time"
 
 	"github.com/cockroachdb/pebble"
 	"github.com/rs/zerolog/log"
@@ -48,10 +46,4 @@ func (c *ChunksCheckpointCommand) Handler(ctx context.Context, req *admin.Comman
 
 func (c *ChunksCheckpointCommand) Validator(req *admin.CommandRequest) error {
 	return nil
-}
-
-func nextTmpFolder(dir string) string {
-	// use timestamp as folder name
-	folderName := time.Now().Format("2006-01-02_15-04-05")
-	return path.Join(dir, folderName)
 }
