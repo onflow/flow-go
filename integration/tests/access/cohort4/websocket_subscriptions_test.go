@@ -123,10 +123,10 @@ func (s *WebsocketSubscriptionSuite) SetupTest() {
 
 	s.net.Start(s.ctx)
 
-	accessUrl := fmt.Sprintf("localhost:%s", s.net.ContainerByName(testnet.PrimaryAN).Port(testnet.GRPCPort))
-	var err error
-	s.grpcClient, err = common.GetAccessAPIClient(accessUrl)
+	sdkClient, err := s.net.ContainerByName(testnet.PrimaryAN).SDKClient()
 	s.Require().NoError(err)
+	
+	s.grpcClient = sdkClient.RPCClient()
 
 	s.serviceClient, err = s.net.ContainerByName(testnet.PrimaryAN).TestnetClient()
 	s.Require().NoError(err)

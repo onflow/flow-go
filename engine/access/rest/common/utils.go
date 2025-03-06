@@ -48,6 +48,7 @@ func ParseBody(raw io.Reader, dst interface{}) error {
 		return fmt.Errorf("request body must not be empty")
 	}
 
+	// verify the request contained exactly one json object
 	err = dec.Decode(&struct{}{})
 	if err != io.EOF {
 		return fmt.Errorf("request body must only contain a single JSON object")

@@ -480,9 +480,8 @@ func (c *Controller) handleSubscribe(ctx context.Context, msg models.SubscribeMe
 	c.dataProvidersGroup.Add(1)
 	go func() {
 		err = provider.Run()
-		// context.Canceled error is expected cause was initiated by closing this provider
-		// during the unsubscribe action. Without this check, the base error context.Canceled
-		// will always be sent, even when simply unsubscribing from a topic.
+		// return the error to the client for all errors except context.Canceled.
+		// context.Canceled is returned during graceful shutdown of a subscription
 		if err != nil && !errors.Is(err, context.Canceled) {
 			err = fmt.Errorf("internal error: %w", err)
 			c.writeErrorResponse(
