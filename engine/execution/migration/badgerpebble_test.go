@@ -67,7 +67,6 @@ func TestMigrateLastSealedExecutedResultToPebble(t *testing.T) {
 				commits,
 				nil,
 				headers,
-				collections,
 				chunkDataPacks,
 				results,
 				myReceipts,

@@ -70,7 +70,7 @@ func TestMyExecutionReceiptsStorage(t *testing.T) {
 	})
 
 	t.Run("store different receipt for same block should fail", func(t *testing.T) {
-		withStore(t, func(store *store.MyExecutionReceipts, db storage.DB) {
+		withStore(t, func(store storage.MyExecutionReceipts, _ storage.ExecutionResults, _ storage.ExecutionReceipts, db storage.DB) {
 			block := unittest.BlockFixture()
 
 			executor1 := unittest.IdentifierFixture()
@@ -94,7 +94,7 @@ func TestMyExecutionReceiptsStorage(t *testing.T) {
 	})
 
 	t.Run("concurrent store different receipt for same block should fail", func(t *testing.T) {
-		withStore(t, func(store *store.MyExecutionReceipts, db storage.DB) {
+		withStore(t, func(store storage.MyExecutionReceipts, _ storage.ExecutionResults, _ storage.ExecutionReceipts, db storage.DB) {
 			block := unittest.BlockFixture()
 
 			executor1 := unittest.IdentifierFixture()
@@ -140,7 +140,7 @@ func TestMyExecutionReceiptsStorage(t *testing.T) {
 	})
 
 	t.Run("concurrent store of 10 different receipts for different blocks should succeed", func(t *testing.T) {
-		withStore(t, func(store *store.MyExecutionReceipts, db storage.DB) {
+		withStore(t, func(store storage.MyExecutionReceipts, _ storage.ExecutionResults, _ storage.ExecutionReceipts, db storage.DB) {
 			var wg sync.WaitGroup
 			errChan := make(chan error, 10)
 
