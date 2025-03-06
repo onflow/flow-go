@@ -97,16 +97,16 @@ func MigrateLastSealedExecutedResultToPebble(logger zerolog.Logger, badgerDB *ba
 			lg.Info().Msgf("existing executed block %v in pebble is older than %v in badger, update executed block",
 				header.Height, lastExecutedSealedHeightInBadger,
 			)
-		}
-
-		if !errors.Is(err, storage.ErrNotFound) {
+		} else if !errors.Is(err, storage.ErrNotFound) {
 			// exception
 			return fmt.Errorf("failed to retrieve executed block from pebble: %w", err)
 		}
 
-		// no executed block in pebble or badger has newer executed block than pebble,
-		// set this block as last executed block
-		// if there is no executed block in pebble, set this block as last executed block
+		// two cases here:
+		// 1. no executed block in pebble
+		// 		in this case: set this block as last executed block
+		// 2. badger has newer executed block than pebble
+		//		in this case: set this block as last executed block
 		if err := operation.UpdateExecutedBlock(batch.Writer(), blockID); err != nil {
 			return fmt.Errorf("failed to update executed block in pebble: %w", err)
 		}
