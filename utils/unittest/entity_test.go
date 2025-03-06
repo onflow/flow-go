@@ -1,9 +1,9 @@
 package unittest
 
 import (
-	clone "github.com/huandu/go-clone/generic"
 	"testing"
 
+	clone "github.com/huandu/go-clone/generic"
 	"github.com/onflow/crypto"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/exp/slices"
