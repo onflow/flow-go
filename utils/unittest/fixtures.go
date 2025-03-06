@@ -380,6 +380,21 @@ func BlockWithParentFixture(parent *flow.Header) *flow.Block {
 	}
 }
 
+// making sure the new block has a unique view
+func BlockWithParentFixtureAndUniqueView(parent *flow.Header, viewIndex map[uint64]struct{}) *flow.Block {
+	block := BlockWithParentFixture(parent)
+	_, ok := viewIndex[block.Header.View]
+	// if !ok, means can't find this view, then the block has unique view
+	if !ok {
+		// add this view to the index
+		viewIndex[block.Header.View] = struct{}{}
+		return block
+	}
+
+	// retry until find a block with unique view
+	return BlockWithParentFixtureAndUniqueView(parent, viewIndex)
+}
+
 func BlockWithParentProtocolState(parent *flow.Block) *flow.Block {
 	payload := PayloadFixture(WithProtocolStateID(parent.Payload.ProtocolStateID))
 	header := BlockHeaderWithParentFixture(parent.Header)
@@ -388,6 +403,20 @@ func BlockWithParentProtocolState(parent *flow.Block) *flow.Block {
 		Header:  header,
 		Payload: &payload,
 	}
+}
+
+// making sure the new block has a unique view
+func BlockWithParentProtocolStateAndUniqueView(parent *flow.Block, viewIndex map[uint64]struct{}) *flow.Block {
+	block := BlockWithParentProtocolState(parent)
+	_, ok := viewIndex[block.Header.View]
+	// if !ok, means can't find this view, then the block has unique view
+	if !ok {
+		// add this view to the index
+		viewIndex[block.Header.View] = struct{}{}
+		return block
+	}
+
+	return BlockWithParentProtocolStateAndUniqueView(parent, viewIndex)
 }
 
 func BlockWithGuaranteesFixture(guarantees []*flow.CollectionGuarantee) *flow.Block {
