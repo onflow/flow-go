@@ -8,6 +8,7 @@ import (
 	"github.com/dgraph-io/badger/v2"
 	"github.com/rs/zerolog"
 
+	"github.com/onflow/flow-go/engine/execution/state/bootstrap"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/block_iterator/latest"
 	"github.com/onflow/flow-go/module/metrics"
@@ -19,15 +20,33 @@ import (
 	"github.com/onflow/flow-go/storage/store"
 )
 
-// MigrateLastSealedExecutedResultToPebble copy execution data of the last sealed and executed block from badger to pebble.
-// the execution data includes the execution result and statecommitment, which is the minimum data needed from the database
-// to be able to continue executing the next block
-func MigrateLastSealedExecutedResultToPebble(logger zerolog.Logger, badgerDB *badger.DB, pebbleDB *pebble.DB, ps protocol.State) error {
+// MigrateLastSealedExecutedResultToPebble run the migration to the pebble database, so that
+// it has necessary data to be able execute the next block.
+// the migration includes the following operations:
+//  1. bootstrap the pebble database
+//  2. copy execution data of the last sealed and executed block from badger to pebble.
+//     the execution data includes the execution result and statecommitment, which is the minimum data needed from the database
+//     to be able to continue executing the next block
+func MigrateLastSealedExecutedResultToPebble(logger zerolog.Logger, badgerDB *badger.DB, pebbleDB *pebble.DB, ps protocol.State, rootSeal *flow.Seal) error {
 	// TODO: skip migration in the next spork
 
 	bdb := badgerimpl.ToDB(badgerDB)
 	pdb := pebbleimpl.ToDB(pebbleDB)
 	lg := logger.With().Str("module", "badger-pebble-migration").Logger()
+
+	// bootstrap pebble database
+	bootstrapper := bootstrap.NewBootstrapper(logger)
+	commit, bootstrapped, err := bootstrapper.IsBootstrapped(pdb)
+	if err != nil {
+		return fmt.Errorf("could not query database to know whether database has been bootstrapped: %w", err)
+	}
+
+	if !bootstrapped {
+		err = bootstrapper.BootstrapExecutionDatabase(pdb, rootSeal)
+		if err != nil {
+			return fmt.Errorf("could not bootstrap pebble execution database: %w", err)
+		}
+	}
 
 	// get last sealed and executed block in badger
 	lastExecutedSealedHeightInBadger, err := latest.LatestSealedAndExecutedHeight(ps, bdb)
@@ -82,7 +101,7 @@ func MigrateLastSealedExecutedResultToPebble(logger zerolog.Logger, badgerDB *ba
 
 			header, err := ps.AtBlockID(existingExecuted).Head()
 			if err != nil {
-				return fmt.Errorf("failed to get block at height from badger %d: %w", lastExecutedSealedHeightInBadger, err)
+				return fmt.Errorf("failed to get block at height %d from badger: %w", lastExecutedSealedHeightInBadger, err)
 			}
 
 			if header.Height > lastExecutedSealedHeightInBadger {
