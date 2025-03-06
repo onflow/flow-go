@@ -1377,7 +1377,10 @@ func (exeNode *ExecutionNode) LoadBootstrapper(node *NodeConfig) error {
 	// check if the execution database already exists
 	bootstrapper := bootstrap.NewBootstrapper(node.Logger)
 
-	commit, bootstrapped, err := bootstrapper.IsBootstrapped(node.ProtocolDB)
+	// in order to support switching from badger to pebble in the middle of the spork,
+	// we will check if the execution database has been bootstrapped by reading the state from badger db.
+	// and if not, bootstrap both badger and pebble db.
+	commit, bootstrapped, err := bootstrapper.IsBootstrapped(badgerimpl.ToDB(node.DB))
 	if err != nil {
 		return fmt.Errorf("could not query database to know whether database has been bootstrapped: %w", err)
 	}
@@ -1402,7 +1405,12 @@ func (exeNode *ExecutionNode) LoadBootstrapper(node *NodeConfig) error {
 			return fmt.Errorf("could not load bootstrap state from checkpoint file: %w", err)
 		}
 
-		err = bootstrapper.BootstrapExecutionDatabase(node.ProtocolDB, node.RootSeal)
+		err = bootstrapper.BootstrapExecutionDatabase(badgerimpl.ToDB(node.DB), node.RootSeal)
+		if err != nil {
+			return fmt.Errorf("could not bootstrap execution database: %w", err)
+		}
+
+		err = bootstrapper.BootstrapExecutionDatabase(pebbleimpl.ToDB(node.PebbleDB), node.RootSeal)
 		if err != nil {
 			return fmt.Errorf("could not bootstrap execution database: %w", err)
 		}
