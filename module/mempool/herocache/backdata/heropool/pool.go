@@ -17,7 +17,7 @@ const (
 	NoEjection     = EjectionMode("no-ejection")
 )
 
-// StateIndex is a type of a state of a placeholder in a pool.
+// StateIndex is a type of state of a placeholder in a pool.
 type StateIndex uint
 
 const numberOfStates = 2
@@ -29,7 +29,7 @@ const ( // iota is reset to 0
 // EIndex is data type representing an entity index in Pool.
 type EIndex uint32
 
-// InvalidIndex is used when a link doesnt point anywhere, in other words it is an equivalent of a nil address.
+// InvalidIndex is used when a link doesn't point anywhere, in other words it is an equivalent of a nil address.
 const InvalidIndex EIndex = math.MaxUint32
 
 // poolEntity represents the data type that is maintained by

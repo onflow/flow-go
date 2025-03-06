@@ -19,7 +19,7 @@ import (
 func TestArrayBackData_SingleBucket(t *testing.T) {
 	limit := 16
 
-	bd := NewCache(uint32(limit),
+	bd := NewCache[flow.Identifier, *unittest.MockEntity](uint32(limit),
 		1,
 		heropool.LRUEjection,
 		unittest.Logger(),
@@ -52,7 +52,7 @@ func TestArrayBackData_SingleBucket(t *testing.T) {
 func TestArrayBackData_Adjust(t *testing.T) {
 	limit := 100_000
 
-	bd := NewCache(uint32(limit),
+	bd := NewCache[flow.Identifier, *unittest.MockEntity](uint32(limit),
 		8,
 		heropool.LRUEjection,
 		unittest.Logger(),
@@ -66,7 +66,7 @@ func TestArrayBackData_Adjust(t *testing.T) {
 	// picks a random entity from BackData and adjusts its identifier to a new one.
 	entityIndex := rand.Int() % limit
 	// checking integrity of retrieving entity
-	oldEntity, ok := bd.ByID(entities[entityIndex].ID())
+	oldEntity, ok := bd.Get(entities[entityIndex].ID())
 	require.True(t, ok)
 	oldEntityID := oldEntity.ID()
 	require.Equal(t, entities[entityIndex].ID(), oldEntityID)
@@ -77,12 +77,12 @@ func TestArrayBackData_Adjust(t *testing.T) {
 	require.NotEqual(t, oldEntityID, newEntityID)
 
 	// adjusts old entity to a new entity with a new identifier
-	newEntity, ok := bd.Adjust(oldEntity.ID(), func(entity flow.Entity) flow.Entity {
-		mockEntity, ok := entity.(*unittest.MockEntity)
+	newEntity, ok := bd.Adjust(oldEntity.ID(), func(entity *unittest.MockEntity) *unittest.MockEntity {
+		//mockEntity, ok := entity.(*unittest.MockEntity)
 		require.True(t, ok)
 		// oldEntity must be passed to func parameter of adjust.
-		require.Equal(t, oldEntityID, mockEntity.ID())
-		require.Equal(t, oldEntity, mockEntity)
+		require.Equal(t, oldEntityID, entity.ID())
+		require.Equal(t, oldEntity, entity)
 
 		return &unittest.MockEntity{Identifier: newEntityID}
 	})
@@ -479,7 +479,7 @@ func TestArrayBackData_Remove(t *testing.T) {
 
 // testAddEntities is a test helper that checks entities are added successfully to the Cache.
 // and each entity is retrievable right after it is written to backdata.
-func testAddEntities(t *testing.T, bd *Cache, entities []*unittest.MockEntity, ejection heropool.EjectionMode) {
+func testAddEntities(t *testing.T, bd *Cache[flow.Identifier, *unittest.MockEntity], entities []*unittest.MockEntity, ejection heropool.EjectionMode) {
 	// initially, head should be undefined
 	e, ok := bd.Head()
 	require.False(t, ok)
