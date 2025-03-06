@@ -26,7 +26,6 @@ import (
 	"github.com/onflow/cadence/test_utils/runtime_utils"
 	"github.com/onflow/crypto"
 	"github.com/onflow/flow-core-contracts/lib/go/contracts"
-	"github.com/onflow/flow-core-contracts/lib/go/templates"
 	bridge "github.com/onflow/flow-evm-bridge"
 	flowsdk "github.com/onflow/flow-go-sdk"
 	"github.com/onflow/flow-go-sdk/test"
@@ -3144,16 +3143,7 @@ func TestVMBridge(t *testing.T) {
 
 			sc := systemcontracts.SystemContractsForChain(chain.ChainID())
 
-			env := templates.Environment{
-				ServiceAccountAddress:             chain.ServiceAddress().String(),
-				FungibleTokenAddress:              sc.FungibleToken.Address.Hex(),
-				FlowTokenAddress:                  sc.FlowToken.Address.Hex(),
-				EVMAddress:                        sc.EVMContract.Address.Hex(),
-				ViewResolverAddress:               chain.ServiceAddress().String(),
-				FungibleTokenMetadataViewsAddress: sc.FungibleToken.Address.Hex(),
-				MetadataViewsAddress:              sc.NonFungibleToken.Address.Hex(),
-				BurnerAddress:                     chain.ServiceAddress().String(),
-			}
+			env := sc.AsTemplateEnv()
 
 			bridgeEnv := bridge.Environment{
 				CrossVMNFTAddress:                     env.ServiceAccountAddress,
@@ -3195,25 +3185,21 @@ func TestVMBridge(t *testing.T) {
 				chain)
 			require.NoError(t, err)
 
-			txBody := transferTokensTx(chain).
-				AddAuthorizer(chain.ServiceAddress()).
-				AddArgument(jsoncdc.MustEncode(cadence.UFix64(2.0))).
-				AddArgument(jsoncdc.MustEncode(cadence.NewAddress(accounts[0])))
-
-			txBody.SetProposalKey(chain.ServiceAddress(), 0, 0)
-			txBody.SetPayer(chain.ServiceAddress())
-
-			err = testutil.SignEnvelope(
-				txBody,
+			txBody := blueprints.TransferFlowTokenTransaction(
 				chain.ServiceAddress(),
-				unittest.ServiceAccountPrivateKey,
+				accounts[0],
+				"2.0",
+				env,
 			)
+
+			err = testutil.SignTransactionAsServiceAccount(txBody, 0, chain)
 			require.NoError(t, err)
 
 			executionSnapshot, output, err := vm.Run(
 				ctx,
 				fvm.Transaction(txBody, 0),
 				snapshotTree)
+
 			require.NoError(t, err)
 			require.NoError(t, output.Err)
 
@@ -3382,18 +3368,7 @@ func TestVMBridge(t *testing.T) {
 
 			sc := systemcontracts.SystemContractsForChain(chain.ChainID())
 
-			env := templates.Environment{
-				ServiceAccountAddress:             chain.ServiceAddress().String(),
-				FungibleTokenAddress:              sc.FungibleToken.Address.Hex(),
-				FlowTokenAddress:                  sc.FlowToken.Address.Hex(),
-				EVMAddress:                        sc.EVMContract.Address.Hex(),
-				ViewResolverAddress:               chain.ServiceAddress().String(),
-				FungibleTokenMetadataViewsAddress: sc.FungibleToken.Address.Hex(),
-				MetadataViewsAddress:              sc.NonFungibleToken.Address.Hex(),
-				NonFungibleTokenAddress:           sc.NonFungibleToken.Address.Hex(),
-				CrossVMMetadataViewsAddress:       sc.NonFungibleToken.Address.Hex(),
-				BurnerAddress:                     chain.ServiceAddress().String(),
-			}
+			env := sc.AsTemplateEnv()
 
 			bridgeEnv := bridge.Environment{
 				CrossVMNFTAddress:                     env.ServiceAccountAddress,
@@ -3435,25 +3410,21 @@ func TestVMBridge(t *testing.T) {
 				chain)
 			require.NoError(t, err)
 
-			txBody := transferTokensTx(chain).
-				AddAuthorizer(chain.ServiceAddress()).
-				AddArgument(jsoncdc.MustEncode(cadence.UFix64(2.0))).
-				AddArgument(jsoncdc.MustEncode(cadence.NewAddress(accounts[0])))
-
-			txBody.SetProposalKey(chain.ServiceAddress(), 0, 0)
-			txBody.SetPayer(chain.ServiceAddress())
-
-			err = testutil.SignEnvelope(
-				txBody,
+			txBody := blueprints.TransferFlowTokenTransaction(
 				chain.ServiceAddress(),
-				unittest.ServiceAccountPrivateKey,
+				accounts[0],
+				"2.0",
+				env,
 			)
+
+			err = testutil.SignTransactionAsServiceAccount(txBody, 0, chain)
 			require.NoError(t, err)
 
 			executionSnapshot, output, err := vm.Run(
 				ctx,
 				fvm.Transaction(txBody, 0),
 				snapshotTree)
+
 			require.NoError(t, err)
 			require.NoError(t, output.Err)
 
