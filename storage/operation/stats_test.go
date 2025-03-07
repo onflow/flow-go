@@ -54,7 +54,7 @@ func TestSummarizeKeysByFirstByteConcurrent(t *testing.T) {
 		require.NoError(t, err)
 
 		// summarize keys by first byte
-		stats, err := operation.SummarizeKeysByFirstByteConcurrent(db.Reader(), 10)
+		stats, err := operation.SummarizeKeysByFirstByteConcurrent(unittest.Logger(), db.Reader(), 10)
 		require.NoError(t, err)
 
 		// print

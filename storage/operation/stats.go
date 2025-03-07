@@ -8,6 +8,7 @@ import (
 
 	"github.com/rs/zerolog"
 
+	"github.com/onflow/flow-go/module/util"
 	"github.com/onflow/flow-go/storage"
 )
 
@@ -24,7 +25,7 @@ type Stats struct {
 // using nWorker goroutines. Each worker handles one prefix at a time until all are processed.
 //
 // The storage.Reader must be able to create multiple iterators concurrently.
-func SummarizeKeysByFirstByteConcurrent(r storage.Reader, nWorker int) (map[byte]Stats, error) {
+func SummarizeKeysByFirstByteConcurrent(log zerolog.Logger, r storage.Reader, nWorker int) (map[byte]Stats, error) {
 	// We'll have at most 256 possible prefixes (0x00..0xFF).
 	// Create tasks (one per prefix), a results channel, and a wait group.
 	taskChan := make(chan byte, 256)
@@ -56,6 +57,12 @@ func SummarizeKeysByFirstByteConcurrent(r storage.Reader, nWorker int) (map[byte
 		}()
 	}
 
+	progress := util.LogProgress(log,
+		util.DefaultLogProgressConfig(
+			"Summarizing keys by first byte",
+			256,
+		))
+
 	// Send all prefixes [0..255] to taskChan.
 	for p := 0; p < 256; p++ {
 		taskChan <- byte(p)
@@ -77,6 +84,7 @@ func SummarizeKeysByFirstByteConcurrent(r storage.Reader, nWorker int) (map[byte
 			return nil, res.err
 		}
 		finalStats[res.prefix] = res.stats
+		progress(1) // log the progress
 	}
 
 	return finalStats, nil
