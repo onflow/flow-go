@@ -108,6 +108,9 @@ func TestMigrateLastSealedExecutedResultToPebble(t *testing.T) {
 			// mock that the executed block is the last executed and sealed block
 			ps := new(protocolmock.State)
 			mockSnapshot := createSnapshot(header)
+			params := new(protocolmock.Params)
+			params.On("SporkID").Return(mainnet26SporkID)
+			ps.On("Params").Return(params)
 			ps.On("AtHeight", mock.Anything).Return(
 				func(height uint64) protocol.Snapshot {
 					if height == header.Height {
