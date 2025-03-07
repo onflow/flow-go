@@ -7,7 +7,9 @@ import (
 // Headers represents persistent storage for blocks.
 type Headers interface {
 
-	// Store will store a header.
+	// Store persists a new header.
+	// Expected errors during normal operation:
+	//   - storage.ErrAlreadyExists if the header has already been persisted
 	Store(header *flow.Header) error
 
 	// ByBlockID returns the header with the given ID. It is available for finalized and ambiguous blocks.
@@ -17,6 +19,14 @@ type Headers interface {
 
 	// ByHeight returns the block with the given number. It is only available for finalized blocks.
 	ByHeight(height uint64) (*flow.Header, error)
+
+	// ByView returns the block with the given view. It is only available for certified blocks.
+	// Certified blocks are the blocks that have received QC. Hotstuff guarantees that for each view,
+	// at most one block is certified. Hence, the return value of `ByView` is guaranteed to be unique
+	// oven for non-finalized blocks.
+	//
+	// TODO: this method is not available until next spork (mainnet27) or a migration that builds the index.
+	// ByView(view uint64) (*flow.Header, error)
 
 	// Exists returns true if a header with the given ID has been stored.
 	// No errors are expected during normal operation.
