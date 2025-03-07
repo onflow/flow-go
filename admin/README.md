@@ -125,3 +125,9 @@ curl localhost:9002/admin/run_command -H 'Content-Type: application/json' -d '{"
 ```
 curl localhost:9002/admin/run_command -H 'Content-Type: application/json' -d '{"commandName": "create-chunk-data-packs-checkpoint" }'
 ```
+
+### Trigger pebble protocol database checkpoints
+Useful for reading protocol state data from the checkpoints using the read-badger util without stopping the node process.
+```
+curl localhost:9002/admin/run_command -H 'Content-Type: application/json' -d '{"commandName": "create-pebble-checkpoint" }'
+```
