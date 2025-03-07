@@ -161,7 +161,7 @@ func GenerateRecoverTxArgsWithDKG(
 	// Filter internalNodes so it only contains nodes which are valid for inclusion in the epoch
 	// This is a safety measure: just in case subsequent functions don't properly account for additional nodes,
 	// we proactively remove them from consideration here.
-	internalNodes = slices.DeleteFunc(internalNodes, func(info model.NodeInfo) bool {
+	internalNodes = slices.DeleteFunc(slices.Clone(internalNodes), func(info model.NodeInfo) bool {
 		_, isCurrentEligibleEpochParticipant := internalNodesMap[info.NodeID]
 		return !isCurrentEligibleEpochParticipant
 	})
@@ -174,7 +174,7 @@ func GenerateRecoverTxArgsWithDKG(
 		}
 	}
 
-	log.Info().Msgf("computing %d collection node clusters for %d partners / %d internals", collectionClusters, len(partnerCollectors), len(internalCollectors))
+	log.Info().Msgf("partitioning %d partners + %d internal nodes into %d collector clusters", len(partnerCollectors), len(internalCollectors), collectionClusters)
 	assignments, clusters, err := common.ConstructClusterAssignment(log, partnerCollectors, internalCollectors, collectionClusters)
 	if err != nil {
 		return nil, fmt.Errorf("unable to generate cluster assignment: %w", err)
