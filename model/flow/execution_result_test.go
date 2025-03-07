@@ -15,9 +15,9 @@ import (
 // the [flow.IDEntity] interface, is resistant to tampering.
 func TestExecutionResultID_Malleability(t *testing.T) {
 	unittest.RequireEntityNonMalleable(t,
-		unittest.ExecutionResultFixture(unittest.WithServiceEvents(3)),
-		unittest.WithTypeGenerator(func() flow.ServiceEvent {
-			return unittest.ServiceEventsFixture(1)[0]
+		unittest.ExecutionResultFixture(),
+		unittest.WithFieldGenerator("ServiceEvents", func() []flow.ServiceEvent {
+			return unittest.ServiceEventsFixture(3)
 		}))
 }
 
