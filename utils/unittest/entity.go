@@ -66,7 +66,7 @@ func RequireEntityNonMalleable(t *testing.T, entity flow.IDEntity, ops ...Mallea
 // If checker encounters a field that is nil, it will create a new instance of the field and continue the check.
 // If checker encounters a nil/empty slice or map, it will create a new instance of the slice/map, insert a value and continue the check.
 // In rare cases, a type may have a different ID computation depending on whether a field is nil.
-// In such cases, we can use the WithPinnedField to skip malleability checks on this field.
+// In such cases, we can use the WithPinnedField option to skip malleability checks on this field.
 //
 // This checker heavily relies on generation of random values for the fields based on their type. All types are split into three categories:
 //  1. structures, primitives, slices, arrays, maps (generateRandomReflectValue)
@@ -114,7 +114,7 @@ func WithTypeGenerator[T any](generator func() T) MalleabilityCheckerOpt {
 }
 
 // WithPinnedField allows to skip malleability checks for the given field. If a field with given path is encountered, the MalleabilityChecker
-// will skip the check for this field. Pinning is mutually exclusive with field generators, meaning if a field is pinned, the checker will not
+// will skip the check for this field. Pinning is mutually exclusive with field generators, meaning if a field is pinned, the checker will not use
 // the generator and vice versa.
 // An example usage would be:
 //
