@@ -86,12 +86,19 @@ func TestMigrateLastSealedExecutedResultToPebble(t *testing.T) {
 			&unittest.GenesisStateCommitment)
 		header := executableBlock.Block.Header
 
-		err = headers.Store(header)
-		require.NoError(t, err)
-
 		computationResult := testutil.ComputationResultFixture(t)
 		computationResult.ExecutableBlock = executableBlock
 		computationResult.ExecutionReceipt.ExecutionResult.BlockID = header.ID()
+
+		commit := computationResult.CurrentEndState()
+		newexecutableBlock := unittest.ExecutableBlockFixtureWithParent(
+			nil,
+			header,
+			&commit)
+		newheader := newexecutableBlock.Block.Header
+
+		err = headers.Store(header)
+		require.NoError(t, err)
 
 		// save execution results
 		err = es.SaveExecutionResults(context.Background(), computationResult)
@@ -105,27 +112,35 @@ func TestMigrateLastSealedExecutedResultToPebble(t *testing.T) {
 
 		// mock that the executed block is the last executed and sealed block
 		ps := new(protocolmock.State)
-		mockSnapshot := createSnapshot(header)
 		params := new(protocolmock.Params)
 		params.On("SporkID").Return(mainnet26SporkID)
 		ps.On("Params").Return(params)
 		ps.On("AtHeight", mock.Anything).Return(
 			func(height uint64) protocol.Snapshot {
 				if height == header.Height {
-					return mockSnapshot
+					return createSnapshot(header)
+				} else if height == newheader.Height {
+					return createSnapshot(newheader)
 				}
 				return invalid.NewSnapshot(fmt.Errorf("invalid height: %v", height))
 			})
 		ps.On("AtBlockID", mock.Anything).Return(
 			func(blockID flow.Identifier) protocol.Snapshot {
 				if blockID == header.ID() {
-					return mockSnapshot
+					return createSnapshot(header)
 				} else if blockID == genesis.ID() {
 					return createSnapshot(genesis)
+				} else if blockID == newheader.ID() {
+					return createSnapshot(newheader)
 				}
 				return invalid.NewSnapshot(fmt.Errorf("invalid block: %v", blockID))
 			})
-		ps.On("Sealed", mock.Anything).Return(mockSnapshot)
+
+		sealed := header
+
+		ps.On("Sealed", mock.Anything).Return(func() protocol.Snapshot {
+			return createSnapshot(sealed)
+		})
 
 		// run the migration
 		require.NoError(t, MigrateLastSealedExecutedResultToPebble(unittest.Logger(), bdb, pdb, ps, rootSeal))
@@ -134,6 +149,64 @@ func TestMigrateLastSealedExecutedResultToPebble(t *testing.T) {
 		pebbleResults, pebbleCommits := createStores(pebbleimpl.ToDB(pdb))
 		presult, pcommit, err := readResultsForBlock(
 			header.ID(), pebbleResults, pebbleCommits)
+		require.NoError(t, err)
+
+		// compare the migrated results
+		require.Equal(t, bresult, presult)
+		require.Equal(t, bcommit, pcommit)
+
+		// store a new block in pebble now, simulating new block executed after migration
+		pbdb := pebbleimpl.ToDB(pdb)
+		txResults = store.NewTransactionResults(metrics, pbdb, bstorage.DefaultCacheSize)
+		commits = store.NewCommits(metrics, pbdb)
+		results = store.NewExecutionResults(metrics, pbdb)
+		receipts = store.NewExecutionReceipts(metrics, pbdb, results, bstorage.DefaultCacheSize)
+		myReceipts = store.NewMyExecutionReceipts(metrics, pbdb, receipts)
+		events = store.NewEvents(metrics, pbdb)
+		serviceEvents = store.NewServiceEvents(metrics, pbdb)
+
+		// create execution state module
+		newes := state.NewExecutionState(
+			nil,
+			commits,
+			nil,
+			headers,
+			chunkDataPacks,
+			results,
+			myReceipts,
+			events,
+			serviceEvents,
+			txResults,
+			db,
+			getLatestFinalized,
+			trace.NewNoopTracer(),
+			nil,
+			false,
+		)
+		require.NotNil(t, es)
+
+		err = headers.Store(newheader)
+		require.NoError(t, err)
+
+		newcomputationResult := testutil.ComputationResultFixture(t)
+		newcomputationResult.ExecutableBlock = newexecutableBlock
+		newcomputationResult.ExecutionReceipt.ExecutionResult.BlockID = newheader.ID()
+		sealed = newheader
+
+		// save execution results
+		err = newes.SaveExecutionResults(context.Background(), newcomputationResult)
+		require.NoError(t, err)
+
+		bresult, bcommit, err = readResultsForBlock(
+			newheader.ID(), badgerResults, badgerCommits)
+		require.NoError(t, err)
+
+		// run the migration
+		require.NoError(t, MigrateLastSealedExecutedResultToPebble(unittest.Logger(), bdb, pdb, ps, rootSeal))
+
+		// read the migrated results after migration
+		presult, pcommit, err = readResultsForBlock(
+			newheader.ID(), pebbleResults, pebbleCommits)
 		require.NoError(t, err)
 
 		// compare the migrated results
