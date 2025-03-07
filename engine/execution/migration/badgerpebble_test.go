@@ -27,121 +27,118 @@ import (
 )
 
 func TestMigrateLastSealedExecutedResultToPebble(t *testing.T) {
-	unittest.RunWithBadgerDB(t, func(bdb *badger.DB) {
-		unittest.RunWithPebbleDB(t, func(pdb *pebble.DB) {
-			// bootstrap to init highest executed height
-			bootstrapper := bootstrap.NewBootstrapper(unittest.Logger())
-			genesis := unittest.BlockHeaderFixture()
-			rootSeal := unittest.Seal.Fixture()
-			unittest.Seal.WithBlock(genesis)(rootSeal)
+	unittest.RunWithBadgerDBAndPebbleDB(t, func(bdb *badger.DB, pdb *pebble.DB) {
+		// bootstrap to init highest executed height
+		bootstrapper := bootstrap.NewBootstrapper(unittest.Logger())
+		genesis := unittest.BlockHeaderFixture()
+		rootSeal := unittest.Seal.Fixture()
+		unittest.Seal.WithBlock(genesis)(rootSeal)
 
-			db := badgerimpl.ToDB(bdb)
-			err := bootstrapper.BootstrapExecutionDatabase(db, rootSeal)
-			require.NoError(t, err)
+		db := badgerimpl.ToDB(bdb)
+		err := bootstrapper.BootstrapExecutionDatabase(db, rootSeal)
+		require.NoError(t, err)
 
-			// create all modules
-			metrics := &metrics.NoopCollector{}
+		// create all modules
+		metrics := &metrics.NoopCollector{}
 
-			headers := bstorage.NewHeaders(metrics, bdb)
-			txResults := store.NewTransactionResults(metrics, db, bstorage.DefaultCacheSize)
-			commits := store.NewCommits(metrics, db)
-			results := store.NewExecutionResults(metrics, db)
-			receipts := store.NewExecutionReceipts(metrics, db, results, bstorage.DefaultCacheSize)
-			myReceipts := store.NewMyExecutionReceipts(metrics, db, receipts)
-			events := store.NewEvents(metrics, db)
-			serviceEvents := store.NewServiceEvents(metrics, db)
-			transactions := bstorage.NewTransactions(metrics, bdb)
-			collections := bstorage.NewCollections(bdb, transactions)
-			chunkDataPacks := store.NewChunkDataPacks(metrics, pebbleimpl.ToDB(pdb), collections, bstorage.DefaultCacheSize)
+		headers := bstorage.NewHeaders(metrics, bdb)
+		txResults := store.NewTransactionResults(metrics, db, bstorage.DefaultCacheSize)
+		commits := store.NewCommits(metrics, db)
+		results := store.NewExecutionResults(metrics, db)
+		receipts := store.NewExecutionReceipts(metrics, db, results, bstorage.DefaultCacheSize)
+		myReceipts := store.NewMyExecutionReceipts(metrics, db, receipts)
+		events := store.NewEvents(metrics, db)
+		serviceEvents := store.NewServiceEvents(metrics, db)
+		transactions := bstorage.NewTransactions(metrics, bdb)
+		collections := bstorage.NewCollections(bdb, transactions)
+		chunkDataPacks := store.NewChunkDataPacks(metrics, pebbleimpl.ToDB(pdb), collections, bstorage.DefaultCacheSize)
 
-			err = headers.Store(genesis)
-			require.NoError(t, err)
+		err = headers.Store(genesis)
+		require.NoError(t, err)
 
-			getLatestFinalized := func() (uint64, error) {
-				return genesis.Height, nil
-			}
+		getLatestFinalized := func() (uint64, error) {
+			return genesis.Height, nil
+		}
 
-			// create execution state module
-			es := state.NewExecutionState(
-				nil,
-				commits,
-				nil,
-				headers,
-				collections,
-				chunkDataPacks,
-				results,
-				myReceipts,
-				events,
-				serviceEvents,
-				txResults,
-				db,
-				getLatestFinalized,
-				trace.NewNoopTracer(),
-				nil,
-				false,
-			)
-			require.NotNil(t, es)
+		// create execution state module
+		es := state.NewExecutionState(
+			nil,
+			commits,
+			nil,
+			headers,
+			chunkDataPacks,
+			results,
+			myReceipts,
+			events,
+			serviceEvents,
+			txResults,
+			db,
+			getLatestFinalized,
+			trace.NewNoopTracer(),
+			nil,
+			false,
+		)
+		require.NotNil(t, es)
 
-			executableBlock := unittest.ExecutableBlockFixtureWithParent(
-				nil,
-				genesis,
-				&unittest.GenesisStateCommitment)
-			header := executableBlock.Block.Header
+		executableBlock := unittest.ExecutableBlockFixtureWithParent(
+			nil,
+			genesis,
+			&unittest.GenesisStateCommitment)
+		header := executableBlock.Block.Header
 
-			err = headers.Store(header)
-			require.NoError(t, err)
+		err = headers.Store(header)
+		require.NoError(t, err)
 
-			computationResult := testutil.ComputationResultFixture(t)
-			computationResult.ExecutableBlock = executableBlock
-			computationResult.ExecutionReceipt.ExecutionResult.BlockID = header.ID()
+		computationResult := testutil.ComputationResultFixture(t)
+		computationResult.ExecutableBlock = executableBlock
+		computationResult.ExecutionReceipt.ExecutionResult.BlockID = header.ID()
 
-			// save execution results
-			err = es.SaveExecutionResults(context.Background(), computationResult)
-			require.NoError(t, err)
+		// save execution results
+		err = es.SaveExecutionResults(context.Background(), computationResult)
+		require.NoError(t, err)
 
-			// read the saved results before migration
-			badgerResults, badgerCommits := createStores(badgerimpl.ToDB(bdb))
-			bresult, bcommit, err := readResultsForBlock(
-				header.ID(), badgerResults, badgerCommits)
-			require.NoError(t, err)
+		// read the saved results before migration
+		badgerResults, badgerCommits := createStores(badgerimpl.ToDB(bdb))
+		bresult, bcommit, err := readResultsForBlock(
+			header.ID(), badgerResults, badgerCommits)
+		require.NoError(t, err)
 
-			// mock that the executed block is the last executed and sealed block
-			ps := new(protocolmock.State)
-			mockSnapshot := createSnapshot(header)
-			params := new(protocolmock.Params)
-			params.On("SporkID").Return(mainnet26SporkID)
-			ps.On("Params").Return(params)
-			ps.On("AtHeight", mock.Anything).Return(
-				func(height uint64) protocol.Snapshot {
-					if height == header.Height {
-						return mockSnapshot
-					}
-					return invalid.NewSnapshot(fmt.Errorf("invalid height: %v", height))
-				})
-			ps.On("AtBlockID", mock.Anything).Return(
-				func(blockID flow.Identifier) protocol.Snapshot {
-					if blockID == header.ID() {
-						return mockSnapshot
-					} else if blockID == genesis.ID() {
-						return createSnapshot(genesis)
-					}
-					return invalid.NewSnapshot(fmt.Errorf("invalid block: %v", blockID))
-				})
-			ps.On("Sealed", mock.Anything).Return(mockSnapshot)
+		// mock that the executed block is the last executed and sealed block
+		ps := new(protocolmock.State)
+		mockSnapshot := createSnapshot(header)
+		params := new(protocolmock.Params)
+		params.On("SporkID").Return(mainnet26SporkID)
+		ps.On("Params").Return(params)
+		ps.On("AtHeight", mock.Anything).Return(
+			func(height uint64) protocol.Snapshot {
+				if height == header.Height {
+					return mockSnapshot
+				}
+				return invalid.NewSnapshot(fmt.Errorf("invalid height: %v", height))
+			})
+		ps.On("AtBlockID", mock.Anything).Return(
+			func(blockID flow.Identifier) protocol.Snapshot {
+				if blockID == header.ID() {
+					return mockSnapshot
+				} else if blockID == genesis.ID() {
+					return createSnapshot(genesis)
+				}
+				return invalid.NewSnapshot(fmt.Errorf("invalid block: %v", blockID))
+			})
+		ps.On("Sealed", mock.Anything).Return(mockSnapshot)
 
-			// run the migration
-			require.NoError(t, MigrateLastSealedExecutedResultToPebble(unittest.Logger(), bdb, pdb, ps, rootSeal))
+		// run the migration
+		require.NoError(t, MigrateLastSealedExecutedResultToPebble(unittest.Logger(), bdb, pdb, ps, rootSeal))
 
-			// read the migrated results after migration
-			pebbleResults, pebbleCommits := createStores(pebbleimpl.ToDB(pdb))
-			presult, pcommit, err := readResultsForBlock(
-				header.ID(), pebbleResults, pebbleCommits)
-			require.NoError(t, err)
+		// read the migrated results after migration
+		pebbleResults, pebbleCommits := createStores(pebbleimpl.ToDB(pdb))
+		presult, pcommit, err := readResultsForBlock(
+			header.ID(), pebbleResults, pebbleCommits)
+		require.NoError(t, err)
 
-			// compare the migrated results
-			require.Equal(t, bresult, presult)
-			require.Equal(t, bcommit, pcommit)
-		})
+		// compare the migrated results
+		require.Equal(t, bresult, presult)
+		require.Equal(t, bcommit, pcommit)
 	})
 }
 

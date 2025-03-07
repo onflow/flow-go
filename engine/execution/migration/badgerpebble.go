@@ -46,9 +46,9 @@ func init() {
 //  2. copy execution data of the last sealed and executed block from badger to pebble.
 //     the execution data includes the execution result and statecommitment, which is the minimum data needed from the database
 //     to be able to continue executing the next block
-func MigrateLastSealedExecutedResultToPebble(logger zerolog.Logger, badgerDB *badger.DB, pebbleDB *pebble.DB, ps protocol.State, rootSeal *flow.Seal) error {
+func MigrateLastSealedExecutedResultToPebble(logger zerolog.Logger, badgerDB *badger.DB, pebbleDB *pebble.DB, state protocol.State, rootSeal *flow.Seal) error {
 	// only run the migration for mainnet26 and testnet52
-	sporkID := ps.Params().SporkID()
+	sporkID := state.Params().SporkID()
 	if sporkID != mainnet26SporkID && sporkID != testnet52SporkID {
 		logger.Warn().Msgf("spork ID %v is not Mainnet26SporkID %v or Testnet52SporkID %v, skip migration",
 			sporkID, mainnet26SporkID, testnet52SporkID)
@@ -74,13 +74,13 @@ func MigrateLastSealedExecutedResultToPebble(logger zerolog.Logger, badgerDB *ba
 	}
 
 	// get last sealed and executed block in badger
-	lastExecutedSealedHeightInBadger, err := latest.LatestSealedAndExecutedHeight(ps, bdb)
+	lastExecutedSealedHeightInBadger, err := latest.LatestSealedAndExecutedHeight(state, bdb)
 	if err != nil {
 		return fmt.Errorf("failed to get last executed sealed block: %w", err)
 	}
 
 	// read all the data and save to pebble
-	header, err := ps.AtHeight(lastExecutedSealedHeightInBadger).Head()
+	header, err := state.AtHeight(lastExecutedSealedHeightInBadger).Head()
 	if err != nil {
 		return fmt.Errorf("failed to get block at height %d: %w", lastExecutedSealedHeightInBadger, err)
 	}
@@ -105,18 +105,6 @@ func MigrateLastSealedExecutedResultToPebble(logger zerolog.Logger, badgerDB *ba
 
 	// store data to pebble in a batch update
 	err = pdb.WithReaderBatchWriter(func(batch storage.ReaderBatchWriter) error {
-		if err := pebbleResults.BatchStore(result, batch); err != nil {
-			return fmt.Errorf("failed to store receipt for block %s: %w", blockID, err)
-		}
-
-		if err := pebbleResults.BatchIndex(blockID, result.ID(), batch); err != nil {
-			return fmt.Errorf("failed to index result for block %s: %w", blockID, err)
-		}
-
-		if err := pebbleCommits.BatchStore(blockID, commit, batch); err != nil {
-			return fmt.Errorf("failed to store commit for block %s: %w", blockID, err)
-		}
-
 		var existingExecuted flow.Identifier
 		err = operation.RetrieveExecutedBlock(batch.GlobalReader(), &existingExecuted)
 		if err == nil {
@@ -124,14 +112,13 @@ func MigrateLastSealedExecutedResultToPebble(logger zerolog.Logger, badgerDB *ba
 			// if newer, it means EN is storing new results in pebble, in this case, we don't
 			// want to update the executed block with the badger one.
 
-			header, err := ps.AtBlockID(existingExecuted).Head()
+			header, err := state.AtBlockID(existingExecuted).Head()
 			if err != nil {
 				return fmt.Errorf("failed to get block at height %d from badger: %w", lastExecutedSealedHeightInBadger, err)
 			}
 
 			if header.Height > lastExecutedSealedHeightInBadger {
-				// existing executed in pebble is higher than badger, no need to update
-
+				// existing executed in pebble is higher than badger, no need to store anything
 				lg.Info().Msgf("existing executed block %v in pebble is newer than %v in badger, skip update",
 					header.Height, lastExecutedSealedHeightInBadger)
 				return nil
@@ -144,6 +131,18 @@ func MigrateLastSealedExecutedResultToPebble(logger zerolog.Logger, badgerDB *ba
 		} else if !errors.Is(err, storage.ErrNotFound) {
 			// exception
 			return fmt.Errorf("failed to retrieve executed block from pebble: %w", err)
+		}
+
+		if err := pebbleResults.BatchStore(result, batch); err != nil {
+			return fmt.Errorf("failed to store receipt for block %s: %w", blockID, err)
+		}
+
+		if err := pebbleResults.BatchIndex(blockID, result.ID(), batch); err != nil {
+			return fmt.Errorf("failed to index result for block %s: %w", blockID, err)
+		}
+
+		if err := pebbleCommits.BatchStore(blockID, commit, batch); err != nil {
+			return fmt.Errorf("failed to store commit for block %s: %w", blockID, err)
 		}
 
 		// two cases here:
@@ -169,7 +168,10 @@ func MigrateLastSealedExecutedResultToPebble(logger zerolog.Logger, badgerDB *ba
 }
 
 func readResultsForBlock(
-	blockID flow.Identifier, resultsStore storage.ExecutionResults, commitsStore storage.Commits) (
+	blockID flow.Identifier,
+	resultsStore storage.ExecutionResults,
+	commitsStore storage.Commits,
+) (
 	*flow.ExecutionResult, flow.StateCommitment, error) {
 	result, err := resultsStore.ByBlockID(blockID)
 	if err != nil {
