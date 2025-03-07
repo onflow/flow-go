@@ -146,6 +146,7 @@ type ExecutionNode struct {
 
 	chunkDataPackDB        *pebble.DB
 	chunkDataPacks         storageerr.ChunkDataPacks
+	collections            storageerr.Collections
 	providerEngine         exeprovider.ProviderEngine
 	checkerEng             *checker.Engine
 	syncCore               *chainsync.Core
@@ -193,9 +194,6 @@ func (builder *ExecutionNodeBuilder) LoadComponentsAndModules() {
 		AdminCommand("set-uploader-enabled", func(config *NodeConfig) commands.AdminCommand {
 			return uploaderCommands.NewToggleUploaderCommand(exeNode.blockDataUploader)
 		}).
-		AdminCommand("get-transactions", func(conf *NodeConfig) commands.AdminCommand {
-			return storageCommands.NewGetTransactionsCommand(conf.State, conf.Storage.Payloads, conf.Storage.Collections)
-		}).
 		AdminCommand("protocol-snapshot", func(conf *NodeConfig) commands.AdminCommand {
 			return storageCommands.NewProtocolSnapshotCommand(
 				conf.Logger,
@@ -205,6 +203,7 @@ func (builder *ExecutionNodeBuilder) LoadComponentsAndModules() {
 				exeNode.exeConf.triedir,
 			)
 		}).
+		Module("load collections", exeNode.LoadCollections).
 		Module("mutable follower state", exeNode.LoadMutableFollowerState).
 		Module("system specs", exeNode.LoadSystemSpecs).
 		Module("execution metrics", exeNode.LoadExecutionMetrics).
@@ -217,6 +216,9 @@ func (builder *ExecutionNodeBuilder) LoadComponentsAndModules() {
 		Module("blobservice peer manager dependencies", exeNode.LoadBlobservicePeerManagerDependencies).
 		Module("bootstrap", exeNode.LoadBootstrapper).
 		Module("register store", exeNode.LoadRegisterStore).
+		AdminCommand("get-transactions", func(conf *NodeConfig) commands.AdminCommand {
+			return storageCommands.NewGetTransactionsCommand(conf.State, conf.Storage.Payloads, exeNode.collections)
+		}).
 		Component("execution state ledger", exeNode.LoadExecutionStateLedger).
 
 		// TODO: Modules should be able to depends on components
@@ -256,6 +258,12 @@ func (builder *ExecutionNodeBuilder) LoadComponentsAndModules() {
 		Component("receipt provider engine", exeNode.LoadReceiptProviderEngine).
 		Component("synchronization engine", exeNode.LoadSynchronizationEngine).
 		Component("grpc server", exeNode.LoadGrpcServer)
+}
+
+func (exeNode *ExecutionNode) LoadCollections(node *NodeConfig) error {
+	transactions := store.NewTransactions(node.Metrics.Cache, node.ProtocolDB)
+	exeNode.collections = store.NewCollections(node.ProtocolDB, transactions)
+	return nil
 }
 
 func (exeNode *ExecutionNode) LoadMutableFollowerState(node *NodeConfig) error {
@@ -466,7 +474,7 @@ func (exeNode *ExecutionNode) LoadGCPBlockDataUploader(
 		asyncUploader,
 		node.Storage.Blocks,
 		exeNode.commits,
-		node.Storage.Collections,
+		exeNode.collections,
 		exeNode.events,
 		exeNode.results,
 		exeNode.txResults,
@@ -744,7 +752,7 @@ func (exeNode *ExecutionNode) LoadExecutionState(
 		return nil
 	})
 	chunkDataPacks := store.NewChunkDataPacks(node.Metrics.Cache,
-		pebbleimpl.ToDB(chunkDataPackDB), node.Storage.Collections, exeNode.exeConf.chunkDataPackCacheSize)
+		pebbleimpl.ToDB(chunkDataPackDB), exeNode.collections, exeNode.exeConf.chunkDataPackCacheSize)
 
 	getLatestFinalized := func() (uint64, error) {
 		final, err := node.State.Final().Head()
@@ -762,7 +770,6 @@ func (exeNode *ExecutionNode) LoadExecutionState(
 		exeNode.commits,
 		node.Storage.Blocks,
 		node.Storage.Headers,
-		node.Storage.Collections,
 		chunkDataPacks,
 		exeNode.results,
 		exeNode.myReceipts,
@@ -1106,7 +1113,7 @@ func (exeNode *ExecutionNode) LoadIngestionEngine(
 		colFetcher,
 		node.Storage.Headers,
 		node.Storage.Blocks,
-		node.Storage.Collections,
+		exeNode.collections,
 		exeNode.executionState,
 		node.State,
 		exeNode.collector,
