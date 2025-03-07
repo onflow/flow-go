@@ -93,7 +93,6 @@ import (
 	storageerr "github.com/onflow/flow-go/storage"
 	storage "github.com/onflow/flow-go/storage/badger"
 	"github.com/onflow/flow-go/storage/operation"
-	"github.com/onflow/flow-go/storage/operation/badgerimpl"
 	"github.com/onflow/flow-go/storage/operation/pebbleimpl"
 	storagepebble "github.com/onflow/flow-go/storage/pebble"
 	"github.com/onflow/flow-go/storage/store"
@@ -479,7 +478,7 @@ func (exeNode *ExecutionNode) LoadGCPBlockDataUploader(
 		exeNode.events,
 		exeNode.results,
 		exeNode.txResults,
-		store.NewComputationResultUploadStatus(badgerimpl.ToDB(node.DB)),
+		store.NewComputationResultUploadStatus(node.ProtocolDB),
 		execution_data.NewDownloader(exeNode.blobService),
 		exeNode.collector)
 	if retryableUploader == nil {
