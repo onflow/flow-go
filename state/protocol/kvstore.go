@@ -1,6 +1,13 @@
 package protocol
 
-import "github.com/onflow/flow-go/model/flow"
+import (
+	"io"
+	"slices"
+
+	"github.com/ethereum/go-ethereum/rlp"
+
+	"github.com/onflow/flow-go/model/flow"
+)
 
 // This file contains versioned read interface to the Protocol State's
 // key-value store and are used by the Protocol State Machine.
@@ -101,7 +108,103 @@ type KVStoreReader interface {
 	//    enough that the network is overwhelming likely to finalize at least one
 	//    block with a view in this range
 	GetFinalizationSafetyThreshold() uint64
+
+	// v2
+
+	// GetCadenceComponentVersion returns the Cadence component version.
+	// Error Returns:
+	//   - kvstore.ErrKeyNotSupported if invoked on a KVStore instance before v2.
+	//   - kvstore.ErrKeyNotSet if the key has no value
+	GetCadenceComponentVersion() (MagnitudeOfChangeVersion, error)
+	// GetCadenceComponentVersionUpgrade returns the most recent upgrade for the Cadence Component Version,
+	// if one exists (otherwise returns nil). The upgrade will be returned even if it has already been applied.
+	// Returns nil if invoked on a KVStore instance before v2.
+	GetCadenceComponentVersionUpgrade() *ViewBasedActivator[MagnitudeOfChangeVersion]
+
+	// GetExecutionComponentVersion returns the Execution component version.
+	// Error Returns:
+	//   - kvstore.ErrKeyNotSupported if invoked on a KVStore instance before v2.
+	//   - kvstore.ErrKeyNotSet if the key has no value
+	GetExecutionComponentVersion() (MagnitudeOfChangeVersion, error)
+	// GetExecutionComponentVersionUpgrade returns the most recent upgrade for the Execution Component Version,
+	// if one exists (otherwise returns nil). The upgrade will be returned even if it has already been applied.
+	// Returns nil if invoked on a KVStore instance before v2.
+	GetExecutionComponentVersionUpgrade() *ViewBasedActivator[MagnitudeOfChangeVersion]
+
+	// GetExecutionMeteringParameters returns the Execution metering parameters.
+	// Error Returns:
+	//   - kvstore.ErrKeyNotSupported if invoked on a KVStore instance before v2.
+	//   - kvstore.ErrKeyNotSet if the key has no value
+	GetExecutionMeteringParameters() (ExecutionMeteringParameters, error)
+	// GetExecutionMeteringParametersUpgrade returns the most recent upgrade for the Execution Metering Parameters,
+	// if one exists (otherwise returns nil). The upgrade will be returned even if it has already been applied.
+	// Returns nil if invoked on a KVStore instance before v2.
+	GetExecutionMeteringParametersUpgrade() *ViewBasedActivator[ExecutionMeteringParameters]
 }
+
+// ExecutionMeteringParameters are used to measure resource usage of transactions,
+// which affects fee calculations and transaction/script stopping conditions.
+// TODO should this live in fvm package?
+type ExecutionMeteringParameters struct {
+	// TODO docs
+	ExecutionEffortParameters map[uint]uint64
+	// TODO docs
+	ExecutionMemoryParameters map[uint]uint64
+	// TODO docs
+	ExecutionMemoryLimit uint64
+}
+
+// EncodeRLP defines RLP encoding behaviour for ExecutionMeteringParameters, overriding the default behaviour.
+// We convert maps to ordered slices of key-pairs before encoding, because RLP does not directly support maps.
+// We require this KVStore field type to be RLP-encodable so we can compute the hash/ID of a kvstore model instance.
+func (params *ExecutionMeteringParameters) EncodeRLP(w io.Writer) error {
+	type pair struct {
+		Key   uint
+		Value uint64
+	}
+	pairOrdering := func(a, b pair) int {
+		if a.Key < b.Key {
+			return -1
+		}
+		if a.Key > b.Key {
+			return 1
+		}
+		// Since we are ordering by key taken directly from a single Go map type, it is not possible to
+		// observe two identical keys while ordering. If we do, some invariant has been violated.
+		// Also, since the sort used is non-stable, this could result in non-deterministic hashes.
+		panic("critical invariant violated: map with duplicate keys")
+	}
+
+	orderedEffortParams := make([]pair, 0, len(params.ExecutionEffortParameters))
+	for k, v := range params.ExecutionEffortParameters {
+		orderedEffortParams = append(orderedEffortParams, pair{k, v})
+	}
+	slices.SortFunc(orderedEffortParams, pairOrdering)
+
+	orderedMemoryParams := make([]pair, 0, len(params.ExecutionMemoryParameters))
+	for k, v := range params.ExecutionMemoryParameters {
+		orderedMemoryParams = append(orderedMemoryParams, pair{k, v})
+	}
+	slices.SortFunc(orderedMemoryParams, pairOrdering)
+
+	return rlp.Encode(w, struct {
+		ExecutionEffortParameters []pair
+		ExecutionMemoryParameters []pair
+		ExecutionMemoryLimit      uint64
+	}{
+		ExecutionEffortParameters: orderedEffortParams,
+		ExecutionMemoryParameters: orderedMemoryParams,
+		ExecutionMemoryLimit:      params.ExecutionMemoryLimit,
+	})
+}
+
+// IsUndefined returns true if params is semantically undefined.
+func (params *ExecutionMeteringParameters) IsUndefined() bool {
+	return params.ExecutionEffortParameters == nil && params.ExecutionMemoryParameters == nil && params.ExecutionMemoryLimit == 0
+}
+
+// UndefinedExecutionMeteringParameters represents the zero or unset value for ExecutionMeteringParameters.
+var UndefinedExecutionMeteringParameters = ExecutionMeteringParameters{}
 
 // VersionedEncodable defines the interface for a versioned key-value store independent
 // of the set of keys which are supported. This allows the storage layer to support
@@ -113,8 +216,64 @@ type VersionedEncodable interface {
 	VersionedEncode() (uint64, []byte, error)
 }
 
-// ViewBasedActivator allows setting value that will be active from specific view.
+// ViewBasedActivator represents a scheduled update to some protocol parameter P.
+// (The relationship between a ViewBasedActivator and P is managed outside this model.)
+// Once the ViewBasedActivator A is persisted to the protocol state, P is updated
+// to value A.Data in the first block on or after view A.ActivationView.
 type ViewBasedActivator[T any] struct {
-	Data           T
-	ActivationView uint64 // first view at which Data will take effect
+	// Data is the pending new value, to be applied when reaching or exceeding ActivationView.
+	Data T
+	// ActivationView is the view at which the new value should be applied.
+	ActivationView uint64
 }
+
+// UpdatableField represents a protocol parameter which can be updated using a ViewBasedActivator.
+type UpdatableField[T any] struct {
+	// CurrentValue is the value that is active after constructing the block
+	// that this Protocol State pertains to.
+	CurrentValue T
+
+	// Update is optional and is nil if no value update has been scheduled yet.
+	// This field will hold the last scheduled update until a newer update
+	// directive is received, even if the value update has already happened.
+	// The update should be applied when reaching or exceeding the ActivationView.
+	Update *ViewBasedActivator[T]
+}
+
+// MagnitudeOfChangeVersion is intended as an intuitive representation of the “magnitude of change”.
+//
+// # CAUTION: Don't confuse this with semver!
+//
+// This versioning representation DEVIATES from established Semantic Versioning.
+// Any two different versions of the Execution Stack are considered incompatible.
+// In particular, two versions only differing in their minor, might be entirely downwards-INCOMPATIBLE.
+//
+// We generally recommend to use Integer Versioning for components. The MagnitudeOfChangeVersion scheme should
+// be only used when there is a clear advantage Integer Versioning which outweighs the risk of falsely
+// making compatibility assumptions by confusing this scheme with Semantic Versioning!
+//
+// MagnitudeOfChangeVersion helps with an intuitive representation of the “magnitude of change”.
+// For example, for the execution stack, bug fixes closing unexploited edge-cases will be a relatively
+// frequent cause of upgrades. Those bug fixes could be reflected by minor version bumps, whose
+// imperfect downwards compatibility might frequently suffice to warrant Access Nodes using the same
+// version (higher minor) across version boundaries. In comparison, major version change would generally
+// indicate broader non-compatibility (or larger feature additions) where it is very unlikely that the Access
+// Node can use one implementation for versions with different major.
+//
+// We emphasize again that this differentiation of “imperfect but good-enough downwards compatibility”
+// is in no way reflected by the versioning scheme. Any automated decisions of compatibility for different
+// versions are to be avoided (including versions where only the minor is different).
+//
+// Engineering teams using this scheme must be aware that the MagnitudeOfChangeVersion is easily
+// misleading wrt to incorrect assumptions about downwards compatibility. Avoiding problems (up to and
+// including the possibility of mainnet outages) requires continued awareness of all engineers in the
+// teams working with this version. The engineers in those teams must commit to diligently documenting
+// all relevant changes, details regarding magnitude of changes and if applicable “imperfect but
+// good-enough downwards compatibility”.
+type MagnitudeOfChangeVersion struct {
+	Major uint
+	Minor uint
+}
+
+// UndefinedMagnitudeOfChangeVersion represents the zero or unset value for a MagnitudeOfChangeVersion.
+var UndefinedMagnitudeOfChangeVersion = MagnitudeOfChangeVersion{}
