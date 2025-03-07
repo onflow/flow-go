@@ -20,6 +20,25 @@ import (
 	"github.com/onflow/flow-go/storage/store"
 )
 
+var (
+	mainnet26SporkID flow.Identifier
+	testnet52SporkID flow.Identifier
+)
+
+func init() {
+	var err error
+
+	mainnet26SporkID, err = flow.HexStringToIdentifier("45894bde3f45dbfd89cab12be84e9172385da5079d40bf63979ca8a6a7ede741")
+	if err != nil {
+		panic(fmt.Sprintf("failed to parse Mainnet26SporkID: %v", err))
+	}
+
+	testnet52SporkID, err = flow.HexStringToIdentifier("5b88b81cfce2619305213489c2137f98e6efa0ec333dab2c31042b743388a3ce")
+	if err != nil {
+		panic(fmt.Sprintf("failed to parse Testnet52SporkID: %v", err))
+	}
+}
+
 // MigrateLastSealedExecutedResultToPebble run the migration to the pebble database, so that
 // it has necessary data to be able execute the next block.
 // the migration includes the following operations:
@@ -28,7 +47,13 @@ import (
 //     the execution data includes the execution result and statecommitment, which is the minimum data needed from the database
 //     to be able to continue executing the next block
 func MigrateLastSealedExecutedResultToPebble(logger zerolog.Logger, badgerDB *badger.DB, pebbleDB *pebble.DB, ps protocol.State, rootSeal *flow.Seal) error {
-	// TODO: skip migration in the next spork
+	// only run the migration for mainnet26 and testnet52
+	sporkID := ps.Params().SporkID()
+	if sporkID != mainnet26SporkID && sporkID != testnet52SporkID {
+		logger.Warn().Msgf("spork ID %v is not Mainnet26SporkID %v or Testnet52SporkID %v, skip migration",
+			sporkID, mainnet26SporkID, testnet52SporkID)
+		return nil
+	}
 
 	bdb := badgerimpl.ToDB(badgerDB)
 	pdb := pebbleimpl.ToDB(pebbleDB)
