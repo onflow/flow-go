@@ -1,4 +1,4 @@
-package access
+package validator
 
 import (
 	"context"
@@ -13,6 +13,7 @@ import (
 	"github.com/onflow/crypto"
 	"github.com/onflow/flow-core-contracts/lib/go/templates"
 
+	"github.com/onflow/flow-go/access/ratelimit"
 	cadenceutils "github.com/onflow/flow-go/access/utils"
 	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/fvm/systemcontracts"
@@ -79,25 +80,6 @@ func (b *ProtocolStateBlocks) IndexedHeight() (uint64, error) {
 		return b.indexReporter.HighestIndexedHeight()
 	}
 	return 0, IndexReporterNotInitialized
-}
-
-// RateLimiter is an interface for checking if an address is rate limited.
-// By convention, the address used is the payer field of a transaction.
-// This rate limiter is applied when a transaction is first received by a
-// node, meaning that if a transaction is rate-limited it will be dropped.
-type RateLimiter interface {
-	// IsRateLimited returns true if the address is rate limited
-	IsRateLimited(address flow.Address) bool
-}
-
-type NoopLimiter struct{}
-
-func NewNoopLimiter() *NoopLimiter {
-	return &NoopLimiter{}
-}
-
-func (l *NoopLimiter) IsRateLimited(address flow.Address) bool {
-	return false
 }
 
 // PayerBalanceMode represents the mode for checking the payer's balance
@@ -175,7 +157,7 @@ type TransactionValidator struct {
 	chain                        flow.Chain // for checking validity of addresses
 	options                      TransactionValidationOptions
 	serviceAccountAddress        flow.Address
-	limiter                      RateLimiter
+	limiter                      ratelimit.RateLimiter
 	scriptExecutor               execution.ScriptExecutor
 	verifyPayerBalanceScript     []byte
 	transactionValidationMetrics module.TransactionValidationMetrics
@@ -201,7 +183,7 @@ func NewTransactionValidator(
 		chain:                        chain,
 		options:                      options,
 		serviceAccountAddress:        chain.ServiceAddress(),
-		limiter:                      NewNoopLimiter(),
+		limiter:                      ratelimit.NewNoopLimiter(),
 		scriptExecutor:               executor,
 		verifyPayerBalanceScript:     templates.GenerateVerifyPayerBalanceForTxExecution(env),
 		transactionValidationMetrics: transactionValidationMetrics,
@@ -217,7 +199,7 @@ func NewTransactionValidatorWithLimiter(
 	chain flow.Chain,
 	options TransactionValidationOptions,
 	transactionValidationMetrics module.TransactionValidationMetrics,
-	rateLimiter RateLimiter,
+	rateLimiter ratelimit.RateLimiter,
 ) *TransactionValidator {
 	txValidator := &TransactionValidator{
 		blocks:                       blocks,

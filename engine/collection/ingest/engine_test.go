@@ -12,7 +12,7 @@ import (
 	"github.com/stretchr/testify/suite"
 	"golang.org/x/time/rate"
 
-	"github.com/onflow/flow-go/access"
+	"github.com/onflow/flow-go/access/validator"
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/factory"
@@ -139,7 +139,7 @@ func (suite *Suite) TestInvalidTransaction() {
 
 		err := suite.engine.ProcessTransaction(&tx)
 		suite.Assert().Error(err)
-		suite.Assert().True(errors.As(err, &access.IncompleteTransactionError{}))
+		suite.Assert().True(errors.As(err, &validator.IncompleteTransactionError{}))
 	})
 
 	suite.Run("gas limit exceeds the maximum allowed", func() {
@@ -150,7 +150,7 @@ func (suite *Suite) TestInvalidTransaction() {
 
 		err := suite.engine.ProcessTransaction(&tx)
 		suite.Assert().Error(err)
-		suite.Assert().True(errors.As(err, &access.InvalidGasLimitError{}))
+		suite.Assert().True(errors.As(err, &validator.InvalidGasLimitError{}))
 	})
 
 	suite.Run("invalid reference block ID", func() {
@@ -169,7 +169,7 @@ func (suite *Suite) TestInvalidTransaction() {
 
 		err := suite.engine.ProcessTransaction(&tx)
 		suite.Assert().Error(err)
-		suite.Assert().True(errors.As(err, &access.InvalidScriptError{}))
+		suite.Assert().True(errors.As(err, &validator.InvalidScriptError{}))
 	})
 
 	// In some cases the Cadence parser will panic rather than return an error.
@@ -188,7 +188,7 @@ func (suite *Suite) TestInvalidTransaction() {
 
 		err := suite.engine.ProcessTransaction(&tx)
 		suite.Assert().Error(err)
-		suite.Assert().True(errors.As(err, &access.InvalidScriptError{}))
+		suite.Assert().True(errors.As(err, &validator.InvalidScriptError{}))
 	})
 
 	suite.Run("invalid signature format", func() {
@@ -213,7 +213,7 @@ func (suite *Suite) TestInvalidTransaction() {
 
 			err := suite.engine.ProcessTransaction(&tx)
 			suite.Assert().Error(err)
-			suite.Assert().True(errors.As(err, &access.InvalidSignatureError{}))
+			suite.Assert().True(errors.As(err, &validator.InvalidSignatureError{}))
 		})
 
 		suite.Run("invalid format of a payload signature", func() {
@@ -224,7 +224,7 @@ func (suite *Suite) TestInvalidTransaction() {
 
 			err := suite.engine.ProcessTransaction(&tx)
 			suite.Assert().Error(err)
-			suite.Assert().True(errors.As(err, &access.InvalidSignatureError{}))
+			suite.Assert().True(errors.As(err, &validator.InvalidSignatureError{}))
 		})
 
 		suite.Run("duplicated signature (envelope only)", func() {
@@ -233,7 +233,7 @@ func (suite *Suite) TestInvalidTransaction() {
 			tx.EnvelopeSignatures = []flow.TransactionSignature{sig1, sig2}
 			err := suite.engine.ProcessTransaction(&tx)
 			suite.Assert().Error(err)
-			suite.Assert().True(errors.As(err, &access.DuplicatedSignatureError{}))
+			suite.Assert().True(errors.As(err, &validator.DuplicatedSignatureError{}))
 		})
 
 		suite.Run("duplicated signature (payload only)", func() {
@@ -243,7 +243,7 @@ func (suite *Suite) TestInvalidTransaction() {
 
 			err := suite.engine.ProcessTransaction(&tx)
 			suite.Assert().Error(err)
-			suite.Assert().True(errors.As(err, &access.DuplicatedSignatureError{}))
+			suite.Assert().True(errors.As(err, &validator.DuplicatedSignatureError{}))
 		})
 
 		suite.Run("duplicated signature (cross case)", func() {
@@ -254,7 +254,7 @@ func (suite *Suite) TestInvalidTransaction() {
 
 			err := suite.engine.ProcessTransaction(&tx)
 			suite.Assert().Error(err)
-			suite.Assert().True(errors.As(err, &access.DuplicatedSignatureError{}))
+			suite.Assert().True(errors.As(err, &validator.DuplicatedSignatureError{}))
 		})
 	})
 
@@ -271,7 +271,7 @@ func (suite *Suite) TestInvalidTransaction() {
 
 		err := suite.engine.ProcessTransaction(&tx)
 		suite.Assert().Error(err)
-		suite.Assert().True(errors.As(err, &access.InvalidAddressError{}))
+		suite.Assert().True(errors.As(err, &validator.InvalidAddressError{}))
 	})
 
 	suite.Run("expired reference block ID", func() {
@@ -285,7 +285,7 @@ func (suite *Suite) TestInvalidTransaction() {
 
 		err := suite.engine.ProcessTransaction(&tx)
 		suite.Assert().Error(err)
-		suite.Assert().True(errors.As(err, &access.ExpiredTransactionError{}))
+		suite.Assert().True(errors.As(err, &validator.ExpiredTransactionError{}))
 	})
 
 }
