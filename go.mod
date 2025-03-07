@@ -51,8 +51,8 @@ require (
 	github.com/onflow/cadence v1.3.4
 	github.com/onflow/crypto v0.25.3
 	github.com/onflow/flow v0.3.4
-	github.com/onflow/flow-core-contracts/lib/go/contracts v1.6.1-0.20250305201645-40781b85c532
-	github.com/onflow/flow-core-contracts/lib/go/templates v1.6.1-0.20250305201645-40781b85c532
+	github.com/onflow/flow-core-contracts/lib/go/contracts v1.6.1
+	github.com/onflow/flow-core-contracts/lib/go/templates v1.6.1
 	github.com/onflow/flow-go-sdk v1.3.3
 	github.com/onflow/flow/protobuf/go/flow v0.4.10
 	github.com/pbnjay/memory v0.0.0-20210728143218-7b4eea64cf58
@@ -107,7 +107,7 @@ require (
 	github.com/ipfs/boxo v0.17.1-0.20240131173518-89bceff34bf1
 	github.com/libp2p/go-libp2p-routing-helpers v0.7.4
 	github.com/mitchellh/mapstructure v1.5.0
-	github.com/onflow/flow-evm-bridge v0.0.0-20250220231823-b59c1dc4881e
+	github.com/onflow/flow-evm-bridge v0.1.0
 	github.com/onflow/go-ethereum v1.14.7
 	github.com/onflow/nft-storefront/lib/go/contracts v1.0.0
 	github.com/onflow/wal v1.0.2
