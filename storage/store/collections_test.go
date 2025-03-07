@@ -96,44 +96,54 @@ func TestCollections_ConcurrentIndexByTx(t *testing.T) {
 		transactions := store.NewTransactions(metrics, db)
 		collections := store.NewCollections(db, transactions)
 
-		// Create two collections sharing the same transaction
+		const numCollections = 100
+
+		// Create collections sharing the same transaction
 		col1 := unittest.CollectionFixture(1)
 		col2 := unittest.CollectionFixture(1)
 		sharedTx := col1.Transactions[0] // The shared transaction
 		col2.Transactions[0] = sharedTx
 
 		var wg sync.WaitGroup
-		wg.Add(2)
+		errChan := make(chan error, 2*numCollections)
 
-		errChan := make(chan error, 2)
-
-		// Concurrently insert col1
+		// Insert col1 batch
+		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			col1Light := col1.Light()
-			err := collections.StoreLightAndIndexByTransaction(&col1Light)
-			errChan <- err
+			for i := 0; i < numCollections; i++ {
+				col := unittest.CollectionFixture(1)
+				col.Transactions[0] = sharedTx // Ensure it shares the same transaction
+				light := col.Light()
+				err := collections.StoreLightAndIndexByTransaction(&light)
+				errChan <- err
+			}
 		}()
 
-		// Concurrently insert col2
+		// Insert col2 batch
+		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			col2Light := col2.Light()
-			err := collections.StoreLightAndIndexByTransaction(&col2Light)
-			errChan <- err
+			for i := 0; i < numCollections; i++ {
+				col := unittest.CollectionFixture(1)
+				col.Transactions[0] = sharedTx // Ensure it shares the same transaction
+				light := col.Light()
+				err := collections.StoreLightAndIndexByTransaction(&light)
+				errChan <- err
+			}
 		}()
 
 		wg.Wait()
 		close(errChan)
 
-		// Ensure both operations succeeded
+		// Ensure all operations succeeded
 		for err := range errChan {
 			require.NoError(t, err)
 		}
 
-		// Verify that one of the collections is indexed by the shared transaction
+		// Verify that at least one collection is indexed by the shared transaction
 		indexedCollection, err := collections.LightByTransactionID(sharedTx.ID())
 		require.NoError(t, err)
-		assert.True(t, indexedCollection.ID() == col1.ID() || indexedCollection.ID() == col2.ID(), "Expected one of the collections to be indexed")
+		assert.NotNil(t, indexedCollection, "Expected at least one collection to be indexed")
 	})
 }

@@ -97,7 +97,7 @@ func (c *Collections) LightByID(colID flow.Identifier) (*flow.LightCollection, e
 }
 
 // Remove removes a collection from the database.
-// if the collection does not exist, it returns nil
+// Remove does not error if the collection does not exist
 // any error returned are exceptions
 func (c *Collections) Remove(colID flow.Identifier) error {
 	err := c.db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {

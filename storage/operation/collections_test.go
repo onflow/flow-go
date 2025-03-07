@@ -1,7 +1,6 @@
 package operation_test
 
 import (
-	"errors"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -22,7 +21,7 @@ func TestCollections(t *testing.T) {
 			var actual flow.LightCollection
 			err := operation.RetrieveCollection(db.Reader(), expected.ID(), &actual)
 			assert.Error(t, err)
-			assert.True(t, errors.Is(err, storage.ErrNotFound))
+			assert.ErrorIs(t, err, storage.ErrNotFound)
 		})
 
 		t.Run("Save", func(t *testing.T) {
@@ -47,7 +46,7 @@ func TestCollections(t *testing.T) {
 			var actual flow.LightCollection
 			err = operation.RetrieveCollection(db.Reader(), expected.ID(), &actual)
 			assert.Error(t, err)
-			assert.True(t, errors.Is(err, storage.ErrNotFound))
+			assert.ErrorIs(t, err, storage.ErrNotFound)
 
 			// Remove again should not error
 			err = db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
