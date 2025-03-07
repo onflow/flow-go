@@ -97,9 +97,9 @@ func NewCertifiedBlock(block *Block, qc *QuorumCertificate) (CertifiedBlock, err
 	return CertifiedBlock{Block: block, CertifyingQC: qc}, nil
 }
 
-// ID returns unique identifier for the block.
+// BlockID returns unique identifier for the block.
 // To avoid repeated computation, we use value from the QC.
-func (b *CertifiedBlock) ID() Identifier {
+func (b *CertifiedBlock) BlockID() Identifier {
 	return b.CertifyingQC.BlockID
 }
 
