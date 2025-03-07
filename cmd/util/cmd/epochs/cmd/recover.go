@@ -71,7 +71,9 @@ func addGenerateRecoverEpochTxArgsCmdFlags() error {
 	generateRecoverEpochTxArgsCmd.Flags().BoolVar(&flagAnInsecure, "insecure", false, "set to true if the protocol snapshot should be retrieved from the insecure AN endpoint")
 	generateRecoverEpochTxArgsCmd.Flags().IntVar(&flagCollectionClusters, "collection-clusters", 0,
 		"number of collection clusters")
-	// required parameters for network configuration and generation of root node identities
+	// Required parameters for network configuration and generation of root node identities
+	// It is expected that these flags may point to directory which includes extra node identities
+	// which are not allowed to participate in the recovery epoch. These identities will be excluded by this tool.
 	generateRecoverEpochTxArgsCmd.Flags().StringVar(&flagNodeConfigJson, "config", "",
 		"path to a JSON file containing multiple node configurations (fields Role, Address, Weight)")
 	generateRecoverEpochTxArgsCmd.Flags().StringVar(&flagInternalNodePrivInfoDir, "internal-priv-dir", "", "path to directory "+
