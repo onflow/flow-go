@@ -25,7 +25,7 @@ func (c *ChunkDataPacks) Has(chunkID flow.Identifier) bool {
 
 // Add adds an chunkDataPack to the mempool.
 func (c *ChunkDataPacks) Add(cdp *flow.ChunkDataPack) bool {
-	added := c.Backend.Add(cdp.ID(), cdp)
+	added := c.Backend.Add(cdp.ChunkID, cdp)
 	return added
 }
 

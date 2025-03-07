@@ -100,7 +100,7 @@ func (ir *IncorporatedResultSeals) Size() uint {
 // All returns all the items in the mempool
 func (ir *IncorporatedResultSeals) All() []*flow.IncorporatedResultSeal {
 	all := ir.Backend.All()
-	results := make([]*flow.IncorporatedResultSeal, 0, ir.mutableBackData.Size())
+	results := make([]*flow.IncorporatedResultSeal, 0, len(all))
 	for _, result := range all {
 		results = append(results, result)
 	}

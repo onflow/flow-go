@@ -58,6 +58,11 @@ func (i *IdentifierMap) Append(key, id flow.Identifier) error {
 // Otherwise it returns nil and false.
 func (i *IdentifierMap) Get(key flow.Identifier) ([]flow.Identifier, bool) {
 	ids := make([]flow.Identifier, 0)
+	// we need to perform a blocking operation since we are dealing with a reference object. Since our mempool
+	// changes the map itself in other operations we need to ensure that all changes to the map are done in mutually
+	// exclusive way, otherwise we risk observing a race condition. This is exactly why we perform `Get` and 
+	// transformation  of the map in critical section since if the goroutine will be suspended in between those two operations
+	// we are potentially concurrently accessing the map.
 	err := i.Run(func(backdata mempool.BackData[flow.Identifier, map[flow.Identifier]struct{}]) error {
 		idsMap, ok := backdata.Get(key)
 		if !ok {
@@ -135,7 +140,7 @@ func (i *IdentifierMap) Size() uint {
 // Keys returns a list of all keys in the mempool
 func (i *IdentifierMap) Keys() ([]flow.Identifier, bool) {
 	all := i.Backend.All()
-	keys := make([]flow.Identifier, 0)
+	keys := make([]flow.Identifier, 0, len(all))
 	for key, _ := range all {
 		keys = append(keys, key)
 	}
