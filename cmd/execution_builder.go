@@ -262,9 +262,8 @@ func (builder *ExecutionNodeBuilder) LoadComponentsAndModules() {
 }
 
 func (exeNode *ExecutionNode) LoadCollections(node *NodeConfig) error {
-	db := badgerimpl.ToDB(node.DB)
-	transactions := store.NewTransactions(node.Metrics.Cache, db)
-	exeNode.collections = store.NewCollections(db, transactions)
+	transactions := store.NewTransactions(node.Metrics.Cache, node.ProtocolDB)
+	exeNode.collections = store.NewCollections(node.ProtocolDB, transactions)
 	return nil
 }
 
