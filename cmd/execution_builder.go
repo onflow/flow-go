@@ -98,6 +98,7 @@ import (
 	"github.com/onflow/flow-go/storage/operation/pebbleimpl"
 	storagepebble "github.com/onflow/flow-go/storage/pebble"
 	"github.com/onflow/flow-go/storage/store"
+	"github.com/onflow/flow-go/storage/store/chained"
 )
 
 const (
@@ -138,13 +139,17 @@ type ExecutionNode struct {
 	registerStore  *storehouse.RegisterStore
 
 	// storage
-	events        storageerr.Events
-	serviceEvents storageerr.ServiceEvents
-	txResults     storageerr.TransactionResults
-	results       storageerr.ExecutionResults
-	receipts      storageerr.ExecutionReceipts
-	myReceipts    storageerr.MyExecutionReceipts
-	commits       storageerr.Commits
+	events          storageerr.Events
+	eventsReader    storageerr.EventsReader
+	serviceEvents   storageerr.ServiceEvents
+	txResults       storageerr.TransactionResults
+	txResultsReader storageerr.TransactionResultsReader
+	results         storageerr.ExecutionResults
+	resultsReader   storageerr.ExecutionResultsReader
+	receipts        storageerr.ExecutionReceipts
+	myReceipts      storageerr.MyExecutionReceipts
+	commits         storageerr.Commits
+	commitsReader   storageerr.CommitsReader
 
 	chunkDataPackDB        *pebble.DB
 	chunkDataPacks         storageerr.ChunkDataPacks
@@ -333,15 +338,33 @@ func (exeNode *ExecutionNode) LoadExecutionStorage(
 	node *NodeConfig,
 ) error {
 	db := node.ProtocolDB
-	exeNode.commits = store.NewCommits(node.Metrics.Cache, db)
-	exeNode.results = store.NewExecutionResults(node.Metrics.Cache, db)
 	exeNode.receipts = store.NewExecutionReceipts(node.Metrics.Cache, db, exeNode.results, storage.DefaultCacheSize)
 	exeNode.myReceipts = store.NewMyExecutionReceipts(node.Metrics.Cache, db, exeNode.receipts)
+	exeNode.serviceEvents = store.NewServiceEvents(node.Metrics.Cache, db)
 
 	// Needed for gRPC server, make sure to assign to main scoped vars
 	exeNode.events = store.NewEvents(node.Metrics.Cache, db)
-	exeNode.serviceEvents = store.NewServiceEvents(node.Metrics.Cache, db)
+	exeNode.commits = store.NewCommits(node.Metrics.Cache, db)
+	exeNode.results = store.NewExecutionResults(node.Metrics.Cache, db)
 	exeNode.txResults = store.NewTransactionResults(node.Metrics.Cache, db, exeNode.exeConf.transactionResultsCacheSize)
+
+	if node.dbops == "badger-batch" || node.dbops == "badger-transaction" {
+		// if data are stored in badger, we can use the same storage for all data
+		exeNode.eventsReader = exeNode.events
+		exeNode.commitsReader = exeNode.commits
+		exeNode.resultsReader = exeNode.results
+		exeNode.txResultsReader = exeNode.txResults
+	} else if node.dbops == "pebble-batch" {
+		// when data are stored in pebble, we need to use chained storage to query data from
+		// both pebble and badger
+		// note the pebble storage is the first argument, and badger storage is the second, so
+		// the data will be queried from pebble first, then badger
+		badgerDB := badgerimpl.ToDB(node.DB)
+		exeNode.eventsReader = chained.NewEvents(exeNode.events, store.NewEvents(node.Metrics.Cache, badgerDB))
+		exeNode.commitsReader = chained.NewCommits(exeNode.commits, store.NewCommits(node.Metrics.Cache, badgerDB))
+		exeNode.resultsReader = chained.NewResults(exeNode.results, store.NewExecutionResults(node.Metrics.Cache, badgerDB))
+		exeNode.txResultsReader = chained.NewTransactionResults(exeNode.txResults, store.NewTransactionResults(node.Metrics.Cache, badgerDB, exeNode.exeConf.transactionResultsCacheSize))
+	}
 	return nil
 }
 
@@ -472,6 +495,7 @@ func (exeNode *ExecutionNode) LoadGCPBlockDataUploader(
 	)
 
 	// Setting up RetryableUploader for GCP uploader
+	// deprecated
 	retryableUploader := uploader.NewBadgerRetryableUploaderWrapper(
 		asyncUploader,
 		node.Storage.Blocks,
@@ -1367,10 +1391,10 @@ func (exeNode *ExecutionNode) LoadGrpcServer(
 		exeNode.scriptsEng,
 		node.Storage.Headers,
 		node.State,
-		exeNode.events,
-		exeNode.results,
-		exeNode.txResults,
-		exeNode.commits,
+		exeNode.eventsReader,
+		exeNode.resultsReader,
+		exeNode.txResultsReader,
+		exeNode.commitsReader,
 		exeNode.metricsProvider,
 		node.RootChainID,
 		signature.NewBlockSignerDecoder(exeNode.committee),
