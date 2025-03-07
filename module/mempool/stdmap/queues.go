@@ -29,13 +29,11 @@ func (b *QueuesBackdata) ByID(queueID flow.Identifier) (*queue.Queue, bool) {
 }
 
 func (b *QueuesBackdata) All() []*queue.Queue {
-	entities := b.BackData.All()
+	all := b.BackData.All()
 
-	queues := make([]*queue.Queue, len(entities))
-	i := 0
-	for _, queue := range entities {
-		queues[i] = queue
-		i++
+	queues := make([]*queue.Queue, len(all))
+	for _, queue := range all {
+		queues = append(queues, queue)
 	}
 	return queues
 }
