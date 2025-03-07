@@ -358,6 +358,7 @@ func HandleCollection(
 	}
 
 	// now store each of the transaction body
+	// TODO: store transaction in an atomic batch update
 	for _, tx := range collection.Transactions {
 		err := transactions.Store(tx)
 		if err != nil {
