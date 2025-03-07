@@ -158,8 +158,8 @@ func (b *Backend[K, V]) Limit() uint {
 	return b.guaranteedCapacity
 }
 
-// All returns an unordered list of all values from the pool.
-func (b *Backend[K, V]) All() []V {
+// All returns all stored key-value pairs as a map from the pool.
+func (b *Backend[K, V]) All() map[K]V {
 	// bs1 := binstat.EnterTime(binstat.BinStdmap + ".r_lock.(Backend)All")
 	b.RLock()
 	// binstat.Leave(bs1)
@@ -168,7 +168,7 @@ func (b *Backend[K, V]) All() []V {
 	// defer binstat.Leave(bs2)
 	defer b.RUnlock()
 
-	return b.mutableBackData.Values()
+	return b.mutableBackData.All()
 }
 
 // Clear removes all entities from the pool.

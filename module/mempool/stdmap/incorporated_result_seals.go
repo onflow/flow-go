@@ -1,8 +1,6 @@
 package stdmap
 
 import (
-	"log"
-
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/mempool"
 )
@@ -14,7 +12,7 @@ type sealSet map[flow.Identifier]*flow.IncorporatedResultSeal
 // ATTENTION: This data structure should NEVER eject seals because it can break liveness.
 // Modules that are using this structure expect that it NEVER ejects a seal.
 type IncorporatedResultSeals struct {
-	*Backend
+	*Backend[flow.Identifier, *flow.IncorporatedResultSeal]
 	// index the seals by the height of the executed block
 	byHeight     map[uint64]sealSet
 	lowestHeight uint64
@@ -33,13 +31,11 @@ func NewIncorporatedResultSeals(limit uint) *IncorporatedResultSeals {
 	// ejecting a seal from mempool means that we have reached our limit and something is very bad, meaning that sealing
 	// is not actually happening.
 	// By setting high limit ~12 hours we ensure that we have some safety window for sealing to recover and make progress
-	ejector := func(b *Backend) (flow.Identifier, flow.Entity, bool) {
-		log.Fatalf("incorporated result seals reached max capacity %d", limit)
-		panic("incorporated result seals reached max capacity")
-	}
-
 	r := &IncorporatedResultSeals{
-		Backend:  NewBackend(WithLimit(limit), WithEject(ejector)),
+		Backend: NewBackend(
+			WithLimit[flow.Identifier, *flow.IncorporatedResultSeal](limit),
+			WithEject(EjectPanic[flow.Identifier, *flow.IncorporatedResultSeal]),
+		),
 		byHeight: byHeight,
 	}
 
@@ -65,7 +61,7 @@ func (ir *IncorporatedResultSeals) removeByHeight(height uint64) {
 func (ir *IncorporatedResultSeals) Add(seal *flow.IncorporatedResultSeal) (bool, error) {
 	added := false
 	sealID := seal.ID()
-	err := ir.Backend.Run(func(_ mempool.BackData) error {
+	err := ir.Backend.Run(func(_ mempool.BackData[flow.Identifier, *flow.IncorporatedResultSeal]) error {
 		// skip elements below the pruned
 		if seal.Header.Height < ir.lowestHeight {
 			return nil
@@ -96,35 +92,32 @@ func (ir *IncorporatedResultSeals) Size() uint {
 
 // All returns all the items in the mempool
 func (ir *IncorporatedResultSeals) All() []*flow.IncorporatedResultSeal {
-	entities := ir.Backend.All()
-	res := make([]*flow.IncorporatedResultSeal, 0, ir.mutableBackData.Size())
-	for _, entity := range entities {
-		// uncaught type assertion; should never panic as the mempool only stores IncorporatedResultSeal:
-		res = append(res, entity.(*flow.IncorporatedResultSeal))
+	all := ir.Backend.All()
+	results := make([]*flow.IncorporatedResultSeal, 0, len(all))
+	for _, result := range all {
+		results = append(results, result)
 	}
-	return res
+	return results
 }
 
 // ByID gets an IncorporatedResultSeal by IncorporatedResult ID
 func (ir *IncorporatedResultSeals) ByID(id flow.Identifier) (*flow.IncorporatedResultSeal, bool) {
-	entity, ok := ir.Backend.ByID(id)
+	result, ok := ir.Backend.Get(id)
 	if !ok {
 		return nil, false
 	}
-	// uncaught type assertion; should never panic as the mempool only stores IncorporatedResultSeal:
-	return entity.(*flow.IncorporatedResultSeal), true
+	return result, true
 }
 
 // Remove removes an IncorporatedResultSeal from the mempool
 func (ir *IncorporatedResultSeals) Remove(id flow.Identifier) bool {
 	removed := false
-	err := ir.Backend.Run(func(_ mempool.BackData) error {
-		var entity flow.Entity
-		entity, removed = ir.mutableBackData.Remove(id)
+	err := ir.Backend.Run(func(_ mempool.BackData[flow.Identifier, *flow.IncorporatedResultSeal]) error {
+		var seal *flow.IncorporatedResultSeal
+		seal, removed = ir.mutableBackData.Remove(id)
 		if !removed {
 			return nil
 		}
-		seal := entity.(*flow.IncorporatedResultSeal)
 		ir.removeFromIndex(id, seal.Header.Height)
 		return nil
 	})
@@ -135,7 +128,7 @@ func (ir *IncorporatedResultSeals) Remove(id flow.Identifier) bool {
 }
 
 func (ir *IncorporatedResultSeals) Clear() {
-	err := ir.Backend.Run(func(_ mempool.BackData) error {
+	err := ir.Backend.Run(func(_ mempool.BackData[flow.Identifier, *flow.IncorporatedResultSeal]) error {
 		ir.mutableBackData.Clear()
 		ir.byHeight = make(map[uint64]sealSet)
 		return nil
@@ -154,7 +147,7 @@ func (ir *IncorporatedResultSeals) Clear() {
 // If `height` is smaller than the previous value, the previous value is kept
 // and the sentinel mempool.BelowPrunedThresholdError is returned.
 func (ir *IncorporatedResultSeals) PruneUpToHeight(height uint64) error {
-	return ir.Backend.Run(func(backData mempool.BackData) error {
+	return ir.Backend.Run(func(backData mempool.BackData[flow.Identifier, *flow.IncorporatedResultSeal]) error {
 		if height < ir.lowestHeight {
 			return mempool.NewBelowPrunedThresholdErrorf(
 				"pruning height: %d, existing height: %d", height, ir.lowestHeight)

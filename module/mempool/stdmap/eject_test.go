@@ -181,7 +181,7 @@ func TestLRUEjector_UntrackEject(t *testing.T) {
 	size := 100
 	backEnd := NewBackend[flow.Identifier, *unittest.MockEntity]()
 
-	items := make([]flow.Identifier, size)
+	items := make(flow.IdentifierList, size)
 
 	for i := 0; i < size; i++ {
 		mockEntity := unittest.MockEntityFixture()
@@ -209,7 +209,7 @@ func TestLRUEjector_EjectAll(t *testing.T) {
 	size := 100
 	backEnd := NewBackend[flow.Identifier, *unittest.MockEntity]()
 
-	items := make([]flow.Identifier, size)
+	items := make(flow.IdentifierList, size)
 
 	for i := 0; i < size; i++ {
 		mockEntity := unittest.MockEntityFixture()
