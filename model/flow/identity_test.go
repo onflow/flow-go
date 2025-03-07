@@ -2,6 +2,7 @@ package flow_test
 
 import (
 	"encoding/json"
+	"math/rand/v2"
 	"strings"
 	"testing"
 
@@ -185,7 +186,9 @@ func TestIdentityList_Union(t *testing.T) {
 func TestGenericIdentityList_Malleability(t *testing.T) {
 	t.Run("IdentityList", func(t *testing.T) {
 		identityList := unittest.IdentityListFixture(10)
-		unittest.RequireEntityNonMalleable(t, &identityList)
+		unittest.RequireEntityNonMalleable(t, &identityList, unittest.WithTypeGenerator(func() flow.EpochParticipationStatus {
+			return flow.EpochParticipationStatus(rand.IntN(int(flow.EpochParticipationStatusEjected) + 1))
+		}))
 	})
 
 	t.Run("IdentitySkeletonList", func(t *testing.T) {
