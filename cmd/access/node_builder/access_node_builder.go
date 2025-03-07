@@ -11,8 +11,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/cockroachdb/pebble"
-	"github.com/dgraph-io/badger/v2"
 	"github.com/ipfs/boxo/bitswap"
 	"github.com/ipfs/go-cid"
 	"github.com/ipfs/go-datastore"
@@ -117,8 +115,6 @@ import (
 	"github.com/onflow/flow-go/state/protocol/blocktimer"
 	"github.com/onflow/flow-go/storage"
 	bstorage "github.com/onflow/flow-go/storage/badger"
-	"github.com/onflow/flow-go/storage/operation/badgerimpl"
-	"github.com/onflow/flow-go/storage/operation/pebbleimpl"
 	pstorage "github.com/onflow/flow-go/storage/pebble"
 	"github.com/onflow/flow-go/storage/store"
 	"github.com/onflow/flow-go/utils/grpcutils"
@@ -351,6 +347,8 @@ type FlowAccessNodeBuilder struct {
 	events                         storage.Events
 	lightTransactionResults        storage.LightTransactionResults
 	transactionResultErrorMessages storage.TransactionResultErrorMessages
+	transactions                   storage.Transactions
+	collections                    storage.Collections
 
 	// The sync engine participants provider is the libp2p peer store for the access node
 	// which is not available until after the network has started.
@@ -579,6 +577,12 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 		AdminCommand("read-execution-data", func(config *cmd.NodeConfig) commands.AdminCommand {
 			return stateSyncCommands.NewReadExecutionDataCommand(builder.ExecutionDataStore)
 		}).
+		Module("transactions and collections storage", func(node *cmd.NodeConfig) error {
+			transactions := store.NewTransactions(node.Metrics.Cache, node.ProtocolDB)
+			builder.collections = store.NewCollections(node.ProtocolDB, transactions)
+			builder.transactions = transactions
+			return nil
+		}).
 		Module("execution data datastore and blobstore", func(node *cmd.NodeConfig) error {
 			datastoreDir := filepath.Join(builder.executionDataDir, "blobstore")
 			err := os.MkdirAll(datastoreDir, 0700)
@@ -618,16 +622,7 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 		Module("processed block height consumer progress", func(node *cmd.NodeConfig) error {
 			// Note: progress is stored in the datastore's DB since that is where the jobqueue
 			// writes execution data to.
-			var db storage.DB
-			edmdb := builder.ExecutionDatastoreManager.DB()
-
-			if bdb, ok := edmdb.(*badger.DB); ok {
-				db = badgerimpl.ToDB(bdb)
-			} else if pdb, ok := edmdb.(*pebble.DB); ok {
-				db = pebbleimpl.ToDB(pdb)
-			} else {
-				return fmt.Errorf("unsupported execution data DB type: %T", edmdb)
-			}
+			db := builder.ExecutionDatastoreManager.DB()
 
 			processedBlockHeight = store.NewConsumerProgress(db, module.ConsumeProgressExecutionDataRequesterBlockHeight)
 			return nil
@@ -635,12 +630,7 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 		Module("processed notifications consumer progress", func(node *cmd.NodeConfig) error {
 			// Note: progress is stored in the datastore's DB since that is where the jobqueue
 			// writes execution data to.
-			var db storage.DB
-			if executionDataDBMode == execution_data.ExecutionDataDBModeBadger {
-				db = badgerimpl.ToDB(builder.ExecutionDatastoreManager.DB().(*badger.DB))
-			} else {
-				db = pebbleimpl.ToDB(builder.ExecutionDatastoreManager.DB().(*pebble.DB))
-			}
+			db := builder.ExecutionDatastoreManager.DB()
 			processedNotifications = store.NewConsumerProgress(db, module.ConsumeProgressExecutionDataRequesterNotification)
 			return nil
 		}).
@@ -876,7 +866,7 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 			}).
 			Module("indexed block height consumer progress", func(node *cmd.NodeConfig) error {
 				// Note: progress is stored in the MAIN db since that is where indexed execution data is stored.
-				indexedBlockHeight = store.NewConsumerProgress(badgerimpl.ToDB(builder.DB), module.ConsumeProgressExecutionDataIndexerBlockHeight)
+				indexedBlockHeight = store.NewConsumerProgress(builder.ProtocolDB, module.ConsumeProgressExecutionDataIndexerBlockHeight)
 				return nil
 			}).
 			Module("transaction results storage", func(node *cmd.NodeConfig) error {
@@ -974,10 +964,10 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 					builder.ProtocolDB,
 					builder.Storage.RegisterIndex,
 					builder.Storage.Headers,
-					builder.events,
-					builder.Storage.Collections,
-					builder.Storage.Transactions,
-					builder.lightTransactionResults,
+					notNil(builder.events),
+					notNil(builder.collections),
+					notNil(builder.transactions),
+					notNil(builder.lightTransactionResults),
 					builder.RootChainID.Chain(),
 					indexerDerivedChainData,
 					builder.collectionExecutedMetric,
@@ -1622,7 +1612,7 @@ func (builder *FlowAccessNodeBuilder) Initialize() error {
 	builder.EnqueueNetworkInit()
 
 	builder.AdminCommand("get-transactions", func(conf *cmd.NodeConfig) commands.AdminCommand {
-		return storageCommands.NewGetTransactionsCommand(conf.State, conf.Storage.Payloads, conf.Storage.Collections)
+		return storageCommands.NewGetTransactionsCommand(conf.State, conf.Storage.Payloads, notNil(builder.collections))
 	})
 
 	// if this is an access node that supports public followers, enqueue the public network
@@ -1867,13 +1857,13 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 			return nil
 		}).
 		Module("processed finalized block height consumer progress", func(node *cmd.NodeConfig) error {
-			processedFinalizedBlockHeight = store.NewConsumerProgress(badgerimpl.ToDB(builder.DB), module.ConsumeProgressIngestionEngineBlockHeight)
+			processedFinalizedBlockHeight = store.NewConsumerProgress(builder.ProtocolDB, module.ConsumeProgressIngestionEngineBlockHeight)
 			return nil
 		}).
 		Module("processed last full block height monotonic consumer progress", func(node *cmd.NodeConfig) error {
 			rootBlockHeight := node.State.Params().FinalizedRoot().Height
 
-			progress, err := store.NewConsumerProgress(badgerimpl.ToDB(builder.DB), module.ConsumeProgressLastFullBlockHeight).Initialize(rootBlockHeight)
+			progress, err := store.NewConsumerProgress(builder.ProtocolDB, module.ConsumeProgressLastFullBlockHeight).Initialize(rootBlockHeight)
 			if err != nil {
 				return err
 			}
@@ -2043,8 +2033,8 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 				HistoricalAccessNodes: builder.HistoricalAccessRPCs,
 				Blocks:                node.Storage.Blocks,
 				Headers:               node.Storage.Headers,
-				Collections:           node.Storage.Collections,
-				Transactions:          node.Storage.Transactions,
+				Collections:           notNil(builder.collections),
+				Transactions:          notNil(builder.transactions),
 				ExecutionReceipts:     node.Storage.Receipts,
 				ExecutionResults:      node.Storage.Results,
 				TxResultErrorMessages: builder.transactionResultErrorMessages,
@@ -2146,8 +2136,8 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 				builder.RequestEng,
 				node.Storage.Blocks,
 				node.Storage.Headers,
-				node.Storage.Collections,
-				node.Storage.Transactions,
+				notNil(builder.collections),
+				notNil(builder.transactions),
 				node.Storage.Results,
 				node.Storage.Receipts,
 				builder.collectionExecutedMetric,
@@ -2180,7 +2170,7 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 	if builder.storeTxResultErrorMessages {
 		builder.Module("processed error messages block height consumer progress", func(node *cmd.NodeConfig) error {
 			processedTxErrorMessagesBlockHeight = store.NewConsumerProgress(
-				badgerimpl.ToDB(builder.DB),
+				builder.ProtocolDB,
 				module.ConsumeProgressEngineTxErrorMessagesBlockHeight,
 			)
 			return nil
@@ -2392,4 +2382,16 @@ func (builder *FlowAccessNodeBuilder) initPublicLibp2pNode(networkKey crypto.Pri
 	}
 
 	return libp2pNode, nil
+}
+
+// notNil ensures that the input is not nil and returns it
+// the usage is to ensure the dependencies are initialized before initializing a module.
+// for instance, the IngestionEngine depends on storage.Collections, which is initialized in a
+// different function, so we need to ensure that the storage.Collections is initialized before
+// creating the IngestionEngine.
+func notNil[T any](dep T) T {
+	if any(dep) == nil {
+		panic("dependency is nil")
+	}
+	return dep
 }
