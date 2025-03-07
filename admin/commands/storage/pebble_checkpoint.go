@@ -3,6 +3,8 @@ package storage
 import (
 	"context"
 	"fmt"
+	"path"
+	"time"
 
 	"github.com/cockroachdb/pebble"
 	"github.com/rs/zerolog/log"
@@ -17,7 +19,7 @@ var _ commands.AdminCommand = (*PebbleDBCheckpointCommand)(nil)
 // while keeping the node alive.
 type PebbleDBCheckpointCommand struct {
 	checkpointDir string
-	dbname        string
+	dbname        string // dbname is for logging purposes only
 	pebbleDB      *pebble.DB
 }
 
@@ -48,4 +50,10 @@ func (c *PebbleDBCheckpointCommand) Handler(ctx context.Context, req *admin.Comm
 
 func (c *PebbleDBCheckpointCommand) Validator(req *admin.CommandRequest) error {
 	return nil
+}
+
+func nextTmpFolder(dir string) string {
+	// use timestamp as folder name
+	folderName := time.Now().Format("2006-01-02_15-04-05")
+	return path.Join(dir, folderName)
 }

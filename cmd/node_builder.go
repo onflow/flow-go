@@ -155,6 +155,7 @@ type BaseConfig struct {
 	DynamicStartupSleepInterval time.Duration
 	datadir                     string
 	pebbleDir                   string
+	pebbleCheckpointsDir        string
 	dbops                       string
 	badgerDB                    *badger.DB
 	pebbleDB                    *pebble.DB

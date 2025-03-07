@@ -3,9 +3,7 @@ package storage
 import (
 	"fmt"
 	"math"
-	"path"
 	"strings"
-	"time"
 
 	"github.com/onflow/flow-go/admin"
 	"github.com/onflow/flow-go/model/flow"
@@ -158,10 +156,4 @@ func findString(input map[string]interface{}, field string) (string, error) {
 	}
 
 	return strings.ToLower(strings.TrimSpace(str)), nil
-}
-
-func nextTmpFolder(dir string) string {
-	// use timestamp as folder name
-	folderName := time.Now().Format("2006-01-02_15-04-05")
-	return path.Join(dir, folderName)
 }
