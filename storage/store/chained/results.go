@@ -19,7 +19,7 @@ var _ storage.ExecutionResultsReader = (*ChainedResults)(nil)
 // will return err
 // for reads, it first query first database, then second database, this is useful when migrating
 // data from badger to pebble
-func NewResults(first storage.ExecutionResultsReader, second storage.ExecutionResultsReader) *ChainedResults {
+func NewExecutionResults(first storage.ExecutionResultsReader, second storage.ExecutionResultsReader) *ChainedResults {
 	return &ChainedResults{
 		first:  first,
 		second: second,

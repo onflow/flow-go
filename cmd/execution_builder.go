@@ -362,7 +362,7 @@ func (exeNode *ExecutionNode) LoadExecutionStorage(
 		badgerDB := badgerimpl.ToDB(node.DB)
 		exeNode.eventsReader = chained.NewEvents(exeNode.events, store.NewEvents(node.Metrics.Cache, badgerDB))
 		exeNode.commitsReader = chained.NewCommits(exeNode.commits, store.NewCommits(node.Metrics.Cache, badgerDB))
-		exeNode.resultsReader = chained.NewResults(exeNode.results, store.NewExecutionResults(node.Metrics.Cache, badgerDB))
+		exeNode.resultsReader = chained.NewExecutionResults(exeNode.results, store.NewExecutionResults(node.Metrics.Cache, badgerDB))
 		exeNode.txResultsReader = chained.NewTransactionResults(exeNode.txResults, store.NewTransactionResults(node.Metrics.Cache, badgerDB, exeNode.exeConf.transactionResultsCacheSize))
 	}
 	return nil
