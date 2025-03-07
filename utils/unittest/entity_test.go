@@ -47,12 +47,12 @@ func (e *StructWithNilFields) ID() flow.Identifier {
 	})
 }
 
-// StructWithUnsupportedFlowField will always fail malleability checking because it contains a private (non-settable) field
-type StructWithUnsupportedFlowField struct {
+// StructWithNotSettableFlowField will always fail malleability checking because it contains a private (non-settable) field
+type StructWithNotSettableFlowField struct {
 	field flow.IdentitySkeleton
 }
 
-func (e *StructWithUnsupportedFlowField) ID() flow.Identifier {
+func (e *StructWithNotSettableFlowField) ID() flow.Identifier {
 	return flow.MakeID(e)
 }
 
@@ -124,49 +124,39 @@ func TestRequireEntityNonMalleable(t *testing.T) {
 	})
 	t.Run("embedded-struct-with-nil-value", func(t *testing.T) {
 		t.Run("nil-slice", func(t *testing.T) {
-			err := NewMalleabilityChecker().Check(&StructWithNilFields{
+			RequireEntityNonMalleable(t, &StructWithNilFields{
 				Identities: nil,
 				Index:      map[flow.Identifier]uint32{IdentifierFixture(): 0},
 				QC:         QuorumCertificateFixture(),
 			})
-			require.Error(t, err)
-			require.ErrorContains(t, err, "invalid entity, map/slice is empty")
 		})
 		t.Run("empty-slice", func(t *testing.T) {
-			err := NewMalleabilityChecker().Check(&StructWithNilFields{
+			RequireEntityNonMalleable(t, &StructWithNilFields{
 				Identities: make(flow.IdentitySkeletonList, 0),
 				Index:      map[flow.Identifier]uint32{IdentifierFixture(): 0},
 				QC:         QuorumCertificateFixture(),
 			})
-			require.Error(t, err)
-			require.ErrorContains(t, err, "invalid entity, map/slice is empty")
 		})
 		t.Run("nil-map", func(t *testing.T) {
-			err := NewMalleabilityChecker().Check(&StructWithNilFields{
+			RequireEntityNonMalleable(t, &StructWithNilFields{
 				Identities: IdentityListFixture(5).ToSkeleton(),
 				Index:      nil,
 				QC:         QuorumCertificateFixture(),
 			})
-			require.Error(t, err)
-			require.ErrorContains(t, err, "invalid entity, map/slice is empty")
 		})
 		t.Run("empty-map", func(t *testing.T) {
-			err := NewMalleabilityChecker().Check(&StructWithNilFields{
+			RequireEntityNonMalleable(t, &StructWithNilFields{
 				Identities: IdentityListFixture(5).ToSkeleton(),
 				Index:      map[flow.Identifier]uint32{},
 				QC:         QuorumCertificateFixture(),
 			})
-			require.Error(t, err)
-			require.ErrorContains(t, err, "invalid entity, map/slice is empty")
 		})
 		t.Run("nil-ptr", func(t *testing.T) {
-			err := NewMalleabilityChecker().Check(&StructWithNilFields{
+			RequireEntityNonMalleable(t, &StructWithNilFields{
 				Identities: IdentityListFixture(5).ToSkeleton(),
 				Index:      map[flow.Identifier]uint32{IdentifierFixture(): 0},
 				QC:         nil,
 			})
-			require.Error(t, err)
-			require.ErrorContains(t, err, "invalid entity, field is nil")
 		})
 	})
 	t.Run("invalid-entity", func(t *testing.T) {
@@ -181,7 +171,7 @@ func TestRequireEntityNonMalleable(t *testing.T) {
 		require.ErrorContains(t, err, "entity is nil")
 	})
 	t.Run("unsupported-field", func(t *testing.T) {
-		err := NewMalleabilityChecker().Check(&StructWithUnsupportedFlowField{
+		err := NewMalleabilityChecker().Check(&StructWithNotSettableFlowField{
 			field: IdentityFixture().IdentitySkeleton,
 		})
 		require.Error(t, err)
@@ -215,5 +205,112 @@ func TestRequireEntityNonMalleable(t *testing.T) {
 			err := NewMalleabilityChecker().Check(v)
 			require.NoError(t, err)
 		})
+	})
+}
+
+type EnterViewEvidence struct {
+	QC *flow.QuorumCertificate
+	TC *flow.TimeoutCertificate
+}
+
+type StructWithPinning struct {
+	Version  uint32
+	Evidence *EnterViewEvidence
+}
+
+func (e *StructWithPinning) ID() flow.Identifier {
+	if e.Version == 1 {
+		if e.Evidence.TC != nil {
+			panic("TC should not be set for version 1")
+		}
+		return flow.MakeID(struct {
+			Version uint32
+			QcID    flow.Identifier
+		}{
+			Version: e.Version,
+			QcID:    e.Evidence.QC.ID(),
+		})
+	} else if e.Version == 2 {
+		if e.Evidence.QC == nil || e.Evidence.TC == nil {
+			panic("QC and TC should be set for version 2")
+		}
+		return flow.MakeID(struct {
+			Version uint32
+			QcID    flow.Identifier
+			TcID    flow.Identifier
+		}{
+			Version: e.Version,
+			QcID:    e.Evidence.QC.ID(),
+			TcID:    e.Evidence.TC.ID(),
+		})
+	} else {
+		panic("unsupported version")
+	}
+}
+
+func TestMalleabilityChecker_PinField(t *testing.T) {
+	t.Run("v1", func(t *testing.T) {
+		checker := NewMalleabilityChecker(WithPinnedField("Version"), WithPinnedField("Evidence.TC"))
+		err := checker.Check(&StructWithPinning{
+			Version: 1,
+			Evidence: &EnterViewEvidence{
+				QC: QuorumCertificateFixture(),
+				TC: nil,
+			},
+		})
+		require.NoError(t, err)
+	})
+	t.Run("v2", func(t *testing.T) {
+		checker := NewMalleabilityChecker(WithPinnedField("Version"))
+		err := checker.Check(&StructWithPinning{
+			Version: 2,
+			Evidence: &EnterViewEvidence{
+				QC: QuorumCertificateFixture(),
+				TC: &flow.TimeoutCertificate{
+					View:          0,
+					NewestQCViews: nil,
+					NewestQC:      nil,
+					SignerIndices: nil,
+					SigData:       nil,
+				},
+			},
+		})
+		require.NoError(t, err)
+	})
+}
+
+type StructWithUnsupportedType struct {
+	Version   uint32
+	Evidences []*EnterViewEvidence
+}
+
+func (e *StructWithUnsupportedType) ID() flow.Identifier {
+	return flow.MakeID(e)
+}
+
+func TestMalleabilityChecker_Generators(t *testing.T) {
+	t.Run("field-generator", func(t *testing.T) {
+		RequireEntityNonMalleable(t, &StructWithUnsupportedType{
+			Version:   0,
+			Evidences: nil,
+		}, WithFieldGenerator("Evidences", func() []*EnterViewEvidence {
+			return []*EnterViewEvidence{
+				{
+					QC: QuorumCertificateFixture(),
+					TC: nil,
+				},
+			}
+		}))
+	})
+	t.Run("type-generator", func(t *testing.T) {
+		RequireEntityNonMalleable(t, &StructWithUnsupportedType{
+			Version:   0,
+			Evidences: nil,
+		}, WithTypeGenerator(func() EnterViewEvidence {
+			return EnterViewEvidence{
+				QC: QuorumCertificateFixture(),
+				TC: nil,
+			}
+		}))
 	})
 }
