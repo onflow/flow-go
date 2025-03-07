@@ -338,14 +338,13 @@ func (exeNode *ExecutionNode) LoadExecutionStorage(
 	node *NodeConfig,
 ) error {
 	db := node.ProtocolDB
-	exeNode.receipts = store.NewExecutionReceipts(node.Metrics.Cache, db, exeNode.results, storage.DefaultCacheSize)
-	exeNode.myReceipts = store.NewMyExecutionReceipts(node.Metrics.Cache, db, exeNode.receipts)
-	exeNode.serviceEvents = store.NewServiceEvents(node.Metrics.Cache, db)
 
-	// Needed for gRPC server, make sure to assign to main scoped vars
 	exeNode.events = store.NewEvents(node.Metrics.Cache, db)
+	exeNode.serviceEvents = store.NewServiceEvents(node.Metrics.Cache, db)
 	exeNode.commits = store.NewCommits(node.Metrics.Cache, db)
 	exeNode.results = store.NewExecutionResults(node.Metrics.Cache, db)
+	exeNode.receipts = store.NewExecutionReceipts(node.Metrics.Cache, db, exeNode.results, storage.DefaultCacheSize)
+	exeNode.myReceipts = store.NewMyExecutionReceipts(node.Metrics.Cache, db, exeNode.receipts)
 	exeNode.txResults = store.NewTransactionResults(node.Metrics.Cache, db, exeNode.exeConf.transactionResultsCacheSize)
 
 	if node.dbops == "badger-batch" || node.dbops == "badger-transaction" {
