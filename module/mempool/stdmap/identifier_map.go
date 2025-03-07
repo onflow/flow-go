@@ -23,34 +23,12 @@ func NewIdentifierMap(limit uint) (*IdentifierMap, error) {
 }
 
 // Append will append the id to the list of identifiers associated with key.
-func (i *IdentifierMap) Append(key, id flow.Identifier) error {
-	return i.Backend.Run(func(backdata mempool.BackData[flow.Identifier, map[flow.Identifier]struct{}]) error {
-		idsMap, ok := backdata.Get(key)
-		if !ok {
-			// no record with key is available in the mempool,
-			// initializes ids.
-			idsMap = make(map[flow.Identifier]struct{})
-		} else {
-			if _, ok := idsMap[id]; ok {
-				// id is already associated with the key
-				// no need to append
-				return nil
-			}
-
-			// removes map entry associated with key for update
-			if _, removed := backdata.Remove(key); !removed {
-				return fmt.Errorf("potential race condition on removing from identifier map")
-			}
-		}
-
-		// appends id to the ids list
-		idsMap[id] = struct{}{}
-
-		if added := backdata.Add(key, idsMap); !added {
-			return fmt.Errorf("potential race condition on adding to identifier map")
-		}
-
-		return nil
+func (i *IdentifierMap) Append(key, id flow.Identifier) {
+	i.Backend.AdjustWithInit(key, func(stored map[flow.Identifier]struct{}) map[flow.Identifier]struct{} {
+		stored[id] = struct{}{}
+		return stored
+	}, func() map[flow.Identifier]struct{} {
+		return map[flow.Identifier]struct{}{id: {}}
 	})
 }
 

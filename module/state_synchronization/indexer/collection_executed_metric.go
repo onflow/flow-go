@@ -66,11 +66,7 @@ func (c *CollectionExecutedMetricImpl) CollectionFinalized(light flow.LightColle
 		for _, t := range light.Transactions {
 			c.accessMetrics.TransactionFinalized(t, ti)
 
-			err = c.blockTransactions.Append(blockID, t)
-			if err != nil {
-				c.log.Warn().Err(err).Msg("could not append finalized tx to track sealed transactions")
-				continue
-			}
+			c.blockTransactions.Append(blockID, t)
 		}
 		c.collectionsToMarkFinalized.Remove(lightID)
 	}
@@ -107,12 +103,7 @@ func (c *CollectionExecutedMetricImpl) BlockFinalized(block *flow.Block) {
 
 		for _, t := range l.Transactions {
 			c.accessMetrics.TransactionFinalized(t, now)
-			err = c.blockTransactions.Append(blockID, t)
-
-			if err != nil {
-				c.log.Warn().Err(err).Msg("could not append finalized tx to track sealed transactions")
-				continue
-			}
+			c.blockTransactions.Append(blockID, t)
 		}
 	}
 
