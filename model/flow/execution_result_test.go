@@ -14,7 +14,11 @@ import (
 // TestExecutionResultID_Malleability confirms that the ExecutionResult struct, which implements
 // the [flow.IDEntity] interface, is resistant to tampering.
 func TestExecutionResultID_Malleability(t *testing.T) {
-	unittest.RequireEntityNonMalleable(t, unittest.ExecutionResultFixture(unittest.WithServiceEvents(3)))
+	unittest.RequireEntityNonMalleable(t,
+		unittest.ExecutionResultFixture(unittest.WithServiceEvents(3)),
+		unittest.WithTypeGenerator(func() flow.ServiceEvent {
+			return unittest.ServiceEventsFixture(1)[0]
+		}))
 }
 
 // TestExecutionResultGroupBy tests the GroupBy method of ExecutionResultList:
