@@ -4,14 +4,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
-// Events represents persistent storage for events.
-type Events interface {
-	// Store will store events for the given block ID
-	Store(blockID flow.Identifier, blockEvents []flow.EventsList) error
-
-	// BatchStore will store events for the given block ID in a given batch
-	BatchStore(blockID flow.Identifier, events []flow.EventsList, batch ReaderBatchWriter) error
-
+type EventsReader interface {
 	// ByBlockID returns the events for the given block ID
 	ByBlockID(blockID flow.Identifier) ([]flow.Event, error)
 
@@ -23,6 +16,17 @@ type Events interface {
 
 	// ByBlockIDEventType returns the events for the given block ID and event type
 	ByBlockIDEventType(blockID flow.Identifier, eventType flow.EventType) ([]flow.Event, error)
+}
+
+// Events represents persistent storage for events.
+type Events interface {
+	EventsReader
+
+	// Store will store events for the given block ID
+	Store(blockID flow.Identifier, blockEvents []flow.EventsList) error
+
+	// BatchStore will store events for the given block ID in a given batch
+	BatchStore(blockID flow.Identifier, events []flow.EventsList, batch ReaderBatchWriter) error
 
 	// BatchRemoveByBlockID removes events keyed by a blockID in provided batch
 	// No errors are expected during normal operation, even if no entries are matched.
