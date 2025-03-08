@@ -114,6 +114,7 @@ func TestMigrateLastSealedExecutedResultToPebble(t *testing.T) {
 		ps := new(protocolmock.State)
 		params := new(protocolmock.Params)
 		params.On("SporkID").Return(mainnet26SporkID)
+		params.On("ChainID").Return(flow.Mainnet)
 		ps.On("Params").Return(params)
 		ps.On("AtHeight", mock.Anything).Return(
 			func(height uint64) protocol.Snapshot {

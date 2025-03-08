@@ -49,10 +49,13 @@ func init() {
 func MigrateLastSealedExecutedResultToPebble(logger zerolog.Logger, badgerDB *badger.DB, pebbleDB *pebble.DB, state protocol.State, rootSeal *flow.Seal) error {
 	// only run the migration for mainnet26 and testnet52
 	sporkID := state.Params().SporkID()
-	if sporkID != mainnet26SporkID && sporkID != testnet52SporkID {
-		logger.Warn().Msgf("spork ID %v is not Mainnet26SporkID %v or Testnet52SporkID %v, skip migration",
-			sporkID, mainnet26SporkID, testnet52SporkID)
-		return nil
+	chainID := state.Params().ChainID()
+	if chainID == flow.Mainnet || chainID == flow.Testnet {
+		if sporkID != mainnet26SporkID && sporkID != testnet52SporkID {
+			logger.Warn().Msgf("spork ID %v is not Mainnet26SporkID %v or Testnet52SporkID %v, skip migration",
+				sporkID, mainnet26SporkID, testnet52SporkID)
+			return nil
+		}
 	}
 
 	bdb := badgerimpl.ToDB(badgerDB)
@@ -119,6 +122,12 @@ func MigrateLastSealedExecutedResultToPebble(logger zerolog.Logger, badgerDB *ba
 
 			if header.Height > lastExecutedSealedHeightInBadger {
 				// existing executed in pebble is higher than badger, no need to store anything
+				// why?
+				// because the migration only copy the last sealed and executed block from badger to pebble,
+				// if EN is still storing new results in badger, then the existingExecuted in pebble will be the same as
+				// badger not higher.
+				// if EN is storing new results in pebble, then the existingExecuted in pebble will be higher than badger,
+				// in this case, we don't need to update the executed block in pebble.
 				lg.Info().Msgf("existing executed block %v in pebble is newer than %v in badger, skip update",
 					header.Height, lastExecutedSealedHeightInBadger)
 				return nil
