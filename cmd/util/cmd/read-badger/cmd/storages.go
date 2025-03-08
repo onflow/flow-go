@@ -52,15 +52,18 @@ func InitBadgerAndPebble() (bdb *badger.DB, pdb *pebble.DB, err error) {
 	if flagDatadir == "" {
 		return nil, nil, fmt.Errorf("must specify --datadir")
 	}
-	bdb = common.InitStorage(flagDatadir)
+
 	if flagPebbleDir == "" {
 		return nil, nil, fmt.Errorf("must specify --pebbledir")
 	}
+
 	pdb, err = pebblestorage.MustOpenDefaultPebbleDB(
 		log.Logger.With().Str("pebbledb", "protocol").Logger(), flagPebbleDir)
 	if err != nil {
 		return nil, nil, err
 	}
+
+	bdb = common.InitStorage(flagDatadir)
 
 	return bdb, pdb, nil
 }
