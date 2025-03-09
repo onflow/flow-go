@@ -4,10 +4,9 @@ import (
 	"bytes"
 	"fmt"
 	"math"
+	"slices"
 
 	"github.com/onflow/crypto"
-	"golang.org/x/exp/slices"
-
 	"github.com/onflow/flow-go/utils/rand"
 )
 
