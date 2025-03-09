@@ -4,11 +4,10 @@ package bootstrap
 import (
 	"encoding/json"
 	"fmt"
+	"slices"
 	"strings"
 
 	"github.com/onflow/crypto"
-	"golang.org/x/exp/slices"
-
 	sdk "github.com/onflow/flow-go-sdk"
 	sdkcrypto "github.com/onflow/flow-go-sdk/crypto"
 

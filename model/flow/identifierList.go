@@ -2,8 +2,7 @@ package flow
 
 import (
 	"fmt"
-
-	"golang.org/x/exp/slices"
+	"slices"
 )
 
 // IdentifierList defines a sortable list of identifiers

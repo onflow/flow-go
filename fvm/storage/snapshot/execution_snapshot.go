@@ -1,9 +1,8 @@
 package snapshot
 
 import (
+	"slices"
 	"strings"
-
-	"golang.org/x/exp/slices"
 
 	"github.com/onflow/flow-go/fvm/meter"
 	"github.com/onflow/flow-go/model/flow"

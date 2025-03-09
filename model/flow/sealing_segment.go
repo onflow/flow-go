@@ -3,8 +3,7 @@ package flow
 import (
 	"errors"
 	"fmt"
-
-	"golang.org/x/exp/slices"
+	"slices"
 )
 
 // SealingSegment is a continuous segment of recently finalized blocks that contains enough history

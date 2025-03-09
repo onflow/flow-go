@@ -3,10 +3,9 @@ package dkg
 import (
 	"math/rand"
 	"os"
+	"slices"
 	"testing"
 	"time"
-
-	"golang.org/x/exp/slices"
 
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"

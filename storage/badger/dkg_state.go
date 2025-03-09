@@ -3,11 +3,10 @@ package badger
 import (
 	"errors"
 	"fmt"
+	"slices"
 
 	"github.com/dgraph-io/badger/v2"
 	"github.com/onflow/crypto"
-	"golang.org/x/exp/slices"
-
 	"github.com/onflow/flow-go/model/encodable"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
