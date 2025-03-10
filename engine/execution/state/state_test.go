@@ -40,7 +40,6 @@ func prepareTest(f func(t *testing.T, es state.ExecutionState, l *ledger.Ledger,
 			stateCommitments := storage.NewCommits(t)
 			headers := storage.NewHeaders(t)
 			blocks := storage.NewBlocks(t)
-			collections := storage.NewCollections(t)
 			events := storage.NewEvents(t)
 			serviceEvents := storage.NewServiceEvents(t)
 			txResults := storage.NewTransactionResults(t)
@@ -54,7 +53,7 @@ func prepareTest(f func(t *testing.T, es state.ExecutionState, l *ledger.Ledger,
 
 			db := badgerimpl.ToDB(badgerDB)
 			es := state.NewExecutionState(
-				ls, stateCommitments, blocks, headers, collections, chunkDataPacks, results, myReceipts, events, serviceEvents, txResults, db, getLatestFinalized, trace.NewNoopTracer(),
+				ls, stateCommitments, blocks, headers, chunkDataPacks, results, myReceipts, events, serviceEvents, txResults, db, getLatestFinalized, trace.NewNoopTracer(),
 				nil,
 				false,
 			)

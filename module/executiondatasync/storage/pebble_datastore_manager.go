@@ -9,6 +9,8 @@ import (
 	pebbleds "github.com/ipfs/go-ds-pebble"
 	"github.com/rs/zerolog"
 
+	"github.com/onflow/flow-go/storage"
+	"github.com/onflow/flow-go/storage/operation/pebbleimpl"
 	pstorage "github.com/onflow/flow-go/storage/pebble"
 )
 
@@ -61,8 +63,8 @@ func (p *PebbleDatastoreManager) Datastore() ds.Batching {
 
 // DB returns the raw database object, allowing for more direct
 // access to the underlying database features and operations.
-func (p *PebbleDatastoreManager) DB() interface{} {
-	return p.db
+func (p *PebbleDatastoreManager) DB() storage.DB {
+	return pebbleimpl.ToDB(p.db)
 }
 
 // Close terminates the connection to the datastore and releases
