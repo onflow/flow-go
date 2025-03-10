@@ -61,6 +61,10 @@ func (c *Creator) Create() (iter module.BlockIterator, hasNext bool, exception e
 	return NewIndexedBlockIterator(c.getBlockIDByIndex, c.progress, iterRange), true, nil
 }
 
+func (c *Creator) IteratorState() module.IteratorStateReader {
+	return c.progress
+}
+
 // NewHeightBasedCreator creates a block iterator that iterates through blocks
 // from root to the latest (either finalized or sealed) by height.
 func NewHeightBasedCreator(

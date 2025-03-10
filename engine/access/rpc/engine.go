@@ -97,7 +97,7 @@ func NewBuilder(
 	log = log.With().Str("engine", "rpc").Logger()
 
 	// wrap the unsecured server with an HTTP proxy server to serve HTTP clients
-	httpServer := newHTTPProxyServer(unsecureGrpcServer.Server)
+	httpServer := newHTTPProxyServer(unsecureGrpcServer)
 
 	finalizedCache, finalizedCacheWorker, err := events.NewFinalizedHeaderCache(state)
 	if err != nil {

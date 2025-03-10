@@ -8,6 +8,7 @@ import (
 
 	"github.com/cockroachdb/pebble"
 	"github.com/hashicorp/go-multierror"
+	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/storage/pebble/registers"
@@ -17,8 +18,8 @@ const DefaultPebbleCacheSize = 1 << 20
 
 // NewBootstrappedRegistersWithPath initializes a new Registers instance with a pebble db
 // if the database is not initialized, it close the database and return storage.ErrNotBootstrapped
-func NewBootstrappedRegistersWithPath(dir string) (*Registers, *pebble.DB, error) {
-	db, err := OpenRegisterPebbleDB(dir)
+func NewBootstrappedRegistersWithPath(logger zerolog.Logger, dir string) (*Registers, *pebble.DB, error) {
+	db, err := OpenRegisterPebbleDB(logger, dir)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to initialize pebble db: %w", err)
 	}
@@ -41,11 +42,11 @@ func NewBootstrappedRegistersWithPath(dir string) (*Registers, *pebble.DB, error
 // a customized comparer (NewMVCCComparer) which is needed to
 // implement finding register values at any given height using
 // pebble's SeekPrefixGE function
-func OpenRegisterPebbleDB(dir string) (*pebble.DB, error) {
+func OpenRegisterPebbleDB(logger zerolog.Logger, dir string) (*pebble.DB, error) {
 	cache := pebble.NewCache(DefaultPebbleCacheSize)
 	defer cache.Unref()
 	// currently pebble is only used for registers
-	opts := DefaultPebbleOptions(cache, registers.NewMVCCComparer())
+	opts := DefaultPebbleOptions(logger, cache, registers.NewMVCCComparer())
 	db, err := pebble.Open(dir, opts)
 	if err != nil {
 		return nil, fmt.Errorf("failed to open db: %w", err)
@@ -58,10 +59,10 @@ func OpenRegisterPebbleDB(dir string) (*pebble.DB, error) {
 // such as cache size and comparer
 // If the pebbleDB is not bootstrapped at this folder, it will auto-bootstrap it,
 // use MustOpenDefaultPebbleDB if you want to return error instead
-func OpenDefaultPebbleDB(dir string) (*pebble.DB, error) {
+func OpenDefaultPebbleDB(logger zerolog.Logger, dir string) (*pebble.DB, error) {
 	cache := pebble.NewCache(DefaultPebbleCacheSize)
 	defer cache.Unref()
-	opts := DefaultPebbleOptions(cache, pebble.DefaultComparer)
+	opts := DefaultPebbleOptions(logger, cache, pebble.DefaultComparer)
 	db, err := pebble.Open(dir, opts)
 	if err != nil {
 		return nil, fmt.Errorf("failed to open db: %w", err)
@@ -72,13 +73,13 @@ func OpenDefaultPebbleDB(dir string) (*pebble.DB, error) {
 
 // MustOpenDefaultPebbleDB returns error if the pebbleDB is not bootstrapped at this folder
 // if bootstrapped, then open the pebbleDB
-func MustOpenDefaultPebbleDB(dir string) (*pebble.DB, error) {
+func MustOpenDefaultPebbleDB(logger zerolog.Logger, dir string) (*pebble.DB, error) {
 	err := IsPebbleInitialized(dir)
 	if err != nil {
 		return nil, fmt.Errorf("pebble db is not initialized: %w", err)
 	}
 
-	return OpenDefaultPebbleDB(dir)
+	return OpenDefaultPebbleDB(logger, dir)
 }
 
 // IsPebbleInitialized checks if the given folder contains a valid Pebble DB.
@@ -95,7 +96,7 @@ func IsPebbleInitialized(folderPath string) error {
 	}
 
 	// Look for Pebble-specific files
-	requiredFiles := []string{"CURRENT", "MANIFEST-*"}
+	requiredFiles := []string{"MANIFEST-*"}
 	for _, pattern := range requiredFiles {
 		matches, err := filepath.Glob(filepath.Join(folderPath, pattern))
 		if err != nil {
@@ -104,20 +105,6 @@ func IsPebbleInitialized(folderPath string) error {
 		if len(matches) == 0 {
 			return fmt.Errorf("missing required file: %s", pattern)
 		}
-	}
-
-	// Optionally, validate the CURRENT file references a MANIFEST file
-	currentPath := filepath.Join(folderPath, "CURRENT")
-	currentFile, err := os.Open(currentPath)
-	if err != nil {
-		return fmt.Errorf("error reading CURRENT file: %v", err)
-	}
-	defer currentFile.Close()
-
-	// Basic validation by ensuring the CURRENT file is non-empty
-	stat, err := currentFile.Stat()
-	if err != nil || stat.Size() == 0 {
-		return fmt.Errorf("CURRENT file is invalid")
 	}
 
 	return nil

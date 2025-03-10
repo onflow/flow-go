@@ -322,7 +322,7 @@ func (tc *ClusterSwitchoverTestCase) Collector(id flow.Identifier) testmock.Coll
 }
 
 // Clusters returns the clusters for the current epoch.
-func (tc *ClusterSwitchoverTestCase) Clusters(epoch protocol.Epoch) []protocol.Cluster {
+func (tc *ClusterSwitchoverTestCase) Clusters(epoch protocol.CommittedEpoch) []protocol.Cluster {
 	clustering, err := epoch.Clustering()
 	require.NoError(tc.T(), err)
 
@@ -344,9 +344,10 @@ func (tc *ClusterSwitchoverTestCase) BlockInEpoch(epochCounter uint64) *flow.Hea
 	for height := root.Height; ; height++ {
 		curr := tc.State().AtHeight(height)
 		next := tc.State().AtHeight(height + 1)
-		curCounter, err := curr.Epochs().Current().Counter()
+		currentEpoch, err := curr.Epochs().Current()
 		require.NoError(tc.T(), err)
-		nextCounter, err := next.Epochs().Current().Counter()
+		curCounter := currentEpoch.Counter()
+		nextEpoch, err := next.Epochs().Current()
 		// if we reach a point where the next block doesn't exist, but the
 		// current block has the correct counter, return the current block
 		if err != nil && curCounter == epochCounter {
@@ -354,6 +355,7 @@ func (tc *ClusterSwitchoverTestCase) BlockInEpoch(epochCounter uint64) *flow.Hea
 			require.NoError(tc.T(), err)
 			return head
 		}
+		nextCounter := nextEpoch.Counter()
 
 		// otherwise, wait until we reach the block where the next block is in
 		// the next epoch - this is the highest block in the requested epoch
@@ -444,8 +446,11 @@ func RunTestCase(tc *ClusterSwitchoverTestCase) {
 	// build halfway through the grace period for the epoch 1 cluster
 	tc.builder.AddBlocksWithSeals(flow.DefaultTransactionExpiry/2, 1)
 
-	epoch1 := tc.State().Final().Epochs().Previous()
-	epoch2 := tc.State().Final().Epochs().Current()
+	finalSnap := tc.State().Final()
+	epoch1, err := finalSnap.Epochs().Previous()
+	require.NoError(tc.T(), err)
+	epoch2, err := finalSnap.Epochs().Current()
+	require.NoError(tc.T(), err)
 
 	epoch1Clusters := tc.Clusters(epoch1)
 	epoch2Clusters := tc.Clusters(epoch2)

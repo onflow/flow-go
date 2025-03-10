@@ -9,9 +9,10 @@ import (
 
 	"github.com/onflow/flow-go/cmd/util/cmd/common"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module/block_iterator/latest"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/storage"
-	"github.com/onflow/flow-go/storage/badger/procedure"
+	"github.com/onflow/flow-go/storage/operation/badgerimpl"
 )
 
 var NoMissmatchFoundError = errors.New("No missmatch found")
@@ -67,7 +68,7 @@ func findFirstMismatch(datadir string, startHeight, endHeight uint64) error {
 	}
 
 	if endHeight == 0 {
-		endHeight, err = findLastExecutedAndSealedHeight(state, db)
+		endHeight, err = latest.LatestSealedAndExecutedHeight(state, badgerimpl.ToDB(db))
 		if err != nil {
 			return fmt.Errorf("could not find last executed and sealed height: %v", err)
 		}
@@ -170,26 +171,6 @@ func (c *checker) CompareAtHeight(height uint64) (bool, error) {
 
 func findRootBlockHeight(state protocol.State) uint64 {
 	return state.Params().SealedRoot().Height
-}
-
-func findLastExecutedAndSealedHeight(state protocol.State, db *badger.DB) (uint64, error) {
-	lastSealed, err := state.Sealed().Head()
-	if err != nil {
-		return 0, err
-	}
-
-	var blockID flow.Identifier
-	var lastExecuted uint64
-	err = db.View(procedure.GetLastExecutedBlock(&lastExecuted, &blockID))
-	if err != nil {
-		return 0, err
-	}
-
-	// the last sealed executed is min(last_sealed, last_executed)
-	if lastExecuted < lastSealed.Height {
-		return lastExecuted, nil
-	}
-	return lastSealed.Height, nil
 }
 
 func findBlockIDByHeight(headers storage.Headers, height uint64) (flow.Identifier, error) {

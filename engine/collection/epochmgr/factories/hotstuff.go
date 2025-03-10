@@ -65,7 +65,7 @@ func NewHotStuffFactory(
 }
 
 func (f *HotStuffFactory) CreateModules(
-	epoch protocol.Epoch,
+	epoch protocol.CommittedEpoch,
 	cluster protocol.Cluster,
 	clusterState cluster.State,
 	headers storage.Headers,

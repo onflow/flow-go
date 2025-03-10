@@ -55,7 +55,6 @@ func FromParams(from protocol.GlobalParams) (*Params, error) {
 		ChainID:              from.ChainID(),
 		SporkID:              from.SporkID(),
 		SporkRootBlockHeight: from.SporkRootBlockHeight(),
-		ProtocolVersion:      from.ProtocolVersion(),
 	}
 	return &Params{params}, nil
 }
@@ -69,12 +68,11 @@ func ClusterFromEncodable(enc EncodableCluster) (*Cluster, error) {
 // root bootstrap state. This is used to bootstrap the protocol state for
 // genesis or post-spork states.
 func SnapshotFromBootstrapState(root *flow.Block, result *flow.ExecutionResult, seal *flow.Seal, qc *flow.QuorumCertificate) (*Snapshot, error) {
-	version := flow.DefaultProtocolVersion
 	safetyParams, err := protocol.DefaultEpochSafetyParams(root.Header.ChainID)
 	if err != nil {
 		return nil, fmt.Errorf("could not get default epoch commit safety threshold: %w", err)
 	}
-	return SnapshotFromBootstrapStateWithParams(root, result, seal, qc, version, func(epochStateID flow.Identifier) (protocol_state.KVStoreAPI, error) {
+	return SnapshotFromBootstrapStateWithParams(root, result, seal, qc, func(epochStateID flow.Identifier) (protocol_state.KVStoreAPI, error) {
 		return kvstore.NewDefaultKVStore(safetyParams.FinalizationSafetyThreshold, safetyParams.EpochExtensionViewCount, epochStateID)
 	})
 }
@@ -86,7 +84,6 @@ func SnapshotFromBootstrapStateWithParams(
 	result *flow.ExecutionResult,
 	seal *flow.Seal,
 	qc *flow.QuorumCertificate,
-	protocolVersion uint,
 	kvStoreFactory func(epochStateID flow.Identifier) (protocol_state.KVStoreAPI, error),
 ) (*Snapshot, error) {
 	setup, ok := result.ServiceEvents[0].Event.(*flow.EpochSetup)
@@ -123,7 +120,6 @@ func SnapshotFromBootstrapStateWithParams(
 		ChainID:              root.Header.ChainID, // chain ID must match the root block
 		SporkID:              root.ID(),           // use root block ID as the unique spork identifier
 		SporkRootBlockHeight: root.Header.Height,  // use root block height as the spork root block height
-		ProtocolVersion:      protocolVersion,     // major software version for this spork
 	}
 
 	rootMinEpochState := EpochProtocolStateFromServiceEvents(setup, commit)

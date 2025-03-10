@@ -156,24 +156,23 @@ func (builder *EpochBuilder) EpochHeights(counter uint64) (*EpochHeights, bool) 
 // about the heights of blocks in the BUILT epoch (epoch N). These can be
 // queried with EpochHeights.
 func (builder *EpochBuilder) BuildEpoch() *EpochBuilder {
-
 	state := builder.states[0]
+	finalSnap := state.Final()
 
 	// prepare default values for the service events based on the current state
-	identities, err := state.Final().Identities(filter.Any)
+	identities, err := finalSnap.Identities(filter.Any)
 	require.NoError(builder.t, err)
-	epoch := state.Final().Epochs().Current()
-	counter, err := epoch.Counter()
+	epoch, err := finalSnap.Epochs().Current()
 	require.NoError(builder.t, err)
-	finalView, err := epoch.FinalView()
-	require.NoError(builder.t, err)
+	counter := epoch.Counter()
+	finalView := epoch.FinalView()
 
 	// retrieve block A
-	A, err := state.Final().Head()
+	A, err := finalSnap.Head()
 	require.NoError(builder.t, err)
 
 	// check that block A satisfies initial condition
-	phase, err := state.Final().EpochPhase()
+	phase, err := finalSnap.EpochPhase()
 	require.NoError(builder.t, err)
 	require.Equal(builder.t, flow.EpochPhaseStaking, phase)
 
@@ -314,17 +313,18 @@ func (builder *EpochBuilder) BuildEpoch() *EpochBuilder {
 // epoch. We must be in the Committed phase to call CompleteEpoch. Once the epoch
 // has been capped off, we can build the next epoch with BuildEpoch.
 func (builder *EpochBuilder) CompleteEpoch() *EpochBuilder {
-
 	state := builder.states[0]
+	finalSnap := state.Final()
 
-	phase, err := state.Final().EpochPhase()
-	require.Nil(builder.t, err)
+	phase, err := finalSnap.EpochPhase()
+	require.NoError(builder.t, err)
 	require.Equal(builder.t, flow.EpochPhaseCommitted, phase)
-	finalView, err := state.Final().Epochs().Current().FinalView()
-	require.Nil(builder.t, err)
+	currentEpoch, err := finalSnap.Epochs().Current()
+	require.NoError(builder.t, err)
+	finalView := currentEpoch.FinalView()
 
-	final, err := state.Final().Head()
-	require.Nil(builder.t, err)
+	final, err := finalSnap.Head()
+	require.NoError(builder.t, err)
 
 	finalBlock, ok := builder.blocksByID[final.ID()]
 	require.True(builder.t, ok)

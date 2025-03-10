@@ -14,10 +14,10 @@ type NodeInfoCollector struct {
 }
 
 const (
-	sporkIDLabel         = "spork_id"
-	versionLabel         = "version"
-	commitLabel          = "commit"
-	protocolVersionLabel = "protocol_version"
+	sporkIDLabel              = "spork_id"
+	versionLabel              = "version"
+	commitLabel               = "commit"
+	protocolStateVersionLabel = "protocol_state_version"
 )
 
 func NewNodeInfoCollector() *NodeInfoCollector {
@@ -32,9 +32,9 @@ func NewNodeInfoCollector() *NodeInfoCollector {
 	return collector
 }
 
-func (sc *NodeInfoCollector) NodeInfo(version, commit, sporkID string, protocolVersion uint) {
+func (sc *NodeInfoCollector) NodeInfo(version, commit, sporkID string, protocolStateVersion uint64) {
 	sc.nodeInfo.WithLabelValues(versionLabel, version)
 	sc.nodeInfo.WithLabelValues(commitLabel, commit)
 	sc.nodeInfo.WithLabelValues(sporkIDLabel, sporkID)
-	sc.nodeInfo.WithLabelValues(protocolVersionLabel, strconv.FormatUint(uint64(protocolVersion), 10))
+	sc.nodeInfo.WithLabelValues(protocolStateVersionLabel, strconv.FormatUint(protocolStateVersion, 10))
 }

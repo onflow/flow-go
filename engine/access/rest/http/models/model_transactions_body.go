@@ -8,14 +8,12 @@
  */
 package models
 
-import (
-	"github.com/onflow/flow-go/engine/access/rest/common/models"
-)
+import "github.com/onflow/flow-go/engine/access/rest/common/models"
 
 type TransactionsBody struct {
 	// Base64 encoded content of the Cadence script.
 	Script string `json:"script"`
-	// An array containing arguments each encoded as Base64 passed in the [JSON-Cadence interchange format](https://docs.onflow.org/cadence/json-cadence-spec/).
+	// A list of arguments each encoded as Base64 passed in the [JSON-Cadence interchange format](https://docs.onflow.org/cadence/json-cadence-spec/).
 	Arguments        []string `json:"arguments"`
 	ReferenceBlockId string   `json:"reference_block_id"`
 	// The limit on the amount of computation a transaction is allowed to preform.

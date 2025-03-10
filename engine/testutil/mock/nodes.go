@@ -46,7 +46,6 @@ import (
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/state/protocol/events"
 	"github.com/onflow/flow-go/storage"
-	bstorage "github.com/onflow/flow-go/storage/badger"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -300,7 +299,7 @@ type VerificationNode struct {
 
 	// chunk consumer and processor for fetcher engine
 	ProcessedChunkIndex storage.ConsumerProgressInitializer
-	ChunksQueue         *bstorage.ChunksQueue
+	ChunksQueue         storage.ChunksQueue
 	ChunkConsumer       *chunkconsumer.ChunkConsumer
 
 	// block consumer for chunk consumer

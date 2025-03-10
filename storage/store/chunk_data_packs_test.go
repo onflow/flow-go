@@ -1,7 +1,6 @@
 package store_test
 
 import (
-	"errors"
 	"testing"
 
 	"github.com/cockroachdb/pebble"
@@ -55,7 +54,7 @@ func TestChunkDataPack_Remove(t *testing.T) {
 
 			// verify it has been removed
 			_, err := chunkDataPackStore.ByChunkID(chunkIDs[0])
-			assert.True(t, errors.Is(err, storage.ErrNotFound))
+			assert.ErrorIs(t, err, storage.ErrNotFound)
 
 			// Removing again should not error
 			require.NoError(t, chunkDataPackStore.Remove(chunkIDs))
@@ -75,7 +74,7 @@ func TestChunkDataPacks_MissingItem(t *testing.T) {
 
 			// attempt to get an invalid
 			_, err := store1.ByChunkID(unittest.IdentifierFixture())
-			assert.True(t, errors.Is(err, storage.ErrNotFound))
+			assert.ErrorIs(t, err, storage.ErrNotFound)
 		})
 	})
 }

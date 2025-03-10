@@ -91,13 +91,14 @@ func (e *ReactorEngine) Ready() <-chan struct{} {
 			e.log.Fatal().Err(err).Msg("failed to check epoch phase when starting DKG reactor engine")
 			return
 		}
-		currentCounter, err := snap.Epochs().Current().Counter()
+		epoch, err := snap.Epochs().Current()
 		if err != nil {
 			// unexpected storage-level error
 			// TODO use irrecoverable context
-			e.log.Fatal().Err(err).Msg("failed to retrieve current epoch counter when starting DKG reactor engine")
+			e.log.Fatal().Err(err).Msg("failed to retrieve current epoch when starting DKG reactor engine")
 			return
 		}
+		currentCounter := epoch.Counter()
 		first, err := snap.Head()
 		if err != nil {
 			// unexpected storage-level error
@@ -159,7 +160,7 @@ func (e *ReactorEngine) startDKGForEpoch(currentEpochCounter uint64, first *flow
 	if err != nil {
 		// unexpected storage-level error
 		// TODO use irrecoverable context
-		log.Fatal().Err(err).Msg("could not check whether DKG is dkgState")
+		log.Fatal().Err(err).Msg("could not check whether DKG is started")
 	}
 	if started {
 		log.Warn().Msg("DKG started before, skipping starting the DKG for this epoch")
@@ -301,9 +302,15 @@ func (e *ReactorEngine) handleEpochCommittedPhaseStarted(currentEpochCounter uin
 	// phase is finalized, the block's snapshot is guaranteed to already be
 	// accessible in the protocol state at this point
 	snapshot := e.State.AtBlockID(firstBlock.ID())
-	nextDKG, err := snapshot.Epochs().Next().DKG()
+	nextEpoch, err := snapshot.Epochs().NextCommitted()
 	if err != nil {
-		// CAUTION: this should never happen, indicates a storage failure or corruption
+		// CAUTION: this should never happen, indicates a storage failure or state corruption
+		// TODO use irrecoverable context
+		log.Fatal().Err(err).Msg("checking beacon key consistency: could not get next committed epoch")
+	}
+	nextDKG, err := nextEpoch.DKG()
+	if err != nil {
+		// CAUTION: this should never happen, indicates a storage failure or state corruption
 		// TODO use irrecoverable context
 		log.Fatal().Err(err).Msg("checking beacon key consistency: could not retrieve next DKG info")
 		return
@@ -361,19 +368,22 @@ func (e *ReactorEngine) handleEpochCommittedPhaseStarted(currentEpochCounter uin
 	log.Info().Msgf("successfully ended DKG, my beacon pub key for epoch %d is %s", nextEpochCounter, localPubKey)
 }
 
-// TODO document error returns
+// getDKGInfo returns the information required to initiate the DKG for the current epoch.
+// firstBlockID must be the first block of the EpochSetup phase. This is one of the few places
+// where we have to use the configuration for a future epoch that has not yet been committed.
+// CAUTION: the epoch transition might not happen as described here!
+// No errors are expected during normal operation.
 func (e *ReactorEngine) getDKGInfo(firstBlockID flow.Identifier) (*dkgInfo, error) {
-	currEpoch := e.State.AtBlockID(firstBlockID).Epochs().Current()
-	nextEpoch := e.State.AtBlockID(firstBlockID).Epochs().Next()
+	epochsAtBlock := e.State.AtBlockID(firstBlockID).Epochs()
+	currEpoch, err := epochsAtBlock.Current()
+	if err != nil {
+		return nil, fmt.Errorf("could not retrieve current epoch: %w", err)
+	}
+	nextEpoch, err := epochsAtBlock.NextUnsafe()
+	if err != nil {
+		return nil, fmt.Errorf("could not retrieve next epoch: %w", err)
+	}
 
-	identities, err := nextEpoch.InitialIdentities()
-	if err != nil {
-		return nil, fmt.Errorf("could not retrieve epoch identities: %w", err)
-	}
-	phase1Final, phase2Final, phase3Final, err := protocol.DKGPhaseViews(currEpoch)
-	if err != nil {
-		return nil, fmt.Errorf("could not retrieve epoch dkg final views: %w", err)
-	}
 	seed := make([]byte, crypto.KeyGenSeedMinLen)
 	_, err = rand.Read(seed)
 	if err != nil {
@@ -381,10 +391,10 @@ func (e *ReactorEngine) getDKGInfo(firstBlockID flow.Identifier) (*dkgInfo, erro
 	}
 
 	info := &dkgInfo{
-		identities:      identities,
-		phase1FinalView: phase1Final,
-		phase2FinalView: phase2Final,
-		phase3FinalView: phase3Final,
+		identities:      nextEpoch.InitialIdentities(),
+		phase1FinalView: currEpoch.DKGPhase1FinalView(),
+		phase2FinalView: currEpoch.DKGPhase2FinalView(),
+		phase3FinalView: currEpoch.DKGPhase3FinalView(),
 		seed:            seed,
 	}
 	return info, nil

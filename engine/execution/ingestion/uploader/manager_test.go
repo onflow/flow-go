@@ -84,7 +84,7 @@ func TestRetryableUploader(t *testing.T) {
 	uploadMgr.AddUploader(testRetryableUploader)
 
 	err := uploadMgr.RetryUploads()
-	assert.Nil(t, err)
+	assert.NoError(t, err)
 
 	require.True(t, testRetryableUploader.RetryUploadCalled())
 }

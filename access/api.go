@@ -203,41 +203,20 @@ type API interface {
 	//
 	// If invalid parameters will be supplied SubscribeBlockDigestsFromLatest will return a failed subscription.
 	SubscribeBlockDigestsFromLatest(ctx context.Context, blockStatus flow.BlockStatus) subscription.Subscription
-	// SubscribeTransactionStatusesFromStartBlockID subscribes to transaction status updates for a given transaction ID.
-	// Monitoring begins from the specified block ID. The subscription streams status updates until the transaction
-	// reaches a final state (TransactionStatusSealed or TransactionStatusExpired). When the transaction reaches one of
-	// these final statuses, the subscription will automatically terminate.
+	// SubscribeTransactionStatuses subscribes to transaction status updates for a given transaction ID. Monitoring starts
+	// from the latest block to obtain the current transaction status. If the transaction is already in the final state
+	// ([flow.TransactionStatusSealed] or [flow.TransactionStatusExpired]), all statuses will be prepared and sent to the client
+	// sequentially. If the transaction is not in the final state, the subscription will stream status updates until the transaction
+	// reaches the final state. Once a final state is reached, the subscription will automatically terminate.
 	//
 	// Parameters:
-	//   - ctx: The context to manage the subscription's lifecycle, including cancellation.
-	//   - txID: The identifier of the transaction to monitor.
-	//   - startBlockID: The block ID from which to start monitoring.
-	//   - requiredEventEncodingVersion: The version of event encoding required for the subscription.
-	SubscribeTransactionStatusesFromStartBlockID(ctx context.Context, txID flow.Identifier, startBlockID flow.Identifier, requiredEventEncodingVersion entities.EventEncodingVersion) subscription.Subscription
-	// SubscribeTransactionStatusesFromStartHeight subscribes to transaction status updates for a given transaction ID.
-	// Monitoring begins from the specified block height. The subscription streams status updates until the transaction
-	// reaches a final state (TransactionStatusSealed or TransactionStatusExpired). When the transaction reaches one of
-	// these final statuses, the subscription will automatically terminate.
-	//
-	// Parameters:
-	//   - ctx: The context to manage the subscription's lifecycle, including cancellation.
-	//   - txID: The unique identifier of the transaction to monitor.
-	//   - startHeight: The block height from which to start monitoring.
-	//   - requiredEventEncodingVersion: The version of event encoding required for the subscription.
-	SubscribeTransactionStatusesFromStartHeight(ctx context.Context, txID flow.Identifier, startHeight uint64, requiredEventEncodingVersion entities.EventEncodingVersion) subscription.Subscription
-	// SubscribeTransactionStatusesFromLatest subscribes to transaction status updates for a given transaction ID.
-	// Monitoring begins from the latest block. The subscription streams status updates until the transaction
-	// reaches a final state (TransactionStatusSealed or TransactionStatusExpired). When the transaction reaches one of
-	// these final statuses, the subscription will automatically terminate.
-	//
-	// Parameters:
-	//   - ctx: The context to manage the subscription's lifecycle, including cancellation.
+	//   - ctx: Context to manage the subscription's lifecycle, including cancellation.
 	//   - txID: The unique identifier of the transaction to monitor.
 	//   - requiredEventEncodingVersion: The version of event encoding required for the subscription.
-	SubscribeTransactionStatusesFromLatest(ctx context.Context, txID flow.Identifier, requiredEventEncodingVersion entities.EventEncodingVersion) subscription.Subscription
-	// SendAndSubscribeTransactionStatuses sends a transaction to the network and subscribes to its status updates.
+	SubscribeTransactionStatuses(ctx context.Context, txID flow.Identifier, requiredEventEncodingVersion entities.EventEncodingVersion) subscription.Subscription
+	// SendAndSubscribeTransactionStatuses sends a transaction to the execution node and subscribes to its status updates.
 	// Monitoring begins from the reference block saved in the transaction itself and streams status updates until the transaction
-	// reaches a final state (TransactionStatusSealed or TransactionStatusExpired). Once a final status is reached, the subscription
+	// reaches the final state ([flow.TransactionStatusSealed] or [flow.TransactionStatusExpired]). Once the final status has been reached, the subscription
 	// automatically terminates.
 	//
 	// Parameters:
@@ -259,6 +238,14 @@ type TransactionResult struct {
 	TransactionID flow.Identifier
 	CollectionID  flow.Identifier
 	BlockHeight   uint64
+}
+
+func (r *TransactionResult) IsExecuted() bool {
+	return r.Status == flow.TransactionStatusExecuted || r.Status == flow.TransactionStatusSealed
+}
+
+func (r *TransactionResult) IsFinal() bool {
+	return r.Status == flow.TransactionStatusSealed || r.Status == flow.TransactionStatusExpired
 }
 
 func TransactionResultToMessage(result *TransactionResult) *access.TransactionResultResponse {
@@ -314,10 +301,17 @@ type CompatibleRange struct {
 
 // NodeVersionInfo contains information about node, such as semver, commit, sporkID, protocolVersion, etc
 type NodeVersionInfo struct {
-	Semver               string
-	Commit               string
-	SporkId              flow.Identifier
-	ProtocolVersion      uint64
+	Semver  string
+	Commit  string
+	SporkId flow.Identifier
+	// ProtocolVersion is the deprecated protocol version number.
+	// Deprecated: Previously this referred to the major software version as of the most recent spork.
+	// Replaced by protocol_state_version.
+	ProtocolVersion uint64
+	// ProtocolStateVersion is the Protocol State version as of the latest finalized block.
+	// This tracks the schema version of the Protocol State and is used to coordinate breaking changes in the Protocol.
+	// Version numbers are monotonically increasing.
+	ProtocolStateVersion uint64
 	SporkRootBlockHeight uint64
 	NodeRootBlockHeight  uint64
 	CompatibleRange      *CompatibleRange

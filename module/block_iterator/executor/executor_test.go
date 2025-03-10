@@ -1,9 +1,11 @@
 package executor_test
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"testing"
+	"time"
 
 	"github.com/cockroachdb/pebble"
 	"github.com/stretchr/testify/require"
@@ -11,6 +13,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/block_iterator/executor"
+	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/storage/operation"
 	"github.com/onflow/flow-go/storage/operation/pebbleimpl"
@@ -50,11 +53,11 @@ func TestExecute(t *testing.T) {
 			},
 		}
 
-		sleeper := &sleeper{}
-
 		// prune blocks
-		batchSize := 3
-		require.NoError(t, executor.IterateExecuteAndCommitInBatch(iter, pr, pdb, func(count int) bool { return count >= batchSize }, sleeper.Sleep))
+		batchSize := uint(3)
+		nosleep := time.Duration(0)
+		require.NoError(t, executor.IterateExecuteAndCommitInBatch(
+			context.Background(), unittest.Logger(), metrics.NewNoopCollector(), iter, pr, pdb, batchSize, nosleep))
 
 		// expect all blocks are pruned
 		for _, b := range bs {
@@ -63,9 +66,6 @@ func TestExecute(t *testing.T) {
 			err := operation.RetrieveChunkDataPack(pdb.Reader(), b, &c)
 			require.True(t, errors.Is(err, storage.ErrNotFound), "expected ErrNotFound but got %v", err)
 		}
-
-		// the sleeper should be called 3 times, because blockCount blocks will be pruned in 3 batchs.
-		require.Equal(t, blockCount/batchSize, sleeper.count)
 	})
 }
 
@@ -109,11 +109,11 @@ func TestExecuteCanBeResumed(t *testing.T) {
 			},
 		}
 
-		sleeper := &sleeper{}
-
 		// prune blocks until interrupted at block 5
-		batchSize := 3
-		err := executor.IterateExecuteAndCommitInBatch(iter, pruneUntilInterrupted, pdb, func(count int) bool { return count >= batchSize }, sleeper.Sleep)
+		batchSize := uint(3)
+		nosleep := time.Duration(0)
+		err := executor.IterateExecuteAndCommitInBatch(
+			context.Background(), unittest.Logger(), metrics.NewNoopCollector(), iter, pruneUntilInterrupted, pdb, batchSize, nosleep)
 		require.True(t, errors.Is(err, interrupted), fmt.Errorf("expected %v but got %v", interrupted, err))
 
 		// expect all blocks are pruned
@@ -132,9 +132,6 @@ func TestExecuteCanBeResumed(t *testing.T) {
 			require.NoError(t, operation.RetrieveChunkDataPack(pdb.Reader(), b, &c))
 		}
 
-		// the sleeper should be called once
-		require.Equal(t, 5/batchSize, sleeper.count)
-
 		// now resume the pruning
 		iterToAll := restoreBlockIterator(iter.blocks, iter.stored)
 
@@ -144,7 +141,8 @@ func TestExecuteCanBeResumed(t *testing.T) {
 			},
 		}
 
-		require.NoError(t, executor.IterateExecuteAndCommitInBatch(iterToAll, pr, pdb, func(count int) bool { return count >= batchSize }, sleeper.Sleep))
+		require.NoError(t, executor.IterateExecuteAndCommitInBatch(
+			context.Background(), unittest.Logger(), metrics.NewNoopCollector(), iterToAll, pr, pdb, batchSize, nosleep))
 
 		// verify all blocks are pruned
 		for _, b := range bs {
@@ -179,20 +177,16 @@ func (b *iterator) Checkpoint() (uint64, error) {
 	return uint64(b.cur), nil
 }
 
+func (b *iterator) Progress() (uint64, uint64, uint64) {
+	return 0, uint64(len(b.blocks) - 1), uint64(b.cur)
+}
+
 func restoreBlockIterator(blocks []flow.Identifier, stored int) *iterator {
 	return &iterator{
 		blocks: blocks,
 		cur:    stored,
 		stored: stored,
 	}
-}
-
-type sleeper struct {
-	count int
-}
-
-func (s *sleeper) Sleep() {
-	s.count++
 }
 
 type testExecutor struct {
@@ -203,4 +197,30 @@ var _ executor.IterationExecutor = (*testExecutor)(nil)
 
 func (p *testExecutor) ExecuteByBlockID(id flow.Identifier, batchWriter storage.ReaderBatchWriter) error {
 	return p.executeByBlockID(id, batchWriter)
+}
+
+func TestCalculateProgress(t *testing.T) {
+	tests := []struct {
+		start   uint64
+		end     uint64
+		current uint64
+		want    float64
+	}{
+		{1, 100, 1, 0.0},     // Just started
+		{1, 100, 50, 49.49},  // Midway
+		{1, 100, 100, 100.0}, // Completed
+		{1, 100, 150, 100.0}, // Exceeds end
+		{1, 100, 0, 0.0},     // Below start
+		{1, 1, 1, 0.0},       // Start = End
+		{1, 1, 0, 0.0},       // Start = End, but below
+		{1, 100, 10, 9.09},   // Early progress
+		{1, 100, 99, 98.99},  // Near completion
+	}
+
+	for _, tt := range tests {
+		got := executor.CalculateProgress(tt.start, tt.end, tt.current)
+		if (got-tt.want) > 0.01 || (tt.want-got) > 0.01 { // Allow small floating-point errors
+			t.Errorf("calculateProgress(%d, %d, %d) = %.2f; want %.2f", tt.start, tt.end, tt.current, got, tt.want)
+		}
+	}
 }

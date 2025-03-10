@@ -55,8 +55,14 @@ func (n *PersistentIteratorState) NextRange() (rg module.IteratorRange, hasNext 
 		return module.IteratorRange{}, false, nil
 	}
 
+	// latest might go backwards if user updated some parameters that controls that.
+	// for instance, if the user uses block iterator to prune data by height, and then updated
+	// the threshold to retain more data, which makes the latest block to go backwards.
+	//
+	// in that case, we need to respect the latest block and return an empty iteration range, so
+	// that we ensure that the block iteration is always forward.
 	if latest < next {
-		return module.IteratorRange{}, false, fmt.Errorf("latest block is less than next block: %d < %d", latest, next)
+		return module.IteratorRange{}, false, nil
 	}
 
 	// iterate from next to latest (inclusive)

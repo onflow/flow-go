@@ -36,7 +36,7 @@ func TestSafetyCheck(t *testing.T) {
 
 		executor := proc.NewExecutor(context, txnState)
 		err := fvm.Run(executor)
-		require.Nil(t, err)
+		require.NoError(t, err)
 		require.Error(t, executor.Output().Err)
 
 		require.NotContains(t, buffer.String(), "programs")
@@ -62,7 +62,7 @@ func TestSafetyCheck(t *testing.T) {
 
 		executor := proc.NewExecutor(context, txnState)
 		err := fvm.Run(executor)
-		require.Nil(t, err)
+		require.NoError(t, err)
 		require.Error(t, executor.Output().Err)
 
 		require.NotContains(t, buffer.String(), "programs")

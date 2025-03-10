@@ -86,6 +86,11 @@ func (_m *ExecutionMetrics) ExecutionComputationResultUploaded() {
 	_m.Called()
 }
 
+// ExecutionLastChunkDataPackPrunedHeight provides a mock function with given fields: height
+func (_m *ExecutionMetrics) ExecutionLastChunkDataPackPrunedHeight(height uint64) {
+	_m.Called(height)
+}
+
 // ExecutionLastExecutedBlockHeight provides a mock function with given fields: height
 func (_m *ExecutionMetrics) ExecutionLastExecutedBlockHeight(height uint64) {
 	_m.Called(height)
@@ -109,6 +114,11 @@ func (_m *ExecutionMetrics) ExecutionStorageStateCommitment(bytes int64) {
 // ExecutionSync provides a mock function with given fields: syncing
 func (_m *ExecutionMetrics) ExecutionSync(syncing bool) {
 	_m.Called(syncing)
+}
+
+// ExecutionTargetChunkDataPackPrunedHeight provides a mock function with given fields: height
+func (_m *ExecutionMetrics) ExecutionTargetChunkDataPackPrunedHeight(height uint64) {
+	_m.Called(height)
 }
 
 // ExecutionTransactionExecuted provides a mock function with given fields: dur, stats, info

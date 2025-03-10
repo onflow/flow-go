@@ -2,10 +2,12 @@ package migrations
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/onflow/cadence/common"
 	"github.com/onflow/cadence/interpreter"
 	"github.com/onflow/cadence/runtime"
+	"github.com/rs/zerolog/log"
 	"golang.org/x/sync/errgroup"
 
 	"github.com/onflow/flow-go/cmd/util/ledger/reporters"
@@ -74,6 +76,8 @@ type difference struct {
 	NewValueStaticType string `json:",omitempty"`
 }
 
+const minLargeAccountRegisterCount = 1_000_000
+
 type CadenceValueDiffReporter struct {
 	address        common.Address
 	chainID        flow.ChainID
@@ -98,12 +102,12 @@ func NewCadenceValueDiffReporter(
 	}
 }
 
-type isValueIncludedFunc func(address common.Address, domain common.StorageDomain, key any) bool
+type IsValueIncludedFunc func(address common.Address, domain common.StorageDomain, key any) bool
 
 func (dr *CadenceValueDiffReporter) DiffStates(
 	oldRegs, newRegs registers.Registers,
 	domains []common.StorageDomain,
-	isValueIncluded isValueIncludedFunc,
+	isValueIncluded IsValueIncludedFunc,
 ) {
 
 	oldStorage := newReadonlyStorage(oldRegs)
@@ -170,7 +174,7 @@ func (dr *CadenceValueDiffReporter) diffDomain(
 	oldRuntime *readonlyStorageRuntime,
 	newRuntime *readonlyStorageRuntime,
 	domain common.StorageDomain,
-	isValueIncluded isValueIncludedFunc,
+	isValueIncluded IsValueIncludedFunc,
 ) {
 	defer func() {
 		if r := recover(); r != nil {
@@ -343,6 +347,19 @@ func (dr *CadenceValueDiffReporter) diffDomain(
 		}
 	}
 
+	startTime := time.Now()
+
+	isLargeAccount := oldRuntime.PayloadCount > minLargeAccountRegisterCount
+
+	if isLargeAccount {
+		log.Info().Msgf(
+			"Diffing %x storage domain containing %d elements (%d payloads) ...",
+			dr.address[:],
+			len(sharedKeys),
+			oldRuntime.PayloadCount,
+		)
+	}
+
 	// Diffing storage domain
 
 	for _, key := range sharedKeys {
@@ -359,6 +376,17 @@ func (dr *CadenceValueDiffReporter) diffDomain(
 				trace,
 			)
 		}
+	}
+
+	if isLargeAccount {
+		log.Info().
+			Msgf(
+				"Finished diffing %x storage domain containing %d elements (%d payloads) in %s",
+				dr.address[:],
+				len(sharedKeys),
+				oldRuntime.PayloadCount,
+				time.Since(startTime),
+			)
 	}
 }
 

@@ -8,9 +8,7 @@
  */
 package models
 
-import (
-	"github.com/onflow/flow-go/engine/access/rest/common/models"
-)
+import "github.com/onflow/flow-go/engine/access/rest/common/models"
 
 type Account struct {
 	Address string `json:"address"`

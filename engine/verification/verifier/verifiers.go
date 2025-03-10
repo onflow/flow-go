@@ -224,7 +224,8 @@ func initStorages(chainID flow.ChainID, dataDir string, chunkDataPackDir string)
 	}
 
 	// require the chunk data pack data must exist before returning the storage module
-	chunkDataPackDB, err := storagepebble.MustOpenDefaultPebbleDB(chunkDataPackDir)
+	chunkDataPackDB, err := storagepebble.MustOpenDefaultPebbleDB(
+		log.Logger.With().Str("pebbledb", "cdp").Logger(), chunkDataPackDir)
 	if err != nil {
 		return nil, nil, nil, nil, nil, fmt.Errorf("could not open chunk data pack DB: %w", err)
 	}

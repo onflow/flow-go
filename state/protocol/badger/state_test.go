@@ -19,8 +19,8 @@ import (
 	"github.com/onflow/flow-go/state/protocol/inmem"
 	"github.com/onflow/flow-go/state/protocol/util"
 	protoutil "github.com/onflow/flow-go/state/protocol/util"
+	bstorage "github.com/onflow/flow-go/storage/badger"
 	storagebadger "github.com/onflow/flow-go/storage/badger"
-	storutil "github.com/onflow/flow-go/storage/util"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -35,26 +35,22 @@ func TestBootstrapAndOpen(t *testing.T) {
 	})
 
 	protoutil.RunWithBootstrapState(t, rootSnapshot, func(db *badger.DB, _ *bprotocol.State) {
-
 		// expect the final view metric to be set to current epoch's final view
-		epoch := rootSnapshot.Epochs().Current()
-		finalView, err := epoch.FinalView()
+		epoch, err := rootSnapshot.Epochs().Current()
 		require.NoError(t, err)
-		counter, err := epoch.Counter()
-		require.NoError(t, err)
+		counter := epoch.Counter()
 		phase, err := rootSnapshot.EpochPhase()
 		require.NoError(t, err)
 
 		complianceMetrics := new(mock.ComplianceMetrics)
 		complianceMetrics.On("CurrentEpochCounter", counter).Once()
 		complianceMetrics.On("CurrentEpochPhase", phase).Once()
-		complianceMetrics.On("CurrentEpochFinalView", finalView).Once()
+		complianceMetrics.On("CurrentEpochFinalView", epoch.FinalView()).Once()
 		complianceMetrics.On("FinalizedHeight", testmock.Anything).Once()
 		complianceMetrics.On("SealedHeight", testmock.Anything).Once()
 
-		dkgPhase1FinalView, dkgPhase2FinalView, dkgPhase3FinalView, err := protocol.DKGPhaseViews(epoch)
-		require.NoError(t, err)
-		complianceMetrics.On("CurrentDKGPhaseViews", dkgPhase1FinalView, dkgPhase2FinalView, dkgPhase3FinalView).Once()
+		complianceMetrics.On("CurrentDKGPhaseViews",
+			epoch.DKGPhase1FinalView(), epoch.DKGPhase2FinalView(), epoch.DKGPhase3FinalView()).Once()
 
 		noopMetrics := new(metrics.NoopCollector)
 		all := storagebadger.InitAll(noopMetrics, db)
@@ -74,12 +70,12 @@ func TestBootstrapAndOpen(t *testing.T) {
 			all.VersionBeacons,
 		)
 		require.NoError(t, err)
-
 		complianceMetrics.AssertExpectations(t)
 
-		unittest.AssertSnapshotsEqual(t, rootSnapshot, state.Final())
+		finalSnap := state.Final()
+		unittest.AssertSnapshotsEqual(t, rootSnapshot, finalSnap)
 
-		vb, err := state.Final().VersionBeacon()
+		vb, err := finalSnap.VersionBeacon()
 		require.NoError(t, err)
 		require.Nil(t, vb)
 	})
@@ -115,9 +111,10 @@ func TestBootstrapAndOpen_EpochCommitted(t *testing.T) {
 
 		complianceMetrics := new(mock.ComplianceMetrics)
 
-		// expect counter to be set to current epochs counter
-		counter, err := committedPhaseSnapshot.Epochs().Current().Counter()
+		currentEpoch, err := committedPhaseSnapshot.Epochs().Current()
 		require.NoError(t, err)
+		// expect counter to be set to current epochs counter
+		counter := currentEpoch.Counter()
 		complianceMetrics.On("CurrentEpochCounter", counter).Once()
 
 		// expect epoch phase to be set to current phase
@@ -125,13 +122,10 @@ func TestBootstrapAndOpen_EpochCommitted(t *testing.T) {
 		require.NoError(t, err)
 		complianceMetrics.On("CurrentEpochPhase", phase).Once()
 
-		currentEpochFinalView, err := committedPhaseSnapshot.Epochs().Current().FinalView()
-		require.NoError(t, err)
-		complianceMetrics.On("CurrentEpochFinalView", currentEpochFinalView).Once()
+		complianceMetrics.On("CurrentEpochFinalView", currentEpoch.FinalView()).Once()
 
-		dkgPhase1FinalView, dkgPhase2FinalView, dkgPhase3FinalView, err := protocol.DKGPhaseViews(committedPhaseSnapshot.Epochs().Current())
-		require.NoError(t, err)
-		complianceMetrics.On("CurrentDKGPhaseViews", dkgPhase1FinalView, dkgPhase2FinalView, dkgPhase3FinalView).Once()
+		complianceMetrics.On("CurrentDKGPhaseViews",
+			currentEpoch.DKGPhase1FinalView(), currentEpoch.DKGPhase2FinalView(), currentEpoch.DKGPhase3FinalView()).Once()
 		complianceMetrics.On("FinalizedHeight", testmock.Anything).Once()
 		complianceMetrics.On("SealedHeight", testmock.Anything).Once()
 
@@ -179,12 +173,14 @@ func TestBootstrap_EpochHeightBoundaries(t *testing.T) {
 	// [x]
 	t.Run("spork root snapshot", func(t *testing.T) {
 		util.RunWithFollowerProtocolState(t, rootSnapshot, func(db *badger.DB, state *bprotocol.FollowerState) {
+			currentEpoch, err := state.Final().Epochs().Current()
+			require.NoError(t, err)
 			// first height of started current epoch should be known
-			firstHeight, err := state.Final().Epochs().Current().FirstHeight()
+			firstHeight, err := currentEpoch.FirstHeight()
 			require.NoError(t, err)
 			assert.Equal(t, epoch1FirstHeight, firstHeight)
 			// final height of not completed current epoch should be unknown
-			_, err = state.Final().Epochs().Current().FinalHeight()
+			_, err = currentEpoch.FinalHeight()
 			assert.ErrorIs(t, err, protocol.ErrUnknownEpochBoundary)
 		})
 	})
@@ -209,21 +205,24 @@ func TestBootstrap_EpochHeightBoundaries(t *testing.T) {
 
 		bootstrap(t, after, func(state *bprotocol.State, err error) {
 			require.NoError(t, err)
+			finalSnap := state.Final()
+			currentEpoch, err := finalSnap.Epochs().Current()
+			require.NoError(t, err)
+			nextEpoch, err := finalSnap.Epochs().NextCommitted()
+			require.NoError(t, err)
 			// first height of started current epoch should be unknown
-			_, err = state.Final().Epochs().Current().FirstHeight()
+			_, err = currentEpoch.FirstHeight()
 			assert.ErrorIs(t, err, protocol.ErrUnknownEpochBoundary)
 			// final height of not completed current epoch should be unknown
-			_, err = state.Final().Epochs().Current().FinalHeight()
+			_, err = currentEpoch.FinalHeight()
 			assert.ErrorIs(t, err, protocol.ErrUnknownEpochBoundary)
 			// first and final height of not started next epoch should be unknown
-			_, err = state.Final().Epochs().Next().FirstHeight()
+			_, err = nextEpoch.FirstHeight()
 			assert.ErrorIs(t, err, protocol.ErrUnknownEpochBoundary)
-			_, err = state.Final().Epochs().Next().FinalHeight()
+			_, err = nextEpoch.FinalHeight()
 			assert.ErrorIs(t, err, protocol.ErrUnknownEpochBoundary)
-			// first and final height of nonexistent previous epoch should be unknown
-			_, err = state.Final().Epochs().Previous().FirstHeight()
-			assert.ErrorIs(t, err, protocol.ErrNoPreviousEpoch)
-			_, err = state.Final().Epochs().Previous().FinalHeight()
+			// nonexistent previous epoch should be unknown
+			_, err = finalSnap.Epochs().Previous()
 			assert.ErrorIs(t, err, protocol.ErrNoPreviousEpoch)
 		})
 	})
@@ -251,18 +250,23 @@ func TestBootstrap_EpochHeightBoundaries(t *testing.T) {
 
 		bootstrap(t, after, func(state *bprotocol.State, err error) {
 			require.NoError(t, err)
+			finalSnap := state.Final()
+			currentEpoch, err := finalSnap.Epochs().Current()
+			require.NoError(t, err)
 			// first height of started current epoch should be known
-			firstHeight, err := state.Final().Epochs().Current().FirstHeight()
+			firstHeight, err := currentEpoch.FirstHeight()
 			assert.Equal(t, epoch2Heights.FirstHeight(), firstHeight)
 			require.NoError(t, err)
 			// final height of not completed current epoch should be unknown
-			_, err = state.Final().Epochs().Current().FinalHeight()
+			_, err = currentEpoch.FinalHeight()
 			assert.ErrorIs(t, err, protocol.ErrUnknownEpochBoundary)
+			previousEpoch, err := finalSnap.Epochs().Previous()
+			require.NoError(t, err)
 			// first height of previous epoch should be unknown
-			_, err = state.Final().Epochs().Previous().FirstHeight()
+			_, err = previousEpoch.FirstHeight()
 			assert.ErrorIs(t, err, protocol.ErrUnknownEpochBoundary)
 			// final height of previous epoch should be known
-			finalHeight, err := state.Final().Epochs().Previous().FinalHeight()
+			finalHeight, err := previousEpoch.FinalHeight()
 			require.NoError(t, err)
 			assert.Equal(t, finalHeight, epoch2Heights.FirstHeight()-1)
 		})
@@ -293,19 +297,24 @@ func TestBootstrap_EpochHeightBoundaries(t *testing.T) {
 
 		bootstrap(t, after, func(state *bprotocol.State, err error) {
 			require.NoError(t, err)
+			finalSnap := state.Final()
+			currentEpoch, err := finalSnap.Epochs().Current()
+			require.NoError(t, err)
 			// first height of started current epoch should be known
-			firstHeight, err := state.Final().Epochs().Current().FirstHeight()
+			firstHeight, err := currentEpoch.FirstHeight()
 			assert.Equal(t, epoch3Heights.FirstHeight(), firstHeight)
 			require.NoError(t, err)
 			// final height of not completed current epoch should be unknown
-			_, err = state.Final().Epochs().Current().FinalHeight()
+			_, err = currentEpoch.FinalHeight()
 			assert.ErrorIs(t, err, protocol.ErrUnknownEpochBoundary)
+			previousEpoch, err := finalSnap.Epochs().Previous()
+			require.NoError(t, err)
 			// first height of previous epoch should be known
-			firstHeight, err = state.Final().Epochs().Previous().FirstHeight()
+			firstHeight, err = previousEpoch.FirstHeight()
 			require.NoError(t, err)
 			assert.Equal(t, epoch2Heights.FirstHeight(), firstHeight)
 			// final height of completed previous epoch should be known
-			finalHeight, err := state.Final().Epochs().Previous().FinalHeight()
+			finalHeight, err := previousEpoch.FinalHeight()
 			require.NoError(t, err)
 			assert.Equal(t, finalHeight, epoch2Heights.FinalHeight())
 		})
@@ -357,8 +366,9 @@ func TestBootstrapNonRoot(t *testing.T) {
 
 		bootstrap(t, after, func(state *bprotocol.State, err error) {
 			require.NoError(t, err)
-			unittest.AssertSnapshotsEqual(t, after, state.Final())
-			segment, err := state.Final().SealingSegment()
+			finalSnap := state.Final()
+			unittest.AssertSnapshotsEqual(t, after, finalSnap)
+			segment, err := finalSnap.SealingSegment()
 			require.NoError(t, err)
 			for _, block := range segment.Blocks {
 				snapshot := state.AtBlockID(block.ID())
@@ -409,8 +419,9 @@ func TestBootstrapNonRoot(t *testing.T) {
 
 		bootstrap(t, after, func(state *bprotocol.State, err error) {
 			require.NoError(t, err)
-			unittest.AssertSnapshotsEqual(t, after, state.Final())
-			segment, err := state.Final().SealingSegment()
+			finalSnap := state.Final()
+			unittest.AssertSnapshotsEqual(t, after, finalSnap)
+			segment, err := finalSnap.SealingSegment()
 			require.NoError(t, err)
 			for _, block := range segment.Blocks {
 				snapshot := state.AtBlockID(block.ID())
@@ -421,7 +432,7 @@ func TestBootstrapNonRoot(t *testing.T) {
 				require.NoError(t, err)
 			}
 
-			epochState, err := state.Final().EpochProtocolState()
+			epochState, err := finalSnap.EpochProtocolState()
 			require.NoError(t, err)
 			require.True(t, epochState.EpochFallbackTriggered())
 			require.Equal(t, flow.EpochPhaseFallback, epochState.EpochPhase())
@@ -444,9 +455,10 @@ func TestBootstrapNonRoot(t *testing.T) {
 
 		bootstrap(t, after, func(state *bprotocol.State, err error) {
 			require.NoError(t, err)
-			unittest.AssertSnapshotsEqual(t, after, state.Final())
+			finalSnap := state.Final()
+			unittest.AssertSnapshotsEqual(t, after, finalSnap)
 
-			segment, err := state.Final().SealingSegment()
+			segment, err := finalSnap.SealingSegment()
 			require.NoError(t, err)
 			assert.GreaterOrEqual(t, len(segment.ProtocolStateEntries), 2, "should have >2 distinct protocol state entries")
 			for _, block := range segment.Blocks {
@@ -475,9 +487,10 @@ func TestBootstrapNonRoot(t *testing.T) {
 
 		bootstrap(t, after, func(state *bprotocol.State, err error) {
 			require.NoError(t, err)
-			unittest.AssertSnapshotsEqual(t, after, state.Final())
+			finalSnap := state.Final()
+			unittest.AssertSnapshotsEqual(t, after, finalSnap)
 
-			segment, err := state.Final().SealingSegment()
+			segment, err := finalSnap.SealingSegment()
 			require.NoError(t, err)
 			assert.GreaterOrEqual(t, len(segment.ProtocolStateEntries), 2, "should have >2 distinct protocol state entries")
 			for _, block := range segment.Blocks {
@@ -497,15 +510,16 @@ func TestBootstrapNonRoot(t *testing.T) {
 				BuildEpoch()                  // build epoch 3
 
 			// find a snapshot from epoch setup phase in epoch 2
-			epoch1Counter, err := rootSnapshot.Epochs().Current().Counter()
+			epoch1, err := rootSnapshot.Epochs().Current()
 			require.NoError(t, err)
+			epoch1Counter := epoch1.Counter()
 			for height := rootBlock.Height + 1; ; height++ {
 				snap := state.AtHeight(height)
-				counter, err := snap.Epochs().Current().Counter()
+				epoch, err := snap.Epochs().Current()
 				require.NoError(t, err)
 				phase, err := snap.EpochPhase()
 				require.NoError(t, err)
-				if phase == flow.EpochPhaseSetup && counter == epoch1Counter+1 {
+				if phase == flow.EpochPhaseSetup && epoch.Counter() == epoch1Counter+1 {
 					return snap
 				}
 			}
@@ -513,9 +527,10 @@ func TestBootstrapNonRoot(t *testing.T) {
 
 		bootstrap(t, after, func(state *bprotocol.State, err error) {
 			require.NoError(t, err)
-			unittest.AssertSnapshotsEqual(t, after, state.Final())
+			finalSnap := state.Final()
+			unittest.AssertSnapshotsEqual(t, after, finalSnap)
 
-			segment, err := state.Final().SealingSegment()
+			segment, err := finalSnap.SealingSegment()
 			require.NoError(t, err)
 			assert.GreaterOrEqual(t, len(segment.ProtocolStateEntries), 2, "should have >2 distinct protocol state entries")
 			for _, block := range segment.Blocks {
@@ -703,7 +718,7 @@ func bootstrap(t *testing.T, rootSnapshot protocol.Snapshot, f func(*bprotocol.S
 	defer os.RemoveAll(dir)
 	db := unittest.BadgerDB(t, dir)
 	defer db.Close()
-	all := storutil.StorageLayer(t, db)
+	all := bstorage.InitAll(metrics, db)
 	state, err := bprotocol.Bootstrap(
 		metrics,
 		db,

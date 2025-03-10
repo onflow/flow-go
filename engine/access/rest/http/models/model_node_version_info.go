@@ -13,6 +13,7 @@ type NodeVersionInfo struct {
 	Commit               string           `json:"commit"`
 	SporkId              string           `json:"spork_id"`
 	ProtocolVersion      string           `json:"protocol_version"`
+	ProtocolStateVersion string           `json:"protocol_state_version"`
 	SporkRootBlockHeight string           `json:"spork_root_block_height"`
 	NodeRootBlockHeight  string           `json:"node_root_block_height"`
 	CompatibleRange      *CompatibleRange `json:"compatible_range,omitempty"`

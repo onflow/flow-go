@@ -39,7 +39,9 @@ func TestRecoverEpochHappyPath(t *testing.T) {
 		snapshotFn := func() *inmem.Snapshot { return rootSnapshot }
 
 		// get expected dkg information
-		currentEpochDKG, err := rootSnapshot.Epochs().Current().DKG()
+		currentEpoch, err := rootSnapshot.Epochs().Current()
+		require.NoError(t, err)
+		currentEpochDKG, err := currentEpoch.DKG()
 		require.NoError(t, err)
 		expectedDKGPubKeys := make(map[cadence.String]struct{})
 		expectedDKGGroupKey := cadence.String(hex.EncodeToString(currentEpochDKG.GroupKey().Encode()))
@@ -72,11 +74,10 @@ func TestRecoverEpochHappyPath(t *testing.T) {
 
 		// verify each argument
 		decodedValues := unittest.InterfafceToCdcValues(t, outputTxArgs)
-		currEpoch := rootSnapshot.Epochs().Current()
-		finalView, err := currEpoch.FinalView()
+		currEpoch, err := rootSnapshot.Epochs().Current()
 		require.NoError(t, err)
-		currEpochTargetEndTime, err := currEpoch.TargetEndTime()
-		require.NoError(t, err)
+		finalView := currEpoch.FinalView()
+		currEpochTargetEndTime := currEpoch.TargetEndTime()
 
 		// epoch counter
 		require.Equal(t, cadence.NewUInt64(flagEpochCounter), decodedValues[0])

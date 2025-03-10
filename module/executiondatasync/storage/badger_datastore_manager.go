@@ -5,6 +5,9 @@ import (
 
 	ds "github.com/ipfs/go-datastore"
 	badgerds "github.com/ipfs/go-ds-badger2"
+
+	"github.com/onflow/flow-go/storage"
+	"github.com/onflow/flow-go/storage/operation/badgerimpl"
 )
 
 var _ DatastoreManager = (*BadgerDatastoreManager)(nil)
@@ -41,8 +44,8 @@ func (b *BadgerDatastoreManager) Datastore() ds.Batching {
 
 // DB returns the raw database object, allowing for more direct
 // access to the underlying database features and operations.
-func (b *BadgerDatastoreManager) DB() interface{} {
-	return b.ds.DB
+func (b *BadgerDatastoreManager) DB() storage.DB {
+	return badgerimpl.ToDB(b.ds.DB)
 }
 
 // Close terminates the connection to the datastore and releases

@@ -142,9 +142,10 @@ func (s *RecoverEpochSuite) TestRecoverEpoch() {
 	// start the paused collection node now that we are in EFM
 	require.NoError(s.T(), ln.Start())
 
-	// get final view form the latest snapshot
-	epoch1FinalView, err := s.Net.BootstrapSnapshot.Epochs().Current().FinalView()
+	// get final view from the latest snapshot
+	epoch1, err := s.Net.BootstrapSnapshot.Epochs().Current()
 	require.NoError(s.T(), err)
+	epoch1FinalView := epoch1.FinalView()
 
 	// Wait for at least the first view past the current epoch's original FinalView to be finalized.
 	s.TimedLogf("waiting for epoch transition (finalized view %d)", epoch1FinalView+1)
@@ -226,8 +227,9 @@ func (s *RecoverEpochSuite) TestRecoverEpochNodeEjected() {
 	require.NoError(s.T(), ln.Start())
 
 	// get final view from the latest snapshot
-	epoch1FinalView, err := s.Net.BootstrapSnapshot.Epochs().Current().FinalView()
+	epoch1, err := s.Net.BootstrapSnapshot.Epochs().Current()
 	require.NoError(s.T(), err)
+	epoch1FinalView := epoch1.FinalView()
 
 	// Wait for at least the first view past the current epoch's original FinalView to be finalized.
 	s.TimedLogf("waiting for epoch transition (finalized view %d)", epoch1FinalView+1)
@@ -326,8 +328,9 @@ func (s *RecoverEpochSuite) TestRecoverEpochEjectNodeDifferentDKG() {
 	require.NoError(s.T(), ln.Start())
 
 	// get final view from the latest snapshot
-	epoch1FinalView, err := s.Net.BootstrapSnapshot.Epochs().Current().FinalView()
+	epoch1, err := s.Net.BootstrapSnapshot.Epochs().Current()
 	require.NoError(s.T(), err)
+	epoch1FinalView := epoch1.FinalView()
 
 	// Wait for at least the first view past the current epoch's original FinalView to be finalized.
 	s.TimedLogf("waiting for epoch transition (finalized view %d)", epoch1FinalView+1)

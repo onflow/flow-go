@@ -249,8 +249,10 @@ func (e *Engine) onTransaction(originID flow.Identifier, tx *flow.TransactionBod
 
 	// using the transaction's reference block, determine which cluster we're in.
 	// if we don't know the reference block, we will fail when attempting to query the epoch.
-	refEpoch := refSnapshot.Epochs().Current()
-
+	refEpoch, err := refSnapshot.Epochs().Current()
+	if err != nil {
+		return fmt.Errorf("could not get current epoch for reference block: %w", err)
+	}
 	localCluster, err := e.getLocalCluster(refEpoch)
 	if err != nil {
 		return fmt.Errorf("could not get local cluster: %w", err)
@@ -298,11 +300,8 @@ func (e *Engine) onTransaction(originID flow.Identifier, tx *flow.TransactionBod
 //     a member of the reference epoch. This is an expected condition and the transaction
 //     should be discarded.
 //   - other error for any other, unexpected error condition.
-func (e *Engine) getLocalCluster(refEpoch protocol.Epoch) (flow.IdentitySkeletonList, error) {
-	epochCounter, err := refEpoch.Counter()
-	if err != nil {
-		return nil, fmt.Errorf("could not get counter for reference epoch: %w", err)
-	}
+func (e *Engine) getLocalCluster(refEpoch protocol.CommittedEpoch) (flow.IdentitySkeletonList, error) {
+	epochCounter := refEpoch.Counter()
 	clusters, err := refEpoch.Clustering()
 	if err != nil {
 		return nil, fmt.Errorf("could not get clusters for reference epoch: %w", err)
@@ -312,10 +311,7 @@ func (e *Engine) getLocalCluster(refEpoch protocol.Epoch) (flow.IdentitySkeleton
 	if !ok {
 		// if we aren't assigned to a cluster, check that we are a member of
 		// the reference epoch
-		refIdentities, err := refEpoch.InitialIdentities()
-		if err != nil {
-			return nil, fmt.Errorf("could not get initial identities for reference epoch: %w", err)
-		}
+		refIdentities := refEpoch.InitialIdentities()
 
 		if _, ok := refIdentities.ByNodeID(e.me.NodeID()); ok {
 			// CAUTION: we are a member of the epoch, but have no assigned cluster!
@@ -336,19 +332,14 @@ func (e *Engine) getLocalCluster(refEpoch protocol.Epoch) (flow.IdentitySkeleton
 // * other error for any other unexpected error condition.
 func (e *Engine) ingestTransaction(
 	log zerolog.Logger,
-	refEpoch protocol.Epoch,
+	refEpoch protocol.CommittedEpoch,
 	tx *flow.TransactionBody,
 	txID flow.Identifier,
 	localClusterFingerprint flow.Identifier,
 	txClusterFingerprint flow.Identifier,
 ) error {
-	epochCounter, err := refEpoch.Counter()
-	if err != nil {
-		return fmt.Errorf("could not get counter for reference epoch: %w", err)
-	}
-
 	// use the transaction pool for the epoch the reference block is part of
-	pool := e.pools.ForEpoch(epochCounter)
+	pool := e.pools.ForEpoch(refEpoch.Counter())
 
 	// short-circuit if we have already stored the transaction
 	if pool.Has(txID) {
@@ -357,7 +348,7 @@ func (e *Engine) ingestTransaction(
 	}
 
 	// we don't pass actual ctx as we don't execute any scripts inside for now
-	err = e.transactionValidator.Validate(context.Background(), tx)
+	err := e.transactionValidator.Validate(context.Background(), tx)
 	if err != nil {
 		return engine.NewInvalidInputErrorf("invalid transaction (%x): %w", txID, err)
 	}

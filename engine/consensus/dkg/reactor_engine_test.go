@@ -52,8 +52,8 @@ type ReactorEngineSuite_SetupPhase struct {
 	logger      zerolog.Logger
 
 	local        *module.Local
-	currentEpoch *protocol.Epoch
-	nextEpoch    *protocol.Epoch
+	currentEpoch *protocol.CommittedEpoch
+	nextEpoch    *protocol.TentativeEpoch
 	epochQuery   *mocks.EpochQuery
 	snapshot     *protocol.Snapshot
 	state        *protocol.State
@@ -117,18 +117,18 @@ func (suite *ReactorEngineSuite_SetupPhase) SetupTest() {
 	suite.expectedPrivateKey = unittest.PrivateKeyFixture(crypto.BLSBLS12381, 48)
 
 	// mock protocol state
-	suite.currentEpoch = new(protocol.Epoch)
-	suite.currentEpoch.On("Counter").Return(suite.epochCounter, nil)
-	suite.currentEpoch.On("DKGPhase1FinalView").Return(suite.dkgPhase1FinalView, nil)
-	suite.currentEpoch.On("DKGPhase2FinalView").Return(suite.dkgPhase2FinalView, nil)
-	suite.currentEpoch.On("DKGPhase3FinalView").Return(suite.dkgPhase3FinalView, nil)
-	suite.nextEpoch = new(protocol.Epoch)
-	suite.nextEpoch.On("Counter").Return(suite.NextEpochCounter(), nil)
-	suite.nextEpoch.On("InitialIdentities").Return(suite.committee.ToSkeleton(), nil)
+	suite.currentEpoch = new(protocol.CommittedEpoch)
+	suite.currentEpoch.On("Counter").Return(suite.epochCounter)
+	suite.currentEpoch.On("DKGPhase1FinalView").Return(suite.dkgPhase1FinalView)
+	suite.currentEpoch.On("DKGPhase2FinalView").Return(suite.dkgPhase2FinalView)
+	suite.currentEpoch.On("DKGPhase3FinalView").Return(suite.dkgPhase3FinalView)
+	suite.nextEpoch = new(protocol.TentativeEpoch)
+	suite.nextEpoch.On("Counter").Return(suite.NextEpochCounter())
+	suite.nextEpoch.On("InitialIdentities").Return(suite.committee.ToSkeleton())
 
 	suite.epochQuery = mocks.NewEpochQuery(suite.T(), suite.epochCounter)
-	suite.epochQuery.Add(suite.currentEpoch)
-	suite.epochQuery.Add(suite.nextEpoch)
+	suite.epochQuery.AddCommitted(suite.currentEpoch)
+	suite.epochQuery.AddTentative(suite.nextEpoch)
 	suite.snapshot = new(protocol.Snapshot)
 	suite.snapshot.On("Epochs").Return(suite.epochQuery)
 	suite.snapshot.On("Head").Return(suite.firstBlock, nil)
@@ -327,7 +327,7 @@ func (suite *ReactorEngineSuite_CommittedPhase) SetupTest() {
 		},
 	)
 
-	currentEpoch := new(protocol.Epoch)
+	currentEpoch := new(protocol.CommittedEpoch)
 	currentEpoch.On("Counter").Return(suite.epochCounter, nil)
 
 	nextDKG := new(protocol.DKG)
@@ -336,13 +336,13 @@ func (suite *ReactorEngineSuite_CommittedPhase) SetupTest() {
 		func(_ flow.Identifier) error { return nil },
 	)
 
-	nextEpoch := new(protocol.Epoch)
+	nextEpoch := new(protocol.CommittedEpoch)
 	nextEpoch.On("Counter").Return(suite.NextEpochCounter(), nil)
 	nextEpoch.On("DKG").Return(nextDKG, nil)
 
 	epochQuery := mocks.NewEpochQuery(suite.T(), suite.epochCounter)
-	epochQuery.Add(currentEpoch)
-	epochQuery.Add(nextEpoch)
+	epochQuery.AddCommitted(currentEpoch)
+	epochQuery.AddCommitted(nextEpoch)
 
 	firstBlock := unittest.BlockHeaderFixture(unittest.HeaderWithView(100))
 	suite.firstBlock = firstBlock

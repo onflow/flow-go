@@ -155,7 +155,6 @@ func (suite *SameGRPCPortTestSuite) SetupTest() {
 	}
 
 	params.On("SporkID").Return(unittest.IdentifierFixture(), nil)
-	params.On("ProtocolVersion").Return(uint(unittest.Uint64InRange(10, 30)), nil)
 	params.On("SporkRootBlockHeight").Return(rootBlock.Header.Height, nil)
 	params.On("SealedRoot").Return(rootBlock.Header, nil)
 

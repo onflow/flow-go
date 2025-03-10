@@ -79,7 +79,7 @@ type Suite struct {
 	finalizedHeaderCache module.FinalizedHeaderCache
 	backend              *backend.Backend
 	sporkID              flow.Identifier
-	protocolVersion      uint
+	protocolStateVersion uint64
 }
 
 // TestAccess tests scenarios which exercise multiple API calls using both the RPC handler and the ingest engine
@@ -95,7 +95,7 @@ func (suite *Suite) SetupTest() {
 	suite.finalSnapshot = new(protocol.Snapshot)
 	suite.sealedSnapshot = new(protocol.Snapshot)
 	suite.sporkID = unittest.IdentifierFixture()
-	suite.protocolVersion = uint(unittest.Uint64InRange(10, 30))
+	suite.protocolStateVersion = unittest.Uint64InRange(10, 30)
 
 	suite.rootBlock = unittest.BlockHeaderFixture(unittest.WithHeaderHeight(0))
 	suite.sealedBlock = suite.rootBlock
@@ -118,10 +118,13 @@ func (suite *Suite) SetupTest() {
 		nil,
 	).Maybe()
 
+	pstate := protocol.NewKVStoreReader(suite.T())
+	pstate.On("GetProtocolStateVersion").Return(suite.protocolStateVersion, nil).Maybe()
+	suite.finalSnapshot.On("ProtocolState").Return(pstate, nil).Maybe()
+
 	suite.params = new(protocol.Params)
 	suite.params.On("FinalizedRoot").Return(suite.rootBlock, nil)
 	suite.params.On("SporkID").Return(suite.sporkID, nil)
-	suite.params.On("ProtocolVersion").Return(suite.protocolVersion, nil)
 	suite.params.On("SporkRootBlockHeight").Return(suite.rootBlock.Height, nil)
 	suite.params.On("SealedRoot").Return(suite.rootBlock, nil)
 	suite.state.On("Params").Return(suite.params).Maybe()
@@ -148,10 +151,11 @@ func (suite *Suite) SetupTest() {
 }
 
 func (suite *Suite) RunTest(
-	f func(handler *access.Handler, db *badger.DB, all *storage.All),
+	f func(handler *access.Handler, db *badger.DB, all *storage.All, en *storage.Execution),
 ) {
 	unittest.RunWithBadgerDB(suite.T(), func(db *badger.DB) {
-		all := util.StorageLayer(suite.T(), db)
+		all := bstorage.InitAll(metrics.NewNoopCollector(), db)
+		en := util.ExecutionStorageLayer(suite.T(), db)
 
 		var err error
 		suite.backend, err = backend.New(backend.Params{
@@ -161,8 +165,8 @@ func (suite *Suite) RunTest(
 			Headers:              all.Headers,
 			Collections:          all.Collections,
 			Transactions:         all.Transactions,
-			ExecutionResults:     all.Results,
-			ExecutionReceipts:    all.Receipts,
+			ExecutionResults:     en.Results,
+			ExecutionReceipts:    en.Receipts,
 			ChainID:              suite.chainID,
 			AccessMetrics:        suite.metrics,
 			MaxHeightRange:       backend.DefaultMaxHeightRange,
@@ -180,12 +184,12 @@ func (suite *Suite) RunTest(
 			subscription.DefaultMaxGlobalStreams,
 			access.WithBlockSignerDecoder(suite.signerIndicesDecoder),
 		)
-		f(handler, db, all)
+		f(handler, db, all, en)
 	})
 }
 
 func (suite *Suite) TestSendAndGetTransaction() {
-	suite.RunTest(func(handler *access.Handler, _ *badger.DB, _ *storage.All) {
+	suite.RunTest(func(handler *access.Handler, _ *badger.DB, _ *storage.All, _ *storage.Execution) {
 		referenceBlock := unittest.BlockHeaderFixture()
 		transaction := unittest.TransactionFixture()
 		transaction.SetReferenceBlockID(referenceBlock.ID())
@@ -238,7 +242,7 @@ func (suite *Suite) TestSendAndGetTransaction() {
 }
 
 func (suite *Suite) TestSendExpiredTransaction() {
-	suite.RunTest(func(handler *access.Handler, _ *badger.DB, _ *storage.All) {
+	suite.RunTest(func(handler *access.Handler, _ *badger.DB, _ *storage.All, en *storage.Execution) {
 		referenceBlock := suite.finalizedBlock
 
 		transaction := unittest.TransactionFixture()
@@ -297,8 +301,8 @@ func (suite *Suite) TestSendTransactionToRandomCollectionNode() {
 		suite.Require().Nil(err)
 		collNode1 := clusters[0][0]
 		collNode2 := clusters[1][0]
-		epoch := new(protocol.Epoch)
-		suite.epochQuery.On("Current").Return(epoch)
+		epoch := new(protocol.CommittedEpoch)
+		suite.epochQuery.On("Current").Return(epoch, nil)
 		epoch.On("Clustering").Return(clusters, nil)
 
 		// create two transactions bound for each of the cluster
@@ -377,7 +381,7 @@ func (suite *Suite) TestSendTransactionToRandomCollectionNode() {
 }
 
 func (suite *Suite) TestGetBlockByIDAndHeight() {
-	suite.RunTest(func(handler *access.Handler, db *badger.DB, all *storage.All) {
+	suite.RunTest(func(handler *access.Handler, db *badger.DB, all *storage.All, en *storage.Execution) {
 
 		// test block1 get by ID
 		block1 := unittest.BlockFixture()
@@ -513,7 +517,7 @@ func (suite *Suite) TestGetBlockByIDAndHeight() {
 }
 
 func (suite *Suite) TestGetExecutionResultByBlockID() {
-	suite.RunTest(func(handler *access.Handler, db *badger.DB, all *storage.All) {
+	suite.RunTest(func(handler *access.Handler, db *badger.DB, all *storage.All, en *storage.Execution) {
 
 		// test block1 get by ID
 		nonexistingID := unittest.IdentifierFixture()
@@ -523,8 +527,8 @@ func (suite *Suite) TestGetExecutionResultByBlockID() {
 			unittest.WithExecutionResultBlockID(blockID),
 			unittest.WithServiceEvents(3))
 
-		require.NoError(suite.T(), all.Results.Store(er))
-		require.NoError(suite.T(), all.Results.Index(blockID, er.ID()))
+		require.NoError(suite.T(), en.Results.Store(er))
+		require.NoError(suite.T(), en.Results.Index(blockID, er.ID()))
 
 		assertResp := func(
 			resp *accessproto.ExecutionResultForBlockIDResponse,
@@ -596,9 +600,8 @@ func (suite *Suite) TestGetExecutionResultByBlockID() {
 // is reported as sealed
 func (suite *Suite) TestGetSealedTransaction() {
 	unittest.RunWithBadgerDB(suite.T(), func(db *badger.DB) {
-		all := util.StorageLayer(suite.T(), db)
-		results := bstorage.NewExecutionResults(suite.metrics, db)
-		receipts := bstorage.NewExecutionReceipts(suite.metrics, db, results, bstorage.DefaultCacheSize)
+		all := bstorage.InitAll(metrics.NewNoopCollector(), db)
+		en := util.ExecutionStorageLayer(suite.T(), db)
 		enIdentities := unittest.IdentityListFixture(2, unittest.WithRole(flow.RoleExecution))
 		enNodeIDs := enIdentities.NodeIDs()
 
@@ -646,7 +649,7 @@ func (suite *Suite) TestGetSealedTransaction() {
 		execNodeIdentitiesProvider := commonrpc.NewExecutionNodeIdentitiesProvider(
 			suite.log,
 			suite.state,
-			receipts,
+			en.Receipts,
 			enNodeIDs,
 			nil,
 		)
@@ -658,8 +661,8 @@ func (suite *Suite) TestGetSealedTransaction() {
 			Headers:                    all.Headers,
 			Collections:                collections,
 			Transactions:               transactions,
-			ExecutionReceipts:          receipts,
-			ExecutionResults:           results,
+			ExecutionReceipts:          en.Receipts,
+			ExecutionResults:           en.Results,
 			ChainID:                    suite.chainID,
 			AccessMetrics:              suite.metrics,
 			ConnFactory:                connFactory,
@@ -704,8 +707,8 @@ func (suite *Suite) TestGetSealedTransaction() {
 			all.Headers,
 			collections,
 			transactions,
-			results,
-			receipts,
+			en.Results,
+			en.Receipts,
 			collectionExecutedMetric,
 			processedHeight,
 			lastFullBlockHeight,
@@ -764,9 +767,8 @@ func (suite *Suite) TestGetSealedTransaction() {
 // transaction ID, block ID, and collection ID.
 func (suite *Suite) TestGetTransactionResult() {
 	unittest.RunWithBadgerDB(suite.T(), func(db *badger.DB) {
-		all := util.StorageLayer(suite.T(), db)
-		results := bstorage.NewExecutionResults(suite.metrics, db)
-		receipts := bstorage.NewExecutionReceipts(suite.metrics, db, results, bstorage.DefaultCacheSize)
+		all := bstorage.InitAll(metrics.NewNoopCollector(), db)
+		en := util.ExecutionStorageLayer(suite.T(), db)
 		originID := unittest.IdentifierFixture()
 
 		*suite.state = protocol.State{}
@@ -836,7 +838,7 @@ func (suite *Suite) TestGetTransactionResult() {
 		execNodeIdentitiesProvider := commonrpc.NewExecutionNodeIdentitiesProvider(
 			suite.log,
 			suite.state,
-			receipts,
+			en.Receipts,
 			enNodeIDs,
 			nil,
 		)
@@ -847,8 +849,8 @@ func (suite *Suite) TestGetTransactionResult() {
 			Headers:                    all.Headers,
 			Collections:                collections,
 			Transactions:               transactions,
-			ExecutionReceipts:          receipts,
-			ExecutionResults:           results,
+			ExecutionReceipts:          en.Receipts,
+			ExecutionResults:           en.Results,
 			ChainID:                    suite.chainID,
 			AccessMetrics:              suite.metrics,
 			ConnFactory:                connFactory,
@@ -895,8 +897,8 @@ func (suite *Suite) TestGetTransactionResult() {
 			all.Headers,
 			collections,
 			transactions,
-			results,
-			receipts,
+			en.Results,
+			en.Receipts,
 			collectionExecutedMetric,
 			processedHeightInitializer,
 			lastFullBlockHeight,
@@ -1059,11 +1061,8 @@ func (suite *Suite) TestGetTransactionResult() {
 // the correct block id
 func (suite *Suite) TestExecuteScript() {
 	unittest.RunWithBadgerDB(suite.T(), func(db *badger.DB) {
-		all := util.StorageLayer(suite.T(), db)
-		transactions := bstorage.NewTransactions(suite.metrics, db)
-		collections := bstorage.NewCollections(db, transactions)
-		results := bstorage.NewExecutionResults(suite.metrics, db)
-		receipts := bstorage.NewExecutionReceipts(suite.metrics, db, results, bstorage.DefaultCacheSize)
+		all := bstorage.InitAll(metrics.NewNoopCollector(), db)
+		en := util.ExecutionStorageLayer(suite.T(), db)
 		identities := unittest.IdentityListFixture(2, unittest.WithRole(flow.RoleExecution))
 		suite.sealedSnapshot.On("Identities", mock.Anything).Return(identities, nil)
 		suite.finalSnapshot.On("Identities", mock.Anything).Return(identities, nil)
@@ -1075,7 +1074,7 @@ func (suite *Suite) TestExecuteScript() {
 		execNodeIdentitiesProvider := commonrpc.NewExecutionNodeIdentitiesProvider(
 			suite.log,
 			suite.state,
-			receipts,
+			en.Receipts,
 			nil,
 			identities.NodeIDs(),
 		)
@@ -1086,10 +1085,10 @@ func (suite *Suite) TestExecuteScript() {
 			CollectionRPC:              suite.collClient,
 			Blocks:                     all.Blocks,
 			Headers:                    all.Headers,
-			Collections:                collections,
-			Transactions:               transactions,
-			ExecutionReceipts:          receipts,
-			ExecutionResults:           results,
+			Collections:                all.Collections,
+			Transactions:               all.Transactions,
+			ExecutionReceipts:          en.Receipts,
+			ExecutionResults:           en.Results,
 			ChainID:                    suite.chainID,
 			AccessMetrics:              suite.metrics,
 			ConnFactory:                connFactory,
@@ -1122,7 +1121,7 @@ func (suite *Suite) TestExecuteScript() {
 			collectionsToMarkFinalized,
 			collectionsToMarkExecuted,
 			blocksToMarkExecuted,
-			collections,
+			all.Collections,
 			all.Blocks,
 			blockTransactions,
 		)
@@ -1150,10 +1149,10 @@ func (suite *Suite) TestExecuteScript() {
 			suite.request,
 			all.Blocks,
 			all.Headers,
-			collections,
-			transactions,
-			results,
-			receipts,
+			all.Collections,
+			all.Transactions,
+			en.Results,
+			en.Receipts,
 			collectionExecutedMetric,
 			processedHeightInitializer,
 			lastFullBlockHeight,
@@ -1278,7 +1277,7 @@ func (suite *Suite) TestExecuteScript() {
 // TestAPICallNodeVersionInfo tests the GetNodeVersionInfo query and check response returns correct node version
 // information
 func (suite *Suite) TestAPICallNodeVersionInfo() {
-	suite.RunTest(func(handler *access.Handler, db *badger.DB, all *storage.All) {
+	suite.RunTest(func(handler *access.Handler, db *badger.DB, all *storage.All, en *storage.Execution) {
 		req := &accessproto.GetNodeVersionInfoRequest{}
 		resp, err := handler.GetNodeVersionInfo(context.Background(), req)
 		require.NoError(suite.T(), err)
@@ -1286,10 +1285,11 @@ func (suite *Suite) TestAPICallNodeVersionInfo() {
 
 		respNodeVersionInfo := resp.Info
 		suite.Require().Equal(respNodeVersionInfo, &entitiesproto.NodeVersionInfo{
-			Semver:          build.Version(),
-			Commit:          build.Commit(),
-			SporkId:         suite.sporkID[:],
-			ProtocolVersion: uint64(suite.protocolVersion),
+			Semver:               build.Version(),
+			Commit:               build.Commit(),
+			SporkId:              suite.sporkID[:],
+			ProtocolVersion:      0,
+			ProtocolStateVersion: uint64(suite.protocolStateVersion),
 		})
 	})
 }
@@ -1298,7 +1298,7 @@ func (suite *Suite) TestAPICallNodeVersionInfo() {
 // field in the response matches the finalized header from cache. It also tests that the LastFinalizedBlock field is
 // updated correctly when a block with a greater height is finalized.
 func (suite *Suite) TestLastFinalizedBlockHeightResult() {
-	suite.RunTest(func(handler *access.Handler, db *badger.DB, all *storage.All) {
+	suite.RunTest(func(handler *access.Handler, db *badger.DB, all *storage.All, en *storage.Execution) {
 		block := unittest.BlockWithParentFixture(suite.finalizedBlock)
 		newFinalizedBlock := unittest.BlockWithParentFixture(block.Header)
 
@@ -1354,10 +1354,10 @@ func (suite *Suite) createChain() (*flow.Block, *flow.Collection) {
 
 	cluster := new(protocol.Cluster)
 	cluster.On("Members").Return(clusterCommittee.ToSkeleton(), nil)
-	epoch := new(protocol.Epoch)
+	epoch := new(protocol.CommittedEpoch)
 	epoch.On("ClusterByChainID", mock.Anything).Return(cluster, nil)
 	epochs := new(protocol.EpochQuery)
-	epochs.On("Current").Return(epoch)
+	epochs.On("Current").Return(epoch, nil)
 	snap := new(protocol.Snapshot)
 	snap.On("Epochs").Return(epochs).Maybe()
 	snap.On("Params").Return(suite.params).Maybe()

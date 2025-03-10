@@ -95,8 +95,8 @@ func (suite *EpochLookupSuite) Phase() flow.EpochPhase {
 // CommitEpochs adds the new epochs to the state.
 func (suite *EpochLookupSuite) CommitEpochs(epochs ...viewRange) {
 	for _, epoch := range epochs {
-		mockEpoch := newMockEpoch(epoch.epochCounter, epoch.firstView, epoch.finalView)
-		suite.epochQuery.Add(mockEpoch)
+		mockEpoch := newMockCommittedEpoch(epoch.epochCounter, epoch.firstView, epoch.finalView)
+		suite.epochQuery.AddCommitted(mockEpoch)
 		// if we add a next epoch (counter 1 greater than current), then set phase to committed
 		if epoch.epochCounter == suite.currentEpochCounter+1 {
 			suite.WithLock(func() {
@@ -360,11 +360,11 @@ func testEpochForView(t *testing.T, lookup *EpochLookup, epochs ...viewRange) {
 	})
 }
 
-// newMockEpoch returns a mock epoch with the given fields set.
-func newMockEpoch(counter, firstView, finalView uint64) *mockprotocol.Epoch {
-	epoch := new(mockprotocol.Epoch)
-	epoch.On("FirstView").Return(firstView, nil)
-	epoch.On("FinalView").Return(finalView, nil)
-	epoch.On("Counter").Return(counter, nil)
+// newMockCommittedEpoch returns a mock epoch with the given properties
+func newMockCommittedEpoch(counter, firstView, finalView uint64) *mockprotocol.CommittedEpoch {
+	epoch := new(mockprotocol.CommittedEpoch)
+	epoch.On("FirstView").Return(firstView)
+	epoch.On("FinalView").Return(finalView)
+	epoch.On("Counter").Return(counter)
 	return epoch
 }

@@ -123,11 +123,11 @@ func (b *BeaconKeyRecovery) recoverMyBeaconPrivateKey(final protocol.Snapshot) e
 		return nextEpochNotYetCommitted
 	}
 
-	nextEpoch := final.Epochs().Next() // guaranteed to be committed
-	nextEpochCounter, err := nextEpoch.Counter()
+	nextEpoch, err := final.Epochs().NextCommitted() // guaranteed to be committed
 	if err != nil {
 		return fmt.Errorf("could not get next epoch counter: %w", err)
 	}
+	nextEpochCounter := nextEpoch.Counter()
 	_, safe, err := b.localDKGState.RetrieveMyBeaconPrivateKey(nextEpochCounter)
 	if err != nil && !errors.Is(err, storage.ErrNotFound) {
 		return fmt.Errorf("could not retrieve my beacon private key for the next epoch: %w", err)

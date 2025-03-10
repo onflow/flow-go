@@ -55,6 +55,9 @@ type BlockIterator interface {
 	// It returns the saved index (next index to iterate)
 	// any error returned are exceptions
 	Checkpoint() (savedIndex uint64, exception error)
+
+	// Progress returns the progress of the iterator
+	Progress() (start, end, next uint64)
 }
 
 // IteratorCreator creates block iterators.
@@ -64,5 +67,10 @@ type BlockIterator interface {
 // if there is no block to iterate, hasNext is false
 // any error returned are exception
 type IteratorCreator interface {
+	// Create return the next block iterator
 	Create() (fromSavedIndexToLatest BlockIterator, hasNext bool, exception error)
+
+	// IteratorState returns the iterate state, useful to know the progress of the iterator
+	// after each round of iteration
+	IteratorState() IteratorStateReader
 }
