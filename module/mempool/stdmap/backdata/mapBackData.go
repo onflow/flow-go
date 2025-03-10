@@ -46,7 +46,9 @@ func (b *MapBackData[K, V]) Remove(key K) (value V, ok bool) {
 }
 
 // Adjust adjusts the value using the given function if the given key can be found.
-// It returns the updated value along with a boolean indicating whether an update occurred.
+// Returns:
+//   - the updated value for the key (if the key exists)
+//   - a boolean indicating whether the key was found (and the update applied)
 func (b *MapBackData[K, V]) Adjust(key K, f func(V) V) (value V, ok bool) {
 	value, ok = b.dataMap[key]
 	if !ok {
@@ -67,8 +69,7 @@ func (b *MapBackData[K, V]) Adjust(key K, f func(V) V) (value V, ok bool) {
 //
 // Returns:
 // - the adjusted value.
-//
-// - a bool which indicates whether the value was adjusted.
+// - a bool which indicates whether the value was adjusted (for MapBackData this is always true)
 func (b *MapBackData[K, V]) AdjustWithInit(key K, adjust func(V) V, init func() V) (V, bool) {
 	if b.Has(key) {
 		return b.Adjust(key, adjust)
@@ -119,7 +120,7 @@ func (b *MapBackData[K, V]) Values() []V {
 	return values
 }
 
-// Clear removes all values from the backdata.
+// Clear removes all key-value pairs from the backdata.
 func (b *MapBackData[K, V]) Clear() {
 	b.dataMap = make(map[K]V)
 }
