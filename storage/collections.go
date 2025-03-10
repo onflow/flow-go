@@ -7,10 +7,6 @@ import (
 // Collections represents persistent storage for collections.
 type Collections interface {
 
-	// StoreLight inserts the collection. It does not insert, nor check
-	// existence of, the constituent transactions.
-	StoreLight(collection *flow.LightCollection) error
-
 	// Store inserts the collection keyed by ID and all constituent
 	// transactions.
 	Store(collection *flow.Collection) error

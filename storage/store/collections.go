@@ -16,27 +16,16 @@ type Collections struct {
 	indexingByTx sync.Mutex
 }
 
+var _ storage.Collections = (*Collections)(nil)
+
 func NewCollections(db storage.DB, transactions *Transactions) *Collections {
+
 	c := &Collections{
 		db:           db,
 		transactions: transactions,
 		indexingByTx: sync.Mutex{},
 	}
 	return c
-}
-
-// StoreLight stores a light collection in the database.
-// any error returned are exceptions
-func (c *Collections) StoreLight(collection *flow.LightCollection) error {
-	err := c.db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-		return operation.UpsertCollection(rw.Writer(), collection)
-	})
-
-	if err != nil {
-		return fmt.Errorf("could not insert collection: %w", err)
-	}
-
-	return nil
 }
 
 // Store stores a collection in the database.
