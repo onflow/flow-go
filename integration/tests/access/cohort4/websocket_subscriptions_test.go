@@ -125,7 +125,7 @@ func (s *WebsocketSubscriptionSuite) SetupTest() {
 
 	sdkClient, err := s.net.ContainerByName(testnet.PrimaryAN).SDKClient()
 	s.Require().NoError(err)
-	
+
 	s.grpcClient = sdkClient.RPCClient()
 
 	s.serviceClient, err = s.net.ContainerByName(testnet.PrimaryAN).TestnetClient()
@@ -466,7 +466,6 @@ func (s *WebsocketSubscriptionSuite) TestHappyCases() {
 		name                               string
 		topic                              string
 		prepareArguments                   func() models.Arguments
-		validateFunc                       func(string, string, []models.BaseDataProvidersResponse)
 		listenSubscriptionResponseDuration time.Duration
 		testUnsubscribe                    bool
 	}{
@@ -476,7 +475,6 @@ func (s *WebsocketSubscriptionSuite) TestHappyCases() {
 			prepareArguments: func() models.Arguments {
 				return models.Arguments{"block_status": parser.Finalized}
 			},
-			validateFunc:                       s.validateBlocks,
 			listenSubscriptionResponseDuration: 5 * time.Second,
 			testUnsubscribe:                    true,
 		},
@@ -486,7 +484,6 @@ func (s *WebsocketSubscriptionSuite) TestHappyCases() {
 			prepareArguments: func() models.Arguments {
 				return models.Arguments{"block_status": parser.Finalized}
 			},
-			validateFunc:                       s.validateBlockHeaders,
 			listenSubscriptionResponseDuration: 5 * time.Second,
 			testUnsubscribe:                    true,
 		},
@@ -496,7 +493,6 @@ func (s *WebsocketSubscriptionSuite) TestHappyCases() {
 			prepareArguments: func() models.Arguments {
 				return models.Arguments{"block_status": parser.Finalized}
 			},
-			validateFunc:                       s.validateBlockDigests,
 			listenSubscriptionResponseDuration: 5 * time.Second,
 			testUnsubscribe:                    true,
 		},
@@ -506,7 +502,6 @@ func (s *WebsocketSubscriptionSuite) TestHappyCases() {
 			prepareArguments: func() models.Arguments {
 				return models.Arguments{}
 			},
-			validateFunc:                       s.validateEvents,
 			listenSubscriptionResponseDuration: 5 * time.Second,
 			testUnsubscribe:                    true,
 		},
@@ -523,7 +518,6 @@ func (s *WebsocketSubscriptionSuite) TestHappyCases() {
 					"event_types": []string{"flow.AccountCreated", "flow.AccountKeyAdded"},
 				}
 			},
-			validateFunc:                       s.validateAccountStatuses,
 			listenSubscriptionResponseDuration: 10 * time.Second,
 			testUnsubscribe:                    true,
 		},
@@ -542,7 +536,6 @@ func (s *WebsocketSubscriptionSuite) TestHappyCases() {
 					"tx_id": tx.ID().String(),
 				}
 			},
-			validateFunc:                       s.validateTransactionStatuses,
 			listenSubscriptionResponseDuration: 10 * time.Second,
 			testUnsubscribe:                    false,
 		},
@@ -602,7 +595,6 @@ func (s *WebsocketSubscriptionSuite) TestHappyCases() {
 					"envelope_signatures": convertToSig(tx.EnvelopeSignatures),
 				}
 			},
-			validateFunc:                       s.validateTransactionStatuses,
 			listenSubscriptionResponseDuration: 10 * time.Second,
 			testUnsubscribe:                    false,
 		},
@@ -638,7 +630,7 @@ func (s *WebsocketSubscriptionSuite) TestHappyCases() {
 			s.validateBaseMessageResponse(baseMessageResponses[0])
 
 			// Step 5: Use the provided validation function to check received responses
-			tt.validateFunc(
+			s.validate(
 				subscriptionRequest.SubscriptionID,
 				subscriptionRequest.Topic,
 				responses,
@@ -659,6 +651,118 @@ func (s *WebsocketSubscriptionSuite) TestHappyCases() {
 				s.validateBaseMessageResponse(response)
 			}
 		})
+	}
+}
+
+// validate checks if the received responses for a given subscription ID and topic
+// match the expected data format and correctness.
+//
+// It dispatches validation to specific topic handlers based on the topic type.
+//
+// Parameters:
+//   - subscriptionId: The unique identifier of the WebSocket subscription.
+//   - topic: The topic associated with the subscription (e.g., blocks, events, transactions).
+//   - responses: A slice of BaseDataProvidersResponse containing the received data.
+//
+// If the topic is invalid or unsupported, it logs a warning instead of failing the test.
+func (s *WebsocketSubscriptionSuite) validate(subscriptionId string, topic string, responses []models.BaseDataProvidersResponse) {
+	switch topic {
+	case data_providers.BlocksTopic:
+		s.validateBlocks(subscriptionId, topic, responses)
+	case data_providers.BlockHeadersTopic:
+		s.validateBlockHeaders(subscriptionId, topic, responses)
+	case data_providers.BlockDigestsTopic:
+		s.validateBlockDigests(subscriptionId, topic, responses)
+	case data_providers.EventsTopic:
+		s.validateEvents(subscriptionId, topic, responses)
+	case data_providers.AccountStatusesTopic:
+		s.validateAccountStatuses(subscriptionId, topic, responses)
+	case data_providers.TransactionStatusesTopic, data_providers.SendAndGetTransactionStatusesTopic:
+		s.validateTransactionStatuses(subscriptionId, topic, responses)
+	default:
+		s.T().Logf("invalid topic to validate %s", topic)
+	}
+}
+
+// TestSubscriptionMultiplexing verifies that when subscribing to multiple channels,
+// all expected messages are received correctly, ensuring subscription multiplexing works as expected.
+func (s *WebsocketSubscriptionSuite) TestSubscriptionMultiplexing() {
+	subscriptions := []struct {
+		name             string
+		topic            string
+		prepareArguments func() models.Arguments
+	}{
+		{
+			name:  "Blocks streaming",
+			topic: data_providers.BlocksTopic,
+			prepareArguments: func() models.Arguments {
+				return models.Arguments{"block_status": parser.Finalized}
+			},
+		},
+		{
+			name:  "Block headers streaming",
+			topic: data_providers.BlockHeadersTopic,
+			prepareArguments: func() models.Arguments {
+				return models.Arguments{"block_status": parser.Finalized}
+			},
+		},
+		{
+			name:  "Block digests streaming",
+			topic: data_providers.BlockDigestsTopic,
+			prepareArguments: func() models.Arguments {
+				return models.Arguments{"block_status": parser.Finalized}
+			},
+		},
+	}
+
+	// Step 1: Establish a WebSocket connection
+	wsClient, err := common.GetWSClient(s.ctx, getWebsocketsUrl(s.restAccessAddress))
+	s.Require().NoError(err)
+	defer func() { s.Require().NoError(wsClient.Close()) }()
+
+	responses := make([]models.BaseDataProvidersResponse, len(subscriptions))
+	// Step 2: Create and send subscription requests for all topics
+	subscriptionRequests := make(map[string]models.SubscribeMessageRequest)
+	for i, sub := range subscriptions {
+		subId := fmt.Sprintf("sub_%d", i+1)
+		subscriptionRequest := s.subscribeMessageRequest(
+			subId, // Unique Subscription ID
+			sub.topic,
+			sub.prepareArguments(),
+		)
+		s.Require().NoError(wsClient.WriteJSON(subscriptionRequest))
+		subscriptionRequests[subId] = subscriptionRequest
+
+		// Step 3: Listen for WebSocket responses for a set duration
+		dataProviderResponses, subscriptionSuccessResponses, _ := s.listenWebSocketResponses(
+			wsClient,
+			5*time.Second,
+			subId,
+		)
+		s.Require().Equal(1, len(subscriptionSuccessResponses), "expected one subscription response")
+		s.Require().Equal(models.ErrorMessage{}, subscriptionSuccessResponses[0].Error, "expected no error in success response")
+		s.Require().GreaterOrEqual(len(dataProviderResponses), 1, "expected at least one data provider response")
+
+		responses[i] = dataProviderResponses[0]
+	}
+
+	// 4. Ensure we received messages for all subscribed topics and validate the received data against gRPC responses
+	for _, response := range responses {
+		_, ok := subscriptionRequests[response.SubscriptionID]
+		s.Require().True(ok, "Expected one messages for each subscription ID: %s", response.SubscriptionID)
+		s.validate(response.SubscriptionID, response.Topic, []models.BaseDataProvidersResponse{response})
+	}
+
+	// Step 5: Unsubscribe from all topics
+	for _, sub := range subscriptionRequests {
+		unsubscriptionRequest := s.unsubscribeMessageRequest(sub.SubscriptionID)
+		s.Require().NoError(wsClient.WriteJSON(unsubscriptionRequest))
+
+		// Read and validate unsubscription response
+		var response models.BaseMessageResponse
+		err := wsClient.ReadJSON(&response)
+		s.Require().NoError(err, "Failed to read unsubscription response for topic: %s", sub.Topic)
+		s.validateBaseMessageResponse(response)
 	}
 }
 
