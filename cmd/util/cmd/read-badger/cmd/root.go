@@ -31,7 +31,7 @@ func init() {
 	rootCmd.PersistentFlags().StringVarP(&flagDatadir, "datadir", "d", "/var/flow/data/protocol", "directory to the badger dababase")
 	_ = rootCmd.MarkPersistentFlagRequired("data-dir")
 
-	rootCmd.PersistentFlags().StringVar(&flagPebbleDir, "pebbledir", "/var/flow/data/protocol-pebble", "directory to the pebble dababase")
+	rootCmd.PersistentFlags().StringVar(&flagPebbleDir, "pebble-dir", "/var/flow/data/protocol-pebble", "directory to the pebble dababase")
 
 	cobra.OnInitialize(initConfig)
 }
