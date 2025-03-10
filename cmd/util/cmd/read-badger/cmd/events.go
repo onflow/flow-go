@@ -25,8 +25,10 @@ var eventsCmd = &cobra.Command{
 	Use:   "events",
 	Short: "Read events from badger",
 	Run: func(cmd *cobra.Command, args []string) {
-		storages, db := InitStorages()
+		_, db := InitStorages()
 		defer db.Close()
+
+		events := common.InitExecutionStorages(db).Events
 
 		if flagEventType != "" && flagTransactionID != "" {
 			log.Error().Msg("provide only one of --transaction-id or --event-type")
@@ -49,7 +51,7 @@ var eventsCmd = &cobra.Command{
 			}
 
 			log.Info().Msgf("getting events for block id: %v, transaction id: %v", blockID, transactionID)
-			events, err := storages.Events.ByBlockIDTransactionID(blockID, transactionID)
+			events, err := events.ByBlockIDTransactionID(blockID, transactionID)
 			if err != nil {
 				log.Error().Err(err).Msgf("could not get events for block id: %v, transaction id: %v", blockID, transactionID)
 				return
@@ -70,7 +72,7 @@ var eventsCmd = &cobra.Command{
 			}
 			if _, ok := validEvents[flagEventType]; ok {
 				log.Info().Msgf("getting events for block id: %v, event type: %s", blockID, flagEventType)
-				events, err := storages.Events.ByBlockIDEventType(blockID, flow.EventType(flagEventType))
+				events, err := events.ByBlockIDEventType(blockID, flow.EventType(flagEventType))
 				if err != nil {
 					log.Error().Err(err).Msgf("could not get events for block id: %v, event type: %s", blockID, flagEventType)
 					return
@@ -88,13 +90,13 @@ var eventsCmd = &cobra.Command{
 
 		// just fetch events for block
 		log.Info().Msgf("getting events for block id: %v", blockID)
-		events, err := storages.Events.ByBlockID(blockID)
+		evts, err := events.ByBlockID(blockID)
 		if err != nil {
 			log.Error().Err(err).Msgf("could not get events for block id: %v", blockID)
 			return
 		}
 
-		for _, event := range events {
+		for _, event := range evts {
 			common.PrettyPrint(event)
 		}
 	},
