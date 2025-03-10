@@ -16,7 +16,7 @@ type Transactions interface {
 	Add(tx *flow.TransactionBody) bool
 
 	// Remove will remove the given transaction from the memory pool; it will
-	// will return true if the transaction was known and removed.
+	// return true if the transaction was known and removed.
 	Remove(txID flow.Identifier) bool
 
 	// ByID retrieve the transaction with the given ID from the memory

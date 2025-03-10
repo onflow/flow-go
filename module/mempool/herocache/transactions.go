@@ -13,15 +13,15 @@ import (
 )
 
 type Transactions struct {
-	c *stdmap.Backend
+	c *stdmap.Backend[flow.Identifier, *flow.TransactionBody]
 }
 
 // NewTransactions implements a transactions mempool based on hero cache.
 func NewTransactions(limit uint32, logger zerolog.Logger, collector module.HeroCacheMetrics) *Transactions {
 	t := &Transactions{
 		c: stdmap.NewBackend(
-			stdmap.WithMutableBackData(
-				herocache.NewCache(limit,
+			stdmap.WithMutableBackData[flow.Identifier, *flow.TransactionBody](
+				herocache.NewCache[flow.Identifier, *flow.TransactionBody](limit,
 					herocache.DefaultOversizeFactor,
 					heropool.LRUEjection,
 					logger.With().Str("mempool", "transactions").Logger(),
@@ -33,7 +33,7 @@ func NewTransactions(limit uint32, logger zerolog.Logger, collector module.HeroC
 
 // Has checks whether the transaction with the given hash is currently in
 // the memory pool.
-func (t Transactions) Has(id flow.Identifier) bool {
+func (t *Transactions) Has(id flow.Identifier) bool {
 	return t.c.Has(id)
 }
 
@@ -41,33 +41,25 @@ func (t Transactions) Has(id flow.Identifier) bool {
 func (t *Transactions) Add(tx *flow.TransactionBody) bool {
 	// Warning! reference pointer must be dereferenced before adding to HeroCache.
 	// This is crucial for its heap object optimizations.
-	return t.c.Add(*tx)
+	return t.c.Add(tx.ID(), tx)
 }
 
 // ByID returns the transaction with the given ID from the mempool.
-func (t Transactions) ByID(txID flow.Identifier) (*flow.TransactionBody, bool) {
-	entity, exists := t.c.ByID(txID)
+func (t *Transactions) ByID(txID flow.Identifier) (*flow.TransactionBody, bool) {
+	tx, exists := t.c.Get(txID)
 	if !exists {
-		return nil, false
+		panic(fmt.Sprintf("invalid entity in transaction pool (%T)", tx))
 	}
-	tx, ok := entity.(flow.TransactionBody)
-	if !ok {
-		panic(fmt.Sprintf("invalid entity in transaction pool (%T)", entity))
-	}
-	return &tx, true
+	return tx, true
 }
 
 // All returns all transactions from the mempool. Since it is using the HeroCache, All guarantees returning
 // all transactions in the same order as they are added.
-func (t Transactions) All() []*flow.TransactionBody {
-	entities := t.c.All()
-	txs := make([]*flow.TransactionBody, 0, len(entities))
-	for _, entity := range entities {
-		tx, ok := entity.(flow.TransactionBody)
-		if !ok {
-			panic(fmt.Sprintf("invalid entity in transaction pool (%T)", entity))
-		}
-		txs = append(txs, &tx)
+func (t *Transactions) All() []*flow.TransactionBody {
+	all := t.c.All()
+	txs := make([]*flow.TransactionBody, 0, len(all))
+	for _, tx := range all {
+		txs = append(txs, tx)
 	}
 	return txs
 }
@@ -78,7 +70,7 @@ func (t *Transactions) Clear() {
 }
 
 // Size returns total number of stored transactions.
-func (t Transactions) Size() uint {
+func (t *Transactions) Size() uint {
 	return t.c.Size()
 }
 
