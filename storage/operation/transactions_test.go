@@ -18,13 +18,13 @@ func TestTransactions(t *testing.T) {
 	dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
 		expected := unittest.TransactionFixture()
 		err := db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-			return operation.InsertTransaction(rw.Writer(), expected.ID(), &expected.TransactionBody)
+			return operation.UpsertTransaction(rw.Writer(), expected.ID(), &expected.TransactionBody)
 		})
-		require.Nil(t, err)
+		require.NoError(t, err)
 
 		var actual flow.Transaction
 		err = operation.RetrieveTransaction(db.Reader(), expected.ID(), &actual.TransactionBody)
-		require.Nil(t, err)
+		require.NoError(t, err)
 		assert.Equal(t, expected, actual)
 	})
 }

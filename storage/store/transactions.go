@@ -17,7 +17,7 @@ type Transactions struct {
 // NewTransactions ...
 func NewTransactions(cacheMetrics module.CacheMetrics, db storage.DB) *Transactions {
 	store := func(rw storage.ReaderBatchWriter, txID flow.Identifier, flowTX *flow.TransactionBody) error {
-		return operation.InsertTransaction(rw.Writer(), txID, flowTX)
+		return operation.UpsertTransaction(rw.Writer(), txID, flowTX)
 	}
 
 	retrieve := func(r storage.Reader, txID flow.Identifier) (*flow.TransactionBody, error) {
@@ -48,9 +48,5 @@ func (t *Transactions) storeTx(rw storage.ReaderBatchWriter, flowTx *flow.Transa
 }
 
 func (t *Transactions) ByID(txID flow.Identifier) (*flow.TransactionBody, error) {
-	val, err := t.cache.Get(t.db.Reader(), txID)
-	if err != nil {
-		return nil, err
-	}
-	return val, err
+	return t.cache.Get(t.db.Reader(), txID)
 }

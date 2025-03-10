@@ -93,7 +93,6 @@ import (
 	storageerr "github.com/onflow/flow-go/storage"
 	storage "github.com/onflow/flow-go/storage/badger"
 	"github.com/onflow/flow-go/storage/operation"
-	"github.com/onflow/flow-go/storage/operation/badgerimpl"
 	"github.com/onflow/flow-go/storage/operation/pebbleimpl"
 	storagepebble "github.com/onflow/flow-go/storage/pebble"
 	"github.com/onflow/flow-go/storage/store"
@@ -148,6 +147,7 @@ type ExecutionNode struct {
 
 	chunkDataPackDB        *pebble.DB
 	chunkDataPacks         storageerr.ChunkDataPacks
+	collections            storageerr.Collections
 	providerEngine         exeprovider.ProviderEngine
 	checkerEng             *checker.Engine
 	syncCore               *chainsync.Core
@@ -262,9 +262,8 @@ func (builder *ExecutionNodeBuilder) LoadComponentsAndModules() {
 }
 
 func (exeNode *ExecutionNode) LoadCollections(node *NodeConfig) error {
-	db := badgerimpl.ToDB(node.DB)
-	transactions := store.NewTransactions(node.Metrics.Cache, db)
-	exeNode.collections = store.NewCollections(db, transactions)
+	transactions := store.NewTransactions(node.Metrics.Cache, node.ProtocolDB)
+	exeNode.collections = store.NewCollections(node.ProtocolDB, transactions)
 	return nil
 }
 
@@ -480,7 +479,7 @@ func (exeNode *ExecutionNode) LoadGCPBlockDataUploader(
 		exeNode.events,
 		exeNode.results,
 		exeNode.txResults,
-		store.NewComputationResultUploadStatus(badgerimpl.ToDB(node.DB)),
+		store.NewComputationResultUploadStatus(node.ProtocolDB),
 		execution_data.NewDownloader(exeNode.blobService),
 		exeNode.collector)
 	if retryableUploader == nil {
