@@ -18,6 +18,8 @@ func SliceToMap(values []string) map[string]bool {
 	return valueMap
 }
 
+// ParseBody parses the input data into the destination interface and returns any decoding errors
+// updated to be more user-friendly. It also checks that there is exactly one json object in the input
 func ParseBody(raw io.Reader, dst interface{}) error {
 	dec := json.NewDecoder(raw)
 	dec.DisallowUnknownFields()
