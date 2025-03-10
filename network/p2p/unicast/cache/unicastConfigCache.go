@@ -8,6 +8,7 @@ import (
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/module/mempool"
 	herocache "github.com/onflow/flow-go/module/mempool/herocache/backdata"
 	"github.com/onflow/flow-go/module/mempool/herocache/backdata/heropool"
 	"github.com/onflow/flow-go/module/mempool/stdmap"
@@ -122,10 +123,25 @@ func (d *UnicastConfigCache) GetWithInit(peerID peer.ID) (*unicast.Config, error
 			EntityId: entityId,
 		}
 	}
-	entity, ok := d.peerCache.GetWithInit(entityId, initFunc)
-	if !ok {
-		return nil, fmt.Errorf("get or init for unicast config for peer %s failed", peerID)
+
+	// TODO(malleability, #7076): UnicastConfigCache implementation will be updated according to new usages.
+	var entity flow.Entity
+	err := d.peerCache.Run(func(backData mempool.BackData[flow.Identifier, flow.Entity]) error {
+		val, ok := backData.Get(entityId)
+		if ok {
+			entity = val
+			return nil
+		}
+
+		entity = initFunc()
+		backData.Add(entityId, entity)
+
+		return nil
+	})
+	if err != nil {
+		return nil, fmt.Errorf("run operation aborted with an error: %w", err)
 	}
+
 	cfg, ok := entity.(UnicastConfigEntity)
 	if !ok {
 		// sanity check

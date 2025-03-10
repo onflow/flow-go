@@ -259,9 +259,9 @@ func TestBackend_AdjustWithInit_Concurrent_HeroCache(t *testing.T) {
 	}
 }
 
-// TestBackend_GetWithInit_Concurrent tests the GetWithInit method of the Backend with HeroCache as the backdata.
+// TestBackend_Run_Concurrent_HeroCache tests the Run method of the Backend with HeroCache as the backdata.
 // It concurrently attempts on adjusting non-existent entities, and verifies that the entities are initialized and retrieved correctly.
-func TestBackend_GetWithInit_Concurrent_HeroCache(t *testing.T) {
+func TestBackend_Run_Concurrent_HeroCache(t *testing.T) {
 	sizeLimit := uint32(100)
 	backData := herocache.NewCache(sizeLimit, herocache.DefaultOversizeFactor, heropool.LRUEjection, unittest.Logger(), metrics.NewNoopCollector())
 
@@ -274,10 +274,19 @@ func TestBackend_GetWithInit_Concurrent_HeroCache(t *testing.T) {
 		go func() {
 			defer adjustDone.Done()
 
-			entity, ok := backend.GetWithInit(e.ID(), func() flow.Entity {
-				return e
+			var entity *unittest.MockEntity
+			err := backend.Run(func(backdata mempool.BackData[flow.Identifier, *unittest.MockEntity]) error {
+				val, ok := backdata.Get(e.ID())
+				if ok {
+					entity = val
+					return nil
+				}
+				entity = e
+				backdata.Add(e.ID(), entity)
+
+				return nil
 			})
-			require.True(t, ok)
+			require.NoError(t, err)
 			require.Equal(t, e.ID(), entity.ID())
 		}()
 	}
@@ -327,9 +336,9 @@ func TestBackend_AdjustWithInit_Concurrent_MapBased(t *testing.T) {
 	}
 }
 
-// TestBackend_GetWithInit_Concurrentt_MapBased tests the GetWithInit method of the Backend with golang map as the backdata.
+// TestBackend_Run_Concurrent_MapBased tests the Run method of the Backend with golang map as the backdata.
 // It concurrently attempts on adjusting non-existent entities, and verifies that the entities are initialized and retrieved correctly.
-func TestBackend_GetWithInit_Concurrent_MapBased(t *testing.T) {
+func TestBackend_Run_Concurrent_MapBased(t *testing.T) {
 	sizeLimit := uint(100)
 	backend := stdmap.NewBackend(stdmap.WithLimit(sizeLimit))
 	entities := unittest.EntityListFixture(100)
@@ -340,10 +349,19 @@ func TestBackend_GetWithInit_Concurrent_MapBased(t *testing.T) {
 		go func() {
 			defer adjustDone.Done()
 
-			entity, ok := backend.GetWithInit(e.ID(), func() flow.Entity {
-				return e
+			var entity *unittest.MockEntity
+			err := backend.Run(func(backdata mempool.BackData[flow.Identifier, *unittest.MockEntity]) error {
+				val, ok := backdata.Get(e.ID())
+				if ok {
+					entity = val
+					return nil
+				}
+				entity = e
+				backdata.Add(e.ID(), entity)
+
+				return nil
 			})
-			require.True(t, ok)
+			require.NoError(t, err)
 			require.Equal(t, e.ID(), entity.ID())
 		}()
 	}
