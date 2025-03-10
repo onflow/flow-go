@@ -3,6 +3,7 @@ package unittest
 import (
 	"testing"
 
+	clone "github.com/huandu/go-clone/generic"
 	"github.com/onflow/crypto"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/exp/slices"
@@ -208,16 +209,21 @@ func TestRequireEntityNonMalleable(t *testing.T) {
 	})
 }
 
+// EnterViewEvidence is a utility struct for testing the malleability checker when multiple levels of nested structs are involved.
 type EnterViewEvidence struct {
 	QC *flow.QuorumCertificate
 	TC *flow.TimeoutCertificate
 }
 
+// StructWithPinning is a struct specifically designed to test the pinning feature of the malleability checker.
 type StructWithPinning struct {
 	Version  uint32
 	Evidence *EnterViewEvidence
 }
 
+// ID returns the hash of the entity depending on the value of the Version field.
+// Depending on the value of the Version field, the ID method includes or excludes the TC field in the hash calculation and requires it's nil or not in some cases.
+// This is a contrived example to demonstrate the pinning feature of the malleability checker.
 func (e *StructWithPinning) ID() flow.Identifier {
 	if e.Version == 1 {
 		if e.Evidence.TC != nil {
@@ -248,6 +254,10 @@ func (e *StructWithPinning) ID() flow.Identifier {
 	}
 }
 
+// TestMalleabilityChecker_PinField tests the behavior of MalleabilityChecker when pinning is required.
+// This structure is implemented in a way that the ID method behaves differently depending on the value of the Version field.
+// Depending on the value of the Version field, the ID method includes or excludes the TC field in the hash calculation and requires
+// it's nil or not in some cases, this means we need to use pinning otherwise checker will generate random values for the fields.
 func TestMalleabilityChecker_PinField(t *testing.T) {
 	t.Run("v1", func(t *testing.T) {
 		checker := NewMalleabilityChecker(WithPinnedField("Version"), WithPinnedField("Evidence.TC"))
@@ -279,38 +289,58 @@ func TestMalleabilityChecker_PinField(t *testing.T) {
 	})
 }
 
-type StructWithUnsupportedType struct {
+// StructWithComplexType is a struct that contains a slice with complex type.
+type StructWithComplexType struct {
 	Version   uint32
 	Evidences []*EnterViewEvidence
 }
 
-func (e *StructWithUnsupportedType) ID() flow.Identifier {
+func (e *StructWithComplexType) ID() flow.Identifier {
 	return flow.MakeID(e)
 }
 
+// TestMalleabilityChecker_Generators tests the behavior of MalleabilityChecker when using field and type generators.
+// In this test we actually ensure that checker uses the generator and the generated values are set on the entity that is being checked.
 func TestMalleabilityChecker_Generators(t *testing.T) {
-	t.Run("field-generator", func(t *testing.T) {
-		RequireEntityNonMalleable(t, &StructWithUnsupportedType{
+	t.Run("no-generator", func(t *testing.T) {
+		original := &StructWithComplexType{
 			Version:   0,
 			Evidences: nil,
-		}, WithFieldGenerator("Evidences", func() []*EnterViewEvidence {
-			return []*EnterViewEvidence{
-				{
-					QC: QuorumCertificateFixture(),
-					TC: nil,
-				},
-			}
-		}))
+		}
+		cpy := clone.Clone(original)
+		RequireEntityNonMalleable(t, cpy)
+		require.NotEqual(t, original.Version, cpy.Version)
+		require.NotElementsMatch(t, original.Evidences, cpy.Evidences)
 	})
-	t.Run("type-generator", func(t *testing.T) {
-		RequireEntityNonMalleable(t, &StructWithUnsupportedType{
+	t.Run("field-generator", func(t *testing.T) {
+		original := &StructWithComplexType{
 			Version:   0,
 			Evidences: nil,
-		}, WithTypeGenerator(func() EnterViewEvidence {
-			return EnterViewEvidence{
+		}
+		generated := []*EnterViewEvidence{
+			{
 				QC: QuorumCertificateFixture(),
 				TC: nil,
-			}
+			},
+		}
+		RequireEntityNonMalleable(t, original, WithFieldGenerator("Evidences", func() []*EnterViewEvidence {
+			return generated
 		}))
+		require.Equal(t, generated, original.Evidences)
+	})
+	t.Run("type-generator", func(t *testing.T) {
+		generated := EnterViewEvidence{
+			QC: QuorumCertificateFixture(),
+			TC: nil,
+		}
+		original := &StructWithComplexType{
+			Version:   0,
+			Evidences: nil,
+		}
+		RequireEntityNonMalleable(t, original, WithTypeGenerator(func() EnterViewEvidence {
+			return generated
+		}),
+		)
+		require.Equal(t, generated, *original.Evidences[0])
 	})
 }
