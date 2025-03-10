@@ -6,7 +6,6 @@ import (
 
 	"github.com/rs/zerolog"
 
-	"github.com/onflow/flow-go/engine/access/rest/common"
 	"github.com/onflow/flow-go/engine/access/rest/common/parser"
 	"github.com/onflow/flow-go/engine/access/rest/http/request"
 	"github.com/onflow/flow-go/engine/access/rest/util"
@@ -146,13 +145,13 @@ func parseEventsArguments(
 	chain flow.Chain,
 	eventFilterConfig state_stream.EventFilterConfig,
 ) (eventsArguments, error) {
-	allowedFields := []string{
-		"start_block_id",
-		"start_block_height",
-		"event_types",
-		"addresses",
-		"contracts",
-		"heartbeat_interval",
+	allowedFields := map[string]struct{}{
+		"start_block_id":     {},
+		"start_block_height": {},
+		"event_types":        {},
+		"addresses":          {},
+		"contracts":          {},
+		"heartbeat_interval": {},
 	}
 	err := ensureAllowedFields(arguments, allowedFields)
 	if err != nil {
@@ -164,41 +163,62 @@ func parseEventsArguments(
 	// Parse block arguments
 	startBlockID, startBlockHeight, err := parseStartBlock(arguments)
 	if err != nil {
-		return args, err
+		return eventsArguments{}, err
 	}
 	args.StartBlockID = startBlockID
 	args.StartBlockHeight = startBlockHeight
 
 	// Parse 'event_types' as a JSON array
 	var eventTypes parser.EventTypes
-	if eventTypesIn, ok := arguments["event_types"]; ok && eventTypesIn != "" {
-		result, err := common.ParseInterfaceToStrings(eventTypesIn)
-		if err != nil {
-			return eventsArguments{}, fmt.Errorf("'event_types' must be an array of string")
-		}
+	rawEventTypes, exists := arguments["event_types"]
+	if !exists {
+		return eventsArguments{}, fmt.Errorf("missing 'event_types' field")
+	}
 
-		err = eventTypes.Parse(result)
-		if err != nil {
-			return eventsArguments{}, fmt.Errorf("invalid 'event_types': %w", err)
-		}
+	eventTypesList, isStringArray := rawEventTypes.([]string)
+	if !isStringArray {
+		return eventsArguments{}, fmt.Errorf("'event_types' must be an array of string")
+	}
+
+	if len(eventTypesList) == 0 {
+		return eventsArguments{}, fmt.Errorf("'event_types' field must not be empty")
+	}
+
+	err = eventTypes.Parse(eventTypesList)
+	if err != nil {
+		return eventsArguments{}, fmt.Errorf("invalid 'event_types': %w", err)
 	}
 
 	// Parse 'addresses' as []string{}
 	var addresses []string
-	if addressesIn, ok := arguments["addresses"]; ok && addressesIn != "" {
-		addresses, err = common.ParseInterfaceToStrings(addressesIn)
-		if err != nil {
-			return eventsArguments{}, fmt.Errorf("'addresses' must be an array of string")
-		}
+	rawAddresses, exists := arguments["addresses"]
+	if !exists {
+		return eventsArguments{}, fmt.Errorf("missing 'addresses' field")
+	}
+
+	addresses, isStringArray = rawAddresses.([]string)
+	if !isStringArray {
+		return eventsArguments{}, fmt.Errorf("'addresses' must be an array of string")
+	}
+
+	if len(addresses) == 0 {
+		return eventsArguments{}, fmt.Errorf("'addresses' field must not be empty")
 	}
 
 	// Parse 'contracts' as []string{}
 	var contracts []string
-	if contractsIn, ok := arguments["contracts"]; ok && contractsIn != "" {
-		contracts, err = common.ParseInterfaceToStrings(contractsIn)
-		if err != nil {
-			return eventsArguments{}, fmt.Errorf("'contracts' must be an array of string")
-		}
+	rawContracts, exists := arguments["contracts"]
+	if !exists {
+		return eventsArguments{}, fmt.Errorf("missing 'contracts' field")
+	}
+
+	contracts, isStringArray = rawContracts.([]string)
+	if !isStringArray {
+		return eventsArguments{}, fmt.Errorf("'contracts' must be an array of string")
+	}
+
+	if len(contracts) == 0 {
+		return eventsArguments{}, fmt.Errorf("'contracts' field must not be empty")
 	}
 
 	var heartbeatInterval uint64
@@ -210,7 +230,7 @@ func parseEventsArguments(
 
 		heartbeatInterval, err = util.ToUint64(result)
 		if err != nil {
-			return eventsArguments{}, fmt.Errorf("invalid 'heartbeat_interval': %w", err)
+			return eventsArguments{}, fmt.Errorf("'heartbeat_interval' must be convertable to uint64: %w", err)
 		}
 
 		args.HeartbeatInterval = &heartbeatInterval

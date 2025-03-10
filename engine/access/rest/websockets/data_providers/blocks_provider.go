@@ -111,10 +111,10 @@ func (p *BlocksDataProvider) createSubscription(ctx context.Context, args blocks
 
 // parseBlocksArguments validates and initializes the blocks arguments.
 func parseBlocksArguments(arguments models.Arguments) (blocksArguments, error) {
-	allowedFields := []string{
-		"start_block_id",
-		"start_block_height",
-		"block_status",
+	allowedFields := map[string]struct{}{
+		"start_block_id":     {},
+		"start_block_height": {},
+		"block_status":       {},
 	}
 	err := ensureAllowedFields(arguments, allowedFields)
 	if err != nil {
@@ -124,19 +124,25 @@ func parseBlocksArguments(arguments models.Arguments) (blocksArguments, error) {
 	var args blocksArguments
 
 	// Parse 'block_status'
-	if blockStatusIn, ok := arguments["block_status"]; ok {
-		result, ok := blockStatusIn.(string)
-		if !ok {
-			return blocksArguments{}, fmt.Errorf("'block_status' must be string")
-		}
-		blockStatus, err := parser.ParseBlockStatus(result)
-		if err != nil {
-			return blocksArguments{}, err
-		}
-		args.BlockStatus = blockStatus
-	} else {
-		return blocksArguments{}, fmt.Errorf("'block_status' must be provided")
+	rawBlockStatus, exists := arguments["block_status"]
+	if !exists {
+		return blocksArguments{}, fmt.Errorf("missing 'block_status' field")
 	}
+
+	blockStatusStr, isString := rawBlockStatus.(string)
+	if !isString {
+		return blocksArguments{}, fmt.Errorf("'block_status' must be string")
+	}
+
+	if len(blockStatusStr) == 0 {
+		return blocksArguments{}, fmt.Errorf("'block_status' field must not be empty")
+	}
+
+	blockStatus, err := parser.ParseBlockStatus(blockStatusStr)
+	if err != nil {
+		return blocksArguments{}, err
+	}
+	args.BlockStatus = blockStatus
 
 	// Parse block arguments
 	startBlockID, startBlockHeight, err := parseStartBlock(arguments)
@@ -180,7 +186,7 @@ func parseStartBlock(arguments models.Arguments) (flow.Identifier, uint64, error
 		}
 		startBlockHeight, err := util.ToUint64(result)
 		if err != nil {
-			return flow.ZeroID, request.EmptyHeight, fmt.Errorf("invalid 'start_block_height': %w", err)
+			return flow.ZeroID, request.EmptyHeight, fmt.Errorf("'start_block_height' must be convertable to uint64: %w", err)
 		}
 		return flow.ZeroID, startBlockHeight, nil
 	}

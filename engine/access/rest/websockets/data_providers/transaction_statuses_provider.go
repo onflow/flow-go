@@ -19,6 +19,11 @@ import (
 	"github.com/onflow/flow/protobuf/go/flow/entities"
 )
 
+// transactionStatusesArguments contains the arguments required for subscribing to transaction statuses
+type transactionStatusesArguments struct {
+	TxID flow.Identifier `json:"tx_id"` // ID of the transaction to monitor.
+}
+
 // TransactionStatusesDataProvider is responsible for providing tx statuses
 type TransactionStatusesDataProvider struct {
 	*baseDataProvider
@@ -46,8 +51,8 @@ func NewTransactionStatusesDataProvider(
 		linkGenerator: linkGenerator,
 	}
 
-	// Initialize txID passed to the provider.
-	txID, err := parseTransactionID(arguments)
+	// Initialize arguments passed to the provider.
+	txStatusesArgs, err := parseTransactionStatusesArguments(arguments)
 	if err != nil {
 		return nil, fmt.Errorf("invalid arguments for tx statuses data provider: %w", err)
 	}
@@ -60,7 +65,7 @@ func NewTransactionStatusesDataProvider(
 		arguments,
 		cancel,
 		send,
-		p.createSubscription(subCtx, txID), // Set up a subscription to tx statuses based on arguments.
+		p.createSubscription(subCtx, txStatusesArgs), // Set up a subscription to tx statuses based on arguments.
 	)
 
 	return p, nil
@@ -77,9 +82,9 @@ func (p *TransactionStatusesDataProvider) Run() error {
 // createSubscription creates a new subscription using the specified input arguments.
 func (p *TransactionStatusesDataProvider) createSubscription(
 	ctx context.Context,
-	txID flow.Identifier,
+	args transactionStatusesArguments,
 ) subscription.Subscription {
-	return p.api.SubscribeTransactionStatuses(ctx, txID, entities.EventEncodingVersion_JSON_CDC_V0)
+	return p.api.SubscribeTransactionStatuses(ctx, args.TxID, entities.EventEncodingVersion_JSON_CDC_V0)
 }
 
 // handleResponse processes a tx statuses and sends the formatted response.
@@ -108,30 +113,42 @@ func (p *TransactionStatusesDataProvider) handleResponse() func(txResults []*acc
 	}
 }
 
-// parseTransactionID validates and initializes the transaction ID argument.
-func parseTransactionID(
+// parseAccountStatusesArguments validates and initializes the account statuses arguments.
+func parseTransactionStatusesArguments(
 	arguments models.Arguments,
-) (flow.Identifier, error) {
-	allowedFields := []string{
-		"tx_id",
+) (transactionStatusesArguments, error) {
+	allowedFields := map[string]struct{}{
+		"tx_id": {},
 	}
 	err := ensureAllowedFields(arguments, allowedFields)
 	if err != nil {
-		return flow.ZeroID, err
+		return transactionStatusesArguments{}, err
 	}
 
-	if txIDIn, ok := arguments["tx_id"]; ok && txIDIn != "" {
-		result, ok := txIDIn.(string)
-		if !ok {
-			return flow.ZeroID, fmt.Errorf("'tx_id' must be a string")
-		}
-		var txIDParsed parser.ID
-		err := txIDParsed.Parse(result)
-		if err != nil {
-			return flow.ZeroID, fmt.Errorf("invalid 'tx_id': %w", err)
-		}
-		return txIDParsed.Flow(), nil
+	var args transactionStatusesArguments
+
+	// Check if tx_id exists and is not empty
+	rawTxID, exists := arguments["tx_id"]
+	if !exists {
+		return transactionStatusesArguments{}, fmt.Errorf("missing 'tx_id' field")
 	}
 
-	return flow.ZeroID, fmt.Errorf("arguments are invalid")
+	// Ensure the transaction ID is a string
+	txIDString, isString := rawTxID.(string)
+	if !isString {
+		return transactionStatusesArguments{}, fmt.Errorf("'tx_id' must be a string")
+	}
+
+	if len(txIDString) == 0 {
+		return transactionStatusesArguments{}, fmt.Errorf("'tx_id' must not be empty")
+	}
+
+	var parsedTxID parser.ID
+	if err = parsedTxID.Parse(txIDString); err != nil {
+		return transactionStatusesArguments{}, fmt.Errorf("invalid 'tx_id': %w", err)
+	}
+
+	// Assign the validated transaction ID to the args
+	args.TxID = parsedTxID.Flow()
+	return args, nil
 }
