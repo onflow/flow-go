@@ -22,11 +22,11 @@ func InitStorages() (*storage.All, *badger.DB) {
 }
 
 // WithStorage runs the given function with the storage dependending on the flags
-// only one flag (datadir / pebbledir) is allowed to be set
+// only one flag (datadir / pebble-dir) is allowed to be set
 func WithStorage(f func(storage.DB) error) error {
 	if flagPebbleDir != "" {
 		if flagDatadir != "" {
-			log.Warn().Msg("both --datadir and --pebbledir are set, using --pebbledir")
+			log.Warn().Msg("both --datadir and --pebble-dir are set, using --pebble-dir")
 		}
 
 		db, err := pebblestorage.MustOpenDefaultPebbleDB(log.Logger, flagPebbleDir)
@@ -44,7 +44,7 @@ func WithStorage(f func(storage.DB) error) error {
 		return f(badgerimpl.ToDB(db))
 	}
 
-	return fmt.Errorf("must specify either --datadir or --pebbledir")
+	return fmt.Errorf("must specify either --datadir or --pebble-dir")
 }
 
 // InitBadgerAndPebble initializes the badger and pebble storages
@@ -54,7 +54,7 @@ func InitBadgerAndPebble() (bdb *badger.DB, pdb *pebble.DB, err error) {
 	}
 
 	if flagPebbleDir == "" {
-		return nil, nil, fmt.Errorf("must specify --pebbledir")
+		return nil, nil, fmt.Errorf("must specify --pebble-dir")
 	}
 
 	pdb, err = pebblestorage.MustOpenDefaultPebbleDB(
