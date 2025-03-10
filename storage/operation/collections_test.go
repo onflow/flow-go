@@ -70,7 +70,6 @@ func TestCollections(t *testing.T) {
 			var actual flow.LightCollection
 			err := operation.LookupCollectionPayload(db.Reader(), blockID, &actual.Transactions)
 			assert.NoError(t, err)
-
 			assert.Equal(t, expected, actual)
 		})
 

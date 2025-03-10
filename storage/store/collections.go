@@ -93,6 +93,10 @@ func (c *Collections) LightByID(colID flow.Identifier) (*flow.LightCollection, e
 		return nil, fmt.Errorf("could not retrieve collection: %w", err)
 	}
 
+	if err != nil {
+		return nil, err
+	}
+
 	return &collection, nil
 }
 

@@ -96,6 +96,7 @@ func TestCollections_ConcurrentIndexByTx(t *testing.T) {
 		transactions := store.NewTransactions(metrics, db)
 		collections := store.NewCollections(db, transactions)
 
+		// Create two collections sharing the same transaction
 		const numCollections = 100
 
 		// Create collections sharing the same transaction
@@ -141,9 +142,9 @@ func TestCollections_ConcurrentIndexByTx(t *testing.T) {
 			require.NoError(t, err)
 		}
 
-		// Verify that at least one collection is indexed by the shared transaction
+		// Verify that one of the collections is indexed by the shared transaction
 		indexedCollection, err := collections.LightByTransactionID(sharedTx.ID())
 		require.NoError(t, err)
-		assert.NotNil(t, indexedCollection, "Expected at least one collection to be indexed")
+		assert.True(t, indexedCollection.ID() == col1.ID() || indexedCollection.ID() == col2.ID(), "Expected one of the collections to be indexed")
 	})
 }

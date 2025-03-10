@@ -26,8 +26,6 @@ func RemoveCollection(w storage.Writer, collID flow.Identifier) error {
 	return RemoveByKey(w, MakePrefix(codeCollection, collID))
 }
 
-// IndexCollectionPayload indexes the transactions within the collection payload
-// of a cluster block.
 // IndexCollectionPayload will overwrite any existing index, which is acceptable
 // because the blockID is derived from txIDs within the payload, ensuring its uniqueness.
 func IndexCollectionPayload(w storage.Writer, blockID flow.Identifier, txIDs []flow.Identifier) error {

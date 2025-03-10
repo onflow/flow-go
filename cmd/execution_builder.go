@@ -143,6 +143,7 @@ type ExecutionNode struct {
 	receipts      storageerr.ExecutionReceipts
 	myReceipts    storageerr.MyExecutionReceipts
 	commits       storageerr.Commits
+	collections   storageerr.Collections
 
 	chunkDataPackDB        *pebble.DB
 	chunkDataPacks         storageerr.ChunkDataPacks
