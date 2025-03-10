@@ -1,6 +1,7 @@
 package store_test
 
 import (
+	"errors"
 	"sync"
 	"testing"
 
@@ -46,6 +47,20 @@ func TestCollections(t *testing.T) {
 			assert.Equal(t, expectedID, actualID)
 		}
 
+		// remove the collection
+		require.NoError(t, collections.Remove(expected.ID()))
+
+		// check that the collection was indeed removed
+		_, err = collections.LightByID(expected.ID())
+		assert.Error(t, err)
+		assert.True(t, errors.Is(err, storage.ErrNotFound))
+
+		// check that the collection was indeed removed from the transaction index
+		for _, tx := range expected.Transactions {
+			_, err = collections.LightByTransactionID(tx)
+			assert.Error(t, err)
+			assert.True(t, errors.Is(err, storage.ErrNotFound))
+		}
 	})
 }
 

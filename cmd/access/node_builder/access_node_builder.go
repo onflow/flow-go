@@ -1776,7 +1776,7 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 				builder.CollectionsToMarkFinalized,
 				builder.CollectionsToMarkExecuted,
 				builder.BlocksToMarkExecuted,
-				builder.Storage.Collections,
+				builder.collections,
 				builder.Storage.Blocks,
 				builder.BlockTransactions,
 			)

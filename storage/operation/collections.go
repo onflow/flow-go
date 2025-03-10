@@ -50,3 +50,15 @@ func UnsafeIndexCollectionByTransaction(w storage.Writer, txID flow.Identifier, 
 func RetrieveCollectionID(r storage.Reader, txID flow.Identifier, collectionID *flow.Identifier) error {
 	return RetrieveByKey(r, MakePrefix(codeIndexCollectionByTransaction, txID), collectionID)
 }
+
+// RemoveCollectionPayloadIndices removes a collection id indexed by a block id
+// any error returned are exceptions
+func RemoveCollectionPayloadIndices(w storage.Writer, blockID flow.Identifier) error {
+	return RemoveByKey(w, MakePrefix(codeIndexCollection, blockID))
+}
+
+// RemoveCollectionTransactionIndices removes a collection id indexed by a transaction id
+// any error returned are exceptions
+func RemoveCollectionTransactionIndices(w storage.Writer, txID flow.Identifier) error {
+	return RemoveByKey(w, MakePrefix(codeIndexCollectionByTransaction, txID))
+}

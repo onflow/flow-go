@@ -104,9 +104,29 @@ func (c *Collections) LightByID(colID flow.Identifier) (*flow.LightCollection, e
 // Remove does not error if the collection does not exist
 // any error returned are exceptions
 func (c *Collections) Remove(colID flow.Identifier) error {
-	err := c.db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+	col, err := c.LightByID(colID)
+	if err != nil {
+		if errors.Is(err, storage.ErrNotFound) {
+			// already removed
+			return nil
+		}
+
+		return fmt.Errorf("could not retrieve collection: %w", err)
+	}
+
+	err = c.db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+		// remove transaction indices
+		for _, txID := range col.Transactions {
+			err = operation.RemoveCollectionTransactionIndices(rw.Writer(), txID)
+			if err != nil {
+				return fmt.Errorf("could not remove collection payload indices: %w", err)
+			}
+		}
+
+		// remove the collection
 		return operation.RemoveCollection(rw.Writer(), colID)
 	})
+
 	if err != nil {
 		return fmt.Errorf("could not remove collection: %w", err)
 	}
