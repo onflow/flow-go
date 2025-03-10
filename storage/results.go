@@ -5,14 +5,7 @@ import (
 	"github.com/onflow/flow-go/storage/badger/transaction"
 )
 
-type ExecutionResults interface {
-
-	// Store stores an execution result.
-	Store(result *flow.ExecutionResult) error
-
-	// BatchStore stores an execution result in a given batch
-	BatchStore(result *flow.ExecutionResult, batch ReaderBatchWriter) error
-
+type ExecutionResultsReader interface {
 	// ByID retrieves an execution result by its ID. Returns `ErrNotFound` if `resultID` is unknown.
 	ByID(resultID flow.Identifier) (*flow.ExecutionResult, error)
 
@@ -20,6 +13,19 @@ type ExecutionResults interface {
 	// When executing the functor, it returns `ErrNotFound` if no execution result with the respective ID is known.
 	// deprecated
 	ByIDTx(resultID flow.Identifier) func(*transaction.Tx) (*flow.ExecutionResult, error)
+
+	// ByBlockID retrieves an execution result by block ID.
+	ByBlockID(blockID flow.Identifier) (*flow.ExecutionResult, error)
+}
+
+type ExecutionResults interface {
+	ExecutionResultsReader
+
+	// Store stores an execution result.
+	Store(result *flow.ExecutionResult) error
+
+	// BatchStore stores an execution result in a given batch
+	BatchStore(result *flow.ExecutionResult, batch ReaderBatchWriter) error
 
 	// Index indexes an execution result by block ID.
 	Index(blockID flow.Identifier, resultID flow.Identifier) error
@@ -29,9 +35,6 @@ type ExecutionResults interface {
 
 	// BatchIndex indexes an execution result by block ID in a given batch
 	BatchIndex(blockID flow.Identifier, resultID flow.Identifier, batch ReaderBatchWriter) error
-
-	// ByBlockID retrieves an execution result by block ID.
-	ByBlockID(blockID flow.Identifier) (*flow.ExecutionResult, error)
 
 	// BatchRemoveIndexByBlockID removes blockID-to-executionResultID index entries keyed by blockID in a provided batch.
 	// No errors are expected during normal operation, even if no entries are matched.
