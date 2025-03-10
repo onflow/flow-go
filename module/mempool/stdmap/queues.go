@@ -31,7 +31,7 @@ func (b *QueuesBackdata) ByID(queueID flow.Identifier) (*queue.Queue, bool) {
 func (b *QueuesBackdata) All() []*queue.Queue {
 	all := b.BackData.All()
 
-	queues := make([]*queue.Queue, len(all))
+	queues := make([]*queue.Queue, 0, len(all))
 	for _, queue := range all {
 		queues = append(queues, queue)
 	}
