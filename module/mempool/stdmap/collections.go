@@ -6,20 +6,20 @@ import (
 
 // Collections implements a mempool storing collections.
 type Collections struct {
-	*Backend
+	*Backend[flow.Identifier, *flow.Collection]
 }
 
 // NewCollections creates a new memory pool for collection.
 func NewCollections(limit uint) (*Collections, error) {
 	c := &Collections{
-		Backend: NewBackend(WithLimit(limit)),
+		Backend: NewBackend(WithLimit[flow.Identifier, *flow.Collection](limit)),
 	}
 	return c, nil
 }
 
 // Add adds a collection to the mempool.
 func (c *Collections) Add(coll *flow.Collection) bool {
-	added := c.Backend.Add(coll)
+	added := c.Backend.Add(coll.ID(), coll)
 	return added
 }
 
@@ -31,20 +31,19 @@ func (c *Collections) Remove(collID flow.Identifier) bool {
 
 // ByID returns the collection with the given ID from the mempool.
 func (c *Collections) ByID(collID flow.Identifier) (*flow.Collection, bool) {
-	entity, exists := c.Backend.ByID(collID)
+	coll, exists := c.Backend.Get(collID)
 	if !exists {
 		return nil, false
 	}
-	coll := entity.(*flow.Collection)
 	return coll, true
 }
 
 // All returns all collections from the mempool.
 func (c *Collections) All() []*flow.Collection {
-	entities := c.Backend.All()
-	colls := make([]*flow.Collection, 0, len(entities))
-	for _, entity := range entities {
-		colls = append(colls, entity.(*flow.Collection))
+	all := c.Backend.All()
+	colls := make([]*flow.Collection, 0, len(all))
+	for _, coll := range all {
+		colls = append(colls, coll)
 	}
 	return colls
 }

@@ -14,41 +14,28 @@ type IdentifierMap struct {
 }
 
 // Append provides a mock function with given fields: key, id
-func (_m *IdentifierMap) Append(key flow.Identifier, id flow.Identifier) error {
-	ret := _m.Called(key, id)
-
-	if len(ret) == 0 {
-		panic("no return value specified for Append")
-	}
-
-	var r0 error
-	if rf, ok := ret.Get(0).(func(flow.Identifier, flow.Identifier) error); ok {
-		r0 = rf(key, id)
-	} else {
-		r0 = ret.Error(0)
-	}
-
-	return r0
+func (_m *IdentifierMap) Append(key flow.Identifier, id flow.Identifier) {
+	_m.Called(key, id)
 }
 
 // Get provides a mock function with given fields: key
-func (_m *IdentifierMap) Get(key flow.Identifier) ([]flow.Identifier, bool) {
+func (_m *IdentifierMap) Get(key flow.Identifier) (flow.IdentifierList, bool) {
 	ret := _m.Called(key)
 
 	if len(ret) == 0 {
 		panic("no return value specified for Get")
 	}
 
-	var r0 []flow.Identifier
+	var r0 flow.IdentifierList
 	var r1 bool
-	if rf, ok := ret.Get(0).(func(flow.Identifier) ([]flow.Identifier, bool)); ok {
+	if rf, ok := ret.Get(0).(func(flow.Identifier) (flow.IdentifierList, bool)); ok {
 		return rf(key)
 	}
-	if rf, ok := ret.Get(0).(func(flow.Identifier) []flow.Identifier); ok {
+	if rf, ok := ret.Get(0).(func(flow.Identifier) flow.IdentifierList); ok {
 		r0 = rf(key)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).([]flow.Identifier)
+			r0 = ret.Get(0).(flow.IdentifierList)
 		}
 	}
 
@@ -80,23 +67,23 @@ func (_m *IdentifierMap) Has(key flow.Identifier) bool {
 }
 
 // Keys provides a mock function with given fields:
-func (_m *IdentifierMap) Keys() ([]flow.Identifier, bool) {
+func (_m *IdentifierMap) Keys() (flow.IdentifierList, bool) {
 	ret := _m.Called()
 
 	if len(ret) == 0 {
 		panic("no return value specified for Keys")
 	}
 
-	var r0 []flow.Identifier
+	var r0 flow.IdentifierList
 	var r1 bool
-	if rf, ok := ret.Get(0).(func() ([]flow.Identifier, bool)); ok {
+	if rf, ok := ret.Get(0).(func() (flow.IdentifierList, bool)); ok {
 		return rf()
 	}
-	if rf, ok := ret.Get(0).(func() []flow.Identifier); ok {
+	if rf, ok := ret.Get(0).(func() flow.IdentifierList); ok {
 		r0 = rf()
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).([]flow.Identifier)
+			r0 = ret.Get(0).(flow.IdentifierList)
 		}
 	}
 

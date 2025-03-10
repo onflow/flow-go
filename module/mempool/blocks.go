@@ -16,7 +16,7 @@ type Blocks interface {
 	Add(block *flow.Block) bool
 
 	// Remove will remove the given block from the memory pool; it will
-	// will return true if the block was known and removed.
+	// return true if the block was known and removed.
 	Remove(blockID flow.Identifier) bool
 
 	// ByID retrieve the block with the given ID from the memory pool.

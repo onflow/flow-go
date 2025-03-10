@@ -47,14 +47,6 @@ func (c CompleteCollection) IsCompleted() bool {
 	return len(c.Transactions) > 0
 }
 
-func (b *BlocksByCollection) ID() flow.Identifier {
-	return b.CollectionID
-}
-
-func (b *BlocksByCollection) Checksum() flow.Identifier {
-	return b.CollectionID
-}
-
 // ID lazy loads the Block.ID() into the private id field on the first call, and returns
 // the id field in all future calls
 func (b *ExecutableBlock) ID() flow.Identifier {

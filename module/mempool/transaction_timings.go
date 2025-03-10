@@ -14,8 +14,7 @@ type TransactionTimings interface {
 	ByID(txID flow.Identifier) (*flow.TransactionTiming, bool)
 	// Adjust will adjust the transaction timing using the given function if the given key can be found.
 	// Returns a bool which indicates whether the value was updated as well as the updated value.
-	Adjust(txID flow.Identifier, f func(*flow.TransactionTiming) *flow.TransactionTiming) (*flow.TransactionTiming,
-		bool)
+	Adjust(txID flow.Identifier, f func(*flow.TransactionTiming) *flow.TransactionTiming) (*flow.TransactionTiming, bool)
 
 	// All returns all transaction timings from the mempool.
 	All() []*flow.TransactionTiming

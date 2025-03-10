@@ -6,13 +6,13 @@ import (
 
 // ChunkDataPacks implements the ChunkDataPack memory pool.
 type ChunkDataPacks struct {
-	*Backend
+	*Backend[flow.Identifier, *flow.ChunkDataPack]
 }
 
 // NewChunkDataPacks creates a new memory pool for ChunkDataPacks.
 func NewChunkDataPacks(limit uint) (*ChunkDataPacks, error) {
 	a := &ChunkDataPacks{
-		Backend: NewBackend(WithLimit(limit)),
+		Backend: NewBackend(WithLimit[flow.Identifier, *flow.ChunkDataPack](limit)),
 	}
 	return a, nil
 }
@@ -25,7 +25,7 @@ func (c *ChunkDataPacks) Has(chunkID flow.Identifier) bool {
 
 // Add adds an chunkDataPack to the mempool.
 func (c *ChunkDataPacks) Add(cdp *flow.ChunkDataPack) bool {
-	added := c.Backend.Add(cdp)
+	added := c.Backend.Add(cdp.ChunkID, cdp)
 	return added
 }
 
@@ -37,11 +37,10 @@ func (c *ChunkDataPacks) Remove(chunkID flow.Identifier) bool {
 
 // ByChunkID returns the chunk data pack with the given chunkID from the mempool.
 func (c *ChunkDataPacks) ByChunkID(chunkID flow.Identifier) (*flow.ChunkDataPack, bool) {
-	entity, exists := c.Backend.ByID(chunkID)
+	chunkDataPack, exists := c.Backend.Get(chunkID)
 	if !exists {
 		return nil, false
 	}
-	chunkDataPack := entity.(*flow.ChunkDataPack)
 	return chunkDataPack, true
 }
 
@@ -52,10 +51,10 @@ func (c *ChunkDataPacks) Size() uint {
 
 // All returns all chunk data packs from the pool.
 func (c *ChunkDataPacks) All() []*flow.ChunkDataPack {
-	entities := c.Backend.All()
-	chunkDataPack := make([]*flow.ChunkDataPack, 0, len(entities))
-	for _, entity := range entities {
-		chunkDataPack = append(chunkDataPack, entity.(*flow.ChunkDataPack))
+	all := c.Backend.All()
+	chunkDataPacks := make([]*flow.ChunkDataPack, 0, len(all))
+	for _, chunkDataPack := range all {
+		chunkDataPacks = append(chunkDataPacks, chunkDataPack)
 	}
-	return chunkDataPack
+	return chunkDataPacks
 }

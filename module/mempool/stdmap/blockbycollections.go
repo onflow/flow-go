@@ -11,27 +11,29 @@ import (
 // Each entry is a missing collection, and all the blocks that contain
 // this collection
 type BlockByCollections struct {
-	*Backend
+	*Backend[flow.Identifier, *entity.BlocksByCollection]
 }
 
 // BlockByCollectionBackdata contains all the collections is being requested,
 // for each collection it stores the blocks that contains the collection.
 // the Backdata is essentially map<collectionID>map<blockID>*ExecutableBlock
 type BlockByCollectionBackdata struct {
-	mempool.BackData
+	mempool.BackData[flow.Identifier, *entity.BlocksByCollection]
 }
 
 func NewBlockByCollections() *BlockByCollections {
-	return &BlockByCollections{NewBackend(WithEject(EjectPanic))}
+	return &BlockByCollections{
+		Backend: NewBackend(WithEject(EjectPanic[flow.Identifier, *entity.BlocksByCollection])),
+	}
 }
 
 func (b *BlockByCollections) Add(block *entity.BlocksByCollection) bool {
-	return b.Backend.Add(block)
+	return b.Backend.Add(block.CollectionID, block)
 }
 
 func (b *BlockByCollections) Get(collID flow.Identifier) (*entity.BlocksByCollection, bool) {
 	backdata := &BlockByCollectionBackdata{b.mutableBackData}
-	return backdata.ByID(collID)
+	return backdata.Get(collID)
 }
 
 func (b *BlockByCollections) Run(f func(backdata *BlockByCollectionBackdata) error) error {
@@ -51,10 +53,9 @@ func (b *BlockByCollections) Run(f func(backdata *BlockByCollectionBackdata) err
 }
 
 func (b *BlockByCollectionBackdata) ByID(id flow.Identifier) (*entity.BlocksByCollection, bool) {
-	e, exists := b.BackData.ByID(id)
+	block, exists := b.BackData.Get(id)
 	if !exists {
 		return nil, false
 	}
-	block := e.(*entity.BlocksByCollection)
 	return block, true
 }

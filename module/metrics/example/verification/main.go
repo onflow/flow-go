@@ -181,17 +181,11 @@ func demo() {
 			})
 
 			tryRandomCall(func() {
-				err := receiptIDsByBlock.Append(receipt.ExecutionResult.BlockID, receipt.ID())
-				if err != nil {
-					panic(err)
-				}
+				receiptIDsByBlock.Append(receipt.ExecutionResult.BlockID, receipt.ID())
 			})
 
 			tryRandomCall(func() {
-				err = receiptIDsByResult.Append(receipt.ExecutionResult.BlockID, receipt.ExecutionResult.ID())
-				if err != nil {
-					panic(err)
-				}
+				receiptIDsByResult.Append(receipt.ExecutionResult.BlockID, receipt.ExecutionResult.ID())
 			})
 
 			tryRandomCall(func() {
