@@ -253,7 +253,7 @@ func (bs *BuilderSuite) SetupTest() {
 
 	err := bs.db.Update(operation.InsertFinalizedHeight(final.Header.Height))
 	bs.Require().NoError(err)
-	err = bs.db.Update(operation.IndexBlockHeight(final.Header.Height, bs.finalID))
+	err = bs.db.Update(operation.IndexFinalizedBlockByHeight(final.Header.Height, bs.finalID))
 	bs.Require().NoError(err)
 
 	err = bs.db.Update(operation.InsertRootHeight(13))
@@ -261,7 +261,7 @@ func (bs *BuilderSuite) SetupTest() {
 
 	err = bs.db.Update(operation.InsertSealedHeight(first.Header.Height))
 	bs.Require().NoError(err)
-	err = bs.db.Update(operation.IndexBlockHeight(first.Header.Height, first.ID()))
+	err = bs.db.Update(operation.IndexFinalizedBlockByHeight(first.Header.Height, first.ID()))
 	bs.Require().NoError(err)
 
 	bs.sentinel = 1337
