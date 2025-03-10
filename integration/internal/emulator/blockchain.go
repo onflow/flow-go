@@ -46,6 +46,7 @@ import (
 	"github.com/onflow/flow-core-contracts/lib/go/templates"
 
 	"github.com/onflow/flow-go/access"
+	"github.com/onflow/flow-go/access/validator"
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/fvm/environment"
@@ -103,7 +104,7 @@ type Blockchain struct {
 	// used to execute transactions and scripts
 	vm                   *fvm.VirtualMachine
 	vmCtx                fvm.Context
-	transactionValidator *access.TransactionValidator
+	transactionValidator *validator.TransactionValidator
 	serviceKey           ServiceKey
 	conf                 config
 	entropyProvider      *blockHashEntropyProvider
@@ -194,11 +195,11 @@ func (gen *blockHashEntropyProvider) RandomSource() ([]byte, error) {
 var _ environment.EntropyProvider = &blockHashEntropyProvider{}
 
 func (b *Blockchain) configureTransactionValidator() error {
-	validator, err := access.NewTransactionValidator(
+	validator, err := validator.NewTransactionValidator(
 		b.storage,
 		b.conf.GetChainID().Chain(),
 		metrics.NewNoopCollector(),
-		access.TransactionValidationOptions{
+		validator.TransactionValidationOptions{
 			Expiry:                       b.conf.TransactionExpiry,
 			ExpiryBuffer:                 0,
 			AllowEmptyReferenceBlockID:   b.conf.TransactionExpiry == 0,
@@ -207,7 +208,7 @@ func (b *Blockchain) configureTransactionValidator() error {
 			CheckScriptsParse:            true,
 			MaxTransactionByteSize:       flowgo.DefaultMaxTransactionByteSize,
 			MaxCollectionByteSize:        flowgo.DefaultMaxCollectionByteSize,
-			CheckPayerBalanceMode:        access.Disabled,
+			CheckPayerBalanceMode:        validator.Disabled,
 		},
 		nil,
 	)

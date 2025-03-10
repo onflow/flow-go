@@ -9,7 +9,7 @@ import (
 
 	"github.com/rs/zerolog"
 
-	"github.com/onflow/flow-go/access"
+	"github.com/onflow/flow-go/access/validator"
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/engine/common/fifoqueue"
 	"github.com/onflow/flow-go/model/flow"
@@ -38,7 +38,7 @@ type Engine struct {
 	pendingTransactions  engine.MessageStore
 	messageHandler       *engine.MessageHandler
 	pools                *epochs.TransactionPools
-	transactionValidator *access.TransactionValidator
+	transactionValidator *validator.TransactionValidator
 
 	config Config
 }
@@ -60,10 +60,10 @@ func New(
 
 	logger := log.With().Str("engine", "ingest").Logger()
 
-	transactionValidator := access.NewTransactionValidatorWithLimiter(
-		access.NewProtocolStateBlocks(state, nil),
+	transactionValidator := validator.NewTransactionValidatorWithLimiter(
+		validator.NewProtocolStateBlocks(state, nil),
 		chain,
-		access.TransactionValidationOptions{
+		validator.TransactionValidationOptions{
 			Expiry:                 flow.DefaultTransactionExpiry,
 			ExpiryBuffer:           config.ExpiryBuffer,
 			MaxGasLimit:            config.MaxGasLimit,
