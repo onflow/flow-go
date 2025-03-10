@@ -69,10 +69,10 @@ func NewCertifiedBlock(block *Block, qc *flow.QuorumCertificate) (CertifiedBlock
 	return CertifiedBlock{Block: block, CertifyingQC: qc}, nil
 }
 
-// ID returns unique identifier for the block.
+// BlockID returns unique identifier for the block.
 // To avoid repeated computation, we use value from the QC.
-func (b *CertifiedBlock) ID() flow.Identifier {
-	return b.Block.BlockID
+func (b *CertifiedBlock) BlockID() flow.Identifier {
+	return b.CertifyingQC.BlockID
 }
 
 // View returns view where the block was proposed.
