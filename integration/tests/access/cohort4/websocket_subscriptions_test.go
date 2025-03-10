@@ -143,9 +143,41 @@ func (s *WebsocketSubscriptionSuite) SetupTest() {
 	}, 30*time.Second, 1*time.Second)
 }
 
+// TestWebsocketSubscriptions initializes a WebSocket client and runs a suite of WebSocket-related tests.
+//
+// This function ensures that all WebSocket tests run within a single setup to minimize system initialization time.
+// New WebSocket-related tests should be added here to maintain efficiency.
+//
+// It executes the following test cases:
+//   - Inactivity tracking
+//   - Maximum subscriptions per connection
+//   - Subscription error handling
+//   - Unsubscription error handling
+//   - Listing active subscriptions
+//   - Valid subscription scenarios (happy cases)
+//   - Subscription multiplexing
+//
+// The WebSocket client is properly closed after each sub-test execution to avoid resource leaks.
+func (s *WebsocketSubscriptionSuite) TestWebsocketSubscriptions() {
+	wsClient, err := common.GetWSClient(s.ctx, getWebsocketsUrl(s.restAccessAddress))
+	s.Require().NoError(err)
+	defer func() { s.Require().NoError(wsClient.Close()) }()
+
+	// NOTE: To minimize the system setup time for WebSocket tests,
+	// the setup is performed once, and all tests run as sub-functions.
+	// When adding a new WebSocket test, please include it here.
+	s.testInactivityTracker()
+	s.testMaxSubscriptionsPerConnection()
+	s.testSubscriptionErrorCases()
+	s.testUnsubscriptionErrorCases()
+	s.testListOfSubscriptions()
+	s.testHappyCases()
+	s.testSubscriptionMultiplexing()
+}
+
 // TestInactivityTracker tests that the WebSocket connection closes due to inactivity
 // after the specified timeout duration.
-func (s *WebsocketSubscriptionSuite) TestInactivityTracker() {
+func (s *WebsocketSubscriptionSuite) testInactivityTracker() {
 	// Steps:
 	// 1. Establish a WebSocket connection to the server.
 	// 2. Start a goroutine to listen for messages from the server.
@@ -218,13 +250,13 @@ func (s *WebsocketSubscriptionSuite) TestInactivityTracker() {
 	})
 }
 
-// TestMaxSubscriptionsPerConnection validates the behavior of the WebSocket server
+// testMaxSubscriptionsPerConnection validates the behavior of the WebSocket server
 // when the number of subscriptions exceeds the configured maximum limit.
 //
 // Expected behavior:
-// - For the first `MaxSubscriptionsPerConnection` requests, the server should respond with successful subscription messages.
+// - For the first `testMaxSubscriptionsPerConnection` requests, the server should respond with successful subscription messages.
 // - On exceeding the subscription limit, the server should return an error response with a message.
-func (s *WebsocketSubscriptionSuite) TestMaxSubscriptionsPerConnection() {
+func (s *WebsocketSubscriptionSuite) testMaxSubscriptionsPerConnection() {
 	websocketsUrl := getWebsocketsUrl(s.restAccessAddress)
 	wsClient, err := common.GetWSClient(s.ctx, websocketsUrl)
 	s.Require().NoError(err)
@@ -287,8 +319,8 @@ func monitorInactivity(t *testing.T, client *websocket.Conn, timeout time.Durati
 	}
 }
 
-// TestSubscriptionErrorCases tests error cases for subscriptions.
-func (s *WebsocketSubscriptionSuite) TestSubscriptionErrorCases() {
+// testSubscriptionErrorCases tests error cases for subscriptions.
+func (s *WebsocketSubscriptionSuite) testSubscriptionErrorCases() {
 	tests := []struct {
 		name            string
 		message         models.SubscribeMessageRequest
@@ -344,8 +376,8 @@ func (s *WebsocketSubscriptionSuite) TestSubscriptionErrorCases() {
 	}
 }
 
-// TestUnsubscriptionErrorCases tests error cases for unsubscriptions.
-func (s *WebsocketSubscriptionSuite) TestUnsubscriptionErrorCases() {
+// testUnsubscriptionErrorCases tests error cases for unsubscriptions.
+func (s *WebsocketSubscriptionSuite) testUnsubscriptionErrorCases() {
 	tests := []struct {
 		name            string
 		message         models.UnsubscribeMessageRequest
@@ -395,8 +427,8 @@ func (s *WebsocketSubscriptionSuite) TestUnsubscriptionErrorCases() {
 	}
 }
 
-// TestListOfSubscriptions tests the websocket request for the list of active subscription and its response.
-func (s *WebsocketSubscriptionSuite) TestListOfSubscriptions() {
+// testListOfSubscriptions tests the websocket request for the list of active subscription and its response.
+func (s *WebsocketSubscriptionSuite) testListOfSubscriptions() {
 	wsClient, err := common.GetWSClient(s.ctx, getWebsocketsUrl(s.restAccessAddress))
 	s.Require().NoError(err)
 	defer func() { s.Require().NoError(wsClient.Close()) }()
@@ -458,10 +490,10 @@ func (s *WebsocketSubscriptionSuite) TestListOfSubscriptions() {
 	s.Require().Equal(expectedSubscriptions, listOfSubscriptionResponse.Subscriptions)
 }
 
-// TestHappyCases tests various scenarios for websocket subscriptions including
+// testHappyCases tests various scenarios for websocket subscriptions including
 // streaming blocks, block headers, block digests, events, account statuses,
 // and transaction statuses.
-func (s *WebsocketSubscriptionSuite) TestHappyCases() {
+func (s *WebsocketSubscriptionSuite) testHappyCases() {
 	tests := []struct {
 		name                               string
 		topic                              string
@@ -654,39 +686,9 @@ func (s *WebsocketSubscriptionSuite) TestHappyCases() {
 	}
 }
 
-// validate checks if the received responses for a given subscription ID and topic
-// match the expected data format and correctness.
-//
-// It dispatches validation to specific topic handlers based on the topic type.
-//
-// Parameters:
-//   - subscriptionId: The unique identifier of the WebSocket subscription.
-//   - topic: The topic associated with the subscription (e.g., blocks, events, transactions).
-//   - responses: A slice of BaseDataProvidersResponse containing the received data.
-//
-// If the topic is invalid or unsupported, it logs a warning instead of failing the test.
-func (s *WebsocketSubscriptionSuite) validate(subscriptionId string, topic string, responses []models.BaseDataProvidersResponse) {
-	switch topic {
-	case data_providers.BlocksTopic:
-		s.validateBlocks(subscriptionId, topic, responses)
-	case data_providers.BlockHeadersTopic:
-		s.validateBlockHeaders(subscriptionId, topic, responses)
-	case data_providers.BlockDigestsTopic:
-		s.validateBlockDigests(subscriptionId, topic, responses)
-	case data_providers.EventsTopic:
-		s.validateEvents(subscriptionId, topic, responses)
-	case data_providers.AccountStatusesTopic:
-		s.validateAccountStatuses(subscriptionId, topic, responses)
-	case data_providers.TransactionStatusesTopic, data_providers.SendAndGetTransactionStatusesTopic:
-		s.validateTransactionStatuses(subscriptionId, topic, responses)
-	default:
-		s.T().Logf("invalid topic to validate %s", topic)
-	}
-}
-
-// TestSubscriptionMultiplexing verifies that when subscribing to multiple channels,
+// testSubscriptionMultiplexing verifies that when subscribing to multiple channels,
 // all expected messages are received correctly, ensuring subscription multiplexing works as expected.
-func (s *WebsocketSubscriptionSuite) TestSubscriptionMultiplexing() {
+func (s *WebsocketSubscriptionSuite) testSubscriptionMultiplexing() {
 	subscriptions := []struct {
 		name             string
 		topic            string
@@ -763,6 +765,36 @@ func (s *WebsocketSubscriptionSuite) TestSubscriptionMultiplexing() {
 		err := wsClient.ReadJSON(&response)
 		s.Require().NoError(err, "Failed to read unsubscription response for topic: %s", sub.Topic)
 		s.validateBaseMessageResponse(response)
+	}
+}
+
+// validate checks if the received responses for a given subscription ID and topic
+// match the expected data format and correctness.
+//
+// It dispatches validation to specific topic handlers based on the topic type.
+//
+// Parameters:
+//   - subscriptionId: The unique identifier of the WebSocket subscription.
+//   - topic: The topic associated with the subscription (e.g., blocks, events, transactions).
+//   - responses: A slice of BaseDataProvidersResponse containing the received data.
+//
+// If the topic is invalid or unsupported, it logs a warning instead of failing the test.
+func (s *WebsocketSubscriptionSuite) validate(subscriptionId string, topic string, responses []models.BaseDataProvidersResponse) {
+	switch topic {
+	case data_providers.BlocksTopic:
+		s.validateBlocks(subscriptionId, topic, responses)
+	case data_providers.BlockHeadersTopic:
+		s.validateBlockHeaders(subscriptionId, topic, responses)
+	case data_providers.BlockDigestsTopic:
+		s.validateBlockDigests(subscriptionId, topic, responses)
+	case data_providers.EventsTopic:
+		s.validateEvents(subscriptionId, topic, responses)
+	case data_providers.AccountStatusesTopic:
+		s.validateAccountStatuses(subscriptionId, topic, responses)
+	case data_providers.TransactionStatusesTopic, data_providers.SendAndGetTransactionStatusesTopic:
+		s.validateTransactionStatuses(subscriptionId, topic, responses)
+	default:
+		s.T().Logf("invalid topic to validate %s", topic)
 	}
 }
 
