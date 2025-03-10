@@ -1,6 +1,7 @@
 package model
 
 import (
+	"github.com/onflow/flow-go/model/cluster"
 	"github.com/onflow/flow-go/model/flow"
 )
 
@@ -56,13 +57,36 @@ func (p *SignedProposal) ProposerVote() *Vote {
 }
 
 // SignedProposalFromFlow turns a flow header into a hotstuff block type.
-func SignedProposalFromFlow(header *flow.Header) *SignedProposal {
+func SignedProposalFromFlow(p *flow.Proposal) *SignedProposal {
 	proposal := SignedProposal{
 		Proposal: Proposal{
-			Block:      BlockFromFlow(header),
-			LastViewTC: header.LastViewTC,
+			Block:      BlockFromFlow(p.Header),
+			LastViewTC: p.Header.LastViewTC,
 		},
-		SigData: header.ProposerSigData,
+		SigData: p.ProposerSigData,
+	}
+	return &proposal
+}
+
+// TODO(tim) clean up conversion functions and/or proposal types here
+func SignedProposalFromBlock(p *flow.BlockProposal) *SignedProposal {
+	proposal := SignedProposal{
+		Proposal: Proposal{
+			Block:      BlockFromFlow(p.Block.Header),
+			LastViewTC: p.Block.Header.LastViewTC,
+		},
+		SigData: p.ProposerSigData,
+	}
+	return &proposal
+}
+
+func SignedProposalFromClusterBlock(p *cluster.Proposal) *SignedProposal {
+	proposal := SignedProposal{
+		Proposal: Proposal{
+			Block:      BlockFromFlow(p.Block.Header),
+			LastViewTC: p.Block.Header.LastViewTC,
+		},
+		SigData: p.ProposerSigData,
 	}
 	return &proposal
 }

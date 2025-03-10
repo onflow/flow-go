@@ -25,25 +25,25 @@ func Connect(t *testing.T, instances []*Instance) {
 		*sender.notifier = *NewMockedCommunicatorConsumer()
 		sender.notifier.On("OnOwnProposal", mock.Anything, mock.Anything).Run(
 			func(args mock.Arguments) {
-				header, ok := args[0].(*flow.Header)
+				proposal, ok := args[0].(*flow.Proposal)
 				require.True(t, ok)
 
 				// sender should always have the parent
 				sender.updatingBlocks.RLock()
-				_, exists := sender.headers[header.ParentID]
+				_, exists := sender.headers[proposal.Header.ParentID]
 				sender.updatingBlocks.RUnlock()
 				if !exists {
-					t.Fatalf("parent for proposal not found (sender: %x, parent: %x)", sender.localID, header.ParentID)
+					t.Fatalf("parent for proposal not found (sender: %x, parent: %x)", sender.localID, proposal.Header.ParentID)
 				}
 
 				// convert into proposal immediately
-				proposal := model.SignedProposalFromFlow(header)
+				hotstuffProposal := model.SignedProposalFromFlow(proposal)
 
 				// store locally and loop back to engine for processing
-				sender.ProcessBlock(proposal)
+				sender.ProcessBlock(hotstuffProposal)
 
 				// check if we should block the outgoing proposal
-				if sender.blockPropOut(proposal) {
+				if sender.blockPropOut(hotstuffProposal) {
 					return
 				}
 
@@ -56,11 +56,11 @@ func Connect(t *testing.T, instances []*Instance) {
 					}
 
 					// check if we should block the incoming proposal
-					if receiver.blockPropIn(proposal) {
+					if receiver.blockPropIn(hotstuffProposal) {
 						continue
 					}
 
-					receiver.ProcessBlock(proposal)
+					receiver.ProcessBlock(hotstuffProposal)
 				}
 			},
 		)

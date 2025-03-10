@@ -48,9 +48,9 @@ func BlockHeaderToMessage(
 		ParentVoterIds:     parentVoterIds,
 		ParentVoterSigData: h.ParentVoterSigData,
 		ProposerId:         h.ProposerID[:],
-		ProposerSigData:    h.ProposerSigData,
 		ChainId:            h.ChainID.String(),
 		LastViewTc:         lastViewTC,
+		//ProposerSigData:    h.ProposerSigData,
 	}, nil
 }
 
@@ -90,7 +90,6 @@ func MessageToBlockHeader(m *entities.BlockHeader) (*flow.Header, error) {
 		ParentVoterIndices: m.ParentVoterIndices,
 		ParentVoterSigData: m.ParentVoterSigData,
 		ProposerID:         MessageToIdentifier(m.ProposerId),
-		ProposerSigData:    m.ProposerSigData,
 		ChainID:            *chainId,
 		LastViewTC:         lastViewTC,
 	}, nil

@@ -117,7 +117,7 @@ func NewBuilder(
 // However, it will pass through all errors returned by `setter` and `sign`.
 // Callers must be aware of possible error returns from the `setter` and `sign` arguments they provide,
 // and handle them accordingly when handling errors returned from BuildOn.
-func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header) error, sign func(*flow.Header) error) (*flow.Header, error) {
+func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header) error, sign func(proposal *flow.Proposal) error) (*flow.Proposal, error) {
 
 	// since we don't know the blockID when building the block we track the
 	// time indirectly and insert the span directly at the end
@@ -143,7 +143,7 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header) er
 	}
 
 	// assemble the block proposal
-	proposal, err := b.createProposal(parentID,
+	block, proposal, err := b.createProposal(parentID,
 		insertableGuarantees,
 		insertableSeals,
 		insertableReceipts,
@@ -152,16 +152,17 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header) er
 	if err != nil {
 		return nil, fmt.Errorf("could not assemble proposal: %w", err)
 	}
+	// assert(block.Header == proposal.Header)
 
-	span, ctx := b.tracer.StartBlockSpan(context.Background(), proposal.ID(), trace.CONBuilderBuildOn, otelTrace.WithTimestamp(startTime))
+	span, ctx := b.tracer.StartBlockSpan(context.Background(), proposal.Header.ID(), trace.CONBuilderBuildOn, otelTrace.WithTimestamp(startTime))
 	defer span.End()
 
-	err = b.state.Extend(ctx, proposal)
+	err = b.state.Extend(ctx, block)
 	if err != nil {
 		return nil, fmt.Errorf("could not extend state with built proposal: %w", err)
 	}
 
-	return proposal.Header, nil
+	return proposal, nil
 }
 
 // repopulateExecutionTree restores latest state of execution tree mempool based on local chain state information.
@@ -619,12 +620,12 @@ func (b *Builder) createProposal(parentID flow.Identifier,
 	seals []*flow.Seal,
 	insertableReceipts *InsertableReceipts,
 	setter func(*flow.Header) error,
-	sign func(*flow.Header) error,
-) (*flow.Block, error) {
+	sign func(proposal *flow.Proposal) error,
+) (*flow.Block, *flow.Proposal, error) {
 
 	parent, err := b.headers.ByBlockID(parentID)
 	if err != nil {
-		return nil, fmt.Errorf("could not retrieve parent: %w", err)
+		return nil, nil, fmt.Errorf("could not retrieve parent: %w", err)
 	}
 
 	timestamp := b.cfg.blockTimer.Build(parent.Timestamp)
@@ -642,20 +643,20 @@ func (b *Builder) createProposal(parentID flow.Identifier,
 	// since we need to know the correct view of the block.
 	err = setter(header)
 	if err != nil {
-		return nil, fmt.Errorf("could not apply setter: %w", err)
+		return nil, nil, fmt.Errorf("could not apply setter: %w", err)
 	}
 
 	// Evolve the Protocol State starting from the parent block's state. Information that may change the state is:
 	// the candidate block's view and Service Events from execution results sealed in the candidate block.
 	protocolStateID, _, err := b.mutableProtocolState.EvolveState(header.ParentID, header.View, seals)
 	if err != nil {
-		return nil, fmt.Errorf("evolving protocol state failed: %w", err)
+		return nil, nil, fmt.Errorf("evolving protocol state failed: %w", err)
 	}
 
-	proposal := &flow.Block{
+	block := &flow.Block{
 		Header: header,
 	}
-	proposal.SetPayload(flow.Payload{
+	block.SetPayload(flow.Payload{
 		Guarantees:      guarantees,
 		Seals:           seals,
 		Receipts:        insertableReceipts.receipts,
@@ -664,12 +665,16 @@ func (b *Builder) createProposal(parentID flow.Identifier,
 	})
 
 	// sign the proposal
-	err = sign(header)
+	proposal := &flow.Proposal{
+		Header:          header,
+		ProposerSigData: nil, // will be immediately signed
+	}
+	err = sign(proposal)
 	if err != nil {
-		return nil, fmt.Errorf("could not sign the proposal: %w", err)
+		return nil, nil, fmt.Errorf("could not sign the block: %w", err)
 	}
 
-	return proposal, nil
+	return block, proposal, nil
 }
 
 // isResultForBlock constructs a mempool.BlockFilter that accepts only blocks whose ID is part of the given set.

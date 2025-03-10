@@ -99,7 +99,7 @@ func NewBuilder(
 // However, it will pass through all errors returned by `setter` and `sign`.
 // Callers must be aware of possible error returns from the `setter` and `sign` arguments they provide,
 // and handle them accordingly when handling errors returned from BuildOn.
-func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header) error, sign func(*flow.Header) error) (*flow.Header, error) {
+func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header) error, sign func(proposal *flow.Proposal) error) (*flow.Proposal, error) {
 	parentSpan, ctx := b.tracer.StartSpanFromContext(context.Background(), trace.COLBuildOn)
 	defer parentSpan.End()
 
@@ -185,26 +185,26 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header) er
 	// STEP 3: we have a set of transactions that are valid to include on this fork.
 	// Now we create the header for the cluster block.
 	span, _ = b.tracer.StartSpanFromContext(ctx, trace.COLBuildOnCreateHeader)
-	header, err := b.buildHeader(buildCtx, payload, setter, sign)
+	proposal, err := b.buildHeader(buildCtx, payload, setter, sign)
 	span.End()
 	if err != nil {
 		return nil, fmt.Errorf("could not build header: %w", err)
 	}
 
-	proposal := cluster.Block{
-		Header:  header,
+	block := cluster.Block{
+		Header:  proposal.Header,
 		Payload: payload,
 	}
 
 	// STEP 4: insert the cluster block to the database.
 	span, _ = b.tracer.StartSpanFromContext(ctx, trace.COLBuildOnDBInsert)
-	err = operation.RetryOnConflict(b.db.Update, procedure.InsertClusterBlock(&proposal))
+	err = operation.RetryOnConflict(b.db.Update, procedure.InsertClusterBlock(&block))
 	span.End()
 	if err != nil {
 		return nil, fmt.Errorf("could not insert built block: %w", err)
 	}
 
-	return proposal.Header, nil
+	return proposal, nil
 }
 
 // getBlockBuildContext retrieves the required contextual information from the database
@@ -496,8 +496,8 @@ func (b *Builder) buildHeader(
 	ctx *blockBuildContext,
 	payload *cluster.Payload,
 	setter func(header *flow.Header) error,
-	sign func(*flow.Header) error,
-) (*flow.Header, error) {
+	sign func(proposal *flow.Proposal) error,
+) (*flow.Proposal, error) {
 
 	header := &flow.Header{
 		ChainID:     ctx.parent.ChainID,
@@ -515,11 +515,15 @@ func (b *Builder) buildHeader(
 	if err != nil {
 		return nil, fmt.Errorf("could not set fields to header: %w", err)
 	}
-	err = sign(header)
+	proposal := &flow.Proposal{
+		Header:          header,
+		ProposerSigData: nil, // will be immediately signed
+	}
+	err = sign(proposal)
 	if err != nil {
 		return nil, fmt.Errorf("could not sign proposal: %w", err)
 	}
-	return header, nil
+	return proposal, nil
 }
 
 // findRefHeightSearchRangeForConflictingClusterBlocks computes the range of reference

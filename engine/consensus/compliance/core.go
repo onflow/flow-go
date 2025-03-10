@@ -229,7 +229,14 @@ func (c *Core) OnBlockProposal(proposal flow.Slashable[*messages.BlockProposal])
 	// execution of the entire recursion, which might include processing the
 	// proposal's pending children. There is another span within
 	// processBlockProposal that measures the time spent for a single proposal.
-	err = c.processBlockAndDescendants(block)
+	p := flow.Slashable[*flow.BlockProposal]{
+		OriginID: proposal.OriginID,
+		Message: &flow.BlockProposal{
+			Block:           block.Message,
+			ProposerSigData: proposal.Message.ProposerSigData,
+		},
+	}
+	err = c.processBlockAndDescendants(p)
 	c.mempoolMetrics.MempoolEntries(metrics.ResourceProposal, c.pending.Size())
 	if err != nil {
 		return fmt.Errorf("could not process block proposal: %w", err)
@@ -244,8 +251,8 @@ func (c *Core) OnBlockProposal(proposal flow.Slashable[*messages.BlockProposal])
 // processed as well.
 // No errors are expected during normal operation. All returned exceptions
 // are potential symptoms of internal state corruption and should be fatal.
-func (c *Core) processBlockAndDescendants(proposal flow.Slashable[*flow.Block]) error {
-	header := proposal.Message.Header
+func (c *Core) processBlockAndDescendants(proposal flow.Slashable[*flow.BlockProposal]) error {
+	header := proposal.Message.Block.Header
 	blockID := header.ID()
 
 	log := c.log.With().
@@ -271,7 +278,7 @@ func (c *Core) processBlockAndDescendants(proposal flow.Slashable[*flow.Block]) 
 			})
 
 			// notify VoteAggregator about the invalid block
-			err = c.voteAggregator.InvalidBlock(model.SignedProposalFromFlow(header))
+			err = c.voteAggregator.InvalidBlock(model.SignedProposalFromBlock(proposal.Message))
 			if err != nil {
 				if mempool.IsBelowPrunedThresholdError(err) {
 					log.Warn().Msg("received invalid block, but is below pruned threshold")
@@ -293,7 +300,14 @@ func (c *Core) processBlockAndDescendants(proposal flow.Slashable[*flow.Block]) 
 		return nil
 	}
 	for _, child := range children {
-		cpr := c.processBlockAndDescendants(child)
+		// TODO use proposals in pending
+		cpr := c.processBlockAndDescendants(flow.Slashable[*flow.BlockProposal]{
+			OriginID: child.OriginID,
+			Message: &flow.BlockProposal{
+				Block:           child.Message,
+				ProposerSigData: nil,
+			},
+		})
 		if cpr != nil {
 			// unexpected error: potentially corrupted internal state => abort processing and escalate error
 			return cpr
@@ -312,13 +326,13 @@ func (c *Core) processBlockAndDescendants(proposal flow.Slashable[*flow.Block]) 
 //   - engine.OutdatedInputError if the block proposal is outdated (e.g. orphaned)
 //   - model.InvalidProposalError if the block proposal is invalid
 //   - engine.UnverifiableInputError if the block proposal cannot be verified
-func (c *Core) processBlockProposal(proposal *flow.Block) error {
+func (c *Core) processBlockProposal(proposal *flow.BlockProposal) error {
 	startTime := time.Now()
 	defer func() {
 		c.hotstuffMetrics.BlockProcessingDuration(time.Since(startTime))
 	}()
 
-	header := proposal.Header
+	header := proposal.Block.Header
 	blockID := header.ID()
 
 	span, ctx := c.tracer.StartBlockSpan(context.Background(), blockID, trace.ConCompProcessBlockProposal)
@@ -327,7 +341,7 @@ func (c *Core) processBlockProposal(proposal *flow.Block) error {
 	)
 	defer span.End()
 
-	hotstuffProposal := model.SignedProposalFromFlow(header)
+	hotstuffProposal := model.SignedProposalFromBlock(proposal)
 	err := c.validator.ValidateProposal(hotstuffProposal)
 	if err != nil {
 		if model.IsInvalidProposalError(err) {
@@ -363,11 +377,7 @@ func (c *Core) processBlockProposal(proposal *flow.Block) error {
 	log.Info().Msg("processing block proposal")
 
 	// see if the block is a valid extension of the protocol state
-	block := &flow.Block{
-		Header:  proposal.Header,
-		Payload: proposal.Payload,
-	}
-	err = c.state.Extend(ctx, block)
+	err = c.state.Extend(ctx, proposal.Block)
 	if err != nil {
 		if state.IsInvalidExtensionError(err) {
 			// if the block proposes an invalid extension of the protocol state, then the block is invalid

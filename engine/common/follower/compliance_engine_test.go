@@ -96,16 +96,17 @@ func (s *EngineSuite) TearDownTest() {
 // TestProcessSyncedBlock checks that processing single synced block results in call to FollowerCore.
 func (s *EngineSuite) TestProcessSyncedBlock() {
 	block := unittest.BlockWithParentFixture(s.finalized)
+	proposal := unittest.ProposalFromBlock(block)
 
 	originID := unittest.IdentifierFixture()
 	done := make(chan struct{})
-	s.core.On("OnBlockRange", originID, []*flow.Block{block}).Return(nil).Run(func(_ mock.Arguments) {
+	s.core.On("OnBlockRange", originID, []*flow.BlockProposal{proposal}).Return(nil).Run(func(_ mock.Arguments) {
 		close(done)
 	}).Once()
 
 	s.engine.OnSyncedBlocks(flow.Slashable[[]*messages.BlockProposal]{
 		OriginID: originID,
-		Message:  flowBlocksToBlockProposals(block),
+		Message:  flowBlockProposalsToMessage(proposal),
 	})
 	unittest.AssertClosesBefore(s.T(), done, time.Second)
 }
@@ -113,14 +114,15 @@ func (s *EngineSuite) TestProcessSyncedBlock() {
 // TestProcessGossipedBlock check that processing single gossiped block results in call to FollowerCore.
 func (s *EngineSuite) TestProcessGossipedBlock() {
 	block := unittest.BlockWithParentFixture(s.finalized)
+	proposal := unittest.ProposalFromBlock(block)
 
 	originID := unittest.IdentifierFixture()
 	done := make(chan struct{})
-	s.core.On("OnBlockRange", originID, []*flow.Block{block}).Return(nil).Run(func(_ mock.Arguments) {
+	s.core.On("OnBlockRange", originID, []*flow.BlockProposal{proposal}).Return(nil).Run(func(_ mock.Arguments) {
 		close(done)
 	}).Once()
 
-	err := s.engine.Process(channels.ReceiveBlocks, originID, messages.NewBlockProposal(block))
+	err := s.engine.Process(channels.ReceiveBlocks, originID, messages.NewBlockProposal(proposal))
 	require.NoError(s.T(), err)
 
 	unittest.AssertClosesBefore(s.T(), done, time.Second)
@@ -129,16 +131,17 @@ func (s *EngineSuite) TestProcessGossipedBlock() {
 // TestProcessBlockFromComplianceInterface check that processing single gossiped block using compliance interface results in call to FollowerCore.
 func (s *EngineSuite) TestProcessBlockFromComplianceInterface() {
 	block := unittest.BlockWithParentFixture(s.finalized)
+	proposal := unittest.ProposalFromBlock(block)
 
 	originID := unittest.IdentifierFixture()
 	done := make(chan struct{})
-	s.core.On("OnBlockRange", originID, []*flow.Block{block}).Return(nil).Run(func(_ mock.Arguments) {
+	s.core.On("OnBlockRange", originID, []*flow.BlockProposal{proposal}).Return(nil).Run(func(_ mock.Arguments) {
 		close(done)
 	}).Once()
 
 	s.engine.OnBlockProposal(flow.Slashable[*messages.BlockProposal]{
 		OriginID: originID,
-		Message:  messages.NewBlockProposal(block),
+		Message:  messages.NewBlockProposal(proposal),
 	})
 
 	unittest.AssertClosesBefore(s.T(), done, time.Second)
@@ -148,7 +151,7 @@ func (s *EngineSuite) TestProcessBlockFromComplianceInterface() {
 // results in submitting all of them.
 func (s *EngineSuite) TestProcessBatchOfDisconnectedBlocks() {
 	originID := unittest.IdentifierFixture()
-	blocks := unittest.ChainFixtureFrom(10, s.finalized)
+	blocks := unittest.ProposalChainFixtureFrom(10, s.finalized)
 	// drop second block
 	blocks = append(blocks[0:1], blocks[2:]...)
 	// drop second from end block
@@ -168,7 +171,7 @@ func (s *EngineSuite) TestProcessBatchOfDisconnectedBlocks() {
 
 	s.engine.OnSyncedBlocks(flow.Slashable[[]*messages.BlockProposal]{
 		OriginID: originID,
-		Message:  flowBlocksToBlockProposals(blocks...),
+		Message:  flowBlockProposalsToMessage(blocks...),
 	})
 	unittest.RequireReturnsBefore(s.T(), wg.Wait, time.Millisecond*500, "expect to return before timeout")
 }
@@ -193,6 +196,8 @@ func (s *EngineSuite) TestProcessFinalizedBlock() {
 	block := unittest.BlockWithParentFixture(s.finalized)
 	block.Header.View = newFinalizedBlock.View - 1 // use block view lower than new latest finalized view
 
+	proposal := unittest.ProposalFromBlock(block)
+
 	// use metrics mock to track that we have indeed processed the message, and the batch was filtered out since it was
 	// lower than finalized height
 	metricsMock := module.NewEngineMetrics(s.T())
@@ -204,7 +209,7 @@ func (s *EngineSuite) TestProcessFinalizedBlock() {
 
 	s.engine.OnSyncedBlocks(flow.Slashable[[]*messages.BlockProposal]{
 		OriginID: unittest.IdentifierFixture(),
-		Message:  flowBlocksToBlockProposals(block),
+		Message:  flowBlockProposalsToMessage(proposal),
 	})
 	unittest.RequireCloseBefore(s.T(), done, time.Millisecond*500, "expect to close before timeout")
 	// check if message wasn't buffered in internal channel
@@ -216,11 +221,11 @@ func (s *EngineSuite) TestProcessFinalizedBlock() {
 	}
 }
 
-// flowBlocksToBlockProposals is a helper function to transform types.
-func flowBlocksToBlockProposals(blocks ...*flow.Block) []*messages.BlockProposal {
-	result := make([]*messages.BlockProposal, 0, len(blocks))
-	for _, block := range blocks {
-		result = append(result, messages.NewBlockProposal(block))
+// flowBlockProposalsToMessage is a helper function to transform types.
+func flowBlockProposalsToMessage(proposals ...*flow.BlockProposal) []*messages.BlockProposal {
+	result := make([]*messages.BlockProposal, 0, len(proposals))
+	for _, prop := range proposals {
+		result = append(result, messages.NewBlockProposal(prop))
 	}
 	return result
 }

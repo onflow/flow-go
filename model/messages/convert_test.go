@@ -12,16 +12,18 @@ import (
 
 func TestBlockProposal(t *testing.T) {
 	block := unittest.FullBlockFixture()
-	proposal := messages.NewBlockProposal(&block)
-	converted := proposal.Block.ToInternal()
-	assert.Equal(t, &block, converted)
+	proposal := unittest.ProposalFromBlock(&block)
+	proposalMsg := messages.NewBlockProposal(proposal)
+	converted := proposalMsg.ToInternal()
+	assert.Equal(t, proposal, converted)
 }
 
 func TestClusterBlockProposal(t *testing.T) {
 	block := unittest.ClusterBlockFixture()
-	proposal := messages.NewClusterBlockProposal(&block)
-	converted := proposal.Block.ToInternal()
-	assert.Equal(t, &block, converted)
+	proposal := unittest.ClusterProposalFromBlock(&block)
+	proposalMsg := messages.ClusterBlockProposalFrom(proposal)
+	converted := proposalMsg.ToInternal()
+	assert.Equal(t, proposal, converted)
 }
 
 func TestBlockResponse(t *testing.T) {

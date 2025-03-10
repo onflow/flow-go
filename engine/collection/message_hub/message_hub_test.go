@@ -188,7 +188,7 @@ func (s *MessageHubSuite) TestProcessIncomingMessages() {
 	s.Run("to-compliance-engine", func() {
 		block := unittest.ClusterBlockFixture()
 
-		blockProposalMsg := messages.NewClusterBlockProposal(&block)
+		blockProposalMsg := messages.NewClusterBlockProposal(&block, nil)
 		expectedComplianceMsg := flow.Slashable[*messages.ClusterBlockProposal]{
 			OriginID: originID,
 			Message:  blockProposalMsg,
@@ -246,7 +246,7 @@ func (s *MessageHubSuite) TestOnOwnProposal() {
 	s.Run("should fail with wrong proposer", func() {
 		header := *block.Header
 		header.ProposerID = unittest.IdentifierFixture()
-		err := s.hub.sendOwnProposal(&header)
+		err := s.hub.sendOwnProposal(&flow.Proposal{Header: &header, ProposerSigData: unittest.SignatureFixture()})
 		require.Error(s.T(), err, "should fail with wrong proposer")
 		header.ProposerID = s.myID
 	})
@@ -255,7 +255,7 @@ func (s *MessageHubSuite) TestOnOwnProposal() {
 	s.Run("should fail with changed/missing parent", func() {
 		header := *block.Header
 		header.ParentID[0]++
-		err := s.hub.sendOwnProposal(&header)
+		err := s.hub.sendOwnProposal(&flow.Proposal{Header: &header, ProposerSigData: unittest.SignatureFixture()})
 		require.Error(s.T(), err, "should fail with missing parent")
 		header.ParentID[0]--
 	})
@@ -264,16 +264,17 @@ func (s *MessageHubSuite) TestOnOwnProposal() {
 	s.Run("should fail with wrong block ID", func() {
 		header := *block.Header
 		header.View++
-		err := s.hub.sendOwnProposal(&header)
+		err := s.hub.sendOwnProposal(&flow.Proposal{Header: &header, ProposerSigData: unittest.SignatureFixture()})
 		require.Error(s.T(), err, "should fail with missing payload")
 		header.View--
 	})
 
 	s.Run("should broadcast proposal and pass to HotStuff for valid proposals", func() {
-		expectedBroadcastMsg := messages.NewClusterBlockProposal(&block)
+		expectedBroadcastMsg := messages.NewClusterBlockProposal(&block, unittest.SignatureFixture())
 
 		submitted := make(chan struct{}) // closed when proposal is submitted to hotstuff
-		hotstuffProposal := model.SignedProposalFromFlow(block.Header)
+		headerProposal := &flow.Proposal{Header: block.Header, ProposerSigData: expectedBroadcastMsg.ProposerSigData}
+		hotstuffProposal := model.SignedProposalFromFlow(headerProposal)
 		s.voteAggregator.On("AddBlock", hotstuffProposal).Once()
 		s.hotstuff.On("SubmitProposal", hotstuffProposal).
 			Run(func(args mock.Arguments) { close(submitted) }).
@@ -286,7 +287,7 @@ func (s *MessageHubSuite) TestOnOwnProposal() {
 			Once()
 
 		// submit to broadcast proposal
-		s.hub.OnOwnProposal(block.Header, time.Now())
+		s.hub.OnOwnProposal(headerProposal, time.Now())
 
 		unittest.AssertClosesBefore(s.T(), util.AllClosed(broadcast, submitted), time.Second)
 	})
@@ -329,21 +330,22 @@ func (s *MessageHubSuite) TestProcessMultipleMessagesHappyPath() {
 	s.Run("proposal", func() {
 		wg.Add(1)
 		// prepare proposal fixture
-		proposal := unittest.ClusterBlockWithParent(s.head)
-		proposal.Header.ProposerID = s.myID
-		s.payloads.On("ByBlockID", proposal.Header.ID()).Return(proposal.Payload, nil)
+		block := unittest.ClusterBlockWithParent(s.head)
+		block.Header.ProposerID = s.myID
+		s.payloads.On("ByBlockID", block.Header.ID()).Return(block.Payload, nil)
+		proposal := &flow.Proposal{Header: block.Header, ProposerSigData: unittest.SignatureFixture()}
 
 		// unset chain and height to make sure they are correctly reconstructed
-		hotstuffProposal := model.SignedProposalFromFlow(proposal.Header)
+		hotstuffProposal := model.SignedProposalFromFlow(proposal)
 		s.voteAggregator.On("AddBlock", hotstuffProposal)
 		s.hotstuff.On("SubmitProposal", hotstuffProposal)
-		expectedBroadcastMsg := messages.NewClusterBlockProposal(&proposal)
+		expectedBroadcastMsg := messages.NewClusterBlockProposal(&block, proposal.ProposerSigData)
 		s.con.On("Publish", expectedBroadcastMsg, s.cluster[1].NodeID, s.cluster[2].NodeID).
 			Run(func(_ mock.Arguments) { wg.Done() }).
 			Return(nil)
 
 		// submit proposal
-		s.hub.OnOwnProposal(proposal.Header, time.Now())
+		s.hub.OnOwnProposal(proposal, time.Now())
 	})
 
 	unittest.RequireReturnsBefore(s.T(), func() {

@@ -110,6 +110,11 @@ func (c *Core) OnBlockProposal(proposal flow.Slashable[*messages.ClusterBlockPro
 		c.hotstuffMetrics.BlockProcessingDuration(time.Since(startTime))
 	}()
 
+	// TODO(tim) this can probably be improved
+	prop := flow.Slashable[*cluster.Proposal]{
+		OriginID: proposal.OriginID,
+		Message:  proposal.Message.ToInternal(),
+	}
 	block := flow.Slashable[*cluster.Block]{
 		OriginID: proposal.OriginID,
 		Message:  proposal.Message.Block.ToInternal(),
@@ -191,6 +196,7 @@ func (c *Core) OnBlockProposal(proposal flow.Slashable[*messages.ClusterBlockPro
 	// pending block, its parent block must have been requested.
 	// if there was problem requesting its parent or ancestors, the sync engine's forward
 	// syncing with range requests for finalized blocks will request for the blocks.
+	// TODO(tim) do we need to cache the proposal (include proposerSig) in `pending`?
 	_, found := c.pending.ByID(header.ParentID)
 	if found {
 		// add the block to the cache
@@ -221,7 +227,7 @@ func (c *Core) OnBlockProposal(proposal flow.Slashable[*messages.ClusterBlockPro
 	// execution of the entire recursion, which might include processing the
 	// proposal's pending children. There is another span within
 	// processBlockProposal that measures the time spent for a single proposal.
-	err = c.processBlockAndDescendants(block)
+	err = c.processBlockAndDescendants(prop)
 	c.mempoolMetrics.MempoolEntries(metrics.ResourceClusterProposal, c.pending.Size())
 	if err != nil {
 		return fmt.Errorf("could not process block proposal: %w", err)
@@ -234,8 +240,8 @@ func (c *Core) OnBlockProposal(proposal flow.Slashable[*messages.ClusterBlockPro
 // its pending descendants. By induction, any child block of a
 // valid proposal is itself connected to the finalized state and can be
 // processed as well.
-func (c *Core) processBlockAndDescendants(proposal flow.Slashable[*cluster.Block]) error {
-	header := proposal.Message.Header
+func (c *Core) processBlockAndDescendants(proposal flow.Slashable[*cluster.Proposal]) error {
+	header := proposal.Message.Block.Header
 	blockID := header.ID()
 	log := c.log.With().
 		Str("block_id", blockID.String()).
@@ -260,7 +266,7 @@ func (c *Core) processBlockAndDescendants(proposal flow.Slashable[*cluster.Block
 			})
 
 			// notify VoteAggregator about the invalid block
-			err = c.voteAggregator.InvalidBlock(model.SignedProposalFromFlow(header))
+			err = c.voteAggregator.InvalidBlock(model.SignedProposalFromClusterBlock(proposal.Message))
 			if err != nil {
 				if mempool.IsBelowPrunedThresholdError(err) {
 					log.Warn().Msg("received invalid block, but is below pruned threshold")
@@ -282,7 +288,13 @@ func (c *Core) processBlockAndDescendants(proposal flow.Slashable[*cluster.Block
 		return nil
 	}
 	for _, child := range children {
-		cpr := c.processBlockAndDescendants(child)
+		cpr := c.processBlockAndDescendants(flow.Slashable[*cluster.Proposal]{
+			OriginID: child.OriginID,
+			Message: &cluster.Proposal{
+				Block:           child.Message,
+				ProposerSigData: nil, // TODO(tim) - proposerSigData storage?
+			},
+		})
 		if cpr != nil {
 			// unexpected error: potentially corrupted internal state => abort processing and escalate error
 			return cpr
@@ -301,8 +313,8 @@ func (c *Core) processBlockAndDescendants(proposal flow.Slashable[*cluster.Block
 //   - engine.OutdatedInputError if the block proposal is outdated (e.g. orphaned)
 //   - model.InvalidProposalError if the block proposal is invalid
 //   - engine.UnverifiableInputError if the proposal cannot be validated
-func (c *Core) processBlockProposal(proposal *cluster.Block) error {
-	header := proposal.Header
+func (c *Core) processBlockProposal(proposal *cluster.Proposal) error {
+	header := proposal.Block.Header
 	blockID := header.ID()
 	log := c.log.With().
 		Str("chain_id", header.ChainID.String()).
@@ -317,7 +329,7 @@ func (c *Core) processBlockProposal(proposal *cluster.Block) error {
 		Logger()
 	log.Info().Msg("processing block proposal")
 
-	hotstuffProposal := model.SignedProposalFromFlow(header)
+	hotstuffProposal := model.SignedProposalFromClusterBlock(proposal)
 	err := c.validator.ValidateProposal(hotstuffProposal)
 	if err != nil {
 		if model.IsInvalidProposalError(err) {
@@ -332,7 +344,7 @@ func (c *Core) processBlockProposal(proposal *cluster.Block) error {
 	}
 
 	// see if the block is a valid extension of the protocol state
-	err = c.state.Extend(proposal)
+	err = c.state.Extend(proposal.Block)
 	if err != nil {
 		if state.IsInvalidExtensionError(err) {
 			// if the block proposes an invalid extension of the cluster state, then the block is invalid

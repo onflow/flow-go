@@ -13,6 +13,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/model/messages"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	mockmodule "github.com/onflow/flow-go/module/mock"
 	"github.com/onflow/flow-go/network/channels"
@@ -427,7 +428,7 @@ func ensureCommunicationSilenceAmongGroups(
 		blockTopic,
 		1,
 		func() interface{} {
-			return unittest.ProposalFixture()
+			return messages.NewBlockProposal(unittest.ProposalFixture())
 		})
 	p2pfixtures.EnsureNoStreamCreationBetweenGroups(t, ctx, groupANodes, groupBNodes)
 }
@@ -437,7 +438,7 @@ func ensureCommunicationOverAllProtocols(t *testing.T, ctx context.Context, spor
 	blockTopic := channels.TopicFromChannel(channels.PushBlocks, sporkId)
 	p2ptest.TryConnectionAndEnsureConnected(t, ctx, nodes)
 	p2ptest.EnsurePubsubMessageExchange(t, ctx, nodes, blockTopic, 1, func() interface{} {
-		return unittest.ProposalFixture()
+		return messages.NewBlockProposal(unittest.ProposalFixture())
 	})
 	p2pfixtures.EnsureMessageExchangeOverUnicast(t, ctx, nodes, inbounds, p2pfixtures.LongStringMessageFactoryFixture(t))
 }

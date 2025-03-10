@@ -386,7 +386,7 @@ func createNode(
 	commitsDB := storage.NewEpochCommits(metricsCollector, db)
 	protocolStateDB := storage.NewEpochProtocolStateEntries(metricsCollector, setupsDB, commitsDB, db,
 		storage.DefaultEpochProtocolStateCacheSize, storage.DefaultProtocolStateIndexCacheSize)
-	protocokKVStoreDB := storage.NewProtocolKVStore(metricsCollector, db,
+	protocolKVStoreDB := storage.NewProtocolKVStore(metricsCollector, db,
 		storage.DefaultProtocolKVStoreCacheSize, storage.DefaultProtocolKVStoreByBlockIDCacheSize)
 	versionBeaconDB := storage.NewVersionBeacons(db)
 	protocolStateEvents := events.NewDistributor()
@@ -409,7 +409,7 @@ func createNode(
 		setupsDB,
 		commitsDB,
 		protocolStateDB,
-		protocokKVStoreDB,
+		protocolKVStoreDB,
 		versionBeaconDB,
 		rootSnapshot,
 	)
@@ -474,7 +474,7 @@ func createNode(
 	mutableProtocolState := protocol_state.NewMutableProtocolState(
 		log,
 		protocolStateDB,
-		protocokKVStoreDB,
+		protocolKVStoreDB,
 		state.Params(),
 		headersDB,
 		resultsDB,
@@ -624,7 +624,7 @@ func createNode(
 		metricsCollector,
 		build,
 		rootHeader,
-		[]*flow.Header{},
+		[]*flow.Proposal{},
 		hotstuffModules,
 		consensus.WithMinTimeout(hotstuffTimeout),
 		func(cfg *consensus.ParticipantConfig) {

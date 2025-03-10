@@ -69,7 +69,7 @@ type BuilderSuite struct {
 	db       *badger.DB
 	sentinel uint64
 	setter   func(*flow.Header) error
-	sign     func(*flow.Header) error
+	sign     func(*flow.Proposal) error
 
 	// mocked dependencies
 	state        *protocol.ParticipantState
@@ -270,7 +270,7 @@ func (bs *BuilderSuite) SetupTest() {
 		header.View = 1337
 		return nil
 	}
-	bs.sign = func(_ *flow.Header) error {
+	bs.sign = func(_ *flow.Proposal) error {
 		return nil
 	}
 
@@ -473,7 +473,7 @@ func (bs *BuilderSuite) TestSetterErrorPassthrough() {
 func (bs *BuilderSuite) TestSignErrorPassthrough() {
 	bs.T().Run("unexpected Exception", func(t *testing.T) {
 		exception := errors.New("exception")
-		sign := func(header *flow.Header) error {
+		sign := func(header *flow.Proposal) error {
 			return exception
 		}
 		_, err := bs.build.BuildOn(bs.parentID, bs.setter, sign)
@@ -482,7 +482,7 @@ func (bs *BuilderSuite) TestSignErrorPassthrough() {
 	bs.T().Run("NoVoteError", func(t *testing.T) {
 		// the EventHandler relies on this sentinel in particular to be passed through
 		sentinel := hotstuffmodel.NewNoVoteErrorf("not voting")
-		sign := func(header *flow.Header) error {
+		sign := func(header *flow.Proposal) error {
 			return sentinel
 		}
 		_, err := bs.build.BuildOn(bs.parentID, bs.setter, sign)

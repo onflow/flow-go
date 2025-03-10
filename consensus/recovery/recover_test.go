@@ -12,10 +12,11 @@ import (
 
 func TestRecover(t *testing.T) {
 	finalized := unittest.BlockHeaderFixture()
-	blocks := unittest.ChainFixtureFrom(100, finalized)
-	pending := make([]*flow.Header, 0)
+	blocks := unittest.ProposalChainFixtureFrom(100, finalized)
+	pending := make([]*flow.Proposal, 0)
 	for _, b := range blocks {
-		pending = append(pending, b.Header)
+		proposal := &flow.Proposal{Header: b.Block.Header, ProposerSigData: b.ProposerSigData}
+		pending = append(pending, proposal)
 	}
 
 	// Recover with `pending` blocks and record what blocks are forwarded to `onProposal`
@@ -39,7 +40,7 @@ func TestRecoverEmptyInput(t *testing.T) {
 		require.Fail(t, "no proposal expected")
 		return nil
 	}
-	err := Recover(unittest.Logger(), []*flow.Header{}, scanner)
+	err := Recover(unittest.Logger(), []*flow.Proposal{}, scanner)
 	require.NoError(t, err)
 }
 

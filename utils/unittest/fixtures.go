@@ -257,17 +257,34 @@ func BlockFixtures(number int) []*flow.Block {
 	return blocks
 }
 
-func ProposalFixture() *messages.BlockProposal {
+func ProposalFixture() *flow.BlockProposal {
 	block := BlockFixture()
-	return ProposalFromBlock(&block)
+	return &flow.BlockProposal{
+		Block:           &block,
+		ProposerSigData: SignatureFixture(),
+	}
 }
 
-func ProposalFromBlock(block *flow.Block) *messages.BlockProposal {
-	return messages.NewBlockProposal(block)
+// TODO(tim) use or remove
+func ProposalFromHeader(header *flow.Header) *flow.Proposal {
+	return &flow.Proposal{
+		Header:          header,
+		ProposerSigData: SignatureFixture(),
+	}
 }
 
-func ClusterProposalFromBlock(block *cluster.Block) *messages.ClusterBlockProposal {
-	return messages.NewClusterBlockProposal(block)
+func ProposalFromBlock(block *flow.Block) *flow.BlockProposal {
+	return &flow.BlockProposal{
+		Block:           block,
+		ProposerSigData: SignatureFixture(),
+	}
+}
+
+func ClusterProposalFromBlock(block *cluster.Block) *cluster.Proposal {
+	return &cluster.Proposal{
+		Block:           block,
+		ProposerSigData: SignatureFixture(),
+	}
 }
 
 func BlockchainFixture(length int) []*flow.Block {
@@ -530,7 +547,6 @@ func BlockHeaderWithParentFixture(parent *flow.Header) *flow.Header {
 		ParentVoterIndices: SignerIndicesFixture(4),
 		ParentVoterSigData: QCSigDataFixture(),
 		ProposerID:         IdentifierFixture(),
-		ProposerSigData:    SignatureFixture(),
 		LastViewTC:         lastViewTC,
 	}
 }
@@ -566,7 +582,6 @@ func BlockHeaderWithParentWithSoRFixture(parent *flow.Header, source []byte) *fl
 		ParentVoterIndices: SignerIndicesFixture(4),
 		ParentVoterSigData: QCSigDataWithSoRFixture(source),
 		ProposerID:         IdentifierFixture(),
-		ProposerSigData:    SignatureFixture(),
 		LastViewTC:         lastViewTC,
 	}
 }
@@ -2381,6 +2396,15 @@ func ChainFixtureFrom(count int, parent *flow.Header) []*flow.Block {
 	}
 
 	return blocks
+}
+
+// ProposalChainFixtureFrom creates a chain of blocks and wraps each one in a BlockProposal.
+func ProposalChainFixtureFrom(count int, parent *flow.Header) []*flow.BlockProposal {
+	proposals := make([]*flow.BlockProposal, 0, count)
+	for _, block := range ChainFixtureFrom(count, parent) {
+		proposals = append(proposals, ProposalFromBlock(block))
+	}
+	return proposals
 }
 
 func ReceiptChainFor(

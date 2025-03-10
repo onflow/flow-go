@@ -69,15 +69,15 @@ func (cs *EngineSuite) TestSubmittingMultipleEntries() {
 	go func() {
 		for i := 0; i < blockCount; i++ {
 			block := unittest.BlockWithParentFixture(cs.head)
-			proposal := messages.NewBlockProposal(block)
-			hotstuffProposal := model.SignedProposalFromFlow(block.Header)
+			proposal := unittest.ProposalFromBlock(block)
+			hotstuffProposal := model.SignedProposalFromBlock(proposal)
 			cs.hotstuff.On("SubmitProposal", hotstuffProposal).Return().Once()
 			cs.voteAggregator.On("AddBlock", hotstuffProposal).Once()
 			cs.validator.On("ValidateProposal", hotstuffProposal).Return(nil).Once()
 			// execute the block submission
 			cs.engine.OnBlockProposal(flow.Slashable[*messages.BlockProposal]{
 				OriginID: unittest.IdentifierFixture(),
-				Message:  proposal,
+				Message:  messages.NewBlockProposal(proposal),
 			})
 		}
 		wg.Done()
@@ -88,13 +88,13 @@ func (cs *EngineSuite) TestSubmittingMultipleEntries() {
 		block := unittest.BlockWithParentFixture(cs.head)
 		proposal := unittest.ProposalFromBlock(block)
 
-		hotstuffProposal := model.SignedProposalFromFlow(block.Header)
+		hotstuffProposal := model.SignedProposalFromBlock(proposal)
 		cs.hotstuff.On("SubmitProposal", hotstuffProposal).Return().Once()
 		cs.voteAggregator.On("AddBlock", hotstuffProposal).Once()
 		cs.validator.On("ValidateProposal", hotstuffProposal).Return(nil).Once()
 		cs.engine.OnBlockProposal(flow.Slashable[*messages.BlockProposal]{
 			OriginID: unittest.IdentifierFixture(),
-			Message:  proposal,
+			Message:  messages.NewBlockProposal(proposal),
 		})
 		wg.Done()
 	}()

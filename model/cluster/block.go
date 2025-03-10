@@ -31,6 +31,12 @@ type Block struct {
 	Payload *Payload
 }
 
+// TODO clean up types
+type Proposal struct {
+	Block           *Block
+	ProposerSigData []byte
+}
+
 // ID returns the ID of the underlying block header.
 func (b Block) ID() flow.Identifier {
 	return b.Header.ID()

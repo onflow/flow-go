@@ -30,7 +30,7 @@ func NewParticipant(
 	mempoolMetrics module.MempoolMetrics,
 	builder module.Builder,
 	finalized *flow.Header,
-	pending []*flow.Header,
+	pending []*flow.Proposal,
 	modules *HotstuffModules,
 	options ...Option,
 ) (*eventloop.EventLoop, error) {

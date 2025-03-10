@@ -236,7 +236,7 @@ func NewBlockProducer(proposerID flow.Identifier) *BlockProducer {
 	}
 }
 
-func (b *BlockProducer) MakeBlockProposal(view uint64, qc *flow.QuorumCertificate, lastViewTC *flow.TimeoutCertificate) (*flow.Header, error) {
+func (b *BlockProducer) MakeBlockProposal(view uint64, qc *flow.QuorumCertificate, lastViewTC *flow.TimeoutCertificate) (*flow.Proposal, error) {
 	if b.producedBlockForView[view] {
 		return nil, model.NewNoVoteErrorf("block already produced")
 	}
@@ -474,10 +474,10 @@ func (es *EventHandlerSuite) TestOnReceiveProposal_ProposeAfterReceivingQC() {
 	es.committee.leaders[es.paceMaker.CurView()] = struct{}{}
 
 	es.notifier.On("OnOwnProposal", mock.Anything, mock.Anything).Run(func(args mock.Arguments) {
-		header, ok := args[0].(*flow.Header)
+		proposal, ok := args[0].(*flow.Proposal)
 		require.True(es.T(), ok)
 		// it should broadcast a header as the same as current view
-		require.Equal(es.T(), es.paceMaker.CurView(), header.View)
+		require.Equal(es.T(), es.paceMaker.CurView(), proposal.Header.View)
 	}).Once()
 
 	// processing this proposal shouldn't trigger view change since we have already seen QC.
@@ -508,10 +508,10 @@ func (es *EventHandlerSuite) TestOnReceiveProposal_ProposeAfterReceivingTC() {
 	es.committee.leaders[es.paceMaker.CurView()] = struct{}{}
 
 	es.notifier.On("OnOwnProposal", mock.Anything, mock.Anything).Run(func(args mock.Arguments) {
-		header, ok := args[0].(*flow.Header)
+		proposal, ok := args[0].(*flow.Proposal)
 		require.True(es.T(), ok)
 		// it should broadcast a header as the same as current view
-		require.Equal(es.T(), es.paceMaker.CurView(), header.View)
+		require.Equal(es.T(), es.paceMaker.CurView(), proposal.Header.View)
 	}).Once()
 
 	// processing this proposal shouldn't trigger view change, since we have already seen QC.
@@ -612,10 +612,10 @@ func (es *EventHandlerSuite) TestOnReceiveQc_NextLeaderProposes() {
 	require.NoError(es.T(), err)
 
 	es.notifier.On("OnOwnProposal", mock.Anything, mock.Anything).Run(func(args mock.Arguments) {
-		header, ok := args[0].(*flow.Header)
+		proposal, ok := args[0].(*flow.Proposal)
 		require.True(es.T(), ok)
 		// it should broadcast a header as the same as endView
-		require.Equal(es.T(), es.endView, header.View)
+		require.Equal(es.T(), es.endView, proposal.Header.View)
 	}).Once()
 
 	// after receiving proposal build QC and deliver it to event handler
@@ -674,16 +674,16 @@ func (es *EventHandlerSuite) TestOnReceiveTc_NextLeaderProposes() {
 	es.endView++
 
 	es.notifier.On("OnOwnProposal", mock.Anything, mock.Anything).Run(func(args mock.Arguments) {
-		header, ok := args[0].(*flow.Header)
+		proposal, ok := args[0].(*flow.Proposal)
 		require.True(es.T(), ok)
 		// it should broadcast a header as the same as endView
-		require.Equal(es.T(), es.endView, header.View)
+		require.Equal(es.T(), es.endView, proposal.Header.View)
 
 		// proposed block should contain valid newest QC and lastViewTC
 		expectedNewestQC := es.paceMaker.NewestQC()
-		proposal := model.SignedProposalFromFlow(header)
-		require.Equal(es.T(), expectedNewestQC, proposal.Block.QC)
-		require.Equal(es.T(), es.paceMaker.LastViewTC(), proposal.LastViewTC)
+		hotstuffProposal := model.SignedProposalFromFlow(proposal)
+		require.Equal(es.T(), expectedNewestQC, hotstuffProposal.Block.QC)
+		require.Equal(es.T(), es.paceMaker.LastViewTC(), hotstuffProposal.LastViewTC)
 	}).Once()
 
 	err := es.eventhandler.OnReceiveTc(es.tc)
@@ -805,9 +805,9 @@ func (es *EventHandlerSuite) TestLeaderBuild100Blocks() {
 		es.endView++
 
 		es.notifier.On("OnOwnProposal", mock.Anything, mock.Anything).Run(func(args mock.Arguments) {
-			header, ok := args[0].(*flow.Header)
+			ownProposal, ok := args[0].(*flow.Proposal)
 			require.True(es.T(), ok)
-			require.Equal(es.T(), proposal.Block.View+1, header.View)
+			require.Equal(es.T(), proposal.Block.View+1, ownProposal.Header.View)
 		}).Once()
 		es.notifier.On("OnOwnVote", proposal.Block.BlockID, proposal.Block.View, mock.Anything, mock.Anything).Once()
 
@@ -897,10 +897,10 @@ func (es *EventHandlerSuite) TestCreateProposal_SanityChecks() {
 	es.committee.leaders[tc.View+1] = struct{}{}
 
 	es.notifier.On("OnOwnProposal", mock.Anything, mock.Anything).Run(func(args mock.Arguments) {
-		header, ok := args[0].(*flow.Header)
+		proposal, ok := args[0].(*flow.Proposal)
 		require.True(es.T(), ok)
 		// we need to make sure that produced proposal contains only QC even if there is TC for previous view as well
-		require.Nil(es.T(), header.LastViewTC)
+		require.Nil(es.T(), proposal.Header.LastViewTC)
 	}).Once()
 
 	err := es.eventhandler.OnReceiveTc(tc)

@@ -129,12 +129,21 @@ func UntrustedBlockFromInternal(flowBlock *flow.Block) UntrustedBlock {
 // BlockProposal is part of the consensus protocol and represents the leader
 // of a consensus round pushing a new proposal to the network.
 type BlockProposal struct {
-	Block UntrustedBlock
+	Block           UntrustedBlock
+	ProposerSigData []byte
 }
 
-func NewBlockProposal(internal *flow.Block) *BlockProposal {
+func NewBlockProposal(internal *flow.BlockProposal) *BlockProposal {
 	return &BlockProposal{
-		Block: UntrustedBlockFromInternal(internal),
+		Block:           UntrustedBlockFromInternal(internal.Block),
+		ProposerSigData: internal.ProposerSigData,
+	}
+}
+
+func (msg *BlockProposal) ToInternal() *flow.BlockProposal {
+	return &flow.BlockProposal{
+		Block:           msg.Block.ToInternal(),
+		ProposerSigData: msg.ProposerSigData,
 	}
 }
 

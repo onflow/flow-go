@@ -47,7 +47,7 @@ func (d *CommunicatorDistributor) OnOwnTimeout(timeout *model.TimeoutObject) {
 	}
 }
 
-func (d *CommunicatorDistributor) OnOwnProposal(proposal *flow.Header, targetPublicationTime time.Time) {
+func (d *CommunicatorDistributor) OnOwnProposal(proposal *flow.Proposal, targetPublicationTime time.Time) {
 	d.lock.RLock()
 	defer d.lock.RUnlock()
 	for _, s := range d.consumers {

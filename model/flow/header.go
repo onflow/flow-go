@@ -11,6 +11,19 @@ import (
 	"github.com/onflow/flow-go/model/fingerprint"
 )
 
+type Proposal struct {
+	Header *Header
+	// ProposerSigData is a signature of the proposer over the new block. Not a single cryptographic
+	// signature since the data represents cryptographic signatures serialized in some way (concatenation or other)
+	ProposerSigData []byte
+}
+
+// BlockProposal is a signed proposal that includes the block payload, in addition to the required header and signature.
+type BlockProposal struct {
+	Block           *Block
+	ProposerSigData []byte
+}
+
 // Header contains all meta-data for a block, as well as a hash representing
 // the combined payload of the entire block. It is what consensus nodes agree
 // on after validating the contents against the payload hash.
@@ -39,9 +52,6 @@ type Header struct {
 	ParentVoterSigData []byte
 	// ProposerID is a proposer identifier for the block
 	ProposerID Identifier
-	// ProposerSigData is a signature of the proposer over the new block. Not a single cryptographic
-	// signature since the data represents cryptographic signatures serialized in some way (concatenation or other)
-	ProposerSigData []byte
 	// LastViewTC is a timeout certificate for previous view, it can be nil
 	// it has to be present if previous round ended with timeout.
 	LastViewTC *TimeoutCertificate

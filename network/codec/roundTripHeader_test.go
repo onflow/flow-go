@@ -22,7 +22,8 @@ import (
 // next developer who wants to add a new serialization format :-)
 func roundTripHeaderViaCodec(t *testing.T, codec network.Codec) {
 	block := unittest.BlockFixture()
-	message := messages.NewBlockProposal(&block)
+	proposal := unittest.ProposalFromBlock(&block)
+	message := messages.NewBlockProposal(proposal)
 	encoded, err := codec.Encode(message)
 	assert.NoError(t, err)
 	decodedInterface, err := codec.Decode(encoded)

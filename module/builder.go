@@ -23,5 +23,5 @@ type Builder interface {
 	// However, it will pass through all errors returned by `setter` and `sign`.
 	// Callers must be aware of possible error returns from the `setter` and `sign` arguments they provide,
 	// and handle them accordingly when handling errors returned from BuildOn.
-	BuildOn(parentID flow.Identifier, setter func(*flow.Header) error, sign func(*flow.Header) error) (*flow.Header, error)
+	BuildOn(parentID flow.Identifier, setter func(*flow.Header) error, sign func(proposal *flow.Proposal) error) (*flow.Proposal, error)
 }
