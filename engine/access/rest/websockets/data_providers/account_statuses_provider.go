@@ -3,6 +3,7 @@ package data_providers
 import (
 	"context"
 	"fmt"
+	"strconv"
 
 	"github.com/rs/zerolog"
 	"google.golang.org/grpc/codes"
@@ -10,7 +11,6 @@ import (
 
 	"github.com/onflow/flow-go/engine/access/rest/common/parser"
 	"github.com/onflow/flow-go/engine/access/rest/http/request"
-	"github.com/onflow/flow-go/engine/access/rest/util"
 	"github.com/onflow/flow-go/engine/access/rest/websockets/models"
 	"github.com/onflow/flow-go/engine/access/state_stream"
 	"github.com/onflow/flow-go/engine/access/state_stream/backend"
@@ -86,7 +86,8 @@ func NewAccountStatusesDataProvider(
 
 // Run starts processing the subscription for events and handles responses.
 //
-// No errors are expected during normal operations.
+// Expected errors during normal operations:
+//   - context.Canceled: if the operation is canceled, during an unsubscribe action.
 func (p *AccountStatusesDataProvider) Run() error {
 	return subscription.HandleSubscription(p.subscription, p.handleResponse())
 }
@@ -145,12 +146,12 @@ func parseAccountStatusesArguments(
 	chain flow.Chain,
 	eventFilterConfig state_stream.EventFilterConfig,
 ) (accountStatusesArguments, error) {
-	allowedFields := []string{
-		"start_block_id",
-		"start_block_height",
-		"event_types",
-		"account_addresses",
-		"heartbeat_interval",
+	allowedFields := map[string]struct{}{
+		"start_block_id":     {},
+		"start_block_height": {},
+		"event_types":        {},
+		"account_addresses":  {},
+		"heartbeat_interval": {},
 	}
 	err := ensureAllowedFields(arguments, allowedFields)
 	if err != nil {
@@ -169,40 +170,54 @@ func parseAccountStatusesArguments(
 
 	// Parse 'event_types' as a JSON array
 	var eventTypes parser.EventTypes
-	if eventTypesIn, ok := arguments["event_types"]; ok && eventTypesIn != "" {
-		result, ok := eventTypesIn.([]string)
-		if !ok {
-			return accountStatusesArguments{}, fmt.Errorf("'event_types' must be an array of string")
-		}
-
-		err := eventTypes.Parse(result)
-		if err != nil {
-			return accountStatusesArguments{}, fmt.Errorf("invalid 'event_types': %w", err)
-		}
+	rawEventTypes, exists := arguments["event_types"]
+	if !exists {
+		return accountStatusesArguments{}, fmt.Errorf("missing 'event_types' field")
 	}
 
-	// Parse 'accountAddresses' as []string{}
+	eventTypesList, isStringArray := rawEventTypes.([]string)
+	if !isStringArray {
+		return accountStatusesArguments{}, fmt.Errorf("'event_types' must be an array of string")
+	}
+
+	if len(eventTypesList) == 0 {
+		return accountStatusesArguments{}, fmt.Errorf("'event_types' field must not be empty")
+	}
+
+	err = eventTypes.Parse(eventTypesList)
+	if err != nil {
+		return accountStatusesArguments{}, fmt.Errorf("invalid 'event_types': %w", err)
+	}
+
+	// Parse 'account_addresses' as []string{}
 	var accountAddresses []string
-	if accountAddressesIn, ok := arguments["account_addresses"]; ok && accountAddressesIn != "" {
-		accountAddresses, ok = accountAddressesIn.([]string)
-		if !ok {
-			return accountStatusesArguments{}, fmt.Errorf("'account_addresses' must be an array of string")
-		}
+	rawAccountAddresses, exists := arguments["account_addresses"]
+	if !exists {
+		return accountStatusesArguments{}, fmt.Errorf("missing 'account_addresses' field")
 	}
 
-	var heartbeatInterval uint64
-	if heartbeatIntervalIn, ok := arguments["heartbeat_interval"]; ok && heartbeatIntervalIn != "" {
-		result, ok := heartbeatIntervalIn.(string)
-		if !ok {
+	accountAddresses, isStringArray = rawAccountAddresses.([]string)
+	if !isStringArray {
+		return accountStatusesArguments{}, fmt.Errorf("'account_addresses' must be an array of string")
+	}
+
+	if len(accountAddresses) == 0 {
+		return accountStatusesArguments{}, fmt.Errorf("'account_addresses' field must not be empty")
+	}
+
+	heartbeatIntervalRaw, exists := arguments["heartbeat_interval"]
+	if exists {
+		heartbeatIntervalString, isString := heartbeatIntervalRaw.(string)
+		if !isString {
 			return accountStatusesArguments{}, fmt.Errorf("'heartbeat_interval' must be a string")
 		}
 
-		heartbeatInterval, err = util.ToUint64(result)
+		heartbeatIntervalParsed, err := strconv.ParseUint(heartbeatIntervalString, 10, 64)
 		if err != nil {
-			return accountStatusesArguments{}, fmt.Errorf("invalid 'heartbeat_interval': %w", err)
+			return accountStatusesArguments{}, fmt.Errorf("'heartbeat_interval' must be convertable to uint64: %w", err)
 		}
 
-		args.HeartbeatInterval = &heartbeatInterval
+		args.HeartbeatInterval = &heartbeatIntervalParsed
 	}
 
 	// Initialize the event filter with the parsed arguments

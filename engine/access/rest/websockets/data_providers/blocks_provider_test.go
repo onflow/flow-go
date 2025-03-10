@@ -225,8 +225,8 @@ func (s *BlocksProviderSuite) TestBlocksDataProvider_InvalidArguments() {
 	for _, test := range s.invalidArgumentsTestCases() {
 		s.Run(test.name, func() {
 			provider, err := NewBlocksDataProvider(ctx, s.log, s.api, "dummy-id", nil, BlocksTopic, test.arguments, send)
-			s.Require().Nil(provider)
 			s.Require().Error(err)
+			s.Require().Nil(provider)
 			s.Require().Contains(err.Error(), test.expectedErrorMsg)
 		})
 	}
@@ -248,7 +248,7 @@ func (s *BlocksProviderSuite) invalidArgumentsTestCases() []testErrType {
 			arguments: models.Arguments{
 				"start_block_id": s.rootBlock.ID().String(),
 			},
-			expectedErrorMsg: "'block_status' must be provided",
+			expectedErrorMsg: "missing 'block_status' field",
 		},
 		{
 			name: "unknown 'block_status' argument",

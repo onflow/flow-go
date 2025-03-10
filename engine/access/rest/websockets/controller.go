@@ -92,6 +92,9 @@ import (
 	"github.com/onflow/flow-go/utils/concurrentmap"
 )
 
+// ErrMaxSubscriptionsReached is returned when the maximum number of active subscriptions per connection is exceeded.
+var ErrMaxSubscriptionsReached = errors.New("maximum number of subscriptions reached")
+
 type Controller struct {
 	logger zerolog.Logger
 	config Config
@@ -141,6 +144,11 @@ func NewWebSocketController(
 	conn WebsocketConnection,
 	dataProviderFactory dp.DataProviderFactory,
 ) *Controller {
+	var limiter *rate.Limiter
+	if config.MaxResponsesPerSecond > 0 {
+		limiter = rate.NewLimiter(rate.Limit(config.MaxResponsesPerSecond), 1)
+	}
+
 	return &Controller{
 		logger:              logger.With().Str("component", "websocket-controller").Logger(),
 		config:              config,
@@ -149,7 +157,7 @@ func NewWebSocketController(
 		dataProviders:       concurrentmap.New[SubscriptionID, dp.DataProvider](),
 		dataProviderFactory: dataProviderFactory,
 		dataProvidersGroup:  &sync.WaitGroup{},
-		limiter:             rate.NewLimiter(rate.Limit(config.MaxResponsesPerSecond), 1),
+		limiter:             limiter,
 	}
 }
 
@@ -283,7 +291,7 @@ func (c *Controller) writeMessages(ctx context.Context) error {
 				return nil
 			}
 
-			if err := c.limiter.WaitN(ctx, 1); err != nil {
+			if err := c.checkRateLimit(ctx); err != nil {
 				return fmt.Errorf("rate limiter wait failed: %w", err)
 			}
 
@@ -315,6 +323,11 @@ func (c *Controller) writeMessages(ctx context.Context) error {
 	}
 }
 
+// inactivityTickerPeriod determines the interval at which the inactivity ticker is triggered.
+//
+// The inactivity ticker is used in the `writeMessages` routine to monitor periods of inactivity
+// in outgoing messages. If no messages are sent within the defined inactivity timeout
+// and there are no active data providers, the WebSocket connection will be terminated.
 func (c *Controller) inactivityTickerPeriod() time.Duration {
 	return c.config.InactivityTimeout / 10
 }
@@ -330,32 +343,50 @@ func (c *Controller) readMessages(ctx context.Context) error {
 	}()
 
 	for {
-		var message json.RawMessage
-		if err := c.conn.ReadJSON(&message); err != nil {
-			if errors.Is(err, websocket.ErrCloseSent) {
-				return err
+		select {
+		// ctx.Done() is necessary in readMessages() to gracefully handle the termination of the connection
+		// and prevent a potential panic ("repeated read on failed websocket connection"). If an error occurs in writeMessages(),
+		// it indirectly affect the keepalive mechanism.
+		// This can stop periodic ping messages from being sent to the server, causing the server to close the connection.
+		// Without ctx.Done(), readMessages could continue blocking on a read operation, eventually encountering an i/o timeout
+		// when no data arrives. By monitoring ctx.Done(), we ensure that readMessages exits promptly when the context is canceled
+		// due to errors elsewhere in the system or intentional shutdown.
+		case <-ctx.Done():
+			return nil
+		default:
+			var message json.RawMessage
+			if err := c.conn.ReadJSON(&message); err != nil {
+				if errors.Is(err, websocket.ErrCloseSent) {
+					return err
+				}
+
+				var closeErr *websocket.CloseError
+				if errors.As(err, &closeErr) {
+					return err
+				}
+
+				err = fmt.Errorf("error reading message: %w", err)
+				c.writeErrorResponse(
+					ctx,
+					err,
+					wrapErrorMessage(http.StatusBadRequest, err.Error(), "", ""),
+				)
+				continue
 			}
 
-			err = fmt.Errorf("error reading message: %w", err)
-			c.writeErrorResponse(
-				ctx,
-				err,
-				wrapErrorMessage(http.StatusBadRequest, err.Error(), "", ""),
-			)
-			continue
-		}
-
-		err := c.handleMessage(ctx, message)
-		if err != nil {
-			err = fmt.Errorf("error parsing message: %w", err)
-			c.writeErrorResponse(
-				ctx,
-				err,
-				wrapErrorMessage(http.StatusBadRequest, err.Error(), "", ""),
-			)
-			continue
+			err := c.handleMessage(ctx, message)
+			if err != nil {
+				err = fmt.Errorf("error parsing message: %w", err)
+				c.writeErrorResponse(
+					ctx,
+					err,
+					wrapErrorMessage(http.StatusBadRequest, err.Error(), "", ""),
+				)
+				continue
+			}
 		}
 	}
+
 }
 
 func (c *Controller) handleMessage(ctx context.Context, message json.RawMessage) error {
@@ -394,7 +425,23 @@ func (c *Controller) handleMessage(ctx context.Context, message json.RawMessage)
 	return nil
 }
 
+// handleSubscribe processes a subscription request.
+//
+// Expected error returns during normal operations:
+//   - ErrMaxSubscriptionsReached: if the maximum number of active subscriptions per connection is exceeded.
 func (c *Controller) handleSubscribe(ctx context.Context, msg models.SubscribeMessageRequest) {
+	// Check if the maximum number of active subscriptions per connection has been reached.
+	// If the limit is exceeded, an error is returned, and the subscription request is rejected.
+	if uint64(c.dataProviders.Size()) >= c.config.MaxSubscriptionsPerConnection {
+		err := fmt.Errorf("error creating new subscription: %w", ErrMaxSubscriptionsReached)
+		c.writeErrorResponse(
+			ctx,
+			err,
+			wrapErrorMessage(http.StatusServiceUnavailable, err.Error(), models.SubscribeAction, msg.SubscriptionID),
+		)
+		return
+	}
+
 	subscriptionID, err := c.parseOrCreateSubscriptionID(msg.SubscriptionID)
 	if err != nil {
 		err = fmt.Errorf("error parsing subscription id: %w", err)
@@ -432,7 +479,9 @@ func (c *Controller) handleSubscribe(ctx context.Context, msg models.SubscribeMe
 	c.dataProvidersGroup.Add(1)
 	go func() {
 		err = provider.Run()
-		if err != nil {
+		// return the error to the client for all errors except context.Canceled.
+		// context.Canceled is returned during graceful shutdown of a subscription
+		if err != nil && !errors.Is(err, context.Canceled) {
 			err = fmt.Errorf("internal error: %w", err)
 			c.writeErrorResponse(
 				ctx,
@@ -551,4 +600,15 @@ func (c *Controller) parseOrCreateSubscriptionID(id string) (SubscriptionID, err
 	}
 
 	return newId, nil
+}
+
+// checkRateLimit checks the controller rate limit and blocks until there is room to send a response.
+// An error is returned if the context is canceled or the expected wait time exceeds the context's
+// deadline.
+func (c *Controller) checkRateLimit(ctx context.Context) error {
+	if c.limiter == nil {
+		return nil
+	}
+
+	return c.limiter.WaitN(ctx, 1)
 }

@@ -69,6 +69,10 @@ func (s *DataProviderFactorySuite) setupSubscription(apiCall *mock.Call) {
 // Each test case includes a topic and arguments for which a data provider should be created.
 func (s *DataProviderFactorySuite) TestSupportedTopics() {
 	// Define supported topics and check if each returns the correct provider without errors
+	tx := unittest.TransactionBodyFixture()
+	tx.PayloadSignatures = []flow.TransactionSignature{unittest.TransactionSignatureFixture()}
+	tx.Arguments = [][]uint8{}
+
 	testCases := []struct {
 		name               string
 		topic              string
@@ -110,9 +114,13 @@ func (s *DataProviderFactorySuite) TestSupportedTopics() {
 			},
 		},
 		{
-			name:      "events topic",
-			topic:     EventsTopic,
-			arguments: models.Arguments{},
+			name:  "events topic",
+			topic: EventsTopic,
+			arguments: models.Arguments{
+				"event_types": []string{state_stream.CoreEventAccountCreated},
+				"addresses":   []string{unittest.AddressFixture().String()},
+				"contracts":   []string{"A.0000000000000001.Contract1", "A.0000000000000001.Contract2"},
+			},
 			setupSubscription: func() {
 				s.setupSubscription(s.stateStreamApi.On("SubscribeEventsFromLatest", mock.Anything, mock.Anything))
 			},
@@ -121,9 +129,12 @@ func (s *DataProviderFactorySuite) TestSupportedTopics() {
 			},
 		},
 		{
-			name:      "account statuses topic",
-			topic:     AccountStatusesTopic,
-			arguments: models.Arguments{},
+			name:  "account statuses topic",
+			topic: AccountStatusesTopic,
+			arguments: models.Arguments{
+				"event_types":       []string{state_stream.CoreEventAccountCreated},
+				"account_addresses": []string{unittest.AddressFixture().String()},
+			},
 			setupSubscription: func() {
 				s.setupSubscription(s.stateStreamApi.On("SubscribeAccountStatusesFromLatestBlock", mock.Anything, mock.Anything))
 			},
@@ -132,9 +143,11 @@ func (s *DataProviderFactorySuite) TestSupportedTopics() {
 			},
 		},
 		{
-			name:      "transaction statuses topic",
-			topic:     TransactionStatusesTopic,
-			arguments: models.Arguments{"tx_id": unittest.IdentifierFixture().String()},
+			name:  "transaction statuses topic",
+			topic: TransactionStatusesTopic,
+			arguments: models.Arguments{
+				"tx_id": unittest.IdentifierFixture().String(),
+			},
 			setupSubscription: func() {
 				s.setupSubscription(s.accessApi.On("SubscribeTransactionStatuses", mock.Anything, mock.Anything, mock.Anything))
 			},
@@ -145,7 +158,7 @@ func (s *DataProviderFactorySuite) TestSupportedTopics() {
 		{
 			name:      "send transaction statuses topic",
 			topic:     SendAndGetTransactionStatusesTopic,
-			arguments: models.Arguments{},
+			arguments: models.Arguments(unittest.CreateSendTxHttpPayload(tx)),
 			setupSubscription: func() {
 				s.setupSubscription(s.accessApi.On("SendAndSubscribeTransactionStatuses", mock.Anything, mock.Anything, mock.Anything))
 			},
@@ -161,8 +174,8 @@ func (s *DataProviderFactorySuite) TestSupportedTopics() {
 			test.setupSubscription()
 
 			provider, err := s.factory.NewDataProvider(s.ctx, "dummy-id", test.topic, test.arguments, s.ch)
-			s.Require().NotNil(provider, "Expected provider for topic %s", test.topic)
 			s.Require().NoError(err, "Expected no error for topic %s", test.topic)
+			s.Require().NotNil(provider, "Expected provider for topic %s", test.topic)
 			s.Require().Equal(test.topic, provider.Topic())
 			s.Require().Equal(test.arguments, provider.Arguments())
 
@@ -184,8 +197,8 @@ func (s *DataProviderFactorySuite) TestUnsupportedTopics() {
 
 	for _, topic := range unsupportedTopics {
 		provider, err := s.factory.NewDataProvider(s.ctx, "dummy-id", topic, nil, s.ch)
-		s.Require().Nil(provider, "Expected no provider for unsupported topic %s", topic)
 		s.Require().Error(err, "Expected error for unsupported topic %s", topic)
+		s.Require().Nil(provider, "Expected no provider for unsupported topic %s", topic)
 		s.Require().EqualError(err, fmt.Sprintf("unsupported topic \"%s\"", topic))
 	}
 }

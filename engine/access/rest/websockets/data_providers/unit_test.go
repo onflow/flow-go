@@ -64,9 +64,8 @@ func testHappyPath(
 
 			// Create the data provider instance
 			provider, err := factory.NewDataProvider(ctx, "dummy-id", topic, test.arguments, send)
-
-			require.NotNil(t, provider)
 			require.NoError(t, err)
+			require.NotNil(t, provider)
 
 			// Ensure the provider is properly closed after the test
 			defer provider.Close()
@@ -110,4 +109,40 @@ func extractPayload[T any](t *testing.T, v interface{}) (*models.BaseDataProvide
 	require.True(t, ok, "Unexpected response payload type: %T", response.Payload)
 
 	return response, payload
+}
+
+func TestEnsureAllowedFields(t *testing.T) {
+	t.Parallel()
+
+	allowedFields := map[string]struct{}{
+		"start_block_id":     {},
+		"start_block_height": {},
+		"event_types":        {},
+		"account_addresses":  {},
+		"heartbeat_interval": {},
+	}
+
+	t.Run("Valid fields with all required", func(t *testing.T) {
+		fields := map[string]interface{}{
+			"start_block_id":     "abc",
+			"start_block_height": 123,
+			"event_types":        []string{"flow.Event"},
+			"account_addresses":  []string{"0x1"},
+			"heartbeat_interval": 10,
+		}
+		if err := ensureAllowedFields(fields, allowedFields); err != nil {
+			t.Errorf("unexpected error: %v", err)
+		}
+	})
+
+	t.Run("Unexpected field present", func(t *testing.T) {
+		fields := map[string]interface{}{
+			"start_block_id":     "abc",
+			"start_block_height": 123,
+			"unknown_field":      "unexpected",
+		}
+		if err := ensureAllowedFields(fields, allowedFields); err == nil {
+			t.Error("expected error for unexpected field, got nil")
+		}
+	})
 }
