@@ -147,7 +147,6 @@ type ExecutionNode struct {
 
 	chunkDataPackDB        *pebble.DB
 	chunkDataPacks         storageerr.ChunkDataPacks
-	collections            storageerr.Collections
 	providerEngine         exeprovider.ProviderEngine
 	checkerEng             *checker.Engine
 	syncCore               *chainsync.Core

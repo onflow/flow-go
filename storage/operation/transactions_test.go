@@ -26,5 +26,9 @@ func TestTransactions(t *testing.T) {
 		err = operation.RetrieveTransaction(db.Reader(), expected.ID(), &actual.TransactionBody)
 		require.NoError(t, err)
 		assert.Equal(t, expected, actual)
+
+		err = operation.RetrieveTransaction(db.Reader(), unittest.IdentifierFixture(), &actual.TransactionBody)
+		require.Error(t, err)
+		require.ErrorIs(t, err, storage.ErrNotFound)
 	})
 }
