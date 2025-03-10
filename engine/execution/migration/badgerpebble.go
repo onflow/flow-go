@@ -106,42 +106,42 @@ func MigrateLastSealedExecutedResultToPebble(logger zerolog.Logger, badgerDB *ba
 	// create pebble storage modules
 	pebbleResults, pebbleCommits := createStores(pdb)
 
-	// store data to pebble in a batch update
-	err = pdb.WithReaderBatchWriter(func(batch storage.ReaderBatchWriter) error {
-		var existingExecuted flow.Identifier
-		err = operation.RetrieveExecutedBlock(batch.GlobalReader(), &existingExecuted)
-		if err == nil {
-			// there is an executed block in pebble, compare if it's newer than the badger one,
-			// if newer, it means EN is storing new results in pebble, in this case, we don't
-			// want to update the executed block with the badger one.
+	var existingExecuted flow.Identifier
+	err = operation.RetrieveExecutedBlock(pdb.Reader(), &existingExecuted)
+	if err == nil {
+		// there is an executed block in pebble, compare if it's newer than the badger one,
+		// if newer, it means EN is storing new results in pebble, in this case, we don't
+		// want to update the executed block with the badger one.
 
-			header, err := state.AtBlockID(existingExecuted).Head()
-			if err != nil {
-				return fmt.Errorf("failed to get block at height %d from badger: %w", lastExecutedSealedHeightInBadger, err)
-			}
-
-			if header.Height > lastExecutedSealedHeightInBadger {
-				// existing executed in pebble is higher than badger, no need to store anything
-				// why?
-				// because the migration only copy the last sealed and executed block from badger to pebble,
-				// if EN is still storing new results in badger, then the existingExecuted in pebble will be the same as
-				// badger not higher.
-				// if EN is storing new results in pebble, then the existingExecuted in pebble will be higher than badger,
-				// in this case, we don't need to update the executed block in pebble.
-				lg.Info().Msgf("existing executed block %v in pebble is newer than %v in badger, skip update",
-					header.Height, lastExecutedSealedHeightInBadger)
-				return nil
-			}
-
-			// otherwise continue to update last executed block in pebble
-			lg.Info().Msgf("existing executed block %v in pebble is older than %v in badger, update executed block",
-				header.Height, lastExecutedSealedHeightInBadger,
-			)
-		} else if !errors.Is(err, storage.ErrNotFound) {
-			// exception
-			return fmt.Errorf("failed to retrieve executed block from pebble: %w", err)
+		header, err := state.AtBlockID(existingExecuted).Head()
+		if err != nil {
+			return fmt.Errorf("failed to get block at height %d from badger: %w", lastExecutedSealedHeightInBadger, err)
 		}
 
+		if header.Height > lastExecutedSealedHeightInBadger {
+			// existing executed in pebble is higher than badger, no need to store anything
+			// why?
+			// because the migration only copy the last sealed and executed block from badger to pebble,
+			// if EN is still storing new results in badger, then the existingExecuted in pebble will be the same as
+			// badger not higher.
+			// if EN is storing new results in pebble, then the existingExecuted in pebble will be higher than badger,
+			// in this case, we don't need to update the executed block in pebble.
+			lg.Info().Msgf("existing executed block %v in pebble is newer than %v in badger, skip update",
+				header.Height, lastExecutedSealedHeightInBadger)
+			return nil
+		}
+
+		// otherwise continue to update last executed block in pebble
+		lg.Info().Msgf("existing executed block %v in pebble is older than %v in badger, update executed block",
+			header.Height, lastExecutedSealedHeightInBadger,
+		)
+	} else if !errors.Is(err, storage.ErrNotFound) {
+		// exception
+		return fmt.Errorf("failed to retrieve executed block from pebble: %w", err)
+	}
+
+	// store data to pebble in a batch update
+	err = pdb.WithReaderBatchWriter(func(batch storage.ReaderBatchWriter) error {
 		if err := pebbleResults.BatchStore(result, batch); err != nil {
 			return fmt.Errorf("failed to store receipt for block %s: %w", blockID, err)
 		}
