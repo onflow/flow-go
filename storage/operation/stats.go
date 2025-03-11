@@ -1,6 +1,7 @@
 package operation
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"math"
@@ -37,22 +38,33 @@ func SummarizeKeysByFirstByteConcurrent(log zerolog.Logger, r storage.Reader, nW
 	}, 256)
 
 	var wg sync.WaitGroup
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 
 	// Start nWorker goroutines.
 	for i := 0; i < nWorker; i++ {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			for prefix := range taskChan {
-				st, err := processPrefix(r, prefix)
-				resultChan <- struct {
-					prefix byte
-					stats  Stats
-					err    error
-				}{
-					prefix: prefix,
-					stats:  st,
-					err:    err,
+			for {
+				select {
+				case <-ctx.Done():
+					return // Stop immediately on cancellation
+				case prefix, ok := <-taskChan:
+					if !ok {
+						return // Stop if taskChan is closed
+					}
+
+					st, err := processPrefix(r, prefix)
+					resultChan <- struct {
+						prefix byte
+						stats  Stats
+						err    error
+					}{
+						prefix: prefix,
+						stats:  st,
+						err:    err,
+					}
 				}
 			}
 		}()
@@ -79,10 +91,13 @@ func SummarizeKeysByFirstByteConcurrent(log zerolog.Logger, r storage.Reader, nW
 	// Gather results. We'll accumulate them in a map[prefix]Stats.
 	finalStats := make(map[byte]Stats, 256)
 
+	var err error
 	// If we encounter an error, we will return it immediately.
 	for res := range resultChan {
 		if res.err != nil {
-			return nil, res.err
+			cancel() // Cancel running goroutines
+			err = res.err
+			break
 		}
 		finalStats[res.prefix] = res.stats
 		log.Info().
@@ -95,6 +110,9 @@ func SummarizeKeysByFirstByteConcurrent(log zerolog.Logger, r storage.Reader, nW
 		progress(1) // log the progress
 	}
 
+	if err != nil {
+		return nil, err
+	}
 	return finalStats, nil
 }
 
@@ -117,7 +135,7 @@ func processPrefix(r storage.Reader, prefix byte) (Stats, error) {
 		item := it.IterItem()
 
 		// item.Value(...) is a function call that gives us the value, on which we measure size.
-		if err := item.Value(func(val []byte) error {
+		err := item.Value(func(val []byte) error {
 			size := len(val)
 			s.Count++
 			s.TotalSize += size
@@ -128,7 +146,9 @@ func processPrefix(r storage.Reader, prefix byte) (Stats, error) {
 				s.MaxSize = size
 			}
 			return nil
-		}); err != nil {
+		})
+
+		if err != nil {
 			return s, fmt.Errorf("failed to process value for prefix %v: %w", int(prefix), err)
 		}
 	}

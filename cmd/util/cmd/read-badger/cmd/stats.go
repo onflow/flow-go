@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"fmt"
+	"runtime"
 
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
@@ -15,12 +16,10 @@ import (
 )
 
 var flagDBType string
-var flagWorker int
 
 func init() {
 	rootCmd.AddCommand(statsCmd)
 	statsCmd.Flags().StringVar(&flagDBType, "dbtype", "badger", "database type to use (badger or pebble)")
-	statsCmd.Flags().IntVar(&flagWorker, "worker", 10, "number of workers to use")
 }
 
 var statsCmd = &cobra.Command{
@@ -43,8 +42,12 @@ var statsCmd = &cobra.Command{
 			return fmt.Errorf("invalid db type")
 		}
 
-		log.Info().Msgf("getting stats for %s db at %s with %v worker", flagDBType, flagDatadir, flagWorker)
-		stats, err := operation.SummarizeKeysByFirstByteConcurrent(log.Logger, sdb.Reader(), flagWorker)
+		numWorkers := runtime.NumCPU()
+		if numWorkers > 256 {
+			numWorkers = 256
+		}
+		log.Info().Msgf("getting stats for %s db at %s with %v workers0", flagDBType, flagDatadir, numWorkers)
+		stats, err := operation.SummarizeKeysByFirstByteConcurrent(log.Logger, sdb.Reader(), numWorkers)
 		if err != nil {
 			return fmt.Errorf("failed to get stats: %w", err)
 		}

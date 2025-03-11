@@ -62,11 +62,11 @@ func TestSummarizeKeysByFirstByteConcurrent(t *testing.T) {
 
 		for i := 0; i < 256; i++ {
 			count := 0
-			if i == 102 {
+			if i == 102 { // events
 				count = 30
-			} else if i == 100 {
+			} else if i == 100 { // CDP
 				count = 100
-			} else if i == 36 {
+			} else if i == 36 { // results
 				count = 20
 			}
 			require.Equal(t, count, stats[byte(i)].Count, "byte %d", i)
