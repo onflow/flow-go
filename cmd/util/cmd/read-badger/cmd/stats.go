@@ -25,7 +25,7 @@ func init() {
 
 var statsCmd = &cobra.Command{
 	Use:   "stats",
-	Short: "get stats for the database",
+	Short: "get stats for the database, such as key count, total value size, min/max value size etc",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		var sdb storage.DB
 		if flagDBType == "badger" {
