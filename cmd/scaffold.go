@@ -171,6 +171,7 @@ func (fnb *FlowNodeBuilder) BaseFlags() {
 	fnb.flags.StringVar(&fnb.BaseConfig.BindAddr, "bind", defaultConfig.BindAddr, "address to bind on")
 	fnb.flags.StringVarP(&fnb.BaseConfig.BootstrapDir, "bootstrapdir", "b", defaultConfig.BootstrapDir, "path to the bootstrap directory")
 	fnb.flags.StringVarP(&fnb.BaseConfig.datadir, "datadir", "d", defaultConfig.datadir, "directory to store the public database (protocol state)")
+	fnb.flags.StringVar(&fnb.BaseConfig.pebbleCheckpointsDir, "pebble-checkpoints-dir", defaultConfig.pebbleCheckpointsDir, "directory to store the checkpoints for the public pebble database (protocol state)")
 	fnb.flags.StringVar(&fnb.BaseConfig.pebbleDir, "pebble-dir", defaultConfig.pebbleDir, "directory to store the public pebble database (protocol state)")
 	fnb.flags.StringVar(&fnb.BaseConfig.secretsdir, "secretsdir", defaultConfig.secretsdir, "directory to store private database (secrets)")
 	fnb.flags.StringVar(&fnb.BaseConfig.dbops, "dbops", defaultConfig.dbops, "database operations to use (badger-transaction, batch-update, pebble-update)")
@@ -2102,6 +2103,9 @@ func (fnb *FlowNodeBuilder) RegisterDefaultAdminCommands() {
 		return storageCommands.NewReadSealsCommand(config.State, config.Storage.Seals, config.Storage.Index)
 	}).AdminCommand("get-latest-identity", func(config *NodeConfig) commands.AdminCommand {
 		return common.NewGetIdentityCommand(config.IdentityProvider)
+	}).AdminCommand("create-pebble-checkpoint", func(config *NodeConfig) commands.AdminCommand {
+		// by default checkpoints will be created under "/data/protocol_pebble_checkpoints"
+		return storageCommands.NewPebbleDBCheckpointCommand(config.pebbleCheckpointsDir, "protocol", config.PebbleDB)
 	})
 }
 
