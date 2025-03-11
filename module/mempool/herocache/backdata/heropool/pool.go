@@ -43,6 +43,12 @@ type poolEntity[K comparable, V any] struct {
 	// When this entity is allocated, the node maintains the connections it to the next and previous (used) pool entities.
 	// When this entity is unallocated, the node maintains the connections to the next and previous unallocated (free) pool entities.
 	node link
+
+	// invalidated indicates whether this pool entity has been invalidated.
+	// An entity becomes invalidated when it is removed or ejected from the pool,
+	// meaning its key and value are no longer valid for use.
+	// This flag helps manage the lifecycle of the entity within the pool.
+	invalidated bool
 }
 
 type PoolEntity[K comparable, V any] struct {
@@ -122,6 +128,8 @@ func (p *Pool[K, V]) Add(key K, value V, owner uint64) (
 		p.poolEntities[entityIndex].value = value
 		p.poolEntities[entityIndex].key = key
 		p.poolEntities[entityIndex].owner = owner
+		// Reset the invalidated flag when reusing a slot.
+		p.poolEntities[entityIndex].invalidated = false
 		p.switchState(stateFree, stateUsed, entityIndex)
 	}
 
@@ -259,12 +267,14 @@ func (p *Pool[K, V]) Remove(sliceIndex EIndex) V {
 // it to the tail of the free list. It also removes the entity that the invalidated node is presenting.
 func (p *Pool[K, V]) invalidateEntityAtIndex(sliceIndex EIndex) V {
 	invalidatedEntity := p.poolEntities[sliceIndex].value
-	if invalidatedEntity == nil {
+	if p.poolEntities[sliceIndex].invalidated {
 		panic(fmt.Sprintf("removing an entity from an empty slot with an index : %d", sliceIndex))
 	}
 	p.switchState(stateUsed, stateFree, sliceIndex)
+
 	var zeroKey K
 	var zeroValue V
+	p.poolEntities[sliceIndex].invalidated = true
 	p.poolEntities[sliceIndex].key = zeroKey
 	p.poolEntities[sliceIndex].value = zeroValue
 	return invalidatedEntity
@@ -273,18 +283,7 @@ func (p *Pool[K, V]) invalidateEntityAtIndex(sliceIndex EIndex) V {
 // isInvalidated returns true if linked-list node represented by getSliceIndex does not contain
 // a valid entity.
 func (p *Pool[K, V]) isInvalidated(sliceIndex EIndex) bool {
-	var zeroKey K
-	var zeroValue V
-
-	if p.poolEntities[sliceIndex].key != zeroKey {
-		return false
-	}
-
-	if p.poolEntities[sliceIndex].value != nil { // Decide what to do with this comparison
-		return false
-	}
-
-	return true
+	return p.poolEntities[sliceIndex].invalidated
 }
 
 // switches state of an entity.
