@@ -186,7 +186,7 @@ func parseStartBlock(arguments models.Arguments) (flow.Identifier, uint64, error
 		}
 		startBlockHeight, err := util.ToUint64(result)
 		if err != nil {
-			return flow.ZeroID, request.EmptyHeight, fmt.Errorf("'start_block_height' must be convertable to uint64: %w", err)
+			return flow.ZeroID, request.EmptyHeight, fmt.Errorf("'start_block_height' must be convertible to uint64: %w", err)
 		}
 		return flow.ZeroID, startBlockHeight, nil
 	}

@@ -3,13 +3,11 @@ package data_providers
 import (
 	"context"
 	"fmt"
-	"strconv"
 
 	"github.com/rs/zerolog"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
-	"github.com/onflow/flow-go/engine/access/rest/common"
 	"github.com/onflow/flow-go/engine/access/rest/common/parser"
 	"github.com/onflow/flow-go/engine/access/rest/http/request"
 	"github.com/onflow/flow-go/engine/access/rest/websockets/models"
@@ -169,48 +167,28 @@ func parseAccountStatusesArguments(
 	args.StartBlockID = startBlockID
 	args.StartBlockHeight = startBlockHeight
 
-	// Parse 'event_types' as a JSON array
-	var eventTypes parser.EventTypes
-	rawEventTypes, exists := arguments["event_types"]
-	if !exists {
-		return accountStatusesArguments{}, fmt.Errorf("missing 'event_types' field")
-	}
-
-	eventTypesList, err := common.ConvertInterfaceToArrayOfStrings(rawEventTypes)
+	// Parse 'heartbeat_interval' argument
+	heartbeatInterval, err := extractHeartbeatInterval(arguments)
 	if err != nil {
-		return accountStatusesArguments{}, fmt.Errorf("'event_types' must be an array of string: %w", err)
+		return accountStatusesArguments{}, err
+	}
+	args.HeartbeatInterval = heartbeatInterval
+
+	// Parse 'event_types' as a JSON array
+	eventTypeList, err := extractArrayOfStrings(arguments, "event_types", true)
+	if err != nil {
+		return accountStatusesArguments{}, err
 	}
 
-	err = eventTypes.Parse(eventTypesList)
+	eventTypes, err := parser.NewEventTypes(eventTypeList)
 	if err != nil {
 		return accountStatusesArguments{}, fmt.Errorf("invalid 'event_types': %w", err)
 	}
 
-	// Parse 'account_addresses' as []string{}
-	var accountAddresses []string
-	rawAccountAddresses, exists := arguments["account_addresses"]
-	if !exists {
-		return accountStatusesArguments{}, fmt.Errorf("missing 'account_addresses' field")
-	}
-
-	accountAddresses, err = common.ConvertInterfaceToArrayOfStrings(rawAccountAddresses)
+	// Parse 'account_addresses' as []string
+	accountAddresses, err := extractArrayOfStrings(arguments, "account_addresses", true)
 	if err != nil {
-		return accountStatusesArguments{}, fmt.Errorf("'account_addresses' must be an array of string: %w", err)
-	}
-
-	heartbeatIntervalRaw, exists := arguments["heartbeat_interval"]
-	if exists {
-		heartbeatIntervalString, isString := heartbeatIntervalRaw.(string)
-		if !isString {
-			return accountStatusesArguments{}, fmt.Errorf("'heartbeat_interval' must be a string")
-		}
-
-		heartbeatIntervalParsed, err := strconv.ParseUint(heartbeatIntervalString, 10, 64)
-		if err != nil {
-			return accountStatusesArguments{}, fmt.Errorf("'heartbeat_interval' must be convertable to uint64: %w", err)
-		}
-
-		args.HeartbeatInterval = &heartbeatIntervalParsed
+		return accountStatusesArguments{}, err
 	}
 
 	// Initialize the event filter with the parsed arguments

@@ -366,7 +366,7 @@ func invalidAccountStatusesArgumentsTestCases() []testErrType {
 				"event_types":        []string{state_stream.CoreEventAccountCreated},
 				"account_addresses":  []string{unittest.AddressFixture().String()},
 			},
-			expectedErrorMsg: "'start_block_height' must be convertable to uint64",
+			expectedErrorMsg: "'start_block_height' must be convertible to uint64",
 		},
 		{
 			name: "invalid 'heartbeat_interval' argument",
@@ -376,7 +376,7 @@ func invalidAccountStatusesArgumentsTestCases() []testErrType {
 				"account_addresses":  []string{unittest.AddressFixture().String()},
 				"heartbeat_interval": "-1",
 			},
-			expectedErrorMsg: "'heartbeat_interval' must be convertable to uint64",
+			expectedErrorMsg: "'heartbeat_interval' must be convertible to uint64",
 		},
 		{
 			name: "unexpected argument",

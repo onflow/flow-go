@@ -93,10 +93,11 @@ func (s *EventsProviderSuite) subscribeEventsDataProviderTestCases(backendRespon
 		{
 			name: "SubscribeBlocksFromStartBlockID happy path",
 			arguments: models.Arguments{
-				"start_block_id": s.rootBlock.ID().String(),
-				"event_types":    []string{string(flow.EventAccountCreated)},
-				"addresses":      []string{unittest.AddressFixture().String()},
-				"contracts":      []string{"A.0000000000000001.Contract1", "A.0000000000000001.Contract2"},
+				"start_block_id":     s.rootBlock.ID().String(),
+				"event_types":        []string{string(flow.EventAccountCreated)},
+				"addresses":          []string{unittest.AddressFixture().String()},
+				"contracts":          []string{"A.0000000000000001.Contract1", "A.0000000000000001.Contract2"},
+				"heartbeat_interval": "3",
 			},
 			setupBackend: func(sub *ssmock.Subscription) {
 				s.api.On(
@@ -115,6 +116,7 @@ func (s *EventsProviderSuite) subscribeEventsDataProviderTestCases(backendRespon
 				"event_types":        []string{string(flow.EventAccountCreated)},
 				"addresses":          []string{unittest.AddressFixture().String()},
 				"contracts":          []string{"A.0000000000000001.Contract1", "A.0000000000000001.Contract2"},
+				"heartbeat_interval": "3",
 			},
 			setupBackend: func(sub *ssmock.Subscription) {
 				s.api.On(
@@ -129,9 +131,10 @@ func (s *EventsProviderSuite) subscribeEventsDataProviderTestCases(backendRespon
 		{
 			name: "SubscribeEventsFromLatest happy path",
 			arguments: models.Arguments{
-				"event_types": []string{string(flow.EventAccountCreated)},
-				"addresses":   []string{unittest.AddressFixture().String()},
-				"contracts":   []string{"A.0000000000000001.Contract1", "A.0000000000000001.Contract2"},
+				"event_types":        []string{string(flow.EventAccountCreated)},
+				"addresses":          []string{unittest.AddressFixture().String()},
+				"contracts":          []string{"A.0000000000000001.Contract1", "A.0000000000000001.Contract2"},
+				"heartbeat_interval": "3",
 			},
 			setupBackend: func(sub *ssmock.Subscription) {
 				s.api.On(
@@ -375,7 +378,7 @@ func invalidEventsArgumentsTestCases() []testErrType {
 				"addresses":          []string{unittest.AddressFixture().String()},
 				"contracts":          []string{"A.0000000000000001.Contract1", "A.0000000000000001.Contract2"},
 			},
-			expectedErrorMsg: "'start_block_height' must be convertable to uint64",
+			expectedErrorMsg: "'start_block_height' must be convertible to uint64",
 		},
 		{
 			name: "invalid 'heartbeat_interval' argument",
@@ -386,7 +389,7 @@ func invalidEventsArgumentsTestCases() []testErrType {
 				"contracts":          []string{"A.0000000000000001.Contract1", "A.0000000000000001.Contract2"},
 				"heartbeat_interval": "-1",
 			},
-			expectedErrorMsg: "'heartbeat_interval' must be convertable to uint64",
+			expectedErrorMsg: "'heartbeat_interval' must be convertible to uint64",
 		},
 		{
 			name: "unexpected argument",

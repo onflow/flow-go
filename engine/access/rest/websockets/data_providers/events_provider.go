@@ -6,10 +6,8 @@ import (
 
 	"github.com/rs/zerolog"
 
-	"github.com/onflow/flow-go/engine/access/rest/common"
 	"github.com/onflow/flow-go/engine/access/rest/common/parser"
 	"github.com/onflow/flow-go/engine/access/rest/http/request"
-	"github.com/onflow/flow-go/engine/access/rest/util"
 	"github.com/onflow/flow-go/engine/access/rest/websockets/models"
 	"github.com/onflow/flow-go/engine/access/state_stream"
 	"github.com/onflow/flow-go/engine/access/state_stream/backend"
@@ -169,66 +167,42 @@ func parseEventsArguments(
 	args.StartBlockID = startBlockID
 	args.StartBlockHeight = startBlockHeight
 
-	// Parse 'event_types' as a JSON array
-	var eventTypes parser.EventTypes
-	rawEventTypes, exists := arguments["event_types"]
-	if !exists {
-		return eventsArguments{}, fmt.Errorf("missing 'event_types' field")
-	}
-
-	eventTypesList, err := common.ConvertInterfaceToArrayOfStrings(rawEventTypes)
+	// Parse 'heartbeat_interval' argument
+	heartbeatInterval, err := extractHeartbeatInterval(arguments)
 	if err != nil {
-		return eventsArguments{}, fmt.Errorf("'event_types' must be an array of string: %w", err)
+		return eventsArguments{}, err
+	}
+	args.HeartbeatInterval = heartbeatInterval
+
+	// Parse 'event_types' as a JSON array
+	eventTypesList, err := extractArrayOfStrings(arguments, "event_types", false)
+	if err != nil {
+		return eventsArguments{}, err
 	}
 
-	err = eventTypes.Parse(eventTypesList)
+	eventTypes, err := parser.NewEventTypes(eventTypesList)
 	if err != nil {
 		return eventsArguments{}, fmt.Errorf("invalid 'event_types': %w", err)
 	}
 
 	// Parse 'addresses' as []string{}
-	var addresses []string
-	rawAddresses, exists := arguments["addresses"]
-	if !exists {
-		return eventsArguments{}, fmt.Errorf("missing 'addresses' field")
-	}
-
-	addresses, err = common.ConvertInterfaceToArrayOfStrings(rawAddresses)
+	addresses, err := extractArrayOfStrings(arguments, "addresses", false)
 	if err != nil {
-		return eventsArguments{}, fmt.Errorf("'addresses' must be an array of string: %w", err)
+		return eventsArguments{}, err
 	}
 
 	// Parse 'contracts' as []string{}
-	rawContracts, exists := arguments["contracts"]
-	if !exists {
-		return eventsArguments{}, fmt.Errorf("missing 'contracts' field")
-	}
-
-	contracts, err := common.ConvertInterfaceToArrayOfStrings(rawContracts)
+	contracts, err := extractArrayOfStrings(arguments, "contracts", false)
 	if err != nil {
-		return eventsArguments{}, fmt.Errorf("'contracts' must be an array of string: %w", err)
-	}
-
-	var heartbeatInterval uint64
-	if heartbeatIntervalIn, ok := arguments["heartbeat_interval"]; ok && heartbeatIntervalIn != "" {
-		result, ok := heartbeatIntervalIn.(string)
-		if !ok {
-			return eventsArguments{}, fmt.Errorf("'heartbeat_interval' must be a string")
-		}
-
-		heartbeatInterval, err = util.ToUint64(result)
-		if err != nil {
-			return eventsArguments{}, fmt.Errorf("'heartbeat_interval' must be convertable to uint64: %w", err)
-		}
-
-		args.HeartbeatInterval = &heartbeatInterval
+		return eventsArguments{}, err
 	}
 
 	// Initialize the event filter with the parsed arguments
-	args.Filter, err = state_stream.NewEventFilter(eventFilterConfig, chain, eventTypes.Flow(), addresses, contracts)
+	filter, err := state_stream.NewEventFilter(eventFilterConfig, chain, eventTypes.Flow(), addresses, contracts)
 	if err != nil {
-		return eventsArguments{}, fmt.Errorf("failed to create event filter: %w", err)
+		return eventsArguments{}, fmt.Errorf("error creating event filter: %w", err)
 	}
+	args.Filter = filter
 
 	return args, nil
 }
