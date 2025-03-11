@@ -1,6 +1,7 @@
 package operation
 
 import (
+	"encoding/json"
 	"fmt"
 	"math"
 	"sort"
@@ -14,11 +15,11 @@ import (
 
 // Stats holds statistics for a single prefix group.
 type Stats struct {
-	Count       int
-	TotalSize   int
-	MinSize     int
-	MaxSize     int
-	AverageSize float64
+	Count       int     `json:"count"`
+	MinSize     int     `json:"min_size"`
+	MaxSize     int     `json:"max_size"`
+	TotalSize   int     `json:"total_size"`
+	AverageSize float64 `json:"avg_size"`
 }
 
 // SummarizeKeysByFirstByteConcurrent iterates over all prefixes [0x00..0xFF] in parallel
@@ -141,28 +142,34 @@ func processPrefix(r storage.Reader, prefix byte) (Stats, error) {
 func PrintStats(log zerolog.Logger, stats map[byte]Stats) {
 	if len(stats) == 0 {
 		log.Info().Msg("No stats to print (map is empty).")
+		return
 	}
 
-	// Sort the prefix keys so logs appear in ascending order.
-	prefixes := make([]int, 0, len(stats))
-	for p := range stats {
-		prefixes = append(prefixes, int(p))
-	}
-	sort.Ints(prefixes)
+	// Convert map to a slice of key-value pairs
+	statList := make([]struct {
+		Prefix int   `json:"prefix"`
+		Stats  Stats `json:"stats"`
+	}, 0, len(stats))
 
-	// Print each prefix's stats.
-	for _, p := range prefixes {
-		s := stats[byte(p)]
-		// Format the prefix as 0xNN
-		prefixLabel := fmt.Sprintf("0x%02X", p)
-
-		log.Info().
-			Str("prefix", prefixLabel).
-			Int("count", s.Count).
-			Int("min_size", s.MinSize).
-			Int("max_size", s.MaxSize).
-			Int("total_size", s.TotalSize).
-			Float64("avg_size", s.AverageSize).
-			Msg("Prefix stats")
+	for p, s := range stats {
+		statList = append(statList, struct {
+			Prefix int   `json:"prefix"`
+			Stats  Stats `json:"stats"`
+		}{Prefix: int(p), Stats: s})
 	}
+
+	// Sort by TotalSize in ascending order
+	sort.Slice(statList, func(i, j int) bool {
+		return statList[i].Stats.TotalSize < statList[j].Stats.TotalSize
+	})
+
+	// Convert sorted stats to JSON
+	jsonData, err := json.MarshalIndent(statList, "", "  ")
+	if err != nil {
+		log.Error().Err(err).Msg("Failed to marshal stats to JSON")
+		return
+	}
+
+	// Log the JSON
+	log.Info().RawJSON("stats", jsonData).Msg("Sorted prefix stats")
 }
