@@ -350,7 +350,8 @@ func testAddRemoveEntities(t *testing.T, limit uint32, entityCount uint32, eject
 			delete(addedEntitiesInPool, expectedRemovedEntityId)
 			actualFlowId, actualEntity, _ := pool.Get(indexInPoolToRemove)
 			require.Equal(t, flow.ZeroID, actualFlowId)
-			require.Equal(t, nil, actualEntity)
+			require.Nil(t, actualEntity)
+			require.True(t, pool.isInvalidated(indexInPoolToRemove))
 		}
 	}
 	for k, v := range addedEntities {
