@@ -54,7 +54,6 @@ func prepareStorehouseTest(f func(t *testing.T, es state.ExecutionState, l *ledg
 			stateCommitments.On("BatchStore", mock.Anything, mock.Anything, mock.Anything).Return(nil)
 			headers := storage.NewHeaders(t)
 			blocks := storage.NewBlocks(t)
-			collections := storage.NewCollections(t)
 			events := storage.NewEvents(t)
 			events.On("BatchStore", mock.Anything, mock.Anything, mock.Anything).Return(nil)
 			serviceEvents := storage.NewServiceEvents(t)
@@ -64,7 +63,6 @@ func prepareStorehouseTest(f func(t *testing.T, es state.ExecutionState, l *ledg
 			chunkDataPacks := storage.NewChunkDataPacks(t)
 			chunkDataPacks.On("Store", mock.Anything).Return(nil)
 			results := storage.NewExecutionResults(t)
-			results.On("BatchStore", mock.Anything, mock.Anything).Return(nil)
 			results.On("BatchIndex", mock.Anything, mock.Anything, mock.Anything).Return(nil)
 			myReceipts := storage.NewMyExecutionReceipts(t)
 			myReceipts.On("BatchStoreMyReceipt", mock.Anything, mock.Anything).Return(nil)
@@ -93,7 +91,7 @@ func prepareStorehouseTest(f func(t *testing.T, es state.ExecutionState, l *ledg
 				}
 
 				es := state.NewExecutionState(
-					ls, stateCommitments, blocks, headers, collections, chunkDataPacks, results, myReceipts, events, serviceEvents, txResults, badgerimpl.ToDB(badgerDB),
+					ls, stateCommitments, blocks, headers, chunkDataPacks, results, myReceipts, events, serviceEvents, txResults, badgerimpl.ToDB(badgerDB),
 					getLatestFinalized,
 					trace.NewNoopTracer(),
 					rs,
