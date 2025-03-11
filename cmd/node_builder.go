@@ -165,6 +165,7 @@ type BaseConfig struct {
 	debugLogLimit               uint32
 	metricsPort                 uint
 	BootstrapDir                string
+	badgerGCInterval            time.Duration
 	profilerConfig              profiler.ProfilerConfig
 	tracerEnabled               bool
 	tracerSensitivity           uint

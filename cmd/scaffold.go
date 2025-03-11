@@ -275,6 +275,8 @@ func (fnb *FlowNodeBuilder) BaseFlags() {
 		"observer-mode-bootstrap-node-addresses",
 		[]string{},
 		"the network addresses of the bootstrap access node if this is an observer e.g. access-001.mainnet.flow.org:9653,access-002.mainnet.flow.org:9653")
+
+	fnb.flags.DurationVar(&fnb.BaseConfig.badgerGCInterval, "badger-gc-interval", flow.DefaultValueLogGCWaitDuration, "interval between badger GC runs")
 }
 
 func (fnb *FlowNodeBuilder) EnqueuePingService() {
@@ -1132,7 +1134,7 @@ func (fnb *FlowNodeBuilder) initBadgerDB() error {
 	})
 
 	fnb.Component("badger log cleaner", func(node *NodeConfig) (module.ReadyDoneAware, error) {
-		return bstorage.NewCleaner(node.Logger, node.DB, node.Metrics.CleanCollector, flow.DefaultValueLogGCWaitDuration), nil
+		return bstorage.NewCleaner(node.Logger, node.DB, node.Metrics.CleanCollector, node.BaseConfig.badgerGCInterval), nil
 	})
 
 	return nil
