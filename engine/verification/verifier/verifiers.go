@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"sync"
+	"time"
 
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
@@ -14,6 +15,7 @@ import (
 	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/fvm/initialize"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/model/verification"
 	"github.com/onflow/flow-go/model/verification/convert"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/chunks"
@@ -288,13 +290,26 @@ func verifyHeight(
 			return err
 		}
 
-		_, err = verifier.Verify(vcd)
-		if err != nil {
-			if stopOnMismatch {
-				return fmt.Errorf("could not verify chunk (index: %v) at block %v (%v): %w", i, height, blockID, err)
-			}
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer cancel()
 
-			log.Error().Err(err).Msgf("could not verify chunk (index: %v) at block %v (%v)", i, height, blockID)
+		done := make(chan error, 1)
+
+		go func(vcd *verification.VerifiableChunkData) {
+			_, err = verifier.Verify(vcd)
+			done <- err
+		}(vcd)
+
+		select {
+		case err := <-done:
+			if err != nil {
+				if stopOnMismatch {
+					return fmt.Errorf("could not verify chunk (index: %v) at block %v (%v): %w", i, height, blockID, err)
+				}
+				log.Error().Err(err).Msgf("fatal: could not verify chunk (index: %v) at block %v (%v)", i, height, blockID)
+			}
+		case <-ctx.Done():
+			return fmt.Errorf("verification timed out for chunk (index: %v) at block %v (%v)", i, height, blockID)
 		}
 	}
 	return nil
