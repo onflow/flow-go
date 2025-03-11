@@ -85,6 +85,13 @@ func SummarizeKeysByFirstByteConcurrent(log zerolog.Logger, r storage.Reader, nW
 			return nil, res.err
 		}
 		finalStats[res.prefix] = res.stats
+		log.Info().
+			Int("prefix", int(res.prefix)).
+			Int("total", res.stats.TotalSize).
+			Int("count", res.stats.Count).
+			Int("min", res.stats.MinSize).
+			Int("max", res.stats.MaxSize).
+			Msg("Processed prefix")
 		progress(1) // log the progress
 	}
 
@@ -122,7 +129,7 @@ func processPrefix(r storage.Reader, prefix byte) (Stats, error) {
 			}
 			return nil
 		}); err != nil {
-			return s, fmt.Errorf("failed to process value for prefix 0x%X: %w", prefix, err)
+			return s, fmt.Errorf("failed to process value for prefix %v: %w", int(prefix), err)
 		}
 	}
 
