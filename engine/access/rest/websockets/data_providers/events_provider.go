@@ -6,6 +6,7 @@ import (
 
 	"github.com/rs/zerolog"
 
+	"github.com/onflow/flow-go/engine/access/rest/common"
 	"github.com/onflow/flow-go/engine/access/rest/common/parser"
 	"github.com/onflow/flow-go/engine/access/rest/http/request"
 	"github.com/onflow/flow-go/engine/access/rest/util"
@@ -175,13 +176,9 @@ func parseEventsArguments(
 		return eventsArguments{}, fmt.Errorf("missing 'event_types' field")
 	}
 
-	eventTypesList, isStringArray := rawEventTypes.([]string)
-	if !isStringArray {
-		return eventsArguments{}, fmt.Errorf("'event_types' must be an array of string")
-	}
-
-	if len(eventTypesList) == 0 {
-		return eventsArguments{}, fmt.Errorf("'event_types' field must not be empty")
+	eventTypesList, err := common.ConvertInterfaceToArrayOfStrings(rawEventTypes)
+	if err != nil {
+		return eventsArguments{}, fmt.Errorf("'event_types' must be an array of string: %w", err)
 	}
 
 	err = eventTypes.Parse(eventTypesList)
@@ -196,29 +193,20 @@ func parseEventsArguments(
 		return eventsArguments{}, fmt.Errorf("missing 'addresses' field")
 	}
 
-	addresses, isStringArray = rawAddresses.([]string)
-	if !isStringArray {
-		return eventsArguments{}, fmt.Errorf("'addresses' must be an array of string")
-	}
-
-	if len(addresses) == 0 {
-		return eventsArguments{}, fmt.Errorf("'addresses' field must not be empty")
+	addresses, err = common.ConvertInterfaceToArrayOfStrings(rawAddresses)
+	if err != nil {
+		return eventsArguments{}, fmt.Errorf("'addresses' must be an array of string: %w", err)
 	}
 
 	// Parse 'contracts' as []string{}
-	var contracts []string
 	rawContracts, exists := arguments["contracts"]
 	if !exists {
 		return eventsArguments{}, fmt.Errorf("missing 'contracts' field")
 	}
 
-	contracts, isStringArray = rawContracts.([]string)
-	if !isStringArray {
-		return eventsArguments{}, fmt.Errorf("'contracts' must be an array of string")
-	}
-
-	if len(contracts) == 0 {
-		return eventsArguments{}, fmt.Errorf("'contracts' field must not be empty")
+	contracts, err := common.ConvertInterfaceToArrayOfStrings(rawContracts)
+	if err != nil {
+		return eventsArguments{}, fmt.Errorf("'contracts' must be an array of string: %w", err)
 	}
 
 	var heartbeatInterval uint64

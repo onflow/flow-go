@@ -9,6 +9,7 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
+	"github.com/onflow/flow-go/engine/access/rest/common"
 	"github.com/onflow/flow-go/engine/access/rest/common/parser"
 	"github.com/onflow/flow-go/engine/access/rest/http/request"
 	"github.com/onflow/flow-go/engine/access/rest/websockets/models"
@@ -175,13 +176,9 @@ func parseAccountStatusesArguments(
 		return accountStatusesArguments{}, fmt.Errorf("missing 'event_types' field")
 	}
 
-	eventTypesList, isStringArray := rawEventTypes.([]string)
-	if !isStringArray {
-		return accountStatusesArguments{}, fmt.Errorf("'event_types' must be an array of string")
-	}
-
-	if len(eventTypesList) == 0 {
-		return accountStatusesArguments{}, fmt.Errorf("'event_types' field must not be empty")
+	eventTypesList, err := common.ConvertInterfaceToArrayOfStrings(rawEventTypes)
+	if err != nil {
+		return accountStatusesArguments{}, fmt.Errorf("'event_types' must be an array of string: %w", err)
 	}
 
 	err = eventTypes.Parse(eventTypesList)
@@ -196,13 +193,9 @@ func parseAccountStatusesArguments(
 		return accountStatusesArguments{}, fmt.Errorf("missing 'account_addresses' field")
 	}
 
-	accountAddresses, isStringArray = rawAccountAddresses.([]string)
-	if !isStringArray {
-		return accountStatusesArguments{}, fmt.Errorf("'account_addresses' must be an array of string")
-	}
-
-	if len(accountAddresses) == 0 {
-		return accountStatusesArguments{}, fmt.Errorf("'account_addresses' field must not be empty")
+	accountAddresses, err = common.ConvertInterfaceToArrayOfStrings(rawAccountAddresses)
+	if err != nil {
+		return accountStatusesArguments{}, fmt.Errorf("'account_addresses' must be an array of string: %w", err)
 	}
 
 	heartbeatIntervalRaw, exists := arguments["heartbeat_interval"]

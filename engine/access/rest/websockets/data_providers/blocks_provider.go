@@ -123,6 +123,14 @@ func parseBlocksArguments(arguments models.Arguments) (blocksArguments, error) {
 
 	var args blocksArguments
 
+	// Parse block arguments
+	startBlockID, startBlockHeight, err := parseStartBlock(arguments)
+	if err != nil {
+		return blocksArguments{}, err
+	}
+	args.StartBlockID = startBlockID
+	args.StartBlockHeight = startBlockHeight
+
 	// Parse 'block_status'
 	rawBlockStatus, exists := arguments["block_status"]
 	if !exists {
@@ -143,14 +151,6 @@ func parseBlocksArguments(arguments models.Arguments) (blocksArguments, error) {
 		return blocksArguments{}, err
 	}
 	args.BlockStatus = blockStatus
-
-	// Parse block arguments
-	startBlockID, startBlockHeight, err := parseStartBlock(arguments)
-	if err != nil {
-		return blocksArguments{}, err
-	}
-	args.StartBlockID = startBlockID
-	args.StartBlockHeight = startBlockHeight
 
 	return args, nil
 }
