@@ -59,7 +59,7 @@ type slotBucket struct {
 
 // Cache implements an array-based generic memory pool backed by a fixed total array.
 // Note that this implementation is NOT thread-safe, and the higher-level Backend is responsible for concurrency management.
-type Cache[K comparable, V any] struct {
+type Cache[V any] struct {
 	logger    zerolog.Logger
 	collector module.HeroCacheMetrics
 	// NOTE: as a BackData implementation, Cache must be non-blocking.
@@ -196,7 +196,7 @@ func (c *Cache[K, V]) Adjust(entityID K, f func(V) V) (value V, ok bool) {
 	}
 
 	newEntity := f(entity)
-	newEntityID := newEntity.ID()
+	newEntityID := newEntity.ID() // pass entityID
 
 	c.put(newEntityID, newEntity)
 
