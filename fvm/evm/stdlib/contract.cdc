@@ -441,9 +441,12 @@ contract EVM {
             return self.address()
         }
 
-        /// Withdraws the balance from the cadence owned account's balance
-        /// Note that amounts smaller than 1e10 attoFlow can't be withdrawn
-        /// given that Flow Token Vaults use UFix64s to store balances.
+        /// Withdraws the balance from the cadence owned account's balance.
+        /// Note that amounts smaller than 1e10 attoFlow can't be withdrawn,
+        /// given that Flow Token Vaults use UFix64 to store balances.
+        /// In other words, the smallest withdrawable amount is 1e10 attoFlow.
+        /// Amounts smaller than 1e10 attoFlow, will cause the function to panic
+        /// with: "withdraw failed! smallest unit allowed to transfer is 1e10 attoFlow".
         /// If the given balance conversion to UFix64 results in
         /// rounding loss, the withdrawal amount will be truncated to the
         /// maximum precision for UFix64.
