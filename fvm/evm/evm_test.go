@@ -1325,6 +1325,8 @@ func TestCadenceOwnedAccountFunctionalities(t *testing.T) {
 						let cadenceOwnedAccount <- EVM.createCadenceOwnedAccount()
 						cadenceOwnedAccount.deposit(from: <-vault)
 
+						// since 1e10 attoFlow is the minimum withdrawable amount,
+						// verify any amount below 1e10 can not be withdrawn.
 						let bal = EVM.Balance(attoflow: 9999999999)
 						let vault2 <- cadenceOwnedAccount.withdraw(balance: bal)
 						let balance = vault2.balance
