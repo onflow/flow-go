@@ -86,11 +86,11 @@ func GenerateRecoverTxArgsWithDKG(
 	includeNodeIDs flow.IdentifierList, // applied as set-union operation
 	snapshot *inmem.Snapshot,
 ) ([]cadence.Value, error) {
-	epoch := snapshot.Epochs().Current()
-	currentEpochCounter, err := epoch.Counter()
+	epoch, err := snapshot.Epochs().Current()
 	if err != nil {
-		return nil, fmt.Errorf("could not retrieve current epoch counter: %w", err)
+		return nil, fmt.Errorf("could not retrieve current epoch: %w", err)
 	}
+	currentEpochCounter := epoch.Counter()
 	if recoveryEpochCounter != currentEpochCounter+1 {
 		return nil, fmt.Errorf("invalid recovery epoch counter, expect %d", currentEpochCounter+1)
 	}
@@ -250,14 +250,9 @@ func GenerateRecoverTxArgsWithDKG(
 	if err != nil {
 		return nil, fmt.Errorf("failed to convert cluster qcs to cadence type")
 	}
-	currEpochFinalView, err := epoch.FinalView()
-	if err != nil {
-		return nil, fmt.Errorf("failed to get final view of current epoch")
-	}
-	currEpochTargetEndTime, err := epoch.TargetEndTime()
-	if err != nil {
-		return nil, fmt.Errorf("failed to get target end time of current epoch")
-	}
+
+	currEpochFinalView := epoch.FinalView()
+	currEpochTargetEndTime := epoch.TargetEndTime()
 
 	// STEP III: compile list of arguments for `recoverEpoch` governance transaction.
 	// ───────────────────────────────────────────────────────────────────────────────

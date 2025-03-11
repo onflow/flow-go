@@ -258,12 +258,12 @@ func (s *Suite) generateBlock(clusterCommittee flow.IdentitySkeletonList, snap *
 // TestOnFinalizedBlock checks that when a block is received, a request for each individual collection is made
 func (s *Suite) TestOnFinalizedBlockSingle() {
 	cluster := new(protocol.Cluster)
-	epoch := new(protocol.Epoch)
+	epoch := new(protocol.CommittedEpoch)
 	epochs := new(protocol.EpochQuery)
 	snap := new(protocol.Snapshot)
 
 	epoch.On("ClusterByChainID", mock.Anything).Return(cluster, nil)
-	epochs.On("Current").Return(epoch)
+	epochs.On("Current").Return(epoch, nil)
 	snap.On("Epochs").Return(epochs)
 
 	// prepare cluster committee members
@@ -314,12 +314,12 @@ func (s *Suite) TestOnFinalizedBlockSingle() {
 // TestOnFinalizedBlockSeveralBlocksAhead checks OnFinalizedBlock with a block several blocks newer than the last block processed
 func (s *Suite) TestOnFinalizedBlockSeveralBlocksAhead() {
 	cluster := new(protocol.Cluster)
-	epoch := new(protocol.Epoch)
+	epoch := new(protocol.CommittedEpoch)
 	epochs := new(protocol.EpochQuery)
 	snap := new(protocol.Snapshot)
 
 	epoch.On("ClusterByChainID", mock.Anything).Return(cluster, nil)
-	epochs.On("Current").Return(epoch)
+	epochs.On("Current").Return(epoch, nil)
 	snap.On("Epochs").Return(epochs)
 
 	// prepare cluster committee members
@@ -580,10 +580,10 @@ func (s *Suite) TestRequestMissingCollections() {
 
 	cluster := new(protocol.Cluster)
 	cluster.On("Members").Return(clusterCommittee, nil)
-	epoch := new(protocol.Epoch)
+	epoch := new(protocol.CommittedEpoch)
 	epoch.On("ClusterByChainID", mock.Anything).Return(cluster, nil)
 	epochs := new(protocol.EpochQuery)
-	epochs.On("Current").Return(epoch)
+	epochs.On("Current").Return(epoch, nil)
 	snap := new(protocol.Snapshot)
 	snap.On("Epochs").Return(epochs)
 	s.proto.state.On("AtBlockID", refBlockID).Return(snap)
@@ -679,10 +679,10 @@ func (s *Suite) TestProcessBackgroundCalls() {
 
 	cluster := new(protocol.Cluster)
 	cluster.On("Members").Return(clusterCommittee, nil)
-	epoch := new(protocol.Epoch)
+	epoch := new(protocol.CommittedEpoch)
 	epoch.On("ClusterByChainID", mock.Anything).Return(cluster, nil)
 	epochs := new(protocol.EpochQuery)
-	epochs.On("Current").Return(epoch)
+	epochs.On("Current").Return(epoch, nil)
 	snap := new(protocol.Snapshot)
 	snap.On("Epochs").Return(epochs)
 	s.proto.state.On("AtBlockID", refBlockID).Return(snap)

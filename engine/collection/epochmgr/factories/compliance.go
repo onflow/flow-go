@@ -25,7 +25,6 @@ type ComplianceEngineFactory struct {
 	engMetrics     module.EngineMetrics
 	mempoolMetrics module.MempoolMetrics
 	protoState     protocol.State
-	transactions   storage.Transactions
 	config         modulecompliance.Config
 }
 
@@ -38,7 +37,6 @@ func NewComplianceEngineFactory(
 	engMetrics module.EngineMetrics,
 	mempoolMetrics module.MempoolMetrics,
 	protoState protocol.State,
-	transactions storage.Transactions,
 	config modulecompliance.Config,
 ) (*ComplianceEngineFactory, error) {
 
@@ -50,7 +48,6 @@ func NewComplianceEngineFactory(
 		engMetrics:     engMetrics,
 		mempoolMetrics: mempoolMetrics,
 		protoState:     protoState,
-		transactions:   transactions,
 		config:         config,
 	}
 	return factory, nil
