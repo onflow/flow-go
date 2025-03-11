@@ -15,7 +15,7 @@ import (
 	"github.com/onflow/flow-go/network/p2p/scoring"
 )
 
-type recordEntityFactory func(identifier flow.Identifier) ClusterPrefixedMessagesReceivedRecord
+type recordFactory func(nodeID flow.Identifier) *ClusterPrefixedMessagesReceivedRecord
 
 type RecordCacheConfig struct {
 	sizeLimit uint32
@@ -31,10 +31,10 @@ type RecordCacheConfig struct {
 // Each record contains a float64 Gauge field that is decayed overtime back to 0. This ensures that nodes that fall
 // behind in the protocol can catch up.
 type RecordCache struct {
-	// recordEntityFactory is a factory function that creates a new ClusterPrefixedMessagesReceivedRecord.
-	recordEntityFactory recordEntityFactory
+	// recordFactory is a factory function that creates a new ClusterPrefixedMessagesReceivedRecord.
+	recordFactory recordFactory
 	// c is the underlying cache.
-	c *stdmap.Backend
+	c *stdmap.Backend[flow.Identifier, *ClusterPrefixedMessagesReceivedRecord]
 	// decayFunc decay func used by the cache to perform decay on gauges.
 	decayFunc decayFunc
 }
@@ -42,23 +42,23 @@ type RecordCache struct {
 // NewRecordCache creates a new *RecordCache.
 // Args:
 // - config: record cache config.
-// - recordEntityFactory: a factory function that creates a new spam record.
+// - recordFactory: a factory function that creates a new spam record.
 // Returns:
 // - *RecordCache, the created cache.
 // Note that this cache is supposed to keep the cluster prefix control messages received record for the authorized (staked) nodes. Since the number of such nodes is
 // expected to be small, we do not eject any records from the cache. The cache size must be large enough to hold all
 // the records of the authorized nodes. Also, this cache is keeping at most one record per peer id, so the
 // size of the cache must be at least the number of authorized nodes.
-func NewRecordCache(config *RecordCacheConfig, recordEntityFactory recordEntityFactory) (*RecordCache, error) {
-	backData := herocache.NewCache(config.sizeLimit,
+func NewRecordCache(config *RecordCacheConfig, recordFactory recordFactory) (*RecordCache, error) {
+	backData := herocache.NewCache[flow.Identifier, *ClusterPrefixedMessagesReceivedRecord](config.sizeLimit,
 		herocache.DefaultOversizeFactor,
 		heropool.LRUEjection,
 		config.logger.With().Str("mempool", "gossipsub=cluster-prefix-control-messages-received-records").Logger(),
 		config.collector)
 	return &RecordCache{
-		recordEntityFactory: recordEntityFactory,
-		decayFunc:           defaultDecayFunction(config.recordDecay),
-		c:                   stdmap.NewBackend(stdmap.WithMutableBackData(backData)),
+		recordFactory: recordFactory,
+		decayFunc:     defaultDecayFunction(config.recordDecay),
+		c:             stdmap.NewBackend(stdmap.WithMutableBackData[flow.Identifier, *ClusterPrefixedMessagesReceivedRecord](backData)),
 	}, nil
 }
 
@@ -72,16 +72,16 @@ func NewRecordCache(config *RecordCacheConfig, recordEntityFactory recordEntityF
 //   - exception only in cases of internal data inconsistency or bugs. No errors are expected.
 func (r *RecordCache) ReceivedClusterPrefixedMessage(pid peer.ID) (float64, error) {
 	var err error
-	adjustFunc := func(entity flow.Entity) flow.Entity {
-		entity, err = r.decayAdjustment(entity) // first decay the record
+	adjustFunc := func(record *ClusterPrefixedMessagesReceivedRecord) *ClusterPrefixedMessagesReceivedRecord {
+		record, err = r.decayAdjustment(record) // first decay the record
 		if err != nil {
-			return entity
+			return record
 		}
-		return r.incrementAdjustment(entity) // then increment the record
+		return r.incrementAdjustment(record) // then increment the record
 	}
-	entityID := r.MakeId(pid)
-	adjustedEntity, adjusted := r.c.AdjustWithInit(entityID, adjustFunc, func() flow.Entity {
-		return r.recordEntityFactory(entityID)
+	nodeID := r.MakeId(pid)
+	adjustedRecord, adjusted := r.c.AdjustWithInit(nodeID, adjustFunc, func() *ClusterPrefixedMessagesReceivedRecord {
+		return r.recordFactory(nodeID)
 	})
 
 	if err != nil {
@@ -92,9 +92,7 @@ func (r *RecordCache) ReceivedClusterPrefixedMessage(pid peer.ID) (float64, erro
 		return 0, fmt.Errorf("adjustment failed for peer %s", pid)
 	}
 
-	record := mustBeClusterPrefixedMessageReceivedRecordEntity(adjustedEntity)
-
-	return record.Gauge, nil
+	return adjustedRecord.Gauge, nil
 }
 
 // GetWithInit returns the current number of cluster prefixed control messages received from a peer.
@@ -108,14 +106,14 @@ func (r *RecordCache) ReceivedClusterPrefixedMessage(pid peer.ID) (float64, erro
 // No errors are expected during normal operation.
 func (r *RecordCache) GetWithInit(pid peer.ID) (float64, bool, error) {
 	var err error
-	adjustLogic := func(entity flow.Entity) flow.Entity {
+	adjustLogic := func(record *ClusterPrefixedMessagesReceivedRecord) *ClusterPrefixedMessagesReceivedRecord {
 		// perform decay on gauge value
-		entity, err = r.decayAdjustment(entity)
-		return entity
+		record, err = r.decayAdjustment(record)
+		return record
 	}
-	entityID := r.MakeId(pid)
-	adjustedEntity, adjusted := r.c.AdjustWithInit(entityID, adjustLogic, func() flow.Entity {
-		return r.recordEntityFactory(entityID)
+	nodeID := r.MakeId(pid)
+	adjustedRecord, adjusted := r.c.AdjustWithInit(nodeID, adjustLogic, func() *ClusterPrefixedMessagesReceivedRecord {
+		return r.recordFactory(nodeID)
 	})
 	if err != nil {
 		return 0, false, fmt.Errorf("unexpected error while applying decay adjustment for peer %s: %w", pid, err)
@@ -124,9 +122,7 @@ func (r *RecordCache) GetWithInit(pid peer.ID) (float64, bool, error) {
 		return 0, false, fmt.Errorf("decay adjustment failed for peer %s", pid)
 	}
 
-	record := mustBeClusterPrefixedMessageReceivedRecordEntity(adjustedEntity)
-
-	return record.Gauge, true, nil
+	return adjustedRecord.Gauge, true, nil
 }
 
 // Remove removes the record of the given peer id from the cache.
@@ -140,8 +136,14 @@ func (r *RecordCache) Remove(pid peer.ID) bool {
 }
 
 // NodeIDs returns the list of identities of the nodes that have a spam record in the cache.
-func (r *RecordCache) NodeIDs() []flow.Identifier {
-	return flow.GetIDs(r.c.All())
+func (r *RecordCache) NodeIDs() flow.IdentifierList {
+	all := r.c.All()
+
+	nodeIDs := make(flow.IdentifierList, 0, len(all))
+	for nodeID, _ := range all {
+		nodeIDs = append(nodeIDs, nodeID)
+	}
+	return nodeIDs
 }
 
 // Size returns the number of records in the cache.
@@ -149,20 +151,14 @@ func (r *RecordCache) Size() uint {
 	return r.c.Size()
 }
 
-// MakeId is a helper function for creating the id field of the duplicateMessagesCounterEntity by hashing the peerID.
+// MakeId is a helper function for creating the id field by hashing the peerID.
 // Returns:
 // - the hash of the peerID as a flow.Identifier.
 func (r *RecordCache) MakeId(peerID peer.ID) flow.Identifier {
 	return flow.MakeID([]byte(peerID))
 }
 
-func (r *RecordCache) incrementAdjustment(entity flow.Entity) flow.Entity {
-	record, ok := entity.(ClusterPrefixedMessagesReceivedRecord)
-	if !ok {
-		// sanity check
-		// This should never happen, because the cache only contains ClusterPrefixedMessagesReceivedRecord entities.
-		panic(fmt.Sprintf("invalid entity type, expected ClusterPrefixedMessagesReceivedRecord type, got: %T", entity))
-	}
+func (r *RecordCache) incrementAdjustment(record *ClusterPrefixedMessagesReceivedRecord) *ClusterPrefixedMessagesReceivedRecord {
 	record.Gauge++
 	record.lastUpdated = time.Now()
 	// Return the adjusted record.
@@ -170,13 +166,7 @@ func (r *RecordCache) incrementAdjustment(entity flow.Entity) flow.Entity {
 }
 
 // All errors returned from this function are unexpected and irrecoverable.
-func (r *RecordCache) decayAdjustment(entity flow.Entity) (flow.Entity, error) {
-	record, ok := entity.(ClusterPrefixedMessagesReceivedRecord)
-	if !ok {
-		// sanity check
-		// This should never happen, because the cache only contains ClusterPrefixedMessagesReceivedRecord entities.
-		panic(fmt.Sprintf("invalid entity type, expected ClusterPrefixedMessagesReceivedRecord type, got: %T", entity))
-	}
+func (r *RecordCache) decayAdjustment(record *ClusterPrefixedMessagesReceivedRecord) (*ClusterPrefixedMessagesReceivedRecord, error) {
 	var err error
 	record, err = r.decayFunc(record)
 	if err != nil {
@@ -189,38 +179,22 @@ func (r *RecordCache) decayAdjustment(entity flow.Entity) (flow.Entity, error) {
 
 // decayFunc the callback used to apply a decay method to the record.
 // All errors returned from this callback are unexpected and irrecoverable.
-type decayFunc func(recordEntity ClusterPrefixedMessagesReceivedRecord) (ClusterPrefixedMessagesReceivedRecord, error)
+type decayFunc func(record *ClusterPrefixedMessagesReceivedRecord) (*ClusterPrefixedMessagesReceivedRecord, error)
 
 // defaultDecayFunction is the default decay function that is used to decay the cluster prefixed control message received gauge of a peer.
 // All errors returned are unexpected and irrecoverable.
 func defaultDecayFunction(decay float64) decayFunc {
-	return func(recordEntity ClusterPrefixedMessagesReceivedRecord) (ClusterPrefixedMessagesReceivedRecord, error) {
-		received := recordEntity.Gauge
+	return func(record *ClusterPrefixedMessagesReceivedRecord) (*ClusterPrefixedMessagesReceivedRecord, error) {
+		received := record.Gauge
 		if received == 0 {
-			return recordEntity, nil
+			return record, nil
 		}
 
-		decayedVal, err := scoring.GeometricDecay(received, decay, recordEntity.lastUpdated)
+		decayedVal, err := scoring.GeometricDecay(received, decay, record.lastUpdated)
 		if err != nil {
-			return recordEntity, fmt.Errorf("could not decay cluster prefixed control messages received gauge: %w", err)
+			return record, fmt.Errorf("could not decay cluster prefixed control messages received gauge: %w", err)
 		}
-		recordEntity.Gauge = decayedVal
-		return recordEntity, nil
+		record.Gauge = decayedVal
+		return record, nil
 	}
-}
-
-// mustBeClusterPrefixedMessageReceivedRecordEntity is a helper function for type assertion of the flow.Entity to ClusterPrefixedMessagesReceivedRecord.
-// It panics if the type assertion fails.
-// Args:
-// - entity: the flow.Entity to be type asserted.
-// Returns:
-// - the ClusterPrefixedMessagesReceivedRecord entity.
-func mustBeClusterPrefixedMessageReceivedRecordEntity(entity flow.Entity) ClusterPrefixedMessagesReceivedRecord {
-	c, ok := entity.(ClusterPrefixedMessagesReceivedRecord)
-	if !ok {
-		// sanity check
-		// This should never happen, because the cache only contains ClusterPrefixedMessagesReceivedRecord entities.
-		panic(fmt.Sprintf("invalid entity type, expected ClusterPrefixedMessagesReceivedRecord type, got: %T", entity))
-	}
-	return c
 }
