@@ -21,12 +21,12 @@ func TestTransactionTimingsPool(t *testing.T) {
 	require.NoError(t, err)
 
 	t.Run("should be able to add first", func(t *testing.T) {
-		added := pool.Add(item1)
+		added := pool.Add(item1.TransactionID, item1)
 		assert.True(t, added)
 	})
 
 	t.Run("should be able to add second", func(t *testing.T) {
-		added := pool.Add(item2)
+		added := pool.Add(item2.TransactionID, item2)
 		assert.True(t, added)
 	})
 
@@ -46,7 +46,7 @@ func TestTransactionTimingsPool(t *testing.T) {
 	})
 
 	t.Run("should be able to get first", func(t *testing.T) {
-		got, exists := pool.ByID(item1.TransactionID)
+		got, exists := pool.Get(item1.TransactionID)
 		assert.True(t, exists)
 		assert.Equal(t, item1, got)
 	})
@@ -59,7 +59,9 @@ func TestTransactionTimingsPool(t *testing.T) {
 	t.Run("should be able to retrieve all", func(t *testing.T) {
 		items := pool.All()
 		assert.Len(t, items, 1)
-		assert.Equal(t, item1, items[0])
+		val, exists := items[item1.TransactionID]
+		require.True(t, exists)
+		assert.Equal(t, item1, val)
 	})
 
 	t.Run("should not panic if item does not exist yet", func(t *testing.T) {
