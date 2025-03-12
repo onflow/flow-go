@@ -35,7 +35,7 @@ func (i *IdentifierMap) Append(key, id flow.Identifier) {
 }
 
 // Get returns the set of all identifiers associated with key and true, if the key exists in the mempool.
-// The set is returned as an unordered list with no duplicates. 
+// The set is returned as an unordered list with no duplicates.
 // Otherwise it returns nil and false.
 func (i *IdentifierMap) Get(key flow.Identifier) (flow.IdentifierList, bool) {
 	var ids flow.IdentifierList
@@ -78,34 +78,19 @@ func (i *IdentifierMap) Remove(key flow.Identifier) bool {
 // RemoveIdFromKey removes the id from the list of identifiers associated with key.
 // If the list becomes empty, it also removes the key from the map.
 func (i *IdentifierMap) RemoveIdFromKey(key, id flow.Identifier) error {
-	err := i.Backend.Run(func(backdata mempool.BackData[flow.Identifier, map[flow.Identifier]struct{}]) error {
-		idsMap, ok := backdata.Get(key)
+	err := i.Backend.Run(func(backData mempool.BackData[flow.Identifier, map[flow.Identifier]struct{}]) error {
+		idsMap, ok := backData.Get(key)
 		if !ok {
 			// entity key has already been removed
 			return nil
 		}
 
-		if _, ok := idsMap[id]; !ok {
-			// id has already been removed from the key map
-			return nil
-		}
-
-		// removes map entry associated with key for update
-		if _, removed := backdata.Remove(key); !removed {
-			return fmt.Errorf("potential race condition on removing from identifier map")
-		}
-
-		// removes id from the secondary map of the key
-		delete(idsMap, id)
-
+		delete(idsMap, id) // mutates the map stored in backData
 		if len(idsMap) == 0 {
-			// all ids related to key are removed, so there is no need
-			// to add key back to the idMapEntity
-			return nil
-		}
-
-		if added := backdata.Add(key, idsMap); !added {
-			return fmt.Errorf("potential race condition on adding to identifier map")
+			// if the set stored under the key is empty, remove the key
+			if _, removed := backData.Remove(key); !removed {
+				return fmt.Errorf("sanity check failed: race condition observed removing from identifier map (key=%x, id=%x)", key, id)
+			}
 		}
 
 		return nil
