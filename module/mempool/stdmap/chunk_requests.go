@@ -15,14 +15,13 @@ import (
 // In this implementation, the ChunkRequests
 // wraps the ChunkDataPackRequests around an internal ChunkRequestStatus data object, and maintains the wrapped
 // version in memory.
+// Stored chunkRequestStatus are keyed by chunk ID.
 type ChunkRequests struct {
 	*Backend[flow.Identifier, *chunkRequestStatus]
 }
 
 func NewChunkRequests(limit uint) *ChunkRequests {
-	return &ChunkRequests{
-		Backend: NewBackend(WithLimit[flow.Identifier, *chunkRequestStatus](limit)),
-	}
+	return &ChunkRequests{NewBackend(WithLimit[flow.Identifier, *chunkRequestStatus](limit))}
 }
 
 // RequestHistory returns the number of times the chunk has been requested,
@@ -89,13 +88,6 @@ func (cs *ChunkRequests) Add(request *verification.ChunkDataPackRequest) bool {
 	})
 
 	return err == nil
-}
-
-// Remove provides deletion functionality from the memory pool.
-// If there is a chunk request with this ID, Remove removes it and returns true.
-// Otherwise it returns false.
-func (cs *ChunkRequests) Remove(chunkID flow.Identifier) bool {
-	return cs.Backend.Remove(chunkID)
 }
 
 // PopAll atomically returns all locators associated with this chunk ID while clearing out the
@@ -191,11 +183,6 @@ func (cs *ChunkRequests) UpdateRequestHistory(chunkID flow.Identifier, updater m
 	})
 
 	return attempts, lastAttempt, retryAfter, err == nil
-}
-
-// Size returns total number of chunk requests in the memory pool.
-func (cs ChunkRequests) Size() uint {
-	return cs.Backend.Size()
 }
 
 // chunkRequestStatus is an internal data type for ChunkRequests mempool. It acts as a wrapper for ChunkDataRequests, maintaining

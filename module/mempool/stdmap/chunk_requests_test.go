@@ -239,8 +239,8 @@ func TestAddingDuplicateChunkIDs(t *testing.T) {
 	require.ElementsMatch(t, thisReq.Agrees.Union(otherReq.Agrees), reqInfoList[0].Agrees)
 	require.ElementsMatch(t, thisReq.Disagrees.Union(otherReq.Disagrees), reqInfoList[0].Disagrees)
 
-	var thisTargets flow.IdentifierList = thisReq.Targets.NodeIDs()
-	var otherTargets flow.IdentifierList = otherReq.Targets.NodeIDs()
+	var thisTargets = thisReq.Targets.NodeIDs()
+	var otherTargets = otherReq.Targets.NodeIDs()
 	require.ElementsMatch(t, thisTargets.Union(otherTargets), reqInfoList[0].Targets.NodeIDs())
 
 	locators, ok := requests.PopAll(thisReq.ChunkID)
