@@ -69,6 +69,10 @@ func (s *DataProviderFactorySuite) setupSubscription(apiCall *mock.Call) {
 // Each test case includes a topic and arguments for which a data provider should be created.
 func (s *DataProviderFactorySuite) TestSupportedTopics() {
 	// Define supported topics and check if each returns the correct provider without errors
+	tx := unittest.TransactionBodyFixture()
+	tx.PayloadSignatures = []flow.TransactionSignature{unittest.TransactionSignatureFixture()}
+	tx.Arguments = [][]uint8{}
+
 	testCases := []struct {
 		name               string
 		topic              string
@@ -134,9 +138,9 @@ func (s *DataProviderFactorySuite) TestSupportedTopics() {
 		{
 			name:      "transaction statuses topic",
 			topic:     TransactionStatusesTopic,
-			arguments: models.Arguments{},
+			arguments: models.Arguments{"tx_id": unittest.IdentifierFixture().String()},
 			setupSubscription: func() {
-				s.setupSubscription(s.accessApi.On("SubscribeTransactionStatusesFromLatest", mock.Anything, mock.Anything, mock.Anything))
+				s.setupSubscription(s.accessApi.On("SubscribeTransactionStatuses", mock.Anything, mock.Anything, mock.Anything))
 			},
 			assertExpectations: func() {
 				s.stateStreamApi.AssertExpectations(s.T())
@@ -145,7 +149,7 @@ func (s *DataProviderFactorySuite) TestSupportedTopics() {
 		{
 			name:      "send transaction statuses topic",
 			topic:     SendAndGetTransactionStatusesTopic,
-			arguments: models.Arguments{},
+			arguments: models.Arguments(unittest.CreateSendTxHttpPayload(tx)),
 			setupSubscription: func() {
 				s.setupSubscription(s.accessApi.On("SendAndSubscribeTransactionStatuses", mock.Anything, mock.Anything, mock.Anything))
 			},

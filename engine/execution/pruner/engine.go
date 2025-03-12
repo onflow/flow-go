@@ -2,7 +2,6 @@ package pruner
 
 import (
 	"github.com/cockroachdb/pebble"
-	"github.com/dgraph-io/badger/v2"
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/module"
@@ -18,7 +17,7 @@ func NewChunkDataPackPruningEngine(
 	log zerolog.Logger,
 	metrics module.ExecutionMetrics,
 	state protocol.State,
-	badgerDB *badger.DB,
+	protocolDB storage.DB,
 	headers storage.Headers,
 	chunkDataPacks storage.ChunkDataPacks,
 	results storage.ExecutionResults,
@@ -31,7 +30,7 @@ func NewChunkDataPackPruningEngine(
 
 			err := LoopPruneExecutionDataFromRootToLatestSealed(
 				ctx, log.With().Str("component", "CDP-pruner").Logger(), metrics,
-				state, badgerDB, headers, chunkDataPacks, results, chunkDataPacksDB, config)
+				state, protocolDB, headers, chunkDataPacks, results, chunkDataPacksDB, config)
 			if err != nil {
 				ctx.Throw(err)
 			}

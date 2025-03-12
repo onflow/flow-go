@@ -108,14 +108,12 @@ func (r *ExecutionResults) Store(result *flow.ExecutionResult) error {
 	return operation.RetryOnConflictTx(r.db, transaction.Update, r.store(result))
 }
 
-func (r *ExecutionResults) BatchStore(result *flow.ExecutionResult, batch storage.BatchStorage) error {
-	writeBatch := batch.GetWriter()
-	return operation.BatchInsertExecutionResult(result)(writeBatch)
+func (r *ExecutionResults) BatchStore(result *flow.ExecutionResult, batch storage.ReaderBatchWriter) error {
+	return fmt.Errorf("not implemented")
 }
 
-func (r *ExecutionResults) BatchIndex(blockID flow.Identifier, resultID flow.Identifier, batch storage.BatchStorage) error {
-	writeBatch := batch.GetWriter()
-	return operation.BatchIndexExecutionResult(blockID, resultID)(writeBatch)
+func (r *ExecutionResults) BatchIndex(blockID flow.Identifier, resultID flow.Identifier, batch storage.ReaderBatchWriter) error {
+	return fmt.Errorf("not implemented")
 }
 
 func (r *ExecutionResults) ByID(resultID flow.Identifier) (*flow.ExecutionResult, error) {
@@ -160,7 +158,6 @@ func (r *ExecutionResults) RemoveIndexByBlockID(blockID flow.Identifier) error {
 // BatchRemoveIndexByBlockID removes blockID-to-executionResultID index entries keyed by blockID in a provided batch.
 // No errors are expected during normal operation, even if no entries are matched.
 // If Badger unexpectedly fails to process the request, the error is wrapped in a generic error and returned.
-func (r *ExecutionResults) BatchRemoveIndexByBlockID(blockID flow.Identifier, batch storage.BatchStorage) error {
-	writeBatch := batch.GetWriter()
-	return operation.BatchRemoveExecutionResultIndex(blockID)(writeBatch)
+func (r *ExecutionResults) BatchRemoveIndexByBlockID(blockID flow.Identifier, batch storage.ReaderBatchWriter) error {
+	return fmt.Errorf("not implemented")
 }
