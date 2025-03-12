@@ -26,7 +26,7 @@ const ( // iota is reset to 0
 	stateUsed
 )
 
-// EIndex is data type representing an entity index in Pool.
+// EIndex is data type representing an value index in Pool.
 type EIndex uint32
 
 // InvalidIndex is used when a link doesn't point anywhere, in other words it is an equivalent of a nil address.
@@ -35,19 +35,19 @@ const InvalidIndex EIndex = math.MaxUint32
 // poolEntity represents the data type that is maintained by
 type poolEntity[K comparable, V any] struct {
 	PoolEntity[K, V]
-	// owner maintains an external reference to the key associated with this entity.
-	// The key is maintained by the HeroCache, and entity is maintained by Pool.
+	// owner maintains an external reference to the key associated with this value.
+	// The key is maintained by the HeroCache, and value is maintained by Pool.
 	owner uint64
 
 	// node keeps the link to the previous and next entities.
-	// When this entity is allocated, the node maintains the connections it to the next and previous (used) pool entities.
-	// When this entity is unallocated, the node maintains the connections to the next and previous unallocated (free) pool entities.
+	// When this value is allocated, the node maintains the connections it to the next and previous (used) pool entities.
+	// When this value is unallocated, the node maintains the connections to the next and previous unallocated (free) pool entities.
 	node link
 
-	// invalidated indicates whether this pool entity has been invalidated.
-	// An entity becomes invalidated when it is removed or ejected from the pool,
+	// invalidated indicates whether this pool value has been invalidated.
+	// An value becomes invalidated when it is removed or ejected from the pool,
 	// meaning its key and value are no longer valid for use.
-	// This flag helps manage the lifecycle of the entity within the pool.
+	// This flag helps manage the lifecycle of the value within the pool.
 	invalidated bool
 }
 
@@ -122,26 +122,26 @@ func (p *Pool[K, V]) initFreeEntities() {
 // If the pool has no available slots and an ejection is set, ejection occurs when adding a new value.
 // If an ejection occurred, ejectedEntity holds the ejected value.
 func (p *Pool[K, V]) Add(key K, value V, owner uint64) (
-	entityIndex EIndex, slotAvailable bool, ejectedEntity V) {
-	entityIndex, slotAvailable, ejectedEntity = p.sliceIndexForEntity()
+	valueIndex EIndex, slotAvailable bool, ejectedValue V, wasEjected bool) {
+	valueIndex, slotAvailable, ejectedValue, wasEjected = p.sliceIndexForEntity()
 	if slotAvailable {
-		p.poolEntities[entityIndex].value = value
-		p.poolEntities[entityIndex].key = key
-		p.poolEntities[entityIndex].owner = owner
+		p.poolEntities[valueIndex].value = value
+		p.poolEntities[valueIndex].key = key
+		p.poolEntities[valueIndex].owner = owner
 		// Reset the invalidated flag when reusing a slot.
-		p.poolEntities[entityIndex].invalidated = false
-		p.switchState(stateFree, stateUsed, entityIndex)
+		p.poolEntities[valueIndex].invalidated = false
+		p.switchState(stateFree, stateUsed, valueIndex)
 	}
 
-	return entityIndex, slotAvailable, ejectedEntity
+	return valueIndex, slotAvailable, ejectedValue, wasEjected
 }
 
-// Get returns entity corresponding to the entity index from the underlying list.
-func (p *Pool[K, V]) Get(entityIndex EIndex) (K, V, uint64) {
-	return p.poolEntities[entityIndex].key, p.poolEntities[entityIndex].value, p.poolEntities[entityIndex].owner
+// Get returns value corresponding to the value index from the underlying list.
+func (p *Pool[K, V]) Get(valueIndex EIndex) (K, V, uint64) {
+	return p.poolEntities[valueIndex].key, p.poolEntities[valueIndex].value, p.poolEntities[valueIndex].owner
 }
 
-// All returns all stored entities in this pool.
+// All returns all stored values in this pool.
 func (p Pool[K, V]) All() []PoolEntity[K, V] {
 	all := make([]PoolEntity[K, V], p.states[stateUsed].size)
 	next := p.states[stateUsed].head
@@ -168,19 +168,19 @@ func (p Pool[K, V]) Head() (value V, ok bool) {
 // sliceIndexForEntity returns a slice index which hosts the next entity to be added to the list.
 // This index is invalid if there are no available slots or ejection could not be performed.
 // If the valid index is returned then it is guaranteed that it corresponds to a free list head.
-// Thus when filled with a new entity a switchState must be applied.
+// Thus when filled with a new value a switchState must be applied.
 //
 // The first boolean return value (hasAvailableSlot) says whether pool has an available slot.
 // Pool goes out of available slots if it is full and no ejection is set.
 //
 // Ejection happens if there is no available slot, and there is an ejection mode set.
 // If an ejection occurred, ejectedEntity holds the ejected entity.
-func (p *Pool[K, V]) sliceIndexForEntity() (i EIndex, hasAvailableSlot bool, ejectedEntity V) {
-	lruEject := func() (EIndex, bool, V) {
+func (p *Pool[K, V]) sliceIndexForEntity() (i EIndex, hasAvailableSlot bool, ejectedValue V, wasEjected bool) {
+	lruEject := func() (EIndex, bool, V, bool) {
 		// LRU ejection
 		// the used head is the oldest entity, so we turn the used head to a free head here.
-		invalidatedEntity := p.invalidateUsedHead()
-		return p.states[stateFree].head, true, invalidatedEntity
+		invalidatedValue := p.invalidateUsedHead()
+		return p.states[stateFree].head, true, invalidatedValue, true
 	}
 
 	if p.states[stateFree].size == 0 {
@@ -188,7 +188,7 @@ func (p *Pool[K, V]) sliceIndexForEntity() (i EIndex, hasAvailableSlot bool, eje
 		switch p.ejectionMode {
 		case NoEjection:
 			// pool is set for no ejection, hence, no slice index is selected, abort immediately.
-			return InvalidIndex, false, ejectedEntity
+			return InvalidIndex, false, ejectedValue, false
 		case RandomEjection:
 			// we only eject randomly when the pool is full and random ejection is on.
 			random, err := rand.Uint32n(p.states[stateUsed].size)
@@ -199,8 +199,8 @@ func (p *Pool[K, V]) sliceIndexForEntity() (i EIndex, hasAvailableSlot bool, eje
 				return lruEject()
 			}
 			randomIndex := EIndex(random)
-			invalidatedEntity := p.invalidateEntityAtIndex(randomIndex)
-			return p.states[stateFree].head, true, invalidatedEntity
+			invalidatedEntity := p.invalidateValueAtIndex(randomIndex)
+			return p.states[stateFree].head, true, invalidatedEntity, true
 		case LRUEjection:
 			// LRU ejection
 			return lruEject()
@@ -208,15 +208,15 @@ func (p *Pool[K, V]) sliceIndexForEntity() (i EIndex, hasAvailableSlot bool, eje
 	}
 
 	// returning the head of free list as the slice index for the next entity to be added
-	return p.states[stateFree].head, true, ejectedEntity
+	return p.states[stateFree].head, true, ejectedValue, false
 }
 
-// Size returns total number of entities that this list maintains.
+// Size returns total number of values that this list maintains.
 func (p Pool[K, V]) Size() uint32 {
 	return p.states[stateUsed].size
 }
 
-// getHeads returns entities corresponding to the used and free heads.
+// getHeads returns values corresponding to the used and free heads.
 func (p Pool[K, V]) getHeads() (*poolEntity[K, V], *poolEntity[K, V]) {
 	var usedHead, freeHead *poolEntity[K, V]
 	if p.states[stateUsed].size != 0 {
@@ -230,7 +230,7 @@ func (p Pool[K, V]) getHeads() (*poolEntity[K, V], *poolEntity[K, V]) {
 	return usedHead, freeHead
 }
 
-// getTails returns entities corresponding to the used and free tails.
+// getTails returns values corresponding to the used and free tails.
 func (p Pool[K, V]) getTails() (*poolEntity[K, V], *poolEntity[K, V]) {
 	var usedTail, freeTail *poolEntity[K, V]
 	if p.states[stateUsed].size != 0 {
@@ -250,23 +250,23 @@ func (p *Pool[K, V]) connect(prev EIndex, next EIndex) {
 }
 
 // invalidateUsedHead moves current used head forward by one node. It
-// also removes the entity the invalidated head is presenting and appends the
+// also removes the value the invalidated head is presenting and appends the
 // node represented by the used head to the tail of the free list.
 func (p *Pool[K, V]) invalidateUsedHead() V {
 	headSliceIndex := p.states[stateUsed].head
-	return p.invalidateEntityAtIndex(headSliceIndex)
+	return p.invalidateValueAtIndex(headSliceIndex)
 }
 
-// Remove removes entity corresponding to given getSliceIndex from the list.
+// Remove removes value corresponding to given getSliceIndex from the list.
 func (p *Pool[K, V]) Remove(sliceIndex EIndex) V {
-	return p.invalidateEntityAtIndex(sliceIndex)
+	return p.invalidateValueAtIndex(sliceIndex)
 }
 
-// invalidateEntityAtIndex invalidates the given getSliceIndex in the linked list by
+// invalidateValueAtIndex invalidates the given getSliceIndex in the linked list by
 // removing its corresponding linked-list node from the used linked list, and appending
-// it to the tail of the free list. It also removes the entity that the invalidated node is presenting.
-func (p *Pool[K, V]) invalidateEntityAtIndex(sliceIndex EIndex) V {
-	invalidatedEntity := p.poolEntities[sliceIndex].value
+// it to the tail of the free list. It also removes the value that the invalidated node is presenting.
+func (p *Pool[K, V]) invalidateValueAtIndex(sliceIndex EIndex) V {
+	invalidatedValue := p.poolEntities[sliceIndex].value
 	if p.poolEntities[sliceIndex].invalidated {
 		panic(fmt.Sprintf("removing an entity from an empty slot with an index : %d", sliceIndex))
 	}
@@ -277,17 +277,17 @@ func (p *Pool[K, V]) invalidateEntityAtIndex(sliceIndex EIndex) V {
 	p.poolEntities[sliceIndex].invalidated = true
 	p.poolEntities[sliceIndex].key = zeroKey
 	p.poolEntities[sliceIndex].value = zeroValue
-	return invalidatedEntity
+	return invalidatedValue
 }
 
 // isInvalidated returns true if linked-list node represented by getSliceIndex does not contain
-// a valid entity.
+// a valid value.
 func (p *Pool[K, V]) isInvalidated(sliceIndex EIndex) bool {
 	return p.poolEntities[sliceIndex].invalidated
 }
 
-// switches state of an entity.
-func (p *Pool[K, V]) switchState(stateFrom StateIndex, stateTo StateIndex, entityIndex EIndex) {
+// switches state of an value.
+func (p *Pool[K, V]) switchState(stateFrom StateIndex, stateTo StateIndex, valueIndex EIndex) {
 	// Remove from stateFrom list
 	if p.states[stateFrom].size == 0 {
 		panic("Removing an entity from an empty list")
@@ -295,20 +295,20 @@ func (p *Pool[K, V]) switchState(stateFrom StateIndex, stateTo StateIndex, entit
 		p.states[stateFrom].head = InvalidIndex
 		p.states[stateFrom].tail = InvalidIndex
 	} else {
-		node := p.poolEntities[entityIndex].node
+		node := p.poolEntities[valueIndex].node
 
-		if entityIndex != p.states[stateFrom].head && entityIndex != p.states[stateFrom].tail {
+		if valueIndex != p.states[stateFrom].head && valueIndex != p.states[stateFrom].tail {
 			// links next and prev elements for non-head and non-tail element
 			p.connect(node.prev, node.next)
 		}
 
-		if entityIndex == p.states[stateFrom].head {
+		if valueIndex == p.states[stateFrom].head {
 			// moves head forward
 			p.states[stateFrom].head = node.next
 			p.poolEntities[p.states[stateFrom].head].node.prev = InvalidIndex
 		}
 
-		if entityIndex == p.states[stateFrom].tail {
+		if valueIndex == p.states[stateFrom].tail {
 			// moves tail backwards
 			p.states[stateFrom].tail = node.prev
 			p.poolEntities[p.states[stateFrom].tail].node.next = InvalidIndex
@@ -318,13 +318,13 @@ func (p *Pool[K, V]) switchState(stateFrom StateIndex, stateTo StateIndex, entit
 
 	// Add to stateTo list
 	if p.states[stateTo].size == 0 {
-		p.states[stateTo].head = entityIndex
-		p.states[stateTo].tail = entityIndex
+		p.states[stateTo].head = valueIndex
+		p.states[stateTo].tail = valueIndex
 		p.poolEntities[p.states[stateTo].head].node.prev = InvalidIndex
 		p.poolEntities[p.states[stateTo].tail].node.next = InvalidIndex
 	} else {
-		p.connect(p.states[stateTo].tail, entityIndex)
-		p.states[stateTo].tail = entityIndex
+		p.connect(p.states[stateTo].tail, valueIndex)
+		p.states[stateTo].tail = valueIndex
 		p.poolEntities[p.states[stateTo].tail].node.next = InvalidIndex
 	}
 	p.states[stateTo].size++
