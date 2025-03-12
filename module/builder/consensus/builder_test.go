@@ -81,7 +81,7 @@ type BuilderSuite struct {
 	receiptsDB   *storage.ExecutionReceipts
 	stateMutator *protocol.MutableProtocolState
 
-	guarPool *mempool.Guarantees
+	guarPool *mempool.Mempool[flow.Identifier, *flow.CollectionGuarantee]
 	sealPool *mempool.IncorporatedResultSeals
 	recPool  *mempool.ExecutionTree
 
@@ -376,11 +376,15 @@ func (bs *BuilderSuite) SetupTest() {
 	)
 
 	// set up memory pool mocks for tests
-	bs.guarPool = &mempool.Guarantees{}
+	bs.guarPool = &mempool.Mempool[flow.Identifier, *flow.CollectionGuarantee]{}
 	bs.guarPool.On("Size").Return(uint(0)) // only used by metrics
 	bs.guarPool.On("All").Return(
-		func() []*flow.CollectionGuarantee {
-			return bs.pendingGuarantees
+		func() map[flow.Identifier]*flow.CollectionGuarantee {
+			guaranteeMap := make(map[flow.Identifier]*flow.CollectionGuarantee, len(bs.pendingGuarantees))
+			for _, guarantee := range bs.pendingGuarantees {
+				guaranteeMap[guarantee.CollectionID] = guarantee
+			}
+			return guaranteeMap
 		},
 	)
 
@@ -395,7 +399,7 @@ func (bs *BuilderSuite) SetupTest() {
 			return res
 		},
 	)
-	bs.sealPool.On("ByID", mock.Anything).Return(
+	bs.sealPool.On("Get", mock.Anything).Return(
 		func(id flow.Identifier) *flow.IncorporatedResultSeal {
 			return bs.pendingSeals[id]
 		},
