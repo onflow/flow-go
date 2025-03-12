@@ -6,6 +6,7 @@ import (
 
 // Guarantees implements the collections memory pool of the consensus nodes,
 // used to store collection guarantees and to generate block payloads.
+// Stored Collection Guarantees are keyed by collection ID.
 type Guarantees struct {
 	*Backend[flow.Identifier, *flow.CollectionGuarantee]
 }
@@ -19,7 +20,7 @@ func NewGuarantees(limit uint) (*Guarantees, error) {
 	return g, nil
 }
 
-// Add adds a collection guarantee to the mempool.
+// Add adds a collection guarantee to the mempool, keyed by the collection ID.
 func (g *Guarantees) Add(guarantee *flow.CollectionGuarantee) bool {
 	return g.Backend.Add(guarantee.ID(), guarantee)
 }

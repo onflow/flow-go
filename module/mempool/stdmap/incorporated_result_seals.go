@@ -9,11 +9,14 @@ type sealSet map[flow.Identifier]*flow.IncorporatedResultSeal
 
 // IncorporatedResultSeals implements the incorporated result seals memory pool
 // of the consensus nodes, used to store seals that need to be added to blocks.
+// Incorporated result seals are keyed by the ID of the incorporated result.
 // ATTENTION: This data structure should NEVER eject seals because it can break liveness.
 // Modules that are using this structure expect that it NEVER ejects a seal.
 type IncorporatedResultSeals struct {
 	*Backend[flow.Identifier, *flow.IncorporatedResultSeal]
-	// index the seals by the height of the executed block
+
+	// CAUTION: byHeight and lowestHeight are protected by the Backend lock and must be modified within `Backend.Run`
+	// byHeight indexes seals by the height of the executed block
 	byHeight     map[uint64]sealSet
 	lowestHeight uint64
 }
