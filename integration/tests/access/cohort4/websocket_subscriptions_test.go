@@ -810,11 +810,46 @@ func (s *WebsocketSubscriptionSuite) testSubscriptionMultiplexing() {
 		s.Require().NoError(wsClient.WriteJSON(unsubscriptionRequest))
 	}
 
-		// Read and validate unsubscription response
-		var response models.BaseMessageResponse
-		err := wsClient.ReadJSON(&response)
-		s.Require().NoError(err, "Failed to read unsubscription response for topic: %s", sub.Topic)
-		s.Require().Equal(0, response.Error.Code, response.Error.Message)
+	unittest.RequireCloseBefore(s.T(), routerStopped, 5*time.Second, "timed out waiting for router to stop")
+
+	// Step 5: Validate the collected messages to ensure they are received for all active subscriptions.
+
+	s.Require().Len(subscribeResponses, len(subscriptions), "Missing subscribe messages: have: %+v", subscribeResponses)
+	s.Require().Len(unsubscribeResponses, len(subscriptions), "Missing unsubscribe messages: have: %+v", unsubscribeResponses)
+
+	blockResponses := make(map[string]int)
+
+	for subID, responses := range messageBuckets {
+		s.Require().NotEmpty(responses, "Expected at least 1 messages for subscription ID: %s", subID)
+		s.validate(subID, subscriptionRequests[subID].Topic, responses)
+
+		for _, response := range responses {
+			payloadRaw := s.validateBaseDataProvidersResponse(response.SubscriptionID, response.Topic, response)
+
+			switch response.Topic {
+			case data_providers.BlockDigestsTopic:
+				var payload models.BlockDigest
+				err := restcommon.ParseBody(bytes.NewReader(payloadRaw), &payload)
+				s.Require().NoError(err)
+				blockResponses[payload.Height]++
+			case data_providers.BlockHeadersTopic:
+				var payload commonmodels.BlockHeader
+				err := restcommon.ParseBody(bytes.NewReader(payloadRaw), &payload)
+				s.Require().NoError(err)
+				blockResponses[payload.Height]++
+			case data_providers.BlocksTopic:
+				var payload commonmodels.Block
+				err := restcommon.ParseBody(bytes.NewReader(payloadRaw), &payload)
+				s.Require().NoError(err)
+				blockResponses[payload.Header.Height]++
+			default:
+				s.Failf("unexpected message topic", "got: %s", response.Topic)
+			}
+		}
+	}
+
+	for height, count := range blockResponses {
+		s.Assert().Equalf(len(subscriptions), count, "Expected %d responses for block height %s, but got: %d", len(subscriptions), height, count)
 	}
 }
 
