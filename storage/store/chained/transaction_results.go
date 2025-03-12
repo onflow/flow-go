@@ -14,9 +14,9 @@ type ChainedTransactionResults struct {
 
 var _ storage.TransactionResultsReader = (*ChainedTransactionResults)(nil)
 
-// NewTransactionResults returns a new ChainedTransactionResults transaction results store, which will handle reads. Any writes query
-// will return err
-// for reads, it first query first database, then second database, this is useful when migrating
+// NewTransactionResults returns a new ChainedTransactionResults transaction results store, which only implements
+// read operations
+// it first queries the first database, then the second database. this is useful when migrating
 // data from badger to pebble
 func NewTransactionResults(first storage.TransactionResultsReader, second storage.TransactionResultsReader) *ChainedTransactionResults {
 	return &ChainedTransactionResults{
@@ -25,6 +25,9 @@ func NewTransactionResults(first storage.TransactionResultsReader, second storag
 	}
 }
 
+// ByBlockIDTransactionID returns the runtime transaction result for the given block ID and transaction ID
+// It returns storage.ErrNotFound if the result is not found
+// any other errors are exceptions
 func (c *ChainedTransactionResults) ByBlockIDTransactionID(blockID flow.Identifier, transactionID flow.Identifier) (*flow.TransactionResult, error) {
 	result, err := c.first.ByBlockIDTransactionID(blockID, transactionID)
 	if err == nil {
@@ -38,6 +41,9 @@ func (c *ChainedTransactionResults) ByBlockIDTransactionID(blockID flow.Identifi
 	return nil, err
 }
 
+// ByBlockIDTransactionIndex returns the runtime transaction result for the given block ID and transaction index
+// It returns storage.ErrNotFound if the result is not found
+// any other errors are exceptions
 func (c *ChainedTransactionResults) ByBlockIDTransactionIndex(blockID flow.Identifier, txIndex uint32) (*flow.TransactionResult, error) {
 	result, err := c.first.ByBlockIDTransactionIndex(blockID, txIndex)
 	if err == nil {
@@ -51,6 +57,9 @@ func (c *ChainedTransactionResults) ByBlockIDTransactionIndex(blockID flow.Ident
 	return nil, err
 }
 
+// ByBlockID gets all transaction results for a block, ordered by transaction index
+// It returns storage.ErrNotFound if the result is not found
+// any other errors are exceptions
 func (c *ChainedTransactionResults) ByBlockID(id flow.Identifier) ([]flow.TransactionResult, error) {
 	results, err := c.first.ByBlockID(id)
 	if err != nil {

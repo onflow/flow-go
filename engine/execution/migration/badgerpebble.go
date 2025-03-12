@@ -180,8 +180,7 @@ func readResultsForBlock(
 	blockID flow.Identifier,
 	resultsStore storage.ExecutionResults,
 	commitsStore storage.Commits,
-) (
-	*flow.ExecutionResult, flow.StateCommitment, error) {
+) (*flow.ExecutionResult, flow.StateCommitment, error) {
 	result, err := resultsStore.ByBlockID(blockID)
 	if err != nil {
 		return nil, flow.DummyStateCommitment, fmt.Errorf("failed to get receipt for block %s: %w", blockID, err)

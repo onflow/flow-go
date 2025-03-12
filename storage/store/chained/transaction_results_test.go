@@ -23,7 +23,7 @@ func TestTxResultsOnlyFirstHave(t *testing.T) {
 		presults := store.NewTransactionResults(metrics.NewNoopCollector(), pebbleimpl.ToDB(pdb), 1)
 
 		blockID := unittest.IdentifierFixture()
-		txResults := make([]flow.TransactionResult, 0)
+		txResults := make([]flow.TransactionResult, 0, 10)
 		for i := 0; i < 10; i++ {
 			txID := unittest.IdentifierFixture()
 			expected := flow.TransactionResult{
@@ -57,7 +57,7 @@ func TestTxResultsOnlySecondHave(t *testing.T) {
 		presults := store.NewTransactionResults(metrics.NewNoopCollector(), pebbleimpl.ToDB(pdb), 1)
 
 		blockID := unittest.IdentifierFixture()
-		txResults := make([]flow.TransactionResult, 0)
+		txResults := make([]flow.TransactionResult, 0, 10)
 		for i := 0; i < 10; i++ {
 			txID := unittest.IdentifierFixture()
 			expected := flow.TransactionResult{
@@ -74,7 +74,7 @@ func TestTxResultsOnlySecondHave(t *testing.T) {
 		require.NoError(t, err)
 		require.Len(t, actual, 0)
 
-		// only stored in first
+		// only stored in second
 		require.NoError(t, badgerimpl.ToDB(bdb).WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 			return bresults.BatchStore(blockID, txResults, rw)
 		}))

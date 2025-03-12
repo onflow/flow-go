@@ -14,9 +14,9 @@ type ChainedCommits struct {
 
 var _ storage.CommitsReader = (*ChainedCommits)(nil)
 
-// NewCommits returns a new ChainedCommits commits store, which will handle reads. Any writes query
-// will return err
-// for reads, it first query first database, then second database, this is useful when migrating
+// NewCommits returns a new ChainedCommits commits store, which will handle reads, which only implements
+// read operations
+// for reads, it first query the first database, then the second database, this is useful when migrating
 // data from badger to pebble
 func NewCommits(first storage.CommitsReader, second storage.CommitsReader) *ChainedCommits {
 	return &ChainedCommits{

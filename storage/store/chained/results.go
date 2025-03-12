@@ -8,25 +8,25 @@ import (
 	"github.com/onflow/flow-go/storage/badger/transaction"
 )
 
-type ChainedResults struct {
+type ChainedExecutionResults struct {
 	first  storage.ExecutionResultsReader
 	second storage.ExecutionResultsReader
 }
 
-var _ storage.ExecutionResultsReader = (*ChainedResults)(nil)
+var _ storage.ExecutionResultsReader = (*ChainedExecutionResults)(nil)
 
-// NewResults returns a new ChainedResults results store, which will handle reads. Any writes query
-// will return err
-// for reads, it first query first database, then second database, this is useful when migrating
+// NewResults returns a new ChainedExecutionResults results store, which will handle reads. which only implements
+// read operations
+// for reads, it first query the first database, then the second database, this is useful when migrating
 // data from badger to pebble
-func NewExecutionResults(first storage.ExecutionResultsReader, second storage.ExecutionResultsReader) *ChainedResults {
-	return &ChainedResults{
+func NewExecutionResults(first storage.ExecutionResultsReader, second storage.ExecutionResultsReader) *ChainedExecutionResults {
+	return &ChainedExecutionResults{
 		first:  first,
 		second: second,
 	}
 }
 
-func (c *ChainedResults) ByID(resultID flow.Identifier) (*flow.ExecutionResult, error) {
+func (c *ChainedExecutionResults) ByID(resultID flow.Identifier) (*flow.ExecutionResult, error) {
 	result, err := c.first.ByID(resultID)
 	if err == nil {
 		return result, nil
@@ -39,7 +39,7 @@ func (c *ChainedResults) ByID(resultID flow.Identifier) (*flow.ExecutionResult, 
 	return nil, err
 }
 
-func (c *ChainedResults) ByBlockID(blockID flow.Identifier) (*flow.ExecutionResult, error) {
+func (c *ChainedExecutionResults) ByBlockID(blockID flow.Identifier) (*flow.ExecutionResult, error) {
 	result, err := c.first.ByBlockID(blockID)
 	if err == nil {
 		return result, nil
@@ -52,7 +52,7 @@ func (c *ChainedResults) ByBlockID(blockID flow.Identifier) (*flow.ExecutionResu
 	return nil, err
 }
 
-func (c *ChainedResults) ByIDTx(resultID flow.Identifier) func(*transaction.Tx) (*flow.ExecutionResult, error) {
+func (c *ChainedExecutionResults) ByIDTx(resultID flow.Identifier) func(*transaction.Tx) (*flow.ExecutionResult, error) {
 	return func(tx *transaction.Tx) (*flow.ExecutionResult, error) {
 		result, err := c.first.ByIDTx(resultID)(tx)
 		if err == nil {

@@ -12,9 +12,9 @@ type ChainedEvents struct {
 
 var _ storage.EventsReader = (*ChainedEvents)(nil)
 
-// NewEvents returns a new ChainedEvents events store, which will handle reads. Any writes query
-// will return err
-// for reads, it first query first database, then second database, this is useful when migrating
+// NewEvents returns a new ChainedEvents events store, which will handle reads, which only implements
+// read operations
+// for reads, it first query the first database, then the second database, this is useful when migrating
 // data from badger to pebble
 func NewEvents(first storage.EventsReader, second storage.EventsReader) *ChainedEvents {
 	return &ChainedEvents{
