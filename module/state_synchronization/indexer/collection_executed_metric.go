@@ -54,7 +54,7 @@ func NewCollectionExecutedMetricImpl(
 // CollectionFinalized tracks collections to mark finalized
 func (c *CollectionExecutedMetricImpl) CollectionFinalized(light flow.LightCollection) {
 	lightID := light.ID()
-	if ti, found := c.collectionsToMarkFinalized.ByID(lightID); found {
+	if ti, found := c.collectionsToMarkFinalized.Get(lightID); found {
 
 		block, err := c.blocks.ByCollectionID(lightID)
 		if err != nil {
@@ -74,7 +74,7 @@ func (c *CollectionExecutedMetricImpl) CollectionFinalized(light flow.LightColle
 
 // CollectionExecuted tracks collections to mark executed
 func (c *CollectionExecutedMetricImpl) CollectionExecuted(light flow.LightCollection) {
-	if ti, found := c.collectionsToMarkExecuted.ByID(light.ID()); found {
+	if ti, found := c.collectionsToMarkExecuted.Get(light.ID()); found {
 		for _, t := range light.Transactions {
 			c.accessMetrics.TransactionExecuted(t, ti)
 		}
@@ -119,7 +119,7 @@ func (c *CollectionExecutedMetricImpl) BlockFinalized(block *flow.Block) {
 		}
 	}
 
-	if ti, found := c.blocksToMarkExecuted.ByID(blockID); found {
+	if ti, found := c.blocksToMarkExecuted.Get(blockID); found {
 		c.blockExecuted(block, ti)
 		c.accessMetrics.UpdateExecutionReceiptMaxHeight(block.Header.Height)
 		c.blocksToMarkExecuted.Remove(blockID)
