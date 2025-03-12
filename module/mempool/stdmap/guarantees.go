@@ -22,7 +22,7 @@ func NewGuarantees(limit uint) (*Guarantees, error) {
 
 // Add adds a collection guarantee to the mempool, keyed by the collection ID.
 func (g *Guarantees) Add(guarantee *flow.CollectionGuarantee) bool {
-	return g.Backend.Add(guarantee.ID(), guarantee)
+	return g.Backend.Add(guarantee.CollectionID, guarantee)
 }
 
 // ByID returns the collection guarantee with the given ID from the mempool.

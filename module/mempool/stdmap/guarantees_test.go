@@ -37,13 +37,13 @@ func TestGuaranteePool(t *testing.T) {
 	})
 
 	t.Run("should be able to get first", func(t *testing.T) {
-		got, exists := pool.ByID(item1.ID())
+		got, exists := pool.ByID(item1.CollectionID)
 		assert.True(t, exists)
 		assert.Equal(t, item1, got)
 	})
 
 	t.Run("should be able to remove second", func(t *testing.T) {
-		ok := pool.Remove(item2.ID())
+		ok := pool.Remove(item2.CollectionID)
 		assert.True(t, ok)
 	})
 
