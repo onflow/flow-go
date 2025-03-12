@@ -64,13 +64,13 @@ func (ir *IncorporatedResultSeals) removeByHeight(height uint64) {
 func (ir *IncorporatedResultSeals) Add(seal *flow.IncorporatedResultSeal) (bool, error) {
 	added := false
 	sealID := seal.ID()
-	err := ir.Backend.Run(func(_ mempool.BackData[flow.Identifier, *flow.IncorporatedResultSeal]) error {
+	err := ir.Backend.Run(func(backData mempool.BackData[flow.Identifier, *flow.IncorporatedResultSeal]) error {
 		// skip elements below the pruned
 		if seal.Header.Height < ir.lowestHeight {
 			return nil
 		}
 
-		added = ir.mutableBackData.Add(sealID, seal)
+		added = backData.Add(sealID, seal)
 		if !added {
 			return nil
 		}
@@ -115,9 +115,9 @@ func (ir *IncorporatedResultSeals) ByID(id flow.Identifier) (*flow.IncorporatedR
 // Remove removes an IncorporatedResultSeal from the mempool
 func (ir *IncorporatedResultSeals) Remove(id flow.Identifier) bool {
 	removed := false
-	err := ir.Backend.Run(func(_ mempool.BackData[flow.Identifier, *flow.IncorporatedResultSeal]) error {
+	err := ir.Backend.Run(func(backData mempool.BackData[flow.Identifier, *flow.IncorporatedResultSeal]) error {
 		var seal *flow.IncorporatedResultSeal
-		seal, removed = ir.mutableBackData.Remove(id)
+		seal, removed = backData.Remove(id)
 		if !removed {
 			return nil
 		}
@@ -131,8 +131,8 @@ func (ir *IncorporatedResultSeals) Remove(id flow.Identifier) bool {
 }
 
 func (ir *IncorporatedResultSeals) Clear() {
-	err := ir.Backend.Run(func(_ mempool.BackData[flow.Identifier, *flow.IncorporatedResultSeal]) error {
-		ir.mutableBackData.Clear()
+	err := ir.Backend.Run(func(backData mempool.BackData[flow.Identifier, *flow.IncorporatedResultSeal]) error {
+		backData.Clear()
 		ir.byHeight = make(map[uint64]sealSet)
 		return nil
 	})
