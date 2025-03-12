@@ -680,7 +680,8 @@ func (s *WsControllerSuite) TestRateLimiter() {
 
 	// Step 2: Configure the WebSocket controller with a rate limit.
 	config := NewDefaultWebsocketConfig()
-	config.MaxResponsesPerSecond = 2 // 2 messages per second.
+	config.MaxResponsesPerSecond = 2
+
 	controller := NewWebSocketController(s.logger, config, conn, nil)
 
 	// Step 3: Simulate sending messages to the controller's `multiplexedStream`.
@@ -853,10 +854,6 @@ func (s *WsControllerSuite) TestControllerShutdown() {
 		controller := NewWebSocketController(s.logger, s.wsConfig, conn, factory)
 
 		ctx, cancel := context.WithCancel(context.Background())
-		conn.On("ReadJSON", mock.Anything).Return(func(_ interface{}) error {
-			<-ctx.Done()
-			return websocket.ErrCloseSent
-		}).Once()
 
 		cancel()
 		controller.HandleConnection(ctx)
@@ -1020,13 +1017,14 @@ func (s *WsControllerSuite) expectSubscribeResponse(t *testing.T, conn *connmock
 func (s *WsControllerSuite) expectCloseConnection(conn *connmock.WebsocketConnection, done <-chan struct{}) {
 	// In the default case, no further communication is expected from the client.
 	// We wait for the writer routine to signal completion, allowing us to close the connection gracefully
+	// This call is optional because it is not needed in cases where readMessages exits promptly when the context is canceled.
 	conn.
 		On("ReadJSON", mock.Anything).
 		Return(func(msg interface{}) error {
 			<-done
 			return websocket.ErrCloseSent
 		}).
-		Once()
+		Maybe()
 
 	s.expectKeepaliveRoutineShutdown(conn, done)
 }

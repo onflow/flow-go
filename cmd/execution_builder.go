@@ -239,8 +239,8 @@ func (builder *ExecutionNodeBuilder) LoadComponentsAndModules() {
 		// Load the admin tool when chunk data packs db are initialized in execution state
 		AdminCommand("create-chunk-data-packs-checkpoint", func(config *NodeConfig) commands.AdminCommand {
 			// by default checkpoints will be created under "/data/chunk_data_packs_checkpoints_dir"
-			return storageCommands.NewChunksCheckpointCommand(exeNode.exeConf.chunkDataPackCheckpointsDir,
-				exeNode.chunkDataPackDB)
+			return storageCommands.NewPebbleDBCheckpointCommand(exeNode.exeConf.chunkDataPackCheckpointsDir,
+				"chunk_data_pack", exeNode.chunkDataPackDB)
 		}).
 		Component("stop control", exeNode.LoadStopControl).
 		Component("execution state ledger WAL compactor", exeNode.LoadExecutionStateLedgerWALCompactor).

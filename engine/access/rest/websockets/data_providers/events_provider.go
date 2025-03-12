@@ -6,6 +6,7 @@ import (
 
 	"github.com/rs/zerolog"
 
+	"github.com/onflow/flow-go/engine/access/rest/common"
 	"github.com/onflow/flow-go/engine/access/rest/common/parser"
 	"github.com/onflow/flow-go/engine/access/rest/http/request"
 	"github.com/onflow/flow-go/engine/access/rest/util"
@@ -85,7 +86,8 @@ func NewEventsDataProvider(
 
 // Run starts processing the subscription for events and handles responses.
 //
-// No errors are expected during normal operations.
+// Expected errors during normal operations:
+//   - context.Canceled: if the operation is canceled, during an unsubscribe action.
 func (p *EventsDataProvider) Run() error {
 	return subscription.HandleSubscription(p.subscription, p.handleResponse())
 }
@@ -170,12 +172,12 @@ func parseEventsArguments(
 	// Parse 'event_types' as a JSON array
 	var eventTypes parser.EventTypes
 	if eventTypesIn, ok := arguments["event_types"]; ok && eventTypesIn != "" {
-		result, ok := eventTypesIn.([]string)
-		if !ok {
+		result, err := common.ParseInterfaceToStrings(eventTypesIn)
+		if err != nil {
 			return eventsArguments{}, fmt.Errorf("'event_types' must be an array of string")
 		}
 
-		err := eventTypes.Parse(result)
+		err = eventTypes.Parse(result)
 		if err != nil {
 			return eventsArguments{}, fmt.Errorf("invalid 'event_types': %w", err)
 		}
@@ -184,8 +186,8 @@ func parseEventsArguments(
 	// Parse 'addresses' as []string{}
 	var addresses []string
 	if addressesIn, ok := arguments["addresses"]; ok && addressesIn != "" {
-		addresses, ok = addressesIn.([]string)
-		if !ok {
+		addresses, err = common.ParseInterfaceToStrings(addressesIn)
+		if err != nil {
 			return eventsArguments{}, fmt.Errorf("'addresses' must be an array of string")
 		}
 	}
@@ -193,8 +195,8 @@ func parseEventsArguments(
 	// Parse 'contracts' as []string{}
 	var contracts []string
 	if contractsIn, ok := arguments["contracts"]; ok && contractsIn != "" {
-		contracts, ok = contractsIn.([]string)
-		if !ok {
+		contracts, err = common.ParseInterfaceToStrings(contractsIn)
+		if err != nil {
 			return eventsArguments{}, fmt.Errorf("'contracts' must be an array of string")
 		}
 	}
