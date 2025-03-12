@@ -10,7 +10,7 @@ import (
 
 type receiptsSet map[flow.Identifier]struct{}
 
-// PendingReceipts stores pending receipts indexed by the id.
+// PendingReceipts stores pending receipts indexed by the ID of execution receipt.
 // It also maintains a secondary index on the previous result id.
 // in order to allow to find receipts by the previous result id.
 type PendingReceipts struct {
@@ -160,11 +160,6 @@ func (r *PendingReceipts) ByPreviousResultID(previousResultID flow.Identifier) [
 	}
 
 	return receipts
-}
-
-// Size will return the total number of pending receipts
-func (r *PendingReceipts) Size() uint {
-	return r.Backend.Size()
 }
 
 // PruneUpToHeight remove all receipts for blocks whose height is strictly

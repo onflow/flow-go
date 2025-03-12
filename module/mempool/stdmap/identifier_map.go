@@ -12,14 +12,9 @@ type IdentifierMap struct {
 	*Backend[flow.Identifier, map[flow.Identifier]struct{}]
 }
 
-// NewIdentifierMap creates a new memory pool for a list of identifiers.
+// NewIdentifierMap creates a new memory pool for sets of Identifier (keyed by some Identifier).
 func NewIdentifierMap(limit uint) (*IdentifierMap, error) {
-	i := &IdentifierMap{
-		Backend: NewBackend[flow.Identifier, map[flow.Identifier]struct{}](
-			WithLimit[flow.Identifier, map[flow.Identifier]struct{}](limit),
-		),
-	}
-	return i, nil
+	return &IdentifierMap{NewBackend(WithLimit[flow.Identifier, map[flow.Identifier]struct{}](limit))}, nil
 }
 
 // Append will add the id to the set of identifiers associated with key.
@@ -64,17 +59,6 @@ func (i *IdentifierMap) Get(key flow.Identifier) (flow.IdentifierList, bool) {
 	return ids, true
 }
 
-// Has returns true if the key exists in the map, i.e., there is at least an id
-// attached to it.
-func (i *IdentifierMap) Has(key flow.Identifier) bool {
-	return i.Backend.Has(key)
-}
-
-// Remove removes the given key with all associated identifiers.
-func (i *IdentifierMap) Remove(key flow.Identifier) bool {
-	return i.Backend.Remove(key)
-}
-
 // RemoveIdFromKey removes the id from the list of identifiers associated with key.
 // If the list becomes empty, it also removes the key from the map.
 func (i *IdentifierMap) RemoveIdFromKey(key, id flow.Identifier) error {
@@ -99,12 +83,7 @@ func (i *IdentifierMap) RemoveIdFromKey(key, id flow.Identifier) error {
 	return err
 }
 
-// Size returns number of a lists of identifiers in the mempool
-func (i *IdentifierMap) Size() uint {
-	return i.Backend.Size()
-}
-
-// Keys returns a list of all keys in the mempool
+// Keys returns a list of all keys in the mempool.
 func (i *IdentifierMap) Keys() (flow.IdentifierList, bool) {
 	all := i.Backend.All()
 	keys := make(flow.IdentifierList, 0, len(all))

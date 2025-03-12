@@ -167,7 +167,7 @@ func demo() {
 			// memory pools
 			receipt := unittest.ExecutionReceiptFixture()
 			tryRandomCall(func() {
-				receipts.Add(receipt)
+				receipts.Add(receipt.ID(), receipt)
 			})
 
 			tryRandomCall(func() {

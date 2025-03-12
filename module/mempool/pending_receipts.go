@@ -16,7 +16,7 @@ type PendingReceipts interface {
 
 	// ByPreviousResultID returns all the pending receipts whose previous result id
 	// matches the given result id
-	ByPreviousResultID(previousReusltID flow.Identifier) []*flow.ExecutionReceipt
+	ByPreviousResultID(previousResultID flow.Identifier) []*flow.ExecutionReceipt
 
 	// PruneUpToHeight remove all receipts for blocks whose height is strictly
 	// smaller that height. Note: receipts for blocks at height are retained.

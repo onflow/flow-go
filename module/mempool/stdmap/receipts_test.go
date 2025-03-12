@@ -18,12 +18,12 @@ func TestReceiptPool(t *testing.T) {
 	require.NoError(t, err)
 
 	t.Run("should be able to add first", func(t *testing.T) {
-		added := pool.Add(item1)
+		added := pool.Add(item1.ID(), item1)
 		assert.True(t, added)
 	})
 
 	t.Run("should be able to add second", func(t *testing.T) {
-		added := pool.Add(item2)
+		added := pool.Add(item2.ID(), item2)
 		assert.True(t, added)
 	})
 
@@ -33,7 +33,7 @@ func TestReceiptPool(t *testing.T) {
 	})
 
 	t.Run("should be able to get first", func(t *testing.T) {
-		got, exists := pool.ByID(item1.ID())
+		got, exists := pool.Get(item1.ID())
 		assert.True(t, exists)
 		assert.Equal(t, item1, got)
 	})
@@ -46,6 +46,8 @@ func TestReceiptPool(t *testing.T) {
 	t.Run("should be able to retrieve all", func(t *testing.T) {
 		items := pool.All()
 		assert.Len(t, items, 1)
-		assert.Equal(t, item1, items[0])
+		val, exists := items[item1.ID()]
+		require.True(t, exists)
+		assert.Equal(t, item1, val)
 	})
 }

@@ -4,7 +4,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
-// IdentifierMap represents a concurrency-safe memory pool for mapping an identifier to a list of identifiers
+// IdentifierMap represents a concurrency-safe memory pool for sets of Identifier (keyed by some Identifier).
 type IdentifierMap interface {
 	// Append will append the id to the list of identifiers associated with key.
 	Append(key, id flow.Identifier)
@@ -24,9 +24,9 @@ type IdentifierMap interface {
 	// attached to it.
 	Has(key flow.Identifier) bool
 
-	// Keys returns a list of all keys in the mempool
+	// Keys returns a list of all keys in the mempool.
 	Keys() (flow.IdentifierList, bool)
 
-	// Size returns number of IdMapEntities in mempool
+	// Size returns the number of items in the mempool.
 	Size() uint
 }
