@@ -166,15 +166,14 @@ func (s *ExecForkSuppressor) All() []*flow.IncorporatedResultSeal {
 	return s.filterConflictingSeals(sealsByBlockID)
 }
 
-// ByID returns an IncorporatedResultSeal by its ID.
-// The IncorporatedResultSeal's ID is the same as IncorporatedResult's ID,
-// so this call essentially is to find the seal for the incorporated result in the mempool.
+// Get returns an IncorporatedResultSeal by IncorporatedResult's ID.
+// This call essentially is to find the seal for the incorporated result in the mempool.
 // Note: This call might crash if the block of the seal has multiple seals in mempool for conflicting
 // incorporated results. Usually the builder will call this method to find a seal for an incorporated
 // result, so the builder might crash if multiple conflicting seals exist.
-func (s *ExecForkSuppressor) ByID(identifier flow.Identifier) (*flow.IncorporatedResultSeal, bool) {
+func (s *ExecForkSuppressor) Get(identifier flow.Identifier) (*flow.IncorporatedResultSeal, bool) {
 	s.mutex.RLock()
-	seal, found := s.seals.ByID(identifier)
+	seal, found := s.seals.Get(identifier)
 	// if we haven't found seal in underlying storage - exit early
 	if !found {
 		s.mutex.RUnlock()
@@ -201,12 +200,12 @@ func (s *ExecForkSuppressor) ByID(identifier flow.Identifier) (*flow.Incorporate
 	return seals[0], true
 }
 
-// Remove removes the IncorporatedResultSeal with id from the mempool
+// Remove removes the IncorporatedResultSeal by IncorporatedResult ID from the mempool.
 func (s *ExecForkSuppressor) Remove(id flow.Identifier) bool {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 
-	seal, found := s.seals.ByID(id)
+	seal, found := s.seals.Get(id)
 	if found {
 		s.seals.Remove(id)
 		set, found := s.sealsForBlock[seal.Seal.BlockID]

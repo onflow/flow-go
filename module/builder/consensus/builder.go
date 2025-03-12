@@ -429,7 +429,7 @@ func (b *Builder) getInsertableSeals(parentID flow.Identifier) ([]*flow.Seal, er
 			// enforce condition (0): candidate seals are only constructed once sufficient
 			// approvals have been collected. Hence, any incorporated result for which we
 			// find a candidate seal satisfies condition (0)
-			irSeal, ok := b.sealPool.ByID(incorporatedResult.ID())
+			irSeal, ok := b.sealPool.Get(incorporatedResult.ID())
 			if !ok {
 				continue
 			}

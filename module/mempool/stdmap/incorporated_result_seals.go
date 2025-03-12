@@ -88,11 +88,6 @@ func (ir *IncorporatedResultSeals) Add(seal *flow.IncorporatedResultSeal) (bool,
 	return added, err
 }
 
-// Size returns the size of the underlying backing store
-func (ir *IncorporatedResultSeals) Size() uint {
-	return ir.Backend.Size()
-}
-
 // All returns all the items in the mempool
 func (ir *IncorporatedResultSeals) All() []*flow.IncorporatedResultSeal {
 	all := ir.Backend.All()
@@ -101,15 +96,6 @@ func (ir *IncorporatedResultSeals) All() []*flow.IncorporatedResultSeal {
 		results = append(results, result)
 	}
 	return results
-}
-
-// ByID gets an IncorporatedResultSeal by IncorporatedResult ID
-func (ir *IncorporatedResultSeals) ByID(id flow.Identifier) (*flow.IncorporatedResultSeal, bool) {
-	result, ok := ir.Backend.Get(id)
-	if !ok {
-		return nil, false
-	}
-	return result, true
 }
 
 // Remove removes an IncorporatedResultSeal from the mempool
