@@ -175,7 +175,7 @@ func parseAccountStatusesArguments(
 	args.HeartbeatInterval = heartbeatInterval
 
 	// Parse 'event_types' as a JSON array
-	eventTypeList, err := extractArrayOfStrings(arguments, "event_types", true)
+	eventTypeList, err := extractArrayOfStrings(arguments, "event_types", false)
 	if err != nil {
 		return accountStatusesArguments{}, err
 	}
@@ -186,7 +186,7 @@ func parseAccountStatusesArguments(
 	}
 
 	// Parse 'account_addresses' as []string
-	accountAddresses, err := extractArrayOfStrings(arguments, "account_addresses", true)
+	accountAddresses, err := extractArrayOfStrings(arguments, "account_addresses", false)
 	if err != nil {
 		return accountStatusesArguments{}, err
 	}

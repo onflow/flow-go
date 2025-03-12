@@ -224,9 +224,8 @@ func (s *WebsocketSubscriptionSuite) testInactivityTracker() {
 			5*time.Second,
 			subscriptionRequest.SubscriptionID,
 		)
-
 		s.Require().Equal(1, len(baseResponses))
-		s.validateBaseMessageResponse(baseResponses[0])
+		s.Require().Equal(0, baseResponses[0].Error.Code, baseResponses[0].Error.Message)
 
 		// Step 3: Unsubscribe from the topic
 		unsubscribeRequest := models.UnsubscribeMessageRequest{
@@ -241,7 +240,7 @@ func (s *WebsocketSubscriptionSuite) testInactivityTracker() {
 		var response models.BaseMessageResponse
 		err = wsClient.ReadJSON(&response)
 		s.Require().NoError(err, "failed to read unsubscribe response")
-		s.validateBaseMessageResponse(response)
+		s.Require().Equal(0, response.Error.Code, response.Error.Message)
 
 		// Step 4: Monitor inactivity after unsubscription
 		actualInactivityDuration := monitorInactivity(s.T(), wsClient, expectedMinInactivityDuration)
@@ -287,7 +286,8 @@ func (s *WebsocketSubscriptionSuite) testMaxSubscriptionsPerConnection() {
 
 		if i <= MaxSubscriptionsPerConnection {
 			// Validate successful subscription response.
-			s.validateBaseMessageResponse(subscribeResponse)
+			s.Require().Equal(0, subscribeResponse.Error.Code, subscribeResponse.Error.Message)
+
 		} else {
 			// Validate error response for exceeding the subscription limit.
 			//s.Require().Equal(models.SubscribeAction, subscribeResponse.Action)
@@ -447,7 +447,7 @@ func (s *WebsocketSubscriptionSuite) testListOfSubscriptions() {
 	// verify success subscribe response
 	_, baseResponses, _ := s.listenWebSocketResponses(wsClient, 1*time.Second, blocksSubscriptionID)
 	s.Require().Equal(1, len(baseResponses))
-	s.validateBaseMessageResponse(baseResponses[0])
+	s.Require().Equal(0, baseResponses[0].Error.Code, baseResponses[0].Error.Message)
 
 	// 2. Create block headers subscription request message
 	blockHeadersSubscriptionID := "block_headers_id"
@@ -463,10 +463,14 @@ func (s *WebsocketSubscriptionSuite) testListOfSubscriptions() {
 	// verify success subscribe response
 	_, baseResponses, _ = s.listenWebSocketResponses(wsClient, 1*time.Second, blockHeadersSubscriptionID)
 	s.Require().Equal(1, len(baseResponses))
-	s.validateBaseMessageResponse(baseResponses[0])
+	s.Require().Equal(0, baseResponses[0].Error.Code, baseResponses[0].Error.Message)
 
 	// 3. Create list of subscription request message
-	listOfSubscriptionRequest := s.listSubscriptionsMessageRequest()
+	listOfSubscriptionRequest := models.ListSubscriptionsMessageRequest{
+		BaseMessageRequest: models.BaseMessageRequest{
+			Action: models.ListSubscriptionsAction,
+		},
+	}
 	// send list of subscription message
 	s.Require().NoError(wsClient.WriteJSON(listOfSubscriptionRequest))
 
@@ -659,7 +663,7 @@ func (s *WebsocketSubscriptionSuite) testHappyCases() {
 
 			// Step 4: Validate the subscription response
 			s.Require().Equal(1, len(baseMessageResponses), "expected one subscription response")
-			s.validateBaseMessageResponse(baseMessageResponses[0])
+			s.Require().Equal(0, baseMessageResponses[0].Error.Code, baseMessageResponses[0].Error.Message)
 
 			// Step 5: Use the provided validation function to check received responses
 			s.validate(
@@ -680,7 +684,7 @@ func (s *WebsocketSubscriptionSuite) testHappyCases() {
 				var response models.BaseMessageResponse
 				err := wsClient.ReadJSON(&response)
 				s.Require().NoError(err, "failed to read unsubscription response")
-				s.validateBaseMessageResponse(response)
+				s.Require().Equal(0, response.Error.Code, response.Error.Message)
 			}
 		})
 	}
@@ -764,7 +768,7 @@ func (s *WebsocketSubscriptionSuite) testSubscriptionMultiplexing() {
 		var response models.BaseMessageResponse
 		err := wsClient.ReadJSON(&response)
 		s.Require().NoError(err, "Failed to read unsubscription response for topic: %s", sub.Topic)
-		s.validateBaseMessageResponse(response)
+		s.Require().Equal(0, response.Error.Code, response.Error.Message)
 	}
 }
 
@@ -1079,15 +1083,6 @@ func (s *WebsocketSubscriptionSuite) unsubscribeMessageRequest(subscriptionID st
 	}
 }
 
-// listSubscriptionsMessageRequest creates a list subscriptions message request.
-func (s *WebsocketSubscriptionSuite) listSubscriptionsMessageRequest() models.ListSubscriptionsMessageRequest {
-	return models.ListSubscriptionsMessageRequest{
-		BaseMessageRequest: models.BaseMessageRequest{
-			Action: models.ListSubscriptionsAction,
-		},
-	}
-}
-
 // getWebsocketsUrl is a helper function that creates websocket url.
 func getWebsocketsUrl(accessAddr string) string {
 	u, _ := url.Parse("http://" + accessAddr + "/v1/ws")
@@ -1156,14 +1151,6 @@ func (s *WebsocketSubscriptionSuite) listenWebSocketResponses(
 			}
 		}
 	}
-}
-
-// validateBaseMessageResponse validates the properties of a success BaseMessageResponse.
-func (s *WebsocketSubscriptionSuite) validateBaseMessageResponse(
-	actualResponse models.BaseMessageResponse,
-) {
-	s.Require().Equal(0, actualResponse.Error.Code)
-	s.Require().Empty(actualResponse.Error.Message)
 }
 
 // createAndSendTx creates a new account transaction.

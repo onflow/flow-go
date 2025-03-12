@@ -23,8 +23,12 @@ func extractArrayOfStrings(args models.Arguments, name string, required bool) ([
 	var result []string
 
 	raw, exists := args[name]
-	if !exists && required {
-		return result, fmt.Errorf("missing '%s' field", name)
+	if !exists {
+		if required {
+			return result, fmt.Errorf("missing '%s' field", name)
+		}
+
+		return result, nil
 	}
 
 	converted, err := common.ConvertInterfaceToArrayOfStrings(raw)
