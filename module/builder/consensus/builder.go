@@ -321,15 +321,13 @@ func (b *Builder) getInsertableGuarantees(parentID flow.Identifier) ([]*flow.Col
 
 	// go through mempool and collect valid collections
 	var guarantees []*flow.CollectionGuarantee
-	for _, guarantee := range b.guarPool.All() {
+	for collID, guarantee := range b.guarPool.All() {
 		// add at most <maxGuaranteeCount> number of collection guarantees in a new block proposal
 		// in order to prevent the block payload from being too big or computationally heavy for the
 		// execution nodes
 		if uint(len(guarantees)) >= b.cfg.maxGuaranteeCount {
 			break
 		}
-
-		collID := guarantee.ID()
 
 		// skip collections that are already included in a block on the fork
 		_, duplicated := receiptLookup[collID]

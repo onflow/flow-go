@@ -13,33 +13,5 @@ type Guarantees struct {
 
 // NewGuarantees creates a new memory pool for collection guarantees.
 func NewGuarantees(limit uint) (*Guarantees, error) {
-	g := &Guarantees{
-		Backend: NewBackend(WithLimit[flow.Identifier, *flow.CollectionGuarantee](limit)),
-	}
-
-	return g, nil
-}
-
-// Add adds a collection guarantee to the mempool, keyed by the collection ID.
-func (g *Guarantees) Add(guarantee *flow.CollectionGuarantee) bool {
-	return g.Backend.Add(guarantee.CollectionID, guarantee)
-}
-
-// ByID returns the collection guarantee with the given ID from the mempool.
-func (g *Guarantees) ByID(collID flow.Identifier) (*flow.CollectionGuarantee, bool) {
-	guarantee, exists := g.Backend.Get(collID)
-	if !exists {
-		return nil, false
-	}
-	return guarantee, true
-}
-
-// All returns all collection guarantees from the mempool.
-func (g *Guarantees) All() []*flow.CollectionGuarantee {
-	all := g.Backend.All()
-	guarantees := make([]*flow.CollectionGuarantee, 0, len(all))
-	for _, guarantee := range all {
-		guarantees = append(guarantees, guarantee)
-	}
-	return guarantees
+	return &Guarantees{NewBackend(WithLimit[flow.Identifier, *flow.CollectionGuarantee](limit))}, nil
 }
