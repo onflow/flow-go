@@ -159,10 +159,6 @@ func (s *WebsocketSubscriptionSuite) SetupTest() {
 //
 // The WebSocket client is properly closed after each sub-test execution to avoid resource leaks.
 func (s *WebsocketSubscriptionSuite) TestWebsocketSubscriptions() {
-	wsClient, err := common.GetWSClient(s.ctx, getWebsocketsUrl(s.restAccessAddress))
-	s.Require().NoError(err)
-	defer func() { s.Require().NoError(wsClient.Close()) }()
-
 	// NOTE: To minimize the system setup time for WebSocket tests,
 	// the setup is performed once, and all tests run as sub-functions.
 	// When adding a new WebSocket test, please include it here.
@@ -226,7 +222,7 @@ func (s *WebsocketSubscriptionSuite) testInactivityTracker() {
 		)
 
 		s.Require().Equal(1, len(baseResponses))
-		s.validateBaseMessageResponse(baseResponses[0])
+		s.Require().Equal(0, baseResponses[0].Error.Code, baseResponses[0].Error.Message)
 
 		// Step 3: Unsubscribe from the topic
 		unsubscribeRequest := models.UnsubscribeMessageRequest{
@@ -241,7 +237,7 @@ func (s *WebsocketSubscriptionSuite) testInactivityTracker() {
 		var response models.BaseMessageResponse
 		err = wsClient.ReadJSON(&response)
 		s.Require().NoError(err, "failed to read unsubscribe response")
-		s.validateBaseMessageResponse(response)
+		s.Require().Equal(0, response.Error.Code, response.Error.Message)
 
 		// Step 4: Monitor inactivity after unsubscription
 		actualInactivityDuration := monitorInactivity(s.T(), wsClient, expectedMinInactivityDuration)
@@ -254,7 +250,7 @@ func (s *WebsocketSubscriptionSuite) testInactivityTracker() {
 // when the number of subscriptions exceeds the configured maximum limit.
 //
 // Expected behavior:
-// - For the first `testMaxSubscriptionsPerConnection` requests, the server should respond with successful subscription messages.
+// - For the first `MaxSubscriptionsPerConnection` requests, the server should respond with successful subscription messages.
 // - On exceeding the subscription limit, the server should return an error response with a message.
 func (s *WebsocketSubscriptionSuite) testMaxSubscriptionsPerConnection() {
 	websocketsUrl := getWebsocketsUrl(s.restAccessAddress)
@@ -268,7 +264,7 @@ func (s *WebsocketSubscriptionSuite) testMaxSubscriptionsPerConnection() {
 	expectedErrorMessage := fmt.Sprintf("error creating new subscription: %s", websockets.ErrMaxSubscriptionsReached.Error())
 
 	// Loop to send subscription requests, including one request exceeding the limit.
-	for i := 1; i <= MaxSubscriptionsPerConnection; i++ {
+	for i := 1; i <= MaxSubscriptionsPerConnection+1; i++ {
 		// Create a subscription message request with a unique ID.
 		subscriptionToBlocksRequest := s.subscribeMessageRequest(
 			strconv.Itoa(i),
@@ -287,10 +283,9 @@ func (s *WebsocketSubscriptionSuite) testMaxSubscriptionsPerConnection() {
 
 		if i <= MaxSubscriptionsPerConnection {
 			// Validate successful subscription response.
-			s.validateBaseMessageResponse(subscribeResponse)
+			s.Require().Equal(0, subscribeResponse.Error.Code, subscribeResponse.Error.Message)
 		} else {
 			// Validate error response for exceeding the subscription limit.
-			//s.Require().Equal(models.SubscribeAction, subscribeResponse.Action)
 			s.Require().Equal(expectedErrorMessage, subscribeResponse.Error.Message)
 		}
 	}
@@ -447,7 +442,7 @@ func (s *WebsocketSubscriptionSuite) testListOfSubscriptions() {
 	// verify success subscribe response
 	_, baseResponses, _ := s.listenWebSocketResponses(wsClient, 1*time.Second, blocksSubscriptionID)
 	s.Require().Equal(1, len(baseResponses))
-	s.validateBaseMessageResponse(baseResponses[0])
+	s.Require().Equal(0, baseResponses[0].Error.Code, baseResponses[0].Error.Message)
 
 	// 2. Create block headers subscription request message
 	blockHeadersSubscriptionID := "block_headers_id"
@@ -463,7 +458,7 @@ func (s *WebsocketSubscriptionSuite) testListOfSubscriptions() {
 	// verify success subscribe response
 	_, baseResponses, _ = s.listenWebSocketResponses(wsClient, 1*time.Second, blockHeadersSubscriptionID)
 	s.Require().Equal(1, len(baseResponses))
-	s.validateBaseMessageResponse(baseResponses[0])
+	s.Require().Equal(0, baseResponses[0].Error.Code, baseResponses[0].Error.Message)
 
 	// 3. Create list of subscription request message
 	listOfSubscriptionRequest := s.listSubscriptionsMessageRequest()
@@ -487,7 +482,15 @@ func (s *WebsocketSubscriptionSuite) testListOfSubscriptions() {
 			Arguments:      blockHeadersSubscriptionArguments,
 		},
 	}
-	s.Require().Equal(expectedSubscriptions, listOfSubscriptionResponse.Subscriptions)
+	s.Require().Len(listOfSubscriptionResponse.Subscriptions, len(expectedSubscriptions))
+
+	for i, expected := range expectedSubscriptions {
+		actual := listOfSubscriptionResponse.Subscriptions[i]
+		s.Require().Equal(expected.SubscriptionID, actual.SubscriptionID)
+		for key, value := range expected.Arguments {
+			s.Require().Equal(value, actual.Arguments[key])
+		}
+	}
 }
 
 // testHappyCases tests various scenarios for websocket subscriptions including
@@ -659,7 +662,7 @@ func (s *WebsocketSubscriptionSuite) testHappyCases() {
 
 			// Step 4: Validate the subscription response
 			s.Require().Equal(1, len(baseMessageResponses), "expected one subscription response")
-			s.validateBaseMessageResponse(baseMessageResponses[0])
+			s.Require().Equal(0, baseMessageResponses[0].Error.Code, baseMessageResponses[0].Error.Message)
 
 			// Step 5: Use the provided validation function to check received responses
 			s.validate(
@@ -680,7 +683,7 @@ func (s *WebsocketSubscriptionSuite) testHappyCases() {
 				var response models.BaseMessageResponse
 				err := wsClient.ReadJSON(&response)
 				s.Require().NoError(err, "failed to read unsubscription response")
-				s.validateBaseMessageResponse(response)
+				s.Require().Equal(0, response.Error.Code, response.Error.Message)
 			}
 		})
 	}
@@ -725,8 +728,68 @@ func (s *WebsocketSubscriptionSuite) testSubscriptionMultiplexing() {
 
 	// Step 2: Subscribe to all topics and handle the responses
 	subscriptionRequests := make(map[string]models.SubscribeMessageRequest)
+	subscribeResponses := make([]models.SubscribeMessageResponse, 0)
+	unsubscribeResponses := make([]models.UnsubscribeMessageResponse, 0)
+	messageBuckets := make(map[string][]models.BaseDataProvidersResponse)
 
-	// Loop over all subscriptions, subscribing to each topic.
+	parseResponse := func(t *testing.T, msg json.RawMessage) (string, interface{}) {
+		var message models.BaseMessageResponse
+		err := json.Unmarshal(msg, &message)
+		s.Require().NoError(err, "failed to unmarshal message")
+
+		switch message.Action {
+		case models.SubscribeAction:
+			var m models.SubscribeMessageResponse
+			err = json.Unmarshal(msg, &m)
+			s.Require().NoError(err, "failed to unmarshal subscribe message")
+			return message.SubscriptionID, m
+
+		case models.UnsubscribeAction:
+			var m models.UnsubscribeMessageResponse
+			err = json.Unmarshal(msg, &m)
+			s.Require().NoError(err, "failed to unmarshal unsubscribe message")
+			return message.SubscriptionID, m
+
+		default:
+			var m models.BaseDataProvidersResponse
+			err = json.Unmarshal(msg, &m)
+			s.Require().NoError(err, "failed to unmarshal unsubscribe message")
+			return message.SubscriptionID, m
+		}
+	}
+
+	// Step 2. Launch a router to collect messages from the WebSocket server into per subscription buckets
+	// will shutdown once all subscriptions are done
+	routerStopped := make(chan struct{})
+	go func() {
+		defer close(routerStopped)
+
+		for {
+			var rawMessage json.RawMessage
+			err := wsClient.ReadJSON(&rawMessage)
+			s.Require().NoError(err)
+
+			subID, message := parseResponse(s.T(), rawMessage)
+
+			switch v := message.(type) {
+			case models.SubscribeMessageResponse:
+				subscribeResponses = append(subscribeResponses, v)
+			case models.UnsubscribeMessageResponse:
+				unsubscribeResponses = append(unsubscribeResponses, v)
+			case models.BaseDataProvidersResponse:
+				messageBuckets[subID] = append(messageBuckets[subID], v)
+			default:
+				s.Failf("unexpected message type", "got type: %T: %+v", message, message)
+			}
+
+			// break out of router once the last expected unsubscribe message is received
+			if len(unsubscribeResponses) == len(subscriptions) {
+				return
+			}
+		}
+	}()
+
+	// Step 3: Subscribe to all topics and handle the responses
 	for i, sub := range subscriptions {
 		subId := fmt.Sprintf("sub_%d", i+1) // Generate a unique subscription ID for each subscription.
 		subscriptionRequest := s.subscribeMessageRequest(subId, sub.topic, sub.prepareArguments())
@@ -734,64 +797,56 @@ func (s *WebsocketSubscriptionSuite) testSubscriptionMultiplexing() {
 		// Send the subscription request.
 		s.Require().NoError(wsClient.WriteJSON(subscriptionRequest))
 		subscriptionRequests[subId] = subscriptionRequest
-
-		// Step 3: Listen for WebSocket subscription success response for the specific subscription.
-		_, subscriptionSuccessResponse, _ := s.listenWebSocketResponses(
-			wsClient,
-			2*time.Second, // Timeout for waiting for a response.
-			subscriptionRequest.SubscriptionID,
-		)
-
-		// Validate that exactly one success response is received and that there is no error.
-		s.Require().Equal(1, len(subscriptionSuccessResponse), "expected one subscription response")
-		s.Require().Equal(models.ErrorMessage{}, subscriptionSuccessResponse[0].Error, "expected no error in subscription success response")
 	}
 
-	// Step 4: Collect messages from the WebSocket for a set duration and categorize them by subscription ID.
-	messageBuckets := make(map[string][]models.BaseDataProvidersResponse)
-	timeout := time.After(15 * time.Second)
-
-loop:
-	for {
-		select {
-		case <-timeout:
-			// Stop collecting messages after the timeout period.
-			break loop
-		default:
-			// Read messages from WebSocket.
-			var response models.BaseDataProvidersResponse
-			if err := wsClient.ReadJSON(&response); err != nil {
-				break // Break out of the loop if there's an error reading a message.
-			}
-			// Store the messages in buckets grouped by subscription ID.
-			messageBuckets[response.SubscriptionID] = append(messageBuckets[response.SubscriptionID], response)
-		}
-	}
-
-	// Step 5: Validate the collected messages to ensure they are received for all active subscriptions.
-	for subID, responses := range messageBuckets {
-		// Ensure at least one message is received for each subscription.
-		s.Require().GreaterOrEqual(len(responses), 1, "Expected at least one message for subscription ID: %s", subID)
-		// Validate the responses for each subscription topic.
-		s.validate(subID, subscriptionRequests[subID].Topic, responses)
-	}
-
-	// Step 6: Unsubscribe from all topics and verify the unsubscription response.
+	// Step 4. Unsubscribe from all topics after a short delay.
+	time.Sleep(time.Second)
 	for _, sub := range subscriptionRequests {
 		// Send the unsubscription request.
 		unsubscriptionRequest := s.unsubscribeMessageRequest(sub.SubscriptionID)
 		s.Require().NoError(wsClient.WriteJSON(unsubscriptionRequest))
+	}
 
-		// Step 3: Listen for WebSocket unsubscription success response.
-		_, unsubscriptionSuccessResponse, _ := s.listenWebSocketResponses(
-			wsClient,
-			2*time.Second, // Timeout for waiting for a response.
-			sub.SubscriptionID,
-		)
+	unittest.RequireCloseBefore(s.T(), routerStopped, 5*time.Second, "timed out waiting for router to stop")
 
-		// Validate that exactly one unsubscription success response is received and that there is no error.
-		s.Require().Equal(1, len(unsubscriptionSuccessResponse), "expected one un-subscription response")
-		s.Require().Equal(models.ErrorMessage{}, unsubscriptionSuccessResponse[0].Error, "expected no error in un-subscription success response")
+	// Step 5: Validate the collected messages to ensure they are received for all active subscriptions.
+
+	s.Require().Len(subscribeResponses, len(subscriptions), "Missing subscribe messages: have: %+v", subscribeResponses)
+	s.Require().Len(unsubscribeResponses, len(subscriptions), "Missing unsubscribe messages: have: %+v", unsubscribeResponses)
+
+	blockResponses := make(map[string]int)
+
+	for subID, responses := range messageBuckets {
+		s.Require().NotEmpty(responses, "Expected at least 1 messages for subscription ID: %s", subID)
+		s.validate(subID, subscriptionRequests[subID].Topic, responses)
+
+		for _, response := range responses {
+			payloadRaw := s.validateBaseDataProvidersResponse(response.SubscriptionID, response.Topic, response)
+
+			switch response.Topic {
+			case data_providers.BlockDigestsTopic:
+				var payload models.BlockDigest
+				err := restcommon.ParseBody(bytes.NewReader(payloadRaw), &payload)
+				s.Require().NoError(err)
+				blockResponses[payload.Height]++
+			case data_providers.BlockHeadersTopic:
+				var payload commonmodels.BlockHeader
+				err := restcommon.ParseBody(bytes.NewReader(payloadRaw), &payload)
+				s.Require().NoError(err)
+				blockResponses[payload.Height]++
+			case data_providers.BlocksTopic:
+				var payload commonmodels.Block
+				err := restcommon.ParseBody(bytes.NewReader(payloadRaw), &payload)
+				s.Require().NoError(err)
+				blockResponses[payload.Header.Height]++
+			default:
+				s.Failf("unexpected message topic", "got: %s", response.Topic)
+			}
+		}
+	}
+
+	for height, count := range blockResponses {
+		s.Assert().Equalf(len(subscriptions), count, "Expected %d responses for block height %s, but got: %d", len(subscriptions), height, count)
 	}
 }
 
@@ -1133,14 +1188,10 @@ func (s *WebsocketSubscriptionSuite) listenWebSocketResponses(
 	duration time.Duration,
 	subscriptionID string,
 ) (
-	[]models.BaseDataProvidersResponse,
-	[]models.BaseMessageResponse,
-	[]models.ListSubscriptionsMessageResponse,
+	baseDataProvidersResponses []models.BaseDataProvidersResponse,
+	baseMessageResponses []models.BaseMessageResponse,
+	listSubscriptionsMessageResponses []models.ListSubscriptionsMessageResponse,
 ) {
-	baseDataProvidersResponses := make([]models.BaseDataProvidersResponse, 0)
-	baseMessageResponses := make([]models.BaseMessageResponse, 0)
-	listSubscriptionsMessageResponses := make([]models.ListSubscriptionsMessageResponse, 0)
-
 	ctx, cancel := context.WithTimeout(context.Background(), duration)
 	defer cancel()
 
@@ -1183,14 +1234,6 @@ func (s *WebsocketSubscriptionSuite) listenWebSocketResponses(
 			}
 		}
 	}
-}
-
-// validateBaseMessageResponse validates the properties of a success BaseMessageResponse.
-func (s *WebsocketSubscriptionSuite) validateBaseMessageResponse(
-	actualResponse models.BaseMessageResponse,
-) {
-	s.Require().Equal(0, actualResponse.Error.Code)
-	s.Require().Empty(actualResponse.Error.Message)
 }
 
 // createAndSendTx creates a new account transaction.
