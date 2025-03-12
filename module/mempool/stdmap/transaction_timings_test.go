@@ -37,7 +37,7 @@ func TestTransactionTimingsPool(t *testing.T) {
 
 	t.Run("should be able to adjust the first", func(t *testing.T) {
 		finalized := time.Now()
-		entity, updated := pool.Adjust(item1.ID(), func(t *flow.TransactionTiming) *flow.TransactionTiming {
+		entity, updated := pool.Adjust(item1.TransactionID, func(t *flow.TransactionTiming) *flow.TransactionTiming {
 			t.Finalized = finalized
 			return t
 		})
@@ -46,13 +46,13 @@ func TestTransactionTimingsPool(t *testing.T) {
 	})
 
 	t.Run("should be able to get first", func(t *testing.T) {
-		got, exists := pool.ByID(item1.ID())
+		got, exists := pool.ByID(item1.TransactionID)
 		assert.True(t, exists)
 		assert.Equal(t, item1, got)
 	})
 
 	t.Run("should be able to remove second", func(t *testing.T) {
-		ok := pool.Remove(item2.ID())
+		ok := pool.Remove(item2.TransactionID)
 		assert.True(t, ok)
 	})
 

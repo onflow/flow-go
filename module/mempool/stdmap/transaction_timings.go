@@ -21,7 +21,7 @@ func NewTransactionTimings(limit uint) (*TransactionTimings, error) {
 
 // Add adds a transaction timing to the mempool.
 func (t *TransactionTimings) Add(tx *flow.TransactionTiming) bool {
-	return t.Backend.Add(tx.ID(), tx)
+	return t.Backend.Add(tx.TransactionID, tx)
 }
 
 // ByID returns the transaction timing with the given ID from the mempool.
