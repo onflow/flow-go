@@ -6,7 +6,6 @@ import (
 
 	"github.com/rs/zerolog"
 
-	"github.com/onflow/flow-go/engine/access/rest/common/parser"
 	"github.com/onflow/flow-go/engine/access/rest/http/request"
 	"github.com/onflow/flow-go/engine/access/rest/websockets/models"
 	"github.com/onflow/flow-go/engine/access/state_stream"
@@ -175,14 +174,9 @@ func parseEventsArguments(
 	args.HeartbeatInterval = heartbeatInterval
 
 	// Parse 'event_types' as a JSON array
-	eventTypesList, err := extractArrayOfStrings(arguments, "event_types", false)
+	eventTypes, err := extractArrayOfStrings(arguments, "event_types", false)
 	if err != nil {
 		return eventsArguments{}, err
-	}
-
-	eventTypes, err := parser.NewEventTypes(eventTypesList)
-	if err != nil {
-		return eventsArguments{}, fmt.Errorf("invalid 'event_types': %w", err)
 	}
 
 	// Parse 'addresses' as []string{}
@@ -198,7 +192,7 @@ func parseEventsArguments(
 	}
 
 	// Initialize the event filter with the parsed arguments
-	filter, err := state_stream.NewEventFilter(eventFilterConfig, chain, eventTypes.Flow(), addresses, contracts)
+	filter, err := state_stream.NewEventFilter(eventFilterConfig, chain, eventTypes, addresses, contracts)
 	if err != nil {
 		return eventsArguments{}, fmt.Errorf("error creating event filter: %w", err)
 	}

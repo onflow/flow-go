@@ -8,7 +8,6 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
-	"github.com/onflow/flow-go/engine/access/rest/common/parser"
 	"github.com/onflow/flow-go/engine/access/rest/http/request"
 	"github.com/onflow/flow-go/engine/access/rest/websockets/models"
 	"github.com/onflow/flow-go/engine/access/state_stream"
@@ -175,14 +174,9 @@ func parseAccountStatusesArguments(
 	args.HeartbeatInterval = heartbeatInterval
 
 	// Parse 'event_types' as a JSON array
-	eventTypeList, err := extractArrayOfStrings(arguments, "event_types", false)
+	eventTypes, err := extractArrayOfStrings(arguments, "event_types", false)
 	if err != nil {
 		return accountStatusesArguments{}, err
-	}
-
-	eventTypes, err := parser.NewEventTypes(eventTypeList)
-	if err != nil {
-		return accountStatusesArguments{}, fmt.Errorf("invalid 'event_types': %w", err)
 	}
 
 	// Parse 'account_addresses' as []string
@@ -192,7 +186,7 @@ func parseAccountStatusesArguments(
 	}
 
 	// Initialize the event filter with the parsed arguments
-	args.Filter, err = state_stream.NewAccountStatusFilter(eventFilterConfig, chain, eventTypes.Flow(), accountAddresses)
+	args.Filter, err = state_stream.NewAccountStatusFilter(eventFilterConfig, chain, eventTypes, accountAddresses)
 	if err != nil {
 		return accountStatusesArguments{}, fmt.Errorf("failed to create event filter: %w", err)
 	}

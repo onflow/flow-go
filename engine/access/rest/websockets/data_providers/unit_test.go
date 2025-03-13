@@ -3,6 +3,7 @@ package data_providers
 import (
 	"context"
 	"fmt"
+	"reflect"
 	"testing"
 	"time"
 
@@ -145,4 +146,68 @@ func TestEnsureAllowedFields(t *testing.T) {
 			t.Error("expected error for unexpected field, got nil")
 		}
 	})
+}
+
+func TestExtractArrayOfStrings(t *testing.T) {
+	tests := []struct {
+		name      string
+		args      models.Arguments
+		key       string
+		required  bool
+		expect    []string
+		expectErr bool
+	}{
+		{
+			name:      "Valid string array",
+			args:      models.Arguments{"tags": []string{"a", "b"}},
+			key:       "tags",
+			required:  true,
+			expect:    []string{"a", "b"},
+			expectErr: false,
+		},
+		{
+			name:      "Missing required key",
+			args:      models.Arguments{},
+			key:       "tags",
+			required:  true,
+			expect:    nil,
+			expectErr: true,
+		},
+		{
+			name:      "Missing optional key",
+			args:      models.Arguments{},
+			key:       "tags",
+			required:  false,
+			expect:    []string{},
+			expectErr: false,
+		},
+		{
+			name:      "Invalid type in array",
+			args:      models.Arguments{"tags": []interface{}{"a", 123}},
+			key:       "tags",
+			required:  true,
+			expect:    nil,
+			expectErr: true,
+		},
+		{
+			name:      "Nil value",
+			args:      models.Arguments{"tags": nil},
+			key:       "tags",
+			required:  false,
+			expect:    nil,
+			expectErr: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result, err := extractArrayOfStrings(tt.args, tt.key, tt.required)
+			if (err != nil) != tt.expectErr {
+				t.Fatalf("unexpected error status. got: %v, want error: %v", err, tt.expectErr)
+			}
+			if !reflect.DeepEqual(result, tt.expect) {
+				t.Fatalf("unexpected result. got: %v, want: %v", result, tt.expect)
+			}
+		})
+	}
 }
