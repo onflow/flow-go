@@ -294,7 +294,7 @@ func testAddRemoveEntities(t *testing.T, limit uint32, entityCount uint32, eject
 				_, found = addedEntities[entities[toAddIndex].ID()]
 				if !found {
 					// found an entity that is not in the pool, add it.
-					indexInThePool, _, ejectedEntity := pool.Add(entities[toAddIndex].ID(), entities[toAddIndex], ownerIds[toAddIndex])
+					indexInThePool, _, ejectedEntity, _ := pool.Add(entities[toAddIndex].ID(), entities[toAddIndex], ownerIds[toAddIndex])
 					if ejectionMode != NoEjection || len(addedEntities) < int(limit) {
 						// when there is an ejection mode in place, or the pool is not full, the index should be valid.
 						require.NotEqual(t, InvalidIndex, indexInThePool)
@@ -350,7 +350,8 @@ func testAddRemoveEntities(t *testing.T, limit uint32, entityCount uint32, eject
 			delete(addedEntitiesInPool, expectedRemovedEntityId)
 			actualFlowId, actualEntity, _ := pool.Get(indexInPoolToRemove)
 			require.Equal(t, flow.ZeroID, actualFlowId)
-			require.Equal(t, nil, actualEntity)
+			require.Nil(t, actualEntity)
+			require.True(t, pool.isInvalidated(indexInPoolToRemove))
 		}
 	}
 	for k, v := range addedEntities {
@@ -464,7 +465,7 @@ func testInvalidatingTail(t *testing.T, pool *Pool[flow.Identifier, *unittest.Mo
 		tailIndex := pool.states[stateUsed].tail
 		require.Equal(t, EIndex(size-1-i), tailIndex)
 
-		pool.invalidateEntityAtIndex(tailIndex)
+		pool.invalidateValueAtIndex(tailIndex)
 		// old head index must be invalidated
 		require.True(t, pool.isInvalidated(tailIndex))
 		// unclaimed head should be appended to free entities
@@ -597,7 +598,7 @@ func testAddingEntities(t *testing.T, pool *Pool[flow.Identifier, *unittest.Mock
 	lruEjectedIndex := 0
 	for i, e := range entitiesToBeAdded {
 		// adding each element must be successful.
-		entityIndex, slotAvailable, ejectedEntity := pool.Add(e.ID(), e, uint64(i))
+		entityIndex, slotAvailable, ejectedEntity, _ := pool.Add(e.ID(), e, uint64(i))
 
 		if i < len(pool.poolEntities) {
 			// in case of no over limit, size of entities linked list should be incremented by each addition.

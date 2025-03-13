@@ -37,6 +37,7 @@ func (b *MapBackData[K, V]) Add(key K, value V) bool {
 // If the key-value pair exists, returns the value and true.
 // Otherwise, returns the zero value for type V and false.
 func (b *MapBackData[K, V]) Remove(key K) (value V, ok bool) {
+	value, ok = b.dataMap[key]
 	if !ok {
 		return value, false
 	}
@@ -45,7 +46,9 @@ func (b *MapBackData[K, V]) Remove(key K) (value V, ok bool) {
 }
 
 // Adjust adjusts the value using the given function if the given key can be found.
-// It returns the updated value along with a boolean indicating whether an update occurred.
+// Returns:
+//   - the updated value for the key (if the key exists)
+//   - a boolean indicating whether the key was found (and the update applied)
 func (b *MapBackData[K, V]) Adjust(key K, f func(V) V) (value V, ok bool) {
 	value, ok = b.dataMap[key]
 	if !ok {
@@ -66,8 +69,7 @@ func (b *MapBackData[K, V]) Adjust(key K, f func(V) V) (value V, ok bool) {
 //
 // Returns:
 // - the adjusted value.
-//
-// - a bool which indicates whether the value was adjusted.
+// - a bool which indicates whether the value was adjusted (for MapBackData this is always true)
 func (b *MapBackData[K, V]) AdjustWithInit(key K, adjust func(V) V, init func() V) (V, bool) {
 	if b.Has(key) {
 		return b.Adjust(key, adjust)
@@ -102,27 +104,23 @@ func (b *MapBackData[K, V]) All() map[K]V {
 
 // Keys returns an unordered list of keys stored in the backdata.
 func (b *MapBackData[K, V]) Keys() []K {
-	keys := make([]K, len(b.dataMap))
-	i := 0
+	keys := make([]K, 0, len(b.dataMap))
 	for key := range b.dataMap {
-		keys[i] = key
-		i++
+		keys = append(keys, key)
 	}
 	return keys
 }
 
 // Values returns an unordered list of values stored in the backdata.
 func (b *MapBackData[K, V]) Values() []V {
-	values := make([]V, len(b.dataMap))
-	i := 0
+	values := make([]V, 0, len(b.dataMap))
 	for _, value := range b.dataMap {
-		values[i] = value
-		i++
+		values = append(values, value)
 	}
 	return values
 }
 
-// Clear removes all values from the backdata.
+// Clear removes all key-value pairs from the backdata.
 func (b *MapBackData[K, V]) Clear() {
 	b.dataMap = make(map[K]V)
 }

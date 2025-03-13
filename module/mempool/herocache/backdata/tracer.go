@@ -1,10 +1,10 @@
 package herocache
 
-type CacheOpt[K comparable, V any] func(*Cache[K, V])
+type CacheOpt[V any] func(*Cache[V])
 
 // Tracer is a generic interface that is used to report specific events that happen during
 // lifetime of Cache and are potentially interesting for external consumer.
-type Tracer[K comparable, V any] interface {
+type Tracer[V any] interface {
 	// EntityEjectionDueToEmergency reports ejected entity whenever a bucket is found full and all of its keys are valid, i.e.,
 	// each key belongs to an existing (key, entity) pair.
 	// Hence, adding a new key to that bucket will replace the oldest valid key inside that bucket.
@@ -16,8 +16,8 @@ type Tracer[K comparable, V any] interface {
 }
 
 // WithTracer injects tracer into the cache
-func WithTracer[K comparable, V any](t Tracer[K, V]) CacheOpt[K, V] {
-	return func(c *Cache[K, V]) {
+func WithTracer[V any](t Tracer[V]) CacheOpt[V] {
+	return func(c *Cache[V]) {
 		c.tracer = t
 	}
 }
