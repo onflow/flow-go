@@ -15,7 +15,7 @@ import (
 // In this implementation, the ChunkRequests
 // wraps the ChunkDataPackRequests around an internal ChunkRequestStatus data object, and maintains the wrapped
 // version in memory.
-// Stored chunkRequestStatus are keyed by chunk ID.
+// Stored chunk request status are keyed by chunk ID.
 type ChunkRequests struct {
 	*Backend[flow.Identifier, *chunkRequestStatus]
 }

@@ -6,7 +6,7 @@ import (
 )
 
 // Assignments implements the chunk assignment memory pool.
-// Stored Assignments are keyed by assignment fingerprint.
+// Stored assignments are keyed by assignment fingerprint.
 type Assignments struct {
 	*Backend[flow.Identifier, *chunkmodels.Assignment]
 }

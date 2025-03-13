@@ -6,7 +6,7 @@ import (
 
 // TransactionTimings implements the transaction timings memory pool of access nodes,
 // used to store transaction timings to report the timing of individual transactions.
-// Stored TransactionTiming are keyed by transaction ID.
+// Stored transaction timings are keyed by transaction ID.
 type TransactionTimings struct {
 	*Backend[flow.Identifier, *flow.TransactionTiming]
 }

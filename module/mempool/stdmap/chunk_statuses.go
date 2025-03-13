@@ -6,7 +6,7 @@ import (
 )
 
 // ChunkStatuses is an implementation of in-memory storage for maintaining the chunk status data objects.
-// Stored ChunkStatuses are keyed by chunks.Locator ID.
+// Stored chunk statuses are keyed by chunks.Locator ID.
 type ChunkStatuses struct {
 	*Backend[flow.Identifier, *verification.ChunkStatus]
 }
