@@ -578,6 +578,9 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 			return stateSyncCommands.NewReadExecutionDataCommand(builder.ExecutionDataStore)
 		}).
 		Module("transactions and collections storage", func(node *cmd.NodeConfig) error {
+			// TODO: needs to be wrapped with ChainedCollections module, otherwise once we switch
+			// ProtocolDB to pebble based storage, the data previously stored in badger will not be
+			// accessable.
 			transactions := store.NewTransactions(node.Metrics.Cache, node.ProtocolDB)
 			builder.collections = store.NewCollections(node.ProtocolDB, transactions)
 			builder.transactions = transactions
