@@ -46,8 +46,11 @@ func UnsafeIndexCollectionByTransaction(w storage.Writer, txID flow.Identifier, 
 	return UpsertByKey(w, MakePrefix(codeIndexCollectionByTransaction, txID), collectionID)
 }
 
-// LookupCollectionID retrieves a collection id by transaction id
-func RetrieveCollectionID(r storage.Reader, txID flow.Identifier, collectionID *flow.Identifier) error {
+// LookupCollectionByTransaction looks up the collection indexed by the given transaction ID,
+// which is the collection in which the given transaction was included.
+// It returns storage.ErrNotFound if the collection is not found.
+// No errors are expected during normal operaion.
+func LookupCollectionByTransaction(r storage.Reader, txID flow.Identifier, collectionID *flow.Identifier) error {
 	return RetrieveByKey(r, MakePrefix(codeIndexCollectionByTransaction, txID), collectionID)
 }
 
@@ -57,8 +60,9 @@ func RemoveCollectionPayloadIndices(w storage.Writer, blockID flow.Identifier) e
 	return RemoveByKey(w, MakePrefix(codeIndexCollection, blockID))
 }
 
-// RemoveCollectionTransactionIndices removes a collection id indexed by a transaction id
-// any error returned are exceptions
+// RemoveCollectionByTransactionIndex removes a collection id indexed by a transaction id,
+// created by [UnsafeIndexCollectionByTransaction].
+// Any error returned is an exception.
 func RemoveCollectionTransactionIndices(w storage.Writer, txID flow.Identifier) error {
 	return RemoveByKey(w, MakePrefix(codeIndexCollectionByTransaction, txID))
 }

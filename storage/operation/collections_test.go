@@ -84,7 +84,7 @@ func TestCollections(t *testing.T) {
 				return nil
 			})
 
-			err := operation.RetrieveCollectionID(db.Reader(), transactionID, &actual)
+			err := operation.LookupCollectionByTransaction(db.Reader(), transactionID, &actual)
 			assert.NoError(t, err)
 
 			assert.Equal(t, expected, actual)

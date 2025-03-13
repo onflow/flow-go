@@ -82,10 +82,6 @@ func (c *Collections) LightByID(colID flow.Identifier) (*flow.LightCollection, e
 		return nil, fmt.Errorf("could not retrieve collection: %w", err)
 	}
 
-	if err != nil {
-		return nil, err
-	}
-
 	return &collection, nil
 }
 
@@ -147,7 +143,7 @@ func (c *Collections) StoreLightAndIndexByTransaction(collection *flow.LightColl
 	// ensure transaction are not indexed before
 	for _, txID := range collection.Transactions {
 		var differentColTxIsIn flow.Identifier
-		err := operation.RetrieveCollectionID(c.db.Reader(), txID, &differentColTxIsIn)
+		err := operation.LookupCollectionByTransaction(c.db.Reader(), txID, &differentColTxIsIn)
 		if err == nil {
 			// collection nodes have ensured that a transaction can only belong to one collection
 			// so if transaction is already indexed by a collection, check if it's the same collection.
@@ -193,7 +189,7 @@ func (c *Collections) StoreLightAndIndexByTransaction(collection *flow.LightColl
 // LightByTransactionID retrieves a light collection by a transaction ID.
 func (c *Collections) LightByTransactionID(txID flow.Identifier) (*flow.LightCollection, error) {
 	collID := &flow.Identifier{}
-	err := operation.RetrieveCollectionID(c.db.Reader(), txID, collID)
+	err := operation.LookupCollectionByTransaction(c.db.Reader(), txID, collID)
 	if err != nil {
 		return nil, fmt.Errorf("could not retrieve collection id: %w", err)
 	}
