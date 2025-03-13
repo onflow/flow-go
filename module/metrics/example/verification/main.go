@@ -114,16 +114,6 @@ func demo() {
 			panic(err)
 		}
 
-		// creates processed results ids mempool, and registers size method of backend for metrics
-		processedResultsIDs, err := stdmap.NewIdentifiers(100)
-		if err != nil {
-			panic(err)
-		}
-		err = mc.Register(metrics.ResourceProcessedResultID, processedResultsIDs.Size)
-		if err != nil {
-			panic(err)
-		}
-
 		// creates consensus cache for follower engine, and registers size method of backend for metrics
 		pendingBlocks := buffer.NewPendingBlocks()
 		err = mc.Register(metrics.ResourcePendingBlock, pendingBlocks.Size)
@@ -177,25 +167,15 @@ func demo() {
 			// memory pools
 			receipt := unittest.ExecutionReceiptFixture()
 			tryRandomCall(func() {
-				receipts.Add(receipt)
+				receipts.Add(receipt.ID(), receipt)
 			})
 
 			tryRandomCall(func() {
-				err := receiptIDsByBlock.Append(receipt.ExecutionResult.BlockID, receipt.ID())
-				if err != nil {
-					panic(err)
-				}
+				receiptIDsByBlock.Append(receipt.ExecutionResult.BlockID, receipt.ID())
 			})
 
 			tryRandomCall(func() {
-				err = receiptIDsByResult.Append(receipt.ExecutionResult.BlockID, receipt.ExecutionResult.ID())
-				if err != nil {
-					panic(err)
-				}
-			})
-
-			tryRandomCall(func() {
-				processedResultsIDs.Add(receipt.ExecutionResult.ID())
+				receiptIDsByResult.Append(receipt.ExecutionResult.BlockID, receipt.ExecutionResult.ID())
 			})
 
 			tryRandomCall(func() {

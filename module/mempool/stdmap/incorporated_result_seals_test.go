@@ -75,7 +75,7 @@ func (m *icrSealsMachine) Get(t *rapid.T) {
 	i := rapid.IntRange(0, n-1).Draw(t, "i")
 
 	s := m.state[i]
-	actual, ok := m.icrs.ByID(s.ID())
+	actual, ok := m.icrs.Get(s.IncorporatedResult.ID())
 	require.True(t, ok)
 	require.Equal(t, s, actual)
 
@@ -103,7 +103,7 @@ func (m *icrSealsMachine) GetUnknown(t *rapid.T) {
 	}
 
 	if unknown {
-		_, found := m.icrs.ByID(seal.ID())
+		_, found := m.icrs.Get(seal.IncorporatedResult.ID())
 		require.False(t, found)
 	}
 	// no modification of state
@@ -120,7 +120,7 @@ func (m *icrSealsMachine) Remove(t *rapid.T) {
 	i := rapid.IntRange(0, n-1).Draw(t, "i")
 
 	s := m.state[i]
-	ok := m.icrs.Remove(s.ID())
+	ok := m.icrs.Remove(s.IncorporatedResult.ID())
 	require.True(t, ok)
 
 	// remove m[i], we don't care about ordering here
@@ -151,7 +151,7 @@ func (m *icrSealsMachine) RemoveUnknown(t *rapid.T) {
 	}
 
 	if unknown {
-		removed := m.icrs.Remove(seal.ID())
+		removed := m.icrs.Remove(seal.IncorporatedResult.ID())
 		require.False(t, removed)
 	}
 	// no modification of state
@@ -189,14 +189,14 @@ func TestIncorporatedResultSeals(t *testing.T) {
 		require.NoError(t, err)
 		require.True(t, ok)
 
-		actual, ok := pool.ByID(seal.ID())
+		actual, ok := pool.Get(seal.IncorporatedResult.ID())
 		require.True(t, ok)
 		require.Equal(t, seal, actual)
 
-		deleted := pool.Remove(seal.ID())
+		deleted := pool.Remove(seal.IncorporatedResult.ID())
 		require.True(t, deleted)
 
-		_, ok = pool.ByID(seal.ID())
+		_, ok = pool.Get(seal.IncorporatedResult.ID())
 		require.False(t, ok)
 	})
 
@@ -254,14 +254,14 @@ func TestIncorporatedResultSeals(t *testing.T) {
 
 func verifyPresent(t *testing.T, pool *IncorporatedResultSeals, seals ...*flow.IncorporatedResultSeal) {
 	for _, seal := range seals {
-		_, ok := pool.ByID(seal.ID())
+		_, ok := pool.Get(seal.IncorporatedResult.ID())
 		require.True(t, ok, "seal at height %d should be in mempool", seal.Header.Height)
 	}
 }
 
 func verifyAbsent(t *testing.T, pool *IncorporatedResultSeals, seals ...*flow.IncorporatedResultSeal) {
 	for _, seal := range seals {
-		_, ok := pool.ByID(seal.ID())
+		_, ok := pool.Get(seal.IncorporatedResult.ID())
 		require.False(t, ok, "seal at height %d should not be in mempool", seal.Header.Height)
 	}
 }

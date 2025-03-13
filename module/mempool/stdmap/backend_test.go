@@ -51,7 +51,9 @@ func TestAddRemove(t *testing.T) {
 		t.Run("should be able to retrieve all", func(t *testing.T) {
 			items := pool.All()
 			require.Len(t, items, 1)
-			assert.Equal(t, item2, items[0])
+			val, exists := items[item2.ID()]
+			require.True(t, exists)
+			assert.Equal(t, item2, val)
 		})
 	})
 }
