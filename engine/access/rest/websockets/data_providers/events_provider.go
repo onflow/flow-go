@@ -89,42 +89,43 @@ func NewEventsDataProvider(
 // Expected errors during normal operations:
 //   - context.Canceled: if the operation is canceled, during an unsubscribe action.
 func (p *EventsDataProvider) Run() error {
-	return subscription.HandleSubscription(p.subscription, p.handleResponse())
+	messageIndex := counters.NewMonotonicCounter(0)
+	blocksSinceLastMessage := uint64(0)
+
+	return run(
+		p.closedChan,
+		p.subscription,
+		func(response *backend.EventsResponse) error {
+			return p.sendResponse(response, &messageIndex, &blocksSinceLastMessage)
+		},
+	)
 }
 
-// handleResponse processes events and sends the formatted response.
-//
-// No errors are expected during normal operations.
-func (p *EventsDataProvider) handleResponse() func(eventsResponse *backend.EventsResponse) error {
-	blocksSinceLastMessage := uint64(0)
-	messageIndex := counters.NewMonotonicCounter(0)
-
-	return func(eventsResponse *backend.EventsResponse) error {
-		// check if there are any events in the response. if not, do not send a message unless the last
-		// response was more than HeartbeatInterval blocks ago
-		if len(eventsResponse.Events) == 0 {
-			blocksSinceLastMessage++
-			if blocksSinceLastMessage < p.heartbeatInterval {
-				return nil
-			}
-		}
-		blocksSinceLastMessage = 0
-
-		index := messageIndex.Value()
-		if ok := messageIndex.Set(messageIndex.Value() + 1); !ok {
-			return fmt.Errorf("message index already incremented to: %d", messageIndex.Value())
-		}
-
-		var eventsPayload models.EventResponse
-		eventsPayload.Build(eventsResponse, index)
-
-		var response models.BaseDataProvidersResponse
-		response.Build(p.ID(), p.Topic(), &eventsPayload)
-
-		p.send <- &response
-
+func (p *EventsDataProvider) sendResponse(
+	eventsResponse *backend.EventsResponse,
+	messageIndex *counters.StrictMonotonicCounter,
+	blocksSinceLastMessage *uint64,
+) error {
+	// Only send a response if there's meaningful data to send
+	// or the heartbeat interval limit is reached
+	*blocksSinceLastMessage += 1
+	contractEmittedEvents := len(eventsResponse.Events) != 0
+	reachedHeartbeatLimit := *blocksSinceLastMessage >= p.heartbeatInterval
+	if !contractEmittedEvents && !reachedHeartbeatLimit {
 		return nil
 	}
+
+	var eventsPayload models.EventResponse
+	eventsPayload.Build(eventsResponse, messageIndex.Value())
+	messageIndex.Increment()
+
+	var response models.BaseDataProvidersResponse
+	response.Build(p.ID(), p.Topic(), &eventsPayload)
+
+	p.send <- &response
+	*blocksSinceLastMessage = 0
+
+	return nil
 }
 
 // createSubscription creates a new subscription using the specified input arguments.

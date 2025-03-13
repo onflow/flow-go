@@ -7,8 +7,6 @@ import (
 	"fmt"
 
 	"github.com/rs/zerolog"
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 
 	"github.com/onflow/flow-go/access"
 	commonmodels "github.com/onflow/flow-go/engine/access/rest/common/models"
@@ -75,10 +73,35 @@ func NewSendAndGetTransactionStatusesDataProvider(
 
 // Run starts processing the subscription for events and handles responses.
 //
-// Expected errors during normal operations:
-//   - context.Canceled: if the operation is canceled, during an unsubscribe action.
+// No errors are expected during normal operations.
 func (p *SendAndGetTransactionStatusesDataProvider) Run() error {
-	return subscription.HandleSubscription(p.subscription, p.handleResponse())
+	messageIndex := counters.NewMonotonicCounter(0)
+
+	return run(
+		p.closedChan,
+		p.subscription,
+		func(response []*access.TransactionResult) error {
+			return p.sendResponse(response, &messageIndex)
+		},
+	)
+}
+
+func (p *SendAndGetTransactionStatusesDataProvider) sendResponse(
+	txResults []*access.TransactionResult,
+	messageIndex *counters.StrictMonotonicCounter,
+) error {
+	for i := range txResults {
+		var txStatusesPayload models.TransactionStatusesResponse
+		txStatusesPayload.Build(p.linkGenerator, txResults[i], messageIndex.Value())
+
+		var response models.BaseDataProvidersResponse
+		response.Build(p.ID(), p.Topic(), &txStatusesPayload)
+
+		messageIndex.Increment()
+		p.send <- &response
+	}
+
+	return nil
 }
 
 // createSubscription creates a new subscription using the specified input arguments.
@@ -87,32 +110,6 @@ func (p *SendAndGetTransactionStatusesDataProvider) createSubscription(
 	args sendAndGetTransactionStatusesArguments,
 ) subscription.Subscription {
 	return p.api.SendAndSubscribeTransactionStatuses(ctx, &args.Transaction, entities.EventEncodingVersion_JSON_CDC_V0)
-}
-
-// handleResponse processes a tx statuses and sends the formatted response.
-//
-// No errors are expected during normal operations.
-func (p *SendAndGetTransactionStatusesDataProvider) handleResponse() func(txResults []*access.TransactionResult) error {
-	messageIndex := counters.NewMonotonicCounter(0)
-
-	return func(txResults []*access.TransactionResult) error {
-		for i := range txResults {
-			index := messageIndex.Value()
-			if ok := messageIndex.Set(messageIndex.Value() + 1); !ok {
-				return status.Errorf(codes.Internal, "message index already incremented to %d", messageIndex.Value())
-			}
-
-			var txStatusesPayload models.TransactionStatusesResponse
-			txStatusesPayload.Build(p.linkGenerator, txResults[i], index)
-
-			var response models.BaseDataProvidersResponse
-			response.Build(p.ID(), p.Topic(), &txStatusesPayload)
-
-			p.send <- &response
-		}
-
-		return nil
-	}
 }
 
 // parseSendAndGetTransactionStatusesArguments validates and initializes the account statuses arguments.

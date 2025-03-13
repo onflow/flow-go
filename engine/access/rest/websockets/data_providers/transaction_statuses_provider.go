@@ -5,8 +5,6 @@ import (
 	"fmt"
 
 	"github.com/rs/zerolog"
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 
 	"github.com/onflow/flow-go/access"
 	commonmodels "github.com/onflow/flow-go/engine/access/rest/common/models"
@@ -18,6 +16,13 @@ import (
 
 	"github.com/onflow/flow/protobuf/go/flow/entities"
 )
+
+// transactionStatusesArguments contains the arguments required for subscribing to transaction statuses
+type transactionStatusesArguments struct {
+	TxID             flow.Identifier // ID of the transaction to monitor.
+	StartBlockID     flow.Identifier // ID of the block to start subscription from
+	StartBlockHeight uint64          // Height of the block to start subscription from
+}
 
 // TransactionStatusesDataProvider is responsible for providing tx statuses
 type TransactionStatusesDataProvider struct {
@@ -46,8 +51,8 @@ func NewTransactionStatusesDataProvider(
 		linkGenerator: linkGenerator,
 	}
 
-	// Initialize txID passed to the provider.
-	txID, err := parseTransactionID(arguments)
+	// Initialize arguments passed to the provider.
+	txStatusesArgs, err := parseTransactionStatusesArguments(arguments)
 	if err != nil {
 		return nil, fmt.Errorf("invalid arguments for tx statuses data provider: %w", err)
 	}
@@ -60,7 +65,7 @@ func NewTransactionStatusesDataProvider(
 		arguments,
 		cancel,
 		send,
-		p.createSubscription(subCtx, txID), // Set up a subscription to tx statuses based on arguments.
+		p.createSubscription(subCtx, txStatusesArgs), // Set up a subscription to tx statuses based on arguments.
 	)
 
 	return p, nil
@@ -68,70 +73,71 @@ func NewTransactionStatusesDataProvider(
 
 // Run starts processing the subscription for events and handles responses.
 //
-// Expected errors during normal operations:
-//   - context.Canceled: if the operation is canceled, during an unsubscribe action.
+// No errors are expected during normal operations.
 func (p *TransactionStatusesDataProvider) Run() error {
-	return subscription.HandleSubscription(p.subscription, p.handleResponse())
+	messageIndex := counters.NewMonotonicCounter(0)
+
+	return run(
+		p.closedChan,
+		p.subscription,
+		func(response []*access.TransactionResult) error {
+			return p.sendResponse(response, &messageIndex)
+		},
+	)
+}
+
+func (p *TransactionStatusesDataProvider) sendResponse(
+	txResults []*access.TransactionResult,
+	messageIndex *counters.StrictMonotonicCounter,
+) error {
+	for i := range txResults {
+		var txStatusesPayload models.TransactionStatusesResponse
+		txStatusesPayload.Build(p.linkGenerator, txResults[i], messageIndex.Value())
+
+		var response models.BaseDataProvidersResponse
+		response.Build(p.ID(), p.Topic(), &txStatusesPayload)
+
+		messageIndex.Increment()
+		p.send <- &response
+	}
+
+	return nil
 }
 
 // createSubscription creates a new subscription using the specified input arguments.
 func (p *TransactionStatusesDataProvider) createSubscription(
 	ctx context.Context,
-	txID flow.Identifier,
+	args transactionStatusesArguments,
 ) subscription.Subscription {
-	return p.api.SubscribeTransactionStatuses(ctx, txID, entities.EventEncodingVersion_JSON_CDC_V0)
+	return p.api.SubscribeTransactionStatuses(ctx, args.TxID, entities.EventEncodingVersion_JSON_CDC_V0)
 }
 
-// handleResponse processes a tx statuses and sends the formatted response.
-//
-// No errors are expected during normal operations.
-func (p *TransactionStatusesDataProvider) handleResponse() func(txResults []*access.TransactionResult) error {
-	messageIndex := counters.NewMonotonicCounter(0)
-
-	return func(txResults []*access.TransactionResult) error {
-		for i := range txResults {
-			index := messageIndex.Value()
-			if ok := messageIndex.Set(messageIndex.Value() + 1); !ok {
-				return status.Errorf(codes.Internal, "message index already incremented to %d", messageIndex.Value())
-			}
-
-			var txStatusesPayload models.TransactionStatusesResponse
-			txStatusesPayload.Build(p.linkGenerator, txResults[i], index)
-
-			var response models.BaseDataProvidersResponse
-			response.Build(p.ID(), p.Topic(), &txStatusesPayload)
-
-			p.send <- &response
-		}
-
-		return nil
-	}
-}
-
-// parseTransactionID validates and initializes the transaction ID argument.
-func parseTransactionID(
+// parseAccountStatusesArguments validates and initializes the account statuses arguments.
+func parseTransactionStatusesArguments(
 	arguments models.Arguments,
-) (flow.Identifier, error) {
+) (transactionStatusesArguments, error) {
 	allowedFields := []string{
 		"tx_id",
 	}
 	err := ensureAllowedFields(arguments, allowedFields)
 	if err != nil {
-		return flow.ZeroID, err
+		return transactionStatusesArguments{}, err
 	}
+
+	var args transactionStatusesArguments
 
 	if txIDIn, ok := arguments["tx_id"]; ok && txIDIn != "" {
 		result, ok := txIDIn.(string)
 		if !ok {
-			return flow.ZeroID, fmt.Errorf("'tx_id' must be a string")
+			return transactionStatusesArguments{}, fmt.Errorf("'tx_id' must be a string")
 		}
-		var txIDParsed parser.ID
-		err := txIDParsed.Parse(result)
+		var txID parser.ID
+		err := txID.Parse(result)
 		if err != nil {
-			return flow.ZeroID, fmt.Errorf("invalid 'tx_id': %w", err)
+			return transactionStatusesArguments{}, fmt.Errorf("invalid 'tx_id': %w", err)
 		}
-		return txIDParsed.Flow(), nil
+		args.TxID = txID.Flow()
 	}
 
-	return flow.ZeroID, fmt.Errorf("arguments are invalid")
+	return args, nil
 }

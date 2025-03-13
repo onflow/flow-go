@@ -5,8 +5,6 @@ import (
 	"fmt"
 
 	"github.com/rs/zerolog"
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 
 	"github.com/onflow/flow-go/engine/access/rest/common"
 	"github.com/onflow/flow-go/engine/access/rest/common/parser"
@@ -90,7 +88,46 @@ func NewAccountStatusesDataProvider(
 // Expected errors during normal operations:
 //   - context.Canceled: if the operation is canceled, during an unsubscribe action.
 func (p *AccountStatusesDataProvider) Run() error {
-	return subscription.HandleSubscription(p.subscription, p.handleResponse())
+	messageIndex := counters.NewMonotonicCounter(0)
+	blocksSinceLastMessage := uint64(0)
+
+	return run(
+		p.closedChan,
+		p.subscription,
+		func(response *backend.AccountStatusesResponse) error {
+			return p.sendResponse(response, &messageIndex, &blocksSinceLastMessage)
+		},
+	)
+}
+
+// sendResponse processes an account statuses message and sends it to data provider's channel.
+//
+// No errors are expected during normal operations.
+func (p *AccountStatusesDataProvider) sendResponse(
+	response *backend.AccountStatusesResponse,
+	messageIndex *counters.StrictMonotonicCounter,
+	blocksSinceLastMessage *uint64,
+) error {
+	// Only send a response if there's meaningful data to send
+	// or the heartbeat interval limit is reached
+	*blocksSinceLastMessage += 1
+	accountEmittedEvents := len(response.AccountEvents) != 0
+	reachedHeartbeatLimit := *blocksSinceLastMessage >= p.heartbeatInterval
+	if !accountEmittedEvents && !reachedHeartbeatLimit {
+		return nil
+	}
+
+	var accountStatusesPayload models.AccountStatusesResponse
+	accountStatusesPayload.Build(response, messageIndex.Value())
+	messageIndex.Increment()
+
+	var resp models.BaseDataProvidersResponse
+	resp.Build(p.ID(), p.Topic(), &accountStatusesPayload)
+
+	p.send <- &resp
+	*blocksSinceLastMessage = 0
+
+	return nil
 }
 
 // createSubscription creates a new subscription using the specified input arguments.
@@ -104,41 +141,6 @@ func (p *AccountStatusesDataProvider) createSubscription(ctx context.Context, ar
 	}
 
 	return p.stateStreamApi.SubscribeAccountStatusesFromLatestBlock(ctx, args.Filter)
-}
-
-// handleResponse processes an account statuses and sends the formatted response.
-//
-// No errors are expected during normal operations.
-func (p *AccountStatusesDataProvider) handleResponse() func(accountStatusesResponse *backend.AccountStatusesResponse) error {
-	blocksSinceLastMessage := uint64(0)
-	messageIndex := counters.NewMonotonicCounter(0)
-
-	return func(accountStatusesResponse *backend.AccountStatusesResponse) error {
-		// check if there are any events in the response. if not, do not send a message unless the last
-		// response was more than HeartbeatInterval blocks ago
-		if len(accountStatusesResponse.AccountEvents) == 0 {
-			blocksSinceLastMessage++
-			if blocksSinceLastMessage < p.heartbeatInterval {
-				return nil
-			}
-		}
-		blocksSinceLastMessage = 0
-
-		index := messageIndex.Value()
-		if ok := messageIndex.Set(messageIndex.Value() + 1); !ok {
-			return status.Errorf(codes.Internal, "message index already incremented to %d", messageIndex.Value())
-		}
-
-		var accountStatusesPayload models.AccountStatusesResponse
-		accountStatusesPayload.Build(accountStatusesResponse, index)
-
-		var response models.BaseDataProvidersResponse
-		response.Build(p.ID(), p.Topic(), &accountStatusesPayload)
-
-		p.send <- &response
-
-		return nil
-	}
 }
 
 // parseAccountStatusesArguments validates and initializes the account statuses arguments.
