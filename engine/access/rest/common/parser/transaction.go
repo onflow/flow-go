@@ -1,10 +1,10 @@
-package request
+package parser
 
 import (
 	"fmt"
 	"io"
 
-	"github.com/onflow/flow-go/engine/access/rest/common/parser"
+	"github.com/onflow/flow-go/engine/access/rest/common"
 	"github.com/onflow/flow-go/engine/access/rest/http/models"
 	"github.com/onflow/flow-go/engine/access/rest/util"
 	"github.com/onflow/flow-go/engine/common/rpc/convert"
@@ -12,13 +12,12 @@ import (
 )
 
 const maxAuthorizers = 100
-const maxAllowedScriptArguments = 100
 
 type Transaction flow.TransactionBody
 
 func (t *Transaction) Parse(raw io.Reader, chain flow.Chain) error {
 	var tx models.TransactionsBody
-	err := parseBody(raw, &tx)
+	err := common.ParseBody(raw, &tx)
 	if err != nil {
 		return err
 	}
@@ -35,8 +34,8 @@ func (t *Transaction) Parse(raw io.Reader, chain flow.Chain) error {
 	if len(tx.Authorizers) > maxAuthorizers {
 		return fmt.Errorf("too many authorizers. Maximum authorizers allowed: %d", maxAuthorizers)
 	}
-	if len(tx.Arguments) > maxAllowedScriptArguments {
-		return fmt.Errorf("too many arguments. Maximum arguments allowed: %d", maxAllowedScriptArguments)
+	if len(tx.Arguments) > MaxAllowedScriptArguments {
+		return fmt.Errorf("too many arguments. Maximum arguments allowed: %d", MaxAllowedScriptArguments)
 	}
 	if tx.ReferenceBlockId == "" {
 		return fmt.Errorf("reference block not provided")
@@ -90,7 +89,7 @@ func (t *Transaction) Parse(raw io.Reader, chain flow.Chain) error {
 		return fmt.Errorf("invalid transaction script encoding")
 	}
 
-	var blockID parser.ID
+	var blockID ID
 	err = blockID.Parse(tx.ReferenceBlockId)
 	if err != nil {
 		return fmt.Errorf("invalid reference block ID: %w", err)

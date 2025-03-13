@@ -54,6 +54,7 @@ import (
 	"github.com/onflow/flow-go/engine/execution/ingestion/fetcher"
 	"github.com/onflow/flow-go/engine/execution/ingestion/stop"
 	"github.com/onflow/flow-go/engine/execution/ingestion/uploader"
+	"github.com/onflow/flow-go/engine/execution/migration"
 	exeprovider "github.com/onflow/flow-go/engine/execution/provider"
 	exepruner "github.com/onflow/flow-go/engine/execution/pruner"
 	"github.com/onflow/flow-go/engine/execution/rpc"
@@ -92,10 +93,13 @@ import (
 	"github.com/onflow/flow-go/state/protocol/blocktimer"
 	storageerr "github.com/onflow/flow-go/storage"
 	storage "github.com/onflow/flow-go/storage/badger"
+	"github.com/onflow/flow-go/storage/dbops"
 	"github.com/onflow/flow-go/storage/operation"
+	"github.com/onflow/flow-go/storage/operation/badgerimpl"
 	"github.com/onflow/flow-go/storage/operation/pebbleimpl"
 	storagepebble "github.com/onflow/flow-go/storage/pebble"
 	"github.com/onflow/flow-go/storage/store"
+	"github.com/onflow/flow-go/storage/store/chained"
 )
 
 const (
@@ -136,14 +140,18 @@ type ExecutionNode struct {
 	registerStore  *storehouse.RegisterStore
 
 	// storage
-	events        storageerr.Events
-	serviceEvents storageerr.ServiceEvents
-	txResults     storageerr.TransactionResults
-	results       storageerr.ExecutionResults
-	receipts      storageerr.ExecutionReceipts
-	myReceipts    storageerr.MyExecutionReceipts
-	commits       storageerr.Commits
-	collections   storageerr.Collections
+	events          storageerr.Events
+	eventsReader    storageerr.EventsReader
+	serviceEvents   storageerr.ServiceEvents
+	txResults       storageerr.TransactionResults
+	txResultsReader storageerr.TransactionResultsReader
+	results         storageerr.ExecutionResults
+	resultsReader   storageerr.ExecutionResultsReader
+	receipts        storageerr.ExecutionReceipts
+	myReceipts      storageerr.MyExecutionReceipts
+	commits         storageerr.Commits
+	commitsReader   storageerr.CommitsReader
+	collections     storageerr.Collections
 
 	chunkDataPackDB        *pebble.DB
 	chunkDataPacks         storageerr.ChunkDataPacks
@@ -216,11 +224,11 @@ func (builder *ExecutionNodeBuilder) LoadComponentsAndModules() {
 		Module("blobservice peer manager dependencies", exeNode.LoadBlobservicePeerManagerDependencies).
 		Module("bootstrap", exeNode.LoadBootstrapper).
 		Module("register store", exeNode.LoadRegisterStore).
+		Module("migrate last executed block", exeNode.MigrateLastSealedExecutedResultToPebble).
 		AdminCommand("get-transactions", func(conf *NodeConfig) commands.AdminCommand {
 			return storageCommands.NewGetTransactionsCommand(conf.State, conf.Storage.Payloads, exeNode.collections)
 		}).
 		Component("execution state ledger", exeNode.LoadExecutionStateLedger).
-
 		// TODO: Modules should be able to depends on components
 		// Because all modules are always bootstrapped first, before components,
 		// its not possible to have a module depending on a Component.
@@ -231,8 +239,8 @@ func (builder *ExecutionNodeBuilder) LoadComponentsAndModules() {
 		// Load the admin tool when chunk data packs db are initialized in execution state
 		AdminCommand("create-chunk-data-packs-checkpoint", func(config *NodeConfig) commands.AdminCommand {
 			// by default checkpoints will be created under "/data/chunk_data_packs_checkpoints_dir"
-			return storageCommands.NewChunksCheckpointCommand(exeNode.exeConf.chunkDataPackCheckpointsDir,
-				exeNode.chunkDataPackDB)
+			return storageCommands.NewPebbleDBCheckpointCommand(exeNode.exeConf.chunkDataPackCheckpointsDir,
+				"chunk_data_pack", exeNode.chunkDataPackDB)
 		}).
 		Component("stop control", exeNode.LoadStopControl).
 		Component("execution state ledger WAL compactor", exeNode.LoadExecutionStateLedgerWALCompactor).
@@ -331,15 +339,32 @@ func (exeNode *ExecutionNode) LoadExecutionStorage(
 	node *NodeConfig,
 ) error {
 	db := node.ProtocolDB
+
+	exeNode.events = store.NewEvents(node.Metrics.Cache, db)
+	exeNode.serviceEvents = store.NewServiceEvents(node.Metrics.Cache, db)
 	exeNode.commits = store.NewCommits(node.Metrics.Cache, db)
 	exeNode.results = store.NewExecutionResults(node.Metrics.Cache, db)
 	exeNode.receipts = store.NewExecutionReceipts(node.Metrics.Cache, db, exeNode.results, storage.DefaultCacheSize)
 	exeNode.myReceipts = store.NewMyExecutionReceipts(node.Metrics.Cache, db, exeNode.receipts)
-
-	// Needed for gRPC server, make sure to assign to main scoped vars
-	exeNode.events = store.NewEvents(node.Metrics.Cache, db)
-	exeNode.serviceEvents = store.NewServiceEvents(node.Metrics.Cache, db)
 	exeNode.txResults = store.NewTransactionResults(node.Metrics.Cache, db, exeNode.exeConf.transactionResultsCacheSize)
+
+	if dbops.IsBadgerBased(node.dbops) {
+		// if data are stored in badger, we can use the same storage for all data
+		exeNode.eventsReader = exeNode.events
+		exeNode.commitsReader = exeNode.commits
+		exeNode.resultsReader = exeNode.results
+		exeNode.txResultsReader = exeNode.txResults
+	} else if dbops.IsPebbleBatch(node.dbops) {
+		// when data are stored in pebble, we need to use chained storage to query data from
+		// both pebble and badger
+		// note the pebble storage is the first argument, and badger storage is the second, so
+		// the data will be queried from pebble first, then badger
+		badgerDB := badgerimpl.ToDB(node.DB)
+		exeNode.eventsReader = chained.NewEvents(exeNode.events, store.NewEvents(node.Metrics.Cache, badgerDB))
+		exeNode.commitsReader = chained.NewCommits(exeNode.commits, store.NewCommits(node.Metrics.Cache, badgerDB))
+		exeNode.resultsReader = chained.NewExecutionResults(exeNode.results, store.NewExecutionResults(node.Metrics.Cache, badgerDB))
+		exeNode.txResultsReader = chained.NewTransactionResults(exeNode.txResults, store.NewTransactionResults(node.Metrics.Cache, badgerDB, exeNode.exeConf.transactionResultsCacheSize))
+	}
 	return nil
 }
 
@@ -470,6 +495,7 @@ func (exeNode *ExecutionNode) LoadGCPBlockDataUploader(
 	)
 
 	// Setting up RetryableUploader for GCP uploader
+	// deprecated
 	retryableUploader := uploader.NewBadgerRetryableUploaderWrapper(
 		asyncUploader,
 		node.Storage.Blocks,
@@ -730,6 +756,16 @@ func (exeNode *ExecutionNode) LoadExecutionDataGetter(node *NodeConfig) error {
 	return nil
 }
 
+func (exeNode *ExecutionNode) MigrateLastSealedExecutedResultToPebble(node *NodeConfig) error {
+	// Migrate the last sealed executed
+	err := migration.MigrateLastSealedExecutedResultToPebble(node.Logger, node.DB, node.PebbleDB, node.State, node.RootSeal)
+	if err != nil {
+		return fmt.Errorf("could not migrate last sealed executed result to pebble: %w", err)
+	}
+
+	return nil
+}
+
 func (exeNode *ExecutionNode) LoadExecutionState(
 	node *NodeConfig,
 ) (
@@ -764,6 +800,8 @@ func (exeNode *ExecutionNode) LoadExecutionState(
 	}
 	exeNode.chunkDataPackDB = chunkDataPackDB
 	exeNode.chunkDataPacks = chunkDataPacks
+
+	// migrate execution data for last sealed and executed block
 
 	exeNode.executionState = state.NewExecutionState(
 		exeNode.ledgerStorage,
@@ -1353,10 +1391,10 @@ func (exeNode *ExecutionNode) LoadGrpcServer(
 		exeNode.scriptsEng,
 		node.Storage.Headers,
 		node.State,
-		exeNode.events,
-		exeNode.results,
-		exeNode.txResults,
-		exeNode.commits,
+		exeNode.eventsReader,
+		exeNode.resultsReader,
+		exeNode.txResultsReader,
+		exeNode.commitsReader,
 		exeNode.metricsProvider,
 		node.RootChainID,
 		signature.NewBlockSignerDecoder(exeNode.committee),
@@ -1370,7 +1408,10 @@ func (exeNode *ExecutionNode) LoadBootstrapper(node *NodeConfig) error {
 	// check if the execution database already exists
 	bootstrapper := bootstrap.NewBootstrapper(node.Logger)
 
-	commit, bootstrapped, err := bootstrapper.IsBootstrapped(node.ProtocolDB)
+	// in order to support switching from badger to pebble in the middle of the spork,
+	// we will check if the execution database has been bootstrapped by reading the state from badger db.
+	// and if not, bootstrap both badger and pebble db.
+	commit, bootstrapped, err := bootstrapper.IsBootstrapped(badgerimpl.ToDB(node.DB))
 	if err != nil {
 		return fmt.Errorf("could not query database to know whether database has been bootstrapped: %w", err)
 	}
@@ -1395,7 +1436,12 @@ func (exeNode *ExecutionNode) LoadBootstrapper(node *NodeConfig) error {
 			return fmt.Errorf("could not load bootstrap state from checkpoint file: %w", err)
 		}
 
-		err = bootstrapper.BootstrapExecutionDatabase(node.ProtocolDB, node.RootSeal)
+		err = bootstrapper.BootstrapExecutionDatabase(badgerimpl.ToDB(node.DB), node.RootSeal)
+		if err != nil {
+			return fmt.Errorf("could not bootstrap execution database: %w", err)
+		}
+
+		err = bootstrapper.BootstrapExecutionDatabase(pebbleimpl.ToDB(node.PebbleDB), node.RootSeal)
 		if err != nil {
 			return fmt.Errorf("could not bootstrap execution database: %w", err)
 		}
