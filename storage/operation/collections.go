@@ -26,6 +26,23 @@ func RemoveCollection(w storage.Writer, collID flow.Identifier) error {
 	return RemoveByKey(w, MakePrefix(codeCollection, collID))
 }
 
+// IndexCollectionPayload will overwrite any existing index, which is acceptable
+// because the blockID is derived from txIDs within the payload, ensuring its uniqueness.
+func IndexCollectionPayload(w storage.Writer, blockID flow.Identifier, txIDs []flow.Identifier) error {
+	return UpsertByKey(w, MakePrefix(codeIndexCollection, blockID), txIDs)
+}
+
+// LookupCollection looks up the collection for a given cluster payload.
+func LookupCollectionPayload(r storage.Reader, blockID flow.Identifier, txIDs *[]flow.Identifier) error {
+	return RetrieveByKey(r, MakePrefix(codeIndexCollection, blockID), txIDs)
+}
+
+// RemoveCollectionPayloadIndices removes a collection id indexed by a block id
+// any error returned are exceptions
+func RemoveCollectionPayloadIndices(w storage.Writer, blockID flow.Identifier) error {
+	return RemoveByKey(w, MakePrefix(codeIndexCollection, blockID))
+}
+
 // UnsafeIndexCollectionByTransaction inserts a collection id keyed by a transaction id
 // Unsafe because a transaction can belong to multiple collections, indexing collection by a transaction
 // will overwrite the previous collection id that was indexed by the same transaction id

@@ -54,5 +54,40 @@ func TestCollections(t *testing.T) {
 			})
 			require.NoError(t, err)
 		})
+
+		t.Run("Index and lookup", func(t *testing.T) {
+			expected := unittest.CollectionFixture(1).Light()
+			blockID := unittest.IdentifierFixture()
+
+			_ = db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+				err := operation.UpsertCollection(rw.Writer(), &expected)
+				assert.NoError(t, err)
+				err = operation.IndexCollectionPayload(rw.Writer(), blockID, expected.Transactions)
+				assert.NoError(t, err)
+				return nil
+			})
+
+			var actual flow.LightCollection
+			err := operation.LookupCollectionPayload(db.Reader(), blockID, &actual.Transactions)
+			assert.NoError(t, err)
+			assert.Equal(t, expected, actual)
+		})
+
+		t.Run("Index and lookup by transaction ID", func(t *testing.T) {
+			expected := unittest.IdentifierFixture()
+			transactionID := unittest.IdentifierFixture()
+			actual := flow.Identifier{}
+
+			_ = db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+				err := operation.UnsafeIndexCollectionByTransaction(rw.Writer(), transactionID, expected)
+				assert.NoError(t, err)
+				return nil
+			})
+
+			err := operation.LookupCollectionByTransaction(db.Reader(), transactionID, &actual)
+			assert.NoError(t, err)
+
+			assert.Equal(t, expected, actual)
+		})
 	})
 }
