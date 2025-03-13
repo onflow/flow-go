@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"sync"
 
+	"github.com/rs/zerolog/log"
+
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/storage/operation"
@@ -140,7 +142,7 @@ func (c *Collections) StoreLightAndIndexByTransaction(collection *flow.LightColl
 	//   make sure there is no dirty read, we need to use a lock to protect the indexing operation.
 	// - Note, this approach works because this is the only place where UnsafeIndexCollectionByTransaction
 	//   is used in the code base to index collection by transaction.
-	cid := collection.ID()
+	collectionID := collection.ID()
 
 	c.indexingByTx.Lock()
 	defer c.indexingByTx.Unlock()
@@ -154,8 +156,9 @@ func (c *Collections) StoreLightAndIndexByTransaction(collection *flow.LightColl
 			// collection nodes have ensured that a transaction can only belong to one collection
 			// so if transaction is already indexed by a collection, check if it's the same collection.
 			// if not, return an error
-			if cid != differentColTxIsIn {
-				return fmt.Errorf("transaction %v is already indexed by a different collection %v", txID, differentColTxIsIn)
+			if collectionID != differentColTxIsIn {
+				log.Error().Msgf("fatal: transaction %v in collection %v is already indexed by a different collection %v",
+					txID, collectionID, differentColTxIsIn)
 			}
 			continue
 		}
@@ -181,7 +184,7 @@ func (c *Collections) StoreLightAndIndexByTransaction(collection *flow.LightColl
 
 		for _, txID := range collection.Transactions {
 			// the indexingByTx lock has ensured we are the only process indexing collection by transaction
-			err = operation.UnsafeIndexCollectionByTransaction(rw.Writer(), txID, collection.ID())
+			err = operation.UnsafeIndexCollectionByTransaction(rw.Writer(), txID, collectionID)
 			if err != nil {
 				return fmt.Errorf("could not insert transaction ID: %w", err)
 			}
