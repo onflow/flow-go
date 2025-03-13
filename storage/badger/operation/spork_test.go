@@ -1,7 +1,6 @@
 package operation
 
 import (
-	"math/rand"
 	"testing"
 
 	"github.com/dgraph-io/badger/v2"
@@ -24,20 +23,5 @@ func TestSporkID_InsertRetrieve(t *testing.T) {
 		require.NoError(t, err)
 
 		assert.Equal(t, sporkID, actual)
-	})
-}
-
-func TestProtocolVersion_InsertRetrieve(t *testing.T) {
-	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
-		version := uint(rand.Uint32())
-
-		err := db.Update(InsertProtocolVersion(version))
-		require.NoError(t, err)
-
-		var actual uint
-		err = db.View(RetrieveProtocolVersion(&actual))
-		require.NoError(t, err)
-
-		assert.Equal(t, version, actual)
 	})
 }

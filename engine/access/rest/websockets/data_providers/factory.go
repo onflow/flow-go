@@ -112,7 +112,7 @@ func (s *DataProviderFactoryImpl) NewDataProvider(ctx context.Context, subscript
 	case TransactionStatusesTopic:
 		return NewTransactionStatusesDataProvider(ctx, s.logger, s.accessApi, subscriptionID, s.linkGenerator, topic, arguments, ch)
 	case SendAndGetTransactionStatusesTopic:
-		return NewSendAndGetTransactionStatusesDataProvider(ctx, s.logger, s.accessApi, subscriptionID, s.linkGenerator, topic, arguments, ch)
+		return NewSendAndGetTransactionStatusesDataProvider(ctx, s.logger, s.accessApi, subscriptionID, s.linkGenerator, topic, arguments, ch, s.chain)
 	default:
 		return nil, fmt.Errorf("unsupported topic \"%s\"", topic)
 	}

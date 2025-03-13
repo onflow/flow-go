@@ -39,7 +39,7 @@ func NewBlockDigestsDataProvider(
 	}
 
 	// Parse arguments passed to the provider.
-	blockArgs, err := ParseBlocksArguments(arguments)
+	blockArgs, err := parseBlocksArguments(arguments)
 	if err != nil {
 		return nil, fmt.Errorf("invalid arguments: %w", err)
 	}
@@ -59,7 +59,8 @@ func NewBlockDigestsDataProvider(
 
 // Run starts processing the subscription for block digests and handles responses.
 //
-// No errors are expected during normal operations.
+// Expected errors during normal operations:
+//   - context.Canceled: if the operation is canceled, during an unsubscribe action.
 func (p *BlockDigestsDataProvider) Run() error {
 	return run(
 		p.closedChan,

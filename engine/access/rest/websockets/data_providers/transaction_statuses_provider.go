@@ -9,7 +9,6 @@ import (
 	"github.com/onflow/flow-go/access"
 	commonmodels "github.com/onflow/flow-go/engine/access/rest/common/models"
 	"github.com/onflow/flow-go/engine/access/rest/common/parser"
-	"github.com/onflow/flow-go/engine/access/rest/http/request"
 	"github.com/onflow/flow-go/engine/access/rest/websockets/models"
 	"github.com/onflow/flow-go/engine/access/subscription"
 	"github.com/onflow/flow-go/model/flow"
@@ -94,10 +93,11 @@ func (p *TransactionStatusesDataProvider) sendResponse(
 	for i := range txResults {
 		var txStatusesPayload models.TransactionStatusesResponse
 		txStatusesPayload.Build(p.linkGenerator, txResults[i], messageIndex.Value())
-		messageIndex.Increment()
 
 		var response models.BaseDataProvidersResponse
 		response.Build(p.ID(), p.Topic(), &txStatusesPayload)
+
+		messageIndex.Increment()
 		p.send <- &response
 	}
 
@@ -109,40 +109,32 @@ func (p *TransactionStatusesDataProvider) createSubscription(
 	ctx context.Context,
 	args transactionStatusesArguments,
 ) subscription.Subscription {
-	if args.StartBlockID != flow.ZeroID {
-		return p.api.SubscribeTransactionStatusesFromStartBlockID(ctx, args.TxID, args.StartBlockID, entities.EventEncodingVersion_JSON_CDC_V0)
-	}
-
-	if args.StartBlockHeight != request.EmptyHeight {
-		return p.api.SubscribeTransactionStatusesFromStartHeight(ctx, args.TxID, args.StartBlockHeight, entities.EventEncodingVersion_JSON_CDC_V0)
-	}
-
-	return p.api.SubscribeTransactionStatusesFromLatest(ctx, args.TxID, entities.EventEncodingVersion_JSON_CDC_V0)
+	return p.api.SubscribeTransactionStatuses(ctx, args.TxID, entities.EventEncodingVersion_JSON_CDC_V0)
 }
 
 // parseAccountStatusesArguments validates and initializes the account statuses arguments.
 func parseTransactionStatusesArguments(
 	arguments models.Arguments,
 ) (transactionStatusesArguments, error) {
-	var args transactionStatusesArguments
-
-	// Parse block arguments
-	startBlockID, startBlockHeight, err := ParseStartBlock(arguments)
-	if err != nil {
-		return args, err
+	allowedFields := []string{
+		"tx_id",
 	}
-	args.StartBlockID = startBlockID
-	args.StartBlockHeight = startBlockHeight
+	err := ensureAllowedFields(arguments, allowedFields)
+	if err != nil {
+		return transactionStatusesArguments{}, err
+	}
+
+	var args transactionStatusesArguments
 
 	if txIDIn, ok := arguments["tx_id"]; ok && txIDIn != "" {
 		result, ok := txIDIn.(string)
 		if !ok {
-			return args, fmt.Errorf("'tx_id' must be a string")
+			return transactionStatusesArguments{}, fmt.Errorf("'tx_id' must be a string")
 		}
 		var txID parser.ID
 		err := txID.Parse(result)
 		if err != nil {
-			return args, fmt.Errorf("invalid 'tx_id': %w", err)
+			return transactionStatusesArguments{}, fmt.Errorf("invalid 'tx_id': %w", err)
 		}
 		args.TxID = txID.Flow()
 	}

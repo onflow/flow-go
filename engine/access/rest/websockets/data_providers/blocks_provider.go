@@ -54,7 +54,7 @@ func NewBlocksDataProvider(
 
 	// Parse arguments passed to the provider.
 	var err error
-	p.arguments, err = ParseBlocksArguments(arguments)
+	p.arguments, err = parseBlocksArguments(arguments)
 	if err != nil {
 		return nil, fmt.Errorf("invalid arguments: %w", err)
 	}
@@ -74,7 +74,8 @@ func NewBlocksDataProvider(
 
 // Run starts processing the subscription for blocks and handles responses.
 //
-// No errors are expected during normal operations.
+// Expected errors during normal operations:
+//   - context.Canceled: if the operation is canceled, during an unsubscribe action.
 func (p *BlocksDataProvider) Run() error {
 	return run(
 		p.closedChan,
@@ -110,29 +111,39 @@ func (p *BlocksDataProvider) createSubscription(ctx context.Context, args blocks
 	return p.api.SubscribeBlocksFromLatest(ctx, args.BlockStatus)
 }
 
-// ParseBlocksArguments validates and initializes the blocks arguments.
-func ParseBlocksArguments(arguments models.Arguments) (blocksArguments, error) {
+// parseBlocksArguments validates and initializes the blocks arguments.
+func parseBlocksArguments(arguments models.Arguments) (blocksArguments, error) {
+	allowedFields := []string{
+		"start_block_id",
+		"start_block_height",
+		"block_status",
+	}
+	err := ensureAllowedFields(arguments, allowedFields)
+	if err != nil {
+		return blocksArguments{}, err
+	}
+
 	var args blocksArguments
 
 	// Parse 'block_status'
 	if blockStatusIn, ok := arguments["block_status"]; ok {
 		result, ok := blockStatusIn.(string)
 		if !ok {
-			return args, fmt.Errorf("'block_status' must be string")
+			return blocksArguments{}, fmt.Errorf("'block_status' must be string")
 		}
 		blockStatus, err := parser.ParseBlockStatus(result)
 		if err != nil {
-			return args, err
+			return blocksArguments{}, err
 		}
 		args.BlockStatus = blockStatus
 	} else {
-		return args, fmt.Errorf("'block_status' must be provided")
+		return blocksArguments{}, fmt.Errorf("'block_status' must be provided")
 	}
 
 	// Parse block arguments
-	startBlockID, startBlockHeight, err := ParseStartBlock(arguments)
+	startBlockID, startBlockHeight, err := parseStartBlock(arguments)
 	if err != nil {
-		return args, err
+		return blocksArguments{}, err
 	}
 	args.StartBlockID = startBlockID
 	args.StartBlockHeight = startBlockHeight
@@ -140,7 +151,7 @@ func ParseBlocksArguments(arguments models.Arguments) (blocksArguments, error) {
 	return args, nil
 }
 
-func ParseStartBlock(arguments models.Arguments) (flow.Identifier, uint64, error) {
+func parseStartBlock(arguments models.Arguments) (flow.Identifier, uint64, error) {
 	startBlockIDIn, hasStartBlockID := arguments["start_block_id"]
 	startBlockHeightIn, hasStartBlockHeight := arguments["start_block_height"]
 

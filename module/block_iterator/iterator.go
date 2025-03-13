@@ -16,6 +16,7 @@ type IndexedBlockIterator struct {
 	// dependencies
 	getBlockIDByIndex func(uint64) (blockID flow.Identifier, indexed bool, exception error)
 	progress          module.IteratorStateWriter // for saving the next index to be iterated for resuming the iteration
+	startIndex        uint64                     // the start index to iterate, this never change
 	endIndex          uint64                     // the end index to iterate, this never change
 	nextIndex         uint64                     // the start index to iterate, this will be updated after each iteration
 }
@@ -31,6 +32,7 @@ func NewIndexedBlockIterator(
 	return &IndexedBlockIterator{
 		getBlockIDByIndex: getBlockIDByIndex,
 		progress:          progress,
+		startIndex:        iterRange.Start,
 		endIndex:          iterRange.End,
 		nextIndex:         iterRange.Start,
 	}
@@ -71,4 +73,9 @@ func (b *IndexedBlockIterator) Checkpoint() (uint64, error) {
 		return 0, fmt.Errorf("failed to save progress at view %v: %w", b.nextIndex, err)
 	}
 	return b.nextIndex, nil
+}
+
+// Progress returns the current progress of the iterator
+func (b *IndexedBlockIterator) Progress() (uint64, uint64, uint64) {
+	return b.startIndex, b.endIndex, b.nextIndex
 }

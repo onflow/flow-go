@@ -1,15 +1,16 @@
 package data_providers
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
 
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/access"
 	commonmodels "github.com/onflow/flow-go/engine/access/rest/common/models"
-	"github.com/onflow/flow-go/engine/access/rest/common/parser"
-	"github.com/onflow/flow-go/engine/access/rest/util"
+	commonparser "github.com/onflow/flow-go/engine/access/rest/common/parser"
 	"github.com/onflow/flow-go/engine/access/rest/websockets/models"
 	"github.com/onflow/flow-go/engine/access/subscription"
 	"github.com/onflow/flow-go/model/flow"
@@ -42,6 +43,7 @@ func NewSendAndGetTransactionStatusesDataProvider(
 	topic string,
 	arguments models.Arguments,
 	send chan<- interface{},
+	chain flow.Chain,
 ) (*SendAndGetTransactionStatusesDataProvider, error) {
 	p := &SendAndGetTransactionStatusesDataProvider{
 		logger:        logger.With().Str("component", "send-transaction-statuses-data-provider").Logger(),
@@ -50,7 +52,7 @@ func NewSendAndGetTransactionStatusesDataProvider(
 	}
 
 	// Initialize arguments passed to the provider.
-	sendTxStatusesArgs, err := parseSendAndGetTransactionStatusesArguments(arguments)
+	sendTxStatusesArgs, err := parseSendAndGetTransactionStatusesArguments(arguments, chain)
 	if err != nil {
 		return nil, fmt.Errorf("invalid arguments for send tx statuses data provider: %w", err)
 	}
@@ -91,11 +93,11 @@ func (p *SendAndGetTransactionStatusesDataProvider) sendResponse(
 	for i := range txResults {
 		var txStatusesPayload models.TransactionStatusesResponse
 		txStatusesPayload.Build(p.linkGenerator, txResults[i], messageIndex.Value())
-		messageIndex.Increment()
 
 		var response models.BaseDataProvidersResponse
 		response.Build(p.ID(), p.Topic(), &txStatusesPayload)
 
+		messageIndex.Increment()
 		p.send <- &response
 	}
 
@@ -113,130 +115,42 @@ func (p *SendAndGetTransactionStatusesDataProvider) createSubscription(
 // parseSendAndGetTransactionStatusesArguments validates and initializes the account statuses arguments.
 func parseSendAndGetTransactionStatusesArguments(
 	arguments models.Arguments,
+	chain flow.Chain,
 ) (sendAndGetTransactionStatusesArguments, error) {
+	allowedFields := []string{
+		"reference_block_id",
+		"script",
+		"arguments",
+		"gas_limit",
+		"payer",
+		"proposal_key",
+		"authorizers",
+		"payload_signatures",
+		"envelope_signatures",
+	}
+	err := ensureAllowedFields(arguments, allowedFields)
+	if err != nil {
+		return sendAndGetTransactionStatusesArguments{}, err
+	}
+
 	var args sendAndGetTransactionStatusesArguments
-	var tx flow.TransactionBody
 
-	if scriptIn, ok := arguments["script"]; ok && scriptIn != "" {
-		result, ok := scriptIn.(string)
-		if !ok {
-			return args, fmt.Errorf("'script' must be a string")
-		}
-
-		script, err := util.FromBase64(result)
-		if err != nil {
-			return args, fmt.Errorf("invalid 'script': %w", err)
-		}
-
-		tx.Script = script
+	// Convert the arguments map to JSON
+	rawJSON, err := json.Marshal(arguments)
+	if err != nil {
+		return args, fmt.Errorf("failed to marshal arguments: %w", err)
 	}
 
-	if argumentsIn, ok := arguments["arguments"]; ok && argumentsIn != "" {
-		result, ok := argumentsIn.([]string)
-		if !ok {
-			return args, fmt.Errorf("'arguments' must be a []string type")
-		}
+	// Create an io.Reader from the JSON bytes
+	rawReader := bytes.NewReader(rawJSON)
 
-		var argumentsData [][]byte
-		for _, arg := range result {
-			argument, err := util.FromBase64(arg)
-			if err != nil {
-				return args, fmt.Errorf("invalid 'arguments': %w", err)
-			}
-
-			argumentsData = append(argumentsData, argument)
-		}
-
-		tx.Arguments = argumentsData
+	var tx commonparser.Transaction
+	err = tx.Parse(rawReader, chain)
+	if err != nil {
+		return args, fmt.Errorf("failed to parse transaction: %w", err)
 	}
 
-	if referenceBlockIDIn, ok := arguments["reference_block_id"]; ok && referenceBlockIDIn != "" {
-		result, ok := referenceBlockIDIn.(string)
-		if !ok {
-			return args, fmt.Errorf("'reference_block_id' must be a string")
-		}
-
-		var referenceBlockID parser.ID
-		err := referenceBlockID.Parse(result)
-		if err != nil {
-			return args, fmt.Errorf("invalid 'reference_block_id': %w", err)
-		}
-
-		tx.ReferenceBlockID = referenceBlockID.Flow()
-	}
-
-	if gasLimitIn, ok := arguments["gas_limit"]; ok && gasLimitIn != "" {
-		result, ok := gasLimitIn.(string)
-		if !ok {
-			return args, fmt.Errorf("'gas_limit' must be a string")
-		}
-
-		gasLimit, err := util.ToUint64(result)
-		if err != nil {
-			return args, fmt.Errorf("invalid 'gas_limit': %w", err)
-		}
-		tx.GasLimit = gasLimit
-	}
-
-	if payerIn, ok := arguments["payer"]; ok && payerIn != "" {
-		result, ok := payerIn.(string)
-		if !ok {
-			return args, fmt.Errorf("'payerIn' must be a string")
-		}
-
-		payerAddr, err := flow.StringToAddress(result)
-		if err != nil {
-			return args, fmt.Errorf("invalid 'payer': %w", err)
-		}
-		tx.Payer = payerAddr
-	}
-
-	if proposalKeyIn, ok := arguments["proposal_key"]; ok && proposalKeyIn != "" {
-		proposalKey, ok := proposalKeyIn.(flow.ProposalKey)
-		if !ok {
-			return args, fmt.Errorf("'proposal_key' must be a object (ProposalKey)")
-		}
-
-		tx.ProposalKey = proposalKey
-	}
-
-	if authorizersIn, ok := arguments["authorizers"]; ok && authorizersIn != "" {
-		result, ok := authorizersIn.([]string)
-		if !ok {
-			return args, fmt.Errorf("'authorizers' must be a []string type")
-		}
-
-		var authorizersData []flow.Address
-		for _, auth := range result {
-			authorizer, err := flow.StringToAddress(auth)
-			if err != nil {
-				return args, fmt.Errorf("invalid 'authorizers': %w", err)
-			}
-
-			authorizersData = append(authorizersData, authorizer)
-		}
-
-		tx.Authorizers = authorizersData
-	}
-
-	if payloadSignaturesIn, ok := arguments["payload_signatures"]; ok && payloadSignaturesIn != "" {
-		payloadSignatures, ok := payloadSignaturesIn.([]flow.TransactionSignature)
-		if !ok {
-			return args, fmt.Errorf("'payload_signatures' must be an array of objects (TransactionSignature)")
-		}
-
-		tx.PayloadSignatures = payloadSignatures
-	}
-
-	if envelopeSignaturesIn, ok := arguments["envelope_signatures"]; ok && envelopeSignaturesIn != "" {
-		envelopeSignatures, ok := envelopeSignaturesIn.([]flow.TransactionSignature)
-		if !ok {
-			return args, fmt.Errorf("'envelope_signatures' must be an array of objects (TransactionSignature)")
-		}
-
-		tx.EnvelopeSignatures = envelopeSignatures
-	}
-	args.Transaction = tx
+	args.Transaction = tx.Flow()
 
 	return args, nil
 }
