@@ -2,6 +2,7 @@ package common
 
 import (
 	"fmt"
+	"reflect"
 	"strings"
 	"testing"
 
@@ -44,4 +45,80 @@ func Test_ParseBody(t *testing.T) {
 
 	err = ParseBody(strings.NewReader(`{ "foo": false }`), &b)
 	assert.EqualError(t, err, `request body contains an invalid value for the "Foo" field (at position 14)`)
+}
+
+func TestConvertInterfaceToArrayOfStrings(t *testing.T) {
+	tests := []struct {
+		name      string
+		input     interface{}
+		expect    []string
+		expectErr bool
+	}{
+		{
+			name:      "Valid slice of strings",
+			input:     []string{"a", "b", "c"},
+			expect:    []string{"a", "b", "c"},
+			expectErr: false,
+		},
+		{
+			name:      "Valid slice of interfaces containing strings",
+			input:     []interface{}{"a", "b", "c"},
+			expect:    []string{"a", "b", "c"},
+			expectErr: false,
+		},
+		{
+			name:      "Empty slice",
+			input:     []interface{}{},
+			expect:    []string{},
+			expectErr: false,
+		},
+		{
+			name:      "Array contains nil value",
+			input:     []interface{}{"a", nil, "c"},
+			expect:    nil,
+			expectErr: true,
+		},
+		{
+			name:      "Mixed types in slice",
+			input:     []interface{}{"a", 123, "c"},
+			expect:    nil,
+			expectErr: true,
+		},
+		{
+			name:      "Non-array input",
+			input:     42,
+			expect:    nil,
+			expectErr: true,
+		},
+		{
+			name:      "Nil input",
+			input:     nil,
+			expect:    nil,
+			expectErr: true,
+		},
+		{
+			name:      "Slice with non-string interface values",
+			input:     []interface{}{true, false},
+			expect:    nil,
+			expectErr: true,
+		},
+		{
+			name:      "Slice with nested slices",
+			input:     []interface{}{[]string{"a"}},
+			expect:    nil,
+			expectErr: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result, err := ConvertInterfaceToArrayOfStrings(tt.input)
+			if (err != nil) != tt.expectErr {
+				t.Fatalf("unexpected error status. got: %v, want error: %v", err, tt.expectErr)
+			}
+			if !reflect.DeepEqual(result, tt.expect) {
+				t.Fatalf("unexpected result. got: %v, want: %v", result, tt.expect)
+			}
+		})
+	}
 }

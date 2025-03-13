@@ -210,9 +210,8 @@ func (s *TransactionStatusesProviderSuite) TestMessageIndexTransactionStatusesPr
 		arguments,
 		send,
 	)
-
-	s.Require().NotNil(provider)
 	s.Require().NoError(err)
+	s.Require().NotNil(provider)
 
 	// Ensure the provider is properly closed after the test
 	defer provider.Close()
@@ -288,8 +287,8 @@ func (s *TransactionStatusesProviderSuite) TestTransactionStatusesDataProvider_I
 				test.arguments,
 				send,
 			)
-			s.Require().Nil(provider)
 			s.Require().Error(err)
+			s.Require().Nil(provider)
 			s.Require().Contains(err.Error(), test.expectedErrorMsg)
 		})
 	}
@@ -298,10 +297,6 @@ func (s *TransactionStatusesProviderSuite) TestTransactionStatusesDataProvider_I
 // invalidTransactionStatusesArgumentsTestCases returns a list of test cases with invalid argument combinations
 // for testing the behavior of transaction statuses data providers. Each test case includes a name,
 // a set of input arguments, and the expected error message that should be returned.
-//
-// The test cases cover scenarios such as:
-// 1. Providing invalid 'tx_id' value.
-// 2. Providing unexpected argument.
 func invalidTransactionStatusesArgumentsTestCases() []testErrType {
 	return []testErrType{
 		{
@@ -310,6 +305,18 @@ func invalidTransactionStatusesArgumentsTestCases() []testErrType {
 				"tx_id": "invalid_tx_id",
 			},
 			expectedErrorMsg: "invalid ID format",
+		},
+		{
+			name: "empty 'tx_id' argument",
+			arguments: map[string]interface{}{
+				"tx_id": "",
+			},
+			expectedErrorMsg: "'tx_id' must not be empty",
+		},
+		{
+			name:             "missing 'tx_id' argument",
+			arguments:        map[string]interface{}{},
+			expectedErrorMsg: "missing 'tx_id' field",
 		},
 		{
 			name: "unexpected argument",
