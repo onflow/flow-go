@@ -39,7 +39,7 @@ func NewBlockDigestsDataProvider(
 	}
 
 	// Parse arguments passed to the provider.
-	blockArgs, err := ParseBlocksArguments(arguments)
+	blockArgs, err := parseBlocksArguments(arguments)
 	if err != nil {
 		return nil, fmt.Errorf("invalid arguments: %w", err)
 	}

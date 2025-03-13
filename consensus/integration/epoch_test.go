@@ -64,8 +64,9 @@ func TestStaticEpochTransition(t *testing.T) {
 	rootSnapshot := createRootSnapshot(t, participantsData)
 	consensusParticipants := NewConsensusParticipants(participantsData)
 
-	firstEpochCounter, err := rootSnapshot.Epochs().Current().Counter()
+	firstEpoch, err := rootSnapshot.Epochs().Current()
 	require.NoError(t, err)
+	firstEpochCounter := firstEpoch.Counter()
 
 	// set up next epoch beginning in 4 views, with same identities as first epoch
 	nextEpochIdentities, err := rootSnapshot.Identities(filter.Any)
@@ -85,9 +86,9 @@ func TestStaticEpochTransition(t *testing.T) {
 
 	// confirm that we have transitioned to the new epoch
 	pstate := nodes[0].state
-	afterCounter, err := pstate.Final().Epochs().Current().Counter()
+	secondEpoch, err := pstate.Final().Epochs().Current()
 	require.NoError(t, err)
-	assert.Equal(t, firstEpochCounter+1, afterCounter)
+	assert.Equal(t, firstEpochCounter+1, secondEpoch.Counter())
 
 	cleanupNodes(nodes)
 }
@@ -102,8 +103,9 @@ func TestEpochTransition_IdentitiesOverlap(t *testing.T) {
 	rootSnapshot := createRootSnapshot(t, firstEpochConsensusParticipants)
 	consensusParticipants := NewConsensusParticipants(firstEpochConsensusParticipants)
 
-	firstEpochCounter, err := rootSnapshot.Epochs().Current().Counter()
+	firstEpoch, err := rootSnapshot.Epochs().Current()
 	require.NoError(t, err)
+	firstEpochCounter := firstEpoch.Counter()
 
 	// set up next epoch with 1 new consensus nodes and 2 consensus nodes from first epoch
 	// 1 consensus node is removed after the first epoch
@@ -117,7 +119,7 @@ func TestEpochTransition_IdentitiesOverlap(t *testing.T) {
 		newIdentity,
 	)
 
-	// generate new identities for next epoch, it will generate new DKG keys for random beacon participants
+	// generate new identities for next epoch, it will generate new Random Beacon keys for random beacon participants
 	nextEpochParticipantData := completeConsensusIdentities(t, privateNodeInfos[1:])
 	rootSnapshot = withNextEpoch(t, rootSnapshot, nextEpochIdentities, nextEpochParticipantData, consensusParticipants, 4, func(block *flow.Block) *flow.QuorumCertificate {
 		return createRootQC(t, block, firstEpochConsensusParticipants)
@@ -134,9 +136,9 @@ func TestEpochTransition_IdentitiesOverlap(t *testing.T) {
 
 	// confirm that we have transitioned to the new epoch
 	pstate := nodes[0].state
-	afterCounter, err := pstate.Final().Epochs().Current().Counter()
+	secondEpoch, err := pstate.Final().Epochs().Current()
 	require.NoError(t, err)
-	assert.Equal(t, firstEpochCounter+1, afterCounter)
+	assert.Equal(t, firstEpochCounter+1, secondEpoch.Counter())
 
 	cleanupNodes(nodes)
 }
@@ -150,8 +152,9 @@ func TestEpochTransition_IdentitiesDisjoint(t *testing.T) {
 	rootSnapshot := createRootSnapshot(t, firstEpochConsensusParticipants)
 	consensusParticipants := NewConsensusParticipants(firstEpochConsensusParticipants)
 
-	firstEpochCounter, err := rootSnapshot.Epochs().Current().Counter()
+	firstEpoch, err := rootSnapshot.Epochs().Current()
 	require.NoError(t, err)
+	firstEpochCounter := firstEpoch.Counter()
 
 	// prepare a next epoch with a completely different consensus committee
 	// (no overlapping consensus nodes)
@@ -179,9 +182,9 @@ func TestEpochTransition_IdentitiesDisjoint(t *testing.T) {
 
 	// confirm that we have transitioned to the new epoch
 	pstate := nodes[0].state
-	afterCounter, err := pstate.Final().Epochs().Current().Counter()
+	secondEpoch, err := pstate.Final().Epochs().Current()
 	require.NoError(t, err)
-	assert.Equal(t, firstEpochCounter+1, afterCounter)
+	assert.Equal(t, firstEpochCounter+1, secondEpoch.Counter())
 
 	cleanupNodes(nodes)
 }
@@ -226,11 +229,13 @@ func withNextEpoch(
 		Participants: nextEpochIdentities.ToSkeleton(),
 		Assignments:  unittest.ClusterAssignment(1, nextEpochIdentities.ToSkeleton()),
 	}
+	dkgIndexMap, dkgParticipantKeys := nextEpochParticipantData.DKGData()
 	nextEpochCommit := &flow.EpochCommit{
 		Counter:            nextEpochSetup.Counter,
 		ClusterQCs:         currEpochCommit.ClusterQCs,
-		DKGParticipantKeys: nextEpochParticipantData.PublicBeaconKeys(),
-		DKGGroupKey:        nextEpochParticipantData.GroupKey,
+		DKGParticipantKeys: dkgParticipantKeys,
+		DKGGroupKey:        nextEpochParticipantData.DKGGroupKey,
+		DKGIndexMap:        dkgIndexMap,
 	}
 
 	// Construct the new min epoch state entry
@@ -267,7 +272,7 @@ func withNextEpoch(
 
 	// Store the modified epoch protocol state entry and corresponding KV store entry
 	rootKVStore, err := kvstore.NewDefaultKVStore(
-		originalRootKVStore.GetEpochCommitSafetyThreshold(),
+		originalRootKVStore.GetFinalizationSafetyThreshold(),
 		originalRootKVStore.GetEpochExtensionViewCount(),
 		epochRichProtocolState.ID())
 	require.NoError(t, err)

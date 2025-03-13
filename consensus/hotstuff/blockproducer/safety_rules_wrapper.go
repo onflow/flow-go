@@ -60,7 +60,10 @@ func newSafetyRulesConcurrencyWrapper(safetyRules hotstuff.SafetyRules) *safetyR
 // Safe under concurrent calls. Per convention, this method should be called exactly once.
 // Only the first call will succeed, and subsequent calls error. The implementation is backed
 // by `SafetyRules` and thereby guarantees consensus safety for singing block proposals.
-// No errors expected during normal operations
+// Error Returns:
+//   - model.NoVoteError if it is not safe for us to vote (our proposal includes our vote)
+//     for this view. This can happen if we have already proposed or timed out this view.
+//   - generic error in case of unexpected failure
 func (w *safetyRulesConcurrencyWrapper) Sign(unsignedHeader *flow.Header) error {
 	if !w.signingStatus.CompareAndSwap(0, 1) { // value of `signingStatus` is something else than 0
 		return fmt.Errorf("signer has already commenced signing; possibly repeated signer call")

@@ -5,8 +5,6 @@ import (
 	"errors"
 	"fmt"
 
-	"go.uber.org/atomic"
-
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
@@ -20,7 +18,9 @@ import (
 	"github.com/onflow/flow-go/module/irrecoverable"
 )
 
-const TransactionExpiryForUnknownStatus = flow.DefaultTransactionExpiry + 10
+// TransactionExpiryForUnknownStatus defines the number of blocks after which
+// a transaction with an unknown status is considered expired.
+const TransactionExpiryForUnknownStatus = flow.DefaultTransactionExpiry
 
 // sendTransaction defines a function type for sending a transaction.
 type sendTransaction func(ctx context.Context, tx *flow.TransactionBody) error
@@ -54,7 +54,7 @@ func (b *backendSubscribeTransactions) SendAndSubscribeTransactionStatuses(
 	requiredEventEncodingVersion entities.EventEncodingVersion,
 ) subscription.Subscription {
 	if err := b.sendTransaction(ctx, tx); err != nil {
-		b.log.Err(err).Str("tx_id", tx.ID().String()).Msg("failed to send transaction")
+		b.log.Debug().Err(err).Str("tx_id", tx.ID().String()).Msg("failed to send transaction")
 		return subscription.NewFailedSubscription(err, "failed to send transaction")
 	}
 
@@ -112,47 +112,36 @@ func (b *backendSubscribeTransactions) createSubscription(
 	// Determine the height of the block to start the subscription from.
 	startHeight, err := b.blockTracker.GetStartHeightFromBlockID(startBlockID)
 	if err != nil {
-		b.log.Err(err).Str("block_id", startBlockID.String()).Msg("failed to get start height")
+		b.log.Debug().Err(err).Str("block_id", startBlockID.String()).Msg("failed to get start height")
 		return subscription.NewFailedSubscription(err, "failed to get start height")
 	}
 
-	// Retrieve the current state of the transaction.
-	txInfo, err := newTransactionSubscriptionMetadata(ctx, b.backendTransactions, txID, referenceBlockID, requiredEventEncodingVersion)
-	if err != nil {
-		b.log.Err(err).Str("tx_id", txID.String()).Msg("failed to get current transaction state")
-		return subscription.NewFailedSubscription(err, "failed to get tx reference block ID")
-	}
+	txInfo := newTransactionSubscriptionMetadata(b.backendTransactions, txID, referenceBlockID, requiredEventEncodingVersion)
 
 	return b.subscriptionHandler.Subscribe(ctx, startHeight, b.getTransactionStatusResponse(txInfo, startHeight))
 }
 
 // getTransactionStatusResponse returns a callback function that produces transaction status
 // subscription responses based on new blocks.
+// The returned callback is not concurrency-safe
 func (b *backendSubscribeTransactions) getTransactionStatusResponse(
 	txInfo *transactionSubscriptionMetadata,
 	startHeight uint64,
 ) func(context.Context, uint64) (interface{}, error) {
-	triggerMissingStatusesOnce := atomic.NewBool(false)
-
 	return func(ctx context.Context, height uint64) (interface{}, error) {
 		err := b.checkBlockReady(height)
 		if err != nil {
 			return nil, err
 		}
 
-		if triggerMissingStatusesOnce.CompareAndSwap(false, true) {
-			return b.generateResultsStatuses(txInfo.txResult, flow.TransactionStatusUnknown)
-		}
-
 		if txInfo.txResult.IsFinal() {
 			return nil, fmt.Errorf("transaction final status %s already reported: %w", txInfo.txResult.Status.String(), subscription.ErrEndOfData)
 		}
 
-		heightDiff := height - startHeight
-		hasReachedUnknownStatusLimit := txInfo.txResult.Status == flow.TransactionStatusUnknown && heightDiff >= TransactionExpiryForUnknownStatus
-		if hasReachedUnknownStatusLimit {
+		// timeout waiting for unknown tx that are never indexed
+		if hasReachedUnknownStatusLimit(height, startHeight, txInfo.txResult.Status) {
 			txInfo.txResult.Status = flow.TransactionStatusExpired
-			return b.generateResultsStatuses(txInfo.txResult, flow.TransactionStatusUnknown)
+			return generateResultsStatuses(txInfo.txResult, flow.TransactionStatusUnknown)
 		}
 
 		// Get old status here, as it could be replaced by status from founded tx result
@@ -162,17 +151,29 @@ func (b *backendSubscribeTransactions) getTransactionStatusResponse(
 			if errors.Is(err, subscription.ErrBlockNotReady) {
 				return nil, err
 			}
-
-			return nil, status.Errorf(codes.Internal, "failed to refresh transaction information: %v", err)
+			if statusErr, ok := status.FromError(err); ok {
+				return nil, status.Errorf(codes.Internal, "failed to refresh transaction information: %v", statusErr)
+			}
+			return nil, fmt.Errorf("unexpected error refreshing transaction information: %w", err)
 		}
 
-		return b.generateResultsStatuses(txInfo.txResult, prevTxStatus)
+		return generateResultsStatuses(txInfo.txResult, prevTxStatus)
 	}
+}
+
+// hasReachedUnknownStatusLimit checks if a transaction's status is still unknown
+// after the expiry limit has been reached.
+func hasReachedUnknownStatusLimit(height, startHeight uint64, status flow.TransactionStatus) bool {
+	if status != flow.TransactionStatusUnknown {
+		return false
+	}
+
+	return height-startHeight >= TransactionExpiryForUnknownStatus
 }
 
 // checkBlockReady checks if the given block height is valid and available based on the expected block status.
 // Expected errors during normal operation:
-// - subscription.ErrBlockNotReady: block for the given block height is not available.
+// - [subscription.ErrBlockNotReady]: block for the given block height is not available.
 func (b *backendSubscribeTransactions) checkBlockReady(height uint64) error {
 	// Get the highest available finalized block height
 	highestHeight, err := b.blockTracker.GetHighestHeight(flow.BlockStatusFinalized)
@@ -197,7 +198,7 @@ func (b *backendSubscribeTransactions) checkBlockReady(height uint64) error {
 // 1. pending(1) -> finalized(2) -> executed(3) -> sealed(4)
 // 2. pending(1) -> expired(5)
 // No errors expected during normal operations.
-func (b *backendSubscribeTransactions) generateResultsStatuses(
+func generateResultsStatuses(
 	txResult *access.TransactionResult,
 	prevTxStatus flow.TransactionStatus,
 ) ([]*access.TransactionResult, error) {
@@ -207,8 +208,8 @@ func (b *backendSubscribeTransactions) generateResultsStatuses(
 		return nil, nil
 	}
 
-	// If the previous status is pending or unknown and the new status is expired, which is the last status, return its result.
-	// If the previous status is anything other than pending, return an error, as this transition is unexpected.
+	// return immediately if the new status is expired, since it's the last status
+	// If the previous status is anything other than pending or unknown, return an error since this transition is unexpected.
 	if txResult.Status == flow.TransactionStatusExpired {
 		if prevTxStatus == flow.TransactionStatusPending || prevTxStatus == flow.TransactionStatusUnknown {
 			return []*access.TransactionResult{

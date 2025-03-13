@@ -5,6 +5,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/onflow/flow-go/cmd/util/cmd/common"
+	"github.com/onflow/flow-go/consensus/hotstuff/persister"
 )
 
 var GetLivenessCmd = &cobra.Command{
@@ -28,7 +29,10 @@ func runGetLivenessData(*cobra.Command, []string) {
 	}
 
 	rootBlock := state.Params().FinalizedRoot()
-	reader := NewHotstuffReader(db, rootBlock.ChainID)
+	reader, err := persister.NewReader(db, rootBlock.ChainID)
+	if err != nil {
+		log.Fatal().Err(err).Msg("could not create reader from db")
+	}
 
 	log.Info().Msg("getting hotstuff liveness data")
 
