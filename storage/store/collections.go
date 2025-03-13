@@ -87,6 +87,7 @@ func (c *Collections) LightByID(colID flow.Identifier) (*flow.LightCollection, e
 
 // Remove removes a collection from the database.
 // Remove does not error if the collection does not exist
+// Note: this method should only be called for collections included in blocks below sealed height
 // any error returned are exceptions
 func (c *Collections) Remove(colID flow.Identifier) error {
 	col, err := c.LightByID(colID)
@@ -105,6 +106,11 @@ func (c *Collections) Remove(colID flow.Identifier) error {
 			err = operation.RemoveCollectionTransactionIndices(rw.Writer(), txID)
 			if err != nil {
 				return fmt.Errorf("could not remove collection payload indices: %w", err)
+			}
+
+			err = operation.RemoveTransaction(rw.Writer(), txID)
+			if err != nil {
+				return fmt.Errorf("could not remove transaction: %w", err)
 			}
 		}
 

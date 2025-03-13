@@ -59,7 +59,11 @@ func TestCollections(t *testing.T) {
 		for _, tx := range expected.Transactions {
 			_, err = collections.LightByTransactionID(tx)
 			assert.Error(t, err)
-			assert.True(t, errors.Is(err, storage.ErrNotFound))
+			assert.ErrorIs(t, err, storage.ErrNotFound)
+
+			_, err = transactions.ByID(tx)
+			assert.Error(t, err)
+			assert.ErrorIs(t, err, storage.ErrNotFound)
 		}
 	})
 }

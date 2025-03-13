@@ -15,3 +15,8 @@ func UpsertTransaction(w storage.Writer, txID flow.Identifier, tx *flow.Transact
 func RetrieveTransaction(r storage.Reader, txID flow.Identifier, tx *flow.TransactionBody) error {
 	return RetrieveByKey(r, MakePrefix(codeTransaction, txID), tx)
 }
+
+// RemoveTransaction removes a transaction by fingerprint.
+func RemoveTransaction(r storage.Writer, txID flow.Identifier) error {
+	return RemoveByKey(r, MakePrefix(codeTransaction, txID))
+}
