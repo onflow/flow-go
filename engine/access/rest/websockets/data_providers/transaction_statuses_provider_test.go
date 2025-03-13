@@ -94,8 +94,10 @@ func (s *TransactionStatusesProviderSuite) subscribeTransactionStatusesDataProvi
 
 	return []testType{
 		{
-			name:      "SubscribeTransactionStatuses happy path",
-			arguments: wsmodels.Arguments{},
+			name: "SubscribeTransactionStatuses happy path",
+			arguments: wsmodels.Arguments{
+				"tx_id": unittest.IdentifierFixture().String(),
+			},
 			setupBackend: func(sub *ssmock.Subscription) {
 				s.api.On(
 					"SubscribeTransactionStatuses",
@@ -288,13 +290,6 @@ func (s *TransactionStatusesProviderSuite) TestTransactionStatusesDataProvider_I
 // invalidTransactionStatusesArgumentsTestCases returns a list of test cases with invalid argument combinations
 // for testing the behavior of transaction statuses data providers. Each test case includes a name,
 // a set of input arguments, and the expected error message that should be returned.
-//
-// The test cases cover scenarios such as:
-// 1. Providing both 'start_block_id' and 'start_block_height' simultaneously.
-// 2. Providing invalid 'tx_id' value.
-// 3. Providing invalid 'start_block_id'  value.
-// 4. Invalid 'start_block_id' argument.
-// 5. Providing unexpected argument.
 func invalidTransactionStatusesArgumentsTestCases() []testErrType {
 	return []testErrType{
 		{

@@ -18,6 +18,8 @@ func SliceToMap(values []string) map[string]bool {
 	return valueMap
 }
 
+// ParseBody parses the input data into the destination interface and returns any decoding errors
+// updated to be more user-friendly. It also checks that there is exactly one json object in the input
 func ParseBody(raw io.Reader, dst interface{}) error {
 	dec := json.NewDecoder(raw)
 	dec.DisallowUnknownFields()
@@ -48,6 +50,7 @@ func ParseBody(raw io.Reader, dst interface{}) error {
 		return fmt.Errorf("request body must not be empty")
 	}
 
+	// verify the request contained exactly one json object
 	err = dec.Decode(&struct{}{})
 	if err != io.EOF {
 		return fmt.Errorf("request body must only contain a single JSON object")
@@ -60,23 +63,20 @@ func ParseBody(raw io.Reader, dst interface{}) error {
 //
 // No errors are expected during normal operations.
 func ParseInterfaceToStrings(value interface{}) ([]string, error) {
-	// Check if value is []string directly
 	if strSlice, ok := value.([]string); ok {
 		return strSlice, nil
 	}
 
-	// Check if value is []interface{}
 	interfaceSlice, ok := value.([]interface{})
 	if !ok {
-		return nil, fmt.Errorf("'%s' must be an array", value)
+		return nil, fmt.Errorf("value must be an array. got %T", value)
 	}
 
-	// Convert []interface{} to []string
 	result := make([]string, len(interfaceSlice))
 	for i, v := range interfaceSlice {
 		str, ok := v.(string)
 		if !ok {
-			return nil, fmt.Errorf("'%s' must be an array of strings", value)
+			return nil, fmt.Errorf("value must be an array of strings. got %T", v)
 		}
 		result[i] = str
 	}

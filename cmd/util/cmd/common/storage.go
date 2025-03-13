@@ -8,6 +8,8 @@ import (
 	"github.com/onflow/flow-go/storage"
 	storagebadger "github.com/onflow/flow-go/storage/badger"
 	"github.com/onflow/flow-go/storage/badger/operation"
+	"github.com/onflow/flow-go/storage/operation/badgerimpl"
+	"github.com/onflow/flow-go/storage/store"
 )
 
 func InitStorage(datadir string) *badger.DB {
@@ -43,4 +45,23 @@ func InitStorages(db *badger.DB) *storage.All {
 	metrics := &metrics.NoopCollector{}
 
 	return storagebadger.InitAll(metrics, db)
+}
+
+func InitExecutionStorages(bdb *badger.DB) *storage.Execution {
+	metrics := &metrics.NoopCollector{}
+
+	db := badgerimpl.ToDB(bdb)
+
+	results := store.NewExecutionResults(metrics, db)
+	receipts := store.NewExecutionReceipts(metrics, db, results, storagebadger.DefaultCacheSize)
+	commits := store.NewCommits(metrics, db)
+	transactionResults := store.NewTransactionResults(metrics, db, storagebadger.DefaultCacheSize)
+	events := store.NewEvents(metrics, db)
+	return &storage.Execution{
+		Results:            results,
+		Receipts:           receipts,
+		Commits:            commits,
+		TransactionResults: transactionResults,
+		Events:             events,
+	}
 }

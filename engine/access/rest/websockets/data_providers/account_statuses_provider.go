@@ -88,7 +88,8 @@ func NewAccountStatusesDataProvider(
 
 // Run starts processing the subscription for events and handles responses.
 //
-// No errors are expected during normal operations.
+// Expected errors during normal operations:
+//   - context.Canceled: if the operation is canceled, during an unsubscribe action.
 func (p *AccountStatusesDataProvider) Run() error {
 	return subscription.HandleSubscription(p.subscription, p.handleResponse())
 }
@@ -175,7 +176,7 @@ func parseAccountStatusesArguments(
 	if eventTypesIn, ok := arguments["event_types"]; ok && eventTypesIn != "" {
 		result, err := common.ParseInterfaceToStrings(eventTypesIn)
 		if err != nil {
-			return args, fmt.Errorf("'event_types' must be an array of string")
+			return accountStatusesArguments{}, fmt.Errorf("'event_types' must be an array of string")
 		}
 
 		err = eventTypes.Parse(result)
@@ -189,7 +190,7 @@ func parseAccountStatusesArguments(
 	if accountAddressesIn, ok := arguments["account_addresses"]; ok && accountAddressesIn != "" {
 		accountAddresses, err = common.ParseInterfaceToStrings(accountAddressesIn)
 		if err != nil {
-			return args, fmt.Errorf("'account_addresses' must be an array of string")
+			return accountStatusesArguments{}, fmt.Errorf("'account_addresses' must be an array of string")
 		}
 	}
 

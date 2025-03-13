@@ -144,6 +144,11 @@ func NewWebSocketController(
 	conn WebsocketConnection,
 	dataProviderFactory dp.DataProviderFactory,
 ) *Controller {
+	var limiter *rate.Limiter
+	if config.MaxResponsesPerSecond > 0 {
+		limiter = rate.NewLimiter(rate.Limit(config.MaxResponsesPerSecond), 1)
+	}
+
 	return &Controller{
 		logger:              logger.With().Str("component", "websocket-controller").Logger(),
 		config:              config,
@@ -152,7 +157,7 @@ func NewWebSocketController(
 		dataProviders:       concurrentmap.New[SubscriptionID, dp.DataProvider](),
 		dataProviderFactory: dataProviderFactory,
 		dataProvidersGroup:  &sync.WaitGroup{},
-		limiter:             rate.NewLimiter(rate.Limit(config.MaxResponsesPerSecond), 1),
+		limiter:             limiter,
 	}
 }
 
@@ -286,7 +291,7 @@ func (c *Controller) writeMessages(ctx context.Context) error {
 				return nil
 			}
 
-			if err := c.limiter.WaitN(ctx, 1); err != nil {
+			if err := c.checkRateLimit(ctx); err != nil {
 				return fmt.Errorf("rate limiter wait failed: %w", err)
 			}
 
@@ -424,11 +429,10 @@ func (c *Controller) handleMessage(ctx context.Context, message json.RawMessage)
 //
 // Expected error returns during normal operations:
 //   - ErrMaxSubscriptionsReached: if the maximum number of active subscriptions per connection is exceeded.
-//   - context.Canceled: if the operation is canceled, during an unsubscribe action.
 func (c *Controller) handleSubscribe(ctx context.Context, msg models.SubscribeMessageRequest) {
 	// Check if the maximum number of active subscriptions per connection has been reached.
 	// If the limit is exceeded, an error is returned, and the subscription request is rejected.
-	if uint64(c.dataProviders.Size()) > c.config.MaxSubscriptionsPerConnection {
+	if uint64(c.dataProviders.Size()) >= c.config.MaxSubscriptionsPerConnection {
 		err := fmt.Errorf("error creating new subscription: %w", ErrMaxSubscriptionsReached)
 		c.writeErrorResponse(
 			ctx,
@@ -475,9 +479,8 @@ func (c *Controller) handleSubscribe(ctx context.Context, msg models.SubscribeMe
 	c.dataProvidersGroup.Add(1)
 	go func() {
 		err = provider.Run()
-		// context.Canceled error is expected cause was initiated by closing this provider
-		// during the unsubscribe action. Without this check, the base error context.Canceled
-		// will always be sent, even when simply unsubscribing from a topic.
+		// return the error to the client for all errors except context.Canceled.
+		// context.Canceled is returned during graceful shutdown of a subscription
 		if err != nil && !errors.Is(err, context.Canceled) {
 			err = fmt.Errorf("internal error: %w", err)
 			c.writeErrorResponse(
@@ -597,4 +600,15 @@ func (c *Controller) parseOrCreateSubscriptionID(id string) (SubscriptionID, err
 	}
 
 	return newId, nil
+}
+
+// checkRateLimit checks the controller rate limit and blocks until there is room to send a response.
+// An error is returned if the context is canceled or the expected wait time exceeds the context's
+// deadline.
+func (c *Controller) checkRateLimit(ctx context.Context) error {
+	if c.limiter == nil {
+		return nil
+	}
+
+	return c.limiter.WaitN(ctx, 1)
 }

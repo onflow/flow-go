@@ -48,10 +48,10 @@ func TestConvertAccountKey(t *testing.T) {
 	accountKey.Revoked = true
 
 	msg, err := convert.AccountKeyToMessage(accountKey)
-	assert.Nil(t, err)
+	assert.NoError(t, err)
 
 	converted, err := convert.MessageToAccountKey(msg)
-	assert.Nil(t, err)
+	assert.NoError(t, err)
 
 	assert.Equal(t, accountKey, *converted)
 	assert.Equal(t, accountKey.PublicKey, converted.PublicKey)

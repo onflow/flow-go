@@ -13,7 +13,7 @@ import (
 
 // GetAccessAPIClient is a helper function that creates client API for AccessAPI service
 func GetAccessAPIClient(address string) (accessproto.AccessAPIClient, error) {
-	conn, err := grpc.Dial(address, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	conn, err := grpc.NewClient(address, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
 		return nil, err
 	}

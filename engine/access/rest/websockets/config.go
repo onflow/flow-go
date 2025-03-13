@@ -36,7 +36,7 @@ const (
 
 	// DefaultMaxResponsesPerSecond defines the default maximum number of responses
 	// that can be sent to a single client per second.
-	DefaultMaxResponsesPerSecond = 1.5 * DefaultMaxSubscriptionsPerConnection
+	DefaultMaxResponsesPerSecond = float64(0)
 
 	// DefaultInactivityTimeout is the default duration a WebSocket connection can remain open without any active subscriptions
 	// before being automatically closed
@@ -51,7 +51,7 @@ type Config struct {
 	MaxSubscriptionsPerConnection uint64
 	// MaxResponsesPerSecond defines the maximum number of responses that
 	// can be sent to a single client per second.
-	MaxResponsesPerSecond uint64
+	MaxResponsesPerSecond float64
 	// InactivityTimeout specifies the duration a WebSocket connection can remain open without any active subscriptions
 	// before being automatically closed
 	InactivityTimeout time.Duration
