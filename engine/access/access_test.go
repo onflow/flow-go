@@ -393,7 +393,7 @@ func (suite *Suite) TestGetBlockByIDAndHeight() {
 		require.NoError(suite.T(), all.Blocks.Store(&block2))
 
 		// the follower logic should update height index on the block storage when a block is finalized
-		err := db.Update(operation.IndexBlockHeight(block2.Header.Height, block2.ID()))
+		err := db.Update(operation.IndexFinalizedBlockByHeight(block2.Header.Height, block2.ID()))
 		require.NoError(suite.T(), err)
 
 		assertHeaderResp := func(
@@ -720,7 +720,7 @@ func (suite *Suite) TestGetSealedTransaction() {
 		err = all.Blocks.Store(block)
 		require.NoError(suite.T(), err)
 
-		err = db.Update(operation.IndexBlockHeight(block.Header.Height, block.ID()))
+		err = db.Update(operation.IndexFinalizedBlockByHeight(block.Header.Height, block.ID()))
 		require.NoError(suite.T(), err)
 
 		suite.sealedBlock = block.Header
@@ -937,7 +937,7 @@ func (suite *Suite) TestGetTransactionResult() {
 				require.NoError(suite.T(), err)
 			}
 		}
-		err = db.Update(operation.IndexBlockHeight(block.Header.Height, block.ID()))
+		err = db.Update(operation.IndexFinalizedBlockByHeight(block.Header.Height, block.ID()))
 		require.NoError(suite.T(), err)
 		finalSnapshot.On("Head").Return(block.Header, nil)
 
@@ -1167,7 +1167,7 @@ func (suite *Suite) TestExecuteScript() {
 		lastBlock := unittest.BlockWithParentFixture(prevBlock.Header)
 		err = all.Blocks.Store(lastBlock)
 		require.NoError(suite.T(), err)
-		err = db.Update(operation.IndexBlockHeight(lastBlock.Header.Height, lastBlock.ID()))
+		err = db.Update(operation.IndexFinalizedBlockByHeight(lastBlock.Header.Height, lastBlock.ID()))
 		require.NoError(suite.T(), err)
 		//update latest sealed block
 		suite.sealedBlock = lastBlock.Header
@@ -1181,7 +1181,7 @@ func (suite *Suite) TestExecuteScript() {
 
 		err = all.Blocks.Store(prevBlock)
 		require.NoError(suite.T(), err)
-		err = db.Update(operation.IndexBlockHeight(prevBlock.Header.Height, prevBlock.ID()))
+		err = db.Update(operation.IndexFinalizedBlockByHeight(prevBlock.Header.Height, prevBlock.ID()))
 		require.NoError(suite.T(), err)
 
 		// create execution receipts for each of the execution node and the previous block
