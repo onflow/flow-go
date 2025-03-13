@@ -54,11 +54,11 @@ func NewBlocksDataProvider(
 	}
 
 	// Parse arguments passed to the provider.
-	var err error
-	p.arguments, err = parseBlocksArguments(arguments)
+	args, err := parseBlocksArguments(arguments)
 	if err != nil {
 		return nil, fmt.Errorf("invalid arguments: %w", err)
 	}
+	p.arguments = args
 
 	subCtx, cancel := context.WithCancel(ctx)
 	p.baseDataProvider = newBaseDataProvider(
@@ -67,7 +67,7 @@ func NewBlocksDataProvider(
 		arguments,
 		cancel,
 		send,
-		p.createSubscription(subCtx, p.arguments), // Set up a subscription to blocks based on arguments.
+		p.createSubscription(subCtx, args), // Set up a subscription to blocks based on arguments.
 	)
 
 	return p, nil
@@ -113,7 +113,7 @@ func (p *BlocksDataProvider) createSubscription(ctx context.Context, args blocks
 }
 
 // ParseBlocksArguments validates and initializes the blocks arguments.
-func ParseBlocksArguments(arguments wsmodels.Arguments) (blocksArguments, error) {
+func parseBlocksArguments(arguments wsmodels.Arguments) (blocksArguments, error) {
 	allowedFields := []string{
 		"start_block_id",
 		"start_block_height",

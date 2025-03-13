@@ -193,7 +193,7 @@ func (s *TransactionStatusesProviderSuite) TestMessageIndexTransactionStatusesPr
 
 	arguments :=
 		map[string]interface{}{
-			"start_block_id": s.rootBlock.ID().String(),
+			"tx_id": unittest.TransactionFixture().ID().String(),
 		}
 
 	// Create the TransactionStatusesDataProvider instance
@@ -207,9 +207,8 @@ func (s *TransactionStatusesProviderSuite) TestMessageIndexTransactionStatusesPr
 		arguments,
 		send,
 	)
-
-	s.Require().NotNil(provider)
 	s.Require().NoError(err)
+	s.Require().NotNil(provider)
 
 	// Ensure the provider is properly closed after the test
 	defer provider.Close()
@@ -309,7 +308,7 @@ func invalidTransactionStatusesArgumentsTestCases() []testErrType {
 			name: "unexpected argument",
 			arguments: map[string]interface{}{
 				"unexpected_argument": "dummy",
-				"tx_id":               "123",
+				"tx_id":               unittest.TransactionFixture().ID().String(),
 			},
 			expectedErrorMsg: "unexpected field: 'unexpected_argument'",
 		},

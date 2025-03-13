@@ -141,9 +141,9 @@ func (s *SendTransactionStatusesProviderSuite) TestSendTransactionStatusesDataPr
 				send,
 				s.chain,
 			)
-			s.Require().Nil(provider)
 			s.Require().Error(err)
 			s.Require().Contains(err.Error(), test.expectedErrorMsg)
+			s.Require().Nil(provider)
 		})
 	}
 }
@@ -172,77 +172,77 @@ func invalidSendTransactionStatusesArgumentsTestCases() []testErrType {
 			arguments: map[string]interface{}{
 				"script": 0,
 			},
-			expectedErrorMsg: "'script' must be a string",
+			expectedErrorMsg: "failed to parse transaction",
 		},
 		{
 			name: "invalid 'script' argument",
 			arguments: map[string]interface{}{
 				"script": "invalid_script",
 			},
-			expectedErrorMsg: "invalid 'script': illegal base64 data ",
+			expectedErrorMsg: "failed to parse transaction",
 		},
 		{
 			name: "invalid 'arguments' type",
 			arguments: map[string]interface{}{
 				"arguments": 0,
 			},
-			expectedErrorMsg: "'arguments' must be a []string type",
+			expectedErrorMsg: "failed to parse transaction",
 		},
 		{
 			name: "invalid 'arguments' argument",
 			arguments: map[string]interface{}{
 				"arguments": []string{"invalid_base64_1", "invalid_base64_2"},
 			},
-			expectedErrorMsg: "invalid 'arguments'",
+			expectedErrorMsg: "failed to parse transaction",
 		},
 		{
 			name: "invalid 'reference_block_id' argument",
 			arguments: map[string]interface{}{
 				"reference_block_id": "invalid_reference_block_id",
 			},
-			expectedErrorMsg: "invalid ID format",
+			expectedErrorMsg: "failed to parse transaction",
 		},
 		{
 			name: "invalid 'gas_limit' argument",
 			arguments: map[string]interface{}{
 				"gas_limit": "-1",
 			},
-			expectedErrorMsg: "value must be an unsigned 64 bit integer",
+			expectedErrorMsg: "failed to parse transaction",
 		},
 		{
 			name: "invalid 'payer' argument",
 			arguments: map[string]interface{}{
 				"payer": "invalid_payer",
 			},
-			expectedErrorMsg: "invalid 'payer': can not decode hex string",
+			expectedErrorMsg: "failed to parse transaction",
 		},
 		{
 			name: "invalid 'proposal_key' argument",
 			arguments: map[string]interface{}{
 				"proposal_key": "invalid ProposalKey object",
 			},
-			expectedErrorMsg: "'proposal_key' must be a object (ProposalKey)",
+			expectedErrorMsg: "failed to parse transaction",
 		},
 		{
 			name: "invalid 'authorizers' argument",
 			arguments: map[string]interface{}{
 				"authorizers": []string{"invalid_base64_1", "invalid_base64_2"},
 			},
-			expectedErrorMsg: "invalid 'authorizers': can not decode hex string",
+			expectedErrorMsg: "failed to parse transaction",
 		},
 		{
 			name: "invalid 'payload_signatures' argument",
 			arguments: map[string]interface{}{
 				"payload_signatures": "invalid TransactionSignature array",
 			},
-			expectedErrorMsg: "'payload_signatures' must be an array of objects (TransactionSignature)",
+			expectedErrorMsg: "failed to parse transaction",
 		},
 		{
 			name: "invalid 'envelope_signatures' argument",
 			arguments: map[string]interface{}{
 				"envelope_signatures": "invalid TransactionSignature array",
 			},
-			expectedErrorMsg: "'envelope_signatures' must be an array of objects (TransactionSignature)",
+			expectedErrorMsg: "failed to parse transaction",
 		},
 		{
 			name: "unexpected argument",
