@@ -445,7 +445,7 @@ func TestChunkResponse_MissingStatus(t *testing.T) {
 	chunkLocatorID := statuses[0].ChunkLocatorID()
 
 	// mocks there is no pending status for this chunk at fetcher engine.
-	s.pendingChunks.On("Get", status.ChunkIndex, result.ID()).Return(nil, false)
+	s.pendingChunks.On("Get", chunks.ChunkLocatorID(result.ID(), status.ChunkIndex)).Return(nil, false)
 
 	s.metrics.On("OnChunkDataPackArrivedAtFetcher").Return().Times(len(responses))
 	e.HandleChunkDataPack(unittest.IdentifierFixture(), responses[chunkLocatorID])
@@ -536,8 +536,8 @@ func TestStopAtHeight(t *testing.T) {
 	// side.
 	mockChunkConsumerNotifier(t, s.chunkConsumerNotifier, flow.GetIDs([]flow.Entity{locatorA, locatorB}))
 
-	s.pendingChunks.On("Add", mock.Anything).Run(func(args mock.Arguments) {
-		spew.Dump(args[0].(*verification.ChunkStatus).BlockHeight)
+	s.pendingChunks.On("Add", mock.Anything, mock.Anything).Run(func(args mock.Arguments) {
+		spew.Dump(args[1].(*verification.ChunkStatus).BlockHeight)
 	}).Return(false)
 
 	e.ProcessAssignedChunk(&locatorA)
@@ -637,13 +637,13 @@ func mockStateAtBlockIDForMissingIdentities(state *protocol.State, blockID flow.
 func mockPendingChunksAdd(t *testing.T, pendingChunks *mempool.Mempool[flow.Identifier, *verification.ChunkStatus], list []*verification.ChunkStatus, added bool) {
 	mu := &sync.Mutex{}
 
-	pendingChunks.On("Add", mock.Anything).
+	pendingChunks.On("Add", mock.Anything, mock.Anything).
 		Run(func(args mock.Arguments) {
 			// to provide mutual exclusion under concurrent invocations.
 			mu.Lock()
 			defer mu.Unlock()
 
-			actual, ok := args[0].(*verification.ChunkStatus)
+			actual, ok := args[1].(*verification.ChunkStatus)
 			require.True(t, ok)
 
 			// there should be a matching chunk status with the received one.
