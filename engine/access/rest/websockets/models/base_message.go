@@ -16,28 +16,12 @@ type BaseMessageRequest struct {
 
 // BaseMessageResponse represents a base structure for outgoing messages.
 type BaseMessageResponse struct {
-	SubscriptionID string       `json:"subscription_id"` // SubscriptionID might be empty in case of error response
-	Error          ErrorMessage `json:"error,omitempty"` // Error might be empty in case of OK response
-	Action         string       `json:"action"`
+	SubscriptionID string        `json:"subscription_id"` // SubscriptionID might be empty in case of error response
+	Error          *ErrorMessage `json:"error,omitempty"` // Error might be empty in case of OK response
+	Action         string        `json:"action"`
 }
 
 type ErrorMessage struct {
 	Code    int    `json:"code"` // Code is an error code that categorizes an error
 	Message string `json:"message"`
-}
-
-// BaseDataProvidersResponse represents a base structure for responses from subscriptions.
-type BaseDataProvidersResponse struct {
-	SubscriptionID string      `json:"subscription_id"` // Unique subscriptionID
-	Topic          string      `json:"topic"`           // Topic of the subscription
-	Payload        interface{} `json:"payload"`         // Payload that's being returned within a subscription.
-}
-
-// Build creates BaseDataProvidersResponse instance for consistent responses of the data providers.
-func (b *BaseDataProvidersResponse) Build(subscriptionID string, topic string, payload interface{}) {
-	*b = BaseDataProvidersResponse{
-		SubscriptionID: subscriptionID,
-		Topic:          topic,
-		Payload:        payload,
-	}
 }

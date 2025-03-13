@@ -13,7 +13,8 @@ import (
 	"github.com/onflow/flow-go/access"
 	accessmock "github.com/onflow/flow-go/access/mock"
 	mockcommonmodels "github.com/onflow/flow-go/engine/access/rest/common/models/mock"
-	"github.com/onflow/flow-go/engine/access/rest/websockets/models"
+	"github.com/onflow/flow-go/engine/access/rest/websockets/data_providers/models"
+	wsmodels "github.com/onflow/flow-go/engine/access/rest/websockets/models"
 	"github.com/onflow/flow-go/engine/access/state_stream"
 	ssmock "github.com/onflow/flow-go/engine/access/state_stream/mock"
 	"github.com/onflow/flow-go/engine/access/subscription"
@@ -94,7 +95,7 @@ func (s *TransactionStatusesProviderSuite) subscribeTransactionStatusesDataProvi
 	return []testType{
 		{
 			name: "SubscribeTransactionStatuses happy path",
-			arguments: models.Arguments{
+			arguments: wsmodels.Arguments{
 				"tx_id": unittest.IdentifierFixture().String(),
 			},
 			setupBackend: func(sub *ssmock.Subscription) {
@@ -154,9 +155,7 @@ func (s *TransactionStatusesProviderSuite) expectedTransactionStatusesResponses(
 	expectedResponses := make([]interface{}, len(backendResponses))
 
 	for i, resp := range backendResponses {
-		var expectedResponsePayload models.TransactionStatusesResponse
-		expectedResponsePayload.Build(s.linkGenerator, resp, uint64(i))
-
+		expectedResponsePayload := models.NewTransactionStatusesResponse(s.linkGenerator, resp, uint64(i))
 		expectedResponses[i] = &models.BaseDataProvidersResponse{
 			Topic:   topic,
 			Payload: &expectedResponsePayload,
@@ -196,7 +195,7 @@ func (s *TransactionStatusesProviderSuite) TestMessageIndexTransactionStatusesPr
 
 	arguments :=
 		map[string]interface{}{
-			"tx_id": unittest.IdentifierFixture().String(),
+			"tx_id": unittest.TransactionFixture().ID().String(),
 		}
 
 	// Create the TransactionStatusesDataProvider instance
@@ -210,9 +209,8 @@ func (s *TransactionStatusesProviderSuite) TestMessageIndexTransactionStatusesPr
 		arguments,
 		send,
 	)
-
-	s.Require().NotNil(provider)
 	s.Require().NoError(err)
+	s.Require().NotNil(provider)
 
 	// Ensure the provider is properly closed after the test
 	defer provider.Close()
@@ -243,13 +241,7 @@ func (s *TransactionStatusesProviderSuite) TestMessageIndexTransactionStatusesPr
 	var responses []*models.TransactionStatusesResponse
 	for i := 0; i < txStatusesCount; i++ {
 		res := <-send
-
-		txStatusesRes, ok := res.(*models.BaseDataProvidersResponse)
-		s.Require().True(ok, "Expected *models.BaseDataProvidersResponse, got %T", res)
-
-		txStatusesResData, ok := txStatusesRes.Payload.(*models.TransactionStatusesResponse)
-		s.Require().True(ok, "Expected *models.TransactionStatusesResponse, got %T", res)
-
+		_, txStatusesResData := extractPayload[*models.TransactionStatusesResponse](s.T(), res)
 		responses = append(responses, txStatusesResData)
 	}
 
@@ -298,10 +290,6 @@ func (s *TransactionStatusesProviderSuite) TestTransactionStatusesDataProvider_I
 // invalidTransactionStatusesArgumentsTestCases returns a list of test cases with invalid argument combinations
 // for testing the behavior of transaction statuses data providers. Each test case includes a name,
 // a set of input arguments, and the expected error message that should be returned.
-//
-// The test cases cover scenarios such as:
-// 1. Providing invalid 'tx_id' value.
-// 2. Providing unexpected argument.
 func invalidTransactionStatusesArgumentsTestCases() []testErrType {
 	return []testErrType{
 		{
@@ -314,8 +302,8 @@ func invalidTransactionStatusesArgumentsTestCases() []testErrType {
 		{
 			name: "unexpected argument",
 			arguments: map[string]interface{}{
-				"tx_id":               unittest.IdentifierFixture().String(),
 				"unexpected_argument": "dummy",
+				"tx_id":               unittest.TransactionFixture().ID().String(),
 			},
 			expectedErrorMsg: "unexpected field: 'unexpected_argument'",
 		},

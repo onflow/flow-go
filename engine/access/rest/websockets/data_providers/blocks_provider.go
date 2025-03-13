@@ -11,7 +11,8 @@ import (
 	"github.com/onflow/flow-go/engine/access/rest/common/parser"
 	"github.com/onflow/flow-go/engine/access/rest/http/request"
 	"github.com/onflow/flow-go/engine/access/rest/util"
-	"github.com/onflow/flow-go/engine/access/rest/websockets/models"
+	"github.com/onflow/flow-go/engine/access/rest/websockets/data_providers/models"
+	wsmodels "github.com/onflow/flow-go/engine/access/rest/websockets/models"
 	"github.com/onflow/flow-go/engine/access/subscription"
 	"github.com/onflow/flow-go/model/flow"
 )
@@ -43,7 +44,7 @@ func NewBlocksDataProvider(
 	subscriptionID string,
 	linkGenerator commonmodels.LinkGenerator,
 	topic string,
-	arguments models.Arguments,
+	arguments wsmodels.Arguments,
 	send chan<- interface{},
 ) (*BlocksDataProvider, error) {
 	p := &BlocksDataProvider{
@@ -53,11 +54,11 @@ func NewBlocksDataProvider(
 	}
 
 	// Parse arguments passed to the provider.
-	var err error
-	p.arguments, err = parseBlocksArguments(arguments)
+	args, err := parseBlocksArguments(arguments)
 	if err != nil {
 		return nil, fmt.Errorf("invalid arguments: %w", err)
 	}
+	p.arguments = args
 
 	subCtx, cancel := context.WithCancel(ctx)
 	p.baseDataProvider = newBaseDataProvider(
@@ -66,7 +67,7 @@ func NewBlocksDataProvider(
 		arguments,
 		cancel,
 		send,
-		p.createSubscription(subCtx, p.arguments), // Set up a subscription to blocks based on arguments.
+		p.createSubscription(subCtx, args), // Set up a subscription to blocks based on arguments.
 	)
 
 	return p, nil
@@ -74,8 +75,7 @@ func NewBlocksDataProvider(
 
 // Run starts processing the subscription for blocks and handles responses.
 //
-// Expected errors during normal operations:
-//   - context.Canceled: if the operation is canceled, during an unsubscribe action.
+// No errors are expected during normal operations.
 func (p *BlocksDataProvider) Run() error {
 	return subscription.HandleSubscription(
 		p.subscription,
@@ -88,8 +88,11 @@ func (p *BlocksDataProvider) Run() error {
 				return nil, fmt.Errorf("failed to build block response :%w", err)
 			}
 
-			var response models.BaseDataProvidersResponse
-			response.Build(p.ID(), p.Topic(), &block)
+			response := models.BaseDataProvidersResponse{
+				SubscriptionID: p.ID(),
+				Topic:          p.Topic(),
+				Payload:        &block,
+			}
 
 			return &response, nil
 		}),
@@ -109,8 +112,8 @@ func (p *BlocksDataProvider) createSubscription(ctx context.Context, args blocks
 	return p.api.SubscribeBlocksFromLatest(ctx, args.BlockStatus)
 }
 
-// parseBlocksArguments validates and initializes the blocks arguments.
-func parseBlocksArguments(arguments models.Arguments) (blocksArguments, error) {
+// ParseBlocksArguments validates and initializes the blocks arguments.
+func parseBlocksArguments(arguments wsmodels.Arguments) (blocksArguments, error) {
 	allowedFields := []string{
 		"start_block_id",
 		"start_block_height",
@@ -149,7 +152,7 @@ func parseBlocksArguments(arguments models.Arguments) (blocksArguments, error) {
 	return args, nil
 }
 
-func parseStartBlock(arguments models.Arguments) (flow.Identifier, uint64, error) {
+func parseStartBlock(arguments wsmodels.Arguments) (flow.Identifier, uint64, error) {
 	startBlockIDIn, hasStartBlockID := arguments["start_block_id"]
 	startBlockHeightIn, hasStartBlockHeight := arguments["start_block_height"]
 

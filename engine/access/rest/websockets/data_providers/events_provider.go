@@ -10,7 +10,8 @@ import (
 	"github.com/onflow/flow-go/engine/access/rest/common/parser"
 	"github.com/onflow/flow-go/engine/access/rest/http/request"
 	"github.com/onflow/flow-go/engine/access/rest/util"
-	"github.com/onflow/flow-go/engine/access/rest/websockets/models"
+	"github.com/onflow/flow-go/engine/access/rest/websockets/data_providers/models"
+	wsmodels "github.com/onflow/flow-go/engine/access/rest/websockets/models"
 	"github.com/onflow/flow-go/engine/access/state_stream"
 	"github.com/onflow/flow-go/engine/access/state_stream/backend"
 	"github.com/onflow/flow-go/engine/access/subscription"
@@ -45,7 +46,7 @@ func NewEventsDataProvider(
 	stateStreamApi state_stream.API,
 	subscriptionID string,
 	topic string,
-	arguments models.Arguments,
+	arguments wsmodels.Arguments,
 	send chan<- interface{},
 	chain flow.Chain,
 	eventFilterConfig state_stream.EventFilterConfig,
@@ -86,8 +87,7 @@ func NewEventsDataProvider(
 
 // Run starts processing the subscription for events and handles responses.
 //
-// Expected errors during normal operations:
-//   - context.Canceled: if the operation is canceled, during an unsubscribe action.
+// No errors are expected during normal operations.
 func (p *EventsDataProvider) Run() error {
 	return subscription.HandleSubscription(p.subscription, p.handleResponse())
 }
@@ -115,11 +115,12 @@ func (p *EventsDataProvider) handleResponse() func(eventsResponse *backend.Event
 			return fmt.Errorf("message index already incremented to: %d", messageIndex.Value())
 		}
 
-		var eventsPayload models.EventResponse
-		eventsPayload.Build(eventsResponse, index)
-
-		var response models.BaseDataProvidersResponse
-		response.Build(p.ID(), p.Topic(), &eventsPayload)
+		eventsPayload := models.NewEventResponse(eventsResponse, index)
+		response := models.BaseDataProvidersResponse{
+			SubscriptionID: p.ID(),
+			Topic:          p.Topic(),
+			Payload:        &eventsPayload,
+		}
 
 		p.send <- &response
 
@@ -142,7 +143,7 @@ func (p *EventsDataProvider) createSubscription(ctx context.Context, args events
 
 // parseEventsArguments validates and initializes the events arguments.
 func parseEventsArguments(
-	arguments models.Arguments,
+	arguments wsmodels.Arguments,
 	chain flow.Chain,
 	eventFilterConfig state_stream.EventFilterConfig,
 ) (eventsArguments, error) {
