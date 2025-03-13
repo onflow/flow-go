@@ -51,6 +51,8 @@ type Controller struct {
 	once *sync.Once
 }
 
+var _ module.DKGController = (*Controller)(nil)
+
 // NewController instantiates a new Joint Feldman DKG controller.
 func NewController(
 	log zerolog.Logger,

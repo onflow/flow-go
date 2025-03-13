@@ -18,10 +18,10 @@ const (
 	codeLivenessData = 11 // liveness data for hotstuff state
 
 	// codes for fields associated with the root state
-	codeSporkID                    = 13
-	codeProtocolVersion            = 14
-	codeEpochCommitSafetyThreshold = 15
-	codeSporkRootBlockHeight       = 16
+	codeSporkID              = 13
+	_                        = 14 // DEPRECATED: 14 was used for ProtocolVersion before the versioned Protocol State
+	_                        = 15 // DEPRECATED: 15 was used to save the finalization safety threshold
+	codeSporkRootBlockHeight = 16
 
 	// code for heights with special meaning
 	codeFinalizedHeight         = 20 // latest finalized block height
@@ -72,8 +72,9 @@ const (
 	codeEpochSetup         = 61 // EpochSetup service event, keyed by ID
 	codeEpochCommit        = 62 // EpochCommit service event, keyed by ID
 	codeBeaconPrivateKey   = 63 // BeaconPrivateKey, keyed by epoch counter
-	codeDKGStarted         = 64 // flag that the DKG for an epoch has been started
-	codeDKGEnded           = 65 // flag that the DKG for an epoch has ended (stores end state)
+	_                      = 64 // [DEPRECATED] flag that the DKG for an epoch has been started, used in protocol version v1
+	codeDKGEndState        = 65 // [DEPRECATED] flag for DKG end state, used in protocol version v1
+	codeDKGState           = 66 // current state of Recoverable Random Beacon State Machine for given epoch
 	codeVersionBeacon      = 67 // flag for storing version beacons
 	codeEpochProtocolState = 68
 	codeProtocolKVStore    = 69

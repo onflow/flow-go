@@ -240,13 +240,7 @@ func (s *TransactionStatusesProviderSuite) TestMessageIndexTransactionStatusesPr
 	var responses []*models.TransactionStatusesResponse
 	for i := 0; i < txStatusesCount; i++ {
 		res := <-send
-
-		txStatusesRes, ok := res.(*models.BaseDataProvidersResponse)
-		s.Require().True(ok, "Expected *models.BaseDataProvidersResponse, got %T", res)
-
-		txStatusesResData, ok := txStatusesRes.Payload.(*models.TransactionStatusesResponse)
-		s.Require().True(ok, "Expected *models.TransactionStatusesResponse, got %T", res)
-
+		_, txStatusesResData := extractPayload[*models.TransactionStatusesResponse](s.T(), res)
 		responses = append(responses, txStatusesResData)
 	}
 
@@ -261,5 +255,63 @@ func (s *TransactionStatusesProviderSuite) TestMessageIndexTransactionStatusesPr
 		prevIndex := responses[i-1].MessageIndex
 		currentIndex := responses[i].MessageIndex
 		s.Require().Equal(prevIndex+1, currentIndex, "Expected MessageIndex to increment by 1")
+	}
+}
+
+// TestTransactionStatusesDataProvider_InvalidArguments tests the behavior of the transaction statuses data provider
+// when invalid arguments are provided. It verifies that appropriate errors are returned
+// for missing or conflicting arguments.
+func (s *TransactionStatusesProviderSuite) TestTransactionStatusesDataProvider_InvalidArguments() {
+	ctx := context.Background()
+	send := make(chan interface{})
+
+	topic := TransactionStatusesTopic
+
+	for _, test := range invalidTransactionStatusesArgumentsTestCases() {
+		s.Run(test.name, func() {
+			provider, err := NewTransactionStatusesDataProvider(
+				ctx,
+				s.log,
+				s.api,
+				"dummy-id",
+				s.linkGenerator,
+				topic,
+				test.arguments,
+				send,
+			)
+			s.Require().Nil(provider)
+			s.Require().Error(err)
+			s.Require().Contains(err.Error(), test.expectedErrorMsg)
+		})
+	}
+}
+
+// invalidTransactionStatusesArgumentsTestCases returns a list of test cases with invalid argument combinations
+// for testing the behavior of transaction statuses data providers. Each test case includes a name,
+// a set of input arguments, and the expected error message that should be returned.
+//
+// The test cases cover scenarios such as:
+// 1. Providing both 'start_block_id' and 'start_block_height' simultaneously.
+// 2. Providing invalid 'tx_id' value.
+// 3. Providing invalid 'start_block_id'  value.
+// 4. Invalid 'start_block_id' argument.
+// 5. Providing unexpected argument.
+func invalidTransactionStatusesArgumentsTestCases() []testErrType {
+	return []testErrType{
+		{
+			name: "invalid 'tx_id' argument",
+			arguments: map[string]interface{}{
+				"tx_id": "invalid_tx_id",
+			},
+			expectedErrorMsg: "invalid ID format",
+		},
+		{
+			name: "unexpected argument",
+			arguments: map[string]interface{}{
+				"unexpected_argument": "dummy",
+				"tx_id":               "123",
+			},
+			expectedErrorMsg: "unexpected field: 'unexpected_argument'",
+		},
 	}
 }

@@ -130,7 +130,11 @@ func (b *backendTransactions) trySendTransaction(ctx context.Context, tx *flow.T
 // collection node cluster responsible for the given tx
 func (b *backendTransactions) chooseCollectionNodes(txID flow.Identifier) (flow.IdentitySkeletonList, error) {
 	// retrieve the set of collector clusters
-	clusters, err := b.state.Final().Epochs().Current().Clustering()
+	currentEpoch, err := b.state.Final().Epochs().Current()
+	if err != nil {
+		return nil, fmt.Errorf("could not get current epoch: %w", err)
+	}
+	clusters, err := currentEpoch.Clustering()
 	if err != nil {
 		return nil, fmt.Errorf("could not cluster collection nodes: %w", err)
 	}

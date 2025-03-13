@@ -74,8 +74,7 @@ func NewTransactionStatusesDataProvider(
 
 // Run starts processing the subscription for events and handles responses.
 //
-// Expected errors during normal operations:
-//   - context.Canceled: if the operation is canceled, during an unsubscribe action.
+// No errors are expected during normal operations.
 func (p *TransactionStatusesDataProvider) Run() error {
 	return subscription.HandleSubscription(p.subscription, p.handleResponse())
 }
@@ -95,7 +94,6 @@ func (p *TransactionStatusesDataProvider) handleResponse() func(txResults []*acc
 	messageIndex := counters.NewMonotonicCounter(0)
 
 	return func(txResults []*access.TransactionResult) error {
-
 		for i := range txResults {
 			index := messageIndex.Value()
 			if ok := messageIndex.Set(messageIndex.Value() + 1); !ok {
@@ -120,17 +118,25 @@ func (p *TransactionStatusesDataProvider) handleResponse() func(txResults []*acc
 func parseTransactionStatusesArguments(
 	arguments wsmodels.Arguments,
 ) (transactionStatusesArguments, error) {
+	allowedFields := []string{
+		"tx_id",
+	}
+	err := ensureAllowedFields(arguments, allowedFields)
+	if err != nil {
+		return transactionStatusesArguments{}, err
+	}
+
 	var args transactionStatusesArguments
 
 	if txIDIn, ok := arguments["tx_id"]; ok && txIDIn != "" {
 		result, ok := txIDIn.(string)
 		if !ok {
-			return args, fmt.Errorf("'tx_id' must be a string")
+			return transactionStatusesArguments{}, fmt.Errorf("'tx_id' must be a string")
 		}
 		var txID parser.ID
 		err := txID.Parse(result)
 		if err != nil {
-			return args, fmt.Errorf("invalid 'tx_id': %w", err)
+			return transactionStatusesArguments{}, fmt.Errorf("invalid 'tx_id': %w", err)
 		}
 		args.TxID = txID.Flow()
 	}

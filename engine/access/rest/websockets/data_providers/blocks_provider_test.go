@@ -218,6 +218,7 @@ func (s *BlocksProviderSuite) expectedBlockResponses(
 // 1. Missing 'block_status' argument.
 // 2. Invalid 'block_status' argument.
 // 3. Providing both 'start_block_id' and 'start_block_height' simultaneously.
+// 4. Providing unexpected argument.
 func (s *BlocksProviderSuite) TestBlocksDataProvider_InvalidArguments() {
 	ctx := context.Background()
 	send := make(chan interface{})
@@ -240,6 +241,7 @@ func (s *BlocksProviderSuite) TestBlocksDataProvider_InvalidArguments() {
 // 1. Missing the required 'block_status' argument.
 // 2. Providing an unknown or invalid 'block_status' value.
 // 3. Supplying both 'start_block_id' and 'start_block_height' simultaneously, which is not allowed.
+// 4. Providing unexpected argument.
 func (s *BlocksProviderSuite) invalidArgumentsTestCases() []testErrType {
 	return []testErrType{
 		{
@@ -264,6 +266,15 @@ func (s *BlocksProviderSuite) invalidArgumentsTestCases() []testErrType {
 				"start_block_height": fmt.Sprintf("%d", s.rootBlock.Header.Height),
 			},
 			expectedErrorMsg: "can only provide either 'start_block_id' or 'start_block_height'",
+		},
+		{
+			name: "unexpected argument",
+			arguments: map[string]interface{}{
+				"block_status":        parser.Finalized,
+				"start_block_id":      unittest.BlockFixture().ID().String(),
+				"unexpected_argument": "dummy",
+			},
+			expectedErrorMsg: "unexpected field: 'unexpected_argument'",
 		},
 	}
 }

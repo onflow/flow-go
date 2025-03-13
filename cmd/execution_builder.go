@@ -13,6 +13,7 @@ import (
 
 	awsconfig "github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
+	"github.com/cockroachdb/pebble"
 	"github.com/dgraph-io/badger/v2"
 	"github.com/ipfs/boxo/bitswap"
 	"github.com/ipfs/go-cid"
@@ -55,6 +56,7 @@ import (
 	"github.com/onflow/flow-go/engine/execution/ingestion/stop"
 	"github.com/onflow/flow-go/engine/execution/ingestion/uploader"
 	exeprovider "github.com/onflow/flow-go/engine/execution/provider"
+	exepruner "github.com/onflow/flow-go/engine/execution/pruner"
 	"github.com/onflow/flow-go/engine/execution/rpc"
 	"github.com/onflow/flow-go/engine/execution/scripts"
 	"github.com/onflow/flow-go/engine/execution/state"
@@ -139,6 +141,8 @@ type ExecutionNode struct {
 	txResults              *storage.TransactionResults
 	results                *storage.ExecutionResults
 	myReceipts             *storage.MyExecutionReceipts
+	chunkDataPackDB        *pebble.DB
+	chunkDataPacks         storageerr.ChunkDataPacks
 	providerEngine         exeprovider.ProviderEngine
 	checkerEng             *checker.Engine
 	syncCore               *chainsync.Core
@@ -226,6 +230,7 @@ func (builder *ExecutionNodeBuilder) LoadComponentsAndModules() {
 		// TODO: will re-visit this once storehouse has implemented new WAL for checkpoint file of
 		// payloadless trie.
 		// Component("execution data pruner", exeNode.LoadExecutionDataPruner).
+		Component("execution db pruner", exeNode.LoadExecutionDBPruner).
 		Component("blob service", exeNode.LoadBlobService).
 		Component("block data upload manager", exeNode.LoadBlockUploaderManager).
 		Component("GCP block data uploader", exeNode.LoadGCPBlockDataUploader).
@@ -626,16 +631,13 @@ func (exeNode *ExecutionNode) LoadProviderEngine(
 			blockID.String(), height, err)
 	}
 
-	// Get the epoch counter form the protocol state, at the same block.
-	protocolStateEpochCounter, err := node.State.
-		AtBlockID(blockID).
-		Epochs().
-		Current().
-		Counter()
-	// Failing to fetch the epoch counter from the protocol state is a fatal error.
+	// Get the epoch counter from the protocol state, at the same block.
+	// Failing to fetch the epoch, or counter for the epoch, from the protocol state is a fatal error.
+	currentEpoch, err := node.State.AtBlockID(blockID).Epochs().Current()
 	if err != nil {
-		return nil, fmt.Errorf("cannot get epoch counter from the protocol state at block %s: %w", blockID.String(), err)
+		return nil, fmt.Errorf("could not get current epoch at block %s: %w", blockID.String(), err)
 	}
+	protocolStateEpochCounter := currentEpoch.Counter()
 
 	l := node.Logger.With().
 		Str("component", "provider engine").
@@ -742,6 +744,9 @@ func (exeNode *ExecutionNode) LoadExecutionState(
 	})
 	chunkDataPacks := store.NewChunkDataPacks(node.Metrics.Cache,
 		pebbleimpl.ToDB(chunkDataPackDB), node.Storage.Collections, exeNode.exeConf.chunkDataPackCacheSize)
+
+	exeNode.chunkDataPackDB = chunkDataPackDB
+	exeNode.chunkDataPacks = chunkDataPacks
 
 	// Needed for gRPC server, make sure to assign to main scoped vars
 	exeNode.events = storage.NewEvents(node.Metrics.Cache, node.DB)
@@ -985,6 +990,27 @@ func (exeNode *ExecutionNode) LoadExecutionDataPruner(
 		pruner.WithThreshold(exeNode.exeConf.executionDataPrunerThreshold),
 	)
 	return exeNode.executionDataPruner, err
+}
+
+func (exeNode *ExecutionNode) LoadExecutionDBPruner(node *NodeConfig) (module.ReadyDoneAware, error) {
+	cfg := exepruner.PruningConfig{
+		Threshold:                 exeNode.exeConf.pruningConfigThreshold,
+		BatchSize:                 exeNode.exeConf.pruningConfigBatchSize,
+		SleepAfterEachBatchCommit: exeNode.exeConf.pruningConfigSleepAfterCommit,
+		SleepAfterEachIteration:   exeNode.exeConf.pruningConfigSleepAfterIteration,
+	}
+
+	return exepruner.NewChunkDataPackPruningEngine(
+		node.Logger,
+		exeNode.collector,
+		node.State,
+		node.DB,
+		node.Storage.Headers,
+		exeNode.chunkDataPacks,
+		exeNode.results,
+		exeNode.chunkDataPackDB,
+		cfg,
+	), nil
 }
 
 func (exeNode *ExecutionNode) LoadCheckerEngine(

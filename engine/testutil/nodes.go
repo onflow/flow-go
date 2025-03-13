@@ -315,7 +315,7 @@ func CollectionNode(t *testing.T, hub *stub.Hub, identity bootstrap.NodeInfo, ro
 		retrieve)
 	require.NoError(t, err)
 
-	pusherEngine, err := pusher.New(node.Log, node.Net, node.State, node.Metrics, node.Metrics, node.Me, collections, transactions)
+	pusherEngine, err := pusher.New(node.Log, node.Net, node.State, node.Metrics, node.Metrics, node.Me)
 	require.NoError(t, err)
 
 	clusterStateFactory, err := factories.NewClusterStateFactory(
@@ -342,7 +342,6 @@ func CollectionNode(t *testing.T, hub *stub.Hub, identity bootstrap.NodeInfo, ro
 		node.Me,
 		node.Metrics, node.Metrics, node.Metrics,
 		node.State,
-		transactions,
 		compliance.DefaultConfig(),
 	)
 	require.NoError(t, err)
@@ -993,10 +992,11 @@ func VerificationNode(t testing.TB,
 	}
 
 	if node.ChunksQueue == nil {
-		node.ChunksQueue = storage.NewChunkQueue(node.PublicDB)
-		ok, err := node.ChunksQueue.Init(chunkconsumer.DefaultJobIndex)
+		cq := store.NewChunkQueue(node.Metrics, badgerimpl.ToDB(node.PublicDB))
+		ok, err := cq.Init(chunkconsumer.DefaultJobIndex)
 		require.NoError(t, err)
 		require.True(t, ok)
+		node.ChunksQueue = cq
 	}
 
 	if node.ProcessedBlockHeight == nil {

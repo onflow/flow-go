@@ -95,7 +95,7 @@ func NewConsensusParticipants(data *run.ParticipantData) *ConsensusParticipants 
 			beaconInfoByEpoch: map[uint64]RandomBeaconNodeInfo{
 				1: {
 					RandomBeaconPrivKey: participant.RandomBeaconPrivKey,
-					DKGParticipant:      data.Lookup[participant.NodeID],
+					DKGParticipant:      data.DKGCommittee[participant.NodeID],
 				},
 			},
 		}
@@ -118,7 +118,7 @@ func (p *ConsensusParticipants) Lookup(nodeID flow.Identifier) *ConsensusPartici
 // If this node was part of previous epoch it will get updated, if not created.
 func (p *ConsensusParticipants) Update(epochCounter uint64, data *run.ParticipantData) {
 	for _, participant := range data.Participants {
-		dkgParticipant := data.Lookup[participant.NodeID]
+		dkgParticipant := data.DKGCommittee[participant.NodeID]
 		entry, ok := p.lookup[participant.NodeID]
 		if !ok {
 			entry = ConsensusParticipant{
@@ -160,20 +160,12 @@ type epochInfo struct {
 }
 
 // buildEpochLookupList is a helper function which builds an auxiliary structure of epochs sorted by counter
-func buildEpochLookupList(epochs ...protocol.Epoch) []epochInfo {
+func buildEpochLookupList(epochs ...protocol.CommittedEpoch) []epochInfo {
 	infos := make([]epochInfo, 0)
 	for _, epoch := range epochs {
-		finalView, err := epoch.FinalView()
-		if err != nil {
-			continue
-		}
-		counter, err := epoch.Counter()
-		if err != nil {
-			continue
-		}
 		infos = append(infos, epochInfo{
-			finalView: finalView,
-			counter:   counter,
+			finalView: epoch.FinalView(),
+			counter:   epoch.Counter(),
 		})
 	}
 	sort.Slice(infos, func(i, j int) bool {
@@ -192,8 +184,17 @@ func createNodes(t *testing.T, participants *ConsensusParticipants, rootSnapshot
 	consensus, err := rootSnapshot.Identities(filter.HasRole[flow.Identity](flow.RoleConsensus))
 	require.NoError(t, err)
 
-	epochViewLookup := buildEpochLookupList(rootSnapshot.Epochs().Current(),
-		rootSnapshot.Epochs().Next())
+	var epochViewLookup []epochInfo
+	currentEpoch, err := rootSnapshot.Epochs().Current()
+	require.NoError(t, err)
+	// Whether there is a next committed epoch depends on the test.
+	nextEpoch, err := rootSnapshot.Epochs().NextCommitted()
+	if err != nil { // the only acceptable error here is `protocol.ErrNextEpochNotCommitted`
+		require.ErrorIs(t, err, protocol.ErrNextEpochNotCommitted)
+		epochViewLookup = buildEpochLookupList(currentEpoch)
+	} else {
+		epochViewLookup = buildEpochLookupList(currentEpoch, nextEpoch)
+	}
 
 	epochLookup := &mockmodule.EpochLookup{}
 	epochLookup.On("EpochForView", mock.Anything).Return(
@@ -257,12 +258,13 @@ func createRootBlockData(t *testing.T, participantData *run.ParticipantData) (*f
 	consensusParticipants := participantData.Identities()
 
 	// add other roles to create a complete identity list
-	participants := unittest.CompleteIdentitySet(consensusParticipants...)
-	participants.Sort(flow.Canonical[flow.Identity])
-
+	participants := unittest.CompleteIdentitySet(consensusParticipants...).Sort(flow.Canonical[flow.Identity])
+	dkgParticipants := participants.ToSkeleton().Filter(filter.IsConsensusCommitteeMember)
 	dkgParticipantsKeys := make([]crypto.PublicKey, 0, len(consensusParticipants))
-	for _, participant := range participants.Filter(filter.HasRole[flow.Identity](flow.RoleConsensus)) {
-		dkgParticipantsKeys = append(dkgParticipantsKeys, participantData.Lookup[participant.NodeID].KeyShare)
+	dkgIndexMap := make(flow.DKGIndexMap)
+	for index, participant := range dkgParticipants {
+		dkgParticipantsKeys = append(dkgParticipantsKeys, participantData.DKGCommittee[participant.NodeID].KeyShare)
+		dkgIndexMap[participant.NodeID] = index
 	}
 
 	counter := uint64(1)
@@ -276,8 +278,9 @@ func createRootBlockData(t *testing.T, participantData *run.ParticipantData) (*f
 		unittest.CommitWithCounter(counter),
 		unittest.WithClusterQCsFromAssignments(setup.Assignments),
 		func(commit *flow.EpochCommit) {
-			commit.DKGGroupKey = participantData.GroupKey
+			commit.DKGGroupKey = participantData.DKGGroupKey
 			commit.DKGParticipantKeys = dkgParticipantsKeys
+			commit.DKGIndexMap = dkgIndexMap
 		},
 	)
 
@@ -327,8 +330,8 @@ func completeConsensusIdentities(t *testing.T, nodeInfos []bootstrap.NodeInfo) *
 
 	participantData := &run.ParticipantData{
 		Participants: make([]run.Participant, 0, len(nodeInfos)),
-		Lookup:       make(map[flow.Identifier]flow.DKGParticipant),
-		GroupKey:     dkgData.PubGroupKey,
+		DKGCommittee: make(map[flow.Identifier]flow.DKGParticipant),
+		DKGGroupKey:  dkgData.PubGroupKey,
 	}
 	for index, node := range nodeInfos {
 		participant := run.Participant{
@@ -336,7 +339,7 @@ func completeConsensusIdentities(t *testing.T, nodeInfos []bootstrap.NodeInfo) *
 			RandomBeaconPrivKey: dkgData.PrivKeyShares[index],
 		}
 		participantData.Participants = append(participantData.Participants, participant)
-		participantData.Lookup[node.NodeID] = flow.DKGParticipant{
+		participantData.DKGCommittee[node.NodeID] = flow.DKGParticipant{
 			Index:    uint(index),
 			KeyShare: dkgData.PubKeyShares[index],
 		}
@@ -528,7 +531,7 @@ func createNode(
 	require.NoError(t, err)
 
 	keys := &storagemock.SafeBeaconKeys{}
-	// there is DKG key for this epoch
+	// there is Random Beacon key for this epoch
 	keys.On("RetrieveMyBeaconPrivateKey", mock.Anything).Return(
 		func(epochCounter uint64) crypto.PrivateKey {
 			dkgInfo, ok := participant.beaconInfoByEpoch[epochCounter]
@@ -548,7 +551,8 @@ func createNode(
 
 	signer := verification.NewCombinedSigner(me, beaconKeyStore)
 
-	persist := persister.New(db, rootHeader.ChainID)
+	persist, err := persister.New(db, rootHeader.ChainID)
+	require.NoError(t, err)
 
 	livenessData, err := persist.GetLivenessData()
 	require.NoError(t, err)
