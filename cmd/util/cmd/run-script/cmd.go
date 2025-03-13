@@ -24,6 +24,7 @@ import (
 	"github.com/onflow/flow-go/fvm/storage/snapshot"
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/metrics"
 )
 
@@ -154,7 +155,6 @@ func run(*cobra.Command, []string) {
 	vm := fvm.NewVirtualMachine()
 
 	if flagServe {
-
 		api := &api{
 			chainID:         chainID,
 			vm:              vm,
@@ -162,7 +162,9 @@ func run(*cobra.Command, []string) {
 			storageSnapshot: storageSnapshot,
 		}
 
+		irrCtx, _ := irrecoverable.WithSignaler(context.Background())
 		server, err := rest.NewServer(
+			irrCtx,
 			api,
 			rest.Config{
 				ListenAddress: fmt.Sprintf(":%d", flagPort),

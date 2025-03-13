@@ -1,7 +1,6 @@
 package websockets
 
 import (
-	"context"
 	"net/http"
 
 	"github.com/gorilla/websocket"
@@ -10,11 +9,13 @@ import (
 	"github.com/onflow/flow-go/engine/access/rest/common"
 	dp "github.com/onflow/flow-go/engine/access/rest/websockets/data_providers"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module/irrecoverable"
 )
 
 type Handler struct {
 	*common.HttpHandler
 
+	ctx                 irrecoverable.SignalerContext
 	logger              zerolog.Logger
 	websocketConfig     Config
 	dataProviderFactory dp.DataProviderFactory
@@ -23,6 +24,7 @@ type Handler struct {
 var _ http.Handler = (*Handler)(nil)
 
 func NewWebSocketHandler(
+	ctx irrecoverable.SignalerContext,
 	logger zerolog.Logger,
 	config Config,
 	chain flow.Chain,
@@ -30,6 +32,7 @@ func NewWebSocketHandler(
 	dataProviderFactory dp.DataProviderFactory,
 ) *Handler {
 	return &Handler{
+		ctx:                 ctx,
 		HttpHandler:         common.NewHttpHandler(logger, chain, maxRequestSize),
 		websocketConfig:     config,
 		logger:              logger,
@@ -61,5 +64,5 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	controller := NewWebSocketController(logger, h.websocketConfig, NewWebsocketConnection(conn), h.dataProviderFactory)
-	controller.HandleConnection(context.TODO())
+	controller.HandleConnection(h.ctx)
 }
