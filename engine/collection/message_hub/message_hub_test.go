@@ -188,7 +188,7 @@ func (s *MessageHubSuite) TestProcessIncomingMessages() {
 	s.Run("to-compliance-engine", func() {
 		block := unittest.ClusterBlockFixture()
 
-		blockProposalMsg := messages.NewClusterBlockProposal(&block, nil)
+		blockProposalMsg := messages.NewClusterBlockProposal(&block, unittest.SignatureFixture())
 		expectedComplianceMsg := flow.Slashable[*messages.ClusterBlockProposal]{
 			OriginID: originID,
 			Message:  blockProposalMsg,

@@ -111,7 +111,7 @@ func (c *Core) OnBlockProposal(proposalMsg flow.Slashable[*messages.ClusterBlock
 	}()
 
 	// TODO(tim) this can probably be improved
-	proposal := flow.Slashable[*cluster.Proposal]{
+	proposal := flow.Slashable[*cluster.BlockProposal]{
 		OriginID: proposalMsg.OriginID,
 		Message:  proposalMsg.Message.ToInternal(),
 	}
@@ -239,7 +239,7 @@ func (c *Core) OnBlockProposal(proposalMsg flow.Slashable[*messages.ClusterBlock
 // its pending descendants. By induction, any child block of a
 // valid proposal is itself connected to the finalized state and can be
 // processed as well.
-func (c *Core) processBlockAndDescendants(proposal flow.Slashable[*cluster.Proposal]) error {
+func (c *Core) processBlockAndDescendants(proposal flow.Slashable[*cluster.BlockProposal]) error {
 	header := proposal.Message.Block.Header
 	blockID := header.ID()
 	log := c.log.With().
@@ -306,7 +306,7 @@ func (c *Core) processBlockAndDescendants(proposal flow.Slashable[*cluster.Propo
 //   - engine.OutdatedInputError if the block proposal is outdated (e.g. orphaned)
 //   - model.InvalidProposalError if the block proposal is invalid
 //   - engine.UnverifiableInputError if the proposal cannot be validated
-func (c *Core) processBlockProposal(proposal *cluster.Proposal) error {
+func (c *Core) processBlockProposal(proposal *cluster.BlockProposal) error {
 	header := proposal.Block.Header
 	blockID := header.ID()
 	log := c.log.With().

@@ -35,7 +35,7 @@ func (suite *BackendSuite) itemWithParent(parent *flow.Header) *item {
 			OriginID: unittest.IdentifierFixture(),
 			Message: &flow.Proposal{
 				Header:          header,
-				ProposerSigData: unittest.SignatureFixture(), //TODO(tim)
+				ProposerSigData: unittest.SignatureFixture(),
 			},
 		},
 		payload: unittest.IdentifierFixture(),

@@ -157,13 +157,8 @@ func (s *CoreSuite) TestProcessingRangeHappyPath() {
 // TestProcessingNotOrderedBatch tests that submitting a batch which is not properly ordered(meaning the batch is not connected)
 // has to result in error.
 func (s *CoreSuite) TestProcessingNotOrderedBatch() {
-	blocks := unittest.ChainFixtureFrom(10, s.finalizedBlock)
-	blocks[2], blocks[3] = blocks[3], blocks[2]
-
-	proposals := make([]*flow.BlockProposal, 0, len(blocks))
-	for _, block := range blocks {
-		proposals = append(proposals, unittest.ProposalFromBlock(block))
-	}
+	proposals := unittest.ProposalChainFixtureFrom(10, s.finalizedBlock)
+	proposals[2], proposals[3] = proposals[3], proposals[2]
 
 	s.validator.On("ValidateProposal", model.SignedProposalFromBlock(proposals[len(proposals)-1])).Return(nil).Once()
 
@@ -173,12 +168,8 @@ func (s *CoreSuite) TestProcessingNotOrderedBatch() {
 
 // TestProcessingInvalidBlock tests that processing a batch which ends with invalid block discards the whole batch
 func (s *CoreSuite) TestProcessingInvalidBlock() {
-	blocks := unittest.ChainFixtureFrom(10, s.finalizedBlock)
+	proposals := unittest.ProposalChainFixtureFrom(10, s.finalizedBlock)
 
-	proposals := make([]*flow.BlockProposal, 0, len(blocks))
-	for _, block := range blocks {
-		proposals = append(proposals, unittest.ProposalFromBlock(block))
-	}
 	invalidProposal := model.SignedProposalFromBlock(proposals[len(proposals)-1])
 	sentinelError := model.NewInvalidProposalErrorf(invalidProposal, "")
 	s.validator.On("ValidateProposal", invalidProposal).Return(sentinelError).Once()

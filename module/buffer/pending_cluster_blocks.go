@@ -14,22 +14,22 @@ func NewPendingClusterBlocks() *PendingClusterBlocks {
 	return b
 }
 
-func (b *PendingClusterBlocks) Add(block flow.Slashable[*cluster.Proposal]) bool {
+func (b *PendingClusterBlocks) Add(block flow.Slashable[*cluster.BlockProposal]) bool {
 	return b.backend.add(flow.Slashable[*flow.Proposal]{
 		OriginID: flow.Identifier{},
 		Message:  &flow.Proposal{Header: block.Message.Block.Header, ProposerSigData: block.Message.ProposerSigData},
 	}, block.Message.Block.Payload)
 }
 
-func (b *PendingClusterBlocks) ByID(blockID flow.Identifier) (flow.Slashable[*cluster.Proposal], bool) {
+func (b *PendingClusterBlocks) ByID(blockID flow.Identifier) (flow.Slashable[*cluster.BlockProposal], bool) {
 	item, ok := b.backend.byID(blockID)
 	if !ok {
-		return flow.Slashable[*cluster.Proposal]{}, false
+		return flow.Slashable[*cluster.BlockProposal]{}, false
 	}
 
-	block := flow.Slashable[*cluster.Proposal]{
+	block := flow.Slashable[*cluster.BlockProposal]{
 		OriginID: item.header.OriginID,
-		Message: &cluster.Proposal{
+		Message: &cluster.BlockProposal{
 			Block: &cluster.Block{
 				Header:  item.header.Message.Header,
 				Payload: item.payload.(*cluster.Payload),
@@ -41,17 +41,17 @@ func (b *PendingClusterBlocks) ByID(blockID flow.Identifier) (flow.Slashable[*cl
 	return block, true
 }
 
-func (b *PendingClusterBlocks) ByParentID(parentID flow.Identifier) ([]flow.Slashable[*cluster.Proposal], bool) {
+func (b *PendingClusterBlocks) ByParentID(parentID flow.Identifier) ([]flow.Slashable[*cluster.BlockProposal], bool) {
 	items, ok := b.backend.byParentID(parentID)
 	if !ok {
 		return nil, false
 	}
 
-	blocks := make([]flow.Slashable[*cluster.Proposal], 0, len(items))
+	blocks := make([]flow.Slashable[*cluster.BlockProposal], 0, len(items))
 	for _, item := range items {
-		block := flow.Slashable[*cluster.Proposal]{
+		block := flow.Slashable[*cluster.BlockProposal]{
 			OriginID: item.header.OriginID,
-			Message: &cluster.Proposal{
+			Message: &cluster.BlockProposal{
 				Block: &cluster.Block{
 					Header:  item.header.Message.Header,
 					Payload: item.payload.(*cluster.Payload),

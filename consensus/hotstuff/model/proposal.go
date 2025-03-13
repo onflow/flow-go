@@ -80,7 +80,7 @@ func SignedProposalFromBlock(p *flow.BlockProposal) *SignedProposal {
 	return &proposal
 }
 
-func SignedProposalFromClusterBlock(p *cluster.Proposal) *SignedProposal {
+func SignedProposalFromClusterBlock(p *cluster.BlockProposal) *SignedProposal {
 	proposal := SignedProposal{
 		Proposal: Proposal{
 			Block:      BlockFromFlow(p.Block.Header),

@@ -330,7 +330,7 @@ func (h *MessageHub) sendOwnProposal(proposal *flow.Proposal) error {
 	}
 
 	// create the proposal message for the collection
-	cbp := &cluster.Proposal{
+	cbp := &cluster.BlockProposal{
 		Block: &cluster.Block{
 			Header:  header,
 			Payload: payload,

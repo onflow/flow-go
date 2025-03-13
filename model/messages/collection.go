@@ -86,14 +86,14 @@ func NewClusterBlockProposal(internal *cluster.Block, proposerSig []byte) *Clust
 	}
 }
 
-func (cbp *ClusterBlockProposal) ToInternal() *cluster.Proposal {
-	return &cluster.Proposal{
+func (cbp *ClusterBlockProposal) ToInternal() *cluster.BlockProposal {
+	return &cluster.BlockProposal{
 		Block:           cbp.Block.ToInternal(),
 		ProposerSigData: cbp.ProposerSigData,
 	}
 }
 
-func ClusterBlockProposalFrom(proposal *cluster.Proposal) *ClusterBlockProposal {
+func ClusterBlockProposalFrom(proposal *cluster.BlockProposal) *ClusterBlockProposal {
 	return &ClusterBlockProposal{
 		Block:           UntrustedClusterBlockFromInternal(proposal.Block),
 		ProposerSigData: proposal.ProposerSigData,

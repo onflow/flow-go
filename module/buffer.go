@@ -29,11 +29,11 @@ type PendingBlockBuffer interface {
 // collection node cluster consensus.
 // Safe for concurrent use.
 type PendingClusterBlockBuffer interface {
-	Add(block flow.Slashable[*cluster.Proposal]) bool
+	Add(block flow.Slashable[*cluster.BlockProposal]) bool
 
-	ByID(blockID flow.Identifier) (flow.Slashable[*cluster.Proposal], bool)
+	ByID(blockID flow.Identifier) (flow.Slashable[*cluster.BlockProposal], bool)
 
-	ByParentID(parentID flow.Identifier) ([]flow.Slashable[*cluster.Proposal], bool)
+	ByParentID(parentID flow.Identifier) ([]flow.Slashable[*cluster.BlockProposal], bool)
 
 	DropForParent(parentID flow.Identifier)
 

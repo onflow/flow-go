@@ -31,8 +31,9 @@ type Block struct {
 	Payload *Payload
 }
 
+// BlockProposal represents a signed proposed block in collection node cluster consensus.
 // TODO clean up types
-type Proposal struct {
+type BlockProposal struct {
 	Block           *Block
 	ProposerSigData []byte
 }
