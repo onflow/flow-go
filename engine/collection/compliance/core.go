@@ -104,20 +104,20 @@ func NewCore(
 
 // OnBlockProposal handles incoming block proposals.
 // No errors are expected during normal operation.
-func (c *Core) OnBlockProposal(proposal flow.Slashable[*messages.ClusterBlockProposal]) error {
+func (c *Core) OnBlockProposal(proposalMsg flow.Slashable[*messages.ClusterBlockProposal]) error {
 	startTime := time.Now()
 	defer func() {
 		c.hotstuffMetrics.BlockProcessingDuration(time.Since(startTime))
 	}()
 
 	// TODO(tim) this can probably be improved
-	prop := flow.Slashable[*cluster.Proposal]{
-		OriginID: proposal.OriginID,
-		Message:  proposal.Message.ToInternal(),
+	proposal := flow.Slashable[*cluster.Proposal]{
+		OriginID: proposalMsg.OriginID,
+		Message:  proposalMsg.Message.ToInternal(),
 	}
 	block := flow.Slashable[*cluster.Block]{
 		OriginID: proposal.OriginID,
-		Message:  proposal.Message.Block.ToInternal(),
+		Message:  proposal.Message.Block,
 	}
 	header := block.Message.Header
 	blockID := header.ID()
@@ -196,11 +196,10 @@ func (c *Core) OnBlockProposal(proposal flow.Slashable[*messages.ClusterBlockPro
 	// pending block, its parent block must have been requested.
 	// if there was problem requesting its parent or ancestors, the sync engine's forward
 	// syncing with range requests for finalized blocks will request for the blocks.
-	// TODO(tim) do we need to cache the proposal (include proposerSig) in `pending`?
 	_, found := c.pending.ByID(header.ParentID)
 	if found {
 		// add the block to the cache
-		_ = c.pending.Add(block)
+		_ = c.pending.Add(proposal)
 		c.mempoolMetrics.MempoolEntries(metrics.ResourceClusterProposal, c.pending.Size())
 
 		return nil
@@ -214,7 +213,7 @@ func (c *Core) OnBlockProposal(proposal flow.Slashable[*messages.ClusterBlockPro
 		return fmt.Errorf("could not check parent exists: %w", err)
 	}
 	if !exists {
-		_ = c.pending.Add(block)
+		_ = c.pending.Add(proposal)
 		c.mempoolMetrics.MempoolEntries(metrics.ResourceClusterProposal, c.pending.Size())
 
 		c.sync.RequestBlock(header.ParentID, header.Height-1)
@@ -227,7 +226,7 @@ func (c *Core) OnBlockProposal(proposal flow.Slashable[*messages.ClusterBlockPro
 	// execution of the entire recursion, which might include processing the
 	// proposal's pending children. There is another span within
 	// processBlockProposal that measures the time spent for a single proposal.
-	err = c.processBlockAndDescendants(prop)
+	err = c.processBlockAndDescendants(proposal)
 	c.mempoolMetrics.MempoolEntries(metrics.ResourceClusterProposal, c.pending.Size())
 	if err != nil {
 		return fmt.Errorf("could not process block proposal: %w", err)
@@ -288,13 +287,7 @@ func (c *Core) processBlockAndDescendants(proposal flow.Slashable[*cluster.Propo
 		return nil
 	}
 	for _, child := range children {
-		cpr := c.processBlockAndDescendants(flow.Slashable[*cluster.Proposal]{
-			OriginID: child.OriginID,
-			Message: &cluster.Proposal{
-				Block:           child.Message,
-				ProposerSigData: nil, // TODO(tim) - proposerSigData storage?
-			},
-		})
+		cpr := c.processBlockAndDescendants(child)
 		if cpr != nil {
 			// unexpected error: potentially corrupted internal state => abort processing and escalate error
 			return cpr

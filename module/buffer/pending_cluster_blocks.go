@@ -14,43 +14,49 @@ func NewPendingClusterBlocks() *PendingClusterBlocks {
 	return b
 }
 
-func (b *PendingClusterBlocks) Add(block flow.Slashable[*cluster.Block]) bool {
-	return b.backend.add(flow.Slashable[*flow.Header]{
+func (b *PendingClusterBlocks) Add(block flow.Slashable[*cluster.Proposal]) bool {
+	return b.backend.add(flow.Slashable[*flow.Proposal]{
 		OriginID: flow.Identifier{},
-		Message:  block.Message.Header,
-	}, block.Message.Payload)
+		Message:  &flow.Proposal{Header: block.Message.Block.Header, ProposerSigData: block.Message.ProposerSigData},
+	}, block.Message.Block.Payload)
 }
 
-func (b *PendingClusterBlocks) ByID(blockID flow.Identifier) (flow.Slashable[*cluster.Block], bool) {
+func (b *PendingClusterBlocks) ByID(blockID flow.Identifier) (flow.Slashable[*cluster.Proposal], bool) {
 	item, ok := b.backend.byID(blockID)
 	if !ok {
-		return flow.Slashable[*cluster.Block]{}, false
+		return flow.Slashable[*cluster.Proposal]{}, false
 	}
 
-	block := flow.Slashable[*cluster.Block]{
+	block := flow.Slashable[*cluster.Proposal]{
 		OriginID: item.header.OriginID,
-		Message: &cluster.Block{
-			Header:  item.header.Message,
-			Payload: item.payload.(*cluster.Payload),
+		Message: &cluster.Proposal{
+			Block: &cluster.Block{
+				Header:  item.header.Message.Header,
+				Payload: item.payload.(*cluster.Payload),
+			},
+			ProposerSigData: item.header.Message.ProposerSigData,
 		},
 	}
 
 	return block, true
 }
 
-func (b *PendingClusterBlocks) ByParentID(parentID flow.Identifier) ([]flow.Slashable[*cluster.Block], bool) {
+func (b *PendingClusterBlocks) ByParentID(parentID flow.Identifier) ([]flow.Slashable[*cluster.Proposal], bool) {
 	items, ok := b.backend.byParentID(parentID)
 	if !ok {
 		return nil, false
 	}
 
-	blocks := make([]flow.Slashable[*cluster.Block], 0, len(items))
+	blocks := make([]flow.Slashable[*cluster.Proposal], 0, len(items))
 	for _, item := range items {
-		block := flow.Slashable[*cluster.Block]{
+		block := flow.Slashable[*cluster.Proposal]{
 			OriginID: item.header.OriginID,
-			Message: &cluster.Block{
-				Header:  item.header.Message,
-				Payload: item.payload.(*cluster.Payload),
+			Message: &cluster.Proposal{
+				Block: &cluster.Block{
+					Header:  item.header.Message.Header,
+					Payload: item.payload.(*cluster.Payload),
+				},
+				ProposerSigData: item.header.Message.ProposerSigData,
 			},
 		}
 		blocks = append(blocks, block)
