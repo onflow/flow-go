@@ -147,35 +147,6 @@ func (c *Collections) StoreLightAndIndexByTransaction(collection *flow.LightColl
 	c.indexingByTx.Lock()
 	defer c.indexingByTx.Unlock()
 
-	hasNewTx := false
-	// ensure transaction are not indexed before
-	for _, txID := range collection.Transactions {
-		var differentColTxIsIn flow.Identifier
-		err := operation.LookupCollectionByTransaction(c.db.Reader(), txID, &differentColTxIsIn)
-		if err == nil {
-			// collection nodes have ensured that a transaction can only belong to one collection
-			// so if transaction is already indexed by a collection, check if it's the same collection.
-			// if not, return an error
-			if collectionID != differentColTxIsIn {
-				log.Error().Msgf("fatal: transaction %v in collection %v is already indexed by a different collection %v",
-					txID, collectionID, differentColTxIsIn)
-			}
-			continue
-		}
-
-		if errors.Is(err, storage.ErrNotFound) {
-			hasNewTx = true
-			continue
-		}
-
-		return fmt.Errorf("could not retrieve collection by transaction id %v: %w", txID, err)
-	}
-
-	if !hasNewTx {
-		// all transactions are already indexed by the same collection
-		return nil
-	}
-
 	return c.db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 		err := operation.UpsertCollection(rw.Writer(), collection)
 		if err != nil {
@@ -183,6 +154,19 @@ func (c *Collections) StoreLightAndIndexByTransaction(collection *flow.LightColl
 		}
 
 		for _, txID := range collection.Transactions {
+			var differentColTxIsIn flow.Identifier
+			err := operation.LookupCollectionByTransaction(rw.GlobalReader(), txID, &differentColTxIsIn)
+			if err == nil {
+				// collection nodes have ensured that a transaction can only belong to one collection
+				// so if transaction is already indexed by a collection, check if it's the same collection.
+				// if not, return an error
+				if collectionID != differentColTxIsIn {
+					log.Error().Msgf("fatal: transaction %v in collection %v is already indexed by a different collection %v",
+						txID, collectionID, differentColTxIsIn)
+				}
+				continue
+			}
+
 			// the indexingByTx lock has ensured we are the only process indexing collection by transaction
 			err = operation.UnsafeIndexCollectionByTransaction(rw.Writer(), txID, collectionID)
 			if err != nil {

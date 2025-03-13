@@ -68,13 +68,15 @@ func TestCollections(t *testing.T) {
 	})
 }
 
+// verify if a tx belongs to multiple collections, the first collection to be
+// indexed by the tx will be the one that is indexed in storage
 func TestCollections_IndexDuplicateTx(t *testing.T) {
 	dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
 		metrics := metrics.NewNoopCollector()
 		transactions := store.NewTransactions(metrics, db)
 		collections := store.NewCollections(db, transactions)
 
-		// create two collections which share 1 transaction
+		// create two collections which share 1 transaction (dupTx)
 		col1 := unittest.CollectionFixture(2)
 		col2 := unittest.CollectionFixture(1)
 		dupTx := col1.Transactions[0]  // the duplicated transaction
@@ -100,7 +102,8 @@ func TestCollections_IndexDuplicateTx(t *testing.T) {
 		_, err = collections.LightByTransactionID(col2Tx.ID())
 		require.NoError(t, err)
 
-		// col2 (not col1) should be indexed by the shared transaction (since col1 was overwritten by col2)
+		// col1 should be indexed by the shared transaction ,
+		// since col1 is the first collection to be indexed by the shared transaction (dupTx)
 		gotLightByDupTxID, err := collections.LightByTransactionID(dupTx.ID())
 		require.NoError(t, err)
 		assert.Equal(t, &col1Light, gotLightByDupTxID)
