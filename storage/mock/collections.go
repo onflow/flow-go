@@ -138,24 +138,6 @@ func (_m *Collections) Store(collection *flow.Collection) error {
 	return r0
 }
 
-// StoreLight provides a mock function with given fields: collection
-func (_m *Collections) StoreLight(collection *flow.LightCollection) error {
-	ret := _m.Called(collection)
-
-	if len(ret) == 0 {
-		panic("no return value specified for StoreLight")
-	}
-
-	var r0 error
-	if rf, ok := ret.Get(0).(func(*flow.LightCollection) error); ok {
-		r0 = rf(collection)
-	} else {
-		r0 = ret.Error(0)
-	}
-
-	return r0
-}
-
 // StoreLightAndIndexByTransaction provides a mock function with given fields: collection
 func (_m *Collections) StoreLightAndIndexByTransaction(collection *flow.LightCollection) error {
 	ret := _m.Called(collection)
