@@ -16,8 +16,9 @@ func TestMalleability(t *testing.T) {
 		unittest.RequireEntityNonMalleable(t, unittest.EpochSetupFixture())
 	})
 	t.Run("EpochCommit with nil DKGIndexMap", func(t *testing.T) {
+		require.Nil(t, unittest.EpochCommitFixture().DKGIndexMap) // sanity check that the fixture has left `DKGIndexMap` nil
 		unittest.RequireEntityNonMalleable(t, unittest.EpochCommitFixture(),
-			// Due to `DKGIndexMap` being nil, `MalleabilityChecker` will skip mutating this field.
+			// We pin the `DKGIndexMap` to the current value (nil), so `MalleabilityChecker` will not mutate this field:
 			unittest.WithPinnedField("DKGIndexMap"),
 		)
 	})
