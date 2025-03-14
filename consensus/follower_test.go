@@ -212,7 +212,7 @@ func (s *HotStuffFollowerSuite) TestFollowerFinalizedBlock() {
 	// adding the certified child of b should advance finality to b
 	finalityAdvanced := make(chan struct{}) // close when finality has advanced to b
 	certifiedChild := toCertifiedBlock(s.T(), c, d.QuorumCertificate())
-	s.notifier.On("OnBlockIncorporated", blockWithID(certifiedChild.ID())).Return().Once()
+	s.notifier.On("OnBlockIncorporated", blockWithID(certifiedChild.BlockID())).Return().Once()
 	s.finalizer.On("MakeFinal", blockID(b.ID())).Return(nil).Once()
 	s.notifier.On("OnFinalizedBlock", blockWithID(b.ID())).Run(func(_ mock.Arguments) {
 		close(finalityAdvanced)
