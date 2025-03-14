@@ -18,6 +18,7 @@ import (
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/mempool"
 	"github.com/onflow/flow-go/module/metrics"
+	"github.com/onflow/flow-go/module/util"
 )
 
 // defaultVoteAggregatorWorkers number of workers to dispatch events for vote aggregators
@@ -99,12 +100,21 @@ func NewVoteAggregator(
 			aggregator.queuedMessagesProcessingLoop(ctx)
 		})
 	}
-	componentBuilder.AddWorker(func(_ irrecoverable.SignalerContext, ready component.ReadyFunc) {
+	componentBuilder.AddWorker(func(parentCtx irrecoverable.SignalerContext, ready component.ReadyFunc) {
 		// create new context which is not connected to parent
 		// we need to ensure that our internal workers stop before asking
 		// vote collectors to stop. We want to avoid delivering events to already stopped vote collectors
 		ctx, cancel := context.WithCancel(context.Background())
-		signalerCtx, _ := irrecoverable.WithSignaler(ctx)
+		signalerCtx, errCh := irrecoverable.WithSignaler(ctx)
+
+		// since we are breaking the connection between parentCtx and signalerCtx, we need to
+		// explicitly rethrow any errors from signalerCtx to parentCtx, otherwise they are dropped.
+		go func() {
+			if err := util.WaitError(errCh, ctx.Done()); err != nil {
+				parentCtx.Throw(err)
+			}
+		}()
+
 		// start vote collectors
 		collectors.Start(signalerCtx)
 		<-collectors.Ready()
