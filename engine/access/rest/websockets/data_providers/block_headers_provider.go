@@ -60,7 +60,8 @@ func NewBlockHeadersDataProvider(
 
 // Run starts processing the subscription for block headers and handles responses.
 //
-// No errors are expected during normal operations.
+// Expected errors during normal operations:
+//   - context.Canceled: if the operation is canceled, during an unsubscribe action.
 func (p *BlockHeadersDataProvider) Run() error {
 	return subscription.HandleSubscription(
 		p.subscription,

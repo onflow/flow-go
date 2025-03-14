@@ -244,7 +244,11 @@ func (s *TransactionStatusesProviderSuite) TestMessageIndexTransactionStatusesPr
 	for i := 0; i < txStatusesCount; i++ {
 		res := <-send
 
-		_, txStatusesResData := extractPayload[*models.TransactionStatusesResponse](s.T(), res)
+		txStatusesRes, ok := res.(*models.BaseDataProvidersResponse)
+		s.Require().True(ok, "Expected *models.BaseDataProvidersResponse, got %T", res)
+
+		txStatusesResData, ok := txStatusesRes.Payload.(*models.TransactionStatusesResponse)
+		s.Require().True(ok, "Expected *models.TransactionStatusesResponse, got %T", res)
 
 		responses = append(responses, txStatusesResData)
 	}
