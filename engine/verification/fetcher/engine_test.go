@@ -34,15 +34,15 @@ type FetcherEngineTestSuite struct {
 	log                   zerolog.Logger
 	metrics               *module.VerificationMetrics
 	tracer                *trace.NoopTracer
-	verifier              *mocknetwork.Engine                 // the verifier engine
-	state                 *protocol.State                     // used to verify the request origin
-	pendingChunks         *mempool.ChunkStatuses              // used to store all the pending chunks that assigned to this node
-	blocks                *storage.Blocks                     // used to for verifying collection ID.
-	headers               *storage.Headers                    // used for building verifiable chunk data.
-	chunkConsumerNotifier *module.ProcessingNotifier          // to report a chunk has been processed
-	results               *storage.ExecutionResults           // to retrieve execution result of an assigned chunk
-	receipts              *storage.ExecutionReceipts          // used to find executor of the chunk
-	requester             *mockfetcher.ChunkDataPackRequester // used to request chunk data packs from network
+	verifier              *mocknetwork.Engine                                          // the verifier engine
+	state                 *protocol.State                                              // used to verify the request origin
+	pendingChunks         *mempool.Mempool[flow.Identifier, *verification.ChunkStatus] // used to store all the pending chunks that assigned to this node
+	blocks                *storage.Blocks                                              // used to for verifying collection ID.
+	headers               *storage.Headers                                             // used for building verifiable chunk data.
+	chunkConsumerNotifier *module.ProcessingNotifier                                   // to report a chunk has been processed
+	results               *storage.ExecutionResults                                    // to retrieve execution result of an assigned chunk
+	receipts              *storage.ExecutionReceipts                                   // used to find executor of the chunk
+	requester             *mockfetcher.ChunkDataPackRequester                          // used to request chunk data packs from network
 }
 
 // setupTest initiates a test suite prior to each test.
@@ -53,7 +53,7 @@ func setupTest() *FetcherEngineTestSuite {
 		tracer:                trace.NewNoopTracer(),
 		verifier:              &mocknetwork.Engine{},
 		state:                 &protocol.State{},
-		pendingChunks:         &mempool.ChunkStatuses{},
+		pendingChunks:         &mempool.Mempool[flow.Identifier, *verification.ChunkStatus]{},
 		headers:               &storage.Headers{},
 		blocks:                &storage.Blocks{},
 		chunkConsumerNotifier: &module.ProcessingNotifier{},
@@ -445,7 +445,7 @@ func TestChunkResponse_MissingStatus(t *testing.T) {
 	chunkLocatorID := statuses[0].ChunkLocatorID()
 
 	// mocks there is no pending status for this chunk at fetcher engine.
-	s.pendingChunks.On("Get", status.ChunkIndex, result.ID()).Return(nil, false)
+	s.pendingChunks.On("Get", chunks.ChunkLocatorID(result.ID(), status.ChunkIndex)).Return(nil, false)
 
 	s.metrics.On("OnChunkDataPackArrivedAtFetcher").Return().Times(len(responses))
 	e.HandleChunkDataPack(unittest.IdentifierFixture(), responses[chunkLocatorID])
@@ -536,8 +536,8 @@ func TestStopAtHeight(t *testing.T) {
 	// side.
 	mockChunkConsumerNotifier(t, s.chunkConsumerNotifier, flow.GetIDs([]flow.Entity{locatorA, locatorB}))
 
-	s.pendingChunks.On("Add", mock.Anything).Run(func(args mock.Arguments) {
-		spew.Dump(args[0].(*verification.ChunkStatus).BlockHeight)
+	s.pendingChunks.On("Add", mock.Anything, mock.Anything).Run(func(args mock.Arguments) {
+		spew.Dump(args[1].(*verification.ChunkStatus).BlockHeight)
 	}).Return(false)
 
 	e.ProcessAssignedChunk(&locatorA)
@@ -634,16 +634,16 @@ func mockStateAtBlockIDForMissingIdentities(state *protocol.State, blockID flow.
 // mockPendingChunksAdd mocks the add method of pending chunks for expecting only the specified list of chunk statuses.
 // Each chunk status should be added only once.
 // It should return the specified added boolean variable as the result of mocking.
-func mockPendingChunksAdd(t *testing.T, pendingChunks *mempool.ChunkStatuses, list []*verification.ChunkStatus, added bool) {
+func mockPendingChunksAdd(t *testing.T, pendingChunks *mempool.Mempool[flow.Identifier, *verification.ChunkStatus], list []*verification.ChunkStatus, added bool) {
 	mu := &sync.Mutex{}
 
-	pendingChunks.On("Add", mock.Anything).
+	pendingChunks.On("Add", mock.Anything, mock.Anything).
 		Run(func(args mock.Arguments) {
 			// to provide mutual exclusion under concurrent invocations.
 			mu.Lock()
 			defer mu.Unlock()
 
-			actual, ok := args[0].(*verification.ChunkStatus)
+			actual, ok := args[1].(*verification.ChunkStatus)
 			require.True(t, ok)
 
 			// there should be a matching chunk status with the received one.
@@ -664,7 +664,7 @@ func mockPendingChunksAdd(t *testing.T, pendingChunks *mempool.ChunkStatuses, li
 // mockPendingChunksRemove mocks the remove method of pending chunks for expecting only the specified list of chunk statuses.
 // Each chunk status should be removed only once.
 // It should return the specified added boolean variable as the result of mocking.
-func mockPendingChunksRemove(t *testing.T, pendingChunks *mempool.ChunkStatuses, list []*verification.ChunkStatus, removed bool) {
+func mockPendingChunksRemove(t *testing.T, pendingChunks *mempool.Mempool[flow.Identifier, *verification.ChunkStatus], list []*verification.ChunkStatus, removed bool) {
 	mu := &sync.Mutex{}
 
 	pendingChunks.On("Remove", mock.Anything, mock.Anything).
@@ -691,7 +691,7 @@ func mockPendingChunksRemove(t *testing.T, pendingChunks *mempool.ChunkStatuses,
 }
 
 // mockPendingChunksGet mocks the Get method of pending chunks for expecting only the specified list of chunk statuses.
-func mockPendingChunksGet(pendingChunks *mempool.ChunkStatuses, list []*verification.ChunkStatus) {
+func mockPendingChunksGet(pendingChunks *mempool.Mempool[flow.Identifier, *verification.ChunkStatus], list []*verification.ChunkStatus) {
 	mu := &sync.Mutex{}
 
 	pendingChunks.On("Get", mock.Anything, mock.Anything).Return(
