@@ -29,30 +29,12 @@ type ExecutableBlock struct {
 	Executing           bool // flag used to indicate if block is being executed, to avoid re-execution
 }
 
-// BlocksByCollection represents a collection that the execution node.
-// has not received its transactions yet.
-// it also holds references to the blocks that contains this collection
-// and are waiting to be executed.
-type BlocksByCollection struct {
-	CollectionID flow.Identifier
-	// a reversed map to look up which block contains this collection. key is the collection id
-	ExecutableBlocks map[flow.Identifier]*ExecutableBlock
-}
-
 func (c CompleteCollection) Collection() flow.Collection {
 	return flow.Collection{Transactions: c.Transactions}
 }
 
 func (c CompleteCollection) IsCompleted() bool {
 	return len(c.Transactions) > 0
-}
-
-func (b *BlocksByCollection) ID() flow.Identifier {
-	return b.CollectionID
-}
-
-func (b *BlocksByCollection) Checksum() flow.Identifier {
-	return b.CollectionID
 }
 
 // ID lazy loads the Block.ID() into the private id field on the first call, and returns

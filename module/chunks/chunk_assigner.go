@@ -61,7 +61,7 @@ func (p *ChunkAssigner) Assign(result *flow.ExecutionResult, blockID flow.Identi
 
 	// checks cache against this assignment
 	assignmentFingerprint := flow.HashToID(hash)
-	a, exists := p.assignments.ByID(assignmentFingerprint)
+	a, exists := p.assignments.Get(assignmentFingerprint)
 	if exists {
 		return a, nil
 	}

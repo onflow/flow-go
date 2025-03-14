@@ -24,7 +24,7 @@ func TestTimesPool(t *testing.T) {
 	})
 
 	t.Run("should be able to get", func(t *testing.T) {
-		got, exists := pool.ByID(id)
+		got, exists := pool.Get(id)
 		assert.True(t, exists)
 		assert.Equal(t, ti, got)
 	})
