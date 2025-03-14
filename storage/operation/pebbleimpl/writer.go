@@ -49,8 +49,11 @@ func (b *ReaderBatchWriter) AddCallback(callback func(error)) {
 }
 
 // Commit flushes the batch to the database.
-// No errors expected during normal operation
+// No errors are expected during normal operation.
+// ReaderBatchWriter can't be reused after Commit() is called.
 func (b *ReaderBatchWriter) Commit() error {
+	defer b.batch.Close() // Release batch resource
+
 	err := b.batch.Commit(pebble.Sync)
 
 	b.callbacks.NotifyCallbacks(err)
@@ -60,6 +63,7 @@ func (b *ReaderBatchWriter) Commit() error {
 
 func WithReaderBatchWriter(db *pebble.DB, fn func(storage.ReaderBatchWriter) error) error {
 	batch := NewReaderBatchWriter(db)
+	defer batch.batch.Close() // Release batch resource
 
 	err := fn(batch)
 	if err != nil {
