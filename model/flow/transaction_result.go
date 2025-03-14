@@ -21,15 +21,6 @@ func (t TransactionResult) String() string {
 	return fmt.Sprintf("Transaction ID: %s, Error Message: %s", t.TransactionID.String(), t.ErrorMessage)
 }
 
-// ID returns a canonical identifier that is guaranteed to be unique.
-func (t TransactionResult) ID() Identifier {
-	return t.TransactionID
-}
-
-func (te *TransactionResult) Checksum() Identifier {
-	return te.ID()
-}
-
 // TODO(ramtin): add canonical encoding and ID
 type TransactionResults []TransactionResult
 
