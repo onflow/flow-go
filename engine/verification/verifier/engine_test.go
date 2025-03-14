@@ -104,7 +104,7 @@ func (suite *VerifierEngineTestSuite) getTestNewEngine() *verifier.Engine {
 		suite.me,
 		suite.chunkVerifier,
 		suite.approvals)
-	require.Nil(suite.T(), err)
+	require.NoError(suite.T(), err)
 
 	suite.net.AssertExpectations(suite.T())
 	return e

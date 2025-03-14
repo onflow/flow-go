@@ -2,8 +2,6 @@ package data_providers
 
 import (
 	"context"
-	"fmt"
-	"strconv"
 	"testing"
 	"time"
 
@@ -95,43 +93,13 @@ func (s *TransactionStatusesProviderSuite) subscribeTransactionStatusesDataProvi
 
 	return []testType{
 		{
-			name: "SubscribeTransactionStatusesFromStartBlockID happy path",
+			name: "SubscribeTransactionStatuses happy path",
 			arguments: models.Arguments{
-				"start_block_id": s.rootBlock.ID().String(),
+				"tx_id": unittest.IdentifierFixture().String(),
 			},
 			setupBackend: func(sub *ssmock.Subscription) {
 				s.api.On(
-					"SubscribeTransactionStatusesFromStartBlockID",
-					mock.Anything,
-					mock.Anything,
-					s.rootBlock.ID(),
-					entities.EventEncodingVersion_JSON_CDC_V0,
-				).Return(sub).Once()
-			},
-			expectedResponses: expectedResponses,
-		},
-		{
-			name: "SubscribeTransactionStatusesFromStartHeight happy path",
-			arguments: models.Arguments{
-				"start_block_height": strconv.FormatUint(s.rootBlock.Header.Height, 10),
-			},
-			setupBackend: func(sub *ssmock.Subscription) {
-				s.api.On(
-					"SubscribeTransactionStatusesFromStartHeight",
-					mock.Anything,
-					mock.Anything,
-					s.rootBlock.Header.Height,
-					entities.EventEncodingVersion_JSON_CDC_V0,
-				).Return(sub).Once()
-			},
-			expectedResponses: expectedResponses,
-		},
-		{
-			name:      "SubscribeTransactionStatusesFromLatest happy path",
-			arguments: models.Arguments{},
-			setupBackend: func(sub *ssmock.Subscription) {
-				s.api.On(
-					"SubscribeTransactionStatusesFromLatest",
+					"SubscribeTransactionStatuses",
 					mock.Anything,
 					mock.Anything,
 					entities.EventEncodingVersion_JSON_CDC_V0,
@@ -214,8 +182,7 @@ func (s *TransactionStatusesProviderSuite) TestMessageIndexTransactionStatusesPr
 	sub.On("Err").Return(nil).Once()
 
 	s.api.On(
-		"SubscribeTransactionStatusesFromStartBlockID",
-		mock.Anything,
+		"SubscribeTransactionStatuses",
 		mock.Anything,
 		mock.Anything,
 		entities.EventEncodingVersion_JSON_CDC_V0,
@@ -229,7 +196,7 @@ func (s *TransactionStatusesProviderSuite) TestMessageIndexTransactionStatusesPr
 
 	arguments :=
 		map[string]interface{}{
-			"start_block_id": s.rootBlock.ID().String(),
+			"tx_id": unittest.IdentifierFixture().String(),
 		}
 
 	// Create the TransactionStatusesDataProvider instance
@@ -277,7 +244,11 @@ func (s *TransactionStatusesProviderSuite) TestMessageIndexTransactionStatusesPr
 	for i := 0; i < txStatusesCount; i++ {
 		res := <-send
 
-		_, txStatusesResData := extractPayload[*models.TransactionStatusesResponse](s.T(), res)
+		txStatusesRes, ok := res.(*models.BaseDataProvidersResponse)
+		s.Require().True(ok, "Expected *models.BaseDataProvidersResponse, got %T", res)
+
+		txStatusesResData, ok := txStatusesRes.Payload.(*models.TransactionStatusesResponse)
+		s.Require().True(ok, "Expected *models.TransactionStatusesResponse, got %T", res)
 
 		responses = append(responses, txStatusesResData)
 	}
@@ -329,21 +300,10 @@ func (s *TransactionStatusesProviderSuite) TestTransactionStatusesDataProvider_I
 // a set of input arguments, and the expected error message that should be returned.
 //
 // The test cases cover scenarios such as:
-// 1. Providing both 'start_block_id' and 'start_block_height' simultaneously.
-// 2. Providing invalid 'tx_id' value.
-// 3. Providing invalid 'start_block_id'  value.
-// 4. Invalid 'start_block_id' argument.
-// 5. Providing unexpected argument.
+// 1. Providing invalid 'tx_id' value.
+// 2. Providing unexpected argument.
 func invalidTransactionStatusesArgumentsTestCases() []testErrType {
 	return []testErrType{
-		{
-			name: "provide both 'start_block_id' and 'start_block_height' arguments",
-			arguments: models.Arguments{
-				"start_block_id":     unittest.BlockFixture().ID().String(),
-				"start_block_height": fmt.Sprintf("%d", unittest.BlockFixture().Header.Height),
-			},
-			expectedErrorMsg: "can only provide either 'start_block_id' or 'start_block_height'",
-		},
 		{
 			name: "invalid 'tx_id' argument",
 			arguments: map[string]interface{}{
@@ -352,23 +312,9 @@ func invalidTransactionStatusesArgumentsTestCases() []testErrType {
 			expectedErrorMsg: "invalid ID format",
 		},
 		{
-			name: "invalid 'start_block_id' argument",
-			arguments: map[string]interface{}{
-				"start_block_id": "invalid_block_id",
-			},
-			expectedErrorMsg: "invalid ID format",
-		},
-		{
-			name: "invalid 'start_block_height' argument",
-			arguments: map[string]interface{}{
-				"start_block_height": "-1",
-			},
-			expectedErrorMsg: "value must be an unsigned 64 bit integer",
-		},
-		{
 			name: "unexpected argument",
 			arguments: map[string]interface{}{
-				"start_block_id":      unittest.BlockFixture().ID().String(),
+				"tx_id":               unittest.IdentifierFixture().String(),
 				"unexpected_argument": "dummy",
 			},
 			expectedErrorMsg: "unexpected field: 'unexpected_argument'",

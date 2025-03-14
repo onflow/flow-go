@@ -66,6 +66,10 @@ func (s *SendTransactionStatusesProviderSuite) SetupTest() {
 // validates that tx statuses are correctly streamed to the channel and ensures
 // no unexpected errors occur.
 func (s *TransactionStatusesProviderSuite) TestSendTransactionStatusesDataProvider_HappyPath() {
+	tx := unittest.TransactionBodyFixture()
+	tx.PayloadSignatures = []flow.TransactionSignature{unittest.TransactionSignatureFixture()}
+	tx.Arguments = [][]uint8{}
+
 	s.linkGenerator.On("TransactionResultLink", mock.AnythingOfType("flow.Identifier")).Return(
 		func(id flow.Identifier) (string, error) {
 			return "some_link", nil
@@ -77,10 +81,8 @@ func (s *TransactionStatusesProviderSuite) TestSendTransactionStatusesDataProvid
 
 	sendTxStatutesTestCases := []testType{
 		{
-			name: "SubscribeTransactionStatusesFromStartBlockID happy path",
-			arguments: models.Arguments{
-				"reference_block_id": s.rootBlock.ID().String(),
-			},
+			name:      "SubscribeTransactionStatusesFromStartBlockID happy path",
+			arguments: unittest.CreateSendTxHttpPayload(tx),
 			setupBackend: func(sub *ssmock.Subscription) {
 				s.api.On(
 					"SendAndSubscribeTransactionStatuses",
@@ -103,7 +105,6 @@ func (s *TransactionStatusesProviderSuite) TestSendTransactionStatusesDataProvid
 		},
 		s.requireTransactionStatuses,
 	)
-
 }
 
 // requireTransactionStatuses ensures that the received transaction statuses information matches the expected data.
@@ -127,127 +128,26 @@ func (s *SendTransactionStatusesProviderSuite) TestSendTransactionStatusesDataPr
 
 	topic := SendAndGetTransactionStatusesTopic
 
-	for _, test := range invalidSendTransactionStatusesArgumentsTestCases() {
-		s.Run(test.name, func() {
-			provider, err := NewSendAndGetTransactionStatusesDataProvider(
-				ctx,
-				s.log,
-				s.api,
-				"dummy-id",
-				s.linkGenerator,
-				topic,
-				test.arguments,
-				send,
-			)
-			s.Require().Nil(provider)
-			s.Require().Error(err)
-			s.Require().Contains(err.Error(), test.expectedErrorMsg)
-		})
-	}
-}
+	invalidTx := unittest.TransactionBodyFixture()
+	invalidTx.PayloadSignatures = []flow.TransactionSignature{unittest.TransactionSignatureFixture()}
+	invalidTx.Arguments = [][]uint8{}
+	arguments := unittest.CreateSendTxHttpPayload(invalidTx)
+	arguments["script"] = 0
 
-// invalidSendTransactionStatusesArgumentsTestCases returns a list of test cases with invalid argument combinations
-// for testing the behavior of send transaction statuses data providers. Each test case includes a name,
-// a set of input arguments, and the expected error message that should be returned.
-//
-// The test cases cover scenarios such as:
-// 1. Providing invalid 'script' type.
-// 2. Providing invalid 'script' value.
-// 3. Providing invalid 'arguments' type.
-// 4. Providing invalid 'arguments' value.
-// 5. Providing invalid 'reference_block_id' value.
-// 6. Providing invalid 'gas_limit' value.
-// 7. Providing invalid 'payer' value.
-// 8. Providing invalid 'proposal_key' value.
-// 9. Providing invalid 'authorizers' value.
-// 10. Providing invalid 'payload_signatures' value.
-// 11. Providing invalid 'envelope_signatures' value.
-// 12. Providing unexpected argument.
-func invalidSendTransactionStatusesArgumentsTestCases() []testErrType {
-	return []testErrType{
-		{
-			name: "invalid 'script' argument type",
-			arguments: map[string]interface{}{
-				"script": 0,
-			},
-			expectedErrorMsg: "'script' must be a string",
-		},
-		{
-			name: "invalid 'script' argument",
-			arguments: map[string]interface{}{
-				"script": "invalid_script",
-			},
-			expectedErrorMsg: "invalid 'script': illegal base64 data ",
-		},
-		{
-			name: "invalid 'arguments' type",
-			arguments: map[string]interface{}{
-				"arguments": 0,
-			},
-			expectedErrorMsg: "'arguments' must be a []string type",
-		},
-		{
-			name: "invalid 'arguments' argument",
-			arguments: map[string]interface{}{
-				"arguments": []string{"invalid_base64_1", "invalid_base64_2"},
-			},
-			expectedErrorMsg: "invalid 'arguments'",
-		},
-		{
-			name: "invalid 'reference_block_id' argument",
-			arguments: map[string]interface{}{
-				"reference_block_id": "invalid_reference_block_id",
-			},
-			expectedErrorMsg: "invalid ID format",
-		},
-		{
-			name: "invalid 'gas_limit' argument",
-			arguments: map[string]interface{}{
-				"gas_limit": "-1",
-			},
-			expectedErrorMsg: "value must be an unsigned 64 bit integer",
-		},
-		{
-			name: "invalid 'payer' argument",
-			arguments: map[string]interface{}{
-				"payer": "invalid_payer",
-			},
-			expectedErrorMsg: "invalid 'payer': can not decode hex string",
-		},
-		{
-			name: "invalid 'proposal_key' argument",
-			arguments: map[string]interface{}{
-				"proposal_key": "invalid ProposalKey object",
-			},
-			expectedErrorMsg: "'proposal_key' must be a object (ProposalKey)",
-		},
-		{
-			name: "invalid 'authorizers' argument",
-			arguments: map[string]interface{}{
-				"authorizers": []string{"invalid_base64_1", "invalid_base64_2"},
-			},
-			expectedErrorMsg: "invalid 'authorizers': can not decode hex string",
-		},
-		{
-			name: "invalid 'payload_signatures' argument",
-			arguments: map[string]interface{}{
-				"payload_signatures": "invalid TransactionSignature array",
-			},
-			expectedErrorMsg: "'payload_signatures' must be an array of objects (TransactionSignature)",
-		},
-		{
-			name: "invalid 'envelope_signatures' argument",
-			arguments: map[string]interface{}{
-				"envelope_signatures": "invalid TransactionSignature array",
-			},
-			expectedErrorMsg: "'envelope_signatures' must be an array of objects (TransactionSignature)",
-		},
-		{
-			name: "unexpected argument",
-			arguments: map[string]interface{}{
-				"unexpected_argument": "dummy",
-			},
-			expectedErrorMsg: "unexpected field: 'unexpected_argument'",
-		},
-	}
+	expectedErrorMsg := "invalid arguments for send tx statuses data provider"
+
+	provider, err := NewSendAndGetTransactionStatusesDataProvider(
+		ctx,
+		s.log,
+		s.api,
+		"dummy-id",
+		s.linkGenerator,
+		topic,
+		arguments,
+		send,
+		s.chain,
+	)
+	s.Require().Nil(provider)
+	s.Require().Error(err)
+	s.Require().Contains(err.Error(), expectedErrorMsg)
 }

@@ -6,7 +6,6 @@ import (
 	"time"
 
 	"github.com/cockroachdb/pebble"
-	"github.com/dgraph-io/badger/v2"
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/module"
@@ -26,7 +25,7 @@ func LoopPruneExecutionDataFromRootToLatestSealed(
 	log zerolog.Logger,
 	metrics module.ExecutionMetrics,
 	state protocol.State,
-	badgerDB *badger.DB,
+	protocolDB storage.DB,
 	headers storage.Headers,
 	chunkDataPacks storage.ChunkDataPacks,
 	results storage.ExecutionResults,
@@ -37,7 +36,7 @@ func LoopPruneExecutionDataFromRootToLatestSealed(
 	chunksDB := pebbleimpl.ToDB(chunkDataPacksDB)
 	// the creator can be reused to create new block iterator that can iterate from the last
 	// checkpoint to the new latest (sealed) block.
-	creator, getNextAndLatest, err := makeBlockIteratorCreator(state, badgerDB, headers, chunksDB, config)
+	creator, getNextAndLatest, err := makeBlockIteratorCreator(state, protocolDB, headers, chunksDB, config)
 	if err != nil {
 		return err
 	}
@@ -61,6 +60,20 @@ func LoopPruneExecutionDataFromRootToLatestSealed(
 			return fmt.Errorf("failed to get next and latest to prune: %w", err)
 		}
 
+		// report the target pruned height and last pruned height
+		lastPruned := nextToPrune - 1
+		metrics.ExecutionLastChunkDataPackPrunedHeight(lastPruned)
+		metrics.ExecutionTargetChunkDataPackPrunedHeight(latestToPrune)
+
+		if lastPruned > latestToPrune {
+			// this might happen if the threshold is increased after restart in order to retain more data,
+			// which will make the latest block to go backwards.
+
+			log.Warn().
+				Uint64("threshold", config.Threshold).
+				Msgf("last pruned height %d is greater than latest to prune %d", lastPruned, latestToPrune)
+		}
+
 		commitDuration := 2 * time.Millisecond // with default batch size 1200, the avg commit duration is 2ms
 		batchCount, totalDuration := EstimateBatchProcessing(
 			nextToPrune, latestToPrune,
@@ -69,6 +82,10 @@ func LoopPruneExecutionDataFromRootToLatestSealed(
 		log.Info().
 			Uint64("nextToPrune", nextToPrune).
 			Uint64("latestToPrune", latestToPrune).
+			Uint64("threshold", config.Threshold).
+			Uint("batchsize", config.BatchSize).
+			Dur("sleepAfterEachBatchCommit", config.SleepAfterEachBatchCommit).
+			Dur("sleepAfterEachIteration", config.SleepAfterEachIteration).
 			Uint64("batchCount", batchCount).
 			Str("totalDuration", totalDuration.String()).
 			Msgf("execution data pruning will start in %s at %s, complete at %s",
@@ -76,9 +93,6 @@ func LoopPruneExecutionDataFromRootToLatestSealed(
 				time.Now().Add(config.SleepAfterEachIteration).UTC(),
 				time.Now().Add(config.SleepAfterEachIteration).Add(totalDuration).UTC(),
 			)
-
-		// report the target pruned height
-		metrics.ExecutionTargetChunkDataPackPrunedHeight(latestToPrune)
 
 		select {
 		case <-ctx.Done():
@@ -110,7 +124,7 @@ func LoopPruneExecutionDataFromRootToLatestSealed(
 // makeBlockIteratorCreator create the block iterator creator
 func makeBlockIteratorCreator(
 	state protocol.State,
-	badgerDB *badger.DB,
+	protocolDB storage.DB,
 	headers storage.Headers,
 	chunkDataPacksDB storage.DB,
 	config PruningConfig,
@@ -125,7 +139,7 @@ func makeBlockIteratorCreator(
 	sealedAndExecuted := latest.NewLatestSealedAndExecuted(
 		root,
 		state,
-		badgerDB,
+		protocolDB,
 	)
 
 	// retrieves the latest sealed and executed block height.

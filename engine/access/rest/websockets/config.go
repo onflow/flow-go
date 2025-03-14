@@ -30,14 +30,28 @@ const (
 	// and allows the server to gracefully handle timeouts for delayed writes.
 	WriteWait = 10 * time.Second
 
+	// DefaultMaxSubscriptionsPerConnection defines the default maximum number
+	// of WebSocket subscriptions allowed per connection.
+	DefaultMaxSubscriptionsPerConnection = 20
+
+	// DefaultMaxResponsesPerSecond defines the default maximum number of responses
+	// that can be sent to a single client per second.
+	DefaultMaxResponsesPerSecond = float64(0)
+
 	// DefaultInactivityTimeout is the default duration a WebSocket connection can remain open without any active subscriptions
 	// before being automatically closed
 	DefaultInactivityTimeout time.Duration = 1 * time.Minute
 )
 
 type Config struct {
+	// MaxSubscriptionsPerConnection specifies the maximum number of active
+	// WebSocket subscriptions allowed per connection. If a client attempts
+	// to create more subscriptions than this limit, an error will be returned,
+	// and the additional subscriptions will be rejected.
 	MaxSubscriptionsPerConnection uint64
-	MaxResponsesPerSecond         uint64
+	// MaxResponsesPerSecond defines the maximum number of responses that
+	// can be sent to a single client per second.
+	MaxResponsesPerSecond float64
 	// InactivityTimeout specifies the duration a WebSocket connection can remain open without any active subscriptions
 	// before being automatically closed
 	InactivityTimeout time.Duration
@@ -45,8 +59,8 @@ type Config struct {
 
 func NewDefaultWebsocketConfig() Config {
 	return Config{
-		MaxSubscriptionsPerConnection: 1000,
-		MaxResponsesPerSecond:         1000,
+		MaxSubscriptionsPerConnection: DefaultMaxSubscriptionsPerConnection,
+		MaxResponsesPerSecond:         DefaultMaxResponsesPerSecond,
 		InactivityTimeout:             DefaultInactivityTimeout,
 	}
 }

@@ -14,6 +14,8 @@ type dbStore struct {
 	db *badger.DB
 }
 
+var _ (storage.DB) = (*dbStore)(nil)
+
 func (b *dbStore) Reader() storage.Reader {
 	return dbReader{db: b.db}
 }
