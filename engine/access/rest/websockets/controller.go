@@ -437,7 +437,7 @@ func (c *Controller) handleSubscribe(ctx context.Context, msg models.SubscribeMe
 		c.writeErrorResponse(
 			ctx,
 			err,
-			wrapErrorMessage(http.StatusServiceUnavailable, err.Error(), models.SubscribeAction, msg.SubscriptionID),
+			wrapErrorMessage(http.StatusTooManyRequests, err.Error(), models.SubscribeAction, msg.SubscriptionID),
 		)
 		return
 	}
