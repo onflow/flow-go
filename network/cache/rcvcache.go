@@ -18,7 +18,7 @@ type ReceiveCache struct {
 // NewHeroReceiveCache returns a new HeroCache-based receive cache.
 func NewHeroReceiveCache(sizeLimit uint32, logger zerolog.Logger, collector module.HeroCacheMetrics,
 ) *ReceiveCache {
-	backData := herocache.NewCache[flow.Identifier, struct{}](sizeLimit,
+	backData := herocache.NewCache[struct{}](sizeLimit,
 		herocache.DefaultOversizeFactor,
 		heropool.LRUEjection, // receive cache must be LRU.
 		logger.With().Str("mempool", "receive-cache").Logger(),

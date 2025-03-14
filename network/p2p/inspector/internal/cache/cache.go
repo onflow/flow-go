@@ -50,7 +50,7 @@ type RecordCache struct {
 // the records of the authorized nodes. Also, this cache is keeping at most one record per peer id, so the
 // size of the cache must be at least the number of authorized nodes.
 func NewRecordCache(config *RecordCacheConfig, recordFactory recordFactory) (*RecordCache, error) {
-	backData := herocache.NewCache[flow.Identifier, *ClusterPrefixedMessagesReceivedRecord](config.sizeLimit,
+	backData := herocache.NewCache[*ClusterPrefixedMessagesReceivedRecord](config.sizeLimit,
 		herocache.DefaultOversizeFactor,
 		heropool.LRUEjection,
 		config.logger.With().Str("mempool", "gossipsub=cluster-prefix-control-messages-received-records").Logger(),

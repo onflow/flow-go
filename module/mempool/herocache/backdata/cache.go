@@ -2,9 +2,10 @@ package herocache
 
 import (
 	"encoding/binary"
-	"github.com/onflow/flow-go/model/flow"
 	"time"
 	_ "unsafe" // for linking runtimeNano
+
+	"github.com/onflow/flow-go/model/flow"
 
 	"github.com/rs/zerolog"
 	"go.uber.org/atomic"
@@ -262,7 +263,7 @@ func (c *Cache[V]) All() map[flow.Identifier]V {
 }
 
 // Keys returns the list of identifiers of entities stored in the backdata.
-func (c *Cache[V]) Keys() flow.IdentifierList {
+func (c *Cache[V]) Keys() []flow.Identifier {
 	defer c.logTelemetry()
 
 	ids := make(flow.IdentifierList, c.entities.Size())

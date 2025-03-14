@@ -14,30 +14,49 @@ import (
 	"github.com/onflow/flow-go/module/mempool/stdmap"
 )
 
+// DNSCache provides a caching mechanism for DNS IP and TXT records.
+//
+// The cache stores IP records in ipCache and TXT records in txtCache, using the domain's hashed
+// flow.Identifier as the key.
 type DNSCache struct {
 	ipCache  *stdmap.Backend[flow.Identifier, *mempool.IpRecord]
 	txtCache *stdmap.Backend[flow.Identifier, *mempool.TxtRecord]
 }
 
+// NewDNSCache creates and returns a new instance of DNSCache.
+// It initializes both the IP and TXT record caches with the provided size limit, logger,
+// and cache metrics collectors for IP and TXT records.
+//
+// Parameters:
+// - sizeLimit: The maximum number of records the cache can hold before eviction.
+// - logger: The logger instance used to log cache operations, such as evictions.
+// - ipCollector: Metrics collector for IP records in the cache.
+// - txtCollector: Metrics collector for TXT records in the cache.
 func NewDNSCache(sizeLimit uint32, logger zerolog.Logger, ipCollector module.HeroCacheMetrics, txtCollector module.HeroCacheMetrics,
 ) *DNSCache {
 	return &DNSCache{
 		txtCache: stdmap.NewBackend(
 			stdmap.WithMutableBackData[flow.Identifier, *mempool.TxtRecord](
-				herocache.NewCache[flow.Identifier, *mempool.TxtRecord](
+				herocache.NewCache[*mempool.TxtRecord](
 					sizeLimit,
 					herocache.DefaultOversizeFactor,
 					heropool.LRUEjection,
 					logger.With().Str("mempool", "dns-txt-cache").Logger(),
-					txtCollector))),
+					txtCollector,
+				),
+			),
+		),
 		ipCache: stdmap.NewBackend(
 			stdmap.WithMutableBackData[flow.Identifier, *mempool.IpRecord](
-				herocache.NewCache[flow.Identifier, *mempool.IpRecord](
+				herocache.NewCache[*mempool.IpRecord](
 					sizeLimit,
 					herocache.DefaultOversizeFactor,
 					heropool.LRUEjection,
 					logger.With().Str("mempool", "dns-ip-cache").Logger(),
-					ipCollector))),
+					ipCollector,
+				),
+			),
+		),
 	}
 }
 
@@ -68,23 +87,13 @@ func (d *DNSCache) PutTxtRecord(domain string, record []string, timestamp int64)
 // GetDomainIp returns the ip domain if exists in the cache.
 // The boolean return value determines if domain exists in the cache.
 func (d *DNSCache) GetDomainIp(domain string) (*mempool.IpRecord, bool) {
-	ipRecord, ok := d.ipCache.Get(domainToIdentifier(domain))
-	if !ok {
-		return nil, false
-	}
-
-	return ipRecord, true
+	return d.ipCache.Get(domainToIdentifier(domain))
 }
 
 // GetTxtRecord returns the txt record if exists in the cache.
 // The boolean return value determines if record exists in the cache.
 func (d *DNSCache) GetTxtRecord(domain string) (*mempool.TxtRecord, bool) {
-	txtRecord, ok := d.txtCache.Get(domainToIdentifier(domain))
-	if !ok {
-		return nil, false
-	}
-
-	return txtRecord, true
+	return d.txtCache.Get(domainToIdentifier(domain))
 }
 
 // RemoveIp removes an ip domain from cache.
@@ -108,9 +117,10 @@ func (d *DNSCache) RemoveTxt(domain string) bool {
 // So the locking happens to avoid any other parallel resolving
 func (d *DNSCache) LockIPDomain(domain string) (bool, error) {
 	locked := false
-	err := d.ipCache.Run(func(backdata mempool.BackData[flow.Identifier, *mempool.IpRecord]) error {
-		id := domainToIdentifier(domain)
-		ipRecord, ok := backdata.Get(id)
+	err := d.ipCache.Run(func(backData mempool.BackData[flow.Identifier, *mempool.IpRecord]) error {
+		key := domainToIdentifier(domain)
+
+		ipRecord, ok := backData.Get(key)
 		if !ok {
 			return fmt.Errorf("ip record does not exist in cache for locking: %s", domain)
 		}
@@ -121,11 +131,11 @@ func (d *DNSCache) LockIPDomain(domain string) (bool, error) {
 
 		ipRecord.Locked = true
 
-		if _, removed := backdata.Remove(id); !removed {
+		if _, removed := backData.Remove(key); !removed {
 			return fmt.Errorf("ip record could not be removed from backdata")
 		}
 
-		if added := backdata.Add(id, ipRecord); !added {
+		if added := backData.Add(key, ipRecord); !added {
 			return fmt.Errorf("updated ip record could not be added to back data")
 		}
 
@@ -138,11 +148,11 @@ func (d *DNSCache) LockIPDomain(domain string) (bool, error) {
 
 // UpdateIPDomain updates the dns record for the given ip domain with the new address and timestamp values.
 func (d *DNSCache) UpdateIPDomain(domain string, addresses []net.IPAddr, timestamp int64) error {
-	return d.ipCache.Run(func(backdata mempool.BackData[flow.Identifier, *mempool.IpRecord]) error {
-		id := domainToIdentifier(domain)
+	return d.ipCache.Run(func(backData mempool.BackData[flow.Identifier, *mempool.IpRecord]) error {
+		key := domainToIdentifier(domain)
 
 		// removes old entry if exists.
-		backdata.Remove(id)
+		backData.Remove(key)
 
 		ipRecord := &mempool.IpRecord{
 			Domain:    domain,
@@ -151,7 +161,7 @@ func (d *DNSCache) UpdateIPDomain(domain string, addresses []net.IPAddr, timesta
 			Locked:    false, // by default an ip record is unlocked.
 		}
 
-		if added := backdata.Add(id, ipRecord); !added {
+		if added := backData.Add(key, ipRecord); !added {
 			return fmt.Errorf("updated ip record could not be added to backdata")
 		}
 
@@ -161,11 +171,11 @@ func (d *DNSCache) UpdateIPDomain(domain string, addresses []net.IPAddr, timesta
 
 // UpdateTxtRecord updates the dns record for the given txt domain with the new address and timestamp values.
 func (d *DNSCache) UpdateTxtRecord(txt string, records []string, timestamp int64) error {
-	return d.txtCache.Run(func(backdata mempool.BackData[flow.Identifier, *mempool.TxtRecord]) error {
-		id := domainToIdentifier(txt)
+	return d.txtCache.Run(func(backData mempool.BackData[flow.Identifier, *mempool.TxtRecord]) error {
+		key := domainToIdentifier(txt)
 
 		// removes old entry if exists.
-		backdata.Remove(id)
+		backData.Remove(key)
 
 		txtRecord := &mempool.TxtRecord{
 			Txt:       txt,
@@ -174,7 +184,7 @@ func (d *DNSCache) UpdateTxtRecord(txt string, records []string, timestamp int64
 			Locked:    false, // by default a txt record is unlocked.
 		}
 
-		if added := backdata.Add(id, txtRecord); !added {
+		if added := backData.Add(key, txtRecord); !added {
 			return fmt.Errorf("updated txt record could not be added to backdata")
 		}
 
@@ -193,9 +203,10 @@ func (d *DNSCache) UpdateTxtRecord(txt string, records []string, timestamp int64
 // So the locking happens to avoid any other parallel resolving.
 func (d *DNSCache) LockTxtRecord(txt string) (bool, error) {
 	locked := false
-	err := d.txtCache.Run(func(backdata mempool.BackData[flow.Identifier, *mempool.TxtRecord]) error {
-		id := domainToIdentifier(txt)
-		txtRecord, ok := backdata.Get(id)
+	err := d.txtCache.Run(func(backData mempool.BackData[flow.Identifier, *mempool.TxtRecord]) error {
+		key := domainToIdentifier(txt)
+
+		txtRecord, ok := backData.Get(key)
 		if !ok {
 			return fmt.Errorf("txt record does not exist in cache for locking: %s", txt)
 		}
@@ -206,11 +217,11 @@ func (d *DNSCache) LockTxtRecord(txt string) (bool, error) {
 
 		txtRecord.Locked = true
 
-		if _, removed := backdata.Remove(id); !removed {
+		if _, removed := backData.Remove(key); !removed {
 			return fmt.Errorf("txt record could not be removed from backdata")
 		}
 
-		if added := backdata.Add(id, txtRecord); !added {
+		if added := backData.Add(key, txtRecord); !added {
 			return fmt.Errorf("updated txt record could not be added to back data")
 		}
 
@@ -228,6 +239,9 @@ func (d *DNSCache) Size() (uint, uint) {
 	return d.ipCache.Size(), d.txtCache.Size()
 }
 
+// domainToIdentifier is a helper function for creating the key for DNSCache by hashing the domain.
+// Returns:
+// - the hash of the domain as a flow.Identifier.
 func domainToIdentifier(domain string) flow.Identifier {
 	return flow.MakeID(domain)
 }

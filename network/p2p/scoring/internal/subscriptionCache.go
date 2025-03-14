@@ -7,6 +7,7 @@ import (
 	"github.com/rs/zerolog"
 	"go.uber.org/atomic"
 
+	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	herocache "github.com/onflow/flow-go/module/mempool/herocache/backdata"
 	"github.com/onflow/flow-go/module/mempool/herocache/backdata/heropool"
@@ -16,7 +17,7 @@ import (
 // SubscriptionRecordCache manages the subscription records of peers in a network.
 // It uses a currentCycle counter to track the update cycles of the cache, ensuring the relevance of subscription data.
 type SubscriptionRecordCache struct {
-	c *stdmap.Backend[peer.ID, *SubscriptionRecord]
+	c *stdmap.Backend[flow.Identifier, *SubscriptionRecord]
 
 	// currentCycle is an atomic counter used to track the update cycles of the subscription cache.
 	// It plays a critical role in maintaining the cache's data relevance and coherence.
@@ -40,14 +41,14 @@ type SubscriptionRecordCache struct {
 func NewSubscriptionRecordCache(sizeLimit uint32,
 	logger zerolog.Logger,
 	collector module.HeroCacheMetrics) *SubscriptionRecordCache {
-	backData := herocache.NewCache[peer.ID, *SubscriptionRecord](sizeLimit,
+	backData := herocache.NewCache[*SubscriptionRecord](sizeLimit,
 		herocache.DefaultOversizeFactor,
 		heropool.LRUEjection,
 		logger.With().Str("mempool", "subscription-records").Logger(),
 		collector)
 
 	return &SubscriptionRecordCache{
-		c:            stdmap.NewBackend(stdmap.WithMutableBackData[peer.ID, *SubscriptionRecord](backData)),
+		c:            stdmap.NewBackend(stdmap.WithMutableBackData[flow.Identifier, *SubscriptionRecord](backData)),
 		currentCycle: *atomic.NewUint64(0),
 	}
 }
@@ -57,7 +58,7 @@ func NewSubscriptionRecordCache(sizeLimit uint32,
 // - []string: the list of topics the peer is subscribed to.
 // - bool: true if there is a record for the peer, false otherwise.
 func (s *SubscriptionRecordCache) GetSubscribedTopics(pid peer.ID) ([]string, bool) {
-	record, ok := s.c.Get(pid)
+	record, ok := s.c.Get(makeId(pid))
 	if !ok {
 		return nil, false
 	}
@@ -128,7 +129,7 @@ func (s *SubscriptionRecordCache) AddWithInitTopicForPeer(pid peer.ID, topic str
 		// Return the adjusted record.
 		return record
 	}
-	adjustedRecord, adjusted := s.c.AdjustWithInit(pid, adjustLogic, initLogic)
+	adjustedRecord, adjusted := s.c.AdjustWithInit(makeId(pid), adjustLogic, initLogic)
 	if rErr != nil {
 		return nil, fmt.Errorf("failed to adjust record with error: %w", rErr)
 	}

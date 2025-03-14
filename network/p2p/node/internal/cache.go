@@ -29,7 +29,7 @@ type DisallowListCache struct {
 // Returns:
 // - *DisallowListCache: the created cache.
 func NewDisallowListCache(sizeLimit uint32, logger zerolog.Logger, collector module.HeroCacheMetrics) *DisallowListCache {
-	backData := herocache.NewCache[flow.Identifier, map[network.DisallowListedCause]struct{}](sizeLimit,
+	backData := herocache.NewCache[map[network.DisallowListedCause]struct{}](sizeLimit,
 		herocache.DefaultOversizeFactor,
 		heropool.LRUEjection,
 		logger.With().Str("mempool", "disallow-list-records").Logger(),

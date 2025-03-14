@@ -7,6 +7,7 @@ import (
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/rs/zerolog"
 
+	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	herocache "github.com/onflow/flow-go/module/mempool/herocache/backdata"
 	"github.com/onflow/flow-go/module/mempool/herocache/backdata/heropool"
@@ -21,7 +22,7 @@ import (
 // Rather they are solely used by the current peer to select the peers to which it will connect on a topic mesh.
 type GossipSubSpamRecordCache struct {
 	// the in-memory and thread-safe cache for storing the spam records of peers.
-	c *stdmap.Backend[peer.ID, *gossipSubSpamRecordWrapper]
+	c *stdmap.Backend[flow.Identifier, *gossipSubSpamRecordWrapper]
 
 	// Optional: the pre-processors to be called upon reading or updating a record in the cache.
 	// The pre-processors are called in the order they are added to the cache.
@@ -67,13 +68,13 @@ func NewGossipSubSpamRecordCache(sizeLimit uint32,
 	collector module.HeroCacheMetrics,
 	initFn func() p2p.GossipSubSpamRecord,
 	prFns ...PreprocessorFunc) *GossipSubSpamRecordCache {
-	backData := herocache.NewCache[peer.ID, *gossipSubSpamRecordWrapper](sizeLimit,
+	backData := herocache.NewCache[*gossipSubSpamRecordWrapper](sizeLimit,
 		herocache.DefaultOversizeFactor,
 		heropool.LRUEjection,
 		logger.With().Str("mempool", "gossipsub-app-Penalty-cache").Logger(),
 		collector)
 	return &GossipSubSpamRecordCache{
-		c:             stdmap.NewBackend(stdmap.WithMutableBackData[peer.ID, *gossipSubSpamRecordWrapper](backData)),
+		c:             stdmap.NewBackend(stdmap.WithMutableBackData[flow.Identifier, *gossipSubSpamRecordWrapper](backData)),
 		preprocessFns: prFns,
 		initFn:        initFn,
 	}
@@ -116,7 +117,7 @@ func (a *GossipSubSpamRecordCache) Adjust(peerID peer.ID, updateFn p2p.UpdateFun
 		}
 	}
 
-	adjustedWrapper, adjusted := a.c.AdjustWithInit(peerID, adjustFunc, initFunc)
+	adjustedWrapper, adjusted := a.c.AdjustWithInit(makeId(peerID), adjustFunc, initFunc)
 	if err != nil {
 		return nil, fmt.Errorf("error while applying pre-processing functions to cache record for peer %s: %w", p2plogging.PeerId(peerID), err)
 	}
@@ -133,7 +134,7 @@ func (a *GossipSubSpamRecordCache) Adjust(peerID peer.ID, updateFn p2p.UpdateFun
 // Returns:
 // - true if the gossipsub spam record of the peer is found in the cache, false otherwise.
 func (a *GossipSubSpamRecordCache) Has(peerID peer.ID) bool {
-	return a.c.Has(peerID)
+	return a.c.Has(makeId(peerID))
 }
 
 // Get returns the spam record of a peer from the cache.
@@ -147,12 +148,13 @@ func (a *GossipSubSpamRecordCache) Has(peerID peer.ID) bool {
 //     the caller is advised to crash the node.
 //   - true if the record is found in the cache, false otherwise.
 func (a *GossipSubSpamRecordCache) Get(peerID peer.ID) (*p2p.GossipSubSpamRecord, error, bool) {
-	if !a.c.Has(peerID) {
+	key := makeId(peerID)
+	if !a.c.Has(key) {
 		return nil, nil, false
 	}
 
 	var err error
-	record, updated := a.c.Adjust(peerID, func(gossipSubSpamRecordWrapper *gossipSubSpamRecordWrapper) *gossipSubSpamRecordWrapper {
+	record, updated := a.c.Adjust(key, func(gossipSubSpamRecordWrapper *gossipSubSpamRecordWrapper) *gossipSubSpamRecordWrapper {
 		currentRecord := gossipSubSpamRecordWrapper.GossipSubSpamRecord
 		for _, apply := range a.preprocessFns {
 			gossipSubSpamRecordWrapper.GossipSubSpamRecord, err = apply(gossipSubSpamRecordWrapper.GossipSubSpamRecord, gossipSubSpamRecordWrapper.lastUpdated)
@@ -182,4 +184,11 @@ type gossipSubSpamRecordWrapper struct {
 	// lastUpdated is the time at which the record was last updated.
 	lastUpdated time.Time
 	p2p.GossipSubSpamRecord
+}
+
+// makeId is a helper function for creating the key for gossipSubSpamRecordWrapper by hashing the peerID.
+// Returns:
+// - the hash of the peerID as a flow.Identifier.
+func makeId(peerID peer.ID) flow.Identifier {
+	return flow.MakeID([]byte(peerID))
 }

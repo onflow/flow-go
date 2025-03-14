@@ -35,7 +35,7 @@ var _ alsp.SpamRecordCache = (*SpamRecordCache)(nil)
 // the spam records of the authorized nodes. Also, this cache is keeping at most one record per origin id, so the
 // size of the cache must be at least the number of authorized nodes.
 func NewSpamRecordCache(sizeLimit uint32, logger zerolog.Logger, collector module.HeroCacheMetrics, recordFactory model.SpamRecordFactoryFunc) *SpamRecordCache {
-	backData := herocache.NewCache[flow.Identifier, *model.ProtocolSpamRecord](sizeLimit,
+	backData := herocache.NewCache[*model.ProtocolSpamRecord](sizeLimit,
 		herocache.DefaultOversizeFactor,
 		heropool.LRUEjection,
 		logger.With().Str("mempool", "aslp-spam-records").Logger(),

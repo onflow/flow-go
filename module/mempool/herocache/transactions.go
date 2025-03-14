@@ -1,8 +1,6 @@
 package herocache
 
 import (
-	"fmt"
-
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/model/flow"
@@ -21,11 +19,14 @@ func NewTransactions(limit uint32, logger zerolog.Logger, collector module.HeroC
 	t := &Transactions{
 		c: stdmap.NewBackend(
 			stdmap.WithMutableBackData[flow.Identifier, *flow.TransactionBody](
-				herocache.NewCache[flow.Identifier, *flow.TransactionBody](limit,
+				herocache.NewCache[*flow.TransactionBody](limit,
 					herocache.DefaultOversizeFactor,
 					heropool.LRUEjection,
 					logger.With().Str("mempool", "transactions").Logger(),
-					collector))),
+					collector,
+				),
+			),
+		),
 	}
 
 	return t
@@ -46,11 +47,7 @@ func (t *Transactions) Add(tx *flow.TransactionBody) bool {
 
 // ByID returns the transaction with the given ID from the mempool.
 func (t *Transactions) ByID(txID flow.Identifier) (*flow.TransactionBody, bool) {
-	tx, exists := t.c.Get(txID)
-	if !exists {
-		panic(fmt.Sprintf("invalid entity in transaction pool (%T)", tx))
-	}
-	return tx, true
+	return t.c.Get(txID)
 }
 
 // All returns all transactions from the mempool. Since it is using the HeroCache, All guarantees returning

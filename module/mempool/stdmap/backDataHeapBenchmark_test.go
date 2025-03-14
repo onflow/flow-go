@@ -49,7 +49,7 @@ func BenchmarkArrayBackDataLRU(b *testing.B) {
 
 	backData := stdmap.NewBackend[flow.Identifier, *unittest.MockEntity](
 		stdmap.WithMutableBackData[flow.Identifier, *unittest.MockEntity](
-			herocache.NewCache(
+			herocache.NewCache[*unittest.MockEntity](
 				uint32(limit),
 				8,
 				heropool.LRUEjection,
@@ -92,13 +92,13 @@ func testAddEntities(t testing.TB, limit uint, b *stdmap.Backend[flow.Identifier
 		} else {
 			// when we cross the limit, the ejection kicks in, and
 			// size must be steady at the limit.
-			require.Equal(t, uint(b.Size()), limit)
+			require.Equal(t, b.Size(), limit)
 		}
 
 		// entity should be immediately retrievable
 		actual, ok := b.Get(e.ID())
 		require.True(t, ok)
-		require.Equal(t, *e, actual)
+		require.Equal(t, e, actual)
 	}
 	elapsed := time.Since(t1)
 	zlog.Info().Dur("interaction_time", elapsed).Msg("adding elements done")
