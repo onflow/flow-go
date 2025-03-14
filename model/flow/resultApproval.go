@@ -44,8 +44,15 @@ func (rab ResultApprovalBody) ID() Identifier {
 
 // ResultApproval includes an approval for a chunk, verified by a verification node
 type ResultApproval struct {
-	Body              ResultApprovalBody
-	VerifierSignature crypto.Signature // signature over all above fields
+	Body ResultApprovalBody
+	// VerifierSignature is a signature over all fields in the Body.
+	// This is a temporary measure intended to provide message attribution.
+	// In the long term, all messages should be attributable as a property of the networking layer.
+	// Currently, the networking layer only provides authentication, which we already check for this type in
+	// the Sealing Engine: https://github.com/onflow/flow-go/blob/6efcbb7e8fa1578a3dd8f3f7f9857eb920e510e0/engine/consensus/sealing/engine.go#L417-L421
+	// Although the attribution property is not currently used, the current structure makes it available in
+	// the absence of support in the networking layer.
+	VerifierSignature crypto.Signature
 }
 
 // ID generates a unique identifier using result approval body
