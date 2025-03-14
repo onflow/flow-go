@@ -314,7 +314,7 @@ func (e *Engine) onBlockResponse(originID flow.Identifier, res *messages.BlockRe
 			e.log.Debug().Uint64("height", header.Height).Msg("block handler rejected")
 			continue
 		}
-		filteredBlocks = append(filteredBlocks, &messages.BlockProposal{Block: block})
+		filteredBlocks = append(filteredBlocks, &messages.BlockProposal{Block: block, ProposerSigData: nil})
 	}
 
 	// forward the block to the compliance engine for validation and processing
