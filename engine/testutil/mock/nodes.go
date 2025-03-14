@@ -228,11 +228,11 @@ type ExecutionNode struct {
 	StorehouseEnabled   bool
 }
 
-func (en ExecutionNode) Ready(ctx context.Context) {
+func (en ExecutionNode) Ready(t *testing.T, ctx context.Context) {
 	// TODO: receipt engine has been migrated to the new component interface, hence
 	// is using Start. Other engines' startup should be refactored once migrated to
 	// new interface.
-	irctx, _ := irrecoverable.WithSignaler(ctx)
+	irctx := irrecoverable.NewMockSignalerContext(t, ctx)
 	en.ReceiptsEngine.Start(irctx)
 	en.IngestionEngine.Start(irctx)
 	en.FollowerCore.Start(irctx)

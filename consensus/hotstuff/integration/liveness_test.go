@@ -73,7 +73,7 @@ func Test2TimeoutOutof7Instances(t *testing.T) {
 	for _, in := range instances {
 		wg.Add(1)
 		go func(in *Instance) {
-			err := in.Run()
+			err := in.Run(t)
 			require.ErrorIs(t, err, errStopCondition)
 			wg.Done()
 		}(in)
@@ -141,7 +141,7 @@ func Test2TimeoutOutof4Instances(t *testing.T) {
 	for _, in := range instances {
 		wg.Add(1)
 		go func(in *Instance) {
-			err := in.Run()
+			err := in.Run(t)
 			require.True(t, errors.Is(err, errStopCondition), "should run until stop condition")
 			wg.Done()
 		}(in)
@@ -209,7 +209,7 @@ func Test1TimeoutOutof5Instances(t *testing.T) {
 	for _, in := range instances {
 		wg.Add(1)
 		go func(in *Instance) {
-			err := in.Run()
+			err := in.Run(t)
 			require.ErrorIs(t, err, errStopCondition)
 			wg.Done()
 		}(in)
@@ -306,7 +306,7 @@ func TestBlockDelayIsHigherThanTimeout(t *testing.T) {
 	for _, in := range instances {
 		wg.Add(1)
 		go func(in *Instance) {
-			err := in.Run()
+			err := in.Run(t)
 			require.ErrorIs(t, err, errStopCondition)
 			wg.Done()
 		}(in)
@@ -388,7 +388,7 @@ func TestAsyncClusterStartup(t *testing.T) {
 	for _, in := range instances {
 		wg.Add(1)
 		go func(in *Instance) {
-			err := in.Run()
+			err := in.Run(t)
 			require.ErrorIs(t, err, errStopCondition)
 			wg.Done()
 		}(in)

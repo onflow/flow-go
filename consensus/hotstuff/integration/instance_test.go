@@ -548,13 +548,13 @@ func NewInstance(t *testing.T, options ...Option) *Instance {
 	return &in
 }
 
-func (in *Instance) Run() error {
+func (in *Instance) Run(t *testing.T) error {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer func() {
 		cancel()
 		<-util.AllDone(in.voteAggregator, in.timeoutAggregator)
 	}()
-	signalerCtx, _ := irrecoverable.WithSignaler(ctx)
+	signalerCtx := irrecoverable.NewMockSignalerContext(t, ctx)
 	in.voteAggregator.Start(signalerCtx)
 	in.timeoutAggregator.Start(signalerCtx)
 	<-util.AllReady(in.voteAggregator, in.timeoutAggregator)

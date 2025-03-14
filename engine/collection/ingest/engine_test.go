@@ -297,7 +297,7 @@ func (suite *Suite) TestComponentShutdown() {
 
 	// start then shut down the engine
 	parentCtx, cancel := context.WithCancel(context.Background())
-	ctx, _ := irrecoverable.WithSignaler(parentCtx)
+	ctx := irrecoverable.NewMockSignalerContext(suite.T(), parentCtx)
 	suite.engine.Start(ctx)
 	unittest.AssertClosesBefore(suite.T(), suite.engine.Ready(), 10*time.Millisecond)
 	cancel()
