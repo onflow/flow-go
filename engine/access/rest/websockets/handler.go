@@ -15,6 +15,11 @@ import (
 type Handler struct {
 	*common.HttpHandler
 
+	// ctx holds the irrecoverable context used to start the REST server
+	// typically we do not store contexts within a struct. it is necessary in this case
+	// because we need to pass an irrecoverable context into the API backend logic to
+	// handle exceptions, and we cannot use the request's context since the websocket
+	// connection lives longer than the request duration.
 	ctx                 irrecoverable.SignalerContext
 	logger              zerolog.Logger
 	websocketConfig     Config
