@@ -41,7 +41,7 @@ type CommonSuite struct {
 
 	head *cluster.BlockProposal
 	// storage data
-	headerDB map[flow.Identifier]*cluster.BlockProposal
+	headerDB map[flow.Identifier]*flow.Header
 
 	pendingDB  map[flow.Identifier]flow.Slashable[*cluster.BlockProposal]
 	childrenDB map[flow.Identifier][]flow.Slashable[*cluster.BlockProposal]
@@ -68,19 +68,19 @@ func (cs *CommonSuite) SetupTest() {
 	cs.head = unittest.ClusterProposalFromBlock(&block)
 
 	// initialize the storage data
-	cs.headerDB = make(map[flow.Identifier]*cluster.BlockProposal)
+	cs.headerDB = make(map[flow.Identifier]*flow.Header)
 	cs.pendingDB = make(map[flow.Identifier]flow.Slashable[*cluster.BlockProposal])
 	cs.childrenDB = make(map[flow.Identifier][]flow.Slashable[*cluster.BlockProposal])
 
 	// store the head header and payload
-	cs.headerDB[block.ID()] = cs.head
+	cs.headerDB[block.ID()] = cs.head.Block.Header
 
 	// set up header storage mock
 	cs.headers = &storage.Headers{}
 	cs.headers.On("ByBlockID", mock.Anything).Return(
 		func(blockID flow.Identifier) *flow.Header {
 			if header := cs.headerDB[blockID]; header != nil {
-				return cs.headerDB[blockID].Block.Header
+				return cs.headerDB[blockID]
 			}
 			return nil
 		},
@@ -202,9 +202,6 @@ func (cs *CoreSuite) TestOnBlockProposalValidParent() {
 	block := unittest.ClusterBlockWithParent(cs.head.Block)
 	proposal := unittest.ClusterProposalFromBlock(&block)
 
-	// store the data for retrieval
-	cs.headerDB[block.Header.ParentID] = cs.head
-
 	hotstuffProposal := model.SignedProposalFromClusterBlock(proposal)
 	cs.validator.On("ValidateProposal", hotstuffProposal).Return(nil)
 	cs.voteAggregator.On("AddBlock", hotstuffProposal).Once()
@@ -225,13 +222,11 @@ func (cs *CoreSuite) TestOnBlockProposalValidAncestor() {
 	ancestor := unittest.ClusterBlockWithParent(cs.head.Block)
 	parent := unittest.ClusterBlockWithParent(&ancestor)
 	block := unittest.ClusterBlockWithParent(&parent)
-	ancestorProposal := unittest.ClusterProposalFromBlock(&ancestor)
-	parentProposal := unittest.ClusterProposalFromBlock(&parent)
 	proposal := unittest.ClusterProposalFromBlock(&block)
 
 	// store the data for retrieval
-	cs.headerDB[parent.ID()] = parentProposal
-	cs.headerDB[ancestor.ID()] = ancestorProposal
+	cs.headerDB[parent.ID()] = parent.Header
+	cs.headerDB[ancestor.ID()] = ancestor.Header
 
 	hotstuffProposal := model.SignedProposalFromClusterBlock(proposal)
 	cs.validator.On("ValidateProposal", hotstuffProposal).Return(nil)
@@ -280,15 +275,13 @@ func (cs *CoreSuite) TestOnBlockProposal_FailsHotStuffValidation() {
 	ancestor := unittest.ClusterBlockWithParent(cs.head.Block)
 	parent := unittest.ClusterBlockWithParent(&ancestor)
 	block := unittest.ClusterBlockWithParent(&parent)
-	ancestorProposal := unittest.ClusterProposalFromBlock(&ancestor)
-	parentProposal := unittest.ClusterProposalFromBlock(&parent)
 	proposal := unittest.ClusterProposalFromBlock(&block)
 	proposalMsg := messages.ClusterBlockProposalFrom(proposal) // TODO(tim) - unittest naming
 	hotstuffProposal := model.SignedProposalFromClusterBlock(proposal)
 
 	// store the data for retrieval
-	cs.headerDB[parent.ID()] = parentProposal
-	cs.headerDB[ancestor.ID()] = ancestorProposal
+	cs.headerDB[parent.ID()] = parent.Header
+	cs.headerDB[ancestor.ID()] = ancestor.Header
 
 	cs.Run("invalid block error", func() {
 		// the block fails HotStuff validation
@@ -366,15 +359,13 @@ func (cs *CoreSuite) TestOnBlockProposal_FailsProtocolStateValidation() {
 	ancestor := unittest.ClusterBlockWithParent(cs.head.Block)
 	parent := unittest.ClusterBlockWithParent(&ancestor)
 	block := unittest.ClusterBlockWithParent(&parent)
-	ancestorProposal := unittest.ClusterProposalFromBlock(&ancestor)
-	parentProposal := unittest.ClusterProposalFromBlock(&parent)
 	proposal := unittest.ClusterProposalFromBlock(&block)
 	proposalMsg := messages.ClusterBlockProposalFrom(proposal)
 	hotstuffProposal := model.SignedProposalFromClusterBlock(proposal)
 
 	// store the data for retrieval
-	cs.headerDB[parent.ID()] = parentProposal
-	cs.headerDB[ancestor.ID()] = ancestorProposal
+	cs.headerDB[parent.ID()] = parent.Header
+	cs.headerDB[ancestor.ID()] = ancestor.Header
 
 	// the block passes HotStuff validation
 	cs.validator.On("ValidateProposal", hotstuffProposal).Return(nil)
@@ -480,7 +471,7 @@ func (cs *CoreSuite) TestProcessBlockAndDescendants() {
 
 	// store the parent on disk
 	parentID := parent.ID()
-	cs.headerDB[parentID] = proposal0
+	cs.headerDB[parentID] = proposal0.Block.Header
 
 	// store the pending children in the cache
 	cs.childrenDB[parentID] = append(cs.childrenDB[parentID], pending1)
@@ -566,7 +557,7 @@ func (cs *CoreSuite) TestProposalBufferingOrder() {
 			header := args.Get(0).(*model.SignedProposal).Block
 			assert.Equal(cs.T(), order[index], header.BlockID, "should submit correct header to hotstuff")
 			index++
-			cs.headerDB[header.BlockID] = proposalsLookup[header.BlockID]
+			cs.headerDB[header.BlockID] = proposalsLookup[header.BlockID].Block.Header
 		},
 	)
 	cs.voteAggregator.On("AddBlock", mock.Anything).Times(4)
