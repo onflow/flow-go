@@ -511,3 +511,42 @@ func (e *EventHandler) ownVote(proposal *model.SignedProposal, curView uint64, n
 	e.notifier.OnOwnVote(ownVote.BlockID, ownVote.View, ownVote.SigData, nextLeader)
 	return nil
 }
+
+func (e *EventHandler) handQc2PaceMaker(qc *flow.QuorumCertificate, logContext zerolog.Logger) (*model.NewViewEvent, error) {
+	newViewEvent, err := e.paceMaker.ProcessQC(qc)
+	if err != nil {
+		return nil, fmt.Errorf("unexpected error from PaceMaker while processing QC: %w", err)
+	}
+	if newViewEvent == nil {
+		logContext.Debug().Msg("QC didn't trigger view change")
+	} else {
+		e.emitCurrentViewDetailsTelemetry()
+		logContext.Debug().Msg("QC triggered view change")
+	}
+	return newViewEvent, nil
+}
+
+func (e *EventHandler) handTc2PaceMaker(tc *flow.TimeoutCertificate, logContext zerolog.Logger) (*model.NewViewEvent, error) {
+	newViewEvent, err := e.paceMaker.ProcessTC(tc)
+	if err != nil {
+		return nil, fmt.Errorf("unexpected error from PaceMaker while processing TC: %w", err)
+	}
+	if newViewEvent == nil {
+		logContext.Debug().Msg("TC didn't trigger view change")
+	} else {
+		e.emitCurrentViewDetailsTelemetry()
+		logContext.Debug().Msg("TC triggered view change")
+	}
+	return newViewEvent, nil
+}
+
+func (e *EventHandler) emitCurrentViewDetailsTelemetry() (finalizedView uint64, curView uint64, curLeader flow.Identifier, err error) {
+	curView = e.paceMaker.CurView()
+	finalizedView = e.forks.FinalizedView()
+	curLeader, err = e.committee.LeaderForView(curView)
+	if err != nil {
+		return 0, 0, flow.ZeroID, fmt.Errorf("failed to determine primary for view %d: %w", curView, err)
+	}
+	e.notifier.OnCurrentViewDetails(curView, finalizedView, curLeader)
+	return finalizedView, curView, curLeader, nil
+}
