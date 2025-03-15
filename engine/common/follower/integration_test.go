@@ -151,19 +151,19 @@ func TestFollowerHappyPath(t *testing.T) {
 		batchesPerWorker := 10
 		blocksPerBatch := 100
 		blocksPerWorker := blocksPerBatch * batchesPerWorker
-		flowBlocks := unittest.ChainFixtureFrom(workers*blocksPerWorker, rootHeader)
+		flowBlocks := unittest.ProposalChainFixtureFrom(workers*blocksPerWorker, rootHeader)
 		require.Greaterf(t, len(flowBlocks), defaultPendingBlocksCacheCapacity, "this test assumes that we operate with more blocks than cache's upper limit")
 
 		// ensure sequential block views - that way we can easily know which block will be finalized after the test
-		for i, block := range flowBlocks {
-			block.Header.View = block.Header.Height
-			block.SetPayload(unittest.PayloadFixture(unittest.WithProtocolStateID(rootProtocolStateID)))
+		for i, proposal := range flowBlocks {
+			proposal.Block.Header.View = proposal.Block.Header.Height
+			proposal.Block.SetPayload(unittest.PayloadFixture(unittest.WithProtocolStateID(rootProtocolStateID)))
 			if i > 0 {
-				block.Header.ParentView = flowBlocks[i-1].Header.View
-				block.Header.ParentID = flowBlocks[i-1].Header.ID()
+				proposal.Block.Header.ParentView = flowBlocks[i-1].Block.Header.View
+				proposal.Block.Header.ParentID = flowBlocks[i-1].Block.Header.ID()
 			}
 		}
-		pendingBlocks := flowBlocksToBlockProposals(flowBlocks...)
+		pendingBlocks := flowBlockProposalsToMessage(flowBlocks...)
 
 		// Regarding the block that we expect to be finalized based on 2-chain finalization rule, we consider the last few blocks in `pendingBlocks`
 		//  ... <-- X <-- Y <-- Z

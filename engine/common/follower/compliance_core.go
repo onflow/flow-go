@@ -104,21 +104,22 @@ func NewComplianceCore(log zerolog.Logger,
 // Caution: method might block if internally too many certified blocks are queued in the channel `certifiedRangesChan`.
 // Expected errors during normal operations:
 //   - cache.ErrDisconnectedBatch
-func (c *ComplianceCore) OnBlockRange(originID flow.Identifier, batch []*flow.Block) error {
+func (c *ComplianceCore) OnBlockRange(originID flow.Identifier, batch []*flow.BlockProposal) error {
 	if len(batch) < 1 {
 		return nil
 	}
 
-	firstBlock := batch[0].Header
-	lastBlock := batch[len(batch)-1].Header
-	hotstuffProposal := model.SignedProposalFromFlow(lastBlock)
+	firstBlock := batch[0].Block.Header
+	lastBlock := batch[len(batch)-1]
+	lastHeader := lastBlock.Block.Header
+	hotstuffProposal := model.SignedProposalFromBlock(lastBlock)
 	log := c.log.With().
 		Hex("origin_id", originID[:]).
-		Str("chain_id", lastBlock.ChainID.String()).
+		Str("chain_id", lastHeader.ChainID.String()).
 		Uint64("first_block_height", firstBlock.Height).
 		Uint64("first_block_view", firstBlock.View).
-		Uint64("last_block_height", lastBlock.Height).
-		Uint64("last_block_view", lastBlock.View).
+		Uint64("last_block_height", lastHeader.Height).
+		Uint64("last_block_view", lastHeader.View).
 		Hex("last_block_id", hotstuffProposal.Block.BlockID[:]).
 		Int("range_length", len(batch)).
 		Logger()
@@ -162,7 +163,7 @@ func (c *ComplianceCore) OnBlockRange(originID flow.Identifier, batch []*flow.Bl
 				//     -> In this case, it is ok for the protocol to halt. Consequently, we can just disregard
 				//        the block, which will probably lead to this node eventually halting.
 				log.Err(err).Msg(
-					"Unable to validate proposal with view from unknown epoch. While there is noting wrong with the node, " +
+					"Unable to validate proposal with view from unknown epoch. While there is nothing wrong with the node, " +
 						"this could be a symptom of (i) the node being severely behind, (ii) there is a byzantine proposer in " +
 						"the network, or (iii) there was no finalization progress for hundreds of views. This should be " +
 						"investigated to confirm the cause is the benign scenario (i).")
@@ -172,7 +173,12 @@ func (c *ComplianceCore) OnBlockRange(originID flow.Identifier, batch []*flow.Bl
 		}
 	}
 
-	certifiedBatch, certifyingQC, err := c.pendingCache.AddBlocks(batch)
+	blocks := make([]*flow.Block, 0, len(batch))
+	for _, block := range batch {
+		blocks = append(blocks, block.Block)
+	}
+
+	certifiedBatch, certifyingQC, err := c.pendingCache.AddBlocks(blocks)
 	if err != nil {
 		return fmt.Errorf("could not add a range of pending blocks: %w", err) // ErrDisconnectedBatch or exception
 	}

@@ -11,6 +11,7 @@ import (
 
 	"github.com/onflow/flow-go/config"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/model/messages"
 	"github.com/onflow/flow-go/module/id"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/mock"
@@ -95,7 +96,7 @@ func TestFullGossipSubConnectivity(t *testing.T) {
 		outgoingMessageScope, err := message.NewOutgoingScope(
 			ids.NodeIDs(),
 			channels.TopicFromChannel(channels.PushBlocks, sporkId),
-			unittest.ProposalFixture(),
+			messages.NewBlockProposal(unittest.ProposalFixture()),
 			unittest.NetworkCodec().Encode,
 			message.ProtocolTypePubSub)
 		require.NoError(t, err)

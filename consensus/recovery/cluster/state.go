@@ -19,7 +19,7 @@ import (
 //
 // Note: this is an expensive method, which is intended to help recover from a crash, e.g. help to
 // re-built the in-memory consensus state.
-func FindLatest(state cluster.State, headers storage.Headers) (*flow.Header, []*flow.Header, error) {
+func FindLatest(state cluster.State, headers storage.Headers) (*flow.Header, []*flow.Proposal, error) {
 	finalizedSnapshot := state.Final()              // state snapshot at latest finalized block
 	finalizedBlock, err := finalizedSnapshot.Head() // header of latest finalized block
 	if err != nil {
@@ -30,13 +30,14 @@ func FindLatest(state cluster.State, headers storage.Headers) (*flow.Header, []*
 		return nil, nil, fmt.Errorf("could not get pending children: %w", err)
 	}
 
-	pending := make([]*flow.Header, 0, len(pendingIDs))
+	pending := make([]*flow.Proposal, 0, len(pendingIDs))
 	for _, pendingID := range pendingIDs {
 		header, err := headers.ByBlockID(pendingID)
 		if err != nil {
 			return nil, nil, fmt.Errorf("could not find pending child: %w", err)
 		}
-		pending = append(pending, header)
+		// TODO(tim) - proposerSigData storage
+		pending = append(pending, &flow.Proposal{Header: header, ProposerSigData: nil})
 	}
 
 	return finalizedBlock, pending, nil

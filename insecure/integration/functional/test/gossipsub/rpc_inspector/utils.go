@@ -9,6 +9,7 @@ import (
 
 	"github.com/onflow/flow-go/config"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/model/messages"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/metrics"
@@ -28,7 +29,7 @@ func startNodesAndEnsureConnected(t *testing.T, ctx irrecoverable.SignalerContex
 	p2ptest.TryConnectionAndEnsureConnected(t, ctx, nodes)
 	blockTopic := channels.TopicFromChannel(channels.PushBlocks, sporkID)
 	p2ptest.EnsurePubsubMessageExchange(t, ctx, nodes, blockTopic, 1, func() interface{} {
-		return unittest.ProposalFixture()
+		return messages.NewBlockProposal(unittest.ProposalFixture())
 	})
 }
 

@@ -11,6 +11,19 @@ import (
 	"github.com/onflow/flow-go/model/fingerprint"
 )
 
+type Proposal struct {
+	Header *Header
+	// ProposerSigData is a signature of the proposer over the new block. Not a single cryptographic
+	// signature since the data represents cryptographic signatures serialized in some way (concatenation or other)
+	ProposerSigData []byte
+}
+
+// BlockProposal is a signed proposal that includes the block payload, in addition to the required header and signature.
+type BlockProposal struct {
+	Block           *Block
+	ProposerSigData []byte
+}
+
 // Header contains all meta-data for a block, as well as a hash representing
 // the combined payload of the entire block. It is what consensus nodes agree
 // on after validating the contents against the payload hash.
@@ -39,29 +52,31 @@ type Header struct {
 	ParentVoterSigData []byte
 	// ProposerID is a proposer identifier for the block
 	ProposerID Identifier
-	// ProposerSigData is a signature of the proposer over the new block. Not a single cryptographic
-	// signature since the data represents cryptographic signatures serialized in some way (concatenation or other)
-	ProposerSigData []byte
 	// LastViewTC is a timeout certificate for previous view, it can be nil
 	// it has to be present if previous round ended with timeout.
 	LastViewTC *TimeoutCertificate
 }
 
-// Body returns the immutable part of the block header.
-func (h Header) Body() interface{} {
-	return struct {
-		ChainID            ChainID
-		ParentID           Identifier
-		Height             uint64
-		PayloadHash        Identifier
-		Timestamp          uint64
-		View               uint64
-		ParentView         uint64
-		ParentVoterIndices []byte
-		ParentVoterSigData []byte
-		ProposerID         Identifier
-		LastViewTCID       Identifier
-	}{
+// EncodableHeader is a type only used to calculate ID of a Header, by converting
+// Timestamp from time.Time to unix time (uint64) and LastViewTC to its identifier LastViewTCID.
+// This is necessary because time.Time is not RLP-encodable or decodable (due to having private fields).
+type EncodableHeader struct {
+	ChainID            ChainID
+	ParentID           Identifier
+	Height             uint64
+	PayloadHash        Identifier
+	Timestamp          uint64
+	View               uint64
+	ParentView         uint64
+	ParentVoterIndices []byte
+	ParentVoterSigData []byte
+	ProposerID         Identifier
+	LastViewTCID       Identifier
+}
+
+// Encodable returns an RLP-encodable representation of the block header.
+func (h Header) Encodable() *EncodableHeader {
+	return &EncodableHeader{
 		ChainID:            h.ChainID,
 		ParentID:           h.ParentID,
 		Height:             h.Height,
@@ -87,13 +102,13 @@ func (h Header) QuorumCertificate() *QuorumCertificate {
 }
 
 func (h Header) Fingerprint() []byte {
-	return fingerprint.Fingerprint(h.Body())
+	return fingerprint.Fingerprint(h.Encodable())
 }
 
 // ID returns a unique ID to singularly identify the header and its block
 // within the flow system.
 func (h Header) ID() Identifier {
-	return MakeID(h)
+	return MakeID(h.Encodable())
 }
 
 // Checksum returns the checksum of the header.
