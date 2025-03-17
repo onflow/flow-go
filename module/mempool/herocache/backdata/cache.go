@@ -240,9 +240,9 @@ func (c *Cache[V]) Size() uint {
 	return uint(c.entities.Size())
 }
 
-// Head returns the head of queue.
+// Head returns the head key and value of queue.
 // Boolean return value determines whether there is a head available.
-func (c *Cache[V]) Head() (V, bool) {
+func (c *Cache[V]) Head() (flow.Identifier, V, bool) {
 	return c.entities.Head()
 }
 

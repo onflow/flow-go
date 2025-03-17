@@ -11,23 +11,23 @@ import (
 	"github.com/onflow/flow-go/module/mempool/herocache/backdata/heropool"
 )
 
-// HeroQueue implements a HeroCache-based in-memory queue.
+// HeroQueue is a generic in-memory queue implementation based on HeroCache.
 // HeroCache is a key-value cache with zero heap allocation and optimized Garbage Collection.
-type HeroQueue struct {
+type HeroQueue[V any] struct {
 	mu        sync.RWMutex
-	cache     *herocache.Cache
+	cache     *herocache.Cache[V]
 	sizeLimit uint
 }
 
-func NewHeroQueue(sizeLimit uint32, logger zerolog.Logger, collector module.HeroCacheMetrics,
-) *HeroQueue {
-	return &HeroQueue{
-		cache: herocache.NewCache(
+func NewHeroQueue[V any](sizeLimit uint32, logger zerolog.Logger, collector module.HeroCacheMetrics) *HeroQueue[V] {
+	return &HeroQueue[V]{
+		cache: herocache.NewCache[V](
 			sizeLimit,
 			herocache.DefaultOversizeFactor,
 			heropool.NoEjection,
 			logger.With().Str("mempool", "hero-queue").Logger(),
-			collector),
+			collector,
+		),
 		sizeLimit: uint(sizeLimit),
 	}
 }
@@ -35,7 +35,7 @@ func NewHeroQueue(sizeLimit uint32, logger zerolog.Logger, collector module.Hero
 // Push stores the entity into the queue.
 // Boolean returned variable determines whether push was successful, i.e.,
 // push may be dropped if queue is full or already exists.
-func (c *HeroQueue) Push(entity flow.Entity) bool {
+func (c *HeroQueue[V]) Push(key flow.Identifier, value V) bool {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
@@ -46,26 +46,31 @@ func (c *HeroQueue) Push(entity flow.Entity) bool {
 		return false
 	}
 
-	return c.cache.Add(entity.ID(), entity)
+	return c.cache.Add(key, value)
 }
 
 // Pop removes and returns the head of queue, and updates the head to the next element.
 // Boolean return value determines whether pop is successful, i.e., popping an empty queue returns false.
-func (c *HeroQueue) Pop() (flow.Entity, bool) {
+func (c *HeroQueue[V]) Pop() (value V, ok bool) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
-	head, ok := c.cache.Head()
+	var key flow.Identifier
+	key, value, ok = c.cache.Head()
 	if !ok {
 		// cache is empty, and there is no head yet to pop.
-		return nil, false
+		return value, false
 	}
 
-	c.cache.Remove(head.ID())
-	return head, true
+	c.cache.Remove(key)
+	return value, true
 }
 
-func (c *HeroQueue) Size() uint {
+// Size returns the number of elements currently stored in the queue.
+//
+// Returns:
+// - The count of elements in the queue.
+func (c *HeroQueue[V]) Size() uint {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
 
