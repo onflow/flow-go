@@ -2,9 +2,10 @@ package herocache
 
 import (
 	"encoding/binary"
-	"github.com/onflow/flow-go/model/flow"
 	"time"
 	_ "unsafe" // for linking runtimeNano
+
+	"github.com/onflow/flow-go/model/flow"
 
 	"github.com/rs/zerolog"
 	"go.uber.org/atomic"
@@ -250,11 +251,9 @@ func (c *Cache[V]) All() map[flow.Identifier]V {
 	defer c.logTelemetry()
 
 	entitiesList := c.entities.All()
-	all := make(map[flow.Identifier]V, len(c.entities.All()))
+	all := make(map[flow.Identifier]V, len(entitiesList))
 
-	total := len(entitiesList)
-	for i := 0; i < total; i++ {
-		p := entitiesList[i]
+	for _, p := range entitiesList {
 		all[p.Id()] = p.Entity()
 	}
 
@@ -265,9 +264,9 @@ func (c *Cache[V]) All() map[flow.Identifier]V {
 func (c *Cache[V]) Keys() flow.IdentifierList {
 	defer c.logTelemetry()
 
-	ids := make(flow.IdentifierList, c.entities.Size())
-	for i, p := range c.entities.All() {
-		ids[i] = p.Id()
+	ids := make(flow.IdentifierList, 0, c.entities.Size())
+	for _, p := range c.entities.All() {
+		ids = append(ids, p.Id())
 	}
 
 	return ids
@@ -277,9 +276,9 @@ func (c *Cache[V]) Keys() flow.IdentifierList {
 func (c *Cache[V]) Values() []V {
 	defer c.logTelemetry()
 
-	entities := make([]V, c.entities.Size())
-	for i, p := range c.entities.All() {
-		entities[i] = p.Entity()
+	entities := make([]V, 0, c.entities.Size())
+	for _, p := range c.entities.All() {
+		entities = append(entities, p.Entity())
 	}
 
 	return entities
