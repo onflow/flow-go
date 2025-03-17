@@ -15,8 +15,8 @@ type BlockDigest struct {
 }
 
 // NewBlockDigest creates a block digest instance with data from the provided flow.BlockDigest.
-func NewBlockDigest(block *flow.BlockDigest) BlockDigest {
-	return BlockDigest{
+func NewBlockDigest(block *flow.BlockDigest) *BlockDigest {
+	return &BlockDigest{
 		BlockId:   block.ID().String(),
 		Height:    util.FromUint(block.Height),
 		Timestamp: block.Timestamp,

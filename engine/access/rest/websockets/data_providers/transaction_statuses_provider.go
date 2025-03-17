@@ -105,9 +105,8 @@ func (p *TransactionStatusesDataProvider) handleResponse() func(txResults []*acc
 			response := models.BaseDataProvidersResponse{
 				SubscriptionID: p.ID(),
 				Topic:          p.Topic(),
-				Payload:        &txStatusesPayload,
+				Payload:        txStatusesPayload,
 			}
-
 			p.send <- &response
 		}
 

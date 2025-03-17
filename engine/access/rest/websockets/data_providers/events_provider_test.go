@@ -173,7 +173,7 @@ func (s *EventsProviderSuite) expectedEventsResponses(
 		expectedResponsePayload := models.NewEventResponse(resp, uint64(i))
 		expectedResponses[i] = &models.BaseDataProvidersResponse{
 			Topic:   EventsTopic,
-			Payload: &expectedResponsePayload,
+			Payload: expectedResponsePayload,
 		}
 	}
 	return expectedResponses

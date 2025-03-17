@@ -188,7 +188,7 @@ func (s *AccountStatusesProviderSuite) expectedAccountStatusesResponses(backendR
 		expectedResponsePayload := models.NewAccountStatusesResponse(resp, uint64(i))
 		expectedResponses[i] = &models.BaseDataProvidersResponse{
 			Topic:   AccountStatusesTopic,
-			Payload: &expectedResponsePayload,
+			Payload: expectedResponsePayload,
 		}
 	}
 

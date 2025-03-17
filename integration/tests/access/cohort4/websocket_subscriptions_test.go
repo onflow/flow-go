@@ -1190,14 +1190,10 @@ func (s *WebsocketSubscriptionSuite) listenWebSocketResponses(
 	duration time.Duration,
 	subscriptionID string,
 ) (
-	[]dpmodels.BaseDataProvidersResponse,
-	[]models.BaseMessageResponse,
-	[]models.ListSubscriptionsMessageResponse,
+	baseDataProvidersResponses []dpmodels.BaseDataProvidersResponse,
+	baseMessageResponses []models.BaseMessageResponse,
+	listSubscriptionsMessageResponses []models.ListSubscriptionsMessageResponse,
 ) {
-	baseDataProvidersResponses := make([]dpmodels.BaseDataProvidersResponse, 0)
-	baseMessageResponses := make([]models.BaseMessageResponse, 0)
-	listSubscriptionsMessageResponses := make([]models.ListSubscriptionsMessageResponse, 0)
-
 	ctx, cancel := context.WithTimeout(context.Background(), duration)
 	defer cancel()
 

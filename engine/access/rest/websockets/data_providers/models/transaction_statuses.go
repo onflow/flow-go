@@ -16,12 +16,12 @@ func NewTransactionStatusesResponse(
 	linkGenerator commonmodels.LinkGenerator,
 	txResult *access.TransactionResult,
 	index uint64,
-) TransactionStatusesResponse {
+) *TransactionStatusesResponse {
 	var transactionResult commonmodels.TransactionResult
 	txID := txResult.TransactionID
 	transactionResult.Build(txResult, txID, linkGenerator)
 
-	return TransactionStatusesResponse{
+	return &TransactionStatusesResponse{
 		TransactionResult: &transactionResult,
 		MessageIndex:      index,
 	}

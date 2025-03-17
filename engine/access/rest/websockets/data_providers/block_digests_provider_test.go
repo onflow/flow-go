@@ -56,7 +56,7 @@ func (s *BlockDigestsProviderSuite) validBlockDigestsArgumentsTestCases() []test
 		blockDigestPayload := models.NewBlockDigest(blockDigest)
 		expectedResponses[i] = &models.BaseDataProvidersResponse{
 			Topic:   BlockDigestsTopic,
-			Payload: &blockDigestPayload,
+			Payload: blockDigestPayload,
 		}
 	}
 

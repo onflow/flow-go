@@ -14,10 +14,10 @@ type AccountStatusesResponse struct {
 	MessageIndex  uint64        `json:"message_index"`
 }
 
-func NewAccountStatusesResponse(accountStatusesResponse *backend.AccountStatusesResponse, index uint64) AccountStatusesResponse {
+func NewAccountStatusesResponse(accountStatusesResponse *backend.AccountStatusesResponse, index uint64) *AccountStatusesResponse {
 	accountEvents := NewAccountEvents(accountStatusesResponse.AccountEvents)
 
-	return AccountStatusesResponse{
+	return &AccountStatusesResponse{
 		BlockID:       accountStatusesResponse.BlockID.String(),
 		Height:        strconv.FormatUint(accountStatusesResponse.Height, 10),
 		AccountEvents: accountEvents,

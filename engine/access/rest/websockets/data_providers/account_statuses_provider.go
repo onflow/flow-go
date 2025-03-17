@@ -134,9 +134,8 @@ func (p *AccountStatusesDataProvider) handleResponse() func(accountStatusesRespo
 		response := models.BaseDataProvidersResponse{
 			SubscriptionID: p.ID(),
 			Topic:          p.Topic(),
-			Payload:        &accountStatusesPayload,
+			Payload:        accountStatusesPayload,
 		}
-
 		p.send <- &response
 
 		return nil

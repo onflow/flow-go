@@ -70,7 +70,7 @@ func (p *BlockDigestsDataProvider) Run() error {
 			response := models.BaseDataProvidersResponse{
 				SubscriptionID: p.ID(),
 				Topic:          p.Topic(),
-				Payload:        &blockDigest,
+				Payload:        blockDigest,
 			}
 
 			return &response, nil

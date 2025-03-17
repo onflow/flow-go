@@ -119,9 +119,8 @@ func (p *EventsDataProvider) handleResponse() func(eventsResponse *backend.Event
 		response := models.BaseDataProvidersResponse{
 			SubscriptionID: p.ID(),
 			Topic:          p.Topic(),
-			Payload:        &eventsPayload,
+			Payload:        eventsPayload,
 		}
-
 		p.send <- &response
 
 		return nil
