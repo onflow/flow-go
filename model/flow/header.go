@@ -57,26 +57,33 @@ type Header struct {
 	LastViewTC *TimeoutCertificate
 }
 
-// EncodableHeader is a type only used to calculate ID of a Header, by converting
-// Timestamp from time.Time to unix time (uint64) and LastViewTC to its identifier LastViewTCID.
-// This is necessary because time.Time is not RLP-encodable or decodable (due to having private fields).
-type EncodableHeader struct {
-	ChainID            ChainID
-	ParentID           Identifier
-	Height             uint64
-	PayloadHash        Identifier
-	Timestamp          uint64
-	View               uint64
-	ParentView         uint64
-	ParentVoterIndices []byte
-	ParentVoterSigData []byte
-	ProposerID         Identifier
-	LastViewTCID       Identifier
+// QuorumCertificate returns quorum certificate that is incorporated in the block header.
+func (h Header) QuorumCertificate() *QuorumCertificate {
+	return &QuorumCertificate{
+		BlockID:       h.ParentID,
+		View:          h.ParentView,
+		SignerIndices: h.ParentVoterIndices,
+		SigData:       h.ParentVoterSigData,
+	}
 }
 
-// Encodable returns an RLP-encodable representation of the block header.
-func (h Header) Encodable() *EncodableHeader {
-	return &EncodableHeader{
+// Fingerprint defines custom encoding for the header to calculate its ID.
+// Timestamp is converted from time.Time to unix time (uint64), which is necessary
+// because time.Time is not RLP-encodable (due to having private fields).
+func (h Header) Fingerprint() []byte {
+	return fingerprint.Fingerprint(struct {
+		ChainID            ChainID
+		ParentID           Identifier
+		Height             uint64
+		PayloadHash        Identifier
+		Timestamp          uint64
+		View               uint64
+		ParentView         uint64
+		ParentVoterIndices []byte
+		ParentVoterSigData []byte
+		ProposerID         Identifier
+		LastViewTCID       Identifier
+	}{
 		ChainID:            h.ChainID,
 		ParentID:           h.ParentID,
 		Height:             h.Height,
@@ -88,27 +95,13 @@ func (h Header) Encodable() *EncodableHeader {
 		ParentVoterSigData: h.ParentVoterSigData,
 		ProposerID:         h.ProposerID,
 		LastViewTCID:       h.LastViewTC.ID(),
-	}
-}
-
-// QuorumCertificate returns quorum certificate that is incorporated in the block header.
-func (h Header) QuorumCertificate() *QuorumCertificate {
-	return &QuorumCertificate{
-		BlockID:       h.ParentID,
-		View:          h.ParentView,
-		SignerIndices: h.ParentVoterIndices,
-		SigData:       h.ParentVoterSigData,
-	}
-}
-
-func (h Header) Fingerprint() []byte {
-	return fingerprint.Fingerprint(h.Encodable())
+	})
 }
 
 // ID returns a unique ID to singularly identify the header and its block
 // within the flow system.
 func (h Header) ID() Identifier {
-	return MakeID(h.Encodable())
+	return MakeID(h)
 }
 
 // Checksum returns the checksum of the header.

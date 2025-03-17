@@ -11,7 +11,6 @@ import (
 	"github.com/vmihailenco/msgpack/v4"
 
 	"github.com/onflow/flow-go/consensus/hotstuff/helper"
-	"github.com/onflow/flow-go/model/encoding/rlp"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -27,31 +26,6 @@ func TestHeaderEncodingJSON(t *testing.T) {
 	decodedID := decoded.ID()
 	assert.Equal(t, headerID, decodedID)
 	assert.Equal(t, *header, decoded)
-}
-
-func TestHeaderFingerprint(t *testing.T) {
-	header := unittest.BlockHeaderFixture()
-	header.LastViewTC = helper.MakeTC()
-	headerID := header.ID()
-	data := header.Fingerprint()
-	var decoded flow.EncodableHeader
-	rlp.NewMarshaler().MustUnmarshal(data, &decoded)
-	decHeader := &flow.Header{
-		ChainID:            decoded.ChainID,
-		ParentID:           decoded.ParentID,
-		Height:             decoded.Height,
-		PayloadHash:        decoded.PayloadHash,
-		Timestamp:          time.Unix(0, int64(decoded.Timestamp)).UTC(),
-		View:               decoded.View,
-		ParentView:         decoded.ParentView,
-		ParentVoterIndices: decoded.ParentVoterIndices,
-		ParentVoterSigData: decoded.ParentVoterSigData,
-		ProposerID:         decoded.ProposerID,
-		LastViewTC:         header.LastViewTC,
-	}
-	decodedID := decHeader.ID()
-	assert.Equal(t, headerID, decodedID)
-	assert.Equal(t, *header, *decHeader)
 }
 
 func TestHeaderEncodingMsgpack(t *testing.T) {
