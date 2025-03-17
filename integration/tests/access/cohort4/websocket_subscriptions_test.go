@@ -287,6 +287,7 @@ func (s *WebsocketSubscriptionSuite) testMaxSubscriptionsPerConnection() {
 		} else {
 			// Validate error response for exceeding the subscription limit.
 			s.Require().Equal(expectedErrorMessage, subscribeResponse.Error.Message)
+			s.Require().Equal(http.StatusTooManyRequests, subscribeResponse.Error.Code)
 		}
 	}
 }
