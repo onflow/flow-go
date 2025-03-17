@@ -98,7 +98,11 @@ func (dc *DirectCall) Message() *gethCore.Message {
 		// When SkipAccountChecks is true, the message nonce is not checked against the
 		// account nonce in state. It also disables checking that the sender is an EOA.
 		// Since we use the direct calls for COAs, we set the nonce and the COA is an smart contract.
-		SkipAccountChecks: true,
+		// SkipNonceChecks & SkipFromEOACheck was previously a single setting, namely
+		// SkipAccountChecks. And since we had SkipAccountChecks = true, we now
+		// have both SkipNonceChecks = SkipFromEOACheck = true
+		SkipNonceChecks:  true,
+		SkipFromEOACheck: true,
 	}
 }
 
