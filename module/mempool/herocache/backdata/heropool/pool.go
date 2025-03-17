@@ -45,7 +45,7 @@ type poolEntity[K comparable, V any] struct {
 	node link
 
 	// invalidated indicates whether this pool value has been invalidated.
-	// An value becomes invalidated when it is removed or ejected from the pool,
+	// A value becomes invalidated when it is removed or ejected from the pool,
 	// meaning its key and value are no longer valid for use.
 	// This flag helps manage the lifecycle of the value within the pool.
 	invalidated bool
@@ -121,6 +121,16 @@ func (p *Pool[K, V]) initFreeEntities() {
 //
 // If the pool has no available slots and an ejection is set, ejection occurs when adding a new value.
 // If an ejection occurred, ejectedEntity holds the ejected value.
+//
+// Returns:
+//   - valueIndex: The index in the pool where the new entity was inserted.
+//     If no slot is available (and no ejection occurs), this will be set to InvalidIndex.
+//   - slotAvailable: Indicates whether an available slot was found. It is true if
+//     the entity was inserted (either in a free slot or by ejecting an existing entity).
+//   - ejectedValue: If an ejection occurred to free a slot, this value holds the entity
+//     that was ejected; otherwise, it is the zero value of type V.
+//   - wasEjected: Indicates whether an ejection was performed (true if an entity was ejected,
+//     false if the insertion simply used an available free slot).
 func (p *Pool[K, V]) Add(key K, value V, owner uint64) (
 	valueIndex EIndex, slotAvailable bool, ejectedValue V, wasEjected bool) {
 	valueIndex, slotAvailable, ejectedValue, wasEjected = p.sliceIndexForEntity()
@@ -142,7 +152,7 @@ func (p *Pool[K, V]) Get(valueIndex EIndex) (K, V, uint64) {
 }
 
 // All returns all stored values in this pool.
-func (p Pool[K, V]) All() []PoolEntity[K, V] {
+func (p *Pool[K, V]) All() []PoolEntity[K, V] {
 	all := make([]PoolEntity[K, V], p.states[stateUsed].size)
 	next := p.states[stateUsed].head
 
@@ -157,7 +167,7 @@ func (p Pool[K, V]) All() []PoolEntity[K, V] {
 
 // Head returns the head of used items. Assuming no ejection happened and pool never goes beyond limit, Head returns
 // the first inserted element.
-func (p Pool[K, V]) Head() (value V, ok bool) {
+func (p *Pool[K, V]) Head() (value V, ok bool) {
 	if p.states[stateUsed].size == 0 {
 		return value, false
 	}
@@ -168,13 +178,22 @@ func (p Pool[K, V]) Head() (value V, ok bool) {
 // sliceIndexForEntity returns a slice index which hosts the next entity to be added to the list.
 // This index is invalid if there are no available slots or ejection could not be performed.
 // If the valid index is returned then it is guaranteed that it corresponds to a free list head.
-// Thus when filled with a new value a switchState must be applied.
+// Thus, when filled with a new value a switchState must be applied.
 //
 // The first boolean return value (hasAvailableSlot) says whether pool has an available slot.
 // Pool goes out of available slots if it is full and no ejection is set.
 //
 // Ejection happens if there is no available slot, and there is an ejection mode set.
 // If an ejection occurred, ejectedEntity holds the ejected entity.
+//
+// Returns:
+//   - i: The slice index where the new entity should be stored. This index is valid only
+//     if hasAvailableSlot is true.
+//   - hasAvailableSlot: Indicates whether the pool has an available slot for a new entity.
+//     If false, the pool is full and no ejection was performed (e.g. if ejection mode is NoEjection).
+//   - ejectedValue: If an ejection occurred to free up a slot, this value holds the entity that was
+//     removed (ejected) from the pool. Otherwise, it is the zero value of type V.
+//   - wasEjected (bool): Indicates whether an ejection occurred (true if an entity was ejected; false otherwise).
 func (p *Pool[K, V]) sliceIndexForEntity() (i EIndex, hasAvailableSlot bool, ejectedValue V, wasEjected bool) {
 	lruEject := func() (EIndex, bool, V, bool) {
 		// LRU ejection
@@ -212,12 +231,12 @@ func (p *Pool[K, V]) sliceIndexForEntity() (i EIndex, hasAvailableSlot bool, eje
 }
 
 // Size returns total number of values that this list maintains.
-func (p Pool[K, V]) Size() uint32 {
+func (p *Pool[K, V]) Size() uint32 {
 	return p.states[stateUsed].size
 }
 
 // getHeads returns values corresponding to the used and free heads.
-func (p Pool[K, V]) getHeads() (*poolEntity[K, V], *poolEntity[K, V]) {
+func (p *Pool[K, V]) getHeads() (*poolEntity[K, V], *poolEntity[K, V]) {
 	var usedHead, freeHead *poolEntity[K, V]
 	if p.states[stateUsed].size != 0 {
 		usedHead = &p.poolEntities[p.states[stateUsed].head]
@@ -231,7 +250,7 @@ func (p Pool[K, V]) getHeads() (*poolEntity[K, V], *poolEntity[K, V]) {
 }
 
 // getTails returns values corresponding to the used and free tails.
-func (p Pool[K, V]) getTails() (*poolEntity[K, V], *poolEntity[K, V]) {
+func (p *Pool[K, V]) getTails() (*poolEntity[K, V], *poolEntity[K, V]) {
 	var usedTail, freeTail *poolEntity[K, V]
 	if p.states[stateUsed].size != 0 {
 		usedTail = &p.poolEntities[p.states[stateUsed].tail]

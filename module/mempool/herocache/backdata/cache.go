@@ -251,11 +251,9 @@ func (c *Cache[V]) All() map[flow.Identifier]V {
 	defer c.logTelemetry()
 
 	entitiesList := c.entities.All()
-	all := make(map[flow.Identifier]V, len(c.entities.All()))
+	all := make(map[flow.Identifier]V, len(entitiesList))
 
-	total := len(entitiesList)
-	for i := 0; i < total; i++ {
-		p := entitiesList[i]
+	for _, p := range entitiesList {
 		all[p.Id()] = p.Entity()
 	}
 
@@ -266,9 +264,9 @@ func (c *Cache[V]) All() map[flow.Identifier]V {
 func (c *Cache[V]) Keys() []flow.Identifier {
 	defer c.logTelemetry()
 
-	ids := make(flow.IdentifierList, c.entities.Size())
-	for i, p := range c.entities.All() {
-		ids[i] = p.Id()
+	ids := make(flow.IdentifierList, 0, c.entities.Size())
+	for _, p := range c.entities.All() {
+		ids = append(ids, p.Id())
 	}
 
 	return ids
@@ -278,9 +276,9 @@ func (c *Cache[V]) Keys() []flow.Identifier {
 func (c *Cache[V]) Values() []V {
 	defer c.logTelemetry()
 
-	entities := make([]V, c.entities.Size())
-	for i, p := range c.entities.All() {
-		entities[i] = p.Entity()
+	entities := make([]V, 0, c.entities.Size())
+	for _, p := range c.entities.All() {
+		entities = append(entities, p.Entity())
 	}
 
 	return entities
@@ -470,14 +468,15 @@ func (c *Cache[V]) linkedValueOf(b bucketIndex, s slotIndex) (key flow.Identifie
 
 	// retrieving value index in the underlying values linked-list
 	valueIndex := c.buckets[b].slots[s].valueIndex
-	id, value, owner := c.entities.Get(valueIndex)
+	var owner uint64
+	key, value, owner = c.entities.Get(valueIndex)
 	if c.ownerIndexOf(b, s) != owner {
 		// value is not linked to this (bucketIndex, slotIndex)
 		c.buckets[b].slots[s].slotAge = slotAgeUnallocated
 		return flow.Identifier{}, value, false
 	}
 
-	return id, value, true
+	return key, value, true
 }
 
 // logTelemetry prints telemetry logs depending on number of interactions and last time telemetry has been logged.
