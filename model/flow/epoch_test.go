@@ -1,7 +1,6 @@
 package flow_test
 
 import (
-	"math/rand"
 	"testing"
 
 	"github.com/onflow/crypto"
@@ -17,10 +16,11 @@ func TestMalleability(t *testing.T) {
 		unittest.RequireEntityNonMalleable(t, unittest.EpochSetupFixture())
 	})
 	t.Run("EpochCommit with nil DKGIndexMap", func(t *testing.T) {
-		checker := unittest.NewMalleabilityChecker(unittest.WithPinnedField("DKGIndexMap"))
-		// Due to `DKGIndexMap` being nil, `MalleabilityChecker` will skip mutating this field.
-		err := checker.Check(unittest.EpochCommitFixture())
-		require.NoError(t, err)
+		require.Nil(t, unittest.EpochCommitFixture().DKGIndexMap) // sanity check that the fixture has left `DKGIndexMap` nil
+		unittest.RequireEntityNonMalleable(t, unittest.EpochCommitFixture(),
+			// We pin the `DKGIndexMap` to the current value (nil), so `MalleabilityChecker` will not mutate this field:
+			unittest.WithPinnedField("DKGIndexMap"),
+		)
 	})
 
 	t.Run("EpochCommit with proper DKGIndexMap", func(t *testing.T) {
@@ -41,35 +41,11 @@ func TestMalleability(t *testing.T) {
 	})
 
 	t.Run("EpochStateContainer", func(t *testing.T) {
-		checker := unittest.NewMalleabilityChecker(
-			unittest.WithFieldGenerator("EpochExtensions", func() []flow.EpochExtension {
-				return []flow.EpochExtension{unittest.EpochExtensionFixture()}
-			}),
-			unittest.WithFieldGenerator("ActiveIdentities", func() flow.DynamicIdentityEntryList {
-				return unittest.DynamicIdentityEntryListFixture(5, func(dynamicIdentityEntry *flow.DynamicIdentityEntry) {
-					dynamicIdentityEntry.Ejected = rand.Intn(2) == 1
-				})
-			}),
-		)
-
-		err := checker.Check(unittest.EpochStateContainerFixture())
-		require.NoError(t, err)
+		unittest.RequireEntityNonMalleable(t, unittest.EpochStateContainerFixture())
 	})
 
 	t.Run("MinEpochStateEntry", func(t *testing.T) {
-		checker := unittest.NewMalleabilityChecker(
-			unittest.WithTypeGenerator(func() flow.DynamicIdentityEntry {
-				return *unittest.DynamicIdentityEntryFixture(func(dynamicIdentityEntry *flow.DynamicIdentityEntry) {
-					dynamicIdentityEntry.Ejected = rand.Intn(2) == 1
-				})
-			}),
-			unittest.WithTypeGenerator(func() flow.EpochExtension {
-				return unittest.EpochExtensionFixture()
-			}),
-		)
-
-		err := checker.Check(unittest.EpochStateFixture(unittest.WithNextEpochProtocolState()).MinEpochStateEntry)
-		require.NoError(t, err)
+		unittest.RequireEntityNonMalleable(t, unittest.EpochStateFixture(unittest.WithNextEpochProtocolState()).MinEpochStateEntry)
 	})
 }
 
