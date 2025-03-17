@@ -45,7 +45,7 @@ type poolEntity[K comparable, V any] struct {
 	node link
 
 	// invalidated indicates whether this pool value has been invalidated.
-	// An value becomes invalidated when it is removed or ejected from the pool,
+	// A value becomes invalidated when it is removed or ejected from the pool,
 	// meaning its key and value are no longer valid for use.
 	// This flag helps manage the lifecycle of the value within the pool.
 	invalidated bool
@@ -168,13 +168,21 @@ func (p *Pool[K, V]) Head() (value V, ok bool) {
 // sliceIndexForEntity returns a slice index which hosts the next entity to be added to the list.
 // This index is invalid if there are no available slots or ejection could not be performed.
 // If the valid index is returned then it is guaranteed that it corresponds to a free list head.
-// Thus when filled with a new value a switchState must be applied.
+// Thus, when filled with a new value a switchState must be applied.
 //
 // The first boolean return value (hasAvailableSlot) says whether pool has an available slot.
 // Pool goes out of available slots if it is full and no ejection is set.
 //
 // Ejection happens if there is no available slot, and there is an ejection mode set.
 // If an ejection occurred, ejectedEntity holds the ejected entity.
+// Returns:
+//   - i: The slice index where the new entity should be stored. This index is valid only
+//     if hasAvailableSlot is true.
+//   - hasAvailableSlot: Indicates whether the pool has an available slot for a new entity.
+//     If false, the pool is full and no ejection was performed (e.g. if ejection mode is NoEjection).
+//   - ejectedValue: If an ejection occurred to free up a slot, this value holds the entity that was
+//     removed (ejected) from the pool. Otherwise, it is the zero value of type V.
+//   - wasEjected (bool): Indicates whether an ejection occurred (true if an entity was ejected; false otherwise).
 func (p *Pool[K, V]) sliceIndexForEntity() (i EIndex, hasAvailableSlot bool, ejectedValue V, wasEjected bool) {
 	lruEject := func() (EIndex, bool, V, bool) {
 		// LRU ejection
