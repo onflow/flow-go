@@ -294,7 +294,7 @@ func testAddRemoveEntities(t *testing.T, limit uint32, entityCount uint32, eject
 				_, found = addedEntities[entities[toAddIndex].ID()]
 				if !found {
 					// found an entity that is not in the pool, add it.
-					indexInThePool, _, ejectedEntity, _ := pool.Add(entities[toAddIndex].ID(), entities[toAddIndex], ownerIds[toAddIndex])
+					indexInThePool, _, ejectedEntity, wasEjected := pool.Add(entities[toAddIndex].ID(), entities[toAddIndex], ownerIds[toAddIndex])
 					if ejectionMode != NoEjection || len(addedEntities) < int(limit) {
 						// when there is an ejection mode in place, or the pool is not full, the index should be valid.
 						require.NotEqual(t, InvalidIndex, indexInThePool)
@@ -303,10 +303,12 @@ func testAddRemoveEntities(t *testing.T, limit uint32, entityCount uint32, eject
 					if ejectionMode != NoEjection && len(addedEntities) == int(limit) {
 						// when there is an ejection mode in place, the ejected entity should be valid.
 						require.NotNil(t, ejectedEntity)
+						require.True(t, wasEjected)
 					}
 					if ejectionMode != NoEjection && len(addedEntities) >= int(limit) {
 						// when there is an ejection mode in place, the ejected entity should be valid.
 						require.NotNil(t, ejectedEntity)
+						require.True(t, wasEjected)
 					}
 					if indexInThePool != InvalidIndex {
 						entityId := entities[toAddIndex].ID()
@@ -598,7 +600,7 @@ func testAddingEntities(t *testing.T, pool *Pool[flow.Identifier, *unittest.Mock
 	lruEjectedIndex := 0
 	for i, e := range entitiesToBeAdded {
 		// adding each element must be successful.
-		entityIndex, slotAvailable, ejectedEntity, _ := pool.Add(e.ID(), e, uint64(i))
+		entityIndex, slotAvailable, ejectedEntity, wasEjected := pool.Add(e.ID(), e, uint64(i))
 
 		if i < len(pool.poolEntities) {
 			// in case of no over limit, size of entities linked list should be incremented by each addition.
@@ -606,6 +608,7 @@ func testAddingEntities(t *testing.T, pool *Pool[flow.Identifier, *unittest.Mock
 
 			require.True(t, slotAvailable)
 			require.Nil(t, ejectedEntity)
+			require.False(t, wasEjected)
 			require.Equal(t, entityIndex, EIndex(i))
 
 			// in case pool is not full, the head should retrieve the first added entity.
@@ -622,6 +625,7 @@ func testAddingEntities(t *testing.T, pool *Pool[flow.Identifier, *unittest.Mock
 			if i >= len(pool.poolEntities) {
 				require.True(t, slotAvailable)
 				require.NotNil(t, ejectedEntity)
+				require.True(t, wasEjected)
 				// confirm that ejected entity is the oldest entity
 				require.Equal(t, entitiesToBeAdded[lruEjectedIndex], ejectedEntity)
 				lruEjectedIndex++
@@ -636,6 +640,7 @@ func testAddingEntities(t *testing.T, pool *Pool[flow.Identifier, *unittest.Mock
 			if i >= len(pool.poolEntities) {
 				require.True(t, slotAvailable)
 				require.NotNil(t, ejectedEntity)
+				require.True(t, wasEjected)
 				// confirm that ejected entity is from list of entitiesToBeAdded
 				_, ok := uniqueEntities[ejectedEntity.ID()]
 				require.True(t, ok)
@@ -646,6 +651,7 @@ func testAddingEntities(t *testing.T, pool *Pool[flow.Identifier, *unittest.Mock
 			if i >= len(pool.poolEntities) {
 				require.False(t, slotAvailable)
 				require.Nil(t, ejectedEntity)
+				require.False(t, wasEjected)
 				require.Equal(t, entityIndex, InvalidIndex)
 
 				// when pool is full and with NoEjection, the head must keep pointing to the first added element.

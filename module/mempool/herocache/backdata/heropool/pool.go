@@ -121,6 +121,16 @@ func (p *Pool[K, V]) initFreeEntities() {
 //
 // If the pool has no available slots and an ejection is set, ejection occurs when adding a new value.
 // If an ejection occurred, ejectedEntity holds the ejected value.
+//
+// Returns:
+//   - valueIndex: The index in the pool where the new entity was inserted.
+//     If no slot is available (and no ejection occurs), this will be set to InvalidIndex.
+//   - slotAvailable: Indicates whether an available slot was found. It is true if
+//     the entity was inserted (either in a free slot or by ejecting an existing entity).
+//   - ejectedValue: If an ejection occurred to free a slot, this value holds the entity
+//     that was ejected; otherwise, it is the zero value of type V.
+//   - wasEjected: Indicates whether an ejection was performed (true if an entity was ejected,
+//     false if the insertion simply used an available free slot).
 func (p *Pool[K, V]) Add(key K, value V, owner uint64) (
 	valueIndex EIndex, slotAvailable bool, ejectedValue V, wasEjected bool) {
 	valueIndex, slotAvailable, ejectedValue, wasEjected = p.sliceIndexForEntity()
@@ -175,6 +185,7 @@ func (p *Pool[K, V]) Head() (value V, ok bool) {
 //
 // Ejection happens if there is no available slot, and there is an ejection mode set.
 // If an ejection occurred, ejectedEntity holds the ejected entity.
+//
 // Returns:
 //   - i: The slice index where the new entity should be stored. This index is valid only
 //     if hasAvailableSlot is true.
