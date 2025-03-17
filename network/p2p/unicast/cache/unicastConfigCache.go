@@ -16,7 +16,7 @@ import (
 )
 
 type UnicastConfigCache struct {
-	peerCache  *stdmap.Backend
+	peerCache  *stdmap.Backend[flow.Identifier, unicast.Config]
 	cfgFactory func() unicast.Config // factory function that creates a new unicast config.
 }
 
@@ -41,7 +41,7 @@ func NewUnicastConfigCache(
 	cfgFactory func() unicast.Config,
 ) *UnicastConfigCache {
 	return &UnicastConfigCache{
-		peerCache: stdmap.NewBackend(stdmap.WithMutableBackData(herocache.NewCache(size,
+		peerCache: stdmap.NewBackend(stdmap.WithMutableBackData[flow.Identifier, unicast.Config](herocache.NewCache[unicast.Config](size,
 			herocache.DefaultOversizeFactor,
 			heropool.LRUEjection,
 			logger.With().Str("module", "unicast-config-cache").Logger(),
@@ -60,49 +60,36 @@ func NewUnicastConfigCache(
 // Returns:
 //   - error any returned error should be considered as an irrecoverable error and indicates a bug.
 func (d *UnicastConfigCache) AdjustWithInit(peerID peer.ID, adjustFunc unicast.UnicastConfigAdjustFunc) (*unicast.Config, error) {
-	entityId := entityIdOf(peerID)
 	var rErr error
 	// wraps external adjust function to adjust the unicast config.
-	wrapAdjustFunc := func(entity flow.Entity) flow.Entity {
-		cfgEntity, ok := entity.(UnicastConfigEntity)
-		if !ok {
-			// sanity check
-			// This should never happen, because the cache only contains UnicastConfigEntity entities.
-			panic(fmt.Sprintf("invalid entity type, expected UnicastConfigEntity type, got: %T", entity))
-		}
-
+	wrapAdjustFunc := func(config unicast.Config) unicast.Config {
 		// adjust the unicast config.
-		adjustedCfg, err := adjustFunc(cfgEntity.Config)
+		adjustedCfg, err := adjustFunc(config)
 		if err != nil {
 			rErr = fmt.Errorf("adjust function failed: %w", err)
-			return entity // returns the original entity (reverse the adjustment).
+			return config // returns the original config (reverse the adjustment).
 		}
 
 		// Return the adjusted config.
-		cfgEntity.Config = adjustedCfg
-		return cfgEntity
+		return adjustedCfg
 	}
 
-	initFunc := func() flow.Entity {
-		return UnicastConfigEntity{
-			PeerId:   peerID,
-			Config:   d.cfgFactory(),
-			EntityId: entityId,
-		}
+	initFunc := func() unicast.Config {
+		return d.cfgFactory()
 	}
 
-	adjustedEntity, adjusted := d.peerCache.AdjustWithInit(entityId, wrapAdjustFunc, initFunc)
+	adjustedConfig, adjusted := d.peerCache.AdjustWithInit(makeId(peerID), wrapAdjustFunc, initFunc)
 	if rErr != nil {
 		return nil, fmt.Errorf("adjust operation aborted with an error: %w", rErr)
 	}
 
 	if !adjusted {
-		return nil, fmt.Errorf("adjust operation aborted, entity not found")
+		return nil, fmt.Errorf("adjust operation aborted, unicast config was not adjusted")
 	}
 
 	return &unicast.Config{
-		StreamCreationRetryAttemptBudget: adjustedEntity.(UnicastConfigEntity).StreamCreationRetryAttemptBudget,
-		ConsecutiveSuccessfulStream:      adjustedEntity.(UnicastConfigEntity).ConsecutiveSuccessfulStream,
+		StreamCreationRetryAttemptBudget: adjustedConfig.StreamCreationRetryAttemptBudget,
+		ConsecutiveSuccessfulStream:      adjustedConfig.ConsecutiveSuccessfulStream,
 	}, nil
 }
 
@@ -115,26 +102,18 @@ func (d *UnicastConfigCache) AdjustWithInit(peerID peer.ID, adjustFunc unicast.U
 //   - error if the factory function returns an error. Any error should be treated as an irrecoverable error and indicates a bug.
 func (d *UnicastConfigCache) GetWithInit(peerID peer.ID) (*unicast.Config, error) {
 	// ensuring that the init-and-get operation is atomic.
-	entityId := entityIdOf(peerID)
-	initFunc := func() flow.Entity {
-		return UnicastConfigEntity{
-			PeerId:   peerID,
-			Config:   d.cfgFactory(),
-			EntityId: entityId,
-		}
-	}
+	key := makeId(peerID)
 
-	// TODO(malleability, #7076): UnicastConfigCache implementation will be updated according to new usages.
-	var entity flow.Entity
-	err := d.peerCache.Run(func(backData mempool.BackData[flow.Identifier, flow.Entity]) error {
-		val, ok := backData.Get(entityId)
+	var config unicast.Config
+	err := d.peerCache.Run(func(backData mempool.BackData[flow.Identifier, unicast.Config]) error {
+		val, ok := backData.Get(key)
 		if ok {
-			entity = val
+			config = val
 			return nil
 		}
 
-		entity = initFunc()
-		backData.Add(entityId, entity)
+		config = d.cfgFactory()
+		backData.Add(key, config)
 
 		return nil
 	})
@@ -142,21 +121,22 @@ func (d *UnicastConfigCache) GetWithInit(peerID peer.ID) (*unicast.Config, error
 		return nil, fmt.Errorf("run operation aborted with an error: %w", err)
 	}
 
-	cfg, ok := entity.(UnicastConfigEntity)
-	if !ok {
-		// sanity check
-		// This should never happen, because the cache only contains UnicastConfigEntity entities.
-		panic(fmt.Sprintf("invalid entity type, expected UnicastConfigEntity type, got: %T", entity))
-	}
-
 	// return a copy of the config (we do not want the caller to modify the config).
 	return &unicast.Config{
-		StreamCreationRetryAttemptBudget: cfg.StreamCreationRetryAttemptBudget,
-		ConsecutiveSuccessfulStream:      cfg.ConsecutiveSuccessfulStream,
+		StreamCreationRetryAttemptBudget: config.StreamCreationRetryAttemptBudget,
+		ConsecutiveSuccessfulStream:      config.ConsecutiveSuccessfulStream,
 	}, nil
 }
 
 // Size returns the number of unicast configs in the cache.
 func (d *UnicastConfigCache) Size() uint {
 	return d.peerCache.Size()
+}
+
+// makeId is a helper function which converts a peer ID to a flow ID by taking the hash of the peer ID.
+// This is not a protocol-level conversion, and is only used internally by the cache, MUST NOT be exposed outside the cache.
+// Returns:
+// - the hash of the peerID as a flow.Identifier.
+func makeId(peerID peer.ID) flow.Identifier {
+	return flow.MakeID([]byte(peerID))
 }
