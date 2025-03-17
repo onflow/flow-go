@@ -142,7 +142,7 @@ func (p *Pool[K, V]) Get(valueIndex EIndex) (K, V, uint64) {
 }
 
 // All returns all stored values in this pool.
-func (p Pool[K, V]) All() []PoolEntity[K, V] {
+func (p *Pool[K, V]) All() []PoolEntity[K, V] {
 	all := make([]PoolEntity[K, V], p.states[stateUsed].size)
 	next := p.states[stateUsed].head
 
@@ -157,7 +157,7 @@ func (p Pool[K, V]) All() []PoolEntity[K, V] {
 
 // Head returns the head of used items. Assuming no ejection happened and pool never goes beyond limit, Head returns
 // the first inserted element.
-func (p Pool[K, V]) Head() (value V, ok bool) {
+func (p *Pool[K, V]) Head() (value V, ok bool) {
 	if p.states[stateUsed].size == 0 {
 		return value, false
 	}
@@ -212,12 +212,12 @@ func (p *Pool[K, V]) sliceIndexForEntity() (i EIndex, hasAvailableSlot bool, eje
 }
 
 // Size returns total number of values that this list maintains.
-func (p Pool[K, V]) Size() uint32 {
+func (p *Pool[K, V]) Size() uint32 {
 	return p.states[stateUsed].size
 }
 
 // getHeads returns values corresponding to the used and free heads.
-func (p Pool[K, V]) getHeads() (*poolEntity[K, V], *poolEntity[K, V]) {
+func (p *Pool[K, V]) getHeads() (*poolEntity[K, V], *poolEntity[K, V]) {
 	var usedHead, freeHead *poolEntity[K, V]
 	if p.states[stateUsed].size != 0 {
 		usedHead = &p.poolEntities[p.states[stateUsed].head]
@@ -231,7 +231,7 @@ func (p Pool[K, V]) getHeads() (*poolEntity[K, V], *poolEntity[K, V]) {
 }
 
 // getTails returns values corresponding to the used and free tails.
-func (p Pool[K, V]) getTails() (*poolEntity[K, V], *poolEntity[K, V]) {
+func (p *Pool[K, V]) getTails() (*poolEntity[K, V], *poolEntity[K, V]) {
 	var usedTail, freeTail *poolEntity[K, V]
 	if p.states[stateUsed].size != 0 {
 		usedTail = &p.poolEntities[p.states[stateUsed].tail]
