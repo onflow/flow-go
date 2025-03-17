@@ -468,14 +468,15 @@ func (c *Cache[V]) linkedValueOf(b bucketIndex, s slotIndex) (key flow.Identifie
 
 	// retrieving value index in the underlying values linked-list
 	valueIndex := c.buckets[b].slots[s].valueIndex
-	id, value, owner := c.entities.Get(valueIndex)
+	var owner uint64
+	key, value, owner = c.entities.Get(valueIndex)
 	if c.ownerIndexOf(b, s) != owner {
 		// value is not linked to this (bucketIndex, slotIndex)
 		c.buckets[b].slots[s].slotAge = slotAgeUnallocated
 		return flow.Identifier{}, value, false
 	}
 
-	return id, value, true
+	return key, value, true
 }
 
 // logTelemetry prints telemetry logs depending on number of interactions and last time telemetry has been logged.
