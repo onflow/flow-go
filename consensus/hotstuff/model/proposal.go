@@ -68,7 +68,7 @@ func SignedProposalFromFlow(p *flow.Proposal) *SignedProposal {
 	return &proposal
 }
 
-// TODO(tim) clean up conversion functions and/or proposal types here
+// TODO(malleability, #7100) clean up conversion functions and/or proposal types here
 func SignedProposalFromBlock(p *flow.BlockProposal) *SignedProposal {
 	proposal := SignedProposal{
 		Proposal: Proposal{

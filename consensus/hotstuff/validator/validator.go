@@ -315,7 +315,7 @@ func (v *Validator) ValidateVote(vote *model.Vote) (*flow.IdentitySkeleton, erro
 			return nil, newInvalidVoteError(vote, err)
 		}
 		if errors.Is(err, model.ErrViewForUnknownEpoch) {
-			return nil, fmt.Errorf("no Epoch information availabe for vote; symptom of internal bug or invalid bootstrapping information: %s", err.Error())
+			return nil, fmt.Errorf("no Epoch information available for vote; symptom of internal bug or invalid bootstrapping information: %s", err.Error())
 		}
 		return nil, fmt.Errorf("cannot verify signature for vote (%x): %w", vote.ID(), err)
 	}

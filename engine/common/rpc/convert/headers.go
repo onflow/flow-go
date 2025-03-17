@@ -50,7 +50,6 @@ func BlockHeaderToMessage(
 		ProposerId:         h.ProposerID[:],
 		ChainId:            h.ChainID.String(),
 		LastViewTc:         lastViewTC,
-		//ProposerSigData:    h.ProposerSigData,
 	}, nil
 }
 

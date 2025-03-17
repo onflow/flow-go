@@ -37,7 +37,7 @@ func NewFollower(log zerolog.Logger,
 		return nil, fmt.Errorf("could not initialize forks: %w", err)
 	}
 
-	// TODO(tim) - proposerSigData storage
+	// TODO(malleability, #7100) - proposerSigData storage
 	// Followers don't need proposer signature (and all headers in storage must have been already verified)
 	pendingProposals := make([]*flow.Proposal, 0, len(pending))
 	for _, p := range pending {

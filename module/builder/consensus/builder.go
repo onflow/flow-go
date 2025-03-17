@@ -152,7 +152,6 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header) er
 	if err != nil {
 		return nil, fmt.Errorf("could not assemble proposal: %w", err)
 	}
-	// assert(block.Header == proposal.Header)
 
 	span, ctx := b.tracer.StartBlockSpan(context.Background(), proposal.Header.ID(), trace.CONBuilderBuildOn, otelTrace.WithTimestamp(startTime))
 	defer span.End()

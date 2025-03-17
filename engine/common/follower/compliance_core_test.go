@@ -195,7 +195,6 @@ func (s *CoreSuite) TestProcessingBlocksAfterShutdown() {
 	// to the protocol state
 
 	blocks := unittest.ProposalChainFixtureFrom(10, s.finalizedBlock)
-
 	s.validator.On("ValidateProposal", model.SignedProposalFromBlock(blocks[len(blocks)-1])).Return(nil).Once()
 
 	err := s.core.OnBlockRange(s.originID, blocks)
