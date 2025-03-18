@@ -151,20 +151,6 @@ func (s *SendTransactionStatusesProviderSuite) TestSendTransactionStatusesDataPr
 // invalidSendTransactionStatusesArgumentsTestCases returns a list of test cases with invalid argument combinations
 // for testing the behavior of send transaction statuses data providers. Each test case includes a name,
 // a set of input arguments, and the expected error message that should be returned.
-//
-// The test cases cover scenarios such as:
-// 1. Providing invalid 'script' type.
-// 2. Providing invalid 'script' value.
-// 3. Providing invalid 'arguments' type.
-// 4. Providing invalid 'arguments' value.
-// 5. Providing invalid 'reference_block_id' value.
-// 6. Providing invalid 'gas_limit' value.
-// 7. Providing invalid 'payer' value.
-// 8. Providing invalid 'proposal_key' value.
-// 9. Providing invalid 'authorizers' value.
-// 10. Providing invalid 'payload_signatures' value.
-// 11. Providing invalid 'envelope_signatures' value.
-// 12. Providing unexpected argument.
 func invalidSendTransactionStatusesArgumentsTestCases() []testErrType {
 	return []testErrType{
 		{
@@ -249,7 +235,7 @@ func invalidSendTransactionStatusesArgumentsTestCases() []testErrType {
 			arguments: map[string]interface{}{
 				"unexpected_argument": "dummy",
 			},
-			expectedErrorMsg: "unexpected field: 'unexpected_argument'",
+			expectedErrorMsg: "request body contains unknown field",
 		},
 	}
 }

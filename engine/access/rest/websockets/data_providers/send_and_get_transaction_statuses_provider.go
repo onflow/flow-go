@@ -122,22 +122,6 @@ func parseSendAndGetTransactionStatusesArguments(
 	arguments wsmodels.Arguments,
 	chain flow.Chain,
 ) (sendAndGetTransactionStatusesArguments, error) {
-	allowedFields := []string{
-		"reference_block_id",
-		"script",
-		"arguments",
-		"gas_limit",
-		"payer",
-		"proposal_key",
-		"authorizers",
-		"payload_signatures",
-		"envelope_signatures",
-	}
-	err := ensureAllowedFields(arguments, allowedFields)
-	if err != nil {
-		return sendAndGetTransactionStatusesArguments{}, err
-	}
-
 	var args sendAndGetTransactionStatusesArguments
 
 	// Convert the arguments map to JSON
@@ -147,9 +131,8 @@ func parseSendAndGetTransactionStatusesArguments(
 	}
 
 	// Create an io.Reader from the JSON bytes
-	rawReader := bytes.NewReader(rawJSON)
-
 	var tx commonparser.Transaction
+	rawReader := bytes.NewReader(rawJSON)
 	err = tx.Parse(rawReader, chain)
 	if err != nil {
 		return sendAndGetTransactionStatusesArguments{}, fmt.Errorf("failed to parse transaction: %w", err)

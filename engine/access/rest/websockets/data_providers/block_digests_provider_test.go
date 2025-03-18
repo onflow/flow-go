@@ -122,10 +122,6 @@ func (s *BlocksProviderSuite) requireBlockDigest(actual interface{}, expected in
 // TestBlockDigestsDataProvider_InvalidArguments tests the behavior of the block digests data provider
 // when invalid arguments are provided. It verifies that appropriate errors are returned
 // for missing or conflicting arguments.
-// This test covers the test cases:
-// 1. Missing 'block_status' argument.
-// 2. Invalid 'block_status' argument.
-// 3. Providing both 'start_block_id' and 'start_block_height' simultaneously.
 func (s *BlockDigestsProviderSuite) TestBlockDigestsDataProvider_InvalidArguments() {
 	ctx := context.Background()
 	send := make(chan interface{})
@@ -135,8 +131,8 @@ func (s *BlockDigestsProviderSuite) TestBlockDigestsDataProvider_InvalidArgument
 	for _, test := range s.invalidArgumentsTestCases() {
 		s.Run(test.name, func() {
 			provider, err := NewBlockDigestsDataProvider(ctx, s.log, s.api, "dummy-id", topic, test.arguments, send)
-			s.Require().Nil(provider)
 			s.Require().Error(err)
+			s.Require().Nil(provider)
 			s.Require().Contains(err.Error(), test.expectedErrorMsg)
 		})
 	}

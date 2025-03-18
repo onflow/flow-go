@@ -221,7 +221,6 @@ func (s *WebsocketSubscriptionSuite) testInactivityTracker() {
 			5*time.Second,
 			subscriptionRequest.SubscriptionID,
 		)
-
 		s.Require().Equal(1, len(baseResponses))
 		s.Require().Nil(baseResponses[0].Error)
 
@@ -463,7 +462,11 @@ func (s *WebsocketSubscriptionSuite) testListOfSubscriptions() {
 	s.Require().Nil(baseResponses[0].Error)
 
 	// 3. Create list of subscription request message
-	listOfSubscriptionRequest := s.listSubscriptionsMessageRequest()
+	listOfSubscriptionRequest := models.ListSubscriptionsMessageRequest{
+		BaseMessageRequest: models.BaseMessageRequest{
+			Action: models.ListSubscriptionsAction,
+		},
+	}
 	// send list of subscription message
 	s.Require().NoError(wsClient.WriteJSON(listOfSubscriptionRequest))
 
@@ -1159,15 +1162,6 @@ func (s *WebsocketSubscriptionSuite) unsubscribeMessageRequest(subscriptionID st
 		BaseMessageRequest: models.BaseMessageRequest{
 			Action:         models.UnsubscribeAction,
 			SubscriptionID: subscriptionID,
-		},
-	}
-}
-
-// listSubscriptionsMessageRequest creates a list subscriptions message request.
-func (s *WebsocketSubscriptionSuite) listSubscriptionsMessageRequest() models.ListSubscriptionsMessageRequest {
-	return models.ListSubscriptionsMessageRequest{
-		BaseMessageRequest: models.BaseMessageRequest{
-			Action: models.ListSubscriptionsAction,
 		},
 	}
 }

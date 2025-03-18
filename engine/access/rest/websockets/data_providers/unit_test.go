@@ -3,6 +3,7 @@ package data_providers
 import (
 	"context"
 	"fmt"
+	"reflect"
 	"testing"
 	"time"
 
@@ -65,9 +66,8 @@ func testHappyPath(
 
 			// Create the data provider instance
 			provider, err := factory.NewDataProvider(ctx, "dummy-id", topic, test.arguments, send)
-
-			require.NotNil(t, provider)
 			require.NoError(t, err)
+			require.NotNil(t, provider)
 
 			// Ensure the provider is properly closed after the test
 			defer provider.Close()
@@ -111,4 +111,104 @@ func extractPayload[T any](t *testing.T, v interface{}) (*models.BaseDataProvide
 	require.True(t, ok, "Unexpected response payload type: %T", response.Payload)
 
 	return response, payload
+}
+
+func TestEnsureAllowedFields(t *testing.T) {
+	t.Parallel()
+
+	allowedFields := map[string]struct{}{
+		"start_block_id":     {},
+		"start_block_height": {},
+		"event_types":        {},
+		"account_addresses":  {},
+		"heartbeat_interval": {},
+	}
+
+	t.Run("Valid fields with all required", func(t *testing.T) {
+		fields := map[string]interface{}{
+			"start_block_id":     "abc",
+			"start_block_height": 123,
+			"event_types":        []string{"flow.Event"},
+			"account_addresses":  []string{"0x1"},
+			"heartbeat_interval": 10,
+		}
+		if err := ensureAllowedFields(fields, allowedFields); err != nil {
+			t.Errorf("unexpected error: %v", err)
+		}
+	})
+
+	t.Run("Unexpected field present", func(t *testing.T) {
+		fields := map[string]interface{}{
+			"start_block_id":     "abc",
+			"start_block_height": 123,
+			"unknown_field":      "unexpected",
+		}
+		if err := ensureAllowedFields(fields, allowedFields); err == nil {
+			t.Error("expected error for unexpected field, got nil")
+		}
+	})
+}
+
+func TestExtractArrayOfStrings(t *testing.T) {
+	tests := []struct {
+		name      string
+		args      wsmodels.Arguments
+		key       string
+		required  bool
+		expect    []string
+		expectErr bool
+	}{
+		{
+			name:      "Valid string array",
+			args:      wsmodels.Arguments{"tags": []string{"a", "b"}},
+			key:       "tags",
+			required:  true,
+			expect:    []string{"a", "b"},
+			expectErr: false,
+		},
+		{
+			name:      "Missing required key",
+			args:      wsmodels.Arguments{},
+			key:       "tags",
+			required:  true,
+			expect:    nil,
+			expectErr: true,
+		},
+		{
+			name:      "Missing optional key",
+			args:      wsmodels.Arguments{},
+			key:       "tags",
+			required:  false,
+			expect:    []string{},
+			expectErr: false,
+		},
+		{
+			name:      "Invalid type in array",
+			args:      wsmodels.Arguments{"tags": []interface{}{"a", 123}},
+			key:       "tags",
+			required:  true,
+			expect:    nil,
+			expectErr: true,
+		},
+		{
+			name:      "Nil value",
+			args:      wsmodels.Arguments{"tags": nil},
+			key:       "tags",
+			required:  false,
+			expect:    nil,
+			expectErr: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result, err := extractArrayOfStrings(tt.args, tt.key, tt.required)
+			if (err != nil) != tt.expectErr {
+				t.Fatalf("unexpected error status. got: %v, want error: %v", err, tt.expectErr)
+			}
+			if !reflect.DeepEqual(result, tt.expect) {
+				t.Fatalf("unexpected result. got: %v, want: %v", result, tt.expect)
+			}
+		})
+	}
 }

@@ -124,10 +124,6 @@ func (s *BlockHeadersProviderSuite) requireBlockHeader(actual interface{}, expec
 // TestBlockHeadersDataProvider_InvalidArguments tests the behavior of the block headers data provider
 // when invalid arguments are provided. It verifies that appropriate errors are returned
 // for missing or conflicting arguments.
-// This test covers the test cases:
-// 1. Missing 'block_status' argument.
-// 2. Invalid 'block_status' argument.
-// 3. Providing both 'start_block_id' and 'start_block_height' simultaneously.
 func (s *BlockHeadersProviderSuite) TestBlockHeadersDataProvider_InvalidArguments() {
 	ctx := context.Background()
 	send := make(chan interface{})
@@ -137,8 +133,8 @@ func (s *BlockHeadersProviderSuite) TestBlockHeadersDataProvider_InvalidArgument
 	for _, test := range s.invalidArgumentsTestCases() {
 		s.Run(test.name, func() {
 			provider, err := NewBlockHeadersDataProvider(ctx, s.log, s.api, "dummy-id", topic, test.arguments, send)
-			s.Require().Nil(provider)
 			s.Require().Error(err)
+			s.Require().Nil(provider)
 			s.Require().Contains(err.Error(), test.expectedErrorMsg)
 		})
 	}
