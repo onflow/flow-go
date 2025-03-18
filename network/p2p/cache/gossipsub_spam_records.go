@@ -22,7 +22,7 @@ import (
 // Rather they are solely used by the current peer to select the peers to which it will connect on a topic mesh.
 type GossipSubSpamRecordCache struct {
 	// the in-memory and thread-safe cache for storing the spam records of peers.
-	c *stdmap.Backend[flow.Identifier, *gossipSubSpamRecordWrapper]
+	c *stdmap.Backend[flow.Identifier, gossipSubSpamRecordWrapper]
 
 	// Optional: the pre-processors to be called upon reading or updating a record in the cache.
 	// The pre-processors are called in the order they are added to the cache.
@@ -68,13 +68,13 @@ func NewGossipSubSpamRecordCache(sizeLimit uint32,
 	collector module.HeroCacheMetrics,
 	initFn func() p2p.GossipSubSpamRecord,
 	prFns ...PreprocessorFunc) *GossipSubSpamRecordCache {
-	backData := herocache.NewCache[*gossipSubSpamRecordWrapper](sizeLimit,
+	backData := herocache.NewCache[gossipSubSpamRecordWrapper](sizeLimit,
 		herocache.DefaultOversizeFactor,
 		heropool.LRUEjection,
 		logger.With().Str("mempool", "gossipsub-app-Penalty-cache").Logger(),
 		collector)
 	return &GossipSubSpamRecordCache{
-		c:             stdmap.NewBackend(stdmap.WithMutableBackData[flow.Identifier, *gossipSubSpamRecordWrapper](backData)),
+		c:             stdmap.NewBackend(stdmap.WithMutableBackData[flow.Identifier, gossipSubSpamRecordWrapper](backData)),
 		preprocessFns: prFns,
 		initFn:        initFn,
 	}
@@ -91,7 +91,7 @@ func NewGossipSubSpamRecordCache(sizeLimit uint32,
 // Note that if any of the pre-processing functions returns an error, the record is reverted to its original state (prior to applying the update function).
 func (a *GossipSubSpamRecordCache) Adjust(peerID peer.ID, updateFn p2p.UpdateFunction) (*p2p.GossipSubSpamRecord, error) {
 	var err error
-	adjustFunc := func(gossipSubSpamRecordWrapper *gossipSubSpamRecordWrapper) *gossipSubSpamRecordWrapper {
+	adjustFunc := func(gossipSubSpamRecordWrapper gossipSubSpamRecordWrapper) gossipSubSpamRecordWrapper {
 		currentRecord := gossipSubSpamRecordWrapper.GossipSubSpamRecord
 		// apply the pre-processing functions to the record.
 		for _, apply := range a.preprocessFns {
@@ -111,8 +111,8 @@ func (a *GossipSubSpamRecordCache) Adjust(peerID peer.ID, updateFn p2p.UpdateFun
 		return gossipSubSpamRecordWrapper
 	}
 
-	initFunc := func() *gossipSubSpamRecordWrapper {
-		return &gossipSubSpamRecordWrapper{
+	initFunc := func() gossipSubSpamRecordWrapper {
+		return gossipSubSpamRecordWrapper{
 			GossipSubSpamRecord: a.initFn(),
 		}
 	}
@@ -154,7 +154,7 @@ func (a *GossipSubSpamRecordCache) Get(peerID peer.ID) (*p2p.GossipSubSpamRecord
 	}
 
 	var err error
-	record, updated := a.c.Adjust(key, func(gossipSubSpamRecordWrapper *gossipSubSpamRecordWrapper) *gossipSubSpamRecordWrapper {
+	record, updated := a.c.Adjust(key, func(gossipSubSpamRecordWrapper gossipSubSpamRecordWrapper) gossipSubSpamRecordWrapper {
 		currentRecord := gossipSubSpamRecordWrapper.GossipSubSpamRecord
 		for _, apply := range a.preprocessFns {
 			gossipSubSpamRecordWrapper.GossipSubSpamRecord, err = apply(gossipSubSpamRecordWrapper.GossipSubSpamRecord, gossipSubSpamRecordWrapper.lastUpdated)

@@ -90,7 +90,7 @@ func TestAdjust(t *testing.T) {
 		assert.True(t, ok)
 		assert.Equal(t, updatedItem, item2)
 
-		value2, found := pool.Get(item2.ID())
+		value2, found := pool.Get(item1.ID())
 		assert.True(t, found)
 		assert.Equal(t, value2, item2)
 	})
