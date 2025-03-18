@@ -293,9 +293,9 @@ func (p *Pool[K, V]) invalidateValueAtIndex(sliceIndex EIndex) V {
 
 	var zeroKey K
 	var zeroValue V
-	p.poolEntities[sliceIndex].invalidated = true
 	p.poolEntities[sliceIndex].key = zeroKey
 	p.poolEntities[sliceIndex].value = zeroValue
+	p.poolEntities[sliceIndex].invalidated = true
 	return invalidatedValue
 }
 
@@ -305,7 +305,7 @@ func (p *Pool[K, V]) isInvalidated(sliceIndex EIndex) bool {
 	return p.poolEntities[sliceIndex].invalidated
 }
 
-// switches state of an value.
+// switches state of a value.
 func (p *Pool[K, V]) switchState(stateFrom StateIndex, stateTo StateIndex, valueIndex EIndex) {
 	// Remove from stateFrom list
 	if p.states[stateFrom].size == 0 {
