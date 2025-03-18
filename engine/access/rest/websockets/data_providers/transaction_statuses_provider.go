@@ -11,7 +11,8 @@ import (
 	"github.com/onflow/flow-go/access"
 	commonmodels "github.com/onflow/flow-go/engine/access/rest/common/models"
 	"github.com/onflow/flow-go/engine/access/rest/common/parser"
-	"github.com/onflow/flow-go/engine/access/rest/websockets/models"
+	"github.com/onflow/flow-go/engine/access/rest/websockets/data_providers/models"
+	wsmodels "github.com/onflow/flow-go/engine/access/rest/websockets/models"
 	"github.com/onflow/flow-go/engine/access/subscription"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/counters"
@@ -42,7 +43,7 @@ func NewTransactionStatusesDataProvider(
 	subscriptionID string,
 	linkGenerator commonmodels.LinkGenerator,
 	topic string,
-	arguments models.Arguments,
+	arguments wsmodels.Arguments,
 	send chan<- interface{},
 ) (*TransactionStatusesDataProvider, error) {
 	p := &TransactionStatusesDataProvider{
@@ -100,12 +101,12 @@ func (p *TransactionStatusesDataProvider) handleResponse() func(txResults []*acc
 				return status.Errorf(codes.Internal, "message index already incremented to %d", messageIndex.Value())
 			}
 
-			var txStatusesPayload models.TransactionStatusesResponse
-			txStatusesPayload.Build(p.linkGenerator, txResults[i], index)
-
-			var response models.BaseDataProvidersResponse
-			response.Build(p.ID(), p.Topic(), &txStatusesPayload)
-
+			txStatusesPayload := models.NewTransactionStatusesResponse(p.linkGenerator, txResults[i], index)
+			response := models.BaseDataProvidersResponse{
+				SubscriptionID: p.ID(),
+				Topic:          p.Topic(),
+				Payload:        txStatusesPayload,
+			}
 			p.send <- &response
 		}
 
@@ -115,7 +116,7 @@ func (p *TransactionStatusesDataProvider) handleResponse() func(txResults []*acc
 
 // parseAccountStatusesArguments validates and initializes the account statuses arguments.
 func parseTransactionStatusesArguments(
-	arguments models.Arguments,
+	arguments wsmodels.Arguments,
 ) (transactionStatusesArguments, error) {
 	allowedFields := map[string]struct{}{
 		"tx_id": {},
