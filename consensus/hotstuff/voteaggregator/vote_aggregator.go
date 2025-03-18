@@ -110,8 +110,10 @@ func NewVoteAggregator(
 		// start vote collectors
 		collectors.Start(signalerCtx)
 		go func() {
-			<-collectors.Ready()
-			ready()
+			if err := util.WaitClosed(parentCtx, collectors.Ready()); err == nil {
+				// only signal ready when collectors are ready, but always handle shutdown
+				ready()
+			}
 
 			// wait for internal workers to stop, then signal vote collectors to stop
 			wg.Wait()
