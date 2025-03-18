@@ -190,7 +190,7 @@ func NewInstance(t *testing.T, options ...Option) *Instance {
 
 	// program the builder module behaviour
 	in.builder.On("BuildOn", mock.Anything, mock.Anything, mock.Anything).Return(
-		func(parentID flow.Identifier, setter func(*flow.Header) error, sign func(*flow.Proposal) error) *flow.Proposal {
+		func(parentID flow.Identifier, setter func(*flow.Header) error, sign func(*flow.Header) ([]byte, error)) *flow.Proposal {
 			in.updatingBlocks.Lock()
 			defer in.updatingBlocks.Unlock()
 
@@ -207,15 +207,16 @@ func NewInstance(t *testing.T, options ...Option) *Instance {
 				Timestamp:   time.Now().UTC(),
 			}
 			require.NoError(t, setter(header))
+			sig, err := sign(header)
+			require.NoError(t, err)
 			proposal := &flow.Proposal{
 				Header:          header,
-				ProposerSigData: nil, // will be immediately signed
+				ProposerSigData: sig,
 			}
-			require.NoError(t, sign(proposal))
 			in.headers[header.ID()] = header
 			return proposal
 		},
-		func(parentID flow.Identifier, _ func(*flow.Header) error, _ func(*flow.Proposal) error) error {
+		func(parentID flow.Identifier, _ func(*flow.Header) error, _ func(*flow.Header) ([]byte, error)) error {
 			in.updatingBlocks.RLock()
 			_, ok := in.headers[parentID]
 			in.updatingBlocks.RUnlock()

@@ -117,7 +117,7 @@ func NewBuilder(
 // However, it will pass through all errors returned by `setter` and `sign`.
 // Callers must be aware of possible error returns from the `setter` and `sign` arguments they provide,
 // and handle them accordingly when handling errors returned from BuildOn.
-func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header) error, sign func(*flow.Proposal) error) (*flow.Proposal, error) {
+func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header) error, sign func(*flow.Header) ([]byte, error)) (*flow.Proposal, error) {
 
 	// since we don't know the blockID when building the block we track the
 	// time indirectly and insert the span directly at the end
@@ -619,7 +619,7 @@ func (b *Builder) createProposal(parentID flow.Identifier,
 	seals []*flow.Seal,
 	insertableReceipts *InsertableReceipts,
 	setter func(*flow.Header) error,
-	sign func(*flow.Proposal) error,
+	sign func(*flow.Header) ([]byte, error),
 ) (*flow.Block, *flow.Proposal, error) {
 
 	parent, err := b.headers.ByBlockID(parentID)
@@ -664,13 +664,13 @@ func (b *Builder) createProposal(parentID flow.Identifier,
 	})
 
 	// sign the proposal
-	proposal := &flow.Proposal{
-		Header:          header,
-		ProposerSigData: nil, // will be immediately signed
-	}
-	err = sign(proposal)
+	sig, err := sign(header)
 	if err != nil {
 		return nil, nil, fmt.Errorf("could not sign the block: %w", err)
+	}
+	proposal := &flow.Proposal{
+		Header:          header,
+		ProposerSigData: sig,
 	}
 
 	return block, proposal, nil

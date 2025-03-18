@@ -99,7 +99,7 @@ func NewBuilder(
 // However, it will pass through all errors returned by `setter` and `sign`.
 // Callers must be aware of possible error returns from the `setter` and `sign` arguments they provide,
 // and handle them accordingly when handling errors returned from BuildOn.
-func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header) error, sign func(*flow.Proposal) error) (*flow.Proposal, error) {
+func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header) error, sign func(*flow.Header) ([]byte, error)) (*flow.Proposal, error) {
 	parentSpan, ctx := b.tracer.StartSpanFromContext(context.Background(), trace.COLBuildOn)
 	defer parentSpan.End()
 
@@ -496,7 +496,7 @@ func (b *Builder) buildHeader(
 	ctx *blockBuildContext,
 	payload *cluster.Payload,
 	setter func(header *flow.Header) error,
-	sign func(proposal *flow.Proposal) error,
+	sign func(header *flow.Header) ([]byte, error),
 ) (*flow.Proposal, error) {
 
 	header := &flow.Header{
@@ -515,15 +515,14 @@ func (b *Builder) buildHeader(
 	if err != nil {
 		return nil, fmt.Errorf("could not set fields to header: %w", err)
 	}
-	proposal := &flow.Proposal{
-		Header:          header,
-		ProposerSigData: nil, // will be immediately signed
-	}
-	err = sign(proposal)
+	sig, err := sign(header)
 	if err != nil {
 		return nil, fmt.Errorf("could not sign proposal: %w", err)
 	}
-	return proposal, nil
+	return &flow.Proposal{
+		Header:          header,
+		ProposerSigData: sig,
+	}, nil
 }
 
 // findRefHeightSearchRangeForConflictingClusterBlocks computes the range of reference

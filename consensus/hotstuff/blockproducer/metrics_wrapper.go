@@ -24,7 +24,7 @@ func NewMetricsWrapper(builder module.Builder, metrics module.HotstuffMetrics) *
 	}
 }
 
-func (w BlockBuilderMetricsWrapper) BuildOn(parentID flow.Identifier, setter func(*flow.Header) error, sign func(proposal *flow.Proposal) error) (*flow.Proposal, error) {
+func (w BlockBuilderMetricsWrapper) BuildOn(parentID flow.Identifier, setter func(*flow.Header) error, sign func(*flow.Header) ([]byte, error)) (*flow.Proposal, error) {
 	processStart := time.Now()
 	header, err := w.builder.BuildOn(parentID, setter, sign)
 	w.metrics.PayloadProductionDuration(time.Since(processStart))

@@ -38,7 +38,7 @@ import (
 )
 
 var noopSetter = func(*flow.Header) error { return nil }
-var noopSigner = func(*flow.Proposal) error { return nil }
+var noopSigner = func(*flow.Header) ([]byte, error) { return nil, nil }
 
 type BuilderSuite struct {
 	suite.Suite
@@ -281,8 +281,8 @@ func (suite *BuilderSuite) TestBuildOn_SetterErrorPassthrough() {
 func (suite *BuilderSuite) TestBuildOn_SignerErrorPassthrough() {
 	suite.T().Run("unexpected Exception", func(t *testing.T) {
 		exception := errors.New("exception")
-		sign := func(h *flow.Proposal) error {
-			return exception
+		sign := func(h *flow.Header) ([]byte, error) {
+			return nil, exception
 		}
 		_, err := suite.builder.BuildOn(suite.genesis.ID(), noopSetter, sign)
 		suite.Assert().ErrorIs(err, exception)
@@ -290,8 +290,8 @@ func (suite *BuilderSuite) TestBuildOn_SignerErrorPassthrough() {
 	suite.T().Run("NoVoteError", func(t *testing.T) {
 		// the EventHandler relies on this sentinel in particular to be passed through
 		sentinel := hotstuffmodel.NewNoVoteErrorf("not voting")
-		sign := func(h *flow.Proposal) error {
-			return sentinel
+		sign := func(h *flow.Header) ([]byte, error) {
+			return nil, sentinel
 		}
 		_, err := suite.builder.BuildOn(suite.genesis.ID(), noopSetter, sign)
 		suite.Assert().ErrorIs(err, sentinel)
