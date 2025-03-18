@@ -80,27 +80,27 @@ func (s *DataProviderFactorySuite) TestSupportedTopics() {
 		assertExpectations func()
 	}{
 		{
-			name:      "block topic",
-			topic:     BlocksTopic,
-			arguments: models.Arguments{"block_status": parser.Finalized},
+			name:              "block topic",
+			topic:             BlocksTopic,
+			arguments:         models.Arguments{"block_status": parser.Finalized},
 			setupSubscription: func() {},
 			assertExpectations: func() {
 				s.accessApi.AssertExpectations(s.T())
 			},
 		},
 		{
-			name:      "block headers topic",
-			topic:     BlockHeadersTopic,
-			arguments: models.Arguments{"block_status": parser.Finalized},
+			name:              "block headers topic",
+			topic:             BlockHeadersTopic,
+			arguments:         models.Arguments{"block_status": parser.Finalized},
 			setupSubscription: func() {},
 			assertExpectations: func() {
 				s.accessApi.AssertExpectations(s.T())
 			},
 		},
 		{
-			name:      "block digests topic",
-			topic:     BlockDigestsTopic,
-			arguments: models.Arguments{"block_status": parser.Finalized},
+			name:              "block digests topic",
+			topic:             BlockDigestsTopic,
+			arguments:         models.Arguments{"block_status": parser.Finalized},
 			setupSubscription: func() {},
 			assertExpectations: func() {
 				s.accessApi.AssertExpectations(s.T())
@@ -143,9 +143,9 @@ func (s *DataProviderFactorySuite) TestSupportedTopics() {
 			},
 		},
 		{
-			name:      "send transaction statuses topic",
-			topic:     SendAndGetTransactionStatusesTopic,
-			arguments: models.Arguments(unittest.CreateSendTxHttpPayload(tx)),
+			name:              "send transaction statuses topic",
+			topic:             SendAndGetTransactionStatusesTopic,
+			arguments:         models.Arguments(unittest.CreateSendTxHttpPayload(tx)),
 			setupSubscription: func() {},
 			assertExpectations: func() {
 				s.stateStreamApi.AssertExpectations(s.T())
