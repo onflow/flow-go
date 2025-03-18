@@ -354,7 +354,7 @@ func TestIgnoreBlocksBelowFinalizedView(t *testing.T) {
 		// sanity checks to confirm correct test setup
 		requireLatestFinalizedBlock(t, forks, blocks[0])
 		requireFinalityProof(t, forks, expectedFinalityProof)
-		require.False(t, forks.IsKnownBlock(builder.GenesisBlock().ID()))
+		require.False(t, forks.IsKnownBlock(builder.GenesisBlock().BlockID()))
 
 		// adding block [◄(1) 5]: note that QC is _below_ the pruning threshold, i.e. cannot resolve the parent
 		// * Forks should store block, despite the parent already being pruned
@@ -375,7 +375,7 @@ func TestIgnoreBlocksBelowFinalizedView(t *testing.T) {
 		// sanity checks to confirm correct test setup
 		requireLatestFinalizedBlock(t, forks, blocks[0])
 		requireFinalityProof(t, forks, expectedFinalityProof)
-		require.False(t, forks.IsKnownBlock(builder.GenesisBlock().ID()))
+		require.False(t, forks.IsKnownBlock(builder.GenesisBlock().BlockID()))
 
 		// adding block [◄(1) 5]: note that QC is _below_ the pruning threshold, i.e. cannot resolve the parent
 		// * Forks should store block, despite the parent already being pruned
