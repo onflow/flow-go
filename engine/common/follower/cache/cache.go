@@ -68,7 +68,7 @@ func (c *Cache) Peek(blockID flow.Identifier) *flow.Block {
 // NewCache creates new instance of Cache
 func NewCache(log zerolog.Logger, limit uint32, collector module.HeroCacheMetrics, notifier hotstuff.ProposalViolationConsumer) *Cache {
 	// We consume ejection event from HeroCache to here to drop ejected blocks from our secondary indices.
-	distributor := NewDistributor()
+	distributor := NewDistributor[*flow.Block]()
 	cache := &Cache{
 		backend: herocache.NewCache[*flow.Block](
 			limit,
