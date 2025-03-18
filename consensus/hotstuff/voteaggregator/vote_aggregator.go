@@ -107,26 +107,22 @@ func NewVoteAggregator(
 		ctx, cancel := context.WithCancel(context.Background())
 		signalerCtx, errCh := irrecoverable.WithSignaler(ctx)
 
-		// since we are breaking the connection between parentCtx and signalerCtx, we need to
-		// explicitly rethrow any errors from signalerCtx to parentCtx, otherwise they are dropped.
-		go func() {
-			if err := util.WaitError(errCh, ctx.Done()); err != nil {
-				parentCtx.Throw(err)
-			}
-		}()
-
 		// start vote collectors
 		collectors.Start(signalerCtx)
-		<-collectors.Ready()
+		go func() {
+			<-collectors.Ready()
+			ready()
 
-		ready()
+			// wait for internal workers to stop, then signal vote collectors to stop
+			wg.Wait()
+			cancel()
+		}()
 
-		// wait for internal workers to stop
-		wg.Wait()
-		// signal vote collectors to stop
-		cancel()
-		// wait for it to stop
-		<-collectors.Done()
+		// since we are breaking the connection between parentCtx and signalerCtx, we need to
+		// explicitly rethrow any errors from signalerCtx to parentCtx, otherwise they are dropped.
+		if err := util.WaitError(errCh, collectors.Done()); err != nil {
+			parentCtx.Throw(err)
+		}
 	})
 	componentBuilder.AddWorker(func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
 		ready()
