@@ -143,7 +143,7 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header) er
 	}
 
 	// assemble the block proposal
-	block, proposal, err := b.createProposal(parentID,
+	blockProposal, err := b.createProposal(parentID,
 		insertableGuarantees,
 		insertableSeals,
 		insertableReceipts,
@@ -153,15 +153,15 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header) er
 		return nil, fmt.Errorf("could not assemble proposal: %w", err)
 	}
 
-	span, ctx := b.tracer.StartBlockSpan(context.Background(), proposal.Header.ID(), trace.CONBuilderBuildOn, otelTrace.WithTimestamp(startTime))
+	span, ctx := b.tracer.StartBlockSpan(context.Background(), blockProposal.Block.Header.ID(), trace.CONBuilderBuildOn, otelTrace.WithTimestamp(startTime))
 	defer span.End()
 
-	err = b.state.Extend(ctx, block)
+	err = b.state.Extend(ctx, blockProposal.Block)
 	if err != nil {
 		return nil, fmt.Errorf("could not extend state with built proposal: %w", err)
 	}
 
-	return proposal, nil
+	return &flow.Proposal{Header: blockProposal.Block.Header, ProposerSigData: blockProposal.ProposerSigData}, nil
 }
 
 // repopulateExecutionTree restores latest state of execution tree mempool based on local chain state information.
@@ -620,11 +620,11 @@ func (b *Builder) createProposal(parentID flow.Identifier,
 	insertableReceipts *InsertableReceipts,
 	setter func(*flow.Header) error,
 	sign func(*flow.Header) ([]byte, error),
-) (*flow.Block, *flow.Proposal, error) {
+) (*flow.BlockProposal, error) {
 
 	parent, err := b.headers.ByBlockID(parentID)
 	if err != nil {
-		return nil, nil, fmt.Errorf("could not retrieve parent: %w", err)
+		return nil, fmt.Errorf("could not retrieve parent: %w", err)
 	}
 
 	timestamp := b.cfg.blockTimer.Build(parent.Timestamp)
@@ -642,14 +642,14 @@ func (b *Builder) createProposal(parentID flow.Identifier,
 	// since we need to know the correct view of the block.
 	err = setter(header)
 	if err != nil {
-		return nil, nil, fmt.Errorf("could not apply setter: %w", err)
+		return nil, fmt.Errorf("could not apply setter: %w", err)
 	}
 
 	// Evolve the Protocol State starting from the parent block's state. Information that may change the state is:
 	// the candidate block's view and Service Events from execution results sealed in the candidate block.
 	protocolStateID, _, err := b.mutableProtocolState.EvolveState(header.ParentID, header.View, seals)
 	if err != nil {
-		return nil, nil, fmt.Errorf("evolving protocol state failed: %w", err)
+		return nil, fmt.Errorf("evolving protocol state failed: %w", err)
 	}
 
 	block := &flow.Block{
@@ -666,14 +666,14 @@ func (b *Builder) createProposal(parentID flow.Identifier,
 	// sign the proposal
 	sig, err := sign(header)
 	if err != nil {
-		return nil, nil, fmt.Errorf("could not sign the block: %w", err)
+		return nil, fmt.Errorf("could not sign the block: %w", err)
 	}
-	proposal := &flow.Proposal{
-		Header:          header,
+	proposal := &flow.BlockProposal{
+		Block:           block,
 		ProposerSigData: sig,
 	}
 
-	return block, proposal, nil
+	return proposal, nil
 }
 
 // isResultForBlock constructs a mempool.BlockFilter that accepts only blocks whose ID is part of the given set.
