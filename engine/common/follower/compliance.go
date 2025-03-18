@@ -73,7 +73,7 @@ type complianceCore interface {
 	module.Startable
 	module.ReadyDoneAware
 
-	// OnBlockRange consumes an *untrusted* range of connected blocks( part of a fork). The originID parameter
+	// OnBlockRange consumes an *untrusted* range of connected blocks (part of a fork). The originID parameter
 	// identifies the node that sent the batch of blocks. The input `connectedRange` must be sequentially ordered
 	// blocks that form a chain, i.e. connectedRange[i] is the parent of connectedRange[i+1]. Submitting a
 	// disconnected batch results in an `ErrDisconnectedBatch` error and the batch is dropped (no-op).
@@ -81,7 +81,7 @@ type complianceCore interface {
 	// Caution: this method is allowed to block.
 	// Expected errors during normal operations:
 	//   - cache.ErrDisconnectedBatch
-	OnBlockRange(originID flow.Identifier, connectedRange []*flow.Block) error
+	OnBlockRange(originID flow.Identifier, connectedRange []*flow.BlockProposal) error
 
 	// OnFinalizedBlock prunes all blocks below the finalized view from the compliance layer's Cache
 	// and PendingTree.
