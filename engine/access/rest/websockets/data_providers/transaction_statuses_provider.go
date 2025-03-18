@@ -86,6 +86,10 @@ func (p *TransactionStatusesDataProvider) Run(ctx context.Context) error {
 	)
 }
 
+// sendResponse processes a tx status message and sends it to client's channel.
+// This function is not expected to be called concurrently.
+//
+// No errors are expected during normal operations.
 func (p *TransactionStatusesDataProvider) sendResponse(
 	txResults []*access.TransactionResult,
 	messageIndex *counters.StrictMonotonicCounter,

@@ -479,9 +479,7 @@ func (c *Controller) handleSubscribe(ctx context.Context, msg models.SubscribeMe
 	c.dataProvidersGroup.Add(1)
 	go func() {
 		err = provider.Run(ctx)
-		// return the error to the client for all errors except context.Canceled.
-		// context.Canceled is returned during graceful shutdown of a subscription
-		if err != nil && !errors.Is(err, context.Canceled) {
+		if err != nil {
 			err = fmt.Errorf("internal error: %w", err)
 			c.writeErrorResponse(
 				ctx,
