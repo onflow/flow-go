@@ -49,7 +49,7 @@ func TestHeroQueue_Sequential(t *testing.T) {
 	for i, e := range entities {
 		popedE, ok := q.Pop()
 		require.True(t, ok)
-		require.Equal(t, *e, popedE)
+		require.Equal(t, e, popedE)
 		require.Equal(t, e.ID(), popedE.ID())
 
 		require.Equal(t, q.Size(), uint(len(entities)-i-1))
