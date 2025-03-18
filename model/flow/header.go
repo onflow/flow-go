@@ -11,6 +11,7 @@ import (
 	"github.com/onflow/flow-go/model/fingerprint"
 )
 
+// Proposal is a block header and the proposer's signature for the block.
 type Proposal struct {
 	Header *Header
 	// ProposerSigData is a signature of the proposer over the new block. Not a single cryptographic

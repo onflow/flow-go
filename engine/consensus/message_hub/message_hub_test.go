@@ -230,7 +230,7 @@ func (s *MessageHubSuite) TestOnOwnProposal() {
 	s.Run("should fail with wrong proposer", func() {
 		header := *block.Header
 		header.ProposerID = unittest.IdentifierFixture()
-		proposal := &flow.Proposal{Header: &header, ProposerSigData: unittest.SignatureFixture()}
+		proposal := unittest.ProposalFromHeader(&header)
 		err := s.hub.sendOwnProposal(proposal)
 		require.Error(s.T(), err, "should fail with wrong proposer")
 		header.ProposerID = s.myID
@@ -240,7 +240,7 @@ func (s *MessageHubSuite) TestOnOwnProposal() {
 	s.Run("should fail with wrong block ID", func() {
 		header := *block.Header
 		header.View++
-		proposal := &flow.Proposal{Header: &header, ProposerSigData: unittest.SignatureFixture()}
+		proposal := unittest.ProposalFromHeader(&header)
 		err := s.hub.sendOwnProposal(proposal)
 		require.Error(s.T(), err, "should fail with missing payload")
 		header.View--

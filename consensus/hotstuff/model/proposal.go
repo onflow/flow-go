@@ -56,7 +56,8 @@ func (p *SignedProposal) ProposerVote() *Vote {
 	return &vote
 }
 
-// SignedProposalFromFlow turns a flow header into a hotstuff block type.
+// SignedProposalFromFlow turns a flow header proposal into a hotstuff block type.
+// Since not all header fields are exposed to HotStuff, this conversion is not reversible.
 func SignedProposalFromFlow(p *flow.Proposal) *SignedProposal {
 	proposal := SignedProposal{
 		Proposal: Proposal{

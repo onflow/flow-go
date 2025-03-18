@@ -259,13 +259,9 @@ func BlockFixtures(number int) []*flow.Block {
 
 func ProposalFixture() *flow.BlockProposal {
 	block := BlockFixture()
-	return &flow.BlockProposal{
-		Block:           &block,
-		ProposerSigData: SignatureFixture(),
-	}
+	return ProposalFromBlock(&block)
 }
 
-// TODO(tim) use or remove
 func ProposalFromHeader(header *flow.Header) *flow.Proposal {
 	return &flow.Proposal{
 		Header:          header,
