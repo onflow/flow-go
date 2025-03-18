@@ -28,60 +28,60 @@ type transactionStatusesArguments struct {
 type TransactionStatusesDataProvider struct {
 	*baseDataProvider
 
-	logger        zerolog.Logger
-	api           access.API
+	arguments     transactionStatusesArguments
+	messageIndex  counters.StrictMonotonicCounter
 	linkGenerator commonmodels.LinkGenerator
 }
 
 var _ DataProvider = (*TransactionStatusesDataProvider)(nil)
 
 func NewTransactionStatusesDataProvider(
-	ctx context.Context,
 	logger zerolog.Logger,
 	api access.API,
 	subscriptionID string,
 	linkGenerator commonmodels.LinkGenerator,
 	topic string,
-	arguments models.Arguments,
+	rawArguments models.Arguments,
 	send chan<- interface{},
 ) (*TransactionStatusesDataProvider, error) {
-	p := &TransactionStatusesDataProvider{
-		logger:        logger.With().Str("component", "transaction-statuses-data-provider").Logger(),
-		api:           api,
-		linkGenerator: linkGenerator,
-	}
-
-	// Initialize arguments passed to the provider.
-	txStatusesArgs, err := parseTransactionStatusesArguments(arguments)
+	args, err := parseTransactionStatusesArguments(rawArguments)
 	if err != nil {
 		return nil, fmt.Errorf("invalid arguments for tx statuses data provider: %w", err)
 	}
-
-	subCtx, cancel := context.WithCancel(ctx)
-
-	p.baseDataProvider = newBaseDataProvider(
+	provider := newBaseDataProvider(
+		logger.With().Str("component", "transaction-statuses-data-provider").Logger(),
+		api,
 		subscriptionID,
 		topic,
-		arguments,
-		cancel,
+		rawArguments,
 		send,
-		p.createSubscription(subCtx, txStatusesArgs), // Set up a subscription to tx statuses based on arguments.
 	)
 
-	return p, nil
+	return &TransactionStatusesDataProvider{
+		baseDataProvider: provider,
+		arguments:        args,
+		messageIndex:     counters.NewMonotonicCounter(0),
+		linkGenerator:    linkGenerator,
+	}, nil
 }
 
 // Run starts processing the subscription for events and handles responses.
 //
 // No errors are expected during normal operations.
-func (p *TransactionStatusesDataProvider) Run() error {
-	messageIndex := counters.NewMonotonicCounter(0)
+func (p *TransactionStatusesDataProvider) Run(ctx context.Context) error {
+	// start a new subscription. we read data from it and send them to client's channel
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+	p.subscriptionState = newSubscriptionState(cancel, p.createAndStartSubscription(ctx, p.arguments))
+
+	// set messageIndex to zero in case Run() called for the second time
+	p.messageIndex = counters.NewMonotonicCounter(0)
 
 	return run(
-		p.closedChan,
-		p.subscription,
+		p.baseDataProvider.done,
+		p.subscriptionState.subscription,
 		func(response []*access.TransactionResult) error {
-			return p.sendResponse(response, &messageIndex)
+			return p.sendResponse(response, &p.messageIndex)
 		},
 	)
 }
@@ -104,8 +104,8 @@ func (p *TransactionStatusesDataProvider) sendResponse(
 	return nil
 }
 
-// createSubscription creates a new subscription using the specified input arguments.
-func (p *TransactionStatusesDataProvider) createSubscription(
+// createAndStartSubscription creates a new subscription using the specified input arguments.
+func (p *TransactionStatusesDataProvider) createAndStartSubscription(
 	ctx context.Context,
 	args transactionStatusesArguments,
 ) subscription.Subscription {

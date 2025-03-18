@@ -1,7 +1,6 @@
 package data_providers
 
 import (
-	"context"
 	"strconv"
 	"testing"
 
@@ -128,14 +127,12 @@ func (s *BlockHeadersProviderSuite) requireBlockHeader(actual interface{}, expec
 // 2. Invalid 'block_status' argument.
 // 3. Providing both 'start_block_id' and 'start_block_height' simultaneously.
 func (s *BlockHeadersProviderSuite) TestBlockHeadersDataProvider_InvalidArguments() {
-	ctx := context.Background()
 	send := make(chan interface{})
-
 	topic := BlockHeadersTopic
 
 	for _, test := range s.invalidArgumentsTestCases() {
 		s.Run(test.name, func() {
-			provider, err := NewBlockHeadersDataProvider(ctx, s.log, s.api, "dummy-id", topic, test.arguments, send)
+			provider, err := NewBlockHeadersDataProvider(s.log, s.api, "dummy-id", topic, test.arguments, send)
 			s.Require().Nil(provider)
 			s.Require().Error(err)
 			s.Require().Contains(err.Error(), test.expectedErrorMsg)

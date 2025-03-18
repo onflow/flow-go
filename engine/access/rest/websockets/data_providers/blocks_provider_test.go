@@ -1,7 +1,6 @@
 package data_providers
 
 import (
-	"context"
 	"fmt"
 	"strconv"
 	"testing"
@@ -219,12 +218,11 @@ func (s *BlocksProviderSuite) expectedBlockResponses(
 // 3. Providing both 'start_block_id' and 'start_block_height' simultaneously.
 // 4. Providing unexpected argument.
 func (s *BlocksProviderSuite) TestBlocksDataProvider_InvalidArguments() {
-	ctx := context.Background()
 	send := make(chan interface{})
 
 	for _, test := range s.invalidArgumentsTestCases() {
 		s.Run(test.name, func() {
-			provider, err := NewBlocksDataProvider(ctx, s.log, s.api, "dummy-id", nil, BlocksTopic, test.arguments, send)
+			provider, err := NewBlocksDataProvider(s.log, s.api, "dummy-id", nil, BlocksTopic, test.arguments, send)
 			s.Require().Nil(provider)
 			s.Require().Error(err)
 			s.Require().Contains(err.Error(), test.expectedErrorMsg)

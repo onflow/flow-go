@@ -5,41 +5,57 @@ import (
 	"fmt"
 	"sync"
 
+	"github.com/rs/zerolog"
+
+	"github.com/onflow/flow-go/access"
 	"github.com/onflow/flow-go/engine/access/rest/websockets/models"
 	"github.com/onflow/flow-go/engine/access/subscription"
 )
 
 // baseDataProvider holds common objects for the provider
 type baseDataProvider struct {
-	subscriptionID string
-	topic          string
-	arguments      models.Arguments
-	cancel         context.CancelFunc
-	send           chan<- interface{}
-	subscription   subscription.Subscription
-	// Ensures the closedChan has been closed once.
-	closedFlag sync.Once
-	closedChan chan struct{}
+	logger            zerolog.Logger
+	api               access.API
+	subscriptionID    string
+	topic             string
+	rawArguments      models.Arguments
+	doneOnce          sync.Once
+	done              chan struct{}
+	send              chan<- interface{}
+	subscriptionState *subscriptionState
+}
+
+type subscriptionState struct {
+	cancelSubscriptionContext context.CancelFunc
+	subscription              subscription.Subscription
+}
+
+func newSubscriptionState(cancel context.CancelFunc, subscription subscription.Subscription) *subscriptionState {
+	return &subscriptionState{
+		cancelSubscriptionContext: cancel,
+		subscription:              subscription,
+	}
 }
 
 // newBaseDataProvider creates a new instance of baseDataProvider.
 func newBaseDataProvider(
+	logger zerolog.Logger,
+	api access.API,
 	subscriptionID string,
 	topic string,
-	arguments models.Arguments,
-	cancel context.CancelFunc,
+	rawArguments models.Arguments,
 	send chan<- interface{},
-	subscription subscription.Subscription,
 ) *baseDataProvider {
 	return &baseDataProvider{
-		subscriptionID: subscriptionID,
-		topic:          topic,
-		arguments:      arguments,
-		cancel:         cancel,
-		send:           send,
-		subscription:   subscription,
-		closedFlag:     sync.Once{},
-		closedChan:     make(chan struct{}),
+		logger:            logger,
+		api:               api,
+		subscriptionID:    subscriptionID,
+		topic:             topic,
+		rawArguments:      rawArguments,
+		doneOnce:          sync.Once{},
+		done:              make(chan struct{}),
+		send:              send,
+		subscriptionState: nil,
 	}
 }
 
@@ -55,29 +71,29 @@ func (b *baseDataProvider) Topic() string {
 
 // Arguments returns the arguments associated with the data provider.
 func (b *baseDataProvider) Arguments() models.Arguments {
-	return b.arguments
+	return b.rawArguments
 }
 
 // Close terminates the data provider.
 //
 // No errors are expected during normal operations.
 func (b *baseDataProvider) Close() {
-	b.cancel()
-	b.closedFlag.Do(func() {
-		close(b.closedChan)
+	b.doneOnce.Do(func() {
+		close(b.done)
 	})
+	b.subscriptionState.cancelSubscriptionContext()
 }
 
 type sendResponseCallback[T any] func(T) error
 
 // run reads data from a subscription and sends it to clients using the provided
 // sendResponse callback. It continuously listens to the subscription's data
-// channel and forwards the received values until the closedChan is closed or
+// channel and forwards the received values until the done channel is doneOnce or
 // the subscription ends. It is used as a helper function for each data provider's
 // Run() function.
 //
 // Parameters:
-//   - closedChan: A channel to signal the termination of the function. When closed,
+//   - providerDone: A channel to signal the termination of the function. When doneOnce,
 //     the function stops reading from the subscription and exits gracefully.
 //   - subscription: An instance of the Subscription interface, which provides a
 //     data stream through its Channel() method and an optional error through Err().
@@ -88,26 +104,28 @@ type sendResponseCallback[T any] func(T) error
 // Returns:
 //   - error: If any error occurs while reading from the subscription or sending
 //     responses, it returns an error wrapped with additional context. If the
-//     closedChan is closed or the subscription ends without errors, it returns nil.
+//     providerDone is doneOnce or the subscription ends without errors, it returns nil.
 //
 // Errors:
 //   - If the subscription ends with an error, it is wrapped and returned.
 //   - If a received value is not of the expected type (T), an error is returned.
 //   - If the sendResponse callback encounters an error, it is wrapped and returned.
 func run[T any](
-	closedChan <-chan struct{},
+	providerDone <-chan struct{},
 	subscription subscription.Subscription,
 	sendResponse sendResponseCallback[T],
 ) error {
 	for {
 		select {
-		case <-closedChan:
+		case <-providerDone:
 			return nil
 		case value, ok := <-subscription.Channel():
 			if !ok {
-				if subscription.Err() != nil {
-					return fmt.Errorf("subscription finished with error: %w", subscription.Err())
+				err := subscription.Err()
+				if err != nil {
+					return fmt.Errorf("subscription finished with error: %w", err)
 				}
+
 				return nil
 			}
 

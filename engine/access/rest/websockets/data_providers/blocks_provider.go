@@ -27,8 +27,6 @@ type blocksArguments struct {
 type BlocksDataProvider struct {
 	*baseDataProvider
 
-	logger        zerolog.Logger
-	api           access.API
 	arguments     blocksArguments
 	linkGenerator commonmodels.LinkGenerator
 }
@@ -37,49 +35,48 @@ var _ DataProvider = (*BlocksDataProvider)(nil)
 
 // NewBlocksDataProvider creates a new instance of BlocksDataProvider.
 func NewBlocksDataProvider(
-	ctx context.Context,
 	logger zerolog.Logger,
 	api access.API,
 	subscriptionID string,
 	linkGenerator commonmodels.LinkGenerator,
 	topic string,
-	arguments models.Arguments,
+	rawArguments models.Arguments,
 	send chan<- interface{},
 ) (*BlocksDataProvider, error) {
-	p := &BlocksDataProvider{
-		logger:        logger.With().Str("component", "blocks-data-provider").Logger(),
-		api:           api,
-		linkGenerator: linkGenerator,
-	}
-
-	// Parse arguments passed to the provider.
-	var err error
-	p.arguments, err = parseBlocksArguments(arguments)
+	args, err := parseBlocksArguments(rawArguments)
 	if err != nil {
 		return nil, fmt.Errorf("invalid arguments: %w", err)
 	}
 
-	subCtx, cancel := context.WithCancel(ctx)
-	p.baseDataProvider = newBaseDataProvider(
+	provider := newBaseDataProvider(
+		logger.With().Str("component", "blocks-data-provider").Logger(),
+		api,
 		subscriptionID,
 		topic,
-		arguments,
-		cancel,
+		rawArguments,
 		send,
-		p.createSubscription(subCtx, p.arguments), // Set up a subscription to blocks based on arguments.
 	)
 
-	return p, nil
+	return &BlocksDataProvider{
+		baseDataProvider: provider,
+		arguments:        args,
+		linkGenerator:    linkGenerator,
+	}, nil
 }
 
 // Run starts processing the subscription for blocks and handles responses.
 //
 // Expected errors during normal operations:
 //   - context.Canceled: if the operation is canceled, during an unsubscribe action.
-func (p *BlocksDataProvider) Run() error {
+func (p *BlocksDataProvider) Run(ctx context.Context) error {
+	// we read data from the subscription and send them to client's channel
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+	p.subscriptionState = newSubscriptionState(cancel, p.createAndStartSubscription(ctx, p.arguments))
+
 	return run(
-		p.closedChan,
-		p.subscription,
+		p.baseDataProvider.done,
+		p.subscriptionState.subscription,
 		func(block *flow.Block) error {
 			var blockResponse commonmodels.Block
 
@@ -98,8 +95,8 @@ func (p *BlocksDataProvider) Run() error {
 	)
 }
 
-// createSubscription creates a new subscription using the specified input arguments.
-func (p *BlocksDataProvider) createSubscription(ctx context.Context, args blocksArguments) subscription.Subscription {
+// createAndStartSubscription creates a new subscription using the specified input arguments.
+func (p *BlocksDataProvider) createAndStartSubscription(ctx context.Context, args blocksArguments) subscription.Subscription {
 	if args.StartBlockID != flow.ZeroID {
 		return p.api.SubscribeBlocksFromStartBlockID(ctx, args.StartBlockID, args.BlockStatus)
 	}

@@ -454,7 +454,7 @@ func (c *Controller) handleSubscribe(ctx context.Context, msg models.SubscribeMe
 	}
 
 	// register new provider
-	provider, err := c.dataProviderFactory.NewDataProvider(ctx, subscriptionID.String(), msg.Topic, msg.Arguments, c.multiplexedStream)
+	provider, err := c.dataProviderFactory.NewDataProvider(subscriptionID.String(), msg.Topic, msg.Arguments, c.multiplexedStream)
 	if err != nil {
 		err = fmt.Errorf("error creating data provider: %w", err)
 		c.writeErrorResponse(
@@ -478,7 +478,7 @@ func (c *Controller) handleSubscribe(ctx context.Context, msg models.SubscribeMe
 	// run provider
 	c.dataProvidersGroup.Add(1)
 	go func() {
-		err = provider.Run()
+		err = provider.Run(ctx)
 		// return the error to the client for all errors except context.Canceled.
 		// context.Canceled is returned during graceful shutdown of a subscription
 		if err != nil && !errors.Is(err, context.Canceled) {

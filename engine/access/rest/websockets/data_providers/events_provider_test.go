@@ -204,7 +204,6 @@ func (s *EventsProviderSuite) TestMessageIndexEventProviderResponse_HappyPath() 
 
 	// Create the EventsDataProvider instance
 	provider, err := NewEventsDataProvider(
-		ctx,
 		s.log,
 		s.api,
 		"dummy-id",
@@ -219,14 +218,14 @@ func (s *EventsProviderSuite) TestMessageIndexEventProviderResponse_HappyPath() 
 	s.Require().NotNil(provider)
 	s.Require().NoError(err)
 
-	// Ensure the provider is properly closed after the test
+	// Ensure the provider is properly doneOnce after the test
 	defer provider.Close()
 
 	// Run the provider in a separate goroutine to simulate subscription processing
 	done := make(chan struct{})
 	go func() {
 		defer close(done)
-		err = provider.Run()
+		err = provider.Run(ctx)
 		s.Require().NoError(err)
 	}()
 
@@ -273,7 +272,6 @@ func (s *EventsProviderSuite) TestMessageIndexEventProviderResponse_HappyPath() 
 // 2. Invalid 'start_block_id' argument.
 // 3. Invalid 'start_block_height' argument.
 func (s *EventsProviderSuite) TestEventsDataProvider_InvalidArguments() {
-	ctx := context.Background()
 	send := make(chan interface{})
 
 	topic := EventsTopic
@@ -281,7 +279,6 @@ func (s *EventsProviderSuite) TestEventsDataProvider_InvalidArguments() {
 	for _, test := range invalidArgumentsTestCases() {
 		s.Run(test.name, func() {
 			provider, err := NewEventsDataProvider(
-				ctx,
 				s.log,
 				s.api,
 				"dummy-id",
@@ -300,13 +297,11 @@ func (s *EventsProviderSuite) TestEventsDataProvider_InvalidArguments() {
 }
 
 func (s *EventsProviderSuite) TestEventsDataProvider_StateStreamNotConfigured() {
-	ctx := context.Background()
 	send := make(chan interface{})
 
 	topic := EventsTopic
 
 	provider, err := NewEventsDataProvider(
-		ctx,
 		s.log,
 		nil,
 		"dummy-id",

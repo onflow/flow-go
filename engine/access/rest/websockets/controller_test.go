@@ -54,7 +54,7 @@ func (s *WsControllerSuite) TestSubscribeRequest() {
 		controller := NewWebSocketController(s.logger, s.wsConfig, conn, dataProviderFactory)
 
 		dataProviderFactory.
-			On("NewDataProvider", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).
+			On("NewDataProvider", mock.Anything, mock.Anything, mock.Anything, mock.Anything).
 			Return(dataProvider, nil).
 			Once()
 
@@ -62,7 +62,7 @@ func (s *WsControllerSuite) TestSubscribeRequest() {
 		// data provider might finish on its own or controller will close it via Close()
 		dataProvider.On("Close").Return(nil).Maybe()
 		dataProvider.
-			On("Run").
+			On("Run", mock.Anything).
 			Run(func(args mock.Arguments) {
 				<-done
 			}).
@@ -167,7 +167,7 @@ func (s *WsControllerSuite) TestSubscribeRequest() {
 		controller := NewWebSocketController(s.logger, s.wsConfig, conn, dataProviderFactory)
 
 		dataProviderFactory.
-			On("NewDataProvider", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).
+			On("NewDataProvider", mock.Anything, mock.Anything, mock.Anything, mock.Anything).
 			Return(nil, fmt.Errorf("error creating data provider")).
 			Once()
 
@@ -206,13 +206,13 @@ func (s *WsControllerSuite) TestSubscribeRequest() {
 		// data provider might finish on its own or controller will close it via Close()
 		dataProvider.On("Close").Return(nil).Maybe()
 		dataProvider.
-			On("Run").
+			On("Run", mock.Anything).
 			Run(func(args mock.Arguments) {}).
 			Return(fmt.Errorf("error running data provider")).
 			Once()
 
 		dataProviderFactory.
-			On("NewDataProvider", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).
+			On("NewDataProvider", mock.Anything, mock.Anything, mock.Anything, mock.Anything).
 			Return(dataProvider, nil).
 			Once()
 
@@ -253,7 +253,7 @@ func (s *WsControllerSuite) TestUnsubscribeRequest() {
 		controller := NewWebSocketController(s.logger, s.wsConfig, conn, dataProviderFactory)
 
 		dataProviderFactory.
-			On("NewDataProvider", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).
+			On("NewDataProvider", mock.Anything, mock.Anything, mock.Anything, mock.Anything).
 			Return(dataProvider, nil).
 			Once()
 
@@ -261,7 +261,7 @@ func (s *WsControllerSuite) TestUnsubscribeRequest() {
 		// data provider might finish on its own or controller will close it via Close()
 		dataProvider.On("Close").Return(nil).Maybe()
 		dataProvider.
-			On("Run").
+			On("Run", mock.Anything).
 			Run(func(args mock.Arguments) {
 				<-done
 			}).
@@ -321,7 +321,7 @@ func (s *WsControllerSuite) TestUnsubscribeRequest() {
 		controller := NewWebSocketController(s.logger, s.wsConfig, conn, dataProviderFactory)
 
 		dataProviderFactory.
-			On("NewDataProvider", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).
+			On("NewDataProvider", mock.Anything, mock.Anything, mock.Anything, mock.Anything).
 			Return(dataProvider, nil).
 			Once()
 
@@ -329,7 +329,7 @@ func (s *WsControllerSuite) TestUnsubscribeRequest() {
 		// data provider might finish on its own or controller will close it via Close()
 		dataProvider.On("Close").Return(nil).Maybe()
 		dataProvider.
-			On("Run").
+			On("Run", mock.Anything).
 			Run(func(args mock.Arguments) {
 				<-done
 			}).
@@ -391,7 +391,7 @@ func (s *WsControllerSuite) TestUnsubscribeRequest() {
 		controller := NewWebSocketController(s.logger, s.wsConfig, conn, dataProviderFactory)
 
 		dataProviderFactory.
-			On("NewDataProvider", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).
+			On("NewDataProvider", mock.Anything, mock.Anything, mock.Anything, mock.Anything).
 			Return(dataProvider, nil).
 			Once()
 
@@ -399,7 +399,7 @@ func (s *WsControllerSuite) TestUnsubscribeRequest() {
 		// data provider might finish on its own or controller will close it via Close()
 		dataProvider.On("Close").Return(nil).Maybe()
 		dataProvider.
-			On("Run").
+			On("Run", mock.Anything).
 			Run(func(args mock.Arguments) {
 				<-done
 			}).
@@ -464,7 +464,7 @@ func (s *WsControllerSuite) TestListSubscriptions() {
 		controller := NewWebSocketController(s.logger, s.wsConfig, conn, dataProviderFactory)
 
 		dataProviderFactory.
-			On("NewDataProvider", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).
+			On("NewDataProvider", mock.Anything, mock.Anything, mock.Anything, mock.Anything).
 			Return(dataProvider, nil).
 			Once()
 
@@ -480,7 +480,7 @@ func (s *WsControllerSuite) TestListSubscriptions() {
 		// data provider might finish on its own or controller will close it via Close()
 		dataProvider.On("Close").Return(nil).Maybe()
 		dataProvider.
-			On("Run").
+			On("Run", mock.Anything).
 			Run(func(args mock.Arguments) {
 				<-done
 			}).
@@ -546,7 +546,7 @@ func (s *WsControllerSuite) TestSubscribeBlocks() {
 		controller := NewWebSocketController(s.logger, s.wsConfig, conn, dataProviderFactory)
 
 		dataProviderFactory.
-			On("NewDataProvider", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).
+			On("NewDataProvider", mock.Anything, mock.Anything, mock.Anything, mock.Anything).
 			Return(dataProvider, nil).
 			Once()
 
@@ -600,7 +600,7 @@ func (s *WsControllerSuite) TestSubscribeBlocks() {
 		controller := NewWebSocketController(s.logger, s.wsConfig, conn, dataProviderFactory)
 
 		dataProviderFactory.
-			On("NewDataProvider", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).
+			On("NewDataProvider", mock.Anything, mock.Anything, mock.Anything, mock.Anything).
 			Return(dataProvider, nil).
 			Once()
 
@@ -805,7 +805,7 @@ func (s *WsControllerSuite) TestControllerShutdown() {
 		controller := NewWebSocketController(s.logger, s.wsConfig, conn, dataProviderFactory)
 
 		dataProviderFactory.
-			On("NewDataProvider", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).
+			On("NewDataProvider", mock.Anything, mock.Anything, mock.Anything, mock.Anything).
 			Return(dataProvider, nil).
 			Once()
 

@@ -63,19 +63,19 @@ func testHappyPath(
 			test.setupBackend(sub)
 
 			// Create the data provider instance
-			provider, err := factory.NewDataProvider(ctx, "dummy-id", topic, test.arguments, send)
+			provider, err := factory.NewDataProvider("dummy-id", topic, test.arguments, send)
 
 			require.NotNil(t, provider)
 			require.NoError(t, err)
 
-			// Ensure the provider is properly closed after the test
+			// Ensure the provider is properly doneOnce after the test
 			defer provider.Close()
 
 			// Run the provider in a separate goroutine
 			done := make(chan struct{})
 			go func() {
 				defer close(done)
-				err = provider.Run()
+				err = provider.Run(ctx)
 				require.NoError(t, err)
 			}()
 
@@ -92,7 +92,7 @@ func testHappyPath(
 			for i, expected := range test.expectedResponses {
 				unittest.RequireReturnsBefore(t, func() {
 					v, ok := <-send
-					require.True(t, ok, "channel closed while waiting for response %v: err: %v", expected, sub.Err())
+					require.True(t, ok, "channel doneOnce while waiting for response %v: err: %v", expected, sub.Err())
 
 					requireFn(v, expected)
 				}, time.Second, fmt.Sprintf("timed out waiting for response %d %v", i, expected))

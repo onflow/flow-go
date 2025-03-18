@@ -1,7 +1,6 @@
 package data_providers
 
 import (
-	"context"
 	"fmt"
 
 	"github.com/rs/zerolog"
@@ -33,13 +32,7 @@ type DataProviderFactory interface {
 	// and configuration parameters.
 	//
 	// No errors are expected during normal operations.
-	NewDataProvider(
-		ctx context.Context,
-		subscriptionID string,
-		topic string,
-		args models.Arguments,
-		ch chan<- interface{},
-	) (DataProvider, error)
+	NewDataProvider(subID string, topic string, args models.Arguments, stream chan<- interface{}) (DataProvider, error)
 }
 
 var _ DataProviderFactory = (*DataProviderFactoryImpl)(nil)
@@ -97,22 +90,22 @@ func NewDataProviderFactory(
 // - ch: Channel to which the data provider sends data.
 //
 // No errors are expected during normal operations.
-func (s *DataProviderFactoryImpl) NewDataProvider(ctx context.Context, subscriptionID string, topic string, arguments models.Arguments, ch chan<- interface{}) (DataProvider, error) {
+func (s *DataProviderFactoryImpl) NewDataProvider(subscriptionID string, topic string, arguments models.Arguments, ch chan<- interface{}) (DataProvider, error) {
 	switch topic {
 	case BlocksTopic:
-		return NewBlocksDataProvider(ctx, s.logger, s.accessApi, subscriptionID, s.linkGenerator, topic, arguments, ch)
+		return NewBlocksDataProvider(s.logger, s.accessApi, subscriptionID, s.linkGenerator, topic, arguments, ch)
 	case BlockHeadersTopic:
-		return NewBlockHeadersDataProvider(ctx, s.logger, s.accessApi, subscriptionID, topic, arguments, ch)
+		return NewBlockHeadersDataProvider(s.logger, s.accessApi, subscriptionID, topic, arguments, ch)
 	case BlockDigestsTopic:
-		return NewBlockDigestsDataProvider(ctx, s.logger, s.accessApi, subscriptionID, topic, arguments, ch)
+		return NewBlockDigestsDataProvider(s.logger, s.accessApi, subscriptionID, topic, arguments, ch)
 	case EventsTopic:
-		return NewEventsDataProvider(ctx, s.logger, s.stateStreamApi, subscriptionID, topic, arguments, ch, s.chain, s.eventFilterConfig, s.heartbeatInterval)
+		return NewEventsDataProvider(s.logger, s.stateStreamApi, subscriptionID, topic, arguments, ch, s.chain, s.eventFilterConfig, s.heartbeatInterval)
 	case AccountStatusesTopic:
-		return NewAccountStatusesDataProvider(ctx, s.logger, s.stateStreamApi, subscriptionID, topic, arguments, ch, s.chain, s.eventFilterConfig, s.heartbeatInterval)
+		return NewAccountStatusesDataProvider(s.logger, s.stateStreamApi, subscriptionID, topic, arguments, ch, s.chain, s.eventFilterConfig, s.heartbeatInterval)
 	case TransactionStatusesTopic:
-		return NewTransactionStatusesDataProvider(ctx, s.logger, s.accessApi, subscriptionID, s.linkGenerator, topic, arguments, ch)
+		return NewTransactionStatusesDataProvider(s.logger, s.accessApi, subscriptionID, s.linkGenerator, topic, arguments, ch)
 	case SendAndGetTransactionStatusesTopic:
-		return NewSendAndGetTransactionStatusesDataProvider(ctx, s.logger, s.accessApi, subscriptionID, s.linkGenerator, topic, arguments, ch, s.chain)
+		return NewSendAndGetTransactionStatusesDataProvider(s.logger, s.accessApi, subscriptionID, s.linkGenerator, topic, arguments, ch, s.chain)
 	default:
 		return nil, fmt.Errorf("unsupported topic \"%s\"", topic)
 	}

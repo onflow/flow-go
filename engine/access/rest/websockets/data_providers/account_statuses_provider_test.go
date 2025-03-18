@@ -86,13 +86,10 @@ func (s *AccountStatusesProviderSuite) TestAccountStatusesDataProvider_HappyPath
 }
 
 func (s *AccountStatusesProviderSuite) TestAccountStatusesDataProvider_StateStreamNotConfigured() {
-	ctx := context.Background()
 	send := make(chan interface{})
-
 	topic := AccountStatusesTopic
 
 	provider, err := NewAccountStatusesDataProvider(
-		ctx,
 		s.log,
 		nil,
 		"dummy-id",
@@ -204,15 +201,12 @@ func (s *AccountStatusesProviderSuite) expectedAccountStatusesResponses(backendR
 // 2. Invalid 'start_block_id' argument.
 // 3. Invalid 'start_block_height' argument.
 func (s *AccountStatusesProviderSuite) TestAccountStatusesDataProvider_InvalidArguments() {
-	ctx := context.Background()
 	send := make(chan interface{})
-
 	topic := AccountStatusesTopic
 
 	for _, test := range invalidArgumentsTestCases() {
 		s.Run(test.name, func() {
 			provider, err := NewAccountStatusesDataProvider(
-				ctx,
 				s.log,
 				s.api,
 				"dummy-id",
@@ -254,7 +248,6 @@ func (s *AccountStatusesProviderSuite) TestMessageIndexAccountStatusesProviderRe
 
 	// Create the AccountStatusesDataProvider instance
 	provider, err := NewAccountStatusesDataProvider(
-		ctx,
 		s.log,
 		s.api,
 		"dummy-id",
@@ -268,14 +261,14 @@ func (s *AccountStatusesProviderSuite) TestMessageIndexAccountStatusesProviderRe
 	s.Require().NotNil(provider)
 	s.Require().NoError(err)
 
-	// Ensure the provider is properly closed after the test
+	// Ensure the provider is properly doneOnce after the test
 	defer provider.Close()
 
 	// Run the provider in a separate goroutine to simulate subscription processing
 	done := make(chan struct{})
 	go func() {
 		defer close(done)
-		err = provider.Run()
+		err = provider.Run(ctx)
 		s.Require().NoError(err)
 	}()
 

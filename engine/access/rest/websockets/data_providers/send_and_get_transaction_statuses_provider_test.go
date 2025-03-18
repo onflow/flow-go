@@ -1,7 +1,6 @@
 package data_providers
 
 import (
-	"context"
 	"testing"
 
 	"github.com/rs/zerolog"
@@ -123,9 +122,7 @@ func (s *SendTransactionStatusesProviderSuite) requireTransactionStatuses(
 // when invalid arguments are provided. It verifies that appropriate errors are returned
 // for missing or conflicting arguments.
 func (s *SendTransactionStatusesProviderSuite) TestSendTransactionStatusesDataProvider_InvalidArguments() {
-	ctx := context.Background()
 	send := make(chan interface{})
-
 	topic := SendAndGetTransactionStatusesTopic
 
 	invalidTx := unittest.TransactionBodyFixture()
@@ -134,10 +131,7 @@ func (s *SendTransactionStatusesProviderSuite) TestSendTransactionStatusesDataPr
 	arguments := unittest.CreateSendTxHttpPayload(invalidTx)
 	arguments["script"] = 0
 
-	expectedErrorMsg := "invalid arguments for send tx statuses data provider"
-
 	provider, err := NewSendAndGetTransactionStatusesDataProvider(
-		ctx,
 		s.log,
 		s.api,
 		"dummy-id",
@@ -149,5 +143,7 @@ func (s *SendTransactionStatusesProviderSuite) TestSendTransactionStatusesDataPr
 	)
 	s.Require().Nil(provider)
 	s.Require().Error(err)
+
+	expectedErrorMsg := "invalid arguments for send tx statuses data provider"
 	s.Require().Contains(err.Error(), expectedErrorMsg)
 }

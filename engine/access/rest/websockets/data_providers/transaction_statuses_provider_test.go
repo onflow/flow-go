@@ -201,7 +201,6 @@ func (s *TransactionStatusesProviderSuite) TestMessageIndexTransactionStatusesPr
 
 	// Create the TransactionStatusesDataProvider instance
 	provider, err := NewTransactionStatusesDataProvider(
-		ctx,
 		s.log,
 		s.api,
 		"dummy-id",
@@ -214,14 +213,14 @@ func (s *TransactionStatusesProviderSuite) TestMessageIndexTransactionStatusesPr
 	s.Require().NotNil(provider)
 	s.Require().NoError(err)
 
-	// Ensure the provider is properly closed after the test
+	// Ensure the provider is properly doneOnce after the test
 	defer provider.Close()
 
 	// Run the provider in a separate goroutine to simulate subscription processing
 	done := make(chan struct{})
 	go func() {
 		defer close(done)
-		err = provider.Run()
+		err = provider.Run(ctx)
 		s.Require().NoError(err)
 	}()
 
@@ -271,7 +270,6 @@ func (s *TransactionStatusesProviderSuite) TestMessageIndexTransactionStatusesPr
 // when invalid arguments are provided. It verifies that appropriate errors are returned
 // for missing or conflicting arguments.
 func (s *TransactionStatusesProviderSuite) TestTransactionStatusesDataProvider_InvalidArguments() {
-	ctx := context.Background()
 	send := make(chan interface{})
 
 	topic := TransactionStatusesTopic
@@ -279,7 +277,6 @@ func (s *TransactionStatusesProviderSuite) TestTransactionStatusesDataProvider_I
 	for _, test := range invalidTransactionStatusesArgumentsTestCases() {
 		s.Run(test.name, func() {
 			provider, err := NewTransactionStatusesDataProvider(
-				ctx,
 				s.log,
 				s.api,
 				"dummy-id",

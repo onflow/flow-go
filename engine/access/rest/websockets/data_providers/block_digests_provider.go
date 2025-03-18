@@ -17,54 +17,52 @@ import (
 type BlockDigestsDataProvider struct {
 	*baseDataProvider
 
-	logger zerolog.Logger
-	api    access.API
+	arguments blocksArguments
 }
 
 var _ DataProvider = (*BlockDigestsDataProvider)(nil)
 
 // NewBlockDigestsDataProvider creates a new instance of BlockDigestsDataProvider.
 func NewBlockDigestsDataProvider(
-	ctx context.Context,
 	logger zerolog.Logger,
 	api access.API,
 	subscriptionID string,
 	topic string,
-	arguments models.Arguments,
+	rawArguments models.Arguments,
 	send chan<- interface{},
 ) (*BlockDigestsDataProvider, error) {
-	p := &BlockDigestsDataProvider{
-		logger: logger.With().Str("component", "block-digests-data-provider").Logger(),
-		api:    api,
-	}
-
-	// Parse arguments passed to the provider.
-	blockArgs, err := parseBlocksArguments(arguments)
+	args, err := parseBlocksArguments(rawArguments)
 	if err != nil {
 		return nil, fmt.Errorf("invalid arguments: %w", err)
 	}
 
-	subCtx, cancel := context.WithCancel(ctx)
-	p.baseDataProvider = newBaseDataProvider(
+	base := newBaseDataProvider(
+		logger.With().Str("component", "block-digests-data-provider").Logger(),
+		api,
 		subscriptionID,
 		topic,
-		arguments,
-		cancel,
+		rawArguments,
 		send,
-		p.createSubscription(subCtx, blockArgs), // Set up a subscription to block digests based on arguments.
 	)
 
-	return p, nil
+	return &BlockDigestsDataProvider{
+		baseDataProvider: base,
+		arguments:        args,
+	}, nil
 }
 
 // Run starts processing the subscription for block digests and handles responses.
 //
-// Expected errors during normal operations:
-//   - context.Canceled: if the operation is canceled, during an unsubscribe action.
-func (p *BlockDigestsDataProvider) Run() error {
+// No errors expected during normal operations
+func (p *BlockDigestsDataProvider) Run(ctx context.Context) error {
+	// we read data from the subscription and send them to client's channel
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+	p.subscriptionState = newSubscriptionState(cancel, p.createAndStartSubscription(ctx, p.arguments))
+
 	return run(
-		p.closedChan,
-		p.subscription,
+		p.baseDataProvider.done,
+		p.subscriptionState.subscription,
 		func(b *flow.BlockDigest) error {
 			var blockDigest models.BlockDigest
 			blockDigest.Build(b)
@@ -78,8 +76,8 @@ func (p *BlockDigestsDataProvider) Run() error {
 	)
 }
 
-// createSubscription creates a new subscription using the specified input arguments.
-func (p *BlockDigestsDataProvider) createSubscription(ctx context.Context, args blocksArguments) subscription.Subscription {
+// createAndStartSubscription creates a new subscription using the specified input arguments.
+func (p *BlockDigestsDataProvider) createAndStartSubscription(ctx context.Context, args blocksArguments) subscription.Subscription {
 	if args.StartBlockID != flow.ZeroID {
 		return p.api.SubscribeBlockDigestsFromStartBlockID(ctx, args.StartBlockID, args.BlockStatus)
 	}

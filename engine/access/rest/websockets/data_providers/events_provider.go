@@ -23,80 +23,79 @@ type eventsArguments struct {
 	StartBlockID      flow.Identifier          // ID of the block to start subscription from
 	StartBlockHeight  uint64                   // Height of the block to start subscription from
 	Filter            state_stream.EventFilter // Filter applied to events for a given subscription
-	HeartbeatInterval *uint64                  // Maximum number of blocks message won't be sent. Nil if not set
+	HeartbeatInterval uint64                   // Maximum number of blocks message won't be sent
 }
 
 // EventsDataProvider is responsible for providing events
 type EventsDataProvider struct {
 	*baseDataProvider
 
-	logger         zerolog.Logger
-	stateStreamApi state_stream.API
-
-	heartbeatInterval uint64
+	stateStreamApi         state_stream.API
+	arguments              eventsArguments
+	messageIndex           counters.StrictMonotonicCounter
+	blocksSinceLastMessage uint64
 }
 
 var _ DataProvider = (*EventsDataProvider)(nil)
 
 // NewEventsDataProvider creates a new instance of EventsDataProvider.
 func NewEventsDataProvider(
-	ctx context.Context,
 	logger zerolog.Logger,
 	stateStreamApi state_stream.API,
 	subscriptionID string,
 	topic string,
-	arguments models.Arguments,
+	rawArguments models.Arguments,
 	send chan<- interface{},
 	chain flow.Chain,
 	eventFilterConfig state_stream.EventFilterConfig,
-	heartbeatInterval uint64,
+	defaultHeartbeatInterval uint64,
 ) (*EventsDataProvider, error) {
 	if stateStreamApi == nil {
 		return nil, fmt.Errorf("this access node does not support streaming events")
 	}
 
-	p := &EventsDataProvider{
-		logger:            logger.With().Str("component", "events-data-provider").Logger(),
-		stateStreamApi:    stateStreamApi,
-		heartbeatInterval: heartbeatInterval,
-	}
-
-	// Initialize arguments passed to the provider.
-	eventArgs, err := parseEventsArguments(arguments, chain, eventFilterConfig)
+	args, err := parseEventsArguments(rawArguments, chain, eventFilterConfig, defaultHeartbeatInterval)
 	if err != nil {
 		return nil, fmt.Errorf("invalid arguments for events data provider: %w", err)
 	}
-	if eventArgs.HeartbeatInterval != nil {
-		p.heartbeatInterval = *eventArgs.HeartbeatInterval
-	}
 
-	subCtx, cancel := context.WithCancel(ctx)
-
-	p.baseDataProvider = newBaseDataProvider(
+	provider := newBaseDataProvider(
+		logger.With().Str("component", "events-data-provider").Logger(),
+		nil,
 		subscriptionID,
 		topic,
-		arguments,
-		cancel,
+		rawArguments,
 		send,
-		p.createSubscription(subCtx, eventArgs), // Set up a subscription to events based on arguments.
 	)
 
-	return p, nil
+	return &EventsDataProvider{
+		baseDataProvider:       provider,
+		stateStreamApi:         stateStreamApi,
+		arguments:              args,
+		messageIndex:           counters.NewMonotonicCounter(0),
+		blocksSinceLastMessage: 0,
+	}, nil
 }
 
 // Run starts processing the subscription for events and handles responses.
 //
 // Expected errors during normal operations:
 //   - context.Canceled: if the operation is canceled, during an unsubscribe action.
-func (p *EventsDataProvider) Run() error {
-	messageIndex := counters.NewMonotonicCounter(0)
-	blocksSinceLastMessage := uint64(0)
+func (p *EventsDataProvider) Run(ctx context.Context) error {
+	// we read data from the subscription and send them to client's channel
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+	p.subscriptionState = newSubscriptionState(cancel, p.createAndStartSubscription(ctx, p.arguments))
+
+	// set to nils in case Run() called for the second time
+	p.messageIndex = counters.NewMonotonicCounter(0)
+	p.blocksSinceLastMessage = 0
 
 	return run(
-		p.closedChan,
-		p.subscription,
+		p.baseDataProvider.done,
+		p.subscriptionState.subscription,
 		func(response *backend.EventsResponse) error {
-			return p.sendResponse(response, &messageIndex, &blocksSinceLastMessage)
+			return p.sendResponse(response, &p.messageIndex, &p.blocksSinceLastMessage)
 		},
 	)
 }
@@ -110,7 +109,7 @@ func (p *EventsDataProvider) sendResponse(
 	// or the heartbeat interval limit is reached
 	*blocksSinceLastMessage += 1
 	contractEmittedEvents := len(eventsResponse.Events) != 0
-	reachedHeartbeatLimit := *blocksSinceLastMessage >= p.heartbeatInterval
+	reachedHeartbeatLimit := *blocksSinceLastMessage >= p.arguments.HeartbeatInterval
 	if !contractEmittedEvents && !reachedHeartbeatLimit {
 		return nil
 	}
@@ -128,8 +127,8 @@ func (p *EventsDataProvider) sendResponse(
 	return nil
 }
 
-// createSubscription creates a new subscription using the specified input arguments.
-func (p *EventsDataProvider) createSubscription(ctx context.Context, args eventsArguments) subscription.Subscription {
+// createAndStartSubscription creates a new subscription using the specified input arguments.
+func (p *EventsDataProvider) createAndStartSubscription(ctx context.Context, args eventsArguments) subscription.Subscription {
 	if args.StartBlockID != flow.ZeroID {
 		return p.stateStreamApi.SubscribeEventsFromStartBlockID(ctx, args.StartBlockID, args.Filter)
 	}
@@ -146,6 +145,7 @@ func parseEventsArguments(
 	arguments models.Arguments,
 	chain flow.Chain,
 	eventFilterConfig state_stream.EventFilterConfig,
+	defaultHeartbeatInterval uint64,
 ) (eventsArguments, error) {
 	allowedFields := []string{
 		"start_block_id",
@@ -202,19 +202,20 @@ func parseEventsArguments(
 		}
 	}
 
-	var heartbeatInterval uint64
 	if heartbeatIntervalIn, ok := arguments["heartbeat_interval"]; ok && heartbeatIntervalIn != "" {
 		result, ok := heartbeatIntervalIn.(string)
 		if !ok {
 			return eventsArguments{}, fmt.Errorf("'heartbeat_interval' must be a string")
 		}
 
-		heartbeatInterval, err = util.ToUint64(result)
+		heartbeatInterval, err := util.ToUint64(result)
 		if err != nil {
 			return eventsArguments{}, fmt.Errorf("invalid 'heartbeat_interval': %w", err)
 		}
 
-		args.HeartbeatInterval = &heartbeatInterval
+		args.HeartbeatInterval = heartbeatInterval
+	} else {
+		args.HeartbeatInterval = defaultHeartbeatInterval
 	}
 
 	// Initialize the event filter with the parsed arguments
