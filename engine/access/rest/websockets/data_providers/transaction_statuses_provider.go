@@ -19,9 +19,7 @@ import (
 
 // transactionStatusesArguments contains the arguments required for subscribing to transaction statuses
 type transactionStatusesArguments struct {
-	TxID             flow.Identifier // ID of the transaction to monitor.
-	StartBlockID     flow.Identifier // ID of the block to start subscription from
-	StartBlockHeight uint64          // Height of the block to start subscription from
+	TxID flow.Identifier `json:"tx_id"` // ID of the transaction to monitor.
 }
 
 // TransactionStatusesDataProvider is responsible for providing tx statuses
@@ -120,8 +118,8 @@ func (p *TransactionStatusesDataProvider) createAndStartSubscription(
 func parseTransactionStatusesArguments(
 	arguments models.Arguments,
 ) (transactionStatusesArguments, error) {
-	allowedFields := []string{
-		"tx_id",
+	allowedFields := map[string]struct{}{
+		"tx_id": {},
 	}
 	err := ensureAllowedFields(arguments, allowedFields)
 	if err != nil {
@@ -130,18 +128,28 @@ func parseTransactionStatusesArguments(
 
 	var args transactionStatusesArguments
 
-	if txIDIn, ok := arguments["tx_id"]; ok && txIDIn != "" {
-		result, ok := txIDIn.(string)
-		if !ok {
-			return transactionStatusesArguments{}, fmt.Errorf("'tx_id' must be a string")
-		}
-		var txID parser.ID
-		err := txID.Parse(result)
-		if err != nil {
-			return transactionStatusesArguments{}, fmt.Errorf("invalid 'tx_id': %w", err)
-		}
-		args.TxID = txID.Flow()
+	// Check if tx_id exists and is not empty
+	rawTxID, exists := arguments["tx_id"]
+	if !exists {
+		return transactionStatusesArguments{}, fmt.Errorf("missing 'tx_id' field")
 	}
 
+	// Ensure the transaction ID is a string
+	txIDString, isString := rawTxID.(string)
+	if !isString {
+		return transactionStatusesArguments{}, fmt.Errorf("'tx_id' must be a string")
+	}
+
+	if len(txIDString) == 0 {
+		return transactionStatusesArguments{}, fmt.Errorf("'tx_id' must not be empty")
+	}
+
+	var parsedTxID parser.ID
+	if err = parsedTxID.Parse(txIDString); err != nil {
+		return transactionStatusesArguments{}, fmt.Errorf("invalid 'tx_id': %w", err)
+	}
+
+	// Assign the validated transaction ID to the args
+	args.TxID = parsedTxID.Flow()
 	return args, nil
 }

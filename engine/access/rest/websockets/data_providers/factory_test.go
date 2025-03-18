@@ -83,9 +83,7 @@ func (s *DataProviderFactorySuite) TestSupportedTopics() {
 			name:      "block topic",
 			topic:     BlocksTopic,
 			arguments: models.Arguments{"block_status": parser.Finalized},
-			setupSubscription: func() {
-				//s.setupSubscription(s.accessApi.On("SubscribeBlocksFromLatest", mock.Anything, flow.BlockStatusFinalized))
-			},
+			setupSubscription: func() {},
 			assertExpectations: func() {
 				s.accessApi.AssertExpectations(s.T())
 			},
@@ -94,9 +92,7 @@ func (s *DataProviderFactorySuite) TestSupportedTopics() {
 			name:      "block headers topic",
 			topic:     BlockHeadersTopic,
 			arguments: models.Arguments{"block_status": parser.Finalized},
-			setupSubscription: func() {
-				//s.setupSubscription(s.accessApi.On("SubscribeBlockHeadersFromLatest", mock.Anything, flow.BlockStatusFinalized))
-			},
+			setupSubscription: func() {},
 			assertExpectations: func() {
 				s.accessApi.AssertExpectations(s.T())
 			},
@@ -105,42 +101,43 @@ func (s *DataProviderFactorySuite) TestSupportedTopics() {
 			name:      "block digests topic",
 			topic:     BlockDigestsTopic,
 			arguments: models.Arguments{"block_status": parser.Finalized},
-			setupSubscription: func() {
-				//s.setupSubscription(s.accessApi.On("SubscribeBlockDigestsFromLatest", mock.Anything, flow.BlockStatusFinalized))
-			},
+			setupSubscription: func() {},
 			assertExpectations: func() {
 				s.accessApi.AssertExpectations(s.T())
 			},
 		},
 		{
-			name:      "events topic",
-			topic:     EventsTopic,
-			arguments: models.Arguments{},
-			setupSubscription: func() {
-				//s.setupSubscription(s.stateStreamApi.On("SubscribeEventsFromLatest", mock.Anything, mock.Anything))
+			name:  "events topic",
+			topic: EventsTopic,
+			arguments: models.Arguments{
+				"event_types": []string{state_stream.CoreEventAccountCreated},
+				"addresses":   []string{unittest.AddressFixture().String()},
+				"contracts":   []string{"A.0000000000000001.Contract1", "A.0000000000000001.Contract2"},
 			},
+			setupSubscription: func() {},
 			assertExpectations: func() {
 				s.stateStreamApi.AssertExpectations(s.T())
 			},
 		},
 		{
-			name:      "account statuses topic",
-			topic:     AccountStatusesTopic,
-			arguments: models.Arguments{},
-			setupSubscription: func() {
-				//s.setupSubscription(s.stateStreamApi.On("SubscribeAccountStatusesFromLatestBlock", mock.Anything, mock.Anything))
+			name:  "account statuses topic",
+			topic: AccountStatusesTopic,
+			arguments: models.Arguments{
+				"event_types":       []string{state_stream.CoreEventAccountCreated},
+				"account_addresses": []string{unittest.AddressFixture().String()},
 			},
+			setupSubscription: func() {},
 			assertExpectations: func() {
 				s.stateStreamApi.AssertExpectations(s.T())
 			},
 		},
 		{
-			name:      "transaction statuses topic",
-			topic:     TransactionStatusesTopic,
-			arguments: models.Arguments{"tx_id": unittest.IdentifierFixture().String()},
-			setupSubscription: func() {
-				//s.setupSubscription(s.accessApi.On("SubscribeTransactionStatuses", mock.Anything, mock.Anything, mock.Anything))
+			name:  "transaction statuses topic",
+			topic: TransactionStatusesTopic,
+			arguments: models.Arguments{
+				"tx_id": unittest.IdentifierFixture().String(),
 			},
+			setupSubscription: func() {},
 			assertExpectations: func() {
 				s.stateStreamApi.AssertExpectations(s.T())
 			},
@@ -149,9 +146,7 @@ func (s *DataProviderFactorySuite) TestSupportedTopics() {
 			name:      "send transaction statuses topic",
 			topic:     SendAndGetTransactionStatusesTopic,
 			arguments: models.Arguments(unittest.CreateSendTxHttpPayload(tx)),
-			setupSubscription: func() {
-				//s.setupSubscription(s.accessApi.On("SendAndSubscribeTransactionStatuses", mock.Anything, mock.Anything, mock.Anything))
-			},
+			setupSubscription: func() {},
 			assertExpectations: func() {
 				s.stateStreamApi.AssertExpectations(s.T())
 			},
@@ -168,13 +163,6 @@ func (s *DataProviderFactorySuite) TestSupportedTopics() {
 			s.Require().NotNil(provider, "Expected provider for topic %s", test.topic)
 			s.Require().Equal(test.topic, provider.Topic())
 			s.Require().Equal(test.arguments, provider.Arguments())
-
-			//ctx, cancel := context.WithCancel(context.Background())
-			//defer cancel()
-			//go func() {
-			//	err := provider.Run(ctx)
-			//	s.Require().NoError(err, "Expected no error for topic %s", test.topic)
-			//}()
 
 			test.assertExpectations()
 		})

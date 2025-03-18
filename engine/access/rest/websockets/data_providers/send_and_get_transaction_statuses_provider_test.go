@@ -141,8 +141,8 @@ func (s *SendTransactionStatusesProviderSuite) TestSendTransactionStatusesDataPr
 		send,
 		s.chain,
 	)
-	s.Require().Nil(provider)
 	s.Require().Error(err)
+	s.Require().Nil(provider)
 
 	expectedErrorMsg := "invalid arguments for send tx statuses data provider"
 	s.Require().Contains(err.Error(), expectedErrorMsg)

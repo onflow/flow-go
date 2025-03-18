@@ -2,6 +2,7 @@ package data_providers
 
 import (
 	"context"
+	"fmt"
 	"strconv"
 	"testing"
 	"time"
@@ -100,8 +101,8 @@ func (s *AccountStatusesProviderSuite) TestAccountStatusesDataProvider_StateStre
 		state_stream.DefaultEventFilterConfig,
 		subscription.DefaultHeartbeatInterval,
 	)
-	s.Require().Nil(provider)
 	s.Require().Error(err)
+	s.Require().Nil(provider)
 	s.Require().Contains(err.Error(), "does not support streaming account statuses")
 }
 
@@ -114,8 +115,9 @@ func (s *AccountStatusesProviderSuite) subscribeAccountStatusesDataProviderTestC
 		{
 			name: "SubscribeAccountStatusesFromStartBlockID happy path",
 			arguments: models.Arguments{
-				"start_block_id": s.rootBlock.ID().String(),
-				"event_types":    []string{"flow.AccountCreated", "flow.AccountKeyAdded"},
+				"start_block_id":    s.rootBlock.ID().String(),
+				"event_types":       []string{string(flow.EventAccountCreated)},
+				"account_addresses": []string{unittest.AddressFixture().String()},
 			},
 			setupBackend: func(sub *ssmock.Subscription) {
 				s.api.On(
@@ -131,6 +133,8 @@ func (s *AccountStatusesProviderSuite) subscribeAccountStatusesDataProviderTestC
 			name: "SubscribeAccountStatusesFromStartHeight happy path",
 			arguments: models.Arguments{
 				"start_block_height": strconv.FormatUint(s.rootBlock.Header.Height, 10),
+				"event_types":        []string{string(flow.EventAccountCreated)},
+				"account_addresses":  []string{unittest.AddressFixture().String()},
 			},
 			setupBackend: func(sub *ssmock.Subscription) {
 				s.api.On(
@@ -143,8 +147,11 @@ func (s *AccountStatusesProviderSuite) subscribeAccountStatusesDataProviderTestC
 			expectedResponses: expectedResponses,
 		},
 		{
-			name:      "SubscribeAccountStatusesFromLatestBlock happy path",
-			arguments: models.Arguments{},
+			name: "SubscribeAccountStatusesFromLatestBlock happy path",
+			arguments: models.Arguments{
+				"event_types":       []string{string(flow.EventAccountCreated)},
+				"account_addresses": []string{unittest.AddressFixture().String()},
+			},
 			setupBackend: func(sub *ssmock.Subscription) {
 				s.api.On(
 					"SubscribeAccountStatusesFromLatestBlock",
@@ -204,7 +211,7 @@ func (s *AccountStatusesProviderSuite) TestAccountStatusesDataProvider_InvalidAr
 	send := make(chan interface{})
 	topic := AccountStatusesTopic
 
-	for _, test := range invalidArgumentsTestCases() {
+	for _, test := range invalidAccountStatusesArgumentsTestCases() {
 		s.Run(test.name, func() {
 			provider, err := NewAccountStatusesDataProvider(
 				s.log,
@@ -217,8 +224,8 @@ func (s *AccountStatusesProviderSuite) TestAccountStatusesDataProvider_InvalidAr
 				state_stream.DefaultEventFilterConfig,
 				subscription.DefaultHeartbeatInterval,
 			)
-			s.Require().Nil(provider)
 			s.Require().Error(err)
+			s.Require().Nil(provider)
 			s.Require().Contains(err.Error(), test.expectedErrorMsg)
 		})
 	}
@@ -243,7 +250,9 @@ func (s *AccountStatusesProviderSuite) TestMessageIndexAccountStatusesProviderRe
 
 	arguments :=
 		map[string]interface{}{
-			"start_block_id": s.rootBlock.ID().String(),
+			"start_block_id":    s.rootBlock.ID().String(),
+			"event_types":       []string{string(flow.EventAccountCreated)},
+			"account_addresses": []string{unittest.AddressFixture().String()},
 		}
 
 	// Create the AccountStatusesDataProvider instance
@@ -258,8 +267,8 @@ func (s *AccountStatusesProviderSuite) TestMessageIndexAccountStatusesProviderRe
 		state_stream.DefaultEventFilterConfig,
 		subscription.DefaultHeartbeatInterval,
 	)
-	s.Require().NotNil(provider)
 	s.Require().NoError(err)
+	s.Require().NotNil(provider)
 
 	// Ensure the provider is properly doneOnce after the test
 	defer provider.Close()
@@ -320,4 +329,57 @@ func (s *AccountStatusesProviderSuite) backendAccountStatusesResponses(events []
 	}
 
 	return responses
+}
+
+func invalidAccountStatusesArgumentsTestCases() []testErrType {
+	return []testErrType{
+		{
+			name: "provide both 'start_block_id' and 'start_block_height' arguments",
+			arguments: models.Arguments{
+				"start_block_id":     unittest.BlockFixture().ID().String(),
+				"start_block_height": fmt.Sprintf("%d", unittest.BlockFixture().Header.Height),
+				"event_types":        []string{state_stream.CoreEventAccountCreated},
+				"account_addresses":  []string{unittest.AddressFixture().String()},
+			},
+			expectedErrorMsg: "can only provide either 'start_block_id' or 'start_block_height'",
+		},
+		{
+			name: "invalid 'start_block_id' argument",
+			arguments: map[string]interface{}{
+				"start_block_id":    "invalid_block_id",
+				"event_types":       []string{state_stream.CoreEventAccountCreated},
+				"account_addresses": []string{unittest.AddressFixture().String()},
+			},
+			expectedErrorMsg: "invalid ID format",
+		},
+		{
+			name: "invalid 'start_block_height' argument",
+			arguments: map[string]interface{}{
+				"start_block_height": "-1",
+				"event_types":        []string{state_stream.CoreEventAccountCreated},
+				"account_addresses":  []string{unittest.AddressFixture().String()},
+			},
+			expectedErrorMsg: "'start_block_height' must be convertible to uint64",
+		},
+		{
+			name: "invalid 'heartbeat_interval' argument",
+			arguments: map[string]interface{}{
+				"start_block_id":     unittest.BlockFixture().ID().String(),
+				"event_types":        []string{state_stream.CoreEventAccountCreated},
+				"account_addresses":  []string{unittest.AddressFixture().String()},
+				"heartbeat_interval": "-1",
+			},
+			expectedErrorMsg: "'heartbeat_interval' must be convertible to uint64",
+		},
+		{
+			name: "unexpected argument",
+			arguments: map[string]interface{}{
+				"start_block_id":      unittest.BlockFixture().ID().String(),
+				"event_types":         []string{state_stream.CoreEventAccountCreated},
+				"account_addresses":   []string{unittest.AddressFixture().String()},
+				"unexpected_argument": "dummy",
+			},
+			expectedErrorMsg: "unexpected field: 'unexpected_argument'",
+		},
+	}
 }

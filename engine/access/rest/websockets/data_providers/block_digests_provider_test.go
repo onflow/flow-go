@@ -46,7 +46,7 @@ func (s *BlockDigestsProviderSuite) TestBlockDigestsDataProvider_HappyPath() {
 }
 
 // validBlockDigestsArgumentsTestCases defines test happy cases for block digests data providers.
-// Each test case specifies input rawArguments, and setup functions for the mock API used in the test.
+// Each test case specifies input arguments, and setup functions for the mock API used in the test.
 func (s *BlockDigestsProviderSuite) validBlockDigestsArgumentsTestCases() []testType {
 	expectedResponses := make([]interface{}, len(s.blocks))
 	for i, b := range s.blocks {
@@ -121,8 +121,8 @@ func (s *BlocksProviderSuite) requireBlockDigest(actual interface{}, expected in
 }
 
 // TestBlockDigestsDataProvider_InvalidArguments tests the behavior of the block digests data provider
-// when invalid rawArguments are provided. It verifies that appropriate errors are returned
-// for missing or conflicting rawArguments.
+// when invalid arguments are provided. It verifies that appropriate errors are returned
+// for missing or conflicting arguments.
 // This test covers the test cases:
 // 1. Missing 'block_status' argument.
 // 2. Invalid 'block_status' argument.
@@ -135,8 +135,8 @@ func (s *BlockDigestsProviderSuite) TestBlockDigestsDataProvider_InvalidArgument
 	for _, test := range s.invalidArgumentsTestCases() {
 		s.Run(test.name, func() {
 			provider, err := NewBlockDigestsDataProvider(s.log, s.api, "dummy-id", topic, test.arguments, send)
-			s.Require().Nil(provider)
 			s.Require().Error(err)
+			s.Require().Nil(provider)
 			s.Require().Contains(err.Error(), test.expectedErrorMsg)
 		})
 	}
