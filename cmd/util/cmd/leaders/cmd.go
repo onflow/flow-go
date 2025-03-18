@@ -18,14 +18,16 @@ var (
 )
 var Cmd = &cobra.Command{
 	Use:   "leaders",
-	Short: "Get leader selection for a view range",
-	Run:   run,
+	Short: "Get leader selection for a view range.",
+	Long: `Get leader selection for a view range in the current epoch for a provided snapshot.
+ Expects a valid protocol state snapshot JSON to be piped into STDIN. Writes a JSON list of leaders for the given view range to STDOUT.`,
+	Run: run,
 }
 
 func init() {
 
-	Cmd.Flags().Uint64Var(&flagStartView, "start-view", 0, "")
-	Cmd.Flags().Uint64Var(&flagEndView, "end-view", 0, "")
+	Cmd.Flags().Uint64Var(&flagStartView, "start-view", 0, "the inclusive first view to get leader selection for")
+	Cmd.Flags().Uint64Var(&flagEndView, "end-view", 0, "the inclusive last view to get leader selection for")
 	Cmd.MarkFlagRequired("start-view")
 	Cmd.MarkFlagRequired("end-view")
 }
