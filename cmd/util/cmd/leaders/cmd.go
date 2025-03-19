@@ -7,6 +7,7 @@ import (
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
 
+	"github.com/onflow/flow-go/cmd"
 	"github.com/onflow/flow-go/consensus/hotstuff/committees/leader"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/state/protocol/inmem"
@@ -28,8 +29,8 @@ func init() {
 
 	Cmd.Flags().Uint64Var(&flagStartView, "start-view", 0, "the inclusive first view to get leader selection for")
 	Cmd.Flags().Uint64Var(&flagEndView, "end-view", 0, "the inclusive last view to get leader selection for")
-	Cmd.MarkFlagRequired("start-view")
-	Cmd.MarkFlagRequired("end-view")
+	cmd.MarkFlagRequired(Cmd, "start-view")
+	cmd.MarkFlagRequired(Cmd, "end-view")
 }
 
 func run(*cobra.Command, []string) {
