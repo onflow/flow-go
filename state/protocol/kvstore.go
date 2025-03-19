@@ -2,6 +2,7 @@ package protocol
 
 import (
 	"io"
+	"math"
 	"slices"
 
 	"github.com/ethereum/go-ethereum/rlp"
@@ -148,6 +149,14 @@ type ExecutionMeteringParameters struct {
 	ExecutionMemoryWeights map[uint64]uint64
 	// ExecutionMemoryLimit ...
 	ExecutionMemoryLimit uint64
+}
+
+func DefaultExecutionMeteringParameters() ExecutionMeteringParameters {
+	return ExecutionMeteringParameters{
+		ExecutionEffortWeights: make(map[uint64]uint64),
+		ExecutionMemoryWeights: make(map[uint64]uint64),
+		ExecutionMemoryLimit:   math.MaxUint64,
+	}
 }
 
 // EncodeRLP defines RLP encoding behaviour for ExecutionMeteringParameters, overriding the default behaviour.
