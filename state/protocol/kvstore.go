@@ -218,8 +218,8 @@ type VersionedEncodable interface {
 
 // ViewBasedActivator represents a scheduled update to some protocol parameter P.
 // (The relationship between a ViewBasedActivator and P is managed outside this model.)
-// Once the ViewBasedActivator A is persisted to the protocol state, P is updated
-// to value A.Data in the first block on or after view A.ActivationView.
+// Once the ViewBasedActivator A is persisted to the protocol state, P is updated to value
+// A.Data in the first block with view ≥ A.ActivationView (in each fork independently).
 type ViewBasedActivator[T any] struct {
 	// Data is the pending new value, to be applied when reaching or exceeding ActivationView.
 	Data T
@@ -249,7 +249,7 @@ type UpdatableField[T any] struct {
 // In particular, two versions only differing in their minor, might be entirely downwards-INCOMPATIBLE.
 //
 // We generally recommend to use Integer Versioning for components. The MagnitudeVersion scheme should
-// be only used when there is a clear advantage Integer Versioning which outweighs the risk of falsely
+// be only used when there is a clear advantage over Integer Versioning, which outweighs the risk of falsely
 // making compatibility assumptions by confusing this scheme with Semantic Versioning!
 //
 // MagnitudeVersion helps with an intuitive representation of the “magnitude of change”.
@@ -261,8 +261,8 @@ type UpdatableField[T any] struct {
 // Node can use one implementation for versions with different major.
 //
 // We emphasize again that this differentiation of “imperfect but good-enough downwards compatibility”
-// is in no way reflected by the versioning scheme. Any automated decisions of compatibility for different
-// versions are to be avoided (including versions where only the minor is different).
+// is in no way reflected by the versioning scheme. Any automated decisions regarding compatibility of
+// different versions are to be avoided (including versions where only the minor is different).
 //
 // Engineering teams using this scheme must be aware that the MagnitudeVersion is easily
 // misleading wrt to incorrect assumptions about downwards compatibility. Avoiding problems (up to and
