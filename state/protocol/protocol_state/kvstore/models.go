@@ -80,9 +80,10 @@ func (model *Modelv0) Replicate(protocolVersion uint64) (protocol_state.KVStoreM
 		// no need for migration, return a complete copy
 		return clone.Clone(model), nil
 	}
-	if protocolVersion != 1 {
+	nextVersion := currentVersion + 1
+	if protocolVersion != nextVersion {
 		return nil, fmt.Errorf("unsupported replication version %d, expect %d: %w",
-			protocolVersion, 1, ErrIncompatibleVersionChange)
+			protocolVersion, nextVersion, ErrIncompatibleVersionChange)
 	}
 
 	// perform actual replication to the next version
@@ -210,7 +211,7 @@ func (model *Modelv1) Replicate(protocolVersion uint64) (protocol_state.KVStoreM
 	if protocolVersion != nextVersion {
 		// can only Replicate into model with numerically consecutive version
 		return nil, fmt.Errorf("unsupported replication version %d, expect %d: %w",
-			protocolVersion, 1, ErrIncompatibleVersionChange)
+			protocolVersion, nextVersion, ErrIncompatibleVersionChange)
 	}
 
 	// perform actual replication to the next version
