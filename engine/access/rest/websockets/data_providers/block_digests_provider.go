@@ -79,7 +79,10 @@ func (p *BlockDigestsDataProvider) Run(ctx context.Context) error {
 }
 
 // createAndStartSubscription creates a new subscription using the specified input arguments.
-func (p *BlockDigestsDataProvider) createAndStartSubscription(ctx context.Context, args blocksArguments) subscription.Subscription {
+func (p *BlockDigestsDataProvider) createAndStartSubscription(
+	ctx context.Context,
+	args blocksArguments,
+) subscription.Subscription {
 	if args.StartBlockID != flow.ZeroID {
 		return p.api.SubscribeBlockDigestsFromStartBlockID(ctx, args.StartBlockID, args.BlockStatus)
 	}

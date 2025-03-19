@@ -67,8 +67,7 @@ func NewBlocksDataProvider(
 
 // Run starts processing the subscription for blocks and handles responses.
 //
-// Expected errors during normal operations:
-//   - context.Canceled: if the operation is canceled, during an unsubscribe action.
+// No errors expected during normal operations
 func (p *BlocksDataProvider) Run(ctx context.Context) error {
 	// we read data from the subscription and send them to client's channel
 	ctx, cancel := context.WithCancel(ctx)
@@ -80,7 +79,13 @@ func (p *BlocksDataProvider) Run(ctx context.Context) error {
 		p.subscriptionState.subscription,
 		func(block *flow.Block) error {
 			expandPayload := map[string]bool{commonmodels.ExpandableFieldPayload: true}
-			blockPayload, err := commonmodels.NewBlock(block, nil, p.linkGenerator, p.arguments.BlockStatus, expandPayload)
+			blockPayload, err := commonmodels.NewBlock(
+				block,
+				nil,
+				p.linkGenerator,
+				p.arguments.BlockStatus,
+				expandPayload,
+			)
 			if err != nil {
 				return fmt.Errorf("failed to build block payload response: %w", err)
 			}
@@ -98,7 +103,10 @@ func (p *BlocksDataProvider) Run(ctx context.Context) error {
 }
 
 // createAndStartSubscription creates a new subscription using the specified input arguments.
-func (p *BlocksDataProvider) createAndStartSubscription(ctx context.Context, args blocksArguments) subscription.Subscription {
+func (p *BlocksDataProvider) createAndStartSubscription(
+	ctx context.Context,
+	args blocksArguments,
+) subscription.Subscription {
 	if args.StartBlockID != flow.ZeroID {
 		return p.api.SubscribeBlocksFromStartBlockID(ctx, args.StartBlockID, args.BlockStatus)
 	}

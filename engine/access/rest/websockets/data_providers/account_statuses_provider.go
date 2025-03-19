@@ -76,8 +76,7 @@ func NewAccountStatusesDataProvider(
 
 // Run starts processing the subscription for events and handles responses.
 //
-// Expected errors during normal operations:
-//   - context.Canceled: if the operation is canceled, during an unsubscribe action.
+// No errors expected during normal operations.
 func (p *AccountStatusesDataProvider) Run(ctx context.Context) error {
 	// we read data from the subscription and send them to client's channel
 	ctx, cancel := context.WithCancel(ctx)
@@ -92,30 +91,26 @@ func (p *AccountStatusesDataProvider) Run(ctx context.Context) error {
 		p.baseDataProvider.done,
 		p.subscriptionState.subscription,
 		func(response *backend.AccountStatusesResponse) error {
-			return p.sendResponse(response, &p.messageIndex, &p.blocksSinceLastMessage)
+			return p.sendResponse(response)
 		},
 	)
 }
 
 // sendResponse processes an account statuses message and sends it to data provider's channel.
-// This function is not expected to be called concurrently.
+// This function is not safe to call concurrently.
 //
-// No errors are expected during normal operations.
-func (p *AccountStatusesDataProvider) sendResponse(
-	response *backend.AccountStatusesResponse,
-	messageIndex *counters.StrictMonotonicCounter,
-	blocksSinceLastMessage *uint64,
-) error {
+// No errors are expected during normal operations
+func (p *AccountStatusesDataProvider) sendResponse(response *backend.AccountStatusesResponse) error {
 	// Only send a response if there's meaningful data to send
 	// or the heartbeat interval limit is reached
-	*blocksSinceLastMessage += 1
+	p.blocksSinceLastMessage += 1
 	accountEmittedEvents := len(response.AccountEvents) != 0
-	reachedHeartbeatLimit := *blocksSinceLastMessage >= p.arguments.HeartbeatInterval
+	reachedHeartbeatLimit := p.blocksSinceLastMessage >= p.arguments.HeartbeatInterval
 	if !accountEmittedEvents && !reachedHeartbeatLimit {
 		return nil
 	}
 
-	accountStatusesPayload := models.NewAccountStatusesResponse(response, messageIndex.Value())
+	accountStatusesPayload := models.NewAccountStatusesResponse(response, p.messageIndex.Value())
 	resp := models.BaseDataProvidersResponse{
 		SubscriptionID: p.ID(),
 		Topic:          p.Topic(),
@@ -123,14 +118,17 @@ func (p *AccountStatusesDataProvider) sendResponse(
 	}
 	p.send <- &resp
 
-	messageIndex.Increment()
-	*blocksSinceLastMessage = 0
+	p.blocksSinceLastMessage = 0
+	p.messageIndex.Increment()
 
 	return nil
 }
 
 // createAndStartSubscription creates a new subscription using the specified input arguments.
-func (p *AccountStatusesDataProvider) createAndStartSubscription(ctx context.Context, args accountStatusesArguments) subscription.Subscription {
+func (p *AccountStatusesDataProvider) createAndStartSubscription(
+	ctx context.Context,
+	args accountStatusesArguments,
+) subscription.Subscription {
 	if args.StartBlockID != flow.ZeroID {
 		return p.stateStreamApi.SubscribeAccountStatusesFromStartBlockID(ctx, args.StartBlockID, args.Filter)
 	}

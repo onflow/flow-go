@@ -55,8 +55,7 @@ func NewBlockHeadersDataProvider(
 
 // Run starts processing the subscription for block headers and handles responses.
 //
-// Expected errors during normal operations:
-//   - context.Canceled: if the operation is canceled, during an unsubscribe action.
+// No errors expected during normal operations
 func (p *BlockHeadersDataProvider) Run(ctx context.Context) error {
 	// we read data from the subscription and send them to client's channel
 	ctx, cancel := context.WithCancel(ctx)
@@ -81,7 +80,10 @@ func (p *BlockHeadersDataProvider) Run(ctx context.Context) error {
 }
 
 // createAndStartSubscription creates a new subscription using the specified input arguments.
-func (p *BlockHeadersDataProvider) createAndStartSubscription(ctx context.Context, args blocksArguments) subscription.Subscription {
+func (p *BlockHeadersDataProvider) createAndStartSubscription(
+	ctx context.Context,
+	args blocksArguments,
+) subscription.Subscription {
 	if args.StartBlockID != flow.ZeroID {
 		return p.api.SubscribeBlockHeadersFromStartBlockID(ctx, args.StartBlockID, args.BlockStatus)
 	}

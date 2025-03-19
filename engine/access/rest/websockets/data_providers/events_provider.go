@@ -77,8 +77,7 @@ func NewEventsDataProvider(
 
 // Run starts processing the subscription for events and handles responses.
 //
-// Expected errors during normal operations:
-//   - context.Canceled: if the operation is canceled, during an unsubscribe action.
+// No errors expected during normal operations
 func (p *EventsDataProvider) Run(ctx context.Context) error {
 	// we read data from the subscription and send them to client's channel
 	ctx, cancel := context.WithCancel(ctx)
@@ -93,7 +92,7 @@ func (p *EventsDataProvider) Run(ctx context.Context) error {
 		p.baseDataProvider.done,
 		p.subscriptionState.subscription,
 		func(response *backend.EventsResponse) error {
-			return p.sendResponse(response, &p.messageIndex, &p.blocksSinceLastMessage)
+			return p.sendResponse(response)
 		},
 	)
 }
@@ -102,21 +101,17 @@ func (p *EventsDataProvider) Run(ctx context.Context) error {
 // This function is not expected to be called concurrently.
 //
 // No errors are expected during normal operations.
-func (p *EventsDataProvider) sendResponse(
-	eventsResponse *backend.EventsResponse,
-	messageIndex *counters.StrictMonotonicCounter,
-	blocksSinceLastMessage *uint64,
-) error {
+func (p *EventsDataProvider) sendResponse(eventsResponse *backend.EventsResponse) error {
 	// Only send a response if there's meaningful data to send
 	// or the heartbeat interval limit is reached
-	*blocksSinceLastMessage += 1
+	p.blocksSinceLastMessage += 1
 	contractEmittedEvents := len(eventsResponse.Events) != 0
-	reachedHeartbeatLimit := *blocksSinceLastMessage >= p.arguments.HeartbeatInterval
+	reachedHeartbeatLimit := p.blocksSinceLastMessage >= p.arguments.HeartbeatInterval
 	if !contractEmittedEvents && !reachedHeartbeatLimit {
 		return nil
 	}
 
-	eventsPayload := models.NewEventResponse(eventsResponse, messageIndex.Value())
+	eventsPayload := models.NewEventResponse(eventsResponse, p.messageIndex.Value())
 	response := models.BaseDataProvidersResponse{
 		SubscriptionID: p.ID(),
 		Topic:          p.Topic(),
@@ -124,8 +119,8 @@ func (p *EventsDataProvider) sendResponse(
 	}
 	p.send <- &response
 
-	*blocksSinceLastMessage = 0
-	messageIndex.Increment()
+	p.blocksSinceLastMessage = 0
+	p.messageIndex.Increment()
 
 	return nil
 }

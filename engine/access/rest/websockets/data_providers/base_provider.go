@@ -75,8 +75,6 @@ func (b *baseDataProvider) Arguments() wsmodels.Arguments {
 }
 
 // Close terminates the data provider.
-//
-// No errors are expected during normal operations.
 func (b *baseDataProvider) Close() {
 	b.doneOnce.Do(func() {
 		close(b.done)
@@ -93,7 +91,7 @@ type sendResponseCallback[T any] func(T) error
 // Run() function.
 //
 // Parameters:
-//   - providerDone: A channel to signal the termination of the function. When doneOnce,
+//   - providerDone: A channel to signal the termination of the function. When closed,
 //     the function stops reading from the subscription and exits gracefully.
 //   - subscription: An instance of the Subscription interface, which provides a
 //     data stream through its Channel() method and an optional error through Err().
@@ -104,12 +102,12 @@ type sendResponseCallback[T any] func(T) error
 // Returns:
 //   - error: If any error occurs while reading from the subscription or sending
 //     responses, it returns an error wrapped with additional context. If the
-//     providerDone is doneOnce or the subscription ends without errors, it returns nil.
+//     providerDone is closed or the subscription ends without errors, it returns nil.
 //
-// Errors:
-//   - If the subscription ends with an error, it is wrapped and returned.
-//   - If a received value is not of the expected type (T), an error is returned.
-//   - If the sendResponse callback encounters an error, it is wrapped and returned.
+// Errors
+//   - If the subscription or sendResponse return an error, it is returned.
+//
+// No other errors are expected during normal operation
 func run[T any](
 	providerDone <-chan struct{},
 	subscription subscription.Subscription,

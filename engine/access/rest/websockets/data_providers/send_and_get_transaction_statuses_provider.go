@@ -69,7 +69,7 @@ func NewSendAndGetTransactionStatusesDataProvider(
 
 // Run starts processing the subscription for events and handles responses.
 //
-// No errors are expected during normal operations.
+// No errors are expected during normal operations
 func (p *SendAndGetTransactionStatusesDataProvider) Run(ctx context.Context) error {
 	// start a new subscription. we read data from it and send them to client's channel
 	ctx, cancel := context.WithCancel(ctx)
@@ -83,21 +83,18 @@ func (p *SendAndGetTransactionStatusesDataProvider) Run(ctx context.Context) err
 		p.baseDataProvider.done,
 		p.subscriptionState.subscription,
 		func(response []*access.TransactionResult) error {
-			return p.sendResponse(response, &p.messageIndex)
+			return p.sendResponse(response)
 		},
 	)
 }
 
 // sendResponse processes a tx status message and sends it to client's channel.
-// This function is not expected to be called concurrently.
+// This function is not safe to call concurrently.
 //
 // No errors are expected during normal operations.
-func (p *SendAndGetTransactionStatusesDataProvider) sendResponse(
-	txResults []*access.TransactionResult,
-	messageIndex *counters.StrictMonotonicCounter,
-) error {
+func (p *SendAndGetTransactionStatusesDataProvider) sendResponse(txResults []*access.TransactionResult) error {
 	for i := range txResults {
-		txStatusesPayload := models.NewTransactionStatusesResponse(p.linkGenerator, txResults[i], messageIndex.Value())
+		txStatusesPayload := models.NewTransactionStatusesResponse(p.linkGenerator, txResults[i], p.messageIndex.Value())
 		response := models.BaseDataProvidersResponse{
 			SubscriptionID: p.ID(),
 			Topic:          p.Topic(),
@@ -105,7 +102,7 @@ func (p *SendAndGetTransactionStatusesDataProvider) sendResponse(
 		}
 		p.send <- &response
 
-		messageIndex.Increment()
+		p.messageIndex.Increment()
 	}
 
 	return nil
