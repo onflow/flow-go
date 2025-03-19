@@ -114,7 +114,6 @@ type KVStoreReader interface {
 	// GetCadenceComponentVersion returns the Cadence component version.
 	// Error Returns:
 	//   - kvstore.ErrKeyNotSupported if invoked on a KVStore instance before v2.
-	//   - kvstore.ErrKeyNotSet if the key has no value
 	GetCadenceComponentVersion() (MagnitudeVersion, error)
 	// GetCadenceComponentVersionUpgrade returns the most recent upgrade for the Cadence Component Version,
 	// if one exists (otherwise returns nil). The upgrade will be returned even if it has already been applied.
@@ -124,7 +123,6 @@ type KVStoreReader interface {
 	// GetExecutionComponentVersion returns the Execution component version.
 	// Error Returns:
 	//   - kvstore.ErrKeyNotSupported if invoked on a KVStore instance before v2.
-	//   - kvstore.ErrKeyNotSet if the key has no value
 	GetExecutionComponentVersion() (MagnitudeVersion, error)
 	// GetExecutionComponentVersionUpgrade returns the most recent upgrade for the Execution Component Version,
 	// if one exists (otherwise returns nil). The upgrade will be returned even if it has already been applied.
@@ -134,7 +132,6 @@ type KVStoreReader interface {
 	// GetExecutionMeteringParameters returns the Execution metering parameters.
 	// Error Returns:
 	//   - kvstore.ErrKeyNotSupported if invoked on a KVStore instance before v2.
-	//   - kvstore.ErrKeyNotSet if the key has no value
 	GetExecutionMeteringParameters() (ExecutionMeteringParameters, error)
 	// GetExecutionMeteringParametersUpgrade returns the most recent upgrade for the Execution Metering Parameters,
 	// if one exists (otherwise returns nil). The upgrade will be returned even if it has already been applied.

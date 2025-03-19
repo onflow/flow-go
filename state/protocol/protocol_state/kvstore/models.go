@@ -217,16 +217,6 @@ func (model *Modelv1) Replicate(protocolVersion uint64) (protocol_state.KVStoreM
 	// perform actual replication to the next version
 	v2 := &Modelv2{
 		Modelv1: clone.Clone(*model),
-		// Execution component versions and metering parameters are explicitly undefined when upgrading to v2
-		CadenceComponentVersion: protocol.UpdatableField[protocol.MagnitudeVersion]{
-			CurrentValue: protocol.UndefinedMagnitudeOfChangeVersion,
-		},
-		ExecutionComponentVersion: protocol.UpdatableField[protocol.MagnitudeVersion]{
-			CurrentValue: protocol.UndefinedMagnitudeOfChangeVersion,
-		},
-		ExecutionMeteringParameters: protocol.UpdatableField[protocol.ExecutionMeteringParameters]{
-			CurrentValue: protocol.UndefinedExecutionMeteringParameters,
-		},
 	}
 	if v2.GetProtocolStateVersion() != protocolVersion {
 		return nil, fmt.Errorf("sanity check: replicate resulted in unexpected version (%d != %d)", v2.GetProtocolStateVersion(), protocolVersion)
@@ -250,17 +240,13 @@ func (model *Modelv1) GetProtocolStateVersion() uint64 {
 	return 1
 }
 
-// Modelv2 adds fields for execution versioning and metering, and reflects a behavioural
-// change for EFM Recovery.
+// Modelv2 reflects a behavioural change of the protocol (compared to Modelv1). Despite there being no change of the
+// actual data model, we increment the version to coordinate switching between the old and the new protocol behaviour.
 // This version adds the following changes:
-//   - Adds execution versioning and metering fields
 //   - Non-system-chunk service event validation support (adds ChunkBody.ServiceEventCount field)
 //   - EFM Recovery (adds EpochCommit.DKGIndexMap field)
 type Modelv2 struct {
 	Modelv1
-	ExecutionMeteringParameters protocol.UpdatableField[protocol.ExecutionMeteringParameters]
-	ExecutionComponentVersion   protocol.UpdatableField[protocol.MagnitudeVersion]
-	CadenceComponentVersion     protocol.UpdatableField[protocol.MagnitudeVersion]
 }
 
 // ID returns an identifier for this key-value store snapshot by hashing internal fields and version number.
@@ -278,10 +264,33 @@ func (model *Modelv2) Replicate(protocolVersion uint64) (protocol_state.KVStoreM
 	if currentVersion == protocolVersion {
 		// no need for migration, return a complete copy
 		return clone.Clone(model), nil
-	} else {
-		return nil, fmt.Errorf("unsupported replication version %d: %w",
-			protocolVersion, ErrIncompatibleVersionChange)
 	}
+	nextVersion := currentVersion + 1
+	if protocolVersion != nextVersion {
+		// can only Replicate into model with numerically consecutive version
+		return nil, fmt.Errorf("unsupported replication version %d, expect %d: %w",
+			protocolVersion, nextVersion, ErrIncompatibleVersionChange)
+	}
+
+	// perform actual replication to the next version
+	v3 := &Modelv3{
+		Modelv2: clone.Clone(*model),
+		// Execution component versions and metering parameters are explicitly undefined when upgrading to v2
+		// TODO: set initial values here
+		CadenceComponentVersion: protocol.UpdatableField[protocol.MagnitudeVersion]{
+			CurrentValue: protocol.UndefinedMagnitudeOfChangeVersion,
+		},
+		ExecutionComponentVersion: protocol.UpdatableField[protocol.MagnitudeVersion]{
+			CurrentValue: protocol.UndefinedMagnitudeOfChangeVersion,
+		},
+		ExecutionMeteringParameters: protocol.UpdatableField[protocol.ExecutionMeteringParameters]{
+			CurrentValue: protocol.UndefinedExecutionMeteringParameters,
+		},
+	}
+	if v3.GetProtocolStateVersion() != protocolVersion {
+		return nil, fmt.Errorf("sanity check: replicate resulted in unexpected version (%d != %d)", v3.GetProtocolStateVersion(), protocolVersion)
+	}
+	return v3, nil
 }
 
 // VersionedEncode encodes the key-value store, returning the version separately
@@ -300,9 +309,54 @@ func (model *Modelv2) GetProtocolStateVersion() uint64 {
 	return 2
 }
 
+// Modelv3 adds fields for execution versioning and metering.
+type Modelv3 struct {
+	Modelv2
+	ExecutionMeteringParameters protocol.UpdatableField[protocol.ExecutionMeteringParameters]
+	ExecutionComponentVersion   protocol.UpdatableField[protocol.MagnitudeVersion]
+	CadenceComponentVersion     protocol.UpdatableField[protocol.MagnitudeVersion]
+}
+
+// ID returns an identifier for this key-value store snapshot by hashing internal fields and version number.
+func (model *Modelv3) ID() flow.Identifier {
+	return makeVersionedModelID(model)
+}
+
+// Replicate instantiates a Protocol State Snapshot of the given protocolVersion.
+// It clones existing snapshot if protocolVersion = currentVersion, other versions are not supported yet.
+// Expected errors during normal operations:
+//   - ErrIncompatibleVersionChange if replicating the Parent Snapshot into a Snapshot
+//     with the specified `protocolVersion` is not supported.
+func (model *Modelv3) Replicate(protocolVersion uint64) (protocol_state.KVStoreMutator, error) {
+	currentVersion := model.GetProtocolStateVersion()
+	if currentVersion == protocolVersion {
+		// no need for migration, return a complete copy
+		return clone.Clone(model), nil
+	} else {
+		return nil, fmt.Errorf("unsupported replication version %d: %w",
+			protocolVersion, ErrIncompatibleVersionChange)
+	}
+}
+
+// VersionedEncode encodes the key-value store, returning the version separately
+// from the encoded bytes.
+// No errors are expected during normal operation.
+func (model *Modelv3) VersionedEncode() (uint64, []byte, error) {
+	return versionedEncode(model.GetProtocolStateVersion(), model)
+}
+
+// GetProtocolStateVersion returns the version of the Protocol State Snapshot
+// that is backing the `Reader` interface. It is the protocol version that originally
+// created the Protocol State Snapshot. Changes in the protocol state version
+// correspond to changes in the set of key-value pairs which are supported,
+// and which model is used for serialization.
+func (model *Modelv3) GetProtocolStateVersion() uint64 {
+	return 3
+}
+
 // GetCadenceComponentVersion returns the current Cadence component version from Modelv2.
 // Returns kvstore.ErrKeyNotSet if the key has no value
-func (model *Modelv2) GetCadenceComponentVersion() (protocol.MagnitudeVersion, error) {
+func (model *Modelv3) GetCadenceComponentVersion() (protocol.MagnitudeVersion, error) {
 	if model.CadenceComponentVersion.CurrentValue == protocol.UndefinedMagnitudeOfChangeVersion {
 		return protocol.UndefinedMagnitudeOfChangeVersion, ErrKeyNotSet
 	}
@@ -311,13 +365,13 @@ func (model *Modelv2) GetCadenceComponentVersion() (protocol.MagnitudeVersion, e
 
 // GetCadenceComponentVersionUpgrade returns the most recent upgrade for the Cadence component version,
 // if one exists (otherwise returns nil).
-func (model *Modelv2) GetCadenceComponentVersionUpgrade() *protocol.ViewBasedActivator[protocol.MagnitudeVersion] {
+func (model *Modelv3) GetCadenceComponentVersionUpgrade() *protocol.ViewBasedActivator[protocol.MagnitudeVersion] {
 	return model.CadenceComponentVersion.Update
 }
 
 // GetExecutionComponentVersion returns the current Execution component version from Modelv2.
 // Returns kvstore.ErrKeyNotSet if the key has no value
-func (model *Modelv2) GetExecutionComponentVersion() (protocol.MagnitudeVersion, error) {
+func (model *Modelv3) GetExecutionComponentVersion() (protocol.MagnitudeVersion, error) {
 	if model.ExecutionComponentVersion.CurrentValue == protocol.UndefinedMagnitudeOfChangeVersion {
 		return protocol.UndefinedMagnitudeOfChangeVersion, ErrKeyNotSet
 	}
@@ -326,13 +380,13 @@ func (model *Modelv2) GetExecutionComponentVersion() (protocol.MagnitudeVersion,
 
 // GetExecutionComponentVersionUpgrade returns the most recent upgrade for the Execution component version,
 // if one exists (otherwise returns nil).
-func (model *Modelv2) GetExecutionComponentVersionUpgrade() *protocol.ViewBasedActivator[protocol.MagnitudeVersion] {
+func (model *Modelv3) GetExecutionComponentVersionUpgrade() *protocol.ViewBasedActivator[protocol.MagnitudeVersion] {
 	return model.ExecutionComponentVersion.Update
 }
 
 // GetExecutionMeteringParameters returns the current Execution metering parameters from Modelv2.
 // Returns kvstore.ErrKeyNotSet if the key has no value
-func (model *Modelv2) GetExecutionMeteringParameters() (protocol.ExecutionMeteringParameters, error) {
+func (model *Modelv3) GetExecutionMeteringParameters() (protocol.ExecutionMeteringParameters, error) {
 	if model.ExecutionMeteringParameters.CurrentValue.IsUndefined() {
 		return protocol.UndefinedExecutionMeteringParameters, ErrKeyNotSet
 	}
@@ -341,7 +395,7 @@ func (model *Modelv2) GetExecutionMeteringParameters() (protocol.ExecutionMeteri
 
 // GetExecutionMeteringParametersUpgrade returns the most recent upgrade for the Execution metering parameters,
 // if one exists (otherwise returns nil).
-func (model *Modelv2) GetExecutionMeteringParametersUpgrade() *protocol.ViewBasedActivator[protocol.ExecutionMeteringParameters] {
+func (model *Modelv3) GetExecutionMeteringParametersUpgrade() *protocol.ViewBasedActivator[protocol.ExecutionMeteringParameters] {
 	return model.ExecutionMeteringParameters.Update
 }
 
@@ -385,7 +439,7 @@ func NewKVStoreV0(finalizationSafetyThreshold, epochExtensionViewCount uint64, e
 // versionedModel generically represents a versioned protocol state model.
 type versionedModel interface {
 	GetProtocolStateVersion() uint64
-	*Modelv0 | *Modelv1 | *Modelv2
+	*Modelv0 | *Modelv1 | *Modelv2 | *Modelv3
 }
 
 // makeVersionedModelID produces an Identifier which includes both the model's
