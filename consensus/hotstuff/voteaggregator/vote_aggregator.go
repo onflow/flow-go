@@ -109,6 +109,9 @@ func NewVoteAggregator(
 
 		// start vote collectors
 		collectors.Start(signalerCtx)
+
+		// Handle the component lifecycle in a separate goroutine so we can capture any errors
+		// thrown during initialization in the main goroutine.
 		go func() {
 			if err := util.WaitClosed(parentCtx, collectors.Ready()); err == nil {
 				// only signal ready when collectors are ready, but always handle shutdown
@@ -122,6 +125,8 @@ func NewVoteAggregator(
 
 		// since we are breaking the connection between parentCtx and signalerCtx, we need to
 		// explicitly rethrow any errors from signalerCtx to parentCtx, otherwise they are dropped.
+		// Handle errors in the main worker goroutine to guarantee that they are rethrown to the parent
+		// before the component is marked done.
 		if err := util.WaitError(errCh, collectors.Done()); err != nil {
 			parentCtx.Throw(err)
 		}
