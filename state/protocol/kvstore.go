@@ -144,13 +144,12 @@ type KVStoreReader interface {
 
 // ExecutionMeteringParameters are used to measure resource usage of transactions,
 // which affects fee calculations and transaction/script stopping conditions.
-// TODO should this live in fvm package?
 type ExecutionMeteringParameters struct {
-	// TODO docs
-	ExecutionEffortParameters map[uint]uint64
-	// TODO docs
-	ExecutionMemoryParameters map[uint]uint64
-	// TODO docs
+	// ExecutionEffortWeights ...
+	ExecutionEffortWeights map[uint64]uint64
+	// ExecutionMemoryWeights ...
+	ExecutionMemoryWeights map[uint64]uint64
+	// ExecutionMemoryLimit ...
 	ExecutionMemoryLimit uint64
 }
 
@@ -159,7 +158,7 @@ type ExecutionMeteringParameters struct {
 // We require this KVStore field type to be RLP-encodable so we can compute the hash/ID of a kvstore model instance.
 func (params *ExecutionMeteringParameters) EncodeRLP(w io.Writer) error {
 	type pair struct {
-		Key   uint
+		Key   uint64
 		Value uint64
 	}
 	pairOrdering := func(a, b pair) int {
@@ -175,35 +174,37 @@ func (params *ExecutionMeteringParameters) EncodeRLP(w io.Writer) error {
 		panic("critical invariant violated: map with duplicate keys")
 	}
 
-	orderedEffortParams := make([]pair, 0, len(params.ExecutionEffortParameters))
-	for k, v := range params.ExecutionEffortParameters {
+	orderedEffortParams := make([]pair, 0, len(params.ExecutionEffortWeights))
+	for k, v := range params.ExecutionEffortWeights {
 		orderedEffortParams = append(orderedEffortParams, pair{k, v})
 	}
 	slices.SortFunc(orderedEffortParams, pairOrdering)
 
-	orderedMemoryParams := make([]pair, 0, len(params.ExecutionMemoryParameters))
-	for k, v := range params.ExecutionMemoryParameters {
+	orderedMemoryParams := make([]pair, 0, len(params.ExecutionMemoryWeights))
+	for k, v := range params.ExecutionMemoryWeights {
 		orderedMemoryParams = append(orderedMemoryParams, pair{k, v})
 	}
 	slices.SortFunc(orderedMemoryParams, pairOrdering)
 
 	return rlp.Encode(w, struct {
-		ExecutionEffortParameters []pair
-		ExecutionMemoryParameters []pair
-		ExecutionMemoryLimit      uint64
+		ExecutionEffortWeights []pair
+		ExecutionMemoryWeights []pair
+		ExecutionMemoryLimit   uint64
 	}{
-		ExecutionEffortParameters: orderedEffortParams,
-		ExecutionMemoryParameters: orderedMemoryParams,
-		ExecutionMemoryLimit:      params.ExecutionMemoryLimit,
+		ExecutionEffortWeights: orderedEffortParams,
+		ExecutionMemoryWeights: orderedMemoryParams,
+		ExecutionMemoryLimit:   params.ExecutionMemoryLimit,
 	})
 }
 
 // IsUndefined returns true if params is semantically undefined.
+// TODO remove
 func (params *ExecutionMeteringParameters) IsUndefined() bool {
-	return params.ExecutionEffortParameters == nil && params.ExecutionMemoryParameters == nil && params.ExecutionMemoryLimit == 0
+	return params.ExecutionEffortWeights == nil && params.ExecutionMemoryWeights == nil && params.ExecutionMemoryLimit == 0
 }
 
 // UndefinedExecutionMeteringParameters represents the zero or unset value for ExecutionMeteringParameters.
+// TODO remove
 var UndefinedExecutionMeteringParameters = ExecutionMeteringParameters{}
 
 // VersionedEncodable defines the interface for a versioned key-value store independent
