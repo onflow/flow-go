@@ -381,6 +381,7 @@ func createNode(
 	receiptsDB := storage.NewExecutionReceipts(metricsCollector, db, resultsDB, storage.DefaultCacheSize)
 	payloadsDB := storage.NewPayloads(db, indexDB, guaranteesDB, sealsDB, receiptsDB, resultsDB)
 	blocksDB := storage.NewBlocks(db, headersDB, payloadsDB)
+	sigsDB := storage.NewProposalSignatures(metricsCollector, db)
 	qcsDB := storage.NewQuorumCertificates(metricsCollector, db, storage.DefaultCacheSize)
 	setupsDB := storage.NewEpochSetups(metricsCollector, db)
 	commitsDB := storage.NewEpochCommits(metricsCollector, db)
@@ -405,6 +406,7 @@ func createNode(
 		sealsDB,
 		resultsDB,
 		blocksDB,
+		sigsDB,
 		qcsDB,
 		setupsDB,
 		commitsDB,

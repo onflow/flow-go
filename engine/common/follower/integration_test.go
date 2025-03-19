@@ -59,6 +59,7 @@ func TestFollowerHappyPath(t *testing.T) {
 			all.Seals,
 			all.Results,
 			all.Blocks,
+			all.ProposalSignatures,
 			all.QuorumCertificates,
 			all.Setups,
 			all.EpochCommits,

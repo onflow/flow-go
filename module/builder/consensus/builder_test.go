@@ -276,9 +276,9 @@ func (bs *BuilderSuite) SetupTest() {
 
 	bs.state = &protocol.ParticipantState{}
 	bs.state.On("Extend", mock.Anything, mock.Anything).Run(func(args mock.Arguments) {
-		block := args.Get(1).(*flow.Block)
-		bs.Assert().Equal(bs.sentinel, block.Header.View)
-		bs.assembled = block.Payload
+		proposal := args.Get(1).(*flow.BlockProposal)
+		bs.Assert().Equal(bs.sentinel, proposal.Block.Header.View)
+		bs.assembled = proposal.Block.Payload
 	}).Return(nil)
 	bs.state.On("Final").Return(func() realproto.Snapshot {
 		if block, ok := bs.blocks[bs.finalID]; ok {

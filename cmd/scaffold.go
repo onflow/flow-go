@@ -1223,6 +1223,7 @@ func (fnb *FlowNodeBuilder) initStorage() error {
 	index := bstorage.NewIndex(fnb.Metrics.Cache, fnb.DB)
 	payloads := bstorage.NewPayloads(fnb.DB, index, guarantees, seals, receipts, results)
 	blocks := bstorage.NewBlocks(fnb.DB, headers, payloads)
+	sigs := bstorage.NewProposalSignatures(fnb.Metrics.Cache, fnb.DB)
 	qcs := bstorage.NewQuorumCertificates(fnb.Metrics.Cache, fnb.DB, bstorage.DefaultCacheSize)
 	transactions := bstorage.NewTransactions(fnb.Metrics.Cache, fnb.DB)
 	collections := bstorage.NewCollections(fnb.DB, transactions)
@@ -1244,6 +1245,7 @@ func (fnb *FlowNodeBuilder) initStorage() error {
 		Index:                     index,
 		Payloads:                  payloads,
 		Blocks:                    blocks,
+		ProposalSignatures:        sigs,
 		QuorumCertificates:        qcs,
 		Transactions:              transactions,
 		Collections:               collections,
@@ -1338,6 +1340,7 @@ func (fnb *FlowNodeBuilder) initState() error {
 			fnb.Storage.Seals,
 			fnb.Storage.Results,
 			fnb.Storage.Blocks,
+			fnb.Storage.ProposalSignatures,
 			fnb.Storage.QuorumCertificates,
 			fnb.Storage.Setups,
 			fnb.Storage.EpochCommits,
@@ -1387,6 +1390,7 @@ func (fnb *FlowNodeBuilder) initState() error {
 			fnb.Storage.Seals,
 			fnb.Storage.Results,
 			fnb.Storage.Blocks,
+			fnb.Storage.ProposalSignatures,
 			fnb.Storage.QuorumCertificates,
 			fnb.Storage.Setups,
 			fnb.Storage.EpochCommits,

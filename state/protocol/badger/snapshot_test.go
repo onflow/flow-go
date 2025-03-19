@@ -169,7 +169,7 @@ func TestSnapshot_Descendants(t *testing.T) {
 			for n := 0; n < i; n++ {
 				block := unittest.BlockWithParentFixture(parent)
 				block.SetPayload(unittest.PayloadFixture(unittest.WithProtocolStateID(rootProtocolStateID)))
-				err := state.Extend(context.Background(), block)
+				err := state.Extend(context.Background(), unittest.ProposalFromBlock(block))
 				require.NoError(t, err)
 				expectedBlocks = append(expectedBlocks, block.ID())
 				parent = block.Header
@@ -1107,7 +1107,7 @@ func TestQuorumCertificate(t *testing.T) {
 			// create a block to query
 			block1 := unittest.BlockWithParentFixture(head)
 			block1.SetPayload(unittest.PayloadFixture(unittest.WithProtocolStateID(rootProtocolStateID)))
-			err := state.Extend(context.Background(), block1)
+			err := state.Extend(context.Background(), unittest.ProposalFromBlock(block1))
 			require.NoError(t, err)
 
 			_, err = state.AtBlockID(block1.ID()).QuorumCertificate()
@@ -1160,14 +1160,14 @@ func TestQuorumCertificate(t *testing.T) {
 			// create a block to query
 			block1 := unittest.BlockWithParentFixture(head)
 			block1.SetPayload(unittest.PayloadFixture(unittest.WithProtocolStateID(rootProtocolStateID)))
-			err := state.Extend(context.Background(), block1)
+			err := state.Extend(context.Background(), unittest.ProposalFromBlock(block1))
 			require.NoError(t, err)
 
 			_, err = state.AtBlockID(block1.ID()).QuorumCertificate()
 			assert.ErrorIs(t, err, storage.ErrNotFound)
 
 			block2 := unittest.BlockWithParentProtocolState(block1)
-			err = state.Extend(context.Background(), block2)
+			err = state.Extend(context.Background(), unittest.ProposalFromBlock(block2))
 			require.NoError(t, err)
 
 			qc, err := state.AtBlockID(block1.ID()).QuorumCertificate()

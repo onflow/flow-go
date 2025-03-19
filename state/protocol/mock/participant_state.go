@@ -57,7 +57,7 @@ func (_m *ParticipantState) AtHeight(height uint64) protocol.Snapshot {
 }
 
 // Extend provides a mock function with given fields: ctx, candidate
-func (_m *ParticipantState) Extend(ctx context.Context, candidate *flow.Block) error {
+func (_m *ParticipantState) Extend(ctx context.Context, candidate *flow.BlockProposal) error {
 	ret := _m.Called(ctx, candidate)
 
 	if len(ret) == 0 {
@@ -65,7 +65,7 @@ func (_m *ParticipantState) Extend(ctx context.Context, candidate *flow.Block) e
 	}
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(context.Context, *flow.Block) error); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, *flow.BlockProposal) error); ok {
 		r0 = rf(ctx, candidate)
 	} else {
 		r0 = ret.Error(0)

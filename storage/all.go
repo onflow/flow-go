@@ -8,6 +8,7 @@ type All struct {
 	Index                          Index
 	Payloads                       Payloads
 	Blocks                         Blocks
+	ProposalSignatures             ProposalSignatures
 	QuorumCertificates             QuorumCertificates
 	Setups                         EpochSetups
 	EpochCommits                   EpochCommits

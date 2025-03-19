@@ -363,7 +363,7 @@ func (c *Core) processBlockProposal(proposal *flow.BlockProposal) error {
 	log.Info().Msg("processing block proposal")
 
 	// see if the block is a valid extension of the protocol state
-	err = c.state.Extend(ctx, proposal.Block)
+	err = c.state.Extend(ctx, proposal)
 	if err != nil {
 		if state.IsInvalidExtensionError(err) {
 			// if the block proposes an invalid extension of the protocol state, then the block is invalid

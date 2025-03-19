@@ -533,7 +533,7 @@ func (suite *Suite) TestGetProtocolStateSnapshotByBlockID_BlockNotFinalizedAtHei
 		newBlock.SetPayload(unittest.PayloadFixture(unittest.WithProtocolStateID(rootProtocolStateID)))
 		ctx := context.Background()
 		// add new block to the chain state
-		err = state.Extend(ctx, newBlock)
+		err = state.Extend(ctx, unittest.ProposalFromBlock(newBlock))
 		suite.Require().NoError(err)
 
 		// since block was added to the block tree it must be queryable by block ID
@@ -575,11 +575,11 @@ func (suite *Suite) TestGetProtocolStateSnapshotByBlockID_DifferentBlockFinalize
 		ctx := context.Background()
 
 		// add new block to the chain state
-		err = state.Extend(ctx, finalizedBlock)
+		err = state.Extend(ctx, unittest.ProposalFromBlock(finalizedBlock))
 		suite.Require().NoError(err)
 
 		// add orphan block to the chain state as well
-		err = state.Extend(ctx, orphanBlock)
+		err = state.Extend(ctx, unittest.ProposalFromBlock(orphanBlock))
 		suite.Require().NoError(err)
 
 		suite.Equal(finalizedBlock.Header.Height, orphanBlock.Header.Height,
@@ -623,7 +623,7 @@ func (suite *Suite) TestGetProtocolStateSnapshotByBlockID_UnexpectedErrorBlockID
 		newBlock.SetPayload(unittest.PayloadFixture(unittest.WithProtocolStateID(rootProtocolStateID)))
 		ctx := context.Background()
 		// add new block to the chain state
-		err = state.Extend(ctx, newBlock)
+		err = state.Extend(ctx, unittest.ProposalFromBlock(newBlock))
 		suite.Require().NoError(err)
 
 		// since block was added to the block tree it must be queryable by block ID
@@ -783,7 +783,7 @@ func (suite *Suite) TestGetProtocolStateSnapshotByHeight_NonFinalizedBlocks() {
 		newBlock.SetPayload(unittest.PayloadFixture(unittest.WithProtocolStateID(rootProtocolStateID)))
 		ctx := context.Background()
 		// add new block to the chain state
-		err = state.Extend(ctx, newBlock)
+		err = state.Extend(ctx, unittest.ProposalFromBlock(newBlock))
 		suite.Require().NoError(err)
 
 		// since block was not yet finalized AtHeight must return an invalid snapshot

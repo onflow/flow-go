@@ -98,6 +98,7 @@ func (suite *MutatorSuite) SetupTest() {
 		all.Seals,
 		all.Results,
 		all.Blocks,
+		all.ProposalSignatures,
 		all.QuorumCertificates,
 		all.Setups,
 		all.EpochCommits,

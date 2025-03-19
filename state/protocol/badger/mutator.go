@@ -169,7 +169,7 @@ func (m *FollowerState) ExtendCertified(ctx context.Context, candidate *flow.Blo
 	}
 
 	// check if the block header is a valid extension of parent block
-	err = m.headerExtend(ctx, candidate, certifyingQC, deferredDbOps)
+	err = m.headerExtend(ctx, candidate, nil, certifyingQC, deferredDbOps)
 	if err != nil {
 		// since we have a QC for this block, it cannot be an invalid extension
 		return fmt.Errorf("unexpected invalid block (id=%x) with certifying qc (id=%x): %s",
@@ -218,9 +218,10 @@ func (m *FollowerState) ExtendCertified(ctx context.Context, candidate *flow.Blo
 // Expected errors during normal operations:
 //   - state.OutdatedExtensionError if the candidate block is outdated (e.g. orphaned)
 //   - state.InvalidExtensionError if the candidate block is invalid
-func (m *ParticipantState) Extend(ctx context.Context, candidate *flow.Block) error {
+func (m *ParticipantState) Extend(ctx context.Context, candidateProposal *flow.BlockProposal) error {
 	span, ctx := m.tracer.StartSpanFromContext(ctx, trace.ProtoStateMutatorExtend)
 	defer span.End()
+	candidate := candidateProposal.Block
 
 	// check if candidate block has been already processed
 	isDuplicate, err := m.checkBlockAlreadyProcessed(candidate.ID())
@@ -230,7 +231,7 @@ func (m *ParticipantState) Extend(ctx context.Context, candidate *flow.Block) er
 	deferredDbOps := transaction.NewDeferredDbOps()
 
 	// check if the block header is a valid extension of parent block
-	err = m.headerExtend(ctx, candidate, nil, deferredDbOps)
+	err = m.headerExtend(ctx, candidate, candidateProposal.ProposerSigData, nil, deferredDbOps)
 	if err != nil {
 		return fmt.Errorf("header not compliant with chain state: %w", err)
 	}
@@ -292,15 +293,16 @@ func (m *ParticipantState) Extend(ctx context.Context, candidate *flow.Block) er
 //
 //	5a. store QC embedded into the candidate block and emit `BlockProcessable` notification for the parent
 //	5b. store candidate block and index it as a child of its parent (needed for recovery to traverse unfinalized blocks)
-//	5c. if we are given a certifyingQC, store it and queue a `BlockProcessable` notification for the candidate block
+//	5c. store candidate block's proposer signature (if present; needed for recovery)
+//	5d. if we are given a certifyingQC, store it and queue a `BlockProcessable` notification for the candidate block
 //
 // If `headerExtend` is called by `ParticipantState.Extend` (full consensus participant) then `certifyingQC` will be nil,
-// but the block payload will be validated. If `headerExtend` is called by `FollowerState.Extend` (consensus follower),
-// then `certifyingQC` must be not nil which proves payload validity.
+// but the block payload will be validated and proposer signature will be present. If `headerExtend` is called by
+// `FollowerState.Extend` (consensus follower), then `certifyingQC` must be not nil which proves payload validity.
 //
 // Expected errors during normal operations:
 //   - state.InvalidExtensionError if the candidate block is invalid
-func (m *FollowerState) headerExtend(ctx context.Context, candidate *flow.Block, certifyingQC *flow.QuorumCertificate, deferredDbOps *transaction.DeferredDbOps) error {
+func (m *FollowerState) headerExtend(ctx context.Context, candidate *flow.Block, proposerSigData []byte, certifyingQC *flow.QuorumCertificate, deferredDbOps *transaction.DeferredDbOps) error {
 	span, _ := m.tracer.StartSpanFromContext(ctx, trace.ProtoStateMutatorExtendCheckHeader)
 	defer span.End()
 	blockID := candidate.ID()
@@ -377,6 +379,12 @@ func (m *FollowerState) headerExtend(ctx context.Context, candidate *flow.Block,
 		err = m.blocks.StoreTx(candidate)(tx) // insert the block into the database AND cache
 		if err != nil {
 			return fmt.Errorf("could not store candidate block: %w", err)
+		}
+		if proposerSigData != nil {
+			err = m.sigs.StoreTx(blockID, proposerSigData)(tx)
+			if err != nil {
+				return fmt.Errorf("could not store proposer signature: %w", err)
+			}
 		}
 		err = transaction.WithTx(procedure.IndexNewBlock(blockID, candidate.Header.ParentID))(tx)
 		if err != nil {

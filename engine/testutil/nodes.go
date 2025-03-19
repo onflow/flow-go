@@ -243,6 +243,7 @@ func CompleteStateFixture(
 		s.Seals,
 		s.Results,
 		s.Blocks,
+		s.ProposalSignatures,
 		s.QuorumCertificates,
 		s.Setups,
 		s.EpochCommits,

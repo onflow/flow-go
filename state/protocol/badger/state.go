@@ -35,6 +35,7 @@ type State struct {
 	db      *badger.DB
 	headers storage.Headers
 	blocks  storage.Blocks
+	sigs    storage.ProposalSignatures
 	qcs     storage.QuorumCertificates
 	results storage.ExecutionResults
 	seals   storage.Seals
@@ -94,6 +95,7 @@ func Bootstrap(
 	seals storage.Seals,
 	results storage.ExecutionResults,
 	blocks storage.Blocks,
+	sigs storage.ProposalSignatures,
 	qcs storage.QuorumCertificates,
 	setups storage.EpochSetups,
 	commits storage.EpochCommits,
@@ -217,6 +219,7 @@ func Bootstrap(
 		seals,
 		results,
 		blocks,
+		sigs,
 		qcs,
 		setups,
 		commits,
@@ -645,6 +648,7 @@ func OpenState(
 	seals storage.Seals,
 	results storage.ExecutionResults,
 	blocks storage.Blocks,
+	sigs storage.ProposalSignatures,
 	qcs storage.QuorumCertificates,
 	setups storage.EpochSetups,
 	commits storage.EpochCommits,
@@ -679,6 +683,7 @@ func OpenState(
 		seals,
 		results,
 		blocks,
+		sigs,
 		qcs,
 		setups,
 		commits,
@@ -783,6 +788,7 @@ func newState(
 	seals storage.Seals,
 	results storage.ExecutionResults,
 	blocks storage.Blocks,
+	sigs storage.ProposalSignatures,
 	qcs storage.QuorumCertificates,
 	setups storage.EpochSetups,
 	commits storage.EpochCommits,
@@ -798,6 +804,7 @@ func newState(
 		results: results,
 		seals:   seals,
 		blocks:  blocks,
+		sigs:    sigs,
 		qcs:     qcs,
 		epoch: struct {
 			setups  storage.EpochSetups

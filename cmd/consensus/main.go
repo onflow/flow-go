@@ -800,7 +800,11 @@ func main() {
 			// TODO(malleability, #7100) proposer signature storage
 			pending := make([]*flow.Proposal, 0, len(pendingOrig))
 			for _, p := range pendingOrig {
-				pending = append(pending, &flow.Proposal{Header: p, ProposerSigData: nil})
+				sig, err := node.Storage.ProposalSignatures.ByBlockID(p.ID())
+				if err != nil {
+					return nil, fmt.Errorf("could not find proposer signature for pending block: %w", err)
+				}
+				pending = append(pending, &flow.Proposal{Header: p, ProposerSigData: sig})
 			}
 
 			// initialize hotstuff consensus algorithm
