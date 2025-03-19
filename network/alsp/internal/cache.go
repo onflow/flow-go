@@ -15,9 +15,10 @@ import (
 )
 
 // SpamRecordCache is a cache that stores spam records at the protocol layer for ALSP.
+// Stored protocol spam records are keyed by the origin id of the spam record.
 type SpamRecordCache struct {
-	recordFactory model.SpamRecordFactoryFunc                                 // recordFactory is a factory function that creates a new spam record.
-	c             *stdmap.Backend[flow.Identifier, *model.ProtocolSpamRecord] // c is the underlying cache.
+	recordFactory                                               model.SpamRecordFactoryFunc // recordFactory is a factory function that creates a new spam record.
+	*stdmap.Backend[flow.Identifier, *model.ProtocolSpamRecord]                             // c is the underlying cache.
 }
 
 var _ alsp.SpamRecordCache = (*SpamRecordCache)(nil)
@@ -39,11 +40,12 @@ func NewSpamRecordCache(sizeLimit uint32, logger zerolog.Logger, collector modul
 		herocache.DefaultOversizeFactor,
 		heropool.LRUEjection,
 		logger.With().Str("mempool", "aslp-spam-records").Logger(),
-		collector)
+		collector,
+	)
 
 	return &SpamRecordCache{
 		recordFactory: recordFactory,
-		c:             stdmap.NewBackend(stdmap.WithMutableBackData[flow.Identifier, *model.ProtocolSpamRecord](backData)),
+		Backend:       stdmap.NewBackend(stdmap.WithMutableBackData[flow.Identifier, *model.ProtocolSpamRecord](backData)),
 	}
 }
 
@@ -75,7 +77,7 @@ func (s *SpamRecordCache) AdjustWithInit(originId flow.Identifier, adjustFunc mo
 		return s.recordFactory(originId)
 	}
 
-	adjustedRecord, adjusted := s.c.AdjustWithInit(originId, wrapAdjustFunc, initFunc)
+	adjustedRecord, adjusted := s.Backend.AdjustWithInit(originId, wrapAdjustFunc, initFunc)
 	if rErr != nil {
 		return 0, fmt.Errorf("failed to adjust record: %w", rErr)
 	}
@@ -95,30 +97,27 @@ func (s *SpamRecordCache) AdjustWithInit(originId flow.Identifier, adjustFunc mo
 // - the record and true if the record exists, nil and false otherwise.
 // Note that the returned record is a copy of the record in the cache (we do not want the caller to modify the record).
 func (s *SpamRecordCache) Get(originId flow.Identifier) (*model.ProtocolSpamRecord, bool) {
-	return s.c.Get(originId)
+	record, ok := s.Backend.Get(originId)
+	if !ok {
+		return nil, false
+	}
+
+	// return a copy of the record (we do not want the caller to modify the record).
+	return &model.ProtocolSpamRecord{
+		OriginId:       record.OriginId,
+		Decay:          record.Decay,
+		CutoffCounter:  record.CutoffCounter,
+		Penalty:        record.Penalty,
+		DisallowListed: record.DisallowListed,
+	}, true
 }
 
 // Identities returns the list of identities of the nodes that have a spam record in the cache.
 func (s *SpamRecordCache) Identities() []flow.Identifier {
-	all := s.c.All()
+	all := s.Backend.All()
 	identifiers := make(flow.IdentifierList, 0, len(all))
-	for identifier, _ := range all {
+	for identifier := range all {
 		identifiers = append(identifiers, identifier)
 	}
 	return identifiers
-}
-
-// Remove removes the spam record of the given origin id from the cache.
-// Returns true if the record is removed, false otherwise (i.e., the record does not exist).
-// Args:
-// - originId: the origin id of the spam record.
-// Returns:
-// - true if the record is removed, false otherwise (i.e., the record does not exist).
-func (s *SpamRecordCache) Remove(originId flow.Identifier) bool {
-	return s.c.Remove(originId)
-}
-
-// Size returns the number of spam records in the cache.
-func (s *SpamRecordCache) Size() uint {
-	return s.c.Size()
 }

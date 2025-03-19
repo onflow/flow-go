@@ -140,7 +140,7 @@ func (r *RecordCache) NodeIDs() flow.IdentifierList {
 	all := r.c.All()
 
 	nodeIDs := make(flow.IdentifierList, 0, len(all))
-	for nodeID, _ := range all {
+	for nodeID := range all {
 		nodeIDs = append(nodeIDs, nodeID)
 	}
 	return nodeIDs

@@ -19,6 +19,7 @@ type HeroQueue[V any] struct {
 	sizeLimit uint
 }
 
+// NewHeroQueue creates a new instance of HeroQueue with the specified size limit.
 func NewHeroQueue[V any](sizeLimit uint32, logger zerolog.Logger, collector module.HeroCacheMetrics) *HeroQueue[V] {
 	return &HeroQueue[V]{
 		cache: herocache.NewCache[V](
@@ -32,7 +33,7 @@ func NewHeroQueue[V any](sizeLimit uint32, logger zerolog.Logger, collector modu
 	}
 }
 
-// Push stores the entity into the queue.
+// Push stores the key-value pair into the queue.
 // Boolean returned variable determines whether push was successful, i.e.,
 // push may be dropped if queue is full or already exists.
 func (c *HeroQueue[V]) Push(key flow.Identifier, value V) bool {
@@ -67,9 +68,6 @@ func (c *HeroQueue[V]) Pop() (value V, ok bool) {
 }
 
 // Size returns the number of elements currently stored in the queue.
-//
-// Returns:
-// - The count of elements in the queue.
 func (c *HeroQueue[V]) Size() uint {
 	c.mu.RLock()
 	defer c.mu.RUnlock()

@@ -20,6 +20,7 @@ import (
 // The spam records of peers is used to calculate the application specific score, which is part of the GossipSub score of a peer.
 // Note that neither of the spam records, application specific score, and GossipSub score are shared publicly with other peers.
 // Rather they are solely used by the current peer to select the peers to which it will connect on a topic mesh.
+// Stored gossipSubSpamRecords are keyed by the hash of the peerID.
 type GossipSubSpamRecordCache struct {
 	// the in-memory and thread-safe cache for storing the spam records of peers.
 	c *stdmap.Backend[flow.Identifier, gossipSubSpamRecordWrapper]

@@ -17,7 +17,7 @@ import (
 // DNSCache provides a caching mechanism for DNS IP and TXT records.
 //
 // The cache stores IP records in ipCache and TXT records in txtCache, using the domain's hashed
-// flow.Identifier as the key.
+// value as the key.
 type DNSCache struct {
 	ipCache  *stdmap.Backend[flow.Identifier, *mempool.IpRecord]
 	txtCache *stdmap.Backend[flow.Identifier, *mempool.TxtRecord]
@@ -26,12 +26,6 @@ type DNSCache struct {
 // NewDNSCache creates and returns a new instance of DNSCache.
 // It initializes both the IP and TXT record caches with the provided size limit, logger,
 // and cache metrics collectors for IP and TXT records.
-//
-// Parameters:
-// - sizeLimit: The maximum number of records the cache can hold before eviction.
-// - logger: The logger instance used to log cache operations, such as evictions.
-// - ipCollector: Metrics collector for IP records in the cache.
-// - txtCollector: Metrics collector for TXT records in the cache.
 func NewDNSCache(sizeLimit uint32, logger zerolog.Logger, ipCollector module.HeroCacheMetrics, txtCollector module.HeroCacheMetrics,
 ) *DNSCache {
 	return &DNSCache{
@@ -240,8 +234,6 @@ func (d *DNSCache) Size() (uint, uint) {
 }
 
 // domainToIdentifier is a helper function for creating the key for DNSCache by hashing the domain.
-// Returns:
-// - the hash of the domain as a flow.Identifier.
 func domainToIdentifier(domain string) flow.Identifier {
 	return flow.MakeID(domain)
 }
