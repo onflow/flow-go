@@ -11,7 +11,8 @@ import (
 	"github.com/onflow/flow-go/engine/access/rest/common/parser"
 	"github.com/onflow/flow-go/engine/access/rest/http/request"
 	"github.com/onflow/flow-go/engine/access/rest/util"
-	"github.com/onflow/flow-go/engine/access/rest/websockets/models"
+	"github.com/onflow/flow-go/engine/access/rest/websockets/data_providers/models"
+	wsmodels "github.com/onflow/flow-go/engine/access/rest/websockets/models"
 	"github.com/onflow/flow-go/engine/access/subscription"
 	"github.com/onflow/flow-go/model/flow"
 )
@@ -40,7 +41,7 @@ func NewBlocksDataProvider(
 	subscriptionID string,
 	linkGenerator commonmodels.LinkGenerator,
 	topic string,
-	rawArguments models.Arguments,
+	rawArguments wsmodels.Arguments,
 	send chan<- interface{},
 ) (*BlocksDataProvider, error) {
 	args, err := parseBlocksArguments(rawArguments)
@@ -78,16 +79,17 @@ func (p *BlocksDataProvider) Run(ctx context.Context) error {
 		p.baseDataProvider.done,
 		p.subscriptionState.subscription,
 		func(block *flow.Block) error {
-			var blockResponse commonmodels.Block
-
 			expandPayload := map[string]bool{commonmodels.ExpandableFieldPayload: true}
-			err := blockResponse.Build(block, nil, p.linkGenerator, p.arguments.BlockStatus, expandPayload)
+			blockPayload, err := commonmodels.NewBlock(block, nil, p.linkGenerator, p.arguments.BlockStatus, expandPayload)
 			if err != nil {
-				return fmt.Errorf("failed to build block response :%w", err)
+				return fmt.Errorf("failed to build block payload response: %w", err)
 			}
 
-			var response models.BaseDataProvidersResponse
-			response.Build(p.ID(), p.Topic(), &blockResponse)
+			response := models.BaseDataProvidersResponse{
+				SubscriptionID: p.ID(),
+				Topic:          p.Topic(),
+				Payload:        blockPayload,
+			}
 			p.send <- &response
 
 			return nil
@@ -109,7 +111,7 @@ func (p *BlocksDataProvider) createAndStartSubscription(ctx context.Context, arg
 }
 
 // parseBlocksArguments validates and initializes the blocks arguments.
-func parseBlocksArguments(arguments models.Arguments) (blocksArguments, error) {
+func parseBlocksArguments(arguments wsmodels.Arguments) (blocksArguments, error) {
 	allowedFields := map[string]struct{}{
 		"start_block_id":     {},
 		"start_block_height": {},
@@ -154,7 +156,7 @@ func parseBlocksArguments(arguments models.Arguments) (blocksArguments, error) {
 	return args, nil
 }
 
-func parseStartBlock(arguments models.Arguments) (flow.Identifier, uint64, error) {
+func parseStartBlock(arguments wsmodels.Arguments) (flow.Identifier, uint64, error) {
 	startBlockIDIn, hasStartBlockID := arguments["start_block_id"]
 	startBlockHeightIn, hasStartBlockHeight := arguments["start_block_height"]
 

@@ -7,7 +7,8 @@ import (
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/engine/access/rest/http/request"
-	"github.com/onflow/flow-go/engine/access/rest/websockets/models"
+	"github.com/onflow/flow-go/engine/access/rest/websockets/data_providers/models"
+	wsmodels "github.com/onflow/flow-go/engine/access/rest/websockets/models"
 	"github.com/onflow/flow-go/engine/access/state_stream"
 	"github.com/onflow/flow-go/engine/access/state_stream/backend"
 	"github.com/onflow/flow-go/engine/access/subscription"
@@ -40,7 +41,7 @@ func NewAccountStatusesDataProvider(
 	stateStreamApi state_stream.API,
 	subscriptionID string,
 	topic string,
-	rawArguments models.Arguments,
+	rawArguments wsmodels.Arguments,
 	send chan<- interface{},
 	chain flow.Chain,
 	eventFilterConfig state_stream.EventFilterConfig,
@@ -114,14 +115,15 @@ func (p *AccountStatusesDataProvider) sendResponse(
 		return nil
 	}
 
-	var accountStatusesPayload models.AccountStatusesResponse
-	accountStatusesPayload.Build(response, messageIndex.Value())
-	messageIndex.Increment()
-
-	var resp models.BaseDataProvidersResponse
-	resp.Build(p.ID(), p.Topic(), &accountStatusesPayload)
-
+	accountStatusesPayload := models.NewAccountStatusesResponse(response, messageIndex.Value())
+	resp := models.BaseDataProvidersResponse{
+		SubscriptionID: p.ID(),
+		Topic:          p.Topic(),
+		Payload:        accountStatusesPayload,
+	}
 	p.send <- &resp
+
+	messageIndex.Increment()
 	*blocksSinceLastMessage = 0
 
 	return nil
@@ -142,7 +144,7 @@ func (p *AccountStatusesDataProvider) createAndStartSubscription(ctx context.Con
 
 // parseAccountStatusesArguments validates and initializes the account statuses arguments.
 func parseAccountStatusesArguments(
-	arguments models.Arguments,
+	arguments wsmodels.Arguments,
 	chain flow.Chain,
 	eventFilterConfig state_stream.EventFilterConfig,
 	defaultHeartbeatInterval uint64,

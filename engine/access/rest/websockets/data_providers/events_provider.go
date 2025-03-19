@@ -7,7 +7,8 @@ import (
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/engine/access/rest/http/request"
-	"github.com/onflow/flow-go/engine/access/rest/websockets/models"
+	"github.com/onflow/flow-go/engine/access/rest/websockets/data_providers/models"
+	wsmodels "github.com/onflow/flow-go/engine/access/rest/websockets/models"
 	"github.com/onflow/flow-go/engine/access/state_stream"
 	"github.com/onflow/flow-go/engine/access/state_stream/backend"
 	"github.com/onflow/flow-go/engine/access/subscription"
@@ -41,7 +42,7 @@ func NewEventsDataProvider(
 	stateStreamApi state_stream.API,
 	subscriptionID string,
 	topic string,
-	rawArguments models.Arguments,
+	rawArguments wsmodels.Arguments,
 	send chan<- interface{},
 	chain flow.Chain,
 	eventFilterConfig state_stream.EventFilterConfig,
@@ -115,15 +116,16 @@ func (p *EventsDataProvider) sendResponse(
 		return nil
 	}
 
-	var eventsPayload models.EventResponse
-	eventsPayload.Build(eventsResponse, messageIndex.Value())
-	messageIndex.Increment()
-
-	var response models.BaseDataProvidersResponse
-	response.Build(p.ID(), p.Topic(), &eventsPayload)
-
+	eventsPayload := models.NewEventResponse(eventsResponse, messageIndex.Value())
+	response := models.BaseDataProvidersResponse{
+		SubscriptionID: p.ID(),
+		Topic:          p.Topic(),
+		Payload:        eventsPayload,
+	}
 	p.send <- &response
+
 	*blocksSinceLastMessage = 0
+	messageIndex.Increment()
 
 	return nil
 }
@@ -143,7 +145,7 @@ func (p *EventsDataProvider) createAndStartSubscription(ctx context.Context, arg
 
 // parseEventsArguments validates and initializes the events arguments.
 func parseEventsArguments(
-	arguments models.Arguments,
+	arguments wsmodels.Arguments,
 	chain flow.Chain,
 	eventFilterConfig state_stream.EventFilterConfig,
 	defaultHeartbeatInterval uint64,

@@ -11,7 +11,8 @@ import (
 	"github.com/onflow/flow-go/access"
 	commonmodels "github.com/onflow/flow-go/engine/access/rest/common/models"
 	commonparser "github.com/onflow/flow-go/engine/access/rest/common/parser"
-	"github.com/onflow/flow-go/engine/access/rest/websockets/models"
+	"github.com/onflow/flow-go/engine/access/rest/websockets/data_providers/models"
+	wsmodels "github.com/onflow/flow-go/engine/access/rest/websockets/models"
 	"github.com/onflow/flow-go/engine/access/subscription"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/counters"
@@ -40,7 +41,7 @@ func NewSendAndGetTransactionStatusesDataProvider(
 	subscriptionID string,
 	linkGenerator commonmodels.LinkGenerator,
 	topic string,
-	rawArguments models.Arguments,
+	rawArguments wsmodels.Arguments,
 	send chan<- interface{},
 	chain flow.Chain,
 ) (*SendAndGetTransactionStatusesDataProvider, error) {
@@ -96,14 +97,15 @@ func (p *SendAndGetTransactionStatusesDataProvider) sendResponse(
 	messageIndex *counters.StrictMonotonicCounter,
 ) error {
 	for i := range txResults {
-		var txStatusesPayload models.TransactionStatusesResponse
-		txStatusesPayload.Build(p.linkGenerator, txResults[i], messageIndex.Value())
-
-		var response models.BaseDataProvidersResponse
-		response.Build(p.ID(), p.Topic(), &txStatusesPayload)
+		txStatusesPayload := models.NewTransactionStatusesResponse(p.linkGenerator, txResults[i], messageIndex.Value())
+		response := models.BaseDataProvidersResponse{
+			SubscriptionID: p.ID(),
+			Topic:          p.Topic(),
+			Payload:        txStatusesPayload,
+		}
+		p.send <- &response
 
 		messageIndex.Increment()
-		p.send <- &response
 	}
 
 	return nil
@@ -119,7 +121,7 @@ func (p *SendAndGetTransactionStatusesDataProvider) createAndStartSubscription(
 
 // parseSendAndGetTransactionStatusesArguments validates and initializes the account statuses arguments.
 func parseSendAndGetTransactionStatusesArguments(
-	arguments models.Arguments,
+	arguments wsmodels.Arguments,
 	chain flow.Chain,
 ) (sendAndGetTransactionStatusesArguments, error) {
 	var args sendAndGetTransactionStatusesArguments

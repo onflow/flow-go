@@ -11,7 +11,8 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/suite"
 
-	"github.com/onflow/flow-go/engine/access/rest/websockets/models"
+	"github.com/onflow/flow-go/engine/access/rest/websockets/data_providers/models"
+	wsmodels "github.com/onflow/flow-go/engine/access/rest/websockets/models"
 	"github.com/onflow/flow-go/engine/access/state_stream"
 	"github.com/onflow/flow-go/engine/access/state_stream/backend"
 	ssmock "github.com/onflow/flow-go/engine/access/state_stream/mock"
@@ -92,7 +93,7 @@ func (s *EventsProviderSuite) subscribeEventsDataProviderTestCases(backendRespon
 	return []testType{
 		{
 			name: "SubscribeBlocksFromStartBlockID happy path",
-			arguments: models.Arguments{
+			arguments: wsmodels.Arguments{
 				"start_block_id":     s.rootBlock.ID().String(),
 				"event_types":        []string{string(flow.EventAccountCreated)},
 				"addresses":          []string{unittest.AddressFixture().String()},
@@ -111,7 +112,7 @@ func (s *EventsProviderSuite) subscribeEventsDataProviderTestCases(backendRespon
 		},
 		{
 			name: "SubscribeEventsFromStartHeight happy path",
-			arguments: models.Arguments{
+			arguments: wsmodels.Arguments{
 				"start_block_height": strconv.FormatUint(s.rootBlock.Header.Height, 10),
 				"event_types":        []string{string(flow.EventAccountCreated)},
 				"addresses":          []string{unittest.AddressFixture().String()},
@@ -130,7 +131,7 @@ func (s *EventsProviderSuite) subscribeEventsDataProviderTestCases(backendRespon
 		},
 		{
 			name: "SubscribeEventsFromLatest happy path",
-			arguments: models.Arguments{
+			arguments: wsmodels.Arguments{
 				"event_types":        []string{string(flow.EventAccountCreated)},
 				"addresses":          []string{unittest.AddressFixture().String()},
 				"contracts":          []string{"A.0000000000000001.Contract1", "A.0000000000000001.Contract2"},
@@ -181,12 +182,10 @@ func (s *EventsProviderSuite) expectedEventsResponses(
 	expectedResponses := make([]interface{}, len(backendResponses))
 
 	for i, resp := range backendResponses {
-		var expectedResponsePayload models.EventResponse
-		expectedResponsePayload.Build(resp, uint64(i))
-
+		expectedResponsePayload := models.NewEventResponse(resp, uint64(i))
 		expectedResponses[i] = &models.BaseDataProvidersResponse{
 			Topic:   EventsTopic,
-			Payload: &expectedResponsePayload,
+			Payload: expectedResponsePayload,
 		}
 	}
 	return expectedResponses
@@ -321,7 +320,7 @@ func (s *EventsProviderSuite) TestEventsDataProvider_StateStreamNotConfigured() 
 		nil,
 		"dummy-id",
 		topic,
-		models.Arguments{},
+		wsmodels.Arguments{},
 		send,
 		s.chain,
 		state_stream.DefaultEventFilterConfig,
@@ -335,18 +334,11 @@ func (s *EventsProviderSuite) TestEventsDataProvider_StateStreamNotConfigured() 
 // invalidEventsArgumentsTestCases returns a list of test cases with invalid argument combinations
 // for testing the behavior of events data providers. Each test case includes a name,
 // a set of input arguments, and the expected error message that should be returned.
-//
-// The test cases cover scenarios such as:
-// 1. Supplying both 'start_block_id' and 'start_block_height' simultaneously, which is not allowed.
-// 2. Providing invalid 'start_block_id' value.
-// 3. Providing invalid 'start_block_height' value.
-// 4. Providing invalid 'heartbeat_interval' value.
-// 5. Providing unexpected argument.
 func invalidEventsArgumentsTestCases() []testErrType {
 	return []testErrType{
 		{
 			name: "provide both 'start_block_id' and 'start_block_height' arguments",
-			arguments: models.Arguments{
+			arguments: wsmodels.Arguments{
 				"start_block_id":     unittest.BlockFixture().ID().String(),
 				"start_block_height": fmt.Sprintf("%d", unittest.BlockFixture().Header.Height),
 				"event_types":        []string{state_stream.CoreEventAccountCreated},

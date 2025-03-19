@@ -8,7 +8,8 @@ import (
 
 	"github.com/onflow/flow-go/access"
 	"github.com/onflow/flow-go/engine/access/rest/http/request"
-	"github.com/onflow/flow-go/engine/access/rest/websockets/models"
+	"github.com/onflow/flow-go/engine/access/rest/websockets/data_providers/models"
+	wsmodels "github.com/onflow/flow-go/engine/access/rest/websockets/models"
 	"github.com/onflow/flow-go/engine/access/subscription"
 	"github.com/onflow/flow-go/model/flow"
 )
@@ -28,7 +29,7 @@ func NewBlockDigestsDataProvider(
 	api access.API,
 	subscriptionID string,
 	topic string,
-	rawArguments models.Arguments,
+	rawArguments wsmodels.Arguments,
 	send chan<- interface{},
 ) (*BlockDigestsDataProvider, error) {
 	args, err := parseBlocksArguments(rawArguments)
@@ -64,11 +65,12 @@ func (p *BlockDigestsDataProvider) Run(ctx context.Context) error {
 		p.baseDataProvider.done,
 		p.subscriptionState.subscription,
 		func(b *flow.BlockDigest) error {
-			var blockDigest models.BlockDigest
-			blockDigest.Build(b)
-
-			var response models.BaseDataProvidersResponse
-			response.Build(p.ID(), p.Topic(), &blockDigest)
+			blockDigest := models.NewBlockDigest(b)
+			response := models.BaseDataProvidersResponse{
+				SubscriptionID: p.ID(),
+				Topic:          p.Topic(),
+				Payload:        blockDigest,
+			}
 			p.send <- &response
 
 			return nil

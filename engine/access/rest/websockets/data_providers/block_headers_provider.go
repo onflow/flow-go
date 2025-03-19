@@ -9,7 +9,8 @@ import (
 	"github.com/onflow/flow-go/access"
 	commonmodels "github.com/onflow/flow-go/engine/access/rest/common/models"
 	"github.com/onflow/flow-go/engine/access/rest/http/request"
-	"github.com/onflow/flow-go/engine/access/rest/websockets/models"
+	"github.com/onflow/flow-go/engine/access/rest/websockets/data_providers/models"
+	wsmodels "github.com/onflow/flow-go/engine/access/rest/websockets/models"
 	"github.com/onflow/flow-go/engine/access/subscription"
 	"github.com/onflow/flow-go/model/flow"
 )
@@ -29,7 +30,7 @@ func NewBlockHeadersDataProvider(
 	api access.API,
 	subscriptionID string,
 	topic string,
-	rawArguments models.Arguments,
+	rawArguments wsmodels.Arguments,
 	send chan<- interface{},
 ) (*BlockHeadersDataProvider, error) {
 	args, err := parseBlocksArguments(rawArguments)
@@ -65,12 +66,13 @@ func (p *BlockHeadersDataProvider) Run(ctx context.Context) error {
 	return run(
 		p.baseDataProvider.done,
 		p.subscriptionState.subscription,
-		func(h *flow.Header) error {
-			var header commonmodels.BlockHeader
-			header.Build(h)
-
-			var response models.BaseDataProvidersResponse
-			response.Build(p.ID(), p.Topic(), &header)
+		func(header *flow.Header) error {
+			headerPayload := commonmodels.NewBlockHeader(header)
+			response := models.BaseDataProvidersResponse{
+				SubscriptionID: p.ID(),
+				Topic:          p.Topic(),
+				Payload:        headerPayload,
+			}
 			p.send <- &response
 
 			return nil

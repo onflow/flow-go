@@ -576,7 +576,7 @@ func (c *Controller) writeResponse(ctx context.Context, response interface{}) {
 func wrapErrorMessage(code int, message string, action string, subscriptionID string) models.BaseMessageResponse {
 	return models.BaseMessageResponse{
 		SubscriptionID: subscriptionID,
-		Error: models.ErrorMessage{
+		Error: &models.ErrorMessage{
 			Code:    code,
 			Message: message,
 		},

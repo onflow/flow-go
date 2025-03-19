@@ -8,7 +8,7 @@ import (
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/access"
-	"github.com/onflow/flow-go/engine/access/rest/websockets/models"
+	wsmodels "github.com/onflow/flow-go/engine/access/rest/websockets/models"
 	"github.com/onflow/flow-go/engine/access/subscription"
 )
 
@@ -18,7 +18,7 @@ type baseDataProvider struct {
 	api               access.API
 	subscriptionID    string
 	topic             string
-	rawArguments      models.Arguments
+	rawArguments      wsmodels.Arguments
 	doneOnce          sync.Once
 	done              chan struct{}
 	send              chan<- interface{}
@@ -43,7 +43,7 @@ func newBaseDataProvider(
 	api access.API,
 	subscriptionID string,
 	topic string,
-	rawArguments models.Arguments,
+	rawArguments wsmodels.Arguments,
 	send chan<- interface{},
 ) *baseDataProvider {
 	return &baseDataProvider{
@@ -70,7 +70,7 @@ func (b *baseDataProvider) Topic() string {
 }
 
 // Arguments returns the arguments associated with the data provider.
-func (b *baseDataProvider) Arguments() models.Arguments {
+func (b *baseDataProvider) Arguments() wsmodels.Arguments {
 	return b.rawArguments
 }
 
