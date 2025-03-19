@@ -115,21 +115,21 @@ type KVStoreReader interface {
 	// Error Returns:
 	//   - kvstore.ErrKeyNotSupported if invoked on a KVStore instance before v2.
 	//   - kvstore.ErrKeyNotSet if the key has no value
-	GetCadenceComponentVersion() (MagnitudeOfChangeVersion, error)
+	GetCadenceComponentVersion() (MagnitudeVersion, error)
 	// GetCadenceComponentVersionUpgrade returns the most recent upgrade for the Cadence Component Version,
 	// if one exists (otherwise returns nil). The upgrade will be returned even if it has already been applied.
 	// Returns nil if invoked on a KVStore instance before v2.
-	GetCadenceComponentVersionUpgrade() *ViewBasedActivator[MagnitudeOfChangeVersion]
+	GetCadenceComponentVersionUpgrade() *ViewBasedActivator[MagnitudeVersion]
 
 	// GetExecutionComponentVersion returns the Execution component version.
 	// Error Returns:
 	//   - kvstore.ErrKeyNotSupported if invoked on a KVStore instance before v2.
 	//   - kvstore.ErrKeyNotSet if the key has no value
-	GetExecutionComponentVersion() (MagnitudeOfChangeVersion, error)
+	GetExecutionComponentVersion() (MagnitudeVersion, error)
 	// GetExecutionComponentVersionUpgrade returns the most recent upgrade for the Execution Component Version,
 	// if one exists (otherwise returns nil). The upgrade will be returned even if it has already been applied.
 	// Returns nil if invoked on a KVStore instance before v2.
-	GetExecutionComponentVersionUpgrade() *ViewBasedActivator[MagnitudeOfChangeVersion]
+	GetExecutionComponentVersionUpgrade() *ViewBasedActivator[MagnitudeVersion]
 
 	// GetExecutionMeteringParameters returns the Execution metering parameters.
 	// Error Returns:
@@ -240,7 +240,7 @@ type UpdatableField[T any] struct {
 	Update *ViewBasedActivator[T]
 }
 
-// MagnitudeOfChangeVersion is intended as an intuitive representation of the “magnitude of change”.
+// MagnitudeVersion is intended as an intuitive representation of the “magnitude of change”.
 //
 // # CAUTION: Don't confuse this with semver!
 //
@@ -248,11 +248,11 @@ type UpdatableField[T any] struct {
 // Any two different versions of the Execution Stack are considered incompatible.
 // In particular, two versions only differing in their minor, might be entirely downwards-INCOMPATIBLE.
 //
-// We generally recommend to use Integer Versioning for components. The MagnitudeOfChangeVersion scheme should
+// We generally recommend to use Integer Versioning for components. The MagnitudeVersion scheme should
 // be only used when there is a clear advantage Integer Versioning which outweighs the risk of falsely
 // making compatibility assumptions by confusing this scheme with Semantic Versioning!
 //
-// MagnitudeOfChangeVersion helps with an intuitive representation of the “magnitude of change”.
+// MagnitudeVersion helps with an intuitive representation of the “magnitude of change”.
 // For example, for the execution stack, bug fixes closing unexploited edge-cases will be a relatively
 // frequent cause of upgrades. Those bug fixes could be reflected by minor version bumps, whose
 // imperfect downwards compatibility might frequently suffice to warrant Access Nodes using the same
@@ -264,16 +264,16 @@ type UpdatableField[T any] struct {
 // is in no way reflected by the versioning scheme. Any automated decisions of compatibility for different
 // versions are to be avoided (including versions where only the minor is different).
 //
-// Engineering teams using this scheme must be aware that the MagnitudeOfChangeVersion is easily
+// Engineering teams using this scheme must be aware that the MagnitudeVersion is easily
 // misleading wrt to incorrect assumptions about downwards compatibility. Avoiding problems (up to and
 // including the possibility of mainnet outages) requires continued awareness of all engineers in the
 // teams working with this version. The engineers in those teams must commit to diligently documenting
 // all relevant changes, details regarding magnitude of changes and if applicable “imperfect but
 // good-enough downwards compatibility”.
-type MagnitudeOfChangeVersion struct {
+type MagnitudeVersion struct {
 	Major uint
 	Minor uint
 }
 
-// UndefinedMagnitudeOfChangeVersion represents the zero or unset value for a MagnitudeOfChangeVersion.
-var UndefinedMagnitudeOfChangeVersion = MagnitudeOfChangeVersion{}
+// UndefinedMagnitudeOfChangeVersion represents the zero or unset value for a MagnitudeVersion.
+var UndefinedMagnitudeOfChangeVersion = MagnitudeVersion{}

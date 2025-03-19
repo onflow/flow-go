@@ -151,22 +151,22 @@ func (model *Modelv0) GetFinalizationSafetyThreshold() uint64 {
 }
 
 // GetCadenceComponentVersion always returns ErrKeyNotSupported because this field is unsupported for Modelv0.
-func (model *Modelv0) GetCadenceComponentVersion() (protocol.MagnitudeOfChangeVersion, error) {
-	return protocol.MagnitudeOfChangeVersion{}, ErrKeyNotSupported
+func (model *Modelv0) GetCadenceComponentVersion() (protocol.MagnitudeVersion, error) {
+	return protocol.MagnitudeVersion{}, ErrKeyNotSupported
 }
 
 // GetCadenceComponentVersionUpgrade always returns nil because this field is unsupported for Modelv0.
-func (model *Modelv0) GetCadenceComponentVersionUpgrade() *protocol.ViewBasedActivator[protocol.MagnitudeOfChangeVersion] {
+func (model *Modelv0) GetCadenceComponentVersionUpgrade() *protocol.ViewBasedActivator[protocol.MagnitudeVersion] {
 	return nil
 }
 
 // GetExecutionComponentVersion always returns ErrKeyNotSupported because this field is unsupported for Modelv0.
-func (model *Modelv0) GetExecutionComponentVersion() (protocol.MagnitudeOfChangeVersion, error) {
-	return protocol.MagnitudeOfChangeVersion{}, ErrKeyNotSupported
+func (model *Modelv0) GetExecutionComponentVersion() (protocol.MagnitudeVersion, error) {
+	return protocol.MagnitudeVersion{}, ErrKeyNotSupported
 }
 
 // GetExecutionComponentVersionUpgrade always returns nil because this field is unsupported for Modelv0.
-func (model *Modelv0) GetExecutionComponentVersionUpgrade() *protocol.ViewBasedActivator[protocol.MagnitudeOfChangeVersion] {
+func (model *Modelv0) GetExecutionComponentVersionUpgrade() *protocol.ViewBasedActivator[protocol.MagnitudeVersion] {
 	return nil
 }
 
@@ -218,10 +218,10 @@ func (model *Modelv1) Replicate(protocolVersion uint64) (protocol_state.KVStoreM
 	v2 := &Modelv2{
 		Modelv1: clone.Clone(*model),
 		// Execution component versions and metering parameters are explicitly undefined when upgrading to v2
-		CadenceComponentVersion: protocol.UpdatableField[protocol.MagnitudeOfChangeVersion]{
+		CadenceComponentVersion: protocol.UpdatableField[protocol.MagnitudeVersion]{
 			CurrentValue: protocol.UndefinedMagnitudeOfChangeVersion,
 		},
-		ExecutionComponentVersion: protocol.UpdatableField[protocol.MagnitudeOfChangeVersion]{
+		ExecutionComponentVersion: protocol.UpdatableField[protocol.MagnitudeVersion]{
 			CurrentValue: protocol.UndefinedMagnitudeOfChangeVersion,
 		},
 		ExecutionMeteringParameters: protocol.UpdatableField[protocol.ExecutionMeteringParameters]{
@@ -259,8 +259,8 @@ func (model *Modelv1) GetProtocolStateVersion() uint64 {
 type Modelv2 struct {
 	Modelv1
 	ExecutionMeteringParameters protocol.UpdatableField[protocol.ExecutionMeteringParameters]
-	ExecutionComponentVersion   protocol.UpdatableField[protocol.MagnitudeOfChangeVersion]
-	CadenceComponentVersion     protocol.UpdatableField[protocol.MagnitudeOfChangeVersion]
+	ExecutionComponentVersion   protocol.UpdatableField[protocol.MagnitudeVersion]
+	CadenceComponentVersion     protocol.UpdatableField[protocol.MagnitudeVersion]
 }
 
 // ID returns an identifier for this key-value store snapshot by hashing internal fields and version number.
@@ -302,7 +302,7 @@ func (model *Modelv2) GetProtocolStateVersion() uint64 {
 
 // GetCadenceComponentVersion returns the current Cadence component version from Modelv2.
 // Returns kvstore.ErrKeyNotSet if the key has no value
-func (model *Modelv2) GetCadenceComponentVersion() (protocol.MagnitudeOfChangeVersion, error) {
+func (model *Modelv2) GetCadenceComponentVersion() (protocol.MagnitudeVersion, error) {
 	if model.CadenceComponentVersion.CurrentValue == protocol.UndefinedMagnitudeOfChangeVersion {
 		return protocol.UndefinedMagnitudeOfChangeVersion, ErrKeyNotSet
 	}
@@ -311,13 +311,13 @@ func (model *Modelv2) GetCadenceComponentVersion() (protocol.MagnitudeOfChangeVe
 
 // GetCadenceComponentVersionUpgrade returns the most recent upgrade for the Cadence component version,
 // if one exists (otherwise returns nil).
-func (model *Modelv2) GetCadenceComponentVersionUpgrade() *protocol.ViewBasedActivator[protocol.MagnitudeOfChangeVersion] {
+func (model *Modelv2) GetCadenceComponentVersionUpgrade() *protocol.ViewBasedActivator[protocol.MagnitudeVersion] {
 	return model.CadenceComponentVersion.Update
 }
 
 // GetExecutionComponentVersion returns the current Execution component version from Modelv2.
 // Returns kvstore.ErrKeyNotSet if the key has no value
-func (model *Modelv2) GetExecutionComponentVersion() (protocol.MagnitudeOfChangeVersion, error) {
+func (model *Modelv2) GetExecutionComponentVersion() (protocol.MagnitudeVersion, error) {
 	if model.ExecutionComponentVersion.CurrentValue == protocol.UndefinedMagnitudeOfChangeVersion {
 		return protocol.UndefinedMagnitudeOfChangeVersion, ErrKeyNotSet
 	}
@@ -326,7 +326,7 @@ func (model *Modelv2) GetExecutionComponentVersion() (protocol.MagnitudeOfChange
 
 // GetExecutionComponentVersionUpgrade returns the most recent upgrade for the Execution component version,
 // if one exists (otherwise returns nil).
-func (model *Modelv2) GetExecutionComponentVersionUpgrade() *protocol.ViewBasedActivator[protocol.MagnitudeOfChangeVersion] {
+func (model *Modelv2) GetExecutionComponentVersionUpgrade() *protocol.ViewBasedActivator[protocol.MagnitudeVersion] {
 	return model.ExecutionComponentVersion.Update
 }
 

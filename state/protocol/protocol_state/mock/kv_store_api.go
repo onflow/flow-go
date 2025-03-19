@@ -17,22 +17,22 @@ type KVStoreAPI struct {
 }
 
 // GetCadenceComponentVersion provides a mock function with given fields:
-func (_m *KVStoreAPI) GetCadenceComponentVersion() (protocol.MagnitudeOfChangeVersion, error) {
+func (_m *KVStoreAPI) GetCadenceComponentVersion() (protocol.MagnitudeVersion, error) {
 	ret := _m.Called()
 
 	if len(ret) == 0 {
 		panic("no return value specified for GetCadenceComponentVersion")
 	}
 
-	var r0 protocol.MagnitudeOfChangeVersion
+	var r0 protocol.MagnitudeVersion
 	var r1 error
-	if rf, ok := ret.Get(0).(func() (protocol.MagnitudeOfChangeVersion, error)); ok {
+	if rf, ok := ret.Get(0).(func() (protocol.MagnitudeVersion, error)); ok {
 		return rf()
 	}
-	if rf, ok := ret.Get(0).(func() protocol.MagnitudeOfChangeVersion); ok {
+	if rf, ok := ret.Get(0).(func() protocol.MagnitudeVersion); ok {
 		r0 = rf()
 	} else {
-		r0 = ret.Get(0).(protocol.MagnitudeOfChangeVersion)
+		r0 = ret.Get(0).(protocol.MagnitudeVersion)
 	}
 
 	if rf, ok := ret.Get(1).(func() error); ok {
@@ -45,19 +45,19 @@ func (_m *KVStoreAPI) GetCadenceComponentVersion() (protocol.MagnitudeOfChangeVe
 }
 
 // GetCadenceComponentVersionUpgrade provides a mock function with given fields:
-func (_m *KVStoreAPI) GetCadenceComponentVersionUpgrade() *protocol.ViewBasedActivator[protocol.MagnitudeOfChangeVersion] {
+func (_m *KVStoreAPI) GetCadenceComponentVersionUpgrade() *protocol.ViewBasedActivator[protocol.MagnitudeVersion] {
 	ret := _m.Called()
 
 	if len(ret) == 0 {
 		panic("no return value specified for GetCadenceComponentVersionUpgrade")
 	}
 
-	var r0 *protocol.ViewBasedActivator[protocol.MagnitudeOfChangeVersion]
-	if rf, ok := ret.Get(0).(func() *protocol.ViewBasedActivator[protocol.MagnitudeOfChangeVersion]); ok {
+	var r0 *protocol.ViewBasedActivator[protocol.MagnitudeVersion]
+	if rf, ok := ret.Get(0).(func() *protocol.ViewBasedActivator[protocol.MagnitudeVersion]); ok {
 		r0 = rf()
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*protocol.ViewBasedActivator[protocol.MagnitudeOfChangeVersion])
+			r0 = ret.Get(0).(*protocol.ViewBasedActivator[protocol.MagnitudeVersion])
 		}
 	}
 
@@ -103,22 +103,22 @@ func (_m *KVStoreAPI) GetEpochStateID() flow.Identifier {
 }
 
 // GetExecutionComponentVersion provides a mock function with given fields:
-func (_m *KVStoreAPI) GetExecutionComponentVersion() (protocol.MagnitudeOfChangeVersion, error) {
+func (_m *KVStoreAPI) GetExecutionComponentVersion() (protocol.MagnitudeVersion, error) {
 	ret := _m.Called()
 
 	if len(ret) == 0 {
 		panic("no return value specified for GetExecutionComponentVersion")
 	}
 
-	var r0 protocol.MagnitudeOfChangeVersion
+	var r0 protocol.MagnitudeVersion
 	var r1 error
-	if rf, ok := ret.Get(0).(func() (protocol.MagnitudeOfChangeVersion, error)); ok {
+	if rf, ok := ret.Get(0).(func() (protocol.MagnitudeVersion, error)); ok {
 		return rf()
 	}
-	if rf, ok := ret.Get(0).(func() protocol.MagnitudeOfChangeVersion); ok {
+	if rf, ok := ret.Get(0).(func() protocol.MagnitudeVersion); ok {
 		r0 = rf()
 	} else {
-		r0 = ret.Get(0).(protocol.MagnitudeOfChangeVersion)
+		r0 = ret.Get(0).(protocol.MagnitudeVersion)
 	}
 
 	if rf, ok := ret.Get(1).(func() error); ok {
@@ -131,19 +131,19 @@ func (_m *KVStoreAPI) GetExecutionComponentVersion() (protocol.MagnitudeOfChange
 }
 
 // GetExecutionComponentVersionUpgrade provides a mock function with given fields:
-func (_m *KVStoreAPI) GetExecutionComponentVersionUpgrade() *protocol.ViewBasedActivator[protocol.MagnitudeOfChangeVersion] {
+func (_m *KVStoreAPI) GetExecutionComponentVersionUpgrade() *protocol.ViewBasedActivator[protocol.MagnitudeVersion] {
 	ret := _m.Called()
 
 	if len(ret) == 0 {
 		panic("no return value specified for GetExecutionComponentVersionUpgrade")
 	}
 
-	var r0 *protocol.ViewBasedActivator[protocol.MagnitudeOfChangeVersion]
-	if rf, ok := ret.Get(0).(func() *protocol.ViewBasedActivator[protocol.MagnitudeOfChangeVersion]); ok {
+	var r0 *protocol.ViewBasedActivator[protocol.MagnitudeVersion]
+	if rf, ok := ret.Get(0).(func() *protocol.ViewBasedActivator[protocol.MagnitudeVersion]); ok {
 		r0 = rf()
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*protocol.ViewBasedActivator[protocol.MagnitudeOfChangeVersion])
+			r0 = ret.Get(0).(*protocol.ViewBasedActivator[protocol.MagnitudeVersion])
 		}
 	}
 
