@@ -432,8 +432,7 @@ func ConsensusNode(t *testing.T, hub *stub.Hub, identity bootstrap.NodeInfo, ide
 	resultsDB := storage.NewExecutionResults(node.Metrics, node.PublicDB)
 	receiptsDB := storage.NewExecutionReceipts(node.Metrics, node.PublicDB, resultsDB, storage.DefaultCacheSize)
 
-	guarantees, err := stdmap.NewGuarantees(1000)
-	require.NoError(t, err)
+	guarantees := stdmap.NewGuarantees(1000)
 
 	receipts := consensusMempools.NewExecutionTree()
 

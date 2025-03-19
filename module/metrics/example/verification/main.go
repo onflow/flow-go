@@ -85,30 +85,23 @@ func demo() {
 		<-mc.Ready()
 
 		// creates a receipt mempool and registers a metric on its size
-		receipts, err := stdmap.NewReceipts(100)
-		if err != nil {
-			panic(err)
-		}
+		receipts := stdmap.NewReceipts(100)
 		err = mc.Register(metrics.ResourceReceipt, receipts.Size)
 		if err != nil {
 			panic(err)
 		}
 
 		// creates pending receipt ids by block mempool, and registers size method of backend for metrics
-		receiptIDsByBlock, err := stdmap.NewIdentifierMap(100)
-		if err != nil {
-			panic(err)
-		}
+		receiptIDsByBlock := stdmap.NewIdentifierMap(100)
+
 		err = mc.Register(metrics.ResourcePendingReceiptIDsByBlock, receiptIDsByBlock.Size)
 		if err != nil {
 			panic(err)
 		}
 
 		// creates pending receipt ids by result mempool, and registers size method of backend for metrics
-		receiptIDsByResult, err := stdmap.NewIdentifierMap(100)
-		if err != nil {
-			panic(err)
-		}
+		receiptIDsByResult := stdmap.NewIdentifierMap(100)
+
 		err = mc.Register(metrics.ResourceReceiptIDsByResult, receiptIDsByResult.Size)
 		if err != nil {
 			panic(err)
