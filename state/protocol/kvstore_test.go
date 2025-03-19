@@ -13,15 +13,15 @@ import (
 func TestExecutionMeteringParameters_EncodeRLP(t *testing.T) {
 	params1 := &ExecutionMeteringParameters{
 		ExecutionMemoryLimit: rand.Uint64(),
-		ExecutionMemoryParameters: map[uint]uint64{
-			uint(rand.Uint64()): rand.Uint64(),
-			uint(rand.Uint64()): rand.Uint64(),
-			uint(rand.Uint64()): rand.Uint64(),
+		ExecutionMemoryWeights: map[uint64]uint64{
+			rand.Uint64(): rand.Uint64(),
+			rand.Uint64(): rand.Uint64(),
+			rand.Uint64(): rand.Uint64(),
 		},
-		ExecutionEffortParameters: map[uint]uint64{
-			uint(rand.Uint64()): rand.Uint64(),
-			uint(rand.Uint64()): rand.Uint64(),
-			uint(rand.Uint64()): rand.Uint64(),
+		ExecutionEffortWeights: map[uint64]uint64{
+			rand.Uint64(): rand.Uint64(),
+			rand.Uint64(): rand.Uint64(),
+			rand.Uint64(): rand.Uint64(),
 		},
 	}
 
@@ -34,9 +34,9 @@ func TestExecutionMeteringParameters_EncodeRLP(t *testing.T) {
 	})
 	t.Run("unique encoding", func(t *testing.T) {
 		params2 := clone.Clone(params1)
-		for k, v := range params2.ExecutionMemoryParameters {
-			params2.ExecutionMemoryParameters[k] = v + 1
-			assert.NotEqual(t, params1.ExecutionMemoryParameters[k], params2.ExecutionMemoryParameters[k])
+		for k, v := range params2.ExecutionMemoryWeights {
+			params2.ExecutionMemoryWeights[k] = v + 1
+			assert.NotEqual(t, params1.ExecutionMemoryWeights[k], params2.ExecutionMemoryWeights[k])
 			break
 		}
 		enc1, err := rlp.EncodeToBytes(params1)
