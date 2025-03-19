@@ -265,7 +265,7 @@ func (s *AccountStatusesProviderSuite) TestMessageIndexAccountStatusesProviderRe
 	s.Require().NoError(err)
 	s.Require().NotNil(provider)
 
-	// Ensure the provider is properly doneOnce after the test
+	// Ensure the provider is properly closed after the test
 	defer provider.Close()
 
 	// Run the provider in a separate goroutine to simulate subscription processing

@@ -86,7 +86,7 @@ type sendResponseCallback[T any] func(T) error
 
 // run reads data from a subscription and sends it to clients using the provided
 // sendResponse callback. It continuously listens to the subscription's data
-// channel and forwards the received values until the done channel is doneOnce or
+// channel and forwards the received values until the done channel is closed or
 // the subscription ends. It is used as a helper function for each data provider's
 // Run() function.
 //
