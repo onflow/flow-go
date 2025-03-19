@@ -10,7 +10,7 @@ import (
 
 	accessmock "github.com/onflow/flow-go/access/mock"
 	"github.com/onflow/flow-go/engine/access/rest/common/parser"
-	"github.com/onflow/flow-go/engine/access/rest/websockets/models"
+	wsmodels "github.com/onflow/flow-go/engine/access/rest/websockets/models"
 	"github.com/onflow/flow-go/engine/access/state_stream"
 	statestreammock "github.com/onflow/flow-go/engine/access/state_stream/mock"
 	"github.com/onflow/flow-go/engine/access/subscription"
@@ -76,14 +76,14 @@ func (s *DataProviderFactorySuite) TestSupportedTopics() {
 	testCases := []struct {
 		name               string
 		topic              string
-		arguments          models.Arguments
+		arguments          wsmodels.Arguments
 		setupSubscription  func()
 		assertExpectations func()
 	}{
 		{
 			name:      "block topic",
 			topic:     BlocksTopic,
-			arguments: models.Arguments{"block_status": parser.Finalized},
+			arguments: wsmodels.Arguments{"block_status": parser.Finalized},
 			setupSubscription: func() {
 				s.setupSubscription(s.accessApi.On("SubscribeBlocksFromLatest", mock.Anything, flow.BlockStatusFinalized))
 			},
@@ -94,7 +94,7 @@ func (s *DataProviderFactorySuite) TestSupportedTopics() {
 		{
 			name:      "block headers topic",
 			topic:     BlockHeadersTopic,
-			arguments: models.Arguments{"block_status": parser.Finalized},
+			arguments: wsmodels.Arguments{"block_status": parser.Finalized},
 			setupSubscription: func() {
 				s.setupSubscription(s.accessApi.On("SubscribeBlockHeadersFromLatest", mock.Anything, flow.BlockStatusFinalized))
 			},
@@ -105,7 +105,7 @@ func (s *DataProviderFactorySuite) TestSupportedTopics() {
 		{
 			name:      "block digests topic",
 			topic:     BlockDigestsTopic,
-			arguments: models.Arguments{"block_status": parser.Finalized},
+			arguments: wsmodels.Arguments{"block_status": parser.Finalized},
 			setupSubscription: func() {
 				s.setupSubscription(s.accessApi.On("SubscribeBlockDigestsFromLatest", mock.Anything, flow.BlockStatusFinalized))
 			},
@@ -116,7 +116,7 @@ func (s *DataProviderFactorySuite) TestSupportedTopics() {
 		{
 			name:  "events topic",
 			topic: EventsTopic,
-			arguments: models.Arguments{
+			arguments: wsmodels.Arguments{
 				"event_types": []string{state_stream.CoreEventAccountCreated},
 				"addresses":   []string{unittest.AddressFixture().String()},
 				"contracts":   []string{"A.0000000000000001.Contract1", "A.0000000000000001.Contract2"},
@@ -131,7 +131,7 @@ func (s *DataProviderFactorySuite) TestSupportedTopics() {
 		{
 			name:  "account statuses topic",
 			topic: AccountStatusesTopic,
-			arguments: models.Arguments{
+			arguments: wsmodels.Arguments{
 				"event_types":       []string{state_stream.CoreEventAccountCreated},
 				"account_addresses": []string{unittest.AddressFixture().String()},
 			},
@@ -145,7 +145,7 @@ func (s *DataProviderFactorySuite) TestSupportedTopics() {
 		{
 			name:  "transaction statuses topic",
 			topic: TransactionStatusesTopic,
-			arguments: models.Arguments{
+			arguments: wsmodels.Arguments{
 				"tx_id": unittest.IdentifierFixture().String(),
 			},
 			setupSubscription: func() {
@@ -158,7 +158,7 @@ func (s *DataProviderFactorySuite) TestSupportedTopics() {
 		{
 			name:      "send transaction statuses topic",
 			topic:     SendAndGetTransactionStatusesTopic,
-			arguments: models.Arguments(unittest.CreateSendTxHttpPayload(tx)),
+			arguments: wsmodels.Arguments(unittest.CreateSendTxHttpPayload(tx)),
 			setupSubscription: func() {
 				s.setupSubscription(s.accessApi.On("SendAndSubscribeTransactionStatuses", mock.Anything, mock.Anything, mock.Anything))
 			},

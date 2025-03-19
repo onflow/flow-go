@@ -11,7 +11,7 @@ import (
 
 	accessmock "github.com/onflow/flow-go/access/mock"
 	mockcommonmodels "github.com/onflow/flow-go/engine/access/rest/common/models/mock"
-	"github.com/onflow/flow-go/engine/access/rest/websockets/models"
+	"github.com/onflow/flow-go/engine/access/rest/websockets/data_providers/models"
 	"github.com/onflow/flow-go/engine/access/state_stream"
 	ssmock "github.com/onflow/flow-go/engine/access/state_stream/mock"
 	"github.com/onflow/flow-go/engine/access/subscription"
@@ -128,26 +128,114 @@ func (s *SendTransactionStatusesProviderSuite) TestSendTransactionStatusesDataPr
 
 	topic := SendAndGetTransactionStatusesTopic
 
-	invalidTx := unittest.TransactionBodyFixture()
-	invalidTx.PayloadSignatures = []flow.TransactionSignature{unittest.TransactionSignatureFixture()}
-	invalidTx.Arguments = [][]uint8{}
-	arguments := unittest.CreateSendTxHttpPayload(invalidTx)
-	arguments["script"] = 0
+	for _, test := range invalidSendTransactionStatusesArgumentsTestCases() {
+		s.Run(test.name, func() {
+			provider, err := NewSendAndGetTransactionStatusesDataProvider(
+				ctx,
+				s.log,
+				s.api,
+				"dummy-id",
+				s.linkGenerator,
+				topic,
+				test.arguments,
+				send,
+				s.chain,
+			)
+			s.Require().Error(err)
+			s.Require().Contains(err.Error(), test.expectedErrorMsg)
+			s.Require().Nil(provider)
+		})
+	}
+}
 
-	expectedErrorMsg := "invalid arguments for send tx statuses data provider"
-
-	provider, err := NewSendAndGetTransactionStatusesDataProvider(
-		ctx,
-		s.log,
-		s.api,
-		"dummy-id",
-		s.linkGenerator,
-		topic,
-		arguments,
-		send,
-		s.chain,
-	)
-	s.Require().Error(err)
-	s.Require().Nil(provider)
-	s.Require().Contains(err.Error(), expectedErrorMsg)
+// invalidSendTransactionStatusesArgumentsTestCases returns a list of test cases with invalid argument combinations
+// for testing the behavior of send transaction statuses data providers. Each test case includes a name,
+// a set of input arguments, and the expected error message that should be returned.
+func invalidSendTransactionStatusesArgumentsTestCases() []testErrType {
+	return []testErrType{
+		{
+			name: "invalid 'script' argument type",
+			arguments: map[string]interface{}{
+				"script": 0,
+			},
+			expectedErrorMsg: "failed to parse transaction",
+		},
+		{
+			name: "invalid 'script' argument",
+			arguments: map[string]interface{}{
+				"script": "invalid_script",
+			},
+			expectedErrorMsg: "failed to parse transaction",
+		},
+		{
+			name: "invalid 'arguments' type",
+			arguments: map[string]interface{}{
+				"arguments": 0,
+			},
+			expectedErrorMsg: "failed to parse transaction",
+		},
+		{
+			name: "invalid 'arguments' argument",
+			arguments: map[string]interface{}{
+				"arguments": []string{"invalid_base64_1", "invalid_base64_2"},
+			},
+			expectedErrorMsg: "failed to parse transaction",
+		},
+		{
+			name: "invalid 'reference_block_id' argument",
+			arguments: map[string]interface{}{
+				"reference_block_id": "invalid_reference_block_id",
+			},
+			expectedErrorMsg: "failed to parse transaction",
+		},
+		{
+			name: "invalid 'gas_limit' argument",
+			arguments: map[string]interface{}{
+				"gas_limit": "-1",
+			},
+			expectedErrorMsg: "failed to parse transaction",
+		},
+		{
+			name: "invalid 'payer' argument",
+			arguments: map[string]interface{}{
+				"payer": "invalid_payer",
+			},
+			expectedErrorMsg: "failed to parse transaction",
+		},
+		{
+			name: "invalid 'proposal_key' argument",
+			arguments: map[string]interface{}{
+				"proposal_key": "invalid ProposalKey object",
+			},
+			expectedErrorMsg: "failed to parse transaction",
+		},
+		{
+			name: "invalid 'authorizers' argument",
+			arguments: map[string]interface{}{
+				"authorizers": []string{"invalid_base64_1", "invalid_base64_2"},
+			},
+			expectedErrorMsg: "failed to parse transaction",
+		},
+		{
+			name: "invalid 'payload_signatures' argument",
+			arguments: map[string]interface{}{
+				"payload_signatures": "invalid TransactionSignature array",
+			},
+			expectedErrorMsg: "failed to parse transaction",
+		},
+		{
+			name: "invalid 'envelope_signatures' argument",
+			arguments: map[string]interface{}{
+				"envelope_signatures": "invalid TransactionSignature array",
+			},
+			expectedErrorMsg: "failed to parse transaction",
+		},
+		{
+			name: "unexpected argument",
+			arguments: map[string]interface{}{
+				"unexpected_argument": "dummy",
+			},
+			expectedErrorMsg: "request body contains unknown field",
+		},
+	}
 }

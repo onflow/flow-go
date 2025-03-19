@@ -12,7 +12,8 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
-	"github.com/onflow/flow-go/engine/access/rest/websockets/models"
+	"github.com/onflow/flow-go/engine/access/rest/websockets/data_providers/models"
+	wsmodels "github.com/onflow/flow-go/engine/access/rest/websockets/models"
 	"github.com/onflow/flow-go/engine/access/state_stream"
 	"github.com/onflow/flow-go/engine/access/state_stream/backend"
 	ssmock "github.com/onflow/flow-go/engine/access/state_stream/mock"
@@ -98,7 +99,7 @@ func (s *AccountStatusesProviderSuite) TestAccountStatusesDataProvider_StateStre
 		nil,
 		"dummy-id",
 		topic,
-		models.Arguments{},
+		wsmodels.Arguments{},
 		send,
 		s.chain,
 		state_stream.DefaultEventFilterConfig,
@@ -117,7 +118,7 @@ func (s *AccountStatusesProviderSuite) subscribeAccountStatusesDataProviderTestC
 	return []testType{
 		{
 			name: "SubscribeAccountStatusesFromStartBlockID happy path",
-			arguments: models.Arguments{
+			arguments: wsmodels.Arguments{
 				"start_block_id":    s.rootBlock.ID().String(),
 				"event_types":       []string{string(flow.EventAccountCreated)},
 				"account_addresses": []string{unittest.AddressFixture().String()},
@@ -134,7 +135,7 @@ func (s *AccountStatusesProviderSuite) subscribeAccountStatusesDataProviderTestC
 		},
 		{
 			name: "SubscribeAccountStatusesFromStartHeight happy path",
-			arguments: models.Arguments{
+			arguments: wsmodels.Arguments{
 				"start_block_height": strconv.FormatUint(s.rootBlock.Header.Height, 10),
 				"event_types":        []string{string(flow.EventAccountCreated)},
 				"account_addresses":  []string{unittest.AddressFixture().String()},
@@ -151,7 +152,7 @@ func (s *AccountStatusesProviderSuite) subscribeAccountStatusesDataProviderTestC
 		},
 		{
 			name: "SubscribeAccountStatusesFromLatestBlock happy path",
-			arguments: models.Arguments{
+			arguments: wsmodels.Arguments{
 				"event_types":       []string{string(flow.EventAccountCreated)},
 				"account_addresses": []string{unittest.AddressFixture().String()},
 			},
@@ -191,12 +192,10 @@ func (s *AccountStatusesProviderSuite) expectedAccountStatusesResponses(backendR
 	expectedResponses := make([]interface{}, len(backendResponses))
 
 	for i, resp := range backendResponses {
-		var expectedResponsePayload models.AccountStatusesResponse
-		expectedResponsePayload.Build(resp, uint64(i))
-
+		expectedResponsePayload := models.NewAccountStatusesResponse(resp, uint64(i))
 		expectedResponses[i] = &models.BaseDataProvidersResponse{
 			Topic:   AccountStatusesTopic,
-			Payload: &expectedResponsePayload,
+			Payload: expectedResponsePayload,
 		}
 	}
 
@@ -206,10 +205,6 @@ func (s *AccountStatusesProviderSuite) expectedAccountStatusesResponses(backendR
 // TestAccountStatusesDataProvider_InvalidArguments tests the behavior of the account statuses data provider
 // when invalid arguments are provided. It verifies that appropriate errors are returned
 // for missing or conflicting arguments.
-// This test covers the test cases:
-// 1. Providing both 'start_block_id' and 'start_block_height' simultaneously.
-// 2. Invalid 'start_block_id' argument.
-// 3. Invalid 'start_block_height' argument.
 func (s *AccountStatusesProviderSuite) TestAccountStatusesDataProvider_InvalidArguments() {
 	ctx := context.Background()
 	send := make(chan interface{})
@@ -342,7 +337,7 @@ func invalidAccountStatusesArgumentsTestCases() []testErrType {
 	return []testErrType{
 		{
 			name: "provide both 'start_block_id' and 'start_block_height' arguments",
-			arguments: models.Arguments{
+			arguments: wsmodels.Arguments{
 				"start_block_id":     unittest.BlockFixture().ID().String(),
 				"start_block_height": fmt.Sprintf("%d", unittest.BlockFixture().Header.Height),
 				"event_types":        []string{state_stream.CoreEventAccountCreated},

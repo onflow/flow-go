@@ -9,7 +9,8 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/onflow/flow-go/engine/access/rest/websockets/models"
+	"github.com/onflow/flow-go/engine/access/rest/websockets/data_providers/models"
+	wsmodels "github.com/onflow/flow-go/engine/access/rest/websockets/models"
 	statestreamsmock "github.com/onflow/flow-go/engine/access/state_stream/mock"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -17,7 +18,7 @@ import (
 // testType represents a valid test scenario for subscribing
 type testType struct {
 	name              string
-	arguments         models.Arguments
+	arguments         wsmodels.Arguments
 	setupBackend      func(sub *statestreamsmock.Subscription)
 	expectedResponses []interface{}
 }
@@ -25,7 +26,7 @@ type testType struct {
 // testErrType represents an error cases for subscribing
 type testErrType struct {
 	name             string
-	arguments        models.Arguments
+	arguments        wsmodels.Arguments
 	expectedErrorMsg string
 }
 
@@ -151,7 +152,7 @@ func TestEnsureAllowedFields(t *testing.T) {
 func TestExtractArrayOfStrings(t *testing.T) {
 	tests := []struct {
 		name      string
-		args      models.Arguments
+		args      wsmodels.Arguments
 		key       string
 		required  bool
 		expect    []string
@@ -159,7 +160,7 @@ func TestExtractArrayOfStrings(t *testing.T) {
 	}{
 		{
 			name:      "Valid string array",
-			args:      models.Arguments{"tags": []string{"a", "b"}},
+			args:      wsmodels.Arguments{"tags": []string{"a", "b"}},
 			key:       "tags",
 			required:  true,
 			expect:    []string{"a", "b"},
@@ -167,7 +168,7 @@ func TestExtractArrayOfStrings(t *testing.T) {
 		},
 		{
 			name:      "Missing required key",
-			args:      models.Arguments{},
+			args:      wsmodels.Arguments{},
 			key:       "tags",
 			required:  true,
 			expect:    nil,
@@ -175,7 +176,7 @@ func TestExtractArrayOfStrings(t *testing.T) {
 		},
 		{
 			name:      "Missing optional key",
-			args:      models.Arguments{},
+			args:      wsmodels.Arguments{},
 			key:       "tags",
 			required:  false,
 			expect:    []string{},
@@ -183,7 +184,7 @@ func TestExtractArrayOfStrings(t *testing.T) {
 		},
 		{
 			name:      "Invalid type in array",
-			args:      models.Arguments{"tags": []interface{}{"a", 123}},
+			args:      wsmodels.Arguments{"tags": []interface{}{"a", 123}},
 			key:       "tags",
 			required:  true,
 			expect:    nil,
@@ -191,7 +192,7 @@ func TestExtractArrayOfStrings(t *testing.T) {
 		},
 		{
 			name:      "Nil value",
-			args:      models.Arguments{"tags": nil},
+			args:      wsmodels.Arguments{"tags": nil},
 			key:       "tags",
 			required:  false,
 			expect:    nil,
