@@ -9,15 +9,6 @@ type Collection struct {
 	Transactions []*TransactionBody
 }
 
-// CollectionFromTransactions creates a new collection from the list of transactions.
-func CollectionFromTransactions(transactions []*Transaction) Collection {
-	coll := Collection{Transactions: make([]*TransactionBody, 0, len(transactions))}
-	for _, tx := range transactions {
-		coll.Transactions = append(coll.Transactions, &tx.TransactionBody)
-	}
-	return coll
-}
-
 // Light returns the light, reference-only version of the collection.
 func (c Collection) Light() LightCollection {
 	lc := LightCollection{Transactions: make([]Identifier, 0, len(c.Transactions))}

@@ -275,7 +275,7 @@ func (s *TransactionStatusSuite) TestSubscribeTransactionStatusHappyCase() {
 	transaction.SetReferenceBlockID(s.finalizedBlock.ID())
 	s.transactions.On("ByID", mock.AnythingOfType("flow.Identifier")).Return(&transaction.TransactionBody, nil)
 
-	col := flow.CollectionFromTransactions([]*flow.Transaction{&transaction})
+	col := unittest.CollectionFromTransactions([]*flow.Transaction{&transaction})
 	guarantee := col.Guarantee()
 	light := col.Light()
 	txId := transaction.ID()
