@@ -645,8 +645,7 @@ func WithCollection(collection *flow.Collection) func(guarantee *flow.Collection
 func AddCollectionsToBlock(block *flow.Block, collections []*flow.Collection) {
 	gs := make([]*flow.CollectionGuarantee, 0, len(collections))
 	for _, collection := range collections {
-		g := collection.Guarantee()
-		gs = append(gs, &g)
+		gs = append(gs, &flow.CollectionGuarantee{CollectionID: collection.ID()})
 	}
 
 	block.Payload.Guarantees = gs
@@ -1543,14 +1542,13 @@ func RegisterIDFixture() flow.RegisterID {
 // execution receipt referencing the block/collections.
 func VerifiableChunkDataFixture(chunkIndex uint64) *verification.VerifiableChunkData {
 
-	guarantees := make([]*flow.CollectionGuarantee, 0)
+	guarantees := make([]*flow.CollectionGuarantee, 0, chunkIndex)
 
 	var col flow.Collection
 
 	for i := 0; i <= int(chunkIndex); i++ {
 		col = CollectionFixture(1)
-		guarantee := col.Guarantee()
-		guarantees = append(guarantees, &guarantee)
+		guarantees = append(guarantees, &flow.CollectionGuarantee{CollectionID: col.ID()})
 	}
 
 	payload := flow.Payload{

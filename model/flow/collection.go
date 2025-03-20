@@ -9,20 +9,13 @@ type Collection struct {
 	Transactions []*TransactionBody
 }
 
-// Light returns the light, reference-only version of the collection.
+// Light returns a LightCollection, which contains only the list of transaction IDs from the Collection.
 func (c Collection) Light() LightCollection {
 	lc := LightCollection{Transactions: make([]Identifier, 0, len(c.Transactions))}
 	for _, tx := range c.Transactions {
 		lc.Transactions = append(lc.Transactions, tx.ID())
 	}
 	return lc
-}
-
-// Guarantee returns a collection guarantee for this collection.
-func (c *Collection) Guarantee() CollectionGuarantee {
-	return CollectionGuarantee{
-		CollectionID: c.ID(),
-	}
 }
 
 // ID returns a cryptographic commitment to the receiver Collection.
