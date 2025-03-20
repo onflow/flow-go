@@ -1,8 +1,6 @@
 package data_providers
 
 import (
-	"context"
-
 	"github.com/onflow/flow-go/engine/access/rest/websockets/models"
 )
 
@@ -35,5 +33,5 @@ type DataProvider interface {
 	// Must be called once.
 	//
 	// No errors expected during normal operations
-	Run(ctx context.Context) error
+	Run() error
 }

@@ -1,6 +1,7 @@
 package data_providers
 
 import (
+	"context"
 	"strconv"
 	"testing"
 
@@ -128,7 +129,7 @@ func (s *BlockDigestsProviderSuite) TestBlockDigestsDataProvider_InvalidArgument
 
 	for _, test := range s.invalidArgumentsTestCases() {
 		s.Run(test.name, func() {
-			provider, err := NewBlockDigestsDataProvider(s.log, s.api, "dummy-id", topic, test.arguments, send)
+			provider, err := NewBlockDigestsDataProvider(context.Background(), s.log, s.api, "dummy-id", topic, test.arguments, send)
 			s.Require().Error(err)
 			s.Require().Nil(provider)
 			s.Require().Contains(err.Error(), test.expectedErrorMsg)

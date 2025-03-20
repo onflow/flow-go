@@ -14,13 +14,14 @@ import (
 
 // baseDataProvider holds common objects for the provider
 type baseDataProvider struct {
+	ctx               context.Context
 	logger            zerolog.Logger
 	api               access.API
 	subscriptionID    string
 	topic             string
 	rawArguments      wsmodels.Arguments
 	send              chan<- interface{}
-	subscriptionState *subscriptionState
+	subscriptionState subscriptionState
 }
 
 type subscriptionState struct {
@@ -28,15 +29,9 @@ type subscriptionState struct {
 	subscription              subscription.Subscription
 }
 
-func newSubscriptionState(cancel context.CancelFunc, subscription subscription.Subscription) *subscriptionState {
-	return &subscriptionState{
-		cancelSubscriptionContext: cancel,
-		subscription:              subscription,
-	}
-}
-
 // newBaseDataProvider creates a new instance of baseDataProvider.
 func newBaseDataProvider(
+	ctx context.Context,
 	logger zerolog.Logger,
 	api access.API,
 	subscriptionID string,
@@ -44,14 +39,19 @@ func newBaseDataProvider(
 	rawArguments wsmodels.Arguments,
 	send chan<- interface{},
 ) *baseDataProvider {
+	ctx, cancel := context.WithCancel(ctx)
 	return &baseDataProvider{
-		logger:            logger,
-		api:               api,
-		subscriptionID:    subscriptionID,
-		topic:             topic,
-		rawArguments:      rawArguments,
-		send:              send,
-		subscriptionState: nil,
+		ctx:            ctx,
+		logger:         logger,
+		api:            api,
+		subscriptionID: subscriptionID,
+		topic:          topic,
+		rawArguments:   rawArguments,
+		send:           send,
+		subscriptionState: subscriptionState{
+			cancelSubscriptionContext: cancel,
+			subscription:              nil, // subscription is initialized and started in Run() function
+		},
 	}
 }
 

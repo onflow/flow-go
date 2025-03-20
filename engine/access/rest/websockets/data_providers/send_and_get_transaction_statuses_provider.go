@@ -36,6 +36,7 @@ type SendAndGetTransactionStatusesDataProvider struct {
 var _ DataProvider = (*SendAndGetTransactionStatusesDataProvider)(nil)
 
 func NewSendAndGetTransactionStatusesDataProvider(
+	ctx context.Context,
 	logger zerolog.Logger,
 	api access.API,
 	subscriptionID string,
@@ -51,6 +52,7 @@ func NewSendAndGetTransactionStatusesDataProvider(
 	}
 
 	provider := newBaseDataProvider(
+		ctx,
 		logger.With().Str("component", "send-transaction-statuses-data-provider").Logger(),
 		api,
 		subscriptionID,
@@ -71,11 +73,8 @@ func NewSendAndGetTransactionStatusesDataProvider(
 // Must be called once.
 //
 // No errors are expected during normal operations
-func (p *SendAndGetTransactionStatusesDataProvider) Run(ctx context.Context) error {
-	// start a new subscription. we read data from it and send them to client's channel
-	ctx, cancel := context.WithCancel(ctx)
-	defer cancel()
-	p.subscriptionState = newSubscriptionState(cancel, p.createAndStartSubscription(ctx, p.arguments))
+func (p *SendAndGetTransactionStatusesDataProvider) Run() error {
+	p.subscriptionState.subscription = p.createAndStartSubscription(p.ctx, p.arguments)
 
 	return run(
 		p.subscriptionState.subscription,

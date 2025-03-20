@@ -52,7 +52,6 @@ func testHappyPath(
 ) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			ctx := context.Background()
 			send := make(chan interface{}, 10)
 
 			// Create a channel to simulate the subscription's data channel
@@ -65,7 +64,7 @@ func testHappyPath(
 			test.setupBackend(sub)
 
 			// Create the data provider instance
-			provider, err := factory.NewDataProvider("dummy-id", topic, test.arguments, send)
+			provider, err := factory.NewDataProvider(context.Background(), "dummy-id", topic, test.arguments, send)
 			require.NoError(t, err)
 			require.NotNil(t, provider)
 
@@ -76,7 +75,7 @@ func testHappyPath(
 			done := make(chan struct{})
 			go func() {
 				defer close(done)
-				err = provider.Run(ctx)
+				err = provider.Run()
 				require.NoError(t, err)
 			}()
 

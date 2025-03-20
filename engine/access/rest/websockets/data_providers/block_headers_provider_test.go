@@ -1,6 +1,7 @@
 package data_providers
 
 import (
+	"context"
 	"strconv"
 	"testing"
 
@@ -129,7 +130,7 @@ func (s *BlockHeadersProviderSuite) TestBlockHeadersDataProvider_InvalidArgument
 
 	for _, test := range s.invalidArgumentsTestCases() {
 		s.Run(test.name, func() {
-			provider, err := NewBlockHeadersDataProvider(s.log, s.api, "dummy-id", topic, test.arguments, send)
+			provider, err := NewBlockHeadersDataProvider(context.Background(), s.log, s.api, "dummy-id", topic, test.arguments, send)
 			s.Require().Error(err)
 			s.Require().Nil(provider)
 			s.Require().Contains(err.Error(), test.expectedErrorMsg)

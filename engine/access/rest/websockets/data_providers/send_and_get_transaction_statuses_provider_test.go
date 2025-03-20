@@ -1,6 +1,7 @@
 package data_providers
 
 import (
+	"context"
 	"testing"
 
 	"github.com/rs/zerolog"
@@ -128,6 +129,7 @@ func (s *SendTransactionStatusesProviderSuite) TestSendTransactionStatusesDataPr
 	for _, test := range invalidSendTransactionStatusesArgumentsTestCases() {
 		s.Run(test.name, func() {
 			provider, err := NewSendAndGetTransactionStatusesDataProvider(
+				context.Background(),
 				s.log,
 				s.api,
 				"dummy-id",

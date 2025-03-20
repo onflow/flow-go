@@ -92,6 +92,7 @@ func (s *AccountStatusesProviderSuite) TestAccountStatusesDataProvider_StateStre
 	topic := AccountStatusesTopic
 
 	provider, err := NewAccountStatusesDataProvider(
+		context.Background(),
 		s.log,
 		nil,
 		"dummy-id",
@@ -209,6 +210,7 @@ func (s *AccountStatusesProviderSuite) TestAccountStatusesDataProvider_InvalidAr
 	for _, test := range invalidAccountStatusesArgumentsTestCases() {
 		s.Run(test.name, func() {
 			provider, err := NewAccountStatusesDataProvider(
+				context.Background(),
 				s.log,
 				s.api,
 				"dummy-id",
@@ -228,7 +230,6 @@ func (s *AccountStatusesProviderSuite) TestAccountStatusesDataProvider_InvalidAr
 
 // TestMessageIndexAccountStatusesProviderResponse_HappyPath tests that MessageIndex values in response are strictly increasing.
 func (s *AccountStatusesProviderSuite) TestMessageIndexAccountStatusesProviderResponse_HappyPath() {
-	ctx := context.Background()
 	send := make(chan interface{}, 10)
 	topic := AccountStatusesTopic
 	accountStatusesCount := 4
@@ -252,6 +253,7 @@ func (s *AccountStatusesProviderSuite) TestMessageIndexAccountStatusesProviderRe
 
 	// Create the AccountStatusesDataProvider instance
 	provider, err := NewAccountStatusesDataProvider(
+		context.Background(),
 		s.log,
 		s.api,
 		"dummy-id",
@@ -272,7 +274,7 @@ func (s *AccountStatusesProviderSuite) TestMessageIndexAccountStatusesProviderRe
 	done := make(chan struct{})
 	go func() {
 		defer close(done)
-		err = provider.Run(ctx)
+		err = provider.Run()
 		s.Require().NoError(err)
 	}()
 

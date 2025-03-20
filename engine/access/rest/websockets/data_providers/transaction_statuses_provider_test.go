@@ -167,7 +167,6 @@ func (s *TransactionStatusesProviderSuite) expectedTransactionStatusesResponses(
 
 // TestMessageIndexTransactionStatusesProviderResponse_HappyPath tests that MessageIndex values in response are strictly increasing.
 func (s *TransactionStatusesProviderSuite) TestMessageIndexTransactionStatusesProviderResponse_HappyPath() {
-	ctx := context.Background()
 	send := make(chan interface{}, 10)
 	topic := TransactionStatusesTopic
 	txStatusesCount := 4
@@ -200,6 +199,7 @@ func (s *TransactionStatusesProviderSuite) TestMessageIndexTransactionStatusesPr
 
 	// Create the TransactionStatusesDataProvider instance
 	provider, err := NewTransactionStatusesDataProvider(
+		context.Background(),
 		s.log,
 		s.api,
 		"dummy-id",
@@ -218,7 +218,7 @@ func (s *TransactionStatusesProviderSuite) TestMessageIndexTransactionStatusesPr
 	done := make(chan struct{})
 	go func() {
 		defer close(done)
-		err = provider.Run(ctx)
+		err = provider.Run()
 		s.Require().NoError(err)
 	}()
 
@@ -269,6 +269,7 @@ func (s *TransactionStatusesProviderSuite) TestTransactionStatusesDataProvider_I
 	for _, test := range invalidTransactionStatusesArgumentsTestCases() {
 		s.Run(test.name, func() {
 			provider, err := NewTransactionStatusesDataProvider(
+				context.Background(),
 				s.log,
 				s.api,
 				"dummy-id",

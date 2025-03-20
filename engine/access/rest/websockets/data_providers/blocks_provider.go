@@ -36,6 +36,7 @@ var _ DataProvider = (*BlocksDataProvider)(nil)
 
 // NewBlocksDataProvider creates a new instance of BlocksDataProvider.
 func NewBlocksDataProvider(
+	ctx context.Context,
 	logger zerolog.Logger,
 	api access.API,
 	subscriptionID string,
@@ -50,6 +51,7 @@ func NewBlocksDataProvider(
 	}
 
 	provider := newBaseDataProvider(
+		ctx,
 		logger.With().Str("component", "blocks-data-provider").Logger(),
 		api,
 		subscriptionID,
@@ -69,11 +71,8 @@ func NewBlocksDataProvider(
 // Must be called once.
 //
 // No errors expected during normal operations
-func (p *BlocksDataProvider) Run(ctx context.Context) error {
-	// we read data from the subscription and send them to client's channel
-	ctx, cancel := context.WithCancel(ctx)
-	defer cancel()
-	p.subscriptionState = newSubscriptionState(cancel, p.createAndStartSubscription(ctx, p.arguments))
+func (p *BlocksDataProvider) Run() error {
+	p.subscriptionState.subscription = p.createAndStartSubscription(p.ctx, p.arguments)
 
 	return run(
 		p.subscriptionState.subscription,

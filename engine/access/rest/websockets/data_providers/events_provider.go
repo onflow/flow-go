@@ -38,6 +38,7 @@ var _ DataProvider = (*EventsDataProvider)(nil)
 
 // NewEventsDataProvider creates a new instance of EventsDataProvider.
 func NewEventsDataProvider(
+	ctx context.Context,
 	logger zerolog.Logger,
 	stateStreamApi state_stream.API,
 	subscriptionID string,
@@ -58,6 +59,7 @@ func NewEventsDataProvider(
 	}
 
 	provider := newBaseDataProvider(
+		ctx,
 		logger.With().Str("component", "events-data-provider").Logger(),
 		nil,
 		subscriptionID,
@@ -79,11 +81,8 @@ func NewEventsDataProvider(
 // Must be called once.
 //
 // No errors expected during normal operations
-func (p *EventsDataProvider) Run(ctx context.Context) error {
-	// we read data from the subscription and send them to client's channel
-	ctx, cancel := context.WithCancel(ctx)
-	defer cancel()
-	p.subscriptionState = newSubscriptionState(cancel, p.createAndStartSubscription(ctx, p.arguments))
+func (p *EventsDataProvider) Run() error {
+	p.subscriptionState.subscription = p.createAndStartSubscription(p.ctx, p.arguments)
 
 	return run(
 		p.subscriptionState.subscription,

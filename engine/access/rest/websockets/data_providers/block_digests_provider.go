@@ -25,6 +25,7 @@ var _ DataProvider = (*BlockDigestsDataProvider)(nil)
 
 // NewBlockDigestsDataProvider creates a new instance of BlockDigestsDataProvider.
 func NewBlockDigestsDataProvider(
+	ctx context.Context,
 	logger zerolog.Logger,
 	api access.API,
 	subscriptionID string,
@@ -38,6 +39,7 @@ func NewBlockDigestsDataProvider(
 	}
 
 	base := newBaseDataProvider(
+		ctx,
 		logger.With().Str("component", "block-digests-data-provider").Logger(),
 		api,
 		subscriptionID,
@@ -56,11 +58,8 @@ func NewBlockDigestsDataProvider(
 // Must be called once.
 //
 // No errors expected during normal operations
-func (p *BlockDigestsDataProvider) Run(ctx context.Context) error {
-	// we read data from the subscription and send them to client's channel
-	ctx, cancel := context.WithCancel(ctx)
-	defer cancel()
-	p.subscriptionState = newSubscriptionState(cancel, p.createAndStartSubscription(ctx, p.arguments))
+func (p *BlockDigestsDataProvider) Run() error {
+	p.subscriptionState.subscription = p.createAndStartSubscription(p.ctx, p.arguments)
 
 	return run(
 		p.subscriptionState.subscription,

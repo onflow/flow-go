@@ -37,6 +37,7 @@ var _ DataProvider = (*AccountStatusesDataProvider)(nil)
 
 // NewAccountStatusesDataProvider creates a new instance of AccountStatusesDataProvider.
 func NewAccountStatusesDataProvider(
+	ctx context.Context,
 	logger zerolog.Logger,
 	stateStreamApi state_stream.API,
 	subscriptionID string,
@@ -57,6 +58,7 @@ func NewAccountStatusesDataProvider(
 	}
 
 	provider := newBaseDataProvider(
+		ctx,
 		logger.With().Str("component", "account-statuses-data-provider").Logger(),
 		nil,
 		subscriptionID,
@@ -78,11 +80,8 @@ func NewAccountStatusesDataProvider(
 // Must be called once.
 //
 // No errors expected during normal operations.
-func (p *AccountStatusesDataProvider) Run(ctx context.Context) error {
-	// we read data from the subscription and send them to client's channel
-	ctx, cancel := context.WithCancel(ctx)
-	defer cancel()
-	p.subscriptionState = newSubscriptionState(cancel, p.createAndStartSubscription(ctx, p.arguments))
+func (p *AccountStatusesDataProvider) Run() error {
+	p.subscriptionState.subscription = p.createAndStartSubscription(p.ctx, p.arguments)
 
 	return run(
 		p.subscriptionState.subscription,

@@ -54,7 +54,7 @@ func (s *WsControllerSuite) TestSubscribeRequest() {
 		controller := NewWebSocketController(s.logger, s.wsConfig, conn, dataProviderFactory)
 
 		dataProviderFactory.
-			On("NewDataProvider", mock.Anything, mock.Anything, mock.Anything, mock.Anything).
+			On("NewDataProvider", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).
 			Return(dataProvider, nil).
 			Once()
 
@@ -167,7 +167,7 @@ func (s *WsControllerSuite) TestSubscribeRequest() {
 		controller := NewWebSocketController(s.logger, s.wsConfig, conn, dataProviderFactory)
 
 		dataProviderFactory.
-			On("NewDataProvider", mock.Anything, mock.Anything, mock.Anything, mock.Anything).
+			On("NewDataProvider", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).
 			Return(nil, fmt.Errorf("error creating data provider")).
 			Once()
 
@@ -212,7 +212,7 @@ func (s *WsControllerSuite) TestSubscribeRequest() {
 			Once()
 
 		dataProviderFactory.
-			On("NewDataProvider", mock.Anything, mock.Anything, mock.Anything, mock.Anything).
+			On("NewDataProvider", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).
 			Return(dataProvider, nil).
 			Once()
 
@@ -253,7 +253,7 @@ func (s *WsControllerSuite) TestUnsubscribeRequest() {
 		controller := NewWebSocketController(s.logger, s.wsConfig, conn, dataProviderFactory)
 
 		dataProviderFactory.
-			On("NewDataProvider", mock.Anything, mock.Anything, mock.Anything, mock.Anything).
+			On("NewDataProvider", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).
 			Return(dataProvider, nil).
 			Once()
 
@@ -321,7 +321,7 @@ func (s *WsControllerSuite) TestUnsubscribeRequest() {
 		controller := NewWebSocketController(s.logger, s.wsConfig, conn, dataProviderFactory)
 
 		dataProviderFactory.
-			On("NewDataProvider", mock.Anything, mock.Anything, mock.Anything, mock.Anything).
+			On("NewDataProvider", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).
 			Return(dataProvider, nil).
 			Once()
 
@@ -391,7 +391,7 @@ func (s *WsControllerSuite) TestUnsubscribeRequest() {
 		controller := NewWebSocketController(s.logger, s.wsConfig, conn, dataProviderFactory)
 
 		dataProviderFactory.
-			On("NewDataProvider", mock.Anything, mock.Anything, mock.Anything, mock.Anything).
+			On("NewDataProvider", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).
 			Return(dataProvider, nil).
 			Once()
 
@@ -464,7 +464,7 @@ func (s *WsControllerSuite) TestListSubscriptions() {
 		controller := NewWebSocketController(s.logger, s.wsConfig, conn, dataProviderFactory)
 
 		dataProviderFactory.
-			On("NewDataProvider", mock.Anything, mock.Anything, mock.Anything, mock.Anything).
+			On("NewDataProvider", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).
 			Return(dataProvider, nil).
 			Once()
 
@@ -546,7 +546,7 @@ func (s *WsControllerSuite) TestSubscribeBlocks() {
 		controller := NewWebSocketController(s.logger, s.wsConfig, conn, dataProviderFactory)
 
 		dataProviderFactory.
-			On("NewDataProvider", mock.Anything, mock.Anything, mock.Anything, mock.Anything).
+			On("NewDataProvider", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).
 			Return(dataProvider, nil).
 			Once()
 
@@ -600,7 +600,7 @@ func (s *WsControllerSuite) TestSubscribeBlocks() {
 		controller := NewWebSocketController(s.logger, s.wsConfig, conn, dataProviderFactory)
 
 		dataProviderFactory.
-			On("NewDataProvider", mock.Anything, mock.Anything, mock.Anything, mock.Anything).
+			On("NewDataProvider", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).
 			Return(dataProvider, nil).
 			Once()
 
@@ -806,7 +806,7 @@ func (s *WsControllerSuite) TestControllerShutdown() {
 		controller := NewWebSocketController(s.logger, s.wsConfig, conn, dataProviderFactory)
 
 		dataProviderFactory.
-			On("NewDataProvider", mock.Anything, mock.Anything, mock.Anything, mock.Anything).
+			On("NewDataProvider", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).
 			Return(dataProvider, nil).
 			Once()
 

@@ -193,7 +193,6 @@ func (s *EventsProviderSuite) expectedEventsResponses(
 
 // TestMessageIndexEventProviderResponse_HappyPath tests that MessageIndex values in response are strictly increasing.
 func (s *EventsProviderSuite) TestMessageIndexEventProviderResponse_HappyPath() {
-	ctx := context.Background()
 	send := make(chan interface{}, 10)
 	topic := EventsTopic
 	eventsCount := 4
@@ -218,6 +217,7 @@ func (s *EventsProviderSuite) TestMessageIndexEventProviderResponse_HappyPath() 
 
 	// Create the EventsDataProvider instance
 	provider, err := NewEventsDataProvider(
+		context.Background(),
 		s.log,
 		s.api,
 		"dummy-id",
@@ -239,7 +239,7 @@ func (s *EventsProviderSuite) TestMessageIndexEventProviderResponse_HappyPath() 
 	done := make(chan struct{})
 	go func() {
 		defer close(done)
-		err = provider.Run(ctx)
+		err = provider.Run()
 		s.Require().NoError(err)
 	}()
 
@@ -287,12 +287,12 @@ func (s *EventsProviderSuite) TestMessageIndexEventProviderResponse_HappyPath() 
 // 3. Invalid 'start_block_height' argument.
 func (s *EventsProviderSuite) TestEventsDataProvider_InvalidArguments() {
 	send := make(chan interface{})
-
 	topic := EventsTopic
 
 	for _, test := range invalidEventsArgumentsTestCases() {
 		s.Run(test.name, func() {
 			provider, err := NewEventsDataProvider(
+				context.Background(),
 				s.log,
 				s.api,
 				"dummy-id",
@@ -312,10 +312,10 @@ func (s *EventsProviderSuite) TestEventsDataProvider_InvalidArguments() {
 
 func (s *EventsProviderSuite) TestEventsDataProvider_StateStreamNotConfigured() {
 	send := make(chan interface{})
-
 	topic := EventsTopic
 
 	provider, err := NewEventsDataProvider(
+		context.Background(),
 		s.log,
 		nil,
 		"dummy-id",
