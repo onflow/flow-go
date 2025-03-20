@@ -245,7 +245,8 @@ func (c *Controller) keepalive(ctx context.Context) error {
 		case <-pingTicker.C:
 			err := c.conn.WriteControl(websocket.PingMessage, time.Now().Add(WriteWait))
 			if err != nil {
-				if errors.Is(err, websocket.ErrCloseSent) {
+				var closeErr *websocket.CloseError
+				if errors.As(err, &closeErr) {
 					return err
 				}
 
@@ -356,10 +357,6 @@ func (c *Controller) readMessages(ctx context.Context) error {
 		default:
 			var message json.RawMessage
 			if err := c.conn.ReadJSON(&message); err != nil {
-				if errors.Is(err, websocket.ErrCloseSent) {
-					return err
-				}
-
 				var closeErr *websocket.CloseError
 				if errors.As(err, &closeErr) {
 					return err
@@ -581,7 +578,7 @@ func (c *Controller) writeResponse(ctx context.Context, response interface{}) {
 func wrapErrorMessage(code int, message string, action string, subscriptionID string) models.BaseMessageResponse {
 	return models.BaseMessageResponse{
 		SubscriptionID: subscriptionID,
-		Error: models.ErrorMessage{
+		Error: &models.ErrorMessage{
 			Code:    code,
 			Message: message,
 		},

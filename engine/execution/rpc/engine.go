@@ -61,10 +61,10 @@ func New(
 	scriptsExecutor exeEng.ScriptExecutor,
 	headers storage.Headers,
 	state protocol.State,
-	events storage.Events,
-	exeResults storage.ExecutionResults,
-	txResults storage.TransactionResults,
-	commits storage.Commits,
+	events storage.EventsReader,
+	exeResults storage.ExecutionResultsReader,
+	txResults storage.TransactionResultsReader,
+	commits storage.CommitsReader,
 	transactionMetrics metrics.TransactionExecutionMetricsProvider,
 	chainID flow.ChainID,
 	signerIndicesDecoder hotstuff.BlockSignerDecoder,
@@ -166,11 +166,11 @@ type handler struct {
 	headers              storage.Headers
 	state                protocol.State
 	signerIndicesDecoder hotstuff.BlockSignerDecoder
-	events               storage.Events
-	exeResults           storage.ExecutionResults
-	transactionResults   storage.TransactionResults
+	events               storage.EventsReader
+	exeResults           storage.ExecutionResultsReader
+	transactionResults   storage.TransactionResultsReader
 	log                  zerolog.Logger
-	commits              storage.Commits
+	commits              storage.CommitsReader
 	transactionMetrics   metrics.TransactionExecutionMetricsProvider
 	maxBlockRange        int
 }

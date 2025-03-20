@@ -9,7 +9,8 @@ import (
 	"github.com/stretchr/testify/suite"
 
 	"github.com/onflow/flow-go/engine/access/rest/common/parser"
-	"github.com/onflow/flow-go/engine/access/rest/websockets/models"
+	"github.com/onflow/flow-go/engine/access/rest/websockets/data_providers/models"
+	wsmodels "github.com/onflow/flow-go/engine/access/rest/websockets/models"
 	statestreamsmock "github.com/onflow/flow-go/engine/access/state_stream/mock"
 	"github.com/onflow/flow-go/model/flow"
 )
@@ -52,20 +53,17 @@ func (s *BlockDigestsProviderSuite) validBlockDigestsArgumentsTestCases() []test
 	expectedResponses := make([]interface{}, len(s.blocks))
 	for i, b := range s.blocks {
 		blockDigest := flow.NewBlockDigest(b.Header.ID(), b.Header.Height, b.Header.Timestamp)
-
-		var block models.BlockDigest
-		block.Build(blockDigest)
-
+		blockDigestPayload := models.NewBlockDigest(blockDigest)
 		expectedResponses[i] = &models.BaseDataProvidersResponse{
 			Topic:   BlockDigestsTopic,
-			Payload: &block,
+			Payload: blockDigestPayload,
 		}
 	}
 
 	return []testType{
 		{
 			name: "happy path with start_block_id argument",
-			arguments: models.Arguments{
+			arguments: wsmodels.Arguments{
 				"start_block_id": s.rootBlock.ID().String(),
 				"block_status":   parser.Finalized,
 			},
@@ -81,7 +79,7 @@ func (s *BlockDigestsProviderSuite) validBlockDigestsArgumentsTestCases() []test
 		},
 		{
 			name: "happy path with start_block_height argument",
-			arguments: models.Arguments{
+			arguments: wsmodels.Arguments{
 				"start_block_height": strconv.FormatUint(s.rootBlock.Header.Height, 10),
 				"block_status":       parser.Finalized,
 			},
@@ -97,7 +95,7 @@ func (s *BlockDigestsProviderSuite) validBlockDigestsArgumentsTestCases() []test
 		},
 		{
 			name: "happy path without any start argument",
-			arguments: models.Arguments{
+			arguments: wsmodels.Arguments{
 				"block_status": parser.Finalized,
 			},
 			setupBackend: func(sub *statestreamsmock.Subscription) {
@@ -124,10 +122,6 @@ func (s *BlocksProviderSuite) requireBlockDigest(actual interface{}, expected in
 // TestBlockDigestsDataProvider_InvalidArguments tests the behavior of the block digests data provider
 // when invalid arguments are provided. It verifies that appropriate errors are returned
 // for missing or conflicting arguments.
-// This test covers the test cases:
-// 1. Missing 'block_status' argument.
-// 2. Invalid 'block_status' argument.
-// 3. Providing both 'start_block_id' and 'start_block_height' simultaneously.
 func (s *BlockDigestsProviderSuite) TestBlockDigestsDataProvider_InvalidArguments() {
 	ctx := context.Background()
 	send := make(chan interface{})
@@ -137,8 +131,8 @@ func (s *BlockDigestsProviderSuite) TestBlockDigestsDataProvider_InvalidArgument
 	for _, test := range s.invalidArgumentsTestCases() {
 		s.Run(test.name, func() {
 			provider, err := NewBlockDigestsDataProvider(ctx, s.log, s.api, "dummy-id", topic, test.arguments, send)
-			s.Require().Nil(provider)
 			s.Require().Error(err)
+			s.Require().Nil(provider)
 			s.Require().Contains(err.Error(), test.expectedErrorMsg)
 		})
 	}
