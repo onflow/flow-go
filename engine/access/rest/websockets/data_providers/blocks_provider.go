@@ -66,6 +66,7 @@ func NewBlocksDataProvider(
 }
 
 // Run starts processing the subscription for blocks and handles responses.
+// Must be called once.
 //
 // No errors expected during normal operations
 func (p *BlocksDataProvider) Run(ctx context.Context) error {
@@ -75,7 +76,6 @@ func (p *BlocksDataProvider) Run(ctx context.Context) error {
 	p.subscriptionState = newSubscriptionState(cancel, p.createAndStartSubscription(ctx, p.arguments))
 
 	return run(
-		p.baseDataProvider.done,
 		p.subscriptionState.subscription,
 		func(block *flow.Block) error {
 			expandPayload := map[string]bool{commonmodels.ExpandableFieldPayload: true}

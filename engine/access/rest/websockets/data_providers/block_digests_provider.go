@@ -53,6 +53,7 @@ func NewBlockDigestsDataProvider(
 }
 
 // Run starts processing the subscription for block digests and handles responses.
+// Must be called once.
 //
 // No errors expected during normal operations
 func (p *BlockDigestsDataProvider) Run(ctx context.Context) error {
@@ -62,7 +63,6 @@ func (p *BlockDigestsDataProvider) Run(ctx context.Context) error {
 	p.subscriptionState = newSubscriptionState(cancel, p.createAndStartSubscription(ctx, p.arguments))
 
 	return run(
-		p.baseDataProvider.done,
 		p.subscriptionState.subscription,
 		func(b *flow.BlockDigest) error {
 			blockDigest := models.NewBlockDigest(b)

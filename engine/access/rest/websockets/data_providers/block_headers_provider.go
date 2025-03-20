@@ -54,6 +54,7 @@ func NewBlockHeadersDataProvider(
 }
 
 // Run starts processing the subscription for block headers and handles responses.
+// Must be called once.
 //
 // No errors expected during normal operations
 func (p *BlockHeadersDataProvider) Run(ctx context.Context) error {
@@ -63,7 +64,6 @@ func (p *BlockHeadersDataProvider) Run(ctx context.Context) error {
 	p.subscriptionState = newSubscriptionState(cancel, p.createAndStartSubscription(ctx, p.arguments))
 
 	return run(
-		p.baseDataProvider.done,
 		p.subscriptionState.subscription,
 		func(header *flow.Header) error {
 			headerPayload := commonmodels.NewBlockHeader(header)

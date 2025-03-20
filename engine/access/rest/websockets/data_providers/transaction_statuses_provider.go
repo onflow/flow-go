@@ -65,6 +65,7 @@ func NewTransactionStatusesDataProvider(
 }
 
 // Run starts processing the subscription for events and handles responses.
+// Must be called once.
 //
 // No errors are expected during normal operations
 func (p *TransactionStatusesDataProvider) Run(ctx context.Context) error {
@@ -73,11 +74,7 @@ func (p *TransactionStatusesDataProvider) Run(ctx context.Context) error {
 	defer cancel()
 	p.subscriptionState = newSubscriptionState(cancel, p.createAndStartSubscription(ctx, p.arguments))
 
-	// set messageIndex to zero in case Run() called for the second time
-	p.messageIndex = counters.NewMonotonicCounter(0)
-
 	return run(
-		p.baseDataProvider.done,
 		p.subscriptionState.subscription,
 		func(response []*access.TransactionResult) error {
 			return p.sendResponse(response)
