@@ -19,7 +19,7 @@ import (
 // from a peer. This count is utilized to calculate a penalty for duplicate messages, which is then applied
 // to the peer's application-specific score. The duplicate message tracker decays over time to prevent perpetual
 // penalization of a peer.
-// The cache uses a hashed version of the peer's ID as the key.
+// Stored duplicate messages counters are keyed by the hash of the peerID.
 type DuplicateMessageTrackerCache struct {
 	// the in-memory and thread-safe cache for storing the spam records of peers.
 	c     *stdmap.Backend[flow.Identifier, *duplicateMessagesCounter]
@@ -39,11 +39,13 @@ type DuplicateMessageTrackerCache struct {
 // Returns:
 //   - *DuplicateMessageTrackerCache: the newly created cache with a HeroCache-based backend.
 func NewDuplicateMessageTrackerCache(sizeLimit uint32, decay, skipDecayThreshold float64, logger zerolog.Logger, collector module.HeroCacheMetrics) *DuplicateMessageTrackerCache {
-	backData := herocache.NewCache[*duplicateMessagesCounter](sizeLimit,
+	backData := herocache.NewCache[*duplicateMessagesCounter](
+		sizeLimit,
 		herocache.DefaultOversizeFactor,
 		heropool.LRUEjection,
 		logger.With().Str("mempool", "gossipsub=duplicate-message-counter-cache").Logger(),
-		collector)
+		collector,
+	)
 	return &DuplicateMessageTrackerCache{
 		decay:              decay,
 		skipDecayThreshold: skipDecayThreshold,

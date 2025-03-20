@@ -15,7 +15,7 @@ import (
 	"github.com/onflow/flow-go/network/p2p"
 )
 
-// AppSpecificScoreCache is a cache that stores the application specific score of peers.
+// AppSpecificScoreCache is a cache that stores the application specific score of peers by the hash of the peerID.
 // The application specific score of a peer is used to calculate the GossipSub score of the peer.
 // Note that the application specific score and the GossipSub score are solely used by the current peer to select the peers
 // to which it will connect on a topic mesh.
@@ -34,11 +34,13 @@ var _ p2p.GossipSubApplicationSpecificScoreCache = (*AppSpecificScoreCache)(nil)
 // Returns:
 // - *AppSpecificScoreCache: the created cache.
 func NewAppSpecificScoreCache(sizeLimit uint32, logger zerolog.Logger, collector module.HeroCacheMetrics) *AppSpecificScoreCache {
-	backData := herocache.NewCache[*appSpecificScoreRecord](sizeLimit,
+	backData := herocache.NewCache[*appSpecificScoreRecord](
+		sizeLimit,
 		herocache.DefaultOversizeFactor,
 		heropool.LRUEjection,
 		logger.With().Str("mempool", "gossipsub-app-specific-score-cache").Logger(),
-		collector)
+		collector,
+	)
 
 	return &AppSpecificScoreCache{
 		c: stdmap.NewBackend(stdmap.WithMutableBackData[flow.Identifier, *appSpecificScoreRecord](backData)),

@@ -166,7 +166,7 @@ func (p *Pool[K, V]) All() []PoolEntity[K, V] {
 }
 
 // Head returns the head of used items. Assuming no ejection happened and pool never goes beyond limit, Head returns
-// the first inserted key, value elements.
+// the first inserted key and value of the element.
 func (p *Pool[K, V]) Head() (key K, value V, ok bool) {
 	if p.states[stateUsed].size == 0 {
 		return key, value, false

@@ -28,6 +28,7 @@ type Transactions interface {
 
 	// Values will retrieve all transactions that are currently in the memory pool
 	// as a slice.
+	// Values guarantees returning all transactions in the same order as they are added.
 	Values() []*flow.TransactionBody
 
 	// Clear removes all transactions from the mempool.

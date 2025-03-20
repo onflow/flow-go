@@ -15,6 +15,8 @@ import (
 	"github.com/onflow/flow-go/network/p2p/unicast"
 )
 
+// UnicastConfigCache cache that stores the unicast configs for all types of nodes.
+// Stored configs are keyed by the hash of the peerID.
 type UnicastConfigCache struct {
 	peerCache  *stdmap.Backend[flow.Identifier, unicast.Config]
 	cfgFactory func() unicast.Config // factory function that creates a new unicast config.
@@ -41,11 +43,17 @@ func NewUnicastConfigCache(
 	cfgFactory func() unicast.Config,
 ) *UnicastConfigCache {
 	return &UnicastConfigCache{
-		peerCache: stdmap.NewBackend(stdmap.WithMutableBackData[flow.Identifier, unicast.Config](herocache.NewCache[unicast.Config](size,
-			herocache.DefaultOversizeFactor,
-			heropool.LRUEjection,
-			logger.With().Str("module", "unicast-config-cache").Logger(),
-			collector))),
+		peerCache: stdmap.NewBackend(
+			stdmap.WithMutableBackData[flow.Identifier, unicast.Config](
+				herocache.NewCache[unicast.Config](
+					size,
+					herocache.DefaultOversizeFactor,
+					heropool.LRUEjection,
+					logger.With().Str("module", "unicast-config-cache").Logger(),
+					collector,
+				),
+			),
+		),
 		cfgFactory: cfgFactory,
 	}
 }

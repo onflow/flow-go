@@ -16,6 +16,7 @@ import (
 
 // SubscriptionRecordCache manages the subscription records of peers in a network.
 // It uses a currentCycle counter to track the update cycles of the cache, ensuring the relevance of subscription data.
+// Stored subscription record are keyed by the hash of the peerID.
 type SubscriptionRecordCache struct {
 	c *stdmap.Backend[flow.Identifier, *SubscriptionRecord]
 
@@ -41,11 +42,13 @@ type SubscriptionRecordCache struct {
 func NewSubscriptionRecordCache(sizeLimit uint32,
 	logger zerolog.Logger,
 	collector module.HeroCacheMetrics) *SubscriptionRecordCache {
-	backData := herocache.NewCache[*SubscriptionRecord](sizeLimit,
+	backData := herocache.NewCache[*SubscriptionRecord](
+		sizeLimit,
 		herocache.DefaultOversizeFactor,
 		heropool.LRUEjection,
 		logger.With().Str("mempool", "subscription-records").Logger(),
-		collector)
+		collector,
+	)
 
 	return &SubscriptionRecordCache{
 		c:            stdmap.NewBackend(stdmap.WithMutableBackData[flow.Identifier, *SubscriptionRecord](backData)),

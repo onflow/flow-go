@@ -18,7 +18,8 @@ type rpcCtrlMsgSentCacheConfig struct {
 	collector module.HeroCacheMetrics
 }
 
-// rpcSentCache cache that stores ControlMessageType. These value's represent RPC control messages sent from the local node.
+// rpcSentCache cache that stores ControlMessageType by an ID from the messageID and control message type
+// which represent RPC control messages sent from the local node.
 type rpcSentCache struct {
 	// c is the underlying cache.
 	c *stdmap.Backend[flow.Identifier, p2pmsg.ControlMessageType]
@@ -32,11 +33,13 @@ type rpcSentCache struct {
 // Note that this cache is intended to track control messages sent by the local node,
 // it stores a ControlMessageType using a rpcSentID which should uniquely identifies the message being tracked.
 func newRPCSentCache(config *rpcCtrlMsgSentCacheConfig) *rpcSentCache {
-	backData := herocache.NewCache[p2pmsg.ControlMessageType](config.sizeLimit,
+	backData := herocache.NewCache[p2pmsg.ControlMessageType](
+		config.sizeLimit,
 		herocache.DefaultOversizeFactor,
 		heropool.LRUEjection,
 		config.logger.With().Str("mempool", "gossipsub-rpc-control-messages-sent").Logger(),
-		config.collector)
+		config.collector,
+	)
 	return &rpcSentCache{
 		c: stdmap.NewBackend(stdmap.WithMutableBackData[flow.Identifier, p2pmsg.ControlMessageType](backData)),
 	}

@@ -209,10 +209,7 @@ func (suite *BuilderSuite) ProtoStateRoot() *flow.Header {
 
 // ClearPool removes all items from the pool
 func (suite *BuilderSuite) ClearPool() {
-	// TODO use Clear()
-	for _, tx := range suite.pool.Values() {
-		suite.pool.Remove(tx.ID())
-	}
+	suite.pool.Clear()
 }
 
 // FillPool adds n transactions to the pool, using the given generator function.
