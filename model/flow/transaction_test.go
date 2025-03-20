@@ -3,9 +3,11 @@ package flow_test
 import (
 	"testing"
 
+	"github.com/onflow/go-ethereum/rlp"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/onflow/flow-go/model/fingerprint"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -65,4 +67,16 @@ func TestTransactionBodyID_Malleability(t *testing.T) {
 	unittest.RequireEntityNonMalleable(t, &txbody, unittest.WithTypeGenerator[flow.TransactionSignature](func() flow.TransactionSignature {
 		return unittest.TransactionSignatureFixture()
 	}))
+}
+
+// TestTransactionBody_Fingerprint provides basic validation that the [TransactionBody] fingerprint
+// is equivalent to its canonical RLP encoding.
+func TestTransactionBody_Fingerprint(t *testing.T) {
+	txbody := unittest.TransactionBodyFixture()
+	fp1 := txbody.Fingerprint()
+	fp2 := fingerprint.Fingerprint(txbody)
+	fp3, err := rlp.EncodeToBytes(txbody)
+	require.NoError(t, err)
+	assert.Equal(t, fp1, fp2)
+	assert.Equal(t, fp2, fp3)
 }
