@@ -87,6 +87,7 @@ type BootstrapParams struct {
 	storagePerFlow                   cadence.UFix64
 	restrictedAccountCreationEnabled cadence.Bool
 	setupEVMEnabled                  cadence.Bool
+	setupVMBridgeEnabled             cadence.Bool
 
 	// versionFreezePeriod is the number of blocks in the future where the version
 	// changes are frozen. The Node version beacon manages the freeze period,
@@ -225,6 +226,13 @@ func WithRestrictedAccountCreationEnabled(enabled cadence.Bool) BootstrapProcedu
 func WithSetupEVMEnabled(enabled cadence.Bool) BootstrapProcedureOption {
 	return func(bp *BootstrapProcedure) *BootstrapProcedure {
 		bp.setupEVMEnabled = enabled
+		return bp
+	}
+}
+
+func WithSetupVMBridgeEnabled(enabled cadence.Bool) BootstrapProcedureOption {
+	return func(bp *BootstrapProcedure) *BootstrapProcedure {
+		bp.setupVMBridgeEnabled = enabled
 		return bp
 	}
 }
@@ -583,7 +591,7 @@ func (b *bootstrapExecutor) deployMetadataViews(fungibleToken, nonFungibleToken 
 }
 
 func (b *bootstrapExecutor) deployCrossVMMetadataViews(nonFungibleToken flow.Address, env *templates.Environment) {
-	if bool(b.setupEVMEnabled) && b.ctx.Chain.ChainID().Transient() {
+	if bool(b.setupEVMEnabled) && bool(b.setupVMBridgeEnabled) && b.ctx.Chain.ChainID().Transient() {
 		crossVMMVContract := contracts.CrossVMMetadataViews(*env)
 
 		txError, err := b.invokeMetaTransaction(
@@ -1009,7 +1017,7 @@ func (stubEntropyProvider) RandomSource() ([]byte, error) {
 func (b *bootstrapExecutor) setupVMBridge(serviceAddress flow.Address, env *templates.Environment) {
 	// only setup VM bridge for transient networks
 	// this is because the evm storage account for testnet and mainnet do not exist yet after boostrapping
-	if bool(b.setupEVMEnabled) && b.ctx.Chain.ChainID().Transient() {
+	if bool(b.setupEVMEnabled) && bool(b.setupVMBridgeEnabled) && b.ctx.Chain.ChainID().Transient() {
 
 		bridgeEnv := bridge.Environment{
 			CrossVMNFTAddress:                     env.ServiceAccountAddress,
