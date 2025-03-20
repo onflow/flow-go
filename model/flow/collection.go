@@ -18,18 +18,15 @@ func (c Collection) Light() LightCollection {
 	return lc
 }
 
-// ID returns a cryptographic commitment to the receiver Collection.
+// ID returns a cryptographic commitment to the Collection.
 // The ID of a Collection is equivalent to the ID of its corresponding LightCollection.
 func (c Collection) ID() Identifier {
 	return c.Light().ID()
 }
 
+// Len returns the number of transactions in the collection.
 func (c Collection) Len() int {
 	return len(c.Transactions)
-}
-
-func (c Collection) Checksum() Identifier {
-	return c.Light().Checksum()
 }
 
 // TODO: why is this necessary?
@@ -52,23 +49,13 @@ type LightCollection struct {
 	Transactions []Identifier
 }
 
+// ID returns a cryptographic commitment to the LightCollection.
+// The ID of a LightCollection is equivalent to the ID for its corresponding Collection.
 func (lc LightCollection) ID() Identifier {
 	return MakeID(lc)
 }
 
-func (lc LightCollection) Checksum() Identifier {
-	return MakeID(lc)
-}
-
+// Len returns the number of transactions in the collection.
 func (lc LightCollection) Len() int {
 	return len(lc.Transactions)
-}
-
-func (lc LightCollection) Has(txID Identifier) bool {
-	for _, id := range lc.Transactions {
-		if txID == id {
-			return true
-		}
-	}
-	return false
 }
