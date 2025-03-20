@@ -11,7 +11,8 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/suite"
 
-	"github.com/onflow/flow-go/engine/access/rest/websockets/models"
+	"github.com/onflow/flow-go/engine/access/rest/websockets/data_providers/models"
+	wsmodels "github.com/onflow/flow-go/engine/access/rest/websockets/models"
 	"github.com/onflow/flow-go/engine/access/state_stream"
 	"github.com/onflow/flow-go/engine/access/state_stream/backend"
 	ssmock "github.com/onflow/flow-go/engine/access/state_stream/mock"
@@ -92,9 +93,12 @@ func (s *EventsProviderSuite) subscribeEventsDataProviderTestCases(backendRespon
 	return []testType{
 		{
 			name: "SubscribeBlocksFromStartBlockID happy path",
-			arguments: models.Arguments{
-				"start_block_id": s.rootBlock.ID().String(),
-				"event_types":    []string{"flow.AccountCreated", "flow.AccountUpdated"},
+			arguments: wsmodels.Arguments{
+				"start_block_id":     s.rootBlock.ID().String(),
+				"event_types":        []string{string(flow.EventAccountCreated)},
+				"addresses":          []string{unittest.AddressFixture().String()},
+				"contracts":          []string{"A.0000000000000001.Contract1", "A.0000000000000001.Contract2"},
+				"heartbeat_interval": "3",
 			},
 			setupBackend: func(sub *ssmock.Subscription) {
 				s.api.On(
@@ -108,8 +112,12 @@ func (s *EventsProviderSuite) subscribeEventsDataProviderTestCases(backendRespon
 		},
 		{
 			name: "SubscribeEventsFromStartHeight happy path",
-			arguments: models.Arguments{
+			arguments: wsmodels.Arguments{
 				"start_block_height": strconv.FormatUint(s.rootBlock.Header.Height, 10),
+				"event_types":        []string{string(flow.EventAccountCreated)},
+				"addresses":          []string{unittest.AddressFixture().String()},
+				"contracts":          []string{"A.0000000000000001.Contract1", "A.0000000000000001.Contract2"},
+				"heartbeat_interval": "3",
 			},
 			setupBackend: func(sub *ssmock.Subscription) {
 				s.api.On(
@@ -122,8 +130,13 @@ func (s *EventsProviderSuite) subscribeEventsDataProviderTestCases(backendRespon
 			expectedResponses: expectedResponses,
 		},
 		{
-			name:      "SubscribeEventsFromLatest happy path",
-			arguments: models.Arguments{},
+			name: "SubscribeEventsFromLatest happy path",
+			arguments: wsmodels.Arguments{
+				"event_types":        []string{string(flow.EventAccountCreated)},
+				"addresses":          []string{unittest.AddressFixture().String()},
+				"contracts":          []string{"A.0000000000000001.Contract1", "A.0000000000000001.Contract2"},
+				"heartbeat_interval": "3",
+			},
 			setupBackend: func(sub *ssmock.Subscription) {
 				s.api.On(
 					"SubscribeEventsFromLatest",
@@ -169,12 +182,10 @@ func (s *EventsProviderSuite) expectedEventsResponses(
 	expectedResponses := make([]interface{}, len(backendResponses))
 
 	for i, resp := range backendResponses {
-		var expectedResponsePayload models.EventResponse
-		expectedResponsePayload.Build(resp, uint64(i))
-
+		expectedResponsePayload := models.NewEventResponse(resp, uint64(i))
 		expectedResponses[i] = &models.BaseDataProvidersResponse{
 			Topic:   EventsTopic,
-			Payload: &expectedResponsePayload,
+			Payload: expectedResponsePayload,
 		}
 	}
 	return expectedResponses
@@ -200,6 +211,9 @@ func (s *EventsProviderSuite) TestMessageIndexEventProviderResponse_HappyPath() 
 	arguments :=
 		map[string]interface{}{
 			"start_block_id": s.rootBlock.ID().String(),
+			"event_types":    []string{state_stream.CoreEventAccountCreated},
+			"addresses":      []string{unittest.AddressFixture().String()},
+			"contracts":      []string{"A.0000000000000001.Contract1", "A.0000000000000001.Contract2"},
 		}
 
 	// Create the EventsDataProvider instance
@@ -216,8 +230,8 @@ func (s *EventsProviderSuite) TestMessageIndexEventProviderResponse_HappyPath() 
 		subscription.DefaultHeartbeatInterval,
 	)
 
-	s.Require().NotNil(provider)
 	s.Require().NoError(err)
+	s.Require().NotNil(provider)
 
 	// Ensure the provider is properly closed after the test
 	defer provider.Close()
@@ -278,7 +292,7 @@ func (s *EventsProviderSuite) TestEventsDataProvider_InvalidArguments() {
 
 	topic := EventsTopic
 
-	for _, test := range invalidArgumentsTestCases() {
+	for _, test := range invalidEventsArgumentsTestCases() {
 		s.Run(test.name, func() {
 			provider, err := NewEventsDataProvider(
 				ctx,
@@ -292,8 +306,8 @@ func (s *EventsProviderSuite) TestEventsDataProvider_InvalidArguments() {
 				state_stream.DefaultEventFilterConfig,
 				subscription.DefaultHeartbeatInterval,
 			)
-			s.Require().Nil(provider)
 			s.Require().Error(err)
+			s.Require().Nil(provider)
 			s.Require().Contains(err.Error(), test.expectedErrorMsg)
 		})
 	}
@@ -311,34 +325,30 @@ func (s *EventsProviderSuite) TestEventsDataProvider_StateStreamNotConfigured() 
 		nil,
 		"dummy-id",
 		topic,
-		models.Arguments{},
+		wsmodels.Arguments{},
 		send,
 		s.chain,
 		state_stream.DefaultEventFilterConfig,
 		subscription.DefaultHeartbeatInterval,
 	)
-	s.Require().Nil(provider)
 	s.Require().Error(err)
+	s.Require().Nil(provider)
 	s.Require().Contains(err.Error(), "does not support streaming events")
 }
 
-// invalidArgumentsTestCases returns a list of test cases with invalid argument combinations
+// invalidEventsArgumentsTestCases returns a list of test cases with invalid argument combinations
 // for testing the behavior of events data providers. Each test case includes a name,
 // a set of input arguments, and the expected error message that should be returned.
-//
-// The test cases cover scenarios such as:
-// 1. Supplying both 'start_block_id' and 'start_block_height' simultaneously, which is not allowed.
-// 2. Providing invalid 'start_block_id' value.
-// 3. Providing invalid 'start_block_height' value.
-// 4. Providing invalid 'heartbeat_interval' value.
-// 5. Providing unexpected argument.
-func invalidArgumentsTestCases() []testErrType {
+func invalidEventsArgumentsTestCases() []testErrType {
 	return []testErrType{
 		{
 			name: "provide both 'start_block_id' and 'start_block_height' arguments",
-			arguments: models.Arguments{
+			arguments: wsmodels.Arguments{
 				"start_block_id":     unittest.BlockFixture().ID().String(),
 				"start_block_height": fmt.Sprintf("%d", unittest.BlockFixture().Header.Height),
+				"event_types":        []string{state_stream.CoreEventAccountCreated},
+				"addresses":          []string{unittest.AddressFixture().String()},
+				"contracts":          []string{"A.0000000000000001.Contract1", "A.0000000000000001.Contract2"},
 			},
 			expectedErrorMsg: "can only provide either 'start_block_id' or 'start_block_height'",
 		},
@@ -346,6 +356,9 @@ func invalidArgumentsTestCases() []testErrType {
 			name: "invalid 'start_block_id' argument",
 			arguments: map[string]interface{}{
 				"start_block_id": "invalid_block_id",
+				"event_types":    []string{state_stream.CoreEventAccountCreated},
+				"addresses":      []string{unittest.AddressFixture().String()},
+				"contracts":      []string{"A.0000000000000001.Contract1", "A.0000000000000001.Contract2"},
 			},
 			expectedErrorMsg: "invalid ID format",
 		},
@@ -353,20 +366,30 @@ func invalidArgumentsTestCases() []testErrType {
 			name: "invalid 'start_block_height' argument",
 			arguments: map[string]interface{}{
 				"start_block_height": "-1",
+				"event_types":        []string{state_stream.CoreEventAccountCreated},
+				"addresses":          []string{unittest.AddressFixture().String()},
+				"contracts":          []string{"A.0000000000000001.Contract1", "A.0000000000000001.Contract2"},
 			},
-			expectedErrorMsg: "value must be an unsigned 64 bit integer",
+			expectedErrorMsg: "'start_block_height' must be convertible to uint64",
 		},
 		{
 			name: "invalid 'heartbeat_interval' argument",
 			arguments: map[string]interface{}{
+				"start_block_id":     unittest.BlockFixture().ID().String(),
+				"event_types":        []string{state_stream.CoreEventAccountCreated},
+				"addresses":          []string{unittest.AddressFixture().String()},
+				"contracts":          []string{"A.0000000000000001.Contract1", "A.0000000000000001.Contract2"},
 				"heartbeat_interval": "-1",
 			},
-			expectedErrorMsg: "value must be an unsigned 64 bit integer",
+			expectedErrorMsg: "'heartbeat_interval' must be convertible to uint64",
 		},
 		{
 			name: "unexpected argument",
 			arguments: map[string]interface{}{
 				"start_block_id":      unittest.BlockFixture().ID().String(),
+				"event_types":         []string{state_stream.CoreEventAccountCreated},
+				"addresses":           []string{unittest.AddressFixture().String()},
+				"contracts":           []string{"A.0000000000000001.Contract1", "A.0000000000000001.Contract2"},
 				"unexpected_argument": "dummy",
 			},
 			expectedErrorMsg: "unexpected field: 'unexpected_argument'",

@@ -8,11 +8,9 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
-	"github.com/onflow/flow-go/engine/access/rest/common"
-	"github.com/onflow/flow-go/engine/access/rest/common/parser"
 	"github.com/onflow/flow-go/engine/access/rest/http/request"
-	"github.com/onflow/flow-go/engine/access/rest/util"
-	"github.com/onflow/flow-go/engine/access/rest/websockets/models"
+	"github.com/onflow/flow-go/engine/access/rest/websockets/data_providers/models"
+	wsmodels "github.com/onflow/flow-go/engine/access/rest/websockets/models"
 	"github.com/onflow/flow-go/engine/access/state_stream"
 	"github.com/onflow/flow-go/engine/access/state_stream/backend"
 	"github.com/onflow/flow-go/engine/access/subscription"
@@ -46,7 +44,7 @@ func NewAccountStatusesDataProvider(
 	stateStreamApi state_stream.API,
 	subscriptionID string,
 	topic string,
-	arguments models.Arguments,
+	arguments wsmodels.Arguments,
 	send chan<- interface{},
 	chain flow.Chain,
 	eventFilterConfig state_stream.EventFilterConfig,
@@ -129,12 +127,12 @@ func (p *AccountStatusesDataProvider) handleResponse() func(accountStatusesRespo
 			return status.Errorf(codes.Internal, "message index already incremented to %d", messageIndex.Value())
 		}
 
-		var accountStatusesPayload models.AccountStatusesResponse
-		accountStatusesPayload.Build(accountStatusesResponse, index)
-
-		var response models.BaseDataProvidersResponse
-		response.Build(p.ID(), p.Topic(), &accountStatusesPayload)
-
+		accountStatusesPayload := models.NewAccountStatusesResponse(accountStatusesResponse, index)
+		response := models.BaseDataProvidersResponse{
+			SubscriptionID: p.ID(),
+			Topic:          p.Topic(),
+			Payload:        accountStatusesPayload,
+		}
 		p.send <- &response
 
 		return nil
@@ -143,16 +141,16 @@ func (p *AccountStatusesDataProvider) handleResponse() func(accountStatusesRespo
 
 // parseAccountStatusesArguments validates and initializes the account statuses arguments.
 func parseAccountStatusesArguments(
-	arguments models.Arguments,
+	arguments wsmodels.Arguments,
 	chain flow.Chain,
 	eventFilterConfig state_stream.EventFilterConfig,
 ) (accountStatusesArguments, error) {
-	allowedFields := []string{
-		"start_block_id",
-		"start_block_height",
-		"event_types",
-		"account_addresses",
-		"heartbeat_interval",
+	allowedFields := map[string]struct{}{
+		"start_block_id":     {},
+		"start_block_height": {},
+		"event_types":        {},
+		"account_addresses":  {},
+		"heartbeat_interval": {},
 	}
 	err := ensureAllowedFields(arguments, allowedFields)
 	if err != nil {
@@ -169,46 +167,27 @@ func parseAccountStatusesArguments(
 	args.StartBlockID = startBlockID
 	args.StartBlockHeight = startBlockHeight
 
+	// Parse 'heartbeat_interval' argument
+	heartbeatInterval, err := extractHeartbeatInterval(arguments)
+	if err != nil {
+		return accountStatusesArguments{}, err
+	}
+	args.HeartbeatInterval = heartbeatInterval
+
 	// Parse 'event_types' as a JSON array
-	var eventTypes parser.EventTypes
-	if eventTypesIn, ok := arguments["event_types"]; ok && eventTypesIn != "" {
-		result, err := common.ParseInterfaceToStrings(eventTypesIn)
-		if err != nil {
-			return accountStatusesArguments{}, fmt.Errorf("'event_types' must be an array of string")
-		}
-
-		err = eventTypes.Parse(result)
-		if err != nil {
-			return accountStatusesArguments{}, fmt.Errorf("invalid 'event_types': %w", err)
-		}
+	eventTypes, err := extractArrayOfStrings(arguments, "event_types", false)
+	if err != nil {
+		return accountStatusesArguments{}, err
 	}
 
-	// Parse 'accountAddresses' as []string{}
-	var accountAddresses []string
-	if accountAddressesIn, ok := arguments["account_addresses"]; ok && accountAddressesIn != "" {
-		accountAddresses, err = common.ParseInterfaceToStrings(accountAddressesIn)
-		if err != nil {
-			return accountStatusesArguments{}, fmt.Errorf("'account_addresses' must be an array of string")
-		}
-	}
-
-	var heartbeatInterval uint64
-	if heartbeatIntervalIn, ok := arguments["heartbeat_interval"]; ok && heartbeatIntervalIn != "" {
-		result, ok := heartbeatIntervalIn.(string)
-		if !ok {
-			return accountStatusesArguments{}, fmt.Errorf("'heartbeat_interval' must be a string")
-		}
-
-		heartbeatInterval, err = util.ToUint64(result)
-		if err != nil {
-			return accountStatusesArguments{}, fmt.Errorf("invalid 'heartbeat_interval': %w", err)
-		}
-
-		args.HeartbeatInterval = &heartbeatInterval
+	// Parse 'account_addresses' as []string
+	accountAddresses, err := extractArrayOfStrings(arguments, "account_addresses", false)
+	if err != nil {
+		return accountStatusesArguments{}, err
 	}
 
 	// Initialize the event filter with the parsed arguments
-	args.Filter, err = state_stream.NewAccountStatusFilter(eventFilterConfig, chain, eventTypes.Flow(), accountAddresses)
+	args.Filter, err = state_stream.NewAccountStatusFilter(eventFilterConfig, chain, eventTypes, accountAddresses)
 	if err != nil {
 		return accountStatusesArguments{}, fmt.Errorf("failed to create event filter: %w", err)
 	}

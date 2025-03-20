@@ -262,7 +262,7 @@ func (suite *Suite) TestSendExpiredTransaction() {
 			Return(referenceBlock, nil).
 			Twice()
 
-		//Advancing final state to expire ref block
+		// Advancing final state to expire ref block
 		suite.finalizedBlock = latestBlock
 
 		req := &accessproto.SendTransactionRequest{
@@ -728,7 +728,7 @@ func (suite *Suite) TestGetSealedTransaction() {
 		background, cancel := context.WithCancel(context.Background())
 		defer cancel()
 
-		ctx, _ := irrecoverable.WithSignaler(background)
+		ctx := irrecoverable.NewMockSignalerContext(suite.T(), background)
 		ingestEng.Start(ctx)
 		<-ingestEng.Ready()
 
@@ -1169,7 +1169,7 @@ func (suite *Suite) TestExecuteScript() {
 		require.NoError(suite.T(), err)
 		err = db.Update(operation.IndexBlockHeight(lastBlock.Header.Height, lastBlock.ID()))
 		require.NoError(suite.T(), err)
-		//update latest sealed block
+		// update latest sealed block
 		suite.sealedBlock = lastBlock.Header
 		// create execution receipts for each of the execution node and the last block
 		executionReceipts := unittest.ReceiptsForBlockFixture(lastBlock, identities.NodeIDs())
