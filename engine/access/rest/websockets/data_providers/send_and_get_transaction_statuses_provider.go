@@ -74,10 +74,8 @@ func NewSendAndGetTransactionStatusesDataProvider(
 //
 // No errors are expected during normal operations
 func (p *SendAndGetTransactionStatusesDataProvider) Run() error {
-	p.subscriptionState.subscription = p.createAndStartSubscription(p.ctx, p.arguments)
-
 	return run(
-		p.subscriptionState.subscription,
+		p.createAndStartSubscription(p.ctx, p.arguments),
 		func(response []*access.TransactionResult) error {
 			return p.sendResponse(response)
 		},

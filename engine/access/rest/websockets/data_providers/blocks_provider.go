@@ -72,10 +72,8 @@ func NewBlocksDataProvider(
 //
 // No errors expected during normal operations
 func (p *BlocksDataProvider) Run() error {
-	p.subscriptionState.subscription = p.createAndStartSubscription(p.ctx, p.arguments)
-
 	return run(
-		p.subscriptionState.subscription,
+		p.createAndStartSubscription(p.ctx, p.arguments),
 		func(block *flow.Block) error {
 			expandPayload := map[string]bool{commonmodels.ExpandableFieldPayload: true}
 			blockPayload, err := commonmodels.NewBlock(

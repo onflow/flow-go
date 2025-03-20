@@ -59,10 +59,8 @@ func NewBlockDigestsDataProvider(
 //
 // No errors expected during normal operations
 func (p *BlockDigestsDataProvider) Run() error {
-	p.subscriptionState.subscription = p.createAndStartSubscription(p.ctx, p.arguments)
-
 	return run(
-		p.subscriptionState.subscription,
+		p.createAndStartSubscription(p.ctx, p.arguments),
 		func(b *flow.BlockDigest) error {
 			blockDigest := models.NewBlockDigest(b)
 			response := models.BaseDataProvidersResponse{

@@ -60,10 +60,8 @@ func NewBlockHeadersDataProvider(
 //
 // No errors expected during normal operations
 func (p *BlockHeadersDataProvider) Run() error {
-	p.subscriptionState.subscription = p.createAndStartSubscription(p.ctx, p.arguments)
-
 	return run(
-		p.subscriptionState.subscription,
+		p.createAndStartSubscription(p.ctx, p.arguments),
 		func(header *flow.Header) error {
 			headerPayload := commonmodels.NewBlockHeader(header)
 			response := models.BaseDataProvidersResponse{

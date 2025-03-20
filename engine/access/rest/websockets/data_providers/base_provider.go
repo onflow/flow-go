@@ -14,19 +14,14 @@ import (
 
 // baseDataProvider holds common objects for the provider
 type baseDataProvider struct {
-	ctx               context.Context
-	logger            zerolog.Logger
-	api               access.API
-	subscriptionID    string
-	topic             string
-	rawArguments      wsmodels.Arguments
-	send              chan<- interface{}
-	subscriptionState subscriptionState
-}
-
-type subscriptionState struct {
+	ctx                       context.Context
+	logger                    zerolog.Logger
+	api                       access.API
+	subscriptionID            string
+	topic                     string
+	rawArguments              wsmodels.Arguments
+	send                      chan<- interface{}
 	cancelSubscriptionContext context.CancelFunc
-	subscription              subscription.Subscription
 }
 
 // newBaseDataProvider creates a new instance of baseDataProvider.
@@ -41,17 +36,14 @@ func newBaseDataProvider(
 ) *baseDataProvider {
 	ctx, cancel := context.WithCancel(ctx)
 	return &baseDataProvider{
-		ctx:            ctx,
-		logger:         logger,
-		api:            api,
-		subscriptionID: subscriptionID,
-		topic:          topic,
-		rawArguments:   rawArguments,
-		send:           send,
-		subscriptionState: subscriptionState{
-			cancelSubscriptionContext: cancel,
-			subscription:              nil, // subscription is initialized and started in Run() function
-		},
+		ctx:                       ctx,
+		logger:                    logger,
+		api:                       api,
+		subscriptionID:            subscriptionID,
+		topic:                     topic,
+		rawArguments:              rawArguments,
+		send:                      send,
+		cancelSubscriptionContext: cancel,
 	}
 }
 
@@ -72,7 +64,7 @@ func (b *baseDataProvider) Arguments() wsmodels.Arguments {
 
 // Close terminates the data provider.
 func (b *baseDataProvider) Close() {
-	b.subscriptionState.cancelSubscriptionContext()
+	b.cancelSubscriptionContext()
 }
 
 type sendResponseCallback[T any] func(T) error

@@ -82,10 +82,8 @@ func NewEventsDataProvider(
 //
 // No errors expected during normal operations
 func (p *EventsDataProvider) Run() error {
-	p.subscriptionState.subscription = p.createAndStartSubscription(p.ctx, p.arguments)
-
 	return run(
-		p.subscriptionState.subscription,
+		p.createAndStartSubscription(p.ctx, p.arguments),
 		func(response *backend.EventsResponse) error {
 			return p.sendResponse(response)
 		},
