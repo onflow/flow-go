@@ -123,14 +123,13 @@ func (s *BlocksProviderSuite) requireBlockDigest(actual interface{}, expected in
 // when invalid arguments are provided. It verifies that appropriate errors are returned
 // for missing or conflicting arguments.
 func (s *BlockDigestsProviderSuite) TestBlockDigestsDataProvider_InvalidArguments() {
-	ctx := context.Background()
 	send := make(chan interface{})
 
 	topic := BlockDigestsTopic
 
 	for _, test := range s.invalidArgumentsTestCases() {
 		s.Run(test.name, func() {
-			provider, err := NewBlockDigestsDataProvider(ctx, s.log, s.api, "dummy-id", topic, test.arguments, send)
+			provider, err := NewBlockDigestsDataProvider(context.Background(), s.log, s.api, "dummy-id", topic, test.arguments, send)
 			s.Require().Error(err)
 			s.Require().Nil(provider)
 			s.Require().Contains(err.Error(), test.expectedErrorMsg)

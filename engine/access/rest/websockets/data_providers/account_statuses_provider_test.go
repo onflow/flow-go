@@ -88,13 +88,11 @@ func (s *AccountStatusesProviderSuite) TestAccountStatusesDataProvider_HappyPath
 }
 
 func (s *AccountStatusesProviderSuite) TestAccountStatusesDataProvider_StateStreamNotConfigured() {
-	ctx := context.Background()
 	send := make(chan interface{})
-
 	topic := AccountStatusesTopic
 
 	provider, err := NewAccountStatusesDataProvider(
-		ctx,
+		context.Background(),
 		s.log,
 		nil,
 		"dummy-id",
@@ -206,15 +204,13 @@ func (s *AccountStatusesProviderSuite) expectedAccountStatusesResponses(backendR
 // when invalid arguments are provided. It verifies that appropriate errors are returned
 // for missing or conflicting arguments.
 func (s *AccountStatusesProviderSuite) TestAccountStatusesDataProvider_InvalidArguments() {
-	ctx := context.Background()
 	send := make(chan interface{})
-
 	topic := AccountStatusesTopic
 
 	for _, test := range invalidAccountStatusesArgumentsTestCases() {
 		s.Run(test.name, func() {
 			provider, err := NewAccountStatusesDataProvider(
-				ctx,
+				context.Background(),
 				s.log,
 				s.api,
 				"dummy-id",
@@ -234,7 +230,6 @@ func (s *AccountStatusesProviderSuite) TestAccountStatusesDataProvider_InvalidAr
 
 // TestMessageIndexAccountStatusesProviderResponse_HappyPath tests that MessageIndex values in response are strictly increasing.
 func (s *AccountStatusesProviderSuite) TestMessageIndexAccountStatusesProviderResponse_HappyPath() {
-	ctx := context.Background()
 	send := make(chan interface{}, 10)
 	topic := AccountStatusesTopic
 	accountStatusesCount := 4
@@ -258,7 +253,7 @@ func (s *AccountStatusesProviderSuite) TestMessageIndexAccountStatusesProviderRe
 
 	// Create the AccountStatusesDataProvider instance
 	provider, err := NewAccountStatusesDataProvider(
-		ctx,
+		context.Background(),
 		s.log,
 		s.api,
 		"dummy-id",

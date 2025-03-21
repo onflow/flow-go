@@ -5,8 +5,6 @@ import (
 	"fmt"
 
 	"github.com/rs/zerolog"
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 
 	"github.com/onflow/flow-go/access"
 	commonmodels "github.com/onflow/flow-go/engine/access/rest/common/models"
@@ -29,8 +27,8 @@ type transactionStatusesArguments struct {
 type TransactionStatusesDataProvider struct {
 	*baseDataProvider
 
-	logger        zerolog.Logger
-	api           access.API
+	arguments     transactionStatusesArguments
+	messageIndex  counters.StrictMonotonicCounter
 	linkGenerator commonmodels.LinkGenerator
 }
 
@@ -43,75 +41,68 @@ func NewTransactionStatusesDataProvider(
 	subscriptionID string,
 	linkGenerator commonmodels.LinkGenerator,
 	topic string,
-	arguments wsmodels.Arguments,
+	rawArguments wsmodels.Arguments,
 	send chan<- interface{},
 ) (*TransactionStatusesDataProvider, error) {
-	p := &TransactionStatusesDataProvider{
-		logger:        logger.With().Str("component", "transaction-statuses-data-provider").Logger(),
-		api:           api,
-		linkGenerator: linkGenerator,
-	}
-
-	// Initialize arguments passed to the provider.
-	txStatusesArgs, err := parseTransactionStatusesArguments(arguments)
+	args, err := parseTransactionStatusesArguments(rawArguments)
 	if err != nil {
 		return nil, fmt.Errorf("invalid arguments for tx statuses data provider: %w", err)
 	}
-
-	subCtx, cancel := context.WithCancel(ctx)
-
-	p.baseDataProvider = newBaseDataProvider(
+	provider := newBaseDataProvider(
+		ctx,
+		logger.With().Str("component", "transaction-statuses-data-provider").Logger(),
+		api,
 		subscriptionID,
 		topic,
-		arguments,
-		cancel,
+		rawArguments,
 		send,
-		p.createSubscription(subCtx, txStatusesArgs), // Set up a subscription to tx statuses based on arguments.
 	)
 
-	return p, nil
+	return &TransactionStatusesDataProvider{
+		baseDataProvider: provider,
+		arguments:        args,
+		messageIndex:     counters.NewMonotonicCounter(0),
+		linkGenerator:    linkGenerator,
+	}, nil
 }
 
 // Run starts processing the subscription for events and handles responses.
+// Must be called once.
 //
-// Expected errors during normal operations:
-//   - context.Canceled: if the operation is canceled, during an unsubscribe action.
+// No errors are expected during normal operations
 func (p *TransactionStatusesDataProvider) Run() error {
-	return subscription.HandleSubscription(p.subscription, p.handleResponse())
+	return run(
+		p.createAndStartSubscription(p.ctx, p.arguments),
+		p.sendResponse,
+	)
 }
 
-// createSubscription creates a new subscription using the specified input arguments.
-func (p *TransactionStatusesDataProvider) createSubscription(
+// sendResponse processes a tx status message and sends it to client's channel.
+// This function is not safe to call concurrently.
+//
+// No errors are expected during normal operations.
+func (p *TransactionStatusesDataProvider) sendResponse(txResults []*access.TransactionResult) error {
+	for i := range txResults {
+		txStatusesPayload := models.NewTransactionStatusesResponse(p.linkGenerator, txResults[i], p.messageIndex.Value())
+		response := models.BaseDataProvidersResponse{
+			SubscriptionID: p.ID(),
+			Topic:          p.Topic(),
+			Payload:        txStatusesPayload,
+		}
+		p.send <- &response
+
+		p.messageIndex.Increment()
+	}
+
+	return nil
+}
+
+// createAndStartSubscription creates a new subscription using the specified input arguments.
+func (p *TransactionStatusesDataProvider) createAndStartSubscription(
 	ctx context.Context,
 	args transactionStatusesArguments,
 ) subscription.Subscription {
 	return p.api.SubscribeTransactionStatuses(ctx, args.TxID, entities.EventEncodingVersion_JSON_CDC_V0)
-}
-
-// handleResponse processes a tx statuses and sends the formatted response.
-//
-// No errors are expected during normal operations.
-func (p *TransactionStatusesDataProvider) handleResponse() func(txResults []*access.TransactionResult) error {
-	messageIndex := counters.NewMonotonicCounter(0)
-
-	return func(txResults []*access.TransactionResult) error {
-		for i := range txResults {
-			index := messageIndex.Value()
-			if ok := messageIndex.Set(messageIndex.Value() + 1); !ok {
-				return status.Errorf(codes.Internal, "message index already incremented to %d", messageIndex.Value())
-			}
-
-			txStatusesPayload := models.NewTransactionStatusesResponse(p.linkGenerator, txResults[i], index)
-			response := models.BaseDataProvidersResponse{
-				SubscriptionID: p.ID(),
-				Topic:          p.Topic(),
-				Payload:        txStatusesPayload,
-			}
-			p.send <- &response
-		}
-
-		return nil
-	}
 }
 
 // parseAccountStatusesArguments validates and initializes the account statuses arguments.

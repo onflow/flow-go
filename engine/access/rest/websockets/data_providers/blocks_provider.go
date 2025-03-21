@@ -28,8 +28,6 @@ type blocksArguments struct {
 type BlocksDataProvider struct {
 	*baseDataProvider
 
-	logger        zerolog.Logger
-	api           access.API
 	arguments     blocksArguments
 	linkGenerator commonmodels.LinkGenerator
 }
@@ -44,63 +42,47 @@ func NewBlocksDataProvider(
 	subscriptionID string,
 	linkGenerator commonmodels.LinkGenerator,
 	topic string,
-	arguments wsmodels.Arguments,
+	rawArguments wsmodels.Arguments,
 	send chan<- interface{},
 ) (*BlocksDataProvider, error) {
-	p := &BlocksDataProvider{
-		logger:        logger.With().Str("component", "blocks-data-provider").Logger(),
-		api:           api,
-		linkGenerator: linkGenerator,
-	}
-
-	// Parse arguments passed to the provider.
-	var err error
-	p.arguments, err = parseBlocksArguments(arguments)
+	args, err := parseBlocksArguments(rawArguments)
 	if err != nil {
 		return nil, fmt.Errorf("invalid arguments: %w", err)
 	}
 
-	subCtx, cancel := context.WithCancel(ctx)
-	p.baseDataProvider = newBaseDataProvider(
+	provider := newBaseDataProvider(
+		ctx,
+		logger.With().Str("component", "blocks-data-provider").Logger(),
+		api,
 		subscriptionID,
 		topic,
-		arguments,
-		cancel,
+		rawArguments,
 		send,
-		p.createSubscription(subCtx, p.arguments), // Set up a subscription to blocks based on arguments.
 	)
 
-	return p, nil
+	return &BlocksDataProvider{
+		baseDataProvider: provider,
+		arguments:        args,
+		linkGenerator:    linkGenerator,
+	}, nil
 }
 
 // Run starts processing the subscription for blocks and handles responses.
+// Must be called once.
 //
-// No errors are expected during normal operations.
+// No errors expected during normal operations
 func (p *BlocksDataProvider) Run() error {
-	return subscription.HandleSubscription(
-		p.subscription,
-		subscription.HandleResponse(p.send, func(b *flow.Block) (interface{}, error) {
-			var block commonmodels.Block
-
-			expandPayload := map[string]bool{commonmodels.ExpandableFieldPayload: true}
-			err := block.Build(b, nil, p.linkGenerator, p.arguments.BlockStatus, expandPayload)
-			if err != nil {
-				return nil, fmt.Errorf("failed to build block response :%w", err)
-			}
-
-			response := models.BaseDataProvidersResponse{
-				SubscriptionID: p.ID(),
-				Topic:          p.Topic(),
-				Payload:        &block,
-			}
-
-			return &response, nil
-		}),
+	return run(
+		p.createAndStartSubscription(p.ctx, p.arguments),
+		p.sendResponse,
 	)
 }
 
-// createSubscription creates a new subscription using the specified input arguments.
-func (p *BlocksDataProvider) createSubscription(ctx context.Context, args blocksArguments) subscription.Subscription {
+// createAndStartSubscription creates a new subscription using the specified input arguments.
+func (p *BlocksDataProvider) createAndStartSubscription(
+	ctx context.Context,
+	args blocksArguments,
+) subscription.Subscription {
 	if args.StartBlockID != flow.ZeroID {
 		return p.api.SubscribeBlocksFromStartBlockID(ctx, args.StartBlockID, args.BlockStatus)
 	}
@@ -110,6 +92,29 @@ func (p *BlocksDataProvider) createSubscription(ctx context.Context, args blocks
 	}
 
 	return p.api.SubscribeBlocksFromLatest(ctx, args.BlockStatus)
+}
+
+func (p *BlocksDataProvider) sendResponse(block *flow.Block) error {
+	expandPayload := map[string]bool{commonmodels.ExpandableFieldPayload: true}
+	blockPayload, err := commonmodels.NewBlock(
+		block,
+		nil,
+		p.linkGenerator,
+		p.arguments.BlockStatus,
+		expandPayload,
+	)
+	if err != nil {
+		return fmt.Errorf("failed to build block payload response: %w", err)
+	}
+
+	response := models.BaseDataProvidersResponse{
+		SubscriptionID: p.ID(),
+		Topic:          p.Topic(),
+		Payload:        blockPayload,
+	}
+	p.send <- &response
+
+	return nil
 }
 
 // parseBlocksArguments validates and initializes the blocks arguments.
