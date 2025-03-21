@@ -3,10 +3,10 @@ package fvm
 import (
 	"bytes"
 	"fmt"
+	"slices"
 
 	"github.com/onflow/cadence"
 	"github.com/onflow/cadence/common"
-	"golang.org/x/exp/slices"
 
 	"github.com/onflow/flow-go/fvm/environment"
 	"github.com/onflow/flow-go/fvm/errors"
