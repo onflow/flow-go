@@ -492,27 +492,15 @@ func TestRecordCache_EdgeCasesAndInvalidInputs(t *testing.T) {
 	unittest.RequireReturnsBefore(t, wg.Wait, 1*time.Second, "timed out waiting for goroutines to finish")
 }
 
-// recordFixture creates a new record entity with the given node id.
-// Args:
-// - id: the node id of the record.
-// Returns:
-// - RecordEntity: the created record entity.
-func recordEntityFixture(id flow.Identifier) ClusterPrefixedMessagesReceivedRecord {
-	return ClusterPrefixedMessagesReceivedRecord{NodeID: id, Gauge: 0.0, lastUpdated: time.Now()}
-}
-
 // cacheFixture returns a new *RecordCache.
 func cacheFixture(t *testing.T, sizeLimit uint32, recordDecay float64, logger zerolog.Logger, collector module.HeroCacheMetrics) *RecordCache {
-	recordFactory := func(id flow.Identifier) ClusterPrefixedMessagesReceivedRecord {
-		return recordEntityFixture(id)
-	}
 	config := &RecordCacheConfig{
 		sizeLimit:   sizeLimit,
 		logger:      logger,
 		collector:   collector,
 		recordDecay: recordDecay,
 	}
-	r, err := NewRecordCache(config, recordFactory)
+	r, err := NewRecordCache(config, NewClusterPrefixedMessagesReceivedRecord)
 	require.NoError(t, err)
 	// expect cache to be empty
 	require.Equalf(t, uint(0), r.Size(), "cache size must be 0")

@@ -54,7 +54,7 @@ func TestMultipleEpochs(t *testing.T) {
 
 				tx := unittest.TransactionBodyFixture()
 				transactions = append(transactions, &tx)
-				pool.Add(&tx)
+				pool.Add(tx.ID(), &tx)
 			}
 		}()
 	}
@@ -76,7 +76,7 @@ func TestCombinedSize(t *testing.T) {
 		pool := pools.ForEpoch(epoch)
 		for i := 0; i < int(transactionsPerEpoch); i++ {
 			next := unittest.TransactionBodyFixture()
-			pool.Add(&next)
+			pool.Add(next.ID(), &next)
 		}
 	}
 

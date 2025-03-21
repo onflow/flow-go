@@ -21,12 +21,12 @@ func TestTransactionPool(t *testing.T) {
 	transactions := herocache.NewTransactions(1000, unittest.Logger(), metrics.NewNoopCollector())
 
 	t.Run("should be able to add first", func(t *testing.T) {
-		added := transactions.Add(&tx1)
+		added := transactions.Add(tx1.ID(), &tx1)
 		assert.True(t, added)
 	})
 
 	t.Run("should be able to add second", func(t *testing.T) {
-		added := transactions.Add(&tx2)
+		added := transactions.Add(tx2.ID(), &tx2)
 		assert.True(t, added)
 	})
 
@@ -36,7 +36,7 @@ func TestTransactionPool(t *testing.T) {
 	})
 
 	t.Run("should be able to get first", func(t *testing.T) {
-		actual, exists := transactions.ByID(tx1.ID())
+		actual, exists := transactions.Get(tx1.ID())
 		assert.True(t, exists)
 		assert.Equal(t, &tx1, actual)
 	})
@@ -46,8 +46,8 @@ func TestTransactionPool(t *testing.T) {
 		assert.True(t, ok)
 	})
 
-	t.Run("should be able to retrieve all", func(t *testing.T) {
-		items := transactions.All()
+	t.Run("should be able to retrieve all values", func(t *testing.T) {
+		items := transactions.Values()
 		assert.Len(t, items, 1)
 		assert.Equal(t, &tx1, items[0])
 	})
@@ -71,7 +71,7 @@ func TestConcurrentWriteAndRead(t *testing.T) {
 	// storing all transactions
 	for i := 0; i < total; i++ {
 		go func(tx flow.TransactionBody) {
-			require.True(t, transactions.Add(&tx))
+			require.True(t, transactions.Add(tx.ID(), &tx))
 
 			wg.Done()
 		}(txs[i])
@@ -84,7 +84,7 @@ func TestConcurrentWriteAndRead(t *testing.T) {
 	// reading all transactions
 	for i := 0; i < total; i++ {
 		go func(tx flow.TransactionBody) {
-			actual, ok := transactions.ByID(tx.ID())
+			actual, ok := transactions.Get(tx.ID())
 			require.True(t, ok)
 			require.Equal(t, tx, *actual)
 
@@ -94,23 +94,23 @@ func TestConcurrentWriteAndRead(t *testing.T) {
 	unittest.RequireReturnsBefore(t, wg.Wait, 100*time.Millisecond, "could not read all transactions on time")
 }
 
-// TestAllReturnsInOrder checks All method of the HeroCache-based transactions mempool returns all
+// TestValuesReturnsInOrder checks All method of the HeroCache-based transactions mempool returns all
 // transactions in the same order as they are returned.
-func TestAllReturnsInOrder(t *testing.T) {
+func TestValuesReturnsInOrder(t *testing.T) {
 	total := 100
 	txs := unittest.TransactionBodyListFixture(total)
 	transactions := herocache.NewTransactions(uint32(total), unittest.Logger(), metrics.NewNoopCollector())
 
 	// storing all transactions
 	for i := 0; i < total; i++ {
-		require.True(t, transactions.Add(&txs[i]))
-		tx, ok := transactions.ByID(txs[i].ID())
+		require.True(t, transactions.Add(txs[i].ID(), &txs[i]))
+		tx, ok := transactions.Get(txs[i].ID())
 		require.True(t, ok)
 		require.Equal(t, txs[i], *tx)
 	}
 
 	// all transactions must be retrieved in the same order as they are added
-	all := transactions.All()
+	all := transactions.Values()
 	for i := 0; i < total; i++ {
 		require.Equal(t, txs[i], *all[i])
 	}

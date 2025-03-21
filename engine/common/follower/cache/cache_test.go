@@ -300,7 +300,7 @@ func (s *CacheSuite) TestChildEjectedBeforeAddingParent() {
 	require.NoError(s.T(), err)
 	// eject B
 	s.cache.backend.Remove(B.ID())
-	s.cache.handleEjectedEntity(B)
+	s.cache.handleEjectedBlock(B)
 
 	certifiedBlocks, certifyingQC, err := s.cache.AddBlocks([]*flow.Block{&A})
 	require.NoError(s.T(), err)

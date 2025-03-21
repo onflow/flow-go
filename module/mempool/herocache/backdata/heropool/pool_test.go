@@ -583,8 +583,9 @@ func testInitialization(t *testing.T, pool *Pool[flow.Identifier, *unittest.Mock
 // testAddingEntities evaluates health of pool for storing new elements.
 func testAddingEntities(t *testing.T, pool *Pool[flow.Identifier, *unittest.MockEntity], entitiesToBeAdded []*unittest.MockEntity, ejectionMode EjectionMode) {
 	// initially head must be empty
-	e, ok := pool.Head()
+	k, e, ok := pool.Head()
 	require.False(t, ok)
+	require.Equal(t, flow.ZeroID, k)
 	require.Nil(t, e)
 
 	var uniqueEntities map[flow.Identifier]struct{}
@@ -612,9 +613,11 @@ func testAddingEntities(t *testing.T, pool *Pool[flow.Identifier, *unittest.Mock
 			require.Equal(t, entityIndex, EIndex(i))
 
 			// in case pool is not full, the head should retrieve the first added entity.
-			headEntity, headExists := pool.Head()
+			headKey, headEntity, headExists := pool.Head()
 			require.True(t, headExists)
-			require.Equal(t, headEntity.ID(), entitiesToBeAdded[0].ID())
+			expectedID := entitiesToBeAdded[0].ID()
+			require.Equal(t, headKey, expectedID)
+			require.Equal(t, headEntity.ID(), expectedID)
 		}
 
 		if ejectionMode == LRUEjection {
@@ -630,9 +633,11 @@ func testAddingEntities(t *testing.T, pool *Pool[flow.Identifier, *unittest.Mock
 				require.Equal(t, entitiesToBeAdded[lruEjectedIndex], ejectedEntity)
 				lruEjectedIndex++
 				// when pool is full and with LRU ejection, the head should move forward with each element added.
-				headEntity, headExists := pool.Head()
+				headKey, headEntity, headExists := pool.Head()
 				require.True(t, headExists)
-				require.Equal(t, headEntity.ID(), entitiesToBeAdded[i+1-len(pool.poolEntities)].ID())
+				expectedID := entitiesToBeAdded[i+1-len(pool.poolEntities)].ID()
+				require.Equal(t, expectedID, headKey)
+				require.Equal(t, expectedID, headEntity.ID())
 			}
 		}
 
@@ -655,9 +660,11 @@ func testAddingEntities(t *testing.T, pool *Pool[flow.Identifier, *unittest.Mock
 				require.Equal(t, entityIndex, InvalidIndex)
 
 				// when pool is full and with NoEjection, the head must keep pointing to the first added element.
-				headEntity, headExists := pool.Head()
+				headKey, headEntity, headExists := pool.Head()
 				require.True(t, headExists)
-				require.Equal(t, headEntity.ID(), entitiesToBeAdded[0].ID())
+				expectedID := entitiesToBeAdded[0].ID()
+				require.Equal(t, expectedID, headKey)
+				require.Equal(t, expectedID, headEntity.ID())
 			}
 		}
 

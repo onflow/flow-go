@@ -24,4 +24,6 @@ type Mempool[K comparable, V any] interface {
 	Size() uint
 	// All returns all stored key-value pairs as a map from the mempool.
 	All() map[K]V
+	// Clear removes all key-value pairs from the mempool.
+	Clear()
 }
