@@ -67,3 +67,8 @@ func (ra ResultApproval) ID() Identifier {
 
 	return MakeID(stub)
 }
+
+// Checksum generates checksum using the result approval full content
+func (ra ResultApproval) Checksum() Identifier {
+	return MakeID(ra)
+}
