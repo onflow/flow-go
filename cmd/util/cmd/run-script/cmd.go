@@ -26,6 +26,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/metrics"
+	modutil "github.com/onflow/flow-go/module/util"
 )
 
 var ErrNotImplemented = errors.New("not implemented")
@@ -162,7 +163,14 @@ func run(*cobra.Command, []string) {
 			storageSnapshot: storageSnapshot,
 		}
 
-		irrCtx, _ := irrecoverable.WithSignaler(context.Background())
+		irrCtx, errCh := irrecoverable.WithSignaler(context.Background())
+		go func() {
+			err := modutil.WaitError(errCh, nil)
+			if err != nil {
+				log.Fatal().Err(err).Msg("server finished with error")
+			}
+		}()
+
 		server, err := rest.NewServer(
 			irrCtx,
 			api,
