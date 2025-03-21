@@ -73,9 +73,7 @@ func NewTransactionStatusesDataProvider(
 func (p *TransactionStatusesDataProvider) Run() error {
 	return run(
 		p.createAndStartSubscription(p.ctx, p.arguments),
-		func(response []*access.TransactionResult) error {
-			return p.sendResponse(response)
-		},
+		p.sendResponse,
 	)
 }
 

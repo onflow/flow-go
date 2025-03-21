@@ -84,9 +84,7 @@ func NewEventsDataProvider(
 func (p *EventsDataProvider) Run() error {
 	return run(
 		p.createAndStartSubscription(p.ctx, p.arguments),
-		func(response *backend.EventsResponse) error {
-			return p.sendResponse(response)
-		},
+		p.sendResponse,
 	)
 }
 

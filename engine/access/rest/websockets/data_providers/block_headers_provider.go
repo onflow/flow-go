@@ -62,17 +62,7 @@ func NewBlockHeadersDataProvider(
 func (p *BlockHeadersDataProvider) Run() error {
 	return run(
 		p.createAndStartSubscription(p.ctx, p.arguments),
-		func(header *flow.Header) error {
-			headerPayload := commonmodels.NewBlockHeader(header)
-			response := models.BaseDataProvidersResponse{
-				SubscriptionID: p.ID(),
-				Topic:          p.Topic(),
-				Payload:        headerPayload,
-			}
-			p.send <- &response
-
-			return nil
-		},
+		p.sendResponse,
 	)
 }
 
@@ -90,4 +80,16 @@ func (p *BlockHeadersDataProvider) createAndStartSubscription(
 	}
 
 	return p.api.SubscribeBlockHeadersFromLatest(ctx, args.BlockStatus)
+}
+
+func (p *BlockHeadersDataProvider) sendResponse(header *flow.Header) error {
+	headerPayload := commonmodels.NewBlockHeader(header)
+	response := models.BaseDataProvidersResponse{
+		SubscriptionID: p.ID(),
+		Topic:          p.Topic(),
+		Payload:        headerPayload,
+	}
+	p.send <- &response
+
+	return nil
 }

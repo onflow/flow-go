@@ -74,28 +74,7 @@ func NewBlocksDataProvider(
 func (p *BlocksDataProvider) Run() error {
 	return run(
 		p.createAndStartSubscription(p.ctx, p.arguments),
-		func(block *flow.Block) error {
-			expandPayload := map[string]bool{commonmodels.ExpandableFieldPayload: true}
-			blockPayload, err := commonmodels.NewBlock(
-				block,
-				nil,
-				p.linkGenerator,
-				p.arguments.BlockStatus,
-				expandPayload,
-			)
-			if err != nil {
-				return fmt.Errorf("failed to build block payload response: %w", err)
-			}
-
-			response := models.BaseDataProvidersResponse{
-				SubscriptionID: p.ID(),
-				Topic:          p.Topic(),
-				Payload:        blockPayload,
-			}
-			p.send <- &response
-
-			return nil
-		},
+		p.sendResponse,
 	)
 }
 
@@ -113,6 +92,29 @@ func (p *BlocksDataProvider) createAndStartSubscription(
 	}
 
 	return p.api.SubscribeBlocksFromLatest(ctx, args.BlockStatus)
+}
+
+func (p *BlocksDataProvider) sendResponse(block *flow.Block) error {
+	expandPayload := map[string]bool{commonmodels.ExpandableFieldPayload: true}
+	blockPayload, err := commonmodels.NewBlock(
+		block,
+		nil,
+		p.linkGenerator,
+		p.arguments.BlockStatus,
+		expandPayload,
+	)
+	if err != nil {
+		return fmt.Errorf("failed to build block payload response: %w", err)
+	}
+
+	response := models.BaseDataProvidersResponse{
+		SubscriptionID: p.ID(),
+		Topic:          p.Topic(),
+		Payload:        blockPayload,
+	}
+	p.send <- &response
+
+	return nil
 }
 
 // parseBlocksArguments validates and initializes the blocks arguments.

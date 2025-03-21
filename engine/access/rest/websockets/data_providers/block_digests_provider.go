@@ -61,17 +61,7 @@ func NewBlockDigestsDataProvider(
 func (p *BlockDigestsDataProvider) Run() error {
 	return run(
 		p.createAndStartSubscription(p.ctx, p.arguments),
-		func(b *flow.BlockDigest) error {
-			blockDigest := models.NewBlockDigest(b)
-			response := models.BaseDataProvidersResponse{
-				SubscriptionID: p.ID(),
-				Topic:          p.Topic(),
-				Payload:        blockDigest,
-			}
-			p.send <- &response
-
-			return nil
-		},
+		p.sendResponse,
 	)
 }
 
@@ -89,4 +79,16 @@ func (p *BlockDigestsDataProvider) createAndStartSubscription(
 	}
 
 	return p.api.SubscribeBlockDigestsFromLatest(ctx, args.BlockStatus)
+}
+
+func (p *BlockDigestsDataProvider) sendResponse(b *flow.BlockDigest) error {
+	blockDigest := models.NewBlockDigest(b)
+	response := models.BaseDataProvidersResponse{
+		SubscriptionID: p.ID(),
+		Topic:          p.Topic(),
+		Payload:        blockDigest,
+	}
+	p.send <- &response
+
+	return nil
 }
