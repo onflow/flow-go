@@ -22,6 +22,13 @@ func (c Collection) ID() Identifier {
 	return c.Light().ID()
 }
 
+// Checksum returns the collection's ID.
+// Deprecated: This is needed temporarily until further malleability is done, because many components assume Collection implements Entity
+// TODO(malleability): remove this function
+func (c Collection) Checksum() Identifier {
+	return c.ID()
+}
+
 // Len returns the number of transactions in the collection.
 func (c Collection) Len() int {
 	return len(c.Transactions)
@@ -37,6 +44,13 @@ type LightCollection struct {
 // The ID of a LightCollection is equivalent to the ID for its corresponding Collection.
 func (lc LightCollection) ID() Identifier {
 	return MakeID(lc)
+}
+
+// Checksum returns the collection's ID.
+// Deprecated: This is needed temporarily until further malleability is done, because many components assume Collection implements Entity
+// TODO(malleability): remove this function
+func (c LightCollection) Checksum() Identifier {
+	return c.ID()
 }
 
 // Len returns the number of transactions in the collection.
