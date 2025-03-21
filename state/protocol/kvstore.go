@@ -110,33 +110,35 @@ type KVStoreReader interface {
 	//    block with a view in this range
 	GetFinalizationSafetyThreshold() uint64
 
-	// v2
+	// v3
 
-	// GetCadenceComponentVersion returns the Cadence component version.
+	// GetCadenceComponentVersion returns the current Cadence component version.
+	// If not otherwise specified, during network bootstrapping or via service event, the component version is initialized to 0.0.
 	// Error Returns:
-	//   - kvstore.ErrKeyNotSupported if invoked on a KVStore instance before v2.
+	//   - kvstore.ErrKeyNotSupported if invoked on a KVStore instance before v3.
 	GetCadenceComponentVersion() (MagnitudeVersion, error)
 	// GetCadenceComponentVersionUpgrade returns the most recent upgrade for the Cadence Component Version,
 	// if one exists (otherwise returns nil). The upgrade will be returned even if it has already been applied.
-	// Returns nil if invoked on a KVStore instance before v2.
+	// Returns nil if invoked on a KVStore instance before v3.
 	GetCadenceComponentVersionUpgrade() *ViewBasedActivator[MagnitudeVersion]
 
 	// GetExecutionComponentVersion returns the Execution component version.
+	// If not otherwise specified, during network bootstrapping or via service event, the component version is initialized to 0.0.
 	// Error Returns:
-	//   - kvstore.ErrKeyNotSupported if invoked on a KVStore instance before v2.
+	//   - kvstore.ErrKeyNotSupported if invoked on a KVStore instance before v3.
 	GetExecutionComponentVersion() (MagnitudeVersion, error)
 	// GetExecutionComponentVersionUpgrade returns the most recent upgrade for the Execution Component Version,
 	// if one exists (otherwise returns nil). The upgrade will be returned even if it has already been applied.
-	// Returns nil if invoked on a KVStore instance before v2.
+	// Returns nil if invoked on a KVStore instance before v3.
 	GetExecutionComponentVersionUpgrade() *ViewBasedActivator[MagnitudeVersion]
 
 	// GetExecutionMeteringParameters returns the Execution metering parameters.
 	// Error Returns:
-	//   - kvstore.ErrKeyNotSupported if invoked on a KVStore instance before v2.
+	//   - kvstore.ErrKeyNotSupported if invoked on a KVStore instance before v3.
 	GetExecutionMeteringParameters() (ExecutionMeteringParameters, error)
 	// GetExecutionMeteringParametersUpgrade returns the most recent upgrade for the Execution Metering Parameters,
 	// if one exists (otherwise returns nil). The upgrade will be returned even if it has already been applied.
-	// Returns nil if invoked on a KVStore instance before v2.
+	// Returns nil if invoked on a KVStore instance before v3.
 	GetExecutionMeteringParametersUpgrade() *ViewBasedActivator[ExecutionMeteringParameters]
 }
 
@@ -151,6 +153,10 @@ type ExecutionMeteringParameters struct {
 	ExecutionMemoryLimit uint64
 }
 
+// DefaultExecutionMeteringParameters returns the default set of execution metering parameters.
+// This is the initial value automatically populated when:
+//   - the Protocol State first upgrades to a version supporting the ExecutionMeteringParameters field
+//   - a new network is bootstrapped without over-riding execution metering parameters
 func DefaultExecutionMeteringParameters() ExecutionMeteringParameters {
 	return ExecutionMeteringParameters{
 		ExecutionEffortWeights: make(map[uint32]uint64),
@@ -202,16 +208,6 @@ func (params *ExecutionMeteringParameters) EncodeRLP(w io.Writer) error {
 		ExecutionMemoryLimit:   params.ExecutionMemoryLimit,
 	})
 }
-
-// IsUndefined returns true if params is semantically undefined.
-// TODO remove
-func (params *ExecutionMeteringParameters) IsUndefined() bool {
-	return params.ExecutionEffortWeights == nil && params.ExecutionMemoryWeights == nil && params.ExecutionMemoryLimit == 0
-}
-
-// UndefinedExecutionMeteringParameters represents the zero or unset value for ExecutionMeteringParameters.
-// TODO remove
-var UndefinedExecutionMeteringParameters = ExecutionMeteringParameters{}
 
 // VersionedEncodable defines the interface for a versioned key-value store independent
 // of the set of keys which are supported. This allows the storage layer to support
@@ -281,6 +277,3 @@ type MagnitudeVersion struct {
 	Major uint
 	Minor uint
 }
-
-// UndefinedMagnitudeOfChangeVersion represents the zero or unset value for a MagnitudeVersion.
-var UndefinedMagnitudeOfChangeVersion = MagnitudeVersion{}

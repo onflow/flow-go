@@ -275,16 +275,15 @@ func (model *Modelv2) Replicate(protocolVersion uint64) (protocol_state.KVStoreM
 	// perform actual replication to the next version
 	v3 := &Modelv3{
 		Modelv2: clone.Clone(*model),
-		// Execution component versions and metering parameters are explicitly undefined when upgrading to v2
-		// TODO: set initial values here
+		// Execution component versions and metering parameters are set to default values when upgrading to v3
 		CadenceComponentVersion: protocol.UpdatableField[protocol.MagnitudeVersion]{
-			CurrentValue: protocol.UndefinedMagnitudeOfChangeVersion,
+			CurrentValue: protocol.MagnitudeVersion{Major: 0, Minor: 0},
 		},
 		ExecutionComponentVersion: protocol.UpdatableField[protocol.MagnitudeVersion]{
-			CurrentValue: protocol.UndefinedMagnitudeOfChangeVersion,
+			CurrentValue: protocol.MagnitudeVersion{Major: 0, Minor: 0},
 		},
 		ExecutionMeteringParameters: protocol.UpdatableField[protocol.ExecutionMeteringParameters]{
-			CurrentValue: protocol.UndefinedExecutionMeteringParameters,
+			CurrentValue: protocol.DefaultExecutionMeteringParameters(),
 		},
 	}
 	if v3.GetProtocolStateVersion() != protocolVersion {
@@ -354,47 +353,40 @@ func (model *Modelv3) GetProtocolStateVersion() uint64 {
 	return 3
 }
 
-// GetCadenceComponentVersion returns the current Cadence component version from Modelv2.
-// Returns kvstore.ErrKeyNotSet if the key has no value
+// GetCadenceComponentVersion returns the current Cadence component version.
+// If not otherwise specified, during network bootstrapping or via service event, the component version is initialized to 0.0.
+// No errors are expected during normal operation.
 func (model *Modelv3) GetCadenceComponentVersion() (protocol.MagnitudeVersion, error) {
-	if model.CadenceComponentVersion.CurrentValue == protocol.UndefinedMagnitudeOfChangeVersion {
-		return protocol.UndefinedMagnitudeOfChangeVersion, ErrKeyNotSet
-	}
 	return model.CadenceComponentVersion.CurrentValue, nil
 }
 
-// GetCadenceComponentVersionUpgrade returns the most recent upgrade for the Cadence component version,
-// if one exists (otherwise returns nil).
+// GetCadenceComponentVersionUpgrade returns the most recent upgrade for the Cadence Component Version,
+// if one exists (otherwise returns nil). The upgrade will be returned even if it has already been applied.
 func (model *Modelv3) GetCadenceComponentVersionUpgrade() *protocol.ViewBasedActivator[protocol.MagnitudeVersion] {
 	return model.CadenceComponentVersion.Update
 }
 
-// GetExecutionComponentVersion returns the current Execution component version from Modelv2.
-// Returns kvstore.ErrKeyNotSet if the key has no value
+// GetExecutionComponentVersion returns the current Execution component version.
+// If not otherwise specified, during network bootstrapping or via service event, the component version is initialized to 0.0.
+// No errors are expected during normal operation.
 func (model *Modelv3) GetExecutionComponentVersion() (protocol.MagnitudeVersion, error) {
-	if model.ExecutionComponentVersion.CurrentValue == protocol.UndefinedMagnitudeOfChangeVersion {
-		return protocol.UndefinedMagnitudeOfChangeVersion, ErrKeyNotSet
-	}
 	return model.ExecutionComponentVersion.CurrentValue, nil
 }
 
-// GetExecutionComponentVersionUpgrade returns the most recent upgrade for the Execution component version,
-// if one exists (otherwise returns nil).
+// GetExecutionComponentVersionUpgrade returns the most recent upgrade for the Execution Component Version,
+// if one exists (otherwise returns nil). The upgrade will be returned even if it has already been applied.
 func (model *Modelv3) GetExecutionComponentVersionUpgrade() *protocol.ViewBasedActivator[protocol.MagnitudeVersion] {
 	return model.ExecutionComponentVersion.Update
 }
 
-// GetExecutionMeteringParameters returns the current Execution metering parameters from Modelv2.
-// Returns kvstore.ErrKeyNotSet if the key has no value
+// GetExecutionMeteringParameters returns the current Execution metering parameters.
+// No errors are expected during normal operation.
 func (model *Modelv3) GetExecutionMeteringParameters() (protocol.ExecutionMeteringParameters, error) {
-	if model.ExecutionMeteringParameters.CurrentValue.IsUndefined() {
-		return protocol.UndefinedExecutionMeteringParameters, ErrKeyNotSet
-	}
 	return model.ExecutionMeteringParameters.CurrentValue, nil
 }
 
-// GetExecutionMeteringParametersUpgrade returns the most recent upgrade for the Execution metering parameters,
-// if one exists (otherwise returns nil).
+// GetExecutionMeteringParametersUpgrade returns the most recent upgrade for the Execution Metering Parameters,
+// if one exists (otherwise returns nil). The upgrade will be returned even if it has already been applied.
 func (model *Modelv3) GetExecutionMeteringParametersUpgrade() *protocol.ViewBasedActivator[protocol.ExecutionMeteringParameters] {
 	return model.ExecutionMeteringParameters.Update
 }
