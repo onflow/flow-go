@@ -12,6 +12,6 @@ type TransactionTimings struct {
 }
 
 // NewTransactionTimings creates a new memory pool for transaction timings.
-func NewTransactionTimings(limit uint) (*TransactionTimings, error) {
-	return &TransactionTimings{NewBackend(WithLimit[flow.Identifier, *flow.TransactionTiming](limit))}, nil
+func NewTransactionTimings(limit uint) *TransactionTimings {
+	return &TransactionTimings{NewBackend(WithLimit[flow.Identifier, *flow.TransactionTiming](limit))}
 }

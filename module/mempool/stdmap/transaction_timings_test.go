@@ -17,8 +17,7 @@ func TestTransactionTimingsPool(t *testing.T) {
 		Received: time.Now().Add(-10 * time.Second), Executed: time.Now()}
 	item2 := &flow.TransactionTiming{TransactionID: unittest.IdentifierFixture(), Received: time.Now()}
 
-	pool, err := stdmap.NewTransactionTimings(1000)
-	require.NoError(t, err)
+	pool := stdmap.NewTransactionTimings(1000)
 
 	t.Run("should be able to add first", func(t *testing.T) {
 		added := pool.Add(item1.TransactionID, item1)

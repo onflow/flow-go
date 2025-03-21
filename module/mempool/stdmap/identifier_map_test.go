@@ -13,11 +13,7 @@ import (
 )
 
 func TestIdentiferMap(t *testing.T) {
-	idMap, err := NewIdentifierMap(10)
-
-	t.Run("creating new mempool", func(t *testing.T) {
-		require.NoError(t, err)
-	})
+	idMap := NewIdentifierMap(10)
 
 	key1 := unittest.IdentifierFixture()
 	id1 := unittest.IdentifierFixture()
@@ -117,7 +113,7 @@ func TestIdentiferMap(t *testing.T) {
 
 		// removes id1 and id2 from key3
 		// removing id1
-		err = idMap.RemoveIdFromKey(key3, id1)
+		err := idMap.RemoveIdFromKey(key3, id1)
 		require.NoError(t, err)
 
 		// key3 should still reside on idMap and id2 should be attached to it
@@ -149,8 +145,7 @@ func TestIdentiferMap(t *testing.T) {
 // Running this test with `-race` flag detects and reports the existence of race condition if
 // it is the case.
 func TestRaceCondition(t *testing.T) {
-	idMap, err := NewIdentifierMap(10)
-	require.NoError(t, err)
+	idMap := NewIdentifierMap(10)
 
 	wg := sync.WaitGroup{}
 
@@ -190,8 +185,7 @@ func TestCapacity(t *testing.T) {
 		limit = 20
 		swarm = 20
 	)
-	idMap, err := NewIdentifierMap(limit)
-	require.NoError(t, err)
+	idMap := NewIdentifierMap(limit)
 
 	wg := sync.WaitGroup{}
 	wg.Add(swarm)

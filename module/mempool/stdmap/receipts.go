@@ -12,7 +12,7 @@ type Receipts struct {
 }
 
 // NewReceipts creates a new memory pool for execution receipts.
-func NewReceipts(limit uint) (*Receipts, error) {
+func NewReceipts(limit uint) *Receipts {
 	// create the receipts memory pool with the lookup maps
-	return &Receipts{NewBackend(WithLimit[flow.Identifier, *flow.ExecutionReceipt](limit))}, nil
+	return &Receipts{NewBackend(WithLimit[flow.Identifier, *flow.ExecutionReceipt](limit))}
 }
