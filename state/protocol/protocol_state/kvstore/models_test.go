@@ -261,7 +261,6 @@ func TestKVStoreAPI_Replicate(t *testing.T) {
 
 	t.Run("v3", func(t *testing.T) {
 		t.Run("->v3", func(t *testing.T) {
-			// TODO: create fixtures for different model versions
 			model := &kvstore.Modelv3{
 				Modelv2: kvstore.Modelv2{
 					Modelv1: kvstore.Modelv1{
@@ -283,6 +282,24 @@ func TestKVStoreAPI_Replicate(t *testing.T) {
 
 			model.VersionUpgrade.ActivationView++ // change
 			require.False(t, reflect.DeepEqual(model, cpy))
+
+			t.Run("v3-only fields are initialized", func(t *testing.T) {
+				cadenceVersion, err := model.GetCadenceComponentVersion()
+				assert.NoError(t, err)
+				assert.Equal(t, protocol.MagnitudeVersion{}, cadenceVersion)
+
+				assert.Nil(t, model.GetCadenceComponentVersionUpgrade())
+
+				executionVersion, err := model.GetExecutionComponentVersion()
+				assert.NoError(t, err)
+				assert.Equal(t, protocol.MagnitudeVersion{}, executionVersion)
+
+				assert.Nil(t, model.GetExecutionComponentVersionUpgrade())
+
+				meteringParams, err := model.GetExecutionMeteringParameters()
+				assert.NoError(t, err)
+				assert.Equal(t, protocol.DefaultExecutionMeteringParameters(), meteringParams)
+			})
 		})
 		t.Run("invalid upgrade", func(t *testing.T) {
 			model := &kvstore.Modelv3{}

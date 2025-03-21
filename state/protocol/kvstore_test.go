@@ -10,6 +10,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+// TestExecutionMeteringParameters_EncodeRLP tests properties of the custom RLP encoding logic.
 func TestExecutionMeteringParameters_EncodeRLP(t *testing.T) {
 	params1 := &ExecutionMeteringParameters{
 		ExecutionMemoryLimit: rand.Uint64(),
