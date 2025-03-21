@@ -50,6 +50,7 @@ type RequestHandler struct {
 	metrics module.EngineMetrics
 
 	blocks               storage.Blocks
+	sigs                 storage.ProposalSignatures
 	finalizedHeaderCache module.FinalizedHeaderCache
 	core                 module.SyncCore
 	responseSender       ResponseSender
@@ -69,6 +70,7 @@ func NewRequestHandler(
 	me module.Local,
 	finalizedHeaderCache *events.FinalizedHeaderCache,
 	blocks storage.Blocks,
+	sigs storage.ProposalSignatures,
 	core module.SyncCore,
 	queueMissingHeights bool,
 ) *RequestHandler {
@@ -78,6 +80,7 @@ func NewRequestHandler(
 		metrics:              metrics,
 		finalizedHeaderCache: finalizedHeaderCache,
 		blocks:               blocks,
+		sigs:                 sigs,
 		core:                 core,
 		responseSender:       responseSender,
 		queueMissingHeights:  queueMissingHeights,
@@ -221,7 +224,7 @@ func (r *RequestHandler) onRangeRequest(originID flow.Identifier, req *messages.
 	}
 
 	// get all the blocks, one by one
-	blocks := make([]messages.UntrustedBlock, 0, req.ToHeight-req.FromHeight+1)
+	blocks := make([]messages.BlockProposal, 0, req.ToHeight-req.FromHeight+1)
 	for height := req.FromHeight; height <= req.ToHeight; height++ {
 		block, err := r.blocks.ByHeight(height)
 		if errors.Is(err, storage.ErrNotFound) {
@@ -231,7 +234,11 @@ func (r *RequestHandler) onRangeRequest(originID flow.Identifier, req *messages.
 		if err != nil {
 			return fmt.Errorf("could not get block for height (%d): %w", height, err)
 		}
-		blocks = append(blocks, messages.UntrustedBlockFromInternal(block))
+		sig, err := r.sigs.ByBlockID(block.ID())
+		if err != nil {
+			return fmt.Errorf("could not retrieve proposer signature for block (%s): %w", block.ID(), err)
+		}
+		blocks = append(blocks, *messages.NewBlockProposal(&flow.BlockProposal{Block: block, ProposerSigData: sig}))
 	}
 
 	// if there are no blocks to send, skip network message
@@ -293,7 +300,7 @@ func (r *RequestHandler) onBatchRequest(originID flow.Identifier, req *messages.
 	}
 
 	// try to get all the blocks by ID
-	blocks := make([]messages.UntrustedBlock, 0, len(blockIDs))
+	blocks := make([]messages.BlockProposal, 0, len(blockIDs))
 	for blockID := range blockIDs {
 		block, err := r.blocks.ByID(blockID)
 		if errors.Is(err, storage.ErrNotFound) {
@@ -303,7 +310,11 @@ func (r *RequestHandler) onBatchRequest(originID flow.Identifier, req *messages.
 		if err != nil {
 			return fmt.Errorf("could not get block by ID (%s): %w", blockID, err)
 		}
-		blocks = append(blocks, messages.UntrustedBlockFromInternal(block))
+		sig, err := r.sigs.ByBlockID(blockID)
+		if err != nil {
+			return fmt.Errorf("could not retrieve proposer signature for block (%s): %w", blockID, err)
+		}
+		blocks = append(blocks, *messages.NewBlockProposal(&flow.BlockProposal{Block: block, ProposerSigData: sig}))
 	}
 
 	// if there are no blocks to send, skip network message

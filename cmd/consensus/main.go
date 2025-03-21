@@ -896,6 +896,7 @@ func main() {
 				node.Me,
 				node.State,
 				node.Storage.Blocks,
+				node.Storage.ProposalSignatures,
 				comp,
 				syncCore,
 				node.SyncEngineIdentifierProvider,

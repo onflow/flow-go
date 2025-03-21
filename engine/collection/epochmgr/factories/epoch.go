@@ -180,7 +180,7 @@ func (factory *EpochComponentsFactory) Create(
 	compliance = complianceEng
 	hotstuffModules.Notifier.AddOnBlockFinalizedConsumer(complianceEng.OnFinalizedBlock)
 
-	sync, err = factory.sync.Create(cluster.Members(), state, blocks, syncCore, complianceEng)
+	sync, err = factory.sync.Create(cluster.Members(), state, blocks, proposerSigs, syncCore, complianceEng)
 	if err != nil {
 		err = fmt.Errorf("could not create sync engine: %w", err)
 		return

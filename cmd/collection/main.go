@@ -408,6 +408,7 @@ func main() {
 				node.Me,
 				node.State,
 				node.Storage.Blocks,
+				node.Storage.ProposalSignatures,
 				followerEng,
 				mainChainSyncCore,
 				node.SyncEngineIdentifierProvider,

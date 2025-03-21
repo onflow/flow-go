@@ -678,6 +678,7 @@ func createNode(
 		me,
 		state,
 		blocksDB,
+		sigsDB,
 		comp,
 		syncCore,
 		idProvider,

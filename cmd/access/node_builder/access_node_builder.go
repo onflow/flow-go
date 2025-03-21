@@ -523,6 +523,7 @@ func (builder *FlowAccessNodeBuilder) buildSyncEngine() *FlowAccessNodeBuilder {
 			node.Me,
 			node.State,
 			node.Storage.Blocks,
+			node.Storage.ProposalSignatures,
 			builder.FollowerEng,
 			builder.SyncCore,
 			builder.SyncEngineParticipantsProviderFactory(),
@@ -2202,6 +2203,7 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 				node.Me,
 				node.State,
 				node.Storage.Blocks,
+				node.Storage.ProposalSignatures,
 				builder.SyncCore,
 			)
 			if err != nil {

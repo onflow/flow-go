@@ -36,14 +36,15 @@ type SyncSuite struct {
 	myID         flow.Identifier
 	participants flow.IdentityList
 	head         *flow.Header
-	heights      map[uint64]*flow.Block
-	blockIDs     map[flow.Identifier]*flow.Block
+	heights      map[uint64]*flow.BlockProposal
+	blockIDs     map[flow.Identifier]*flow.BlockProposal
 	net          *mocknetwork.Network
 	con          *mocknetwork.Conduit
 	me           *module.Local
 	state        *protocol.State
 	snapshot     *protocol.Snapshot
 	blocks       *storage.Blocks
+	sigs         *storage.ProposalSignatures
 	comp         *mockconsensus.Compliance
 	core         *module.SyncCore
 	e            *Engine
@@ -64,8 +65,8 @@ func (ss *SyncSuite) SetupTest() {
 	ss.head = header
 
 	// create maps to enable block returns
-	ss.heights = make(map[uint64]*flow.Block)
-	ss.blockIDs = make(map[flow.Identifier]*flow.Block)
+	ss.heights = make(map[uint64]*flow.BlockProposal)
+	ss.blockIDs = make(map[flow.Identifier]*flow.BlockProposal)
 
 	// set up the network module mock
 	ss.net = &mocknetwork.Network{}
@@ -122,29 +123,30 @@ func (ss *SyncSuite) SetupTest() {
 	// set up blocks storage mock
 	ss.blocks = &storage.Blocks{}
 	ss.blocks.On("ByHeight", mock.Anything).Return(
-		func(height uint64) *flow.Block {
-			return ss.heights[height]
-		},
-		func(height uint64) error {
-			_, enabled := ss.heights[height]
+		func(height uint64) (*flow.Block, error) {
+			block, enabled := ss.heights[height]
 			if !enabled {
-				return storerr.ErrNotFound
+				return nil, storerr.ErrNotFound
 			}
-			return nil
-		},
-	)
+			return block.Block, nil
+		})
 	ss.blocks.On("ByID", mock.Anything).Return(
-		func(blockID flow.Identifier) *flow.Block {
-			return ss.blockIDs[blockID]
-		},
-		func(blockID flow.Identifier) error {
-			_, enabled := ss.blockIDs[blockID]
+		func(blockID flow.Identifier) (*flow.Block, error) {
+			block, enabled := ss.blockIDs[blockID]
 			if !enabled {
-				return storerr.ErrNotFound
+				return nil, storerr.ErrNotFound
 			}
-			return nil
-		},
-	)
+			return block.Block, nil
+		})
+	ss.sigs = &storage.ProposalSignatures{}
+	ss.sigs.On("ByBlockID", mock.Anything).Return(
+		func(blockID flow.Identifier) ([]byte, error) {
+			block, enabled := ss.blockIDs[blockID]
+			if !enabled {
+				return nil, storerr.ErrNotFound
+			}
+			return block.ProposerSigData, nil
+		})
 
 	// set up compliance engine mock
 	ss.comp = mockconsensus.NewCompliance(ss.T())
@@ -161,7 +163,7 @@ func (ss *SyncSuite) SetupTest() {
 	require.NoError(ss.T(), err, "could not create protocol state identity cache")
 	spamConfig, err := NewSpamDetectionConfig()
 	require.NoError(ss.T(), err, "could not create spam detection config")
-	e, err := New(log, metrics, ss.net, ss.me, ss.state, ss.blocks, ss.comp, ss.core,
+	e, err := New(log, metrics, ss.net, ss.me, ss.state, ss.blocks, ss.sigs, ss.comp, ss.core,
 		id.NewIdentityFilterIdentifierProvider(
 			filter.And(
 				filter.HasRole[flow.Identity](flow.RoleConsensus),
