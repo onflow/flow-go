@@ -168,7 +168,7 @@ func run(*cobra.Command, []string) {
 
 		irrCtx, errCh := irrecoverable.WithSignaler(ctx)
 		go func() {
-			err := modutil.WaitError(errCh, ctx)
+			err := modutil.WaitError(errCh, ctx.Done())
 			if err != nil {
 				log.Fatal().Err(err).Msg("server finished with error")
 			}
