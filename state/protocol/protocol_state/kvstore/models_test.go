@@ -255,7 +255,23 @@ func TestKVStoreAPI_Replicate(t *testing.T) {
 			require.True(t, ok, "expected Modelv3")
 			require.Equal(t, upgradedKVStore.GetVersionUpgrade(), model.GetVersionUpgrade())
 
-			// TODO check that v3-only fields are initialized to initial values
+			t.Run("v3-only fields are initialized", func(t *testing.T) {
+				cadenceVersion, err := upgradedKVStore.GetCadenceComponentVersion()
+				assert.NoError(t, err)
+				assert.Equal(t, protocol.MagnitudeVersion{}, cadenceVersion)
+
+				assert.Nil(t, upgradedKVStore.GetCadenceComponentVersionUpgrade())
+
+				executionVersion, err := upgradedKVStore.GetExecutionComponentVersion()
+				assert.NoError(t, err)
+				assert.Equal(t, protocol.MagnitudeVersion{}, executionVersion)
+
+				assert.Nil(t, upgradedKVStore.GetExecutionComponentVersionUpgrade())
+
+				meteringParams, err := upgradedKVStore.GetExecutionMeteringParameters()
+				assert.NoError(t, err)
+				assert.Equal(t, protocol.DefaultExecutionMeteringParameters(), meteringParams)
+			})
 		})
 	})
 
@@ -282,24 +298,6 @@ func TestKVStoreAPI_Replicate(t *testing.T) {
 
 			model.VersionUpgrade.ActivationView++ // change
 			require.False(t, reflect.DeepEqual(model, cpy))
-
-			t.Run("v3-only fields are initialized", func(t *testing.T) {
-				cadenceVersion, err := model.GetCadenceComponentVersion()
-				assert.NoError(t, err)
-				assert.Equal(t, protocol.MagnitudeVersion{}, cadenceVersion)
-
-				assert.Nil(t, model.GetCadenceComponentVersionUpgrade())
-
-				executionVersion, err := model.GetExecutionComponentVersion()
-				assert.NoError(t, err)
-				assert.Equal(t, protocol.MagnitudeVersion{}, executionVersion)
-
-				assert.Nil(t, model.GetExecutionComponentVersionUpgrade())
-
-				meteringParams, err := model.GetExecutionMeteringParameters()
-				assert.NoError(t, err)
-				assert.Equal(t, protocol.DefaultExecutionMeteringParameters(), meteringParams)
-			})
 		})
 		t.Run("invalid upgrade", func(t *testing.T) {
 			model := &kvstore.Modelv3{}
