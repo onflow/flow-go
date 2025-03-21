@@ -275,8 +275,8 @@ func (s *TransactionStatusSuite) TestSubscribeTransactionStatusHappyCase() {
 	transaction.SetReferenceBlockID(s.finalizedBlock.ID())
 	s.transactions.On("ByID", mock.AnythingOfType("flow.Identifier")).Return(&transaction.TransactionBody, nil)
 
-	col := flow.CollectionFromTransactions([]*flow.Transaction{&transaction})
-	guarantee := col.Guarantee()
+	col := unittest.CollectionFromTransactions([]*flow.Transaction{&transaction})
+	guarantee := &flow.CollectionGuarantee{CollectionID: col.ID()}
 	light := col.Light()
 	txId := transaction.ID()
 	txResult := flow.LightTransactionResult{
@@ -329,7 +329,7 @@ func (s *TransactionStatusSuite) TestSubscribeTransactionStatusHappyCase() {
 	// 2. Make transaction reference block sealed, and add a new finalized block that includes the transaction
 	s.sealedBlock = s.finalizedBlock
 	s.addNewFinalizedBlock(s.sealedBlock.Header, true, func(block *flow.Block) {
-		block.SetPayload(unittest.PayloadFixture(unittest.WithGuarantees(&guarantee)))
+		block.SetPayload(unittest.PayloadFixture(unittest.WithGuarantees(guarantee)))
 		s.collections.On("LightByID", mock.AnythingOfType("flow.Identifier")).Return(&light, nil).Maybe()
 	})
 	checkNewSubscriptionMessage(sub, flow.TransactionStatusFinalized)
