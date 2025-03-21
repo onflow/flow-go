@@ -144,17 +144,17 @@ type KVStoreReader interface {
 // which affects fee calculations and transaction/script stopping conditions.
 type ExecutionMeteringParameters struct {
 	// ExecutionEffortWeights ...
-	ExecutionEffortWeights map[uint64]uint64
+	ExecutionEffortWeights map[uint32]uint64
 	// ExecutionMemoryWeights ...
-	ExecutionMemoryWeights map[uint64]uint64
+	ExecutionMemoryWeights map[uint32]uint64
 	// ExecutionMemoryLimit ...
 	ExecutionMemoryLimit uint64
 }
 
 func DefaultExecutionMeteringParameters() ExecutionMeteringParameters {
 	return ExecutionMeteringParameters{
-		ExecutionEffortWeights: make(map[uint64]uint64),
-		ExecutionMemoryWeights: make(map[uint64]uint64),
+		ExecutionEffortWeights: make(map[uint32]uint64),
+		ExecutionMemoryWeights: make(map[uint32]uint64),
 		ExecutionMemoryLimit:   math.MaxUint64,
 	}
 }
@@ -164,7 +164,7 @@ func DefaultExecutionMeteringParameters() ExecutionMeteringParameters {
 // We require this KVStore field type to be RLP-encodable so we can compute the hash/ID of a kvstore model instance.
 func (params *ExecutionMeteringParameters) EncodeRLP(w io.Writer) error {
 	type pair struct {
-		Key   uint64
+		Key   uint32
 		Value uint64
 	}
 	pairOrdering := func(a, b pair) int {

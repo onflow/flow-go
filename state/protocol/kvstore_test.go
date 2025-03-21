@@ -13,15 +13,15 @@ import (
 func TestExecutionMeteringParameters_EncodeRLP(t *testing.T) {
 	params1 := &ExecutionMeteringParameters{
 		ExecutionMemoryLimit: rand.Uint64(),
-		ExecutionMemoryWeights: map[uint64]uint64{
-			rand.Uint64(): rand.Uint64(),
-			rand.Uint64(): rand.Uint64(),
-			rand.Uint64(): rand.Uint64(),
+		ExecutionMemoryWeights: map[uint32]uint64{
+			rand.Uint32(): rand.Uint64(),
+			rand.Uint32(): rand.Uint64(),
+			rand.Uint32(): rand.Uint64(),
 		},
-		ExecutionEffortWeights: map[uint64]uint64{
-			rand.Uint64(): rand.Uint64(),
-			rand.Uint64(): rand.Uint64(),
-			rand.Uint64(): rand.Uint64(),
+		ExecutionEffortWeights: map[uint32]uint64{
+			rand.Uint32(): rand.Uint64(),
+			rand.Uint32(): rand.Uint64(),
+			rand.Uint32(): rand.Uint64(),
 		},
 	}
 
