@@ -163,9 +163,12 @@ func run(*cobra.Command, []string) {
 			storageSnapshot: storageSnapshot,
 		}
 
-		irrCtx, errCh := irrecoverable.WithSignaler(context.Background())
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+
+		irrCtx, errCh := irrecoverable.WithSignaler(ctx)
 		go func() {
-			err := modutil.WaitError(errCh, nil)
+			err := modutil.WaitError(errCh, ctx)
 			if err != nil {
 				log.Fatal().Err(err).Msg("server finished with error")
 			}
