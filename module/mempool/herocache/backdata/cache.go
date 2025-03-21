@@ -187,6 +187,44 @@ func (c *Cache[V]) Remove(key flow.Identifier) (value V, ok bool) {
 	return value, true
 }
 
+// Adjust adjusts the value using the given function if the given identifier can be found.
+// Returns a bool which indicates whether the value was updated as well as the updated value.
+func (c *Cache[V]) Adjust(key flow.Identifier, f func(V) V) (value V, ok bool) {
+	defer c.logTelemetry()
+
+	value, removed := c.Remove(key)
+	if !removed {
+		return value, false
+	}
+
+	newValue := f(value)
+
+	// TODO(malleability, #7171): Think of a better solution cause of removing and inserting value with same ID https://github.com/onflow/flow-go/issues/7171
+	c.put(key, newValue)
+
+	return newValue, true
+}
+
+// AdjustWithInit adjusts the value using the given function if the given identifier can be found. When the
+// value is not found, it initializes the value using the given init function and then applies the adjust function.
+// Args:
+// - key: the identifier of the value to adjust.
+// - adjust: the function that adjusts the value.
+// - init: the function that initializes the value when it is not found.
+// Returns:
+//   - the adjusted value.
+//
+// - a bool which indicates whether the value was adjusted.
+func (c *Cache[V]) AdjustWithInit(key flow.Identifier, adjust func(V) V, init func() V) (V, bool) {
+	defer c.logTelemetry()
+
+	if c.Has(key) {
+		return c.Adjust(key, adjust)
+	}
+	c.put(key, init())
+	return c.Adjust(key, adjust)
+}
+
 // Get returns the given value from the backdata.
 func (c *Cache[V]) Get(key flow.Identifier) (V, bool) {
 	defer c.logTelemetry()
