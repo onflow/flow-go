@@ -224,7 +224,7 @@ func TestBackend_Multiple_OnEjectionCallbacks(t *testing.T) {
 // It concurrently attempts on adjusting non-existent entities, and verifies that the entities are initialized and adjusted correctly.
 func TestBackend_AdjustWithInit_Concurrent_HeroCache(t *testing.T) {
 	sizeLimit := uint32(100)
-	backData := herocache.NewCache(sizeLimit,
+	backData := herocache.NewCache[flow.Identifier, *unittest.MockEntity](sizeLimit,
 		herocache.DefaultOversizeFactor,
 		heropool.LRUEjection,
 		unittest.Logger(),
