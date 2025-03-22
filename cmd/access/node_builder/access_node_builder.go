@@ -347,6 +347,8 @@ type FlowAccessNodeBuilder struct {
 	events                         storage.Events
 	lightTransactionResults        storage.LightTransactionResults
 	transactionResultErrorMessages storage.TransactionResultErrorMessages
+	transactions                   storage.Transactions
+	collections                    storage.Collections
 
 	// The sync engine participants provider is the libp2p peer store for the access node
 	// which is not available until after the network has started.
@@ -574,6 +576,15 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 	builder.
 		AdminCommand("read-execution-data", func(config *cmd.NodeConfig) commands.AdminCommand {
 			return stateSyncCommands.NewReadExecutionDataCommand(builder.ExecutionDataStore)
+		}).
+		Module("transactions and collections storage", func(node *cmd.NodeConfig) error {
+			// TODO: needs to be wrapped with ChainedCollections module, otherwise once we switch
+			// ProtocolDB to pebble based storage, the data previously stored in badger will not be
+			// accessable.
+			transactions := store.NewTransactions(node.Metrics.Cache, node.ProtocolDB)
+			builder.collections = store.NewCollections(node.ProtocolDB, transactions)
+			builder.transactions = transactions
+			return nil
 		}).
 		Module("execution data datastore and blobstore", func(node *cmd.NodeConfig) error {
 			datastoreDir := filepath.Join(builder.executionDataDir, "blobstore")
@@ -956,10 +967,10 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 					builder.ProtocolDB,
 					builder.Storage.RegisterIndex,
 					builder.Storage.Headers,
-					builder.events,
-					builder.Storage.Collections,
-					builder.Storage.Transactions,
-					builder.lightTransactionResults,
+					notNil(builder.events),
+					notNil(builder.collections),
+					notNil(builder.transactions),
+					notNil(builder.lightTransactionResults),
 					builder.RootChainID.Chain(),
 					indexerDerivedChainData,
 					builder.collectionExecutedMetric,
@@ -1618,7 +1629,7 @@ func (builder *FlowAccessNodeBuilder) Initialize() error {
 	builder.EnqueueNetworkInit()
 
 	builder.AdminCommand("get-transactions", func(conf *cmd.NodeConfig) commands.AdminCommand {
-		return storageCommands.NewGetTransactionsCommand(conf.State, conf.Storage.Payloads, conf.Storage.Collections)
+		return storageCommands.NewGetTransactionsCommand(conf.State, conf.Storage.Payloads, notNil(builder.collections))
 	})
 
 	// if this is an access node that supports public followers, enqueue the public network
@@ -1782,7 +1793,7 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 				builder.CollectionsToMarkFinalized,
 				builder.CollectionsToMarkExecuted,
 				builder.BlocksToMarkExecuted,
-				builder.Storage.Collections,
+				builder.collections,
 				builder.Storage.Blocks,
 				builder.BlockTransactions,
 			)
@@ -2039,8 +2050,8 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 				HistoricalAccessNodes: builder.HistoricalAccessRPCs,
 				Blocks:                node.Storage.Blocks,
 				Headers:               node.Storage.Headers,
-				Collections:           node.Storage.Collections,
-				Transactions:          node.Storage.Transactions,
+				Collections:           notNil(builder.collections),
+				Transactions:          notNil(builder.transactions),
 				ExecutionReceipts:     node.Storage.Receipts,
 				ExecutionResults:      node.Storage.Results,
 				TxResultErrorMessages: builder.transactionResultErrorMessages,
@@ -2142,8 +2153,8 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 				builder.RequestEng,
 				node.Storage.Blocks,
 				node.Storage.Headers,
-				node.Storage.Collections,
-				node.Storage.Transactions,
+				notNil(builder.collections),
+				notNil(builder.transactions),
 				node.Storage.Results,
 				node.Storage.Receipts,
 				builder.collectionExecutedMetric,
@@ -2388,4 +2399,16 @@ func (builder *FlowAccessNodeBuilder) initPublicLibp2pNode(networkKey crypto.Pri
 	}
 
 	return libp2pNode, nil
+}
+
+// notNil ensures that the input is not nil and returns it
+// the usage is to ensure the dependencies are initialized before initializing a module.
+// for instance, the IngestionEngine depends on storage.Collections, which is initialized in a
+// different function, so we need to ensure that the storage.Collections is initialized before
+// creating the IngestionEngine.
+func notNil[T any](dep T) T {
+	if any(dep) == nil {
+		panic("dependency is nil")
+	}
+	return dep
 }

@@ -14,6 +14,8 @@ type Transactions struct {
 	cache *Cache[flow.Identifier, *flow.TransactionBody]
 }
 
+var _ storage.Transactions = (*Transactions)(nil)
+
 // NewTransactions ...
 func NewTransactions(cacheMetrics module.CacheMetrics, db storage.DB) *Transactions {
 	store := func(rw storage.ReaderBatchWriter, txID flow.Identifier, flowTX *flow.TransactionBody) error {
@@ -49,4 +51,9 @@ func (t *Transactions) storeTx(rw storage.ReaderBatchWriter, flowTx *flow.Transa
 
 func (t *Transactions) ByID(txID flow.Identifier) (*flow.TransactionBody, error) {
 	return t.cache.Get(t.db.Reader(), txID)
+}
+
+// RemoveBatch removes a transaction by fingerprint.
+func (t *Transactions) RemoveBatch(rw storage.ReaderBatchWriter, txID flow.Identifier) error {
+	return operation.RemoveTransaction(rw.Writer(), txID)
 }
