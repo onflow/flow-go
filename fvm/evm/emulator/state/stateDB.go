@@ -102,21 +102,27 @@ func (db *StateDB) IsNewContract(addr gethCommon.Address) bool {
 	return db.latestView().IsNewContract(addr)
 }
 
-// SelfDestruct flags the address for deletion.
+// SelfDestruct flags the address for deletion and returns the previous balance.
 //
-// while this address exists for the rest of transaction,
-// the balance of this account is return zero after the SelfDestruct call.
-func (db *StateDB) SelfDestruct(addr gethCommon.Address) {
+// While this address exists for the rest of the transaction,
+// the balance of this account is cleared after the SelfDestruct call.
+func (db *StateDB) SelfDestruct(addr gethCommon.Address) uint256.Int {
 	db.handleError(fmt.Errorf("legacy self destruct is not supported"))
+	return uint256.Int{}
 }
 
-// Selfdestruct6780 would only follow the self destruct steps if account is a new contract
+// SelfDestruct6780 would only follow the self destruct steps if account is a new contract
 // either just created, or address had balance before but got a contract deployed to it (in this tx).
-func (db *StateDB) Selfdestruct6780(addr gethCommon.Address) {
+// Returns the previous balance and a boolean value denoting whether the address was self destructed.
+func (db *StateDB) SelfDestruct6780(addr gethCommon.Address) (uint256.Int, bool) {
 	if db.IsNewContract(addr) {
 		err := db.latestView().SelfDestruct(addr)
 		db.handleError(err)
 	}
+	balance, err := db.latestView().GetBalance(addr)
+	db.handleError(err)
+
+	return *balance, false
 }
 
 // HasSelfDestructed returns true if address is flagged with self destruct.
@@ -126,33 +132,45 @@ func (db *StateDB) HasSelfDestructed(addr gethCommon.Address) bool {
 }
 
 // SubBalance substitutes the amount from the balance of the given address
+// and returns the previous balance.
 func (db *StateDB) SubBalance(
 	addr gethCommon.Address,
 	amount *uint256.Int,
 	reason gethTracing.BalanceChangeReason,
-) {
+) uint256.Int {
 	// negative amounts are not accepted.
 	if amount.Sign() < 0 {
 		db.handleError(types.ErrInvalidBalance)
-		return
+		return uint256.Int{}
 	}
-	err := db.latestView().SubBalance(addr, amount)
+	prevBalance, err := db.latestView().GetBalance(addr)
 	db.handleError(err)
+
+	err = db.latestView().SubBalance(addr, amount)
+	db.handleError(err)
+
+	return *prevBalance
 }
 
 // AddBalance adds the amount from the balance of the given address
+// and returns the previous balance.
 func (db *StateDB) AddBalance(
 	addr gethCommon.Address,
 	amount *uint256.Int,
 	reason gethTracing.BalanceChangeReason,
-) {
+) uint256.Int {
 	// negative amounts are not accepted.
 	if amount.Sign() < 0 {
 		db.handleError(types.ErrInvalidBalance)
-		return
+		return uint256.Int{}
 	}
-	err := db.latestView().AddBalance(addr, amount)
+	prevBalance, err := db.latestView().GetBalance(addr)
 	db.handleError(err)
+
+	err = db.latestView().AddBalance(addr, amount)
+	db.handleError(err)
+
+	return *prevBalance
 }
 
 // GetBalance returns the balance of the given address
@@ -254,10 +272,17 @@ func (db *StateDB) GetStorageRoot(addr gethCommon.Address) gethCommon.Hash {
 	return root
 }
 
-// SetState sets a value for the given storage slot
-func (db *StateDB) SetState(addr gethCommon.Address, key gethCommon.Hash, value gethCommon.Hash) {
-	err := db.latestView().SetState(types.SlotAddress{Address: addr, Key: key}, value)
+// SetState sets a value for the given storage slot.
+// It returns the previous value in any case.
+func (db *StateDB) SetState(
+	addr gethCommon.Address,
+	key gethCommon.Hash,
+	value gethCommon.Hash,
+) gethCommon.Hash {
+	prevState, err := db.latestView().SetState(types.SlotAddress{Address: addr, Key: key}, value)
 	db.handleError(err)
+
+	return prevState
 }
 
 // GetTransientState returns the value for the given key of the transient storage
@@ -479,6 +504,10 @@ func (db *StateDB) Commit(finalize bool) (hash.Hash, error) {
 		}
 	}
 	return updateCommit, nil
+}
+
+func (db *StateDB) Finalise(deleteEmptyObjects bool) {
+	panic(fmt.Errorf("should not be called!"))
 }
 
 // Finalize flushes all the changes
