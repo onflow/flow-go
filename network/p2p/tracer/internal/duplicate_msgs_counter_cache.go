@@ -12,6 +12,7 @@ import (
 	herocache "github.com/onflow/flow-go/module/mempool/herocache/backdata"
 	"github.com/onflow/flow-go/module/mempool/herocache/backdata/heropool"
 	"github.com/onflow/flow-go/module/mempool/stdmap"
+	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/network/p2p/scoring"
 )
 
@@ -67,7 +68,7 @@ func (d *DuplicateMessageTrackerCache) DuplicateMessageReceived(peerID peer.ID) 
 		return d.incrementAdjustment(counter) // then increment the record
 	}
 
-	adjustedCounter, adjusted := d.c.AdjustWithInit(makeId(peerID), adjustFunc, func() *duplicateMessagesCounter {
+	adjustedCounter, adjusted := d.c.AdjustWithInit(p2p.MakeId(peerID), adjustFunc, func() *duplicateMessagesCounter {
 		return newDuplicateMessagesCounter()
 	})
 
@@ -99,7 +100,7 @@ func (d *DuplicateMessageTrackerCache) GetWithInit(peerID peer.ID) (float64, boo
 		return counter
 	}
 
-	adjustedCounter, adjusted := d.c.AdjustWithInit(makeId(peerID), adjustLogic, func() *duplicateMessagesCounter {
+	adjustedCounter, adjusted := d.c.AdjustWithInit(p2p.MakeId(peerID), adjustLogic, func() *duplicateMessagesCounter {
 		return newDuplicateMessagesCounter()
 	})
 	if err != nil {
@@ -146,11 +147,4 @@ func (d *DuplicateMessageTrackerCache) decayAdjustment(counter *duplicateMessage
 	counter.lastUpdated = time.Now()
 	// Return the adjusted counter.
 	return counter, nil
-}
-
-// makeId is a helper function for creating the id field of the duplicateMessagesCounter by hashing the peerID.
-// Returns:
-// - the hash of the peerID as a flow.Identifier.
-func makeId(peerID peer.ID) flow.Identifier {
-	return flow.MakeID([]byte(peerID))
 }

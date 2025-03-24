@@ -12,6 +12,7 @@ import (
 	herocache "github.com/onflow/flow-go/module/mempool/herocache/backdata"
 	"github.com/onflow/flow-go/module/mempool/herocache/backdata/heropool"
 	"github.com/onflow/flow-go/module/mempool/stdmap"
+	"github.com/onflow/flow-go/network/p2p"
 )
 
 // SubscriptionRecordCache manages the subscription records of peers in a network.
@@ -61,7 +62,7 @@ func NewSubscriptionRecordCache(sizeLimit uint32,
 // - []string: the list of topics the peer is subscribed to.
 // - bool: true if there is a record for the peer, false otherwise.
 func (s *SubscriptionRecordCache) GetSubscribedTopics(pid peer.ID) ([]string, bool) {
-	record, ok := s.c.Get(makeId(pid))
+	record, ok := s.c.Get(p2p.MakeId(pid))
 	if !ok {
 		return nil, false
 	}
@@ -132,7 +133,7 @@ func (s *SubscriptionRecordCache) AddWithInitTopicForPeer(pid peer.ID, topic str
 		// Return the adjusted record.
 		return record
 	}
-	adjustedRecord, adjusted := s.c.AdjustWithInit(makeId(pid), adjustLogic, initLogic)
+	adjustedRecord, adjusted := s.c.AdjustWithInit(p2p.MakeId(pid), adjustLogic, initLogic)
 	if rErr != nil {
 		return nil, fmt.Errorf("failed to adjust record with error: %w", rErr)
 	}

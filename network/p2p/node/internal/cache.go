@@ -13,6 +13,7 @@ import (
 	"github.com/onflow/flow-go/module/mempool/herocache/backdata/heropool"
 	"github.com/onflow/flow-go/module/mempool/stdmap"
 	"github.com/onflow/flow-go/network"
+	"github.com/onflow/flow-go/network/p2p"
 )
 
 // DisallowListCache is the disallow-list cache. It is used to keep track of the disallow-listed peers and the reasons for it.
@@ -48,7 +49,7 @@ func NewDisallowListCache(sizeLimit uint32, logger zerolog.Logger, collector mod
 // a nil slice is returned.
 // - bool: true if the peer is disallow-listed for any reason, false otherwise.
 func (d *DisallowListCache) IsDisallowListed(peerID peer.ID) ([]network.DisallowListedCause, bool) {
-	causes, exists := d.c.Get(makeId(peerID))
+	causes, exists := d.c.Get(p2p.MakeId(peerID))
 	if !exists {
 		return nil, false
 	}
@@ -76,7 +77,7 @@ func (d *DisallowListCache) DisallowFor(peerID peer.ID, cause network.DisallowLi
 		causes[cause] = struct{}{}
 		return causes
 	}
-	adjustedCauses, adjusted := d.c.AdjustWithInit(makeId(peerID), adjustLogic, initLogic)
+	adjustedCauses, adjusted := d.c.AdjustWithInit(p2p.MakeId(peerID), adjustLogic, initLogic)
 	if !adjusted {
 		return nil, fmt.Errorf("failed to disallow list peer %s for cause %s", peerID, cause)
 	}
@@ -98,7 +99,7 @@ func (d *DisallowListCache) DisallowFor(peerID peer.ID, cause network.DisallowLi
 // - the list of causes for which the peer is disallow-listed.
 // - error if the entity for the peerID is not found in the cache it returns ErrDisallowCacheEntityNotFound, which is a benign error.
 func (d *DisallowListCache) AllowFor(peerID peer.ID, cause network.DisallowListedCause) []network.DisallowListedCause {
-	adjustedCauses, adjusted := d.c.Adjust(makeId(peerID), func(causes map[network.DisallowListedCause]struct{}) map[network.DisallowListedCause]struct{} {
+	adjustedCauses, adjusted := d.c.Adjust(p2p.MakeId(peerID), func(causes map[network.DisallowListedCause]struct{}) map[network.DisallowListedCause]struct{} {
 		delete(causes, cause)
 		return causes
 	})
@@ -115,11 +116,4 @@ func (d *DisallowListCache) AllowFor(peerID peer.ID, cause network.DisallowListe
 		causes = append(causes, c)
 	}
 	return causes
-}
-
-// makeId is a helper function for creating the key for DisallowListCache by hashing the peerID.
-// Returns:
-// - the hash of the peerID as a flow.Identifier.
-func makeId(peerID peer.ID) flow.Identifier {
-	return flow.MakeID([]byte(peerID))
 }

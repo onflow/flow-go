@@ -55,7 +55,7 @@ func NewAppSpecificScoreCache(sizeLimit uint32, logger zerolog.Logger, collector
 // - time.Time: the time at which the score was last updated.
 // - bool: true if the score was retrieved successfully, false otherwise.
 func (a *AppSpecificScoreCache) Get(peerID peer.ID) (float64, time.Time, bool) {
-	record, ok := a.c.Get(makeId(peerID))
+	record, ok := a.c.Get(p2p.MakeId(peerID))
 	if !ok {
 		return 0, time.Time{}, false
 	}
@@ -83,17 +83,10 @@ func (a *AppSpecificScoreCache) AdjustWithInit(peerID peer.ID, score float64, ti
 		record.LastUpdated = time
 		return record
 	}
-	_, adjusted := a.c.AdjustWithInit(makeId(peerID), adjustLogic, initLogic)
+	_, adjusted := a.c.AdjustWithInit(p2p.MakeId(peerID), adjustLogic, initLogic)
 	if !adjusted {
 		return fmt.Errorf("failed to adjust app specific score for peer %s", peerID)
 	}
 
 	return nil
-}
-
-// makeId is a helper function for creating the key for appSpecificScoreRecord by hashing the peerID.
-// Returns:
-// - the hash of the peerID as a flow.Identifier.
-func makeId(peerID peer.ID) flow.Identifier {
-	return flow.MakeID([]byte(peerID))
 }

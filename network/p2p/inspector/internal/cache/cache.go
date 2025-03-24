@@ -12,6 +12,7 @@ import (
 	herocache "github.com/onflow/flow-go/module/mempool/herocache/backdata"
 	"github.com/onflow/flow-go/module/mempool/herocache/backdata/heropool"
 	"github.com/onflow/flow-go/module/mempool/stdmap"
+	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/network/p2p/scoring"
 )
 
@@ -81,7 +82,7 @@ func (r *RecordCache) ReceivedClusterPrefixedMessage(pid peer.ID) (float64, erro
 		}
 		return r.incrementAdjustment(record) // then increment the record
 	}
-	nodeID := r.MakeId(pid)
+	nodeID := p2p.MakeId(pid)
 	adjustedRecord, adjusted := r.c.AdjustWithInit(nodeID, adjustFunc, func() *ClusterPrefixedMessagesReceivedRecord {
 		return r.recordFactory(nodeID)
 	})
@@ -113,7 +114,7 @@ func (r *RecordCache) GetWithInit(pid peer.ID) (float64, bool, error) {
 		record, err = r.decayAdjustment(record)
 		return record
 	}
-	nodeID := r.MakeId(pid)
+	nodeID := p2p.MakeId(pid)
 	adjustedRecord, adjusted := r.c.AdjustWithInit(nodeID, adjustLogic, func() *ClusterPrefixedMessagesReceivedRecord {
 		return r.recordFactory(nodeID)
 	})
@@ -134,7 +135,7 @@ func (r *RecordCache) GetWithInit(pid peer.ID) (float64, bool, error) {
 // Returns:
 // - true if the record is removed, false otherwise (i.e., the record does not exist).
 func (r *RecordCache) Remove(pid peer.ID) bool {
-	return r.c.Remove(r.MakeId(pid))
+	return r.c.Remove(p2p.MakeId(pid))
 }
 
 // NodeIDs returns the list of identities of the nodes that have a spam record in the cache.
@@ -151,13 +152,6 @@ func (r *RecordCache) NodeIDs() flow.IdentifierList {
 // Size returns the number of records in the cache.
 func (r *RecordCache) Size() uint {
 	return r.c.Size()
-}
-
-// MakeId is a helper function for creating the id field by hashing the peerID.
-// Returns:
-// - the hash of the peerID as a flow.Identifier.
-func (r *RecordCache) MakeId(peerID peer.ID) flow.Identifier {
-	return flow.MakeID([]byte(peerID))
 }
 
 func (r *RecordCache) incrementAdjustment(record *ClusterPrefixedMessagesReceivedRecord) *ClusterPrefixedMessagesReceivedRecord {

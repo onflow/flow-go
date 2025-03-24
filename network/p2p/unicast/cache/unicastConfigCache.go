@@ -12,6 +12,7 @@ import (
 	herocache "github.com/onflow/flow-go/module/mempool/herocache/backdata"
 	"github.com/onflow/flow-go/module/mempool/herocache/backdata/heropool"
 	"github.com/onflow/flow-go/module/mempool/stdmap"
+	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/network/p2p/unicast"
 )
 
@@ -86,7 +87,7 @@ func (d *UnicastConfigCache) AdjustWithInit(peerID peer.ID, adjustFunc unicast.U
 		return d.cfgFactory()
 	}
 
-	adjustedConfig, adjusted := d.peerCache.AdjustWithInit(makeId(peerID), wrapAdjustFunc, initFunc)
+	adjustedConfig, adjusted := d.peerCache.AdjustWithInit(p2p.MakeId(peerID), wrapAdjustFunc, initFunc)
 	if rErr != nil {
 		return nil, fmt.Errorf("adjust operation aborted with an error: %w", rErr)
 	}
@@ -110,7 +111,7 @@ func (d *UnicastConfigCache) AdjustWithInit(peerID peer.ID, adjustFunc unicast.U
 //   - error if the factory function returns an error. Any error should be treated as an irrecoverable error and indicates a bug.
 func (d *UnicastConfigCache) GetWithInit(peerID peer.ID) (*unicast.Config, error) {
 	// ensuring that the init-and-get operation is atomic.
-	key := makeId(peerID)
+	key := p2p.MakeId(peerID)
 
 	var config unicast.Config
 	err := d.peerCache.Run(func(backData mempool.BackData[flow.Identifier, unicast.Config]) error {
@@ -139,12 +140,4 @@ func (d *UnicastConfigCache) GetWithInit(peerID peer.ID) (*unicast.Config, error
 // Size returns the number of unicast configs in the cache.
 func (d *UnicastConfigCache) Size() uint {
 	return d.peerCache.Size()
-}
-
-// makeId is a helper function which converts a peer ID to a flow ID by taking the hash of the peer ID.
-// This is not a protocol-level conversion, and is only used internally by the cache, MUST NOT be exposed outside the cache.
-// Returns:
-// - the hash of the peerID as a flow.Identifier.
-func makeId(peerID peer.ID) flow.Identifier {
-	return flow.MakeID([]byte(peerID))
 }

@@ -121,7 +121,7 @@ func (a *GossipSubSpamRecordCache) Adjust(peerID peer.ID, updateFn p2p.UpdateFun
 		}
 	}
 
-	adjustedWrapper, adjusted := a.c.AdjustWithInit(makeId(peerID), adjustFunc, initFunc)
+	adjustedWrapper, adjusted := a.c.AdjustWithInit(p2p.MakeId(peerID), adjustFunc, initFunc)
 	if err != nil {
 		return nil, fmt.Errorf("error while applying pre-processing functions to cache record for peer %s: %w", p2plogging.PeerId(peerID), err)
 	}
@@ -138,7 +138,7 @@ func (a *GossipSubSpamRecordCache) Adjust(peerID peer.ID, updateFn p2p.UpdateFun
 // Returns:
 // - true if the gossipsub spam record of the peer is found in the cache, false otherwise.
 func (a *GossipSubSpamRecordCache) Has(peerID peer.ID) bool {
-	return a.c.Has(makeId(peerID))
+	return a.c.Has(p2p.MakeId(peerID))
 }
 
 // Get returns the spam record of a peer from the cache.
@@ -152,7 +152,7 @@ func (a *GossipSubSpamRecordCache) Has(peerID peer.ID) bool {
 //     the caller is advised to crash the node.
 //   - true if the record is found in the cache, false otherwise.
 func (a *GossipSubSpamRecordCache) Get(peerID peer.ID) (*p2p.GossipSubSpamRecord, error, bool) {
-	key := makeId(peerID)
+	key := p2p.MakeId(peerID)
 	if !a.c.Has(key) {
 		return nil, nil, false
 	}
@@ -190,11 +190,4 @@ type gossipSubSpamRecord struct {
 	// lastUpdated is the time at which the record was last updated.
 	lastUpdated time.Time
 	p2p.GossipSubSpamRecord
-}
-
-// makeId is a helper function for creating the key for gossipSubSpamRecord by hashing the peerID.
-// Returns:
-// - the hash of the peerID as a flow.Identifier.
-func makeId(peerID peer.ID) flow.Identifier {
-	return flow.MakeID([]byte(peerID))
 }
