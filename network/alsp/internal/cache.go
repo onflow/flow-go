@@ -17,8 +17,8 @@ import (
 // SpamRecordCache is a cache that stores spam records at the protocol layer for ALSP.
 // Stored protocol spam records are keyed by the origin id of the spam record.
 type SpamRecordCache struct {
-	recordFactory                                               model.SpamRecordFactoryFunc // recordFactory is a factory function that creates a new spam record.
 	*stdmap.Backend[flow.Identifier, *model.ProtocolSpamRecord]                             // c is the underlying cache.
+	recordFactory                                               model.SpamRecordFactoryFunc // recordFactory is a factory function that creates a new spam record.
 }
 
 var _ alsp.SpamRecordCache = (*SpamRecordCache)(nil)
