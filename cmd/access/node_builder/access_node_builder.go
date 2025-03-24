@@ -25,7 +25,7 @@ import (
 	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/credentials/insecure"
 
-	accessNode "github.com/onflow/flow-go/access"
+	txvalidator "github.com/onflow/flow-go/access/validator"
 	"github.com/onflow/flow-go/admin/commands"
 	stateSyncCommands "github.com/onflow/flow-go/admin/commands/state_synchronization"
 	storageCommands "github.com/onflow/flow-go/admin/commands/storage"
@@ -286,7 +286,7 @@ func DefaultAccessNodeConfig() *AccessNodeConfig {
 		registerCacheType:                    pstorage.CacheTypeTwoQueue.String(),
 		registerCacheSize:                    0,
 		programCacheSize:                     0,
-		checkPayerBalanceMode:                accessNode.Disabled.String(),
+		checkPayerBalanceMode:                txvalidator.Disabled.String(),
 		versionControlEnabled:                true,
 		storeTxResultErrorMessages:           false,
 		stopControlEnabled:                   false,
@@ -1543,7 +1543,7 @@ func (builder *FlowAccessNodeBuilder) extraFlags() {
 			}
 		}
 
-		if builder.checkPayerBalanceMode != accessNode.Disabled.String() && !builder.executionDataIndexingEnabled {
+		if builder.checkPayerBalanceMode != txvalidator.Disabled.String() && !builder.executionDataIndexingEnabled {
 			return errors.New("execution-data-indexing-enabled must be set if check-payer-balance is enabled")
 		}
 
@@ -2009,7 +2009,7 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 				indexReporter = builder.Reporter
 			}
 
-			checkPayerBalanceMode, err := accessNode.ParsePayerBalanceMode(builder.checkPayerBalanceMode)
+			checkPayerBalanceMode, err := txvalidator.ParsePayerBalanceMode(builder.checkPayerBalanceMode)
 			if err != nil {
 				return nil, fmt.Errorf("could not parse payer balance mode: %w", err)
 
