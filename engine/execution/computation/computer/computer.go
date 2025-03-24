@@ -25,7 +25,6 @@ import (
 	"github.com/onflow/flow-go/module/mempool/entity"
 	"github.com/onflow/flow-go/module/trace"
 	"github.com/onflow/flow-go/state/protocol"
-	"github.com/onflow/flow-go/utils/logging"
 )
 
 const (
@@ -330,7 +329,7 @@ func (e *blockComputer) executeBlock(
 		return nil, fmt.Errorf("executable block start state is not set")
 	}
 
-	blockId := block.ID()
+	blockId := block.BlockID()
 	blockIdStr := blockId.String()
 
 	rawCollections := block.Collections()
@@ -420,7 +419,7 @@ func (e *blockComputer) executeBlock(
 	}
 
 	e.log.Debug().
-		Hex("block_id", logging.Entity(block)).
+		Str("block_id", blockIdStr).
 		Msg("all views committed")
 
 	e.metrics.ExecutionBlockCachedPrograms(derivedBlockData.CachedPrograms())

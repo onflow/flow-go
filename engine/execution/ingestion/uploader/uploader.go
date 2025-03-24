@@ -6,13 +6,12 @@ import (
 
 	"github.com/rs/zerolog"
 
+	"github.com/sethvargo/go-retry"
+
 	"github.com/onflow/flow-go/engine/execution"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/component"
 	"github.com/onflow/flow-go/module/irrecoverable"
-	"github.com/onflow/flow-go/utils/logging"
-
-	"github.com/sethvargo/go-retry"
 )
 
 type Uploader interface {
@@ -99,7 +98,7 @@ func (a *AsyncUploader) UploadTask(ctx context.Context, computationResult *execu
 	start := time.Now()
 
 	a.log.Debug().Msgf("computation result of block %s is being uploaded",
-		computationResult.ExecutableBlock.ID().String())
+		computationResult.ExecutableBlock.BlockID().String())
 
 	err := retry.Do(ctx, backoff, func(ctx context.Context) error {
 		err := a.uploader.Upload(computationResult)
@@ -113,11 +112,11 @@ func (a *AsyncUploader) UploadTask(ctx context.Context, computationResult *execu
 	// and the upload success is not critical to correct continued operation of the node
 	if err != nil {
 		a.log.Error().Err(err).
-			Hex("block_id", logging.Entity(computationResult.ExecutableBlock)).
+			Str("block_id", computationResult.ExecutableBlock.BlockID().String()).
 			Msg("failed to upload block data")
 	} else {
 		a.log.Debug().Msgf("computation result of block %s was successfully uploaded",
-			computationResult.ExecutableBlock.ID().String())
+			computationResult.ExecutableBlock.BlockID().String())
 	}
 
 	a.metrics.ExecutionBlockDataUploadFinished(time.Since(start))

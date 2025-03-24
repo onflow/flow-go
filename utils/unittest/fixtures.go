@@ -809,7 +809,7 @@ func ExecutableBlockFromTransactions(
 		CompleteCollections: completeCollections,
 	}
 	// Preload the id
-	executableBlock.ID()
+	executableBlock.BlockID()
 	return executableBlock
 }
 

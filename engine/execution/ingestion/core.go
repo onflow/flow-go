@@ -309,8 +309,8 @@ func (e *Core) enqueuBlock(block *flow.Block, blockID flow.Identifier) (
 			return nil, nil, fmt.Errorf("unexpected error while reenqueue block to block queue: %w", err)
 		}
 
-		missingColls = flow.Deduplicate(append(missingColls, missing...))
-		executables = flow.Deduplicate(append(executables, execs...))
+		missingColls = append(missingColls, missing...)
+		executables = append(executables, execs...)
 	}
 
 	lg.Info().Bool("parent_is_executed", false).
@@ -345,7 +345,7 @@ func (e *Core) onBlockExecuted(
 		return fmt.Errorf("cannot persist execution state: %w", err)
 	}
 
-	blockID := block.ID()
+	blockID := block.BlockID()
 	lg := e.log.With().
 		Hex("block_id", blockID[:]).
 		Uint64("height", block.Block.Header.Height).
@@ -477,7 +477,7 @@ func (e *Core) execute(ctx context.Context, executable *entity.ExecutableBlock) 
 	}
 
 	e.log.Info().
-		Hex("block_id", logging.Entity(executable)).
+		Str("block_id", executable.BlockID().String()).
 		Uint64("height", executable.Block.Header.Height).
 		Int("collections", len(executable.CompleteCollections)).
 		Msgf("executing block")

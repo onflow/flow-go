@@ -70,5 +70,5 @@ func (u *GCPBucketUploader) Upload(computationResult *execution.ComputationResul
 }
 
 func GCPBlockDataObjectName(computationResult *execution.ComputationResult) string {
-	return fmt.Sprintf("%s.cbor", computationResult.ExecutableBlock.ID().String())
+	return fmt.Sprintf("%s.cbor", computationResult.ExecutableBlock.BlockID().String())
 }

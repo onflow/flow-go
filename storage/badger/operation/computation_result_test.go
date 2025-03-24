@@ -18,7 +18,7 @@ import (
 func TestInsertAndUpdateAndRetrieveComputationResultUpdateStatus(t *testing.T) {
 	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
 		expected := testutil.ComputationResultFixture(t)
-		expectedId := expected.ExecutableBlock.ID()
+		expectedId := expected.ExecutableBlock.BlockID()
 
 		t.Run("Update existing ComputationResult", func(t *testing.T) {
 			// insert as False
@@ -58,7 +58,7 @@ func TestInsertAndUpdateAndRetrieveComputationResultUpdateStatus(t *testing.T) {
 func TestUpsertAndRetrieveComputationResultUpdateStatus(t *testing.T) {
 	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
 		expected := testutil.ComputationResultFixture(t)
-		expectedId := expected.ExecutableBlock.ID()
+		expectedId := expected.ExecutableBlock.BlockID()
 
 		t.Run("Upsert ComputationResult", func(t *testing.T) {
 			// first upsert as false
@@ -90,7 +90,7 @@ func TestUpsertAndRetrieveComputationResultUpdateStatus(t *testing.T) {
 func TestRemoveComputationResultUploadStatus(t *testing.T) {
 	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
 		expected := testutil.ComputationResultFixture(t)
-		expectedId := expected.ExecutableBlock.ID()
+		expectedId := expected.ExecutableBlock.BlockID()
 
 		t.Run("Remove ComputationResult", func(t *testing.T) {
 			testUploadStatusVal := true
@@ -123,7 +123,7 @@ func TestListComputationResults(t *testing.T) {
 			expectedIDs := make(map[string]bool, 0)
 			// Store a list of ComputationResult instances first
 			for _, cr := range expected {
-				expectedId := cr.ExecutableBlock.ID()
+				expectedId := cr.ExecutableBlock.BlockID()
 				expectedIDs[expectedId.String()] = true
 				err := db.Update(InsertComputationResultUploadStatus(expectedId, true))
 				require.NoError(t, err)
