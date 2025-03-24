@@ -46,7 +46,7 @@ func (i *IdentifierMap) Get(key flow.Identifier) (flow.IdentifierList, bool) {
 		}
 
 		ids = make(flow.IdentifierList, 0, len(idsMap))
-		for id, _ := range idsMap {
+		for id := range idsMap {
 			ids = append(ids, id)
 		}
 
@@ -87,7 +87,7 @@ func (i *IdentifierMap) RemoveIdFromKey(key, id flow.Identifier) error {
 func (i *IdentifierMap) Keys() (flow.IdentifierList, bool) {
 	all := i.Backend.All()
 	keys := make(flow.IdentifierList, 0, len(all))
-	for key, _ := range all {
+	for key := range all {
 		keys = append(keys, key)
 	}
 	return keys, true

@@ -444,8 +444,9 @@ func TestChunkResponse_MissingStatus(t *testing.T) {
 
 	chunkLocatorID := statuses[0].ChunkLocatorID()
 
+	var zero *verification.ChunkStatus
 	// mocks there is no pending status for this chunk at fetcher engine.
-	s.pendingChunks.On("Get", chunks.ChunkLocatorID(result.ID(), status.ChunkIndex)).Return(nil, false)
+	s.pendingChunks.On("Get", chunks.ChunkLocatorID(result.ID(), status.ChunkIndex)).Return(zero, false)
 
 	s.metrics.On("OnChunkDataPackArrivedAtFetcher").Return().Times(len(responses))
 	e.HandleChunkDataPack(unittest.IdentifierFixture(), responses[chunkLocatorID])
@@ -465,7 +466,7 @@ func TestChunkResponse_MissingStatus(t *testing.T) {
 }
 
 // TestSkipChunkOfSealedBlock evaluates that if fetcher engine receives a chunk belonging to a sealed block,
-// it drops it without processing it any further and and notifies consumer
+// it drops it without processing it any further and notifies consumer
 // that it is done with processing that chunk.
 func TestSkipChunkOfSealedBlock(t *testing.T) {
 	s := setupTest()
@@ -548,11 +549,10 @@ func TestStopAtHeight(t *testing.T) {
 	// we should not request a duplicate chunk status.
 	s.requester.AssertNotCalled(t, "Request")
 
-	s.pendingChunks.AssertNotCalled(t, "Add", mock.MatchedBy(func(status *verification.ChunkStatus) bool {
+	s.pendingChunks.AssertNotCalled(t, "Add", mock.Anything, mock.MatchedBy(func(status *verification.ChunkStatus) bool {
 		return status.BlockHeight == headerB.Height
 	}))
-
-	s.pendingChunks.AssertCalled(t, "Add", mock.MatchedBy(func(status *verification.ChunkStatus) bool {
+	s.pendingChunks.AssertCalled(t, "Add", mock.Anything, mock.MatchedBy(func(status *verification.ChunkStatus) bool {
 		return status.BlockHeight == headerA.Height
 	}))
 }
@@ -667,21 +667,18 @@ func mockPendingChunksAdd(t *testing.T, pendingChunks *mempool.Mempool[flow.Iden
 func mockPendingChunksRemove(t *testing.T, pendingChunks *mempool.Mempool[flow.Identifier, *verification.ChunkStatus], list []*verification.ChunkStatus, removed bool) {
 	mu := &sync.Mutex{}
 
-	pendingChunks.On("Remove", mock.Anything, mock.Anything).
+	pendingChunks.On("Remove", mock.Anything).
 		Run(func(args mock.Arguments) {
 			// to provide mutual exclusion under concurrent invocations.
 			mu.Lock()
 			defer mu.Unlock()
 
-			actualIndex, ok := args[0].(uint64)
-			require.True(t, ok)
-
-			actualResultID, ok := args[1].(flow.Identifier)
+			actualChunkLocatorID, ok := args[0].(flow.Identifier)
 			require.True(t, ok)
 
 			// there should be a matching chunk status with the received one.
 			for _, expected := range list {
-				if expected.ChunkIndex == actualIndex && expected.ExecutionResult.ID() == actualResultID {
+				if actualChunkLocatorID == expected.ChunkLocatorID() {
 					return
 				}
 			}
@@ -694,22 +691,22 @@ func mockPendingChunksRemove(t *testing.T, pendingChunks *mempool.Mempool[flow.I
 func mockPendingChunksGet(pendingChunks *mempool.Mempool[flow.Identifier, *verification.ChunkStatus], list []*verification.ChunkStatus) {
 	mu := &sync.Mutex{}
 
-	pendingChunks.On("Get", mock.Anything, mock.Anything).Return(
-		func(chunkIndex uint64, resultID flow.Identifier) *verification.ChunkStatus {
+	pendingChunks.On("Get", mock.Anything).Return(
+		func(chunkLocatorID flow.Identifier) *verification.ChunkStatus {
 			// to provide mutual exclusion under concurrent invocations.
 			mu.Lock()
 			defer mu.Unlock()
 
 			for _, expected := range list {
-				if expected.ChunkIndex == chunkIndex && expected.ExecutionResult.ID() == resultID {
+				if expected.ChunkLocatorID() == chunkLocatorID {
 					return expected
 				}
 			}
 			return nil
 		},
-		func(chunkIndex uint64, resultID flow.Identifier) bool {
+		func(chunkLocatorID flow.Identifier) bool {
 			for _, expected := range list {
-				if expected.ChunkIndex == chunkIndex && expected.ExecutionResult.ID() == resultID {
+				if expected.ChunkLocatorID() == chunkLocatorID {
 					return true
 				}
 			}

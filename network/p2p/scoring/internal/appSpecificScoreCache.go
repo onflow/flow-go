@@ -15,12 +15,12 @@ import (
 	"github.com/onflow/flow-go/network/p2p"
 )
 
-// AppSpecificScoreCache is a cache that stores the application specific score of peers.
+// AppSpecificScoreCache is a cache that stores the application specific score of peers by the hash of the peerID.
 // The application specific score of a peer is used to calculate the GossipSub score of the peer.
 // Note that the application specific score and the GossipSub score are solely used by the current peer to select the peers
 // to which it will connect on a topic mesh.
 type AppSpecificScoreCache struct {
-	c *stdmap.Backend
+	c *stdmap.Backend[flow.Identifier, *appSpecificScoreRecord]
 }
 
 var _ p2p.GossipSubApplicationSpecificScoreCache = (*AppSpecificScoreCache)(nil)
@@ -34,14 +34,16 @@ var _ p2p.GossipSubApplicationSpecificScoreCache = (*AppSpecificScoreCache)(nil)
 // Returns:
 // - *AppSpecificScoreCache: the created cache.
 func NewAppSpecificScoreCache(sizeLimit uint32, logger zerolog.Logger, collector module.HeroCacheMetrics) *AppSpecificScoreCache {
-	backData := herocache.NewCache(sizeLimit,
+	backData := herocache.NewCache[*appSpecificScoreRecord](
+		sizeLimit,
 		herocache.DefaultOversizeFactor,
 		heropool.LRUEjection,
 		logger.With().Str("mempool", "gossipsub-app-specific-score-cache").Logger(),
-		collector)
+		collector,
+	)
 
 	return &AppSpecificScoreCache{
-		c: stdmap.NewBackend(stdmap.WithMutableBackData(backData)),
+		c: stdmap.NewBackend(stdmap.WithMutableBackData[flow.Identifier, *appSpecificScoreRecord](backData)),
 	}
 }
 
@@ -53,11 +55,11 @@ func NewAppSpecificScoreCache(sizeLimit uint32, logger zerolog.Logger, collector
 // - time.Time: the time at which the score was last updated.
 // - bool: true if the score was retrieved successfully, false otherwise.
 func (a *AppSpecificScoreCache) Get(peerID peer.ID) (float64, time.Time, bool) {
-	e, ok := a.c.ByID(entityIdOf(peerID))
+	record, ok := a.c.Get(p2p.MakeId(peerID))
 	if !ok {
 		return 0, time.Time{}, false
 	}
-	return e.(appSpecificScoreRecordEntity).Score, e.(appSpecificScoreRecordEntity).LastUpdated, true
+	return record.Score, record.LastUpdated, true
 }
 
 // AdjustWithInit adds the application specific score of a peer to the cache.
@@ -69,23 +71,19 @@ func (a *AppSpecificScoreCache) Get(peerID peer.ID) (float64, time.Time, bool) {
 // Returns:
 // - error on failure to add the score. The returned error is irrecoverable and indicates an exception.
 func (a *AppSpecificScoreCache) AdjustWithInit(peerID peer.ID, score float64, time time.Time) error {
-	entityId := entityIdOf(peerID)
-
-	initLogic := func() flow.Entity {
-		return appSpecificScoreRecordEntity{
-			entityId:    entityId,
+	initLogic := func() *appSpecificScoreRecord {
+		return &appSpecificScoreRecord{
 			PeerID:      peerID,
 			Score:       score,
 			LastUpdated: time,
 		}
 	}
-	adjustLogic := func(entity flow.Entity) flow.Entity {
-		r := entity.(appSpecificScoreRecordEntity)
-		r.Score = score
-		r.LastUpdated = time
-		return r
+	adjustLogic := func(record *appSpecificScoreRecord) *appSpecificScoreRecord {
+		record.Score = score
+		record.LastUpdated = time
+		return record
 	}
-	_, adjusted := a.c.AdjustWithInit(entityId, adjustLogic, initLogic)
+	_, adjusted := a.c.AdjustWithInit(p2p.MakeId(peerID), adjustLogic, initLogic)
 	if !adjusted {
 		return fmt.Errorf("failed to adjust app specific score for peer %s", peerID)
 	}

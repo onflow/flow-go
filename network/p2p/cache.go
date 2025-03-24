@@ -5,6 +5,8 @@ import (
 
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/libp2p/go-libp2p/core/protocol"
+
+	"github.com/onflow/flow-go/model/flow"
 )
 
 // ProtocolPeerCache is an interface that stores a mapping from protocol ID to peers who support that protocol.
@@ -109,4 +111,12 @@ type GossipSubSpamRecord struct {
 	// The decay process is multiplicative (newPenalty = decayRate * oldPenalty) and operates within a range of 0 to 1. At certain regular intervals, the decay adjustment is evaluated and if the node's penalty falls below the set threshold, the decay rate is modified by the reduction factor, such as 0.01. This modification incrementally increases the decay rate. For example, if the decay rate is `x`, adding the reduction factor results in a decay rate of `x + 0.01`, leading to a slower reduction in penalty. Thus, a higher decay rate actually slows down the recovery process, contrary to accelerating it.
 	// The LastDecayAdjustment timestamp is crucial in ensuring balanced and fair penalization, especially important during periods of high message traffic to prevent unintended rapid decay of penalties for malicious nodes.
 	LastDecayAdjustment time.Time
+}
+
+// MakeId is a helper function which converts a peer ID to a flow Identifier by taking the hash of the peer ID.
+// This is not a protocol-level conversion, and is only used internally by the mempool caches, MUST NOT be exposed outside the cache.
+// Returns:
+// - the hash of the peerID as a flow.Identifier.
+func MakeId(peerID peer.ID) flow.Identifier {
+	return flow.MakeID([]byte(peerID))
 }

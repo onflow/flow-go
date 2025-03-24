@@ -75,6 +75,11 @@ func (_m *Mempool[K, V]) All() map[K]V {
 	return r0
 }
 
+// Clear provides a mock function with given fields:
+func (_m *Mempool[K, V]) Clear() {
+	_m.Called()
+}
+
 // Get provides a mock function with given fields: _a0
 func (_m *Mempool[K, V]) Get(_a0 K) (V, bool) {
 	ret := _m.Called(_a0)

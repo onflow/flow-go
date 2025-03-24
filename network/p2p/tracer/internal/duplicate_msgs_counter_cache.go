@@ -12,6 +12,7 @@ import (
 	herocache "github.com/onflow/flow-go/module/mempool/herocache/backdata"
 	"github.com/onflow/flow-go/module/mempool/herocache/backdata/heropool"
 	"github.com/onflow/flow-go/module/mempool/stdmap"
+	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/network/p2p/scoring"
 )
 
@@ -19,9 +20,10 @@ import (
 // from a peer. This count is utilized to calculate a penalty for duplicate messages, which is then applied
 // to the peer's application-specific score. The duplicate message tracker decays over time to prevent perpetual
 // penalization of a peer.
+// Stored duplicate messages counters are keyed by the hash of the peerID.
 type DuplicateMessageTrackerCache struct {
 	// the in-memory and thread-safe cache for storing the spam records of peers.
-	c     *stdmap.Backend
+	c     *stdmap.Backend[flow.Identifier, *duplicateMessagesCounter]
 	decay float64
 	// skipDecayThreshold The threshold for which when the counter is below this value, the decay function will not be called
 	skipDecayThreshold float64
@@ -38,15 +40,17 @@ type DuplicateMessageTrackerCache struct {
 // Returns:
 //   - *DuplicateMessageTrackerCache: the newly created cache with a HeroCache-based backend.
 func NewDuplicateMessageTrackerCache(sizeLimit uint32, decay, skipDecayThreshold float64, logger zerolog.Logger, collector module.HeroCacheMetrics) *DuplicateMessageTrackerCache {
-	backData := herocache.NewCache(sizeLimit,
+	backData := herocache.NewCache[*duplicateMessagesCounter](
+		sizeLimit,
 		herocache.DefaultOversizeFactor,
 		heropool.LRUEjection,
 		logger.With().Str("mempool", "gossipsub=duplicate-message-counter-cache").Logger(),
-		collector)
+		collector,
+	)
 	return &DuplicateMessageTrackerCache{
 		decay:              decay,
 		skipDecayThreshold: skipDecayThreshold,
-		c:                  stdmap.NewBackend(stdmap.WithMutableBackData(backData)),
+		c:                  stdmap.NewBackend(stdmap.WithMutableBackData[flow.Identifier, *duplicateMessagesCounter](backData)),
 	}
 }
 
@@ -56,17 +60,16 @@ func NewDuplicateMessageTrackerCache(sizeLimit uint32, decay, skipDecayThreshold
 //   - exception only in cases of internal data inconsistency or bugs. No errors are expected.
 func (d *DuplicateMessageTrackerCache) DuplicateMessageReceived(peerID peer.ID) (float64, error) {
 	var err error
-	adjustFunc := func(entity flow.Entity) flow.Entity {
-		entity, err = d.decayAdjustment(entity) // first decay the record
+	adjustFunc := func(counter *duplicateMessagesCounter) *duplicateMessagesCounter {
+		counter, err = d.decayAdjustment(counter) // first decay the record
 		if err != nil {
-			return entity
+			return counter
 		}
-		return d.incrementAdjustment(entity) // then increment the record
+		return d.incrementAdjustment(counter) // then increment the record
 	}
 
-	entityId := makeId(peerID)
-	adjustedEntity, adjusted := d.c.AdjustWithInit(entityId, adjustFunc, func() flow.Entity {
-		return newDuplicateMessagesCounter(entityId)
+	adjustedCounter, adjusted := d.c.AdjustWithInit(p2p.MakeId(peerID), adjustFunc, func() *duplicateMessagesCounter {
+		return newDuplicateMessagesCounter()
 	})
 
 	if err != nil {
@@ -77,9 +80,7 @@ func (d *DuplicateMessageTrackerCache) DuplicateMessageReceived(peerID peer.ID) 
 		return 0, fmt.Errorf("adjustment failed for peer %s", peerID)
 	}
 
-	record := mustBeDuplicateMessagesCounterEntity(adjustedEntity)
-
-	return record.Value, nil
+	return adjustedCounter.Value, nil
 }
 
 // GetWithInit returns the current number of duplicate messages received from a peer.
@@ -93,15 +94,14 @@ func (d *DuplicateMessageTrackerCache) DuplicateMessageReceived(peerID peer.ID) 
 // No errors are expected during normal operation, all errors returned are considered irrecoverable.
 func (d *DuplicateMessageTrackerCache) GetWithInit(peerID peer.ID) (float64, bool, error) {
 	var err error
-	adjustLogic := func(entity flow.Entity) flow.Entity {
+	adjustLogic := func(counter *duplicateMessagesCounter) *duplicateMessagesCounter {
 		// perform decay on gauge value
-		entity, err = d.decayAdjustment(entity)
-		return entity
+		counter, err = d.decayAdjustment(counter)
+		return counter
 	}
 
-	entityId := makeId(peerID)
-	adjustedEntity, adjusted := d.c.AdjustWithInit(entityId, adjustLogic, func() flow.Entity {
-		return newDuplicateMessagesCounter(entityId)
+	adjustedCounter, adjusted := d.c.AdjustWithInit(p2p.MakeId(peerID), adjustLogic, func() *duplicateMessagesCounter {
+		return newDuplicateMessagesCounter()
 	})
 	if err != nil {
 		return 0, false, fmt.Errorf("unexpected error while applying decay adjustment for peer %s: %w", peerID, err)
@@ -110,14 +110,11 @@ func (d *DuplicateMessageTrackerCache) GetWithInit(peerID peer.ID) (float64, boo
 		return 0, false, fmt.Errorf("decay adjustment failed for peer %s", peerID)
 	}
 
-	counter := mustBeDuplicateMessagesCounterEntity(adjustedEntity)
-
-	return counter.Value, true, nil
+	return adjustedCounter.Value, true, nil
 }
 
-// incrementAdjustment performs a cache adjustment that increments the guage for the duplicateMessagesCounterEntity
-func (d *DuplicateMessageTrackerCache) incrementAdjustment(entity flow.Entity) flow.Entity {
-	counter := mustBeDuplicateMessagesCounterEntity(entity)
+// incrementAdjustment performs a cache adjustment that increments the guage for the duplicateMessagesCounter
+func (d *DuplicateMessageTrackerCache) incrementAdjustment(counter *duplicateMessagesCounter) *duplicateMessagesCounter {
 	counter.Value++
 	counter.lastUpdated = time.Now()
 	// Return the adjusted counter.
@@ -126,8 +123,7 @@ func (d *DuplicateMessageTrackerCache) incrementAdjustment(entity flow.Entity) f
 
 // decayAdjustment performs geometric recordDecay on the duplicate message counter gauge of a peer. This ensures a peer is not penalized forever.
 // All errors returned from this function are unexpected and irrecoverable.
-func (d *DuplicateMessageTrackerCache) decayAdjustment(entity flow.Entity) (flow.Entity, error) {
-	counter := mustBeDuplicateMessagesCounterEntity(entity)
+func (d *DuplicateMessageTrackerCache) decayAdjustment(counter *duplicateMessagesCounter) (*duplicateMessagesCounter, error) {
 	duplicateMessages := counter.Value
 	if duplicateMessages == 0 {
 		return counter, nil

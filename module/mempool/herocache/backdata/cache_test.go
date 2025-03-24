@@ -478,8 +478,9 @@ func TestArrayBackData_Remove(t *testing.T) {
 // and each entity is retrievable right after it is written to backdata.
 func testAddEntities(t *testing.T, bd *Cache[*unittest.MockEntity], entities []*unittest.MockEntity, ejection heropool.EjectionMode) {
 	// initially, head should be undefined
-	e, ok := bd.Head()
+	k, e, ok := bd.Head()
 	require.False(t, ok)
+	require.Equal(t, flow.ZeroID, k)
 	require.Nil(t, e)
 
 	// adding elements
@@ -489,9 +490,11 @@ func testAddEntities(t *testing.T, bd *Cache[*unittest.MockEntity], entities []*
 			require.False(t, bd.Add(e.ID(), e))
 
 			// the head should retrieve the first added entity.
-			headEntity, headExists := bd.Head()
+			headKey, headEntity, headExists := bd.Head()
 			require.True(t, headExists)
-			require.Equal(t, headEntity.ID(), entities[0].ID())
+			expectedID := entities[0].ID()
+			require.Equal(t, expectedID, headKey)
+			require.Equal(t, expectedID, headEntity.ID())
 		} else {
 			// adding each element must be successful.
 			require.True(t, bd.Add(e.ID(), e))
@@ -502,9 +505,11 @@ func testAddEntities(t *testing.T, bd *Cache[*unittest.MockEntity], entities []*
 				require.Equal(t, bd.Size(), uint(i+1))
 
 				// in case cache is not full, the head should retrieve the first added entity.
-				headEntity, headExists := bd.Head()
+				headKey, headEntity, headExists := bd.Head()
 				require.True(t, headExists)
-				require.Equal(t, headEntity.ID(), entities[0].ID())
+				expectedID := entities[0].ID()
+				require.Equal(t, expectedID, headKey)
+				require.Equal(t, expectedID, headEntity.ID())
 			} else {
 				// when we cross the limit, the ejection kicks in, and
 				// size must be steady at the limit.
