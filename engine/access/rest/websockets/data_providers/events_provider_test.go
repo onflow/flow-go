@@ -193,7 +193,6 @@ func (s *EventsProviderSuite) expectedEventsResponses(
 
 // TestMessageIndexEventProviderResponse_HappyPath tests that MessageIndex values in response are strictly increasing.
 func (s *EventsProviderSuite) TestMessageIndexEventProviderResponse_HappyPath() {
-	ctx := context.Background()
 	send := make(chan interface{}, 10)
 	topic := EventsTopic
 	eventsCount := 4
@@ -218,7 +217,7 @@ func (s *EventsProviderSuite) TestMessageIndexEventProviderResponse_HappyPath() 
 
 	// Create the EventsDataProvider instance
 	provider, err := NewEventsDataProvider(
-		ctx,
+		context.Background(),
 		s.log,
 		s.api,
 		"dummy-id",
@@ -287,15 +286,13 @@ func (s *EventsProviderSuite) TestMessageIndexEventProviderResponse_HappyPath() 
 // 2. Invalid 'start_block_id' argument.
 // 3. Invalid 'start_block_height' argument.
 func (s *EventsProviderSuite) TestEventsDataProvider_InvalidArguments() {
-	ctx := context.Background()
 	send := make(chan interface{})
-
 	topic := EventsTopic
 
 	for _, test := range invalidEventsArgumentsTestCases() {
 		s.Run(test.name, func() {
 			provider, err := NewEventsDataProvider(
-				ctx,
+				context.Background(),
 				s.log,
 				s.api,
 				"dummy-id",
@@ -314,13 +311,11 @@ func (s *EventsProviderSuite) TestEventsDataProvider_InvalidArguments() {
 }
 
 func (s *EventsProviderSuite) TestEventsDataProvider_StateStreamNotConfigured() {
-	ctx := context.Background()
 	send := make(chan interface{})
-
 	topic := EventsTopic
 
 	provider, err := NewEventsDataProvider(
-		ctx,
+		context.Background(),
 		s.log,
 		nil,
 		"dummy-id",

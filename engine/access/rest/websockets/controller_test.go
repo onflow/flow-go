@@ -62,7 +62,7 @@ func (s *WsControllerSuite) TestSubscribeRequest() {
 		// data provider might finish on its own or controller will close it via Close()
 		dataProvider.On("Close").Return(nil).Maybe()
 		dataProvider.
-			On("Run").
+			On("Run", mock.Anything).
 			Run(func(args mock.Arguments) {
 				<-done
 			}).
@@ -206,7 +206,7 @@ func (s *WsControllerSuite) TestSubscribeRequest() {
 		// data provider might finish on its own or controller will close it via Close()
 		dataProvider.On("Close").Return(nil).Maybe()
 		dataProvider.
-			On("Run").
+			On("Run", mock.Anything).
 			Run(func(args mock.Arguments) {}).
 			Return(fmt.Errorf("error running data provider")).
 			Once()
@@ -261,7 +261,7 @@ func (s *WsControllerSuite) TestUnsubscribeRequest() {
 		// data provider might finish on its own or controller will close it via Close()
 		dataProvider.On("Close").Return(nil).Maybe()
 		dataProvider.
-			On("Run").
+			On("Run", mock.Anything).
 			Run(func(args mock.Arguments) {
 				<-done
 			}).
@@ -329,7 +329,7 @@ func (s *WsControllerSuite) TestUnsubscribeRequest() {
 		// data provider might finish on its own or controller will close it via Close()
 		dataProvider.On("Close").Return(nil).Maybe()
 		dataProvider.
-			On("Run").
+			On("Run", mock.Anything).
 			Run(func(args mock.Arguments) {
 				<-done
 			}).
@@ -399,7 +399,7 @@ func (s *WsControllerSuite) TestUnsubscribeRequest() {
 		// data provider might finish on its own or controller will close it via Close()
 		dataProvider.On("Close").Return(nil).Maybe()
 		dataProvider.
-			On("Run").
+			On("Run", mock.Anything).
 			Run(func(args mock.Arguments) {
 				<-done
 			}).
@@ -480,7 +480,7 @@ func (s *WsControllerSuite) TestListSubscriptions() {
 		// data provider might finish on its own or controller will close it via Close()
 		dataProvider.On("Close").Return(nil).Maybe()
 		dataProvider.
-			On("Run").
+			On("Run", mock.Anything).
 			Run(func(args mock.Arguments) {
 				<-done
 			}).

@@ -52,7 +52,6 @@ func testHappyPath(
 ) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			ctx := context.Background()
 			send := make(chan interface{}, 10)
 
 			// Create a channel to simulate the subscription's data channel
@@ -65,7 +64,7 @@ func testHappyPath(
 			test.setupBackend(sub)
 
 			// Create the data provider instance
-			provider, err := factory.NewDataProvider(ctx, "dummy-id", topic, test.arguments, send)
+			provider, err := factory.NewDataProvider(context.Background(), "dummy-id", topic, test.arguments, send)
 			require.NoError(t, err)
 			require.NotNil(t, provider)
 
@@ -108,7 +107,8 @@ func extractPayload[T any](t *testing.T, v interface{}) (*models.BaseDataProvide
 	require.True(t, ok, "Expected *models.BaseDataProvidersResponse, got %T", v)
 
 	payload, ok := response.Payload.(T)
-	require.True(t, ok, "Unexpected response payload type: %T", response.Payload)
+	var empty T
+	require.True(t, ok, "Unexpected response payload type, got: %T, expect: %T", response.Payload, empty)
 
 	return response, payload
 }

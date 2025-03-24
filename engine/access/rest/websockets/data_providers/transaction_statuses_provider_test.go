@@ -167,7 +167,6 @@ func (s *TransactionStatusesProviderSuite) expectedTransactionStatusesResponses(
 
 // TestMessageIndexTransactionStatusesProviderResponse_HappyPath tests that MessageIndex values in response are strictly increasing.
 func (s *TransactionStatusesProviderSuite) TestMessageIndexTransactionStatusesProviderResponse_HappyPath() {
-	ctx := context.Background()
 	send := make(chan interface{}, 10)
 	topic := TransactionStatusesTopic
 	txStatusesCount := 4
@@ -200,7 +199,7 @@ func (s *TransactionStatusesProviderSuite) TestMessageIndexTransactionStatusesPr
 
 	// Create the TransactionStatusesDataProvider instance
 	provider, err := NewTransactionStatusesDataProvider(
-		ctx,
+		context.Background(),
 		s.log,
 		s.api,
 		"dummy-id",
@@ -212,7 +211,7 @@ func (s *TransactionStatusesProviderSuite) TestMessageIndexTransactionStatusesPr
 	s.Require().NoError(err)
 	s.Require().NotNil(provider)
 
-	// Ensure the provider is properly closed after the test
+	// Ensure the provider is properly doneOnce after the test
 	defer provider.Close()
 
 	// Run the provider in a separate goroutine to simulate subscription processing
@@ -263,7 +262,6 @@ func (s *TransactionStatusesProviderSuite) TestMessageIndexTransactionStatusesPr
 // when invalid arguments are provided. It verifies that appropriate errors are returned
 // for missing or conflicting arguments.
 func (s *TransactionStatusesProviderSuite) TestTransactionStatusesDataProvider_InvalidArguments() {
-	ctx := context.Background()
 	send := make(chan interface{})
 
 	topic := TransactionStatusesTopic
@@ -271,7 +269,7 @@ func (s *TransactionStatusesProviderSuite) TestTransactionStatusesDataProvider_I
 	for _, test := range invalidTransactionStatusesArgumentsTestCases() {
 		s.Run(test.name, func() {
 			provider, err := NewTransactionStatusesDataProvider(
-				ctx,
+				context.Background(),
 				s.log,
 				s.api,
 				"dummy-id",

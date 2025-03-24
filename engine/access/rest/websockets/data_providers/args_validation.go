@@ -37,21 +37,21 @@ func extractArrayOfStrings(args models.Arguments, name string, required bool) ([
 }
 
 // extractHeartbeatInterval extracts 'heartbeat_interval' argument which is always optional
-func extractHeartbeatInterval(args models.Arguments) (*uint64, error) {
+func extractHeartbeatInterval(args models.Arguments, defaultHeartbeatInterval uint64) (uint64, error) {
 	heartbeatIntervalRaw, exists := args["heartbeat_interval"]
 	if !exists {
-		return nil, nil
+		return defaultHeartbeatInterval, nil
 	}
 
 	heartbeatIntervalString, ok := heartbeatIntervalRaw.(string)
 	if !ok {
-		return nil, fmt.Errorf("'heartbeat_interval' must be a string")
+		return 0, fmt.Errorf("'heartbeat_interval' must be a string")
 	}
 
 	heartbeatInterval, err := strconv.ParseUint(heartbeatIntervalString, 10, 64)
 	if err != nil {
-		return nil, fmt.Errorf("'heartbeat_interval' must be convertible to uint64: %w", err)
+		return 0, fmt.Errorf("'heartbeat_interval' must be convertible to uint64: %w", err)
 	}
 
-	return &heartbeatInterval, nil
+	return heartbeatInterval, nil
 }

@@ -215,12 +215,11 @@ func (s *BlocksProviderSuite) expectedBlockResponses(
 // when invalid arguments are provided. It verifies that appropriate errors are returned
 // for missing or conflicting arguments.
 func (s *BlocksProviderSuite) TestBlocksDataProvider_InvalidArguments() {
-	ctx := context.Background()
 	send := make(chan interface{})
 
 	for _, test := range s.invalidArgumentsTestCases() {
 		s.Run(test.name, func() {
-			provider, err := NewBlocksDataProvider(ctx, s.log, s.api, "dummy-id", nil, BlocksTopic, test.arguments, send)
+			provider, err := NewBlocksDataProvider(context.Background(), s.log, s.api, "dummy-id", nil, BlocksTopic, test.arguments, send)
 			s.Require().Error(err)
 			s.Require().Nil(provider)
 			s.Require().Contains(err.Error(), test.expectedErrorMsg)

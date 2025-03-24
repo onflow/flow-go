@@ -123,15 +123,13 @@ func (s *SendTransactionStatusesProviderSuite) requireTransactionStatuses(
 // when invalid arguments are provided. It verifies that appropriate errors are returned
 // for missing or conflicting arguments.
 func (s *SendTransactionStatusesProviderSuite) TestSendTransactionStatusesDataProvider_InvalidArguments() {
-	ctx := context.Background()
 	send := make(chan interface{})
-
 	topic := SendAndGetTransactionStatusesTopic
 
 	for _, test := range invalidSendTransactionStatusesArgumentsTestCases() {
 		s.Run(test.name, func() {
 			provider, err := NewSendAndGetTransactionStatusesDataProvider(
-				ctx,
+				context.Background(),
 				s.log,
 				s.api,
 				"dummy-id",
