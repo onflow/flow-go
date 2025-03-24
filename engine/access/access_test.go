@@ -634,14 +634,10 @@ func (suite *Suite) TestGetSealedTransaction() {
 		metrics := metrics.NewNoopCollector()
 		transactions := bstorage.NewTransactions(metrics, db)
 		collections := bstorage.NewCollections(db, transactions)
-		collectionsToMarkFinalized, err := stdmap.NewTimes(100)
-		require.NoError(suite.T(), err)
-		collectionsToMarkExecuted, err := stdmap.NewTimes(100)
-		require.NoError(suite.T(), err)
-		blocksToMarkExecuted, err := stdmap.NewTimes(100)
-		require.NoError(suite.T(), err)
-		blockTransactions, err := stdmap.NewIdentifierMap(100)
-		require.NoError(suite.T(), err)
+		collectionsToMarkFinalized := stdmap.NewTimes(100)
+		collectionsToMarkExecuted := stdmap.NewTimes(100)
+		blocksToMarkExecuted := stdmap.NewTimes(100)
+		blockTransactions := stdmap.NewIdentifierMap(100)
 
 		execNodeIdentitiesProvider := commonrpc.NewExecutionNodeIdentitiesProvider(
 			suite.log,
@@ -824,14 +820,10 @@ func (suite *Suite) TestGetTransactionResult() {
 		collections := bstorage.NewCollections(db, transactions)
 		err = collections.Store(collectionNegative)
 		require.NoError(suite.T(), err)
-		collectionsToMarkFinalized, err := stdmap.NewTimes(100)
-		require.NoError(suite.T(), err)
-		collectionsToMarkExecuted, err := stdmap.NewTimes(100)
-		require.NoError(suite.T(), err)
-		blocksToMarkExecuted, err := stdmap.NewTimes(100)
-		require.NoError(suite.T(), err)
-		blockTransactions, err := stdmap.NewIdentifierMap(100)
-		require.NoError(suite.T(), err)
+		collectionsToMarkFinalized := stdmap.NewTimes(100)
+		collectionsToMarkExecuted := stdmap.NewTimes(100)
+		blocksToMarkExecuted := stdmap.NewTimes(100)
+		blockTransactions := stdmap.NewIdentifierMap(100)
 
 		execNodeIdentitiesProvider := commonrpc.NewExecutionNodeIdentitiesProvider(
 			suite.log,
@@ -1107,14 +1099,10 @@ func (suite *Suite) TestExecuteScript() {
 
 		// initialize metrics related storage
 		metrics := metrics.NewNoopCollector()
-		collectionsToMarkFinalized, err := stdmap.NewTimes(100)
-		require.NoError(suite.T(), err)
-		collectionsToMarkExecuted, err := stdmap.NewTimes(100)
-		require.NoError(suite.T(), err)
-		blocksToMarkExecuted, err := stdmap.NewTimes(100)
-		require.NoError(suite.T(), err)
-		blockTransactions, err := stdmap.NewIdentifierMap(100)
-		require.NoError(suite.T(), err)
+		collectionsToMarkFinalized := stdmap.NewTimes(100)
+		collectionsToMarkExecuted := stdmap.NewTimes(100)
+		blocksToMarkExecuted := stdmap.NewTimes(100)
+		blockTransactions := stdmap.NewIdentifierMap(100)
 
 		collectionExecutedMetric, err := indexer.NewCollectionExecutedMetricImpl(
 			suite.log,

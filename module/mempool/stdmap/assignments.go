@@ -12,6 +12,6 @@ type Assignments struct {
 }
 
 // NewAssignments creates a new memory pool for Assignments.
-func NewAssignments(limit uint) (*Assignments, error) {
-	return &Assignments{NewBackend(WithLimit[flow.Identifier, *chunkmodels.Assignment](limit))}, nil
+func NewAssignments(limit uint) *Assignments {
+	return &Assignments{NewBackend(WithLimit[flow.Identifier, *chunkmodels.Assignment](limit))}
 }

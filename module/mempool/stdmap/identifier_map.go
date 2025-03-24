@@ -13,8 +13,8 @@ type IdentifierMap struct {
 }
 
 // NewIdentifierMap creates a new memory pool for sets of Identifier (keyed by some Identifier).
-func NewIdentifierMap(limit uint) (*IdentifierMap, error) {
-	return &IdentifierMap{NewBackend(WithLimit[flow.Identifier, map[flow.Identifier]struct{}](limit))}, nil
+func NewIdentifierMap(limit uint) *IdentifierMap {
+	return &IdentifierMap{NewBackend(WithLimit[flow.Identifier, map[flow.Identifier]struct{}](limit))}
 }
 
 // Append will add the id to the set of identifiers associated with key.
