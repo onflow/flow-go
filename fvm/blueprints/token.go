@@ -143,20 +143,17 @@ func MintFlowTokenTransaction(
 }
 
 func TransferFlowTokenTransaction(
-	authorizer, to flow.Address,
-	amount string,
 	env templates.Environment,
+	from, to flow.Address,
+	amount string,
 ) *flow.TransactionBody {
 	cadenceAmount, _ := cadence.NewUFix64(amount)
 	txScript := templates.GenerateTransferGenericVaultWithAddressScript(env)
 	return flow.NewTransactionBody().
-		SetScript([]byte(
-			txScript,
-		),
-		).
+		SetScript(txScript).
 		AddArgument(jsoncdc.MustEncode(cadenceAmount)).
 		AddArgument(jsoncdc.MustEncode(cadence.NewAddress(to))).
 		AddArgument(jsoncdc.MustEncode(cadence.NewAddress(flow.HexToAddress(env.FlowTokenAddress)))).
 		AddArgument(jsoncdc.MustEncode(cadence.String("FlowToken"))).
-		AddAuthorizer(authorizer)
+		AddAuthorizer(from)
 }
