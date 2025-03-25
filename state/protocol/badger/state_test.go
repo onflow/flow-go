@@ -744,12 +744,12 @@ func snapshotAfter(t *testing.T, rootSnapshot protocol.Snapshot, f func(*bprotoc
 
 // buildBlock extends the protocol state by the given block
 func buildBlock(t *testing.T, state protocol.FollowerState, block *flow.Block) {
-	require.NoError(t, state.ExtendCertified(context.Background(), block, unittest.CertifyBlock(block.Header)))
+	require.NoError(t, state.ExtendCertified(context.Background(), unittest.NewCertifiedBlock(block)))
 }
 
 // buildFinalizedBlock extends the protocol state by the given block and marks the block as finalized
 func buildFinalizedBlock(t *testing.T, state protocol.FollowerState, block *flow.Block) {
-	require.NoError(t, state.ExtendCertified(context.Background(), block, unittest.CertifyBlock(block.Header)))
+	require.NoError(t, state.ExtendCertified(context.Background(), unittest.NewCertifiedBlock(block)))
 	require.NoError(t, state.Finalize(context.Background(), block.ID()))
 }
 

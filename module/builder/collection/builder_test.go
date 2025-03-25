@@ -341,8 +341,7 @@ func (suite *BuilderSuite) TestBuildOn_WithUnfinalizedReferenceBlock() {
 
 	unfinalizedReferenceBlock := unittest.BlockWithParentFixture(genesis)
 	unfinalizedReferenceBlock.SetPayload(unittest.PayloadFixture(unittest.WithProtocolStateID(protocolStateID)))
-	err = suite.protoState.ExtendCertified(context.Background(), unfinalizedReferenceBlock,
-		unittest.CertifyBlock(unfinalizedReferenceBlock.Header))
+	err = suite.protoState.ExtendCertified(context.Background(), unittest.NewCertifiedBlock(unfinalizedReferenceBlock))
 	suite.Require().NoError(err)
 
 	// add a transaction with unfinalized reference block to the pool
@@ -382,12 +381,12 @@ func (suite *BuilderSuite) TestBuildOn_WithOrphanedReferenceBlock() {
 	// create a block extending genesis which will be orphaned
 	orphan := unittest.BlockWithParentFixture(genesis)
 	orphan.SetPayload(unittest.PayloadFixture(unittest.WithProtocolStateID(protocolStateID)))
-	err = suite.protoState.ExtendCertified(context.Background(), orphan, unittest.CertifyBlock(orphan.Header))
+	err = suite.protoState.ExtendCertified(context.Background(), unittest.NewCertifiedBlock(orphan))
 	suite.Require().NoError(err)
 	// create and finalize a block on top of genesis, orphaning `orphan`
 	block1 := unittest.BlockWithParentFixture(genesis)
 	block1.SetPayload(unittest.PayloadFixture(unittest.WithProtocolStateID(protocolStateID)))
-	err = suite.protoState.ExtendCertified(context.Background(), block1, unittest.CertifyBlock(block1.Header))
+	err = suite.protoState.ExtendCertified(context.Background(), unittest.NewCertifiedBlock(block1))
 	suite.Require().NoError(err)
 	err = suite.protoState.Finalize(context.Background(), block1.ID())
 	suite.Require().NoError(err)
@@ -697,7 +696,7 @@ func (suite *BuilderSuite) TestBuildOn_ExpiredTransaction() {
 	for i := 0; i < flow.DefaultTransactionExpiry+1; i++ {
 		block := unittest.BlockWithParentFixture(head)
 		block.SetPayload(unittest.PayloadFixture(unittest.WithProtocolStateID(protocolStateID)))
-		err = suite.protoState.ExtendCertified(context.Background(), block, unittest.CertifyBlock(block.Header))
+		err = suite.protoState.ExtendCertified(context.Background(), unittest.NewCertifiedBlock(block))
 		suite.Require().NoError(err)
 		err = suite.protoState.Finalize(context.Background(), block.ID())
 		suite.Require().NoError(err)

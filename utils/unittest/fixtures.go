@@ -2021,6 +2021,20 @@ func CertifyBlock(header *flow.Header) *flow.QuorumCertificate {
 	return qc
 }
 
+func CertifiedByChild(block *flow.Block, child *flow.Block) *flow.CertifiedBlock {
+	return &flow.CertifiedBlock{
+		Block:        block,
+		CertifyingQC: child.Header.QuorumCertificate(),
+	}
+}
+
+func NewCertifiedBlock(block *flow.Block) *flow.CertifiedBlock {
+	return &flow.CertifiedBlock{
+		Block:        block,
+		CertifyingQC: CertifyBlock(block.Header),
+	}
+}
+
 func QuorumCertificatesFixtures(
 	n uint,
 	opts ...func(*flow.QuorumCertificate),

@@ -2650,7 +2650,7 @@ func TestHeaderExtendValid(t *testing.T) {
 		extend := unittest.BlockWithParentFixture(head)
 		extend.SetPayload(unittest.PayloadFixture(unittest.WithProtocolStateID(rootProtocolStateID)))
 
-		err = state.ExtendCertified(context.Background(), extend, unittest.CertifyBlock(extend.Header))
+		err = state.ExtendCertified(context.Background(), unittest.NewCertifiedBlock(extend))
 		require.NoError(t, err)
 
 		finalCommit, err := state.Final().Commit()
@@ -2670,7 +2670,7 @@ func TestHeaderExtendMissingParent(t *testing.T) {
 		extend.Header.ParentID = unittest.BlockFixture().ID()
 		extend.Header.PayloadHash = extend.Payload.Hash()
 
-		err := state.ExtendCertified(context.Background(), &extend, unittest.CertifyBlock(extend.Header))
+		err := state.ExtendCertified(context.Background(), unittest.NewCertifiedBlock(&extend))
 		require.Error(t, err)
 		require.False(t, st.IsInvalidExtensionError(err), err)
 
@@ -2699,10 +2699,10 @@ func TestHeaderExtendHeightTooSmall(t *testing.T) {
 		block2 := unittest.BlockWithParentFixture(block1.Header)
 		block2.Header.Height = block1.Header.Height
 
-		err = state.ExtendCertified(context.Background(), block1, block2.Header.QuorumCertificate())
+		err = state.ExtendCertified(context.Background(), unittest.CertifiedByChild(block1, block2))
 		require.NoError(t, err)
 
-		err = state.ExtendCertified(context.Background(), block2, unittest.CertifyBlock(block2.Header))
+		err = state.ExtendCertified(context.Background(), unittest.NewCertifiedBlock(block2))
 		require.False(t, st.IsInvalidExtensionError(err))
 
 		// verify seal not indexed
@@ -2723,7 +2723,7 @@ func TestHeaderExtendHeightTooLarge(t *testing.T) {
 		// set an invalid height
 		block.Header.Height = head.Height + 2
 
-		err = state.ExtendCertified(context.Background(), block, unittest.CertifyBlock(block.Header))
+		err = state.ExtendCertified(context.Background(), unittest.NewCertifiedBlock(block))
 		require.False(t, st.IsInvalidExtensionError(err))
 	})
 }
@@ -2744,7 +2744,7 @@ func TestExtendBlockProcessable(t *testing.T) {
 
 		// extend block using certifying QC, expect that BlockProcessable will be emitted once
 		consumer.On("BlockProcessable", block.Header, child.Header.QuorumCertificate()).Once()
-		err := state.ExtendCertified(context.Background(), block, child.Header.QuorumCertificate())
+		err := state.ExtendCertified(context.Background(), unittest.CertifiedByChild(block, child))
 		require.NoError(t, err)
 
 		// extend block without certifying QC, expect that BlockProcessable won't be called
@@ -2754,10 +2754,10 @@ func TestExtendBlockProcessable(t *testing.T) {
 
 		// extend block using certifying QC, expect that BlockProcessable will be emitted twice.
 		// One for parent block and second for current block.
-		grandChildCertifyingQC := unittest.CertifyBlock(grandChild.Header)
+		certifiedGrandchild := unittest.NewCertifiedBlock(grandChild)
 		consumer.On("BlockProcessable", child.Header, grandChild.Header.QuorumCertificate()).Once()
-		consumer.On("BlockProcessable", grandChild.Header, grandChildCertifyingQC).Once()
-		err = state.ExtendCertified(context.Background(), grandChild, grandChildCertifyingQC)
+		consumer.On("BlockProcessable", grandChild.Header, certifiedGrandchild.CertifyingQC).Once()
+		err = state.ExtendCertified(context.Background(), certifiedGrandchild)
 		require.NoError(t, err)
 	})
 }
@@ -2776,7 +2776,7 @@ func TestFollowerHeaderExtendBlockNotConnected(t *testing.T) {
 
 		block1 := unittest.BlockWithParentFixture(head)
 		block1.SetPayload(unittest.PayloadFixture(unittest.WithProtocolStateID(rootProtocolStateID)))
-		err = state.ExtendCertified(context.Background(), block1, unittest.CertifyBlock(block1.Header))
+		err = state.ExtendCertified(context.Background(), unittest.NewCertifiedBlock(block1))
 		require.NoError(t, err)
 
 		err = state.Finalize(context.Background(), block1.ID())
@@ -2785,7 +2785,7 @@ func TestFollowerHeaderExtendBlockNotConnected(t *testing.T) {
 		// create a fork at view/height 1 and try to connect it to root
 		block2 := unittest.BlockWithParentFixture(head)
 		block2.SetPayload(unittest.PayloadFixture(unittest.WithProtocolStateID(rootProtocolStateID)))
-		err = state.ExtendCertified(context.Background(), block2, unittest.CertifyBlock(block2.Header))
+		err = state.ExtendCertified(context.Background(), unittest.NewCertifiedBlock(block2))
 		require.NoError(t, err)
 
 		// verify seal not indexed
@@ -2840,7 +2840,7 @@ func TestHeaderExtendHighestSeal(t *testing.T) {
 
 		block3 := unittest.BlockWithParentProtocolState(block2)
 
-		err := state.ExtendCertified(context.Background(), block2, block3.Header.QuorumCertificate())
+		err := state.ExtendCertified(context.Background(), unittest.CertifiedByChild(block2, block3))
 		require.NoError(t, err)
 
 		// create receipts and seals for block2 and block3
@@ -2864,13 +2864,13 @@ func TestHeaderExtendHighestSeal(t *testing.T) {
 			unittest.WithProtocolStateID(rootProtocolStateID),
 		))
 
-		err = state.ExtendCertified(context.Background(), block3, block4.Header.QuorumCertificate())
+		err = state.ExtendCertified(context.Background(), unittest.CertifiedByChild(block3, block4))
 		require.NoError(t, err)
 
-		err = state.ExtendCertified(context.Background(), block4, block5.Header.QuorumCertificate())
+		err = state.ExtendCertified(context.Background(), unittest.CertifiedByChild(block4, block5))
 		require.NoError(t, err)
 
-		err = state.ExtendCertified(context.Background(), block5, unittest.CertifyBlock(block5.Header))
+		err = state.ExtendCertified(context.Background(), unittest.NewCertifiedBlock(block5))
 		require.NoError(t, err)
 
 		finalCommit, err := state.AtBlockID(block5.ID()).Commit()
@@ -2890,16 +2890,16 @@ func TestExtendCertifiedInvalidQC(t *testing.T) {
 		block.SetPayload(flow.EmptyPayload())
 
 		t.Run("qc-invalid-view", func(t *testing.T) {
-			certifyingQC := unittest.CertifyBlock(block.Header)
-			certifyingQC.View++ // invalidate block view
-			err = state.ExtendCertified(context.Background(), block, certifyingQC)
+			certified := unittest.NewCertifiedBlock(block)
+			certified.CertifyingQC.View++ // invalidate block view
+			err = state.ExtendCertified(context.Background(), certified)
 			require.Error(t, err)
 			require.False(t, st.IsOutdatedExtensionError(err))
 		})
 		t.Run("qc-invalid-block-id", func(t *testing.T) {
-			certifyingQC := unittest.CertifyBlock(block.Header)
-			certifyingQC.BlockID = unittest.IdentifierFixture() // invalidate blockID
-			err = state.ExtendCertified(context.Background(), block, certifyingQC)
+			certified := unittest.NewCertifiedBlock(block)
+			certified.CertifyingQC.BlockID = unittest.IdentifierFixture() // invalidate blockID
+			err = state.ExtendCertified(context.Background(), certified)
 			require.Error(t, err)
 			require.False(t, st.IsOutdatedExtensionError(err))
 		})
@@ -3035,7 +3035,7 @@ func TestSealed(t *testing.T) {
 			unittest.WithProtocolStateID(rootProtocolStateID),
 		))
 
-		err = state.ExtendCertified(context.Background(), block1, block2.Header.QuorumCertificate())
+		err = state.ExtendCertified(context.Background(), unittest.CertifiedByChild(block1, block2))
 		require.NoError(t, err)
 		err = state.Finalize(context.Background(), block1.ID())
 		require.NoError(t, err)
@@ -3047,12 +3047,12 @@ func TestSealed(t *testing.T) {
 			ProtocolStateID: rootProtocolStateID,
 		})
 
-		err = state.ExtendCertified(context.Background(), block2, block3.Header.QuorumCertificate())
+		err = state.ExtendCertified(context.Background(), unittest.CertifiedByChild(block2, block3))
 		require.NoError(t, err)
 		err = state.Finalize(context.Background(), block2.ID())
 		require.NoError(t, err)
 
-		err = state.ExtendCertified(context.Background(), block3, unittest.CertifyBlock(block3.Header))
+		err = state.ExtendCertified(context.Background(), unittest.NewCertifiedBlock(block3))
 		require.NoError(t, err)
 		err = state.Finalize(context.Background(), block3.ID())
 		require.NoError(t, err)
@@ -3098,7 +3098,7 @@ func TestCacheAtomicity(t *testing.T) {
 
 			// storing the block to database, which supposed to be atomic updates to headers and index,
 			// both to badger database and the cache.
-			err = state.ExtendCertified(context.Background(), block, unittest.CertifyBlock(block.Header))
+			err = state.ExtendCertified(context.Background(), unittest.NewCertifiedBlock(block))
 			require.NoError(t, err)
 			wg.Wait()
 		})
@@ -3177,11 +3177,11 @@ func TestProtocolStateIdempotent(t *testing.T) {
 		util.RunWithFollowerProtocolState(t, rootSnapshot, func(db *badger.DB, state *protocol.FollowerState) {
 			block := unittest.BlockWithParentFixture(head)
 			block.SetPayload(unittest.PayloadFixture(unittest.WithProtocolStateID(rootProtocolStateID)))
-			err := state.ExtendCertified(context.Background(), block, unittest.CertifyBlock(block.Header))
+			err := state.ExtendCertified(context.Background(), unittest.NewCertifiedBlock(block))
 			require.NoError(t, err)
 
 			// same operation should be no-op
-			err = state.ExtendCertified(context.Background(), block, unittest.CertifyBlock(block.Header))
+			err = state.ExtendCertified(context.Background(), unittest.NewCertifiedBlock(block))
 			require.NoError(t, err)
 		})
 	})
@@ -3196,7 +3196,7 @@ func TestProtocolStateIdempotent(t *testing.T) {
 			err = state.Extend(context.Background(), unittest.ProposalFromBlock(block))
 			require.NoError(t, err)
 
-			err = state.ExtendCertified(context.Background(), block, unittest.CertifyBlock(block.Header))
+			err = state.ExtendCertified(context.Background(), unittest.NewCertifiedBlock(block))
 			require.NoError(t, err)
 		})
 	})

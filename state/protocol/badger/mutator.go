@@ -148,7 +148,9 @@ func NewFullConsensusState(
 // potentially very often.
 //
 // No errors are expected during normal operations.
-func (m *FollowerState) ExtendCertified(ctx context.Context, candidate *flow.Block, certifyingQC *flow.QuorumCertificate) error {
+func (m *FollowerState) ExtendCertified(ctx context.Context, certified *flow.CertifiedBlock) error {
+	candidate := certified.Block
+	certifyingQC := certified.CertifyingQC
 	span, ctx := m.tracer.StartSpanFromContext(ctx, trace.ProtoStateMutatorHeaderExtend)
 	defer span.End()
 

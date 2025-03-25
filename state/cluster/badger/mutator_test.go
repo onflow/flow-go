@@ -396,7 +396,7 @@ func (suite *MutatorSuite) TestExtend_WithExpiredReferenceBlock() {
 	parent := suite.protoGenesis
 	for i := 0; i < flow.DefaultTransactionExpiry+1; i++ {
 		next := unittest.BlockWithParentProtocolState(parent)
-		err := suite.protoState.ExtendCertified(context.Background(), next, unittest.CertifyBlock(next.Header))
+		err := suite.protoState.ExtendCertified(context.Background(), unittest.NewCertifiedBlock(next))
 		suite.Require().Nil(err)
 		err = suite.protoState.Finalize(context.Background(), next.ID())
 		suite.Require().Nil(err)
@@ -445,7 +445,7 @@ func (suite *MutatorSuite) TestExtend_WithReferenceBlockFromDifferentEpoch() {
 // block has been finalized, we just haven't processed it yet.
 func (suite *MutatorSuite) TestExtend_WithUnfinalizedReferenceBlock() {
 	unfinalized := unittest.BlockWithParentProtocolState(suite.protoGenesis)
-	err := suite.protoState.ExtendCertified(context.Background(), unfinalized, unittest.CertifyBlock(unfinalized.Header))
+	err := suite.protoState.ExtendCertified(context.Background(), unittest.NewCertifiedBlock(unfinalized))
 	suite.Require().NoError(err)
 
 	block := suite.Block()
@@ -462,14 +462,14 @@ func (suite *MutatorSuite) TestExtend_WithUnfinalizedReferenceBlock() {
 func (suite *MutatorSuite) TestExtend_WithOrphanedReferenceBlock() {
 	// create a block extending genesis which is not finalized
 	orphaned := unittest.BlockWithParentProtocolState(suite.protoGenesis)
-	err := suite.protoState.ExtendCertified(context.Background(), orphaned, unittest.CertifyBlock(orphaned.Header))
+	err := suite.protoState.ExtendCertified(context.Background(), unittest.NewCertifiedBlock(orphaned))
 	suite.Require().NoError(err)
 
 	// create a block extending genesis (conflicting with previous) which is finalized
 	finalized := unittest.BlockWithParentProtocolState(suite.protoGenesis)
 	finalized.Payload.Guarantees = nil
 	finalized.SetPayload(*finalized.Payload)
-	err = suite.protoState.ExtendCertified(context.Background(), finalized, unittest.CertifyBlock(finalized.Header))
+	err = suite.protoState.ExtendCertified(context.Background(), unittest.NewCertifiedBlock(finalized))
 	suite.Require().NoError(err)
 	err = suite.protoState.Finalize(context.Background(), finalized.ID())
 	suite.Require().NoError(err)

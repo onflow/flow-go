@@ -363,7 +363,7 @@ func (builder *EpochBuilder) addBlock(block *flow.Block) {
 	block.Header.PayloadHash = block.Payload.Hash()
 	blockID := block.ID()
 	for _, state := range builder.states {
-		err = state.ExtendCertified(context.Background(), block, CertifyBlock(block.Header))
+		err = state.ExtendCertified(context.Background(), NewCertifiedBlock(block))
 		require.NoError(builder.t, err)
 
 		err = state.Finalize(context.Background(), blockID)
