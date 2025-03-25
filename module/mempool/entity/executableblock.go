@@ -17,10 +17,10 @@ type CompleteCollection struct {
 
 // ExecutableBlock represents a block that can be executed by the VM
 //
-// It assumes that the Block attached is immutable, so take care in not modifying or changing the inner
+// It assumes that the attached Block is immutable, so take care in not modifying or changing the inner
 // *flow.Block, otherwise the struct will be in an inconsistent state. It requires the Block is immutable
-// because it lazy loads the Block.ID() into the private id field, on the first call to ExecutableBlock.ID()
-// All future calls to BlockID will not call Block.ID(), therefore it Block changes, the blockID will not match the Block.
+// because it lazily loads the Block.ID() into the private blockID field, on the first call to ExecutableBlock.ID()
+// All future calls to BlockID will not call Block.ID(), therefore if the Block changes, the blockID will not match the Block.
 type ExecutableBlock struct {
 	blockID             flow.Identifier
 	Block               *flow.Block
