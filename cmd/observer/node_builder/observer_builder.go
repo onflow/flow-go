@@ -13,8 +13,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/cockroachdb/pebble"
-	"github.com/dgraph-io/badger/v2"
 	"github.com/ipfs/boxo/bitswap"
 	"github.com/ipfs/go-cid"
 	"github.com/ipfs/go-datastore"
@@ -110,7 +108,6 @@ import (
 	"github.com/onflow/flow-go/storage"
 	bstorage "github.com/onflow/flow-go/storage/badger"
 	"github.com/onflow/flow-go/storage/operation/badgerimpl"
-	"github.com/onflow/flow-go/storage/operation/pebbleimpl"
 	pstorage "github.com/onflow/flow-go/storage/pebble"
 	"github.com/onflow/flow-go/storage/store"
 	"github.com/onflow/flow-go/utils/grpcutils"
@@ -300,6 +297,10 @@ type ObserverServiceBuilder struct {
 	Reporter            *index.Reporter
 	EventsIndex         *index.EventsIndex
 	ScriptExecutor      *backend.ScriptExecutor
+
+	// storage
+	events                  storage.Events
+	lightTransactionResults storage.LightTransactionResults
 
 	// available until after the network has started. Hence, a factory function that needs to be called just before
 	// creating the sync engine
@@ -820,11 +821,25 @@ func (builder *ObserverServiceBuilder) extraFlags() {
 			defaultConfig.registerDBPruneThreshold,
 			fmt.Sprintf("specifies the number of blocks below the latest stored block height to keep in register db. default: %d", defaultConfig.registerDBPruneThreshold))
 
-		flags.DurationVar(&builder.rpcConf.WebSocketConfig.InactivityTimeout,
+		// websockets config
+		flags.DurationVar(
+			&builder.rpcConf.WebSocketConfig.InactivityTimeout,
 			"websocket-inactivity-timeout",
 			defaultConfig.rpcConf.WebSocketConfig.InactivityTimeout,
-			"specifies the duration a WebSocket connection can remain open without any active subscriptions before being automatically closed")
-
+			"the duration a WebSocket connection can remain open without any active subscriptions before being automatically closed",
+		)
+		flags.Uint64Var(
+			&builder.rpcConf.WebSocketConfig.MaxSubscriptionsPerConnection,
+			"websocket-max-subscriptions-per-connection",
+			defaultConfig.rpcConf.WebSocketConfig.MaxSubscriptionsPerConnection,
+			"the maximum number of active WebSocket subscriptions allowed per connection",
+		)
+		flags.Float64Var(
+			&builder.rpcConf.WebSocketConfig.MaxResponsesPerSecond,
+			"websocket-max-responses-per-second",
+			defaultConfig.rpcConf.WebSocketConfig.MaxResponsesPerSecond,
+			fmt.Sprintf("the maximum number of responses that can be sent to a single client per second. Default: %f. if set to 0, no limit is applied to the number of responses per second.", defaultConfig.rpcConf.WebSocketConfig.MaxResponsesPerSecond),
+		)
 		flags.BoolVar(
 			&builder.rpcConf.EnableWebSocketsStreamAPI,
 			"experimental-enable-websockets-stream-api",
@@ -1100,7 +1115,9 @@ func (builder *ObserverServiceBuilder) BuildExecutionSyncComponents() *ObserverS
 			}
 
 			if executionDataDBMode == execution_data.ExecutionDataDBModePebble {
-				builder.ExecutionDatastoreManager, err = edstorage.NewPebbleDatastoreManager(datastoreDir, nil)
+				builder.ExecutionDatastoreManager, err = edstorage.NewPebbleDatastoreManager(
+					node.Logger.With().Str("pebbledb", "endata").Logger(),
+					datastoreDir, nil)
 				if err != nil {
 					return fmt.Errorf("could not create PebbleDatastoreManager for execution data: %w", err)
 				}
@@ -1124,12 +1141,7 @@ func (builder *ObserverServiceBuilder) BuildExecutionSyncComponents() *ObserverS
 		Module("processed block height consumer progress", func(node *cmd.NodeConfig) error {
 			// Note: progress is stored in the datastore's DB since that is where the jobqueue
 			// writes execution data to.
-			var db storage.DB
-			if executionDataDBMode == execution_data.ExecutionDataDBModeBadger {
-				db = badgerimpl.ToDB(builder.ExecutionDatastoreManager.DB().(*badger.DB))
-			} else {
-				db = pebbleimpl.ToDB(builder.ExecutionDatastoreManager.DB().(*pebble.DB))
-			}
+			db := builder.ExecutionDatastoreManager.DB()
 
 			processedBlockHeight = store.NewConsumerProgress(db, module.ConsumeProgressExecutionDataRequesterBlockHeight)
 			return nil
@@ -1137,12 +1149,7 @@ func (builder *ObserverServiceBuilder) BuildExecutionSyncComponents() *ObserverS
 		Module("processed notifications consumer progress", func(node *cmd.NodeConfig) error {
 			// Note: progress is stored in the datastore's DB since that is where the jobqueue
 			// writes execution data to.
-			var db storage.DB
-			if executionDataDBMode == execution_data.ExecutionDataDBModeBadger {
-				db = badgerimpl.ToDB(builder.ExecutionDatastoreManager.DB().(*badger.DB))
-			} else {
-				db = pebbleimpl.ToDB(builder.ExecutionDatastoreManager.DB().(*pebble.DB))
-			}
+			db := builder.ExecutionDatastoreManager.DB()
 			processedNotifications = store.NewConsumerProgress(db, module.ConsumeProgressExecutionDataRequesterNotification)
 			return nil
 		}).
@@ -1335,14 +1342,16 @@ func (builder *ObserverServiceBuilder) BuildExecutionSyncComponents() *ObserverS
 			indexedBlockHeight = store.NewConsumerProgress(badgerimpl.ToDB(builder.DB), module.ConsumeProgressExecutionDataIndexerBlockHeight)
 			return nil
 		}).Module("transaction results storage", func(node *cmd.NodeConfig) error {
-			builder.Storage.LightTransactionResults = bstorage.NewLightTransactionResults(node.Metrics.Cache, node.DB, bstorage.DefaultCacheSize)
+			builder.lightTransactionResults = store.NewLightTransactionResults(node.Metrics.Cache, node.ProtocolDB, bstorage.DefaultCacheSize)
 			return nil
 		}).DependableComponent("execution data indexer", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 			// Note: using a DependableComponent here to ensure that the indexer does not block
 			// other components from starting while bootstrapping the register db since it may
 			// take hours to complete.
 
-			pdb, err := pstorage.OpenRegisterPebbleDB(builder.registersDBPath)
+			pdb, err := pstorage.OpenRegisterPebbleDB(
+				node.Logger.With().Str("pebbledb", "registers").Logger(),
+				builder.registersDBPath)
 			if err != nil {
 				return nil, fmt.Errorf("could not open registers db: %w", err)
 			}
@@ -1424,13 +1433,13 @@ func (builder *ObserverServiceBuilder) BuildExecutionSyncComponents() *ObserverS
 			indexerCore, err := indexer.New(
 				builder.Logger,
 				metrics.NewExecutionStateIndexerCollector(),
-				builder.DB,
+				builder.ProtocolDB,
 				builder.Storage.RegisterIndex,
 				builder.Storage.Headers,
-				builder.Storage.Events,
+				builder.events,
 				builder.Storage.Collections,
 				builder.Storage.Transactions,
-				builder.Storage.LightTransactionResults,
+				builder.lightTransactionResults,
 				builder.RootChainID.Chain(),
 				indexerDerivedChainData,
 				collectionExecutedMetric,
@@ -1778,7 +1787,7 @@ func (builder *ObserverServiceBuilder) enqueueRPCServer() {
 		return nil
 	})
 	builder.Module("events storage", func(node *cmd.NodeConfig) error {
-		builder.Storage.Events = bstorage.NewEvents(node.Metrics.Cache, node.DB)
+		builder.events = store.NewEvents(node.Metrics.Cache, node.ProtocolDB)
 		return nil
 	})
 	builder.Module("reporter", func(node *cmd.NodeConfig) error {
@@ -1786,11 +1795,11 @@ func (builder *ObserverServiceBuilder) enqueueRPCServer() {
 		return nil
 	})
 	builder.Module("events index", func(node *cmd.NodeConfig) error {
-		builder.EventsIndex = index.NewEventsIndex(builder.Reporter, builder.Storage.Events)
+		builder.EventsIndex = index.NewEventsIndex(builder.Reporter, builder.events)
 		return nil
 	})
 	builder.Module("transaction result index", func(node *cmd.NodeConfig) error {
-		builder.TxResultsIndex = index.NewTransactionResultsIndex(builder.Reporter, builder.Storage.LightTransactionResults)
+		builder.TxResultsIndex = index.NewTransactionResultsIndex(builder.Reporter, builder.lightTransactionResults)
 		return nil
 	})
 	builder.Module("script executor", func(node *cmd.NodeConfig) error {

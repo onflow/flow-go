@@ -19,8 +19,8 @@ import (
 	"github.com/onflow/flow-go/state/protocol/inmem"
 	"github.com/onflow/flow-go/state/protocol/util"
 	protoutil "github.com/onflow/flow-go/state/protocol/util"
+	bstorage "github.com/onflow/flow-go/storage/badger"
 	storagebadger "github.com/onflow/flow-go/storage/badger"
-	storutil "github.com/onflow/flow-go/storage/util"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -718,7 +718,7 @@ func bootstrap(t *testing.T, rootSnapshot protocol.Snapshot, f func(*bprotocol.S
 	defer os.RemoveAll(dir)
 	db := unittest.BadgerDB(t, dir)
 	defer db.Close()
-	all := storutil.StorageLayer(t, db)
+	all := bstorage.InitAll(metrics, db)
 	state, err := bprotocol.Bootstrap(
 		metrics,
 		db,

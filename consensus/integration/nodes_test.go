@@ -60,6 +60,8 @@ import (
 	"github.com/onflow/flow-go/state/protocol/util"
 	storage "github.com/onflow/flow-go/storage/badger"
 	storagemock "github.com/onflow/flow-go/storage/mock"
+	"github.com/onflow/flow-go/storage/operation/badgerimpl"
+	"github.com/onflow/flow-go/storage/store"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -224,7 +226,7 @@ func createNodes(t *testing.T, participants *ConsensusParticipants, rootSnapshot
 
 	// create a context which will be used for all nodes
 	ctx, cancel := context.WithCancel(context.Background())
-	signalerCtx, _ := irrecoverable.WithSignaler(ctx)
+	signalerCtx := irrecoverable.NewMockSignalerContext(t, ctx)
 
 	// create a function to return which the test case can use to run the nodes for some maximum duration
 	// and gracefully stop after.
@@ -389,7 +391,7 @@ func createNode(
 		storage.DefaultEpochProtocolStateCacheSize, storage.DefaultProtocolStateIndexCacheSize)
 	protocokKVStoreDB := storage.NewProtocolKVStore(metricsCollector, db,
 		storage.DefaultProtocolKVStoreCacheSize, storage.DefaultProtocolKVStoreByBlockIDCacheSize)
-	versionBeaconDB := storage.NewVersionBeacons(db)
+	versionBeaconDB := store.NewVersionBeacons(badgerimpl.ToDB(db))
 	protocolStateEvents := events.NewDistributor()
 
 	localID := identity.ID()

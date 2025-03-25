@@ -10,318 +10,171 @@ import (
 
 	"github.com/rs/zerolog"
 
+	"github.com/onflow/flow/protobuf/go/flow/entities"
+
 	"github.com/onflow/flow-go/engine/access/subscription"
 	"github.com/onflow/flow-go/engine/access/subscription/tracker"
-	"github.com/onflow/flow-go/engine/common/rpc"
 	accessmodel "github.com/onflow/flow-go/model/access"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/irrecoverable"
-	"github.com/onflow/flow-go/state"
-	"github.com/onflow/flow-go/storage"
-
-	"github.com/onflow/flow/protobuf/go/flow/entities"
 )
+
+// TransactionExpiryForUnknownStatus defines the number of blocks after which
+// a transaction with an unknown status is considered expired.
+const TransactionExpiryForUnknownStatus = flow.DefaultTransactionExpiry
 
 // sendTransaction defines a function type for sending a transaction.
 type sendTransaction func(ctx context.Context, tx *flow.TransactionBody) error
 
-// backendSubscribeTransactions handles transaction subscriptions.
+// backendSubscribeTransactions manages transaction subscriptions for monitoring transaction statuses.
+// It provides functionalities to send transactions, subscribe to transaction status updates,
+// and handle subscription lifecycles.
 type backendSubscribeTransactions struct {
-	txLocalDataProvider *TransactionsLocalDataProvider
-	backendTransactions *backendTransactions
-	executionResults    storage.ExecutionResults
 	log                 zerolog.Logger
-
+	backendTransactions *backendTransactions
 	subscriptionHandler *subscription.SubscriptionHandler
 	blockTracker        tracker.BlockTracker
 	sendTransaction     sendTransaction
 }
 
-// transactionSubscriptionMetadata holds data representing the status state for each transaction subscription.
-type transactionSubscriptionMetadata struct {
-	*accessmodel.TransactionResult
-	txReferenceBlockID   flow.Identifier
-	blockWithTx          *flow.Header
-	txExecuted           bool
-	eventEncodingVersion entities.EventEncodingVersion
-	shouldTriggerPending bool
-}
-
 // SendAndSubscribeTransactionStatuses sends a transaction and subscribes to its status updates.
-// It starts monitoring the status from the transaction's reference block ID.
-// If the transaction cannot be sent or an error occurs during subscription creation, a failed subscription is returned.
+//
+// The subscription begins monitoring from the reference block specified in the transaction itself and
+// streams updates until the transaction reaches a final state ([flow.TransactionStatusSealed] or [flow.TransactionStatusExpired]).
+// Upon reaching a final state, the subscription automatically terminates.
+//
+// Parameters:
+//   - ctx: The context to manage the transaction sending and subscription lifecycle, including cancellation.
+//   - tx: The transaction body to be sent and monitored.
+//   - requiredEventEncodingVersion: The version of event encoding required for the subscription.
+//
+// If the transaction cannot be sent, the subscription will fail and return a failed subscription.
 func (b *backendSubscribeTransactions) SendAndSubscribeTransactionStatuses(
 	ctx context.Context,
 	tx *flow.TransactionBody,
 	requiredEventEncodingVersion entities.EventEncodingVersion,
 ) subscription.Subscription {
 	if err := b.sendTransaction(ctx, tx); err != nil {
-		b.log.Error().Err(err).Str("tx_id", tx.ID().String()).Msg("failed to send transaction")
+		b.log.Debug().Err(err).Str("tx_id", tx.ID().String()).Msg("failed to send transaction")
 		return subscription.NewFailedSubscription(err, "failed to send transaction")
 	}
 
-	return b.createSubscription(ctx, tx.ID(), tx.ReferenceBlockID, 0, tx.ReferenceBlockID, requiredEventEncodingVersion, true)
+	return b.createSubscription(ctx, tx.ID(), tx.ReferenceBlockID, tx.ReferenceBlockID, requiredEventEncodingVersion)
 }
 
-// SubscribeTransactionStatusesFromStartHeight subscribes to the status updates of a transaction.
-// Monitoring starts from the specified block height.
-// If the block height cannot be determined or an error occurs during subscription creation, a failed subscription is returned.
-func (b *backendSubscribeTransactions) SubscribeTransactionStatusesFromStartHeight(
-	ctx context.Context,
-	txID flow.Identifier,
-	startHeight uint64,
-	requiredEventEncodingVersion entities.EventEncodingVersion,
-) subscription.Subscription {
-	return b.createSubscription(ctx, txID, flow.ZeroID, startHeight, flow.ZeroID, requiredEventEncodingVersion, false)
-}
-
-// SubscribeTransactionStatusesFromStartBlockID subscribes to the status updates of a transaction.
-// Monitoring starts from the specified block ID.
-// If the block ID cannot be determined or an error occurs during subscription creation, a failed subscription is returned.
-func (b *backendSubscribeTransactions) SubscribeTransactionStatusesFromStartBlockID(
-	ctx context.Context,
-	txID flow.Identifier,
-	startBlockID flow.Identifier,
-	requiredEventEncodingVersion entities.EventEncodingVersion,
-) subscription.Subscription {
-	return b.createSubscription(ctx, txID, startBlockID, 0, flow.ZeroID, requiredEventEncodingVersion, false)
-}
-
-// SubscribeTransactionStatusesFromLatest subscribes to the status updates of a transaction.
-// Monitoring starts from the latest block.
-// If the block cannot be retrieved or an error occurs during subscription creation, a failed subscription is returned.
-func (b *backendSubscribeTransactions) SubscribeTransactionStatusesFromLatest(
+// SubscribeTransactionStatuses subscribes to status updates for a given transaction ID.
+//
+// The subscription starts monitoring from the last sealed block. Updates are streamed
+// until the transaction reaches a final state ([flow.TransactionStatusSealed] or [flow.TransactionStatusExpired]).
+// The subscription terminates automatically once the final state is reached.
+//
+// Parameters:
+//   - ctx: The context to manage the subscription's lifecycle, including cancellation.
+//   - txID: The unique identifier of the transaction to monitor.
+//   - requiredEventEncodingVersion: The version of event encoding required for the subscription.
+func (b *backendSubscribeTransactions) SubscribeTransactionStatuses(
 	ctx context.Context,
 	txID flow.Identifier,
 	requiredEventEncodingVersion entities.EventEncodingVersion,
 ) subscription.Subscription {
-	header, err := b.txLocalDataProvider.state.Sealed().Head()
+	header, err := b.backendTransactions.state.Sealed().Head()
 	if err != nil {
-		b.log.Error().Err(err).Msg("failed to retrieve latest block")
-		return subscription.NewFailedSubscription(err, "failed to retrieve latest block")
+		// throw the exception as the node must have the current sealed block in storage
+		irrecoverable.Throw(ctx, fmt.Errorf("failed to lookup sealed block: %w", err))
+		return subscription.NewFailedSubscription(err, "failed to lookup sealed block")
 	}
 
-	return b.createSubscription(ctx, txID, header.ID(), 0, flow.ZeroID, requiredEventEncodingVersion, false)
+	return b.createSubscription(ctx, txID, header.ID(), flow.ZeroID, requiredEventEncodingVersion)
 }
 
-// createSubscription initializes a subscription for monitoring a transaction's status.
-// If the start height cannot be determined, a failed subscription is returned.
+// createSubscription initializes a transaction subscription for monitoring status updates.
+//
+// The subscription monitors the transaction's progress starting from the specified block ID.
+// It streams updates until the transaction reaches a final state or an error occurs.
+//
+// Parameters:
+//   - ctx: Context to manage the subscription lifecycle.
+//   - txID: The unique identifier of the transaction to monitor.
+//   - startBlockID: The ID of the block to start monitoring from.
+//   - referenceBlockID: The ID of the transaction's reference block.
+//   - requiredEventEncodingVersion: The required version of event encoding.
+//
+// Returns:
+//   - subscription.Subscription: A subscription for monitoring transaction status updates.
+//
+// If the start height cannot be determined or current transaction state cannot be determined, a failed subscription is returned.
 func (b *backendSubscribeTransactions) createSubscription(
 	ctx context.Context,
 	txID flow.Identifier,
 	startBlockID flow.Identifier,
-	startBlockHeight uint64,
 	referenceBlockID flow.Identifier,
 	requiredEventEncodingVersion entities.EventEncodingVersion,
-	shouldTriggerPending bool,
 ) subscription.Subscription {
-	var nextHeight uint64
-	var err error
-
-	// Get height to start subscription from
-	if startBlockID == flow.ZeroID {
-		if nextHeight, err = b.blockTracker.GetStartHeightFromHeight(startBlockHeight); err != nil {
-			b.log.Error().Err(err).Uint64("block_height", startBlockHeight).Msg("failed to get start height")
-			return subscription.NewFailedSubscription(err, "failed to get start height")
-		}
-	} else {
-		if nextHeight, err = b.blockTracker.GetStartHeightFromBlockID(startBlockID); err != nil {
-			b.log.Error().Err(err).Str("block_id", startBlockID.String()).Msg("failed to get start height")
-			return subscription.NewFailedSubscription(err, "failed to get start height")
-		}
+	// Determine the height of the block to start the subscription from.
+	startHeight, err := b.blockTracker.GetStartHeightFromBlockID(startBlockID)
+	if err != nil {
+		b.log.Debug().Err(err).Str("block_id", startBlockID.String()).Msg("failed to get start height")
+		return subscription.NewFailedSubscription(err, "failed to get start height")
 	}
 
-	// choose initial transaction status
-	initialStatus := flow.TransactionStatusUnknown
-	if shouldTriggerPending {
-		// The status of the first pending transaction should be returned immediately, as the transaction has already been sent.
-		// This should occur only once for each subscription.
-		initialStatus = flow.TransactionStatusPending
-	}
+	txInfo := newTransactionSubscriptionMetadata(b.backendTransactions, txID, referenceBlockID, requiredEventEncodingVersion)
 
-	txInfo := transactionSubscriptionMetadata{
-		TransactionResult: &accessmodel.TransactionResult{
-			TransactionID: txID,
-			BlockID:       flow.ZeroID,
-			Status:        initialStatus,
-		},
-		txReferenceBlockID:   referenceBlockID,
-		blockWithTx:          nil,
-		eventEncodingVersion: requiredEventEncodingVersion,
-		shouldTriggerPending: shouldTriggerPending,
-	}
-
-	return b.subscriptionHandler.Subscribe(ctx, nextHeight, b.getTransactionStatusResponse(&txInfo))
+	return b.subscriptionHandler.Subscribe(ctx, startHeight, b.getTransactionStatusResponse(txInfo, startHeight))
 }
 
 // getTransactionStatusResponse returns a callback function that produces transaction status
 // subscription responses based on new blocks.
-func (b *backendSubscribeTransactions) getTransactionStatusResponse(txInfo *transactionSubscriptionMetadata) func(context.Context, uint64) (interface{}, error) {
+// The returned callback is not concurrency-safe
+func (b *backendSubscribeTransactions) getTransactionStatusResponse(
+	txInfo *transactionSubscriptionMetadata,
+	startHeight uint64,
+) func(context.Context, uint64) (interface{}, error) {
 	return func(ctx context.Context, height uint64) (interface{}, error) {
 		err := b.checkBlockReady(height)
 		if err != nil {
 			return nil, err
 		}
 
-		if txInfo.shouldTriggerPending {
-			return b.handlePendingStatus(txInfo)
+		if txInfo.txResult.IsFinal() {
+			return nil, fmt.Errorf("transaction final status %s already reported: %w", txInfo.txResult.Status.String(), subscription.ErrEndOfData)
 		}
 
-		if b.isTransactionFinalStatus(txInfo) {
-			return nil, fmt.Errorf("transaction final status %s already reported: %w", txInfo.Status.String(), subscription.ErrEndOfData)
-		}
-
-		// If on this step transaction block not available, search for it.
-		if txInfo.blockWithTx == nil {
-			// Search for transaction`s block information.
-			txInfo.blockWithTx,
-				txInfo.BlockID,
-				txInfo.BlockHeight,
-				txInfo.CollectionID,
-				err = b.searchForTransactionBlockInfo(height, txInfo)
-
-			if err != nil {
-				if errors.Is(err, storage.ErrNotFound) {
-					return nil, fmt.Errorf("could not find block %d in storage: %w", height, subscription.ErrBlockNotReady)
-				}
-
-				if !errors.Is(err, ErrTransactionNotInBlock) {
-					return nil, status.Errorf(codes.Internal, "could not get block %d: %v", height, err)
-				}
-			}
+		// timeout waiting for unknown tx that are never indexed
+		if hasReachedUnknownStatusLimit(height, startHeight, txInfo.txResult.Status) {
+			txInfo.txResult.Status = flow.TransactionStatusExpired
+			return generateResultsStatuses(txInfo.txResult, flow.TransactionStatusUnknown)
 		}
 
 		// Get old status here, as it could be replaced by status from founded tx result
-		prevTxStatus := txInfo.Status
+		prevTxStatus := txInfo.txResult.Status
 
-		// Check, if transaction executed and transaction result already available
-		if txInfo.blockWithTx != nil && !txInfo.txExecuted {
-			txResult, err := b.searchForTransactionResult(ctx, txInfo)
-			if err != nil {
-				return nil, status.Errorf(codes.Internal, "failed to get execution result for block %s: %v", txInfo.BlockID, err)
+		if err = txInfo.Refresh(ctx); err != nil {
+			if errors.Is(err, subscription.ErrBlockNotReady) {
+				return nil, err
 			}
-
-			// If transaction result was found, fully replace it in metadata. New transaction status already included in result.
-			if txResult != nil {
-				txInfo.TransactionResult = txResult
-				// Fill in execution status for future usages
-				txInfo.txExecuted = true
+			if statusErr, ok := status.FromError(err); ok {
+				return nil, status.Errorf(codes.Internal, "failed to refresh transaction information: %v", statusErr)
 			}
+			return nil, fmt.Errorf("unexpected error refreshing transaction information: %w", err)
 		}
 
-		// If block with transaction was not found, get transaction status to check if it different from last status
-		if txInfo.Status, err = b.getTransactionStatus(ctx, txInfo, prevTxStatus); err != nil {
-			return nil, err
-		}
-
-		// If the old and new transaction statuses are still the same, the status change should not be reported, so
-		// return here with no response.
-		if prevTxStatus == txInfo.Status {
-			return nil, nil
-		}
-
-		return b.generateResultsWithMissingStatuses(txInfo, prevTxStatus)
+		return generateResultsStatuses(txInfo.txResult, prevTxStatus)
 	}
 }
 
-// handlePendingStatus handles the initial pending status for a transaction.
-func (b *backendSubscribeTransactions) handlePendingStatus(txInfo *transactionSubscriptionMetadata) (interface{}, error) {
-	txInfo.shouldTriggerPending = false
-	return b.generateResultsWithMissingStatuses(txInfo, flow.TransactionStatusUnknown)
-}
-
-// isTransactionFinalStatus checks if a transaction has reached a final state (Sealed or Expired).
-func (b *backendSubscribeTransactions) isTransactionFinalStatus(txInfo *transactionSubscriptionMetadata) bool {
-	return txInfo.Status == flow.TransactionStatusSealed || txInfo.Status == flow.TransactionStatusExpired
-}
-
-// getTransactionStatus determines the current status of a transaction based on its metadata
-// and previous status. It  derives the transaction status by analyzing the transaction's
-// execution block, if available, or its reference block.
-//
-// No errors expected during normal operations.
-func (b *backendSubscribeTransactions) getTransactionStatus(ctx context.Context, txInfo *transactionSubscriptionMetadata, prevTxStatus flow.TransactionStatus) (flow.TransactionStatus, error) {
-	txStatus := txInfo.Status
-	var err error
-
-	if txInfo.blockWithTx == nil {
-		txStatus, err = b.txLocalDataProvider.DeriveUnknownTransactionStatus(txInfo.txReferenceBlockID)
-	} else if txStatus == prevTxStatus {
-		// When a block with the transaction is available, it is possible to receive a new transaction status while
-		// searching for the transaction result. Otherwise, it remains unchanged. So, if the old and new transaction
-		// statuses are the same, the current transaction status should be retrieved.
-		txStatus, err = b.txLocalDataProvider.DeriveTransactionStatus(txInfo.blockWithTx.Height, txInfo.txExecuted)
+// hasReachedUnknownStatusLimit checks if a transaction's status is still unknown
+// after the expiry limit has been reached.
+func hasReachedUnknownStatusLimit(height, startHeight uint64, status flow.TransactionStatus) bool {
+	if status != flow.TransactionStatusUnknown {
+		return false
 	}
 
-	if err != nil {
-		if !errors.Is(err, state.ErrUnknownSnapshotReference) {
-			irrecoverable.Throw(ctx, err)
-		}
-		return flow.TransactionStatusUnknown, rpc.ConvertStorageError(err)
-	}
-
-	return txStatus, nil
-}
-
-// generateResultsWithMissingStatuses checks if the current result differs from the previous result by more than one step.
-// If yes, it generates results for the missing transaction statuses. This is done because the subscription should send
-// responses for each of the statuses in the transaction lifecycle, and the message should be sent in the order of transaction statuses.
-// Possible orders of transaction statuses:
-// 1. pending(1) -> finalized(2) -> executed(3) -> sealed(4)
-// 2. pending(1) -> expired(5)
-// No errors expected during normal operations.
-func (b *backendSubscribeTransactions) generateResultsWithMissingStatuses(
-	txInfo *transactionSubscriptionMetadata,
-	prevTxStatus flow.TransactionStatus,
-) ([]*accessmodel.TransactionResult, error) {
-	// If the previous status is pending and the new status is expired, which is the last status, return its result.
-	// If the previous status is anything other than pending, return an error, as this transition is unexpected.
-	if txInfo.Status == flow.TransactionStatusExpired {
-		if prevTxStatus == flow.TransactionStatusPending {
-			return []*accessmodel.TransactionResult{
-				txInfo.TransactionResult,
-			}, nil
-		} else {
-			return nil, fmt.Errorf("unexpected transition from %s to %s transaction status", prevTxStatus.String(), txInfo.Status.String())
-		}
-	}
-
-	var results []*accessmodel.TransactionResult
-
-	// If the difference between statuses' values is more than one step, fill in the missing results.
-	if (txInfo.Status - prevTxStatus) > 1 {
-		for missingStatus := prevTxStatus + 1; missingStatus < txInfo.Status; missingStatus++ {
-			switch missingStatus {
-			case flow.TransactionStatusPending:
-				results = append(results, &accessmodel.TransactionResult{
-					Status:        missingStatus,
-					TransactionID: txInfo.TransactionID,
-				})
-			case flow.TransactionStatusFinalized:
-				results = append(results, &accessmodel.TransactionResult{
-					Status:        missingStatus,
-					TransactionID: txInfo.TransactionID,
-					BlockID:       txInfo.BlockID,
-					BlockHeight:   txInfo.BlockHeight,
-					CollectionID:  txInfo.CollectionID,
-				})
-			case flow.TransactionStatusExecuted:
-				missingTxResult := *txInfo.TransactionResult
-				missingTxResult.Status = missingStatus
-				results = append(results, &missingTxResult)
-			default:
-				return nil, fmt.Errorf("unexpected missing transaction status")
-			}
-		}
-	}
-
-	results = append(results, txInfo.TransactionResult)
-	return results, nil
+	return height-startHeight >= TransactionExpiryForUnknownStatus
 }
 
 // checkBlockReady checks if the given block height is valid and available based on the expected block status.
 // Expected errors during normal operation:
-// - subscription.ErrBlockNotReady: block for the given block height is not available.
+// - [subscription.ErrBlockNotReady]: block for the given block height is not available.
 func (b *backendSubscribeTransactions) checkBlockReady(height uint64) error {
 	// Get the highest available finalized block height
 	highestHeight, err := b.blockTracker.GetHighestHeight(flow.BlockStatusFinalized)
@@ -339,64 +192,64 @@ func (b *backendSubscribeTransactions) checkBlockReady(height uint64) error {
 	return nil
 }
 
-// searchForTransactionBlockInfo searches for the block containing the specified transaction.
-// It retrieves the block at the given height and checks if the transaction is included in that block.
-// Expected errors:
-// - ErrTransactionNotInBlock when unable to retrieve the collection
-// - codes.Internal when other errors occur during block or collection lookup
-func (b *backendSubscribeTransactions) searchForTransactionBlockInfo(
-	height uint64,
-	txInfo *transactionSubscriptionMetadata,
-) (*flow.Header, flow.Identifier, uint64, flow.Identifier, error) {
-	block, err := b.txLocalDataProvider.blocks.ByHeight(height)
-	if err != nil {
-		return nil, flow.ZeroID, 0, flow.ZeroID, fmt.Errorf("error looking up block: %w", err)
+// generateResultsStatuses checks if the current result differs from the previous result by more than one step.
+// If yes, it generates results for the missing transaction statuses. This is done because the subscription should send
+// responses for each of the statuses in the transaction lifecycle, and the message should be sent in the order of transaction statuses.
+// Possible orders of transaction statuses:
+// 1. pending(1) -> finalized(2) -> executed(3) -> sealed(4)
+// 2. pending(1) -> expired(5)
+// No errors expected during normal operations.
+func generateResultsStatuses(
+	txResult *accessmodel.TransactionResult,
+	prevTxStatus flow.TransactionStatus,
+) ([]*accessmodel.TransactionResult, error) {
+	// If the old and new transaction statuses are still the same, the status change should not be reported, so
+	// return here with no response.
+	if prevTxStatus == txResult.Status {
+		return nil, nil
 	}
 
-	collectionID, err := b.txLocalDataProvider.LookupCollectionIDInBlock(block, txInfo.TransactionID)
-	if err != nil {
-		return nil, flow.ZeroID, 0, flow.ZeroID, fmt.Errorf("error looking up transaction in block: %w", err)
-	}
-
-	if collectionID != flow.ZeroID {
-		return block.Header, block.ID(), height, collectionID, nil
-	}
-
-	return nil, flow.ZeroID, 0, flow.ZeroID, nil
-}
-
-// searchForTransactionResult searches for the transaction result of a block. It retrieves the execution result for the specified block ID.
-// Expected errors:
-// - codes.Internal if an internal error occurs while retrieving execution result.
-func (b *backendSubscribeTransactions) searchForTransactionResult(
-	ctx context.Context,
-	txInfo *transactionSubscriptionMetadata,
-) (*accessmodel.TransactionResult, error) {
-	_, err := b.executionResults.ByBlockID(txInfo.BlockID)
-	if err != nil {
-		if errors.Is(err, storage.ErrNotFound) {
-			return nil, nil
+	// return immediately if the new status is expired, since it's the last status
+	// If the previous status is anything other than pending or unknown, return an error since this transition is unexpected.
+	if txResult.Status == flow.TransactionStatusExpired {
+		if prevTxStatus == flow.TransactionStatusPending || prevTxStatus == flow.TransactionStatusUnknown {
+			return []*accessmodel.TransactionResult{
+				txResult,
+			}, nil
+		} else {
+			return nil, fmt.Errorf("unexpected transition from %s to %s transaction status", prevTxStatus.String(), txResult.Status.String())
 		}
-		return nil, fmt.Errorf("failed to get execution result for block %s: %w", txInfo.BlockID, err)
 	}
 
-	txResult, err := b.backendTransactions.GetTransactionResult(
-		ctx,
-		txInfo.TransactionID,
-		txInfo.BlockID,
-		txInfo.CollectionID,
-		txInfo.eventEncodingVersion,
-	)
+	var results []*accessmodel.TransactionResult
 
-	if err != nil {
-		// if either the storage or execution node reported no results or there were not enough execution results
-		if status.Code(err) == codes.NotFound {
-			// No result yet, indicate that it has not been executed
-			return nil, nil
+	// If the difference between statuses' values is more than one step, fill in the missing results.
+	if (txResult.Status - prevTxStatus) > 1 {
+		for missingStatus := prevTxStatus + 1; missingStatus < txResult.Status; missingStatus++ {
+			switch missingStatus {
+			case flow.TransactionStatusPending:
+				results = append(results, &accessmodel.TransactionResult{
+					Status:        missingStatus,
+					TransactionID: txResult.TransactionID,
+				})
+			case flow.TransactionStatusFinalized:
+				results = append(results, &accessmodel.TransactionResult{
+					Status:        missingStatus,
+					TransactionID: txResult.TransactionID,
+					BlockID:       txResult.BlockID,
+					BlockHeight:   txResult.BlockHeight,
+					CollectionID:  txResult.CollectionID,
+				})
+			case flow.TransactionStatusExecuted:
+				missingTxResult := *txResult
+				missingTxResult.Status = missingStatus
+				results = append(results, &missingTxResult)
+			default:
+				return nil, fmt.Errorf("unexpected missing transaction status")
+			}
 		}
-		// Other Error trying to retrieve the result, return with err
-		return nil, err
 	}
 
-	return txResult, nil
+	results = append(results, txResult)
+	return results, nil
 }

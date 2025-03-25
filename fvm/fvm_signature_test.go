@@ -63,7 +63,7 @@ func TestKeyListSignature(t *testing.T) {
 			"SHA3_256",
 			func(tag string) hash.Hasher {
 				hasher, err := fvmCrypto.NewPrefixedHashing(hash.SHA3_256, tag)
-				require.Nil(t, err)
+				require.NoError(t, err)
 				return hasher
 			},
 		},
@@ -71,7 +71,7 @@ func TestKeyListSignature(t *testing.T) {
 			"SHA2_256",
 			func(tag string) hash.Hasher {
 				hasher, err := fvmCrypto.NewPrefixedHashing(hash.SHA2_256, tag)
-				require.Nil(t, err)
+				require.NoError(t, err)
 				return hasher
 			},
 		},
@@ -79,7 +79,7 @@ func TestKeyListSignature(t *testing.T) {
 			"KECCAK_256",
 			func(tag string) hash.Hasher {
 				hasher, err := fvmCrypto.NewPrefixedHashing(hash.Keccak_256, tag)
-				require.Nil(t, err)
+				require.NoError(t, err)
 				return hasher
 			},
 		},

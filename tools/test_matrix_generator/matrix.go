@@ -27,7 +27,7 @@ var (
 const (
 	flowPackagePrefix = "github.com/onflow/flow-go/"
 	ciMatrixName      = "dynamicMatrix"
-	defaultCIRunner   = "ubuntu-20.04"
+	defaultCIRunner   = "ubuntu-latest"
 )
 
 // flowGoPackage configuration for a package to be tested.
@@ -165,7 +165,7 @@ func processSubpackages(subPkgs []*subpackage, allPkgs []*packages.Package, seen
 	return testMatrices
 }
 
-// processTopLevelPackages creates test matrix for the top level package excluding any packages from the exclude list.
+// processTopLevelPackage creates test matrix for the top level package excluding any packages from the exclude list.
 func processTopLevelPackage(pkg *flowGoPackage, allPkgs []*packages.Package, seenPath func(p string), seen func(p string) bool) *testMatrix {
 	var topLevelTestPkgStrBuilder strings.Builder
 	for _, p := range allPkgs {
