@@ -17,7 +17,7 @@ type ExecutionResults struct {
 }
 
 // BatchIndex provides a mock function with given fields: blockID, resultID, batch
-func (_m *ExecutionResults) BatchIndex(blockID flow.Identifier, resultID flow.Identifier, batch storage.BatchStorage) error {
+func (_m *ExecutionResults) BatchIndex(blockID flow.Identifier, resultID flow.Identifier, batch storage.ReaderBatchWriter) error {
 	ret := _m.Called(blockID, resultID, batch)
 
 	if len(ret) == 0 {
@@ -25,7 +25,7 @@ func (_m *ExecutionResults) BatchIndex(blockID flow.Identifier, resultID flow.Id
 	}
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(flow.Identifier, flow.Identifier, storage.BatchStorage) error); ok {
+	if rf, ok := ret.Get(0).(func(flow.Identifier, flow.Identifier, storage.ReaderBatchWriter) error); ok {
 		r0 = rf(blockID, resultID, batch)
 	} else {
 		r0 = ret.Error(0)
@@ -35,7 +35,7 @@ func (_m *ExecutionResults) BatchIndex(blockID flow.Identifier, resultID flow.Id
 }
 
 // BatchRemoveIndexByBlockID provides a mock function with given fields: blockID, batch
-func (_m *ExecutionResults) BatchRemoveIndexByBlockID(blockID flow.Identifier, batch storage.BatchStorage) error {
+func (_m *ExecutionResults) BatchRemoveIndexByBlockID(blockID flow.Identifier, batch storage.ReaderBatchWriter) error {
 	ret := _m.Called(blockID, batch)
 
 	if len(ret) == 0 {
@@ -43,7 +43,7 @@ func (_m *ExecutionResults) BatchRemoveIndexByBlockID(blockID flow.Identifier, b
 	}
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(flow.Identifier, storage.BatchStorage) error); ok {
+	if rf, ok := ret.Get(0).(func(flow.Identifier, storage.ReaderBatchWriter) error); ok {
 		r0 = rf(blockID, batch)
 	} else {
 		r0 = ret.Error(0)
@@ -53,7 +53,7 @@ func (_m *ExecutionResults) BatchRemoveIndexByBlockID(blockID flow.Identifier, b
 }
 
 // BatchStore provides a mock function with given fields: result, batch
-func (_m *ExecutionResults) BatchStore(result *flow.ExecutionResult, batch storage.BatchStorage) error {
+func (_m *ExecutionResults) BatchStore(result *flow.ExecutionResult, batch storage.ReaderBatchWriter) error {
 	ret := _m.Called(result, batch)
 
 	if len(ret) == 0 {
@@ -61,7 +61,7 @@ func (_m *ExecutionResults) BatchStore(result *flow.ExecutionResult, batch stora
 	}
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(*flow.ExecutionResult, storage.BatchStorage) error); ok {
+	if rf, ok := ret.Get(0).(func(*flow.ExecutionResult, storage.ReaderBatchWriter) error); ok {
 		r0 = rf(result, batch)
 	} else {
 		r0 = ret.Error(0)
