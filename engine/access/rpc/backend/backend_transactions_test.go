@@ -15,11 +15,11 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
-	acc "github.com/onflow/flow-go/access"
 	"github.com/onflow/flow-go/engine/access/index"
 	connectionmock "github.com/onflow/flow-go/engine/access/rpc/connection/mock"
 	"github.com/onflow/flow-go/engine/common/rpc/convert"
 	"github.com/onflow/flow-go/fvm/blueprints"
+	accessmodel "github.com/onflow/flow-go/model/access"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
 	syncmock "github.com/onflow/flow-go/module/state_synchronization/mock"
@@ -278,7 +278,7 @@ func (suite *Suite) TestGetTransactionResultCacheNonExistent() {
 		txStatus := flow.TransactionStatusUnknown
 		res, ok := backend.txResultCache.Get(tx.ID())
 		suite.Require().True(ok)
-		suite.Require().Equal(res, &acc.TransactionResult{
+		suite.Require().Equal(res, &accessmodel.TransactionResult{
 			Status:     txStatus,
 			StatusCode: uint(txStatus),
 		})
@@ -319,7 +319,7 @@ func (suite *Suite) TestGetTransactionResultUnknownFromCache() {
 		txStatus := flow.TransactionStatusUnknown
 		res, ok := backend.txResultCache.Get(tx.ID())
 		suite.Require().True(ok)
-		suite.Require().Equal(res, &acc.TransactionResult{
+		suite.Require().Equal(res, &accessmodel.TransactionResult{
 			Status:     txStatus,
 			StatusCode: uint(txStatus),
 		})
@@ -1236,7 +1236,7 @@ func (suite *Suite) TestGetSystemTransactionResult_FailedEncodingConversion() {
 
 func (suite *Suite) assertTransactionResultResponse(
 	err error,
-	response *acc.TransactionResult,
+	response *accessmodel.TransactionResult,
 	block flow.Block,
 	txId flow.Identifier,
 	txFailed bool,

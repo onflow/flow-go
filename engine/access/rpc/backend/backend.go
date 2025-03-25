@@ -11,7 +11,6 @@ import (
 	accessproto "github.com/onflow/flow/protobuf/go/flow/access"
 	"github.com/rs/zerolog"
 
-	"github.com/onflow/flow-go/access"
 	"github.com/onflow/flow-go/access/validator"
 	"github.com/onflow/flow-go/cmd/build"
 	"github.com/onflow/flow-go/engine/access/index"
@@ -21,6 +20,7 @@ import (
 	commonrpc "github.com/onflow/flow-go/engine/common/rpc"
 	"github.com/onflow/flow-go/engine/common/version"
 	"github.com/onflow/flow-go/fvm/blueprints"
+	accessmodel "github.com/onflow/flow-go/model/access"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/counters"
@@ -129,9 +129,9 @@ func New(params Params) (*Backend, error) {
 		return nil, fmt.Errorf("failed to initialize script logging cache: %w", err)
 	}
 
-	var txResCache *lru.Cache[flow.Identifier, *access.TransactionResult]
+	var txResCache *lru.Cache[flow.Identifier, *accessmodel.TransactionResult]
 	if params.TxResultCacheSize > 0 {
-		txResCache, err = lru.New[flow.Identifier, *access.TransactionResult](int(params.TxResultCacheSize))
+		txResCache, err = lru.New[flow.Identifier, *accessmodel.TransactionResult](int(params.TxResultCacheSize))
 		if err != nil {
 			return nil, fmt.Errorf("failed to init cache for transaction results: %w", err)
 		}
@@ -306,7 +306,7 @@ func (b *Backend) Ping(ctx context.Context) error {
 }
 
 // GetNodeVersionInfo returns node version information such as semver, commit, sporkID, protocolVersion, etc
-func (b *Backend) GetNodeVersionInfo(_ context.Context) (*access.NodeVersionInfo, error) {
+func (b *Backend) GetNodeVersionInfo(_ context.Context) (*accessmodel.NodeVersionInfo, error) {
 	sporkID := b.stateParams.SporkID()
 	sporkRootBlockHeight := b.stateParams.SporkRootBlockHeight()
 	nodeRootBlockHeader := b.stateParams.SealedRoot()
@@ -315,17 +315,17 @@ func (b *Backend) GetNodeVersionInfo(_ context.Context) (*access.NodeVersionInfo
 		return nil, fmt.Errorf("could not read finalized protocol kvstore: %w", err)
 	}
 
-	var compatibleRange *access.CompatibleRange
+	var compatibleRange *accessmodel.CompatibleRange
 
 	// Version control feature could be disabled
 	if b.versionControl != nil {
-		compatibleRange = &access.CompatibleRange{
+		compatibleRange = &accessmodel.CompatibleRange{
 			StartHeight: b.versionControl.StartHeight(),
 			EndHeight:   b.versionControl.EndHeight(),
 		}
 	}
 
-	nodeInfo := &access.NodeVersionInfo{
+	nodeInfo := &accessmodel.NodeVersionInfo{
 		Semver:               build.Version(),
 		Commit:               build.Commit(),
 		SporkId:              sporkID,
@@ -369,8 +369,8 @@ func (b *Backend) GetFullCollectionByID(_ context.Context, colID flow.Identifier
 	return col, nil
 }
 
-func (b *Backend) GetNetworkParameters(_ context.Context) access.NetworkParameters {
-	return access.NetworkParameters{
+func (b *Backend) GetNetworkParameters(_ context.Context) accessmodel.NetworkParameters {
+	return accessmodel.NetworkParameters{
 		ChainID: b.chainID,
 	}
 }

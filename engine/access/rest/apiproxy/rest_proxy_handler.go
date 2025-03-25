@@ -4,19 +4,19 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/rs/zerolog"
 	"google.golang.org/grpc/status"
 
-	"github.com/rs/zerolog"
+	accessproto "github.com/onflow/flow/protobuf/go/flow/access"
+	"github.com/onflow/flow/protobuf/go/flow/entities"
 
 	"github.com/onflow/flow-go/access"
 	"github.com/onflow/flow-go/engine/access/rpc/connection"
 	"github.com/onflow/flow-go/engine/common/grpc/forwarder"
 	"github.com/onflow/flow-go/engine/common/rpc/convert"
+	accessmodel "github.com/onflow/flow-go/model/access"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/metrics"
-
-	accessproto "github.com/onflow/flow/protobuf/go/flow/access"
-	"github.com/onflow/flow/protobuf/go/flow/entities"
 )
 
 // RestProxyHandler is a structure that represents the proxy algorithm for observer node.
@@ -155,7 +155,7 @@ func (r *RestProxyHandler) GetTransactionResult(
 	blockID flow.Identifier,
 	collectionID flow.Identifier,
 	requiredEventEncodingVersion entities.EventEncodingVersion,
-) (*access.TransactionResult, error) {
+) (*accessmodel.TransactionResult, error) {
 	upstream, closer, err := r.FaultTolerantClient()
 	if err != nil {
 
@@ -177,7 +177,7 @@ func (r *RestProxyHandler) GetTransactionResult(
 		return nil, err
 	}
 
-	return access.MessageToTransactionResult(transactionResultResponse), nil
+	return convert.MessageToTransactionResult(transactionResultResponse), nil
 }
 
 // GetAccountAtBlockHeight returns account by account address and block height.

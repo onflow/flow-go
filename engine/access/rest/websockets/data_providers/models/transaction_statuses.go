@@ -1,8 +1,8 @@
 package models
 
 import (
-	"github.com/onflow/flow-go/access"
 	commonmodels "github.com/onflow/flow-go/engine/access/rest/common/models"
+	accessmodel "github.com/onflow/flow-go/model/access"
 )
 
 // TransactionStatusesResponse is the response message for 'events' topic.
@@ -14,7 +14,7 @@ type TransactionStatusesResponse struct {
 // NewTransactionStatusesResponse creates a TransactionStatusesResponse instance.
 func NewTransactionStatusesResponse(
 	linkGenerator commonmodels.LinkGenerator,
-	txResult *access.TransactionResult,
+	txResult *accessmodel.TransactionResult,
 	index uint64,
 ) *TransactionStatusesResponse {
 	var transactionResult commonmodels.TransactionResult

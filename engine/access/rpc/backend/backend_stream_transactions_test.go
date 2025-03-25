@@ -21,7 +21,6 @@ import (
 	accessproto "github.com/onflow/flow/protobuf/go/flow/access"
 	"github.com/onflow/flow/protobuf/go/flow/entities"
 
-	accessapi "github.com/onflow/flow-go/access"
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/engine/access/index"
 	access "github.com/onflow/flow-go/engine/access/mock"
@@ -31,6 +30,7 @@ import (
 	subscriptionmock "github.com/onflow/flow-go/engine/access/subscription/mock"
 	commonrpc "github.com/onflow/flow-go/engine/common/rpc"
 	"github.com/onflow/flow-go/engine/common/rpc/convert"
+	accessmodel "github.com/onflow/flow-go/model/access"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/counters"
@@ -371,7 +371,7 @@ func (s *TransactionStatusSuite) checkNewSubscriptionMessage(sub subscription.Su
 			"channel closed while waiting for transaction info:\n\t- txID %x\n\t- blockID: %x \n\t- err: %v",
 			txId, s.finalizedBlock.ID(), sub.Err())
 
-		txResults, ok := v.([]*accessapi.TransactionResult)
+		txResults, ok := v.([]*accessmodel.TransactionResult)
 		require.True(s.T(), ok, "unexpected response type: %T", v)
 		require.Len(s.T(), txResults, len(expectedTxStatuses))
 

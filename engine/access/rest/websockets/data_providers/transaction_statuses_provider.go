@@ -12,6 +12,7 @@ import (
 	"github.com/onflow/flow-go/engine/access/rest/websockets/data_providers/models"
 	wsmodels "github.com/onflow/flow-go/engine/access/rest/websockets/models"
 	"github.com/onflow/flow-go/engine/access/subscription"
+	accessmodel "github.com/onflow/flow-go/model/access"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/counters"
 
@@ -81,7 +82,7 @@ func (p *TransactionStatusesDataProvider) Run() error {
 // This function is not safe to call concurrently.
 //
 // No errors are expected during normal operations.
-func (p *TransactionStatusesDataProvider) sendResponse(txResults []*access.TransactionResult) error {
+func (p *TransactionStatusesDataProvider) sendResponse(txResults []*accessmodel.TransactionResult) error {
 	for i := range txResults {
 		txStatusesPayload := models.NewTransactionStatusesResponse(p.linkGenerator, txResults[i], p.messageIndex.Value())
 		response := models.BaseDataProvidersResponse{
