@@ -15,3 +15,11 @@ type TransactionResult struct {
 	CollectionID  flow.Identifier
 	BlockHeight   uint64
 }
+
+func (r *TransactionResult) IsExecuted() bool {
+	return r.Status == flow.TransactionStatusExecuted || r.Status == flow.TransactionStatusSealed
+}
+
+func (r *TransactionResult) IsFinal() bool {
+	return r.Status == flow.TransactionStatusSealed || r.Status == flow.TransactionStatusExpired
+}

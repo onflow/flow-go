@@ -279,7 +279,7 @@ func (_m *ExecutionState) StateCommitmentByBlockID(_a0 flow.Identifier) (flow.St
 }
 
 // UpdateLastExecutedBlock provides a mock function with given fields: _a0, _a1
-func (_m *ExecutionState) UpdateLastExecutedBlock(_a0 context.Context, _a1 *flow.Header) error {
+func (_m *ExecutionState) UpdateLastExecutedBlock(_a0 context.Context, _a1 flow.Identifier) error {
 	ret := _m.Called(_a0, _a1)
 
 	if len(ret) == 0 {
@@ -287,7 +287,7 @@ func (_m *ExecutionState) UpdateLastExecutedBlock(_a0 context.Context, _a1 *flow
 	}
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(context.Context, *flow.Header) error); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, flow.Identifier) error); ok {
 		r0 = rf(_a0, _a1)
 	} else {
 		r0 = ret.Error(0)

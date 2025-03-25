@@ -685,7 +685,7 @@ func (net *FlowNetwork) addConsensusFollower(t *testing.T, rootProtocolSnapshotP
 	dataDir := makeDir(t, tmpdir, DefaultFlowDBDir)
 	pebbleDir := makeDir(t, tmpdir, DefaultFlowPebbleDBDir)
 
-	pebbleDB, _, err := database.InitPebbleDB(pebbleDir)
+	pebbleDB, _, err := database.InitPebbleDB(net.log, pebbleDir)
 	require.NoError(t, err)
 
 	// create a follower-specific directory for the bootstrap files

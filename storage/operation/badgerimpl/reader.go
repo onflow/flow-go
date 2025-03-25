@@ -17,6 +17,8 @@ type dbReader struct {
 	db *badger.DB
 }
 
+var _ storage.Reader = (*dbReader)(nil)
+
 // Get gets the value for the given key. It returns ErrNotFound if the DB
 // does not contain the key.
 // other errors are exceptions

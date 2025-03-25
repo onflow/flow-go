@@ -55,7 +55,7 @@ func (s *TimeoutAggregatorTestSuite) SetupTest() {
 	require.NoError(s.T(), err)
 
 	ctx, cancel := context.WithCancel(context.Background())
-	signalerCtx, _ := irrecoverable.WithSignaler(ctx)
+	signalerCtx := irrecoverable.NewMockSignalerContext(s.T(), ctx)
 	s.stopAggregator = cancel
 	s.aggregator.Start(signalerCtx)
 	unittest.RequireCloseBefore(s.T(), s.aggregator.Ready(), 100*time.Millisecond, "should close before timeout")
