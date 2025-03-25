@@ -55,6 +55,7 @@ import (
 	"github.com/onflow/flow-go/engine/access/state_stream"
 	statestreambackend "github.com/onflow/flow-go/engine/access/state_stream/backend"
 	"github.com/onflow/flow-go/engine/access/subscription"
+	subscriptiontracker "github.com/onflow/flow-go/engine/access/subscription/tracker"
 	followereng "github.com/onflow/flow-go/engine/common/follower"
 	"github.com/onflow/flow-go/engine/common/requester"
 	commonrpc "github.com/onflow/flow-go/engine/common/rpc"
@@ -1059,7 +1060,7 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 			useIndex := builder.executionDataIndexingEnabled &&
 				eventQueryMode != backend.IndexQueryModeExecutionNodesOnly
 
-			executionDataTracker := subscription.NewExecutionDataTracker(
+			executionDataTracker := subscriptiontracker.NewExecutionDataTracker(
 				builder.Logger,
 				node.State,
 				builder.executionDataConfig.InitialBlockHeight,
@@ -1986,7 +1987,7 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 			broadcaster := engine.NewBroadcaster()
 			// create BlockTracker that will track for new blocks (finalized and sealed) and
 			// handles block-related operations.
-			blockTracker, err := subscription.NewBlockTracker(
+			blockTracker, err := subscriptiontracker.NewBlockTracker(
 				node.State,
 				builder.FinalizedRootBlock.Header.Height,
 				node.Storage.Headers,

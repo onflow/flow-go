@@ -13,6 +13,7 @@ import (
 	"github.com/onflow/flow/protobuf/go/flow/entities"
 
 	"github.com/onflow/flow-go/engine/access/subscription"
+	"github.com/onflow/flow-go/engine/access/subscription/tracker"
 	accessmodel "github.com/onflow/flow-go/model/access"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/irrecoverable"
@@ -32,7 +33,7 @@ type backendSubscribeTransactions struct {
 	log                 zerolog.Logger
 	backendTransactions *backendTransactions
 	subscriptionHandler *subscription.SubscriptionHandler
-	blockTracker        subscription.BlockTracker
+	blockTracker        tracker.BlockTracker
 	sendTransaction     sendTransaction
 }
 
