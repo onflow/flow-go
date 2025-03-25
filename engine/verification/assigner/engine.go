@@ -6,7 +6,6 @@ import (
 	"sync/atomic"
 
 	"github.com/rs/zerolog"
-	"github.com/rs/zerolog/log"
 
 	"github.com/onflow/flow-go/model/chunks"
 	"github.com/onflow/flow-go/model/flow"
@@ -77,7 +76,7 @@ func (e *Engine) resultChunkAssignment(ctx context.Context,
 	incorporatingBlock flow.Identifier,
 ) (flow.ChunkList, error) {
 	resultID := result.ID()
-	log := log.With().
+	log := e.log.With().
 		Hex("result_id", logging.ID(resultID)).
 		Hex("executed_block_id", logging.ID(result.BlockID)).
 		Hex("incorporating_block_id", logging.ID(incorporatingBlock)).
