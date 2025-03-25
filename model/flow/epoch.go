@@ -4,13 +4,13 @@ import (
 	"bytes"
 	"encoding/json"
 	"io"
+	"slices"
 
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/fxamacker/cbor/v2"
 	"github.com/onflow/crypto"
 	"github.com/vmihailenco/msgpack/v4"
 	"golang.org/x/exp/maps"
-	"golang.org/x/exp/slices"
 
 	"github.com/onflow/flow-go/model/encodable"
 )

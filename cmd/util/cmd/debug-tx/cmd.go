@@ -4,13 +4,13 @@ import (
 	"cmp"
 	"context"
 	"encoding/hex"
+	"slices"
 
 	client "github.com/onflow/flow-go-sdk/access/grpc"
 	"github.com/onflow/flow/protobuf/go/flow/execution"
 	"github.com/onflow/flow/protobuf/go/flow/executiondata"
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
-	"golang.org/x/exp/slices"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 

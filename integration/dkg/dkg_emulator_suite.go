@@ -4,11 +4,10 @@ import (
 	"context"
 	"encoding/hex"
 	"fmt"
+	"slices"
 	"os"
 
 	"github.com/onflow/crypto"
-	"golang.org/x/exp/slices"
-
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"

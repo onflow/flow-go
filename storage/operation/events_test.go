@@ -2,9 +2,8 @@ package operation_test
 
 import (
 	"bytes"
+	"slices"
 	"testing"
-
-	"golang.org/x/exp/slices"
 
 	"github.com/stretchr/testify/require"
 
