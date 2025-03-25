@@ -97,7 +97,7 @@ func NewBuilder(
 	log = log.With().Str("engine", "rpc").Logger()
 
 	// wrap the unsecured server with an HTTP proxy server to serve HTTP clients
-	httpServer := newHTTPProxyServer(unsecureGrpcServer.Server)
+	httpServer := newHTTPProxyServer(unsecureGrpcServer)
 
 	finalizedCache, finalizedCacheWorker, err := events.NewFinalizedHeaderCache(state)
 	if err != nil {
@@ -242,9 +242,8 @@ func (e *Engine) serveREST(ctx irrecoverable.SignalerContext, ready component.Re
 		return
 	}
 
-	e.log.Info().Str("rest_api_address", e.config.RestConfig.ListenAddress).Msg("starting REST server on address")
-
 	r, err := rest.NewServer(
+		ctx,
 		e.restHandler,
 		e.config.RestConfig,
 		e.log,
@@ -266,6 +265,8 @@ func (e *Engine) serveREST(ctx irrecoverable.SignalerContext, ready component.Re
 	e.restServer.BaseContext = func(_ net.Listener) context.Context {
 		return irrecoverable.WithSignalerContext(ctx, ctx)
 	}
+
+	e.log.Info().Str("rest_api_address", e.config.RestConfig.ListenAddress).Msg("starting REST server on address")
 
 	l, err := net.Listen("tcp", e.config.RestConfig.ListenAddress)
 	if err != nil {

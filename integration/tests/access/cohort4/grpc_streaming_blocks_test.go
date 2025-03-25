@@ -5,9 +5,6 @@ import (
 	"fmt"
 	"testing"
 
-	"google.golang.org/grpc"
-	"google.golang.org/grpc/credentials/insecure"
-
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
@@ -15,6 +12,7 @@ import (
 	"github.com/onflow/flow-go/engine/common/rpc/convert"
 	"github.com/onflow/flow-go/engine/ghost/client"
 	"github.com/onflow/flow-go/integration/testnet"
+	"github.com/onflow/flow-go/integration/tests/access/common"
 	"github.com/onflow/flow-go/integration/tests/lib"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -135,11 +133,11 @@ func (s *GrpcBlocksStreamSuite) Ghost() *client.GhostClient {
 // TestRestEventStreaming tests gRPC event streaming
 func (s *GrpcBlocksStreamSuite) TestHappyPath() {
 	accessUrl := fmt.Sprintf("localhost:%s", s.net.ContainerByName(testnet.PrimaryAN).Port(testnet.GRPCPort))
-	accessClient, err := getAccessAPIClient(accessUrl)
+	accessClient, err := common.GetAccessAPIClient(accessUrl)
 	s.Require().NoError(err)
 
 	observerURL := fmt.Sprintf("localhost:%s", s.net.ContainerByName(testnet.PrimaryON).Port(testnet.GRPCPort))
-	observerClient, err := getAccessAPIClient(observerURL)
+	observerClient, err := common.GetAccessAPIClient(observerURL)
 	s.Require().NoError(err)
 
 	// get the first block height
@@ -286,13 +284,4 @@ func (s *GrpcBlocksStreamSuite) getRPCs() []subscribeBlocksRPCTest {
 			},
 		},
 	}
-}
-
-func getAccessAPIClient(address string) (accessproto.AccessAPIClient, error) {
-	conn, err := grpc.Dial(address, grpc.WithTransportCredentials(insecure.NewCredentials()))
-	if err != nil {
-		return nil, err
-	}
-
-	return accessproto.NewAccessAPIClient(conn), nil
 }

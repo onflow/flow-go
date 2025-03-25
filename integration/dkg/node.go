@@ -55,31 +55,28 @@ func (n *node) Done() <-chan struct{} {
 	return util.AllDone(n.messagingEngine, n.reactorEngine)
 }
 
-// setEpochs configures the mock state snapthost at firstBlock to return the
-// desired current and next epochs
+// setEpochs configures the mock state snapshot at firstBlock to return the
+// desired current and next epochs.
+// The next epoch is set up as tentative, since this helper is only used by the DKG emulator test
+// and DKG events occur during the `flow.EpochPhaseSetup` phase before the next epoch is committed.
 func (n *node) setEpochs(t *testing.T, currentSetup flow.EpochSetup, nextSetup flow.EpochSetup, firstBlock *flow.Header) {
+	currentEpoch := new(protocolmock.CommittedEpoch)
+	currentEpoch.On("Counter").Return(currentSetup.Counter)
+	currentEpoch.On("InitialIdentities").Return(currentSetup.Participants)
+	currentEpoch.On("DKGPhase1FinalView").Return(currentSetup.DKGPhase1FinalView)
+	currentEpoch.On("DKGPhase2FinalView").Return(currentSetup.DKGPhase2FinalView)
+	currentEpoch.On("DKGPhase3FinalView").Return(currentSetup.DKGPhase3FinalView)
+	currentEpoch.On("FinalView").Return(currentSetup.FinalView)
+	currentEpoch.On("FirstView").Return(currentSetup.FirstView)
+	currentEpoch.On("RandomSource").Return(nextSetup.RandomSource)
 
-	currentEpoch := new(protocolmock.Epoch)
-	currentEpoch.On("Counter").Return(currentSetup.Counter, nil)
-	currentEpoch.On("InitialIdentities").Return(currentSetup.Participants, nil)
-	currentEpoch.On("DKGPhase1FinalView").Return(currentSetup.DKGPhase1FinalView, nil)
-	currentEpoch.On("DKGPhase2FinalView").Return(currentSetup.DKGPhase2FinalView, nil)
-	currentEpoch.On("DKGPhase3FinalView").Return(currentSetup.DKGPhase3FinalView, nil)
-	currentEpoch.On("FinalView").Return(currentSetup.FinalView, nil)
-	currentEpoch.On("FirstView").Return(currentSetup.FirstView, nil)
-	currentEpoch.On("RandomSource").Return(nextSetup.RandomSource, nil)
-
-	nextEpoch := new(protocolmock.Epoch)
-	nextEpoch.On("Counter").Return(nextSetup.Counter, nil)
-	nextEpoch.On("InitialIdentities").Return(nextSetup.Participants, nil)
-	nextEpoch.On("RandomSource").Return(nextSetup.RandomSource, nil)
-	nextEpoch.On("DKG").Return(nil, nil) // no error means didn't run into EFM
-	nextEpoch.On("FirstView").Return(nextSetup.FirstView, nil)
-	nextEpoch.On("FinalView").Return(nextSetup.FinalView, nil)
+	nextEpoch := new(protocolmock.TentativeEpoch)
+	nextEpoch.On("Counter").Return(nextSetup.Counter)
+	nextEpoch.On("InitialIdentities").Return(nextSetup.Participants)
 
 	epochQuery := mocks.NewEpochQuery(t, currentSetup.Counter)
-	epochQuery.Add(currentEpoch)
-	epochQuery.Add(nextEpoch)
+	epochQuery.AddCommitted(currentEpoch)
+	epochQuery.AddTentative(nextEpoch)
 	snapshot := new(protocolmock.Snapshot)
 	snapshot.On("Epochs").Return(epochQuery)
 	snapshot.On("EpochPhase").Return(flow.EpochPhaseStaking, nil)

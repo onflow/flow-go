@@ -189,7 +189,6 @@ func finalize(cmd *cobra.Command, args []string) {
 		result,
 		seal,
 		rootQC,
-		intermediaryData.ProtocolVersion,
 		func(epochStateID flow.Identifier) (protocol_state.KVStoreAPI, error) {
 			return kvstore.NewDefaultKVStore(
 				intermediaryData.FinalizationSafetyThreshold,
