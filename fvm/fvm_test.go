@@ -3185,12 +3185,7 @@ func TestVMBridge(t *testing.T) {
 				chain)
 			require.NoError(t, err)
 
-			txBody := blueprints.TransferFlowTokenTransaction(
-				chain.ServiceAddress(),
-				accounts[0],
-				"2.0",
-				env,
-			)
+			txBody := blueprints.TransferFlowTokenTransaction(env, chain.ServiceAddress(), accounts[0], "2.0")
 
 			err = testutil.SignTransactionAsServiceAccount(txBody, 0, chain)
 			require.NoError(t, err)
@@ -3230,7 +3225,7 @@ func TestVMBridge(t *testing.T) {
 			// Onboard the Fungible Token Type
 			typeToOnboard := "A." + accounts[0].String() + "." + tokenContractName + ".Vault"
 
-			txBody = blueprints.OnboardToBridgeByTypeIDTransaction(accounts[0], bridgeEnv, env, typeToOnboard)
+			txBody = blueprints.OnboardToBridgeByTypeIDTransaction(env, bridgeEnv, accounts[0], typeToOnboard)
 
 			err = testutil.SignTransaction(txBody, accounts[0], privateKey, 1)
 			require.NoError(t, err)
@@ -3260,7 +3255,7 @@ func TestVMBridge(t *testing.T) {
 			}
 
 			// Create COA in the new account
-			txBody = blueprints.CreateCOATransaction(accounts[0], bridgeEnv, env)
+			txBody = blueprints.CreateCOATransaction(env, bridgeEnv, accounts[0])
 			err = testutil.SignTransaction(txBody, accounts[0], privateKey, 2)
 			require.NoError(t, err)
 
@@ -3275,7 +3270,7 @@ func TestVMBridge(t *testing.T) {
 			snapshotTree = snapshotTree.Append(executionSnapshot)
 
 			// Bridge the Fungible Token to EVM
-			txBody = blueprints.BridgeFTToEVMTransaction(accounts[0], bridgeEnv, env, typeToOnboard, "1.0")
+			txBody = blueprints.BridgeFTToEVMTransaction(env, bridgeEnv, accounts[0], typeToOnboard, "1.0")
 			err = testutil.SignTransaction(txBody, accounts[0], privateKey, 3)
 			require.NoError(t, err)
 
@@ -3290,7 +3285,7 @@ func TestVMBridge(t *testing.T) {
 			snapshotTree = snapshotTree.Append(executionSnapshot)
 
 			// Confirm that the FT is escrowed
-			script := blueprints.GetEscrowedTokenBalanceScript(bridgeEnv, env)
+			script := blueprints.GetEscrowedTokenBalanceScript(env, bridgeEnv)
 
 			arguments := []cadence.Value{
 				cadence.String(typeToOnboard),
@@ -3314,7 +3309,7 @@ func TestVMBridge(t *testing.T) {
 			require.Equal(t, expected, result)
 
 			// Bridge the tokens back to Cadence
-			txBody = blueprints.BridgeFTFromEVMTransaction(accounts[0], bridgeEnv, env, typeToOnboard, 1000000000000000000)
+			txBody = blueprints.BridgeFTFromEVMTransaction(env, bridgeEnv, accounts[0], typeToOnboard, 1000000000000000000)
 
 			err = testutil.SignTransaction(txBody, accounts[0], privateKey, 4)
 			require.NoError(t, err)
@@ -3330,7 +3325,7 @@ func TestVMBridge(t *testing.T) {
 			snapshotTree = snapshotTree.Append(executionSnapshot)
 
 			// Confirm that the FT is no longer escrowed
-			script = blueprints.GetEscrowedTokenBalanceScript(bridgeEnv, env)
+			script = blueprints.GetEscrowedTokenBalanceScript(env, bridgeEnv)
 
 			arguments = []cadence.Value{
 				cadence.String(typeToOnboard),
@@ -3410,12 +3405,7 @@ func TestVMBridge(t *testing.T) {
 				chain)
 			require.NoError(t, err)
 
-			txBody := blueprints.TransferFlowTokenTransaction(
-				chain.ServiceAddress(),
-				accounts[0],
-				"2.0",
-				env,
-			)
+			txBody := blueprints.TransferFlowTokenTransaction(env, chain.ServiceAddress(), accounts[0], "2.0")
 
 			err = testutil.SignTransactionAsServiceAccount(txBody, 0, chain)
 			require.NoError(t, err)
@@ -3455,7 +3445,7 @@ func TestVMBridge(t *testing.T) {
 			// Onboard the Non-Fungible Token Type
 			typeToOnboard := "A." + accounts[0].String() + "." + nftContractName + ".NFT"
 
-			txBody = blueprints.OnboardToBridgeByTypeIDTransaction(accounts[0], bridgeEnv, env, typeToOnboard)
+			txBody = blueprints.OnboardToBridgeByTypeIDTransaction(env, bridgeEnv, accounts[0], typeToOnboard)
 
 			err = testutil.SignTransaction(txBody, accounts[0], privateKey, 1)
 			require.NoError(t, err)
@@ -3485,7 +3475,7 @@ func TestVMBridge(t *testing.T) {
 			snapshotTree = snapshotTree.Append(executionSnapshot)
 
 			// Create COA in the new account
-			txBody = blueprints.CreateCOATransaction(accounts[0], bridgeEnv, env)
+			txBody = blueprints.CreateCOATransaction(env, bridgeEnv, accounts[0])
 			err = testutil.SignTransaction(txBody, accounts[0], privateKey, 2)
 			require.NoError(t, err)
 
@@ -3576,7 +3566,7 @@ func TestVMBridge(t *testing.T) {
 			}
 
 			// Bridge the NFT to EVM
-			txBody = blueprints.BridgeNFTToEVMTransaction(accounts[0], bridgeEnv, env, typeToOnboard, id)
+			txBody = blueprints.BridgeNFTToEVMTransaction(env, bridgeEnv, accounts[0], typeToOnboard, id)
 
 			err = testutil.SignTransaction(txBody, accounts[0], privateKey, 4)
 			require.NoError(t, err)
@@ -3592,7 +3582,7 @@ func TestVMBridge(t *testing.T) {
 			snapshotTree = snapshotTree.Append(executionSnapshot)
 
 			// Confirm that the NFT is escrowed
-			script := blueprints.GetIsNFTInEscrowScript(bridgeEnv, env)
+			script := blueprints.GetIsNFTInEscrowScript(env, bridgeEnv)
 
 			arguments := []cadence.Value{
 				cadence.String(typeToOnboard),
@@ -3618,7 +3608,7 @@ func TestVMBridge(t *testing.T) {
 			id256 := cadence.NewUInt256(uint(id))
 
 			// Bridge the NFT back to Cadence
-			txBody = blueprints.BridgeNFTFromEVMTransaction(accounts[0], bridgeEnv, env, typeToOnboard, id256)
+			txBody = blueprints.BridgeNFTFromEVMTransaction(env, bridgeEnv, accounts[0], typeToOnboard, id256)
 
 			err = testutil.SignTransaction(txBody, accounts[0], privateKey, 5)
 			require.NoError(t, err)
