@@ -12,6 +12,14 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
+// All the Cadence contracts that make up the core functionality
+// of the Flow VM bridge. They are all needed for the
+// bridge to function properly.
+// Solidity contracts are handled elsewhere in the bootstrapping process
+// See more info in the VM Bridge Repo
+// https://github.com/onflow/flow-evm-bridge
+// or FLIP
+// https://github.com/onflow/flips/blob/main/application/20231222-evm-vm-bridge.md
 var BridgeContracts = []string{
 	"cadence/contracts/utils/ArrayUtils.cdc",
 	"cadence/contracts/utils/StringUtils.cdc",

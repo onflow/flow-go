@@ -2,7 +2,6 @@ package fvm
 
 import (
 	"fmt"
-	"log"
 	"math"
 	"strings"
 
@@ -230,6 +229,8 @@ func WithSetupEVMEnabled(enabled cadence.Bool) BootstrapProcedureOption {
 	}
 }
 
+// Option to deploy and setup the Flow VM bridge during bootstrapping
+// so that assets can be bridged between Flow-Cadence and Flow-EVM
 func WithSetupVMBridgeEnabled(enabled cadence.Bool) BootstrapProcedureOption {
 	return func(bp *BootstrapProcedure) *BootstrapProcedure {
 		bp.setupVMBridgeEnabled = enabled
@@ -1088,6 +1089,8 @@ func (b *bootstrapExecutor) setupVMBridge(serviceAddress flow.Address, env *temp
 	// Create a COA in the bridge account
 	run(blueprints.CreateCOATransaction(*env, bridgeEnv, serviceAddress), "failed to create COA in Service Account: %s")
 
+	// Arbitrary high gas limit that can be used for all the
+	// EVM transactions to ensure none of them run out of gas
 	gasLimit := 15000000
 	deploymentValue := 0.0
 
@@ -1097,7 +1100,10 @@ func (b *bootstrapExecutor) setupVMBridge(serviceAddress flow.Address, env *temp
 	// deploy the Solidity Factory contract to the service account's COA
 	txOutput := runAndReturn(blueprints.DeployEVMContractTransaction(*env, bridgeEnv, serviceAddress, factoryBytecode, gasLimit, deploymentValue), "failed to deploy the Factory in the Service Account COA: %s")
 
-	factoryAddress := getContractAddressFromEVMEvent(txOutput)
+	factoryAddress, err := getContractAddressFromEVMEvent(txOutput)
+	if err != nil {
+		panic(fmt.Sprintf("failed to deploy Solidity Factory contract: %s", err))
+	}
 
 	// Retrieve the registry bytecode from the JSON args
 	registryBytecode := bridge.GetBytecodeFromArgsJSON("cadence/args/deploy-deployment-registry-args.json")
@@ -1105,7 +1111,10 @@ func (b *bootstrapExecutor) setupVMBridge(serviceAddress flow.Address, env *temp
 	// deploy the Solidity Registry contract to the service account's COA
 	txOutput = runAndReturn(blueprints.DeployEVMContractTransaction(*env, bridgeEnv, serviceAddress, registryBytecode, gasLimit, deploymentValue), "failed to deploy the Registry in the Service Account COA: %s")
 
-	registryAddress := getContractAddressFromEVMEvent(txOutput)
+	registryAddress, err := getContractAddressFromEVMEvent(txOutput)
+	if err != nil {
+		panic(fmt.Sprintf("failed to deploy Solidity Registry contract: %s", err))
+	}
 
 	// Retrieve the erc20Deployer bytecode from the JSON args
 	erc20DeployerBytecode := bridge.GetBytecodeFromArgsJSON("cadence/args/deploy-erc20-deployer-args.json")
@@ -1113,14 +1122,20 @@ func (b *bootstrapExecutor) setupVMBridge(serviceAddress flow.Address, env *temp
 	// deploy the Solidity ERC20 Deployer contract to the service account's COA
 	txOutput = runAndReturn(blueprints.DeployEVMContractTransaction(*env, bridgeEnv, serviceAddress, erc20DeployerBytecode, gasLimit, deploymentValue), "failed to deploy the ERC20 Deployer in the Service Account COA: %s")
 
-	erc20DeployerAddress := getContractAddressFromEVMEvent(txOutput)
+	erc20DeployerAddress, err := getContractAddressFromEVMEvent(txOutput)
+	if err != nil {
+		panic(fmt.Sprintf("failed to deploy ERC20 deployer contract: %s", err))
+	}
 
 	erc721DeployerBytecode := bridge.GetBytecodeFromArgsJSON("cadence/args/deploy-erc721-deployer-args.json")
 
-	// deploy the Solidity Registry contract to the service account's COA
+	// deploy the ERC721 deployer contract to the service account's COA
 	txOutput = runAndReturn(blueprints.DeployEVMContractTransaction(*env, bridgeEnv, serviceAddress, erc721DeployerBytecode, gasLimit, deploymentValue), "failed to deploy the ERC721 Deployer in the Service Account COA: %s")
 
-	erc721DeployerAddress := getContractAddressFromEVMEvent(txOutput)
+	erc721DeployerAddress, err := getContractAddressFromEVMEvent(txOutput)
+	if err != nil {
+		panic(fmt.Sprintf("failed to deploy ERC 721 deployer contract: %s", err))
+	}
 
 	for _, path := range blueprints.BridgeContracts {
 
@@ -1217,7 +1232,10 @@ func (b *bootstrapExecutor) setupVMBridge(serviceAddress flow.Address, env *temp
 	txOutput = runAndReturn(blueprints.DeployEVMContractTransaction(*env, bridgeEnv, serviceAddress, wflowBytecode, gasLimit, deploymentValue),
 		"failed to deploy the WFLOW contract in the Service Account COA: %s")
 
-	wflowAddress := getContractAddressFromEVMEvent(txOutput)
+	wflowAddress, err := getContractAddressFromEVMEvent(txOutput)
+	if err != nil {
+		panic(fmt.Sprintf("failed to deploy WFLOW contract: %s", err))
+	}
 
 	// Create WFLOW Token Handler, supplying the WFLOW EVM address
 	run(blueprints.CreateWFLOWTokenHandlerTransaction(*env, bridgeEnv, serviceAddress, wflowAddress),
@@ -1235,7 +1253,7 @@ func (b *bootstrapExecutor) setupVMBridge(serviceAddress flow.Address, env *temp
 }
 
 // getContractAddressFromEVMEvent gets the deployment address from a evm deployment transaction
-func getContractAddressFromEVMEvent(output ProcedureOutput) string {
+func getContractAddressFromEVMEvent(output ProcedureOutput) (string, error) {
 	for _, event := range output.Events {
 		if strings.Contains(string(event.Type), "TransactionExecuted") {
 			// decode the event payload
@@ -1247,13 +1265,17 @@ func getContractAddressFromEVMEvent(output ProcedureOutput) string {
 			).(cadence.String)
 
 			if contractAddr.String() == "" {
-				log.Fatal("Contract address not found in event")
+				return "", fmt.Errorf(
+					"Contract address not found in event")
 			}
-			address := strings.ToLower(strings.Split(contractAddr.String(), "x")[1])
-			return address[:len(address)-1]
+			address := strings.ToLower(strings.TrimPrefix(contractAddr.String(), "0x"))
+			// For some reason, there are extra quotations here in the address
+			// so the first and last character needs to be removed for it to only be the address
+			return address[1 : len(address)-1], nil
 		}
 	}
-	return ""
+	return "", fmt.Errorf(
+		"No TransactionExecuted event found in the output of the transaction.")
 }
 
 func (b *bootstrapExecutor) registerNodes(service, fungibleToken, flowToken flow.Address) {
