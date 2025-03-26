@@ -53,7 +53,7 @@ type ExecForkSuppressor struct {
 
 var _ mempool.IncorporatedResultSeals = (*ExecForkSuppressor)(nil)
 
-// sealSet is a set of seals; internally represented as a map from sealID -> to seal
+// sealSet is a set of seals; internally represented as a map from incorporated result ID -> to seal
 type sealSet map[flow.Identifier]*flow.IncorporatedResultSeal
 
 // sealsList is a list of seals
@@ -133,7 +133,7 @@ func (s *ExecForkSuppressor) Add(newSeal *flow.IncorporatedResultSeal) (bool, er
 		blockSeals = make(sealSet)
 		s.sealsForBlock[blockID] = blockSeals
 	}
-	blockSeals[newSeal.ID()] = newSeal
+	blockSeals[newSeal.IncorporatedResultID()] = newSeal
 
 	// cache block height to prune additional index by height
 	blocksAtHeight, found := s.byHeight[newSeal.Header.Height]
