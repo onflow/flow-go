@@ -16,11 +16,11 @@ func TestResults_InsertRetrieve(t *testing.T) {
 		expected := unittest.ExecutionResultFixture()
 
 		err := db.Update(InsertExecutionResult(expected))
-		require.Nil(t, err)
+		require.NoError(t, err)
 
 		var actual flow.ExecutionResult
 		err = db.View(RetrieveExecutionResult(expected.ID(), &actual))
-		require.Nil(t, err)
+		require.NoError(t, err)
 
 		assert.Equal(t, expected, &actual)
 	})

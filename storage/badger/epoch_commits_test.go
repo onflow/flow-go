@@ -1,7 +1,6 @@
 package badger_test
 
 import (
-	"errors"
 	"io"
 	"testing"
 
@@ -30,7 +29,7 @@ func TestEpochCommitStoreAndRetrieve(t *testing.T) {
 
 		// attempt to get a invalid commit
 		_, err := store.ByID(unittest.IdentifierFixture())
-		assert.True(t, errors.Is(err, storage.ErrNotFound))
+		assert.ErrorIs(t, err, storage.ErrNotFound)
 
 		// store a commit in db
 		expected := unittest.EpochCommitFixture()

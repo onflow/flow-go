@@ -24,8 +24,12 @@ import (
 	"github.com/onflow/flow-go/fvm/storage/snapshot"
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/metrics"
+	modutil "github.com/onflow/flow-go/module/util"
 )
+
+var ErrNotImplemented = errors.New("not implemented")
 
 var (
 	flagPayloads        string
@@ -152,7 +156,6 @@ func run(*cobra.Command, []string) {
 	vm := fvm.NewVirtualMachine()
 
 	if flagServe {
-
 		api := &api{
 			chainID:         chainID,
 			vm:              vm,
@@ -160,7 +163,19 @@ func run(*cobra.Command, []string) {
 			storageSnapshot: storageSnapshot,
 		}
 
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+
+		irrCtx, errCh := irrecoverable.WithSignaler(ctx)
+		go func() {
+			err := modutil.WaitError(errCh, ctx.Done())
+			if err != nil {
+				log.Fatal().Err(err).Msg("server finished with error")
+			}
+		}()
+
 		server, err := rest.NewServer(
+			irrCtx,
 			api,
 			rest.Config{
 				ListenAddress: fmt.Sprintf(":%d", flagPort),
@@ -533,35 +548,18 @@ func (*api) SubscribeBlockDigestsFromLatest(
 	return nil
 }
 
-func (a *api) SubscribeTransactionStatusesFromStartBlockID(
+func (a *api) SubscribeTransactionStatuses(
 	_ context.Context,
-	_ flow.Identifier,
 	_ flow.Identifier,
 	_ entities.EventEncodingVersion,
 ) subscription.Subscription {
-	return nil
+	return subscription.NewFailedSubscription(ErrNotImplemented, "failed to call SubscribeTransactionStatuses")
 }
 
-func (a *api) SubscribeTransactionStatusesFromStartHeight(
-	_ context.Context,
-	_ flow.Identifier,
-	_ uint64,
-	_ entities.EventEncodingVersion,
-) subscription.Subscription {
-	return nil
-}
-
-func (a *api) SubscribeTransactionStatusesFromLatest(
-	_ context.Context,
-	_ flow.Identifier,
-	_ entities.EventEncodingVersion,
-) subscription.Subscription {
-	return nil
-}
 func (a *api) SendAndSubscribeTransactionStatuses(
 	_ context.Context,
 	_ *flow.TransactionBody,
 	_ entities.EventEncodingVersion,
 ) subscription.Subscription {
-	return nil
+	return subscription.NewFailedSubscription(ErrNotImplemented, "failed to call SendAndSubscribeTransactionStatuses")
 }
