@@ -26,8 +26,6 @@ func RemoveCollection(w storage.Writer, collID flow.Identifier) error {
 	return RemoveByKey(w, MakePrefix(codeCollection, collID))
 }
 
-// IndexCollectionPayload indexes the transactions within the collection payload
-// of a cluster block.
 // IndexCollectionPayload will overwrite any existing index, which is acceptable
 // because the blockID is derived from txIDs within the payload, ensuring its uniqueness.
 func IndexCollectionPayload(w storage.Writer, blockID flow.Identifier, txIDs []flow.Identifier) error {
@@ -39,6 +37,12 @@ func LookupCollectionPayload(r storage.Reader, blockID flow.Identifier, txIDs *[
 	return RetrieveByKey(r, MakePrefix(codeIndexCollection, blockID), txIDs)
 }
 
+// RemoveCollectionPayloadIndices removes a collection id indexed by a block id
+// any error returned are exceptions
+func RemoveCollectionPayloadIndices(w storage.Writer, blockID flow.Identifier) error {
+	return RemoveByKey(w, MakePrefix(codeIndexCollection, blockID))
+}
+
 // UnsafeIndexCollectionByTransaction inserts a collection id keyed by a transaction id
 // Unsafe because a transaction can belong to multiple collections, indexing collection by a transaction
 // will overwrite the previous collection id that was indexed by the same transaction id
@@ -48,7 +52,17 @@ func UnsafeIndexCollectionByTransaction(w storage.Writer, txID flow.Identifier, 
 	return UpsertByKey(w, MakePrefix(codeIndexCollectionByTransaction, txID), collectionID)
 }
 
-// LookupCollectionID retrieves a collection id by transaction id
-func RetrieveCollectionID(r storage.Reader, txID flow.Identifier, collectionID *flow.Identifier) error {
+// LookupCollectionByTransaction looks up the collection indexed by the given transaction ID,
+// which is the collection in which the given transaction was included.
+// It returns storage.ErrNotFound if the collection is not found.
+// No errors are expected during normal operaion.
+func LookupCollectionByTransaction(r storage.Reader, txID flow.Identifier, collectionID *flow.Identifier) error {
 	return RetrieveByKey(r, MakePrefix(codeIndexCollectionByTransaction, txID), collectionID)
+}
+
+// RemoveCollectionByTransactionIndex removes a collection id indexed by a transaction id,
+// created by [UnsafeIndexCollectionByTransaction].
+// Any error returned is an exception.
+func RemoveCollectionTransactionIndices(w storage.Writer, txID flow.Identifier) error {
+	return RemoveByKey(w, MakePrefix(codeIndexCollectionByTransaction, txID))
 }
