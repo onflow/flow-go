@@ -271,6 +271,11 @@ func ToStateCommitment(stateBytes []byte) (StateCommitment, error) {
 	return state, nil
 }
 
+func (s StateCommitment) String() string {
+	// Just use the string function of the parent type
+	return hash.Hash(s).String()
+}
+
 func (s StateCommitment) MarshalJSON() ([]byte, error) {
 	return json.Marshal(hex.EncodeToString(s[:]))
 }

@@ -197,21 +197,12 @@ func (b *BlockSeals) Build(seals []*flow.Seal) error {
 }
 
 func (b *BlockSeal) Build(seal *flow.Seal) error {
-	finalState := ""
-	if len(seal.FinalState) > 0 { // todo(sideninja) this is always true?
-		finalStateBytes, err := seal.FinalState.MarshalJSON()
-		if err != nil {
-			return err
-		}
-		finalState = string(finalStateBytes)
-	}
-
 	var aggregatedSigs AggregatedSignatures
 	aggregatedSigs.Build(seal.AggregatedApprovalSigs)
 
 	b.BlockId = seal.BlockID.String()
 	b.ResultId = seal.ResultID.String()
-	b.FinalState = finalState
+	b.FinalState = seal.FinalState.String()
 	b.AggregatedApprovalSignatures = aggregatedSigs
 	return nil
 }
