@@ -419,7 +419,7 @@ func (e *blockComputer) executeBlock(
 	}
 
 	e.log.Debug().
-		Str("block_id", blockIdStr).
+		Hex("block_id", blockId[:]).
 		Msg("all views committed")
 
 	e.metrics.ExecutionBlockCachedPrograms(derivedBlockData.CachedPrograms())

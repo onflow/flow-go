@@ -476,8 +476,9 @@ func (e *Core) execute(ctx context.Context, executable *entity.ExecutableBlock) 
 		return nil
 	}
 
+	blockID := executable.BlockID()
 	e.log.Info().
-		Str("block_id", executable.BlockID().String()).
+		Hex("block_id", blockID[:]).
 		Uint64("height", executable.Block.Header.Height).
 		Int("collections", len(executable.CompleteCollections)).
 		Msgf("executing block")
