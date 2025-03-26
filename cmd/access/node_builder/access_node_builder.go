@@ -323,7 +323,7 @@ type FlowAccessNodeBuilder struct {
 	PingMetrics                  module.PingMetrics
 	Committee                    hotstuff.DynamicCommittee
 	Finalized                    *flow.Header // latest finalized block that the node knows of at startup time
-	Pending                      []*flow.Header
+	Pending                      []*flow.Proposal
 	FollowerCore                 module.HotStuffFollower
 	Validator                    hotstuff.Validator
 	ExecutionDataDownloader      execution_data.Downloader
@@ -425,7 +425,7 @@ func (builder *FlowAccessNodeBuilder) buildCommittee() *FlowAccessNodeBuilder {
 
 func (builder *FlowAccessNodeBuilder) buildLatestHeader() *FlowAccessNodeBuilder {
 	builder.Module("latest header", func(node *cmd.NodeConfig) error {
-		finalized, pending, err := recovery.FindLatest(node.State, node.Storage.Headers)
+		finalized, pending, err := recovery.FindLatest(node.State, node.Storage.Headers, node.Storage.ProposalSignatures)
 		builder.Finalized, builder.Pending = finalized, pending
 
 		return err
@@ -523,6 +523,7 @@ func (builder *FlowAccessNodeBuilder) buildSyncEngine() *FlowAccessNodeBuilder {
 			node.Me,
 			node.State,
 			node.Storage.Blocks,
+			node.Storage.ProposalSignatures,
 			builder.FollowerEng,
 			builder.SyncCore,
 			builder.SyncEngineParticipantsProviderFactory(),
@@ -2202,6 +2203,7 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 				node.Me,
 				node.State,
 				node.Storage.Blocks,
+				node.Storage.ProposalSignatures,
 				builder.SyncCore,
 			)
 			if err != nil {

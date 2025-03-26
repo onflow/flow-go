@@ -2,6 +2,7 @@ package cache
 
 import (
 	"errors"
+	"fmt"
 	"sync"
 
 	"github.com/rs/zerolog"
@@ -19,17 +20,17 @@ var (
 	ErrDisconnectedBatch = errors.New("batch must be a sequence of connected blocks")
 )
 
-type BlocksByID map[flow.Identifier]*flow.Block
+type BlocksByID map[flow.Identifier]*flow.BlockProposal
 
 // batchContext contains contextual data for batch of blocks. Per convention, a batch is
 // a continuous sequence of blocks, i.e. `batch[k]` is the parent block of `batch[k+1]`.
 type batchContext struct {
-	batchParent *flow.Block // immediate parent of the first block in batch, i.e. `batch[0]`
-	batchChild  *flow.Block // immediate child of the last block in batch, i.e. `batch[len(batch)-1]`
+	batchParent *flow.BlockProposal // immediate parent of the first block in batch, i.e. `batch[0]`
+	batchChild  *flow.BlockProposal // immediate child of the last block in batch, i.e. `batch[len(batch)-1]`
 
 	// equivocatingBlocks holds the list of equivocations that the batch contained, when comparing to the
 	// cached blocks. An equivocation are two blocks for the same view that have different block IDs.
-	equivocatingBlocks [][2]*flow.Block
+	equivocatingBlocks [][2]*flow.BlockProposal
 
 	// redundant marks if ALL blocks in batch are already stored in cache, meaning that
 	// such input is identical to what was previously processed.
@@ -55,11 +56,11 @@ type Cache struct {
 
 // Peek performs lookup of cached block by blockID.
 // Concurrency safe
-func (c *Cache) Peek(blockID flow.Identifier) *flow.Block {
+func (c *Cache) Peek(blockID flow.Identifier) *flow.BlockProposal {
 	c.lock.RLock()
 	defer c.lock.RUnlock()
 	if block, found := c.backend.ByID(blockID); found {
-		return block.(*flow.Block)
+		return block.(*flow.BlockProposal)
 	} else {
 		return nil
 	}
@@ -90,21 +91,21 @@ func NewCache(log zerolog.Logger, limit uint32, collector module.HeroCacheMetric
 // WARNING: Concurrency safety of this function is guaranteed by `c.lock`. This method is only called
 // by `herocache.Cache.Add` and we perform this call while `c.lock` is in locked state.
 func (c *Cache) handleEjectedEntity(entity flow.Entity) {
-	block := entity.(*flow.Block)
+	block := entity.(*flow.BlockProposal)
 	blockID := block.ID()
 
 	// remove block from the set of blocks for this view
-	blocksForView := c.byView[block.Header.View]
+	blocksForView := c.byView[block.Block.Header.View]
 	delete(blocksForView, blockID)
 	if len(blocksForView) == 0 {
-		delete(c.byView, block.Header.View)
+		delete(c.byView, block.Block.Header.View)
 	}
 
 	// remove block from the parent's set of its children
-	siblings := c.byParent[block.Header.ParentID]
+	siblings := c.byParent[block.Block.Header.ParentID]
 	delete(siblings, blockID)
 	if len(siblings) == 0 {
-		delete(c.byParent, block.Header.ParentID)
+		delete(c.byParent, block.Block.Header.ParentID)
 	}
 }
 
@@ -118,14 +119,14 @@ func (c *Cache) handleEjectedEntity(entity flow.Entity) {
 //   - parent for first block available in cache allowing to certify it, we can certify one extra block(parent).
 //
 // - for last block:
-//   - no child available for last block, need to wait for child to certify it.
-//   - child for last block available in cache allowing to certify it, we can certify one extra block(child).
+//   - no child available for last block, need to wait for child to certify it (certify one fewer block).
+//   - child for last block available in cache allowing to certify it, we can certify the last block.
 //
 // All blocks from the batch are stored in the cache to provide deduplication.
 // The function returns any new certified chain of blocks created by addition of the batch.
-// Returns `certifiedBatch, certifyingQC` if the input batch has more than one block, and/or if either a child
+// Returns `certifiedBatch` if the input batch has more than one block, and/or if either a child
 // or parent of the batch is in the cache. The implementation correctly handles cases with `len(batch) == 1`
-// or `len(batch) == 0`, where it returns `nil, nil` in the following cases:
+// or `len(batch) == 0`, where it returns `nil` in the following cases:
 //   - the input batch has exactly one block and neither its parent nor child is in the cache.
 //   - the input batch is empty
 //
@@ -134,18 +135,18 @@ func (c *Cache) handleEjectedEntity(entity flow.Entity) {
 //
 // Expected errors during normal operations:
 //   - ErrDisconnectedBatch
-func (c *Cache) AddBlocks(batch []*flow.Block) (certifiedBatch []*flow.Block, certifyingQC *flow.QuorumCertificate, err error) {
+func (c *Cache) AddBlocks(batch []*flow.BlockProposal) (certifiedBatch []flow.CertifiedBlock, err error) {
 	batch = c.trimLeadingBlocksBelowPruningThreshold(batch)
 
 	batchSize := len(batch)
 	if batchSize < 1 { // empty batch is no-op
-		return nil, nil, nil
+		return nil, nil
 	}
 
 	// precompute block IDs (outside of lock) and sanity-check batch itself that blocks are connected
 	blockIDs, err := enforceSequentialBlocks(batch)
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 
 	// Single atomic operation (main logic), with result returned as `batchContext`
@@ -159,38 +160,40 @@ func (c *Cache) AddBlocks(batch []*flow.Block) (certifiedBatch []*flow.Block, ce
 	//    are already known: then skip further processing
 	bc := c.unsafeAtomicAdd(blockIDs, batch)
 	if bc.redundant {
-		return nil, nil, nil
+		return nil, nil
 	}
-
-	// If there exists a child of the last block in the batch, then the entire batch is certified.
-	// Otherwise, all blocks in the batch _except_ for the last one are certified
-	if bc.batchChild != nil {
-		certifiedBatch = batch
-		certifyingQC = bc.batchChild.Header.QuorumCertificate()
-	} else {
-		certifiedBatch = batch[:batchSize-1]
-		certifyingQC = batch[batchSize-1].Header.QuorumCertificate()
-	}
-	// caution: in the case `len(batch) == 1`, the `certifiedBatch` might be empty now (else-case)
 
 	// If there exists a parent for the batch's first block, then this is parent is certified
 	//  by the batch. Hence, we prepend certifiedBatch by the parent.
 	if bc.batchParent != nil {
-		s := make([]*flow.Block, 0, 1+len(certifiedBatch))
-		s = append(s, bc.batchParent)
-		certifiedBatch = append(s, certifiedBatch...)
+		batch = append([]*flow.BlockProposal{bc.batchParent}, batch...)
 	}
+	// If there exists a child of the last block in the batch, then the entire batch is certified.
+	// Otherwise, all blocks in the batch _except_ for the last one are certified
+	if bc.batchChild != nil {
+		batch = append(batch, bc.batchChild)
+	}
+
+	certifiedBatch = make([]flow.CertifiedBlock, 0, len(batch)-1)
+	for i, proposal := range batch[:len(batch)-1] {
+		certifiedBlock, err := flow.NewCertifiedBlock(proposal.Block, batch[i+1].Block.Header.QuorumCertificate(), proposal.ProposerSigData)
+		if err != nil {
+			return nil, fmt.Errorf("could not construct certified block: %w", err)
+		}
+		certifiedBatch = append(certifiedBatch, certifiedBlock)
+	}
+	// caution: in the case `len(batch) == 1`, the `certifiedBatch` might be empty now (if there was no batchParent or batchChild)
 
 	// report equivocations
 	for _, pair := range bc.equivocatingBlocks {
-		c.notifier.OnDoubleProposeDetected(model.BlockFromFlow(pair[0].Header), model.BlockFromFlow(pair[1].Header))
+		c.notifier.OnDoubleProposeDetected(model.BlockFromFlow(pair[0].Block.Header), model.BlockFromFlow(pair[1].Block.Header))
 	}
 
 	if len(certifiedBatch) < 1 {
-		return nil, nil, nil
+		return nil, nil
 	}
 
-	return certifiedBatch, certifyingQC, nil
+	return certifiedBatch, nil
 }
 
 // PruneUpToView sets the lowest view that we are accepting blocks for. Any blocks
@@ -235,10 +238,10 @@ func (c *Cache) removeByView(view uint64, blocks BlocksByID) {
 	for blockID, block := range blocks {
 		c.backend.Remove(blockID)
 
-		siblings := c.byParent[block.Header.ParentID]
+		siblings := c.byParent[block.Block.Header.ParentID]
 		delete(siblings, blockID)
 		if len(siblings) == 0 {
-			delete(c.byParent, block.Header.ParentID)
+			delete(c.byParent, block.Block.Header.ParentID)
 		}
 	}
 
@@ -260,13 +263,13 @@ func (c *Cache) removeByView(view uint64, blocks BlocksByID) {
 //   - requires pre-computed blockIDs in the same order as fullBlocks
 //
 // Any errors are symptoms of internal state corruption.
-func (c *Cache) unsafeAtomicAdd(blockIDs []flow.Identifier, fullBlocks []*flow.Block) (bc batchContext) {
+func (c *Cache) unsafeAtomicAdd(blockIDs []flow.Identifier, fullBlocks []*flow.BlockProposal) (bc batchContext) {
 	c.lock.Lock()
 	defer c.lock.Unlock()
 
 	// check whether we have the parent of first block already in our cache:
-	if parent, ok := c.backend.ByID(fullBlocks[0].Header.ParentID); ok {
-		bc.batchParent = parent.(*flow.Block)
+	if parent, ok := c.backend.ByID(fullBlocks[0].Block.Header.ParentID); ok {
+		bc.batchParent = parent.(*flow.BlockProposal)
 	}
 
 	// check whether we have a child of last block already in our cache:
@@ -286,7 +289,7 @@ func (c *Cache) unsafeAtomicAdd(blockIDs []flow.Identifier, fullBlocks []*flow.B
 	for i, block := range fullBlocks {
 		equivocation, cached := c.cache(blockIDs[i], block)
 		if equivocation != nil {
-			bc.equivocatingBlocks = append(bc.equivocatingBlocks, [2]*flow.Block{equivocation, block})
+			bc.equivocatingBlocks = append(bc.equivocatingBlocks, [2]*flow.BlockProposal{equivocation, block})
 		}
 		if cached {
 			storedBlocks++
@@ -301,8 +304,8 @@ func (c *Cache) unsafeAtomicAdd(blockIDs []flow.Identifier, fullBlocks []*flow.B
 // equivocation. The first return value contains the already-cached equivocating block or `nil` otherwise.
 // Repeated calls with the same block are no-ops.
 // CAUTION: not concurrency safe: execute within Cache's lock.
-func (c *Cache) cache(blockID flow.Identifier, block *flow.Block) (equivocation *flow.Block, stored bool) {
-	cachedBlocksAtView, haveCachedBlocksAtView := c.byView[block.Header.View]
+func (c *Cache) cache(blockID flow.Identifier, block *flow.BlockProposal) (equivocation *flow.BlockProposal, stored bool) {
+	cachedBlocksAtView, haveCachedBlocksAtView := c.byView[block.Block.Header.View]
 	// Check whether there is a block with the same view already in the cache.
 	// During happy-path operations `cachedBlocksAtView` contains usually zero blocks or exactly one block, which
 	// is our input `block` (duplicate). Larger sets of blocks can only be caused by slashable byzantine actions.
@@ -327,15 +330,15 @@ func (c *Cache) cache(blockID flow.Identifier, block *flow.Block) (equivocation 
 	// populate `byView` index
 	if !haveCachedBlocksAtView {
 		cachedBlocksAtView = make(BlocksByID)
-		c.byView[block.Header.View] = cachedBlocksAtView
+		c.byView[block.Block.Header.View] = cachedBlocksAtView
 	}
 	cachedBlocksAtView[blockID] = block
 
 	// populate `byParent` index
-	siblings, ok := c.byParent[block.Header.ParentID]
+	siblings, ok := c.byParent[block.Block.Header.ParentID]
 	if !ok {
 		siblings = make(BlocksByID)
-		c.byParent[block.Header.ParentID] = siblings
+		c.byParent[block.Block.Header.ParentID] = siblings
 	}
 	siblings[blockID] = block
 
@@ -346,15 +349,15 @@ func (c *Cache) cache(blockID flow.Identifier, block *flow.Block) (equivocation 
 // is the parent block of `batch[k+1]`. Returns a slice with IDs of the blocks in the same order
 // as batch. Returns `ErrDisconnectedBatch` if blocks are not a continuous sequence.
 // Pure function, hence concurrency safe.
-func enforceSequentialBlocks(batch []*flow.Block) ([]flow.Identifier, error) {
+func enforceSequentialBlocks(batch []*flow.BlockProposal) ([]flow.Identifier, error) {
 	blockIDs := make([]flow.Identifier, 0, len(batch))
-	parentID := batch[0].ID()
+	parentID := batch[0].Block.ID()
 	blockIDs = append(blockIDs, parentID)
 	for _, b := range batch[1:] {
-		if b.Header.ParentID != parentID {
+		if b.Block.Header.ParentID != parentID {
 			return nil, ErrDisconnectedBatch
 		}
-		parentID = b.ID()
+		parentID = b.Block.ID()
 		blockIDs = append(blockIDs, parentID)
 	}
 	return blockIDs, nil
@@ -370,10 +373,10 @@ func enforceSequentialBlocks(batch []*flow.Block) ([]flow.Identifier, error) {
 //   - For this method, we do _not_ assume any specific ordering of the blocks.
 //   - We drop all blocks at the _beginning_ that we anyway would not want to cache.
 //   - The returned slice of blocks could still contain blocks with views below the cutoff.
-func (c *Cache) trimLeadingBlocksBelowPruningThreshold(batch []*flow.Block) []*flow.Block {
+func (c *Cache) trimLeadingBlocksBelowPruningThreshold(batch []*flow.BlockProposal) []*flow.BlockProposal {
 	lowestView := c.lowestView.Value()
 	for i, block := range batch {
-		if block.Header.View >= lowestView {
+		if block.Block.Header.View >= lowestView {
 			return batch[i:]
 		}
 	}

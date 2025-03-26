@@ -261,7 +261,7 @@ func certifiedBlocksFixture(count int, parent *flow.Header) []flow.CertifiedBloc
 	result := make([]flow.CertifiedBlock, 0, count)
 	blocks := unittest.ChainFixtureFrom(count, parent)
 	for i := 0; i < count-1; i++ {
-		certBlock, err := flow.NewCertifiedBlock(blocks[i], blocks[i+1].Header.QuorumCertificate())
+		certBlock, err := flow.NewCertifiedBlock(blocks[i], blocks[i+1].Header.QuorumCertificate(), unittest.SignatureFixture())
 		if err != nil {
 			// this should never happen, as we are specifically constructing a certifying QC for the input block
 			panic(fmt.Sprintf("unexpected error constructing certified block: %s", err.Error()))
@@ -274,10 +274,5 @@ func certifiedBlocksFixture(count int, parent *flow.Header) []flow.CertifiedBloc
 
 // certifiedBlockFixture builds a certified block using a QC with fixture signatures.
 func certifiedBlockFixture(block *flow.Block) flow.CertifiedBlock {
-	certBlock, err := flow.NewCertifiedBlock(block, unittest.CertifyBlock(block.Header))
-	if err != nil {
-		// this should never happen, as we are specifically constructing a certifying QC for the input block
-		panic(fmt.Sprintf("unexpected error constructing certified block: %s", err.Error()))
-	}
-	return certBlock
+	return *unittest.NewCertifiedBlock(block)
 }

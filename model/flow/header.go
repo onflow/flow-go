@@ -25,6 +25,18 @@ type BlockProposal struct {
 	ProposerSigData []byte
 }
 
+// TODO(malleability, #7100, herocache): this is only to support insertion and retrieval by parentID for follower pending blocks herocache
+func (b *BlockProposal) ID() Identifier {
+	return b.Block.ID()
+}
+func (b *BlockProposal) Checksum() Identifier {
+	return MakeID(b)
+}
+
+func (b *BlockProposal) HeaderProposal() *Proposal {
+	return &Proposal{Header: b.Block.Header, ProposerSigData: b.ProposerSigData}
+}
+
 // Header contains all meta-data for a block, as well as a hash representing
 // the combined payload of the entire block. It is what consensus nodes agree
 // on after validating the contents against the payload hash.
