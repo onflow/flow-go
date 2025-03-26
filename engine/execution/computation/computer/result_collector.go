@@ -405,7 +405,7 @@ func (collector *resultCollector) Finalize(
 
 	executionResult := flow.NewExecutionResult(
 		collector.parentBlockExecutionResultID,
-		collector.result.ExecutableBlock.ID(),
+		collector.result.ExecutableBlock.BlockID(),
 		collector.result.AllChunks(),
 		collector.result.AllConvertedServiceEvents(),
 		executionDataID)
