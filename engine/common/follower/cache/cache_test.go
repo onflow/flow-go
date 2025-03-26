@@ -357,7 +357,7 @@ func (s *CacheSuite) TestAddOverCacheLimit() {
 					if len(certifiedBlocks) > 0 {
 						uniqueBlocksLock.Lock()
 						for _, block := range certifiedBlocks {
-							uniqueBlocks[block.ID()] = struct{}{}
+							uniqueBlocks[block.BlockID()] = struct{}{}
 						}
 						if len(uniqueBlocks) == certifiedGoal {
 							done.Store(true)

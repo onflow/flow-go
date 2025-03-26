@@ -280,7 +280,7 @@ func (s *CoreSuite) TestConcurrentAdd() {
 	s.follower.On("AddCertifiedBlock", mock.Anything).Return(nil).Run(func(args mock.Arguments) {
 		// ensure that proposals are submitted in-order
 		block := args.Get(0).(*model.CertifiedBlock)
-		if block.ID() == targetSubmittedBlockID {
+		if block.BlockID() == targetSubmittedBlockID {
 			close(done)
 		}
 	}).Return().Times(len(blocks) - 1) // all proposals have to be submitted
@@ -315,5 +315,5 @@ func (s *CoreSuite) TestConcurrentAdd() {
 
 // blockWithID returns a testify `argumentMatcher` that only accepts blocks with the given ID
 func blockWithID(expectedBlockID flow.Identifier) interface{} {
-	return mock.MatchedBy(func(block *model.CertifiedBlock) bool { return expectedBlockID == block.ID() })
+	return mock.MatchedBy(func(block *model.CertifiedBlock) bool { return expectedBlockID == block.BlockID() })
 }

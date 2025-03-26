@@ -98,9 +98,10 @@ func NewCertifiedBlock(block *Block, qc *QuorumCertificate, sig []byte) (Certifi
 	return CertifiedBlock{Block: block, CertifyingQC: qc, ProposerSignature: sig}, nil
 }
 
-// ID returns unique identifier for the block.
+// BlockID returns a unique identifier for the block (the ID signed to produce a block vote).
 // To avoid repeated computation, we use value from the QC.
-func (b *CertifiedBlock) ID() Identifier {
+// CAUTION: This is not a cryptographic commitment for the CertifiedBlock model.
+func (b *CertifiedBlock) BlockID() Identifier {
 	return b.CertifyingQC.BlockID
 }
 
