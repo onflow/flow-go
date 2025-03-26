@@ -33,7 +33,7 @@ func init() {
 
 	Cmd.Flags().Uint64Var(&flagStartView, "start-view", 0, "the inclusive first view to get leader selection for")
 	Cmd.Flags().Uint64Var(&flagEndView, "end-view", 0, "the inclusive last view to get leader selection for")
-	Cmd.Flags().StringVar(&flagSnapshotPath, "snapshot-path", "", "the path to the snapshot to use")
+	Cmd.Flags().StringVar(&flagSnapshotPath, "snapshot-path", "", "the path to the snapshot to use (or pipe snapshot to stdin and omit this flag)")
 	cmd.MarkFlagRequired(Cmd, "start-view")
 	cmd.MarkFlagRequired(Cmd, "end-view")
 }
@@ -55,7 +55,7 @@ func run(*cobra.Command, []string) {
 	var snapshot inmem.EncodableSnapshot
 	err := json.NewDecoder(inputBuffer).Decode(&snapshot)
 	if err != nil {
-		log.Fatal().Err(err).Msg("Failed to read snapshot from stdin")
+		log.Fatal().Err(err).Msg("Failed to read snapshot")
 	}
 
 	snap := inmem.SnapshotFromEncodable(snapshot)
