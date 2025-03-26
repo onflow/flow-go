@@ -12,7 +12,7 @@ import (
 	"github.com/onflow/flow-go/storage/badger/transaction"
 )
 
-// ProposalSignatures implements a simple read-only proposal signature storage around a badger DB.
+// ProposalSignatures implements a proposal signature storage around a badger DB.
 type ProposalSignatures struct {
 	db    *badger.DB
 	cache *Cache[flow.Identifier, []byte]
