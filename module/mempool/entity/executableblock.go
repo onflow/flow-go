@@ -19,7 +19,7 @@ type CompleteCollection struct {
 //
 // It assumes that the attached Block is immutable, so take care in not modifying or changing the inner
 // *flow.Block, otherwise the struct will be in an inconsistent state. It requires the Block is immutable
-// because it lazily loads the Block.ID() into the private blockID field, on the first call to ExecutableBlock.ID()
+// because it lazy loads the Block.ID() into the private blockID field, on the first call to ExecutableBlock.BlockID()
 // All future calls to BlockID will not call Block.ID(), therefore if the Block changes, the blockID will not match the Block.
 type ExecutableBlock struct {
 	blockID             flow.Identifier
