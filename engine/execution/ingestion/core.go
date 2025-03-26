@@ -304,13 +304,10 @@ func (e *Core) enqueuBlock(block *flow.Block, blockID flow.Identifier) (
 		}
 
 		// now re-enqueue the block with parent commit
-		missing, execs, err := e.blockQueue.HandleBlock(block, &parentCommitment)
+		missingColls, executables, err = e.blockQueue.HandleBlock(block, &parentCommitment)
 		if err != nil {
 			return nil, nil, fmt.Errorf("unexpected error while reenqueue block to block queue: %w", err)
 		}
-
-		missingColls = append(missingColls, missing...)
-		executables = append(executables, execs...)
 	}
 
 	lg.Info().Bool("parent_is_executed", false).
