@@ -55,7 +55,7 @@ var transactionResultsCmd = &cobra.Command{
 				log.Error().Err(err).Msgf("could not get transaction result for block id and transaction id: %v", txID)
 				return
 			}
-			common.PrettyPrintEntity(transactionResult)
+			common.PrettyPrint(transactionResult)
 		}
 	},
 }
