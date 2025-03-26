@@ -171,7 +171,7 @@ func (m *FollowerState) ExtendCertified(ctx context.Context, certified *flow.Cer
 	}
 
 	// check if the block header is a valid extension of parent block
-	err = m.headerExtend(ctx, candidate, nil, certifyingQC, deferredDbOps)
+	err = m.headerExtend(ctx, candidate, certified.ProposerSignature, certifyingQC, deferredDbOps)
 	if err != nil {
 		// since we have a QC for this block, it cannot be an invalid extension
 		return fmt.Errorf("unexpected invalid block (id=%x) with certifying qc (id=%x): %s",

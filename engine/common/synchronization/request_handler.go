@@ -234,11 +234,22 @@ func (r *RequestHandler) onRangeRequest(originID flow.Identifier, req *messages.
 		if err != nil {
 			return fmt.Errorf("could not get block for height (%d): %w", height, err)
 		}
-		sig, err := r.sigs.ByBlockID(block.ID())
+		blockID := block.ID()
+		sig, err := r.sigs.ByBlockID(blockID)
+		if errors.Is(err, storage.ErrNotFound) {
+			logger.Warn().Str("blockID", blockID.String()).Msg("proposer signature not found in storage")
+			// proposer signature will be nil; we can try to verify blocks via QCs of child blocks instead
+		}
 		if err != nil {
-			return fmt.Errorf("could not retrieve proposer signature for block (%s): %w", block.ID(), err)
+			return fmt.Errorf("could not get proposer signature for height (%d): %w", height, err)
 		}
 		blocks = append(blocks, *messages.NewBlockProposal(&flow.BlockProposal{Block: block, ProposerSigData: sig}))
+	}
+	// At least the last block of the block response should be sent with a valid proposer signature.
+	// Other blocks can be verified via QCs included in the headers.
+	if len(blocks) > 0 && blocks[len(blocks)-1].ProposerSigData == nil {
+		// the response will not be fully verifiable due to lack of proposer signature/QC for the final block
+		return fmt.Errorf("block response not verifiable: no proposer signature stored for final block (height %d)", blocks[len(blocks)-1].Block.Header.Height)
 	}
 
 	// if there are no blocks to send, skip network message

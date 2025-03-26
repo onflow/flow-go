@@ -138,6 +138,7 @@ func (s *CoreSuite) TestProcessingRangeHappyPath() {
 	wg.Add(len(proposals) - 1)
 	for i := 1; i < len(proposals); i++ {
 		certified := unittest.CertifiedByChild(proposals[i-1].Block, proposals[i].Block)
+		certified.ProposerSignature = proposals[i-1].ProposerSigData
 		s.state.On("ExtendCertified", mock.Anything, certified).Return(nil).Once()
 		s.follower.On("AddCertifiedBlock", blockWithID(proposals[i-1].Block.ID())).Run(func(args mock.Arguments) {
 			wg.Done()

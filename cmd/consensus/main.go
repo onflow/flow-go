@@ -793,19 +793,11 @@ func main() {
 			if !startupTime.IsZero() {
 				opts = append(opts, consensus.WithStartupTime(startupTime))
 			}
-			finalizedBlock, pendingOrig, err := recovery.FindLatest(node.State, node.Storage.Headers)
+			finalizedBlock, pending, err := recovery.FindLatest(node.State, node.Storage.Headers, node.Storage.ProposalSignatures)
 			if err != nil {
 				return nil, err
 			}
 			// TODO(malleability, #7100) proposer signature storage
-			pending := make([]*flow.Proposal, 0, len(pendingOrig))
-			for _, p := range pendingOrig {
-				sig, err := node.Storage.ProposalSignatures.ByBlockID(p.ID())
-				if err != nil {
-					return nil, fmt.Errorf("could not find proposer signature for pending block: %w", err)
-				}
-				pending = append(pending, &flow.Proposal{Header: p, ProposerSigData: sig})
-			}
 
 			// initialize hotstuff consensus algorithm
 			hot, err = consensus.NewParticipant(

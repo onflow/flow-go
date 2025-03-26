@@ -173,12 +173,7 @@ func (c *ComplianceCore) OnBlockRange(originID flow.Identifier, batch []*flow.Bl
 		}
 	}
 
-	blocks := make([]*flow.Block, 0, len(batch))
-	for _, block := range batch {
-		blocks = append(blocks, block.Block)
-	}
-
-	certifiedBatch, certifyingQC, err := c.pendingCache.AddBlocks(blocks)
+	certifiedBatch, err := c.pendingCache.AddBlocks(batch)
 	if err != nil {
 		return fmt.Errorf("could not add a range of pending blocks: %w", err) // ErrDisconnectedBatch or exception
 	}
@@ -187,15 +182,11 @@ func (c *ComplianceCore) OnBlockRange(originID flow.Identifier, batch []*flow.Bl
 	if len(certifiedBatch) < 1 {
 		return nil
 	}
-	certifiedRange, err := rangeToCertifiedBlocks(certifiedBatch, certifyingQC)
-	if err != nil {
-		return fmt.Errorf("converting the certified batch to list of certified blocks failed: %w", err)
-	}
 
 	// in case we have already stopped our worker, we use a select statement to avoid
 	// blocking since there is no active consumer for this channel
 	select {
-	case c.certifiedRangesChan <- certifiedRange:
+	case c.certifiedRangesChan <- certifiedBatch:
 	case <-c.ComponentManager.ShutdownSignal():
 	}
 	return nil
@@ -307,28 +298,4 @@ func (c *ComplianceCore) processFinalizedBlock(ctx context.Context, finalized *f
 		return fmt.Errorf("finalizing block %v caused the PendingTree to connect additional blocks, which is a symptom of internal state corruption or a bug", finalized.ID())
 	}
 	return nil
-}
-
-// rangeToCertifiedBlocks transform batch of connected blocks and a QC that certifies last block to a range of
-// certified and connected blocks.
-// Pure function (side-effect free). No errors expected during normal operations.
-func rangeToCertifiedBlocks(certifiedRange []*flow.Block, certifyingQC *flow.QuorumCertificate) (CertifiedBlocks, error) {
-	certifiedBlocks := make(CertifiedBlocks, 0, len(certifiedRange))
-	lastIndex := len(certifiedRange) - 1
-	for i, block := range certifiedRange {
-		var qc *flow.QuorumCertificate
-		if i < lastIndex {
-			qc = certifiedRange[i+1].Header.QuorumCertificate()
-		} else {
-			qc = certifyingQC
-		}
-
-		// bundle block and its certifying QC to `CertifiedBlock`:
-		certBlock, err := flow.NewCertifiedBlock(block, qc)
-		if err != nil {
-			return nil, fmt.Errorf("constructing certified root block failed: %w", err)
-		}
-		certifiedBlocks = append(certifiedBlocks, certBlock)
-	}
-	return certifiedBlocks, nil
 }

@@ -329,7 +329,7 @@ func main() {
 			// create a finalizer for updating the protocol
 			// state when the follower detects newly finalized blocks
 			finalizer := confinalizer.NewFinalizer(node.DB, node.Storage.Headers, followerState, node.Tracer)
-			finalized, pending, err := recovery.FindLatest(node.State, node.Storage.Headers)
+			finalized, pending, err := recovery.FindLatest(node.State, node.Storage.Headers, node.Storage.ProposalSignatures)
 			if err != nil {
 				return nil, fmt.Errorf("could not find latest finalized block and pending blocks to recover consensus follower: %w", err)
 			}

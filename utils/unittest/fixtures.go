@@ -2023,15 +2023,17 @@ func CertifyBlock(header *flow.Header) *flow.QuorumCertificate {
 
 func CertifiedByChild(block *flow.Block, child *flow.Block) *flow.CertifiedBlock {
 	return &flow.CertifiedBlock{
-		Block:        block,
-		CertifyingQC: child.Header.QuorumCertificate(),
+		Block:             block,
+		CertifyingQC:      child.Header.QuorumCertificate(),
+		ProposerSignature: SignatureFixture(),
 	}
 }
 
 func NewCertifiedBlock(block *flow.Block) *flow.CertifiedBlock {
 	return &flow.CertifiedBlock{
-		Block:        block,
-		CertifyingQC: CertifyBlock(block.Header),
+		Block:             block,
+		CertifyingQC:      CertifyBlock(block.Header),
+		ProposerSignature: SignatureFixture(),
 	}
 }
 

@@ -79,22 +79,23 @@ func (s BlockStatus) String() string {
 // therefore proves validity of the block. A certified block satisfies:
 // Block.View == QC.View and Block.BlockID == QC.BlockID
 type CertifiedBlock struct {
-	Block        *Block
-	CertifyingQC *QuorumCertificate
+	Block             *Block
+	CertifyingQC      *QuorumCertificate
+	ProposerSignature []byte // while not necessary for consensus followers, participants use it to verify the block when recovering or catching up
 }
 
 // NewCertifiedBlock constructs a new certified block. It checks the consistency
 // requirements and errors otherwise:
 //
 //	Block.View == QC.View and Block.BlockID == QC.BlockID
-func NewCertifiedBlock(block *Block, qc *QuorumCertificate) (CertifiedBlock, error) {
+func NewCertifiedBlock(block *Block, qc *QuorumCertificate, sig []byte) (CertifiedBlock, error) {
 	if block.Header.View != qc.View {
 		return CertifiedBlock{}, fmt.Errorf("block's view (%d) should equal the qc's view (%d)", block.Header.View, qc.View)
 	}
 	if block.ID() != qc.BlockID {
 		return CertifiedBlock{}, fmt.Errorf("block's ID (%v) should equal the block referenced by the qc (%d)", block.ID(), qc.BlockID)
 	}
-	return CertifiedBlock{Block: block, CertifyingQC: qc}, nil
+	return CertifiedBlock{Block: block, CertifyingQC: qc, ProposerSignature: sig}, nil
 }
 
 // ID returns unique identifier for the block.

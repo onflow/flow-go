@@ -278,7 +278,7 @@ type ObserverServiceBuilder struct {
 	FollowerDistributor  *pubsub.FollowerDistributor
 	Committee            hotstuff.DynamicCommittee
 	Finalized            *flow.Header
-	Pending              []*flow.Header
+	Pending              []*flow.Proposal
 	FollowerCore         module.HotStuffFollower
 	ExecutionIndexer     *indexer.Indexer
 	ExecutionIndexerCore *indexer.IndexerCore
@@ -447,7 +447,7 @@ func (builder *ObserverServiceBuilder) buildCommittee() *ObserverServiceBuilder 
 
 func (builder *ObserverServiceBuilder) buildLatestHeader() *ObserverServiceBuilder {
 	builder.Module("latest header", func(node *cmd.NodeConfig) error {
-		finalized, pending, err := recovery.FindLatest(node.State, node.Storage.Headers)
+		finalized, pending, err := recovery.FindLatest(node.State, node.Storage.Headers, node.Storage.ProposalSignatures)
 		builder.Finalized, builder.Pending = finalized, pending
 
 		return err

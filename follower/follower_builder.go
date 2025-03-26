@@ -99,7 +99,7 @@ type FollowerServiceBuilder struct {
 	FollowerDistributor *pubsub.FollowerDistributor
 	Committee           hotstuff.DynamicCommittee
 	Finalized           *flow.Header
-	Pending             []*flow.Header
+	Pending             []*flow.Proposal
 	FollowerCore        module.HotStuffFollower
 	// for the observer, the sync engine participants provider is the libp2p peer store which is not
 	// available until after the network has started. Hence, a factory function that needs to be called just before
@@ -186,7 +186,7 @@ func (builder *FollowerServiceBuilder) buildCommittee() *FollowerServiceBuilder 
 
 func (builder *FollowerServiceBuilder) buildLatestHeader() *FollowerServiceBuilder {
 	builder.Module("latest header", func(node *cmd.NodeConfig) error {
-		finalized, pending, err := recovery.FindLatest(node.State, node.Storage.Headers)
+		finalized, pending, err := recovery.FindLatest(node.State, node.Storage.Headers, node.Storage.ProposalSignatures)
 		builder.Finalized, builder.Pending = finalized, pending
 
 		return err

@@ -915,7 +915,7 @@ func createFollowerCore(
 ) (module.HotStuffFollower, *confinalizer.Finalizer) {
 	finalizer := confinalizer.NewFinalizer(node.PublicDB, node.Headers, followerState, trace.NewNoopTracer())
 
-	pending := make([]*flow.Header, 0)
+	pending := make([]*flow.Proposal, 0)
 
 	// creates a consensus follower with noop consumer as the notifier
 	followerCore, err := consensus.NewFollower(
