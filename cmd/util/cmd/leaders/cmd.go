@@ -2,6 +2,7 @@ package leaders
 
 import (
 	"encoding/json"
+	"io"
 	"os"
 
 	"github.com/rs/zerolog/log"
@@ -14,14 +15,17 @@ import (
 )
 
 var (
-	flagStartView uint64
-	flagEndView   uint64
+	flagSnapshotPath string
+	flagStartView    uint64
+	flagEndView      uint64
 )
+
 var Cmd = &cobra.Command{
 	Use:   "leaders",
 	Short: "Get leader selection for a view range.",
 	Long: `Get leader selection for a view range in the current epoch for a provided snapshot.
- Expects a valid protocol state snapshot JSON to be piped into STDIN. Writes a JSON list of leaders for the given view range to STDOUT.`,
+Expects a valid protocol state snapshot JSON to be piped into STDIN, or provided as the snapshot-path flag.
+Writes a JSON list of leaders for the given view range to STDOUT.`,
 	Run: run,
 }
 
@@ -29,14 +33,27 @@ func init() {
 
 	Cmd.Flags().Uint64Var(&flagStartView, "start-view", 0, "the inclusive first view to get leader selection for")
 	Cmd.Flags().Uint64Var(&flagEndView, "end-view", 0, "the inclusive last view to get leader selection for")
+	Cmd.Flags().StringVar(&flagSnapshotPath, "snapshot-path", "", "the path to the snapshot to use")
 	cmd.MarkFlagRequired(Cmd, "start-view")
 	cmd.MarkFlagRequired(Cmd, "end-view")
 }
 
 func run(*cobra.Command, []string) {
 
+	// If a snapshot file is specified, read the file. Otherwise assume the snapshot is piped to stdin.
+	var inputBuffer io.Reader
+	if flagSnapshotPath != "" {
+		snapshotFile, err := os.Open(flagSnapshotPath)
+		if err != nil {
+			log.Fatal().Err(err).Msg("cannot open snapshot file")
+		}
+		inputBuffer = snapshotFile
+	} else {
+		inputBuffer = os.Stdin
+	}
+
 	var snapshot inmem.EncodableSnapshot
-	err := json.NewDecoder(os.Stdin).Decode(&snapshot)
+	err := json.NewDecoder(inputBuffer).Decode(&snapshot)
 	if err != nil {
 		log.Fatal().Err(err).Msg("Failed to read snapshot from stdin")
 	}
