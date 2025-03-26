@@ -55,6 +55,8 @@ type ResultApproval struct {
 	VerifierSignature crypto.Signature
 }
 
+var _ Entity = (*ResultApproval)(nil)
+
 // ID generates a unique identifier using result approval full content
 func (ra ResultApproval) ID() Identifier {
 	stub := struct {
