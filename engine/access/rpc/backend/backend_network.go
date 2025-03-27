@@ -59,8 +59,8 @@ func (b *backendNetwork) GetProtocolStateSnapshotByBlockID(ctx context.Context, 
 	snapshotHeadByBlockId, err := snapshot.Head()
 	if err != nil {
 		// storage.ErrNotFound is specifically NOT allowed since the snapshot's reference block must exist
-		// within the snapshot.
-		err = access.RequireErrorIs(ctx, err, state.ErrUnknownSnapshotReference)
+		// within the snapshot. we can ignore the actual error since it is rewritten below
+		_ = access.RequireErrorIs(ctx, err, state.ErrUnknownSnapshotReference)
 		return nil, access.NewDataNotFoundError("snapshot", fmt.Errorf("failed to retrieve a valid snapshot: block not found"))
 	}
 
@@ -69,7 +69,8 @@ func (b *backendNetwork) GetProtocolStateSnapshotByBlockID(ctx context.Context, 
 	// If they match, then the queried block must be finalized.
 	blockIDFinalizedAtHeight, err := b.headers.BlockIDByHeight(snapshotHeadByBlockId.Height)
 	if err != nil {
-		err = access.RequireErrorIs(ctx, err, storage.ErrNotFound)
+		// assert that the error is storage.ErrNotFound. we can ignore the actual error since it is rewritten below
+		_ = access.RequireErrorIs(ctx, err, storage.ErrNotFound)
 
 		// The block exists, but no block has been finalized at its height. Therefore, this block
 		// may be finalized in the future, and the client can retry.
@@ -106,8 +107,8 @@ func (b *backendNetwork) GetProtocolStateSnapshotByHeight(ctx context.Context, b
 	_, err := snapshot.Head()
 	if err != nil {
 		// storage.ErrNotFound is specifically NOT allowed since the snapshot's reference block must exist
-		// within the snapshot.
-		err = access.RequireErrorIs(ctx, err, state.ErrUnknownSnapshotReference)
+		// within the snapshot. we can ignore the actual error since it is rewritten below
+		_ = access.RequireErrorIs(ctx, err, state.ErrUnknownSnapshotReference)
 		return nil, access.NewDataNotFoundError("snapshot", fmt.Errorf("failed to retrieve a valid snapshot: block not found"))
 	}
 
