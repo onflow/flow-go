@@ -25,9 +25,9 @@ func TestAddRemove(t *testing.T) {
 
 	t.Run("should be able to add and rem", func(t *testing.T) {
 		pool := stdmap.NewBackend[flow.Identifier, *unittest.MockEntity]()
-		added := pool.Add(item1.ID(), item1)
+		added := pool.Add(item1.Identifier, item1)
 		require.True(t, added)
-		added = pool.Add(item2.ID(), item2)
+		added = pool.Add(item2.Identifier, item2)
 		require.True(t, added)
 
 		t.Run("should be able to get size", func(t *testing.T) {
@@ -36,13 +36,13 @@ func TestAddRemove(t *testing.T) {
 		})
 
 		t.Run("should be able to get first", func(t *testing.T) {
-			gotItem, exists := pool.Get(item1.ID())
+			gotItem, exists := pool.Get(item1.Identifier)
 			assert.True(t, exists)
 			assert.Equal(t, item1, gotItem)
 		})
 
 		t.Run("should be able to remove first", func(t *testing.T) {
-			removed := pool.Remove(item1.ID())
+			removed := pool.Remove(item1.Identifier)
 			assert.True(t, removed)
 			size := pool.Size()
 			assert.EqualValues(t, uint(1), size)
@@ -51,7 +51,7 @@ func TestAddRemove(t *testing.T) {
 		t.Run("should be able to retrieve all", func(t *testing.T) {
 			items := pool.All()
 			require.Len(t, items, 1)
-			val, exists := items[item2.ID()]
+			val, exists := items[item2.Identifier]
 			require.True(t, exists)
 			assert.Equal(t, item2, val)
 		})
@@ -64,25 +64,25 @@ func TestAdjust(t *testing.T) {
 
 	t.Run("should not adjust if not exist", func(t *testing.T) {
 		pool := stdmap.NewBackend[flow.Identifier, *unittest.MockEntity]()
-		_ = pool.Add(item1.ID(), item1)
+		_ = pool.Add(item1.Identifier, item1)
 
 		// item2 doesn't exist
-		updatedItem, updated := pool.Adjust(item2.ID(), func(old *unittest.MockEntity) *unittest.MockEntity {
+		updatedItem, updated := pool.Adjust(item2.Identifier, func(old *unittest.MockEntity) *unittest.MockEntity {
 			return item2
 		})
 
 		assert.False(t, updated)
 		assert.Nil(t, updatedItem)
 
-		_, found := pool.Get(item2.ID())
+		_, found := pool.Get(item2.Identifier)
 		assert.False(t, found)
 	})
 
 	t.Run("should adjust if exists", func(t *testing.T) {
 		pool := stdmap.NewBackend[flow.Identifier, *unittest.MockEntity]()
-		_ = pool.Add(item1.ID(), item1)
+		_ = pool.Add(item1.Identifier, item1)
 
-		updatedItem, ok := pool.Adjust(item1.ID(), func(old *unittest.MockEntity) *unittest.MockEntity {
+		updatedItem, ok := pool.Adjust(item1.Identifier, func(old *unittest.MockEntity) *unittest.MockEntity {
 			// item 1 exist, got replaced with item2, the value was updated
 			return item2
 		})
@@ -90,7 +90,7 @@ func TestAdjust(t *testing.T) {
 		assert.True(t, ok)
 		assert.Equal(t, updatedItem, item2)
 
-		value2, found := pool.Get(item1.ID())
+		value2, found := pool.Get(item1.Identifier)
 		assert.True(t, found)
 		assert.Equal(t, value2, item2)
 	})
@@ -100,11 +100,11 @@ func TestAdjust(t *testing.T) {
 func Test_DeduplicationByID(t *testing.T) {
 	item1 := unittest.MockEntityFixture()
 	item2 := unittest.MockEntity{Identifier: item1.Identifier} // duplicate
-	assert.True(t, item1.ID() == item2.ID())
+	assert.True(t, item1.Identifier == item2.Identifier)
 
 	pool := stdmap.NewBackend[flow.Identifier, *unittest.MockEntity]()
-	pool.Add(item1.ID(), item1)
-	pool.Add(item2.ID(), item1)
+	pool.Add(item1.Identifier, item1)
+	pool.Add(item2.Identifier, item1)
 	assert.Equal(t, uint(1), pool.Size())
 }
 
@@ -127,7 +127,7 @@ func TestBackend_RunLimitChecking(t *testing.T) {
 			// creates and adds a fake item to the mempool
 			item := unittest.MockEntityFixture()
 			_ = pool.Run(func(backdata mempool.BackData[flow.Identifier, *unittest.MockEntity]) error {
-				added := backdata.Add(item.ID(), item)
+				added := backdata.Add(item.Identifier, item)
 				if !added {
 					return fmt.Errorf("potential race condition on adding to back data")
 				}
@@ -156,7 +156,7 @@ func TestBackend_RegisterEjectionCallback(t *testing.T) {
 
 	// on ejection callback: test whether ejected identity is no longer part of the mempool
 	ensureEntityNotInMempool := func(entity *unittest.MockEntity) {
-		id := entity.ID()
+		id := entity.Identifier
 		go func() {
 			e, found := pool.Get(id)
 			require.False(t, found)
@@ -174,7 +174,7 @@ func TestBackend_RegisterEjectionCallback(t *testing.T) {
 		go func(x int) {
 			// creates and adds a fake item to the mempool
 			item := unittest.MockEntityFixture()
-			pool.Add(item.ID(), item)
+			pool.Add(item.Identifier, item)
 			wg.Done()
 		}(i)
 	}
@@ -239,7 +239,7 @@ func TestBackend_AdjustWithInit_Concurrent_HeroCache(t *testing.T) {
 		go func() {
 			defer adjustDone.Done()
 
-			backend.AdjustWithInit(e.ID(), func(entity *unittest.MockEntity) *unittest.MockEntity {
+			backend.AdjustWithInit(e.Identifier, func(entity *unittest.MockEntity) *unittest.MockEntity {
 				// increment nonce of the entity
 				entity.Nonce++
 				return entity
@@ -252,9 +252,9 @@ func TestBackend_AdjustWithInit_Concurrent_HeroCache(t *testing.T) {
 	unittest.RequireReturnsBefore(t, adjustDone.Wait, 1*time.Second, "failed to adjust elements in time")
 
 	for _, e := range entities {
-		actual, ok := backend.Get(e.ID())
+		actual, ok := backend.Get(e.Identifier)
 		require.True(t, ok)
-		require.Equal(t, e.ID(), actual.ID())
+		require.Equal(t, e.Identifier, actual.Identifier)
 		require.Equal(t, uint64(1), actual.Nonce)
 	}
 }
@@ -273,7 +273,7 @@ func TestBackend_AdjustWithInit_Concurrent_MapBased(t *testing.T) {
 		go func() {
 			defer adjustDone.Done()
 
-			backend.AdjustWithInit(e.ID(), func(entity *unittest.MockEntity) *unittest.MockEntity {
+			backend.AdjustWithInit(e.Identifier, func(entity *unittest.MockEntity) *unittest.MockEntity {
 				// increment nonce of the entity
 				entity.Nonce++
 				return entity
@@ -286,9 +286,9 @@ func TestBackend_AdjustWithInit_Concurrent_MapBased(t *testing.T) {
 	unittest.RequireReturnsBefore(t, adjustDone.Wait, 1*time.Second, "failed to adjust elements in time")
 
 	for _, e := range entities {
-		actual, ok := backend.Get(e.ID())
+		actual, ok := backend.Get(e.Identifier)
 		require.True(t, ok)
-		require.Equal(t, e.ID(), actual.ID())
+		require.Equal(t, e.Identifier, actual.Identifier)
 		require.Equal(t, uint64(1), actual.Nonce)
 	}
 }
@@ -314,14 +314,14 @@ func TestBackend_All(t *testing.T) {
 	// Add
 	for _, e := range entities {
 		// all entities must be stored successfully
-		require.True(t, backend.Add(e.ID(), e))
+		require.True(t, backend.Add(e.Identifier, e))
 	}
 
 	// All
 	all := backend.All()
 	require.Equal(t, len(entities), len(all))
 	for _, expected := range entities {
-		actual, ok := backend.Get(expected.ID())
+		actual, ok := backend.Get(expected.Identifier)
 		require.True(t, ok)
 		require.Equal(t, expected, actual)
 	}

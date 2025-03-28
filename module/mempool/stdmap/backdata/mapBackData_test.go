@@ -16,13 +16,13 @@ func TestMapBackData_StoreAnd(t *testing.T) {
 	// Add
 	for _, e := range entities {
 		// all entities must be stored successfully
-		require.True(t, backData.Add(e.ID(), e))
+		require.True(t, backData.Add(e.Identifier, e))
 	}
 
 	// Get
 	for _, expected := range entities {
 		// all entities must be retrievable successfully
-		actual, ok := backData.Get(expected.ID())
+		actual, ok := backData.Get(expected.Identifier)
 		require.True(t, ok)
 		require.Equal(t, expected, actual)
 	}
@@ -31,7 +31,7 @@ func TestMapBackData_StoreAnd(t *testing.T) {
 	all := backData.All()
 	require.Equal(t, len(entities), len(all))
 	for _, expected := range entities {
-		actual, ok := backData.Get(expected.ID())
+		actual, ok := backData.Get(expected.Identifier)
 		require.True(t, ok)
 		require.Equal(t, expected, actual)
 	}
@@ -54,12 +54,16 @@ func TestMapBackData_StoreAnd(t *testing.T) {
 func TestMapBackData_AdjustWithInit(t *testing.T) {
 	backData := NewMapBackData[flow.Identifier, *unittest.MockEntity]()
 	entities := unittest.EntityListFixture(100)
-	ids := flow.GetIDs(entities)
+
+	ids := make([]flow.Identifier, 0, len(entities))
+	for _, entity := range entities {
+		ids = append(ids, entity.Identifier)
+	}
 
 	// AdjustWithInit
 	for _, e := range entities {
 		// all entities must be adjusted successfully
-		actual, ok := backData.AdjustWithInit(e.ID(), func(entity *unittest.MockEntity) *unittest.MockEntity {
+		actual, ok := backData.AdjustWithInit(e.Identifier, func(entity *unittest.MockEntity) *unittest.MockEntity {
 			// increment nonce of the entity
 			entity.Nonce++
 			return entity
@@ -74,9 +78,9 @@ func TestMapBackData_AdjustWithInit(t *testing.T) {
 	all := backData.All()
 	require.Equal(t, len(entities), len(all))
 	for _, expected := range entities {
-		actual, ok := backData.Get(expected.ID())
+		actual, ok := backData.Get(expected.Identifier)
 		require.True(t, ok)
-		require.Equal(t, expected.ID(), actual.ID())
+		require.Equal(t, expected.Identifier, actual.Identifier)
 		require.Equal(t, uint64(1), actual.Nonce)
 	}
 
@@ -96,9 +100,9 @@ func TestMapBackData_AdjustWithInit(t *testing.T) {
 	// Get
 	for _, e := range entities {
 		// all entities must be retrieved successfully
-		actual, ok := backData.Get(e.ID())
+		actual, ok := backData.Get(e.Identifier)
 		require.True(t, ok)
-		require.Equal(t, e.ID(), actual.ID())
+		require.Equal(t, e.Identifier, actual.Identifier)
 		require.Equal(t, uint64(1), actual.Nonce)
 	}
 }

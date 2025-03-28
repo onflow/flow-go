@@ -28,10 +28,10 @@ func TestHeroQueue_Sequential(t *testing.T) {
 	entities := unittest.EntityListFixture(uint(sizeLimit))
 	// pushing entities sequentially.
 	for i, e := range entities {
-		require.True(t, q.Push(e.ID(), e))
+		require.True(t, q.Push(e.Identifier, e))
 
 		// duplicate push should fail
-		require.False(t, q.Push(e.ID(), e))
+		require.False(t, q.Push(e.Identifier, e))
 
 		require.Equal(t, q.Size(), uint(i+1))
 	}
@@ -39,7 +39,7 @@ func TestHeroQueue_Sequential(t *testing.T) {
 	// once queue meets the size limit, any extra push should fail.
 	for i := 0; i < 100; i++ {
 		entity := unittest.MockEntityFixture()
-		require.False(t, q.Push(entity.ID(), entity))
+		require.False(t, q.Push(entity.Identifier, entity))
 
 		// size should not change
 		require.Equal(t, q.Size(), uint(sizeLimit))
@@ -50,7 +50,7 @@ func TestHeroQueue_Sequential(t *testing.T) {
 		popedE, ok := q.Pop()
 		require.True(t, ok)
 		require.Equal(t, e, popedE)
-		require.Equal(t, e.ID(), popedE.ID())
+		require.Equal(t, e.Identifier, popedE.Identifier)
 
 		require.Equal(t, q.Size(), uint(len(entities)-i-1))
 	}
@@ -75,7 +75,7 @@ func TestHeroQueue_Concurrent(t *testing.T) {
 	for _, e := range entities {
 		e := e // suppress loop variable
 		go func() {
-			require.True(t, q.Push(e.ID(), e))
+			require.True(t, q.Push(e.Identifier, e))
 			pushWG.Done()
 		}()
 	}
@@ -86,7 +86,7 @@ func TestHeroQueue_Concurrent(t *testing.T) {
 	for i := 0; i < sizeLimit; i++ {
 		go func() {
 			entity := unittest.MockEntityFixture()
-			require.False(t, q.Push(entity.ID(), entity))
+			require.False(t, q.Push(entity.Identifier, entity))
 			pushWG.Done()
 		}()
 	}
