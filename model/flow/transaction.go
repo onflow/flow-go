@@ -458,19 +458,20 @@ type TransactionSignature struct {
 	SignerIndex int
 	KeyIndex    uint32
 	Signature   []byte
+	Info        []byte
 }
 
 // String returns the string representation of a transaction signature.
 func (s TransactionSignature) String() string {
-	return fmt.Sprintf("Address: %s. SignerIndex: %d. KeyID: %d. Signature: %s",
-		s.Address, s.SignerIndex, s.KeyIndex, s.Signature)
+	return fmt.Sprintf("Address: %s. SignerIndex: %d. KeyID: %d. Signature: %s. Info: %s",
+		s.Address, s.SignerIndex, s.KeyIndex, s.Signature, s.Info)
 }
 
 // ByteSize returns the byte size of the transaction signature
 func (s TransactionSignature) ByteSize() int {
 	signerIndexLen := 8
 	keyIDLen := 8
-	return len(s.Address) + signerIndexLen + keyIDLen + len(s.Signature)
+	return len(s.Address) + signerIndexLen + keyIDLen + len(s.Signature) + len(s.Info)
 }
 
 func (s TransactionSignature) Fingerprint() []byte {
@@ -482,10 +483,12 @@ func (s TransactionSignature) canonicalForm() interface{} {
 		SignerIndex uint
 		KeyID       uint
 		Signature   []byte
+		Info        []byte
 	}{
 		SignerIndex: uint(s.SignerIndex), // int is not RLP-serializable
 		KeyID:       uint(s.KeyIndex),    // int is not RLP-serializable
 		Signature:   s.Signature,
+		Info:        s.Info,
 	}
 }
 

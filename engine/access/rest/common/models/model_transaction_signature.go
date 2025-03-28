@@ -12,4 +12,5 @@ type TransactionSignature struct {
 	Address   string `json:"address"`
 	KeyIndex  string `json:"key_index"`
 	Signature string `json:"signature"`
+	Info      string `json:"info"`
 }
