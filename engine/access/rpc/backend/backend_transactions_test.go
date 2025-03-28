@@ -73,7 +73,7 @@ func (suite *Suite) TestGetTransactionResultReturnsUnknown() {
 		tx := unittest.TransactionFixture()
 		tx.TransactionBody = tbody
 
-		coll := flow.CollectionFromTransactions([]*flow.Transaction{&tx})
+		coll := unittest.CollectionFromTransactions([]*flow.Transaction{&tx})
 		suite.state.On("AtBlockID", block.ID()).Return(snap, nil).Once()
 
 		suite.transactions.
@@ -106,7 +106,7 @@ func (suite *Suite) TestGetTransactionResultReturnsTransactionError() {
 		tx := unittest.TransactionFixture()
 		tx.TransactionBody = tbody
 
-		coll := flow.CollectionFromTransactions([]*flow.Transaction{&tx})
+		coll := unittest.CollectionFromTransactions([]*flow.Transaction{&tx})
 
 		suite.transactions.
 			On("ByID", tx.ID()).
@@ -144,7 +144,7 @@ func (suite *Suite) TestGetTransactionResultReturnsValidTransactionResultFromHis
 		tx := unittest.TransactionFixture()
 		tx.TransactionBody = tbody
 
-		coll := flow.CollectionFromTransactions([]*flow.Transaction{&tx})
+		coll := unittest.CollectionFromTransactions([]*flow.Transaction{&tx})
 
 		suite.transactions.
 			On("ByID", tx.ID()).
@@ -218,7 +218,7 @@ func (suite *Suite) TestGetTransactionResultFromCache() {
 		backend, err := New(params)
 		suite.Require().NoError(err)
 
-		coll := flow.CollectionFromTransactions([]*flow.Transaction{tx})
+		coll := unittest.CollectionFromTransactions([]*flow.Transaction{tx})
 
 		resp, err := backend.GetTransactionResult(
 			context.Background(),
@@ -261,7 +261,7 @@ func (suite *Suite) TestGetTransactionResultCacheNonExistent() {
 		backend, err := New(params)
 		suite.Require().NoError(err)
 
-		coll := flow.CollectionFromTransactions([]*flow.Transaction{tx})
+		coll := unittest.CollectionFromTransactions([]*flow.Transaction{tx})
 
 		resp, err := backend.GetTransactionResult(
 			context.Background(),
@@ -302,7 +302,7 @@ func (suite *Suite) TestGetTransactionResultUnknownFromCache() {
 		backend, err := New(params)
 		suite.Require().NoError(err)
 
-		coll := flow.CollectionFromTransactions([]*flow.Transaction{tx})
+		coll := unittest.CollectionFromTransactions([]*flow.Transaction{tx})
 
 		resp, err := backend.GetTransactionResult(
 			context.Background(),
@@ -1269,9 +1269,9 @@ func (suite *Suite) TestTransactionResultFromStorage() {
 	// Create fixtures for block, transaction, and collection
 	block := unittest.BlockFixture()
 	transaction := unittest.TransactionFixture()
-	col := flow.CollectionFromTransactions([]*flow.Transaction{&transaction})
-	guarantee := col.Guarantee()
-	block.SetPayload(unittest.PayloadFixture(unittest.WithGuarantees(&guarantee)))
+	col := unittest.CollectionFromTransactions([]*flow.Transaction{&transaction})
+	guarantee := &flow.CollectionGuarantee{CollectionID: col.ID()}
+	block.SetPayload(unittest.PayloadFixture(unittest.WithGuarantees(guarantee)))
 	txId := transaction.ID()
 	blockId := block.ID()
 
@@ -1359,9 +1359,9 @@ func (suite *Suite) TestTransactionByIndexFromStorage() {
 	// Create fixtures for block, transaction, and collection
 	block := unittest.BlockFixture()
 	transaction := unittest.TransactionFixture()
-	col := flow.CollectionFromTransactions([]*flow.Transaction{&transaction})
-	guarantee := col.Guarantee()
-	block.SetPayload(unittest.PayloadFixture(unittest.WithGuarantees(&guarantee)))
+	col := unittest.CollectionFromTransactions([]*flow.Transaction{&transaction})
+	guarantee := &flow.CollectionGuarantee{CollectionID: col.ID()}
+	block.SetPayload(unittest.PayloadFixture(unittest.WithGuarantees(guarantee)))
 	blockId := block.ID()
 	txId := transaction.ID()
 	txIndex := rand.Uint32()
@@ -1445,8 +1445,8 @@ func (suite *Suite) TestTransactionResultsByBlockIDFromStorage() {
 	// Create fixtures for the block and collection
 	block := unittest.BlockFixture()
 	col := unittest.CollectionFixture(2)
-	guarantee := col.Guarantee()
-	block.SetPayload(unittest.PayloadFixture(unittest.WithGuarantees(&guarantee)))
+	guarantee := &flow.CollectionGuarantee{CollectionID: col.ID()}
+	block.SetPayload(unittest.PayloadFixture(unittest.WithGuarantees(guarantee)))
 	blockId := block.ID()
 
 	// Mock the behavior of the blocks, collections and light transaction results objects
