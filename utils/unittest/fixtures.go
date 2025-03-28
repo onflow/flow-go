@@ -1241,14 +1241,14 @@ func WithRandomPublicKeys() func(*flow.Identity) {
 	}
 }
 
-// WithAllRoles can be used used to ensure an IdentityList fixtures contains
+// WithAllRoles can be used to ensure an IdentityList fixtures contains
 // all the roles required for a valid genesis block.
 func WithAllRoles() func(*flow.Identity) {
 	return WithAllRolesExcept()
 }
 
-// Same as above, but omitting a certain role for cases where we are manually
-// setting up nodes or a particular role.
+// WithAllRolesExcept is used to ensure an IdentityList fixture contains all roles
+// except omitting a certain role, for cases where we are manually setting up nodes.
 func WithAllRolesExcept(except ...flow.Role) func(*flow.Identity) {
 	i := 0
 	roles := flow.Roles()
@@ -1553,7 +1553,7 @@ func RegisterIDFixture() flow.RegisterID {
 
 // VerifiableChunkDataFixture returns a complete verifiable chunk with an
 // execution receipt referencing the block/collections.
-func VerifiableChunkDataFixture(chunkIndex uint64) *verification.VerifiableChunkData {
+func VerifiableChunkDataFixture(chunkIndex uint64, opts ...func(*flow.Header)) (*verification.VerifiableChunkData, *flow.Block) {
 
 	guarantees := make([]*flow.CollectionGuarantee, 0, chunkIndex+1)
 
@@ -1569,6 +1569,9 @@ func VerifiableChunkDataFixture(chunkIndex uint64) *verification.VerifiableChunk
 		Seals:      nil,
 	}
 	header := BlockHeaderFixture()
+	for _, opt := range opts {
+		opt(header)
+	}
 	header.PayloadHash = payload.Hash()
 
 	block := flow.Block{
@@ -1608,13 +1611,17 @@ func VerifiableChunkDataFixture(chunkIndex uint64) *verification.VerifiableChunk
 		endState = result.Chunks[index+1].StartState
 	}
 
+	chunkDataPack := ChunkDataPackFixture(chunk.ID(), func(c *flow.ChunkDataPack) {
+		c.Collection = &col
+	})
+
 	return &verification.VerifiableChunkData{
 		Chunk:         &chunk,
 		Header:        block.Header,
 		Result:        &result,
-		ChunkDataPack: ChunkDataPackFixture(result.ID()),
+		ChunkDataPack: chunkDataPack,
 		EndState:      endState,
-	}
+	}, &block
 }
 
 // ChunkDataResponseMsgFixture creates a chunk data response message with a single-transaction collection, and random chunk ID.
@@ -2342,7 +2349,10 @@ func SnapshotClusterByIndex(
 	clusterIndex uint,
 ) (protocol.Cluster, error) {
 	epochs := snapshot.Epochs()
-	epoch := epochs.Current()
+	epoch, err := epochs.Current()
+	if err != nil {
+		return nil, err
+	}
 	cluster, err := epoch.Cluster(clusterIndex)
 	if err != nil {
 		return nil, err

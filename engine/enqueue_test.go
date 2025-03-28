@@ -1,7 +1,6 @@
 package engine_test
 
 import (
-	"errors"
 	"fmt"
 	"sync"
 	"testing"
@@ -363,7 +362,6 @@ func TestUnknownMessageType(t *testing.T) {
 		unknownType := struct{ n int }{n: 10}
 
 		err := eng.Process(id, unknownType)
-		require.Error(t, err)
-		require.True(t, errors.Is(err, engine.IncompatibleInputTypeError))
+		require.ErrorIs(t, err, engine.IncompatibleInputTypeError)
 	})
 }

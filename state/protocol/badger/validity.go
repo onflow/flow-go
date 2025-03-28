@@ -67,14 +67,12 @@ func IsValidRootSnapshot(snap protocol.Snapshot, verifyResultID bool) error {
 		return fmt.Errorf("qc is for wrong block (got: %x, expected: %x)", qc.BlockID, highestID)
 	}
 
-	firstView, err := snap.Epochs().Current().FirstView()
+	currentEpoch, err := snap.Epochs().Current()
 	if err != nil {
-		return fmt.Errorf("could not get first view: %w", err)
+		return fmt.Errorf("could not get current epoch: %w", err)
 	}
-	finalView, err := snap.Epochs().Current().FinalView()
-	if err != nil {
-		return fmt.Errorf("could not get final view: %w", err)
-	}
+	firstView := currentEpoch.FirstView()
+	finalView := currentEpoch.FinalView()
 
 	// the segment must be fully within the current epoch
 	if firstView > lowest.Header.View {
@@ -102,7 +100,10 @@ func IsValidRootSnapshotQCs(snap protocol.Snapshot) error {
 	}
 
 	// validate each collection cluster separately
-	curEpoch := snap.Epochs().Current()
+	curEpoch, err := snap.Epochs().Current()
+	if err != nil {
+		return fmt.Errorf("could not get current epoch for root snapshot: %w", err)
+	}
 	clusters, err := curEpoch.Clustering()
 	if err != nil {
 		return fmt.Errorf("could not get clustering for root snapshot: %w", err)
@@ -133,7 +134,11 @@ func validateRootQC(snap protocol.Snapshot) error {
 		return fmt.Errorf("could not get root QC: %w", err)
 	}
 
-	dkg, err := snap.Epochs().Current().DKG()
+	currentEpoch, err := snap.Epochs().Current()
+	if err != nil {
+		return fmt.Errorf("could not get current epoch for root snapshot: %w", err)
+	}
+	dkg, err := currentEpoch.DKG()
 	if err != nil {
 		return fmt.Errorf("could not get DKG for root snapshot: %w", err)
 	}

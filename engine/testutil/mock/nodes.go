@@ -46,7 +46,6 @@ import (
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/state/protocol/events"
 	"github.com/onflow/flow-go/storage"
-	bstorage "github.com/onflow/flow-go/storage/badger"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -229,11 +228,11 @@ type ExecutionNode struct {
 	StorehouseEnabled   bool
 }
 
-func (en ExecutionNode) Ready(ctx context.Context) {
+func (en ExecutionNode) Ready(t *testing.T, ctx context.Context) {
 	// TODO: receipt engine has been migrated to the new component interface, hence
 	// is using Start. Other engines' startup should be refactored once migrated to
 	// new interface.
-	irctx, _ := irrecoverable.WithSignaler(ctx)
+	irctx := irrecoverable.NewMockSignalerContext(t, ctx)
 	en.ReceiptsEngine.Start(irctx)
 	en.IngestionEngine.Start(irctx)
 	en.FollowerCore.Start(irctx)
@@ -300,7 +299,7 @@ type VerificationNode struct {
 
 	// chunk consumer and processor for fetcher engine
 	ProcessedChunkIndex storage.ConsumerProgressInitializer
-	ChunksQueue         *bstorage.ChunksQueue
+	ChunksQueue         storage.ChunksQueue
 	ChunkConsumer       *chunkconsumer.ChunkConsumer
 
 	// block consumer for chunk consumer

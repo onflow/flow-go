@@ -38,7 +38,7 @@ func TestWorkerPool_SingleEvent_SingleWorker(t *testing.T) {
 
 	cancelCtx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	ctx, _ := irrecoverable.WithSignaler(cancelCtx)
+	ctx := irrecoverable.NewMockSignalerContext(t, cancelCtx)
 	cm := component.NewComponentManagerBuilder().
 		AddWorker(pool.WorkerLogic()).
 		Build()
@@ -75,7 +75,7 @@ func TestWorkerBuilder_UnhappyPaths(t *testing.T) {
 
 	cancelCtx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	ctx, _ := irrecoverable.WithSignaler(cancelCtx)
+	ctx := irrecoverable.NewMockSignalerContext(t, cancelCtx)
 	cm := component.NewComponentManagerBuilder().
 		AddWorker(pool.WorkerLogic()).
 		Build()
@@ -138,7 +138,7 @@ func TestWorkerPool_TwoWorkers_ConcurrentEvents(t *testing.T) {
 
 	cancelCtx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	ctx, _ := irrecoverable.WithSignaler(cancelCtx)
+	ctx := irrecoverable.NewMockSignalerContext(t, cancelCtx)
 	cm := component.NewComponentManagerBuilder().
 		AddWorker(pool.WorkerLogic()).
 		AddWorker(pool.WorkerLogic()).

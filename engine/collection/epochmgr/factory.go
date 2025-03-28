@@ -18,7 +18,7 @@ type EpochComponentsFactory interface {
 	// a given epoch counter.
 	//
 	// Must return ErrNotAuthorizedForEpoch if this node is not authorized in the epoch.
-	Create(epoch protocol.Epoch) (
+	Create(epoch protocol.CommittedEpoch) (
 		state cluster.State,
 		proposal component.Component,
 		sync module.ReadyDoneAware,
