@@ -13,7 +13,7 @@ import (
 func TestLightTransactionResultErrorMessages_HappyPath(t *testing.T) {
 	storage := NewTransactionResultErrorMessages()
 
-	// Define block ID and transaction results
+	// Define block ID and error messages
 	block := unittest.BlockFixture()
 	txResults := unittest.TransactionResultsFixture(2)
 	errorMessages := []flow.TransactionResultErrorMessage{
@@ -31,7 +31,7 @@ func TestLightTransactionResultErrorMessages_HappyPath(t *testing.T) {
 		},
 	}
 
-	// Store transaction results
+	// Store error messages
 	err := storage.Store(block.ID(), errorMessages)
 	require.NoError(t, err)
 
