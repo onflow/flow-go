@@ -8,15 +8,6 @@ type MockEntity struct {
 	Nonce      uint64
 }
 
-//
-//func (m MockEntity) ID() flow.Identifier {
-//	return m.Identifier
-//}
-//
-//func (m MockEntity) Checksum() flow.Identifier {
-//	return m.Identifier
-//}
-
 func EntityListFixture(n uint) []*MockEntity {
 	list := make([]*MockEntity, 0, n)
 	for range n {
