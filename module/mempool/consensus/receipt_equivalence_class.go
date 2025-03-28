@@ -52,7 +52,7 @@ func (rsr *ReceiptsOfSameResult) AddReceipt(receipt *flow.ExecutionReceipt) (uin
 	if rsr.Has(receiptID) {
 		return 0, nil
 	}
-	rsr.receipts[receipt.ID()] = receipt.Meta()
+	rsr.receipts[receiptID] = receipt.Meta()
 	return 1, nil
 }
 

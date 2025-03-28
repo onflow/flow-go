@@ -51,7 +51,7 @@ func NewReceiptValidator(state protocol.State,
 // Expected errors during normal operations:
 //   - engine.InvalidInputError if the signature is invalid
 func (v *receiptValidator) verifySignature(receipt *flow.ExecutionReceiptMeta, nodeIdentity *flow.Identity) error {
-	id := receipt.ID()
+	id := receipt.SignableID()
 	valid, err := nodeIdentity.StakingPubKey.Verify(receipt.ExecutorSignature, id[:], v.signatureHasher)
 	if err != nil { // Verify(..) returns (false,nil) for invalid signature. Any error indicates unexpected internal failure.
 		return irrecoverable.NewExceptionf("failed to verify signature: %w", err)
