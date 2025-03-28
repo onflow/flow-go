@@ -37,7 +37,7 @@ func (m *icrSealsMachine) Add(t *rapid.T) {
 	// we do not re-add already present seals
 	unmet := true
 	for _, v := range m.state {
-		if v.ID() == seal.ID() {
+		if v.IncorporatedResultID() == seal.IncorporatedResultID() {
 			unmet = false
 		}
 	}
@@ -97,7 +97,7 @@ func (m *icrSealsMachine) GetUnknown(t *rapid.T) {
 	// check seal is unknown
 	unknown := true
 	for _, v := range m.state {
-		if v.ID() == seal.ID() {
+		if v.IncorporatedResultID() == seal.IncorporatedResultID() {
 			unknown = false
 		}
 	}
@@ -145,7 +145,7 @@ func (m *icrSealsMachine) RemoveUnknown(t *rapid.T) {
 	// check seal is unknown
 	unknown := true
 	for _, v := range m.state {
-		if v.ID() == seal.ID() {
+		if v.IncorporatedResultID() == seal.IncorporatedResultID() {
 			unknown = false
 		}
 	}

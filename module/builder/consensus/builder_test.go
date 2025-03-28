@@ -158,7 +158,7 @@ func (bs *BuilderSuite) chainSeal(incorporatedResult *flow.IncorporatedResult) {
 	)
 
 	bs.chain = append(bs.chain, incorporatedResultSeal.Seal)
-	bs.irsMap[incorporatedResultSeal.ID()] = incorporatedResultSeal
+	bs.irsMap[incorporatedResultSeal.IncorporatedResultID()] = incorporatedResultSeal
 	bs.irsList = append(bs.irsList, incorporatedResultSeal)
 }
 
@@ -762,7 +762,7 @@ func (bs *BuilderSuite) TestPayloadSeals_Duplicate() {
 func (bs *BuilderSuite) TestPayloadSeals_MissingNextSeal() {
 	// remove the seal for block [F0]
 	firstSeal := bs.irsList[0]
-	delete(bs.irsMap, firstSeal.ID())
+	delete(bs.irsMap, firstSeal.IncorporatedResultID())
 	bs.pendingSeals = bs.irsMap
 
 	_, err := bs.build.BuildOn(bs.parentID, bs.setter, bs.sign)
@@ -786,7 +786,7 @@ func (bs *BuilderSuite) TestPayloadSeals_MissingNextSeal() {
 func (bs *BuilderSuite) TestPayloadSeals_MissingInterimSeal() {
 	// remove a seal for block [F4]
 	seal := bs.irsList[3]
-	delete(bs.irsMap, seal.ID())
+	delete(bs.irsMap, seal.IncorporatedResultID())
 	bs.pendingSeals = bs.irsMap
 
 	_, err := bs.build.BuildOn(bs.parentID, bs.setter, bs.sign)
@@ -1403,7 +1403,7 @@ func storeSealForIncorporatedResult(result *flow.ExecutionResult, incorporatingB
 		unittest.IncorporatedResultSeal.WithResult(result),
 		unittest.IncorporatedResultSeal.WithIncorporatedBlockID(incorporatingBlockID),
 	)
-	pendingSeals[incorporatedResultSeal.ID()] = incorporatedResultSeal
+	pendingSeals[incorporatedResultSeal.IncorporatedResultID()] = incorporatedResultSeal
 	return incorporatedResultSeal
 }
 
