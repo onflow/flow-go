@@ -13,32 +13,6 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
-// MockEntity implements a bare minimum entity for sake of test.
-type MockEntity struct {
-	Identifier flow.Identifier
-	Nonce      uint64
-}
-
-func (m MockEntity) ID() flow.Identifier {
-	return m.Identifier
-}
-
-func (m MockEntity) Checksum() flow.Identifier {
-	return m.Identifier
-}
-
-func EntityListFixture(n uint) []*MockEntity {
-	list := make([]*MockEntity, 0, n)
-	for range n {
-		list = append(list, MockEntityFixture())
-	}
-	return list
-}
-
-func MockEntityFixture() *MockEntity {
-	return &MockEntity{Identifier: IdentifierFixture()}
-}
-
 // RequireEntityNonMalleable is a sanity check that the entity is not malleable with regards to the ID() function.
 // Non-malleability in this sense means that it is computationally hard to build a different entity with the same ID.
 // Hence, changing *any* field of a non-malleable entity should change the ID, which we check here.
