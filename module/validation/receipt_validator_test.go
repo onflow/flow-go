@@ -50,7 +50,7 @@ func (s *ReceiptValidationSuite) TestReceiptValid() {
 		unittest.WithResult(valSubgrph.Result))
 	s.AddSubgraphFixtureToMempools(valSubgrph)
 
-	receiptID := receipt.ID()
+	receiptID := receipt.SignableID()
 	s.publicKey.On("Verify",
 		receipt.ExecutorSignature,
 		receiptID[:],
