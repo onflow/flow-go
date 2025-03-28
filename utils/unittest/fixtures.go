@@ -1555,7 +1555,7 @@ func RegisterIDFixture() flow.RegisterID {
 // execution receipt referencing the block/collections.
 func VerifiableChunkDataFixture(chunkIndex uint64) *verification.VerifiableChunkData {
 
-	guarantees := make([]*flow.CollectionGuarantee, 0, chunkIndex)
+	guarantees := make([]*flow.CollectionGuarantee, 0, chunkIndex+1)
 
 	var col flow.Collection
 
