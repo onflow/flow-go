@@ -108,7 +108,8 @@ type HotView interface {
 	SetCode(gethCommon.Address, []byte) error
 
 	// SetState sets a value for the given slot in the main storage
-	SetState(SlotAddress, gethCommon.Hash) error
+	// and returns the previous value.
+	SetState(SlotAddress, gethCommon.Hash) (gethCommon.Hash, error)
 	// SetTransientState sets a value for the given slot in the transient storage
 	SetTransientState(SlotAddress, gethCommon.Hash)
 

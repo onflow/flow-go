@@ -9,6 +9,7 @@ import (
 	"github.com/onflow/crypto/hash"
 	gethCommon "github.com/onflow/go-ethereum/common"
 	gethCore "github.com/onflow/go-ethereum/core"
+	"github.com/onflow/go-ethereum/core/tracing"
 	gethTracing "github.com/onflow/go-ethereum/core/tracing"
 	gethTypes "github.com/onflow/go-ethereum/core/types"
 	gethVM "github.com/onflow/go-ethereum/core/vm"
@@ -305,7 +306,10 @@ func (bl *BlockView) DryRunTransaction(
 	// use the from as the signer
 	msg.From = from
 	// we need to skip nonce check for dry run
-	msg.SkipAccountChecks = true
+	// Previous we had: msg.SkipAccountChecks = true,
+	// so we need to set SkipNonceChecks, SkipFromEOACheck both to true.
+	msg.SkipNonceChecks = true
+	msg.SkipFromEOACheck = true
 
 	// run and return without committing the state changes
 	return proc.run(msg, tx.Hash(), tx.Type())
@@ -321,7 +325,7 @@ func (bl *BlockView) newProcedure() (*procedure, error) {
 		config: cfg,
 		evm: gethVM.NewEVM(
 			*cfg.BlockContext,
-			*cfg.TxContext,
+			// *cfg.TxContext, TODO(m-Peter): Investigate
 			execState,
 			cfg.ChainConfig,
 			cfg.EVMConfig,
@@ -511,11 +515,15 @@ func (proc *procedure) deployAt(
 		proc.state.CreateAccount(callerCommon)
 	}
 	// increment the nonce for the caller
-	proc.state.SetNonce(callerCommon, proc.state.GetNonce(callerCommon)+1)
+	proc.state.SetNonce(
+		callerCommon,
+		proc.state.GetNonce(callerCommon)+1,
+		tracing.NonceChangeContractCreator,
+	)
 
 	// setup account
 	proc.state.CreateAccount(addr)
-	proc.state.SetNonce(addr, 1) // (EIP-158)
+	proc.state.SetNonce(addr, 1, tracing.NonceChangeNewContract) // (EIP-158)
 	if call.Value.Sign() > 0 {
 		proc.evm.Context.Transfer( // transfer value
 			proc.state,
@@ -639,11 +647,11 @@ func (proc *procedure) run(
 	gasPool := (*gethCore.GasPool)(&proc.config.BlockContext.GasLimit)
 
 	// transit the state
-	execResult, err := gethCore.NewStateTransition(
+	execResult, err := gethCore.ApplyMessage(
 		proc.evm,
 		msg,
 		gasPool,
-	).TransitionDb()
+	)
 	if err != nil {
 		// if the error is a fatal error or a non-fatal state error or a backend err return it
 		// this condition should never happen given all StateDB errors are withheld for the commit time.
