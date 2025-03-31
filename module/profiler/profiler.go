@@ -312,6 +312,9 @@ func (p *AutoProfiler) pprofAllocs(w io.Writer, d time.Duration) (err error) {
 	return diff.Write(w)
 }
 
+// I'm keeping this for later use
+//
+//nolint:unused
 func (p *AutoProfiler) pprofBlock(w io.Writer, d time.Duration) error {
 	runtime.SetBlockProfileRate(100)
 	defer runtime.SetBlockProfileRate(0)
