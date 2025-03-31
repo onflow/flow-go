@@ -1,9 +1,10 @@
 package unsynchronized
 
 import (
+	"sync"
+
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/storage"
-	"sync"
 )
 
 type Events struct {
