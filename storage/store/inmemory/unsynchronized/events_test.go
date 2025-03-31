@@ -24,8 +24,8 @@ func TestEvents_HappyPath(t *testing.T) {
 	event3 := unittest.EventFixture(flow.EventAccountCreated, 1, 2, transaction2.ID(), 202)
 
 	// Store events
-	expectedStoredEvents := []flow.EventsList{{event1, event2, event3}}
-	err := eventsStore.Store(block.ID(), expectedStoredEvents)
+	expectedStoredEvents := flow.EventsList{event1, event2, event3}
+	err := eventsStore.Store(block.ID(), []flow.EventsList{expectedStoredEvents})
 	require.NoError(t, err)
 
 	// Retrieve events by block ID
