@@ -1,6 +1,6 @@
 module github.com/onflow/flow-go
 
-go 1.23
+go 1.23.0
 
 require (
 	cloud.google.com/go/compute/metadata v0.5.0
@@ -82,7 +82,7 @@ require (
 	golang.org/x/sync v0.10.0
 	golang.org/x/sys v0.29.0
 	golang.org/x/text v0.21.0
-	golang.org/x/time v0.5.0
+	golang.org/x/time v0.9.0
 	golang.org/x/tools v0.29.0
 	google.golang.org/api v0.169.0
 	google.golang.org/genproto v0.0.0-20240227224415-6ceb2ff114de
@@ -108,7 +108,7 @@ require (
 	github.com/libp2p/go-libp2p-routing-helpers v0.7.4
 	github.com/mitchellh/mapstructure v1.5.0
 	github.com/onflow/bridged-usdc/lib/go/contracts v1.0.0
-	github.com/onflow/go-ethereum v1.14.8-0.20250327095906-66cfed12c882
+	github.com/onflow/go-ethereum v1.14.8-0.20250327101549-e6d0051ec37a
 	github.com/onflow/nft-storefront/lib/go/contracts v1.0.0
 	github.com/onflow/wal v1.0.2
 	github.com/slok/go-http-metrics v0.12.0
