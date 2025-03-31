@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -21,6 +22,14 @@ func TestExecutionReceiptID_Malleability(t *testing.T) {
 		unittest.WithFieldGenerator("ExecutionResult.ServiceEvents", func() []flow.ServiceEvent {
 			return unittest.ServiceEventsFixture(3)
 		}))
+
+	checker := unittest.NewMalleabilityChecker(
+		unittest.WithPinnedField("ExecutorSignature"),
+		unittest.WithFieldGenerator("ExecutionResult.ServiceEvents", func() []flow.ServiceEvent {
+			return unittest.ServiceEventsFixture(3)
+		}))
+	err := checker.CheckCustom(receipt, receipt.SignableID)
+	require.NoError(t, err)
 }
 
 // TestExecutionReceiptGroupBy tests the GroupBy method of ExecutionReceiptList:
