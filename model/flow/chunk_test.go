@@ -368,25 +368,46 @@ func TestChunk_ModelVersions_EncodeDecode(t *testing.T) {
 //
 // Backward compatibility is implemented by providing a custom EncodeRLP method.
 func TestChunk_FingerprintBackwardCompatibility(t *testing.T) {
-	chunk := unittest.ChunkFixture(unittest.IdentifierFixture(), 1, unittest.StateCommitmentFixture())
+	chunk := unittest.ChunkFixture(unittest.IdentifierFixture(), 0, unittest.StateCommitmentFixture())
 	chunk.ServiceEventCount = nil
-	chunkBody := chunk.ChunkBody
-	var chunkBodyV0 flow.ChunkBodyV0
-	unittest.EncodeDecodeDifferentVersions(t, chunkBody, &chunkBodyV0)
+
+	// Define an older type which use flow.ChunkBodyV0
+	type ChunkV0 struct {
+		flow.ChunkBodyV0
+		Index    uint64
+		EndState flow.StateCommitment
+	}
+
+	var chunkV0 ChunkV0
+	unittest.EncodeDecodeDifferentVersions(t, chunk, &chunkV0)
 
 	// A nil ServiceEventCount fields indicates a prior model version.
 	// The ID calculation for the old and new model version should be the same.
 	t.Run("nil ServiceEventCount fields", func(t *testing.T) {
 		chunk.ServiceEventCount = nil
-		assert.Equal(t, flow.MakeID(chunkBodyV0), chunk.ID())
-		assert.Equal(t, flow.MakeID(chunkBodyV0), flow.MakeID(chunk.ChunkBody))
+		assert.Equal(t, flow.MakeID(chunkV0), chunk.ID())
+		assert.Equal(t, flow.MakeID(chunkV0), flow.MakeID(chunk))
 	})
 	// A non-nil ServiceEventCount fields indicates an up-to-date model version.
 	// The ID calculation for the old and new model version should be different,
 	// because the new model should include the ServiceEventCount field value.
 	t.Run("non-nil ServiceEventCount fields", func(t *testing.T) {
 		chunk.ServiceEventCount = unittest.PtrTo[uint16](0)
-		assert.NotEqual(t, flow.MakeID(chunkBodyV0), chunk.ID())
-		assert.NotEqual(t, flow.MakeID(chunkBodyV0), flow.MakeID(chunk.ChunkBody))
+		assert.NotEqual(t, flow.MakeID(chunkV0), chunk.ID())
+		assert.NotEqual(t, flow.MakeID(chunkV0), flow.MakeID(chunk))
+	})
+}
+
+// TestChunkMalleability performs sanity checks to ensure that chunk is not malleable.
+func TestChunkMalleability(t *testing.T) {
+	t.Run("Chunk with non-nil ServiceEventCount", func(t *testing.T) {
+		unittest.RequireEntityNonMalleable(t, unittest.ChunkFixture(unittest.IdentifierFixture(), 0, unittest.StateCommitmentFixture()))
+	})
+
+	// TODO(mainnet27, #6773): remove this test according to https://github.com/onflow/flow-go/issues/6773
+	t.Run("Chunk with nil ServiceEventCount", func(t *testing.T) {
+		unittest.RequireEntityNonMalleable(t, unittest.ChunkFixture(unittest.IdentifierFixture(), 0, unittest.StateCommitmentFixture(), func(c *flow.Chunk) {
+			c.ServiceEventCount = nil
+		}))
 	})
 }
