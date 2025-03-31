@@ -55,6 +55,11 @@ func RequireEntityNonMalleable(t *testing.T, entity flow.IDEntity, ops ...Mallea
 	require.NoError(t, err)
 }
 
+func RequireNonMalleable(t *testing.T, model any, idFunc func() flow.Identifier, ops ...MalleabilityCheckerOpt) {
+	err := NewMalleabilityChecker(ops...).CheckCustom(model, idFunc)
+	require.NoError(t, err)
+}
+
 // MalleabilityChecker is a customizable checker to test whether an entity is malleable. If a structure implements [flow.IDEntity]
 // interface, *any* change to the data structure has to change the ID of the entity as well.
 // The MalleabilityChecker performs a recursive check of all fields of the entity and ensures that changing any field will change
@@ -194,6 +199,25 @@ func (mc *MalleabilityChecker) Check(entity flow.IDEntity) error {
 	}
 	v = v.Elem()
 	if err := mc.isEntityMalleable(v, nil, "", entity.ID); err != nil {
+		return err
+	}
+	return mc.checkExpectations()
+}
+
+func (mc *MalleabilityChecker) CheckCustom(entity any, idFunc func() flow.Identifier) error {
+	v := reflect.ValueOf(entity)
+	if !v.IsValid() {
+		return fmt.Errorf("input is not a valid entity")
+	}
+	if v.Kind() != reflect.Ptr {
+		// If it is not a pointer type, we may not be able to set fields to test malleability, since the entity may not be addressable
+		return fmt.Errorf("entity is not a pointer type (try checking a reference to it), entity: %v %v", v.Kind(), v.Type())
+	}
+	if v.IsNil() {
+		return fmt.Errorf("entity is nil, nothing to check")
+	}
+	v = v.Elem()
+	if err := mc.isEntityMalleable(v, nil, "", idFunc); err != nil {
 		return err
 	}
 	return mc.checkExpectations()
