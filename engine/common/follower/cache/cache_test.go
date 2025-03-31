@@ -118,7 +118,7 @@ func (s *CacheSuite) TestChildCertifiesParent() {
 	require.NoError(s.T(), err)
 	require.Len(s.T(), certifiedBatch, 1)
 	require.Equal(s.T(), block.ID(), certifiedBatch[0].CertifyingQC.BlockID)
-	require.Equal(s.T(), certifiedBatch[0].Block, &block)
+	require.Equal(s.T(), certifiedBatch[0].Proposal.Block, &block)
 }
 
 // TestChildBeforeParent tests a scenario: A <- B[QC_A].
@@ -126,13 +126,13 @@ func (s *CacheSuite) TestChildCertifiesParent() {
 // We expect that A will get certified after adding A.
 func (s *CacheSuite) TestChildBeforeParent() {
 	blocks := unittest.ProposalChainFixtureFrom(2, unittest.BlockHeaderFixture())
-	_, err := s.cache.AddBlocks([]*flow.BlockProposal{blocks[1]})
+	_, err := s.cache.AddBlocks(blocks[1:2])
 	require.NoError(s.T(), err)
-	certifiedBatch, err := s.cache.AddBlocks([]*flow.BlockProposal{blocks[0]})
+	certifiedBatch, err := s.cache.AddBlocks(blocks[0:1])
 	require.NoError(s.T(), err)
 	require.Len(s.T(), certifiedBatch, 1)
 	require.Equal(s.T(), blocks[0].Block.ID(), certifiedBatch[0].CertifyingQC.BlockID)
-	require.Equal(s.T(), certifiedBatch[0].Block, blocks[0].Block)
+	require.Equal(s.T(), blocks[0], certifiedBatch[0].Proposal)
 }
 
 // TestBlockInTheMiddle tests a scenario: A <- B[QC_A] <- C[QC_B].
@@ -153,8 +153,8 @@ func (s *CacheSuite) TestBlockInTheMiddle() {
 	// add B
 	certifiedBlocks, err = s.cache.AddBlocks(blocks[1:2])
 	require.NoError(s.T(), err)
-	require.Equal(s.T(), blocks[0].Block, certifiedBlocks[0].Block)
-	require.Equal(s.T(), blocks[len(blocks)-2].Block, certifiedBlocks[len(certifiedBlocks)-1].Block)
+	require.Equal(s.T(), blocks[0], certifiedBlocks[0].Proposal)
+	require.Equal(s.T(), blocks[len(blocks)-2], certifiedBlocks[len(certifiedBlocks)-1].Proposal)
 	require.Equal(s.T(), blocks[2].Block.Header.QuorumCertificate(), certifiedBlocks[1].CertifyingQC)
 }
 
@@ -165,8 +165,8 @@ func (s *CacheSuite) TestAddBatch() {
 	blocks := unittest.ProposalChainFixtureFrom(10, unittest.BlockHeaderFixture())
 	certifiedBatch, err := s.cache.AddBlocks(blocks)
 	require.NoError(s.T(), err)
-	require.Equal(s.T(), blocks[0].Block, certifiedBatch[0].Block)
-	require.Equal(s.T(), blocks[len(blocks)-2].Block, certifiedBatch[len(certifiedBatch)-1].Block)
+	require.Equal(s.T(), blocks[0], certifiedBatch[0].Proposal)
+	require.Equal(s.T(), blocks[len(blocks)-2], certifiedBatch[len(certifiedBatch)-1].Proposal)
 	require.Equal(s.T(), blocks[len(blocks)-1].Block.Header.QuorumCertificate(), certifiedBatch[len(certifiedBatch)-1].CertifyingQC)
 }
 
@@ -178,8 +178,8 @@ func (s *CacheSuite) TestDuplicatedBatch() {
 	certifiedBatch, err := s.cache.AddBlocks(blocks[1:])
 	require.NoError(s.T(), err)
 	require.Len(s.T(), certifiedBatch, len(blocks)-2)
-	require.Equal(s.T(), blocks[1].Block, certifiedBatch[0].Block)
-	require.Equal(s.T(), blocks[len(blocks)-2].Block, certifiedBatch[len(certifiedBatch)-1].Block)
+	require.Equal(s.T(), blocks[1], certifiedBatch[0].Proposal)
+	require.Equal(s.T(), blocks[len(blocks)-2], certifiedBatch[len(certifiedBatch)-1].Proposal)
 	require.Equal(s.T(), blocks[len(blocks)-1].Block.Header.QuorumCertificate(), certifiedBatch[len(certifiedBatch)-1].CertifyingQC)
 
 	// add same batch again, this has to be rejected as redundant input
@@ -192,8 +192,8 @@ func (s *CacheSuite) TestDuplicatedBatch() {
 	certifiedBatch, err = s.cache.AddBlocks(blocks)
 	require.NoError(s.T(), err)
 	require.Len(s.T(), certifiedBatch, len(blocks)-1)
-	require.Equal(s.T(), blocks[0].Block, certifiedBatch[0].Block)
-	require.Equal(s.T(), blocks[len(blocks)-2].Block, certifiedBatch[len(certifiedBatch)-1].Block)
+	require.Equal(s.T(), blocks[0], certifiedBatch[0].Proposal)
+	require.Equal(s.T(), blocks[len(blocks)-2], certifiedBatch[len(certifiedBatch)-1].Proposal)
 	require.Equal(s.T(), blocks[len(blocks)-1].Block.Header.QuorumCertificate(), certifiedBatch[len(certifiedBatch)-1].CertifyingQC)
 }
 
@@ -203,8 +203,8 @@ func (s *CacheSuite) TestPruneUpToView() {
 	s.cache.PruneUpToView(blocks[1].Block.Header.View)
 	certifiedBatch, err := s.cache.AddBlocks(blocks)
 	require.NoError(s.T(), err)
-	require.Equal(s.T(), blocks[1].Block, certifiedBatch[0].Block)
-	require.Equal(s.T(), blocks[len(blocks)-2].Block, certifiedBatch[len(certifiedBatch)-1].Block)
+	require.Equal(s.T(), blocks[1], certifiedBatch[0].Proposal)
+	require.Equal(s.T(), blocks[len(blocks)-2], certifiedBatch[len(certifiedBatch)-1].Proposal)
 	require.Equal(s.T(), blocks[len(blocks)-1].Block.Header.QuorumCertificate(), certifiedBatch[len(certifiedBatch)-1].CertifyingQC)
 }
 
@@ -246,10 +246,10 @@ func (s *CacheSuite) TestConcurrentAdd() {
 
 	require.Len(s.T(), allCertifiedBlocks, len(blocks)-1)
 	slices.SortFunc(allCertifiedBlocks, func(lhs flow.CertifiedBlock, rhs flow.CertifiedBlock) int {
-		return int(lhs.Block.Header.Height) - int(rhs.Block.Header.Height)
+		return int(lhs.Proposal.Block.Header.Height) - int(rhs.Proposal.Block.Header.Height)
 	})
 	for i, block := range blocks[:len(blocks)-1] {
-		require.Equal(s.T(), block.Block, allCertifiedBlocks[i].Block)
+		require.Equal(s.T(), block, allCertifiedBlocks[i].Proposal)
 	}
 }
 
@@ -284,7 +284,7 @@ func (s *CacheSuite) TestMultipleChildrenForSameParent() {
 	certifiedBlocks, err := s.cache.AddBlocks([]*flow.BlockProposal{unittest.ProposalFromBlock(&A)})
 	require.NoError(s.T(), err)
 	require.Len(s.T(), certifiedBlocks, 1)
-	require.Equal(s.T(), &A, certifiedBlocks[0].Block)
+	require.Equal(s.T(), &A, certifiedBlocks[0].Proposal.Block)
 	require.Equal(s.T(), A.ID(), certifiedBlocks[0].CertifyingQC.BlockID)
 }
 
@@ -316,7 +316,7 @@ func (s *CacheSuite) TestChildEjectedBeforeAddingParent() {
 	certifiedBlocks, err := s.cache.AddBlocks([]*flow.BlockProposal{Ap})
 	require.NoError(s.T(), err)
 	require.Len(s.T(), certifiedBlocks, 1)
-	require.Equal(s.T(), &A, certifiedBlocks[0].Block)
+	require.Equal(s.T(), Ap, certifiedBlocks[0].Proposal)
 	require.Equal(s.T(), A.ID(), certifiedBlocks[0].CertifyingQC.BlockID)
 }
 

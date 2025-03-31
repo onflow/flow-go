@@ -79,23 +79,22 @@ func (s BlockStatus) String() string {
 // therefore proves validity of the block. A certified block satisfies:
 // Block.View == QC.View and Block.BlockID == QC.BlockID
 type CertifiedBlock struct {
-	Block             *Block
-	CertifyingQC      *QuorumCertificate
-	ProposerSignature []byte // while not necessary for consensus followers, participants use it to verify the block when recovering or catching up
+	Proposal     *BlockProposal
+	CertifyingQC *QuorumCertificate
 }
 
 // NewCertifiedBlock constructs a new certified block. It checks the consistency
 // requirements and errors otherwise:
 //
 //	Block.View == QC.View and Block.BlockID == QC.BlockID
-func NewCertifiedBlock(block *Block, qc *QuorumCertificate, sig []byte) (CertifiedBlock, error) {
-	if block.Header.View != qc.View {
-		return CertifiedBlock{}, fmt.Errorf("block's view (%d) should equal the qc's view (%d)", block.Header.View, qc.View)
+func NewCertifiedBlock(proposal *BlockProposal, qc *QuorumCertificate) (CertifiedBlock, error) {
+	if proposal.Block.Header.View != qc.View {
+		return CertifiedBlock{}, fmt.Errorf("block's view (%d) should equal the qc's view (%d)", proposal.Block.Header.View, qc.View)
 	}
-	if block.ID() != qc.BlockID {
-		return CertifiedBlock{}, fmt.Errorf("block's ID (%v) should equal the block referenced by the qc (%d)", block.ID(), qc.BlockID)
+	if proposal.Block.ID() != qc.BlockID {
+		return CertifiedBlock{}, fmt.Errorf("block's ID (%v) should equal the block referenced by the qc (%d)", proposal.Block.ID(), qc.BlockID)
 	}
-	return CertifiedBlock{Block: block, CertifyingQC: qc, ProposerSignature: sig}, nil
+	return CertifiedBlock{Proposal: proposal, CertifyingQC: qc}, nil
 }
 
 // BlockID returns a unique identifier for the block (the ID signed to produce a block vote).
@@ -112,7 +111,7 @@ func (b *CertifiedBlock) View() uint64 {
 
 // Height returns height of the block.
 func (b *CertifiedBlock) Height() uint64 {
-	return b.Block.Header.Height
+	return b.Proposal.Block.Header.Height
 }
 
 // BlockDigest holds lightweight block information which includes only the block's id, height and timestamp

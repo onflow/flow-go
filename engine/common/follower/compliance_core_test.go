@@ -138,7 +138,7 @@ func (s *CoreSuite) TestProcessingRangeHappyPath() {
 	wg.Add(len(proposals) - 1)
 	for i := 1; i < len(proposals); i++ {
 		certified := unittest.CertifiedByChild(proposals[i-1].Block, proposals[i].Block)
-		certified.ProposerSignature = proposals[i-1].ProposerSigData
+		certified.Proposal.ProposerSigData = proposals[i-1].ProposerSigData
 		s.state.On("ExtendCertified", mock.Anything, certified).Return(nil).Once()
 		s.follower.On("AddCertifiedBlock", blockWithID(proposals[i-1].Block.ID())).Run(func(args mock.Arguments) {
 			wg.Done()
@@ -222,12 +222,12 @@ func (s *CoreSuite) TestProcessingConnectedRangesOutOfOrder() {
 	s.state.On("ExtendCertified", mock.Anything, mock.Anything).Run(func(args mock.Arguments) {
 		certified := args.Get(1).(*flow.CertifiedBlock)
 		if lastSubmittedBlockID != flow.ZeroID {
-			if certified.Block.Header.ParentID != lastSubmittedBlockID {
+			if certified.Proposal.Block.Header.ParentID != lastSubmittedBlockID {
 				s.Failf("blocks not sequential",
-					"blocks submitted to protocol state are not sequential at height %d", certified.Block.Header.Height)
+					"blocks submitted to protocol state are not sequential at height %d", certified.Proposal.Block.Header.Height)
 			}
 		}
-		lastSubmittedBlockID = certified.Block.ID()
+		lastSubmittedBlockID = certified.Proposal.ID()
 	}).Return(nil).Times(len(blocks) - 1)
 
 	s.validator.On("ValidateProposal", mock.Anything).Return(nil).Once()
@@ -288,12 +288,12 @@ func (s *CoreSuite) TestConcurrentAdd() {
 	s.state.On("ExtendCertified", mock.Anything, mock.Anything).Run(func(args mock.Arguments) {
 		certified := args.Get(1).(*flow.CertifiedBlock)
 		if lastSubmittedBlockID != flow.ZeroID {
-			if certified.Block.Header.ParentID != lastSubmittedBlockID {
+			if certified.Proposal.Block.Header.ParentID != lastSubmittedBlockID {
 				s.Failf("blocks not sequential",
-					"blocks submitted to protocol state are not sequential at height %d", certified.Block.Header.Height)
+					"blocks submitted to protocol state are not sequential at height %d", certified.Proposal.Block.Header.Height)
 			}
 		}
-		lastSubmittedBlockID = certified.Block.ID()
+		lastSubmittedBlockID = certified.Proposal.ID()
 	}).Return(nil).Times(len(blocks) - 1)
 
 	var wg sync.WaitGroup

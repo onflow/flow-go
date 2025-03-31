@@ -149,7 +149,7 @@ func NewFullConsensusState(
 //
 // No errors are expected during normal operations.
 func (m *FollowerState) ExtendCertified(ctx context.Context, certified *flow.CertifiedBlock) error {
-	candidate := certified.Block
+	candidate := certified.Proposal.Block
 	certifyingQC := certified.CertifyingQC
 	span, ctx := m.tracer.StartSpanFromContext(ctx, trace.ProtoStateMutatorHeaderExtend)
 	defer span.End()
@@ -171,7 +171,7 @@ func (m *FollowerState) ExtendCertified(ctx context.Context, certified *flow.Cer
 	}
 
 	// check if the block header is a valid extension of parent block
-	err = m.headerExtend(ctx, candidate, certified.ProposerSignature, certifyingQC, deferredDbOps)
+	err = m.headerExtend(ctx, certified.Proposal, certifyingQC, deferredDbOps)
 	if err != nil {
 		// since we have a QC for this block, it cannot be an invalid extension
 		return fmt.Errorf("unexpected invalid block (id=%x) with certifying qc (id=%x): %s",
@@ -233,7 +233,7 @@ func (m *ParticipantState) Extend(ctx context.Context, candidateProposal *flow.B
 	deferredDbOps := transaction.NewDeferredDbOps()
 
 	// check if the block header is a valid extension of parent block
-	err = m.headerExtend(ctx, candidate, candidateProposal.ProposerSigData, nil, deferredDbOps)
+	err = m.headerExtend(ctx, candidateProposal, nil, deferredDbOps)
 	if err != nil {
 		return fmt.Errorf("header not compliant with chain state: %w", err)
 	}
@@ -304,14 +304,14 @@ func (m *ParticipantState) Extend(ctx context.Context, candidateProposal *flow.B
 //
 // Expected errors during normal operations:
 //   - state.InvalidExtensionError if the candidate block is invalid
-func (m *FollowerState) headerExtend(ctx context.Context, candidate *flow.Block, proposerSigData []byte, certifyingQC *flow.QuorumCertificate, deferredDbOps *transaction.DeferredDbOps) error {
+func (m *FollowerState) headerExtend(ctx context.Context, candidate *flow.BlockProposal, certifyingQC *flow.QuorumCertificate, deferredDbOps *transaction.DeferredDbOps) error {
 	span, _ := m.tracer.StartSpanFromContext(ctx, trace.ProtoStateMutatorExtendCheckHeader)
 	defer span.End()
-	blockID := candidate.ID()
-	header := candidate.Header
+	blockID := candidate.Block.ID()
+	header := candidate.Block.Header
 
 	// STEP 1: Check that the payload is consistent with the payload hash in the header
-	if candidate.Payload.Hash() != header.PayloadHash {
+	if candidate.Block.Payload.Hash() != header.PayloadHash {
 		return state.NewInvalidExtensionErrorf("payload integrity check failed")
 	}
 
@@ -357,7 +357,7 @@ func (m *FollowerState) headerExtend(ctx context.Context, candidate *flow.Block,
 	}
 
 	// STEP 5:
-	qc := candidate.Header.QuorumCertificate()
+	qc := candidate.Block.Header.QuorumCertificate()
 	deferredDbOps.AddDbOp(func(tx *transaction.Tx) error {
 		// STEP 5a: Store QC for parent block and emit `BlockProcessable` notification if and only if
 		//  - the QC for the parent has not been stored before (otherwise, we already emitted the notification) and
@@ -378,17 +378,17 @@ func (m *FollowerState) headerExtend(ctx context.Context, candidate *flow.Block,
 		}
 
 		// STEP 5b: Store candidate block and index it as a child of its parent (needed for recovery to traverse unfinalized blocks)
-		err = m.blocks.StoreTx(candidate)(tx) // insert the block into the database AND cache
+		err = m.blocks.StoreTx(candidate.Block)(tx) // insert the block into the database AND cache
 		if err != nil {
 			return fmt.Errorf("could not store candidate block: %w", err)
 		}
-		if proposerSigData != nil {
-			err = m.sigs.StoreTx(blockID, proposerSigData)(tx)
+		if candidate.ProposerSigData != nil {
+			err = m.sigs.StoreTx(blockID, candidate.ProposerSigData)(tx)
 			if err != nil {
 				return fmt.Errorf("could not store proposer signature: %w", err)
 			}
 		}
-		err = transaction.WithTx(procedure.IndexNewBlock(blockID, candidate.Header.ParentID))(tx)
+		err = transaction.WithTx(procedure.IndexNewBlock(blockID, candidate.Block.Header.ParentID))(tx)
 		if err != nil {
 			return fmt.Errorf("could not index new block: %w", err)
 		}
@@ -400,7 +400,7 @@ func (m *FollowerState) headerExtend(ctx context.Context, candidate *flow.Block,
 				return fmt.Errorf("could not store certifying qc: %w", err)
 			}
 			tx.OnSucceed(func() { // queue a BlockProcessable event for candidate block, since it is certified
-				m.consumer.BlockProcessable(candidate.Header, certifyingQC)
+				m.consumer.BlockProcessable(candidate.Block.Header, certifyingQC)
 			})
 		}
 		return nil

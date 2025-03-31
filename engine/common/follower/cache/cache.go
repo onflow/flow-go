@@ -176,7 +176,7 @@ func (c *Cache) AddBlocks(batch []*flow.BlockProposal) (certifiedBatch []flow.Ce
 
 	certifiedBatch = make([]flow.CertifiedBlock, 0, len(batch)-1)
 	for i, proposal := range batch[:len(batch)-1] {
-		certifiedBlock, err := flow.NewCertifiedBlock(proposal.Block, batch[i+1].Block.Header.QuorumCertificate(), proposal.ProposerSigData)
+		certifiedBlock, err := flow.NewCertifiedBlock(proposal, batch[i+1].Block.Header.QuorumCertificate())
 		if err != nil {
 			return nil, fmt.Errorf("could not construct certified block: %w", err)
 		}
