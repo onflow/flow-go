@@ -54,6 +54,7 @@ services:
       - ./conf/grafana-dashboards.yaml:/etc/grafana/provisioning/dashboards/dashboards.yaml:z
       - ./conf/grafana-localnet.json:/etc/grafana/provisioning/dashboards/localnet.json:z
       - ./conf/grafana-exec-sync.json:/etc/grafana/provisioning/dashboards/exec-sync.json:z
+      - ./conf/grafana-loader.json:/etc/grafana/provisioning/dashboards/loader.json:z
       - ./conf/grafana.ini:/etc/grafana/grafana.ini
     environment:
       - GF_AUTH_ANONYMOUS_ENABLED=true
