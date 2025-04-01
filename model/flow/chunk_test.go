@@ -406,8 +406,13 @@ func TestChunkMalleability(t *testing.T) {
 
 	// TODO(mainnet27, #6773): remove this test according to https://github.com/onflow/flow-go/issues/6773
 	t.Run("Chunk with nil ServiceEventCount", func(t *testing.T) {
-		unittest.RequireEntityNonMalleable(t, unittest.ChunkFixture(unittest.IdentifierFixture(), 0, unittest.StateCommitmentFixture(), func(c *flow.Chunk) {
-			c.ServiceEventCount = nil
-		}))
+		unittest.RequireEntityNonMalleable(
+			t,
+			unittest.ChunkFixture(unittest.IdentifierFixture(), 0, unittest.StateCommitmentFixture(), func(c *flow.Chunk) {
+				c.ServiceEventCount = nil
+			}),
+			// We pin the `ServiceEventCount` to the current value (nil), so `MalleabilityChecker` will not mutate this field:
+			unittest.WithPinnedField("ChunkBody.ServiceEventCount"),
+		)
 	})
 }
