@@ -368,7 +368,7 @@ func TestChunk_ModelVersions_EncodeDecode(t *testing.T) {
 //
 // Backward compatibility is implemented by providing a custom EncodeRLP method.
 func TestChunk_FingerprintBackwardCompatibility(t *testing.T) {
-	chunk := unittest.ChunkFixture(unittest.IdentifierFixture(), 0, unittest.StateCommitmentFixture())
+	chunk := unittest.ChunkFixture(unittest.IdentifierFixture(), 1, unittest.StateCommitmentFixture())
 	chunk.ServiceEventCount = nil
 
 	// Define an older type which use flow.ChunkBodyV0
