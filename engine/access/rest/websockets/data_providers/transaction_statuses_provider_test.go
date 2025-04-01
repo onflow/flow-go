@@ -10,13 +10,14 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
-	"github.com/onflow/flow-go/access"
 	accessmock "github.com/onflow/flow-go/access/mock"
 	mockcommonmodels "github.com/onflow/flow-go/engine/access/rest/common/models/mock"
-	"github.com/onflow/flow-go/engine/access/rest/websockets/models"
+	"github.com/onflow/flow-go/engine/access/rest/websockets/data_providers/models"
+	wsmodels "github.com/onflow/flow-go/engine/access/rest/websockets/models"
 	"github.com/onflow/flow-go/engine/access/state_stream"
 	ssmock "github.com/onflow/flow-go/engine/access/state_stream/mock"
 	"github.com/onflow/flow-go/engine/access/subscription"
+	accessmodel "github.com/onflow/flow-go/model/access"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/utils/unittest"
 
@@ -88,13 +89,13 @@ func (s *TransactionStatusesProviderSuite) TestTransactionStatusesDataProvider_H
 	)
 }
 
-func (s *TransactionStatusesProviderSuite) subscribeTransactionStatusesDataProviderTestCases(backendResponses []*access.TransactionResult) []testType {
+func (s *TransactionStatusesProviderSuite) subscribeTransactionStatusesDataProviderTestCases(backendResponses []*accessmodel.TransactionResult) []testType {
 	expectedResponses := s.expectedTransactionStatusesResponses(backendResponses, TransactionStatusesTopic)
 
 	return []testType{
 		{
 			name: "SubscribeTransactionStatuses happy path",
-			arguments: models.Arguments{
+			arguments: wsmodels.Arguments{
 				"tx_id": unittest.IdentifierFixture().String(),
 			},
 			setupBackend: func(sub *ssmock.Subscription) {
@@ -122,10 +123,10 @@ func (s *TransactionStatusesProviderSuite) requireTransactionStatuses(
 	require.Equal(s.T(), expectedResponsePayload.TransactionResult.BlockId, actualResponsePayload.TransactionResult.BlockId)
 }
 
-func backendTransactionStatusesResponse(block flow.Block) []*access.TransactionResult {
+func backendTransactionStatusesResponse(block flow.Block) []*accessmodel.TransactionResult {
 	id := unittest.IdentifierFixture()
 	cid := unittest.IdentifierFixture()
-	txr := access.TransactionResult{
+	txr := accessmodel.TransactionResult{
 		Status:     flow.TransactionStatusSealed,
 		StatusCode: 10,
 		Events: []flow.Event{
@@ -137,7 +138,7 @@ func backendTransactionStatusesResponse(block flow.Block) []*access.TransactionR
 		BlockHeight:  block.Header.Height,
 	}
 
-	var expectedTxResultsResponses []*access.TransactionResult
+	var expectedTxResultsResponses []*accessmodel.TransactionResult
 
 	for i := 0; i < 2; i++ {
 		expectedTxResultsResponses = append(expectedTxResultsResponses, &txr)
@@ -148,18 +149,16 @@ func backendTransactionStatusesResponse(block flow.Block) []*access.TransactionR
 
 // expectedTransactionStatusesResponses creates the expected responses for the provided backend responses.
 func (s *TransactionStatusesProviderSuite) expectedTransactionStatusesResponses(
-	backendResponses []*access.TransactionResult,
+	backendResponses []*accessmodel.TransactionResult,
 	topic string,
 ) []interface{} {
 	expectedResponses := make([]interface{}, len(backendResponses))
 
 	for i, resp := range backendResponses {
-		var expectedResponsePayload models.TransactionStatusesResponse
-		expectedResponsePayload.Build(s.linkGenerator, resp, uint64(i))
-
+		expectedResponsePayload := models.NewTransactionStatusesResponse(s.linkGenerator, resp, uint64(i))
 		expectedResponses[i] = &models.BaseDataProvidersResponse{
 			Topic:   topic,
-			Payload: &expectedResponsePayload,
+			Payload: expectedResponsePayload,
 		}
 	}
 
@@ -168,7 +167,6 @@ func (s *TransactionStatusesProviderSuite) expectedTransactionStatusesResponses(
 
 // TestMessageIndexTransactionStatusesProviderResponse_HappyPath tests that MessageIndex values in response are strictly increasing.
 func (s *TransactionStatusesProviderSuite) TestMessageIndexTransactionStatusesProviderResponse_HappyPath() {
-	ctx := context.Background()
 	send := make(chan interface{}, 10)
 	topic := TransactionStatusesTopic
 	txStatusesCount := 4
@@ -196,12 +194,12 @@ func (s *TransactionStatusesProviderSuite) TestMessageIndexTransactionStatusesPr
 
 	arguments :=
 		map[string]interface{}{
-			"tx_id": unittest.IdentifierFixture().String(),
+			"tx_id": unittest.TransactionFixture().ID().String(),
 		}
 
 	// Create the TransactionStatusesDataProvider instance
 	provider, err := NewTransactionStatusesDataProvider(
-		ctx,
+		context.Background(),
 		s.log,
 		s.api,
 		"dummy-id",
@@ -210,11 +208,10 @@ func (s *TransactionStatusesProviderSuite) TestMessageIndexTransactionStatusesPr
 		arguments,
 		send,
 	)
-
-	s.Require().NotNil(provider)
 	s.Require().NoError(err)
+	s.Require().NotNil(provider)
 
-	// Ensure the provider is properly closed after the test
+	// Ensure the provider is properly doneOnce after the test
 	defer provider.Close()
 
 	// Run the provider in a separate goroutine to simulate subscription processing
@@ -226,9 +223,9 @@ func (s *TransactionStatusesProviderSuite) TestMessageIndexTransactionStatusesPr
 	}()
 
 	// Simulate emitting data to the tx statuses channel
-	var txResults []*access.TransactionResult
+	var txResults []*accessmodel.TransactionResult
 	for i := 0; i < txStatusesCount; i++ {
-		txResults = append(txResults, &access.TransactionResult{
+		txResults = append(txResults, &accessmodel.TransactionResult{
 			BlockHeight: s.rootBlock.Header.Height,
 		})
 	}
@@ -243,13 +240,7 @@ func (s *TransactionStatusesProviderSuite) TestMessageIndexTransactionStatusesPr
 	var responses []*models.TransactionStatusesResponse
 	for i := 0; i < txStatusesCount; i++ {
 		res := <-send
-
-		txStatusesRes, ok := res.(*models.BaseDataProvidersResponse)
-		s.Require().True(ok, "Expected *models.BaseDataProvidersResponse, got %T", res)
-
-		txStatusesResData, ok := txStatusesRes.Payload.(*models.TransactionStatusesResponse)
-		s.Require().True(ok, "Expected *models.TransactionStatusesResponse, got %T", res)
-
+		_, txStatusesResData := extractPayload[*models.TransactionStatusesResponse](s.T(), res)
 		responses = append(responses, txStatusesResData)
 	}
 
@@ -271,7 +262,6 @@ func (s *TransactionStatusesProviderSuite) TestMessageIndexTransactionStatusesPr
 // when invalid arguments are provided. It verifies that appropriate errors are returned
 // for missing or conflicting arguments.
 func (s *TransactionStatusesProviderSuite) TestTransactionStatusesDataProvider_InvalidArguments() {
-	ctx := context.Background()
 	send := make(chan interface{})
 
 	topic := TransactionStatusesTopic
@@ -279,7 +269,7 @@ func (s *TransactionStatusesProviderSuite) TestTransactionStatusesDataProvider_I
 	for _, test := range invalidTransactionStatusesArgumentsTestCases() {
 		s.Run(test.name, func() {
 			provider, err := NewTransactionStatusesDataProvider(
-				ctx,
+				context.Background(),
 				s.log,
 				s.api,
 				"dummy-id",
@@ -288,8 +278,8 @@ func (s *TransactionStatusesProviderSuite) TestTransactionStatusesDataProvider_I
 				test.arguments,
 				send,
 			)
-			s.Require().Nil(provider)
 			s.Require().Error(err)
+			s.Require().Nil(provider)
 			s.Require().Contains(err.Error(), test.expectedErrorMsg)
 		})
 	}
@@ -298,10 +288,6 @@ func (s *TransactionStatusesProviderSuite) TestTransactionStatusesDataProvider_I
 // invalidTransactionStatusesArgumentsTestCases returns a list of test cases with invalid argument combinations
 // for testing the behavior of transaction statuses data providers. Each test case includes a name,
 // a set of input arguments, and the expected error message that should be returned.
-//
-// The test cases cover scenarios such as:
-// 1. Providing invalid 'tx_id' value.
-// 2. Providing unexpected argument.
 func invalidTransactionStatusesArgumentsTestCases() []testErrType {
 	return []testErrType{
 		{
@@ -312,10 +298,22 @@ func invalidTransactionStatusesArgumentsTestCases() []testErrType {
 			expectedErrorMsg: "invalid ID format",
 		},
 		{
+			name: "empty 'tx_id' argument",
+			arguments: map[string]interface{}{
+				"tx_id": "",
+			},
+			expectedErrorMsg: "'tx_id' must not be empty",
+		},
+		{
+			name:             "missing 'tx_id' argument",
+			arguments:        map[string]interface{}{},
+			expectedErrorMsg: "missing 'tx_id' field",
+		},
+		{
 			name: "unexpected argument",
 			arguments: map[string]interface{}{
-				"tx_id":               unittest.IdentifierFixture().String(),
 				"unexpected_argument": "dummy",
+				"tx_id":               unittest.TransactionFixture().ID().String(),
 			},
 			expectedErrorMsg: "unexpected field: 'unexpected_argument'",
 		},

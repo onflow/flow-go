@@ -8,6 +8,7 @@ import (
 
 	"github.com/onflow/flow-go/engine/access/state_stream"
 	"github.com/onflow/flow-go/engine/access/subscription"
+	"github.com/onflow/flow-go/engine/access/subscription/tracker"
 
 	"github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/model/flow"
@@ -25,7 +26,7 @@ type AccountStatusesBackend struct {
 	log                 zerolog.Logger
 	subscriptionHandler *subscription.SubscriptionHandler
 
-	executionDataTracker subscription.ExecutionDataTracker
+	executionDataTracker tracker.ExecutionDataTracker
 	eventsRetriever      EventsRetriever
 }
 

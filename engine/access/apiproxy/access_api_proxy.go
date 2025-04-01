@@ -8,7 +8,7 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
-	accessflow "github.com/onflow/flow-go/access"
+	"github.com/onflow/flow-go/engine/access/rpc"
 	"github.com/onflow/flow-go/engine/access/rpc/connection"
 	"github.com/onflow/flow-go/engine/common/grpc/forwarder"
 	"github.com/onflow/flow-go/model/flow"
@@ -26,7 +26,7 @@ type FlowAccessAPIRouter struct {
 	logger   zerolog.Logger
 	metrics  *metrics.ObserverCollector
 	upstream *FlowAccessAPIForwarder
-	local    *accessflow.Handler
+	local    *rpc.Handler
 	useIndex bool
 }
 
@@ -34,7 +34,7 @@ type Params struct {
 	Log      zerolog.Logger
 	Metrics  *metrics.ObserverCollector
 	Upstream *FlowAccessAPIForwarder
-	Local    *accessflow.Handler
+	Local    *rpc.Handler
 	UseIndex bool
 }
 
@@ -161,7 +161,7 @@ func (h *FlowAccessAPIRouter) GetTransaction(context context.Context, req *acces
 }
 
 func (h *FlowAccessAPIRouter) GetTransactionResult(context context.Context, req *access.GetTransactionRequest) (*access.TransactionResultResponse, error) {
-	//TODO: add implementation for transaction error message before adding local impl
+	// TODO: add implementation for transaction error message before adding local impl
 
 	res, err := h.upstream.GetTransactionResult(context, req)
 	h.log(UpstreamApiService, "GetTransactionResult", err)
@@ -169,7 +169,7 @@ func (h *FlowAccessAPIRouter) GetTransactionResult(context context.Context, req 
 }
 
 func (h *FlowAccessAPIRouter) GetTransactionResultsByBlockID(context context.Context, req *access.GetTransactionsByBlockIDRequest) (*access.TransactionResultsResponse, error) {
-	//TODO: add implementation for transaction error message before adding local impl
+	// TODO: add implementation for transaction error message before adding local impl
 
 	res, err := h.upstream.GetTransactionResultsByBlockID(context, req)
 	h.log(UpstreamApiService, "GetTransactionResultsByBlockID", err)
@@ -189,7 +189,7 @@ func (h *FlowAccessAPIRouter) GetTransactionsByBlockID(context context.Context, 
 }
 
 func (h *FlowAccessAPIRouter) GetTransactionResultByIndex(context context.Context, req *access.GetTransactionByIndexRequest) (*access.TransactionResultResponse, error) {
-	//TODO: add implementation for transaction error message before adding local impl
+	// TODO: add implementation for transaction error message before adding local impl
 
 	res, err := h.upstream.GetTransactionResultByIndex(context, req)
 	h.log(UpstreamApiService, "GetTransactionResultByIndex", err)
@@ -479,7 +479,7 @@ func (h *FlowAccessAPIRouter) SubscribeBlockDigestsFromLatest(req *access.Subscr
 }
 
 func (h *FlowAccessAPIRouter) SendAndSubscribeTransactionStatuses(req *access.SendAndSubscribeTransactionStatusesRequest, server access.AccessAPI_SendAndSubscribeTransactionStatusesServer) error {
-	//SendAndSubscribeTransactionStatuses is not implemented for observer yet
+	// SendAndSubscribeTransactionStatuses is not implemented for observer yet
 	return status.Errorf(codes.Unimplemented, "method SendAndSubscribeTransactionStatuses not implemented")
 }
 

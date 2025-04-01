@@ -26,7 +26,7 @@ import (
 	"github.com/onflow/crypto"
 	"github.com/onflow/crypto/hash"
 
-	"github.com/onflow/flow-go/access"
+	accessmodel "github.com/onflow/flow-go/model/access"
 	flowgo "github.com/onflow/flow-go/model/flow"
 )
 
@@ -117,7 +117,7 @@ func (s ServiceKey) AccountKey() (crypto.PublicKey, crypto.PrivateKey) {
 
 type AccessProvider interface {
 	Ping() error
-	GetNetworkParameters() access.NetworkParameters
+	GetNetworkParameters() accessmodel.NetworkParameters
 
 	GetLatestBlock() (*flowgo.Block, error)
 	GetBlockByID(id flowgo.Identifier) (*flowgo.Block, error)
@@ -127,9 +127,9 @@ type AccessProvider interface {
 	GetFullCollectionByID(colID flowgo.Identifier) (*flowgo.Collection, error)
 
 	GetTransaction(txID flowgo.Identifier) (*flowgo.TransactionBody, error)
-	GetTransactionResult(txID flowgo.Identifier) (*access.TransactionResult, error)
+	GetTransactionResult(txID flowgo.Identifier) (*accessmodel.TransactionResult, error)
 	GetTransactionsByBlockID(blockID flowgo.Identifier) ([]*flowgo.TransactionBody, error)
-	GetTransactionResultsByBlockID(blockID flowgo.Identifier) ([]*access.TransactionResult, error)
+	GetTransactionResultsByBlockID(blockID flowgo.Identifier) ([]*accessmodel.TransactionResult, error)
 
 	GetAccount(address flowgo.Address) (*flowgo.Account, error)
 	GetAccountAtBlockHeight(address flowgo.Address, blockHeight uint64) (*flowgo.Account, error)

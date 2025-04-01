@@ -8,7 +8,6 @@ import (
 	legacyaccessproto "github.com/onflow/flow/protobuf/go/flow/legacy/access"
 	"google.golang.org/grpc"
 
-	"github.com/onflow/flow-go/access"
 	legacyaccess "github.com/onflow/flow-go/access/legacy"
 	"github.com/onflow/flow-go/consensus/hotstuff"
 	"github.com/onflow/flow-go/module"
@@ -80,11 +79,11 @@ func (builder *RPCEngineBuilder) WithLegacy() *RPCEngineBuilder {
 	return builder
 }
 
-func (builder *RPCEngineBuilder) DefaultHandler(signerIndicesDecoder hotstuff.BlockSignerDecoder) *access.Handler {
+func (builder *RPCEngineBuilder) DefaultHandler(signerIndicesDecoder hotstuff.BlockSignerDecoder) *Handler {
 	if signerIndicesDecoder == nil {
-		return access.NewHandler(builder.Engine.backend, builder.Engine.chain, builder.finalizedHeaderCache, builder.me, builder.stateStreamConfig.MaxGlobalStreams, access.WithIndexReporter(builder.indexReporter))
+		return NewHandler(builder.Engine.backend, builder.Engine.chain, builder.finalizedHeaderCache, builder.me, builder.stateStreamConfig.MaxGlobalStreams, WithIndexReporter(builder.indexReporter))
 	} else {
-		return access.NewHandler(builder.Engine.backend, builder.Engine.chain, builder.finalizedHeaderCache, builder.me, builder.stateStreamConfig.MaxGlobalStreams, access.WithBlockSignerDecoder(signerIndicesDecoder), access.WithIndexReporter(builder.indexReporter))
+		return NewHandler(builder.Engine.backend, builder.Engine.chain, builder.finalizedHeaderCache, builder.me, builder.stateStreamConfig.MaxGlobalStreams, WithBlockSignerDecoder(signerIndicesDecoder), WithIndexReporter(builder.indexReporter))
 	}
 }
 
