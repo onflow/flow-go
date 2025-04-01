@@ -81,9 +81,9 @@ func testAddEntities(t testing.TB, limit uint, b *stdmap.Backend[flow.Identifier
 	// adding elements
 	t1 := time.Now()
 	for i, e := range entities {
-		require.False(t, b.Has(e.ID()))
+		require.False(t, b.Has(e.Identifier))
 		// adding each element must be successful.
-		require.True(t, b.Add(e.ID(), e))
+		require.True(t, b.Add(e.Identifier, e))
 
 		if uint(i) < limit {
 			// when we are below limit the total of
@@ -96,7 +96,7 @@ func testAddEntities(t testing.TB, limit uint, b *stdmap.Backend[flow.Identifier
 		}
 
 		// entity should be immediately retrievable
-		actual, ok := b.Get(e.ID())
+		actual, ok := b.Get(e.Identifier)
 		require.True(t, ok)
 		require.Equal(t, e, actual)
 	}
