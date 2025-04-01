@@ -281,17 +281,6 @@ func NewChunkDataPack(
 	}
 }
 
-// ID returns the unique identifier for the concrete view, which is the ID of
-// the chunk the view is for.
-func (c *ChunkDataPack) ID() Identifier {
-	return c.ChunkID
-}
-
-// Checksum returns the checksum of the chunk data pack.
-func (c *ChunkDataPack) Checksum() Identifier {
-	return MakeID(c)
-}
-
 // TODO: This is the basic version of the list, we need to substitute it with something like Merkle tree at some point
 type ChunkList []*Chunk
 
