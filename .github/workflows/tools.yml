@@ -42,6 +42,8 @@ jobs:
         fetch-depth: 0
         ref: ${{ inputs.tag }}
     - name: Build and upload boot-tools
+      env:
+        CADENCE_DEPLOY_KEY: ${{ secrets.CADENCE_DEPLOY_KEY }}
       run: |
         make tool-bootstrap tool-transit
         mkdir boot-tools
@@ -53,6 +55,8 @@ jobs:
         tar -czf boot-tools.tar ./boot-tools/
         gsutil cp boot-tools.tar gs://flow-genesis-bootstrap/tools/${{ inputs.tag }}/boot-tools.tar
     - name: Build and upload util
+      env:
+        CADENCE_DEPLOY_KEY: ${{ secrets.CADENCE_DEPLOY_KEY }}
       run: |
         make tool-util
         sha256sum util > util.sha256sum
