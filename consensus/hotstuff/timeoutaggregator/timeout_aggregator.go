@@ -35,7 +35,7 @@ type TimeoutAggregator struct {
 	log                    zerolog.Logger
 	hotstuffMetrics        module.HotstuffMetrics
 	engineMetrics          module.EngineMetrics
-	lowestRetainedView     counters.StrictMonotonousCounter // lowest view, for which we still process timeouts
+	lowestRetainedView     counters.StrictMonotonicCounter // lowest view, for which we still process timeouts
 	collectors             hotstuff.TimeoutCollectors
 	queuedTimeoutsNotifier engine.Notifier
 	enteringViewNotifier   engine.Notifier
@@ -64,7 +64,7 @@ func NewTimeoutAggregator(log zerolog.Logger,
 		log:                    log.With().Str("component", "hotstuff.timeout_aggregator").Logger(),
 		hotstuffMetrics:        hotstuffMetrics,
 		engineMetrics:          engineMetrics,
-		lowestRetainedView:     counters.NewMonotonousCounter(lowestRetainedView),
+		lowestRetainedView:     counters.NewMonotonicCounter(lowestRetainedView),
 		collectors:             collectors,
 		queuedTimeoutsNotifier: engine.NewNotifier(),
 		enteringViewNotifier:   engine.NewNotifier(),

@@ -59,7 +59,7 @@ func Test_ProviderPushSequential(t *testing.T) {
 	}
 
 	data, err := provider.GetTransactionExecutionMetricsAfter(height)
-	require.Nil(t, err)
+	require.NoError(t, err)
 	for i := 0; uint(i) < bufferSize; i++ {
 		require.Equal(t, time.Duration(uint(i)), data[height+uint64(i)+1][0].ExecutionTime)
 	}

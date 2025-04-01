@@ -539,7 +539,7 @@ func bootstrapEpochForProtocolStateEntry(
 
 			if commit != nil {
 				if err := protocol.IsValidEpochCommit(commit, setup); err != nil {
-					return fmt.Errorf("invalid EpochCommit for next epoch")
+					return fmt.Errorf("invalid EpochCommit for next epoch: %w", err)
 				}
 				commits = append(commits, commit)
 			}
@@ -586,12 +586,6 @@ func bootstrapSporkInfo(root protocol.Snapshot) func(*transaction.Tx) error {
 		err = operation.InsertSporkRootBlockHeight(sporkRootBlockHeight)(bdtx)
 		if err != nil {
 			return fmt.Errorf("could not insert spork root block height: %w", err)
-		}
-
-		version := params.ProtocolVersion()
-		err = operation.InsertProtocolVersion(version)(bdtx)
-		if err != nil {
-			return fmt.Errorf("could not insert protocol version: %w", err)
 		}
 
 		return nil
@@ -844,38 +838,19 @@ func IsBootstrapped(db *badger.DB) (bool, error) {
 // updateEpochMetrics update the `consensus_compliance_current_epoch_counter` and the
 // `consensus_compliance_current_epoch_phase` metric
 func updateEpochMetrics(metrics module.ComplianceMetrics, snap protocol.Snapshot) error {
-
-	// update epoch counter
-	counter, err := snap.Epochs().Current().Counter()
+	currentEpoch, err := snap.Epochs().Current()
 	if err != nil {
-		return fmt.Errorf("could not get current epoch counter: %w", err)
+		return fmt.Errorf("could not get current epoch: %w", err)
 	}
-	metrics.CurrentEpochCounter(counter)
-
-	// update epoch phase
-	phase, err := snap.EpochPhase()
-	if err != nil {
-		return fmt.Errorf("could not get current epoch counter: %w", err)
-	}
-	metrics.CurrentEpochPhase(phase)
-
-	currentEpochFinalView, err := snap.Epochs().Current().FinalView()
-	if err != nil {
-		return fmt.Errorf("could not update current epoch final view: %w", err)
-	}
-	metrics.CurrentEpochFinalView(currentEpochFinalView)
-
-	dkgPhase1FinalView, dkgPhase2FinalView, dkgPhase3FinalView, err := protocol.DKGPhaseViews(snap.Epochs().Current())
-	if err != nil {
-		return fmt.Errorf("could not get dkg phase final view: %w", err)
-	}
-
-	metrics.CurrentDKGPhaseViews(dkgPhase1FinalView, dkgPhase2FinalView, dkgPhase3FinalView)
+	metrics.CurrentEpochCounter(currentEpoch.Counter())
+	metrics.CurrentEpochFinalView(currentEpoch.FinalView())
+	metrics.CurrentDKGPhaseViews(currentEpoch.DKGPhase1FinalView(), currentEpoch.DKGPhase2FinalView(), currentEpoch.DKGPhase3FinalView())
 
 	epochProtocolState, err := snap.EpochProtocolState()
 	if err != nil {
 		return fmt.Errorf("could not get epoch protocol state: %w", err)
 	}
+	metrics.CurrentEpochPhase(epochProtocolState.EpochPhase()) // update epoch phase
 	// notify whether epoch fallback mode is active
 	if epochProtocolState.EpochFallbackTriggered() {
 		metrics.EpochFallbackModeTriggered()

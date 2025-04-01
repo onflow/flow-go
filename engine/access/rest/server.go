@@ -15,6 +15,7 @@ import (
 	"github.com/onflow/flow-go/engine/access/state_stream/backend"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/module/irrecoverable"
 )
 
 const (
@@ -37,13 +38,16 @@ type Config struct {
 }
 
 // NewServer returns an HTTP server initialized with the REST API handler
-func NewServer(serverAPI access.API,
+func NewServer(
+	ctx irrecoverable.SignalerContext,
+	serverAPI access.API,
 	config Config,
 	logger zerolog.Logger,
 	chain flow.Chain,
 	restCollector module.RestMetrics,
 	stateStreamApi state_stream.API,
 	stateStreamConfig backend.Config,
+	enableNewWebsocketsStreamAPI bool,
 	wsConfig websockets.Config,
 ) (*http.Server, error) {
 	builder := router.NewRouterBuilder(logger, restCollector).AddRestRoutes(serverAPI, chain, config.MaxRequestSize)
@@ -60,7 +64,10 @@ func NewServer(serverAPI access.API,
 		stateStreamConfig.HeartbeatInterval,
 		builder.LinkGenerator,
 	)
-	builder.AddWebsocketsRoute(chain, wsConfig, config.MaxRequestSize, dataProviderFactory)
+
+	if enableNewWebsocketsStreamAPI {
+		builder.AddWebsocketsRoute(ctx, chain, wsConfig, config.MaxRequestSize, dataProviderFactory)
+	}
 
 	c := cors.New(cors.Options{
 		AllowedOrigins: []string{"*"},
