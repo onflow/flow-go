@@ -4,8 +4,23 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
+type CollectionReader interface {
+	// LightByID returns collection with the given ID. Only retrieves
+	// transaction hashes.
+	LightByID(collID flow.Identifier) (*flow.LightCollection, error)
+
+	// ByID returns the collection with the given ID, including all
+	// transactions within the collection.
+	ByID(collID flow.Identifier) (*flow.Collection, error)
+
+	// LightByTransactionID returns the collection for the given transaction ID. Only retrieves
+	// transaction hashes.
+	LightByTransactionID(txID flow.Identifier) (*flow.LightCollection, error)
+}
+
 // Collections represents persistent storage for collections.
 type Collections interface {
+	CollectionReader
 
 	// StoreLight inserts the collection. It does not insert, nor check
 	// existence of, the constituent transactions.
@@ -17,14 +32,6 @@ type Collections interface {
 
 	// Remove removes the collection and all constituent transactions.
 	Remove(collID flow.Identifier) error
-
-	// LightByID returns collection with the given ID. Only retrieves
-	// transaction hashes.
-	LightByID(collID flow.Identifier) (*flow.LightCollection, error)
-
-	// ByID returns the collection with the given ID, including all
-	// transactions within the collection.
-	ByID(collID flow.Identifier) (*flow.Collection, error)
 
 	// StoreLightAndIndexByTransaction inserts the light collection (only
 	// transaction IDs) and adds a transaction id index for each of the
@@ -39,8 +46,4 @@ type Collections interface {
 	// the transaction_id->collection_id index when an index for the transaction
 	// already exists.
 	StoreLightAndIndexByTransaction(collection *flow.LightCollection) error
-
-	// LightByTransactionID returns the collection for the given transaction ID. Only retrieves
-	// transaction hashes.
-	LightByTransactionID(txID flow.Identifier) (*flow.LightCollection, error)
 }

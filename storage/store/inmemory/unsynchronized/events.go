@@ -22,6 +22,8 @@ func NewEvents() *Events {
 	}
 }
 
+var _ storage.EventsReader = (*Events)(nil)
+
 func (e *Events) ByBlockID(blockID flow.Identifier) ([]flow.Event, error) {
 	e.lock.RLock()
 	val, ok := e.blockIdToEvents[blockID]
