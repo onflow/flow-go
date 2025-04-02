@@ -321,7 +321,7 @@ func bootstrapSealingSegment(
 		for _, block := range segment.ExtraBlocks {
 			blockID := block.ID()
 			height := block.Header.Height
-			err := blocks.StoreTx(block)(tx)
+			err := blocks.StoreTx(&flow.BlockProposal{Block: block, ProposerSigData: nil})(tx)
 			if err != nil {
 				return fmt.Errorf("could not insert SealingSegment extra block: %w", err)
 			}
@@ -339,7 +339,7 @@ func bootstrapSealingSegment(
 			blockID := block.ID()
 			height := block.Header.Height
 
-			err := blocks.StoreTx(block)(tx)
+			err := blocks.StoreTx(&flow.BlockProposal{Block: block, ProposerSigData: nil})(tx)
 			if err != nil {
 				return fmt.Errorf("could not insert SealingSegment block: %w", err)
 			}

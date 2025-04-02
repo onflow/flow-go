@@ -122,8 +122,38 @@ func (_m *Blocks) IndexBlockForCollections(blockID flow.Identifier, collIDs []fl
 	return r0
 }
 
+// ProposalByID provides a mock function with given fields: blockID
+func (_m *Blocks) ProposalByID(blockID flow.Identifier) (*flow.BlockProposal, error) {
+	ret := _m.Called(blockID)
+
+	if len(ret) == 0 {
+		panic("no return value specified for ProposalByID")
+	}
+
+	var r0 *flow.BlockProposal
+	var r1 error
+	if rf, ok := ret.Get(0).(func(flow.Identifier) (*flow.BlockProposal, error)); ok {
+		return rf(blockID)
+	}
+	if rf, ok := ret.Get(0).(func(flow.Identifier) *flow.BlockProposal); ok {
+		r0 = rf(blockID)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*flow.BlockProposal)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(flow.Identifier) error); ok {
+		r1 = rf(blockID)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
 // Store provides a mock function with given fields: block
-func (_m *Blocks) Store(block *flow.Block) error {
+func (_m *Blocks) Store(block *flow.BlockProposal) error {
 	ret := _m.Called(block)
 
 	if len(ret) == 0 {
@@ -131,7 +161,7 @@ func (_m *Blocks) Store(block *flow.Block) error {
 	}
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(*flow.Block) error); ok {
+	if rf, ok := ret.Get(0).(func(*flow.BlockProposal) error); ok {
 		r0 = rf(block)
 	} else {
 		r0 = ret.Error(0)
@@ -141,7 +171,7 @@ func (_m *Blocks) Store(block *flow.Block) error {
 }
 
 // StoreTx provides a mock function with given fields: block
-func (_m *Blocks) StoreTx(block *flow.Block) func(*transaction.Tx) error {
+func (_m *Blocks) StoreTx(block *flow.BlockProposal) func(*transaction.Tx) error {
 	ret := _m.Called(block)
 
 	if len(ret) == 0 {
@@ -149,7 +179,7 @@ func (_m *Blocks) StoreTx(block *flow.Block) func(*transaction.Tx) error {
 	}
 
 	var r0 func(*transaction.Tx) error
-	if rf, ok := ret.Get(0).(func(*flow.Block) func(*transaction.Tx) error); ok {
+	if rf, ok := ret.Get(0).(func(*flow.BlockProposal) func(*transaction.Tx) error); ok {
 		r0 = rf(block)
 	} else {
 		if ret.Get(0) != nil {

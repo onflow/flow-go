@@ -9,15 +9,19 @@ import (
 type Blocks interface {
 
 	// Store will atomically store a block with all its dependencies.
-	Store(block *flow.Block) error
+	Store(block *flow.BlockProposal) error
 
 	// StoreTx allows us to store a new block, including its payload & header, as part of a DB transaction, while
 	// still going through the caching layer.
-	StoreTx(block *flow.Block) func(*transaction.Tx) error
+	StoreTx(block *flow.BlockProposal) func(*transaction.Tx) error
 
 	// ByID returns the block with the given hash. It is available for
 	// finalized and ambiguous blocks.
 	ByID(blockID flow.Identifier) (*flow.Block, error)
+
+	// ProposalByID
+	// TODO
+	ProposalByID(blockID flow.Identifier) (*flow.BlockProposal, error)
 
 	// ByHeight returns the block at the given height. It is only available
 	// for finalized blocks.

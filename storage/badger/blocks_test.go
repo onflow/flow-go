@@ -18,8 +18,9 @@ func TestBlockStoreAndRetrieve(t *testing.T) {
 		blocks := badgerstorage.InitAll(cacheMetrics, db).Blocks
 		block := unittest.FullBlockFixture()
 		block.SetPayload(unittest.PayloadFixture(unittest.WithAllTheFixins))
+		prop := unittest.ProposalFromBlock(&block)
 
-		err := blocks.Store(&block)
+		err := blocks.Store(prop)
 		require.NoError(t, err)
 
 		retrieved, err := blocks.ByID(block.ID())

@@ -29,15 +29,20 @@ func NewBlocks(db *badger.DB, headers *Headers, payloads *Payloads, sigs *Propos
 	return b
 }
 
-func (b *Blocks) StoreTx(block *flow.Block) func(*transaction.Tx) error {
+func (b *Blocks) StoreTx(block *flow.BlockProposal) func(*transaction.Tx) error {
 	return func(tx *transaction.Tx) error {
-		err := b.headers.storeTx(block.Header)(tx)
+		blockID := block.Block.ID()
+		err := b.headers.storeTx(block.Block.Header)(tx)
 		if err != nil {
-			return fmt.Errorf("could not store header %v: %w", block.Header.ID(), err)
+			return fmt.Errorf("could not store header %v: %w", blockID, err)
 		}
-		err = b.payloads.storeTx(block.ID(), block.Payload)(tx)
+		err = b.payloads.storeTx(blockID, block.Block.Payload)(tx)
 		if err != nil {
 			return fmt.Errorf("could not store payload: %w", err)
+		}
+		err = b.sigs.StoreTx(blockID, block.ProposerSigData)(tx)
+		if err != nil {
+			return fmt.Errorf("could not store proposer signature: %w", err)
 		}
 		return nil
 	}
@@ -87,7 +92,7 @@ func (b *Blocks) retrieveProposalTx(blockID flow.Identifier) func(*badger.Txn) (
 }
 
 // Store ...
-func (b *Blocks) Store(block *flow.Block) error {
+func (b *Blocks) Store(block *flow.BlockProposal) error {
 	return operation.RetryOnConflictTx(b.db, transaction.Update, b.StoreTx(block))
 }
 
@@ -96,6 +101,12 @@ func (b *Blocks) ByID(blockID flow.Identifier) (*flow.Block, error) {
 	tx := b.db.NewTransaction(false)
 	defer tx.Discard()
 	return b.retrieveTx(blockID)(tx)
+}
+
+func (b *Blocks) ProposalByID(blockID flow.Identifier) (*flow.BlockProposal, error) {
+	tx := b.db.NewTransaction(false)
+	defer tx.Discard()
+	return b.retrieveProposalTx(blockID)(tx)
 }
 
 // ByHeight ...

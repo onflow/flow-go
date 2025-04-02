@@ -378,15 +378,9 @@ func (m *FollowerState) headerExtend(ctx context.Context, candidate *flow.BlockP
 		}
 
 		// STEP 5b: Store candidate block and index it as a child of its parent (needed for recovery to traverse unfinalized blocks)
-		err = m.blocks.StoreTx(candidate.Block)(tx) // insert the block into the database AND cache
+		err = m.blocks.StoreTx(candidate)(tx) // insert the block into the database AND cache
 		if err != nil {
 			return fmt.Errorf("could not store candidate block: %w", err)
-		}
-		if candidate.ProposerSigData != nil {
-			err = m.sigs.StoreTx(blockID, candidate.ProposerSigData)(tx)
-			if err != nil {
-				return fmt.Errorf("could not store proposer signature: %w", err)
-			}
 		}
 		err = transaction.WithTx(procedure.IndexNewBlock(blockID, candidate.Block.Header.ParentID))(tx)
 		if err != nil {
