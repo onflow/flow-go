@@ -62,7 +62,7 @@ func (s *WsControllerSuite) TestSubscribeRequest() {
 		// data provider might finish on its own or controller will close it via Close()
 		dataProvider.On("Close").Return(nil).Maybe()
 		dataProvider.
-			On("Run").
+			On("Run", mock.Anything).
 			Run(func(args mock.Arguments) {
 				<-done
 			}).
@@ -100,7 +100,7 @@ func (s *WsControllerSuite) TestSubscribeRequest() {
 				require.True(t, ok)
 				require.Equal(t, request.SubscriptionID, response.SubscriptionID)
 
-				return websocket.ErrCloseSent
+				return &websocket.CloseError{Code: websocket.CloseNormalClosure}
 			})
 
 		s.expectCloseConnection(conn, done)
@@ -149,7 +149,7 @@ func (s *WsControllerSuite) TestSubscribeRequest() {
 				require.NotEmpty(t, response.Error)
 				require.Equal(t, http.StatusBadRequest, response.Error.Code)
 				require.Equal(t, "", response.Action)
-				return websocket.ErrCloseSent
+				return &websocket.CloseError{Code: websocket.CloseNormalClosure}
 			})
 
 		s.expectCloseConnection(conn, done)
@@ -186,7 +186,7 @@ func (s *WsControllerSuite) TestSubscribeRequest() {
 				require.Equal(t, http.StatusBadRequest, response.Error.Code)
 				require.Equal(t, models.SubscribeAction, response.Action)
 
-				return websocket.ErrCloseSent
+				return &websocket.CloseError{Code: websocket.CloseNormalClosure}
 			})
 
 		s.expectCloseConnection(conn, done)
@@ -206,7 +206,7 @@ func (s *WsControllerSuite) TestSubscribeRequest() {
 		// data provider might finish on its own or controller will close it via Close()
 		dataProvider.On("Close").Return(nil).Maybe()
 		dataProvider.
-			On("Run").
+			On("Run", mock.Anything).
 			Run(func(args mock.Arguments) {}).
 			Return(fmt.Errorf("error running data provider")).
 			Once()
@@ -232,7 +232,7 @@ func (s *WsControllerSuite) TestSubscribeRequest() {
 				require.Equal(t, http.StatusInternalServerError, response.Error.Code)
 				require.Equal(t, models.SubscribeAction, response.Action)
 
-				return websocket.ErrCloseSent
+				return &websocket.CloseError{Code: websocket.CloseNormalClosure}
 			})
 
 		s.expectCloseConnection(conn, done)
@@ -261,7 +261,7 @@ func (s *WsControllerSuite) TestUnsubscribeRequest() {
 		// data provider might finish on its own or controller will close it via Close()
 		dataProvider.On("Close").Return(nil).Maybe()
 		dataProvider.
-			On("Run").
+			On("Run", mock.Anything).
 			Run(func(args mock.Arguments) {
 				<-done
 			}).
@@ -301,7 +301,7 @@ func (s *WsControllerSuite) TestUnsubscribeRequest() {
 				require.Empty(t, response.Error)
 				require.Equal(t, request.SubscriptionID, response.SubscriptionID)
 
-				return websocket.ErrCloseSent
+				return &websocket.CloseError{Code: websocket.CloseNormalClosure}
 			}).
 			Once()
 
@@ -329,7 +329,7 @@ func (s *WsControllerSuite) TestUnsubscribeRequest() {
 		// data provider might finish on its own or controller will close it via Close()
 		dataProvider.On("Close").Return(nil).Maybe()
 		dataProvider.
-			On("Run").
+			On("Run", mock.Anything).
 			Run(func(args mock.Arguments) {
 				<-done
 			}).
@@ -371,7 +371,7 @@ func (s *WsControllerSuite) TestUnsubscribeRequest() {
 				require.Equal(t, http.StatusBadRequest, response.Error.Code)
 				require.Equal(t, models.UnsubscribeAction, response.Action)
 
-				return websocket.ErrCloseSent
+				return &websocket.CloseError{Code: websocket.CloseNormalClosure}
 			}).
 			Once()
 
@@ -399,7 +399,7 @@ func (s *WsControllerSuite) TestUnsubscribeRequest() {
 		// data provider might finish on its own or controller will close it via Close()
 		dataProvider.On("Close").Return(nil).Maybe()
 		dataProvider.
-			On("Run").
+			On("Run", mock.Anything).
 			Run(func(args mock.Arguments) {
 				<-done
 			}).
@@ -443,7 +443,7 @@ func (s *WsControllerSuite) TestUnsubscribeRequest() {
 
 				require.Equal(t, models.UnsubscribeAction, response.Action)
 
-				return websocket.ErrCloseSent
+				return &websocket.CloseError{Code: websocket.CloseNormalClosure}
 			}).
 			Once()
 
@@ -480,7 +480,7 @@ func (s *WsControllerSuite) TestListSubscriptions() {
 		// data provider might finish on its own or controller will close it via Close()
 		dataProvider.On("Close").Return(nil).Maybe()
 		dataProvider.
-			On("Run").
+			On("Run", mock.Anything).
 			Run(func(args mock.Arguments) {
 				<-done
 			}).
@@ -523,7 +523,7 @@ func (s *WsControllerSuite) TestListSubscriptions() {
 				require.Equal(t, arguments, response.Subscriptions[0].Arguments)
 				require.Equal(t, models.ListSubscriptionsAction, response.Action)
 
-				return websocket.ErrCloseSent
+				return &websocket.CloseError{Code: websocket.CloseNormalClosure}
 			}).
 			Once()
 
@@ -581,7 +581,7 @@ func (s *WsControllerSuite) TestSubscribeBlocks() {
 				actualBlock = block
 				require.Equal(t, expectedBlock, actualBlock)
 
-				return websocket.ErrCloseSent
+				return &websocket.CloseError{Code: websocket.CloseNormalClosure}
 			})
 
 		s.expectCloseConnection(conn, done)
@@ -641,7 +641,7 @@ func (s *WsControllerSuite) TestSubscribeBlocks() {
 				if i == len(expectedBlocks) {
 					require.Equal(t, expectedBlocks, actualBlocks)
 					close(done)
-					return websocket.ErrCloseSent
+					return &websocket.CloseError{Code: websocket.CloseNormalClosure}
 				}
 
 				return nil
@@ -680,7 +680,8 @@ func (s *WsControllerSuite) TestRateLimiter() {
 
 	// Step 2: Configure the WebSocket controller with a rate limit.
 	config := NewDefaultWebsocketConfig()
-	config.MaxResponsesPerSecond = 2 // 2 messages per second.
+	config.MaxResponsesPerSecond = 2
+
 	controller := NewWebSocketController(s.logger, config, conn, nil)
 
 	// Step 3: Simulate sending messages to the controller's `multiplexedStream`.
@@ -742,7 +743,7 @@ func (s *WsControllerSuite) TestConfigureKeepaliveConnection() {
 }
 
 func (s *WsControllerSuite) TestControllerShutdown() {
-	s.T().Run("Keepalive routine failed", func(t *testing.T) {
+	s.T().Run("Keepalive routine initiated shutdown", func(t *testing.T) {
 		t.Parallel()
 
 		conn := connmock.NewWebsocketConnection(t)
@@ -754,12 +755,12 @@ func (s *WsControllerSuite) TestControllerShutdown() {
 		controller := NewWebSocketController(s.logger, s.wsConfig, conn, factory)
 
 		// Mock keepalive to return an error
-		done := make(chan struct{})
+		done := make(chan struct{}, 1)
 		conn.
 			On("WriteControl", websocket.PingMessage, mock.Anything).
 			Return(func(int, time.Time) error {
 				close(done)
-				return websocket.ErrCloseSent
+				return assert.AnError
 			}).
 			Once()
 
@@ -767,7 +768,7 @@ func (s *WsControllerSuite) TestControllerShutdown() {
 			On("ReadJSON", mock.Anything).
 			Return(func(interface{}) error {
 				<-done
-				return websocket.ErrCloseSent
+				return &websocket.CloseError{Code: websocket.CloseNormalClosure}
 			}).
 			Once()
 
@@ -775,7 +776,8 @@ func (s *WsControllerSuite) TestControllerShutdown() {
 		conn.AssertExpectations(t)
 	})
 
-	s.T().Run("Read routine failed", func(t *testing.T) {
+	// TODO: we should test a case when the read routine fails with an arbitrary error (assert.NoError)
+	s.T().Run("Read routine initiated shutdown", func(t *testing.T) {
 		t.Parallel()
 
 		conn := connmock.NewWebsocketConnection(t)
@@ -789,7 +791,7 @@ func (s *WsControllerSuite) TestControllerShutdown() {
 		conn.
 			On("ReadJSON", mock.Anything).
 			Return(func(_ interface{}) error {
-				return websocket.ErrCloseSent //TODO: this should be assert.AnError and test should be rewritten
+				return &websocket.CloseError{Code: websocket.CloseNormalClosure}
 			}).
 			Once()
 
@@ -853,10 +855,6 @@ func (s *WsControllerSuite) TestControllerShutdown() {
 		controller := NewWebSocketController(s.logger, s.wsConfig, conn, factory)
 
 		ctx, cancel := context.WithCancel(context.Background())
-		conn.On("ReadJSON", mock.Anything).Return(func(_ interface{}) error {
-			<-ctx.Done()
-			return websocket.ErrCloseSent
-		}).Once()
 
 		cancel()
 		controller.HandleConnection(ctx)
@@ -885,7 +883,7 @@ func (s *WsControllerSuite) TestControllerShutdown() {
 				// make sure the reader routine sleeps for more time than InactivityTimeout + inactivity ticker period.
 				// meanwhile, the writer routine must shut down the controller.
 				<-time.After(wsConfig.InactivityTimeout + controller.inactivityTickerPeriod()*2)
-				return websocket.ErrCloseSent
+				return &websocket.CloseError{Code: websocket.CloseNormalClosure}
 			}).
 			Once()
 
@@ -910,7 +908,7 @@ func (s *WsControllerSuite) TestKeepaliveRoutine() {
 			Return(func(int, time.Time) error {
 				if i == expectedCalls {
 					close(done)
-					return websocket.ErrCloseSent
+					return &websocket.CloseError{Code: websocket.CloseNormalClosure}
 				}
 
 				i += 1
@@ -920,7 +918,7 @@ func (s *WsControllerSuite) TestKeepaliveRoutine() {
 
 		conn.On("ReadJSON", mock.Anything).Return(func(_ interface{}) error {
 			<-done
-			return websocket.ErrCloseSent
+			return &websocket.CloseError{Code: websocket.CloseNormalClosure}
 		})
 
 		factory := dpmock.NewDataProviderFactory(t)
@@ -930,11 +928,12 @@ func (s *WsControllerSuite) TestKeepaliveRoutine() {
 		conn.AssertExpectations(t)
 	})
 
-	s.T().Run("Error on write to connection", func(t *testing.T) {
+	s.T().Run("Error on write to closed connection", func(t *testing.T) {
 		conn := connmock.NewWebsocketConnection(t)
+		expectedError := &websocket.CloseError{Code: websocket.CloseNormalClosure}
 		conn.
 			On("WriteControl", websocket.PingMessage, mock.Anything).
-			Return(websocket.ErrCloseSent). //TODO: change to assert.AnError and rewrite test
+			Return(expectedError).
 			Once()
 
 		factory := dpmock.NewDataProviderFactory(t)
@@ -945,7 +944,27 @@ func (s *WsControllerSuite) TestKeepaliveRoutine() {
 
 		err := controller.keepalive(ctx)
 		s.Require().Error(err)
-		s.Require().ErrorIs(websocket.ErrCloseSent, err)
+		s.Require().ErrorIs(expectedError, err)
+
+		conn.AssertExpectations(t)
+	})
+
+	s.T().Run("Error on write to open connection", func(t *testing.T) {
+		conn := connmock.NewWebsocketConnection(t)
+		conn.
+			On("WriteControl", websocket.PingMessage, mock.Anything).
+			Return(assert.AnError).
+			Once()
+
+		factory := dpmock.NewDataProviderFactory(t)
+		controller := NewWebSocketController(s.logger, s.wsConfig, conn, factory)
+
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+
+		err := controller.keepalive(ctx)
+		s.Require().Error(err)
+		s.Require().ErrorContains(err, "error sending ping")
 
 		conn.AssertExpectations(t)
 	})
@@ -1020,13 +1039,14 @@ func (s *WsControllerSuite) expectSubscribeResponse(t *testing.T, conn *connmock
 func (s *WsControllerSuite) expectCloseConnection(conn *connmock.WebsocketConnection, done <-chan struct{}) {
 	// In the default case, no further communication is expected from the client.
 	// We wait for the writer routine to signal completion, allowing us to close the connection gracefully
+	// This call is optional because it is not needed in cases where readMessages exits promptly when the context is canceled.
 	conn.
 		On("ReadJSON", mock.Anything).
 		Return(func(msg interface{}) error {
 			<-done
-			return websocket.ErrCloseSent
+			return &websocket.CloseError{Code: websocket.CloseNormalClosure}
 		}).
-		Once()
+		Maybe()
 
 	s.expectKeepaliveRoutineShutdown(conn, done)
 }
@@ -1038,7 +1058,7 @@ func (s *WsControllerSuite) expectKeepaliveRoutineShutdown(conn *connmock.Websoc
 		Return(func(int, time.Time) error {
 			select {
 			case <-done:
-				return websocket.ErrCloseSent
+				return &websocket.CloseError{Code: websocket.CloseNormalClosure}
 			default:
 				return nil
 			}

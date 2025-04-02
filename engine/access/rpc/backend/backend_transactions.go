@@ -15,6 +15,7 @@ import (
 	"google.golang.org/grpc/status"
 
 	"github.com/onflow/flow-go/access"
+	"github.com/onflow/flow-go/access/validator"
 	"github.com/onflow/flow-go/engine/access/rpc/connection"
 	"github.com/onflow/flow-go/engine/common/rpc"
 	commonrpc "github.com/onflow/flow-go/engine/common/rpc"
@@ -38,7 +39,7 @@ type backendTransactions struct {
 	txResultErrorMessages storage.TransactionResultErrorMessages
 	chainID               flow.ChainID
 	transactionMetrics    module.TransactionMetrics
-	transactionValidator  *access.TransactionValidator
+	transactionValidator  *validator.TransactionValidator
 	retry                 *Retry
 	connFactory           connection.ConnectionFactory
 
@@ -130,7 +131,11 @@ func (b *backendTransactions) trySendTransaction(ctx context.Context, tx *flow.T
 // collection node cluster responsible for the given tx
 func (b *backendTransactions) chooseCollectionNodes(txID flow.Identifier) (flow.IdentitySkeletonList, error) {
 	// retrieve the set of collector clusters
-	clusters, err := b.state.Final().Epochs().Current().Clustering()
+	currentEpoch, err := b.state.Final().Epochs().Current()
+	if err != nil {
+		return nil, fmt.Errorf("could not get current epoch: %w", err)
+	}
+	clusters, err := currentEpoch.Clustering()
 	if err != nil {
 		return nil, fmt.Errorf("could not cluster collection nodes: %w", err)
 	}
@@ -285,7 +290,7 @@ func (b *backendTransactions) GetTransactionResult(
 	var txResult *access.TransactionResult
 	// access node may not have the block if it hasn't yet been finalized, hence block can be nil at this point
 	if block != nil {
-		txResult, err = b.lookupTransactionResult(ctx, txID, block, requiredEventEncodingVersion)
+		txResult, err = b.lookupTransactionResult(ctx, txID, block.Header, requiredEventEncodingVersion)
 		if err != nil {
 			return nil, rpc.ConvertError(err, "failed to retrieve result", codes.Internal)
 		}
@@ -345,11 +350,15 @@ func (b *backendTransactions) GetTransactionResult(
 	return txResult, nil
 }
 
-// retrieveBlock function returns a block based on the input argument. The block ID lookup has the highest priority,
-// followed by the collection ID lookup. If both are missing, the default lookup by transaction ID is performed.
+// retrieveBlock function returns a block based on the input arguments.
+// The block ID lookup has the highest priority, followed by the collection ID lookup.
+// If both are missing, the default lookup by transaction ID is performed.
+//
+// If looking up the block based solely on the txID returns not found, then no error is returned.
+//
+// Expected errors:
+// - storage.ErrNotFound if the requested block or collection was not found.
 func (b *backendTransactions) retrieveBlock(
-	// the requested block or collection was not found. If looking up the block based solely on the txID returns
-	// not found, then no error is returned.
 	blockID flow.Identifier,
 	collectionID flow.Identifier,
 	txID flow.Identifier,
@@ -621,7 +630,7 @@ func (b *backendTransactions) GetSystemTransactionResult(ctx context.Context, bl
 		return nil, rpc.ConvertStorageError(err)
 	}
 
-	return b.lookupTransactionResult(ctx, b.systemTxID, block, requiredEventEncodingVersion)
+	return b.lookupTransactionResult(ctx, b.systemTxID, block.Header, requiredEventEncodingVersion)
 }
 
 // Error returns:
@@ -644,21 +653,21 @@ func (b *backendTransactions) lookupBlock(txID flow.Identifier) (*flow.Block, er
 func (b *backendTransactions) lookupTransactionResult(
 	ctx context.Context,
 	txID flow.Identifier,
-	block *flow.Block,
+	block *flow.Header,
 	requiredEventEncodingVersion entities.EventEncodingVersion,
 ) (*access.TransactionResult, error) {
 	var txResult *access.TransactionResult
 	var err error
 	switch b.txResultQueryMode {
 	case IndexQueryModeExecutionNodesOnly:
-		txResult, err = b.getTransactionResultFromExecutionNode(ctx, block, txID, requiredEventEncodingVersion)
+		txResult, err = b.GetTransactionResultFromExecutionNode(ctx, block, txID, requiredEventEncodingVersion)
 	case IndexQueryModeLocalOnly:
 		txResult, err = b.GetTransactionResultFromStorage(ctx, block, txID, requiredEventEncodingVersion)
 	case IndexQueryModeFailover:
 		txResult, err = b.GetTransactionResultFromStorage(ctx, block, txID, requiredEventEncodingVersion)
 		if err != nil {
 			// If any error occurs with local storage - request transaction result from EN
-			txResult, err = b.getTransactionResultFromExecutionNode(ctx, block, txID, requiredEventEncodingVersion)
+			txResult, err = b.GetTransactionResultFromExecutionNode(ctx, block, txID, requiredEventEncodingVersion)
 		}
 	default:
 		return nil, status.Errorf(codes.Internal, "unknown transaction result query mode: %v", b.txResultQueryMode)
@@ -742,9 +751,9 @@ func (b *backendTransactions) registerTransactionForRetry(tx *flow.TransactionBo
 	b.retry.RegisterTransaction(referenceBlock.Height, tx)
 }
 
-func (b *backendTransactions) getTransactionResultFromExecutionNode(
+func (b *backendTransactions) GetTransactionResultFromExecutionNode(
 	ctx context.Context,
-	block *flow.Block,
+	block *flow.Header,
 	transactionID flow.Identifier,
 	requiredEventEncodingVersion entities.EventEncodingVersion,
 ) (*access.TransactionResult, error) {
@@ -773,7 +782,7 @@ func (b *backendTransactions) getTransactionResultFromExecutionNode(
 	}
 
 	// tx body is irrelevant to status if it's in an executed block
-	txStatus, err := b.DeriveTransactionStatus(block.Header.Height, true)
+	txStatus, err := b.DeriveTransactionStatus(block.Height, true)
 	if err != nil {
 		if !errors.Is(err, state.ErrUnknownSnapshotReference) {
 			irrecoverable.Throw(ctx, err)
@@ -793,7 +802,7 @@ func (b *backendTransactions) getTransactionResultFromExecutionNode(
 		Events:        events,
 		ErrorMessage:  resp.GetErrorMessage(),
 		BlockID:       blockID,
-		BlockHeight:   block.Header.Height,
+		BlockHeight:   block.Height,
 	}, nil
 }
 

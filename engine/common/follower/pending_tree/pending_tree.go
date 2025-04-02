@@ -102,13 +102,13 @@ func (t *PendingTree) AddBlocks(certifiedBlocks []flow.CertifiedBlock) ([]flow.C
 		if iter.HasNext() {
 			v := iter.NextVertex().(*PendingBlockVertex)
 
-			if v.VertexID() == block.ID() {
+			if v.VertexID() == block.BlockID() {
 				// this vertex is already in tree, skip it
 				continue
 			} else {
 				return nil, model.ByzantineThresholdExceededError{Evidence: fmt.Sprintf(
 					"conflicting QCs at view %d: %v and %v",
-					block.View(), v.ID(), block.ID(),
+					block.View(), v.BlockID(), block.BlockID(),
 				)}
 			}
 		}

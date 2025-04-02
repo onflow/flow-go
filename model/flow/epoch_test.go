@@ -16,22 +16,36 @@ func TestMalleability(t *testing.T) {
 		unittest.RequireEntityNonMalleable(t, unittest.EpochSetupFixture())
 	})
 	t.Run("EpochCommit with nil DKGIndexMap", func(t *testing.T) {
-		// Due to `DKGIndexMap` being nil, `MalleabilityChecker` will skip mutating this field.
-		unittest.RequireEntityNonMalleable(t, unittest.EpochCommitFixture())
+		require.Nil(t, unittest.EpochCommitFixture().DKGIndexMap) // sanity check that the fixture has left `DKGIndexMap` nil
+		unittest.RequireEntityNonMalleable(t, unittest.EpochCommitFixture(),
+			// We pin the `DKGIndexMap` to the current value (nil), so `MalleabilityChecker` will not mutate this field:
+			unittest.WithPinnedField("DKGIndexMap"),
+		)
 	})
 
-	checker := unittest.NewMalleabilityChecker(unittest.WithCustomType(func() flow.DKGIndexMap {
-		return flow.DKGIndexMap{unittest.IdentifierFixture(): 0, unittest.IdentifierFixture(): 1}
-	}))
 	t.Run("EpochCommit with proper DKGIndexMap", func(t *testing.T) {
+		checker := unittest.NewMalleabilityChecker(unittest.WithFieldGenerator("DKGIndexMap", func() flow.DKGIndexMap {
+			return flow.DKGIndexMap{unittest.IdentifierFixture(): 0, unittest.IdentifierFixture(): 1}
+		}))
 		err := checker.Check(unittest.EpochCommitFixture(func(commit *flow.EpochCommit) {
 			commit.DKGIndexMap = flow.DKGIndexMap{unittest.IdentifierFixture(): 0, unittest.IdentifierFixture(): 1}
 		}))
 		require.NoError(t, err)
 	})
 	t.Run("EpochRecover", func(t *testing.T) {
+		checker := unittest.NewMalleabilityChecker(unittest.WithFieldGenerator("EpochCommit.DKGIndexMap", func() flow.DKGIndexMap {
+			return flow.DKGIndexMap{unittest.IdentifierFixture(): 0, unittest.IdentifierFixture(): 1}
+		}))
 		err := checker.Check(unittest.EpochRecoverFixture())
 		require.NoError(t, err)
+	})
+
+	t.Run("EpochStateContainer", func(t *testing.T) {
+		unittest.RequireEntityNonMalleable(t, unittest.EpochStateContainerFixture())
+	})
+
+	t.Run("MinEpochStateEntry", func(t *testing.T) {
+		unittest.RequireEntityNonMalleable(t, unittest.EpochStateFixture(unittest.WithNextEpochProtocolState()).MinEpochStateEntry)
 	})
 }
 

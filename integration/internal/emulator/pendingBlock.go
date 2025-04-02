@@ -38,6 +38,7 @@ const MaxViewIncrease = 3
 
 // A pendingBlock contains the pending state required to form a new block.
 type pendingBlock struct {
+	BlockID   flowgo.Identifier
 	height    uint64
 	view      uint64
 	parentID  flowgo.Identifier
@@ -62,7 +63,7 @@ func newPendingBlock(
 	ledgerSnapshot snapshot.StorageSnapshot,
 	timestamp time.Time,
 ) *pendingBlock {
-	return &pendingBlock{
+	pb := &pendingBlock{
 		height: prevBlock.Header.Height + 1,
 		// the view increments by between 1 and MaxViewIncrease to match
 		// behaviour on a real network, where views are not consecutive
@@ -78,11 +79,10 @@ func newPendingBlock(
 		events: make([]flowgo.Event, 0),
 		index:  0,
 	}
-}
 
-// ID returns the ID of the pending block.
-func (b *pendingBlock) ID() flowgo.Identifier {
-	return b.Block().ID()
+	pb.BlockID = pb.Block().ID()
+
+	return pb
 }
 
 // Block returns the block information for the pending block.
