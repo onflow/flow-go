@@ -281,6 +281,16 @@ func NewChunkDataPack(
 	}
 }
 
+// ID returns unique identifier for the ChunkDataPack struct.
+func (c *ChunkDataPack) ID() Identifier {
+	return MakeID(c)
+}
+
+// Checksum returns the checksum of the chunk data pack.
+func (c *ChunkDataPack) Checksum() Identifier {
+	return MakeID(c)
+}
+
 // TODO: This is the basic version of the list, we need to substitute it with something like Merkle tree at some point
 type ChunkList []*Chunk
 

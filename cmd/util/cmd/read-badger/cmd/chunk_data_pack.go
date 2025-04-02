@@ -48,7 +48,7 @@ var chunkDataPackCmd = &cobra.Command{
 				return nil
 			}
 
-			common.PrettyPrint(chunkDataPack)
+			common.PrettyPrintEntity(chunkDataPack)
 			return nil
 		})
 
