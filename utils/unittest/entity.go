@@ -5,7 +5,6 @@ import (
 	"math/rand"
 	"reflect"
 	"testing"
-	"time"
 
 	"github.com/onflow/crypto"
 	"github.com/stretchr/testify/require"
@@ -33,38 +32,98 @@ func RequireEntityNonMalleable(t *testing.T, entity flow.IDEntity, ops ...Mallea
 // The MalleabilityChecker performs a recursive check of all fields of the entity and ensures that changing any field will change
 // the ID of the entity. By default, the MalleabilityChecker uses pre-defined generators for each basic golang type, which return
 // a random value, to modify the entity's field values. However, the MalleabilityChecker can be customized, by providing custom
-// types and their generators.
+// generators for specific types or specific fields.
 //
-// The caller must provide a properly instantiated entity struct, which serves a template for further modification.
-// Input entities must have all non-nil and non-empty slice/map fields, otherwise `Check` will return an error.
+// The caller can provide a loosely instantiated entity struct, which serves as a template for further modification.
+// If checker encounters a field that is nil, it will insert a randomized instance into field and continue the check.
+// If checker encounters a nil/empty slice or map, it will create a new instance of the slice/map, insert a value and continue the check.
 // In rare cases, a type may have a different ID computation depending on whether a field is nil.
-// In such cases, we can use the `malleability:"optional"` struct tag to skip malleability checks when the field is nil.
+// In such cases, we can use the WithPinnedField option to skip malleability checks on this field.
 //
 // This checker heavily relies on generation of random values for the fields based on their type. All types are split into three categories:
-//  1. structures (generateCustomFlowValue)
+//  1. structures, primitives, slices, arrays, maps (generateRandomReflectValue)
 //  2. interfaces (generateInterfaceFlowValue)
-//  3. primitives, slices, arrays, maps (generateRandomReflectValue)
 //
 // Checker knows how to deal with each of the categories and generate random values for them.
 // There are two ways to handle types not natively recognized byt he MalleabilityChecker:
-//  1. User can provide a custom type generator for the type using WithCustomType option.
-//  2. User can extend the checker with new type handling.
+//  1. User can provide a custom type generator for the type using WithTypeGenerator option.
+//  2. User can provide a custom generator for the field using WithFieldGenerator option.
 //
-// It is recommended to use the second option if type is used in multiple places and general enough. For other cases
-// it is better to use the first option. Mind that the first option overrides any type handling that is embedded in the checker.
-// This is very useful for cases where the field is context-sensitive, and we cannot generate a completely random value.
+// It is recommended to use the first option if type is used in multiple places and general enough.
+// Matching by type (instead of field name) is less selective, by covering all fields of the given type.
+// Field generator is very useful for cases where the field is context-sensitive, and we cannot generate a completely random value.
 type MalleabilityChecker struct {
-	customTypes map[reflect.Type]func() reflect.Value
+	typeGenerator  map[reflect.Type]func() reflect.Value
+	fieldGenerator map[string]func() reflect.Value
+	pinnedFields   map[string]struct{}
 }
 
 // MalleabilityCheckerOpt is a functional option for the MalleabilityChecker which allows to modify behavior of the checker.
 type MalleabilityCheckerOpt func(*MalleabilityChecker)
 
-// WithCustomType allows to override the default behavior of the checker for the given type, meaning if a field of the given type
+// WithTypeGenerator allows to override the default behavior of the checker for the given type, meaning if a field of the given type
 // is encountered, the MalleabilityChecker will use the provided generator instead of a random value.
-func WithCustomType[T any](generator func() T) MalleabilityCheckerOpt {
+// An example usage would be:
+//
+//	type BarType struct {
+//		Baz string
+//	}
+//	type FooType struct {
+//		Bar []BarType
+//	}
+//
+//	...
+//
+//	WithTypeGenerator(func() BarType { return randomBar()})
+//
+// ATTENTION: In order for the MalleabilityChecker to work properly, two calls of the generator should produce two different values.
+func WithTypeGenerator[T any](generator func() T) MalleabilityCheckerOpt {
 	return func(mc *MalleabilityChecker) {
-		mc.customTypes[reflect.TypeOf((*T)(nil)).Elem()] = func() reflect.Value {
+		mc.typeGenerator[reflect.TypeOf((*T)(nil)).Elem()] = func() reflect.Value {
+			return reflect.ValueOf(generator())
+		}
+	}
+}
+
+// WithPinnedField allows to skip malleability checks for the given field. If a field with given path is encountered, the MalleabilityChecker
+// will skip the check for this field. Pinning is mutually exclusive with field generators, meaning if a field is pinned, the checker will
+// not overwrite the field with a random value, even if a field generator is provided. This is useful when the ID computation varies depending
+// on specific values of some field (typically used for temporary downwards compatibility - new fields are added as temporary optional).
+// An example usage would be:
+//
+//	type BarType struct {
+//		Baz string
+//	}
+//	type FooType struct {
+//		Bar BarType
+//	}
+//
+//	...
+//
+//	WithPinnedField("Bar.Baz")
+func WithPinnedField(field string) MalleabilityCheckerOpt {
+	return func(mc *MalleabilityChecker) {
+		mc.pinnedFields[field] = struct{}{}
+	}
+}
+
+// WithFieldGenerator allows to override the default behavior of the checker for the given field, meaning if a field with given path
+// is encountered, the MalleabilityChecker will use the provided generator instead of a random value.
+// An example usage would be:
+//
+//	type BarType struct {
+//		Baz string
+//	}
+//	type FooType struct {
+//		Bar BarType
+//	}
+//
+//	...
+//
+//	WithFieldGenerator("Bar.Baz", func() string { return randomString()})
+func WithFieldGenerator[T any](field string, generator func() T) MalleabilityCheckerOpt {
+	return func(mc *MalleabilityChecker) {
+		mc.fieldGenerator[field] = func() reflect.Value {
 			return reflect.ValueOf(generator())
 		}
 	}
@@ -73,20 +132,26 @@ func WithCustomType[T any](generator func() T) MalleabilityCheckerOpt {
 // NewMalleabilityChecker creates a new instance of the MalleabilityChecker with the given options.
 func NewMalleabilityChecker(ops ...MalleabilityCheckerOpt) *MalleabilityChecker {
 	checker := &MalleabilityChecker{
-		customTypes: make(map[reflect.Type]func() reflect.Value),
+		pinnedFields:   make(map[string]struct{}),
+		typeGenerator:  make(map[reflect.Type]func() reflect.Value),
+		fieldGenerator: make(map[string]func() reflect.Value),
 	}
+
 	for _, op := range ops {
 		op(checker)
 	}
+
 	return checker
 }
 
 // Check is a method that performs the malleability check on the entity.
+// The caller provides a loosely instantiated entity struct, which serves a template for further modification.
 // The malleability check is recursively applied to all fields of the entity.
-// Inputs must have all non-nil and non-empty slice/map fields, otherwise Check will return an error.
-// In rare cases, a type may have a different ID computation depending on whether a field is nil.
-// In such cases, we can use the `malleability:"optional"` struct tag to skip malleability checks when the field is nil.
+// If one of the fields is nil or empty slice/map, the checker will create a new instance of the field and continue the check.
+// In rare cases, a type may have a different ID computation depending on whether a field is nil, in such case, we can use field pinning to
+// prevent the checker from changing the field.
 // It returns an error if the entity is malleable, otherwise it returns nil.
+// No errors are expected during normal operations.
 func (mc *MalleabilityChecker) Check(entity flow.IDEntity) error {
 	v := reflect.ValueOf(entity)
 	if !v.IsValid() {
@@ -100,95 +165,118 @@ func (mc *MalleabilityChecker) Check(entity flow.IDEntity) error {
 		return fmt.Errorf("entity is nil, nothing to check")
 	}
 	v = v.Elem()
-	return mc.isEntityMalleable(v, entity.ID)
-}
-
-// isEntityMalleable is a helper function to recursively check fields of the entity.
-// Every time we change a field we check if ID of the entity has changed. If the ID has not changed then entity is malleable.
-// This function returns error if the entity is malleable, otherwise it returns nil.
-func (mc *MalleabilityChecker) isEntityMalleable(v reflect.Value, idFunc func() flow.Identifier) error {
-	if err := ensureFieldNotEmpty(v); err != nil {
+	if err := mc.isEntityMalleable(v, nil, "", entity.ID); err != nil {
 		return err
 	}
-
-	tType := v.Type()
-	// if we have a custom type function we should use it to generate a random value for the field.
-	customTypeGenerator, hasCustomTypeOverride := mc.customTypes[tType]
-	if hasCustomTypeOverride {
-		origID := idFunc()
-		v.Set(customTypeGenerator())
-		newID := idFunc()
-		if origID != newID {
-			return nil
-		}
-		return fmt.Errorf("ID did not change after changing %s value", tType.String())
-	}
-
-	if v.Kind() == reflect.Struct {
-		// in case we are dealing with struct we have two options:
-		// 1) if it's a type that we know how to generate a random value for, we replace the whole field with such random value
-		// 2) if it's an unknown struct type, we check if the field is malleable by checking all of its fields recursively
-		if generatedValue := reflect.ValueOf(generateCustomFlowValue(v)); generatedValue.IsValid() {
-			origID := idFunc()
-			v.Set(generatedValue)
-			newID := idFunc()
-			if origID != newID {
-				return nil
-			}
-			return fmt.Errorf("ID did not change after changing %s value", tType.String())
-		} else {
-			for i := 0; i < v.NumField(); i++ {
-				field := v.Field(i)
-				if !field.CanSet() {
-					return fmt.Errorf("field %s is not settable", tType.Field(i).Name)
-				}
-				if err := ensureFieldNotEmpty(field); err != nil {
-					// if the field is empty and has a tag malleability:"optional" we omit it from the check
-					// and consider it as non-malleable.
-					if tType.Field(i).Tag.Get("malleability") == "optional" {
-						continue
-					}
-					return err
-				}
-				if err := mc.isEntityMalleable(field, idFunc); err != nil {
-					return fmt.Errorf("field %s is malleable: %w", tType.Field(i).Name, err)
-				}
-			}
-			return nil
-		}
-	} else {
-		// when dealing with non-composite type we can generate random values for it and check if ID has changed.
-		origID := idFunc()
-		err := generateRandomReflectValue(v)
-		if err != nil {
-			return fmt.Errorf("failed to generate random value for %s: %w", tType.String(), err)
-		}
-		newID := idFunc()
-		if origID != newID {
-			return nil
-		}
-		return fmt.Errorf("ID did not change after changing %s value", tType.String())
-	}
+	return mc.checkExpectations()
 }
 
-// ensureFieldNotEmpty is a helper function to ensure that the field is not empty.
-// An empty field is considered a nil or an empty map/slice.
-func ensureFieldNotEmpty(v reflect.Value) error {
-	if v.Kind() == reflect.Ptr && v.IsNil() {
-		return fmt.Errorf("invalid entity, field is nil")
-	} else if v.Kind() == reflect.Map || v.Kind() == reflect.Slice {
-		if v.Len() == 0 {
-			return fmt.Errorf("invalid entity, map/slice is empty")
-		}
+// checkExpectations checks if all pre-configured options were used during the check.
+// This includes checking if all pinned fields were used and if all field generators were used.
+// Pins and field generators are mutually exclusive, and consumed once per field.
+// An error is returned in case checker has been misconfigured.
+func (mc *MalleabilityChecker) checkExpectations() error {
+	for field := range mc.pinnedFields {
+		return fmt.Errorf("field %s is pinned, but wasn't used, checker misconfigured", field)
+	}
+	for field := range mc.fieldGenerator {
+		return fmt.Errorf("field %s has a generator, but wasn't used, checker misconfigured", field)
 	}
 	return nil
 }
 
+// isEntityMalleable is a helper function to recursively check fields of the entity.
+// This function is called recursively for each field of the entity and checks if the entity is malleable by comparing ID
+// before and after changing the field value.
+// Arguments:
+//   - v: field value to check.
+//   - structField: optional metadata about the field, it is present only for values which are fields of a struct.
+//   - parentFieldPath: previously accumulated field path which leads to the current field.
+//   - idFunc:  function to get the ID of the whole entity.
+//
+// This function returns error if the entity is malleable, otherwise it returns nil.
+func (mc *MalleabilityChecker) isEntityMalleable(v reflect.Value, structField *reflect.StructField, parentFieldPath string, idFunc func() flow.Identifier) error {
+	var fullFieldPath string
+	// if we are dealing with a field of a struct, we need to build a full field path and use that for custom options lookup.
+	if structField != nil {
+		fullFieldPath = buildFieldPath(parentFieldPath, structField.Name)
+		// pinning has priority over field generators, if the field is pinned, we skip the check for this field.
+		// if we have both pin and field generator, we will never use the field generator but will fail to meet the expectations, after running the check.
+		if _, ok := mc.pinnedFields[fullFieldPath]; ok {
+			// make sure we consume the pin so we can check if all pins were used.
+			delete(mc.pinnedFields, fullFieldPath)
+			return nil
+		}
+	}
+
+	if v.Kind() == reflect.Ptr {
+		if v.IsNil() {
+			v.Set(reflect.New(v.Type().Elem()))
+		}
+		v = v.Elem()
+	}
+	tType := v.Type()
+
+	// if we have a field generator for the field, we use it to generate a random value for the field instead of using the default flow.
+	if generator, ok := mc.fieldGenerator[fullFieldPath]; ok {
+		// make sure we consume the field generator so we can check if all field generators were used.
+		delete(mc.fieldGenerator, fullFieldPath)
+		origID := idFunc()
+		v.Set(generator())
+		newID := idFunc()
+		if origID != newID {
+			return nil
+		}
+		return fmt.Errorf("ID did not change after changing %s value", fullFieldPath)
+	}
+
+	if v.Kind() == reflect.Struct {
+		// any time we encounter a structure we need to go through all fields and check if the entity is malleable in recursive manner.
+		for i := 0; i < v.NumField(); i++ {
+			field := v.Field(i)
+			if !field.CanSet() {
+				return fmt.Errorf("field %s is not settable, try providing a field generator for field %s", tType.Field(i).Name, fullFieldPath)
+			}
+
+			nextField := tType.Field(i)
+			if err := mc.isEntityMalleable(field, &nextField, fullFieldPath, idFunc); err != nil {
+				return fmt.Errorf("field %s is malleable: %w", tType.Field(i).Name, err)
+			}
+		}
+		return nil
+	} else {
+		// when dealing with non-composite type we can generate random values for it and check if ID has changed.
+		origID := idFunc()
+		err := mc.generateRandomReflectValue(v)
+		if err != nil {
+			return fmt.Errorf("failed to generate random value for %s: %w", fullFieldPath, err)
+		}
+		newID := idFunc()
+		if origID != newID {
+			return nil
+		}
+		return fmt.Errorf("ID did not change after changing %s value", fullFieldPath)
+	}
+}
+
+// buildFieldPath is a helper function to build a full field path.
+func buildFieldPath(fieldPath string, fieldName string) string {
+	if fieldPath == "" {
+		return fieldName
+	}
+	return fieldPath + "." + fieldName
+}
+
 // generateRandomReflectValue uses reflection to switch on the field type and generate a random value for it.
 // This function mutates the input [reflect.Value]. If it cannot mutate the input, an error is returned and the malleability check should be considered failed.
-// In rare cases, a type may have a different ID computation depending on whether a field is nil.
-// In such cases, we can use the `malleability:"optional"` struct tag to skip malleability checks when the field is nil.
-func generateRandomReflectValue(field reflect.Value) error {
+// If a type generator is provided for the field type, it will be used to generate a random value for the field.
+// No errors are expected during normal operations.
+func (mc *MalleabilityChecker) generateRandomReflectValue(field reflect.Value) error {
+	if generator, ok := mc.typeGenerator[field.Type()]; ok {
+		field.Set(generator())
+		return nil
+	}
+
 	switch field.Kind() {
 	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
 		field.SetUint(^field.Uint())
@@ -201,39 +289,47 @@ func generateRandomReflectValue(field reflect.Value) error {
 	case reflect.Bool:
 		field.SetBool(!field.Bool())
 	case reflect.Slice:
-		sliceLen := field.Len()
-		if sliceLen <= 0 {
-			return fmt.Errorf("cannot generate random value for empty slice")
+		if field.Len() == 0 {
+			field.Set(reflect.MakeSlice(field.Type(), 1, 1))
 		}
-		index := rand.Intn(sliceLen)
-		return generateRandomReflectValue(field.Index(index))
+		return mc.generateRandomReflectValue(field.Index(rand.Intn(field.Len())))
 	case reflect.Array:
 		index := rand.Intn(field.Len())
-		return generateRandomReflectValue(field.Index(index))
+		return mc.generateRandomReflectValue(field.Index(index))
 	case reflect.Map:
 		mapKeys := field.MapKeys()
+		var key reflect.Value
 		if len(mapKeys) == 0 {
-			return fmt.Errorf("cannot generate random value for empty map")
+			field.Set(reflect.MakeMap(field.Type()))
+			key = reflect.New(field.Type().Key()).Elem()
+			if err := mc.generateRandomReflectValue(key); err != nil {
+				return err
+			}
+		} else {
+			index := rand.Intn(len(mapKeys))
+			key = mapKeys[index]
 		}
-		index := rand.Intn(len(mapKeys))
-		key := mapKeys[index]
-		oldVal := field.MapIndex(key)
-		newVal := reflect.New(oldVal.Type()).Elem()
-		if err := generateRandomReflectValue(newVal); err != nil {
+		val := reflect.New(field.Type().Elem()).Elem()
+		if err := mc.generateRandomReflectValue(val); err != nil {
 			return err
 		}
-		field.SetMapIndex(key, newVal)
+		field.SetMapIndex(key, val)
 	case reflect.Ptr:
 		if field.IsNil() {
-			return fmt.Errorf("cannot generate random value for nil pointer")
+			field.Set(reflect.New(field.Type().Elem()))
 		}
-		return generateRandomReflectValue(field.Elem()) // modify underlying value
+		return mc.generateRandomReflectValue(field.Elem()) // modify underlying value
 	case reflect.Struct:
-		generatedValue := reflect.ValueOf(generateCustomFlowValue(field))
-		if !generatedValue.IsValid() {
-			return fmt.Errorf("cannot generate random value for struct: %s", field.Type().String())
+		// if we are dealing with a struct, we need to go through all fields and generate random values for them
+		// if the field is another struct, we will deal with it recursively.
+		// at the end of the recursion, we must encounter a primitive type, which we can generate a random value for, otherwise an error is returned.
+		for i := 0; i < field.NumField(); i++ {
+			structField := field.Field(i)
+			err := mc.generateRandomReflectValue(structField)
+			if err != nil {
+				return fmt.Errorf("cannot generate random value for struct field: %s", field.Type().String())
+			}
 		}
-		field.Set(generatedValue)
 	case reflect.Interface:
 		generatedValue := reflect.ValueOf(generateInterfaceFlowValue(field)) // it's always a pointer
 		if !generatedValue.IsValid() {
@@ -242,32 +338,6 @@ func generateRandomReflectValue(field reflect.Value) error {
 		field.Set(generatedValue)
 	default:
 		return fmt.Errorf("cannot generate random value, unsupported type: %s", field.Kind().String())
-	}
-	return nil
-}
-
-// generateCustomFlowValue generates a random value for the field of the struct that is not a primitive type.
-// This can be extended for types that are broadly used in the code base.
-func generateCustomFlowValue(field reflect.Value) any {
-	switch field.Type() {
-	case reflect.TypeOf(flow.Identity{}):
-		return *IdentityFixture()
-	case reflect.TypeOf(flow.IdentitySkeleton{}):
-		return IdentityFixture().IdentitySkeleton
-	case reflect.TypeOf(flow.ClusterQCVoteData{}):
-		return flow.ClusterQCVoteDataFromQC(QuorumCertificateWithSignerIDsFixture())
-	case reflect.TypeOf(flow.QuorumCertificate{}):
-		return *QuorumCertificateFixture()
-	case reflect.TypeOf(flow.TimeoutCertificate{}):
-		return flow.TimeoutCertificate{
-			View:          rand.Uint64(),
-			NewestQCViews: []uint64{rand.Uint64()},
-			NewestQC:      QuorumCertificateFixture(),
-			SignerIndices: SignerIndicesFixture(2),
-			SigData:       SignatureFixture(),
-		}
-	case reflect.TypeOf(time.Time{}):
-		return time.Now()
 	}
 	return nil
 }

@@ -53,12 +53,10 @@ func TestCloseAndMergeError(t *testing.T) {
 	// Test case 6: close error is storage.ErrNotFound
 	closer.closeError = fmt.Errorf("not found error: %w", storage.ErrNotFound)
 	err = CloseAndMergeError(closer, nil)
-	require.Error(t, err)
-	require.True(t, errors.Is(err, storage.ErrNotFound))
+	require.ErrorIs(t, err, storage.ErrNotFound)
 
 	// Test case 7: error check works with multierror
 	closer.closeError = fmt.Errorf("exception")
 	err = CloseAndMergeError(closer, fmt.Errorf("not found error: %w", storage.ErrNotFound))
-	require.Error(t, err)
-	require.True(t, errors.Is(err, storage.ErrNotFound))
+	require.ErrorIs(t, err, storage.ErrNotFound)
 }

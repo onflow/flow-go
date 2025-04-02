@@ -4,6 +4,8 @@ import (
 	"context"
 
 	"github.com/ipfs/go-datastore"
+
+	"github.com/onflow/flow-go/storage"
 )
 
 // DatastoreManager is an interface that defines the methods for managing
@@ -17,7 +19,7 @@ type DatastoreManager interface {
 	Datastore() datastore.Batching
 	// DB returns the raw database object, allowing for more direct
 	// access to the underlying database features and operations.
-	DB() interface{}
+	DB() storage.DB
 	// Close terminates the connection to the datastore and releases
 	// any associated resources. This method should be called
 	// when finished using the datastore to ensure proper resource cleanup.

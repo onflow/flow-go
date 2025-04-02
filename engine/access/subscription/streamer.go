@@ -52,6 +52,9 @@ func NewStreamer(
 
 // Stream is a blocking method that streams data to the subscription until either the context is
 // cancelled or it encounters an error.
+// This function follows a somewhat unintuitive contract: if the context is canceled,
+// it is treated as an error and written to the subscription. However, you can rely on
+// this behavior in the subscription to handle it as a graceful shutdown.
 func (s *Streamer) Stream(ctx context.Context) {
 	s.log.Debug().Msg("starting streaming")
 	defer s.log.Debug().Msg("finished streaming")
@@ -75,12 +78,15 @@ func (s *Streamer) Stream(ctx context.Context) {
 		err := s.sendAllAvailable(ctx)
 
 		if err != nil {
-			//TODO: The functionality to graceful shutdown on demand should be improved with https://github.com/onflow/flow-go/issues/5561
+			// TODO: The functionality to graceful shutdown on demand should be improved with https://github.com/onflow/flow-go/issues/5561
 			if errors.Is(err, ErrEndOfData) {
 				s.sub.Close()
 				return
 			}
-
+			if errors.Is(err, context.Canceled) {
+				s.sub.Fail(fmt.Errorf("client disconnected: %w", ctx.Err()))
+				return
+			}
 			s.log.Err(err).Msg("error sending response")
 			s.sub.Fail(err)
 			return

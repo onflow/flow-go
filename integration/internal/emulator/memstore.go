@@ -24,7 +24,7 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/onflow/flow-go/access"
+	"github.com/onflow/flow-go/access/validator"
 	"github.com/onflow/flow-go/fvm/environment"
 	"github.com/onflow/flow-go/fvm/storage/snapshot"
 	flowgo "github.com/onflow/flow-go/model/flow"
@@ -52,7 +52,7 @@ type Store struct {
 }
 
 var _ environment.Blocks = &Store{}
-var _ access.Blocks = &Store{}
+var _ validator.Blocks = &Store{}
 var _ EmulatorStorage = &Store{}
 
 func (b *Store) HeaderByID(id flowgo.Identifier) (*flowgo.Header, error) {

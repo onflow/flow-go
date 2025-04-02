@@ -25,7 +25,7 @@ import (
 
 	"github.com/psiemens/graceland"
 
-	"github.com/onflow/flow-go/access"
+	"github.com/onflow/flow-go/access/validator"
 	"github.com/onflow/flow-go/fvm/environment"
 	"github.com/onflow/flow-go/fvm/storage/snapshot"
 	flowgo "github.com/onflow/flow-go/model/flow"
@@ -46,7 +46,7 @@ import (
 type EmulatorStorage interface {
 	graceland.Routine
 	environment.Blocks
-	access.Blocks
+	validator.Blocks
 	LatestBlockHeight(ctx context.Context) (uint64, error)
 
 	// LatestBlock returns the block with the highest block height.

@@ -77,7 +77,7 @@ func IsSporkRootSnapshot(snapshot Snapshot) (bool, error) {
 // state snapshot.
 // No errors are expected during normal operation.
 func PreviousEpochExists(snap Snapshot) (bool, error) {
-	_, err := snap.Epochs().Previous().Counter()
+	_, err := snap.Epochs().Previous()
 	if errors.Is(err, ErrNoPreviousEpoch) {
 		return false, nil
 	}
@@ -95,8 +95,10 @@ func PreviousEpochExists(snap Snapshot) (bool, error) {
 //   - protocol.ErrClusterNotFound if cluster is not found by the given chainID
 func FindGuarantors(state State, guarantee *flow.CollectionGuarantee) ([]flow.Identifier, error) {
 	snapshot := state.AtBlockID(guarantee.ReferenceBlockID)
-	epochs := snapshot.Epochs()
-	epoch := epochs.Current()
+	epoch, err := snapshot.Epochs().Current()
+	if err != nil {
+		return nil, fmt.Errorf("could not get current epoch: %w", err)
+	}
 	cluster, err := epoch.ClusterByChainID(guarantee.ChainID)
 
 	if err != nil {

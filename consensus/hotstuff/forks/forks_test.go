@@ -44,7 +44,7 @@ func TestFinalize_Direct1Chain(t *testing.T) {
 		Add(1, 2).
 		Add(2, 3)
 	blocks, err := builder.Blocks()
-	require.Nil(t, err)
+	require.NoError(t, err)
 
 	t.Run("consensus participant mode: ingest validated blocks", func(t *testing.T) {
 		forks, _ := newForks(t)
@@ -88,7 +88,7 @@ func TestFinalize_Direct2Chain(t *testing.T) {
 		Add(2, 3).
 		Add(3, 4).
 		Blocks()
-	require.Nil(t, err)
+	require.NoError(t, err)
 	expectedFinalityProof := makeFinalityProof(t, blocks[0], blocks[1], blocks[2].QC)
 
 	t.Run("consensus participant mode: ingest validated blocks", func(t *testing.T) {
@@ -117,7 +117,7 @@ func TestFinalize_DirectIndirect2Chain(t *testing.T) {
 		Add(2, 3).
 		Add(3, 5).
 		Blocks()
-	require.Nil(t, err)
+	require.NoError(t, err)
 	expectedFinalityProof := makeFinalityProof(t, blocks[0], blocks[1], blocks[2].QC)
 
 	t.Run("consensus participant mode: ingest validated blocks", func(t *testing.T) {
@@ -146,7 +146,7 @@ func TestFinalize_IndirectDirect2Chain(t *testing.T) {
 		Add(3, 5).
 		Add(5, 7).
 		Blocks()
-	require.Nil(t, err)
+	require.NoError(t, err)
 
 	t.Run("consensus participant mode: ingest validated blocks", func(t *testing.T) {
 		forks, _ := newForks(t)
@@ -178,7 +178,7 @@ func TestFinalize_Direct2ChainOnIndirect(t *testing.T) {
 		Add(6, 7).
 		Add(7, 8).
 		Blocks()
-	require.Nil(t, err)
+	require.NoError(t, err)
 	expectedFinalityProof := makeFinalityProof(t, blocks[2], blocks[3], blocks[4].QC)
 
 	t.Run("consensus participant mode: ingest validated blocks", func(t *testing.T) {
@@ -209,7 +209,7 @@ func TestFinalize_Direct2ChainOnDirect(t *testing.T) {
 		Add(4, 5).
 		Add(5, 6).
 		Blocks()
-	require.Nil(t, err)
+	require.NoError(t, err)
 	expectedFinalityProof := makeFinalityProof(t, blocks[2], blocks[3], blocks[4].QC)
 
 	t.Run("consensus participant mode: ingest validated blocks", func(t *testing.T) {
@@ -240,7 +240,7 @@ func TestFinalize_Multiple2Chains(t *testing.T) {
 		Add(3, 6).
 		Add(3, 7).
 		Blocks()
-	require.Nil(t, err)
+	require.NoError(t, err)
 	expectedFinalityProof := makeFinalityProof(t, blocks[0], blocks[1], blocks[2].QC)
 
 	t.Run("consensus participant mode: ingest validated blocks", func(t *testing.T) {
@@ -275,7 +275,7 @@ func TestFinalize_OrphanedFork(t *testing.T) {
 		Add(4, 5). // [◄(4) 5]
 		Add(5, 6). // [◄(5) 6]
 		Blocks()
-	require.Nil(t, err)
+	require.NoError(t, err)
 	expectedFinalityProof := makeFinalityProof(t, blocks[2], blocks[3], blocks[4].QC)
 
 	t.Run("consensus participant mode: ingest validated blocks", func(t *testing.T) {
@@ -311,7 +311,7 @@ func TestDuplication(t *testing.T) {
 		Add(4, 5).
 		Add(4, 5).
 		Blocks()
-	require.Nil(t, err)
+	require.NoError(t, err)
 	expectedFinalityProof := makeFinalityProof(t, blocks[1], blocks[3], blocks[5].QC)
 
 	t.Run("consensus participant mode: ingest validated blocks", func(t *testing.T) {
@@ -341,7 +341,7 @@ func TestIgnoreBlocksBelowFinalizedView(t *testing.T) {
 		Add(3, 4). // [◄(3) 4]
 		Add(1, 5)  // [◄(1) 5]
 	blocks, err := builder.Blocks()
-	require.Nil(t, err)
+	require.NoError(t, err)
 	expectedFinalityProof := makeFinalityProof(t, blocks[0], blocks[1], blocks[2].QC)
 
 	t.Run("consensus participant mode: ingest validated blocks", func(t *testing.T) {
@@ -354,7 +354,7 @@ func TestIgnoreBlocksBelowFinalizedView(t *testing.T) {
 		// sanity checks to confirm correct test setup
 		requireLatestFinalizedBlock(t, forks, blocks[0])
 		requireFinalityProof(t, forks, expectedFinalityProof)
-		require.False(t, forks.IsKnownBlock(builder.GenesisBlock().ID()))
+		require.False(t, forks.IsKnownBlock(builder.GenesisBlock().BlockID()))
 
 		// adding block [◄(1) 5]: note that QC is _below_ the pruning threshold, i.e. cannot resolve the parent
 		// * Forks should store block, despite the parent already being pruned
@@ -375,7 +375,7 @@ func TestIgnoreBlocksBelowFinalizedView(t *testing.T) {
 		// sanity checks to confirm correct test setup
 		requireLatestFinalizedBlock(t, forks, blocks[0])
 		requireFinalityProof(t, forks, expectedFinalityProof)
-		require.False(t, forks.IsKnownBlock(builder.GenesisBlock().ID()))
+		require.False(t, forks.IsKnownBlock(builder.GenesisBlock().BlockID()))
 
 		// adding block [◄(1) 5]: note that QC is _below_ the pruning threshold, i.e. cannot resolve the parent
 		// * Forks should store block, despite the parent already being pruned
@@ -401,14 +401,14 @@ func TestDoubleProposal(t *testing.T) {
 		Add(1, 2).                // [◄(1) 2]
 		AddVersioned(1, 2, 0, 1). // [◄(1) 2']
 		Blocks()
-	require.Nil(t, err)
+	require.NoError(t, err)
 
 	t.Run("consensus participant mode: ingest validated blocks", func(t *testing.T) {
 		forks, notifier := newForks(t)
 		notifier.On("OnDoubleProposeDetected", blocks[1], blocks[0]).Once()
 
 		err = addValidatedBlockToForks(forks, blocks)
-		require.Nil(t, err)
+		require.NoError(t, err)
 	})
 
 	t.Run("consensus follower mode: ingest certified blocks", func(t *testing.T) {
@@ -416,9 +416,9 @@ func TestDoubleProposal(t *testing.T) {
 		notifier.On("OnDoubleProposeDetected", blocks[1], blocks[0]).Once()
 
 		err = forks.AddCertifiedBlock(toCertifiedBlock(t, blocks[0])) // add [◄(1) 2]  as certified block
-		require.Nil(t, err)
+		require.NoError(t, err)
 		err = forks.AddCertifiedBlock(toCertifiedBlock(t, blocks[1])) // add [◄(1) 2']  as certified block
-		require.Nil(t, err)
+		require.NoError(t, err)
 	})
 }
 
@@ -438,7 +438,7 @@ func TestConflictingQCs(t *testing.T) {
 		Add(4, 6).                // [◄(4) 6]
 		AddVersioned(3, 5, 1, 0). // [◄(3') 5]
 		Blocks()
-	require.Nil(t, err)
+	require.NoError(t, err)
 
 	t.Run("consensus participant mode: ingest validated blocks", func(t *testing.T) {
 		forks, notifier := newForks(t)
@@ -477,7 +477,7 @@ func TestConflictingFinalizedForks(t *testing.T) {
 		Add(6, 7).
 		Add(7, 8). // finalizes [◄(2) 6], conflicting with conflicts with [◄(2) 3]
 		Blocks()
-	require.Nil(t, err)
+	require.NoError(t, err)
 
 	t.Run("consensus participant mode: ingest validated blocks", func(t *testing.T) {
 		forks, _ := newForks(t)
@@ -502,7 +502,7 @@ func TestAddDisconnectedBlock(t *testing.T) {
 		Add(1, 2). // we will skip this block [◄(1) 2]
 		Add(2, 3). // [◄(2) 3]
 		Blocks()
-	require.Nil(t, err)
+	require.NoError(t, err)
 
 	t.Run("consensus participant mode: ingest validated blocks", func(t *testing.T) {
 		forks, _ := newForks(t)
@@ -530,7 +530,7 @@ func TestGetBlock(t *testing.T) {
 		Add(3, 4). // [◄(3) 4]
 		Add(4, 5). // [◄(4) 5]
 		Blocks()
-	require.Nil(t, err)
+	require.NoError(t, err)
 
 	t.Run("consensus participant mode: ingest validated blocks", func(t *testing.T) {
 		blocksAddedFirst := blocks[:3] // [◄(1) 2] [◄(2) 3] [◄(3) 4]
@@ -543,7 +543,7 @@ func TestGetBlock(t *testing.T) {
 
 		// add first 3 blocks - should finalize [◄(1) 2]
 		err = addValidatedBlockToForks(forks, blocksAddedFirst)
-		require.Nil(t, err)
+		require.NoError(t, err)
 
 		// should be able to retrieve all stored blocks
 		for _, block := range blocksAddedFirst {
@@ -581,9 +581,9 @@ func TestGetBlock(t *testing.T) {
 
 		// add first blocks - should finalize [◄(1) 2]
 		err := forks.AddCertifiedBlock(blocksAddedFirst[0])
-		require.Nil(t, err)
+		require.NoError(t, err)
 		err = forks.AddCertifiedBlock(blocksAddedFirst[1])
-		require.Nil(t, err)
+		require.NoError(t, err)
 
 		// should be able to retrieve all stored blocks
 		for _, block := range blocksAddedFirst {
@@ -620,14 +620,14 @@ func TestGetBlocksForView(t *testing.T) {
 		Add(2, 4).                // [◄(2) 4]
 		AddVersioned(2, 4, 0, 1). // [◄(2) 4']
 		Blocks()
-	require.Nil(t, err)
+	require.NoError(t, err)
 
 	t.Run("consensus participant mode: ingest validated blocks", func(t *testing.T) {
 		forks, notifier := newForks(t)
 		notifier.On("OnDoubleProposeDetected", blocks[2], blocks[1]).Once()
 
 		err = addValidatedBlockToForks(forks, blocks)
-		require.Nil(t, err)
+		require.NoError(t, err)
 
 		// expect 1 block at view 2
 		storedBlocks := forks.GetBlocksForView(2)
@@ -649,11 +649,11 @@ func TestGetBlocksForView(t *testing.T) {
 		notifier.On("OnDoubleProposeDetected", blocks[2], blocks[1]).Once()
 
 		err := forks.AddCertifiedBlock(toCertifiedBlock(t, blocks[0]))
-		require.Nil(t, err)
+		require.NoError(t, err)
 		err = forks.AddCertifiedBlock(toCertifiedBlock(t, blocks[1]))
-		require.Nil(t, err)
+		require.NoError(t, err)
 		err = forks.AddCertifiedBlock(toCertifiedBlock(t, blocks[2]))
-		require.Nil(t, err)
+		require.NoError(t, err)
 
 		// expect 1 block at view 2
 		storedBlocks := forks.GetBlocksForView(2)
@@ -683,7 +683,7 @@ func TestNotifications(t *testing.T) {
 		Add(2, 3).
 		Add(3, 4)
 	blocks, err := builder.Blocks()
-	require.Nil(t, err)
+	require.NoError(t, err)
 
 	t.Run("consensus participant mode: ingest validated blocks", func(t *testing.T) {
 		notifier := &mocks.Consumer{}
@@ -736,7 +736,7 @@ func TestFinalizingMultipleBlocks(t *testing.T) {
 		Add(11, 12). // index 4: [◄(11) 12]
 		Add(12, 22)  // index 5: [◄(12) 22]
 	blocks, err := builder.Blocks()
-	require.Nil(t, err)
+	require.NoError(t, err)
 
 	// The Finality Proof should right away point to the _latest_ finalized block. Subsequently emitting
 	// Finalization events for lower blocks is fine, because notifications are guaranteed to be
@@ -791,7 +791,7 @@ func TestFinalizingMultipleBlocks(t *testing.T) {
 	t.Run("consensus participant mode: ingest validated blocks", func(t *testing.T) {
 		forks, finalizationCallback, notifier := setupForksAndAssertions()
 		err = addValidatedBlockToForks(forks, blocks[:5]) // adding [◄(1) 2] [◄(2) 4] [◄(4) 6] [◄(6) 11] [◄(11) 12]
-		require.Nil(t, err)
+		require.NoError(t, err)
 		requireOnlyGenesisBlockFinalized(t, forks) // finalization should still be at the genesis block
 
 		require.NoError(t, forks.AddValidatedBlock(blocks[5])) // adding [◄(12) 22] should trigger finalization events
@@ -807,7 +807,7 @@ func TestFinalizingMultipleBlocks(t *testing.T) {
 		require.NoError(t, forks.AddCertifiedBlock(toCertifiedBlock(t, blocks[1])))
 		require.NoError(t, forks.AddCertifiedBlock(toCertifiedBlock(t, blocks[2])))
 		require.NoError(t, forks.AddCertifiedBlock(toCertifiedBlock(t, blocks[3])))
-		require.Nil(t, err)
+		require.NoError(t, err)
 		requireOnlyGenesisBlockFinalized(t, forks) // finalization should still be at the genesis block
 
 		// adding certified block [◄(11) 12] ◄(12) should trigger finalization events
@@ -831,7 +831,7 @@ func newForks(t *testing.T) (*Forks, *mocks.Consumer) {
 
 	forks, err := New(genesisBQ, finalizationCallback, notifier)
 
-	require.Nil(t, err)
+	require.NoError(t, err)
 	return forks, notifier
 }
 
@@ -914,7 +914,7 @@ func toCertifiedBlock(t *testing.T, block *model.Block) *model.CertifiedBlock {
 		BlockID: block.BlockID,
 	}
 	cb, err := model.NewCertifiedBlock(block, qc)
-	require.Nil(t, err)
+	require.NoError(t, err)
 	return &cb
 }
 

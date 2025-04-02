@@ -24,7 +24,6 @@ const rootBlockHappyPathLogs = "collecting partner network and staking keys" +
 	`remove internal partner nodes` +
 	`removed 0 internal partner nodes` +
 	`checking constraints on consensus nodes` +
-
 	`assembling network and staking keys` +
 	`wrote file \S+/node-infos.pub.json` +
 	`running DKG for consensus nodes` +
@@ -36,6 +35,8 @@ const rootBlockHappyPathLogs = "collecting partner network and staking keys" +
 	`computing collection node clusters` +
 	`constructing root blocks for collection node clusters` +
 	`constructing root QCs for collection node clusters` +
+	`producing QC for cluster .*` +
+	`producing QC for cluster .*` +
 	`constructing root header` +
 	`constructing intermediary bootstrapping data` +
 	`wrote file \S+/intermediary-bootstrapping-data.json` +
@@ -68,7 +69,6 @@ func TestRootBlock_HappyPath(t *testing.T) {
 		flagNumViewsInStakingAuction = 50_000
 		flagNumViewsInDKGPhase = 2_000
 		flagFinalizationSafetyThreshold = 1_000
-		flagProtocolVersion = 42
 		flagUseDefaultEpochTargetEndTime = true
 		flagEpochTimingRefCounter = 0
 		flagEpochTimingRefTimestamp = 0
