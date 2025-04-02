@@ -302,6 +302,7 @@ func (e *Engine) handleChunkDataPackWithTracing(
 			originID,
 			status.ExecutionResult.ID(),
 			status.ChunkIndex,
+			chunkDataPack.ID(),
 			chunkDataPack.ChunkID,
 			chunkDataPack.Collection.ID(),
 			err,
