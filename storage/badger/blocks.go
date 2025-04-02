@@ -15,14 +15,16 @@ type Blocks struct {
 	db       *badger.DB
 	headers  *Headers
 	payloads *Payloads
+	sigs     *ProposalSignatures
 }
 
 // NewBlocks ...
-func NewBlocks(db *badger.DB, headers *Headers, payloads *Payloads) *Blocks {
+func NewBlocks(db *badger.DB, headers *Headers, payloads *Payloads, sigs *ProposalSignatures) *Blocks {
 	b := &Blocks{
 		db:       db,
 		headers:  headers,
 		payloads: payloads,
+		sigs:     sigs,
 	}
 	return b
 }
@@ -56,6 +58,31 @@ func (b *Blocks) retrieveTx(blockID flow.Identifier) func(*badger.Txn) (*flow.Bl
 			Payload: payload,
 		}
 		return block, nil
+	}
+}
+
+func (b *Blocks) retrieveProposalTx(blockID flow.Identifier) func(*badger.Txn) (*flow.BlockProposal, error) {
+	return func(tx *badger.Txn) (*flow.BlockProposal, error) {
+		header, err := b.headers.retrieveTx(blockID)(tx)
+		if err != nil {
+			return nil, fmt.Errorf("could not retrieve header: %w", err)
+		}
+		payload, err := b.payloads.retrieveTx(blockID)(tx)
+		if err != nil {
+			return nil, fmt.Errorf("could not retrieve payload: %w", err)
+		}
+		sig, err := b.sigs.retrieveTx(blockID)(tx)
+		if err != nil {
+			return nil, fmt.Errorf("could not retrieve proposer signature: %w", err)
+		}
+		proposal := &flow.BlockProposal{
+			Block: &flow.Block{
+				Header:  header,
+				Payload: payload,
+			},
+			ProposerSigData: sig,
+		}
+		return proposal, nil
 	}
 }
 

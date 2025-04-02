@@ -54,7 +54,8 @@ func ExportExecutedTransactions(blockID flow.Identifier, dbPath string, outputPa
 	transactions := badger.NewTransactions(cacheMetrics, db)
 	headers := badger.NewHeaders(cacheMetrics, db)
 	payloads := badger.NewPayloads(db, index, guarantees, seals, receipts, results)
-	blocks := badger.NewBlocks(db, headers, payloads)
+	sigs := badger.NewProposalSignatures(cacheMetrics, db)
+	blocks := badger.NewBlocks(db, headers, payloads, sigs)
 	collections := badger.NewCollections(db, transactions)
 
 	activeBlockID := blockID
