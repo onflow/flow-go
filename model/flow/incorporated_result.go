@@ -21,7 +21,7 @@ func NewIncorporatedResult(incorporatedBlockID Identifier, result *ExecutionResu
 	}
 }
 
-// ID returns unique identifier for the IncorporatedResult struct.
+// ID returns a collision-resistant hash for the [IncorporatedResult] structure.
 func (ir *IncorporatedResult) ID() Identifier {
 	return MakeID(ir)
 }
