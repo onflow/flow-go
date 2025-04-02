@@ -349,9 +349,9 @@ func (s *TransactionStatusSuite) mockTransactionResult(transactionID *flow.Ident
 }
 
 func (s *TransactionStatusSuite) addBlockWithTransaction(transaction *flow.Transaction) {
-	col := flow.CollectionFromTransactions([]*flow.Transaction{transaction})
+	col := unittest.CollectionFromTransactions([]*flow.Transaction{transaction})
 	colID := col.ID()
-	guarantee := col.Guarantee()
+	guarantee := flow.CollectionGuarantee{CollectionID: colID}
 	light := col.Light()
 	s.sealedBlock = s.finalizedBlock
 	s.addNewFinalizedBlock(s.sealedBlock.Header, true, func(block *flow.Block) {
