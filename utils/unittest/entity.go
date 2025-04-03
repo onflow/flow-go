@@ -40,23 +40,25 @@ func MockEntityFixture() *MockEntity {
 	return &MockEntity{Identifier: IdentifierFixture()}
 }
 
-// RequireEntityNonMalleable is a sanity check that the entity is not malleable with regards to the ID() function.
-// Non-malleability in this sense means that it is computationally hard to build a different entity with the same ID.
-// Hence, changing *any* field of a non-malleable entity should change the ID, which we check here.
-// Note that this is sanity check of non-malleability and that passing this test does not guarantee non-malleability.
-// Non-malleability is a required property for any entity that implements the [flow.IDEntity] interface. This is especially
-// important for entities that contain signatures and are transmitted over the network.
+// RequireEntityNonMalleable is RequireNonMalleable with the constraint that models implement [flow.IDEntity]
+// and the content hash function is the ID() function.
+// Non-malleability is a required property for any entity that implements the [flow.IDEntity] interface.
+// This is especially important for entities that contain signatures and are transmitted over the network.
 // ID is used by the protocol to insure entity integrity when transmitted over the network. ID must therefore be a binding cryptographic commitment to an entity.
 // This function consumes the entity and modifies its fields randomly to ensure that the ID changes after each modification.
 // Generally speaking each type that implements [flow.IDEntity] method should be tested with this function.
-// ATTENTION: We put only one requirement for data types, that is all fields have to be exported so we can modify them.
 func RequireEntityNonMalleable(t *testing.T, entity flow.IDEntity, ops ...MalleabilityCheckerOpt) {
 	err := NewMalleabilityChecker(ops...).Check(entity)
 	require.NoError(t, err)
 }
 
-func RequireNonMalleable(t *testing.T, model any, idFunc func() flow.Identifier, ops ...MalleabilityCheckerOpt) {
-	err := NewMalleabilityChecker(ops...).CheckCustom(model, idFunc)
+// RequireNonMalleable is a sanity check that the model is not malleable with respect to a content hash over the model (hashModel).
+// Non-malleability in this sense means that it is computationally hard to build a different model with the same hash.
+// Hence, changing *any* field of a non-malleable model should change the hash, which we check here.
+// Note that this is sanity check of non-malleability and that passing this test does not guarantee non-malleability.
+// ATTENTION: We put only one requirement for data types, that is all fields have to be exported so we can modify them.
+func RequireNonMalleable(t *testing.T, model any, hashModel func() flow.Identifier, ops ...MalleabilityCheckerOpt) {
+	err := NewMalleabilityChecker(ops...).CheckCustom(model, hashModel)
 	require.NoError(t, err)
 }
 
@@ -204,20 +206,20 @@ func (mc *MalleabilityChecker) Check(entity flow.IDEntity) error {
 	return mc.checkExpectations()
 }
 
-func (mc *MalleabilityChecker) CheckCustom(entity any, idFunc func() flow.Identifier) error {
-	v := reflect.ValueOf(entity)
+func (mc *MalleabilityChecker) CheckCustom(model any, hashModel func() flow.Identifier) error {
+	v := reflect.ValueOf(model)
 	if !v.IsValid() {
-		return fmt.Errorf("input is not a valid entity")
+		return fmt.Errorf("input is not a valid model")
 	}
 	if v.Kind() != reflect.Ptr {
-		// If it is not a pointer type, we may not be able to set fields to test malleability, since the entity may not be addressable
-		return fmt.Errorf("entity is not a pointer type (try checking a reference to it), entity: %v %v", v.Kind(), v.Type())
+		// If it is not a pointer type, we may not be able to set fields to test malleability, since the model may not be addressable
+		return fmt.Errorf("model is not a pointer type (try checking a reference to it), model: %v %v", v.Kind(), v.Type())
 	}
 	if v.IsNil() {
-		return fmt.Errorf("entity is nil, nothing to check")
+		return fmt.Errorf("model is nil, nothing to check")
 	}
 	v = v.Elem()
-	if err := mc.isEntityMalleable(v, nil, "", idFunc); err != nil {
+	if err := mc.isEntityMalleable(v, nil, "", hashModel); err != nil {
 		return err
 	}
 	return mc.checkExpectations()
