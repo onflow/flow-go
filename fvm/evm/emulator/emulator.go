@@ -538,12 +538,14 @@ func (proc *procedure) deployAt(
 	var err error
 	inter := gethVM.NewEVMInterpreter(proc.evm)
 	contract := gethVM.NewContract(
-		gethVM.AccountRef(callerCommon),
-		gethVM.AccountRef(addr),
+		callerCommon,
+		addr,
 		castedValue,
-		call.GasLimit)
+		call.GasLimit,
+		nil,
+	)
 
-	contract.SetCallCode(&addr, gethCrypto.Keccak256Hash(call.Data), call.Data)
+	contract.SetCallCode(gethCrypto.Keccak256Hash(call.Data), call.Data)
 	// update access list (Berlin)
 	proc.state.AddAddressToAccessList(addr)
 
