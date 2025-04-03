@@ -446,11 +446,11 @@ func newLedger(t *testing.T) *completeLedger.Ledger {
 }
 
 func blockFixture(collection *flow.Collection) *flow.Block {
-	guarantee := collection.Guarantee()
+	guarantee := &flow.CollectionGuarantee{CollectionID: collection.ID()}
 	block := &flow.Block{
 		Header: unittest.BlockHeaderFixture(),
 		Payload: &flow.Payload{
-			Guarantees: []*flow.CollectionGuarantee{&guarantee},
+			Guarantees: []*flow.CollectionGuarantee{guarantee},
 		},
 	}
 	block.Header.PayloadHash = block.Payload.Hash()
