@@ -1,10 +1,12 @@
 package unsynchronized
 
 import (
+	"testing"
+
+	"github.com/stretchr/testify/require"
+
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/utils/unittest"
-	"github.com/stretchr/testify/require"
-	"testing"
 )
 
 func TestCollection_HappyCase(t *testing.T) {
@@ -19,7 +21,7 @@ func TestCollection_HappyCase(t *testing.T) {
 	// Retrieve collection
 	retrieved, err := collections.ByID(collection.ID())
 	require.NoError(t, err)
-	require.Equal(t, collection, retrieved)
+	require.Equal(t, &collection, retrieved)
 
 	// Remove collection
 	err = collections.Remove(collection.ID())
