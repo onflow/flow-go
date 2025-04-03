@@ -10,7 +10,9 @@ import (
 	"github.com/onflow/atree"
 	"github.com/onflow/crypto/hash"
 	gethCommon "github.com/onflow/go-ethereum/common"
+	gethState "github.com/onflow/go-ethereum/core/state"
 	gethStateless "github.com/onflow/go-ethereum/core/stateless"
+	"github.com/onflow/go-ethereum/core/tracing"
 	gethTracing "github.com/onflow/go-ethereum/core/tracing"
 	gethTypes "github.com/onflow/go-ethereum/core/types"
 	gethParams "github.com/onflow/go-ethereum/params"
@@ -188,7 +190,11 @@ func (db *StateDB) GetNonce(addr gethCommon.Address) uint64 {
 }
 
 // SetNonce sets the nonce value for the given address
-func (db *StateDB) SetNonce(addr gethCommon.Address, nonce uint64) {
+func (db *StateDB) SetNonce(
+	addr gethCommon.Address,
+	nonce uint64,
+	reason tracing.NonceChangeReason,
+) {
 	err := db.latestView().SetNonce(addr, nonce)
 	db.handleError(err)
 }
@@ -215,9 +221,11 @@ func (db *StateDB) GetCodeSize(addr gethCommon.Address) int {
 }
 
 // SetCode sets the code for the given address
-func (db *StateDB) SetCode(addr gethCommon.Address, code []byte) {
+func (db *StateDB) SetCode(addr gethCommon.Address, code []byte) (prev []byte) {
 	err := db.latestView().SetCode(addr, code)
 	db.handleError(err)
+
+	return nil
 }
 
 // AddRefund adds the amount to the total (gas) refund
@@ -569,6 +577,10 @@ func (s *StateDB) PointCache() *gethUtils.PointCache {
 // The returned map could be nil if the witness is empty.
 func (s *StateDB) Witness() *gethStateless.Witness {
 	return nil
+}
+
+func (s *StateDB) AccessEvents() *gethState.AccessEvents {
+	return &gethState.AccessEvents{}
 }
 
 func (db *StateDB) latestView() *DeltaView {
