@@ -454,7 +454,7 @@ func TestBootstrapNonRoot(t *testing.T) {
 				// should be able to read all protocol state entries
 				protocolStateEntry, err := snapshot.ProtocolState()
 				require.NoError(t, err)
-				assert.Equal(t, block.Payload.ProtocolStateID, protocolStateEntry.ID())
+				assert.Equal(t, block.Block.Payload.ProtocolStateID, protocolStateEntry.ID())
 			}
 		})
 	})
@@ -485,7 +485,7 @@ func TestBootstrapNonRoot(t *testing.T) {
 				// should be able to read all protocol state entries
 				protocolStateEntry, err := snapshot.ProtocolState()
 				require.NoError(t, err)
-				assert.Equal(t, block.Payload.ProtocolStateID, protocolStateEntry.ID())
+				assert.Equal(t, block.Block.Payload.ProtocolStateID, protocolStateEntry.ID())
 			}
 		})
 	})
@@ -523,7 +523,7 @@ func TestBootstrapNonRoot(t *testing.T) {
 				// should be able to read all protocol state entries
 				protocolStateEntry, err := snapshot.ProtocolState()
 				require.NoError(t, err)
-				assert.Equal(t, block.Payload.ProtocolStateID, protocolStateEntry.ID())
+				assert.Equal(t, block.Block.Payload.ProtocolStateID, protocolStateEntry.ID())
 			}
 		})
 	})
@@ -607,8 +607,8 @@ func TestBootstrap_DisconnectedSealingSegment(t *testing.T) {
 	// convert to encodable to easily modify snapshot
 	encodable := rootSnapshot.Encodable()
 	// add an un-connected tail block to the sealing segment
-	tail := unittest.BlockFixture()
-	encodable.SealingSegment.Blocks = append([]*flow.Block{&tail}, encodable.SealingSegment.Blocks...)
+	tail := unittest.ProposalFixture()
+	encodable.SealingSegment.Blocks = append([]*flow.BlockProposal{tail}, encodable.SealingSegment.Blocks...)
 	rootSnapshot = inmem.SnapshotFromEncodable(encodable)
 
 	bootstrap(t, rootSnapshot, func(state *bprotocol.State, err error) {

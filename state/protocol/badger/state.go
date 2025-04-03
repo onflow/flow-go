@@ -191,7 +191,7 @@ func Bootstrap(
 		metrics.SealedHeight(lastSealed.Header.Height)
 		metrics.FinalizedHeight(lastFinalized.Header.Height)
 		for _, block := range segment.Blocks {
-			metrics.BlockFinalized(block)
+			metrics.BlockFinalized(block.Block)
 		}
 
 		return nil
@@ -261,12 +261,12 @@ func bootstrapProtocolState(
 
 		for _, block := range segment.AllBlocks() {
 			blockID := block.ID()
-			protocolStateEntryWrapper := segment.ProtocolStateEntries[block.Payload.ProtocolStateID]
+			protocolStateEntryWrapper := segment.ProtocolStateEntries[block.Block.Payload.ProtocolStateID]
 			err := epochProtocolStateSnapshots.Index(blockID, protocolStateEntryWrapper.EpochEntry.ID())(tx)
 			if err != nil {
 				return fmt.Errorf("could not index root protocol state: %w", err)
 			}
-			err = protocolKVStoreSnapshots.IndexTx(blockID, block.Payload.ProtocolStateID)(tx)
+			err = protocolKVStoreSnapshots.IndexTx(blockID, block.Block.Payload.ProtocolStateID)(tx)
 			if err != nil {
 				return fmt.Errorf("could not index root kv store: %w", err)
 			}
@@ -315,10 +315,10 @@ func bootstrapSealingSegment(
 			return fmt.Errorf("could not index root result: %w", err)
 		}
 
-		for _, block := range segment.ExtraBlocks {
-			blockID := block.ID()
-			height := block.Header.Height
-			err := blocks.StoreTx(&flow.BlockProposal{Block: block, ProposerSigData: nil})(tx)
+		for _, proposal := range segment.ExtraBlocks {
+			blockID := proposal.Block.ID()
+			height := proposal.Block.Header.Height
+			err := blocks.StoreTx(proposal)(tx)
 			if err != nil {
 				return fmt.Errorf("could not insert SealingSegment extra block: %w", err)
 			}
@@ -326,17 +326,17 @@ func bootstrapSealingSegment(
 			if err != nil {
 				return fmt.Errorf("could not index SealingSegment extra block (id=%x): %w", blockID, err)
 			}
-			err = qcs.StoreTx(block.Header.QuorumCertificate())(tx)
+			err = qcs.StoreTx(proposal.Block.Header.QuorumCertificate())(tx)
 			if err != nil {
 				return fmt.Errorf("could not store qc for SealingSegment extra block (id=%x): %w", blockID, err)
 			}
 		}
 
-		for i, block := range segment.Blocks {
-			blockID := block.ID()
-			height := block.Header.Height
+		for i, proposal := range segment.Blocks {
+			blockID := proposal.Block.ID()
+			height := proposal.Block.Header.Height
 
-			err := blocks.StoreTx(&flow.BlockProposal{Block: block, ProposerSigData: nil})(tx)
+			err := blocks.StoreTx(proposal)(tx)
 			if err != nil {
 				return fmt.Errorf("could not insert SealingSegment block: %w", err)
 			}
@@ -344,7 +344,7 @@ func bootstrapSealingSegment(
 			if err != nil {
 				return fmt.Errorf("could not index SealingSegment block (id=%x): %w", blockID, err)
 			}
-			err = qcs.StoreTx(block.Header.QuorumCertificate())(tx)
+			err = qcs.StoreTx(proposal.Block.Header.QuorumCertificate())(tx)
 			if err != nil {
 				return fmt.Errorf("could not store qc for SealingSegment block (id=%x): %w", blockID, err)
 			}
@@ -367,7 +367,7 @@ func bootstrapSealingSegment(
 
 			// for all but the first block in the segment, index the parent->child relationship
 			if i > 0 {
-				err = operation.InsertBlockChildren(block.Header.ParentID, []flow.Identifier{blockID})(txn)
+				err = operation.InsertBlockChildren(proposal.Block.Header.ParentID, []flow.Identifier{blockID})(txn)
 				if err != nil {
 					return fmt.Errorf("could not insert child index for block (id=%x): %w", blockID, err)
 				}
@@ -622,11 +622,11 @@ func indexEpochHeights(segment *flow.SealingSegment) func(*badger.Txn) error {
 		// then index `B2.EpochCounter → B2.Height`.
 		allBlocks := segment.AllBlocks()
 		lastBlock := allBlocks[0]
-		lastBlockEpochCounter := segment.ProtocolStateEntries[lastBlock.Payload.ProtocolStateID].EpochEntry.EpochCounter()
+		lastBlockEpochCounter := segment.ProtocolStateEntries[lastBlock.Block.Payload.ProtocolStateID].EpochEntry.EpochCounter()
 		for _, block := range allBlocks[1:] {
-			thisBlockEpochCounter := segment.ProtocolStateEntries[block.Payload.ProtocolStateID].EpochEntry.EpochCounter()
+			thisBlockEpochCounter := segment.ProtocolStateEntries[block.Block.Payload.ProtocolStateID].EpochEntry.EpochCounter()
 			if lastBlockEpochCounter != thisBlockEpochCounter {
-				firstHeight := block.Header.Height
+				firstHeight := block.Block.Header.Height
 				err := operation.InsertEpochFirstHeight(thisBlockEpochCounter, firstHeight)(tx)
 				if err != nil {
 					return fmt.Errorf("could not index first height %d for epoch %d: %w", firstHeight, thisBlockEpochCounter, err)

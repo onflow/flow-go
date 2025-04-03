@@ -659,7 +659,7 @@ func (c *Core) getOutdatedBlockIDsFromRootSealingSegment(rootHeader *flow.Header
 	outdatedBlockIDs := make(flow.IdentifierList, 0)
 	for _, block := range rootSealingSegment.Blocks {
 		knownBlockIDs[block.ID()] = struct{}{}
-		for _, result := range block.Payload.Results {
+		for _, result := range block.Block.Payload.Results {
 			_, known := knownBlockIDs[result.BlockID]
 			if !known {
 				outdatedBlockIDs = append(outdatedBlockIDs, result.BlockID)

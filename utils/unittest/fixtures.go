@@ -257,6 +257,15 @@ func BlockFixtures(number int) []*flow.Block {
 	return blocks
 }
 
+func ProposalFixtures(number int) []*flow.BlockProposal {
+	proposals := make([]*flow.BlockProposal, 0, number)
+	for ; number > 0; number-- {
+		proposal := ProposalFixture()
+		proposals = append(proposals, proposal)
+	}
+	return proposals
+}
+
 func ProposalFixture() *flow.BlockProposal {
 	block := BlockFixture()
 	return ProposalFromBlock(&block)

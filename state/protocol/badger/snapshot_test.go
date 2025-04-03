@@ -285,7 +285,8 @@ func TestSealingSegment(t *testing.T) {
 			assert.Len(t, actual.ExecutionResults, 1)
 			assert.Len(t, actual.Blocks, 1)
 			assert.Empty(t, actual.ExtraBlocks)
-			unittest.AssertEqualBlocksLenAndOrder(t, expected.Blocks, actual.Blocks)
+			require.Equal(t, len(expected.Blocks), len(actual.Blocks))
+			require.Equal(t, expected.Blocks[0].Block.ID(), actual.Blocks[0].Block.ID())
 
 			assertSealingSegmentBlocksQueryableAfterBootstrap(t, state.AtBlockID(head.ID()))
 		})
@@ -351,7 +352,7 @@ func TestSealingSegment(t *testing.T) {
 			require.NoError(t, err)
 
 			require.Len(t, segment.ExtraBlocks, 1)
-			assert.Equal(t, segment.ExtraBlocks[0].Header.Height, head.Height)
+			assert.Equal(t, segment.ExtraBlocks[0].Block.Header.Height, head.Height)
 
 			// build a valid child B3 to ensure we have a QC
 			buildBlock(t, state, unittest.BlockWithParentProtocolState(block3))
@@ -409,7 +410,7 @@ func TestSealingSegment(t *testing.T) {
 			// sealing segment should cover range [B1, BN]
 			assert.Len(t, segment.Blocks, 102)
 			assert.Len(t, segment.ExtraBlocks, 1)
-			assert.Equal(t, segment.ExtraBlocks[0].Header.Height, head.Height)
+			assert.Equal(t, segment.ExtraBlocks[0].Block.Header.Height, head.Height)
 			// first and last blocks should be B1, BN
 			assert.Equal(t, block1.ID(), segment.Blocks[0].ID())
 			assert.Equal(t, blockN.ID(), segment.Blocks[101].ID())

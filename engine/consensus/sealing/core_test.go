@@ -678,11 +678,12 @@ func (s *ApprovalProcessingCoreTestSuite) TestRepopulateAssignmentCollectorTree(
 	rootSnapshot := unittest.StateSnapshotForKnownBlock(s.rootHeader, nil)
 	s.Snapshots[s.rootHeader.ID()] = rootSnapshot
 	rootSnapshot.On("SealingSegment").Return(
-		&flow.SealingSegment{
-			Blocks: []*flow.Block{{
+		&flow.SealingSegment{Blocks: []*flow.BlockProposal{{
+			Block: &flow.Block{
 				Header:  s.rootHeader,
 				Payload: &flow.Payload{},
-			}},
+			},
+			ProposerSigData: nil}},
 		}, nil)
 
 	s.sealsDB.On("HighestInFork", s.IncorporatedBlock.ID()).Return(
@@ -813,17 +814,19 @@ func (s *ApprovalProcessingCoreTestSuite) TestRepopulateAssignmentCollectorTree_
 	finalSnapShot.On("Descendants").Return(nil, nil)
 	// set up sealing segment
 	finalSnapShot.On("SealingSegment").Return(
-		&flow.SealingSegment{
-			Blocks: []*flow.Block{{
+		&flow.SealingSegment{Blocks: []*flow.BlockProposal{
+			{Block: &flow.Block{
 				Header:  s.Block,
 				Payload: &candidatePayload,
-			}, {
+			}, ProposerSigData: nil},
+			{Block: &flow.Block{
 				Header:  s.ParentBlock,
 				Payload: &flow.Payload{},
-			}, {
+			}, ProposerSigData: unittest.SignatureFixture()},
+			{Block: &flow.Block{
 				Header:  s.IncorporatedBlock,
 				Payload: &incorporatedBlockPayload,
-			}},
+			}, ProposerSigData: unittest.SignatureFixture()}},
 		}, nil)
 	s.State.On("Final").Return(finalSnapShot)
 
