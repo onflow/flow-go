@@ -5,16 +5,16 @@ import (
 	"github.com/onflow/flow-go/storage"
 )
 
-func eventPrefix(prefix byte, blockID flow.Identifier, event flow.Event) []byte {
+func EventPrefix(prefix byte, blockID flow.Identifier, event flow.Event) []byte {
 	return MakePrefix(prefix, blockID, event.TransactionID, event.TransactionIndex, event.EventIndex)
 }
 
 func InsertEvent(w storage.Writer, blockID flow.Identifier, event flow.Event) error {
-	return UpsertByKey(w, eventPrefix(codeEvent, blockID, event), event)
+	return UpsertByKey(w, EventPrefix(codeEvent, blockID, event), event)
 }
 
 func InsertServiceEvent(w storage.Writer, blockID flow.Identifier, event flow.Event) error {
-	return UpsertByKey(w, eventPrefix(codeServiceEvent, blockID, event), event)
+	return UpsertByKey(w, EventPrefix(codeServiceEvent, blockID, event), event)
 }
 
 func RetrieveEvents(r storage.Reader, blockID flow.Identifier, transactionID flow.Identifier, events *[]flow.Event) error {

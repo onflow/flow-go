@@ -1,10 +1,12 @@
 package unsynchronized
 
 import (
+	"fmt"
 	"sync"
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/storage"
+	"github.com/onflow/flow-go/storage/operation"
 )
 
 type Events struct {
@@ -93,6 +95,21 @@ func (e *Events) Store(blockID flow.Identifier, blockEvents []flow.EventsList) e
 	e.lock.Lock()
 	e.blockIdToEvents[blockID] = events
 	e.lock.Unlock()
+
+	return nil
+}
+
+func (e *Events) AddToBatch(batch storage.ReaderBatchWriter) error {
+	writer := batch.Writer()
+
+	for blockID, events := range e.blockIdToEvents {
+		for _, event := range events {
+			err := operation.InsertEvent(writer, blockID, event)
+			if err != nil {
+				return fmt.Errorf("cannot batch insert event: %w", err)
+			}
+		}
+	}
 
 	return nil
 }
