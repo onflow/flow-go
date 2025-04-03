@@ -144,7 +144,7 @@ var _ rlp.Encoder = &Chunk{}
 // not interpreted as the RLP encoding for the entire Chunk.
 // No errors expected during normal operation.
 // TODO(mainnet27, #6773): remove this method https://github.com/onflow/flow-go/issues/6773
-func (ch Chunk) EncodeRLP(w io.Writer) error {
+func (ch *Chunk) EncodeRLP(w io.Writer) error {
 	return rlp.Encode(w, struct {
 		ChunkBody ChunkBody
 		Index     uint64
@@ -225,9 +225,9 @@ func NewChunk_ProtocolVersion1(
 	}
 }
 
-// ID returns a unique id for this entity
+// ID returns the unique identifier of the Chunk
 func (ch *Chunk) ID() Identifier {
-	return MakeID(ch.ChunkBody)
+	return MakeID(ch)
 }
 
 // Checksum provides a cryptographic commitment for a chunk content
@@ -319,16 +319,6 @@ func (cl ChunkList) Indices() []uint64 {
 	}
 
 	return indices
-}
-
-// ByChecksum returns an entity from the list by entity fingerprint
-func (cl ChunkList) ByChecksum(cs Identifier) (*Chunk, bool) {
-	for _, ch := range cl {
-		if ch.Checksum() == cs {
-			return ch, true
-		}
-	}
-	return nil, false
 }
 
 // ByIndex returns an entity from the list by index
