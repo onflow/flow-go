@@ -65,7 +65,6 @@ func New(
 	participants flow.IdentitySkeletonList,
 	state cluster.State,
 	blocks storage.ClusterBlocks,
-	sigs storage.ProposalSignatures,
 	comp collection.Compliance,
 	core module.SyncCore,
 	opts ...commonsync.OptionFunc,
@@ -108,7 +107,7 @@ func New(
 	}
 	e.con = con
 
-	e.requestHandler = NewRequestHandlerEngine(log, metrics, con, me, blocks, sigs, core, state)
+	e.requestHandler = NewRequestHandlerEngine(log, metrics, con, me, blocks, core, state)
 
 	return e, nil
 }

@@ -138,7 +138,8 @@ func (m *MutableState) Extend(candidate *cluster.Block) error {
 	}
 
 	span, _ = m.tracer.StartSpanFromContext(ctx, trace.COLClusterStateMutatorExtendDBInsert)
-	err = operation.RetryOnConflict(m.State.db.Update, procedure.InsertClusterBlock(candidate))
+	// TODO(tim)
+	err = operation.RetryOnConflict(m.State.db.Update, procedure.InsertClusterBlock(&cluster.BlockProposal{Block: candidate, ProposerSigData: nil}))
 	span.End()
 	if err != nil {
 		return fmt.Errorf("could not insert cluster block: %w", err)

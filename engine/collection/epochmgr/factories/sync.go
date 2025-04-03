@@ -40,7 +40,6 @@ func (f *SyncEngineFactory) Create(
 	participants flow.IdentitySkeletonList,
 	state cluster.State,
 	blocks storage.ClusterBlocks,
-	sigs storage.ProposalSignatures,
 	core *chainsync.Core,
 	comp collection.Compliance,
 ) (*syncengine.Engine, error) {
@@ -53,7 +52,6 @@ func (f *SyncEngineFactory) Create(
 		participants,
 		state,
 		blocks,
-		sigs,
 		comp,
 		core,
 	)

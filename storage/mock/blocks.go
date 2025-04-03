@@ -122,6 +122,36 @@ func (_m *Blocks) IndexBlockForCollections(blockID flow.Identifier, collIDs []fl
 	return r0
 }
 
+// ProposalByHeight provides a mock function with given fields: height
+func (_m *Blocks) ProposalByHeight(height uint64) (*flow.BlockProposal, error) {
+	ret := _m.Called(height)
+
+	if len(ret) == 0 {
+		panic("no return value specified for ProposalByHeight")
+	}
+
+	var r0 *flow.BlockProposal
+	var r1 error
+	if rf, ok := ret.Get(0).(func(uint64) (*flow.BlockProposal, error)); ok {
+		return rf(height)
+	}
+	if rf, ok := ret.Get(0).(func(uint64) *flow.BlockProposal); ok {
+		r0 = rf(height)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*flow.BlockProposal)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(uint64) error); ok {
+		r1 = rf(height)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
 // ProposalByID provides a mock function with given fields: blockID
 func (_m *Blocks) ProposalByID(blockID flow.Identifier) (*flow.BlockProposal, error) {
 	ret := _m.Called(blockID)

@@ -419,7 +419,6 @@ func (v *VerificationNodeBuilder) LoadComponentsAndModules() {
 				node.Me,
 				node.State,
 				node.Storage.Blocks,
-				node.Storage.ProposalSignatures,
 				followerEng,
 				syncCore,
 				node.SyncEngineIdentifierProvider,

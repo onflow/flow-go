@@ -95,6 +95,21 @@ func (mr *MockBlocksMockRecorder) IndexBlockForCollections(arg0, arg1 interface{
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "IndexBlockForCollections", reflect.TypeOf((*MockBlocks)(nil).IndexBlockForCollections), arg0, arg1)
 }
 
+// ProposalByHeight mocks base method.
+func (m *MockBlocks) ProposalByHeight(arg0 uint64) (*flow.BlockProposal, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ProposalByHeight", arg0)
+	ret0, _ := ret[0].(*flow.BlockProposal)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// ProposalByHeight indicates an expected call of ProposalByHeight.
+func (mr *MockBlocksMockRecorder) ProposalByHeight(arg0 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ProposalByHeight", reflect.TypeOf((*MockBlocks)(nil).ProposalByHeight), arg0)
+}
+
 // ProposalByID mocks base method.
 func (m *MockBlocks) ProposalByID(arg0 flow.Identifier) (*flow.BlockProposal, error) {
 	m.ctrl.T.Helper()

@@ -51,7 +51,6 @@ type SyncSuite struct {
 	snapshot     *cluster.Snapshot
 	params       *cluster.Params
 	blocks       *storage.ClusterBlocks
-	sigs         *storage.ProposalSignatures
 	comp         *mockcollection.Compliance
 	core         *module.SyncCore
 	e            *Engine
@@ -126,29 +125,20 @@ func (ss *SyncSuite) SetupTest() {
 	// set up blocks storage mock
 	ss.blocks = &storage.ClusterBlocks{}
 	ss.blocks.On("ByHeight", mock.Anything).Return(
-		func(height uint64) (*clustermodel.Block, error) {
+		func(height uint64) (*clustermodel.BlockProposal, error) {
 			block, enabled := ss.heights[height]
 			if !enabled {
 				return nil, storerr.ErrNotFound
 			}
-			return block.Block, nil
+			return block, nil
 		})
 	ss.blocks.On("ByID", mock.Anything).Return(
-		func(blockID flow.Identifier) (*clustermodel.Block, error) {
+		func(blockID flow.Identifier) (*clustermodel.BlockProposal, error) {
 			block, enabled := ss.blockIDs[blockID]
 			if !enabled {
 				return nil, storerr.ErrNotFound
 			}
-			return block.Block, nil
-		})
-	ss.sigs = &storage.ProposalSignatures{}
-	ss.sigs.On("ByBlockID", mock.Anything).Return(
-		func(blockID flow.Identifier) ([]byte, error) {
-			block, enabled := ss.blockIDs[blockID]
-			if !enabled {
-				return nil, storerr.ErrNotFound
-			}
-			return block.ProposerSigData, nil
+			return block, nil
 		})
 
 	// set up compliance engine mock
@@ -161,7 +151,7 @@ func (ss *SyncSuite) SetupTest() {
 	log := zerolog.New(io.Discard)
 	metrics := metrics.NewNoopCollector()
 
-	e, err := New(log, metrics, ss.net, ss.me, ss.participants.ToSkeleton(), ss.state, ss.blocks, ss.sigs, ss.comp, ss.core)
+	e, err := New(log, metrics, ss.net, ss.me, ss.participants.ToSkeleton(), ss.state, ss.blocks, ss.comp, ss.core)
 	require.NoError(ss.T(), err, "should pass engine initialization")
 
 	ss.e = e

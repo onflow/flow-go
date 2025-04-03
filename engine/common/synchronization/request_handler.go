@@ -50,7 +50,6 @@ type RequestHandler struct {
 	metrics module.EngineMetrics
 
 	blocks               storage.Blocks
-	sigs                 storage.ProposalSignatures
 	finalizedHeaderCache module.FinalizedHeaderCache
 	core                 module.SyncCore
 	responseSender       ResponseSender
@@ -70,7 +69,6 @@ func NewRequestHandler(
 	me module.Local,
 	finalizedHeaderCache *events.FinalizedHeaderCache,
 	blocks storage.Blocks,
-	sigs storage.ProposalSignatures,
 	core module.SyncCore,
 	queueMissingHeights bool,
 ) *RequestHandler {
@@ -80,7 +78,6 @@ func NewRequestHandler(
 		metrics:              metrics,
 		finalizedHeaderCache: finalizedHeaderCache,
 		blocks:               blocks,
-		sigs:                 sigs,
 		core:                 core,
 		responseSender:       responseSender,
 		queueMissingHeights:  queueMissingHeights,
@@ -226,7 +223,7 @@ func (r *RequestHandler) onRangeRequest(originID flow.Identifier, req *messages.
 	// get all the blocks, one by one
 	blocks := make([]messages.BlockProposal, 0, req.ToHeight-req.FromHeight+1)
 	for height := req.FromHeight; height <= req.ToHeight; height++ {
-		block, err := r.blocks.ByHeight(height)
+		proposal, err := r.blocks.ProposalByHeight(height)
 		if errors.Is(err, storage.ErrNotFound) {
 			logger.Error().Uint64("height", height).Msg("skipping unknown heights")
 			break
@@ -234,16 +231,7 @@ func (r *RequestHandler) onRangeRequest(originID flow.Identifier, req *messages.
 		if err != nil {
 			return fmt.Errorf("could not get block for height (%d): %w", height, err)
 		}
-		blockID := block.ID()
-		sig, err := r.sigs.ByBlockID(blockID)
-		if errors.Is(err, storage.ErrNotFound) {
-			logger.Warn().Str("blockID", blockID.String()).Msg("proposer signature not found in storage")
-			// proposer signature will be nil; we can try to verify blocks via QCs of child blocks instead
-		}
-		if err != nil {
-			return fmt.Errorf("could not get proposer signature for height (%d): %w", height, err)
-		}
-		blocks = append(blocks, *messages.NewBlockProposal(&flow.BlockProposal{Block: block, ProposerSigData: sig}))
+		blocks = append(blocks, *messages.NewBlockProposal(proposal))
 	}
 	// At least the last block of the block response should be sent with a valid proposer signature.
 	// Other blocks can be verified via QCs included in the headers.
@@ -313,7 +301,7 @@ func (r *RequestHandler) onBatchRequest(originID flow.Identifier, req *messages.
 	// try to get all the blocks by ID
 	blocks := make([]messages.BlockProposal, 0, len(blockIDs))
 	for blockID := range blockIDs {
-		block, err := r.blocks.ByID(blockID)
+		proposal, err := r.blocks.ProposalByID(blockID)
 		if errors.Is(err, storage.ErrNotFound) {
 			logger.Debug().Hex("block_id", blockID[:]).Msg("skipping unknown block")
 			continue
@@ -321,11 +309,7 @@ func (r *RequestHandler) onBatchRequest(originID flow.Identifier, req *messages.
 		if err != nil {
 			return fmt.Errorf("could not get block by ID (%s): %w", blockID, err)
 		}
-		sig, err := r.sigs.ByBlockID(blockID)
-		if err != nil {
-			return fmt.Errorf("could not retrieve proposer signature for block (%s): %w", blockID, err)
-		}
-		blocks = append(blocks, *messages.NewBlockProposal(&flow.BlockProposal{Block: block, ProposerSigData: sig}))
+		blocks = append(blocks, *messages.NewBlockProposal(proposal))
 	}
 
 	// if there are no blocks to send, skip network message

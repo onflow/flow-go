@@ -285,7 +285,6 @@ func (builder *FollowerServiceBuilder) buildSyncEngine() *FollowerServiceBuilder
 			node.Me,
 			node.State,
 			node.Storage.Blocks,
-			node.Storage.ProposalSignatures,
 			builder.FollowerEng,
 			builder.SyncCore,
 			builder.SyncEngineParticipantsProviderFactory(),

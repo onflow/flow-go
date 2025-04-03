@@ -41,7 +41,6 @@ type RequestHandlerEngine struct {
 	metrics module.EngineMetrics
 
 	blocks storage.ClusterBlocks
-	sigs   storage.ProposalSignatures
 	core   module.SyncCore
 	state  cluster.State
 	con    network.Conduit // used for sending responses to requesters
@@ -58,7 +57,6 @@ func NewRequestHandlerEngine(
 	con network.Conduit,
 	me module.Local,
 	blocks storage.ClusterBlocks,
-	sigs storage.ProposalSignatures,
 	core module.SyncCore,
 	state cluster.State,
 ) *RequestHandlerEngine {
@@ -69,7 +67,6 @@ func NewRequestHandlerEngine(
 		log:     log.With().Str("engine", "cluster_synchronization").Logger(),
 		metrics: metrics,
 		blocks:  blocks,
-		sigs:    sigs,
 		core:    core,
 		state:   state,
 		con:     con,
@@ -247,11 +244,7 @@ func (r *RequestHandlerEngine) onRangeRequest(originID flow.Identifier, req *mes
 		if err != nil {
 			return fmt.Errorf("could not get block for height (%d): %w", height, err)
 		}
-		sig, err := r.sigs.ByBlockID(block.ID())
-		if err != nil {
-			return fmt.Errorf("could not retrieve proposer signature for block (%s): %w", block.ID(), err)
-		}
-		blocks = append(blocks, *messages.NewClusterBlockProposal(block, sig))
+		blocks = append(blocks, *messages.ClusterBlockProposalFrom(block))
 	}
 
 	// if there are no blocks to send, skip network message
@@ -320,11 +313,7 @@ func (r *RequestHandlerEngine) onBatchRequest(originID flow.Identifier, req *mes
 		if err != nil {
 			return fmt.Errorf("could not get block by ID (%s): %w", blockID, err)
 		}
-		sig, err := r.sigs.ByBlockID(blockID)
-		if err != nil {
-			return fmt.Errorf("could not retrieve proposer signature for block (%s): %w", blockID, err)
-		}
-		blocks = append(blocks, *messages.NewClusterBlockProposal(block, sig))
+		blocks = append(blocks, *messages.ClusterBlockProposalFrom(block))
 	}
 
 	// if there are no blocks to send, skip network message

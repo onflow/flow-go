@@ -27,6 +27,10 @@ type Blocks interface {
 	// for finalized blocks.
 	ByHeight(height uint64) (*flow.Block, error)
 
+	// ProposalByHeight returns the block with proposer signature at the given height.
+	// It is only available for finalized blocks.
+	ProposalByHeight(height uint64) (*flow.BlockProposal, error)
+
 	// ByCollectionID returns the block for the given collection ID.
 	ByCollectionID(collID flow.Identifier) (*flow.Block, error)
 

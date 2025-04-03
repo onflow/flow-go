@@ -17,14 +17,16 @@ type ClusterBlocks struct {
 	chainID  flow.ChainID
 	headers  *Headers
 	payloads *ClusterPayloads
+	sigs     *ProposalSignatures
 }
 
-func NewClusterBlocks(db *badger.DB, chainID flow.ChainID, headers *Headers, payloads *ClusterPayloads) *ClusterBlocks {
+func NewClusterBlocks(db *badger.DB, chainID flow.ChainID, headers *Headers, payloads *ClusterPayloads, sigs *ProposalSignatures) *ClusterBlocks {
 	b := &ClusterBlocks{
 		db:       db,
 		chainID:  chainID,
 		headers:  headers,
 		payloads: payloads,
+		sigs:     sigs,
 	}
 	return b
 }
@@ -47,7 +49,7 @@ func (b *ClusterBlocks) storeTx(block *cluster.Block) func(*transaction.Tx) erro
 	}
 }
 
-func (b *ClusterBlocks) ByID(blockID flow.Identifier) (*cluster.Block, error) {
+func (b *ClusterBlocks) ByID(blockID flow.Identifier) (*cluster.BlockProposal, error) {
 	header, err := b.headers.ByBlockID(blockID)
 	if err != nil {
 		return nil, fmt.Errorf("could not get header: %w", err)
@@ -56,14 +58,21 @@ func (b *ClusterBlocks) ByID(blockID flow.Identifier) (*cluster.Block, error) {
 	if err != nil {
 		return nil, fmt.Errorf("could not retrieve payload: %w", err)
 	}
-	block := cluster.Block{
-		Header:  header,
-		Payload: payload,
+	sig, err := b.sigs.ByBlockID(blockID)
+	if err != nil {
+		return nil, fmt.Errorf("could not retrieve proposer signature: %w", err)
 	}
-	return &block, nil
+	proposal := &cluster.BlockProposal{
+		Block: &cluster.Block{
+			Header:  header,
+			Payload: payload,
+		},
+		ProposerSigData: sig,
+	}
+	return proposal, nil
 }
 
-func (b *ClusterBlocks) ByHeight(height uint64) (*cluster.Block, error) {
+func (b *ClusterBlocks) ByHeight(height uint64) (*cluster.BlockProposal, error) {
 	var blockID flow.Identifier
 	err := b.db.View(operation.LookupClusterBlockHeight(b.chainID, height, &blockID))
 	if err != nil {

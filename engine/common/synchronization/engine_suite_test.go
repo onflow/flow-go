@@ -44,7 +44,6 @@ type SyncSuite struct {
 	state        *protocol.State
 	snapshot     *protocol.Snapshot
 	blocks       *storage.Blocks
-	sigs         *storage.ProposalSignatures
 	comp         *mockconsensus.Compliance
 	core         *module.SyncCore
 	e            *Engine
@@ -122,30 +121,21 @@ func (ss *SyncSuite) SetupTest() {
 
 	// set up blocks storage mock
 	ss.blocks = &storage.Blocks{}
-	ss.blocks.On("ByHeight", mock.Anything).Return(
-		func(height uint64) (*flow.Block, error) {
+	ss.blocks.On("ProposalByHeight", mock.Anything).Return(
+		func(height uint64) (*flow.BlockProposal, error) {
 			block, enabled := ss.heights[height]
 			if !enabled {
 				return nil, storerr.ErrNotFound
 			}
-			return block.Block, nil
+			return block, nil
 		})
-	ss.blocks.On("ByID", mock.Anything).Return(
-		func(blockID flow.Identifier) (*flow.Block, error) {
+	ss.blocks.On("ProposalByID", mock.Anything).Return(
+		func(blockID flow.Identifier) (*flow.BlockProposal, error) {
 			block, enabled := ss.blockIDs[blockID]
 			if !enabled {
 				return nil, storerr.ErrNotFound
 			}
-			return block.Block, nil
-		})
-	ss.sigs = &storage.ProposalSignatures{}
-	ss.sigs.On("ByBlockID", mock.Anything).Return(
-		func(blockID flow.Identifier) ([]byte, error) {
-			block, enabled := ss.blockIDs[blockID]
-			if !enabled {
-				return nil, storerr.ErrNotFound
-			}
-			return block.ProposerSigData, nil
+			return block, nil
 		})
 
 	// set up compliance engine mock
@@ -163,7 +153,7 @@ func (ss *SyncSuite) SetupTest() {
 	require.NoError(ss.T(), err, "could not create protocol state identity cache")
 	spamConfig, err := NewSpamDetectionConfig()
 	require.NoError(ss.T(), err, "could not create spam detection config")
-	e, err := New(log, metrics, ss.net, ss.me, ss.state, ss.blocks, ss.sigs, ss.comp, ss.core,
+	e, err := New(log, metrics, ss.net, ss.me, ss.state, ss.blocks, ss.comp, ss.core,
 		id.NewIdentityFilterIdentifierProvider(
 			filter.And(
 				filter.HasRole[flow.Identity](flow.RoleConsensus),

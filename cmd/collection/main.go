@@ -223,7 +223,11 @@ func main() {
 			if !ok {
 				panic("fail to initialize admin tool, conf.Storage.Headers can not be casted as badger headers")
 			}
-			return storageCommands.NewReadRangeClusterBlocksCommand(conf.DB, headers, clusterPayloads)
+			sigs, ok := conf.Storage.ProposalSignatures.(*badger.ProposalSignatures)
+			if !ok {
+				panic("fail to initialize admin tool, conf.Storage.ProposalSignatures can not be casted as badger proposalSignatures")
+			}
+			return storageCommands.NewReadRangeClusterBlocksCommand(conf.DB, headers, clusterPayloads, sigs)
 		}).
 		Module("follower distributor", func(node *cmd.NodeConfig) error {
 			followerDistributor = pubsub.NewFollowerDistributor()
@@ -408,7 +412,6 @@ func main() {
 				node.Me,
 				node.State,
 				node.Storage.Blocks,
-				node.Storage.ProposalSignatures,
 				followerEng,
 				mainChainSyncCore,
 				node.SyncEngineIdentifierProvider,

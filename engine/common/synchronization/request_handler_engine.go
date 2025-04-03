@@ -72,7 +72,6 @@ func NewRequestHandlerEngine(
 	me module.Local,
 	state protocol.State,
 	blocks storage.Blocks,
-	sigs storage.ProposalSignatures,
 	core module.SyncCore,
 ) (*RequestHandlerEngine, error) {
 	e := &RequestHandlerEngine{}
@@ -94,7 +93,6 @@ func NewRequestHandlerEngine(
 		me,
 		finalizedHeaderCache,
 		blocks,
-		sigs,
 		core,
 		false,
 	)

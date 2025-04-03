@@ -28,7 +28,7 @@ func TestReadClusterRange(t *testing.T) {
 
 		// add blocks
 		for _, block := range blocks {
-			err := db.Update(procedure.InsertClusterBlock(&block))
+			err := db.Update(procedure.InsertClusterBlock(unittest.ClusterProposalFromBlock(&block)))
 			require.NoError(t, err)
 
 			err = db.Update(procedure.FinalizeClusterBlock(block.Header.ID()))
@@ -40,6 +40,7 @@ func TestReadClusterRange(t *testing.T) {
 			blocks[0].Header.ChainID,
 			badgerstorage.NewHeaders(metrics.NewNoopCollector(), db),
 			badgerstorage.NewClusterPayloads(metrics.NewNoopCollector(), db),
+			badgerstorage.NewProposalSignatures(metrics.NewNoopCollector(), db),
 		)
 
 		startHeight := blocks[0].Header.Height

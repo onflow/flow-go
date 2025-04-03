@@ -129,7 +129,6 @@ func (suite *BuilderSuite) SetupTest() {
 		all.Seals,
 		all.Results,
 		all.Blocks,
-		all.ProposalSignatures,
 		all.QuorumCertificates,
 		all.Setups,
 		all.EpochCommits,
@@ -174,7 +173,7 @@ func (suite *BuilderSuite) TearDownTest() {
 }
 
 func (suite *BuilderSuite) InsertBlock(block model.Block) {
-	err := suite.db.Update(procedure.InsertClusterBlock(&block))
+	err := suite.db.Update(procedure.InsertClusterBlock(unittest.ClusterProposalFromBlock(&block)))
 	suite.Assert().NoError(err)
 }
 
@@ -1092,7 +1091,7 @@ func benchmarkBuildOn(b *testing.B, size int) {
 	final := suite.genesis
 	for i := 0; i < size; i++ {
 		block := unittest.ClusterBlockWithParent(final)
-		err := suite.db.Update(procedure.InsertClusterBlock(&block))
+		err := suite.db.Update(procedure.InsertClusterBlock(unittest.ClusterProposalFromBlock(&block)))
 		require.NoError(b, err)
 
 		// finalize the block 80% of the time, resulting in a fork-rate of 20%

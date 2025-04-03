@@ -1288,7 +1288,6 @@ func (exeNode *ExecutionNode) LoadSynchronizationEngine(
 		node.Me,
 		node.State,
 		node.Storage.Blocks,
-		node.Storage.ProposalSignatures,
 		exeNode.followerEng,
 		exeNode.syncCore,
 		node.SyncEngineIdentifierProvider,

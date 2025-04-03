@@ -24,13 +24,15 @@ type ReadRangeClusterBlocksCommand struct {
 	db       *badger.DB
 	headers  *storage.Headers
 	payloads *storage.ClusterPayloads
+	sigs     *storage.ProposalSignatures
 }
 
-func NewReadRangeClusterBlocksCommand(db *badger.DB, headers *storage.Headers, payloads *storage.ClusterPayloads) commands.AdminCommand {
+func NewReadRangeClusterBlocksCommand(db *badger.DB, headers *storage.Headers, payloads *storage.ClusterPayloads, sigs *storage.ProposalSignatures) commands.AdminCommand {
 	return &ReadRangeClusterBlocksCommand{
 		db:       db,
 		headers:  headers,
 		payloads: payloads,
+		sigs:     sigs,
 	}
 }
 
@@ -52,7 +54,7 @@ func (c *ReadRangeClusterBlocksCommand) Handler(ctx context.Context, req *admin.
 	}
 
 	clusterBlocks := storage.NewClusterBlocks(
-		c.db, flow.ChainID(chainID), c.headers, c.payloads,
+		c.db, flow.ChainID(chainID), c.headers, c.payloads, c.sigs,
 	)
 
 	lights, err := read.ReadClusterLightBlockByHeightRange(clusterBlocks, reqData.startHeight, reqData.endHeight)

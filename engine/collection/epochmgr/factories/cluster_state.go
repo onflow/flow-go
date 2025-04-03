@@ -40,8 +40,8 @@ func (f *ClusterStateFactory) Create(stateRoot *clusterkv.StateRoot) (
 
 	headers := bstorage.NewHeaders(f.metrics, f.db)
 	payloads := bstorage.NewClusterPayloads(f.metrics, f.db)
-	blocks := bstorage.NewClusterBlocks(f.db, stateRoot.ClusterID(), headers, payloads)
 	proposerSigs := bstorage.NewProposalSignatures(f.metrics, f.db)
+	blocks := bstorage.NewClusterBlocks(f.db, stateRoot.ClusterID(), headers, payloads, proposerSigs)
 
 	isBootStrapped, err := clusterkv.IsBootstrapped(f.db, stateRoot.ClusterID())
 	if err != nil {

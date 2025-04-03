@@ -409,7 +409,6 @@ func (c *Container) OpenState() (*state.State, error) {
 		seals,
 		results,
 		blocks,
-		sigs,
 		qcs,
 		setups,
 		commits,

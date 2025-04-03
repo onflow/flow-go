@@ -243,7 +243,6 @@ func CompleteStateFixture(
 		s.Seals,
 		s.Results,
 		s.Blocks,
-		s.ProposalSignatures,
 		s.QuorumCertificates,
 		s.Setups,
 		s.EpochCommits,
@@ -793,7 +792,6 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity bootstrap.NodeInfo, ide
 		node.Me,
 		node.State,
 		node.Blocks,
-		node.ProposalSignatures,
 		followerEng,
 		syncCore,
 		id.NewIdentityFilterIdentifierProvider(

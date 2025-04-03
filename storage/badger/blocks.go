@@ -121,6 +121,17 @@ func (b *Blocks) ByHeight(height uint64) (*flow.Block, error) {
 	return b.retrieveTx(blockID)(tx)
 }
 
+func (b *Blocks) ProposalByHeight(height uint64) (*flow.BlockProposal, error) {
+	tx := b.db.NewTransaction(false)
+	defer tx.Discard()
+
+	blockID, err := b.headers.retrieveIdByHeightTx(height)(tx)
+	if err != nil {
+		return nil, err
+	}
+	return b.retrieveProposalTx(blockID)(tx)
+}
+
 // ByCollectionID ...
 func (b *Blocks) ByCollectionID(collID flow.Identifier) (*flow.Block, error) {
 	var blockID flow.Identifier

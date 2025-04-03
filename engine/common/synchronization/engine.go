@@ -73,7 +73,6 @@ func New(
 	me module.Local,
 	state protocol.State,
 	blocks storage.Blocks,
-	sigs storage.ProposalSignatures,
 	comp consensus.Compliance,
 	core module.SyncCore,
 	participantsProvider module.IdentifierProvider,
@@ -117,7 +116,7 @@ func New(
 		return nil, fmt.Errorf("could not register engine: %w", err)
 	}
 	e.con = con
-	e.requestHandler = NewRequestHandler(log, metrics, NewResponseSender(con), me, finalizedHeaderCache, blocks, sigs, core, true)
+	e.requestHandler = NewRequestHandler(log, metrics, NewResponseSender(con), me, finalizedHeaderCache, blocks, core, true)
 
 	// set up worker routines
 	builder := component.NewComponentManagerBuilder().

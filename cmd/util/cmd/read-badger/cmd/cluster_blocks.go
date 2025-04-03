@@ -32,11 +32,12 @@ var clusterBlocksCmd = &cobra.Command{
 		db := common.InitStorage(flagDatadir)
 		headers := badger.NewHeaders(metrics, db)
 		clusterPayloads := badger.NewClusterPayloads(metrics, db)
+		sigs := badger.NewProposalSignatures(metrics, db)
 
 		// get chain id
 		log.Info().Msgf("got flag chain name: %s", flagChainName)
 		chainID := flow.ChainID(flagChainName)
-		clusterBlocks := badger.NewClusterBlocks(db, chainID, headers, clusterPayloads)
+		clusterBlocks := badger.NewClusterBlocks(db, chainID, headers, clusterPayloads, sigs)
 
 		if flagClusterBlockID != "" && flagHeight != 0 {
 			log.Error().Msg("provide either a --id or --height and not both")
@@ -70,7 +71,7 @@ var clusterBlocksCmd = &cobra.Command{
 				return
 			}
 
-			log.Info().Msgf("block id: %v", clusterBlock.ID())
+			log.Info().Msgf("block id: %v", clusterBlock.Block.ID())
 			common.PrettyPrint(clusterBlock)
 			return
 		}

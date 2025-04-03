@@ -63,7 +63,6 @@ func (suite *SnapshotSuite) SetupTest() {
 		all.Seals,
 		all.Results,
 		all.Blocks,
-		all.ProposalSignatures,
 		all.QuorumCertificates,
 		all.Setups,
 		all.EpochCommits,
@@ -125,7 +124,8 @@ func (suite *SnapshotSuite) Block() model.Block {
 }
 
 func (suite *SnapshotSuite) InsertBlock(block model.Block) {
-	err := suite.db.Update(procedure.InsertClusterBlock(&block))
+	// TODO(tim)
+	err := suite.db.Update(procedure.InsertClusterBlock(&model.BlockProposal{Block: &block, ProposerSigData: nil}))
 	suite.Assert().Nil(err)
 }
 
