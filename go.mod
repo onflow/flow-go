@@ -15,7 +15,7 @@ require (
 	github.com/dgraph-io/badger/v2 v2.2007.4
 	github.com/ef-ds/deque v1.0.4
 	github.com/ethereum/go-ethereum v1.13.10
-	github.com/fxamacker/cbor/v2 v2.4.1-0.20230228173756-c0c9f774e40c
+	github.com/fxamacker/cbor/v2 v2.8.1-0.20250401165920-8bb2c1a19ccd
 	github.com/gammazero/workerpool v1.1.3
 	github.com/gogo/protobuf v1.3.2
 	github.com/golang/mock v1.6.0
@@ -47,8 +47,8 @@ require (
 	github.com/multiformats/go-multiaddr v0.14.0
 	github.com/multiformats/go-multiaddr-dns v0.4.1
 	github.com/multiformats/go-multihash v0.2.3
-	github.com/onflow/atree v0.9.0
-	github.com/onflow/cadence v1.3.3
+	github.com/onflow/atree v0.9.1-0.20250401190124-9ad64231c8a3
+	github.com/onflow/cadence v1.3.4-0.20250401190807-cc08b3c7dcbf
 	github.com/onflow/crypto v0.25.2
 	github.com/onflow/flow v0.3.4
 	github.com/onflow/flow-core-contracts/lib/go/contracts v1.6.0
@@ -336,7 +336,7 @@ require (
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20241007155032-5fefd90f89a9 // indirect
 	gopkg.in/ini.v1 v1.67.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
-	lukechampine.com/blake3 v1.3.0 // indirect
+	lukechampine.com/blake3 v1.4.0 // indirect
 	nhooyr.io/websocket v1.8.7 // indirect
 	rsc.io/tmplfunc v0.0.3 // indirect
 )
