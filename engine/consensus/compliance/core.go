@@ -146,7 +146,7 @@ func (c *Core) OnBlockProposal(proposal flow.Slashable[*messages.BlockProposal])
 		Uint64("finalized_height", finalHeight).
 		Uint64("finalized_view", finalView).
 		Logger()
-	log.Info().Msg("block proposal received")
+	log.Debug().Msg("block proposal received")
 
 	// drop proposals below the finalized threshold
 	if header.Height <= finalHeight || header.View <= finalView {
@@ -387,7 +387,7 @@ func (c *Core) processBlockProposal(proposal *flow.Block) error {
 
 	// submit the model to hotstuff for processing
 	// TODO replace with pubsub https://github.com/dapperlabs/flow-go/issues/6395
-	log.Info().Msg("forwarding block proposal to hotstuff")
+	log.Debug().Msg("forwarding block proposal to hotstuff")
 	c.hotstuff.SubmitProposal(hotstuffProposal)
 
 	return nil
