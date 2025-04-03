@@ -94,7 +94,7 @@ require (
 )
 
 require (
-	github.com/cockroachdb/pebble v1.1.1
+	github.com/cockroachdb/pebble v1.1.2
 	github.com/coreos/go-semver v0.3.0
 	github.com/docker/go-units v0.5.0
 	github.com/dustin/go-humanize v1.0.1
@@ -108,7 +108,7 @@ require (
 	github.com/libp2p/go-libp2p-routing-helpers v0.7.4
 	github.com/mitchellh/mapstructure v1.5.0
 	github.com/onflow/bridged-usdc/lib/go/contracts v1.0.0
-	github.com/onflow/go-ethereum v1.14.8-0.20250313102023-d74083dc74d3
+	github.com/onflow/go-ethereum v1.14.8-0.20250317120349-01f77f5201a0
 	github.com/onflow/nft-storefront/lib/go/contracts v1.0.0
 	github.com/onflow/wal v1.0.2
 	github.com/slok/go-http-metrics v0.12.0
@@ -144,7 +144,7 @@ require (
 	github.com/aws/smithy-go v1.20.2 // indirect
 	github.com/benbjohnson/clock v1.3.5 // indirect
 	github.com/beorn7/perks v1.0.1 // indirect
-	github.com/bits-and-blooms/bitset v1.10.0 // indirect
+	github.com/bits-and-blooms/bitset v1.13.0 // indirect
 	github.com/btcsuite/btcd/chaincfg/chainhash v1.0.2 // indirect
 	github.com/cenkalti/backoff/v4 v4.3.0 // indirect
 	github.com/cespare/xxhash v1.1.0 // indirect
@@ -169,7 +169,7 @@ require (
 	github.com/dgryski/go-farm v0.0.0-20190423205320-6a90982ecee2 // indirect
 	github.com/elastic/gosigar v0.14.3 // indirect
 	github.com/ethereum/c-kzg-4844 v1.0.0 // indirect
-	github.com/ethereum/go-verkle v0.1.1-0.20240306133620-7d920df305f0 // indirect
+	github.com/ethereum/go-verkle v0.1.1-0.20240829091221-dffa7562dbe9 // indirect
 	github.com/felixge/fgprof v0.9.3 // indirect
 	github.com/felixge/httpsnoop v1.0.4 // indirect
 	github.com/filecoin-project/go-clock v0.1.0 // indirect
