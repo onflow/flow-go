@@ -338,3 +338,44 @@ func TestMalleabilityChecker_Generators(t *testing.T) {
 		require.Equal(t, generated, *original.Evidences[0])
 	})
 }
+
+// PartialHashStruct represents a model which includes a signature field attesting to the rest of the model.
+// Hash returns a hash over PartialHashStruct excluding the Signature field, and the Signature would sign the Hash.
+// ID returns a hash over the entire PartialHashStruct.
+// PartialHashStruct is malleable with respect to the Hash method, but non-malleable with respect to the ID method.
+// Although the Hash method is malleable, we still want to be able to verify that it is non-malleable with respect
+// to all fields other than the Signature field.
+type PartialHashStruct struct {
+	Data      []byte
+	Signature crypto.Signature
+}
+
+func (e *PartialHashStruct) Hash() flow.Identifier {
+	return flow.MakeID(struct {
+		Data []byte
+	}{
+		Data: e.Data,
+	})
+}
+
+func (e *PartialHashStruct) ID() flow.Identifier {
+	return flow.MakeID(e)
+}
+
+// TestMalleabilityChecker_PartialHash tests a partial hash malleability check. See PartialHashStruct for details.
+func TestMalleabilityChecker_PartialHash(t *testing.T) {
+	model := &PartialHashStruct{
+		Data:      SeedFixture(32),
+		Signature: SignatureFixture(),
+	}
+	// the entity check passes
+	err := NewMalleabilityChecker().CheckEntity(model)
+	require.NoError(t, err)
+	// the default Hash check fails
+	err = NewMalleabilityChecker().Check(model, model.Hash)
+	require.Error(t, err)
+	require.ErrorContains(t, err, "Signature is malleable")
+	// the Hash check omitting the Signature field passes
+	err = NewMalleabilityChecker(WithPinnedField("Signature")).Check(model, model.Hash)
+	require.NoError(t, err)
+}
