@@ -48,7 +48,7 @@ func MockEntityFixture() *MockEntity {
 // This function consumes the entity and modifies its fields randomly to ensure that the ID changes after each modification.
 // Generally speaking each type that implements [flow.IDEntity] method should be tested with this function.
 func RequireEntityNonMalleable(t *testing.T, entity flow.IDEntity, ops ...MalleabilityCheckerOpt) {
-	err := NewMalleabilityChecker(ops...).Check(entity)
+	err := NewMalleabilityChecker(ops...).CheckEntity(entity)
 	require.NoError(t, err)
 }
 
@@ -58,7 +58,7 @@ func RequireEntityNonMalleable(t *testing.T, entity flow.IDEntity, ops ...Mallea
 // Note that this is sanity check of non-malleability and that passing this test does not guarantee non-malleability.
 // ATTENTION: We put only one requirement for data types, that is all fields have to be exported so we can modify them.
 func RequireNonMalleable(t *testing.T, model any, hashModel func() flow.Identifier, ops ...MalleabilityCheckerOpt) {
-	err := NewMalleabilityChecker(ops...).CheckCustom(model, hashModel)
+	err := NewMalleabilityChecker(ops...).Check(model, hashModel)
 	require.NoError(t, err)
 }
 
@@ -179,15 +179,10 @@ func NewMalleabilityChecker(ops ...MalleabilityCheckerOpt) *MalleabilityChecker 
 	return checker
 }
 
-// Check is a method that performs the malleability check on the entity.
-// The caller provides a loosely instantiated entity struct, which serves a template for further modification.
-// The malleability check is recursively applied to all fields of the entity.
-// If one of the fields is nil or empty slice/map, the checker will create a new instance of the field and continue the check.
-// In rare cases, a type may have a different ID computation depending on whether a field is nil, in such case, we can use field pinning to
-// prevent the checker from changing the field.
+// CheckEntity is Check with the constraint that models implement [flow.IDEntity] and the content hash function is the ID() function.
 // It returns an error if the entity is malleable, otherwise it returns nil.
 // No errors are expected during normal operations.
-func (mc *MalleabilityChecker) Check(entity flow.IDEntity) error {
+func (mc *MalleabilityChecker) CheckEntity(entity flow.IDEntity) error {
 	v := reflect.ValueOf(entity)
 	if !v.IsValid() {
 		return fmt.Errorf("input is not a valid entity")
@@ -206,7 +201,15 @@ func (mc *MalleabilityChecker) Check(entity flow.IDEntity) error {
 	return mc.checkExpectations()
 }
 
-func (mc *MalleabilityChecker) CheckCustom(model any, hashModel func() flow.Identifier) error {
+// Check is a method that performs the malleability check on the input model.
+// The caller provides a loosely instantiated model, which serves as a template for further modification.
+// The malleability check is recursively applied to all fields of the model.
+// If one of the fields is nil or an empty slice/map, the checker will create a new instance of the field and continue the check.
+// In rare cases, a type may have a different ID computation depending on whether a field is nil, in such case, we can use field pinning to
+// prevent the checker from changing the field.
+// It returns an error if the model is malleable, otherwise it returns nil.
+// No errors are expected during normal operations.
+func (mc *MalleabilityChecker) Check(model any, hashModel func() flow.Identifier) error {
 	v := reflect.ValueOf(model)
 	if !v.IsValid() {
 		return fmt.Errorf("input is not a valid model")

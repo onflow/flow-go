@@ -161,25 +161,25 @@ func TestRequireEntityNonMalleable(t *testing.T) {
 		})
 	})
 	t.Run("invalid-entity", func(t *testing.T) {
-		err := NewMalleabilityChecker().Check(nil)
+		err := NewMalleabilityChecker().CheckEntity(nil)
 		require.Error(t, err)
 		require.ErrorContains(t, err, "input is not a valid entity")
 	})
 	t.Run("nil-entity", func(t *testing.T) {
 		var e *flow.ExecutionReceipt = nil
-		err := NewMalleabilityChecker().Check(e)
+		err := NewMalleabilityChecker().CheckEntity(e)
 		require.Error(t, err)
 		require.ErrorContains(t, err, "entity is nil")
 	})
 	t.Run("unsupported-field", func(t *testing.T) {
-		err := NewMalleabilityChecker().Check(&StructWithNotSettableFlowField{
+		err := NewMalleabilityChecker().CheckEntity(&StructWithNotSettableFlowField{
 			field: IdentityFixture().IdentitySkeleton,
 		})
 		require.Error(t, err)
 		require.ErrorContains(t, err, "not settable")
 	})
 	t.Run("malleable-entity", func(t *testing.T) {
-		err := NewMalleabilityChecker().Check(&MalleableEntityStruct{
+		err := NewMalleabilityChecker().CheckEntity(&MalleableEntityStruct{
 			Identities: IdentityListFixture(2).ToSkeleton(),
 			QC:         QuorumCertificateFixture(),
 			Signature:  SignatureFixture(),
@@ -189,7 +189,7 @@ func TestRequireEntityNonMalleable(t *testing.T) {
 	})
 	t.Run("struct-with-optional-field", func(t *testing.T) {
 		t.Run("without-optional-field", func(t *testing.T) {
-			err := NewMalleabilityChecker().Check(&StructWithOptionalField{
+			err := NewMalleabilityChecker().CheckEntity(&StructWithOptionalField{
 				Identifier:    IdentifierFixture(),
 				RequiredField: 42,
 				OptionalField: nil,
@@ -203,7 +203,7 @@ func TestRequireEntityNonMalleable(t *testing.T) {
 				OptionalField: new(uint32),
 			}
 			*v.OptionalField = 13
-			err := NewMalleabilityChecker().Check(v)
+			err := NewMalleabilityChecker().CheckEntity(v)
 			require.NoError(t, err)
 		})
 	})
@@ -261,7 +261,7 @@ func (e *StructWithPinning) ID() flow.Identifier {
 func TestMalleabilityChecker_PinField(t *testing.T) {
 	t.Run("v1", func(t *testing.T) {
 		checker := NewMalleabilityChecker(WithPinnedField("Version"), WithPinnedField("Evidence.TC"))
-		err := checker.Check(&StructWithPinning{
+		err := checker.CheckEntity(&StructWithPinning{
 			Version: 1,
 			Evidence: &EnterViewEvidence{
 				QC: QuorumCertificateFixture(),
@@ -272,7 +272,7 @@ func TestMalleabilityChecker_PinField(t *testing.T) {
 	})
 	t.Run("v2", func(t *testing.T) {
 		checker := NewMalleabilityChecker(WithPinnedField("Version"))
-		err := checker.Check(&StructWithPinning{
+		err := checker.CheckEntity(&StructWithPinning{
 			Version: 2,
 			Evidence: &EnterViewEvidence{
 				QC: QuorumCertificateFixture(),

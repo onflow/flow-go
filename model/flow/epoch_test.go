@@ -27,7 +27,7 @@ func TestMalleability(t *testing.T) {
 		checker := unittest.NewMalleabilityChecker(unittest.WithFieldGenerator("DKGIndexMap", func() flow.DKGIndexMap {
 			return flow.DKGIndexMap{unittest.IdentifierFixture(): 0, unittest.IdentifierFixture(): 1}
 		}))
-		err := checker.Check(unittest.EpochCommitFixture(func(commit *flow.EpochCommit) {
+		err := checker.CheckEntity(unittest.EpochCommitFixture(func(commit *flow.EpochCommit) {
 			commit.DKGIndexMap = flow.DKGIndexMap{unittest.IdentifierFixture(): 0, unittest.IdentifierFixture(): 1}
 		}))
 		require.NoError(t, err)
@@ -36,7 +36,7 @@ func TestMalleability(t *testing.T) {
 		checker := unittest.NewMalleabilityChecker(unittest.WithFieldGenerator("EpochCommit.DKGIndexMap", func() flow.DKGIndexMap {
 			return flow.DKGIndexMap{unittest.IdentifierFixture(): 0, unittest.IdentifierFixture(): 1}
 		}))
-		err := checker.Check(unittest.EpochRecoverFixture())
+		err := checker.CheckEntity(unittest.EpochRecoverFixture())
 		require.NoError(t, err)
 	})
 
