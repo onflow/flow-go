@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/fxamacker/cbor/v2"
+	"github.com/ipfs/go-cid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -389,4 +390,15 @@ func TestChunk_FingerprintBackwardCompatibility(t *testing.T) {
 		assert.NotEqual(t, flow.MakeID(chunkBodyV0), chunk.ID())
 		assert.NotEqual(t, flow.MakeID(chunkBodyV0), flow.MakeID(chunk.ChunkBody))
 	})
+}
+
+// TestChunkDataPackMalleability performs sanity checks to ensure that ChunkDataPack is not malleable.
+func TestChunkDataPackMalleability(t *testing.T) {
+	unittest.RequireEntityNonMalleable(
+		t,
+		unittest.ChunkDataPackFixture(unittest.IdentifierFixture()),
+		unittest.WithTypeGenerator[cid.Cid](func() cid.Cid {
+			return flow.IdToCid(unittest.IdentifierFixture())
+		}),
+	)
 }

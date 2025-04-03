@@ -366,6 +366,19 @@ type BlockExecutionDataRoot struct {
 	ChunkExecutionDataIDs []cid.Cid
 }
 
+// EncodeRLP defines RLP encoding behaviour for BlockExecutionDataRoot.
+func (b BlockExecutionDataRoot) EncodeRLP(w io.Writer) error {
+	encodingCanonicalForm := struct {
+		BlockID               Identifier
+		ChunkExecutionDataIDs []string
+	}{
+		BlockID:               b.BlockID,
+		ChunkExecutionDataIDs: cidsToStrings(b.ChunkExecutionDataIDs),
+	}
+
+	return rlp.Encode(w, encodingCanonicalForm)
+}
+
 // MarshalMsgpack implements the msgpack.Marshaler interface
 func (b BlockExecutionDataRoot) MarshalMsgpack() ([]byte, error) {
 	return msgpack.Marshal(struct {
