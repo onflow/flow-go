@@ -52,7 +52,7 @@ func (s *EventLoopTestSuite) SetupTest() {
 
 	ctx, cancel := context.WithCancel(context.Background())
 	s.cancel = cancel
-	signalerCtx, _ := irrecoverable.WithSignaler(ctx)
+	signalerCtx := irrecoverable.NewMockSignalerContext(s.T(), ctx)
 
 	s.eventLoop.Start(signalerCtx)
 	unittest.RequireCloseBefore(s.T(), s.eventLoop.Ready(), 100*time.Millisecond, "event loop not started")
@@ -207,7 +207,7 @@ func TestEventLoop_Timeout(t *testing.T) {
 	eh.On("TimeoutChannel").Return(time.After(100 * time.Millisecond))
 
 	ctx, cancel := context.WithCancel(context.Background())
-	signalerCtx, _ := irrecoverable.WithSignaler(ctx)
+	signalerCtx := irrecoverable.NewMockSignalerContext(t, ctx)
 	eventLoop.Start(signalerCtx)
 
 	unittest.RequireCloseBefore(t, eventLoop.Ready(), 100*time.Millisecond, "event loop not stopped")
@@ -264,7 +264,7 @@ func TestReadyDoneWithStartTime(t *testing.T) {
 	}).Return(nil).Once()
 
 	ctx, cancel := context.WithCancel(context.Background())
-	signalerCtx, _ := irrecoverable.WithSignaler(ctx)
+	signalerCtx := irrecoverable.NewMockSignalerContext(t, ctx)
 	eventLoop.Start(signalerCtx)
 
 	unittest.RequireCloseBefore(t, eventLoop.Ready(), 100*time.Millisecond, "event loop not started")

@@ -37,6 +37,12 @@ type BaseSuite struct {
 	Client *testnet.Client
 	Ctx    context.Context
 
+	// these are used for any helper goroutines started for the test
+	// we need to shut them down before stopping the network, however canceling the network's
+	// context before stopping causes the testdock shutdown to fail.
+	HelperCtx   context.Context
+	stopHelpers context.CancelFunc
+
 	// Epoch config (lengths in views)
 	StakingAuctionLen           uint64
 	DKGPhaseLen                 uint64
@@ -66,6 +72,7 @@ func (s *BaseSuite) SetupTest() {
 	require.Greater(s.T(), s.EpochLen, minEpochLength+s.FinalizationSafetyThreshold, "epoch too short")
 
 	s.Ctx, s.cancel = context.WithCancel(context.Background())
+	s.HelperCtx, s.stopHelpers = context.WithCancel(s.Ctx)
 	s.Log = unittest.LoggerForTest(s.Suite.T(), zerolog.InfoLevel)
 	s.Log.Info().Msg("================> SetupTest")
 	defer func() {
@@ -119,7 +126,7 @@ func (s *BaseSuite) SetupTest() {
 	s.Net.Start(s.Ctx)
 
 	// start tracking blocks
-	s.Track(s.T(), s.Ctx, s.Ghost())
+	s.Track(s.T(), s.HelperCtx, s.Ghost())
 
 	// use AN1 for test-related queries - the AN join/leave test will replace AN2
 	client, err := s.Net.ContainerByName(testnet.PrimaryAN).TestnetClient()
@@ -128,11 +135,12 @@ func (s *BaseSuite) SetupTest() {
 	s.Client = client
 
 	// log network info periodically to aid in debugging future flaky tests
-	go lib.LogStatusPeriodically(s.T(), s.Ctx, s.Log, s.Client, 5*time.Second)
+	go lib.LogStatusPeriodically(s.T(), s.HelperCtx, s.Log, s.Client, 5*time.Second)
 }
 
 func (s *BaseSuite) TearDownTest() {
 	s.Log.Info().Msg("================> Start TearDownTest")
+	s.stopHelpers() // cancel before stopping network to ensure helper goroutines are stopped
 	s.Net.Remove()
 	s.cancel()
 	s.Log.Info().Msg("================> Finish TearDownTest")
@@ -159,9 +167,9 @@ func (s *BaseSuite) AwaitEpochPhase(ctx context.Context, expectedEpoch uint64, e
 	condition := func() bool {
 		snapshot, err := s.Client.GetLatestProtocolSnapshot(ctx)
 		require.NoError(s.T(), err)
-
-		actualEpoch, err = snapshot.Epochs().Current().Counter()
+		epoch, err := snapshot.Epochs().Current()
 		require.NoError(s.T(), err)
+		actualEpoch = epoch.Counter()
 		actualPhase, err = snapshot.EpochPhase()
 		require.NoError(s.T(), err)
 
@@ -205,9 +213,9 @@ func (s *BaseSuite) AssertInEpoch(ctx context.Context, expectedEpoch uint64) {
 // CurrentEpoch returns the current epoch counter (as of the latest finalized block).
 func (s *BaseSuite) CurrentEpoch(ctx context.Context) uint64 {
 	snapshot := s.GetLatestProtocolSnapshot(ctx)
-	counter, err := snapshot.Epochs().Current().Counter()
+	epoch, err := snapshot.Epochs().Current()
 	require.NoError(s.T(), err)
-	return counter
+	return epoch.Counter()
 }
 
 // GetLatestProtocolSnapshot returns the protocol snapshot as of the latest finalized block.

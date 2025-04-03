@@ -102,7 +102,13 @@ func NewCadenceValueDiffReporter(
 	}
 }
 
-func (dr *CadenceValueDiffReporter) DiffStates(oldRegs, newRegs registers.Registers, domains []string) {
+type IsValueIncludedFunc func(address common.Address, domain common.StorageDomain, key any) bool
+
+func (dr *CadenceValueDiffReporter) DiffStates(
+	oldRegs, newRegs registers.Registers,
+	domains []common.StorageDomain,
+	isValueIncluded IsValueIncludedFunc,
+) {
 
 	oldStorage := newReadonlyStorage(oldRegs)
 
@@ -136,65 +142,6 @@ func (dr *CadenceValueDiffReporter) DiffStates(oldRegs, newRegs registers.Regist
 		return
 	}
 
-	if oldRegs.Count() > minLargeAccountRegisterCount {
-		// Add concurrency to diff domains
-		var g errgroup.Group
-
-		// NOTE: preload storage map in the same goroutine
-		for _, domain := range domains {
-			_ = oldStorage.GetStorageMap(dr.address, domain, false)
-			_ = newStorage.GetStorageMap(dr.address, domain, false)
-		}
-
-		// Create goroutine to diff storage domain
-		g.Go(func() (err error) {
-			oldRuntime, err := newReadonlyStorageRuntimeWithStorage(oldStorage, oldRegs.Count())
-			if err != nil {
-				return fmt.Errorf("failed to create runtime for old registers: %s", err)
-			}
-
-			newRuntime, err := newReadonlyStorageRuntimeWithStorage(newStorage, newRegs.Count())
-			if err != nil {
-				return fmt.Errorf("failed to create runtime for new registers: %s", err)
-			}
-
-			dr.diffDomain(oldRuntime, newRuntime, common.PathDomainStorage.Identifier())
-			return nil
-		})
-
-		// Create goroutine to diff other domains
-		g.Go(func() (err error) {
-			oldRuntime, err := newReadonlyStorageRuntimeWithStorage(oldStorage, oldRegs.Count())
-			if err != nil {
-				return fmt.Errorf("failed to create runtime for old registers: %s", err)
-			}
-
-			newRuntime, err := newReadonlyStorageRuntimeWithStorage(newStorage, oldRegs.Count())
-			if err != nil {
-				return fmt.Errorf("failed to create runtime for new registers: %s", err)
-			}
-
-			for _, domain := range domains {
-				if domain != common.PathDomainStorage.Identifier() {
-					dr.diffDomain(oldRuntime, newRuntime, domain)
-				}
-			}
-			return nil
-		})
-
-		err = g.Wait()
-		if err != nil {
-			dr.reportWriter.Write(
-				diffError{
-					Address: dr.address.Hex(),
-					Kind:    diffErrorKindString[abortErrorKind],
-					Msg:     err.Error(),
-				})
-		}
-
-		return
-	}
-
 	// Skip goroutine overhead for smaller accounts
 	oldRuntime, err := newReadonlyStorageRuntimeWithStorage(oldStorage, oldRegs.Count())
 	if err != nil {
@@ -219,21 +166,22 @@ func (dr *CadenceValueDiffReporter) DiffStates(oldRegs, newRegs registers.Regist
 	}
 
 	for _, domain := range domains {
-		dr.diffDomain(oldRuntime, newRuntime, domain)
+		dr.diffDomain(oldRuntime, newRuntime, domain, isValueIncluded)
 	}
 }
 
 func (dr *CadenceValueDiffReporter) diffDomain(
 	oldRuntime *readonlyStorageRuntime,
 	newRuntime *readonlyStorageRuntime,
-	domain string,
+	domain common.StorageDomain,
+	isValueIncluded IsValueIncludedFunc,
 ) {
 	defer func() {
 		if r := recover(); r != nil {
 			dr.reportWriter.Write(
 				diffProblem{
 					Address: dr.address.Hex(),
-					Domain:  domain,
+					Domain:  domain.Identifier(),
 					Kind:    diffErrorKindString[abortErrorKind],
 					Msg: fmt.Sprintf(
 						"panic while diffing storage maps: %s",
@@ -244,8 +192,8 @@ func (dr *CadenceValueDiffReporter) diffDomain(
 		}
 	}()
 
-	oldStorageMap := oldRuntime.Storage.GetStorageMap(dr.address, domain, false)
-	newStorageMap := newRuntime.Storage.GetStorageMap(dr.address, domain, false)
+	oldStorageMap := oldRuntime.Storage.GetDomainStorageMap(oldRuntime.Interpreter, dr.address, domain, false)
+	newStorageMap := newRuntime.Storage.GetDomainStorageMap(newRuntime.Interpreter, dr.address, domain, false)
 
 	if oldStorageMap == nil && newStorageMap == nil {
 		// No storage maps for this domain.
@@ -256,7 +204,7 @@ func (dr *CadenceValueDiffReporter) diffDomain(
 		dr.reportWriter.Write(
 			difference{
 				Address: dr.address.Hex(),
-				Domain:  domain,
+				Domain:  domain.Identifier(),
 				Kind:    diffKindString[storageMapExistDiffKind],
 				Msg: fmt.Sprintf(
 					"old storage map doesn't exist, new storage map has %d elements with keys %v",
@@ -272,7 +220,7 @@ func (dr *CadenceValueDiffReporter) diffDomain(
 		dr.reportWriter.Write(
 			difference{
 				Address: dr.address.Hex(),
-				Domain:  domain,
+				Domain:  domain.Identifier(),
 				Kind:    diffKindString[storageMapExistDiffKind],
 				Msg: fmt.Sprintf(
 					"new storage map doesn't exist, old storage map has %d elements with keys %v",
@@ -294,7 +242,7 @@ func (dr *CadenceValueDiffReporter) diffDomain(
 		dr.reportWriter.Write(
 			difference{
 				Address: dr.address.Hex(),
-				Domain:  domain,
+				Domain:  domain.Identifier(),
 				Kind:    diffKindString[storageMapKeyDiffKind],
 				Msg: fmt.Sprintf(
 					"old storage map has %d elements with keys %v, that are not present in new storge map",
@@ -309,7 +257,7 @@ func (dr *CadenceValueDiffReporter) diffDomain(
 		dr.reportWriter.Write(
 			difference{
 				Address: dr.address.Hex(),
-				Domain:  domain,
+				Domain:  domain.Identifier(),
 				Kind:    diffKindString[storageMapKeyDiffKind],
 				Msg: fmt.Sprintf(
 					"new storage map has %d elements with keys %v, that are not present in old storge map",
@@ -325,7 +273,7 @@ func (dr *CadenceValueDiffReporter) diffDomain(
 
 	getValues := func(key any) (interpreter.Value, interpreter.Value, *util.Trace, bool) {
 
-		trace := util.NewTrace(fmt.Sprintf("%s[%v]", domain, key))
+		trace := util.NewTrace(fmt.Sprintf("%s[%v]", domain.Identifier(), key))
 
 		var mapKey interpreter.StorageMapKey
 
@@ -346,7 +294,7 @@ func (dr *CadenceValueDiffReporter) diffDomain(
 			dr.reportWriter.Write(
 				diffProblem{
 					Address: dr.address.Hex(),
-					Domain:  domain,
+					Domain:  domain.Identifier(),
 					Kind:    diffErrorKindString[storageMapKeyNotImplementingStorageMapKeyDiffErrorKind],
 					Trace:   trace.String(),
 					Msg: fmt.Sprintf(
@@ -386,7 +334,7 @@ func (dr *CadenceValueDiffReporter) diffDomain(
 				dr.reportWriter.Write(
 					difference{
 						Address:            dr.address.Hex(),
-						Domain:             domain,
+						Domain:             domain.Identifier(),
 						Kind:               diffKindString[storageMapValueDiffKind],
 						Msg:                "storage map elements are different",
 						Trace:              trace.String(),
@@ -399,132 +347,47 @@ func (dr *CadenceValueDiffReporter) diffDomain(
 		}
 	}
 
-	// Skip goroutine overhead for non-storage domain and small accounts.
-	if domain != common.PathDomainStorage.Identifier() ||
-		oldRuntime.PayloadCount < minLargeAccountRegisterCount ||
-		len(sharedKeys) == 1 {
-
-		for _, key := range sharedKeys {
-			oldValue, newValue, trace, canDiff := getValues(key)
-			if canDiff {
-				diffValues(
-					oldRuntime.Interpreter,
-					oldValue,
-					newRuntime.Interpreter,
-					newValue,
-					trace,
-				)
-			}
-		}
-		return
-	}
-
 	startTime := time.Now()
 
-	log.Info().Msgf(
-		"Diffing %x storage domain containing %d elements (%d payloads) ...",
-		dr.address[:],
-		len(sharedKeys),
-		oldRuntime.PayloadCount,
-	)
+	isLargeAccount := oldRuntime.PayloadCount > minLargeAccountRegisterCount
 
-	// Diffing storage domain in large account
-
-	type job struct {
-		oldValue interpreter.Value
-		newValue interpreter.Value
-		trace    *util.Trace
-	}
-
-	nWorkers := dr.nWorkers
-	if len(sharedKeys) < nWorkers {
-		nWorkers = len(sharedKeys)
-	}
-
-	jobs := make(chan job, nWorkers)
-
-	var g errgroup.Group
-
-	for i := 0; i < nWorkers; i++ {
-
-		g.Go(func() error {
-			oldInterpreter, err := interpreter.NewInterpreter(
-				nil,
-				nil,
-				&interpreter.Config{
-					Storage: oldRuntime.Storage,
-				},
-			)
-			if err != nil {
-				dr.reportWriter.Write(
-					diffError{
-						Address: dr.address.Hex(),
-						Kind:    diffErrorKindString[abortErrorKind],
-						Msg:     fmt.Sprintf("failed to create interpreter for old registers: %s", err),
-					})
-				return nil
-			}
-
-			newInterpreter, err := interpreter.NewInterpreter(
-				nil,
-				nil,
-				&interpreter.Config{
-					Storage: newRuntime.Storage,
-				},
-			)
-			if err != nil {
-				dr.reportWriter.Write(
-					diffError{
-						Address: dr.address.Hex(),
-						Kind:    diffErrorKindString[abortErrorKind],
-						Msg:     fmt.Sprintf("failed to create interpreter for new registers: %s", err),
-					})
-				return nil
-			}
-
-			for job := range jobs {
-				diffValues(oldInterpreter, job.oldValue, newInterpreter, job.newValue, job.trace)
-			}
-
-			return nil
-		})
-	}
-
-	// Launch goroutine to send account registers to jobs channel
-	go func() {
-		defer close(jobs)
-
-		for _, key := range sharedKeys {
-			oldValue, newValue, trace, canDiff := getValues(key)
-			if canDiff {
-				jobs <- job{
-					oldValue: oldValue,
-					newValue: newValue,
-					trace:    trace,
-				}
-			}
-		}
-	}()
-
-	// Wait for workers
-	err := g.Wait()
-	if err != nil {
-		dr.reportWriter.Write(
-			diffError{
-				Address: dr.address.Hex(),
-				Kind:    diffErrorKindString[abortErrorKind],
-				Msg:     fmt.Sprintf("failed to diff domain %s: %s", domain, err),
-			})
-	}
-
-	log.Info().
-		Msgf(
-			"Finished diffing %x storage domain containing %d elements (%d payloads) in %s",
+	if isLargeAccount {
+		log.Info().Msgf(
+			"Diffing %x storage domain containing %d elements (%d payloads) ...",
 			dr.address[:],
 			len(sharedKeys),
 			oldRuntime.PayloadCount,
-			time.Since(startTime),
 		)
+	}
+
+	// Diffing storage domain
+
+	for _, key := range sharedKeys {
+		if !isValueIncluded(dr.address, domain, key) {
+			continue
+		}
+		oldValue, newValue, trace, canDiff := getValues(key)
+		if canDiff {
+			diffValues(
+				oldRuntime.Interpreter,
+				oldValue,
+				newRuntime.Interpreter,
+				newValue,
+				trace,
+			)
+		}
+	}
+
+	if isLargeAccount {
+		log.Info().
+			Msgf(
+				"Finished diffing %x storage domain containing %d elements (%d payloads) in %s",
+				dr.address[:],
+				len(sharedKeys),
+				oldRuntime.PayloadCount,
+				time.Since(startTime),
+			)
+	}
 }
 
 func (dr *CadenceValueDiffReporter) diffValues(
@@ -532,7 +395,7 @@ func (dr *CadenceValueDiffReporter) diffValues(
 	v interpreter.Value,
 	otherInterpreter *interpreter.Interpreter,
 	other interpreter.Value,
-	domain string,
+	domain common.StorageDomain,
 	trace *util.Trace,
 ) (hasDifference bool) {
 	switch v := v.(type) {
@@ -558,7 +421,7 @@ func (dr *CadenceValueDiffReporter) diffEquatable(
 	v interpreter.Value,
 	otherInterpreter *interpreter.Interpreter,
 	other interpreter.Value,
-	domain string,
+	domain common.StorageDomain,
 	trace *util.Trace,
 ) (hasDifference bool) {
 
@@ -567,7 +430,7 @@ func (dr *CadenceValueDiffReporter) diffEquatable(
 			dr.reportWriter.Write(
 				diffProblem{
 					Address: dr.address.Hex(),
-					Domain:  domain,
+					Domain:  domain.Identifier(),
 					Kind:    diffErrorKindString[abortErrorKind],
 					Trace:   trace.String(),
 					Msg: fmt.Sprintf(
@@ -584,7 +447,7 @@ func (dr *CadenceValueDiffReporter) diffEquatable(
 		dr.reportWriter.Write(
 			diffProblem{
 				Address: dr.address.Hex(),
-				Domain:  domain,
+				Domain:  domain.Identifier(),
 				Kind:    diffErrorKindString[cadenceValueNotImplementEquatableValueDiffErrorKind],
 				Trace:   trace.String(),
 				Msg: fmt.Sprintf(
@@ -600,7 +463,7 @@ func (dr *CadenceValueDiffReporter) diffEquatable(
 		dr.reportWriter.Write(
 			difference{
 				Address:            dr.address.Hex(),
-				Domain:             domain,
+				Domain:             domain.Identifier(),
 				Kind:               diffKindString[cadenceValueDiffKind],
 				Msg:                fmt.Sprintf("values differ: %T vs %T", oldValue, other),
 				Trace:              trace.String(),
@@ -620,7 +483,7 @@ func (dr *CadenceValueDiffReporter) diffCadenceSomeValue(
 	v *interpreter.SomeValue,
 	otherInterpreter *interpreter.Interpreter,
 	other interpreter.Value,
-	domain string,
+	domain common.StorageDomain,
 	trace *util.Trace,
 ) (hasDifference bool) {
 
@@ -629,7 +492,7 @@ func (dr *CadenceValueDiffReporter) diffCadenceSomeValue(
 			dr.reportWriter.Write(
 				diffProblem{
 					Address: dr.address.Hex(),
-					Domain:  domain,
+					Domain:  domain.Identifier(),
 					Kind:    diffErrorKindString[abortErrorKind],
 					Trace:   trace.String(),
 					Msg: fmt.Sprintf(
@@ -646,7 +509,7 @@ func (dr *CadenceValueDiffReporter) diffCadenceSomeValue(
 		dr.reportWriter.Write(
 			difference{
 				Address: dr.address.Hex(),
-				Domain:  domain,
+				Domain:  domain.Identifier(),
 				Kind:    diffKindString[cadenceValueTypeDiffKind],
 				Trace:   trace.String(),
 				Msg:     fmt.Sprintf("types differ: %T != %T", v, other),
@@ -673,7 +536,7 @@ func (dr *CadenceValueDiffReporter) diffCadenceArrayValue(
 	v *interpreter.ArrayValue,
 	otherInterpreter *interpreter.Interpreter,
 	other interpreter.Value,
-	domain string,
+	domain common.StorageDomain,
 	trace *util.Trace,
 ) (hasDifference bool) {
 
@@ -682,7 +545,7 @@ func (dr *CadenceValueDiffReporter) diffCadenceArrayValue(
 			dr.reportWriter.Write(
 				diffProblem{
 					Address: dr.address.Hex(),
-					Domain:  domain,
+					Domain:  domain.Identifier(),
 					Kind:    diffErrorKindString[abortErrorKind],
 					Trace:   trace.String(),
 					Msg: fmt.Sprintf(
@@ -699,7 +562,7 @@ func (dr *CadenceValueDiffReporter) diffCadenceArrayValue(
 		dr.reportWriter.Write(
 			difference{
 				Address: dr.address.Hex(),
-				Domain:  domain,
+				Domain:  domain.Identifier(),
 				Kind:    diffKindString[cadenceValueTypeDiffKind],
 				Trace:   trace.String(),
 				Msg:     fmt.Sprintf("types differ: %T != %T", v, other),
@@ -713,7 +576,7 @@ func (dr *CadenceValueDiffReporter) diffCadenceArrayValue(
 		dr.reportWriter.Write(
 			difference{
 				Address: dr.address.Hex(),
-				Domain:  domain,
+				Domain:  domain.Identifier(),
 				Kind:    diffKindString[cadenceValueStaticTypeDiffKind],
 				Trace:   trace.String(),
 				Msg:     fmt.Sprintf("array static types differ: nil != %s", otherArray.Type),
@@ -726,7 +589,7 @@ func (dr *CadenceValueDiffReporter) diffCadenceArrayValue(
 		dr.reportWriter.Write(
 			difference{
 				Address: dr.address.Hex(),
-				Domain:  domain,
+				Domain:  domain.Identifier(),
 				Kind:    diffKindString[cadenceValueStaticTypeDiffKind],
 				Trace:   trace.String(),
 				Msg:     fmt.Sprintf("array static types differ: %s != nil", v.Type),
@@ -739,7 +602,7 @@ func (dr *CadenceValueDiffReporter) diffCadenceArrayValue(
 		dr.reportWriter.Write(
 			difference{
 				Address: dr.address.Hex(),
-				Domain:  domain,
+				Domain:  domain.Identifier(),
 				Kind:    diffKindString[cadenceValueStaticTypeDiffKind],
 				Trace:   trace.String(),
 				Msg:     fmt.Sprintf("array static types differ: %s != %s", v.Type, otherArray.Type),
@@ -752,7 +615,7 @@ func (dr *CadenceValueDiffReporter) diffCadenceArrayValue(
 
 		d := difference{
 			Address: dr.address.Hex(),
-			Domain:  domain,
+			Domain:  domain.Identifier(),
 			Kind:    diffKindString[cadenceValueDiffKind],
 			Trace:   trace.String(),
 			Msg:     fmt.Sprintf("array counts differ: %d != %d", count, otherArray.Count()),
@@ -793,7 +656,7 @@ func (dr *CadenceValueDiffReporter) diffCadenceCompositeValue(
 	v *interpreter.CompositeValue,
 	otherInterpreter *interpreter.Interpreter,
 	other interpreter.Value,
-	domain string,
+	domain common.StorageDomain,
 	trace *util.Trace,
 ) (hasDifference bool) {
 
@@ -802,7 +665,7 @@ func (dr *CadenceValueDiffReporter) diffCadenceCompositeValue(
 			dr.reportWriter.Write(
 				diffProblem{
 					Address: dr.address.Hex(),
-					Domain:  domain,
+					Domain:  domain.Identifier(),
 					Kind:    diffErrorKindString[abortErrorKind],
 					Trace:   trace.String(),
 					Msg: fmt.Sprintf(
@@ -819,7 +682,7 @@ func (dr *CadenceValueDiffReporter) diffCadenceCompositeValue(
 		dr.reportWriter.Write(
 			difference{
 				Address: dr.address.Hex(),
-				Domain:  domain,
+				Domain:  domain.Identifier(),
 				Kind:    diffKindString[cadenceValueTypeDiffKind],
 				Trace:   trace.String(),
 				Msg:     fmt.Sprintf("types differ: %T != %T", v, other),
@@ -833,7 +696,7 @@ func (dr *CadenceValueDiffReporter) diffCadenceCompositeValue(
 		dr.reportWriter.Write(
 			difference{
 				Address: dr.address.Hex(),
-				Domain:  domain,
+				Domain:  domain.Identifier(),
 				Kind:    diffKindString[cadenceValueStaticTypeDiffKind],
 				Trace:   trace.String(),
 				Msg: fmt.Sprintf(
@@ -849,7 +712,7 @@ func (dr *CadenceValueDiffReporter) diffCadenceCompositeValue(
 		dr.reportWriter.Write(
 			difference{
 				Address: dr.address.Hex(),
-				Domain:  domain,
+				Domain:  domain.Identifier(),
 				Kind:    diffKindString[cadenceValueStaticTypeDiffKind],
 				Trace:   trace.String(),
 				Msg: fmt.Sprintf(
@@ -881,7 +744,7 @@ func (dr *CadenceValueDiffReporter) diffCadenceCompositeValue(
 		dr.reportWriter.Write(
 			difference{
 				Address: dr.address.Hex(),
-				Domain:  domain,
+				Domain:  domain.Identifier(),
 				Kind:    diffKindString[cadenceValueDiffKind],
 				Trace:   trace.String(),
 				Msg: fmt.Sprintf(
@@ -899,7 +762,7 @@ func (dr *CadenceValueDiffReporter) diffCadenceCompositeValue(
 		dr.reportWriter.Write(
 			difference{
 				Address: dr.address.Hex(),
-				Domain:  domain,
+				Domain:  domain.Identifier(),
 				Kind:    diffKindString[cadenceValueDiffKind],
 				Trace:   trace.String(),
 				Msg: fmt.Sprintf(
@@ -937,7 +800,7 @@ func (dr *CadenceValueDiffReporter) diffCadenceDictionaryValue(
 	v *interpreter.DictionaryValue,
 	otherInterpreter *interpreter.Interpreter,
 	other interpreter.Value,
-	domain string,
+	domain common.StorageDomain,
 	trace *util.Trace,
 ) (hasDifference bool) {
 
@@ -946,7 +809,7 @@ func (dr *CadenceValueDiffReporter) diffCadenceDictionaryValue(
 			dr.reportWriter.Write(
 				diffProblem{
 					Address: dr.address.Hex(),
-					Domain:  domain,
+					Domain:  domain.Identifier(),
 					Kind:    diffErrorKindString[abortErrorKind],
 					Trace:   trace.String(),
 					Msg: fmt.Sprintf(
@@ -963,7 +826,7 @@ func (dr *CadenceValueDiffReporter) diffCadenceDictionaryValue(
 		dr.reportWriter.Write(
 			difference{
 				Address: dr.address.Hex(),
-				Domain:  domain,
+				Domain:  domain.Identifier(),
 				Kind:    diffKindString[cadenceValueTypeDiffKind],
 				Trace:   trace.String(),
 				Msg:     fmt.Sprintf("types differ: %T != %T", v, other),
@@ -977,7 +840,7 @@ func (dr *CadenceValueDiffReporter) diffCadenceDictionaryValue(
 		dr.reportWriter.Write(
 			difference{
 				Address: dr.address.Hex(),
-				Domain:  domain,
+				Domain:  domain.Identifier(),
 				Kind:    diffKindString[cadenceValueStaticTypeDiffKind],
 				Trace:   trace.String(),
 				Msg: fmt.Sprintf(
@@ -1035,7 +898,7 @@ func (dr *CadenceValueDiffReporter) diffCadenceDictionaryValue(
 		dr.reportWriter.Write(
 			difference{
 				Address: dr.address.Hex(),
-				Domain:  domain,
+				Domain:  domain.Identifier(),
 				Kind:    diffKindString[cadenceValueDiffKind],
 				Trace:   trace.String(),
 				Msg: fmt.Sprintf(
@@ -1065,7 +928,7 @@ func (dr *CadenceValueDiffReporter) diffCadenceDictionaryValue(
 			dr.reportWriter.Write(
 				difference{
 					Address: dr.address.Hex(),
-					Domain:  domain,
+					Domain:  domain.Identifier(),
 					Kind:    diffKindString[cadenceValueDiffKind],
 					Trace:   trace.String(),
 					Msg: fmt.Sprintf(
@@ -1080,7 +943,7 @@ func (dr *CadenceValueDiffReporter) diffCadenceDictionaryValue(
 	return hasDifference
 }
 
-func getStorageMapKeys(storageMap *interpreter.StorageMap) []any {
+func getStorageMapKeys(storageMap *interpreter.DomainStorageMap) []any {
 	keys := make([]any, 0, storageMap.Count())
 
 	iter := storageMap.Iterator(nil)
@@ -1137,7 +1000,10 @@ func min(a, b int) int {
 
 func newReadonlyStorage(regs registers.Registers) *runtime.Storage {
 	ledger := &registers.ReadOnlyLedger{Registers: regs}
-	return runtime.NewStorage(ledger, nil)
+	config := runtime.StorageConfig{
+		StorageFormatV2Enabled: true,
+	}
+	return runtime.NewStorage(ledger, nil, config)
 }
 
 type readonlyStorageRuntime struct {

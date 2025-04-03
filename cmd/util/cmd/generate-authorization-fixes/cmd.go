@@ -11,7 +11,6 @@ import (
 	"github.com/onflow/cadence/common"
 	"github.com/onflow/cadence/interpreter"
 	"github.com/onflow/cadence/sema"
-	"github.com/onflow/cadence/stdlib"
 	"github.com/rs/zerolog/log"
 	"github.com/schollz/progressbar/v3"
 	"github.com/spf13/cobra"
@@ -334,9 +333,10 @@ func (g *AuthorizationFixGenerator) generateFixesForAccount(address common.Addre
 		log.Fatal().Err(err)
 	}
 
-	capabilityControllerStorage := mr.Storage.GetStorageMap(
+	capabilityControllerStorage := mr.Storage.GetDomainStorageMap(
+		mr.Interpreter,
 		address,
-		stdlib.CapabilityControllerStorageDomain,
+		common.StorageDomainCapabilityController,
 		false,
 	)
 	if capabilityControllerStorage == nil {

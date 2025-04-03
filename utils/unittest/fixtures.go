@@ -893,15 +893,14 @@ func WithBlock(block *flow.Block) func(*flow.ExecutionResult) {
 	return func(result *flow.ExecutionResult) {
 		startState := result.Chunks[0].StartState // retain previous start state in case it was user-defined
 		result.BlockID = blockID
-		result.Chunks = ChunkListFixture(uint(chunks), blockID)
-		result.Chunks[0].StartState = startState // set start state to value before update
+		result.Chunks = ChunkListFixture(uint(chunks), blockID, startState)
 		result.PreviousResultID = previousResultID
 	}
 }
 
 func WithChunks(n uint) func(*flow.ExecutionResult) {
 	return func(result *flow.ExecutionResult) {
-		result.Chunks = ChunkListFixture(n, result.BlockID)
+		result.Chunks = ChunkListFixture(n, result.BlockID, StateCommitmentFixture())
 	}
 }
 
@@ -971,7 +970,7 @@ func ExecutionResultFixture(opts ...func(*flow.ExecutionResult)) *flow.Execution
 	result := &flow.ExecutionResult{
 		PreviousResultID: IdentifierFixture(),
 		BlockID:          executedBlockID,
-		Chunks:           ChunkListFixture(2, executedBlockID),
+		Chunks:           ChunkListFixture(2, executedBlockID, StateCommitmentFixture()),
 		ExecutionDataID:  IdentifierFixture(),
 	}
 
@@ -1243,14 +1242,14 @@ func WithRandomPublicKeys() func(*flow.Identity) {
 	}
 }
 
-// WithAllRoles can be used used to ensure an IdentityList fixtures contains
+// WithAllRoles can be used to ensure an IdentityList fixtures contains
 // all the roles required for a valid genesis block.
 func WithAllRoles() func(*flow.Identity) {
 	return WithAllRolesExcept()
 }
 
-// Same as above, but omitting a certain role for cases where we are manually
-// setting up nodes or a particular role.
+// WithAllRolesExcept is used to ensure an IdentityList fixture contains all roles
+// except omitting a certain role, for cases where we are manually setting up nodes.
 func WithAllRolesExcept(except ...flow.Role) func(*flow.Identity) {
 	i := 0
 	roles := flow.Roles()
@@ -1333,12 +1332,13 @@ func WithServiceEventCount(count *uint16) func(*flow.Chunk) {
 func ChunkFixture(
 	blockID flow.Identifier,
 	collectionIndex uint,
+	startState flow.StateCommitment,
 	opts ...func(*flow.Chunk),
 ) *flow.Chunk {
 	chunk := &flow.Chunk{
 		ChunkBody: flow.ChunkBody{
 			CollectionIndex:      collectionIndex,
-			StartState:           StateCommitmentFixture(),
+			StartState:           startState,
 			EventCollection:      IdentifierFixture(),
 			ServiceEventCount:    PtrTo[uint16](0),
 			TotalComputationUsed: 4200,
@@ -1356,12 +1356,13 @@ func ChunkFixture(
 	return chunk
 }
 
-func ChunkListFixture(n uint, blockID flow.Identifier, opts ...func(*flow.Chunk)) flow.ChunkList {
+func ChunkListFixture(n uint, blockID flow.Identifier, startState flow.StateCommitment, opts ...func(*flow.Chunk)) flow.ChunkList {
 	chunks := make([]*flow.Chunk, 0, n)
 	for i := uint64(0); i < uint64(n); i++ {
-		chunk := ChunkFixture(blockID, uint(i), opts...)
+		chunk := ChunkFixture(blockID, uint(i), startState, opts...)
 		chunk.Index = i
 		chunks = append(chunks, chunk)
+		startState = chunk.EndState
 	}
 	return chunks
 }
@@ -1540,7 +1541,7 @@ func RegisterIDFixture() flow.RegisterID {
 
 // VerifiableChunkDataFixture returns a complete verifiable chunk with an
 // execution receipt referencing the block/collections.
-func VerifiableChunkDataFixture(chunkIndex uint64) *verification.VerifiableChunkData {
+func VerifiableChunkDataFixture(chunkIndex uint64, opts ...func(*flow.Header)) (*verification.VerifiableChunkData, *flow.Block) {
 
 	guarantees := make([]*flow.CollectionGuarantee, 0)
 
@@ -1557,6 +1558,9 @@ func VerifiableChunkDataFixture(chunkIndex uint64) *verification.VerifiableChunk
 		Seals:      nil,
 	}
 	header := BlockHeaderFixture()
+	for _, opt := range opts {
+		opt(header)
+	}
 	header.PayloadHash = payload.Hash()
 
 	block := flow.Block{
@@ -1596,13 +1600,17 @@ func VerifiableChunkDataFixture(chunkIndex uint64) *verification.VerifiableChunk
 		endState = result.Chunks[index+1].StartState
 	}
 
+	chunkDataPack := ChunkDataPackFixture(chunk.ID(), func(c *flow.ChunkDataPack) {
+		c.Collection = &col
+	})
+
 	return &verification.VerifiableChunkData{
 		Chunk:         &chunk,
 		Header:        block.Header,
 		Result:        &result,
-		ChunkDataPack: ChunkDataPackFixture(result.ID()),
+		ChunkDataPack: chunkDataPack,
 		EndState:      endState,
-	}
+	}, &block
 }
 
 // ChunkDataResponseMsgFixture creates a chunk data response message with a single-transaction collection, and random chunk ID.
@@ -1768,6 +1776,15 @@ func ChunkDataPacksFixture(
 	}
 
 	return chunkDataPacks
+}
+
+func ChunkDataPacksFixtureAndResult() ([]*flow.ChunkDataPack, *flow.ExecutionResult) {
+	result := ExecutionResultFixture()
+	cdps := make([]*flow.ChunkDataPack, 0, len(result.Chunks))
+	for _, c := range result.Chunks {
+		cdps = append(cdps, ChunkDataPackFixture(c.ID()))
+	}
+	return cdps, result
 }
 
 // SeedFixture returns a random []byte with length n
@@ -2321,7 +2338,10 @@ func SnapshotClusterByIndex(
 	clusterIndex uint,
 ) (protocol.Cluster, error) {
 	epochs := snapshot.Epochs()
-	epoch := epochs.Current()
+	epoch, err := epochs.Current()
+	if err != nil {
+		return nil, err
+	}
 	cluster, err := epoch.Cluster(clusterIndex)
 	if err != nil {
 		return nil, err

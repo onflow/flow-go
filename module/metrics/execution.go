@@ -20,6 +20,8 @@ type ExecutionCollector struct {
 	totalFailedTransactionsCounter          prometheus.Counter
 	lastExecutedBlockHeightGauge            prometheus.Gauge
 	lastFinalizedExecutedBlockHeightGauge   prometheus.Gauge
+	lastChunkDataPackPrunedHeightGauge      prometheus.Gauge
+	targetChunkDataPackPrunedHeightGauge    prometheus.Gauge
 	stateStorageDiskTotal                   prometheus.Gauge
 	storageStateCommitment                  prometheus.Gauge
 	checkpointSize                          prometheus.Gauge
@@ -83,7 +85,7 @@ type ExecutionCollector struct {
 	stateSyncActive                         prometheus.Gauge
 	blockDataUploadsInProgress              prometheus.Gauge
 	blockDataUploadsDuration                prometheus.Histogram
-	maxCollectionHeightData                 counters.StrictMonotonousCounter
+	maxCollectionHeightData                 counters.StrictMonotonicCounter
 	maxCollectionHeight                     prometheus.Gauge
 	computationResultUploadedCount          prometheus.Counter
 	computationResultUploadRetriedCount     prometheus.Counter
@@ -653,6 +655,20 @@ func NewExecutionCollector(tracer module.Tracer) *ExecutionCollector {
 			Help:      "the last height that was finalized and executed",
 		}),
 
+		lastChunkDataPackPrunedHeightGauge: promauto.NewGauge(prometheus.GaugeOpts{
+			Namespace: namespaceExecution,
+			Subsystem: subsystemRuntime,
+			Name:      "last_chunk_data_pack_pruned_height",
+			Help:      "the last height that was pruned for chunk data pack",
+		}),
+
+		targetChunkDataPackPrunedHeightGauge: promauto.NewGauge(prometheus.GaugeOpts{
+			Namespace: namespaceExecution,
+			Subsystem: subsystemRuntime,
+			Name:      "target_chunk_data_pack_pruned_height",
+			Help:      "the target height for pruning chunk data pack",
+		}),
+
 		stateStorageDiskTotal: promauto.NewGauge(prometheus.GaugeOpts{
 			Namespace: namespaceExecution,
 			Subsystem: subsystemStateStorage,
@@ -703,7 +719,7 @@ func NewExecutionCollector(tracer module.Tracer) *ExecutionCollector {
 			Help:      "the number of times a program was found in the cache",
 		}),
 
-		maxCollectionHeightData: counters.NewMonotonousCounter(0),
+		maxCollectionHeightData: counters.NewMonotonicCounter(0),
 
 		maxCollectionHeight: prometheus.NewGauge(prometheus.GaugeOpts{
 			Name:      "max_collection_height",
@@ -890,6 +906,15 @@ func (ec *ExecutionCollector) ExecutionLastExecutedBlockHeight(height uint64) {
 // ExecutionLastFinalizedExecutedBlockHeight reports last finalized executed block height
 func (ec *ExecutionCollector) ExecutionLastFinalizedExecutedBlockHeight(height uint64) {
 	ec.lastFinalizedExecutedBlockHeightGauge.Set(float64(height))
+}
+
+// ExecutionLastChunkDataPackPrunedHeight reports last chunk data pack pruned height
+func (ec *ExecutionCollector) ExecutionLastChunkDataPackPrunedHeight(height uint64) {
+	ec.lastChunkDataPackPrunedHeightGauge.Set(float64(height))
+}
+
+func (ec *ExecutionCollector) ExecutionTargetChunkDataPackPrunedHeight(height uint64) {
+	ec.targetChunkDataPackPrunedHeightGauge.Set(float64(height))
 }
 
 // ForestApproxMemorySize records approximate memory usage of forest (all in-memory trees)

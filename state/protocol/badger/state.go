@@ -20,10 +20,14 @@ import (
 	"github.com/onflow/flow-go/storage/badger/transaction"
 )
 
-// cachedHeader caches a block header and its ID.
-type cachedHeader struct {
-	id     flow.Identifier
-	header *flow.Header
+// cachedLatest caches both latest finalized and sealed block
+// since finalized block and sealed block are updated together atomically,
+// we can cache them together
+type cachedLatest struct {
+	finalizedID     flow.Identifier
+	finalizedHeader *flow.Header
+	sealedID        flow.Identifier
+	sealedHeader    *flow.Header
 }
 
 type State struct {
@@ -57,12 +61,10 @@ type State struct {
 	// Caution: A node that joined in a later epoch past the spork, the node will likely _not_
 	// know the spork's root block in full (though it will always know the height).
 	sporkRootBlockHeight uint64
-	// cachedLatestFinal is the *latest* finalized block header, which we can cache here,
+	// cachedLatest caches both the *latest* finalized header and sealed header,
 	// because the protocol state is solely responsible for updating it.
-	cachedLatestFinal *atomic.Pointer[cachedHeader]
-	// cachedLatestSealed is the *latest* sealed block headers, which we can cache here,
-	// because the protocol state is solely responsible for updating it.
-	cachedLatestSealed *atomic.Pointer[cachedHeader]
+	// finalized header and sealed header can be cached together since they are updated together atomically
+	cachedLatest *atomic.Pointer[cachedLatest]
 }
 
 var _ protocol.State = (*State)(nil)
@@ -586,12 +588,6 @@ func bootstrapSporkInfo(root protocol.Snapshot) func(*transaction.Tx) error {
 			return fmt.Errorf("could not insert spork root block height: %w", err)
 		}
 
-		version := params.ProtocolVersion()
-		err = operation.InsertProtocolVersion(version)(bdtx)
-		if err != nil {
-			return fmt.Errorf("could not insert protocol version: %w", err)
-		}
-
 		return nil
 	}
 }
@@ -718,21 +714,21 @@ func (state *State) Params() protocol.Params {
 // Sealed returns a snapshot for the latest sealed block. A latest sealed block
 // must always exist, so this function always returns a valid snapshot.
 func (state *State) Sealed() protocol.Snapshot {
-	cached := state.cachedLatestSealed.Load()
+	cached := state.cachedLatest.Load()
 	if cached == nil {
 		return invalid.NewSnapshotf("internal inconsistency: no cached sealed header")
 	}
-	return NewFinalizedSnapshot(state, cached.id, cached.header)
+	return NewFinalizedSnapshot(state, cached.sealedID, cached.sealedHeader)
 }
 
 // Final returns a snapshot for the latest finalized block. A latest finalized
 // block must always exist, so this function always returns a valid snapshot.
 func (state *State) Final() protocol.Snapshot {
-	cached := state.cachedLatestFinal.Load()
+	cached := state.cachedLatest.Load()
 	if cached == nil {
 		return invalid.NewSnapshotf("internal inconsistency: no cached final header")
 	}
-	return NewFinalizedSnapshot(state, cached.id, cached.header)
+	return NewFinalizedSnapshot(state, cached.finalizedID, cached.finalizedHeader)
 }
 
 // AtHeight returns a snapshot for the finalized block at the given height.
@@ -813,9 +809,8 @@ func newState(
 				protocolKVStoreSnapshots,
 				params,
 			),
-		versionBeacons:     versionBeacons,
-		cachedLatestFinal:  new(atomic.Pointer[cachedHeader]),
-		cachedLatestSealed: new(atomic.Pointer[cachedHeader]),
+		versionBeacons: versionBeacons,
+		cachedLatest:   new(atomic.Pointer[cachedLatest]),
 	}
 
 	// populate the protocol state cache
@@ -843,38 +838,19 @@ func IsBootstrapped(db *badger.DB) (bool, error) {
 // updateEpochMetrics update the `consensus_compliance_current_epoch_counter` and the
 // `consensus_compliance_current_epoch_phase` metric
 func updateEpochMetrics(metrics module.ComplianceMetrics, snap protocol.Snapshot) error {
-
-	// update epoch counter
-	counter, err := snap.Epochs().Current().Counter()
+	currentEpoch, err := snap.Epochs().Current()
 	if err != nil {
-		return fmt.Errorf("could not get current epoch counter: %w", err)
+		return fmt.Errorf("could not get current epoch: %w", err)
 	}
-	metrics.CurrentEpochCounter(counter)
-
-	// update epoch phase
-	phase, err := snap.EpochPhase()
-	if err != nil {
-		return fmt.Errorf("could not get current epoch counter: %w", err)
-	}
-	metrics.CurrentEpochPhase(phase)
-
-	currentEpochFinalView, err := snap.Epochs().Current().FinalView()
-	if err != nil {
-		return fmt.Errorf("could not update current epoch final view: %w", err)
-	}
-	metrics.CurrentEpochFinalView(currentEpochFinalView)
-
-	dkgPhase1FinalView, dkgPhase2FinalView, dkgPhase3FinalView, err := protocol.DKGPhaseViews(snap.Epochs().Current())
-	if err != nil {
-		return fmt.Errorf("could not get dkg phase final view: %w", err)
-	}
-
-	metrics.CurrentDKGPhaseViews(dkgPhase1FinalView, dkgPhase2FinalView, dkgPhase3FinalView)
+	metrics.CurrentEpochCounter(currentEpoch.Counter())
+	metrics.CurrentEpochFinalView(currentEpoch.FinalView())
+	metrics.CurrentDKGPhaseViews(currentEpoch.DKGPhase1FinalView(), currentEpoch.DKGPhase2FinalView(), currentEpoch.DKGPhase3FinalView())
 
 	epochProtocolState, err := snap.EpochProtocolState()
 	if err != nil {
 		return fmt.Errorf("could not get epoch protocol state: %w", err)
 	}
+	metrics.CurrentEpochPhase(epochProtocolState.EpochPhase()) // update epoch phase
 	// notify whether epoch fallback mode is active
 	if epochProtocolState.EpochFallbackTriggered() {
 		metrics.EpochFallbackModeTriggered()
@@ -910,32 +886,30 @@ func (state *State) populateCache() error {
 		if err != nil {
 			return fmt.Errorf("could not lookup finalized height: %w", err)
 		}
-		var cachedFinalHeader cachedHeader
-		err = operation.LookupBlockHeight(finalizedHeight, &cachedFinalHeader.id)(tx)
+		var cachedLatest cachedLatest
+		err = operation.LookupBlockHeight(finalizedHeight, &cachedLatest.finalizedID)(tx)
 		if err != nil {
 			return fmt.Errorf("could not lookup finalized id (height=%d): %w", finalizedHeight, err)
 		}
-		cachedFinalHeader.header, err = state.headers.ByBlockID(cachedFinalHeader.id)
+		cachedLatest.finalizedHeader, err = state.headers.ByBlockID(cachedLatest.finalizedID)
 		if err != nil {
-			return fmt.Errorf("could not get finalized block (id=%x): %w", cachedFinalHeader.id, err)
+			return fmt.Errorf("could not get finalized block (id=%x): %w", cachedLatest.finalizedID, err)
 		}
-		state.cachedLatestFinal.Store(&cachedFinalHeader)
 		// sealed header
 		var sealedHeight uint64
 		err = operation.RetrieveSealedHeight(&sealedHeight)(tx)
 		if err != nil {
 			return fmt.Errorf("could not lookup sealed height: %w", err)
 		}
-		var cachedSealedHeader cachedHeader
-		err = operation.LookupBlockHeight(sealedHeight, &cachedSealedHeader.id)(tx)
+		err = operation.LookupBlockHeight(sealedHeight, &cachedLatest.sealedID)(tx)
 		if err != nil {
 			return fmt.Errorf("could not lookup sealed id (height=%d): %w", sealedHeight, err)
 		}
-		cachedSealedHeader.header, err = state.headers.ByBlockID(cachedSealedHeader.id)
+		cachedLatest.sealedHeader, err = state.headers.ByBlockID(cachedLatest.sealedID)
 		if err != nil {
-			return fmt.Errorf("could not get sealed block (id=%x): %w", cachedSealedHeader.id, err)
+			return fmt.Errorf("could not get sealed block (id=%x): %w", cachedLatest.sealedID, err)
 		}
-		state.cachedLatestSealed.Store(&cachedSealedHeader)
+		state.cachedLatest.Store(&cachedLatest)
 
 		state.finalizedRootHeight = state.Params().FinalizedRoot().Height
 		state.sealedRootHeight = state.Params().SealedRoot().Height

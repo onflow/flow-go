@@ -13,10 +13,10 @@ permissions:
   contents: read
 
 env:
+  GO_VERSION: "1.23"
   BIGQUERY_DATASET: dev_src_flow_test_metrics
   BIGQUERY_TABLE: skipped_tests
   BIGQUERY_TABLE2: test_results
-  GO_VERSION: "1.22"
   SKIPPED_TESTS_FILE: skipped-tests
   RESULTS_FILE: test-results
   COMMIT_SHA: ${{ github.sha }}
@@ -37,9 +37,9 @@ jobs:
       dynamic-matrix: ${{ steps.set-test-matrix.outputs.dynamicMatrix }}
     steps:
       - name: Checkout repo
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
       - name: Setup Go
-        uses: actions/setup-go@v4
+        uses: actions/setup-go@v5
         with:
           go-version: ${{ env.GO_VERSION }}
           cache: true
@@ -55,12 +55,12 @@ jobs:
       matrix:
         targets: ${{ fromJSON(needs.create-dynamic-test-matrix.outputs.dynamic-matrix)}}
     # need to set image explicitly due to GitHub logging issue as described in https://github.com/onflow/flow-go/pull/3087#issuecomment-1234383202
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-latest
     steps:
       - name: Checkout repo
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
       - name: Setup Go
-        uses: actions/setup-go@v4
+        uses: actions/setup-go@v5
         with:
           go-version: ${{ env.GO_VERSION }}
           cache: true
@@ -100,9 +100,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repo
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
       - name: Setup Go
-        uses: actions/setup-go@v4
+        uses: actions/setup-go@v5
         with:
           go-version: ${{ env.GO_VERSION }}
           cache: true
@@ -160,12 +160,12 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repo
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           # all tags are needed for integration tests
           fetch-depth: 0
       - name: Setup Go
-        uses: actions/setup-go@v4
+        uses: actions/setup-go@v5
         with:
           go-version: ${{ env.GO_VERSION }}
           cache: true

@@ -2,8 +2,6 @@ package data_providers
 
 import (
 	"context"
-	"fmt"
-	"strconv"
 	"testing"
 	"time"
 
@@ -12,13 +10,14 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
-	"github.com/onflow/flow-go/access"
 	accessmock "github.com/onflow/flow-go/access/mock"
 	mockcommonmodels "github.com/onflow/flow-go/engine/access/rest/common/models/mock"
-	"github.com/onflow/flow-go/engine/access/rest/websockets/models"
+	"github.com/onflow/flow-go/engine/access/rest/websockets/data_providers/models"
+	wsmodels "github.com/onflow/flow-go/engine/access/rest/websockets/models"
 	"github.com/onflow/flow-go/engine/access/state_stream"
 	ssmock "github.com/onflow/flow-go/engine/access/state_stream/mock"
 	"github.com/onflow/flow-go/engine/access/subscription"
+	accessmodel "github.com/onflow/flow-go/model/access"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/utils/unittest"
 
@@ -90,48 +89,18 @@ func (s *TransactionStatusesProviderSuite) TestTransactionStatusesDataProvider_H
 	)
 }
 
-func (s *TransactionStatusesProviderSuite) subscribeTransactionStatusesDataProviderTestCases(backendResponses []*access.TransactionResult) []testType {
-	expectedResponses := s.expectedTransactionStatusesResponses(backendResponses)
+func (s *TransactionStatusesProviderSuite) subscribeTransactionStatusesDataProviderTestCases(backendResponses []*accessmodel.TransactionResult) []testType {
+	expectedResponses := s.expectedTransactionStatusesResponses(backendResponses, TransactionStatusesTopic)
 
 	return []testType{
 		{
-			name: "SubscribeTransactionStatusesFromStartBlockID happy path",
-			arguments: models.Arguments{
-				"start_block_id": s.rootBlock.ID().String(),
+			name: "SubscribeTransactionStatuses happy path",
+			arguments: wsmodels.Arguments{
+				"tx_id": unittest.IdentifierFixture().String(),
 			},
 			setupBackend: func(sub *ssmock.Subscription) {
 				s.api.On(
-					"SubscribeTransactionStatusesFromStartBlockID",
-					mock.Anything,
-					mock.Anything,
-					s.rootBlock.ID(),
-					entities.EventEncodingVersion_JSON_CDC_V0,
-				).Return(sub).Once()
-			},
-			expectedResponses: expectedResponses,
-		},
-		{
-			name: "SubscribeTransactionStatusesFromStartHeight happy path",
-			arguments: models.Arguments{
-				"start_block_height": strconv.FormatUint(s.rootBlock.Header.Height, 10),
-			},
-			setupBackend: func(sub *ssmock.Subscription) {
-				s.api.On(
-					"SubscribeTransactionStatusesFromStartHeight",
-					mock.Anything,
-					mock.Anything,
-					s.rootBlock.Header.Height,
-					entities.EventEncodingVersion_JSON_CDC_V0,
-				).Return(sub).Once()
-			},
-			expectedResponses: expectedResponses,
-		},
-		{
-			name:      "SubscribeTransactionStatusesFromLatest happy path",
-			arguments: models.Arguments{},
-			setupBackend: func(sub *ssmock.Subscription) {
-				s.api.On(
-					"SubscribeTransactionStatusesFromLatest",
+					"SubscribeTransactionStatuses",
 					mock.Anything,
 					mock.Anything,
 					entities.EventEncodingVersion_JSON_CDC_V0,
@@ -147,104 +116,57 @@ func (s *TransactionStatusesProviderSuite) requireTransactionStatuses(
 	actual interface{},
 	expected interface{},
 ) {
-	expectedTxStatusesResponse, ok := expected.(*models.TransactionStatusesResponse)
-	require.True(s.T(), ok, "expected *models.TransactionStatusesResponse, got %T", expected)
+	expectedResponse, expectedResponsePayload := extractPayload[*models.TransactionStatusesResponse](s.T(), expected)
+	actualResponse, actualResponsePayload := extractPayload[*models.TransactionStatusesResponse](s.T(), actual)
 
-	actualResponse, ok := actual.(*models.TransactionStatusesResponse)
-	require.True(s.T(), ok, "expected *models.TransactionStatusesResponse, got %T", actual)
+	require.Equal(s.T(), expectedResponse.Topic, actualResponse.Topic)
+	require.Equal(s.T(), expectedResponsePayload.TransactionResult.BlockId, actualResponsePayload.TransactionResult.BlockId)
+}
 
-	require.Equal(s.T(), expectedTxStatusesResponse.TransactionResult.BlockId, actualResponse.TransactionResult.BlockId)
+func backendTransactionStatusesResponse(block flow.Block) []*accessmodel.TransactionResult {
+	id := unittest.IdentifierFixture()
+	cid := unittest.IdentifierFixture()
+	txr := accessmodel.TransactionResult{
+		Status:     flow.TransactionStatusSealed,
+		StatusCode: 10,
+		Events: []flow.Event{
+			unittest.EventFixture(flow.EventAccountCreated, 1, 0, id, 200),
+		},
+		ErrorMessage: "",
+		BlockID:      block.ID(),
+		CollectionID: cid,
+		BlockHeight:  block.Header.Height,
+	}
+
+	var expectedTxResultsResponses []*accessmodel.TransactionResult
+
+	for i := 0; i < 2; i++ {
+		expectedTxResultsResponses = append(expectedTxResultsResponses, &txr)
+	}
+
+	return expectedTxResultsResponses
 }
 
 // expectedTransactionStatusesResponses creates the expected responses for the provided backend responses.
 func (s *TransactionStatusesProviderSuite) expectedTransactionStatusesResponses(
-	backendResponses []*access.TransactionResult,
+	backendResponses []*accessmodel.TransactionResult,
+	topic string,
 ) []interface{} {
 	expectedResponses := make([]interface{}, len(backendResponses))
 
 	for i, resp := range backendResponses {
-		var expectedResponse models.TransactionStatusesResponse
-		expectedResponse.Build(s.linkGenerator, resp, uint64(i))
-
-		expectedResponses[i] = &expectedResponse
+		expectedResponsePayload := models.NewTransactionStatusesResponse(s.linkGenerator, resp, uint64(i))
+		expectedResponses[i] = &models.BaseDataProvidersResponse{
+			Topic:   topic,
+			Payload: expectedResponsePayload,
+		}
 	}
 
 	return expectedResponses
 }
 
-// TestTransactionStatusesDataProvider_InvalidArguments tests the behavior of the transaction statuses data provider
-// when invalid arguments are provided. It verifies that appropriate errors are returned
-// for missing or conflicting arguments.
-func (s *TransactionStatusesProviderSuite) TestTransactionStatusesDataProvider_InvalidArguments() {
-	ctx := context.Background()
-	send := make(chan interface{})
-
-	topic := TransactionStatusesTopic
-
-	for _, test := range invalidTransactionStatusesArgumentsTestCases() {
-		s.Run(test.name, func() {
-			provider, err := NewTransactionStatusesDataProvider(
-				ctx,
-				s.log,
-				s.api,
-				s.linkGenerator,
-				topic,
-				test.arguments,
-				send,
-			)
-			s.Require().Nil(provider)
-			s.Require().Error(err)
-			s.Require().Contains(err.Error(), test.expectedErrorMsg)
-		})
-	}
-}
-
-// invalidTransactionStatusesArgumentsTestCases returns a list of test cases with invalid argument combinations
-// for testing the behavior of transaction statuses data providers. Each test case includes a name,
-// a set of input arguments, and the expected error message that should be returned.
-//
-// The test cases cover scenarios such as:
-// 1. Providing both 'start_block_id' and 'start_block_height' simultaneously.
-// 2. Providing invalid 'tx_id' value.
-// 3. Providing invalid 'start_block_id'  value.
-// 4. Invalid 'start_block_id' argument.
-func invalidTransactionStatusesArgumentsTestCases() []testErrType {
-	return []testErrType{
-		{
-			name: "provide both 'start_block_id' and 'start_block_height' arguments",
-			arguments: models.Arguments{
-				"start_block_id":     unittest.BlockFixture().ID().String(),
-				"start_block_height": fmt.Sprintf("%d", unittest.BlockFixture().Header.Height),
-			},
-			expectedErrorMsg: "can only provide either 'start_block_id' or 'start_block_height'",
-		},
-		{
-			name: "invalid 'tx_id' argument",
-			arguments: map[string]interface{}{
-				"tx_id": "invalid_tx_id",
-			},
-			expectedErrorMsg: "invalid ID format",
-		},
-		{
-			name: "invalid 'start_block_id' argument",
-			arguments: map[string]interface{}{
-				"start_block_id": "invalid_block_id",
-			},
-			expectedErrorMsg: "invalid ID format",
-		},
-		{
-			name: "invalid 'start_block_height' argument",
-			arguments: map[string]interface{}{
-				"start_block_height": "-1",
-			},
-			expectedErrorMsg: "value must be an unsigned 64 bit integer",
-		},
-	}
-}
-
 // TestMessageIndexTransactionStatusesProviderResponse_HappyPath tests that MessageIndex values in response are strictly increasing.
 func (s *TransactionStatusesProviderSuite) TestMessageIndexTransactionStatusesProviderResponse_HappyPath() {
-	ctx := context.Background()
 	send := make(chan interface{}, 10)
 	topic := TransactionStatusesTopic
 	txStatusesCount := 4
@@ -258,8 +180,7 @@ func (s *TransactionStatusesProviderSuite) TestMessageIndexTransactionStatusesPr
 	sub.On("Err").Return(nil).Once()
 
 	s.api.On(
-		"SubscribeTransactionStatusesFromStartBlockID",
-		mock.Anything,
+		"SubscribeTransactionStatuses",
 		mock.Anything,
 		mock.Anything,
 		entities.EventEncodingVersion_JSON_CDC_V0,
@@ -273,24 +194,24 @@ func (s *TransactionStatusesProviderSuite) TestMessageIndexTransactionStatusesPr
 
 	arguments :=
 		map[string]interface{}{
-			"start_block_id": s.rootBlock.ID().String(),
+			"tx_id": unittest.TransactionFixture().ID().String(),
 		}
 
 	// Create the TransactionStatusesDataProvider instance
 	provider, err := NewTransactionStatusesDataProvider(
-		ctx,
+		context.Background(),
 		s.log,
 		s.api,
+		"dummy-id",
 		s.linkGenerator,
 		topic,
 		arguments,
 		send,
 	)
-
-	s.Require().NotNil(provider)
 	s.Require().NoError(err)
+	s.Require().NotNil(provider)
 
-	// Ensure the provider is properly closed after the test
+	// Ensure the provider is properly doneOnce after the test
 	defer provider.Close()
 
 	// Run the provider in a separate goroutine to simulate subscription processing
@@ -302,9 +223,9 @@ func (s *TransactionStatusesProviderSuite) TestMessageIndexTransactionStatusesPr
 	}()
 
 	// Simulate emitting data to the tx statuses channel
-	var txResults []*access.TransactionResult
+	var txResults []*accessmodel.TransactionResult
 	for i := 0; i < txStatusesCount; i++ {
-		txResults = append(txResults, &access.TransactionResult{
+		txResults = append(txResults, &accessmodel.TransactionResult{
 			BlockHeight: s.rootBlock.Header.Height,
 		})
 	}
@@ -319,9 +240,8 @@ func (s *TransactionStatusesProviderSuite) TestMessageIndexTransactionStatusesPr
 	var responses []*models.TransactionStatusesResponse
 	for i := 0; i < txStatusesCount; i++ {
 		res := <-send
-		txStatusesRes, ok := res.(*models.TransactionStatusesResponse)
-		s.Require().True(ok, "Expected *models.TransactionStatusesResponse, got %T", res)
-		responses = append(responses, txStatusesRes)
+		_, txStatusesResData := extractPayload[*models.TransactionStatusesResponse](s.T(), res)
+		responses = append(responses, txStatusesResData)
 	}
 
 	// Wait for the provider goroutine to finish
@@ -338,26 +258,64 @@ func (s *TransactionStatusesProviderSuite) TestMessageIndexTransactionStatusesPr
 	}
 }
 
-func backendTransactionStatusesResponse(block flow.Block) []*access.TransactionResult {
-	id := unittest.IdentifierFixture()
-	cid := unittest.IdentifierFixture()
-	txr := access.TransactionResult{
-		Status:     flow.TransactionStatusSealed,
-		StatusCode: 10,
-		Events: []flow.Event{
-			unittest.EventFixture(flow.EventAccountCreated, 1, 0, id, 200),
+// TestTransactionStatusesDataProvider_InvalidArguments tests the behavior of the transaction statuses data provider
+// when invalid arguments are provided. It verifies that appropriate errors are returned
+// for missing or conflicting arguments.
+func (s *TransactionStatusesProviderSuite) TestTransactionStatusesDataProvider_InvalidArguments() {
+	send := make(chan interface{})
+
+	topic := TransactionStatusesTopic
+
+	for _, test := range invalidTransactionStatusesArgumentsTestCases() {
+		s.Run(test.name, func() {
+			provider, err := NewTransactionStatusesDataProvider(
+				context.Background(),
+				s.log,
+				s.api,
+				"dummy-id",
+				s.linkGenerator,
+				topic,
+				test.arguments,
+				send,
+			)
+			s.Require().Error(err)
+			s.Require().Nil(provider)
+			s.Require().Contains(err.Error(), test.expectedErrorMsg)
+		})
+	}
+}
+
+// invalidTransactionStatusesArgumentsTestCases returns a list of test cases with invalid argument combinations
+// for testing the behavior of transaction statuses data providers. Each test case includes a name,
+// a set of input arguments, and the expected error message that should be returned.
+func invalidTransactionStatusesArgumentsTestCases() []testErrType {
+	return []testErrType{
+		{
+			name: "invalid 'tx_id' argument",
+			arguments: map[string]interface{}{
+				"tx_id": "invalid_tx_id",
+			},
+			expectedErrorMsg: "invalid ID format",
 		},
-		ErrorMessage: "",
-		BlockID:      block.ID(),
-		CollectionID: cid,
-		BlockHeight:  block.Header.Height,
+		{
+			name: "empty 'tx_id' argument",
+			arguments: map[string]interface{}{
+				"tx_id": "",
+			},
+			expectedErrorMsg: "'tx_id' must not be empty",
+		},
+		{
+			name:             "missing 'tx_id' argument",
+			arguments:        map[string]interface{}{},
+			expectedErrorMsg: "missing 'tx_id' field",
+		},
+		{
+			name: "unexpected argument",
+			arguments: map[string]interface{}{
+				"unexpected_argument": "dummy",
+				"tx_id":               unittest.TransactionFixture().ID().String(),
+			},
+			expectedErrorMsg: "unexpected field: 'unexpected_argument'",
+		},
 	}
-
-	var expectedTxResultsResponses []*access.TransactionResult
-
-	for i := 0; i < 2; i++ {
-		expectedTxResultsResponses = append(expectedTxResultsResponses, &txr)
-	}
-
-	return expectedTxResultsResponses
 }

@@ -11,7 +11,8 @@ import (
 	"github.com/onflow/flow-go/engine/access/rest/common/parser"
 	"github.com/onflow/flow-go/engine/access/rest/http/request"
 	"github.com/onflow/flow-go/engine/access/rest/util"
-	"github.com/onflow/flow-go/engine/access/rest/websockets/models"
+	"github.com/onflow/flow-go/engine/access/rest/websockets/data_providers/models"
+	wsmodels "github.com/onflow/flow-go/engine/access/rest/websockets/models"
 	"github.com/onflow/flow-go/engine/access/subscription"
 	"github.com/onflow/flow-go/model/flow"
 )
@@ -27,8 +28,6 @@ type blocksArguments struct {
 type BlocksDataProvider struct {
 	*baseDataProvider
 
-	logger        zerolog.Logger
-	api           access.API
 	arguments     blocksArguments
 	linkGenerator commonmodels.LinkGenerator
 }
@@ -40,59 +39,50 @@ func NewBlocksDataProvider(
 	ctx context.Context,
 	logger zerolog.Logger,
 	api access.API,
+	subscriptionID string,
 	linkGenerator commonmodels.LinkGenerator,
 	topic string,
-	arguments models.Arguments,
+	rawArguments wsmodels.Arguments,
 	send chan<- interface{},
 ) (*BlocksDataProvider, error) {
-	p := &BlocksDataProvider{
-		logger:        logger.With().Str("component", "blocks-data-provider").Logger(),
-		api:           api,
-		linkGenerator: linkGenerator,
-	}
-
-	// Parse arguments passed to the provider.
-	var err error
-	p.arguments, err = ParseBlocksArguments(arguments)
+	args, err := parseBlocksArguments(rawArguments)
 	if err != nil {
 		return nil, fmt.Errorf("invalid arguments: %w", err)
 	}
 
-	subCtx, cancel := context.WithCancel(ctx)
-	p.baseDataProvider = newBaseDataProvider(
+	provider := newBaseDataProvider(
+		ctx,
+		logger.With().Str("component", "blocks-data-provider").Logger(),
+		api,
+		subscriptionID,
 		topic,
-		cancel,
+		rawArguments,
 		send,
-		p.createSubscription(subCtx, p.arguments), // Set up a subscription to blocks based on arguments.
 	)
 
-	return p, nil
+	return &BlocksDataProvider{
+		baseDataProvider: provider,
+		arguments:        args,
+		linkGenerator:    linkGenerator,
+	}, nil
 }
 
 // Run starts processing the subscription for blocks and handles responses.
+// Must be called once.
 //
-// No errors are expected during normal operations.
+// No errors expected during normal operations
 func (p *BlocksDataProvider) Run() error {
-	return subscription.HandleSubscription(
-		p.subscription,
-		subscription.HandleResponse(p.send, func(b *flow.Block) (interface{}, error) {
-			var block commonmodels.Block
-
-			expandPayload := map[string]bool{commonmodels.ExpandableFieldPayload: true}
-			err := block.Build(b, nil, p.linkGenerator, p.arguments.BlockStatus, expandPayload)
-			if err != nil {
-				return nil, fmt.Errorf("failed to build block response :%w", err)
-			}
-
-			return &models.BlockMessageResponse{
-				Block: &block,
-			}, nil
-		}),
+	return run(
+		p.createAndStartSubscription(p.ctx, p.arguments),
+		p.sendResponse,
 	)
 }
 
-// createSubscription creates a new subscription using the specified input arguments.
-func (p *BlocksDataProvider) createSubscription(ctx context.Context, args blocksArguments) subscription.Subscription {
+// createAndStartSubscription creates a new subscription using the specified input arguments.
+func (p *BlocksDataProvider) createAndStartSubscription(
+	ctx context.Context,
+	args blocksArguments,
+) subscription.Subscription {
 	if args.StartBlockID != flow.ZeroID {
 		return p.api.SubscribeBlocksFromStartBlockID(ctx, args.StartBlockID, args.BlockStatus)
 	}
@@ -104,37 +94,76 @@ func (p *BlocksDataProvider) createSubscription(ctx context.Context, args blocks
 	return p.api.SubscribeBlocksFromLatest(ctx, args.BlockStatus)
 }
 
-// ParseBlocksArguments validates and initializes the blocks arguments.
-func ParseBlocksArguments(arguments models.Arguments) (blocksArguments, error) {
-	var args blocksArguments
-
-	// Parse 'block_status'
-	if blockStatusIn, ok := arguments["block_status"]; ok {
-		result, ok := blockStatusIn.(string)
-		if !ok {
-			return args, fmt.Errorf("'block_status' must be string")
-		}
-		blockStatus, err := parser.ParseBlockStatus(result)
-		if err != nil {
-			return args, err
-		}
-		args.BlockStatus = blockStatus
-	} else {
-		return args, fmt.Errorf("'block_status' must be provided")
+func (p *BlocksDataProvider) sendResponse(block *flow.Block) error {
+	expandPayload := map[string]bool{commonmodels.ExpandableFieldPayload: true}
+	blockPayload, err := commonmodels.NewBlock(
+		block,
+		nil,
+		p.linkGenerator,
+		p.arguments.BlockStatus,
+		expandPayload,
+	)
+	if err != nil {
+		return fmt.Errorf("failed to build block payload response: %w", err)
 	}
 
-	// Parse block arguments
-	startBlockID, startBlockHeight, err := ParseStartBlock(arguments)
+	response := models.BaseDataProvidersResponse{
+		SubscriptionID: p.ID(),
+		Topic:          p.Topic(),
+		Payload:        blockPayload,
+	}
+	p.send <- &response
+
+	return nil
+}
+
+// parseBlocksArguments validates and initializes the blocks arguments.
+func parseBlocksArguments(arguments wsmodels.Arguments) (blocksArguments, error) {
+	allowedFields := map[string]struct{}{
+		"start_block_id":     {},
+		"start_block_height": {},
+		"block_status":       {},
+	}
+	err := ensureAllowedFields(arguments, allowedFields)
 	if err != nil {
-		return args, err
+		return blocksArguments{}, err
+	}
+
+	var args blocksArguments
+
+	// Parse block arguments
+	startBlockID, startBlockHeight, err := parseStartBlock(arguments)
+	if err != nil {
+		return blocksArguments{}, err
 	}
 	args.StartBlockID = startBlockID
 	args.StartBlockHeight = startBlockHeight
 
+	// Parse 'block_status'
+	rawBlockStatus, exists := arguments["block_status"]
+	if !exists {
+		return blocksArguments{}, fmt.Errorf("missing 'block_status' field")
+	}
+
+	blockStatusStr, isString := rawBlockStatus.(string)
+	if !isString {
+		return blocksArguments{}, fmt.Errorf("'block_status' must be string")
+	}
+
+	if len(blockStatusStr) == 0 {
+		return blocksArguments{}, fmt.Errorf("'block_status' field must not be empty")
+	}
+
+	blockStatus, err := parser.ParseBlockStatus(blockStatusStr)
+	if err != nil {
+		return blocksArguments{}, err
+	}
+	args.BlockStatus = blockStatus
+
 	return args, nil
 }
 
-func ParseStartBlock(arguments models.Arguments) (flow.Identifier, uint64, error) {
+func parseStartBlock(arguments wsmodels.Arguments) (flow.Identifier, uint64, error) {
 	startBlockIDIn, hasStartBlockID := arguments["start_block_id"]
 	startBlockHeightIn, hasStartBlockHeight := arguments["start_block_height"]
 
@@ -165,7 +194,7 @@ func ParseStartBlock(arguments models.Arguments) (flow.Identifier, uint64, error
 		}
 		startBlockHeight, err := util.ToUint64(result)
 		if err != nil {
-			return flow.ZeroID, request.EmptyHeight, fmt.Errorf("invalid 'start_block_height': %w", err)
+			return flow.ZeroID, request.EmptyHeight, fmt.Errorf("'start_block_height' must be convertible to uint64: %w", err)
 		}
 		return flow.ZeroID, startBlockHeight, nil
 	}

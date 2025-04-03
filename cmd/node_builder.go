@@ -4,6 +4,7 @@ import (
 	"context"
 	"time"
 
+	"github.com/cockroachdb/pebble"
 	"github.com/dgraph-io/badger/v2"
 	madns "github.com/multiformats/go-multiaddr-dns"
 	"github.com/onflow/crypto"
@@ -26,7 +27,9 @@ import (
 	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/state/protocol/events"
+	"github.com/onflow/flow-go/storage"
 	bstorage "github.com/onflow/flow-go/storage/badger"
+	"github.com/onflow/flow-go/storage/dbops"
 	"github.com/onflow/flow-go/utils/grpcutils"
 )
 
@@ -151,6 +154,11 @@ type BaseConfig struct {
 	DynamicStartupEpoch         string
 	DynamicStartupSleepInterval time.Duration
 	datadir                     string
+	pebbleDir                   string
+	pebbleCheckpointsDir        string
+	dbops                       string
+	badgerDB                    *badger.DB
+	pebbleDB                    *pebble.DB
 	secretsdir                  string
 	secretsDBEnabled            bool
 	InsecureSecretsDB           bool
@@ -164,7 +172,6 @@ type BaseConfig struct {
 	MetricsEnabled              bool
 	guaranteesCacheSize         uint
 	receiptsCacheSize           uint
-	db                          *badger.DB
 	HeroCacheMetricsEnable      bool
 	SyncCoreConfig              chainsync.Config
 	CodecFactory                func() network.Codec
@@ -198,6 +205,8 @@ type NodeConfig struct {
 	MetricsRegisterer prometheus.Registerer
 	Metrics           Metrics
 	DB                *badger.DB
+	PebbleDB          *pebble.DB
+	ProtocolDB        storage.DB
 	SecretsDB         *badger.DB
 	Storage           Storage
 	ProtocolEvents    *events.Distributor
@@ -253,6 +262,7 @@ type StateExcerptAtBoot struct {
 
 func DefaultBaseConfig() *BaseConfig {
 	datadir := "/data/protocol"
+	pebbleDir := "/data/protocol-pebble"
 
 	// NOTE: if the codec used in the network component is ever changed any code relying on
 	// the message format specific to the codec must be updated. i.e: the AuthorizedSenderValidator.
@@ -269,6 +279,10 @@ func DefaultBaseConfig() *BaseConfig {
 		ObserverMode:     false,
 		BootstrapDir:     "bootstrap",
 		datadir:          datadir,
+		pebbleDir:        pebbleDir,
+		dbops:            string(dbops.BadgerTransaction), // "badger-transaction" (default) or "batch-update"
+		badgerDB:         nil,
+		pebbleDB:         nil,
 		secretsdir:       NotSet,
 		secretsDBEnabled: true,
 		level:            "info",

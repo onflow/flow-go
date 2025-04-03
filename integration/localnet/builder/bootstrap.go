@@ -69,7 +69,7 @@ var (
 	profileUploader             bool
 	tracing                     bool
 	cadenceTracing              bool
-	extesiveTracing             bool
+	extensiveTracing            bool
 	consensusDelay              time.Duration
 	collectionDelay             time.Duration
 	logLevel                    string
@@ -95,7 +95,7 @@ func init() {
 	flag.BoolVar(&profileUploader, "profile-uploader", DefaultProfileUploader, "whether to upload profiles to the cloud")
 	flag.BoolVar(&tracing, "tracing", DefaultTracing, "whether to enable low-overhead tracing in flow")
 	flag.BoolVar(&cadenceTracing, "cadence-tracing", DefaultCadenceTracing, "whether to enable the tracing in cadance")
-	flag.BoolVar(&extesiveTracing, "extensive-tracing", DefaultExtensiveTracing, "enables high-overhead tracing in fvm")
+	flag.BoolVar(&extensiveTracing, "extensive-tracing", DefaultExtensiveTracing, "enables high-overhead tracing in fvm")
 	flag.DurationVar(&consensusDelay, "consensus-delay", DefaultConsensusDelay, "delay on consensus node block proposals")
 	flag.DurationVar(&collectionDelay, "collection-delay", DefaultCollectionDelay, "delay on collection node block proposals")
 	flag.StringVar(&logLevel, "loglevel", DefaultLogLevel, "log level for all nodes")
@@ -352,6 +352,7 @@ func prepareConsensusService(container testnet.ContainerConfig, i int, n int) Se
 	service.Command = append(service.Command,
 		fmt.Sprintf("--cruise-ctl-fallback-proposal-duration=%s", consensusDelay),
 		fmt.Sprintf("--hotstuff-min-timeout=%s", timeout),
+		"--cruise-ctl-max-view-duration=2s",
 		"--chunk-alpha=1",
 		"--emergency-sealing-active=false",
 		"--insecure-access-api=false",
@@ -400,9 +401,11 @@ func prepareExecutionService(container testnet.ContainerConfig, i int, n int) Se
 		"--triedir=/trie",
 		fmt.Sprintf("--rpc-addr=%s:%s", container.ContainerName, testnet.GRPCPort),
 		fmt.Sprintf("--cadence-tracing=%t", cadenceTracing),
-		fmt.Sprintf("--extensive-tracing=%t", extesiveTracing),
+		fmt.Sprintf("--extensive-tracing=%t", extensiveTracing),
 		"--execution-data-dir=/data/execution-data",
 		"--chunk-data-pack-dir=/data/chunk-data-pack",
+		"--pruning-config-threshold=20",
+		"--pruning-config-sleep-after-iteration=1m",
 	)
 
 	service.Volumes = append(service.Volumes,
@@ -422,7 +425,7 @@ func prepareAccessService(container testnet.ContainerConfig, i int, n int) Servi
 		fmt.Sprintf("--secure-rpc-addr=%s:%s", container.ContainerName, testnet.GRPCSecurePort),
 		fmt.Sprintf("--http-addr=%s:%s", container.ContainerName, testnet.GRPCWebPort),
 		fmt.Sprintf("--rest-addr=%s:%s", container.ContainerName, testnet.RESTPort),
-		fmt.Sprintf("--state-stream-addr=%s:%s", container.ContainerName, testnet.ExecutionStatePort),
+		fmt.Sprintf("--state-stream-addr=%s:%s", container.ContainerName, testnet.GRPCPort),
 		fmt.Sprintf("--collection-ingress-port=%s", testnet.GRPCPort),
 		"--supports-observer=true",
 		fmt.Sprintf("--public-network-address=%s:%s", container.ContainerName, testnet.PublicNetworkPort),
@@ -444,7 +447,6 @@ func prepareAccessService(container testnet.ContainerConfig, i int, n int) Servi
 		testnet.GRPCSecurePort,
 		testnet.GRPCWebPort,
 		testnet.RESTPort,
-		testnet.ExecutionStatePort,
 		testnet.PublicNetworkPort,
 	)
 
@@ -467,7 +469,7 @@ func prepareObserverService(i int, observerName string, agPublicKey string) Serv
 		fmt.Sprintf("--secure-rpc-addr=%s:%s", observerName, testnet.GRPCSecurePort),
 		fmt.Sprintf("--http-addr=%s:%s", observerName, testnet.GRPCWebPort),
 		fmt.Sprintf("--rest-addr=%s:%s", observerName, testnet.RESTPort),
-		fmt.Sprintf("--state-stream-addr=%s:%s", observerName, testnet.ExecutionStatePort),
+		fmt.Sprintf("--state-stream-addr=%s:%s", observerName, testnet.GRPCPort),
 		"--execution-data-dir=/data/execution-data",
 		"--execution-data-sync-enabled=true",
 		"--execution-data-indexing-enabled=true",
@@ -480,7 +482,6 @@ func prepareObserverService(i int, observerName string, agPublicKey string) Serv
 		testnet.GRPCSecurePort,
 		testnet.GRPCWebPort,
 		testnet.RESTPort,
-		testnet.ExecutionStatePort,
 	)
 
 	// observer services rely on the access gateway

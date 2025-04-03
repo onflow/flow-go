@@ -332,11 +332,11 @@ func main() {
 				return fmt.Errorf("could not load beacon key file: %w", err)
 			}
 
-			rootEpoch := rootSnapshot.Epochs().Current()
-			rootEpochCounter, err := rootEpoch.Counter()
+			rootEpoch, err := rootSnapshot.Epochs().Current()
 			if err != nil {
-				return fmt.Errorf("could not get root epoch counter: %w", err)
+				return fmt.Errorf("could not get root epoch: %w", err)
 			}
+			rootEpochCounter := rootEpoch.Counter()
 
 			// confirm the beacon key file matches the canonical public keys
 			rootDKG, err := rootEpoch.DKG()
@@ -486,6 +486,9 @@ func main() {
 				seals,
 				getSealingConfigs,
 			)
+			if err != nil {
+				return nil, fmt.Errorf("could not initialize sealing engine: %w", err)
+			}
 
 			// subscribe for finalization events from hotstuff
 			followerDistributor.AddOnBlockFinalizedConsumer(e.OnFinalizedBlock)

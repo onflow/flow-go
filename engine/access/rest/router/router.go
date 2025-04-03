@@ -20,6 +20,7 @@ import (
 	"github.com/onflow/flow-go/engine/access/state_stream/backend"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/module/irrecoverable"
 )
 
 // RouterBuilder is a utility for building HTTP routers with common middleware and routes.
@@ -70,6 +71,9 @@ func (b *RouterBuilder) AddRestRoutes(
 }
 
 // AddLegacyWebsocketsRoutes adds WebSocket routes to the router.
+//
+// Deprecated: Use AddWebsocketsRoute instead, which allows managing multiple streams with
+// a single endpoint.
 func (b *RouterBuilder) AddLegacyWebsocketsRoutes(
 	stateStreamApi state_stream.API,
 	chain flow.Chain,
@@ -90,12 +94,13 @@ func (b *RouterBuilder) AddLegacyWebsocketsRoutes(
 }
 
 func (b *RouterBuilder) AddWebsocketsRoute(
+	ctx irrecoverable.SignalerContext,
 	chain flow.Chain,
 	config websockets.Config,
 	maxRequestSize int64,
 	dataProviderFactory dp.DataProviderFactory,
 ) *RouterBuilder {
-	handler := websockets.NewWebSocketHandler(b.logger, config, chain, maxRequestSize, dataProviderFactory)
+	handler := websockets.NewWebSocketHandler(ctx, b.logger, config, chain, maxRequestSize, dataProviderFactory)
 	b.v1SubRouter.
 		Methods(http.MethodGet).
 		Path("/ws").

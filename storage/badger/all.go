@@ -5,6 +5,8 @@ import (
 
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/storage"
+	"github.com/onflow/flow-go/storage/operation/badgerimpl"
+	"github.com/onflow/flow-go/storage/store"
 )
 
 func InitAll(metrics module.CacheMetrics, db *badger.DB) *storage.All {
@@ -22,14 +24,10 @@ func InitAll(metrics module.CacheMetrics, db *badger.DB) *storage.All {
 	epochProtocolStateEntries := NewEpochProtocolStateEntries(metrics, setups, epochCommits, db,
 		DefaultEpochProtocolStateCacheSize, DefaultProtocolStateIndexCacheSize)
 	protocolKVStore := NewProtocolKVStore(metrics, db, DefaultProtocolKVStoreCacheSize, DefaultProtocolKVStoreByBlockIDCacheSize)
-	versionBeacons := NewVersionBeacons(db)
+	versionBeacons := store.NewVersionBeacons(badgerimpl.ToDB(db))
 
-	commits := NewCommits(metrics, db)
 	transactions := NewTransactions(metrics, db)
-	transactionResults := NewTransactionResults(metrics, db, 10000)
 	collections := NewCollections(db, transactions)
-	events := NewEvents(metrics, db)
-	chunkDataPacks := NewChunkDataPacks(metrics, db, collections, 1000)
 
 	return &storage.All{
 		Headers:                   headers,
@@ -46,11 +44,7 @@ func InitAll(metrics module.CacheMetrics, db *badger.DB) *storage.All {
 		VersionBeacons:            versionBeacons,
 		Results:                   results,
 		Receipts:                  receipts,
-		ChunkDataPacks:            chunkDataPacks,
-		Commits:                   commits,
 		Transactions:              transactions,
-		TransactionResults:        transactionResults,
 		Collections:               collections,
-		Events:                    events,
 	}
 }

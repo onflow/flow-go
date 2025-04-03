@@ -142,7 +142,7 @@ func NewBasicMigrationRuntime(regs registers.Registers) *BasicMigrationRuntime {
 	accounts := environment.NewAccounts(transactionState)
 
 	accountsAtreeLedger := util.NewAccountsAtreeLedger(accounts)
-	runtimeStorage := runtime.NewStorage(accountsAtreeLedger, nil)
+	runtimeStorage := runtime.NewStorage(accountsAtreeLedger, nil, runtime.StorageConfig{})
 
 	return &BasicMigrationRuntime{
 		Registers:        regs,

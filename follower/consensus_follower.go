@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"sync"
 
+	"github.com/cockroachdb/pebble"
 	"github.com/dgraph-io/badger/v2"
 	"github.com/onflow/crypto"
 	"github.com/rs/zerolog"
@@ -36,8 +37,8 @@ type Config struct {
 	networkPrivKey   crypto.PrivateKey   // the network private key of this node
 	bootstrapNodes   []BootstrapNodeInfo // the bootstrap nodes to use
 	bindAddr         string              // address to bind on
-	db               *badger.DB          // the badger DB storage to use for the protocol state
-	dataDir          string              // directory to store the protocol state (if the badger storage is not provided)
+	badgerDB         *badger.DB          // badger instance
+	pebbleDB         *pebble.DB          // pebble instance
 	bootstrapDir     string              // path to the bootstrap directory
 	logLevel         string              // log level
 	exposeMetrics    bool                // whether to expose metrics
@@ -47,13 +48,16 @@ type Config struct {
 
 type Option func(c *Config)
 
-// WithDataDir sets the underlying directory to be used to store the database
-// If a database is supplied, then data directory will be set to empty string
-func WithDataDir(dataDir string) Option {
+// currently used by rosetta
+func WithDB(db *badger.DB) Option {
 	return func(cf *Config) {
-		if cf.db == nil {
-			cf.dataDir = dataDir
-		}
+		cf.badgerDB = db
+	}
+}
+
+func WithPebbleDB(db *pebble.DB) Option {
+	return func(cf *Config) {
+		cf.pebbleDB = db
 	}
 }
 
@@ -66,15 +70,6 @@ func WithBootstrapDir(bootstrapDir string) Option {
 func WithLogLevel(level string) Option {
 	return func(cf *Config) {
 		cf.logLevel = level
-	}
-}
-
-// WithDB sets the underlying database that will be used to store the chain state
-// WithDB takes precedence over WithDataDir and datadir will be set to empty if DB is set using this option
-func WithDB(db *badger.DB) Option {
-	return func(cf *Config) {
-		cf.db = db
-		cf.dataDir = ""
 	}
 }
 
@@ -133,17 +128,17 @@ func getBaseOptions(config *Config) []cmd.Option {
 	if config.bootstrapDir != "" {
 		options = append(options, cmd.WithBootstrapDir(config.bootstrapDir))
 	}
-	if config.dataDir != "" {
-		options = append(options, cmd.WithDataDir(config.dataDir))
-	}
 	if config.bindAddr != "" {
 		options = append(options, cmd.WithBindAddress(config.bindAddr))
 	}
+	if config.badgerDB != nil {
+		options = append(options, cmd.WithBadgerDB(config.badgerDB))
+	}
+	if config.pebbleDB != nil {
+		options = append(options, cmd.WithPebbleDB(config.pebbleDB))
+	}
 	if config.logLevel != "" {
 		options = append(options, cmd.WithLogLevel(config.logLevel))
-	}
-	if config.db != nil {
-		options = append(options, cmd.WithDB(config.db))
 	}
 	if config.exposeMetrics {
 		options = append(options, cmd.WithMetricsEnabled(config.exposeMetrics))
@@ -187,6 +182,8 @@ func NewConsensusFollower(
 		networkPrivKey: networkPrivKey,
 		bootstrapNodes: bootstapIdentities,
 		bindAddr:       bindAddr,
+		badgerDB:       nil,
+		pebbleDB:       nil,
 		logLevel:       "info",
 		exposeMetrics:  false,
 	}
@@ -206,6 +203,7 @@ func NewConsensusFollower(
 	anb.FollowerDistributor.AddOnBlockFinalizedConsumer(cf.onBlockFinalized)
 	cf.NodeConfig = anb.NodeConfig
 
+	// Build will initialize the database
 	cf.Component, err = anb.Build()
 	if err != nil {
 		return nil, err

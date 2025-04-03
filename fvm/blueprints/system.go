@@ -18,10 +18,7 @@ const SystemChunkTransactionGasLimit = 100_000_000
 //go:embed scripts/systemChunkTransactionTemplate.cdc
 var systemChunkTransactionTemplate string
 
-// TODO: when the EVM contract is moved to the flow-core-contracts, we can
-// just directly use the replace address functionality of the templates package.
-
-var placeholderEVMAddress = "\"EVM\""
+const placeholderMigrationAddress = "\"Migration\""
 
 func prepareSystemContractCode(chainID flow.ChainID) string {
 	sc := systemcontracts.SystemContractsForChain(chainID)
@@ -31,8 +28,8 @@ func prepareSystemContractCode(chainID flow.ChainID) string {
 	)
 	code = strings.ReplaceAll(
 		code,
-		placeholderEVMAddress,
-		sc.EVMContract.Address.HexWithPrefix(),
+		placeholderMigrationAddress,
+		sc.Migration.Address.HexWithPrefix(),
 	)
 	return code
 }

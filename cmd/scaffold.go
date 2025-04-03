@@ -12,6 +12,7 @@ import (
 	"time"
 
 	gcemd "cloud.google.com/go/compute/metadata"
+	"github.com/cockroachdb/pebble"
 	"github.com/dgraph-io/badger/v2"
 	"github.com/hashicorp/go-multierror"
 	dht "github.com/libp2p/go-libp2p-kad-dht"
@@ -20,6 +21,7 @@ import (
 	"github.com/libp2p/go-libp2p/core/routing"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/rs/zerolog"
+	"github.com/rs/zerolog/log"
 	"github.com/spf13/pflag"
 	"golang.org/x/time/rate"
 	"google.golang.org/api/option"
@@ -31,6 +33,7 @@ import (
 	"github.com/onflow/flow-go/admin/commands/common"
 	storageCommands "github.com/onflow/flow-go/admin/commands/storage"
 	"github.com/onflow/flow-go/cmd/build"
+	"github.com/onflow/flow-go/cmd/scaffold"
 	"github.com/onflow/flow-go/config"
 	"github.com/onflow/flow-go/consensus/hotstuff/persister"
 	"github.com/onflow/flow-go/fvm/initialize"
@@ -80,6 +83,10 @@ import (
 	"github.com/onflow/flow-go/storage"
 	bstorage "github.com/onflow/flow-go/storage/badger"
 	"github.com/onflow/flow-go/storage/badger/operation"
+	"github.com/onflow/flow-go/storage/dbops"
+	"github.com/onflow/flow-go/storage/operation/badgerimpl"
+	"github.com/onflow/flow-go/storage/operation/pebbleimpl"
+	"github.com/onflow/flow-go/storage/store"
 	sutil "github.com/onflow/flow-go/storage/util"
 	"github.com/onflow/flow-go/utils/logging"
 )
@@ -164,7 +171,10 @@ func (fnb *FlowNodeBuilder) BaseFlags() {
 	fnb.flags.StringVar(&fnb.BaseConfig.BindAddr, "bind", defaultConfig.BindAddr, "address to bind on")
 	fnb.flags.StringVarP(&fnb.BaseConfig.BootstrapDir, "bootstrapdir", "b", defaultConfig.BootstrapDir, "path to the bootstrap directory")
 	fnb.flags.StringVarP(&fnb.BaseConfig.datadir, "datadir", "d", defaultConfig.datadir, "directory to store the public database (protocol state)")
+	fnb.flags.StringVar(&fnb.BaseConfig.pebbleCheckpointsDir, "pebble-checkpoints-dir", defaultConfig.pebbleCheckpointsDir, "directory to store the checkpoints for the public pebble database (protocol state)")
+	fnb.flags.StringVar(&fnb.BaseConfig.pebbleDir, "pebble-dir", defaultConfig.pebbleDir, "directory to store the public pebble database (protocol state)")
 	fnb.flags.StringVar(&fnb.BaseConfig.secretsdir, "secretsdir", defaultConfig.secretsdir, "directory to store private database (secrets)")
+	fnb.flags.StringVar(&fnb.BaseConfig.dbops, "dbops", defaultConfig.dbops, "database operations to use (badger-transaction, batch-update, pebble-update)")
 	fnb.flags.StringVarP(&fnb.BaseConfig.level, "loglevel", "l", defaultConfig.level, "level for logging output")
 	fnb.flags.Uint32Var(&fnb.BaseConfig.debugLogLimit, "debug-log-limit", defaultConfig.debugLogLimit, "max number of debug/trace log events per second")
 	fnb.flags.UintVarP(&fnb.BaseConfig.metricsPort, "metricport", "m", defaultConfig.metricsPort, "port for /metrics endpoint")
@@ -574,6 +584,7 @@ func (fnb *FlowNodeBuilder) BuildPublicLibp2pNode(address string, bootstrapIdent
 		&p2pbuilderconfig.UnicastConfig{
 			Unicast: fnb.FlowConfig.NetworkConfig.Unicast,
 		}).
+		SetProtocolPeerCacheList(protocols.FlowProtocolID(fnb.SporkID)).
 		SetSubscriptionFilter(
 			subscription.NewRoleBasedFilter(
 				subscription.UnstakedRole, fnb.IdentityProvider,
@@ -949,8 +960,11 @@ func (fnb *FlowNodeBuilder) initMetrics() error {
 		// metrics enabled, report node info metrics as post init event
 		fnb.PostInit(func(nodeConfig *NodeConfig) error {
 			nodeInfoMetrics := metrics.NewNodeInfoCollector()
-			protocolVersion := fnb.RootSnapshot.Params().ProtocolVersion()
-			nodeInfoMetrics.NodeInfo(build.Version(), build.Commit(), nodeConfig.SporkID.String(), protocolVersion)
+			pstate, err := nodeConfig.State.Final().ProtocolState()
+			if err != nil {
+				return fmt.Errorf("could not get protocol state: %w", err)
+			}
+			nodeInfoMetrics.NodeInfo(build.Version(), build.Commit(), nodeConfig.SporkID.String(), pstate.GetProtocolStateVersion())
 			return nil
 		})
 	}
@@ -1062,12 +1076,20 @@ func (fnb *FlowNodeBuilder) initProfiler() error {
 	return nil
 }
 
-func (fnb *FlowNodeBuilder) initDB() error {
-
-	// if a db has been passed in, use that instead of creating one
-	if fnb.BaseConfig.db != nil {
-		fnb.DB = fnb.BaseConfig.db
+func (fnb *FlowNodeBuilder) initBadgerDB() error {
+	// if the badger DB is already set, use it.
+	// the badger DB might be set by the follower engine
+	if fnb.BaseConfig.badgerDB != nil {
+		fnb.DB = fnb.BaseConfig.badgerDB
 		return nil
+	}
+
+	// if the badger DB is not set, then the datadir must be provided to initialize
+	// the badger DB
+	// since we've set an default directory for the badger DB, this check
+	// is not necessary, but rather a sanity check
+	if fnb.BaseConfig.datadir == NotSet {
+		return fmt.Errorf("missing required flag '--datadir'")
 	}
 
 	// Pre-create DB path (Badger creates only one-level dirs)
@@ -1076,8 +1098,6 @@ func (fnb *FlowNodeBuilder) initDB() error {
 		return fmt.Errorf("could not create datadir (path: %s): %w", fnb.BaseConfig.datadir, err)
 	}
 
-	log := sutil.NewLogger(fnb.Logger)
-
 	// we initialize the database with options that allow us to keep the maximum
 	// item size in the trie itself (up to 1MB) and where we keep all level zero
 	// tables in-memory as well; this slows down compaction and increases memory
@@ -1085,7 +1105,7 @@ func (fnb *FlowNodeBuilder) initDB() error {
 	opts := badger.
 		DefaultOptions(fnb.BaseConfig.datadir).
 		WithKeepL0InMemory(true).
-		WithLogger(log).
+		WithLogger(sutil.NewLogger(fnb.Logger.With().Str("badgerdb", "protocol").Logger())).
 
 		// the ValueLogFileSize option specifies how big the value of a
 		// key-value pair is allowed to be saved into badger.
@@ -1101,9 +1121,12 @@ func (fnb *FlowNodeBuilder) initDB() error {
 		return fmt.Errorf("could not open public db: %w", err)
 	}
 	fnb.DB = publicDB
+	// set badger db as protocol db
+	// TODO: making it dynamic to switch between badger and pebble
+	fnb.ProtocolDB = badgerimpl.ToDB(publicDB)
 
 	fnb.ShutdownFunc(func() error {
-		if err := fnb.DB.Close(); err != nil {
+		if err := publicDB.Close(); err != nil {
 			return fmt.Errorf("error closing protocol database: %w", err)
 		}
 		return nil
@@ -1113,6 +1136,38 @@ func (fnb *FlowNodeBuilder) initDB() error {
 		return bstorage.NewCleaner(node.Logger, node.DB, node.Metrics.CleanCollector, flow.DefaultValueLogGCWaitDuration), nil
 	})
 
+	return nil
+}
+
+func (fnb *FlowNodeBuilder) initPebbleDB() error {
+	// if the pebble DB is already set, use it
+	// the pebble DB might be set by the follower engine
+	if fnb.BaseConfig.pebbleDB != nil {
+		fnb.PebbleDB = fnb.BaseConfig.pebbleDB
+		return nil
+	}
+
+	db, closer, err := scaffold.InitPebbleDB(fnb.Logger.With().Str("pebbledb", "protocol").Logger(), fnb.BaseConfig.pebbleDir)
+	if err != nil {
+		return err
+	}
+
+	fnb.PebbleDB = db
+	fnb.ShutdownFunc(closer.Close)
+	return nil
+}
+
+// create protocol db according to the badger or pebble db
+func (fnb *FlowNodeBuilder) initProtocolDB(bdb *badger.DB, pdb *pebble.DB) error {
+	if dbops.IsBadgerBased(fnb.dbops) {
+		fnb.ProtocolDB = badgerimpl.ToDB(bdb)
+		fnb.Logger.Info().Msg("initProtocolDB: using badger protocol db")
+	} else if dbops.IsPebbleBatch(fnb.dbops) {
+		fnb.ProtocolDB = pebbleimpl.ToDB(pdb)
+		fnb.Logger.Info().Msgf("initProtocolDB: using pebble protocol db")
+	} else {
+		return fmt.Errorf(dbops.UsageErrMsg, fnb.dbops)
+	}
 	return nil
 }
 
@@ -1133,9 +1188,9 @@ func (fnb *FlowNodeBuilder) initSecretsDB() error {
 		return fmt.Errorf("could not create secrets db dir (path: %s): %w", fnb.BaseConfig.secretsdir, err)
 	}
 
-	log := sutil.NewLogger(fnb.Logger)
-
-	opts := badger.DefaultOptions(fnb.BaseConfig.secretsdir).WithLogger(log)
+	opts := badger.DefaultOptions(fnb.BaseConfig.secretsdir).
+		WithLogger(sutil.NewLogger(
+			fnb.Logger.With().Str("badgerdb", "secret").Logger()))
 
 	// NOTE: SN nodes need to explicitly set --insecure-secrets-db to true in order to
 	// disable secrets database encryption
@@ -1197,18 +1252,15 @@ func (fnb *FlowNodeBuilder) initStorage() error {
 	collections := bstorage.NewCollections(fnb.DB, transactions)
 	setups := bstorage.NewEpochSetups(fnb.Metrics.Cache, fnb.DB)
 	epochCommits := bstorage.NewEpochCommits(fnb.Metrics.Cache, fnb.DB)
-	commits := bstorage.NewCommits(fnb.Metrics.Cache, fnb.DB)
 	protocolState := bstorage.NewEpochProtocolStateEntries(fnb.Metrics.Cache, setups, epochCommits, fnb.DB,
 		bstorage.DefaultEpochProtocolStateCacheSize, bstorage.DefaultProtocolStateIndexCacheSize)
 	protocolKVStores := bstorage.NewProtocolKVStore(fnb.Metrics.Cache, fnb.DB,
 		bstorage.DefaultProtocolKVStoreCacheSize, bstorage.DefaultProtocolKVStoreByBlockIDCacheSize)
-	versionBeacons := bstorage.NewVersionBeacons(fnb.DB)
+	versionBeacons := store.NewVersionBeacons(badgerimpl.ToDB(fnb.DB))
 
 	fnb.Storage = Storage{
 		Headers:                   headers,
 		Guarantees:                guarantees,
-		Receipts:                  receipts,
-		Results:                   results,
 		Seals:                     seals,
 		Index:                     index,
 		Payloads:                  payloads,
@@ -1221,7 +1273,9 @@ func (fnb *FlowNodeBuilder) initStorage() error {
 		VersionBeacons:            versionBeacons,
 		EpochProtocolStateEntries: protocolState,
 		ProtocolKVStore:           protocolKVStores,
-		Commits:                   commits,
+
+		Results:  results,
+		Receipts: receipts,
 	}
 
 	return nil
@@ -1893,11 +1947,55 @@ func WithBindAddress(bindAddress string) Option {
 	}
 }
 
+// WithDataDir set the data directory for the badger database
+// It will be ignored if WithBadgerDB is used
 func WithDataDir(dataDir string) Option {
 	return func(config *BaseConfig) {
-		if config.db == nil {
-			config.datadir = dataDir
+		if config.badgerDB != nil {
+			log.Warn().Msgf("ignoring data directory %s as badger database is already set", dataDir)
+			return
 		}
+
+		config.datadir = dataDir
+	}
+}
+
+// WithBadgerDB sets the badger database instance
+// If used, then WithDataDir method will be ignored
+func WithBadgerDB(db *badger.DB) Option {
+	return func(config *BaseConfig) {
+		if config.datadir != "" && config.datadir != NotSet {
+			log.Warn().Msgf("ignoring data directory is already set for badger %v", config.datadir)
+			config.datadir = ""
+		}
+
+		config.badgerDB = db
+	}
+}
+
+// WithPebbleDir set the data directory for the pebble database
+// It will be ignored if WithPebbleDB is used
+func WithPebbleDir(dataDir string) Option {
+	return func(config *BaseConfig) {
+		if config.pebbleDB != nil {
+			log.Warn().Msgf("ignoring data directory %s as pebble database is already set", dataDir)
+			return
+		}
+
+		config.pebbleDir = dataDir
+	}
+}
+
+// WithPebbleDB sets the pebble database instance
+// If used, then WithPebbleDir method will be ignored
+func WithPebbleDB(db *pebble.DB) Option {
+	return func(config *BaseConfig) {
+		if config.pebbleDir != "" && config.pebbleDir != NotSet {
+			log.Warn().Msgf("ignoring data directory is already set for pebble %v", config.pebbleDir)
+			config.pebbleDir = ""
+		}
+
+		config.pebbleDB = db
 	}
 }
 
@@ -1928,14 +2026,6 @@ func WithComplianceConfig(complianceConfig compliance.Config) Option {
 func WithLogLevel(level string) Option {
 	return func(config *BaseConfig) {
 		config.level = level
-	}
-}
-
-// WithDB takes precedence over WithDataDir and datadir will be set to empty if DB is set using this option
-func WithDB(db *badger.DB) Option {
-	return func(config *BaseConfig) {
-		config.db = db
-		config.datadir = ""
 	}
 }
 
@@ -2013,6 +2103,9 @@ func (fnb *FlowNodeBuilder) RegisterDefaultAdminCommands() {
 		return storageCommands.NewReadSealsCommand(config.State, config.Storage.Seals, config.Storage.Index)
 	}).AdminCommand("get-latest-identity", func(config *NodeConfig) commands.AdminCommand {
 		return common.NewGetIdentityCommand(config.IdentityProvider)
+	}).AdminCommand("create-pebble-checkpoint", func(config *NodeConfig) commands.AdminCommand {
+		// by default checkpoints will be created under "/data/protocol_pebble_checkpoints"
+		return storageCommands.NewPebbleDBCheckpointCommand(config.pebbleCheckpointsDir, "protocol", config.PebbleDB)
 	})
 }
 
@@ -2044,7 +2137,17 @@ func (fnb *FlowNodeBuilder) onStart() error {
 		return err
 	}
 
-	if err := fnb.initDB(); err != nil {
+	// we always initialize both badger and pebble databases
+	// even if we only use one of them, this simplify the code and checks
+	if err := fnb.initBadgerDB(); err != nil {
+		return err
+	}
+
+	if err := fnb.initPebbleDB(); err != nil {
+		return err
+	}
+
+	if err := fnb.initProtocolDB(fnb.DB, fnb.PebbleDB); err != nil {
 		return err
 	}
 

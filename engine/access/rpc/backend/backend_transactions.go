@@ -14,11 +14,12 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
-	"github.com/onflow/flow-go/access"
+	"github.com/onflow/flow-go/access/validator"
 	"github.com/onflow/flow-go/engine/access/rpc/connection"
 	"github.com/onflow/flow-go/engine/common/rpc"
 	commonrpc "github.com/onflow/flow-go/engine/common/rpc"
 	"github.com/onflow/flow-go/engine/common/rpc/convert"
+	accessmodel "github.com/onflow/flow-go/model/access"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/irrecoverable"
@@ -38,14 +39,14 @@ type backendTransactions struct {
 	txResultErrorMessages storage.TransactionResultErrorMessages
 	chainID               flow.ChainID
 	transactionMetrics    module.TransactionMetrics
-	transactionValidator  *access.TransactionValidator
+	transactionValidator  *validator.TransactionValidator
 	retry                 *Retry
 	connFactory           connection.ConnectionFactory
 
 	previousAccessNodes []accessproto.AccessAPIClient
 	log                 zerolog.Logger
 	nodeCommunicator    Communicator
-	txResultCache       *lru.Cache[flow.Identifier, *access.TransactionResult]
+	txResultCache       *lru.Cache[flow.Identifier, *accessmodel.TransactionResult]
 	txResultQueryMode   IndexQueryMode
 
 	systemTxID                 flow.Identifier
@@ -130,7 +131,11 @@ func (b *backendTransactions) trySendTransaction(ctx context.Context, tx *flow.T
 // collection node cluster responsible for the given tx
 func (b *backendTransactions) chooseCollectionNodes(txID flow.Identifier) (flow.IdentitySkeletonList, error) {
 	// retrieve the set of collector clusters
-	clusters, err := b.state.Final().Epochs().Current().Clustering()
+	currentEpoch, err := b.state.Final().Epochs().Current()
+	if err != nil {
+		return nil, fmt.Errorf("could not get current epoch: %w", err)
+	}
+	clusters, err := currentEpoch.Clustering()
 	if err != nil {
 		return nil, fmt.Errorf("could not cluster collection nodes: %w", err)
 	}
@@ -233,7 +238,7 @@ func (b *backendTransactions) GetTransactionResult(
 	blockID flow.Identifier,
 	collectionID flow.Identifier,
 	requiredEventEncodingVersion entities.EventEncodingVersion,
-) (*access.TransactionResult, error) {
+) (*accessmodel.TransactionResult, error) {
 	// look up transaction from storage
 	start := time.Now()
 
@@ -257,7 +262,7 @@ func (b *backendTransactions) GetTransactionResult(
 			// if tx not found in old access nodes either, then assume that the tx was submitted to a different AN
 			// and return status as unknown
 			txStatus := flow.TransactionStatusUnknown
-			result := &access.TransactionResult{
+			result := &accessmodel.TransactionResult{
 				Status:     txStatus,
 				StatusCode: uint(txStatus),
 			}
@@ -282,10 +287,10 @@ func (b *backendTransactions) GetTransactionResult(
 	}
 
 	var blockHeight uint64
-	var txResult *access.TransactionResult
+	var txResult *accessmodel.TransactionResult
 	// access node may not have the block if it hasn't yet been finalized, hence block can be nil at this point
 	if block != nil {
-		txResult, err = b.lookupTransactionResult(ctx, txID, block, requiredEventEncodingVersion)
+		txResult, err = b.lookupTransactionResult(ctx, txID, block.Header, requiredEventEncodingVersion)
 		if err != nil {
 			return nil, rpc.ConvertError(err, "failed to retrieve result", codes.Internal)
 		}
@@ -329,7 +334,7 @@ func (b *backendTransactions) GetTransactionResult(
 			return nil, rpc.ConvertStorageError(err)
 		}
 
-		txResult = &access.TransactionResult{
+		txResult = &accessmodel.TransactionResult{
 			BlockID:       blockID,
 			BlockHeight:   blockHeight,
 			TransactionID: txID,
@@ -345,11 +350,15 @@ func (b *backendTransactions) GetTransactionResult(
 	return txResult, nil
 }
 
-// retrieveBlock function returns a block based on the input argument. The block ID lookup has the highest priority,
-// followed by the collection ID lookup. If both are missing, the default lookup by transaction ID is performed.
+// retrieveBlock function returns a block based on the input arguments.
+// The block ID lookup has the highest priority, followed by the collection ID lookup.
+// If both are missing, the default lookup by transaction ID is performed.
+//
+// If looking up the block based solely on the txID returns not found, then no error is returned.
+//
+// Expected errors:
+// - storage.ErrNotFound if the requested block or collection was not found.
 func (b *backendTransactions) retrieveBlock(
-	// the requested block or collection was not found. If looking up the block based solely on the txID returns
-	// not found, then no error is returned.
 	blockID flow.Identifier,
 	collectionID flow.Identifier,
 	txID flow.Identifier,
@@ -376,7 +385,7 @@ func (b *backendTransactions) GetTransactionResultsByBlockID(
 	ctx context.Context,
 	blockID flow.Identifier,
 	requiredEventEncodingVersion entities.EventEncodingVersion,
-) ([]*access.TransactionResult, error) {
+) ([]*accessmodel.TransactionResult, error) {
 	// TODO: consider using storage.Index.ByBlockID, the index contains collection id and seals ID
 	block, err := b.blocks.ByID(blockID)
 	if err != nil {
@@ -405,7 +414,7 @@ func (b *backendTransactions) getTransactionResultsByBlockIDFromExecutionNode(
 	ctx context.Context,
 	block *flow.Block,
 	requiredEventEncodingVersion entities.EventEncodingVersion,
-) ([]*access.TransactionResult, error) {
+) ([]*accessmodel.TransactionResult, error) {
 	blockID := block.ID()
 	req := &execproto.GetTransactionsByBlockIDRequest{
 		BlockId: blockID[:],
@@ -427,7 +436,7 @@ func (b *backendTransactions) getTransactionResultsByBlockIDFromExecutionNode(
 		return nil, rpc.ConvertError(err, "failed to retrieve result from execution node", codes.Internal)
 	}
 
-	results := make([]*access.TransactionResult, 0, len(resp.TransactionResults))
+	results := make([]*accessmodel.TransactionResult, 0, len(resp.TransactionResults))
 	i := 0
 	errInsufficientResults := status.Errorf(
 		codes.Internal,
@@ -461,7 +470,7 @@ func (b *backendTransactions) getTransactionResultsByBlockIDFromExecutionNode(
 					"failed to convert events to message in txID %x: %v", txID, err)
 			}
 
-			results = append(results, &access.TransactionResult{
+			results = append(results, &accessmodel.TransactionResult{
 				Status:        txStatus,
 				StatusCode:    uint(txResult.GetStatusCode()),
 				Events:        events,
@@ -510,7 +519,7 @@ func (b *backendTransactions) getTransactionResultsByBlockIDFromExecutionNode(
 			return nil, rpc.ConvertError(err, "failed to convert events from system tx result", codes.Internal)
 		}
 
-		results = append(results, &access.TransactionResult{
+		results = append(results, &accessmodel.TransactionResult{
 			Status:        systemTxStatus,
 			StatusCode:    uint(systemTxResult.GetStatusCode()),
 			Events:        events,
@@ -530,7 +539,7 @@ func (b *backendTransactions) GetTransactionResultByIndex(
 	blockID flow.Identifier,
 	index uint32,
 	requiredEventEncodingVersion entities.EventEncodingVersion,
-) (*access.TransactionResult, error) {
+) (*accessmodel.TransactionResult, error) {
 	// TODO: https://github.com/onflow/flow-go/issues/2175 so caching doesn't cause a circular dependency
 	block, err := b.blocks.ByID(blockID)
 	if err != nil {
@@ -560,7 +569,7 @@ func (b *backendTransactions) getTransactionResultByIndexFromExecutionNode(
 	block *flow.Block,
 	index uint32,
 	requiredEventEncodingVersion entities.EventEncodingVersion,
-) (*access.TransactionResult, error) {
+) (*accessmodel.TransactionResult, error) {
 	blockID := block.ID()
 	// create request and forward to EN
 	req := &execproto.GetTransactionByIndexRequest{
@@ -599,7 +608,7 @@ func (b *backendTransactions) getTransactionResultByIndexFromExecutionNode(
 	}
 
 	// convert to response, cache and return
-	return &access.TransactionResult{
+	return &accessmodel.TransactionResult{
 		Status:       txStatus,
 		StatusCode:   uint(resp.GetStatusCode()),
 		Events:       events,
@@ -615,13 +624,13 @@ func (b *backendTransactions) GetSystemTransaction(ctx context.Context, _ flow.I
 }
 
 // GetSystemTransactionResult returns system transaction result
-func (b *backendTransactions) GetSystemTransactionResult(ctx context.Context, blockID flow.Identifier, requiredEventEncodingVersion entities.EventEncodingVersion) (*access.TransactionResult, error) {
+func (b *backendTransactions) GetSystemTransactionResult(ctx context.Context, blockID flow.Identifier, requiredEventEncodingVersion entities.EventEncodingVersion) (*accessmodel.TransactionResult, error) {
 	block, err := b.blocks.ByID(blockID)
 	if err != nil {
 		return nil, rpc.ConvertStorageError(err)
 	}
 
-	return b.lookupTransactionResult(ctx, b.systemTxID, block, requiredEventEncodingVersion)
+	return b.lookupTransactionResult(ctx, b.systemTxID, block.Header, requiredEventEncodingVersion)
 }
 
 // Error returns:
@@ -644,21 +653,21 @@ func (b *backendTransactions) lookupBlock(txID flow.Identifier) (*flow.Block, er
 func (b *backendTransactions) lookupTransactionResult(
 	ctx context.Context,
 	txID flow.Identifier,
-	block *flow.Block,
+	block *flow.Header,
 	requiredEventEncodingVersion entities.EventEncodingVersion,
-) (*access.TransactionResult, error) {
-	var txResult *access.TransactionResult
+) (*accessmodel.TransactionResult, error) {
+	var txResult *accessmodel.TransactionResult
 	var err error
 	switch b.txResultQueryMode {
 	case IndexQueryModeExecutionNodesOnly:
-		txResult, err = b.getTransactionResultFromExecutionNode(ctx, block, txID, requiredEventEncodingVersion)
+		txResult, err = b.GetTransactionResultFromExecutionNode(ctx, block, txID, requiredEventEncodingVersion)
 	case IndexQueryModeLocalOnly:
 		txResult, err = b.GetTransactionResultFromStorage(ctx, block, txID, requiredEventEncodingVersion)
 	case IndexQueryModeFailover:
 		txResult, err = b.GetTransactionResultFromStorage(ctx, block, txID, requiredEventEncodingVersion)
 		if err != nil {
 			// If any error occurs with local storage - request transaction result from EN
-			txResult, err = b.getTransactionResultFromExecutionNode(ctx, block, txID, requiredEventEncodingVersion)
+			txResult, err = b.GetTransactionResultFromExecutionNode(ctx, block, txID, requiredEventEncodingVersion)
 		}
 	default:
 		return nil, status.Errorf(codes.Internal, "unknown transaction result query mode: %v", b.txResultQueryMode)
@@ -705,7 +714,7 @@ func (b *backendTransactions) getHistoricalTransaction(
 func (b *backendTransactions) getHistoricalTransactionResult(
 	ctx context.Context,
 	txID flow.Identifier,
-) (*access.TransactionResult, error) {
+) (*accessmodel.TransactionResult, error) {
 	for _, historicalNode := range b.previousAccessNodes {
 		result, err := historicalNode.GetTransactionResult(ctx, &accessproto.GetTransactionRequest{Id: txID[:]})
 		if err == nil {
@@ -722,7 +731,7 @@ func (b *backendTransactions) getHistoricalTransactionResult(
 				result.Status = entities.TransactionStatus_EXPIRED
 			}
 
-			return access.MessageToTransactionResult(result), nil
+			return convert.MessageToTransactionResult(result), nil
 		}
 		// Otherwise, if not found, just continue
 		if status.Code(err) == codes.NotFound {
@@ -742,12 +751,12 @@ func (b *backendTransactions) registerTransactionForRetry(tx *flow.TransactionBo
 	b.retry.RegisterTransaction(referenceBlock.Height, tx)
 }
 
-func (b *backendTransactions) getTransactionResultFromExecutionNode(
+func (b *backendTransactions) GetTransactionResultFromExecutionNode(
 	ctx context.Context,
-	block *flow.Block,
+	block *flow.Header,
 	transactionID flow.Identifier,
 	requiredEventEncodingVersion entities.EventEncodingVersion,
-) (*access.TransactionResult, error) {
+) (*accessmodel.TransactionResult, error) {
 	blockID := block.ID()
 	// create an execution API request for events at blockID and transactionID
 	req := &execproto.GetTransactionResultRequest{
@@ -773,7 +782,7 @@ func (b *backendTransactions) getTransactionResultFromExecutionNode(
 	}
 
 	// tx body is irrelevant to status if it's in an executed block
-	txStatus, err := b.DeriveTransactionStatus(block.Header.Height, true)
+	txStatus, err := b.DeriveTransactionStatus(block.Height, true)
 	if err != nil {
 		if !errors.Is(err, state.ErrUnknownSnapshotReference) {
 			irrecoverable.Throw(ctx, err)
@@ -786,14 +795,14 @@ func (b *backendTransactions) getTransactionResultFromExecutionNode(
 		return nil, rpc.ConvertError(err, "failed to convert events to message", codes.Internal)
 	}
 
-	return &access.TransactionResult{
+	return &accessmodel.TransactionResult{
 		TransactionID: transactionID,
 		Status:        txStatus,
 		StatusCode:    uint(resp.GetStatusCode()),
 		Events:        events,
 		ErrorMessage:  resp.GetErrorMessage(),
 		BlockID:       blockID,
-		BlockHeight:   block.Header.Height,
+		BlockHeight:   block.Height,
 	}, nil
 }
 

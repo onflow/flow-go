@@ -77,12 +77,12 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"net/http"
 	"sync"
 	"time"
 
 	"golang.org/x/time/rate"
 
-	"github.com/google/uuid"
 	"github.com/gorilla/websocket"
 	"github.com/rs/zerolog"
 	"golang.org/x/sync/errgroup"
@@ -91,6 +91,9 @@ import (
 	"github.com/onflow/flow-go/engine/access/rest/websockets/models"
 	"github.com/onflow/flow-go/utils/concurrentmap"
 )
+
+// ErrMaxSubscriptionsReached is returned when the maximum number of active subscriptions per connection is exceeded.
+var ErrMaxSubscriptionsReached = errors.New("maximum number of subscriptions reached")
 
 type Controller struct {
 	logger zerolog.Logger
@@ -129,7 +132,7 @@ type Controller struct {
 	// issues such as sending on a closed channel while maintaining proper cleanup.
 	multiplexedStream chan interface{}
 
-	dataProviders       *concurrentmap.Map[uuid.UUID, dp.DataProvider]
+	dataProviders       *concurrentmap.Map[SubscriptionID, dp.DataProvider]
 	dataProviderFactory dp.DataProviderFactory
 	dataProvidersGroup  *sync.WaitGroup
 	limiter             *rate.Limiter
@@ -141,15 +144,20 @@ func NewWebSocketController(
 	conn WebsocketConnection,
 	dataProviderFactory dp.DataProviderFactory,
 ) *Controller {
+	var limiter *rate.Limiter
+	if config.MaxResponsesPerSecond > 0 {
+		limiter = rate.NewLimiter(rate.Limit(config.MaxResponsesPerSecond), 1)
+	}
+
 	return &Controller{
 		logger:              logger.With().Str("component", "websocket-controller").Logger(),
 		config:              config,
 		conn:                conn,
 		multiplexedStream:   make(chan interface{}),
-		dataProviders:       concurrentmap.New[uuid.UUID, dp.DataProvider](),
+		dataProviders:       concurrentmap.New[SubscriptionID, dp.DataProvider](),
 		dataProviderFactory: dataProviderFactory,
 		dataProvidersGroup:  &sync.WaitGroup{},
-		limiter:             rate.NewLimiter(rate.Limit(config.MaxResponsesPerSecond), 1),
+		limiter:             limiter,
 	}
 }
 
@@ -220,6 +228,13 @@ func (c *Controller) configureKeepalive() error {
 // keepalive sends a ping message periodically to keep the WebSocket connection alive
 // and avoid timeouts.
 func (c *Controller) keepalive(ctx context.Context) error {
+	defer func() {
+		// gracefully handle panics from github.com/gorilla/websocket
+		if r := recover(); r != nil {
+			c.logger.Warn().Interface("recovered_context", r).Msg("keepalive routine recovered from panic")
+		}
+	}()
+
 	pingTicker := time.NewTicker(PingPeriod)
 	defer pingTicker.Stop()
 
@@ -230,7 +245,8 @@ func (c *Controller) keepalive(ctx context.Context) error {
 		case <-pingTicker.C:
 			err := c.conn.WriteControl(websocket.PingMessage, time.Now().Add(WriteWait))
 			if err != nil {
-				if errors.Is(err, websocket.ErrCloseSent) {
+				var closeErr *websocket.CloseError
+				if errors.As(err, &closeErr) {
 					return err
 				}
 
@@ -246,10 +262,12 @@ func (c *Controller) keepalive(ctx context.Context) error {
 // If no messages are sent within InactivityTimeout and no active data providers exist,
 // the connection will be closed.
 func (c *Controller) writeMessages(ctx context.Context) error {
-	inactivityTicker := time.NewTicker(c.config.InactivityTimeout / 10)
-	defer inactivityTicker.Stop()
-
-	lastMessageSentAt := time.Now()
+	defer func() {
+		// gracefully handle panics from github.com/gorilla/websocket
+		if r := recover(); r != nil {
+			c.logger.Warn().Interface("recovered_context", r).Msg("writer routine recovered from panic")
+		}
+	}()
 
 	defer func() {
 		// drain the channel as some providers may still send data to it after this routine shutdowns
@@ -260,6 +278,11 @@ func (c *Controller) writeMessages(ctx context.Context) error {
 		}()
 	}()
 
+	inactivityTicker := time.NewTicker(c.inactivityTickerPeriod())
+	defer inactivityTicker.Stop()
+
+	lastMessageSentAt := time.Now()
+
 	for {
 		select {
 		case <-ctx.Done():
@@ -269,7 +292,7 @@ func (c *Controller) writeMessages(ctx context.Context) error {
 				return nil
 			}
 
-			if err := c.limiter.WaitN(ctx, 1); err != nil {
+			if err := c.checkRateLimit(ctx); err != nil {
 				return fmt.Errorf("rate limiter wait failed: %w", err)
 			}
 
@@ -301,32 +324,66 @@ func (c *Controller) writeMessages(ctx context.Context) error {
 	}
 }
 
+// inactivityTickerPeriod determines the interval at which the inactivity ticker is triggered.
+//
+// The inactivity ticker is used in the `writeMessages` routine to monitor periods of inactivity
+// in outgoing messages. If no messages are sent within the defined inactivity timeout
+// and there are no active data providers, the WebSocket connection will be terminated.
+func (c *Controller) inactivityTickerPeriod() time.Duration {
+	return c.config.InactivityTimeout / 10
+}
+
 // readMessages continuously reads messages from a client WebSocket connection,
 // validates each message, and processes it based on the message type.
 func (c *Controller) readMessages(ctx context.Context) error {
+	defer func() {
+		// gracefully handle panics from github.com/gorilla/websocket
+		if r := recover(); r != nil {
+			c.logger.Warn().Interface("recovered_context", r).Msg("reader routine recovered from panic")
+		}
+	}()
+
 	for {
-		var message json.RawMessage
-		if err := c.conn.ReadJSON(&message); err != nil {
-			if errors.Is(err, websocket.ErrCloseSent) {
-				return err
+		select {
+		// ctx.Done() is necessary in readMessages() to gracefully handle the termination of the connection
+		// and prevent a potential panic ("repeated read on failed websocket connection"). If an error occurs in writeMessages(),
+		// it indirectly affect the keepalive mechanism.
+		// This can stop periodic ping messages from being sent to the server, causing the server to close the connection.
+		// Without ctx.Done(), readMessages could continue blocking on a read operation, eventually encountering an i/o timeout
+		// when no data arrives. By monitoring ctx.Done(), we ensure that readMessages exits promptly when the context is canceled
+		// due to errors elsewhere in the system or intentional shutdown.
+		case <-ctx.Done():
+			return nil
+		default:
+			var message json.RawMessage
+			if err := c.conn.ReadJSON(&message); err != nil {
+				var closeErr *websocket.CloseError
+				if errors.As(err, &closeErr) {
+					return err
+				}
+
+				err = fmt.Errorf("error reading message: %w", err)
+				c.writeErrorResponse(
+					ctx,
+					err,
+					wrapErrorMessage(http.StatusBadRequest, err.Error(), "", ""),
+				)
+				continue
 			}
 
-			c.writeErrorResponse(
-				ctx,
-				err,
-				wrapErrorMessage(InvalidMessage, "error reading message", "", "", ""))
-			continue
-		}
-
-		err := c.handleMessage(ctx, message)
-		if err != nil {
-			c.writeErrorResponse(
-				ctx,
-				err,
-				wrapErrorMessage(InvalidMessage, "error parsing message", "", "", ""))
-			continue
+			err := c.handleMessage(ctx, message)
+			if err != nil {
+				err = fmt.Errorf("error parsing message: %w", err)
+				c.writeErrorResponse(
+					ctx,
+					err,
+					wrapErrorMessage(http.StatusBadRequest, err.Error(), "", ""),
+				)
+				continue
+			}
 		}
 	}
+
 }
 
 func (c *Controller) handleMessage(ctx context.Context, message json.RawMessage) error {
@@ -365,25 +422,52 @@ func (c *Controller) handleMessage(ctx context.Context, message json.RawMessage)
 	return nil
 }
 
+// handleSubscribe processes a subscription request.
+//
+// Expected error returns during normal operations:
+//   - ErrMaxSubscriptionsReached: if the maximum number of active subscriptions per connection is exceeded.
 func (c *Controller) handleSubscribe(ctx context.Context, msg models.SubscribeMessageRequest) {
-	// register new provider
-	provider, err := c.dataProviderFactory.NewDataProvider(ctx, msg.Topic, msg.Arguments, c.multiplexedStream)
-	if err != nil {
+	// Check if the maximum number of active subscriptions per connection has been reached.
+	// If the limit is exceeded, an error is returned, and the subscription request is rejected.
+	if uint64(c.dataProviders.Size()) >= c.config.MaxSubscriptionsPerConnection {
+		err := fmt.Errorf("error creating new subscription: %w", ErrMaxSubscriptionsReached)
 		c.writeErrorResponse(
 			ctx,
 			err,
-			wrapErrorMessage(InvalidArgument, "error creating data provider", msg.ClientMessageID, models.SubscribeAction, ""),
+			wrapErrorMessage(http.StatusTooManyRequests, err.Error(), models.SubscribeAction, msg.SubscriptionID),
 		)
 		return
 	}
-	c.dataProviders.Add(provider.ID(), provider)
+
+	subscriptionID, err := c.parseOrCreateSubscriptionID(msg.SubscriptionID)
+	if err != nil {
+		err = fmt.Errorf("error parsing subscription id: %w", err)
+		c.writeErrorResponse(
+			ctx,
+			err,
+			wrapErrorMessage(http.StatusBadRequest, err.Error(), models.SubscribeAction, msg.SubscriptionID),
+		)
+		return
+	}
+
+	// register new provider
+	provider, err := c.dataProviderFactory.NewDataProvider(ctx, subscriptionID.String(), msg.Topic, msg.Arguments, c.multiplexedStream)
+	if err != nil {
+		err = fmt.Errorf("error creating data provider: %w", err)
+		c.writeErrorResponse(
+			ctx,
+			err,
+			wrapErrorMessage(http.StatusBadRequest, err.Error(), models.SubscribeAction, subscriptionID.String()),
+		)
+		return
+	}
+	c.dataProviders.Add(subscriptionID, provider)
 
 	// write OK response to client
 	responseOk := models.SubscribeMessageResponse{
 		BaseMessageResponse: models.BaseMessageResponse{
-			ClientMessageID: msg.ClientMessageID,
-			Success:         true,
-			SubscriptionID:  provider.ID().String(),
+			SubscriptionID: subscriptionID.String(),
+			Action:         models.SubscribeAction,
 		},
 	}
 	c.writeResponse(ctx, responseOk)
@@ -393,75 +477,69 @@ func (c *Controller) handleSubscribe(ctx context.Context, msg models.SubscribeMe
 	go func() {
 		err = provider.Run()
 		if err != nil {
+			err = fmt.Errorf("internal error: %w", err)
 			c.writeErrorResponse(
 				ctx,
 				err,
-				wrapErrorMessage(SubscriptionError, "subscription finished with error", "", "", ""),
+				wrapErrorMessage(http.StatusInternalServerError, err.Error(),
+					models.SubscribeAction, subscriptionID.String()),
 			)
 		}
 
 		c.dataProvidersGroup.Done()
-		c.dataProviders.Remove(provider.ID())
+		c.dataProviders.Remove(subscriptionID)
 	}()
 }
 
 func (c *Controller) handleUnsubscribe(ctx context.Context, msg models.UnsubscribeMessageRequest) {
-	id, err := uuid.Parse(msg.SubscriptionID)
+	subscriptionID, err := ParseClientSubscriptionID(msg.SubscriptionID)
 	if err != nil {
+		err = fmt.Errorf("error parsing subscription id: %w", err)
 		c.writeErrorResponse(
 			ctx,
 			err,
-			wrapErrorMessage(InvalidArgument, "error parsing subscription ID", msg.ClientMessageID, models.UnsubscribeAction, msg.SubscriptionID),
+			wrapErrorMessage(http.StatusBadRequest, err.Error(), models.UnsubscribeAction, msg.SubscriptionID),
 		)
 		return
 	}
 
-	provider, ok := c.dataProviders.Get(id)
+	provider, ok := c.dataProviders.Get(subscriptionID)
 	if !ok {
 		c.writeErrorResponse(
 			ctx,
 			err,
-			wrapErrorMessage(NotFound, "subscription not found", msg.ClientMessageID, models.UnsubscribeAction, msg.SubscriptionID),
+			wrapErrorMessage(http.StatusNotFound, "subscription not found",
+				models.UnsubscribeAction, subscriptionID.String()),
 		)
 		return
 	}
 
 	provider.Close()
-	c.dataProviders.Remove(id)
+	c.dataProviders.Remove(subscriptionID)
 
 	responseOk := models.UnsubscribeMessageResponse{
 		BaseMessageResponse: models.BaseMessageResponse{
-			ClientMessageID: msg.ClientMessageID,
-			Success:         true,
-			SubscriptionID:  msg.SubscriptionID,
+			SubscriptionID: subscriptionID.String(),
+			Action:         models.UnsubscribeAction,
 		},
 	}
 	c.writeResponse(ctx, responseOk)
 }
 
-func (c *Controller) handleListSubscriptions(ctx context.Context, msg models.ListSubscriptionsMessageRequest) {
+func (c *Controller) handleListSubscriptions(ctx context.Context, _ models.ListSubscriptionsMessageRequest) {
 	var subs []*models.SubscriptionEntry
-	err := c.dataProviders.ForEach(func(id uuid.UUID, provider dp.DataProvider) error {
+	_ = c.dataProviders.ForEach(func(id SubscriptionID, provider dp.DataProvider) error {
 		subs = append(subs, &models.SubscriptionEntry{
-			ID:    id.String(),
-			Topic: provider.Topic(),
+			SubscriptionID: id.String(),
+			Topic:          provider.Topic(),
+			Arguments:      provider.Arguments(),
 		})
 		return nil
 	})
 
-	if err != nil {
-		c.writeErrorResponse(
-			ctx,
-			err,
-			wrapErrorMessage(NotFound, "error listing subscriptions", msg.ClientMessageID, models.ListSubscriptionsAction, ""),
-		)
-		return
-	}
-
 	responseOk := models.ListSubscriptionsMessageResponse{
-		Success:         true,
-		ClientMessageID: msg.ClientMessageID,
-		Subscriptions:   subs,
+		Subscriptions: subs,
+		Action:        models.ListSubscriptionsAction,
 	}
 	c.writeResponse(ctx, responseOk)
 }
@@ -472,13 +550,10 @@ func (c *Controller) shutdownConnection() {
 		c.logger.Debug().Err(err).Msg("error closing connection")
 	}
 
-	err = c.dataProviders.ForEach(func(_ uuid.UUID, provider dp.DataProvider) error {
+	_ = c.dataProviders.ForEach(func(_ SubscriptionID, provider dp.DataProvider) error {
 		provider.Close()
 		return nil
 	})
-	if err != nil {
-		c.logger.Debug().Err(err).Msg("error closing data provider")
-	}
 
 	c.dataProviders.Clear()
 	c.dataProvidersGroup.Wait()
@@ -498,15 +573,37 @@ func (c *Controller) writeResponse(ctx context.Context, response interface{}) {
 	}
 }
 
-func wrapErrorMessage(code Code, message string, msgId string, action string, subscriptionID string) models.BaseMessageResponse {
+func wrapErrorMessage(code int, message string, action string, subscriptionID string) models.BaseMessageResponse {
 	return models.BaseMessageResponse{
-		ClientMessageID: msgId,
-		Success:         false,
-		SubscriptionID:  subscriptionID,
-		Error: models.ErrorMessage{
-			Code:    int(code),
+		SubscriptionID: subscriptionID,
+		Error: &models.ErrorMessage{
+			Code:    code,
 			Message: message,
-			Action:  action,
 		},
+		Action: action,
 	}
+}
+
+func (c *Controller) parseOrCreateSubscriptionID(id string) (SubscriptionID, error) {
+	newId, err := NewSubscriptionID(id)
+	if err != nil {
+		return SubscriptionID{}, err
+	}
+
+	if c.dataProviders.Has(newId) {
+		return SubscriptionID{}, fmt.Errorf("subscription ID is already in use: %s", newId)
+	}
+
+	return newId, nil
+}
+
+// checkRateLimit checks the controller rate limit and blocks until there is room to send a response.
+// An error is returned if the context is canceled or the expected wait time exceeds the context's
+// deadline.
+func (c *Controller) checkRateLimit(ctx context.Context) error {
+	if c.limiter == nil {
+		return nil
+	}
+
+	return c.limiter.WaitN(ctx, 1)
 }

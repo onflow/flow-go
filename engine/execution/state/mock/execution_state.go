@@ -117,12 +117,40 @@ func (_m *ExecutionState) GetExecutionResultID(_a0 context.Context, _a1 flow.Ide
 	return r0, r1
 }
 
-// GetHighestExecutedBlockID provides a mock function with given fields: _a0
-func (_m *ExecutionState) GetHighestExecutedBlockID(_a0 context.Context) (uint64, flow.Identifier, error) {
+// GetHighestFinalizedExecuted provides a mock function with given fields:
+func (_m *ExecutionState) GetHighestFinalizedExecuted() (uint64, error) {
+	ret := _m.Called()
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetHighestFinalizedExecuted")
+	}
+
+	var r0 uint64
+	var r1 error
+	if rf, ok := ret.Get(0).(func() (uint64, error)); ok {
+		return rf()
+	}
+	if rf, ok := ret.Get(0).(func() uint64); ok {
+		r0 = rf()
+	} else {
+		r0 = ret.Get(0).(uint64)
+	}
+
+	if rf, ok := ret.Get(1).(func() error); ok {
+		r1 = rf()
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// GetLastExecutedBlockID provides a mock function with given fields: _a0
+func (_m *ExecutionState) GetLastExecutedBlockID(_a0 context.Context) (uint64, flow.Identifier, error) {
 	ret := _m.Called(_a0)
 
 	if len(ret) == 0 {
-		panic("no return value specified for GetHighestExecutedBlockID")
+		panic("no return value specified for GetLastExecutedBlockID")
 	}
 
 	var r0 uint64
@@ -152,34 +180,6 @@ func (_m *ExecutionState) GetHighestExecutedBlockID(_a0 context.Context) (uint64
 	}
 
 	return r0, r1, r2
-}
-
-// GetHighestFinalizedExecuted provides a mock function with given fields:
-func (_m *ExecutionState) GetHighestFinalizedExecuted() (uint64, error) {
-	ret := _m.Called()
-
-	if len(ret) == 0 {
-		panic("no return value specified for GetHighestFinalizedExecuted")
-	}
-
-	var r0 uint64
-	var r1 error
-	if rf, ok := ret.Get(0).(func() (uint64, error)); ok {
-		return rf()
-	}
-	if rf, ok := ret.Get(0).(func() uint64); ok {
-		r0 = rf()
-	} else {
-		r0 = ret.Get(0).(uint64)
-	}
-
-	if rf, ok := ret.Get(1).(func() error); ok {
-		r1 = rf()
-	} else {
-		r1 = ret.Error(1)
-	}
-
-	return r0, r1
 }
 
 // IsBlockExecuted provides a mock function with given fields: height, blockID
@@ -278,16 +278,16 @@ func (_m *ExecutionState) StateCommitmentByBlockID(_a0 flow.Identifier) (flow.St
 	return r0, r1
 }
 
-// UpdateHighestExecutedBlockIfHigher provides a mock function with given fields: _a0, _a1
-func (_m *ExecutionState) UpdateHighestExecutedBlockIfHigher(_a0 context.Context, _a1 *flow.Header) error {
+// UpdateLastExecutedBlock provides a mock function with given fields: _a0, _a1
+func (_m *ExecutionState) UpdateLastExecutedBlock(_a0 context.Context, _a1 flow.Identifier) error {
 	ret := _m.Called(_a0, _a1)
 
 	if len(ret) == 0 {
-		panic("no return value specified for UpdateHighestExecutedBlockIfHigher")
+		panic("no return value specified for UpdateLastExecutedBlock")
 	}
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(context.Context, *flow.Header) error); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, flow.Identifier) error); ok {
 		r0 = rf(_a0, _a1)
 	} else {
 		r0 = ret.Error(0)
