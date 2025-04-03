@@ -183,22 +183,10 @@ func NewMalleabilityChecker(ops ...MalleabilityCheckerOpt) *MalleabilityChecker 
 // It returns an error if the entity is malleable, otherwise it returns nil.
 // No errors are expected during normal operations.
 func (mc *MalleabilityChecker) CheckEntity(entity flow.IDEntity) error {
-	v := reflect.ValueOf(entity)
-	if !v.IsValid() {
-		return fmt.Errorf("input is not a valid entity")
+	if entity == nil {
+		return fmt.Errorf("entity is nil")
 	}
-	if v.Kind() != reflect.Ptr {
-		// If it is not a pointer type, we may not be able to set fields to test malleability, since the entity may not be addressable
-		return fmt.Errorf("entity is not a pointer type (try checking a reference to it), entity: %v %v", v.Kind(), v.Type())
-	}
-	if v.IsNil() {
-		return fmt.Errorf("entity is nil, nothing to check")
-	}
-	v = v.Elem()
-	if err := mc.isEntityMalleable(v, nil, "", entity.ID); err != nil {
-		return err
-	}
-	return mc.checkExpectations()
+	return mc.Check(entity, entity.ID)
 }
 
 // Check is a method that performs the malleability check on the input model.
@@ -212,14 +200,14 @@ func (mc *MalleabilityChecker) CheckEntity(entity flow.IDEntity) error {
 func (mc *MalleabilityChecker) Check(model any, hashModel func() flow.Identifier) error {
 	v := reflect.ValueOf(model)
 	if !v.IsValid() {
-		return fmt.Errorf("input is not a valid model")
+		return fmt.Errorf("input is not a valid entity")
 	}
 	if v.Kind() != reflect.Ptr {
 		// If it is not a pointer type, we may not be able to set fields to test malleability, since the model may not be addressable
-		return fmt.Errorf("model is not a pointer type (try checking a reference to it), model: %v %v", v.Kind(), v.Type())
+		return fmt.Errorf("entity is not a pointer type (try checking a reference to it), entity: %v %v", v.Kind(), v.Type())
 	}
 	if v.IsNil() {
-		return fmt.Errorf("model is nil, nothing to check")
+		return fmt.Errorf("entity is nil, nothing to check")
 	}
 	v = v.Elem()
 	if err := mc.isEntityMalleable(v, nil, "", hashModel); err != nil {
