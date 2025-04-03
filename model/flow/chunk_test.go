@@ -29,58 +29,6 @@ func TestChunkList_ByIndex(t *testing.T) {
 	require.True(t, ok)
 }
 
-// TestDistinctChunkIDs_EmptyChunks evaluates that two empty chunks
-// with the distinct block ids would have distinct chunk ids.
-func TestDistinctChunkIDs_EmptyChunks(t *testing.T) {
-	// generates two random block ids and requires them
-	// being distinct
-	blockIdA := unittest.IdentifierFixture()
-	blockIdB := unittest.IdentifierFixture()
-	require.NotEqual(t, blockIdA, blockIdB)
-
-	// generates a chunk associated with each block id
-	chunkA := &flow.Chunk{
-		ChunkBody: flow.ChunkBody{
-			BlockID: blockIdA,
-		},
-	}
-
-	chunkB := &flow.Chunk{
-		ChunkBody: flow.ChunkBody{
-			BlockID: blockIdB,
-		},
-	}
-
-	require.NotEqual(t, chunkA.ID(), chunkB.ID())
-}
-
-// TestDistinctChunkIDs_FullChunks evaluates that two full chunks
-// with completely identical fields but distinct block ids have
-// distinct chunk ids.
-func TestDistinctChunkIDs_FullChunks(t *testing.T) {
-	// generates two random block ids and requires them
-	// being distinct
-	blockIdA := unittest.IdentifierFixture()
-	blockIdB := unittest.IdentifierFixture()
-	require.NotEqual(t, blockIdA, blockIdB)
-
-	// generates a chunk associated with blockA
-	chunkA := unittest.ChunkFixture(blockIdA, 42, unittest.StateCommitmentFixture())
-
-	// generates a deep copy of chunkA in chunkB
-	chunkB := *chunkA
-
-	// since chunkB is a deep copy of chunkA their
-	// chunk ids should be the same
-	require.Equal(t, chunkA.ID(), chunkB.ID())
-
-	// changes block id in chunkB
-	chunkB.BlockID = blockIdB
-
-	// chunks with distinct block ids should have distinct chunk ids
-	require.NotEqual(t, chunkA.ID(), chunkB.ID())
-}
-
 // TestChunkList_Indices evaluates the Indices method of ChunkList on lists of different sizes.
 func TestChunkList_Indices(t *testing.T) {
 	cl := unittest.ChunkListFixture(5, unittest.IdentifierFixture(), unittest.StateCommitmentFixture())
@@ -370,23 +318,49 @@ func TestChunk_ModelVersions_EncodeDecode(t *testing.T) {
 func TestChunk_FingerprintBackwardCompatibility(t *testing.T) {
 	chunk := unittest.ChunkFixture(unittest.IdentifierFixture(), 1, unittest.StateCommitmentFixture())
 	chunk.ServiceEventCount = nil
-	chunkBody := chunk.ChunkBody
-	var chunkBodyV0 flow.ChunkBodyV0
-	unittest.EncodeDecodeDifferentVersions(t, chunkBody, &chunkBodyV0)
+
+	// Define an older type which use flow.ChunkBodyV0
+	type ChunkV0 struct {
+		flow.ChunkBodyV0
+		Index    uint64
+		EndState flow.StateCommitment
+	}
+
+	var chunkV0 ChunkV0
+	unittest.EncodeDecodeDifferentVersions(t, chunk, &chunkV0)
 
 	// A nil ServiceEventCount fields indicates a prior model version.
 	// The ID calculation for the old and new model version should be the same.
 	t.Run("nil ServiceEventCount fields", func(t *testing.T) {
 		chunk.ServiceEventCount = nil
-		assert.Equal(t, flow.MakeID(chunkBodyV0), chunk.ID())
-		assert.Equal(t, flow.MakeID(chunkBodyV0), flow.MakeID(chunk.ChunkBody))
+		assert.Equal(t, flow.MakeID(chunkV0), chunk.ID())
+		assert.Equal(t, flow.MakeID(chunkV0), flow.MakeID(chunk))
 	})
 	// A non-nil ServiceEventCount fields indicates an up-to-date model version.
 	// The ID calculation for the old and new model version should be different,
 	// because the new model should include the ServiceEventCount field value.
 	t.Run("non-nil ServiceEventCount fields", func(t *testing.T) {
 		chunk.ServiceEventCount = unittest.PtrTo[uint16](0)
-		assert.NotEqual(t, flow.MakeID(chunkBodyV0), chunk.ID())
-		assert.NotEqual(t, flow.MakeID(chunkBodyV0), flow.MakeID(chunk.ChunkBody))
+		assert.NotEqual(t, flow.MakeID(chunkV0), chunk.ID())
+		assert.NotEqual(t, flow.MakeID(chunkV0), flow.MakeID(chunk))
+	})
+}
+
+// TestChunkMalleability performs sanity checks to ensure that chunk is not malleable.
+func TestChunkMalleability(t *testing.T) {
+	t.Run("Chunk with non-nil ServiceEventCount", func(t *testing.T) {
+		unittest.RequireEntityNonMalleable(t, unittest.ChunkFixture(unittest.IdentifierFixture(), 0, unittest.StateCommitmentFixture()))
+	})
+
+	// TODO(mainnet27, #6773): remove this test according to https://github.com/onflow/flow-go/issues/6773
+	t.Run("Chunk with nil ServiceEventCount", func(t *testing.T) {
+		unittest.RequireEntityNonMalleable(
+			t,
+			unittest.ChunkFixture(unittest.IdentifierFixture(), 0, unittest.StateCommitmentFixture(), func(c *flow.Chunk) {
+				c.ServiceEventCount = nil
+			}),
+			// We pin the `ServiceEventCount` to the current value (nil), so `MalleabilityChecker` will not mutate this field:
+			unittest.WithPinnedField("ChunkBody.ServiceEventCount"),
+		)
 	})
 }
