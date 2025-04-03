@@ -379,7 +379,7 @@ func TestStateDB(t *testing.T) {
 		db, err = state.NewStateDB(ledger, rootAddr)
 		require.NoError(t, err)
 		// call self destruct
-		db.Selfdestruct6780(addr1)
+		db.SelfDestruct6780(addr1)
 		require.NoError(t, db.Error())
 		// noop is expected
 		require.Equal(t, balance1, db.GetBalance(addr1))
@@ -400,7 +400,7 @@ func TestStateDB(t *testing.T) {
 		db, err = state.NewStateDB(ledger, rootAddr)
 		require.NoError(t, err)
 		// call self destruct should not work
-		db.Selfdestruct6780(addr2)
+		db.SelfDestruct6780(addr2)
 		require.NoError(t, db.Error())
 		// still no impact
 		require.Equal(t, balance2, db.GetBalance(addr2))
@@ -417,7 +417,7 @@ func TestStateDB(t *testing.T) {
 		db.CreateContract(addr2)
 		require.Equal(t, code1, db.GetCode(addr2))
 		// now calling selfdestruct should do the job
-		db.Selfdestruct6780(addr2)
+		db.SelfDestruct6780(addr2)
 		require.NoError(t, db.Error())
 		commit, err = db.Commit(true)
 		require.NoError(t, err)
@@ -444,7 +444,7 @@ func TestStateDB(t *testing.T) {
 		db.AddBalance(addr3, balance3, tracing.BalanceChangeTransfer)
 		require.NoError(t, db.Error())
 		// call self destruct
-		db.Selfdestruct6780(addr3)
+		db.SelfDestruct6780(addr3)
 		require.NoError(t, db.Error())
 		// commit changes
 		commit, err = db.Commit(true)
