@@ -425,7 +425,7 @@ func (builder *FlowAccessNodeBuilder) buildCommittee() *FlowAccessNodeBuilder {
 
 func (builder *FlowAccessNodeBuilder) buildLatestHeader() *FlowAccessNodeBuilder {
 	builder.Module("latest header", func(node *cmd.NodeConfig) error {
-		finalized, pending, err := recovery.FindLatest(node.State, node.Storage.Headers, node.Storage.ProposalSignatures)
+		finalized, pending, err := recovery.FindLatest(node.State, node.Storage.Headers)
 		builder.Finalized, builder.Pending = finalized, pending
 
 		return err

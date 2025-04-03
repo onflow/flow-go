@@ -1145,7 +1145,7 @@ func (exeNode *ExecutionNode) LoadFollowerCore(
 	// state when the follower detects newly finalized blocks
 	final := finalizer.NewFinalizer(node.DB, node.Storage.Headers, exeNode.followerState, node.Tracer)
 
-	finalized, pending, err := recovery.FindLatest(node.State, node.Storage.Headers, node.Storage.ProposalSignatures)
+	finalized, pending, err := recovery.FindLatest(node.State, node.Storage.Headers)
 	if err != nil {
 		return nil, fmt.Errorf("could not find latest finalized block and pending blocks to recover consensus follower: %w", err)
 	}

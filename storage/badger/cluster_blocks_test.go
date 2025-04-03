@@ -38,7 +38,6 @@ func TestClusterBlocksByHeight(t *testing.T) {
 			blocks[0].Header.ChainID,
 			NewHeaders(metrics.NewNoopCollector(), db),
 			NewClusterPayloads(metrics.NewNoopCollector(), db),
-			NewProposalSignatures(metrics.NewNoopCollector(), db),
 		)
 
 		// check if the block can be retrieved by height

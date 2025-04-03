@@ -25,15 +25,21 @@ func TestBlockStoreAndRetrieve(t *testing.T) {
 
 		retrieved, err := blocks.ByID(block.ID())
 		require.NoError(t, err)
-
 		require.Equal(t, &block, retrieved)
+
+		retrievedp, err := blocks.ProposalByID(block.ID())
+		require.NoError(t, err)
+		require.Equal(t, prop, retrievedp)
 
 		// verify after a restart, the block stored in the database is the same
 		// as the original
 		blocksAfterRestart := badgerstorage.InitAll(cacheMetrics, db).Blocks
 		receivedAfterRestart, err := blocksAfterRestart.ByID(block.ID())
 		require.NoError(t, err)
-
 		require.Equal(t, &block, receivedAfterRestart)
+
+		receivedAfterRestartp, err := blocksAfterRestart.ProposalByID(block.ID())
+		require.NoError(t, err)
+		require.Equal(t, prop, receivedAfterRestartp)
 	})
 }

@@ -15,8 +15,7 @@ func InitAll(metrics module.CacheMetrics, db *badger.DB) *storage.All {
 	results := NewExecutionResults(metrics, db)
 	receipts := NewExecutionReceipts(metrics, db, results, DefaultCacheSize)
 	payloads := NewPayloads(db, index, guarantees, seals, receipts, results)
-	sigs := NewProposalSignatures(metrics, db)
-	blocks := NewBlocks(db, headers, payloads, sigs)
+	blocks := NewBlocks(db, headers, payloads)
 	qcs := NewQuorumCertificates(metrics, db, DefaultCacheSize)
 	setups := NewEpochSetups(metrics, db)
 	epochCommits := NewEpochCommits(metrics, db)
@@ -38,7 +37,6 @@ func InitAll(metrics module.CacheMetrics, db *badger.DB) *storage.All {
 		Index:                     index,
 		Payloads:                  payloads,
 		Blocks:                    blocks,
-		ProposalSignatures:        sigs,
 		QuorumCertificates:        qcs,
 		Setups:                    setups,
 		EpochCommits:              epochCommits,

@@ -75,7 +75,7 @@ func (_m *ClusterBlocks) ByID(blockID flow.Identifier) (*cluster.BlockProposal, 
 }
 
 // Store provides a mock function with given fields: block
-func (_m *ClusterBlocks) Store(block *cluster.Block) error {
+func (_m *ClusterBlocks) Store(block *cluster.BlockProposal) error {
 	ret := _m.Called(block)
 
 	if len(ret) == 0 {
@@ -83,7 +83,7 @@ func (_m *ClusterBlocks) Store(block *cluster.Block) error {
 	}
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(*cluster.Block) error); ok {
+	if rf, ok := ret.Get(0).(func(*cluster.BlockProposal) error); ok {
 		r0 = rf(block)
 	} else {
 		r0 = ret.Error(0)

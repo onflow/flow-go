@@ -19,7 +19,7 @@ import (
 //
 // Note: this is an expensive method, which is intended to help recover from a crash, e.g. help to
 // re-built the in-memory consensus state.
-func FindLatest(state protocol.State, headers storage.Headers, sigs storage.ProposalSignatures) (*flow.Header, []*flow.Proposal, error) {
+func FindLatest(state protocol.State, headers storage.Headers) (*flow.Header, []*flow.Proposal, error) {
 	finalizedSnapshot := state.Final()              // state snapshot at latest finalized block
 	finalizedBlock, err := finalizedSnapshot.Head() // header of latest finalized block
 	if err != nil {
@@ -33,15 +33,11 @@ func FindLatest(state protocol.State, headers storage.Headers, sigs storage.Prop
 	// retrieve the headers for each of the pending blocks
 	pending := make([]*flow.Proposal, 0, len(pendingIDs))
 	for _, pendingID := range pendingIDs {
-		pendingHeader, err := headers.ByBlockID(pendingID)
+		proposal, err := headers.ProposalByBlockID(pendingID)
 		if err != nil {
 			return nil, nil, fmt.Errorf("could not find pending block by ID: %w", err)
 		}
-		sig, err := sigs.ByBlockID(pendingID)
-		if err != nil {
-			return nil, nil, fmt.Errorf("could not find proposer signature for block ID: %w", err)
-		}
-		pending = append(pending, &flow.Proposal{Header: pendingHeader, ProposerSigData: sig})
+		pending = append(pending, proposal)
 	}
 
 	return finalizedBlock, pending, nil

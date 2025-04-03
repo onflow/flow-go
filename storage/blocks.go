@@ -19,8 +19,8 @@ type Blocks interface {
 	// finalized and ambiguous blocks.
 	ByID(blockID flow.Identifier) (*flow.Block, error)
 
-	// ProposalByID
-	// TODO
+	// ProposalByID returns the block with the given ID, along with the proposer's signature on it.
+	// It is available for finalized and ambiguous blocks.
 	ProposalByID(blockID flow.Identifier) (*flow.BlockProposal, error)
 
 	// ByHeight returns the block at the given height. It is only available

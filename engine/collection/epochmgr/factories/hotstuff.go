@@ -181,14 +181,13 @@ func (f *HotStuffFactory) Create(
 	metrics module.HotstuffMetrics,
 	builder module.Builder,
 	headers storage.Headers,
-	proposerSigs storage.ProposalSignatures,
 	hotstuffModules *consensus.HotstuffModules,
 ) (module.HotStuff, error) {
 
 	// setup metrics/logging with the new chain ID
 	builder = blockproducer.NewMetricsWrapper(builder, metrics) // wrapper for measuring time spent building block payload component
 
-	finalizedBlock, pendingBlocks, err := recovery.FindLatest(clusterState, headers, proposerSigs)
+	finalizedBlock, pendingBlocks, err := recovery.FindLatest(clusterState, headers)
 	if err != nil {
 		return nil, err
 	}

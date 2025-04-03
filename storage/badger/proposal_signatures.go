@@ -44,7 +44,7 @@ func NewProposalSignatures(collector module.CacheMetrics, db *badger.DB) *Propos
 	}
 }
 
-func (h *ProposalSignatures) StoreTx(blockID flow.Identifier, sig []byte) func(*transaction.Tx) error {
+func (h *ProposalSignatures) storeTx(blockID flow.Identifier, sig []byte) func(*transaction.Tx) error {
 	return h.cache.PutTx(blockID, sig)
 }
 

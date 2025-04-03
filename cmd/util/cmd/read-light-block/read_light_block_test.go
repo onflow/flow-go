@@ -40,7 +40,6 @@ func TestReadClusterRange(t *testing.T) {
 			blocks[0].Header.ChainID,
 			badgerstorage.NewHeaders(metrics.NewNoopCollector(), db),
 			badgerstorage.NewClusterPayloads(metrics.NewNoopCollector(), db),
-			badgerstorage.NewProposalSignatures(metrics.NewNoopCollector(), db),
 		)
 
 		startHeight := blocks[0].Header.Height

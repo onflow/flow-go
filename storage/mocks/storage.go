@@ -251,8 +251,23 @@ func (mr *MockHeadersMockRecorder) Exists(arg0 interface{}) *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Exists", reflect.TypeOf((*MockHeaders)(nil).Exists), arg0)
 }
 
+// ProposalByBlockID mocks base method.
+func (m *MockHeaders) ProposalByBlockID(arg0 flow.Identifier) (*flow.Proposal, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ProposalByBlockID", arg0)
+	ret0, _ := ret[0].(*flow.Proposal)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// ProposalByBlockID indicates an expected call of ProposalByBlockID.
+func (mr *MockHeadersMockRecorder) ProposalByBlockID(arg0 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ProposalByBlockID", reflect.TypeOf((*MockHeaders)(nil).ProposalByBlockID), arg0)
+}
+
 // Store mocks base method.
-func (m *MockHeaders) Store(arg0 *flow.Header) error {
+func (m *MockHeaders) Store(arg0 *flow.Proposal) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Store", arg0)
 	ret0, _ := ret[0].(error)

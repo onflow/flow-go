@@ -223,11 +223,7 @@ func main() {
 			if !ok {
 				panic("fail to initialize admin tool, conf.Storage.Headers can not be casted as badger headers")
 			}
-			sigs, ok := conf.Storage.ProposalSignatures.(*badger.ProposalSignatures)
-			if !ok {
-				panic("fail to initialize admin tool, conf.Storage.ProposalSignatures can not be casted as badger proposalSignatures")
-			}
-			return storageCommands.NewReadRangeClusterBlocksCommand(conf.DB, headers, clusterPayloads, sigs)
+			return storageCommands.NewReadRangeClusterBlocksCommand(conf.DB, headers, clusterPayloads)
 		}).
 		Module("follower distributor", func(node *cmd.NodeConfig) error {
 			followerDistributor = pubsub.NewFollowerDistributor()
@@ -333,7 +329,7 @@ func main() {
 			// create a finalizer for updating the protocol
 			// state when the follower detects newly finalized blocks
 			finalizer := confinalizer.NewFinalizer(node.DB, node.Storage.Headers, followerState, node.Tracer)
-			finalized, pending, err := recovery.FindLatest(node.State, node.Storage.Headers, node.Storage.ProposalSignatures)
+			finalized, pending, err := recovery.FindLatest(node.State, node.Storage.Headers)
 			if err != nil {
 				return nil, fmt.Errorf("could not find latest finalized block and pending blocks to recover consensus follower: %w", err)
 			}

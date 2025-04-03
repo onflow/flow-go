@@ -793,11 +793,10 @@ func main() {
 			if !startupTime.IsZero() {
 				opts = append(opts, consensus.WithStartupTime(startupTime))
 			}
-			finalizedBlock, pending, err := recovery.FindLatest(node.State, node.Storage.Headers, node.Storage.ProposalSignatures)
+			finalizedBlock, pending, err := recovery.FindLatest(node.State, node.Storage.Headers)
 			if err != nil {
 				return nil, err
 			}
-			// TODO(malleability, #7100) proposer signature storage
 
 			// initialize hotstuff consensus algorithm
 			hot, err = consensus.NewParticipant(

@@ -15,16 +15,14 @@ type Blocks struct {
 	db       *badger.DB
 	headers  *Headers
 	payloads *Payloads
-	sigs     *ProposalSignatures
 }
 
 // NewBlocks ...
-func NewBlocks(db *badger.DB, headers *Headers, payloads *Payloads, sigs *ProposalSignatures) *Blocks {
+func NewBlocks(db *badger.DB, headers *Headers, payloads *Payloads) *Blocks {
 	b := &Blocks{
 		db:       db,
 		headers:  headers,
 		payloads: payloads,
-		sigs:     sigs,
 	}
 	return b
 }
@@ -32,17 +30,13 @@ func NewBlocks(db *badger.DB, headers *Headers, payloads *Payloads, sigs *Propos
 func (b *Blocks) StoreTx(block *flow.BlockProposal) func(*transaction.Tx) error {
 	return func(tx *transaction.Tx) error {
 		blockID := block.Block.ID()
-		err := b.headers.storeTx(block.Block.Header)(tx)
+		err := b.headers.storeTx(block.Block.Header, block.ProposerSigData)(tx)
 		if err != nil {
 			return fmt.Errorf("could not store header %v: %w", blockID, err)
 		}
 		err = b.payloads.storeTx(blockID, block.Block.Payload)(tx)
 		if err != nil {
 			return fmt.Errorf("could not store payload: %w", err)
-		}
-		err = b.sigs.StoreTx(blockID, block.ProposerSigData)(tx)
-		if err != nil {
-			return fmt.Errorf("could not store proposer signature: %w", err)
 		}
 		return nil
 	}
@@ -76,7 +70,7 @@ func (b *Blocks) retrieveProposalTx(blockID flow.Identifier) func(*badger.Txn) (
 		if err != nil {
 			return nil, fmt.Errorf("could not retrieve payload: %w", err)
 		}
-		sig, err := b.sigs.retrieveTx(blockID)(tx)
+		sig, err := b.headers.sigs.retrieveTx(blockID)(tx)
 		if err != nil {
 			return nil, fmt.Errorf("could not retrieve proposer signature: %w", err)
 		}

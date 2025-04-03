@@ -8,7 +8,7 @@ import (
 type Headers interface {
 
 	// Store will store a header.
-	Store(header *flow.Header) error
+	Store(header *flow.Proposal) error
 
 	// ByBlockID returns the header with the given ID. It is available for finalized and ambiguous blocks.
 	// Error returns:
@@ -31,4 +31,8 @@ type Headers interface {
 	// might be unfinalized; if there is more than one, at least one of them has to
 	// be unfinalized.
 	ByParentID(parentID flow.Identifier) ([]*flow.Header, error)
+
+	// ProposalByBlockID returns the header with the given ID, along with the corresponding proposer signature.
+	// It is available for finalized and ambiguous blocks.
+	ProposalByBlockID(blockID flow.Identifier) (*flow.Proposal, error)
 }

@@ -104,10 +104,9 @@ func (factory *EpochComponentsFactory) Create(
 
 	// create the cluster state
 	var (
-		headers      storage.Headers
-		payloads     storage.ClusterPayloads
-		blocks       storage.ClusterBlocks
-		proposerSigs storage.ProposalSignatures
+		headers  storage.Headers
+		payloads storage.ClusterPayloads
+		blocks   storage.ClusterBlocks
 	)
 
 	stateRoot, err := badger.NewStateRoot(cluster.RootBlock(), cluster.RootQC(), cluster.EpochCounter())
@@ -116,7 +115,7 @@ func (factory *EpochComponentsFactory) Create(
 		return
 	}
 	var mutableState *badger.MutableState
-	mutableState, headers, payloads, blocks, proposerSigs, err = factory.state.Create(stateRoot)
+	mutableState, headers, payloads, blocks, err = factory.state.Create(stateRoot)
 	state = mutableState
 	if err != nil {
 		err = fmt.Errorf("could not create cluster state: %w", err)
@@ -147,7 +146,6 @@ func (factory *EpochComponentsFactory) Create(
 		metrics,
 		builder,
 		headers,
-		proposerSigs,
 		hotstuffModules,
 	)
 	if err != nil {
