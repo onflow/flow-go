@@ -212,7 +212,7 @@ require (
 	github.com/onflow/flow-nft/lib/go/contracts v1.2.3 // indirect
 	github.com/onflow/flow-nft/lib/go/templates v1.2.1 // indirect
 	github.com/onflow/flow/protobuf/go/flow v0.4.10 // indirect
-	github.com/onflow/go-ethereum v1.14.8-0.20250327092350-88fbc940c1b0 // indirect
+	github.com/onflow/go-ethereum v1.14.8-0.20250327095627-0e03f79f9bfd // indirect
 	github.com/onflow/nft-storefront/lib/go/contracts v1.0.0 // indirect
 	github.com/onflow/sdks v0.6.0-preview.1 // indirect
 	github.com/onflow/wal v1.0.2 // indirect
@@ -270,7 +270,7 @@ require (
 	github.com/spf13/viper v1.15.0 // indirect
 	github.com/stretchr/objx v0.5.2 // indirect
 	github.com/subosito/gotenv v1.4.2 // indirect
-	github.com/supranational/blst v0.3.13 // indirect
+	github.com/supranational/blst v0.3.14 // indirect
 	github.com/syndtr/goleveldb v1.0.1-0.20210819022825-2ae1ddf74ef7 // indirect
 	github.com/texttheater/golang-levenshtein/levenshtein v0.0.0-20200805054039-cae8b0eaed6c // indirect
 	github.com/tklauser/go-sysconf v0.3.12 // indirect

@@ -108,7 +108,7 @@ require (
 	github.com/libp2p/go-libp2p-routing-helpers v0.7.4
 	github.com/mitchellh/mapstructure v1.5.0
 	github.com/onflow/bridged-usdc/lib/go/contracts v1.0.0
-	github.com/onflow/go-ethereum v1.14.8-0.20250327092350-88fbc940c1b0
+	github.com/onflow/go-ethereum v1.14.8-0.20250327095627-0e03f79f9bfd
 	github.com/onflow/nft-storefront/lib/go/contracts v1.0.0
 	github.com/onflow/wal v1.0.2
 	github.com/slok/go-http-metrics v0.12.0
@@ -302,7 +302,7 @@ require (
 	github.com/spf13/jwalterweatherman v1.1.0 // indirect
 	github.com/stretchr/objx v0.5.2 // indirect
 	github.com/subosito/gotenv v1.4.2 // indirect
-	github.com/supranational/blst v0.3.13 // indirect
+	github.com/supranational/blst v0.3.14 // indirect
 	github.com/syndtr/goleveldb v1.0.1-0.20210819022825-2ae1ddf74ef7 // indirect
 	github.com/texttheater/golang-levenshtein/levenshtein v0.0.0-20200805054039-cae8b0eaed6c // indirect
 	github.com/tklauser/go-sysconf v0.3.12 // indirect
