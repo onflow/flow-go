@@ -13,17 +13,13 @@ import (
 // TestExecutionMeteringParameters_EncodeRLP tests properties of the custom RLP encoding logic.
 func TestExecutionMeteringParameters_EncodeRLP(t *testing.T) {
 	params1 := &ExecutionMeteringParameters{
-		ExecutionMemoryLimit: rand.Uint64(),
-		ExecutionMemoryWeights: map[uint32]uint64{
-			rand.Uint32(): rand.Uint64(),
-			rand.Uint32(): rand.Uint64(),
-			rand.Uint32(): rand.Uint64(),
-		},
-		ExecutionEffortWeights: map[uint32]uint64{
-			rand.Uint32(): rand.Uint64(),
-			rand.Uint32(): rand.Uint64(),
-			rand.Uint32(): rand.Uint64(),
-		},
+		ExecutionMemoryLimit:   rand.Uint64(),
+		ExecutionMemoryWeights: make(map[uint32]uint64, 10),
+		ExecutionEffortWeights: make(map[uint32]uint64, 10),
+	}
+	for range 10 {
+		params1.ExecutionMemoryWeights[rand.Uint32()] = rand.Uint64()
+		params1.ExecutionEffortWeights[rand.Uint32()] = rand.Uint64()
 	}
 
 	t.Run("deterministic encoding", func(t *testing.T) {
