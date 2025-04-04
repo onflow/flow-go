@@ -2055,7 +2055,7 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 				Transactions:          notNil(builder.transactions),
 				ExecutionReceipts:     node.Storage.Receipts,
 				ExecutionResults:      node.Storage.Results,
-				TxResultErrorMessages: notNil(builder.transactionResultErrorMessages),
+				TxResultErrorMessages: builder.transactionResultErrorMessages, // might be nil
 				ChainID:               node.RootChainID,
 				AccessMetrics:         notNil(builder.AccessMetrics),
 				ConnFactory:           connFactory,
@@ -2141,7 +2141,7 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 				builder.TxResultErrorMessagesCore = tx_error_messages.NewTxErrorMessagesCore(
 					node.Logger,
 					notNil(builder.nodeBackend),
-					notNil(builder.transactionResultErrorMessages),
+					builder.transactionResultErrorMessages,
 					notNil(builder.ExecNodeIdentitiesProvider),
 				)
 			}
