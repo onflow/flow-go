@@ -66,7 +66,7 @@ func (vc *TimeoutObjectsCache) AddTimeoutObject(timeout *model.TimeoutObject) er
 		vc.lock.Unlock()
 		// TODO: once we have signer indices, implement Equals methods for QC, TC
 		// and TimeoutObjects, to avoid the comparatively very expensive ID computation.
-		if firstTimeout.ID() != timeout.ID() {
+		if firstTimeout.RepeatableTimeoutObject.ID() != timeout.RepeatableTimeoutObject.ID() {
 			return model.NewDoubleTimeoutErrorf(firstTimeout, timeout, "detected timeout equivocation by replica %x at view: %d", timeout.SignerID, vc.view)
 		}
 		return ErrRepeatedTimeout

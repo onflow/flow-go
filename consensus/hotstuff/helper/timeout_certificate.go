@@ -55,11 +55,13 @@ func WithTCHighQCViews(highQCViews []uint64) func(*flow.TimeoutCertificate) {
 
 func TimeoutObjectFixture(opts ...func(TimeoutObject *hotstuff.TimeoutObject)) *hotstuff.TimeoutObject {
 	timeout := &hotstuff.TimeoutObject{
-		View:       uint64(rand.Uint32()),
-		NewestQC:   MakeQC(),
-		LastViewTC: MakeTC(),
-		SignerID:   unittest.IdentifierFixture(),
-		SigData:    unittest.RandomBytes(128),
+		RepeatableTimeoutObject: hotstuff.RepeatableTimeoutObject{
+			View:       uint64(rand.Uint32()),
+			NewestQC:   MakeQC(),
+			LastViewTC: MakeTC(),
+			SignerID:   unittest.IdentifierFixture(),
+			SigData:    unittest.RandomBytes(128),
+		},
 	}
 
 	for _, opt := range opts {

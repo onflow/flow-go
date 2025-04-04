@@ -70,11 +70,13 @@ func (c *StakingSigner) CreateTimeout(curView uint64, newestQC *flow.QuorumCerti
 	}
 
 	timeout := &model.TimeoutObject{
-		View:       curView,
-		NewestQC:   newestQC,
-		LastViewTC: lastViewTC,
-		SignerID:   c.signerID,
-		SigData:    sigData,
+		RepeatableTimeoutObject: model.RepeatableTimeoutObject{
+			View:       curView,
+			NewestQC:   newestQC,
+			LastViewTC: lastViewTC,
+			SignerID:   c.signerID,
+			SigData:    sigData,
+		},
 	}
 	return timeout, nil
 }
