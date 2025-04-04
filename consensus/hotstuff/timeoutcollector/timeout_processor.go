@@ -3,10 +3,10 @@ package timeoutcollector
 import (
 	"errors"
 	"fmt"
+	"slices"
 
 	"github.com/rs/zerolog"
 	"go.uber.org/atomic"
-	"golang.org/x/exp/slices"
 
 	"github.com/onflow/flow-go/consensus/hotstuff"
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
