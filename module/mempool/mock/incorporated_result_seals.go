@@ -61,12 +61,17 @@ func (_m *IncorporatedResultSeals) All() []*flow.IncorporatedResultSeal {
 	return r0
 }
 
-// ByID provides a mock function with given fields: _a0
-func (_m *IncorporatedResultSeals) ByID(_a0 flow.Identifier) (*flow.IncorporatedResultSeal, bool) {
+// Clear provides a mock function with given fields:
+func (_m *IncorporatedResultSeals) Clear() {
+	_m.Called()
+}
+
+// Get provides a mock function with given fields: _a0
+func (_m *IncorporatedResultSeals) Get(_a0 flow.Identifier) (*flow.IncorporatedResultSeal, bool) {
 	ret := _m.Called(_a0)
 
 	if len(ret) == 0 {
-		panic("no return value specified for ByID")
+		panic("no return value specified for Get")
 	}
 
 	var r0 *flow.IncorporatedResultSeal
@@ -89,11 +94,6 @@ func (_m *IncorporatedResultSeals) ByID(_a0 flow.Identifier) (*flow.Incorporated
 	}
 
 	return r0, r1
-}
-
-// Clear provides a mock function with given fields:
-func (_m *IncorporatedResultSeals) Clear() {
-	_m.Called()
 }
 
 // Limit provides a mock function with given fields:

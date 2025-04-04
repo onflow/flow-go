@@ -21,12 +21,12 @@ func TestBlockExecutionDataPool(t *testing.T) {
 	cache := herocache.NewBlockExecutionData(1000, unittest.Logger(), metrics.NewNoopCollector())
 
 	t.Run("should be able to add first", func(t *testing.T) {
-		added := cache.Add(ed1)
+		added := cache.Add(ed1.BlockID, ed1)
 		assert.True(t, added)
 	})
 
 	t.Run("should be able to add second", func(t *testing.T) {
-		added := cache.Add(ed2)
+		added := cache.Add(ed2.BlockID, ed2)
 		assert.True(t, added)
 	})
 
@@ -36,7 +36,7 @@ func TestBlockExecutionDataPool(t *testing.T) {
 	})
 
 	t.Run("should be able to get first by blockID", func(t *testing.T) {
-		actual, exists := cache.ByID(ed1.BlockID)
+		actual, exists := cache.Get(ed1.BlockID)
 		assert.True(t, exists)
 		assert.Equal(t, ed1, actual)
 	})
@@ -49,7 +49,9 @@ func TestBlockExecutionDataPool(t *testing.T) {
 	t.Run("should be able to retrieve all", func(t *testing.T) {
 		items := cache.All()
 		assert.Len(t, items, 1)
-		assert.Equal(t, ed1, items[0])
+		val, exists := items[ed1.BlockID]
+		require.True(t, exists)
+		assert.Equal(t, ed1, val)
 	})
 
 	t.Run("should be able to clear", func(t *testing.T) {
@@ -71,7 +73,7 @@ func TestBlockExecutionDataConcurrentWriteAndRead(t *testing.T) {
 	// storing all cache
 	for i := 0; i < total; i++ {
 		go func(ed *execution_data.BlockExecutionDataEntity) {
-			require.True(t, cache.Add(ed))
+			require.True(t, cache.Add(ed.BlockID, ed))
 
 			wg.Done()
 		}(execDatas[i])
@@ -84,7 +86,7 @@ func TestBlockExecutionDataConcurrentWriteAndRead(t *testing.T) {
 	// reading all cache
 	for i := 0; i < total; i++ {
 		go func(ed *execution_data.BlockExecutionDataEntity) {
-			actual, ok := cache.ByID(ed.BlockID)
+			actual, ok := cache.Get(ed.BlockID)
 			require.True(t, ok)
 			require.Equal(t, ed, actual)
 
@@ -103,8 +105,8 @@ func TestBlockExecutionDataAllReturnsInOrder(t *testing.T) {
 
 	// storing all cache
 	for i := 0; i < total; i++ {
-		require.True(t, cache.Add(execDatas[i]))
-		ed, ok := cache.ByID(execDatas[i].BlockID)
+		require.True(t, cache.Add(execDatas[i].BlockID, execDatas[i]))
+		ed, ok := cache.Get(execDatas[i].BlockID)
 		require.True(t, ok)
 		require.Equal(t, execDatas[i], ed)
 	}
@@ -112,6 +114,8 @@ func TestBlockExecutionDataAllReturnsInOrder(t *testing.T) {
 	// all cache must be retrieved in the same order as they are added
 	all := cache.All()
 	for i := 0; i < total; i++ {
-		require.Equal(t, execDatas[i], all[i])
+		val, exists := all[execDatas[i].BlockID]
+		require.True(t, exists)
+		assert.Equal(t, execDatas[i], val)
 	}
 }

@@ -15,7 +15,7 @@ import (
 // TestHeroQueue_Sequential evaluates correctness of queue implementation against sequential push and pop.
 func TestHeroQueue_Sequential(t *testing.T) {
 	sizeLimit := 100
-	q := queue.NewHeroQueue(uint32(sizeLimit), unittest.Logger(), metrics.NewNoopCollector())
+	q := queue.NewHeroQueue[*unittest.MockEntity](uint32(sizeLimit), unittest.Logger(), metrics.NewNoopCollector())
 
 	// initially queue must be zero
 	require.Zero(t, q.Size())
@@ -28,17 +28,18 @@ func TestHeroQueue_Sequential(t *testing.T) {
 	entities := unittest.EntityListFixture(uint(sizeLimit))
 	// pushing entities sequentially.
 	for i, e := range entities {
-		require.True(t, q.Push(*e))
+		require.True(t, q.Push(e.Identifier, e))
 
 		// duplicate push should fail
-		require.False(t, q.Push(*e))
+		require.False(t, q.Push(e.Identifier, e))
 
 		require.Equal(t, q.Size(), uint(i+1))
 	}
 
 	// once queue meets the size limit, any extra push should fail.
 	for i := 0; i < 100; i++ {
-		require.False(t, q.Push(*unittest.MockEntityFixture()))
+		entity := unittest.MockEntityFixture()
+		require.False(t, q.Push(entity.Identifier, entity))
 
 		// size should not change
 		require.Equal(t, q.Size(), uint(sizeLimit))
@@ -48,8 +49,8 @@ func TestHeroQueue_Sequential(t *testing.T) {
 	for i, e := range entities {
 		popedE, ok := q.Pop()
 		require.True(t, ok)
-		require.Equal(t, *e, popedE)
-		require.Equal(t, e.ID(), popedE.ID())
+		require.Equal(t, e, popedE)
+		require.Equal(t, e.Identifier, popedE.Identifier)
 
 		require.Equal(t, q.Size(), uint(len(entities)-i-1))
 	}
@@ -58,7 +59,7 @@ func TestHeroQueue_Sequential(t *testing.T) {
 // TestHeroQueue_Concurrent evaluates correctness of queue implementation against concurrent push and pop.
 func TestHeroQueue_Concurrent(t *testing.T) {
 	sizeLimit := 100
-	q := queue.NewHeroQueue(uint32(sizeLimit), unittest.Logger(), metrics.NewNoopCollector())
+	q := queue.NewHeroQueue[*unittest.MockEntity](uint32(sizeLimit), unittest.Logger(), metrics.NewNoopCollector())
 	// initially queue must be zero
 	require.Zero(t, q.Size())
 	// initially there should be nothing to pop
@@ -74,7 +75,7 @@ func TestHeroQueue_Concurrent(t *testing.T) {
 	for _, e := range entities {
 		e := e // suppress loop variable
 		go func() {
-			require.True(t, q.Push(*e))
+			require.True(t, q.Push(e.Identifier, e))
 			pushWG.Done()
 		}()
 	}
@@ -84,7 +85,8 @@ func TestHeroQueue_Concurrent(t *testing.T) {
 	pushWG.Add(sizeLimit)
 	for i := 0; i < sizeLimit; i++ {
 		go func() {
-			require.False(t, q.Push(*unittest.MockEntityFixture()))
+			entity := unittest.MockEntityFixture()
+			require.False(t, q.Push(entity.Identifier, entity))
 			pushWG.Done()
 		}()
 	}
@@ -101,7 +103,7 @@ func TestHeroQueue_Concurrent(t *testing.T) {
 			require.True(t, ok)
 
 			matchLock.Lock()
-			matchAndRemoveEntity(t, entities, popedE.(unittest.MockEntity))
+			matchAndRemoveEntity(t, entities, popedE)
 			matchLock.Unlock()
 
 			popWG.Done()
@@ -115,9 +117,9 @@ func TestHeroQueue_Concurrent(t *testing.T) {
 
 // matchAndRemove checks existence of the entity in the "entities" array, and if a match is found, it is removed.
 // If no match is found for an entity, it fails the test.
-func matchAndRemoveEntity(t *testing.T, entities []*unittest.MockEntity, entity unittest.MockEntity) []*unittest.MockEntity {
+func matchAndRemoveEntity(t *testing.T, entities []*unittest.MockEntity, entity *unittest.MockEntity) []*unittest.MockEntity {
 	for i, e := range entities {
-		if *e == entity {
+		if e == entity {
 			// removes the matched entity from the list
 			entities = append(entities[:i], entities[i+1:]...)
 			return entities

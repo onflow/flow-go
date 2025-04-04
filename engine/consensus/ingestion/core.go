@@ -97,7 +97,7 @@ func (e *Core) OnGuarantee(originID flow.Identifier, guarantee *flow.CollectionG
 	}
 
 	// at this point, we can add the guarantee to the memory pool
-	added := e.pool.Add(guarantee)
+	added := e.pool.Add(guarantee.CollectionID, guarantee)
 	if !added {
 		log.Debug().Msg("discarding guarantee already in pool")
 		return nil

@@ -281,10 +281,9 @@ func NewChunkDataPack(
 	}
 }
 
-// ID returns the unique identifier for the concrete view, which is the ID of
-// the chunk the view is for.
+// ID returns a collision-resistant hash of the ChunkDataPack struct.
 func (c *ChunkDataPack) ID() Identifier {
-	return c.ChunkID
+	return MakeID(c)
 }
 
 // Checksum returns the checksum of the chunk data pack.
@@ -355,6 +354,20 @@ type BlockExecutionDataRoot struct {
 	// ChunkExecutionDataIDs is a list of the root CIDs for each serialized execution_data.ChunkExecutionData
 	// associated with this block.
 	ChunkExecutionDataIDs []cid.Cid
+}
+
+// EncodeRLP defines an RLP encoding BlockExecutionDataRoot. We need to define a custom RLP encoding since [cid.Cid] doesn't have one. Without it we can't produce a collision-resistant hash.
+// No errors are expected during normal operations.
+func (b BlockExecutionDataRoot) EncodeRLP(w io.Writer) error {
+	encodingCanonicalForm := struct {
+		BlockID               Identifier
+		ChunkExecutionDataIDs []string
+	}{
+		BlockID:               b.BlockID,
+		ChunkExecutionDataIDs: cidsToStrings(b.ChunkExecutionDataIDs),
+	}
+
+	return rlp.Encode(w, encodingCanonicalForm)
 }
 
 // MarshalMsgpack implements the msgpack.Marshaler interface

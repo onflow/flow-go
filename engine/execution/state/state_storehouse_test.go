@@ -236,13 +236,13 @@ func makeComputationResult(
 
 	executionResult := flow.NewExecutionResult(
 		unittest.IdentifierFixture(),
-		completeBlock.ID(),
+		completeBlock.BlockID(),
 		computationResult.AllChunks(),
 		flow.ServiceEventList{},
 		executionDataID)
 
 	computationResult.BlockAttestationResult.BlockExecutionResult.ExecutionDataRoot = &flow.BlockExecutionDataRoot{
-		BlockID:               completeBlock.ID(),
+		BlockID:               completeBlock.BlockID(),
 		ChunkExecutionDataIDs: []cid.Cid{flow.IdToCid(unittest.IdentifierFixture())},
 	}
 

@@ -127,14 +127,10 @@ func (s *Suite) SetupTest() {
 	s.receipts = new(storage.ExecutionReceipts)
 	s.transactions = new(storage.Transactions)
 	s.results = new(storage.ExecutionResults)
-	collectionsToMarkFinalized, err := stdmap.NewTimes(100)
-	require.NoError(s.T(), err)
-	collectionsToMarkExecuted, err := stdmap.NewTimes(100)
-	require.NoError(s.T(), err)
-	blocksToMarkExecuted, err := stdmap.NewTimes(100)
-	require.NoError(s.T(), err)
-	blockTransactions, err := stdmap.NewIdentifierMap(100)
-	require.NoError(s.T(), err)
+	collectionsToMarkFinalized := stdmap.NewTimes(100)
+	collectionsToMarkExecuted := stdmap.NewTimes(100)
+	blocksToMarkExecuted := stdmap.NewTimes(100)
+	blockTransactions := stdmap.NewIdentifierMap(100)
 
 	s.proto.state.On("Identity").Return(s.obsIdentity, nil)
 	s.proto.state.On("Params").Return(s.proto.params)
@@ -172,6 +168,7 @@ func (s *Suite) SetupTest() {
 	header := unittest.BlockHeaderFixture(unittest.WithHeaderHeight(0))
 	s.proto.params.On("FinalizedRoot").Return(header, nil)
 
+	var err error
 	s.collectionExecutedMetric, err = indexer.NewCollectionExecutedMetricImpl(
 		s.log,
 		metrics.NewNoopCollector(),

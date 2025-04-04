@@ -81,7 +81,7 @@ func ComputationResultForBlockFixture(
 
 	executionResult := flow.NewExecutionResult(
 		parentBlockExecutionResultID,
-		completeBlock.ID(),
+		completeBlock.BlockID(),
 		computationResult.AllChunks(),
 		convertedServiceEvents,
 		executionDataID)

@@ -381,7 +381,7 @@ func (s *state) SaveExecutionResults(
 	}
 
 	//outside batch because it requires read access
-	err = s.UpdateLastExecutedBlock(childCtx, result.ExecutableBlock.ID())
+	err = s.UpdateLastExecutedBlock(childCtx, result.ExecutableBlock.BlockID())
 	if err != nil {
 		return fmt.Errorf("cannot update highest executed block: %w", err)
 	}
@@ -392,7 +392,7 @@ func (s *state) saveExecutionResults(
 	ctx context.Context,
 	result *execution.ComputationResult,
 ) (err error) {
-	blockID := result.ExecutableBlock.ID()
+	blockID := result.ExecutableBlock.BlockID()
 
 	err = s.chunkDataPacks.Store(result.AllChunkDataPacks())
 	if err != nil {
@@ -412,7 +412,7 @@ func (s *state) saveExecutionResults(
 				chunks := result.AllChunkDataPacks()
 				chunkIDs := make([]flow.Identifier, 0, len(chunks))
 				for _, chunk := range chunks {
-					chunkIDs = append(chunkIDs, chunk.ID())
+					chunkIDs = append(chunkIDs, chunk.ChunkID)
 				}
 				_ = s.chunkDataPacks.Remove(chunkIDs)
 			}

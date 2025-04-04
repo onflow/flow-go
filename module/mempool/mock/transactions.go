@@ -13,17 +13,17 @@ type Transactions struct {
 	mock.Mock
 }
 
-// Add provides a mock function with given fields: tx
-func (_m *Transactions) Add(tx *flow.TransactionBody) bool {
-	ret := _m.Called(tx)
+// Add provides a mock function with given fields: txId, tx
+func (_m *Transactions) Add(txId flow.Identifier, tx *flow.TransactionBody) bool {
+	ret := _m.Called(txId, tx)
 
 	if len(ret) == 0 {
 		panic("no return value specified for Add")
 	}
 
 	var r0 bool
-	if rf, ok := ret.Get(0).(func(*flow.TransactionBody) bool); ok {
-		r0 = rf(tx)
+	if rf, ok := ret.Get(0).(func(flow.Identifier, *flow.TransactionBody) bool); ok {
+		r0 = rf(txId, tx)
 	} else {
 		r0 = ret.Get(0).(bool)
 	}
@@ -31,32 +31,17 @@ func (_m *Transactions) Add(tx *flow.TransactionBody) bool {
 	return r0
 }
 
-// All provides a mock function with given fields:
-func (_m *Transactions) All() []*flow.TransactionBody {
-	ret := _m.Called()
-
-	if len(ret) == 0 {
-		panic("no return value specified for All")
-	}
-
-	var r0 []*flow.TransactionBody
-	if rf, ok := ret.Get(0).(func() []*flow.TransactionBody); ok {
-		r0 = rf()
-	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).([]*flow.TransactionBody)
-		}
-	}
-
-	return r0
+// Clear provides a mock function with given fields:
+func (_m *Transactions) Clear() {
+	_m.Called()
 }
 
-// ByID provides a mock function with given fields: txID
-func (_m *Transactions) ByID(txID flow.Identifier) (*flow.TransactionBody, bool) {
+// Get provides a mock function with given fields: txID
+func (_m *Transactions) Get(txID flow.Identifier) (*flow.TransactionBody, bool) {
 	ret := _m.Called(txID)
 
 	if len(ret) == 0 {
-		panic("no return value specified for ByID")
+		panic("no return value specified for Get")
 	}
 
 	var r0 *flow.TransactionBody
@@ -79,11 +64,6 @@ func (_m *Transactions) ByID(txID flow.Identifier) (*flow.TransactionBody, bool)
 	}
 
 	return r0, r1
-}
-
-// Clear provides a mock function with given fields:
-func (_m *Transactions) Clear() {
-	_m.Called()
 }
 
 // Has provides a mock function with given fields: txID
@@ -135,6 +115,26 @@ func (_m *Transactions) Size() uint {
 		r0 = rf()
 	} else {
 		r0 = ret.Get(0).(uint)
+	}
+
+	return r0
+}
+
+// Values provides a mock function with given fields:
+func (_m *Transactions) Values() []*flow.TransactionBody {
+	ret := _m.Called()
+
+	if len(ret) == 0 {
+		panic("no return value specified for Values")
+	}
+
+	var r0 []*flow.TransactionBody
+	if rf, ok := ret.Get(0).(func() []*flow.TransactionBody); ok {
+		r0 = rf()
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]*flow.TransactionBody)
+		}
 	}
 
 	return r0

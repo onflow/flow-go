@@ -343,7 +343,7 @@ func (o *Orchestrator) handleChunkDataPackResponseEvent(chunkDataPackReplyEvent 
 	}
 	o.logger.Debug().
 		Hex("corrupted_id", logging.ID(chunkDataPackReplyEvent.CorruptOriginId)).
-		Hex("chunk_id", logging.ID(cdpRep.ChunkDataPack.ID())).
+		Hex("chunk_id", logging.ID(cdpRep.ChunkDataPack.ChunkID)).
 		Msg("chunk data pack response passed through")
 	return nil
 }

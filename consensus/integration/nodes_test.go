@@ -467,8 +467,7 @@ func createNode(
 	net := hub.AddNetwork(localNodeID, node)
 
 	guaranteeLimit, sealLimit := uint(1000), uint(1000)
-	guarantees, err := stdmap.NewGuarantees(guaranteeLimit)
-	require.NoError(t, err)
+	guarantees := stdmap.NewGuarantees(guaranteeLimit)
 
 	receipts := consensusMempools.NewExecutionTree()
 

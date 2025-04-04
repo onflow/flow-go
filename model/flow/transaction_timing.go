@@ -12,11 +12,3 @@ type TransactionTiming struct {
 	Executed      time.Time
 	Sealed        time.Time
 }
-
-func (t TransactionTiming) ID() Identifier {
-	return t.TransactionID
-}
-
-func (t TransactionTiming) Checksum() Identifier {
-	return t.TransactionID
-}

@@ -81,7 +81,7 @@ type BuilderSuite struct {
 	receiptsDB   *storage.ExecutionReceipts
 	stateMutator *protocol.MutableProtocolState
 
-	guarPool *mempool.Guarantees
+	guarPool *mempool.Mempool[flow.Identifier, *flow.CollectionGuarantee]
 	sealPool *mempool.IncorporatedResultSeals
 	recPool  *mempool.ExecutionTree
 
@@ -158,7 +158,7 @@ func (bs *BuilderSuite) chainSeal(incorporatedResult *flow.IncorporatedResult) {
 	)
 
 	bs.chain = append(bs.chain, incorporatedResultSeal.Seal)
-	bs.irsMap[incorporatedResultSeal.ID()] = incorporatedResultSeal
+	bs.irsMap[incorporatedResultSeal.IncorporatedResultID()] = incorporatedResultSeal
 	bs.irsList = append(bs.irsList, incorporatedResultSeal)
 }
 
@@ -376,11 +376,15 @@ func (bs *BuilderSuite) SetupTest() {
 	)
 
 	// set up memory pool mocks for tests
-	bs.guarPool = &mempool.Guarantees{}
+	bs.guarPool = &mempool.Mempool[flow.Identifier, *flow.CollectionGuarantee]{}
 	bs.guarPool.On("Size").Return(uint(0)) // only used by metrics
 	bs.guarPool.On("All").Return(
-		func() []*flow.CollectionGuarantee {
-			return bs.pendingGuarantees
+		func() map[flow.Identifier]*flow.CollectionGuarantee {
+			guaranteeMap := make(map[flow.Identifier]*flow.CollectionGuarantee, len(bs.pendingGuarantees))
+			for _, guarantee := range bs.pendingGuarantees {
+				guaranteeMap[guarantee.CollectionID] = guarantee
+			}
+			return guaranteeMap
 		},
 	)
 
@@ -395,7 +399,7 @@ func (bs *BuilderSuite) SetupTest() {
 			return res
 		},
 	)
-	bs.sealPool.On("ByID", mock.Anything).Return(
+	bs.sealPool.On("Get", mock.Anything).Return(
 		func(id flow.Identifier) *flow.IncorporatedResultSeal {
 			return bs.pendingSeals[id]
 		},
@@ -758,7 +762,7 @@ func (bs *BuilderSuite) TestPayloadSeals_Duplicate() {
 func (bs *BuilderSuite) TestPayloadSeals_MissingNextSeal() {
 	// remove the seal for block [F0]
 	firstSeal := bs.irsList[0]
-	delete(bs.irsMap, firstSeal.ID())
+	delete(bs.irsMap, firstSeal.IncorporatedResultID())
 	bs.pendingSeals = bs.irsMap
 
 	_, err := bs.build.BuildOn(bs.parentID, bs.setter, bs.sign)
@@ -782,7 +786,7 @@ func (bs *BuilderSuite) TestPayloadSeals_MissingNextSeal() {
 func (bs *BuilderSuite) TestPayloadSeals_MissingInterimSeal() {
 	// remove a seal for block [F4]
 	seal := bs.irsList[3]
-	delete(bs.irsMap, seal.ID())
+	delete(bs.irsMap, seal.IncorporatedResultID())
 	bs.pendingSeals = bs.irsMap
 
 	_, err := bs.build.BuildOn(bs.parentID, bs.setter, bs.sign)
@@ -1399,7 +1403,7 @@ func storeSealForIncorporatedResult(result *flow.ExecutionResult, incorporatingB
 		unittest.IncorporatedResultSeal.WithResult(result),
 		unittest.IncorporatedResultSeal.WithIncorporatedBlockID(incorporatingBlockID),
 	)
-	pendingSeals[incorporatedResultSeal.ID()] = incorporatedResultSeal
+	pendingSeals[incorporatedResultSeal.IncorporatedResultID()] = incorporatedResultSeal
 	return incorporatedResultSeal
 }
 

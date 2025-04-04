@@ -12,34 +12,6 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
-// MockEntity implements a bare minimum entity for sake of test.
-// TODO(malleability, #7076): This is a leftover from previous design, it is used to test mempools that are working with entity.
-// As soon as that work stream is finished, this entity should be removed.
-type MockEntity struct {
-	Identifier flow.Identifier
-	Nonce      uint64
-}
-
-func (m MockEntity) ID() flow.Identifier {
-	return m.Identifier
-}
-
-func (m MockEntity) Checksum() flow.Identifier {
-	return m.Identifier
-}
-
-func EntityListFixture(n uint) []*MockEntity {
-	list := make([]*MockEntity, 0, n)
-	for range n {
-		list = append(list, MockEntityFixture())
-	}
-	return list
-}
-
-func MockEntityFixture() *MockEntity {
-	return &MockEntity{Identifier: IdentifierFixture()}
-}
-
 // RequireEntityNonMalleable is RequireNonMalleable with the constraint that models implement [flow.IDEntity]
 // and the content hash function is the ID() function.
 // Non-malleability is a required property for any entity that implements the [flow.IDEntity] interface.
@@ -80,7 +52,7 @@ func RequireNonMalleable(t *testing.T, model any, hashModel func() flow.Identifi
 //  2. interfaces (generateInterfaceFlowValue)
 //
 // Checker knows how to deal with each of the categories and generate random values for them.
-// There are two ways to handle types not natively recognized byt he MalleabilityChecker:
+// There are two ways to handle types not natively recognized by the MalleabilityChecker:
 //  1. User can provide a custom type generator for the type using WithTypeGenerator option.
 //  2. User can provide a custom generator for the field using WithFieldGenerator option.
 //

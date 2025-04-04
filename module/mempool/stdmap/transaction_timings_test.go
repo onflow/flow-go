@@ -17,16 +17,15 @@ func TestTransactionTimingsPool(t *testing.T) {
 		Received: time.Now().Add(-10 * time.Second), Executed: time.Now()}
 	item2 := &flow.TransactionTiming{TransactionID: unittest.IdentifierFixture(), Received: time.Now()}
 
-	pool, err := stdmap.NewTransactionTimings(1000)
-	require.NoError(t, err)
+	pool := stdmap.NewTransactionTimings(1000)
 
 	t.Run("should be able to add first", func(t *testing.T) {
-		added := pool.Add(item1)
+		added := pool.Add(item1.TransactionID, item1)
 		assert.True(t, added)
 	})
 
 	t.Run("should be able to add second", func(t *testing.T) {
-		added := pool.Add(item2)
+		added := pool.Add(item2.TransactionID, item2)
 		assert.True(t, added)
 	})
 
@@ -37,7 +36,7 @@ func TestTransactionTimingsPool(t *testing.T) {
 
 	t.Run("should be able to adjust the first", func(t *testing.T) {
 		finalized := time.Now()
-		entity, updated := pool.Adjust(item1.ID(), func(t *flow.TransactionTiming) *flow.TransactionTiming {
+		entity, updated := pool.Adjust(item1.TransactionID, func(t *flow.TransactionTiming) *flow.TransactionTiming {
 			t.Finalized = finalized
 			return t
 		})
@@ -46,20 +45,22 @@ func TestTransactionTimingsPool(t *testing.T) {
 	})
 
 	t.Run("should be able to get first", func(t *testing.T) {
-		got, exists := pool.ByID(item1.ID())
+		got, exists := pool.Get(item1.TransactionID)
 		assert.True(t, exists)
 		assert.Equal(t, item1, got)
 	})
 
 	t.Run("should be able to remove second", func(t *testing.T) {
-		ok := pool.Remove(item2.ID())
+		ok := pool.Remove(item2.TransactionID)
 		assert.True(t, ok)
 	})
 
 	t.Run("should be able to retrieve all", func(t *testing.T) {
 		items := pool.All()
 		assert.Len(t, items, 1)
-		assert.Equal(t, item1, items[0])
+		val, exists := items[item1.TransactionID]
+		require.True(t, exists)
+		assert.Equal(t, item1, val)
 	})
 
 	t.Run("should not panic if item does not exist yet", func(t *testing.T) {

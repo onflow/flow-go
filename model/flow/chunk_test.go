@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/fxamacker/cbor/v2"
+	"github.com/ipfs/go-cid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -363,4 +364,15 @@ func TestChunkMalleability(t *testing.T) {
 			unittest.WithPinnedField("ChunkBody.ServiceEventCount"),
 		)
 	})
+}
+
+// TestChunkDataPackMalleability performs sanity checks to ensure that ChunkDataPack is not malleable.
+func TestChunkDataPackMalleability(t *testing.T) {
+	unittest.RequireEntityNonMalleable(
+		t,
+		unittest.ChunkDataPackFixture(unittest.IdentifierFixture()),
+		unittest.WithTypeGenerator[cid.Cid](func() cid.Cid {
+			return flow.IdToCid(unittest.IdentifierFixture())
+		}),
+	)
 }

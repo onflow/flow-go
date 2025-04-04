@@ -270,7 +270,7 @@ func (b *BasicBlockExecutor) ExecuteCollections(tb testing.TB, collections [][]*
 	executableBlock.StartState = &b.activeStateCommitment
 
 	derivedBlockData := b.derivedChainData.GetOrCreateDerivedBlockData(
-		executableBlock.ID(),
+		executableBlock.BlockID(),
 		executableBlock.ParentID())
 
 	computationResult, err := b.blockComputer.ExecuteBlock(

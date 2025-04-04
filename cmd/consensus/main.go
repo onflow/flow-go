@@ -383,8 +383,8 @@ func main() {
 			return nil
 		}).
 		Module("collection guarantees mempool", func(node *cmd.NodeConfig) error {
-			guarantees, err = stdmap.NewGuarantees(guaranteeLimit)
-			return err
+			guarantees = stdmap.NewGuarantees(guaranteeLimit)
+			return nil
 		}).
 		Module("execution receipts mempool", func(node *cmd.NodeConfig) error {
 			receipts = consensusMempools.NewExecutionTree()

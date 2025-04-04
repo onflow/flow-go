@@ -310,12 +310,6 @@ func WithAssignee(t *testing.T, assignee flow.Identifier) func(flow.Identifier, 
 	}
 }
 
-func FromChunkID(chunkID flow.Identifier) flow.ChunkDataPack {
-	return flow.ChunkDataPack{
-		ChunkID: chunkID,
-	}
-}
-
 type ChunkAssignerFunc func(chunkIndex uint64, chunks int) bool
 
 // MockChunkAssignmentFixture is a test helper that mocks a chunk assigner for a set of verification nodes for the

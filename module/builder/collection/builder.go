@@ -373,7 +373,7 @@ func (b *Builder) buildPayload(buildCtx *blockBuildContext) (*cluster.Payload, e
 	var transactions []*flow.TransactionBody
 	var totalByteSize uint64
 	var totalGas uint64
-	for _, tx := range b.transactions.All() {
+	for _, tx := range b.transactions.Values() {
 
 		// if we have reached maximum number of transactions, stop
 		if uint(len(transactions)) >= b.config.MaxCollectionSize {

@@ -17,26 +17,16 @@ type CompleteCollection struct {
 
 // ExecutableBlock represents a block that can be executed by the VM
 //
-// It assumes that the Block attached is immutable, so take care in not modifying or changing the inner
+// It assumes that the attached Block is immutable, so take care in not modifying or changing the inner
 // *flow.Block, otherwise the struct will be in an inconsistent state. It requires the Block is immutable
-// because the it lazy lodas the Block.ID() into the private id field, on the first call to ExecutableBlock.ID()
-// All future calls to ID will not call Block.ID(), therefore it Block changes, the id will not match the Block.
+// because it lazy loads the Block.ID() into the private blockID field, on the first call to ExecutableBlock.BlockID()
+// All future calls to BlockID will not call Block.ID(), therefore if the Block changes, the blockID will not match the Block.
 type ExecutableBlock struct {
-	id                  flow.Identifier
+	blockID             flow.Identifier
 	Block               *flow.Block
 	CompleteCollections map[flow.Identifier]*CompleteCollection // key is the collection ID.
 	StartState          *flow.StateCommitment
 	Executing           bool // flag used to indicate if block is being executed, to avoid re-execution
-}
-
-// BlocksByCollection represents a collection that the execution node.
-// has not received its transactions yet.
-// it also holds references to the blocks that contains this collection
-// and are waiting to be executed.
-type BlocksByCollection struct {
-	CollectionID flow.Identifier
-	// a reversed map to look up which block contains this collection. key is the collection id
-	ExecutableBlocks map[flow.Identifier]*ExecutableBlock
 }
 
 func (c CompleteCollection) Collection() flow.Collection {
@@ -47,25 +37,13 @@ func (c CompleteCollection) IsCompleted() bool {
 	return len(c.Transactions) > 0
 }
 
-func (b *BlocksByCollection) ID() flow.Identifier {
-	return b.CollectionID
-}
-
-func (b *BlocksByCollection) Checksum() flow.Identifier {
-	return b.CollectionID
-}
-
-// ID lazy loads the Block.ID() into the private id field on the first call, and returns
+// BlockID lazy loads the Block.ID() into the private blockID field on the first call, and returns
 // the id field in all future calls
-func (b *ExecutableBlock) ID() flow.Identifier {
-	if b.id == flow.ZeroID {
-		b.id = b.Block.ID()
+func (b *ExecutableBlock) BlockID() flow.Identifier {
+	if b.blockID == flow.ZeroID {
+		b.blockID = b.Block.ID()
 	}
-	return b.id
-}
-
-func (b *ExecutableBlock) Checksum() flow.Identifier {
-	return b.Block.Checksum()
+	return b.blockID
 }
 
 func (b *ExecutableBlock) Height() uint64 {

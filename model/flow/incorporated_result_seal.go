@@ -17,14 +17,8 @@ type IncorporatedResultSeal struct {
 	Header *Header
 }
 
-// ID implements flow.Entity.ID for IncorporatedResultSeal to make it capable of
-// being stored directly in mempools and storage.
-func (s *IncorporatedResultSeal) ID() Identifier {
+// IncorporatedResultID returns the identifier of the IncorporatedResult
+// associated with the IncorporatedResultSeal.
+func (s *IncorporatedResultSeal) IncorporatedResultID() Identifier {
 	return s.IncorporatedResult.ID()
-}
-
-// CheckSum implements flow.Entity.CheckSum for IncorporatedResultSeal to make
-// it capable of being stored directly in mempools and storage.
-func (s *IncorporatedResultSeal) Checksum() Identifier {
-	return MakeID(s)
 }

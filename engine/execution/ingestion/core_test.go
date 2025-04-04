@@ -180,10 +180,10 @@ type mockExecutor struct {
 	consumer *mockConsumer
 }
 
-func (m *mockExecutor) ExecuteBlock(ctx context.Context, block *entity.ExecutableBlock) (*execution.ComputationResult, error) {
+func (m *mockExecutor) ExecuteBlock(_ context.Context, block *entity.ExecutableBlock) (*execution.ComputationResult, error) {
 	result := testutil.ComputationResultFixture(m.t)
 	result.ExecutableBlock = block
-	result.ExecutionResult.BlockID = block.ID()
+	result.ExecutionResult.BlockID = block.BlockID()
 	log.Info().Msgf("mockExecutor: block %v executed", block.Block.Header.Height)
 	return result, nil
 }
@@ -206,10 +206,10 @@ func newMockConsumer(executed flow.Identifier) *mockConsumer {
 func (m *mockConsumer) BeforeComputationResultSaved(ctx context.Context, result *execution.ComputationResult) {
 }
 
-func (m *mockConsumer) OnComputationResultSaved(ctx context.Context, result *execution.ComputationResult) string {
+func (m *mockConsumer) OnComputationResultSaved(_ context.Context, result *execution.ComputationResult) string {
 	m.Lock()
 	defer m.Unlock()
-	blockID := result.BlockExecutionResult.ExecutableBlock.ID()
+	blockID := result.BlockExecutionResult.ExecutableBlock.BlockID()
 	if _, ok := m.executed[blockID]; ok {
 		return fmt.Sprintf("block %v is already executed", blockID)
 	}
