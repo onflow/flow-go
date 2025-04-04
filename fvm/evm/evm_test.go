@@ -1770,7 +1770,7 @@ func TestDryRun(t *testing.T) {
 				require.Less(t, result.GasConsumed, limit)
 
 				// gas limit too low, but still bigger than intrinsic gas value
-				limit = uint64(21216)
+				limit = uint64(24_216)
 				tx = gethTypes.NewTransaction(
 					0,
 					testContract.DeployedAt.ToCommon(),
@@ -2330,7 +2330,7 @@ func TestDryCall(t *testing.T) {
 				require.Less(t, result.GasConsumed, limit)
 
 				// gas limit too low, but still bigger than intrinsic gas value
-				limit = uint64(21216)
+				limit = uint64(24_216)
 				tx = gethTypes.NewTransaction(
 					0,
 					testContract.DeployedAt.ToCommon(),
