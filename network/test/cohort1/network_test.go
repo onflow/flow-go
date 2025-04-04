@@ -484,7 +484,7 @@ func (suite *NetworkTestSuite) TestUnicastRateLimit_Bandwidth() {
 	_, err = newNet.Register(channels.TestNetworkChannel, newEngine)
 	require.NoError(suite.T(), err)
 
-	callCount := counters.NewMonotonousCounter(0)
+	callCount := counters.NewMonotonicCounter(0)
 	newEngine.On("Process", channels.TestNetworkChannel, suite.ids[0].NodeID, mockery.Anything).Run(func(args mockery.Arguments) {
 		_ = callCount.Increment()
 	}).Return(nil)

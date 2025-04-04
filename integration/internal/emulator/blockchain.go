@@ -45,12 +45,13 @@ import (
 
 	"github.com/onflow/flow-core-contracts/lib/go/templates"
 
-	"github.com/onflow/flow-go/access"
+	"github.com/onflow/flow-go/access/validator"
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/fvm/environment"
 	fvmerrors "github.com/onflow/flow-go/fvm/errors"
 	reusableRuntime "github.com/onflow/flow-go/fvm/runtime"
+	accessmodel "github.com/onflow/flow-go/model/access"
 	flowgo "github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/metrics"
 )
@@ -103,7 +104,7 @@ type Blockchain struct {
 	// used to execute transactions and scripts
 	vm                   *fvm.VirtualMachine
 	vmCtx                fvm.Context
-	transactionValidator *access.TransactionValidator
+	transactionValidator *validator.TransactionValidator
 	serviceKey           ServiceKey
 	conf                 config
 	entropyProvider      *blockHashEntropyProvider
@@ -173,8 +174,8 @@ func (b *Blockchain) GetChain() flowgo.Chain {
 	return b.vmCtx.Chain
 }
 
-func (b *Blockchain) GetNetworkParameters() access.NetworkParameters {
-	return access.NetworkParameters{
+func (b *Blockchain) GetNetworkParameters() accessmodel.NetworkParameters {
+	return accessmodel.NetworkParameters{
 		ChainID: b.GetChain().ChainID(),
 	}
 }
@@ -194,11 +195,11 @@ func (gen *blockHashEntropyProvider) RandomSource() ([]byte, error) {
 var _ environment.EntropyProvider = &blockHashEntropyProvider{}
 
 func (b *Blockchain) configureTransactionValidator() error {
-	validator, err := access.NewTransactionValidator(
+	validator, err := validator.NewTransactionValidator(
 		b.storage,
 		b.conf.GetChainID().Chain(),
 		metrics.NewNoopCollector(),
-		access.TransactionValidationOptions{
+		validator.TransactionValidationOptions{
 			Expiry:                       b.conf.TransactionExpiry,
 			ExpiryBuffer:                 0,
 			AllowEmptyReferenceBlockID:   b.conf.TransactionExpiry == 0,
@@ -207,7 +208,7 @@ func (b *Blockchain) configureTransactionValidator() error {
 			CheckScriptsParse:            true,
 			MaxTransactionByteSize:       flowgo.DefaultMaxTransactionByteSize,
 			MaxCollectionByteSize:        flowgo.DefaultMaxCollectionByteSize,
-			CheckPayerBalanceMode:        access.Disabled,
+			CheckPayerBalanceMode:        validator.Disabled,
 		},
 		nil,
 	)
@@ -380,16 +381,16 @@ func (b *Blockchain) getTransaction(txID flowgo.Identifier) (*flowgo.Transaction
 	return &tx, nil
 }
 
-func (b *Blockchain) GetTransactionResult(txID flowgo.Identifier) (*access.TransactionResult, error) {
+func (b *Blockchain) GetTransactionResult(txID flowgo.Identifier) (*accessmodel.TransactionResult, error) {
 	b.mu.RLock()
 	defer b.mu.RUnlock()
 
 	return b.getTransactionResult(txID)
 }
 
-func (b *Blockchain) getTransactionResult(txID flowgo.Identifier) (*access.TransactionResult, error) {
+func (b *Blockchain) getTransactionResult(txID flowgo.Identifier) (*accessmodel.TransactionResult, error) {
 	if b.pendingBlock.ContainsTransaction(txID) {
-		return &access.TransactionResult{
+		return &accessmodel.TransactionResult{
 			Status: flowgo.TransactionStatusPending,
 		}, nil
 	}
@@ -397,7 +398,7 @@ func (b *Blockchain) getTransactionResult(txID flowgo.Identifier) (*access.Trans
 	storedResult, err := b.storage.TransactionResultByID(context.Background(), txID)
 	if err != nil {
 		if errors.Is(err, ErrNotFound) {
-			return &access.TransactionResult{
+			return &accessmodel.TransactionResult{
 				Status: flowgo.TransactionStatusUnknown,
 			}, nil
 		}
@@ -408,7 +409,7 @@ func (b *Blockchain) getTransactionResult(txID flowgo.Identifier) (*access.Trans
 	if storedResult.ErrorCode > 0 {
 		statusCode = 1
 	}
-	result := access.TransactionResult{
+	result := accessmodel.TransactionResult{
 		Status:        flowgo.TransactionStatusSealed,
 		StatusCode:    uint(statusCode),
 		ErrorMessage:  storedResult.ErrorMessage,
@@ -942,7 +943,7 @@ func (b *Blockchain) GetTransactionsByBlockID(blockID flowgo.Identifier) ([]*flo
 	return transactions, nil
 }
 
-func (b *Blockchain) GetTransactionResultsByBlockID(blockID flowgo.Identifier) ([]*access.TransactionResult, error) {
+func (b *Blockchain) GetTransactionResultsByBlockID(blockID flowgo.Identifier) ([]*accessmodel.TransactionResult, error) {
 	b.mu.RLock()
 	defer b.mu.RUnlock()
 
@@ -951,7 +952,7 @@ func (b *Blockchain) GetTransactionResultsByBlockID(blockID flowgo.Identifier) (
 		return nil, fmt.Errorf("failed to get block %s: %w", blockID, err)
 	}
 
-	var results []*access.TransactionResult
+	var results []*accessmodel.TransactionResult
 	for i, guarantee := range block.Payload.Guarantees {
 		c, err := b.getCollectionByID(guarantee.CollectionID)
 		if err != nil {
@@ -1001,17 +1002,8 @@ func (b *Blockchain) systemChunkTransaction() (*flowgo.TransactionBody, error) {
 		systemChunkTransactionTemplate,
 		templates.Environment{
 			RandomBeaconHistoryAddress: serviceAddress.Hex(),
+			EVMAddress:                 serviceAddress.Hex(),
 		},
-	)
-
-	// TODO: move this to `templates.Environment` struct
-	script = strings.ReplaceAll(
-		script,
-		`import EVM from "EVM"`,
-		fmt.Sprintf(
-			"import EVM from %s",
-			serviceAddress.HexWithPrefix(),
-		),
 	)
 
 	script = strings.ReplaceAll(

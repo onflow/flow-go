@@ -23,7 +23,6 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
-	"github.com/onflow/flow-go/access"
 	"github.com/onflow/flow-go/cmd/build"
 	accessmock "github.com/onflow/flow-go/engine/access/mock"
 	backendmock "github.com/onflow/flow-go/engine/access/rpc/backend/mock"
@@ -33,6 +32,7 @@ import (
 	"github.com/onflow/flow-go/engine/common/rpc/convert"
 	"github.com/onflow/flow-go/engine/common/version"
 	"github.com/onflow/flow-go/fvm/blueprints"
+	accessmodel "github.com/onflow/flow-go/model/access"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/counters"
@@ -108,7 +108,6 @@ func (suite *Suite) SetupTest() {
 	params := new(protocol.Params)
 	params.On("FinalizedRoot").Return(header, nil)
 	params.On("SporkID").Return(unittest.IdentifierFixture(), nil)
-	params.On("ProtocolVersion").Return(uint(unittest.Uint64InRange(10, 30)), nil)
 	params.On("SporkRootBlockHeight").Return(header.Height, nil)
 	params.On("SealedRoot").Return(header, nil)
 	suite.state.On("Params").Return(params)
@@ -628,7 +627,7 @@ func (suite *Suite) TestGetProtocolStateSnapshotByBlockID_UnexpectedErrorBlockID
 
 		// since block was added to the block tree it must be queryable by block ID
 		suite.state.On("AtBlockID", newBlock.ID()).Return(state.AtBlockID(newBlock.ID()))
-		//expectedError := errors.New("runtime-error")
+		// expectedError := errors.New("runtime-error")
 		suite.headers.On("BlockIDByHeight", newBlock.Header.Height).Return(flow.ZeroID,
 			status.Errorf(codes.Internal, "failed to lookup block id by height %d", newBlock.Header.Height))
 
@@ -697,9 +696,9 @@ func (suite *Suite) TestGetProtocolStateSnapshotByBlockID_InvalidSegment() {
 		suite.T().Run("sealing segment between epochs", func(t *testing.T) {
 			// Take snapshot at height of latest finalized block
 			snap := state.Final()
-			epochCounter, err := snap.Epochs().Current().Counter()
+			currentEpoch, err := snap.Epochs().Current()
 			suite.Require().NoError(err)
-			suite.Require().Equal(epoch1.Counter+1, epochCounter, "expect to be in next epoch")
+			suite.Require().Equal(epoch1.Counter+1, currentEpoch.Counter(), "expect to be in next epoch")
 			block, err := snap.Head()
 			suite.Require().NoError(err)
 
@@ -1012,7 +1011,7 @@ func (suite *Suite) TestGetTransactionResultsByBlockID() {
 		suite.assertAllExpectations()
 	})
 
-	//tests that signaler context received error when node state is inconsistent
+	// tests that signaler context received error when node state is inconsistent
 	suite.Run("GetTransactionResultsByBlockID - fails with inconsistent node's state", func() {
 		err := fmt.Errorf("inconsistent node's state")
 		suite.snapshot.On("Head").Return(nil, err).Once()
@@ -1578,23 +1577,27 @@ func (suite *Suite) TestGetNodeVersionInfo() {
 	sporkRootBlock := unittest.BlockHeaderFixture()
 	nodeRootBlock := unittest.BlockHeaderFixture(unittest.WithHeaderHeight(sporkRootBlock.Height + 100))
 	sporkID := unittest.IdentifierFixture()
-	protocolVersion := uint(1234)
+	protocolStateVersion := uint64(1234)
+
+	stateParams := protocol.NewParams(suite.T())
+	stateParams.On("SporkID").Return(sporkID, nil)
+	stateParams.On("SporkRootBlockHeight").Return(sporkRootBlock.Height, nil)
+	stateParams.On("SealedRoot").Return(nodeRootBlock, nil)
+
+	state := protocol.NewState(suite.T())
+	snap := protocol.NewSnapshot(suite.T())
+	kvstore := protocol.NewKVStoreReader(suite.T())
+	state.On("Params").Return(stateParams, nil).Maybe()
+	state.On("Final").Return(snap).Maybe()
+	snap.On("ProtocolState").Return(kvstore, nil).Maybe()
+	kvstore.On("GetProtocolStateVersion").Return(protocolStateVersion).Maybe()
 
 	suite.Run("happy path", func() {
-		stateParams := protocol.NewParams(suite.T())
-		stateParams.On("SporkID").Return(sporkID, nil)
-		stateParams.On("ProtocolVersion").Return(protocolVersion, nil)
-		stateParams.On("SporkRootBlockHeight").Return(sporkRootBlock.Height, nil)
-		stateParams.On("SealedRoot").Return(nodeRootBlock, nil)
-
-		state := protocol.NewState(suite.T())
-		state.On("Params").Return(stateParams, nil).Maybe()
-
-		expected := &access.NodeVersionInfo{
+		expected := &accessmodel.NodeVersionInfo{
 			Semver:               build.Version(),
 			Commit:               build.Commit(),
 			SporkId:              sporkID,
-			ProtocolVersion:      uint64(protocolVersion),
+			ProtocolStateVersion: protocolStateVersion,
 			SporkRootBlockHeight: sporkRootBlock.Height,
 			NodeRootBlockHeight:  nodeRootBlock.Height,
 			CompatibleRange:      nil,
@@ -1676,23 +1679,14 @@ func (suite *Suite) TestGetNodeVersionInfo() {
 		suite.versionControl.Start(irrecoverable.NewMockSignalerContext(suite.T(), ctx))
 		unittest.RequireComponentsReadyBefore(suite.T(), 2*time.Second, suite.versionControl)
 
-		stateParams := protocol.NewParams(suite.T())
-		stateParams.On("SporkID").Return(sporkID, nil)
-		stateParams.On("ProtocolVersion").Return(protocolVersion, nil)
-		stateParams.On("SporkRootBlockHeight").Return(sporkRootBlock.Height, nil)
-		stateParams.On("SealedRoot").Return(nodeRootBlock, nil)
-
-		state := protocol.NewState(suite.T())
-		state.On("Params").Return(stateParams, nil).Maybe()
-
-		expected := &access.NodeVersionInfo{
+		expected := &accessmodel.NodeVersionInfo{
 			Semver:               build.Version(),
 			Commit:               build.Commit(),
 			SporkId:              sporkID,
-			ProtocolVersion:      uint64(protocolVersion),
+			ProtocolStateVersion: protocolStateVersion,
 			SporkRootBlockHeight: sporkRootBlock.Height,
 			NodeRootBlockHeight:  nodeRootBlock.Height,
-			CompatibleRange: &access.CompatibleRange{
+			CompatibleRange: &accessmodel.CompatibleRange{
 				StartHeight: nodeRootBlock.Height + 12,
 				EndHeight:   latestBlockHeight - 9,
 			},

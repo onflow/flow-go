@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"io"
 
+	"github.com/onflow/flow-go/engine/access/rest/common"
+	"github.com/onflow/flow-go/engine/access/rest/common/parser"
 	"github.com/onflow/flow-go/engine/access/rest/util"
 )
 
@@ -13,13 +15,13 @@ type scriptBody struct {
 }
 
 type Script struct {
-	Args   Arguments
+	Args   parser.Arguments
 	Source []byte
 }
 
 func (s *Script) Parse(raw io.Reader) error {
 	var body scriptBody
-	err := parseBody(raw, &body)
+	err := common.ParseBody(raw, &body)
 	if err != nil {
 		return err
 	}
@@ -29,7 +31,7 @@ func (s *Script) Parse(raw io.Reader) error {
 		return fmt.Errorf("invalid script source encoding")
 	}
 
-	var args Arguments
+	var args parser.Arguments
 	err = args.Parse(body.Arguments)
 	if err != nil {
 		return err

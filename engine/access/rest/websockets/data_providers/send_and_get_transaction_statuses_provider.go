@@ -1,19 +1,20 @@
 package data_providers
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
 
 	"github.com/rs/zerolog"
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 
 	"github.com/onflow/flow-go/access"
 	commonmodels "github.com/onflow/flow-go/engine/access/rest/common/models"
-	"github.com/onflow/flow-go/engine/access/rest/common/parser"
-	"github.com/onflow/flow-go/engine/access/rest/util"
-	"github.com/onflow/flow-go/engine/access/rest/websockets/models"
+	commonparser "github.com/onflow/flow-go/engine/access/rest/common/parser"
+	"github.com/onflow/flow-go/engine/access/rest/websockets/data_providers/models"
+	wsmodels "github.com/onflow/flow-go/engine/access/rest/websockets/models"
 	"github.com/onflow/flow-go/engine/access/subscription"
+	accessmodel "github.com/onflow/flow-go/model/access"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/counters"
 
@@ -28,8 +29,8 @@ type sendAndGetTransactionStatusesArguments struct {
 type SendAndGetTransactionStatusesDataProvider struct {
 	*baseDataProvider
 
-	logger        zerolog.Logger
-	api           access.API
+	arguments     sendAndGetTransactionStatusesArguments
+	messageIndex  counters.StrictMonotonicCounter
 	linkGenerator commonmodels.LinkGenerator
 }
 
@@ -42,204 +43,93 @@ func NewSendAndGetTransactionStatusesDataProvider(
 	subscriptionID string,
 	linkGenerator commonmodels.LinkGenerator,
 	topic string,
-	arguments models.Arguments,
+	rawArguments wsmodels.Arguments,
 	send chan<- interface{},
+	chain flow.Chain,
 ) (*SendAndGetTransactionStatusesDataProvider, error) {
-	p := &SendAndGetTransactionStatusesDataProvider{
-		logger:        logger.With().Str("component", "send-transaction-statuses-data-provider").Logger(),
-		api:           api,
-		linkGenerator: linkGenerator,
-	}
-
-	// Initialize arguments passed to the provider.
-	sendTxStatusesArgs, err := parseSendAndGetTransactionStatusesArguments(arguments)
+	args, err := parseSendAndGetTransactionStatusesArguments(rawArguments, chain)
 	if err != nil {
 		return nil, fmt.Errorf("invalid arguments for send tx statuses data provider: %w", err)
 	}
 
-	subCtx, cancel := context.WithCancel(ctx)
-
-	p.baseDataProvider = newBaseDataProvider(
+	provider := newBaseDataProvider(
+		ctx,
+		logger.With().Str("component", "send-transaction-statuses-data-provider").Logger(),
+		api,
 		subscriptionID,
 		topic,
-		arguments,
-		cancel,
+		rawArguments,
 		send,
-		p.createSubscription(subCtx, sendTxStatusesArgs), // Set up a subscription to tx statuses based on arguments.
 	)
 
-	return p, nil
+	return &SendAndGetTransactionStatusesDataProvider{
+		baseDataProvider: provider,
+		arguments:        args,
+		messageIndex:     counters.NewMonotonicCounter(0),
+		linkGenerator:    linkGenerator,
+	}, nil
 }
 
 // Run starts processing the subscription for events and handles responses.
+// Must be called once.
 //
-// No errors are expected during normal operations.
+// No errors are expected during normal operations
 func (p *SendAndGetTransactionStatusesDataProvider) Run() error {
-	return subscription.HandleSubscription(p.subscription, p.handleResponse())
+	return run(
+		p.createAndStartSubscription(p.ctx, p.arguments),
+		p.sendResponse,
+	)
 }
 
-// createSubscription creates a new subscription using the specified input arguments.
-func (p *SendAndGetTransactionStatusesDataProvider) createSubscription(
+// sendResponse processes a tx status message and sends it to client's channel.
+// This function is not safe to call concurrently.
+//
+// No errors are expected during normal operations.
+func (p *SendAndGetTransactionStatusesDataProvider) sendResponse(txResults []*accessmodel.TransactionResult) error {
+	for i := range txResults {
+		txStatusesPayload := models.NewTransactionStatusesResponse(p.linkGenerator, txResults[i], p.messageIndex.Value())
+		response := models.BaseDataProvidersResponse{
+			SubscriptionID: p.ID(),
+			Topic:          p.Topic(),
+			Payload:        txStatusesPayload,
+		}
+		p.send <- &response
+
+		p.messageIndex.Increment()
+	}
+
+	return nil
+}
+
+// createAndStartSubscription creates a new subscription using the specified input arguments.
+func (p *SendAndGetTransactionStatusesDataProvider) createAndStartSubscription(
 	ctx context.Context,
 	args sendAndGetTransactionStatusesArguments,
 ) subscription.Subscription {
 	return p.api.SendAndSubscribeTransactionStatuses(ctx, &args.Transaction, entities.EventEncodingVersion_JSON_CDC_V0)
 }
 
-// handleResponse processes a tx statuses and sends the formatted response.
-//
-// No errors are expected during normal operations.
-func (p *SendAndGetTransactionStatusesDataProvider) handleResponse() func(txResults []*access.TransactionResult) error {
-	messageIndex := counters.NewMonotonousCounter(0)
-
-	return func(txResults []*access.TransactionResult) error {
-
-		for i := range txResults {
-			index := messageIndex.Value()
-			if ok := messageIndex.Set(messageIndex.Value() + 1); !ok {
-				return status.Errorf(codes.Internal, "message index already incremented to %d", messageIndex.Value())
-			}
-
-			var txStatusesPayload models.TransactionStatusesResponse
-			txStatusesPayload.Build(p.linkGenerator, txResults[i], index)
-
-			var response models.BaseDataProvidersResponse
-			response.Build(p.ID(), p.Topic(), &txStatusesPayload)
-
-			p.send <- &response
-		}
-
-		return nil
-	}
-}
-
 // parseSendAndGetTransactionStatusesArguments validates and initializes the account statuses arguments.
 func parseSendAndGetTransactionStatusesArguments(
-	arguments models.Arguments,
+	arguments wsmodels.Arguments,
+	chain flow.Chain,
 ) (sendAndGetTransactionStatusesArguments, error) {
 	var args sendAndGetTransactionStatusesArguments
-	var tx flow.TransactionBody
 
-	if scriptIn, ok := arguments["script"]; ok && scriptIn != "" {
-		result, ok := scriptIn.(string)
-		if !ok {
-			return args, fmt.Errorf("'script' must be a string")
-		}
-
-		script, err := util.FromBase64(result)
-		if err != nil {
-			return args, fmt.Errorf("invalid 'script': %w", err)
-		}
-
-		tx.Script = script
+	// Convert the arguments map to JSON
+	rawJSON, err := json.Marshal(arguments)
+	if err != nil {
+		return sendAndGetTransactionStatusesArguments{}, fmt.Errorf("failed to marshal arguments: %w", err)
 	}
 
-	if argumentsIn, ok := arguments["arguments"]; ok && argumentsIn != "" {
-		result, ok := argumentsIn.([]string)
-		if !ok {
-			return args, fmt.Errorf("'arguments' must be a []string type")
-		}
-
-		var argumentsData [][]byte
-		for _, arg := range result {
-			argument, err := util.FromBase64(arg)
-			if err != nil {
-				return args, fmt.Errorf("invalid 'arguments': %w", err)
-			}
-
-			argumentsData = append(argumentsData, argument)
-		}
-
-		tx.Arguments = argumentsData
+	// Create an io.Reader from the JSON bytes
+	var tx commonparser.Transaction
+	rawReader := bytes.NewReader(rawJSON)
+	err = tx.Parse(rawReader, chain)
+	if err != nil {
+		return sendAndGetTransactionStatusesArguments{}, fmt.Errorf("failed to parse transaction: %w", err)
 	}
 
-	if referenceBlockIDIn, ok := arguments["reference_block_id"]; ok && referenceBlockIDIn != "" {
-		result, ok := referenceBlockIDIn.(string)
-		if !ok {
-			return args, fmt.Errorf("'reference_block_id' must be a string")
-		}
-
-		var referenceBlockID parser.ID
-		err := referenceBlockID.Parse(result)
-		if err != nil {
-			return args, fmt.Errorf("invalid 'reference_block_id': %w", err)
-		}
-
-		tx.ReferenceBlockID = referenceBlockID.Flow()
-	}
-
-	if gasLimitIn, ok := arguments["gas_limit"]; ok && gasLimitIn != "" {
-		result, ok := gasLimitIn.(string)
-		if !ok {
-			return args, fmt.Errorf("'gas_limit' must be a string")
-		}
-
-		gasLimit, err := util.ToUint64(result)
-		if err != nil {
-			return args, fmt.Errorf("invalid 'gas_limit': %w", err)
-		}
-		tx.GasLimit = gasLimit
-	}
-
-	if payerIn, ok := arguments["payer"]; ok && payerIn != "" {
-		result, ok := payerIn.(string)
-		if !ok {
-			return args, fmt.Errorf("'payerIn' must be a string")
-		}
-
-		payerAddr, err := flow.StringToAddress(result)
-		if err != nil {
-			return args, fmt.Errorf("invalid 'payer': %w", err)
-		}
-		tx.Payer = payerAddr
-	}
-
-	if proposalKeyIn, ok := arguments["proposal_key"]; ok && proposalKeyIn != "" {
-		proposalKey, ok := proposalKeyIn.(flow.ProposalKey)
-		if !ok {
-			return args, fmt.Errorf("'proposal_key' must be a object (ProposalKey)")
-		}
-
-		tx.ProposalKey = proposalKey
-	}
-
-	if authorizersIn, ok := arguments["authorizers"]; ok && authorizersIn != "" {
-		result, ok := authorizersIn.([]string)
-		if !ok {
-			return args, fmt.Errorf("'authorizers' must be a []string type")
-		}
-
-		var authorizersData []flow.Address
-		for _, auth := range result {
-			authorizer, err := flow.StringToAddress(auth)
-			if err != nil {
-				return args, fmt.Errorf("invalid 'authorizers': %w", err)
-			}
-
-			authorizersData = append(authorizersData, authorizer)
-		}
-
-		tx.Authorizers = authorizersData
-	}
-
-	if payloadSignaturesIn, ok := arguments["payload_signatures"]; ok && payloadSignaturesIn != "" {
-		payloadSignatures, ok := payloadSignaturesIn.([]flow.TransactionSignature)
-		if !ok {
-			return args, fmt.Errorf("'payload_signatures' must be an array of objects (TransactionSignature)")
-		}
-
-		tx.PayloadSignatures = payloadSignatures
-	}
-
-	if envelopeSignaturesIn, ok := arguments["envelope_signatures"]; ok && envelopeSignaturesIn != "" {
-		envelopeSignatures, ok := envelopeSignaturesIn.([]flow.TransactionSignature)
-		if !ok {
-			return args, fmt.Errorf("'envelope_signatures' must be an array of objects (TransactionSignature)")
-		}
-
-		tx.EnvelopeSignatures = envelopeSignatures
-	}
-	args.Transaction = tx
-
+	args.Transaction = tx.Flow()
 	return args, nil
 }

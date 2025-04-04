@@ -20,7 +20,7 @@ import (
 // EFM can be exited only by a special service event, EpochRecover, which initially originates from a manual service account transaction.
 // The full epoch data must be generated manually and submitted with this transaction in order for an
 // EpochRecover event to be emitted. This command retrieves the current protocol state identities, computes the cluster assignment using those
-// identities, generates the cluster QCs and retrieves the DKG key vector of the last successful epoch.
+// identities, generates the cluster QCs and retrieves the Random Beacon key vector of the last successful epoch.
 // This recovery process has some constraints:
 //   - The RecoveryEpoch must have exactly the same consensus committee as participated in the most recent successful DKG.
 //   - The RecoveryEpoch must contain enough "internal" collection nodes so that all clusters contain a supermajority of "internal" collection nodes (same constraint as sporks)
@@ -38,19 +38,21 @@ This recovery process has some constraints:
 		Run: generateRecoverEpochTxArgs(getSnapshot),
 	}
 
-	flagOut                      string
-	flagAnAddress                string
-	flagAnPubkey                 string
-	flagAnInsecure               bool
-	flagInternalNodePrivInfoDir  string
-	flagNodeConfigJson           string
-	flagCollectionClusters       int
-	flagNumViewsInEpoch          uint64
-	flagNumViewsInStakingAuction uint64
-	flagEpochCounter             uint64
-	flagTargetDuration           uint64
-	flagInitNewEpoch             bool
-	flagRootChainID              string
+	flagOut                         string
+	flagAnAddress                   string
+	flagAnPubkey                    string
+	flagAnInsecure                  bool
+	flagInternalNodePrivInfoDir     string
+	flagNodeConfigJson              string
+	flagCollectionClusters          int
+	flagNumViewsInEpoch             uint64
+	flagNumViewsInStakingAuction    uint64
+	flagEpochCounter                uint64
+	flagRecoveryEpochTargetDuration uint64
+	flagUnsafeAllowOverWrite        bool
+	flagRootChainID                 string
+	flagExcludeNodeIDs              []string
+	flagIncludeNodeIDs              []string
 )
 
 func init() {
@@ -69,20 +71,24 @@ func addGenerateRecoverEpochTxArgsCmdFlags() error {
 	generateRecoverEpochTxArgsCmd.Flags().BoolVar(&flagAnInsecure, "insecure", false, "set to true if the protocol snapshot should be retrieved from the insecure AN endpoint")
 	generateRecoverEpochTxArgsCmd.Flags().IntVar(&flagCollectionClusters, "collection-clusters", 0,
 		"number of collection clusters")
-	// required parameters for network configuration and generation of root node identities
+	// Required parameters for network configuration and generation of root node identities.
+	// It is expected that these flags may point to directory which includes extra node identities
+	// which are not allowed to participate in the recovery epoch. These identities will be excluded by this tool.
 	generateRecoverEpochTxArgsCmd.Flags().StringVar(&flagNodeConfigJson, "config", "",
-		"path to a JSON file containing multiple node configurations (fields Role, Address, Weight)")
-	generateRecoverEpochTxArgsCmd.Flags().StringVar(&flagInternalNodePrivInfoDir, "internal-priv-dir", "", "path to directory "+
-		"containing the output from the `keygen` command for internal nodes")
+		"path to a JSON file containing multiple node configurations (fields Role, Address, Weight).")
+	generateRecoverEpochTxArgsCmd.Flags().StringVar(&flagInternalNodePrivInfoDir, "internal-priv-dir", "", "path to directory containing the output from the `keygen` command for internal nodes."+
+		" It is allowed for this directory to include extra internal nodes which are not current eligible epoch participants (they will be excluded from recovery epoch).")
 	generateRecoverEpochTxArgsCmd.Flags().Uint64Var(&flagNumViewsInEpoch, "epoch-length", 0, "length of each epoch measured in views")
 	generateRecoverEpochTxArgsCmd.Flags().Uint64Var(&flagNumViewsInStakingAuction, "epoch-staking-phase-length", 0, "length of the epoch staking phase measured in views")
-	generateRecoverEpochTxArgsCmd.Flags().Uint64Var(&flagEpochCounter, "epoch-counter", 0, "the epoch counter used to generate the root cluster block")
-	generateRecoverEpochTxArgsCmd.Flags().Uint64Var(&flagTargetDuration, "epoch-timing-duration", 0, "the target duration of the epoch, in seconds")
+	generateRecoverEpochTxArgsCmd.Flags().Uint64Var(&flagRecoveryEpochTargetDuration, "epoch-timing-recovery-duration", 0, "the target duration of the recovery epoch, in seconds")
 	// The following option allows the RecoveryEpoch specified by this command to overwrite an epoch which already exists in the smart contract.
 	// This is needed only if a previous recoverEpoch transaction was submitted and a race condition occurred such that:
 	//   - the RecoveryEpoch in the admin transaction was accepted by the smart contract
 	//   - the RecoveryEpoch service event (after sealing latency) was rejected by the Protocol State
-	generateRecoverEpochTxArgsCmd.Flags().BoolVar(&flagInitNewEpoch, "unsafe-overwrite-epoch-data", false, "set to true if the resulting transaction is allowed to overwrite an already specified epoch in the smart contract.")
+	generateRecoverEpochTxArgsCmd.Flags().BoolVar(&flagUnsafeAllowOverWrite, "unsafe-overwrite-epoch-data", false, "set to true if the resulting transaction is allowed to overwrite an already specified epoch in the smart contract.")
+	generateRecoverEpochTxArgsCmd.Flags().Uint64Var(&flagEpochCounter, "recovery-epoch-counter", 0, "the epoch counter for the recovery epoch")
+	generateRecoverEpochTxArgsCmd.Flags().StringArrayVar(&flagExcludeNodeIDs, "exclude-node-ids", nil, "list of node IDs to exclude from the recovery epoch (if they exist)")
+	generateRecoverEpochTxArgsCmd.Flags().StringArrayVar(&flagIncludeNodeIDs, "include-node-ids", nil, "list of node IDs to include in the recovery epoch")
 
 	err := generateRecoverEpochTxArgsCmd.MarkFlagRequired("access-address")
 	if err != nil {
@@ -96,22 +102,21 @@ func addGenerateRecoverEpochTxArgsCmdFlags() error {
 	if err != nil {
 		return fmt.Errorf("failed to mark epoch-staking-phase-length flag as required")
 	}
-	err = generateRecoverEpochTxArgsCmd.MarkFlagRequired("epoch-counter")
-	if err != nil {
-		return fmt.Errorf("failed to mark epoch-counter flag as required")
-	}
 	err = generateRecoverEpochTxArgsCmd.MarkFlagRequired("collection-clusters")
 	if err != nil {
 		return fmt.Errorf("failed to mark collection-clusters flag as required")
 	}
-	err = generateRecoverEpochTxArgsCmd.MarkFlagRequired("epoch-timing-duration")
+	err = generateRecoverEpochTxArgsCmd.MarkFlagRequired("epoch-timing-recovery-duration")
 	if err != nil {
-		return fmt.Errorf("failed to mark epoch-timing-duration flag as required")
+		return fmt.Errorf("failed to mark epoch-timing-recovery-duration flag as required")
 	}
-
 	err = generateRecoverEpochTxArgsCmd.MarkFlagRequired("root-chain-id")
 	if err != nil {
 		return fmt.Errorf("failed to mark root-chain-id flag as required")
+	}
+	err = generateRecoverEpochTxArgsCmd.MarkFlagRequired("recovery-epoch-counter")
+	if err != nil {
+		return fmt.Errorf("failed to mark recovery-epoch-counter flag as required")
 	}
 	return nil
 }
@@ -139,6 +144,15 @@ func getSnapshot() *inmem.Snapshot {
 // generateRecoverEpochTxArgs generates recover epoch transaction arguments from a root protocol state snapshot and writes it to a JSON file
 func generateRecoverEpochTxArgs(getSnapshot func() *inmem.Snapshot) func(cmd *cobra.Command, args []string) {
 	return func(cmd *cobra.Command, args []string) {
+		excludeNodeIDs, err := flow.IdentifierListFromHex(flagExcludeNodeIDs)
+		if err != nil {
+			log.Fatal().Err(err).Msg("failed to parse to parse node IDs provided via 'exclude-node-ids'")
+		}
+		includeNodeIDs, err := flow.IdentifierListFromHex(flagIncludeNodeIDs)
+		if err != nil {
+			log.Fatal().Err(err).Msg("failed to parse node IDs for additional inclusion provided via 'include-node-ids'")
+		}
+
 		// generate transaction arguments
 		txArgs, err := run.GenerateRecoverEpochTxArgs(
 			log,
@@ -149,8 +163,10 @@ func generateRecoverEpochTxArgs(getSnapshot func() *inmem.Snapshot) func(cmd *co
 			flow.ChainID(flagRootChainID),
 			flagNumViewsInStakingAuction,
 			flagNumViewsInEpoch,
-			flagTargetDuration,
-			flagInitNewEpoch,
+			flagRecoveryEpochTargetDuration,
+			flagUnsafeAllowOverWrite,
+			excludeNodeIDs,
+			includeNodeIDs,
 			getSnapshot(),
 		)
 		if err != nil {

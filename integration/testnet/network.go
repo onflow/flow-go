@@ -15,9 +15,11 @@ import (
 	"testing"
 	"time"
 
+	"github.com/onflow/flow-go/follower/database"
 	"github.com/onflow/flow-go/state/protocol/protocol_state"
 
 	"github.com/dapperlabs/testingdock"
+	badgerv2 "github.com/dgraph-io/badger/v2"
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
 	dockercontainer "github.com/docker/docker/api/types/container"
@@ -53,6 +55,7 @@ import (
 	"github.com/onflow/flow-go/state/protocol/badger"
 	"github.com/onflow/flow-go/state/protocol/inmem"
 	"github.com/onflow/flow-go/state/protocol/protocol_state/kvstore"
+	badgerstorage "github.com/onflow/flow-go/storage/badger"
 	"github.com/onflow/flow-go/utils/io"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -73,6 +76,8 @@ const (
 	DefaultFlowDataDir = "/data"
 	// DefaultFlowDBDir is the default directory for the node database.
 	DefaultFlowDBDir = "/data/protocol"
+	// DefaultFlowPebbleDBDir is the default directory for the pebble database.
+	DefaultFlowPebbleDBDir = "/data/protocol-pebble"
 	// DefaultFlowSecretsDBDir is the default directory for secrets database.
 	DefaultFlowSecretsDBDir = "/data/secrets"
 	// DefaultExecutionRootDir is the default directory for the execution node state database.
@@ -115,12 +120,12 @@ const (
 	// PrimaryON is the container name for the primary observer node to use for API requests
 	PrimaryON = "observer_1"
 
-	DefaultViewsInStakingAuction      uint64 = 5
-	DefaultViewsInDKGPhase            uint64 = 50
-	DefaultViewsInEpoch               uint64 = 200
-	DefaultViewsPerSecond             uint64 = 1
-	DefaultEpochCommitSafetyThreshold uint64 = 20
-	DefaultEpochExtensionViewCount    uint64 = 50
+	DefaultViewsInStakingAuction       uint64 = 5
+	DefaultViewsInDKGPhase             uint64 = 50
+	DefaultViewsInEpoch                uint64 = 200
+	DefaultViewsPerSecond              uint64 = 1
+	DefaultFinalizationSafetyThreshold uint64 = 20
+	DefaultEpochExtensionViewCount     uint64 = 50
 
 	// DefaultMinimumNumOfAccessNodeIDS at-least 1 AN ID must be configured for LN & SN
 	DefaultMinimumNumOfAccessNodeIDS = 1
@@ -422,33 +427,33 @@ func NewConsensusFollowerConfig(t *testing.T, networkingPrivKey crypto.PrivateKe
 
 // NetworkConfig is the config for the network.
 type NetworkConfig struct {
-	Nodes                      NodeConfigs
-	ConsensusFollowers         []ConsensusFollowerConfig
-	Observers                  []ObserverConfig
-	Name                       string
-	NClusters                  uint
-	ViewsInDKGPhase            uint64
-	ViewsInStakingAuction      uint64
-	ViewsInEpoch               uint64
-	ViewsPerSecond             uint64
-	EpochCommitSafetyThreshold uint64
-	KVStoreFactory             func(epochStateID flow.Identifier) (protocol_state.KVStoreAPI, error)
+	Nodes                       NodeConfigs
+	ConsensusFollowers          []ConsensusFollowerConfig
+	Observers                   []ObserverConfig
+	Name                        string
+	NClusters                   uint
+	ViewsInDKGPhase             uint64
+	ViewsInStakingAuction       uint64
+	ViewsInEpoch                uint64
+	ViewsPerSecond              uint64
+	FinalizationSafetyThreshold uint64
+	KVStoreFactory              func(epochStateID flow.Identifier) (protocol_state.KVStoreAPI, error)
 }
 
 type NetworkConfigOpt func(*NetworkConfig)
 
 func NewNetworkConfig(name string, nodes NodeConfigs, opts ...NetworkConfigOpt) NetworkConfig {
 	c := NetworkConfig{
-		Nodes:                      nodes,
-		Name:                       name,
-		NClusters:                  1, // default to 1 cluster
-		ViewsInStakingAuction:      DefaultViewsInStakingAuction,
-		ViewsInDKGPhase:            DefaultViewsInDKGPhase,
-		ViewsInEpoch:               DefaultViewsInEpoch,
-		ViewsPerSecond:             DefaultViewsPerSecond,
-		EpochCommitSafetyThreshold: DefaultEpochCommitSafetyThreshold,
+		Nodes:                       nodes,
+		Name:                        name,
+		NClusters:                   1, // default to 1 cluster
+		ViewsInStakingAuction:       DefaultViewsInStakingAuction,
+		ViewsInDKGPhase:             DefaultViewsInDKGPhase,
+		ViewsInEpoch:                DefaultViewsInEpoch,
+		ViewsPerSecond:              DefaultViewsPerSecond,
+		FinalizationSafetyThreshold: DefaultFinalizationSafetyThreshold,
 		KVStoreFactory: func(epochStateID flow.Identifier) (protocol_state.KVStoreAPI, error) {
-			return kvstore.NewDefaultKVStore(DefaultEpochCommitSafetyThreshold, DefaultEpochExtensionViewCount, epochStateID)
+			return kvstore.NewDefaultKVStore(DefaultFinalizationSafetyThreshold, DefaultEpochExtensionViewCount, epochStateID)
 		},
 	}
 
@@ -464,7 +469,7 @@ func NewNetworkConfigWithEpochConfig(name string, nodes NodeConfigs, viewsInStak
 		WithViewsInStakingAuction(viewsInStakingAuction),
 		WithViewsInDKGPhase(viewsInDKGPhase),
 		WithViewsInEpoch(viewsInEpoch),
-		WithEpochCommitSafetyThreshold(safetyThreshold))
+		WithFinalizationSafetyThreshold(safetyThreshold))
 
 	for _, apply := range opts {
 		apply(&c)
@@ -497,9 +502,9 @@ func WithViewsInDKGPhase(views uint64) func(*NetworkConfig) {
 	}
 }
 
-func WithEpochCommitSafetyThreshold(threshold uint64) func(*NetworkConfig) {
+func WithFinalizationSafetyThreshold(threshold uint64) func(*NetworkConfig) {
 	return func(config *NetworkConfig) {
-		config.EpochCommitSafetyThreshold = threshold
+		config.FinalizationSafetyThreshold = threshold
 	}
 }
 
@@ -645,6 +650,11 @@ func PrepareFlowNetwork(t *testing.T, networkConf NetworkConfig, chainID flow.Ch
 			nodeContainer.AddFlag("insecure-access-api", "false")
 			nodeContainer.AddFlag("access-node-ids", strings.Join(accessNodeIDS, ","))
 		}
+		// Increase the maximum view duration to accommodate the default Localnet block rate of 1bps
+		if nodeConf.Role == flow.RoleConsensus {
+			nodeContainer := flowNetwork.Containers[nodeConf.ContainerName]
+			nodeContainer.AddFlag("cruise-ctl-max-view-duration", "2s")
+		}
 	}
 
 	for i, observerConf := range networkConf.Observers {
@@ -673,6 +683,10 @@ func (net *FlowNetwork) addConsensusFollower(t *testing.T, rootProtocolSnapshotP
 
 	// create a directory for the follower database
 	dataDir := makeDir(t, tmpdir, DefaultFlowDBDir)
+	pebbleDir := makeDir(t, tmpdir, DefaultFlowPebbleDBDir)
+
+	pebbleDB, _, err := database.InitPebbleDB(net.log, pebbleDir)
+	require.NoError(t, err)
 
 	// create a follower-specific directory for the bootstrap files
 	followerBootstrapDir := makeDir(t, tmpdir, DefaultBootstrapDir)
@@ -680,14 +694,26 @@ func (net *FlowNetwork) addConsensusFollower(t *testing.T, rootProtocolSnapshotP
 
 	// copy root protocol snapshot to the follower-specific folder
 	// bootstrap/public-root-information directory
-	err := io.Copy(rootProtocolSnapshotPath, filepath.Join(followerBootstrapDir, bootstrap.PathRootProtocolStateSnapshot))
+	err = io.Copy(rootProtocolSnapshotPath, filepath.Join(followerBootstrapDir, bootstrap.PathRootProtocolStateSnapshot))
 	require.NoError(t, err)
 
 	// consensus follower
+	dbOpts := badgerv2.
+		DefaultOptions(dataDir).
+		WithKeepL0InMemory(true).
+		WithValueLogFileSize(128 << 23).
+		WithValueLogMaxEntries(100000) // Default is 1000000
+	badgerDB, err := badgerstorage.InitPublic(dbOpts)
+	require.NoError(t, err)
+
 	bindAddr := gonet.JoinHostPort("localhost", testingdock.RandomPort(t))
 	opts := append(
 		followerConf.Opts,
-		consensus_follower.WithDataDir(dataDir),
+		consensus_follower.WithDB(badgerDB),
+		// this is required, otherwise consensus follower will create a pebble db at the default
+		// path /data/protocol-pebble, which is outside of the tmpdir, and will run into permission
+		// denied error.
+		consensus_follower.WithPebbleDB(pebbleDB),
 		consensus_follower.WithBootstrapDir(followerBootstrapDir),
 	)
 
@@ -1077,11 +1103,11 @@ func BootstrapNetwork(networkConf NetworkConfig, bootstrapDir string, chainID fl
 
 	allNodeInfos := append(toNodeInfos(stakedConfs), followerInfos...)
 
-	// IMPORTANT: we must use this ordering when writing the DKG keys as
-	//            this ordering defines the DKG participant's indices
+	// IMPORTANT: we must use this ordering when writing the Random Beacon keys as
+	//            this ordering defines the DKG participants' indices
 	stakedNodeInfos := bootstrap.Sort(toNodeInfos(stakedConfs), flow.Canonical[flow.Identity])
 
-	dkg, err := runBeaconKG(stakedConfs)
+	dkg, dkgIndexMap, err := runBeaconKG(stakedConfs)
 	if err != nil {
 		return nil, fmt.Errorf("failed to run DKG: %w", err)
 	}
@@ -1188,6 +1214,7 @@ func BootstrapNetwork(networkConf NetworkConfig, bootstrapDir string, chainID fl
 		ClusterQCs:         flow.ClusterQCVoteDatasFromQCs(qcsWithSignerIDs),
 		DKGGroupKey:        dkg.PubGroupKey,
 		DKGParticipantKeys: dkg.PubKeyShares,
+		DKGIndexMap:        dkgIndexMap,
 	}
 	root := &flow.Block{
 		Header: rootHeader,
@@ -1269,7 +1296,6 @@ func BootstrapNetwork(networkConf NetworkConfig, bootstrapDir string, chainID fl
 		result,
 		seal,
 		qc,
-		flow.DefaultProtocolVersion,
 		networkConf.KVStoreFactory,
 	)
 	if err != nil {
@@ -1351,23 +1377,28 @@ func setupKeys(networkConf NetworkConfig) ([]ContainerConfig, error) {
 // and returns all DKG data. This includes the group private key, node indices,
 // and per-node public and private key-shares.
 // Only consensus nodes participate in the DKG.
-func runBeaconKG(confs []ContainerConfig) (dkgmod.DKGData, error) {
+func runBeaconKG(confs []ContainerConfig) (dkgmod.ThresholdKeySet, flow.DKGIndexMap, error) {
 
 	// filter by consensus nodes
-	consensusNodes := bootstrap.FilterByRole(toNodeInfos(confs), flow.RoleConsensus)
+	consensusNodes := bootstrap.Sort(bootstrap.FilterByRole(toNodeInfos(confs), flow.RoleConsensus), flow.Canonical[flow.Identity])
 	nConsensusNodes := len(consensusNodes)
 
 	dkgSeed, err := getSeed()
 	if err != nil {
-		return dkgmod.DKGData{}, err
+		return dkgmod.ThresholdKeySet{}, nil, err
 	}
 
-	dkg, err := dkg.RandomBeaconKG(nConsensusNodes, dkgSeed)
+	randomBeaconData, err := dkg.RandomBeaconKG(nConsensusNodes, dkgSeed)
 	if err != nil {
-		return dkgmod.DKGData{}, err
+		return dkgmod.ThresholdKeySet{}, nil, err
 	}
 
-	return dkg, nil
+	indexMap := make(flow.DKGIndexMap, nConsensusNodes)
+	for i, node := range consensusNodes {
+		indexMap[node.NodeID] = i
+	}
+
+	return randomBeaconData, indexMap, nil
 }
 
 // setupClusterGenesisBlockQCs generates bootstrapping resources necessary for each collector cluster:

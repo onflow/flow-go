@@ -228,6 +228,37 @@ var InternalEVMTypeCallFunctionType = &sema.FunctionType{
 	ReturnTypeAnnotation: sema.NewTypeAnnotation(sema.AnyStructType),
 }
 
+// InternalEVM.dryCall
+
+const InternalEVMTypeDryCallFunctionName = "dryCall"
+
+var InternalEVMTypeDryCallFunctionType = &sema.FunctionType{
+	Parameters: []sema.Parameter{
+		{
+			Label:          "from",
+			TypeAnnotation: sema.NewTypeAnnotation(EVMAddressBytesType),
+		},
+		{
+			Label:          "to",
+			TypeAnnotation: sema.NewTypeAnnotation(EVMAddressBytesType),
+		},
+		{
+			Label:          "data",
+			TypeAnnotation: sema.NewTypeAnnotation(sema.ByteArrayType),
+		},
+		{
+			Label:          "gasLimit",
+			TypeAnnotation: sema.NewTypeAnnotation(sema.UInt64Type),
+		},
+		{
+			Label:          "value",
+			TypeAnnotation: sema.NewTypeAnnotation(sema.UIntType),
+		},
+	},
+	// Actually EVM.Result, but cannot refer to it here
+	ReturnTypeAnnotation: sema.NewTypeAnnotation(sema.AnyStructType),
+}
+
 // InternalEVM.createCadenceOwnedAccount
 
 const InternalEVMTypeCreateCadenceOwnedAccountFunctionName = "createCadenceOwnedAccount"
@@ -450,6 +481,12 @@ var InternalEVMContractType = func() *sema.CompositeType {
 			ty,
 			InternalEVMTypeCallFunctionName,
 			InternalEVMTypeCallFunctionType,
+			"",
+		),
+		sema.NewUnmeteredPublicFunctionMember(
+			ty,
+			InternalEVMTypeDryCallFunctionName,
+			InternalEVMTypeDryCallFunctionType,
 			"",
 		),
 		sema.NewUnmeteredPublicFunctionMember(

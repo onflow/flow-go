@@ -86,8 +86,19 @@ func NewBuilder(
 	return &b, nil
 }
 
-// BuildOn creates a new block built on the given parent. It produces a payload
-// that is valid with respect to the un-finalized chain it extends.
+// BuildOn generates a new payload that is valid with respect to the parent
+// being built upon, with the view being provided by the consensus algorithm.
+// The builder stores the block and validates it against the cluster state
+// before returning it. The specified parent block must exist in the cluster state.
+//
+// NOTE: Since the block is stored within Builder, HotStuff MUST propose the
+// block once BuildOn successfully returns.
+//
+// # Errors
+// This function does not produce any expected errors.
+// However, it will pass through all errors returned by `setter` and `sign`.
+// Callers must be aware of possible error returns from the `setter` and `sign` arguments they provide,
+// and handle them accordingly when handling errors returned from BuildOn.
 func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header) error, sign func(*flow.Header) error) (*flow.Header, error) {
 	parentSpan, ctx := b.tracer.StartSpanFromContext(context.Background(), trace.COLBuildOn)
 	defer parentSpan.End()

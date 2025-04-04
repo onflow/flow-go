@@ -5,6 +5,8 @@ import (
 
 	"github.com/improbable-eng/grpc-web/go/grpcweb"
 	"google.golang.org/grpc"
+
+	"github.com/onflow/flow-go/module/grpcserver"
 )
 
 type HTTPHeader struct {
@@ -28,11 +30,11 @@ var defaultHTTPHeaders = []HTTPHeader{
 }
 
 // newHTTPProxyServer creates a new HTTP GRPC proxy server.
-func newHTTPProxyServer(grpcServer *grpc.Server) *http.Server {
-	wrappedServer := grpcweb.WrapServer(
-		grpcServer,
-		grpcweb.WithOriginFunc(func(origin string) bool { return true }),
-	)
+func newHTTPProxyServer(grpcServer *grpcserver.GrpcServer) *http.Server {
+	var wrappedServer *grpcweb.WrappedGrpcServer
+	grpcServer.RegisterService(func(s *grpc.Server) {
+		wrappedServer = grpcweb.WrapServer(s, grpcweb.WithOriginFunc(func(origin string) bool { return true }))
+	})
 
 	// register gRPC HTTP proxy
 	mux := http.NewServeMux()

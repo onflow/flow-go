@@ -9,9 +9,9 @@ import (
 	mocktestify "github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
-	"github.com/onflow/flow-go/access"
 	"github.com/onflow/flow-go/access/mock"
 	"github.com/onflow/flow-go/engine/access/rest/router"
+	accessmodel "github.com/onflow/flow-go/model/access"
 	"github.com/onflow/flow-go/model/flow"
 )
 
@@ -29,7 +29,7 @@ func TestGetNetworkParameters(t *testing.T) {
 
 		req := getNetworkParametersRequest(t)
 
-		params := access.NetworkParameters{
+		params := accessmodel.NetworkParameters{
 			ChainID: flow.Mainnet,
 		}
 
