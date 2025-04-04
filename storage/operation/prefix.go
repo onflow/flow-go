@@ -130,7 +130,7 @@ func MakePrefix(code byte, keys ...any) []byte {
 }
 
 // AppendPrefixKeyPart appends v in binary prefix format to buf.
-// NOTE: this function needs to be in sync with PrefixKeyPartLength.
+// NOTE: this function needs to be in sync with prefixKeyPartLength.
 func AppendPrefixKeyPart(buf []byte, v any) []byte {
 	switch i := v.(type) {
 	case uint8:
