@@ -6,6 +6,9 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/onflow/flow-go/storage"
+	"github.com/onflow/flow-go/storage/operation"
+	"github.com/onflow/flow-go/storage/operation/dbtest"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -35,4 +38,33 @@ func TestLightTransactionResults_HappyPath(t *testing.T) {
 	require.NoError(t, err)
 	assert.Len(t, retrievedTxs, len(txResults))
 	assert.Equal(t, txResults, retrievedTxs)
+}
+
+func TestLightTransactionResults_Persist(t *testing.T) {
+	dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
+		txResultStore := NewLightTransactionResults()
+		block := unittest.BlockFixture()
+		txResults := unittest.LightTransactionResultsFixture(1)
+
+		// Store transaction results
+		err := txResultStore.Store(block.ID(), txResults)
+		require.NoError(t, err)
+		require.NoError(t, db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+			return txResultStore.AddToBatch(rw)
+		}))
+
+		// Encode key
+		blockID := block.ID()
+		lightTransactionResultCode := byte(108) // taken from operation/prefix.go
+		key := operation.MakePrefix(lightTransactionResultCode, blockID, txResults[0].TransactionID)
+
+		// Get light tx result
+		reader := db.Reader()
+		value, closer, err := reader.Get(key)
+		defer closer.Close()
+		require.NoError(t, err)
+
+		// Ensure value with such a key was stored in DB
+		require.NotEmpty(t, value)
+	})
 }

@@ -60,7 +60,7 @@ func TestEvents_HappyPath(t *testing.T) {
 	assert.Contains(t, typeEvents, event3)
 }
 
-func TestAddToBatch(t *testing.T) {
+func TestEvents_Persist(t *testing.T) {
 	dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
 		eventStore := NewEvents()
 		block := unittest.BlockFixture()
@@ -75,13 +75,13 @@ func TestAddToBatch(t *testing.T) {
 			return eventStore.AddToBatch(rw)
 		}))
 
-		// Decode event key
-		reader := db.Reader()
+		// Encode event key
 		blockID := block.ID()
-		codeEvent := byte(102) // taken from operation/prefix.go
-		key := operation.EventPrefix(codeEvent, blockID, event)
+		eventCode := byte(102) // taken from operation/prefix.go
+		key := operation.EventPrefix(eventCode, blockID, event)
 
 		// Get event
+		reader := db.Reader()
 		value, closer, err := reader.Get(key)
 		defer closer.Close()
 		require.NoError(t, err)

@@ -1,10 +1,12 @@
 package unsynchronized
 
 import (
+	"fmt"
 	"sync"
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/storage"
+	"github.com/onflow/flow-go/storage/operation"
 	"github.com/onflow/flow-go/storage/store"
 )
 
@@ -85,6 +87,26 @@ func (l *LightTransactionResults) Store(blockID flow.Identifier, transactionResu
 		l.store[txIDKey] = txResult
 		l.indexStore[txIndexKey] = txResult
 		l.lock.Unlock()
+	}
+
+	return nil
+}
+
+func (l *LightTransactionResults) AddToBatch(batch storage.ReaderBatchWriter) error {
+	writer := batch.Writer()
+
+	for block, results := range l.blockStore {
+		decodedBlock, err := store.KeyToBlockID(block)
+		if err != nil {
+			return fmt.Errorf("could not decode block: %w", err)
+		}
+
+		for _, txResult := range results {
+			err = operation.BatchInsertLightTransactionResult(writer, decodedBlock, &txResult)
+			if err != nil {
+				return fmt.Errorf("could not persist light transaction result: %w", err)
+			}
+		}
 	}
 
 	return nil
