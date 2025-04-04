@@ -115,35 +115,65 @@ const (
 	codeEpochEmergencyFallbackTriggered = 255
 )
 
-func MakePrefix(code byte, keys ...interface{}) []byte {
-	prefix := make([]byte, 1)
+func MakePrefix(code byte, keys ...any) []byte {
+	length := 1
+	for _, key := range keys {
+		length += prefixKeyPartLength(key)
+	}
+
+	prefix := make([]byte, 1, length)
 	prefix[0] = code
 	for _, key := range keys {
-		prefix = append(prefix, KeyPartToBytes(key)...)
+		prefix = AppendPrefixKeyPart(prefix, key)
 	}
 	return prefix
 }
 
-func KeyPartToBytes(v interface{}) []byte {
+// AppendPrefixKeyPart appends v in binary prefix format to buf.
+// NOTE: this function needs to be in sync with PrefixKeyPartLength.
+func AppendPrefixKeyPart(buf []byte, v any) []byte {
 	switch i := v.(type) {
 	case uint8:
-		return []byte{i}
+		return append(buf, i)
 	case uint32:
-		b := make([]byte, 4)
-		binary.BigEndian.PutUint32(b, i)
-		return b
+		var b [4]byte
+		binary.BigEndian.PutUint32(b[:], i)
+		return append(buf, b[:]...)
 	case uint64:
-		b := make([]byte, 8)
-		binary.BigEndian.PutUint64(b, i)
-		return b
+		var b [8]byte
+		binary.BigEndian.PutUint64(b[:], i)
+		return append(buf, b[:]...)
 	case string:
-		return []byte(i)
+		return append(buf, []byte(i)...)
 	case flow.Role:
-		return []byte{byte(i)}
+		return append(buf, byte(i))
 	case flow.Identifier:
-		return i[:]
+		return append(buf, i[:]...)
 	case flow.ChainID:
-		return []byte(i)
+		return append(buf, []byte(i)...)
+	default:
+		panic(fmt.Sprintf("unsupported type to convert (%T)", v))
+	}
+}
+
+// prefixKeyPartLength returns length of v in binary prefix format.
+// NOTE: this function needs to be in sync with AppendPrefixKeyPartToBuffer.
+func prefixKeyPartLength(v any) int {
+	switch i := v.(type) {
+	case uint8:
+		return 1
+	case uint32:
+		return 4
+	case uint64:
+		return 8
+	case string:
+		return len(i)
+	case flow.Role:
+		return 1
+	case flow.Identifier:
+		return len(i)
+	case flow.ChainID:
+		return len(i)
 	default:
 		panic(fmt.Sprintf("unsupported type to convert (%T)", v))
 	}
