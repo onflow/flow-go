@@ -213,7 +213,7 @@ func (va *VoteAggregator) processQueuedVote(vote *model.Vote) error {
 			vote.View, err)
 	}
 	if created {
-		va.log.Info().Uint64("view", vote.View).Msg("vote collector is created by processing vote")
+		va.log.Debug().Uint64("view", vote.View).Msg("vote collector is created by processing vote")
 	}
 
 	err = collector.AddVote(vote)
@@ -222,7 +222,7 @@ func (va *VoteAggregator) processQueuedVote(vote *model.Vote) error {
 			vote.View, vote.BlockID, err)
 	}
 
-	va.log.Info().
+	va.log.Debug().
 		Uint64("view", vote.View).
 		Hex("block_id", vote.BlockID[:]).
 		Str("vote_id", vote.ID().String()).
@@ -251,7 +251,7 @@ func (va *VoteAggregator) processQueuedBlock(block *model.SignedProposal) error 
 		return fmt.Errorf("could not get or create collector for block %v: %w", block.Block.BlockID, err)
 	}
 	if created {
-		va.log.Info().
+		va.log.Debug().
 			Uint64("view", block.Block.View).
 			Hex("block_id", block.Block.BlockID[:]).
 			Msg("vote collector is created by processing block")
@@ -268,7 +268,7 @@ func (va *VoteAggregator) processQueuedBlock(block *model.SignedProposal) error 
 		return fmt.Errorf("could not process block: %v, %w", block.Block.BlockID, err)
 	}
 
-	va.log.Info().
+	va.log.Debug().
 		Uint64("view", block.Block.View).
 		Hex("block_id", block.Block.BlockID[:]).
 		Msg("block has been processed successfully")
