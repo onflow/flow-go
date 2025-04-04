@@ -18,7 +18,7 @@ func InitAll(metrics module.CacheMetrics, db *badger.DB) *storage.All {
 	receipts := NewExecutionReceipts(metrics, db, results, DefaultCacheSize)
 	payloads := NewPayloads(db, index, guarantees, seals, receipts, results)
 	blocks := NewBlocks(db, headers, payloads)
-	qcs := NewQuorumCertificates(metrics, db, DefaultCacheSize)
+	qcs := store.NewQuorumCertificates(metrics, badgerimpl.ToDB(db), DefaultCacheSize)
 	setups := NewEpochSetups(metrics, db)
 	epochCommits := NewEpochCommits(metrics, db)
 	epochProtocolStateEntries := NewEpochProtocolStateEntries(metrics, setups, epochCommits, db,
