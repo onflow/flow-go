@@ -7,10 +7,13 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/storage"
+	"github.com/onflow/flow-go/storage/operation"
+	"github.com/onflow/flow-go/storage/operation/dbtest"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
-func TestLightTransactionResultErrorMessages_HappyPath(t *testing.T) {
+func TestTransactionResultErrorMessages_HappyPath(t *testing.T) {
 	storage := NewTransactionResultErrorMessages()
 
 	// Define block ID and error messages
@@ -50,4 +53,40 @@ func TestLightTransactionResultErrorMessages_HappyPath(t *testing.T) {
 	require.NoError(t, err)
 	assert.Len(t, retrievedErrorMessages, len(errorMessages))
 	assert.Equal(t, errorMessages, retrievedErrorMessages)
+}
+
+func TestTransactionResultErrorMessages_Persist(t *testing.T) {
+	dbtest.RunWithDB(t, func(t *testing.T, db storage.DB) {
+		store := NewTransactionResultErrorMessages()
+		block := unittest.BlockFixture()
+		txResults := unittest.TransactionResultsFixture(2)
+		errorMessages := []flow.TransactionResultErrorMessage{
+			{
+				TransactionID: txResults[0].TransactionID,
+				Index:         0,
+				ErrorMessage:  "dummy error message 0",
+				ExecutorID:    unittest.IdentifierFixture(),
+			},
+		}
+
+		// Store error messages
+		err := store.Store(block.ID(), errorMessages)
+		require.NoError(t, err)
+		require.NoError(t, db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+			return store.AddToBatch(rw)
+		}))
+
+		// Encode key
+		txErrorMessageCode := byte(110) // taken from operation/prefix.go
+		key := operation.MakePrefix(txErrorMessageCode, block.ID(), errorMessages[0].TransactionID)
+
+		// Get stored error message value
+		reader := db.Reader()
+		value, closer, err := reader.Get(key)
+		defer closer.Close()
+		require.NoError(t, err)
+
+		// Ensure value with such a key was stored in DB
+		require.NotEmpty(t, value)
+	})
 }

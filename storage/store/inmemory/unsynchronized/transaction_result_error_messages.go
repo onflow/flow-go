@@ -1,10 +1,12 @@
 package unsynchronized
 
 import (
+	"fmt"
 	"sync"
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/storage"
+	"github.com/onflow/flow-go/storage/operation"
 	"github.com/onflow/flow-go/storage/store"
 )
 
@@ -109,7 +111,21 @@ func (t *TransactionResultErrorMessages) Store(
 }
 
 func (t *TransactionResultErrorMessages) AddToBatch(batch storage.ReaderBatchWriter) error {
-	//TODO implement me
-	panic("implement me")
+	writer := batch.Writer()
+
+	for block, errorMessages := range t.blockStore {
+		decoded, err := store.KeyToBlockID(block)
+		if err != nil {
+			return fmt.Errorf("could not decode block: %w", err)
+		}
+
+		for _, msg := range errorMessages {
+			err := operation.BatchInsertTransactionResultErrorMessage(writer, decoded, &msg)
+			if err != nil {
+				return fmt.Errorf("could not persist transaction result error message: %w", err)
+			}
+		}
+	}
+
 	return nil
 }

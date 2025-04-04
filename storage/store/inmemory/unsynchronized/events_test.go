@@ -76,9 +76,8 @@ func TestEvents_Persist(t *testing.T) {
 		}))
 
 		// Encode event key
-		blockID := block.ID()
 		eventCode := byte(102) // taken from operation/prefix.go
-		key := operation.EventPrefix(eventCode, blockID, event)
+		key := operation.EventPrefix(eventCode, block.ID(), event)
 
 		// Get event
 		reader := db.Reader()

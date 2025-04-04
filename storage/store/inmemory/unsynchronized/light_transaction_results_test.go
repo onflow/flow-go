@@ -54,9 +54,8 @@ func TestLightTransactionResults_Persist(t *testing.T) {
 		}))
 
 		// Encode key
-		blockID := block.ID()
 		lightTransactionResultCode := byte(108) // taken from operation/prefix.go
-		key := operation.MakePrefix(lightTransactionResultCode, blockID, txResults[0].TransactionID)
+		key := operation.MakePrefix(lightTransactionResultCode, block.ID(), txResults[0].TransactionID)
 
 		// Get light tx result
 		reader := db.Reader()
