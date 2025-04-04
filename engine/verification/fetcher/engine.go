@@ -293,18 +293,20 @@ func (e *Engine) handleChunkDataPackWithTracing(
 	ctx context.Context,
 	originID flow.Identifier,
 	status *verification.ChunkStatus,
-	chunkDataPack *flow.ChunkDataPack) (bool, error) {
-
+	chunkDataPack *flow.ChunkDataPack,
+) (bool, error) {
 	// make sure the chunk data pack is valid
 	err := e.validateChunkDataPackWithTracing(ctx, status.ChunkIndex, originID, chunkDataPack, status.ExecutionResult)
 	if err != nil {
-		return false, NewChunkDataPackValidationError(originID,
+		return false, NewChunkDataPackValidationError(
+			originID,
 			status.ExecutionResult.ID(),
 			status.ChunkIndex,
 			chunkDataPack.ID(),
 			chunkDataPack.ChunkID,
 			chunkDataPack.Collection.ID(),
-			err)
+			err,
+		)
 	}
 
 	processed, err := e.handleValidatedChunkDataPack(ctx, status, chunkDataPack)
