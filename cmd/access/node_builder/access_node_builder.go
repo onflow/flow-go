@@ -965,16 +965,16 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 				indexerCore, err := indexer.New(
 					builder.Logger,
 					metrics.NewExecutionStateIndexerCollector(),
-					builder.ProtocolDB,
-					builder.Storage.RegisterIndex,
-					builder.Storage.Headers,
+					notNil(builder.ProtocolDB),
+					notNil(builder.Storage.RegisterIndex),
+					notNil(builder.Storage.Headers),
 					notNil(builder.events),
 					notNil(builder.collections),
 					notNil(builder.transactions),
 					notNil(builder.lightTransactionResults),
 					builder.RootChainID.Chain(),
 					indexerDerivedChainData,
-					builder.collectionExecutedMetric,
+					notNil(builder.collectionExecutedMetric),
 				)
 				if err != nil {
 					return nil, err
@@ -2047,17 +2047,17 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 
 			builder.nodeBackend, err = backend.New(backend.Params{
 				State:                 node.State,
-				CollectionRPC:         builder.CollectionRPC,
-				HistoricalAccessNodes: builder.HistoricalAccessRPCs,
+				CollectionRPC:         notNil(builder.CollectionRPC),
+				HistoricalAccessNodes: notNil(builder.HistoricalAccessRPCs),
 				Blocks:                node.Storage.Blocks,
 				Headers:               node.Storage.Headers,
 				Collections:           notNil(builder.collections),
 				Transactions:          notNil(builder.transactions),
 				ExecutionReceipts:     node.Storage.Receipts,
 				ExecutionResults:      node.Storage.Results,
-				TxResultErrorMessages: builder.transactionResultErrorMessages,
+				TxResultErrorMessages: notNil(builder.transactionResultErrorMessages),
 				ChainID:               node.RootChainID,
-				AccessMetrics:         builder.AccessMetrics,
+				AccessMetrics:         notNil(builder.AccessMetrics),
 				ConnFactory:           connFactory,
 				RetryEnabled:          builder.retryEnabled,
 				MaxHeightRange:        backendConfig.MaxHeightRange,
@@ -2065,25 +2065,25 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 				SnapshotHistoryLimit:  backend.DefaultSnapshotHistoryLimit,
 				Communicator:          backend.NewNodeCommunicator(backendConfig.CircuitBreakerConfig.Enabled),
 				TxResultCacheSize:     builder.TxResultCacheSize,
-				ScriptExecutor:        builder.ScriptExecutor,
+				ScriptExecutor:        notNil(builder.ScriptExecutor),
 				ScriptExecutionMode:   scriptExecMode,
 				CheckPayerBalanceMode: checkPayerBalanceMode,
 				EventQueryMode:        eventQueryMode,
 				BlockTracker:          blockTracker,
 				SubscriptionHandler: subscription.NewSubscriptionHandler(
-					builder.Logger,
+					notNil(builder.Logger),
 					broadcaster,
 					builder.stateStreamConf.ClientSendTimeout,
 					builder.stateStreamConf.ResponseLimit,
 					builder.stateStreamConf.ClientSendBufferSize,
 				),
-				EventsIndex:                builder.EventsIndex,
+				EventsIndex:                notNil(builder.EventsIndex),
 				TxResultQueryMode:          txResultQueryMode,
-				TxResultsIndex:             builder.TxResultsIndex,
+				TxResultsIndex:             notNil(builder.TxResultsIndex),
 				LastFullBlockHeight:        lastFullBlockHeight,
 				IndexReporter:              indexReporter,
-				VersionControl:             builder.VersionControl,
-				ExecNodeIdentitiesProvider: builder.ExecNodeIdentitiesProvider,
+				VersionControl:             notNil(builder.VersionControl),
+				ExecNodeIdentitiesProvider: notNil(builder.ExecNodeIdentitiesProvider),
 			})
 			if err != nil {
 				return nil, fmt.Errorf("could not initialize backend: %w", err)
@@ -2094,14 +2094,14 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 				node.State,
 				config,
 				node.RootChainID,
-				builder.AccessMetrics,
+				notNil(builder.AccessMetrics),
 				builder.rpcMetricsEnabled,
-				builder.Me,
-				builder.nodeBackend,
-				builder.nodeBackend,
-				builder.secureGrpcServer,
-				builder.unsecureGrpcServer,
-				builder.stateStreamBackend,
+				notNil(builder.Me),
+				notNil(builder.nodeBackend),
+				notNil(builder.nodeBackend),
+				notNil(builder.secureGrpcServer),
+				notNil(builder.unsecureGrpcServer),
+				notNil(builder.stateStreamBackend),
 				builder.stateStreamConf,
 				indexReporter,
 			)
@@ -2140,9 +2140,9 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 			if builder.storeTxResultErrorMessages {
 				builder.TxResultErrorMessagesCore = tx_error_messages.NewTxErrorMessagesCore(
 					node.Logger,
-					builder.nodeBackend,
-					builder.transactionResultErrorMessages,
-					builder.ExecNodeIdentitiesProvider,
+					notNil(builder.nodeBackend),
+					notNil(builder.transactionResultErrorMessages),
+					notNil(builder.ExecNodeIdentitiesProvider),
 				)
 			}
 
@@ -2158,10 +2158,10 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 				notNil(builder.transactions),
 				node.Storage.Results,
 				node.Storage.Receipts,
-				builder.collectionExecutedMetric,
+				notNil(builder.collectionExecutedMetric),
 				processedFinalizedBlockHeight,
 				lastFullBlockHeight,
-				builder.TxResultErrorMessagesCore,
+				notNil(builder.TxResultErrorMessagesCore),
 			)
 			if err != nil {
 				return nil, err
