@@ -34,9 +34,11 @@ type TimerInfo struct {
 // is started.
 type NewViewEvent TimerInfo
 
-// TimeoutObject represents intent of replica to leave its current view with a timeout. This concept is very similar to
-// HotStuff vote. Valid TimeoutObject is signed by staking key.
-type TimeoutObject struct {
+// RepeatableTimeoutObject represents the core data of a TimeoutObject.
+//
+// Unlike TimeoutObject, this struct does not include the TimeoutTick field
+// and is used for de-duplicated TimeoutObjects.
+type RepeatableTimeoutObject struct {
 	// View is the view number which is replica is timing out
 	View uint64
 	// NewestQC is the newest QC (by view) known to the creator of this TimeoutObject
@@ -50,19 +52,10 @@ type TimeoutObject struct {
 	// SigData is a BLS signature created by staking key signing View + NewestQC.View
 	// This signature is further aggregated in TimeoutCertificate.
 	SigData crypto.Signature
-	// TimeoutTick is the number of times the `timeout.Controller` has (re-)emitted the
-	// timeout for this view. When the timer for the view's original duration expires, a `TimeoutObject`
-	// with `TimeoutTick = 0` is broadcast. Subsequently, `timeout.Controller` re-broadcasts the
-	// `TimeoutObject` periodically  based on some internal heuristic. Each time we attempt a re-broadcast,
-	// the `TimeoutTick` is incremented. Incrementing the field prevents de-duplicated within the network layer,
-	// which in turn guarantees quick delivery of the `TimeoutObject` after GST and facilitates recovery.
-	// This field is not part of timeout object ID. Thereby, two timeouts are identical if only they differ
-	// by their TimeoutTick value.
-	TimeoutTick uint64
 }
 
-// ID returns the TimeoutObject's identifier
-func (t *TimeoutObject) ID() flow.Identifier {
+// ID returns the RepeatableTimeoutObject's identifier
+func (t *RepeatableTimeoutObject) ID() flow.Identifier {
 	body := struct {
 		View         uint64
 		NewestQCID   flow.Identifier
@@ -79,6 +72,24 @@ func (t *TimeoutObject) ID() flow.Identifier {
 	return flow.MakeID(body)
 }
 
+// TimeoutObject represents intent of replica to leave its current view with a timeout. This concept is very similar to
+// HotStuff vote. Valid TimeoutObject is signed by staking key.
+type TimeoutObject struct {
+	RepeatableTimeoutObject
+	// TimeoutTick is the number of times the `timeout.Controller` has (re-)emitted the
+	// timeout for this view. When the timer for the view's original duration expires, a `TimeoutObject`
+	// with `TimeoutTick = 0` is broadcast. Subsequently, `timeout.Controller` re-broadcasts the
+	// `TimeoutObject` periodically  based on some internal heuristic. Each time we attempt a re-broadcast,
+	// the `TimeoutTick` is incremented. Incrementing the field prevents de-duplicated within the network layer,
+	// which in turn guarantees quick delivery of the `TimeoutObject` after GST and facilitates recovery.
+	TimeoutTick uint64
+}
+
+// ID returns the RepeatableTimeoutObject's identifier
+func (t *TimeoutObject) ID() flow.Identifier {
+	return flow.MakeID(t)
+}
+
 func (t *TimeoutObject) String() string {
 	return fmt.Sprintf(
 		"View: %d, HighestQC.View: %d, LastViewTC: %v, TimeoutTick: %d",
@@ -89,7 +100,7 @@ func (t *TimeoutObject) String() string {
 	)
 }
 
-// LogContext returns a `zerolog.Contex` including the most important properties of the TC:
+// LogContext returns a `zerolog.Context` including the most important properties of the TC:
 //   - view number that this TC is for
 //   - view and ID of the block that the included QC points to
 //   - number of times a re-broadcast of this timeout was attempted
