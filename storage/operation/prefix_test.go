@@ -14,13 +14,13 @@ func TestMakePrefix(t *testing.T) {
 
 	u := uint64(1337)
 	expected := []byte{0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x05, 0x39}
-	actual := makePrefix(code, u)
+	actual := MakePrefix(code, u)
 
 	assert.Equal(t, expected, actual)
 
 	r := flow.Role(2)
 	expected = []byte{0x01, 0x02}
-	actual = makePrefix(code, r)
+	actual = MakePrefix(code, r)
 
 	assert.Equal(t, expected, actual)
 
@@ -31,7 +31,7 @@ func TestMakePrefix(t *testing.T) {
 		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
 		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
 	}
-	actual = makePrefix(code, id)
+	actual = MakePrefix(code, id)
 
 	assert.Equal(t, expected, actual)
 }

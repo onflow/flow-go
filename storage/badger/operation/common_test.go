@@ -620,7 +620,7 @@ func TestFindHighestAtOrBelow(t *testing.T) {
 		entity3 := Entity{Value: 43}
 
 		err := db.Update(func(tx *badger.Txn) error {
-			key := append(prefix, b(uint64(15))...)
+			key := append(prefix, keyPartToBinary(uint64(15))...)
 			val, err := msgpack.Marshal(entity3)
 			if err != nil {
 				return err
@@ -630,7 +630,7 @@ func TestFindHighestAtOrBelow(t *testing.T) {
 				return err
 			}
 
-			key = append(prefix, b(uint64(5))...)
+			key = append(prefix, keyPartToBinary(uint64(5))...)
 			val, err = msgpack.Marshal(entity1)
 			if err != nil {
 				return err
@@ -640,7 +640,7 @@ func TestFindHighestAtOrBelow(t *testing.T) {
 				return err
 			}
 
-			key = append(prefix, b(uint64(10))...)
+			key = append(prefix, keyPartToBinary(uint64(10))...)
 			val, err = msgpack.Marshal(entity2)
 			if err != nil {
 				return err
