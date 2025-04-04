@@ -56,20 +56,7 @@ type RepeatableTimeoutObject struct {
 
 // ID returns the RepeatableTimeoutObject's identifier
 func (t *RepeatableTimeoutObject) ID() flow.Identifier {
-	body := struct {
-		View         uint64
-		NewestQCID   flow.Identifier
-		LastViewTCID flow.Identifier
-		SignerID     flow.Identifier
-		SigData      crypto.Signature
-	}{
-		View:         t.View,
-		NewestQCID:   t.NewestQC.ID(),
-		LastViewTCID: t.LastViewTC.ID(),
-		SignerID:     t.SignerID,
-		SigData:      t.SigData,
-	}
-	return flow.MakeID(body)
+	return flow.MakeID(t)
 }
 
 // TimeoutObject represents intent of replica to leave its current view with a timeout. This concept is very similar to
