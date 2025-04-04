@@ -1,6 +1,10 @@
 package store
 
 import (
+	"errors"
+	"fmt"
+	"sync"
+
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/metrics"
@@ -11,8 +15,9 @@ import (
 
 // QuorumCertificates implements persistent storage for quorum certificates.
 type QuorumCertificates struct {
-	db    storage.DB
-	cache *Cache[flow.Identifier, *flow.QuorumCertificate]
+	db      storage.DB
+	storing sync.Mutex
+	cache   *Cache[flow.Identifier, *flow.QuorumCertificate]
 }
 
 var _ storage.QuorumCertificates = (*QuorumCertificates)(nil)
@@ -36,6 +41,7 @@ func NewQuorumCertificates(collector module.CacheMetrics, db storage.DB, cacheSi
 			withLimit[flow.Identifier, *flow.QuorumCertificate](cacheSize),
 			withStore(store),
 			withRetrieve(retrieve)),
+		storing: sync.Mutex{},
 	}
 }
 
@@ -44,8 +50,29 @@ func (q *QuorumCertificates) StoreTx(qc *flow.QuorumCertificate) func(*transacti
 }
 
 // BatchStore stores a Quorum Certificate as part of database batch update. QC is indexed by QC.BlockID.
-// * storage.ErrAlreadyExists if any QC for blockID is already stored
+// * storage.ErrAlreadyExists if a different QC for blockID is already stored
 func (q *QuorumCertificates) BatchStore(qc *flow.QuorumCertificate, rw storage.ReaderBatchWriter) error {
+	q.storing.Lock()
+	rw.AddCallback(func(error) {
+		q.storing.Unlock()
+	})
+
+	// Check if the QC is already exist
+	existing, err := q.cache.Get(rw.GlobalReader(), qc.BlockID)
+	if err == nil {
+		if existing.ID() != qc.ID() {
+			return fmt.Errorf("different qc %v (!= %v)already exists for block ID %s: %w",
+				existing.ID(), qc.ID(), qc.BlockID, storage.ErrAlreadyExists)
+		}
+
+		// if the same QC is already exist, we can skip the store
+		return nil
+	}
+
+	if !errors.Is(err, storage.ErrNotFound) {
+		return fmt.Errorf("failed to get qc for block ID %s: %w", qc.BlockID, err)
+	}
+
 	return q.cache.PutTx(rw, qc.BlockID, qc)
 }
 
