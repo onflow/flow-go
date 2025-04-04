@@ -253,8 +253,8 @@ SearchLoop:
 	}
 
 	// generates a signature over the execution result
-	id := receipt.SignableID()
-	sig, err := ss.exeSK.Sign(id[:], exeUtils.NewExecutionReceiptHasher())
+	signableID := receipt.SignableID()
+	sig, err := ss.exeSK.Sign(signableID[:], exeUtils.NewExecutionReceiptHasher())
 	require.NoError(ss.T(), err)
 
 	receipt.ExecutorSignature = sig
@@ -267,13 +267,13 @@ SearchLoop:
 		ExecutorSignature: crypto.Signature{},
 	}
 
-	id = receipt2.SignableID()
-	sig2, err := ss.exe2SK.Sign(id[:], exeUtils.NewExecutionReceiptHasher())
+	signableID2 := receipt2.SignableID()
+	sig2, err := ss.exe2SK.Sign(signableID2[:], exeUtils.NewExecutionReceiptHasher())
 	require.NoError(ss.T(), err)
 
 	receipt2.ExecutorSignature = sig2
 
-	valid, err := ss.exe2SK.PublicKey().Verify(receipt2.ExecutorSignature, id[:], exeUtils.NewExecutionReceiptHasher())
+	valid, err := ss.exe2SK.PublicKey().Verify(receipt2.ExecutorSignature, signableID2[:], exeUtils.NewExecutionReceiptHasher())
 	require.NoError(ss.T(), err)
 	require.True(ss.T(), valid)
 
