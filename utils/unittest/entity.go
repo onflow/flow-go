@@ -210,7 +210,7 @@ func (mc *MalleabilityChecker) Check(model any, hashModel func() flow.Identifier
 		return fmt.Errorf("entity is nil, nothing to check")
 	}
 	v = v.Elem()
-	if err := mc.isEntityMalleable(v, nil, "", hashModel); err != nil {
+	if err := mc.isModelMalleable(v, nil, "", hashModel); err != nil {
 		return err
 	}
 	return mc.checkExpectations()
@@ -230,17 +230,18 @@ func (mc *MalleabilityChecker) checkExpectations() error {
 	return nil
 }
 
-// isEntityMalleable is a helper function to recursively check fields of the entity.
-// This function is called recursively for each field of the entity and checks if the entity is malleable by comparing ID
+// isModelMalleable is a helper function to recursively check fields of a model for malleability.
+// This function is called recursively for each field of the input model and checks if the model is malleable by comparing its hash
 // before and after changing the field value.
 // Arguments:
-//   - v: field value to check.
+//   - modelOrField: value to check - at the top-level of the recursion, it is the overall model we are checking;
+//     for all recursive calls it is fields and sub-fields of the model.
 //   - structField: optional metadata about the field, it is present only for values which are fields of a struct.
 //   - parentFieldPath: previously accumulated field path which leads to the current field.
-//   - idFunc:  function to get the ID of the whole entity.
+//   - hashModel:  function to get a hash of the whole model.
 //
 // This function returns error if the entity is malleable, otherwise it returns nil.
-func (mc *MalleabilityChecker) isEntityMalleable(v reflect.Value, structField *reflect.StructField, parentFieldPath string, idFunc func() flow.Identifier) error {
+func (mc *MalleabilityChecker) isModelMalleable(modelOrField reflect.Value, structField *reflect.StructField, parentFieldPath string, hashModel func() flow.Identifier) error {
 	var fullFieldPath string
 	// if we are dealing with a field of a struct, we need to build a full field path and use that for custom options lookup.
 	if structField != nil {
@@ -254,53 +255,53 @@ func (mc *MalleabilityChecker) isEntityMalleable(v reflect.Value, structField *r
 		}
 	}
 
-	if v.Kind() == reflect.Ptr {
-		if v.IsNil() {
-			v.Set(reflect.New(v.Type().Elem()))
+	if modelOrField.Kind() == reflect.Ptr {
+		if modelOrField.IsNil() {
+			modelOrField.Set(reflect.New(modelOrField.Type().Elem()))
 		}
-		v = v.Elem()
+		modelOrField = modelOrField.Elem()
 	}
-	tType := v.Type()
+	tType := modelOrField.Type()
 
 	// if we have a field generator for the field, we use it to generate a random value for the field instead of using the default flow.
 	if generator, ok := mc.fieldGenerator[fullFieldPath]; ok {
 		// make sure we consume the field generator so we can check if all field generators were used.
 		delete(mc.fieldGenerator, fullFieldPath)
-		origID := idFunc()
-		v.Set(generator())
-		newID := idFunc()
-		if origID != newID {
+		originalHash := hashModel()
+		modelOrField.Set(generator())
+		newHash := hashModel()
+		if originalHash != newHash {
 			return nil
 		}
-		return fmt.Errorf("ID did not change after changing %s value", fullFieldPath)
+		return fmt.Errorf("hash did not change after changing %s value", fullFieldPath)
 	}
 
-	if v.Kind() == reflect.Struct {
+	if modelOrField.Kind() == reflect.Struct {
 		// any time we encounter a structure we need to go through all fields and check if the entity is malleable in recursive manner.
-		for i := 0; i < v.NumField(); i++ {
-			field := v.Field(i)
+		for i := 0; i < modelOrField.NumField(); i++ {
+			field := modelOrField.Field(i)
 			if !field.CanSet() {
 				return fmt.Errorf("field %s is not settable, try providing a field generator for field %s", tType.Field(i).Name, fullFieldPath)
 			}
 
 			nextField := tType.Field(i)
-			if err := mc.isEntityMalleable(field, &nextField, fullFieldPath, idFunc); err != nil {
+			if err := mc.isModelMalleable(field, &nextField, fullFieldPath, hashModel); err != nil {
 				return fmt.Errorf("field %s is malleable: %w", tType.Field(i).Name, err)
 			}
 		}
 		return nil
 	} else {
 		// when dealing with non-composite type we can generate random values for it and check if ID has changed.
-		origID := idFunc()
-		err := mc.generateRandomReflectValue(v)
+		origID := hashModel()
+		err := mc.generateRandomReflectValue(modelOrField)
 		if err != nil {
 			return fmt.Errorf("failed to generate random value for %s: %w", fullFieldPath, err)
 		}
-		newID := idFunc()
+		newID := hashModel()
 		if origID != newID {
 			return nil
 		}
-		return fmt.Errorf("ID did not change after changing %s value", fullFieldPath)
+		return fmt.Errorf("hash did not change after changing %s value", fullFieldPath)
 	}
 }
 
