@@ -281,7 +281,7 @@ func NewChunkDataPack(
 	}
 }
 
-// ID returns unique identifier for the ChunkDataPack struct.
+// ID returns a collision-resistant hash of the ChunkDataPack struct.
 func (c *ChunkDataPack) ID() Identifier {
 	return MakeID(c)
 }
@@ -366,7 +366,8 @@ type BlockExecutionDataRoot struct {
 	ChunkExecutionDataIDs []cid.Cid
 }
 
-// EncodeRLP defines RLP encoding behaviour for BlockExecutionDataRoot.
+// EncodeRLP defines an RLP encoding BlockExecutionDataRoot. We need to define a custom RLP encoding since [cid.Cid] doesn't have one. Without it we can't produce a collision-resistant hash.
+// No errors are expected during normal operations.
 func (b BlockExecutionDataRoot) EncodeRLP(w io.Writer) error {
 	encodingCanonicalForm := struct {
 		BlockID               Identifier
