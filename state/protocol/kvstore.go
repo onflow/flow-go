@@ -145,11 +145,17 @@ type KVStoreReader interface {
 // ExecutionMeteringParameters are used to measure resource usage of transactions,
 // which affects fee calculations and transaction/script stopping conditions.
 type ExecutionMeteringParameters struct {
-	// ExecutionEffortWeights ...
+	// ExecutionEffortWeights maps execution effort kinds to their weights. The weights are used to tally up
+	// execution effort of a cadence transaction. If execution effort reaches the limit `DefaultMaxTransactionGasLimit`
+	// the transaction will be halted and considered failed. The transactions execution effort is also used to calculate
+	// the transaction fees. Unspecified weights default to `meter.DefaultComputationWeights`.
 	ExecutionEffortWeights map[uint32]uint64
-	// ExecutionMemoryWeights ...
+	// ExecutionMemoryWeights maps execution memory kinds to their weights. The weights are used to tally up
+	// memory usage of a cadence transaction. If memory usage reaches the limit `ExecutionMemoryLimit` the transaction
+	// will be halted and considered failed. Unspecified weights default to `meter.DefaultMemoryWeights`.
 	ExecutionMemoryWeights map[uint32]uint64
-	// ExecutionMemoryLimit ...
+	// ExecutionMemoryLimit is the maximum amount of memory that can be used by a transaction before it is halted and
+	// considered failed. If set to `math.MaxUint64` the `meter.DefaultMemoryLimit` is used.
 	ExecutionMemoryLimit uint64
 }
 
