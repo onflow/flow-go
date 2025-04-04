@@ -159,7 +159,7 @@ func (s *TimeoutCollectorTestSuite) TestAddTimeout_TONotifications() {
 	timeouts := make([]*model.TimeoutObject, 0, qcCount)
 	for i := 0; i < qcCount; i++ {
 		qc := helper.MakeQC(helper.WithQCView(uint64(i)))
-		timeout := helper.TimeoutObjectFixture(func(timeout *model.TimeoutObject) {
+		timeout := helper.TimeoutObjectFixture(func(timeout *model.RepeatableTimeoutObject) {
 			timeout.View = s.view
 			timeout.NewestQC = qc
 			timeout.LastViewTC = lastViewTC

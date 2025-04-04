@@ -53,15 +53,19 @@ func WithTCHighQCViews(highQCViews []uint64) func(*flow.TimeoutCertificate) {
 	}
 }
 
-func TimeoutObjectFixture(opts ...func(TimeoutObject *hotstuff.TimeoutObject)) *hotstuff.TimeoutObject {
-	timeout := &hotstuff.TimeoutObject{
-		RepeatableTimeoutObject: hotstuff.RepeatableTimeoutObject{
-			View:       uint64(rand.Uint32()),
-			NewestQC:   MakeQC(),
-			LastViewTC: MakeTC(),
-			SignerID:   unittest.IdentifierFixture(),
-			SigData:    unittest.RandomBytes(128),
-		},
+func TimeoutObjectFixture(opts ...func(timeout *hotstuff.RepeatableTimeoutObject)) *hotstuff.TimeoutObject {
+	return &hotstuff.TimeoutObject{
+		RepeatableTimeoutObject: *RepeatableTimeoutObjectFixture(opts...),
+	}
+}
+
+func RepeatableTimeoutObjectFixture(opts ...func(timeout *hotstuff.RepeatableTimeoutObject)) *hotstuff.RepeatableTimeoutObject {
+	timeout := &hotstuff.RepeatableTimeoutObject{
+		View:       uint64(rand.Uint32()),
+		NewestQC:   MakeQC(),
+		LastViewTC: MakeTC(),
+		SignerID:   unittest.IdentifierFixture(),
+		SigData:    unittest.RandomBytes(128),
 	}
 
 	for _, opt := range opts {
@@ -71,26 +75,26 @@ func TimeoutObjectFixture(opts ...func(TimeoutObject *hotstuff.TimeoutObject)) *
 	return timeout
 }
 
-func WithTimeoutObjectSignerID(signerID flow.Identifier) func(*hotstuff.TimeoutObject) {
-	return func(TimeoutObject *hotstuff.TimeoutObject) {
-		TimeoutObject.SignerID = signerID
+func WithTimeoutObjectSignerID(signerID flow.Identifier) func(*hotstuff.RepeatableTimeoutObject) {
+	return func(timeout *hotstuff.RepeatableTimeoutObject) {
+		timeout.SignerID = signerID
 	}
 }
 
-func WithTimeoutNewestQC(newestQC *flow.QuorumCertificate) func(*hotstuff.TimeoutObject) {
-	return func(timeout *hotstuff.TimeoutObject) {
+func WithTimeoutNewestQC(newestQC *flow.QuorumCertificate) func(*hotstuff.RepeatableTimeoutObject) {
+	return func(timeout *hotstuff.RepeatableTimeoutObject) {
 		timeout.NewestQC = newestQC
 	}
 }
 
-func WithTimeoutLastViewTC(lastViewTC *flow.TimeoutCertificate) func(*hotstuff.TimeoutObject) {
-	return func(timeout *hotstuff.TimeoutObject) {
+func WithTimeoutLastViewTC(lastViewTC *flow.TimeoutCertificate) func(*hotstuff.RepeatableTimeoutObject) {
+	return func(timeout *hotstuff.RepeatableTimeoutObject) {
 		timeout.LastViewTC = lastViewTC
 	}
 }
 
-func WithTimeoutObjectView(view uint64) func(*hotstuff.TimeoutObject) {
-	return func(TimeoutObject *hotstuff.TimeoutObject) {
-		TimeoutObject.View = view
+func WithTimeoutObjectView(view uint64) func(*hotstuff.RepeatableTimeoutObject) {
+	return func(timeout *hotstuff.RepeatableTimeoutObject) {
+		timeout.View = view
 	}
 }

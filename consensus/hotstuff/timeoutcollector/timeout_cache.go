@@ -57,7 +57,7 @@ func (vc *TimeoutObjectsCache) AddTimeoutObject(timeout *model.TimeoutObject) er
 
 	// De-duplicated timeouts based on the following rules:
 	//  * For each voter (i.e. SignerID), we store the _first_  t0.
-	//  * For any subsequent timeout t, we check whether t.ID() == t0.ID().
+	//  * For any subsequent timeout t, we check whether t.RepeatableTimeoutObject.ID() == t0.RepeatableTimeoutObject.ID().
 	//    If this is the case, we consider the timeout a duplicate and drop it.
 	//    If t and t0 have different checksums, the voter is equivocating, and
 	//    we return a model.DoubleTimeoutError.
