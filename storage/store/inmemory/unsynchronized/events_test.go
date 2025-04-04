@@ -66,9 +66,9 @@ func TestEvents_Persist(t *testing.T) {
 		block := unittest.BlockFixture()
 		transaction := unittest.TransactionFixture()
 		event := unittest.EventFixture(flow.EventAccountCreated, 0, 0, transaction.ID(), 200)
+		expectedStoredEvents := flow.EventsList{event}
 
 		// Store events
-		expectedStoredEvents := flow.EventsList{event}
 		err := eventStore.Store(block.ID(), []flow.EventsList{expectedStoredEvents})
 		require.NoError(t, err)
 		require.NoError(t, db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {

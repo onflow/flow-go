@@ -1,10 +1,12 @@
 package unsynchronized
 
 import (
+	"fmt"
 	"sync"
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/storage"
+	"github.com/onflow/flow-go/storage/operation"
 )
 
 type Transactions struct {
@@ -40,5 +42,18 @@ func (t *Transactions) Store(tx *flow.TransactionBody) error {
 	t.lock.Lock()
 	defer t.lock.Unlock()
 	t.store[tx.ID()] = tx
+	return nil
+}
+
+func (t *Transactions) AddToBatch(batch storage.ReaderBatchWriter) error {
+	writer := batch.Writer()
+
+	for txID, tx := range t.store {
+		err := operation.UpsertTransaction(writer, txID, tx)
+		if err != nil {
+			return fmt.Errorf("could not persist transaction: %w", err)
+		}
+	}
+
 	return nil
 }

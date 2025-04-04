@@ -65,3 +65,8 @@ func (r *Registers) Store(entries flow.RegisterEntries, height uint64) error {
 
 	return nil
 }
+
+func (r *Registers) AddToBatch(batch storage.ReaderBatchWriter) error {
+	panic("implement me")
+	return nil
+}

@@ -107,3 +107,9 @@ func (t *TransactionResultErrorMessages) Store(
 
 	return nil
 }
+
+func (t *TransactionResultErrorMessages) AddToBatch(batch storage.ReaderBatchWriter) error {
+	//TODO implement me
+	panic("implement me")
+	return nil
+}
