@@ -17,6 +17,12 @@ type ExecutionReceipt struct {
 	ExecutorSignature crypto.Signature
 }
 
+// SignableID returns a hash over the data of the execution receipt.
+// This is what is signed by the executor and verified by recipients.
+func (er *ExecutionReceipt) SignableID() Identifier {
+	return er.Meta().SignableID()
+}
+
 // ID returns the canonical ID of the execution receipt.
 func (er *ExecutionReceipt) ID() Identifier {
 	return er.Meta().ID()
@@ -58,9 +64,10 @@ func ExecutionReceiptFromMeta(meta ExecutionReceiptMeta, result ExecutionResult)
 	}
 }
 
-// ID returns the canonical ID of the execution receipt.
-// It is identical to the ID of the full receipt.
-func (er *ExecutionReceiptMeta) ID() Identifier {
+// SignableID returns a hash over the data in the execution receipt.
+// This is what is signed by the executor and verified by recipients.
+// It is identical to the SignableID of the full receipt.
+func (er *ExecutionReceiptMeta) SignableID() Identifier {
 	body := struct {
 		ExecutorID Identifier
 		ResultID   Identifier
@@ -71,6 +78,12 @@ func (er *ExecutionReceiptMeta) ID() Identifier {
 		Spocks:     er.Spocks,
 	}
 	return MakeID(body)
+}
+
+// ID returns the canonical ID of the execution receipt.
+// It is identical to the ID of the full receipt.
+func (er *ExecutionReceiptMeta) ID() Identifier {
+	return MakeID(er)
 }
 
 func (er ExecutionReceiptMeta) MarshalJSON() ([]byte, error) {

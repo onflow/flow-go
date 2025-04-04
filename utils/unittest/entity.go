@@ -80,7 +80,7 @@ func RequireNonMalleable(t *testing.T, model any, hashModel func() flow.Identifi
 //  2. interfaces (generateInterfaceFlowValue)
 //
 // Checker knows how to deal with each of the categories and generate random values for them.
-// There are two ways to handle types not natively recognized byt he MalleabilityChecker:
+// There are two ways to handle types not natively recognized by the MalleabilityChecker:
 //  1. User can provide a custom type generator for the type using WithTypeGenerator option.
 //  2. User can provide a custom generator for the field using WithFieldGenerator option.
 //
