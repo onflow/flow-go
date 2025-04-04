@@ -2047,7 +2047,7 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 
 			builder.nodeBackend, err = backend.New(backend.Params{
 				State:                 node.State,
-				CollectionRPC:         notNil(builder.CollectionRPC),
+				CollectionRPC:         builder.CollectionRPC, // might be nil
 				HistoricalAccessNodes: notNil(builder.HistoricalAccessRPCs),
 				Blocks:                node.Storage.Blocks,
 				Headers:               node.Storage.Headers,
