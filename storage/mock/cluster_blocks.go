@@ -15,23 +15,23 @@ type ClusterBlocks struct {
 }
 
 // ByHeight provides a mock function with given fields: height
-func (_m *ClusterBlocks) ByHeight(height uint64) (*cluster.Block, error) {
+func (_m *ClusterBlocks) ByHeight(height uint64) (*cluster.BlockProposal, error) {
 	ret := _m.Called(height)
 
 	if len(ret) == 0 {
 		panic("no return value specified for ByHeight")
 	}
 
-	var r0 *cluster.Block
+	var r0 *cluster.BlockProposal
 	var r1 error
-	if rf, ok := ret.Get(0).(func(uint64) (*cluster.Block, error)); ok {
+	if rf, ok := ret.Get(0).(func(uint64) (*cluster.BlockProposal, error)); ok {
 		return rf(height)
 	}
-	if rf, ok := ret.Get(0).(func(uint64) *cluster.Block); ok {
+	if rf, ok := ret.Get(0).(func(uint64) *cluster.BlockProposal); ok {
 		r0 = rf(height)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*cluster.Block)
+			r0 = ret.Get(0).(*cluster.BlockProposal)
 		}
 	}
 
@@ -45,23 +45,23 @@ func (_m *ClusterBlocks) ByHeight(height uint64) (*cluster.Block, error) {
 }
 
 // ByID provides a mock function with given fields: blockID
-func (_m *ClusterBlocks) ByID(blockID flow.Identifier) (*cluster.Block, error) {
+func (_m *ClusterBlocks) ByID(blockID flow.Identifier) (*cluster.BlockProposal, error) {
 	ret := _m.Called(blockID)
 
 	if len(ret) == 0 {
 		panic("no return value specified for ByID")
 	}
 
-	var r0 *cluster.Block
+	var r0 *cluster.BlockProposal
 	var r1 error
-	if rf, ok := ret.Get(0).(func(flow.Identifier) (*cluster.Block, error)); ok {
+	if rf, ok := ret.Get(0).(func(flow.Identifier) (*cluster.BlockProposal, error)); ok {
 		return rf(blockID)
 	}
-	if rf, ok := ret.Get(0).(func(flow.Identifier) *cluster.Block); ok {
+	if rf, ok := ret.Get(0).(func(flow.Identifier) *cluster.BlockProposal); ok {
 		r0 = rf(blockID)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*cluster.Block)
+			r0 = ret.Get(0).(*cluster.BlockProposal)
 		}
 	}
 
@@ -75,7 +75,7 @@ func (_m *ClusterBlocks) ByID(blockID flow.Identifier) (*cluster.Block, error) {
 }
 
 // Store provides a mock function with given fields: block
-func (_m *ClusterBlocks) Store(block *cluster.Block) error {
+func (_m *ClusterBlocks) Store(block *cluster.BlockProposal) error {
 	ret := _m.Called(block)
 
 	if len(ret) == 0 {
@@ -83,7 +83,7 @@ func (_m *ClusterBlocks) Store(block *cluster.Block) error {
 	}
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(*cluster.Block) error); ok {
+	if rf, ok := ret.Get(0).(func(*cluster.BlockProposal) error); ok {
 		r0 = rf(block)
 	} else {
 		r0 = ret.Error(0)

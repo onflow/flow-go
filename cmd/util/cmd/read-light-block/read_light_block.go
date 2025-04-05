@@ -35,7 +35,7 @@ func ReadClusterLightBlockByHeightRange(clusterBlocks storage.ClusterBlocks, sta
 			}
 			return nil, fmt.Errorf("could not get cluster block by height %v: %w", height, err)
 		}
-		light := ClusterBlockToLight(block)
+		light := ClusterBlockToLight(block.Block)
 		blocks = append(blocks, light)
 	}
 	return blocks, nil

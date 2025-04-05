@@ -257,6 +257,15 @@ func BlockFixtures(number int) []*flow.Block {
 	return blocks
 }
 
+func ProposalFixtures(number int) []*flow.BlockProposal {
+	proposals := make([]*flow.BlockProposal, 0, number)
+	for ; number > 0; number-- {
+		proposal := ProposalFixture()
+		proposals = append(proposals, proposal)
+	}
+	return proposals
+}
+
 func ProposalFixture() *flow.BlockProposal {
 	block := BlockFixture()
 	return ProposalFromBlock(&block)
@@ -2019,6 +2028,23 @@ func CertifyBlock(header *flow.Header) *flow.QuorumCertificate {
 		qc.BlockID = header.ID()
 	})
 	return qc
+}
+
+func CertifiedByChild(block *flow.Block, child *flow.Block) *flow.CertifiedBlock {
+	return &flow.CertifiedBlock{
+		Proposal:     &flow.BlockProposal{Block: block, ProposerSigData: SignatureFixture()},
+		CertifyingQC: child.Header.QuorumCertificate(),
+	}
+}
+
+func NewCertifiedBlock(block *flow.Block) *flow.CertifiedBlock {
+	return &flow.CertifiedBlock{
+		Proposal: &flow.BlockProposal{
+			Block:           block,
+			ProposerSigData: SignatureFixture(),
+		},
+		CertifyingQC: CertifyBlock(block.Header),
+	}
 }
 
 func QuorumCertificatesFixtures(

@@ -26,7 +26,7 @@ func TestClusterBlocksByHeight(t *testing.T) {
 
 		// store a chain of blocks
 		for _, block := range blocks {
-			err := db.Update(procedure.InsertClusterBlock(&block))
+			err := db.Update(procedure.InsertClusterBlock(unittest.ClusterProposalFromBlock(&block)))
 			require.NoError(t, err)
 
 			err = db.Update(procedure.FinalizeClusterBlock(block.Header.ID()))
@@ -44,7 +44,7 @@ func TestClusterBlocksByHeight(t *testing.T) {
 		for _, block := range blocks {
 			retrievedBlock, err := clusterBlocks.ByHeight(block.Header.Height)
 			require.NoError(t, err)
-			require.Equal(t, block.ID(), retrievedBlock.ID())
+			require.Equal(t, block.ID(), retrievedBlock.Block.ID())
 		}
 	})
 }

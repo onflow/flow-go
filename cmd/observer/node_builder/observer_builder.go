@@ -278,7 +278,7 @@ type ObserverServiceBuilder struct {
 	FollowerDistributor  *pubsub.FollowerDistributor
 	Committee            hotstuff.DynamicCommittee
 	Finalized            *flow.Header
-	Pending              []*flow.Header
+	Pending              []*flow.Proposal
 	FollowerCore         module.HotStuffFollower
 	ExecutionIndexer     *indexer.Indexer
 	ExecutionIndexerCore *indexer.IndexerCore

@@ -22,9 +22,10 @@ func TestHeaderStoreRetrieve(t *testing.T) {
 		headers := badgerstorage.NewHeaders(metrics, db)
 
 		block := unittest.BlockFixture()
+		proposal := unittest.ProposalFromHeader(block.Header)
 
 		// store header
-		err := headers.Store(block.Header)
+		err := headers.Store(proposal)
 		require.NoError(t, err)
 
 		// index the header
@@ -35,6 +36,10 @@ func TestHeaderStoreRetrieve(t *testing.T) {
 		actual, err := headers.ByHeight(block.Header.Height)
 		require.NoError(t, err)
 		require.Equal(t, block.Header, actual)
+
+		actualProposal, err := headers.ProposalByBlockID(block.Header.ID())
+		require.NoError(t, err)
+		require.Equal(t, proposal, actualProposal)
 	})
 }
 

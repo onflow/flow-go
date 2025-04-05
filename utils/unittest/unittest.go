@@ -435,7 +435,7 @@ func Concurrently(n int, f func(int)) {
 }
 
 // AssertEqualBlocksLenAndOrder asserts that both a segment of blocks have the same len and blocks are in the same order
-func AssertEqualBlocksLenAndOrder(t *testing.T, expectedBlocks, actualSegmentBlocks []*flow.Block) {
+func AssertEqualBlocksLenAndOrder(t *testing.T, expectedBlocks []*flow.Block, actualSegmentBlocks []*flow.BlockProposal) {
 	assert.Equal(t, flow.GetIDs(expectedBlocks), flow.GetIDs(actualSegmentBlocks))
 }
 

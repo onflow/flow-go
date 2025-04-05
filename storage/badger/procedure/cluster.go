@@ -14,29 +14,35 @@ import (
 
 // InsertClusterBlock inserts a cluster consensus block, updating all
 // associated indexes.
-func InsertClusterBlock(block *cluster.Block) func(*badger.Txn) error {
+func InsertClusterBlock(block *cluster.BlockProposal) func(*badger.Txn) error {
 	return func(tx *badger.Txn) error {
 
 		// check payload integrity
-		if block.Header.PayloadHash != block.Payload.Hash() {
+		if block.Block.Header.PayloadHash != block.Block.Payload.Hash() {
 			return fmt.Errorf("computed payload hash does not match header")
 		}
 
 		// store the block header
-		blockID := block.ID()
-		err := operation.InsertHeader(blockID, block.Header)(tx)
+		blockID := block.Block.ID()
+		err := operation.InsertHeader(blockID, block.Block.Header)(tx)
 		if err != nil {
 			return fmt.Errorf("could not insert header: %w", err)
 		}
 
+		// store the block proposer signature
+		err = operation.InsertProposalSignature(blockID, &block.ProposerSigData)(tx)
+		if err != nil {
+			return fmt.Errorf("could not insert proposer signature: %w", err)
+		}
+
 		// insert the block payload
-		err = InsertClusterPayload(blockID, block.Payload)(tx)
+		err = InsertClusterPayload(blockID, block.Block.Payload)(tx)
 		if err != nil {
 			return fmt.Errorf("could not insert payload: %w", err)
 		}
 
 		// index the child block for recovery
-		err = IndexNewBlock(blockID, block.Header.ParentID)(tx)
+		err = IndexNewBlock(blockID, block.Block.Header.ParentID)(tx)
 		if err != nil {
 			return fmt.Errorf("could not index new block: %w", err)
 		}

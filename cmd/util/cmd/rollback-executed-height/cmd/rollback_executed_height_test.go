@@ -11,6 +11,7 @@ import (
 	"github.com/onflow/flow-go/engine/execution/state"
 	"github.com/onflow/flow-go/engine/execution/state/bootstrap"
 	"github.com/onflow/flow-go/engine/execution/testutil"
+	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/module/trace"
 	bstorage "github.com/onflow/flow-go/storage/badger"
@@ -47,7 +48,7 @@ func TestReExecuteBlock(t *testing.T) {
 			transactions := bstorage.NewTransactions(metrics, db)
 			collections := bstorage.NewCollections(db, transactions)
 
-			err = headers.Store(genesis)
+			err = headers.Store(&flow.Proposal{Header: genesis, ProposerSigData: nil})
 			require.NoError(t, err)
 
 			// create execution state module
@@ -73,7 +74,7 @@ func TestReExecuteBlock(t *testing.T) {
 			computationResult := testutil.ComputationResultFixture(t)
 			header := computationResult.Block.Header
 
-			err = headers.Store(header)
+			err = headers.Store(unittest.ProposalFromHeader(header))
 			require.NoError(t, err)
 
 			// save execution results
@@ -181,7 +182,7 @@ func TestReExecuteBlockWithDifferentResult(t *testing.T) {
 			transactions := bstorage.NewTransactions(metrics, db)
 			collections := bstorage.NewCollections(db, transactions)
 
-			err = headers.Store(genesis)
+			err = headers.Store(&flow.Proposal{Header: genesis, ProposerSigData: nil})
 			require.NoError(t, err)
 
 			// create execution state module
@@ -210,7 +211,7 @@ func TestReExecuteBlockWithDifferentResult(t *testing.T) {
 				&unittest.GenesisStateCommitment)
 			header := executableBlock.Block.Header
 
-			err = headers.Store(header)
+			err = headers.Store(unittest.ProposalFromHeader(header))
 			require.NoError(t, err)
 
 			computationResult := testutil.ComputationResultFixture(t)

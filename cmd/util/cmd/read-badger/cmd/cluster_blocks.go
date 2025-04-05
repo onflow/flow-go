@@ -70,7 +70,7 @@ var clusterBlocksCmd = &cobra.Command{
 				return
 			}
 
-			log.Info().Msgf("block id: %v", clusterBlock.ID())
+			log.Info().Msgf("block id: %v", clusterBlock.Block.ID())
 			common.PrettyPrint(clusterBlock)
 			return
 		}

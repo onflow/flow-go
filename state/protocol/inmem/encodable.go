@@ -42,12 +42,12 @@ func (snap EncodableSnapshot) LatestSeal() (*flow.Seal, error) {
 	// first block (by height descending) which contains any seals.
 	for i := len(snap.SealingSegment.Blocks) - 1; i >= 0; i-- {
 		block := snap.SealingSegment.Blocks[i]
-		for _, seal := range block.Payload.Seals {
+		for _, seal := range block.Block.Payload.Seals {
 			if seal.ID() == latestSealID {
 				return seal, nil
 			}
 		}
-		if len(block.Payload.Seals) > 0 {
+		if len(block.Block.Payload.Seals) > 0 {
 			// We encountered a block with some seals, but not the latest seal.
 			// This can only occur in a structurally invalid SealingSegment.
 			return nil, fmt.Errorf("LatestSeal: sanity check failed: no latest seal")
@@ -71,7 +71,7 @@ func (snap EncodableSnapshot) LatestSealedResult() (*flow.ExecutionResult, error
 	// either appear in a block payload or in the ExecutionResults field.
 	for i := len(snap.SealingSegment.Blocks) - 1; i >= 0; i-- {
 		block := snap.SealingSegment.Blocks[i]
-		for _, result := range block.Payload.Results {
+		for _, result := range block.Block.Payload.Results {
 			if latestSeal.ResultID == result.ID() {
 				return result, nil
 			}
