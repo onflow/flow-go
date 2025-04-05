@@ -20,6 +20,7 @@ import (
 	"github.com/onflow/flow-go/insecure/corruptlibp2p"
 	"github.com/onflow/flow-go/insecure/internal"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/model/messages"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/module/mock"
@@ -1051,7 +1052,7 @@ func testGossipSubSpamMitigationIntegration(t *testing.T, msgType p2pmsg.Control
 	// as nodes started fresh and no spamming has happened yet, the nodes should be able to exchange messages on the topic.
 	blockTopic := channels.TopicFromChannel(channels.PushBlocks, sporkID)
 	p2ptest.EnsurePubsubMessageExchange(t, ctx, nodes, blockTopic, 1, func() interface{} {
-		return unittest.ProposalFixture()
+		return messages.NewBlockProposal(unittest.ProposalFixture())
 	})
 
 	var unknownTopicSpam []pubsub_pb.ControlMessage
@@ -1104,6 +1105,6 @@ func testGossipSubSpamMitigationIntegration(t *testing.T, msgType p2pmsg.Control
 		blockTopic,
 		1,
 		func() interface{} {
-			return unittest.ProposalFixture()
+			return messages.NewBlockProposal(unittest.ProposalFixture())
 		})
 }

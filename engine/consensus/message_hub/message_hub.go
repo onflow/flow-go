@@ -83,7 +83,7 @@ type MessageHub struct {
 	pushBlocksCon              network.Conduit
 	ownOutboundMessageNotifier engine.Notifier
 	ownOutboundVotes           *fifoqueue.FifoQueue // queue for handling outgoing vote transmissions
-	ownOutboundProposals       *fifoqueue.FifoQueue // queue for handling outgoing proposal transmissions
+	ownOutboundProposals       *fifoqueue.FifoQueue // queue for handling outgoing proposal transmissions (flow.Proposal)
 	ownOutboundTimeouts        *fifoqueue.FifoQueue // queue for handling outgoing timeout transmissions
 
 	// injected dependencies
@@ -193,10 +193,10 @@ func (h *MessageHub) sendOwnMessages(ctx context.Context) error {
 
 		msg, ok := h.ownOutboundProposals.Pop()
 		if ok {
-			block := msg.(*flow.Header)
-			err := h.sendOwnProposal(block)
+			proposal := msg.(*flow.Proposal)
+			err := h.sendOwnProposal(proposal)
 			if err != nil {
-				return fmt.Errorf("could not process queued block %v: %w", block.ID(), err)
+				return fmt.Errorf("could not process queued block %v: %w", proposal.Header.ID(), err)
 			}
 			continue
 		}
@@ -293,8 +293,9 @@ func (h *MessageHub) sendOwnVote(packed *packedVote) error {
 //   - broadcast to all non-consensus participants
 //
 // No errors are expected during normal operations.
-func (h *MessageHub) sendOwnProposal(header *flow.Header) error {
+func (h *MessageHub) sendOwnProposal(proposal *flow.Proposal) error {
 	// first, check that we are the proposer of the block
+	header := proposal.Header
 	if header.ProposerID != h.me.NodeID() {
 		return fmt.Errorf("cannot broadcast proposal with non-local proposer (%x)", header.ProposerID)
 	}
@@ -342,13 +343,16 @@ func (h *MessageHub) sendOwnProposal(header *flow.Header) error {
 	// NOTE: some fields are not needed for the message
 	// - proposer ID is conveyed over the network message
 	// - the payload hash is deduced from the payload
-	proposal := messages.NewBlockProposal(&flow.Block{
-		Header:  header,
-		Payload: payload,
+	blockProposal := messages.NewBlockProposal(&flow.BlockProposal{
+		Block: &flow.Block{
+			Header:  header,
+			Payload: payload,
+		},
+		ProposerSigData: proposal.ProposerSigData,
 	})
 
 	// broadcast the proposal to consensus nodes
-	err = h.con.Publish(proposal, consRecipients.NodeIDs()...)
+	err = h.con.Publish(blockProposal, consRecipients.NodeIDs()...)
 	if err != nil {
 		if !errors.Is(err, network.EmptyTargetList) {
 			log.Err(err).Msg("could not send proposal message")
@@ -358,7 +362,7 @@ func (h *MessageHub) sendOwnProposal(header *flow.Header) error {
 	log.Info().Msg("block proposal was broadcast")
 
 	// submit proposal to non-consensus nodes
-	h.provideProposal(proposal, allIdentities.Filter(filter.Not(filter.HasRole[flow.Identity](flow.RoleConsensus))))
+	h.provideProposal(blockProposal, allIdentities.Filter(filter.Not(filter.HasRole[flow.Identity](flow.RoleConsensus))))
 	h.engineMetrics.MessageSent(metrics.EngineConsensusMessageHub, metrics.MessageBlockProposal)
 
 	return nil
@@ -428,7 +432,7 @@ func (h *MessageHub) OnOwnTimeout(timeout *model.TimeoutObject) {
 // OnOwnProposal directly forwards proposal to HotStuff core logic (skipping compliance engine as we assume our
 // own proposals to be correct) and queues proposal for subsequent propagation to all consensus participants (including this node).
 // The proposal will only be placed in the queue, after the specified delay (or dropped on shutdown signal).
-func (h *MessageHub) OnOwnProposal(proposal *flow.Header, targetPublicationTime time.Time) {
+func (h *MessageHub) OnOwnProposal(proposal *flow.Proposal, targetPublicationTime time.Time) {
 	go func() {
 		select {
 		case <-time.After(time.Until(targetPublicationTime)):
