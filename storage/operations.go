@@ -61,6 +61,7 @@ type IteratorOption struct {
 	BadgerIterateKeyOnly bool // default false
 }
 
+// TODO: convert into a var
 func DefaultIteratorOptions() IteratorOption {
 	return IteratorOption{
 		// only needed for badger. ignored by pebble
