@@ -221,6 +221,9 @@ func (r *RequestHandler) onRangeRequest(originID flow.Identifier, req *messages.
 	}
 
 	// get all the blocks, one by one
+	// We currently require all blocks in the block response to be sent with a valid proposer signature.
+	// Consensus Followers theoretically only need the last block to have a valid proposer signature,
+	// as the other blocks can be verified via included QCs, but we want to avoid having sometimes-nil data.
 	blocks := make([]messages.BlockProposal, 0, req.ToHeight-req.FromHeight+1)
 	for height := req.FromHeight; height <= req.ToHeight; height++ {
 		proposal, err := r.blocks.ProposalByHeight(height)
@@ -232,12 +235,6 @@ func (r *RequestHandler) onRangeRequest(originID flow.Identifier, req *messages.
 			return fmt.Errorf("could not get block for height (%d): %w", height, err)
 		}
 		blocks = append(blocks, *messages.NewBlockProposal(proposal))
-	}
-	// At least the last block of the block response should be sent with a valid proposer signature.
-	// Other blocks can be verified via QCs included in the headers.
-	if len(blocks) > 0 && blocks[len(blocks)-1].ProposerSigData == nil {
-		// the response will not be fully verifiable due to lack of proposer signature/QC for the final block
-		return fmt.Errorf("block response not verifiable: no proposer signature stored for final block (height %d)", blocks[len(blocks)-1].Block.Header.Height)
 	}
 
 	// if there are no blocks to send, skip network message

@@ -37,10 +37,6 @@ func NewFollower(log zerolog.Logger,
 		return nil, fmt.Errorf("could not initialize forks: %w", err)
 	}
 
-	// TODO(malleability, #7100) - proposerSigData storage
-	// Followers don't need proposer signature (and all headers in storage must have been already verified)
-	// However, they may receive block requests, and need to include proposer signatures to produce a valid response
-
 	// recover forks internal state (inserts all pending blocks)
 	err = recovery.Recover(log, pending, recovery.ForksState(forks))
 	if err != nil {

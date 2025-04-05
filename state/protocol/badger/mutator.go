@@ -295,7 +295,7 @@ func (m *ParticipantState) Extend(ctx context.Context, candidateProposal *flow.B
 //
 //	5a. store QC embedded into the candidate block and emit `BlockProcessable` notification for the parent
 //	5b. store candidate block and index it as a child of its parent (needed for recovery to traverse unfinalized blocks)
-//	5c. store candidate block's proposer signature (if present; needed for recovery)
+//	5c. store candidate block's proposer signature along with the block
 //	5d. if we are given a certifyingQC, store it and queue a `BlockProcessable` notification for the candidate block
 //
 // If `headerExtend` is called by `ParticipantState.Extend` (full consensus participant) then `certifyingQC` will be nil,

@@ -13,6 +13,10 @@ import (
 )
 
 // ProposalSignatures implements a proposal signature storage around a badger DB.
+// The proposer's signature is only transiently important conceptually (until the block obtains a QC),
+// but our current business logic validates it even in cases where it is not strictly necessary.
+// For simplicity, we require it be stored for all blocks, however it is stored separately to
+// make it easier to remove in the future if/when we update the syncing and block ingestion logic.
 type ProposalSignatures struct {
 	db    *badger.DB
 	cache *Cache[flow.Identifier, []byte]
