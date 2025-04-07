@@ -217,7 +217,7 @@ func VerifySignatureFromTransaction(
 	message []byte,
 	pk crypto.PublicKey,
 	hashAlgo hash.HashingAlgorithm,
-	scheme SignatureScheme,
+	scheme AuthenticationScheme,
 	extensionData []byte,
 ) (bool, error) {
 
@@ -260,7 +260,7 @@ func VerifySignatureFromTransaction(
 	return valid, nil
 }
 
-func reconstructMessage(scheme SignatureScheme, extensionData []byte, message []byte) ([]byte, error) {
+func reconstructMessage(scheme AuthenticationScheme, extensionData []byte, message []byte) ([]byte, error) {
 	switch scheme {
 	case PLAIN:
 		if extensionData != nil && len(extensionData) != 1 {

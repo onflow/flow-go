@@ -1,8 +1,8 @@
 package crypto
 
-type SignatureScheme byte
+type AuthenticationScheme byte
 
 const (
-	PLAIN    SignatureScheme = iota // 0x0
-	WEBAUTHN                        // 0x01
+	PLAIN    AuthenticationScheme = iota // 0x0
+	WEBAUTHN                             // 0x01
 )
