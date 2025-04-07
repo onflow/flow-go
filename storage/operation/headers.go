@@ -1,6 +1,10 @@
 package operation
 
 import (
+	"errors"
+	"fmt"
+	"sync"
+
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/storage"
 )
@@ -13,10 +17,25 @@ func RetrieveHeader(r storage.Reader, blockID flow.Identifier, header *flow.Head
 	return RetrieveByKey(r, MakePrefix(codeHeader, blockID), header)
 }
 
-// UnsafeIndexBlockHeight indexes the height of a block. It should only be called on
+// IndexBlockHeight indexes the height of a block. It should only be called on
 // finalized blocks.
-func UnsafeIndexBlockHeight(w storage.Writer, height uint64, blockID flow.Identifier) error {
-	return UpsertByKey(w, MakePrefix(codeHeightToBlock, height), blockID)
+func IndexBlockHeight(indexing *sync.Mutex, rw storage.ReaderBatchWriter, height uint64, blockID flow.Identifier) error {
+	indexing.Lock()
+	rw.AddCallback(func(err error) {
+		indexing.Unlock()
+	})
+
+	var existingID flow.Identifier
+	err := RetrieveByKey(rw.GlobalReader(), MakePrefix(codeHeightToBlock, height), &existingID)
+	if err == nil {
+		return fmt.Errorf("block ID already exists for height %d: %w", height, storage.ErrAlreadyExists)
+	}
+
+	if !errors.Is(err, storage.ErrNotFound) {
+		return fmt.Errorf("failed to check existing block ID for height %d: %w", height, err)
+	}
+
+	return UpsertByKey(rw.Writer(), MakePrefix(codeHeightToBlock, height), blockID)
 }
 
 // LookupBlockHeight retrieves finalized blocks by height.
