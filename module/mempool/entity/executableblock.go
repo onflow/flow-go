@@ -80,7 +80,7 @@ func (b *ExecutableBlock) Collections() []*CompleteCollection {
 	collections := make([]*CompleteCollection, len(b.Block.Payload.Guarantees))
 
 	for i, cg := range b.Block.Payload.Guarantees {
-		collections[i] = b.CompleteCollections[cg.ID()]
+		collections[i] = b.CompleteCollections[cg.CollectionID]
 	}
 
 	return collections
@@ -92,7 +92,7 @@ func (b *ExecutableBlock) CompleteCollectionAt(index int) *CompleteCollection {
 	if index < 0 || index >= len(b.Block.Payload.Guarantees) {
 		return nil
 	}
-	return b.CompleteCollections[b.Block.Payload.Guarantees[index].ID()]
+	return b.CompleteCollections[b.Block.Payload.Guarantees[index].CollectionID]
 }
 
 // CollectionAt returns a collection at the given index,
@@ -110,7 +110,7 @@ func (b *ExecutableBlock) CollectionAt(index int) *flow.Collection {
 func (b *ExecutableBlock) HasAllTransactions() bool {
 	for _, collection := range b.Block.Payload.Guarantees {
 
-		completeCollection, ok := b.CompleteCollections[collection.ID()]
+		completeCollection, ok := b.CompleteCollections[collection.CollectionID]
 		if ok && completeCollection.IsCompleted() {
 			continue
 		}

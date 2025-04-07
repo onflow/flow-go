@@ -523,7 +523,7 @@ func (e *Core) fetch(missingColls []*block_queue.MissingCollection) (int, error)
 		err = e.collectionFetcher.FetchCollection(col.BlockID, col.Height, col.Guarantee)
 		if err != nil {
 			return 0, fmt.Errorf("failed to fetch collection %v for block %v (height: %v): %w",
-				col.Guarantee.ID(), col.BlockID, col.Height, err)
+				col.Guarantee.CollectionID, col.BlockID, col.Height, err)
 		}
 		missingCount++
 	}

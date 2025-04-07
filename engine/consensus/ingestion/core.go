@@ -66,17 +66,15 @@ func (e *Core) OnGuarantee(originID flow.Identifier, guarantee *flow.CollectionG
 	)
 	defer span.End()
 
-	guaranteeID := guarantee.ID()
-
 	log := e.log.With().
 		Hex("origin_id", originID[:]).
-		Hex("collection_id", guaranteeID[:]).
+		Hex("collection_id", guarantee.CollectionID[:]).
 		Hex("signers", guarantee.SignerIndices).
 		Logger()
 	log.Info().Msg("collection guarantee received")
 
 	// skip collection guarantees that are already in our memory pool
-	exists := e.pool.Has(guaranteeID)
+	exists := e.pool.Has(guarantee.ID())
 	if exists {
 		log.Debug().Msg("skipping known collection guarantee")
 		return nil

@@ -329,7 +329,7 @@ func (b *Builder) getInsertableGuarantees(parentID flow.Identifier) ([]*flow.Col
 			break
 		}
 
-		collID := guarantee.ID()
+		collID := guarantee.CollectionID
 
 		// skip collections that are already included in a block on the fork
 		_, duplicated := receiptLookup[collID]

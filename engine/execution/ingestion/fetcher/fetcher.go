@@ -73,10 +73,10 @@ func (e *CollectionFetcher) FetchCollection(blockID flow.Identifier, height uint
 
 	e.log.Debug().Bool("onflowOnlyLNs", e.onflowOnlyLNs).
 		Msgf("queued collection %v for block %v, height %v from guarantors: %v",
-			guarantee.ID(), blockID, height, guarantors)
+			guarantee.CollectionID, blockID, height, guarantors)
 
 	// queue the collection to be requested from one of the guarantors
-	e.request.EntityByID(guarantee.ID(), filter.And(
+	e.request.EntityByID(guarantee.CollectionID, filter.And(
 		filters...,
 	))
 

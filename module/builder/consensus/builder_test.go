@@ -511,7 +511,7 @@ func (bs *BuilderSuite) TestPayloadGuaranteeDuplicate() {
 	for _, guarantee := range duplicated {
 		blockID := forkBlocks[rand.Intn(len(forkBlocks))]
 		index := bs.index[blockID]
-		index.CollectionIDs = append(index.CollectionIDs, guarantee.ID())
+		index.CollectionIDs = append(index.CollectionIDs, guarantee.CollectionID)
 		bs.index[blockID] = index
 	}
 

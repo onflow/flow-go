@@ -16,7 +16,8 @@ type CollectionGuarantee struct {
 
 // ID returns the fingerprint of the collection guarantee.
 func (cg *CollectionGuarantee) ID() Identifier {
-	return cg.CollectionID
+	return MakeID(cg)
+
 }
 
 // Checksum returns a checksum of the collection guarantee including the

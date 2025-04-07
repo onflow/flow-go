@@ -171,10 +171,8 @@ func BlockToMessage(h *flow.Block) (*entitiesproto.Block, error) {
 }
 
 func collectionGuaranteeToMessage(g *flow.CollectionGuarantee) *entitiesproto.CollectionGuarantee {
-	id := g.ID()
-
 	return &entitiesproto.CollectionGuarantee{
-		CollectionId: id[:],
+		CollectionId: IdentifierToMessage(g.CollectionID),
 		Signatures:   [][]byte{g.Signature},
 	}
 }

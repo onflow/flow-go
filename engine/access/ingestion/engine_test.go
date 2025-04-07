@@ -570,7 +570,7 @@ func (s *Suite) TestRequestMissingCollections() {
 		// simulate some db i/o contention
 		After(time.Millisecond * time.Duration(rand.Intn(5)))
 
-	// setup the requester engine mock
+	// set up the requester engine mock
 	// entityByID should be called once per collection
 	for _, c := range collIDs {
 		s.request.On("EntityByID", c, mock.Anything).Return()
