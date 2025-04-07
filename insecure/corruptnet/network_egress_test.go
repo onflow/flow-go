@@ -333,7 +333,7 @@ func TestProcessAttackerMessage_ExecutionReceipt_Dictated(t *testing.T) {
 			// filled up by the CCF.
 			dictatedResult := *unittest.ExecutionResultFixture()
 			msg, _, _ := insecure.EgressMessageFixture(t, unittest.NetworkCodec(), insecure.Protocol_PUBLISH, &flow.ExecutionReceipt{
-				ExecutionResult: dictatedResult,
+				ExecutionReceiptBody: flow.ExecutionReceiptBody{ExecutionResult: dictatedResult},
 			})
 
 			params := []interface{}{channels.Channel(msg.Egress.ChannelID), mock.Anything}
