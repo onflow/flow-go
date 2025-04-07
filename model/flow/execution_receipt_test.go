@@ -16,9 +16,13 @@ func TestExecutionReceiptID_Malleability(t *testing.T) {
 		unittest.WithResult(unittest.ExecutionResultFixture(unittest.WithServiceEvents(3))),
 		unittest.WithSpocks(unittest.SignaturesFixture(3)),
 	)
-	unittest.RequireEntityNonMalleable(t, receipt.Meta())
+	receiptMeta := receipt.Meta()
+	// check ID of body used for signature
+	unittest.RequireEntityNonMalleable(t, &receiptMeta.ExecutionReceiptMetaBody)
+	// check full ID used for indexing
+	unittest.RequireEntityNonMalleable(t, receiptMeta)
 	unittest.RequireEntityNonMalleable(t, receipt,
-		unittest.WithFieldGenerator("ExecutionResult.ServiceEvents", func() []flow.ServiceEvent {
+		unittest.WithFieldGenerator("ExecutionReceiptBody.ExecutionResult.ServiceEvents", func() []flow.ServiceEvent {
 			return unittest.ServiceEventsFixture(3)
 		}))
 }

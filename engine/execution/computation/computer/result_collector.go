@@ -444,21 +444,21 @@ func GenerateExecutionReceipt(
 	*flow.ExecutionReceipt,
 	error,
 ) {
-	receipt := &flow.ExecutionReceipt{
-		ExecutionResult:   *result,
-		Spocks:            spockSignatures,
-		ExecutorSignature: crypto.Signature{},
-		ExecutorID:        signer.NodeID(),
+	body := flow.ExecutionReceiptBody{
+		ExecutionResult: *result,
+		Spocks:          spockSignatures,
+		ExecutorID:      signer.NodeID(),
 	}
 
 	// generates a signature over the execution result
-	signableID := receipt.SignableID()
+	signableID := body.ID()
 	sig, err := signer.Sign(signableID[:], receiptHasher)
 	if err != nil {
 		return nil, fmt.Errorf("could not sign execution result: %w", err)
 	}
 
-	receipt.ExecutorSignature = sig
-
-	return receipt, nil
+	return &flow.ExecutionReceipt{
+		ExecutionReceiptBody: body,
+		ExecutorSignature:    sig,
+	}, nil
 }

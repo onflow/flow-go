@@ -11,16 +11,15 @@ type Spock []byte
 // ExecutionReceipt is the full execution receipt, as sent by the Execution Node.
 // Specifically, it contains the detailed execution result.
 type ExecutionReceipt struct {
-	ExecutorID Identifier
-	ExecutionResult
-	Spocks            []crypto.Signature
+	ExecutionReceiptBody
 	ExecutorSignature crypto.Signature
 }
 
-// SignableID returns a hash over the data of the execution receipt.
-// This is what is signed by the executor and verified by recipients.
-func (er *ExecutionReceipt) SignableID() Identifier {
-	return er.Meta().SignableID()
+// ExecutionReceiptBody contains the fields of the execution receipt that are signed by the executor.
+type ExecutionReceiptBody struct {
+	ExecutorID Identifier
+	ExecutionResult
+	Spocks []crypto.Signature
 }
 
 // ID returns the canonical ID of the execution receipt.
@@ -36,10 +35,23 @@ func (er *ExecutionReceipt) Checksum() Identifier {
 // Meta returns the receipt metadata for the receipt.
 func (er *ExecutionReceipt) Meta() *ExecutionReceiptMeta {
 	return &ExecutionReceiptMeta{
-		ExecutorID:        er.ExecutorID,
-		ResultID:          er.ExecutionResult.ID(),
-		Spocks:            er.Spocks,
-		ExecutorSignature: er.ExecutorSignature,
+		ExecutionReceiptMetaBody: er.ExecutionReceiptBody.Meta(),
+		ExecutorSignature:        er.ExecutorSignature,
+	}
+}
+
+// ID returns a hash over the data of the execution receipt.
+// This is what is signed by the executor and verified by recipients.
+// Necessary to override ExecutionResult.ID().
+func (erb ExecutionReceiptBody) ID() Identifier {
+	return erb.Meta().ID()
+}
+
+func (erb ExecutionReceiptBody) Meta() ExecutionReceiptMetaBody {
+	return ExecutionReceiptMetaBody{
+		ExecutorID: erb.ExecutorID,
+		ResultID:   erb.ExecutionResult.ID(),
+		Spocks:     erb.Spocks,
 	}
 }
 
@@ -49,35 +61,33 @@ func (er *ExecutionReceipt) Meta() *ExecutionReceiptMeta {
 // result the receipt commits to. The ExecutionReceiptMeta is useful for
 // storing results and receipts separately in a composable way.
 type ExecutionReceiptMeta struct {
-	ExecutorID        Identifier
-	ResultID          Identifier
-	Spocks            []crypto.Signature
+	ExecutionReceiptMetaBody
 	ExecutorSignature crypto.Signature
+}
+
+// ExecutionReceiptMetaBody contains the fields of ExecutionReceiptMeta that are signed by the executor.
+type ExecutionReceiptMetaBody struct {
+	ExecutorID Identifier
+	ResultID   Identifier
+	Spocks     []crypto.Signature
 }
 
 func ExecutionReceiptFromMeta(meta ExecutionReceiptMeta, result ExecutionResult) *ExecutionReceipt {
 	return &ExecutionReceipt{
-		ExecutorID:        meta.ExecutorID,
-		ExecutionResult:   result,
-		Spocks:            meta.Spocks,
+		ExecutionReceiptBody: ExecutionReceiptBody{
+			ExecutorID:      meta.ExecutorID,
+			ExecutionResult: result,
+			Spocks:          meta.Spocks,
+		},
 		ExecutorSignature: meta.ExecutorSignature,
 	}
 }
 
-// SignableID returns a hash over the data in the execution receipt.
+// ID returns a hash over the data in the execution receipt.
 // This is what is signed by the executor and verified by recipients.
-// It is identical to the SignableID of the full receipt.
-func (er *ExecutionReceiptMeta) SignableID() Identifier {
-	body := struct {
-		ExecutorID Identifier
-		ResultID   Identifier
-		Spocks     []crypto.Signature
-	}{
-		ExecutorID: er.ExecutorID,
-		ResultID:   er.ResultID,
-		Spocks:     er.Spocks,
-	}
-	return MakeID(body)
+// It is identical to the ID of the full receipt body.
+func (erb ExecutionReceiptMetaBody) ID() Identifier {
+	return MakeID(erb)
 }
 
 // ID returns the canonical ID of the execution receipt.

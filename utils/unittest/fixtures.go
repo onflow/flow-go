@@ -833,9 +833,11 @@ func WithSpocks(spocks []crypto.Signature) func(*flow.ExecutionReceipt) {
 
 func ExecutionReceiptFixture(opts ...func(*flow.ExecutionReceipt)) *flow.ExecutionReceipt {
 	receipt := &flow.ExecutionReceipt{
-		ExecutorID:        IdentifierFixture(),
-		ExecutionResult:   *ExecutionResultFixture(),
-		Spocks:            nil,
+		ExecutionReceiptBody: flow.ExecutionReceiptBody{
+			ExecutorID:      IdentifierFixture(),
+			ExecutionResult: *ExecutionResultFixture(),
+			Spocks:          nil,
+		},
 		ExecutorSignature: SignatureFixture(),
 	}
 

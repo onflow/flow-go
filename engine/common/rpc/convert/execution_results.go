@@ -112,9 +112,11 @@ func MessagesToExecutionResultMetaList(m []*entities.ExecutionReceiptMeta) flow.
 	execMetaList := make([]*flow.ExecutionReceiptMeta, len(m))
 	for i, message := range m {
 		execMetaList[i] = &flow.ExecutionReceiptMeta{
-			ExecutorID:        MessageToIdentifier(message.ExecutorId),
-			ResultID:          MessageToIdentifier(message.ResultId),
-			Spocks:            MessagesToSignatures(message.Spocks),
+			ExecutionReceiptMetaBody: flow.ExecutionReceiptMetaBody{
+				ExecutorID: MessageToIdentifier(message.ExecutorId),
+				ResultID:   MessageToIdentifier(message.ResultId),
+				Spocks:     MessagesToSignatures(message.Spocks),
+			},
 			ExecutorSignature: MessageToSignature(message.ExecutorSignature),
 		}
 	}

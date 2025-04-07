@@ -245,33 +245,37 @@ SearchLoop:
 	ss.T().Logf("execution result generated (result: %x)\n", result.ID())
 
 	// create the execution receipt for the only execution node
-	receipt := flow.ExecutionReceipt{
-		ExecutorID:        ss.exeID, // our fake execution node
-		ExecutionResult:   result,   // result for target block
-		Spocks:            nil,      // ignored
-		ExecutorSignature: crypto.Signature{},
+	receiptBody := flow.ExecutionReceiptBody{
+		ExecutorID:      ss.exeID, // our fake execution node
+		ExecutionResult: result,   // result for target block
+		Spocks:          nil,      // ignored
 	}
 
 	// generates a signature over the execution result
-	signableID := receipt.SignableID()
+	signableID := receiptBody.ID()
 	sig, err := ss.exeSK.Sign(signableID[:], exeUtils.NewExecutionReceiptHasher())
 	require.NoError(ss.T(), err)
 
-	receipt.ExecutorSignature = sig
-
-	// keep trying to send 2 matching execution receipt to the first consensus node
-	receipt2 := flow.ExecutionReceipt{
-		ExecutorID:        ss.exe2ID, // our fake execution node
-		ExecutionResult:   result,    // result for target block
-		Spocks:            nil,       // ignored
-		ExecutorSignature: crypto.Signature{},
+	receipt := flow.ExecutionReceipt{
+		ExecutionReceiptBody: receiptBody,
+		ExecutorSignature:    sig,
 	}
 
-	signableID2 := receipt2.SignableID()
+	// keep trying to send 2 matching execution receipt to the first consensus node
+	receiptBody2 := flow.ExecutionReceiptBody{
+		ExecutorID:      ss.exe2ID, // our fake execution node
+		ExecutionResult: result,    // result for target block
+		Spocks:          nil,       // ignored
+	}
+
+	signableID2 := receiptBody2.ID()
 	sig2, err := ss.exe2SK.Sign(signableID2[:], exeUtils.NewExecutionReceiptHasher())
 	require.NoError(ss.T(), err)
 
-	receipt2.ExecutorSignature = sig2
+	receipt2 := flow.ExecutionReceipt{
+		ExecutionReceiptBody: receiptBody2,
+		ExecutorSignature:    sig2,
+	}
 
 	valid, err := ss.exe2SK.PublicKey().Verify(receipt2.ExecutorSignature, signableID2[:], exeUtils.NewExecutionReceiptHasher())
 	require.NoError(ss.T(), err)
