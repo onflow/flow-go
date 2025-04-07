@@ -313,9 +313,12 @@ func (builder *LibP2PNodeBuilder) Build() (p2p.LibP2PNode, error) {
 		Metrics:       builder.metricsConfig.Metrics,
 		Parameters:    &builder.unicastConfig.UnicastManager,
 		UnicastConfigCacheFactory: func(configFactory func() unicast.Config) unicast.ConfigCache {
-			return unicastcache.NewUnicastConfigCache(builder.unicastConfig.UnicastManager.ConfigCacheSize, builder.logger,
+			return unicastcache.NewUnicastConfigCache(
+				builder.unicastConfig.UnicastManager.ConfigCacheSize,
+				builder.logger,
 				metrics.DialConfigCacheMetricFactory(builder.metricsConfig.HeroCacheFactory, builder.networkingType),
-				configFactory)
+				configFactory,
+			)
 		},
 	})
 	if err != nil {

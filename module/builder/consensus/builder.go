@@ -329,10 +329,8 @@ func (b *Builder) getInsertableGuarantees(parentID flow.Identifier) ([]*flow.Col
 			break
 		}
 
-		collID := guarantee.CollectionID
-
 		// skip collections that are already included in a block on the fork
-		_, duplicated := receiptLookup[collID]
+		_, duplicated := receiptLookup[guarantee.CollectionID]
 		if duplicated {
 			continue
 		}
@@ -431,7 +429,7 @@ func (b *Builder) getInsertableSeals(parentID flow.Identifier) ([]*flow.Seal, er
 			// enforce condition (0): candidate seals are only constructed once sufficient
 			// approvals have been collected. Hence, any incorporated result for which we
 			// find a candidate seal satisfies condition (0)
-			irSeal, ok := b.sealPool.ByID(incorporatedResult.ID())
+			irSeal, ok := b.sealPool.Get(incorporatedResult.ID())
 			if !ok {
 				continue
 			}
