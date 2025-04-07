@@ -301,13 +301,13 @@ func reconstructMessage(scheme SignatureScheme, extensionData []byte, message []
 		}
 
 		// rpIdHash, userFlags, sigCounter, extensions
-		rpIdHash, userFlags, _, _ := decodedWebAuthnData.AuthenticatorData[0:32], decodedWebAuthnData.AuthenticatorData[32:33], decodedWebAuthnData.AuthenticatorData[33:37], decodedWebAuthnData.AuthenticatorData[37:]
+		rpIdHash, userFlags, _, extensions := decodedWebAuthnData.AuthenticatorData[0:32], decodedWebAuthnData.AuthenticatorData[32:33], decodedWebAuthnData.AuthenticatorData[33:37], decodedWebAuthnData.AuthenticatorData[37:]
 
 		if bytes.Equal(flow.TransactionDomainTag[:], rpIdHash) {
 			return nil, errors.NewValueErrorf("authenticatorData rpIdHash error", "authenticatorData rpIdHash error")
 		}
 
-		if err := validateFlags(userFlags[0]); err != nil {
+		if err := validateFlags(userFlags[0], extensions); err != nil {
 			return nil, errors.NewValueErrorf("authenticatorData userFlags invalid", "authenticatorData userFlags invalid")
 		}
 

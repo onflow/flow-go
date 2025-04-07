@@ -479,6 +479,17 @@ func (s TransactionSignature) Fingerprint() []byte {
 }
 
 func (s TransactionSignature) canonicalForm() interface{} {
+	if s.Info == nil {
+		return struct {
+			SignerIndex uint
+			KeyID       uint
+			Signature   []byte
+		}{
+			SignerIndex: uint(s.SignerIndex), // int is not RLP-serializable
+			KeyID:       uint(s.KeyIndex),    // int is not RLP-serializable
+			Signature:   s.Signature,
+		}
+	}
 	return struct {
 		SignerIndex uint
 		KeyID       uint

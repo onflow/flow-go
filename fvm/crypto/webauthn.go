@@ -40,7 +40,7 @@ func (w *WebAuthnExtensionData) GetCollectedClientData() (*CollectedClientData, 
 
 // As per https://github.com/onflow/flips/blob/tarak/webauthn/protocol/20250203-webauthn-credential-support.md#fvm-transaction-validation-changes
 // check UP is set, BS is not set if BE is not set, AT is only set if attested data is included, ED is set only if extension data is included. If any of the checks fail, return "invalid".
-func validateFlags(flags byte) error {
+func validateFlags(flags byte, extensions []byte) error {
 	// Parse flags
 	if userPresent := (flags & 0x01) != 0; !userPresent {
 		return errors.New("invalid flags: user presence (UP) not set")
@@ -53,8 +53,15 @@ func validateFlags(flags byte) error {
 		return errors.New("invalid flags: backup state (BS) set without backup eligibility (BE)")
 	}
 
-	// attestationCredentialData := (flags & 0x40) != 0 // Bit 6: Attestation Credential Data (AT).
-	// extensionData := (flags & 0x80) != 0 // Bit 7: Extension Data (ED).
+	attestationCredentialData := (flags & 0x40) != 0 // Bit 6: Attestation Credential Data (AT).
+	extensionData := (flags & 0x80) != 0             // Bit 7: Extension Data (ED).
 
+	// For now, just check if there is a mismatch in expected state,
+	// i.e. no extension data but flags are set.
+	if len(extensions) == 0 && (attestationCredentialData || extensionData) {
+		return errors.New("invalid flags: Attestation Credential Data (AT) Extension Data (ED) flag set without corrosponding extension data")
+	}
+
+	// If all checks pass, return nil
 	return nil
 }
