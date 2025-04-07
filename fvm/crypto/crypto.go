@@ -1,9 +1,11 @@
 package crypto
 
 import (
+	"bytes"
 	"encoding/hex"
 	"fmt"
 
+	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/onflow/cadence/runtime"
 	"github.com/onflow/crypto"
 	"github.com/onflow/crypto/hash"
@@ -215,6 +217,8 @@ func VerifySignatureFromTransaction(
 	message []byte,
 	pk crypto.PublicKey,
 	hashAlgo hash.HashingAlgorithm,
+	scheme SignatureScheme,
+	extensionData []byte,
 ) (bool, error) {
 
 	// check ECDSA compatibilites
@@ -232,12 +236,17 @@ func VerifySignatureFromTransaction(
 			hashAlgo.String(), "is not supported in transactions"))
 	}
 
-	hasher, err := NewPrefixedHashing(hashAlgo, flow.TransactionTagString)
+	reconstructedMessage, err := reconstructMessage(scheme, extensionData, message)
+	if err != nil {
+		return false, errors.NewValueErrorf(err.Error(), "could not reconstruct message for signature verification")
+	}
+
+	hasher, err := NewPrefixedHashing(hashAlgo, "")
 	if err != nil {
 		return false, errors.NewValueErrorf(err.Error(), "transaction verification failed")
 	}
 
-	valid, err := pk.Verify(signature, message, hasher)
+	valid, err := pk.Verify(signature, reconstructedMessage, hasher)
 	if err != nil {
 		// All inputs are guaranteed to be valid at this stage.
 		// The check for crypto.InvalidInputs is only a sanity check
@@ -249,6 +258,67 @@ func VerifySignatureFromTransaction(
 	}
 
 	return valid, nil
+}
+
+func reconstructMessage(scheme SignatureScheme, extensionData []byte, message []byte) ([]byte, error) {
+	switch scheme {
+	case PLAIN:
+		if extensionData != nil && len(extensionData) != 1 {
+			return nil, errors.NewValueErrorf("signature scheme is PLAIN, but extension data length is not 1", "signature scheme is PLAIN, but extension data length is not 1")
+		}
+		newMessage := make([]byte, 0, len(flow.TransactionTagString)+len(extensionData))
+		newMessage = append(newMessage, flow.TransactionDomainTag[:]...)
+		return append(newMessage, message...), nil
+	case WEBAUTHN:
+		if len(extensionData) == 0 {
+			return nil, errors.NewValueErrorf("extension data is empty", "extension data is empty")
+		}
+		rlpEncodedWebAuthnData := extensionData[1:]
+		decodedWebAuthnData := WebAuthnExtensionData{}
+		rlp.DecodeBytes(rlpEncodedWebAuthnData, decodedWebAuthnData)
+		clientData, err := decodedWebAuthnData.GetCollectedClientData()
+		if err != nil {
+			return nil, errors.NewValueErrorf("could not decode webauthn client data", "could not decode webauthn client data")
+		}
+		clientDataChallenge, err := hex.DecodeString(clientData.Challenge)
+		if err != nil {
+			return nil, errors.NewValueErrorf("could not decode webauthn client data", "could not decode webauthn client data")
+		}
+		// Validate challenge
+		hasher, err := NewPrefixedHashing(hash.SHA2_256, flow.TransactionTagString)
+		if err != nil {
+			return nil, errors.NewValueErrorf(err.Error(), "transaction verification failed")
+		}
+		computedChallenge := hasher.ComputeHash(message)
+
+		if !computedChallenge.Equal(clientDataChallenge) {
+			return nil, errors.NewValueErrorf("challenge mismatch", "challenge mismatch")
+		}
+
+		// Validate authenticatorData
+		if len(decodedWebAuthnData.AuthenticatorData) < 37 {
+			return nil, errors.NewValueErrorf("authenticatorData length is less than 37", "authenticatorData length is less than 37")
+		}
+
+		// rpIdHash, userFlags, sigCounter, extensions
+		rpIdHash, userFlags, _, _ := decodedWebAuthnData.AuthenticatorData[0:32], decodedWebAuthnData.AuthenticatorData[32:33], decodedWebAuthnData.AuthenticatorData[33:37], decodedWebAuthnData.AuthenticatorData[37:]
+
+		if bytes.Equal(flow.TransactionDomainTag[:], rpIdHash) {
+			return nil, errors.NewValueErrorf("authenticatorData rpIdHash error", "authenticatorData rpIdHash error")
+		}
+
+		if err := validateFlags(userFlags[0]); err != nil {
+			return nil, errors.NewValueErrorf("authenticatorData userFlags invalid", "authenticatorData userFlags invalid")
+		}
+
+		clientDataHash := hash.NewSHA2_256().ComputeHash(decodedWebAuthnData.ClientDataJson)
+
+		newMessage := make([]byte, 0, len(decodedWebAuthnData.AuthenticatorData)+len(clientDataHash))
+		newMessage = append(newMessage, decodedWebAuthnData.AuthenticatorData...)
+		return append(newMessage, clientDataHash...), nil
+	default:
+		return nil, errors.NewValueErrorf(fmt.Sprintf("%d", scheme), "signature scheme type not found")
+	}
 }
 
 // VerifyPOP verifies a proof of possession (PoP) for the receiver public key; currently only works for BLS

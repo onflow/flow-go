@@ -86,6 +86,7 @@ func newSignatureEntries(
 	payloadMessage []byte,
 	envelopeSignatures []flow.TransactionSignature,
 	envelopeMessage []byte,
+	extensionData []byte,
 ) (
 	[]*signatureContinuation,
 	map[flow.Address]int,
@@ -206,7 +207,8 @@ func (v *TransactionVerifier) verifyTransaction(
 		tx.PayloadSignatures,
 		tx.PayloadMessage(),
 		tx.EnvelopeSignatures,
-		tx.EnvelopeMessage())
+		tx.EnvelopeMessage(),
+	)
 	if err != nil {
 		return err
 	}

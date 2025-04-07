@@ -354,7 +354,7 @@ func TestVerifySignatureFromTransaction(t *testing.T) {
 						signature = sig.Bytes()
 					}
 
-					ok, err := crypto.VerifySignatureFromTransaction(signature, data, sk.PublicKey(), h)
+					ok, err := crypto.VerifySignatureFromTransaction(signature, data, sk.PublicKey(), h, crypto.PLAIN, nil)
 
 					if _, shouldBeOk := correctCombinations[s][h]; shouldBeOk {
 						require.NoError(t, err)
@@ -414,7 +414,7 @@ func TestVerifySignatureFromTransaction(t *testing.T) {
 						require.NoError(t, err)
 						signature := sig.Bytes()
 
-						ok, err := crypto.VerifySignatureFromTransaction(signature, data, sk.PublicKey(), h)
+						ok, err := crypto.VerifySignatureFromTransaction(signature, data, sk.PublicKey(), h, crypto.PLAIN, nil)
 						c.require(t, ok, err)
 					})
 				}
