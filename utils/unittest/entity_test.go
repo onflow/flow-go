@@ -160,26 +160,20 @@ func TestRequireEntityNonMalleable(t *testing.T) {
 			})
 		})
 	})
-	t.Run("invalid-entity", func(t *testing.T) {
-		err := NewMalleabilityChecker().Check(nil)
-		require.Error(t, err)
-		require.ErrorContains(t, err, "input is not a valid entity")
-	})
 	t.Run("nil-entity", func(t *testing.T) {
-		var e *flow.ExecutionReceipt = nil
-		err := NewMalleabilityChecker().Check(e)
+		err := NewMalleabilityChecker().CheckEntity(nil)
 		require.Error(t, err)
 		require.ErrorContains(t, err, "entity is nil")
 	})
 	t.Run("unsupported-field", func(t *testing.T) {
-		err := NewMalleabilityChecker().Check(&StructWithNotSettableFlowField{
+		err := NewMalleabilityChecker().CheckEntity(&StructWithNotSettableFlowField{
 			field: IdentityFixture().IdentitySkeleton,
 		})
 		require.Error(t, err)
 		require.ErrorContains(t, err, "not settable")
 	})
 	t.Run("malleable-entity", func(t *testing.T) {
-		err := NewMalleabilityChecker().Check(&MalleableEntityStruct{
+		err := NewMalleabilityChecker().CheckEntity(&MalleableEntityStruct{
 			Identities: IdentityListFixture(2).ToSkeleton(),
 			QC:         QuorumCertificateFixture(),
 			Signature:  SignatureFixture(),
@@ -189,7 +183,7 @@ func TestRequireEntityNonMalleable(t *testing.T) {
 	})
 	t.Run("struct-with-optional-field", func(t *testing.T) {
 		t.Run("without-optional-field", func(t *testing.T) {
-			err := NewMalleabilityChecker().Check(&StructWithOptionalField{
+			err := NewMalleabilityChecker().CheckEntity(&StructWithOptionalField{
 				Identifier:    IdentifierFixture(),
 				RequiredField: 42,
 				OptionalField: nil,
@@ -203,7 +197,7 @@ func TestRequireEntityNonMalleable(t *testing.T) {
 				OptionalField: new(uint32),
 			}
 			*v.OptionalField = 13
-			err := NewMalleabilityChecker().Check(v)
+			err := NewMalleabilityChecker().CheckEntity(v)
 			require.NoError(t, err)
 		})
 	})
@@ -261,7 +255,7 @@ func (e *StructWithPinning) ID() flow.Identifier {
 func TestMalleabilityChecker_PinField(t *testing.T) {
 	t.Run("v1", func(t *testing.T) {
 		checker := NewMalleabilityChecker(WithPinnedField("Version"), WithPinnedField("Evidence.TC"))
-		err := checker.Check(&StructWithPinning{
+		err := checker.CheckEntity(&StructWithPinning{
 			Version: 1,
 			Evidence: &EnterViewEvidence{
 				QC: QuorumCertificateFixture(),
@@ -272,7 +266,7 @@ func TestMalleabilityChecker_PinField(t *testing.T) {
 	})
 	t.Run("v2", func(t *testing.T) {
 		checker := NewMalleabilityChecker(WithPinnedField("Version"))
-		err := checker.Check(&StructWithPinning{
+		err := checker.CheckEntity(&StructWithPinning{
 			Version: 2,
 			Evidence: &EnterViewEvidence{
 				QC: QuorumCertificateFixture(),
@@ -343,4 +337,45 @@ func TestMalleabilityChecker_Generators(t *testing.T) {
 		)
 		require.Equal(t, generated, *original.Evidences[0])
 	})
+}
+
+// PartialHashStruct represents a model which includes a signature field attesting to the rest of the model.
+// Hash returns a hash over PartialHashStruct excluding the Signature field, and the Signature would sign the Hash.
+// ID returns a hash over the entire PartialHashStruct.
+// PartialHashStruct is malleable with respect to the Hash method, but non-malleable with respect to the ID method.
+// Although the Hash method is malleable, we still want to be able to verify that it is non-malleable with respect
+// to all fields other than the Signature field.
+type PartialHashStruct struct {
+	Data      []byte
+	Signature crypto.Signature
+}
+
+func (e *PartialHashStruct) Hash() flow.Identifier {
+	return flow.MakeID(struct {
+		Data []byte
+	}{
+		Data: e.Data,
+	})
+}
+
+func (e *PartialHashStruct) ID() flow.Identifier {
+	return flow.MakeID(e)
+}
+
+// TestMalleabilityChecker_PartialHash tests a partial hash malleability check. See PartialHashStruct for details.
+func TestMalleabilityChecker_PartialHash(t *testing.T) {
+	model := &PartialHashStruct{
+		Data:      SeedFixture(32),
+		Signature: SignatureFixture(),
+	}
+	// the entity check passes
+	err := NewMalleabilityChecker().CheckEntity(model)
+	require.NoError(t, err)
+	// the default Hash check fails
+	err = NewMalleabilityChecker().Check(model, model.Hash)
+	require.Error(t, err)
+	require.ErrorContains(t, err, "Signature is malleable")
+	// the Hash check omitting the Signature field passes
+	err = NewMalleabilityChecker(WithPinnedField("Signature")).Check(model, model.Hash)
+	require.NoError(t, err)
 }

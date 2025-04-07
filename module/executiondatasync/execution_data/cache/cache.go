@@ -61,7 +61,7 @@ func (c *ExecutionDataCache) ByID(ctx context.Context, executionDataID flow.Iden
 // - MalformedDataError if some level of the blob tree cannot be properly deserialized
 // - BlobSizeLimitExceededError if some blob in the blob tree exceeds the maximum allowed size
 func (c *ExecutionDataCache) ByBlockID(ctx context.Context, blockID flow.Identifier) (*execution_data.BlockExecutionDataEntity, error) {
-	if execData, ok := c.cache.ByID(blockID); ok {
+	if execData, ok := c.cache.Get(blockID); ok {
 		return execData, nil
 	}
 
@@ -77,7 +77,7 @@ func (c *ExecutionDataCache) ByBlockID(ctx context.Context, blockID flow.Identif
 
 	execDataEntity := execution_data.NewBlockExecutionDataEntity(executionDataID, execData)
 
-	_ = c.cache.Add(execDataEntity)
+	_ = c.cache.Add(execDataEntity.BlockID, execDataEntity)
 
 	return execDataEntity, nil
 }
