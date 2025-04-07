@@ -226,7 +226,7 @@ func TestBlockExecutor_ExecuteBlock_VersionAwareChunk(t *testing.T) {
 
 		require.Equal(t, 2, committer.callCount)
 
-		assert.Equal(t, block.ID(), result.BlockExecutionData.BlockID)
+		assert.Equal(t, block.BlockID(), result.BlockExecutionData.BlockID)
 
 		expectedChunk1EndState := incStateCommitment(*block.StartState)
 		expectedChunk2EndState := incStateCommitment(expectedChunk1EndState)
@@ -243,7 +243,7 @@ func TestBlockExecutor_ExecuteBlock_VersionAwareChunk(t *testing.T) {
 			t,
 			parentBlockExecutionResultID,
 			receipt.PreviousResultID)
-		assert.Equal(t, block.ID(), receipt.BlockID)
+		assert.Equal(t, block.BlockID(), receipt.BlockID)
 		assert.NotEqual(t, flow.ZeroID, receipt.ExecutionDataID)
 
 		assert.Len(t, receipt.Chunks, 1+1) // +1 system chunk
@@ -251,7 +251,7 @@ func TestBlockExecutor_ExecuteBlock_VersionAwareChunk(t *testing.T) {
 		chunk1 := receipt.Chunks[0]
 
 		eventCommits := result.AllEventCommitments()
-		assert.Equal(t, block.ID(), chunk1.BlockID)
+		assert.Equal(t, block.BlockID(), chunk1.BlockID)
 		assert.Equal(t, uint(0), chunk1.CollectionIndex)
 		assert.Equal(t, uint64(2), chunk1.NumberOfTransactions)
 		assert.Equal(t, eventCommits[0], chunk1.EventCollection)
@@ -263,7 +263,7 @@ func TestBlockExecutor_ExecuteBlock_VersionAwareChunk(t *testing.T) {
 		assert.Equal(t, expectedChunk1EndState, chunk1.EndState)
 
 		chunk2 := receipt.Chunks[1]
-		assert.Equal(t, block.ID(), chunk2.BlockID)
+		assert.Equal(t, block.BlockID(), chunk2.BlockID)
 		assert.Equal(t, uint(1), chunk2.CollectionIndex)
 		assert.Equal(t, uint64(1), chunk2.NumberOfTransactions)
 		assert.Equal(t, eventCommits[1], chunk2.EventCollection)
@@ -450,7 +450,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 
 		require.Equal(t, 2, committer.callCount)
 
-		assert.Equal(t, block.ID(), result.BlockExecutionData.BlockID)
+		assert.Equal(t, block.BlockID(), result.BlockExecutionData.BlockID)
 
 		expectedChunk1EndState := incStateCommitment(*block.StartState)
 		expectedChunk2EndState := incStateCommitment(expectedChunk1EndState)
@@ -467,7 +467,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 			t,
 			parentBlockExecutionResultID,
 			receipt.PreviousResultID)
-		assert.Equal(t, block.ID(), receipt.BlockID)
+		assert.Equal(t, block.BlockID(), receipt.BlockID)
 		assert.NotEqual(t, flow.ZeroID, receipt.ExecutionDataID)
 
 		assert.Len(t, receipt.Chunks, 1+1) // +1 system chunk
@@ -475,7 +475,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 		chunk1 := receipt.Chunks[0]
 
 		eventCommits := result.AllEventCommitments()
-		assert.Equal(t, block.ID(), chunk1.BlockID)
+		assert.Equal(t, block.BlockID(), chunk1.BlockID)
 		assert.Equal(t, uint(0), chunk1.CollectionIndex)
 		assert.Equal(t, uint64(2), chunk1.NumberOfTransactions)
 		assert.Equal(t, eventCommits[0], chunk1.EventCollection)
@@ -487,7 +487,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 		assert.Equal(t, expectedChunk1EndState, chunk1.EndState)
 
 		chunk2 := receipt.Chunks[1]
-		assert.Equal(t, block.ID(), chunk2.BlockID)
+		assert.Equal(t, block.BlockID(), chunk2.BlockID)
 		assert.Equal(t, uint(1), chunk2.CollectionIndex)
 		assert.Equal(t, uint64(1), chunk2.NumberOfTransactions)
 		assert.Equal(t, eventCommits[1], chunk2.EventCollection)

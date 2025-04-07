@@ -170,7 +170,7 @@ func (e *Manager) ComputeBlock(
 		Msg("received complete block")
 
 	derivedBlockData := e.derivedChainData.GetOrCreateDerivedBlockData(
-		block.ID(),
+		block.BlockID(),
 		block.ParentID())
 
 	result, err := e.blockComputer.ExecuteBlock(
