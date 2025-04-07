@@ -630,12 +630,14 @@ func ComputationResultFixture(t *testing.T) *execution.ComputationResult {
 			},
 		},
 		ExecutionReceipt: &flow.ExecutionReceipt{
-			ExecutionResult: flow.ExecutionResult{
-				Chunks: flow.ChunkList{
-					{EndState: unittest.StateCommitmentFixture()},
-					{EndState: unittest.StateCommitmentFixture()},
-					{EndState: unittest.StateCommitmentFixture()},
-					{EndState: unittest.StateCommitmentFixture()},
+			ExecutionReceiptBody: flow.ExecutionReceiptBody{
+				ExecutionResult: flow.ExecutionResult{
+					Chunks: flow.ChunkList{
+						{EndState: unittest.StateCommitmentFixture()},
+						{EndState: unittest.StateCommitmentFixture()},
+						{EndState: unittest.StateCommitmentFixture()},
+						{EndState: unittest.StateCommitmentFixture()},
+					},
 				},
 			},
 		},
