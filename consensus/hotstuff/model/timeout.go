@@ -54,7 +54,7 @@ type RepeatableTimeoutObject struct {
 	SigData crypto.Signature
 }
 
-// ID returns the RepeatableTimeoutObject's identifier
+// ID returns a collision-resistant hash of the RepeatableTimeoutObject struct.
 func (t *RepeatableTimeoutObject) ID() flow.Identifier {
 	return flow.MakeID(t)
 }
@@ -72,7 +72,7 @@ type TimeoutObject struct {
 	TimeoutTick uint64
 }
 
-// ID returns the RepeatableTimeoutObject's identifier
+// ID returns a collision-resistant hash of the TimeoutObject struct.
 func (t *TimeoutObject) ID() flow.Identifier {
 	return flow.MakeID(t)
 }
