@@ -1717,30 +1717,13 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 			return nil
 		}).
 		Module("transaction timing mempools", func(node *cmd.NodeConfig) error {
-			var err error
-			builder.TransactionTimings, err = stdmap.NewTransactionTimings(1500 * 300) // assume 1500 TPS * 300 seconds
-			if err != nil {
-				return err
-			}
+			builder.TransactionTimings = stdmap.NewTransactionTimings(1500 * 300) // assume 1500 TPS * 300 seconds
+			builder.CollectionsToMarkFinalized = stdmap.NewTimes(50 * 300)        // assume 50 collection nodes * 300 seconds
+			builder.CollectionsToMarkExecuted = stdmap.NewTimes(50 * 300)         // assume 50 collection nodes * 300 seconds
+			builder.BlockTransactions = stdmap.NewIdentifierMap(10000)
+			builder.BlocksToMarkExecuted = stdmap.NewTimes(1 * 300) // assume 1 block per second * 300 seconds
 
-			builder.CollectionsToMarkFinalized, err = stdmap.NewTimes(50 * 300) // assume 50 collection nodes * 300 seconds
-			if err != nil {
-				return err
-			}
-
-			builder.CollectionsToMarkExecuted, err = stdmap.NewTimes(50 * 300) // assume 50 collection nodes * 300 seconds
-			if err != nil {
-				return err
-			}
-
-			builder.BlockTransactions, err = stdmap.NewIdentifierMap(10000)
-			if err != nil {
-				return err
-			}
-
-			builder.BlocksToMarkExecuted, err = stdmap.NewTimes(1 * 300) // assume 1 block per second * 300 seconds
-
-			return err
+			return nil
 		}).
 		Module("transaction metrics", func(node *cmd.NodeConfig) error {
 			builder.TransactionMetrics = metrics.NewTransactionCollector(

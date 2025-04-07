@@ -19,7 +19,7 @@ import (
 func TestArrayBackData_SingleBucket(t *testing.T) {
 	limit := 16
 
-	bd := NewCache(uint32(limit),
+	bd := NewCache[*unittest.MockEntity](uint32(limit),
 		1,
 		heropool.LRUEjection,
 		unittest.Logger(),
@@ -38,7 +38,7 @@ func TestArrayBackData_SingleBucket(t *testing.T) {
 		require.Equal(t, bd.buckets[0].slots[i].slotAge, uint64(i+1))
 		// also, since we have not yet over-limited,
 		// entities are assigned their entityIndex in the same order they are added.
-		require.Equal(t, bd.buckets[0].slots[i].entityIndex, i)
+		require.Equal(t, bd.buckets[0].slots[i].valueIndex, i)
 		_, _, owner := bd.entities.Get(i)
 		require.Equal(t, owner, uint64(i))
 	}
@@ -52,7 +52,7 @@ func TestArrayBackData_SingleBucket(t *testing.T) {
 func TestArrayBackData_Adjust(t *testing.T) {
 	limit := 100_000
 
-	bd := NewCache(uint32(limit),
+	bd := NewCache[*unittest.MockEntity](uint32(limit),
 		8,
 		heropool.LRUEjection,
 		unittest.Logger(),
@@ -66,10 +66,10 @@ func TestArrayBackData_Adjust(t *testing.T) {
 	// picks a random entity from BackData and adjusts its identifier to a new one.
 	entityIndex := rand.Int() % limit
 	// checking integrity of retrieving entity
-	oldEntity, ok := bd.ByID(entities[entityIndex].ID())
+	oldEntity, ok := bd.Get(entities[entityIndex].Identifier)
 	require.True(t, ok)
-	oldEntityID := oldEntity.ID()
-	require.Equal(t, entities[entityIndex].ID(), oldEntityID)
+	oldEntityID := oldEntity.Identifier
+	require.Equal(t, entities[entityIndex].Identifier, oldEntityID)
 	require.Equal(t, entities[entityIndex], oldEntity)
 
 	// picks a new identifier for the entity and makes sure it is different than its current one.
@@ -77,45 +77,44 @@ func TestArrayBackData_Adjust(t *testing.T) {
 	require.NotEqual(t, oldEntityID, newEntityID)
 
 	// adjusts old entity to a new entity with a new identifier
-	newEntity, ok := bd.Adjust(oldEntity.ID(), func(entity flow.Entity) flow.Entity {
-		mockEntity, ok := entity.(*unittest.MockEntity)
+	newEntity, ok := bd.Adjust(oldEntity.Identifier, func(entity *unittest.MockEntity) *unittest.MockEntity {
 		require.True(t, ok)
 		// oldEntity must be passed to func parameter of adjust.
-		require.Equal(t, oldEntityID, mockEntity.ID())
-		require.Equal(t, oldEntity, mockEntity)
+		require.Equal(t, oldEntityID, entity.Identifier)
+		require.Equal(t, oldEntity, entity)
 
-		return &unittest.MockEntity{Identifier: newEntityID}
+		return &unittest.MockEntity{Identifier: oldEntityID, Nonce: entity.Nonce + 1}
 	})
 
-	// adjustment must be successful, and identifier must be updated.
+	// adjustment must be successful, and identifier must be same.
 	require.True(t, ok)
-	require.Equal(t, newEntityID, newEntity.ID())
-	newMockEntity, ok := newEntity.(*unittest.MockEntity)
-	require.True(t, ok)
+	require.Equal(t, oldEntityID, newEntity.Identifier)
 
 	// replaces new entity in the original reference list and
 	// retrieves all.
-	entities[entityIndex] = newMockEntity
+	entities[entityIndex] = newEntity
 	testRetrievableFrom(t, bd, entities, 0)
 
-	// re-adjusting old entity must fail, since its identifier must no longer exist
-	entity, ok := bd.Adjust(oldEntityID, func(entity flow.Entity) flow.Entity {
-		require.Fail(t, "function must not be invoked on a non-existing entity")
-		return entity
+	// re-adjusting the entity should succeed because the adjusted entity remains under the original id.
+	entity, ok := bd.Adjust(oldEntityID, func(entity *unittest.MockEntity) *unittest.MockEntity {
+		return &unittest.MockEntity{
+			Identifier: entity.Identifier, // preserve the old id
+			Nonce:      entity.Nonce + 1,
+		}
 	})
-	require.False(t, ok)
-	require.Nil(t, entity)
+	require.True(t, ok)
+	require.NotNil(t, entity)
 
-	// similarly, retrieving old entity must fail
-	entity, ok = bd.ByID(oldEntityID)
-	require.False(t, ok)
-	require.Nil(t, entity)
+	// similarly, retrieving old entity must not fail
+	entity, ok = bd.Get(oldEntityID)
+	require.True(t, ok)
+	require.NotNil(t, entity)
 
 	ok = bd.Has(oldEntityID)
-	require.False(t, ok)
+	require.True(t, ok)
 
 	// adjusting any random non-existing identifier must fail
-	entity, ok = bd.Adjust(unittest.IdentifierFixture(), func(entity flow.Entity) flow.Entity {
+	entity, ok = bd.Adjust(unittest.IdentifierFixture(), func(entity *unittest.MockEntity) *unittest.MockEntity {
 		require.Fail(t, "function must not be invoked on a non-existing entity")
 		return entity
 	})
@@ -131,7 +130,7 @@ func TestArrayBackData_Adjust(t *testing.T) {
 func TestArrayBackData_AdjustWitInit(t *testing.T) {
 	limit := 100_000
 
-	bd := NewCache(uint32(limit),
+	bd := NewCache[*unittest.MockEntity](uint32(limit),
 		8,
 		heropool.LRUEjection,
 		unittest.Logger(),
@@ -139,27 +138,25 @@ func TestArrayBackData_AdjustWitInit(t *testing.T) {
 
 	entities := unittest.EntityListFixture(uint(limit))
 	for _, e := range entities {
-		adjustedEntity, adjusted := bd.AdjustWithInit(e.ID(), func(entity flow.Entity) flow.Entity {
+		adjustedEntity, adjusted := bd.AdjustWithInit(e.Identifier, func(entity *unittest.MockEntity) *unittest.MockEntity {
 			// adjust logic, increments the nonce of the entity
-			mockEntity, ok := entity.(*unittest.MockEntity)
-			require.True(t, ok)
-			mockEntity.Nonce++
-			return mockEntity
-		}, func() flow.Entity {
+			entity.Nonce++
+			return entity
+		}, func() *unittest.MockEntity {
 			return e // initialize with the entity
 		})
 		require.True(t, adjusted)
-		require.Equal(t, e.ID(), adjustedEntity.ID())
-		require.Equal(t, uint64(1), adjustedEntity.(*unittest.MockEntity).Nonce)
+		require.Equal(t, e.Identifier, adjustedEntity.Identifier)
+		require.Equal(t, uint64(1), adjustedEntity.Nonce)
 	}
 
 	// picks a random entity from BackData and adjusts its identifier to a new one.
 	entityIndex := rand.Int() % limit
 	// checking integrity of retrieving entity
-	oldEntity, ok := bd.ByID(entities[entityIndex].ID())
+	oldEntity, ok := bd.Get(entities[entityIndex].Identifier)
 	require.True(t, ok)
-	oldEntityID := oldEntity.ID()
-	require.Equal(t, entities[entityIndex].ID(), oldEntityID)
+	oldEntityID := oldEntity.Identifier
+	require.Equal(t, entities[entityIndex].Identifier, oldEntityID)
 	require.Equal(t, entities[entityIndex], oldEntity)
 
 	// picks a new identifier for the entity and makes sure it is different than its current one.
@@ -167,117 +164,44 @@ func TestArrayBackData_AdjustWitInit(t *testing.T) {
 	require.NotEqual(t, oldEntityID, newEntityID)
 
 	// adjusts old entity to a new entity with a new identifier
-	newEntity, ok := bd.Adjust(oldEntity.ID(), func(entity flow.Entity) flow.Entity {
-		mockEntity, ok := entity.(*unittest.MockEntity)
-		require.True(t, ok)
+	newEntity, ok := bd.Adjust(oldEntity.Identifier, func(entity *unittest.MockEntity) *unittest.MockEntity {
 		// oldEntity must be passed to func parameter of adjust.
-		require.Equal(t, oldEntityID, mockEntity.ID())
-		require.Equal(t, oldEntity, mockEntity)
+		require.Equal(t, oldEntityID, entity.Identifier)
+		require.Equal(t, oldEntity, entity)
 
 		// adjust logic, adjsuts the nonce of the entity
-		return &unittest.MockEntity{Identifier: newEntityID, Nonce: 2}
+		return &unittest.MockEntity{Identifier: oldEntityID, Nonce: 2}
 	})
 
 	// adjustment must be successful, and identifier must be updated.
 	require.True(t, ok)
-	require.Equal(t, newEntityID, newEntity.ID())
-	require.Equal(t, uint64(2), newEntity.(*unittest.MockEntity).Nonce)
-	newMockEntity, ok := newEntity.(*unittest.MockEntity)
-	require.True(t, ok)
+	require.Equal(t, oldEntityID, newEntity.Identifier)
+	require.Equal(t, uint64(2), newEntity.Nonce)
 
 	// replaces new entity in the original reference list and
 	// retrieves all.
-	entities[entityIndex] = newMockEntity
+	entities[entityIndex] = newEntity
 	testRetrievableFrom(t, bd, entities, 0)
 
-	// re-adjusting old entity must fail, since its identifier must no longer exist
-	entity, ok := bd.Adjust(oldEntityID, func(entity flow.Entity) flow.Entity {
-		require.Fail(t, "function must not be invoked on a non-existing entity")
-		return entity
+	// Now, re-adjusting the entity (using its original ID) should succeed.
+	entity, ok := bd.Adjust(oldEntityID, func(entity *unittest.MockEntity) *unittest.MockEntity {
+		// Further adjust: increment the nonce.
+		return &unittest.MockEntity{Identifier: oldEntityID, Nonce: entity.Nonce + 1}
 	})
-	require.False(t, ok)
-	require.Nil(t, entity)
+	require.True(t, ok)
+	require.NotNil(t, entity)
+	require.Equal(t, oldEntityID, entity.Identifier)
+	// Check that the nonce was incremented from 2 to 3.
+	require.Equal(t, uint64(3), entity.Nonce)
 
-	// similarly, retrieving old entity must fail
-	entity, ok = bd.ByID(oldEntityID)
-	require.False(t, ok)
-	require.Nil(t, entity)
+	// Retrieving the entity using the original identifier must succeed.
+	entity, ok = bd.Get(oldEntityID)
+	require.True(t, ok)
+	require.Equal(t, oldEntityID, entity.Identifier)
+	require.Equal(t, uint64(3), entity.Nonce)
 
 	ok = bd.Has(oldEntityID)
-	require.False(t, ok)
-}
-
-// TestArrayBackData_GetWithInit evaluates that GetWithInit method. It should initialize and then retrieve the value of
-// non-existing entity while preserving the integrity of BackData on just retrieving the value of existing entity.
-func TestArrayBackData_GetWithInit(t *testing.T) {
-	limit := 1000
-
-	bd := NewCache(uint32(limit), 8, heropool.LRUEjection, unittest.Logger(), metrics.NewNoopCollector())
-
-	entities := unittest.EntityListFixture(uint(limit))
-
-	// GetWithInit
-	for _, e := range entities {
-		// all entities must be initialized retrieved successfully
-		actual, ok := bd.GetWithInit(e.ID(), func() flow.Entity {
-			return e // initialize with the entity
-		})
-		require.True(t, ok)
-		require.Equal(t, e, actual)
-	}
-
-	// All
-	all := bd.All()
-	require.Equal(t, len(entities), len(all))
-	for _, expected := range entities {
-		actual, ok := bd.ByID(expected.ID())
-		require.True(t, ok)
-		require.Equal(t, expected, actual)
-	}
-
-	// Identifiers
-	ids := bd.Identifiers()
-	require.Equal(t, len(entities), len(ids))
-	for _, id := range ids {
-		require.True(t, bd.Has(id))
-	}
-
-	// Entities
-	actualEntities := bd.Entities()
-	require.Equal(t, len(entities), len(actualEntities))
-	require.ElementsMatch(t, entities, actualEntities)
-
-	// Adjust
-	for _, e := range entities {
-		// all entities must be adjusted successfully
-		actual, ok := bd.Adjust(e.ID(), func(entity flow.Entity) flow.Entity {
-			// increment nonce of the entity
-			entity.(*unittest.MockEntity).Nonce++
-			return entity
-		})
-		require.True(t, ok)
-		require.Equal(t, e, actual)
-	}
-
-	// ByID; should return the latest version of the entity
-	for _, e := range entities {
-		// all entities must be retrieved successfully
-		actual, ok := bd.ByID(e.ID())
-		require.True(t, ok)
-		require.Equal(t, e.ID(), actual.ID())
-		require.Equal(t, uint64(1), actual.(*unittest.MockEntity).Nonce)
-	}
-
-	// GetWithInit; should return the latest version of the entity, than increment the nonce
-	for _, e := range entities {
-		// all entities must be retrieved successfully
-		actual, ok := bd.GetWithInit(e.ID(), func() flow.Entity {
-			require.Fail(t, "should not be called") // entity has already been initialized
-			return e
-		})
-		require.True(t, ok)
-		require.Equal(t, e.ID(), actual.ID())
-	}
+	require.True(t, ok)
 }
 
 // TestArrayBackData_WriteHeavy evaluates correctness of Cache under the writing and retrieving
@@ -285,7 +209,7 @@ func TestArrayBackData_GetWithInit(t *testing.T) {
 func TestArrayBackData_WriteHeavy(t *testing.T) {
 	limit := 100_000
 
-	bd := NewCache(uint32(limit),
+	bd := NewCache[*unittest.MockEntity](uint32(limit),
 		8,
 		heropool.LRUEjection,
 		unittest.Logger(),
@@ -309,7 +233,7 @@ func TestArrayBackData_LRU_Ejection(t *testing.T) {
 	limit := 100_000
 	items := uint(1_000_000)
 
-	bd := NewCache(uint32(limit),
+	bd := NewCache[*unittest.MockEntity](uint32(limit),
 		8,
 		heropool.LRUEjection,
 		unittest.Logger(),
@@ -334,7 +258,7 @@ func TestArrayBackData_No_Ejection(t *testing.T) {
 	limit := 100_000
 	items := uint(1_000_000)
 
-	bd := NewCache(uint32(limit),
+	bd := NewCache[*unittest.MockEntity](uint32(limit),
 		8,
 		heropool.NoEjection,
 		unittest.Logger(),
@@ -359,7 +283,7 @@ func TestArrayBackData_Random_Ejection(t *testing.T) {
 	limit := 100_000
 	items := uint(1_000_000)
 
-	bd := NewCache(uint32(limit),
+	bd := NewCache[*unittest.MockEntity](uint32(limit),
 		8,
 		heropool.RandomEjection,
 		unittest.Logger(),
@@ -380,7 +304,7 @@ func TestArrayBackData_Random_Ejection(t *testing.T) {
 func TestArrayBackData_AddDuplicate(t *testing.T) {
 	limit := 100
 
-	bd := NewCache(uint32(limit),
+	bd := NewCache[*unittest.MockEntity](uint32(limit),
 		8,
 		heropool.LRUEjection,
 		unittest.Logger(),
@@ -393,7 +317,7 @@ func TestArrayBackData_AddDuplicate(t *testing.T) {
 
 	// adding duplicate entity should fail
 	for _, entity := range entities {
-		require.False(t, bd.Add(entity.ID(), entity))
+		require.False(t, bd.Add(entity.Identifier, entity))
 	}
 
 	// still all entities must be retrievable from Cache.
@@ -404,7 +328,7 @@ func TestArrayBackData_AddDuplicate(t *testing.T) {
 func TestArrayBackData_Clear(t *testing.T) {
 	limit := 100
 
-	bd := NewCache(uint32(limit),
+	bd := NewCache[*unittest.MockEntity](uint32(limit),
 		8,
 		heropool.LRUEjection,
 		unittest.Logger(),
@@ -460,7 +384,7 @@ func TestArrayBackData_All(t *testing.T) {
 
 	for _, tc := range tt {
 		t.Run(fmt.Sprintf("%d-limit-%d-items-%s-ejection", tc.limit, tc.items, tc.ejectionMode), func(t *testing.T) {
-			bd := NewCache(tc.limit,
+			bd := NewCache[*unittest.MockEntity](tc.limit,
 				8,
 				tc.ejectionMode,
 				unittest.Logger(),
@@ -473,8 +397,8 @@ func TestArrayBackData_All(t *testing.T) {
 				// in random ejection mode we count total number of matched entities
 				// with All map.
 				testMapMatchCount(t, bd.All(), entities, int(tc.limit))
-				testEntitiesMatchCount(t, bd.Entities(), entities, int(tc.limit))
-				testIdentifiersMatchCount(t, bd.Identifiers(), entities, int(tc.limit))
+				testEntitiesMatchCount(t, bd.Values(), entities, int(tc.limit))
+				testIdentifiersMatchCount(t, bd.Keys(), entities, int(tc.limit))
 			} else {
 				// in LRU ejection mode we match All items based on a from index (i.e., last "from" items).
 				from := int(tc.items) - int(tc.limit)
@@ -483,8 +407,8 @@ func TestArrayBackData_All(t *testing.T) {
 					from = 0
 				}
 				testMapMatchFrom(t, bd.All(), entities, from)
-				testEntitiesMatchFrom(t, bd.Entities(), entities, from)
-				testIdentifiersMatchFrom(t, bd.Identifiers(), entities, from)
+				testEntitiesMatchFrom(t, bd.Values(), entities, from)
+				testIdentifiersMatchFrom(t, bd.Keys(), entities, from)
 			}
 		})
 	}
@@ -526,7 +450,7 @@ func TestArrayBackData_Remove(t *testing.T) {
 
 	for _, tc := range tt {
 		t.Run(fmt.Sprintf("%d-limit-%d-items-%dfrom-%dcount", tc.limit, tc.items, tc.from, tc.count), func(t *testing.T) {
-			bd := NewCache(
+			bd := NewCache[*unittest.MockEntity](
 				tc.limit,
 				8,
 				heropool.RandomEjection,
@@ -552,25 +476,28 @@ func TestArrayBackData_Remove(t *testing.T) {
 
 // testAddEntities is a test helper that checks entities are added successfully to the Cache.
 // and each entity is retrievable right after it is written to backdata.
-func testAddEntities(t *testing.T, bd *Cache, entities []*unittest.MockEntity, ejection heropool.EjectionMode) {
+func testAddEntities(t *testing.T, bd *Cache[*unittest.MockEntity], entities []*unittest.MockEntity, ejection heropool.EjectionMode) {
 	// initially, head should be undefined
-	e, ok := bd.Head()
+	k, e, ok := bd.Head()
 	require.False(t, ok)
+	require.Equal(t, flow.ZeroID, k)
 	require.Nil(t, e)
 
 	// adding elements
 	for i, e := range entities {
 		if ejection == heropool.NoEjection && uint32(i) >= bd.sizeLimit {
 			// with no ejection when it goes beyond limit, the writes should be unsuccessful.
-			require.False(t, bd.Add(e.ID(), e))
+			require.False(t, bd.Add(e.Identifier, e))
 
 			// the head should retrieve the first added entity.
-			headEntity, headExists := bd.Head()
+			headKey, headEntity, headExists := bd.Head()
 			require.True(t, headExists)
-			require.Equal(t, headEntity.ID(), entities[0].ID())
+			expectedID := entities[0].Identifier
+			require.Equal(t, expectedID, headKey)
+			require.Equal(t, expectedID, headEntity.Identifier)
 		} else {
 			// adding each element must be successful.
-			require.True(t, bd.Add(e.ID(), e))
+			require.True(t, bd.Add(e.Identifier, e))
 
 			if uint32(i) < bd.sizeLimit {
 				// when we are below limit the size of
@@ -578,9 +505,11 @@ func testAddEntities(t *testing.T, bd *Cache, entities []*unittest.MockEntity, e
 				require.Equal(t, bd.Size(), uint(i+1))
 
 				// in case cache is not full, the head should retrieve the first added entity.
-				headEntity, headExists := bd.Head()
+				headKey, headEntity, headExists := bd.Head()
 				require.True(t, headExists)
-				require.Equal(t, headEntity.ID(), entities[0].ID())
+				expectedID := entities[0].Identifier
+				require.Equal(t, expectedID, headKey)
+				require.Equal(t, expectedID, headEntity.Identifier)
 			} else {
 				// when we cross the limit, the ejection kicks in, and
 				// size must be steady at the limit.
@@ -588,7 +517,7 @@ func testAddEntities(t *testing.T, bd *Cache, entities []*unittest.MockEntity, e
 			}
 
 			// entity should be immediately retrievable
-			actual, ok := bd.ByID(e.ID())
+			actual, ok := bd.Get(e.Identifier)
 			require.True(t, ok)
 			require.Equal(t, e, actual)
 		}
@@ -596,15 +525,15 @@ func testAddEntities(t *testing.T, bd *Cache, entities []*unittest.MockEntity, e
 }
 
 // testRetrievableInRange is a test helper that evaluates that all entities starting from given index are retrievable from Cache.
-func testRetrievableFrom(t *testing.T, bd *Cache, entities []*unittest.MockEntity, from int) {
+func testRetrievableFrom(t *testing.T, bd *Cache[*unittest.MockEntity], entities []*unittest.MockEntity, from int) {
 	testRetrievableInRange(t, bd, entities, from, len(entities))
 }
 
 // testRetrievableInRange is a test helper that evaluates within given range [from, to) are retrievable from Cache.
-func testRetrievableInRange(t *testing.T, bd *Cache, entities []*unittest.MockEntity, from int, to int) {
+func testRetrievableInRange(t *testing.T, bd *Cache[*unittest.MockEntity], entities []*unittest.MockEntity, from int, to int) {
 	for i := range entities {
 		expected := entities[i]
-		actual, ok := bd.ByID(expected.ID())
+		actual, ok := bd.Get(expected.Identifier)
 		if i < from || i >= to {
 			require.False(t, ok, i)
 			require.Nil(t, actual)
@@ -616,11 +545,11 @@ func testRetrievableInRange(t *testing.T, bd *Cache, entities []*unittest.MockEn
 }
 
 // testRemoveAtRandom is a test helper removes specified number of entities from Cache at random.
-func testRemoveAtRandom(t *testing.T, bd *Cache, entities []*unittest.MockEntity, count int) {
+func testRemoveAtRandom(t *testing.T, bd *Cache[*unittest.MockEntity], entities []*unittest.MockEntity, count int) {
 	for removedCount := 0; removedCount < count; {
 		unittest.RequireReturnsBefore(t, func() {
 			index := rand.Int() % len(entities)
-			expected, removed := bd.Remove(entities[index].ID())
+			expected, removed := bd.Remove(entities[index].Identifier)
 			if !removed {
 				return
 			}
@@ -633,9 +562,9 @@ func testRemoveAtRandom(t *testing.T, bd *Cache, entities []*unittest.MockEntity
 }
 
 // testRemoveRange is a test helper that removes specified range of entities from Cache.
-func testRemoveRange(t *testing.T, bd *Cache, entities []*unittest.MockEntity, from int, to int) {
+func testRemoveRange(t *testing.T, bd *Cache[*unittest.MockEntity], entities []*unittest.MockEntity, from int, to int) {
 	for i := from; i < to; i++ {
-		expected, removed := bd.Remove(entities[i].ID())
+		expected, removed := bd.Remove(entities[i].Identifier)
 		require.True(t, removed)
 		require.Equal(t, entities[i], expected)
 		// size sanity check after removal
@@ -644,26 +573,26 @@ func testRemoveRange(t *testing.T, bd *Cache, entities []*unittest.MockEntity, f
 }
 
 // testCheckRangeRemoved is a test helper that evaluates the specified range of entities have been removed from Cache.
-func testCheckRangeRemoved(t *testing.T, bd *Cache, entities []*unittest.MockEntity, from int, to int) {
+func testCheckRangeRemoved(t *testing.T, bd *Cache[*unittest.MockEntity], entities []*unittest.MockEntity, from int, to int) {
 	for i := from; i < to; i++ {
 		// both removal and retrieval must fail
-		expected, removed := bd.Remove(entities[i].ID())
+		expected, removed := bd.Remove(entities[i].Identifier)
 		require.False(t, removed)
 		require.Nil(t, expected)
 
-		expected, exists := bd.ByID(entities[i].ID())
+		expected, exists := bd.Get(entities[i].Identifier)
 		require.False(t, exists)
 		require.Nil(t, expected)
 	}
 }
 
 // testMapMatchFrom is a test helper that checks entities are retrievable from entitiesMap starting specified index.
-func testMapMatchFrom(t *testing.T, entitiesMap map[flow.Identifier]flow.Entity, entities []*unittest.MockEntity, from int) {
+func testMapMatchFrom(t *testing.T, entitiesMap map[flow.Identifier]*unittest.MockEntity, entities []*unittest.MockEntity, from int) {
 	require.Len(t, entitiesMap, len(entities)-from)
 
 	for i := range entities {
 		expected := entities[i]
-		actual, ok := entitiesMap[expected.ID()]
+		actual, ok := entitiesMap[expected.Identifier]
 		if i < from {
 			require.False(t, ok, i)
 			require.Nil(t, actual)
@@ -675,7 +604,7 @@ func testMapMatchFrom(t *testing.T, entitiesMap map[flow.Identifier]flow.Entity,
 }
 
 // testEntitiesMatchFrom is a test helper that checks entities are retrievable from given list starting specified index.
-func testEntitiesMatchFrom(t *testing.T, expectedEntities []flow.Entity, actualEntities []*unittest.MockEntity, from int) {
+func testEntitiesMatchFrom(t *testing.T, expectedEntities []*unittest.MockEntity, actualEntities []*unittest.MockEntity, from int) {
 	require.Len(t, expectedEntities, len(actualEntities)-from)
 
 	for i, actual := range actualEntities {
@@ -693,20 +622,20 @@ func testIdentifiersMatchFrom(t *testing.T, expectedIdentifiers flow.IdentifierL
 
 	for i, actual := range actualEntities {
 		if i < from {
-			require.NotContains(t, expectedIdentifiers, actual.ID())
+			require.NotContains(t, expectedIdentifiers, actual.Identifier)
 		} else {
-			require.Contains(t, expectedIdentifiers, actual.ID())
+			require.Contains(t, expectedIdentifiers, actual.Identifier)
 		}
 	}
 }
 
 // testMapMatchFrom is a test helper that checks specified number of entities are retrievable from entitiesMap.
-func testMapMatchCount(t *testing.T, entitiesMap map[flow.Identifier]flow.Entity, entities []*unittest.MockEntity, count int) {
+func testMapMatchCount(t *testing.T, entitiesMap map[flow.Identifier]*unittest.MockEntity, entities []*unittest.MockEntity, count int) {
 	require.Len(t, entitiesMap, count)
 	actualCount := 0
 	for i := range entities {
 		expected := entities[i]
-		actual, ok := entitiesMap[expected.ID()]
+		actual, ok := entitiesMap[expected.Identifier]
 		if !ok {
 			continue
 		}
@@ -717,12 +646,12 @@ func testMapMatchCount(t *testing.T, entitiesMap map[flow.Identifier]flow.Entity
 }
 
 // testEntitiesMatchCount is a test helper that checks specified number of entities are retrievable from given list.
-func testEntitiesMatchCount(t *testing.T, expectedEntities []flow.Entity, actualEntities []*unittest.MockEntity, count int) {
-	entitiesMap := make(map[flow.Identifier]flow.Entity)
+func testEntitiesMatchCount(t *testing.T, expectedEntities []*unittest.MockEntity, actualEntities []*unittest.MockEntity, count int) {
+	entitiesMap := make(map[flow.Identifier]*unittest.MockEntity)
 
 	// converts expected entities list to a map in order to utilize a test helper.
 	for _, expected := range expectedEntities {
-		entitiesMap[expected.ID()] = expected
+		entitiesMap[expected.Identifier] = expected
 	}
 
 	testMapMatchCount(t, entitiesMap, actualEntities, count)
@@ -740,7 +669,7 @@ func testIdentifiersMatchCount(t *testing.T, expectedIdentifiers flow.Identifier
 	require.Len(t, idMap, count)
 	actualCount := 0
 	for _, e := range actualEntities {
-		_, ok := idMap[e.ID()]
+		_, ok := idMap[e.Identifier]
 		if !ok {
 			continue
 		}
@@ -751,12 +680,12 @@ func testIdentifiersMatchCount(t *testing.T, expectedIdentifiers flow.Identifier
 
 // testRetrievableCount is a test helper that checks the number of retrievable entities from backdata exactly matches
 // the expectedCount.
-func testRetrievableCount(t *testing.T, bd *Cache, entities []*unittest.MockEntity, expectedCount uint64) {
+func testRetrievableCount(t *testing.T, bd *Cache[*unittest.MockEntity], entities []*unittest.MockEntity, expectedCount uint64) {
 	actualCount := 0
 
 	for i := range entities {
 		expected := entities[i]
-		actual, ok := bd.ByID(expected.ID())
+		actual, ok := bd.Get(expected.Identifier)
 		if !ok {
 			continue
 		}
