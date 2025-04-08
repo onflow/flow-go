@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/dgraph-io/badger/v2"
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/engine"
@@ -48,7 +47,9 @@ type FollowerState struct {
 	protocolState protocol.MutableProtocolState
 
 	// locks
-	indexingNewBlock *sync.Mutex
+	indexingNewBlock         *sync.Mutex
+	indexingFinalizedHeight  *sync.Mutex
+	indexingEpochFirstHeight *sync.Mutex
 }
 
 var _ protocol.FollowerState = (*FollowerState)(nil)
@@ -93,7 +94,9 @@ func NewFollowerState(
 			state.epoch.commits,
 		),
 
-		indexingNewBlock: &sync.Mutex{},
+		indexingNewBlock:         &sync.Mutex{},
+		indexingFinalizedHeight:  &sync.Mutex{},
+		indexingEpochFirstHeight: &sync.Mutex{},
 	}
 	return followerState, nil
 }
@@ -837,12 +840,12 @@ func (m *FollowerState) Finalize(ctx context.Context, blockID flow.Identifier) e
 	// this must be the case, as the `Finalize` method only finalizes one block
 	// at a time and hence the parent of `blockID` must already be finalized.
 	var finalized uint64
-	err = m.db.View(badgeroperation.RetrieveFinalizedHeight(&finalized))
+	err = operation.RetrieveFinalizedHeight(m.sdb.Reader(), &finalized)
 	if err != nil {
 		return fmt.Errorf("could not retrieve finalized height: %w", err)
 	}
 	var finalID flow.Identifier
-	err = m.db.View(badgeroperation.LookupBlockHeight(finalized, &finalID))
+	err = operation.LookupBlockHeight(m.sdb.Reader(), finalized, &finalID)
 	if err != nil {
 		return fmt.Errorf("could not retrieve final header: %w", err)
 	}
@@ -894,22 +897,23 @@ func (m *FollowerState) Finalize(ctx context.Context, blockID flow.Identifier) e
 	//   This value could actually stay the same if it has no seals in
 	//   its payload, in which case the parent's seal is the same.
 	// * set the epoch fallback flag, if it is triggered
-	err = badgeroperation.RetryOnConflict(m.db.Update, func(tx *badger.Txn) error {
-		err = badgeroperation.IndexBlockHeight(header.Height, blockID)(tx)
+	// err = badgeroperation.RetryOnConflict(m.db.Update, func(tx *badger.Txn) error {
+	err = m.sdb.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
+		err = operation.IndexBlockHeight(m.indexingFinalizedHeight, rw, header.Height, blockID)
 		if err != nil {
 			return fmt.Errorf("could not insert number mapping: %w", err)
 		}
-		err = badgeroperation.UpdateFinalizedHeight(header.Height)(tx)
+		err = operation.UpsertFinalizedHeight(rw.Writer(), header.Height)
 		if err != nil {
 			return fmt.Errorf("could not update finalized height: %w", err)
 		}
-		err = badgeroperation.UpdateSealedHeight(sealed.Height)(tx)
+		err = operation.UpsertSealedHeight(rw.Writer(), sealed.Height)
 		if err != nil {
 			return fmt.Errorf("could not update sealed height: %w", err)
 		}
 
 		if isFirstBlockOfEpoch(parentEpochState, finalizingEpochState) {
-			err = badgeroperation.InsertEpochFirstHeight(currentEpochSetup.Counter, header.Height)(tx)
+			err = operation.InsertEpochFirstHeight(m.indexingEpochFirstHeight, rw, currentEpochSetup.Counter, header.Height)
 			if err != nil {
 				return fmt.Errorf("could not insert epoch first block height: %w", err)
 			}
@@ -919,7 +923,7 @@ func (m *FollowerState) Finalize(ctx context.Context, blockID flow.Identifier) e
 		// guarantees that only a single, continuous execution fork is sealed. Here, we index for
 		// each block ID the ID of its _finalized_ seal.
 		for _, seal := range block.Payload.Seals {
-			err = badgeroperation.IndexFinalizedSealByBlockID(seal.BlockID, seal.ID())(tx)
+			err = operation.IndexFinalizedSealByBlockID(rw.Writer(), seal.BlockID, seal.ID())
 			if err != nil {
 				return fmt.Errorf("could not index the seal by the sealed block ID: %w", err)
 			}
@@ -928,7 +932,7 @@ func (m *FollowerState) Finalize(ctx context.Context, blockID flow.Identifier) e
 		if len(versionBeacons) > 0 {
 			// only index the last version beacon as that is the relevant one.
 			// TODO: The other version beacons can be used for validation.
-			err := badgeroperation.IndexVersionBeaconByHeight(versionBeacons[len(versionBeacons)-1])(tx)
+			err := operation.IndexVersionBeaconByHeight(rw.Writer(), versionBeacons[len(versionBeacons)-1])
 			if err != nil {
 				return fmt.Errorf("could not index version beacon or height (%d): %w", header.Height, err)
 			}
