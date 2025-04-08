@@ -3,6 +3,7 @@ package protocol_state
 import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/state/protocol"
+	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/storage/badger/transaction"
 )
 
@@ -22,6 +23,7 @@ type ProtocolKVStore interface {
 	// Expected errors of the returned anonymous function:
 	//   - storage.ErrAlreadyExists if a KV-store snapshot with the given id is already stored.
 	StoreTx(stateID flow.Identifier, kvStore protocol.KVStoreReader) func(*transaction.Tx) error
+	BatchStore(rw storage.ReaderBatchWriter, stateID flow.Identifier, kvStore protocol.KVStoreReader) error
 
 	// IndexTx returns an anonymous function intended to be executed as part of a database transaction.
 	// In a nutshell, we want to maintain a map from `blockID` to `stateID`, where `blockID` references the
@@ -37,6 +39,7 @@ type ProtocolKVStore interface {
 	// Expected errors of the returned anonymous function:
 	//   - storage.ErrAlreadyExists if a KV store for the given blockID has already been indexed.
 	IndexTx(blockID flow.Identifier, stateID flow.Identifier) func(*transaction.Tx) error
+	BatchIndex(rw storage.ReaderBatchWriter, blockID flow.Identifier, stateID flow.Identifier) error
 
 	// ByID retrieves the KV store snapshot with the given ID.
 	// Expected errors during normal operations:

@@ -217,6 +217,28 @@ func (s *MutableProtocolState) EvolveState(
 	return resultingStateID, dbUpdates, nil
 }
 
+func (s *MutableProtocolState) FollowerEvolveState(
+	parentBlockID flow.Identifier,
+	candidateView uint64,
+	candidateSeals []*flow.Seal,
+) (flow.Identifier, []storage.BlockIndexingBatchWrite, error) {
+	serviceEvents, err := s.serviceEventsFromSeals(candidateSeals)
+	if err != nil {
+		return flow.ZeroID, nil, fmt.Errorf("extracting service events from candidate seals failed: %w", err)
+	}
+
+	parentStateID, stateMachines, evolvingState, err := s.initializeOrthogonalStateMachines(parentBlockID, candidateView)
+	if err != nil {
+		return flow.ZeroID, nil, fmt.Errorf("failure initializing sub-state machines for evolving the Protocol State: %w", err)
+	}
+
+	resultingStateID, dbUpdates, err := s.build(parentStateID, stateMachines, serviceEvents, evolvingState)
+	if err != nil {
+		return flow.ZeroID, nil, fmt.Errorf("evolving and building the resulting Protocol State failed: %w", err)
+	}
+	return resultingStateID, dbUpdates, nil
+}
+
 // initializeOrthogonalStateMachines instantiates the sub-state machines that in aggregate evolve the protocol state.
 // In a nutshell, we proceed as follows:
 //  1. We retrieve the protocol state snapshot that the parent block committed to.
@@ -312,6 +334,47 @@ func (s *MutableProtocolState) serviceEventsFromSeals(candidateSeals []*flow.Sea
 //     on the candidate block's ID, which is still unknown at the time of block construction.
 //   - err: All error returns indicate potential state corruption and should therefore be treated as fatal.
 func (s *MutableProtocolState) build(
+	parentStateID flow.Identifier,
+	stateMachines []protocol_state.KeyValueStoreStateMachine,
+	serviceEvents []flow.ServiceEvent,
+	evolvingState protocol.KVStoreReader,
+) (flow.Identifier, []storage.BlockIndexingBatchWrite, error) {
+	for _, stateMachine := range stateMachines {
+		err := stateMachine.EvolveState(serviceEvents) // state machine should only bubble up exceptions
+		if err != nil {
+			return flow.ZeroID, nil, fmt.Errorf("exception from sub-state machine during state evolution: %w", err)
+		}
+	}
+
+	// _after_ all state machines have ingested the available information, we build the resulting overall state
+	dbUpdates := make([]storage.BlockIndexingBatchWrite, 0, len(stateMachines)+2)
+	for _, stateMachine := range stateMachines {
+		dbOps, err := stateMachine.BuildBatchOps()
+		if err != nil {
+			return flow.ZeroID, nil, fmt.Errorf("unexpected exception from sub-state machine while building its output state: %w", err)
+		}
+		dbUpdates = append(dbUpdates, dbOps)
+	}
+	resultingStateID := evolvingState.ID()
+
+	// We _always_ index the protocol state by the candidate block's ID. But only if the
+	// state actually changed, we add a database operation to persist it.
+	dbUpdates = append(dbUpdates, func(blockID flow.Identifier, rw storage.ReaderBatchWriter) error {
+		return s.kvStoreSnapshots.BatchIndex(rw, blockID, resultingStateID)
+	})
+
+	if parentStateID != resultingStateID {
+		// TODO(leo): update comment
+		// note that `SkipDuplicatesTx` is still required, because the result might equal to an earlier known state (we explicitly want to de-duplicate)
+		dbUpdates = append(dbUpdates, func(_ flow.Identifier, rw storage.ReaderBatchWriter) error {
+			return s.kvStoreSnapshots.BatchStore(rw, resultingStateID, evolvingState)
+		})
+	}
+
+	return resultingStateID, dbUpdates, nil
+}
+
+func (s *MutableProtocolState) followerBuild(
 	parentStateID flow.Identifier,
 	stateMachines []protocol_state.KeyValueStoreStateMachine,
 	serviceEvents []flow.ServiceEvent,
