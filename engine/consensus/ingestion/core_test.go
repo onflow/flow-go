@@ -308,7 +308,7 @@ func (suite *IngestionCoreSuite) TestOnGuaranteeEpochEnd() {
 	guarantee := suite.validGuarantee()
 
 	// the guarantee is not part of the memory pool
-	suite.pool.On("Has", guarantee.ID()).Return(false)
+	suite.pool.On("Has", guarantee.CollectionID).Return(false)
 	suite.pool.On("Add", guarantee.CollectionID, guarantee).Return(true).Once()
 
 	// submit the guarantee as if it was sent by the collection node which

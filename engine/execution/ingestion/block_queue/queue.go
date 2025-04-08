@@ -62,7 +62,7 @@ func (m *MissingCollection) ID() flow.Identifier {
 	}{
 		m.BlockID,
 		m.Height,
-		m.Guarantee.ID(),
+		m.Guarantee.CollectionID,
 	}
 	return flow.MakeID(stub)
 }
