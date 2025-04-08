@@ -382,13 +382,19 @@ func (c *Core) OnBlockFinalization() error {
 			lastSealed.ID(), lastSealed.Height, err)
 	}
 
-	c.log.Debug().
+	log := c.log.With().
 		Uint64("first_height_missing_result", firstMissingHeight).
 		Uint("seals_size", c.seals.Size()).
 		Uint("receipts_size", c.receipts.Size()).
 		Int("pending_receipt_requests", pendingReceiptRequests).
 		Int64("duration_ms", time.Since(startTime).Milliseconds()).
-		Msg("finalized block processed successfully")
+		Logger()
+	// this runs frequently, so we only log at info-level if there are pending requests
+	if pendingReceiptRequests > 0 {
+		log.Info().Msg("finalized block processed successfully")
+	} else {
+		log.Debug().Msg("finalized block processed successfully")
+	}
 
 	return nil
 }
