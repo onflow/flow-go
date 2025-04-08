@@ -63,6 +63,11 @@ func (b dbReader) NewIter(startPrefix, endPrefix []byte, ops storage.IteratorOpt
 	return newBadgerIterator(b.db, startPrefix, endPrefix, ops), nil
 }
 
+// NewSeeker returns a new Seeker.
+func (b dbReader) NewSeeker() storage.Seeker {
+	return newBadgerSeeker(b.db)
+}
+
 // ToReader is a helper function to convert a *badger.DB to a Reader
 func ToReader(db *badger.DB) storage.Reader {
 	return dbReader{db}
