@@ -4,20 +4,18 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/dgraph-io/badger/v2"
-
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/trace"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/storage"
-	"github.com/onflow/flow-go/storage/badger/operation"
+	"github.com/onflow/flow-go/storage/operation"
 )
 
 // Finalizer is a simple wrapper around our temporary state to clean up after a
 // block has been fully finalized to the persistent protocol state.
 type Finalizer struct {
-	db      *badger.DB
+	db      storage.DB
 	headers storage.Headers
 	state   protocol.FollowerState
 	cleanup CleanupFunc
@@ -25,7 +23,7 @@ type Finalizer struct {
 }
 
 // NewFinalizer creates a new finalizer for the temporary state.
-func NewFinalizer(db *badger.DB,
+func NewFinalizer(db storage.DB,
 	headers storage.Headers,
 	state protocol.FollowerState,
 	tracer module.Tracer,
@@ -61,8 +59,10 @@ func (f *Finalizer) MakeFinal(blockID flow.Identifier) error {
 	// one of two things: if it conflicts with the block already finalized at
 	// that height, it's an invalid operation. Otherwise, it is a no-op.
 
+	r := f.db.Reader()
+
 	var finalized uint64
-	err := f.db.View(operation.RetrieveFinalizedHeight(&finalized))
+	err := operation.RetrieveFinalizedHeight(r, &finalized)
 	if err != nil {
 		return fmt.Errorf("could not retrieve finalized height: %w", err)
 	}
@@ -89,7 +89,7 @@ func (f *Finalizer) MakeFinal(blockID flow.Identifier) error {
 	// back to the last finalized block, this is also an invalid call.
 
 	var finalID flow.Identifier
-	err = f.db.View(operation.LookupBlockHeight(finalized, &finalID))
+	err = operation.LookupBlockHeight(r, finalized, &finalID)
 	if err != nil {
 		return fmt.Errorf("could not retrieve finalized header: %w", err)
 	}

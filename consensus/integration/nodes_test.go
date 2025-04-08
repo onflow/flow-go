@@ -519,7 +519,7 @@ func createNode(
 	protocolStateEvents.AddConsumer(committee)
 
 	// initialize the block finalizer
-	final := finalizer.NewFinalizer(db, headersDB, fullState, trace.NewNoopTracer())
+	final := finalizer.NewFinalizer(badgerimpl.ToDB(db), headersDB, fullState, trace.NewNoopTracer())
 
 	syncCore, err := synccore.New(log, synccore.DefaultConfig(), metricsCollector, rootHeader.ChainID)
 	require.NoError(t, err)
