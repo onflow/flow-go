@@ -3,6 +3,7 @@ package flow_test
 import (
 	"encoding/json"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -11,6 +12,18 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/utils/unittest"
 )
+
+func TestBlockID_Malleability(t *testing.T) {
+	block := unittest.FullBlockFixture()
+	block.SetPayload(unittest.PayloadFixture(unittest.WithAllTheFixins))
+	unittest.RequireEntityNonMalleable(t, &block,
+		unittest.WithFieldGenerator("Header.Timestamp", func() time.Time { return time.Now().UTC() }),
+		unittest.WithFieldGenerator("Payload", func() flow.Payload {
+			payload := unittest.PayloadFixture(unittest.WithAllTheFixins)
+			block.SetPayload(payload)
+			return payload
+		}))
+}
 
 func TestGenesisEncodingJSON(t *testing.T) {
 	genesis := flow.Genesis(flow.Mainnet)
