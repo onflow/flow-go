@@ -478,15 +478,25 @@ func (s TransactionSignature) Fingerprint() []byte {
 	return fingerprint.Fingerprint(s.canonicalForm())
 }
 
+// checks if the scheme is plain authentication scheme.
+// While the expectation is that s.Info == []byte{0} if it is not nil,
+// We don't check it here, as this is simply checking if the scheme is plain,
+// and not the validity of the info field
+func (s TransactionSignature) isPlainAuthenticationScheme() bool {
+	// len check covers nil case
+	return len(s.Info) == 0 || s.Info[0] == 0
+}
+
 func (s TransactionSignature) canonicalForm() interface{} {
-	if s.Info == nil {
+	// int is not RLP-serializable, therefore s.SignerIndex and s.KeyIndex are converted to uint
+	if s.isPlainAuthenticationScheme() {
 		return struct {
 			SignerIndex uint
 			KeyID       uint
 			Signature   []byte
 		}{
-			SignerIndex: uint(s.SignerIndex), // int is not RLP-serializable
-			KeyID:       uint(s.KeyIndex),    // int is not RLP-serializable
+			SignerIndex: uint(s.SignerIndex),
+			KeyID:       uint(s.KeyIndex),
 			Signature:   s.Signature,
 		}
 	}
@@ -496,8 +506,8 @@ func (s TransactionSignature) canonicalForm() interface{} {
 		Signature   []byte
 		Info        []byte
 	}{
-		SignerIndex: uint(s.SignerIndex), // int is not RLP-serializable
-		KeyID:       uint(s.KeyIndex),    // int is not RLP-serializable
+		SignerIndex: uint(s.SignerIndex),
+		KeyID:       uint(s.KeyIndex),
 		Signature:   s.Signature,
 		Info:        s.Info,
 	}
