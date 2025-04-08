@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"sync"
 
+	"github.com/dgraph-io/badger/v2"
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/engine"
@@ -58,6 +59,7 @@ var _ protocol.FollowerState = (*FollowerState)(nil)
 // state with a new block, by checking the _entire_ block payload.
 type ParticipantState struct {
 	*FollowerState
+	db               *badger.DB
 	receiptValidator module.ReceiptValidator
 	sealValidator    module.SealValidator
 }
@@ -109,6 +111,7 @@ func NewFullConsensusState(
 	logger zerolog.Logger,
 	tracer module.Tracer,
 	consumer protocol.Consumer,
+	db *badger.DB,
 	state *State,
 	index storage.Index,
 	payloads storage.Payloads,
@@ -130,6 +133,7 @@ func NewFullConsensusState(
 	}
 	return &ParticipantState{
 		FollowerState:    followerState,
+		db:               db,
 		receiptValidator: receiptValidator,
 		sealValidator:    sealValidator,
 	}, nil

@@ -33,7 +33,6 @@ type cachedLatest struct {
 
 type State struct {
 	metrics module.ComplianceMetrics
-	db      *badger.DB
 	sdb     storage.DB
 	headers storage.Headers
 	blocks  storage.Blocks
@@ -789,7 +788,6 @@ func newState(
 ) (*State, error) {
 	state := &State{
 		metrics: metrics,
-		db:      db,
 		// TODO (leo): to replace db field
 		sdb:     badgerimpl.ToDB(db),
 		headers: headers,

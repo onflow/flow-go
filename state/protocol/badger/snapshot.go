@@ -4,8 +4,6 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/dgraph-io/badger/v2"
-
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
@@ -15,8 +13,8 @@ import (
 	"github.com/onflow/flow-go/state/protocol/inmem"
 	"github.com/onflow/flow-go/state/protocol/protocol_state/kvstore"
 	"github.com/onflow/flow-go/storage"
-	"github.com/onflow/flow-go/storage/badger/operation"
-	"github.com/onflow/flow-go/storage/badger/procedure"
+	"github.com/onflow/flow-go/storage/operation"
+	"github.com/onflow/flow-go/storage/procedure"
 )
 
 // Snapshot implements the protocol.Snapshot interface.
@@ -301,7 +299,7 @@ func (s *Snapshot) Descendants() ([]flow.Identifier, error) {
 
 func (s *Snapshot) lookupChildren(blockID flow.Identifier) ([]flow.Identifier, error) {
 	var children flow.IdentifierList
-	err := s.state.db.View(procedure.LookupBlockChildren(blockID, &children))
+	err := procedure.LookupBlockChildren(s.state.sdb.Reader(), blockID, &children)
 	if err != nil {
 		return nil, fmt.Errorf("could not get children of block %v: %w", blockID, err)
 	}
@@ -542,34 +540,33 @@ func (q *EpochQuery) retrieveEpochHeightBounds(epoch uint64) (
 	isFirstHeightKnown, isLastHeightKnown bool,
 	err error,
 ) {
-	err = q.snap.state.db.View(func(tx *badger.Txn) error {
-		// Retrieve the epoch's first height
-		err = operation.RetrieveEpochFirstHeight(epoch, &firstHeight)(tx)
-		if err != nil {
-			if errors.Is(err, storage.ErrNotFound) {
-				isFirstHeightKnown = false // unknown boundary
-			} else {
-				return err // unexpected error
-			}
+
+	r := q.snap.state.sdb.Reader()
+	// Retrieve the epoch's first height
+	err = operation.RetrieveEpochFirstHeight(r, epoch, &firstHeight)
+	if err != nil {
+		if errors.Is(err, storage.ErrNotFound) {
+			isFirstHeightKnown = false // unknown boundary
 		} else {
-			isFirstHeightKnown = true // known boundary
+			return 0, 0, false, false, err // unexpected error
 		}
+	} else {
+		isFirstHeightKnown = true // known boundary
+	}
 
-		var subsequentEpochFirstHeight uint64
-		err = operation.RetrieveEpochFirstHeight(epoch+1, &subsequentEpochFirstHeight)(tx)
-		if err != nil {
-			if errors.Is(err, storage.ErrNotFound) {
-				isLastHeightKnown = false // unknown boundary
-			} else {
-				return err // unexpected error
-			}
-		} else { // known boundary
-			isLastHeightKnown = true
-			finalHeight = subsequentEpochFirstHeight - 1
+	var subsequentEpochFirstHeight uint64
+	err = operation.RetrieveEpochFirstHeight(r, epoch+1, &subsequentEpochFirstHeight)
+	if err != nil {
+		if errors.Is(err, storage.ErrNotFound) {
+			isLastHeightKnown = false // unknown boundary
+		} else {
+			return 0, 0, false, false, err // unexpected error
 		}
+	} else { // known boundary
+		isLastHeightKnown = true
+		finalHeight = subsequentEpochFirstHeight - 1
+	}
 
-		return nil
-	})
 	if err != nil {
 		return 0, 0, false, false, err
 	}

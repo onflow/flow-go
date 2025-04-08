@@ -291,6 +291,7 @@ func main() {
 				node.Logger,
 				node.Tracer,
 				node.ProtocolEvents,
+				node.DB,
 				state,
 				node.Storage.Index,
 				node.Storage.Payloads,
