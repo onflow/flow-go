@@ -1,6 +1,7 @@
 package store_test
 
 import (
+	"sync"
 	"testing"
 
 	"github.com/onflow/flow-go/storage/operation"
@@ -26,8 +27,9 @@ func TestHeaderStoreRetrieve(t *testing.T) {
 		require.NoError(t, err)
 
 		// index the header
+		indexing := &sync.Mutex{}
 		err = db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-			return operation.UnsafeIndexBlockHeight(rw.Writer(), block.Header.Height, block.ID())
+			return operation.IndexBlockHeight(indexing, rw, block.Header.Height, block.ID())
 		})
 		require.NoError(t, err)
 
