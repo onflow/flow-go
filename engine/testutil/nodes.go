@@ -920,7 +920,7 @@ func createFollowerCore(
 	rootHead *flow.Header,
 	rootQC *flow.QuorumCertificate,
 ) (module.HotStuffFollower, *confinalizer.Finalizer) {
-	finalizer := confinalizer.NewFinalizer(node.PublicDB, node.Headers, followerState, trace.NewNoopTracer())
+	finalizer := confinalizer.NewFinalizer(badgerimpl.ToDB(node.PublicDB), node.Headers, followerState, trace.NewNoopTracer())
 
 	pending := make([]*flow.Header, 0)
 

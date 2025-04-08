@@ -585,7 +585,7 @@ func main() {
 		Component("hotstuff modules", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 			// initialize the block finalizer
 			finalize := finalizer.NewFinalizer(
-				node.DB,
+				node.ProtocolDB,
 				node.Storage.Headers,
 				mutableState,
 				node.Tracer,

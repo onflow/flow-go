@@ -16,6 +16,7 @@ import (
 	storage "github.com/onflow/flow-go/storage/badger"
 	"github.com/onflow/flow-go/storage/badger/operation"
 	mockstor "github.com/onflow/flow-go/storage/mock"
+	"github.com/onflow/flow-go/storage/operation/badgerimpl"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -31,7 +32,7 @@ func TestNewFinalizer(t *testing.T) {
 		headers := &mockstor.Headers{}
 		state := &mockprot.FollowerState{}
 		tracer := trace.NewNoopTracer()
-		fin := NewFinalizer(db, headers, state, tracer)
+		fin := NewFinalizer(badgerimpl.ToDB(db), headers, state, tracer)
 		assert.Equal(t, fin.db, db)
 		assert.Equal(t, fin.headers, headers)
 		assert.Equal(t, fin.state, state)
