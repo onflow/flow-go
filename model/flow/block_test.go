@@ -16,13 +16,44 @@ import (
 func TestBlockID_Malleability(t *testing.T) {
 	block := unittest.FullBlockFixture()
 	block.SetPayload(unittest.PayloadFixture(unittest.WithAllTheFixins))
+	receiptGenerator := func() (receipts flow.ExecutionReceiptMetaList, results flow.ExecutionResultList) {
+		receipt := unittest.ExecutionReceiptFixture(
+			unittest.WithResult(unittest.ExecutionResultFixture(unittest.WithServiceEvents(3))),
+			unittest.WithSpocks(unittest.SignaturesFixture(3)),
+		)
+		receipts = flow.ExecutionReceiptMetaList{receipt.Meta()}
+		results = flow.ExecutionResultList{&receipt.ExecutionResult}
+		return receipts, results
+	}
 	unittest.RequireEntityNonMalleable(t, &block,
 		unittest.WithFieldGenerator("Header.Timestamp", func() time.Time { return time.Now().UTC() }),
-		unittest.WithFieldGenerator("Payload", func() flow.Payload {
-			payload := unittest.PayloadFixture(unittest.WithAllTheFixins)
-			block.SetPayload(payload)
-			return payload
-		}))
+		unittest.WithFieldGenerator("Payload.Seals", func() []*flow.Seal {
+			block.Payload.Seals = unittest.Seal.Fixtures(3)
+			block.SetPayload(*block.Payload)
+			return block.Payload.Seals
+		}),
+		unittest.WithFieldGenerator("Payload.Guarantees", func() []*flow.CollectionGuarantee {
+			block.Payload.Guarantees = unittest.CollectionGuaranteesFixture(4)
+			block.SetPayload(*block.Payload)
+			return block.Payload.Guarantees
+		}),
+		unittest.WithFieldGenerator("Payload.Receipts", func() flow.ExecutionReceiptMetaList {
+			block.Payload.Receipts, _ = receiptGenerator()
+			block.SetPayload(*block.Payload)
+			return block.Payload.Receipts
+		}),
+		unittest.WithFieldGenerator("Payload.Results", func() flow.ExecutionResultList {
+			_, block.Payload.Results = receiptGenerator()
+			block.SetPayload(*block.Payload)
+			return block.Payload.Results
+		}),
+		unittest.WithFieldGenerator("Payload.ProtocolStateID", func() flow.Identifier {
+			id := unittest.IdentifierFixture()
+			block.Payload.ProtocolStateID = id
+			block.SetPayload(*block.Payload)
+			return id
+		}),
+	)
 }
 
 func TestGenesisEncodingJSON(t *testing.T) {
