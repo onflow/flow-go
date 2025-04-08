@@ -206,24 +206,14 @@ func FindHighestAtOrBelowByPrefix(r storage.Reader, prefix []byte, height uint64
 	}
 
 	key := append(prefix, EncodeKeyPart(height)...)
-	it, err := r.NewIter(prefix, key, storage.DefaultIteratorOptions())
+
+	seeker := r.NewSeeker()
+
+	highestKey, found, err := seeker.SeekLE(prefix, key, key)
 	if err != nil {
-		return fmt.Errorf("can not create iterator: %w", err)
+		return fmt.Errorf("can not seek height %d: %w", height, err)
 	}
-	defer func() {
-		errToReturn = merr.CloseAndMergeError(it, errToReturn)
-	}()
-
-	var highestKey []byte
-
-	// find highest value below the given height
-	for it.First(); it.Valid(); it.Next() {
-		// copy the key to avoid the underlying slices of the key
-		// being modified by the Next() call
-		highestKey = it.IterItem().KeyCopy(highestKey)
-	}
-
-	if len(highestKey) == 0 {
+	if !found {
 		return storage.ErrNotFound
 	}
 
