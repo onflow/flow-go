@@ -257,6 +257,7 @@ func CompleteStateFixture(
 		log,
 		tracer,
 		consumer,
+		db,
 		state,
 		s.Index,
 		s.Payloads,

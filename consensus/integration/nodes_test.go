@@ -425,6 +425,7 @@ func createNode(
 		log,
 		tracer,
 		protocolStateEvents,
+		db,
 		state,
 		indexDB,
 		payloadsDB,
