@@ -18,7 +18,7 @@ func TestSealInsertCheckRetrieve(t *testing.T) {
 		expected := unittest.Seal.Fixture()
 
 		err := db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-			return operation.InsertSeal(rw.Writer(), expected)
+			return operation.InsertSeal(rw.Writer(), expected.ID(), expected)
 		})
 		require.NoError(t, err)
 
@@ -43,7 +43,7 @@ func TestSealIndexAndLookup(t *testing.T) {
 
 		err := db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 			for _, seal := range seals {
-				if err := operation.InsertSeal(rw.Writer(), seal); err != nil {
+				if err := operation.InsertSeal(rw.Writer(), seal.ID(), seal); err != nil {
 					return err
 				}
 			}
