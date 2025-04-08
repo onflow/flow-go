@@ -317,7 +317,7 @@ func (c *Core) processBlockProposal(proposal *cluster.Block) error {
 		Hex("proposer", header.ProposerID[:]).
 		Hex("parent_signer_indices", header.ParentVoterIndices).
 		Logger()
-	log.Info().Msg("processing block proposal")
+	log.Debug().Msg("processing block proposal")
 
 	hotstuffProposal := model.SignedProposalFromFlow(header)
 	err := c.validator.ValidateProposal(hotstuffProposal)
