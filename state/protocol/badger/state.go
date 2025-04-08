@@ -16,8 +16,9 @@ import (
 	"github.com/onflow/flow-go/state/protocol/invalid"
 	protocol_state "github.com/onflow/flow-go/state/protocol/protocol_state/state"
 	"github.com/onflow/flow-go/storage"
-	"github.com/onflow/flow-go/storage/badger/operation"
+	badgeroperation "github.com/onflow/flow-go/storage/badger/operation"
 	"github.com/onflow/flow-go/storage/badger/transaction"
+	"github.com/onflow/flow-go/storage/operation"
 	"github.com/onflow/flow-go/storage/operation/badgerimpl"
 )
 
@@ -132,7 +133,7 @@ func Bootstrap(
 		return nil, fmt.Errorf("could not get sealed result for sealing segment: %w", err)
 	}
 
-	err = operation.RetryOnConflictTx(db, transaction.Update, func(tx *transaction.Tx) error {
+	err = badgeroperation.RetryOnConflictTx(db, transaction.Update, func(tx *transaction.Tx) error {
 		// sealing segment is in ascending height order, so the tail is the
 		// oldest ancestor and head is the newest child in the segment
 		// TAIL <- ... <- HEAD
@@ -247,7 +248,7 @@ func bootstrapProtocolState(
 		// The sealing segment contains a protocol state entry for every block in the segment, including the root block.
 		for protocolStateID, stateEntry := range segment.ProtocolStateEntries {
 			// Store the protocol KV Store entry
-			err := operation.SkipDuplicatesTx(protocolKVStoreSnapshots.StoreTx(protocolStateID, &stateEntry.KVStore))(tx)
+			err := badgeroperation.SkipDuplicatesTx(protocolKVStoreSnapshots.StoreTx(protocolStateID, &stateEntry.KVStore))(tx)
 			if err != nil {
 				return fmt.Errorf("could not store protocol state kvstore: %w", err)
 			}
@@ -289,11 +290,11 @@ func bootstrapSealingSegment(
 	return func(tx *transaction.Tx) error {
 		txn := tx.DBTxn // tx is just a wrapper around a badger transaction with the additional ability to register callbacks that are executed after the badger transaction completed _successfully_
 		for _, result := range segment.ExecutionResults {
-			err := operation.SkipDuplicates(operation.InsertExecutionResult(result))(txn)
+			err := badgeroperation.SkipDuplicates(badgeroperation.InsertExecutionResult(result))(txn)
 			if err != nil {
 				return fmt.Errorf("could not insert execution result: %w", err)
 			}
-			err = operation.IndexExecutionResult(result.BlockID, result.ID())(txn)
+			err = badgeroperation.IndexExecutionResult(result.BlockID, result.ID())(txn)
 			if err != nil {
 				return fmt.Errorf("could not index execution result: %w", err)
 			}
@@ -301,7 +302,7 @@ func bootstrapSealingSegment(
 
 		// insert the first seal (in case the segment's first block contains no seal)
 		if segment.FirstSeal != nil {
-			err := operation.InsertSeal(segment.FirstSeal.ID(), segment.FirstSeal)(txn)
+			err := badgeroperation.InsertSeal(segment.FirstSeal.ID(), segment.FirstSeal)(txn)
 			if err != nil {
 				return fmt.Errorf("could not insert first seal: %w", err)
 			}
@@ -311,7 +312,7 @@ func bootstrapSealingSegment(
 		// different from the finalized root block, then it means the node dynamically bootstrapped.
 		// In that case, we should index the result of the sealed root block so that the EN is able
 		// to execute the next block.
-		err := operation.SkipDuplicates(operation.IndexExecutionResult(rootSeal.BlockID, rootSeal.ResultID))(txn)
+		err := badgeroperation.SkipDuplicates(badgeroperation.IndexExecutionResult(rootSeal.BlockID, rootSeal.ResultID))(txn)
 		if err != nil {
 			return fmt.Errorf("could not index root result: %w", err)
 		}
@@ -323,7 +324,7 @@ func bootstrapSealingSegment(
 			if err != nil {
 				return fmt.Errorf("could not insert SealingSegment extra block: %w", err)
 			}
-			err = operation.IndexBlockHeight(height, blockID)(txn)
+			err = badgeroperation.IndexBlockHeight(height, blockID)(txn)
 			if err != nil {
 				return fmt.Errorf("could not index SealingSegment extra block (id=%x): %w", blockID, err)
 			}
@@ -341,7 +342,7 @@ func bootstrapSealingSegment(
 			if err != nil {
 				return fmt.Errorf("could not insert SealingSegment block: %w", err)
 			}
-			err = operation.IndexBlockHeight(height, blockID)(txn)
+			err = badgeroperation.IndexBlockHeight(height, blockID)(txn)
 			if err != nil {
 				return fmt.Errorf("could not index SealingSegment block (id=%x): %w", blockID, err)
 			}
@@ -357,18 +358,18 @@ func bootstrapSealingSegment(
 			}
 			// sanity check: make sure the seal exists
 			var latestSeal flow.Seal
-			err = operation.RetrieveSeal(latestSealID, &latestSeal)(txn)
+			err = badgeroperation.RetrieveSeal(latestSealID, &latestSeal)(txn)
 			if err != nil {
 				return fmt.Errorf("could not verify latest seal for block (id=%x) exists: %w", blockID, err)
 			}
-			err = operation.IndexLatestSealAtBlock(blockID, latestSealID)(txn)
+			err = badgeroperation.IndexLatestSealAtBlock(blockID, latestSealID)(txn)
 			if err != nil {
 				return fmt.Errorf("could not index block seal: %w", err)
 			}
 
 			// for all but the first block in the segment, index the parent->child relationship
 			if i > 0 {
-				err = operation.InsertBlockChildren(block.Header.ParentID, []flow.Identifier{blockID})(txn)
+				err = badgeroperation.InsertBlockChildren(block.Header.ParentID, []flow.Identifier{blockID})(txn)
 				if err != nil {
 					return fmt.Errorf("could not insert child index for block (id=%x): %w", blockID, err)
 				}
@@ -376,7 +377,7 @@ func bootstrapSealingSegment(
 		}
 
 		// insert an empty child index for the final block in the segment
-		err = operation.InsertBlockChildren(head.ID(), nil)(txn)
+		err = badgeroperation.InsertBlockChildren(head.ID(), nil)(txn)
 		if err != nil {
 			return fmt.Errorf("could not insert child index for head block (id=%x): %w", head.ID(), err)
 		}
@@ -434,34 +435,34 @@ func bootstrapStatePointers(root protocol.Snapshot) func(*transaction.Tx) error 
 
 		bdtx := tx.DBTxn // tx is just a wrapper around a badger transaction with the additional ability to register callbacks that are executed after the badger transaction completed _successfully_
 		// insert initial views for HotStuff
-		err = operation.InsertSafetyData(highest.Header.ChainID, safetyData)(bdtx)
+		err = badgeroperation.InsertSafetyData(highest.Header.ChainID, safetyData)(bdtx)
 		if err != nil {
 			return fmt.Errorf("could not insert safety data: %w", err)
 		}
-		err = operation.InsertLivenessData(highest.Header.ChainID, livenessData)(bdtx)
+		err = badgeroperation.InsertLivenessData(highest.Header.ChainID, livenessData)(bdtx)
 		if err != nil {
 			return fmt.Errorf("could not insert liveness data: %w", err)
 		}
 
 		// insert height pointers
-		err = operation.InsertRootHeight(highest.Header.Height)(bdtx)
+		err = badgeroperation.InsertRootHeight(highest.Header.Height)(bdtx)
 		if err != nil {
 			return fmt.Errorf("could not insert finalized root height: %w", err)
 		}
 		// the sealed root height is the lowest block in sealing segment
-		err = operation.InsertSealedRootHeight(lowest.Header.Height)(bdtx)
+		err = badgeroperation.InsertSealedRootHeight(lowest.Header.Height)(bdtx)
 		if err != nil {
 			return fmt.Errorf("could not insert sealed root height: %w", err)
 		}
-		err = operation.InsertFinalizedHeight(highest.Header.Height)(bdtx)
+		err = badgeroperation.InsertFinalizedHeight(highest.Header.Height)(bdtx)
 		if err != nil {
 			return fmt.Errorf("could not insert finalized height: %w", err)
 		}
-		err = operation.InsertSealedHeight(lowest.Header.Height)(bdtx)
+		err = badgeroperation.InsertSealedHeight(lowest.Header.Height)(bdtx)
 		if err != nil {
 			return fmt.Errorf("could not insert sealed height: %w", err)
 		}
-		err = operation.IndexFinalizedSealByBlockID(seal.BlockID, seal.ID())(bdtx)
+		err = badgeroperation.IndexFinalizedSealByBlockID(seal.BlockID, seal.ID())(bdtx)
 		if err != nil {
 			return fmt.Errorf("could not index sealed block: %w", err)
 		}
@@ -562,7 +563,7 @@ func bootstrapEpochForProtocolStateEntry(
 		}
 
 		// insert epoch protocol state entry, which references above service events
-		err := operation.SkipDuplicatesTx(epochProtocolStateSnapshots.StoreTx(richEntry.ID(), richEntry.MinEpochStateEntry))(tx)
+		err := badgeroperation.SkipDuplicatesTx(epochProtocolStateSnapshots.StoreTx(richEntry.ID(), richEntry.MinEpochStateEntry))(tx)
 		if err != nil {
 			return fmt.Errorf("could not store epoch protocol state entry: %w", err)
 		}
@@ -578,13 +579,13 @@ func bootstrapSporkInfo(root protocol.Snapshot) func(*transaction.Tx) error {
 
 		params := root.Params()
 		sporkID := params.SporkID()
-		err := operation.InsertSporkID(sporkID)(bdtx)
+		err := badgeroperation.InsertSporkID(sporkID)(bdtx)
 		if err != nil {
 			return fmt.Errorf("could not insert spork ID: %w", err)
 		}
 
 		sporkRootBlockHeight := params.SporkRootBlockHeight()
-		err = operation.InsertSporkRootBlockHeight(sporkRootBlockHeight)(bdtx)
+		err = badgeroperation.InsertSporkRootBlockHeight(sporkRootBlockHeight)(bdtx)
 		if err != nil {
 			return fmt.Errorf("could not insert spork root block height: %w", err)
 		}
@@ -604,7 +605,7 @@ func indexEpochHeights(segment *flow.SealingSegment) func(*badger.Txn) error {
 		if segment.IsSporkRoot() {
 			counter := segment.LatestProtocolStateEntry().EpochEntry.EpochCounter()
 			firstHeight := segment.Highest().Header.Height
-			err := operation.InsertEpochFirstHeight(counter, firstHeight)(tx)
+			err := badgeroperation.InsertEpochFirstHeight(counter, firstHeight)(tx)
 			if err != nil {
 				return fmt.Errorf("could not index first height %d for epoch %d: %w", firstHeight, counter, err)
 			}
@@ -622,7 +623,7 @@ func indexEpochHeights(segment *flow.SealingSegment) func(*badger.Txn) error {
 			thisBlockEpochCounter := segment.ProtocolStateEntries[block.Payload.ProtocolStateID].EpochEntry.EpochCounter()
 			if lastBlockEpochCounter != thisBlockEpochCounter {
 				firstHeight := block.Header.Height
-				err := operation.InsertEpochFirstHeight(thisBlockEpochCounter, firstHeight)(tx)
+				err := badgeroperation.InsertEpochFirstHeight(thisBlockEpochCounter, firstHeight)(tx)
 				if err != nil {
 					return fmt.Errorf("could not index first height %d for epoch %d: %w", firstHeight, thisBlockEpochCounter, err)
 				}
@@ -827,7 +828,7 @@ func newState(
 // IsBootstrapped returns whether the database contains a bootstrapped state
 func IsBootstrapped(db *badger.DB) (bool, error) {
 	var finalized uint64
-	err := db.View(operation.RetrieveFinalizedHeight(&finalized))
+	err := db.View(badgeroperation.RetrieveFinalizedHeight(&finalized))
 	if errors.Is(err, storage.ErrNotFound) {
 		return false, nil
 	}
@@ -872,7 +873,7 @@ func boostrapVersionBeacon(snapshot protocol.Snapshot) func(*transaction.Tx) err
 		if versionBeacon == nil {
 			return nil
 		}
-		return operation.IndexVersionBeaconByHeight(versionBeacon)(tx.DBTxn)
+		return badgeroperation.IndexVersionBeaconByHeight(versionBeacon)(tx.DBTxn)
 	}
 }
 
@@ -881,47 +882,41 @@ func boostrapVersionBeacon(snapshot protocol.Snapshot) func(*transaction.Tx) err
 // No errors expected during normal operations.
 func (state *State) populateCache() error {
 	// cache the initial value for finalized block
-	err := state.db.View(func(tx *badger.Txn) error {
-		// finalized header
-		var finalizedHeight uint64
-		err := operation.RetrieveFinalizedHeight(&finalizedHeight)(tx)
-		if err != nil {
-			return fmt.Errorf("could not lookup finalized height: %w", err)
-		}
-		var cachedLatest cachedLatest
-		err = operation.LookupBlockHeight(finalizedHeight, &cachedLatest.finalizedID)(tx)
-		if err != nil {
-			return fmt.Errorf("could not lookup finalized id (height=%d): %w", finalizedHeight, err)
-		}
-		cachedLatest.finalizedHeader, err = state.headers.ByBlockID(cachedLatest.finalizedID)
-		if err != nil {
-			return fmt.Errorf("could not get finalized block (id=%x): %w", cachedLatest.finalizedID, err)
-		}
-		// sealed header
-		var sealedHeight uint64
-		err = operation.RetrieveSealedHeight(&sealedHeight)(tx)
-		if err != nil {
-			return fmt.Errorf("could not lookup sealed height: %w", err)
-		}
-		err = operation.LookupBlockHeight(sealedHeight, &cachedLatest.sealedID)(tx)
-		if err != nil {
-			return fmt.Errorf("could not lookup sealed id (height=%d): %w", sealedHeight, err)
-		}
-		cachedLatest.sealedHeader, err = state.headers.ByBlockID(cachedLatest.sealedID)
-		if err != nil {
-			return fmt.Errorf("could not get sealed block (id=%x): %w", cachedLatest.sealedID, err)
-		}
-		state.cachedLatest.Store(&cachedLatest)
-
-		state.finalizedRootHeight = state.Params().FinalizedRoot().Height
-		state.sealedRootHeight = state.Params().SealedRoot().Height
-		state.sporkRootBlockHeight = state.Params().SporkRootBlockHeight()
-
-		return nil
-	})
+	// finalized header
+	r := state.sdb.Reader()
+	var finalizedHeight uint64
+	err := operation.RetrieveFinalizedHeight(r, &finalizedHeight)
 	if err != nil {
-		return fmt.Errorf("could not cache finalized header: %w", err)
+		return fmt.Errorf("could not lookup finalized height: %w", err)
 	}
+	var cachedLatest cachedLatest
+	err = operation.LookupBlockHeight(r, finalizedHeight, &cachedLatest.finalizedID)
+	if err != nil {
+		return fmt.Errorf("could not lookup finalized id (height=%d): %w", finalizedHeight, err)
+	}
+	cachedLatest.finalizedHeader, err = state.headers.ByBlockID(cachedLatest.finalizedID)
+	if err != nil {
+		return fmt.Errorf("could not get finalized block (id=%x): %w", cachedLatest.finalizedID, err)
+	}
+	// sealed header
+	var sealedHeight uint64
+	err = operation.RetrieveSealedHeight(r, &sealedHeight)
+	if err != nil {
+		return fmt.Errorf("could not lookup sealed height: %w", err)
+	}
+	err = operation.LookupBlockHeight(r, sealedHeight, &cachedLatest.sealedID)
+	if err != nil {
+		return fmt.Errorf("could not lookup sealed id (height=%d): %w", sealedHeight, err)
+	}
+	cachedLatest.sealedHeader, err = state.headers.ByBlockID(cachedLatest.sealedID)
+	if err != nil {
+		return fmt.Errorf("could not get sealed block (id=%x): %w", cachedLatest.sealedID, err)
+	}
+	state.cachedLatest.Store(&cachedLatest)
+
+	state.finalizedRootHeight = state.Params().FinalizedRoot().Height
+	state.sealedRootHeight = state.Params().SealedRoot().Height
+	state.sporkRootBlockHeight = state.Params().SporkRootBlockHeight()
 
 	return nil
 }
