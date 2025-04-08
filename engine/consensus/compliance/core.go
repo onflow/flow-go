@@ -363,7 +363,7 @@ func (c *Core) processBlockProposal(proposal *flow.Block) error {
 		Hex("proposer", header.ProposerID[:]).
 		Hex("parent_signer_indices", header.ParentVoterIndices).
 		Logger()
-	log.Info().Msg("processing block proposal")
+	log.Debug().Msg("processing block proposal")
 
 	// see if the block is a valid extension of the protocol state
 	block := &flow.Block{
