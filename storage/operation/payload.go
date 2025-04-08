@@ -5,8 +5,8 @@ import (
 	"github.com/onflow/flow-go/storage"
 )
 
-func InsertSeal(w storage.Writer, seal *flow.Seal) error {
-	return UpsertByKey(w, MakePrefix(codeSeal, seal.ID()), seal)
+func InsertSeal(w storage.Writer, sealID flow.Identifier, seal *flow.Seal) error {
+	return UpsertByKey(w, MakePrefix(codeSeal, sealID), seal)
 }
 
 func RetrieveSeal(r storage.Reader, sealID flow.Identifier, seal *flow.Seal) error {
