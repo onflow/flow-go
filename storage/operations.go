@@ -68,6 +68,15 @@ func DefaultIteratorOptions() IteratorOption {
 	}
 }
 
+// Seeker is an interface for seeking keys in a given range.
+type Seeker interface {
+	// SeekLE (seek less than or equal) returns given key if present.  Otherwise,
+	// it returns the largest key that is less than the given key within startPrefix
+	// and endPrefix.  Keys are ordered in lexicographical order.
+	// This function returns error if given key is outside range of startPrefix and endPrefix.
+	SeekLE(startPrefix, endPrefix []byte, key []byte) ([]byte, bool, error)
+}
+
 type Reader interface {
 	// Get gets the value for the given key. It returns ErrNotFound if the DB
 	// does not contain the key.
@@ -86,6 +95,9 @@ type Reader interface {
 	//   - have a prefix equal to the endPrefix OR
 	//   - have a prefix that is lexicographically between startPrefix and endPrefix
 	NewIter(startPrefix, endPrefix []byte, ops IteratorOption) (Iterator, error)
+
+	// NewSeeker returns a new Seeker.
+	NewSeeker() Seeker
 }
 
 // Writer is an interface for batch writing to a storage backend.
