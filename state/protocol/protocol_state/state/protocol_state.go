@@ -210,7 +210,7 @@ func (s *MutableProtocolState) EvolveState(
 		return flow.ZeroID, nil, fmt.Errorf("failure initializing sub-state machines for evolving the Protocol State: %w", err)
 	}
 
-	resultingStateID, dbUpdates, err := s.build(parentStateID, stateMachines, serviceEvents, evolvingState)
+	resultingStateID, dbUpdates, err := s.followerBuild(parentStateID, stateMachines, serviceEvents, evolvingState)
 	if err != nil {
 		return flow.ZeroID, nil, fmt.Errorf("evolving and building the resulting Protocol State failed: %w", err)
 	}
