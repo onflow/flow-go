@@ -2,6 +2,8 @@ package storage
 
 import (
 	"io"
+
+	"github.com/onflow/flow-go/model/flow"
 )
 
 // Iterator is an interface for iterating over key-value pairs in a storage backend.
@@ -237,3 +239,5 @@ func PrefixUpperBound(prefix []byte) []byte {
 	}
 	return nil // no upper-bound
 }
+
+type BlockIndexingBatchWrite func(blockID flow.Identifier, rw ReaderBatchWriter) error

@@ -18,6 +18,7 @@ import (
 	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/storage/badger/operation"
 	"github.com/onflow/flow-go/storage/badger/transaction"
+	"github.com/onflow/flow-go/storage/operation/badgerimpl"
 )
 
 // cachedLatest caches both latest finalized and sealed block
@@ -33,6 +34,7 @@ type cachedLatest struct {
 type State struct {
 	metrics module.ComplianceMetrics
 	db      *badger.DB
+	sdb     storage.DB
 	headers storage.Headers
 	blocks  storage.Blocks
 	qcs     storage.QuorumCertificates
@@ -788,6 +790,8 @@ func newState(
 	state := &State{
 		metrics: metrics,
 		db:      db,
+		// TODO (leo): to replace db field
+		sdb:     badgerimpl.ToDB(db),
 		headers: headers,
 		results: results,
 		seals:   seals,
