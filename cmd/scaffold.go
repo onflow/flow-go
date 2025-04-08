@@ -1244,7 +1244,8 @@ func (fnb *FlowNodeBuilder) initStorage() error {
 	index := bstorage.NewIndex(fnb.Metrics.Cache, fnb.DB)
 	payloads := bstorage.NewPayloads(fnb.DB, index, guarantees, seals, receipts, results)
 	blocks := bstorage.NewBlocks(fnb.DB, headers, payloads)
-	qcs := bstorage.NewQuorumCertificates(fnb.Metrics.Cache, fnb.DB, bstorage.DefaultCacheSize)
+	// TODO(leo): replace fnb.DB with ProtocolDB
+	qcs := store.NewQuorumCertificates(fnb.Metrics.Cache, badgerimpl.ToDB(fnb.DB), bstorage.DefaultCacheSize)
 	transactions := bstorage.NewTransactions(fnb.Metrics.Cache, fnb.DB)
 	collections := bstorage.NewCollections(fnb.DB, transactions)
 	setups := bstorage.NewEpochSetups(fnb.Metrics.Cache, fnb.DB)
