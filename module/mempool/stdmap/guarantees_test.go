@@ -49,7 +49,7 @@ func TestGuaranteePool(t *testing.T) {
 	t.Run("should be able to retrieve all", func(t *testing.T) {
 		items := pool.All()
 		assert.Len(t, items, 1)
-		val, exists := items[item1.ID()]
+		val, exists := items[item1.CollectionID]
 		require.True(t, exists)
 		assert.Equal(t, item1, val)
 

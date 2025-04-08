@@ -40,7 +40,7 @@ func TestIndexGuaranteedCollectionByBlockHashInsertRetrieve(t *testing.T) {
 
 		err := db.Update(func(tx *badger.Txn) error {
 			for _, guarantee := range guarantees {
-				if err := InsertGuarantee(guarantee.ID(), guarantee)(tx); err != nil {
+				if err := InsertGuarantee(guarantee.CollectionID, guarantee)(tx); err != nil {
 					return err
 				}
 			}
