@@ -73,7 +73,7 @@ type Seeker interface {
 	// SeekLE (seek less than or equal) returns the largest key in lexicographical
 	// order within inclusive range of [startPrefix, key].
 	// This function returns an error if specified key is less than startPrefix.
-	// This function returns nil key (without error) if a key that matches
+	// This function returns storage.ErrNotFound if a key that matches
 	// the specified criteria is not found.
 	SeekLE(startPrefix, key []byte) ([]byte, error)
 }

@@ -22,7 +22,7 @@ func newBadgerSeeker(db *badger.DB) *badgerSeeker {
 // SeekLE (seek less than or equal) returns the largest key in lexicographical
 // order within inclusive range of [startPrefix, key].
 // This function returns an error if specified key is less than startPrefix.
-// This function returns nil key (without error) if a key that matches
+// This function returns storage.ErrNotFound if a key that matches
 // the specified criteria is not found.
 func (i *badgerSeeker) SeekLE(startPrefix, key []byte) ([]byte, error) {
 	if bytes.Compare(key, startPrefix) < 0 {
@@ -45,13 +45,15 @@ func (i *badgerSeeker) SeekLE(startPrefix, key []byte) ([]byte, error) {
 
 	// Check if we reach the end of the iteration.
 	if !iter.Valid() {
-		return nil, nil
+		return nil, storage.ErrNotFound
 	}
+
+	item := iter.Item()
 
 	// Check if returned key is less than startPrefix.
-	if bytes.Compare(iter.Item().Key(), startPrefix) < 0 {
-		return nil, nil
+	if bytes.Compare(item.Key(), startPrefix) < 0 {
+		return nil, storage.ErrNotFound
 	}
 
-	return iter.Item().KeyCopy(nil), nil
+	return item.KeyCopy(nil), nil
 }

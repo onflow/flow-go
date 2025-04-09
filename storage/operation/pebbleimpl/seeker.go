@@ -27,7 +27,7 @@ func newPebbleSeeker(reader pebble.Reader) *pebbleSeeker {
 // SeekLE (seek less than or equal) returns the largest key in lexicographical
 // order within inclusive range of [startPrefix, key].
 // This function returns an error if specified key is less than startPrefix.
-// This function returns nil key (without error) if a key that matches
+// This function returns storage.ErrNotFound if a key that matches
 // the specified criteria is not found.
 func (i *pebbleSeeker) SeekLE(startPrefix, key []byte) (_ []byte, errToReturn error) {
 
@@ -68,7 +68,7 @@ func (i *pebbleSeeker) SeekLE(startPrefix, key []byte) (_ []byte, errToReturn er
 
 	valid = iter.SeekLT(key)
 	if !valid {
-		return nil, nil
+		return nil, storage.ErrNotFound
 	}
 
 	return slices.Clone(iter.Key()), nil

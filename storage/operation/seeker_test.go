@@ -76,7 +76,7 @@ func TestSeekLE(t *testing.T) {
 			for _, keyPart := range []uint64{0} {
 				key := operation.MakePrefix(codePrefix, keyPart)
 				foundKey, err := seeker.SeekLE(startPrefix, key)
-				require.NoError(t, err)
+				require.ErrorIs(t, err, storage.ErrNotFound)
 				require.Nil(t, foundKey)
 			}
 		})
@@ -89,7 +89,7 @@ func TestSeekLE(t *testing.T) {
 			// Key 5 exists, but it is below startPrefix, so nil is returned.
 			key := operation.MakePrefix(codePrefix, uint64(6))
 			foundKey, err := seeker.SeekLE(startPrefix, key)
-			require.NoError(t, err)
+			require.ErrorIs(t, err, storage.ErrNotFound)
 			require.Nil(t, foundKey)
 		})
 	})
