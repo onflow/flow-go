@@ -53,7 +53,7 @@ func WithTCHighQCViews(highQCViews []uint64) func(*flow.TimeoutCertificate) {
 	}
 }
 
-func TimeoutObjectFixture(opts ...func(timeout *hotstuff.TimeoutObject)) *hotstuff.TimeoutObject {
+func TimeoutObjectFixture(opts ...func(TimeoutObject *hotstuff.TimeoutObject)) *hotstuff.TimeoutObject {
 	timeout := &hotstuff.TimeoutObject{
 		View:       uint64(rand.Uint32()),
 		NewestQC:   MakeQC(),
