@@ -155,7 +155,7 @@ func (db *StateDB) SubBalance(
 	return *prevBalance
 }
 
-// AddBalance adds the amount from the balance of the given address
+// AddBalance adds the amount to the balance of the given address
 // and returns the previous balance.
 func (db *StateDB) AddBalance(
 	addr gethCommon.Address,
