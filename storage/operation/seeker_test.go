@@ -35,66 +35,48 @@ func TestSeekLE(t *testing.T) {
 
 			key := operation.MakePrefix(codePrefix, uint64(4))
 			startPrefix := operation.MakePrefix(codePrefix, uint64(5))
-			endPrefix := operation.MakePrefix(codePrefix, uint64(10))
 
-			_, _, err := seeker.SeekLE(startPrefix, endPrefix, key)
-			require.Error(t, err)
-		})
-
-		t.Run("key above end prefix", func(t *testing.T) {
-			seeker := r.NewSeeker()
-
-			startPrefix := operation.MakePrefix(codePrefix, uint64(0))
-			endPrefix := operation.MakePrefix(codePrefix, uint64(5))
-			key := operation.MakePrefix(codePrefix, uint64(10))
-
-			_, _, err := seeker.SeekLE(startPrefix, endPrefix, key)
+			_, err := seeker.SeekLE(startPrefix, key)
 			require.Error(t, err)
 		})
 
 		t.Run("seek key inside range", func(t *testing.T) {
 			seeker := r.NewSeeker()
 
-			// Seek range is [0, 10].
 			startPrefix := operation.MakePrefix(codePrefix)
-			endPrefix := operation.MakePrefix(codePrefix, uint64(10))
 
-			// Seeking [9, 10] in range of [0, 10] returns 9.
+			// Seeking 9 and 10 return 9.
 			for _, keyPart := range []uint64{9, 10} {
 				key := operation.MakePrefix(codePrefix, keyPart)
 				expectedKey := operation.MakePrefix(codePrefix, uint64(9))
-				foundKey, found, err := seeker.SeekLE(startPrefix, endPrefix, key)
+				foundKey, err := seeker.SeekLE(startPrefix, key)
 				require.NoError(t, err)
-				require.True(t, found)
 				require.Equal(t, expectedKey, foundKey)
 			}
 
-			// Seeking [5, 8] in range of [0, 10] returns 5.
+			// Seeking [5, 8] returns 5.
 			for _, keyPart := range []uint64{5, 6, 7, 8} {
 				key := operation.MakePrefix(codePrefix, keyPart)
 				expectedKey := operation.MakePrefix(codePrefix, uint64(5))
-				foundKey, found, err := seeker.SeekLE(startPrefix, endPrefix, key)
+				foundKey, err := seeker.SeekLE(startPrefix, key)
 				require.NoError(t, err)
-				require.True(t, found)
 				require.Equal(t, expectedKey, foundKey)
 			}
 
-			// Seeking [1, 4] in range of [0, 10] returns 1.
+			// Seeking [1, 4] returns 1.
 			for _, keyPart := range []uint64{1, 2, 3, 4} {
 				key := operation.MakePrefix(codePrefix, keyPart)
 				expectedKey := operation.MakePrefix(codePrefix, uint64(1))
-				foundKey, found, err := seeker.SeekLE(startPrefix, endPrefix, key)
+				foundKey, err := seeker.SeekLE(startPrefix, key)
 				require.NoError(t, err)
-				require.True(t, found)
 				require.Equal(t, expectedKey, foundKey)
 			}
 
-			// Seeking [0] in range of [0, 10] returns nil.
+			// Seeking 0 returns nil.
 			for _, keyPart := range []uint64{0} {
 				key := operation.MakePrefix(codePrefix, keyPart)
-				foundKey, found, err := seeker.SeekLE(startPrefix, endPrefix, key)
+				foundKey, err := seeker.SeekLE(startPrefix, key)
 				require.NoError(t, err)
-				require.False(t, found)
 				require.Nil(t, foundKey)
 			}
 		})
@@ -103,13 +85,11 @@ func TestSeekLE(t *testing.T) {
 			seeker := r.NewSeeker()
 
 			startPrefix := operation.MakePrefix(codePrefix, uint64(6))
-			endPrefix := operation.MakePrefix(codePrefix, uint64(10))
 
-			// Key 5 exists, but it is outside of specified range, so nil is returned.
+			// Key 5 exists, but it is below startPrefix, so nil is returned.
 			key := operation.MakePrefix(codePrefix, uint64(6))
-			foundKey, found, err := seeker.SeekLE(startPrefix, endPrefix, key)
+			foundKey, err := seeker.SeekLE(startPrefix, key)
 			require.NoError(t, err)
-			require.False(t, found)
 			require.Nil(t, foundKey)
 		})
 	})
