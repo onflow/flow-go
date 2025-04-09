@@ -319,16 +319,18 @@ func (bl *BlockView) newProcedure() (*procedure, error) {
 		return nil, err
 	}
 	cfg := bl.config
+	evm := gethVM.NewEVM(
+		*cfg.BlockContext,
+		execState,
+		cfg.ChainConfig,
+		cfg.EVMConfig,
+	)
+	evm.SetTxContext(*cfg.TxContext)
+
 	return &procedure{
 		config: cfg,
-		evm: gethVM.NewEVM(
-			*cfg.BlockContext,
-			// *cfg.TxContext, TODO(m-Peter): Investigate
-			execState,
-			cfg.ChainConfig,
-			cfg.EVMConfig,
-		),
-		state: execState,
+		evm:    evm,
+		state:  execState,
 	}, nil
 }
 
