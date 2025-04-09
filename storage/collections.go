@@ -4,14 +4,15 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
-type CollectionReader interface {
-	// LightByID returns collection with the given ID. Only retrieves
-	// transaction hashes.
-	LightByID(collID flow.Identifier) (*flow.LightCollection, error)
-
+// CollectionsReader represents persistent storage read operations for collections.
+type CollectionsReader interface {
 	// ByID returns the collection with the given ID, including all
 	// transactions within the collection.
 	ByID(collID flow.Identifier) (*flow.Collection, error)
+
+	// LightByID returns collection with the given ID. Only retrieves
+	// transaction hashes.
+	LightByID(collID flow.Identifier) (*flow.LightCollection, error)
 
 	// LightByTransactionID returns the collection for the given transaction ID. Only retrieves
 	// transaction hashes.
@@ -20,7 +21,7 @@ type CollectionReader interface {
 
 // Collections represents persistent storage for collections.
 type Collections interface {
-	CollectionReader
+	CollectionsReader
 
 	// StoreLight inserts the collection. It does not insert, nor check
 	// existence of, the constituent transactions.
