@@ -305,9 +305,7 @@ func (bl *BlockView) DryRunTransaction(
 
 	// use the from as the signer
 	msg.From = from
-	// we need to skip nonce check for dry run
-	// Previous we had: msg.SkipAccountChecks = true,
-	// so we need to set SkipNonceChecks, SkipFromEOACheck both to true.
+	// we need to skip nonce/eoa check for dry run
 	msg.SkipNonceChecks = true
 	msg.SkipFromEOACheck = true
 
