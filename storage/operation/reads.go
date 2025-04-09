@@ -209,7 +209,10 @@ func FindHighestAtOrBelowByPrefix(r storage.Reader, prefix []byte, height uint64
 
 	seeker := r.NewSeeker()
 
-	highestKey, found, err := seeker.SeekLE(prefix, key, key)
+	// Seek the highest key equal or below to the given key within the [prefix, key] prefix range
+	// Note: We are only interested in key at or less than given height.
+	endPrefix := key // endPrefix is the caller-specified height (key).
+	highestKey, found, err := seeker.SeekLE(prefix, endPrefix, key)
 	if err != nil {
 		return fmt.Errorf("can not seek height %d: %w", height, err)
 	}

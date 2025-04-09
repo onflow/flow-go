@@ -55,8 +55,8 @@ func TestSeekLE(t *testing.T) {
 		t.Run("seek key inside range", func(t *testing.T) {
 			seeker := r.NewSeeker()
 
-			// Seek range is [0, 10]
-			startPrefix := []byte{codePrefix}
+			// Seek range is [0, 10].
+			startPrefix := operation.MakePrefix(codePrefix)
 			endPrefix := operation.MakePrefix(codePrefix, uint64(10))
 
 			// Seeking [9, 10] in range of [0, 10] returns 9.
