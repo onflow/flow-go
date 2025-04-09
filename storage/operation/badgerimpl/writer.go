@@ -7,14 +7,13 @@ import (
 
 	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/storage/operation"
-	op "github.com/onflow/flow-go/storage/operation"
 )
 
 type ReaderBatchWriter struct {
 	globalReader storage.Reader
 	batch        *badger.WriteBatch
 
-	callbacks op.Callbacks
+	callbacks operation.Callbacks
 }
 
 var _ storage.ReaderBatchWriter = (*ReaderBatchWriter)(nil)
@@ -60,6 +59,7 @@ func (b *ReaderBatchWriter) Commit() error {
 
 func WithReaderBatchWriter(db *badger.DB, fn func(storage.ReaderBatchWriter) error) error {
 	batch := NewReaderBatchWriter(db)
+	defer batch.batch.Cancel() // Release memory
 
 	err := fn(batch)
 	if err != nil {
