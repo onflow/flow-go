@@ -387,7 +387,7 @@ func (d *DeltaView) GetState(sk types.SlotAddress) (gethCommon.Hash, error) {
 	return d.parent.GetState(sk)
 }
 
-// SetState adds sets a value for the given slot of the main storage.
+// SetState sets or adds a value for the given slot of the main storage.
 // It returns the previous value in any case.
 func (d *DeltaView) SetState(
 	sk types.SlotAddress,
