@@ -574,6 +574,18 @@ func writeDockerComposeConfig(services Services) error {
 		return err
 	}
 
+	// add networks section
+	_, err = f.WriteString(`
+networks:
+  default:
+    name: localnet_network
+    driver: bridge
+    attachable: true
+`)
+	if err != nil {
+		return err
+	}
+
 	return nil
 }
 
