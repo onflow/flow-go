@@ -64,7 +64,7 @@ func (vc *TimeoutObjectsCache) AddTimeoutObject(timeout *model.TimeoutObject) er
 	firstTimeout, exists := vc.timeouts[timeout.SignerID]
 	if exists {
 		vc.lock.Unlock()
-		if !firstTimeout.Equal(timeout) {
+		if !firstTimeout.Equals(timeout) {
 			return model.NewDoubleTimeoutErrorf(firstTimeout, timeout, "detected timeout equivocation by replica %x at view: %d", timeout.SignerID, vc.view)
 		}
 		return ErrRepeatedTimeout
