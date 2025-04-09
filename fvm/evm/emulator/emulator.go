@@ -9,7 +9,6 @@ import (
 	"github.com/onflow/crypto/hash"
 	gethCommon "github.com/onflow/go-ethereum/common"
 	gethCore "github.com/onflow/go-ethereum/core"
-	"github.com/onflow/go-ethereum/core/tracing"
 	gethTracing "github.com/onflow/go-ethereum/core/tracing"
 	gethTypes "github.com/onflow/go-ethereum/core/types"
 	gethVM "github.com/onflow/go-ethereum/core/vm"
@@ -521,12 +520,12 @@ func (proc *procedure) deployAt(
 	proc.state.SetNonce(
 		callerCommon,
 		proc.state.GetNonce(callerCommon)+1,
-		tracing.NonceChangeContractCreator,
+		gethTracing.NonceChangeContractCreator,
 	)
 
 	// setup account
 	proc.state.CreateAccount(addr)
-	proc.state.SetNonce(addr, 1, tracing.NonceChangeNewContract) // (EIP-158)
+	proc.state.SetNonce(addr, 1, gethTracing.NonceChangeNewContract) // (EIP-158)
 	if call.Value.Sign() > 0 {
 		proc.evm.Context.Transfer( // transfer value
 			proc.state,
