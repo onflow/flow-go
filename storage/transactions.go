@@ -4,6 +4,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
+// TransactionsReader represents persistent storage read operations for transactions.
 type TransactionsReader interface {
 	// ByID returns the transaction for the given fingerprint.
 	ByID(txID flow.Identifier) (*flow.TransactionBody, error)

@@ -16,19 +16,21 @@ type Transactions struct {
 	store map[flow.Identifier]*flow.TransactionBody
 }
 
+var _ storage.Transactions = (*Transactions)(nil)
+
 func NewTransactions() *Transactions {
 	return &Transactions{
 		store: make(map[flow.Identifier]*flow.TransactionBody),
 	}
 }
 
-var _ storage.Transactions = (*Transactions)(nil)
-
+// ByID returns the transaction for the given fingerprint.
+// Returns storage.ErrNotFound if transaction is not found.
 func (t *Transactions) ByID(txID flow.Identifier) (*flow.TransactionBody, error) {
 	t.lock.RLock()
-	val, ok := t.store[txID]
-	t.lock.RUnlock()
+	defer t.lock.RUnlock()
 
+	val, ok := t.store[txID]
 	if !ok {
 		return nil, storage.ErrNotFound
 	}
@@ -36,9 +38,18 @@ func (t *Transactions) ByID(txID flow.Identifier) (*flow.TransactionBody, error)
 	return val, nil
 }
 
+// Store inserts the transaction, keyed by fingerprint. Duplicate transaction insertion is ignored
+// Return no errors.
 func (t *Transactions) Store(tx *flow.TransactionBody) error {
-	t.lock.Lock()
-	defer t.lock.Unlock()
-	t.store[tx.ID()] = tx
+	t.lock.RLock()
+	_, ok := t.store[tx.ID()]
+	t.lock.RUnlock()
+
+	if !ok {
+		t.lock.Lock()
+		defer t.lock.Unlock()
+		t.store[tx.ID()] = tx
+	}
+
 	return nil
 }
