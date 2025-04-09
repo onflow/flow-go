@@ -515,9 +515,7 @@ func (db *StateDB) Commit(finalize bool) (hash.Hash, error) {
 	return updateCommit, nil
 }
 
-func (db *StateDB) Finalise(deleteEmptyObjects bool) {
-	panic(fmt.Errorf("should not be called!"))
-}
+func (db *StateDB) Finalise(deleteEmptyObjects bool) {}
 
 // Finalize flushes all the changes
 // to the permanent storage

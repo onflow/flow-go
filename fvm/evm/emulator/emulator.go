@@ -342,6 +342,9 @@ type procedure struct {
 
 // commit commits the changes to the state (with optional finalization)
 func (proc *procedure) commit(finalize bool) (hash.Hash, error) {
+	// Calling `StateDB.Finalise(true)` is currently a no-op, but
+	// we add it here to be more in line with how its envisioned.
+	proc.state.Finalise(true)
 	stateUpdateCommitment, err := proc.state.Commit(finalize)
 	if err != nil {
 		// if known types (state errors) don't do anything and return
