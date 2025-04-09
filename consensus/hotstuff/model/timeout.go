@@ -77,18 +77,17 @@ func (t *TimeoutObject) Equals(other *TimeoutObject) bool {
 
 func (t *TimeoutObject) String() string {
 	return fmt.Sprintf(
-		"View: %d, HighestQC.View: %d, LastViewTC: %v, TimeoutTick: %d",
+		"Signer ID: %s, View: %d, NewestQC.View: %d",
+		t.SignerID,
 		t.View,
 		t.NewestQC.View,
-		t.LastViewTC,
-		t.TimeoutTick,
 	)
 }
 
-// LogContext returns a `zerolog.Context` including the most important properties of the TC:
-//   - view number that this TC is for
+// LogContext returns a `zerolog.Context` including the most important properties of the TO:
 //   - view and ID of the block that the included QC points to
 //   - number of times a re-broadcast of this timeout was attempted
+//   - view number that this TO is for
 //   - [optional] if the TC also includes a TC for the prior view, i.e. `LastViewTC` ≠ nil:
 //     the new of `LastViewTC` and the view that `LastViewTC.NewestQC` is for
 func (t *TimeoutObject) LogContext(logger zerolog.Logger) zerolog.Context {

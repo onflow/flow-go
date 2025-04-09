@@ -513,10 +513,8 @@ func NewInvalidTimeoutErrorf(timeout *TimeoutObject, msg string, args ...interfa
 }
 
 func (e InvalidTimeoutError) Error() string {
-	return fmt.Sprintf("invalid timeout: signer id: %s, view: %d, newest QC view: %d: %s",
-		e.Timeout.SignerID.String(),
-		e.Timeout.View,
-		e.Timeout.NewestQC.View,
+	return fmt.Sprintf("invalid timeout: %s: %s",
+		e.Timeout.String(),
 		e.Err.Error(),
 	)
 }
