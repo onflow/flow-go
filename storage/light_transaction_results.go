@@ -2,6 +2,7 @@ package storage
 
 import "github.com/onflow/flow-go/model/flow"
 
+// LightTransactionResultsReader represents persistent storage read operations for light transaction result
 type LightTransactionResultsReader interface {
 	// ByBlockIDTransactionID returns the transaction result for the given block ID and transaction ID
 	ByBlockIDTransactionID(blockID flow.Identifier, transactionID flow.Identifier) (*flow.LightTransactionResult, error)

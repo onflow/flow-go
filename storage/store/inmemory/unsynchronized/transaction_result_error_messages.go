@@ -1,6 +1,7 @@
 package unsynchronized
 
 import (
+	"errors"
 	"sync"
 
 	"github.com/onflow/flow-go/model/flow"
@@ -9,31 +10,24 @@ import (
 )
 
 type TransactionResultErrorMessages struct {
-	// TODO: A mutexes aren't strictly necessary here since, by design, data is written only once
+	// TODO: A mutex isn't strictly necessary here since, by design, data is written only once
 	// before any future reads. However, we're keeping it temporarily during active development
 	// for safety and debugging purposes. It will be removed once the implementation is finalized.
-	store     map[string]flow.TransactionResultErrorMessage
-	storeLock sync.RWMutex
-
-	indexStore     map[string]flow.TransactionResultErrorMessage
-	indexStoreLock sync.RWMutex
-
-	blockStore     map[string][]flow.TransactionResultErrorMessage
-	blockStoreLock sync.RWMutex
-}
-
-func NewTransactionResultErrorMessages() *TransactionResultErrorMessages {
-	return &TransactionResultErrorMessages{
-		store:          make(map[string]flow.TransactionResultErrorMessage),
-		storeLock:      sync.RWMutex{},
-		indexStore:     make(map[string]flow.TransactionResultErrorMessage),
-		indexStoreLock: sync.RWMutex{},
-		blockStore:     make(map[string][]flow.TransactionResultErrorMessage),
-		blockStoreLock: sync.RWMutex{},
-	}
+	lock       sync.RWMutex
+	store      map[string]*flow.TransactionResultErrorMessage
+	indexStore map[string]*flow.TransactionResultErrorMessage
+	blockStore map[string][]flow.TransactionResultErrorMessage
 }
 
 var _ storage.TransactionResultErrorMessages = (*TransactionResultErrorMessages)(nil)
+
+func NewTransactionResultErrorMessages() *TransactionResultErrorMessages {
+	return &TransactionResultErrorMessages{
+		store:      make(map[string]*flow.TransactionResultErrorMessage),
+		indexStore: make(map[string]*flow.TransactionResultErrorMessage),
+		blockStore: make(map[string][]flow.TransactionResultErrorMessage),
+	}
+}
 
 // Exists returns true if transaction result error messages for the given ID have been stored.
 //
@@ -41,6 +35,10 @@ var _ storage.TransactionResultErrorMessages = (*TransactionResultErrorMessages)
 func (t *TransactionResultErrorMessages) Exists(blockID flow.Identifier) (bool, error) {
 	_, err := t.ByBlockID(blockID)
 	if err != nil {
+		if errors.Is(err, storage.ErrNotFound) {
+			return false, nil
+		}
+
 		return false, err
 	}
 
@@ -56,16 +54,15 @@ func (t *TransactionResultErrorMessages) ByBlockIDTransactionID(
 	transactionID flow.Identifier,
 ) (*flow.TransactionResultErrorMessage, error) {
 	key := store.KeyFromBlockIDTransactionID(blockID, transactionID)
+	t.lock.RLock()
+	defer t.lock.RUnlock()
 
-	t.storeLock.RLock()
 	val, ok := t.store[key]
-	t.storeLock.RUnlock()
-
 	if !ok {
 		return nil, storage.ErrNotFound
 	}
 
-	return &val, nil
+	return val, nil
 }
 
 // ByBlockIDTransactionIndex returns the transaction result error message for the given blockID and transaction index.
@@ -77,29 +74,28 @@ func (t *TransactionResultErrorMessages) ByBlockIDTransactionIndex(
 	txIndex uint32,
 ) (*flow.TransactionResultErrorMessage, error) {
 	key := store.KeyFromBlockIDIndex(blockID, txIndex)
+	t.lock.RLock()
+	defer t.lock.RUnlock()
 
-	t.indexStoreLock.RLock()
 	val, ok := t.indexStore[key]
-	t.indexStoreLock.RUnlock()
-
 	if !ok {
 		return nil, storage.ErrNotFound
 	}
 
-	return &val, nil
+	return val, nil
 }
 
 // ByBlockID gets all transaction result error messages for a block, ordered by transaction index.
 // Note: This method will return an empty slice both if the block is not indexed yet and if the block does not have any errors.
 //
-// No errors are expected during normal operation.
+// Expected errors during normal operation:
+//   - `storage.ErrNotFound` if no block was found.
 func (t *TransactionResultErrorMessages) ByBlockID(id flow.Identifier) ([]flow.TransactionResultErrorMessage, error) {
 	key := store.KeyFromBlockID(id)
+	t.lock.RLock()
+	defer t.lock.RUnlock()
 
-	t.blockStoreLock.RLock()
 	val, ok := t.blockStore[key]
-	t.blockStoreLock.RUnlock()
-
 	if !ok {
 		return nil, storage.ErrNotFound
 	}
@@ -115,21 +111,16 @@ func (t *TransactionResultErrorMessages) Store(
 	transactionResultErrorMessages []flow.TransactionResultErrorMessage,
 ) error {
 	key := store.KeyFromBlockID(blockID)
-	t.blockStoreLock.Lock()
-	t.blockStore[key] = transactionResultErrorMessages
-	t.blockStoreLock.Unlock()
+	t.lock.Lock()
+	defer t.lock.Unlock()
 
+	t.blockStore[key] = transactionResultErrorMessages
 	for i, txResult := range transactionResultErrorMessages {
 		txIDKey := store.KeyFromBlockIDTransactionID(blockID, txResult.TransactionID)
 		txIndexKey := store.KeyFromBlockIDIndex(blockID, uint32(i))
 
-		t.storeLock.Lock()
-		t.store[txIDKey] = txResult
-		t.storeLock.Unlock()
-
-		t.indexStoreLock.Lock()
-		t.indexStore[txIndexKey] = txResult
-		t.indexStoreLock.Unlock()
+		t.store[txIDKey] = &txResult
+		t.indexStore[txIndexKey] = &txResult
 	}
 
 	return nil
