@@ -122,6 +122,7 @@ func (db *StateDB) SelfDestruct6780(addr gethCommon.Address) (uint256.Int, bool)
 	if db.IsNewContract(addr) {
 		err := db.latestView().SelfDestruct(addr)
 		db.handleError(err)
+		return *balance, true
 	}
 
 	return *balance, false
