@@ -25,8 +25,8 @@ func newPebbleSeeker(reader pebble.Reader) *pebbleSeeker {
 }
 
 // SeekLE (seek less than or equal) returns given key if present.  Otherwise,
-// it returns the largest key that is less than the given key within startPrefix
-// and endPrefix.  Keys are ordered in lexicographical order.
+// it returns the largest key that is less than the given key in lexicographical
+// order within the prefix range [startPrefix, endPrefix], both inclusive.
 // This function returns error if given key is outside range of startPrefix and endPrefix.
 func (i *pebbleSeeker) SeekLE(startPrefix, endPrefix []byte, key []byte) (_ []byte, _ bool, errToReturn error) {
 	lowerBound, upperBound, hasUpperBound := storage.StartEndPrefixToLowerUpperBound(startPrefix, endPrefix)
@@ -35,7 +35,7 @@ func (i *pebbleSeeker) SeekLE(startPrefix, endPrefix []byte, key []byte) (_ []by
 		return nil, false, errors.New("key must be greater than or equal to startPrefix key")
 	}
 
-	if hasUpperBound && bytes.Compare(key, endPrefix) > 0 {
+	if hasUpperBound && bytes.Compare(key, upperBound) >= 0 {
 		return nil, false, errors.New("key must be less than or equal to endPrefix key")
 	}
 
@@ -62,7 +62,7 @@ func (i *pebbleSeeker) SeekLE(startPrefix, endPrefix []byte, key []byte) (_ []by
 	valid := iter.SeekGE(key)
 	if valid {
 		if bytes.Equal(iter.Key(), key) {
-			return slices.Clone(iter.Key()), true, nil
+			return slices.Clone(key), true, nil
 		}
 	}
 
