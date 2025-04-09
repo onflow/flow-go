@@ -1345,7 +1345,7 @@ func (fnb *FlowNodeBuilder) InitIDProviders() {
 func (fnb *FlowNodeBuilder) initState() error {
 	fnb.ProtocolEvents = events.NewDistributor()
 
-	isBootStrapped, err := badgerState.IsBootstrapped(fnb.DB)
+	isBootStrapped, err := badgerState.IsBootstrapped(fnb.ProtocolDB)
 	if err != nil {
 		return fmt.Errorf("failed to determine whether database contains bootstrapped state: %w", err)
 	}

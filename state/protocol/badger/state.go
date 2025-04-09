@@ -111,7 +111,7 @@ func Bootstrap(
 		opt(config)
 	}
 
-	isBootstrapped, err := IsBootstrapped(db)
+	isBootstrapped, err := IsBootstrapped(badgerimpl.ToDB(db))
 	if err != nil {
 		return nil, fmt.Errorf("failed to determine whether database contains bootstrapped state: %w", err)
 	}
@@ -826,9 +826,9 @@ func newState(
 }
 
 // IsBootstrapped returns whether the database contains a bootstrapped state
-func IsBootstrapped(db *badger.DB) (bool, error) {
+func IsBootstrapped(db storage.DB) (bool, error) {
 	var finalized uint64
-	err := db.View(badgeroperation.RetrieveFinalizedHeight(&finalized))
+	err := operation.RetrieveFinalizedHeight(db.Reader(), &finalized)
 	if errors.Is(err, storage.ErrNotFound) {
 		return false, nil
 	}
