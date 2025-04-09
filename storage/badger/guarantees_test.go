@@ -22,7 +22,7 @@ func TestGuaranteeStoreRetrieve(t *testing.T) {
 		expected := unittest.CollectionGuaranteeFixture()
 
 		// retrieve guarantee without stored
-		_, err := store.ByCollectionID(expected.ID())
+		_, err := store.ByCollectionID(expected.CollectionID)
 		require.ErrorIs(t, err, storage.ErrNotFound)
 
 		// store guarantee
@@ -30,7 +30,7 @@ func TestGuaranteeStoreRetrieve(t *testing.T) {
 		require.NoError(t, err)
 
 		// retreive by coll idx
-		actual, err := store.ByCollectionID(expected.ID())
+		actual, err := store.ByCollectionID(expected.CollectionID)
 		require.NoError(t, err)
 		require.Equal(t, expected, actual)
 	})

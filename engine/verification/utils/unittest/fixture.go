@@ -308,7 +308,7 @@ func ExecutionResultFixture(t *testing.T,
 		require.NoError(t, err)
 
 		completeColls := make(map[flow.Identifier]*entity.CompleteCollection)
-		completeColls[guarantee.ID()] = &entity.CompleteCollection{
+		completeColls[guarantee.CollectionID] = &entity.CompleteCollection{
 			Guarantee:    guarantee,
 			Transactions: collection.Transactions,
 		}
@@ -326,7 +326,7 @@ func ExecutionResultFixture(t *testing.T,
 			collections = append(collections, &collection)
 			guarantees = append(guarantees, guarantee)
 
-			completeColls[guarantee.ID()] = &entity.CompleteCollection{
+			completeColls[guarantee.CollectionID] = &entity.CompleteCollection{
 				Guarantee:    guarantee,
 				Transactions: collection.Transactions,
 			}
