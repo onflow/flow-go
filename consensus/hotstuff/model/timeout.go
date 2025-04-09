@@ -75,10 +75,12 @@ func (t *TimeoutObject) Equals(other *TimeoutObject) bool {
 		bytes.Equal(t.SigData, other.SigData)
 }
 
+// String returns a partial string representation of the TimeoutObject,
+// including the signer ID, view, and the newest QC view.
 func (t *TimeoutObject) String() string {
 	return fmt.Sprintf(
 		"Signer ID: %s, View: %d, NewestQC.View: %d",
-		t.SignerID,
+		t.SignerID.String(),
 		t.View,
 		t.NewestQC.View,
 	)
