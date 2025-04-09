@@ -8,13 +8,13 @@ import (
 )
 
 type Collections struct {
-	collMutex   sync.RWMutex
-	collections map[flow.Identifier]*flow.Collection
-
-	lightCollMutex   sync.RWMutex
-	lightCollections map[flow.Identifier]*flow.LightCollection
-
-	txToLightCollMutex             sync.RWMutex
+	//TODO: we don't need a mutex here as we have a guarantee by design
+	// that we write data only once and it happens before the future reads.
+	// We decided to leave a mutex for some time during active development.
+	// It'll be removed in the future.
+	lock                           sync.RWMutex
+	collections                    map[flow.Identifier]*flow.Collection
+	lightCollections               map[flow.Identifier]*flow.LightCollection
 	transactionIDToLightCollection map[flow.Identifier]*flow.LightCollection
 }
 
@@ -31,8 +31,8 @@ func NewCollections() *Collections {
 // ByID returns the collection with the given ID, including all transactions within the collection.
 // Returns storage.ErrNotFound if collection wasn't found.
 func (c *Collections) ByID(collID flow.Identifier) (*flow.Collection, error) {
-	c.collMutex.RLock()
-	defer c.collMutex.RUnlock()
+	c.lock.RLock()
+	defer c.lock.RUnlock()
 
 	val, ok := c.collections[collID]
 	if !ok {
@@ -45,8 +45,8 @@ func (c *Collections) ByID(collID flow.Identifier) (*flow.Collection, error) {
 // LightByID returns collection with the given ID. Only retrieves transaction hashes.
 // Returns storage.ErrNotFound if collection wasn't found.
 func (c *Collections) LightByID(collID flow.Identifier) (*flow.LightCollection, error) {
-	c.lightCollMutex.RLock()
-	defer c.lightCollMutex.RUnlock()
+	c.lock.RLock()
+	defer c.lock.RUnlock()
 
 	val, ok := c.lightCollections[collID]
 	if !ok {
@@ -59,8 +59,8 @@ func (c *Collections) LightByID(collID flow.Identifier) (*flow.LightCollection, 
 // LightByTransactionID returns the collection for the given transaction ID. Only retrieves transaction hashes.
 // Returns storage.ErrNotFound if collection wasn't found.
 func (c *Collections) LightByTransactionID(txID flow.Identifier) (*flow.LightCollection, error) {
-	c.txToLightCollMutex.RLock()
-	defer c.txToLightCollMutex.RUnlock()
+	c.lock.RLock()
+	defer c.lock.RUnlock()
 
 	val, ok := c.transactionIDToLightCollection[txID]
 	if !ok {
@@ -73,8 +73,8 @@ func (c *Collections) LightByTransactionID(txID flow.Identifier) (*flow.LightCol
 // Store inserts the collection keyed by ID and all constituent transactions.
 // Returns no errors during normal operation.
 func (c *Collections) Store(collection *flow.Collection) error {
-	c.collMutex.Lock()
-	defer c.collMutex.Unlock()
+	c.lock.Lock()
+	defer c.lock.Unlock()
 
 	c.collections[collection.ID()] = collection
 	return nil
@@ -83,8 +83,8 @@ func (c *Collections) Store(collection *flow.Collection) error {
 // StoreLight inserts the collection. It does not insert, nor check existence of, the constituent transactions.
 // Returns no errors during normal operation.
 func (c *Collections) StoreLight(collection *flow.LightCollection) error {
-	c.lightCollMutex.Lock()
-	defer c.lightCollMutex.Unlock()
+	c.lock.Lock()
+	defer c.lock.Unlock()
 
 	c.lightCollections[collection.ID()] = collection
 	return nil
@@ -105,8 +105,8 @@ func (c *Collections) StoreLight(collection *flow.LightCollection) error {
 //
 // Returns no errors during normal operation.
 func (c *Collections) StoreLightAndIndexByTransaction(collection *flow.LightCollection) error {
-	c.txToLightCollMutex.Lock()
-	defer c.txToLightCollMutex.Unlock()
+	c.lock.Lock()
+	defer c.lock.Unlock()
 
 	c.lightCollections[collection.ID()] = collection
 	for _, txID := range collection.Transactions {
@@ -119,21 +119,16 @@ func (c *Collections) StoreLightAndIndexByTransaction(collection *flow.LightColl
 // Remove removes the collection and all constituent transactions.
 // Returns no errors during normal operation.
 func (c *Collections) Remove(collID flow.Identifier) error {
-	c.collMutex.Lock()
+	c.lock.Lock()
+	defer c.lock.Unlock()
+
 	delete(c.collections, collID)
-	c.collMutex.Unlock()
-
-	c.lightCollMutex.Lock()
 	delete(c.lightCollections, collID)
-	c.lightCollMutex.Unlock()
-
-	c.txToLightCollMutex.Lock()
 	for txID, coll := range c.transactionIDToLightCollection {
 		if coll.ID() == collID {
 			delete(c.transactionIDToLightCollection, txID)
 		}
 	}
-	c.txToLightCollMutex.Unlock()
 
 	return nil
 }
