@@ -149,7 +149,7 @@ func NewSafetyRules(t *testing.T) *SafetyRules {
 
 	safetyRules.On("ProduceTimeout", mock.Anything, mock.Anything, mock.Anything).Return(
 		func(curView uint64, newestQC *flow.QuorumCertificate, lastViewTC *flow.TimeoutCertificate) *model.TimeoutObject {
-			return helper.TimeoutObjectFixture(func(timeout *model.RepeatableTimeoutObject) {
+			return helper.TimeoutObjectFixture(func(timeout *model.TimeoutObject) {
 				timeout.View = curView
 				timeout.NewestQC = newestQC
 				timeout.LastViewTC = lastViewTC

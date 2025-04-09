@@ -242,13 +242,11 @@ func NewInstance(t *testing.T, options ...Option) *Instance {
 	in.signer.On("CreateTimeout", mock.Anything, mock.Anything, mock.Anything).Return(
 		func(curView uint64, newestQC *flow.QuorumCertificate, lastViewTC *flow.TimeoutCertificate) *model.TimeoutObject {
 			timeoutObject := &model.TimeoutObject{
-				RepeatableTimeoutObject: model.RepeatableTimeoutObject{
-					View:       curView,
-					NewestQC:   newestQC,
-					LastViewTC: lastViewTC,
-					SignerID:   in.localID,
-					SigData:    unittest.RandomBytes(msig.SigLen),
-				},
+				View:       curView,
+				NewestQC:   newestQC,
+				LastViewTC: lastViewTC,
+				SignerID:   in.localID,
+				SigData:    unittest.RandomBytes(msig.SigLen),
 			}
 			return timeoutObject
 		},

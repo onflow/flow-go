@@ -492,10 +492,8 @@ func (s *SafetyRulesTestSuite) TestProduceVote_AfterTimeout() {
 	view := s.proposal.Block.View
 	newestQC := helper.MakeQC(helper.WithQCView(view - 1))
 	expectedTimeout := &model.TimeoutObject{
-		RepeatableTimeoutObject: model.RepeatableTimeoutObject{
-			View:     view,
-			NewestQC: newestQC,
-		},
+		View:     view,
+		NewestQC: newestQC,
 	}
 	s.signer.On("CreateTimeout", view, newestQC, (*flow.TimeoutCertificate)(nil)).Return(expectedTimeout, nil).Once()
 	s.persister.On("PutSafetyData", mock.Anything).Return(nil).Once()
@@ -520,10 +518,8 @@ func (s *SafetyRulesTestSuite) TestProduceTimeout_ShouldTimeout() {
 	view := s.proposal.Block.View
 	newestQC := helper.MakeQC(helper.WithQCView(view - 1))
 	expectedTimeout := &model.TimeoutObject{
-		RepeatableTimeoutObject: model.RepeatableTimeoutObject{
-			View:     view,
-			NewestQC: newestQC,
-		},
+		View:     view,
+		NewestQC: newestQC,
 	}
 
 	expectedSafetyData := &hotstuff.SafetyData{
@@ -547,7 +543,7 @@ func (s *SafetyRulesTestSuite) TestProduceTimeout_ShouldTimeout() {
 
 	otherTimeout, err := s.safety.ProduceTimeout(view, newestQC, nil)
 	require.NoError(s.T(), err)
-	require.Equal(s.T(), timeout.RepeatableTimeoutObject.ID(), otherTimeout.RepeatableTimeoutObject.ID())
+	require.True(s.T(), timeout.Equal(otherTimeout))
 	require.Equal(s.T(), timeout.TimeoutTick+1, otherTimeout.TimeoutTick)
 
 	// to create new TO we need to provide a TC
@@ -555,11 +551,9 @@ func (s *SafetyRulesTestSuite) TestProduceTimeout_ShouldTimeout() {
 		helper.WithTCNewestQC(newestQC))
 
 	expectedTimeout = &model.TimeoutObject{
-		RepeatableTimeoutObject: model.RepeatableTimeoutObject{
-			View:       view + 1,
-			NewestQC:   newestQC,
-			LastViewTC: lastViewTC,
-		},
+		View:       view + 1,
+		NewestQC:   newestQC,
+		LastViewTC: lastViewTC,
 	}
 	s.signer.On("CreateTimeout", view+1, newestQC, lastViewTC).Return(expectedTimeout, nil).Once()
 	expectedSafetyData = &hotstuff.SafetyData{
@@ -681,10 +675,8 @@ func (s *SafetyRulesTestSuite) TestProduceTimeout_PersistStateException() {
 	view := s.proposal.Block.View
 	newestQC := helper.MakeQC(helper.WithQCView(view - 1))
 	expectedTimeout := &model.TimeoutObject{
-		RepeatableTimeoutObject: model.RepeatableTimeoutObject{
-			View:     view,
-			NewestQC: newestQC,
-		},
+		View:     view,
+		NewestQC: newestQC,
 	}
 
 	s.signer.On("CreateTimeout", view, newestQC, (*flow.TimeoutCertificate)(nil)).Return(expectedTimeout, nil).Once()
@@ -710,10 +702,8 @@ func (s *SafetyRulesTestSuite) TestProduceTimeout_AfterVote() {
 	newestQC := helper.MakeQC(helper.WithQCView(view - 1))
 
 	expectedTimeout := &model.TimeoutObject{
-		RepeatableTimeoutObject: model.RepeatableTimeoutObject{
-			View:     view,
-			NewestQC: newestQC,
-		},
+		View:     view,
+		NewestQC: newestQC,
 	}
 
 	s.signer.On("CreateTimeout", view, newestQC, (*flow.TimeoutCertificate)(nil)).Return(expectedTimeout, nil).Once()

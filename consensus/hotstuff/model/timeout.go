@@ -1,6 +1,7 @@
 package model
 
 import (
+	"bytes"
 	"fmt"
 	"time"
 
@@ -34,11 +35,9 @@ type TimerInfo struct {
 // is started.
 type NewViewEvent TimerInfo
 
-// RepeatableTimeoutObject represents the core data of a TimeoutObject.
-//
-// Unlike TimeoutObject, this struct does not include the TimeoutTick field
-// and is used for de-duplicated TimeoutObjects.
-type RepeatableTimeoutObject struct {
+// TimeoutObject represents intent of replica to leave its current view with a timeout. This concept is very similar to
+// HotStuff vote. Valid TimeoutObject is signed by staking key.
+type TimeoutObject struct {
 	// View is the view number which is replica is timing out
 	View uint64
 	// NewestQC is the newest QC (by view) known to the creator of this TimeoutObject
@@ -52,17 +51,6 @@ type RepeatableTimeoutObject struct {
 	// SigData is a BLS signature created by staking key signing View + NewestQC.View
 	// This signature is further aggregated in TimeoutCertificate.
 	SigData crypto.Signature
-}
-
-// ID returns a collision-resistant hash of the RepeatableTimeoutObject struct.
-func (t *RepeatableTimeoutObject) ID() flow.Identifier {
-	return flow.MakeID(t)
-}
-
-// TimeoutObject represents intent of replica to leave its current view with a timeout. This concept is very similar to
-// HotStuff vote. Valid TimeoutObject is signed by staking key.
-type TimeoutObject struct {
-	RepeatableTimeoutObject
 	// TimeoutTick is the number of times the `timeout.Controller` has (re-)emitted the
 	// timeout for this view. When the timer for the view's original duration expires, a `TimeoutObject`
 	// with `TimeoutTick = 0` is broadcast. Subsequently, `timeout.Controller` re-broadcasts the
@@ -75,6 +63,16 @@ type TimeoutObject struct {
 // ID returns a collision-resistant hash of the TimeoutObject struct.
 func (t *TimeoutObject) ID() flow.Identifier {
 	return flow.MakeID(t)
+}
+
+// Equal returns true if the TimeoutObject is equal to the provided other TimeoutObject.
+// It compares View, NewestQC, LastViewTC, SignerID and SigData and is used for de-duplicate TimeoutObjects in the cache.
+func (t *TimeoutObject) Equal(other *TimeoutObject) bool {
+	return t.View == other.View &&
+		t.NewestQC.ID() == other.NewestQC.ID() &&
+		t.LastViewTC.ID() == other.LastViewTC.ID() &&
+		t.SignerID == other.SignerID &&
+		bytes.Equal(t.SigData, other.SigData)
 }
 
 func (t *TimeoutObject) String() string {

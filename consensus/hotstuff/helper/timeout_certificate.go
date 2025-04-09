@@ -53,14 +53,8 @@ func WithTCHighQCViews(highQCViews []uint64) func(*flow.TimeoutCertificate) {
 	}
 }
 
-func TimeoutObjectFixture(opts ...func(timeout *hotstuff.RepeatableTimeoutObject)) *hotstuff.TimeoutObject {
-	return &hotstuff.TimeoutObject{
-		RepeatableTimeoutObject: *RepeatableTimeoutObjectFixture(opts...),
-	}
-}
-
-func RepeatableTimeoutObjectFixture(opts ...func(timeout *hotstuff.RepeatableTimeoutObject)) *hotstuff.RepeatableTimeoutObject {
-	timeout := &hotstuff.RepeatableTimeoutObject{
+func TimeoutObjectFixture(opts ...func(timeout *hotstuff.TimeoutObject)) *hotstuff.TimeoutObject {
+	timeout := &hotstuff.TimeoutObject{
 		View:       uint64(rand.Uint32()),
 		NewestQC:   MakeQC(),
 		LastViewTC: MakeTC(),
@@ -75,26 +69,26 @@ func RepeatableTimeoutObjectFixture(opts ...func(timeout *hotstuff.RepeatableTim
 	return timeout
 }
 
-func WithTimeoutObjectSignerID(signerID flow.Identifier) func(*hotstuff.RepeatableTimeoutObject) {
-	return func(timeout *hotstuff.RepeatableTimeoutObject) {
+func WithTimeoutObjectSignerID(signerID flow.Identifier) func(*hotstuff.TimeoutObject) {
+	return func(timeout *hotstuff.TimeoutObject) {
 		timeout.SignerID = signerID
 	}
 }
 
-func WithTimeoutNewestQC(newestQC *flow.QuorumCertificate) func(*hotstuff.RepeatableTimeoutObject) {
-	return func(timeout *hotstuff.RepeatableTimeoutObject) {
+func WithTimeoutNewestQC(newestQC *flow.QuorumCertificate) func(*hotstuff.TimeoutObject) {
+	return func(timeout *hotstuff.TimeoutObject) {
 		timeout.NewestQC = newestQC
 	}
 }
 
-func WithTimeoutLastViewTC(lastViewTC *flow.TimeoutCertificate) func(*hotstuff.RepeatableTimeoutObject) {
-	return func(timeout *hotstuff.RepeatableTimeoutObject) {
+func WithTimeoutLastViewTC(lastViewTC *flow.TimeoutCertificate) func(*hotstuff.TimeoutObject) {
+	return func(timeout *hotstuff.TimeoutObject) {
 		timeout.LastViewTC = lastViewTC
 	}
 }
 
-func WithTimeoutObjectView(view uint64) func(*hotstuff.RepeatableTimeoutObject) {
-	return func(timeout *hotstuff.RepeatableTimeoutObject) {
+func WithTimeoutObjectView(view uint64) func(*hotstuff.TimeoutObject) {
+	return func(timeout *hotstuff.TimeoutObject) {
 		timeout.View = view
 	}
 }

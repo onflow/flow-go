@@ -83,13 +83,11 @@ func (c *CombinedSigner) CreateTimeout(curView uint64, newestQC *flow.QuorumCert
 	}
 
 	timeout := &model.TimeoutObject{
-		RepeatableTimeoutObject: model.RepeatableTimeoutObject{
-			View:       curView,
-			NewestQC:   newestQC,
-			LastViewTC: lastViewTC,
-			SignerID:   c.staking.NodeID(),
-			SigData:    sigData,
-		},
+		View:       curView,
+		NewestQC:   newestQC,
+		LastViewTC: lastViewTC,
+		SignerID:   c.staking.NodeID(),
+		SigData:    sigData,
 	}
 	return timeout, nil
 }

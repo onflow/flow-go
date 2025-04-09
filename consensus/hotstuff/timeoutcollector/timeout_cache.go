@@ -57,16 +57,15 @@ func (vc *TimeoutObjectsCache) AddTimeoutObject(timeout *model.TimeoutObject) er
 
 	// De-duplicated timeouts based on the following rules:
 	//  * For each voter (i.e. SignerID), we store the _first_  t0.
-	//  * For any subsequent timeout t, we check whether t.RepeatableTimeoutObject.ID() == t0.RepeatableTimeoutObject.ID().
+	//  * For any subsequent timeout t, we check whether t equals t0.
 	//    If this is the case, we consider the timeout a duplicate and drop it.
 	//    If t and t0 have different checksums, the voter is equivocating, and
 	//    we return a model.DoubleTimeoutError.
 	firstTimeout, exists := vc.timeouts[timeout.SignerID]
 	if exists {
 		vc.lock.Unlock()
-		// TODO: once we have signer indices, implement Equals methods for QC, TC
-		// and RepeatableTimeoutObject, to avoid the comparatively very expensive ID computation.
-		if firstTimeout.RepeatableTimeoutObject.ID() != timeout.RepeatableTimeoutObject.ID() {
+		// TODO: once we have signer indices, implement Equals methods for QC, TC to avoid the comparatively very expensive ID computation.
+		if !firstTimeout.Equal(timeout) {
 			return model.NewDoubleTimeoutErrorf(firstTimeout, timeout, "detected timeout equivocation by replica %x at view: %d", timeout.SignerID, vc.view)
 		}
 		return ErrRepeatedTimeout

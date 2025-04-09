@@ -466,13 +466,11 @@ func (h *MessageHub) Process(channel channels.Channel, originID flow.Identifier,
 		h.forwardToOwnVoteAggregator(msg, originID)
 	case *messages.TimeoutObject:
 		t := &model.TimeoutObject{
-			RepeatableTimeoutObject: model.RepeatableTimeoutObject{
-				View:       msg.View,
-				NewestQC:   msg.NewestQC,
-				LastViewTC: msg.LastViewTC,
-				SignerID:   originID,
-				SigData:    msg.SigData,
-			},
+			View:        msg.View,
+			NewestQC:    msg.NewestQC,
+			LastViewTC:  msg.LastViewTC,
+			SignerID:    originID,
+			SigData:     msg.SigData,
 			TimeoutTick: msg.TimeoutTick,
 		}
 		h.forwardToOwnTimeoutAggregator(t)
