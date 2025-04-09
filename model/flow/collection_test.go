@@ -23,3 +23,7 @@ func TestCollectionID_Malleability(t *testing.T) {
 		return unittest.TransactionBodyFixture()
 	}))
 }
+
+func TestCollectionGuaranteeID_Malleability(t *testing.T) {
+	unittest.RequireEntityNonMalleable(t, unittest.CollectionGuaranteeFixture())
+}
