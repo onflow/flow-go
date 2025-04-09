@@ -62,7 +62,7 @@ func TestLoopPruneExecutionDataFromRootToLatestSealed(t *testing.T) {
 				// verify that chunk data pack fixture can be found by the result
 				for _, c := range chunk.Result.Chunks {
 					chunkID := c.ID()
-					require.Equal(t, chunk.ChunkDataPack.ID(), chunkID)
+					require.Equal(t, chunk.ChunkDataPack.ChunkID, chunkID)
 					_, err := chunkDataPacks.ByChunkID(chunkID)
 					require.NoError(t, err)
 				}
@@ -107,7 +107,7 @@ func TestLoopPruneExecutionDataFromRootToLatestSealed(t *testing.T) {
 			lastPrunedHeight := lastSealedHeight - int(cfg.Threshold) // 90
 			for i := 1; i <= lastPrunedHeight; i++ {
 				expected := chunks[i]
-				_, err := chunkDataPacks.ByChunkID(expected.ChunkDataPack.ID())
+				_, err := chunkDataPacks.ByChunkID(expected.ChunkDataPack.ChunkID)
 				require.Error(t, err, fmt.Errorf("chunk data pack at height %v should be pruned, but not", i))
 				require.ErrorIs(t, err, storage.ErrNotFound)
 			}
@@ -115,7 +115,7 @@ func TestLoopPruneExecutionDataFromRootToLatestSealed(t *testing.T) {
 			// verify the chunk data packs within the threshold are not pruned
 			for i := lastPrunedHeight + 1; i <= lastFinalizedHeight; i++ {
 				expected := chunks[i]
-				actual, err := chunkDataPacks.ByChunkID(expected.ChunkDataPack.ID())
+				actual, err := chunkDataPacks.ByChunkID(expected.ChunkDataPack.ChunkID)
 				require.NoError(t, err)
 				require.Equal(t, expected.ChunkDataPack, actual)
 			}

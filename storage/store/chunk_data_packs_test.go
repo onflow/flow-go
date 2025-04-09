@@ -46,7 +46,7 @@ func TestChunkDataPack_Remove(t *testing.T) {
 
 			chunkIDs := make([]flow.Identifier, 0, len(chunkDataPacks))
 			for _, chunk := range chunkDataPacks {
-				chunkIDs = append(chunkIDs, chunk.ID())
+				chunkIDs = append(chunkIDs, chunk.ChunkID)
 			}
 
 			require.NoError(t, chunkDataPackStore.Store(chunkDataPacks))

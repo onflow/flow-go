@@ -42,7 +42,7 @@ type batchContext struct {
 // Resolves certified blocks when processing incoming batches.
 // Concurrency safe.
 type Cache struct {
-	backend *herocache.Cache // cache with random ejection
+	backend *herocache.Cache[*flow.Block] // cache with random ejection
 	lock    sync.RWMutex
 
 	// secondary indices
@@ -58,8 +58,8 @@ type Cache struct {
 func (c *Cache) Peek(blockID flow.Identifier) *flow.Block {
 	c.lock.RLock()
 	defer c.lock.RUnlock()
-	if block, found := c.backend.ByID(blockID); found {
-		return block.(*flow.Block)
+	if block, found := c.backend.Get(blockID); found {
+		return block
 	} else {
 		return nil
 	}
@@ -68,29 +68,28 @@ func (c *Cache) Peek(blockID flow.Identifier) *flow.Block {
 // NewCache creates new instance of Cache
 func NewCache(log zerolog.Logger, limit uint32, collector module.HeroCacheMetrics, notifier hotstuff.ProposalViolationConsumer) *Cache {
 	// We consume ejection event from HeroCache to here to drop ejected blocks from our secondary indices.
-	distributor := NewDistributor()
+	distributor := NewDistributor[*flow.Block]()
 	cache := &Cache{
-		backend: herocache.NewCache(
+		backend: herocache.NewCache[*flow.Block](
 			limit,
 			herocache.DefaultOversizeFactor,
 			heropool.RandomEjection,
 			log.With().Str("component", "follower.cache").Logger(),
 			collector,
-			herocache.WithTracer(distributor),
+			herocache.WithTracer[*flow.Block](distributor),
 		),
 		byView:   make(map[uint64]BlocksByID),
 		byParent: make(map[flow.Identifier]BlocksByID),
 		notifier: notifier,
 	}
-	distributor.AddConsumer(cache.handleEjectedEntity)
+	distributor.AddConsumer(cache.handleEjectedBlock)
 	return cache
 }
 
-// handleEjectedEntity performs cleanup of secondary indexes to prevent memory leaks.
+// handleEjectedBlock performs cleanup of secondary indexes to prevent memory leaks.
 // WARNING: Concurrency safety of this function is guaranteed by `c.lock`. This method is only called
 // by `herocache.Cache.Add` and we perform this call while `c.lock` is in locked state.
-func (c *Cache) handleEjectedEntity(entity flow.Entity) {
-	block := entity.(*flow.Block)
+func (c *Cache) handleEjectedBlock(block *flow.Block) {
 	blockID := block.ID()
 
 	// remove block from the set of blocks for this view
@@ -265,8 +264,8 @@ func (c *Cache) unsafeAtomicAdd(blockIDs []flow.Identifier, fullBlocks []*flow.B
 	defer c.lock.Unlock()
 
 	// check whether we have the parent of first block already in our cache:
-	if parent, ok := c.backend.ByID(fullBlocks[0].Header.ParentID); ok {
-		bc.batchParent = parent.(*flow.Block)
+	if parent, ok := c.backend.Get(fullBlocks[0].Header.ParentID); ok {
+		bc.batchParent = parent
 	}
 
 	// check whether we have a child of last block already in our cache:

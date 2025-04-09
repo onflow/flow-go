@@ -12,12 +12,14 @@ import (
 	herocache "github.com/onflow/flow-go/module/mempool/herocache/backdata"
 	"github.com/onflow/flow-go/module/mempool/herocache/backdata/heropool"
 	"github.com/onflow/flow-go/module/mempool/stdmap"
+	"github.com/onflow/flow-go/network/p2p"
 )
 
 // SubscriptionRecordCache manages the subscription records of peers in a network.
 // It uses a currentCycle counter to track the update cycles of the cache, ensuring the relevance of subscription data.
+// Stored subscription record are keyed by the hash of the peerID.
 type SubscriptionRecordCache struct {
-	c *stdmap.Backend
+	c *stdmap.Backend[flow.Identifier, *SubscriptionRecord]
 
 	// currentCycle is an atomic counter used to track the update cycles of the subscription cache.
 	// It plays a critical role in maintaining the cache's data relevance and coherence.
@@ -41,14 +43,16 @@ type SubscriptionRecordCache struct {
 func NewSubscriptionRecordCache(sizeLimit uint32,
 	logger zerolog.Logger,
 	collector module.HeroCacheMetrics) *SubscriptionRecordCache {
-	backData := herocache.NewCache(sizeLimit,
+	backData := herocache.NewCache[*SubscriptionRecord](
+		sizeLimit,
 		herocache.DefaultOversizeFactor,
 		heropool.LRUEjection,
 		logger.With().Str("mempool", "subscription-records").Logger(),
-		collector)
+		collector,
+	)
 
 	return &SubscriptionRecordCache{
-		c:            stdmap.NewBackend(stdmap.WithBackData(backData)),
+		c:            stdmap.NewBackend(stdmap.WithMutableBackData[flow.Identifier, *SubscriptionRecord](backData)),
 		currentCycle: *atomic.NewUint64(0),
 	}
 }
@@ -58,11 +62,11 @@ func NewSubscriptionRecordCache(sizeLimit uint32,
 // - []string: the list of topics the peer is subscribed to.
 // - bool: true if there is a record for the peer, false otherwise.
 func (s *SubscriptionRecordCache) GetSubscribedTopics(pid peer.ID) ([]string, bool) {
-	e, ok := s.c.ByID(entityIdOf(pid))
+	record, ok := s.c.Get(p2p.MakeId(pid))
 	if !ok {
 		return nil, false
 	}
-	return e.(SubscriptionRecordEntity).Topics, true
+	return record.Topics, true
 }
 
 // MoveToNextUpdateCycle moves the subscription cache to the next update cycle.
@@ -96,24 +100,15 @@ func (s *SubscriptionRecordCache) MoveToNextUpdateCycle() uint64 {
 // - error: an error if the update failed; any returned error is an irrecoverable error and indicates a bug or misconfiguration.
 // Implementation must be thread-safe.
 func (s *SubscriptionRecordCache) AddWithInitTopicForPeer(pid peer.ID, topic string) ([]string, error) {
-	entityId := entityIdOf(pid)
-	initLogic := func() flow.Entity {
-		return SubscriptionRecordEntity{
-			entityId:         entityId,
+	initLogic := func() *SubscriptionRecord {
+		return &SubscriptionRecord{
 			PeerID:           pid,
 			Topics:           make([]string, 0),
 			LastUpdatedCycle: s.currentCycle.Load(),
 		}
 	}
 	var rErr error
-	adjustLogic := func(entity flow.Entity) flow.Entity {
-		record, ok := entity.(SubscriptionRecordEntity)
-		if !ok {
-			// sanity check
-			// This should never happen, because the cache only contains SubscriptionRecordEntity entities.
-			panic(fmt.Sprintf("invalid entity type, expected SubscriptionRecordEntity type, got: %T", entity))
-		}
-
+	adjustLogic := func(record *SubscriptionRecord) *SubscriptionRecord {
 		currentCycle := s.currentCycle.Load()
 		if record.LastUpdatedCycle > currentCycle {
 			// sanity check
@@ -138,7 +133,7 @@ func (s *SubscriptionRecordCache) AddWithInitTopicForPeer(pid peer.ID, topic str
 		// Return the adjusted record.
 		return record
 	}
-	adjustedEntity, adjusted := s.c.AdjustWithInit(entityId, adjustLogic, initLogic)
+	adjustedRecord, adjusted := s.c.AdjustWithInit(p2p.MakeId(pid), adjustLogic, initLogic)
 	if rErr != nil {
 		return nil, fmt.Errorf("failed to adjust record with error: %w", rErr)
 	}
@@ -146,16 +141,5 @@ func (s *SubscriptionRecordCache) AddWithInitTopicForPeer(pid peer.ID, topic str
 		return nil, fmt.Errorf("failed to adjust record, entity not found")
 	}
 
-	return adjustedEntity.(SubscriptionRecordEntity).Topics, nil
-}
-
-// entityIdOf converts a peer ID to a flow ID by taking the hash of the peer ID.
-// This is used to convert the peer ID in a notion that is compatible with HeroCache.
-// This is not a protocol-level conversion, and is only used internally by the cache, MUST NOT be exposed outside the cache.
-// Args:
-// - peerId: the peer ID of the peer in the GossipSub protocol.
-// Returns:
-// - flow.Identifier: the flow ID of the peer.
-func entityIdOf(pid peer.ID) flow.Identifier {
-	return flow.MakeID(pid)
+	return adjustedRecord.Topics, nil
 }
