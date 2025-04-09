@@ -14,7 +14,7 @@ type CollectionGuarantee struct {
 	Signature        crypto.Signature // guarantor signatures
 }
 
-// ID returns the fingerprint of the collection guarantee.
+// ID returns a collision-resistant hash of the CollectionGuarantee struct.
 func (cg *CollectionGuarantee) ID() Identifier {
 	return MakeID(cg)
 }
