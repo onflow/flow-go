@@ -12,7 +12,6 @@ import (
 	gethCommon "github.com/onflow/go-ethereum/common"
 	gethState "github.com/onflow/go-ethereum/core/state"
 	gethStateless "github.com/onflow/go-ethereum/core/stateless"
-	"github.com/onflow/go-ethereum/core/tracing"
 	gethTracing "github.com/onflow/go-ethereum/core/tracing"
 	gethTypes "github.com/onflow/go-ethereum/core/types"
 	gethParams "github.com/onflow/go-ethereum/params"
@@ -194,7 +193,7 @@ func (db *StateDB) GetNonce(addr gethCommon.Address) uint64 {
 func (db *StateDB) SetNonce(
 	addr gethCommon.Address,
 	nonce uint64,
-	reason tracing.NonceChangeReason,
+	reason gethTracing.NonceChangeReason,
 ) {
 	err := db.latestView().SetNonce(addr, nonce)
 	db.handleError(err)
