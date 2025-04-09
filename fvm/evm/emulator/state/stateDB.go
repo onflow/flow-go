@@ -221,12 +221,14 @@ func (db *StateDB) GetCodeSize(addr gethCommon.Address) int {
 	return codeSize
 }
 
-// SetCode sets the code for the given address
+// SetCode sets the code for the given address, and returns the
+// previous code located at the given address, if any.
 func (db *StateDB) SetCode(addr gethCommon.Address, code []byte) (prev []byte) {
+	prev = db.GetCode(addr)
 	err := db.latestView().SetCode(addr, code)
 	db.handleError(err)
 
-	return nil
+	return prev
 }
 
 // AddRefund adds the amount to the total (gas) refund
