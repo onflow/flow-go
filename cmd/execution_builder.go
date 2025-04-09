@@ -1411,7 +1411,7 @@ func (exeNode *ExecutionNode) LoadBootstrapper(node *NodeConfig) error {
 	// in order to support switching from badger to pebble in the middle of the spork,
 	// we will check if the execution database has been bootstrapped by reading the state from badger db.
 	// and if not, bootstrap both badger and pebble db.
-	commit, bootstrapped, err := bootstrapper.IsBootstrapped(badgerimpl.ToDB(node.DB))
+	commit, bootstrapped, err := bootstrapper.IsBootstrapped(node.ProtocolDB)
 	if err != nil {
 		return fmt.Errorf("could not query database to know whether database has been bootstrapped: %w", err)
 	}
