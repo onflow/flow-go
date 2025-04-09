@@ -24,20 +24,18 @@ func newPebbleSeeker(reader pebble.Reader) *pebbleSeeker {
 	}
 }
 
-// SeekLE (seek less than or equal) returns given key if present.  Otherwise,
-// it returns the largest key that is less than the given key in lexicographical
-// order within the prefix range [startPrefix, endPrefix], both inclusive.
-// This function returns error if given key is outside range of startPrefix and endPrefix.
-func (i *pebbleSeeker) SeekLE(startPrefix, endPrefix []byte, key []byte) (_ []byte, _ bool, errToReturn error) {
-	lowerBound, upperBound, hasUpperBound := storage.StartEndPrefixToLowerUpperBound(startPrefix, endPrefix)
+// SeekLE (seek less than or equal) returns the largest key in lexicographical
+// order within inclusive range of [startPrefix, key].
+// This function returns an error if specified key is less than startPrefix.
+// This function returns nil key (without error) if a key that matches
+// the specified criteria is not found.
+func (i *pebbleSeeker) SeekLE(startPrefix, key []byte) (_ []byte, errToReturn error) {
 
 	if bytes.Compare(key, startPrefix) < 0 {
-		return nil, false, errors.New("key must be greater than or equal to startPrefix key")
+		return nil, errors.New("key must be greater than or equal to startPrefix key")
 	}
 
-	if hasUpperBound && bytes.Compare(key, upperBound) >= 0 {
-		return nil, false, errors.New("key must be less than or equal to endPrefix key")
-	}
+	lowerBound, upperBound, hasUpperBound := storage.StartEndPrefixToLowerUpperBound(startPrefix, key)
 
 	options := pebble.IterOptions{
 		LowerBound: lowerBound,
@@ -51,7 +49,7 @@ func (i *pebbleSeeker) SeekLE(startPrefix, endPrefix []byte, key []byte) (_ []by
 
 	iter, err := i.reader.NewIter(&options)
 	if err != nil {
-		return nil, false, fmt.Errorf("can not create iterator: %w", err)
+		return nil, fmt.Errorf("can not create iterator: %w", err)
 	}
 	defer func() {
 		errToReturn = merr.CloseAndMergeError(iter, errToReturn)
@@ -62,16 +60,16 @@ func (i *pebbleSeeker) SeekLE(startPrefix, endPrefix []byte, key []byte) (_ []by
 	valid := iter.SeekGE(key)
 	if valid {
 		if bytes.Equal(iter.Key(), key) {
-			return slices.Clone(key), true, nil
+			return slices.Clone(key), nil
 		}
 	}
 
-	// Seek smallest key less than the given key.
+	// Seek largest key less than the given key.
 
 	valid = iter.SeekLT(key)
 	if !valid {
-		return nil, false, nil
+		return nil, nil
 	}
 
-	return slices.Clone(iter.Key()), true, nil
+	return slices.Clone(iter.Key()), nil
 }

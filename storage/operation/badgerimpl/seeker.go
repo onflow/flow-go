@@ -19,19 +19,14 @@ func newBadgerSeeker(db *badger.DB) *badgerSeeker {
 	return &badgerSeeker{db: db}
 }
 
-// SeekLE (seek less than or equal) returns given key if present.  Otherwise,
-// it returns the largest key that is less than the given key in lexicographical
-// order within the prefix range [startPrefix, endPrefix], both inclusive.
-// This function returns error if given key is outside range of startPrefix and endPrefix.
-func (i *badgerSeeker) SeekLE(startPrefix, endPrefix []byte, key []byte) ([]byte, bool, error) {
-	lowerBound, upperBound, hasUpperBound := storage.StartEndPrefixToLowerUpperBound(startPrefix, endPrefix)
-
+// SeekLE (seek less than or equal) returns the largest key in lexicographical
+// order within inclusive range of [startPrefix, key].
+// This function returns an error if specified key is less than startPrefix.
+// This function returns nil key (without error) if a key that matches
+// the specified criteria is not found.
+func (i *badgerSeeker) SeekLE(startPrefix, key []byte) ([]byte, error) {
 	if bytes.Compare(key, startPrefix) < 0 {
-		return nil, false, errors.New("key must be greater than or equal to startPrefix key")
-	}
-
-	if hasUpperBound && bytes.Compare(key, upperBound) >= 0 {
-		return nil, false, errors.New("key must be less than or equal to endPrefix key")
+		return nil, errors.New("key must be greater than or equal to startPrefix key")
 	}
 
 	options := badger.DefaultIteratorOptions
@@ -50,13 +45,13 @@ func (i *badgerSeeker) SeekLE(startPrefix, endPrefix []byte, key []byte) ([]byte
 
 	// Check if we reach the end of the iteration.
 	if !iter.Valid() {
-		return nil, false, nil
+		return nil, nil
 	}
 
-	// Check if returned key is less than lowerBound.
-	if bytes.Compare(iter.Item().Key(), lowerBound) < 0 {
-		return nil, false, nil
+	// Check if returned key is less than startPrefix.
+	if bytes.Compare(iter.Item().Key(), startPrefix) < 0 {
+		return nil, nil
 	}
 
-	return iter.Item().KeyCopy(nil), true, nil
+	return iter.Item().KeyCopy(nil), nil
 }

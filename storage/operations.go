@@ -68,13 +68,14 @@ func DefaultIteratorOptions() IteratorOption {
 	}
 }
 
-// Seeker is an interface for seeking keys in a given range.
+// Seeker is an interface for seeking a key within a range.
 type Seeker interface {
-	// SeekLE (seek less than or equal) returns given key if present.  Otherwise,
-	// it returns the largest key that is less than the given key in lexicographical
-	// order within the prefix range [startPrefix, endPrefix], both inclusive.
-	// This function returns error if given key is outside range of startPrefix and endPrefix.
-	SeekLE(startPrefix, endPrefix []byte, key []byte) ([]byte, bool, error)
+	// SeekLE (seek less than or equal) returns the largest key in lexicographical
+	// order within inclusive range of [startPrefix, key].
+	// This function returns an error if specified key is less than startPrefix.
+	// This function returns nil key (without error) if a key that matches
+	// the specified criteria is not found.
+	SeekLE(startPrefix, key []byte) ([]byte, error)
 }
 
 type Reader interface {
