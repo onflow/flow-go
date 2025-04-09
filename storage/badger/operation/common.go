@@ -517,7 +517,7 @@ func findHighestAtOrBelow(
 		it := tx.NewIterator(opts)
 		defer it.Close()
 
-		it.Seek(append(prefix, b(height)...))
+		it.Seek(append(prefix, keyPartToBinary(height)...))
 
 		if !it.Valid() {
 			return storage.ErrNotFound

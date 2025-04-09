@@ -1,6 +1,14 @@
 package protocol
 
-import "github.com/onflow/flow-go/model/flow"
+import (
+	"io"
+	"math"
+	"slices"
+
+	"github.com/ethereum/go-ethereum/rlp"
+
+	"github.com/onflow/flow-go/model/flow"
+)
 
 // This file contains versioned read interface to the Protocol State's
 // key-value store and are used by the Protocol State Machine.
@@ -101,6 +109,110 @@ type KVStoreReader interface {
 	//    enough that the network is overwhelming likely to finalize at least one
 	//    block with a view in this range
 	GetFinalizationSafetyThreshold() uint64
+
+	// v3
+
+	// GetCadenceComponentVersion returns the current Cadence component version.
+	// If not otherwise specified, during network bootstrapping or via service event, the component version is initialized to 0.0.
+	// Error Returns:
+	//   - kvstore.ErrKeyNotSupported if invoked on a KVStore instance before v3.
+	GetCadenceComponentVersion() (MagnitudeVersion, error)
+	// GetCadenceComponentVersionUpgrade returns the most recent upgrade for the Cadence Component Version,
+	// if one exists (otherwise returns nil). The upgrade will be returned even if it has already been applied.
+	// Returns nil if invoked on a KVStore instance before v3.
+	GetCadenceComponentVersionUpgrade() *ViewBasedActivator[MagnitudeVersion]
+
+	// GetExecutionComponentVersion returns the Execution component version.
+	// If not otherwise specified, during network bootstrapping or via service event, the component version is initialized to 0.0.
+	// Error Returns:
+	//   - kvstore.ErrKeyNotSupported if invoked on a KVStore instance before v3.
+	GetExecutionComponentVersion() (MagnitudeVersion, error)
+	// GetExecutionComponentVersionUpgrade returns the most recent upgrade for the Execution Component Version,
+	// if one exists (otherwise returns nil). The upgrade will be returned even if it has already been applied.
+	// Returns nil if invoked on a KVStore instance before v3.
+	GetExecutionComponentVersionUpgrade() *ViewBasedActivator[MagnitudeVersion]
+
+	// GetExecutionMeteringParameters returns the Execution metering parameters.
+	// Error Returns:
+	//   - kvstore.ErrKeyNotSupported if invoked on a KVStore instance before v3.
+	GetExecutionMeteringParameters() (ExecutionMeteringParameters, error)
+	// GetExecutionMeteringParametersUpgrade returns the most recent upgrade for the Execution Metering Parameters,
+	// if one exists (otherwise returns nil). The upgrade will be returned even if it has already been applied.
+	// Returns nil if invoked on a KVStore instance before v3.
+	GetExecutionMeteringParametersUpgrade() *ViewBasedActivator[ExecutionMeteringParameters]
+}
+
+// ExecutionMeteringParameters are used to measure resource usage of transactions,
+// which affects fee calculations and transaction/script stopping conditions.
+type ExecutionMeteringParameters struct {
+	// ExecutionEffortWeights maps execution effort kinds to their weights. The weights are used to tally up
+	// execution effort of a cadence transaction. If execution effort reaches the limit `DefaultMaxTransactionGasLimit`
+	// the transaction will be halted and considered failed. The transactions execution effort is also used to calculate
+	// the transaction fees. Unspecified weights default to `meter.DefaultComputationWeights`.
+	ExecutionEffortWeights map[uint32]uint64
+	// ExecutionMemoryWeights maps execution memory kinds to their weights. The weights are used to tally up
+	// memory usage of a cadence transaction. If memory usage reaches the limit `ExecutionMemoryLimit` the transaction
+	// will be halted and considered failed. Unspecified weights default to `meter.DefaultMemoryWeights`.
+	ExecutionMemoryWeights map[uint32]uint64
+	// ExecutionMemoryLimit is the maximum amount of memory that can be used by a transaction before it is halted and
+	// considered failed. If set to `math.MaxUint64` the `meter.DefaultMemoryLimit` is used.
+	ExecutionMemoryLimit uint64
+}
+
+// DefaultExecutionMeteringParameters returns the default set of execution metering parameters.
+// This is the initial value automatically populated when:
+//   - the Protocol State first upgrades to a version supporting the ExecutionMeteringParameters field
+//   - a new network is bootstrapped without over-riding execution metering parameters
+func DefaultExecutionMeteringParameters() ExecutionMeteringParameters {
+	return ExecutionMeteringParameters{
+		ExecutionEffortWeights: make(map[uint32]uint64),
+		ExecutionMemoryWeights: make(map[uint32]uint64),
+		ExecutionMemoryLimit:   math.MaxUint64,
+	}
+}
+
+// EncodeRLP defines RLP encoding behaviour for ExecutionMeteringParameters, overriding the default behaviour.
+// We convert maps to ordered slices of key-pairs before encoding, because RLP does not directly support maps.
+// We require this KVStore field type to be RLP-encodable so we can compute the hash/ID of a kvstore model instance.
+func (params *ExecutionMeteringParameters) EncodeRLP(w io.Writer) error {
+	type pair struct {
+		Key   uint32
+		Value uint64
+	}
+	pairOrdering := func(a, b pair) int {
+		if a.Key < b.Key {
+			return -1
+		}
+		if a.Key > b.Key {
+			return 1
+		}
+		// Since we are ordering by key taken directly from a single Go map type, it is not possible to
+		// observe two identical keys while ordering. If we do, some invariant has been violated.
+		// Also, since the sort used is non-stable, this could result in non-deterministic hashes.
+		panic("critical invariant violated: map with duplicate keys")
+	}
+
+	orderedEffortParams := make([]pair, 0, len(params.ExecutionEffortWeights))
+	for k, v := range params.ExecutionEffortWeights {
+		orderedEffortParams = append(orderedEffortParams, pair{k, v})
+	}
+	slices.SortFunc(orderedEffortParams, pairOrdering)
+
+	orderedMemoryParams := make([]pair, 0, len(params.ExecutionMemoryWeights))
+	for k, v := range params.ExecutionMemoryWeights {
+		orderedMemoryParams = append(orderedMemoryParams, pair{k, v})
+	}
+	slices.SortFunc(orderedMemoryParams, pairOrdering)
+
+	return rlp.Encode(w, struct {
+		ExecutionEffortWeights []pair
+		ExecutionMemoryWeights []pair
+		ExecutionMemoryLimit   uint64
+	}{
+		ExecutionEffortWeights: orderedEffortParams,
+		ExecutionMemoryWeights: orderedMemoryParams,
+		ExecutionMemoryLimit:   params.ExecutionMemoryLimit,
+	})
 }
 
 // VersionedEncodable defines the interface for a versioned key-value store independent
@@ -113,8 +225,61 @@ type VersionedEncodable interface {
 	VersionedEncode() (uint64, []byte, error)
 }
 
-// ViewBasedActivator allows setting value that will be active from specific view.
+// ViewBasedActivator represents a scheduled update to some protocol parameter P.
+// (The relationship between a ViewBasedActivator and P is managed outside this model.)
+// Once the ViewBasedActivator A is persisted to the protocol state, P is updated to value
+// A.Data in the first block with view ≥ A.ActivationView (in each fork independently).
 type ViewBasedActivator[T any] struct {
-	Data           T
-	ActivationView uint64 // first view at which Data will take effect
+	// Data is the pending new value, to be applied when reaching or exceeding ActivationView.
+	Data T
+	// ActivationView is the view at which the new value should be applied.
+	ActivationView uint64
+}
+
+// UpdatableField represents a protocol parameter which can be updated using a ViewBasedActivator.
+type UpdatableField[T any] struct {
+	// CurrentValue is the value that is active after constructing the block
+	// that this Protocol State pertains to.
+	CurrentValue T
+
+	// Update is optional and is nil if no value update has been scheduled yet.
+	// This field will hold the last scheduled update until a newer update
+	// directive is received, even if the value update has already happened.
+	// The update should be applied when reaching or exceeding the ActivationView.
+	Update *ViewBasedActivator[T]
+}
+
+// MagnitudeVersion is intended as an intuitive representation of the “magnitude of change”.
+//
+// # CAUTION: Don't confuse this with semver!
+//
+// This versioning representation DEVIATES from established Semantic Versioning.
+// Any two different versions of the Execution Stack are considered incompatible.
+// In particular, two versions only differing in their minor, might be entirely downwards-INCOMPATIBLE.
+//
+// We generally recommend to use Integer Versioning for components. The MagnitudeVersion scheme should
+// be only used when there is a clear advantage over Integer Versioning, which outweighs the risk of falsely
+// making compatibility assumptions by confusing this scheme with Semantic Versioning!
+//
+// MagnitudeVersion helps with an intuitive representation of the “magnitude of change”.
+// For example, for the execution stack, bug fixes closing unexploited edge-cases will be a relatively
+// frequent cause of upgrades. Those bug fixes could be reflected by minor version bumps, whose
+// imperfect downwards compatibility might frequently suffice to warrant Access Nodes using the same
+// version (higher minor) across version boundaries. In comparison, major version change would generally
+// indicate broader non-compatibility (or larger feature additions) where it is very unlikely that the Access
+// Node can use one implementation for versions with different major.
+//
+// We emphasize again that this differentiation of “imperfect but good-enough downwards compatibility”
+// is in no way reflected by the versioning scheme. Any automated decisions regarding compatibility of
+// different versions are to be avoided (including versions where only the minor is different).
+//
+// Engineering teams using this scheme must be aware that the MagnitudeVersion is easily
+// misleading wrt to incorrect assumptions about downwards compatibility. Avoiding problems (up to and
+// including the possibility of mainnet outages) requires continued awareness of all engineers in the
+// teams working with this version. The engineers in those teams must commit to diligently documenting
+// all relevant changes, details regarding magnitude of changes and if applicable “imperfect but
+// good-enough downwards compatibility”.
+type MagnitudeVersion struct {
+	Major uint
+	Minor uint
 }
