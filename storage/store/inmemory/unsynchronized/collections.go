@@ -29,7 +29,9 @@ func NewCollections() *Collections {
 }
 
 // ByID returns the collection with the given ID, including all transactions within the collection.
-// Returns storage.ErrNotFound if collection wasn't found.
+//
+// Expected errors during normal operation:
+//   - `storage.ErrNotFound` if no light collection was found.
 func (c *Collections) ByID(collID flow.Identifier) (*flow.Collection, error) {
 	c.lock.RLock()
 	defer c.lock.RUnlock()
@@ -43,7 +45,9 @@ func (c *Collections) ByID(collID flow.Identifier) (*flow.Collection, error) {
 }
 
 // LightByID returns collection with the given ID. Only retrieves transaction hashes.
-// Returns storage.ErrNotFound if collection wasn't found.
+//
+// Expected errors during normal operation:
+//   - `storage.ErrNotFound` if no light collection was found.
 func (c *Collections) LightByID(collID flow.Identifier) (*flow.LightCollection, error) {
 	c.lock.RLock()
 	defer c.lock.RUnlock()
@@ -57,7 +61,9 @@ func (c *Collections) LightByID(collID flow.Identifier) (*flow.LightCollection, 
 }
 
 // LightByTransactionID returns the collection for the given transaction ID. Only retrieves transaction hashes.
-// Returns storage.ErrNotFound if collection wasn't found.
+//
+// Expected errors during normal operation:
+//   - `storage.ErrNotFound` if no light collection was found.
 func (c *Collections) LightByTransactionID(txID flow.Identifier) (*flow.LightCollection, error) {
 	c.lock.RLock()
 	defer c.lock.RUnlock()
@@ -71,7 +77,7 @@ func (c *Collections) LightByTransactionID(txID flow.Identifier) (*flow.LightCol
 }
 
 // Store inserts the collection keyed by ID and all constituent transactions.
-// Returns no errors during normal operation.
+// No errors are expected during normal operation.
 func (c *Collections) Store(collection *flow.Collection) error {
 	c.lock.Lock()
 	defer c.lock.Unlock()
@@ -81,7 +87,7 @@ func (c *Collections) Store(collection *flow.Collection) error {
 }
 
 // StoreLight inserts the collection. It does not insert, nor check existence of, the constituent transactions.
-// Returns no errors during normal operation.
+// No errors are expected during normal operation.
 func (c *Collections) StoreLight(collection *flow.LightCollection) error {
 	c.lock.Lock()
 	defer c.lock.Unlock()
@@ -103,7 +109,7 @@ func (c *Collections) StoreLight(collection *flow.LightCollection) error {
 // the transaction_id->collection_id index when an index for the transaction
 // already exists.
 //
-// Returns no errors during normal operation.
+// No errors are expected during normal operation.
 func (c *Collections) StoreLightAndIndexByTransaction(collection *flow.LightCollection) error {
 	c.lock.Lock()
 	defer c.lock.Unlock()
@@ -117,7 +123,7 @@ func (c *Collections) StoreLightAndIndexByTransaction(collection *flow.LightColl
 }
 
 // Remove removes the collection and all constituent transactions.
-// Returns no errors during normal operation.
+// No errors are expected during normal operation.
 func (c *Collections) Remove(collID flow.Identifier) error {
 	c.lock.Lock()
 	defer c.lock.Unlock()
