@@ -87,7 +87,8 @@ func (c *Collections) LightByID(colID flow.Identifier) (*flow.LightCollection, e
 	return &collection, nil
 }
 
-// Remove removes a collection from the database.
+// Remove removes a collection from the database, including all constituent transactions and
+// indices inserted by Store.
 // Remove does not error if the collection does not exist
 // Note: this method should only be called for collections included in blocks below sealed height
 // any error returned are exceptions
@@ -159,9 +160,9 @@ func (c *Collections) StoreLightAndIndexByTransaction(collection *flow.LightColl
 			if err == nil {
 				// collection nodes have ensured that a transaction can only belong to one collection
 				// so if transaction is already indexed by a collection, check if it's the same collection.
-				// if not, return an error
+				// TODO: For now we log a warning, but eventually we need to handle Byzantine clusters
 				if collectionID != differentColTxIsIn {
-					log.Error().Msgf("fatal: transaction %v in collection %v is already indexed by a different collection %v",
+					log.Error().Msgf("sanity check failed: transaction %v in collection %v is already indexed by a different collection %v",
 						txID, collectionID, differentColTxIsIn)
 				}
 				continue
@@ -172,7 +173,6 @@ func (c *Collections) StoreLightAndIndexByTransaction(collection *flow.LightColl
 			if err != nil {
 				return fmt.Errorf("could not insert transaction ID: %w", err)
 			}
-			continue
 		}
 
 		return nil

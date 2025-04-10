@@ -16,7 +16,7 @@ func RetrieveTransaction(r storage.Reader, txID flow.Identifier, tx *flow.Transa
 	return RetrieveByKey(r, MakePrefix(codeTransaction, txID), tx)
 }
 
-// RemoveTransaction removes a transaction by fingerprint.
+// RemoveTransaction removes a transaction by ID.
 func RemoveTransaction(r storage.Writer, txID flow.Identifier) error {
 	return RemoveByKey(r, MakePrefix(codeTransaction, txID))
 }
