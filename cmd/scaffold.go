@@ -1244,17 +1244,16 @@ func (fnb *FlowNodeBuilder) initStorage() error {
 	index := bstorage.NewIndex(fnb.Metrics.Cache, fnb.DB)
 	payloads := bstorage.NewPayloads(fnb.DB, index, guarantees, seals, receipts, results)
 	blocks := bstorage.NewBlocks(fnb.DB, headers, payloads)
-	// TODO(leo): replace fnb.DB with ProtocolDB
-	qcs := store.NewQuorumCertificates(fnb.Metrics.Cache, badgerimpl.ToDB(fnb.DB), bstorage.DefaultCacheSize)
+	qcs := store.NewQuorumCertificates(fnb.Metrics.Cache, fnb.ProtocolDB, bstorage.DefaultCacheSize)
 	transactions := bstorage.NewTransactions(fnb.Metrics.Cache, fnb.DB)
 	collections := bstorage.NewCollections(fnb.DB, transactions)
-	setups := bstorage.NewEpochSetups(fnb.Metrics.Cache, fnb.DB)
-	epochCommits := bstorage.NewEpochCommits(fnb.Metrics.Cache, fnb.DB)
-	protocolState := bstorage.NewEpochProtocolStateEntries(fnb.Metrics.Cache, setups, epochCommits, fnb.DB,
+	setups := store.NewEpochSetups(fnb.Metrics.Cache, fnb.ProtocolDB)
+	epochCommits := store.NewEpochCommits(fnb.Metrics.Cache, fnb.ProtocolDB)
+	protocolState := store.NewEpochProtocolStateEntries(fnb.Metrics.Cache, setups, epochCommits, fnb.ProtocolDB,
 		bstorage.DefaultEpochProtocolStateCacheSize, bstorage.DefaultProtocolStateIndexCacheSize)
-	protocolKVStores := bstorage.NewProtocolKVStore(fnb.Metrics.Cache, fnb.DB,
+	protocolKVStores := store.NewProtocolKVStore(fnb.Metrics.Cache, fnb.ProtocolDB,
 		bstorage.DefaultProtocolKVStoreCacheSize, bstorage.DefaultProtocolKVStoreByBlockIDCacheSize)
-	versionBeacons := store.NewVersionBeacons(badgerimpl.ToDB(fnb.DB))
+	versionBeacons := store.NewVersionBeacons(fnb.ProtocolDB)
 
 	fnb.Storage = Storage{
 		Headers:                   headers,
@@ -1354,7 +1353,7 @@ func (fnb *FlowNodeBuilder) initState() error {
 		fnb.Logger.Info().Msg("opening already bootstrapped protocol state")
 		state, err := badgerState.OpenState(
 			fnb.Metrics.Compliance,
-			fnb.DB,
+			fnb.ProtocolDB,
 			fnb.Storage.Headers,
 			fnb.Storage.Seals,
 			fnb.Storage.Results,
@@ -1403,7 +1402,7 @@ func (fnb *FlowNodeBuilder) initState() error {
 
 		fnb.State, err = badgerState.Bootstrap(
 			fnb.Metrics.Compliance,
-			fnb.DB,
+			fnb.ProtocolDB,
 			fnb.Storage.Headers,
 			fnb.Storage.Seals,
 			fnb.Storage.Results,

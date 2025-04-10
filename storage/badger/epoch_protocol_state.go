@@ -139,6 +139,10 @@ func (s *EpochProtocolStateEntries) StoreTx(epochProtocolStateEntryID flow.Ident
 	return transaction.WithTx(operation.InsertEpochProtocolState(epochProtocolStateEntryID, epochStateEntry))
 }
 
+func (s *EpochProtocolStateEntries) BatchStore(rw storage.ReaderBatchWriter, epochProtocolStateEntryID flow.Identifier, epochStateEntry *flow.MinEpochStateEntry) error {
+	panic("not implemented")
+}
+
 // Index returns an anonymous function that is intended to be executed as part of a database transaction.
 // In a nutshell, we want to maintain a map from `blockID` to `epochStateEntry`, where `blockID` references the
 // block that _proposes_ the referenced epoch protocol state entry.
@@ -155,6 +159,9 @@ func (s *EpochProtocolStateEntries) StoreTx(epochProtocolStateEntryID flow.Ident
 //   - storage.ErrAlreadyExists if a state entry for the given blockID has already been indexed
 func (s *EpochProtocolStateEntries) Index(blockID flow.Identifier, epochProtocolStateEntryID flow.Identifier) func(*transaction.Tx) error {
 	return s.byBlockIdCache.PutTx(blockID, epochProtocolStateEntryID)
+}
+func (s *EpochProtocolStateEntries) BatchIndex(rw storage.ReaderBatchWriter, blockID flow.Identifier, epochProtocolStateEntryID flow.Identifier) error {
+	panic("not implemented")
 }
 
 // ByID returns the epoch protocol state entry by its ID.
