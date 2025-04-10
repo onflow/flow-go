@@ -60,11 +60,6 @@ type TimeoutObject struct {
 	TimeoutTick uint64
 }
 
-// ID returns a collision-resistant hash of the TimeoutObject struct.
-func (t *TimeoutObject) ID() flow.Identifier {
-	return flow.MakeID(t)
-}
-
 // Equals returns true if the TimeoutObject is equal to the provided other TimeoutObject.
 // It compares View, NewestQC, LastViewTC, SignerID and SigData and is used for de-duplicate TimeoutObjects in the cache.
 // It excludes TimeoutTick: two TimeoutObjects with different TimeoutTick values can be considered equal.
