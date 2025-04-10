@@ -20,7 +20,7 @@ var (
 // view. The cache memorizes the order in which the timeouts were received. Timeouts
 // are de-duplicated based on the following rules:
 //   - For each voter (i.e. SignerID), we store the _first_ timeout t0.
-//   - For any subsequent timeout t, we check whether t.ID() == t0.ID().
+//   - For any subsequent timeout t, we check whether t equals t0.
 //     If this is the case, we consider the timeout a duplicate and drop it.
 //     If t and t0 have different checksums, the voter is equivocating, and
 //     we return a model.DoubleTimeoutError.
