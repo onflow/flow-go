@@ -67,6 +67,7 @@ func (t *TimeoutObject) ID() flow.Identifier {
 
 // Equals returns true if the TimeoutObject is equal to the provided other TimeoutObject.
 // It compares View, NewestQC, LastViewTC, SignerID and SigData and is used for de-duplicate TimeoutObjects in the cache.
+// It excludes TimeoutTick: two TimeoutObjects with different TimeoutTick values can be considered equal.
 func (t *TimeoutObject) Equals(other *TimeoutObject) bool {
 	return t.View == other.View &&
 		t.NewestQC.ID() == other.NewestQC.ID() &&
