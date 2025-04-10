@@ -36,17 +36,17 @@ func (_m *MutableState) AtBlockID(blockID flow.Identifier) cluster.Snapshot {
 	return r0
 }
 
-// Extend provides a mock function with given fields: candidate
-func (_m *MutableState) Extend(candidate *modelcluster.Block) error {
-	ret := _m.Called(candidate)
+// Extend provides a mock function with given fields: proposal
+func (_m *MutableState) Extend(proposal *modelcluster.BlockProposal) error {
+	ret := _m.Called(proposal)
 
 	if len(ret) == 0 {
 		panic("no return value specified for Extend")
 	}
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(*modelcluster.Block) error); ok {
-		r0 = rf(candidate)
+	if rf, ok := ret.Get(0).(func(*modelcluster.BlockProposal) error); ok {
+		r0 = rf(proposal)
 	} else {
 		r0 = ret.Error(0)
 	}

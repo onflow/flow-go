@@ -98,7 +98,8 @@ func (m *MutableState) getExtendCtx(candidate *cluster.Block) (extendContext, er
 //   - state.OutdatedExtensionError if the candidate block is outdated (e.g. orphaned)
 //   - state.UnverifiableExtensionError if the reference block is _not_ a known finalized block
 //   - state.InvalidExtensionError if the candidate block is invalid
-func (m *MutableState) Extend(candidate *cluster.Block) error {
+func (m *MutableState) Extend(proposal *cluster.BlockProposal) error {
+	candidate := proposal.Block
 	parentSpan, ctx := m.tracer.StartCollectionSpan(context.Background(), candidate.ID(), trace.COLClusterStateMutatorExtend)
 	defer parentSpan.End()
 
@@ -138,8 +139,7 @@ func (m *MutableState) Extend(candidate *cluster.Block) error {
 	}
 
 	span, _ = m.tracer.StartSpanFromContext(ctx, trace.COLClusterStateMutatorExtendDBInsert)
-	// TODO(tim)
-	err = operation.RetryOnConflict(m.State.db.Update, procedure.InsertClusterBlock(&cluster.BlockProposal{Block: candidate, ProposerSigData: nil}))
+	err = operation.RetryOnConflict(m.State.db.Update, procedure.InsertClusterBlock(proposal))
 	span.End()
 	if err != nil {
 		return fmt.Errorf("could not insert cluster block: %w", err)

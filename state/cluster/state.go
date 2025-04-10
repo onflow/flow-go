@@ -39,5 +39,5 @@ type MutableState interface {
 	//   - state.OutdatedExtensionError if the candidate block is outdated (e.g. orphaned)
 	//   - state.UnverifiableExtensionError if the reference block is _not_ a known finalized block
 	//   - state.InvalidExtensionError if the candidate block is invalid
-	Extend(candidate *cluster.Block) error
+	Extend(proposal *cluster.BlockProposal) error
 }

@@ -241,7 +241,7 @@ func (cs *CoreSuite) TestOnBlockProposalValidAncestor() {
 	require.NoError(cs.T(), err, "valid block proposal should pass")
 
 	// we should extend the state with the header
-	cs.state.AssertCalled(cs.T(), "Extend", &block)
+	cs.state.AssertCalled(cs.T(), "Extend", proposal)
 }
 
 func (cs *CoreSuite) TestOnBlockProposalSkipProposalThreshold() {
@@ -393,7 +393,7 @@ func (cs *CoreSuite) TestOnBlockProposal_FailsProtocolStateValidation() {
 		require.NoError(cs.T(), err, "proposal with invalid extension should fail")
 
 		// we should extend the state with the header
-		cs.state.AssertCalled(cs.T(), "Extend", &block)
+		cs.state.AssertCalled(cs.T(), "Extend", proposal)
 		// we should not pass the block to hotstuff
 		cs.hotstuff.AssertNotCalled(cs.T(), "SubmitProposal", mock.Anything)
 		// we should not attempt to process the children
@@ -414,7 +414,7 @@ func (cs *CoreSuite) TestOnBlockProposal_FailsProtocolStateValidation() {
 		require.NoError(cs.T(), err, "proposal with invalid extension should fail")
 
 		// we should extend the state with the header
-		cs.state.AssertCalled(cs.T(), "Extend", &block)
+		cs.state.AssertCalled(cs.T(), "Extend", proposal)
 		// we should not pass the block to hotstuff
 		cs.hotstuff.AssertNotCalled(cs.T(), "SubmitProposal", mock.Anything)
 		// we should not attempt to process the children
@@ -436,7 +436,7 @@ func (cs *CoreSuite) TestOnBlockProposal_FailsProtocolStateValidation() {
 		require.ErrorIs(cs.T(), err, unexpectedErr)
 
 		// we should extend the state with the header
-		cs.state.AssertCalled(cs.T(), "Extend", &block)
+		cs.state.AssertCalled(cs.T(), "Extend", proposal)
 		// we should not pass the block to hotstuff
 		cs.hotstuff.AssertNotCalled(cs.T(), "SubmitProposal", mock.Anything, mock.Anything)
 		// we should not attempt to process the children
