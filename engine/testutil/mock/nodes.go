@@ -78,7 +78,6 @@ type GenericNode struct {
 	Seals              storage.Seals
 	Payloads           storage.Payloads
 	Blocks             storage.Blocks
-	ProposalSignatures storage.ProposalSignatures
 	QuorumCertificates storage.QuorumCertificates
 	Results            storage.ExecutionResults
 	Setups             storage.EpochSetups
