@@ -6,55 +6,49 @@ import (
 )
 
 func Genesis(chainID ChainID) *Block {
-
-	// create the raw content for the genesis block
-	payload := Payload{}
-
-	// create the header
-	header := Header{
-		ChainID:     chainID,
-		ParentID:    ZeroID,
-		Height:      0,
-		PayloadHash: payload.Hash(),
-		Timestamp:   GenesisTime,
-		View:        0,
-	}
-
-	// combine to block
+	// create genesis block
 	genesis := Block{
-		Header:  &header,
-		Payload: &payload,
+		Header: HeaderFields{
+			ChainID:   chainID,
+			ParentID:  ZeroID,
+			Height:    0,
+			Timestamp: GenesisTime,
+			View:      0,
+		},
+		Payload: &Payload{},
 	}
 
 	return &genesis
 }
 
-// Block (currently) includes the header, the payload hashes as well as the
-// payload contents.
+// Block (currently) includes the header fields and payload contents.
 type Block struct {
-	Header  *Header
+	Header  HeaderFields
 	Payload *Payload
 }
 
+// ToHeader hashes the payload of the block.
+func (b *Block) ToHeader() *Header {
+	return &Header{
+		HeaderFields: b.Header,
+		PayloadHash:  b.Payload.Hash(),
+	}
+}
+
 // SetPayload sets the payload and updates the payload hash.
+// TODO remove usages of this; include the payload in struct initialization, or as an argument to a builder or builder function
 func (b *Block) SetPayload(payload Payload) {
 	b.Payload = &payload
-	b.Header.PayloadHash = b.Payload.Hash()
 }
 
-// Valid will check whether the block is valid bottom-up.
-func (b Block) Valid() bool {
-	return b.Header.PayloadHash == b.Payload.Hash()
-}
-
-// ID returns the ID of the header.
+// ID returns the ID of the block, by first hashing the payload, and then the rest of the block.
 func (b Block) ID() Identifier {
-	return b.Header.ID()
+	return b.ToHeader().ID()
 }
 
 // Checksum returns the checksum of the header.
 func (b Block) Checksum() Identifier {
-	return b.Header.Checksum()
+	return b.ToHeader().Checksum()
 }
 
 // BlockStatus represents the status of a block.
