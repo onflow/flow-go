@@ -26,7 +26,9 @@ func NewEvents() *Events {
 }
 
 // ByBlockID returns the events for the given block ID.
-// Returns storage.ErrNotFound if block wasn't found.
+//
+// Expected errors during normal operation:
+//   - `storage.ErrNotFound` if no events were found at given block.
 func (e *Events) ByBlockID(blockID flow.Identifier) ([]flow.Event, error) {
 	e.lock.RLock()
 	defer e.lock.RUnlock()
@@ -40,7 +42,9 @@ func (e *Events) ByBlockID(blockID flow.Identifier) ([]flow.Event, error) {
 }
 
 // ByBlockIDTransactionID returns the events for the given block ID and transaction ID.
-// Returns storage.ErrNotFound if block wasn't found.
+//
+// Expected errors during normal operation:
+//   - `storage.ErrNotFound` if no events were found at given block and transaction.
 func (e *Events) ByBlockIDTransactionID(blockID flow.Identifier, txID flow.Identifier) ([]flow.Event, error) {
 	events, err := e.ByBlockID(blockID)
 	if err != nil {
@@ -58,7 +62,9 @@ func (e *Events) ByBlockIDTransactionID(blockID flow.Identifier, txID flow.Ident
 }
 
 // ByBlockIDTransactionIndex returns the events for the transaction at given index in a given block
-// Returns storage.ErrNotFound if block wasn't found.
+//
+// Expected errors during normal operation:
+//   - `storage.ErrNotFound` if no events were found at given block and transaction.
 func (e *Events) ByBlockIDTransactionIndex(blockID flow.Identifier, txIndex uint32) ([]flow.Event, error) {
 	events, err := e.ByBlockID(blockID)
 	if err != nil {
@@ -76,7 +82,9 @@ func (e *Events) ByBlockIDTransactionIndex(blockID flow.Identifier, txIndex uint
 }
 
 // ByBlockIDEventType returns the events for the given block ID and event type.
-// Returns storage.ErrNotFound if block wasn't found in storage.
+//
+// Expected errors during normal operation:
+//   - `storage.ErrNotFound` if no events were found at given block.
 func (e *Events) ByBlockIDEventType(blockID flow.Identifier, eventType flow.EventType) ([]flow.Event, error) {
 	events, err := e.ByBlockID(blockID)
 	if err != nil {
@@ -94,7 +102,7 @@ func (e *Events) ByBlockIDEventType(blockID flow.Identifier, eventType flow.Even
 }
 
 // Store will store events for the given block ID.
-// No errors expected during normal operation.
+// No errors are expected during normal operation.
 func (e *Events) Store(blockID flow.Identifier, blockEvents []flow.EventsList) error {
 	var events []flow.Event
 	for _, eventList := range blockEvents {
