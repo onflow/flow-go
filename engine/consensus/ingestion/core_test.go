@@ -44,9 +44,9 @@ type IngestionCoreSuite struct {
 	ref   *mockprotocol.Snapshot // state snapshot w.r.t. reference block
 
 	query   *mockprotocol.EpochQuery
-	epoch   *mockprotocol.Epoch
+	epoch   *mockprotocol.CommittedEpoch
 	headers *mockstorage.Headers
-	pool    *mockmempool.Guarantees
+	pool    *mockmempool.Mempool[flow.Identifier, *flow.CollectionGuarantee]
 
 	core *Core
 }
@@ -82,9 +82,9 @@ func (suite *IngestionCoreSuite) SetupTest() {
 	final := &mockprotocol.Snapshot{}
 	ref := &mockprotocol.Snapshot{}
 	suite.query = &mockprotocol.EpochQuery{}
-	suite.epoch = &mockprotocol.Epoch{}
+	suite.epoch = &mockprotocol.CommittedEpoch{}
 	headers := &mockstorage.Headers{}
-	pool := &mockmempool.Guarantees{}
+	pool := &mockmempool.Mempool[flow.Identifier, *flow.CollectionGuarantee]{}
 	cluster := &mockprotocol.Cluster{}
 
 	// this state basically works like a normal protocol state
@@ -112,7 +112,7 @@ func (suite *IngestionCoreSuite) SetupTest() {
 		nil,
 	)
 	ref.On("Epochs").Return(suite.query)
-	suite.query.On("Current").Return(suite.epoch)
+	suite.query.On("Current").Return(suite.epoch, nil)
 	cluster.On("Members").Return(suite.clusterMembers.ToSkeleton())
 	suite.epoch.On("ClusterByChainID", mock.Anything).Return(
 		func(chainID flow.ChainID) protocol.Cluster {
@@ -165,14 +165,14 @@ func (suite *IngestionCoreSuite) TestOnGuaranteeNewFromCollection() {
 
 	// the guarantee is not part of the memory pool yet
 	suite.pool.On("Has", guarantee.ID()).Return(false)
-	suite.pool.On("Add", guarantee).Return(true)
+	suite.pool.On("Add", guarantee.CollectionID, guarantee).Return(true)
 
 	// submit the guarantee as if it was sent by a collection node
 	err := suite.core.OnGuarantee(suite.collID, guarantee)
 	suite.Assert().NoError(err, "should not error on new guarantee from collection node")
 
 	// check that the guarantee has been added to the mempool
-	suite.pool.AssertCalled(suite.T(), "Add", guarantee)
+	suite.pool.AssertCalled(suite.T(), "Add", guarantee.CollectionID, guarantee)
 
 }
 
@@ -199,14 +199,14 @@ func (suite *IngestionCoreSuite) TestOnGuaranteeNotAdded() {
 
 	// the guarantee is not already part of the memory pool
 	suite.pool.On("Has", guarantee.ID()).Return(false)
-	suite.pool.On("Add", guarantee).Return(false)
+	suite.pool.On("Add", guarantee.CollectionID, guarantee).Return(false)
 
 	// submit the guarantee as if it was sent by a collection node
 	err := suite.core.OnGuarantee(suite.collID, guarantee)
 	suite.Assert().NoError(err, "should not error when guarantee was already added")
 
 	// check that the guarantee has been added to the mempool
-	suite.pool.AssertCalled(suite.T(), "Add", guarantee)
+	suite.pool.AssertCalled(suite.T(), "Add", guarantee.CollectionID, guarantee)
 
 }
 
@@ -309,7 +309,7 @@ func (suite *IngestionCoreSuite) TestOnGuaranteeEpochEnd() {
 
 	// the guarantee is not part of the memory pool
 	suite.pool.On("Has", guarantee.ID()).Return(false)
-	suite.pool.On("Add", guarantee).Return(true).Once()
+	suite.pool.On("Add", guarantee.CollectionID, guarantee).Return(true).Once()
 
 	// submit the guarantee as if it was sent by the collection node which
 	// is leaving at the current epoch boundary
@@ -326,14 +326,14 @@ func (suite *IngestionCoreSuite) TestOnGuaranteeUnknownOrigin() {
 
 	// the guarantee is not part of the memory pool
 	suite.pool.On("Has", guarantee.ID()).Return(false)
-	suite.pool.On("Add", guarantee).Return(true)
+	suite.pool.On("Add", guarantee.CollectionID, guarantee).Return(true)
 
 	// submit the guarantee with an unknown origin
 	err := suite.core.OnGuarantee(unittest.IdentifierFixture(), guarantee)
 	suite.Assert().Error(err)
 	suite.Assert().True(engine.IsInvalidInputError(err))
 
-	suite.pool.AssertNotCalled(suite.T(), "Add", guarantee)
+	suite.pool.AssertNotCalled(suite.T(), "Add", guarantee.CollectionID, guarantee)
 
 }
 

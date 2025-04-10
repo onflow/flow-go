@@ -37,7 +37,7 @@ func TestFinalizer(t *testing.T) {
 		cleanup := func() {
 			// wipe the DB
 			err := db.DropAll()
-			require.Nil(t, err)
+			require.NoError(t, err)
 			// clear the mempool
 			for _, tx := range pool.All() {
 				pool.Remove(tx.ID())
@@ -57,7 +57,7 @@ func TestFinalizer(t *testing.T) {
 		// a helper function to insert a block
 		insert := func(block model.Block) {
 			err := db.Update(procedure.InsertClusterBlock(&block))
-			assert.Nil(t, err)
+			assert.NoError(t, err)
 		}
 
 		t.Run("non-existent block", func(t *testing.T) {
@@ -82,7 +82,7 @@ func TestFinalizer(t *testing.T) {
 
 			// tx1 is included in the finalized block
 			tx1 := unittest.TransactionBodyFixture(func(tx *flow.TransactionBody) { tx.ProposalKey.SequenceNumber = 1 })
-			assert.True(t, pool.Add(&tx1))
+			assert.True(t, pool.Add(tx1.ID(), &tx1))
 
 			// create a new block on genesis
 			block := unittest.ClusterBlockWithParent(genesis)
@@ -91,11 +91,11 @@ func TestFinalizer(t *testing.T) {
 
 			// finalize the block
 			err := finalizer.MakeFinal(block.ID())
-			assert.Nil(t, err)
+			assert.NoError(t, err)
 
 			// finalize the block again - this should be a no-op
 			err = finalizer.MakeFinal(block.ID())
-			assert.Nil(t, err)
+			assert.NoError(t, err)
 		})
 
 		t.Run("unconnected block", func(t *testing.T) {
@@ -130,11 +130,11 @@ func TestFinalizer(t *testing.T) {
 
 			// finalize the block
 			err := finalizer.MakeFinal(block.ID())
-			assert.Nil(t, err)
+			assert.NoError(t, err)
 
 			// check finalized boundary using cluster state
 			final, err := state.Final().Head()
-			assert.Nil(t, err)
+			assert.NoError(t, err)
 			assert.Equal(t, block.ID(), final.ID())
 
 			// collection should not have been propagated
@@ -150,10 +150,10 @@ func TestFinalizer(t *testing.T) {
 
 			// tx1 is included in the finalized block and mempool
 			tx1 := unittest.TransactionBodyFixture(func(tx *flow.TransactionBody) { tx.ProposalKey.SequenceNumber = 1 })
-			assert.True(t, pool.Add(&tx1))
+			assert.True(t, pool.Add(tx1.ID(), &tx1))
 			// tx2 is only in the mempool
 			tx2 := unittest.TransactionBodyFixture(func(tx *flow.TransactionBody) { tx.ProposalKey.SequenceNumber = 2 })
-			assert.True(t, pool.Add(&tx2))
+			assert.True(t, pool.Add(tx2.ID(), &tx2))
 
 			// create a block containing tx1 on top of genesis
 			block := unittest.ClusterBlockWithParent(genesis)
@@ -171,7 +171,7 @@ func TestFinalizer(t *testing.T) {
 
 			// finalize the block
 			err := finalizer.MakeFinal(block.ID())
-			assert.Nil(t, err)
+			assert.NoError(t, err)
 
 			// tx1 should have been removed from mempool
 			assert.False(t, pool.Has(tx1.ID()))
@@ -180,7 +180,7 @@ func TestFinalizer(t *testing.T) {
 
 			// check finalized boundary using cluster state
 			final, err := state.Final().Head()
-			assert.Nil(t, err)
+			assert.NoError(t, err)
 			assert.Equal(t, block.ID(), final.ID())
 			assertClusterBlocksIndexedByReferenceHeight(t, db, refBlock.Height, final.ID())
 		})
@@ -195,10 +195,10 @@ func TestFinalizer(t *testing.T) {
 
 			// tx1 is included in the first finalized block and mempool
 			tx1 := unittest.TransactionBodyFixture(func(tx *flow.TransactionBody) { tx.ProposalKey.SequenceNumber = 1 })
-			assert.True(t, pool.Add(&tx1))
+			assert.True(t, pool.Add(tx1.ID(), &tx1))
 			// tx2 is included in the second finalized block and mempool
 			tx2 := unittest.TransactionBodyFixture(func(tx *flow.TransactionBody) { tx.ProposalKey.SequenceNumber = 2 })
-			assert.True(t, pool.Add(&tx2))
+			assert.True(t, pool.Add(tx2.ID(), &tx2))
 
 			// create a block containing tx1 on top of genesis
 			block1 := unittest.ClusterBlockWithParent(genesis)
@@ -228,7 +228,7 @@ func TestFinalizer(t *testing.T) {
 
 			// finalize block2 (should indirectly finalize block1 as well)
 			err := finalizer.MakeFinal(block2.ID())
-			assert.Nil(t, err)
+			assert.NoError(t, err)
 
 			// tx1 and tx2 should have been removed from mempool
 			assert.False(t, pool.Has(tx1.ID()))
@@ -236,7 +236,7 @@ func TestFinalizer(t *testing.T) {
 
 			// check finalized boundary using cluster state
 			final, err := state.Final().Head()
-			assert.Nil(t, err)
+			assert.NoError(t, err)
 			assert.Equal(t, block2.ID(), final.ID())
 			assertClusterBlocksIndexedByReferenceHeight(t, db, refBlock.Height, block1.ID(), block2.ID())
 		})
@@ -250,10 +250,10 @@ func TestFinalizer(t *testing.T) {
 
 			// tx1 is included in the finalized parent block and mempool
 			tx1 := unittest.TransactionBodyFixture(func(tx *flow.TransactionBody) { tx.ProposalKey.SequenceNumber = 1 })
-			assert.True(t, pool.Add(&tx1))
+			assert.True(t, pool.Add(tx1.ID(), &tx1))
 			// tx2 is included in the un-finalized block and mempool
 			tx2 := unittest.TransactionBodyFixture(func(tx *flow.TransactionBody) { tx.ProposalKey.SequenceNumber = 2 })
-			assert.True(t, pool.Add(&tx2))
+			assert.True(t, pool.Add(tx2.ID(), &tx2))
 
 			// create a block containing tx1 on top of genesis
 			block1 := unittest.ClusterBlockWithParent(genesis)
@@ -276,7 +276,7 @@ func TestFinalizer(t *testing.T) {
 
 			// finalize block1 (should NOT finalize block2)
 			err := finalizer.MakeFinal(block1.ID())
-			assert.Nil(t, err)
+			assert.NoError(t, err)
 
 			// tx1 should have been removed from mempool
 			assert.False(t, pool.Has(tx1.ID()))
@@ -285,7 +285,7 @@ func TestFinalizer(t *testing.T) {
 
 			// check finalized boundary using cluster state
 			final, err := state.Final().Head()
-			assert.Nil(t, err)
+			assert.NoError(t, err)
 			assert.Equal(t, block1.ID(), final.ID())
 			assertClusterBlocksIndexedByReferenceHeight(t, db, refBlock.Height, block1.ID())
 		})
@@ -300,10 +300,10 @@ func TestFinalizer(t *testing.T) {
 
 			// tx1 is included in the finalized block and mempool
 			tx1 := unittest.TransactionBodyFixture(func(tx *flow.TransactionBody) { tx.ProposalKey.SequenceNumber = 1 })
-			assert.True(t, pool.Add(&tx1))
+			assert.True(t, pool.Add(tx1.ID(), &tx1))
 			// tx2 is included in the conflicting block and mempool
 			tx2 := unittest.TransactionBodyFixture(func(tx *flow.TransactionBody) { tx.ProposalKey.SequenceNumber = 2 })
-			assert.True(t, pool.Add(&tx2))
+			assert.True(t, pool.Add(tx2.ID(), &tx2))
 
 			// create a block containing tx1 on top of genesis
 			block1 := unittest.ClusterBlockWithParent(genesis)
@@ -326,7 +326,7 @@ func TestFinalizer(t *testing.T) {
 
 			// finalize block1
 			err := finalizer.MakeFinal(block1.ID())
-			assert.Nil(t, err)
+			assert.NoError(t, err)
 
 			// tx1 should have been removed from mempool
 			assert.False(t, pool.Has(tx1.ID()))
@@ -335,7 +335,7 @@ func TestFinalizer(t *testing.T) {
 
 			// check finalized boundary using cluster state
 			final, err := state.Final().Head()
-			assert.Nil(t, err)
+			assert.NoError(t, err)
 			assert.Equal(t, block1.ID(), final.ID())
 			assertClusterBlocksIndexedByReferenceHeight(t, db, refBlock.Height, block1.ID())
 		})

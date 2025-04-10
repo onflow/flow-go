@@ -103,7 +103,7 @@ func (u *UnicastAuthorizationTestSuite) setupNetworks(slashingViolationsConsumer
 // startNetworksAndLibp2pNodes will start both sender and receiver networks with an irrecoverable signaler context and set the context cancel func.
 func (u *UnicastAuthorizationTestSuite) startNetworksAndLibp2pNodes() {
 	ctx, cancel := context.WithCancel(context.Background())
-	sigCtx, _ := irrecoverable.WithSignaler(ctx)
+	sigCtx := irrecoverable.NewMockSignalerContext(u.T(), ctx)
 
 	testutils.StartNodes(sigCtx, u.T(), u.libP2PNodes)
 	testutils.StartNetworks(sigCtx, u.T(), []network.EngineRegistry{u.senderNetwork, u.receiverNetwork})
@@ -168,7 +168,7 @@ func (u *UnicastAuthorizationTestSuite) TestUnicastAuthorization_UnstakedPeer() 
 func (u *UnicastAuthorizationTestSuite) TestUnicastAuthorization_EjectedPeer() {
 	slashingViolationsConsumer := mocknetwork.NewViolationsConsumer(u.T())
 	u.setupNetworks(slashingViolationsConsumer)
-	//NOTE: setup ejected identity
+	// NOTE: setup ejected identity
 	u.senderID.EpochParticipationStatus = flow.EpochParticipationStatusEjected
 
 	// overriding the identity provide of the receiver node to return the ejected identity so that the

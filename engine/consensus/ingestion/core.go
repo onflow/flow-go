@@ -97,7 +97,7 @@ func (e *Core) OnGuarantee(originID flow.Identifier, guarantee *flow.CollectionG
 	}
 
 	// at this point, we can add the guarantee to the memory pool
-	added := e.pool.Add(guarantee)
+	added := e.pool.Add(guarantee.CollectionID, guarantee)
 	if !added {
 		log.Debug().Msg("discarding guarantee already in pool")
 		return nil
@@ -155,7 +155,11 @@ func (e *Core) validateExpiry(guarantee *flow.CollectionGuarantee) error {
 func (e *Core) validateGuarantors(guarantee *flow.CollectionGuarantee) error {
 	// get the clusters to assign the guarantee and check if the guarantor is part of it
 	snapshot := e.state.AtBlockID(guarantee.ReferenceBlockID)
-	cluster, err := snapshot.Epochs().Current().ClusterByChainID(guarantee.ChainID)
+	epoch, err := snapshot.Epochs().Current()
+	if err != nil {
+		return fmt.Errorf("could not get current epoch: %w", err)
+	}
+	cluster, err := epoch.ClusterByChainID(guarantee.ChainID)
 	// reference block not found
 	if errors.Is(err, state.ErrUnknownSnapshotReference) {
 		return engine.NewUnverifiableInputError(

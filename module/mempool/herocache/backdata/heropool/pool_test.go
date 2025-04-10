@@ -40,14 +40,14 @@ func TestStoreAndRetrieval_BelowLimit(t *testing.T) {
 		},
 	} {
 		t.Run(fmt.Sprintf("%d-limit-%d-entities", tc.limit, tc.entityCount), func(t *testing.T) {
-			withTestScenario(t, tc.limit, tc.entityCount, LRUEjection, []func(*testing.T, *Pool, []*unittest.MockEntity){
-				func(t *testing.T, pool *Pool, entities []*unittest.MockEntity) {
+			withTestScenario(t, tc.limit, tc.entityCount, LRUEjection, []func(*testing.T, *Pool[flow.Identifier, *unittest.MockEntity], []*unittest.MockEntity){
+				func(t *testing.T, pool *Pool[flow.Identifier, *unittest.MockEntity], entities []*unittest.MockEntity) {
 					testInitialization(t, pool, entities)
 				},
-				func(t *testing.T, pool *Pool, entities []*unittest.MockEntity) {
+				func(t *testing.T, pool *Pool[flow.Identifier, *unittest.MockEntity], entities []*unittest.MockEntity) {
 					testAddingEntities(t, pool, entities, LRUEjection)
 				},
-				func(t *testing.T, pool *Pool, entities []*unittest.MockEntity) {
+				func(t *testing.T, pool *Pool[flow.Identifier, *unittest.MockEntity], entities []*unittest.MockEntity) {
 					testRetrievingEntitiesFrom(t, pool, entities, 0)
 				},
 			}...,
@@ -76,11 +76,11 @@ func TestStoreAndRetrieval_With_No_Ejection(t *testing.T) {
 		},
 	} {
 		t.Run(fmt.Sprintf("%d-limit-%d-entities", tc.limit, tc.entityCount), func(t *testing.T) {
-			withTestScenario(t, tc.limit, tc.entityCount, NoEjection, []func(*testing.T, *Pool, []*unittest.MockEntity){
-				func(t *testing.T, pool *Pool, entities []*unittest.MockEntity) {
+			withTestScenario(t, tc.limit, tc.entityCount, NoEjection, []func(*testing.T, *Pool[flow.Identifier, *unittest.MockEntity], []*unittest.MockEntity){
+				func(t *testing.T, pool *Pool[flow.Identifier, *unittest.MockEntity], entities []*unittest.MockEntity) {
 					testAddingEntities(t, pool, entities, NoEjection)
 				},
-				func(t *testing.T, pool *Pool, entities []*unittest.MockEntity) {
+				func(t *testing.T, pool *Pool[flow.Identifier, *unittest.MockEntity], entities []*unittest.MockEntity) {
 					// with the NoEjection mode, only the first "limit" entities must be retrievable.
 					testRetrievingEntitiesInRange(t, pool, entities, 0, EIndex(tc.limit))
 				},
@@ -111,11 +111,11 @@ func TestStoreAndRetrieval_With_LRU_Ejection(t *testing.T) {
 		},
 	} {
 		t.Run(fmt.Sprintf("%d-limit-%d-entities", tc.limit, tc.entityCount), func(t *testing.T) {
-			withTestScenario(t, tc.limit, tc.entityCount, LRUEjection, []func(*testing.T, *Pool, []*unittest.MockEntity){
-				func(t *testing.T, pool *Pool, entities []*unittest.MockEntity) {
+			withTestScenario(t, tc.limit, tc.entityCount, LRUEjection, []func(*testing.T, *Pool[flow.Identifier, *unittest.MockEntity], []*unittest.MockEntity){
+				func(t *testing.T, pool *Pool[flow.Identifier, *unittest.MockEntity], entities []*unittest.MockEntity) {
 					testAddingEntities(t, pool, entities, LRUEjection)
 				},
-				func(t *testing.T, pool *Pool, entities []*unittest.MockEntity) {
+				func(t *testing.T, pool *Pool[flow.Identifier, *unittest.MockEntity], entities []*unittest.MockEntity) {
 					// with a limit of tc.limit, storing a total of tc.entityCount (> tc.limit) entities, results
 					// in ejection of the first tc.entityCount - tc.limit entities.
 					// Hence, we check retrieval of the last tc.limit entities, which start from index
@@ -144,11 +144,11 @@ func TestStoreAndRetrieval_With_Random_Ejection(t *testing.T) {
 		},
 	} {
 		t.Run(fmt.Sprintf("%d-limit-%d-entities", tc.limit, tc.entityCount), func(t *testing.T) {
-			withTestScenario(t, tc.limit, tc.entityCount, RandomEjection, []func(*testing.T, *Pool, []*unittest.MockEntity){
-				func(t *testing.T, backData *Pool, entities []*unittest.MockEntity) {
+			withTestScenario(t, tc.limit, tc.entityCount, RandomEjection, []func(*testing.T, *Pool[flow.Identifier, *unittest.MockEntity], []*unittest.MockEntity){
+				func(t *testing.T, backData *Pool[flow.Identifier, *unittest.MockEntity], entities []*unittest.MockEntity) {
 					testAddingEntities(t, backData, entities, RandomEjection)
 				},
-				func(t *testing.T, pool *Pool, entities []*unittest.MockEntity) {
+				func(t *testing.T, pool *Pool[flow.Identifier, *unittest.MockEntity], entities []*unittest.MockEntity) {
 					// with a limit of tc.limit, storing a total of tc.entityCount (> tc.limit) entities, results
 					// in ejection of "tc.entityCount - tc.limit" entities at random.
 					// Hence, we check retrieval any successful total of "tc.limit" entities.
@@ -194,11 +194,11 @@ func TestInvalidateEntity(t *testing.T) {
 	} {
 		// head invalidation test (LRU)
 		t.Run(fmt.Sprintf("head-invalidation-%d-limit-%d-entities", tc.limit, tc.entityCount), func(t *testing.T) {
-			withTestScenario(t, tc.limit, tc.entityCount, LRUEjection, []func(*testing.T, *Pool, []*unittest.MockEntity){
-				func(t *testing.T, backData *Pool, entities []*unittest.MockEntity) {
+			withTestScenario(t, tc.limit, tc.entityCount, LRUEjection, []func(*testing.T, *Pool[flow.Identifier, *unittest.MockEntity], []*unittest.MockEntity){
+				func(t *testing.T, backData *Pool[flow.Identifier, *unittest.MockEntity], entities []*unittest.MockEntity) {
 					testAddingEntities(t, backData, entities, LRUEjection)
 				},
-				func(t *testing.T, pool *Pool, entities []*unittest.MockEntity) {
+				func(t *testing.T, pool *Pool[flow.Identifier, *unittest.MockEntity], entities []*unittest.MockEntity) {
 					testInvalidatingHead(t, pool, entities)
 				},
 			}...)
@@ -206,11 +206,11 @@ func TestInvalidateEntity(t *testing.T) {
 
 		// tail invalidation test (LIFO)
 		t.Run(fmt.Sprintf("tail-invalidation-%d-limit-%d-entities-", tc.limit, tc.entityCount), func(t *testing.T) {
-			withTestScenario(t, tc.limit, tc.entityCount, LRUEjection, []func(*testing.T, *Pool, []*unittest.MockEntity){
-				func(t *testing.T, backData *Pool, entities []*unittest.MockEntity) {
+			withTestScenario(t, tc.limit, tc.entityCount, LRUEjection, []func(*testing.T, *Pool[flow.Identifier, *unittest.MockEntity], []*unittest.MockEntity){
+				func(t *testing.T, backData *Pool[flow.Identifier, *unittest.MockEntity], entities []*unittest.MockEntity) {
 					testAddingEntities(t, backData, entities, LRUEjection)
 				},
-				func(t *testing.T, pool *Pool, entities []*unittest.MockEntity) {
+				func(t *testing.T, pool *Pool[flow.Identifier, *unittest.MockEntity], entities []*unittest.MockEntity) {
 					testInvalidatingTail(t, pool, entities)
 				},
 			}...)
@@ -268,7 +268,7 @@ func testAddRemoveEntities(t *testing.T, limit uint32, entityCount uint32, eject
 		return int(random)
 	}
 
-	pool := NewHeroPool(limit, ejectionMode, unittest.Logger())
+	pool := NewHeroPool[flow.Identifier, *unittest.MockEntity](limit, ejectionMode, unittest.Logger())
 	entities := unittest.EntityListFixture(uint(entityCount))
 	// retryLimit is the max number of retries to find an entity that is not already in the pool to add it.
 	// The test fails if it reaches this limit.
@@ -278,7 +278,7 @@ func testAddRemoveEntities(t *testing.T, limit uint32, entityCount uint32, eject
 	// generate ownerId to index in the entities array.
 	for i := 0; i < int(entityCount); i++ {
 		randomOwnerId, err := rand.Uint64()
-		require.Nil(t, err)
+		require.NoError(t, err)
 		ownerIds[i] = randomOwnerId
 	}
 	// this map maintains entities currently stored in the pool.
@@ -291,10 +291,10 @@ func testAddRemoveEntities(t *testing.T, limit uint32, entityCount uint32, eject
 			found := false
 			for retryTime := 0; retryTime < retryLimit; retryTime++ {
 				toAddIndex := randomIntN(int(entityCount))
-				_, found = addedEntities[entities[toAddIndex].ID()]
+				_, found = addedEntities[entities[toAddIndex].Identifier]
 				if !found {
 					// found an entity that is not in the pool, add it.
-					indexInThePool, _, ejectedEntity := pool.Add(entities[toAddIndex].ID(), entities[toAddIndex], ownerIds[toAddIndex])
+					indexInThePool, _, ejectedEntity, wasEjected := pool.Add(entities[toAddIndex].Identifier, entities[toAddIndex], ownerIds[toAddIndex])
 					if ejectionMode != NoEjection || len(addedEntities) < int(limit) {
 						// when there is an ejection mode in place, or the pool is not full, the index should be valid.
 						require.NotEqual(t, InvalidIndex, indexInThePool)
@@ -303,13 +303,15 @@ func testAddRemoveEntities(t *testing.T, limit uint32, entityCount uint32, eject
 					if ejectionMode != NoEjection && len(addedEntities) == int(limit) {
 						// when there is an ejection mode in place, the ejected entity should be valid.
 						require.NotNil(t, ejectedEntity)
+						require.True(t, wasEjected)
 					}
 					if ejectionMode != NoEjection && len(addedEntities) >= int(limit) {
 						// when there is an ejection mode in place, the ejected entity should be valid.
 						require.NotNil(t, ejectedEntity)
+						require.True(t, wasEjected)
 					}
 					if indexInThePool != InvalidIndex {
-						entityId := entities[toAddIndex].ID()
+						entityId := entities[toAddIndex].Identifier
 						// tracks the index of the entity in the pool and the index of the entity in the entities array.
 						addedEntities[entityId] = int(toAddIndex)
 						addedEntitiesInPool[entityId] = indexInThePool
@@ -320,9 +322,9 @@ func testAddRemoveEntities(t *testing.T, limit uint32, entityCount uint32, eject
 						require.Equal(t, ownerIds[toAddIndex], actualOwnerId, "pool returned a different owner than the one added")
 					}
 					if ejectedEntity != nil {
-						require.Contains(t, addedEntities, ejectedEntity.ID(), "pool ejected an entity that was not added before")
-						delete(addedEntities, ejectedEntity.ID())
-						delete(addedEntitiesInPool, ejectedEntity.ID())
+						require.Contains(t, addedEntities, ejectedEntity.Identifier, "pool ejected an entity that was not added before")
+						delete(addedEntities, ejectedEntity.Identifier)
+						delete(addedEntitiesInPool, ejectedEntity.Identifier)
 					}
 					break
 				}
@@ -344,19 +346,20 @@ func testAddRemoveEntities(t *testing.T, limit uint32, entityCount uint32, eject
 			}
 			// remove the selected entity from the pool.
 			removedEntity := pool.Remove(indexInPoolToRemove)
-			expectedRemovedEntityId := entities[indexInEntitiesArray].ID()
-			require.Equal(t, expectedRemovedEntityId, removedEntity.ID(), "removed wrong entity")
+			expectedRemovedEntityId := entities[indexInEntitiesArray].Identifier
+			require.Equal(t, expectedRemovedEntityId, removedEntity.Identifier, "removed wrong entity")
 			delete(addedEntities, expectedRemovedEntityId)
 			delete(addedEntitiesInPool, expectedRemovedEntityId)
 			actualFlowId, actualEntity, _ := pool.Get(indexInPoolToRemove)
 			require.Equal(t, flow.ZeroID, actualFlowId)
-			require.Equal(t, nil, actualEntity)
+			require.Nil(t, actualEntity)
+			require.True(t, pool.isInvalidated(indexInPoolToRemove))
 		}
 	}
 	for k, v := range addedEntities {
 		indexInPool := addedEntitiesInPool[k]
 		actualFlowId, actualEntity, actualOwnerId := pool.Get(indexInPool)
-		require.Equal(t, entities[v].ID(), actualFlowId)
+		require.Equal(t, entities[v].Identifier, actualFlowId)
 		require.Equal(t, entities[v], actualEntity)
 		require.Equal(t, ownerIds[v], actualOwnerId)
 	}
@@ -365,7 +368,7 @@ func testAddRemoveEntities(t *testing.T, limit uint32, entityCount uint32, eject
 
 // testInvalidatingHead keeps invalidating the head and evaluates the linked-list keeps updating its head
 // and remains connected.
-func testInvalidatingHead(t *testing.T, pool *Pool, entities []*unittest.MockEntity) {
+func testInvalidatingHead(t *testing.T, pool *Pool[flow.Identifier, *unittest.MockEntity], entities []*unittest.MockEntity) {
 	// total number of entities to store
 	totalEntitiesStored := len(entities)
 	// freeListInitialSize is total number of empty nodes after
@@ -434,12 +437,12 @@ func testInvalidatingHead(t *testing.T, pool *Pool, entities []*unittest.MockEnt
 			//
 			// used tail should point to the last element in pool, since we are
 			// invalidating head.
-			require.Equal(t, entities[totalEntitiesStored-1].ID(), usedTail.id)
+			require.Equal(t, entities[totalEntitiesStored-1].Identifier, usedTail.key)
 			require.Equal(t, EIndex(totalEntitiesStored-1), pool.states[stateUsed].tail)
 
 			// used head must point to the next element in the pool,
 			// i.e., invalidating head moves it forward.
-			require.Equal(t, entities[i+1].ID(), usedHead.id)
+			require.Equal(t, entities[i+1].Identifier, usedHead.key)
 			require.Equal(t, EIndex(i+1), pool.states[stateUsed].head)
 		} else {
 			// pool is empty
@@ -456,7 +459,7 @@ func testInvalidatingHead(t *testing.T, pool *Pool, entities []*unittest.MockEnt
 }
 
 // testInvalidatingHead keeps invalidating the tail and evaluates the underlying free and used linked-lists keep updating its tail and remains connected.
-func testInvalidatingTail(t *testing.T, pool *Pool, entities []*unittest.MockEntity) {
+func testInvalidatingTail(t *testing.T, pool *Pool[flow.Identifier, *unittest.MockEntity], entities []*unittest.MockEntity) {
 	size := len(entities)
 	offset := len(pool.poolEntities) - size
 	for i := 0; i < size; i++ {
@@ -464,7 +467,7 @@ func testInvalidatingTail(t *testing.T, pool *Pool, entities []*unittest.MockEnt
 		tailIndex := pool.states[stateUsed].tail
 		require.Equal(t, EIndex(size-1-i), tailIndex)
 
-		pool.invalidateEntityAtIndex(tailIndex)
+		pool.invalidateValueAtIndex(tailIndex)
 		// old head index must be invalidated
 		require.True(t, pool.isInvalidated(tailIndex))
 		// unclaimed head should be appended to free entities
@@ -523,11 +526,11 @@ func testInvalidatingTail(t *testing.T, pool *Pool, entities []*unittest.MockEnt
 			// pool is not empty yet
 			//
 			// used tail should move backward after each invalidation
-			require.Equal(t, entities[size-i-2].ID(), usedTail.id)
+			require.Equal(t, entities[size-i-2].Identifier, usedTail.key)
 			require.Equal(t, EIndex(size-i-2), pool.states[stateUsed].tail)
 
 			// used head must point to the first element in the pool,
-			require.Equal(t, entities[0].ID(), usedHead.id)
+			require.Equal(t, entities[0].Identifier, usedHead.key)
 			require.Equal(t, EIndex(0), pool.states[stateUsed].head)
 		} else {
 			// pool is empty
@@ -544,7 +547,7 @@ func testInvalidatingTail(t *testing.T, pool *Pool, entities []*unittest.MockEnt
 }
 
 // testInitialization evaluates the state of an initialized pool before adding any element to it.
-func testInitialization(t *testing.T, pool *Pool, _ []*unittest.MockEntity) {
+func testInitialization(t *testing.T, pool *Pool[flow.Identifier, *unittest.MockEntity], _ []*unittest.MockEntity) {
 	// "used" linked-list must have a zero size, since we have no elements in the list.
 	require.True(t, pool.states[stateUsed].size == 0)
 	require.Equal(t, pool.states[stateUsed].head, InvalidIndex)
@@ -578,17 +581,18 @@ func testInitialization(t *testing.T, pool *Pool, _ []*unittest.MockEntity) {
 }
 
 // testAddingEntities evaluates health of pool for storing new elements.
-func testAddingEntities(t *testing.T, pool *Pool, entitiesToBeAdded []*unittest.MockEntity, ejectionMode EjectionMode) {
+func testAddingEntities(t *testing.T, pool *Pool[flow.Identifier, *unittest.MockEntity], entitiesToBeAdded []*unittest.MockEntity, ejectionMode EjectionMode) {
 	// initially head must be empty
-	e, ok := pool.Head()
+	k, e, ok := pool.Head()
 	require.False(t, ok)
+	require.Equal(t, flow.ZeroID, k)
 	require.Nil(t, e)
 
 	var uniqueEntities map[flow.Identifier]struct{}
 	if ejectionMode != NoEjection {
 		uniqueEntities = make(map[flow.Identifier]struct{})
 		for _, entity := range entitiesToBeAdded {
-			uniqueEntities[entity.ID()] = struct{}{}
+			uniqueEntities[entity.Identifier] = struct{}{}
 		}
 		require.Equalf(t, len(uniqueEntities), len(entitiesToBeAdded), "entitesToBeAdded must be constructed of unique entities")
 	}
@@ -597,7 +601,7 @@ func testAddingEntities(t *testing.T, pool *Pool, entitiesToBeAdded []*unittest.
 	lruEjectedIndex := 0
 	for i, e := range entitiesToBeAdded {
 		// adding each element must be successful.
-		entityIndex, slotAvailable, ejectedEntity := pool.Add(e.ID(), e, uint64(i))
+		entityIndex, slotAvailable, ejectedEntity, wasEjected := pool.Add(e.Identifier, e, uint64(i))
 
 		if i < len(pool.poolEntities) {
 			// in case of no over limit, size of entities linked list should be incremented by each addition.
@@ -605,12 +609,15 @@ func testAddingEntities(t *testing.T, pool *Pool, entitiesToBeAdded []*unittest.
 
 			require.True(t, slotAvailable)
 			require.Nil(t, ejectedEntity)
+			require.False(t, wasEjected)
 			require.Equal(t, entityIndex, EIndex(i))
 
 			// in case pool is not full, the head should retrieve the first added entity.
-			headEntity, headExists := pool.Head()
+			headKey, headEntity, headExists := pool.Head()
 			require.True(t, headExists)
-			require.Equal(t, headEntity.ID(), entitiesToBeAdded[0].ID())
+			expectedID := entitiesToBeAdded[0].Identifier
+			require.Equal(t, headKey, expectedID)
+			require.Equal(t, headEntity.Identifier, expectedID)
 		}
 
 		if ejectionMode == LRUEjection {
@@ -621,13 +628,16 @@ func testAddingEntities(t *testing.T, pool *Pool, entitiesToBeAdded []*unittest.
 			if i >= len(pool.poolEntities) {
 				require.True(t, slotAvailable)
 				require.NotNil(t, ejectedEntity)
+				require.True(t, wasEjected)
 				// confirm that ejected entity is the oldest entity
 				require.Equal(t, entitiesToBeAdded[lruEjectedIndex], ejectedEntity)
 				lruEjectedIndex++
 				// when pool is full and with LRU ejection, the head should move forward with each element added.
-				headEntity, headExists := pool.Head()
+				headKey, headEntity, headExists := pool.Head()
 				require.True(t, headExists)
-				require.Equal(t, headEntity.ID(), entitiesToBeAdded[i+1-len(pool.poolEntities)].ID())
+				expectedID := entitiesToBeAdded[i+1-len(pool.poolEntities)].Identifier
+				require.Equal(t, expectedID, headKey)
+				require.Equal(t, expectedID, headEntity.Identifier)
 			}
 		}
 
@@ -635,8 +645,9 @@ func testAddingEntities(t *testing.T, pool *Pool, entitiesToBeAdded []*unittest.
 			if i >= len(pool.poolEntities) {
 				require.True(t, slotAvailable)
 				require.NotNil(t, ejectedEntity)
+				require.True(t, wasEjected)
 				// confirm that ejected entity is from list of entitiesToBeAdded
-				_, ok := uniqueEntities[ejectedEntity.ID()]
+				_, ok := uniqueEntities[ejectedEntity.Identifier]
 				require.True(t, ok)
 			}
 		}
@@ -645,12 +656,15 @@ func testAddingEntities(t *testing.T, pool *Pool, entitiesToBeAdded []*unittest.
 			if i >= len(pool.poolEntities) {
 				require.False(t, slotAvailable)
 				require.Nil(t, ejectedEntity)
+				require.False(t, wasEjected)
 				require.Equal(t, entityIndex, InvalidIndex)
 
 				// when pool is full and with NoEjection, the head must keep pointing to the first added element.
-				headEntity, headExists := pool.Head()
+				headKey, headEntity, headExists := pool.Head()
 				require.True(t, headExists)
-				require.Equal(t, headEntity.ID(), entitiesToBeAdded[0].ID())
+				expectedID := entitiesToBeAdded[0].Identifier
+				require.Equal(t, expectedID, headKey)
+				require.Equal(t, expectedID, headEntity.Identifier)
 			}
 		}
 
@@ -666,21 +680,21 @@ func testAddingEntities(t *testing.T, pool *Pool, entitiesToBeAdded []*unittest.
 				// be moved.
 				expectedUsedHead = (i + 1) % len(pool.poolEntities)
 			}
-			require.Equal(t, pool.poolEntities[expectedUsedHead].entity, usedHead.entity)
+			require.Equal(t, pool.poolEntities[expectedUsedHead].value, usedHead.value)
 			// head must be healthy and point back to undefined.
 			require.Equal(t, usedHead.node.prev, InvalidIndex)
 		}
 
 		if ejectionMode != NoEjection || i < len(pool.poolEntities) {
 			// new entity must be successfully added to tail of used linked-list
-			require.Equal(t, entitiesToBeAdded[i], usedTail.entity)
+			require.Equal(t, entitiesToBeAdded[i], usedTail.value)
 			// used tail must be healthy and point back to undefined.
 			require.Equal(t, usedTail.node.next, InvalidIndex)
 		}
 
 		if ejectionMode == NoEjection && i >= len(pool.poolEntities) {
 			// used tail must not move
-			require.Equal(t, entitiesToBeAdded[len(pool.poolEntities)-1], usedTail.entity)
+			require.Equal(t, entitiesToBeAdded[len(pool.poolEntities)-1], usedTail.value)
 			// used tail must be healthy and point back to undefined.
 			// This is not needed anymore as tail's next is now ignored
 			require.Equal(t, usedTail.node.next, InvalidIndex)
@@ -765,27 +779,27 @@ func testAddingEntities(t *testing.T, pool *Pool, entitiesToBeAdded []*unittest.
 }
 
 // testRetrievingEntitiesFrom evaluates that all entities starting from given index are retrievable from pool.
-func testRetrievingEntitiesFrom(t *testing.T, pool *Pool, entities []*unittest.MockEntity, from EIndex) {
+func testRetrievingEntitiesFrom(t *testing.T, pool *Pool[flow.Identifier, *unittest.MockEntity], entities []*unittest.MockEntity, from EIndex) {
 	testRetrievingEntitiesInRange(t, pool, entities, from, EIndex(len(entities)))
 }
 
 // testRetrievingEntitiesInRange evaluates that all entities in the given range are retrievable from pool.
-func testRetrievingEntitiesInRange(t *testing.T, pool *Pool, entities []*unittest.MockEntity, from EIndex, to EIndex) {
+func testRetrievingEntitiesInRange(t *testing.T, pool *Pool[flow.Identifier, *unittest.MockEntity], entities []*unittest.MockEntity, from EIndex, to EIndex) {
 	for i := from; i < to; i++ {
 		actualID, actual, _ := pool.Get(i % EIndex(len(pool.poolEntities)))
-		require.Equal(t, entities[i].ID(), actualID, i)
+		require.Equal(t, entities[i].Identifier, actualID, i)
 		require.Equal(t, entities[i], actual, i)
 	}
 }
 
 // testRetrievingCount evaluates that exactly expected number of entities are retrievable from underlying pool.
-func testRetrievingCount(t *testing.T, pool *Pool, entities []*unittest.MockEntity, expected int) {
+func testRetrievingCount(t *testing.T, pool *Pool[flow.Identifier, *unittest.MockEntity], entities []*unittest.MockEntity, expected int) {
 	actualRetrievable := 0
 
 	for i := EIndex(0); i < EIndex(len(entities)); i++ {
 		for j := EIndex(0); j < EIndex(len(pool.poolEntities)); j++ {
 			actualID, actual, _ := pool.Get(j % EIndex(len(pool.poolEntities)))
-			if entities[i].ID() == actualID && entities[i] == actual {
+			if entities[i].Identifier == actualID && entities[i] == actual {
 				actualRetrievable++
 			}
 		}
@@ -799,9 +813,9 @@ func withTestScenario(t *testing.T,
 	limit uint32,
 	entityCount uint32,
 	ejectionMode EjectionMode,
-	helpers ...func(*testing.T, *Pool, []*unittest.MockEntity)) {
+	helpers ...func(*testing.T, *Pool[flow.Identifier, *unittest.MockEntity], []*unittest.MockEntity)) {
 
-	pool := NewHeroPool(limit, ejectionMode, unittest.Logger())
+	pool := NewHeroPool[flow.Identifier, *unittest.MockEntity](limit, ejectionMode, unittest.Logger())
 
 	// head on underlying linked-list value should be uninitialized
 	require.True(t, pool.states[stateUsed].size == 0)
@@ -815,7 +829,7 @@ func withTestScenario(t *testing.T,
 }
 
 // tailAccessibleFromHead checks tail of given entities linked-list is reachable from its head by traversing expected number of steps.
-func tailAccessibleFromHead(t *testing.T, headSliceIndex EIndex, tailSliceIndex EIndex, pool *Pool, steps uint32) {
+func tailAccessibleFromHead(t *testing.T, headSliceIndex EIndex, tailSliceIndex EIndex, pool *Pool[flow.Identifier, *unittest.MockEntity], steps uint32) {
 	seen := make(map[EIndex]struct{})
 
 	index := headSliceIndex
@@ -835,7 +849,7 @@ func tailAccessibleFromHead(t *testing.T, headSliceIndex EIndex, tailSliceIndex 
 }
 
 // headAccessibleFromTail checks head of given entities linked list is reachable from its tail by traversing expected number of steps.
-func headAccessibleFromTail(t *testing.T, headSliceIndex EIndex, tailSliceIndex EIndex, pool *Pool, total uint32) {
+func headAccessibleFromTail(t *testing.T, headSliceIndex EIndex, tailSliceIndex EIndex, pool *Pool[flow.Identifier, *unittest.MockEntity], total uint32) {
 	seen := make(map[EIndex]struct{})
 
 	index := tailSliceIndex
@@ -854,7 +868,7 @@ func headAccessibleFromTail(t *testing.T, headSliceIndex EIndex, tailSliceIndex 
 }
 
 // checkEachEntityIsInFreeOrUsedState checks if each entity in the pool belongs exactly to one of the state lists.
-func checkEachEntityIsInFreeOrUsedState(t *testing.T, pool *Pool) {
+func checkEachEntityIsInFreeOrUsedState(t *testing.T, pool *Pool[flow.Identifier, *unittest.MockEntity]) {
 	pool_capacity := len(pool.poolEntities)
 	// check size
 	require.Equal(t, int(pool.states[stateFree].size+pool.states[stateUsed].size), pool_capacity, "Pool capacity is not equal to the sum of used and free sizes")
@@ -868,7 +882,7 @@ func checkEachEntityIsInFreeOrUsedState(t *testing.T, pool *Pool) {
 }
 
 // discoverEntitiesBelongingToStateList discovers all entities in the pool that belong to the given list.
-func discoverEntitiesBelongingToStateList(t *testing.T, pool *Pool, stateType StateIndex) []bool {
+func discoverEntitiesBelongingToStateList(t *testing.T, pool *Pool[flow.Identifier, *unittest.MockEntity], stateType StateIndex) []bool {
 	result := make([]bool, len(pool.poolEntities))
 	for node_index := pool.states[stateType].head; node_index != InvalidIndex; {
 		require.False(t, result[node_index], "A node is present two times in the same state list")

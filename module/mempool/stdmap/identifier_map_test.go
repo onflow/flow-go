@@ -13,17 +13,12 @@ import (
 )
 
 func TestIdentiferMap(t *testing.T) {
-	idMap, err := NewIdentifierMap(10)
-
-	t.Run("creating new mempool", func(t *testing.T) {
-		require.NoError(t, err)
-	})
+	idMap := NewIdentifierMap(10)
 
 	key1 := unittest.IdentifierFixture()
 	id1 := unittest.IdentifierFixture()
 	t.Run("appending id to new key", func(t *testing.T) {
-		err := idMap.Append(key1, id1)
-		require.NoError(t, err)
+		idMap.Append(key1, id1)
 
 		// checks the existence of id1 for key
 		ids, ok := idMap.Get(key1)
@@ -33,8 +28,7 @@ func TestIdentiferMap(t *testing.T) {
 
 	id2 := unittest.IdentifierFixture()
 	t.Run("appending the second id", func(t *testing.T) {
-		err := idMap.Append(key1, id2)
-		require.NoError(t, err)
+		idMap.Append(key1, id2)
 
 		// checks the existence of both id1 and id2 for key1
 		ids, ok := idMap.Get(key1)
@@ -47,8 +41,7 @@ func TestIdentiferMap(t *testing.T) {
 	// tests against existence of another key, with a shared id (id1)
 	key2 := unittest.IdentifierFixture()
 	t.Run("appending shared id to another key", func(t *testing.T) {
-		err := idMap.Append(key2, id1)
-		require.NoError(t, err)
+		idMap.Append(key2, id1)
 
 		// checks the existence of both id1 and id2 for key1
 		ids, ok := idMap.Get(key1)
@@ -109,21 +102,18 @@ func TestIdentiferMap(t *testing.T) {
 		require.True(t, ok)
 		assert.Contains(t, ids, id1)
 
-		err := idMap.Append(key2, id1)
-		require.NoError(t, err)
+		idMap.Append(key2, id1)
 	})
 
 	t.Run("removing id from a key test", func(t *testing.T) {
 		// creates key3 and adds id1 and id2 to it.
 		key3 := unittest.IdentifierFixture()
-		err := idMap.Append(key3, id1)
-		require.NoError(t, err)
-		err = idMap.Append(key3, id2)
-		require.NoError(t, err)
+		idMap.Append(key3, id1)
+		idMap.Append(key3, id2)
 
 		// removes id1 and id2 from key3
 		// removing id1
-		err = idMap.RemoveIdFromKey(key3, id1)
+		err := idMap.RemoveIdFromKey(key3, id1)
 		require.NoError(t, err)
 
 		// key3 should still reside on idMap and id2 should be attached to it
@@ -155,8 +145,7 @@ func TestIdentiferMap(t *testing.T) {
 // Running this test with `-race` flag detects and reports the existence of race condition if
 // it is the case.
 func TestRaceCondition(t *testing.T) {
-	idMap, err := NewIdentifierMap(10)
-	require.NoError(t, err)
+	idMap := NewIdentifierMap(10)
 
 	wg := sync.WaitGroup{}
 
@@ -166,7 +155,7 @@ func TestRaceCondition(t *testing.T) {
 
 	go func() {
 		defer wg.Done()
-		require.NoError(t, idMap.Append(key, id))
+		idMap.Append(key, id)
 	}()
 
 	go func() {
@@ -196,8 +185,7 @@ func TestCapacity(t *testing.T) {
 		limit = 20
 		swarm = 20
 	)
-	idMap, err := NewIdentifierMap(limit)
-	require.NoError(t, err)
+	idMap := NewIdentifierMap(limit)
 
 	wg := sync.WaitGroup{}
 	wg.Add(swarm)
@@ -207,8 +195,7 @@ func TestCapacity(t *testing.T) {
 			// adds an item on a separate goroutine
 			key := unittest.IdentifierFixture()
 			id := unittest.IdentifierFixture()
-			err := idMap.Append(key, id)
-			require.NoError(t, err)
+			idMap.Append(key, id)
 
 			// evaluates that the size remains in the permissible range
 			require.True(t, idMap.Size() <= uint(limit),

@@ -27,7 +27,9 @@ import (
 	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/state/protocol/events"
+	"github.com/onflow/flow-go/storage"
 	bstorage "github.com/onflow/flow-go/storage/badger"
+	"github.com/onflow/flow-go/storage/dbops"
 	"github.com/onflow/flow-go/utils/grpcutils"
 )
 
@@ -153,6 +155,8 @@ type BaseConfig struct {
 	DynamicStartupSleepInterval time.Duration
 	datadir                     string
 	pebbleDir                   string
+	pebbleCheckpointsDir        string
+	dbops                       string
 	badgerDB                    *badger.DB
 	pebbleDB                    *pebble.DB
 	secretsdir                  string
@@ -202,6 +206,7 @@ type NodeConfig struct {
 	Metrics           Metrics
 	DB                *badger.DB
 	PebbleDB          *pebble.DB
+	ProtocolDB        storage.DB
 	SecretsDB         *badger.DB
 	Storage           Storage
 	ProtocolEvents    *events.Distributor
@@ -275,6 +280,7 @@ func DefaultBaseConfig() *BaseConfig {
 		BootstrapDir:     "bootstrap",
 		datadir:          datadir,
 		pebbleDir:        pebbleDir,
+		dbops:            string(dbops.BadgerTransaction), // "badger-transaction" (default) or "batch-update"
 		badgerDB:         nil,
 		pebbleDB:         nil,
 		secretsdir:       NotSet,

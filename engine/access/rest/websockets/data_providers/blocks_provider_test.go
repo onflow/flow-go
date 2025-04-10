@@ -15,7 +15,8 @@ import (
 	commonmodels "github.com/onflow/flow-go/engine/access/rest/common/models"
 	mockcommonmodels "github.com/onflow/flow-go/engine/access/rest/common/models/mock"
 	"github.com/onflow/flow-go/engine/access/rest/common/parser"
-	"github.com/onflow/flow-go/engine/access/rest/websockets/models"
+	"github.com/onflow/flow-go/engine/access/rest/websockets/data_providers/models"
+	wsmodels "github.com/onflow/flow-go/engine/access/rest/websockets/models"
 	"github.com/onflow/flow-go/engine/access/state_stream"
 	statestreamsmock "github.com/onflow/flow-go/engine/access/state_stream/mock"
 	"github.com/onflow/flow-go/engine/access/subscription"
@@ -60,9 +61,9 @@ func (s *BlocksProviderSuite) SetupTest() {
 	for i := 0; i < blockCount; i++ {
 		block := unittest.BlockWithParentFixture(parent)
 		transaction := unittest.TransactionFixture()
-		col := flow.CollectionFromTransactions([]*flow.Transaction{&transaction})
-		guarantee := col.Guarantee()
-		block.SetPayload(unittest.PayloadFixture(unittest.WithGuarantees(&guarantee)))
+		col := unittest.CollectionFromTransactions([]*flow.Transaction{&transaction})
+		guarantee := &flow.CollectionGuarantee{CollectionID: col.ID()}
+		block.SetPayload(unittest.PayloadFixture(unittest.WithGuarantees(guarantee)))
 		// update for next iteration
 		parent = block.Header
 		s.blocks = append(s.blocks, block)
@@ -119,7 +120,7 @@ func (s *BlocksProviderSuite) validBlockArgumentsTestCases() []testType {
 	return []testType{
 		{
 			name: "happy path with start_block_id argument",
-			arguments: models.Arguments{
+			arguments: wsmodels.Arguments{
 				"start_block_id": s.rootBlock.ID().String(),
 				"block_status":   parser.Finalized,
 			},
@@ -135,7 +136,7 @@ func (s *BlocksProviderSuite) validBlockArgumentsTestCases() []testType {
 		},
 		{
 			name: "happy path with start_block_height argument",
-			arguments: models.Arguments{
+			arguments: wsmodels.Arguments{
 				"start_block_height": strconv.FormatUint(s.rootBlock.Header.Height, 10),
 				"block_status":       parser.Finalized,
 			},
@@ -151,7 +152,7 @@ func (s *BlocksProviderSuite) validBlockArgumentsTestCases() []testType {
 		},
 		{
 			name: "happy path without any start argument",
-			arguments: models.Arguments{
+			arguments: wsmodels.Arguments{
 				"block_status": parser.Finalized,
 			},
 			setupBackend: func(sub *statestreamsmock.Subscription) {
@@ -165,7 +166,7 @@ func (s *BlocksProviderSuite) validBlockArgumentsTestCases() []testType {
 		},
 		{
 			name: "happy path without any start argument",
-			arguments: models.Arguments{
+			arguments: wsmodels.Arguments{
 				"block_status": parser.Finalized,
 			},
 			setupBackend: func(sub *statestreamsmock.Subscription) {
@@ -213,19 +214,14 @@ func (s *BlocksProviderSuite) expectedBlockResponses(
 // TestBlocksDataProvider_InvalidArguments tests the behavior of the block data provider
 // when invalid arguments are provided. It verifies that appropriate errors are returned
 // for missing or conflicting arguments.
-// This test covers the test cases:
-// 1. Missing 'block_status' argument.
-// 2. Invalid 'block_status' argument.
-// 3. Providing both 'start_block_id' and 'start_block_height' simultaneously.
 func (s *BlocksProviderSuite) TestBlocksDataProvider_InvalidArguments() {
-	ctx := context.Background()
 	send := make(chan interface{})
 
 	for _, test := range s.invalidArgumentsTestCases() {
 		s.Run(test.name, func() {
-			provider, err := NewBlocksDataProvider(ctx, s.log, s.api, "dummy-id", nil, BlocksTopic, test.arguments, send)
-			s.Require().Nil(provider)
+			provider, err := NewBlocksDataProvider(context.Background(), s.log, s.api, "dummy-id", nil, BlocksTopic, test.arguments, send)
 			s.Require().Error(err)
+			s.Require().Nil(provider)
 			s.Require().Contains(err.Error(), test.expectedErrorMsg)
 		})
 	}
@@ -234,35 +230,39 @@ func (s *BlocksProviderSuite) TestBlocksDataProvider_InvalidArguments() {
 // invalidArgumentsTestCases returns a list of test cases with invalid argument combinations
 // for testing the behavior of block, block headers, block digests data providers. Each test case includes a name,
 // a set of input arguments, and the expected error message that should be returned.
-//
-// The test cases cover scenarios such as:
-// 1. Missing the required 'block_status' argument.
-// 2. Providing an unknown or invalid 'block_status' value.
-// 3. Supplying both 'start_block_id' and 'start_block_height' simultaneously, which is not allowed.
 func (s *BlocksProviderSuite) invalidArgumentsTestCases() []testErrType {
 	return []testErrType{
 		{
 			name: "missing 'block_status' argument",
-			arguments: models.Arguments{
+			arguments: wsmodels.Arguments{
 				"start_block_id": s.rootBlock.ID().String(),
 			},
-			expectedErrorMsg: "'block_status' must be provided",
+			expectedErrorMsg: "missing 'block_status' field",
 		},
 		{
 			name: "unknown 'block_status' argument",
-			arguments: models.Arguments{
+			arguments: wsmodels.Arguments{
 				"block_status": unknownBlockStatus,
 			},
 			expectedErrorMsg: fmt.Sprintf("invalid 'block_status', must be '%s' or '%s'", parser.Finalized, parser.Sealed),
 		},
 		{
 			name: "provide both 'start_block_id' and 'start_block_height' arguments",
-			arguments: models.Arguments{
+			arguments: wsmodels.Arguments{
 				"block_status":       parser.Finalized,
 				"start_block_id":     s.rootBlock.ID().String(),
 				"start_block_height": fmt.Sprintf("%d", s.rootBlock.Header.Height),
 			},
 			expectedErrorMsg: "can only provide either 'start_block_id' or 'start_block_height'",
+		},
+		{
+			name: "unexpected argument",
+			arguments: map[string]interface{}{
+				"block_status":        parser.Finalized,
+				"start_block_id":      unittest.BlockFixture().ID().String(),
+				"unexpected_argument": "dummy",
+			},
+			expectedErrorMsg: "unexpected field: 'unexpected_argument'",
 		},
 	}
 }

@@ -7,6 +7,7 @@ import (
 	"github.com/onflow/cadence"
 	"github.com/onflow/crypto"
 	"github.com/rs/zerolog"
+	"golang.org/x/exp/slices"
 
 	"github.com/onflow/flow-go/cmd/util/cmd/common"
 	"github.com/onflow/flow-go/fvm/systemcontracts"
@@ -20,7 +21,8 @@ import (
 
 // GenerateRecoverEpochTxArgs generates the required transaction arguments for the `recoverEpoch` transaction.
 // No errors are expected during normal operation.
-func GenerateRecoverEpochTxArgs(log zerolog.Logger,
+func GenerateRecoverEpochTxArgs(
+	log zerolog.Logger,
 	internalNodePrivInfoDir string,
 	nodeConfigJson string,
 	collectionClusters int,
@@ -67,7 +69,8 @@ func GenerateRecoverEpochTxArgs(log zerolog.Logger,
 
 // GenerateRecoverTxArgsWithDKG generates the required transaction arguments for the `recoverEpoch` transaction.
 // No errors are expected during normal operation.
-func GenerateRecoverTxArgsWithDKG(log zerolog.Logger,
+func GenerateRecoverTxArgsWithDKG(
+	log zerolog.Logger,
 	internalNodes []bootstrap.NodeInfo,
 	collectionClusters int,
 	recoveryEpochCounter uint64,
@@ -83,11 +86,11 @@ func GenerateRecoverTxArgsWithDKG(log zerolog.Logger,
 	includeNodeIDs flow.IdentifierList, // applied as set-union operation
 	snapshot *inmem.Snapshot,
 ) ([]cadence.Value, error) {
-	epoch := snapshot.Epochs().Current()
-	currentEpochCounter, err := epoch.Counter()
+	epoch, err := snapshot.Epochs().Current()
 	if err != nil {
-		return nil, fmt.Errorf("could not retrieve current epoch counter: %w", err)
+		return nil, fmt.Errorf("could not retrieve current epoch: %w", err)
 	}
+	currentEpochCounter := epoch.Counter()
 	if recoveryEpochCounter != currentEpochCounter+1 {
 		return nil, fmt.Errorf("invalid recovery epoch counter, expect %d", currentEpochCounter+1)
 	}
@@ -149,10 +152,19 @@ func GenerateRecoverTxArgsWithDKG(log zerolog.Logger,
 	internalNodesMap := make(map[flow.Identifier]struct{})
 	for _, node := range internalNodes {
 		if !eligibleEpochIdentities.Exists(node.Identity()) {
-			log.Warn().Msgf("node with ID %s is not part of the network according to the bootstrapping data; we might not get any data", node.NodeID)
+			log.Warn().Msgf("Internal node (role=%s id=%x addr=%s) found in internal directory but does not exist in most recent protocol state snapshot. This node will be excluded from recovery epoch.", node.Role, node.NodeID, node.Address)
+			continue
 		}
+		// only add nodes which exist in protocol state snapshot
 		internalNodesMap[node.NodeID] = struct{}{}
 	}
+	// Filter internalNodes so it only contains nodes which are valid for inclusion in the epoch
+	// This is a safety measure: just in case subsequent functions don't properly account for additional nodes,
+	// we proactively remove them from consideration here.
+	internalNodes = slices.DeleteFunc(slices.Clone(internalNodes), func(info model.NodeInfo) bool {
+		_, isCurrentEligibleEpochParticipant := internalNodesMap[info.NodeID]
+		return !isCurrentEligibleEpochParticipant
+	})
 
 	for _, collector := range collectors {
 		if _, ok := internalNodesMap[collector.NodeID]; ok {
@@ -162,7 +174,7 @@ func GenerateRecoverTxArgsWithDKG(log zerolog.Logger,
 		}
 	}
 
-	log.Info().Msg("computing collection node clusters")
+	log.Info().Msgf("partitioning %d partners + %d internal nodes into %d collector clusters", len(partnerCollectors), len(internalCollectors), collectionClusters)
 	assignments, clusters, err := common.ConstructClusterAssignment(log, partnerCollectors, internalCollectors, collectionClusters)
 	if err != nil {
 		return nil, fmt.Errorf("unable to generate cluster assignment: %w", err)
@@ -238,14 +250,9 @@ func GenerateRecoverTxArgsWithDKG(log zerolog.Logger,
 	if err != nil {
 		return nil, fmt.Errorf("failed to convert cluster qcs to cadence type")
 	}
-	currEpochFinalView, err := epoch.FinalView()
-	if err != nil {
-		return nil, fmt.Errorf("failed to get final view of current epoch")
-	}
-	currEpochTargetEndTime, err := epoch.TargetEndTime()
-	if err != nil {
-		return nil, fmt.Errorf("failed to get target end time of current epoch")
-	}
+
+	currEpochFinalView := epoch.FinalView()
+	currEpochTargetEndTime := epoch.TargetEndTime()
 
 	// STEP III: compile list of arguments for `recoverEpoch` governance transaction.
 	// ───────────────────────────────────────────────────────────────────────────────
@@ -299,10 +306,11 @@ func ConstructRootQCsForClusters(log zerolog.Logger, clusterList flow.ClusterLis
 	}
 
 	qcs := make([]*flow.QuorumCertificate, len(clusterBlocks))
-	for i, cluster := range clusterList {
-		signers := filterClusterSigners(cluster, nodeInfos)
+	for i, clusterMembers := range clusterList {
+		signers := filterClusterSigners(clusterMembers, nodeInfos)
+		log.Info().Msgf("producing QC for cluster (index: %d, size: %d) with %d internal signers", i, len(clusterMembers), len(signers))
 
-		qc, err := GenerateClusterRootQC(signers, cluster, clusterBlocks[i])
+		qc, err := GenerateClusterRootQC(signers, clusterMembers, clusterBlocks[i])
 		if err != nil {
 			log.Fatal().Err(err).Int("cluster index", i).Msg("generating collector cluster root QC failed")
 		}
