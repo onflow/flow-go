@@ -70,8 +70,8 @@ func TimeoutObjectFixture(opts ...func(TimeoutObject *hotstuff.TimeoutObject)) *
 }
 
 func WithTimeoutObjectSignerID(signerID flow.Identifier) func(*hotstuff.TimeoutObject) {
-	return func(TimeoutObject *hotstuff.TimeoutObject) {
-		TimeoutObject.SignerID = signerID
+	return func(timeout *hotstuff.TimeoutObject) {
+		timeout.SignerID = signerID
 	}
 }
 
@@ -88,7 +88,7 @@ func WithTimeoutLastViewTC(lastViewTC *flow.TimeoutCertificate) func(*hotstuff.T
 }
 
 func WithTimeoutObjectView(view uint64) func(*hotstuff.TimeoutObject) {
-	return func(TimeoutObject *hotstuff.TimeoutObject) {
-		TimeoutObject.View = view
+	return func(timeout *hotstuff.TimeoutObject) {
+		timeout.View = view
 	}
 }
