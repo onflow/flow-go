@@ -337,7 +337,7 @@ func (c *Core) processBlockProposal(proposal *cluster.BlockProposal) error {
 	}
 
 	// see if the block is a valid extension of the protocol state
-	err = c.state.Extend(proposal.Block)
+	err = c.state.Extend(proposal)
 	if err != nil {
 		if state.IsInvalidExtensionError(err) {
 			// if the block proposes an invalid extension of the cluster state, then the block is invalid

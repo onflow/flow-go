@@ -81,7 +81,7 @@ func SealBlock(t *testing.T, st protocol.ParticipantState, mutableProtocolState 
 		Results:         []*flow.ExecutionResult{&receipt.ExecutionResult},
 		ProtocolStateID: block.Payload.ProtocolStateID,
 	})
-	err := st.Extend(context.Background(), block2)
+	err := st.Extend(context.Background(), ProposalFromBlock(block2))
 	require.NoError(t, err)
 
 	block3 := BlockWithParentFixture(block2.Header)
@@ -94,7 +94,7 @@ func SealBlock(t *testing.T, st protocol.ParticipantState, mutableProtocolState 
 		Seals:           seals,
 		ProtocolStateID: updatedStateId,
 	})
-	err = st.Extend(context.Background(), block3)
+	err = st.Extend(context.Background(), ProposalFromBlock(block3))
 	require.NoError(t, err)
 
 	return block2, block3
@@ -102,7 +102,7 @@ func SealBlock(t *testing.T, st protocol.ParticipantState, mutableProtocolState 
 
 // InsertAndFinalize inserts, then finalizes, the input block.
 func InsertAndFinalize(t *testing.T, st protocol.ParticipantState, block *flow.Block) {
-	err := st.Extend(context.Background(), block)
+	err := st.Extend(context.Background(), ProposalFromBlock(block))
 	require.NoError(t, err)
 	err = st.Finalize(context.Background(), block.ID())
 	require.NoError(t, err)

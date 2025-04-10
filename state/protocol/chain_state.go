@@ -56,7 +56,7 @@ type FollowerState interface {
 	// Orphaned blocks are excepted.
 	//
 	// No errors are expected during normal operations.
-	ExtendCertified(ctx context.Context, candidate *flow.Block, qc *flow.QuorumCertificate) error
+	ExtendCertified(ctx context.Context, certified *flow.CertifiedBlock) error
 
 	// Finalize finalizes the block with the given hash.
 	// At this level, we can only finalize one block at a time. This implies
@@ -85,5 +85,5 @@ type ParticipantState interface {
 	// Expected errors during normal operations:
 	//  * state.OutdatedExtensionError if the candidate block is outdated (e.g. orphaned)
 	//  * state.InvalidExtensionError if the candidate block is invalid
-	Extend(ctx context.Context, candidate *flow.Block) error
+	Extend(ctx context.Context, candidate *flow.BlockProposal) error
 }

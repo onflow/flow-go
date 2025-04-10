@@ -397,7 +397,7 @@ func ExtendStateWithFinalizedBlocks(t *testing.T, completeExecutionReceipts Comp
 				continue
 			}
 
-			err := state.Extend(context.Background(), receipt.ReferenceBlock)
+			err := state.Extend(context.Background(), unittest.ProposalFromBlock(receipt.ReferenceBlock))
 			require.NoError(t, err, fmt.Errorf("can not extend block %v: %w", receipt.ReferenceBlock.ID(), err))
 			err = state.Finalize(context.Background(), refBlockID)
 			require.NoError(t, err)
@@ -412,7 +412,7 @@ func ExtendStateWithFinalizedBlocks(t *testing.T, completeExecutionReceipts Comp
 			// skips extending state with already duplicate container block
 			continue
 		}
-		err := state.Extend(context.Background(), completeER.ContainerBlock)
+		err := state.Extend(context.Background(), unittest.ProposalFromBlock(completeER.ContainerBlock))
 		require.NoError(t, err)
 		err = state.Finalize(context.Background(), containerBlockID)
 		require.NoError(t, err)

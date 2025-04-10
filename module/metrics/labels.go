@@ -50,6 +50,7 @@ const (
 const (
 	ResourceUndefined                                        = "undefined"
 	ResourceProposal                                         = "proposal"
+	ResourceProposalSignature                                = "proposal_signature"
 	ResourceHeader                                           = "header"
 	ResourceFinalizedHeight                                  = "finalized_height"
 	ResourceIndex                                            = "index"

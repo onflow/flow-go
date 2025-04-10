@@ -28,14 +28,14 @@ func ClusterBlockToLight(clusterBlock *cluster.Block) *ClusterLightBlock {
 func ReadClusterLightBlockByHeightRange(clusterBlocks storage.ClusterBlocks, startHeight uint64, endHeight uint64) ([]*ClusterLightBlock, error) {
 	blocks := make([]*ClusterLightBlock, 0)
 	for height := startHeight; height <= endHeight; height++ {
-		block, err := clusterBlocks.ByHeight(height)
+		block, err := clusterBlocks.ProposalByHeight(height)
 		if err != nil {
 			if errors.Is(err, storage.ErrNotFound) {
 				break
 			}
 			return nil, fmt.Errorf("could not get cluster block by height %v: %w", height, err)
 		}
-		light := ClusterBlockToLight(block)
+		light := ClusterBlockToLight(block.Block)
 		blocks = append(blocks, light)
 	}
 	return blocks, nil
