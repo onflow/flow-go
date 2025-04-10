@@ -403,7 +403,7 @@ func createNode(
 
 	state, err := bprotocol.Bootstrap(
 		metricsCollector,
-		db,
+		badgerimpl.ToDB(db),
 		headersDB,
 		sealsDB,
 		resultsDB,

@@ -238,7 +238,7 @@ func CompleteStateFixture(
 
 	state, err := badgerstate.Bootstrap(
 		metric,
-		db,
+		badgerimpl.ToDB(db),
 		s.Headers,
 		s.Seals,
 		s.Results,
