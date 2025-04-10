@@ -1,7 +1,6 @@
 package operation_test
 
 import (
-	"sync"
 	"testing"
 	"time"
 
@@ -67,9 +66,8 @@ func TestBlockHeightIndexLookup(t *testing.T) {
 		height := uint64(1337)
 		expected := flow.Identifier{0x01, 0x02, 0x03}
 
-		indexing := &sync.Mutex{}
 		err := db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
-			return operation.IndexBlockHeight(indexing, rw, height, expected)
+			return operation.IndexBlockHeight(rw, height, expected)
 		})
 		require.NoError(t, err)
 
