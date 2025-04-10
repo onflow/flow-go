@@ -217,7 +217,6 @@ func VerifySignatureFromTransaction(
 	message []byte,
 	pk crypto.PublicKey,
 	hashAlgo hash.HashingAlgorithm,
-	scheme AuthenticationScheme,
 	extensionData []byte,
 ) (bool, error) {
 
@@ -234,6 +233,15 @@ func VerifySignatureFromTransaction(
 		// This case only happens in production if there is a bug
 		return false, errors.NewUnknownFailure(fmt.Errorf(
 			hashAlgo.String(), "is not supported in transactions"))
+	}
+
+	// Default to PlAIN scheme if extension data is nil or empty
+	scheme := PLAIN
+	if len(extensionData) > 0 {
+		scheme = AuthenticationSchemeFromByte(extensionData[0])
+	}
+	if scheme == INVALID {
+		return false, errors.NewValueErrorf(fmt.Sprintf("%d", scheme), "authenticaion scheme type not found")
 	}
 
 	reconstructedMessage, err := reconstructMessage(scheme, extensionData, message)
@@ -275,7 +283,10 @@ func reconstructMessage(scheme AuthenticationScheme, extensionData []byte, messa
 		}
 		rlpEncodedWebAuthnData := extensionData[1:]
 		decodedWebAuthnData := WebAuthnExtensionData{}
-		rlp.DecodeBytes(rlpEncodedWebAuthnData, decodedWebAuthnData)
+		if err := rlp.DecodeBytes(rlpEncodedWebAuthnData, decodedWebAuthnData); err != nil {
+			return nil, errors.NewValueErrorf("could not decode webauthn extension data", "could not decode webauthn extension data")
+		}
+
 		clientData, err := decodedWebAuthnData.GetCollectedClientData()
 		if err != nil {
 			return nil, errors.NewValueErrorf("could not decode webauthn client data", "could not decode webauthn client data")

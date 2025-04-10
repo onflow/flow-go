@@ -71,6 +71,7 @@ func (entry *signatureContinuation) verify() errors.CodedError {
 		entry.message,
 		entry.accountKey.PublicKey,
 		entry.accountKey.HashAlgo,
+		entry.Info,
 	)
 	if err != nil {
 		entry.verifyErr = entry.newError(err)
@@ -86,7 +87,6 @@ func newSignatureEntries(
 	payloadMessage []byte,
 	envelopeSignatures []flow.TransactionSignature,
 	envelopeMessage []byte,
-	extensionData []byte,
 ) (
 	[]*signatureContinuation,
 	map[flow.Address]int,
