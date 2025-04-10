@@ -16,6 +16,8 @@ type Blocks struct {
 	payloads *Payloads
 }
 
+var _ storage.Blocks = (*Blocks)(nil)
+
 // NewBlocks ...
 func NewBlocks(db storage.DB, headers *Headers, payloads *Payloads) *Blocks {
 	b := &Blocks{
@@ -26,7 +28,7 @@ func NewBlocks(db storage.DB, headers *Headers, payloads *Payloads) *Blocks {
 	return b
 }
 
-func (b *Blocks) StoreTx(block *flow.Block) *func(*transaction.Tx) error {
+func (b *Blocks) StoreTx(block *flow.Block) func(*transaction.Tx) error {
 	panic("StoreTx is deprecated, use BatchStore instead")
 }
 
