@@ -250,7 +250,7 @@ func FullBlockFixture() flow.Block {
 
 func BlockFixtures(number int) []*flow.Block {
 	blocks := make([]*flow.Block, 0, number)
-	for ; number > 0; number-- {
+	for range number {
 		block := BlockFixture()
 		blocks = append(blocks, &block)
 	}
@@ -259,7 +259,7 @@ func BlockFixtures(number int) []*flow.Block {
 
 func ProposalFixtures(number int) []*flow.BlockProposal {
 	proposals := make([]*flow.BlockProposal, 0, number)
-	for ; number > 0; number-- {
+	for range number {
 		proposal := ProposalFixture()
 		proposals = append(proposals, proposal)
 	}

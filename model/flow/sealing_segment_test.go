@@ -585,7 +585,7 @@ func (suite *SealingSegmentSuite) TestAddExtraBlock() {
 	// populate sealing segment with one block
 	firstBlock := suite.FirstBlock()
 	firstBlock.Header.Height += 100
-	prop1 := unittest.ProposalFromBlock(firstBlock)
+	firstProposal := unittest.ProposalFromBlock(firstBlock)
 	suite.AddBlocks(firstBlock)
 
 	suite.T().Run("empty-segment", func(t *testing.T) {
@@ -603,7 +603,7 @@ func (suite *SealingSegmentSuite) TestAddExtraBlock() {
 	})
 	suite.T().Run("extra-block-not-continuous", func(t *testing.T) {
 		builder := flow.NewSealingSegmentBuilder(suite.GetResult, suite.GetSealByBlockID, suite.GetProtocolStateEntry)
-		err := builder.AddBlock(prop1)
+		err := builder.AddBlock(firstProposal)
 		require.NoError(t, err)
 		extraBlock := suite.BlockFixture()
 		extraBlock.Header.Height = firstBlock.Header.Height - 1 // make it connect
@@ -616,7 +616,7 @@ func (suite *SealingSegmentSuite) TestAddExtraBlock() {
 	})
 	suite.T().Run("root-segment-extra-blocks", func(t *testing.T) {
 		builder := flow.NewSealingSegmentBuilder(suite.GetResult, suite.GetSealByBlockID, suite.GetProtocolStateEntry)
-		err := builder.AddBlock(prop1)
+		err := builder.AddBlock(firstProposal)
 		require.NoError(t, err)
 
 		extraBlock := suite.BlockFixture()

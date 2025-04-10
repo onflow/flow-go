@@ -18,7 +18,7 @@ type Headers struct {
 	db          *badger.DB
 	cache       *Cache[flow.Identifier, *flow.Header]
 	heightCache *Cache[uint64, flow.Identifier]
-	sigs        *ProposalSignatures
+	sigs        *proposalSignatures
 }
 
 func NewHeaders(collector module.CacheMetrics, db *badger.DB) *Headers {
@@ -61,7 +61,7 @@ func NewHeaders(collector module.CacheMetrics, db *badger.DB) *Headers {
 			withStore(storeHeight),
 			withRetrieve(retrieveHeight)),
 
-		sigs: NewProposalSignatures(collector, db),
+		sigs: newProposalSignatures(collector, db),
 	}
 
 	return h

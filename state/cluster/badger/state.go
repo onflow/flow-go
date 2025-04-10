@@ -7,7 +7,7 @@ import (
 	"github.com/dgraph-io/badger/v2"
 
 	"github.com/onflow/flow-go/consensus/hotstuff"
-	cluster2 "github.com/onflow/flow-go/model/cluster"
+	clustermodel "github.com/onflow/flow-go/model/cluster"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/state/cluster"
@@ -41,7 +41,7 @@ func Bootstrap(db *badger.DB, stateRoot *StateRoot) (*State, error) {
 	err = operation.RetryOnConflict(state.db.Update, func(tx *badger.Txn) error {
 		chainID := genesis.Header.ChainID
 		// insert the block
-		err := procedure.InsertClusterBlock(&cluster2.BlockProposal{Block: genesis, ProposerSigData: nil})(tx)
+		err := procedure.InsertClusterBlock(&clustermodel.BlockProposal{Block: genesis, ProposerSigData: nil})(tx)
 		if err != nil {
 			return fmt.Errorf("could not insert genesis block: %w", err)
 		}

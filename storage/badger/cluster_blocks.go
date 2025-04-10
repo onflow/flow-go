@@ -29,17 +29,17 @@ func NewClusterBlocks(db *badger.DB, chainID flow.ChainID, headers *Headers, pay
 	return b
 }
 
-func (b *ClusterBlocks) Store(block *cluster.BlockProposal) error {
-	return operation.RetryOnConflictTx(b.db, transaction.Update, b.storeTx(block))
+func (b *ClusterBlocks) Store(proposal *cluster.BlockProposal) error {
+	return operation.RetryOnConflictTx(b.db, transaction.Update, b.storeTx(proposal))
 }
 
-func (b *ClusterBlocks) storeTx(block *cluster.BlockProposal) func(*transaction.Tx) error {
+func (b *ClusterBlocks) storeTx(proposal *cluster.BlockProposal) func(*transaction.Tx) error {
 	return func(tx *transaction.Tx) error {
-		err := b.headers.storeTx(block.Block.Header, block.ProposerSigData)(tx)
+		err := b.headers.storeTx(proposal.Block.Header, proposal.ProposerSigData)(tx)
 		if err != nil {
 			return fmt.Errorf("could not store header: %w", err)
 		}
-		err = b.payloads.storeTx(block.Block.ID(), block.Block.Payload)(tx)
+		err = b.payloads.storeTx(proposal.Block.ID(), proposal.Block.Payload)(tx)
 		if err != nil {
 			return fmt.Errorf("could not store payload: %w", err)
 		}

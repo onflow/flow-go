@@ -27,14 +27,14 @@ func NewBlocks(db *badger.DB, headers *Headers, payloads *Payloads) *Blocks {
 	return b
 }
 
-func (b *Blocks) StoreTx(block *flow.BlockProposal) func(*transaction.Tx) error {
+func (b *Blocks) StoreTx(proposal *flow.BlockProposal) func(*transaction.Tx) error {
 	return func(tx *transaction.Tx) error {
-		blockID := block.Block.ID()
-		err := b.headers.storeTx(block.Block.Header, block.ProposerSigData)(tx)
+		blockID := proposal.Block.ID()
+		err := b.headers.storeTx(proposal.Block.Header, proposal.ProposerSigData)(tx)
 		if err != nil {
 			return fmt.Errorf("could not store header %v: %w", blockID, err)
 		}
-		err = b.payloads.storeTx(blockID, block.Block.Payload)(tx)
+		err = b.payloads.storeTx(blockID, proposal.Block.Payload)(tx)
 		if err != nil {
 			return fmt.Errorf("could not store payload: %w", err)
 		}
@@ -86,8 +86,8 @@ func (b *Blocks) retrieveProposalTx(blockID flow.Identifier) func(*badger.Txn) (
 }
 
 // Store ...
-func (b *Blocks) Store(block *flow.BlockProposal) error {
-	return operation.RetryOnConflictTx(b.db, transaction.Update, b.StoreTx(block))
+func (b *Blocks) Store(proposal *flow.BlockProposal) error {
+	return operation.RetryOnConflictTx(b.db, transaction.Update, b.StoreTx(proposal))
 }
 
 // ByID ...

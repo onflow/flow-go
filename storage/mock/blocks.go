@@ -182,9 +182,9 @@ func (_m *Blocks) ProposalByID(blockID flow.Identifier) (*flow.BlockProposal, er
 	return r0, r1
 }
 
-// Store provides a mock function with given fields: block
-func (_m *Blocks) Store(block *flow.BlockProposal) error {
-	ret := _m.Called(block)
+// Store provides a mock function with given fields: proposal
+func (_m *Blocks) Store(proposal *flow.BlockProposal) error {
+	ret := _m.Called(proposal)
 
 	if len(ret) == 0 {
 		panic("no return value specified for Store")
@@ -192,7 +192,7 @@ func (_m *Blocks) Store(block *flow.BlockProposal) error {
 
 	var r0 error
 	if rf, ok := ret.Get(0).(func(*flow.BlockProposal) error); ok {
-		r0 = rf(block)
+		r0 = rf(proposal)
 	} else {
 		r0 = ret.Error(0)
 	}
@@ -200,9 +200,9 @@ func (_m *Blocks) Store(block *flow.BlockProposal) error {
 	return r0
 }
 
-// StoreTx provides a mock function with given fields: block
-func (_m *Blocks) StoreTx(block *flow.BlockProposal) func(*transaction.Tx) error {
-	ret := _m.Called(block)
+// StoreTx provides a mock function with given fields: proposal
+func (_m *Blocks) StoreTx(proposal *flow.BlockProposal) func(*transaction.Tx) error {
+	ret := _m.Called(proposal)
 
 	if len(ret) == 0 {
 		panic("no return value specified for StoreTx")
@@ -210,7 +210,7 @@ func (_m *Blocks) StoreTx(block *flow.BlockProposal) func(*transaction.Tx) error
 
 	var r0 func(*transaction.Tx) error
 	if rf, ok := ret.Get(0).(func(*flow.BlockProposal) func(*transaction.Tx) error); ok {
-		r0 = rf(block)
+		r0 = rf(proposal)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(func(*transaction.Tx) error)

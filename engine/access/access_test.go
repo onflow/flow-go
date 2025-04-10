@@ -381,14 +381,14 @@ func (suite *Suite) TestGetBlockByIDAndHeight() {
 
 		// test block1 get by ID
 		block1 := unittest.BlockFixture()
-		block1p := unittest.ProposalFromBlock(&block1)
+		proposal1 := unittest.ProposalFromBlock(&block1)
 		// test block2 get by height
 		block2 := unittest.BlockFixture()
 		block2.Header.Height = 2
-		block2p := unittest.ProposalFromBlock(&block2)
+		proposal2 := unittest.ProposalFromBlock(&block2)
 
-		require.NoError(suite.T(), all.Blocks.Store(block1p))
-		require.NoError(suite.T(), all.Blocks.Store(block2p))
+		require.NoError(suite.T(), all.Blocks.Store(proposal1))
+		require.NoError(suite.T(), all.Blocks.Store(proposal2))
 
 		// the follower logic should update height index on the block storage when a block is finalized
 		err := db.Update(operation.IndexBlockHeight(block2.Header.Height, block2.ID()))
@@ -1168,12 +1168,12 @@ func (suite *Suite) TestExecuteScript() {
 
 		// create another block as a predecessor of the block created earlier
 		prevBlock := unittest.BlockWithParentFixture(suite.finalizedBlock)
-		prevBlockp := unittest.ProposalFromBlock(prevBlock)
+		prevProposal := unittest.ProposalFromBlock(prevBlock)
 
 		// create a block and a seal pointing to that block
 		lastBlock := unittest.BlockWithParentFixture(prevBlock.Header)
-		lastBlockp := unittest.ProposalFromBlock(lastBlock)
-		err = all.Blocks.Store(lastBlockp)
+		lastProposal := unittest.ProposalFromBlock(lastBlock)
+		err = all.Blocks.Store(lastProposal)
 		require.NoError(suite.T(), err)
 		err = db.Update(operation.IndexBlockHeight(lastBlock.Header.Height, lastBlock.ID()))
 		require.NoError(suite.T(), err)
@@ -1187,7 +1187,7 @@ func (suite *Suite) TestExecuteScript() {
 			require.NoError(suite.T(), err)
 		}
 
-		err = all.Blocks.Store(prevBlockp)
+		err = all.Blocks.Store(prevProposal)
 		require.NoError(suite.T(), err)
 		err = db.Update(operation.IndexBlockHeight(prevBlock.Header.Height, prevBlock.ID()))
 		require.NoError(suite.T(), err)

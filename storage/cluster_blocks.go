@@ -8,7 +8,7 @@ import (
 type ClusterBlocks interface {
 
 	// Store stores the cluster block.
-	Store(block *cluster.BlockProposal) error
+	Store(proposal *cluster.BlockProposal) error
 
 	// ByID returns the block with the given ID.
 	ByID(blockID flow.Identifier) (*cluster.BlockProposal, error)
