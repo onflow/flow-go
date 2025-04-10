@@ -1,7 +1,9 @@
 package store
 
 import (
+	"errors"
 	"fmt"
+	"sync"
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
@@ -36,6 +38,8 @@ type ProtocolKVStore struct {
 	// `byBlockIdCache` will contain an entry for every block. We want to be able to cover a broad interval of views
 	// without cache misses, so a cache size of roughly 1000 entries is reasonable.
 	byBlockIdCache *Cache[flow.Identifier, flow.Identifier]
+	storing        *sync.Mutex
+	indexing       *sync.Mutex
 }
 
 var _ storage.ProtocolKVStore = (*ProtocolKVStore)(nil)
@@ -77,12 +81,14 @@ func NewProtocolKVStore(collector module.CacheMetrics,
 	}
 
 	return &ProtocolKVStore{
-		db: db,
-		cache: newCache[flow.Identifier, *flow.PSKeyValueStoreData](collector, metrics.ResourceProtocolKVStore,
+		db:       db,
+		storing:  new(sync.Mutex),
+		indexing: new(sync.Mutex),
+		cache: newCache(collector, metrics.ResourceProtocolKVStore,
 			withLimit[flow.Identifier, *flow.PSKeyValueStoreData](kvStoreCacheSize),
 			withStore(storeByStateID),
 			withRetrieve(retrieveByStateID)),
-		byBlockIdCache: newCache[flow.Identifier, flow.Identifier](collector, metrics.ResourceProtocolKVStoreByBlockID,
+		byBlockIdCache: newCache(collector, metrics.ResourceProtocolKVStoreByBlockID,
 			withLimit[flow.Identifier, flow.Identifier](kvStoreByBlockIDCacheSize),
 			withStore(storeByBlockID),
 			withRetrieve(retrieveByBlockID)),
@@ -98,6 +104,20 @@ func (s *ProtocolKVStore) StoreTx(stateID flow.Identifier, data *flow.PSKeyValue
 }
 
 func (s *ProtocolKVStore) BatchStore(rw storage.ReaderBatchWriter, stateID flow.Identifier, data *flow.PSKeyValueStoreData) error {
+	s.storing.Lock()
+	rw.AddCallback(func(error) {
+		s.storing.Unlock()
+	})
+
+	_, err := s.ByID(stateID)
+	if err == nil {
+		return fmt.Errorf("kv-store snapshot with id (%x) already exists: %w", stateID[:], storage.ErrAlreadyExists)
+	}
+
+	if !errors.Is(err, storage.ErrNotFound) {
+		return fmt.Errorf("could not check if kv-store snapshot with id (%x) exists: %w", stateID[:], err)
+	}
+
 	return s.db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 		return s.cache.PutTx(rw, stateID, data)
 	})
@@ -121,16 +141,29 @@ func (s *ProtocolKVStore) IndexTx(blockID flow.Identifier, stateID flow.Identifi
 }
 
 func (s *ProtocolKVStore) BatchIndex(rw storage.ReaderBatchWriter, blockID flow.Identifier, stateID flow.Identifier) error {
+	s.indexing.Lock()
+	rw.AddCallback(func(error) {
+		s.indexing.Unlock()
+	})
+
+	_, err := s.byBlockIdCache.Get(s.db.Reader(), blockID)
+	if err == nil {
+		return fmt.Errorf("kv-store snapshot with block id (%x) already exists: %w", blockID[:], storage.ErrAlreadyExists)
+	}
+	if !errors.Is(err, storage.ErrNotFound) {
+		return fmt.Errorf("could not check if kv-store snapshot with block id (%x) exists: %w", blockID[:], err)
+	}
+
 	return s.db.WithReaderBatchWriter(func(rw storage.ReaderBatchWriter) error {
 		return s.byBlockIdCache.PutTx(rw, blockID, stateID)
 	})
 }
 
-// ByID retrieves the KV store snapshot with the given ID.
+// ByID retrieves the KV store snapshot with the given state ID.
 // Expected errors during normal operations:
 //   - storage.ErrNotFound if no snapshot with the given Identifier is known.
-func (s *ProtocolKVStore) ByID(id flow.Identifier) (*flow.PSKeyValueStoreData, error) {
-	return s.cache.Get(s.db.Reader(), id)
+func (s *ProtocolKVStore) ByID(stateID flow.Identifier) (*flow.PSKeyValueStoreData, error) {
+	return s.cache.Get(s.db.Reader(), stateID)
 }
 
 // ByBlockID retrieves the kv-store snapshot that the block with the given ID proposes.
