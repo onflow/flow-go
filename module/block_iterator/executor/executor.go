@@ -44,6 +44,12 @@ func IterateExecuteAndCommitInBatch(
 	sleepAfterEachBatchCommit time.Duration,
 ) error {
 	batch := db.NewBatch()
+	defer func() {
+		// Close last batch.
+		// NOTE: batch variable is reused, so it refers to the last batch when defer is executed.
+		batch.Close()
+	}()
+
 	iteratedCountInCurrentBatch := uint(0)
 
 	startTime := time.Now()
@@ -109,6 +115,9 @@ func IterateExecuteAndCommitInBatch(
 				return nil
 			case <-time.After(sleepAfterEachBatchCommit):
 			}
+
+			// Close previous batch before creating a new batch.
+			batch.Close()
 
 			// create a new batch, and reset iteratedCountInCurrentBatch
 			batch = db.NewBatch()
