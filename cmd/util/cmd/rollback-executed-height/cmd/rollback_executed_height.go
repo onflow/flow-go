@@ -89,8 +89,10 @@ func run(*cobra.Command, []string) {
 	chunkDataPacksDB := pebbleimpl.ToDB(chunkDataPacksPebbleDB)
 	chunkDataPacks := store.NewChunkDataPacks(metrics, chunkDataPacksDB, collections, 1000)
 	chunkBatch := chunkDataPacksDB.NewBatch()
+	defer chunkBatch.Close()
 
 	writeBatch := db.NewBatch()
+	defer writeBatch.Close()
 
 	err = removeExecutionResultsFromHeight(
 		writeBatch,

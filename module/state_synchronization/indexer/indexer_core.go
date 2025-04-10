@@ -145,6 +145,7 @@ func (c *IndexerCore) IndexBlockData(data *execution_data.BlockExecutionDataEnti
 		}
 
 		batch := c.protocolDB.NewBatch()
+		defer batch.Close()
 
 		err := c.events.BatchStore(data.BlockID, []flow.EventsList{events}, batch)
 		if err != nil {

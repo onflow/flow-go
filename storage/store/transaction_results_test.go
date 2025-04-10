@@ -34,6 +34,8 @@ func TestBatchStoringTransactionResults(t *testing.T) {
 			txResults = append(txResults, expected)
 		}
 		writeBatch := db.NewBatch()
+		defer writeBatch.Close()
+
 		err := st.BatchStore(blockID, txResults, writeBatch)
 		require.NoError(t, err)
 
