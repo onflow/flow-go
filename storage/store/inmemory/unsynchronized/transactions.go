@@ -25,7 +25,8 @@ func NewTransactions() *Transactions {
 }
 
 // ByID returns the transaction for the given fingerprint.
-// Returns storage.ErrNotFound if transaction is not found.
+// Expected errors during normal operation:
+//   - `storage.ErrNotFound` if transaction is not found.
 func (t *Transactions) ByID(txID flow.Identifier) (*flow.TransactionBody, error) {
 	t.lock.RLock()
 	defer t.lock.RUnlock()
@@ -39,15 +40,13 @@ func (t *Transactions) ByID(txID flow.Identifier) (*flow.TransactionBody, error)
 }
 
 // Store inserts the transaction, keyed by fingerprint. Duplicate transaction insertion is ignored
-// Return no errors.
+// No errors are returned during normal operation.
 func (t *Transactions) Store(tx *flow.TransactionBody) error {
-	t.lock.RLock()
-	_, ok := t.store[tx.ID()]
-	t.lock.RUnlock()
+	t.lock.Lock()
+	defer t.lock.Unlock()
 
+	_, ok := t.store[tx.ID()]
 	if !ok {
-		t.lock.Lock()
-		defer t.lock.Unlock()
 		t.store[tx.ID()] = tx
 	}
 
