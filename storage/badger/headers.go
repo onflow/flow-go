@@ -113,8 +113,8 @@ func (h *Headers) retrieveIdByHeightTx(height uint64) func(*badger.Txn) (flow.Id
 	}
 }
 
-func (h *Headers) Store(headerProposal *flow.Proposal) error {
-	return operation.RetryOnConflictTx(h.db, transaction.Update, h.storeTx(headerProposal.Header, headerProposal.ProposerSigData))
+func (h *Headers) Store(proposal *flow.Proposal) error {
+	return operation.RetryOnConflictTx(h.db, transaction.Update, h.storeTx(proposal.Header, proposal.ProposerSigData))
 }
 
 func (h *Headers) ByBlockID(blockID flow.Identifier) (*flow.Header, error) {

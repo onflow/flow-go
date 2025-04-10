@@ -47,7 +47,7 @@ func (b *ClusterBlocks) storeTx(proposal *cluster.BlockProposal) func(*transacti
 	}
 }
 
-func (b *ClusterBlocks) ByID(blockID flow.Identifier) (*cluster.BlockProposal, error) {
+func (b *ClusterBlocks) ProposalByID(blockID flow.Identifier) (*cluster.BlockProposal, error) {
 	header, err := b.headers.ByBlockID(blockID)
 	if err != nil {
 		return nil, fmt.Errorf("could not get header: %w", err)
@@ -70,11 +70,11 @@ func (b *ClusterBlocks) ByID(blockID flow.Identifier) (*cluster.BlockProposal, e
 	return proposal, nil
 }
 
-func (b *ClusterBlocks) ByHeight(height uint64) (*cluster.BlockProposal, error) {
+func (b *ClusterBlocks) ProposalByHeight(height uint64) (*cluster.BlockProposal, error) {
 	var blockID flow.Identifier
 	err := b.db.View(operation.LookupClusterBlockHeight(b.chainID, height, &blockID))
 	if err != nil {
 		return nil, fmt.Errorf("could not look up block: %w", err)
 	}
-	return b.ByID(blockID)
+	return b.ProposalByID(blockID)
 }

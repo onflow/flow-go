@@ -236,7 +236,7 @@ func (r *RequestHandlerEngine) onRangeRequest(originID flow.Identifier, req *mes
 	// get all of the blocks, one by one
 	blocks := make([]messages.ClusterBlockProposal, 0, req.ToHeight-req.FromHeight+1)
 	for height := req.FromHeight; height <= req.ToHeight; height++ {
-		block, err := r.blocks.ByHeight(height)
+		block, err := r.blocks.ProposalByHeight(height)
 		if errors.Is(err, storage.ErrNotFound) {
 			r.log.Error().Uint64("height", height).Msg("skipping unknown heights")
 			break
@@ -305,7 +305,7 @@ func (r *RequestHandlerEngine) onBatchRequest(originID flow.Identifier, req *mes
 	// try to get all the blocks by ID
 	blocks := make([]messages.ClusterBlockProposal, 0, len(blockIDs))
 	for blockID := range blockIDs {
-		block, err := r.blocks.ByID(blockID)
+		block, err := r.blocks.ProposalByID(blockID)
 		if errors.Is(err, storage.ErrNotFound) {
 			r.log.Debug().Hex("block_id", blockID[:]).Msg("skipping unknown block")
 			continue

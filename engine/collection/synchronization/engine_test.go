@@ -124,7 +124,7 @@ func (ss *SyncSuite) SetupTest() {
 
 	// set up blocks storage mock
 	ss.blocks = &storage.ClusterBlocks{}
-	ss.blocks.On("ByHeight", mock.Anything).Return(
+	ss.blocks.On("ProposalByHeight", mock.Anything).Return(
 		func(height uint64) (*clustermodel.BlockProposal, error) {
 			block, enabled := ss.heights[height]
 			if !enabled {
@@ -132,7 +132,7 @@ func (ss *SyncSuite) SetupTest() {
 			}
 			return block, nil
 		})
-	ss.blocks.On("ByID", mock.Anything).Return(
+	ss.blocks.On("ProposalByID", mock.Anything).Return(
 		func(blockID flow.Identifier) (*clustermodel.BlockProposal, error) {
 			block, enabled := ss.blockIDs[blockID]
 			if !enabled {

@@ -14,12 +14,12 @@ type ClusterBlocks struct {
 	mock.Mock
 }
 
-// ByHeight provides a mock function with given fields: height
-func (_m *ClusterBlocks) ByHeight(height uint64) (*cluster.BlockProposal, error) {
+// ProposalByHeight provides a mock function with given fields: height
+func (_m *ClusterBlocks) ProposalByHeight(height uint64) (*cluster.BlockProposal, error) {
 	ret := _m.Called(height)
 
 	if len(ret) == 0 {
-		panic("no return value specified for ByHeight")
+		panic("no return value specified for ProposalByHeight")
 	}
 
 	var r0 *cluster.BlockProposal
@@ -44,12 +44,12 @@ func (_m *ClusterBlocks) ByHeight(height uint64) (*cluster.BlockProposal, error)
 	return r0, r1
 }
 
-// ByID provides a mock function with given fields: blockID
-func (_m *ClusterBlocks) ByID(blockID flow.Identifier) (*cluster.BlockProposal, error) {
+// ProposalByID provides a mock function with given fields: blockID
+func (_m *ClusterBlocks) ProposalByID(blockID flow.Identifier) (*cluster.BlockProposal, error) {
 	ret := _m.Called(blockID)
 
 	if len(ret) == 0 {
-		panic("no return value specified for ByID")
+		panic("no return value specified for ProposalByID")
 	}
 
 	var r0 *cluster.BlockProposal

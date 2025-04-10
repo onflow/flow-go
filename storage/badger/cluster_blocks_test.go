@@ -42,7 +42,7 @@ func TestClusterBlocksByHeight(t *testing.T) {
 
 		// check if the block can be retrieved by height
 		for _, block := range blocks {
-			retrievedBlock, err := clusterBlocks.ByHeight(block.Header.Height)
+			retrievedBlock, err := clusterBlocks.ProposalByHeight(block.Header.Height)
 			require.NoError(t, err)
 			require.Equal(t, block.ID(), retrievedBlock.Block.ID())
 		}

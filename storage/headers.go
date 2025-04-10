@@ -8,7 +8,7 @@ import (
 type Headers interface {
 
 	// Store will store a header.
-	Store(header *flow.Proposal) error
+	Store(proposal *flow.Proposal) error
 
 	// ByBlockID returns the header with the given ID. It is available for finalized and ambiguous blocks.
 	// Error returns:

@@ -190,9 +190,9 @@ func (_m *Headers) ProposalByBlockID(blockID flow.Identifier) (*flow.Proposal, e
 	return r0, r1
 }
 
-// Store provides a mock function with given fields: header
-func (_m *Headers) Store(header *flow.Proposal) error {
-	ret := _m.Called(header)
+// Store provides a mock function with given fields: proposal
+func (_m *Headers) Store(proposal *flow.Proposal) error {
+	ret := _m.Called(proposal)
 
 	if len(ret) == 0 {
 		panic("no return value specified for Store")
@@ -200,7 +200,7 @@ func (_m *Headers) Store(header *flow.Proposal) error {
 
 	var r0 error
 	if rf, ok := ret.Get(0).(func(*flow.Proposal) error); ok {
-		r0 = rf(header)
+		r0 = rf(proposal)
 	} else {
 		r0 = ret.Error(0)
 	}
